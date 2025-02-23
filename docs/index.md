@@ -8,7 +8,7 @@ title: 主页
     * [热身](#warmup)
     * [线性回归](#linear_regression)
 * [__感知__](#perception)  
-    *   [检测](#detection)  [warmup.md](warmup.md)
+    *   [检测](#detection)
     *   [跟踪](#tracking)  
 * [__规划__](#planning)
     *   [导航](#navigation)
