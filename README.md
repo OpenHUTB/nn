@@ -22,7 +22,7 @@ mkdocs serve
 
 ## 贡献指南
 准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
-代码的优化包括：注释、PEP 8 风格调整、应用到Carla模拟器中、撰写对应文档等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
+代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/en/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
 
 
 ## 参考
