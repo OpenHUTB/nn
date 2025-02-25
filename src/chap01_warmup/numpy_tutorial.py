@@ -8,8 +8,7 @@
 # ### numpy 的array操作
 
 # #### 1.导入numpy库
-
-
+import numpy
 
 
 
