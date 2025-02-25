@@ -20,6 +20,11 @@ mkdocs serve
 ```
 然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
 
+## 贡献指南
+准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
+代码的优化包括：注释、PEP 8 风格调整、应用到Carla模拟器中、撰写对应文档等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
+
+
 ## 参考
 
 * [代理模拟器文档](https://openhutb.github.io/carla_doc/)
