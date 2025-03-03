@@ -141,6 +141,13 @@ dot_product = np.dot(x, y)
 print("使用*运算符的结果（元素级乘法）:\n", elementwise_multiplication)
 print("使用np.multiply函数的结果（元素级乘法）:\n", multiplication_using_function)
 print("使用np.dot函数的结果（矩阵乘法）:\n", dot_product)
+#换个不是方阵的
+x = np.array([[1, 2, 6], [3, 4, 5]], dtype=np.float64)
+y = np.array([[5, 6], [7, 8], [9, 10]], dtype=np.float64)
+print(x*y)
+print(np.multiply(x, y))
+print(np.dot(x,y))
+#发现只有np.dot(x,y)可以输出
 
 # #### 16. 利用13题目中的x,y,输出 x / y .(提示 ： 使用函数 np.divide())
 
@@ -175,7 +182,7 @@ print("使用np.dot(x, y)的结果：\n",np.dot(x,y))
 print("(1) x中所有元素的总和:\n", np.sum(x))
 print("(2) 沿着axis=0（列方向）的总和:\n", np.sum(x,axis=0))
 print("(3) 沿着axis=1（行方向）的总和:\n", np.sum(x,axis=1))
-
+#axis = 0代表列方向，axis = 1代表行方向
 
 
 
