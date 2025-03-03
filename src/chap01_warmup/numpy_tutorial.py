@@ -33,7 +33,6 @@ print(b[0,0])
 print(b[0,1])
 print(b[1,1])
 
-
 # #### 4.  (1)建立一个全0矩阵 a, 大小为 3x3; 类型为整型（提示: dtype = int）(2)建立一个全1矩阵b,大小为4x5;  (3)建立一个单位矩阵c ,大小为4x4; (4)生成一个随机数矩阵d,大小为 3x2.
 
 # In[ ]:
@@ -45,6 +44,7 @@ c = np.eye(4)
 print(c)
 d = np.random.randint(low=0, high=10, size=(3, 2))
 print(d)
+
 
 
 # #### 5. 建立一个数组 a,(值为[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1)打印a; (2)输出  下标为(2,3),(0,0) 这两个数组元素的值
@@ -112,7 +112,6 @@ x = np.array([1.0, 2.0])
 print(x.dtype)
 
 
-
 # #### 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出 x+y ,和 np.add(x,y)
 
 # In[ ]:
@@ -165,9 +164,12 @@ print(np.dot(x,y))
 # ##### 19.利用13题目中的 x,进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
 
 # In[ ]:
-print(np.sum(x))
-print(np.sum(x,axis = 0))
-print(np.sum(x,axis = 1))
+
+print("(1) x中所有元素的总和:\n", np.sum(x))
+print("(2) 沿着axis=0（列方向）的总和:\n", np.sum(x,axis=0))
+print("(3) 沿着axis=1（行方向）的总和:\n", np.sum(x,axis=1))
+#axis = 0代表列方向，axis = 1代表行方向
+
 
 
 # #### 20.利用13题目中的 x,进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
@@ -218,16 +220,25 @@ plt.show()
 # #### 25.画图。画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() np.cos() 函数和 matplotlib.pyplot 库)
 
 # In[ ]:
+# 生成 x 值，从 0 到 3π，步长为 0.1
 x = np.arange(0, 3 * np.pi, 0.1)
+# 计算对应的正弦值和余弦值
 y_sin = np.sin(x)
 y_cos = np.cos(x)
+# 创建一个新的图形
 plt.figure()
-plt.plot(x, y_sin, label='sin(x)')
-plt.plot(x, y_cos, label='cos(x)')
+# 绘制正弦曲线
+plt.plot(x, y_sin, label='sin(x)', color='blue')
+# 绘制余弦曲线
+plt.plot(x, y_cos, label='cos(x)', color='red')
+# 添加标题和标签
 plt.title('Sine and Cosine Functions')
 plt.xlabel('x')
 plt.ylabel('y')
+# 显示图例
 plt.legend()
+# 显示网格
 plt.grid(True)
+# 显示图形
 plt.show()
 
