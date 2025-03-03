@@ -243,34 +243,17 @@ plt.show()
 # #### 25.画图。画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() np.cos() 函数和 matplotlib.pyplot 库)
 
 # In[ ]:
-# 生成 x 值，从 0 到 3π，步长为 0.1
 x = np.arange(0, 3 * np.pi, 0.1)
-
-# 计算对应的正弦值和余弦值
 y_sin = np.sin(x)
 y_cos = np.cos(x)
-
-# 创建一个新的图形
 plt.figure()
-
-# 绘制正弦曲线
 plt.plot(x, y_sin, label='sin(x)')
-
-# 绘制余弦曲线
 plt.plot(x, y_cos, label='cos(x)')
-
-# 添加标题和标签
 plt.title('Sine and Cosine Functions')
 plt.xlabel('x')
 plt.ylabel('y')
-
-# 显示图例
 plt.legend()
-
-# 显示网格
 plt.grid(True)
-
-# 显示图形
 plt.show()
 
 
