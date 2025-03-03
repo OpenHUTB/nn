@@ -111,7 +111,6 @@ x = np.array([1.0, 2.0])
 print("x的数据类型：",x.dtype)
 
 
-
 # #### 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出 x+y ,和 np.add(x,y)
 
 # In[ ]:
