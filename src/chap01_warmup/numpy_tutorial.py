@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# #                                           numpy 练习题
+# #                                       numpy 练习题
 
 #  
 
