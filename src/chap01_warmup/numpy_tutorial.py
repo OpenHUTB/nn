@@ -6,12 +6,10 @@
 #  
 
 # ### numpy 的array操作
-
 # #### 1.导入numpy库
 #24.导入matplotlib.pyplot库
-import numpy as np
 import matplotlib
-
+import numpy as np
 matplotlib.use('TkAgg')  # 关键代码,临时指定matplotlib后端代码
 import matplotlib.pyplot as plt
 
@@ -56,10 +54,18 @@ a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
 c = a[-2:, :]
 print("\n输出 c:\n", c)
 print("c 中第一行的最后一个元素:", c[0, -1])
+# In[ ]:
+b=np.array([[4,5,6],[1,2,3]])
+print("维度：",b.shape)
+print("b(0,0):",b[0,0])
+print("b(0,1):",b[0,1])
+print("b(1,1):",b[1,1])
+
 
 # #### 8.建立数组a,初始化a为[[1, 2], [3, 4], [5, 6]]，输出 （0,0）（1,1）（2,0）这三个元素（提示： 使用 print(a[[0, 1, 2], [0, 1, 0]]) ）
 a = np.array([[1, 2], [3, 4], [5, 6]])
 print("\n", a[[0, 1, 2], [0, 1, 0]])
+
 
 # #### 9.建立矩阵a ,初始化为[[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]，输出(0,0),(1,2),(2,0),(3,1) (提示使用 b = np.array([0,
 # 2, 0, 1])    print(a[np.arange(4), b]))
@@ -77,6 +83,7 @@ print(a)
 # ### array 的数学运算
 
 # #### 11.  执行 x = np.array([1, 2])，然后输出 x 的数据类型
+
 print("\n")
 x = np.array([1, 2])
 print("输出x 的数据类型:", x.dtype)
@@ -85,6 +92,7 @@ print("输出x 的数据类型:", x.dtype)
 print("\n")
 x = np.array([1.0, 2.0])
 print("输出x 的数据类型:", x.dtype)
+
 
 # #### 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出
 # x+y ,和 np.add(x,y)
@@ -166,6 +174,7 @@ print(np.argmax(x, axis=1))
 print("\n")
 plt.rcParams['figure.dpi'] = 300
 
+
 # 生成 x 值
 x = np.arange(0, 100, 0.1)
 # 计算对应的 y 值
@@ -192,6 +201,7 @@ plt.show()
 # #### 25.画图。画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() np.cos() 函数和 matplotlib.pyplot 库)
 print("\n")
 plt.rcParams['figure.dpi'] = 300
+
 
 #生成x值
 x = np.arange(0, 3 * np.pi, 0.1)
