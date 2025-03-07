@@ -210,10 +210,8 @@ plt.plot(x, y2, label='$y = np.cos(x)$', color='green')
 plt.title('$y1 = np.sin(x)$, $y2 = np.cos(x)$')
 plt.xlabel('x')
 plt.ylabel('y')
-
 #显示图例
 plt.legend()
-
 #显示网格线
 plt.grid(True)
 
