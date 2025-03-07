@@ -13,6 +13,7 @@ import numpy as np
 matplotlib.use('TkAgg')  # 关键代码,临时指定matplotlib后端代码
 import matplotlib.pyplot as plt
 
+
 # #### 2.建立一个一维数组 a 初始化为[4,5,6], (1)输出a 的类型（type）(2)输出a的各维度的大小（shape）(3)输出 a的第一个元素（值为4）
 a = np.array([4, 5, 6])
 print("a 的类型:", type(a))
