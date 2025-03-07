@@ -78,6 +78,20 @@ def main(x_train, y_train):
     
     #==========
     #todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
+    #最小二乘法
+    #通过 np.linalg.pinv(phi) 计算伪逆矩阵来求解 w
+    w = np.dot(np.linalg.pinv(phi), y_train)
+
+    #梯度下降（使用时取消注释）
+    # learning_rate=0.01,
+    # epochs=1000
+    # w = np.zeros(phi.shape[1])
+        
+    # for epoch in range(epochs):
+    #     y_pred = np.dot(phi, w)
+    #     error = y_pred - y_train
+    #     gradient = np.dot(phi.T, error) / len(y_train)
+    #     w -= learning_rate * gradient
     #==========
     
     def f(x):
