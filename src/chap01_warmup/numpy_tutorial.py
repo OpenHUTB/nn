@@ -234,9 +234,12 @@ y=x*x
 plt.figure()
 ax=plt.subplot()
 ax.plot(x,y)
+ax.plot(x, y, color='#FF4500', linewidth=2.5, linestyle='--', alpha=0.8)  
+ax.grid(True, which='both', linestyle=':', linewidth=0.5)  
 ax.set_title('Plot of y = x^2')
 ax.set_xlabel('x')
 ax.set_ylabel('y')
+plt.tight_layout()  
 plt.show()
 # #### 25.画图。画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() np.cos() 函数和 matplotlib.pyplot 库)
 
