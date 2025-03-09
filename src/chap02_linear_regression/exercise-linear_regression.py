@@ -48,7 +48,9 @@ def gaussian_basis(x, feature_num=10):
     #==========
     #todo '''请实现高斯基函数'''
     #==========
-    ret = None
+    centers = np.linspace(0, 25, feature_num)  # 在0-25之间均匀分布的中心
+    width = centers[1] - centers[0]  # 高斯函数的宽度
+    ret = np.exp(-0.5 * np.power((x[:, np.newaxis] - centers) / width, 2))
     return ret
 
 
@@ -70,7 +72,7 @@ def main(x_train, y_train):
     训练模型，并返回从x到y的映射。
     
     """
-    basis_func = identity_basis
+    basis_func = gaussian_basis
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1)
@@ -138,14 +140,12 @@ if __name__ == '__main__':
     std = evaluate(y_test, y_test_pred)
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
-    #显示结果
-    plt.plot(x_train, y_train, 'ro', markersize=3)
-#     plt.plot(x_test, y_test, 'k')
-    plt.plot(x_test, y_test_pred, 'k')
+    plt.plot(x_train, y_train, 'ro', markersize=3, label='Training data')
+    plt.plot(x_test, y_test_pred, 'b-', label='Predicted value')
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.title('Linear Regression')
-    plt.legend(['train', 'test', 'pred'])
+    plt.title('gaussian_basis')
+    plt.legend()
     plt.show()
 
 
