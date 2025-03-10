@@ -134,7 +134,7 @@ print("np.dot(x,y)\n", np.dot(x, y))
 # ##### 19.利用13题目中的 x,进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
 print("第十九题：\n")
 
-print("print(np.sum(x)):", print(np.sum(x)))
+print("print(np.sum(x)):", np.sum(x))
 print("print(np.sum(x, axis=0))", np.sum(x, axis=0))
 print("print(np.sum(x, axis=1))", np.sum(x, axis=1))
 
