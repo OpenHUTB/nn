@@ -150,9 +150,12 @@ print("第二十一题：\n")
 print("转置后的结果:\n", x.T)
 
 # 22.利用13题目中的x,求e的指数（提示： 函数 np.exp()）
-print("第二十二题：\n")
+print("第二十二题：计算 e^x")
 
-print(np.exp(x))
+# 题目 13 的 x 需要事先定义，这里假设 x 已经存在
+# x = np.array([...])  # 请在运行前确保 x 已定义
+
+print(np.exp(x))  # 计算 e 的指数
 
 # 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
@@ -164,45 +167,41 @@ print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))
 print("第二十四题：\n")
 
 x = np.arange(0, 100, 0.1)
-y = x * x
+y = x**2  # 计算 y = x^2
 
-plt.figure(figsize=(10, 6))  # 设置图像大小
-plt.plot(x, y, label="y = x^2", color="blue")  # 绘制曲线
+plt.figure(figsize=(10, 6))  # 设置画布大小
+plt.plot(x, y, label="y = x^2", color="blue")  # 画曲线
+plt.title("函数 y = x^2")  # 设置标题
+plt.xlabel("x 轴")  # x 轴标签
+plt.ylabel("y 轴")  # y 轴标签
+plt.grid(True)  # 显示网格
+plt.legend()  # 显示图例
+plt.show()  # 显示图像
 
-# 添加标题和标签
-plt.title("Plot of y = x^2")  # 图像标题
-plt.xlabel("x")  # x 轴标签
-plt.ylabel("y")  # y 轴标签
-
-# 添加网格
-plt.grid(True)
-
-# 显示图例
-plt.legend()
-
-plt.show()
 
 # 25.画图。画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() np.cos() 函数和 matplotlib.pyplot 库)
-print("第二十五题：\n")
+print("\n第二十五题：绘制正弦函数和余弦函数")
 
-x = np.arange(0, 3 * np.pi, 0.1)
-y_sin = np.sin(x)
-y_cos = np.cos(x)
+x = np.arange(0, 3 * np.pi, 0.1)  # 生成 x 值
+y_sin = np.sin(x)  # 计算正弦值
+y_cos = np.cos(x)  # 计算余弦值
 
-plt.figure(figsize=(10, 6))  # 设置图像大小
-plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制曲线
-plt.title("Plot of y = sin(x)")  # 图像标题
-plt.xlabel("x")  # x 轴标签
-plt.ylabel("y")  # y 轴标签
+# 绘制正弦曲线
+plt.figure(figsize=(10, 6))
+plt.plot(x, y_sin, label="y = sin(x)", color="blue")
+plt.title("正弦函数 y = sin(x)")
+plt.xlabel("x 轴")
+plt.ylabel("y 轴")
 plt.grid(True)
 plt.legend()
 plt.show()
 
-plt.figure(figsize=(10, 6))  # 设置图像大小
-plt.plot(x, y_cos, label="y = cos(x)", color="blue")  # 绘制曲线
-plt.title("Plot of y = cos(x)")  # 图像标题
-plt.xlabel("x")  # x 轴标签
-plt.ylabel("y")  # y 轴标签
+# 绘制余弦曲线
+plt.figure(figsize=(10, 6))
+plt.plot(x, y_cos, label="y = cos(x)", color="red")
+plt.title("余弦函数 y = cos(x)")
+plt.xlabel("x 轴")
+plt.ylabel("y 轴")
 plt.grid(True)
 plt.legend()
 plt.show()
