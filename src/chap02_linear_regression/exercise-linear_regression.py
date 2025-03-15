@@ -40,7 +40,7 @@ def multinomial_basis(x, feature_num=10):
     #==========
     #todo '''请实现多项式基函数'''
     #==========
-    ret = None
+    ret = np.hstack([x ** i for i in range(feature_num)])
     return ret
 
 def gaussian_basis(x, feature_num=10):
@@ -48,7 +48,10 @@ def gaussian_basis(x, feature_num=10):
     #==========
     #todo '''请实现高斯基函数'''
     #==========
-    ret = None
+    centers = np.linspace(0, 25, feature_num)
+    width = 1.0
+    x = np.expend_dims(x, axis = 1)
+    ret = np.hstack([np.exp(-(x - c) ** 2 / (2 * width ** 2)) for c in centers])
     return ret
 
 
@@ -83,15 +86,15 @@ def main(x_train, y_train):
     w = np.dot(np.linalg.pinv(phi), y_train)
 
     #梯度下降（使用时取消注释）
-    # learning_rate=0.01,
-    # epochs=1000
-    # w = np.zeros(phi.shape[1])
+    learning_rate=0.01,
+    epochs=1000
+    w = np.zeros(phi.shape[1])
         
-    # for epoch in range(epochs):
-    #     y_pred = np.dot(phi, w)
-    #     error = y_pred - y_train
-    #     gradient = np.dot(phi.T, error) / len(y_train)
-    #     w -= learning_rate * gradient
+    for epoch in range(epochs):
+       y_pred = np.dot(phi, w)
+       error = y_pred - y_train
+       gradient = np.dot(phi.T, error) / len(y_train)
+       w -= learning_rate * gradient
     #==========
     
     def f(x):
