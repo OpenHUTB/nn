@@ -64,6 +64,7 @@ def main(x_train, y_train):
         w_gd -= learning_rate * gradient
     w = w_gd
 
+
     def f(x):
         phi0 = np.expand_dims(np.ones_like(x), axis = 1)
         phi1 = basis_func(x)
