@@ -47,6 +47,7 @@ def multinomial_basis(x, feature_num=10):
     return ret
 
 
+
 def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
     # ==========

@@ -87,6 +87,7 @@ def predict(model, xs):
     return y_preds.numpy()
 
 
+
 def evaluate(ys, ys_pred):
     """评估模型。"""
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
