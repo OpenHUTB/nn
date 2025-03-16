@@ -94,6 +94,7 @@ def evaluate(ys, ys_pred):
     return std
 
 
+
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
     if i % 100 == 1:
