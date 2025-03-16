@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding: utf-8
 
-# #                                           numpy 练习题
+# numpy 练习题
 
-#  
+# numpy 的array操作
 
 # ### numpy 的array操作
 
@@ -71,6 +71,7 @@ a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
 b = np.array([0, 2, 0, 1])
 print("\n")
 a[np.arange(4), b] += 10
+
 print(a)
 
 # #### 11.  执行 x = np.array([1, 2])，然后输出 x 的数据类型
@@ -111,7 +112,7 @@ x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
 y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
 print(x / y)
 print(np.divide(x, y))
-
+print("输出:", type(x))
 
 # #### 17. 利用13题目中的x,输出 x的 开方。(提示： 使用函数 np.sqrt() )
 print("\n")
@@ -179,8 +180,10 @@ plt.title('Graph of $y = x^2$')
 plt.xlabel('x')
 plt.ylabel('y')
 
+
 # 显示图例
 plt.legend()
+
 
 # 显示网格线
 plt.grid(True)
@@ -215,4 +218,5 @@ plt.grid(True)
 
 #显示图形
 plt.show()
+
 

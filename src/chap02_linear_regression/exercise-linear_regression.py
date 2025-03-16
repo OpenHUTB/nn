@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ## 说明
-# 
-# 请按照填空顺序编号分别完成 参数优化，不同基函数的实现
-
-# In[1]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
+
+# 设置 Matplotlib 使用支持中文的字体
+plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置字体为 SimHei
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 
 
 def load_data(filename):
@@ -22,15 +19,6 @@ def load_data(filename):
         return np.asarray(xs), np.asarray(ys)
 
 
-# ## 不同的基函数 (basis function)的实现 填空顺序 2
-#
-# 请分别在这里实现“多项式基函数”以及“高斯基函数”
-#
-# 其中以及训练集的x的范围在0-25之间
-
-# In[6]:
-
-
 def identity_basis(x):
     ret = np.expand_dims(x, axis=1)
     return ret
@@ -39,52 +27,30 @@ def identity_basis(x):
 def multinomial_basis(x, feature_num=10):
     '''多项式基函数'''
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # ==========
-    # todo '''请实现多项式基函数'''
     ret = np.hstack([x ** i for i in range(feature_num)])
-    # ==========
     return ret
 
 
 def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
-    # ==========
-    # todo '''请实现高斯基函数'''
     centers = np.linspace(0, 25, feature_num)
     width = 1.0
     x = np.expand_dims(x, axis=1)
     ret = np.hstack([np.exp(-(x - c) ** 2 / (2 * width ** 2)) for c in centers])
-    # ==========
     return ret
-
-
-# ## 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化
-# ## 填空顺序 3 用梯度下降进行模型优化
-# > 先完成最小二乘法的优化 (参考书中第二章 2.3中的公式)
-#
-# > 再完成梯度下降的优化   (参考书中第二章 2.3中的公式)
-#
-# 在main中利用训练集训练好模型的参数，并且返回一个训练好的模型。
-#
-# 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
-
-# In[7]:
 
 
 def main(x_train, y_train):
     """
     训练模型，并返回从x到y的映射。
-
     """
-    basis_func = identity_basis
+    basis_func = gaussian_basis
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
     phi1 = basis_func(x_train)
+
     phi = np.concatenate([phi0, phi1], axis=1)
 
-    # ==========
-    # todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
     # 最小二乘法
-    # 通过 np.linalg.pinv(phi) 计算伪逆矩阵来求解 w
     w_ls = np.dot(np.linalg.pinv(phi), y_train)
 
     # 梯度下降
@@ -97,10 +63,7 @@ def main(x_train, y_train):
         error = y_pred - y_train
         gradient = np.dot(phi.T, error) / len(y_train)
         w_gd -= learning_rate * gradient
-    # 这里我们选择使用梯度下降得到的 w
     w = w_gd
-
-    # ==========
 
     def f(x):
         phi0 = np.expand_dims(np.ones_like(x), axis=1)
@@ -112,20 +75,12 @@ def main(x_train, y_train):
     return f
 
 
-# ## 评估结果
-# > 没有需要填写的代码，但是建议读懂
-
-# In[ ]:
-
-
 def evaluate(ys, ys_pred):
     """评估模型。"""
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
     return std
 
 
-
-# 程序主入口（建议不要改动以下函数的接口）
 if __name__ == '__main__':
     train_file = 'train.txt'
     test_file = 'test.txt'
@@ -149,11 +104,11 @@ if __name__ == '__main__':
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
     # 显示结果
-    plt.plot(x_train, y_train, 'ro', markersize=3)
-    #     plt.plot(x_test, y_test, 'k')
-    plt.plot(x_test, y_test_pred, 'k')
+    plt.plot(x_train, y_train, 'ro', markersize=3, label='训练数据')  # 添加 label
+    plt.plot(x_test, y_test_pred, 'k', label='预测结果')  # 添加 label
+
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.title('Linear Regression')
-    plt.legend(['train', 'test', 'pred'])
+    plt.title('高斯基函数')
+    plt.legend()  # 显示图例
     plt.show()
