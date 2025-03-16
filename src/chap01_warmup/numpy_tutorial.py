@@ -190,7 +190,7 @@ x = np.arange(0, 3 * np.pi, 0.1)
 y_sin = np.sin(x)
 y_cos = np.cos(x)
 
-# 26. 使用同一个figure绘制正弦和余弦函数
+# 使用同一个figure绘制正弦和余弦函数
 plt.figure(figsize=(10, 6))  # 设置图像大小
 plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦曲线
 plt.plot(x, y_cos, label="y = cos(x)", color="red")   # 绘制余弦曲线
