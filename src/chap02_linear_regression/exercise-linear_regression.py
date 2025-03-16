@@ -40,6 +40,7 @@ def gaussian_basis(x, feature_num=10):
     return ret
 
 
+
 def main(x_train, y_train):
     """
     训练模型，并返回从x到y的映射。

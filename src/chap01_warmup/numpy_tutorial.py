@@ -120,6 +120,7 @@ x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
 y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
 print(np.sqrt(x))
 
+
 # #### 18.利用13题目中的x,y ,执行 print(x.dot(y)) 和 print(np.dot(x,y))
 print("\n")
 x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
