@@ -20,13 +20,13 @@ def load_data(filename):
 
 
 def identity_basis(x):
-    ret = np.expand_dims(x, axis=1)
+    ret = np.expand_dims(x, axis = 1)
     return ret
 
 
 def multinomial_basis(x, feature_num=10):
     '''多项式基函数'''
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    x = np.expand_dims(x, axis = 1)  # shape(N, 1)
     ret = np.hstack([x ** i for i in range(feature_num)])
     return ret
 
@@ -35,7 +35,7 @@ def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
     centers = np.linspace(0, 25, feature_num)
     width = 1.0
-    x = np.expand_dims(x, axis=1)
+    x = np.expand_dims(x, axis = 1)
     ret = np.hstack([np.exp(-(x - c) ** 2 / (2 * width ** 2)) for c in centers])
     return ret
 
@@ -45,10 +45,10 @@ def main(x_train, y_train):
     训练模型，并返回从x到y的映射。
     """
     basis_func = gaussian_basis
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
     phi1 = basis_func(x_train)
 
-    phi = np.concatenate([phi0, phi1], axis=1)
+    phi = np.concatenate([phi0, phi1], axis = 1)
 
     # 最小二乘法
     w_ls = np.dot(np.linalg.pinv(phi), y_train)
@@ -66,9 +66,9 @@ def main(x_train, y_train):
     w = w_gd
 
     def f(x):
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        phi0 = np.expand_dims(np.ones_like(x), axis = 1)
         phi1 = basis_func(x)
-        phi = np.concatenate([phi0, phi1], axis=1)
+        phi = np.concatenate([phi0, phi1], axis = 1)
         y = np.dot(phi, w)
         return y
 
