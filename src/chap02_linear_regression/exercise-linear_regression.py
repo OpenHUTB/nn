@@ -52,7 +52,6 @@ def main(x_train, y_train):
 
     # 最小二乘法
     w_ls = np.dot(np.linalg.pinv(phi), y_train)
-
     # 梯度下降
     learning_rate = 0.01
     epochs = 1000
