@@ -112,6 +112,7 @@ y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
 print(x / y)
 print(np.divide(x, y))
 
+
 # #### 17. 利用13题目中的x,输出 x的 开方。(提示： 使用函数 np.sqrt() )
 print("\n")
 x = np.array([[1, 2], [3, 4]], dtype=np.float64, )

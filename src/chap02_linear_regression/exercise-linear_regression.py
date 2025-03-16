@@ -124,6 +124,7 @@ def evaluate(ys, ys_pred):
     return std
 
 
+
 # 程序主入口（建议不要改动以下函数的接口）
 if __name__ == '__main__':
     train_file = 'train.txt'

@@ -3,10 +3,11 @@
 
 # ## 设计基函数(basis function) 以及数据读取
 
-# In[20]:
-
 import numpy as np
 import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+import torch.optim as optim
 
 
 def identity_basis(x):
@@ -47,59 +48,43 @@ def load_data(filename, basis_func=gaussian_basis):
         phi0 = np.expand_dims(np.ones_like(xs), axis=1)
         phi1 = basis_func(xs)
         xs = np.concatenate([phi0, phi1], axis=1)
-        return (np.float32(xs), np.float32(ys)), (o_x, o_y)
+        return (torch.tensor(xs, dtype=torch.float32), torch.tensor(ys, dtype=torch.float32)), (o_x, o_y)
 
 
 # ## 定义模型
-
-# In[21]:
-
-
-import tensorflow as tf
-from tensorflow.keras import optimizers, layers, Model
-
-
-class linearModel(Model):
+class LinearModel(nn.Module):
     def __init__(self, ndim):
-        super(linearModel, self).__init__()
-        self.w = tf.Variable(
-            shape=[ndim, 1],
-            initial_value=tf.random.uniform(
-                [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32))
+        super(LinearModel, self).__init__()
+        self.w = nn.Parameter(torch.randn(ndim, 1) * 0.1)
 
-    @tf.function
-    def call(self, x):
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)
+    def forward(self, x):
+        y = torch.squeeze(torch.matmul(x, self.w), dim=1)
         return y
 
 
 (xs, ys), (o_x, o_y) = load_data('train.txt')
 ndim = xs.shape[1]
 
-model = linearModel(ndim=ndim)
+model = LinearModel(ndim=ndim)
 
 # ## 训练以及评估
-
-# In[26]:
-
-
-optimizer = optimizers.Adam(0.1)
+optimizer = optim.Adam(model.parameters(), lr=0.1)
 
 
-@tf.function
 def train_one_step(model, xs, ys):
-    with tf.GradientTape() as tape:
-        y_preds = model(xs)
-        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))
-    grads = tape.gradient(loss, model.w)
-    optimizer.apply_gradients([(grads, model.w)])
-    return loss
-
-
-@tf.function
-def predict(model, xs):
+    optimizer.zero_grad()
     y_preds = model(xs)
-    return y_preds
+    loss = torch.mean(torch.sqrt(1e-12 + (ys - y_preds) ** 2))
+    loss.backward()
+    optimizer.step()
+    return loss.item()
+
+
+def predict(model, xs):
+    model.eval()
+    with torch.no_grad():
+        y_preds = model(xs)
+    return y_preds.numpy()
 
 
 def evaluate(ys, ys_pred):
@@ -108,22 +93,19 @@ def evaluate(ys, ys_pred):
     return std
 
 
-# In[27]:
-
-
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
     if i % 100 == 1:
         print(f'loss is {loss:.4}')
 
 y_preds = predict(model, xs)
-std = evaluate(ys, y_preds)
+std = evaluate(ys.numpy(), y_preds)
 print('训练集预测值与真实值的标准差：{:.1f}'.format(std))
 
 (xs_test, ys_test), (o_x_test, o_y_test) = load_data('test.txt')
 
 y_test_preds = predict(model, xs_test)
-std = evaluate(ys_test, y_test_preds)
+std = evaluate(ys_test.numpy(), y_test_preds)
 print('测试集预测值与真实值的标准差：{:.1f}'.format(std))
 
 plt.plot(o_x, o_y, 'ro', markersize=3)
