@@ -204,6 +204,7 @@ plt.figure(figsize=(5, 3))
 plt.plot(x, y1, label='$y = np.sin(x)$', color='blue')
 plt.plot(x, y2, label='$y = np.cos(x)$', color='green')
 
+
 #添加标题跟标签
 plt.title('$y1 = np.sin(x)$, $y2 = np.cos(x)$')
 plt.xlabel('x')

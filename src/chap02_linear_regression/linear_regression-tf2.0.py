@@ -104,6 +104,7 @@ print('训练集预测值与真实值的标准差：{:.1f}'.format(std))
 
 (xs_test, ys_test), (o_x_test, o_y_test) = load_data('test.txt')
 
+
 y_test_preds = predict(model, xs_test)
 std = evaluate(ys_test.numpy(), y_test_preds)
 print('测试集预测值与真实值的标准差：{:.1f}'.format(std))
