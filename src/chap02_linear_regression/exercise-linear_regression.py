@@ -73,11 +73,7 @@ def main(x_train, y_train):
     
     """
     basis_func = gaussian_basis
-<<<<<<< HEAD
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
-=======
-    phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
->>>>>>> c32815e7f4f5f9b440ca8b029d8371c7c320d574
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis = 1)
     
@@ -144,13 +140,9 @@ if __name__ == '__main__':
     std = evaluate(y_test, y_test_pred)
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
-<<<<<<< HEAD
+
     plt.plot(x_train, y_train, 'ro', markersize=3, label='Training data')
     plt.plot(x_test, y_test_pred, 'b-', label='Predicted value')
-=======
-    plt.plot(x_train, y_train, 'ro', markersize = 3, label = 'Training data')
-    plt.plot(x_test, y_test_pred, 'b-', label = 'Predicted value')
->>>>>>> c32815e7f4f5f9b440ca8b029d8371c7c320d574
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title('gaussian_basis')
