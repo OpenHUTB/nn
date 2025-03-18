@@ -114,25 +114,8 @@ print("x*y\n", x * y)
 print("np.multiply(x, y)\n", np.multiply(x, y))
 print("np.dot(x,y)\n", np.dot(x, y))
 
-<<<<<<< HEAD
-# In[ ]:
-elementwise_multiplication = x * y
-multiplication_using_function = np.multiply(x, y)
-dot_product = np.dot(x, y)
-print("使用*运算符的结果（元素级乘法）:\n", elementwise_multiplication)
-print("使用np.multiply函数的结果（元素级乘法）:\n", multiplication_using_function)
-print("使用np.dot函数的结果（矩阵乘法）:\n", dot_product)
-#换个不是方阵的
-x = np.array([[1, 2, 6], [3, 4, 5]], dtype=np.float64)
-y = np.array([[5, 6], [7, 8], [9, 10]], dtype=np.float64)
-print(x*y)
-print(np.multiply(x, y))
-print(np.dot(x,y))
-#发现只有np.dot(x,y)可以输出
-=======
 # 16. 利用13题目中的x,y,输出 x / y .(提示 ： 使用函数 np.divide())
 print("第十六题：\n")
->>>>>>> c32815e7f4f5f9b440ca8b029d8371c7c320d574
 
 print("x/y\n", x / y)
 print("np.divide(x,y)\n", np.divide(x, y))
@@ -178,19 +161,11 @@ print("print(np.argmax(x))", np.argmax(x))
 print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))
 print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))
 
-<<<<<<< HEAD
-# In[ ]:
-print("(1) x中所有元素的总和:\n", np.sum(x))
-print("(2) 沿着axis=0（列方向）的总和:\n", np.sum(x,axis=0))
-print("(3) 沿着axis=1（行方向）的总和:\n", np.sum(x,axis=1))
-#axis = 0代表列方向，axis = 1代表行方向
-=======
 # 24,画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （提示这里用到  matplotlib.pyplot 库）
 print("第二十四题：\n")
 
 x = np.arange(0, 100, 0.1)
 y = x * x
->>>>>>> c32815e7f4f5f9b440ca8b029d8371c7c320d574
 
 plt.figure(figsize=(10, 6))  # 设置图像大小
 plt.plot(x, y, label="y = x^2", color="blue")  # 绘制曲线
