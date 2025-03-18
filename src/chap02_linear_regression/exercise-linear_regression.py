@@ -33,8 +33,9 @@ def load_data(filename):
 
 
 def identity_basis(x):
-    ret = np.expand_dims(x, axis=1)
+    ret = np.expand_dims(x, axis = 1)
     return ret
+
 
 
 def multinomial_basis(x, feature_num=10):
@@ -44,12 +45,14 @@ def multinomial_basis(x, feature_num=10):
     # todo '''请实现多项式基函数'''
     ret = np.hstack([x ** i for i in range(feature_num)])
     # ==========
+
     return ret
 
 
 
 def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
+
     # ==========
     # todo '''请实现高斯基函数'''
     centers = np.linspace(0, 25, feature_num)
@@ -57,6 +60,7 @@ def gaussian_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1)
     ret = np.hstack([np.exp(-(x - c) ** 2 / (2 * width ** 2)) for c in centers])
     # ==========
+
     return ret
 
 
@@ -79,10 +83,12 @@ def main(x_train, y_train):
     训练模型，并返回从x到y的映射。
 
     """
-    basis_func = identity_basis
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    basis_func = gaussian_basis
+    phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
     phi1 = basis_func(x_train)
+
     phi = np.concatenate([phi0, phi1], axis=1)
+
 
     # ==========
     # todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
@@ -106,9 +112,9 @@ def main(x_train, y_train):
     # ==========
 
     def f(x):
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        phi0 = np.expand_dims(np.ones_like(x), axis = 1)
         phi1 = basis_func(x)
-        phi = np.concatenate([phi0, phi1], axis=1)
+        phi = np.concatenate([phi0, phi1], axis = 1)
         y = np.dot(phi, w)
         return y
 
@@ -151,12 +157,12 @@ if __name__ == '__main__':
     std = evaluate(y_test, y_test_pred)
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
-    # 显示结果
-    plt.plot(x_train, y_train, 'ro', markersize=3)
-    #     plt.plot(x_test, y_test, 'k')
-    plt.plot(x_test, y_test_pred, 'k')
+
+    plt.plot(x_train, y_train, 'ro', markersize = 3, label = 'Training data')
+    plt.plot(x_test, y_test_pred, 'b-', label = 'Predicted value')
+
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.title('Linear Regression')
-    plt.legend(['train', 'test', 'pred'])
+    plt.title('gaussian_basis')
+    plt.legend()
     plt.show()
