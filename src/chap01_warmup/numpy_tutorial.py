@@ -30,7 +30,7 @@ print("输出b(1,1):", b[1, 1])
 
 # #### 4.  (1)建立一个全0矩阵 a, 大小为 3x3; 类型为整型（提示: dtype = int）(2)建立一个全1矩阵b,大小为4x5;  (3)建立一个单位矩阵c ,大小为4x4; (4)生成一个随机数矩阵d,
 # 大小为 3x2.
-a = np.zeros((3, 3), dtype=int)
+a = np.zeros((3, 3), dtype = int)
 print("\n全0矩阵 a:\n", a)
 b = np.ones((4, 5))
 print("全1矩阵 b:\n", b)
@@ -88,30 +88,30 @@ print("输出x 的数据类型:", x.dtype)
 
 # #### 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出 x+y ,和 np.add(x,y)
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(x + y)
 print(np.add(x, y))
 
 # #### 14. 利用 13题目中的x,y 输出 x-y 和 np.subtract(x,y)
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(x - y)
 print(np.subtract(x, y))
 
 # #### 15. 利用13题目中的x，y 输出 x*y ,和 np.multiply(x, y) 还有  np.dot(x,y),比较差异。然后自己换一个不是方阵的试试。
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(x * y)
 print(np.multiply(x, y))
 print(np.dot(x, y))
 
 # #### 16. 利用13题目中的x,y,输出 x / y .(提示 ： 使用函数 np.divide())
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(x / y)
 print(np.divide(x, y))
 
@@ -119,49 +119,49 @@ print(np.divide(x, y))
 
 # #### 17. 利用13题目中的x,输出 x的 开方。(提示： 使用函数 np.sqrt() )
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(np.sqrt(x))
 
 # #### 18.利用13题目中的x,y ,执行 print(x.dot(y)) 和 print(np.dot(x,y))
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(x.dot(y))
 print(np.dot(x, y))
 
 # ##### 19.利用13题目中的 x,进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
-y = np.array([[5, 6], [7, 8]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
+y = np.array([[5, 6], [7, 8]], dtype = np.float64, )
 print(np.sum(x))
-print(np.sum(x, axis=0))
-print(np.sum(x, axis=1))
+print(np.sum(x, axis = 0))
+print(np.sum(x, axis = 1))
 
 # #### 20.利用13题目中的 x,进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
 print(np.mean(x))
-print(np.mean(x, axis=0))
-print(np.mean(x, axis=1))
+print(np.mean(x, axis = 0))
+print(np.mean(x, axis = 1))
 
 # #### 21.利用13题目中的x，对x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
 transposed_x = x.T
 print(transposed_x)
 
 # #### 22.利用13题目中的x,求e的指数（提示： 函数 np.exp()）
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
 print(np.exp(x))
 
 # #### 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("\n")
-x = np.array([[1, 2], [3, 4]], dtype=np.float64, )
+x = np.array([[1, 2], [3, 4]], dtype = np.float64, )
 print(np.argmax(x))
-print(np.argmax(x, axis=0))
-print(np.argmax(x, axis=1))
+print(np.argmax(x, axis = 0))
+print(np.argmax(x, axis = 1))
 
 
 
@@ -175,8 +175,8 @@ x = np.arange(0, 100, 0.1)
 y = x * x
 
 # 创建图形并绘制曲线
-plt.figure(figsize=(5, 3))
-plt.plot(x, y, label='$y = x^2$', color='blue')
+plt.figure(figsize = (5, 3))
+plt.plot(x, y, label = '$y = x^2$', color = 'blue')
 
 # 添加标题和标签
 plt.title('Graph of $y = x^2$')
@@ -204,9 +204,9 @@ y1 = np.sin(x)
 y2 = np.cos(x)
 
 #绘制图形并绘制曲线
-plt.figure(figsize=(5, 3))
-plt.plot(x, y1, label='$y = np.sin(x)$', color='blue')
-plt.plot(x, y2, label='$y = np.cos(x)$', color='green')
+plt.figure(figsize = (5, 3))
+plt.plot(x, y1, label = '$y = np.sin(x)$', color = 'blue')
+plt.plot(x, y2, label = '$y = np.cos(x)$', color = 'green')
 
 
 #添加标题跟标签

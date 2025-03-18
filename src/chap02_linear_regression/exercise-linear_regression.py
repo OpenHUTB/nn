@@ -77,7 +77,6 @@ def gaussian_basis(x, feature_num=10):
 
 # In[7]:
 
-
 def main(x_train, y_train):
     """
     训练模型，并返回从x到y的映射。
@@ -87,7 +86,7 @@ def main(x_train, y_train):
     phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
     phi1 = basis_func(x_train)
 
-    phi = np.concatenate([phi0, phi1], axis=1)
+    phi = np.concatenate([phi0, phi1], axis = 1)
 
 
     # ==========

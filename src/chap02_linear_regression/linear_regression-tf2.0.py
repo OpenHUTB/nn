@@ -11,9 +11,6 @@ import torch.nn as nn
 import torch.optim as optim
 
 
-
-
-
 def identity_basis(x):
     ret = np.expand_dims(x, axis = 1)
     return ret
