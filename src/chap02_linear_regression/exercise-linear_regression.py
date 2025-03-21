@@ -20,8 +20,9 @@ def load_data(filename):
 
 
 def identity_basis(x):
-    ret = np.expand_dims(x, axis = 1)
+    ret = np.expand_dims(x, axis=1)
     return ret
+
 
 
 def multinomial_basis(x, feature_num=10):
@@ -45,9 +46,8 @@ def main(x_train, y_train):
     训练模型，并返回从x到y的映射。
     """
     basis_func = gaussian_basis
-    phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
+    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
     phi1 = basis_func(x_train)
-
     phi = np.concatenate([phi0, phi1], axis = 1)
 
     # 最小二乘法
@@ -66,9 +66,9 @@ def main(x_train, y_train):
 
 
     def f(x):
-        phi0 = np.expand_dims(np.ones_like(x), axis = 1)
+        phi0 = np.expand_dims(np.ones_like(x), axis=1)
         phi1 = basis_func(x)
-        phi = np.concatenate([phi0, phi1], axis = 1)
+        phi = np.concatenate([phi0, phi1], axis=1)
         y = np.dot(phi, w)
         return y
 
@@ -103,6 +103,7 @@ if __name__ == '__main__':
     std = evaluate(y_test, y_test_pred)
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
+
     # 显示结果
     plt.plot(x_train, y_train, 'ro', markersize=3, label='训练数据')  # 添加 label
     plt.plot(x_test, y_test_pred, 'k', label='预测结果')  # 添加 label
@@ -112,3 +113,4 @@ if __name__ == '__main__':
     plt.title('高斯基函数')
     plt.legend()  # 显示图例
     plt.show()
+
