@@ -6,6 +6,18 @@ In today's digital age, it is becoming increasingly common to witness pedestrian
 
 The prediction scheme for the pictures above is **<predicted_label: (true|false)>, <true_label: (1|0)>**
 
+
+This module is part of the following [paper](https://ieeexplore.ieee.org/abstract/document/10737454)
+```
+@article{ejaz2024trust,
+  title={Trust-aware safe control for autonomous navigation: Estimation of system-to-human trust for trust-adaptive control barrier functions},
+  author={Ejaz, Saad and Inoue, Masaki},
+  journal={IEEE Transactions on Control Systems Technology},
+  year={2024},
+  publisher={IEEE}
+}
+```
+
 ## Sourcing the Dataset
 
 The dataset utilized for this project has been compiled from various publicly available pedestrian datasets that encompass a wide range of images depicting pedestrians in diverse ambient environments, orientations, and engagements. These datasets include prominent sources such as PETA [[3]](#3).
