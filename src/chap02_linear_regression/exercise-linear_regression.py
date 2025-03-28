@@ -63,9 +63,9 @@ def gaussian_basis(x, feature_num=10):
 # 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 # In[7]:
-def least_squares(phi, y):
+def least_squares(phi, y, alpha=0.0):
     """最小二乘法优化"""
-    w = np.linalg.inv(phi.T @ phi) @ phi.T @ y
+    w = np.linalg.pinv(phi.T @ phi + alpha * np.eye(phi.shape[1])) @ phi.T @ y  # 使用伪逆更稳定
     return w
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
     """梯度下降优化"""
