@@ -68,6 +68,8 @@ def compute_loss(pred, label):
     #输入label shape(N,), pred shape(N,)
     #输出 losses shape(N,) 每一个样本一个loss
     #todo 填空一，实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
+    pred = tf.clip_by_value(pred, epsilon, 1 - epsilon)
+    losses = - (label * tf.math.log(pred) + (1 - label) * tf.math.log(1 - pred))
     '''============================='''
     loss = tf.reduce_mean(losses)
     
