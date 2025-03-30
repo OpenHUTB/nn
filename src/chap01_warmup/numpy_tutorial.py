@@ -190,6 +190,7 @@ x = np.arange(0, 3 * np.pi, 0.1)
 y_sin = np.sin(x)
 y_cos = np.cos(x)
 
+plt.figure(figsize=(10, 6))  # 设置图像大小 plt.plot(x, y, label="y = sin(x)", color="blue")  # 绘制曲线
 
 # 26.xlabel() 和 ylabel用于设置x轴和y轴的标签,plot()用于绘制二维数据
 plt.figure(figsize=(10, 6))  # 设置图像大小
@@ -197,7 +198,11 @@ plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制曲线
 plt.title("Plot of y = sin(x)")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
+ 
+ # 添加网格
 plt.grid(True)
+ 
+ # 显示图例
 plt.legend()
 plt.show()
 
@@ -207,8 +212,10 @@ plt.plot(x, y_cos, label="y = cos(x)", color="blue")  # 绘制曲线
 plt.title("Plot of y = cos(x)")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
+ 
+ # 添加网格
 plt.grid(True)
+ 
+ # 显示图例
 plt.legend()
 plt.show()
-
-

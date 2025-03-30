@@ -89,10 +89,20 @@ def main(x_train, y_train, use_gradient_descent=False):
     
     #==========
     #todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
-    if use_gradient_descent:
-        w = gradient_descent(phi, y_train)
-    else:
-        w = least_squares(phi, y_train)
+    #最小二乘法
+    #通过 np.linalg.pinv(phi) 计算伪逆矩阵来求解 w
+    w_lsq = np.dot(np.linalg.pinv(phi), y_train)
+
+    #梯度下降（使用时取消注释）
+    learning_rate=0.01,
+    epochs=1000
+    w_gd = np.zeros(phi.shape[1])
+        
+    for epoch in range(epochs):
+     y_pred = np.dot(phi, w)
+    error = y_pred - y_train
+    gradient = np.dot(phi.T, error) / len(y_train)
+    w_gd -= learning_rate * gradient
     #==========
     
     def f(x):
@@ -100,9 +110,13 @@ def main(x_train, y_train, use_gradient_descent=False):
         phi1 = basis_func(x)
         phi = np.concatenate([phi0, phi1], axis=1)
         y = np.dot(phi, w)
-        return y
-
-    return f
+        if 'w_lsq' in locals() or 'w_lsq' in globals():  # 使用最小二乘法得到的w进行预测
+            return np.dot(phi, w_lsq)
+        else:  # 使用梯度下降得到的w进行预测（需要确保w_gd已在当前作用域内定义）
+            return np.dot(phi, w_gd)
+# 这里我们默认返回使用最小二乘法训练的模型，如果您想使用梯度下降训练的模型，
+    # 请将下面的'w_lsq'替换为'w_gd'，并确保在调用此函数之前已经通过梯度下降训练了模型。
+    return f, w_lsq, w_gd  # 返回预测函数以及两种方法得到的权重w（可选）
 
 
 # ## 评估结果 
