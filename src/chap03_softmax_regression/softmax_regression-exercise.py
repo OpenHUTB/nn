@@ -59,6 +59,9 @@ class SoftmaxRegression():
     def __init__(self):
         '''============================='''
         #todo 填空一，构建模型所需的参数 self.W, self.b 可以参考logistic-regression-exercise
+        self.W = tf.Variable(shape=[2, 3], dtype=tf.float32, 
+                initial_value=tf.random.uniform(shape=[2, 3], minval=-0.1, maxval=0.1))
+        self.b = tf.Variable(shape=[3], dtype=tf.float32, initial_value=tf.zeros(shape=[3]))
         '''============================='''
         
         self.trainable_variables = [self.W, self.b]
@@ -75,6 +78,8 @@ def compute_loss(pred, label):
     #输入label shape(N, 3), pred shape(N, 3)
     #输出 losses shape(N,) 每一个样本一个loss
     #todo 填空二，实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
+    pred = tf.clip_by_value(pred, epsilon, 1.0)
+    losses = -tf.reduce_sum(label * tf.math.log(pred), axis=1)
     '''============================='''
     loss = tf.reduce_mean(losses)
     
