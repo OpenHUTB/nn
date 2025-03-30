@@ -94,12 +94,12 @@ print("输出:", type(x))
 # 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出 x+y ,和 np.add(x,y)
 print("第十三题：\n")
 
-x = np.array([[1, 2], [3, 4]], dtype=np.float64)
-y = np.array([[5, 6], [7, 8]], dtype=np.float64)
+x = np.array([[1, 2], [3, 4]], dtype=np.float64)# 创建一个二维的 NumPy 数组 x，其元素为 [[1, 2], [3, 4]]，数据类型指定为 np.float64（双精度浮点数）
+y = np.array([[5, 6], [7, 8]], dtype=np.float64)# 创建另一个二维的 NumPy 数组 y，其元素为 [[5, 6], [7, 8]]，数据类型同样为 np.float64
 
-print("x+y\n", x + y)
+print("x+y\n", x + y)# 使用 + 运算符对两个数组进行逐元素相加操作，并将结果打印出来
 
-print("np.add(x,y)\n", np.add(x, y))
+print("np.add(x,y)\n", np.add(x, y))# np.add 是 NumPy 库中用于数组相加的函数，同样会对两个数组进行逐元素相加
 
 # 14. 利用 13题目中的x,y 输出 x-y 和 np.subtract(x,y)
 print("第十四题：\n")
@@ -157,9 +157,9 @@ print(np.exp(x))
 
 # 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
-print("print(np.argmax(x))", np.argmax(x))
-print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))
-print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))
+print("print(np.argmax(x))", np.argmax(x))# 打印整个数组 x 中最大值的下标
+print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))# 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
+print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))# 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
 # 24,画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （提示这里用到  matplotlib.pyplot 库）
 print("第二十四题：\n")
