@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 def load_data(filename):
     """载入数据。"""
     xys = []
+    # 使用列表推导式读取并转换数据
+    # xys = [(float(x), float(y)) for line in f for x, y in [line.strip().split()]]
     with open(filename, 'r') as f:
         for line in f:
             xys.append(map(float, line.strip().split()))
