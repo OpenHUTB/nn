@@ -6,14 +6,14 @@
 # 请按照填空顺序编号分别完成 参数优化，不同基函数的实现
 
 # In[1]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
 def load_data(filename):
     """载入数据。"""
     xys = []
+    # 使用列表推导式读取并转换数据
+    # xys = [(float(x), float(y)) for line in f for x, y in [line.strip().split()]]
     with open(filename, 'r') as f:
         for line in f:
             xys.append(map(float, line.strip().split()))
@@ -28,8 +28,6 @@ def load_data(filename):
 # 其中以及训练集的x的范围在0-25之间
 
 # In[6]:
-
-
 def identity_basis(x):
     ret = np.expand_dims(x, axis=1)
     return ret
@@ -39,18 +37,20 @@ def multinomial_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1) # shape(N, 1)
     #==========
     #todo '''请实现多项式基函数'''
+    x = np.expand_dims(x, axis=1) # shape(N, 1)
+    ret = [x**i for i in range(1, feature_num+1)]  # 生成 1, x, x^2, ..., x^(feature_num-1)
+    ret = np.concatenate(ret, axis=1)  # 合并成 shape(N, feature_num)
     #==========
-    ret = None
     return ret
 
 def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
     #==========
     #todo '''请实现高斯基函数'''
+    centers = np.linspace(0, 25, feature_num)  # 在 0 到 25 之间均匀分布中心
+    widths = np.ones(feature_num) * (25 / feature_num)  # 每个基函数的宽度
+    ret = np.exp(-0.5 * ((x[:, np.newaxis] - centers) / widths)**2)  # shape(N, feature_num)
     #==========
-    centers = np.linspace(0, 25, feature_num)  # 在0-25之间均匀分布的中心
-    width = centers[1] - centers[0]  # 高斯函数的宽度
-    ret = np.exp(-0.5 * np.power((x[:, np.newaxis] - centers) / width, 2))
     return ret
 
 
@@ -65,9 +65,20 @@ def gaussian_basis(x, feature_num=10):
 # 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 # In[7]:
+def least_squares(phi, y, alpha=0.0):
+    """最小二乘法优化"""
+    w = np.linalg.pinv(phi.T @ phi + alpha * np.eye(phi.shape[1])) @ phi.T @ y  # 使用伪逆更稳定
+    return w
+def gradient_descent(phi, y, lr=0.01, epochs=1000):
+    """梯度下降优化"""
+    w = np.zeros(phi.shape[1])  # 初始化 w
+    for epoch in range(epochs):
+        y_pred = phi @ w
+        gradient = -2 * phi.T @ (y - y_pred) / len(y)  # 计算梯度
+        w -= lr * gradient  # 更新 w
+    return w
 
-
-def main(x_train, y_train):
+def main(x_train, y_train, use_gradient_descent=False):
     """
     训练模型，并返回从x到y的映射。
     
@@ -82,18 +93,18 @@ def main(x_train, y_train):
     #todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
     #最小二乘法
     #通过 np.linalg.pinv(phi) 计算伪逆矩阵来求解 w
-    w = np.dot(np.linalg.pinv(phi), y_train)
+    w_lsq = np.dot(np.linalg.pinv(phi), y_train)
 
     #梯度下降（使用时取消注释）
-    # learning_rate=0.01,
-    # epochs=1000
-    # w = np.zeros(phi.shape[1])
+    learning_rate=0.01,
+    epochs=1000
+    w_gd = np.zeros(phi.shape[1])
         
-    # for epoch in range(epochs):
-    #     y_pred = np.dot(phi, w)
-    #     error = y_pred - y_train
-    #     gradient = np.dot(phi.T, error) / len(y_train)
-    #     w -= learning_rate * gradient
+    for epoch in range(epochs):
+     y_pred = np.dot(phi, w)
+    error = y_pred - y_train
+    gradient = np.dot(phi.T, error) / len(y_train)
+    w_gd -= learning_rate * gradient
     #==========
     
     def f(x):
@@ -101,9 +112,13 @@ def main(x_train, y_train):
         phi1 = basis_func(x)
         phi = np.concatenate([phi0, phi1], axis=1)
         y = np.dot(phi, w)
-        return y
-
-    return f
+        if 'w_lsq' in locals() or 'w_lsq' in globals():  # 使用最小二乘法得到的w进行预测
+            return np.dot(phi, w_lsq)
+        else:  # 使用梯度下降得到的w进行预测（需要确保w_gd已在当前作用域内定义）
+            return np.dot(phi, w_gd)
+# 这里我们默认返回使用最小二乘法训练的模型，如果您想使用梯度下降训练的模型，
+    # 请将下面的'w_lsq'替换为'w_gd'，并确保在调用此函数之前已经通过梯度下降训练了模型。
+    return f, w_lsq, w_gd  # 返回预测函数以及两种方法得到的权重w（可选）
 
 
 # ## 评估结果 
