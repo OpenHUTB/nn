@@ -83,7 +83,7 @@ def main(x_train, y_train, use_gradient_descent=False):
     训练模型，并返回从x到y的映射。
     
     """
-    basis_func = gaussian_basis
+    basis_func = identity_basis
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1)
@@ -155,12 +155,14 @@ if __name__ == '__main__':
     std = evaluate(y_test, y_test_pred)
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
-    plt.plot(x_train, y_train, 'ro', markersize=3, label='Training data')
-    plt.plot(x_test, y_test_pred, 'b-', label='Predicted value')
+    #显示结果
+    plt.plot(x_train, y_train, 'ro', markersize=3)
+#     plt.plot(x_test, y_test, 'k')
+    plt.plot(x_test, y_test_pred, 'k')
     plt.xlabel('x')
     plt.ylabel('y')
-    plt.title('gaussian_basis')
-    plt.legend()
+    plt.title('Linear Regression')
+    plt.legend(['train', 'test', 'pred'])
     plt.show()
 
 
