@@ -18,7 +18,7 @@ from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
-get_ipython().run_line_magic('matplotlib', 'inline')
+#get_ipython().run_line_magic('matplotlib', 'inline')
 
 dot_num = 100
 x_p = np.random.normal(3., 1, dot_num)
@@ -105,7 +105,8 @@ def train_one_step(model, optimizer, x, y):
 model = SoftmaxRegression()
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 x1, x2, y = list(zip(*data_set))
-x = list(zip(x1, x2))
+x = np.array(list(zip(x1, x2)), dtype=np.float32)  # 转换为 float32
+y = np.array(y, dtype=np.int32)  # 转换为 int32
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
     if i%50==49:
