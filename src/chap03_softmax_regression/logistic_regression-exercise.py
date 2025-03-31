@@ -48,7 +48,9 @@ np.random.shuffle(data_set)
 epsilon = 1e-12
 class LogisticRegression():
     def __init__(self):
-        self.W = tf.Variable(shape=[2, 1], dtype=tf.float32, 
+        # L2正则化
+        l2_reg = tf.keras.regularizers.l2(0.01)
+        self.W = tf.Variable(..., regularizer=l2_reg) 
             initial_value=tf.random.uniform(shape=[2, 1], minval=-0.1, maxval=0.1))
         self.b = tf.Variable(shape=[1], dtype=tf.float32, initial_value=tf.zeros(shape=[1]))
         
@@ -92,7 +94,8 @@ def train_one_step(model, optimizer, x, y):
 
 if __name__ == '__main__':
     model = LogisticRegression()
-    opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+    # 使用自适应优化器
+    opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
     x1, x2, y = list(zip(*data_set))
     x = list(zip(x1, x2))
     animation_fram = []
