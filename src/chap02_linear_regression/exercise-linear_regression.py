@@ -31,26 +31,14 @@ def identity_basis(x):
     return ret
 
 def multinomial_basis(x, feature_num=10):
-    '''多项式基函数'''
-    x = np.expand_dims(x, axis=1) # shape(N, 1)
-    #==========
-    #todo '''请实现多项式基函数'''
-    x = np.expand_dims(x, axis=1) # shape(N, 1)
-    ret = [x**i for i in range(1, feature_num+1)]  # 生成 1, x, x^2, ..., x^(feature_num-1)
-    ret = np.concatenate(ret, axis=1)  # 合并成 shape(N, feature_num)
-    #==========
-    return ret
+    '''多项式基函数（包含常数项）'''
+    return np.column_stack([x**i for i in range(feature_num)])  # 从x^0开始
 
 def gaussian_basis(x, feature_num=10):
-    '''高斯基函数'''
-    #==========
-    #todo '''请实现高斯基函数'''
-    centers = np.linspace(0, 25, feature_num)  # 在 0 到 25 之间均匀分布中心
-    widths = np.ones(feature_num) * (25 / feature_num)  # 每个基函数的宽度
-    ret = np.exp(-0.5 * ((x[:, np.newaxis] - centers) / widths)**2)  # shape(N, feature_num)
-    #==========
-    return ret
-
+    '''自适应高斯基函数'''
+    centers = np.linspace(np.min(x), np.max(x), feature_num)  # 动态范围
+    width = (centers[-1] - centers[0]) / feature_num  # 自适应宽度
+    return np.exp(-((x[:,None]-centers)/width)**2)
 
 # ## 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化 
 # ## 填空顺序 3 用梯度下降进行模型优化
@@ -67,34 +55,36 @@ def least_squares(phi, y):
     """最小二乘法优化"""
     w = np.linalg.inv(phi.T @ phi) @ phi.T @ y
     return w
-def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化"""
-    w = np.zeros(phi.shape[1])  # 初始化 w
+def gradient_descent(phi, y, lr=0.01, epochs=1000, tol=1e-5):
+    w = np.zeros(phi.shape[1])
+    prev_loss = float('inf')
     for epoch in range(epochs):
         y_pred = phi @ w
-        gradient = -2 * phi.T @ (y - y_pred) / len(y)  # 计算梯度
-        w -= lr * gradient  # 更新 w
+        loss = np.mean((y_pred - y)**2)
+        if abs(prev_loss - loss) < tol:  # 早停机制
+            break
+        prev_loss = loss
+        grad = phi.T @ (y_pred - y) / len(y)
+        w -= lr * grad
+        lr *= 0.995  # 学习率衰减
     return w
 
-def main(x_train, y_train, use_gradient_descent=False):
-    """
-    训练模型，并返回从x到y的映射。
+def main(x_train, y_train, basis_type='linear', opt_method='least_squares'):
+    basis_funcs = {
+        'linear': identity_basis,
+        'poly': multinomial_basis,
+        'gaussian': gaussian_basis
+    }
+    basis_func = basis_funcs[basis_type]
     
-    """
-    basis_func = identity_basis
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
-    phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1)
+    # 特征矩阵构建
+    phi = np.column_stack([np.ones_like(x_train), basis_func(x_train)])
     
-    
-    #==========
-    #todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
-    if use_gradient_descent:
+    # 优化方法选择
+    if opt_method == 'gradient':
         w = gradient_descent(phi, y_train)
     else:
         w = least_squares(phi, y_train)
-    #==========
-    
     def f(x):
         phi0 = np.expand_dims(np.ones_like(x), axis=1)
         phi1 = basis_func(x)
@@ -111,10 +101,11 @@ def main(x_train, y_train, use_gradient_descent=False):
 # In[ ]:
 
 
-def evaluate(ys, ys_pred):
-    """评估模型。"""
-    std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std
+def evaluate(y_true, y_pred):
+    mse = np.mean((y_true - y_pred)**2)
+    rmse = np.sqrt(mse)
+    r2 = 1 - np.sum((y_true-y_pred)**2)/np.sum((y_true-np.mean(y_true))**2)
+    return {'RMSE': rmse, 'R2': r2, 'MSE': mse}
 
 # 程序主入口（建议不要改动以下函数的接口）
 if __name__ == '__main__':
