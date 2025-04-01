@@ -150,7 +150,7 @@ def main(x_train, y_train, use_gradient_descent=False):
             return np.dot(phi, w_gd)
     # 这里我们默认返回使用最小二乘法训练的模型，如果您想使用梯度下降训练的模型，
     # 请将下面的'w_lsq'替换为'w_gd'，并确保在调用此函数之前已经通过梯度下降训练了模型。
-    return f, w_lsq, w_gd  # 返回预测函数以及两种方法得到的权重 w（可选）
+        return f, w_lsq, w_gd  # 返回预测函数以及两种方法得到的权重 w（可选）
 
 
 # ## 评估结果 
@@ -167,19 +167,23 @@ def evaluate(ys, ys_pred):
 
 # 程序主入口（建议不要改动以下函数的接口）
 if __name__ == '__main__':
-    train_file = 'train.txt'
-    test_file = 'test.txt'
+    # 定义训练和测试数据文件路径
+    train_file = 'train.txt' # 训练集文件
+    test_file = 'test.txt'   # 测试集文件
     # 载入数据
-    x_train, y_train = load_data(train_file)
-    x_test, y_test = load_data(test_file)
+    x_train, y_train = load_data(train_file) # 从文件加载训练数据，返回特征矩阵x_train和标签向量y_train
+    x_test, y_test = load_data(test_file)    # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
     print(x_train.shape)
     print(x_test.shape)
 
     # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
+    # f: 预测函数 y = f(x)
+    # w_lsq: 通过最小二乘法得到的权重向量
+    # w_gd: 通过梯度下降法得到的权重向量
     f, w_lsq, w_gd = main(x_train, y_train)
 
-    y_train_pred = f(x_train)
-    std = evaluate(y_train, y_train_pred)
+    y_train_pred = f(x_train) # 对训练数据应用预测函数
+    std = evaluate(y_train, y_train_pred) # 计算预测值与真实值的标准差作为评估指标
     print('训练集预测值与真实值的标准差：{:.1f}'.format(std))
     
     # 计算预测的输出值
