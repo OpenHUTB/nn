@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 
 def load_data(filename):
     """载入数据。"""
+     #:param filename: 数据文件的路径
+     #:return: 包含特征和标签的 numpy 数组
     xys = []
     # 打开指定文件进行读取操作
     with open(filename, 'r') as f:
@@ -53,6 +55,9 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
+    # :param x: 输入的特征向量
+    #:param feature_num: 基函数的数量
+    #:return: 转换后的特征矩阵
     #==========
     #todo '''请实现高斯基函数'''
     # 在 0 到 25 之间均匀分布 feature_num 个中心
