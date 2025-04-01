@@ -30,27 +30,25 @@ def load_data(filename):
 # In[6]:
 
 
-def identity_basis(x):
+def identity_basis(x): #恒等基函数
     ret = np.expand_dims(x, axis=1)
     return ret
 
-def multinomial_basis(x, feature_num=10):
-    '''多项式基函数'''
+def multinomial_basis(x, feature_num=10): #多项式基函数
     x = np.expand_dims(x, axis=1) # shape(N, 1)
     #==========
     #todo '''请实现多项式基函数'''
+    ret = np.power(x, np.arange(feature_num))
     #==========
-    ret = None
     return ret
 
-def gaussian_basis(x, feature_num=10):
-    '''高斯基函数'''
+def gaussian_basis(x, feature_num=10):#高斯基函数
     #==========
     #todo '''请实现高斯基函数'''
-    #==========
     centers = np.linspace(0, 25, feature_num)  # 在0-25之间均匀分布的中心
     width = centers[1] - centers[0]  # 高斯函数的宽度
     ret = np.exp(-0.5 * np.power((x[:, np.newaxis] - centers) / width, 2))
+    #==========
     return ret
 
 
@@ -72,7 +70,7 @@ def main(x_train, y_train):
     训练模型，并返回从x到y的映射。
     
     """
-    basis_func = gaussian_basis
+    basis_func = gaussian_basis # 可以选择不同的基函数
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1)
@@ -81,19 +79,24 @@ def main(x_train, y_train):
     #==========
     #todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
     #最小二乘法
+    if method == 'least_squares':
     #通过 np.linalg.pinv(phi) 计算伪逆矩阵来求解 w
-    w = np.dot(np.linalg.pinv(phi), y_train)
-
+        w = np.dot(np.linalg.pinv(phi), y_train)
+    elif method == 'gradient_descent':
     #梯度下降（使用时取消注释）
-    # learning_rate=0.01,
-    # epochs=1000
-    # w = np.zeros(phi.shape[1])
+        learning_rate=0.01,
+        epochs=1000
+        w = np.zeros(phi.shape[1])
         
-    # for epoch in range(epochs):
-    #     y_pred = np.dot(phi, w)
-    #     error = y_pred - y_train
-    #     gradient = np.dot(phi.T, error) / len(y_train)
-    #     w -= learning_rate * gradient
+        for epoch in range(epochs):
+             y_pred = np.dot(phi, w)
+             error = y_pred - y_train
+             gradient = np.dot(phi.T, error) / len(y_train)
+             w -= learning_rate * gradient
+            # 每100次迭代打印损失
+            if epoch % 100 == 0:
+                loss = np.mean(error**2)
+                print(f'Epoch {epoch}, Loss: {loss:.4f}')
     #==========
     
     def f(x):
@@ -128,7 +131,7 @@ if __name__ == '__main__':
     print(x_test.shape)
 
     # 使用线性回归训练模型，返回一个函数f()使得y = f(x)
-    f = main(x_train, y_train)
+    f = main(x_train, y_train)#
 
     y_train_pred = f(x_train)
     std = evaluate(y_train, y_train_pred)
