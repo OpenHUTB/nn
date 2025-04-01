@@ -145,6 +145,7 @@ print("print(np.mean(x))", np.mean(x))
 print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))
 print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))
 
+
 # 21.利用13题目中的x，对x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("第二十一题：\n")
 
@@ -154,6 +155,7 @@ print("转置后的结果:\n", x.T)
 print("第二十二题：\n")
 
 print(np.exp(x))
+
 
 # 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
