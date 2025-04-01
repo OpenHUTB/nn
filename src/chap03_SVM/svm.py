@@ -34,13 +34,35 @@ class SVM():
 
     def __init__(self):
         # 请补全此处代码
+        self.w = None  # 权重向量
+        self.b = 0     # 偏置项
         pass
 
     def train(self, data_train):
         """
         训练模型。
         """
-
+# 提取特征和标签
+        x = data_train[:, :2]
+        t = data_train[:, 2]
+        
+        # 初始化参数
+        n_samples, n_features = x.shape
+        self.w = np.zeros(n_features)
+        learning_rate = 0.01
+        lambda_ = 0.01
+        epochs = 1000
+ 
+        # 梯度下降优化
+        for _ in range(epochs):
+            for idx, x_i in enumerate(x):
+                # 计算预测值（使用符号函数判断分类）
+                condition = t[idx] * (np.dot(x_i, self.w) + self.b)
+                if condition >= 1:
+                    self.w -= learning_rate * (lambda_ * self.w)  # 仅正则化项
+                else:
+                    self.w -= learning_rate * (lambda_ * self.w - t[idx] * x_i)
+                    self.b -= learning_rate * (-t[idx])
         # 请补全此处代码
 
     def predict(self, x):
@@ -49,6 +71,10 @@ class SVM():
         """
 
         # 请补全此处代码
+# 计算决策函数值
+        decision_values = np.dot(x, self.w) + self.b
+        # 返回预测标签（0或1）
+        return np.where(decision_values >= 0, 1, 0)
 
 
 if __name__ == '__main__':
