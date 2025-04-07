@@ -48,16 +48,16 @@ x_image = tf.reshape(xs, [-1, 28, 28, 1])
 #  卷积层 1
 ## conv1 layer ##
 
-W_conv1 = weight_variable([7, 7, 1, 32])
-b_conv1 = bias_variable([32])
-h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
-h_pool1 = max_pool_2x2(h_conv1)
- 
+W_conv1 = weight_variable([7, 7, 1, 32])                      # patch 7x7, in size 1, out size 32
+b_conv1 = bias_variable([32])                     
+h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)                      # 卷积  自己选择 选择激活函数
+h_pool1 = max_pool_2x2(h_conv1)                      # 池化               
+
 # 卷积层 2
-W_conv2 = weight_variable([5, 5, 32, 64])
+W_conv2 = weight_variable([5, 5, 32, 64])                       # patch 5x5, in size 32, out size 64
 b_conv2 = bias_variable([64])
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-h_pool2 = max_pool_2x2(h_conv2)
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)                       # 卷积  自己选择 选择激活函数
+h_pool2 = max_pool_2x2(h_conv2)                       # 池化
 
 #  全连接层 1
 ## fc1 layer ##
