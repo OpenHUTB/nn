@@ -25,7 +25,9 @@ def softmax(x):
     ##########
     return prob_x
 
+# 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
+# 比较自定义的softmax函数结果和tf自带的softmax函数结果，误差小于 0.0001 则认为相等
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 <0.0001
 
 
@@ -41,7 +43,9 @@ def sigmoid(x):
     ##########
     return prob_x
 
+# 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
+# 比较自定义的sigmoid函数结果和tf自带的sigmoid函数结果，误差小于 0.0001 则认为相等
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
 
 
@@ -58,11 +62,14 @@ def softmax_ce(x, label):
     ##########
     return loss
 
+# 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
+# 对测试数据进行softmax操作得到概率分布
 prob = tf.nn.softmax(test_data)
+# 生成对应的标签，每个样本只有一个类别为 1，其余为 0
 label = np.zeros_like(test_data)
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
-
+# 比较自定义的softmax交叉熵损失和tf自带的softmax交叉熵损失，误差小于 0.0001 则认为相等
 ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
   - softmax_ce(prob, label))**2 < 0.0001).numpy()
 
@@ -75,7 +82,9 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 def sigmoid_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
+    # 为了避免对数运算出现无穷大，添加一个极小值
     epsilon = 1e-8
+    # 计算sigmoid交叉熵损失，先计算每个样本的交叉熵，再求平均值
     loss = -tf.reduce_mean(
         label * tf.math.log(x + epsilon) + 
         (1 - label) * tf.math.log(1 - x + epsilon)
@@ -83,11 +92,14 @@ def sigmoid_ce(x, label):
     ##########
     return loss
 
+# 生成测试数据，形状为 [10] 的正态分布随机数
 test_data = np.random.normal(size=[10])
+# 对测试数据进行sigmoid操作得到概率分布
 prob = tf.nn.sigmoid(test_data)
+# 生成对应的标签，取值为 0 或 1
 label = np.random.randint(0, 2, 10).astype(test_data.dtype)
 print (label)
-
+# 比较自定义的sigmoid交叉熵损失和tf自带的sigmoid交叉熵损失，误差小于 0.0001 则认为相等
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data))- sigmoid_ce(prob, label))**2 < 0.0001).numpy()
 
 
