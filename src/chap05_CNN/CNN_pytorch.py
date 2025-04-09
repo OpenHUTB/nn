@@ -34,18 +34,16 @@ class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
         self.conv1 = nn.Sequential(
-            nn.Conv2d( # ???
-                # patch 7 * 7 ; 1  in channels ; 32 out channels ; ; stride is 1
-                # padding style is same(that means the convolution opration's input and output have the same size)
-                in_channels=      ,  
-                out_channels=     ,
-                kernel_size=      ,
-                stride=           ,
-                padding=          ,
-            ),
-            nn.ReLU(),        # activation function
-            nn.MaxPool2d(2),  # pooling operation
-        )
+    nn.Conv2d(
+        in_channels=1,          # MNIST是灰度图像，输入通道数为1
+        out_channels=32,        # 输出32个特征图
+        kernel_size=7,          # 7x7的卷积核
+        stride=1,               # 步长为1
+        padding=3,              # 填充3像素以保持输入输出尺寸相同(因为kernel_size=7)
+    ),
+    nn.ReLU(),                  # ReLU激活函数
+    nn.MaxPool2d(2),            # 2x2最大池化，步长默认为kernel_size
+)
         self.conv2 = nn.Sequential( # ???
             # line 1 : convolution function, patch 5*5 , 32 in channels ;64 out channels; padding style is same; stride is 1
             # line 2 : choosing your activation funciont
