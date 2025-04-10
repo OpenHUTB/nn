@@ -15,6 +15,8 @@ from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
+
+# 确保在Jupyter Notebook中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
@@ -53,6 +55,8 @@ np.random.shuffle(data_set)
 # 
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
 # In[37]:
+
+# 防止对数运算出现数值不稳定问题，添加一个极小值
 epsilon = 1e-12
 class LogisticRegression():
     def __init__(self):
@@ -72,7 +76,7 @@ class LogisticRegression():
         # 对logits应用sigmoid函数，得到预测概率
         pred = tf.nn.sigmoid(logits)
         return pred
-
+# 使用tf.function将该方法编译为静态图，提高执行效率
 @tf.function
 def compute_loss(pred, label):
     if not isinstance(label, tf.Tensor):

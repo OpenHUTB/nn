@@ -118,7 +118,20 @@ class myRNNModel(keras.Model):
         '''
         此处完成上述图中模型
         '''
+         # 输入形状: (batch_size, maxlen)
+        embedded_num1 = self.embed_layer(num1)  # (batch_size, maxlen, 32)
+        embedded_num2 = self.embed_layer(num2)  # (batch_size, maxlen, 32)
+        
+        # 特征融合：将两个数字的嵌入表示相加
+        combined_features = embedded_num1 + embedded_num2  # (batch_size, maxlen, 32)
+        
+        # RNN处理序列依赖
+        rnn_outputs = self.rnn_layer(combined_features)  # (batch_size, maxlen, 64)
+        
+        # 全连接层输出每个位置的数字预测（0-9）
+        logits = self.dense(rnn_outputs)  # (batch_size, maxlen, 10)
         return logits
+        
 
 
 # In[4]:
