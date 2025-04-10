@@ -37,11 +37,11 @@ class CNN(nn.Module):
             nn.Conv2d( # ???
                 # patch 7 * 7 ; 1  in channels ; 32 out channels ; ; stride is 1
                 # padding style is same(that means the convolution opration's input and output have the same size)
-                in_channels=      ,  
-                out_channels=     ,
-                kernel_size=      ,
-                stride=           ,
-                padding=          ,
+                in_channels= 1     ,  
+                out_channels= 32     ,
+                kernel_size= 7     ,
+                stride=   1        ,
+                padding=   3       ,
             ),
             nn.ReLU(),        # activation function
             nn.MaxPool2d(2),  # pooling operation
@@ -50,10 +50,16 @@ class CNN(nn.Module):
             # line 1 : convolution function, patch 5*5 , 32 in channels ;64 out channels; padding style is same; stride is 1
             # line 2 : choosing your activation funciont
             # line 3 : pooling operation function.
-            
-         
-
-        )
+            nn.Conv2d(
+            in_channels=32,
+                out_channels=64,
+                kernel_size=5,
+                stride=1,
+                padding=2  
+            ),
+            nn.ReLU(), 
+            nn.MaxPool2d(2) 
+         )
         self.out1 = nn.Linear( 7*7*64 , 1024 , bias= True)   # full connection layer one
 
         self.dropout = nn.Dropout(keep_prob_rate)
@@ -64,7 +70,7 @@ class CNN(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
-        x = x.view(      )  # flatten the output of coonv2 to (batch_size ,32 * 7 * 7)    # ???
+        x = x.view(x.size(0), -1)  # flatten the output of coonv2 to (batch_size ,32 * 7 * 7)    # ???
         out1 = self.out1(x)
         out1 = F.relu(out1)
         out1 = self.dropout(out1)
