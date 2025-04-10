@@ -36,12 +36,20 @@ class myModel:
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
         ####################
-        pass
+        #pass
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        self.b1 = tf.Variable(tf.zeros([128]))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
+        self.b2 = tf.Variable(tf.zeros([10]))
     def __call__(self, x):
         ####################
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
         ####################
-        logits = None
+        #logits = None
+        #return logits
+        x = tf.reshape(x, [-1, 784])          # 展平为[batch_size, 784]
+        h = tf.nn.relu(x @ self.W1 + self.b1) # 隐藏层+ReLU
+        logits = h @ self.W2 + self.b2         # 输出层（未归一化）
         return logits
         
 model = myModel()
