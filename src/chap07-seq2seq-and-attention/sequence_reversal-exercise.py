@@ -69,6 +69,16 @@ class mySeq2SeqModel(keras.Model):
         '''
         完成sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好
         '''
+        # 编码过程
+        enc_emb = self.embed_layer(enc_ids)  # (batch_size, enc_seq_len, emb_dim)
+        enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (batch_size, enc_seq_len, enc_units)
+        
+        # 解码过程，使用编码器的最终状态作为初始状态
+        dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
+        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
+        
+        # 计算logits
+        logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
         return logits
     
     
