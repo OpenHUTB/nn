@@ -339,16 +339,27 @@ def test(model, x, y):
 # In[12]:
 
 
-train_data, test_data = mnist_dataset()
-train_label = np.zeros(shape=[train_data[0].shape[0], 10])
-test_label = np.zeros(shape=[test_data[0].shape[0], 10])
-train_label[np.arange(train_data[0].shape[0]), np.array(train_data[1])] = 1.
-test_label[np.arange(test_data[0].shape[0]), np.array(test_data[1])] = 1.
+def prepare_data():
+    train_data, test_data = mnist_dataset()
+    train_label = np.zeros(shape=[train_data[0].shape[0], 10])
+    test_label = np.zeros(shape=[test_data[0].shape[0], 10])
+    train_label[np.arange(train_data[0].shape[0]), np.array(train_data[1])] = 1.
+    test_label[np.arange(test_data[0].shape[0]), np.array(test_data[1])] = 1.
+    return train_data[0], train_label, test_data[0], test_label
 
-for epoch in range(50):
-    loss, accuracy = train_one_step(model, train_data[0], train_label)
-    print('epoch', epoch, ': loss', loss, '; accuracy', accuracy)
-loss, accuracy = test(model, test_data[0], test_label)
+def train(model, train_data, train_label, epochs=50):
+    losses = []
+    accuracies = []
+    for epoch in tqdm(range(epochs), desc="Training"):
+        loss, accuracy = train_one_step(model, train_data, train_label)
+        losses.append(loss)
+        accuracies.append(accuracy)
+        print(f'Epoch {epoch}: Loss {loss:.4f}; Accuracy {accuracy:.4f}')
+    return losses, accuracies
 
-print('test loss', loss, '; accuracy', accuracy)
-
+if __name__ == "__main__":
+    train_data, train_label, test_data, test_label = prepare_data()
+    model = myModel()
+    losses, accuracies = train(model, train_data, train_label)
+    test_loss, test_accuracy = test(model, test_data, test_label)
+    print(f'Test Loss {test_loss:.4f}; Test Accuracy {test_accuracy:.4f}')    
