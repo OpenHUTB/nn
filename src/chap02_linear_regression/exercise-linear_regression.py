@@ -6,8 +6,6 @@
 # 请按照填空顺序编号分别完成 参数优化，不同基函数的实现
 
 # In[1]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -28,8 +26,6 @@ def load_data(filename):
 # 其中以及训练集的x的范围在0-25之间
 
 # In[6]:
-
-
 def identity_basis(x): #恒等基函数
     ret = np.expand_dims(x, axis=1)
     return ret
@@ -63,8 +59,6 @@ def gaussian_basis(x, feature_num=10):#高斯基函数
 # 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 # In[7]:
-
-
 def main(x_train, y_train):
     """
     训练模型，并返回从x到y的映射。
@@ -113,8 +107,6 @@ def main(x_train, y_train):
 # > 没有需要填写的代码，但是建议读懂
 
 # In[ ]:
-
-
 def evaluate(ys, ys_pred):
     """评估模型。"""
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
@@ -151,18 +143,3 @@ if __name__ == '__main__':
     plt.title('gaussian_basis')
     plt.legend()
     plt.show()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:

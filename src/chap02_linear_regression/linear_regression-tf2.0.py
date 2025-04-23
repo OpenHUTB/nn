@@ -4,8 +4,6 @@
 # ## 设计基函数(basis function) 以及数据读取
 
 # In[20]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -51,8 +49,6 @@ def load_data(filename, basis_func=gaussian_basis):
 # ## 定义模型
 
 # In[21]:
-
-
 import tensorflow as tf
 from tensorflow.keras import optimizers, layers, Model
 
@@ -78,8 +74,6 @@ model = linearModel(ndim=ndim)
 # ## 训练以及评估
 
 # In[26]:
-
-
 optimizer = optimizers.Adam(0.1)
 @tf.function
 def train_one_step(model, xs, ys):
@@ -103,8 +97,6 @@ def evaluate(ys, ys_pred):
 
 
 # In[27]:
-
-
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
     if i % 100 == 0:  # 修改4: 改为每100次都输出
@@ -129,22 +121,3 @@ plt.title('Linear Regression')
 plt.legend(['train', 'test', 'pred'])
 plt.grid(True)  # 修改8: 添加网格线
 plt.show()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
