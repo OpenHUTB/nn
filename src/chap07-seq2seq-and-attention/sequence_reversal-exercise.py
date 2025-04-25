@@ -35,7 +35,7 @@ def randomString(stringLength):
 
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]
-    enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
+    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
