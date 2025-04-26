@@ -20,25 +20,25 @@ tf.random.set_seed(42)
 np.random.seed(42)
 
 dot_num = 100
-epsilon = 1e-12  # 防止数值不稳定
+epsilon = 1e-12  # 防止数值不稳定（如log(0)时的计算溢出）
 
 # 数据生成部分优化
 def generate_data():
-    # 蓝色类别
-    x_p = np.random.normal(3., 1, dot_num)
+    # 蓝色类别（+号）
+    x_p = np.random.normal(3., 1, dot_num)  # 均值3，标准差1的正态分布
     y_p = np.random.normal(6., 1, dot_num)
-    C1 = np.stack([x_p, y_p, np.ones(dot_num)], axis=1)
-    
-    # 绿色类别
+    C1 = np.stack([x_p, y_p, np.ones(dot_num)], axis=1)  # 合并坐标和标签（标签为1）
+
+    # 绿色类别（o号）
     x_n = np.random.normal(6., 1, dot_num)
     y_n = np.random.normal(3., 1, dot_num)
-    C2 = np.stack([x_n, y_n, np.zeros(dot_num)], axis=1)
-    
-    # 红色类别
+    C2 = np.stack([x_n, y_n, np.zeros(dot_num)], axis=1)  # 标签为0
+
+    # 红色类别（*号）
     x_b = np.random.normal(7., 1, dot_num)
     y_b = np.random.normal(7., 1, dot_num)
-    C3 = np.stack([x_b, y_b, np.ones(dot_num)*2], axis=1)
-    
+    C3 = np.stack([x_b, y_b, np.ones(dot_num)*2], axis=1)  # 标签为2（*号）
+
     return np.concatenate([C1, C2, C3], axis=0)
 
 # 生成并打乱数据集
@@ -65,28 +65,28 @@ plt.show()
 
 class SoftmaxRegression():
     def __init__(self):
-        self.l2_lambda = 0.01  # L2正则化系数
+        self.l2_lambda = 0.01  # L2正则化系数（防止过拟合）
         
         '''============================='''
-        # todo 填空一，构建模型所需的参数 self.W, self.b 可以参考logistic-regression-exercise
+        # 填空一：构建模型参数
         self.W = tf.Variable(
-            initial_value=tf.random.truncated_normal([2, 3], stddev=0.1),
-            regularizer=tf.keras.regularizers.L2(self.l2_lambda),
+            initial_value=tf.random.truncated_normal([2, 3], stddev=0.1),  # 输入2维→3类输出的权重矩阵
+            regularizer=tf.keras.regularizers.L2(self.l2_lambda),  # 添加L2正则化
             name='weights'
         )
         self.b = tf.Variable(
-            initial_value=tf.zeros([3]),
+            initial_value=tf.zeros([3]),  # 偏置项初始化为0
             name='bias'
         )
         '''============================='''
 
-        self.trainable_variables = [self.W, self.b]
+        self.trainable_variables = [self.W, self.b]  # 模型可训练参数列表
         
     @tf.function
     def __call__(self, inputs):
-        # 计算logits并进行softmax归一化
-        logits = tf.matmul(inputs, self.W) + self.b
-        return tf.nn.softmax(logits)
+        # 计算线性组合logits并进行softmax归一化
+        logits = tf.matmul(inputs, self.W) + self.b  # 线性变换：XW + b
+        return tf.nn.softmax(logits)  # 转换为概率分布（每行和为1）
 
 @tf.function
 def compute_loss(model, pred, label):
@@ -94,32 +94,30 @@ def compute_loss(model, pred, label):
     label = tf.one_hot(tf.cast(label, tf.int32), depth=3, dtype=tf.float32)
     
     '''============================='''
-    # 输入label shape(N,3), pred shape(N,3)
-    # 输出 losses shape(N,) 每一个样本一个loss
-    # todo 填空二，实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
-    pred_clipped = tf.clip_by_value(pred, epsilon, 1. - epsilon)  # 防止log(0)
-    cross_entropy = -tf.reduce_sum(label * tf.math.log(pred_clipped), axis=1)
-    losses = cross_entropy
+    # 实现交叉熵损失函数
+    pred_clipped = tf.clip_by_value(pred, epsilon, 1. - epsilon)  # 防止log(0)或log(1)
+    cross_entropy = -tf.reduce_sum(label * tf.math.log(pred_clipped), axis=1)  # 每个样本的交叉熵
+    losses = cross_entropy  # 每个样本的损失值
     '''============================='''
 
     # 计算总损失（包含正则化项）
-    total_loss = tf.reduce_mean(losses) + tf.reduce_sum(model.losses)
+    total_loss = tf.reduce_mean(losses) + tf.reduce_sum(model.losses)  # model.losses自动包含L2正则损失
     
     # 计算准确率
-    pred_class = tf.argmax(pred, axis=1)
-    label_class = tf.argmax(label, axis=1)
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(pred_class, label_class), tf.float32))
+    pred_class = tf.argmax(pred, axis=1)  # 预测类别
+    label_class = tf.argmax(label, axis=1)  # 真实类别
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(pred_class, label_class), tf.float32))  # 计算匹配率
     
     return total_loss, accuracy
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
     with tf.GradientTape() as tape:
-        predictions = model(x)
-        loss, acc = compute_loss(model, predictions, y)
+        predictions = model(x)  # 前向传播
+        loss, acc = compute_loss(model, predictions, y)  # 计算损失和准确率
         
-    gradients = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    gradients = tape.gradient(loss, model.trainable_variables)  # 计算梯度
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))  # 参数更新
     return loss, acc
 
 
@@ -130,19 +128,19 @@ def train_one_step(model, optimizer, x, y):
 
 if __name__ == '__main__':
     model = SoftmaxRegression()
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)  # 使用Adam优化器
+    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)  # 使用Adam优化器，学习率0.001
     
     # 数据预处理
-    x_data = data_set[:, :2].astype(np.float32)
-    y_data = data_set[:, 2].astype(np.int32)
+    x_data = data_set[:, :2].astype(np.float32)  # 特征部分
+    y_data = data_set[:, 2].astype(np.int32)  # 标签部分
     
     # 使用TensorFlow Dataset API
-    dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))
-    dataset = dataset.shuffle(300).batch(32).prefetch(tf.data.AUTOTUNE)
+    dataset = tf.data.Dataset.from_tensor_slices((x_data, y_data))  # 构建数据集
+    dataset = dataset.shuffle(300).batch(32).prefetch(tf.data.AUTOTUNE)  # 打乱、分批次、预加载
     
     # 训练配置
-    num_epochs = 1000
-    display_step = 100
+    num_epochs = 1000  # 总迭代次数
+    display_step = 100  # 每100次迭代输出一次训练信息
     
     for epoch in range(num_epochs):
         epoch_loss = 0.0
@@ -151,8 +149,8 @@ if __name__ == '__main__':
         
         for batch_x, batch_y in dataset:
             loss, acc = train_one_step(model, optimizer, batch_x, batch_y)
-            epoch_loss += loss.numpy()
-            epoch_acc += acc.numpy()
+            epoch_loss += loss.numpy()  # 累积损失
+            epoch_acc += acc.numpy()    # 累积准确率
             batch_count += 1
             
         # 每display_step次迭代输出训练信息
@@ -169,22 +167,22 @@ if __name__ == '__main__':
 # 创建网格进行预测
 x_min, x_max = data_set[:,0].min()-1, data_set[:,0].max()+1
 y_min, y_max = data_set[:,1].min()-1, data_set[:,1].max()+1
-xx, yy = np.meshgrid(
+xx, yy = np.meshgrid(  # 生成网格坐标
     np.linspace(x_min, x_max, 200),
     np.linspace(y_min, y_max, 200)
 )
-grid_points = np.c_[xx.ravel(), yy.ravel()].astype(np.float32)
+grid_points = np.c_[xx.ravel(), yy.ravel()].astype(np.float32)  # 展开为二维点集
 
 # 预测并绘制决策边界
-Z = model(grid_points)
-Z = np.argmax(Z.numpy(), axis=1).reshape(xx.shape)
+Z = model(grid_points)  # 预测所有网格点
+Z = np.argmax(Z.numpy(), axis=1).reshape(xx.shape)  # 转换为类别矩阵
 
 # 绘制结果
 plt.figure(figsize=(12,9))
 plt.scatter(data_set[:,0], data_set[:,1], c=data_set[:,2], 
-            cmap='viridis', alpha=0.6, edgecolors='k', s=50)
-plt.contourf(xx, yy, Z, alpha=0.3, cmap='viridis', levels=3)
-plt.colorbar(label='Predicted Class')
+            cmap='viridis', alpha=0.6, edgecolors='k', s=50)  # 绘制原始数据
+plt.contourf(xx, yy, Z, alpha=0.3, cmap='viridis', levels=3)  # 决策区域填充
+plt.colorbar(label='Predicted Class')  # 颜色条表示类别
 plt.title('Softmax Regression with Decision Boundaries')
 plt.xlabel('X')
 plt.ylabel('Y')
