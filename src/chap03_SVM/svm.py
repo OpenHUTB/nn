@@ -10,7 +10,6 @@ def load_data(fname):
     """
     with open(fname, 'r') as f:
         data = []
-        line = f.readline()
         for line in f:
             line = line.strip().split()
             x1 = float(line[0])
@@ -31,50 +30,56 @@ class SVM():
     """
     SVM模型。
     """
-
-    def __init__(self):
+    def __init__(self, learning_rate=0.01, lambda_=0.01, epochs=1000):
         # 请补全此处代码
         self.w = None  # 权重向量
-        self.b = 0     # 偏置项
+        self.b = 0.0   # 偏置项
+        self.learning_rate = learning_rate  # 学习率
+        self.lambda_ = lambda_             # 正则化系数
+        self.epochs = epochs               # 迭代次数
         pass
 
     def train(self, data_train):
         """
         训练模型。
         """
-# 提取特征和标签
+        # 提取特征和标签
         x = data_train[:, :2]
         t = data_train[:, 2]
-        
-        # 初始化参数
         n_samples, n_features = x.shape
-        self.w = np.zeros(n_features)
-        learning_rate = 0.01
-        lambda_ = 0.01
-        epochs = 1000
- 
-        # 梯度下降优化
-        for _ in range(epochs):
-            for idx, x_i in enumerate(x):
-                # 计算预测值（使用符号函数判断分类）
-                condition = t[idx] * (np.dot(x_i, self.w) + self.b)
+        self.w = np.zeros(n_features)  # 初始化权重
+
+        # 训练过程优化：随机梯度下降
+        for _ in range(self.epochs):
+            # 打乱样本顺序提升训练效果
+            indices = np.random.permutation(n_samples)  
+            for idx in indices:
+                x_i = x[idx]
+                t_i = t[idx]
+
+                # 计算预测值（判断是否满足条件）
+                condition = t_i * (np.dot(x_i, self.w) + self.b)
+
                 if condition >= 1:
-                    self.w -= learning_rate * (lambda_ * self.w)  # 仅正则化项
+                    # 更新权重（仅正则化项）
+                    grad_w = self.lambda_ * self.w
+                    self.w -= self.learning_rate * grad_w
                 else:
-                    self.w -= learning_rate * (lambda_ * self.w - t[idx] * x_i)
-                    self.b -= learning_rate * (-t[idx])
-        # 请补全此处代码
+                    # 更新权重和偏置项（梯度下降方向）
+                    grad_w = self.lambda_ * self.w - t_i * x_i
+                    grad_b = -t_i
+                    self.w -= self.learning_rate * grad_w
+                    self.b -= self.learning_rate * grad_b
 
     def predict(self, x):
         """
         预测标签。
         """
-
         # 请补全此处代码
-# 计算决策函数值
+        # 计算决策函数值：w·x + b
         decision_values = np.dot(x, self.w) + self.b
         # 返回预测标签（0或1）
-        return np.where(decision_values >= 0, 1, 0)
+        return np.where(decision_values >= 0, 1, 0)  # 映射到0/1标签
 
 
 if __name__ == '__main__':

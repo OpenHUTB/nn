@@ -3,145 +3,118 @@
 
 # ## 设计基函数(basis function) 以及数据读取
 
-# In[20]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
-
-def identity_basis(x):
-    ret = np.expand_dims(x, axis=1)
-    return ret
-
-def multinomial_basis(x, feature_num=10):
-    x = np.expand_dims(x, axis=1) # shape(N, 1)
-    feat = [x]
-    for i in range(2, feature_num+1):
-        feat.append(x**i)
-    ret = np.concatenate(feat, axis=1)
-    return ret
-
-def gaussian_basis(x, feature_num=10):
-    centers = np.linspace(0, 25, feature_num)
-    width = 1.0 * (centers[1] - centers[0])
-    x = np.expand_dims(x, axis=1)
-    x = np.concatenate([x]*feature_num, axis=1)
-    
-    out = (x-centers)/width
-    ret = np.exp(-0.5 * out ** 2)
-    return ret
-
-def load_data(filename, basis_func=gaussian_basis):
-    """载入数据。"""
-    xys = []
-    with open(filename, 'r') as f:
-        for line in f:
-            xys.append(map(float, line.strip().split()))
-        xs, ys = zip(*xys)
-        xs, ys = np.asarray(xs), np.asarray(ys)
-        
-        o_x, o_y = xs, ys
-        phi0 = np.expand_dims(np.ones_like(xs), axis=1)
-        phi1 = basis_func(xs)
-        xs = np.concatenate([phi0, phi1], axis=1)
-        return (np.float32(xs), np.float32(ys)), (o_x, o_y)
-
-
-# ## 定义模型
-
-# In[21]:
-
-
 import tensorflow as tf
 from tensorflow.keras import optimizers, layers, Model
 
-class linearModel(Model):
-    def __init__(self, ndim):
-        super(linearModel, self).__init__()
-        self.w = tf.Variable(
-            shape=[ndim, 1], 
-            initial_value=tf.random.uniform(
-                [ndim,1], minval=-0.1, maxval=0.1, dtype=tf.float32))
+# 基函数实现优化
+def identity_basis(x):
+    return np.expand_dims(x, axis=1)
+
+def multinomial_basis(x, feature_num=10):
+    x = np.expand_dims(x, axis=1)
+    exponents = np.arange(1, feature_num+1)  # 从x^1到x^10
+    return x ** exponents
+
+def gaussian_basis(x, centers, width):
+    x = np.expand_dims(x, axis=1)
+    return np.exp(-0.5 * ((x - centers)/width)**2)
+
+def load_data(filename, basis_func, **basis_params):
+    """载入数据。"""
+    with open(filename, 'r') as f:
+        xys = [list(map(float, line.strip().split())) for line in f]
+        xs, ys = zip(*xys)
+        xs, ys = np.asarray(xs, dtype=np.float32), np.asarray(ys, dtype=np.float32)
         
+        # 应用基函数转换
+        phi = basis_func(xs, **basis_params) if basis_params else basis_func(xs)
+        phi = np.concatenate([np.ones((len(xs), 1)), phi], axis=1)  # 添加偏置项
+        
+        return (phi, ys), (xs, ys)
+
+# 预先计算高斯基函数的参数
+feature_num = 10
+centers = np.linspace(0, 25, feature_num)
+width = 2.0 * (centers[1] - centers[0])  # 调整宽度参数
+
+# 定义模型
+class LinearModel(Model):
+    def __init__(self, ndim):
+        super(LinearModel, self).__init__()
+        self.w = tf.Variable(
+            initial_value=tf.random.normal([ndim, 1], stddev=0.1),
+            trainable=True
+        )
+    
     @tf.function
     def call(self, x):
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)
-        return y
+        return tf.squeeze(tf.linalg.matvec(x, self.w), axis=1)
 
-(xs, ys), (o_x, o_y) = load_data('train.txt')        
-ndim = xs.shape[1]
+# 训练与评估
+def train_and_evaluate():
+    # 加载训练数据
+    (train_features, train_labels), (o_x_train, o_y_train) = load_data(
+        'train.txt', 
+        basis_func=gaussian_basis, 
+        centers=centers, 
+        width=width
+    )
+    
+    # 加载测试数据
+    (test_features, test_labels), (o_x_test, o_y_test) = load_data(
+        'test.txt', 
+        basis_func=gaussian_basis, 
+        centers=centers, 
+        width=width
+    )
+    
+    # 初始化模型
+    model = LinearModel(train_features.shape[1])
+    optimizer = optimizers.Adam(learning_rate=0.01)  # 调整学习率
+    
+    # 定义训练步骤
+    @tf.function
+    def train_step(x, y):
+        with tf.GradientTape() as tape:
+            predictions = model(x)
+            loss = tf.reduce_mean(tf.square(y - predictions))
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        return loss
+    
+    # 训练循环
+    for epoch in range(5000):
+        loss = train_step(train_features, train_labels)
+        if epoch % 500 == 0:
+            print(f"Epoch {epoch:4d}: Loss = {loss.numpy():.4f}")
+    
+    # 评估
+    def evaluate_rmse(y_true, y_pred):
+        return np.sqrt(np.mean((y_true - y_pred.numpy())**2))
+    
+    # 训练集评估
+    train_pred = model(train_features)
+    train_rmse = evaluate_rmse(train_labels, train_pred)
+    print(f"训练集RMSE: {train_rmse:.2f}")
+    
+    # 测试集评估
+    test_pred = model(test_features)
+    test_rmse = evaluate_rmse(test_labels, test_pred)
+    print(f"测试集RMSE: {test_rmse:.2f}")
+    
+    # 绘图
+    plt.figure(figsize=(12, 6))
+    plt.scatter(o_x_train, o_y_train, c='r', label='训练集', s=15)
+    plt.scatter(o_x_test, o_y_test, c='g', label='测试集真实值', s=15)
+    plt.plot(o_x_test, test_pred, 'b-', label='预测曲线', linewidth=2)
+    plt.title('基函数回归结果')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
-model = linearModel(ndim=ndim)
-
-
-# ## 训练以及评估
-
-# In[26]:
-
-
-optimizer = optimizers.Adam(0.1)
-@tf.function
-def train_one_step(model, xs, ys):
-    with tf.GradientTape() as tape:
-        y_preds = model(xs)
-        loss = tf.reduce_mean(tf.sqrt(1e-12+(ys-y_preds)**2))
-    grads = tape.gradient(loss, model.w)
-    optimizer.apply_gradients([(grads, model.w)])
-    return loss
-
-@tf.function
-def predict(model, xs):
-    y_preds = model(xs)
-    return y_preds
-
-def evaluate(ys, ys_pred):
-    """评估模型。"""
-    std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std
-
-
-# In[27]:
-
-
-for i in range(1000):
-    loss = train_one_step(model, xs, ys)
-    if i % 100 == 1:
-        print(f'loss is {loss:.4}')
-        
-        
-y_preds = predict(model, xs)
-std = evaluate(ys, y_preds)
-print('训练集预测值与真实值的标准差：{:.1f}'.format(std))
-
-(xs_test, ys_test), (o_x_test, o_y_test) = load_data('test.txt')
-
-y_test_preds = predict(model, xs_test)
-std = evaluate(ys_test, y_test_preds)
-print('训练集预测值与真实值的标准差：{:.1f}'.format(std))
-
-plt.plot(o_x, o_y, 'ro', markersize=3)
-plt.plot(o_x_test, y_test_preds, 'k')
-plt.xlabel('x')
-plt.ylabel('y')
-plt.title('Linear Regression')
-plt.legend(['train', 'test', 'pred'])
-plt.show()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
+if __name__ == '__main__':
+    train_and_evaluate()
