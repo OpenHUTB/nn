@@ -31,6 +31,7 @@ y = np.ones(dot_num)
 C1 = np.array([x_p, y_p, y]).T
 # random函数为伪随机数生成，并非真随机
 
+
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 x_n = np.random.normal(6., 1, dot_num)
 # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
