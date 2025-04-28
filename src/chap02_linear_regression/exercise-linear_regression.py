@@ -28,8 +28,30 @@ def load_data(filename):
 
 # ## 不同的基函数 (basis function)的实现 填空顺序 2
 # 
+def identity_basis(x):
+    ret = np.expand_dims(x, axis=1)
+    return ret
+    
 # 请分别在这里实现“多项式基函数”以及“高斯基函数”
 # 
+def multinomial_basis(x, feature_num=10):
+    x = np.expand_dims(x, axis=1) # shape(N, 1)
+    feat = [x]
+    for i in range(2, feature_num+1):
+        feat.append(x**i)
+    ret = np.concatenate(feat, axis=1)
+    return ret
+
+def gaussian_basis(x, feature_num=10):
+    centers = np.linspace(0, 25, feature_num)
+    width = 1.0 * (centers[1] - centers[0])
+    x = np.expand_dims(x, axis=1)
+    x = np.concatenate([x]*feature_num, axis=1)
+    
+    out = (x-centers)/width
+    ret = np.exp(-0.5 * out ** 2)
+    return ret
+    
 # 其中以及训练集的x的范围在0-25之间
 
 # In[6]:
