@@ -124,13 +124,9 @@ def test(model, ds):
     loss = 0.0
     accuracy = 0.0
     for step, (x, y) in enumerate(ds):
-        loss, accuracy = test_step(model, x, y)
-
-        
+        loss, accuracy = test_step(model, x, y)    
     print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
-
     return loss, accuracy
-
 
 # # 训练
 
