@@ -5,7 +5,6 @@
 
 # In[1]:
 
-
 import os
 import numpy as np
 import tensorflow as tf
@@ -70,8 +69,6 @@ class Relu:
         '''计算relu 激活函数对应的梯度'''
         ####################
         return grad_x
-    
-
 
 class Softmax:
     '''
@@ -129,8 +126,6 @@ class Log:
         x = self.mem['x']
         
         return 1./(x+1e-12) * grad_y
-    
-
 
 # ## Gradient check
 
@@ -213,7 +208,6 @@ class Log:
 # # Final Gradient Check
 
 # In[6]:
-
 
 import tensorflow as tf
 
@@ -312,7 +306,6 @@ model = myModel()
 def compute_loss(log_prob, labels):
      return np.mean(np.sum(-log_prob*labels, axis=1))
     
-
 def compute_accuracy(log_prob, labels):
     predictions = np.argmax(log_prob, axis=1)
     truth = np.argmax(labels, axis=1)
@@ -333,11 +326,9 @@ def test(model, x, y):
     accuracy = compute_accuracy(model.h2_log, y)
     return loss, accuracy
 
-
 # ## 实际训练
 
 # In[12]:
-
 
 def prepare_data():
     train_data, test_data = mnist_dataset()
