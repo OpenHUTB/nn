@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
 # numpy 练习题
-
 # numpy 的array操作
-
 # 1.导入numpy库
 import numpy as np
 
