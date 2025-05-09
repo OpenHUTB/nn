@@ -181,7 +181,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
 
 # 显示图例
-plt.legend()
+plt.legend(loc='upper right')
 
 plt.show()
 
@@ -205,7 +205,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
  
  # 显示图例
-plt.legend()
+plt.legend(loc='upper right')
 plt.show()
 
 
@@ -219,5 +219,5 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
  
  # 显示图例
-plt.legend()
+plt.legend(loc='upper right')
 plt.show()
