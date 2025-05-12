@@ -112,7 +112,13 @@ def least_squares(phi, y, alpha=0.0):
     return w
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化"""
+    """梯度下降优化
+    :param phi: 特征矩阵
+    :param y: 标签向量
+    :param lr: 学习率（默认为 0.01）
+    :param epochs: 迭代次数（默认为 1000）
+    :return: 优化后的权重向量 w
+    """
     # 初始化权重 w 为全零向量
     w = np.zeros(phi.shape[1])
     # 迭代训练 epochs 次
