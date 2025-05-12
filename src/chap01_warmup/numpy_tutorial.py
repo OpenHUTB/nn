@@ -76,7 +76,7 @@ print("输出:\n", a[np.arange(4), b])
 # 10.对9 中输出的那四个元素，每个都加上10，然后重新输出矩阵a.(提示： a[np.arange(4), b] += 10 ）
 print("第十题：\n")
 
-a[np.arange(4), b] += 10
+a[np.arange(4), b] += 10 #利用numpy的高级索引功能，行用 np.arange(4) 生成，列用 b 数组指定，进行加法操作
 print("输出:", a)
 
 # 11.  执行 x = np.array([1, 2])，然后输出 x 的数据类型
