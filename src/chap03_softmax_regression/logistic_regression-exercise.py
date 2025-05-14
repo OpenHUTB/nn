@@ -29,6 +29,8 @@ y_p = np.random.normal(6., 1, dot_num)
 y = np.ones(dot_num)
 # 将正样本的x、y坐标和标签组合成一个数组，形状为 (dot_num, 3)
 C1 = np.array([x_p, y_p, y]).T
+# random函数为伪随机数生成，并非真随机
+
 
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 x_n = np.random.normal(6., 1, dot_num)
@@ -178,19 +180,19 @@ def init():
 
 # 动画更新函数，根据训练过程中的参数绘制拟合直线、样本点和更新训练信息文本
 def animate(i):
-    xx = np.arange(10, step=0.1)
-    a = animation_fram[i][0]
+    xx = np.arange(10, step=0.1) # 创建 x 轴的数据，从 10 开始，步长为 0.1
+    a = animation_fram[i][0]     # 从 animation_fram 中提取当前帧的参数
     b = animation_fram[i][1]
     c = animation_fram[i][2]
-    yy = a/-b * xx +c/-b
-    line_d.set_data(xx, yy)
-        
-    C1_dots.set_data(C1[:, 0], C1[:, 1])
-    C2_dots.set_data(C2[:, 0], C2[:, 1])
+    yy = a/-b * xx +c/-b         # 根据公式计算 y = (a/-b) * x + (c/-b)，即直线的表达式
+    line_d.set_data(xx, yy)      # 更新直线的数据
+      # 更新第一组点（C1）的数据
+    C1_dots.set_data(C1[:, 0], C1[:, 1])  # C1[:, 0] 是 x 坐标，C1[:, 1] 是 y 坐标
+    C2_dots.set_data(C2[:, 0], C2[:, 1])  # C2[:, 0] 是 x 坐标，C2[:, 1] 是 y 坐标
     
-    frame_text.set_text('Timestep = %.1d/%.1d\nLoss = %.3f' % (i, len(animation_fram), animation_fram[i][3]))
+    frame_text.set_text('Timestep = %.1d/%.1d\nLoss = %.3f' % (i, len(animation_fram), animation_fram[i][3])) # 更新帧文本信息，包括当前帧索引、总帧数和损失值
     
-    return (line_d,) + (C1_dots,) + (C2_dots,)
+    return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象，以便 Matplotlib 动画知道要更新哪些部分
 
 # 创建动画对象，设置动画的参数
 anim = animation.FuncAnimation(f, animate, init_func=init,

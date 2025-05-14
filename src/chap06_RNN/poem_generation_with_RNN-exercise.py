@@ -32,7 +32,7 @@ def process_dataset(fileName):
     counter = collections.Counter()
     for e in examples:
         for w in e:
-            counter[w]+=1
+            counter[w] += 1
     
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])  # 排序
     words, _ = zip(*sorted_counter)

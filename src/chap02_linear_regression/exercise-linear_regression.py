@@ -28,13 +28,36 @@ def load_data(filename):
 
 # ## 不同的基函数 (basis function)的实现 填空顺序 2
 # 
+def identity_basis(x):
+    ret = np.expand_dims(x, axis=1)
+    return ret
+    
 # 请分别在这里实现“多项式基函数”以及“高斯基函数”
 # 
+def multinomial_basis(x, feature_num=10):
+    x = np.expand_dims(x, axis=1) # shape(N, 1)
+    feat = [x]
+    for i in range(2, feature_num+1):
+        feat.append(x**i)
+    ret = np.concatenate(feat, axis=1)
+    return ret
+
+def gaussian_basis(x, feature_num=10):
+    centers = np.linspace(0, 25, feature_num)
+    width = 1.0 * (centers[1] - centers[0])
+    x = np.expand_dims(x, axis=1)
+    x = np.concatenate([x]*feature_num, axis=1)
+    
+    out = (x-centers)/width
+    ret = np.exp(-0.5 * out ** 2)
+    return ret
+    
 # 其中以及训练集的x的范围在0-25之间
 
 # In[6]:
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
+    # 用于适配线性回归的矩阵运算格式 
     ret = np.expand_dims(x, axis=1)
     return ret
 
@@ -45,6 +68,7 @@ def multinomial_basis(x, feature_num=10):
     #==========
     #todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
+    # 通过列表推导式创建各次项，最后在列方向拼接合并
     x = np.expand_dims(x, axis=1) # shape(N, 1)
     # 生成 1, x, x^2, ..., x^(feature_num-1)
     ret = [x**i for i in range(1, feature_num+1)]
@@ -88,7 +112,13 @@ def least_squares(phi, y, alpha=0.0):
     return w
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化"""
+    """梯度下降优化
+    :param phi: 特征矩阵
+    :param y: 标签向量
+    :param lr: 学习率（默认为 0.01）
+    :param epochs: 迭代次数（默认为 1000）
+    :return: 优化后的权重向量 w
+    """
     # 初始化权重 w 为全零向量
     w = np.zeros(phi.shape[1])
     # 迭代训练 epochs 次

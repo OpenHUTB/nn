@@ -35,7 +35,7 @@ def randomString(stringLength):
 
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]
-    enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
+    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
@@ -69,6 +69,16 @@ class mySeq2SeqModel(keras.Model):
         '''
         完成sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好
         '''
+        # 编码过程
+        enc_emb = self.embed_layer(enc_ids)  # (batch_size, enc_seq_len, emb_dim)
+        enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (batch_size, enc_seq_len, enc_units)
+        
+        # 解码过程，使用编码器的最终状态作为初始状态
+        dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
+        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
+        
+        # 计算logits
+        logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
         return logits
     
     

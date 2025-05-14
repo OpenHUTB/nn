@@ -33,10 +33,10 @@ print("(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,
 # 大小为 3x2.
 print("第四题：\n")
 
-a = np.zeros((3, 3), dtype=int)
-b = np.ones((4, 5))
-c = np.eye(4)
-d = np.random.random((3, 2))
+a = np.zeros((3, 3), dtype=int)# 全0矩阵，3x3
+b = np.ones((4, 5))                  # 全1矩阵，4x5
+c = np.eye(4)                        # 单位矩阵，4x4
+d = np.random.random((3, 2))         # 随机数矩阵，3x2
 
 # 5. 建立一个数组 a,(值为[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1)打印a; (2)输出  下标为(2,3),(0,0) 这两个数组元素的值
 print("第五题：\n")
@@ -69,14 +69,14 @@ print("输出:\n", a[[0, 1, 2], [0, 1, 0]])
 # 2, 0, 1])    print(a[np.arange(4), b]))
 print("第九题：\n")
 
-a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
-b = np.array([0, 2, 0, 1])
+a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])# 创建一个 4x3 的二维数组 a
+b = np.array([0, 2, 0, 1])# 创建一个一维数组 b，表示每行需要提取的列索引
 print("输出:\n", a[np.arange(4), b])
 
 # 10.对9 中输出的那四个元素，每个都加上10，然后重新输出矩阵a.(提示： a[np.arange(4), b] += 10 ）
 print("第十题：\n")
 
-a[np.arange(4), b] += 10
+a[np.arange(4), b] += 10 #利用numpy的高级索引功能，行用 np.arange(4) 生成，列用 b 数组指定，进行加法操作
 print("输出:", a)
 
 # 11.  执行 x = np.array([1, 2])，然后输出 x 的数据类型
@@ -181,7 +181,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
 
 # 显示图例
-plt.legend()
+plt.legend(loc='upper right')
 
 plt.show()
 
@@ -205,7 +205,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
  
  # 显示图例
-plt.legend()
+plt.legend(loc='upper right')
 plt.show()
 
 
@@ -219,5 +219,5 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
  
  # 显示图例
-plt.legend()
+plt.legend(loc='upper right')
 plt.show()

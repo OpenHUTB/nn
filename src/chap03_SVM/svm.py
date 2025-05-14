@@ -65,7 +65,13 @@ class SVM():
                     self.b -= learning_rate * (-t[idx])
         # 请补全此处代码
 
-    def predict(self, x):
+        def predict(self, x):
+            if self.weights is None:
+                raise RuntimeError("Model not trained yet")
+            logits = np.dot(x, self.weights) + self.bias
+            return (logits >= 0).astype(int)  
+        # 二分类示例
+    #def predict(self, x):
         """
         预测标签。
         """
