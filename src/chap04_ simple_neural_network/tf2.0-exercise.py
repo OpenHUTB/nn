@@ -20,8 +20,8 @@ def softmax(x):
     '''实现softmax函数，只要求对最后一维归一化，
     不允许用tf自带的softmax函数'''
     x_max = tf.reduce_max(x, axis=-1, keepdims=True)
-    e_x = tf.exp(x - x_max)
-    prob_x = e_x / tf.reduce_sum(e_x, axis=-1, keepdims=True)
+    e_x = tf.exp(x - x_max)                                     #数值稳定处理：减去最大值防止指数爆炸
+    prob_x = e_x / tf.reduce_sum(e_x, axis=-1, keepdims=True)   #归一化
     ##########
     return prob_x
 
@@ -39,7 +39,7 @@ test_data = np.random.normal(size=[10, 5])
 def sigmoid(x):
     ##########
     '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
-    prob_x = 1 / (1 + tf.exp(-x))
+    prob_x = 1 / (1 + tf.exp(-x))           #sigmoid 数学定义：1 / (1 + e^{-x})
     ##########
     return prob_x
 
@@ -58,7 +58,7 @@ def softmax_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     epsilon = 1e-8
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x + epsilon), axis=1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x + epsilon), axis=1))     #计算交叉熵：-Σ(label * log(prob))
     ##########
     return loss
 
