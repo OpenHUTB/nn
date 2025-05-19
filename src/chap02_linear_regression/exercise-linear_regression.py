@@ -112,7 +112,13 @@ def least_squares(phi, y, alpha=0.0):
     return w
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化"""
+    """梯度下降优化
+    :param phi: 特征矩阵
+    :param y: 标签向量
+    :param lr: 学习率（默认为 0.01）
+    :param epochs: 迭代次数（默认为 1000）
+    :return: 优化后的权重向量 w
+    """
     # 初始化权重 w 为全零向量
     w = np.zeros(phi.shape[1])
     # 迭代训练 epochs 次
@@ -225,10 +231,10 @@ if __name__ == '__main__':
     plt.plot(x_train, y_train, 'ro', markersize=3)
 #     plt.plot(x_test, y_test, 'k')
     plt.plot(x_test, y_test_pred, 'k')
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('Linear Regression')
-    plt.legend(['train', 'test', 'pred'])
+    plt.xlabel('x') # 设置x轴的标签
+    plt.ylabel('y') # 设置y轴的标签
+    plt.title('Linear Regression') # 设置图表标题
+    plt.legend(['train', 'test', 'pred']) # 添加图例，表示每条线的含义
     plt.show()
 
 
