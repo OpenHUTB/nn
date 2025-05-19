@@ -20,28 +20,28 @@ import matplotlib.cm as cm
 import numpy as np
 #get_ipython().run_line_magic('matplotlib', 'inline')
 
-dot_num = 100
-x_p = np.random.normal(3., 1, dot_num)
+dot_num = 100 # 设置数据点数量
+x_p = np.random.normal(3., 1, dot_num) # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
 y_p = np.random.normal(6., 1, dot_num)
 y = np.ones(dot_num)
 C1 = np.array([x_p, y_p, y]).T
 
-x_n = np.random.normal(6., 1, dot_num)
+x_n = np.random.normal(6., 1, dot_num) # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 y_n = np.random.normal(3., 1, dot_num)
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
-x_b = np.random.normal(7., 1, dot_num)
+x_b = np.random.normal(7., 1, dot_num) # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
 y_b = np.random.normal(7., 1, dot_num)
 y = np.ones(dot_num)*2
 C3 = np.array([x_b, y_b, y]).T
 
-plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
-plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
-plt.scatter(C3[:, 0], C3[:, 1], c='r', marker='*')
+plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+') # 绘制正样本，用蓝色加号表示
+plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o') # 绘制负样本，用绿色圆圈表示
+plt.scatter(C3[:, 0], C3[:, 1], c='r', marker='*') # 绘制负样本，用红色星号表示
 
-data_set = np.concatenate((C1, C2, C3), axis=0)
-np.random.shuffle(data_set)
+data_set = np.concatenate((C1, C2, C3), axis=0) # 将正样本和负样本连接成一个数据集
+np.random.shuffle(data_set) # 随机打乱数据集的顺序
 
 
 # ## 建立模型

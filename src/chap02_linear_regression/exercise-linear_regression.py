@@ -231,10 +231,10 @@ if __name__ == '__main__':
     plt.plot(x_train, y_train, 'ro', markersize=3)
 #     plt.plot(x_test, y_test, 'k')
     plt.plot(x_test, y_test_pred, 'k')
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.title('Linear Regression')
-    plt.legend(['train', 'test', 'pred'])
+    plt.xlabel('x') # 设置x轴的标签
+    plt.ylabel('y') # 设置y轴的标签
+    plt.title('Linear Regression') # 设置图表标题
+    plt.legend(['train', 'test', 'pred']) # 添加图例，表示每条线的含义
     plt.show()
 
 

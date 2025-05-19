@@ -24,14 +24,14 @@ def eval_acc(label, pred):
     """
     计算准确率。
     """
-    return np.sum(label == pred) / len(pred)
+    return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
 
 
 class SVM():
     """
     SVM模型。
     """
-
+    #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self):
         # 请补全此处代码
         self.w = None  # 权重向量
@@ -49,8 +49,8 @@ class SVM():
         # 初始化参数
         n_samples, n_features = x.shape
         self.w = np.zeros(n_features)
-        learning_rate = 0.01
-        lambda_ = 0.01
+        learning_rate = 0.01            # 学习率η：控制参数更新步长
+        lambda_ = 0.01                  # 正则化系数λ：控制模型复杂度         
         epochs = 1000
  
         # 梯度下降优化
@@ -66,9 +66,10 @@ class SVM():
         # 请补全此处代码
 
         def predict(self, x):
+
             if self.weights is None:
                 raise RuntimeError("Model not trained yet")
-            logits = np.dot(x, self.weights) + self.bias
+            logits = np.dot(x, self.weights) + self.bias#输入特征 x 与权重矩阵 self.weights 的点积+偏置项 
             return (logits >= 0).astype(int)  
         # 二分类示例
     #def predict(self, x):
@@ -77,8 +78,8 @@ class SVM():
         """
 
         # 请补全此处代码
-# 计算决策函数值
-        decision_values = np.dot(x, self.w) + self.b
+        # 计算决策函数值
+        decision_values = np.dot(x, self.w) + self.b#计算决策函数值:logits = X·w + b,其中 w 是权重向量,b 是偏置项
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, 0)
 
