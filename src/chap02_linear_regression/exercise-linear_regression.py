@@ -9,21 +9,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def load_data(filename):
-    """载入数据。"""
-     #:param filename: 数据文件的路径
-     #:return: 包含特征和标签的 numpy 数组
+    """载入数据。
+
+    Args:
+        filename: 数据文件的路径
+
+    Returns:
+        tuple: 包含特征和标签的numpy数组 (xs, ys)
+    """
     xys = []
-    # 打开指定文件进行读取操作
     with open(filename, 'r') as f:
-        # 逐行读取文件内容
         for line in f:
-            # 将每行内容按空格分割并转换为浮点数，添加到 xys 列表中
-            xys.append(map(float, line.strip().split()))
-        # 将 xys 列表中的元素拆分为 xs 和 ys 两个元组
-        xs, ys = zip(*xys)
-        # 将元组转换为 numpy 数组并返回
-        return np.asarray(xs), np.asarray(ys)
+            # 将每行内容按空格分割并转换为浮点数
+            line_data = list(map(float, line.strip().split()))
+            xys.append(line_data)
+    # 将数据拆分为特征和标签
+    xs, ys = zip(*xys)
+    return np.asarray(xs), np.asarray(ys)
 
 
 # ## 不同的基函数 (basis function)的实现 填空顺序 2
