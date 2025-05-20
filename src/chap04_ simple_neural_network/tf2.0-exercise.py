@@ -6,8 +6,8 @@
 # In[2]:
 
 
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 
 # ## 实现softmax函数
