@@ -65,17 +65,18 @@ class SVM():
                     self.b -= learning_rate * (-t[idx])
         # 请补全此处代码
 
-        def predict(self, x):
-            if self.weights is None:
-                raise RuntimeError("Model not trained yet")
-            logits = np.dot(x, self.weights) + self.bias
-            return (logits >= 0).astype(int)  
+#        def predict(self, x):
+#            if self.weights is None:
+#                raise RuntimeError("Model not trained yet")
+#            logits = np.dot(x, self.weights) + self.bias
+#            return (logits >= 0).astype(int)##
         # 二分类示例
-    #def predict(self, x):
+    def predict(self, x):
         """
         预测标签。
         """
-
+        if self.w is None:
+            raise RuntimeError("Model not trained yet")
         # 请补全此处代码
 # 计算决策函数值
         decision_values = np.dot(x, self.w) + self.b
