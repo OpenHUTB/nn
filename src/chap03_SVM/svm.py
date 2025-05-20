@@ -69,7 +69,7 @@ class SVM():
 #            if self.weights is None:
 #                raise RuntimeError("Model not trained yet")
 #            logits = np.dot(x, self.weights) + self.bias
-#            return (logits >= 0).astype(int)##
+#            return (logits >= 0).astype(int)
         # 二分类示例
     def predict(self, x):
         """

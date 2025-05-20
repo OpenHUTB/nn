@@ -62,6 +62,7 @@ np.random.shuffle(data_set)
 epsilon = 1e-12
 class LogisticRegression():
     def __init__(self):
+        #正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
         # L2正则化，防止过拟合，正则化系数为0.01
         l2_reg = tf.keras.regularizers.l2(0.01)
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
@@ -92,6 +93,9 @@ def compute_loss(pred, label):
     #todo 填空一，实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
     # 计算每个样本的sigmoid交叉熵损失，防止log(0)的情况，加上一个小的epsilon
     losses = - label * tf.math.log(pred + epsilon) - (1 - label) * tf.math.log(1 - pred + epsilon)
+    # 交叉熵损失公式（二分类问题）：
+    # L = -Σ [y * log(p) + (1 - y) * log(1 - p)]
+    # 其中 y 是真实标签，p 是预测概率
     '''============================='''
     # 计算所有样本损失的平均值
     loss = tf.reduce_mean(losses)

@@ -208,4 +208,138 @@ print(a)
   - `x / y` 和 `np.divide` 均为逐元素除法，结果一致。  
   - **关键点**：除法运算符 `/` 与 `np.divide` 等价，结果为浮点数类型。
 
-  
+#### 17. 数组开方
+```python
+print("第十七题：\n")
+print("np.sqrt(x)\n", np.sqrt(x))
+```
+- **功能**：对数组`x`中每个元素计算算术平方根
+- **输出示例**：  
+  `[[1.         1.41421356 1.73205081] [2.         2.23606798 2.44948974]]`
+
+
+#### 18. 矩阵点积
+```python
+print("第十八题：\n")
+print("x.dot(y)\n", x.dot(y))
+print("np.dot(x,y)\n", np.dot(x, y))
+```
+- **功能**：计算矩阵`x`和`y`的点积（需满足矩阵乘法维度规则）
+- **两种实现方式**：
+  - 数组方法 `.dot()`
+  - 函数 `np.dot()`
+- **输出示例**：  
+  `[[58 64] [139 154]]`
+
+
+#### 19. 数组求和
+```python
+print("第十九题：\n")
+print("print(np.sum(x)):", np.sum(x))         # 所有元素求和
+print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
+print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 按行求和（行维度）
+```
+- **`axis`参数说明**：
+  - `axis=0`：沿第0轴（列方向），返回各列之和
+  - `axis=1`：沿第1轴（行方向），返回各行之和
+- **输出示例**：  
+  `21 [5 7 9] [6 15]`
+
+
+#### 20. 数组求平均
+```python
+print("第二十题：\n")
+print("print(np.mean(x))", np.mean(x))         # 全局均值
+print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 列均值
+print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行均值
+```
+- **与求和逻辑一致**：通过`axis`参数控制维度
+- **输出示例**：  
+  `3.5 [2.5 3.5 4.5] [2.  5. ]`
+
+
+#### 21. 矩阵转置
+```python
+print("第二十一题：\n")
+print("转置后的结果:\n", x.T)
+```
+- **功能**：交换数组的行和列
+- **输出示例**：  
+  `[[1 4] [2 5] [3 6]]`
+
+
+#### 22. 自然指数计算
+```python
+print("第二十二题：\n")
+print(np.exp(x))
+```
+- **功能**：对每个元素计算`e^x`（`e`为自然常数）
+- **输出示例**：  
+  `[[2.71828183e+00 7.38905610e+00 2.00855369e+01] [5.45981500e+01 1.48413159e+02 4.03428793e+02]]`
+
+
+#### 23. 最大值下标查找
+```python
+print("第二十三题：\n")
+print("print(np.argmax(x))", np.argmax(x))         # 全局最大值下标（扁平索引）
+print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))  # 各列最大值下标
+print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))  # 各行最大值下标
+```
+- **索引规则**：
+  - 全局索引：按行优先展开为一维数组后的索引
+  - 列索引：每列最大值在该列中的行索引
+  - 行索引：每行最大值在该行中的列索引
+- **输出示例**（假设`x=[[1,3],[2,4]]`）：  
+  `3 [1 1] [1 1]`
+
+
+#### 24. 绘制二次函数图像
+```python
+print("第二十四题：\n")
+x_plot = np.arange(0, 100, 0.1)  # 生成0-100的连续数据（步长0.1）
+y_plot = x_plot ** 2
+
+plt.figure(figsize=(10, 6))  # 创建画布（宽10英寸，高6英寸）
+plt.plot(x_plot, y_plot, label="y = x^2", color="blue")  # 绘制曲线
+
+# 图像美化
+plt.title("Plot of y = x^2")       # 标题
+plt.xlabel("x")                   # x轴标签
+plt.ylabel("y")                   # y轴标签
+plt.grid(True)                    # 显示网格
+plt.legend(loc='upper right')     # 图例位置
+plt.show()                        # 显示图像
+```
+- **图像特点**：开口向上的抛物线，横坐标范围[0,100]，纵坐标自动适配
+
+
+#### 25-26. 绘制正余弦函数图像
+```python
+print("第二十五题：\n")
+x_sin_cos = np.arange(0, 3 * np.pi, 0.1)  # 0到3π的连续数据
+y_sin = np.sin(x_sin_cos)
+y_cos = np.cos(x_sin_cos)
+
+# 绘制正弦曲线
+plt.figure(figsize=(10, 6))
+plt.plot(x_sin_cos, y_sin, label="y = sin(x)", color="blue")
+plt.title("Plot of y = sin(x)")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# 绘制余弦曲线（代码结构与正弦一致）
+plt.figure(figsize=(10, 6))
+plt.plot(x_sin_cos, y_cos, label="y = cos(x)", color="red")
+plt.title("Plot of y = cos(x)")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid(True)
+plt.legend()
+plt.show()
+```
+- **图像特点**：
+  - 正弦曲线：周期为`2π`，值域[-1,1]
+  - 余弦曲线：与正弦曲线相位差`π/2`，形状相同但平移

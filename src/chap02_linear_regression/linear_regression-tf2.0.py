@@ -10,8 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def identity_basis(x):
-    ret = np.expand_dims(x, axis=1)
-    return ret
+    return np.expand_dims(x, axis=1)
+
 
 def multinomial_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1) # shape(N, 1)
