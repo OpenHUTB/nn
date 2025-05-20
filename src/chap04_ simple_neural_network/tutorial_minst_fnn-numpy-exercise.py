@@ -99,7 +99,7 @@ class Softmax:
         g_y_exp = np.expand_dims(grad_y, axis=1)
         tmp = np.matmul(g_y_exp, sisj) #(N, 1, c)
         tmp = np.squeeze(tmp, axis=1)
-        tmp = -tmp+grad_y*s 
+        tmp = -tmp + grad_y * s 
         return tmp
     
 class Log:
