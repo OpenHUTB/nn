@@ -51,7 +51,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
-        self.v_sz=27
+        self.v_sz = 27
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
         
