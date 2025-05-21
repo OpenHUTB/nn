@@ -78,7 +78,7 @@ class SVM():
         if self.w is None:
             raise RuntimeError("Model not trained yet")
         # 请补全此处代码
-# 计算决策函数值
+        # 计算决策函数值
         decision_values = np.dot(x, self.w) + self.b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, 0)
