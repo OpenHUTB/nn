@@ -10,7 +10,7 @@ def load_data(fname):
     """
     with open(fname, 'r') as f:
         data = []
-        line = f.readline()
+        line = f.readline() # 首行是标题行，自动跳过
         for line in f:
             line = line.strip().split()
             x1 = float(line[0])
