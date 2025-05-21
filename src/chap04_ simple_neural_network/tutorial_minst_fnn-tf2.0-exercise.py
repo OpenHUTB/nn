@@ -61,7 +61,7 @@ optimizer = optimizers.Adam()
 # ## 计算 loss
 
 # In[13]:
-# 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
+# 以下部分函数皆使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def compute_loss(logits, labels):
     # 计算稀疏softmax交叉熵损失，并求平均值
@@ -69,7 +69,6 @@ def compute_loss(logits, labels):
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels))
 
-# 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def compute_accuracy(logits, labels):
     # 对logits在axis=1维度上取最大值的索引，得到预测结果
@@ -77,7 +76,6 @@ def compute_accuracy(logits, labels):
     # 计算预测结果与真实标签相等的比例，得到准确率
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
-# 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def train_one_step(model, optimizer, x, y):
     # 使用GradientTape记录计算图，用于自动求导
@@ -97,7 +95,6 @@ def train_one_step(model, optimizer, x, y):
     # loss and accuracy is scalar tensor
     return loss, accuracy
 
-# 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def test(model, x, y):
     logits = model(x)
