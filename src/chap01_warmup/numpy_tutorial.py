@@ -9,7 +9,11 @@
 import numpy as np
 
 # 导入matplotlib.pyplot库
+<<<<<<< HEAD
 import matplotlib
+=======
+import matplotlib.pyplot
+>>>>>>> 66425a2 (添加了一些注释易于理解)
 
 matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码
 import matplotlib.pyplot as plt #导入matplotlib库并命名为plt库
@@ -33,10 +37,17 @@ print("(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,
 # 大小为 3x2.
 print("第四题：\n")
 
+<<<<<<< HEAD
 a = np.zeros((3, 3), dtype=int)# 全0矩阵，3x3
 b = np.ones((4, 5))                  # 全1矩阵，4x5
 c = np.eye(4)                        # 单位矩阵，4x4
 d = np.random.random((3, 2))         # 随机数矩阵，3x2
+=======
+a = np.zeros((3, 3), dtype=int)
+b = np.ones((4, 5))
+c = np.eye(4)
+d = np.random.random((3, 2))
+>>>>>>> 66425a2 (添加了一些注释易于理解)
 
 # 5. 建立一个数组 a,(值为[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1)打印a; (2)输出  下标为(2,3),(0,0) 这两个数组元素的值
 print("第五题：\n")
@@ -69,14 +80,23 @@ print("输出:\n", a[[0, 1, 2], [0, 1, 0]])
 # 2, 0, 1])    print(a[np.arange(4), b]))
 print("第九题：\n")
 
+<<<<<<< HEAD
 a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])# 创建一个 4x3 的二维数组 a
 b = np.array([0, 2, 0, 1])# 创建一个一维数组 b，表示每行需要提取的列索引
+=======
+a = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]])
+b = np.array([0, 2, 0, 1])
+>>>>>>> 66425a2 (添加了一些注释易于理解)
 print("输出:\n", a[np.arange(4), b])
 
 # 10.对9 中输出的那四个元素，每个都加上10，然后重新输出矩阵a.(提示： a[np.arange(4), b] += 10 ）
 print("第十题：\n")
 
+<<<<<<< HEAD
 a[np.arange(4), b] += 10 #利用numpy的高级索引功能，行用 np.arange(4) 生成，列用 b 数组指定，进行加法操作
+=======
+a[np.arange(4), b] += 10
+>>>>>>> 66425a2 (添加了一些注释易于理解)
 print("输出:", a)
 
 # 11.  执行 x = np.array([1, 2])，然后输出 x 的数据类型
@@ -94,12 +114,21 @@ print("输出:", type(x))
 # 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出 x+y ,和 np.add(x,y)
 print("第十三题：\n")
 
+<<<<<<< HEAD
 x = np.array([[1, 2], [3, 4]], dtype=np.float64)# 创建一个二维的 NumPy 数组 x，其元素为 [[1, 2], [3, 4]]，数据类型指定为 np.float64（双精度浮点数）
 y = np.array([[5, 6], [7, 8]], dtype=np.float64)# 创建另一个二维的 NumPy 数组 y，其元素为 [[5, 6], [7, 8]]，数据类型同样为 np.float64
 
 print("x+y\n", x + y)# 使用 + 运算符对两个数组进行逐元素相加操作，并将结果打印出来
 
 print("np.add(x,y)\n", np.add(x, y))# np.add 是 NumPy 库中用于数组相加的函数，同样会对两个数组进行逐元素相加
+=======
+x = np.array([[1, 2], [3, 4]], dtype=np.float64)
+y = np.array([[5, 6], [7, 8]], dtype=np.float64)
+
+print("x+y\n", x + y)
+
+print("np.add(x,y)\n", np.add(x, y))
+>>>>>>> 66425a2 (添加了一些注释易于理解)
 
 # 14. 利用 13题目中的x,y 输出 x-y 和 np.subtract(x,y)
 print("第十四题：\n")
@@ -145,7 +174,10 @@ print("print(np.mean(x))", np.mean(x))
 print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))
 print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 66425a2 (添加了一些注释易于理解)
 # 21.利用13题目中的x，对x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("第二十一题：\n")
 
@@ -156,6 +188,7 @@ print("第二十二题：\n")
 
 print(np.exp(x))
 
+<<<<<<< HEAD
 
 # 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
@@ -221,3 +254,34 @@ plt.grid(True)
  # 显示图例
 plt.legend(loc='upper right')
 plt.show()
+=======
+# 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
+print("第二十三题：\n")
+print("print(np.argmax(x))", np.argmax(x))
+print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))
+print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))
+
+# 24,画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （提示这里用到  matplotlib.pyplot 库）
+def plot_function(x, y, title, xlabel, ylabel, label, color="blue"):
+    plt.figure(figsize=(10, 6))  # 设置图像大小
+    plt.plot(x, y, label=label, color=color)  # 绘制曲线
+    plt.title(title)  # 图像标题
+    plt.xlabel(xlabel)  # x 轴标签
+    plt.ylabel(ylabel)  # y 轴标签
+    plt.grid(True)  # 添加网格
+    plt.legend()  # 显示图例
+    plt.show()
+
+print("第二十四题：\n")
+x = np.arange(0, 100, 0.1) # 生成 x 轴的数据点，范围从 0 到 100，步长为 0.1
+y = x * x
+plot_function(x, y, "Plot of y = x^2", "x", "y", "y = x^2") # 调用 plot_function 函数绘制 y = x^2 的图像
+
+print("第二十五题：\n")
+x = np.arange(0, 3 * np.pi, 0.1) # 生成 x 轴的数据点，范围从 0 到 3π，步长为 0.1
+y_sin = np.sin(x)  # 计算 y = sin(x) 的值
+plot_function(x, y_sin, "Plot of y = sin(x)", "x", "y", "y = sin(x)")
+
+y_cos = np.cos(x)  # 计算 y = cos(x) 的值
+plot_function(x, y_cos, "Plot of y = cos(x)", "x", "y", "y = cos(x)")
+>>>>>>> 66425a2 (添加了一些注释易于理解)
