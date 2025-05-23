@@ -13,7 +13,7 @@
 
 # In[17]:
 
-
+#环境配置与库导入
 import os
 import tensorflow as tf
 from tensorflow import keras
@@ -21,7 +21,7 @@ from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}设置TensorFlow日志级别,表示只显示错误信息
 
 def cifar10_dataset():
     (x, y), (x_test, y_test) = datasets.cifar10.load_data()

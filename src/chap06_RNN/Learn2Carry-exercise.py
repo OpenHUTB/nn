@@ -107,11 +107,11 @@ class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
         self.embed_layer = tf.keras.layers.Embedding(10, 32, 
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape=[None, None])#嵌入层
         
-        self.rnncell = tf.keras.layers.SimpleRNNCell(64)
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
-        self.dense = tf.keras.layers.Dense(10)
+        self.rnncell = tf.keras.layers.SimpleRNNCell(64)#RNN单元
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)#RNN层
+        self.dense = tf.keras.layers.Dense(10)#全连接层
         
     @tf.function
     def call(self, num1, num2):
@@ -138,6 +138,7 @@ class myRNNModel(keras.Model):
 
 
 @tf.function
+#交叉熵损失函数： L = -Σ y_t log(softmax(logits_t))
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
