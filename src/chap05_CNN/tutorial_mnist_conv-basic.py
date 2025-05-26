@@ -49,14 +49,15 @@ def prepare_mnist_features_and_labels(x, y):
 class myConvModel(keras.Model):
     def __init__(self):
         super(myConvModel, self).__init__()
-        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
-        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')#定义第一层卷积层,有32个过滤器,每个过滤器大小为5x5,使用ReLU激活函数
+        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')#第二层卷积层
+        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)#池化层
         self.flat = Flatten()
-        self.dense1 = layers.Dense(100, activation='tanh')
-        self.dense2 = layers.Dense(10)
+        self.dense1 = layers.Dense(100, activation='tanh')#全连接层,有100个神经元,使用tanh激活函数
+        self.dense2 = layers.Dense(10)#输出层,有10个神经元
     @tf.function
     def call(self, x):
+        #前向传播
         h1 = self.l1_conv(x)
         h1_pool = self.pool(h1)
         h2 = self.l2_conv(h1_pool)
@@ -77,12 +78,14 @@ optimizer = optimizers.Adam()
 
 @tf.function
 def compute_loss(logits, labels):
+    #计算交叉熵损失
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels))
 
 @tf.function
 def compute_accuracy(logits, labels):
+    #计算预测准确率
     predictions = tf.argmax(logits, axis=1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
@@ -93,9 +96,9 @@ def train_one_step(model, optimizer, x, y):
         logits = model(x)
         loss = compute_loss(logits, y)
 
-    # compute gradient
+    # compute gradient(梯度)
     grads = tape.gradient(loss, model.trainable_variables)
-    # update to weights
+    # update to weights(权重)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
     accuracy = compute_accuracy(logits, y)
