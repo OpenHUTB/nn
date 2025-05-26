@@ -186,3 +186,4 @@ plot_function(x, y_sin, "Plot of y = sin(x)", "x", "y", "y = sin(x)")
 y_cos = np.cos(x)  # 计算 y = cos(x) 的值
 plot_function(x, y_cos, "Plot of y = cos(x)", "x", "y", "y = cos(x)")
 
+
