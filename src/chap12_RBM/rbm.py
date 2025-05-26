@@ -11,10 +11,14 @@ class RBM:
         """Initialize model."""
 
         # 请补全此处代码
+        if n_hidden <= 0 or n_observe <= 0:
+            raise ValueError("Number of hidden and visible units must be positive integers.")
         self.n_hidden = n_hidden
         self.n_observe = n_observe
         # 初始化权重和偏置
-        self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
+        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))
+        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))
+        #self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
         self.b_h = np.zeros(n_hidden)
         self.b_v = np.zeros(n_observe)
         pass
