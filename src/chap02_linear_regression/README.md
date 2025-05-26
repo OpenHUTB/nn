@@ -118,6 +118,77 @@
 ---
 ## 注意事项
 1. 确保 `train.txt` 和 `test.txt` 文件路径正确。
+
 2. 高斯基函数的宽度默认基于数据范围自动计算，可根据实际数据分布调整。
+
 3. 梯度下降法的学习率和迭代次数需手动调整（代码中 `lr` 和 `epochs` 参数）。
 
+   
+
+   
+
+# [linear_regression-tf2.0.py](https://github.com/bbacxc/nn/blob/main/src/chap02_linear_regression/linear_regression-tf2.0.py)线性回归基函数模型说明文档
+
+## 项目概述
+
+本项目实现了一个使用不同基函数(basis function)的线性回归模型，用于拟合非线性数据。通过TensorFlow框架实现，并提供结果可视化功能。
+
+## 主要功能
+
+- 提供三种基函数选择：
+  - 恒等基函数(identity_basis) - 普通线性回归
+  - 多项式基函数(multinomial_basis) - 多项式特征回归
+  - 高斯基函数(gaussian_basis) - 径向基函数回归
+- 自定义线性回归模型实现
+- 训练和评估指标计算
+- 数据可视化展示
+
+## 环境要求
+
+- Python 3.x
+- NumPy 科学计算库
+- Matplotlib 绘图库
+- TensorFlow 2.x 深度学习框架
+
+## 使用方法
+
+1. 准备训练数据`train.txt`和测试数据`test.txt`，每行包含用空格分隔的x,y值
+2. 运行Jupyter notebook或Python脚本
+3. 程序将自动执行以下操作：
+   - 加载并预处理数据
+   - 训练线性回归模型
+   - 在训练集和测试集上评估性能
+   - 显示原始数据与预测结果的对比图
+
+## 自定义设置
+
+可通过修改`load_data()`函数中的`basis_func`参数选择不同的基函数：
+
+- `identity_basis` - 简单线性回归
+- `multinomial_basis` - 多项式回归
+- `gaussian_basis` - 径向基函数回归(默认)
+
+## 训练参数
+
+- 学习率: 0.1 (使用Adam优化器)
+- 训练迭代次数: 1000
+- 损失函数: 均方根误差(RMSE)
+
+## 输出结果
+
+程序运行后将输出:
+
+- 训练过程中的损失值
+- 训练集预测值与真实值的标准差
+- 测试集预测值与真实值的标准差
+- 可视化图表包含:
+  - 训练数据点(红色圆点)
+  - 测试集预测结果(黑色曲线)
+
+## 文件说明
+
+- `train.txt` - 训练数据文件
+- `test.txt` - 测试数据文件
+- (可选)包含完整实现的Jupyter notebook文件
+
+注意：用户需要自行准备`train.txt`和`test.txt`数据文件，并放在与脚本相同的目录下。
