@@ -46,7 +46,8 @@ def softmax_ce(x, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     epsilon = 1e-8
     x = tf.cast(x, tf.float32)
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x + epsilon), axis=1))     # 计算交叉熵：-Σ(label * log(prob))
+    label = tf.cast(label, tf.float32) # 将标签转换为float32
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x + epsilon), axis=1))     #计算交叉熵：-Σ(label * log(prob))
     ##########
     return loss
 
@@ -68,6 +69,8 @@ def sigmoid_ce(x, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     epsilon = 1e-8
     x = tf.cast(x, tf.float32)
+    label = tf.cast(label, tf.float32) # 将标签转换为float32
+    # 计算sigmoid交叉熵损失，先计算每个样本的交叉熵，再求平均值
     loss = -tf.reduce_mean(
         label * tf.math.log(x + epsilon) +
         (1 - label) * tf.math.log(1 - x + epsilon)
