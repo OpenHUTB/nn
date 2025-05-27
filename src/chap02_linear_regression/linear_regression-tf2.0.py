@@ -3,9 +3,6 @@
 
 # ## 设计基函数(basis function) 以及数据读取
 
-# In[20]:
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 
