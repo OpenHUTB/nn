@@ -65,6 +65,7 @@ class linearModel(Model):
         
     @tf.function
     def call(self, x):
+
         y = tf.squeeze(tf.matmul(x, self.w), axis=1)
         return y
 
