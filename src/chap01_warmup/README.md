@@ -99,6 +99,7 @@ print(a[np.arange(4), b])
 (1,2) → 6
 (2,0) → 7
 (3,1) → 11
+
 #### 10. 修改数组中的特定元素
 ```python
 a[np.arange(4), b] += 10
@@ -108,10 +109,7 @@ print(a)
 
   以下是统一格式后的第11题至第16题解析：
 
-  ### **第11题解析**  
-  **题目要求**：执行 `x = np.array([1, 2])`，输出 `x` 的数据类型。  
-  **代码示例**：  
-
+#### 11. 执行 `x = np.array([1, 2])`，输出 `x` 的数据类型  
   ```python
   x = np.array([1, 2])
   print("输出:", type(x))  # 输出: <class 'numpy.ndarray'>
@@ -124,10 +122,7 @@ print(a)
 
   ---
 
-  ### **第12题解析**  
-  **题目要求**：执行 `x = np.array([1.0, 2.0])`，输出 `x` 的数据类型。  
-  **代码示例**：  
-
+#### 12. 执行 `x = np.array([1.0, 2.0])`，输出 `x` 的数据类型
   ```python
   x = np.array([1.0, 2.0])
   print("输出:", type(x))  # 输出: <class 'numpy.ndarray'>
@@ -139,9 +134,7 @@ print(a)
 
   ---
 
-  ### **第13题解析**  
-  **题目要求**：创建两个二维数组 `x` 和 `y`，输出 `x + y` 和 `np.add(x, y)`。  
-  **代码示例**：  
+#### 13. 创建两个二维数组 `x` 和 `y`，输出 `x + y` 和 `np.add(x, y)`  
   ```python
   x = np.array([[1, 2], [3, 4]], dtype=np.float64)
   y = np.array([[5, 6], [7, 8]], dtype=np.float64)
@@ -154,9 +147,7 @@ print(a)
 
   ---
 
-  ### **第14题解析**  
-  **题目要求**：利用第13题的 `x` 和 `y`，输出 `x - y` 和 `np.subtract(x, y)`。  
-  **代码示例**：  
+#### 14. 利用第13题的 `x` 和 `y`，输出 `x - y` 和 `np.subtract(x, y)`  
   ```python
   print("x - y:\n", x - y)
   print("np.subtract(x, y):\n", np.subtract(x, y))
@@ -167,9 +158,7 @@ print(a)
 
   ---
 
-  ### **第15题解析**  
-  **题目要求**：利用第13题的 `x` 和 `y`，输出 `x * y`、`np.multiply(x, y)` 和 `np.dot(x, y)`，比较差异。  
-  **代码示例**：  
+#### 15. 利用第13题的 `x` 和 `y`，输出 `x * y`、`np.multiply(x, y)` 和 `np.dot(x, y)`，比较差异 
   ```python
   print("逐元素乘法（x * y）:\n", x * y)
   print("np.multiply(x, y):\n", np.multiply(x, y))
@@ -191,9 +180,7 @@ print(a)
 
   ---
 
-  ### **第16题解析**  
-  **题目要求**：利用第13题的 `x` 和 `y`，输出 `x / y` 和 `np.divide(x, y)`。  
-  **代码示例**：  
+#### 16. 利用第13题的 `x` 和 `y`，输出 `x / y` 和 `np.divide(x, y)`  
   ```python
   print("x / y:\n", x / y)
   print("np.divide(x, y):\n", np.divide(x, y))
