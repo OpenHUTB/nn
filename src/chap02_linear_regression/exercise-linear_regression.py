@@ -62,20 +62,16 @@ def multinomial_basis(x, feature_num=10):
     return ret
 
 def gaussian_basis(x, feature_num=10):
-    '''高斯基函数'''
-    # :param x: 输入的特征向量
-    #:param feature_num: 基函数的数量
-    #:return: 转换后的特征矩阵
-    #==========
-    #todo '''请实现高斯基函数'''
-    # 在 0 到 25 之间均匀分布 feature_num 个中心
+    """
+    高斯基函数：将输入映射为一组高斯函数响应
+    """
+    # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
-    # 每个基函数的宽度
-    widths = np.ones(feature_num) * (25 / feature_num)
-    # 计算高斯基函数的值，得到 shape(N, feature_num) 的二维数组
-    ret = np.exp(-0.5 * ((x[:, np.newaxis] - centers) / widths)**2)
-    #==========
-    return ret
+    # 每个高斯函数的标准差（带宽）
+    sigma = 25 / feature_num
+    # 计算每个输入 x 对所有中心的响应，输出 shape (N, feature_num)
+    return np.exp(-0.5 * ((x[:, np.newaxis] - centers) / sigma) ** 2)
+
 
 
 # ## 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化 
