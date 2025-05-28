@@ -3,9 +3,6 @@
 
 # ## 准备数据
 
-# In[7]:
-
-
 import os
 import numpy as np
 import tensorflow as tf
@@ -16,14 +13,11 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    #normalize
+    # normalize
     x = x/255.0
     x_test = x_test/255.0
     
     return (x, y), (x_test, y_test)
-
-
-# In[8]:
 
 
 print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
@@ -31,18 +25,29 @@ print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
 
 # ## 建立模型
 
-# In[9]:
-
-
 class myModel:
     def __init__(self):
         ####################
         '''声明模型对应的参数'''
         ####################
+        # 初始化权重和偏置
+        self.W1 = tf.Variable(tf.random.normal(shape=(784, 256), stddev=0.1))
+        self.b1 = tf.Variable(tf.zeros(shape=(256,)))
+        self.W2 = tf.Variable(tf.random.normal(shape=(256, 10), stddev=0.1))
+        self.b2 = tf.Variable(tf.zeros(shape=(10,)))
+        
     def __call__(self, x):
         ####################
         '''实现模型函数体，返回未归一化的logits'''
         ####################
+        # 展平输入图像 (28x28 -> 784)
+        x = tf.reshape(x, shape=(-1, 784))
+        # 第一层全连接
+        h = tf.matmul(x, self.W1) + self.b1
+        # ReLU激活函数
+        h = tf.nn.relu(h)
+        # 第二层全连接 (输出层)
+        logits = tf.matmul(h, self.W2) + self.b2
         return logits
         
 model = myModel()
@@ -51,9 +56,6 @@ optimizer = optimizers.Adam()
 
 
 # ## 计算 loss
-
-# In[13]:
-
 
 @tf.function
 def compute_loss(logits, labels):
@@ -75,8 +77,7 @@ def train_one_step(model, optimizer, x, y):
     # compute gradient
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
     grads = tape.gradient(loss, trainable_vars)
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01*g)
+    optimizer.apply_gradients(zip(grads, trainable_vars))
 
     accuracy = compute_accuracy(logits, y)
 
@@ -93,18 +94,26 @@ def test(model, x, y):
 
 # ## 实际训练
 
-# In[14]:
-
-
 train_data, test_data = mnist_dataset()
 for epoch in range(50):
-    loss, accuracy = train_one_step(model, optimizer, 
-                                    tf.constant(train_data[0], dtype=tf.float32), 
-                                    tf.constant(train_data[1], dtype=tf.int64))
-    print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
-loss, accuracy = test(model, 
-                      tf.constant(test_data[0], dtype=tf.float32), 
-                      tf.constant(test_data[1], dtype=tf.int64))
-
-print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
-
+    # 批量训练
+    batch_size = 64
+    num_batches = len(train_data[0]) // batch_size
+    total_loss = 0.0
+    total_accuracy = 0.0
+    
+    for i in range(num_batches):
+        start = i * batch_size
+        end = start + batch_size
+        x_batch = train_data[0][start:end]
+        y_batch = train_data[1][start:end]
+        
+        loss, accuracy = train_one_step(model, optimizer, 
+                                        tf.constant(x_batch, dtype=tf.float32), 
+                                        tf.constant(y_batch, dtype=tf.int64))
+        total_loss += loss.numpy()
+        total_accuracy += accuracy.numpy()
+    
+    avg_loss = total_loss / num_batches
+    avg_accuracy = total_accuracy / num_batches
+    
