@@ -7,9 +7,6 @@
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 
-# In[7]:
-
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
@@ -42,9 +39,6 @@ np.random.shuffle(data_set)
 # 
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
 
-# In[37]:
-
-
 epsilon = 1e-12
 class LogisticRegression():
     def __init__(self):
@@ -68,12 +62,14 @@ def compute_loss(pred, label):
     #输入label shape(N,), pred shape(N,)
     #输出 losses shape(N,) 每一个样本一个loss
     #todo 填空一，实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
+    losses = - (label * tf.math.log(pred + epsilon) + (1 - label) * tf.math.log(1 - pred + epsilon))
     '''============================='''
     loss = tf.reduce_mean(losses)
     
     pred = tf.where(pred>0.5, tf.ones_like(pred), tf.zeros_like(pred))
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype=tf.float32))
     return loss, accuracy
+
 @tf.function
 def train_one_step(model, optimizer, x, y):
     with tf.GradientTape() as tape:
@@ -87,27 +83,28 @@ def train_one_step(model, optimizer, x, y):
 
 # ### 实例化一个模型，进行训练
 
-# In[38]:
-
-
 if __name__ == '__main__':
     model = LogisticRegression()
     opt = tf.keras.optimizers.SGD(learning_rate=0.01)
     x1, x2, y = list(zip(*data_set))
     x = list(zip(x1, x2))
+    # 将x转换为numpy数组以便后续处理
+    x = np.array(x, dtype=np.float32)
+    y = np.array(y, dtype=np.float32)
     animation_fram = []
     
+    # 将输入数据转换为TensorFlow张量
+    x_tensor = tf.constant(x)
+    y_tensor = tf.constant(y)
+    
     for i in range(200):
-        loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
+        loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x_tensor, y_tensor)
         animation_fram.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()))
         if i%20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
 
 # ## 结果展示，无需填写代码
-
-# In[5]:
-
 
 f, ax = plt.subplots(figsize=(6,4))
 f.suptitle('Logistic Regression Example', fontsize=15)
@@ -135,7 +132,7 @@ def animate(i):
     a = animation_fram[i][0]
     b = animation_fram[i][1]
     c = animation_fram[i][2]
-    yy = a/-b * xx +c/-b
+    yy = a/-b * xx + c/-b
     line_d.set_data(xx, yy)
         
     C1_dots.set_data(C1[:, 0], C1[:, 1])
@@ -149,5 +146,3 @@ anim = animation.FuncAnimation(f, animate, init_func=init,
                                frames=len(animation_fram), interval=30, blit=True)
 
 HTML(anim.to_html5_video())
-
-
