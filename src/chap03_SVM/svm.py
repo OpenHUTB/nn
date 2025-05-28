@@ -10,7 +10,7 @@ def load_data(fname):
     """
     with open(fname, 'r') as f:
         data = []
-        line = f.readline()
+        line = f.readline() # 首行是标题行，自动跳过
         for line in f:
             line = line.strip().split()
             x1 = float(line[0])
@@ -24,35 +24,61 @@ def eval_acc(label, pred):
     """
     计算准确率。
     """
-    return np.sum(label == pred) / len(pred)
+    return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
 
 
 class SVM():
     """
     SVM模型。
     """
-
+    #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self):
         # 请补全此处代码
+        self.w = None  # 权重向量
+        self.b = 0     # 偏置项
         pass
 
     def train(self, data_train):
         """
         训练模型。
         """
+        # 提取特征和标签
+        x = data_train[:, :2]
+        t = data_train[:, 2]
+        t = np.where(t == 0, -1, 1)  # 转换标签为-1和1
 
+        # 初始化参数
+        n_samples, n_features = x.shape
+        self.w = np.zeros(n_features)
+        learning_rate = 0.01            # 学习率η：控制参数更新步长
+        lambda_ = 0.01                  # 正则化系数λ：控制模型复杂度
+        epochs = 1000
+
+        # 梯度下降优化
+        for _ in range(epochs):
+            for idx, x_i in enumerate(x):
+                # 计算预测值（使用符号函数判断分类）
+                condition = t[idx] * (np.dot(x_i, self.w) + self.b)
+                if condition >= 1:
+                    self.w -= learning_rate * (lambda_ * self.w)  # 仅正则化项
+                else:
+                    self.w -= learning_rate * (lambda_ * self.w - t[idx] * x_i)
+                    self.b -= learning_rate * (-t[idx])
         # 请补全此处代码
 
     def predict(self, x):
         """
         预测标签。
         """
-
         # 请补全此处代码
+        # 计算决策函数值
+        decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
+        # 返回预测标签（0或1）
+        return np.where(decision_values >= 0, 1, 0)
 
 
 if __name__ == '__main__':
-    # 载入数据，实际实用时将x替换为具体名称
+    # 载入数据，实际使用时将x替换为具体名称
     train_file = 'data/train_linear.txt'
     test_file = 'data/test_linear.txt'
     data_train = load_data(train_file)  # 数据格式[x1, x2, t]

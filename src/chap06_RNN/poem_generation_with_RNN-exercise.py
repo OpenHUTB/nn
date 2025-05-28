@@ -32,7 +32,7 @@ def process_dataset(fileName):
     counter = collections.Counter()
     for e in examples:
         for w in e:
-            counter[w]+=1
+            counter[w] += 1
     
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])  # 排序
     words, _ = zip(*sorted_counter)
@@ -66,7 +66,7 @@ def poem_dataset():
 
 class myRNNModel(keras.Model):
     def __init__(self, w2id):
-        super(myRNNModel, self).__init__()
+        super().__init__()
         self.v_sz = len(w2id)
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
