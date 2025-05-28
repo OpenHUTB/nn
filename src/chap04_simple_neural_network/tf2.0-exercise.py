@@ -8,16 +8,28 @@ import tensorflow as tf
 
 # ## 实现softmax函数
 
-def softmax(x):
-    ##########
-    '''实现softmax函数，只要求对最后一维归一化，
-    不允许用tf自带的softmax函数'''
+def softmax(x: tf.Tensor) -> tf.Tensor:
+    """
+    实现数值稳定的 softmax 函数，仅在最后一维进行归一化。
+    
+    参数:
+        x: 输入张量，任意形状，通常最后一维表示分类 logits。
+    
+    返回:
+        与输入形状相同的 softmax 概率分布张量。
+    """
     x = tf.cast(x, tf.float32)
-    x_max = tf.reduce_max(x, axis=-1, keepdims=True)
-    e_x = tf.exp(x - x_max)                                     # 数值稳定处理：减去最大值防止指数爆炸
-    prob_x = e_x / tf.reduce_sum(e_x, axis=-1, keepdims=True)   # 归一化
-    ##########
-    return prob_x
+
+    # 数值稳定性处理：减去最大值避免指数爆炸
+    max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    shifted_logits = x - max_per_row
+
+    # 计算 softmax
+    exp_logits = tf.exp(shifted_logits)
+    sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+    softmax_output = exp_logits / sum_exp
+
+    return softmax_output
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
