@@ -35,8 +35,32 @@ def generate_data(n_samples=1000):
 
 # 自定义logsumexp函数
 def logsumexp(log_p, axis=1, keepdims=False):
+    #max_val = np.max(log_p, axis=axis, keepdims=True)
+    #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims=keepdims))
+    """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理"""
+    log_p = np.asarray(log_p)
+    
+    # 处理空输入情况
+    if log_p.size == 0:
+        return np.array(-np.inf, dtype=log_p.dtype)
+    
+    # 计算最大值（处理全-inf输入）
     max_val = np.max(log_p, axis=axis, keepdims=True)
-    return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims=keepdims))
+    if np.all(np.isneginf(max_val)):
+        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)
+    
+    # 计算修正后的指数和（处理-inf输入）
+    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)
+    sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)
+    
+    # 计算最终结果
+    result = max_val + np.log(sum_exp)
+    
+    # 处理全-inf输入的特殊case
+    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):
+        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis)
+    
+    return result
 
 # 高斯混合模型类
 class GaussianMixtureModel:
