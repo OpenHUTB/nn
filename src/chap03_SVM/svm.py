@@ -72,6 +72,8 @@ class SVM():
         """
         # 请补全此处代码
         # 计算决策函数值
+        if x.ndim == 1:
+           x = np.expand_dims(x, axis=0)  # 处理单样本输入
         decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, 0)

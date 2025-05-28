@@ -127,8 +127,8 @@ print("np.sqrt(x)\n", np.sqrt(x))
 # 18.利用13题目中的x,y ,执行 print(x.dot(y)) 和 print(np.dot(x,y))
 print("第十八题：\n")
 
-print("x.dot(y)\n", x.dot(y))
-print("np.dot(x,y)\n", np.dot(x, y))
+print("x.dot(y)\n", x.dot(y))  # 使用dot方法进行矩阵乘法
+print("np.dot(x,y)\n", np.dot(x, y))  # 使用np.dot函数进行矩阵乘法
 
 # 19.利用13题目中的 x,进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
 print("第十九题：\n")
