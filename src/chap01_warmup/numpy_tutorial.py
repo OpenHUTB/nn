@@ -186,25 +186,24 @@ plt.show() #显示绘制的图像
 
 # 25.画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 print("第二十五题：\n")
-
-x = np.arange(0, 3 * np.pi, 0.1)  ## 生成从0到3π 的x值，步长为0.1
-y_sin = np.sin(x)  # 计算对应的正弦值
-y_cos = np.cos(x)  # 计算对应的余弦值
-
-plt.figure(figsize=(10, 6))  # # 创建一个图像窗口，设置大小为10×6英寸 
-plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
-plt.plot(x, y_cos, label="y = cos(x)", color="red") # 绘制余弦函数曲线
-
-# 添加标题和标签
-plt.title("Sine and Cosine Functions")
+x_sin_cos = np.arange(0, 3 * np.pi, 0.1)  # 0到3π的连续数据
+y_sin = np.sin(x_sin_cos)
+y_cos = np.cos(x_sin_cos)
+ 
+# 统一绘图设置
+plt.figure(figsize=(10, 6))
 plt.xlabel("x")
 plt.ylabel("y")
-
-# 添加网格线
 plt.grid(True)
-
-# 显示图例
+ 
+# 绘制正弦曲线
+plt.plot(x_sin_cos, y_sin, label="y = sin(x)", color="blue")
+plt.title("Plot of y = sin(x)")
 plt.legend()
-
-# 显示图像
+plt.show()
+ 
+# 绘制余弦曲线（复用绘图设置，仅修改函数和标题）
+plt.plot(x_sin_cos, y_cos, label="y = cos(x)", color="red")
+plt.title("Plot of y = cos(x)")
+plt.legend()
 plt.show()
