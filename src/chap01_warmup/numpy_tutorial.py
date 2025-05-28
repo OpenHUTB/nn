@@ -6,7 +6,7 @@
 # numpy 的array操作
 
 # 1.导入numpy库
-import numpy as np
+import numpy as np  # 导入NumPy库并简称为np
 
 # 导入matplotlib.pyplot库
 import matplotlib
@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt #导入matplotlib库并命名为plt库
 # 2.建立一个一维数组 a 初始化为[4,5,6]，(1)输出a 的类型（type）(2)输出a的各维度的大小（shape）(3)输出 a的第一个元素（值为4）
 print("第二题：\n")
 
-a = np.array([4, 5, 6])
-print("(1)输出a 的类型（type）\n", type(a))
+a = np.array([4, 5, 6])  # 创建一维NumPy数组
+print("(1)输出a 的类型（type）\n", type(a))  
 print("(2)输出a的各维度的大小（shape）\n", a.shape)
 print("(3)输出 a的第一个元素（值为4）\n", a[0])
 
@@ -48,9 +48,9 @@ print(a[2, 3], a[0, 0])
 # 6.把上一题的 a数组的 0到1行 2到3列，放到b里面去，（此处不需要从新建立a,直接调用即可）(1),输出b;(2) 输出b 的（0,0）这个元素的值
 print("第六题：\n")
 
-b = a[0:2, 1:3]
-print("(1)输出b\n", b)
-print("(2) 输出b 的（0,0）这个元素的值\n", b[0, 0])
+b = a[0:2, 1:3]  # 切片操作：获取第0-1行，第1-2列（注意Python切片是左闭右开）
+print("(1)输出b\n", b) #打印切片后的数组
+print("(2) 输出b 的（0,0）这个元素的值\n", b[0, 0]) # 输出切片后数组的第一个元素
 
 # 7. 把第5题中数组a的最后两行所有元素放到 c中，（提示： a[1:2, :]）(1)输出 c ; (2) 输出 c 中第一行的最后一个元素（提示，使用 -1                 表示最后一个元素）
 print("第七题：\n")
@@ -134,41 +134,41 @@ print("np.dot(x,y)\n", np.dot(x, y))
 # 19.利用13题目中的 x,进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
 print("第十九题：\n")
 
-print("print(np.sum(x)):", np.sum(x))
-print("print(np.sum(x, axis=0))", np.sum(x, axis=0))
-print("print(np.sum(x, axis=1))", np.sum(x, axis=1))
+print("print(np.sum(x)):", np.sum(x)) # 计算所有元素的和
+print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 沿列求和（压缩行）
+print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 沿行求和（压缩列）
 
 # 20.利用13题目中的 x,进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
 print("第二十题：\n")
 
-print("print(np.mean(x))", np.mean(x))
-print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))
-print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))
+print("print(np.mean(x))", np.mean(x))  # 计算所有元素的平均值
+print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 计算每列的平均值
+print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 计算每行的平均值
 
 # 21.利用13题目中的x，对x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("第二十一题：\n")
 
-print("转置后的结果:\n", x.T)
+print("转置后的结果:\n", x.T)   # 输出矩阵的转置
 
 # 22.利用13题目中的x,求e的指数（提示： 函数 np.exp()）
 print("第二十二题：\n")
 
-print(np.exp(x))
+print(np.exp(x))  # 计算数组中每个元素的自然指数函数值
 
 # 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
-print("print(np.argmax(x))", np.argmax(x))
-print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))
-print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))
+print("print(np.argmax(x))", np.argmax(x))  # 输出展平后数组中最大值的索引
+print("print(np.argmax(x, axis=0))", np.argmax(x, axis=0))  # 输出每列最大值的行索引
+print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))  # 输出每行最大值的列索引
 
 # 24,画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （提示这里用到  matplotlib.pyplot 库）
 print("第二十四题：\n")
 
-x = np.arange(0, 100, 0.1)
+x = np.arange(0, 100, 0.1)  # 创建从0到100，步长为0.1的数组
 y = x * x
 
-plt.figure(figsize=(10, 6))  # 设置图像大小
-plt.plot(x, y, label="y = x^2", color="blue")  # 绘制曲线
+plt.figure(figsize=(10, 6))  # 设置图像大小为10*6英寸
+plt.plot(x, y, label="y = x^2", color="blue")  # 绘制蓝色曲线
 
 # 添加标题和标签
 plt.title("Plot of y = x^2")  # 图像标题
@@ -179,7 +179,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True)
 
 # 显示图例
-plt.legend()
+plt.legend(loc='upper right') #显式指定图例位置为右上角
 
 plt.show()
 
@@ -197,7 +197,7 @@ plt.title("Plot of y = sin(x)")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 plt.grid(True)
-plt.legend()
+plt.legend(loc='upper right') #显式指定图例位置为右上角
 plt.show()
 
 plt.figure(figsize=(10, 6))  # 设置图像大小
@@ -206,5 +206,5 @@ plt.title("Plot of y = cos(x)")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 plt.grid(True)
-plt.legend()
+plt.legend(loc='upper right') #显式指定图例位置为右上角
 plt.show()
