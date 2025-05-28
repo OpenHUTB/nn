@@ -23,9 +23,9 @@ def gaussian_basis(x, feature_num=10):
     width = 1.0 * (centers[1] - centers[0])
     x = np.expand_dims(x, axis=1)
     x = np.concatenate([x]*feature_num, axis=1)
-    
-    out = (x-centers)/width
-    ret = np.exp(-0.5 * out ** 2)
+    # 计算每个x到每个中心的距离
+    out = (x.T-centers)/width
+    ret = np.exp(-0.5 * out ** 2).T # 转置以匹配输入形状
     return ret
 
 def load_data(filename, basis_func=gaussian_basis):
