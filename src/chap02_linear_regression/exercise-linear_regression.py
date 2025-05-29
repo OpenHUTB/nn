@@ -39,11 +39,6 @@ def identity_basis(x):
   
 # 其中以及训练集的x的范围在0-25之间
 
-def identity_basis(x):
-    # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
-    # 用于适配线性回归的矩阵运算格式 
-    ret = np.expand_dims(x, axis=1)
-    return ret
 
 def multinomial_basis(x, feature_num=10):
     '''多项式基函数'''
