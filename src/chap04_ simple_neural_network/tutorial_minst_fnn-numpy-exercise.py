@@ -49,6 +49,8 @@ class Matmul:
         
         ####################
         '''计算矩阵乘法的对应的梯度'''
+        grad_x = np.matmul(grad_y, W.T)
+        grad_W = np.matmul(x.T, grad_y)
         ####################
         return grad_x, grad_W
 
@@ -67,6 +69,8 @@ class Relu:
         '''
         ####################
         '''计算relu 激活函数对应的梯度'''
+        x = self.mem['x']
+        grad_x = grad_y * (x > 0)  # ReLU的梯度是1（x>0）或0（x<=0）
         ####################
         return grad_x
 

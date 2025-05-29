@@ -44,10 +44,19 @@ test_data = np.random.normal(size=[10, 5])
 def softmax_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
+    #参数logits: 未经Softmax的原始输出（logits）
+    #参数label: one-hot格式的标签
     epsilon = 1e-8
-    x = tf.cast(x, tf.float32)
-    label = tf.cast(label, tf.float32) # 将标签转换为float32
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x + epsilon), axis=1))     #计算交叉熵：-Σ(label * log(prob))
+    logits = tf.cast(logits, tf.float32)
+    label = tf.cast(label, tf.float32)
+    # 数值稳定处理：减去最大值
+    logits_max = tf.reduce_max(logits, axis=-1, keepdims=True)
+    stable_logits = logits - logits_max
+    # 计算Softmax概率
+    exp_logits = tf.exp(stable_logits)
+    prob = exp_logits / tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+    # 计算交叉熵
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(prob + epsilon), axis=1))
     ##########
     return loss
 

@@ -11,9 +11,9 @@ def weights_init(m):
         weight_shape = list(m.weight.data.size())
         fan_in = weight_shape[1]
         fan_out = weight_shape[0]
-        w_bound = np.sqrt(6. / (fan_in + fan_out))
-        m.weight.data.uniform_(-w_bound, w_bound)
-        m.bias.data.fill_(0)
+        w_bound = np.sqrt(6. / (fan_in + fan_out)) # 计算权重初始化范围
+        m.weight.data.uniform_(-w_bound, w_bound) # 均匀分布初始化权重
+        m.bias.data.fill_(0) # 偏置置零
         print("inital  linear weight ")
 
 

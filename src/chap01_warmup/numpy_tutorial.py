@@ -24,7 +24,6 @@ print("(3)输出 a的第一个元素（element）\n", a[0])
 
 # 3.建立一个二维数组 b,初始化为 [ [4, 5, 6],[1, 2, 3]] (1)输出二维数组b的形状（shape）（输出值为（2,3））(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）
 print("第三题：\n")
-print("第三题：\n")
 
 b = np.array([[4, 5, 6], [1, 2, 3]])
 print("(1)输出各维度的大小（shape）\n", b.shape)
@@ -128,8 +127,8 @@ print("np.sqrt(x)\n", np.sqrt(x))
 # 18.利用13题目中的x,y ,执行 print(x.dot(y)) 和 print(np.dot(x,y))
 print("第十八题：\n")
 
-print("x.dot(y)\n", x.dot(y))
-print("np.dot(x,y)\n", np.dot(x, y))
+print("x.dot(y)\n", x.dot(y))  # 使用dot方法进行矩阵乘法
+print("np.dot(x,y)\n", np.dot(x, y))  # 使用np.dot函数进行矩阵乘法
 
 # 19.利用13题目中的 x,进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
 print("第十九题：\n")

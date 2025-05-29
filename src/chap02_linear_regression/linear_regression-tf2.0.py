@@ -36,7 +36,7 @@ def load_data(filename, basis_func=gaussian_basis):
     xys = []
     with open(filename, 'r') as f:
         for line in f:
-            xys.append(map(float, line.strip().split()))
+            xys.append(list(map(float, line.strip().split())))  # 改进: 转换为list
         xs, ys = zip(*xys)
         xs, ys = np.asarray(xs), np.asarray(ys)
         
