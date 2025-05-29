@@ -8,9 +8,9 @@ import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
-learning_rate = 1e-4
-keep_prob_rate = 0.7 # 
-max_epoch = 2000
+learning_rate = 1e-4 #学习率
+keep_prob_rate = 0.7 # Dropout保留概率
+max_epoch = 2000 #最大训练轮数
 def compute_accuracy(v_xs, v_ys):
     global prediction
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
