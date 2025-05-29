@@ -22,7 +22,14 @@ def load_data(fname):
 
 def eval_acc(label, pred):
     """
-    计算准确率。
+    计算预测准确率。
+
+    参数:
+        label: 实际标签
+        pred: 预测标签
+
+    返回:
+        准确率，范围 [0, 1]
     """
     return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
 
@@ -41,27 +48,35 @@ class SVM():
     def train(self, data_train):
         """
         训练模型。
+        
+        使用梯度下降法训练 SVM 模型。
+
+        参数:
+            data_train: 包含两个特征和标签的数据数组，形如 (n_samples, 3)
         """
         # 提取特征和标签
-        x = data_train[:, :2]
-        t = data_train[:, 2]
+        x = data_train[:, :2]  # 特征向量 (x1, x2)
+        t = data_train[:, 2]  # 原始标签 (0 或 1)
         t = np.where(t == 0, -1, 1)  # 转换标签为-1和1
 
         # 初始化参数
         n_samples, n_features = x.shape
-        self.w = np.zeros(n_features)
+        self.w = np.zeros(n_features)   # 权重初始化为0
         learning_rate = 0.01            # 学习率η：控制参数更新步长
         lambda_ = 0.01                  # 正则化系数λ：控制模型复杂度
-        epochs = 1000
+        epochs = 1000                   # 训练轮数
 
         # 梯度下降优化
         for _ in range(epochs):
             for idx, x_i in enumerate(x):
                 # 计算预测值（使用符号函数判断分类）
                 condition = t[idx] * (np.dot(x_i, self.w) + self.b)
+                # 梯度更新逻辑
                 if condition >= 1:
+                    # 满足要求，无需误差项梯度，仅更新正则化项
                     self.w -= learning_rate * (lambda_ * self.w)  # 仅正则化项
                 else:
+                    # 未满足条件，需加入误差项梯度
                     self.w -= learning_rate * (lambda_ * self.w - t[idx] * x_i)
                     self.b -= learning_rate * (-t[idx])
         # 请补全此处代码
@@ -69,6 +84,12 @@ class SVM():
     def predict(self, x):
         """
         预测标签。
+        
+        参数:
+            x: 输入样本特征，形如 (n_samples, 2) 或 (2,)
+
+        返回:
+            预测标签（0 或 1）
         """
         # 请补全此处代码
         # 计算决策函数值
