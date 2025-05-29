@@ -50,9 +50,10 @@ class SoftmaxRegression():
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 
 # 填空一：在`__init__`构造函数中建立模型所需的参数
-#  self.W = tf.Variable(shape=[2, 3], dtype=tf.float32, 
-                initial_value=tf.random.uniform(shape=[2, 3], minval=-0.1, maxval=0.1))
-        self.b = tf.Variable(shape=[3], dtype=tf.float32, initial_value=tf.zeros(shape=[3]))
+#  self.W = tf.Variable(tf.random.uniform(shape=[2, 3], minval=-0.1, maxval=0.1, dtype=tf.float32), 
+                            name='weight')  # 初始化权重W
+        self.b = tf.Variable(tf.zeros(shape=[3], dtype=tf.float32), name='bias')  # 初始化偏置b
+#添加了name参数以便于调试和可视化。明确注释了权重 W 和偏置 b 的初始化。
         '''============================='''
         
         self.trainable_variables = [self.W, self.b]
