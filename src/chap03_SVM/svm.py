@@ -24,6 +24,9 @@ def eval_acc(label, pred):
     """
     计算准确率。
     """
+     if len(label) != len(pred):
+        print(f"{RED}错误: 标签和预测值长度不匹配 ({len(label)} vs {len(pred)}){ENDC}")
+        return 0.0
     return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
 
 
