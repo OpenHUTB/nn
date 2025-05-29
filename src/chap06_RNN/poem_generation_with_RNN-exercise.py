@@ -65,21 +65,25 @@ def poem_dataset():
 
 
 class myRNNModel(keras.Model):
+    #初始化模型和参数
     def __init__(self, w2id):
-        super().__init__()
-        self.v_sz = len(w2id)
+        super(myRNNModel, self).__init__()
+        self.v_sz = len(w2id)   #嵌入层
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
         
-        self.rnncell = tf.keras.layers.SimpleRNNCell(128)
+        self.rnncell = tf.keras.layers.SimpleRNNCell(128)   #RNN 层
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
-        self.dense = tf.keras.layers.Dense(self.v_sz)
+        self.dense = tf.keras.layers.Dense(self.v_sz)   #全连接层
         
     @tf.function
     def call(self, inp_ids):
         '''
         此处完成建模过程，可以参考Learn2Carry
         '''
+        x = self.embed_layer(inp_ids)           # [batch_size, seq_len, emb_dim]：输入序列转换为嵌入向量
+        x = self.rnn_layer(x)                   # [batch_size, seq_len, hidden_dim]：通过RNN层处理序列
+        logits = self.dense(x)                  # [batch_size, seq_len, vocab_size]：全连接层输出每个位置的类别得分
         return logits
     
     @tf.function
