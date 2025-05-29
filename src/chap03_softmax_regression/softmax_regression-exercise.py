@@ -50,6 +50,7 @@ class SoftmaxRegression():
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 
 # 填空一：在`__init__`构造函数中建立模型所需的参数
+ main
 #  self.W = tf.Variable(tf.random.uniform(shape=[2, 3], minval=-0.1, maxval=0.1, dtype=tf.float32), 
                             name='weight')  # 初始化权重W
         self.b = tf.Variable(tf.zeros(shape=[3], dtype=tf.float32), name='bias')  # 初始化偏置b
@@ -83,16 +84,79 @@ def compute_loss(pred, label):
     accuracy = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(label,axis=1), tf.argmax(pred, axis=1)), dtype=tf.float32))
     return loss, accuracy
  
+=======
+# 
+# 填空二：实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
+
+# In[1]:
+
+
+epsilon = 1e-12  # 防止 log(0)
+
+class SoftmaxRegression(tf.Module):
+    def __init__(self, input_dim=2, num_classes=3):
+        """
+        初始化 Softmax 回归模型参数
+        :param input_dim: 输入特征维度
+        :param num_classes: 类别数量
+        """
+        super().__init__()
+        # 初始化权重 W 和偏置 b
+        self.W = tf.Variable(tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1), name='W')
+        self.b = tf.Variable(tf.zeros([num_classes]), name='b')
+        self.trainable_variables = [self.W, self.b]
+
+    @tf.function
+    def __call__(self, x):
+        """
+        模型前向传播
+        :param x: 输入数据，shape = (N, input_dim)
+        :return: softmax 概率分布，shape = (N, num_classes)
+        """
+        logits = tf.matmul(x, self.W) + self.b
+        return tf.nn.softmax(logits)
+
+
 @tf.function
-def train_one_step(model, optimizer, x, y):
+def compute_loss(pred, labels, num_classes=3):
+    """
+    计算交叉熵损失和准确率
+    :param pred: 模型输出，shape = (N, num_classes)
+    :param labels: 实际标签，shape = (N,)
+    :param num_classes: 类别数
+    :return: 平均损失值和准确率
+    """
+    one_hot_labels = tf.one_hot(tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32)
+    pred = tf.clip_by_value(pred, epsilon, 1.0)  # 防止log(0)
+    sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
+    loss = tf.reduce_mean(sample_losses)
+
+    acc = tf.reduce_mean(tf.cast(
+        tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
+        dtype=tf.float32
+    ))
+    return loss, acc
+
+ main
+@tf.function
+def train_one_step(model, optimizer, x_batch, y_batch):
+    """
+    一步梯度下降优化
+    :param model: SoftmaxRegression 实例
+    :param optimizer: 优化器（如 Adam, SGD）
+    :param x_batch: 输入特征
+    :param y_batch: 标签
+    :return: 当前批次的损失与准确率
+    """
     with tf.GradientTape() as tape:
-        pred = model(x)
-        loss, accuracy = compute_loss(pred, y)
-        
+        predictions = model(x_batch)
+        loss, accuracy = compute_loss(predictions, y_batch)
+
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy
 
+main
 
 
 
@@ -105,6 +169,8 @@ def train_one_step(model, optimizer, x, y):
 
 # In[1]:
 
+=======
+ main
 # ### 实例化一个模型，进行训练
 
 # In[12]:
