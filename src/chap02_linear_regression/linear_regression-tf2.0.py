@@ -15,9 +15,12 @@ def identity_basis(x):
 
 def multinomial_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1) # shape(N, 1)
-    feat = [x]
+    feat = [x] # 初始化特征列表，第一个特征是原始x（1次）
+    # 生成2次到feature_num次的多项式特征
     for i in range(2, feature_num+1):
-        feat.append(x**i)
+        feat.append(x**i) # x的i次方
+
+    # 将所有特征沿列方向拼接
     ret = np.concatenate(feat, axis=1)
     return ret
 
