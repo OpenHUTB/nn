@@ -10,7 +10,7 @@ def load_data(fname):
     """
     with open(fname, 'r') as f:
         data = []
-        line = f.readline()
+        line = f.readline() # 首行是标题行，自动跳过
         for line in f:
             line = line.strip().split()
             x1 = float(line[0])
@@ -42,17 +42,18 @@ class SVM():
         """
         训练模型。
         """
-# 提取特征和标签
+        # 提取特征和标签
         x = data_train[:, :2]
         t = data_train[:, 2]
-        
+        t = np.where(t == 0, -1, 1)  # 转换标签为-1和1
+
         # 初始化参数
         n_samples, n_features = x.shape
         self.w = np.zeros(n_features)
         learning_rate = 0.01            # 学习率η：控制参数更新步长
-        lambda_ = 0.01                  # 正则化系数λ：控制模型复杂度         
+        lambda_ = 0.01                  # 正则化系数λ：控制模型复杂度
         epochs = 1000
- 
+
         # 梯度下降优化
         for _ in range(epochs):
             for idx, x_i in enumerate(x):
@@ -65,21 +66,15 @@ class SVM():
                     self.b -= learning_rate * (-t[idx])
         # 请补全此处代码
 
-        def predict(self, x):
-
-            if self.weights is None:
-                raise RuntimeError("Model not trained yet")
-            logits = np.dot(x, self.weights) + self.bias#输入特征 x 与权重矩阵 self.weights 的点积+偏置项 
-            return (logits >= 0).astype(int)  
-        # 二分类示例
-    #def predict(self, x):
+    def predict(self, x):
         """
         预测标签。
         """
-
         # 请补全此处代码
         # 计算决策函数值
-        decision_values = np.dot(x, self.w) + self.b#计算决策函数值:logits = X·w + b,其中 w 是权重向量,b 是偏置项
+        if x.ndim == 1:
+           x = np.expand_dims(x, axis=0)  # 处理单样本输入
+        decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, 0)
 

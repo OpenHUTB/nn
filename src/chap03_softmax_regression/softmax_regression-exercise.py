@@ -20,28 +20,28 @@ import matplotlib.cm as cm
 import numpy as np
 #get_ipython().run_line_magic('matplotlib', 'inline')
 
-dot_num = 100
-x_p = np.random.normal(3., 1, dot_num)
-y_p = np.random.normal(6., 1, dot_num)
-y = np.ones(dot_num)
-C1 = np.array([x_p, y_p, y]).T
+dot_num = 100 # 设置数据点数量
+x_p = np.random.normal(3., 1, dot_num) # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
+y_p = np.random.normal(6., 1, dot_num)  #x和y坐标
+y = np.ones(dot_num) #标签为1 
+C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 
-x_n = np.random.normal(6., 1, dot_num)
-y_n = np.random.normal(3., 1, dot_num)
+x_n = np.random.normal(6., 1, dot_num) # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
+y_n = np.random.normal(3., 1, dot_num) 
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
-x_b = np.random.normal(7., 1, dot_num)
+x_b = np.random.normal(7., 1, dot_num) # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
 y_b = np.random.normal(7., 1, dot_num)
 y = np.ones(dot_num)*2
 C3 = np.array([x_b, y_b, y]).T
 
-plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
-plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
-plt.scatter(C3[:, 0], C3[:, 1], c='r', marker='*')
+plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+') # 绘制正样本，用蓝色加号表示
+plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o') # 绘制负样本，用绿色圆圈表示
+plt.scatter(C3[:, 0], C3[:, 1], c='r', marker='*') # 绘制负样本，用红色星号表示
 
-data_set = np.concatenate((C1, C2, C3), axis=0)
-np.random.shuffle(data_set)
+data_set = np.concatenate((C1, C2, C3), axis=0) # 将正样本和负样本连接成一个数据集
+np.random.shuffle(data_set) # 随机打乱数据集的顺序
 
 
 # ## 建立模型
@@ -103,15 +103,18 @@ def train_one_step(model, optimizer, x, y):
 
 
 model = SoftmaxRegression()
+# 创建一个 SoftmaxRegression 模型实例 model
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+# 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
 x1, x2, y = list(zip(*data_set))
 x = np.array(list(zip(x1, x2)), dtype=np.float32)  # 转换为 float32
 y = np.array(y, dtype=np.int32)  # 转换为 int32
+# 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
     if i%50==49:
         print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
-
+# 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
 
 # ## 结果展示，无需填写代码
 
