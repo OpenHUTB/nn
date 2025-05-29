@@ -1,5 +1,6 @@
 import tensorflow as tf
 import os
+import numpy as np
 
 class RL_QG_agent:
     def __init__(self):
@@ -37,10 +38,10 @@ class RL_QG_agent:
         # action 表示的是 要下的位置。
        # action = 123456789    # 删掉这句话，并填写相应代码
        # 状态预处理
-        state_input = np.array(state).reshape(1, -1).astype(np.float32)  # 转换为(1,64)形状
+        state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
-        q_vals = self.sess.run(self.q_values, feed_dict={self.input_state: state_input})
+        q_vals = self.sess.run(self.q_values, feed_dict={self.input_states: state_input})
         
         # 过滤合法动作并选择最优
         legal_q = q_vals[0][enables]
