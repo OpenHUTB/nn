@@ -7,12 +7,11 @@
 
 # 1.导入numpy库
 import numpy as np #将numpy库命名为np
-
 # 导入matplotlib.pyplot库
 import matplotlib
-
-matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
+#import放一起代码美观
+matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 
 # 2.建立一个一维数组 a 初始化为[4,5,6]，(1)输出a 的类型（type）(2)输出a的各维度的大小（shape）(3)输出 a的第一个元素（element）
 print("第二题：\n")
@@ -24,7 +23,6 @@ print("(3)输出 a的第一个元素（element）\n", a[0])
 
 # 3.建立一个二维数组 b,初始化为 [ [4, 5, 6],[1, 2, 3]] (1)输出二维数组b的形状（shape）（输出值为（2,3））(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）
 print("第三题：\n")
-
 b = np.array([[4, 5, 6], [1, 2, 3]])
 print("(1)输出各维度的大小（shape）\n", b.shape)
 print("(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])
