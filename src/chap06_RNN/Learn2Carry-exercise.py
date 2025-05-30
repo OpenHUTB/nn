@@ -181,7 +181,9 @@ def evaluate(model):
 
 
 # In[5]:
-
+# 添加主程序入口
+if __name__ == "__main__":
+    # 初始化模型和优化器
 
 optimizer = optimizers.Adam(0.001)
 model = myRNNModel()
