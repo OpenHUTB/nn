@@ -6,11 +6,14 @@
 
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
+# 加载MNIST数据集
+mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+#训练参数
 learning_rate = 1e-4 #学习率
 keep_prob_rate = 0.7 # Dropout保留概率
 max_epoch = 2000 #最大训练轮数
+#计算准确率
 def compute_accuracy(v_xs, v_ys):
     global prediction
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
@@ -18,21 +21,21 @@ def compute_accuracy(v_xs, v_ys):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
-
+#权重初始化函数
 def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev=0.1)
     return tf.Variable(initial)
-
+#偏置初始化函数
 def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
-
+#卷积层函数
 def conv2d(x, W):
     # 每一维度  滑动步长全部是 1， padding 方式 选择 same
     # 提示 使用函数  tf.nn.conv2d
     
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-
+#最大池化层函数
 def max_pool_2x2(x):
     # 滑动步长 是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool
