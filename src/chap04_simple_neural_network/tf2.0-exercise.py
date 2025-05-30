@@ -53,7 +53,7 @@ test_data = np.random.normal(size=[10, 5])
 
 # ## 实现 softmax 交叉熵loss函数
 
-def softmax_ce(x, label):
+def softmax_ce(logits, label):#修正参数名错误
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     #参数logits: 未经Softmax的原始输出（logits）
@@ -85,7 +85,7 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 
 # ## 实现 sigmoid 交叉熵loss函数
 
-def sigmoid_ce(x, label):
+def sigmoid_ce(logits, label):#修正参数名错误
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     epsilon = 1e-8
