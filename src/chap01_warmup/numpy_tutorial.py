@@ -197,8 +197,8 @@ plt.plot(x, y_cos, label="y = cos(x)", color="red") # 绘制余弦函数曲线
 
 # 添加标题和标签
 plt.title("Sine and Cosine Functions")
-plt.xlabel("x")
-plt.ylabel("y")
+plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
+plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 
 # 添加网格线
 plt.grid(True)
