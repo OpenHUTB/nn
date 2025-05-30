@@ -303,30 +303,40 @@ plt.show()                        # 显示图像
 #### 25-26. 绘制正余弦函数图像
 ```python
 print("第二十五题：\n")
-x_sin_cos = np.arange(0, 3 * np.pi, 0.1)  # 0到3π的连续数据
-y_sin = np.sin(x_sin_cos)
-y_cos = np.cos(x_sin_cos)
+# 设置中文字体支持
+plt.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC"]
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
+# 生成数据
+x = np.arange(0, 3 * np.pi, 0.1)
+y_sin = np.sin(x)
+y_cos = np.cos(x)
+
+# 创建画布和子图
+plt.figure(figsize=(12, 5))
 
 # 绘制正弦曲线
-plt.figure(figsize=(10, 6))
-plt.plot(x_sin_cos, y_sin, label="y = sin(x)", color="blue")
-plt.title("Plot of y = sin(x)")
-plt.xlabel("x")
-plt.ylabel("y")
-plt.grid(True)
+plt.subplot(1, 2, 1)  # 1行2列的第1个子图
+plt.plot(x, y_sin, 'b-', linewidth=2, label='y = sin(x)')
+plt.title('正弦函数图像')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+plt.xticks([0, np.pi, 2*np.pi, 3*np.pi], ['0', 'π', '2π', '3π'])
 plt.legend()
-plt.show()
 
-# 绘制余弦曲线（代码结构与正弦一致）
-plt.figure(figsize=(10, 6))
-plt.plot(x_sin_cos, y_cos, label="y = cos(x)", color="red")
-plt.title("Plot of y = cos(x)")
-plt.xlabel("x")
-plt.ylabel("y")
-plt.grid(True)
+# 绘制余弦曲线
+plt.subplot(1, 2, 2)  # 1行2列的第2个子图
+plt.plot(x, y_cos, 'r-', linewidth=2, label='y = cos(x)')
+plt.title('余弦函数图像')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+plt.xticks([0, np.pi, 2*np.pi, 3*np.pi], ['0', 'π', '2π', '3π'])
 plt.legend()
+
+# 调整布局
+plt.tight_layout()
 plt.show()
-```
-- **图像特点**：
-  - 正弦曲线：周期为`2π`，值域[-1,1]
-  - 余弦曲线：与正弦曲线相位差`π/2`，形状相同但平移

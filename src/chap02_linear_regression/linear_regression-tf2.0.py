@@ -103,7 +103,7 @@ def evaluate(ys, ys_pred):
     return std
 
 
-# In[27]:
+# In[27]:评估指标的计算
 
 
 for i in range(1000):

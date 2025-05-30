@@ -50,19 +50,40 @@ print(get_batch(2, 10))
 
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
+        # 初始化父类 keras.Model，必须调用
         super(mySeq2SeqModel, self).__init__()
+
+        # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
         self.v_sz = 27
-        self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
+
+        # 嵌入层：将每个字符的索引映射成64维的向量表示
+        # 输入维度：self.v_sz（即词表大小），输出维度为64
+        self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64,
                                                     batch_input_shape=[None, None])
-        
+
+        # 编码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(128)
+
+        # 解码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(128)
-        
-        self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
-                                           return_sequences=True, return_state=True)
-        self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
-                                           return_sequences=True, return_state=True)
+
+        # 编码器RNN层：将RNNCell包裹成完整RNN，输出整个序列（return_sequences=True），并返回最终状态（return_state=True）
+        self.encoder = tf.keras.layers.RNN(
+            self.encoder_cell,
+            return_sequences=True,   # 返回每个时间步的输出
+            return_state=True        # 还返回最终隐藏状态
+        )
+
+        # 解码器RNN层：与编码器类似
+        self.decoder = tf.keras.layers.RNN(
+            self.decoder_cell,
+            return_sequences=True,
+            return_state=True
+        )
+
+        # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
         self.dense = tf.keras.layers.Dense(self.v_sz)
+
         
     @tf.function
     def call(self, enc_ids, dec_ids):
@@ -82,7 +103,7 @@ class mySeq2SeqModel(keras.Model):
         return logits
     
     
-#     @tf.function
+    @tf.function
     def encode(self, enc_ids):
         enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)
         enc_out, enc_state = self.encoder(enc_emb)
