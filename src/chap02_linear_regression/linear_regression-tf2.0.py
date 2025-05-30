@@ -103,7 +103,7 @@ def evaluate(ys, ys_pred):
     return std
 
 
-# In[27]:
+# In[27]:评估指标的计算
 
 
 for i in range(1000):
@@ -127,6 +127,7 @@ plt.plot(o_x_test, y_test_preds, 'k')
 plt.xlabel('x')
 plt.ylabel('y')
 plt.title('Linear Regression')
+plt.grid(True, linestyle='--', alpha=0.7, color='gray')  # 虚线网格，半透明灰色
 plt.legend(['train', 'test', 'pred'])
 plt.show()
 

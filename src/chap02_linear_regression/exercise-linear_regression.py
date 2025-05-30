@@ -8,7 +8,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+#下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
 
@@ -180,9 +180,9 @@ if __name__ == '__main__':
     print('预测值与真实值的标准差：{:.1f}'.format(std))
 
     # 显示结果
-    plt.plot(x_train, y_train, 'ro', markersize=3)
-    plt.plot(x_test, y_test, 'k')
-    plt.plot(x_test, y_test_pred, 'k')
+    plt.plot(x_train, y_train, 'ro', markersize=3) # 红色点为训练集数据
+    plt.plot(x_test, y_test, 'k') # 红色点为训练集数据
+    plt.plot(x_test, y_test_pred, 'k') # 黑线为预测值（可以用其他颜色区分）
     plt.xlabel('x') # 设置x轴的标签
     plt.ylabel('y') # 设置y轴的标签
     plt.title('Linear Regression') # 设置图表标题
