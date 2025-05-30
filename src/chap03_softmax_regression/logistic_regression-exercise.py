@@ -198,7 +198,7 @@ def animate(i):
     
     return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象，以便 Matplotlib 动画知道要更新哪些部分
 
-# 创建动画对象，设置动画的参数
+# 创建动画对象 anim，使用 matplotlib.animation.FuncAnimation 函数生成动态动画
 anim = animation.FuncAnimation(f, animate, init_func=init,
                                frames=len(animation_frames), interval=30, blit=True)
 

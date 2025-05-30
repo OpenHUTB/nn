@@ -7,12 +7,11 @@
 
 # 1.导入numpy库
 import numpy as np #将numpy库命名为np
-
 # 导入matplotlib.pyplot库
 import matplotlib
-
-matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
+#import放一起代码美观
+matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 
 # 2.建立一个一维数组 a 初始化为[4,5,6]，(1)输出a 的类型（type）(2)输出a的各维度的大小（shape）(3)输出 a的第一个元素（element）
 print("第二题：\n")
@@ -24,7 +23,6 @@ print("(3)输出 a的第一个元素（element）\n", a[0])
 
 # 3.建立一个二维数组 b,初始化为 [ [4, 5, 6],[1, 2, 3]] (1)输出二维数组b的形状（shape）（输出值为（2,3））(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）
 print("第三题：\n")
-
 b = np.array([[4, 5, 6], [1, 2, 3]])
 print("(1)输出各维度的大小（shape）\n", b.shape)
 print("(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])
@@ -187,6 +185,7 @@ plt.show() #显示绘制的图像
 
 # 25.画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 print("第二十五题：\n")
+main
 x_sin_cos = np.arange(0, 3 * np.pi, 0.1)  # 0到3π的连续数据
 y_sin = np.sin(x_sin_cos)
 y_cos = np.cos(x_sin_cos)
@@ -195,6 +194,23 @@ y_cos = np.cos(x_sin_cos)
 plt.figure(figsize=(10, 6))
 plt.xlabel("x")
 plt.ylabel("y")
+=======
+
+x = np.arange(0, 3 * np.pi, 0.1)  ## 生成从0到3π 的x值，步长为0.1
+y_sin = np.sin(x)  # 计算对应的正弦值
+y_cos = np.cos(x)  # 计算对应的余弦值
+
+plt.figure(figsize=(10, 6))  # # 创建一个图像窗口，设置大小为10×6英寸 
+plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
+plt.plot(x, y_cos, label="y = cos(x)", color="red") # 绘制余弦函数曲线
+
+# 添加标题和标签
+plt.title("Sine and Cosine Functions")
+plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
+plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
+
+# 添加网格线
+main
 plt.grid(True)
  
 # 绘制正弦曲线
