@@ -8,12 +8,16 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import tensorflow as tf
+from tensorflow.keras import optimizers, layers, Model
 
 def identity_basis(x):
+    """恒等基函数"""
     return np.expand_dims(x, axis=1)
 
 
 def multinomial_basis(x, feature_num=10):
+    """多项式基函数"""
     x = np.expand_dims(x, axis=1) # shape(N, 1)
     feat = [x]
     for i in range(2, feature_num+1):
@@ -22,6 +26,7 @@ def multinomial_basis(x, feature_num=10):
     return ret
 
 def gaussian_basis(x, feature_num=10):
+    """高斯基函数"""
     centers = np.linspace(0, 25, feature_num)
     width = 1.0 * (centers[1] - centers[0])
     x = np.expand_dims(x, axis=1)
@@ -36,7 +41,7 @@ def load_data(filename, basis_func=gaussian_basis):
     xys = []
     with open(filename, 'r') as f:
         for line in f:
-            xys.append(map(float, line.strip().split()))
+            xys.append(list(map(float, line.strip().split())))  # 改进: 转换为list
         xs, ys = zip(*xys)
         xs, ys = np.asarray(xs), np.asarray(ys)
         
@@ -52,8 +57,6 @@ def load_data(filename, basis_func=gaussian_basis):
 # In[21]:
 
 
-import tensorflow as tf
-from tensorflow.keras import optimizers, layers, Model
 
 class linearModel(Model):
     def __init__(self, ndim):

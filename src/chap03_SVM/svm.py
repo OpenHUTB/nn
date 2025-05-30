@@ -37,33 +37,36 @@ class SVM():
         self.w = None  # 权重向量
         self.b = 0     # 偏置项
         pass
+    
 
     def train(self, data_train):
         """
-        训练模型。
+        训练 SVM 模型。
+        :param data_train: 包含特征和标签的 NumPy 数组，形状为 (n_samples, n_features + 1)
         """
-        # 提取特征和标签
-        x = data_train[:, :2]
-        t = data_train[:, 2]
-        t = np.where(t == 0, -1, 1)  # 转换标签为-1和1
+        X = data_train[:, :-1]
+        y = np.where(data_train[:, -1] == 0, -1, 1)
 
-        # 初始化参数
-        n_samples, n_features = x.shape
+        n_samples, n_features = X.shape
         self.w = np.zeros(n_features)
-        learning_rate = 0.01            # 学习率η：控制参数更新步长
-        lambda_ = 0.01                  # 正则化系数λ：控制模型复杂度
-        epochs = 1000
+        self.b = 0
 
-        # 梯度下降优化
-        for _ in range(epochs):
-            for idx, x_i in enumerate(x):
-                # 计算预测值（使用符号函数判断分类）
-                condition = t[idx] * (np.dot(x_i, self.w) + self.b)
-                if condition >= 1:
-                    self.w -= learning_rate * (lambda_ * self.w)  # 仅正则化项
-                else:
-                    self.w -= learning_rate * (lambda_ * self.w - t[idx] * x_i)
-                    self.b -= learning_rate * (-t[idx])
+        for epoch in range(self.epochs):
+            # 计算 margins
+            margin = y * (X @ self.w + self.b)
+            misclassified = margin < 1
+
+            # 梯度计算
+            dw = self.lambda_ * self.w - np.mean((misclassified * y)[:, np.newaxis] * X, axis=0)
+            db = -np.mean(misclassified * y)
+
+            # 参数更新
+            self.w -= self.lr * dw
+            self.b -= self.lr * db
+
+            # 提前停止：权重更新变化太小
+            if np.linalg.norm(self.lr * dw) < self.tolerance:
+                break
         # 请补全此处代码
 
     def predict(self, x):
@@ -72,6 +75,8 @@ class SVM():
         """
         # 请补全此处代码
         # 计算决策函数值
+        if x.ndim == 1:
+           x = np.expand_dims(x, axis=0)  # 处理单样本输入
         decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, 0)
