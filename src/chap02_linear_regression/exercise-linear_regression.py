@@ -8,7 +8,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+#下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
 
@@ -32,18 +32,13 @@ def load_data(filename):
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
 # 
 def identity_basis(x):
-    ret = np.expand_dims(x, axis=1)
-    return ret
-    
-# 请分别在这里实现“多项式基函数”（Multinomial Basis Function）以及“高斯基函数”（Gaussian Basis Function）
-  
-# 其中以及训练集的x的范围在0-25之间
-
-def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式 
     ret = np.expand_dims(x, axis=1)
     return ret
+# 请分别在这里实现“多项式基函数”（Multinomial Basis Function）以及“高斯基函数”（Gaussian Basis Function）
+  
+# 其中以及训练集的x的范围在0-25之间
 
 def multinomial_basis(x, feature_num=10):
     '''多项式基函数'''

@@ -26,7 +26,7 @@ def eval_acc(label, pred):
     """
     return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
 
-
+#SVM模型 实现了线性SVM分类器
 class SVM():
     """
     SVM模型。
