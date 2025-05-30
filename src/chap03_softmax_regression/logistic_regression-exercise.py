@@ -134,15 +134,15 @@ if __name__ == '__main__':
     x1, x2, y = list(zip(*data_set))
     # 将x1和x2组合成输入数据x
     x = list(zip(x1, x2))
-    # 用于存储训练过程中的参数和损失值，以便后续可视化
-    animation_fram = []
-    
+    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
+    animation_frames = []
+
     # 进行200次训练迭代
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重W和偏置b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
-        # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_fram中
-        animation_fram.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()))
+        # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
+        animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()))
         # 每20次迭代打印一次损失和准确率
         if i%20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
@@ -185,22 +185,22 @@ def init():
 # 动画更新函数，根据训练过程中的参数绘制拟合直线、样本点和更新训练信息文本
 def animate(i):
     xx = np.arange(10, step=0.1) # 创建 x 轴的数据，从 10 开始，步长为 0.1
-    a = animation_fram[i][0]     # 从 animation_fram 中提取当前帧的参数
-    b = animation_fram[i][1]
-    c = animation_fram[i][2]
+    a = animation_frames[i][0]     # 从 animation_frames 中提取当前帧的参数W[0]
+    b = animation_frames[i][1]     # W[1]
+    c = animation_frames[i][2]     # b
     yy = a/-b * xx +c/-b         # 根据公式计算 y = (a/-b) * x + (c/-b)，即直线的表达式
     line_d.set_data(xx, yy)      # 更新直线的数据
       # 更新第一组点（C1）的数据
     C1_dots.set_data(C1[:, 0], C1[:, 1])  # C1[:, 0] 是 x 坐标，C1[:, 1] 是 y 坐标
     C2_dots.set_data(C2[:, 0], C2[:, 1])  # C2[:, 0] 是 x 坐标，C2[:, 1] 是 y 坐标
     
-    frame_text.set_text('Timestep = %.1d/%.1d\nLoss = %.3f' % (i, len(animation_fram), animation_fram[i][3])) # 更新帧文本信息，包括当前帧索引、总帧数和损失值
+    frame_text.set_text('Timestep = %.1d/%.1d\nLoss = %.3f' % (i, len(animation_frames), animation_frames[i][3])) # 更新帧文本信息，包括当前帧索引、总帧数和损失值
     
     return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象，以便 Matplotlib 动画知道要更新哪些部分
 
 # 创建动画对象，设置动画的参数
 anim = animation.FuncAnimation(f, animate, init_func=init,
-                               frames=len(animation_fram), interval=30, blit=True)
+                               frames=len(animation_frames), interval=30, blit=True)
 
 # 将动画转换为HTML5视频格式并显示
 HTML(anim.to_html5_video())
