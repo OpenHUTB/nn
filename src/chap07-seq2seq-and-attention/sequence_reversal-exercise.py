@@ -31,7 +31,8 @@ def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
 
     letters = string.ascii_uppercase
-    return ''.join(random.choice(letters) for i in range(stringLength))
+    return ''.join(random.choice(letters) for i in range(stringLength)) 
+# 生成随机字符串的函数
 
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]
@@ -41,7 +42,7 @@ def get_batch(batch_size, length):
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
-
+# 生成批次数据
 
 # # 建立sequence to sequence 模型
 
@@ -170,11 +171,9 @@ def sequence_reversal():
     return decode(state, enc_x.get_shape()[-1]), batched_examples
 
 def is_reverse(seq, rev_seq):
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
-    if seq == rev_seq_rev:
-        return True
-    else:
-        return False
+    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))]) #检查序列是否反转
+    return seq == rev_seq_rev
+    #简化了is_reverse函数
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 print(list(zip(*sequence_reversal())))
 
