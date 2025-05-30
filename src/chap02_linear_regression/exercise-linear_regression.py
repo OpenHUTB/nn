@@ -8,7 +8,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
+#下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
 
