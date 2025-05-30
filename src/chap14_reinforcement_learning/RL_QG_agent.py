@@ -1,5 +1,6 @@
 import tensorflow as tf
 import os
+import numpy as np
 
 class RL_QG_agent:
     def __init__(self):
