@@ -188,9 +188,11 @@ print("第二十五题：\n")
 
 x = np.arange(0, 3 * np.pi, 0.1)
 y = np.sin(x)
+y_cos = np.cos(x)  # 计算余弦值
 
 plt.figure(figsize=(10, 6))  # 设置图像大小
 plt.plot(x, y, label="y = sin(x)", color="blue")  # 绘制曲线
+plt.plot(x, y_cos, label="y = cos(x)", color="red")
 plt.title("Plot of y = sin(x)")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
