@@ -154,13 +154,22 @@ def compute_loss(logits, labels, seqlen):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
     losses = reduce_avg(losses, seqlen, dim=1)
-    return tf.reduce_mean(losses)
+    return tf.reduce_mean(losses) #计算序列损失
 
 @tf.function
 def train_one_step(model, optimizer, x, y, seqlen):
     '''
     完成一步优化过程，可以参考之前做过的模型
     '''
+    #执行单步训练
+    with tf.GradientTape() as tape:
+        logits = model(x)
+        loss = compute_loss(logits, y, seqlen)
+    
+    # 计算梯度并更新参数
+    grads = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    #完善train_one_step函数
     return loss
 
 def train(epoch, model, optimizer, ds):
