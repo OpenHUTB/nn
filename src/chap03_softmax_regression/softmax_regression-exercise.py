@@ -27,7 +27,7 @@ y = np.ones(dot_num) #标签为1
 C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 
 x_n = np.random.normal(6., 1, dot_num) # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
-y_n = np.random.normal(3., 1, dot_num) 
+y_n = np.random.normal(3., 1, dot_num) # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
