@@ -43,7 +43,9 @@ class RNN_model(nn.Module):
         self.lstm_dim = lstm_hidden_dim
         #########################################
         # here you need to define the "self.rnn_lstm"  the input size is "embedding_dim" and the output size is "lstm_hidden_dim"
+        # (这里你需要定义 self.rnn_lstm，输入维度是 embedding_dim，输出维度是 lstm_hidden_dim。)
         # the lstm should have two layers, and the  input and output tensors are provided as (batch, seq, feature)
+        # (LSTM 应该有两层，且输入和输出的张量格式为 (batch, seq, feature)。)
         # ???
         self.rnn_lstm = nn.LSTM(input_size=embedding_dim, hidden_size=lstm_hidden_dim, num_layers=2, batch_first=False)
 
@@ -59,7 +61,9 @@ class RNN_model(nn.Module):
         # print(batch_input.size()) # print the size of the input
         ################################################
         # here you need to put the "batch_input"  input the self.lstm which is defined before.
+        # (这里你需要把 batch_input 传入之前定义的 self.lstm。)
         # the hidden output should be named as output, the initial hidden state and cell state set to zero.
+        # (隐藏层输出应命名为 output，初始的隐藏状态和细胞状态应初始化为全零。)
         # ???
         h0 = torch.zeros(2, batch_input.size(1), self.lstm_dim)  # (num_layers, batch_size, hidden_dim)
         c0 = torch.zeros(2, batch_input.size(1), self.lstm_dim)  # (num_layers, batch_size, hidden_dim)
