@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # Logistic Regression Example
-
 # ### 生成数据集， 看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
@@ -54,10 +52,8 @@ np.random.shuffle(data_set)
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
-# 
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
 # In[37]:
-
 # 防止对数运算出现数值不稳定问题，添加一个极小值
 epsilon = 1e-12
 class LogisticRegression():
@@ -173,7 +169,6 @@ C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
 # 创建一个空的散点对象，用于绘制负样本
 C2_dots, = ax.plot([], [], 'o', c='g' ,label='actual_dots')
 
-
 # 创建一个文本对象，用于显示训练的信息
 frame_text = ax.text(0.02, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
 # ax.legend()
@@ -193,7 +188,7 @@ def animate(i):
     c = animation_frames[i][2]     # b
     yy = a/-b * xx +c/-b         # 根据公式计算 y = (a/-b) * x + (c/-b)，即直线的表达式
     line_d.set_data(xx, yy)      # 更新直线的数据
-      # 更新第一组点（C1）的数据
+    # 更新第一组点（C1）的数据
     C1_dots.set_data(C1[:, 0], C1[:, 1])  # C1[:, 0] 是 x 坐标，C1[:, 1] 是 y 坐标
     C2_dots.set_data(C2[:, 0], C2[:, 1])  # C2[:, 0] 是 x 坐标，C2[:, 1] 是 y 坐标
     
