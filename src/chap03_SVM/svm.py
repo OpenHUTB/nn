@@ -44,11 +44,11 @@ class SVM():
         训练 SVM 模型。
         :param data_train: 包含特征和标签的 NumPy 数组，形状为 (n_samples, n_features + 1)
         """
-        X = data_train[:, :-1]
-        y = np.where(data_train[:, -1] == 0, -1, 1)
+        X = data_train[:, :-1] #从data_train中提取特征矩阵X
+        y = np.where(data_train[:, -1] == 0, -1, 1) #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
 
-        n_samples, n_features = X.shape
-        self.w = np.zeros(n_features)
+        n_samples, n_features = X.shape #获取样本数量和特征数量
+        self.w = np.zeros(n_features) #初始化权重向量w为零向量
         self.b = 0
 
         for epoch in range(self.epochs):

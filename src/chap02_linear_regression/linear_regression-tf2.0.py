@@ -27,10 +27,10 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     """高斯基函数"""
-    centers = np.linspace(0, 25, feature_num)
-    width = 1.0 * (centers[1] - centers[0])
-    x = np.expand_dims(x, axis=1)
-    x = np.concatenate([x]*feature_num, axis=1)
+    centers = np.linspace(0, 25, feature_num) #使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点，这些中心点将作为高斯函数的均值位置
+    width = 1.0 * (centers[1] - centers[0]) #计算高斯函数的宽度(标准差)
+    x = np.expand_dims(x, axis=1) #使用np.expand_dims在x的第1维度(axis=1)上增加一个维度
+    x = np.concatenate([x]*feature_num, axis=1) #将x沿着第1维度(axis=1)复制feature_num次并连接
     
     out = (x-centers)/width
     ret = np.exp(-0.5 * out ** 2)
