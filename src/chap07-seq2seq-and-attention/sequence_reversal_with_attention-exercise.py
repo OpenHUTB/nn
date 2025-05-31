@@ -32,6 +32,7 @@ def randomString(stringLength):
     letters = string.ascii_uppercase
     return ''.join(random.choice(letters) for i in range(stringLength))
 
+ #定义一个函数 get_batch，用于生成一批训练数据
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]
     enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
