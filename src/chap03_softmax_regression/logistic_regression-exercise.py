@@ -81,8 +81,9 @@ class LogisticRegression():
         pred = tf.nn.sigmoid(logits)
         return pred
 # 使用tf.function将该方法编译为静态图，提高执行效率
-@tf.function
 #以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
+@tf.function
+
 def compute_loss(pred, label):
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
