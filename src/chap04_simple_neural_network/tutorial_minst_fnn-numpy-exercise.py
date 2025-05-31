@@ -8,6 +8,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
@@ -26,8 +27,6 @@ def mnist_dataset():
 
 # In[3]:
 
-
-import numpy as np
 
 class Matmul:
     def __init__(self):

@@ -5,7 +5,6 @@
 
 # In[20]:
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -15,10 +14,9 @@ def identity_basis(x):
     """恒等基函数"""
     return np.expand_dims(x, axis=1)
 
-
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
-    x = np.expand_dims(x, axis=1) # shape(N, 1)
+    x = np.expand_dims(x, axis=1)  #shape(N, 1)
     feat = [x]
     for i in range(2, feature_num+1):
         feat.append(x**i)
@@ -37,7 +35,7 @@ def gaussian_basis(x, feature_num=10):
     return ret
 
 def load_data(filename, basis_func=gaussian_basis):
-    """载入数据。"""
+    """载入数据"""
     xys = []
     with open(filename, 'r') as f:
         for line in f:
@@ -53,10 +51,7 @@ def load_data(filename, basis_func=gaussian_basis):
 
 
 # ## 定义模型
-
 # In[21]:
-
-
 
 class linearModel(Model):
     def __init__(self, ndim):

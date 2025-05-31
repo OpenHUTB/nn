@@ -3,11 +3,8 @@
 
 import numpy as np
 
-
 def load_data(fname):
-    """
-    载入数据。
-    """
+    """载入数据"""
     with open(fname, 'r') as f:
         data = []
         line = f.readline() # 首行是标题行，自动跳过
@@ -21,21 +18,17 @@ def load_data(fname):
 
 
 def eval_acc(label, pred):
-    """
-    计算准确率。
-    """
+    """计算准确率"""
     return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
-
-#SVM模型 实现了线性SVM分类器
+  
+#SVM模型 实现了线性SVM分类
 class SVM():
-    """
-    SVM模型。
-    """
+    """SVM模型"""
     #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self):
         # 请补全此处代码
-        self.w = None  # 权重向量
-        self.b = 0     # 偏置项
+        self.w = None  # w: 权重向量(决定分类超平面的方向)
+        self.b = 0     # b: 偏置项(决定分类超平面的位置)
         pass
     
 
@@ -71,7 +64,7 @@ class SVM():
 
     def predict(self, x):
         """
-        预测标签。
+        预测标签
         """
         # 请补全此处代码
         # 计算决策函数值
