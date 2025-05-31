@@ -27,7 +27,7 @@ y = np.ones(dot_num) #标签为1
 C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 
 x_n = np.random.normal(6., 1, dot_num) # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
-y_n = np.random.normal(3., 1, dot_num) 
+y_n = np.random.normal(3., 1, dot_num) # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
@@ -79,7 +79,7 @@ class SoftmaxRegression(tf.Module):
         logits = tf.matmul(x, self.W) + self.b
         return tf.nn.softmax(logits)
 
-
+#计算多分类问题中的交叉熵损失以及准确率，适用于处理具有多个类别的分类任务
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
     """
