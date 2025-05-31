@@ -79,7 +79,7 @@ class SoftmaxRegression(tf.Module):
         logits = tf.matmul(x, self.W) + self.b
         return tf.nn.softmax(logits)
 
-
+#计算多分类问题中的交叉熵损失以及准确率，适用于处理具有多个类别的分类任务
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
     """

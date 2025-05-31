@@ -36,7 +36,7 @@ test_data = np.random.normal(size=[10, 5])
 # 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
 
-# ## 实现sigmoid函数
+#数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
 
 def sigmoid(x):
     ##########
