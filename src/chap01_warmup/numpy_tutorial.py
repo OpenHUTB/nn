@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
 # coding: utf-8
-
 # numpy 练习题
-
 # numpy 的array操作
 
 # 1.导入numpy库
 import numpy as np #将numpy库命名为np
-
 # 导入matplotlib.pyplot库
 import matplotlib
-
-matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
+#import放一起代码美观
+matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 
 # 2.建立一个一维数组 a 初始化为[4,5,6]，(1)输出a 的类型（type）(2)输出a的各维度的大小（shape）(3)输出 a的第一个元素（element）
 print("第二题：\n")
@@ -21,10 +18,10 @@ a = np.array([4, 5, 6])
 print("(1)输出a 的类型（type）\n", type(a))
 print("(2)输出a的各维度的大小（shape）\n", a.shape)
 print("(3)输出 a的第一个元素（element）\n", a[0])
+#使用array()函数创建数组，函数可基于序列型的对象。创建了一个一维数组 a，并输出其类型（numpy.ndarray）、形状（(3,)） 和第一个元素（4）。
 
 # 3.建立一个二维数组 b,初始化为 [ [4, 5, 6],[1, 2, 3]] (1)输出二维数组b的形状（shape）（输出值为（2,3））(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）
 print("第三题：\n")
-
 b = np.array([[4, 5, 6], [1, 2, 3]])
 print("(1)输出各维度的大小（shape）\n", b.shape)
 print("(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])
@@ -42,7 +39,7 @@ d = np.random.random((3, 2))         # 随机数矩阵，3x2
 print("第五题：\n")
 
 a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
-print(a)
+print(a) #输出数组a
 print(a[2, 3], a[0, 0])
 
 # 6.把上一题的 a数组的0到1行，2到3列，放到b里面去，（此处不需要从新建立a,直接调用即可）(1) 输出b; (2) 输出b数组中（0,0）这个元素的值
@@ -197,8 +194,8 @@ plt.plot(x, y_cos, label="y = cos(x)", color="red") # 绘制余弦函数曲线
 
 # 添加标题和标签
 plt.title("Sine and Cosine Functions")
-plt.xlabel("x")
-plt.ylabel("y")
+plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
+plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 
 # 添加网格线
 plt.grid(True)
