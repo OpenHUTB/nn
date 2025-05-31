@@ -89,11 +89,13 @@ def compute_loss(pred, labels, num_classes=3):
     :param num_classes: 类别数
     :return: 平均损失值和准确率
     """
+    # 将标签转换为one-hot编码
     one_hot_labels = tf.one_hot(tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32)
     pred = tf.clip_by_value(pred, epsilon, 1.0)  # 防止log(0)
+    # 计算每个样本的交叉熵损失
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
+    # 计算平均损失和准确率
     loss = tf.reduce_mean(sample_losses)
-
     acc = tf.reduce_mean(tf.cast(
         tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
         dtype=tf.float32
@@ -115,6 +117,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
         predictions = model(x_batch)
         loss, accuracy = compute_loss(predictions, y_batch)
 
+    # 计算梯度并应用优化
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy
