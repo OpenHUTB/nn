@@ -28,7 +28,7 @@ def mnist_dataset():
 print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
 
 
-# ## 建立模型
+#定义了一个简单的两层神经网络模型，用于处理 MNIST 手写数字识别任务
 
 # In[9]:
 class myModel:
