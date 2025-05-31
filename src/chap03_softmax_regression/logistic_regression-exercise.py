@@ -64,6 +64,7 @@ class LogisticRegression():
     def __init__(self):
         #正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
         # L2正则化，防止过拟合，正则化系数为0.01
+        # L2正则化通过对权重施加平方惩罚项来防止权重过大
         l2_reg = tf.keras.regularizers.l2(0.01)
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(initial_value=tf.random.uniform(shape=[2, 1], minval=-0.1, maxval=0.1), regularizer=l2_reg)
@@ -80,7 +81,9 @@ class LogisticRegression():
         pred = tf.nn.sigmoid(logits)
         return pred
 # 使用tf.function将该方法编译为静态图，提高执行效率
+#以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
 @tf.function
+
 def compute_loss(pred, label):
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
