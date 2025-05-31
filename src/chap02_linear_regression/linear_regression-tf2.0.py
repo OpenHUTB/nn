@@ -68,6 +68,15 @@ class linearModel(Model):
         
     @tf.function
     def call(self, x):
+        """
+        模型前向传播
+        
+        参数:
+            x: 输入特征，形状为(batch_size, ndim)
+            
+        返回:
+            预测值，形状为(batch_size,)
+        """
         y = tf.squeeze(tf.matmul(x, self.w), axis=1)
         return y
 
