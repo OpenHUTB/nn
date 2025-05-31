@@ -15,12 +15,12 @@ class RBM:
             raise ValueError("Number of hidden and visible units must be positive integers.")
         self.n_hidden = n_hidden
         self.n_observe = n_observe
-        # 初始化权重和偏置
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))
+        
+        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden)) #计算权重的初始化标准差
+        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden)) #初始化权重矩阵 self.W
         #self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-        self.b_h = np.zeros(n_hidden)
-        self.b_v = np.zeros(n_observe)
+        self.b_h = np.zeros(n_hidden) #初始化隐藏层的偏置向量 self.b_h
+        self.b_v = np.zeros(n_observe) #初始化输出层的偏置向量 self.b_v
         pass
     def _sigmoid(self, x):
         """Sigmoid激活函数"""
