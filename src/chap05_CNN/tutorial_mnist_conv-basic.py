@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ## 准备数据
-
 # In[29]:
-
-
+#导入了用于构建和训练卷积神经网络（CNN）的TensorFlow和Keras模块
 import os
 import tensorflow as tf
 from tensorflow import keras
@@ -36,10 +33,6 @@ def prepare_mnist_features_and_labels(x, y):
 
 
 # In[ ]:
-
-
-
-
 
 # ## 建立模型
 
