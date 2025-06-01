@@ -86,7 +86,7 @@ with tf.Session() as sess:
     for i in range(max_epoch):
         batch_xs, batch_ys = mnist.train.next_batch(100)
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
-        if i % 100 == 0:
+        if i % 100 == 0:#每 100 个迭代在测试集的前 1000 个样本上评估准确率
             print(compute_accuracy(
                 mnist.test.images[:1000], mnist.test.labels[:1000]))
 
