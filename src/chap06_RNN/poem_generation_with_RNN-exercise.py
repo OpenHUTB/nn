@@ -2,12 +2,10 @@
 # coding: utf-8
 
 # # 诗歌生成
-
 # # 数据处理
 
 # In[1]:
-
-
+#导入了多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
 import tensorflow as tf
 import collections
@@ -182,11 +180,12 @@ def mkMask(input_tensor, maxLen):
     """
     shape_of_input = tf.shape(input_tensor) # 获取输入张量的形状
     shape_of_output = tf.concat(axis=0, values=[shape_of_input, [maxLen]])
-
+    #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
+    #使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
+    
     return tf.reshape(flat_mask, shape_of_output)
-
 
 def reduce_avg(reduce_target, lengths, dim):
     """沿指定维度计算掩码后的平均值（忽略填充部分）
@@ -231,16 +230,13 @@ def reduce_avg(reduce_target, lengths, dim):
 
 # In[4]:
 
-
 @tf.function
 def compute_loss(logits, labels, seqlen):
     """计算序列的交叉熵损失（考虑变长序列）
-    
     Args:
         logits: 模型输出，形状(batch_size, seq_len, vocab_size)
         labels: 真实标签，形状(batch_size, seq_len)
-        seqlen: 每个序列的实际长度
-        
+        seqlen: 每个序列的实际长度    
     Returns:
         平均损失值
     """
@@ -307,7 +303,6 @@ def train(epoch, model, optimizer, ds):
 
 # In[5]:
 
-
 # 初始化优化器
 optimizer = optimizers.Adam(0.0005)  # 学习率0.0005
 # 加载数据集
@@ -319,11 +314,9 @@ model = myRNNModel(word2id)
 for epoch in range(10):
     loss = train(epoch, model, optimizer, train_ds)
 
-
 # # 诗歌生成
 
 # In[74]:
-
 
 def gen_sentence():
     """使用训练好的模型生成诗歌

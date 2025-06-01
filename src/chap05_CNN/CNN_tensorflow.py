@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # In[ ]:
-
-
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
+#使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
 learning_rate = 1e-4 #学习率
@@ -50,7 +48,6 @@ x_image = tf.reshape(xs, [-1, 28, 28, 1])
 
 #  卷积层 1
 ## conv1 layer ##
-
 W_conv1 = weight_variable([7, 7, 1, 32])                      # patch 7x7, in size 1, out size 32
 b_conv1 = bias_variable([32])                     
 h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)                      # 卷积  自己选择 选择激活函数
@@ -77,7 +74,6 @@ W_fc2 = weight_variable([1024, 10])
 b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
-
 # 交叉熵函数
 cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),
                                               reduction_indices=[1]))
@@ -90,7 +86,7 @@ with tf.Session() as sess:
     for i in range(max_epoch):
         batch_xs, batch_ys = mnist.train.next_batch(100)
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
-        if i % 100 == 0:
+        if i % 100 == 0:#每 100 个迭代在测试集的前 1000 个样本上评估准确率
             print(compute_accuracy(
                 mnist.test.images[:1000], mnist.test.labels[:1000]))
 
