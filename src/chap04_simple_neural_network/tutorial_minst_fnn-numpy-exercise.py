@@ -245,16 +245,21 @@ print(h2_log_grad)
 print('--'*20)
 # print(W2_grad)
 
+# 开启梯度记录环境（自动微分）
 with tf.GradientTape() as tape:
     x, W1, W2, label = tf.constant(x), tf.constant(W1), tf.constant(W2), tf.constant(label)
+    # 显式声明需要跟踪梯度的变量（虽然W1/W2已经是tf.constant，但watch确保它们被记录）
     tape.watch(W1)
     tape.watch(W2)
+    # 前向传播过程：
     h1 = tf.matmul(x, W1)
     h1_relu = tf.nn.relu(h1)
     h2 = tf.matmul(h1_relu, W2)
     prob = tf.nn.softmax(h2)
     log_prob = tf.math.log(prob)
+    # 计算损失函数：负对数似然（交叉熵的组成部分）
     loss = tf.reduce_sum(label * log_prob)
+    # 自动计算损失关于prob的梯度（反向传播）
     grads = tape.gradient(loss, [prob])
     print (grads[0].numpy())
 
@@ -266,9 +271,10 @@ with tf.GradientTape() as tape:
 
 class myModel:
     def __init__(self):
-        
-        self.W1 = np.random.normal(size=[28*28+1, 100])
-        self.W2 = np.random.normal(size=[100, 10])
+        scale1 = np.sqrt(2.0 / (28 * 28 + 100))  # 输入输出维度平方根倒数
+        scale2 = np.sqrt(2.0 / (100 + 10))
+        self.W1 = np.random.normal(scale=scale1, size=[28 * 28 + 1, 100])
+        self.W2 = np.random.normal(scale=scale2, size=[100, 10])
         
         self.mul_h1 = Matmul()
         self.mul_h2 = Matmul()
@@ -314,8 +320,8 @@ def compute_accuracy(log_prob, labels):
 def train_one_step(model, x, y):
     model.forward(x)
     model.backward(y)
-    model.W1 -= 1e-5* model.W1_grad
-    model.W2 -= 1e-5* model.W2_grad
+    model.W1 -= 1e-3 * model.W1_grad / (np.linalg.norm(model.W1_grad) + 1e-8)  # 添加梯度归一化
+    model.W2 -= 1e-3 * model.W2_grad / (np.linalg.norm(model.W2_grad) + 1e-8)  # 防止除零
     loss = compute_loss(model.h2_log, y)
     accuracy = compute_accuracy(model.h2_log, y)
     return loss, accuracy
