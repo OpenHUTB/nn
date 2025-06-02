@@ -9,8 +9,6 @@
 # #### '<font color="red">*</font>' 从高斯分布采样  (X, Y) ~ N(7, 7, 1, 1, 0)<br>
 
 # In[1]:
-
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
@@ -52,8 +50,6 @@ np.random.shuffle(data_set) # 随机打乱数据集的顺序
 # 填空二：实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
 
 # In[1]:
-
-
 epsilon = 1e-12  # 防止 log(0)
 
 class SoftmaxRegression(tf.Module):
@@ -91,7 +87,7 @@ def compute_loss(pred, labels, num_classes=3):
     """
     # 将标签转换为one-hot编码
     one_hot_labels = tf.one_hot(tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32)
-    pred = tf.clip_by_value(pred, epsilon, 1.0)  # 防止log(0)
+    pred = tf.maximum(pred, epsilon)  # 更高效地防止log(0)
     # 计算每个样本的交叉熵损失
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
     # 计算平均损失和准确率
@@ -153,7 +149,11 @@ plt.scatter(C3[:, 0], C3[:, 1], c='r', marker='*')
 x = np.arange(0., 10., 0.1)
 y = np.arange(0., 10., 0.1)
 
+# 生成网格点坐标矩阵
+# x和y是1维数组，meshgrid将它们转换为2维网格坐标矩阵
+# X和Y的形状都是(len(y), len(x))，其中X的每一行是x的复制，Y的每一列是y的复制
 X, Y = np.meshgrid(x, y)
+
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 Z = model(inp)

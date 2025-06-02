@@ -8,7 +8,6 @@
 
 # In[1]:
 
-
 import numpy as np
 import tensorflow as tf
 import collections
@@ -22,7 +21,6 @@ import os,sys,tqdm
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[2]:
-
 
 import random
 import string
@@ -55,7 +53,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
-        super(mySeq2SeqModel, self).__init__()
+        super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
         self.v_sz = 27
@@ -129,16 +127,19 @@ class mySeq2SeqModel(keras.Model):
 
 # In[4]:
 
-
+#定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
 @tf.function
 def compute_loss(logits, labels):
+    """计算交叉熵损失"""
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
     losses = tf.reduce_mean(losses)
     return losses
+#定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
 
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
+    """执行一次反向传播训练"""
     with tf.GradientTape() as tape:
         logits = model(enc_x, dec_x)
         loss = compute_loss(logits, y)
@@ -149,6 +150,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
     return loss
 
 def train(model, optimizer, seqlen):
+    """训练过程，迭代 3000 步"""
     loss = 0.0
     accuracy = 0.0
     for step in range(3000):
@@ -162,8 +164,6 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-
-
 optimizer = optimizers.Adam(0.0005)
 model = mySeq2SeqModel()
 train(model, optimizer, seqlen=20)
@@ -171,23 +171,23 @@ train(model, optimizer, seqlen=20)
 
 # # 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
-# 
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
 
 # In[6]:
 
 
 def sequence_reversal():
+    """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
     def decode(init_state, steps=10):
         b_sz = tf.shape(init_state[0])[0]
-        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)  # 起始 token（全为 0）
         state = init_state
         collect = []
         for i in range(steps):
             cur_token, state = model.get_next_token(cur_token, state)
-            collect.append(tf.expand_dims(cur_token, axis=-1))
-        out = tf.concat(collect, axis=-1).numpy()
-        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
+            collect.append(tf.expand_dims(cur_token, axis=-1))  # 收集每一步生成的 token
+        out = tf.concat(collect, axis=-1).numpy()  # 拼接输出序列
+        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]  # 索引转字符
         return out
     
     batched_examples, enc_x, _, _ = get_batch(32, 10)
@@ -195,11 +195,13 @@ def sequence_reversal():
     return decode(state, enc_x.get_shape()[-1]), batched_examples
 
 def is_reverse(seq, rev_seq):
+    """检查 rev_seq 是否为 seq 的逆序"""
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     if seq == rev_seq_rev:
         return True
     else:
         return False
+# 测试模型逆序能力的准确性
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 print(list(zip(*sequence_reversal())))
 

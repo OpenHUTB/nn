@@ -7,7 +7,6 @@
 
 # In[19]:
 
-
 import numpy as np
 import tensorflow as tf
 import collections
@@ -15,16 +14,14 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
-
+import random
+import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[20]:
 
-
-import random
-import string
 
 def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
@@ -43,12 +40,10 @@ print(get_batch(2, 10))
 
 
 # # 建立sequence to sequence 模型
-# 
 # 完成两空，模型搭建以及单步解码逻辑
 
 # In[26]:
-
-
+#定义了一个自定义的序列到序列（Seq2Seq）模型类mySeq2SeqModel，继承自keras.Model
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
@@ -133,7 +128,6 @@ class mySeq2SeqModel(keras.Model):
 
 # In[27]:
 
-
 @tf.function
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -180,7 +174,6 @@ train(model, optimizer, seqlen=20)
 
 # In[30]:
 
-
 def sequence_reversal():
     def decode(init_state, steps, enc_out):
         b_sz = tf.shape(init_state[0])[0]
@@ -206,7 +199,6 @@ def is_reverse(seq, rev_seq):
         return False
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 print(list(zip(*sequence_reversal())))
-
 
 # In[ ]:
 
