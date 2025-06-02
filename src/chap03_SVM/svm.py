@@ -8,9 +8,9 @@ def load_data(fname):
     """
     载入数据。
     """
-    with open(fname, 'r') as f:
+    with open(fname, "r") as f:
         data = []
-        line = f.readline() # 首行是标题行，自动跳过
+        line = f.readline()  # 首行是标题行，自动跳过
         for line in f:
             line = line.strip().split()
             x1 = float(line[0])
@@ -24,20 +24,21 @@ def eval_acc(label, pred):
     """
     计算准确率。
     """
-    return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
+    return np.sum(label == pred) / len(pred)  # 准确率 = 正确预测的样本数 / 总样本数
 
-#SVM模型 实现了线性SVM分类器
-class SVM():
+
+# SVM模型 实现了线性SVM分类器
+class SVM:
     """
     SVM模型。
     """
-    #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
+
+    # 目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self):
         # 请补全此处代码
         self.w = None  # 权重向量
-        self.b = 0     # 偏置项
+        self.b = 0  # 偏置项
         pass
-    
 
     def train(self, data_train):
         """
@@ -57,7 +58,9 @@ class SVM():
             misclassified = margin < 1
 
             # 梯度计算
-            dw = self.lambda_ * self.w - np.mean((misclassified * y)[:, np.newaxis] * X, axis=0)
+            dw = self.lambda_ * self.w - np.mean(
+                (misclassified * y)[:, np.newaxis] * X, axis=0
+            )
             db = -np.mean(misclassified * y)
 
             # 参数更新
@@ -75,17 +78,26 @@ class SVM():
         """
         # 请补全此处代码
         # 计算决策函数值
+        # 检查模型是否已经训练
+        if self.w is None:
+            raise ValueError("模型尚未训练，请先调用 train 方法")
+
+        # 确保输入是二维数组
         if x.ndim == 1:
-           x = np.expand_dims(x, axis=0)  # 处理单样本输入
-        decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
-        # 返回预测标签（0或1）
+            x = np.expand_dims(x, axis=0)  # 处理单样本输入
+
+        # 计算决策函数值: wx + b
+        decision_values = np.dot(x, self.w) + self.b
+
+        # 根据决策函数值返回预测标签
+        # 使用连续输出可以提供置信度信息
         return np.where(decision_values >= 0, 1, 0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # 载入数据，实际使用时将x替换为具体名称
-    train_file = 'data/train_linear.txt'
-    test_file = 'data/test_linear.txt'
+    train_file = "data/train_linear.txt"
+    test_file = "data/test_linear.txt"
     data_train = load_data(train_file)  # 数据格式[x1, x2, t]
     data_test = load_data(test_file)
 
