@@ -134,7 +134,7 @@ class mySeq2SeqModel(keras.Model):
         output_expanded = tf.expand_dims(output, 1)  # [batch_size, 1, hidden]
         scores = tf.matmul(output_expanded, enc_out, transpose_b=True)  # [batch_size, 1, enc_len]
         scores = tf.squeeze(scores, axis=1)  # [batch_size, enc_len]
-        attn_weights = tf.nn.softmax(scores, axis=1)  # [batch_size, enc_len]
+        attn_weights = tf.nn.softmax(scores, axis=1)  # [batch_size, enc_len]，注意力权重使用softmax归一化
         
         # 计算上下文向量
         context = tf.matmul(tf.expand_dims(attn_weights, 1), enc_out)  # [batch_size, 1, hidden]

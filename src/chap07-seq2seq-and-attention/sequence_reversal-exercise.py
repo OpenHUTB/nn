@@ -36,10 +36,10 @@ def randomString(stringLength):
     # 最终返回生成的随机字符串
 
 def get_batch(batch_size, length):
-    batched_examples = [randomString(length) for i in range(batch_size)]
-    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
-    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
-    dec_x = [[0] + e_idx[:-1] for e_idx in y]
+    batched_examples = [randomString(length) for i in range(batch_size)]    # 生成batch_size个随机字符串
+    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]  # 转成索引
+    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]   # 逆序
+    dec_x = [[0] + e_idx[:-1] for e_idx in y]   # 添加起始符
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
@@ -91,6 +91,7 @@ class mySeq2SeqModel(keras.Model):
     def call(self, enc_ids, dec_ids):
         '''
         完成sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好
+        前向传播过程：编码器 -> 解码器 -> 全连接层
         '''
         # 编码过程
         enc_emb = self.embed_layer(enc_ids)  # (batch_size, enc_seq_len, emb_dim)
@@ -100,7 +101,7 @@ class mySeq2SeqModel(keras.Model):
         dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
         dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
         
-        # 计算logits
+        # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
         return logits
     
