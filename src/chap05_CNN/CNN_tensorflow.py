@@ -20,8 +20,9 @@ def compute_accuracy(v_xs, v_ys):
     return result
 
 def weight_variable(shape):
+    # 初始化权重：截断正态分布，stddev=0.1，有助于稳定训练
     initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
+    return tf.Variable(initial) # 返回可训练变量
 
 def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
