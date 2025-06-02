@@ -58,3 +58,59 @@ python logistic_regression-exercise.py
 
 ## 五、总结
 本项目通过一个简单的示例展示了如何使用 TensorFlow 实现逻辑回归模型，并进行训练和可视化。通过修改代码中的参数，可以进一步探索不同数据集和模型参数对分类结果的影响。
+
+---
+
+# softmax_regression-exercise.py项目说明
+
+## 简介
+
+本项目展示了如何使用 TensorFlow 实现软最大回归（Softmax Regression）模型。通过该模型，您可以对三类数据进行分类，并计算交叉熵损失和准确率。
+
+## 文件结构
+
+-   `softmax_regression-exercise.py`: 包含数据生成、模型定义和训练过程的主要代码。
+
+## 环境要求
+
+-   Python 3.x
+-   TensorFlow 2.x
+-   Matplotlib
+-   NumPy
+
+## 安装依赖
+
+可以使用以下命令安装所需的 Python 库：
+
+```bash
+pip install tensorflow matplotlib numpy
+```
+
+## 使用说明
+
+### 1. 数据生成
+
+代码中生成三类数据点：
+
+-   类别 1: 从高斯分布 `N(3, 6, 1, 1, 0)` 生成。
+-   类别 2: 从高斯分布 `N(6, 3, 1, 1, 0)` 生成。
+-   类别 3: 从高斯分布 `N(7, 7, 1, 1, 0)` 生成。
+
+### 2. 模型定义
+
+`SoftmaxRegression` 类定义了模型的参数和前向传播过程。您可以通过修改 `input_dim` 和 `num_classes` 参数来适应不同的输入特征和类别数量。
+
+### 3. 训练模型
+
+模型使用随机梯度下降（SGD）优化器进行训练。运行以下代码进行训练：
+
+```python
+for i in range(1000):
+    loss, accuracy = train_one_step(model, opt, x, y)
+    if i % 50 == 49:
+        print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
+```
+
+### 4. 结果展示
+
+训练完成后，代码会绘制数据点和模型的决策边界。
