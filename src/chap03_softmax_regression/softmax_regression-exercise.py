@@ -9,8 +9,6 @@
 # #### '<font color="red">*</font>' 从高斯分布采样  (X, Y) ~ N(7, 7, 1, 1, 0)<br>
 
 # In[1]:
-
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
@@ -27,7 +25,7 @@ y = np.ones(dot_num) #标签为1
 C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 
 x_n = np.random.normal(6., 1, dot_num) # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
-y_n = np.random.normal(3., 1, dot_num) 
+y_n = np.random.normal(3., 1, dot_num) # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
@@ -52,8 +50,6 @@ np.random.shuffle(data_set) # 随机打乱数据集的顺序
 # 填空二：实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
 
 # In[1]:
-
-
 epsilon = 1e-12  # 防止 log(0)
 
 class SoftmaxRegression(tf.Module):
@@ -79,7 +75,7 @@ class SoftmaxRegression(tf.Module):
         logits = tf.matmul(x, self.W) + self.b
         return tf.nn.softmax(logits)
 
-
+#计算多分类问题中的交叉熵损失以及准确率，适用于处理具有多个类别的分类任务
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
     """
@@ -89,11 +85,13 @@ def compute_loss(pred, labels, num_classes=3):
     :param num_classes: 类别数
     :return: 平均损失值和准确率
     """
+    # 将标签转换为one-hot编码
     one_hot_labels = tf.one_hot(tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32)
-    pred = tf.clip_by_value(pred, epsilon, 1.0)  # 防止log(0)
+    pred = tf.maximum(pred, epsilon)  # 更高效地防止log(0)
+    # 计算每个样本的交叉熵损失
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
+    # 计算平均损失和准确率
     loss = tf.reduce_mean(sample_losses)
-
     acc = tf.reduce_mean(tf.cast(
         tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
         dtype=tf.float32
@@ -115,6 +113,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
         predictions = model(x_batch)
         loss, accuracy = compute_loss(predictions, y_batch)
 
+    # 计算梯度并应用优化
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy
@@ -150,7 +149,11 @@ plt.scatter(C3[:, 0], C3[:, 1], c='r', marker='*')
 x = np.arange(0., 10., 0.1)
 y = np.arange(0., 10., 0.1)
 
+# 生成网格点坐标矩阵
+# x和y是1维数组，meshgrid将它们转换为2维网格坐标矩阵
+# X和Y的形状都是(len(y), len(x))，其中X的每一行是x的复制，Y的每一列是y的复制
 X, Y = np.meshgrid(x, y)
+
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 Z = model(inp)

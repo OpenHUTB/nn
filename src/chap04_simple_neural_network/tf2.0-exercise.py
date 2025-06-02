@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # Tensorflow2.0 小练习
 
 import numpy as np
 import tensorflow as tf
 
 # ## 实现softmax函数
-
 def softmax(x: tf.Tensor) -> tf.Tensor:
     """
     实现数值稳定的 softmax 函数，仅在最后一维进行归一化。
@@ -24,9 +22,13 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
     shifted_logits = x - max_per_row
 
-    # 计算 softmax
+    # 计算指数值
+    # shifted_logits是模型的原始输出（logits），形状通常为(batch_size, n_classes)
+    # tf.exp计算每个元素的指数值，使所有值为正数
     exp_logits = tf.exp(shifted_logits)
+    
     sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+    
     softmax_output = exp_logits / sum_exp
 
     return softmax_output
@@ -36,14 +38,14 @@ test_data = np.random.normal(size=[10, 5])
 # 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
 
-# ## 实现sigmoid函数
+#数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
 
 def sigmoid(x):
     ##########
     '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
-    x = tf.cast(x, tf.float32)
+    x = tf.cast(x, tf.float32) #将输入x转换为float32类型，确保数值计算的精度和类型一致性。
     prob_x = 1 / (1 + tf.exp(-x))           # sigmoid 数学定义：1 / (1 + e^{-x})
-    ##########
+    
     return prob_x
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
