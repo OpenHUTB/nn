@@ -97,9 +97,9 @@ if __name__ == '__main__':
     x_train = data_train[:, :2]  # feature [x1, x2]
     t_train = data_train[:, 2]  # 真实标签
     t_train_pred = svm.predict(x_train)  # 预测标签
-    x_test = data_test[:, :2]
-    t_test = data_test[:, 2]
-    t_test_pred = svm.predict(x_test)
+    x_test = data_test[:, :2]  # 提取测试集特征（x1, x2）
+    t_test = data_test[:, 2] # 提取测试集真实标签
+    t_test_pred = svm.predict(x_test) # 对测试集进行预测，得到预测标签
 
     # 评估结果，计算准确率
     acc_train = eval_acc(t_train, t_train_pred)
