@@ -22,6 +22,7 @@ def randomString(stringLength):
     letters = string.ascii_uppercase
     return ''.join(random.choice(letters) for i in range(stringLength))
 
+ #定义一个函数 get_batch，用于生成一批训练数据
 def get_batch(batch_size, length):
     """生成一批训练数据
     返回:

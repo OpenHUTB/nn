@@ -58,7 +58,7 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     # 处理全-inf输入的特殊case
     if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):
-        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis)
+        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val 的适当形式。
     
     return result
 

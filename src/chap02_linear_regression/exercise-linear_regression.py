@@ -193,6 +193,7 @@ def main(x_train, y_train, use_gradient_descent=False):
         # 梯度下降求解权重（缩进修正）
         learning_rate = 0.01 #设置学习率为0.01
         epochs = 1000  #设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         for epoch in range(epochs): #开始梯度下降的迭代循环，将进行epochs次参数更新。
             y_pred = np.dot(phi, w_gd)
