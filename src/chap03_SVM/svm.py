@@ -25,10 +25,14 @@ def eval_acc(label, pred):
 class SVM():
     """SVM模型"""
     #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
-    def __init__(self):
-        # 请补全此处代码
+    def __init__(self, lr=0.001, epochs=1000, lambda_=0.001, tolerance=1e-3):
+        # 补全此处代码
         self.w = None  # w: 权重向量(决定分类超平面的方向)
         self.b = 0     # b: 偏置项(决定分类超平面的位置)
+        self.lr = lr   # 学习率
+        self.epochs = epochs  # 训练轮数
+        self.lambda_ = lambda_  # 正则化参数
+        self.tolerance = tolerance  # 提前停止的阈值
         pass
     
 
@@ -38,7 +42,7 @@ class SVM():
         :param data_train: 包含特征和标签的 NumPy 数组，形状为 (n_samples, n_features + 1)
         """
         X = data_train[:, :-1] #从data_train中提取特征矩阵X
-        y = np.where(data_train[:, -1] == 0, -1, 1) #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
+        y = data_train[:, -1] #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
 
         n_samples, n_features = X.shape #获取样本数量和特征数量
         self.w = np.zeros(n_features) #初始化权重向量w为零向量
@@ -72,7 +76,7 @@ class SVM():
            x = np.expand_dims(x, axis=0)  # 处理单样本输入
         decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
-        return np.where(decision_values >= 0, 1, 0)
+        return np.where(decision_values >= 0, 1, -1)
 
 
 if __name__ == '__main__':
@@ -81,6 +85,8 @@ if __name__ == '__main__':
     test_file = 'data/test_linear.txt'
     data_train = load_data(train_file)  # 数据格式[x1, x2, t]
     data_test = load_data(test_file)
+
+    #print(data_train[:1000])  # 查看前5行数据
 
     # 使用训练集训练SVM模型
     svm = SVM()  # 初始化模型
