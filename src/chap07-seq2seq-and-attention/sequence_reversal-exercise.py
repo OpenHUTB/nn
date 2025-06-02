@@ -53,7 +53,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
-        super(mySeq2SeqModel, self).__init__()
+        super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
         self.v_sz = 27
