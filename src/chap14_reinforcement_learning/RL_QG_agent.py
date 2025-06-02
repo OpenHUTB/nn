@@ -6,6 +6,7 @@ class RL_QG_agent:
     def __init__(self):
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
     #    pass    # 删掉这句话，并填写相应代码
+        #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
         os.makedirs(self.model_dir, exist_ok=True)
         self.sess = None
         self.saver = None
@@ -32,7 +33,6 @@ class RL_QG_agent:
         self.saver = tf.train.Saver()
         # 补全代码
         
-
     def place(self,state,enables):
         # 这个函数 主要用于测试， 返回的 action是 0-63 之间的一个数值，
         # action 表示的是 要下的位置。
@@ -55,7 +55,7 @@ class RL_QG_agent:
         action = np.random.choice(candidates)
 
         return action
-
+   #save_model和load_model，用于保存和加载TensorFlow模型的参数
     def save_model(self):  # 保存 模型
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
 

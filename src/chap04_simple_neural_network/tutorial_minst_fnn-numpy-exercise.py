@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # ## 准备数据
-
 # In[1]:
 
 import os
 import numpy as np
 import tensorflow as tf
+import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
+#定义了一个函数mnist_dataset()，用于加载并预处理MNIST数据集
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
@@ -21,12 +20,8 @@ def mnist_dataset():
     
     return (x, y), (x_test, y_test)
 
-
 # ## Demo numpy based auto differentiation
-
 # In[3]:
-
-
 import numpy as np
 
 class Matmul:
@@ -47,13 +42,11 @@ class Matmul:
         x = self.mem['x']
         W = self.mem['W']
         
-        ####################
         '''计算矩阵乘法的对应的梯度'''
         grad_x = np.matmul(grad_y, W.T)
         grad_W = np.matmul(x.T, grad_y)
-        ####################
+      
         return grad_x, grad_W
-
 
 class Relu:
     def __init__(self):
@@ -100,6 +93,9 @@ class Softmax:
         '''
         s = self.mem['out']
         sisj = np.matmul(np.expand_dims(s,axis=2), np.expand_dims(s, axis=1)) # (N, c, c)
+        # 对grad_y进行维度扩展
+        # 假设grad_y是一个形状为(N, c)的梯度张量
+        # np.expand_dims(grad_y, axis=1)将其形状变为(N, 1, c)
         g_y_exp = np.expand_dims(grad_y, axis=1)
         tmp = np.matmul(g_y_exp, sisj) #(N, 1, c)
         tmp = np.squeeze(tmp, axis=1)
