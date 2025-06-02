@@ -25,7 +25,7 @@ def process_dataset(fileName):
             outs = line.strip().split(':')
             content = ''.join(outs[1:])
             ins = [start_token] + list(content) + [end_token] 
-            if len(ins) > 200:
+            if len(ins) > 200:  # 过滤掉长度过长的样本
                 continue
             examples.append(ins)
             
