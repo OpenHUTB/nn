@@ -34,3 +34,53 @@ mkdocs serve
 * [代理模拟器文档](https://openhutb.github.io/carla_doc/)
 * [已有相关实现](https://openhutb.github.io/carla_doc/used_by/)
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
+
+
+## 使用说明
+### 初始化智能体并加载模型
+```python
+from RL_QG_agent import RL_QG_agent
+
+agent = RL_QG_agent()
+agent.init_model()
+
+# 如已有模型，可直接加载参数
+# agent.load_model()
+```
+
+### 模拟一次智能体决策
+```python
+
+import numpy as np
+
+# 假设棋盘状态为 8x8x3 的 0 填充数组（仅为示例）
+state = np.zeros((8, 8, 3), dtype=np.float32)
+
+# 示例合法落子位置索引（0-63）
+enables = [19, 26, 37, 44]
+
+# 获取智能体建议动作
+action = agent.place(state, enables)
+print("Agent suggests placing at index:", action)
+```
+
+### 保存 / 加载模型
+```python
+
+# 保存当前模型参数
+agent.save_model()
+
+# 加载保存的模型参数
+agent.load_model()
+```
+
+## 类与方法说明
+RL_QG_agent
+| 方法                      | 说明                               |
+| ----------------------- | -------------------------------- |
+| `__init__()`            | 初始化模型保存目录与变量                     |
+| `init_model()`          | 创建 TensorFlow 图并构建神经网络           |
+| `place(state, enables)` | 输入状态和合法位置，返回推荐落子位置（0\~63）        |
+| `save_model()`          | 保存当前模型参数到 Reversi/parameter.ckpt |
+| `load_model()`          | 加载已保存的模型参数                       |
+
