@@ -13,43 +13,63 @@ batch_size = 64
 
 def process_poems1(file_name):
     """
+    处理古诗文本文件，返回诗歌的向量表示（每个字映射为索引）。
 
-    :param file_name:
-    :return: poems_vector  have tow dimmention ,first is the poem, the second is the word_index
-    e.g. [[1,2,3,4,5,6,7,8,9,10],[9,6,3,8,5,2,7,4,1]]
-
+    :param file_name: 包含诗歌的文件路径，格式为 每行 "标题:内容"
+    :return:
+        poems_vector: 二维列表，每首诗转换为字的索引序列
+        word_int_map: 字到索引的映射字典
+        words: 所有字组成的元组，按频率降序排序，最后加一个空格符
+    例子：[[1,2,3,4],[5,6,7,8]]
     """
-    poems = []
-    with open(file_name, "r", encoding='utf-8', ) as f:
+
+    poems = []  # 存储处理后的诗歌
+    with open(file_name, "r", encoding='utf-8') as f:
         for line in f.readlines():
             try:
+                # 尝试按“标题:内容”格式解析
                 title, content = line.strip().split(':')
-                # content = content.replace(' ', '').replace('，','').replace('。','')
+                # 去除空格
                 content = content.replace(' ', '')
+
+                # 跳过包含特殊字符或起始/结束标记的诗句
                 if '_' in content or '(' in content or '（' in content or '《' in content or '[' in content or \
-                                start_token in content or end_token in content:
+                        start_token in content or end_token in content:
                     continue
+                # 跳过长度不合理的诗句
                 if len(content) < 5 or len(content) > 80:
                     continue
+
+                # 添加起始和结束标记
                 content = start_token + content + end_token
                 poems.append(content)
-            except ValueError as e:
-                print("error")
+            except ValueError:
+                print("error")  # 如果行不符合“标题:内容”格式则跳过
                 pass
-    # 按诗的字数排序
+
+    # 按诗的长度进行排序，便于后续按批处理
     poems = sorted(poems, key=lambda line: len(line))
-    # print(poems)
-    # 统计每个字出现次数
+
+    # 统计所有诗句中的字频
     all_words = []
     for poem in poems:
-        all_words += [word for word in poem]
-    counter = collections.Counter(all_words)  # 统计词和词频。
-    count_pairs = sorted(counter.items(), key=lambda x: -x[1])  # 排序
+        all_words += [word for word in poem]  # 拆成单字列表
+
+    counter = collections.Counter(all_words)  # 统计每个字的出现次数
+    count_pairs = sorted(counter.items(), key=lambda x: -x[1])  # 按频率降序排序
+
+    # 提取所有字，按频率排列，加一个空格符用于补齐
     words, _ = zip(*count_pairs)
     words = words[:len(words)] + (' ',)
+
+    # 构建字到索引的映射
     word_int_map = dict(zip(words, range(len(words))))
+
+    # 将诗句转为索引序列
     poems_vector = [list(map(word_int_map.get, poem)) for poem in poems]
+
     return poems_vector, word_int_map, words
+
 
 def process_poems2(file_name):
     """

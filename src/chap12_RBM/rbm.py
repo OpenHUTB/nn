@@ -3,7 +3,6 @@
 
 import numpy as np
 
-
 class RBM:
     """Restricted Boltzmann Machine."""
 
@@ -11,12 +10,13 @@ class RBM:
         """初始化模型参数（受限玻尔兹曼机）"""
 
         # 请补全此处代码
-
         # 确保隐藏层和可见层的单元数量为正整数
+        #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
         if n_hidden <= 0 or n_observe <= 0:
             raise ValueError("Number of hidden and visible units must be positive integers.")
         self.n_hidden = n_hidden     # 隐藏层神经元个数
         self.n_observe = n_observe    # 可见层神经元个数
+        
         # 初始化权重和偏置
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))     # Xavier初始化
         self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 权重矩阵
@@ -75,17 +75,25 @@ class RBM:
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
 
-        # 请补全此处代码
-        # 初始化随机可见层
+        # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（即模拟初始图像）
         v = np.random.binomial(1, 0.5, self.n_observe)
-        # 进行1000次Gibbs采样
+
+        # 进行1000次Gibbs采样迭代，以逐步趋近真实数据分布
         for _ in range(1000):
+            # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
+
+            # 根据激活概率采样得到隐藏层的状态（伯努利采样）
             h_sample = self._sample_binary(h_prob)
+
+            # 基于隐藏层的采样结果，重新估算可见层的激活概率（反向传播）
             v_prob = self._sigmoid(np.dot(h_sample, self.W.T) + self.b_v)
+
+            # 根据估算的概率采样新的可见层状态
             v = self._sample_binary(v_prob)
-        return v.reshape(28, 28)  # 恢复图像形状
-        pass
+
+        # 将最终的可见层向量重塑为 28×28 的图像格式
+        return v.reshape(28, 28)
 
 
 # 使用MNIST数据集训练RBM模型
@@ -94,7 +102,7 @@ if __name__ == '__main__':
     mnist = np.load('mnist_bin.npy')  # 60000x28x28
     n_imgs, n_rows, n_cols = mnist.shape
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
-    print mnist.shape  # 打印数据维度
+    print(mnist.shape)  # 打印数据维度
 
     # 初始化RBM对象：2个隐藏节点，784个可见节点（28×28图像）
     rbm = RBM(2, img_size)

@@ -22,7 +22,6 @@ def mnist_dataset():
     
     return (x, y), (x_test, y_test)
 
-
 # In[8]:
 # 打印两个列表对应元素组成的元组列表，这里是示例代码，与后续模型训练测试无直接关系
 print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
@@ -35,12 +34,15 @@ class myModel:
     def __init__(self):
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
-        ####################
-        #pass
+        # 定义第一层的权重矩阵
         self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        # 定义第一层的偏置向量
         self.b1 = tf.Variable(tf.zeros([128]))
+        # 定义第二层的权重矩阵
         self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
+        # 定义第二层的偏置向量
         self.b2 = tf.Variable(tf.zeros([10]))
+        
     def __call__(self, x):
         ####################
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
@@ -56,7 +58,6 @@ model = myModel()
 
 # 使用Adam优化器，用于训练过程中更新模型参数
 optimizer = optimizers.Adam()
-
 
 # ## 计算 loss
 
