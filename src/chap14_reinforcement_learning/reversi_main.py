@@ -4,18 +4,18 @@ import numpy as np
 
 from RL_QG_agent import RL_QG_agent  # 导入强化学习智能体
 
-# 创建 8x8 的 Reversi（黑白棋）环境
+# 创建初始环境并重置
 env = gym.make('Reversi8x8-v0')
 env.reset()
 
-# 初始化并加载训练好的白棋智能体模型
+# 初始化智能体并加载预训练模型
 agent = RL_QG_agent()
 agent.load_model()
 
-# 设置最大对局数
+# 设置最大训练轮数
 max_epochs = 100
 
-# 外层循环控制进行 max_epochs 局对局
+# 主训练循环
 for i_episode in range(max_epochs):
     # 初始化棋局，返回初始 observation（3x8x8 的状态表示）
     observation = env.reset()
