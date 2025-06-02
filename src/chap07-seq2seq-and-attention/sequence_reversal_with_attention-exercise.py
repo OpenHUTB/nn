@@ -115,7 +115,7 @@ class mySeq2SeqModel(keras.Model):
         output, new_state = self.decoder_cell(emb_x, state)
         
         # Attention
-        output_expanded = tf.expand_dims(output, 1)
+        output_expanded = tf.expand_dims(output, 1) # (batch_size, 1, hidden_size)
         scores = tf.matmul(output_expanded, enc_out, transpose_b=True)
         scores = tf.squeeze(scores, axis=1)
         attn_weights = tf.nn.softmax(scores, axis=1)
