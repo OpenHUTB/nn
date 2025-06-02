@@ -45,7 +45,7 @@ class myConvModel(keras.Model):
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')#定义第一层卷积层,有32个过滤器,每个过滤器大小为5x5,使用ReLU激活函数
         self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')#第二层卷积层
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)#池化层
-        self.flat = Flatten()
+        self.flat = Flatten() # 展平层：将多维张量转为一维向量
         self.dense1 = layers.Dense(100, activation='tanh')#全连接层,有100个神经元,使用tanh激活函数
         self.dense2 = layers.Dense(10)#输出层,有10个神经元
     @tf.function

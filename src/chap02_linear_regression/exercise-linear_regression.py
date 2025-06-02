@@ -258,6 +258,14 @@ if __name__ == "__main__":
     print("预测值与真实值的标准差：{:.1f}".format(std))
 
     # 显示结果
+
+    plt.plot(x_train, y_train, 'ro', markersize=3) # 红色点为训练集数据
+    plt.plot(x_test, y_test, 'k') # 红色点为训练集数据
+    plt.plot(x_test, y_test_pred, 'k') # 黑线为预测值（可以用其他颜色区分）
+    plt.xlabel('x') # 设置x轴的标签
+    plt.ylabel('y') # 设置y轴的标签
+    plt.title('Linear Regression') # 设置图表标题
+    plt.legend(['train', 'test', 'pred']) # 添加图例，表示每条线的含义
     plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
