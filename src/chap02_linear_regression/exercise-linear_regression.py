@@ -238,8 +238,8 @@ if __name__ == "__main__":
     x_test, y_test = load_data(
         test_file
     )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)
-    print(x_test.shape)
+    print(x_train.shape)# x_train.shape 返回训练集特征矩阵的维度信息
+    print(x_test.shape) # x_test.shape 返回测试集特征矩阵的维度信息
 
     # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
     # f: 预测函数 y = f(x)
