@@ -6,12 +6,16 @@
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 
 # In[7]:
+# 导入必要的库
+# TensorFlow，用于机器学习任务
 import tensorflow as tf
+# Matplotlib，用于数据可视化
 import matplotlib.pyplot as plt
 
 from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
+# NumPy，用于数值计算
 import numpy as np
 
 # 设置随机种子（确保结果可复现）
