@@ -87,7 +87,7 @@ def compute_loss(pred, labels, num_classes=3):
     """
     # 将标签转换为one-hot编码
     one_hot_labels = tf.one_hot(tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32)
-    pred = tf.clip_by_value(pred, epsilon, 1.0)  # 防止log(0)
+    pred = tf.maximum(pred, epsilon)  # 更高效地防止log(0)
     # 计算每个样本的交叉熵损失
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
     # 计算平均损失和准确率
