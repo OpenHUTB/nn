@@ -62,3 +62,66 @@
 
 [5] Xavier Glorot, Antoine Bordes, Yoshua Bengio. 2011. Deep Sparse Rectifier Neural Networks. PMLR 15:315-323.
 
+---
+
+# TensorFlow 2.0 练习说明
+
+## 简介
+
+本项目实现了一些基本的 TensorFlow 2.0 练习，包括自定义的 softmax 函数、sigmoid 函数以及它们各自的交叉熵损失函数。这些实现展示了如何在不使用 TensorFlow 内置函数的情况下，手动计算这些常用函数。
+
+## 文件结构
+
+-   `tf2.0-exercise.py`: 包含上述功能实现的主要代码。
+
+## 环境要求
+
+-   Python 3.x
+-   TensorFlow 2.x
+-   NumPy
+
+## 安装依赖
+
+可以使用以下命令安装所需的 Python 库：
+
+```bash
+pip install tensorflow numpy
+```
+
+## 使用说明
+
+### 1. Softmax 函数
+
+`softmax(x)` 函数实现了数值稳定的 softmax 操作，适用于任意形状的输入张量。调用示例：
+
+```python
+result = softmax(tf.constant([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]))
+```
+
+### 2. Sigmoid 函数
+
+`sigmoid(x)` 函数实现了 sigmoid 操作，返回输入的 sigmoid 概率。调用示例：
+
+```python
+result = sigmoid(tf.constant([[0.0], [1.0], [2.0]]))
+```
+
+### 3. Softmax 交叉熵损失函数
+
+`softmax_ce(logits, label)` 函数计算 softmax 交叉熵损失。该函数接受未经 softmax 处理的原始输出（logits）和 one-hot 格式的标签。调用示例：
+
+```python
+loss = softmax_ce(logits=tf.constant([[1.0, 2.0, 3.0], [1.0, 2.0, 3.0]]), label=tf.constant([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]))
+```
+
+### 4. Sigmoid 交叉熵损失函数
+
+`sigmoid_ce(x, label)` 函数计算 sigmoid 交叉熵损失。调用示例：
+
+```python
+loss = sigmoid_ce(x=tf.constant([0.5, 0.8]), label=tf.constant([1.0, 0.0]))
+```
+
+## 测试
+
+代码中包含测试用例，用于验证自定义函数的正确性。通过比较自定义函数与 TensorFlow 内置函数的结果，确保实现的准确性。

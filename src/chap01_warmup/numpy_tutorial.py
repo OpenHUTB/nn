@@ -143,6 +143,7 @@ print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 列均值
 print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行均值
 
 
+
 # 21.利用13题目中的x，对x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("第二十一题：\n")
 
