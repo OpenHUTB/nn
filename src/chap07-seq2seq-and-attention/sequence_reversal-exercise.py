@@ -8,7 +8,6 @@
 
 # In[1]:
 
-
 import numpy as np
 import tensorflow as tf
 import collections
@@ -22,7 +21,6 @@ import os,sys,tqdm
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[2]:
-
 
 import random
 import string
@@ -129,14 +127,14 @@ class mySeq2SeqModel(keras.Model):
 
 # In[4]:
 
-
+#定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
 @tf.function
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
     losses = tf.reduce_mean(losses)
     return losses
-
+#定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     with tf.GradientTape() as tape:
@@ -162,8 +160,6 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-
-
 optimizer = optimizers.Adam(0.0005)
 model = mySeq2SeqModel()
 train(model, optimizer, seqlen=20)
@@ -171,7 +167,6 @@ train(model, optimizer, seqlen=20)
 
 # # 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
-# 
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
 
 # In[6]:

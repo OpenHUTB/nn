@@ -18,7 +18,7 @@ def generate_data(n_samples=1000):
     weights_true = np.array([0.3, 0.4, 0.3])
     n_components = len(weights_true)
     
-    # 生成每个簇的样本
+    # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
     samples_per_component = (weights_true * n_samples).astype(int)
     X_list = []
     y_true = []
