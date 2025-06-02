@@ -14,14 +14,14 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
-
+import random
+import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[20]:
-import random
-import string
+
 
 def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
