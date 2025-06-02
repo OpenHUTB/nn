@@ -4,14 +4,18 @@ import numpy as np
 
 from RL_QG_agent import RL_QG_agent
 
+# 创建初始环境并重置
 env = gym.make('Reversi8x8-v0')
 env.reset()
 
+# 初始化智能体并加载预训练模型
 agent = RL_QG_agent()
 agent.load_model()
 
+# 设置最大训练轮数
 max_epochs = 100
 
+# 主训练循环
 for i_episode in range(max_epochs):
     observation = env.reset()
     # observation  是 3 x 8 x 8 的 list,表示当前的棋局，具体定义在 reversi.py 中的 state
