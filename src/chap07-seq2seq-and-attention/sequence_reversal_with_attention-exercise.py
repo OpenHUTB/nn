@@ -7,7 +7,6 @@
 
 # In[19]:
 
-
 import numpy as np
 import tensorflow as tf
 import collections
@@ -21,8 +20,6 @@ import os,sys,tqdm
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[20]:
-
-
 import random
 import string
 
@@ -43,16 +40,14 @@ print(get_batch(2, 10))
 
 
 # # 建立sequence to sequence 模型
-# 
 # 完成两空，模型搭建以及单步解码逻辑
 
 # In[26]:
-
-
+#定义了一个自定义的序列到序列（Seq2Seq）模型类mySeq2SeqModel，继承自keras.Model
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
-        self.v_sz=27
+        self.v_sz = 27
         self.hidden = 128
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
@@ -76,8 +71,24 @@ class mySeq2SeqModel(keras.Model):
         完成带attention机制的 sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好，
         用双线性attention，或者自己改一下`__init__`函数做加性attention
         '''
+        enc_emb = self.embed_layer(enc_ids)
+        enc_outputs, enc_state = self.encoder(enc_emb)
+        
+        # Decoder
+        dec_emb = self.embed_layer(dec_ids)
+        dec_outputs, _ = self.decoder(dec_emb, initial_state=enc_state)
+        
+        # Attention
+        scores = tf.matmul(dec_outputs, enc_outputs, transpose_b=True)
+        attn_weights = tf.nn.softmax(scores, axis=-1)
+        context = tf.matmul(attn_weights, enc_outputs)
+        combined = tf.concat([dec_outputs, context], axis=-1)
+        
+        # Generate logits
+        attn_output = self.dense_attn(combined)
+        logits = self.dense(attn_output)
         return logits
-    
+       
     
     @tf.function
     def encode(self, enc_ids):
@@ -93,13 +104,29 @@ class mySeq2SeqModel(keras.Model):
         '''
         todo
         参考sequence_reversal-exercise, 自己构建单步解码逻辑'''
-        return out, state
+        emb_x = self.embed_layer(x)
+        
+        # RNN step
+        output, new_state = self.decoder_cell(emb_x, state)
+        
+        # Attention
+        output_expanded = tf.expand_dims(output, 1)
+        scores = tf.matmul(output_expanded, enc_out, transpose_b=True)
+        scores = tf.squeeze(scores, axis=1)
+        attn_weights = tf.nn.softmax(scores, axis=1)
+        context = tf.matmul(tf.expand_dims(attn_weights, 1), enc_out)
+        context = tf.squeeze(context, axis=1)
+        
+        # Combine and predict
+        combined = tf.concat([output, context], axis=-1)
+        attn_output = self.dense_attn(combined)
+        logits = self.dense(attn_output)
+        return tf.argmax(logits, axis=-1, output_type=tf.int32), new_state
 
 
 # # Loss函数以及训练逻辑
 
 # In[27]:
-
 
 @tf.function
 def compute_loss(logits, labels):
@@ -147,7 +174,6 @@ train(model, optimizer, seqlen=20)
 
 # In[30]:
 
-
 def sequence_reversal():
     def decode(init_state, steps, enc_out):
         b_sz = tf.shape(init_state[0])[0]
@@ -173,7 +199,6 @@ def is_reverse(seq, rev_seq):
         return False
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 print(list(zip(*sequence_reversal())))
-
 
 # In[ ]:
 

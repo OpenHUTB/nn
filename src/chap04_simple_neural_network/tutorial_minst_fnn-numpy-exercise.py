@@ -1,19 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # ## 准备数据
-
 # In[1]:
-
 
 import os
 import numpy as np
 import tensorflow as tf
+import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
+#定义了一个函数mnist_dataset()，用于加载并预处理MNIST数据集
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
@@ -22,12 +20,8 @@ def mnist_dataset():
     
     return (x, y), (x_test, y_test)
 
-
 # ## Demo numpy based auto differentiation
-
 # In[3]:
-
-
 import numpy as np
 
 class Matmul:
@@ -48,11 +42,11 @@ class Matmul:
         x = self.mem['x']
         W = self.mem['W']
         
-        ####################
         '''计算矩阵乘法的对应的梯度'''
-        ####################
+        grad_x = np.matmul(grad_y, W.T)
+        grad_W = np.matmul(x.T, grad_y)
+      
         return grad_x, grad_W
-
 
 class Relu:
     def __init__(self):
@@ -68,10 +62,10 @@ class Relu:
         '''
         ####################
         '''计算relu 激活函数对应的梯度'''
+        x = self.mem['x']
+        grad_x = grad_y * (x > 0)  # ReLU的梯度是1（x>0）或0（x<=0）
         ####################
         return grad_x
-    
-
 
 class Softmax:
     '''
@@ -99,10 +93,13 @@ class Softmax:
         '''
         s = self.mem['out']
         sisj = np.matmul(np.expand_dims(s,axis=2), np.expand_dims(s, axis=1)) # (N, c, c)
+        # 对grad_y进行维度扩展
+        # 假设grad_y是一个形状为(N, c)的梯度张量
+        # np.expand_dims(grad_y, axis=1)将其形状变为(N, 1, c)
         g_y_exp = np.expand_dims(grad_y, axis=1)
         tmp = np.matmul(g_y_exp, sisj) #(N, 1, c)
         tmp = np.squeeze(tmp, axis=1)
-        tmp = -tmp+grad_y*s 
+        tmp = -tmp + grad_y * s 
         return tmp
     
 class Log:
@@ -129,8 +126,6 @@ class Log:
         x = self.mem['x']
         
         return 1./(x+1e-12) * grad_y
-    
-
 
 # ## Gradient check
 
@@ -213,7 +208,6 @@ class Log:
 # # Final Gradient Check
 
 # In[6]:
-
 
 import tensorflow as tf
 
@@ -312,7 +306,6 @@ model = myModel()
 def compute_loss(log_prob, labels):
      return np.mean(np.sum(-log_prob*labels, axis=1))
     
-
 def compute_accuracy(log_prob, labels):
     predictions = np.argmax(log_prob, axis=1)
     truth = np.argmax(labels, axis=1)
@@ -333,22 +326,31 @@ def test(model, x, y):
     accuracy = compute_accuracy(model.h2_log, y)
     return loss, accuracy
 
-
 # ## 实际训练
 
 # In[12]:
 
+def prepare_data():
+    train_data, test_data = mnist_dataset()
+    train_label = np.zeros(shape=[train_data[0].shape[0], 10])
+    test_label = np.zeros(shape=[test_data[0].shape[0], 10])
+    train_label[np.arange(train_data[0].shape[0]), np.array(train_data[1])] = 1.
+    test_label[np.arange(test_data[0].shape[0]), np.array(test_data[1])] = 1.
+    return train_data[0], train_label, test_data[0], test_label
 
-train_data, test_data = mnist_dataset()
-train_label = np.zeros(shape=[train_data[0].shape[0], 10])
-test_label = np.zeros(shape=[test_data[0].shape[0], 10])
-train_label[np.arange(train_data[0].shape[0]), np.array(train_data[1])] = 1.
-test_label[np.arange(test_data[0].shape[0]), np.array(test_data[1])] = 1.
+def train(model, train_data, train_label, epochs=50):
+    losses = []
+    accuracies = []
+    for epoch in tqdm(range(epochs), desc="Training"):
+        loss, accuracy = train_one_step(model, train_data, train_label)
+        losses.append(loss)
+        accuracies.append(accuracy)
+        print(f'Epoch {epoch}: Loss {loss:.4f}; Accuracy {accuracy:.4f}')
+    return losses, accuracies
 
-for epoch in range(50):
-    loss, accuracy = train_one_step(model, train_data[0], train_label)
-    print('epoch', epoch, ': loss', loss, '; accuracy', accuracy)
-loss, accuracy = test(model, test_data[0], test_label)
-
-print('test loss', loss, '; accuracy', accuracy)
-
+if __name__ == "__main__":
+    train_data, train_label, test_data, test_label = prepare_data()
+    model = myModel()
+    losses, accuracies = train(model, train_data, train_label)
+    test_loss, test_accuracy = test(model, test_data, test_label)
+    print(f'Test Loss {test_loss:.4f}; Test Accuracy {test_accuracy:.4f}')    

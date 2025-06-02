@@ -3,14 +3,11 @@
 
 import numpy as np
 
-
 def load_data(fname):
-    """
-    载入数据。
-    """
+    """载入数据"""
     with open(fname, 'r') as f:
         data = []
-        line = f.readline()
+        line = f.readline() # 首行是标题行，自动跳过
         for line in f:
             line = line.strip().split()
             x1 = float(line[0])
@@ -21,38 +18,65 @@ def load_data(fname):
 
 
 def eval_acc(label, pred):
-    """
-    计算准确率。
-    """
-    return np.sum(label == pred) / len(pred)
-
-
+    """计算准确率"""
+    return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
+  
+#SVM模型 实现了线性SVM分类
 class SVM():
-    """
-    SVM模型。
-    """
-
+    """SVM模型"""
+    #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self):
         # 请补全此处代码
+        self.w = None  # w: 权重向量(决定分类超平面的方向)
+        self.b = 0     # b: 偏置项(决定分类超平面的位置)
         pass
+    
 
     def train(self, data_train):
         """
-        训练模型。
+        训练 SVM 模型。
+        :param data_train: 包含特征和标签的 NumPy 数组，形状为 (n_samples, n_features + 1)
         """
+        X = data_train[:, :-1] #从data_train中提取特征矩阵X
+        y = np.where(data_train[:, -1] == 0, -1, 1) #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
 
+        n_samples, n_features = X.shape #获取样本数量和特征数量
+        self.w = np.zeros(n_features) #初始化权重向量w为零向量
+        self.b = 0
+
+        for epoch in range(self.epochs):
+            # 计算 margins
+            margin = y * (X @ self.w + self.b)
+            misclassified = margin < 1
+
+            # 梯度计算
+            dw = self.lambda_ * self.w - np.mean((misclassified * y)[:, np.newaxis] * X, axis=0)
+            db = -np.mean(misclassified * y)
+
+            # 参数更新
+            self.w -= self.lr * dw
+            self.b -= self.lr * db
+
+            # 提前停止：权重更新变化太小
+            if np.linalg.norm(self.lr * dw) < self.tolerance:
+                break
         # 请补全此处代码
 
     def predict(self, x):
         """
-        预测标签。
+        预测标签
         """
-
         # 请补全此处代码
+        # 计算决策函数值
+        if x.ndim == 1:
+           x = np.expand_dims(x, axis=0)  # 处理单样本输入
+        decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
+        # 返回预测标签（0或1）
+        return np.where(decision_values >= 0, 1, 0)
 
 
 if __name__ == '__main__':
-    # 载入数据，实际实用时将x替换为具体名称
+    # 载入数据，实际使用时将x替换为具体名称
     train_file = 'data/train_linear.txt'
     test_file = 'data/test_linear.txt'
     data_train = load_data(train_file)  # 数据格式[x1, x2, t]
