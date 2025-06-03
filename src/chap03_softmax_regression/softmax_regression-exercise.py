@@ -18,7 +18,7 @@ from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
-get_ipython().run_line_magic('matplotlib', 'inline')
+#get_ipython().run_line_magic('matplotlib', 'inline')
 
 dot_num = 100
 x_p = np.random.normal(3., 1, dot_num)
@@ -59,6 +59,9 @@ class SoftmaxRegression():
     def __init__(self):
         '''============================='''
         #todo 填空一，构建模型所需的参数 self.W, self.b 可以参考logistic-regression-exercise
+        self.W = tf.Variable(shape=[2, 3], dtype=tf.float32, 
+            initial_value=tf.random.uniform(shape=[2, 3], minval=-0.1, maxval=0.1))
+        self.b = tf.Variable(shape=[3], dtype=tf.float32, initial_value=tf.zeros(shape=[3]))
         '''============================='''
         
         self.trainable_variables = [self.W, self.b]
@@ -75,6 +78,7 @@ def compute_loss(pred, label):
     #输入label shape(N, 3), pred shape(N, 3)
     #输出 losses shape(N,) 每一个样本一个loss
     #todo 填空二，实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
+    losses = -tf.reduce_sum(label * tf.math.log(pred + epsilon), axis=1)
     '''============================='''
     loss = tf.reduce_mean(losses)
     
@@ -101,6 +105,10 @@ model = SoftmaxRegression()
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 x1, x2, y = list(zip(*data_set))
 x = list(zip(x1, x2))
+# 将输入数据转换为float32类型
+x = tf.cast(x, dtype=tf.float32)
+y = tf.cast(y, dtype=tf.float32)
+
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
     if i%50==49:
