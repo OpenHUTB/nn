@@ -179,10 +179,10 @@ frame_text = ax.text(0.02, 0.95,'',horizontalalignment='left',verticalalignment=
 
 # 初始化函数，用于清空图形上的线条和散点数据
 def init():
-    line_d.set_data([],[])
-    C1_dots.set_data([],[])
-    C2_dots.set_data([],[])
-    return (line_d,) + (C1_dots,) + (C2_dots,)
+    line_d.set_data([],[])#初始化动态线数据为空列表
+    C1_dots.set_data([],[])#初始化C1点集数据为空列表
+    C2_dots.set_data([],[])#初始化C2点集数据为空列表
+    return (line_d,) + (C1_dots,) + (C2_dots,)#返回包含所有图形对象的元组
 
 # 动画更新函数，根据训练过程中的参数绘制拟合直线、样本点和更新训练信息文本
 def animate(i):
