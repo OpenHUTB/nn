@@ -57,11 +57,11 @@ class Matmul:
 class Relu:
     def __init__(self):
         self.mem = {}
-        
+        #初始化记忆字典，用于存储前向传播的输入
     def forward(self, x):
-        self.mem['x']=x
+        self.mem['x']=x#保存输入x，供反向传播使用
         return np.where(x > 0, x, np.zeros_like(x))
-    
+    #ReLU激活函数：x>0时输出x，否则输出0
     def backward(self, grad_y):
         '''
         grad_y: same shape as x
