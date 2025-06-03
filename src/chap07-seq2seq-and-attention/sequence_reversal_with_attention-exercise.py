@@ -99,9 +99,7 @@ class mySeq2SeqModel(keras.Model):
         dec_outputs, _ = self.decoder(dec_emb, initial_state=enc_state)  # [batch_size, dec_len, hidden]
         
         # 注意力机制：计算解码器对编码器各位置的关注度
-        scores = tf.matmul(dec_outputs, enc_outputs, transpose_b=True)  # [batch_size, dec_len, enc_len]
-        attn_weights = tf.nn.softmax(scores, axis=-1)  # 注意力权重
-        context = tf.matmul(attn_weights, enc_outputs)  # 上下文向量 [batch_size, dec_len, hidden]
+        context = tf.keras.layers.Attention()([dec_outputs, enc_outputs])
         
         # 合并解码器输出和上下文向量
         combined = tf.concat([dec_outputs, context], axis=-1)  # [batch_size, dec_len, 2*hidden]
@@ -196,6 +194,7 @@ train(model, optimizer, seqlen=20)  # 训练模型，序列长度为20
 
 def sequence_reversal():
     """测试模型的序列逆置能力"""
+
     def decode(init_state, steps, enc_out):
         """自回归解码生成序列"""
         b_sz = tf.shape(init_state[0])[0]
@@ -212,13 +211,15 @@ def sequence_reversal():
         out = tf.concat(collect, axis=-1).numpy()
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
-    
+
+
     # 生成测试数据
     batched_examples, enc_x, _, _ = get_batch(32, 20)
     # 编码输入序列
     enc_out, state = model.encode(enc_x)
     # 解码生成逆置序列
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
+
 
 def is_reverse(seq, rev_seq):
     """检查rev_seq是否是seq的逆置"""
