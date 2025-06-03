@@ -68,17 +68,17 @@ class RBM:
                 h0_sample = self._sample_binary(h0_prob)
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)
-                v1_sample = self._sample_binary(v1_prob)
+                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)     
+                v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
-                # 计算梯度
+                # 计算梯度      
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)
                 db_v = np.sum(v0 - v1_sample, axis=0)
                 db_h = np.sum(h0_sample - h1_prob, axis=0)
 
                 # 更新参数
-                self.W += learning_rate * dW / batch_size
+                self.W += learning_rate * dW / batch_size       
                 self.b_v += learning_rate * db_v / batch_size
                 self.b_h += learning_rate * db_h / batch_size
         pass

@@ -101,20 +101,20 @@ class GaussianMixtureModel:
             gamma = np.exp(log_prob - log_prob_sum) # 计算后验概率矩阵gamma(也称为响应度矩阵)
 
             # M步：更新参数
-            Nk = np.sum(gamma, axis=0)
-            self.pi = Nk / n_samples
-            new_mu = np.zeros_like(self.mu)
-            new_sigma = np.zeros_like(self.sigma)
+            Nk = np.sum(gamma, axis=0)  # 沿样本轴求和，得到长度为n_components的向量
+            self.pi = Nk / n_samples    # 更新混合系数
+            new_mu = np.zeros_like(self.mu)     # 初始化均值向量
+            new_sigma = np.zeros_like(self.sigma)       # 初始化协方差矩阵
             
             for k in range(self.n_components):
                 # 更新均值
 
-                new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
+                new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]   # 计算第k个高斯分布的均值
                 # 更新协方差
 
-                X_centered = X - new_mu[k]
-                weighted_X = gamma[:, k, None] * X_centered
-                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]
+                X_centered = X - new_mu[k]      # 中心化
+                weighted_X = gamma[:, k, None] * X_centered     # 计算第k个高斯分布的权重
+                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]      # 计算协方差矩阵
                 new_sigma[k] += np.eye(n_features) * 1e-6  # 正则化
             
             # 计算对数似然
