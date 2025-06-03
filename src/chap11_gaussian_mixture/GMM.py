@@ -12,10 +12,11 @@ def generate_data(n_samples=1000):
         [-5, 5]  # 第三个高斯分布的均值
     ])
     # 定义三个高斯分布的协方差矩阵
-    sigma_true = np.array([ 
+    sigma_true = np.array([
         [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
         [[2, 0.5], [0.5, 1]],   # 第二个分布：倾斜的椭圆
-        [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
+        [[1, -0.5], [-0.5, 2]]
+        # 第三个分布：反向倾斜的椭圆
     ])
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
@@ -70,6 +71,7 @@ def logsumexp(log_p, axis=1, keepdims=False):
 class GaussianMixtureModel:
     """高斯混合模型(GMM)实现"""
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
+        
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
@@ -87,16 +89,17 @@ class GaussianMixtureModel:
         
         # 初始化协方差矩阵为单位矩阵
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
-        
+
         log_likelihood = -np.inf
         for iter in range(self.max_iter):
             # E步：计算后验概率
+
             log_prob = np.zeros((n_samples, self.n_components))
             for k in range(self.n_components):
                 log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k])
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
             gamma = np.exp(log_prob - log_prob_sum)
-            
+
             # M步：更新参数
             Nk = np.sum(gamma, axis=0)
             self.pi = Nk / n_samples
@@ -105,8 +108,10 @@ class GaussianMixtureModel:
             
             for k in range(self.n_components):
                 # 更新均值
+
                 new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
                 # 更新协方差
+
                 X_centered = X - new_mu[k]
                 weighted_X = gamma[:, k, None] * X_centered
                 new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]
@@ -142,9 +147,8 @@ class GaussianMixtureModel:
 
         # 计算协方差矩阵的逆
         inv = np.linalg.inv(sigma)
-
         # 计算高斯分布中的指数项（二次型），对应 (x - μ)^T Σ⁻¹ (x - μ)
-        exponent = -0.5 * np.sum(X_centered @ inv * X_centered, axis=1)
+        exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
 
         # 返回多维高斯分布的对数概率密度值
         # 公式为：-0.5 * D * log(2π) - 0.5 * log|Σ| + exponent
@@ -164,6 +168,7 @@ if __name__ == "__main__":
     plt.subplot(1, 2, 1)
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
     plt.title("True Clusters") # 子图标题
+
     # 设置坐标轴标签
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
@@ -171,8 +176,10 @@ if __name__ == "__main__":
     plt.subplot(1, 2, 2)
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
     plt.title("GMM Predicted Clusters") # 子图标题
+
     # 设置坐标轴标签
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
+
     plt.show() # 显示图形
