@@ -154,14 +154,16 @@ if __name__ == "__main__":
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
-    plt.title("True Clusters")
+    plt.title("True Clusters") # 子图标题
+    # 设置坐标轴标签
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
     plt.subplot(1, 2, 2)
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
-    plt.title("GMM Predicted Clusters")
+    plt.title("GMM Predicted Clusters") # 子图标题
+    # 设置坐标轴标签
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.show()
+    plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
+    plt.show() # 显示图形
