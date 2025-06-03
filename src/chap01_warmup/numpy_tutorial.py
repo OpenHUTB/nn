@@ -9,7 +9,7 @@ import numpy as np #将numpy库命名为np
 import matplotlib
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
 #import放一起代码美观
-matplotlib.use('TkAgg')  # 关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
+matplotlib.use('TkAgg')  #关键代码，临时指定matplotlib后端代码，指定TkAgg可以确保图形能在标准窗口中正常渲染
 
 # 2.建立一个一维数组 a 初始化为[4,5,6]，(1)输出a 的类型（type）(2)输出a的各维度的大小（shape）(3)输出 a的第一个元素（element）
 print("第二题：\n")
@@ -165,7 +165,7 @@ print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))# 打印数组 x 沿�
 # 24.画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 print("第二十四题：\n")
 
-x = np.arange(0, 100, 0.1) #生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
+x = np.arange(0, 100, 0.1) #生成从0到99.9的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
 y = x * x #计算每个 x 对应的y=x^2 的值
 
 plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
