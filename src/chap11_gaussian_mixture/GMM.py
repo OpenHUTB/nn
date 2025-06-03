@@ -24,12 +24,12 @@ def generate_data(n_samples=1000):
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
     samples_per_component = (weights_true * n_samples).astype(int)
-    X_list = []
-    y_true = []
-    for i in range(n_components):
+    X_list = []  # 用于存储每个高斯分布生成的数据点
+    y_true = []  # 用于存储每个数据点对应的真实分布标签
+    for i in range(n_components):  # 从第i个高斯分布生成样本
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
-        X_list.append(X_i)
-        y_true.extend([i] * samples_per_component[i])
+        X_list.append(X_i)  # 将生成的样本添加到列表
+        y_true.extend([i] * samples_per_component[i])  # 添加对应标签
     
     # 合并并打乱数据
     X = np.vstack(X_list)
