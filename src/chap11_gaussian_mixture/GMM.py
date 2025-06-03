@@ -45,13 +45,13 @@ def logsumexp(log_p, axis=1, keepdims=False):
     log_p = np.asarray(log_p)
     
     # 处理空输入情况
-    if log_p.size == 0:
-        return np.array(-np.inf, dtype=log_p.dtype)
+    if log_p.size == 0:  # 检查输入的对数概率数组是否为空
+        return np.array(-np.inf, dtype=log_p.dtype)  # 返回与输入相同数据类型的负无穷值
     
     # 计算最大值（处理全-inf输入）
-    max_val = np.max(log_p, axis=axis, keepdims=True)
-    if np.all(np.isneginf(max_val)):
-        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)
+    max_val = np.max(log_p, axis=axis, keepdims=True)  # 计算沿指定轴的最大值
+    if np.all(np.isneginf(max_val)):  # 检查是否所有最大值都是负无穷
+        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
     safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)
