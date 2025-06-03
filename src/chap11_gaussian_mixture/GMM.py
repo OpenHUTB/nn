@@ -69,15 +69,15 @@ def logsumexp(log_p, axis=1, keepdims=False):
 # 高斯混合模型类
 class GaussianMixtureModel:
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
-        self.n_components = n_components
-        self.max_iter = max_iter
-        self.tol = tol
+        self.n_components = n_components   # 初始化混合成分数量
+        self.max_iter = max_iter  # 设置最大迭代次数（防止无限循环）
+        self.tol = tol  # 设置收敛容忍度（控制训练精度）
     
     def fit(self, X):
-        n_samples, n_features = X.shape
-        self.pi = np.ones(self.n_components) / self.n_components
-        self.mu = X[np.random.choice(n_samples, self.n_components, replace=False)]
-        self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
+        n_samples, n_features = X.shape  # 获取输入数据的样本数和特征数
+        self.pi = np.ones(self.n_components) / self.n_components  # 初始化混合权重（pi），表示每个高斯分布的权重
+        self.mu = X[np.random.choice(n_samples, self.n_components, replace=False)]  # 初始化均值向量（mu），从输入数据中随机选择n_components个样本作为初始均值
+        self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])  # 为每个成分创建一个单位矩阵作为初始协方差矩阵
         
         log_likelihood = -np.inf
         for iter in range(self.max_iter):
