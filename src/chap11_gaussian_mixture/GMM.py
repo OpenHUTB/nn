@@ -64,15 +64,24 @@ def logsumexp(log_p, axis=1, keepdims=False):
 
 # 高斯混合模型类
 class GaussianMixtureModel:
+    """高斯混合模型(GMM)实现"""
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
-        self.n_components = n_components
-        self.max_iter = max_iter
-        self.tol = tol
+        # 初始化模型参数
+        self.n_components = n_components  # 高斯分布数量
+        self.max_iter = max_iter          # EM算法最大迭代次数
+        self.tol = tol                    # 收敛阈值
     
     def fit(self, X):
+        """使用EM算法训练模型"""
         n_samples, n_features = X.shape
+        
+        # 初始化混合系数（均匀分布）
         self.pi = np.ones(self.n_components) / self.n_components
+        
+        # 随机选择样本点作为初始均值
         self.mu = X[np.random.choice(n_samples, self.n_components, replace=False)]
+        
+        # 初始化协方差矩阵为单位矩阵
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
         
         log_likelihood = -np.inf
