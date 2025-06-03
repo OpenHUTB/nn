@@ -62,12 +62,21 @@ h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)                       #
 h_pool2 = max_pool_2x2(h_conv2)                       # 池化
 
 #  全连接层 1
-## fc1 layer ##
+# 定义全连接层1的权重（W_fc1），维度是 [7*7*64, 1024]：
+# 输入是前一层池化输出展平后的长度（7x7x64），输出是1024个神经元
 W_fc1 = weight_variable([7*7*64, 1024])
+
+# 定义全连接层1的偏置（b_fc1），大小为1024，对应输出维度
 b_fc1 = bias_variable([1024])
 
+# 将上一层池化层的输出展平成一维向量，-1 表示自动计算 batch size
 h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
+
+# 全连接计算 + ReLU激活函数
+# matmul 矩阵乘法，得到的是一个 [batch_size, 1024] 的激活输出
 h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+
+# 应用 Dropout 防止过拟合，keep_prob 是保留节点的概率（在 feed_dict 中提供）
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 # 全连接层 2
