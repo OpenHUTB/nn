@@ -23,7 +23,7 @@ def load_data(filename):
 
 # ## 不同的基函数 (basis function)的实现 填空顺序 2
 # 
-# 请分别在这里实现“多项式基函数”以及“高斯基函数”
+# 请分别在这里实现"多项式基函数"以及"高斯基函数"
 # 
 # 其中以及训练集的x的范围在0-25之间
 
@@ -37,18 +37,18 @@ def identity_basis(x):
 def multinomial_basis(x, feature_num=10):
     '''多项式基函数'''
     x = np.expand_dims(x, axis=1) # shape(N, 1)
-    #==========
-    #todo '''请实现多项式基函数'''
-    #==========
-    ret = None
+    feat = [x ** i for i in range(1, feature_num + 1)]
+    ret = np.concatenate(feat, axis=1)
     return ret
 
 def gaussian_basis(x, feature_num=10):
     '''高斯基函数'''
-    #==========
-    #todo '''请实现高斯基函数'''
-    #==========
-    ret = None
+    centers = np.linspace(0, 25, feature_num)
+    width = 1.0 * (centers[1] - centers[0])
+    x = np.expand_dims(x, axis=1)
+    x = np.concatenate([x] * feature_num, axis=1)
+    out = (x - centers) / width
+    ret = np.exp(-0.5 * out ** 2)
     return ret
 
 
@@ -70,16 +70,16 @@ def main(x_train, y_train):
     训练模型，并返回从x到y的映射。
     
     """
-    basis_func = identity_basis
+    # basis_func = identity_basis
+    # basis_func = multinomial_basis
+    basis_func = gaussian_basis  # 可切换
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1)
     
-    
-    #==========
-    #todo '''计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w'''
-    #==========
-    
+    # 最小二乘法
+    w = np.linalg.inv(phi.T @ phi) @ phi.T @ y_train
+
     def f(x):
         phi0 = np.expand_dims(np.ones_like(x), axis=1)
         phi1 = basis_func(x)

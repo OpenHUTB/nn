@@ -74,13 +74,15 @@ model = linearModel(ndim=ndim)
 
 # ## 训练以及评估
 
-optimizer = optimizers.Adam(0.1)
+optimizer = optimizers.Adam(0.01)
 
 @tf.function
-def train_one_step(model, xs, ys):
+def train_one_step(model, xs, ys, l2_lambda=0.01):
     with tf.GradientTape() as tape:
         y_preds = model(xs)
-        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))
+        mse = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))
+        l2_loss = l2_lambda * tf.reduce_sum(tf.square(model.w))
+        loss = mse + l2_loss
     grads = tape.gradient(loss, model.w)
     optimizer.apply_gradients([(grads, model.w)])
     return loss
@@ -99,7 +101,7 @@ def evaluate(ys, ys_pred):
 
 
 # 训练过程
-for i in range(1000):
+for i in range(2000):
     loss = train_one_step(model, xs, ys)
     if i % 100 == 0:  # 修改为0以显示第0步的损失
         print(f'第 {i} 步 loss is {loss:.4f}')
