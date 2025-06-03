@@ -17,7 +17,7 @@ from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
-get_ipython().run_line_magic('matplotlib', 'inline')
+#get_ipython().run_line_magic('matplotlib', 'inline')
 
 dot_num = 100
 x_p = np.random.normal(3., 1, dot_num)
@@ -68,6 +68,7 @@ def compute_loss(pred, label):
     #输入label shape(N,), pred shape(N,)
     #输出 losses shape(N,) 每一个样本一个loss
     #todo 填空一，实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
+    losses = -label * tf.math.log(pred + epsilon) - (1 - label) * tf.math.log(1 - pred + epsilon)
     '''============================='''
     loss = tf.reduce_mean(losses)
     
@@ -95,6 +96,9 @@ if __name__ == '__main__':
     opt = tf.keras.optimizers.SGD(learning_rate=0.01)
     x1, x2, y = list(zip(*data_set))
     x = list(zip(x1, x2))
+    # 将输入数据转换为float32类型
+    x = tf.cast(x, dtype=tf.float32)
+    y = tf.cast(y, dtype=tf.float32)
     animation_fram = []
     
     for i in range(200):
@@ -147,7 +151,7 @@ def animate(i):
 
 anim = animation.FuncAnimation(f, animate, init_func=init,
                                frames=len(animation_fram), interval=30, blit=True)
-
-HTML(anim.to_html5_video())
-
-
+#HTML(anim.to_html5_video()) 
+# 保存为GIF文件
+anim.save('logistic_regression.gif', writer='pillow')
+plt.show() 
