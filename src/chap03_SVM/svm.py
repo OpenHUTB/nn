@@ -54,7 +54,6 @@ class SVM():
         self.lambda_ = lambda_  # 正则化参数
         self.tolerance = tolerance  # 提前停止的阈值
         pass
-    
 
     def train(self, data_train):
         """
@@ -85,8 +84,8 @@ class SVM():
             # 提前停止：权重更新变化太小
             if np.linalg.norm(self.lr * dw) < self.tolerance:
                 break
+    
         # 请补全此处代码
-
     def predict(self, x):
         """
         预测标签
@@ -98,7 +97,6 @@ class SVM():
         decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, -1)
-
 
 if __name__ == '__main__':
     # 载入数据，实际使用时将x替换为具体名称
