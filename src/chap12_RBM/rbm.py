@@ -33,6 +33,7 @@ class RBM:
         self.b_h = np.zeros(n_hidden)   # 隐藏层偏置
         self.b_v = np.zeros(n_observe)  # 可见层偏置
         pass
+    
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
         return 1.0 / (1 + np.exp(-x))
@@ -40,6 +41,7 @@ class RBM:
     def _sample_binary(self, probs):
         """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）"""
         return np.random.binomial(1, probs)
+    
     def train(self, data):
         """使用Contrastive Divergence算法对模型进行训练"""
     
