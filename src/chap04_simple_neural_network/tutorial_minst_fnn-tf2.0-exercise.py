@@ -44,9 +44,7 @@ class myModel:
         self.b2 = tf.Variable(tf.zeros([10]))
         
     def __call__(self, x):
-        ####################
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
-        ####################
         #logits = None
         #return logits
         x = tf.reshape(x, [-1, 784])          # 展平为[batch_size, 784]
@@ -94,7 +92,6 @@ def train_one_step(model, optimizer, x, y):
         v.assign_sub(0.01*g)
 
     accuracy = compute_accuracy(logits, y)
-
     # loss and accuracy is scalar tensor
     return loss, accuracy
 
@@ -104,7 +101,7 @@ def test(model, x, y):
     logits = model(x) # 计算预测结果与真实标签之间的损失值
     loss = compute_loss(logits, y) # compute_loss函数应实现具体的损失计算逻辑
     accuracy = compute_accuracy(logits, y) # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
-    return loss,  accuracy  # 返回损失值和准确率
+    return compute_loss(logits, y), compute_accuracy(logits, y)
 
 
 # ## 实际训练
