@@ -114,7 +114,7 @@ class myRNNModel(keras.Model):
         embedded_num2 = self.embed_layer(num2)  # (batch_size, maxlen, 32)
         
         # 特征融合：将两个数字的嵌入表示相加
-        combined_features = embedded_num1 + embedded_num2  # (batch_size, maxlen, 32)
+        combined_features = tf.add(embedded_num1, embedded_num2)
         
         # RNN处理序列依赖
         rnn_outputs = self.rnn_layer(combined_features)  # (batch_size, maxlen, 64)
