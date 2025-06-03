@@ -55,17 +55,17 @@ def logsumexp(log_p, axis=1, keepdims=False):
         return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
-    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)
-    sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)
+    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
+    sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)  # 计算调整后的指数和
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
     
     # 处理全-inf输入的特殊case
-    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):
+    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):  #判断是否所有有效值都是-inf
         result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val 的适当形式。
     
-    return result
+    return result  #返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类
 class GaussianMixtureModel:
