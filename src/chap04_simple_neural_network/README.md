@@ -125,3 +125,65 @@ loss = sigmoid_ce(x=tf.constant([0.5, 0.8]), label=tf.constant([1.0, 0.0]))
 ## 测试
 
 代码中包含测试用例，用于验证自定义函数的正确性。通过比较自定义函数与 TensorFlow 内置函数的结果，确保实现的准确性。
+
+----
+
+# MNIST FNN with Numpy
+
+## 项目简介
+
+该项目实现了一个简单的前馈神经网络（Feedforward Neural Network, FNN），用于识别手写数字。网络使用 Numpy 实现，并通过自动微分计算梯度。数据集使用的是经典的 MNIST 数据集。
+
+## 目录结构
+
+```
+.
+├── tutorial_minst_fnn-numpy-exercise.py  # 主代码文件
+```
+
+## 环境要求
+
+-   Python 3.x
+-   Numpy
+-   TensorFlow
+
+## 安装依赖
+
+使用以下命令安装所需的 Python 包：
+
+```bash
+pip install numpy tensorflow
+```
+
+## 使用方法
+
+1.  **准备数据**
+     通过调用 `mnist_dataset()` 函数加载并预处理 MNIST 数据集。
+2.  **定义模型**
+     创建 `myModel` 类，包含前向传播和反向传播的方法。
+3.  **训练模型**
+     使用 `train()` 函数训练模型，训练过程中会打印每个 epoch 的损失和准确率。
+4.  **测试模型**
+     使用 `test()` 函数在测试集上评估模型性能。
+
+## 代码说明
+
+-   **Matmul**: 实现矩阵乘法及其梯度计算。
+-   **Relu**: 实现 ReLU 激活函数及其梯度计算。
+-   **Softmax**: 实现 Softmax 函数及其梯度计算。
+-   **Log**: 实现 Log Softmax 函数及其梯度计算。
+-   **compute_loss**: 计算损失函数。
+-   **compute_accuracy**: 计算模型准确率。
+
+## 示例
+
+在主程序中调用以下代码开始训练和测试：
+
+```python
+if __name__ == "__main__":
+    train_data, train_label, test_data, test_label = prepare_data()
+    model = myModel()
+    losses, accuracies = train(model, train_data, train_label)
+    test_loss, test_accuracy = test(model, test_data, test_label)
+    print(f'Test Loss {test_loss:.4f}; Test Accuracy {test_accuracy:.4f}')
+```
