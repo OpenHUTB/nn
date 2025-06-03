@@ -36,8 +36,10 @@ def process_dataset(fileName):
             content = ''.join(outs[1:])  # 取内容部分
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
+            if len(ins) > 200:  # 过滤掉长度过长的样本
             # 过滤过长的诗歌
             if len(ins) > 200:
+
                 continue
             examples.append(ins)
             
