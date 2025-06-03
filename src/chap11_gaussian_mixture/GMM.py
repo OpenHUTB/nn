@@ -32,10 +32,10 @@ def generate_data(n_samples=1000):
         y_true.extend([i] * samples_per_component[i])  # 添加对应标签
     
     # 合并并打乱数据
-    X = np.vstack(X_list)
-    y_true = np.array(y_true)
-    shuffle_idx = np.random.permutation(n_samples)
-    return X[shuffle_idx], y_true[shuffle_idx]
+    X = np.vstack(X_list)  #将多个子数据集合并为一个完整数据集
+    y_true = np.array(y_true)  #将Python列表转换为NumPy数组
+    shuffle_idx = np.random.permutation(n_samples) #生成0到n_samples-1的随机排列
+    return X[shuffle_idx], y_true[shuffle_idx] #使用相同的随机索引同时打乱特征和标签
 
 # 自定义logsumexp函数
 def logsumexp(log_p, axis=1, keepdims=False):
