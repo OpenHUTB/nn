@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 import collections
 from tensorflow import keras
+from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
@@ -127,16 +128,16 @@ class myRNNModel(keras.Model):
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
-    return tf.reduce_mean(losses)
+    return tf.reduce_mean(losses)## 使用交叉熵损失函数来计算每个样本的损失
 
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
     with tf.GradientTape() as tape:
-        logits = model(x, y)
+        logits = model(x, y)       #前向传播：计算输出 logits
         loss = compute_loss(logits, label)
 
     # compute gradient
-    grads = tape.gradient(loss, model.trainable_variables)
+    grads = tape.gradient(loss, model.trainable_variables)#计算梯度，自动求导
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
 
@@ -157,9 +158,10 @@ def train(steps, model, optimizer):
 def evaluate(model):
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+    # 前向传播预测 logits
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1)
+    pred = np.argmax(logits, axis=-1) # 每位取最大概率的数字
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
         print(o[0], o[1], o[0]==o[1])
