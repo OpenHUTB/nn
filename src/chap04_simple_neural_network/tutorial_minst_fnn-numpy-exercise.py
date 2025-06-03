@@ -30,8 +30,11 @@ class Matmul:
         self.mem = {}
         
     def forward(self, x, W):
+        # 前向传播：执行矩阵乘法，计算 h = x @ W
         h = np.matmul(x, W)
+        # 缓存输入 x 和 权重 W，以便在反向传播中计算梯度
         self.mem={'x': x, 'W':W}
+        # 缓存输入 x 和 权重 W，以便在反向传播中计算梯度
         return h
     
     def backward(self, grad_y):

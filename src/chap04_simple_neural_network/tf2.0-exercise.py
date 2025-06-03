@@ -55,7 +55,7 @@ test_data = np.random.normal(size=[10, 5])
 
 # ## 实现 softmax 交叉熵loss函数
 
-def softmax_ce(x, label):
+def softmax_ce(logits, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     #参数logits: 未经Softmax的原始输出（logits）

@@ -193,6 +193,7 @@ def main(x_train, y_train, use_gradient_descent=False):
         # 梯度下降求解权重（缩进修正）
         learning_rate = 0.01 #设置学习率为0.01
         epochs = 1000  #设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         for epoch in range(epochs): #开始梯度下降的迭代循环，将进行epochs次参数更新。
             y_pred = np.dot(phi, w_gd)
@@ -237,8 +238,8 @@ if __name__ == "__main__":
     x_test, y_test = load_data(
         test_file
     )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)
-    print(x_test.shape)
+    print(x_train.shape)# x_train.shape 返回训练集特征矩阵的维度信息
+    print(x_test.shape) # x_test.shape 返回测试集特征矩阵的维度信息
 
     # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
     # f: 预测函数 y = f(x)
@@ -257,6 +258,14 @@ if __name__ == "__main__":
     print("预测值与真实值的标准差：{:.1f}".format(std))
 
     # 显示结果
+
+    plt.plot(x_train, y_train, 'ro', markersize=3) # 红色点为训练集数据
+    plt.plot(x_test, y_test, 'k') # 红色点为训练集数据
+    plt.plot(x_test, y_test_pred, 'k') # 黑线为预测值（可以用其他颜色区分）
+    plt.xlabel('x') # 设置x轴的标签
+    plt.ylabel('y') # 设置y轴的标签
+    plt.title('Linear Regression') # 设置图表标题
+    plt.legend(['train', 'test', 'pred']) # 添加图例，表示每条线的含义
     plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）

@@ -30,8 +30,8 @@ def gaussian_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1) #使用np.expand_dims在x的第1维度(axis=1)上增加一个维度
     x = np.concatenate([x]*feature_num, axis=1) #将x沿着第1维度(axis=1)复制feature_num次并连接
     
-    out = (x-centers)/width
-    ret = np.exp(-0.5 * out ** 2)
+    out = (x-centers)/width #计算每个样本点到每个中心点的标准化距离
+    ret = np.exp(-0.5 * out ** 2) #对标准化距离应用高斯函数
     return ret
 
 def load_data(filename, basis_func=gaussian_basis):

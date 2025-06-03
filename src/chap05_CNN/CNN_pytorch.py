@@ -116,9 +116,9 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)  # 前向传播得到预测结果
             loss = loss_func(output, y)  # 计算损失
-            optimizer.zero_grad()  # 清空梯度
-            loss.backward()  # 反向传播计算梯度
-            optimizer.step()  # 更新参数
+            optimizer.zero_grad(set_to_none=True)  # 更高效的梯度清零方式
+            loss.backward()
+            optimizer.step()
             
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
