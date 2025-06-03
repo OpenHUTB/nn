@@ -24,6 +24,7 @@ def mnist_dataset():
 # In[3]:
 import numpy as np
 
+# 定义矩阵乘法层
 class Matmul:
     def __init__(self):
         self.mem = {}
@@ -39,6 +40,7 @@ class Matmul:
         w: shape(d, d')
         grad_y: shape(N, d')
         '''
+       # 反向传播计算 x 和 W 的梯度
         x = self.mem['x']
         W = self.mem['W']
         
@@ -48,6 +50,7 @@ class Matmul:
       
         return grad_x, grad_W
 
+# 定义 ReLU 激活层
 class Relu:
     def __init__(self):
         self.mem = {}
@@ -67,6 +70,7 @@ class Relu:
         ####################
         return grad_x
 
+# 定义 Softmax 层（输出概率）
 class Softmax:
     '''
     softmax over last dimention
@@ -102,6 +106,7 @@ class Softmax:
         tmp = -tmp + grad_y * s 
         return tmp
     
+# 定义 Log 层（计算 log softmax，用于交叉熵）
 class Log:
     '''
     softmax over last dimention
@@ -267,8 +272,8 @@ with tf.GradientTape() as tape:
 class myModel:
     def __init__(self):
         
-        self.W1 = np.random.normal(size=[28*28+1, 100])
-        self.W2 = np.random.normal(size=[100, 10])
+        self.W1 = np.random.normal(size=[28*28+1, 100])  # 输入层到隐藏层，增加偏置项
+        self.W2 = np.random.normal(size=[100, 10])       # 输入层到隐藏层，增加偏置项
         
         self.mul_h1 = Matmul()
         self.mul_h2 = Matmul()
@@ -278,8 +283,8 @@ class myModel:
         
         
     def forward(self, x):
-        x = x.reshape(-1, 28*28)
-        bias = np.ones(shape=[x.shape[0], 1])
+        x = x.reshape(-1, 28*28)  # 展平图像
+        bias = np.ones(shape=[x.shape[0], 1])  # 添加偏置项
         x = np.concatenate([x, bias], axis=1)
         
         self.h1 = self.mul_h1.forward(x, self.W1) # shape(5, 4)
@@ -311,6 +316,7 @@ def compute_accuracy(log_prob, labels):
     truth = np.argmax(labels, axis=1)
     return np.mean(predictions==truth)
 
+# 单步训练函数
 def train_one_step(model, x, y):
     model.forward(x)
     model.backward(y)
@@ -320,6 +326,7 @@ def train_one_step(model, x, y):
     accuracy = compute_accuracy(model.h2_log, y)
     return loss, accuracy
 
+# 测试函数
 def test(model, x, y):
     model.forward(x)
     loss = compute_loss(model.h2_log, y)
