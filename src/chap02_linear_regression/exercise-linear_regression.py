@@ -13,8 +13,6 @@ import matplotlib.pyplot as plt
 def load_data(filename):
     """载入数据。
 
-    
-    
     Args:
         filename: 数据文件的路径
 
