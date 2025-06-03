@@ -144,16 +144,25 @@ def train_one_step(model, optimizer, x, y, label):
 def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
-    for step in range(steps):
-        datas = gen_data_batch(batch_size=200, start=0, end=555555555)
-        Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
-                              tf.constant(Nums2, dtype=tf.int32),
-                              tf.constant(results, dtype=tf.int32))
-        if step%50 == 0:
-            print('step', step, ': loss', loss.numpy())
+    # 训练循环，执行指定步数
+for step in range(steps):
+    # 生成批量数据（200个样本），数值范围0-555555555
+    datas = gen_data_batch(batch_size=200, start=0, end=555555555)
+    
+    # 准备训练数据：两个数字序列和结果，统一填充到长度11
+    Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+    
+    # 单步训练：将数据转为Tensor，计算并返回损失
+    loss = train_one_step(model, optimizer, 
+                          tf.constant(Nums1, dtype=tf.int32),
+                          tf.constant(Nums2, dtype=tf.int32),
+                          tf.constant(results, dtype=tf.int32))
+    
+    # 每50步打印当前损失
+    if step % 50 == 0:
+        print('step', step, ': loss', loss.numpy())
 
-    return loss
+return loss  # 返回最终损失值
 
 def evaluate(model):
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
