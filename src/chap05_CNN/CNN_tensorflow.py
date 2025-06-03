@@ -5,89 +5,110 @@
 
 
 import tensorflow as tf
-from tensorflow.examples.tutorials.mnist import input_data
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+from tensorflow.keras.datasets import mnist
+import numpy as np
+
+# 加载MNIST数据集
+(x_train, y_train), (x_test, y_test) = mnist.load_data()
+# 数据预处理
+x_train = x_train.reshape(-1, 784) / 255.0
+x_test = x_test.reshape(-1, 784) / 255.0
+y_train = tf.keras.utils.to_categorical(y_train, 10)
+y_test = tf.keras.utils.to_categorical(y_test, 10)
 
 learning_rate = 1e-4
-keep_prob_rate = 0.7 # 
+keep_prob_rate = 0.7
 max_epoch = 2000
-def compute_accuracy(v_xs, v_ys):
-    global prediction
-    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
-    correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(v_ys,1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
-    return result
 
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
-
-def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
-
-def conv2d(x, W):
-    # 每一维度  滑动步长全部是 1， padding 方式 选择 same
-    # 提示 使用函数  tf.nn.conv2d
+class CNN(tf.keras.Model):
+    def __init__(self):
+        super(CNN, self).__init__()
+        # 卷积层1
+        self.conv1 = tf.keras.layers.Conv2D(
+            filters=32,
+            kernel_size=7,
+            strides=1,
+            padding='same',
+            activation='relu'
+        )
+        self.pool1 = tf.keras.layers.MaxPool2D(
+            pool_size=2,
+            strides=2,
+            padding='same'
+        )
+        
+        # 卷积层2
+        self.conv2 = tf.keras.layers.Conv2D(
+            filters=64,
+            kernel_size=5,
+            strides=1,
+            padding='same',
+            activation='relu'
+        )
+        self.pool2 = tf.keras.layers.MaxPool2D(
+            pool_size=2,
+            strides=2,
+            padding='same'
+        )
+        
+        # 全连接层
+        self.flatten = tf.keras.layers.Flatten()
+        self.fc1 = tf.keras.layers.Dense(1024, activation='relu')
+        self.dropout = tf.keras.layers.Dropout(keep_prob_rate)
+        self.fc2 = tf.keras.layers.Dense(10, activation='softmax')
     
-    return 
+    def call(self, x, training=False):
+        x = tf.reshape(x, [-1, 28, 28, 1])
+        x = self.conv1(x)
+        x = self.pool1(x)
+        x = self.conv2(x)
+        x = self.pool2(x)
+        x = self.flatten(x)
+        x = self.fc1(x)
+        x = self.dropout(x, training=training)
+        x = self.fc2(x)
+        return x
 
-def max_pool_2x2(x):
-    # 滑动步长 是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
-    # 提示 使用函数  tf.nn.max_pool
+# 创建模型和优化器
+model = CNN()
+optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+# 定义损失函数
+loss_fn = tf.keras.losses.CategoricalCrossentropy()
+
+# 定义训练步骤
+@tf.function
+def train_step(x, y):
+    with tf.GradientTape() as tape:
+        predictions = model(x, training=True)
+        loss = loss_fn(y, predictions)
     
-    return 
+    gradients = tape.gradient(loss, model.trainable_variables)
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+    return loss, predictions
 
-# define placeholder for inputs to network
-xs = tf.placeholder(tf.float32, [None, 784])/255.
-ys = tf.placeholder(tf.float32, [None, 10])
-keep_prob = tf.placeholder(tf.float32)
-x_image = tf.reshape(xs, [-1, 28, 28, 1])
+# 定义测试步骤
+@tf.function
+def test_step(x, y):
+    predictions = model(x, training=False)
+    loss = loss_fn(y, predictions)
+    return loss, predictions
 
-#  卷积层 1
-## conv1 layer ##
-
-W_conv1 =                       # patch 7x7, in size 1, out size 32
-b_conv1 =                      
-h_conv1 =                       # 卷积  自己选择 选择激活函数
-h_pool1 =                       # 池化               
-
-# 卷积层 2
-W_conv2 =                        # patch 5x5, in size 32, out size 64
-b_conv2 = 
-h_conv2 =                        # 卷积  自己选择 选择激活函数
-h_pool2 =                        # 池化
-
-#  全连接层 1
-## fc1 layer ##
-W_fc1 = weight_variable([7*7*64, 1024])
-b_fc1 = bias_variable([1024])
-
-h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
-h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
-
-# 全连接层 2
-## fc2 layer ##
-W_fc2 = weight_variable([1024, 10])
-b_fc2 = bias_variable([10])
-prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
-
-
-# 交叉熵函数
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),
-                                              reduction_indices=[1]))
-train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
-
-with tf.Session() as sess:
-    init = tf.global_variables_initializer()
-    sess.run(init)
+# 训练模型
+for epoch in range(max_epoch):
+    # 随机选择100个样本进行训练
+    indices = np.random.randint(0, len(x_train), 100)
+    batch_xs = x_train[indices]
+    batch_ys = y_train[indices]
     
-    for i in range(max_epoch):
-        batch_xs, batch_ys = mnist.train.next_batch(100)
-        sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
-        if i % 100 == 0:
-            print(compute_accuracy(
-                mnist.test.images[:1000], mnist.test.labels[:1000]))
+    # 训练步骤
+    loss, predictions = train_step(batch_xs, batch_ys)
+    
+    # 每100步打印一次测试准确率
+    if epoch % 100 == 0:
+        test_loss, test_predictions = test_step(x_test[:1000], y_test[:1000])
+        test_accuracy = tf.reduce_mean(
+            tf.cast(tf.equal(tf.argmax(test_predictions, 1), tf.argmax(y_test[:1000], 1)), tf.float32)
+        )
+        print(f'Epoch {epoch}, Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}')
 
