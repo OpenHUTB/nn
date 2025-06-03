@@ -101,12 +101,12 @@ class GaussianMixtureModel:
             gamma = np.exp(log_prob - log_prob_sum) # 计算后验概率矩阵gamma(也称为响应度矩阵)
 
             # M步：更新参数
-            Nk = np.sum(gamma, axis=0)
-            self.pi = Nk / n_samples
-            new_mu = np.zeros_like(self.mu)
+            Nk = np.sum(gamma, axis=0) # 计算每个高斯成分的"有效样本数"（即属于该成分的样本概率之和）
+            self.pi = Nk / n_samples # 更新混合权重π：各成分的样本占比
+            new_mu = np.zeros_like(self.mu) # 初始化新均值和新协方差矩阵的存储空间
             new_sigma = np.zeros_like(self.sigma)
             
-            for k in range(self.n_components):
+            for k in range(self.n_components): # 遍历每个高斯成分更新参数
                 # 更新均值
 
                 new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
