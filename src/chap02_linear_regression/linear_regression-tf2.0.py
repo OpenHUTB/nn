@@ -49,7 +49,6 @@ def load_data(filename, basis_func=gaussian_basis):
         xs = np.concatenate([phi0, phi1], axis=1)
         return (np.float32(xs), np.float32(ys)), (o_x, o_y)
 
-
 # ## 定义模型
 # In[21]:
 
@@ -80,11 +79,9 @@ ndim = xs.shape[1]
 
 model = linearModel(ndim=ndim)
 
-
 # ## 训练以及评估
 
 # In[26]:
-
 
 optimizer = optimizers.Adam(0.1)
 @tf.function
@@ -106,16 +103,13 @@ def evaluate(ys, ys_pred):
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
     return std
 
-
 # In[27]:评估指标的计算
-
 
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
     if i % 100 == 1:
         print(f'loss is {loss:.4}')
-        
-        
+                
 y_preds = predict(model, xs)
 std = evaluate(ys, y_preds)
 print('训练集预测值与真实值的标准差：{:.1f}'.format(std))
