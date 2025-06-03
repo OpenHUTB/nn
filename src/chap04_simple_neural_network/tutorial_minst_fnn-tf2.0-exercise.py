@@ -17,8 +17,8 @@ def mnist_dataset():
     # 加载MNIST数据集，包含训练集和测试集的图像及标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
-    x = x/255.0
-    x_test = x_test/255.0
+    x = x / 255.0
+    x_test = x_test / 255.0
     
     return (x, y), (x_test, y_test)
 
