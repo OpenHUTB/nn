@@ -82,11 +82,11 @@ class GaussianMixtureModel:
         log_likelihood = -np.inf
         for iter in range(self.max_iter):
             # E步：计算后验概率
-            log_prob = np.zeros((n_samples, self.n_components))
-            for k in range(self.n_components):
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k])
-            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
-            gamma = np.exp(log_prob - log_prob_sum)
+            log_prob = np.zeros((n_samples, self.n_components))  # 初始化对数概率矩阵
+            for k in range(self.n_components):  # 遍历每个高斯成分，计算样本在该分布下的对数概率
+                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k])  # 结果存储到log_prob矩阵的第k列
+            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)  # 计算对数概率的归一化因子（对数空间）
+            gamma = np.exp(log_prob - log_prob_sum)  # 计算后验概率矩阵gamma（也称为响应度矩阵）
             
             # M步：更新参数
             Nk = np.sum(gamma, axis=0)
