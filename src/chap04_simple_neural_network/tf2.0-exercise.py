@@ -110,7 +110,3 @@ label = np.random.randint(0, 2, 10).astype(test_data.dtype)
 print(label)
 # 比较自定义的损失值和tf自带的结果，误差小于 0.0001 则认为相等
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data)) - sigmoid_ce(prob, label))**2 < 0.0001).numpy()
-
-
-
-
