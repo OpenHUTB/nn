@@ -16,7 +16,7 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-#定义了一个函数mnist_dataset()，用于加载并预处理MNIST数据集
+#定义了一个函数mnist_dataset()，用于加载并预处理 MNIST 数据集
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
@@ -121,7 +121,7 @@ class Softmax:
         tmp = -tmp + grad_y * s 
         return tmp
     
-# 定义 Log 层（计算 log softmax，用于交叉熵）
+# 定义 Log 层（计算 log softmax ，用于交叉熵）
 class Log:
     '''
     softmax over last dimention
@@ -150,7 +150,6 @@ class Log:
 # ## Gradient check
 
 # In[5]:
-
 
 # import tensorflow as tf
 
@@ -224,7 +223,6 @@ class Log:
 #     grads = tape.gradient(loss, x)
 #     print (grads)
 
-
 # # Final Gradient Check
 
 # In[6]:
@@ -254,7 +252,6 @@ h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2)
 h2_log = log.forward(h2_soft)
 
-
 h2_log_grad = log.backward(label)
 h2_soft_grad = softmax.backward(h2_log_grad)
 h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)
@@ -278,11 +275,9 @@ with tf.GradientTape() as tape:
     grads = tape.gradient(loss, [prob])
     print (grads[0].numpy())
 
-
 # ## 建立模型
 
 # In[10]:
-
 
 class myModel:
     def __init__(self):
@@ -295,8 +290,7 @@ class myModel:
         self.relu = Relu()
         self.softmax = Softmax()
         self.log = Log()
-        
-        
+                
     def forward(self, x):
         x = x.reshape(-1, 28*28)  # 展平图像
         bias = np.ones(shape=[x.shape[0], 1])  # 添加偏置项
@@ -317,11 +311,9 @@ class myModel:
         
 model = myModel()
 
-
 # ## 计算 loss
 
 # In[11]:
-
 
 def compute_loss(log_prob, labels):
      return np.mean(np.sum(-log_prob*labels, axis=1))
