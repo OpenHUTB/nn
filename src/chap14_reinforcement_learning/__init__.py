@@ -1,22 +1,18 @@
 from gym.envs.registration import registry, register, make, spec
-
 # Algorithmic
 # ----------------------------------------
-
 register(
     id='Copy-v0',
     entry_point='gym.envs.algorithmic:CopyEnv',
     max_episode_steps=200,
     reward_threshold=25.0,
 )
-
 register(
     id='RepeatCopy-v0',
     entry_point='gym.envs.algorithmic:RepeatCopyEnv',
     max_episode_steps=200,
     reward_threshold=75.0,
 )
-
 register(
     id='ReversedAddition-v0',
     entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
@@ -70,14 +66,12 @@ register(
     max_episode_steps=200,
     reward_threshold=-110.0,
 )
-
 register(
     id='MountainCarContinuous-v0',
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
     max_episode_steps=999,
     reward_threshold=90.0,
 )
-
 register(
     id='Pendulum-v0',
     entry_point='gym.envs.classic_control:PendulumEnv',
@@ -309,7 +303,6 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         name = ''.join([g.capitalize() for g in game.split('_')])
         if obs_type == 'ram':
             name = '{}-ram'.format(name)
-
         nondeterministic = False
         if game == 'elevator_action' and obs_type == 'ram':
             # ElevatorAction-ram-v0 seems to yield slightly
@@ -317,7 +310,6 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
             # should track this down eventually, but for now we just
             # mark it as nondeterministic.
             nondeterministic = True
-
         register(
             id='{}-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
@@ -377,7 +369,6 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
 
 # Board games
 # ----------------------------------------
-
 register(
     id='Go9x9-v0',
     entry_point='gym.envs.board_game:GoEnv',
