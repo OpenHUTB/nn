@@ -1,21 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# ## 说明
-#
-# 请按照填空顺序编号分别完成 参数优化，不同基函数的实现
-
 import numpy as np
 import matplotlib.pyplot as plt
-
 
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
-
     Args:
         filename: 数据文件的路径
-
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
