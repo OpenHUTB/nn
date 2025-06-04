@@ -15,6 +15,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
+
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
@@ -24,6 +25,7 @@ def mnist_dataset():
     ds = ds.take(20000).shuffle(20000).batch(100)
 
 
+    
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
@@ -49,6 +51,7 @@ class myConvModel(keras.Model):
         self.flat = Flatten()
         self.dense1 = layers.Dense(100, activation='tanh')
         self.dense2 = layers.Dense(10)
+   
     @tf.function
     def call(self, x):
         h1 = self.l1_conv(x)
