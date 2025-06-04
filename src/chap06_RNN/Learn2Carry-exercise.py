@@ -2,7 +2,6 @@
 # coding: utf-8
 # # 加法进位实验
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
-
 # In[1]:
 #导入了多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
@@ -12,13 +11,6 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
-
-
-# ## 数据生成
-# 我们随机在 `start->end`之间采样除整数对`(num1, num2)`，计算结果`num1+num2`作为监督信号。
-# * 首先将数字转换成数字位列表 `convertNum2Digits`
-# * 将数字位列表反向
-# * 将数字位列表填充到同样的长度 `pad2len`
 
 # In[2]:
 
