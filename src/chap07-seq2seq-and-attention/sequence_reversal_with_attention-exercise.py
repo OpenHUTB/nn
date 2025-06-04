@@ -44,7 +44,7 @@ print(get_batch(2, 10))
 
 
 # # 建立sequence to sequence 模型
-# 
+# ##
 # 完成两空，模型搭建以及单步解码逻辑
 
 # In[26]:
@@ -98,7 +98,7 @@ class mySeq2SeqModel(keras.Model):
 
 
 # # Loss函数以及训练逻辑
-
+ ##
 # In[27]:
 
 
