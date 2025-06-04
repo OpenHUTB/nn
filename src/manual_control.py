@@ -157,15 +157,15 @@ except ImportError:
 # ==============================================================================
 
 
-def find_weather_presets():
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
+def find_weather_presets():# 定义一个正则表达式，用于将 PascalCase 格式的字符串拆分成单词
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)') # 定义一个 lambda 函数，将类名如 "ClearNoon" 拆分为 "Clear Noon"
+    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))# 从 carla.WeatherParameters 中提取所有以大写字母开头的属性名
+    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]# 返回包含 (天气参数对象, 格式化后的名称) 的元组列表
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
-def get_actor_display_name(actor, truncate=250):
-    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
+def get_actor_display_name(actor, truncate=250):# 提取 actor 的类型标识符，并将其格式化为更易读的名称（例如 vehicle.tesla.model3 -> Tesla Model3）
+    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:]) # 如果名称过长，则进行截断，并在末尾加上省略号（…）
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
@@ -384,13 +384,17 @@ class World(object):
 class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
+        # 初始化控制状态标志
         self._autopilot_enabled = start_in_autopilot
         self._ackermann_enabled = False
         self._ackermann_reverse = 1
+        # 根据角色类型(车辆/行人)初始化不同的控制器
         if isinstance(world.player, carla.Vehicle):
+             # 车辆控制初始化
             self._control = carla.VehicleControl()
             self._ackermann_control = carla.VehicleAckermannControl()
             self._lights = carla.VehicleLightState.NONE
+            # 设置初始自动驾驶状态和灯光状态
             world.player.set_autopilot(self._autopilot_enabled)
             world.player.set_light_state(self._lights)
         elif isinstance(world.player, carla.Walker):
@@ -1247,56 +1251,77 @@ class CameraManager(object):
 
 
 def game_loop(args):
+    # 初始化 pygame 和字体模块
     pygame.init()
     pygame.font.init()
     world = None
-    original_settings = None
+    original_settings = None  # 用于记录原始仿真设置（以便退出时恢复）
 
     try:
+        # 创建 CARLA 客户端，连接指定主机和端口
         client = carla.Client(args.host, args.port)
-        client.set_timeout(2000.0)
+        client.set_timeout(2000.0)  # 设置连接超时时间为 2 秒
 
-        sim_world = client.get_world()
+        sim_world = client.get_world()  # 获取仿真世界
+
+        # 如果启用了同步模式（同步仿真帧和主循环）
         if args.sync:
-            original_settings = sim_world.get_settings()
-            settings = sim_world.get_settings()
+            original_settings = sim_world.get_settings()  # 记录原始设置
+            settings = sim_world.get_settings()  # 获取当前设置
             if not settings.synchronous_mode:
+                # 启用同步模式，并设置固定步长（即每帧为 0.05 秒 = 20 FPS）
                 settings.synchronous_mode = True
                 settings.fixed_delta_seconds = 0.05
-            sim_world.apply_settings(settings)
+            sim_world.apply_settings(settings)  # 应用设置
 
+            # 设置交通管理器也为同步模式，确保交通控制和仿真帧同步
             traffic_manager = client.get_trafficmanager()
             traffic_manager.set_synchronous_mode(True)
 
+        # 警告：如果启用自动驾驶但不在同步模式下，可能会导致交通系统问题
         if args.autopilot and not sim_world.get_settings().synchronous_mode:
             print("WARNING: You are currently in asynchronous mode and could "
                   "experience some issues with the traffic simulation")
 
+        # 设置渲染窗口（HWSURFACE：硬件加速，DOUBLEBUF：双缓冲）
         display = pygame.display.set_mode(
             (args.width, args.height),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
-        display.fill((0,0,0))
-        pygame.display.flip()
+        display.fill((0, 0, 0))  # 背景填充为黑色
+        pygame.display.flip()    # 显示更新后的画面
 
+        # 初始化 HUD（用于显示信息的图层）
         hud = HUD(args.width, args.height)
-        world = World(sim_world, hud, args)
-        controller = KeyboardControl(world, args.autopilot)  # 湖工商场景中虚幻注释掉
 
+        # 创建 World 实例，封装了车辆、摄像头等逻辑
+        world = World(sim_world, hud, args)
+
+        # 初始化键盘控制器（可选：控制车辆或切换模式等）
+        controller = KeyboardControl(world, args.autopilot)
+        # 注：在某些场景（如“湖工商”）中可能注释此行以禁用用户交互
+
+        # 在同步模式下，需要手动推进仿真一帧
         if args.sync:
             sim_world.tick()
         else:
-            sim_world.wait_for_tick()
+            sim_world.wait_for_tick()  # 异步模式下等待下一帧自动到来
 
-        clock = pygame.time.Clock()
+        clock = pygame.time.Clock()  # 用于控制帧率的时钟对象
+
+        # 主循环：每帧处理输入、更新世界状态、渲染画面
         while True:
             if args.sync:
-                sim_world.tick()
-            clock.tick_busy_loop(60)
+                sim_world.tick()  # 手动推进仿真一帧
+
+            clock.tick_busy_loop(60)  # 保持 60 FPS 的运行频率
+
+            # 解析并处理用户输入事件（如退出、键盘操作等）
             if controller.parse_events(client, world, clock, args.sync):
-                return
-            world.tick(clock)
-            world.render(display)
-            pygame.display.flip()
+                return  # 如果返回 True，则退出主循环
+
+            world.tick(clock)         # 更新世界状态（如 HUD 信息、传感器）
+            world.render(display)     # 渲染当前帧到 pygame 显示窗口
+            pygame.display.flip()     # 刷新屏幕显示最新画面
 
     finally:
 
