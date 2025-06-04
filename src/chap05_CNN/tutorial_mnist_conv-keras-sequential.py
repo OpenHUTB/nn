@@ -15,7 +15,8 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D,BatchNormalization
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
-def mnist_dataset():# 准备MNIST数据集的主函数
+# 准备MNIST数据集的主函数
+def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28,1)
@@ -28,9 +29,12 @@ def mnist_dataset():# 准备MNIST数据集的主函数
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
     return ds, test_ds
 
-def prepare_mnist_features_and_labels(x, y):# 预处理MNIST图像和标签的辅助函数
-    x = tf.cast(x, tf.float32) / 255.0# 将像素值从[0, 255]归一化到[0, 1]，并转换为float32类型
-    y = tf.cast(y, tf.int64)# 将标签转换为int64类型
+# 预处理MNIST图像和标签的辅助函数
+def prepare_mnist_features_and_labels(x, y):
+    # 将像素值从[0, 255]归一化到[0, 1]，并转换为float32类型
+    x = tf.cast(x, tf.float32) / 255.0
+    # 将标签转换为int64类型
+    y = tf.cast(y, tf.int64)
     return x, y
 
 
