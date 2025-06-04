@@ -23,7 +23,6 @@ def load_data(filename):
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
-#
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
@@ -168,7 +167,8 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
 
 def main(x_train, y_train, use_gradient_descent=False):
     """训练模型，并返回从x到y的映射。"""
-    basis_func = identity_basis  # 默认使用恒等基函数
+    # 默认使用恒等基函数
+    basis_func = identity_basis  
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
@@ -181,11 +181,14 @@ def main(x_train, y_train, use_gradient_descent=False):
     w_gd = None
     if use_gradient_descent:
         # 梯度下降求解权重（缩进修正）
-        learning_rate = 0.01 #设置学习率为0.01
-        epochs = 1000  #设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        #设置学习率为0.01
+        learning_rate = 0.01 
+        #设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        epochs = 1000  
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
-        for epoch in range(epochs): #开始梯度下降的迭代循环，将进行epochs次参数更新。
+        #开始梯度下降的迭代循环，将进行epochs次参数更新。
+        for epoch in range(epochs): 
             y_pred = np.dot(phi, w_gd)
             error = y_pred - y_train
             gradient = np.dot(phi.T, error) / len(y_train)
