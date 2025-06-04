@@ -15,8 +15,7 @@ def generate_data(n_samples=1000):
     sigma_true = np.array([
         [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
         [[2, 0.5], [0.5, 1]],   # 第二个分布：倾斜的椭圆
-        [[1, -0.5], [-0.5, 2]]
-        # 第三个分布：反向倾斜的椭圆
+        [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
     ])
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
@@ -40,9 +39,10 @@ def generate_data(n_samples=1000):
 
 # 自定义logsumexp函数
 def logsumexp(log_p, axis=1, keepdims=False):
-    #max_val = np.max(log_p, axis=axis, keepdims=True)
-    #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims=keepdims))
-    """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理"""
+    """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理
+    数学原理：log(sum(exp(log_p))) = max(log_p) + log(sum(exp(log_p - max(log_p))))
+    该技巧通过减去最大值避免指数运算时的数值溢出或下溢
+    """
     log_p = np.asarray(log_p)
     
     # 处理空输入情况
@@ -69,7 +69,11 @@ def logsumexp(log_p, axis=1, keepdims=False):
 
 # 高斯混合模型类
 class GaussianMixtureModel:
-    """高斯混合模型(GMM)实现"""
+    """高斯混合模型(GMM)实现，使用期望最大化(EM)算法进行参数估计
+    模型假设：数据由K个多元高斯分布混合生成，即：
+    p(x) = Σ_{k=1}^K π_k * N(x|μ_k, Σ_k)
+    其中，π_k是混合系数(权重)，μ_k和Σ_k分别是第k个高斯分布的均值和协方差矩阵
+    """
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
         
         # 初始化模型参数
@@ -78,7 +82,12 @@ class GaussianMixtureModel:
         self.tol = tol                    # 收敛阈值
     
     def fit(self, X):
-        """使用EM算法训练模型"""
+        """使用EM算法训练模型
+        EM算法分为两个步骤迭代进行：
+        1. E步：根据当前参数计算隐变量(各样本属于每个高斯成分的概率)
+        2. M步：根据隐变量更新模型参数(π, μ, Σ)
+        重复这两个步骤直到收敛
+        """
         n_samples, n_features = X.shape
         
         # 初始化混合系数（均匀分布）
@@ -92,45 +101,60 @@ class GaussianMixtureModel:
 
         log_likelihood = -np.inf  # 初始化对数似然值为负无穷
         for iter in range(self.max_iter): # 开始EM算法的主循环
-            # E步：计算后验概率
-
+            # E步：计算后验概率（也称为"响应度"）
+            # 对于每个样本x_i，计算它属于每个高斯成分k的概率γ_{i,k} = P(z_i=k|x_i;θ)
+            
             log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵，形状为(样本数 × 成分数)
             for k in range(self.n_components): # 遍历每个高斯成分
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯分布的对数概率密度
+                # 计算第k个高斯分布的对数概率密度：log[π_k * N(x|μ_k,Σ_k)]
+                # 这里拆分为两部分：混合权重的对数 + 高斯概率密度的对数
+                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) 
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True) # 使用logsumexp实现数值稳定的概率求和
             gamma = np.exp(log_prob - log_prob_sum) # 计算后验概率矩阵gamma(也称为响应度矩阵)
-
-            # M步：更新参数
+            # 这里使用了对数概率的减法，等价于：gamma = exp(log_prob) / sum(exp(log_prob))
+            
+            # M步：更新参数（基于当前后验概率重新估计模型参数）
             Nk = np.sum(gamma, axis=0) # 计算每个高斯成分的"有效样本数"（即属于该成分的样本概率之和）
             self.pi = Nk / n_samples # 更新混合权重π：各成分的样本占比
+            
             new_mu = np.zeros_like(self.mu) # 初始化新均值和新协方差矩阵的存储空间
             new_sigma = np.zeros_like(self.sigma)
             
             for k in range(self.n_components): # 遍历每个高斯成分更新参数
-                # 更新均值
-
+                # 更新均值：加权平均，权重为后验概率gamma
+                # 公式：μ_k = (Σ_i γ_{i,k} * x_i) / N_k
                 new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
-                # 更新协方差
-
-                X_centered = X - new_mu[k]
-                weighted_X = gamma[:, k, None] * X_centered
-                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]
-                new_sigma[k] += np.eye(n_features) * 1e-6  # 正则化
+                
+                # 更新协方差矩阵
+                # 公式：Σ_k = (Σ_i γ_{i,k} * (x_i-μ_k)(x_i-μ_k)^T) / N_k
+                X_centered = X - new_mu[k]  # 中心化：每个样本减去当前估计的均值
+                weighted_X = gamma[:, k, None] * X_centered  # 加权：每个样本乘以其属于该成分的概率
+                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]  # 计算加权协方差矩阵
+                new_sigma[k] += np.eye(n_features) * 1e-6  # 添加小的正则化项，确保协方差矩阵正定
             
-            # 计算对数似然
+            # 计算对数似然（用于判断收敛）
+            # 对数似然：log P(X|θ) = Σ_i log[Σ_k π_k * N(x_i|μ_k,Σ_k)]
             current_log_likelihood = np.sum(log_prob_sum)
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
-                break
+                break  # 对数似然变化小于阈值时，认为算法收敛
             log_likelihood = current_log_likelihood
             
+            # 更新模型参数为新估计值
             self.mu = new_mu
             self.sigma = new_sigma
         
-        # 计算最终聚类结果
+        # 计算最终聚类结果：每个样本分配给概率最大的成分
         self.labels_ = np.argmax(gamma, axis=1)
         return self
 
     def _log_gaussian(self, X, mu, sigma):
+        """计算多元高斯分布的对数概率密度
+        数学公式：log N(x|μ,Σ) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^TΣ^(-1)(x-μ)
+        其中：
+        - D是特征维度
+        - |Σ|是协方差矩阵的行列式
+        - (x-μ)^TΣ^(-1)(x-μ)是马氏距离的平方
+        """
         # 获取特征维度数量
         n_features = mu.shape[0]
 
@@ -173,6 +197,7 @@ if __name__ == "__main__":
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
+    
     plt.subplot(1, 2, 2)
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
     plt.title("GMM Predicted Clusters") # 子图标题
