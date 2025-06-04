@@ -47,9 +47,12 @@ class myModel:
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
         #logits = None
         #return logits
-        x = tf.reshape(x, [-1, 784])          # 展平为[batch_size, 784]
-        h = tf.nn.relu(x @ self.W1 + self.b1) # 隐藏层+ReLU
-        logits = h @ self.W2 + self.b2         # 输出层（未归一化）
+        # 展平为[batch_size, 784]
+        x = tf.reshape(x, [-1, 784])
+        # 隐藏层+ReLU
+        h = tf.nn.relu(x @ self.W1 + self.b1) 
+        # 输出层（未归一化）
+        logits = h @ self.W2 + self.b2         
         return logits
         
 model = myModel()
