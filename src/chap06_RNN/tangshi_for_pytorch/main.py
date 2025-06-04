@@ -135,29 +135,50 @@ def process_poems2(file_name):
     return poems_vector, word_int_map, words
 
 def generate_batch(batch_size, poems_vec, word_to_int):
-    n_chunk = len(poems_vec) // batch_size
-    x_batches = []
-    y_batches = []
+    """
+    生成训练所需的批次数据（x_batches 和 y_batches）
+
+    参数:
+    - batch_size: 每个批次的样本数（即每次喂给模型多少首诗）
+    - poems_vec: 所有诗歌的索引表示（列表形式，里面是每首诗的词索引序列）
+    - word_to_int: 词到索引的映射字典（未在本函数中使用，但一般可用于逆映射）
+
+    返回:
+    - x_batches: 输入数据批次，每个元素是一个形状为 (batch_size, seq_len) 的输入序列列表
+    - y_batches: 目标数据批次，每个元素是对应输入的下一个词序列（即标签）
+    """
+
+    n_chunk = len(poems_vec) // batch_size  # 计算可以划分成多少完整的 batch（整除部分）
+
+    x_batches = []  # 用于存储所有输入批次
+    y_batches = []  # 用于存储所有目标批次
+
     for i in range(n_chunk):
         start_index = i * batch_size
         end_index = start_index + batch_size
+
+        # 从诗歌向量集中取出一个 batch 的诗句（每首诗是一个词索引列表）
         x_data = poems_vec[start_index:end_index]
+
         y_data = []
         for row in x_data:
-            y  = row[1:]
-            y.append(row[-1])
+            # 构造目标序列 y：将原序列向后偏移一位，并补上最后一个词（常用于语言模型预测下一个词）
+            y = row[1:]          # 将序列右移一位
+            y.append(row[-1])    # 最后一个词复制一份填充，确保长度一致
             y_data.append(y)
+
         """
+        示例：
         x_data             y_data
-        [6,2,4,6,9]       [2,4,6,9,9]
+        [6,2,4,6,9]       [2,4,6,9,9]  # 下一个词的预测目标
         [1,4,2,8,5]       [4,2,8,5,5]
         """
-        # print(x_data[0])
-        # print(y_data[0])
-        # exit(0)
+
         x_batches.append(x_data)
         y_batches.append(y_data)
+
     return x_batches, y_batches
+
 
 
 def run_training():
