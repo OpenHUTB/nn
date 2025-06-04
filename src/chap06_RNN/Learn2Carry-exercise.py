@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 # coding: utf-8
+
 # # 加法进位实验
+#
+
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
 
 # In[1]:
-#导入了多个用于构建和训练深度学习模型的Python库和模块
+
+
 import numpy as np
 import tensorflow as tf
 import collections
@@ -16,11 +20,14 @@ import os,sys,tqdm
 
 # ## 数据生成
 # 我们随机在 `start->end`之间采样除整数对`(num1, num2)`，计算结果`num1+num2`作为监督信号。
+#
 # * 首先将数字转换成数字位列表 `convertNum2Digits`
 # * 将数字位列表反向
 # * 将数字位列表填充到同样的长度 `pad2len`
+#
 
 # In[2]:
+
 
 def gen_data_batch(batch_size, start, end):
     '''在(start, end)区间采样生成一个batch的整型的数据
@@ -29,21 +36,16 @@ def gen_data_batch(batch_size, start, end):
         start: 开始数值
         end: 结束数值
     '''
-    #使用 numpy.random.randint 函数生成两个随机整数数组
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
-    #计算两个随机整数数组 numbers_1 和 numbers_2 的逐元素和，并将结果存储在 results 中
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
-    #将整数 Num 转换为字符串形式
     strNum = str(Num)
-    #将字符串 strNum 转换为一个字符列表
     chNums = list(strNum)
-    #使用列表推导式将字符串中的每个字符转换为整数，生成一个整数列表
     digitNums = [int(o) for o in strNum]
     return digitNums
 
@@ -84,98 +86,81 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
-    
+
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
-    
+
     Nums1 = [pad2len(o, maxlen) for o in Nums1]
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
-    
+
     return Nums1, Nums2, results
+
 
 # # 建模过程， 按照图示完成建模
 
 # In[3]:
 
+
 class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
-        self.embed_layer = tf.keras.layers.Embedding(10, 32, 
+        self.embed_layer = tf.keras.layers.Embedding(10, 32,
                                                     batch_input_shape=[None, None])
-        
+
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
         self.dense = tf.keras.layers.Dense(10)
-        
+
     @tf.function
     def call(self, num1, num2):
         '''
         此处完成上述图中模型
         '''
-         # 输入形状: (batch_size, maxlen)
-        embedded_num1 = self.embed_layer(num1)  # (batch_size, maxlen, 32)
-        embedded_num2 = self.embed_layer(num2)  # (batch_size, maxlen, 32)
-        
-        # 特征融合：将两个数字的嵌入表示相加
-        combined_features = tf.add(embedded_num1, embedded_num2)
-        
-        # RNN处理序列依赖
-        rnn_outputs = self.rnn_layer(combined_features)  # (batch_size, maxlen, 64)
-        
-        # 全连接层输出每个位置的数字预测（0-9）
-        logits = self.dense(rnn_outputs)  # (batch_size, maxlen, 10)
         return logits
-        
+
+
 # In[4]:
+
+
 @tf.function
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
-    return tf.reduce_mean(losses)## 使用交叉熵损失函数来计算每个样本的损失
+    return tf.reduce_mean(losses)
 
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
     with tf.GradientTape() as tape:
-        logits = model(x, y)       #前向传播：计算输出 logits
+        logits = model(x, y)
         loss = compute_loss(logits, label)
 
     # compute gradient
-    grads = tape.gradient(loss, model.trainable_variables)#计算梯度，自动求导
+    grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
 
 def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
-    # 训练循环，执行指定步数
-for step in range(steps):
-    # 生成批量数据（200个样本），数值范围0-555555555
-    datas = gen_data_batch(batch_size=200, start=0, end=555555555)
-    
-    # 准备训练数据：两个数字序列和结果，统一填充到长度11
-    Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    
-    # 单步训练：将数据转为Tensor，计算并返回损失
-    loss = train_one_step(model, optimizer, 
-                          tf.constant(Nums1, dtype=tf.int32),
-                          tf.constant(Nums2, dtype=tf.int32),
-                          tf.constant(results, dtype=tf.int32))
-    
-    # 每50步打印当前损失
-    if step % 50 == 0:
-        print('step', step, ': loss', loss.numpy())
+    for step in range(steps):
+        datas = gen_data_batch(batch_size=200, start=0, end=555555555)
+        Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
+                              tf.constant(Nums2, dtype=tf.int32),
+                              tf.constant(results, dtype=tf.int32))
+        if step%50 == 0:
+            print('step', step, ': loss', loss.numpy())
 
-return loss  # 返回最终损失值
+    return loss
 
 def evaluate(model):
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    # 前向传播预测 logits
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1) # 每位取最大概率的数字
+    pred = np.argmax(logits, axis=-1)
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
         print(o[0], o[1], o[0]==o[1])
@@ -185,17 +170,19 @@ def evaluate(model):
 
 # In[5]:
 
+
 optimizer = optimizers.Adam(0.001)
 model = myRNNModel()
 
 
 # In[6]:
 
+
 train(3000, model, optimizer)
 evaluate(model)
 
 
-# In[7]:
+# In[11]:
 
 
 
