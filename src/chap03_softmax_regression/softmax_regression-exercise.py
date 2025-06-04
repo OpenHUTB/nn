@@ -73,7 +73,7 @@ np.random.shuffle(data_set)
 # In[1]:
 
 
-epsilon = 1e-12  # 防止 log(0)
+epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 
 class SoftmaxRegression(tf.Module):
@@ -85,6 +85,7 @@ class SoftmaxRegression(tf.Module):
         """
         super().__init__()
         # 初始化权重 W 和偏置 b
+        # 使用均匀分布随机初始化
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
             name="W",
@@ -100,7 +101,9 @@ class SoftmaxRegression(tf.Module):
         :param x: 输入数据，shape = (N, input_dim)
         :return: softmax 概率分布，shape = (N, num_classes)
         """
+        #计算线性变换
         logits = tf.matmul(x, self.W) + self.b
+        #应用softmax函数，将logits转换为概率分布
         return tf.nn.softmax(logits)
 
 
