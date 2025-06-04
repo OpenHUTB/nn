@@ -3,11 +3,16 @@
 # ## 准备数据
 # In[1]:
 
+# 导入操作系统接口模块，提供与操作系统交互的功能
 import os
+# 导入NumPy数值计算库，用于高效处理多维数组和矩阵运算
 import numpy as np
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
 import numpy as np
+# 从TensorFlow中导入Keras高级API
 from tensorflow import keras
+# 从Keras中导入常用模块
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
