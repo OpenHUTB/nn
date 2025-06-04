@@ -17,13 +17,11 @@ def mnist_dataset():
     #normalize
     x = x/255.0
     x_test = x_test/255.0
-    
     return (x, y), (x_test, y_test)
 
 # ## Demo numpy based auto differentiation
 # In[3]:
 import numpy as np
-
 # 定义矩阵乘法层
 class Matmul:
     def __init__(self):
@@ -123,7 +121,6 @@ class Log:
         x: shape(N, c)
         '''
         out = np.log(x+self.epsilon)
-        
         self.mem['x'] = x
         return out
     
