@@ -59,12 +59,15 @@ class SVM():
         训练 SVM 模型。
         :param data_train: 包含特征和标签的 NumPy 数组，形状为 (n_samples, n_features + 1)
         """
-        X = data_train[:, :-1] #从data_train中提取特征矩阵X
+         #从data_train中提取特征矩阵X
+        X = data_train[:, :-1]
         y = np.where(data_train[:, -1] == 0, -1, 1) #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
         y = data_train[:, -1] #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
 
-        n_samples, n_features = X.shape #获取样本数量和特征数量
-        self.w = np.zeros(n_features) #初始化权重向量w为零向量
+        #获取样本数量和特征数量
+        n_samples, n_features = X.shape 
+        #初始化权重向量w为零向量
+        self.w = np.zeros(n_features) 
         self.b = 0
 
         for epoch in range(self.epochs):
@@ -84,15 +87,14 @@ class SVM():
             if np.linalg.norm(self.lr * dw) < self.tolerance:
                 break
     
-        # 请补全此处代码
     def predict(self, x):
         """
         预测标签
         """
-        # 请补全此处代码
         # 计算决策函数值
         if x.ndim == 1:
-           x = np.expand_dims(x, axis=0)  # 处理单样本输入
+            # 处理单样本输入
+           x = np.expand_dims(x, axis=0)  
         decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, -1)
@@ -101,7 +103,8 @@ if __name__ == '__main__':
     # 载入数据，实际使用时将x替换为具体名称
     train_file = 'data/train_linear.txt'
     test_file = 'data/test_linear.txt'
-    data_train = load_data(train_file)  # 数据格式[x1, x2, t]
+    # 数据格式[x1, x2, t]
+    data_train = load_data(train_file)  
     data_test = load_data(test_file)
 
     #print(data_train[:1000])  # 查看前5行数据
@@ -112,11 +115,16 @@ if __name__ == '__main__':
 
     # 使用SVM模型预测标签
     x_train = data_train[:, :2]  # feature [x1, x2]
-    t_train = data_train[:, 2]  # 真实标签
-    t_train_pred = svm.predict(x_train)  # 预测标签
-    x_test = data_test[:, :2]  # 提取测试集特征（x1, x2）
-    t_test = data_test[:, 2] # 提取测试集真实标签
-    t_test_pred = svm.predict(x_test) # 对测试集进行预测，得到预测标签
+     # 真实标签
+    t_train = data_train[:, 2] 
+     # 预测标签
+    t_train_pred = svm.predict(x_train) 
+    # 提取测试集特征（x1, x2）
+    x_test = data_test[:, :2]  
+    # 提取测试集真实标签
+    t_test = data_test[:, 2] 
+    # 对测试集进行预测，得到预测标签
+    t_test_pred = svm.predict(x_test) 
 
     # 评估结果，计算准确率
     acc_train = eval_acc(t_train, t_train_pred)
