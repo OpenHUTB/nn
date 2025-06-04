@@ -39,7 +39,10 @@ train_loader = Data.DataLoader(
 )
 
 # 加载测试数据集
-test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)  # 加载测试集
+# torchvision.datasets.MNIST用于加载MNIST数据集
+# root='./mnist/'指定数据集的存储路径
+# train=False表示加载测试集（而不是训练集）
+test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
 # 预处理测试数据：转换为Variable，调整维度，归一化，只取前500个样本
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为numpy数组
@@ -113,9 +116,9 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)  # 前向传播得到预测结果
             loss = loss_func(output, y)  # 计算损失
-            optimizer.zero_grad()  # 清空梯度
-            loss.backward()  # 反向传播计算梯度
-            optimizer.step()  # 更新参数
+            optimizer.zero_grad(set_to_none=True)  # 更高效的梯度清零方式
+            loss.backward()
+            optimizer.step()
             
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:

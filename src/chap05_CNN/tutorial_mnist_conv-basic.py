@@ -1,11 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ## 准备数据
-
 # In[29]:
-
-
+#导入了用于构建和训练卷积神经网络（CNN）的TensorFlow和Keras模块
 import os
 import tensorflow as tf
 from tensorflow import keras
@@ -14,20 +11,20 @@ from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
-def mnist_dataset():
+#构建 MNIST 手写数字数据集的 TensorFlow 数据加载管道，包含数据预处理、批处理和随机打乱等操作
+def mnist_dataset():#加载MNIST数据集
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28,1)
     
-    ds = tf.data.Dataset.from_tensor_slices((x, y))
-    ds = ds.map(prepare_mnist_features_and_labels)
-    ds = ds.take(20000).shuffle(20000).batch(32)
+    ds = tf.data.Dataset.from_tensor_slices((x, y))#从numpy数组创建Dataset
+    ds = ds.map(prepare_mnist_features_and_labels)#应用预处理函数
+    ds = ds.take(20000).shuffle(20000).batch(32)#取20000样本，打乱，分32的batch
     
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
-    return ds, test_ds
+    return ds, test_ds#测试集整批处理
 
 def prepare_mnist_features_and_labels(x, y):
     x = tf.cast(x, tf.float32) / 255.0
@@ -36,10 +33,6 @@ def prepare_mnist_features_and_labels(x, y):
 
 
 # In[ ]:
-
-
-
-
 
 # ## 建立模型
 
@@ -52,7 +45,7 @@ class myConvModel(keras.Model):
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')#定义第一层卷积层,有32个过滤器,每个过滤器大小为5x5,使用ReLU激活函数
         self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')#第二层卷积层
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)#池化层
-        self.flat = Flatten()
+        self.flat = Flatten() # 展平层：将多维张量转为一维向量
         self.dense1 = layers.Dense(100, activation='tanh')#全连接层,有100个神经元,使用tanh激活函数
         self.dense2 = layers.Dense(10)#输出层,有10个神经元
     @tf.function

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # Logistic Regression Example
-
 # ### 生成数据集， 看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
@@ -15,6 +13,10 @@ from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
+
+# 设置随机种子（确保结果可复现）
+np.random.seed(42)      # NumPy的随机种子
+tf.random.set_seed(42)  # TensorFlow的随机种子
 
 # 确保在Jupyter Notebook中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -54,16 +56,15 @@ np.random.shuffle(data_set)
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
-# 
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
 # In[37]:
-
 # 防止对数运算出现数值不稳定问题，添加一个极小值
 epsilon = 1e-12
 class LogisticRegression():
     def __init__(self):
         #正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
         # L2正则化，防止过拟合，正则化系数为0.01
+        # L2正则化通过对权重施加平方惩罚项来防止权重过大
         l2_reg = tf.keras.regularizers.l2(0.01)
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(initial_value=tf.random.uniform(shape=[2, 1], minval=-0.1, maxval=0.1), regularizer=l2_reg)
@@ -80,7 +81,9 @@ class LogisticRegression():
         pred = tf.nn.sigmoid(logits)
         return pred
 # 使用tf.function将该方法编译为静态图，提高执行效率
+#以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
 @tf.function
+
 def compute_loss(pred, label):
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
@@ -170,17 +173,16 @@ C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
 # 创建一个空的散点对象，用于绘制负样本
 C2_dots, = ax.plot([], [], 'o', c='g' ,label='actual_dots')
 
-
 # 创建一个文本对象，用于显示训练的信息
 frame_text = ax.text(0.02, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
 # ax.legend()
 
 # 初始化函数，用于清空图形上的线条和散点数据
 def init():
-    line_d.set_data([],[])
-    C1_dots.set_data([],[])
-    C2_dots.set_data([],[])
-    return (line_d,) + (C1_dots,) + (C2_dots,)
+    line_d.set_data([],[])#初始化动态线数据为空列表
+    C1_dots.set_data([],[])#初始化C1点集数据为空列表
+    C2_dots.set_data([],[])#初始化C2点集数据为空列表
+    return (line_d,) + (C1_dots,) + (C2_dots,)#返回包含所有图形对象的元组
 
 # 动画更新函数，根据训练过程中的参数绘制拟合直线、样本点和更新训练信息文本
 def animate(i):
@@ -190,7 +192,7 @@ def animate(i):
     c = animation_frames[i][2]     # b
     yy = a/-b * xx +c/-b         # 根据公式计算 y = (a/-b) * x + (c/-b)，即直线的表达式
     line_d.set_data(xx, yy)      # 更新直线的数据
-      # 更新第一组点（C1）的数据
+    # 更新第一组点（C1）的数据
     C1_dots.set_data(C1[:, 0], C1[:, 1])  # C1[:, 0] 是 x 坐标，C1[:, 1] 是 y 坐标
     C2_dots.set_data(C2[:, 0], C2[:, 1])  # C2[:, 0] 是 x 坐标，C2[:, 1] 是 y 坐标
     
@@ -198,7 +200,7 @@ def animate(i):
     
     return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象，以便 Matplotlib 动画知道要更新哪些部分
 
-# 创建动画对象，设置动画的参数
+# 创建动画对象 anim，使用 matplotlib.animation.FuncAnimation 函数生成动态动画
 anim = animation.FuncAnimation(f, animate, init_func=init,
                                frames=len(animation_frames), interval=30, blit=True)
 
