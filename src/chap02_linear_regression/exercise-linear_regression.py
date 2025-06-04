@@ -42,8 +42,6 @@ def identity_basis(x):
 # 请分别在这里实现“多项式基函数”（Multinomial Basis Function）以及“高斯基函数”（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
-
-
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
