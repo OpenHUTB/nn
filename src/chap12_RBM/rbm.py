@@ -12,26 +12,26 @@ class RBM:
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
-        if n_hidden <= 0 or n_observe <= 0:
-            raise ValueError("Number of hidden and visible units must be positive integers.")
+        """
+        参数说明：
+        n_observe (int): 可见层（输入层）神经元的数量，即输入特征维度
+        n_hidden (int): 隐藏层神经元的数量
+        """
 
-        self.n_hidden = n_hidden
-        self.n_observe = n_observe
-        
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden)) #计算权重的初始化标准差
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden)) #初始化权重矩阵 self.W
-        #self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-        self.b_h = np.zeros(n_hidden) #初始化隐藏层的偏置向量 self.b_h
-        self.b_v = np.zeros(n_observe) #初始化输出层的偏置向量 self.b_v
         self.n_hidden = n_hidden     # 隐藏层神经元个数
-        self.n_observe = n_observe    # 可见层神经元个数
-        
+        self.n_observe = n_observe   # 可见层神经元个数
+
         # 初始化权重和偏置
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))     # Xavier初始化
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 权重矩阵
-        # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))  # 另一种初始化方式
-        self.b_h = np.zeros(n_hidden)   # 隐藏层偏置
-        self.b_v = np.zeros(n_observe)  # 可见层偏置
+        # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
+        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
+
+        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 初始化权重矩阵（可见层 -> 隐藏层）
+
+        # 可选替代方案：使用更小的固定标准差进行初始化
+        # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
+
+        self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
+        self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
         pass
     
     def _sigmoid(self, x):
