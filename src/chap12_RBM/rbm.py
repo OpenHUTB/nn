@@ -32,7 +32,7 @@ class RBM:
 
         self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
         self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
-        pass
+        # pass
     
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
