@@ -47,8 +47,8 @@ class RBM:
     
         # 请补全此处代码
          # 将数据展平为二维数组 [n_samples, n_observe]
-        data_flat = data.reshape(data.shape[0], -1)
-        n_samples = data_flat.shape[0]
+        data_flat = data.reshape(data.shape[0], -1)  
+        n_samples = data_flat.shape[0]  # 样本数量
         
         # 定义训练参数
         learning_rate = 0.1 # 学习率，控制参数更新的步长

@@ -139,7 +139,7 @@ class GaussianMixtureModel:
             self.sigma, new_sigma	当前模型的协方差 / 更新后的协方差
             '''
             current_log_likelihood = np.sum(log_prob_sum)       # 计算当前轮的总对数似然
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
+            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: 
                 break
             log_likelihood = current_log_likelihood
             
@@ -147,7 +147,7 @@ class GaussianMixtureModel:
             self.sigma = new_sigma
         
         # 计算最终聚类结果
-        self.labels_ = np.argmax(gamma, axis=1)
+        self.labels_ = np.argmax(gamma, axis=1) # 返回每个样本所属的聚类
         return self
 
     def _log_gaussian(self, X, mu, sigma):
