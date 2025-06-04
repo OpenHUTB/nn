@@ -9,7 +9,6 @@ class RBM:
     def __init__(self, n_hidden=2, n_observe=784):
         """初始化模型参数（受限玻尔兹曼机）"""
 
-        # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
         if n_hidden <= 0 or n_observe <= 0:
@@ -17,14 +16,19 @@ class RBM:
 
         self.n_hidden = n_hidden
         self.n_observe = n_observe
-        
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden)) #计算权重的初始化标准差
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden)) #初始化权重矩阵 self.W
+         #计算权重的初始化标准差
+        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))
+        #初始化权重矩阵 self.W
+        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden)) 
         #self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-        self.b_h = np.zeros(n_hidden) #初始化隐藏层的偏置向量 self.b_h
-        self.b_v = np.zeros(n_observe) #初始化输出层的偏置向量 self.b_v
-        self.n_hidden = n_hidden     # 隐藏层神经元个数
-        self.n_observe = n_observe    # 可见层神经元个数
+        #初始化隐藏层的偏置向量 self.b_h
+        self.b_h = np.zeros(n_hidden) 
+         #初始化输出层的偏置向量 self.b_v
+        self.b_v = np.zeros(n_observe)
+         # 隐藏层神经元个数
+        self.n_hidden = n_hidden  
+        # 可见层神经元个数
+        self.n_observe = n_observe    
         
         # 初始化权重和偏置
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))     # Xavier初始化
@@ -51,18 +55,24 @@ class RBM:
         n_samples = data_flat.shape[0]
         
         # 定义训练参数
-        learning_rate = 0.1 # 学习率，控制参数更新的步长
-        epochs = 10 # 训练轮数，整个数据集将被遍历10次v
-        batch_size = 100 # 批处理大小，每次更新参数使用的样本数量
+        # 学习率，控制参数更新的步长
+        learning_rate = 0.1 
+         # 训练轮数，整个数据集将被遍历10次v
+        epochs = 10
+        # 批处理大小，每次更新参数使用的样本数量
+        batch_size = 100 
 
        # 开始训练轮数
         for epoch in range(epochs):
             # 打乱数据顺序
-            np.random.shuffle(data_flat) # 使用小批量梯度下降法
-            for i in range(0, n_samples, batch_size):# 获取当前批次的数据
-                batch = data_flat[i:i + batch_size] # 将批次数据转换为float64类型，确保数值计算的精度
-                v0 = batch.astype(np.float64)  # 确保数据类型正确
-
+            # 使用小批量梯度下降法
+            np.random.shuffle(data_flat) 
+            # 获取当前批次的数据
+            for i in range(0, n_samples, batch_size):
+                # 将批次数据转换为float64类型，确保数值计算的精度
+                batch = data_flat[i:i + batch_size] 
+                # 确保数据类型正确
+                v0 = batch.astype(np.float64)  
                 # 正相传播：从v0计算隐藏层激活概率
                 h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h)
                 h0_sample = self._sample_binary(h0_prob)
