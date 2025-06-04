@@ -39,7 +39,7 @@ class Matmul:
         # 前向传播：执行矩阵乘法，计算 h = x @ W
         h = np.matmul(x, W)
         # 缓存输入 x 和 权重 W，以便在反向传播中计算梯度
-        self.mem={'x': x, 'W':W}
+        self.mem = {'x': x, 'W':W}
         # 缓存输入 x 和 权重 W，以便在反向传播中计算梯度
         return h
     
@@ -65,7 +65,8 @@ class Relu:
         self.mem = {}
         #初始化记忆字典，用于存储前向传播的输入
     def forward(self, x):
-        self.mem['x']=x#保存输入x，供反向传播使用
+        #保存输入x，供反向传播使用
+        self.mem['x'] = x
         return np.where(x > 0, x, np.zeros_like(x))
     #ReLU激活函数：x>0时输出x，否则输出0
     def backward(self, grad_y):
