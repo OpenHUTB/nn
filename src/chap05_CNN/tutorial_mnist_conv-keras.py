@@ -4,8 +4,6 @@
 # ## 准备数据
 
 # In[1]:
-
-
 import os
 import tensorflow as tf
 from tensorflow import keras
@@ -25,19 +23,24 @@ def mnist_dataset():
     
     # 创建训练数据集对象
     ds = tf.data.Dataset.from_tensor_slices((x, y))
-    ds = ds.map(prepare_mnist_features_and_labels)  # 特征处理
-    ds = ds.take(20000).shuffle(20000).batch(100)   # 随机打乱并分批
+    # 特征处理
+    ds = ds.map(prepare_mnist_features_and_labels)  
+    # 随机打乱并分批
+    ds = ds.take(20000).shuffle(20000).batch(100)   
 
     # 创建测试数据集对象
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)  # 批量评估使用大批次
+    # 批量评估使用大批次
+    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)  
     return ds, test_ds
 
 # 特征归一化并转换标签类型
 def prepare_mnist_features_and_labels(x, y):
-    x = tf.cast(x, tf.float32) / 255.0  # 像素值归一化到 0~1
-    y = tf.cast(y, tf.int64)            # 标签转为 int64 类型
+    # 像素值归一化到 0~1
+    x = tf.cast(x, tf.float32) / 255.0  
+     # 标签转为 int64 类型
+    y = tf.cast(y, tf.int64)           
     return x, y
 
 
@@ -76,7 +79,8 @@ class myConvModel(keras.Model):
 
 # 创建模型和优化器
 model = myConvModel()
-optimizer = optimizers.Adam()  # 使用 Adam 优化器
+# 使用 Adam 优化器
+optimizer = optimizers.Adam()  
 
 
 # ## 编译， fit以及evaluate
@@ -85,8 +89,10 @@ optimizer = optimizers.Adam()  # 使用 Adam 优化器
 
 # 编译模型，设置损失函数和评价指标
 model.compile(optimizer=optimizer,
-              loss='sparse_categorical_crossentropy',  # 稀疏交叉熵损失
-              metrics=['accuracy'])                    # 评估准确率
+              # 稀疏交叉熵损失
+              loss='sparse_categorical_crossentropy',  
+               # 评估准确率
+              metrics=['accuracy'])                   
 
 # 获取训练集和测试集
 train_ds, test_ds = mnist_dataset()
@@ -96,8 +102,6 @@ model.fit(train_ds, epochs=5)
 
 # 在测试集上评估模型性能
 model.evaluate(test_ds)
-
-
 # In[ ]:
 
 
