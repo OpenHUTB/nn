@@ -113,7 +113,13 @@ class GaussianMixtureModel:
                 # 更新协方差
 
                 X_centered = X - new_mu[k]
+                # 计算每个样本与当前第k个聚类中心的差值（中心化数据）
+                # X_centered的形状为 [n_samples, n_features]
                 weighted_X = gamma[:, k, None] * X_centered
+                # 计算加权后的中心化数据
+                # gamma[:, k, None] 将gamma的第k列转换为列向量 [n_samples, 1]
+                # 通过广播机制与X_centered相乘，实现每个样本按属于第k类的概率进行加权
+                # weighted_X的形状为 [n_samples, n_features]
                 new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]
                 new_sigma[k] += np.eye(n_features) * 1e-6  # 正则化
             
