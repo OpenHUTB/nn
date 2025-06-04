@@ -6,7 +6,7 @@ class RL_QG_agent:
     def __init__(self):
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
     #    pass    # 删掉这句话，并填写相应代码
-        #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
+        #初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
         os.makedirs(self.model_dir, exist_ok=True)
         self.sess = None
         self.saver = None
@@ -15,9 +15,9 @@ class RL_QG_agent:
 
     def init_model(self):
 
-        # 定义自己的 网络
+        # 定义自己的网络
         self.sess = tf.Session()
-        # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
+        # 定义输入状态，假设为8x8棋盘，3个通道
         self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name="input_states")
         # 构建卷积神经网络
         conv1 = tf.layers.conv2d(inputs=self.input_states, filters=32, kernel_size=3, padding="same", activation=tf.nn.relu)
@@ -34,7 +34,7 @@ class RL_QG_agent:
         # 补全代码
         
     def place(self,state,enables):
-        # 这个函数 主要用于测试， 返回的 action是 0-63 之间的一个数值，
+        # 用于测试的函数，返回的action是 0-63 之间的一个数值，
         # action 表示的是 要下的位置。
        # action = 123456789    # 删掉这句话，并填写相应代码
        # 状态预处理
