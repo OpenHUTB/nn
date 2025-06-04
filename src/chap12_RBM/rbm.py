@@ -14,7 +14,6 @@ class RBM:
         #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
         if n_hidden <= 0 or n_observe <= 0:
             raise ValueError("Number of hidden and visible units must be positive integers.")
-
         self.n_hidden = n_hidden
         self.n_observe = n_observe
         
@@ -45,7 +44,6 @@ class RBM:
     def train(self, data):
         """使用Contrastive Divergence算法对模型进行训练"""
     
-        # 请补全此处代码
          # 将数据展平为二维数组 [n_samples, n_observe]
         data_flat = data.reshape(data.shape[0], -1)
         n_samples = data_flat.shape[0]
