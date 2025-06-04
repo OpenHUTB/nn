@@ -11,11 +11,13 @@ import torchvision  # 包含常用的数据集和模型
 import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
 import numpy as np
 
+
 # 设置超参数
 learning_rate = 1e-4  # 学习率
 keep_prob_rate = 0.7  # Dropout保留神经元的比例
 max_epoch = 3  # 训练的总轮数
 BATCH_SIZE = 50  # 每批训练数据的大小
+
 
 # 检查是否需要下载MNIST数据集
 DOWNLOAD_MNIST = False
@@ -30,6 +32,7 @@ train_data = torchvision.datasets.MNIST(
     transform=torchvision.transforms.ToTensor(),  # 将图像转换为Tensor并归一化到[0,1]
     download=DOWNLOAD_MNIST  # 如果需要则下载
 )
+
 
 # 创建数据加载器，用于批量加载数据
 train_loader = Data.DataLoader(
