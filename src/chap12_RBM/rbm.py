@@ -33,6 +33,7 @@ class RBM:
         self.b_h = np.zeros(n_hidden)   # 隐藏层偏置
         self.b_v = np.zeros(n_observe)  # 可见层偏置
         pass
+    
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
         return 1.0 / (1 + np.exp(-x))
@@ -40,6 +41,7 @@ class RBM:
     def _sample_binary(self, probs):
         """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）"""
         return np.random.binomial(1, probs)
+    
     def train(self, data):
         """使用Contrastive Divergence算法对模型进行训练"""
     
@@ -49,16 +51,16 @@ class RBM:
         n_samples = data_flat.shape[0]
         
         # 定义训练参数
-        learning_rate = 0.1
-        epochs = 10
-        batch_size = 100
+        learning_rate = 0.1 # 学习率，控制参数更新的步长
+        epochs = 10 # 训练轮数，整个数据集将被遍历10次v
+        batch_size = 100 # 批处理大小，每次更新参数使用的样本数量
 
        # 开始训练轮数
         for epoch in range(epochs):
             # 打乱数据顺序
-            np.random.shuffle(data_flat)
-            for i in range(0, n_samples, batch_size):
-                batch = data_flat[i:i + batch_size]
+            np.random.shuffle(data_flat) # 使用小批量梯度下降法
+            for i in range(0, n_samples, batch_size):# 获取当前批次的数据
+                batch = data_flat[i:i + batch_size] # 将批次数据转换为float64类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率

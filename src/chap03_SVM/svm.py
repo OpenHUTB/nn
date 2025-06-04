@@ -46,7 +46,6 @@ class SVM():
     """SVM模型"""
     #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self, lr=0.001, epochs=1000, lambda_=0.001, tolerance=1e-3):
-        # 补全此处代码
         self.w = None  # w: 权重向量(决定分类超平面的方向)
         self.b = 0     # b: 偏置项(决定分类超平面的位置)
         self.lr = lr   # 学习率
@@ -54,7 +53,6 @@ class SVM():
         self.lambda_ = lambda_  # 正则化参数
         self.tolerance = tolerance  # 提前停止的阈值
         pass
-    
 
     def train(self, data_train):
         """
@@ -85,8 +83,8 @@ class SVM():
             # 提前停止：权重更新变化太小
             if np.linalg.norm(self.lr * dw) < self.tolerance:
                 break
+    
         # 请补全此处代码
-
     def predict(self, x):
         """
         预测标签
@@ -98,7 +96,6 @@ class SVM():
         decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
         # 返回预测标签（0或1）
         return np.where(decision_values >= 0, 1, -1)
-
 
 if __name__ == '__main__':
     # 载入数据，实际使用时将x替换为具体名称
