@@ -116,19 +116,19 @@ class mySeq2SeqModel(keras.Model):
     
     @tf.function
     def encode(self, enc_ids):
-        enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)
-        enc_out, enc_state = self.encoder(enc_emb)
+        enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)，通过嵌入层将token ID转换为词向量，输出形状: (batch_size, sequence_length, embedding_size)
+        enc_out, enc_state = self.encoder(enc_emb)# 使用编码器处理嵌入向量，获取编码器输出和最终状态
         
-        return [enc_out[:, -1, :], enc_state]
+        return [enc_out[:, -1, :], enc_state]# 返回编码器最后一个时间步的输出和最终状态
     
     def get_next_token(self, x, state):
         '''
         shape(x) = [b_sz,] 
         '''
-        inp_emb = self.embed_layer(x) #shape(b_sz, emb_sz)
-        h, state = self.decoder_cell.call(inp_emb, state) # shape(b_sz, h_sz)
-        logits = self.dense(h) # shape(b_sz, v_sz)
-        out = tf.argmax(logits, axis=-1)
+        inp_emb = self.embed_layer(x) #shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
+        h, state = self.decoder_cell.call(inp_emb, state) # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
+        logits = self.dense(h) # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
+        out = tf.argmax(logits, axis=-1)# 选择得分最高的token作为预测结果
         return out, state
 
 
@@ -190,24 +190,24 @@ train(model, optimizer, seqlen=20)
 def sequence_reversal():
     """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
     def decode(init_state, steps=10):
-        b_sz = tf.shape(init_state[0])[0]
+        b_sz = tf.shape(init_state[0])[0]# 获取批次大小
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)  # 起始 token（全为 0）
-        state = init_state
-        collect = []
-        for i in range(steps):
-            cur_token, state = model.get_next_token(cur_token, state)
+        state = init_state# 初始化状态为编码器输出的状态
+        collect = []# 存储每一步生成的token
+        for i in range(steps):# 逐步解码生成序列
+            cur_token, state = model.get_next_token(cur_token, state)# 获取下一个token预测和更新后的状态
             collect.append(tf.expand_dims(cur_token, axis=-1))  # 收集每一步生成的 token
         out = tf.concat(collect, axis=-1).numpy()  # 拼接输出序列
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]  # 索引转字符
         return out
     
-    batched_examples, enc_x, _, _ = get_batch(32, 10)
-    state = model.encode(enc_x)
-    return decode(state, enc_x.get_shape()[-1]), batched_examples
+    batched_examples, enc_x, _, _ = get_batch(32, 10)# 生成一批测试数据（32个样本，每个序列长度10）
+    state = model.encode(enc_x)# 对输入序列进行编码
+    return decode(state, enc_x.get_shape()[-1]), batched_examples# 解码生成逆序序列，步数等于输入序列长度
 
 def is_reverse(seq, rev_seq):
     """检查 rev_seq 是否为 seq 的逆序"""
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])# 反转rev_seq并与原始seq比较
     if seq == rev_seq_rev:
         return True
     else:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # 序列逆置 （加注意力的seq2seq）
+# 序列逆置 （加注意力的seq2seq）
 # 使用attentive sequence to sequence 模型将一个字符串序列逆置。例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`
 
 import numpy as np
@@ -14,7 +14,7 @@ import os, sys, tqdm
 import random
 import string
 
-# ## 玩具序列数据生成
+# 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 def randomString(stringLength):
@@ -187,7 +187,7 @@ optimizer = optimizers.Adam(0.0005)  # 优化器
 model = mySeq2SeqModel()  # 实例化模型
 train(model, optimizer, seqlen=20)  # 训练模型，序列长度为20
 
-# # 测试模型逆置能力
+# 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
 # 
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
