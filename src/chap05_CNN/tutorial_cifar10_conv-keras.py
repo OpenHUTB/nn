@@ -12,8 +12,6 @@
 # ## 准备数据
 
 # In[17]:
-
-
 import os
 import tensorflow as tf
 from tensorflow import keras
@@ -39,18 +37,10 @@ def prepare_mnist_features_and_labels(x, y):
     y = tf.cast(y, tf.int64)
     return x, y
 
-
 # In[ ]:
-
-
-
-
-
 # ## 建立模型
 
 # In[18]:
-
-
 class myConvModel(keras.Model):
     '''在这里实现alexNet模型'''
     def __init__(self):
@@ -98,10 +88,7 @@ optimizer = optimizers.Adam(0.001)
 
 
 # ## 编译， fit以及evaluate
-
 # In[19]:
-
-
 model.compile(optimizer=optimizer,
               loss='sparse_categorical_crossentropy',
               metrics=['accuracy'])
@@ -109,10 +96,7 @@ train_ds, test_ds = cifar10_dataset()
 model.fit(train_ds, epochs=10)
 model.evaluate(test_ds)
 
-
 # In[20]:
-
-
 import numpy
 import pylab
 from PIL import Image
@@ -160,7 +144,6 @@ pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])
 pylab.show()
 
-
 pylab.figure(figsize=(10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
@@ -168,11 +151,7 @@ pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
 pylab.show()
 
-
-
 # In[23]:
-
-
 import numpy
 import pylab
 from PIL import Image
@@ -220,7 +199,6 @@ pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])
 pylab.show()
 
-
 pylab.figure(figsize=(10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
@@ -228,10 +206,4 @@ pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
 pylab.show()
 
-
-
 # In[ ]:
-
-
-
-
