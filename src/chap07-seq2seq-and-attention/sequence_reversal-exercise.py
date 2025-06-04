@@ -200,6 +200,10 @@ def sequence_reversal():
 def is_reverse(seq, rev_seq):
     """检查 rev_seq 是否为 seq 的逆序"""
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    # 将rev_seq转换为列表后反转，再重新组合成字符串/序列
+    # reversed(rev_seq) 创建了一个反转迭代器
+    # list() 将迭代器转换为列表
+    # ''.join() 将列表中的元素连接成字符串（对于字符串输入）
     if seq == rev_seq_rev:
         return True
     else:
