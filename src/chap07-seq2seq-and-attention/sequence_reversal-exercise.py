@@ -24,13 +24,22 @@ import os,sys,tqdm
 import random
 import string
 
-def randomString(stringLength):
-    """Generate a random string with the combination of lowercase and uppercase letters """
+def random_string(length):
+    """
+    生成一个由大写英文字母组成的随机字符串。
+    参数:
+        length (int): 要生成的字符串长度。
+    返回:
+        str: 随机生成的字符串。
+    """
+    # 步骤 1：定义可用字符集（这里使用大写英文字母）
+    letters = string.ascii_uppercase  # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-    letters = string.ascii_uppercase # 定义可用的字符集
-    return ''.join(random.choice(letters) for i in range(stringLength))
-    # 生成随机字符串
-    # 使用 random.choice(letters) 从 letters 中随机选择一个字符
+    # 步骤 2：从字符集中随机选择指定数量的字符 ；使用 random.choice(letters) 从 letters 中随机选择一个字符
+    random_chars = [random.choice(letters) for _ in range(length)]
+
+    # 步骤 3：将字符列表拼接成字符串并返回
+    return ''.join(random_chars)
     # 重复这个过程 stringLength 次，并用 ''.join() 将这些字符连接成一个字符串
     # 最终返回生成的随机字符串
 
