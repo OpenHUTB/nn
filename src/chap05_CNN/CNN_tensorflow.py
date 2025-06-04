@@ -1,14 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 # In[ ]:
+#导入必要的库
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 #使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
-
+#超参数设置
 learning_rate = 1e-4 #学习率
 keep_prob_rate = 0.7 # Dropout保留概率
 max_epoch = 2000 #最大训练轮数
+#计算准确率的函数
 def compute_accuracy(v_xs, v_ys):
     global prediction
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1}) # 获取模型预测结果
@@ -16,7 +18,7 @@ def compute_accuracy(v_xs, v_ys):
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) # 计算准确率
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1}) # 运行准确率计算
     return result
-
+#初始化权重的函数，使用截断正态分布
 def weight_variable(shape):
 
     # 初始化权重：截断正态分布，stddev=0.1，有助于稳定训练
@@ -26,16 +28,19 @@ def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev=0.1)
     return tf.Variable(initial) # 返回可训练变量
 
+#初始化偏置的函数，初始值设为0，1
 def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
 
+#二维卷积函数
 def conv2d(x, W):
     # 每一维度  滑动步长全部是 1， padding 方式 选择 same
     # 提示 使用函数  tf.nn.conv2d
     
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-
+    
+#最大池化函数
 def max_pool_2x2(x):
     # 滑动步长 是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool
