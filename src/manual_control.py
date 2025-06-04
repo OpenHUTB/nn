@@ -614,13 +614,17 @@ class KeyboardControl(object):
                 world.player.apply_control(self._control)
 
     def _parse_vehicle_keys(self, keys, milliseconds):
+        # 处理加速/前进控制 (W键或上箭头)
         if keys[K_UP] or keys[K_w]:
             if not self._ackermann_enabled:
+                # 普通控制模式: 增加油门(最大1.0)
                 self._control.throttle = min(self._control.throttle + 0.1, 1.00)
             else:
+                # Ackermann控制模式: 根据时间增量增加速度
                 self._ackermann_control.speed += round(milliseconds * 0.005, 2) * self._ackermann_reverse
         else:
             if not self._ackermann_enabled:
+                # 未按下加速键时重置油门
                 self._control.throttle = 0.0
 
         if keys[K_DOWN] or keys[K_s]:
