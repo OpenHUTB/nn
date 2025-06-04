@@ -658,11 +658,15 @@ class KeyboardControl(object):
         else:
             # 没有转向输入时重置转向
             self._steer_cache = 0.0
+        # 限制转向幅度在[-0.7, 0.7]范围内
         self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
+        # 应用转向控制
         if not self._ackermann_enabled:
+            # 普通控制模式: 设置转向值(四舍五入到小数点后1位)和手刹状态
             self._control.steer = round(self._steer_cache, 1)
             self._control.hand_brake = keys[K_SPACE]
         else:
+            # Ackermann控制模式: 只设置转向值
             self._ackermann_control.steer = round(self._steer_cache, 1)
 
     def _parse_walker_keys(self, keys, milliseconds, world):
