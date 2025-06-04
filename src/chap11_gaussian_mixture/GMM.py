@@ -23,18 +23,27 @@ def generate_data(n_samples=1000):
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
     samples_per_component = (weights_true * n_samples).astype(int)
-    X_list = []  # 用于存储每个高斯分布生成的数据点
-    y_true = []  # 用于存储每个数据点对应的真实分布标签
-    for i in range(n_components):  # 从第i个高斯分布生成样本
+    # 用于存储每个高斯分布生成的数据点
+    X_list = []  
+    # 用于存储每个数据点对应的真实分布标签
+    y_true = []  
+     # 从第i个高斯分布生成样本
+    for i in range(n_components): 
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
-        X_list.append(X_i)  # 将生成的样本添加到列表
-        y_true.extend([i] * samples_per_component[i])  # 添加对应标签
+         # 将生成的样本添加到列表
+        X_list.append(X_i) 
+         # 添加对应标签
+        y_true.extend([i] * samples_per_component[i]) 
     
     # 合并并打乱数据
-    X = np.vstack(X_list)  #将多个子数据集合并为一个完整数据集
-    y_true = np.array(y_true)  #将Python列表转换为NumPy数组
-    shuffle_idx = np.random.permutation(n_samples) #生成0到n_samples-1的随机排列
-    return X[shuffle_idx], y_true[shuffle_idx] #使用相同的随机索引同时打乱特征和标签
+    #将多个子数据集合并为一个完整数据集
+    X = np.vstack(X_list)  
+     #将Python列表转换为NumPy数组
+    y_true = np.array(y_true) 
+    #生成0到n_samples-1的随机排列
+    shuffle_idx = np.random.permutation(n_samples) 
+     #使用相同的随机索引同时打乱特征和标签
+    return X[shuffle_idx], y_true[shuffle_idx]
 
 # 自定义logsumexp函数
 def logsumexp(log_p, axis=1, keepdims=False):
