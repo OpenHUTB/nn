@@ -3,6 +3,7 @@
 # # 加法进位实验
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
 
+
 # In[1]:
 #导入了多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
@@ -14,13 +15,11 @@ from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
 
-# ## 数据生成
-# 我们随机在 `start->end`之间采样除整数对`(num1, num2)`，计算结果`num1+num2`作为监督信号。
-# * 首先将数字转换成数字位列表 `convertNum2Digits`
-# * 将数字位列表反向
-# * 将数字位列表填充到同样的长度 `pad2len`
+
+
 
 # In[2]:
+
 
 def gen_data_batch(batch_size, start, end):
     '''在(start, end)区间采样生成一个batch的整型的数据
@@ -29,6 +28,7 @@ def gen_data_batch(batch_size, start, end):
         start: 开始数值
         end: 结束数值
     '''
+    
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
@@ -50,11 +50,13 @@ def convertDigits2Num(Digits):
     Num = int(numStr)
     return Num
 
+
 def pad2len(lst, length, pad=0):
     '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
     '''
     lst+=[pad]*(length - len(lst))
     return lst
+
 
 def results_converter(res_lst):
     '''将预测好的数字位列表批量转换成为原始整数
@@ -63,6 +65,7 @@ def results_converter(res_lst):
     '''
     res = [reversed(digits) for digits in res_lst]
     return [convertDigits2Num(digits) for digits in res]
+
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
     '''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
@@ -83,14 +86,18 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
+
     
     Nums1 = [pad2len(o, maxlen) for o in Nums1]
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
+
     
     return Nums1, Nums2, results
 
+
 # # 建模过程， 按照图示完成建模
+
 
 # In[3]:
 
@@ -103,7 +110,8 @@ class myRNNModel(keras.Model):
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
         self.dense = tf.keras.layers.Dense(10)
-        
+
+    
     @tf.function
     def call(self, num1, num2):
         '''
@@ -140,7 +148,6 @@ def train_one_step(model, optimizer, x, y, label):
     grads = tape.gradient(loss, model.trainable_variables)#计算梯度，自动求导
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
-
 def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
@@ -148,10 +155,8 @@ def train(steps, model, optimizer):
 for step in range(steps):
     # 生成批量数据（200个样本），数值范围0-555555555
     datas = gen_data_batch(batch_size=200, start=0, end=555555555)
-    
     # 准备训练数据：两个数字序列和结果，统一填充到长度11
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    
     # 单步训练：将数据转为Tensor，计算并返回损失
     loss = train_one_step(model, optimizer, 
                           tf.constant(Nums1, dtype=tf.int32),
