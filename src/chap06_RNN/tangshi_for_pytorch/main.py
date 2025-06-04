@@ -135,6 +135,19 @@ def process_poems2(file_name):
     return poems_vector, word_int_map, words
 
 def generate_batch(batch_size, poems_vec, word_to_int):
+<<<<<<< HEAD
+    n_chunk = len(poems_vec) // batch_size# 计算可生成的完整批次数量
+    x_batches = []# 存储输入序列批次
+    y_batches = []# 存储目标序列批次
+    for i in range(n_chunk):# 按批次处理数据
+        start_index = i * batch_size# 计算当前批次在数据中的起始和结束索引
+        end_index = start_index + batch_size
+        x_data = poems_vec[start_index:end_index]# 提取当前批次的输入数据
+        y_data = []
+        for row in x_data:# 为每个输入序列生成对应的目标序列,目标序列是输入序列右移一位，最后一个元素复制到末尾
+            y  = row[1:]# 移除第一个元素
+            y.append(row[-1])# 将原序列的最后一个元素添加到末尾
+=======
     """
     生成训练所需的批次数据（x_batches 和 y_batches）
 
@@ -165,6 +178,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
             # 构造目标序列 y：将原序列向后偏移一位，并补上最后一个词（常用于语言模型预测下一个词）
             y = row[1:]          # 将序列右移一位
             y.append(row[-1])    # 最后一个词复制一份填充，确保长度一致
+>>>>>>> 5a735ea8a8cbb391818b5d2b86302469c1000d24
             y_data.append(y)
 
         """
@@ -173,8 +187,15 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         [6,2,4,6,9]       [2,4,6,9,9]  # 下一个词的预测目标
         [1,4,2,8,5]       [4,2,8,5,5]
         """
+<<<<<<< HEAD
+        # print(x_data[0])
+        # print(y_data[0])
+        # exit(0)
+        x_batches.append(x_data)# 将处理好的批次添加到批次列表中
+=======
 
         x_batches.append(x_data)
+>>>>>>> 5a735ea8a8cbb391818b5d2b86302469c1000d24
         y_batches.append(y_data)
 
     return x_batches, y_batches
@@ -187,46 +208,48 @@ def run_training():
     poems_vector, word_to_int, vocabularies = process_poems1('./poems.txt')
     # 生成batch
     print("finish  loadding data")
-    BATCH_SIZE = 100
+    BATCH_SIZE = 100# 每批次处理的样本数量
 
-    torch.manual_seed(5)
-    word_embedding = rnn_lstm.word_embedding( vocab_length= len(word_to_int) + 1 , embedding_dim= 100)
-    rnn_model = rnn_lstm.RNN_model(batch_sz = BATCH_SIZE,vocab_len = len(word_to_int) + 1 ,word_embedding = word_embedding ,embedding_dim= 100, lstm_hidden_dim=128)
+    torch.manual_seed(5)# 设置随机种子以确保结果可复现
+    word_embedding = rnn_lstm.word_embedding( vocab_length= len(word_to_int) + 1 , embedding_dim= 100)# 模型初始化阶段：创建词嵌入层和RNN模型,创建词嵌入层，为每个词生成100维的向量表示
+    rnn_model = rnn_lstm.RNN_model(batch_sz = BATCH_SIZE,vocab_len = len(word_to_int) + 1 ,word_embedding = word_embedding ,embedding_dim= 100, lstm_hidden_dim=128)# 创建RNN模型，使用LSTM作为核心结
 
-    # optimizer = optim.Adam(rnn_model.parameters(), lr= 0.001)
+    # optimizer = optim.Adam(rnn_model.parameters(), lr= 0.001)# 配置优化器和损失函数
     optimizer=optim.RMSprop(rnn_model.parameters(), lr=0.01)
 
     loss_fun = torch.nn.NLLLoss()
     # rnn_model.load_state_dict(torch.load('./poem_generator_rnn'))  # if you have already trained your model you can load it by this line.
 
     for epoch in range(30):
+        # 生成批次数据
         batches_inputs, batches_outputs = generate_batch(BATCH_SIZE, poems_vector, word_to_int)
         n_chunk = len(batches_inputs)
+        # 遍历每个批次
         for batch in range(n_chunk):
             batch_x = batches_inputs[batch]
             batch_y = batches_outputs[batch] # (batch , time_step)
 
-            loss = 0
-            for index in range(BATCH_SIZE):
-                x = np.array(batch_x[index], dtype = np.int64)
-                y = np.array(batch_y[index], dtype = np.int64)
-                x = Variable(torch.from_numpy(np.expand_dims(x,axis=1)))
+            loss = 0# 初始化批次损失
+            for index in range(BATCH_SIZE): # 处理批次中的每个样本
+                x = np.array(batch_x[index], dtype = np.int64)# 样本输入序列
+                y = np.array(batch_y[index], dtype = np.int64)# 样本目标序列
+                x = Variable(torch.from_numpy(np.expand_dims(x,axis=1)))# 转换为PyTorch张量并调整维度
                 y = Variable(torch.from_numpy(y ))
                 pre = rnn_model(x)
                 loss += loss_fun(pre , y)
-                if index == 0:
+                if index == 0:# 每批次的第一个样本打印预测结果用于调试
                     _, pre = torch.max(pre, dim=1)
                     print('prediction', pre.data.tolist()) # the following  three line can print the output and the prediction
                     print('b_y       ', y.data.tolist())   # And you need to take a screenshot and then past is to your homework paper.
                     print('*' * 30)
-            loss  = loss  / BATCH_SIZE
+            loss  = loss  / BATCH_SIZE# 计算平均损失
             print("epoch  ",epoch,'batch number',batch,"loss is: ", loss.data.tolist())
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm(rnn_model.parameters(), 1)
-            optimizer.step()
+            optimizer.zero_grad()# 梯度清零
+            loss.backward()# 反向传播计算梯度
+            torch.nn.utils.clip_grad_norm(rnn_model.parameters(), 1) # 梯度裁剪防止梯度爆炸
+            optimizer.step()# 更新模型参数
 
-            if batch % 20 ==0:
+            if batch % 20 ==0:# 每20个批次保存一次模型
                 torch.save(rnn_model.state_dict(), './poem_generator_rnn')
                 print("finish  save model")
 
