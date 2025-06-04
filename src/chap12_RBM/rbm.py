@@ -21,6 +21,8 @@ class RBM:
         self.n_hidden = n_hidden     # 隐藏层神经元个数
         self.n_observe = n_observe   # 可见层神经元个数
 
+        
+        
         # 初始化权重和偏置
         # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
