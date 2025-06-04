@@ -36,13 +36,13 @@ def bias_variable(shape):
     return tf.Variable(initial)
 
 def conv2d(x, W):
-    # 每一维度  滑动步长全部是 1， padding 方式 选择 same
+    # 每一维度滑动步长全部是 1， padding 方式选择 same
     # 提示 使用函数  tf.nn.conv2d
     
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 def max_pool_2x2(x):
-    # 滑动步长 是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
+    # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool
     
     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
@@ -105,4 +105,3 @@ with tf.Session() as sess:
         if i % 100 == 0:#每 100 个迭代在测试集的前 1000 个样本上评估准确率
             print(compute_accuracy(
                 mnist.test.images[:1000], mnist.test.labels[:1000]))
-
