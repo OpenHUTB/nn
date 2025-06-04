@@ -116,7 +116,7 @@ class GaussianMixtureModel:
                 # 每个样本加权后的中心化向量
                 weighted_X = gamma[:, k, None] * X_centered  # shape: (n_samples, n_features)
                 # 使用加权样本计算协方差矩阵（第 k 个高斯成分）
-                new_sigma_k = (X_centered.T @ weighted_X) / Nk[k]  # shape: (n_features, n_features)
+                new_sigma_k = np.einsum('ni,nj->ij', X_centered, weighted_X) / Nk[k]
                 # 正则化以防止协方差矩阵奇异，eps 可以调节
                 eps = 1e-6  # 正则化系数（可以作为参数传入或配置）
                 new_sigma_k += np.eye(n_features) * eps  # 向对角线加小数值，避免数值不稳定
