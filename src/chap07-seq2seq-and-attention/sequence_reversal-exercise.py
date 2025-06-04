@@ -52,9 +52,9 @@ def get_batch(batch_size, length):
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
 
+###
 
-
-# # 建立sequence to sequence 模型
+# # 建立sequence to sequence 模型##
 
 # In[3]:
 
