@@ -1,21 +1,15 @@
 #!/usr/bin/env python
 # 参考：https://github.com/marcgpuig/carla_py_clients/blob/master/imu_plot.py
-
 # Copyright (c) 2019 Computer Vision Center (CVC) at the Universitat Autonoma de
 # Barcelona (UAB).
-#
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>.
-
 # Allows controlling a vehicle with a keyboard. For a simpler and more
 # documented example, please take a look at tutorial.py.
-
 # 如果要自己操控，新开一个命令行，进入WindowsNoEditor\PythonAPI\examples目录，在cmd中输入：
 # python manual_control.py
-
 """
 Welcome to CARLA manual control.
-
 Use ARROWS or WASD keys for control.
 
     W            : throttle
@@ -191,12 +185,9 @@ def get_actor_blueprints(world, filter, generation):
     except:
         print("   Warning! Actor Generation is not valid. No actor will be spawned.")
         return []
-
-
 # ==============================================================================
 # -- World ---------------------------------------------------------------------
 # ==============================================================================
-
 
 class World(object):
     def __init__(self, carla_world, hud, args):
@@ -344,20 +335,16 @@ class World(object):
             physics_control.use_sweep_wheel_collision = True
             actor.apply_physics_control(physics_control)
         except Exception:
-            pass
-
+        pass
     def tick(self, clock):
         self.hud.tick(self, clock)
-
     def render(self, display):
         self.camera_manager.render(display)
         self.hud.render(display)
-
     def destroy_sensors(self):
         self.camera_manager.sensor.destroy()
         self.camera_manager.sensor = None
         self.camera_manager.index = None
-
     def destroy(self):
         if self.radar_sensor is not None:
             self.toggle_radar()
@@ -400,7 +387,6 @@ class KeyboardControl(object):
             raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
     def parse_events(self, client, world, clock, sync_mode):
         if isinstance(self._control, carla.VehicleControl):
             current_lights = self._lights
@@ -624,7 +610,6 @@ class KeyboardControl(object):
         else:
             if not self._ackermann_enabled:
                 self._control.brake = 0
-
         steer_increment = 5e-4 * milliseconds
         if keys[K_LEFT] or keys[K_a]:
             if self._steer_cache > 0:
@@ -689,10 +674,8 @@ class HUD(object):
         self._show_info = True
         self._info_text = []
         self._server_clock = pygame.time.Clock()
-
         self._show_ackermann_info = False
         self._ackermann_control = carla.VehicleAckermannControl()
-
     def on_world_tick(self, timestamp):
         self._server_clock.tick()
         self.server_fps = self._server_clock.get_fps()
