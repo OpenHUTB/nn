@@ -1,7 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# ## 准备数据
 
 # In[1]:
 
@@ -12,9 +8,7 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
 # 加载 MNIST 数据集并构建训练与测试集
 def mnist_dataset():
     # 下载 MNIST 手写数字数据集，包含训练集和测试集
@@ -28,6 +22,14 @@ def mnist_dataset():
     ds = ds.map(prepare_mnist_features_and_labels)  # 特征处理
     ds = ds.take(20000).shuffle(20000).batch(100)   # 随机打乱并分批
 
+
+
+
+
+
+
+
+    
     # 创建测试数据集对象
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
@@ -41,7 +43,10 @@ def prepare_mnist_features_and_labels(x, y):
     return x, y
 
 
-# ## 建立模型
+
+
+
+
 
 # In[5]:
 
