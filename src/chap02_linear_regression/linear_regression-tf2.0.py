@@ -2,9 +2,7 @@
 # coding: utf-8
 
 # ## 设计基函数(basis function) 以及数据读取
-
 # In[20]:
-
 import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -51,7 +49,6 @@ def load_data(filename, basis_func=gaussian_basis):
 
 # ## 定义模型
 # In[21]:
-
 class linearModel(Model):
     def __init__(self, ndim):
         super(linearModel, self).__init__()
@@ -80,7 +77,6 @@ ndim = xs.shape[1]
 model = linearModel(ndim=ndim)
 
 # ## 训练以及评估
-
 # In[26]:
 
 optimizer = optimizers.Adam(0.1)
@@ -104,7 +100,6 @@ def evaluate(ys, ys_pred):
     return std
 
 # In[27]:评估指标的计算
-
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
     if i % 100 == 1:
@@ -129,18 +124,9 @@ plt.grid(True, linestyle='--', alpha=0.7, color='gray')  # 虚线网格，半透
 plt.legend(['train', 'test', 'pred'])
 plt.show()
 
-
 # In[ ]:
 
-
-
-
-
 # In[ ]:
-
-
-
-
 
 # In[ ]:
 
