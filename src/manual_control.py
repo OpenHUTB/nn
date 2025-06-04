@@ -864,15 +864,22 @@ class FadingText(object):
 
 class HelpText(object):
     """Helper class to handle text output using pygame"""
+
     def __init__(self, font, width, height):
+        # 获取类文档字符串中的每一行文本
         lines = __doc__.split('\n')
         self.font = font
-        self.line_space = 18
+        self.line_space = 18  # 每行文字的垂直间距
+
+        # 计算绘制区域尺寸（宽度固定，高度由行数决定）
         self.dim = (780, len(lines) * self.line_space + 12)
+
+        # 计算绘制区域的居中位置
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
-        self.surface.fill((0, 0, 0, 0))
+
+        self.seconds_left = 0  # 可用于计时隐藏提示（当前未使用）
+        self.surface = pygame.Surface(self.dim)  # 创建绘图表面
+        self.surface.fill((0, 0, 0, 0))  # 填充透明背景
         for n, line in enumerate(lines):
             text_texture = self.font.render(line, True, (255, 255, 255))
             self.surface.blit(text_texture, (22, n * self.line_space))
