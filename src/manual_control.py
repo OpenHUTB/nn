@@ -641,19 +641,22 @@ class KeyboardControl(object):
             if not self._ackermann_enabled:
                 # 未按下减速键时重置刹车
                 self._control.brake = 0
-
+        # 处理转向控制 (A/D键或左右箭头)
         steer_increment = 5e-4 * milliseconds
         if keys[K_LEFT] or keys[K_a]:
+             # 左转: 如果是向右转状态则重置，否则增加左转量
             if self._steer_cache > 0:
                 self._steer_cache = 0
             else:
                 self._steer_cache -= steer_increment
         elif keys[K_RIGHT] or keys[K_d]:
+            # 右转: 如果是向左转状态则重置，否则增加右转量
             if self._steer_cache < 0:
                 self._steer_cache = 0
             else:
                 self._steer_cache += steer_increment
         else:
+            # 没有转向输入时重置转向
             self._steer_cache = 0.0
         self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
         if not self._ackermann_enabled:
