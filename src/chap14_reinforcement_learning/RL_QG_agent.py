@@ -17,7 +17,7 @@ class RL_QG_agent:
 
         # 定义自己的 网络
         self.sess = tf.Session()
-        # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
+        # 定义输入状态，假设为8x8棋盘，3个通道
         self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name="input_states")
         # 构建卷积神经网络
         conv1 = tf.layers.conv2d(inputs=self.input_states, filters=32, kernel_size=3, padding="same", activation=tf.nn.relu)
@@ -34,8 +34,8 @@ class RL_QG_agent:
         # 补全代码
         
     def place(self,state,enables):
-        # 这个函数 主要用于测试， 返回的 action是 0-63 之间的一个数值，
-        # action 表示的是 要下的位置。
+        # 主要是用于测试的函数，返回的action是0-63之间的一个数值，
+        # action 表示的是要下的位置。
        # action = 123456789    # 删掉这句话，并填写相应代码
        # 状态预处理
         state_input = np.array(state).reshape(1, -1).astype(np.float32)  # 转换为(1,64)形状
