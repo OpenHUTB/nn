@@ -49,7 +49,7 @@ def process_dataset(fileName):
         for w in e:
             counter[w] += 1
     
-    # 按词频从高到低排序
+    # 按词的出现频率从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)
@@ -96,9 +96,7 @@ def poem_dataset():
 
 
 # # 模型代码
-
 # In[2]:
-
 
 class myRNNModel(keras.Model):
     """基于RNN的诗歌生成模型"""
@@ -166,7 +164,6 @@ class myRNNModel(keras.Model):
 
 
 # ## 辅助函数：计算序列损失
-
 # In[3]:
 
 
