@@ -1,14 +1,10 @@
 # python: 2.7
 # encoding: utf-8
-
 import numpy as np
-
 class RBM:
     """Restricted Boltzmann Machine."""
-
     def __init__(self, n_hidden=2, n_observe=784):
         """初始化模型参数（受限玻尔兹曼机）"""
-
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
@@ -76,19 +72,15 @@ class RBM:
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)
                 db_v = np.sum(v0 - v1_sample, axis=0)
                 db_h = np.sum(h0_sample - h1_prob, axis=0)
-
                 # 更新参数
                 self.W += learning_rate * dW / batch_size
                 self.b_v += learning_rate * db_v / batch_size
                 self.b_h += learning_rate * db_h / batch_size
         pass
-
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
-
         # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（即模拟初始图像）
         v = np.random.binomial(1, 0.5, self.n_observe)
-
         # 进行1000次Gibbs采样迭代，以逐步趋近真实数据分布
         for _ in range(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
@@ -102,11 +94,8 @@ class RBM:
 
             # 根据估算的概率采样新的可见层状态
             v = self._sample_binary(v_prob)
-
         # 将最终的可见层向量重塑为 28×28 的图像格式
         return v.reshape(28, 28)
-
-
 # 使用MNIST数据集训练RBM模型
 if __name__ == '__main__':
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
@@ -114,7 +103,6 @@ if __name__ == '__main__':
     n_imgs, n_rows, n_cols = mnist.shape
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
-
     # 初始化RBM对象：2个隐藏节点，784个可见节点（28×28图像）
     rbm = RBM(2, img_size)
 
