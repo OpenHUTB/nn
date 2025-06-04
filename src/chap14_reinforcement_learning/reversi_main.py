@@ -15,10 +15,12 @@ agent.load_model()
 # 设置最大训练轮数
 max_epochs = 100
 
-# 主训练循环
+# 主训练循环（控制训练的总轮数）
 for i_episode in range(max_epochs):
     # 初始化棋局，返回初始 observation（3x8x8 的状态表示）
+    #3个通道分别表示：黑棋位置、白棋位置、当前玩家
     observation = env.reset()
+    
     # 每局最多进行 100 步操作（黑白双方交替下棋）
     for t in range(100):
         action = [1, 2]  # 初始化 action，占位，稍后会被赋真实值
@@ -27,7 +29,12 @@ for i_episode in range(max_epochs):
 
         ################### 黑棋（随机策略） ###################
         env.render()  # 打印当前棋盘状态
-        enables = env.possible_actions  # 获取当前黑棋可落子的位置列表
+        
+        # 获取当前黑棋可落子的位置列表
+        # enables是一个包含合法位置索引的列表
+        enables = env.possible_actions  
+        
+        # 判断是否有合法落子的位置
         if len(enables) == 0:
             # 没有可落子位置，则选择“跳过”操作，编码为 board_size^2 + 1
             action_ = env.board_size**2 + 1
@@ -63,4 +70,4 @@ for i_episode in range(max_epochs):
             else:
                 print("白棋赢了！")
             print(black_score)  # 打印黑棋得分
-            break
+            break #结束代码

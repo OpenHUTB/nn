@@ -12,27 +12,27 @@ class RBM:
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
-        if n_hidden <= 0 or n_observe <= 0:
-            raise ValueError("Number of hidden and visible units must be positive integers.")
+        """
+        参数说明：
+        n_observe (int): 可见层（输入层）神经元的数量，即输入特征维度
+        n_hidden (int): 隐藏层神经元的数量
+        """
 
-        self.n_hidden = n_hidden
-        self.n_observe = n_observe
-        
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden)) #计算权重的初始化标准差
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden)) #初始化权重矩阵 self.W
-        #self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-        self.b_h = np.zeros(n_hidden) #初始化隐藏层的偏置向量 self.b_h
-        self.b_v = np.zeros(n_observe) #初始化输出层的偏置向量 self.b_v
         self.n_hidden = n_hidden     # 隐藏层神经元个数
-        self.n_observe = n_observe    # 可见层神经元个数
-        
+        self.n_observe = n_observe   # 可见层神经元个数
+
         # 初始化权重和偏置
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))     # Xavier初始化
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 权重矩阵
-        # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))  # 另一种初始化方式
-        self.b_h = np.zeros(n_hidden)   # 隐藏层偏置
-        self.b_v = np.zeros(n_observe)  # 可见层偏置
-        pass
+        # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
+        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
+
+        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 初始化权重矩阵（可见层 -> 隐藏层）
+
+        # 可选替代方案：使用更小的固定标准差进行初始化
+        # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
+
+        self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
+        self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
+        # pass
     
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
@@ -51,16 +51,16 @@ class RBM:
         n_samples = data_flat.shape[0]
         
         # 定义训练参数
-        learning_rate = 0.1
-        epochs = 10
-        batch_size = 100
+        learning_rate = 0.1 # 学习率，控制参数更新的步长
+        epochs = 10 # 训练轮数，整个数据集将被遍历10次v
+        batch_size = 100 # 批处理大小，每次更新参数使用的样本数量
 
        # 开始训练轮数
         for epoch in range(epochs):
             # 打乱数据顺序
-            np.random.shuffle(data_flat)
-            for i in range(0, n_samples, batch_size):
-                batch = data_flat[i:i + batch_size]
+            np.random.shuffle(data_flat) # 使用小批量梯度下降法
+            for i in range(0, n_samples, batch_size):# 获取当前批次的数据
+                batch = data_flat[i:i + batch_size] # 将批次数据转换为float64类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率
@@ -73,14 +73,14 @@ class RBM:
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
                 # 计算梯度      
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)
-                db_v = np.sum(v0 - v1_sample, axis=0)
-                db_h = np.sum(h0_sample - h1_prob, axis=0)
+                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)         # 计算权重矩阵的梯度
+                db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
+                db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
 
                 # 更新参数
-                self.W += learning_rate * dW / batch_size       
-                self.b_v += learning_rate * db_v / batch_size
-                self.b_h += learning_rate * db_h / batch_size
+                self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
+                self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
+                self.b_h += learning_rate * db_h / batch_size                         # 更新隐藏层偏置
         pass
 
     def sample(self):

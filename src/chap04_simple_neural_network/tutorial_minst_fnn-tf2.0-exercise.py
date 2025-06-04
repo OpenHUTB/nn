@@ -17,8 +17,8 @@ def mnist_dataset():
     # 加载MNIST数据集，包含训练集和测试集的图像及标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
-    x = x/255.0
-    x_test = x_test/255.0
+    x = x / 255.0
+    x_test = x_test / 255.0
     
     return (x, y), (x_test, y_test)
 
@@ -47,9 +47,12 @@ class myModel:
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
         #logits = None
         #return logits
-        x = tf.reshape(x, [-1, 784])          # 展平为[batch_size, 784]
-        h = tf.nn.relu(x @ self.W1 + self.b1) # 隐藏层+ReLU
-        logits = h @ self.W2 + self.b2         # 输出层（未归一化）
+        # 展平为[batch_size, 784]
+        x = tf.reshape(x, [-1, 784])
+        # 隐藏层+ReLU
+        h = tf.nn.relu(x @ self.W1 + self.b1) 
+        # 输出层（未归一化）
+        logits = h @ self.W2 + self.b2         
         return logits
         
 model = myModel()

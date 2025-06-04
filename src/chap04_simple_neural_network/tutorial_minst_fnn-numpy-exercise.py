@@ -3,11 +3,16 @@
 # ## 准备数据
 # In[1]:
 
+# 导入操作系统接口模块，提供与操作系统交互的功能
 import os
+# 导入NumPy数值计算库，用于高效处理多维数组和矩阵运算
 import numpy as np
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
 import numpy as np
+# 从TensorFlow中导入Keras高级API
 from tensorflow import keras
+# 从Keras中导入常用模块
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
@@ -17,7 +22,8 @@ def mnist_dataset():
     #normalize
     x = x/255.0
     x_test = x_test/255.0
-    
+
+
     return (x, y), (x_test, y_test)
 
 # ## Demo numpy based auto differentiation
@@ -33,7 +39,7 @@ class Matmul:
         # 前向传播：执行矩阵乘法，计算 h = x @ W
         h = np.matmul(x, W)
         # 缓存输入 x 和 权重 W，以便在反向传播中计算梯度
-        self.mem={'x': x, 'W':W}
+        self.mem = {'x': x, 'W':W}
         # 缓存输入 x 和 权重 W，以便在反向传播中计算梯度
         return h
     
@@ -59,7 +65,8 @@ class Relu:
         self.mem = {}
         #初始化记忆字典，用于存储前向传播的输入
     def forward(self, x):
-        self.mem['x']=x#保存输入x，供反向传播使用
+        #保存输入x，供反向传播使用
+        self.mem['x'] = x
         return np.where(x > 0, x, np.zeros_like(x))
     #ReLU激活函数：x>0时输出x，否则输出0
     def backward(self, grad_y):
@@ -86,10 +93,15 @@ class Softmax:
         '''
         x: shape(N, c)
         '''
+        # 对输入数据应用指数函数，确保所有值为正
         x_exp = np.exp(x)
+        # 计算每个样本的归一化分母（分区函数）
         partition = np.sum(x_exp, axis=1, keepdims=True)
+        # 计算 softmax 输出：指数值 / 分区函数
+        # 添加 epsilon 防止除零错误（数值稳定性）
         out = x_exp/(partition+self.epsilon)
-        
+
+        # 将计算结果存入内存字典，用于反向传播
         self.mem['out'] = out
         self.mem['x_exp'] = x_exp
         return out
@@ -219,22 +231,22 @@ class Log:
 
 import tensorflow as tf
 
-label = np.zeros_like(x)
+label = np.zeros_like(x) #创建了一个与x形状相同的全零标签矩阵
 label[0, 1]=1.
 label[1, 0]=1
 label[2, 3]=1
 label[3, 5]=1
 label[4, 0]=1
 
-x = np.random.normal(size=[5, 6])
-W1 = np.random.normal(size=[6, 5])
-W2 = np.random.normal(size=[5, 6])
+x = np.random.normal(size=[5, 6]) # 5个样本，每个样本6维特征
+W1 = np.random.normal(size=[6, 5]) # 第一层权重 (6→5)
+W2 = np.random.normal(size=[5, 6]) # 第二层权重 (5→6)
 
-mul_h1 = Matmul()
-mul_h2 = Matmul()
-relu = Relu()
+mul_h1 = Matmul() # 第一层矩阵乘法
+mul_h2 = Matmul() # 第二层矩阵乘法
+relu = Relu() # ReLU激活函数
 softmax = Softmax()
-log = Log()
+log = Log() # 对数函数
 
 h1 = mul_h1.forward(x, W1) # shape(5, 4)
 h1_relu = relu.forward(h1)

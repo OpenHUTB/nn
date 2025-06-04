@@ -12,10 +12,6 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
 
 class myConvModel(keras.Model):
     def __init__(self):
@@ -27,9 +23,16 @@ class myConvModel(keras.Model):
         h1 = self.l1_conv(x)
         return h1
 
+
+
 # In[192]:
 
+
 random_conv = myConvModel()
+import numpy
+import pylab
+from PIL import Image
+import numpy as np
 
 # open random image of dimensions 639x516
 img = Image.open(open('corgi.jpg', 'rb'))
@@ -43,3 +46,4 @@ pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
 pylab.show()
+
