@@ -627,15 +627,19 @@ class KeyboardControl(object):
             if not self._ackermann_enabled:
                 # 未按下加速键时重置油门
                 self._control.throttle = 0.0
-
+        # 处理减速/后退控制 (S键或下箭头)
         if keys[K_DOWN] or keys[K_s]:
             if not self._ackermann_enabled:
+                # 普通控制模式: 增加刹车(最大1.0)
                 self._control.brake = min(self._control.brake + 0.2, 1)
             else:
+                # Ackermann控制模式: 根据时间增量减少速度
                 self._ackermann_control.speed -= min(abs(self._ackermann_control.speed), round(milliseconds * 0.005, 2)) * self._ackermann_reverse
+                # 确保速度不为负
                 self._ackermann_control.speed = max(0, abs(self._ackermann_control.speed)) * self._ackermann_reverse
         else:
             if not self._ackermann_enabled:
+                # 未按下减速键时重置刹车
                 self._control.brake = 0
 
         steer_increment = 5e-4 * milliseconds
