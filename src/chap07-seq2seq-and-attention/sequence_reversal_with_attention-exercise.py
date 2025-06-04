@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # 序列逆置 （加注意力的seq2seq）
 # 使用attentive sequence to sequence 模型将一个字符串序列逆置。例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`
 
@@ -16,7 +15,6 @@ import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
-
 def randomString(stringLength):
     """生成指定长度的随机字符串（仅含大写字母A-Z）"""
     letters = string.ascii_uppercase
@@ -35,13 +33,10 @@ def get_batch(batch_size, length):
     
     # 将字符转换为索引（A=1, B=2, ..., Z=26）
     enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
-    
     # 目标输出：将输入序列逆置
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
-    
     # 解码器输入：在目标序列前加0（起始标记），并去掉最后一个字符
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
-    
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 
