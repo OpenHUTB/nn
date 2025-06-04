@@ -8,16 +8,13 @@
 # In[7]:
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
 from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
-
 # 设置随机种子（确保结果可复现）
 np.random.seed(42)      # NumPy的随机种子
 tf.random.set_seed(42)  # TensorFlow的随机种子
-
 # 确保在Jupyter Notebook中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
 
