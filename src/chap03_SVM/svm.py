@@ -34,8 +34,12 @@ def load_data(fname):
             # 将这三个值组成一个列表，并添加到 data 列表中
             data.append([x1, x2, t])
 
+
+
+        
         # 将整个列表转换为 NumPy 数组，方便后续数值计算和处理
         return np.array(data)
+
 
 def eval_acc(label, pred):
     """计算准确率"""
@@ -54,6 +58,7 @@ class SVM():
         self.tolerance = tolerance  # 提前停止的阈值
         pass
 
+    
     def train(self, data_train):
         """
         训练 SVM 模型。
@@ -67,6 +72,7 @@ class SVM():
         self.w = np.zeros(n_features) #初始化权重向量w为零向量
         self.b = 0
 
+        
         for epoch in range(self.epochs):
             # 计算 margins
             margin = y * (X @ self.w + self.b)
