@@ -11,10 +11,10 @@ keep_prob_rate = 0.7 # Dropout保留概率
 max_epoch = 2000 #最大训练轮数
 def compute_accuracy(v_xs, v_ys):
     global prediction
-    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
-    correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(v_ys,1))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
+    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1}) # 获取模型预测结果
+    correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(v_ys,1)) # 比较预测与真实标签
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) # 计算准确率
+    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1}) # 运行准确率计算
     return result
 
 def weight_variable(shape):

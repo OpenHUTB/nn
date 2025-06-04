@@ -12,7 +12,6 @@ import numpy as np
 import tensorflow as tf
 import collections
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
@@ -138,18 +137,20 @@ def compute_loss(logits, labels):
     return losses
 #定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
 
-@tf.function
+@tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
-    """执行一次反向传播训练"""
-    with tf.GradientTape() as tape:
-        logits = model(enc_x, dec_x)
-        loss = compute_loss(logits, y)
+    """执行一次训练步骤（前向传播+反向传播）"""
+    with tf.GradientTape() as tape:  # 自动记录梯度
+        logits = model(enc_x, dec_x)  # 前向传播获取预测值
+        loss = compute_loss(logits, y)  # 计算预测值与标签的损失
 
-    # compute gradient
+    # 计算梯度（自动微分）
     grads = tape.gradient(loss, model.trainable_variables)
+    
+    # 应用梯度更新模型参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    return loss
-
+    
+    return loss  # 返回当前步骤的损失值
 def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
     loss = 0.0

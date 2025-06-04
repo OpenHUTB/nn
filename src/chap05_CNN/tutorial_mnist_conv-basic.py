@@ -12,19 +12,19 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 #构建 MNIST 手写数字数据集的 TensorFlow 数据加载管道，包含数据预处理、批处理和随机打乱等操作
-def mnist_dataset():
+def mnist_dataset():#加载MNIST数据集
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28,1)
     
-    ds = tf.data.Dataset.from_tensor_slices((x, y))
-    ds = ds.map(prepare_mnist_features_and_labels)
-    ds = ds.take(20000).shuffle(20000).batch(32)
+    ds = tf.data.Dataset.from_tensor_slices((x, y))#从numpy数组创建Dataset
+    ds = ds.map(prepare_mnist_features_and_labels)#应用预处理函数
+    ds = ds.take(20000).shuffle(20000).batch(32)#取20000样本，打乱，分32的batch
     
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
-    return ds, test_ds
+    return ds, test_ds#测试集整批处理
 
 def prepare_mnist_features_and_labels(x, y):
     x = tf.cast(x, tf.float32) / 255.0
