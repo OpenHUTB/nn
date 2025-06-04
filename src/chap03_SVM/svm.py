@@ -46,6 +46,14 @@ class SVM():
     """SVM模型"""
     #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
     def __init__(self, lr = 0.001, epochs=1000, lambda_ = 0.001, tolerance = 1e-3):
+        """初始化SVM模型参数
+        
+        参数:
+            lr (float): 学习率，控制参数更新的步长
+            epochs (int): 最大训练轮数
+            lambda_ (float): 正则化参数，控制正则化强度
+            tolerance (float): 提前停止的阈值，当权重更新变化小于此值时停止训练
+        """
         self.w = None  # w: 权重向量(决定分类超平面的方向)
         self.b = 0     # b: 偏置项(决定分类超平面的位置)
         self.lr = lr   # 学习率
@@ -61,7 +69,7 @@ class SVM():
         """
         X = data_train[:, :-1] #从data_train中提取特征矩阵X
         y = np.where(data_train[:, -1] == 0, -1, 1) #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
-        y = data_train[:, -1] #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
+         #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
 
         n_samples, n_features = X.shape #获取样本数量和特征数量
         self.w = np.zeros(n_features) #初始化权重向量w为零向量
