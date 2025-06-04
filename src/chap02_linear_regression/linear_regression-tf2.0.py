@@ -9,6 +9,8 @@ import tensorflow as tf
 from tensorflow.keras import optimizers, layers, Model
 
 
+
+
 def identity_basis(x):
     """恒等基函数"""
     return np.expand_dims(x, axis=1)
