@@ -9,7 +9,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-# 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
 
@@ -31,7 +30,6 @@ def load_data(filename):
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
-#
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
@@ -39,9 +37,6 @@ def identity_basis(x):
     return ret
 
 
-# 请分别在这里实现“多项式基函数”（Multinomial Basis Function）以及“高斯基函数”（Gaussian Basis Function）
-
-# 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
@@ -60,26 +55,13 @@ def multinomial_basis(x, feature_num=10):
 
 
 def gaussian_basis(x, feature_num=10):
-    """
-    高斯基函数：将输入映射为一组高斯函数响应
-    """
+    """高斯基函数：将输入映射为一组高斯函数响应"""
     # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
     # 每个高斯函数的标准差（带宽）
     sigma = 25 / feature_num
     # 计算每个输入 x 对所有中心的响应，输出 shape (N, feature_num)
     return np.exp(-0.5 * ((x[:, np.newaxis] - centers) / sigma) ** 2)
-
-
-# ## 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化
-# ## 填空顺序 3 用梯度下降进行模型优化
-# > 先完成最小二乘法的优化 (参考书中第二章 2.3中的公式)
-#
-# > 再完成梯度下降的优化   (参考书中第二章 2.3中的公式)
-#
-# 在main中利用训练集训练好模型的参数，并且返回一个训练好的模型。
-#
-# 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 
 def least_squares(phi, y, alpha=0.0, solver="pinv"):
@@ -189,11 +171,11 @@ def main(x_train, y_train, use_gradient_descent=False):
     w_gd = None
     if use_gradient_descent:
         # 梯度下降求解权重（缩进修正）
-        learning_rate = 0.01 #设置学习率为0.01
-        epochs = 1000  #设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        learning_rate = 0.01  # 设置学习率为0.01
+        epochs = 1000  # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
-        for epoch in range(epochs): #开始梯度下降的迭代循环，将进行epochs次参数更新。
+        for epoch in range(epochs):  # 开始梯度下降的迭代循环，将进行epochs次参数更新。
             y_pred = np.dot(phi, w_gd)
             error = y_pred - y_train
             gradient = np.dot(phi.T, error) / len(y_train)
@@ -213,10 +195,6 @@ def main(x_train, y_train, use_gradient_descent=False):
     return f, w_lsq, w_gd
 
 
-# ## 评估结果
-# > 没有需要填写的代码，但是建议读懂
-
-
 def evaluate(ys, ys_pred):
     """评估模型。"""
     # 计算预测值与真实值的标准差
@@ -224,7 +202,6 @@ def evaluate(ys, ys_pred):
     return std
 
 
-# 程序主入口（建议不要改动以下函数的接口）
 if __name__ == "__main__":
     # 定义训练和测试数据文件路径
     train_file = "train.txt"  # 训练集文件
@@ -236,8 +213,8 @@ if __name__ == "__main__":
     x_test, y_test = load_data(
         test_file
     )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)# x_train.shape 返回训练集特征矩阵的维度信息
-    print(x_test.shape) # x_test.shape 返回测试集特征矩阵的维度信息
+    print(x_train.shape)  # x_train.shape 返回训练集特征矩阵的维度信息
+    print(x_test.shape)  # x_test.shape 返回测试集特征矩阵的维度信息
 
     # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
     # f: 预测函数 y = f(x)
@@ -256,14 +233,13 @@ if __name__ == "__main__":
     print("预测值与真实值的标准差：{:.1f}".format(std))
 
     # 显示结果
-
-    plt.plot(x_train, y_train, 'ro', markersize=3) # 红色点为训练集数据
-    plt.plot(x_test, y_test, 'k') # 红色点为训练集数据
-    plt.plot(x_test, y_test_pred, 'k') # 黑线为预测值（可以用其他颜色区分）
-    plt.xlabel('x') # 设置x轴的标签
-    plt.ylabel('y') # 设置y轴的标签
-    plt.title('Linear Regression') # 设置图表标题
-    plt.legend(['train', 'test', 'pred']) # 添加图例，表示每条线的含义
+    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
+    plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
+    plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
+    plt.xlabel("x")  # 设置x轴的标签
+    plt.ylabel("y")  # 设置y轴的标签
+    plt.title("Linear Regression")  # 设置图表标题
+    plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
     plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
