@@ -51,6 +51,7 @@ def softmax_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     ##########
+    ##########
     return loss
 
 test_data = np.random.normal(size=[10, 5])
@@ -71,6 +72,7 @@ def sigmoid_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     ##########
+    ##########
     return loss
 
 test_data = np.random.normal(size=[10])
@@ -81,6 +83,7 @@ print (label)
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data))- sigmoid_ce(prob, label))**2 < 0.0001).numpy()
 
 
+# In[ ]:
 # In[ ]:
 
 
