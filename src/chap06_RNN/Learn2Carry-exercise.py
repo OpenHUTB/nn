@@ -29,16 +29,21 @@ def gen_data_batch(batch_size, start, end):
         start: 开始数值
         end: 结束数值
     '''
+    #使用 numpy.random.randint 函数生成两个随机整数数组
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
+    #计算两个随机整数数组 numbers_1 和 numbers_2 的逐元素和，并将结果存储在 results 中
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
+    #将整数 Num 转换为字符串形式
     strNum = str(Num)
+    #将字符串 strNum 转换为一个字符列表
     chNums = list(strNum)
+    #使用列表推导式将字符串中的每个字符转换为整数，生成一个整数列表
     digitNums = [int(o) for o in strNum]
     return digitNums
 
