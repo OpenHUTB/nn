@@ -398,12 +398,16 @@ class KeyboardControl(object):
             world.player.set_autopilot(self._autopilot_enabled)
             world.player.set_light_state(self._lights)
         elif isinstance(world.player, carla.Walker):
+            # 行人控制初始化
             self._control = carla.WalkerControl()
             self._autopilot_enabled = False
             self._rotation = world.player.get_transform().rotation
         else:
+            # 不支持的角色类型抛出异常
             raise NotImplementedError("Actor type not supported")
+        # 初始化转向缓存值(用于平滑转向控制)
         self._steer_cache = 0.0
+         # 在HUD上显示帮助提示信息(4秒)
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock, sync_mode):
