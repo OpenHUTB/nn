@@ -49,12 +49,13 @@ print(get_batch(2, 10))
 
 # In[26]:
 
-
+# 定义了一个名为 mySeq2SeqModel 的类，继承自 keras.Model
+#调用父类 keras.Model 的初始化方法
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
-        self.v_sz=27
-        self.hidden = 128
+        self.v_sz=27 # 词汇表大小（包括可能的特殊符号）
+        self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
         
