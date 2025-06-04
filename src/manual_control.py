@@ -380,26 +380,33 @@ class World(object):
 # ==============================================================================
 
 
-class KeyboardControl(object):
-    """Class that handles keyboard input."""
+class KeyboardControl:
+
     def __init__(self, world, start_in_autopilot):
         self._autopilot_enabled = start_in_autopilot
         self._ackermann_enabled = False
         self._ackermann_reverse = 1
-        if isinstance(world.player, carla.Vehicle):
+        self._steer_cache = 0.0
+
+        player = world.player
+
+        if isinstance(player, carla.Vehicle):
             self._control = carla.VehicleControl()
             self._ackermann_control = carla.VehicleAckermannControl()
             self._lights = carla.VehicleLightState.NONE
-            world.player.set_autopilot(self._autopilot_enabled)
-            world.player.set_light_state(self._lights)
-        elif isinstance(world.player, carla.Walker):
+            player.set_autopilot(self._autopilot_enabled)
+            player.set_light_state(self._lights)
+
+        elif isinstance(player, carla.Walker):
             self._control = carla.WalkerControl()
             self._autopilot_enabled = False
-            self._rotation = world.player.get_transform().rotation
+            self._rotation = player.get_transform().rotation
+
         else:
-            raise NotImplementedError("Actor type not supported")
-        self._steer_cache = 0.0
+            raise NotImplementedError("Actor type not supported: {}".format(type(player)))
+
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
+
 
     def parse_events(self, client, world, clock, sync_mode):
         if isinstance(self._control, carla.VehicleControl):
