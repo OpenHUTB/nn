@@ -118,6 +118,14 @@ class GaussianMixtureModel:
                 new_sigma[k] += np.eye(n_features) * 1e-6  # 正则化
             
             # 计算对数似然
+            '''
+            log_prob_sum	每个样本的对数似然值
+            current_log_likelihood	当前轮次总对数似然
+            log_likelihood	上一轮的总对数似然
+            self.tol	收敛阈值（容差）
+            self.mu, new_mu	当前模型的高斯分布均值 / 更新后的均值
+            self.sigma, new_sigma	当前模型的协方差 / 更新后的协方差
+            '''
             current_log_likelihood = np.sum(log_prob_sum)
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
