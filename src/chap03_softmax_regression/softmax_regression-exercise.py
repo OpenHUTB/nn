@@ -1,14 +1,13 @@
-#!/usr/bin/env python
-# coding: utf-8
 
-# # Softmax Regression Example
 
 # ### 生成数据集， 看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 # #### '<font color="red">*</font>' 从高斯分布采样  (X, Y) ~ N(7, 7, 1, 1, 0)<br>
 
+
 # In[1]:
+
 
 
 import tensorflow as tf
@@ -43,12 +42,14 @@ y_b = np.random.normal(7.0, 1, dot_num)
 y = np.ones(dot_num) * 2
 C3 = np.array([x_b, y_b, y]).T
 
+
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")  # 绘制正样本，用蓝色加号表示
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")  # 绘制负样本，用绿色圆圈表示
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")  # 绘制负样本，用红色星号表示
 
 data_set = np.concatenate((C1, C2, C3), axis=0)  # 将正样本和负样本连接成一个数据集
 np.random.shuffle(data_set)  # 随机打乱数据集的顺序
+
 
 
 # ## 建立模型
@@ -62,6 +63,7 @@ np.random.shuffle(data_set)  # 随机打乱数据集的顺序
 
 
 epsilon = 1e-12  # 防止 log(0)
+
 
 
 class SoftmaxRegression(tf.Module):
@@ -90,6 +92,7 @@ class SoftmaxRegression(tf.Module):
         """
         logits = tf.matmul(x, self.W) + self.b
         return tf.nn.softmax(logits)
+
 
 
 @tf.function
