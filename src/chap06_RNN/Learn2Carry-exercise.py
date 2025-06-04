@@ -133,11 +133,13 @@ def compute_loss(logits, labels):
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
     with tf.GradientTape() as tape:
-        logits = model(x, y)       #前向传播：计算输出 logits
+        #前向传播：计算输出 logits
+        logits = model(x, y)
         loss = compute_loss(logits, label)
 
     # compute gradient
-    grads = tape.gradient(loss, model.trainable_variables)#计算梯度，自动求导
+    #计算梯度，自动求导
+    grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
 
@@ -170,7 +172,8 @@ def evaluate(model):
     # 前向传播预测 logits
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1) # 每位取最大概率的数字
+    # 每位取最大概率的数字
+    pred = np.argmax(logits, axis=-1) 
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
         print(o[0], o[1], o[0]==o[1])
