@@ -1,11 +1,5 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# ## 准备数据
 
 # In[1]:
-
-
 import os
 import tensorflow as tf
 from tensorflow import keras
@@ -13,7 +7,9 @@ from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D,BatchNormalization
 
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
+
 
 def mnist_dataset():# 准备MNIST数据集的主函数
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
@@ -22,6 +18,7 @@ def mnist_dataset():# 准备MNIST数据集的主函数
     ds = tf.data.Dataset.from_tensor_slices((x, y))
     ds = ds.map(prepare_mnist_features_and_labels)
     ds = ds.take(20000).shuffle(20000).batch(100)
+
     
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
@@ -37,12 +34,16 @@ def prepare_mnist_features_and_labels(x, y):# 预处理MNIST图像和标签的�
 # In[2]:
 
 
+
 7*7*64
+
 
 
 # ## 建立模型
 
+
 # In[3]:
+
 
 
 model = keras.Sequential([
