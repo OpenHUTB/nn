@@ -87,30 +87,30 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 
 # ## 实现 sigmoid 交叉熵loss函数
 
-def sigmoid_ce(x, label):
-    ##########
-    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
-    epsilon = 1e-8
-    x = tf.cast(x, tf.float32)
-    label = tf.cast(label, tf.float32) # 将标签转换为float32
-    # 计算sigmoid交叉熵损失，先计算每个样本的交叉熵，再求平均值
-    loss = -tf.reduce_mean(
-        label * tf.math.log(x + epsilon) +
-        (1 - label) * tf.math.log(1 - x + epsilon)
+def sigmoid_ce(logits, labels):
+    """
+    实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
+    接收未经过 sigmoid 的 logits 输入
+    """
+    logits = tf.cast(logits, tf.float32)
+    labels = tf.cast(labels, tf.float32)
+    
+    # 通过更稳定的方式实现 sigmoid 交叉熵：
+    loss = tf.reduce_mean(
+        tf.nn.relu(logits) - logits * labels + 
+        tf.math.log(1 + tf.exp(-tf.abs(logits)))
     )
-    ##########
+    
     return loss
 
-# 生成测试数据，形状为 [10] 的正态随机数
+# 测试逻辑
 test_data = np.random.normal(size=[10])
-# 进行sigmoid转换
-prob = tf.nn.sigmoid(test_data)
-# 生成标签，取值为 0 或 1
-label = np.random.randint(0, 2, 10).astype(test_data.dtype)
-print(label)
-# 比较自定义的损失值和tf自带的结果，误差小于 0.0001 则认为相等
-((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data)) - sigmoid_ce(prob, label))**2 < 0.0001).numpy()
+labels = np.random.randint(0, 2, size=[10]).astype(np.float32)
 
+# 对比 TensorFlow 原始结果和自定义函数结果
+tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=test_data))
+custom_loss = sigmoid_ce(test_data, labels)
 
-
-
+print("tf loss:", tf_loss.numpy())
+print("custom loss:", custom_loss.numpy())
+print("误差是否小于0.0001:", ((tf_loss - custom_loss) ** 2 < 0.0001).numpy())
