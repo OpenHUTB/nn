@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# ## 设计基函数(basis function) 以及数据读取
-
+# ## 设计基函数(basis function) 及数据读取
 # In[20]:
 
 import numpy as np
@@ -82,7 +80,6 @@ model = linearModel(ndim=ndim)
 
 
 # ## 训练以及评估
-
 # In[26]:
 
 
