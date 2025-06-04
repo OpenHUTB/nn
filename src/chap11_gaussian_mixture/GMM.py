@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
     np.random.seed(42)
-    # 真实参数
-    # 定义三个高斯分布的均值(中心点)
+    # 定义三个高斯分布的中心点
     mu_true = np.array([ 
         [0, 0],  # 第一个高斯分布的均值
         [5, 5],  # 第二个高斯分布的均值
@@ -15,8 +14,7 @@ def generate_data(n_samples=1000):
     sigma_true = np.array([
         [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
         [[2, 0.5], [0.5, 1]],   # 第二个分布：倾斜的椭圆
-        [[1, -0.5], [-0.5, 2]]
-        # 第三个分布：反向倾斜的椭圆
+        [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
     ])
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
@@ -63,8 +61,7 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     # 处理全-inf输入的特殊case
     if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):  #判断是否所有有效值都是-inf
-        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val 的适当形式。
-    
+        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val的适当形式。
     return result  #返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类

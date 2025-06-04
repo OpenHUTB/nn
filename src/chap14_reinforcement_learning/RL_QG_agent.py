@@ -61,7 +61,7 @@ class RL_QG_agent:
         # 补全代码
         
     def place(self,state,enables):
-        # 这个函数 主要用于测试， 返回的 action是 0-63 之间的一个数值，
+        # 用于测试的函数，返回的action是 0-63 之间的一个数值，
         # action 表示的是 要下的位置。
        # action = 123456789    # 删掉这句话，并填写相应代码
        # 状态预处理
