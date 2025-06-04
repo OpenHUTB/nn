@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # 参考mnist_conv-keras实现针对cifar10的alexNet卷积模型
 # 
 # 
@@ -8,9 +7,7 @@
 # ### 解压放到 ~/.keras/datasets/
 # 
 # ## tar zxvf cifar***.tar.zip
-
 # ## 准备数据
-
 # In[17]:
 
 
