@@ -1,5 +1,4 @@
 from gym.envs.registration import registry, register, make, spec
-
 # Algorithmic
 # ----------------------------------------
 
@@ -200,7 +199,6 @@ register(
 
 # Mujoco
 # ----------------------------------------
-
 # 2D
 
 register(
