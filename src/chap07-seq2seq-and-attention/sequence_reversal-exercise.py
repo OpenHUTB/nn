@@ -1,39 +1,29 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # 序列逆置
 # 使用sequence to sequence 模型将一个字符串序列逆置。
 # 例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`(下图来自网络，是一个sequence to sequence 模型示意图 )
 # ![seq2seq](./seq2seq.png)
-
 # In[1]:
-
 import numpy as np
 import tensorflow as tf
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
-
-
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
-
 # In[2]:
-
 import random
 import string
-
 def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
-
     letters = string.ascii_uppercase # 定义可用的字符集
     return ''.join(random.choice(letters) for i in range(stringLength))
     # 生成随机字符串
     # 使用 random.choice(letters) 从 letters 中随机选择一个字符
     # 重复这个过程 stringLength 次，并用 ''.join() 将这些字符连接成一个字符串
     # 最终返回生成的随机字符串
-
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]    # 生成batch_size个随机字符串
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]  # 转成索引
@@ -42,21 +32,14 @@ def get_batch(batch_size, length):
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
-
-
 # # 建立sequence to sequence 模型
-
 # In[3]:
-
-
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
         super().__init__()
-
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
         self.v_sz = 27
-
         # 嵌入层：将每个字符的索引映射成64维的向量表示
         # 输入维度：self.v_sz（即词表大小），输出维度为64
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64,
