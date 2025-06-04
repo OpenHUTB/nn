@@ -63,18 +63,14 @@ class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
         super().__init__()
-
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
         self.v_sz = 27
-
         # 嵌入层：将每个字符的索引映射成64维的向量表示
         # 输入维度：self.v_sz（即词表大小），输出维度为64
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64,
                                                     batch_input_shape=[None, None])
-
         # 编码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(128)
-
         # 解码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(128)
 
