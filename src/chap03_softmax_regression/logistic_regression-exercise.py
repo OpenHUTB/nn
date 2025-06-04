@@ -5,15 +5,16 @@
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 
+
 # In[7]:
 import tensorflow as tf
 import matplotlib.pyplot as plt
+
 
 from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
-
 # 设置随机种子（确保结果可复现）
 np.random.seed(42)      # NumPy的随机种子
 tf.random.set_seed(42)  # TensorFlow的随机种子
@@ -32,8 +33,6 @@ y = np.ones(dot_num)
 # 将正样本的x、y坐标和标签组合成一个数组，形状为 (dot_num, 3)
 C1 = np.array([x_p, y_p, y]).T
 # random函数为伪随机数生成，并非真随机
-
-
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 x_n = np.random.normal(6., 1, dot_num)
 # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
@@ -42,7 +41,6 @@ y_n = np.random.normal(3., 1, dot_num)
 y = np.zeros(dot_num)
 # 将负样本的x、y坐标和标签组合成一个数组，形状为 (dot_num, 3)
 C2 = np.array([x_n, y_n, y]).T
-
 # 绘制正样本，用蓝色加号表示
 plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
 # 绘制负样本，用绿色圆圈表示
@@ -52,8 +50,6 @@ plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
 data_set = np.concatenate((C1, C2), axis=0)
 # 随机打乱数据集的顺序
 np.random.shuffle(data_set)
-
-
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
@@ -83,7 +79,6 @@ class LogisticRegression():
 # 使用tf.function将该方法编译为静态图，提高执行效率
 #以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
 @tf.function
-
 def compute_loss(pred, label):
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
