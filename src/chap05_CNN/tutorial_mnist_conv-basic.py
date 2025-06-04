@@ -11,7 +11,7 @@ from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-#构建 MNIST 手写数字数据集的 TensorFlow 数据加载管道，包含数据预处理、批处理和随机打乱等操作
+#构建 MNIST 手写数字数据集的 TensorFlow 数据加载管道
 def mnist_dataset():#加载MNIST数据集
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
@@ -24,14 +24,13 @@ def mnist_dataset():#加载MNIST数据集
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
-    return ds, test_ds#测试集整批处理
+    return ds, test_ds
 
 def prepare_mnist_features_and_labels(x, y):
     x = tf.cast(x, tf.float32) / 255.0
     y = tf.cast(y, tf.int64)
     return x, y
-
-
+    
 # In[ ]:
 
 # ## 建立模型
@@ -65,7 +64,6 @@ optimizer = optimizers.Adam()
 
 
 # ## 定义loss以及train loop
-
 # In[25]:
 
 
