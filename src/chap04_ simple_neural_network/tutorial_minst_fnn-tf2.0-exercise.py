@@ -23,6 +23,7 @@ def mnist_dataset():
     return (x, y), (x_test, y_test)
 
 
+
 # In[8]:
 
 

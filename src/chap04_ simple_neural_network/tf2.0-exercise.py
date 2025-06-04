@@ -22,6 +22,7 @@ def softmax(x):
     ##########
     return prob_x
 
+
 test_data = np.random.normal(size=[10, 5])
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 <0.0001
 

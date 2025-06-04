@@ -13,6 +13,7 @@ class RBM:
         # 请补全此处代码
         pass
 
+
     def train(self, data):
         """Train model using data."""
 

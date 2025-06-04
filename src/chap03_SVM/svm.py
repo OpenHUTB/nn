@@ -5,6 +5,7 @@ import numpy as np
 
 
 def load_data(fname):
+
     """
     载入数据。
     """

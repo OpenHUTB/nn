@@ -23,6 +23,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
+
 def cifar10_dataset():
     (x, y), (x_test, y_test) = datasets.cifar10.load_data()
     ds = tf.data.Dataset.from_tensor_slices((x, y))

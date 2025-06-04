@@ -96,7 +96,8 @@ if __name__ == '__main__':
     x1, x2, y = list(zip(*data_set))
     x = list(zip(x1, x2))
     animation_fram = []
-    
+
+
     for i in range(200):
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
         animation_fram.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()))

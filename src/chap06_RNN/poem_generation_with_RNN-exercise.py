@@ -28,7 +28,8 @@ def process_dataset(fileName):
             if len(ins) > 200:
                 continue
             examples.append(ins)
-            
+
+
     counter = collections.Counter()
     for e in examples:
         for w in e:
