@@ -45,7 +45,7 @@ def eval_acc(label, pred):
 class SVM():
     """SVM模型"""
     #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
-    def __init__(self, lr=0.001, epochs=1000, lambda_=0.001, tolerance=1e-3):
+    def __init__(self, lr = 0.001, epochs=1000, lambda_ = 0.001, tolerance = 1e-3):
         self.w = None  # w: 权重向量(决定分类超平面的方向)
         self.b = 0     # b: 偏置项(决定分类超平面的位置)
         self.lr = lr   # 学习率
