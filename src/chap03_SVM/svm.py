@@ -9,6 +9,8 @@ def load_data(fname):
     """
     载入数据。
     """
+   
+    
     with open(fname, 'r') as f:
         data = []
         line = f.readline()
@@ -19,6 +21,7 @@ def load_data(fname):
             t = int(line[2])
             data.append([x1, x2, t])
         return np.array(data)
+
 
 
 def eval_acc(label, pred):
