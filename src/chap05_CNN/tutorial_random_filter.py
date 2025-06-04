@@ -13,6 +13,7 @@ from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
+
 class myConvModel(keras.Model):
     def __init__(self):
         super(myConvModel, self).__init__()
@@ -22,6 +23,7 @@ class myConvModel(keras.Model):
     def call(self, x):
         h1 = self.l1_conv(x)
         return h1
+
 
 
 
@@ -39,6 +41,9 @@ img = Image.open(open('corgi.jpg', 'rb'))
 img = numpy.asarray(img, dtype='float64') / 256.
 img = np.expand_dims(img, axis=0)
 img_out = random_conv(img)
+
+
+
 
 pylab.figure(figsize=(10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img[0, :, :, :])
