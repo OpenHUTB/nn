@@ -14,14 +14,41 @@ class RL_QG_agent:
         self.Q_values = None
 
     def init_model(self):
+        '''
+        self.input_states	网络输入（状态图像），大小为 [batch_size, 8, 8, 3]
+        conv1, conv2	两层卷积网络，用于提取棋盘局部特征
+        flat	卷积输出扁平化，供全连接层使用
+        dense	一个隐藏层，用于提取高层语义特征
+        self.Q_values	输出层，返回每个位置对应的 Q 值（动作的价值）
+        self.target_Q	训练目标 Q 值（用于计算 loss）
+        self.loss	使用 MSE 作为损失函数
+        self.optimizer	使用 Adam 优化器进行参数更新
+        self.saver	用于模型保存和恢复
 
+        '''
         # 定义自己的 网络
         self.sess = tf.Session()
         # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
         self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name="input_states")
         # 构建卷积神经网络
-        conv1 = tf.layers.conv2d(inputs=self.input_states, filters=32, kernel_size=3, padding="same", activation=tf.nn.relu)
-        conv2 = tf.layers.conv2d(inputs=conv1, filters=64, kernel_size=3, padding="same", activation=tf.nn.relu)
+        # 第1个卷积层：提取局部空间特征
+        conv1 = tf.layers.conv2d(
+            inputs=self.input_states,
+            filters=32,                 # 输出通道数：32个卷积核
+            kernel_size=3,              # 卷积核大小 3x3
+            padding="same",             # 输出大小与输入相同
+            activation=tf.nn.relu       # ReLU 激活函数
+            )
+
+    # 第2个卷积层：提取更高级特征
+        conv2 = tf.layers.conv2d(
+            inputs=conv1,
+            filters=64,                 # 输出通道数：64个卷积核
+            kernel_size=3,
+            padding="same",
+            activation=tf.nn.relu
+            )
+        
         # 扁平化层
         flat = tf.layers.flatten(conv2)
         # 全连接层
