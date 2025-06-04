@@ -40,6 +40,7 @@ def get_batch(batch_size, length):
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     
     # 解码器输入：在目标序列前加0（起始标记），并去掉最后一个字符
+    #例如，目标序列为[5,4,3,2,1],则解码器输入[0,5,4,3,2]
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
