@@ -219,22 +219,22 @@ class Log:
 
 import tensorflow as tf
 
-label = np.zeros_like(x)
+label = np.zeros_like(x) #创建了一个与x形状相同的全零标签矩阵
 label[0, 1]=1.
 label[1, 0]=1
 label[2, 3]=1
 label[3, 5]=1
 label[4, 0]=1
 
-x = np.random.normal(size=[5, 6])
-W1 = np.random.normal(size=[6, 5])
-W2 = np.random.normal(size=[5, 6])
+x = np.random.normal(size=[5, 6]) # 5个样本，每个样本6维特征
+W1 = np.random.normal(size=[6, 5]) # 第一层权重 (6→5)
+W2 = np.random.normal(size=[5, 6]) # 第二层权重 (5→6)
 
-mul_h1 = Matmul()
-mul_h2 = Matmul()
-relu = Relu()
+mul_h1 = Matmul() # 第一层矩阵乘法
+mul_h2 = Matmul() # 第二层矩阵乘法
+relu = Relu() # ReLU激活函数
 softmax = Softmax()
-log = Log()
+log = Log() # 对数函数
 
 h1 = mul_h1.forward(x, W1) # shape(5, 4)
 h1_relu = relu.forward(h1)
