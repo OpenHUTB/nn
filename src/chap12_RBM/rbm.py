@@ -8,32 +8,19 @@ class RBM:
 
     def __init__(self, n_hidden=2, n_observe=784):
         """初始化模型参数（受限玻尔兹曼机）"""
-
-        # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
-        #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
         if n_hidden <= 0 or n_observe <= 0:
             raise ValueError("Number of hidden and visible units must be positive integers.")
 
-        self.n_hidden = n_hidden
-        self.n_observe = n_observe
-        
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden)) #计算权重的初始化标准差
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden)) #初始化权重矩阵 self.W
-        #self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-        self.b_h = np.zeros(n_hidden) #初始化隐藏层的偏置向量 self.b_h
-        self.b_v = np.zeros(n_observe) #初始化输出层的偏置向量 self.b_v
         self.n_hidden = n_hidden     # 隐藏层神经元个数
         self.n_observe = n_observe    # 可见层神经元个数
         
         # 初始化权重和偏置
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))     # Xavier初始化
         self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 权重矩阵
-        # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))  # 另一种初始化方式
         self.b_h = np.zeros(n_hidden)   # 隐藏层偏置
         self.b_v = np.zeros(n_observe)  # 可见层偏置
-        pass
-    
+
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
         return 1.0 / (1 + np.exp(-x))
