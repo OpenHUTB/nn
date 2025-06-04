@@ -187,3 +187,60 @@ if __name__ == "__main__":
     test_loss, test_accuracy = test(model, test_data, test_label)
     print(f'Test Loss {test_loss:.4f}; Test Accuracy {test_accuracy:.4f}')
 ```
+
+---
+
+# MNIST 手写数字识别教程
+
+## 简介
+
+本项目使用 TensorFlow 2.0 实现一个简单的前馈神经网络（Feedforward Neural Network, FNN），用于识别 MNIST 数据集中的手写数字。该项目主要包括数据准备、模型定义、训练和测试过程。
+
+## 环境要求
+
+-   Python 3.x
+-   TensorFlow 2.0+
+-   NumPy
+
+## 文件结构
+
+-   `tutorial_minst_fnn-tf2.0-exercise.py`：主程序，包含数据加载、模型定义、训练和测试逻辑。
+
+## 使用说明
+
+### 1. 准备数据
+
+程序首先加载 MNIST 数据集，并对图像数据进行归一化处理，将像素值缩放到 [0, 1] 之间。
+
+### 2. 定义模型
+
+创建了一个简单的两层神经网络模型，包含：
+
+-   输入层：784 个节点（28x28 像素展平）
+-   隐藏层：128 个 ReLU 激活的节点
+-   输出层：10 个节点（数字 0-9）
+
+### 3. 训练模型
+
+使用 Adam 优化器进行模型训练，执行 50 个 epoch。每个 epoch 将输出当前的损失和准确率。
+
+### 4. 测试模型
+
+在测试集上评估训练后的模型，输出测试损失和准确率。
+
+## 如何运行
+
+确保安装了所需的库后，可以通过以下命令运行该程序：
+
+```bash
+python tutorial_minst_fnn-tf2.0-exercise.py
+```
+
+## 代码说明
+
+-   **数据加载**：通过 `mnist_dataset()` 函数加载数据。
+-   **模型定义**：使用 `myModel` 类定义模型的结构和前向传播逻辑。
+-   **损失和准确率计算**：通过 `compute_loss()` 和 `compute_accuracy()` 函数计算损失和准确率。
+-   **训练步骤**：`train_one_step()` 函数执行一次训练步骤并更新模型参数。
+-   **测试步骤**：`test()` 函数计算测试集上的损失和准确率。
+
