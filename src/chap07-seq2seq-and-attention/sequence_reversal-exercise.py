@@ -26,8 +26,8 @@ import string
 
 def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
-
-    letters = string.ascii_uppercase # 定义可用的字符集
+# 定义可用的字符集
+    letters = string.ascii_uppercase 
     return ''.join(random.choice(letters) for i in range(stringLength))
     # 生成随机字符串
     # 使用 random.choice(letters) 从 letters 中随机选择一个字符
@@ -35,10 +35,14 @@ def randomString(stringLength):
     # 最终返回生成的随机字符串
 
 def get_batch(batch_size, length):
-    batched_examples = [randomString(length) for i in range(batch_size)]    # 生成batch_size个随机字符串
-    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]  # 转成索引
-    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]   # 逆序
-    dec_x = [[0] + e_idx[:-1] for e_idx in y]   # 添加起始符
+     # 生成batch_size个随机字符串
+    batched_examples = [randomString(length) for i in range(batch_size)]   
+    # 转成索引
+    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]  
+     # 逆序
+    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]  
+     # 添加起始符
+    dec_x = [[0] + e_idx[:-1] for e_idx in y]  
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
