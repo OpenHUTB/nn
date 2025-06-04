@@ -17,7 +17,8 @@ def mnist_dataset():
     #normalize
     x = x/255.0
     x_test = x_test/255.0
-    
+
+
     return (x, y), (x_test, y_test)
 
 # ## Demo numpy based auto differentiation
