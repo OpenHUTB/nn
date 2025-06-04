@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
     np.random.seed(42)
-    # 真实参数
-    # 定义三个高斯分布的均值(中心点)
+    # 定义三个高斯分布的中心点
     mu_true = np.array([ 
         [0, 0],  # 第一个高斯分布的均值
         [5, 5],  # 第二个高斯分布的均值
@@ -15,8 +14,7 @@ def generate_data(n_samples=1000):
     sigma_true = np.array([
         [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
         [[2, 0.5], [0.5, 1]],   # 第二个分布：倾斜的椭圆
-        [[1, -0.5], [-0.5, 2]]
-        # 第三个分布：反向倾斜的椭圆
+        [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
     ])
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
@@ -63,8 +61,7 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     # 处理全-inf输入的特殊case
     if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):  #判断是否所有有效值都是-inf
-        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val 的适当形式。
-    
+        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val的适当形式。
     return result  #返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类
@@ -108,16 +105,30 @@ class GaussianMixtureModel:
             
             for k in range(self.n_components): # 遍历每个高斯成分更新参数
                 # 更新均值
-
                 new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
-                # 更新协方差
 
-                X_centered = X - new_mu[k]
-                weighted_X = gamma[:, k, None] * X_centered
-                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]
-                new_sigma[k] += np.eye(n_features) * 1e-6  # 正则化
+                # 更新协方差
+                # 计算中心化后的样本：X 减去第 k 个高斯成分的均值
+                X_centered = X - new_mu[k]  # shape: (n_samples, n_features)
+                # 每个样本加权后的中心化向量
+                weighted_X = gamma[:, k, None] * X_centered  # shape: (n_samples, n_features)
+                # 使用加权样本计算协方差矩阵（第 k 个高斯成分）
+                new_sigma_k = np.einsum('ni,nj->ij', X_centered, weighted_X) / Nk[k]
+                # 正则化以防止协方差矩阵奇异，eps 可以调节
+                eps = 1e-6  # 正则化系数（可以作为参数传入或配置）
+                new_sigma_k += np.eye(n_features) * eps  # 向对角线加小数值，避免数值不稳定
+
+                new_sigma[k] = new_sigma_k
             
             # 计算对数似然
+            '''
+            log_prob_sum	每个样本的对数似然值
+            current_log_likelihood	当前轮次总对数似然
+            log_likelihood	上一轮的总对数似然
+            self.tol	收敛阈值（容差）
+            self.mu, new_mu	当前模型的高斯分布均值 / 更新后的均值
+            self.sigma, new_sigma	当前模型的协方差 / 更新后的协方差
+            '''
             current_log_likelihood = np.sum(log_prob_sum)
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break

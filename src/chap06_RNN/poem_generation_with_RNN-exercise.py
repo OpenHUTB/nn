@@ -37,7 +37,7 @@ def process_dataset(fileName):
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            # 过滤过长的诗歌
+            ### 过滤过长的诗歌
             if len(ins) > 200:
 
                 continue
@@ -49,7 +49,7 @@ def process_dataset(fileName):
         for w in e:
             counter[w] += 1
     
-    # 按词频从高到低排序
+    ## 按词频从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)
@@ -65,7 +65,7 @@ def process_dataset(fileName):
     # 记录每个诗歌的长度
     seqlen = [len(e) for e in indexed_examples]
     
-    # 组合诗歌数据和对应长度
+    #  组合诗歌数据和对应长度
     instances = list(zip(indexed_examples, seqlen))
     
     return instances, word2id, id2word

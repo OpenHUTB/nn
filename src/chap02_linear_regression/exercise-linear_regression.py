@@ -1,21 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# ## 说明
-#
-# 请按照填空顺序编号分别完成 参数优化，不同基函数的实现
-
 import numpy as np
 import matplotlib.pyplot as plt
-
 
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
-
     Args:
         filename: 数据文件的路径
-
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
@@ -212,9 +204,10 @@ def main(x_train, y_train, use_gradient_descent=False):
     # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
 
-
+# ## 评估结果
 # ## 评估结果
 # > 没有需要填写的代码，但是建议读懂
+
 
 
 def evaluate(ys, ys_pred):
@@ -270,5 +263,6 @@ if __name__ == "__main__":
     plt.xlabel("x")  # 设置x轴的标签
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
-    plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
+    plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义 # 添加图例，表示每条线的含义
     plt.show()
+

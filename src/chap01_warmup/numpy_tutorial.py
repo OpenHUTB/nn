@@ -5,6 +5,7 @@
 
 # 1.导入numpy库
 import numpy as np #将numpy库命名为np
+
 # 导入matplotlib.pyplot库
 import matplotlib
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
@@ -200,6 +201,7 @@ plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 
 # 添加网格线
 plt.grid(True)
+#plt.grid(True)
 
 # 显示图例
 plt.legend()

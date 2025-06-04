@@ -91,6 +91,7 @@ import carla
 
 from carla import ColorConverter as cc
 
+
 import argparse
 import collections
 import datetime
@@ -383,22 +384,30 @@ class World(object):
 class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
+        # 初始化控制状态标志
         self._autopilot_enabled = start_in_autopilot
         self._ackermann_enabled = False
         self._ackermann_reverse = 1
+        # 根据角色类型(车辆/行人)初始化不同的控制器
         if isinstance(world.player, carla.Vehicle):
+             # 车辆控制初始化
             self._control = carla.VehicleControl()
             self._ackermann_control = carla.VehicleAckermannControl()
             self._lights = carla.VehicleLightState.NONE
+            # 设置初始自动驾驶状态和灯光状态
             world.player.set_autopilot(self._autopilot_enabled)
             world.player.set_light_state(self._lights)
         elif isinstance(world.player, carla.Walker):
+            # 行人控制初始化
             self._control = carla.WalkerControl()
             self._autopilot_enabled = False
             self._rotation = world.player.get_transform().rotation
         else:
+            # 不支持的角色类型抛出异常
             raise NotImplementedError("Actor type not supported")
+        # 初始化转向缓存值(用于平滑转向控制)
         self._steer_cache = 0.0
+         # 在HUD上显示帮助提示信息(4秒)
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock, sync_mode):
