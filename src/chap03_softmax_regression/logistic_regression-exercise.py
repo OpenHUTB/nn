@@ -6,12 +6,20 @@
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 
 # In[7]:
+# 导入 TensorFlow 深度学习框架
 import tensorflow as tf
+# 导入 matplotlib 的 pyplot 模块，用于数据可视化
 import matplotlib.pyplot as plt
 
+# 从 matplotlib 导入 animation 和 rc 模块
+# animation：用于创建动态动画
+# rc：运行时配置(runtime configuration)，用于设置图形默认参数
 from matplotlib import animation, rc
+# 导入 IPython 的 HTML 显示功能，用于在 Notebook 中嵌入动画
 from IPython.display import HTML
+# 导入 matplotlib 的 colormap 模块，用于颜色映射
 import matplotlib.cm as cm
+# 导入 NumPy 数值计算库
 import numpy as np
 
 # 设置随机种子（确保结果可复现）

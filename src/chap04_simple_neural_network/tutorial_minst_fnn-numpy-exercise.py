@@ -87,10 +87,15 @@ class Softmax:
         '''
         x: shape(N, c)
         '''
+        # 对输入数据应用指数函数，确保所有值为正
         x_exp = np.exp(x)
+        # 计算每个样本的归一化分母（分区函数）
         partition = np.sum(x_exp, axis=1, keepdims=True)
+        # 计算 softmax 输出：指数值 / 分区函数
+        # 添加 epsilon 防止除零错误（数值稳定性）
         out = x_exp/(partition+self.epsilon)
-        
+
+        # 将计算结果存入内存字典，用于反向传播
         self.mem['out'] = out
         self.mem['x_exp'] = x_exp
         return out
