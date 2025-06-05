@@ -14,13 +14,31 @@ def identity_basis(x):
     return np.expand_dims(x, axis=1)
 
 
-def multinomial_basis(x, feature_num=10):
-    """多项式基函数"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    feat = [x]
-    for i in range(2, feature_num + 1):
-        feat.append(x**i)
-    ret = np.concatenate(feat, axis=1)
+def multinomial_basis(x, feature_num=10, include_bias=True, degree_start=1):
+    """
+    多项式基函数
+    
+    参数:
+        x: 输入数据，形状为 (N,)
+        feature_num: 多项式特征数量
+        include_bias: 是否包含常数项 (x^0)
+        degree_start: 多项式起始阶数，默认为1
+    
+    返回:
+        多项式特征矩阵，形状为 (N, feature_num)
+    """
+    x = np.expand_dims(x, axis=1)  # shape (N, 1)
+    feats = []
+    
+    # 包含常数项 (x^0)
+    if include_bias:
+        feats.append(np.ones_like(x))
+    
+    # 生成多项式特征 x^degree_start, x^(degree_start+1), ...
+    for i in range(degree_start, degree_start + feature_num - (1 if include_bias else 0)):
+        feats.append(x ** i)
+    
+    ret = np.concatenate(feats, axis=1)  # shape (N, feature_num)
     return ret
 
 
