@@ -168,6 +168,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
 model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+# 使用随机梯度下降优化器
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
 x1, x2, y = list(zip(*data_set))
 # 转换为 float32
