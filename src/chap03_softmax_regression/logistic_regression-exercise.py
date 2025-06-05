@@ -4,7 +4,6 @@
 # ### 生成数据集， 看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
-
 # In[7]:
 # 导入 TensorFlow 深度学习框架
 import tensorflow as tf
@@ -43,6 +42,7 @@ y = np.ones(dot_num)
 C1 = np.array([x_p, y_p, y]).T
 # random函数为伪随机数生成，并非真随机
 
+
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 x_n = np.random.normal(6., 1, dot_num)
 # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
@@ -56,6 +56,7 @@ C2 = np.array([x_n, y_n, y]).T
 plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
 # 绘制负样本，用绿色圆圈表示
 plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
+
 
 # 将正样本和负样本连接成一个数据集
 data_set = np.concatenate((C1, C2), axis=0)
@@ -120,6 +121,7 @@ def compute_loss(pred, label):
     '''============================='''
     # 计算所有样本损失的平均值
     loss = tf.reduce_mean(losses)
+
     
     # 将预测概率大于0.5的设置为1，小于等于0.5的设置为0，得到预测标签
     pred = tf.where(pred>0.5, tf.ones_like(pred), tf.zeros_like(pred))
