@@ -95,6 +95,7 @@ def sigmoid_ce(logits, labels):
     实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
     接收未经过 sigmoid 的 logits 输入
     """
+    # 将 logits 和 labels 转换为 tf.float32 类型，确保后续计算的数值稳定性
     logits = tf.cast(logits, tf.float32)
     labels = tf.cast(labels, tf.float32)
     

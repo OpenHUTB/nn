@@ -9,27 +9,46 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 learning_rate = 1e-4 #学习率
 keep_prob_rate = 0.7 # Dropout保留概率0.7
 max_epoch = 2000 #最大训练轮数2000
+
+
 def compute_accuracy(v_xs, v_ys):
+    """
+    计算模型在给定数据集上的准确率。
+
+    参数:
+        v_xs: 输入数据。
+        v_ys: 真实标签。
+
+    返回:
+        result: 模型的准确率。
+    """
     global prediction
     # 获取模型预测结果
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
-    correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(v_ys,1)) 
+    correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
     # 计算准确率
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) 
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1}) 
+    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
 
 def weight_variable(shape):
+    """
+    初始化权重变量。
 
-    # 初始化权重：截断正态分布，stddev=0.1，有助于稳定训练
-    # 使用截断正态分布初始化权重
-    # 截断正态分布可以防止梯度爆炸或消失的问题
-    # stddev=0.1 表示标准差为0.1，控制初始权重的范围
+    参数:
+        shape: 权重的形状。
+
+    返回:
+        tf.Variable: 初始化后的权重变量。
+    """
+    # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
     initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial) ## 返回可训练变量
+    return tf.Variable(initial)
+
+
 
 def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
