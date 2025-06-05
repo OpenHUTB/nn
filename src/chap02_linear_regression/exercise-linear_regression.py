@@ -153,16 +153,18 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
     :param epochs: 迭代次数（默认为 1000）
     :return: 优化后的权重向量 w
     """
-    # 初始化权重 w 为全零向量
-    w = np.zeros(phi.shape[1])
-    # 迭代训练 epochs 次
+   w = np.zeros(phi.shape[1])  # 初始化 w
     for epoch in range(epochs):
-        # 计算预测值
         y_pred = phi @ w
-        # 计算梯度
-        gradient = -2 * phi.T @ (y - y_pred) / len(y)
-        # 更新权重 w
-        w -= lr * gradient
+        gradient = -2 * phi.T @ (y - y_pred) / len(y)  # 计算梯度
+        w_new = w - lr * gradient  # 更新 w
+        
+        # 提前终止条件
+        if np.linalg.norm(w_new - w) < tol:
+            break
+            
+        w = w_new
+        
     return w
 
 
