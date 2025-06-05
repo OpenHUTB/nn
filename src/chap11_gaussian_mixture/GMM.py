@@ -42,13 +42,13 @@ def generate_data(n_samples=1000):
         y_true.extend([i] * samples_per_component[i]) 
     
     # 合并并打乱数据
-    #将多个子数据集合并为一个完整数据集
+    # 将多个子数据集合并为一个完整数据集
     X = np.vstack(X_list)  
-     #将Python列表转换为NumPy数组
+     # 将Python列表转换为NumPy数组
     y_true = np.array(y_true) 
-    #生成0到n_samples-1的随机排列
+    # 生成0到n_samples-1的随机排列
     shuffle_idx = np.random.permutation(n_samples) 
-     #使用相同的随机索引同时打乱特征和标签
+     # 使用相同的随机索引同时打乱特征和标签
     return X[shuffle_idx], y_true[shuffle_idx]
 
 # 自定义logsumexp函数
@@ -205,12 +205,12 @@ if __name__ == "__main__":
     # 此标签通常用于描述y轴所代表的数据含义或特征名称
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
     plt.subplot(1, 2, 2) # 创建一个1行2列的子图网格，并选择第2个子图(右侧)进行后续绘图
-    #   - 第一个参数1: 表示子图网格的行数
-    #   - 第二个参数2: 表示子图网格的列数
-    #   - 第三个参数2: 表示当前选中的子图位置(从左到右、从上到下计数)
+    #  - 第一个参数1: 表示子图网格的行数
+    #  - 第二个参数2: 表示子图网格的列数
+    #  - 第三个参数2: 表示当前选中的子图位置(从左到右、从上到下计数)
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)# 创建二维数据点的散点图，每个点的颜色由预测标签y_pred决定
-#   - X[:, 0]: 所有数据点的第一个特征值(作为x轴坐标)
-#   - X[:, 1]: 所有数据点的第二个特征值(作为y轴坐标)
+#  - X[:, 0]: 所有数据点的第一个特征值(作为x轴坐标)
+#  - X[:, 1]: 所有数据点的第二个特征值(作为y轴坐标)
     plt.title("GMM Predicted Clusters") # 子图标题
 
     # 设置坐标轴标签
