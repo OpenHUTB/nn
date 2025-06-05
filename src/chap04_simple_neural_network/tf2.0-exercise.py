@@ -19,6 +19,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     """
     x = tf.cast(x, tf.float32)
 
+   
     # 数值稳定性处理：减去最大值避免指数爆炸
     max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
     shifted_logits = x - max_per_row
