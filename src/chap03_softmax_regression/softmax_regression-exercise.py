@@ -94,7 +94,7 @@ class SoftmaxRegression(tf.Module):
     @tf.function
     def __call__(self, x):
         """
-        模型前向传播
+        模型前向传播：计算线性变换并应用softmax函数得到概率分布
         :param x: 输入数据，shape = (N, input_dim)
         :return: softmax 概率分布，shape = (N, num_classes)
         """
