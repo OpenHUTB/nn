@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # 加法进位实验
 #
-
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
 
 # In[1]:
