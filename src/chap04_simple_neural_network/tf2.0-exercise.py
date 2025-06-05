@@ -6,7 +6,6 @@ import numpy as np
 import tensorflow as tf
 
 # ## 实现softmax函数
-# ## 实现softmax函数
 def softmax(x: tf.Tensor) -> tf.Tensor:
     """
     实现数值稳定的 softmax 函数，仅在最后一维进行归一化。
