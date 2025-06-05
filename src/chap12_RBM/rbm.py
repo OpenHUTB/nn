@@ -67,8 +67,8 @@ class RBM:
                 # 正相传播：从v0计算隐藏层激活概率
 
 
-                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h)
-                h0_sample = self._sample_binary(h0_prob)
+                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) # 计算隐藏层单元被激活的概率
+                h0_sample = self._sample_binary(h0_prob) # 根据计算出的概率对隐藏层进行二值化采样
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
                 v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)     
