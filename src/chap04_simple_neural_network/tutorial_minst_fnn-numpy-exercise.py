@@ -218,38 +218,61 @@ class Log:
 # In[6]:
 
 import tensorflow as tf
-
+# 创建一个与x形状相同的全零标签矩阵
+# 手动设置一些标签值为1（模拟多标签分类问题）
 label = np.zeros_like(x)
 label[0, 1]=1.
 label[1, 0]=1
 label[2, 3]=1
 label[3, 5]=1
 label[4, 0]=1
+ # 第一个样本的第二个类别为正
+ # 第二个样本的第一个类别为正
+ # 第三个样本的第四个类别为正
+ # 第四个样本的第六个类别为正
+ # 第五个样本的第一个类别为正
 
+
+# 生成随机输入数据，形状为(5, 6) - 5个样本，每个样本6个特征x = np.random.normal(size=[5, 6])
 x = np.random.normal(size=[5, 6])
+# 初始化第一层权重矩阵，形状为(6, 5) - 输入6维，输出5维
 W1 = np.random.normal(size=[6, 5])
+# 初始化第二层权重矩阵，形状为(5, 6) - 输入5维，输出6维
 W2 = np.random.normal(size=[5, 6])
 
-mul_h1 = Matmul()
-mul_h2 = Matmul()
-relu = Relu()
-softmax = Softmax()
-log = Log()
-
-h1 = mul_h1.forward(x, W1) # shape(5, 4)
+# 创建操作对象
+mul_h1 = Matmul()  # 第一层矩阵乘法
+mul_h2 = Matmul()  # 第二层矩阵乘法
+relu = Relu()      # ReLU激活函数
+softmax = Softmax()  # Softmax激活函数
+log = Log()        # 对数变换（通常用于交叉熵损失计算）
+ 
+# 前向传播过程
+# 第一层矩阵乘法：输入x (5,6) 与权重W1 (6,5) 相乘，得到形状(5,5)的输出
+h1 = mul_h1.forward(x, W1)  # shape应为(5, 5)
+# 对第一层输出应用ReLU激活函数
 h1_relu = relu.forward(h1)
-h2 = mul_h2.forward(h1_relu, W2)
+# 第二层矩阵乘法：ReLU输出 (5,5) 与权重W2 (5,6) 相乘，得到形状(5,6)的输出
+h2 = mul_h2.forward(h1_relu, W2)  # shape(5, 6)
+# 对第二层输出应用Softmax激活函数（将输出转换为概率分布）
 h2_soft = softmax.forward(h2)
+# 对Softmax输出取对数（通常用于计算交叉熵损失）
 h2_log = log.forward(h2_soft)
-
-
+ 
+# 反向传播过程（从损失开始计算梯度）
+# 计算对数层的梯度（假设label是真实标签）
 h2_log_grad = log.backward(label)
+# 计算Softmax层的梯度
 h2_soft_grad = softmax.backward(h2_log_grad)
+# 计算第二层矩阵乘法的梯度，返回输入梯度和权重梯度
 h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)
+# 计算ReLU层的梯度
 h1_relu_grad = relu.backward(h2_grad)
+# 计算第一层矩阵乘法的梯度，返回输入梯度和权重梯度
 h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)
-
-print(h2_log_grad)
+ 
+# 打印结果
+print(h2_log_grad)  # 打印对数层的梯度
 print('--'*20)
 # print(W2_grad)
 
