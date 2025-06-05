@@ -69,7 +69,7 @@ def compute_loss(logits, labels):
     # 计算稀疏softmax交叉熵损失，并求平均值
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels))
+            logits = logits, labels = labels))
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
