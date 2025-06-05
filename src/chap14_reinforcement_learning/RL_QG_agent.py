@@ -74,12 +74,12 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         
         # 过滤合法动作并选择最优
         
-        legal_q = q_vals[0][enables]
+        legal_q = q_vals[0][enables]  # 从 Q 值矩阵中提取当前状态下的合法动作的 Q 值
         if np.sum(legal_q) == 0:  # 所有合法动作Q值都为 0 的特殊情况处理
-            return np.random.choice(np.where(enables)[0])
+            return np.random.choice(np.where(enables)[0])   # 随机选择一个合法动作
         
-        max_q = np.max(legal_q)
-        candidates = np.where(legal_q == max_q)[0]
+        max_q = np.max(legal_q)  # 找到合法动作中 Q 值最大的值
+        candidates = np.where(legal_q == max_q)[0]  # 找到所有 Q 值等于最大 Q 值的动作索引
         
         # 随机选择最优动作 （解决多个最大值的情况）
         return np.random.choice(candidates)
