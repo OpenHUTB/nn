@@ -197,13 +197,13 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     # 定义预测函数
     def f(x):
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)# 创建常数项特征 phi0 (全1向量)，并增加一个维度使其成为列向量
-        phi1 = basis_func(x)# 计算基函数转换后的特征 phi1
-        phi = np.concatenate([phi0, phi1], axis=1)# 将常数项特征和基函数特征在列方向拼接，构成完整的特征矩阵
-        if use_gradient_descent and w_gd is not None:# 根据训练方法选择使用梯度下降的权重(w_gd)还是最小二乘的权重(w_lsq)
-            return np.dot(phi, w_gd) # 使用梯度下降训练的权重进行预测
+        phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        phi1 = basis_func(x)
+        phi = np.concatenate([phi0, phi1], axis=1)
+        if use_gradient_descent and w_gd is not None:
+            return np.dot(phi, w_gd)
         else:
-            return np.dot(phi, w_lsq) # 使用最小二乘法训练的权重进行预测
+            return np.dot(phi, w_lsq)
 
     # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
