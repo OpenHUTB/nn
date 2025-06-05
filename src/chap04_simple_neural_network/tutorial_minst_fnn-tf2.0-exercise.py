@@ -82,20 +82,17 @@ def compute_accuracy(logits, labels):
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def train_one_step(model, optimizer, x, y):
-    # 使用GradientTape记录计算图，用于自动求导
-    with tf.GradientTape() as tape:
-        logits = model(x)
-        loss = compute_loss(logits, y)
+    """
+    执行一次训练步骤，计算梯度并更新模型参数。
+    """
+    with tf.GradientTape() as tape:  # 记录计算图以计算梯度
+        logits = model(x)  # 前向传播
+        loss = compute_loss(logits, y)  # 计算损失
 
-    # 计算可训练变量的梯度，这里的变量声明在模型中未完善，当前为假设的变量
-    trainable_vars = [model.W1, model.W2, model.b1, model.b2]
-    grads = tape.gradient(loss, trainable_vars)
-    # 使用梯度更新可训练变量
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01*g)
+    grads = tape.gradient(loss, model.trainable_variables)  # 计算梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
-    accuracy = compute_accuracy(logits, y)
-    # loss and accuracy is scalar tensor
+    accuracy = compute_accuracy(logits, y)  # 计算准确率
     return loss, accuracy
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率

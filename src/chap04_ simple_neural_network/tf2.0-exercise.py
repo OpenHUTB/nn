@@ -16,10 +16,14 @@ import numpy as np
 
 
 def softmax(x):
-    ##########
-    '''实现softmax函数，只要求对最后一维归一化，
-    不允许用tf自带的softmax函数'''
-    ##########
+    """
+    实现softmax函数，对输入张量的最后一维进行归一化。
+    不允许使用 TensorFlow 自带的 softmax 函数。
+    """
+    # 计算每个元素的指数值，减去最大值以提高数值稳定性
+    exp_x = tf.exp(x - tf.reduce_max(x, axis=-1, keepdims=True))
+    # 计算 softmax 值
+    prob_x = exp_x / tf.reduce_sum(exp_x, axis=-1, keepdims=True)
     return prob_x
 
 
