@@ -29,7 +29,7 @@ C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 x_n = np.random.normal(6., 1, dot_num) # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 y_n = np.random.normal(3., 1, dot_num) # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y = np.zeros(dot_num)
-C2 = np.array([x_n, y_n, y]).T
+C2 = np.array([x_n, y_n, y]).T # 创建负样本数据集，每行包含x坐标、y坐标和标签0
 
 x_b = np.random.normal(7., 1, dot_num) # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
 y_b = np.random.normal(7., 1, dot_num)
