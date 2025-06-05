@@ -12,7 +12,6 @@
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
 from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
@@ -37,6 +36,7 @@ C1 = np.array([x_p, y_p, y]).T
 x_n = np.random.normal(
     6.0, 1, dot_num
 )
+
 y_n = np.random.normal(3.0, 1, dot_num)
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
