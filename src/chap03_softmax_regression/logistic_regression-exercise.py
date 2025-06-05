@@ -217,6 +217,6 @@ if __name__ == '__main__':
 
     anim = animation.FuncAnimation(
         f, animate, init_func=init,
-        frames=len(animation_frames), interval=30, blit=True
+        frames=len(animation_frames), interval=50, blit=True, repeat=False
     )
     HTML(anim.to_html5_video())
