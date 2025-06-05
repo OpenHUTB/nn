@@ -60,7 +60,7 @@ class RBM:
             # 打乱数据顺序
             np.random.shuffle(data_flat) # 使用小批量梯度下降法
             for i in range(0, n_samples, batch_size):# 获取当前批次的数据
-                batch = data_flat[i:i + batch_size] # 将批次数据转换为float64类型，确保数值计算的精度
+                batch = data_flat[i:i + batch_size] # 将批次数据转换为 float64 类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率
@@ -89,7 +89,7 @@ class RBM:
         # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（即模拟初始图像）
         v = np.random.binomial(1, 0.5, self.n_observe)
 
-        # 进行1000次Gibbs采样迭代，以逐步趋近真实数据分布
+        # 进行1000次 Gibbs 采样迭代，以逐步趋近真实数据分布
         for _ in range(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
@@ -106,8 +106,7 @@ class RBM:
         # 将最终的可见层向量重塑为 28×28 的图像格式
         return v.reshape(28, 28)
 
-
-# 使用MNIST数据集训练RBM模型
+# 使用 MNIST 数据集训练 RBM 模型
 if __name__ == '__main__':
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
     mnist = np.load('mnist_bin.npy')  # 60000x28x28
@@ -115,10 +114,10 @@ if __name__ == '__main__':
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
 
-    # 初始化RBM对象：2个隐藏节点，784个可见节点（28×28图像）
+    # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28图像）
     rbm = RBM(2, img_size)
 
-    # 使用MNIST数据进行训练
+    # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 
     # 从模型中采样一张图像
