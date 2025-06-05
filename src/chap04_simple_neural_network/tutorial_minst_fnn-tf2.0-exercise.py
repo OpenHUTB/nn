@@ -46,8 +46,8 @@ class myModel:
         
     def __call__(self, x):
         '''实现模型函数体，返回未归一化的 logits ，这里未实现具体运算逻辑，需补充'''
-        #logits = None
-        #return logits
+        # logits = None
+        # return logits
         # 展平为[batch_size, 784]
         x = tf.reshape(x, [-1, 784])
         # 隐藏层+ReLU
