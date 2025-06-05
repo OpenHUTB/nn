@@ -6,15 +6,15 @@ import numpy as np
 
 def load_data(fname):
     """载入数据。"""
-    with open(fname, 'r') as f:
-        data = []
-        line = f.readline()
+    with open(fname, 'r') as f:# 'r' 表示以只读模式打开文件
+        data = []# 初始化一个空列表用于存储处理后的数据
+        line = f.readline()# 读取并丢弃第一行（通常可能是标题行或不需要的数据）
         for line in f:
-            line = line.strip().split()
-            x1 = float(line[0])
-            x2 = float(line[1])
-            t = int(line[2])
-            data.append([x1, x2, t])
+            line = line.strip().split()# 去除行首尾的空白字符（如换行符、空格等），然后按空白字符分割字符串，得到元素列表
+            x1 = float(line[0])# 将第一列转换为浮点数，作为第一个特征 x1
+            x2 = float(line[1])# 将第二列转换为浮点数，作为第二个特征 x2
+            t = int(line[2])# 将第三列转换为整数，作为目标值/标签 t
+            data.append([x1, x2, t])# 将处理后的数据组合成列表并添加到 data 中
         return np.array(data)
 
 
