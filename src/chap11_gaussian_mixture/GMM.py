@@ -10,23 +10,29 @@ def generate_data(n_samples=1000):
         [5, 5],  # 第二个高斯分布的均值
         [-5, 5]  # 第三个高斯分布的均值
     ])
+    
     # 定义三个高斯分布的协方差矩阵
     sigma_true = np.array([
         [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
         [[2, 0.5], [0.5, 1]],   # 第二个分布：倾斜的椭圆
         [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
     ])
+    
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
+    
     # 获取混合成分的数量(这里是3)
     n_components = len(weights_true)
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
     samples_per_component = (weights_true * n_samples).astype(int)
+    
     # 用于存储每个高斯分布生成的数据点
     X_list = []  
+    
     # 用于存储每个数据点对应的真实分布标签
     y_true = []  
+    
      # 从第i个高斯分布生成样本
     for i in range(n_components): 
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
