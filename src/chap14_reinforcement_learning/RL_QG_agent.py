@@ -7,7 +7,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
     #    pass    # 删掉这句话，并填写相应代码
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok=True)
+        os.makedirs(self.model_dir, exist_ok = True)
         self.sess = None
         self.saver = None
         self.input_states = None
@@ -29,15 +29,15 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # 定义自己的 网络
         self.sess = tf.Session()
         # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
-        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name="input_states")
+        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name = "input_states")
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
         conv1 = tf.layers.conv2d(
-            inputs=self.input_states,
-            filters=32,                 # 输出通道数：32个卷积核
-            kernel_size=3,              # 卷积核大小 3x3
-            padding="same",             # 输出大小与输入相同
-            activation=tf.nn.relu       # ReLU 激活函数
+            inputs = self.input_states,
+            filters = 32,                 # 输出通道数：32个卷积核
+            kernel_size = 3,              # 卷积核大小 3x3
+            padding = "same",             # 输出大小与输入相同
+            activation = tf.nn.relu       # ReLU 激活函数
             )
 
     # 第2个卷积层：提取更高级特征
@@ -83,10 +83,11 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
 
         return action
     #save_model和load_model，用于保存和加载TensorFlow模型的参数
-    def save_model(self):  # 保存 模型
+    # 保存模型
+    def save_model(self):  
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-
-    def load_model(self):# 重新导入模型
+    # 重新导入模型
+    def load_model(self):
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
 
     # 定义自己需要的函数

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # coding: utf-8
-# numpy 练习题
 # numpy 的array操作
 
 # 1.导入numpy库
@@ -50,7 +49,6 @@ print(a)
 print(a[2, 3], a[0, 0])
 
 # 6.把上一题的 a数组的0到1行，2到3列，放到b里面去，（此处不需要从新建立a,直接调用即可）(1) 输出b; (2) 输出b数组中（0,0）这个元素的值
-print("第六题：\n")
 print("第六题：\n")
 
 #0:2表示取第 0 行（包含）到第 2 行（不包含），即实际取第 0 行和第 1 行；2:4表示取第 2 列（包含）到第 4 列（不包含），即实际取第 2 列和第 3 列
@@ -187,8 +185,8 @@ plt.title("Plot of y = x^2")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 
-# 显示网格线
-plt.grid(True)
+# 显示半透明网格线
+plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
 plt.legend(loc='upper right')

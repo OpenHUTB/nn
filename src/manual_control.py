@@ -670,14 +670,20 @@ class KeyboardControl(object):
             self._ackermann_control.steer = round(self._steer_cache, 1)
 
     def _parse_walker_keys(self, keys, milliseconds, world):
+        # 初始化速度为0
         self._control.speed = 0.0
+        # 处理停止/减速 (S键或下箭头)
         if keys[K_DOWN] or keys[K_s]:
             self._control.speed = 0.0
+        # 处理左转 (A键或左箭头)
         if keys[K_LEFT] or keys[K_a]:
             self._control.speed = .01
+            # 根据时间增量减少偏航角(左转)
             self._rotation.yaw -= 0.08 * milliseconds
+        # 处理右转 (D键或右箭头)
         if keys[K_RIGHT] or keys[K_d]:
             self._control.speed = .01
+            # 根据时间增量增加偏航角(右转)
             self._rotation.yaw += 0.08 * milliseconds
         if keys[K_UP] or keys[K_w]:
             self._control.speed = world.player_max_speed_fast if pygame.key.get_mods() & KMOD_SHIFT else world.player_max_speed
