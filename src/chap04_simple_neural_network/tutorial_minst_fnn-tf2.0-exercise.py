@@ -11,13 +11,19 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
 # 设置TensorFlow日志级别，减少无关信息输出
+# 0: 显示所有日志（默认）
+# 1: 显示警告和错误
+# 2: 只显示错误
+# 3: 不显示任何日志
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 def mnist_dataset():
     # 加载MNIST数据集，包含训练集和测试集的图像及标签
+     # MNIST数据集由28x28像素的手写数字图像组成，共有10个类别（0-9）
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
+     # 这是神经网络训练的常见预处理步骤，可以加速收敛并提高模型稳定性
     x = x / 255.0
     x_test = x_test / 255.0
     
@@ -36,6 +42,7 @@ class myModel:
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
         # 定义第一层的权重矩阵
+        # 使用随机正态分布初始化，标准差为0.1，避免梯度消失或爆炸
         self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
         # 定义第一层的偏置向量
         self.b1 = tf.Variable(tf.zeros([128]))
