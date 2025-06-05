@@ -175,8 +175,8 @@ def get_actor_blueprints(world, filter, generation):
     if generation.lower() == "all":
         return bps
 
-    # If the filter returns only one bp, we assume that this one needed
-    # and therefore, we ignore the generation
+    #  If the filter returns only one bp, we assume that this one needed
+    #  and therefore, we ignore the generation
     if len(bps) == 1:
         return bps
 
@@ -194,9 +194,9 @@ def get_actor_blueprints(world, filter, generation):
         return []
 
 
-# ==============================================================================
-# -- World ---------------------------------------------------------------------
-# ==============================================================================
+#  ==============================================================================
+#  -- World ---------------------------------------------------------------------
+#  ==============================================================================
 
 
 class World(object):

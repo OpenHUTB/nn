@@ -93,6 +93,16 @@ class LogisticRegression():
 @tf.function
 
 def compute_loss(pred, label):
+    """
+        计算二分类交叉熵损失函数（手动实现，不使用tf内置loss）
+        
+        参数:
+            pred: 输入特征，形状为(N, 2)的Tensor
+            label: 真实标签，形状为(N, 1)的Tensor，取值为0或1
+            
+        返回:
+            loss: 平均交叉熵损失 + L2正则化项
+        """
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
         label = tf.constant(label, dtype=tf.float32)

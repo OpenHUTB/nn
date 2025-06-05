@@ -91,8 +91,7 @@ b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 # 交叉熵函数
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),
-                                              reduction_indices=[1]))
+cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),reduction_indices=[1]))
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
 with tf.Session() as sess:
@@ -102,6 +101,5 @@ with tf.Session() as sess:
     for i in range(max_epoch):
         batch_xs, batch_ys = mnist.train.next_batch(100)
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
-        if i % 100 == 0:#每 100 个迭代在测试集的前 1000 个样本上评估准确率
-            print(compute_accuracy(
-                mnist.test.images[:1000], mnist.test.labels[:1000]))
+        if i % 100 == 0:  #每 100 个迭代在测试集的前 1000 个样本上评估准确率
+            print(compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000]))

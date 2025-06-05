@@ -254,7 +254,7 @@ if __name__ == "__main__":
 
     # 显示结果
 
-    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
+    plt.plot(x_train, y_train, "ro", markersize=3)  #  红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
     plt.xlabel("x")  # 设置x轴的标签

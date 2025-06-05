@@ -172,12 +172,13 @@ for i in range(1000):
         print(f"loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}")
 # 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
 
-# ## 结果展示，无需填写代码
+# # 结果展示，无需填写代码
 
 # In[13]:
 
-
-plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")
+# 绘制散点图
+# C1[:, 0] 和 C1[:, 1] 分别表示 C1 的第一列和第二列数据（通常是特征）
+plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
@@ -196,3 +197,4 @@ plt.show()
 
 
 # In[ ]:
+

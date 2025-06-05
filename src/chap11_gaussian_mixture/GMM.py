@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 # 生成混合高斯分布数据
-def generate_data(n_samples=1000):
+def generate_data(n_samples = 1000):
     np.random.seed(42)
     # 定义三个高斯分布的中心点
     mu_true = np.array([ 
@@ -47,8 +47,8 @@ def generate_data(n_samples=1000):
     return X[shuffle_idx], y_true[shuffle_idx]
 
 # 自定义logsumexp函数
-def logsumexp(log_p, axis=1, keepdims=False):
-    #max_val = np.max(log_p, axis=axis, keepdims=True)
+def logsumexp(log_p, axis  =1, keepdims = False):
+    #max_val = np.max(log_p, axis = axis, keepdims = True)
     #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims=keepdims))
     """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理"""
     log_p = np.asarray(log_p)
@@ -100,7 +100,6 @@ class GaussianMixtureModel:
         log_likelihood = -np.inf  # 初始化对数似然值为负无穷
         for iter in range(self.max_iter): # 开始EM算法的主循环
             # E步：计算后验概率
-
             log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵，形状为(样本数 × 成分数)
             for k in range(self.n_components): # 遍历每个高斯成分
                 log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯分布的对数概率密度
@@ -127,7 +126,6 @@ class GaussianMixtureModel:
                 # 正则化以防止协方差矩阵奇异，eps 可以调节
                 eps = 1e-6  # 正则化系数（可以作为参数传入或配置）
                 new_sigma_k += np.eye(n_features) * eps  # 向对角线加小数值，避免数值不稳定
-
                 new_sigma[k] = new_sigma_k
             
             # 计算对数似然
