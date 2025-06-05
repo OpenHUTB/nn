@@ -54,12 +54,39 @@ def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
 
-def conv2d(x, W):
+def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+    """
+    实现二维卷积操作，增加了参数灵活性和异常处理
+    
+    参数:
+        x (tf.Tensor): 输入张量，形状为[batch, height, width, channels]
+        W (tf.Tensor): 卷积核权重，形状为[filter_height, filter_width, in_channels, out_channels]
+        padding (str): 填充方式，'SAME'或'VALID'
+        strides (list): 步长列表，[1, stride_h, stride_w, 1]
+        
+    返回:
+        tf.Tensor: 卷积结果
+    """
     # 每一维度滑动步长全部是 1， padding 方式选择 same
     # 提示 使用函数  tf.nn.conv2d
     
-    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-
+    # 验证输入类型
+    if not tf.is_tensor(x):
+        x = tf.convert_to_tensor(x)
+    
+    # 验证padding参数
+    if padding not in ['SAME', 'VALID']:
+        raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
+    
+    # 执行卷积操作
+    conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
+    
+    # 添加批归一化以提高训练稳定性
+    # 注意：在实际应用中，是否使用批归一化取决于网络结构和需求
+    # conv = tf.layers.batch_normalization(conv, training=is_training)
+    
+    return conv
+    
 def max_pool_2x2(x):
     # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool
