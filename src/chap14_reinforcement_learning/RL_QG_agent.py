@@ -82,9 +82,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         candidates = np.where(legal_q == max_q)[0]
         
         # 随机选择最优动作 （解决多个最大值的情况）
-        action = np.random.choice(candidates)
-
-        return action
+        return np.random.choice(candidates)
     #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
     # 保存模型
     def save_model(self):  
