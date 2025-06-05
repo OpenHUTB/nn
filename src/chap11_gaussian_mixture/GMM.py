@@ -190,9 +190,13 @@ if __name__ == "__main__":
 
     # 设置坐标轴标签
     plt.xlabel("Feature 1") #设置 X 轴（水平轴）的标签为 "Feature 1"，通常用于表示数据的第一个特征或变量
-    plt.ylabel("Feature 2") 
+    plt.ylabel("Feature 2") # 设置y轴的标签为"Feature 2"
+    # 此标签通常用于描述y轴所代表的数据含义或特征名称
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
-    plt.subplot(1, 2, 2)
+    plt.subplot(1, 2, 2) # 创建一个1行2列的子图网格，并选择第2个子图(右侧)进行后续绘图
+    #   - 第一个参数1: 表示子图网格的行数
+    #   - 第二个参数2: 表示子图网格的列数
+    #   - 第三个参数2: 表示当前选中的子图位置(从左到右、从上到下计数)
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
     plt.title("GMM Predicted Clusters") # 子图标题
 
