@@ -141,6 +141,7 @@ if __name__ == '__main__':
     animation_frames = []
 
     # 进行200次训练迭代
+    # 通常训练会持续多个epochs以逐步优化模型参数
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重W和偏置b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
