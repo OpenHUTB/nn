@@ -101,7 +101,7 @@ class SoftmaxRegression(tf.Module):
         #计算线性变换
         logits = tf.matmul(x, self.W) + self.b
         #应用softmax函数，将logits转换为概率分布
-        return tf.nn.softmax(logits)
+        return tf.nn.softmax(logits)# 返回经过softmax处理后的概率分布
 
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
