@@ -22,29 +22,23 @@ def mnist_dataset():
     ds = tf.data.Dataset.from_tensor_slices((x, y))
     ds = ds.map(prepare_mnist_features_and_labels)
     ds = ds.take(20000).shuffle(20000).batch(100)
-    
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
     return ds, test_ds
-
 
 def prepare_mnist_features_and_labels(x, y):
     x = tf.cast(x, tf.float32) / 255.0
     y = tf.cast(y, tf.int64)
     return x, y
 
-
 # In[2]:
 
-
 7*7*64
-
 
 # ## 建立模型
 
 # In[3]:
-
 
 model = keras.Sequential([
     Conv2D(32, (5, 5), activation='relu', padding='same'),
@@ -56,11 +50,9 @@ model = keras.Sequential([
     layers.Dense(10, activation='softmax')]) #N*10
 optimizer = optimizers.Adam(0.0001)
 
-
 # ## 编译， fit以及evaluate
 
 # In[4]:
-
 
 model.compile(optimizer=optimizer,
               loss='sparse_categorical_crossentropy',
@@ -69,14 +61,15 @@ train_ds, test_ds = mnist_dataset()
 model.fit(train_ds, epochs=5)
 model.evaluate(test_ds)
 
-
 # In[ ]:
 
 
 
 
 
+
 # In[ ]:
+
 
 
 
