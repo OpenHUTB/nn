@@ -27,11 +27,11 @@ class RBM:
 
         self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 初始化权重矩阵（可见层 -> 隐藏层）
 
-        # 可选替代方案：使用更小的固定标准差进行初始化
+        #  可选替代方案：使用更小的固定标准差进行初始化
         # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
 
         self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
-        self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
+        self.b_v = np.zeros(n_observe)  ## 初始化可见层偏置向量
         # pass
     
     def _sigmoid(self, x):

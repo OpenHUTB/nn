@@ -18,7 +18,7 @@ def generate_data(n_samples=1000):
         [[1, -0.5], [-0.5, 2]]
         # 第三个分布：反向倾斜的椭圆
     ])
-    # 定义每个高斯分布的混合权重(必须和为1)
+    # 定义每个高斯分布的混合权重 (必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
     # 获取混合成分的数量(这里是3)
     n_components = len(weights_true)
@@ -27,7 +27,7 @@ def generate_data(n_samples=1000):
     samples_per_component = (weights_true * n_samples).astype(int)
     X_list = []  # 用于存储每个高斯分布生成的数据点
     y_true = []  # 用于存储每个数据点对应的真实分布标签
-    for i in range(n_components):  # 从第i个高斯分布生成样本
+    for i in range(n_components):  #  从第i个高斯分布生成样本
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
         X_list.append(X_i)  # 将生成的样本添加到列表
         y_true.extend([i] * samples_per_component[i])  # 添加对应标签
