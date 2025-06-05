@@ -34,8 +34,11 @@ class SVM():
     """
 
     def __init__(self):
-        # 请补全此处代码
-        pass
+        self.learning_rate = 0.01
+        self.reg_lambda = 0.01
+        self.max_iter = 1000
+        self.w = None  # 权重向量
+        self.b = None  # 偏置项
 
     def train(self, data_train):
         """

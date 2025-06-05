@@ -10,6 +10,7 @@ import numpy as np
 # 导入TensorFlow深度学习框架
 import tensorflow as tf
 import numpy as np
+from tqdm import tqdm
 # 从TensorFlow中导入Keras高级API
 from tensorflow import keras
 # 从Keras中导入常用模块
@@ -355,11 +356,33 @@ def prepare_data():
 def train(model, train_data, train_label, epochs=50):
     losses = []
     accuracies = []
+    num_samples = train_data.shape[0]
+    from tqdm import tqdm  # 添加tqdm导入  
     for epoch in tqdm(range(epochs), desc="Training"):
-        loss, accuracy = train_one_step(model, train_data, train_label)
-        losses.append(loss)
-        accuracies.append(accuracy)
-        print(f'Epoch {epoch}: Loss {loss:.4f}; Accuracy {accuracy:.4f}')
+        # 打乱数据顺序
+        indices = np.random.permutation(num_samples)
+        shuffled_data = train_data[indices]
+        shuffled_labels = train_label[indices]
+        epoch_loss = 0
+        epoch_accuracy = 0
+        
+        # 小批量训练
+        for i in range(0, num_samples, batch_size):
+            # 获取当前批次数据
+            batch_data = shuffled_data[i:i+batch_size]
+            batch_labels = shuffled_labels[i:i+batch_size]
+            # 执行单步训练
+            loss, accuracy = train_one_step(model, batch_data, batch_labels)
+            # 累计统计量
+            epoch_loss += loss * batch_data.shape[0]
+            epoch_accuracy += accuracy * batch_data.shape[0]
+
+        # 计算整个epoch的平均损失和准确率
+        epoch_loss /= num_samples
+        epoch_accuracy /= num_samples
+        losses.append(epoch_loss)
+        accuracies.append(epoch_accuracy)
+        print(f'Epoch {epoch}: Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
     return losses, accuracies
 
 if __name__ == "__main__":
