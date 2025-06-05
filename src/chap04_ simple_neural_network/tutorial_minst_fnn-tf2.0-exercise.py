@@ -15,12 +15,27 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 def mnist_dataset():
+    """
+    加载并预处理 MNIST 手写数字数据集
+    该函数执行以下操作：
+    1. 使用 Keras datasets 模块加载 MNIST 数据集
+    2. 对图像数据进行归一化处理（将像素值从 [0,255] 映射到 [0,1]）
+    3. 返回处理后的训练集和测试集
+    返回值格式：
+    ((x_train, y_train), (x_test, y_test))，其中：
+        x_train: 训练图像数据 [60000, 28, 28]（浮点型）
+        y_train: 训练标签 [60000,]（整数型）
+        x_test: 测试图像数据 [10000, 28, 28]（浮点型）
+        y_test: 测试标签 [10000,]（整数型）
+    """
+    # 加载 MNIST 数据集（训练集和测试集）
+    # 注意：Keras 的 datasets.mnist.load_data() 会自动下载数据（首次调用时）
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
-    
+    # 数据归一化：将像素值从 [0,255] 缩放到 [0,1]
     x = x/255.0
     x_test = x_test/255.0
-    
+    # 返回处理后的数据集
     return (x, y), (x_test, y_test)
 
 
