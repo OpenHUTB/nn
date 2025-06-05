@@ -5,20 +5,17 @@
 # 使用sequence to sequence 模型将一个字符串序列逆置。
 # 例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`
 
-
 import numpy as np
 import tensorflow as tf
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
-
+import random
+import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
-
-import random
-import string
 
 def random_string(length):
     """
@@ -98,7 +95,6 @@ class mySeq2SeqModel(keras.Model):
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的logits
         self.dense = tf.keras.layers.Dense(self.v_sz)
 
-        
     @tf.function
     def call(self, enc_ids, dec_ids):
         '''
@@ -117,7 +113,6 @@ class mySeq2SeqModel(keras.Model):
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
         return logits
     
-    
     @tf.function
     def encode(self, enc_ids):
         """
@@ -126,9 +121,9 @@ class mySeq2SeqModel(keras.Model):
             list: 包含编码器最后一个时间步的输出和最终状态
         """
         enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)
-        enc_out, enc_state = self.encoder(enc_emb)# 使用编码器处理嵌入向量，获取编码器输出和最终状态
+        enc_out, enc_state = self.encoder(enc_emb)  # 使用编码器处理嵌入向量，获取编码器输出和最终状态
         
-        return [enc_out[:, -1, :], enc_state]# 返回编码器最后一个时间步的输出和最终状态
+        return [enc_out[:, -1, :], enc_state]  # 返回编码器最后一个时间步的输出和最终状态
     
     def get_next_token(self, x, state):
         '''
@@ -141,7 +136,6 @@ class mySeq2SeqModel(keras.Model):
         out = tf.argmax(logits, axis=-1)# 选择得分最高的token作为预测结果
         return out, state
 
-
 # # Loss函数以及训练逻辑
 
 #定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
@@ -153,7 +147,8 @@ def compute_loss(logits, labels):
     losses = tf.reduce_mean(losses)
     return losses
 
-@tf.function  # 将函数编译为TensorFlow计算图，提升性能
+@tf.function  
+# 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     """执行一次训练步骤（前向传播+反向传播）"""
     with tf.GradientTape() as tape:  # 自动记录梯度
@@ -179,13 +174,11 @@ def train(model, optimizer, seqlen):
             print('step', step, ': loss', loss.numpy())
     return loss
 
-
 # # 训练迭代
 
 optimizer = optimizers.Adam(0.0005)
 model = mySeq2SeqModel()
 train(model, optimizer, seqlen=20)
-
 
 # # 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
@@ -202,12 +195,12 @@ def sequence_reversal():
         返回:
             list: 生成的字符串列表
         """
-        b_sz = tf.shape(init_state[0])[0]# 获取批次大小
+        b_sz = tf.shape(init_state[0])[0]  # 获取批次大小
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)  # 起始 token（全为 0）
-        state = init_state# 初始化状态为编码器输出的状态
-        collect = []# 存储每一步生成的token
+        state = init_state  # 初始化状态为编码器输出的状态
+        collect = []  # 存储每一步生成的token
         for i in range(steps):# 逐步解码生成序列
-            cur_token, state = model.get_next_token(cur_token, state)# 获取下一个token预测和更新后的状态
+            cur_token, state = model.get_next_token(cur_token, state)  # 获取下一个token预测和更新后的状态
             collect.append(tf.expand_dims(cur_token, axis=-1))  # 收集每一步生成的 token
         out = tf.concat(collect, axis=-1).numpy()  # 拼接输出序列
         
@@ -215,13 +208,13 @@ def sequence_reversal():
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]  
         return out
     
-    batched_examples, enc_x, _, _ = get_batch(32, 10)# 生成一批测试数据（32个样本，每个序列长度10）
-    state = model.encode(enc_x)# 对输入序列进行编码
-    return decode(state, enc_x.get_shape()[-1]), batched_examples# 解码生成逆序序列，步数等于输入序列长度
+    batched_examples, enc_x, _, _ = get_batch(32, 10)  # 生成一批测试数据（32个样本，每个序列长度10）
+    state = model.encode(enc_x)  # 对输入序列进行编码
+    return decode(state, enc_x.get_shape()[-1]), batched_examples  # 解码生成逆序序列，步数等于输入序列长度
 
 def is_reverse(seq, rev_seq):
     """检查 rev_seq 是否为 seq 的逆序"""
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])# 反转rev_seq并与原始seq比较
+    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])  # 反转rev_seq并与原始seq比较
     if seq == rev_seq_rev:
         return True
     else:
