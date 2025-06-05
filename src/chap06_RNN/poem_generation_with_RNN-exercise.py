@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+
 # coding: utf-8
 
 # # 诗歌生成
+
 # # 数据处理
 
 # In[1]:
@@ -14,6 +16,7 @@ from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
+
 start_token = 'bos'  # Beginning of sentence
 
 end_token = 'eos'    # End of sentence
@@ -50,15 +53,22 @@ def process_dataset(fileName):
     for e in examples:
         for w in e:
             counter[w] += 1
+
     
     ## 按词频从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
+    
     words, _ = zip(*sorted_counter)
+    
     words = ('PAD', 'UNK') + words[:len(words)]
+    
     # 创建词语到id的映射
+    
     word2id = dict(zip(words, range(len(words))))
+    
     # 创建id到词语的映射
+    
     id2word = {word2id[k]:k for k in word2id}
     
     # 将诗歌转换为数字id序列
