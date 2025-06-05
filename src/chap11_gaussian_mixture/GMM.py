@@ -109,6 +109,8 @@ class GaussianMixtureModel:
             # M步：更新参数
             Nk = np.sum(gamma, axis=0) # 计算每个高斯成分的"有效样本数"（即属于该成分的样本概率之和）
             self.pi = Nk / n_samples # 更新混合权重π：各成分的样本占比
+            # 初始化新均值和新协方差矩阵的存储空间
+            # 保持与原参数相同的形状，用于后续计算
             new_mu = np.zeros_like(self.mu) # 初始化新均值和新协方差矩阵的存储空间
             new_sigma = np.zeros_like(self.sigma) #此函数会创建一个新数组，其数据类型（dtype）和形状（shape）都与输入数组self.sigma相同，不过数组里的元素全部为 0。
             
