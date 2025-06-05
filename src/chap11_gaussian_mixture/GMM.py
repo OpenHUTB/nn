@@ -123,12 +123,12 @@ class GaussianMixtureModel:
                 break  # 如果变化小于阈值，终止迭代（已收敛）
             log_likelihood = current_log_likelihood  # 更新记录的对数似然值，供下次迭代比较使用 
           
-            self.mu = new_mu
-            self.sigma = new_sigma
+            self.mu = new_mu  # 更新各高斯分布的均值向量 
+            self.sigma = new_sigma  # 更新各高斯分布的协方差矩阵
         
         # 计算最终聚类结果
-        self.labels_ = np.argmax(gamma, axis=1)
-        return self
+        self.labels_ = np.argmax(gamma, axis=1)  # 确定最终聚类标签（硬聚类）
+        return self  # 返回训练完成的模型
 
     def _log_gaussian(self, X, mu, sigma):
         # 获取特征维度数量
