@@ -138,8 +138,11 @@ def train(model, optimizer, seqlen):
 # In[28]:
 
 
+# 创建Adam优化器实例，设置学习率为0.0005
 optimizer = optimizers.Adam(0.0005)
+# 实例化自定义的序列到序列模型
 model = mySeq2SeqModel()
+# 调用训练函数，传入模型、优化器和序列长度参数
 train(model, optimizer, seqlen=20)
 
 
