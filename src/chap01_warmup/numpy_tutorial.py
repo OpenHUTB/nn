@@ -202,8 +202,8 @@ y_sin = np.sin(x)  # 计算对应的正弦值
 y_cos = np.cos(x)  # 计算对应的余弦值
 
 plt.figure(figsize=(10, 6))  # # 创建一个图像窗口，设置大小为10×6英寸 
-plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
-plt.plot(x, y_cos, label="y = cos(x)", color="red") # 绘制余弦函数曲线
+plt.plot(x, y_sin, label="y = sin(x)", color = "blue")  # 绘制正弦函数曲线
+plt.plot(x, y_cos, label="y = cos(x)", color = "red") # 绘制余弦函数曲线
 
 # 添加标题和标签
 plt.title("Sine and Cosine Functions")
