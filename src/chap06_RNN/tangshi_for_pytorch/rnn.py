@@ -40,11 +40,12 @@ class RNN_model(nn.Module):
     def __init__(self, batch_sz, vocab_len, word_embedding, embedding_dim, lstm_hidden_dim):
         super(RNN_model, self).__init__()
 
+        # 模型组件初始化
         self.word_embedding_lookup = word_embedding  # 使用外部定义的词嵌入模块
-        self.batch_size = batch_sz
-        self.vocab_length = vocab_len
-        self.word_embedding_dim = embedding_dim
-        self.lstm_dim = lstm_hidden_dim
+        self.batch_size = batch_sz  # 批处理大小
+        self.vocab_length = vocab_len  #词汇表大小
+        self.word_embedding_dim = embedding_dim  #词向量维度
+        self.lstm_dim = lstm_hidden_dim  # LSTM隐藏状态维度
 
         # 定义LSTM层
         # input_size=embedding_dim：输入的特征维度，即词嵌入维度
