@@ -43,7 +43,15 @@ test_data = np.random.normal(size=[10, 5])
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 <0.0001
 
 # ## 实现sigmoid函数
-
+"""
+    实现sigmoid激活函数，公式为：sigmoid(x) = 1 / (1 + exp(-x))
+    
+    参数:
+        x (tf.Tensor): 输入张量，任意形状
+    
+    返回:
+        tf.Tensor: sigmoid处理后的概率值，范围在(0, 1)之间
+    """
 # In[9]:
 
 def sigmoid(x):
