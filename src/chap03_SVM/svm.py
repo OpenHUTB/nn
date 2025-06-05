@@ -3,7 +3,6 @@
 
 import numpy as np
 
-
 def load_data(fname):
 
     """
@@ -20,20 +19,18 @@ def load_data(fname):
             data.append([x1, x2, t])
         return np.array(data)
 
-
 def eval_acc(label, pred):
     """
     计算准确率。
     """
     return np.sum(label == pred) / len(pred)
 
-
 class SVM():
     """
     SVM模型。
     """
 
-    def __init__(self):
+ def __init__(self):
         # 请补全此处代码
         pass
 
@@ -50,7 +47,6 @@ class SVM():
         """
 
         # 请补全此处代码
-
 
 if __name__ == '__main__':
     # 载入数据，实际实用时将x替换为具体名称
@@ -71,9 +67,9 @@ if __name__ == '__main__':
     t_test = data_test[:, 2]
     t_test_pred = svm.predict(x_test)
 
-    # 评估结果，计算准确率
-    # 评估结果，计算准确率
-    # 评估结果，计算准确率
+    # 评估结果，计算准确率，进行比较
+    # 评估结果，计算准确率，进行比较
+    # 评估结果，计算准确率，进行比较
     acc_train = eval_acc(t_train, t_train_pred)
     acc_test = eval_acc(t_test, t_test_pred)
     print("train accuracy: {:.1f}%".format(acc_train * 100))
