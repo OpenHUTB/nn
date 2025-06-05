@@ -91,6 +91,25 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 # ## 实现 sigmoid 交叉熵loss函数
 
 def sigmoid_ce(logits, labels):
+     """
+    实现 Softmax 交叉熵损失函数（手动版），支持数值稳定的计算。
+    
+    参数:
+        logits (tf.Tensor): 未经过 Softmax 的原始输出，形状为 (batch_size, n_classes)
+        label (tf.Tensor): One-Hot 编码的真实标签，形状与 logits 一致
+    
+    返回:
+        tf.Tensor: 平均交叉熵损失值
+    
+    计算流程:
+        1. 对 logits 进行数值稳定处理（减去最大值）。
+        2. 计算 Softmax 概率分布。
+        3. 计算交叉熵损失: -Σ(y_true * log(y_pred)) 的平均值。
+    
+    数值稳定性:
+        - 避免直接对大数值计算指数，通过减去最大值降低计算风险。
+        - 添加极小值 epsilon 防止 log(0) 导致的负无穷。
+    """
     """
     实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
     接收未经过 sigmoid 的 logits 输入
