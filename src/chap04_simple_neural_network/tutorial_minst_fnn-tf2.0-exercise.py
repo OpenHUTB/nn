@@ -16,6 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 def mnist_dataset():
     # 加载MNIST数据集，包含训练集和测试集的图像及标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
     x = x / 255.0
     x_test = x_test / 255.0
@@ -44,7 +45,7 @@ class myModel:
         self.b2 = tf.Variable(tf.zeros([10]))
         
     def __call__(self, x):
-        '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
+        '''实现模型函数体，返回未归一化的 logits ，这里未实现具体运算逻辑，需补充'''
         #logits = None
         #return logits
         # 展平为[batch_size, 784]
