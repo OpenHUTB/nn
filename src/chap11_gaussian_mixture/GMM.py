@@ -137,13 +137,16 @@ class GaussianMixtureModel:
             self.mu, new_mu	当前模型的高斯分布均值 / 更新后的均值
             self.sigma, new_sigma	当前模型的协方差 / 更新后的协方差
             '''
+            # 计算当前迭代轮次中所有数据点的对数似然总和
+            # log_prob_sum 应是一个包含每个数据点对数概率的数组
             current_log_likelihood = np.sum(log_prob_sum)       # 计算当前轮的总对数似然
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: 
-                break
-            log_likelihood = current_log_likelihood
+            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: # 检查收敛条件（从第二次迭代开始检查）
+                # 如果当前对数似然与上一轮的差值小于容忍度(tol)，则判定收敛
+                break# 退出EM循环
+            log_likelihood = current_log_likelihood# 更新记录的对数似然值，用于下一轮的收敛判断
             
-            self.mu = new_mu
-            self.sigma = new_sigma
+            self.mu = new_mu# 使用新计算的均值向量替换旧的
+            self.sigma = new_sigma# 使用新计算的协方差矩阵替换旧的
         
         # 计算最终聚类结果
         self.labels_ = np.argmax(gamma, axis=1) # 返回每个样本所属的聚类
