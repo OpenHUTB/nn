@@ -3,7 +3,6 @@
 
 import numpy as np
 
-
 def load_data(fname):
 
     """
@@ -19,7 +18,6 @@ def load_data(fname):
             t = int(line[2])
             data.append([x1, x2, t])
         return np.array(data)
-
 
 def eval_acc(label, pred):
     """
@@ -54,7 +52,6 @@ class SVM():
 
         # 请补全此处代码
 
-
 if __name__ == '__main__':
     # 载入数据，实际实用时将x替换为具体名称
     train_file = 'data/train_linear.txt'
@@ -73,7 +70,7 @@ if __name__ == '__main__':
     x_test = data_test[:, :2]
     t_test = data_test[:, 2]
     t_test_pred = svm.predict(x_test)
-
+    
     # 评估结果，计算准确率
     # 评估结果，计算准确率
     # 评估结果，计算准确率
@@ -81,3 +78,5 @@ if __name__ == '__main__':
     acc_test = eval_acc(t_test, t_test_pred)
     print("train accuracy: {:.1f}%".format(acc_train * 100))
     print("test accuracy: {:.1f}%".format(acc_test * 100))
+
+
