@@ -200,13 +200,19 @@ if __name__ == '__main__':
         C2_dots.set_data([], [])
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
-    def animate(i):
-        xx = np.arange(10, step=0.1)
-        a = animation_frames[i][0]
-        b = animation_frames[i][1]
-        c = animation_frames[i][2]
-        yy = a/-b * xx + c/-b
-        line_d.set_data(xx, yy)
+   def animate(i):
+    w1 = animation_frames[i][0]  # W[0, 0]
+    w2 = animation_frames[i][1]  # W[1, 0]
+    b = animation_frames[i][2]    # 偏置
+    
+    if w2 == 0:  # 防止除零错误（实际场景中概率极低）
+        xx = np.array([0])
+        yy = np.array([-b/w1])
+    else:
+        xx = np.arange(0, 10, 0.1)
+        yy = (-w1 / w2) * xx - b / w2  # 正确的决策边界方程
+    
+    line_d.set_data(xx, yy)
         C1_dots.set_data(C1[:, 0], C1[:, 1])
         C2_dots.set_data(C2[:, 0], C2[:, 1])
         frame_text.set_text(
