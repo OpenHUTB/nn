@@ -32,7 +32,7 @@ print("(2)输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为4,5,
 print("第四题：\n")
 
 # 全0矩阵，3x3
-a = np.zeros((3, 3), dtype=int）
+a = np.zeros((3, 3), dtype=int)
 # 全1矩阵，4x5
 b = np.ones((4, 5))
 # 单位矩阵，4x4
