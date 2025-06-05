@@ -139,4 +139,5 @@ plt.title("Linear Regression")
 # 虚线网格，半透明灰色
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
 plt.legend(["train", "test", "pred"])
+plt.tight_layout()  # 自动调整布局
 plt.show()
