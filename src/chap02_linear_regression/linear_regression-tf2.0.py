@@ -105,7 +105,7 @@ def train_one_step(model, xs, ys):
 
 @tf.function
 def predict(model, xs):
-    y_preds = model(xs)
+    y_preds = model(xs)     # 模型前向传播
     return y_preds
 
 
