@@ -26,7 +26,6 @@ import os,sys,tqdm
 
 # In[2]:
 
-
 def gen_data_batch(batch_size, start, end):
     '''在(start, end)区间采样生成一个batch的整型的数据
     Args :
@@ -100,13 +99,11 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
 
 # In[3]:
 
-
 class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
         self.embed_layer = tf.keras.layers.Embedding(10, 32,
                                                     batch_input_shape = [None, None])
-
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
         self.dense = tf.keras.layers.Dense(10)
@@ -120,7 +117,6 @@ class myRNNModel(keras.Model):
 
 
 # In[4]:
-
 
 @tf.function
 def compute_loss(logits, labels):
@@ -150,7 +146,7 @@ def train(steps, model, optimizer):
                               tf.constant(results, dtype=tf.int32))
         if step%50 == 0:
             print('step', step, ': loss', loss.numpy())
-
+            
     return loss
 
 def evaluate(model):
@@ -185,15 +181,7 @@ evaluate(model)
 
 
 
-
 # In[ ]:
-
-
-
-
-
-# In[ ]:
-
 
 
 
@@ -203,9 +191,12 @@ evaluate(model)
 
 
 
-
 # In[ ]:
 
+
+
+
+# In[ ]:
 
 
 
