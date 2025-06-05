@@ -103,7 +103,7 @@ class GaussianMixtureModel:
             log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵，形状为(样本数 × 成分数)
             for k in range(self.n_components): # 遍历每个高斯成分
                 log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯分布的对数概率密度
-            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True) # 使用logsumexp实现数值稳定的概率求和
+            log_prob_sum = logsumexp(log_prob, axis = 1, keepdims = True) # 使用logsumexp实现数值稳定的概率求和
             gamma = np.exp(log_prob - log_prob_sum) # 计算后验概率矩阵gamma(也称为响应度矩阵)
 
             # M步：更新参数
