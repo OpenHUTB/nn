@@ -3,13 +3,10 @@
 
 # # Softmax Regression Example
 
-# ### 生成数据集， 看明白即可无需填写代码
+# ### 生成数据集，看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
-# #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
-# #### '<font color="red">*</font>' 从高斯分布采样  (X, Y) ~ N(7, 7, 1, 1, 0)<br>
-
-# In[1]:
-
+# #### '<font color="green">o</font>' 从高斯分布采样 (X, Y) ~ N(6, 3, 1, 1, 0)<br>
+# #### '<font color="red">*</font>' 从高斯分布采样 (X, Y) ~ N(7, 7, 1, 1, 0)<br>
 
 import tensorflow as tf
 import matplotlib.pyplot as plt
@@ -22,30 +19,24 @@ import numpy as np
 # get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
-dot_num = 100  
+dot_num = 100
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
-x_p = np.random.normal(
-    3.0, 1, dot_num
-) 
+x_p = np.random.normal(3.0, 1, dot_num)
 # x和y坐标
 y_p = np.random.normal(6.0, 1, dot_num)
 # 标签为1
 y = np.ones(dot_num)
 # 组合成(x, y, label)格式
-C1 = np.array([x_p, y_p, y]).T 
+C1 = np.array([x_p, y_p, y]).T
 
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
-x_n = np.random.normal(
-    6.0, 1, dot_num
-)
+x_n = np.random.normal(6.0, 1, dot_num)
 y_n = np.random.normal(3.0, 1, dot_num)
 y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
-x_b = np.random.normal(
-    7.0, 1, dot_num
-)
+x_b = np.random.normal(7.0, 1, dot_num)
 y_b = np.random.normal(7.0, 1, dot_num)
 y = np.ones(dot_num) * 2
 C3 = np.array([x_b, y_b, y]).T
@@ -69,9 +60,6 @@ np.random.shuffle(data_set)
 # 填空一：在`__init__`构造函数中建立模型所需的参数
 #
 # 填空二：实现softmax的交叉熵损失函数(不使用tf内置的loss 函数)
-
-# In[1]:
-
 
 epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
@@ -101,9 +89,9 @@ class SoftmaxRegression(tf.Module):
         :param x: 输入数据，shape = (N, input_dim)
         :return: softmax 概率分布，shape = (N, num_classes)
         """
-        #计算线性变换
+        # 计算线性变换
         logits = tf.matmul(x, self.W) + self.b
-        #应用softmax函数，将logits转换为概率分布
+        # 应用softmax函数，将logits转换为概率分布
         return tf.nn.softmax(logits)
 
 
@@ -153,18 +141,15 @@ def train_one_step(model, optimizer, x_batch, y_batch):
 
 # ### 实例化一个模型，进行训练
 
-# In[12]:
-
-
 model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
 x1, x2, y = list(zip(*data_set))
 # 转换为 float32
-x = np.array(list(zip(x1, x2)), dtype=np.float32)  
+x = np.array(list(zip(x1, x2)), dtype=np.float32)
 # 转换为 int32
-y = np.array(y, dtype=np.int32)  
+y = np.array(y, dtype=np.int32)
 # 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
@@ -174,16 +159,12 @@ for i in range(1000):
 
 # ## 结果展示，无需填写代码
 
-# In[13]:
-
-
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
-
 
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
@@ -193,6 +174,3 @@ Z = np.argmax(Z, axis=1)
 Z = Z.reshape(X.shape)
 plt.contour(X, Y, Z)
 plt.show()
-
-
-# In[ ]:
