@@ -36,10 +36,34 @@ class SVM():
     def train(self, data_train):
         """训练模型。"""
         # 请补全此处代码
+        X = data_train[:, :2]
+        y = data_train[:, 2]
+        y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
+        m, n = X.shape
+        
+        # 初始化参数
+        self.w = np.zeros(n)
+        self.b = 0
+        
+        for epoch in range(self.max_iter):
+            # 计算函数间隔
+            margin = y * (np.dot(X, self.w) + self.b)
+            # 找出违反间隔条件的样本（margin < 1）
+            idx = np.where(margin < 1)[0]
+            
+            # 计算梯度
+            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis=0)
+            db = -np.mean(y[idx])
+            
+            # 参数更新
+            self.w -= self.learning_rate * dw
+            self.b -= self.learning_rate * db
 
     def predict(self, x):
         """预测标签。"""
         # 请补全此处代码
+        score = np.dot(x, self.w) + self.b
+        return np.where(score >= 0, 1, 0)  # 转换回{0, 1}标签
 
 
 if __name__ == '__main__':
