@@ -28,7 +28,8 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     exp_logits = tf.exp(shifted_logits)
     
     sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
-    
+    # 计算softmax输出：将每个类别的指数值除以其对应样本所有类别指数值的和
+    # 这使得每个样本的所有类别概率之和为1
     softmax_output = exp_logits / sum_exp
 
     return softmax_output
