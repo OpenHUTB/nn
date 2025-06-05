@@ -83,10 +83,11 @@ class RL_QG_agent:
 
         return action
     #save_model和load_model，用于保存和加载TensorFlow模型的参数
-    def save_model(self):  # 保存 模型
+    # 保存模型
+    def save_model(self):  
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-
-    def load_model(self):# 重新导入模型
+    # 重新导入模型
+    def load_model(self):
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
 
     # 定义自己需要的函数

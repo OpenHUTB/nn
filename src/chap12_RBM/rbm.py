@@ -47,8 +47,8 @@ class RBM:
     
         # 请补全此处代码
          # 将数据展平为二维数组 [n_samples, n_observe]
-        data_flat = data.reshape(data.shape[0], -1)
-        n_samples = data_flat.shape[0]
+        data_flat = data.reshape(data.shape[0], -1)  
+        n_samples = data_flat.shape[0]  # 样本数量
         
         # 定义训练参数
         learning_rate = 0.1 # 学习率，控制参数更新的步长
@@ -68,19 +68,19 @@ class RBM:
                 h0_sample = self._sample_binary(h0_prob)
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)
-                v1_sample = self._sample_binary(v1_prob)
+                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)     
+                v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
-                # 计算梯度
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)
-                db_v = np.sum(v0 - v1_sample, axis=0)
-                db_h = np.sum(h0_sample - h1_prob, axis=0)
+                # 计算梯度      
+                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)         # 计算权重矩阵的梯度
+                db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
+                db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
 
                 # 更新参数
-                self.W += learning_rate * dW / batch_size
-                self.b_v += learning_rate * db_v / batch_size
-                self.b_h += learning_rate * db_h / batch_size
+                self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
+                self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
+                self.b_h += learning_rate * db_h / batch_size                         # 更新隐藏层偏置
         pass
 
     def sample(self):
