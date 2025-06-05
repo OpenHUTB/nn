@@ -8,13 +8,17 @@
 
 # In[1]:
 
+# 标准库（Python内置模块，按字母顺序排列）
+import collections
+import os
+import sys
+import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
+
+# 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
 import numpy as np
 import tensorflow as tf
-import collections
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
-
+from tensorflow.keras import datasets, layers, optimizers  # 同一库的子模块合并导入，按字母顺序排列
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
