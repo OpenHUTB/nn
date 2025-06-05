@@ -15,6 +15,7 @@ agent.load_model()
 # 设置最大训练轮数
 max_epochs = 100
 
+
 # 主训练循环（控制训练的总轮数）
 for i_episode in range(max_epochs):
     # 初始化棋局，返回初始 observation（3x8x8 的状态表示）
@@ -70,4 +71,4 @@ for i_episode in range(max_epochs):
             else:
                 print("白棋赢了！")
             print(black_score)  # 打印黑棋得分
-            break #结束代码
+            break # 结束代码
