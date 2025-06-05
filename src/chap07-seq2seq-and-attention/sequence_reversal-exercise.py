@@ -121,15 +121,16 @@ class mySeq2SeqModel(keras.Model):
         enc_out, enc_state = self.encoder(enc_emb)# 使用编码器处理嵌入向量，获取编码器输出和最终状态
         
         return [enc_out[:, -1, :], enc_state]# 返回编码器最后一个时间步的输出和最终状态
-    
+
     def get_next_token(self, x, state):
         '''
-        shape(x) = [b_sz,] 
+        shape(x) = [b_sz,]
         '''
-        inp_emb = self.embed_layer(x) #shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
-        h, state = self.decoder_cell.call(inp_emb, state) # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
-        logits = self.dense(h) # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
-        out = tf.argmax(logits, axis=-1)# 选择得分最高的token作为预测结果
+        # 解码器单步预测：根据当前token和状态预测下一个token
+        inp_emb = self.embed_layer(x)  # shape(b_sz, emb_sz)
+        h, state = self.decoder_cell.call(inp_emb, state)  # shape(b_sz, h_sz)
+        logits = self.dense(h)  # shape(b_sz, v_sz)
+        out = tf.argmax(logits, axis=-1)
         return out, state
 
 
