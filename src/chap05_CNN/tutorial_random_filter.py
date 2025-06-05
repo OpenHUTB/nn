@@ -5,6 +5,7 @@
 
 # In[191]:
 
+# 导入必要的库
 
 import os
 import tensorflow as tf
@@ -12,6 +13,8 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
+
+#定义一个简单的卷积模型
 
 class myConvModel(keras.Model):
     def __init__(self):
