@@ -7,7 +7,7 @@ class RL_QG_agent:
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
     #    pass    # 删掉这句话，并填写相应代码
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok=True)
+        os.makedirs(self.model_dir, exist_ok = True)
         self.sess = None
         self.saver = None
         self.input_states = None
@@ -29,15 +29,15 @@ class RL_QG_agent:
         # 定义自己的 网络
         self.sess = tf.Session()
         # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
-        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name="input_states")
+        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name = "input_states")
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
         conv1 = tf.layers.conv2d(
-            inputs=self.input_states,
-            filters=32,                 # 输出通道数：32个卷积核
-            kernel_size=3,              # 卷积核大小 3x3
-            padding="same",             # 输出大小与输入相同
-            activation=tf.nn.relu       # ReLU 激活函数
+            inputs = self.input_states,
+            filters = 32,                 # 输出通道数：32个卷积核
+            kernel_size = 3,              # 卷积核大小 3x3
+            padding = "same",             # 输出大小与输入相同
+            activation = tf.nn.relu       # ReLU 激活函数
             )
 
     # 第2个卷积层：提取更高级特征
