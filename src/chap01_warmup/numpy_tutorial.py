@@ -5,7 +5,7 @@
 # 1.导入numpy库
 import numpy as np #将numpy库命名为np
 
-# 导入matplotlib.pyplot库
+
 import matplotlib
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
 #import放一起代码美观
@@ -203,8 +203,8 @@ y_sin = np.sin(x)  # 计算对应的正弦值
 y_cos = np.cos(x)  # 计算对应的余弦值
 
 plt.figure(figsize=(10, 6))  # # 创建一个图像窗口，设置大小为10×6英寸 
-plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
-plt.plot(x, y_cos, label="y = cos(x)", color="red") # 绘制余弦函数曲线
+plt.plot(x, y_sin, label="y = sin(x)", color = "blue")  # 绘制正弦函数曲线
+plt.plot(x, y_cos, label="y = cos(x)", color = "red") # 绘制余弦函数曲线
 
 # 添加标题和标签
 plt.title("Sine and Cosine Functions")

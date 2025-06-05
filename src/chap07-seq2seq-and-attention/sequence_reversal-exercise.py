@@ -155,7 +155,7 @@ class mySeq2SeqModel(keras.Model):
 
 # In[4]:
 
-#定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
+# 定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
 @tf.function
 def compute_loss(logits, labels):
     """计算交叉熵损失"""
