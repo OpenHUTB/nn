@@ -1,6 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
+import matplotlib.pyplot as plt # 导入所需模块
 
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
