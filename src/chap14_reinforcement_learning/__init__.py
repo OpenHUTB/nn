@@ -35,17 +35,17 @@ register(
 )
 
 register(
-    id='DuplicatedInput-v0',
-    entry_point='gym.envs.algorithmic:DuplicatedInputEnv',
-    max_episode_steps=200,
-    reward_threshold=9.0,
+    id = 'DuplicatedInput-v0',
+    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',
+    max_episode_steps = 200,
+    reward_threshold = 9.0,
 )
 
 register(
-    id='Reverse-v0',
-    entry_point='gym.envs.algorithmic:ReverseEnv',
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    id = 'Reverse-v0',
+    entry_point = 'gym.envs.algorithmic:ReverseEnv',
+    max_episode_steps = 200,
+    reward_threshold = 25.0,
 )
 
 # Classic
