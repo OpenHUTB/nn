@@ -34,6 +34,7 @@ def mnist_dataset():
 # 定义矩阵乘法层
 class Matmul:
     def __init__(self):
+        
         self.mem = {}
         
     def forward(self, x, W):
@@ -87,6 +88,7 @@ class Softmax:
     softmax over last dimention
     '''
     def __init__(self):
+        #初始化类实例的基础参数和状态容器
         self.epsilon = 1e-12
         self.mem = {}
         
