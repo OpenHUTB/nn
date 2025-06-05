@@ -38,10 +38,20 @@ class myModel:
         ####################
         '''声明模型对应的参数'''
         ####################
+    # 输入层784 -> 隐藏层128
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        self.b1 = tf.Variable(tf.zeros([128]))
+        # 隐藏层128 -> 输出层10
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
+        self.b2 = tf.Variable(tf.zeros([10]))
+    
     def __call__(self, x):
         ####################
         '''实现模型函数体，返回未归一化的logits'''
         ####################
+        x = tf.reshape(x, [-1, 784])                     # 展平输入图像
+        h1 = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)  # 第一层激活
+        logits = tf.matmul(h1, self.W2) + self.b2         # 输出层
         return logits
         
 model = myModel()
