@@ -68,6 +68,7 @@ class myConvModel(keras.Model):
         return logits
 
 model = myConvModel()
+
 optimizer = optimizers.Adam()
 
 
