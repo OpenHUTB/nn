@@ -112,17 +112,17 @@ class GaussianMixtureModel:
                 new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
                 # 更新协方差
 
-                X_centered = X - new_mu[k]
-                weighted_X = gamma[:, k, None] * X_centered
-                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]
+                X_centered = X - new_mu[k]  # 计算第 k 个高斯分布的协方差矩阵更新
+                weighted_X = gamma[:, k, None] * X_centered  # 计算加权后的中心化数据
+                new_sigma[k] = (X_centered.T @ weighted_X) / Nk[k]  #计算新的协方差矩阵
                 new_sigma[k] += np.eye(n_features) * 1e-6  # 正则化
             
             # 计算对数似然
-            current_log_likelihood = np.sum(log_prob_sum)
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
-                break
-            log_likelihood = current_log_likelihood
-            
+            current_log_likelihood = np.sum(log_prob_sum)  # 计算当前迭代的对数似然值总和
+            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:  # 检查EM算法的收敛条件（从第二次迭代开始检查）
+                break  # 如果变化小于阈值，终止迭代（已收敛）
+            log_likelihood = current_log_likelihood  # 更新记录的对数似然值，供下次迭代比较使用 
+          
             self.mu = new_mu
             self.sigma = new_sigma
         
