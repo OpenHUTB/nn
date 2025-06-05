@@ -3,7 +3,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
@@ -22,7 +21,6 @@ def load_data(filename):
     xs, ys = zip(*xys)
     return np.asarray(xs), np.asarray(ys)
 
-
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
@@ -30,9 +28,7 @@ def identity_basis(x):
     ret = np.expand_dims(x, axis=1)
     return ret
 
-
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
-
 # 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
@@ -101,7 +97,6 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
         )
 
     n_samples, n_features = phi.shape
-
     # 根据选择的求解器执行计算
     if solver == "pinv":
         # 使用 numpy 的伪逆函数，基于 SVD 分解
@@ -143,7 +138,6 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
         )
 
     return w
-
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
     """梯度下降优化
@@ -208,7 +202,6 @@ def main(x_train, y_train, use_gradient_descent=False):
     # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
 
-
 # ## 评估结果
 # ## 评估结果
 # > 没有需要填写的代码，但是建议读懂
@@ -251,7 +244,6 @@ if __name__ == "__main__":
     # 使用测试集评估模型
     std = evaluate(y_test, y_test_pred)
     print("预测值与真实值的标准差：{:.1f}".format(std))
-
     # 显示结果
 
     plt.plot(x_train, y_train, "ro", markersize=3)  #  红色点为训练集数据
