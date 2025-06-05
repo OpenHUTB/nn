@@ -4,11 +4,12 @@ from gym.envs.registration import registry, register, make, spec
 # ----------------------------------------
 
 register(
-    id='Copy-v0',
-    entry_point = 'gym.envs.algorithmic:CopyEnv',
-    max_episode_steps = 200,
-    reward_threshold = 25.0,
+    id = 'Copy-v0',  # 环境ID
+    entry_point = 'gym.envs.algorithmic:CopyEnv',  # 环境实现类
+    max_episode_steps = 200,  # 最大步数
+    reward_threshold = 25.0,  # 达标奖励阈值
 )
+
 
 register(
     id='RepeatCopy-v0',
