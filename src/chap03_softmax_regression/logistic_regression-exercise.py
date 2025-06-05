@@ -8,7 +8,7 @@
 # In[7]:
 # 导入 TensorFlow 深度学习框架
 import tensorflow as tf
-# 导入 matplotlib 的 pyplot 模块，用于数据可视化
+# 导入 matplotlib 的 pyplot 模块，用于数据可视化，提高数据的利用效率
 import matplotlib.pyplot as plt
 
 # 从 matplotlib 导入 animation 和 rc 模块
@@ -59,7 +59,7 @@ plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
 
 # 将正样本和负样本连接成一个数据集
 data_set = np.concatenate((C1, C2), axis=0)
-# 随机打乱数据集的顺序
+# 把数据集的顺序随机打乱
 np.random.shuffle(data_set)
 
 # ## 建立模型
