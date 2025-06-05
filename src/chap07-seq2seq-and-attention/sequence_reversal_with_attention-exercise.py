@@ -2,11 +2,11 @@
 # coding: utf-8
 
 # # 序列逆置 （加注意力的seq2seq）
+
 # 使用attentive sequence to sequence 模型将一个字符串序列逆置。例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`(下图来自网络，是一个加attentino的sequence to sequence 模型示意图)
 # ![attentive seq2seq](./seq2seq-attn.jpg)
 
 # In[19]:
-
 
 import numpy as np
 import tensorflow as tf
@@ -16,12 +16,11 @@ from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
-
 # ## 玩具序列数据生成
+
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[20]:
-
 
 import random
 import string
@@ -29,9 +28,9 @@ import string
 def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
 
-
     letters = string.ascii_uppercase
     return ''.join(random.choice(letters) for i in range(stringLength))
+
 
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]
@@ -40,6 +39,7 @@ def get_batch(batch_size, length):
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
+    
 print(get_batch(2, 10))
 
 
@@ -50,7 +50,9 @@ print(get_batch(2, 10))
 # In[26]:
 
 # 定义了一个名为 mySeq2SeqModel 的类，继承自 keras.Model
+
 #调用父类 keras.Model 的初始化方法
+
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
@@ -58,17 +60,23 @@ class mySeq2SeqModel(keras.Model):
         self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
+
         
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
+
         
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
+                                           
                                            return_sequences=True, return_state=True)
-        self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
-                                           return_sequences=True, return_state=True)
-        self.dense_attn = tf.keras.layers.Dense(self.hidden)
-        self.dense = tf.keras.layers.Dense(self.v_sz)
         
+        self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
+                                           
+                                           return_sequences=True, return_state=True)
+        
+        self.dense_attn = tf.keras.layers.Dense(self.hidden)
+        
+        self.dense = tf.keras.layers.Dense(self.v_sz)
         
     @tf.function
     def call(self, enc_ids, dec_ids):
