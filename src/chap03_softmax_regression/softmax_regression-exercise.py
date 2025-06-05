@@ -172,8 +172,10 @@ opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 x1, x2, y = list(zip(*data_set))
 # 转换为 float32
 x = np.array(list(zip(x1, x2)), dtype=np.float32)  
+# 特征
 # 转换为 int32
 y = np.array(y, dtype=np.int32)  
+# 标签
 # 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
