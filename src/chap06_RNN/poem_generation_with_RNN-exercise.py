@@ -81,7 +81,7 @@ def poem_dataset():
         word2id: 词语到id的映射
         id2word: id到词语的映射
     """
-    # 处理原始数据
+    # 处理数据
     instances, word2id, id2word = process_dataset('../poems.txt')
     # 创建Dataset
     ds = tf.data.Dataset.from_generator(
@@ -125,6 +125,7 @@ class myRNNModel(keras.Model):
         # 输出层：预测下一个词的概率分布
         self.dense = tf.keras.layers.Dense(self.v_sz)
         
+   
     @tf.function
     def call(self, inp_ids):
         """模型前向传播
