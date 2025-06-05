@@ -5,6 +5,7 @@
 # 使用sequence to sequence 模型将一个字符串序列逆置。
 # 例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`
 
+
 import numpy as np
 import tensorflow as tf
 import collections
