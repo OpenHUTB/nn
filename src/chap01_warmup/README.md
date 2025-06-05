@@ -1,5 +1,4 @@
 # numpy exercise
-
 ## 题目要求： 
 
 按照 [python 文件](https://github.com/OpenHUTB/nn/blob/main/src/chap01_warmup/numpy_tutorial.py) 中的要求，利用numpy 实现对应的操作。
@@ -12,7 +11,6 @@
 2. **数组操作**：包括创建数组、访问数组元素、数组切片、数组形状操作等。
 3. **数学运算**：包括数组的加减乘除、矩阵乘法、求和、平均值、转置、指数运算等。
 4. **绘图**：使用 `matplotlib.pyplot` 绘制简单的函数图像，如二次函数、正弦函数和余弦函数。
-
 ### **题目解析：**
 
 #### 1. 导入 `numpy` 库
@@ -319,6 +317,7 @@ plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
 plt.xticks([0, np.pi, 2*np.pi, 3*np.pi], ['0', 'π', '2π', '3π'])
 plt.legend()
 
+
 # 绘制余弦曲线
 plt.subplot(1, 2, 2)  # 1行2列的第2个子图
 plt.plot(x, y_cos, 'r-', linewidth=2, label='y = cos(x)')
@@ -333,3 +332,5 @@ plt.legend()
 # 调整布局
 plt.tight_layout()
 plt.show()
+
+
