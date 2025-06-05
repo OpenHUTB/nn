@@ -10,10 +10,9 @@
 
 # In[1]:
 
-
+# 导入必要的库
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
 from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
@@ -24,30 +23,21 @@ import numpy as np
 # 设置数据点数量
 dot_num = 100  
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
-x_p = np.random.normal(
-    3.0, 1, dot_num
-) 
-# x和y坐标
-y_p = np.random.normal(6.0, 1, dot_num)
-# 标签为1
-y = np.ones(dot_num)
-# 组合成(x, y, label)格式
-C1 = np.array([x_p, y_p, y]).T 
+x_p = np.random.normal(3.0, 1, dot_num)  # x坐标服从 N(3, 1)
+y_p = np.random.normal(6.0, 1, dot_num)  # y坐标服从 N(6, 1)
+y = np.ones(dot_num)  # 标签为1
+C1 = np.array([x_p, y_p, y]).T   # 组合成(x, y, label)格式
 
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
-x_n = np.random.normal(
-    6.0, 1, dot_num
-)
+x_n = np.random.normal(6.0, 1, dot_num)
 y_n = np.random.normal(3.0, 1, dot_num)
-y = np.zeros(dot_num)
+y = np.zeros(dot_num)  # 标签设为0
 C2 = np.array([x_n, y_n, y]).T
 
 # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
-x_b = np.random.normal(
-    7.0, 1, dot_num
-)
+x_b = np.random.normal(7.0, 1, dot_num)
 y_b = np.random.normal(7.0, 1, dot_num)
-y = np.ones(dot_num) * 2
+y = np.ones(dot_num) * 2  # 标签设为2
 C3 = np.array([x_b, y_b, y]).T
 
 # 绘制正样本，用蓝色加号表示
@@ -152,11 +142,11 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :return: 当前批次的损失与准确率
     """
     with tf.GradientTape() as tape:
-        predictions = model(x_batch)
-        loss, accuracy = compute_loss(predictions, y_batch)
+        predictions = model(x_batch)  # 前向传播
+        loss, accuracy = compute_loss(predictions, y_batch)  # 计算损失和准确率
 
-    grads = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    grads = tape.gradient(loss, model.trainable_variables)  # 计算梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 参数更新
     return loss, accuracy
 
 
@@ -164,22 +154,23 @@ def train_one_step(model, optimizer, x_batch, y_batch):
 
 # In[12]:
 
-
-model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
-opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+model = SoftmaxRegression()
+
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
+opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+
+# 从数据集中分离出特征和标签
 x1, x2, y = list(zip(*data_set))
-# 转换为 float32
-x = np.array(list(zip(x1, x2)), dtype=np.float32)  
-# 转换为 int32
-y = np.array(y, dtype=np.int32)  
-# 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
+x = np.array(list(zip(x1, x2)), dtype=np.float32)  # 转换为 float32
+y = np.array(y, dtype=np.int32)  # 转换为 int32
+
+# 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
     if i % 50 == 49:
         print(f"loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}")
-# 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
+
 
 # # 结果展示，无需填写代码
 
@@ -193,14 +184,18 @@ plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
-
-
 X, Y = np.meshgrid(x, y)
+
+# 将网格点转换为模型输入格式
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
-print(inp.shape)
-Z = model(inp)
-Z = np.argmax(Z, axis=1)
-Z = Z.reshape(X.shape)
+
+print(inp.shape)  # 输出总共的测试点个数（10000 个点）
+
+Z = model(inp)  # 模型预测
+Z = np.argmax(Z, axis=1)  # 获取每个点所属的最大概率类别
+Z = Z.reshape(X.shape)  # 恢复成原来的网格形状
+
+# 绘制模型的分类边界
 plt.contour(X, Y, Z)
 plt.show()
 
