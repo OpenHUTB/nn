@@ -1,6 +1,6 @@
 # python: 2.7
 # encoding: utf-8
-
+# 导入numpy模块并命名为np
 import numpy as np
 
 class RBM:
@@ -25,7 +25,9 @@ class RBM:
         # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
 
-        self.W = np.random.normal(0, init_std, size = (self.n_observe, self.n_hidden))  # 初始化权重矩阵（可见层 -> 隐藏层）
+        self.W = np.random.normal(
+            0, init_std, size=(self.n_observe, self.n_hidden)
+        )  # 初始化权重矩阵（可见层 -> 隐藏层）
 
         # 可选替代方案：使用更小的固定标准差进行初始化。
         # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
@@ -66,12 +68,11 @@ class RBM:
 
                 # 正相传播：从v0计算隐藏层激活概率
 
-
-                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h)
-                h0_sample = self._sample_binary(h0_prob)
+                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) # 计算隐藏层单元被激活的概率
+                h0_sample = self._sample_binary(h0_prob) # 根据计算出的概率对隐藏层进行二值化采样
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)     
+                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  #将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
                 v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
@@ -84,7 +85,6 @@ class RBM:
                 self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
                 self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
                 self.b_h += learning_rate * db_h / batch_size                         # 更新隐藏层偏置
-        pass
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""

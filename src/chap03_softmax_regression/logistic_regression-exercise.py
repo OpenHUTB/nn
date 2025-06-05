@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
 # # Logistic Regression Example
-# ### 生成数据集， 看明白即可无需填写代码
+# ### 生成数据集，看明白即可无需填写代码
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
-# #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
+# #### '<font color="green">o</font>' 从高斯分布采样 (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 
-# In[7]:
 # 导入 TensorFlow 深度学习框架
 import tensorflow as tf
 # 导入 matplotlib 的 pyplot 模块，用于数据可视化
@@ -53,9 +52,9 @@ y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 绘制正样本，用蓝色加号表示
-plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
+plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
 # 绘制负样本，用绿色圆圈表示
-plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
+plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
 
 # 将正样本和负样本连接成一个数据集
 data_set = np.concatenate((C1, C2), axis=0)
@@ -65,22 +64,32 @@ np.random.shuffle(data_set)
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
-# In[37]:
 # 防止对数运算出现数值不稳定问题，添加一个极小值
 epsilon = 1e-12
+
+
 class LogisticRegression():
     def __init__(self):
-        #正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
+        # 正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
         # L2正则化，防止过拟合，正则化系数为0.01
         # L2正则化通过对权重施加平方惩罚项来防止权重过大
         l2_reg = tf.keras.regularizers.l2(0.01)
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
-        self.W = tf.Variable(initial_value=tf.random.uniform(shape=[2, 1], minval=-0.1, maxval=0.1), regularizer=l2_reg)
+        self.W = tf.Variable(
+            initial_value=tf.random.uniform(
+                shape=[2, 1], minval=-0.1, maxval=0.1
+            ),
+            regularizer=l2_reg
+        )
         # 初始化偏置变量b，形状为[1]，初始值为0
-        self.b = tf.Variable(shape=[1], dtype=tf.float32, initial_value=tf.zeros(shape=[1]))
-        
+        self.b = tf.Variable(
+            shape=[1], 
+            dtype=tf.float32, 
+            initial_value=tf.zeros(shape=[1])
+        )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
+
     @tf.function
     def __call__(self, inp):
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
@@ -88,10 +97,11 @@ class LogisticRegression():
         # 对logits应用sigmoid函数，得到预测概率
         pred = tf.nn.sigmoid(logits)
         return pred
-# 使用tf.function将该方法编译为静态图，提高执行效率
-#以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
-@tf.function
 
+
+# 使用tf.function将该方法编译为静态图，提高执行效率
+# 以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
+@tf.function
 def compute_loss(pred, label):
     """
         计算二分类交叉熵损失函数（手动实现，不使用tf内置loss）
@@ -109,11 +119,11 @@ def compute_loss(pred, label):
     # 压缩预测结果的维度，从形状(N, 1)变为(N,)
     pred = tf.squeeze(pred, axis=1)
     '''============================='''
-    #输入label shape(N,), pred shape(N,)
-    #输出 losses shape(N,) 每一个样本一个loss
-    #todo 填空一，实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
+    # 输入label shape(N,), pred shape(N,)
+    # 输出 losses shape(N,) 每一个样本一个loss
+    # todo 填空一，实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
     # 计算每个样本的sigmoid交叉熵损失，防止log(0)的情况，加上一个小的epsilon
-    losses = - label * tf.math.log(pred + epsilon) - (1 - label) * tf.math.log(1 - pred + epsilon)
+    losses = -label * tf.math.log(pred + epsilon) - (1 - label) * tf.math.log(1 - pred + epsilon)
     # 交叉熵损失公式（二分类问题）：
     # L = -Σ [y * log(p) + (1 - y) * log(1 - p)]
     # 其中 y 是真实标签，p 是预测概率
@@ -122,10 +132,11 @@ def compute_loss(pred, label):
     loss = tf.reduce_mean(losses)
     
     # 将预测概率大于0.5的设置为1，小于等于0.5的设置为0，得到预测标签
-    pred = tf.where(pred>0.5, tf.ones_like(pred), tf.zeros_like(pred))
+    pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype=tf.float32))
     return loss, accuracy
+
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
@@ -142,9 +153,7 @@ def train_one_step(model, optimizer, x, y):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy, model.W, model.b
 
-# ### 实例化一个模型，进行训练
 
-# In[38]:
 if __name__ == '__main__':
     # 实例化逻辑回归模型
     model = LogisticRegression()
@@ -157,72 +166,57 @@ if __name__ == '__main__':
     # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
     animation_frames = []
 
-    # 进行200次训练迭代
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
-        animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()))
-        # 每20次迭代打印一次损失和准确率
-        if i%20 == 0:
+        animation_frames.append(
+            (W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
+        )
+        if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
-# ## 结果展示，无需填写代码
+    # 创建图形
+    f, ax = plt.subplots(figsize=(6, 4))
+    f.suptitle('Logistic Regression Example', fontsize=15)
+    plt.ylabel('Y')
+    plt.xlabel('X')
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 10)
 
-# In[5]:
-# 创建一个图形和子图对象，设置图形大小为(6, 4)
-f, ax = plt.subplots(figsize=(6,4))
-# 设置图形的总标题
-f.suptitle('Logistic Regression Example', fontsize=15)
-# 设置y轴标签
-plt.ylabel('Y')
-# 设置x轴标签
-plt.xlabel('X')
-# 设置x轴的范围
-ax.set_xlim(0, 10)
-# 设置y轴的范围
-ax.set_ylim(0, 10)
+    line_d, = ax.plot([], [], label='fit_line')
+    C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
+    C2_dots, = ax.plot([], [], 'o', c='g', label='actual_dots')
+    frame_text = ax.text(
+        0.02, 0.95, '',
+        horizontalalignment='left',
+        verticalalignment='top', 
+        transform=ax.transAxes
+    )
 
-# 创建一个空的线条对象，用于绘制拟合的直线
-line_d, = ax.plot([], [], label='fit_line')
-# 创建一个空的散点对象，用于绘制正样本
-C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
-# 创建一个空的散点对象，用于绘制负样本
-C2_dots, = ax.plot([], [], 'o', c='g' ,label='actual_dots')
+    def init():
+        line_d.set_data([], [])
+        C1_dots.set_data([], [])
+        C2_dots.set_data([], [])
+        return (line_d,) + (C1_dots,) + (C2_dots,)
 
-# 创建一个文本对象，用于显示训练的信息
-frame_text = ax.text(0.02, 0.95,'',horizontalalignment='left',verticalalignment='top', transform=ax.transAxes)
-# ax.legend()
+    def animate(i):
+        xx = np.arange(10, step=0.1)
+        a = animation_frames[i][0]
+        b = animation_frames[i][1]
+        c = animation_frames[i][2]
+        yy = a/-b * xx + c/-b
+        line_d.set_data(xx, yy)
+        C1_dots.set_data(C1[:, 0], C1[:, 1])
+        C2_dots.set_data(C2[:, 0], C2[:, 1])
+        frame_text.set_text(
+            'Timestep = %.1d/%.1d\nLoss = %.3f' % 
+            (i, len(animation_frames), animation_frames[i][3])
+        )
+        return (line_d,) + (C1_dots,) + (C2_dots,)
 
-# 初始化函数，用于清空图形上的线条和散点数据
-def init():
-    line_d.set_data([],[])#初始化动态线数据为空列表
-    C1_dots.set_data([],[])#初始化C1点集数据为空列表
-    C2_dots.set_data([],[])#初始化C2点集数据为空列表
-    return (line_d,) + (C1_dots,) + (C2_dots,)#返回包含所有图形对象的元组
-
-# 动画更新函数，根据训练过程中的参数绘制拟合直线、样本点和更新训练信息文本
-def animate(i):
-    xx = np.arange(10, step=0.1) # 创建 x 轴的数据，从 10 开始，步长为 0.1
-    a = animation_frames[i][0]     # 从 animation_frames 中提取当前帧的参数W[0]
-    b = animation_frames[i][1]     # W[1]
-    c = animation_frames[i][2]     # b
-    yy = a/-b * xx +c/-b         # 根据公式计算 y = (a/-b) * x + (c/-b)，即直线的表达式
-    line_d.set_data(xx, yy)      # 更新直线的数据
-    # 更新第一组点（C1）的数据
-    C1_dots.set_data(C1[:, 0], C1[:, 1])  # C1[:, 0] 是 x 坐标，C1[:, 1] 是 y 坐标
-    C2_dots.set_data(C2[:, 0], C2[:, 1])  # C2[:, 0] 是 x 坐标，C2[:, 1] 是 y 坐标
-    
-    frame_text.set_text('Timestep = %.1d/%.1d\nLoss = %.3f' % (i, len(animation_frames), animation_frames[i][3])) # 更新帧文本信息，包括当前帧索引、总帧数和损失值
-    
-    return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象，以便 Matplotlib 动画知道要更新哪些部分
-
-# 创建动画对象 anim，使用 matplotlib.animation.FuncAnimation 函数生成动态动画
-anim = animation.FuncAnimation(f, animate, init_func=init,
-                               frames=len(animation_frames), interval=30, blit=True)
-
-# 将动画转换为HTML5视频格式并显示
-HTML(anim.to_html5_video())
-
-
-# ## 结果展示，无需填写代码
+    anim = animation.FuncAnimation(
+        f, animate, init_func=init,
+        frames=len(animation_frames), interval=30, blit=True
+    )
+    HTML(anim.to_html5_video())

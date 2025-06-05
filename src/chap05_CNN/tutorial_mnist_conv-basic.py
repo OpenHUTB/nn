@@ -48,6 +48,12 @@ def prepare_mnist_features_and_labels(x, y):
 
 
 class myConvModel(keras.Model):
+    """
+    自定义卷积神经网络模型，用于图像分类任务
+    
+    网络结构：
+    Conv2D(32) → Conv2D(64) → MaxPooling2D → Flatten → Dense(100) → Dense(10)
+    """
     def __init__(self):
         super(myConvModel, self).__init__()
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')

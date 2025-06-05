@@ -1,9 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
+import matplotlib.pyplot as plt # 导入所需模块
 
 # 生成混合高斯分布数据
-def generate_data(n_samples = 1000):
+def generate_data(n_samples=1000):
     np.random.seed(42)
     # 定义三个高斯分布的中心点
     mu_true = np.array([ 
@@ -11,23 +10,29 @@ def generate_data(n_samples = 1000):
         [5, 5],  # 第二个高斯分布的均值
         [-5, 5]  # 第三个高斯分布的均值
     ])
+    
     # 定义三个高斯分布的协方差矩阵
     sigma_true = np.array([
         [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
         [[2, 0.5], [0.5, 1]],   # 第二个分布：倾斜的椭圆
         [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
     ])
+    
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
+    
     # 获取混合成分的数量(这里是3)
     n_components = len(weights_true)
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
     samples_per_component = (weights_true * n_samples).astype(int)
+    
     # 用于存储每个高斯分布生成的数据点
     X_list = []  
+    
     # 用于存储每个数据点对应的真实分布标签
     y_true = []  
+    
      # 从第i个高斯分布生成样本
     for i in range(n_components): 
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
@@ -109,8 +114,10 @@ class GaussianMixtureModel:
             # M步：更新参数
             Nk = np.sum(gamma, axis=0) # 计算每个高斯成分的"有效样本数"（即属于该成分的样本概率之和）
             self.pi = Nk / n_samples # 更新混合权重π：各成分的样本占比
+            # 初始化新均值和新协方差矩阵的存储空间
+            # 保持与原参数相同的形状，用于后续计算
             new_mu = np.zeros_like(self.mu) # 初始化新均值和新协方差矩阵的存储空间
-            new_sigma = np.zeros_like(self.sigma)
+            new_sigma = np.zeros_like(self.sigma) #此函数会创建一个新数组，其数据类型（dtype）和形状（shape）都与输入数组self.sigma相同，不过数组里的元素全部为 0。
             
             for k in range(self.n_components): # 遍历每个高斯成分更新参数
                 # 更新均值
@@ -137,13 +144,16 @@ class GaussianMixtureModel:
             self.mu, new_mu	当前模型的高斯分布均值 / 更新后的均值
             self.sigma, new_sigma	当前模型的协方差 / 更新后的协方差
             '''
+            # 计算当前迭代轮次中所有数据点的对数似然总和
+            # log_prob_sum 应是一个包含每个数据点对数概率的数组
             current_log_likelihood = np.sum(log_prob_sum)       # 计算当前轮的总对数似然
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: 
-                break
-            log_likelihood = current_log_likelihood
+            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: # 检查收敛条件（从第二次迭代开始检查）
+                # 如果当前对数似然与上一轮的差值小于容忍度(tol)，则判定收敛
+                break# 退出EM循环
+            log_likelihood = current_log_likelihood# 更新记录的对数似然值，用于下一轮的收敛判断
             
-            self.mu = new_mu
-            self.sigma = new_sigma
+            self.mu = new_mu# 使用新计算的均值向量替换旧的
+            self.sigma = new_sigma# 使用新计算的协方差矩阵替换旧的
         
         # 计算最终聚类结果
         self.labels_ = np.argmax(gamma, axis=1) # 返回每个样本所属的聚类
@@ -190,11 +200,17 @@ if __name__ == "__main__":
     plt.title("True Clusters") # 子图标题
 
     # 设置坐标轴标签
-    plt.xlabel("Feature 1")
-    plt.ylabel("Feature 2")
+    plt.xlabel("Feature 1") #设置 X 轴（水平轴）的标签为 "Feature 1"，通常用于表示数据的第一个特征或变量
+    plt.ylabel("Feature 2") # 设置y轴的标签为"Feature 2"
+    # 此标签通常用于描述y轴所代表的数据含义或特征名称
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
-    plt.subplot(1, 2, 2)
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
+    plt.subplot(1, 2, 2) # 创建一个1行2列的子图网格，并选择第2个子图(右侧)进行后续绘图
+    #   - 第一个参数1: 表示子图网格的行数
+    #   - 第二个参数2: 表示子图网格的列数
+    #   - 第三个参数2: 表示当前选中的子图位置(从左到右、从上到下计数)
+    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)# 创建二维数据点的散点图，每个点的颜色由预测标签y_pred决定
+#   - X[:, 0]: 所有数据点的第一个特征值(作为x轴坐标)
+#   - X[:, 1]: 所有数据点的第二个特征值(作为y轴坐标)
     plt.title("GMM Predicted Clusters") # 子图标题
 
     # 设置坐标轴标签

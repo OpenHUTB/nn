@@ -1,17 +1,17 @@
-import tensorflow as tf
 import os
 import numpy as np
+import tensorflow as tf
 
 class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
     def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
     #    pass    # 删掉这句话，并填写相应代码
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok = True)
-        self.sess = None
-        self.saver = None
-        self.input_states = None
-        self.Q_values = None
+        os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
+        self.sess = None  # TensorFlow会话对象初始化占位
+        self.saver = None  # TensorFlow模型保存器初始化占位
+        self.input_states = None  # 神经网络输入占位符初始化占位
+        self.Q_values = None  # 神经网络输出的Q值初始化占位
 
 
     def init_model(self):
@@ -43,11 +43,11 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
 
     # 第2个卷积层：提取更高级特征
         conv2 = tf.layers.conv2d(
-            inputs=conv1,
-            filters=64,                 # 输出通道数：64个卷积核
-            kernel_size=3,
-            padding="same",
-            activation=tf.nn.relu
+            inputs = conv1,
+            filters = 64,                 # 输出通道数：64个卷积核
+            kernel_size = 3,
+            padding = "same",
+            activation = tf.nn.relu
             )
         
         # 扁平化层
@@ -67,23 +67,22 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # action = 123456789
         # 删掉这句话，并填写相应代码
         # 状态预处理
-        state_input = np.array(state).reshape(1, -1).astype(np.float32)  # 转换为(1,64)形状
+        state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
         q_vals = self.sess.run(self.q_values, feed_dict={self.input_state: state_input})
         
         # 过滤合法动作并选择最优
-        legal_q = q_vals[0][enables]
-        if np.sum(legal_q) == 0:  # 所有合法动作Q值都为 0 的特殊情况处理
-            return np.random.choice(np.where(enables)[0])
         
-        max_q = np.max(legal_q)
-        candidates = np.where(legal_q == max_q)[0]
+        legal_q = q_vals[0][enables]  # 从 Q 值矩阵中提取当前状态下的合法动作的 Q 值
+        if np.sum(legal_q) == 0:  # 所有合法动作Q值都为 0 的特殊情况处理
+            return np.random.choice(np.where(enables)[0])   # 随机选择一个合法动作
+        
+        max_q = np.max(legal_q)  # 找到合法动作中 Q 值最大的值
+        candidates = np.where(legal_q == max_q)[0]  # 找到所有 Q 值等于最大 Q 值的动作索引
         
         # 随机选择最优动作 （解决多个最大值的情况）
-        action = np.random.choice(candidates)
-
-        return action
+        return np.random.choice(candidates)
     #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
     # 保存模型
     def save_model(self):  

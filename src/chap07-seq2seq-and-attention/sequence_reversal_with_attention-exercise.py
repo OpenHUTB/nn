@@ -9,11 +9,10 @@
 
 
 # 导入NumPy库，用于科学计算和数组操作
-# NumPy提供了高性能的多维数组对象和各种数学运算工具
 import numpy as np
 # 导入TensorFlow库，用于机器学习和深度学习任务
-# TensorFlow是一个开源的端到端机器学习平台
 import tensorflow as tf
+# 导入 collections 模块，提供额外的容器类型如字典和列表
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -26,8 +25,9 @@ import os,sys,tqdm
 
 # In[20]:
 
-
+# 导入random模块，用于生成随机数和随机操作
 import random
+# 导入string模块，提供与字符串操作相关的常量和工具函数
 import string
 
 def randomString(stringLength):
@@ -48,7 +48,6 @@ print(get_batch(2, 10))
 
 
 # # 建立sequence to sequence 模型
-# ##
 # 完成两空，模型搭建以及单步解码逻辑
 
 # In[26]:
@@ -103,7 +102,6 @@ class mySeq2SeqModel(keras.Model):
 
 
 # # Loss函数以及训练逻辑
- ##
 # In[27]:
 
 
@@ -137,20 +135,20 @@ def train(model, optimizer, seqlen):
 
 
 # # 训练迭代
-
 # In[28]:
 
 
+# 创建Adam优化器实例，设置学习率为0.0005
 optimizer = optimizers.Adam(0.0005)
+# 实例化自定义的序列到序列模型
 model = mySeq2SeqModel()
+# 调用训练函数，传入模型、优化器和序列长度参数
 train(model, optimizer, seqlen=20)
 
 
 # # 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
-# 
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
-
 # In[30]:
 
 

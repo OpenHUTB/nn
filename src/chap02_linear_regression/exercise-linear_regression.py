@@ -197,8 +197,11 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     # 定义预测函数
     def f(x):
+        # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
         phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        # 调用basis_func函数，对输入x进行某种变换，得到基函数的值
         phi1 = basis_func(x)
+        # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
         phi = np.concatenate([phi0, phi1], axis=1)
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)

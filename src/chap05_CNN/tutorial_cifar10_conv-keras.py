@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # 参考mnist_conv-keras实现针对cifar10的alexNet卷积模型
+# # 参考 mnist_conv-keras 实现针对 cifar10 的 alexNet 卷积模型
 # 
 # 
 # #### 链接: https://pan.baidu.com/s/1LcCPcK9DgLS3W_DUPZS8kQ 提取码: 5vwz
@@ -9,7 +9,7 @@
 # 
 # ## tar zxvf cifar***.tar.zip
 
-# ## 准备数据
+# ## 准备所需要的数据
 
 # In[17]:
 import os
@@ -23,11 +23,23 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 def cifar10_dataset():
+    """
+    加载并预处理CIFAR-10数据集，返回训练集和测试集的TensorFlow Dataset对象
+    
+    返回:
+        ds (tf.data.Dataset): 处理后的训练数据集
+        test_ds (tf.data.Dataset): 处理后的测试数据集
+    """
+    # 加载CIFAR-10数据集
+    # x: 图像数据 (50000张训练图像 + 10000张测试图像，32x32像素RGB)
+    # y: 对应标签 (0-9的整数标签)
     (x, y), (x_test, y_test) = datasets.cifar10.load_data()
+    # 创建训练数据集
     ds = tf.data.Dataset.from_tensor_slices((x, y))
     ds = ds.map(prepare_mnist_features_and_labels)
     ds = ds.take(20000).shuffle(20000).batch(100)
-    
+
+    # 创建测试数据集
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).batch(20000)
@@ -39,7 +51,7 @@ def prepare_mnist_features_and_labels(x, y):
     return x, y
 
 # In[ ]:
-# ## 建立模型
+# ## 开始建立模型
 
 # In[18]:
 class myConvModel(keras.Model):
@@ -88,7 +100,7 @@ model = myConvModel()
 optimizer = optimizers.Adam(0.001)
 
 
-# ## 编译， fit以及evaluate
+# ## 编译， fit 以及 evaluate
 # In[19]:
 model.compile(optimizer=optimizer,
               loss='sparse_categorical_crossentropy',
