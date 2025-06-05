@@ -47,7 +47,7 @@ C1 = np.array([x_p, y_p, y]).T
 x_n = np.random.normal(6., 1, dot_num)
 # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y_n = np.random.normal(3., 1, dot_num)
-# 负样本的标签设为0
+# 将负样本的标签设为0
 y = np.zeros(dot_num)
 # 将负样本的x、y坐标和标签组合成一个数组，形状为 (dot_num, 3)
 C2 = np.array([x_n, y_n, y]).T
@@ -88,7 +88,7 @@ class LogisticRegression():
         # 对logits应用sigmoid函数，得到预测概率
         pred = tf.nn.sigmoid(logits)
         return pred
-# 使用tf.function将该方法编译为静态图，提高执行效率
+# 使用tf.function将该方法编译为静态图，提高执行效率，节约时间
 #以下代码计算了二分类问题里的交叉熵损失以及准确率，并且进行了一系列的数据处理和数值稳定性方面的优化
 @tf.function
 
