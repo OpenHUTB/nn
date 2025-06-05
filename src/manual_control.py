@@ -817,13 +817,17 @@ class HUD(object):
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
     def render(self, display):
+        # 当需要显示信息时进行渲染
         if self._show_info:
+            # 创建半透明背景板
             info_surface = pygame.Surface((220, self.dim[1]))
-            info_surface.set_alpha(100)
-            display.blit(info_surface, (0, 0))
+            info_surface.set_alpha(100)# 设置透明度
+            display.blit(info_surface, (0, 0))# 将背景绘制到显示表面
+            # 初始化垂直偏移量和进度条水平位置
             v_offset = 4
             bar_h_offset = 100
             bar_width = 106
+            # 遍历所有信息文本项
             for item in self._info_text:
                 if v_offset + 18 > self.dim[1]:
                     break
