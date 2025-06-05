@@ -2,16 +2,17 @@ import tensorflow as tf
 import os
 import numpy as np
 
-class RL_QG_agent:
-    def __init__(self):
-        self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
+class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
+    def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
+        self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
     #    pass    # 删掉这句话，并填写相应代码
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok=True)
+        os.makedirs(self.model_dir, exist_ok = True)
         self.sess = None
         self.saver = None
         self.input_states = None
         self.Q_values = None
+
 
     def init_model(self):
         '''
@@ -29,15 +30,15 @@ class RL_QG_agent:
         # 定义自己的 网络
         self.sess = tf.Session()
         # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
-        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name="input_states")
+        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name = "input_states")
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
         conv1 = tf.layers.conv2d(
-            inputs=self.input_states,
-            filters=32,                 # 输出通道数：32个卷积核
-            kernel_size=3,              # 卷积核大小 3x3
-            padding="same",             # 输出大小与输入相同
-            activation=tf.nn.relu       # ReLU 激活函数
+            inputs = self.input_states,
+            filters = 32,                 # 输出通道数：32个卷积核
+            kernel_size = 3,              # 卷积核大小 3x3
+            padding = "same",             # 输出大小与输入相同
+            activation = tf.nn.relu       # ReLU 激活函数
             )
 
     # 第2个卷积层：提取更高级特征
@@ -63,8 +64,9 @@ class RL_QG_agent:
     def place(self,state,enables):
         # 用于测试的函数，返回的action是 0-63 之间的一个数值，
         # action 表示的是 要下的位置。
-       # action = 123456789    # 删掉这句话，并填写相应代码
-       # 状态预处理
+        # action = 123456789
+        # 删掉这句话，并填写相应代码
+        # 状态预处理
         state_input = np.array(state).reshape(1, -1).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
@@ -72,21 +74,22 @@ class RL_QG_agent:
         
         # 过滤合法动作并选择最优
         legal_q = q_vals[0][enables]
-        if np.sum(legal_q) == 0:  # 所有合法动作Q值都为0的特殊情况处理
+        if np.sum(legal_q) == 0:  # 所有合法动作Q值都为 0 的特殊情况处理
             return np.random.choice(np.where(enables)[0])
         
         max_q = np.max(legal_q)
         candidates = np.where(legal_q == max_q)[0]
         
-        # 随机选择最优动作（解决多个最大值的情况）
+        # 随机选择最优动作 （解决多个最大值的情况）
         action = np.random.choice(candidates)
 
         return action
-   #save_model和load_model，用于保存和加载TensorFlow模型的参数
-    def save_model(self):  # 保存 模型
+    #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
+    # 保存模型
+    def save_model(self):  
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-
-    def load_model(self):# 重新导入模型
+    # 重新导入模型
+    def load_model(self):
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
 
     # 定义自己需要的函数

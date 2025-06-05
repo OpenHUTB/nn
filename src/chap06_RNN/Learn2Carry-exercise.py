@@ -107,10 +107,10 @@ class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
         self.embed_layer = tf.keras.layers.Embedding(10, 32,
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape = [None, None])
 
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
         self.dense = tf.keras.layers.Dense(10)
 
     @tf.function
@@ -127,7 +127,7 @@ class myRNNModel(keras.Model):
 @tf.function
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits = logits , labels = labels)
     return tf.reduce_mean(losses)
 
 @tf.function

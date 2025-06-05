@@ -1,8 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 # 生成混合高斯分布数据
-def generate_data(n_samples=1000):
+def generate_data(n_samples = 1000):
     np.random.seed(42)
     # 定义三个高斯分布的中心点
     mu_true = np.array([ 
@@ -23,22 +24,31 @@ def generate_data(n_samples=1000):
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
     samples_per_component = (weights_true * n_samples).astype(int)
-    X_list = []  # 用于存储每个高斯分布生成的数据点
-    y_true = []  # 用于存储每个数据点对应的真实分布标签
-    for i in range(n_components):  # 从第i个高斯分布生成样本
+    # 用于存储每个高斯分布生成的数据点
+    X_list = []  
+    # 用于存储每个数据点对应的真实分布标签
+    y_true = []  
+     # 从第i个高斯分布生成样本
+    for i in range(n_components): 
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
-        X_list.append(X_i)  # 将生成的样本添加到列表
-        y_true.extend([i] * samples_per_component[i])  # 添加对应标签
+         # 将生成的样本添加到列表
+        X_list.append(X_i) 
+         # 添加对应标签
+        y_true.extend([i] * samples_per_component[i]) 
     
     # 合并并打乱数据
-    X = np.vstack(X_list)  #将多个子数据集合并为一个完整数据集
-    y_true = np.array(y_true)  #将Python列表转换为NumPy数组
-    shuffle_idx = np.random.permutation(n_samples) #生成0到n_samples-1的随机排列
-    return X[shuffle_idx], y_true[shuffle_idx] #使用相同的随机索引同时打乱特征和标签
+    #将多个子数据集合并为一个完整数据集
+    X = np.vstack(X_list)  
+     #将Python列表转换为NumPy数组
+    y_true = np.array(y_true) 
+    #生成0到n_samples-1的随机排列
+    shuffle_idx = np.random.permutation(n_samples) 
+     #使用相同的随机索引同时打乱特征和标签
+    return X[shuffle_idx], y_true[shuffle_idx]
 
 # 自定义logsumexp函数
-def logsumexp(log_p, axis=1, keepdims=False):
-    #max_val = np.max(log_p, axis=axis, keepdims=True)
+def logsumexp(log_p, axis  =1, keepdims = False):
+    #max_val = np.max(log_p, axis = axis, keepdims = True)
     #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims=keepdims))
     """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理"""
     log_p = np.asarray(log_p)
@@ -90,11 +100,10 @@ class GaussianMixtureModel:
         log_likelihood = -np.inf  # 初始化对数似然值为负无穷
         for iter in range(self.max_iter): # 开始EM算法的主循环
             # E步：计算后验概率
-
             log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵，形状为(样本数 × 成分数)
             for k in range(self.n_components): # 遍历每个高斯成分
                 log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯分布的对数概率密度
-            log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True) # 使用logsumexp实现数值稳定的概率求和
+            log_prob_sum = logsumexp(log_prob, axis = 1, keepdims = True) # 使用logsumexp实现数值稳定的概率求和
             gamma = np.exp(log_prob - log_prob_sum) # 计算后验概率矩阵gamma(也称为响应度矩阵)
 
             # M步：更新参数
@@ -117,7 +126,6 @@ class GaussianMixtureModel:
                 # 正则化以防止协方差矩阵奇异，eps 可以调节
                 eps = 1e-6  # 正则化系数（可以作为参数传入或配置）
                 new_sigma_k += np.eye(n_features) * eps  # 向对角线加小数值，避免数值不稳定
-
                 new_sigma[k] = new_sigma_k
             
             # 计算对数似然
@@ -129,8 +137,8 @@ class GaussianMixtureModel:
             self.mu, new_mu	当前模型的高斯分布均值 / 更新后的均值
             self.sigma, new_sigma	当前模型的协方差 / 更新后的协方差
             '''
-            current_log_likelihood = np.sum(log_prob_sum)
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
+            current_log_likelihood = np.sum(log_prob_sum)       # 计算当前轮的总对数似然
+            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: 
                 break
             log_likelihood = current_log_likelihood
             
@@ -138,7 +146,7 @@ class GaussianMixtureModel:
             self.sigma = new_sigma
         
         # 计算最终聚类结果
-        self.labels_ = np.argmax(gamma, axis=1)
+        self.labels_ = np.argmax(gamma, axis=1) # 返回每个样本所属的聚类
         return self
 
     def _log_gaussian(self, X, mu, sigma):
@@ -158,6 +166,7 @@ class GaussianMixtureModel:
 
         # 计算协方差矩阵的逆
         inv = np.linalg.inv(sigma)
+        
         # 计算高斯分布中的指数项（二次型），对应 (x - μ)^T Σ⁻¹ (x - μ)
         exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
 

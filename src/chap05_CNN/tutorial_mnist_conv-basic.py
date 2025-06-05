@@ -68,6 +68,7 @@ class myConvModel(keras.Model):
         return logits
 
 model = myConvModel()
+
 optimizer = optimizers.Adam()
 
 
@@ -80,7 +81,7 @@ optimizer = optimizers.Adam()
 def compute_loss(logits, labels):
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels))
+            logits = logits, labels = labels))
 
 @tf.function
 def compute_accuracy(logits, labels):

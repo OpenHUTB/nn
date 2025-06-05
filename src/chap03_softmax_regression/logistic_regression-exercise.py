@@ -23,8 +23,10 @@ import matplotlib.cm as cm
 import numpy as np
 
 # 设置随机种子（确保结果可复现）
-np.random.seed(42)      # NumPy的随机种子
-tf.random.set_seed(42)  # TensorFlow的随机种子
+# NumPy的随机种子
+np.random.seed(42)
+# TensorFlow的随机种子
+tf.random.set_seed(42)
 
 # 确保在Jupyter Notebook中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -51,9 +53,9 @@ y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 绘制正样本，用蓝色加号表示
-plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
+plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
 # 绘制负样本，用绿色圆圈表示
-plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
+plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
 
 # 将正样本和负样本连接成一个数据集
 data_set = np.concatenate((C1, C2), axis=0)
@@ -91,6 +93,16 @@ class LogisticRegression():
 @tf.function
 
 def compute_loss(pred, label):
+    """
+        计算二分类交叉熵损失函数（手动实现，不使用tf内置loss）
+        
+        参数:
+            pred: 输入特征，形状为(N, 2)的Tensor
+            label: 真实标签，形状为(N, 1)的Tensor，取值为0或1
+            
+        返回:
+            loss: 平均交叉熵损失 + L2正则化项
+        """
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
         label = tf.constant(label, dtype=tf.float32)

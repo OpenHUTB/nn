@@ -26,10 +26,14 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     """高斯基函数"""
-    centers = np.linspace(0, 25, feature_num)  # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点，这些中心点将作为高斯函数的均值位置
-    width = 1.0 * (centers[1] - centers[0])  # 计算高斯函数的宽度(标准差)
-    x = np.expand_dims(x, axis=1)  # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度
-    x = np.concatenate([x] * feature_num, axis=1)  # 将x沿着第1维度(axis=1)复制feature_num次并连接
+    # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
+    centers = np.linspace(0, 25, feature_num)
+    # 计算高斯函数的宽度(标准差)
+    width = 1.0 * (centers[1] - centers[0])
+    # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度
+    x = np.expand_dims(x, axis=1)
+    # 将x沿着第1维度(axis=1)复制feature_num次并连接
+    x = np.concatenate([x] * feature_num, axis=1)
     
     out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
     ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
@@ -41,7 +45,8 @@ def load_data(filename, basis_func=gaussian_basis):
     xys = []
     with open(filename, "r") as f:
         for line in f:
-            xys.append(list(map(float, line.strip().split())))  # 改进: 转换为list
+            # 改进: 转换为list
+            xys.append(list(map(float, line.strip().split())))
         xs, ys = zip(*xys)
         xs, ys = np.asarray(xs), np.asarray(ys)
         
@@ -89,11 +94,12 @@ optimizer = optimizers.Adam(0.1)
 
 @tf.function
 def train_one_step(model, xs, ys):
+    # 在梯度带(GradientTape)上下文中记录前向计算过程
     with tf.GradientTape() as tape:
-        y_preds = model(xs)
-        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))
-    grads = tape.gradient(loss, model.w)
-    optimizer.apply_gradients([(grads, model.w)])
+        y_preds = model(xs)    # 模型前向传播计算预测值
+        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))    #计算损失函数
+    grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
+    optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
     return loss
 
 
@@ -130,27 +136,7 @@ plt.plot(o_x_test, y_test_preds, "k")
 plt.xlabel("x")
 plt.ylabel("y")
 plt.title("Linear Regression")
-plt.grid(True, linestyle="--", alpha=0.7, color="gray")  # 虚线网格，半透明灰色
+# 虚线网格，半透明灰色
+plt.grid(True, linestyle="--", alpha=0.7, color="gray")
 plt.legend(["train", "test", "pred"])
 plt.show()
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-

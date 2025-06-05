@@ -17,6 +17,7 @@ register(
     reward_threshold=75.0,
 )
 
+
 register(
     id='ReversedAddition-v0',
     entry_point='gym.envs.algorithmic:ReversedAdditionEnv',

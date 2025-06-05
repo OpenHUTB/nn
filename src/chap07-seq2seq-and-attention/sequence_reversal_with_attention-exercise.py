@@ -8,7 +8,11 @@
 # In[19]:
 
 
+# 导入NumPy库，用于科学计算和数组操作
+# NumPy提供了高性能的多维数组对象和各种数学运算工具
 import numpy as np
+# 导入TensorFlow库，用于机器学习和深度学习任务
+# TensorFlow是一个开源的端到端机器学习平台
 import tensorflow as tf
 import collections
 from tensorflow import keras
@@ -49,12 +53,13 @@ print(get_batch(2, 10))
 
 # In[26]:
 
-
+# 定义了一个名为 mySeq2SeqModel 的类，继承自 keras.Model
+#调用父类 keras.Model 的初始化方法
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
-        self.v_sz=27
-        self.hidden = 128
+        self.v_sz=27 # 词汇表大小（包括可能的特殊符号）
+        self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
         

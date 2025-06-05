@@ -60,28 +60,45 @@ optimizer = optimizers.Adam()
 def compute_loss(logits, labels):
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels))
+            logits = logits, labels = labels))
 
 @tf.function
 def compute_accuracy(logits, labels):
     predictions = tf.argmax(logits, axis=1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
+
 @tf.function
 def train_one_step(model, optimizer, x, y):
-    with tf.GradientTape() as tape:
-        logits = model(x)
-        loss = compute_loss(logits, y)
+    """
+    执行一次训练步骤，计算梯度并更新模型参数。
 
-    # compute gradient
+    参数:
+        model: 模型实例。
+        optimizer: 优化器实例。
+        x: 输入数据。
+        y: 标签数据。
+
+    返回:
+        loss: 训练损失。
+        accuracy: 训练准确率。
+    """
+    with tf.GradientTape() as tape:
+        logits = model(x)  # 前向传播，获取模型输出
+        loss = compute_loss(logits, y)  # 计算损失
+
+    # 计算梯度
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
     grads = tape.gradient(loss, trainable_vars)
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01*g)
 
+    # 更新参数
+    for g, v in zip(grads, trainable_vars):
+        v.assign_sub(0.01 * g)  # 使用固定学习率更新参数
+
+    # 计算准确率
     accuracy = compute_accuracy(logits, y)
 
-    # loss and accuracy is scalar tensor
+    # 返回损失和准确率（都是标量张量）
     return loss, accuracy
 
 @tf.function

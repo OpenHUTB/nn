@@ -10,13 +10,14 @@ import numpy as np
 # 导入TensorFlow深度学习框架
 import tensorflow as tf
 import numpy as np
+from tqdm import tqdm
 # 从TensorFlow中导入Keras高级API
 from tensorflow import keras
 # 从Keras中导入常用模块
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-#定义了一个函数mnist_dataset()，用于加载并预处理MNIST数据集
+#定义了一个函数mnist_dataset()，用于加载并预处理 MNIST 数据集
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
@@ -121,7 +122,7 @@ class Softmax:
         tmp = -tmp + grad_y * s 
         return tmp
     
-# 定义 Log 层（计算 log softmax，用于交叉熵）
+# 定义 Log 层（计算 log softmax ，用于交叉熵）
 class Log:
     '''
     softmax over last dimention
@@ -150,7 +151,6 @@ class Log:
 # ## Gradient check
 
 # In[5]:
-
 
 # import tensorflow as tf
 
@@ -224,7 +224,6 @@ class Log:
 #     grads = tape.gradient(loss, x)
 #     print (grads)
 
-
 # # Final Gradient Check
 
 # In[6]:
@@ -238,9 +237,9 @@ label[2, 3]=1
 label[3, 5]=1
 label[4, 0]=1
 
-x = np.random.normal(size=[5, 6]) # 5个样本，每个样本6维特征
-W1 = np.random.normal(size=[6, 5]) # 第一层权重 (6→5)
-W2 = np.random.normal(size=[5, 6]) # 第二层权重 (5→6)
+x = np.random.normal(size = [5, 6]) # 5个样本，每个样本6维特征
+W1 = np.random.normal(size = [6, 5]) # 第一层权重 (6→5)
+W2 = np.random.normal(size = [5, 6]) # 第二层权重 (5→6)
 
 mul_h1 = Matmul() # 第一层矩阵乘法
 mul_h2 = Matmul() # 第二层矩阵乘法
@@ -253,7 +252,6 @@ h1_relu = relu.forward(h1)
 h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2)
 h2_log = log.forward(h2_soft)
-
 
 h2_log_grad = log.backward(label)
 h2_soft_grad = softmax.backward(h2_log_grad)
@@ -278,11 +276,9 @@ with tf.GradientTape() as tape:
     grads = tape.gradient(loss, [prob])
     print (grads[0].numpy())
 
-
 # ## 建立模型
 
 # In[10]:
-
 
 class myModel:
     def __init__(self):
@@ -295,8 +291,7 @@ class myModel:
         self.relu = Relu()
         self.softmax = Softmax()
         self.log = Log()
-        
-        
+                
     def forward(self, x):
         x = x.reshape(-1, 28*28)  # 展平图像
         bias = np.ones(shape=[x.shape[0], 1])  # 添加偏置项
@@ -317,11 +312,9 @@ class myModel:
         
 model = myModel()
 
-
 # ## 计算 loss
 
 # In[11]:
-
 
 def compute_loss(log_prob, labels):
      return np.mean(np.sum(-log_prob*labels, axis=1))
@@ -363,11 +356,33 @@ def prepare_data():
 def train(model, train_data, train_label, epochs=50):
     losses = []
     accuracies = []
+    num_samples = train_data.shape[0]
+    from tqdm import tqdm  # 添加tqdm导入  
     for epoch in tqdm(range(epochs), desc="Training"):
-        loss, accuracy = train_one_step(model, train_data, train_label)
-        losses.append(loss)
-        accuracies.append(accuracy)
-        print(f'Epoch {epoch}: Loss {loss:.4f}; Accuracy {accuracy:.4f}')
+        # 打乱数据顺序
+        indices = np.random.permutation(num_samples)
+        shuffled_data = train_data[indices]
+        shuffled_labels = train_label[indices]
+        epoch_loss = 0
+        epoch_accuracy = 0
+        
+        # 小批量训练
+        for i in range(0, num_samples, batch_size):
+            # 获取当前批次数据
+            batch_data = shuffled_data[i:i+batch_size]
+            batch_labels = shuffled_labels[i:i+batch_size]
+            # 执行单步训练
+            loss, accuracy = train_one_step(model, batch_data, batch_labels)
+            # 累计统计量
+            epoch_loss += loss * batch_data.shape[0]
+            epoch_accuracy += accuracy * batch_data.shape[0]
+
+        # 计算整个epoch的平均损失和准确率
+        epoch_loss /= num_samples
+        epoch_accuracy /= num_samples
+        losses.append(epoch_loss)
+        accuracies.append(epoch_accuracy)
+        print(f'Epoch {epoch}: Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
     return losses, accuracies
 
 if __name__ == "__main__":
