@@ -27,7 +27,7 @@ class RBM:
 
         self.W = np.random.normal(0, init_std, size = (self.n_observe, self.n_hidden))  # 初始化权重矩阵（可见层 -> 隐藏层）
 
-        # 可选替代方案：使用更小的固定标准差进行初始化
+        # 可选替代方案：使用更小的固定标准差进行初始化。
         # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
 
         self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
@@ -50,7 +50,7 @@ class RBM:
          # 将数据展平为二维数组 [n_samples, n_observe]
         data_flat = data.reshape(data.shape[0], -1)  
         n_samples = data_flat.shape[0]  # 样本数量
-        
+
         # 定义训练参数
         learning_rate = 0.1 # 学习率，控制参数更新的步长
         epochs = 10 # 训练轮数，整个数据集将被遍历10次v
@@ -65,6 +65,8 @@ class RBM:
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率
+
+
                 h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h)
                 h0_sample = self._sample_binary(h0_prob)
 
@@ -87,7 +89,7 @@ class RBM:
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
 
-        # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（即模拟初始图像）
+        # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（模拟初始图像）
         v = np.random.binomial(1, 0.5, self.n_observe)
 
 
