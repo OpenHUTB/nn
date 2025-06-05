@@ -17,10 +17,10 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-#定义了一个函数mnist_dataset()，用于加载并预处理 MNIST 数据集
+# 定义了一个函数mnist_dataset()，用于加载并预处理 MNIST 数据集
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    #normalize
+    # normalize
     x = x/255.0
     x_test = x_test/255.0
 
@@ -64,12 +64,12 @@ class Matmul:
 class Relu:
     def __init__(self):
         self.mem = {}
-        #初始化记忆字典，用于存储前向传播的输入
+        # 初始化记忆字典，用于存储前向传播的输入
     def forward(self, x):
-        #保存输入x，供反向传播使用
+        # 保存输入x，供反向传播使用
         self.mem['x'] = x
         return np.where(x > 0, x, np.zeros_like(x))
-    #ReLU激活函数：x>0时输出x，否则输出0
+    # ReLU激活函数：x>0时输出x，否则输出0
     def backward(self, grad_y):
         '''
         grad_y: same shape as x
@@ -236,7 +236,7 @@ label[2, 3]=1
 label[3, 5]=1
 label[4, 0]=1
 
-x = np.random.normal(size = [5, 6]) # 5个样本，每个样本6维特征
+x = np.random.normal(size = [5, 6])  # 5个样本，每个样本6维特征
 W1 = np.random.normal(size = [6, 5]) # 第一层权重 (6→5)
 W2 = np.random.normal(size = [5, 6]) # 第二层权重 (5→6)
 
