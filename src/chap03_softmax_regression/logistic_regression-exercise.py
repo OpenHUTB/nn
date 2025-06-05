@@ -219,7 +219,7 @@ def animate(i):
 
 # 创建动画对象 anim，使用 matplotlib.animation.FuncAnimation 函数生成动态动画
 anim = animation.FuncAnimation(f, animate, init_func=init,
-                               frames=len(animation_frames), interval=30, blit=True)
+                               frames=len(animation_frames), interval=50, blit=True, repeat=False)
 
 # 将动画转换为HTML5视频格式并显示
 HTML(anim.to_html5_video())
