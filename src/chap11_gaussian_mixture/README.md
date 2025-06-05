@@ -35,10 +35,13 @@
 
 1. 安装依赖
 ```bash
+
 pip install numpy matplotlib
 ```
 2. 运行程序
+   
 ```bash
+
 python gmm.py
 ```
 
