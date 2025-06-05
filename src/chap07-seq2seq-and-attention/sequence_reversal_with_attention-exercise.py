@@ -26,8 +26,9 @@ import os,sys,tqdm
 
 # In[20]:
 
-
+# 导入random模块，用于生成随机数和随机操作
 import random
+# 导入string模块，提供与字符串操作相关的常量和工具函数
 import string
 
 def randomString(stringLength):
