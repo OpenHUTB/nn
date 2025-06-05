@@ -34,7 +34,7 @@ def gen_data_batch(batch_size, start, end):
         start: 开始数值
         end: 结束数值
     '''
-    numbers_1 = np.random.randint(start, end, batch_size)
+    numbers_1 = np.random.randint(start, end, batch_size)    #赋予数值
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
@@ -185,21 +185,17 @@ evaluate(model)
 
 
 
+# In[ ]:
+
+
+
 
 # In[ ]:
 
 
 
 
-
 # In[ ]:
-
-
-
-
-
-# In[ ]:
-
 
 
 
