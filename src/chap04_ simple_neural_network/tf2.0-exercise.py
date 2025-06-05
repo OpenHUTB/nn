@@ -33,8 +33,8 @@ def softmax(x):
     exp_x = tf.exp(x - x_max)
     
     # 计算softmax值，添加小的epsilon值避免除零错误
-    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
-    prob_x = exp_x / (sum_exp + 1e-10)
+    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)# 计算指数值的和，保持维度以便广播
+    prob_x = exp_x / (sum_exp + 1e-10)# 将每个指数值除以其总和（加上极小值避免除零）
     
     return prob_x
 
