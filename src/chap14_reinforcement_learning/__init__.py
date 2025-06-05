@@ -73,7 +73,7 @@ register(
 )
 
 register(
-    id='MountainCarContinuous-v0',
+    id='MountainCarContinuous-v0',    # 连续动作版本
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
     max_episode_steps=999,
     reward_threshold=90.0,
