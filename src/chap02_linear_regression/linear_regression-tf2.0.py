@@ -13,10 +13,11 @@ def identity_basis(x):
     """恒等基函数"""
     return np.expand_dims(x, axis=1)
 
-
+# 生成多项式基函数
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
+# 初始化特征列表
     feat = [x]
     for i in range(2, feature_num + 1):
         feat.append(x**i)
@@ -105,7 +106,7 @@ def train_one_step(model, xs, ys):
 
 @tf.function
 def predict(model, xs):
-    y_preds = model(xs)
+    y_preds = model(xs)     # 模型前向传播
     return y_preds
 
 
@@ -139,4 +140,5 @@ plt.title("Linear Regression")
 # 虚线网格，半透明灰色
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
 plt.legend(["train", "test", "pred"])
+plt.tight_layout()  # 自动调整布局
 plt.show()

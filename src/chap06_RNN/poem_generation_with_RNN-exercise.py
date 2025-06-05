@@ -203,7 +203,9 @@ def reduce_avg(reduce_target, lengths, dim):
     Returns:
         掩码后的平均值
     """
+    # 获取长度张量的形状
     shape_of_lengths = lengths.get_shape()
+    # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
@@ -226,8 +228,11 @@ def reduce_avg(reduce_target, lengths, dim):
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
 
+    # 在指定维度上求和（不保留归约后的维度）
     red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
+    # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）
     red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
+    # 返回计算得到的平均值张量
     return red_avg
 
 

@@ -9,38 +9,84 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 learning_rate = 1e-4 #学习率
 keep_prob_rate = 0.7 # Dropout保留概率0.7
 max_epoch = 2000 #最大训练轮数2000
+
+
 def compute_accuracy(v_xs, v_ys):
+    """
+    计算模型在给定数据集上的准确率。
+
+    参数:
+        v_xs: 输入数据。
+        v_ys: 真实标签。
+
+    返回:
+        result: 模型的准确率。
+    """
     global prediction
     # 获取模型预测结果
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
-    correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(v_ys,1)) 
+    correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
     # 计算准确率
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) 
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1}) 
+    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
 
 def weight_variable(shape):
+    """
+    初始化权重变量。
 
-    # 初始化权重：截断正态分布，stddev=0.1，有助于稳定训练
-    # 使用截断正态分布初始化权重
-    # 截断正态分布可以防止梯度爆炸或消失的问题
-    # stddev=0.1 表示标准差为0.1，控制初始权重的范围
+    参数:
+        shape: 权重的形状。
+
+    返回:
+        tf.Variable: 初始化后的权重变量。
+    """
+    # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
     initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial) ## 返回可训练变量
+    return tf.Variable(initial)
+
+
 
 def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
 
-def conv2d(x, W):
+def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+    """
+    实现二维卷积操作，增加了参数灵活性和异常处理
+    
+    参数:
+        x (tf.Tensor): 输入张量，形状为[batch, height, width, channels]
+        W (tf.Tensor): 卷积核权重，形状为[filter_height, filter_width, in_channels, out_channels]
+        padding (str): 填充方式，'SAME'或'VALID'
+        strides (list): 步长列表，[1, stride_h, stride_w, 1]
+        
+    返回:
+        tf.Tensor: 卷积结果
+    """
     # 每一维度滑动步长全部是 1， padding 方式选择 same
     # 提示 使用函数  tf.nn.conv2d
     
-    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-
+    # 验证输入类型
+    if not tf.is_tensor(x):
+        x = tf.convert_to_tensor(x)
+    
+    # 验证padding参数
+    if padding not in ['SAME', 'VALID']:
+        raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
+    
+    # 执行卷积操作
+    conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
+    
+    # 添加批归一化以提高训练稳定性
+    # 注意：在实际应用中，是否使用批归一化取决于网络结构和需求
+    # conv = tf.layers.batch_normalization(conv, training=is_training)
+    
+    return conv
+    
 def max_pool_2x2(x):
     # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool

@@ -685,10 +685,14 @@ class KeyboardControl(object):
             self._control.speed = .01
             # 根据时间增量增加偏航角(右转)
             self._rotation.yaw += 0.08 * milliseconds
+        # 处理前进 (W键或上箭头)
         if keys[K_UP] or keys[K_w]:
             self._control.speed = world.player_max_speed_fast if pygame.key.get_mods() & KMOD_SHIFT else world.player_max_speed
+        # 空格键控制跳跃
         self._control.jump = keys[K_SPACE]
+        # 将偏航角四舍五入到小数点后1位(防止过度旋转)
         self._rotation.yaw = round(self._rotation.yaw, 1)
+        # 根据当前旋转角度设置前进方向向量
         self._control.direction = self._rotation.get_forward_vector()
 
     @staticmethod

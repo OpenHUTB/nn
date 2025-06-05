@@ -16,6 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 def mnist_dataset():
     # 加载MNIST数据集，包含训练集和测试集的图像及标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
     x = x / 255.0
     x_test = x_test / 255.0
@@ -44,9 +45,9 @@ class myModel:
         self.b2 = tf.Variable(tf.zeros([10]))
         
     def __call__(self, x):
-        '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
-        #logits = None
-        #return logits
+        '''实现模型函数体，返回未归一化的 logits ，这里未实现具体运算逻辑，需补充'''
+        # logits = None
+        # return logits
         # 展平为[batch_size, 784]
         x = tf.reshape(x, [-1, 784])
         # 隐藏层+ReLU
@@ -85,22 +86,22 @@ def train_one_step(model, optimizer, x, y):
     """
     执行一次训练步骤，计算梯度并更新模型参数。
     """
-    with tf.GradientTape() as tape:  # 记录计算图以计算梯度
-        logits = model(x)  # 前向传播
+    with tf.GradientTape() as tape:     # 记录计算图以计算梯度
+        logits = model(x)               # 前向传播
         loss = compute_loss(logits, y)  # 计算损失
 
-    grads = tape.gradient(loss, model.trainable_variables)  # 计算梯度
+    grads = tape.gradient(loss, model.trainable_variables)            # 计算梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
-    accuracy = compute_accuracy(logits, y)  # 计算准确率
+    accuracy = compute_accuracy(logits, y)   # 计算准确率
     return loss, accuracy
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def test(model, x, y):
-    logits = model(x) # 计算预测结果与真实标签之间的损失值
-    loss = compute_loss(logits, y) # compute_loss函数应实现具体的损失计算逻辑
-    accuracy = compute_accuracy(logits, y) # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
+    logits = model(x)                             # 计算预测结果与真实标签之间的损失值
+    loss = compute_loss(logits, y)                # compute_loss函数应实现具体的损失计算逻辑
+    accuracy = compute_accuracy(logits, y)        # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
     return compute_loss(logits, y), compute_accuracy(logits, y)
 
 
@@ -114,11 +115,11 @@ for epoch in range(50):
     # 执行一次训练步骤，传入模型、优化器、训练数据及标签
     loss, accuracy = train_one_step(model, optimizer, 
                                     tf.constant(train_data[0], dtype=tf.float32),  # 图像数据
-                                    tf.constant(train_data[1], dtype=tf.int64)) # 图像数据
+                                    tf.constant(train_data[1], dtype=tf.int64))    # 图像数据
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 # 在测试集上测试模型
 loss, accuracy = test(model, 
                       tf.constant(test_data[0], dtype=tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，数据类型为float32
-                      tf.constant(test_data[1], dtype=tf.int64))  # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
+                      tf.constant(test_data[1], dtype=tf.int64))    # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
 
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())

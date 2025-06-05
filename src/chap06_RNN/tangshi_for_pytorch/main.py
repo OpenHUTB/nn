@@ -264,10 +264,10 @@ def to_word(predict, vocabs):  # 预测的结果转化成汉字
     return vocabs[sample]
 
 
-def pretty_print_poem(poem):  # 令打印的结果更工整
-    shige=[]
+def pretty_print_poem(poem):  # 格式化打印古诗，令打印的结果更工整
+    shige=[]  # 存储有效诗句的列表
     for w in poem:
-        if w == start_token or w == end_token:
+        if w == start_token or w == end_token:  # 遇到开始或结束标记则停止
             break
         shige.append(w)
     poem_sentences = poem.split('。')
@@ -275,10 +275,12 @@ def pretty_print_poem(poem):  # 令打印的结果更工整
         if s != '' and len(s) > 10:
             print(s + '。')
 
-
+# 生成古诗的主函数
 def gen_poem(begin_word):
     # poems_vector, word_int_map, vocabularies = process_poems2('./tangshi.txt')  #  use the other dataset to train the network
     poems_vector, word_int_map, vocabularies = process_poems1('./poems.txt')
+    
+   # 创建词嵌入层 
     word_embedding = rnn_lstm.word_embedding(vocab_length=len(word_int_map) + 1, embedding_dim=100)
     rnn_model = rnn_lstm.RNN_model(batch_sz=64, vocab_len=len(word_int_map) + 1, word_embedding=word_embedding,
                                    embedding_dim=100, lstm_hidden_dim=128)
