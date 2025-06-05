@@ -44,6 +44,10 @@ train_loader = Data.DataLoader(
 # train=False表示加载测试集（而不是训练集）
 test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
 # 预处理测试数据：转换为 Variable ，调整维度，归一化，只取前500个样本
+# 1. 将测试数据转换为 Variable (PyTorch 0.4 之前的自动求导机制)
+# 2. 添加一个维度以符合 CNN 输入要求 (batch_size, channels, height, width)
+# 3. 将像素值归一化到 [0,1] 范围
+# 4. 仅取前500个样本用于测试
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
@@ -70,7 +74,9 @@ class CNN(nn.Module):
             nn.MaxPool2d(2)  # 2x2的最大池化，尺寸再减半
         )
         
-        # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
+        # 计算全连接层输入维度：
+        # 输入图像尺寸为28x28，经过两次池化后尺寸变为7x7 (28 -> 14 -> 7)
+        # 64个特征图，每个7x7，因此输入维度为 7*7*64=3136
         self.out1 = nn.Linear(7*7*64, 1024, bias=True)
         
         # Dropout层：训练时随机丢弃神经元，防止过拟合
