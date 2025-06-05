@@ -10,7 +10,6 @@
 
 # In[1]:
 
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
@@ -72,9 +71,7 @@ np.random.shuffle(data_set)
 
 # In[1]:
 
-
 epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
-
 
 class SoftmaxRegression(tf.Module):
     def __init__(self, input_dim=2, num_classes=3):
@@ -105,7 +102,6 @@ class SoftmaxRegression(tf.Module):
         logits = tf.matmul(x, self.W) + self.b
         #应用softmax函数，将logits转换为概率分布
         return tf.nn.softmax(logits)
-
 
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
@@ -140,7 +136,6 @@ def compute_loss(pred, labels, num_classes=3):
     
     return loss, acc
 
-
 @tf.function
 def train_one_step(model, optimizer, x_batch, y_batch):
     """
@@ -159,11 +154,9 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy
 
-
-# ### 实例化一个模型，进行训练
+# ### 实例化一个模型，进行训练，提取所需的数据
 
 # In[12]:
-
 
 model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
@@ -193,7 +186,6 @@ plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
-
 
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
