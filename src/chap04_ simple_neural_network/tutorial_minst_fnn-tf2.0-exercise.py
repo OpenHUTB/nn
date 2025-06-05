@@ -32,7 +32,7 @@ print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
 
 # In[9]:
 
-
+#用函数进行运行
 class myModel:
     def __init__(self):
         ####################
