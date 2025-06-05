@@ -174,7 +174,7 @@ if __name__ == '__main__':
             (W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
         )
         if i % 20 == 0:
-            print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
+            print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')# 打印当前损失值和准确率，保留4位小数
 
     # 创建图形
     f, ax = plt.subplots(figsize=(6, 4))
