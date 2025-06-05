@@ -1,13 +1,17 @@
 #!/usr/bin/env python
+
 # coding: utf-8
 
 # # 序列逆置
+
 # 使用sequence to sequence 模型将一个字符串序列逆置。
+
 # 例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`
 
 import numpy as np
 import tensorflow as tf
 import collections
+
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
@@ -44,7 +48,6 @@ def get_batch(batch_size, length):
         tuple: 包含原始字符串、编码器输入、解码器输入和解码器输出的张量
     """
     batched_examples = [random_string(length) for i in range(batch_size)]    # 生成batch_size个随机字符串
-    
     # 将每个字符转换为对应的索引（A->1, B->2, ..., Z->26）
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     
@@ -219,6 +222,8 @@ def is_reverse(seq, rev_seq):
         return True
     else:
         return False
+
+
 
 # 测试模型逆序能力的准确性
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
