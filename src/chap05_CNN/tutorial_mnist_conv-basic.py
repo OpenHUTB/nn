@@ -15,20 +15,21 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
+
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    x = x.reshape(x.shape[0], 28, 28,1)
-    x_test = x_test.reshape(x_test.shape[0], 28, 28,1)
-    
+    x = x.reshape(x.shape[0], 28, 28, 1)
+    x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
+
     ds = tf.data.Dataset.from_tensor_slices((x, y))
     ds = ds.map(prepare_mnist_features_and_labels)
     ds = ds.take(20000).shuffle(20000).batch(32)
-
 
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
     return ds, test_ds
+
 
 def prepare_mnist_features_and_labels(x, y):
     x = tf.cast(x, tf.float32) / 255.0
@@ -37,9 +38,6 @@ def prepare_mnist_features_and_labels(x, y):
 
 
 # In[ ]:
-
-
-
 
 
 # ## 建立模型
@@ -62,6 +60,7 @@ class myConvModel(keras.Model):
         self.flat = Flatten()
         self.dense1 = layers.Dense(100, activation='tanh')
         self.dense2 = layers.Dense(10)
+
     @tf.function
     def call(self, x):
         h1 = self.l1_conv(x)
@@ -72,6 +71,7 @@ class myConvModel(keras.Model):
         dense1 = self.dense1(flat_h)
         logits = self.dense2(dense1)
         return logits
+
 
 model = myConvModel()
 
@@ -87,16 +87,17 @@ optimizer = optimizers.Adam()
 def compute_loss(logits, labels):
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits = logits, labels = labels))
+            logits=logits, labels=labels))
+
 
 @tf.function
 def compute_accuracy(logits, labels):
     predictions = tf.argmax(logits, axis=1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
+
 @tf.function
 def train_one_step(model, optimizer, x, y):
-
     with tf.GradientTape() as tape:
         logits = model(x)
         loss = compute_loss(logits, y)
@@ -111,12 +112,14 @@ def train_one_step(model, optimizer, x, y):
     # loss and accuracy is scalar tensor
     return loss, accuracy
 
+
 @tf.function
 def test_step(model, x, y):
     logits = model(x)
     loss = compute_loss(logits, y)
     accuracy = compute_accuracy(logits, y)
     return loss, accuracy
+
 
 def train(epoch, model, optimizer, ds):
     loss = 0.0
@@ -125,16 +128,18 @@ def train(epoch, model, optimizer, ds):
         loss, accuracy = train_one_step(model, optimizer, x, y)
 
         if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
+            print('epoch', epoch, ': loss', loss.numpy(), '; accuracy',
+                  accuracy.numpy())
 
     return loss, accuracy
+
+
 def test(model, ds):
     loss = 0.0
     accuracy = 0.0
     for step, (x, y) in enumerate(ds):
         loss, accuracy = test_step(model, x, y)
 
-        
     print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
 
     return loss, accuracy
