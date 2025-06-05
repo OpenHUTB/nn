@@ -1,24 +1,39 @@
 #!/usr/bin/env python
+
 # coding: utf-8
+
 # In[ ]:
+
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
+
 #使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
 learning_rate = 1e-4 #学习率
+
 keep_prob_rate = 0.7 # Dropout保留概率0.7
+
 max_epoch = 2000 #最大训练轮数2000
+
 def compute_accuracy(v_xs, v_ys):
     global prediction
     # 获取模型预测结果
+    
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
+    
     # 比较预测与真实标签
+    
     correct_prediction = tf.equal(tf.argmax(y_pre,1), tf.argmax(v_ys,1)) 
+    
     # 计算准确率
+    
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32)) 
+    
     # 运行准确率计算
+    
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1}) 
+    
     return result
 
 
@@ -37,14 +52,14 @@ def bias_variable(shape):
 
 def conv2d(x, W):
     # 每一维度滑动步长全部是 1， padding 方式选择 same
-    # 提示 使用函数  tf.nn.conv2d
     
+    # 提示 使用函数  tf.nn.conv2d
     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
 
 def max_pool_2x2(x):
     # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool
-    
+
     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
 # define placeholder for inputs to network
