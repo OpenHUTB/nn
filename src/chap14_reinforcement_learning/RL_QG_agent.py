@@ -63,7 +63,8 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
     def place(self,state,enables):
         # 用于测试的函数，返回的action是 0-63 之间的一个数值，
         # action 表示的是 要下的位置。
-        # action = 123456789    # 删掉这句话，并填写相应代码
+        # action = 123456789    
+        # 删掉这句话，并填写相应代码
         # 状态预处理
         state_input = np.array(state).reshape(1, -1).astype(np.float32)  # 转换为(1,64)形状
         
@@ -82,7 +83,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         action = np.random.choice(candidates)
 
         return action
-    #save_model和load_model，用于保存和加载TensorFlow模型的参数
+    #save_model 和 load_model，用于保存和加载 TensorFlow 模型的参数
     # 保存模型
     def save_model(self):  
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
