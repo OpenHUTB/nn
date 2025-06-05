@@ -5,7 +5,7 @@
 # 1.导入numpy库
 import numpy as np #将numpy库命名为np
 
-# 导入matplotlib.pyplot库
+
 import matplotlib
 import matplotlib.pyplot as plt #导入matplotlib库并将其命名为plt
 #import放一起代码美观
