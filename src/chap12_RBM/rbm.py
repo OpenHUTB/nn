@@ -25,7 +25,9 @@ class RBM:
         # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
 
-        self.W = np.random.normal(0, init_std, size=(self.n_observe, self.n_hidden))  # 初始化权重矩阵（可见层 -> 隐藏层）
+        self.W = np.random.normal(
+            0, init_std, size=(self.n_observe, self.n_hidden)
+        )  # 初始化权重矩阵（可见层 -> 隐藏层）
 
         # 可选替代方案：使用更小的固定标准差进行初始化。
         # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
