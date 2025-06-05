@@ -119,7 +119,7 @@ if __name__ == '__main__':
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
 
-    # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28图像）
+    # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
 
     # 使用 MNIST 数据进行训练
