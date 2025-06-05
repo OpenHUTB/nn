@@ -3,13 +3,11 @@
 # # 加法进位实验
 #
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
-
 # In[1]:
-
 
 import numpy as np
 import tensorflow as tf
-import collections
+import collections    #导入集合模块
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
