@@ -46,9 +46,9 @@ def prepare_mnist_features_and_labels(x, y):
 class myConvModel(keras.Model):
     def __init__(self):
         super(myConvModel, self).__init__()
-        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')    #第一层卷积层
-        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')    #第二层卷积层
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)                   #最大池化层
+        self.l1_conv = Conv2D(32, (5, 5), activation = 'relu', padding = 'same')    #第一层卷积层
+        self.l2_conv = Conv2D(64, (5, 5), activation = 'relu', padding = 'same')    #第二层卷积层
+        self.pool = MaxPooling2D(pool_size = (2, 2), strides = 2)                   #最大池化层
         self.flat = Flatten()                                                   #展平层
         self.dense1 = layers.Dense(100, activation='tanh')                      #第一层全连接层 
         self.dense2 = layers.Dense(10)                                          #第二层全连接层 
