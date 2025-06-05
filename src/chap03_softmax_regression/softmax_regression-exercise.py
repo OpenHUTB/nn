@@ -190,17 +190,16 @@ for i in range(1000):
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
-
+# 生成网格点并预测每个点的类别
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
-
-
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 Z = model(inp)
 Z = np.argmax(Z, axis=1)
 Z = Z.reshape(X.shape)
+
 plt.contour(X, Y, Z)
 plt.show()
 
