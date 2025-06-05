@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # 序列逆置
+
 # 使用sequence to sequence 模型将一个字符串序列逆置。
+
 # 例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`
 
 import numpy as np
 import tensorflow as tf
 import collections
+
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
+
 import os,sys,tqdm
 import random
 import string
@@ -21,13 +24,17 @@ def random_string(length):
     """
     生成一个由大写英文字母组成的随机字符串。
     参数:
+    
         length (int): 要生成的字符串长度。
+        
     返回:
+    
         str: 随机生成的字符串。
     """
+    
     # 步骤 1：定义可用字符集（这里使用大写英文字母）
     letters = string.ascii_uppercase  # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-
+    
     # 步骤 2：从字符集中随机选择指定数量的字符
     random_chars = [random.choice(letters) for _ in range(length)]
 
