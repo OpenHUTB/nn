@@ -5,7 +5,7 @@ import tensorflow as tf
 class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
     def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
-    #    pass    # 删掉这句话，并填写相应代码
+        #    pass    
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
         os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
         self.sess = None  # TensorFlow会话对象初始化占位
@@ -41,7 +41,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
             activation = tf.nn.relu       # ReLU 激活函数
             )
 
-    # 第2个卷积层：提取更高级特征
+        # 第2个卷积层：提取更高级特征
         conv2 = tf.layers.conv2d(
             inputs = conv1,
             filters = 64,                 # 输出通道数：64个卷积核
@@ -65,7 +65,6 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # 用于测试的函数，返回的action是 0-63 之间的一个数值，
         # action 表示的是 要下的位置。
         # action = 123456789
-        # 删掉这句话，并填写相应代码
         # 状态预处理
         state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
@@ -83,12 +82,12 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         
         # 随机选择最优动作 （解决多个最大值的情况）
         return np.random.choice(candidates)
-    #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
-    # 保存模型
+        #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
+        # 保存模型
     def save_model(self):  
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-    # 重新导入模型
+        # 重新导入模型
     def load_model(self):
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
 
-    # 定义自己需要的函数
+        # 定义自己需要的函数
