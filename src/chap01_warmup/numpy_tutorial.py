@@ -116,7 +116,7 @@ print("np.add(x,y)\n", np.add(x, y))# np.add 是 NumPy 库中用于数组相加�
 print("第十四题：\n")
 
 print("x-y\n", x-y)
-print("np.subtract(x,y)\n", np.subtract(x, y))
+print("np.subtract(x,y)\n", np.subtract(x, y)) # 使用 NumPy 的 subtract 函数计算 x 和 y 的差，并打印结果
 
 # 15.利用13题目中的x,y 输出 x*y ,和 np.multiply(x,y) 还有np.dot(x,y),比较差异。然后自己换一个不是方阵的试试。
 print("第十五题：\n")
