@@ -190,7 +190,7 @@ def mkMask(input_tensor, maxLen):
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
     
-    return tf.reshape(flat_mask, shape_of_output)
+    return tf.reshape(flat_mask, shape_of_output)    #结束这个函数
 
 def reduce_avg(reduce_target, lengths, dim):
     """沿指定维度计算掩码后的平均值（忽略填充部分）
