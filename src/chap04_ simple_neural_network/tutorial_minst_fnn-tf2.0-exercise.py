@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # ## 准备数据
 
 # In[7]:
-
 
 import os
 import numpy as np
@@ -12,23 +10,23 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
+
 
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
+    
     x = x/255.0
     x_test = x_test/255.0
     
     return (x, y), (x_test, y_test)
 
 
-
 # In[8]:
 
-
 print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
-
 
 # ## 建立模型
 

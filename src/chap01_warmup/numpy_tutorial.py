@@ -100,11 +100,11 @@ print("第十二题：\n")
 x = np.array([1.0, 2.0])
 print("输出:", type(x))
 
-# 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype=np.float64)，然后输出 x+y ,和 np.add(x,y)
+# 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype = np.float64)，然后输出 x+y ,和 np.add(x,y)
 print("第十三题：\n")
 
-x = np.array([[1, 2], [3, 4]], dtype=np.float64)# 创建一个二维的 NumPy 数组 x，其元素为 [[1, 2], [3, 4]]，数据类型指定为 np.float64（双精度浮点数）
-y = np.array([[5, 6], [7, 8]], dtype=np.float64)# 创建另一个二维的 NumPy 数组 y，其元素为 [[5, 6], [7, 8]]，数据类型同样为 np.float64
+x = np.array([[1, 2], [3, 4]], dtype = np.float64)# 创建一个二维的 NumPy 数组 x，其元素为 [[1, 2], [3, 4]]，数据类型指定为 np.float64（双精度浮点数）
+y = np.array([[5, 6], [7, 8]], dtype = np.float64)# 创建另一个二维的 NumPy 数组 y，其元素为 [[5, 6], [7, 8]]，数据类型同样为 np.float64
 
 print("x+y\n", x + y)# 使用 + 运算符对两个数组进行逐元素相加操作，并将结果打印出来
 
