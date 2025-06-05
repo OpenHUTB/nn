@@ -101,13 +101,14 @@ def test(cnn):
     correct = np.sum(prediction == test_y)  # 计算正确预测的数量
     return correct / 500.0  # 返回准确率
 
+
 # 训练函数
 def train(cnn):
     # 使用Adam优化器，学习率为learning_rate
     optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
     # 使用交叉熵损失函数
     loss_func = nn.CrossEntropyLoss()
-    
+
     # 训练max_epoch轮
     for epoch in range(max_epoch):
         # 遍历训练数据加载器
@@ -116,14 +117,13 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)  # 前向传播得到预测结果
             loss = loss_func(output, y)  # 计算损失
-            optimizer.zero_grad(set_to_none=True)  # 更高效的梯度清零方式
-            loss.backward()
-            optimizer.step()
-            
+            optimizer.zero_grad(set_to_none=True)  # 清空之前的梯度
+            loss.backward()  # 反向传播计算梯度
+            optimizer.step()  # 更新参数
+
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
-                print("=" * 10, step, "="*5, "="*5, "测试准确率: ", test(cnn), "=" * 10)
-
+                print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
 # 主程序入口
 if __name__ == '__main__':
     cnn = CNN()  # 创建CNN实例
