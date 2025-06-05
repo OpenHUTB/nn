@@ -35,7 +35,7 @@ def gaussian_basis(x, feature_num=10):
     # 将x沿着第1维度(axis=1)复制feature_num次并连接
     x = np.concatenate([x] * feature_num, axis=1)
     
-    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
+    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离，优化注释
     ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
     return ret
 
