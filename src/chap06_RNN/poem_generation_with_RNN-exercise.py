@@ -51,11 +51,14 @@ def process_dataset(fileName):
     
     ## 按词频从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+    
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)
     words = ('PAD', 'UNK') + words[:len(words)]
+    
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
+    
     # 创建id到词语的映射
     id2word = {word2id[k]:k for k in word2id}
     
