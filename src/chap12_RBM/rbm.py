@@ -56,11 +56,11 @@ class RBM:
         batch_size = 100
 
        # 开始训练轮数
-        for epoch in range(epochs):
+        for epoch in range(epochs):  # 外层循环：遍历所有训练轮数（epochs）
             # 打乱数据顺序
-            np.random.shuffle(data_flat)
-            for i in range(0, n_samples, batch_size):
-                batch = data_flat[i:i + batch_size]
+            np.random.shuffle(data_flat)  # 在每个epoch开始时，打乱数据顺序
+            for i in range(0, n_samples, batch_size):  # 内层循环：按批次（batch）处理数据
+                batch = data_flat[i:i + batch_size]  # 从打乱后的数据中取出当前批次的数据
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率
