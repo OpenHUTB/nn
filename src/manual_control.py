@@ -91,6 +91,7 @@ import carla
 
 from carla import ColorConverter as cc
 
+
 import argparse
 import collections
 import datetime
@@ -156,15 +157,15 @@ except ImportError:
 # ==============================================================================
 
 
-def find_weather_presets():
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
+def find_weather_presets():# 定义一个正则表达式，用于将 PascalCase 格式的字符串拆分成单词
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)') # 定义一个 lambda 函数，将类名如 "ClearNoon" 拆分为 "Clear Noon"
+    name = lambda x: ' '.join(m.group(0) for m in rgx.finditer(x))# 从 carla.WeatherParameters 中提取所有以大写字母开头的属性名
+    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]# 返回包含 (天气参数对象, 格式化后的名称) 的元组列表
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
-def get_actor_display_name(actor, truncate=250):
-    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
+def get_actor_display_name(actor, truncate=250):# 提取 actor 的类型标识符，并将其格式化为更易读的名称（例如 vehicle.tesla.model3 -> Tesla Model3）
+    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:]) # 如果名称过长，则进行截断，并在末尾加上省略号（…）
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
@@ -174,8 +175,8 @@ def get_actor_blueprints(world, filter, generation):
     if generation.lower() == "all":
         return bps
 
-    # If the filter returns only one bp, we assume that this one needed
-    # and therefore, we ignore the generation
+    #  If the filter returns only one bp, we assume that this one needed
+    #  and therefore, we ignore the generation
     if len(bps) == 1:
         return bps
 
@@ -193,9 +194,9 @@ def get_actor_blueprints(world, filter, generation):
         return []
 
 
-# ==============================================================================
-# -- World ---------------------------------------------------------------------
-# ==============================================================================
+#  ==============================================================================
+#  -- World ---------------------------------------------------------------------
+#  ==============================================================================
 
 
 class World(object):
@@ -383,22 +384,30 @@ class World(object):
 class KeyboardControl(object):
     """Class that handles keyboard input."""
     def __init__(self, world, start_in_autopilot):
+        # 初始化控制状态标志
         self._autopilot_enabled = start_in_autopilot
         self._ackermann_enabled = False
         self._ackermann_reverse = 1
+        # 根据角色类型(车辆/行人)初始化不同的控制器
         if isinstance(world.player, carla.Vehicle):
+             # 车辆控制初始化
             self._control = carla.VehicleControl()
             self._ackermann_control = carla.VehicleAckermannControl()
             self._lights = carla.VehicleLightState.NONE
+            # 设置初始自动驾驶状态和灯光状态
             world.player.set_autopilot(self._autopilot_enabled)
             world.player.set_light_state(self._lights)
         elif isinstance(world.player, carla.Walker):
+            # 行人控制初始化
             self._control = carla.WalkerControl()
             self._autopilot_enabled = False
             self._rotation = world.player.get_transform().rotation
         else:
+            # 不支持的角色类型抛出异常
             raise NotImplementedError("Actor type not supported")
+        # 初始化转向缓存值(用于平滑转向控制)
         self._steer_cache = 0.0
+         # 在HUD上显示帮助提示信息(4秒)
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock, sync_mode):
@@ -606,59 +615,84 @@ class KeyboardControl(object):
                 world.player.apply_control(self._control)
 
     def _parse_vehicle_keys(self, keys, milliseconds):
+        # 处理加速/前进控制 (W键或上箭头)
         if keys[K_UP] or keys[K_w]:
             if not self._ackermann_enabled:
+                # 普通控制模式: 增加油门(最大1.0)
                 self._control.throttle = min(self._control.throttle + 0.1, 1.00)
             else:
+                # Ackermann控制模式: 根据时间增量增加速度
                 self._ackermann_control.speed += round(milliseconds * 0.005, 2) * self._ackermann_reverse
         else:
             if not self._ackermann_enabled:
+                # 未按下加速键时重置油门
                 self._control.throttle = 0.0
-
+        # 处理减速/后退控制 (S键或下箭头)
         if keys[K_DOWN] or keys[K_s]:
             if not self._ackermann_enabled:
+                # 普通控制模式: 增加刹车(最大1.0)
                 self._control.brake = min(self._control.brake + 0.2, 1)
             else:
+                # Ackermann控制模式: 根据时间增量减少速度
                 self._ackermann_control.speed -= min(abs(self._ackermann_control.speed), round(milliseconds * 0.005, 2)) * self._ackermann_reverse
+                # 确保速度不为负
                 self._ackermann_control.speed = max(0, abs(self._ackermann_control.speed)) * self._ackermann_reverse
         else:
             if not self._ackermann_enabled:
+                # 未按下减速键时重置刹车
                 self._control.brake = 0
-
+        # 处理转向控制 (A/D键或左右箭头)
         steer_increment = 5e-4 * milliseconds
         if keys[K_LEFT] or keys[K_a]:
+             # 左转: 如果是向右转状态则重置，否则增加左转量
             if self._steer_cache > 0:
                 self._steer_cache = 0
             else:
                 self._steer_cache -= steer_increment
         elif keys[K_RIGHT] or keys[K_d]:
+            # 右转: 如果是向左转状态则重置，否则增加右转量
             if self._steer_cache < 0:
                 self._steer_cache = 0
             else:
                 self._steer_cache += steer_increment
         else:
+            # 没有转向输入时重置转向
             self._steer_cache = 0.0
+        # 限制转向幅度在[-0.7, 0.7]范围内
         self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
+        # 应用转向控制
         if not self._ackermann_enabled:
+            # 普通控制模式: 设置转向值(四舍五入到小数点后1位)和手刹状态
             self._control.steer = round(self._steer_cache, 1)
             self._control.hand_brake = keys[K_SPACE]
         else:
+            # Ackermann控制模式: 只设置转向值
             self._ackermann_control.steer = round(self._steer_cache, 1)
 
     def _parse_walker_keys(self, keys, milliseconds, world):
+        # 初始化速度为0
         self._control.speed = 0.0
+        # 处理停止/减速 (S键或下箭头)
         if keys[K_DOWN] or keys[K_s]:
             self._control.speed = 0.0
+        # 处理左转 (A键或左箭头)
         if keys[K_LEFT] or keys[K_a]:
             self._control.speed = .01
+            # 根据时间增量减少偏航角(左转)
             self._rotation.yaw -= 0.08 * milliseconds
+        # 处理右转 (D键或右箭头)
         if keys[K_RIGHT] or keys[K_d]:
             self._control.speed = .01
+            # 根据时间增量增加偏航角(右转)
             self._rotation.yaw += 0.08 * milliseconds
+        # 处理前进 (W键或上箭头)
         if keys[K_UP] or keys[K_w]:
             self._control.speed = world.player_max_speed_fast if pygame.key.get_mods() & KMOD_SHIFT else world.player_max_speed
+        # 空格键控制跳跃
         self._control.jump = keys[K_SPACE]
+        # 将偏航角四舍五入到小数点后1位(防止过度旋转)
         self._rotation.yaw = round(self._rotation.yaw, 1)
+        # 根据当前旋转角度设置前进方向向量
         self._control.direction = self._rotation.get_forward_vector()
 
     @staticmethod
@@ -1246,56 +1280,77 @@ class CameraManager(object):
 
 
 def game_loop(args):
+    # 初始化 pygame 和字体模块
     pygame.init()
     pygame.font.init()
     world = None
-    original_settings = None
+    original_settings = None  # 用于记录原始仿真设置（以便退出时恢复）
 
     try:
+        # 创建 CARLA 客户端，连接指定主机和端口
         client = carla.Client(args.host, args.port)
-        client.set_timeout(2000.0)
+        client.set_timeout(2000.0)  # 设置连接超时时间为 2 秒
 
-        sim_world = client.get_world()
+        sim_world = client.get_world()  # 获取仿真世界
+
+        # 如果启用了同步模式（同步仿真帧和主循环）
         if args.sync:
-            original_settings = sim_world.get_settings()
-            settings = sim_world.get_settings()
+            original_settings = sim_world.get_settings()  # 记录原始设置
+            settings = sim_world.get_settings()  # 获取当前设置
             if not settings.synchronous_mode:
+                # 启用同步模式，并设置固定步长（即每帧为 0.05 秒 = 20 FPS）
                 settings.synchronous_mode = True
                 settings.fixed_delta_seconds = 0.05
-            sim_world.apply_settings(settings)
+            sim_world.apply_settings(settings)  # 应用设置
 
+            # 设置交通管理器也为同步模式，确保交通控制和仿真帧同步
             traffic_manager = client.get_trafficmanager()
             traffic_manager.set_synchronous_mode(True)
 
+        # 警告：如果启用自动驾驶但不在同步模式下，可能会导致交通系统问题
         if args.autopilot and not sim_world.get_settings().synchronous_mode:
             print("WARNING: You are currently in asynchronous mode and could "
                   "experience some issues with the traffic simulation")
 
+        # 设置渲染窗口（HWSURFACE：硬件加速，DOUBLEBUF：双缓冲）
         display = pygame.display.set_mode(
             (args.width, args.height),
             pygame.HWSURFACE | pygame.DOUBLEBUF)
-        display.fill((0,0,0))
-        pygame.display.flip()
+        display.fill((0, 0, 0))  # 背景填充为黑色
+        pygame.display.flip()    # 显示更新后的画面
 
+        # 初始化 HUD（用于显示信息的图层）
         hud = HUD(args.width, args.height)
-        world = World(sim_world, hud, args)
-        controller = KeyboardControl(world, args.autopilot)  # 湖工商场景中虚幻注释掉
 
+        # 创建 World 实例，封装了车辆、摄像头等逻辑
+        world = World(sim_world, hud, args)
+
+        # 初始化键盘控制器（可选：控制车辆或切换模式等）
+        controller = KeyboardControl(world, args.autopilot)
+        # 注：在某些场景（如“湖工商”）中可能注释此行以禁用用户交互
+
+        # 在同步模式下，需要手动推进仿真一帧
         if args.sync:
             sim_world.tick()
         else:
-            sim_world.wait_for_tick()
+            sim_world.wait_for_tick()  # 异步模式下等待下一帧自动到来
 
-        clock = pygame.time.Clock()
+        clock = pygame.time.Clock()  # 用于控制帧率的时钟对象
+
+        # 主循环：每帧处理输入、更新世界状态、渲染画面
         while True:
             if args.sync:
-                sim_world.tick()
-            clock.tick_busy_loop(60)
+                sim_world.tick()  # 手动推进仿真一帧
+
+            clock.tick_busy_loop(60)  # 保持 60 FPS 的运行频率
+
+            # 解析并处理用户输入事件（如退出、键盘操作等）
             if controller.parse_events(client, world, clock, args.sync):
-                return
-            world.tick(clock)
-            world.render(display)
-            pygame.display.flip()
+                return  # 如果返回 True，则退出主循环
+
+            world.tick(clock)         # 更新世界状态（如 HUD 信息、传感器）
+            world.render(display)     # 渲染当前帧到 pygame 显示窗口
+            pygame.display.flip()     # 刷新屏幕显示最新画面
 
     finally:
 

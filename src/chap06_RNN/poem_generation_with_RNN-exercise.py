@@ -37,9 +37,6 @@ def process_dataset(fileName):
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            # 过滤过长的诗歌
-            if len(ins) > 200:
-
                 continue
             examples.append(ins)
             
@@ -49,13 +46,16 @@ def process_dataset(fileName):
         for w in e:
             counter[w] += 1
     
-    # 按词频从高到低排序
+    ## 按词频从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+    
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)
     words = ('PAD', 'UNK') + words[:len(words)]
+    
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
+    
     # 创建id到词语的映射
     id2word = {word2id[k]:k for k in word2id}
     
@@ -65,7 +65,7 @@ def process_dataset(fileName):
     # 记录每个诗歌的长度
     seqlen = [len(e) for e in indexed_examples]
     
-    # 组合诗歌数据和对应长度
+    #  组合诗歌数据和对应长度
     instances = list(zip(indexed_examples, seqlen))
     
     return instances, word2id, id2word
@@ -200,7 +200,9 @@ def reduce_avg(reduce_target, lengths, dim):
     Returns:
         掩码后的平均值
     """
+    # 获取长度张量的形状
     shape_of_lengths = lengths.get_shape()
+    # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
@@ -223,8 +225,11 @@ def reduce_avg(reduce_target, lengths, dim):
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
 
+    # 在指定维度上求和（不保留归约后的维度）
     red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
+    # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）
     red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
+    # 返回计算得到的平均值张量
     return red_avg
 
 
