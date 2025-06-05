@@ -164,7 +164,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
 
 # In[12]:
 
-
+#实例化模型并训练
 model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
