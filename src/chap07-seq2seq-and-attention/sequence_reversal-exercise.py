@@ -107,7 +107,7 @@ class mySeq2SeqModel(keras.Model):
         enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (batch_size, enc_seq_len, enc_units)
         
         # 解码过程，使用编码器的最终状态作为初始状态
-        dec_emb = self.embed_layer(dec_ids)  ## (batch_size, dec_seq_len, emb_dim)
+        dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
         dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
         
         # 计算logits 

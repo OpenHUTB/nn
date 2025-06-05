@@ -6,17 +6,27 @@
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 
 # In[7]:
+# 导入 TensorFlow 深度学习框架
 import tensorflow as tf
+# 导入 matplotlib 的 pyplot 模块，用于数据可视化
 import matplotlib.pyplot as plt
 
+# 从 matplotlib 导入 animation 和 rc 模块
+# animation：用于创建动态动画
+# rc：运行时配置(runtime configuration)，用于设置图形默认参数
 from matplotlib import animation, rc
+# 导入 IPython 的 HTML 显示功能，用于在 Notebook 中嵌入动画
 from IPython.display import HTML
+# 导入 matplotlib 的 colormap 模块，用于颜色映射
 import matplotlib.cm as cm
+# 导入 NumPy 数值计算库
 import numpy as np
 
 # 设置随机种子（确保结果可复现）
-np.random.seed(42)      # NumPy的随机种子
-tf.random.set_seed(42)  # TensorFlow的随机种子
+# NumPy的随机种子
+np.random.seed(42)
+# TensorFlow的随机种子
+tf.random.set_seed(42)
 
 # 确保在Jupyter Notebook中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
@@ -33,7 +43,6 @@ y = np.ones(dot_num)
 C1 = np.array([x_p, y_p, y]).T
 # random函数为伪随机数生成，并非真随机
 
-
 # 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
 x_n = np.random.normal(6., 1, dot_num)
 # 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
@@ -44,15 +53,14 @@ y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 绘制正样本，用蓝色加号表示
-plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
+plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
 # 绘制负样本，用绿色圆圈表示
-plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
+plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
 
 # 将正样本和负样本连接成一个数据集
 data_set = np.concatenate((C1, C2), axis=0)
 # 随机打乱数据集的顺序
 np.random.shuffle(data_set)
-
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
@@ -85,6 +93,16 @@ class LogisticRegression():
 @tf.function
 
 def compute_loss(pred, label):
+    """
+        计算二分类交叉熵损失函数（手动实现，不使用tf内置loss）
+        
+        参数:
+            pred: 输入特征，形状为(N, 2)的Tensor
+            label: 真实标签，形状为(N, 1)的Tensor，取值为0或1
+            
+        返回:
+            loss: 平均交叉熵损失 + L2正则化项
+        """
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
         label = tf.constant(label, dtype=tf.float32)
@@ -124,25 +142,24 @@ def train_one_step(model, optimizer, x, y):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy, model.W, model.b
 
-
 # ### 实例化一个模型，进行训练
 
 # In[38]:
 if __name__ == '__main__':
     # 实例化逻辑回归模型
     model = LogisticRegression()
-    # 使用自适应优化器Adam，学习率为0.01
+    # 使用自适应优化器 Adam ，学习率为0.01
     opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
     # 从数据集中解包出x1, x2坐标和标签y
     x1, x2, y = list(zip(*data_set))
-    # 将x1和x2组合成输入数据x
+    # 将x1和x2组合成输入数据 x
     x = list(zip(x1, x2))
     # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
     animation_frames = []
 
     # 进行200次训练迭代
     for i in range(200):
-        # 执行一次训练步骤，返回损失、准确率、当前的权重W和偏置b
+        # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
         animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()))

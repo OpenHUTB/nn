@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# ## 说明
-#
-# 请按照填空顺序编号分别完成 参数优化，不同基函数的实现
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -12,10 +7,8 @@ import matplotlib.pyplot as plt
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
-
     Args:
         filename: 数据文件的路径
-
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
@@ -31,7 +24,6 @@ def load_data(filename):
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
-#
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
@@ -39,7 +31,7 @@ def identity_basis(x):
     return ret
 
 
-# 请分别在这里实现“多项式基函数”（Multinomial Basis Function）以及“高斯基函数”（Gaussian Basis Function）
+# 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
@@ -176,7 +168,8 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
 
 def main(x_train, y_train, use_gradient_descent=False):
     """训练模型，并返回从x到y的映射。"""
-    basis_func = identity_basis  # 默认使用恒等基函数
+    # 默认使用恒等基函数
+    basis_func = identity_basis  
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
@@ -189,11 +182,14 @@ def main(x_train, y_train, use_gradient_descent=False):
     w_gd = None
     if use_gradient_descent:
         # 梯度下降求解权重（缩进修正）
-        learning_rate = 0.01 #设置学习率为0.01
-        epochs = 1000  #设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        # 设置学习率为0.01
+        learning_rate = 0.01 
+        # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
+        epochs = 1000  
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
-        for epoch in range(epochs): #开始梯度下降的迭代循环，将进行epochs次参数更新。
+        # 开始梯度下降的迭代循环，将进行epochs次参数更新。
+        for epoch in range(epochs): 
             y_pred = np.dot(phi, w_gd)
             error = y_pred - y_train
             gradient = np.dot(phi.T, error) / len(y_train)
@@ -212,10 +208,10 @@ def main(x_train, y_train, use_gradient_descent=False):
     # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
 
+
 # ## 评估结果
 # ## 评估结果
 # > 没有需要填写的代码，但是建议读懂
-
 
 
 def evaluate(ys, ys_pred):
@@ -237,8 +233,8 @@ if __name__ == "__main__":
     x_test, y_test = load_data(
         test_file
     )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)# x_train.shape 返回训练集特征矩阵的维度信息
-    print(x_test.shape) # x_test.shape 返回测试集特征矩阵的维度信息
+    print(x_train.shape)  # x_train.shape 返回训练集特征矩阵的维度信息
+    print(x_test.shape)  # x_test.shape 返回测试集特征矩阵的维度信息
 
     # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
     # f: 预测函数 y = f(x)
@@ -258,13 +254,13 @@ if __name__ == "__main__":
 
     # 显示结果
 
-    plt.plot(x_train, y_train, 'ro', markersize=3) # 红色点为训练集数据
-    plt.plot(x_test, y_test, 'k') # 红色点为训练集数据
-    plt.plot(x_test, y_test_pred, 'k') # 黑线为预测值（可以用其他颜色区分）
-    plt.xlabel('x') # 设置x轴的标签
-    plt.ylabel('y') # 设置y轴的标签
-    plt.title('Linear Regression') # 设置图表标题
-    plt.legend(['train', 'test', 'pred']) # 添加图例，表示每条线的含义
+    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
+    plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
+    plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
+    plt.xlabel("x")  # 设置x轴的标签
+    plt.ylabel("y")  # 设置y轴的标签
+    plt.title("Linear Regression")  # 设置图表标题
+    plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
     plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
@@ -273,4 +269,3 @@ if __name__ == "__main__":
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义 # 添加图例，表示每条线的含义
     plt.show()
-

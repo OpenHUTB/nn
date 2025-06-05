@@ -47,9 +47,12 @@ class myModel:
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
         #logits = None
         #return logits
-        x = tf.reshape(x, [-1, 784])          # 展平为[batch_size, 784]
-        h = tf.nn.relu(x @ self.W1 + self.b1) # 隐藏层+ReLU
-        logits = h @ self.W2 + self.b2         # 输出层（未归一化）
+        # 展平为[batch_size, 784]
+        x = tf.reshape(x, [-1, 784])
+        # 隐藏层+ReLU
+        h = tf.nn.relu(x @ self.W1 + self.b1) 
+        # 输出层（未归一化）
+        logits = h @ self.W2 + self.b2         
         return logits
         
 model = myModel()
@@ -66,7 +69,7 @@ def compute_loss(logits, labels):
     # 计算稀疏softmax交叉熵损失，并求平均值
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels))
+            logits = logits, labels = labels))
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
@@ -79,20 +82,17 @@ def compute_accuracy(logits, labels):
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
 def train_one_step(model, optimizer, x, y):
-    # 使用GradientTape记录计算图，用于自动求导
-    with tf.GradientTape() as tape:
-        logits = model(x)
-        loss = compute_loss(logits, y)
+    """
+    执行一次训练步骤，计算梯度并更新模型参数。
+    """
+    with tf.GradientTape() as tape:  # 记录计算图以计算梯度
+        logits = model(x)  # 前向传播
+        loss = compute_loss(logits, y)  # 计算损失
 
-    # 计算可训练变量的梯度，这里的变量声明在模型中未完善，当前为假设的变量
-    trainable_vars = [model.W1, model.W2, model.b1, model.b2]
-    grads = tape.gradient(loss, trainable_vars)
-    # 使用梯度更新可训练变量
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01*g)
+    grads = tape.gradient(loss, model.trainable_variables)  # 计算梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
-    accuracy = compute_accuracy(logits, y)
-    # loss and accuracy is scalar tensor
+    accuracy = compute_accuracy(logits, y)  # 计算准确率
     return loss, accuracy
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
@@ -118,7 +118,7 @@ for epoch in range(50):
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 # 在测试集上测试模型
 loss, accuracy = test(model, 
-                      tf.constant(test_data[0], dtype=tf.float32), 
-                      tf.constant(test_data[1], dtype=tf.int64))
+                      tf.constant(test_data[0], dtype=tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，数据类型为float32
+                      tf.constant(test_data[1], dtype=tf.int64))  # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
 
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())

@@ -17,17 +17,17 @@ keep_prob_rate = 0.7  # Dropout保留神经元的比例
 max_epoch = 3  # 训练的总轮数
 BATCH_SIZE = 50  # 每批训练数据的大小
 
-# 检查是否需要下载MNIST数据集
+# 检查是否需要下载 MNIST 数据集
 DOWNLOAD_MNIST = False
 if not(os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
-    # 如果不存在mnist目录或者目录为空，则需要下载
+    # 如果不存在 mnist 目录或者目录为空，则需要下载
     DOWNLOAD_MNIST = True
 
 # 加载训练数据集
 train_data = torchvision.datasets.MNIST(
     root='./mnist/',  # 数据集保存路径
     train=True,  # 加载训练集
-    transform=torchvision.transforms.ToTensor(),  # 将图像转换为Tensor并归一化到[0,1]
+    transform=torchvision.transforms.ToTensor(),  # 将图像转换为 Tensor 并归一化到[0,1]
     download=DOWNLOAD_MNIST  # 如果需要则下载
 )
 
@@ -39,13 +39,13 @@ train_loader = Data.DataLoader(
 )
 
 # 加载测试数据集
-# torchvision.datasets.MNIST用于加载MNIST数据集
+# torchvision.datasets.MNIST用于加载 MNIST 数据集
 # root='./mnist/'指定数据集的存储路径
 # train=False表示加载测试集（而不是训练集）
 test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
-# 预处理测试数据：转换为Variable，调整维度，归一化，只取前500个样本
+# 预处理测试数据：转换为 Variable ，调整维度，归一化，只取前500个样本
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
-# 获取测试集的标签（前500个），并转换为numpy数组
+# 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
 
 # 定义CNN模型
@@ -97,9 +97,10 @@ def test(cnn):
     y_pre = cnn(test_x)  # 用模型预测测试数据
     _, pre_index = torch.max(y_pre, 1)  # 获取预测类别（最大概率的索引）
     pre_index = pre_index.view(-1)  # 调整张量形状
-    prediction = pre_index.data.numpy()  # 转换为numpy数组
+    prediction = pre_index.data.numpy()  # 转换为 numpy 数组
     correct = np.sum(prediction == test_y)  # 计算正确预测的数量
     return correct / 500.0  # 返回准确率
+
 
 # 训练函数
 def train(cnn):
@@ -107,7 +108,7 @@ def train(cnn):
     optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
     # 使用交叉熵损失函数
     loss_func = nn.CrossEntropyLoss()
-    
+
     # 训练max_epoch轮
     for epoch in range(max_epoch):
         # 遍历训练数据加载器
@@ -116,14 +117,13 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)  # 前向传播得到预测结果
             loss = loss_func(output, y)  # 计算损失
-            optimizer.zero_grad(set_to_none=True)  # 更高效的梯度清零方式
-            loss.backward()
-            optimizer.step()
-            
+            optimizer.zero_grad(set_to_none=True)  # 清空之前的梯度
+            loss.backward()  # 反向传播计算梯度
+            optimizer.step()  # 更新参数
+
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
-                print("=" * 10, step, "="*5, "="*5, "测试准确率: ", test(cnn), "=" * 10)
-
+                print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
 # 主程序入口
 if __name__ == '__main__':
     cnn = CNN()  # 创建CNN实例
