@@ -100,7 +100,6 @@ class GaussianMixtureModel:
         log_likelihood = -np.inf  # 初始化对数似然值为负无穷
         for iter in range(self.max_iter): # 开始EM算法的主循环
             # E步：计算后验概率
-
             log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵，形状为(样本数 × 成分数)
             for k in range(self.n_components): # 遍历每个高斯成分
                 log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯分布的对数概率密度
@@ -127,7 +126,6 @@ class GaussianMixtureModel:
                 # 正则化以防止协方差矩阵奇异，eps 可以调节
                 eps = 1e-6  # 正则化系数（可以作为参数传入或配置）
                 new_sigma_k += np.eye(n_features) * eps  # 向对角线加小数值，避免数值不稳定
-
                 new_sigma[k] = new_sigma_k
             
             # 计算对数似然
