@@ -138,6 +138,7 @@ def compute_loss(pred, labels, num_classes=3):
 
 @tf.function
 def train_one_step(model, optimizer, x_batch, y_batch):
+    #单步训练：计算梯度并更新参数
     """
     一步梯度下降优化
     :param model: SoftmaxRegression 实例
