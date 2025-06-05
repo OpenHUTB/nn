@@ -27,11 +27,11 @@ register(
 )
 
 register(
-    id='ReversedAddition3-v0',
-    entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs={'rows' : 3},
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    id = 'ReversedAddition3-v0',
+    entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
+    kwargs = {'rows' : 3},    # 使用3行进行加法运算
+    max_episode_steps = 200,
+    reward_threshold = 25.0,
 )
 
 register(
