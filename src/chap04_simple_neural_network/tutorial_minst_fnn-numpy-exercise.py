@@ -29,7 +29,7 @@ def mnist_dataset():
 
 # ## Demo numpy based auto differentiation
 # In[3]:
-import numpy as np
+
 
 # 定义矩阵乘法层
 class Matmul:
@@ -228,7 +228,6 @@ class Log:
 
 # In[6]:
 
-import tensorflow as tf
 
 label = np.zeros_like(x) #创建了一个与x形状相同的全零标签矩阵
 label[0, 1]=1.
@@ -357,7 +356,7 @@ def train(model, train_data, train_label, epochs=50):
     losses = []
     accuracies = []
     num_samples = train_data.shape[0]
-    from tqdm import tqdm  # 添加tqdm导入  
+    
     for epoch in tqdm(range(epochs), desc="Training"):
         # 打乱数据顺序
         indices = np.random.permutation(num_samples)
