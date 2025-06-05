@@ -54,7 +54,7 @@ def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape)
     return tf.Variable(initial)
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding='SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -91,7 +91,7 @@ def max_pool_2x2(x):
     # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
     # 提示 使用函数  tf.nn.max_pool
     
-    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    return tf.nn.max_pool(x, ksize = [1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
 # define placeholder for inputs to network
 xs = tf.placeholder(tf.float32, [None, 784]) / 255.
