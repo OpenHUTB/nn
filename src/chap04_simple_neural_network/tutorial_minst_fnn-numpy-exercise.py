@@ -80,7 +80,6 @@ class Relu:
         grad_x = grad_y * (x > 0)  # ReLU的梯度是1（x>0）或0（x<=0）
         ####################
         return grad_x
-
 # 定义 Softmax 层（输出概率）
 class Softmax:
     '''
