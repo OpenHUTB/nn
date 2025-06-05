@@ -203,7 +203,9 @@ def reduce_avg(reduce_target, lengths, dim):
     Returns:
         掩码后的平均值
     """
+    # 获取长度张量的形状
     shape_of_lengths = lengths.get_shape()
+    # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
