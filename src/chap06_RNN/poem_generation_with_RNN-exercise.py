@@ -15,7 +15,9 @@ from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
+
 end_token = 'eos'    # End of sentence
+
 
 def process_dataset(fileName):
     """处理诗歌数据集，构建词汇表和数字索引的诗歌数据
