@@ -15,11 +15,27 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 def mnist_dataset():
-    (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    #normalize
+    """
+    加载并预处理MNIST手写数字数据集
     
-    x = x/255.0
-    x_test = x_test/255.0
+    返回:
+    - 训练集: (x_train, y_train)
+    - 测试集: (x_test, y_test)
+    
+    数据形状:
+    - x: [样本数, 28, 28], 图像像素值范围[0, 1]
+    - y: [样本数], 标签值范围[0, 9]
+    """
+    # 从Keras内置数据集加载MNIST数据
+    # x: 灰度图像, 形状为(样本数, 28, 28)
+    # y: 标签, 形状为(样本数,)
+    (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    
+    # 像素值归一化处理
+    # 将原始范围[0, 255]的整数转换为[0, 1]的浮点数
+    # 归一化有助于模型训练稳定性和收敛速度
+    x = x / 255.0       # 训练集归一化
+    x_test = x_test / 255.0  # 测试集归一化
     
     return (x, y), (x_test, y_test)
 
