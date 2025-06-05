@@ -193,6 +193,7 @@ print(inp.shape)
 Z = model(inp)
 # 获取预测的类别
 Z = np.argmax(Z, axis=1)
+# 重塑为网络形状
 Z = Z.reshape(X.shape)
 # 绘制决策边界
 plt.contour(X, Y, Z)
