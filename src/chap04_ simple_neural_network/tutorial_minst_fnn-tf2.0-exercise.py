@@ -3,58 +3,48 @@
 # ## 准备数据
 
 # In[7]:
-
 import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    #normalize
-    
-    x = x/255.0
-    x_test = x_test/255.0
-    
+    # normalize
+    x = x / 255.0
+    x_test = x_test / 255.0
+
     return (x, y), (x_test, y_test)
 
 
 # In[8]:
-
 print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
+
 
 # ## 建立模型
 
 # In[9]:
-
-
-class myModel:
+class MyModel:
     def __init__(self):
-        ####################
-        '''声明模型对应的参数'''
-        ####################
-    # 输入层784 -> 隐藏层128
+        """声明模型对应的参数"""
         self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
         self.b1 = tf.Variable(tf.zeros([128]))
-        # 隐藏层128 -> 输出层10
         self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
         self.b2 = tf.Variable(tf.zeros([10]))
-    
+
     def __call__(self, x):
-        ####################
-        '''实现模型函数体，返回未归一化的logits'''
-        ####################
-        x = tf.reshape(x, [-1, 784])                     # 展平输入图像
+        """实现模型函数体，返回未归一化的 logits"""
+        x = tf.reshape(x, [-1, 784])  # 展平输入图像
         h1 = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)  # 第一层激活
-        logits = tf.matmul(h1, self.W2) + self.b2         # 输出层
+        logits = tf.matmul(h1, self.W2) + self.b2  # 输出层
         return logits
-        
-model = myModel()
+
+
+model = MyModel()
 
 optimizer = optimizers.Adam()
 
@@ -62,13 +52,14 @@ optimizer = optimizers.Adam()
 # ## 计算 loss
 
 # In[13]:
-
-
 @tf.function
 def compute_loss(logits, labels):
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits = logits, labels = labels))
+            logits=logits, labels=labels
+        )
+    )
+
 
 @tf.function
 def compute_accuracy(logits, labels):
@@ -109,6 +100,7 @@ def train_one_step(model, optimizer, x, y):
     # 返回损失和准确率（都是标量张量）
     return loss, accuracy
 
+
 @tf.function
 def test(model, x, y):
     logits = model(x)
@@ -120,17 +112,19 @@ def test(model, x, y):
 # ## 实际训练
 
 # In[14]:
-
-
 train_data, test_data = mnist_dataset()
 for epoch in range(50):
-    loss, accuracy = train_one_step(model, optimizer, 
-                                    tf.constant(train_data[0], dtype=tf.float32), 
-                                    tf.constant(train_data[1], dtype=tf.int64))
+    loss, accuracy = train_one_step(
+        model,
+        optimizer,
+        tf.constant(train_data[0], dtype=tf.float32),
+        tf.constant(train_data[1], dtype=tf.int64)
+    )
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
-loss, accuracy = test(model, 
-                      tf.constant(test_data[0], dtype=tf.float32), 
-                      tf.constant(test_data[1], dtype=tf.int64))
+loss, accuracy = test(
+    model,
+    tf.constant(test_data[0], dtype=tf.float32),
+    tf.constant(test_data[1], dtype=tf.int64)
+)
 
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
-
