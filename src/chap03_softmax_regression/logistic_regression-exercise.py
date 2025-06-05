@@ -86,7 +86,7 @@ class LogisticRegression():
             shape=[1], 
             dtype=tf.float32, 
             initial_value=tf.zeros(shape=[1])
-        
+        )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
 
@@ -212,10 +212,12 @@ if __name__ == '__main__':
         frame_text.set_text(
             'Timestep = %.1d/%.1d\nLoss = %.3f' % 
             (i, len(animation_frames), animation_frames[i][3])
-        return (line_d,) + (C1_dots,) + (C2_dots,)
-
+        )
+        return (line_d,) + (C1_dots,) + (C2_dots,) 
+        
     anim = animation.FuncAnimation(
         f, animate, init_func=init,
         frames=len(animation_frames), interval=30, blit=True
     )
     HTML(anim.to_html5_video())
+        
