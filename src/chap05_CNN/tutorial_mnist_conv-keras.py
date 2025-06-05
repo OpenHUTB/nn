@@ -15,6 +15,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
+# 加载并预处理MNIST数据集，将20000个样本打乱并分批次
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
@@ -29,6 +30,7 @@ def mnist_dataset():
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
     return ds, test_ds
 
+# 准备MNIST数据特征和标签
 def prepare_mnist_features_and_labels(x, y):
     x = tf.cast(x, tf.float32) / 255.0
     y = tf.cast(y, tf.int64)
@@ -40,16 +42,18 @@ def prepare_mnist_features_and_labels(x, y):
 # In[5]:
 
 
+#自定义卷积神经网络模型
 class myConvModel(keras.Model):
     def __init__(self):
         super(myConvModel, self).__init__()
-        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
-        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
-        self.flat = Flatten()
-        self.dense1 = layers.Dense(100, activation='tanh')
-        self.dense2 = layers.Dense(10)
+        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')    #第一层卷积层
+        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')    #第二层卷积层
+        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)                   #最大池化层
+        self.flat = Flatten()                                                   #展平层
+        self.dense1 = layers.Dense(100, activation='tanh')                      #第一层全连接层 
+        self.dense2 = layers.Dense(10)                                          #第二层全连接层 
     @tf.function
+    # 前向传播函数
     def call(self, x):
         h1 = self.l1_conv(x)
         h1_pool = self.pool(h1)
