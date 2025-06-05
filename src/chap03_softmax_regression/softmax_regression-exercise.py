@@ -172,7 +172,7 @@ for i in range(1000):
         print(f"loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}")
 # 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
 
-# ## 结果展示，无需填写代码
+# # 结果展示，无需填写代码
 
 # In[13]:
 
@@ -197,3 +197,4 @@ plt.show()
 
 
 # In[ ]:
+
