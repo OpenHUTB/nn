@@ -1,9 +1,13 @@
 import tensorflow as tf
+
 import os
+
 import numpy as np
 
 class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
+    
     def __init__(self): #__init__ 方法是类的构造函数，用于初始化类的实例
+        
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
     #    pass    # 删掉这句话，并填写相应代码
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
@@ -13,6 +17,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         self.input_states = None
         self.Q_values = None
 
+    
     def init_model(self):
         '''
         self.input_states	网络输入（状态图像），大小为 [batch_size, 8, 8, 3]
@@ -24,6 +29,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         self.loss	使用 MSE 作为损失函数
         self.optimizer	使用 Adam 优化器进行参数更新
         self.saver	用于模型保存和恢复
+
 
         '''
         # 定义自己的 网络
