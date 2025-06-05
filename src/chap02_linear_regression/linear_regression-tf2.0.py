@@ -94,11 +94,12 @@ optimizer = optimizers.Adam(0.1)
 
 @tf.function
 def train_one_step(model, xs, ys):
+    # 在梯度带(GradientTape)上下文中记录前向计算过程
     with tf.GradientTape() as tape:
-        y_preds = model(xs)
-        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))
-    grads = tape.gradient(loss, model.w)
-    optimizer.apply_gradients([(grads, model.w)])
+        y_preds = model(xs)    # 模型前向传播计算预测值
+        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))    #计算损失函数
+    grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
+    optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
     return loss
 
 
