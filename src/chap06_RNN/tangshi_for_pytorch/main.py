@@ -3,13 +3,11 @@ import collections
 import torch
 from torch.autograd import Variable
 import torch.optim as optim
-
 import rnn
 
 start_token = 'B'
 end_token = 'E'
 batch_size = 64
-
 
 def process_poems1(file_name):
     """
