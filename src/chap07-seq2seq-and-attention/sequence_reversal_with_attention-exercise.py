@@ -103,11 +103,14 @@ class mySeq2SeqModel(keras.Model):
 # In[27]:
 
 
-@tf.function
+@tf.function# TensorFlow的装饰器，将Python函数编译为TensorFlow计算图，提高执行效率
 def compute_loss(logits, labels):
+    # 计算稀疏softmax交叉熵损失（自动处理类别不平衡）
+    # 内部会自动对logits做softmax归一化，再计算交叉熵
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
-    losses = tf.reduce_mean(losses)
+            logits=logits, labels=labels)# 输出形状：[batch_size]
+    # 对batch维度取平均，得到标量损失值
+    losses = tf.reduce_mean(losses)# 输出形状：标量（单个数值）
     return losses
 
 @tf.function
