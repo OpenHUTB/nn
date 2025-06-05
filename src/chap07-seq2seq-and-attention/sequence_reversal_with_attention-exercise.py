@@ -221,7 +221,7 @@ def sequence_reversal():
 
 def is_reverse(seq, rev_seq):
     """检查rev_seq是否是seq的逆置"""
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))]) # 将 rev_seq 逆序重组成字符串
     if seq == rev_seq_rev:
         return True
     else:
