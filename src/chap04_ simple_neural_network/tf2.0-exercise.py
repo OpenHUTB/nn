@@ -14,13 +14,28 @@ import numpy as np
 
 def softmax(x):
     """
-    实现softmax函数，对输入张量的最后一维进行归一化。
+    实现数值稳定的softmax函数，对输入张量的最后一维进行归一化。
     不允许使用 TensorFlow 自带的 softmax 函数。
+    
+    参数:
+        x (tf.Tensor): 输入张量
+        
+    返回:
+        tf.Tensor: softmax处理后的概率分布
     """
+    # 检查输入是否为张量
+    if not tf.is_tensor(x):
+        x = tf.convert_to_tensor(x)
+    
     # 计算每个元素的指数值，减去最大值以提高数值稳定性
-    exp_x = tf.exp(x - tf.reduce_max(x, axis=-1, keepdims=True))
-    # 计算 softmax 值
-    prob_x = exp_x / tf.reduce_sum(exp_x, axis=-1, keepdims=True)
+    # 使用keepdims=True确保维度正确
+    x_max = tf.reduce_max(x, axis=-1, keepdims=True)
+    exp_x = tf.exp(x - x_max)
+    
+    # 计算softmax值，添加小的epsilon值避免除零错误
+    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
+    prob_x = exp_x / (sum_exp + 1e-10)
+    
     return prob_x
 
 # 测试 softmax 实现是否正确，使用随机数据对比 TensorFlow 的实现
