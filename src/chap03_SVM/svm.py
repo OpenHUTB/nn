@@ -44,15 +44,42 @@ class SVM():
         """
         训练模型。
         """
-
         # 请补全此处代码
 
+        x = data_train[:, :2]  # 提取特征 (N x 2)
+        y = data_train[:, 2]   # 提取标签 (N,)
+
+        # 将标签转换为 +1 和 -1
+        y = np.where(y == 0, -1, 1)
+
+        num_samples, num_features = x.shape
+        self.w = np.zeros(num_features)  # 初始化权重
+        self.b = 0.0                      # 初始化偏置
+
+        for _ in range(self.max_iter):
+            for i in range(num_samples):
+                xi = x[i]
+                yi = y[i]
+                condition = yi * (np.dot(self.w, xi) + self.b)
+
+                if condition >= 1:
+                    # 不违反间隔约束，只考虑正则项
+                    self.w -= self.learning_rate * self.reg_lambda * self.w
+                    # self.b 不变
+                else:
+                    # 违反间隔约束，考虑损失项和正则项
+                    self.w -= self.learning_rate * (self.reg_lambda * self.w - yi * xi)
+                    self.b += self.learning_rate * yi
+
+    
     def predict(self, x):
         """
         预测标签。
         """
-
         # 请补全此处代码
+        linear_output = np.dot(x, self.w) + self.b
+        predictions = np.where(linear_output >= 0, 1, 0)  # 注意返回0或1标签
+        return predictions
 
 
 if __name__ == '__main__':
