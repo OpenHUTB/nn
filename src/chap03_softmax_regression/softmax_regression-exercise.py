@@ -198,9 +198,8 @@ Z = np.argmax(Z, axis=1)
 # 重塑为网络形状
 Z = Z.reshape(X.shape)
 # 绘制决策边界
-plt.contour(X, Y, Z)
-plt.show()
-
+plt.contourf(X, Y, Z, cmap=cm.Paired)  # 填充等高线
+plt.colorbar()  # 添加颜色条
 
 # In[ ]:
 
