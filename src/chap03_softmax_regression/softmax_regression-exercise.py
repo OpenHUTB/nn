@@ -116,19 +116,28 @@ def compute_loss(pred, labels, num_classes=3):
     :param num_classes: 类别数
     :return: 平均损失值和准确率
     """
+     # 将真实标签转换为one-hot编码形式
     one_hot_labels = tf.one_hot(
         tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32
     )
-    pred = tf.clip_by_value(pred, epsilon, 1.0)  # 防止log(0)
+    
+    # 防止log(0)的情况，将预测概率限制在[epsilon, 1.0]范围内
+    pred = tf.clip_by_value(pred, epsilon, 1.0)
+    
+    # 计算每个样本的交叉熵损失，对于每个样本，计算其真实类别的概率的负对数
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
+    
+    # 计算所有样本的平均损失
     loss = tf.reduce_mean(sample_losses)
-
+    
+    # 计算准确率，比较模型预测的类别和真实类别是否一致
     acc = tf.reduce_mean(
         tf.cast(
             tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
             dtype=tf.float32,
         )
     )
+    
     return loss, acc
 
 
