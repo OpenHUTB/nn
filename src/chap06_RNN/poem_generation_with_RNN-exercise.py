@@ -301,7 +301,7 @@ def train(epoch, model, optimizer, ds):
     return loss
 
 
-# # 训练过程
+# ## 训练过程
 
 # In[5]:
 
@@ -335,7 +335,7 @@ def gen_sentence():
     
     # 生成最多50个词
     for _ in range(50):
-        # 预测下一个词
+        #  预测下一个词
         cur_token, state = model.get_next_token(cur_token, state)
         collect.append(cur_token.numpy()[0])
         # 遇到结束标记则停止
@@ -345,5 +345,6 @@ def gen_sentence():
     # 将id序列转换为词语
     return [id2word[t] for t in collect]
 
+# 生成并打印诗歌
 # 生成并打印诗歌
 print(''.join(gen_sentence()))
