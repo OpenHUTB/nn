@@ -166,6 +166,7 @@ class GaussianMixtureModel:
 
         # 计算协方差矩阵的逆
         inv = np.linalg.inv(sigma)
+        
         # 计算高斯分布中的指数项（二次型），对应 (x - μ)^T Σ⁻¹ (x - μ)
         exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
 

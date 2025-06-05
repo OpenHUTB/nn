@@ -8,7 +8,11 @@
 # In[19]:
 
 
+# 导入NumPy库，用于科学计算和数组操作
+# NumPy提供了高性能的多维数组对象和各种数学运算工具
 import numpy as np
+# 导入TensorFlow库，用于机器学习和深度学习任务
+# TensorFlow是一个开源的端到端机器学习平台
 import tensorflow as tf
 import collections
 from tensorflow import keras
