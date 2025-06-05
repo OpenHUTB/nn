@@ -159,13 +159,13 @@ if __name__ == "__main__":
     X, y_true = generate_data()
     
     # 训练GMM模型
-    gmm = GaussianMixtureModel(n_components=3)
-    gmm.fit(X)
-    y_pred = gmm.labels_
+    gmm = GaussianMixtureModel(n_components=3)  # 创建高斯混合模型(GMM)实例，设置聚类数量为3
+    gmm.fit(X)  # 使用数据X拟合GMM模型（执行EM算法）
+    y_pred = gmm.labels_  # 获取每个样本的聚类标签（基于最大后验概率）
     
     # 可视化结果
-    plt.figure(figsize=(12, 5))
-    plt.subplot(1, 2, 1)
+    plt.figure(figsize=(12, 5))  # 创建12x5英寸的画布
+    plt.subplot(1, 2, 1)  # 1行2列布局中的第1个子图
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
     plt.title("True Clusters") # 子图标题
 
