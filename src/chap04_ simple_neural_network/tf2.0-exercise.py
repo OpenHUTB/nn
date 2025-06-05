@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # Tensorflow2.0 小练习
-
 # In[2]:
 
 import tensorflow as tf
@@ -75,19 +73,24 @@ def sigmoid_ce(x, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     ##########
     # clip 避免 log(0) 的数值不稳定问题
+    
     x = tf.clip_by_value(x, 1e-10, 1.0 - 1e-10)
+    
     # 计算二分类交叉熵损失
+    
     loss = -tf.reduce_mean(label * tf.math.log(x) + (1 - label) * tf.math.log(1 - x))
     ##########
     return loss
 
 # 构造测试数据并验证 sigmoid_ce 函数正确性
+
 test_data = np.random.normal(size=[10])
 prob = tf.nn.sigmoid(test_data)  # 得到 sigmoid 概率
 label = np.random.randint(0, 2, 10).astype(test_data.dtype)   # 随机生成 0 或 1 的标签
 print (label)
 
 # 对比手动实现和 TensorFlow 实现的 sigmoid 交叉熵结果
+
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data))- sigmoid_ce(prob, label))**2 < 0.0001).numpy()
 
 # In[ ]:
