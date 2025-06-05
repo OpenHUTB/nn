@@ -37,7 +37,8 @@ def random_string(length):
         str: 随机生成的字符串。
     """
     # 步骤 1：定义可用字符集（这里使用大写英文字母）
-    letters = string.ascii_uppercase  # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    letters = string.ascii_uppercase
 
     # 步骤 2：从字符集中随机选择指定数量的字符 ；使用 random.choice(letters) 从 letters 中随机选择一个字符
     random_chars = [random.choice(letters) for _ in range(length)]
@@ -48,10 +49,14 @@ def random_string(length):
     # 最终返回生成的随机字符串
 
 def get_batch(batch_size, length):
-    batched_examples = [randomString(length) for i in range(batch_size)]    # 生成batch_size个随机字符串
-    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]  # 转成索引
-    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]   # 逆序
-    dec_x = [[0] + e_idx[:-1] for e_idx in y]   # 添加起始符
+    # 生成batch_size个随机字符串
+    batched_examples = [randomString(length) for i in range(batch_size)]
+    # 转成索引
+    enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
+    # 逆序
+    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
+    # 添加起始符
+    dec_x = [[0] + e_idx[:-1] for e_idx in y]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
@@ -85,8 +90,10 @@ class mySeq2SeqModel(keras.Model):
         # 编码器RNN层：将RNNCell包裹成完整RNN，输出整个序列（return_sequences=True），并返回最终状态（return_state=True）
         self.encoder = tf.keras.layers.RNN(
             self.encoder_cell,
-            return_sequences=True,   # 返回每个时间步的输出
-            return_state=True        # 还返回最终隐藏状态
+            # 返回每个时间步的输出
+            return_sequences=True,
+            # 还返回最终隐藏状态
+            return_state=True
         )
 
         # 解码器RNN层：与编码器类似
@@ -121,19 +128,26 @@ class mySeq2SeqModel(keras.Model):
     
     @tf.function
     def encode(self, enc_ids):
-        enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)，通过嵌入层将token ID转换为词向量，输出形状: (batch_size, sequence_length, embedding_size)
-        enc_out, enc_state = self.encoder(enc_emb)# 使用编码器处理嵌入向量，获取编码器输出和最终状态
-        
-        return [enc_out[:, -1, :], enc_state]# 返回编码器最后一个时间步的输出和最终状态
+        # shape(b_sz, len, emb_sz)，通过嵌入层将token ID转换为词向量，输出形状: (batch_size, sequence_length, embedding_size)
+        enc_emb = self.embed_layer(enc_ids) 
+        # 使用编码器处理嵌入向量，获取编码器输出和最终状态
+        enc_out, enc_state = self.encoder(enc_emb)
+
+        # 返回编码器最后一个时间步的输出和最终状态
+        return [enc_out[:, -1, :], enc_state]
     
     def get_next_token(self, x, state):
         '''
         shape(x) = [b_sz,] 
         '''
-        inp_emb = self.embed_layer(x) #shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
-        h, state = self.decoder_cell.call(inp_emb, state) # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
-        logits = self.dense(h) # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
-        out = tf.argmax(logits, axis=-1)# 选择得分最高的token作为预测结果
+        #shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
+        inp_emb = self.embed_layer(x)
+        # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
+        h, state = self.decoder_cell.call(inp_emb, state)
+        # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
+        logits = self.dense(h)
+        # 选择得分最高的token作为预测结果
+        out = tf.argmax(logits, axis=-1)
         return out, state
 
 
@@ -154,17 +168,21 @@ def compute_loss(logits, labels):
 @tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     """执行一次训练步骤（前向传播+反向传播）"""
-    with tf.GradientTape() as tape:  # 自动记录梯度
-        logits = model(enc_x, dec_x)  # 前向传播获取预测值
-        loss = compute_loss(logits, y)  # 计算预测值与标签的损失
+    # 自动记录梯度
+    with tf.GradientTape() as tape:
+        # 前向传播获取预测值
+        logits = model(enc_x, dec_x)
+        # 计算预测值与标签的损失
+        loss = compute_loss(logits, y)
 
     # 计算梯度（自动微分）
     grads = tape.gradient(loss, model.trainable_variables)
     
     # 应用梯度更新模型参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    
-    return loss  # 返回当前步骤的损失值
+
+    # 返回当前步骤的损失值
+    return loss
 def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
     # 初始化训练指标
@@ -205,24 +223,37 @@ train(model, optimizer, seqlen=20)
 def sequence_reversal():
     """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
     def decode(init_state, steps=10):
-        b_sz = tf.shape(init_state[0])[0]# 获取批次大小
-        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)  # 起始 token（全为 0）
-        state = init_state# 初始化状态为编码器输出的状态
-        collect = []# 存储每一步生成的token
-        for i in range(steps):# 逐步解码生成序列
-            cur_token, state = model.get_next_token(cur_token, state)# 获取下一个token预测和更新后的状态
-            collect.append(tf.expand_dims(cur_token, axis=-1))  # 收集每一步生成的 token
-        out = tf.concat(collect, axis=-1).numpy()  # 拼接输出序列
-        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]  # 索引转字符
+        # 获取批次大小
+        b_sz = tf.shape(init_state[0])[0]
+        # 起始 token（全为 0）
+        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        # 初始化状态为编码器输出的状态
+        state = init_state
+        # 存储每一步生成的token
+        collect = []
+        # 逐步解码生成序列
+        for i in range(steps):
+            # 获取下一个token预测和更新后的状态
+            cur_token, state = model.get_next_token(cur_token, state)
+            # 收集每一步生成的 token
+            collect.append(tf.expand_dims(cur_token, axis=-1))
+        # 拼接输出序列
+        out = tf.concat(collect, axis=-1).numpy()
+        # 索引转字符
+        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
-    
-    batched_examples, enc_x, _, _ = get_batch(32, 10)# 生成一批测试数据（32个样本，每个序列长度10）
-    state = model.encode(enc_x)# 对输入序列进行编码
-    return decode(state, enc_x.get_shape()[-1]), batched_examples# 解码生成逆序序列，步数等于输入序列长度
+
+    # 生成一批测试数据（32个样本，每个序列长度10）
+    batched_examples, enc_x, _, _ = get_batch(32, 10)
+    # 对输入序列进行编码
+    state = model.encode(enc_x)
+    # 解码生成逆序序列，步数等于输入序列长度
+    return decode(state, enc_x.get_shape()[-1]), batched_examples
 
 def is_reverse(seq, rev_seq):
     """检查 rev_seq 是否为 seq 的逆序"""
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])# 反转rev_seq并与原始seq比较
+    # 反转rev_seq并与原始seq比较
+    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     if seq == rev_seq_rev:
         return True
     else:
