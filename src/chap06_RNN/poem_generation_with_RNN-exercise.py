@@ -15,9 +15,7 @@ from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
-
 end_token = 'eos'    # End of sentence
-
 
 def process_dataset(fileName):
     """处理诗歌数据集，构建词汇表和数字索引的诗歌数据
@@ -73,7 +71,7 @@ def process_dataset(fileName):
     return instances, word2id, id2word
 
 def poem_dataset():
-    """创建诗歌数据集的 TensorFlow Dataset 对象
+    """创建诗歌数据集的TensorFlow Dataset对象
     
     Returns:
         ds: 处理好的tf.data.Dataset对象
@@ -96,9 +94,11 @@ def poem_dataset():
     ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1))
     return ds, word2id, id2word
 
+
 # # 模型代码
 
 # In[2]:
+
 
 class myRNNModel(keras.Model):
     """基于RNN的诗歌生成模型"""
@@ -164,9 +164,11 @@ class myRNNModel(keras.Model):
         out = tf.argmax(logits, axis=-1)
         return out, state
 
+
 # ## 辅助函数：计算序列损失
 
 # In[3]:
+
 
 def mkMask(input_tensor, maxLen):
     """创建掩码，用于处理变长序列
@@ -225,6 +227,7 @@ def reduce_avg(reduce_target, lengths, dim):
     red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
     return red_avg
 
+
 # # 定义损失函数和训练函数
 
 # In[4]:
@@ -276,7 +279,7 @@ def train(epoch, model, optimizer, ds):
     """训练一个epoch
     
     Args:
-        epoch: 当前 epoch 编号
+        epoch: 当前epoch编号
         model: 诗歌生成模型
         optimizer: 优化器
         ds: 训练数据集
@@ -296,6 +299,7 @@ def train(epoch, model, optimizer, ds):
             print('epoch', epoch, ': loss', loss.numpy())
 
     return loss
+
 
 # # 训练过程
 
