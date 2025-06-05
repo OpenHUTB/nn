@@ -12,14 +12,14 @@ import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softma
 import numpy as np
 
 # 设置超参数
-learning_rate = 1e-4  #  学习率
-keep_prob_rate = 0.7  #  Dropout保留神经元的比例
+learning_rate = 1e-4  # 学习率
+keep_prob_rate = 0.7  # Dropout保留神经元的比例
 max_epoch = 3  # 训练的总轮数
 BATCH_SIZE = 50  # 每批训练数据的大小为50
 
 # 检查是否需要下载 MNIST 数据集
 DOWNLOAD_MNIST = False
-if not(os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
+if not (os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
     # 如果不存在 mnist 目录或者目录为空，则需要下载
     DOWNLOAD_MNIST = True
 
@@ -39,12 +39,11 @@ train_loader = Data.DataLoader(
 )
 
 # 加载测试数据集
-# torchvision.datasets.MNIST用于加载 MNIST 数据集
-# root='./mnist/'指定数据集的存储路径
-# train=False表示加载测试集（而不是训练集）
 test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
-# 预处理测试数据：转换为 Variable ，调整维度，归一化，只取前500个样本
-test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
+
+# 预处理测试数据：转换为 Variable，调整维度，归一化，只取前500个样本
+test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500] / 255.
+
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
 
@@ -55,8 +54,6 @@ class CNN(nn.Module):
         
         # 第一个卷积层
         self.conv1 = nn.Sequential(
-            # 卷积层：1个输入通道，32个输出通道，7x7的卷积核
-            # stride=1表示步长为1，padding=3表示边缘填充3层（保持尺寸不变）
             nn.Conv2d(in_channels=1, out_channels=32, kernel_size=7, stride=1, padding=3),
             nn.ReLU(),  # ReLU激活函数
             nn.MaxPool2d(2)  # 2x2的最大池化，尺寸减半
@@ -64,14 +61,13 @@ class CNN(nn.Module):
         
         # 第二个卷积层
         self.conv2 = nn.Sequential(
-            # 卷积层：32个输入通道，64个输出通道，5x5的卷积核
             nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1, padding=2),
             nn.ReLU(),  # ReLU激活函数
             nn.MaxPool2d(2)  # 2x2的最大池化，尺寸再减半
         )
         
         # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
-        self.out1 = nn.Linear(7*7*64, 1024, bias=True)
+        self.out1 = nn.Linear(7 * 7 * 64, 1024, bias=True)
         
         # Dropout层：训练时随机丢弃神经元，防止过拟合
         self.dropout = nn.Dropout(keep_prob_rate)
@@ -101,7 +97,6 @@ def test(cnn):
     correct = np.sum(prediction == test_y)  # 计算正确预测的数量
     return correct / 500.0  # 返回准确率
 
-
 # 训练函数
 def train(cnn):
     # 使用Adam优化器，学习率为learning_rate
@@ -124,6 +119,7 @@ def train(cnn):
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
                 print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
+
 # 主程序入口
 if __name__ == '__main__':
     cnn = CNN()  # 创建CNN实例
