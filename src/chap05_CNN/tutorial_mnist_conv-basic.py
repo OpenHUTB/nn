@@ -16,18 +16,43 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 def mnist_dataset():
-    (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    x = x.reshape(x.shape[0], 28, 28,1)
-    x_test = x_test.reshape(x_test.shape[0], 28, 28,1)
+    """
+    加载并预处理MNIST数据集，返回训练集和测试集的Dataset对象
     
+    返回:
+    - ds: 训练数据集，批次大小32，包含20000个样本
+    - test_ds: 测试数据集，批次大小20000，包含20000个样本
+    """
+    # 加载MNIST数据集
+    (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    
+    # 重塑数据为CNN所需的四维张量 [样本数, 高度, 宽度, 通道数]
+    # MNIST图像为单通道灰度图，故通道数为1
+    x = x.reshape(x.shape[0], 28, 28, 1)
+    x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
+    
+    # 创建训练数据集
     ds = tf.data.Dataset.from_tensor_slices((x, y))
+    # 应用数据预处理函数（归一化和类型转换）
     ds = ds.map(prepare_mnist_features_and_labels)
-    ds = ds.take(20000).shuffle(20000).batch(32)
-
-
+    # 限制训练集大小为20000个样本
+    ds = ds.take(20000)
+    # 打乱数据顺序，缓冲区大小为20000（覆盖全部样本）
+    ds = ds.shuffle(20000)
+    # 批处理数据，每批32个样本
+    ds = ds.batch(32)
+    
+    # 创建测试数据集
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+    # 应用相同的数据预处理
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
+    # 限制测试集大小为20000个样本（原测试集有10000个，此处可能有冗余）
+    test_ds = test_ds.take(20000)
+    # 打乱测试数据（通常测试集不需要打乱，但此处保留）
+    test_ds = test_ds.shuffle(20000)
+    # 批处理测试数据，每批20000个样本（适合一次性评估）
+    test_ds = test_ds.batch(20000)
+    
     return ds, test_ds
 
 def prepare_mnist_features_and_labels(x, y):
