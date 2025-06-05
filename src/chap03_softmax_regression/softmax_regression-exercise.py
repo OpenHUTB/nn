@@ -78,6 +78,7 @@ epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 class SoftmaxRegression(tf.Module):
     def __init__(self, input_dim=2, num_classes=3):
+        # 初始化模型参数：权重W和偏置b
         """
         初始化 Softmax 回归模型参数
         :param input_dim: 输入特征维度
