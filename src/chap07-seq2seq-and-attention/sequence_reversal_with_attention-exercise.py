@@ -49,7 +49,6 @@ print(get_batch(2, 10))
 
 
 # # 建立sequence to sequence 模型
-# ##
 # 完成两空，模型搭建以及单步解码逻辑
 
 # In[26]:
@@ -104,7 +103,6 @@ class mySeq2SeqModel(keras.Model):
 
 
 # # Loss函数以及训练逻辑
- ##
 # In[27]:
 
 
@@ -138,7 +136,6 @@ def train(model, optimizer, seqlen):
 
 
 # # 训练迭代
-
 # In[28]:
 
 
@@ -149,9 +146,7 @@ train(model, optimizer, seqlen=20)
 
 # # 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
-# 
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
-
 # In[30]:
 
 
