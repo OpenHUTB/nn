@@ -27,7 +27,7 @@ def mnist_dataset():
 print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
 
 
-#定义了一个简单的两层神经网络模型，用于处理 MNIST 手写数字识别任务
+# 定义了一个简单的两层神经网络模型，用于处理 MNIST 手写数字识别任务
 
 # In[9]:
 class myModel:
@@ -45,8 +45,8 @@ class myModel:
         
     def __call__(self, x):
         '''实现模型函数体，返回未归一化的logits，这里未实现具体运算逻辑，需补充'''
-        #logits = None
-        #return logits
+        # logits = None
+        # return logits
         # 展平为[batch_size, 784]
         x = tf.reshape(x, [-1, 784])
         # 隐藏层+ReLU
