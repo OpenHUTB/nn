@@ -163,11 +163,21 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
     return loss  # 返回当前步骤的损失值
 def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
-    loss = 0.0
-    accuracy = 0.0
+    # 初始化训练指标
+    loss = 0.0 # 记录loss值 (初始为0)
+    accuracy = 0.0 # 可扩展性占位 (当前未实际计算准确率)
     for step in range(3000):
+        # 获取训练batch数据:
+        # - batched_examples: 原始样本 (用于调试/可视化)
+        # - enc_x: 编码器输入序列 [batch_size, seqlen]
+        # - dec_x: 解码器输入序列 [batch_size, seqlen] 
+        # - y: 目标输出序列 [batch_size, seqlen]
         batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
+        
+        # 执行单步训练并返回当前loss
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+        
+        # 每500步打印训练进度
         if step % 500 == 0:
             print('step', step, ': loss', loss.numpy())
     return loss
