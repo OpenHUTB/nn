@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 
 # 生成混合高斯分布数据
-def generate_data(n_samples = 1000):
+def generate_data(n_samples=1000):
     np.random.seed(42)
     # 定义三个高斯分布的中心点
     mu_true = np.array([ 
