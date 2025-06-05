@@ -200,6 +200,7 @@ inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 Z = model(inp)
 Z = np.argmax(Z, axis=1)
+# 重塑为网络形状
 Z = Z.reshape(X.shape)
 plt.contour(X, Y, Z)
 plt.show()
