@@ -27,6 +27,7 @@ def load_data(filename):
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
+    # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
     ret = np.expand_dims(x, axis=1)
     return ret
 
@@ -38,12 +39,13 @@ def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    #可以替换成 x = identity_basis(x)
     # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
     # 通过列表推导式创建各次项，最后在列方向拼接合并
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 生成 1, x, x^2, ..., x^(feature_num-1)
+    # 生成 x, x^2, ..., x^(feature_num)
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
     ret = np.concatenate(ret, axis=1)
