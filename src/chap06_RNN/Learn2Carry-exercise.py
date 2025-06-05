@@ -55,7 +55,7 @@ def convertDigits2Num(Digits):
     return Num
 
 def pad2len(lst, length, pad=0):
-    '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    '''将一个列表用`pad`填充到`length`的长度,例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
     '''
     lst+=[pad]*(length - len(lst))
     return lst
@@ -93,6 +93,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     results = [pad2len(o, maxlen) for o in results]
 
     return Nums1, Nums2, results
+
 
 
 # # 建模过程， 按照图示完成建模
