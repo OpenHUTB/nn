@@ -6,12 +6,14 @@ import matplotlib.pyplot as plt
 
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
+    
     """载入数据。
     Args:
         filename: 数据文件的路径
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
+    
     xys = []
     with open(filename, "r") as f:
         for line in f:
@@ -36,8 +38,10 @@ def identity_basis(x):
 # 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
+    
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    
     # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
@@ -48,13 +52,16 @@ def multinomial_basis(x, feature_num=10):
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
     ret = np.concatenate(ret, axis=1)
     # ==========
+    
     return ret
 
 
 def gaussian_basis(x, feature_num=10):
+    
     """
     高斯基函数：将输入映射为一组高斯函数响应
     """
+    
     # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
     # 每个高斯函数的标准差（带宽）
@@ -75,6 +82,7 @@ def gaussian_basis(x, feature_num=10):
 
 
 def least_squares(phi, y, alpha=0.0, solver="pinv"):
+    
     """
     带正则化的最小二乘法优化，支持多种求解器
 
@@ -90,6 +98,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     异常:
     ValueError: 当 solver 参数不是支持的类型时抛出
     """
+    
     # 检查输入矩阵是否为空
     if phi.size == 0 or y.size == 0:
         raise ValueError("输入矩阵 phi 和目标值 y 不能为零矩阵")
@@ -146,6 +155,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
 
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
+    
     """梯度下降优化
     :param phi: 特征矩阵
     :param y: 标签向量
@@ -153,6 +163,7 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
     :param epochs: 迭代次数（默认为 1000）
     :return: 优化后的权重向量 w
     """
+    
     # 初始化权重 w 为全零向量
     w = np.zeros(phi.shape[1])
     # 迭代训练 epochs 次
@@ -167,7 +178,9 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
 
 
 def main(x_train, y_train, use_gradient_descent=False):
+    
     """训练模型，并返回从x到y的映射。"""
+    
     # 默认使用恒等基函数
     basis_func = identity_basis  
 
@@ -215,7 +228,9 @@ def main(x_train, y_train, use_gradient_descent=False):
 
 
 def evaluate(ys, ys_pred):
+    
     """评估模型。"""
+    
     # 计算预测值与真实值的标准差
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
     return std
