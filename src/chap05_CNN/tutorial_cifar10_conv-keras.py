@@ -23,11 +23,23 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 def cifar10_dataset():
+    """
+    加载并预处理CIFAR-10数据集，返回训练集和测试集的TensorFlow Dataset对象
+    
+    返回:
+        ds (tf.data.Dataset): 处理后的训练数据集
+        test_ds (tf.data.Dataset): 处理后的测试数据集
+    """
+    # 加载CIFAR-10数据集
+    # x: 图像数据 (50000张训练图像 + 10000张测试图像，32x32像素RGB)
+    # y: 对应标签 (0-9的整数标签)
     (x, y), (x_test, y_test) = datasets.cifar10.load_data()
+    # 创建训练数据集
     ds = tf.data.Dataset.from_tensor_slices((x, y))
     ds = ds.map(prepare_mnist_features_and_labels)
     ds = ds.take(20000).shuffle(20000).batch(100)
-    
+
+    # 创建测试数据集
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).batch(20000)
