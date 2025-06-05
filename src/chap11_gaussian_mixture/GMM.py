@@ -189,9 +189,20 @@ if __name__ == "__main__":
     X, y_true = generate_data()
     
     # 训练GMM模型
-    gmm = GaussianMixtureModel(n_components=3)
-    gmm.fit(X)
-    y_pred = gmm.labels_
+  # 创建一个高斯混合模型(GMM)，设置3个分量（聚类中心）
+# n_components: 高斯分布的数量，即聚类的类别数
+# 每个分量表示一个高斯分布，整个模型是这些分布的加权和
+gmm = GaussianMixtureModel(n_components=3)
+
+# 使用训练数据X拟合GMM模型
+# 拟合过程使用EM(期望最大化)算法迭代优化模型参数
+# 包括每个高斯分布的均值(means)、协方差(covariances)和权重(weights)
+gmm.fit(X)
+
+# 预测数据点所属的聚类类别
+# y_pred是一个一维数组，包含每个样本的预测类别标签(0,1,2)
+# 标签对应于拟合的3个高斯分量
+y_pred = gmm.labels_
     
     # 可视化结果
     plt.figure(figsize=(12, 5))
