@@ -77,15 +77,15 @@ class LogisticRegression():
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
             initial_value=tf.random.uniform(
-                shape=[2, 1], minval=-0.1, maxval=0.1
+                shape = [2, 1], minval = -0.1, maxval = 0.1
             ),
             regularizer=l2_reg
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
-            shape=[1], 
-            dtype=tf.float32, 
-            initial_value=tf.zeros(shape=[1])
+            shape = [1], 
+            dtype = tf.float32, 
+            initial_value = tf.zeros(shape=[1])
         )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
