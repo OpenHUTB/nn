@@ -171,7 +171,7 @@ class GaussianMixtureModel:
         sign, logdet = np.linalg.slogdet(sigma)
         if sign <= 0:
             # 添加微小扰动确保协方差矩阵正定（数值稳定性）
-            sigma += np.eye(n_features) * 1e-6
+            sigma += np.eye(n_features) * 1e-6 # 加入正则化项，避免协方差矩阵奇异（不可逆）导致求逆失败
             sign, logdet = np.linalg.slogdet(sigma)
 
         # 计算协方差矩阵的逆
