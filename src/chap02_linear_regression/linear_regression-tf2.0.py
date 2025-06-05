@@ -41,7 +41,6 @@ def multinomial_basis(x, feature_num=10, include_bias=True, degree_start=1):
     ret = np.concatenate(feats, axis=1)  # shape (N, feature_num)
     return ret
 
-
 def gaussian_basis(x, feature_num=10):
     """高斯基函数"""
     # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
