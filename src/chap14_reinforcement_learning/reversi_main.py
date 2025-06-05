@@ -72,4 +72,4 @@ for i_episode in range(max_epochs):
             else:                   # 黑棋数量不超过一半（含平局情况）
                 print("白棋赢了！")
             print(black_score)      # 打印黑棋得分
-            break #结束代码
+            break # 结束代码
