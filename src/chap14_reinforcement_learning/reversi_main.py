@@ -1,14 +1,18 @@
 import gym
+
 import random
+
 import numpy as np
 
 from RL_QG_agent import RL_QG_agent  # 导入强化学习智能体
 
 # 创建初始环境并重置
+
 env = gym.make('Reversi8x8-v0')
 env.reset()
 
 # 初始化智能体并加载预训练模型
+
 agent = RL_QG_agent()
 agent.load_model()
 
@@ -16,12 +20,14 @@ agent.load_model()
 max_epochs = 100
 
 # 主训练循环（控制训练的总轮数）
+
 for i_episode in range(max_epochs):
     # 初始化棋局，返回初始 observation（3x8x8 的状态表示）
     #3个通道分别表示：黑棋位置、白棋位置、当前玩家
     observation = env.reset()
     
     # 每局最多进行 100 步操作（黑白双方交替下棋）
+    
     for t in range(100):
         action = [1, 2]  # 初始化 action，占位，稍后会被赋真实值
         # action[0]: 表示棋盘上的位置（0~63），或特殊值表示“跳过”
