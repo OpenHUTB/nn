@@ -114,7 +114,7 @@ def test(model, x, y):
     logits = model(x)
     loss = compute_loss(logits, y)
     accuracy = compute_accuracy(logits, y)
-    return loss, accuracy
+    return loss, accuracy# 返回损失值和准确率
 
 
 # ## 实际训练
