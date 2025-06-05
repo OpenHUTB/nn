@@ -57,9 +57,12 @@ def softmax_ce(x, label):
 
 # 构造测试数据并验证 softmax_ce 函数正确性
 test_data = np.random.normal(size=[10, 5])
-prob = tf.nn.softmax(test_data)  # 得到 softmax 概率
-label = np.zeros_like(test_data)   # 创建 one-hot 标签
-label[np.arange(10), np.random.randint(0, 5, size=10)]=1.0  # 每行随机一个位置设为 1
+# 得到 softmax 概率
+prob = tf.nn.softmax(test_data)
+# 创建 one-hot 标签
+label = np.zeros_like(test_data)
+# 每行随机一个位置设为 1
+label[np.arange(10), np.random.randint(0, 5, size=10)]=1.0  
 
 # 对比手动实现和 TensorFlow 实现的 softmax 交叉熵结果
 ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
@@ -82,8 +85,10 @@ def sigmoid_ce(x, label):
 
 # 构造测试数据并验证 sigmoid_ce 函数正确性
 test_data = np.random.normal(size=[10])
-prob = tf.nn.sigmoid(test_data)  # 得到 sigmoid 概率
-label = np.random.randint(0, 2, 10).astype(test_data.dtype)   # 随机生成 0 或 1 的标签
+# 得到 sigmoid 概率
+prob = tf.nn.sigmoid(test_data)  
+# 随机生成 0 或 1 的标签
+label = np.random.randint(0, 2, 10).astype(test_data.dtype)   
 print (label)
 
 # 对比手动实现和 TensorFlow 实现的 sigmoid 交叉熵结果
