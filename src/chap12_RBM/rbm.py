@@ -1,6 +1,6 @@
 # python: 2.7
 # encoding: utf-8
-
+# 导入numpy模块并命名为np
 import numpy as np
 
 class RBM:
