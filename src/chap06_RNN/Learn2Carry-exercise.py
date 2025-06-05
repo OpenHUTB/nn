@@ -36,7 +36,7 @@ def gen_data_batch(batch_size, start, end):
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
-    return numbers_1, numbers_2, results
+    return numbers_1, numbers_2, results   #该操作对numbers_1和numbers_2的对应元素进行逐元素相加求和
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
