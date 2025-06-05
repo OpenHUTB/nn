@@ -2,93 +2,147 @@ import os
 import numpy as np
 import tensorflow as tf
 
-class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
-    def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
-        self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
-    #    pass    # 删掉这句话，并填写相应代码
-        #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
-        self.sess = None  # TensorFlow会话对象初始化占位
-        self.saver = None  # TensorFlow模型保存器初始化占位
-        self.input_states = None  # 神经网络输入占位符初始化占位
-        self.Q_values = None  # 神经网络输出的Q值初始化占位
 
+class RLQGAgent:
+    """
+    基于深度强化学习的棋盘游戏智能体（Q-Learning）
+    - 使用卷积神经网络（CNN）提取棋盘特征
+    - 通过Q值预测合法动作
+    """
 
-    def init_model(self):
-        '''
-        self.input_states	网络输入（状态图像），大小为 [batch_size, 8, 8, 3]
-        conv1, conv2	两层卷积网络，用于提取棋盘局部特征
-        flat	卷积输出扁平化，供全连接层使用
-        dense	一个隐藏层，用于提取高层语义特征
-        self.Q_values	输出层，返回每个位置对应的 Q 值（动作的价值）
-        self.target_Q	训练目标 Q 值（用于计算 loss）
-        self.loss	使用 MSE 作为损失函数
-        self.optimizer	使用 Adam 优化器进行参数更新
-        self.saver	用于模型保存和恢复
+    def __init__(self):
+        """初始化模型目录和TensorFlow会话"""
+        # 获取模型保存目录（与当前脚本同级的 Reversi 文件夹）
+        self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
+        os.makedirs(self.model_dir, exist_ok=True)  # 创建目录（如果不存在）
 
-        '''
-        # 定义自己的 网络
+        # TensorFlow 会话和模型相关属性
+        self.sess = None
+        self.saver = None
+        self.input_states = None  # 输入占位符
+        self.q_values = None      # 输出Q值
+        self.build_model()        # 初始化模型
+
+    def build_model(self):
+        """
+        构建卷积神经网络模型
+        输入: [batch_size, 8, 8, 3] 棋盘状态（玩家棋子、对手棋子、合法位置）
+        输出: [batch_size, 64]    每个位置的Q值
+        """
         self.sess = tf.Session()
-        # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
-        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name = "input_states")
-        # 构建卷积神经网络
-        # 第1个卷积层：提取局部空间特征
-        conv1 = tf.layers.conv2d(
-            inputs = self.input_states,
-            filters = 32,                 # 输出通道数：32个卷积核
-            kernel_size = 3,              # 卷积核大小 3x3
-            padding = "same",             # 输出大小与输入相同
-            activation = tf.nn.relu       # ReLU 激活函数
-            )
-
-    # 第2个卷积层：提取更高级特征
-        conv2 = tf.layers.conv2d(
-            inputs = conv1,
-            filters = 64,                 # 输出通道数：64个卷积核
-            kernel_size = 3,
-            padding = "same",
-            activation = tf.nn.relu
-            )
         
-        # 扁平化层
+        # 定义输入占位符
+        self.input_states = tf.placeholder(
+            tf.float32,
+            shape=[None, 8, 8, 3],
+            name="input_states"
+        )
+
+        # 卷积层1: 提取局部特征
+        conv1 = tf.layers.conv2d(
+            inputs=self.input_states,
+            filters=32,               # 输出通道数
+            kernel_size=3,            # 卷积核大小
+            padding="same",           # 保持输出尺寸
+            activation=tf.nn.relu
+        )
+
+        # 卷积层2: 提取高级特征
+        conv2 = tf.layers.conv2d(
+            inputs=conv1,
+            filters=64,
+            kernel_size=3,
+            padding="same",
+            activation=tf.nn.relu
+        )
+
+        # 展平层
         flat = tf.layers.flatten(conv2)
-        # 全连接层
-        dense = tf.layers.dense(inputs=flat, units=512, activation=tf.nn.relu)
-        # 输出层，64个动作的Q值
-        self.Q_values = tf.layers.dense(inputs=dense, units=64, name="q_values")
-        # 初始化变量和Saver
+
+        # 全连接层: 提取语义特征
+        dense = tf.layers.dense(
+            inputs=flat,
+            units=512,
+            activation=tf.nn.relu
+        )
+
+        # 输出层: 64个动作的Q值
+        self.q_values = tf.layers.dense(
+            inputs=dense,
+            units=64,
+            name="q_values"
+        )
+
+        # 初始化变量和模型保存器
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
-        # 补全代码
-        
-    def place(self,state,enables):
-        # 用于测试的函数，返回的action是 0-63 之间的一个数值，
-        # action 表示的是 要下的位置。
-        # action = 123456789
-        # 删掉这句话，并填写相应代码
-        # 状态预处理
-        state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
-        
-        # 前向传播获取Q值
-        q_vals = self.sess.run(self.q_values, feed_dict={self.input_state: state_input})
-        
-        # 过滤合法动作并选择最优
-        
-        legal_q = q_vals[0][enables]  # 从 Q 值矩阵中提取当前状态下的合法动作的 Q 值
-        if np.sum(legal_q) == 0:  # 所有合法动作Q值都为 0 的特殊情况处理
-            return np.random.choice(np.where(enables)[0])   # 随机选择一个合法动作
-        
-        max_q = np.max(legal_q)  # 找到合法动作中 Q 值最大的值
-        candidates = np.where(legal_q == max_q)[0]  # 找到所有 Q 值等于最大 Q 值的动作索引
-        
-        # 随机选择最优动作 （解决多个最大值的情况）
-        return np.random.choice(candidates)
-    #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
-    # 保存模型
-    def save_model(self):  
-        self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-    # 重新导入模型
-    def load_model(self):
-        self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
 
-    # 定义自己需要的函数
+    def place(self, state, enables):
+        """
+        根据当前状态选择合法动作
+        Args:
+            state: 当前棋盘状态 (8x8x3)
+            enables: 合法动作掩码 (64位布尔数组)
+        Returns:
+            action: 0-63 的合法动作索引
+        """
+        # 状态预处理：转换为张量并归一化
+        state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)
+
+        # 获取Q值
+        q_values = self.sess.run(
+            self.q_values,
+            feed_dict={self.input_states: state_input}
+        )[0]  # 取第一个样本的Q值
+
+        # 过滤合法动作
+        legal_actions = np.where(enables)[0]
+        if len(legal_actions) == 0:
+            raise ValueError("No legal actions available!")
+
+        legal_q = q_values[legal_actions]  # 合法动作对应的Q值
+
+        # 特殊情况处理：所有Q值为0时随机选择
+        if np.all(legal_q == 0):
+            return np.random.choice(legal_actions)
+
+        # 找到最大Q值对应的所有候选动作
+        max_q = np.max(legal_q)
+        candidates = np.where(legal_q == max_q)[0]
+
+        # 随机选择最优动作（处理多个最大值的情况）
+        return legal_actions[candidates[np.random.choice(len(candidates))]]
+
+    def save_model(self):
+        """保存模型参数"""
+        try:
+            self.saver.save(self.sess, os.path.join(self.model_dir, "parameter.ckpt"))
+        except Exception as e:
+            print(f"[ERROR] Model save failed: {e}")
+
+    def load_model(self):
+        """加载模型参数"""
+        try:
+            self.saver.restore(self.sess, os.path.join(self.model_dir, "parameter.ckpt"))
+        except Exception as e:
+            print(f"[ERROR] Model load failed: {e}")
+
+    def close(self):
+        """关闭会话"""
+        if self.sess:
+            self.sess.close()
+
+
+# 示例用法
+if __name__ == "__main__":
+    agent = RLQGAgent()
+    
+    # 测试输入（示例）
+    dummy_state = np.zeros((8, 8, 3))
+    dummy_enables = np.random.randint(0, 2, size=64, dtype=bool)
+    
+    try:
+        action = agent.place(dummy_state, dummy_enables)
+        print(f"Selected action: {action}")
+    finally:
+        agent.close()
