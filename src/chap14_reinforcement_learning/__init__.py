@@ -337,7 +337,7 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
 
         # Standard Deterministic (as in the original DeepMind paper)
         if game == 'space_invaders':
-            frameskip = 3
+            frameskip = 3    #使用具体数据进行计算
         else:
             frameskip = 4
 
