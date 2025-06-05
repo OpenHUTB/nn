@@ -193,6 +193,7 @@ print(inp.shape)
 Z = model(inp)
 Z = np.argmax(Z, axis=1)
 Z = Z.reshape(X.shape)
+# 绘制决策边界
 plt.contour(X, Y, Z)
 plt.show()
 
