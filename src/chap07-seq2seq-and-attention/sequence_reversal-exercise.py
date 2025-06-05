@@ -13,7 +13,7 @@ import tensorflow as tf
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
+import os,sys,tqdm # 导入需要的模块
 
 
 # ## 玩具序列数据生成
