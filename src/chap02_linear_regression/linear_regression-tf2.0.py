@@ -13,10 +13,11 @@ def identity_basis(x):
     """恒等基函数"""
     return np.expand_dims(x, axis=1)
 
-
+# 生成多项式基函数
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
+# 初始化特征列表
     feat = [x]
     for i in range(2, feature_num + 1):
         feat.append(x**i)
