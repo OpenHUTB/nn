@@ -44,11 +44,13 @@ def multinomial_basis(x, feature_num=10):
     # 通过列表推导式创建各次项，最后在列方向拼接合并
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 生成 1, x, x^2, ..., x^(feature_num-1)
-    ret = [x**i for i in range(1, feature_num + 1)]
+    #ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
-    ret = np.concatenate(ret, axis=1)
+    #ret = np.concatenate(ret, axis=1)
     # ==========
-    return ret
+    #return ret
+    ret = [x**i for i in range(feature_num)]  # i从0开始，生成x^0到x^(feature_num-1)
+    return np.concatenate(ret, axis=1)  # 合并后 shape=(N, feature_num)
 
 
 def gaussian_basis(x, feature_num=10):
@@ -58,7 +60,7 @@ def gaussian_basis(x, feature_num=10):
     # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
     # 每个高斯函数的标准差（带宽）
-    sigma = 25 / feature_num
+    sigma = 25 / (feature_num - 1)  # 中心间距为25/(feature_num-1)，sigma取一半或相近值
     # 计算每个输入 x 对所有中心的响应，输出 shape (N, feature_num)
     return np.exp(-0.5 * ((x[:, np.newaxis] - centers) / sigma) ** 2)
 
