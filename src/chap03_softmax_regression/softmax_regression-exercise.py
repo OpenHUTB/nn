@@ -190,6 +190,7 @@ y = np.arange(0.0, 10.0, 0.1)
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
+#模型预测
 Z = model(inp)
 # 获取预测的类别
 Z = np.argmax(Z, axis=1)
