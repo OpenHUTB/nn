@@ -19,6 +19,7 @@ def generate_data(n_samples = 1000):
     ])
     # 定义每个高斯分布的混合权重(必须和为1)
     weights_true = np.array([0.3, 0.4, 0.3])
+    
     # 获取混合成分的数量(这里是3)
     n_components = len(weights_true)
     
