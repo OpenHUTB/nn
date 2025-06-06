@@ -197,8 +197,15 @@ if __name__ == "__main__":
     y_pred = gmm.labels_ # 获取每个样本的聚类标签
     
     # 可视化结果
+    # 创建一个宽12英寸、高5英寸的图形窗口
     plt.figure(figsize=(12, 5))
+    # 创建1行2列的子图布局，选择第1个子图进行绘制
     plt.subplot(1, 2, 1)
+    # 绘制散点图，展示真实的聚类标签
+    # X[:, 0]和X[:, 1]分别表示数据的两个特征维度
+    # c=y_true：根据真实标签y_true为每个数据点着色
+    # cmap='viridis'：使用viridis颜色映射（从蓝到黄）
+    # s=10：设置散点大小为10
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
     plt.title("True Clusters") # 子图标题
 
