@@ -111,8 +111,24 @@ def train_one_step(model, optimizer, x, y):
 
 @tf.function
 def test(model, x, y):
-    logits = model(x)
+    """
+    使用 TensorFlow 图模式执行模型评估的函数
+    该函数计算模型在给定输入数据上的损失和准确率
+    Args:
+        model: 已构建的 Keras 模型或兼容的 TensorFlow 模型
+        x: 输入特征张量，形状为 [batch_size, ...]
+        y: 真实标签张量，形状为 [batch_size] 或 [batch_size, num_classes]
+    Returns:
+        loss: 标量张量，表示当前批次的损失值
+        accuracy: 标量张量，表示当前批次的准确率
+    """
+    # 前向传播：通过模型计算预测输出（logits）
+    logits = model(x)  # logits 是未经过 softmax 的原始输出
+    # 计算损失值（需确保 compute_loss 已定义）
+    # 通常使用交叉熵损失（cross-entropy）或均方误差（MSE）
     loss = compute_loss(logits, y)
+    # 计算准确率（需确保 compute_accuracy 已定义）
+    # 通常通过 argmax 比较预测值和真实标签
     accuracy = compute_accuracy(logits, y)
     return loss, accuracy
 
