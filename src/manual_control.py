@@ -1007,18 +1007,17 @@ class LaneInvasionSensor(object):
 
 
 class GnssSensor(object):
-   # GNSS（全球导航卫星系统）传感器类，用于在 CARLA 仿真中模拟 GPS 定位设备
-    def __init__(self, parent_actor): # 初始化 GNSS 传感器
-        self.sensor = None            # 传感器对象占位符
-        self._parent = parent_actor   # 父角色引用
-        self.lat = 0.0                # 纬度（初始值）
-        self.lon = 0.0                # 经度（初始值)
-        world = self._parent.get_world() # 获取父角色所在的世界
-        bp = world.get_blueprint_library().find('sensor.other.gnss') # 从蓝图库中查找 GNSS 传感器蓝图
+    def __init__(self, parent_actor):
+        self.sensor = None
+        self._parent = parent_actor
+        self.lat = 0.0
+        self.lon = 0.0
+        world = self._parent.get_world()
+        bp = world.get_blueprint_library().find('sensor.other.gnss')
         self.sensor = world.spawn_actor(bp, carla.Transform(carla.Location(x=1.0, z=2.8)), attach_to=self._parent)
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
-        weak_self = weakref.ref(self) # 使用弱引用避免循环引用问题
+        weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
 
     @staticmethod
@@ -1372,16 +1371,16 @@ def game_loop(args):
 
     finally:
 
-        if original_settings:
+        if original_settings: # 如果存在恢复原始仿真设置
             sim_world.apply_settings(original_settings)
 
-        if (world and world.recording_enabled):
+        if (world and world.recording_enabled): # 如果正在录制停止记录仪
             client.stop_recorder()
 
-        if world is not None:
+        if world is not None:  # 销毁世界对象（释放资源）
             world.destroy()
 
-        pygame.quit()
+        pygame.quit() # 退出Pygame（关闭窗口、释放输入设备等）
 
 
 # ==============================================================================
