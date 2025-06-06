@@ -87,8 +87,8 @@ class CNN(nn.Module):
         x = x.view(x.size(0), -1)
         out1 = self.out1(x)
         out1 = F.relu(out1)
-        out1 = self.dropout(out1)
-        out2 = self.out2(out1)
+        out1 = self.dropout(out1)# Dropout正则化，防止过拟合，训练时随机丢弃部分神经元，测试时不丢弃
+        out2 = self.out2(out1)# 第二个全连接层，输出原始logits，线性变换: [B, hidden_features] -> [B, num_classes]
         output = F.softmax(out2, dim=1)  # 指定softmax维度
         return output
 
