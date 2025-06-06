@@ -487,9 +487,10 @@ register(
 # semi_supervised envs
     # probably the easiest:
 register(
-    id='SemisuperPendulumNoise-v0',
-    entry_point='gym.envs.safety:SemisuperPendulumNoiseEnv',
-    max_episode_steps=200,
+    id='SemisuperPendulumNoise-v0',                # 环境标识符，用于gym.make()
+    entry_point='gym.envs.safety:SemisuperPendulumNoiseEnv',  # 环境类路径
+    max_episode_steps=200,                 # 每个episode最大步数
+                                               # 与标准CartPole保持一致
 )
     # somewhat harder because of higher variance:
 register(
