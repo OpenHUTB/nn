@@ -139,13 +139,13 @@ def predict(model, xs):
 
 def evaluate(ys, ys_pred):
     """评估模型。"""
-    std = np.std(ys - ys_pred)
+    std = np.std(ys - ys_pred)# 计算预测误差的标准差
     return std
 
 
 # 评估指标的计算
-for i in range(1000):
-    loss = train_one_step(model, xs, ys)
+for i in range(1000):# 进行1000次训练迭代
+    loss = train_one_step(model, xs, ys)# 执行单步训练并获取当前损失值
     if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
         print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
                 
