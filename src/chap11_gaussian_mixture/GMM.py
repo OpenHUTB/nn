@@ -82,7 +82,7 @@ def logsumexp(log_p, axis  =1, keepdims = False):
 # 高斯混合模型类
 class GaussianMixtureModel:
     """高斯混合模型(GMM)实现"""
-    def __init__(self, n_components=3, max_iter=100, tol=1e-6):
+    def __init__(self, n_components=3, max_iter=100, tol=1e-6):# 初始化：设定高斯成分数、最大迭代次数和收敛阈值
         
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
