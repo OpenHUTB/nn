@@ -204,6 +204,12 @@ Z = Z.reshape(X.shape)
 plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
 
+# 保存模型
+model.save_weights('softmax_regression_weights')
+
+# 加载模型
+model.load_weights('softmax_regression_weights')
+
 
 # In[ ]:
 
