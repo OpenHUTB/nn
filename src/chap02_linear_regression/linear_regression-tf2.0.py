@@ -146,8 +146,8 @@ def evaluate(ys, ys_pred):
 # 评估指标的计算
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
-    if i % 100 == 1:
-        print(f"loss is {loss:.4}")
+    if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
+        print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
                 
 y_preds = predict(model, xs)
 std = evaluate(ys, y_preds)
