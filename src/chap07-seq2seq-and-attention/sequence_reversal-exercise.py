@@ -99,8 +99,8 @@ class mySeq2SeqModel(keras.Model):
         # 解码器RNN层：与编码器类似
         self.decoder = tf.keras.layers.RNN(
             self.decoder_cell,
-            return_sequences=True,
-            return_state=True
+            return_sequences = True,
+            return_state = True
         )
 
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
