@@ -267,12 +267,14 @@ with tf.GradientTape() as tape:
     x, W1, W2, label = tf.constant(x), tf.constant(W1), tf.constant(W2), tf.constant(label)
     tape.watch(W1)
     tape.watch(W2)
+    # 构建与手动实现相同的计算图
     h1 = tf.matmul(x, W1)
     h1_relu = tf.nn.relu(h1)
     h2 = tf.matmul(h1_relu, W2)
     prob = tf.nn.softmax(h2)
     log_prob = tf.math.log(prob)
     loss = tf.reduce_sum(label * log_prob)
+    # 计算损失函数对prob的梯度（自动微分）
     grads = tape.gradient(loss, [prob])
     print (grads[0].numpy())
 
