@@ -53,150 +53,150 @@ register(
 
 register(
     id='CartPole-v0',
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=200,
-    reward_threshold=195.0,
+    entry_point = 'gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps = 200,
+    reward_threshold = 195.0,
 )
 
 register(
-    id='CartPole-v1',
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=500,
-    reward_threshold=475.0,
+    id = 'CartPole-v1',
+    entry_point = 'gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps = 500,
+    reward_threshold = 475.0,
 )
 
 register(
-    id='MountainCar-v0',
-    entry_point='gym.envs.classic_control:MountainCarEnv',
-    max_episode_steps=200,
-    reward_threshold=-110.0,
+    id = 'MountainCar-v0',
+    entry_point = 'gym.envs.classic_control:MountainCarEnv',
+    max_episode_steps = 200,
+    reward_threshold = -110.0,
 )
 
 register(
-    id='MountainCarContinuous-v0',
-    entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
-    max_episode_steps=999,
-    reward_threshold=90.0,
+    id = 'MountainCarContinuous-v0',
+    entry_point = 'gym.envs.classic_control:Continuous_MountainCarEnv',
+    max_episode_steps = 999,
+    reward_threshold = 90.0,
 )
 
 register(
-    id='Pendulum-v0',
-    entry_point='gym.envs.classic_control:PendulumEnv',
-    max_episode_steps=200,
+    id = 'Pendulum-v0',
+    entry_point = 'gym.envs.classic_control:PendulumEnv',
+    max_episode_steps = 200,
 )
 
 register(
-    id='Acrobot-v1',
-    entry_point='gym.envs.classic_control:AcrobotEnv',
-    max_episode_steps=500,
+    id = 'Acrobot-v1',
+    entry_point = 'gym.envs.classic_control:AcrobotEnv',
+    max_episode_steps = 500,
 )
 
 # Box2d
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',
-    entry_point='gym.envs.box2d:LunarLander',
-    max_episode_steps=1000,
-    reward_threshold=200,
+    id = 'LunarLander-v2',
+    entry_point = 'gym.envs.box2d:LunarLander',
+    max_episode_steps = 1000,
+    reward_threshold = 200,
 )
 
 register(
-    id='LunarLanderContinuous-v2',
-    entry_point='gym.envs.box2d:LunarLanderContinuous',
-    max_episode_steps=1000,
-    reward_threshold=200,
+    id = 'LunarLanderContinuous-v2',
+    entry_point = 'gym.envs.box2d:LunarLanderContinuous',
+    max_episode_steps = 1000,
+    reward_threshold = 200,
 )
 
 register(
-    id='BipedalWalker-v2',
-    entry_point='gym.envs.box2d:BipedalWalker',
-    max_episode_steps=1600,
-    reward_threshold=300,
+    id = 'BipedalWalker-v2',
+    entry_point = 'gym.envs.box2d:BipedalWalker',
+    max_episode_steps = 1600,
+    reward_threshold = 300,
 )
 
 register(
-    id='BipedalWalkerHardcore-v2',
-    entry_point='gym.envs.box2d:BipedalWalkerHardcore',
-    max_episode_steps=2000,
-    reward_threshold=300,
+    id = 'BipedalWalkerHardcore-v2',
+    entry_point = 'gym.envs.box2d:BipedalWalkerHardcore',
+    max_episode_steps = 2000,
+    reward_threshold = 300,
 )
 
 register(
-    id='CarRacing-v0',
-    entry_point='gym.envs.box2d:CarRacing',
-    max_episode_steps=1000,
-    reward_threshold=900,
+    id = 'CarRacing-v0',
+    entry_point = 'gym.envs.box2d:CarRacing',
+    max_episode_steps = 1000,
+    reward_threshold = 900,
 )
 
 # Toy Text
 # ----------------------------------------
 
 register(
-    id='Blackjack-v0',
-    entry_point='gym.envs.toy_text:BlackjackEnv',
+    id = 'Blackjack-v0',
+    entry_point = 'gym.envs.toy_text:BlackjackEnv',
 )
 
 register(
-    id='KellyCoinflip-v0',
-    entry_point='gym.envs.toy_text:KellyCoinflipEnv',
-    reward_threshold=246.61,
+    id = 'KellyCoinflip-v0',
+    entry_point = 'gym.envs.toy_text:KellyCoinflipEnv',
+    reward_threshold = 246.61,
 )
 register(
-    id='KellyCoinflipGeneralized-v0',
-    entry_point='gym.envs.toy_text:KellyCoinflipGeneralizedEnv',
-)
-
-register(
-    id='FrozenLake-v0',
-    entry_point='gym.envs.toy_text:FrozenLakeEnv',
-    kwargs={'map_name' : '4x4'},
-    max_episode_steps=100,
-    reward_threshold=0.78, # optimum = .8196
+    id = 'KellyCoinflipGeneralized-v0',
+    entry_point = 'gym.envs.toy_text:KellyCoinflipGeneralizedEnv',
 )
 
 register(
-    id='FrozenLake8x8-v0',
-    entry_point='gym.envs.toy_text:FrozenLakeEnv',
-    kwargs={'map_name' : '8x8'},
-    max_episode_steps=200,
-    reward_threshold=0.99, # optimum = 1
+    id = 'FrozenLake-v0',
+    entry_point = 'gym.envs.toy_text:FrozenLakeEnv',
+    kwargs = {'map_name' : '4x4'},
+    max_episode_steps = 100,
+    reward_threshold = 0.78, # optimum = .8196
 )
 
 register(
-    id='CliffWalking-v0',
-    entry_point='gym.envs.toy_text:CliffWalkingEnv',
+    id = 'FrozenLake8x8-v0',
+    entry_point = 'gym.envs.toy_text:FrozenLakeEnv',
+    kwargs = {'map_name' : '8x8'},
+    max_episode_steps = 200,
+    reward_threshold = 0.99, # optimum = 1
 )
 
 register(
-    id='NChain-v0',
-    entry_point='gym.envs.toy_text:NChainEnv',
-    max_episode_steps=1000,
+    id = 'CliffWalking-v0',
+    entry_point = 'gym.envs.toy_text:CliffWalkingEnv',
 )
 
 register(
-    id='Roulette-v0',
-    entry_point='gym.envs.toy_text:RouletteEnv',
-    max_episode_steps=100,
+    id = 'NChain-v0',
+    entry_point = 'gym.envs.toy_text:NChainEnv',
+    max_episode_steps = 1000,
 )
 
 register(
-    id='Taxi-v2',
-    entry_point='gym.envs.toy_text.taxi:TaxiEnv',
-    reward_threshold=8, # optimum = 8.46
-    max_episode_steps=200,
+    id = 'Roulette-v0',
+    entry_point = 'gym.envs.toy_text:RouletteEnv',
+    max_episode_steps = 100,
 )
 
 register(
-    id='GuessingGame-v0',
-    entry_point='gym.envs.toy_text.guessing_game:GuessingGame',
-    max_episode_steps=200,
+    id = 'Taxi-v2',
+    entry_point = 'gym.envs.toy_text.taxi:TaxiEnv',
+    reward_threshold = 8, # optimum = 8.46
+    max_episode_steps = 200,
 )
 
 register(
-    id='HotterColder-v0',
-    entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
-    max_episode_steps=200,
+    id = 'GuessingGame-v0',
+    entry_point = 'gym.envs.toy_text.guessing_game:GuessingGame',
+    max_episode_steps = 200,
+)
+
+register(
+    id = 'HotterColder-v0',
+    entry_point = 'gym.envs.toy_text.hotter_colder:HotterColder',
+    max_episode_steps = 200,
 )
 
 # Mujoco
@@ -205,59 +205,59 @@ register(
 # 2D
 
 register(
-    id='Reacher-v1',
-    entry_point='gym.envs.mujoco:ReacherEnv',
-    max_episode_steps=50,
-    reward_threshold=-3.75,
+    id = 'Reacher-v1',
+    entry_point = 'gym.envs.mujoco:ReacherEnv',
+    max_episode_steps = 50,
+    reward_threshold = -3.75,
 )
 
 register(
-    id='Pusher-v0',
-    entry_point='gym.envs.mujoco:PusherEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    id = 'Pusher-v0',
+    entry_point = 'gym.envs.mujoco:PusherEnv',
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 register(
-    id='Thrower-v0',
-    entry_point='gym.envs.mujoco:ThrowerEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    id = 'Thrower-v0',
+    entry_point = 'gym.envs.mujoco:ThrowerEnv',
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 register(
-    id='Striker-v0',
-    entry_point='gym.envs.mujoco:StrikerEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    id = 'Striker-v0',
+    entry_point = 'gym.envs.mujoco:StrikerEnv',
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 register(
-    id='InvertedPendulum-v1',
-    entry_point='gym.envs.mujoco:InvertedPendulumEnv',
-    max_episode_steps=1000,
-    reward_threshold=950.0,
+    id = 'InvertedPendulum-v1',
+    entry_point = 'gym.envs.mujoco:InvertedPendulumEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 950.0,
 )
 
 register(
-    id='InvertedDoublePendulum-v1',
-    entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
-    max_episode_steps=1000,
-    reward_threshold=9100.0,
+    id = 'InvertedDoublePendulum-v1',
+    entry_point = 'gym.envs.mujoco:InvertedDoublePendulumEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 9100.0,
 )
 
 register(
-    id='HalfCheetah-v1',
-    entry_point='gym.envs.mujoco:HalfCheetahEnv',
-    max_episode_steps=1000,
-    reward_threshold=4800.0,
+    id = 'HalfCheetah-v1',
+    entry_point = 'gym.envs.mujoco:HalfCheetahEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 4800.0,
 )
 
 register(
-    id='Hopper-v1',
-    entry_point='gym.envs.mujoco:HopperEnv',
-    max_episode_steps=1000,
-    reward_threshold=3800.0,
+    id = 'Hopper-v1',
+    entry_point = 'gym.envs.mujoco:HopperEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 3800.0,
 )
 
 register(
