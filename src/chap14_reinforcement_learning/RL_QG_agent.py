@@ -72,7 +72,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
-        q_vals = self.sess.run(self.q_values, feed_dict = {self.input_state: state_input})
+        q_vals = self.sess.run(self.q_values, feed_dict = {self.input_states: state_input})
         
         # 过滤合法动作并选择最优
         

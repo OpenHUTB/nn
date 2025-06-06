@@ -159,28 +159,44 @@ class mySeq2SeqModel(keras.Model):
 @tf.function
 #这段代码定义了一个计算分类任务损失值的函数 compute_loss，主要用于神经网络训练时评估预测结果与真实标签之间的差异。
 def compute_loss(logits, labels):
+    # 计算每个位置上的交叉熵损失
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 对整个批次求平均
     losses = tf.reduce_mean(losses)
     return losses
-
+    
+# 使用图执行模式优化训练步骤
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
+     # 创建梯度记录环境
     with tf.GradientTape() as tape:
+          # 前向传播：获取模型预测
         logits = model(enc_x, dec_x)
+        # 计算损失
         loss = compute_loss(logits, y)
 
     # compute gradient
+    # 计算损失对可训练参数的梯度
     grads = tape.gradient(loss, model.trainable_variables)
+    # 应用梯度更新模型参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
 
 def train(model, optimizer, seqlen):
     loss = 0.0
     accuracy = 0.0
+        # 循环2000个训练步骤
     for step in range(2000):
+        # 获取一个批次的数据：
+        # batched_examples: 原始字符串样本列表
+        # enc_x: 编码器输入序列
+        # dec_x: 解码器输入序列
+        # y: 目标输出序列
         batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
+        # 执行训练步骤
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+        # 每500步打印一次进度
         if step % 500 == 0:
             print('step', step, ': loss', loss.numpy())
     return loss
@@ -206,19 +222,29 @@ train(model, optimizer, seqlen=20)
 
 def sequence_reversal():
     def decode(init_state, steps, enc_out):
+        # 获取批次大小
         b_sz = tf.shape(init_state[0])[0]
+        # 初始化解码器输入：全0（表示起始符）
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
         state = init_state
-        collect = []
+        collect = [] # 收集每一步生成的token
+        # 逐步生成序列
         for i in range(steps):
+             # 获取下一个token和新的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
+            # 收集当前步生成的token
             collect.append(tf.expand_dims(cur_token, axis=-1))
+            # 拼接所有生成的token [batch_size, steps]
         out = tf.concat(collect, axis=-1).numpy()
+        # 将索引转换为字符：
+        # 假设索引1对应'A'，2对应'B'，依此类推  
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
-    
+     # 获取测试批次（仅使用编码器输入）
     batched_examples, enc_x, _, _ = get_batch(32, 20)
+    # 编码输入序列
     enc_out, state = model.encode(enc_x)
+    # 解码生成逆置序列
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
 
 def is_reverse(seq, rev_seq):# 将待检测序列反转（使用列表推导式+reversed函数实现字符串反转）

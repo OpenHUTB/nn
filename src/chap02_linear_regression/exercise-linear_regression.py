@@ -39,7 +39,7 @@ def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    #可以替换成 x = identity_basis(x)
+    # 可以替换成 x = identity_basis(x)
     # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
@@ -169,7 +169,13 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
 
 
 def main(x_train, y_train, use_gradient_descent=False):
-    """训练模型，并返回从x到y的映射。"""
+    """训练模型，并返回从x到y的映射。
+    流程:
+    1. 选择基函数（默认恒等基）
+    2. 构建设计矩阵 φ = [1, basis_func(x)]
+    3. 使用最小二乘或梯度下降求解权重 w
+    4. 返回预测函数 f(x) = φ(x) · w
+    """
     # 默认使用恒等基函数
     basis_func = identity_basis  
 
@@ -205,8 +211,10 @@ def main(x_train, y_train, use_gradient_descent=False):
         phi1 = basis_func(x)
         # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
         phi = np.concatenate([phi0, phi1], axis=1)
+        # 判断是否使用梯度下降算法，并且 w_gd 是否已经定义，如果使用梯度下降算法，并且 w_gd 已经定义，则使用 w_gd 进行预测
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
+        # 如果不使用梯度下降算法，或者 w_gd 没有定义，则使用最小二乘法得到的权重 w_lsq 进行预测
         else:
             return np.dot(phi, w_lsq)
 
@@ -273,11 +281,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    #plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
-    #plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
-    #plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
-    #plt.xlabel("x")  # 设置x轴的标签
-    #plt.ylabel("y")  # 设置y轴的标签
-    #plt.title("Linear Regression")  # 设置图表标题
-    #plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义 # 添加图例，表示每条线的含义
     plt.show()

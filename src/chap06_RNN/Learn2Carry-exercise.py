@@ -53,7 +53,8 @@ def convertNum2Digits(Num):
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''
-    digitStrs = [str(o) for o in Digits]
+    
+    digitStrs = [str(o) for o in Digits] # 转换为字符串列表
     numStr = ''.join(digitStrs)
     Num = int(numStr)
     return Num
@@ -165,6 +166,7 @@ def train(steps, model, optimizer):
             
     return loss
 
+#定义了一个名为 evaluate 的函数，其核心功能是评估一个神经网络模型在大数加法任务上的准确率。
 def evaluate(model):
     datas = gen_data_batch(batch_size = 2000, start = 555555555, end = 999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
