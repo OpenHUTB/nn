@@ -51,8 +51,8 @@ def weight_variable(shape):
 
 
 def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    initial = tf.constant(0.1, shape=shape)# 使用常数 0.1 初始化偏置，避免神经元输出为 0（死亡神经元问题）
+    return tf.Variable(initial)# 创建可训练的 TensorFlow 变量
 
 def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     """
