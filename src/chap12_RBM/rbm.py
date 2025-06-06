@@ -18,7 +18,7 @@ class RBM:
         ValueError: 若输入参数非正整数则抛出异常
         """
         # 参数验证：确保隐藏层和可见层单元数量为正整数
-        if not (isinstance(n_hidden, int) and n_hidden > 0):
+        if not (isinstance(n_hidden, int) and n_hidden > 0): # 检查 n_hidden 是否为正整数（类型为 int 且大于 0）
             raise ValueError("隐藏层单元数量 n_hidden 必须为正整数")
         if not (isinstance(n_observe, int) and n_observe > 0):
             raise ValueError("可见层单元数量 n_observe 必须为正整数")
