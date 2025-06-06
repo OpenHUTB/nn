@@ -124,12 +124,12 @@ train_data, test_data = mnist_dataset()
 for epoch in range(50):
     # 执行一次训练步骤，传入模型、优化器、训练数据及标签
     loss, accuracy = train_one_step(model, optimizer, 
-                                    tf.constant(train_data[0], dtype=tf.float32),  # 图像数据
-                                    tf.constant(train_data[1], dtype=tf.int64))    # 图像数据
+                                    tf.constant(train_data[0], dtype = tf.float32),  # 图像数据
+                                    tf.constant(train_data[1], dtype = tf.int64))    # 图像数据
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 # 在测试集上测试模型
 loss, accuracy = test(model, 
-                      tf.constant(test_data[0], dtype=tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，数据类型为float32
-                      tf.constant(test_data[1], dtype=tf.int64))    # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
+                      tf.constant(test_data[0], dtype = tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，数据类型为float32
+                      tf.constant(test_data[1], dtype = tf.int64))    # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
 
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
