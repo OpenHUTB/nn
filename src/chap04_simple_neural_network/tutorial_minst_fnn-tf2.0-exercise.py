@@ -35,9 +35,9 @@ class myModel:
     def __init__(self):
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
-        # 定义第一层的权重矩阵
+        # 定义第一层的权重矩阵 ; 权重矩阵 W1 的形状为 [784, 128]，初始值为均值为 0，标准差为 0.1 的正态分布随机数
         self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
-        # 定义第一层的偏置向量
+        # 定义第一层的偏置向量 ; 偏置向量 b1 的形状为 [128]，初始化为全 0
         self.b1 = tf.Variable(tf.zeros([128]))
         # 定义第二层的权重矩阵
         self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
@@ -45,13 +45,23 @@ class myModel:
         self.b2 = tf.Variable(tf.zeros([10]))
         
     def __call__(self, x):
-        '''实现模型函数体，返回未归一化的 logits ，这里未实现具体运算逻辑，需补充'''
-        # logits = None
-        # return logits
+        '''实现模型函数体，返回未归一化的 logits ，这里未实现具体运算逻辑，需补充
+        参数：
+            x : Tensor
+            输入数据，形状为 [batch_size, 28, 28]（例如 28x28 像素的灰度图像）
+
+        返回：
+            logits : Tensor
+            未经过归一化的输出 logits，形状为 [batch_size, 10]（对应 10 个分类的得分）
+        '''
         # 展平为[batch_size, 784]
         x = tf.reshape(x, [-1, 784])
-        # 隐藏层+ReLU
+        
+        # 隐藏层+ReLU,隐藏层计算：
+        # 通过矩阵乘法（x @ self.W1）加上偏置项 self.b1，得到隐藏层的加权和
+        # 使用 ReLU 激活函数增加非线性
         h = tf.nn.relu(x @ self.W1 + self.b1) 
+        
         # 输出层（未归一化）
         logits = h @ self.W2 + self.b2         
         return logits

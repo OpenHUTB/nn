@@ -13,9 +13,11 @@ from gym.utils import seeding
 def make_random_policy(np_random):
     def random_policy(state, player_color):
         possible_places = ReversiEnv.get_possible_actions(state, player_color)
-        # No places left
+        # 没有可落子位置，返回"pass"动作
         if len(possible_places) == 0:
-            return d**2 + 1
+            d = state.shape[-1]#动态获取棋盘的边长
+            return d**2 + 1    # pass动作
+        # 随机选择一个可能的动作
         a = np_random.randint(len(possible_places))
         return possible_places[a]
     return random_policy
@@ -30,16 +32,17 @@ class ReversiEnv(gym.Env):
 
     def __init__(self, player_color, opponent, observation_type, illegal_place_mode, board_size):
         """
-        Args:
-            player_color: Stone color for the agent. Either 'black' or 'white'
-            opponent: An opponent policy
-            observation_type: State encoding
-            illegal_place_mode: What to do when the agent makes an illegal place. Choices: 'raise' or 'lose'
-            board_size: size of the Reversi board
+        参数:
+            player_color: 代理(玩家)的棋子颜色，'black'或'white'
+            opponent: 对手策略，可以是'random'或自定义策略函数
+            observation_type: 状态编码方式，目前仅支持'numpy3c'
+            illegal_place_mode: 处理非法落子的方式，'lose'(自动输)或'raise'(抛出异常)
+            board_size: 棋盘大小，默认8x8
         """
         assert isinstance(board_size, int) and board_size >= 1, 'Invalid board size: {}'.format(board_size)
         self.board_size = board_size
 
+        # 将颜色字符串映射为内部表示
         colormap = {
             'black': ReversiEnv.BLACK,
             'white': ReversiEnv.WHITE,

@@ -129,11 +129,16 @@ def compute_loss(pred, labels, num_classes=3):
     # 计算准确率，比较模型预测的类别和真实类别是否一致
     acc = tf.reduce_mean(
         tf.cast(
-            tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
+            tf.equal(
+                tf.argmax(pred, axis=1),
+                tf.argmax(one_hot_labels, axis=1)
+            ),
             dtype=tf.float32,
         )
     )
-    
+    # 返回损失值和准确率
+    # loss: 预先计算好的损失值（如交叉熵损失）
+    # acc: 当前批次的分类准确率（0-1 标量）
     return loss, acc
 
 @tf.function
@@ -148,12 +153,12 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :return: 当前批次的损失与准确率
     """
     with tf.GradientTape() as tape:
-        predictions = model(x_batch)
-        loss, accuracy = compute_loss(predictions, y_batch)
+        predictions = model(x_batch)# 前向传播：计算模型对输入批次的预测
+        loss, accuracy = compute_loss(predictions, y_batch)# 计算损失和准确率
 
-    grads = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    return loss, accuracy
+    grads = tape.gradient(loss, model.trainable_variables)# 自动计算损失函数对模型参数的梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))# 优化步骤：使用优化器将计算出的梯度应用到模型参数上
+    return loss, accuracy# 返回当前批次的损失和准确率
 
 # ### 实例化一个模型，进行训练，提取所需的数据
 
@@ -198,8 +203,14 @@ Z = np.argmax(Z, axis=1)
 # 重塑为网络形状
 Z = Z.reshape(X.shape)
 # 绘制决策边界
-plt.contour(X, Y, Z)
+plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
+
+# 保存模型
+model.save_weights('softmax_regression_weights')
+
+# 加载模型
+model.load_weights('softmax_regression_weights')
 
 
 # In[ ]:

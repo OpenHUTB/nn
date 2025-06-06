@@ -54,8 +54,8 @@ def weight_variable(shape):
 
 
 def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    initial = tf.constant(0.1, shape=shape)# 使用常数 0.1 初始化偏置，避免神经元输出为 0（死亡神经元问题）
+    return tf.Variable(initial)# 创建可训练的 TensorFlow 变量
 
 def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     """
@@ -69,6 +69,9 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
         
     返回:
         tf.Tensor: 卷积结果
+    异常:
+        ValueError: 如果 padding 不是 'SAME' 或 'VALID'，会抛出异常。
+        TypeError: 如果输入参数类型不正确，会抛出异常。
     """
     # 每一维度滑动步长全部是 1， padding 方式选择 same
     # 提示 使用函数  tf.nn.conv2d
@@ -76,10 +79,17 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     # 验证输入类型
     if not tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
+
+    if not tf.is_tensor(W):
+        raise TypeError(f"Expected W to be a tf.Tensor, but got {type(W)}.")
     
-    # 验证padding参数
+    # 验证padding参数,如果 padding 无效，抛出 ValueError 异常并提供详细信息
     if padding not in ['SAME', 'VALID']:
         raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
+
+    # 验证 strides 参数的格式，应该是一个长度为4的列表
+    if len(strides) != 4:
+        raise ValueError(f"Strides should be a list of length 4, but got list of length {len(strides)}.")
     
     # 执行卷积操作
     conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
@@ -90,11 +100,27 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     
     return conv
     
-def max_pool_2x2(x):
-    # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
-    # 提示 使用函数  tf.nn.max_pool
+def max_pool_2x2(x: tf.Tensor,
+    pool_size: int = 2,
+    strides: int = 2,
+    padding: str = 'SAME',
+    data_format: str = 'NHWC'
+) -> tf.Tensor:
+    # 验证参数合法性
+    if padding not in ['SAME', 'VALID']:
+        raise ValueError(f"padding must be 'SAME' or 'VALID', got {padding}.")
+    if data_format not in ['NHWC', 'NCHW']:
+        raise ValueError(f"data_format must be 'NHWC' or 'NCHW', got {data_format}.")
     
-    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    # 构造池化核和步长参数
+    if data_format == 'NHWC':
+        ksize = [1, pool_size, pool_size, 1]
+        strides = [1, strides, strides, 1]
+    else:  # NCHW
+        ksize = [1, 1, pool_size, pool_size]
+        strides = [1, 1, strides, strides]
+    
+    return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
 
 # define placeholder for inputs to network
 xs = tf.placeholder(tf.float32, [None, 784]) / 255.
@@ -140,7 +166,9 @@ b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 # 交叉熵函数
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),reduction_indices=[1]))
+cross_entropy = tf.reduce_mean(
+    -tf.reduce_sum(ys * tf.log(prediction),reduction_indices=[1])
+)
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
 with tf.Session() as sess:

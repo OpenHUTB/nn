@@ -77,21 +77,30 @@ class LogisticRegression():
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
             initial_value=tf.random.uniform(
-                shape=[2, 1], minval=-0.1, maxval=0.1
+                shape = [2, 1], minval = -0.1, maxval = 0.1
             ),
             regularizer=l2_reg
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
-            shape=[1], 
-            dtype=tf.float32, 
-            initial_value=tf.zeros(shape=[1])
+            shape = [1], 
+            dtype = tf.float32, 
+            initial_value = tf.zeros(shape=[1])
         )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
 
     @tf.function
     def __call__(self, inp):
+        """
+           计算神经网络模型的前向传播过程，包括输入数据与权重的矩阵乘法、加偏置、然后应用sigmoid激活函数。
+    
+           参数:
+               inp (tf.Tensor): 输入数据，形状通常为(N, D)，其中N是样本数，D是特征维度。
+    
+           返回:
+                tf.Tensor: 预测的概率值，形状为(N, 1)，值在[0, 1]之间。
+        """
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
         logits = tf.matmul(inp, self.W) + self.b 
         # 对logits应用sigmoid函数，得到预测概率
@@ -177,8 +186,8 @@ if __name__ == '__main__':
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
     # 创建图形
-    f, ax = plt.subplots(figsize=(6, 4))
-    f.suptitle('Logistic Regression Example', fontsize=15)
+    f, ax = plt.subplots(figsize=(6, 4)) # 创建一个图形和坐标轴
+    f.suptitle('Logistic Regression Example', fontsize=15) # 设置图形的标题
     plt.ylabel('Y')
     plt.xlabel('X')
     ax.set_xlim(0, 10)
@@ -195,9 +204,19 @@ if __name__ == '__main__':
     )
 
     def init():
+        """
+        初始化动画所需的图形元素
+        该函数将所有动态绘图对象的数据清空，为动画初始化做准备
+        通常用于 Matplotlib 的 FuncAnimation 初始化函数
+        """
+        # 清空线条对象的数据（x, y 坐标）
         line_d.set_data([], [])
+        # 清空类别1的散点数据（C1）
         C1_dots.set_data([], [])
+        # 清空类别2的散点数据（C2）
         C2_dots.set_data([], [])
+        # 返回所有需要动画更新的图形对象（打包为元组）
+        # Matplotlib 动画要求返回值为 Artist 对象的集合
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
     def animate(i):
@@ -217,6 +236,6 @@ if __name__ == '__main__':
 
     anim = animation.FuncAnimation(
         f, animate, init_func=init,
-        frames=len(animation_frames), interval=30, blit=True
+        frames=len(animation_frames), interval=50, blit=True, repeat=False
     )
     HTML(anim.to_html5_video())
