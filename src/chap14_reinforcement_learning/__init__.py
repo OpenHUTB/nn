@@ -141,12 +141,12 @@ register(
 )
 
 register(
-    id='KellyCoinflip-v0',
+    id='KellyCoinflip-v0',   # 凯利判赌任务
     entry_point='gym.envs.toy_text:KellyCoinflipEnv',
     reward_threshold=246.61,
 )
 register(
-    id='KellyCoinflipGeneralized-v0',
+    id='KellyCoinflipGeneralized-v0',    # 通用凯利判赌
     entry_point='gym.envs.toy_text:KellyCoinflipGeneralizedEnv',
 )
 
