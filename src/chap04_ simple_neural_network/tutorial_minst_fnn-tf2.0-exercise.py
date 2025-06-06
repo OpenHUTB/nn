@@ -15,6 +15,12 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
 def mnist_dataset():
+   """
+    加载MNIST数据集并进行预处理：
+    - 划分训练集和测试集
+    - 像素值归一化到[0, 1]区间
+    - 保持原始数据类型（图像为float32，标签为int64）
+    """
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
     
