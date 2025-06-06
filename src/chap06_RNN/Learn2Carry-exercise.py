@@ -118,6 +118,17 @@ class myRNNModel(keras.Model):
         '''
         此处完成上述图中模型
         '''
+        emb1 = self.embed_layer(num1)  # shape: (batch, seq_len, 32)
+        emb2 = self.embed_layer(num2)  # shape: (batch, seq_len, 32)
+
+        # 拼接两个数字的嵌入向量
+        emb = tf.concat([emb1, emb2], axis=-1)  # shape: (batch, seq_len, 64)
+
+        # RNN 输出
+        rnn_out = self.rnn_layer(emb)  # shape: (batch, seq_len, 64)
+
+        # 全连接层预测每一位的数字（0-9）
+        logits = self.dense(rnn_out)  # shape: (batch, seq_len, 10)
         return logits
 
 
