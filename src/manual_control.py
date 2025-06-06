@@ -317,9 +317,13 @@ class World(object):
         self.player.get_world().set_weather(preset[0])
 
     def next_map_layer(self, reverse=False):
+        # 根据reverse参数决定增加或减少当前地图层索引
         self.current_map_layer += -1 if reverse else 1
+        # 使用取模运算确保索引在有效范围内循环
         self.current_map_layer %= len(self.map_layer_names)
+        # 获取当前选择的地图层名称
         selected = self.map_layer_names[self.current_map_layer]
+        # 显示HUD通知，告知用户当前选择的地图层
         self.hud.notification('LayerMap selected: %s' % selected)
 
     def load_map_layer(self, unload=False):
