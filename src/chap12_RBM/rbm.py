@@ -7,15 +7,15 @@ class RBM:
     """Restricted Boltzmann Machine."""
 
     def __init__(self, n_hidden=2, n_observe=784):
-    """
-    初始化受限玻尔兹曼机（RBM）模型参数
+        """
+        初始化受限玻尔兹曼机（RBM）模型参数
 
-    Args:
-        n_hidden (int): 隐藏层单元数量（默认 2）
-        n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
+        Args:
+            n_hidden (int): 隐藏层单元数量（默认 2）
+            n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
 
-    Raises:
-        ValueError: 若输入参数非正整数则抛出异常
+        Raises:
+            ValueError: 若输入参数非正整数则抛出异常
         """
         # 参数验证：确保隐藏层和可见层单元数量为正整数
         if not (isinstance(n_hidden, int) and n_hidden > 0):
@@ -146,17 +146,16 @@ class RBM:
 if __name__ == '__main__':
     try:
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
-    mnist = np.load('mnist_bin.npy')  # 60000x28x28
+      mnist = np.load('mnist_bin.npy')  # 60000x28x28
     except IOError:
-    print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
-    sys.exit(1)
+      print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
+      sys.exit(1)
     n_imgs, n_rows, n_cols = mnist.shape
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
-
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 
