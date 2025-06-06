@@ -269,7 +269,6 @@ print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])# 列表�
 print(list(zip(*sequence_reversal())))# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
 
 
-# In[ ]:
 
 
 
