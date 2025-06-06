@@ -107,7 +107,7 @@ model.compile(optimizer=optimizer,
               metrics=['accuracy'])
 train_ds, test_ds = cifar10_dataset()
 model.fit(train_ds, epochs=10)
-model.evaluate(test_ds)
+model.evaluate(test_ds) #模型评估
 
 # In[20]:
 import numpy
