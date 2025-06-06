@@ -169,7 +169,13 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
 
 
 def main(x_train, y_train, use_gradient_descent=False):
-    """训练模型，并返回从x到y的映射。"""
+    """训练模型，并返回从x到y的映射。
+    流程:
+    1. 选择基函数（默认恒等基）
+    2. 构建设计矩阵 φ = [1, basis_func(x)]
+    3. 使用最小二乘或梯度下降求解权重 w
+    4. 返回预测函数 f(x) = φ(x) · w
+    """
     # 默认使用恒等基函数
     basis_func = identity_basis  
 
