@@ -98,7 +98,7 @@ def train_one_step(model, xs, ys):
     # 在梯度带(GradientTape)上下文中记录前向计算过程
     with tf.GradientTape() as tape:
         y_preds = model(xs)    # 模型前向传播计算预测值
-        loss = tf.reduce_mean(tf.sqrt(1e-12 + (ys - y_preds) ** 2))    #计算损失函数
+        loss = tf.keras.losses.MSE(ys, y_preds)   #计算损失函数
     grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
     optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
     return loss
@@ -112,7 +112,7 @@ def predict(model, xs):
 
 def evaluate(ys, ys_pred):
     """评估模型。"""
-    std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
+    std = np.std(ys - ys_pred)
     return std
 
 
