@@ -80,6 +80,45 @@ class mySeq2SeqModel(keras.Model):
         完成带attention机制的 sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好，
         用双线性attention，或者自己改一下`__init__`函数做加性attention
         '''
+        # 编码阶段
+        enc_emb = self.embed_layer(enc_ids)  # shape(b_sz, enc_len, emb_sz)
+        enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (b_sz, enc_len, hidden)
+    
+    # 解码阶段
+        dec_emb = self.embed_layer(dec_ids)  # shape(b_sz, dec_len, emb_sz)
+        dec_len = tf.shape(dec_ids)[1]
+    
+    # 初始化解码器状态为编码器的最终状态
+        state = enc_state
+        outputs = []
+    
+    # 对每个解码时间步进行处理
+        for t in range(dec_len):
+        # 获取当前时间步的输入
+           current_emb = dec_emb[:, t, :]  # (b_sz, emb_sz)
+        
+        # 计算注意力权重
+        # 使用双线性注意力: score = h_t^T * W * h_s
+           attn_scores = tf.matmul(enc_out, tf.expand_dims(self.dense_attn(state[0]), -1))  # (b_sz, enc_len, 1)
+           attn_weights = tf.nn.softmax(attn_scores, axis=1)  # (b_sz, enc_len, 1)
+        
+        # 计算上下文向量
+           context = tf.reduce_sum(attn_weights * enc_out, axis=1)  # (b_sz, hidden)
+        
+        # 解码器输入 = 当前嵌入 + 上下文向量
+           decoder_input = tf.concat([current_emb, context], axis=-1)
+        
+        # 单步解码
+           output, state = self.decoder_cell(decoder_input, state)
+        
+        # 保存当前时间步的输出
+           outputs.append(tf.expand_dims(output, axis=1))
+    
+    # 拼接所有时间步的输出
+        decoder_outputs = tf.concat(outputs, axis=1)  # (b_sz, dec_len, hidden)
+    
+    # 通过全连接层生成logits
+        logits = self.dense(decoder_outputs)  # (b_sz, dec_len, v_sz)
         return logits
     
     
@@ -93,6 +132,28 @@ class mySeq2SeqModel(keras.Model):
         '''
         shape(x) = [b_sz,] 
         '''
+        # 嵌入当前输入token
+        x_emb = self.embed_layer(x)  # (b_sz, emb_sz)
+    
+    # 计算注意力权重
+        attn_scores = tf.matmul(enc_out, tf.expand_dims(self.dense_attn(state[0]), -1))  # (b_sz, enc_len, 1)
+        attn_weights = tf.nn.softmax(attn_scores, axis=1)  # (b_sz, enc_len, 1)
+    
+    # 计算上下文向量
+        context = tf.reduce_sum(attn_weights * enc_out, axis=1)  # (b_sz, hidden)
+    
+    # 解码器输入 = 当前嵌入 + 上下文向量
+        decoder_input = tf.concat([x_emb, context], axis=-1)
+    
+    # 单步解码
+        output, state = self.decoder_cell(decoder_input, state)
+    
+    # 通过全连接层生成logits
+        logits = self.dense(output)  # (b_sz, v_sz)
+    
+    # 选择概率最高的token
+        out = tf.argmax(logits, axis=-1)  # (b_sz,)
+    
     
         '''
         todo
