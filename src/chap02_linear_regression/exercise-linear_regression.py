@@ -35,7 +35,7 @@ def identity_basis(x):
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
-def multinomial_basis(x, feature_num=10):
+def multinomial_basis(x, feature_num = 10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
@@ -53,7 +53,7 @@ def multinomial_basis(x, feature_num=10):
     return ret
 
 
-def gaussian_basis(x, feature_num=10):
+def gaussian_basis(x, feature_num = 10):
     """
     高斯基函数：将输入映射为一组高斯函数响应
     """
@@ -76,7 +76,7 @@ def gaussian_basis(x, feature_num=10):
 # 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 
-def least_squares(phi, y, alpha=0.0, solver="pinv"):
+def least_squares(phi, y, alpha = 0.0, solver = "pinv"):
     """
     带正则化的最小二乘法优化，支持多种求解器
 
@@ -168,15 +168,15 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
     return w
 
 
-def main(x_train, y_train, use_gradient_descent=False):
+def main(x_train, y_train, use_gradient_descent = False):
     """训练模型，并返回从x到y的映射。"""
     # 默认使用恒等基函数
     basis_func = identity_basis  
 
     # 生成偏置项和特征矩阵
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
     phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1)
+    phi = np.concatenate([phi0, phi1], axis = 1)
 
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
@@ -189,7 +189,7 @@ def main(x_train, y_train, use_gradient_descent=False):
         # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
         epochs = 1000  
         w_gd = np.zeros(phi.shape[1])
-        w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
+        w_gd = gradient_descent(phi, y_train, lr = 0.001, epochs = 5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
         for epoch in range(epochs): 
             y_pred = np.dot(phi, w_gd)
@@ -200,11 +200,11 @@ def main(x_train, y_train, use_gradient_descent=False):
     # 定义预测函数
     def f(x):
         # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        phi0 = np.expand_dims(np.ones_like(x), axis = 1)
         # 调用basis_func函数，对输入x进行某种变换，得到基函数的值
         phi1 = basis_func(x)
-        # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
-        phi = np.concatenate([phi0, phi1], axis=1)
+        # 将phi0和phi1沿着列方向（axis = 1）拼接起来，形成设计矩阵phi
+        phi = np.concatenate([phi0, phi1], axis = 1)
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
         else:
@@ -259,14 +259,14 @@ if __name__ == "__main__":
 
     # 显示结果
 
-    plt.plot(x_train, y_train, "ro", markersize=3)  #  红色点为训练集数据
+    plt.plot(x_train, y_train, "ro", markersize = 3)  #  红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
     plt.xlabel("x")  # 设置x轴的标签
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
+    plt.plot(x_train, y_train, "ro", markersize = 3)  # 红色点为训练集数据
     plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
     plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
     plt.xlabel("x")  # 设置x轴的标签
