@@ -34,9 +34,7 @@ def softmax(x):
     
     # 计算softmax值，添加小的epsilon值避免除零错误
     sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
-    prob_x = exp_x / (sum_exp + 1e-10)
-    
-    return prob_x
+    return exp_x / (sum_exp + 1e-10)
 
 # 测试 softmax 实现是否正确，使用随机数据对比 TensorFlow 的实现
 test_data = np.random.normal(size=[10, 5])
