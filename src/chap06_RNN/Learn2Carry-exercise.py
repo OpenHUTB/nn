@@ -146,7 +146,7 @@ class myRNNModel(keras.Model):
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits = logits , labels = labels)
-    return tf.reduce_mean(losses)
+    return tf.reduce_mean(losses) # 返回平均损失
 
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
