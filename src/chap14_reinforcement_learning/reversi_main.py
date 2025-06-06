@@ -29,13 +29,9 @@ for i_episode in range(max_epochs):
 
         ################### 黑棋（随机策略） ###################
         env.render()  # 打印当前棋盘状态
-        
-        # 获取当前黑棋可落子的位置列表
-        # enables是一个包含合法位置索引的列表
-        enables = env.possible_actions  
-        
-        # 判断是否有合法落子的位置
-        if len(enables) == 0:
+        enables = env.possible_actions  # 获取当前黑棋可落子的位置列表
+
+        if len(enables) == 0:# 判断是否有合法落子的位置
             # 没有可落子位置，则选择“跳过”操作，编码为 board_size^2 + 1
             action_ = env.board_size**2 + 1
         else:
