@@ -55,23 +55,23 @@ register(
 register(
     id='CartPole-v0',  # 倒立摆平衡任务
     entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=200,  # 200步达标
-    reward_threshold=195.0,
+    max_episode_steps = 200,  # 200步达标
+    reward_threshold = 195.0,
 )
 
 
 register(
     id='CartPole-v1',  # 更高难度版本
     entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=500,  # 500步达标
-    reward_threshold=475.0,
+    max_episode_steps = 500,  # 500步达标
+    reward_threshold = 475.0,
 )
 
 register(
     id='MountainCar-v0',  # 山车任务：爬坡
-    entry_point='gym.envs.classic_control:MountainCarEnv',
-    max_episode_steps=200,
-    reward_threshold=-110.0,  # 负数表示尽量减少步数
+    entry_point = 'gym.envs.classic_control:MountainCarEnv',
+    max_episode_steps = 200,
+    reward_threshold = -110.0,  # 负数表示尽量减少步数
 )
 register(
     id='MountainCarContinuous-v0',    # 连续动作版本
