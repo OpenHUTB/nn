@@ -91,9 +91,9 @@ class mySeq2SeqModel(keras.Model):
         self.encoder = tf.keras.layers.RNN(
             self.encoder_cell,
             # 返回每个时间步的输出
-            return_sequences=True,
+            return_sequences = True,
             # 还返回最终隐藏状态
-            return_state=True
+            return_state = True
         )
 
         # 解码器RNN层：与编码器类似
