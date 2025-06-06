@@ -113,7 +113,8 @@ def compute_loss(logits, labels):
             logits=logits, labels=labels)
     losses = tf.reduce_mean(losses)
     return losses
-
+    
+# 使用图执行模式优化训练步骤
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     with tf.GradientTape() as tape:
