@@ -118,17 +118,17 @@ register(
 )
 
 register(
-    id='BipedalWalkerHardcore-v2',
+    id='BipedalWalkerHardcore-v2',   # 困难版本
     entry_point='gym.envs.box2d:BipedalWalkerHardcore',
     max_episode_steps=2000,
-    reward_threshold=300,
+    reward_threshold=300,  
 )
 
 register(
-    id='CarRacing-v0',
+    id='CarRacing-v0',    # 赛车游戏
     entry_point='gym.envs.box2d:CarRacing',
     max_episode_steps=1000,
-    reward_threshold=900,
+    reward_threshold=900,   # 完成赛道得分
 )
 
 # Toy Text
