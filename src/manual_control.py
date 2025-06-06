@@ -1022,12 +1022,12 @@ class GnssSensor(object):
         self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
 
     @staticmethod
-    def _on_gnss_event(weak_self, event):
-        self = weak_self()
-        if not self:
+    def _on_gnss_event(weak_self, event): # GNSS 事件回调函数（静态方法）
+        self = weak_self()                # 从弱引用获取实际实例
+        if not self:                      # 如果实例已被销毁，则直接返回
             return
-        self.lat = event.latitude
-        self.lon = event.longitude
+        self.lat = event.latitude         # 将事件中的纬度值赋值给对象的lat属性
+        self.lon = event.longitude        # 将事件中的经度值赋值给对象的lon属性
 
 
 # ==============================================================================
