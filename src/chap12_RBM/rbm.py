@@ -121,12 +121,11 @@ class RBM:
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
-
-        # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（模拟初始图像）
+        # 初始化可见层：使用伯努利分布随机生成二值向量（每个像素有50%概率为1）
+        # n_observe是可见层神经元数量（28x28=784）
         v = np.random.binomial(1, 0.5, self.n_observe)
 
-
-        # 进行1000次 Gibbs 采样迭代，以逐步趋近真实数据分布
+        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布
         for _ in xrange(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
