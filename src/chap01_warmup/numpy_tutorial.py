@@ -102,7 +102,7 @@ print("第十二题：\n")
 x = np.array([1.0, 2.0])
 print("输出:", type(x))
 
-# 13.执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype = np.float64)，然后输出 x+y ,和 np.add(x,y)
+# 13.执行 x = np.array([[1, 2], [3, 4]], dtype = np.float64) ，y = np.array([[5, 6], [7, 8]], dtype = np.float64)，然后输出 x+y ,和 np.add(x,y)
 print("第十三题：\n")
 
 x = np.array([[1, 2], [3, 4]], dtype = np.float64)# 创建一个二维的 NumPy 数组 x，其元素为 [[1, 2], [3, 4]]，数据类型指定为 np.float64（双精度浮点数）
@@ -146,15 +146,15 @@ print("np.dot(x,y)\n", np.dot(x, y))  # 使用np.dot函数进行矩阵乘法
 print("第十九题：\n")
 
 print("print(np.sum(x)):", np.sum(x))  # 所有元素求和
-print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
-print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 按行求和（行维度）
+print("print(np.sum(x, axis = 0))", np.sum(x, axis = 0))  # 按列求和（列维度）
+print("print(np.sum(x, axis = 1))", np.sum(x, axis = 1))  # 按行求和（行维度）
 
 # 20.利用13题目中的 x,进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
 print("第二十题：\n")
 
 print("print(np.mean(x))", np.mean(x))  # 全局均值
-print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 列均值
-print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行均值
+print("print(np.mean(x,axis = 0))", np.mean(x, axis = 0))  # 列均值
+print("print(np.mean(x,axis = 1))", np.mean(x, axis = 1))  # 行均值
 
 # 21.利用13题目中的x，对x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("第二十一题：\n")
@@ -170,8 +170,8 @@ print(np.exp(x))
 # 23.利用13题目中的 x,求值最大的下标（提示(1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
 print("全局最大值的下标:", np.argmax(x))# 打印整个数组 x 中最大值的下标
-print("每列最大值的下标:", np.argmax(x, axis=0))# 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-print("每行最大值的下标:", np.argmax(x, axis=1))# 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
+print("每列最大值的下标:", np.argmax(x, axis = 0))# 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
+print("每行最大值的下标:", np.argmax(x, axis = 1))# 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
 # 24.画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 print("第二十四题：\n")
@@ -179,8 +179,8 @@ print("第二十四题：\n")
 x = np.arange(0, 100, 0.1) #生成从0到99.9的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
 y = x * x #计算每个 x 对应的y=x^2 的值
 
-plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
-plt.plot(x, y, label="y = x^2", color="blue")  # 制蓝色曲线，并设置图例标签为y = x^2
+plt.figure(figsize = (10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
+plt.plot(x, y, label = "y = x^2", color = "blue")  # 制蓝色曲线，并设置图例标签为y = x^2
 
 # 添加标题和标签
 plt.title("Plot of y = x^2")  # 图像标题
@@ -188,10 +188,10 @@ plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 
 # 显示半透明网格线
-plt.grid(True, alpha=0.5)
+plt.grid(True, alpha = 0.5)
 
 # 在右上角显示图例
-plt.legend(loc='upper right')
+plt.legend(loc = 'upper right')
 
 plt.show() #显示绘制的图像
 
