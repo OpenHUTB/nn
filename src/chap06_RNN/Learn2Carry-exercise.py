@@ -3,18 +3,15 @@
 # # 加法进位实验
 #
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
-
 # In[1]:
-
 
 import numpy as np
 import tensorflow as tf
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers
-from tensorflow.keras import layers, optimizers, datasets
+from tensorflow.keras import layers, optimizers, datasets   # 导入特定组件
 import os,sys,tqdm
-
 
 # ## 数据生成
 # 我们随机在 `start->end`之间采样除整数对`(num1, num2)`，计算结果`num1+num2`作为监督信号。
