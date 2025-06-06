@@ -4,154 +4,158 @@ from gym.envs.registration import registry, register, make, spec
 # ----------------------------------------
 
 register(
-    id='Copy-v0',
-    entry_point='gym.envs.algorithmic:CopyEnv',
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    id = 'Copy-v0',
+    entry_point = 'gym.envs.algorithmic:CopyEnv',
+    max_episode_steps = 200,
+    reward_threshold = 25.0,
 )
 
 register(
-    id='RepeatCopy-v0',
-    entry_point='gym.envs.algorithmic:RepeatCopyEnv',
-    max_episode_steps=200,
-    reward_threshold=75.0,
+    id = 'RepeatCopy-v0',
+    entry_point = 'gym.envs.algorithmic:RepeatCopyEnv',
+    max_episode_steps = 200,
+    reward_threshold = 75.0,
+)
+
+
+register(
+    id = 'ReversedAddition-v0',
+    entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
+    kwargs = {'rows' : 2},
+    max_episode_steps = 200,
+    reward_threshold = 25.0,
 )
 
 register(
-    id='ReversedAddition-v0',
-    entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs={'rows' : 2},
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    id = 'ReversedAddition3-v0',
+    entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
+    kwargs = {'rows' : 3},
+    max_episode_steps = 200,
+    reward_threshold = 25.0,
 )
 
 register(
-    id='ReversedAddition3-v0',
-    entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs={'rows' : 3},
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    id = 'DuplicatedInput-v0',
+    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',
+    max_episode_steps = 200,
+    reward_threshold = 9.0,
 )
 
 register(
-    id='DuplicatedInput-v0',
-    entry_point='gym.envs.algorithmic:DuplicatedInputEnv',
-    max_episode_steps=200,
-    reward_threshold=9.0,
-)
-
-register(
-    id='Reverse-v0',
-    entry_point='gym.envs.algorithmic:ReverseEnv',
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    id = 'Reverse-v0',
+    entry_point = 'gym.envs.algorithmic:ReverseEnv',
+    max_episode_steps = 200,
+    reward_threshold = 25.0,
 )
 
 # Classic
 # ----------------------------------------
+# 经典控制环境：基于数学模型的控制问题
 
 register(
-    id='CartPole-v0',
+    id='CartPole-v0',  # 倒立摆平衡任务
     entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=200,
+    max_episode_steps=200,  # 200步达标
     reward_threshold=195.0,
 )
 
+
 register(
-    id='CartPole-v1',
+    id='CartPole-v1',  # 更高难度版本
     entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=500,
+    max_episode_steps=500,  # 500步达标
     reward_threshold=475.0,
 )
 
 register(
-    id='MountainCar-v0',
+    id='MountainCar-v0',  # 山车任务：爬坡
     entry_point='gym.envs.classic_control:MountainCarEnv',
     max_episode_steps=200,
-    reward_threshold=-110.0,
+    reward_threshold=-110.0,  # 负数表示尽量减少步数
 )
-
 register(
-    id='MountainCarContinuous-v0',
+    id='MountainCarContinuous-v0',    # 连续动作版本
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
     max_episode_steps=999,
     reward_threshold=90.0,
 )
 
 register(
-    id='Pendulum-v0',
+    id='Pendulum-v0',   # 钟摆任务：摆到垂直位置
     entry_point='gym.envs.classic_control:PendulumEnv',
     max_episode_steps=200,
 )
 
 register(
-    id='Acrobot-v1',
+    id='Acrobot-v1',     # 双连杆机械臂任务
     entry_point='gym.envs.classic_control:AcrobotEnv',
     max_episode_steps=500,
 )
 
 # Box2d
+# Box2d物理引擎环境：复杂物理模拟任务
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',
+    id='LunarLander-v2',    # 月球着陆器
     entry_point='gym.envs.box2d:LunarLander',
     max_episode_steps=1000,
-    reward_threshold=200,
+    reward_threshold=200,   # 成功着陆得分
 )
 
 register(
-    id='LunarLanderContinuous-v2',
+    id='LunarLanderContinuous-v2',   # 连续控制版本
     entry_point='gym.envs.box2d:LunarLanderContinuous',
     max_episode_steps=1000,
     reward_threshold=200,
 )
 
 register(
-    id='BipedalWalker-v2',
+    id='BipedalWalker-v2',   # 双足步行机器人
     entry_point='gym.envs.box2d:BipedalWalker',
     max_episode_steps=1600,
-    reward_threshold=300,
+    reward_threshold=300,     # 完成步行得分
 )
 
 register(
-    id='BipedalWalkerHardcore-v2',
+    id='BipedalWalkerHardcore-v2',   # 困难版本
     entry_point='gym.envs.box2d:BipedalWalkerHardcore',
     max_episode_steps=2000,
-    reward_threshold=300,
+    reward_threshold=300,  
 )
 
 register(
-    id='CarRacing-v0',
+    id='CarRacing-v0',    # 赛车游戏
     entry_point='gym.envs.box2d:CarRacing',
     max_episode_steps=1000,
-    reward_threshold=900,
+    reward_threshold=900,   # 完成赛道得分
 )
 
 # Toy Text
+# 文本类简单环境：离散状态空间
 # ----------------------------------------
 
 register(
-    id='Blackjack-v0',
+    id='Blackjack-v0',    # 21点游戏
     entry_point='gym.envs.toy_text:BlackjackEnv',
 )
 
 register(
-    id='KellyCoinflip-v0',
+    id='KellyCoinflip-v0',   # 凯利判赌任务
     entry_point='gym.envs.toy_text:KellyCoinflipEnv',
     reward_threshold=246.61,
 )
 register(
-    id='KellyCoinflipGeneralized-v0',
+    id='KellyCoinflipGeneralized-v0',    # 通用凯利判赌
     entry_point='gym.envs.toy_text:KellyCoinflipGeneralizedEnv',
 )
 
 register(
-    id='FrozenLake-v0',
+    id='FrozenLake-v0',   # 冰湖行走任务
     entry_point='gym.envs.toy_text:FrozenLakeEnv',
-    kwargs={'map_name' : '4x4'},
+    kwargs={'map_name' : '4x4'},   # 4x4网格
     max_episode_steps=100,
-    reward_threshold=0.78, # optimum = .8196
+    reward_threshold=0.78, # optimum = .8196   # 成功到达目标的平均奖励
 )
 
 register(
@@ -305,10 +309,10 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
     'solaris', 'space_invaders', 'star_gunner', 'tennis', 'time_pilot', 'tutankham', 'up_n_down',
     'venture', 'video_pinball', 'wizard_of_wor', 'yars_revenge', 'zaxxon']:
     for obs_type in ['image', 'ram']:
-        # space_invaders should yield SpaceInvaders-v0 and SpaceInvaders-ram-v0
-        name = ''.join([g.capitalize() for g in game.split('_')])
+        # 生成标准环境名称（如 SpaceInvaders-v0）
+        name = ''.join(g.capitalize() for g in game.split('_'))
         if obs_type == 'ram':
-            name = '{}-ram'.format(name)
+            name = f'{name}-ram'  # RAM观测版本添加-ram后缀
 
         nondeterministic = False
         if game == 'elevator_action' and obs_type == 'ram':
@@ -504,14 +508,14 @@ register(
 
 register(
     id='OffSwitchCartpoleProb-v0',
-    entry_point='gym.envs.safety:OffSwitchCartpoleProbEnv',
-    max_episode_steps=200,
+    entry_point = 'gym.envs.safety:OffSwitchCartpoleProbEnv',
+    max_episode_steps = 200,
 )
 
 register(
     id='Reversi8x8-v0',
-    entry_point='gym.envs.reversi:ReversiEnv',
-    kwargs={
+    entry_point = 'gym.envs.reversi:ReversiEnv',
+    kwargs = {
         'player_color': 'black',
         'opponent': 'random',
         'observation_type': 'numpy3c',

@@ -36,3 +36,80 @@
 1. Learning to Play Othello with Deep Neural Networks
 2. Reinforcement Learning in the Game of Othello: Learning Against a Fixed Opponent and Learning from Self-Play
 
+# RL_QG_agent.py 文件说明文档
+
+## 项目简介
+
+`RL_QG_agent` 是一个使用卷积神经网络（CNN）结构实现的强化学习智能体，用于黑白棋（Reversi）对局决策。该模型采用 TensorFlow 1.x 构建，能够根据输入棋盘状态预测每个位置的 Q 值，从而选择最优落子位置。
+
+## 文件结构
+
+```
+your_project/
+│
+├── RL_QG_agent.py         # 主模型文件
+├── Reversi/               # 模型保存目录，自动创建
+│   └── parameter.ckpt     # 保存的模型参数（运行后生成）
+└── README.md              # 使用说明文档
+```
+
+## 模型结构
+
+* 输入：`[None, 8, 8, 3]`，表示一个 8x8 棋盘（当前玩家棋子、对手棋子、合法落子位置）
+* 网络结构：
+
+  * Conv2D (32 filters, 3x3, relu)
+  * Conv2D (64 filters, 3x3, relu)
+  * Flatten
+  * Dense (512 units, relu)
+  * Dense (64 units) → 每个格子的 Q 值
+
+## 使用说明
+
+### 初始化模型
+
+```python
+from RL_QG_agent import RL_QG_agent
+
+agent = RL_QG_agent()
+agent.init_model()
+```
+
+### 保存模型
+
+```python
+agent.save_model()
+```
+
+### 加载模型
+
+```python
+agent.load_model()
+```
+
+### 推理落子
+
+```python
+# 输入state为形状(8, 8, 3)的 numpy 数组
+# enables 为合法位置的掩码（bool 类型，shape 为 (64,)）
+action = agent.place(state, enables)
+# 返回 0~63 之间的动作编号，代表应落子的格子
+```
+
+## 注意事项
+
+* **TensorFlow 版本要求**：必须使用 **TensorFlow 1.x**，如 `1.15`。
+* 模型保存路径为当前目录下的 `Reversi/parameter.ckpt`。
+* `state` 输入为 `[8, 8, 3]`，每个通道通常表示：
+
+  * 通道 0：当前玩家棋子（1为有子，0为无）
+  * 通道 1：对手棋子
+  * 通道 2：当前可落子位置（1为可落子）
+* `enables` 应为布尔数组，表示 64 个位置是否合法（例如 `np.array([0, 1, 0, ..., 0])`）
+
+## 待完善项（建议）
+
+* 支持训练功能（当前模型仅包含推理功能）
+* 增加模型评估与训练数据生成模块
+* 可视化 Q 值输出（便于分析）
+

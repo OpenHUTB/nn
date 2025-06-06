@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding: utf-8
 
 # # 诗歌生成
 # # 数据处理
 
 # In[1]:
-#导入了多个用于构建和训练深度学习模型的Python库和模块
+# 导入了多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
 import tensorflow as tf
 import collections
@@ -37,7 +37,7 @@ def process_dataset(fileName):
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            # 过滤过长的诗歌
+            ### 过滤过长的诗歌
             if len(ins) > 200:
 
                 continue
@@ -49,13 +49,16 @@ def process_dataset(fileName):
         for w in e:
             counter[w] += 1
     
-    # 按词频从高到低排序
+    ## 按词频从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+    
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)
     words = ('PAD', 'UNK') + words[:len(words)]
+    
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
+    
     # 创建id到词语的映射
     id2word = {word2id[k]:k for k in word2id}
     
@@ -65,7 +68,7 @@ def process_dataset(fileName):
     # 记录每个诗歌的长度
     seqlen = [len(e) for e in indexed_examples]
     
-    # 组合诗歌数据和对应长度
+    #  组合诗歌数据和对应长度
     instances = list(zip(indexed_examples, seqlen))
     
     return instances, word2id, id2word
@@ -200,7 +203,9 @@ def reduce_avg(reduce_target, lengths, dim):
     Returns:
         掩码后的平均值
     """
+    # 获取长度张量的形状
     shape_of_lengths = lengths.get_shape()
+    # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
@@ -223,8 +228,11 @@ def reduce_avg(reduce_target, lengths, dim):
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
 
+    # 在指定维度上求和（不保留归约后的维度）
     red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
+    # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）
     red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
+    # 返回计算得到的平均值张量
     return red_avg
 
 
@@ -320,30 +328,38 @@ for epoch in range(10):
 
 # In[74]:
 
-def gen_sentence():
-    """使用训练好的模型生成诗歌
-    
+def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int = 50) -> str:
+    """使用训练好的RNN模型生成诗歌
+
+    Args:
+        model: 训练好的诗歌生成模型
+        word2id: 词语到id的映射字典
+        id2word: id到词语的映射字典
+        max_len: 生成诗歌的最大长度，默认为50
+
     Returns:
-        生成的诗歌字符串
+        str: 生成的诗歌字符串（不包含开始和结束标记）
     """
-    # 初始化RNN状态
-    state = [tf.random.normal(shape=(1, 128), stddev=0.5), 
+    # 初始化RNN隐藏状态
+    state = [tf.random.normal(shape=(1, 128), stddev=0.5),
              tf.random.normal(shape=(1, 128), stddev=0.5)]
-    # 从开始标记开始
-    cur_token = tf.constant([word2id['bos']], dtype=tf.int32)
-    collect = []
-    
-    # 生成最多50个词
-    for _ in range(50):
-        # 预测下一个词
+
+    # 从开始标记开始生成
+    cur_token = tf.constant([word2id[start_token]], dtype=tf.int32)
+    generated_tokens = []
+
+    # 循环生成直到遇到结束标记或达到最大长度
+    for _ in range(max_len):
         cur_token, state = model.get_next_token(cur_token, state)
-        collect.append(cur_token.numpy()[0])
-        # 遇到结束标记则停止
-        if id2word[collect[-1]] == 'eos':
+        token_id = cur_token.numpy()[0]
+        generated_tokens.append(token_id)
+
+        # 遇到结束标记则停止生成
+        if id2word[token_id] == end_token:
             break
-    
-    # 将id序列转换为词语
-    return [id2word[t] for t in collect]
+
+    # 转换为词语并拼接成字符串
+    return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
 print(''.join(gen_sentence()))
