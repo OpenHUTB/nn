@@ -730,21 +730,25 @@ class HUD(object):
         self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
         self._notifications = FadingText(font, (width, 40), (0, height - 40))
         self.help = HelpText(pygame.font.Font(mono, 16), width, height)
-        self.server_fps = 0
-        self.frame = 0
-        self.simulation_time = 0
-        self._show_info = True
-        self._info_text = []
+
+        # 性能指标初始化
+        self.server_fps = 0       # 服务器帧率
+        self.frame = 0            # 当前帧数 
+        self.simulation_time = 0  # 仿真运行时间
+
+        # 显示控制
+        self._show_info = True    # 是否显示信息面板
+        self._info_text = []      # 信息面板内容缓存 
         self._server_clock = pygame.time.Clock()
 
         self._show_ackermann_info = False
         self._ackermann_control = carla.VehicleAckermannControl()
 
-    def on_world_tick(self, timestamp):
-        self._server_clock.tick()
-        self.server_fps = self._server_clock.get_fps()
-        self.frame = timestamp.frame
-        self.simulation_time = timestamp.elapsed_seconds
+    def on_world_tick(self, timestamp): # 世界更新回调函数
+        self._server_clock.tick()       # 更新服务器时钟
+        self.server_fps = self._server_clock.get_fps()   # 计算服务器FPS
+        self.frame = timestamp.frame    # 更新当前帧数
+        self.simulation_time = timestamp.elapsed_seconds # 更新仿真时间
 
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
