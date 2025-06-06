@@ -219,10 +219,13 @@ train(model, optimizer, seqlen=20)
 
 def sequence_reversal():
     def decode(init_state, steps, enc_out):
+        # 获取批次大小
         b_sz = tf.shape(init_state[0])[0]
+        # 初始化解码器输入：全0（表示起始符）
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
         state = init_state
-        collect = []
+        collect = [] # 收集每一步生成的token
+        # 逐步生成序列
         for i in range(steps):
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
             collect.append(tf.expand_dims(cur_token, axis=-1))
