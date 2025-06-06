@@ -38,8 +38,11 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         tuple: 包含三个numpy数组的元组(numbers_1, numbers_2, results)，
                每个数组形状为(batch_size,)
     """
+    
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
+    
+      # 计算两数之和
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
 
