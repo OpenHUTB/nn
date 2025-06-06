@@ -23,7 +23,7 @@ import numpy as np
 dot_num = 100  
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
 x_p = np.random.normal(
-    3.0, 1, dot_num
+    3.0, 1, dot_num  # Python的random模块提供了一系列用于生成伪随机数的函数，并非真随机
 ) 
 # x和y坐标
 y_p = np.random.normal(6.0, 1, dot_num)
