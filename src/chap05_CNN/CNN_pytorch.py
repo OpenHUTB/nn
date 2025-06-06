@@ -5,11 +5,11 @@
 import os
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.utils.data as Data
 import torchvision  # 包含常用的数据集和模型
 import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
 import numpy as np
+from torch.autograd import Variable
 
 # 设置超参数
 learning_rate = 1e-4  #  学习率
