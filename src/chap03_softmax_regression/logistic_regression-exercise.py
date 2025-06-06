@@ -227,7 +227,7 @@ if __name__ == '__main__':
         yy = a/-b * xx + c/-b       # 计算直线方程 y = (-a/b)x + (-c/b)
         line_d.set_data(xx, yy)     # 更新直线数据
         C1_dots.set_data(C1[:, 0], C1[:, 1]) # 更新C1和C2散点数据
-        C2_dots.set_data(C2[:, 0], C2[:, 1])
+        C2_dots.set_data(C2[:, 0], C2[:, 1]) # 更新C2散点数据
         frame_text.set_text(        # 更新帧文本信息，显示当前时间步和损失值
             'Timestep = %.1d/%.1d\nLoss = %.3f' % 
             (i, len(animation_frames), animation_frames[i][3])
