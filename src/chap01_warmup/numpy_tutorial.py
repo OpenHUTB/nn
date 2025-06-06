@@ -5,7 +5,6 @@
 # 1. 导入 numpy 库
 import numpy as np  # 将 numpy 库命名为 np
 
-
 import matplotlib
 import matplotlib.pyplot as plt  # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
@@ -131,91 +130,90 @@ print("第十六题：\n")
 print("x/y\n", x / y)  # 逐元素除法
 print("np.divide(x,y)\n", np.divide(x, y))  # 逐元素除法
 
-# 17. 利用 13 题目中的 x, 输出 x 的 开方。(提示： 使用函数 np.sqrt() )
+# 17. 数组开方
 print("第十七题：\n")
 
-print("np.sqrt(x)\n", np.sqrt(x))
+print("np.sqrt(x)\n", np.sqrt(x))  # 对每个元素开平方
 
-# 18. 利用 13 题目中的 x,y , 执行 print(x.dot(y)) 和 print(np.dot(x,y))
+# 18. 矩阵乘法
 print("第十八题：\n")
 
-print("x.dot(y)\n", x.dot(y))  # 使用 dot 方法进行矩阵乘法
-print("np.dot(x,y)\n", np.dot(x, y))  # 使用 np.dot 函数进行矩阵乘法
+print("x.dot(y)\n", x.dot(y))  # 矩阵乘法
+print("np.dot(x,y)\n", np.dot(x, y))  # 同上
 
-# 19. 利用 13 题目中的 x, 进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
+# 19. 数组求和
 print("第十九题：\n")
 
 print("print(np.sum(x)):", np.sum(x))  # 所有元素求和
-print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
-print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 按行求和（行维度）
+print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和
+print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 按行求和
 
-# 20. 利用 13 题目中的 x, 进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
+# 20. 数组求平均
 print("第二十题：\n")
 
-print("print(np.mean(x))", np.mean(x))  # 全局均值
-print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 列均值
-print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行均值
+print("print(np.mean(x))", np.mean(x))  # 全局平均
+print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 列平均
+print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行平均
 
-# 21. 利用 13 题目中的 x，对 x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
+# 21. 矩阵转置
 print("第二十一题：\n")
+print("x 转置后的结果:\n", x.T)  # 行列互换
 
-print("x 转置后的结果:\n", x.T)
-
-# 22. 利用 13 题目中的 x, 求 e 的指数（提示： 函数 np.exp()）
+# 22. 指数运算
 print("第二十二题：\n")
 
 print("e 的指数：np.exp(x)")  
-print(np.exp(x))
+print(np.exp(x))  # 对每个元素求e的指数
 
-# 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
+# 23. 最大值索引
 print("第二十三题：\n")
-print("全局最大值的下标:", np.argmax(x))  # 打印整个数组 x 中最大值的下标
-print("每列最大值的下标:", np.argmax(x, axis=0))  # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-print("每行最大值的下标:", np.argmax(x, axis=1))  # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
-# 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
+print("全局最大值的下标:", np.argmax(x))  # 整个数组中最大值的索引
+print("每列最大值的下标:", np.argmax(x, axis=0))  # 每列最大值的索引
+print("每行最大值的下标:", np.argmax(x, axis=1))  # 每行最大值的索引
+
+# 24. 绘制二次函数图像
 print("第二十四题：\n")
 
-x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
-y = x * x  # 计算每个 x 对应的 y=x^2 的值
+# 生成x值（0到100，步长0.1）
+x = np.arange(0, 100, 0.1)
+# 计算y=x^2
+y = x * x
 
-plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
-plt.plot(x, y, label="y = x^2", color="blue")  # 绘制蓝色曲线，并设置图例标签为 y = x^2
-
+# 创建图形窗口
+plt.figure(figsize=(10, 6))
+# 绘制曲线
+plt.plot(x, y, label="y = x^2", color="blue")
 # 添加标题和标签
-plt.title("Plot of y = x^2")  # 图像标题
-plt.xlabel("x")  # x 轴标签
-plt.ylabel("y")  # y 轴标签
-
-# 显示半透明网格线
+plt.title("Plot of y = x^2")
+plt.xlabel("x")
+plt.ylabel("y")
+# 添加网格和图例
 plt.grid(True, alpha=0.5)
-
-# 在右上角显示图例
 plt.legend(loc='upper right')
+# 显示图形
+plt.show()
 
-plt.show()  # 显示绘制的图像
-
-# 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
+# 25. 绘制正弦和余弦函数
 print("第二十五题：\n")
 
-x = np.arange(0, 3 * np.pi, 0.1)  ## 生成从 0 到 3π 的 x 值，步长为 0.1
-y_sin = np.sin(x)  # 计算对应的正弦值
-y_cos = np.cos(x)  # 计算对应的余弦值
+# 生成x值（0到3π，步长0.1）
+x = np.arange(0, 3 * np.pi, 0.1)
+# 计算正弦和余弦值
+y_sin = np.sin(x)
+y_cos = np.cos(x)
 
-plt.figure(figsize=(10, 6))  # 创建一个图像窗口，设置大小为 10×6 英寸 
-plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
-plt.plot(x, y_cos, label="y = cos(x)", color="red")  # 绘制余弦函数曲线
-
+# 创建图形窗口
+plt.figure(figsize=(10, 6))
+# 绘制两条曲线
+plt.plot(x, y_sin, label="y = sin(x)", color="blue")
+plt.plot(x, y_cos, label="y = cos(x)", color="red")
 # 添加标题和标签
 plt.title("Sine and Cosine Functions")
-plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
-plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
-
-# 添加网格线
+plt.xlabel("x")
+plt.ylabel("y")
+# 添加网格和图例
 plt.grid(True)
-
-# 显示图例
 plt.legend()
-
-# 显示图像
+# 显示图形
 plt.show()
