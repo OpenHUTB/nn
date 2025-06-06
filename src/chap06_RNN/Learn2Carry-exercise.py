@@ -165,6 +165,7 @@ def train(steps, model, optimizer):
             
     return loss
 
+#定义了一个名为 evaluate 的函数，其核心功能是评估一个神经网络模型在大数加法任务上的准确率。
 def evaluate(model):
     datas = gen_data_batch(batch_size = 2000, start = 555555555, end = 999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
