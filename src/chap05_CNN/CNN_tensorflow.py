@@ -153,7 +153,9 @@ b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 # 交叉熵函数
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(ys * tf.log(prediction),reduction_indices=[1]))
+cross_entropy = tf.reduce_mean(
+    -tf.reduce_sum(ys * tf.log(prediction),reduction_indices=[1])
+)
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
 with tf.Session() as sess:
