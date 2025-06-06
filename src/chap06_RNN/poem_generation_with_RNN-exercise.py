@@ -141,7 +141,7 @@ class myRNNModel(keras.Model):
         
         # 3. 输出层：预测下一个词
         logits = self.dense(rnn_out)  # (batch_size, seq_len, vocab_size)
-        return logits
+        return logits, logits
     
     @tf.function
     def get_next_token(self, x, state):
