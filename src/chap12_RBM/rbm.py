@@ -77,7 +77,7 @@ class RBM:
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
                 v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  #将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
                 v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
-                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
+                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       #计算隐藏单元被激活的概率
 
                 # 计算梯度      
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
