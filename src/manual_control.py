@@ -331,13 +331,13 @@ class World(object):
         # 显示HUD通知，告知用户当前选择的地图层
         self.hud.notification('LayerMap selected: %s' % selected)
 
-    def load_map_layer(self, unload=False):
-        selected = self.map_layer_names[self.current_map_layer]
+    def load_map_layer(self, unload=False): # 加载或卸载当前选中的地图图层
+        selected = self.map_layer_names[self.current_map_layer] # 获取当前选中的地图图层名称
         if unload:
-            self.hud.notification('Unloading map layer: %s' % selected)
+            self.hud.notification('Unloading map layer: %s' % selected) # 卸载指定图层，从场景中移除该图层元素
             self.world.unload_map_layer(selected)
         else:
-            self.hud.notification('Loading map layer: %s' % selected)
+            self.hud.notification('Loading map layer: %s' % selected) # 加载指定图层，将其添加到当前场景中
             self.world.load_map_layer(selected)
 
     def toggle_radar(self):
