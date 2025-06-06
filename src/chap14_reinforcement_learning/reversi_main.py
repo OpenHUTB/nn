@@ -43,17 +43,26 @@ for i_episode in range(max_epochs):
         observation, reward, done, info = env.step(action)
 
         ################### 白棋（智能体策略） ###################
+        # 可视化当前棋盘状态，便于调试或展示
         env.render()  # 打印当前棋盘状态
         enables = env.possible_actions  # 获取当前白棋可落子的位置列表
-        if len(enables) == 0:
+        if not enables:
             # 无法落子，执行“跳过”操作
             action_ = env.board_size ** 2 + 1
-        else:
+        else:  
             # 使用训练好的智能体模型选择最佳落子位置
+            # observation: 当前环境观测（如棋盘状态）
+            # enables: 合法动作列表
+            # 返回值: 选中的动作编号（对应enables中的索引）
             action_ = agent.place(observation, enables)
-        action[0] = action_
+            # 构建动作向量 [动作编号, 玩家编号]
+        action[0] = action_ # 落子位置或特殊动作编号
         action[1] = 1  # 设置为白棋
         # 白棋落子并更新环境状态
+        # observation: 更新后的环境观测
+        # reward: 执行动作后获得的奖励（如胜利+1，失败-1）
+        # done: 游戏是否结束
+        # info: 额外信息（如获胜方、结束原因）
         observation, reward, done, info = env.step(action)
 
         # 如果对局结束
@@ -61,7 +70,7 @@ for i_episode in range(max_epochs):
             # 打印游戏结束信息，显示总回合数(t+1是因为索引从0开始)
             print("Episode finished after {} timesteps".format(t+1))
             # 统计黑棋得分（棋盘中为1的个数）
-            black_score = len(np.where(env.state[0,:,:]==1)[0])
+            black_score = len(np.where(env.state[0,:,:] == 1)[0])
             # 判断游戏胜负（棋盘总位置数通常为64）
             if black_score > 32:    # 黑棋数量超过一半
                 print("黑棋赢了！")

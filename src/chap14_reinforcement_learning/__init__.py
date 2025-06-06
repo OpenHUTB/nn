@@ -35,8 +35,8 @@ register(
 )
 
 register(
-    id = 'DuplicatedInput-v0',
-    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',
+    id = 'DuplicatedInput-v0',  # 环境唯一标识符
+    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',  # 环境类的导入路径
     max_episode_steps = 200,
     reward_threshold = 9.0,
 )
@@ -53,18 +53,18 @@ register(
 # 经典控制环境：基于数学模型的控制问题
 
 register(
-    id='CartPole-v0',  # 倒立摆平衡任务
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=200,  # 200步达标
-    reward_threshold=195.0,
+    id = 'CartPole-v0',  # 倒立摆平衡任务
+    entry_point = 'gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps = 200,  # 200步达标
+    reward_threshold = 195.0,
 )
 
 
 register(
-    id='CartPole-v1',  # 更高难度版本
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=500,  # 500步达标
-    reward_threshold=475.0,
+    id = 'CartPole-v1',  # 更高难度版本
+    entry_point = 'gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps = 500,  # 500步达标
+    reward_threshold = 475.0,
 )
 
 register(
@@ -83,7 +83,7 @@ register(
 register(
     id='Pendulum-v0',   # 钟摆任务：摆到垂直位置
     entry_point='gym.envs.classic_control:PendulumEnv',
-    max_episode_steps=200,
+    max_episode_steps = 200,
 )
 
 register(
@@ -97,10 +97,10 @@ register(
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',    # 月球着陆器
-    entry_point='gym.envs.box2d:LunarLander',
-    max_episode_steps=1000,
-    reward_threshold=200,   # 成功着陆得分
+    id = 'LunarLander-v2',    # 月球着陆器
+    entry_point = 'gym.envs.box2d:LunarLander',
+    max_episode_steps = 1000,
+    reward_threshold = 200,   # 成功着陆得分
 )
 
 register(
@@ -152,10 +152,10 @@ register(
 
 register(
     id='FrozenLake-v0',   # 冰湖行走任务
-    entry_point='gym.envs.toy_text:FrozenLakeEnv',
-    kwargs={'map_name' : '4x4'},   # 4x4网格
-    max_episode_steps=100,
-    reward_threshold=0.78, # optimum = .8196   # 成功到达目标的平均奖励
+    entry_point = 'gym.envs.toy_text:FrozenLakeEnv',
+    kwargs = {'map_name' : '4x4'},   # 4x4网格
+    max_episode_steps = 100,
+    reward_threshold = 0.78, # optimum = .8196   # 成功到达目标的平均奖励
 )
 
 register(
@@ -177,17 +177,22 @@ register(
     max_episode_steps=1000,
 )
 
+# 注册后可通过gym.make('Roulette-v0')创建环境实例
 register(
-    id='Roulette-v0',
-    entry_point='gym.envs.toy_text:RouletteEnv',
-    max_episode_steps=100,
+    id='Roulette-v0',  # 环境唯一标识符（在代码中引用的名称
+    entry_point='gym.envs.toy_text:RouletteEnv',  # 环境类的导入路径
+                                                  # 格式为：'包名:类名'
+
+    max_episode_steps=100,              # 每个episode的最大步数
+                                        # 达到此步数后，环境自动终止
+                                        # 防止无限循环，控制训练复杂度
 )
 
 register(
-    id='Taxi-v2',
-    entry_point='gym.envs.toy_text.taxi:TaxiEnv',
+    id='Taxi-v2',  # 环境的唯一标识符
+    entry_point='gym.envs.toy_text.taxi:TaxiEnv',  # 指定环境类的位置
     reward_threshold=8, # optimum = 8.46
-    max_episode_steps=200,
+    max_episode_steps=200,  # 设置每个episode的最大步数为200
 )
 
 register(
@@ -271,16 +276,16 @@ register(
 )
 
 register(
-    id='Walker2d-v1',
-    max_episode_steps=1000,
-    entry_point='gym.envs.mujoco:Walker2dEnv',
+    id = 'Walker2d-v1',
+    max_episode_steps = 1000,
+    entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
 
 register(
-    id='Ant-v1',
-    entry_point='gym.envs.mujoco:AntEnv',
-    max_episode_steps=1000,
-    reward_threshold=6000.0,
+    id = 'Ant-v1',
+    entry_point = 'gym.envs.mujoco:AntEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 6000.0,
 )
 
 register(
@@ -468,23 +473,24 @@ register(
 
 # interpretability envs
 register(
-    id='PredictActionsCartpole-v0',
-    entry_point='gym.envs.safety:PredictActionsCartpoleEnv',
+    id = 'PredictActionsCartpole-v0',
+    entry_point = 'gym.envs.safety:PredictActionsCartpoleEnv',
     max_episode_steps=200,
 )
 
 register(
-    id='PredictObsCartpole-v0',
-    entry_point='gym.envs.safety:PredictObsCartpoleEnv',
+    id = 'PredictObsCartpole-v0',
+    entry_point = 'gym.envs.safety:PredictObsCartpoleEnv',
     max_episode_steps=200,
 )
 
 # semi_supervised envs
     # probably the easiest:
 register(
-    id='SemisuperPendulumNoise-v0',
-    entry_point='gym.envs.safety:SemisuperPendulumNoiseEnv',
-    max_episode_steps=200,
+    id='SemisuperPendulumNoise-v0',                # 环境标识符，用于gym.make()
+    entry_point='gym.envs.safety:SemisuperPendulumNoiseEnv',  # 环境类路径
+    max_episode_steps=200,                 # 每个episode最大步数
+                                               # 与标准CartPole保持一致
 )
     # somewhat harder because of higher variance:
 register(
@@ -503,19 +509,19 @@ register(
 register(
     id='OffSwitchCartpole-v0',
     entry_point='gym.envs.safety:OffSwitchCartpoleEnv',
-    max_episode_steps=200,
+    max_episode_steps = 200,
 )
 
 register(
     id='OffSwitchCartpoleProb-v0',
-    entry_point='gym.envs.safety:OffSwitchCartpoleProbEnv',
-    max_episode_steps=200,
+    entry_point = 'gym.envs.safety:OffSwitchCartpoleProbEnv',
+    max_episode_steps = 200,
 )
 
 register(
     id='Reversi8x8-v0',
-    entry_point='gym.envs.reversi:ReversiEnv',
-    kwargs={
+    entry_point = 'gym.envs.reversi:ReversiEnv',
+    kwargs = {
         'player_color': 'black',
         'opponent': 'random',
         'observation_type': 'numpy3c',

@@ -68,19 +68,19 @@ from __future__ import print_function
 
 import glob
 import os
-import sys
+import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 
 # 获取当前进程ID（便于调试）
-process_id = os.getpid()
-print("Current process id is: ", process_id)
+process_id = os.getpid() # 获取当前运行进程的ID
+print("Current process id is: ", process_id) # 打印进程ID
 
-try:
+try: # 尝试将Carla的egg文件路径添加到Python搜索路径中
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
 except IndexError:
-    pass
+    pass # 若未找到匹配的egg文件，忽略错误
 
 # ==============================================================================
 # -- imports -------------------------------------------------------------------
@@ -169,29 +169,29 @@ def get_actor_display_name(actor, truncate=250):                                
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
-def get_actor_blueprints(world, filter, generation):
-    bps = world.get_blueprint_library().filter(filter)
+def get_actor_blueprints(world, filter, generation):                               # 从Carla仿真环境中获取符合条件的Actor蓝图列表
+    bps = world.get_blueprint_library().filter(filter)                             # 从世界对象中获取蓝图库，并应用过滤器
 
-    if generation.lower() == "all":
+    if generation.lower() == "all":                                                # 如果generation参数为"all"，直接返回所有过滤后的蓝图
         return bps
 
     #  If the filter returns only one bp, we assume that this one needed
     #  and therefore, we ignore the generation
-    if len(bps) == 1:
+    if len(bps) == 1:                                                              # 如果过滤结果仅包含一个蓝图，默认使用该蓝图而忽略generation参数
         return bps
 
     try:
-        int_generation = int(generation)
+        int_generation = int(generation)  # 转换失败返回空列表
         # Check if generation is in available generations
-        if int_generation in [1, 2, 3]:
+        if int_generation in [1, 2, 3]:  # 筛选匹配代数的蓝图
             bps = [x for x in bps if int(x.get_attribute('generation')) == int_generation]
             return bps
         else:
             print("   Warning! Actor Generation is not valid. No actor will be spawned.")
-            return []
+            return []  # 转换失败返回空列表
     except:
         print("   Warning! Actor Generation is not valid. No actor will be spawned.")
-        return []
+        return []  # 转换失败返回空列表
 
 
 #  ==============================================================================
@@ -310,16 +310,25 @@ class World(object):
             self.world.wait_for_tick()
 
     def next_weather(self, reverse=False):
+        # 根据reverse参数决定增加或减少当前天气索引
         self._weather_index += -1 if reverse else 1
+        # 使用取模运算确保索引在有效范围内循环
         self._weather_index %= len(self._weather_presets)
+        # 获取当前选择的天气预设
         preset = self._weather_presets[self._weather_index]
+        # 显示HUD通知，告知用户当前选择的天气
         self.hud.notification('Weather: %s' % preset[1])
+        # 设置游戏世界中的天气为当前选择的天气预设
         self.player.get_world().set_weather(preset[0])
 
     def next_map_layer(self, reverse=False):
+        # 根据reverse参数决定增加或减少当前地图层索引
         self.current_map_layer += -1 if reverse else 1
+        # 使用取模运算确保索引在有效范围内循环
         self.current_map_layer %= len(self.map_layer_names)
+        # 获取当前选择的地图层名称
         selected = self.map_layer_names[self.current_map_layer]
+        # 显示HUD通知，告知用户当前选择的地图层
         self.hud.notification('LayerMap selected: %s' % selected)
 
     def load_map_layer(self, unload=False):
@@ -332,10 +341,14 @@ class World(object):
             self.world.load_map_layer(selected)
 
     def toggle_radar(self):
+        # 检查当前是否没有雷达传感器实例
         if self.radar_sensor is None:
+            # 创建一个新的雷达传感器实例并赋值给self.radar_sensor
             self.radar_sensor = RadarSensor(self.player)
         elif self.radar_sensor.sensor is not None:
+            # 如果雷达传感器存在且其sensor属性不为空，则销毁该传感器
             self.radar_sensor.sensor.destroy()
+            # 将self.radar_sensor设置为None，表示雷达传感器已被移除
             self.radar_sensor = None
 
     def modify_vehicle_physics(self, actor):
@@ -717,21 +730,25 @@ class HUD(object):
         self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
         self._notifications = FadingText(font, (width, 40), (0, height - 40))
         self.help = HelpText(pygame.font.Font(mono, 16), width, height)
-        self.server_fps = 0
-        self.frame = 0
-        self.simulation_time = 0
-        self._show_info = True
-        self._info_text = []
+
+        # 性能指标初始化
+        self.server_fps = 0       # 服务器帧率
+        self.frame = 0            # 当前帧数 
+        self.simulation_time = 0  # 仿真运行时间
+
+        # 显示控制
+        self._show_info = True    # 是否显示信息面板
+        self._info_text = []      # 信息面板内容缓存 
         self._server_clock = pygame.time.Clock()
 
         self._show_ackermann_info = False
         self._ackermann_control = carla.VehicleAckermannControl()
 
-    def on_world_tick(self, timestamp):
-        self._server_clock.tick()
-        self.server_fps = self._server_clock.get_fps()
-        self.frame = timestamp.frame
-        self.simulation_time = timestamp.elapsed_seconds
+    def on_world_tick(self, timestamp): # 世界更新回调函数
+        self._server_clock.tick()       # 更新服务器时钟
+        self.server_fps = self._server_clock.get_fps()   # 计算服务器FPS
+        self.frame = timestamp.frame    # 更新当前帧数
+        self.simulation_time = timestamp.elapsed_seconds # 更新仿真时间
 
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
@@ -990,26 +1007,27 @@ class LaneInvasionSensor(object):
 
 
 class GnssSensor(object):
-    def __init__(self, parent_actor):
-        self.sensor = None
-        self._parent = parent_actor
-        self.lat = 0.0
-        self.lon = 0.0
-        world = self._parent.get_world()
-        bp = world.get_blueprint_library().find('sensor.other.gnss')
+   # GNSS（全球导航卫星系统）传感器类，用于在 CARLA 仿真中模拟 GPS 定位设备
+    def __init__(self, parent_actor): # 初始化 GNSS 传感器
+        self.sensor = None            # 传感器对象占位符
+        self._parent = parent_actor   # 父角色引用
+        self.lat = 0.0                # 纬度（初始值）
+        self.lon = 0.0                # 经度（初始值)
+        world = self._parent.get_world() # 获取父角色所在的世界
+        bp = world.get_blueprint_library().find('sensor.other.gnss') # 从蓝图库中查找 GNSS 传感器蓝图
         self.sensor = world.spawn_actor(bp, carla.Transform(carla.Location(x=1.0, z=2.8)), attach_to=self._parent)
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
-        weak_self = weakref.ref(self)
+        weak_self = weakref.ref(self) # 使用弱引用避免循环引用问题
         self.sensor.listen(lambda event: GnssSensor._on_gnss_event(weak_self, event))
 
     @staticmethod
-    def _on_gnss_event(weak_self, event):
-        self = weak_self()
-        if not self:
+    def _on_gnss_event(weak_self, event): # GNSS 事件回调函数（静态方法）
+        self = weak_self()                # 从弱引用获取实际实例
+        if not self:                      # 如果实例已被销毁，则直接返回
             return
-        self.lat = event.latitude
-        self.lon = event.longitude
+        self.lat = event.latitude         # 将事件中的纬度值赋值给对象的lat属性
+        self.lon = event.longitude        # 将事件中的经度值赋值给对象的lon属性
 
 
 # ==============================================================================

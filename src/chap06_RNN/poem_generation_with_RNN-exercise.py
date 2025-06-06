@@ -29,7 +29,7 @@ def process_dataset(fileName):
         id2word: 数字id到词语的映射字典
     """
     examples = []
-    with open(fileName, 'r') as fd:
+    with open(fileName, 'r'，encoding='utf-8', ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
@@ -38,8 +38,6 @@ def process_dataset(fileName):
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
             ### 过滤过长的诗歌
-            if len(ins) > 200:
-
                 continue
             examples.append(ins)
             
@@ -207,6 +205,32 @@ def reduce_avg(reduce_target, lengths, dim):
     shape_of_lengths = lengths.get_shape()
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
+    # 验证输入张量的维度是否符合要求
+   # shape_of_lengths: lengths张量的维度列表
+   # dim: 预期的长度张量的秩(rank)
+    if len(shape_of_lengths) != dim:
+        raise ValueError(('Second input tensor should be rank %d, ' +
+                         'while it got rank %d') % (dim, len(shape_of_lengths)))
+    # 验证目标张量的维度是否符合要求
+    # shape_of_target: reduce_target张量的维度列表
+    # dim+1: 预期的目标张量的最小秩
+    if len(shape_of_target) < dim+1 :
+        raise ValueError(('First input tensor should be at least rank %d, ' +
+                         'while it got rank %d') % (dim+1, len(shape_of_target)))
+
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
+    mxlen = tf.shape(reduce_target)[dim]
+    mask = mkMask(lengths, mxlen)
+    if rank_diff!=0:
+        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+    else:
+        len_shape = tf.shape(lengths)
+        mask_shape = tf.shape(mask)
+    lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    mask = tf.reshape(mask, shape=mask_shape)
+
+    mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))

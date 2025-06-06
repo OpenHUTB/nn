@@ -27,7 +27,7 @@ np.random.seed(42)
 # TensorFlow的随机种子
 tf.random.set_seed(42)
 
-# 确保在Jupyter Notebook中内联显示图形
+# 确保在 Jupyter Notebook 中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
@@ -83,8 +83,8 @@ class LogisticRegression():
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
-            shape=[1], 
-            dtype=tf.float32, 
+            shape=[1],
+            dtype=tf.float32,
             initial_value=tf.zeros(shape=[1])
         )
         # 定义模型的可训练变量，即权重W和偏置b
@@ -102,7 +102,7 @@ class LogisticRegression():
                 tf.Tensor: 预测的概率值，形状为(N, 1)，值在[0, 1]之间。
         """
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
-        logits = tf.matmul(inp, self.W) + self.b 
+        logits = tf.matmul(inp, self.W) + self.b
         # 对logits应用sigmoid函数，得到预测概率
         pred = tf.nn.sigmoid(logits)
         return pred
@@ -186,8 +186,8 @@ if __name__ == '__main__':
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
     # 创建图形
-    f, ax = plt.subplots(figsize=(6, 4))
-    f.suptitle('Logistic Regression Example', fontsize=15)
+    f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
+    f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
     plt.ylabel('Y')
     plt.xlabel('X')
     ax.set_xlim(0, 10)
@@ -220,22 +220,22 @@ if __name__ == '__main__':
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
     def animate(i):
-        xx = np.arange(10, step=0.1)
-        a = animation_frames[i][0]
+        xx = np.arange(10, step=0.1)# 生成x轴数据点，范围0-9.9，步长0.1
+        a = animation_frames[i][0]  # 从帧数据中提取当前帧的参数，假设animation_frames是一个列表，每个元素包含[a, b, c, loss]四个值
         b = animation_frames[i][1]
         c = animation_frames[i][2]
-        yy = a/-b * xx + c/-b
-        line_d.set_data(xx, yy)
-        C1_dots.set_data(C1[:, 0], C1[:, 1])
+        yy = a/-b * xx + c/-b       # 计算直线方程 y = (-a/b)x + (-c/b)
+        line_d.set_data(xx, yy)     # 更新直线数据
+        C1_dots.set_data(C1[:, 0], C1[:, 1]) # 更新C1和C2散点数据
         C2_dots.set_data(C2[:, 0], C2[:, 1])
-        frame_text.set_text(
+        frame_text.set_text(        # 更新帧文本信息，显示当前时间步和损失值
             'Timestep = %.1d/%.1d\nLoss = %.3f' % 
             (i, len(animation_frames), animation_frames[i][3])
         )
-        return (line_d,) + (C1_dots,) + (C2_dots,)
-
+        return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象元组，用于blitting优化
+    # 创建FuncAnimation对象
     anim = animation.FuncAnimation(
-        f, animate, init_func=init,
-        frames=len(animation_frames), interval=50, blit=True, repeat=False
+        f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
+        frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
-    HTML(anim.to_html5_video())
+    HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示

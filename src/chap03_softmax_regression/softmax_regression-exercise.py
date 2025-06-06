@@ -88,8 +88,8 @@ class SoftmaxRegression(tf.Module):
             name="W",
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        # 定义模型的可训练变量列表，用于梯度计算和参数更新
-        self.trainable_variables = [self.W, self.b]
+        
+        
 
     @tf.function
     def __call__(self, x):
@@ -136,7 +136,9 @@ def compute_loss(pred, labels, num_classes=3):
             dtype=tf.float32,
         )
     )
-    
+    # 返回损失值和准确率
+    # loss: 预先计算好的损失值（如交叉熵损失）
+    # acc: 当前批次的分类准确率（0-1 标量）
     return loss, acc
 
 @tf.function
@@ -154,7 +156,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
         predictions = model(x_batch)# 前向传播：计算模型对输入批次的预测
         loss, accuracy = compute_loss(predictions, y_batch)# 计算损失和准确率
 
-    grads = tape.gradient(loss, model.trainable_variables)# 自动微分：计算损失相对于模型可训练变量的梯度
+    grads = tape.gradient(loss, model.trainable_variables)# 自动计算损失函数对模型参数的梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))# 优化步骤：使用优化器将计算出的梯度应用到模型参数上
     return loss, accuracy# 返回当前批次的损失和准确率
 
@@ -203,6 +205,12 @@ Z = Z.reshape(X.shape)
 # 绘制决策边界
 plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
+
+# 保存模型
+model.save_weights('softmax_regression_weights')
+
+# 加载模型
+model.load_weights('softmax_regression_weights')
 
 
 # In[ ]:

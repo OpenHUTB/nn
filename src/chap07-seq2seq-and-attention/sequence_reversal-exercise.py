@@ -50,7 +50,7 @@ def random_string(length):
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
-    batched_examples = [randomString(length) for i in range(batch_size)]
+    batched_examples = [random_string(length) for i in range(batch_size)]
     # 转成索引
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     # 逆序
@@ -98,9 +98,15 @@ class mySeq2SeqModel(keras.Model):
 
         # 解码器RNN层：与编码器类似
         self.decoder = tf.keras.layers.RNN(
-            self.decoder_cell,
-            return_sequences = True,
-            return_state = True
+            self.decoder_cell,             # 指定解码器使用的RNN单元
+                                           # 例如LSTMCell、GRUCell或自定义单元
+            return_sequences = True,       # 返回完整的输出序列
+                                           # 适用于序列到序列模型，每个时间步都需要输出
+                                           # 输出形状: [batch_size, seq_len, units]
+            return_state = True            # 返回最终的隐藏状态
+                                           # 对于LSTM单元，返回[h_state, c_state]
+                                           # 对于GRU单元，返回[h_state]
+                                           # 用于传递状态到下一个解码步骤
         )
 
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
@@ -140,15 +146,19 @@ class mySeq2SeqModel(keras.Model):
         '''
         shape(x) = [b_sz,] 
         '''
-        # shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
-        inp_emb = self.embed_layer(x)
-        # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
-        h, state = self.decoder_cell.call(inp_emb, state)
-        # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
-        logits = self.dense(h)
-        # 选择得分最高的token作为预测结果
-        out = tf.argmax(logits, axis=-1)
-        return out, state
+        x_embed = self.embed_layer(x)  # (B, E)
+    
+    # 加性注意力计算
+        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
+        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+        attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+    
+        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
+        output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
+        logits = self.dense(output)  # (B, V)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        return next_token, new_state[0]  # 返回单个状态向量
 
 
 # # Loss函数以及训练逻辑
@@ -210,9 +220,9 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-optimizer = optimizers.Adam(0.0005)
-model = mySeq2SeqModel()
-train(model, optimizer, seqlen=20)
+optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
+model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
+train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
 
 
 # # 测试模型逆置能力
@@ -240,7 +250,7 @@ def sequence_reversal():
             # 收集每一步生成的 token
             collect.append(tf.expand_dims(cur_token, axis=-1))
         # 拼接输出序列
-        out = tf.concat(collect, axis=-1).numpy()
+        out = tf.concat(collect, axis = -1).numpy()
         # 索引转字符
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
@@ -265,7 +275,6 @@ print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])# 列表�
 print(list(zip(*sequence_reversal())))# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
 
 
-# In[ ]:
 
 
 

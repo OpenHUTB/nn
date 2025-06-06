@@ -7,15 +7,15 @@ class RBM:
     """Restricted Boltzmann Machine."""
 
     def __init__(self, n_hidden=2, n_observe=784):
-    """
-    初始化受限玻尔兹曼机（RBM）模型参数
+        """
+        初始化受限玻尔兹曼机（RBM）模型参数
 
-    Args:
-        n_hidden (int): 隐藏层单元数量（默认 2）
-        n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
+        Args:
+            n_hidden (int): 隐藏层单元数量（默认 2）
+            n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
 
-    Raises:
-        ValueError: 若输入参数非正整数则抛出异常
+        Raises:
+            ValueError: 若输入参数非正整数则抛出异常
         """
         # 参数验证：确保隐藏层和可见层单元数量为正整数
         if not (isinstance(n_hidden, int) and n_hidden > 0):
@@ -27,9 +27,9 @@ class RBM:
         self.n_observe = n_observe
         # 权重矩阵 (可见层到隐藏层)
         self.W = np.random.normal(
-        loc=0.0,                # 均值
-        scale=0.1,              # 标准差（常见初始化方法）
-        size=(n_observe, n_hidden))
+        loc = 0.0,                # 均值
+        scale = 0.1,              # 标准差（常见初始化方法）
+        size = (n_observe, n_hidden))
         # 可见层偏置（1 x n_observe）
         self.Wv = np.zeros((1, n_observe))
         # 隐藏层偏置（1 x n_hidden）
@@ -121,12 +121,11 @@ class RBM:
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
-
-        # 初始化一个随机的可见层状态（v），每个像素点以0.5概率为1（模拟初始图像）
+        # 初始化可见层：使用伯努利分布随机生成二值向量（每个像素有50%概率为1）
+        # n_observe是可见层神经元数量（28x28=784）
         v = np.random.binomial(1, 0.5, self.n_observe)
 
-
-        # 进行1000次 Gibbs 采样迭代，以逐步趋近真实数据分布
+        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布
         for _ in xrange(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
@@ -147,17 +146,16 @@ class RBM:
 if __name__ == '__main__':
     try:
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
-    mnist = np.load('mnist_bin.npy')  # 60000x28x28
+      mnist = np.load('mnist_bin.npy')  # 60000x28x28
     except IOError:
-    print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
-    sys.exit(1)
+      print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
+      sys.exit(1)
     n_imgs, n_rows, n_cols = mnist.shape
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
-
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 

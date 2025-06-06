@@ -6,8 +6,7 @@
 
 # In[1]:
 
-
-import numpy as np
+import numpy as np #导入数值计算库
 import tensorflow as tf
 import collections
 from tensorflow import keras
@@ -38,15 +37,15 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         tuple: 包含三个numpy数组的元组(numbers_1, numbers_2, results)，
                每个数组形状为(batch_size,)
     """
-    numbers_1 = np.random.randint(start, end, batch_size)
-    numbers_2 = np.random.randint(start, end, batch_size)
-    results = numbers_1 + numbers_2
+    numbers_1 = np.random.randint(start, end, batch_size)# 生成第一个随机整数数组，形状为(batch_size,)，数值范围：start ≤ numbers_1[i] < end
+    numbers_2 = np.random.randint(start, end, batch_size)# 生成第二个随机整数数组，与numbers_1独立，数值范围：start ≤ numbers_2[i] < end
+    results = numbers_1 + numbers_2# 逐元素计算两数之和，结果形状同样为(batch_size,)
     return numbers_1, numbers_2, results
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
-    strNum = str(Num)
+    strNum = str(Num)  # 转换为字符串
     chNums = list(strNum)
     digitNums = [int(o) for o in strNum]
     return digitNums
@@ -54,7 +53,8 @@ def convertNum2Digits(Num):
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''
-    digitStrs = [str(o) for o in Digits]
+    
+    digitStrs = [str(o) for o in Digits] # 转换为字符串列表
     numStr = ''.join(digitStrs)
     Num = int(numStr)
     return Num
@@ -85,18 +85,23 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
         Nums2: shape(batch_size, maxlen)
         results: shape(batch_size, maxlen)
     '''
+
+    # 将数字转换为数字位列表
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
+
 
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
 
+      # 填充到统一长度
     Nums1 = [pad2len(o, maxlen) for o in Nums1]
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
 
+    
     return Nums1, Nums2, results
 
 
@@ -110,6 +115,7 @@ class myRNNModel(keras.Model):
         super(myRNNModel, self).__init__()
         self.embed_layer = tf.keras.layers.Embedding(10, 32,
                                                     batch_input_shape = [None, None])
+         # 定义RNN单元(SimpleRNNCell)
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
         self.dense = tf.keras.layers.Dense(10)
@@ -119,6 +125,18 @@ class myRNNModel(keras.Model):
         '''
         此处完成上述图中模型
         '''
+        
+        emb1 = self.embed_layer(num1)  # shape: (batch, seq_len, 32)
+        emb2 = self.embed_layer(num2)  # shape: (batch, seq_len, 32)
+
+        # 拼接两个数字的嵌入向量
+        emb = tf.concat([emb1, emb2], axis=-1)  # shape: (batch, seq_len, 64)
+
+        # RNN 输出
+        rnn_out = self.rnn_layer(emb)  # shape: (batch, seq_len, 64)
+
+        # 全连接层预测每一位的数字（0-9）
+        logits = self.dense(rnn_out)  # shape: (batch, seq_len, 10)
         return logits
 
 
@@ -146,7 +164,7 @@ def train(steps, model, optimizer):
     accuracy = 0.0
     for step in range(steps):
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
-        Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+        Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
@@ -155,23 +173,26 @@ def train(steps, model, optimizer):
             
     return loss
 
+#定义了一个名为 evaluate 的函数，其核心功能是评估一个神经网络模型在大数加法任务上的准确率。
 def evaluate(model):
-    datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
-    Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
+    datas = gen_data_batch(batch_size = 2000, start = 555555555, end = 999999999)
+    Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
+    logits = model(tf.constant(Nums1, dtype = tf.int32), tf.constant(Nums2, dtype = tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1)
+    pred = np.argmax(logits, axis = -1)
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(o[0], o[1], o[0] == o[1])
 
-    print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
+    print('accuracy is: %g' % np.mean([o[0] == o[1] for o in zip(datas[2], res)]))
 
 
 # In[5]:
 
-
+# 创建 Adam 优化器实例
+# 学习率（learning rate）设置为 0.001，控制参数更新的步长
 optimizer = optimizers.Adam(0.001)
+# 实例化自定义 RNN 模型
 model = myRNNModel()
 
 

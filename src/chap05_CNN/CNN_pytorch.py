@@ -5,11 +5,11 @@
 import os
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.utils.data as Data
 import torchvision  # 包含常用的数据集和模型
 import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
 import numpy as np
+from torch.autograd import Variable
 
 # 设置超参数
 learning_rate = 1e-4  #  学习率
@@ -89,13 +89,14 @@ class CNN(nn.Module):
         out1 = F.relu(out1)# 应用ReLU激活函数引入非线性
         out1 = self.dropout(out1)
         out2 = self.out2(out1)
-        output = F.softmax(out2, dim=1)  # 指定softmax维度
-        return output
+        return out2
 
 # 测试函数
 def test(cnn):
     global prediction  # 声明全局变量
     y_pre = cnn(test_x)  # 用模型预测测试数据
+     # 这里使用softmax获取概率分布
+    y_prob = F.softmax(y_pre, dim=1)
     _, pre_index = torch.max(y_pre, 1)  # 获取预测类别（最大概率的索引）
     pre_index = pre_index.view(-1)  # 调整张量形状
     prediction = pre_index.data.numpy()  # 转换为 numpy 数组
@@ -118,7 +119,7 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)  # 前向传播得到预测结果
             loss = loss_func(output, y)  # 计算损失
-            optimizer.zero_grad(set_to_none=True)  # 清空之前的梯度
+            optimizer.zero_grad(set_to_none=True)   # 清空模型参数的梯度缓存，set_to_none=True可减少内存占用
             loss.backward()  # 反向传播计算梯度
             optimizer.step()  # 更新参数
 
