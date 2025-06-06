@@ -109,8 +109,10 @@ class mySeq2SeqModel(keras.Model):
 
 @tf.function
 def compute_loss(logits, labels):
+    # 计算每个位置上的交叉熵损失
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 对整个批次求平均
     losses = tf.reduce_mean(losses)
     return losses
 
