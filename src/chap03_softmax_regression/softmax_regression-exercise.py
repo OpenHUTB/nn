@@ -88,8 +88,8 @@ class SoftmaxRegression(tf.Module):
             name="W",
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        # 定义模型的可训练变量列表，用于梯度计算和参数更新
-        self.trainable_variables = [self.W, self.b]
+        
+        
 
     @tf.function
     def __call__(self, x):
