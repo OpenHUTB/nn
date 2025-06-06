@@ -42,8 +42,8 @@ def get_batch(batch_size, length):
     enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
-    return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
+    return (batched_examples, tf.constant(enc_x, dtype = tf.int32), 
+            tf.constant(dec_x, dtype = tf.int32), tf.constant(y, dtype = tf.int32))
 print(get_batch(2, 10))
 
 
@@ -60,13 +60,13 @@ class mySeq2SeqModel(keras.Model):
         self.v_sz=27 # 词汇表大小（包括可能的特殊符号）
         self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape = [None, None])
         
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
-                                           return_sequences=True, return_state=True)
+                                           return_sequences = True, return_state=True)
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
                                            return_sequences=True, return_state=True)
         self.dense_attn = tf.keras.layers.Dense(self.hidden)
