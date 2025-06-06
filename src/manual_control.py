@@ -322,14 +322,14 @@ class World(object):
         selected = self.map_layer_names[self.current_map_layer]
         self.hud.notification('LayerMap selected: %s' % selected)
 
-    def load_map_layer(self, unload=False):
-        selected = self.map_layer_names[self.current_map_layer]
-        if unload:
+    def load_map_layer(self, unload=False): # 加载或卸载当前选中的地图图层
+        selected = self.map_layer_names[self.current_map_layer] # 获取当前选中的地图图层名称
+        if unload:  # 卸载指定图层
             self.hud.notification('Unloading map layer: %s' % selected)
-            self.world.unload_map_layer(selected)
-        else:
+            self.world.unload_map_layer(selected) # 从内存中释放图层数据，停止渲染该图层
+        else: # 加载指定图层
             self.hud.notification('Loading map layer: %s' % selected)
-            self.world.load_map_layer(selected)
+            self.world.load_map_layer(selected) # 将指定图层的几何数据和纹理加载到内存，并在场景中渲染
 
     def toggle_radar(self):
         if self.radar_sensor is None:
