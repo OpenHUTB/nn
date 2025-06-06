@@ -38,8 +38,6 @@ def process_dataset(fileName):
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
             ### 过滤过长的诗歌
-            if len(ins) > 200:
-
                 continue
             examples.append(ins)
             
@@ -210,7 +208,7 @@ def reduce_avg(reduce_target, lengths, dim):
     # 验证输入张量的维度是否符合要求
    # shape_of_lengths: lengths张量的维度列表
    # dim: 预期的长度张量的秩(rank)
-     if len(shape_of_lengths) != dim:
+    if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
     # 验证目标张量的维度是否符合要求
