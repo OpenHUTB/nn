@@ -246,4 +246,5 @@ if __name__ == '__main__':
         f, animate, init_func=init,
         frames=len(animation_frames), interval=50, blit=True, repeat=False
     )
+    # 在Jupyter Notebook中显示动画
     HTML(anim.to_html5_video())
