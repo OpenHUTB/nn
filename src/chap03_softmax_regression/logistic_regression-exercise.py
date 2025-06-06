@@ -92,6 +92,15 @@ class LogisticRegression():
 
     @tf.function
     def __call__(self, inp):
+        """
+           计算神经网络模型的前向传播过程，包括输入数据与权重的矩阵乘法、加偏置、然后应用sigmoid激活函数。
+    
+           参数:
+               inp (tf.Tensor): 输入数据，形状通常为(N, D)，其中N是样本数，D是特征维度。
+    
+           返回:
+                tf.Tensor: 预测的概率值，形状为(N, 1)，值在[0, 1]之间。
+        """
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
         logits = tf.matmul(inp, self.W) + self.b 
         # 对logits应用sigmoid函数，得到预测概率
