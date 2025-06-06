@@ -83,7 +83,7 @@ register(
 register(
     id='Pendulum-v0',   # 钟摆任务：摆到垂直位置
     entry_point='gym.envs.classic_control:PendulumEnv',
-    max_episode_steps=200,
+    max_episode_steps = 200,
 )
 
 register(
@@ -97,10 +97,10 @@ register(
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',    # 月球着陆器
-    entry_point='gym.envs.box2d:LunarLander',
-    max_episode_steps=1000,
-    reward_threshold=200,   # 成功着陆得分
+    id = 'LunarLander-v2',    # 月球着陆器
+    entry_point = 'gym.envs.box2d:LunarLander',
+    max_episode_steps = 1000,
+    reward_threshold = 200,   # 成功着陆得分
 )
 
 register(
