@@ -88,6 +88,8 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
 
+
+    # 反转数字序列(便于从低位开始处理)
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
