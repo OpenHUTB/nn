@@ -328,30 +328,38 @@ for epoch in range(10):
 
 # In[74]:
 
-def gen_sentence():
-    """使用训练好的模型生成诗歌
-    
+def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int = 50) -> str:
+    """使用训练好的RNN模型生成诗歌
+
+    Args:
+        model: 训练好的诗歌生成模型
+        word2id: 词语到id的映射字典
+        id2word: id到词语的映射字典
+        max_len: 生成诗歌的最大长度，默认为50
+
     Returns:
-        生成的诗歌字符串
+        str: 生成的诗歌字符串（不包含开始和结束标记）
     """
-    # 初始化RNN状态
-    state = [tf.random.normal(shape=(1, 128), stddev=0.5), 
+    # 初始化RNN隐藏状态
+    state = [tf.random.normal(shape=(1, 128), stddev=0.5),
              tf.random.normal(shape=(1, 128), stddev=0.5)]
-    # 从开始标记开始
-    cur_token = tf.constant([word2id['bos']], dtype=tf.int32)
-    collect = []
-    
-    # 生成最多50个词
-    for _ in range(50):
-        # 预测下一个词
+
+    # 从开始标记开始生成
+    cur_token = tf.constant([word2id[start_token]], dtype=tf.int32)
+    generated_tokens = []
+
+    # 循环生成直到遇到结束标记或达到最大长度
+    for _ in range(max_len):
         cur_token, state = model.get_next_token(cur_token, state)
-        collect.append(cur_token.numpy()[0])
-        # 遇到结束标记则停止
-        if id2word[collect[-1]] == 'eos':
+        token_id = cur_token.numpy()[0]
+        generated_tokens.append(token_id)
+
+        # 遇到结束标记则停止生成
+        if id2word[token_id] == end_token:
             break
-    
-    # 将id序列转换为词语
-    return [id2word[t] for t in collect]
+
+    # 转换为词语并拼接成字符串
+    return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
 print(''.join(gen_sentence()))
