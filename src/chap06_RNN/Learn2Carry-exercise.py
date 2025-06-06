@@ -79,11 +79,13 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
         Nums2: shape(batch_size,)
         results: shape(batch_size,)
         maxlen:  type(int)
+        
     Returns:
         Nums1: shape(batch_size, maxlen)
         Nums2: shape(batch_size, maxlen)
         results: shape(batch_size, maxlen)
     '''
+    
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
@@ -96,6 +98,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
 
+    
     return Nums1, Nums2, results
 
 
@@ -107,6 +110,8 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
 class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
+        
+        # 定义嵌入层，将数字(0-9)映射到32维向量
         self.embed_layer = tf.keras.layers.Embedding(10, 32,
                                                     batch_input_shape = [None, None])
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
