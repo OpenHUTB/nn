@@ -189,9 +189,9 @@ if __name__ == "__main__":
     X, y_true = generate_data()
     
     # 训练GMM模型
-    gmm = GaussianMixtureModel(n_components=3)
-    gmm.fit(X)
-    y_pred = gmm.labels_
+    gmm = GaussianMixtureModel(n_components=3) # 创建GMM实例，指定聚类数为3
+    gmm.fit(X) # 用数据X训练模型
+    y_pred = gmm.labels_ # 获取每个样本的聚类标签
     
     # 可视化结果
     plt.figure(figsize=(12, 5))
