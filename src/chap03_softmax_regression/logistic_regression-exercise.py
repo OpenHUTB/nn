@@ -204,9 +204,19 @@ if __name__ == '__main__':
     )
 
     def init():
+        """
+        初始化动画所需的图形元素
+        该函数将所有动态绘图对象的数据清空，为动画初始化做准备
+        通常用于 Matplotlib 的 FuncAnimation 初始化函数
+        """
+        # 清空线条对象的数据（x, y 坐标）
         line_d.set_data([], [])
+        # 清空类别1的散点数据（C1）
         C1_dots.set_data([], [])
+        # 清空类别2的散点数据（C2）
         C2_dots.set_data([], [])
+        # 返回所有需要动画更新的图形对象（打包为元组）
+        # Matplotlib 动画要求返回值为 Artist 对象的集合
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
     def animate(i):
