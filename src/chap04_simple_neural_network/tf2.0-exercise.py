@@ -16,7 +16,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     返回:
         与输入形状相同的 softmax 概率分布张量。
     """
-    x = tf.cast(x, tf.float32)
+    x = tf.cast(x, tf.float32) # 统一为float32类型，确保计算精度
 
     # 数值稳定性处理：减去最大值避免指数爆炸
     max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
@@ -28,10 +28,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     exp_logits = tf.exp(shifted_logits)
     
     sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
-    
-    softmax_output = exp_logits / sum_exp
-
-    return softmax_output
+    return exp_logits / sum_exp
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
