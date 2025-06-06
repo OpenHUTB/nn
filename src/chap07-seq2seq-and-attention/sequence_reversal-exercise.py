@@ -1,4 +1,4 @@
-# !/usr/bin/env python
+#!/usr/bin/env python
 # coding: utf-8
 
 # # 序列逆置
@@ -7,7 +7,6 @@
 # ![seq2seq](./seq2seq.png)
 
 # In[1]:
-
 # 标准库（Python内置模块，按字母顺序排列）
 import collections
 import os
@@ -24,7 +23,6 @@ from tensorflow.keras import datasets, layers, optimizers  # 同一库的子模�
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[2]:
-
 import random
 import string
 
@@ -61,14 +59,11 @@ def get_batch(batch_size, length):
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
 
-###
 
 # # 建立sequence to sequence 模型##
 
 # In[3]:
-
-
-class mySeq2SeqModel(keras.Model):
+class MySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
         super().__init__()
@@ -91,22 +86,22 @@ class mySeq2SeqModel(keras.Model):
         self.encoder = tf.keras.layers.RNN(
             self.encoder_cell,
             # 返回每个时间步的输出
-            return_sequences = True,
+            return_sequences=True,
             # 还返回最终隐藏状态
-            return_state = True
+            return_state=True
         )
 
         # 解码器RNN层：与编码器类似
         self.decoder = tf.keras.layers.RNN(
             self.decoder_cell,
-            return_sequences = True,
-            return_state = True
+            return_sequences=True,
+            return_state=True
         )
 
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
         self.dense = tf.keras.layers.Dense(self.v_sz)
 
-        
+
     @tf.function
     def call(self, enc_ids, dec_ids):
         '''
@@ -125,7 +120,6 @@ class mySeq2SeqModel(keras.Model):
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
         return logits
     
-    
     @tf.function
     def encode(self, enc_ids):
         # shape(b_sz, len, emb_sz)，通过嵌入层将token ID转换为词向量，输出形状: (batch_size, sequence_length, embedding_size)
@@ -141,9 +135,9 @@ class mySeq2SeqModel(keras.Model):
         shape(x) = [b_sz,] 
         '''
         x_embed = self.embed_layer(x)  # (B, E)
-    
-    # 加性注意力计算
-        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
+
+        # 加性注意力计算
+        score = tf.nn.tanh(self.dense(enc_out))  # (B, T1, H)
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
@@ -158,7 +152,6 @@ class mySeq2SeqModel(keras.Model):
 # # Loss函数以及训练逻辑
 
 # In[4]:
-
 # 定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
 @tf.function
 def compute_loss(logits, labels):
@@ -215,7 +208,7 @@ def train(model, optimizer, seqlen):
 
 # In[5]:
 optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
-model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
+model = MySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
 train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
 
 
@@ -224,8 +217,6 @@ train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程�
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
 
 # In[6]:
-
-
 def sequence_reversal():
     """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
     def decode(init_state, steps=10):
@@ -267,9 +258,3 @@ def is_reverse(seq, rev_seq):
 # 测试模型逆序能力的准确性
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])# 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
 print(list(zip(*sequence_reversal())))# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
-
-
-
-
-
-
