@@ -55,19 +55,21 @@ class CNN(nn.Module):
         
         # 第一个卷积层
         self.conv1 = nn.Sequential(
-            # 卷积层：1个输入通道，32个输出通道，7x7的卷积核
-            # stride=1表示步长为1，padding=3表示边缘填充3层（保持尺寸不变）
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=7, stride=1, padding=3),
-            nn.ReLU(),  # ReLU激活函数
-            nn.MaxPool2d(2)  # 2x2的最大池化，尺寸减半
+            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
+            nn.BatchNorm2d(32),  # 添加批量归一化
+            nn.ReLU(),
+            nn.MaxPool2d(2)
         )
         
         # 第二个卷积层
         self.conv2 = nn.Sequential(
-            # 卷积层：32个输入通道，64个输出通道，5x5的卷积核
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1, padding=2),
-            nn.ReLU(),  # ReLU激活函数
-            nn.MaxPool2d(2)  # 2x2的最大池化，尺寸再减半
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
+            nn.BatchNorm2d(64),  # 添加批量归一化
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
         )
         
         # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
@@ -80,15 +82,14 @@ class CNN(nn.Module):
         self.out2 = nn.Linear(1024, 10, bias=True)
 
     def forward(self, x):
-        # 前向传播过程
-        x = self.conv1(x)  # 通过第一个卷积层
-        x = self.conv2(x)  # 通过第二个卷积层
-        x = x.view(x.size(0), -1)  # 将特征图展平为一维向量，保留batch维度
-        out1 = self.out1(x)  # 第一个全连接层
-        out1 = F.relu(out1)  # ReLU激活
-        out1 = self.dropout(out1)  # Dropout
-        out2 = self.out2(out1)  # 第二个全连接层
-        output = F.softmax(out2)  # Softmax得到概率分布
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = x.view(x.size(0), -1)
+        out1 = self.out1(x)
+        out1 = F.relu(out1)
+        out1 = self.dropout(out1)
+        out2 = self.out2(out1)
+        output = F.softmax(out2, dim=1)  # 指定softmax维度
         return output
 
 # 测试函数
