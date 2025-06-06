@@ -41,7 +41,7 @@ def process_dataset(fileName):
             if len(ins) > 200:
 
                 continue
-            examples.append(ins)
+            examples.append(ins)  # apend函数每次调用只能添加一个元素（可以是任意数据类型，如数字、字符串、列表等
             
     # 统计词频
     counter = collections.Counter()
