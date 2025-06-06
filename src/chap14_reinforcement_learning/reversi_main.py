@@ -46,7 +46,7 @@ for i_episode in range(max_epochs):
         # 可视化当前棋盘状态，便于调试或展示
         env.render()  # 打印当前棋盘状态
         enables = env.possible_actions  # 获取当前白棋可落子的位置列表
-        if len(enables) == 0:
+        if not enables:
             # 无法落子，执行“跳过”操作
             action_ = env.board_size ** 2 + 1
         else:  
