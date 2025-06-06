@@ -183,9 +183,17 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
 def train(model, optimizer, seqlen):
     loss = 0.0
     accuracy = 0.0
+        # 循环2000个训练步骤
     for step in range(2000):
+        # 获取一个批次的数据：
+        # batched_examples: 原始字符串样本列表
+        # enc_x: 编码器输入序列
+        # dec_x: 解码器输入序列
+        # y: 目标输出序列
         batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
+        # 执行训练步骤
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+        # 每500步打印一次进度
         if step % 500 == 0:
             print('step', step, ': loss', loss.numpy())
     return loss
