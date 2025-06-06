@@ -54,8 +54,9 @@ def convertNum2Digits(Num):
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''
+    
     digitStrs = [str(o) for o in Digits]
-    numStr = ''.join(digitStrs)
+    numStr = ''.join(digitStrs)   # 拼接成字符串
     Num = int(numStr)
     return Num
 
