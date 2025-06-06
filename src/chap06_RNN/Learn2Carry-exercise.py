@@ -53,7 +53,8 @@ def convertNum2Digits(Num):
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''
-    digitStrs = [str(o) for o in Digits]
+    
+    digitStrs = [str(o) for o in Digits] # 转换为字符串列表
     numStr = ''.join(digitStrs)
     Num = int(numStr)
     return Num
