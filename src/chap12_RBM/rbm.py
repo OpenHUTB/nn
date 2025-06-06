@@ -46,7 +46,11 @@ class RBM:
         return np.random.binomial(1, probs)
     
     def train(self, data):
-        """使用Contrastive Divergence算法对模型进行训练"""
+        """
+         使用Contrastive Divergence算法对模型进行训练
+         参数说明：
+         data (numpy.ndarray): 训练数据，形状为 (n_samples, n_observe)。
+        """
     
         # 请补全此处代码
         # 将数据展平为二维数组 [n_samples, n_observe]
