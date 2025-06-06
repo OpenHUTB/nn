@@ -13,11 +13,14 @@ from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
+# 自定义卷积神经网络模型
 class myConvModel(keras.Model):
     def __init__(self):
         super(myConvModel, self).__init__()
+        # 创建一个3x3卷积核的卷积层，使用3个滤波器，保持输入尺寸不变(padding='same')
         self.l1_conv = Conv2D(filters=3, kernel_size=(3, 3), padding='same')
-        
+
+    # 使用图执行模式优化
     @tf.function
     def call(self, x):
         h1 = self.l1_conv(x)
