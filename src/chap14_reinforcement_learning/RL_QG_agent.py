@@ -5,7 +5,6 @@ import tensorflow as tf
 class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
     def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
-    # pass    # 删掉这句话，并填写相应代码
         #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
         os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
         self.sess = None  # TensorFlow会话对象初始化占位
@@ -34,7 +33,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
         conv1 = tf.layers.conv2d(
-            inputs = self.input_states,
+            inputs = self.input_states,   # 输入张量，形状应为 [batch_size, height, width, channels]
             filters = 32,                 # 输出通道数：32个卷积核
             kernel_size = 3,              # 卷积核大小 3x3
             padding = "same",             # 输出大小与输入相同
