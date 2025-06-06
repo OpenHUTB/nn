@@ -85,9 +85,12 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
         Nums2: shape(batch_size, maxlen)
         results: shape(batch_size, maxlen)
     '''
+
+    # 将数字转换为数字位列表
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
+
 
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
