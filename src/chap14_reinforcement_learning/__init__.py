@@ -35,8 +35,8 @@ register(
 )
 
 register(
-    id = 'DuplicatedInput-v0',
-    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',
+    id = 'DuplicatedInput-v0',  # 环境唯一标识符
+    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',  # 环境类的导入路径
     max_episode_steps = 200,
     reward_threshold = 9.0,
 )
