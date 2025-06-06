@@ -26,13 +26,18 @@ import os,sys,tqdm
 
 # In[2]:
 
-def gen_data_batch(batch_size, start, end):
-    '''在(start, end)区间采样生成一个batch的整型的数据
-    Args :
-        batch_size: batch_size
-        start: 开始数值
-        end: 结束数值
-    '''
+def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
+    """生成包含随机整数对及其和的批量数据。
+
+    Args:
+        batch_size: 批量大小，必须是正整数
+        start: 随机数范围起始值(包含)
+        end: 随机数范围结束值(不包含)
+
+    Returns:
+        tuple: 包含三个numpy数组的元组(numbers_1, numbers_2, results)，
+               每个数组形状为(batch_size,)
+    """
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
