@@ -276,16 +276,16 @@ register(
 )
 
 register(
-    id='Walker2d-v1',
-    max_episode_steps=1000,
-    entry_point='gym.envs.mujoco:Walker2dEnv',
+    id = 'Walker2d-v1',
+    max_episode_steps = 1000,
+    entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
 
 register(
-    id='Ant-v1',
-    entry_point='gym.envs.mujoco:AntEnv',
-    max_episode_steps=1000,
-    reward_threshold=6000.0,
+    id = 'Ant-v1',
+    entry_point = 'gym.envs.mujoco:AntEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 6000.0,
 )
 
 register(
