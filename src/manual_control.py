@@ -341,10 +341,14 @@ class World(object):
             self.world.load_map_layer(selected)
 
     def toggle_radar(self):
+        # 检查当前是否没有雷达传感器实例
         if self.radar_sensor is None:
+            # 创建一个新的雷达传感器实例并赋值给self.radar_sensor
             self.radar_sensor = RadarSensor(self.player)
         elif self.radar_sensor.sensor is not None:
+            # 如果雷达传感器存在且其sensor属性不为空，则销毁该传感器
             self.radar_sensor.sensor.destroy()
+            # 将self.radar_sensor设置为None，表示雷达传感器已被移除
             self.radar_sensor = None
 
     def modify_vehicle_physics(self, actor):
