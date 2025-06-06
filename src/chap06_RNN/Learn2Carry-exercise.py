@@ -142,17 +142,23 @@ def train_one_step(model, optimizer, x, y, label):
     return loss
 
 def train(steps, model, optimizer):
+    # 初始化损失和准确率为0.0
     loss = 0.0
     accuracy = 0.0
+    # 循环进行指定步数的训练
     for step in range(steps):
+        # 生成一批数据，批次大小为200，数字范围从0到555555555
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
+        # 准备一批数据，包括两个数字列表和它们的结果列表，并设置最大长度为11
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+        # 进行一步训练，并计算损失
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
+        # 每50步打印一次当前步骤和损失值
         if step%50 == 0:
             print('step', step, ': loss', loss.numpy())
-            
+    # 返回最终的损失值        
     return loss
 
 def evaluate(model):
