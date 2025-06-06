@@ -331,12 +331,12 @@ class World(object):
             self.hud.notification('Loading map layer: %s' % selected)
             self.world.load_map_layer(selected)
 
-    def toggle_radar(self):
-        if self.radar_sensor is None:
+    def toggle_radar(self): # 切换雷达传感器的开启/关闭状态
+        if self.radar_sensor is None: # 如果雷达传感器尚未创建，则创建并启用它
             self.radar_sensor = RadarSensor(self.player)
-        elif self.radar_sensor.sensor is not None:
-            self.radar_sensor.sensor.destroy()
-            self.radar_sensor = None
+        elif self.radar_sensor.sensor is not None: # 如果雷达传感器已存在且处于活动状态，则销毁并禁用它
+            self.radar_sensor.sensor.destroy() # destroy() 是 Carla 传感器对象的方法，释放资源并停止数据生成
+            self.radar_sensor = None # 将 self.radar_sensor 置为 None，标记传感器已被销毁
 
     def modify_vehicle_physics(self, actor):
         #If actor is not a vehicle, we cannot use the physics control
