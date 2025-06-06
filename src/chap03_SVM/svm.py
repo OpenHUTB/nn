@@ -33,10 +33,10 @@ class SVM():
         self.b = None  # 偏置项
 
     def train(self, data_train):
-        """训练模型。"""
+        """训练SVM模型。"""
         # 请补全此处代码
-        X = data_train[:, :2]
-        y = data_train[:, 2]
+        X = data_train[:, :2]  # 输入特征
+        y = data_train[:, 2]   # 原始标签 (0或1)
         y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
         m, n = X.shape
         
