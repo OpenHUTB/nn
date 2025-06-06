@@ -19,9 +19,9 @@ def multinomial_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
 # 初始化特征列表
     feat = [x]
-    for i in range(2, feature_num + 1):
+    for i in range(2, feature_num + 1): # 生成x^2到x^feature_num的特征
         feat.append(x**i)
-    ret = np.concatenate(feat, axis=1)
+    ret = np.concatenate(feat, axis=1)  # 沿列方向拼接所有特征，形成(N, feature_num)矩阵
     return ret
 
 
