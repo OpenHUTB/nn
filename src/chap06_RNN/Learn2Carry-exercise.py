@@ -151,6 +151,7 @@ def compute_loss(logits, labels):
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
     with tf.GradientTape() as tape:
+        # 前向传播获取预测结果
         logits = model(x, y)
         loss = compute_loss(logits, label)
 
