@@ -33,8 +33,8 @@ def randomString(stringLength):
     """Generate a random string with the combination of lowercase and uppercase letters """
 
 
-    letters = string.ascii_uppercase
-    return ''.join(random.choice(letters) for i in range(stringLength))
+    letters = string.ascii_uppercase# 获取所有大写字母字符集
+    return ''.join(random.choice(letters) for i in range(stringLength)) # 从字符集中随机选择字符并拼接成指定长度的字符串
 
 def get_batch(batch_size, length):
     batched_examples = [randomString(length) for i in range(batch_size)]
