@@ -228,7 +228,7 @@ class Log:
 
 # In[6]:
 
-
+x = np.random.normal(size=[5, 6])  # 示例：生成5个样本，每个样本6维特征
 label = np.zeros_like(x) #创建了一个与x形状相同的全零标签矩阵
 label[0, 1] = 1.
 label[1, 0] = 1
@@ -352,7 +352,7 @@ def prepare_data():
     test_label[np.arange(test_data[0].shape[0]), np.array(test_data[1])] = 1.
     return train_data[0], train_label, test_data[0], test_label
 
-def train(model, train_data, train_label, epochs=50):
+def train(model, train_data, train_label, epochs=50,batch_size=128):
     losses = []
     accuracies = []
     num_samples = train_data.shape[0]
