@@ -157,6 +157,7 @@ class mySeq2SeqModel(keras.Model):
 
 
 @tf.function
+#这段代码定义了一个计算分类任务损失值的函数 compute_loss，主要用于神经网络训练时评估预测结果与真实标签之间的差异。
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
