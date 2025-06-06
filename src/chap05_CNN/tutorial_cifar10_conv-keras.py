@@ -46,10 +46,27 @@ def cifar10_dataset():
     return ds, test_ds
 
 def prepare_mnist_features_and_labels(x, y):
+    """
+    预处理MNIST数据集的特征和标签
+    
+    参数:
+    x: 图像数据，形状为 [样本数, 28, 28]，像素值范围 [0, 255]
+    y: 标签数据，形状为 [样本数]，标签值范围 [0, 9]
+    
+    返回:
+    x: 归一化后的图像数据，数据类型 float32，范围 [0, 1]
+    y: 转换为int64类型的标签数据
+    """
+    # 将图像数据从uint8类型转换为float32类型
+    # 并将像素值从[0, 255]归一化到[0, 1]范围
+    # 归一化有助于梯度下降优化过程更稳定
     x = tf.cast(x, tf.float32) / 255.0
+    
+    # 将标签数据转换为int64类型
+    # 这是TensorFlow中稀疏分类交叉熵损失函数要求的类型
     y = tf.cast(y, tf.int64)
+    
     return x, y
-
 # In[ ]:
 # ## 开始建立模型
 
