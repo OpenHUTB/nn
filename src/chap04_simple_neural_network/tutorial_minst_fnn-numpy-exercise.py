@@ -263,9 +263,10 @@ print('--'*20)
 # print(W2_grad)
 # 使用TensorFlow自动微分验证梯度
 with tf.GradientTape() as tape:
+    # 将数据转换为TensorFlow常量
     x, W1, W2, label = tf.constant(x), tf.constant(W1), tf.constant(W2), tf.constant(label)
-    tape.watch(W1)
-    tape.watch(W2)
+    tape.watch(W1)  # 追踪W1的梯度
+    tape.watch(W2) # 追踪W2的梯度
     h1 = tf.matmul(x, W1)
     h1_relu = tf.nn.relu(h1)
     h2 = tf.matmul(h1_relu, W2)
