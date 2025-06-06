@@ -2,7 +2,7 @@
 # encoding: utf-8
 # 导入numpy模块并命名为np
 import numpy as np
-
+import sys
 class RBM:
     """Restricted Boltzmann Machine."""
 
@@ -11,7 +11,7 @@ class RBM:
 
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
-        #神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
+        # 神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
         """
         参数说明：
         n_observe (int): 可见层（输入层）神经元的数量，即输入特征维度
@@ -49,7 +49,7 @@ class RBM:
         """使用Contrastive Divergence算法对模型进行训练"""
     
         # 请补全此处代码
-         # 将数据展平为二维数组 [n_samples, n_observe]
+        # 将数据展平为二维数组 [n_samples, n_observe]
         data_flat = data.reshape(data.shape[0], -1)  
         n_samples = data_flat.shape[0]  # 样本数量
 
@@ -77,7 +77,7 @@ class RBM:
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
                 # 计算梯度      
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)         # 计算权重矩阵的梯度
+                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
                 db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
                 db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
 
@@ -112,9 +112,12 @@ class RBM:
 
 # 使用 MNIST 数据集训练 RBM 模型
 if __name__ == '__main__':
-
+    try:
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
     mnist = np.load('mnist_bin.npy')  # 60000x28x28
+    except IOError:
+    print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
+    sys.exit(1)
     n_imgs, n_rows, n_cols = mnist.shape
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
