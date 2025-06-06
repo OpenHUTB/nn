@@ -168,12 +168,14 @@ def sequence_reversal():
     enc_out, state = model.encode(enc_x)
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
 
-def is_reverse(seq, rev_seq):
+def is_reverse(seq, rev_seq):# 将待检测序列反转（使用列表推导式+reversed函数实现字符串反转）
+    # 比较原始序列与反转后的序列是否相同
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     if seq == rev_seq_rev:
         return True
     else:
         return False
+
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 print(list(zip(*sequence_reversal())))
 
