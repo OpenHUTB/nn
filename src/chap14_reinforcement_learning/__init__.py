@@ -152,10 +152,10 @@ register(
 
 register(
     id='FrozenLake-v0',   # 冰湖行走任务
-    entry_point='gym.envs.toy_text:FrozenLakeEnv',
-    kwargs={'map_name' : '4x4'},   # 4x4网格
-    max_episode_steps=100,
-    reward_threshold=0.78, # optimum = .8196   # 成功到达目标的平均奖励
+    entry_point = 'gym.envs.toy_text:FrozenLakeEnv',
+    kwargs = {'map_name' : '4x4'},   # 4x4网格
+    max_episode_steps = 100,
+    reward_threshold = 0.78, # optimum = .8196   # 成功到达目标的平均奖励
 )
 
 register(
