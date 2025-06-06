@@ -40,13 +40,11 @@ def random_string(length):
     # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     letters = string.ascii_uppercase
 
-    # 步骤 2：从字符集中随机选择指定数量的字符 ；使用 random.choice(letters) 从 letters 中随机选择一个字符
+    # 步骤 2：从字符集中随机选择指定数量的字符
     random_chars = [random.choice(letters) for _ in range(length)]
 
     # 步骤 3：将字符列表拼接成字符串并返回
     return ''.join(random_chars)
-    # 重复这个过程 stringLength 次，并用 ''.join() 将这些字符连接成一个字符串
-    # 最终返回生成的随机字符串
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
@@ -59,6 +57,7 @@ def get_batch(batch_size, length):
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
+
 print(get_batch(2, 10))
 
 ###
@@ -66,7 +65,6 @@ print(get_batch(2, 10))
 # # 建立sequence to sequence 模型##
 
 # In[3]:
-
 
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
@@ -79,7 +77,7 @@ class mySeq2SeqModel(keras.Model):
         # 嵌入层：将每个字符的索引映射成64维的向量表示
         # 输入维度：self.v_sz（即词表大小），输出维度为64
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64,
-                                                    batch_input_shape=[None, None])
+                                                     batch_input_shape=[None, None])
 
         # 编码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(128)
@@ -91,22 +89,21 @@ class mySeq2SeqModel(keras.Model):
         self.encoder = tf.keras.layers.RNN(
             self.encoder_cell,
             # 返回每个时间步的输出
-            return_sequences = True,
+            return_sequences=True,
             # 还返回最终隐藏状态
-            return_state = True
+            return_state=True
         )
 
         # 解码器RNN层：与编码器类似
         self.decoder = tf.keras.layers.RNN(
             self.decoder_cell,
-            return_sequences = True,
-            return_state = True
+            return_sequences=True,
+            return_state=True
         )
 
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
         self.dense = tf.keras.layers.Dense(self.v_sz)
 
-        
     @tf.function
     def call(self, enc_ids, dec_ids):
         '''
@@ -124,8 +121,7 @@ class mySeq2SeqModel(keras.Model):
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
         return logits
-    
-    
+
     @tf.function
     def encode(self, enc_ids):
         # shape(b_sz, len, emb_sz)，通过嵌入层将token ID转换为词向量，输出形状: (batch_size, sequence_length, embedding_size)
@@ -141,13 +137,13 @@ class mySeq2SeqModel(keras.Model):
         shape(x) = [b_sz,] 
         '''
         x_embed = self.embed_layer(x)  # (B, E)
-    
-    # 加性注意力计算
+
+        # 加性注意力计算
         score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
-    
+
         rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
         output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
         logits = self.dense(output)  # (B, V)
@@ -165,12 +161,12 @@ def compute_loss(logits, labels):
     """计算交叉熵损失"""
     # 计算稀疏交叉熵损失
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+        logits=logits, labels=labels)
     # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
-# 定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
 
+# 定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
 @tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     """执行一次训练步骤（前向传播+反向传播）"""
@@ -183,17 +179,18 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
 
     # 计算梯度（自动微分）
     grads = tape.gradient(loss, model.trainable_variables)
-    
+
     # 应用梯度更新模型参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
     # 返回当前步骤的损失值
     return loss
+
 def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
     # 初始化训练指标
-    loss = 0.0 # 记录loss值 (初始为0)
-    accuracy = 0.0 # 可扩展性占位 (当前未实际计算准确率)
+    loss = 0.0  # 记录loss值 (初始为0)
+    accuracy = 0.0  # 可扩展性占位 (当前未实际计算准确率)
     for step in range(3000):
         # 获取训练batch数据:
         # - batched_examples: 原始样本 (用于调试/可视化)
@@ -214,9 +211,9 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
-model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
-train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
+optimizer = optimizers.Adam(0.0005)  # 创建一个 Adam 优化器，用于更新模型参数。
+model = mySeq2SeqModel()  # 实例化一个序列到序列（Seq2Seq）模型。
+train(model, optimizer, seqlen=20)  # 调用 train 函数开启模型训练流程。
 
 
 # # 测试模型逆置能力
@@ -224,7 +221,6 @@ train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程�
 # 测试阶段跟训练阶段的区别在于，在训练的时候decoder的输入是给定的，而在预测的时候我们需要一步步生成下一步的decoder的输入
 
 # In[6]:
-
 
 def sequence_reversal():
     """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
@@ -244,9 +240,9 @@ def sequence_reversal():
             # 收集每一步生成的 token
             collect.append(tf.expand_dims(cur_token, axis=-1))
         # 拼接输出序列
-        out = tf.concat(collect, axis = -1).numpy()
+        out = tf.concat(collect, axis=-1).numpy()
         # 索引转字符
-        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
+        out = [''.join([chr(idx + ord('A') - 1) for idx in exp]) for exp in out]
         return out
 
     # 生成一批测试数据（32个样本，每个序列长度10）
@@ -264,9 +260,14 @@ def is_reverse(seq, rev_seq):
         return True
     else:
         return False
+
 # 测试模型逆序能力的准确性
-print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])# 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
-print(list(zip(*sequence_reversal())))# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
+print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])  # 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
+print(list(zip(*sequence_reversal())))  # 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
+
+
+
+
 
 
 
