@@ -132,10 +132,11 @@ register(
 )
 
 # Toy Text
+# 文本类简单环境：离散状态空间
 # ----------------------------------------
 
 register(
-    id='Blackjack-v0',
+    id='Blackjack-v0',    # 21点游戏
     entry_point='gym.envs.toy_text:BlackjackEnv',
 )
 
