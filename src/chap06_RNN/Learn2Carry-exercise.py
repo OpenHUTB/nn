@@ -24,8 +24,10 @@ import os,sys,tqdm
 # * 将数字位列表填充到同样的长度 `pad2len`
 #
 
+
 # In[2]:
 
+ # 生成两个随机数数组
 def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     """生成包含随机整数对及其和的批量数据。
 
