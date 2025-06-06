@@ -240,7 +240,7 @@ def sequence_reversal():
             # 收集每一步生成的 token
             collect.append(tf.expand_dims(cur_token, axis=-1))
         # 拼接输出序列
-        out = tf.concat(collect, axis=-1).numpy()
+        out = tf.concat(collect, axis = -1).numpy()
         # 索引转字符
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out

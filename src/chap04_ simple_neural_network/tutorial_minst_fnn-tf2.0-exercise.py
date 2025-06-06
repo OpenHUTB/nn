@@ -45,10 +45,10 @@ class MyModel:
         '''声明模型对应的参数'''
         ####################
     # 输入层784 -> 隐藏层128
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev = 0.1))
         self.b1 = tf.Variable(tf.zeros([128]))
         # 隐藏层128 -> 输出层10
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev = 0.1))
         self.b2 = tf.Variable(tf.zeros([10]))
     
     def __call__(self, x):
@@ -78,7 +78,7 @@ def compute_loss(logits, labels):
 
 @tf.function
 def compute_accuracy(logits, labels):
-    predictions = tf.argmax(logits, axis=1)
+    predictions = tf.argmax(logits, axis = 1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
 
@@ -147,11 +147,11 @@ def test(model, x, y):
 train_data, test_data = mnist_dataset()
 for epoch in range(50):
     loss, accuracy = train_one_step(model, optimizer, 
-                                    tf.constant(train_data[0], dtype=tf.float32), 
-                                    tf.constant(train_data[1], dtype=tf.int64))
+                                    tf.constant(train_data[0], dtype = tf.float32), 
+                                    tf.constant(train_data[1], dtype = tf.int64))
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 loss, accuracy = test(model, 
-                      tf.constant(test_data[0], dtype=tf.float32), 
-                      tf.constant(test_data[1], dtype=tf.int64))
+                      tf.constant(test_data[0], dtype = tf.float32), 
+                      tf.constant(test_data[1], dtype = tf.int64))
 
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())

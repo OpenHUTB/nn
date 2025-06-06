@@ -80,6 +80,39 @@ class mySeq2SeqModel(keras.Model):
         完成带attention机制的 sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好，
         用双线性attention，或者自己改一下`__init__`函数做加性attention
         '''
+        # Embedding
+        enc_emb = self.embed_layer(enc_ids)  # (B, T1, E)
+        dec_emb = self.embed_layer(dec_ids)  # (B, T2, E)
+
+        # 编码器输出
+        enc_outputs, enc_state = self.encoder(enc_emb)  # (B, T1, H), (B, H)
+
+        # 初始化解码器状态
+        state = enc_state  # (B, H)
+
+        # Attention + Decoder + Output
+        outputs = []
+        for t in range(dec_emb.shape[1]):
+            # 当前时刻的 decoder 输入
+            dec_input_t = dec_emb[:, t, :]  # (B, E)
+
+            # Attention 权重计算（加性）
+            score = tf.nn.tanh(self.dense_attn(enc_outputs))  # (B, T1, H)
+            score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+            attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+            context = tf.reduce_sum(enc_outputs * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+
+            # 合并 context 与 decoder input
+            dec_input_combined = tf.concat([dec_input_t, context], axis=-1)  # (B, H+E)
+
+            # Decoder RNN 一步
+            output, state = self.decoder_cell(dec_input_combined, [state])  # output: (B, H)
+
+            # 输出层
+            logits = self.dense(output)  # (B, V)
+            outputs.append(tf.expand_dims(logits, axis=1))  # (B, 1, V)
+
+        logits = tf.concat(outputs, axis=1)  # (B, T2, V)
         return logits
     
     
@@ -96,8 +129,25 @@ class mySeq2SeqModel(keras.Model):
     
         '''
         todo
-        参考sequence_reversal-exercise, 自己构建单步解码逻辑'''
-        return out, state
+        参考sequence_reversal-exercise, 自己构建单步解码逻辑
+        '''
+        x_embed = self.embed_layer(x)  # (B, E)
+
+        # Attention 权重计算
+        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
+        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+        attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+
+        # 合并 decoder input 和 context
+        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, H + E)
+
+        # 解码一步
+        output, state = self.decoder_cell(rnn_input, [state])  # output: (B, H)
+        logits = self.dense(output)  # (B, V)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        return next_token, state[0]
+        
 
 
 # # Loss函数以及训练逻辑
