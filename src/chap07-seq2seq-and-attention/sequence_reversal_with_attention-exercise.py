@@ -169,8 +169,11 @@ def compute_loss(logits, labels):
 # 使用图执行模式优化训练步骤
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
+     # 创建梯度记录环境
     with tf.GradientTape() as tape:
+          # 前向传播：获取模型预测
         logits = model(enc_x, dec_x)
+        # 计算损失
         loss = compute_loss(logits, y)
 
     # compute gradient
