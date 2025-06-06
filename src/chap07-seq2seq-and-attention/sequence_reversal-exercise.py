@@ -159,8 +159,10 @@ class mySeq2SeqModel(keras.Model):
 @tf.function
 def compute_loss(logits, labels):
     """计算交叉熵损失"""
+    # 计算稀疏交叉熵损失
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
 #定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
