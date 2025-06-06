@@ -81,13 +81,13 @@ register(
 )
 
 register(
-    id='Pendulum-v0',
+    id='Pendulum-v0',   # 钟摆任务：摆到垂直位置
     entry_point='gym.envs.classic_control:PendulumEnv',
     max_episode_steps=200,
 )
 
 register(
-    id='Acrobot-v1',
+    id='Acrobot-v1',     # 双连杆机械臂任务
     entry_point='gym.envs.classic_control:AcrobotEnv',
     max_episode_steps=500,
 )
