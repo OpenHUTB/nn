@@ -54,29 +54,29 @@ def generate_data(n_samples=1000):
 # 自定义logsumexp函数
 def logsumexp(log_p, axis  =1, keepdims = False):
     #max_val = np.max(log_p, axis = axis, keepdims = True)
-    #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims=keepdims))
+    #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims = keepdims))
     """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理"""
     log_p = np.asarray(log_p)
     
     # 处理空输入情况
     if log_p.size == 0:  # 检查输入的对数概率数组是否为空
-        return np.array(-np.inf, dtype=log_p.dtype)  # 返回与输入相同数据类型的负无穷值
+        return np.array(-np.inf, dtype = log_p.dtype)  # 返回与输入相同数据类型的负无穷值
     
     # 计算最大值（处理全-inf输入）
-    max_val = np.max(log_p, axis=axis, keepdims=True)  # 计算沿指定轴的最大值
+    max_val = np.max(log_p, axis = axis, keepdims = True)  # 计算沿指定轴的最大值
     if np.all(np.isneginf(max_val)):  # 检查是否所有最大值都是负无穷
-        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
+        return max_val.copy() if keepdims else max_val.squeeze(axis = axis)  # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
     safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
-    sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)  # 计算调整后的指数和
+    sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = keepdims)  # 计算调整后的指数和
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
     
     # 处理全-inf输入的特殊case
     if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):  #判断是否所有有效值都是-inf
-        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) #根据keepdims参数的值返回 max_val的适当形式。
+        result = max_val.copy() if keepdims else max_val.squeeze(axis = axis) #根据keepdims参数的值返回 max_val的适当形式。
     return result  #返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类
@@ -97,7 +97,7 @@ class GaussianMixtureModel:
         self.pi = np.ones(self.n_components) / self.n_components
         
         # 随机选择样本点作为初始均值
-        self.mu = X[np.random.choice(n_samples, self.n_components, replace=False)]
+        self.mu = X[np.random.choice(n_samples, self.n_components, replace = False)]
         
         # 初始化协方差矩阵为单位矩阵
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
@@ -112,7 +112,7 @@ class GaussianMixtureModel:
             gamma = np.exp(log_prob - log_prob_sum) # 计算后验概率矩阵gamma(也称为响应度矩阵)
 
             # M步：更新参数
-            Nk = np.sum(gamma, axis=0) # 计算每个高斯成分的"有效样本数"（即属于该成分的样本概率之和）
+            Nk = np.sum(gamma, axis = 0) # 计算每个高斯成分的"有效样本数"（即属于该成分的样本概率之和）
             self.pi = Nk / n_samples # 更新混合权重π：各成分的样本占比
             # 初始化新均值和新协方差矩阵的存储空间
             # 保持与原参数相同的形状，用于后续计算
@@ -121,7 +121,7 @@ class GaussianMixtureModel:
             
             for k in range(self.n_components): # 遍历每个高斯成分更新参数
                 # 更新均值
-                new_mu[k] = np.sum(gamma[:, k, None] * X, axis=0) / Nk[k]
+                new_mu[k] = np.sum(gamma[:, k, None] * X, axis = 0) / Nk[k]
 
                 # 更新协方差
                 # 计算中心化后的样本：X 减去第 k 个高斯成分的均值
