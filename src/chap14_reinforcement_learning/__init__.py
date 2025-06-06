@@ -111,10 +111,10 @@ register(
 )
 
 register(
-    id='BipedalWalker-v2',
+    id='BipedalWalker-v2',   # 双足步行机器人
     entry_point='gym.envs.box2d:BipedalWalker',
     max_episode_steps=1600,
-    reward_threshold=300,
+    reward_threshold=300,     # 完成步行得分
 )
 
 register(
