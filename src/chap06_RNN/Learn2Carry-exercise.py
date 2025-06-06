@@ -118,7 +118,7 @@ class myRNNModel(keras.Model):
          # 定义RNN单元(SimpleRNNCell)
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
-        self.dense = tf.keras.layers.Dense(10)
+        self.dense = tf.keras.layers.Dense(10) # 定义全连接层，输出10个类别(数字0-9)的概率
 
     @tf.function
     def call(self, num1, num2):
