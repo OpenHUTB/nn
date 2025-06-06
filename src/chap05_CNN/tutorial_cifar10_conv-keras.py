@@ -134,13 +134,21 @@ import numpy as np
 
 ds, test_ds = cifar10_dataset()
 
+# 从测试数据集中获取第一个批次的第一张图像
 for i in test_ds:
-    test_batch = i[0][:1, :, :]
-    break
-img = Image.open(open('corgi.jpg', 'rb'))
-img = numpy.asarray(img, dtype='float32') / 256.
-# print(img.shape)
+    test_batch = i[0][:1, :, :]  # 提取第一批中的第一张图像 [1, H, W, C]
+    break                        # 只取一个样本，跳出循环
+
+# 打开并预处理自定义图像（示例：柯基犬图片）
+img = Image.open(open('corgi.jpg', 'rb'))  # 打开图像文件
+img = numpy.asarray(img, dtype='float32')  # 转换为float32类型的numpy数组
+img = img / 256.0                          # 错误：应除以255.0进行归一化
+# print(img.shape)                         # 打印图像形状，例如 (224, 224, 3)
+
+# 在第0维添加一个维度，将图像转换为批次格式 [1, H, W, C]
+# 这是因为模型通常期望输入是批次形式的
 img = np.expand_dims(img, axis=0)
+
 
 # img = test_batch
 img_out = model.getL2_feature_map(img)
