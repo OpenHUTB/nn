@@ -177,10 +177,15 @@ register(
     max_episode_steps=1000,
 )
 
+# 注册后可通过gym.make('Roulette-v0')创建环境实例
 register(
-    id='Roulette-v0',
-    entry_point='gym.envs.toy_text:RouletteEnv',
-    max_episode_steps=100,
+    id='Roulette-v0',  # 环境唯一标识符（在代码中引用的名称
+    entry_point='gym.envs.toy_text:RouletteEnv',  # 环境类的导入路径
+                                                  # 格式为：'包名:类名'
+
+    max_episode_steps=100,              # 每个episode的最大步数
+                                        # 达到此步数后，环境自动终止
+                                        # 防止无限循环，控制训练复杂度
 )
 
 register(
@@ -503,7 +508,7 @@ register(
 register(
     id='OffSwitchCartpole-v0',
     entry_point='gym.envs.safety:OffSwitchCartpoleEnv',
-    max_episode_steps=200,
+    max_episode_steps = 200,
 )
 
 register(
