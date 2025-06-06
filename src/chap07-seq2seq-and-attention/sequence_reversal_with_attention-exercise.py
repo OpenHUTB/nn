@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding: utf-8
 
 # # 序列逆置 （加注意力的seq2seq）
@@ -52,7 +52,7 @@ print(get_batch(2, 10))
 # In[26]:
 
 # 定义了一个名为 mySeq2SeqModel 的类，继承自 keras.Model
-#调用父类 keras.Model 的初始化方法
+# 调用父类 keras.Model 的初始化方法
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
