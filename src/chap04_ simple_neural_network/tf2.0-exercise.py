@@ -22,6 +22,7 @@ def softmax(x):
     """
     # 检查输入是否为张量
     if not tf.is_tensor(x):
+        # 将输入转换为TensorFlow张量
         x = tf.convert_to_tensor(x)
     
     # 计算每个元素的指数值，减去最大值以提高数值稳定性
