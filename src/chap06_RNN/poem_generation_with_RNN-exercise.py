@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding: utf-8
 
 # # 诗歌生成
 # # 数据处理
 
 # In[1]:
-#导入了多个用于构建和训练深度学习模型的Python库和模块
+# 导入了多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
 import tensorflow as tf
 import collections
