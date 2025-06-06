@@ -144,6 +144,7 @@ class myRNNModel(keras.Model):
 
 @tf.function
 def compute_loss(logits, labels):
+     # 计算稀疏交叉熵损失(不需要对标签做one-hot编码)
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits = logits , labels = labels)
     return tf.reduce_mean(losses)
