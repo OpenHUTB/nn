@@ -63,6 +63,7 @@ class MyConvModel(keras.Model):
     网络结构：
     Conv2D(32) → Conv2D(64) → MaxPooling2D → Flatten → Dense(100) → Dense(10)
     """
+
     def __init__(self):
         super(MyConvModel, self).__init__()
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
@@ -92,6 +93,7 @@ class MyConvModel(keras.Model):
         logits = self.dense2(dense1)
         return logits
 
+
 model = MyConvModel()
 optimizer = optimizers.Adam()
 
@@ -113,7 +115,9 @@ def compute_loss(logits, labels):
     """
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels))
+            logits=logits, labels=labels)
+    )
+
 
 @tf.function
 def compute_accuracy(logits, labels):
@@ -129,6 +133,7 @@ def compute_accuracy(logits, labels):
     """
     predictions = tf.argmax(logits, axis=1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
+
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
@@ -155,6 +160,7 @@ def train_one_step(model, optimizer, x, y):
     accuracy = compute_accuracy(logits, y)
     return loss, accuracy
 
+
 @tf.function
 def test_step(model, x, y):
     """
@@ -173,6 +179,7 @@ def test_step(model, x, y):
     loss = compute_loss(logits, y)
     accuracy = compute_accuracy(logits, y)
     return loss, accuracy
+
 
 def train(epoch, model, optimizer, ds):
     """
@@ -194,9 +201,11 @@ def train(epoch, model, optimizer, ds):
         loss, accuracy = train_one_step(model, optimizer, x, y)
 
         if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
+            print('epoch', epoch, ': loss', loss.numpy(),
+                  '; accuracy', accuracy.numpy())
 
     return loss, accuracy
+
 
 def test(model, ds):
     """
