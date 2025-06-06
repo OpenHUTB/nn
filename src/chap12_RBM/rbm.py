@@ -67,9 +67,8 @@ class RBM:
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率
-
-                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) # 计算隐藏层单元被激活的概率
-                h0_sample = self._sample_binary(h0_prob) # 根据计算出的概率对隐藏层进行二值化采样
+                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) # 通过输入层向量v0与权重矩阵self.W的点积，再加上隐藏层偏置self.b_h
+                h0_sample = self._sample_binary(h0_prob) #这段代码的作用是借助 self._sample_binary 方法，对 h0_prob 进行二值采样，进而得到 h0_sample。在深度学习领域，当处理二值变量或者进行二值掩码操作时，常常会用到这样的采样。
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
                 v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  #将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
