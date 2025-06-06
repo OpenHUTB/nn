@@ -118,6 +118,7 @@ class mySeq2SeqModel(keras.Model):
     
     
     @tf.function
+    #这段代码定义了一个编码器（encode）方法，主要功能是将输入的 token 序列（enc_ids）转换为带有上下文信息的表示（enc_out）和最终状态（enc_state）
     def encode(self, enc_ids):
         enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)
         enc_out, enc_state = self.encoder(enc_emb)
