@@ -377,7 +377,7 @@ def train(model, train_data, train_label, epochs=50):
         # 计算整个epoch的平均损失和准确率
         epoch_loss /= num_samples
         epoch_accuracy /= num_samples
-        losses.append(epoch_loss)
+        losses.append(epoch_loss)  # apend函数每次调用只能添加一个元素（可以是任意数据类型，如数字、字符串、列表等
         accuracies.append(epoch_accuracy)
         print(f'Epoch {epoch}: Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
     return losses, accuracies
