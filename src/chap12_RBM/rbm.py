@@ -7,7 +7,37 @@ class RBM:
     """Restricted Boltzmann Machine."""
 
     def __init__(self, n_hidden=2, n_observe=784):
-        """初始化模型参数（受限玻尔兹曼机）"""
+    """
+    初始化受限玻尔兹曼机（RBM）模型参数
+
+    Args:
+        n_hidden (int): 隐藏层单元数量（默认 2）
+        n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
+
+    Raises:
+        ValueError: 若输入参数非正整数则抛出异常
+        """
+        # 参数验证：确保隐藏层和可见层单元数量为正整数
+        if not (isinstance(n_hidden, int) and n_hidden > 0):
+            raise ValueError("隐藏层单元数量 n_hidden 必须为正整数")
+        if not (isinstance(n_observe, int) and n_observe > 0):
+            raise ValueError("可见层单元数量 n_observe 必须为正整数")
+        # 初始化模型参数
+        self.n_hidden = n_hidden
+        self.n_observe = n_observe
+        # 权重矩阵 (可见层到隐藏层)
+        self.W = np.random.normal(
+        loc=0.0,                # 均值
+        scale=0.1,              # 标准差（常见初始化方法）
+        size=(n_observe, n_hidden))
+        # 可见层偏置（1 x n_observe）
+        self.Wv = np.zeros((1, n_observe))
+        # 隐藏层偏置（1 x n_hidden）
+        self.Wh = np.zeros((1, n_hidden))
+        # 可选：使用 Xavier/Glorot 初始化替代
+        # self.W = np.random.randn(n_observe, n_hidden) * np.sqrt(1.0 / n_observe)
+        # self.Wv = np.zeros((1, n_observe))
+        # self.Wh = np.zeros((1, n_hidden))
 
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
