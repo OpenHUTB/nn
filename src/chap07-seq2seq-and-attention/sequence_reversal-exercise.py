@@ -50,7 +50,7 @@ def random_string(length):
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
-    batched_examples = [randomString(length) for i in range(batch_size)]
+    batched_examples = [random_string(length) for i in range(batch_size)]
     # 转成索引
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     # 逆序
@@ -140,15 +140,19 @@ class mySeq2SeqModel(keras.Model):
         '''
         shape(x) = [b_sz,] 
         '''
-        # shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
-        inp_emb = self.embed_layer(x)
-        # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
-        h, state = self.decoder_cell.call(inp_emb, state)
-        # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
-        logits = self.dense(h)
-        # 选择得分最高的token作为预测结果
-        out = tf.argmax(logits, axis=-1)
-        return out, state
+        x_embed = self.embed_layer(x)  # (B, E)
+    
+    # 加性注意力计算
+        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
+        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+        attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+    
+        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
+        output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
+        logits = self.dense(output)  # (B, V)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        return next_token, new_state[0]  # 返回单个状态向量
 
 
 # # Loss函数以及训练逻辑

@@ -61,7 +61,7 @@ class mySeq2SeqModel(keras.Model):
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None]) # 输入词汇表大小，即嵌入层的输入维度和每个词向量的维度以及输入张量的形状，支持任意批次大小和序列长度
         
-        self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
+        self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden) # 隐藏状态的维度，即输出维度
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
@@ -91,6 +91,7 @@ class mySeq2SeqModel(keras.Model):
         state = enc_state  # (B, H)
 
         # Attention + Decoder + Output
+        #这里的这段代码实现了一个加性注意力机制
         outputs = []
         for t in range(dec_emb.shape[1]):
             # 当前时刻的 decoder 输入
@@ -117,6 +118,7 @@ class mySeq2SeqModel(keras.Model):
     
     
     @tf.function
+    #这段代码定义了一个编码器（encode）方法，主要功能是将输入的 token 序列（enc_ids）转换为带有上下文信息的表示（enc_out）和最终状态（enc_state）
     def encode(self, enc_ids):
         enc_emb = self.embed_layer(enc_ids) # shape(b_sz, len, emb_sz)
         enc_out, enc_state = self.encoder(enc_emb)
