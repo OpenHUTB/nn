@@ -62,10 +62,13 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # 补全代码
         
     def place(self,state,enables):
-        # 用于测试的函数，返回的action是 0-63 之间的一个数值，
-        # action 表示的是 要下的位置。
-        # action = 123456789
-        # 删掉这句话，并填写相应代码
+        """
+           根据当前棋盘状态和合法落子位置，选择最优落子位置。
+
+           :param state: 当前棋盘状态，形状为 (8, 8, 3) 的数组
+           :param enables: 合法落子位置的索引列表
+           :return: 选择的落子位置索引，范围为 0-63
+           """
         # 状态预处理
         state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
