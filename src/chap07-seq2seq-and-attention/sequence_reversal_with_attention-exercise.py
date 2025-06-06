@@ -33,7 +33,7 @@ def randomString(stringLength):  # 定义函数 get_batch，输入参数 batch_s
     """Generate a random string with the combination of lowercase and uppercase letters """
 
 
-    letters = string.ascii_uppercase
+    letters = string.ascii_uppercase #生成指定长度的随机大写字母字符串
     return ''.join(random.choice(letters) for i in range(stringLength))
 
 def get_batch(batch_size, length):
@@ -59,7 +59,7 @@ class mySeq2SeqModel(keras.Model):
         self.v_sz=27 # 词汇表大小（包括可能的特殊符号）
         self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape=[None, None]) # 输入词汇表大小，即嵌入层的输入维度和每个词向量的维度以及输入张量的形状，支持任意批次大小和序列长度
         
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
