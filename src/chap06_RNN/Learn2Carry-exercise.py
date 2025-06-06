@@ -125,7 +125,7 @@ class myRNNModel(keras.Model):
         '''
         此处完成上述图中模型
         '''
-        
+        # 将输入数字序列嵌入到向量空间
         emb1 = self.embed_layer(num1)  # shape: (batch, seq_len, 32)
         emb2 = self.embed_layer(num2)  # shape: (batch, seq_len, 32)
 
