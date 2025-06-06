@@ -15,6 +15,7 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
+# 代码模块化
 def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28,1)
