@@ -87,11 +87,27 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     
     return conv
     
-def max_pool_2x2(x):
-    # 滑动步长是 2步; 池化窗口的尺度 高和宽度都是2; padding 方式 请选择 same
-    # 提示 使用函数  tf.nn.max_pool
+def max_pool_2x2(x: tf.Tensor,
+    pool_size: int = 2,
+    strides: int = 2,
+    padding: str = 'SAME',
+    data_format: str = 'NHWC'
+) -> tf.Tensor:
+    # 验证参数合法性
+    if padding not in ['SAME', 'VALID']:
+        raise ValueError(f"padding must be 'SAME' or 'VALID', got {padding}.")
+    if data_format not in ['NHWC', 'NCHW']:
+        raise ValueError(f"data_format must be 'NHWC' or 'NCHW', got {data_format}.")
     
-    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+    # 构造池化核和步长参数
+    if data_format == 'NHWC':
+        ksize = [1, pool_size, pool_size, 1]
+        strides = [1, strides, strides, 1]
+    else:  # NCHW
+        ksize = [1, 1, pool_size, pool_size]
+        strides = [1, 1, strides, strides]
+    
+    return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
 
 # define placeholder for inputs to network
 xs = tf.placeholder(tf.float32, [None, 784]) / 255.
