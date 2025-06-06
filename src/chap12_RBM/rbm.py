@@ -27,9 +27,9 @@ class RBM:
         self.n_observe = n_observe
         # 权重矩阵 (可见层到隐藏层)
         self.W = np.random.normal(
-        loc=0.0,                # 均值
-        scale=0.1,              # 标准差（常见初始化方法）
-        size=(n_observe, n_hidden))
+        loc = 0.0,                # 均值
+        scale = 0.1,              # 标准差（常见初始化方法）
+        size = (n_observe, n_hidden))
         # 可见层偏置（1 x n_observe）
         self.Wv = np.zeros((1, n_observe))
         # 隐藏层偏置（1 x n_hidden）
