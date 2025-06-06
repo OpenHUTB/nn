@@ -174,7 +174,9 @@ class GaussianMixtureModel:
             sigma += np.eye(n_features) * 1e-6
             sign, logdet = np.linalg.slogdet(sigma)
 
-        # 计算协方差矩阵的逆
+        # 计算协方差矩阵的行列式对数（数值稳定版本）
+        # sign: 行列式符号（应为正数）
+        # logdet: log(|Σ|)
         inv = np.linalg.inv(sigma)
         
         # 计算高斯分布中的指数项（二次型），对应 (x - μ)^T Σ⁻¹ (x - μ)
