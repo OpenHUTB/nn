@@ -36,6 +36,7 @@ import numpy
 import pylab
 from PIL import Image
 import numpy as np
+# 给numpy起别名np
 
 # open random image of dimensions 639x516
 img = Image.open(open('corgi.jpg', 'rb'))
