@@ -39,8 +39,15 @@ test_data = np.random.normal(size=[10, 5])
 # 数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
 
 def sigmoid(x):
-    ##########
-    '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
+    """
+    实现数值稳定的 sigmoid 函数
+    
+    参数:
+        x: 输入张量，任意形状
+        
+    返回:
+        与输入形状相同的 sigmoid 激活结果
+    """
     # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
     x = tf.cast(x, tf.float32)
     # sigmoid 数学定义：1 / (1 + e^{-x})
@@ -57,7 +64,16 @@ test_data = np.random.normal(size=[10, 5])
 
 def softmax_ce(logits, label):
     ##########
-    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
+    """
+    实现数值稳定的 softmax 交叉熵损失函数
+    
+    参数:
+        logits: 未经Softmax的原始输出，形状[batch_size, num_classes]
+        labels: one-hot格式的标签，形状与logits相同
+        
+    返回:
+        标量损失值
+    """
     # 参数logits: 未经Softmax的原始输出（logits）
     # 参数label: one-hot格式的标签
     epsilon = 1e-8
