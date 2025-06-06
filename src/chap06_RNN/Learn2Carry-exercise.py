@@ -37,9 +37,9 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         tuple: 包含三个numpy数组的元组(numbers_1, numbers_2, results)，
                每个数组形状为(batch_size,)
     """
-    numbers_1 = np.random.randint(start, end, batch_size)
-    numbers_2 = np.random.randint(start, end, batch_size)
-    results = numbers_1 + numbers_2
+    numbers_1 = np.random.randint(start, end, batch_size)# 生成第一个随机整数数组，形状为(batch_size,)，数值范围：start ≤ numbers_1[i] < end
+    numbers_2 = np.random.randint(start, end, batch_size)# 生成第二个随机整数数组，与numbers_1独立，数值范围：start ≤ numbers_2[i] < end
+    results = numbers_1 + numbers_2# 逐元素计算两数之和，结果形状同样为(batch_size,)
     return numbers_1, numbers_2, results
 
 def convertNum2Digits(Num):
