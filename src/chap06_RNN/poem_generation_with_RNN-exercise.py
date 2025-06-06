@@ -29,7 +29,7 @@ def process_dataset(fileName):
         id2word: 数字id到词语的映射字典
     """
     examples = []
-    with open(fileName, 'r') as fd:
+    with open(fileName, 'r'，encoding='utf-8', ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
