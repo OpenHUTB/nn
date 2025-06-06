@@ -172,7 +172,9 @@ def sequence_reversal():
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
 
 def is_reverse(seq, rev_seq):
+    # 将模型输出的反转序列再次反转
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+     # 比较原始序列和二次反转后的序列
     if seq == rev_seq_rev:
         return True
     else:
