@@ -309,12 +309,12 @@ class World(object):
         else:
             self.world.wait_for_tick()
 
-    def next_weather(self, reverse=False):
-        self._weather_index += -1 if reverse else 1
-        self._weather_index %= len(self._weather_presets)
-        preset = self._weather_presets[self._weather_index]
-        self.hud.notification('Weather: %s' % preset[1])
-        self.player.get_world().set_weather(preset[0])
+    def next_weather(self, reverse=False): #  切换到下一个或上一个天气预设
+        self._weather_index += -1 if reverse else 1 # 更新天气索引：顺序或逆序移动1个位置
+        self._weather_index %= len(self._weather_presets) # 使用模运算确保索引在有效范围内循环
+        preset = self._weather_presets[self._weather_index]   # 获取当前索引对应的天气预设
+        self.hud.notification('Weather: %s' % preset[1]) # 在HUD（抬头显示）上显示当前天气名称
+        self.player.get_world().set_weather(preset[0]) # 应用新的天气到仿真世界
 
     def next_map_layer(self, reverse=False):
         self.current_map_layer += -1 if reverse else 1
