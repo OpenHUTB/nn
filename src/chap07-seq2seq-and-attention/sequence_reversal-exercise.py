@@ -98,9 +98,15 @@ class mySeq2SeqModel(keras.Model):
 
         # 解码器RNN层：与编码器类似
         self.decoder = tf.keras.layers.RNN(
-            self.decoder_cell,
-            return_sequences = True,
-            return_state = True
+            self.decoder_cell,             # 指定解码器使用的RNN单元
+                                           # 例如LSTMCell、GRUCell或自定义单元
+            return_sequences = True,       # 返回完整的输出序列
+                                           # 适用于序列到序列模型，每个时间步都需要输出
+                                           # 输出形状: [batch_size, seq_len, units]
+            return_state = True            # 返回最终的隐藏状态
+                                           # 对于LSTM单元，返回[h_state, c_state]
+                                           # 对于GRU单元，返回[h_state]
+                                           # 用于传递状态到下一个解码步骤
         )
 
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
