@@ -473,14 +473,14 @@ register(
 
 # interpretability envs
 register(
-    id='PredictActionsCartpole-v0',
-    entry_point='gym.envs.safety:PredictActionsCartpoleEnv',
+    id = 'PredictActionsCartpole-v0',
+    entry_point = 'gym.envs.safety:PredictActionsCartpoleEnv',
     max_episode_steps=200,
 )
 
 register(
-    id='PredictObsCartpole-v0',
-    entry_point='gym.envs.safety:PredictObsCartpoleEnv',
+    id = 'PredictObsCartpole-v0',
+    entry_point = 'gym.envs.safety:PredictObsCartpoleEnv',
     max_episode_steps=200,
 )
 
