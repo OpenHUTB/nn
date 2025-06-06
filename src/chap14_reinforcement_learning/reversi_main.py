@@ -70,7 +70,7 @@ for i_episode in range(max_epochs):
             # 打印游戏结束信息，显示总回合数(t+1是因为索引从0开始)
             print("Episode finished after {} timesteps".format(t+1))
             # 统计黑棋得分（棋盘中为1的个数）
-            black_score = len(np.where(env.state[0,:,:]==1)[0])
+            black_score = len(np.where(env.state[0,:,:] == 1)[0])
             # 判断游戏胜负（棋盘总位置数通常为64）
             if black_score > 32:    # 黑棋数量超过一半
                 print("黑棋赢了！")
