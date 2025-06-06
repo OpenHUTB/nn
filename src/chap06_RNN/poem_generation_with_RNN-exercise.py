@@ -1,27 +1,26 @@
-# !/usr/bin/env python
+#!/usr/bin/env python
 # coding: utf-8
 
 # # 诗歌生成
 # # 数据处理
 
 # In[1]:
-# 导入了多个用于构建和训练深度学习模型的Python库和模块
+# 导入多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
 import tensorflow as tf
 import collections
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
 
-def process_dataset(fileName):
-    """处理诗歌数据集，构建词汇表和数字索引的诗歌数据
+def process_dataset(file_name):
+    """处理诗歌数据集，构建词汇表和数字索引的诗歌数据。
     
     Args:
-        fileName: 诗歌文本文件路径，格式为"标题:内容"
+        file_name: 诗歌文本文件路径，格式为"标题:内容"
         
     Returns:
         instances: 数字索引化的诗歌列表，每个诗歌是数字id的列表
@@ -29,7 +28,7 @@ def process_dataset(fileName):
         id2word: 数字id到词语的映射字典
     """
     examples = []
-    with open(fileName, 'r') as fd:
+    with open(file_name, 'r') as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
@@ -37,7 +36,6 @@ def process_dataset(fileName):
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            ### 过滤过长的诗歌
                 continue
             examples.append(ins)
             
@@ -47,7 +45,7 @@ def process_dataset(fileName):
         for w in e:
             counter[w] += 1
     
-    ## 按词频从高到低排序
+    # 按词频从高到低排序
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
@@ -58,7 +56,7 @@ def process_dataset(fileName):
     word2id = dict(zip(words, range(len(words))))
     
     # 创建id到词语的映射
-    id2word = {word2id[k]:k for k in word2id}
+    id2word = {word2id[k]: k for k in word2id}
     
     # 将诗歌转换为数字id序列
     indexed_examples = [[word2id[w] for w in poem]
@@ -66,13 +64,13 @@ def process_dataset(fileName):
     # 记录每个诗歌的长度
     seqlen = [len(e) for e in indexed_examples]
     
-    #  组合诗歌数据和对应长度
+    # 组合诗歌数据和对应长度
     instances = list(zip(indexed_examples, seqlen))
     
     return instances, word2id, id2word
 
 def poem_dataset():
-    """创建诗歌数据集的TensorFlow Dataset对象
+    """创建诗歌数据集的TensorFlow Dataset对象。
     
     Returns:
         ds: 处理好的tf.data.Dataset对象
@@ -99,12 +97,10 @@ def poem_dataset():
 # # 模型代码
 
 # In[2]:
-
-
-class myRNNModel(keras.Model):
-    """基于RNN的诗歌生成模型"""
+class MyRNNModel(keras.Model):
+    """基于RNN的诗歌生成模型。"""
     def __init__(self, w2id):
-        """初始化模型
+        """初始化模型。
         
         Args:
             w2id: 词语到id的映射字典，用于确定词汇表大小
@@ -125,7 +121,7 @@ class myRNNModel(keras.Model):
         
     @tf.function
     def call(self, inp_ids):
-        """模型前向传播
+        """模型前向传播。
         
         Args:
             inp_ids: 输入词id序列，形状(batch_size, seq_len)
@@ -145,7 +141,7 @@ class myRNNModel(keras.Model):
     
     @tf.function
     def get_next_token(self, x, state):
-        """生成下一个词（用于文本生成阶段）
+        """生成下一个词（用于文本生成阶段）。
         
         Args:
             x: 当前词id，形状(batch_size,)
@@ -169,29 +165,27 @@ class myRNNModel(keras.Model):
 # ## 辅助函数：计算序列损失
 
 # In[3]:
-
-
-def mkMask(input_tensor, maxLen):
-    """创建掩码，用于处理变长序列
+def mk_mask(input_tensor, max_len):
+    """创建掩码，用于处理变长序列。
     
     Args:
         input_tensor: 包含序列长度的张量
-        maxLen: 最大序列长度
+        max_len: 最大序列长度
         
     Returns:
         与input_tensor形状相同的布尔掩码
     """
-    shape_of_input = tf.shape(input_tensor) # 获取输入张量的形状
-    shape_of_output = tf.concat(axis=0, values=[shape_of_input, [maxLen]])
-    #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
-    oneDtensor = tf.reshape(input_tensor, shape=(-1,))
-    #使用tf.sequence_mask函数生成一个掩码张量flat_mask
-    flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
+    shape_of_input = tf.shape(input_tensor)  # 获取输入张量的形状
+    shape_of_output = tf.concat(axis=0, values=[shape_of_input, [max_len]])
+    # 使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
+    one_d_tensor = tf.reshape(input_tensor, shape=(-1,))
+    # 使用tf.sequence_mask函数生成一个掩码张量flat_mask
+    flat_mask = tf.sequence_mask(one_d_tensor, maxlen=max_len)
     
     return tf.reshape(flat_mask, shape_of_output)
 
 def reduce_avg(reduce_target, lengths, dim):
-    """沿指定维度计算掩码后的平均值（忽略填充部分）
+    """沿指定维度计算掩码后的平均值（忽略填充部分）。
     
     Args:
         reduce_target: 需要求平均的张量
@@ -206,44 +200,20 @@ def reduce_avg(reduce_target, lengths, dim):
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     # 验证输入张量的维度是否符合要求
-   # shape_of_lengths: lengths张量的维度列表
-   # dim: 预期的长度张量的秩(rank)
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
     # 验证目标张量的维度是否符合要求
-    # shape_of_target: reduce_target张量的维度列表
-    # dim+1: 预期的目标张量的最小秩
-    if len(shape_of_target) < dim+1 :
+    if len(shape_of_target) < dim + 1:
         raise ValueError(('First input tensor should be at least rank %d, ' +
-                         'while it got rank %d') % (dim+1, len(shape_of_target)))
+                         'while it got rank %d') % (dim + 1, len(shape_of_target)))
 
     rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
-    mxlen = tf.shape(reduce_target)[dim]
-    mask = mkMask(lengths, mxlen)
-    if rank_diff!=0:
-        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
-        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
-    else:
-        len_shape = tf.shape(lengths)
-        mask_shape = tf.shape(mask)
-    lengths_reshape = tf.reshape(lengths, shape=len_shape)
-    mask = tf.reshape(mask, shape=mask_shape)
-
-    mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-    if len(shape_of_lengths) != dim:
-        raise ValueError(('Second input tensor should be rank %d, ' +
-                         'while it got rank %d') % (dim, len(shape_of_lengths)))
-    if len(shape_of_target) < dim+1 :
-        raise ValueError(('First input tensor should be at least rank %d, ' +
-                         'while it got rank %d') % (dim+1, len(shape_of_target)))
-
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
-    mxlen = tf.shape(reduce_target)[dim]
-    mask = mkMask(lengths, mxlen)
-    if rank_diff!=0:
-        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
-        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+    mx_len = tf.shape(reduce_target)[dim]
+    mask = mk_mask(lengths, mx_len)
+    if rank_diff != 0:
+        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1] * rank_diff])
+        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1] * rank_diff])
     else:
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
@@ -263,10 +233,9 @@ def reduce_avg(reduce_target, lengths, dim):
 # # 定义损失函数和训练函数
 
 # In[4]:
-
 @tf.function
 def compute_loss(logits, labels, seqlen):
-    """计算序列的交叉熵损失（考虑变长序列）
+    """计算序列的交叉熵损失（考虑变长序列）。
     Args:
         logits: 模型输出，形状(batch_size, seq_len, vocab_size)
         labels: 真实标签，形状(batch_size, seq_len)
@@ -283,7 +252,7 @@ def compute_loss(logits, labels, seqlen):
 
 @tf.function
 def train_one_step(model, optimizer, x, y, seqlen):
-    """执行一步训练
+    """执行一步训练。
     
     Args:
         model: 诗歌生成模型
@@ -308,7 +277,7 @@ def train_one_step(model, optimizer, x, y, seqlen):
     return loss
 
 def train(epoch, model, optimizer, ds):
-    """训练一个epoch
+    """训练一个epoch。
     
     Args:
         epoch: 当前epoch编号
@@ -320,7 +289,6 @@ def train(epoch, model, optimizer, ds):
         最后一个批次的损失值
     """
     loss = 0.0
-    accuracy = 0.0
     # 遍历数据集
     for step, (x, y, seqlen) in enumerate(ds):
         # 训练一步
@@ -336,13 +304,12 @@ def train(epoch, model, optimizer, ds):
 # # 训练过程
 
 # In[5]:
-
 # 初始化优化器
 optimizer = optimizers.Adam(0.0005)  # 学习率0.0005
 # 加载数据集
 train_ds, word2id, id2word = poem_dataset()
 # 初始化模型
-model = myRNNModel(word2id)
+model = MyRNNModel(word2id)
 
 # 训练10个epoch
 for epoch in range(10):
@@ -351,9 +318,8 @@ for epoch in range(10):
 # # 诗歌生成
 
 # In[74]:
-
-def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int = 50) -> str:
-    """使用训练好的RNN模型生成诗歌
+def gen_sentence(model: MyRNNModel, word2id: dict, id2word: dict, max_len: int = 50) -> str:
+    """使用训练好的RNN模型生成诗歌。
 
     Args:
         model: 训练好的诗歌生成模型
@@ -386,4 +352,4 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
-print(''.join(gen_sentence()))
+print(''.join(gen_sentence(model, word2id, id2word)))
