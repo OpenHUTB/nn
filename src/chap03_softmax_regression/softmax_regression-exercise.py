@@ -154,7 +154,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
         predictions = model(x_batch)# 前向传播：计算模型对输入批次的预测
         loss, accuracy = compute_loss(predictions, y_batch)# 计算损失和准确率
 
-    grads = tape.gradient(loss, model.trainable_variables)# 自动微分：计算损失相对于模型可训练变量的梯度
+    grads = tape.gradient(loss, model.trainable_variables)# 自动计算损失函数对模型参数的梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))# 优化步骤：使用优化器将计算出的梯度应用到模型参数上
     return loss, accuracy# 返回当前批次的损失和准确率
 
