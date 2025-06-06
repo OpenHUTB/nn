@@ -38,8 +38,6 @@ def process_dataset(fileName):
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
             ### 过滤过长的诗歌
-            if len(ins) > 200:
-
                 continue
             examples.append(ins)
             
