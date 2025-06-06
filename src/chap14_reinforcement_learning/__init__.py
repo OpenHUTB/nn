@@ -93,17 +93,18 @@ register(
 )
 
 # Box2d
+# Box2d物理引擎环境：复杂物理模拟任务
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',
+    id='LunarLander-v2',    # 月球着陆器
     entry_point='gym.envs.box2d:LunarLander',
     max_episode_steps=1000,
-    reward_threshold=200,
+    reward_threshold=200,   # 成功着陆得分
 )
 
 register(
-    id='LunarLanderContinuous-v2',
+    id='LunarLanderContinuous-v2',   # 连续控制版本
     entry_point='gym.envs.box2d:LunarLanderContinuous',
     max_episode_steps=1000,
     reward_threshold=200,
