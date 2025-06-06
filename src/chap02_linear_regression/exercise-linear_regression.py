@@ -39,7 +39,7 @@ def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    #可以替换成 x = identity_basis(x)
+    # 可以替换成 x = identity_basis(x)
     # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
@@ -274,11 +274,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    #plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
-    #plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
-    #plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
-    #plt.xlabel("x")  # 设置x轴的标签
-    #plt.ylabel("y")  # 设置y轴的标签
-    #plt.title("Linear Regression")  # 设置图表标题
-    #plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义 # 添加图例，表示每条线的含义
     plt.show()
