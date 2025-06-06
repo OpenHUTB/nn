@@ -61,9 +61,9 @@ register(
 
 
 register(
-    id='CartPole-v1',
+    id='CartPole-v1',  # 更高难度版本
     entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=500,
+    max_episode_steps=500,  # 500步达标
     reward_threshold=475.0,
 )
 
