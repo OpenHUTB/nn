@@ -110,7 +110,7 @@ class myRNNModel(keras.Model):
             w2id: 词语到id的映射字典，用于确定词汇表大小
         """
         super().__init__()
-        self.v_sz = len(w2id)  # 词汇表大小
+        self.v_sz = len(word2id)  # 词汇表大小
         # 嵌入层：将词语id映射为密集向量
         self.embed_layer = tf.keras.layers.Embedding(
             self.v_sz, 64,  # 64维嵌入向量
