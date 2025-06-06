@@ -933,11 +933,11 @@ class CollisionSensor(object):
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
 
-    def get_collision_history(self):
-        history = collections.defaultdict(int)
-        for frame, intensity in self.history:
+    def get_collision_history(self):           # 获取按帧汇总的碰撞历史数据
+        history = collections.defaultdict(int) # 使用defaultdict初始化历史记录，默认值为0
+        for frame, intensity in self.history:  # 遍历所有碰撞记录，按帧号累加碰撞强度
             history[frame] += intensity
-        return history
+        return history                         # 返回按帧汇总的碰撞强度字典
 
     @staticmethod
     def _on_collision(weak_self, event):
