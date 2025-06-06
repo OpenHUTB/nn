@@ -161,9 +161,14 @@ def sequence_reversal():
         state = init_state
         collect = []
         for i in range(steps):
+             # 获取下一个token和新的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
+            # 收集当前步生成的token
             collect.append(tf.expand_dims(cur_token, axis=-1))
+            # 拼接所有生成的token [batch_size, steps]
         out = tf.concat(collect, axis=-1).numpy()
+        # 将索引转换为字符：
+        # 假设索引1对应'A'，2对应'B'，依此类推  
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
     
