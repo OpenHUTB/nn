@@ -169,15 +169,15 @@ def get_actor_display_name(actor, truncate=250):                                
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
-def get_actor_blueprints(world, filter, generation):
-    bps = world.get_blueprint_library().filter(filter)
+def get_actor_blueprints(world, filter, generation):                               # 从Carla仿真环境中获取符合条件的Actor蓝图列表
+    bps = world.get_blueprint_library().filter(filter)                             # 从世界对象中获取蓝图库，并应用过滤器
 
-    if generation.lower() == "all":
+    if generation.lower() == "all":                                                # 如果generation参数为"all"，直接返回所有过滤后的蓝图
         return bps
 
     #  If the filter returns only one bp, we assume that this one needed
     #  and therefore, we ignore the generation
-    if len(bps) == 1:
+    if len(bps) == 1:                                                              # 如果过滤结果仅包含一个蓝图，默认使用该蓝图而忽略generation参数
         return bps
 
     try:
