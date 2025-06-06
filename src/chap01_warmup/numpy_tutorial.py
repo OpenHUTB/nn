@@ -4,8 +4,6 @@
 
 # 1. 导入 numpy 库
 import numpy as np  # 将 numpy 库命名为 np
-
-
 import matplotlib
 import matplotlib.pyplot as plt  # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
