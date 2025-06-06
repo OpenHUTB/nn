@@ -15,7 +15,6 @@ import tensorflow as tf
 # 导入 collections 模块，提供额外的容器类型如字典和列表
 import collections
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
