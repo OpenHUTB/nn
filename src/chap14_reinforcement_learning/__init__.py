@@ -93,18 +93,17 @@ register(
 )
 
 # Box2d
-# Box2d物理引擎环境：复杂物理模拟任务
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',    # 月球着陆器
+    id='LunarLander-v2',
     entry_point='gym.envs.box2d:LunarLander',
     max_episode_steps=1000,
-    reward_threshold=200,   # 成功着陆得分
+    reward_threshold=200,
 )
 
 register(
-    id='LunarLanderContinuous-v2',   # 连续控制版本
+    id='LunarLanderContinuous-v2',
     entry_point='gym.envs.box2d:LunarLanderContinuous',
     max_episode_steps=1000,
     reward_threshold=200,
@@ -487,28 +486,28 @@ register(
 )
     # somewhat harder because of higher variance:
 register(
-    id='SemisuperPendulumRandom-v0',
-    entry_point='gym.envs.safety:SemisuperPendulumRandomEnv',
-    max_episode_steps=200,
+    id = 'SemisuperPendulumRandom-v0',
+    entry_point = 'gym.envs.safety:SemisuperPendulumRandomEnv',
+    max_episode_steps = 200,
 )
     # probably the hardest because you only get a constant number of rewards in total:
 register(
-    id='SemisuperPendulumDecay-v0',
-    entry_point='gym.envs.safety:SemisuperPendulumDecayEnv',
-    max_episode_steps=200,
+    id = 'SemisuperPendulumDecay-v0',
+    entry_point = 'gym.envs.safety:SemisuperPendulumDecayEnv',
+    max_episode_steps = 200,
 )
 
 # off_switch envs
 register(
-    id='OffSwitchCartpole-v0',
-    entry_point='gym.envs.safety:OffSwitchCartpoleEnv',
-    max_episode_steps=200,
+    id = 'OffSwitchCartpole-v0',
+    entry_point = 'gym.envs.safety:OffSwitchCartpoleEnv',
+    max_episode_steps = 200,
 )
 
 register(
-    id='OffSwitchCartpoleProb-v0',
-    entry_point='gym.envs.safety:OffSwitchCartpoleProbEnv',
-    max_episode_steps=200,
+    id = 'OffSwitchCartpoleProb-v0',
+    entry_point = 'gym.envs.safety:OffSwitchCartpoleProbEnv',
+    max_episode_steps = 200,
 )
 
 register(
