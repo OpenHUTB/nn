@@ -26,14 +26,14 @@ def mnist_dataset():
 
 # In[8]:
 
-print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
+#print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd']))) 测试代码
 
 # ## 建立模型
 
 # In[9]:
 
 
-class myModel:
+class MyModel:
     def __init__(self):
         ####################
         '''声明模型对应的参数'''
@@ -54,7 +54,7 @@ class myModel:
         logits = tf.matmul(h1, self.W2) + self.b2         # 输出层
         return logits
         
-model = myModel()
+model = MyModel()
 
 optimizer = optimizers.Adam()
 
@@ -133,4 +133,3 @@ loss, accuracy = test(model,
                       tf.constant(test_data[1], dtype=tf.int64))
 
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
-
