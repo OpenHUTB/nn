@@ -186,8 +186,8 @@ if __name__ == '__main__':
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
     # 创建图形
-    f, ax = plt.subplots(figsize=(6, 4))
-    f.suptitle('Logistic Regression Example', fontsize=15)
+    f, ax = plt.subplots(figsize=(6, 4)) # 创建一个图形和坐标轴
+    f.suptitle('Logistic Regression Example', fontsize=15) # 设置图形的标题
     plt.ylabel('Y')
     plt.xlabel('X')
     ax.set_xlim(0, 10)
