@@ -147,7 +147,7 @@ def test(model, ds):
 
 train_ds, test_ds = mnist_dataset()
 for epoch in range(2):
-    loss, accuracy = train(epoch, model, optimizer, train_ds)
+    loss, accuracy = train(epoch, model, optimizer, train_ds)  # 训练2次，循环2次
 loss, accuracy = test(model, test_ds)
 
 
