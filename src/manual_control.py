@@ -316,11 +316,11 @@ class World(object):
         self.hud.notification('Weather: %s' % preset[1])
         self.player.get_world().set_weather(preset[0])
 
-    def next_map_layer(self, reverse=False):
-        self.current_map_layer += -1 if reverse else 1
-        self.current_map_layer %= len(self.map_layer_names)
-        selected = self.map_layer_names[self.current_map_layer]
-        self.hud.notification('LayerMap selected: %s' % selected)
+    def next_map_layer(self, reverse=False):# 切换到下一个或上一个地图图层显示
+        self.current_map_layer += -1 if reverse else 1 # 更新地图图层索引：顺序或逆序移动1个位置
+        self.current_map_layer %= len(self.map_layer_names) # 使用模运算确保索引在有效范围内循环
+        selected = self.map_layer_names[self.current_map_layer] # 获取当前索引对应的图层名称
+        self.hud.notification('LayerMap selected: %s' % selected) # 在HUD（抬头显示）上显示当前选中的图层名称
 
     def load_map_layer(self, unload=False):
         selected = self.map_layer_names[self.current_map_layer]
