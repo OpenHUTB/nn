@@ -58,18 +58,18 @@ class myConvModel(keras.Model):
     '''在这里实现alexNet模型'''
     def __init__(self):
         super(myConvModel, self).__init__()
-        self.l1_conv = Conv2D(filters=32, 
-                              kernel_size=(5, 5), 
-                              activation='relu', padding='same')
+        self.l1_conv = Conv2D(filters = 32, 
+                              kernel_size = (5, 5), 
+                              activation = 'relu', padding = 'same')
         
-        self.l2_conv = Conv2D(filters=64, 
-                              kernel_size=(5, 5), 
-                              activation='relu',padding='same')
+        self.l2_conv = Conv2D(filters = 64, 
+                              kernel_size = (5, 5), 
+                              activation = 'relu',padding = 'same')
         
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+        self.pool = MaxPooling2D(pool_size = (2, 2), strides = 2)
         
         self.flat = Flatten()
-        self.dense1 = layers.Dense(100, activation='tanh')
+        self.dense1 = layers.Dense(100, activation = 'tanh')
         self.dense2 = layers.Dense(10)
     @tf.function
     def call(self, x):
@@ -80,7 +80,7 @@ class myConvModel(keras.Model):
         flat_h = self.flat(h2_pool)
         dense1 = self.dense1(flat_h)
         logits = self.dense2(dense1)
-        probs = tf.nn.softmax(logits, axis=-1)
+        probs = tf.nn.softmax(logits, axis = -1)
         return probs
     
     @tf.function
@@ -121,43 +121,43 @@ for i in test_ds:
     test_batch = i[0][:1, :, :]
     break
 img = Image.open(open('corgi.jpg', 'rb'))
-img = numpy.asarray(img, dtype='float32') / 256.
+img = numpy.asarray(img, dtype = 'float32') / 256.
 # print(img.shape)
-img = np.expand_dims(img, axis=0)
+img = np.expand_dims(img, axis = 0)
 
 # img = test_batch
 img_out = model.getL2_feature_map(img)
 pylab.imshow(img[0, :, :, :])
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 3])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 4])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 5])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 6])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 7])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 8])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 9])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 10])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 11])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 12])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 13])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
@@ -176,43 +176,43 @@ for i in test_ds:
     test_batch = i[0][:1, :, :]
     break
 img = Image.open(open('corgi.jpg', 'rb'))
-img = numpy.asarray(img, dtype='float32') / 256.
+img = numpy.asarray(img, dtype = 'float32') / 256.
 # print(img.shape)
-img = np.expand_dims(img, axis=0)
+img = np.expand_dims(img, axis = 0)
 
 # img = test_batch
 img_out = rand_model.getL1_feature_map(img)
 pylab.imshow(img[0, :, :, :])
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 3])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 4])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 5])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 6])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 7])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 8])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 9])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 10])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 11])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 12])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 13])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])
 pylab.show()
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize = (10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
