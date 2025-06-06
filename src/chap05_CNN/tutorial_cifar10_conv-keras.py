@@ -4,7 +4,7 @@
 # # 参考 mnist_conv-keras 实现针对 cifar10 的 alexNet 卷积模型
 # 
 # 
-# #### 链接: https://pan.baidu.com/s/1LcCPcK9DgLS3W_DUPZS8kQ 提取码: 5vwz
+# #### 链接: https://pan.baidu.com/s/1LcCPcK9DgLS3W_DUPZS8kQ   提取码: 5vwz
 # ### 解压放到 ~/.keras/datasets/
 # 
 # ## tar zxvf cifar***.tar.zip
@@ -46,25 +46,42 @@ def cifar10_dataset():
     return ds, test_ds
 
 def prepare_mnist_features_and_labels(x, y):
+    """
+    预处理MNIST数据集的特征和标签
+    
+    参数:
+    x: 图像数据，形状为 [样本数, 28, 28]，像素值范围 [0, 255]
+    y: 标签数据，形状为 [样本数]，标签值范围 [0, 9]
+    
+    返回:
+    x: 归一化后的图像数据，数据类型 float32，范围 [0, 1]
+    y: 转换为int64类型的标签数据
+    """
+    # 将图像数据从uint8类型转换为float32类型
+    # 并将像素值从[0, 255]归一化到[0, 1]范围
+    # 归一化有助于梯度下降优化过程更稳定
     x = tf.cast(x, tf.float32) / 255.0
+    
+    # 将标签数据转换为int64类型
+    # 这是TensorFlow中稀疏分类交叉熵损失函数要求的类型
     y = tf.cast(y, tf.int64)
+    
     return x, y
-
 # In[ ]:
 # ## 开始建立模型
 
 # In[18]:
-class myConvModel(keras.Model):
+class MyConvModel(keras.Model):
     '''在这里实现alexNet模型'''
     def __init__(self):
-        super(myConvModel, self).__init__()
+        super(MyConvModel, self).__init__()
         self.l1_conv = Conv2D(filters=32, 
                               kernel_size=(5, 5), 
                               activation='relu', padding='same')
         
         self.l2_conv = Conv2D(filters=64, 
                               kernel_size=(5, 5), 
-                              activation='relu',padding='same')
+                              activation='relu', padding='same')
         
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
         
@@ -96,7 +113,7 @@ class myConvModel(keras.Model):
         h2 = self.l2_conv(h1_pool) #[32, 14, 14, 64]
         return h2
 
-model = myConvModel()
+model = MyConvModel()
 optimizer = optimizers.Adam(0.001)
 
 
@@ -169,7 +186,7 @@ import numpy
 import pylab
 from PIL import Image
 import numpy as np
-rand_model = myConvModel()
+rand_model = MyConvModel()
 ds, test_ds = cifar10_dataset()
 
 for i in test_ds:

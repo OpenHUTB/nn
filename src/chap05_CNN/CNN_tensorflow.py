@@ -66,6 +66,9 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
         
     返回:
         tf.Tensor: 卷积结果
+    异常:
+        ValueError: 如果 padding 不是 'SAME' 或 'VALID'，会抛出异常。
+        TypeError: 如果输入参数类型不正确，会抛出异常。
     """
     # 每一维度滑动步长全部是 1， padding 方式选择 same
     # 提示 使用函数  tf.nn.conv2d
@@ -73,10 +76,17 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     # 验证输入类型
     if not tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
+
+    if not tf.is_tensor(W):
+        raise TypeError(f"Expected W to be a tf.Tensor, but got {type(W)}.")
     
-    # 验证padding参数
+    # 验证padding参数,如果 padding 无效，抛出 ValueError 异常并提供详细信息
     if padding not in ['SAME', 'VALID']:
         raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
+
+    # 验证 strides 参数的格式，应该是一个长度为4的列表
+    if len(strides) != 4:
+        raise ValueError(f"Strides should be a list of length 4, but got list of length {len(strides)}.")
     
     # 执行卷积操作
     conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)

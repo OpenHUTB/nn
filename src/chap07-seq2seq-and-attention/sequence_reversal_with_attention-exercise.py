@@ -29,7 +29,7 @@ import random
 # 导入string模块，提供与字符串操作相关的常量和工具函数
 import string
 
-def randomString(stringLength):
+def randomString(stringLength):  # 定义函数 get_batch，输入参数 batch_size 和 length
     """Generate a random string with the combination of lowercase and uppercase letters """
 
 
@@ -37,12 +37,12 @@ def randomString(stringLength):
     return ''.join(random.choice(letters) for i in range(stringLength))
 
 def get_batch(batch_size, length):
-    batched_examples = [randomString(length) for i in range(batch_size)]
-    enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
-    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
-    dec_x = [[0]+e_idx[:-1] for e_idx in y]
-    return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
+    batched_examples = [randomString(length) for i in range(batch_size)]   # 生成 batch_size 个长度为 length 的随机字符串
+    enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]   # 将每个字符串中的字符转换为对应的数字编码
+    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]  # 生成目标输出 y，将 enc_x 中的每个编码列表反转
+    dec_x = [[0]+e_idx[:-1] for e_idx in y]   # 生成解码输入 dec_x，将 y 中的每个编码列表左移一位，并在开头添加 0
+    return (batched_examples, tf.constant(enc_x, dtype=tf.int32),    # 返回原始字符串列表、编码后的输入、编码后的解码输入和编码后的目标输出
+            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))  # 使用 tf.constant 将列表转换为 TensorFlow 张量
 print(get_batch(2, 10))
 
 

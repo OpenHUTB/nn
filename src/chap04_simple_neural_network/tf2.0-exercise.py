@@ -1,8 +1,9 @@
 # !/usr/bin/env python
 # coding: utf-8
 # # Tensorflow2.0 小练习
-
+# 导入 numpy 库，并简写为 np（标准约定）
 import numpy as np
+# 导入 TensorFlow 库，并简写为 tf（标准约定）
 import tensorflow as tf
 
 # ## 实现softmax函数

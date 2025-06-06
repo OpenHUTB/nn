@@ -136,7 +136,9 @@ def compute_loss(pred, labels, num_classes=3):
             dtype=tf.float32,
         )
     )
-    
+    # 返回损失值和准确率
+    # loss: 预先计算好的损失值（如交叉熵损失）
+    # acc: 当前批次的分类准确率（0-1 标量）
     return loss, acc
 
 @tf.function
@@ -203,6 +205,12 @@ Z = Z.reshape(X.shape)
 # 绘制决策边界
 plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
+
+# 保存模型
+model.save_weights('softmax_regression_weights')
+
+# 加载模型
+model.load_weights('softmax_regression_weights')
 
 
 # In[ ]:

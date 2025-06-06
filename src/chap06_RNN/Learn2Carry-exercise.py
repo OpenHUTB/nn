@@ -170,8 +170,10 @@ def evaluate(model):
 
 # In[5]:
 
-
+# 创建 Adam 优化器实例
+# 学习率（learning rate）设置为 0.001，控制参数更新的步长
 optimizer = optimizers.Adam(0.001)
+# 实例化自定义 RNN 模型
 model = myRNNModel()
 
 
