@@ -37,10 +37,30 @@ def randomString(stringLength):
     return ''.join(random.choice(letters) for i in range(stringLength))
 
 def get_batch(batch_size, length):
+    """
+    生成批量的随机字符串序列，用于序列到序列模型的训练
+    
+    参数:
+    batch_size: 批次大小
+    length: 每个字符串的固定长度
+    
+    返回:
+    tuple: (原始字符串, 编码器输入, 解码器输入, 目标输出)
+    """
+    # 生成batch_size个随机字符串，每个长度为length
+    # 字符范围为A-Z（例如：['KPHXWZ', 'FJDQNA', ...]）
     batched_examples = [randomString(length) for i in range(batch_size)]
+    # 编码器输入：将字符转换为数字（A→1, B→2, ..., Z→26）
+    # 例如：['ABC'] → [[1, 2, 3]]
     enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
+     # 目标输出：将编码器输入反转（用于实现反转任务）
+    # 例如：[[1, 2, 3]] → [[3, 2, 1]]
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
+    # 解码器输入：在目标序列前添加起始标记0，并移除最后一个字符
+    # 例如：[[3, 2, 1]] → [[0, 3, 2]]
+    # 0作为序列开始标记(SOS)
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
+    # 返回原始字符串和三个TensorFlow张量
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
