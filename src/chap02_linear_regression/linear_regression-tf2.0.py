@@ -2,10 +2,13 @@
 # coding: utf-8
 
 # ## 设计基函数(basis function) 以及数据读取
-
+# 导入NumPy库 - 用于高性能科学计算和多维数组处理
 import numpy as np
+# 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
 import matplotlib.pyplot as plt
+# 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
 import tensorflow as tf
+# 从Keras导入常用模块
 from tensorflow.keras import optimizers, layers, Model
 
 
@@ -60,14 +63,38 @@ def load_data(filename, basis_func=gaussian_basis):
 
 # ## 定义模型
 class linearModel(Model):
+    """线性回归模型，实现 y = w·x + b"""
+    
     def __init__(self, ndim):
+        """
+        初始化线性模型
+        
+        参数:
+        ndim: 输入特征的维度
+        """
+        # 调用父类(Model)的构造函数
         super(linearModel, self).__init__()
+        
+        # 定义模型参数：权重矩阵 w
+        # 形状为 [ndim, 1]，表示从 ndim 维输入到 1 维输出的线性变换
+        # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
+        # trainable=True 表示该变量需要在训练过程中被优化
         self.w = tf.Variable(
             shape=[ndim, 1],
             initial_value=tf.random.uniform(
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             )
+            trainable=True,
+            name="weight"
         )
+        
+        # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
+        # 可补充：
+        # self.b = tf.Variable(
+        #     initial_value=tf.zeros([1]),
+        #     trainable=True,
+        #     name="bias"
+        # )
         
     @tf.function
     def call(self, x):
@@ -119,8 +146,8 @@ def evaluate(ys, ys_pred):
 # 评估指标的计算
 for i in range(1000):
     loss = train_one_step(model, xs, ys)
-    if i % 100 == 1:
-        print(f"loss is {loss:.4}")
+    if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
+        print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
                 
 y_preds = predict(model, xs)
 std = evaluate(ys, y_preds)

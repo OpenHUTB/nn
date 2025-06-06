@@ -19,21 +19,19 @@ def weights_init(m):
 # 定义词嵌入模块
 class word_embedding(nn.Module):
     def __init__(self, vocab_length, embedding_dim):
-        super(word_embedding, self).__init__()
-        # 使用均匀分布初始化词向量，范围为[-1, 1]
-        w_embeding_random_intial = np.random.uniform(-1, 1, size=(vocab_length, embedding_dim))
-        # 创建词嵌入层
+        super().__init__()
         self.word_embedding = nn.Embedding(vocab_length, embedding_dim)
-        # 将词嵌入层的权重设置为初始化的随机值
-        self.word_embedding.weight.data.copy_(torch.from_numpy(w_embeding_random_intial))
+        # PyTorch默认使用均匀分布初始化，范围为[-sqrt(1/dim), sqrt(1/dim)]
+        # 如果需要特定范围，可以使用：
+        # nn.init.uniform_(self.word_embedding.weight, -1.0, 1.0)
 
     def forward(self, input_sentence):
         """
         :param input_sentence: 一个包含词索引的张量
         :return: 一个包含对应词向量的张量
         """
-        sen_embed = self.word_embedding(input_sentence)  # 查找词嵌入
-        return sen_embed
+        return self.word_embedding(input_sentence)
+
 
 # 定义RNN模型
 class RNN_model(nn.Module):

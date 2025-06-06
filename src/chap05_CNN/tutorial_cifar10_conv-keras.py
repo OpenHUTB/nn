@@ -4,7 +4,7 @@
 # # 参考 mnist_conv-keras 实现针对 cifar10 的 alexNet 卷积模型
 # 
 # 
-# #### 链接: https://pan.baidu.com/s/1LcCPcK9DgLS3W_DUPZS8kQ 提取码: 5vwz
+# #### 链接: https://pan.baidu.com/s/1LcCPcK9DgLS3W_DUPZS8kQ   提取码: 5vwz
 # ### 解压放到 ~/.keras/datasets/
 # 
 # ## tar zxvf cifar***.tar.zip
@@ -46,25 +46,42 @@ def cifar10_dataset():
     return ds, test_ds
 
 def prepare_mnist_features_and_labels(x, y):
+    """
+    预处理MNIST数据集的特征和标签
+    
+    参数:
+    x: 图像数据，形状为 [样本数, 28, 28]，像素值范围 [0, 255]
+    y: 标签数据，形状为 [样本数]，标签值范围 [0, 9]
+    
+    返回:
+    x: 归一化后的图像数据，数据类型 float32，范围 [0, 1]
+    y: 转换为int64类型的标签数据
+    """
+    # 将图像数据从uint8类型转换为float32类型
+    # 并将像素值从[0, 255]归一化到[0, 1]范围
+    # 归一化有助于梯度下降优化过程更稳定
     x = tf.cast(x, tf.float32) / 255.0
+    
+    # 将标签数据转换为int64类型
+    # 这是TensorFlow中稀疏分类交叉熵损失函数要求的类型
     y = tf.cast(y, tf.int64)
+    
     return x, y
-
 # In[ ]:
 # ## 开始建立模型
 
 # In[18]:
-class myConvModel(keras.Model):
+class MyConvModel(keras.Model):
     '''在这里实现alexNet模型'''
     def __init__(self):
-        super(myConvModel, self).__init__()
+        super(MyConvModel, self).__init__()
         self.l1_conv = Conv2D(filters=32, 
                               kernel_size=(5, 5), 
                               activation='relu', padding='same')
         
         self.l2_conv = Conv2D(filters=64, 
                               kernel_size=(5, 5), 
-                              activation='relu',padding='same')
+                              activation='relu', padding='same')
         
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
         
@@ -96,7 +113,7 @@ class myConvModel(keras.Model):
         h2 = self.l2_conv(h1_pool) #[32, 14, 14, 64]
         return h2
 
-model = myConvModel()
+model = MyConvModel()
 optimizer = optimizers.Adam(0.001)
 
 
@@ -117,13 +134,21 @@ import numpy as np
 
 ds, test_ds = cifar10_dataset()
 
+# 从测试数据集中获取第一个批次的第一张图像
 for i in test_ds:
-    test_batch = i[0][:1, :, :]
-    break
-img = Image.open(open('corgi.jpg', 'rb'))
-img = numpy.asarray(img, dtype='float32') / 256.
-# print(img.shape)
+    test_batch = i[0][:1, :, :]  # 提取第一批中的第一张图像 [1, H, W, C]
+    break                        # 只取一个样本，跳出循环
+
+# 打开并预处理自定义图像（示例：柯基犬图片）
+img = Image.open(open('corgi.jpg', 'rb'))  # 打开图像文件
+img = numpy.asarray(img, dtype='float32')  # 转换为float32类型的numpy数组
+img = img / 256.0                          # 错误：应除以255.0进行归一化
+# print(img.shape)                         # 打印图像形状，例如 (224, 224, 3)
+
+# 在第0维添加一个维度，将图像转换为批次格式 [1, H, W, C]
+# 这是因为模型通常期望输入是批次形式的
 img = np.expand_dims(img, axis=0)
+
 
 # img = test_batch
 img_out = model.getL2_feature_map(img)
@@ -169,7 +194,7 @@ import numpy
 import pylab
 from PIL import Image
 import numpy as np
-rand_model = myConvModel()
+rand_model = MyConvModel()
 ds, test_ds = cifar10_dataset()
 
 for i in test_ds:

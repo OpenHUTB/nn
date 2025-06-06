@@ -6,8 +6,7 @@
 
 # In[1]:
 
-
-import numpy as np
+import numpy as np #导入数值计算库
 import tensorflow as tf
 import collections
 from tensorflow import keras
@@ -119,6 +118,17 @@ class myRNNModel(keras.Model):
         '''
         此处完成上述图中模型
         '''
+        emb1 = self.embed_layer(num1)  # shape: (batch, seq_len, 32)
+        emb2 = self.embed_layer(num2)  # shape: (batch, seq_len, 32)
+
+        # 拼接两个数字的嵌入向量
+        emb = tf.concat([emb1, emb2], axis=-1)  # shape: (batch, seq_len, 64)
+
+        # RNN 输出
+        rnn_out = self.rnn_layer(emb)  # shape: (batch, seq_len, 64)
+
+        # 全连接层预测每一位的数字（0-9）
+        logits = self.dense(rnn_out)  # shape: (batch, seq_len, 10)
         return logits
 
 
@@ -146,7 +156,7 @@ def train(steps, model, optimizer):
     accuracy = 0.0
     for step in range(steps):
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
-        Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+        Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
@@ -156,22 +166,24 @@ def train(steps, model, optimizer):
     return loss
 
 def evaluate(model):
-    datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
-    Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
+    datas = gen_data_batch(batch_size = 2000, start = 555555555, end = 999999999)
+    Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
+    logits = model(tf.constant(Nums1, dtype = tf.int32), tf.constant(Nums2, dtype = tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1)
+    pred = np.argmax(logits, axis = -1)
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(o[0], o[1], o[0] == o[1])
 
-    print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
+    print('accuracy is: %g' % np.mean([o[0] == o[1] for o in zip(datas[2], res)]))
 
 
 # In[5]:
 
-
+# 创建 Adam 优化器实例
+# 学习率（learning rate）设置为 0.001，控制参数更新的步长
 optimizer = optimizers.Adam(0.001)
+# 实例化自定义 RNN 模型
 model = myRNNModel()
 
 

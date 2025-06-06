@@ -29,20 +29,20 @@ import random
 # 导入string模块，提供与字符串操作相关的常量和工具函数
 import string
 
-def randomString(stringLength):
+def randomString(stringLength):  # 定义函数 get_batch，输入参数 batch_size 和 length
     """Generate a random string with the combination of lowercase and uppercase letters """
 
 
-    letters = string.ascii_uppercase
+    letters = string.ascii_uppercase #生成指定长度的随机大写字母字符串
     return ''.join(random.choice(letters) for i in range(stringLength))
 
 def get_batch(batch_size, length):
-    batched_examples = [randomString(length) for i in range(batch_size)]
-    enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]
-    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
-    dec_x = [[0]+e_idx[:-1] for e_idx in y]
-    return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
+    batched_examples = [randomString(length) for i in range(batch_size)]   # 生成 batch_size 个长度为 length 的随机字符串
+    enc_x = [[ord(ch)-ord('A')+1 for ch in list(exp)] for exp in batched_examples]   # 将每个字符串中的字符转换为对应的数字编码
+    y = [[o for o in reversed(e_idx)] for e_idx in enc_x]  # 生成目标输出 y，将 enc_x 中的每个编码列表反转
+    dec_x = [[0]+e_idx[:-1] for e_idx in y]   # 生成解码输入 dec_x，将 y 中的每个编码列表左移一位，并在开头添加 0
+    return (batched_examples, tf.constant(enc_x, dtype=tf.int32),    # 返回原始字符串列表、编码后的输入、编码后的解码输入和编码后的目标输出
+            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))  # 使用 tf.constant 将列表转换为 TensorFlow 张量
 print(get_batch(2, 10))
 
 
@@ -59,7 +59,7 @@ class mySeq2SeqModel(keras.Model):
         self.v_sz=27 # 词汇表大小（包括可能的特殊符号）
         self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape=[None, None]) # 输入词汇表大小，即嵌入层的输入维度和每个词向量的维度以及输入张量的形状，支持任意批次大小和序列长度
         
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
@@ -80,6 +80,39 @@ class mySeq2SeqModel(keras.Model):
         完成带attention机制的 sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好，
         用双线性attention，或者自己改一下`__init__`函数做加性attention
         '''
+        # Embedding
+        enc_emb = self.embed_layer(enc_ids)  # (B, T1, E)
+        dec_emb = self.embed_layer(dec_ids)  # (B, T2, E)
+
+        # 编码器输出
+        enc_outputs, enc_state = self.encoder(enc_emb)  # (B, T1, H), (B, H)
+
+        # 初始化解码器状态
+        state = enc_state  # (B, H)
+
+        # Attention + Decoder + Output
+        outputs = []
+        for t in range(dec_emb.shape[1]):
+            # 当前时刻的 decoder 输入
+            dec_input_t = dec_emb[:, t, :]  # (B, E)
+
+            # Attention 权重计算（加性）
+            score = tf.nn.tanh(self.dense_attn(enc_outputs))  # (B, T1, H)
+            score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+            attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+            context = tf.reduce_sum(enc_outputs * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+
+            # 合并 context 与 decoder input
+            dec_input_combined = tf.concat([dec_input_t, context], axis=-1)  # (B, H+E)
+
+            # Decoder RNN 一步
+            output, state = self.decoder_cell(dec_input_combined, [state])  # output: (B, H)
+
+            # 输出层
+            logits = self.dense(output)  # (B, V)
+            outputs.append(tf.expand_dims(logits, axis=1))  # (B, 1, V)
+
+        logits = tf.concat(outputs, axis=1)  # (B, T2, V)
         return logits
     
     
@@ -96,8 +129,25 @@ class mySeq2SeqModel(keras.Model):
     
         '''
         todo
-        参考sequence_reversal-exercise, 自己构建单步解码逻辑'''
-        return out, state
+        参考sequence_reversal-exercise, 自己构建单步解码逻辑
+        '''
+        x_embed = self.embed_layer(x)  # (B, E)
+
+        # Attention 权重计算
+        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
+        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+        attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+
+        # 合并 decoder input 和 context
+        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, H + E)
+
+        # 解码一步
+        output, state = self.decoder_cell(rnn_input, [state])  # output: (B, H)
+        logits = self.dense(output)  # (B, V)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        return next_token, state[0]
+        
 
 
 # # Loss函数以及训练逻辑
