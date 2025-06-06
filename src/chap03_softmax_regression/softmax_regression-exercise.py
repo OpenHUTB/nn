@@ -129,7 +129,10 @@ def compute_loss(pred, labels, num_classes=3):
     # 计算准确率，比较模型预测的类别和真实类别是否一致
     acc = tf.reduce_mean(
         tf.cast(
-            tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
+            tf.equal(
+                tf.argmax(pred, axis=1),
+                tf.argmax(one_hot_labels, axis=1)
+            ),
             dtype=tf.float32,
         )
     )
