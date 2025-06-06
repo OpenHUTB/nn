@@ -178,24 +178,46 @@ def main(x_train, y_train, use_gradient_descent=False):
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1)
 
-    # 最小二乘法求解权重
-    w_lsq = np.dot(np.linalg.pinv(phi), y_train)
+# 使用最小二乘法求解最优权重参数
+# np.linalg.pinv(phi) 计算设计矩阵phi的伪逆矩阵（Moore-Penrose伪逆）
+# 伪逆可以处理非方阵或不满秩矩阵的情况
+# np.dot() 执行矩阵乘法，得到最优权重向量
+# 数学公式：w = (φ^T φ)^(-1) φ^T y
+w_lsq = np.dot(np.linalg.pinv(phi), y_train)
 
-    w_gd = None
-    if use_gradient_descent:
-        # 梯度下降求解权重（缩进修正）
-        # 设置学习率为0.01
-        learning_rate = 0.01 
-        # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
-        epochs = 1000  
-        w_gd = np.zeros(phi.shape[1])
-        w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
-        # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs): 
-            y_pred = np.dot(phi, w_gd)
-            error = y_pred - y_train
-            gradient = np.dot(phi.T, error) / len(y_train)
-            w_gd -= learning_rate * gradient
+# 初始化梯度下降权重为None（默认不使用）
+w_gd = None
+
+# 检查是否使用梯度下降法
+if use_gradient_descent:
+    # 梯度下降法参数设置
+    learning_rate = 0.01  # 学习率/步长，控制每次参数更新的幅度
+    epochs = 1000        # 训练轮数，整个数据集将被遍历1000次
+    
+    # 初始化权重为零向量，形状与phi的列数相同
+    w_gd = np.zeros(phi.shape[1])
+    
+    # 调用梯度下降函数进行优化
+    # 注意：这里实际使用了更小的学习率(0.001)和更多迭代次数(5000)
+    w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
+    
+    #  梯度下降迭代过程 
+    for epoch in range(epochs):
+        # 1. 前向传播：计算当前权重下的预测值
+        # φw = y_pred，矩阵乘法计算预测值
+        y_pred = np.dot(phi, w_gd)
+        
+        # 2. 计算误差：预测值与真实值的差
+        error = y_pred - y_train
+        
+        # 3. 计算梯度：
+        # 梯度公式：∇J(w) = (1/m) * φ^T (φw - y)
+        # φ.T @ error 等价于sum(φ_i * error_i) for all samples
+        gradient = np.dot(phi.T, error) / len(y_train)
+        
+        # 4. 参数更新：沿负梯度方向更新权重
+        # w := w - α * ∇J(w)
+        w_gd -= learning_rate * gradient
 
     # 定义预测函数
     def f(x):
