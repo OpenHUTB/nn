@@ -217,5 +217,5 @@ if __name__ == "__main__":
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
-
+    plt.tight_layout()
     plt.show() # 显示图形
