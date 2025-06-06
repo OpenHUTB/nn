@@ -17,7 +17,6 @@ def load_data(fname):
             data.append([x1, x2, t])# 将处理后的数据组合成列表并添加到 data 中
         return np.array(data)
 
-
 def eval_acc(label, pred):
     """计算准确率。"""
     return np.sum(label == pred) / len(pred)
