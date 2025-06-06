@@ -160,7 +160,7 @@ def sequence_reversal():
         for i in range(steps):
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
             collect.append(tf.expand_dims(cur_token, axis=-1))
-        out = tf.concat(collect, axis=-1).numpy()
+        out = tf.concat(collect, axis=-1).numpy()  # concat 函数通常用于将多个字符串或序列（如列表、元组）连接在一起
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
     
