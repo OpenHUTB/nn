@@ -958,20 +958,20 @@ class CollisionSensor(object):
 # ==============================================================================
 
 
-class LaneInvasionSensor(object):
+class LaneInvasionSensor(object): # 车道入侵传感器类，用于检测并处理车辆偏离车道的事件
     def __init__(self, parent_actor, hud):
-        self.sensor = None
+        self.sensor = None # 存储Carla传感器对象的引用
 
-        # If the spawn object is not a vehicle, we cannot use the Lane Invasion Sensor
+        # 仅当父Actor是车辆时才创建传感器
         if parent_actor.type_id.startswith("vehicle."):
-            self._parent = parent_actor
-            self.hud = hud
-            world = self._parent.get_world()
+            self._parent = parent_actor # 挂载传感器的车辆
+            self.hud = hud # HUD对象，用于显示车道偏离信息
+            world = self._parent.get_world() # 获取世界对象并创建车道入侵传感器蓝图
             bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
-            self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
+            self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent) # 生成传感器并将其附着到车辆上
             # We need to pass the lambda a weak reference to self to avoid circular
             # reference.
-            weak_self = weakref.ref(self)
+            weak_self = weakref.ref(self) # 设置传感器数据回调函数，使用弱引用避免循环引用
             self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
 
     @staticmethod
