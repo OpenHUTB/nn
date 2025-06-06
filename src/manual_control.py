@@ -310,10 +310,15 @@ class World(object):
             self.world.wait_for_tick()
 
     def next_weather(self, reverse=False):
+        # 根据reverse参数决定增加或减少当前天气索引
         self._weather_index += -1 if reverse else 1
+        # 使用取模运算确保索引在有效范围内循环
         self._weather_index %= len(self._weather_presets)
+        # 获取当前选择的天气预设
         preset = self._weather_presets[self._weather_index]
+        # 显示HUD通知，告知用户当前选择的天气
         self.hud.notification('Weather: %s' % preset[1])
+        # 设置游戏世界中的天气为当前选择的天气预设
         self.player.get_world().set_weather(preset[0])
 
     def next_map_layer(self, reverse=False):
