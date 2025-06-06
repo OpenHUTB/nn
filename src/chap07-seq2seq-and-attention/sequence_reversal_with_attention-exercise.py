@@ -240,9 +240,11 @@ def sequence_reversal():
         # 假设索引1对应'A'，2对应'B'，依此类推  
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
         return out
-    
+     # 获取测试批次（仅使用编码器输入）
     batched_examples, enc_x, _, _ = get_batch(32, 20)
+    # 编码输入序列
     enc_out, state = model.encode(enc_x)
+    # 解码生成逆置序列
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
 
 def is_reverse(seq, rev_seq):# 将待检测序列反转（使用列表推导式+reversed函数实现字符串反转）
