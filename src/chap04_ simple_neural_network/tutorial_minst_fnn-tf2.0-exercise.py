@@ -39,7 +39,7 @@ class MyModel:
         '''声明模型对应的参数'''
         ####################
     # 输入层784 -> 隐藏层128
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))  # def 关键字：用于声明一个函数的开始。
         self.b1 = tf.Variable(tf.zeros([128]))
         # 隐藏层128 -> 输出层10
         self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
