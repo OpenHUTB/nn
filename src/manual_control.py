@@ -181,17 +181,17 @@ def get_actor_blueprints(world, filter, generation):
         return bps
 
     try:
-        int_generation = int(generation)
+        int_generation = int(generation)  # 转换失败返回空列表
         # Check if generation is in available generations
-        if int_generation in [1, 2, 3]:
+        if int_generation in [1, 2, 3]:  # 筛选匹配代数的蓝图
             bps = [x for x in bps if int(x.get_attribute('generation')) == int_generation]
             return bps
         else:
             print("   Warning! Actor Generation is not valid. No actor will be spawned.")
-            return []
+            return []  # 转换失败返回空列表
     except:
         print("   Warning! Actor Generation is not valid. No actor will be spawned.")
-        return []
+        return []  # 转换失败返回空列表
 
 
 #  ==============================================================================
