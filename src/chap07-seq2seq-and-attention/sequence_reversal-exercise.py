@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding: utf-8
 
 # # 序列逆置
@@ -140,7 +140,7 @@ class mySeq2SeqModel(keras.Model):
         '''
         shape(x) = [b_sz,] 
         '''
-        #shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
+        # shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
         inp_emb = self.embed_layer(x)
         # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
         h, state = self.decoder_cell.call(inp_emb, state)
@@ -165,7 +165,7 @@ def compute_loss(logits, labels):
     # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
-#定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
+# 定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
 
 @tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
