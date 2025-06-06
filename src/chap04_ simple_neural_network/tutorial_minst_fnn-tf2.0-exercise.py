@@ -21,9 +21,10 @@ def mnist_dataset():
     - 像素值归一化到[0, 1]区间
     - 保持原始数据类型（图像为float32，标签为int64）
     """
-    (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    # 加载MNIST数据集
+   (x, y), (x_test, y_test) = datasets.mnist.load_data()
     #normalize
-    
+    # 归一化像素值到[0, 1]范围
     x = x/255.0
     x_test = x_test/255.0
     
