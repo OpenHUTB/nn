@@ -20,7 +20,7 @@ def multinomial_basis(x, feature_num=10):
 # 初始化特征列表
     feat = [x]
     for i in range(2, feature_num + 1):
-        feat.append(x**i)
+        feat.append(x**i)  # apend函数每次调用只能添加一个元素（可以是任意数据类型，如数字、字符串、列表等）
     ret = np.concatenate(feat, axis=1)
     return ret
 
