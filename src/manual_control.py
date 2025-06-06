@@ -68,19 +68,19 @@ from __future__ import print_function
 
 import glob
 import os
-import sys
+import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 
 # 获取当前进程ID（便于调试）
-process_id = os.getpid()
-print("Current process id is: ", process_id)
+process_id = os.getpid() # 获取当前运行进程的ID
+print("Current process id is: ", process_id) # 打印进程ID
 
-try:
+try: # 尝试将Carla的egg文件路径添加到Python搜索路径中
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
 except IndexError:
-    pass
+    pass # 若未找到匹配的egg文件，忽略错误
 
 # ==============================================================================
 # -- imports -------------------------------------------------------------------
