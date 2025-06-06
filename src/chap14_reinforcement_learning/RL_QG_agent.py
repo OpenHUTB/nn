@@ -53,9 +53,9 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # 扁平化层
         flat = tf.layers.flatten(conv2)
         # 全连接层
-        dense = tf.layers.dense(inputs=flat, units=512, activation=tf.nn.relu)
+        dense = tf.layers.dense(inputs = flat, units = 512, activation = tf.nn.relu)
         # 输出层，64个动作的Q值
-        self.Q_values = tf.layers.dense(inputs=dense, units=64, name="q_values")
+        self.Q_values = tf.layers.dense(inputs = dense, units = 64, name = "q_values")
         # 初始化变量和Saver
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
@@ -73,7 +73,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
-        q_vals = self.sess.run(self.q_values, feed_dict={self.input_state: state_input})
+        q_vals = self.sess.run(self.q_values, feed_dict = {self.input_state: state_input})
         
         # 过滤合法动作并选择最优
         
