@@ -214,9 +214,9 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-optimizer = optimizers.Adam(0.0005)
-model = mySeq2SeqModel()
-train(model, optimizer, seqlen=20)
+optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
+model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
+train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
 
 
 # # 测试模型逆置能力
