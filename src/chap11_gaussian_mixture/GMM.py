@@ -133,7 +133,8 @@ class GaussianMixtureModel:
                 # 正则化以防止协方差矩阵奇异，eps 可以调节
                 eps = 1e-6  # 正则化系数（可以作为参数传入或配置）
                 new_sigma_k += np.eye(n_features) * eps  # 向对角线加小数值，避免数值不稳定
-                new_sigma[k] = new_sigma_k
+                new_sigma[k] = new_sigma_k # 更新第k个分量的标准差参数
+
             
             # 计算对数似然
             '''
