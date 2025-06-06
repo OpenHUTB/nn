@@ -261,7 +261,7 @@ h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)
 print(h2_log_grad)
 print('--'*20)
 # print(W2_grad)
-
+# 使用TensorFlow自动微分验证梯度
 with tf.GradientTape() as tape:
     x, W1, W2, label = tf.constant(x), tf.constant(W1), tf.constant(W2), tf.constant(label)
     tape.watch(W1)
