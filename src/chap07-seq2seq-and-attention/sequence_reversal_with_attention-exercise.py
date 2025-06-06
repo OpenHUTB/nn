@@ -81,6 +81,15 @@ class mySeq2SeqModel(keras.Model):
         完成带attention机制的 sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好，
         用双线性attention，或者自己改一下`__init__`函数做加性attention
         '''
+        enc_out, enc_state = self.encode(enc_ids)  # 编码器输出和状态
+        dec_emb = self.embed_layer(dec_ids)  # 解码器嵌入
+        dec_out, _ = self.decoder(dec_emb, initial_state=enc_state)  # 解码器输出
+        # 添加注意力机制
+        attn_scores = tf.matmul(dec_out, enc_out, transpose_b=True)  # 计算注意力分数
+        attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # 计算注意力权重
+        context = tf.matmul(attn_weights, enc_out)  # 计算上下文向量
+        combined = dec_out + context  # 结合上下文向量和解码器输出
+        logits = self.dense(combined)  # 输出层
         return logits
     
     
