@@ -184,10 +184,10 @@ register(
 )
 
 register(
-    id='Taxi-v2',
-    entry_point='gym.envs.toy_text.taxi:TaxiEnv',
+    id='Taxi-v2',  # 环境的唯一标识符
+    entry_point='gym.envs.toy_text.taxi:TaxiEnv',  # 指定环境类的位置
     reward_threshold=8, # optimum = 8.46
-    max_episode_steps=200,
+    max_episode_steps=200,  # 设置每个episode的最大步数为200
 )
 
 register(
