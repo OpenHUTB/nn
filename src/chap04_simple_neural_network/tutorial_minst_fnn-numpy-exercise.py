@@ -245,13 +245,13 @@ mul_h2 = Matmul() # 第二层矩阵乘法
 relu = Relu() # ReLU激活函数
 softmax = Softmax()
 log = Log() # 对数函数
-
+# 手动实现的前向传播过程：
 h1 = mul_h1.forward(x, W1) # shape(5, 4)
 h1_relu = relu.forward(h1)
 h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2)
 h2_log = log.forward(h2_soft)
-
+# 手动实现的反向传播过程（计算梯度）：
 h2_log_grad = log.backward(label)
 h2_soft_grad = softmax.backward(h2_log_grad)
 h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)
