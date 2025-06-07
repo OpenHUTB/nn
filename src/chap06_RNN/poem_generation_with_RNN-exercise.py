@@ -6,7 +6,7 @@
 
 # In[1]:
 # 导入了多个用于构建和训练深度学习模型的Python库和模块
-import numpy as np
+import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
 import tensorflow as tf
 import collections
 from tensorflow import keras
