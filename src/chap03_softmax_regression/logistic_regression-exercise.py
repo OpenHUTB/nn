@@ -192,7 +192,8 @@ if __name__ == '__main__':
     plt.xlabel('X')
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
-
+    
+    # 创建空的线条和数据点对象，用于后续动态更新
     line_d, = ax.plot([], [], label='fit_line')
     C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
     C2_dots, = ax.plot([], [], 'o', c='g', label='actual_dots')
