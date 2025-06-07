@@ -273,8 +273,10 @@ def is_reverse(seq, rev_seq):
     else:
         return False
 # 测试模型逆序能力的准确性
-print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])# 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
-print(list(zip(*sequence_reversal())))# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
+print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
+print(list(zip(*sequence_reversal())))
+# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
 
 
 
