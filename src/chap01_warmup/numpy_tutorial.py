@@ -235,6 +235,7 @@ plt.grid(True)
 
 # 显示图例
 plt.legend()
+plt.tight_layout()
 
 # 显示图像
 plt.show()
