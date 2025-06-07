@@ -75,13 +75,25 @@ optimizer = optimizers.Adam()
 
 # In[13]:
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
-@tf.function
+# @tf.function 将Python函数转换为TensorFlow计算图，加速计算并支持导出
+@tf.function  
 def compute_loss(logits, labels):
-    # 计算稀疏softmax交叉熵损失，并求平均值
-    # 数学公式：-log(exp(logits[labels]) / Σexp(logits))
+    """
+    计算稀疏softmax交叉熵损失（分类任务常用损失函数）
+    参数:
+        logits: 模型最后一层的未归一化输出（未经过softmax），形状通常为[batch_size, num_classes]
+        labels: 真实类别标签（非one-hot编码），形状为[batch_size]
+    返回:
+        标量损失值（已对batch求平均）
+    """
+    # 计算稀疏softmax交叉熵损失（不需要提前对labels做one-hot编码）
+    # 内部实现等价于：先对logits做softmax，再计算交叉熵
+    # 数学公式：loss = -log(exp(logits[true_class]) / Σexp(logits))
+    # tf.reduce_mean() 对batch中所有样本的损失求平均
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits = logits, labels = labels))
+            logits=logits,  # 模型原始输出（未归一化）
+            labels=labels))  # 真实类别索引（0到num_classes-1）
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
