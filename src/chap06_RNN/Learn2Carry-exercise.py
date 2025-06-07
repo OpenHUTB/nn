@@ -166,6 +166,7 @@ def train_one_step(model, optimizer, x, y, label):
         loss: 当前步骤的损失值。
     """
     with tf.GradientTape() as tape:
+        # 前向传播获取预测结果
         logits = model(x, y)
         loss = compute_loss(logits, label)
 
