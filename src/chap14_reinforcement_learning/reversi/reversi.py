@@ -9,7 +9,7 @@ from gym import spaces
 import numpy as np
 from gym import error
 from gym.utils import seeding
-
+ #这段代码定义了一个随机策略函数 random_policy，用于在黑白棋（Reversi/Othello）游戏中为当前玩家随机选择一个合法的落子动作（包括“跳过”动作）
 def make_random_policy(np_random):
     def random_policy(state, player_color):
         possible_places = ReversiEnv.get_possible_actions(state, player_color)
