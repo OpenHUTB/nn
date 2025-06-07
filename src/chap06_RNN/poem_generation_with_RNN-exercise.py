@@ -52,7 +52,7 @@ def process_dataset(fileName):
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter) #对tuple进行解压，得到words列表代表所有字符
-    words = ('PAD', 'UNK') + words[:len(words)]
+    words = ('PAD', 'UNK') + words[:len(words)]# 扩展词汇表：在原始词汇表前添加特殊标记
     
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
