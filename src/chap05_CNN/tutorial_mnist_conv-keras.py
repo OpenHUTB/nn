@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # ## 准备数据
 
 # In[1]:
@@ -103,6 +102,7 @@ optimizer = optimizers.Adam()
 # ## 编译， fit以及evaluate
 
 # In[6]:
+#这段代码片段展示了如何使用Keras API来编译、训练和评估一个神经网络模型。
 model.compile(
     optimizer=optimizer,
     loss='sparse_categorical_crossentropy',
