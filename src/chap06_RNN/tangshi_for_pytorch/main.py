@@ -288,7 +288,7 @@ def gen_poem(begin_word):
     rnn_model.load_state_dict(torch.load('./poem_generator_rnn'))
 
     # 指定开始的字
-
+    #基于一个循环神经网络（RNN）模型逐步预测下一个单词，直到满足停止条件（如遇到结束标记或达到最大长度）
     poem = begin_word
     word = begin_word
     while word != end_token:
