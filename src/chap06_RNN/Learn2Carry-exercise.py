@@ -16,13 +16,12 @@ from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
 
-# ## 数据生成
-# 我们随机在 `start->end`之间采样除整数对`(num1, num2)`，计算结果`num1+num2`作为监督信号。
-#
-# * 首先将数字转换成数字位列表 `convertNum2Digits`
-# * 将数字位列表反向
-# * 将数字位列表填充到同样的长度 `pad2len`
-#
+# 数据生成
+# 我们随机在 `start->end` 之间采样整数对 `(num1, num2)`，计算结果 `num1+num2` 作为监督信号。
+# 主要步骤：
+# 1. 将数字转换成数字位列表 `convert_num_to_digits`
+# 2. 将数字位列表反向
+# 3. 将数字位列表填充到同样的长度 `pad_to_len`
 
 # In[2]:
 
@@ -38,16 +37,21 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         tuple: 包含三个numpy数组的元组(numbers_1, numbers_2, results)，
                每个数组形状为(batch_size,)
     """
+    # 随机生成两个整数数组
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
+    # 计算两个整数数组的和
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
+    # 将整数转换为字符串，以便逐位处理
     strNum = str(Num)
+    # 将字符串转换为字符列表，每个字符代表数字的一位
     chNums = list(strNum)
+    # 将字符列表转换为整数列表，每个整数代表数字的一位
     digitNums = [int(o) for o in strNum]
     return digitNums
 
