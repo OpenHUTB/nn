@@ -1,4 +1,4 @@
-# !/usr/bin/env python
+#!/usr/bin/env python
 # coding: utf-8
 
 # # 诗歌生成
@@ -6,7 +6,7 @@
 
 # In[1]:
 # 导入了多个用于构建和训练深度学习模型的Python库和模块
-import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
+import numpy as np  # 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
 import tensorflow as tf
 import collections
 from tensorflow import keras
@@ -29,18 +29,18 @@ def process_dataset(fileName):
         id2word: 数字id到词语的映射字典
     """
     examples = []
-    with open(fileName, 'r'，encoding='utf-8', ) as fd:
+    with open(fileName, 'r', encoding='utf-8') as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
             content = ''.join(outs[1:])  # 取内容部分
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
-            ins = [start_token] + list(content) + [end_token] 
+            ins = [start_token] + list(content) + [end_token]
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            ### 过滤过长的诗歌
+                ### 过滤过长的诗歌
                 continue
             examples.append(ins)
-            
+
     # 统计词频
     counter = collections.Counter()
     for e in examples:
@@ -51,22 +51,21 @@ def process_dataset(fileName):
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
-    words, _ = zip(*sorted_counter) #对tuple进行解压，得到words列表代表所有字符
+    words, _ = zip(*sorted_counter)  # 对tuple进行解压，得到words列表代表所有字符
     words = ('PAD', 'UNK') + words[:len(words)]
     
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
     
     # 创建id到词语的映射
-    id2word = {word2id[k]:k for k in word2id}
+    id2word = {word2id[k]: k for k in word2id}
     
     # 将诗歌转换为数字id序列
-    indexed_examples = [[word2id[w] for w in poem]
-                       for poem in examples]
+    indexed_examples = [[word2id[w] for w in poem] for poem in examples]
     # 记录每个诗歌的长度
     seqlen = [len(e) for e in indexed_examples]
     
-    #  组合诗歌数据和对应长度
+    # 组合诗歌数据和对应长度
     instances = list(zip(indexed_examples, seqlen))
     
     return instances, word2id, id2word
@@ -83,7 +82,7 @@ def poem_dataset():
     instances, word2id, id2word = process_dataset('../poems.txt')
     # 创建Dataset
     ds = tf.data.Dataset.from_generator(
-        lambda: [ins for ins in instances], 
+        lambda: [ins for ins in instances],
         (tf.int64, tf.int64),  # 输出类型：诗歌序列和长度
         (tf.TensorShape([None]), tf.TensorShape([])))  # 输出形状
     
@@ -92,14 +91,13 @@ def poem_dataset():
     # 批处理并填充到相同长度
     ds = ds.padded_batch(100, padded_shapes=(tf.TensorShape([None]), tf.TensorShape([])))
     # 为语言模型准备输入输出对：输入是前n-1个词，输出是后n-1个词
-    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1))
+    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen - 1))
     return ds, word2id, id2word
 
 
 # # 模型代码
 
 # In[2]:
-
 
 class myRNNModel(keras.Model):
     """基于RNN的诗歌生成模型"""
@@ -146,7 +144,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(rnn_out)  # (batch_size, seq_len, vocab_size)
         return logits
         
-    #定义了一个用于文本生成的函数 get_next_token，其核心作用是基于当前词和 RNN 的隐藏状态，预测下一个词并更新 RNN 状态
+    # 定义了一个用于文本生成的函数 get_next_token，其核心作用是基于当前词和 RNN 的隐藏状态，预测下一个词并更新 RNN 状态
     @tf.function
     def get_next_token(self, x, state):
         """生成下一个词（用于文本生成阶段）
@@ -174,7 +172,6 @@ class myRNNModel(keras.Model):
 
 # In[3]:
 
-
 def mkMask(input_tensor, maxLen):
     """创建掩码，用于处理变长序列
     
@@ -185,11 +182,11 @@ def mkMask(input_tensor, maxLen):
     Returns:
         与input_tensor形状相同的布尔掩码
     """
-    shape_of_input = tf.shape(input_tensor) # 获取输入张量的形状
+    shape_of_input = tf.shape(input_tensor)  # 获取输入张量的形状
     shape_of_output = tf.concat(axis=0, values=[shape_of_input, [maxLen]])
-    #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
+    # 使用tf.reshape将input_tensor展平为一维张量oneDtensor。
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
-    #使用tf.sequence_mask函数生成一个掩码张量flat_mask
+    # 使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
     
     return tf.reshape(flat_mask, shape_of_output)
@@ -210,44 +207,44 @@ def reduce_avg(reduce_target, lengths, dim):
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     # 验证输入张量的维度是否符合要求
-   # shape_of_lengths: lengths张量的维度列表
-   # dim: 预期的长度张量的秩(rank)
+    # shape_of_lengths: lengths张量的维度列表
+    # dim: 预期的长度张量的秩(rank)
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
-                         'while it got rank %d') % (dim, len(shape_of_lengths)))
+                          'while it got rank %d') % (dim, len(shape_of_lengths)))
     # 验证目标张量的维度是否符合要求
     # shape_of_target: reduce_target张量的维度列表
     # dim+1: 预期的目标张量的最小秩
-    if len(shape_of_target) < dim+1 : # 输入验证：确保目标张量的秩至少为 dim+1
+    if len(shape_of_target) < dim + 1:  # 输入验证：确保目标张量的秩至少为 dim+1
         raise ValueError(('First input tensor should be at least rank %d, ' +
-                         'while it got rank %d') % (dim+1, len(shape_of_target)))
+                          'while it got rank %d') % (dim + 1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算目标张量与长度张量的秩差
-    mxlen = tf.shape(reduce_target)[dim]                         # 获取目标维度的最大长度，并生成掩码矩阵
-    mask = mkMask(lengths, mxlen)                                # mkMask函数生成布尔掩码
-    if rank_diff!=0: # 根据秩差调整掩码和长度张量的形状，以便广播
-        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
-        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1  # 计算目标张量与长度张量的秩差
+    mxlen = tf.shape(reduce_target)[dim]  # 获取目标维度的最大长度，并生成掩码矩阵
+    mask = mkMask(lengths, mxlen)  # mkMask函数生成布尔掩码
+    if rank_diff != 0:  # 根据秩差调整掩码和长度张量的形状，以便广播
+        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1] * rank_diff])
+        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1] * rank_diff])
     else:
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
-    lengths_reshape = tf.reshape(lengths, shape=len_shape) # 重塑张量以匹配目标张量的形状
-    mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
+    lengths_reshape = tf.reshape(lengths, shape=len_shape)  # 重塑张量以匹配目标张量的形状
+    mask = tf.reshape(mask, shape=mask_shape)  # 将掩码应用到目标张量上
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-    if len(shape_of_lengths) != dim: # 再次验证输入
+    if len(shape_of_lengths) != dim:  # 再次验证输入
         raise ValueError(('Second input tensor should be rank %d, ' +
-                         'while it got rank %d') % (dim, len(shape_of_lengths)))
-    if len(shape_of_target) < dim+1 :
+                          'while it got rank %d') % (dim, len(shape_of_lengths)))
+    if len(shape_of_target) < dim + 1:
         raise ValueError(('First input tensor should be at least rank %d, ' +
-                         'while it got rank %d') % (dim+1, len(shape_of_target)))
+                          'while it got rank %d') % (dim + 1, len(shape_of_target)))
 
     rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
     mxlen = tf.shape(reduce_target)[dim]
     mask = mkMask(lengths, mxlen)
-    if rank_diff!=0:
-        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
-        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+    if rank_diff != 0:
+        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1] * rank_diff])
+        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1] * rank_diff])
     else:
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
@@ -271,16 +268,18 @@ def reduce_avg(reduce_target, lengths, dim):
 @tf.function
 def compute_loss(logits, labels, seqlen):
     """计算序列的交叉熵损失（考虑变长序列）
+
     Args:
         logits: 模型输出，形状(batch_size, seq_len, vocab_size)
         labels: 真实标签，形状(batch_size, seq_len)
         seqlen: 每个序列的实际长度    
+
     Returns:
         平均损失值
     """
     # 计算每个位置的交叉熵
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+        logits=logits, labels=labels)
     # 对变长序列求平均（忽略填充部分）
     losses = reduce_avg(losses, seqlen, dim=1)
     return tf.reduce_mean(losses)
