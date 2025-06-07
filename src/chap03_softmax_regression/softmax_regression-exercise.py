@@ -102,6 +102,7 @@ class SoftmaxRegression(tf.Module):
         #计算线性变换
         logits = tf.matmul(x, self.W) + self.b
         #应用softmax函数，将logits转换为概率分布
+        # softmax 函数对每个样本的 logits 进行归一化，使得每个类别的概率在 [0, 1] 范围内
         return tf.nn.softmax(logits)
 
 @tf.function
