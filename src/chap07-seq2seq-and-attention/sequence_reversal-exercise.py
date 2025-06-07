@@ -77,7 +77,8 @@ class mySeq2SeqModel(keras.Model):
         super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
-        self.v_sz = 27
+        self.v_sz = 27 # 词表大小：26个字母+1个起始符（0）
+
 
         # 嵌入层：将每个字符的索引映射成64维的向量表示
         # 输入维度：self.v_sz（即词表大小），输出维度为64
@@ -271,6 +272,7 @@ def sequence_reversal():
         # 将一个数值列表转换为对应的字母字符串
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
         return out
+    
 
     # 生成一批测试数据（32个样本，每个序列长度10）
     batched_examples, enc_x, _, _ = get_batch(32, 10)
