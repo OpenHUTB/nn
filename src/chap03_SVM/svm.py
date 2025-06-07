@@ -81,12 +81,12 @@ if __name__ == '__main__':
     # 使用训练好的SVM模型对训练数据进行标签预测
     t_train_pred = svm.predict(x_train)     # 预测标签
     
-    x_test = data_test[:, :2]
-    t_test = data_test[:, 2]
-    t_test_pred = svm.predict(x_test)
+    x_test = data_test[:, :2]  # 提取训练集特征（前两列）
+    t_test = data_test[:, 2]   # 提取训练集真实标签（第三列）
+    t_test_pred = svm.predict(x_test)  # 预测训练集标签
 
     # 评估结果，计算准确率
-    acc_train = eval_acc(t_train, t_train_pred)
-    acc_test = eval_acc(t_test, t_test_pred)
+    acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
+    acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
     print("train accuracy: {:.1f}%".format(acc_train * 100))
     print("test accuracy: {:.1f}%".format(acc_test * 100))
