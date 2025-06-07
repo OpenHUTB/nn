@@ -89,8 +89,6 @@ class SoftmaxRegression(tf.Module):
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
         
-        
-
     @tf.function
     def __call__(self, x):
         """
