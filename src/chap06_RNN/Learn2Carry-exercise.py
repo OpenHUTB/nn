@@ -141,7 +141,7 @@ class myRNNModel(keras.Model):
         embed2 = self.embed_layer(num2)  # [batch_size, maxlen, embed_dim]
         
         # 将两个输入的嵌入向量相加
-        inputs = embed1 + embed2  # [batch_size, maxlen, embed_dim]
+        inputs = tf.concat([emb1, emb2], axis=-1)  # [batch_size, maxlen, embed_dim]
         
         # 通过RNN层处理
         rnn_out = self.rnn_layer(inputs)  # [batch_size, maxlen, rnn_units]
