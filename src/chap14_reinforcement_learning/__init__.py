@@ -356,11 +356,11 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         register(
             id='{}Deterministic-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type, 'frameskip': frameskip, 'repeat_action_probability': 0.25},
+            kwargs={'game': game, 'obs_type': obs_type, 'frameskip': frameskip, 'repeat_action_probability': 0.25},# 固定帧跳过
             max_episode_steps=100000,
             nondeterministic=nondeterministic,
         )
-
+# 确定性帧跳过版本 (v4)
         register(
             id='{}Deterministic-v4'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
