@@ -18,15 +18,16 @@ import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库�
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import datasets, layers, optimizers  # 同一库的子模块合并导入，按字母顺序排列
+from tensorflow.keras import datasets, layers, optimizers
+# 同一库的子模块合并导入，按字母顺序排列
+import random
+import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[2]:
 
-import random
-import string
 
 def random_string(length):
     """
