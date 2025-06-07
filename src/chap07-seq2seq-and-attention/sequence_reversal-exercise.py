@@ -269,7 +269,7 @@ def is_reverse(seq, rev_seq):
     # 反转rev_seq并与原始seq比较
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     if seq == rev_seq_rev:
-        return True
+        return True # 返回 True 表示预测结果与真实逆序相符
     else:
         return False
 # 测试模型逆序能力的准确性
