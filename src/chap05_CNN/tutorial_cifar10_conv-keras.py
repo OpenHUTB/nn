@@ -18,6 +18,14 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
+import numpy
+import pylab
+from PIL import Image
+import numpy as np
+import numpy
+import pylab
+from PIL import Image
+import numpy as np
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
@@ -74,15 +82,19 @@ def prepare_mnist_features_and_labels(x, y):
 class MyConvModel(keras.Model):
     '''在这里实现alexNet模型'''
     def __init__(self):
+        """
+        初始化自定义卷积神经网络模型。
+        """
         super(MyConvModel, self).__init__()
+        # 第一层卷积层
         self.l1_conv = Conv2D(filters=32, 
                               kernel_size=(5, 5), 
                               activation='relu', padding='same')
-        
+        # 第二层卷积层
         self.l2_conv = Conv2D(filters=64, 
                               kernel_size=(5, 5), 
                               activation='relu', padding='same')
-        
+        # 最大池化层
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
         
         self.flat = Flatten()
@@ -127,10 +139,7 @@ model.fit(train_ds, epochs=10)
 model.evaluate(test_ds) #模型评估
 
 # In[20]:
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
+
 
 ds, test_ds = cifar10_dataset()
 
@@ -152,7 +161,7 @@ img = np.expand_dims(img, axis=0)
 
 # img = test_batch
 img_out = model.getL2_feature_map(img)
-pylab.imshow(img[0, :, :, :])
+pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
 
 pylab.figure(figsize=(10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
@@ -190,10 +199,7 @@ pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
 pylab.show()
 
 # In[23]:
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
+
 rand_model = MyConvModel()
 ds, test_ds = cifar10_dataset()
 

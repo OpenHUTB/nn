@@ -1,5 +1,7 @@
+# 导入NumPy库，用于科学计算和数值操作
 import numpy as np
-import matplotlib.pyplot as plt # 导入所需模块
+# 导入matplotlib。pyplot模块，用于数据可视化和绘图
+import matplotlib.pyplot as plt 
 
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
@@ -81,16 +83,33 @@ def logsumexp(log_p, axis  =1, keepdims = False):
 
 # 高斯混合模型类
 class GaussianMixtureModel:
-    """高斯混合模型(GMM)实现"""
+    """高斯混合模型(GMM)实现
+    
+    参数:
+        n_components: int, 高斯分布数量 (默认=3)
+        max_iter: int, EM算法最大迭代次数 (默认=100)
+        tol: float, 收敛阈值 (默认=1e-6)
+        random_state: int, 随机种子 (可选)
+    """
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
         
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
-    
+        self.log_likelihoods = []  # 新增：存储每轮迭代的对数似然值
+
+    # 初始化随机数生成器
+        self.rng = np.random.default_rng(random_state)
+
     def fit(self, X):
-        """使用EM算法训练模型"""
+         """使用EM算法训练模型
+        
+        参数:
+            X: array-like, shape=(n_samples, n_features)
+               输入数据矩阵
+        """
+        X = np.asarray(X)
         n_samples, n_features = X.shape
         
         # 初始化混合系数（均匀分布）
@@ -118,7 +137,7 @@ class GaussianMixtureModel:
             # 保持与原参数相同的形状，用于后续计算
             new_mu = np.zeros_like(self.mu) # 初始化新均值和新协方差矩阵的存储空间
             new_sigma = np.zeros_like(self.sigma) #此函数会创建一个新数组，其数据类型（dtype）和形状（shape）都与输入数组self.sigma相同，不过数组里的元素全部为 0。
-            
+
             for k in range(self.n_components): # 遍历每个高斯成分更新参数
                 # 更新均值
                 new_mu[k] = np.sum(gamma[:, k, None] * X, axis = 0) / Nk[k]
@@ -148,6 +167,7 @@ class GaussianMixtureModel:
             # 计算当前迭代轮次中所有数据点的对数似然总和
             # log_prob_sum 应是一个包含每个数据点对数概率的数组
             current_log_likelihood = np.sum(log_prob_sum)       # 计算当前轮的总对数似然
+            self.log_likelihoods.append(current_log_likelihood)  # 新增：记录当前对数似然
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol: # 检查收敛条件（从第二次迭代开始检查）
                 # 如果当前对数似然与上一轮的差值小于容忍度(tol)，则判定收敛
                 break# 退出EM循环
@@ -186,7 +206,21 @@ class GaussianMixtureModel:
         # 返回多维高斯分布的对数概率密度值
         # 公式为：-0.5 * D * log(2π) - 0.5 * log|Σ| + exponent
         return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
-
+#定义了一个名为 plot_convergence 的方法，功能是可视化期望最大化（EM）算法在训练过程中的收敛情况
+    def plot_convergence(self):
+    #"""可视化对数似然的收敛过程"""
+        if not self.log_likelihoods:
+           raise ValueError("请先调用fit方法训练模型")
+        
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
+        plt.xlabel('迭代次数')
+        plt.ylabel('对数似然值')
+        plt.title('EM算法收敛曲线')
+        # 启用网格线（增强图表可读性，便于查看数据点位置）
+# 可选参数：linestyle='--'（虚线）, alpha=0.5（透明度）等
+        plt.grid(True)
+        plt.show()
 # 主程序
 if __name__ == "__main__":
     X, y_true = generate_data()
@@ -195,7 +229,8 @@ if __name__ == "__main__":
     gmm = GaussianMixtureModel(n_components=3) # 创建GMM实例，指定聚类数为3
     gmm.fit(X) # 用数据X训练模型
     y_pred = gmm.labels_ # 获取每个样本的聚类标签
-    
+       # 新增：绘制收敛曲线
+    gmm.plot_convergence()
     # 可视化结果
     # 创建一个宽12英寸、高5英寸的图形窗口
     plt.figure(figsize=(12, 5))
@@ -224,8 +259,8 @@ if __name__ == "__main__":
     plt.title("GMM Predicted Clusters") # 子图标题
 
     # 设置坐标轴标签
-    plt.xlabel("Feature 1")
-    plt.ylabel("Feature 2")
+    plt.xlabel("Feature 1") # 设置X轴标签为“Feature 1”
+    plt.ylabel("Feature 2") # 设置Y轴标签为“Feature 2”
     plt.grid(True, linestyle='--', alpha=0.7) # 添加网格线，线型为虚线，透明度为0.7
     plt.tight_layout()
     plt.show() # 显示图形

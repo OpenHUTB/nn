@@ -81,10 +81,15 @@ class MyConvModel(keras.Model):
         Returns:
             probs: 输出概率。
         """
+        # 第一层卷积，提取特征
         h1 = self.l1_conv(x)
+        # 第一层池化，降维
         h1_pool = self.pool(h1)
+        # 第二层卷积，进一步提取特征
         h2 = self.l2_conv(h1_pool)
+        # 第二层池化，再次降维
         h2_pool = self.pool(h2)
+        # 展平特征图，准备输入全连接层
         flat_h = self.flat(h2_pool)
         dense1 = self.dense1(flat_h)
         logits = self.dense2(dense1)
