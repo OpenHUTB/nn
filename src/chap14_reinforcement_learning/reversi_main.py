@@ -4,13 +4,13 @@ import numpy as np
 
 from RL_QG_agent import RL_QG_agent  # 导入强化学习智能体
 
-# 创建初始环境并重置
-env = gym.make('Reversi8x8-v0')
-env.reset()
+# 创建初始环境并重置（8*8棋盘）
+env = gym.make('Reversi8x8-v0')#使用openAI Gym接口创建黑白棋环境
+env.reset()#重置环境到初始状态
 
 # 初始化智能体并加载预训练模型
-agent = RL_QG_agent()
-agent.load_model()
+agent = RL_QG_agent()#创建智能体实例
+agent.load_model()#加载预训练模型参数
 
 # 设置最大训练轮数
 max_epochs = 100
