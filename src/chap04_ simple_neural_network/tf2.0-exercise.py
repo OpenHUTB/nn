@@ -30,6 +30,7 @@ def softmax(x):
     exp_x = tf.exp(x - x_max)
     
     # 计算softmax值，添加小的epsilon值避免除零错误
+    # 1e-10是科学计数法，表示1乘以10的负10次方
     sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
     return exp_x / (sum_exp + 1e-10)
 
@@ -42,8 +43,8 @@ test_data = np.random.normal(size=[10, 5])
 # ## 实现sigmoid函数
 
 def sigmoid(x):
-    exp_neg_x = tf.exp(-x)
-    prob_x = 1.0 / (1.0 + exp_neg_x)
+    exp_neg_x = tf.exp(-x)# 计算 -x 的指数
+    prob_x = 1.0 / (1.0 + exp_neg_x) # 计算 sigmoid 函数值
     return prob_x
 
 
@@ -81,7 +82,6 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 
 
 # ## 实现 sigmoid 交叉熵loss函数
-
 def sigmoid_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''

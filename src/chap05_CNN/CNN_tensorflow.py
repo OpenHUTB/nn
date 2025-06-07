@@ -51,8 +51,8 @@ def weight_variable(shape):
 
 
 def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
+    initial = tf.constant(0.1, shape=shape)# 使用常数 0.1 初始化偏置，避免神经元输出为 0（死亡神经元问题）
+    return tf.Variable(initial)# 创建可训练的 TensorFlow 变量
 
 def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     """
@@ -66,6 +66,9 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
         
     返回:
         tf.Tensor: 卷积结果
+    异常:
+        ValueError: 如果 padding 不是 'SAME' 或 'VALID'，会抛出异常。
+        TypeError: 如果输入参数类型不正确，会抛出异常。
     """
     # 每一维度滑动步长全部是 1， padding 方式选择 same
     # 提示 使用函数  tf.nn.conv2d
@@ -73,10 +76,17 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     # 验证输入类型
     if not tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
+
+    if not tf.is_tensor(W):
+        raise TypeError(f"Expected W to be a tf.Tensor, but got {type(W)}.")
     
-    # 验证padding参数
+    # 验证padding参数,如果 padding 无效，抛出 ValueError 异常并提供详细信息
     if padding not in ['SAME', 'VALID']:
         raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
+
+    # 验证 strides 参数的格式，应该是一个长度为4的列表
+    if len(strides) != 4:
+        raise ValueError(f"Strides should be a list of length 4, but got list of length {len(strides)}.")
     
     # 执行卷积操作
     conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
@@ -115,18 +125,23 @@ ys = tf.placeholder(tf.float32, [None, 10])
 keep_prob = tf.placeholder(tf.float32)
 x_image = tf.reshape(xs, [-1, 28, 28, 1])
 
-#  卷积层 1
-## conv1 layer ##
-W_conv1 = weight_variable([7, 7, 1, 32])                      # patch 7x7, in size 1, out size 32
-b_conv1 = bias_variable([32])                     
-h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)                      # 卷积  自己选择 选择激活函数
-h_pool1 = max_pool_2x2(h_conv1)                      # 池化               
+# 定义第一个卷积层的权重变量，卷积核大小为 7x7，输入通道数为 1，输出通道数为 32
+W_conv1 = weight_variable([7, 7, 1, 32])
+# 定义第一个卷积层的偏置变量，输出通道数为 32
+b_conv1 = bias_variable([32])
+# 执行第一个卷积操作
+h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
+# 执行第一个最大池化操作
+h_pool1 = max_pool_2x2(h_conv1)
 
-# 卷积层 2
-W_conv2 = weight_variable([5, 5, 32, 64])                       # patch 5x5, in size 32, out size 64
+# 定义第二个卷积层的权重变量，卷积核大小为 5x5，输入通道数为 32，输出通道数为 64
+W_conv2 = weight_variable([5, 5, 32, 64])
+# 定义第一个卷积层的偏置变量，输出通道数为 32
 b_conv2 = bias_variable([64])
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)                       # 卷积  自己选择 选择激活函数
-h_pool2 = max_pool_2x2(h_conv2)                       # 池化
+# 执行第二个卷积操作
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+#执行第二个最大池化操作
+h_pool2 = max_pool_2x2(h_conv2)
 
 #  全连接层 1
 # 定义全连接层1的权重（W_fc1），维度是 [7*7*64, 1024]：

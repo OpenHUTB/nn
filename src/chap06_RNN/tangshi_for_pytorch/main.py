@@ -6,9 +6,9 @@ import torch.optim as optim
 
 import rnn
 
-start_token = 'B'
-end_token = 'E'
-batch_size = 64
+start_token = 'B' #定义了起始标记，表示序列的开始
+end_token = 'E'#定义了结束标记表示序列的结束
+batch_size = 64 #定义了训练或推理时的批处理大小（Batch Size），即每次处理的样本数量
 
 
 def process_poems1(file_name):

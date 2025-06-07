@@ -15,18 +15,21 @@ import sys
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
 
 # 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
-import numpy as np
+import numpy as np# 导入NumPy库（科学计算基础库）
+                    # 提供多维数组操作、数学函数、线性代数等功能
+                    # 常用于数据预处理、模型输入构建和结果分析
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import datasets, layers, optimizers  # 同一库的子模块合并导入，按字母顺序排列
+from tensorflow.keras import datasets, layers, optimizers
+# 同一库的子模块合并导入，按字母顺序排列
+import random
+import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[2]:
 
-import random
-import string
 
 def random_string(length):
     """
@@ -50,7 +53,7 @@ def random_string(length):
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
-    batched_examples = [randomString(length) for i in range(batch_size)]
+    batched_examples = [random_string(length) for i in range(batch_size)]
     # 转成索引
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     # 逆序
@@ -98,9 +101,15 @@ class mySeq2SeqModel(keras.Model):
 
         # 解码器RNN层：与编码器类似
         self.decoder = tf.keras.layers.RNN(
-            self.decoder_cell,
-            return_sequences = True,
-            return_state = True
+            self.decoder_cell,             # 指定解码器使用的RNN单元
+                                           # 例如LSTMCell、GRUCell或自定义单元
+            return_sequences = True,       # 返回完整的输出序列
+                                           # 适用于序列到序列模型，每个时间步都需要输出
+                                           # 输出形状: [batch_size, seq_len, units]
+            return_state = True            # 返回最终的隐藏状态
+                                           # 对于LSTM单元，返回[h_state, c_state]
+                                           # 对于GRU单元，返回[h_state]
+                                           # 用于传递状态到下一个解码步骤
         )
 
         # 全连接层：将解码器的每个时间步的输出转换为词表大小的 logits（即每个字符的预测概率分布）
@@ -123,6 +132,8 @@ class mySeq2SeqModel(keras.Model):
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
+      # 返回模型预测的logits值，通常后续会通过softmax计算概率
+# 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
     
     
@@ -137,18 +148,33 @@ class mySeq2SeqModel(keras.Model):
         return [enc_out[:, -1, :], enc_state]
     
     def get_next_token(self, x, state):
-        '''
-        shape(x) = [b_sz,] 
-        '''
-        # shape(b_sz, emb_sz)，将输入token ID转换为词向量，输出形状: (batch_size, embedding_size)
-        inp_emb = self.embed_layer(x)
-        # shape(b_sz, h_sz)，通过解码器单元处理当前输入，更新隐藏状态，h形状: (batch_size, hidden_size)
-        h, state = self.decoder_cell.call(inp_emb, state)
-        # shape(b_sz, v_sz)，将解码器输出映射到词汇表大小的空间，获取每个token的得分，输出形状: (batch_size, vocabulary_size)
-        logits = self.dense(h)
-        # 选择得分最高的token作为预测结果
-        out = tf.argmax(logits, axis=-1)
-        return out, state
+       '''
+    根据当前输入和状态生成下一个token
+    参数:
+        x: 当前输入token，shape=[b_sz,]
+        state: 当前RNN状态
+    返回:
+        next_token: 预测的下一个token
+        new_state: 更新后的RNN状态
+    '''
+    # 将输入token通过嵌入层转换为密集向量表示
+        x_embed = self.embed_layer(x)  # (B, E)
+        # 加性注意力计算
+        # 计算注意力分数
+        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
+        # 计算注意力权重
+        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+        attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+        # 计算上下文向量
+        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+        # 将嵌入向量和上下文向量拼接作为RNN输入
+        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
+        # 通过RNN单元计算输出和更新状态
+        output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
+        # 通过全连接层计算logits
+        logits = self.dense(output)  # (B, V)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        return next_token, new_state[0]  # 返回单个状态向量
 
 
 # # Loss函数以及训练逻辑
@@ -210,9 +236,9 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-optimizer = optimizers.Adam(0.0005)
-model = mySeq2SeqModel()
-train(model, optimizer, seqlen=20)
+optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
+model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
+train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
 
 
 # # 测试模型逆置能力
@@ -240,9 +266,9 @@ def sequence_reversal():
             # 收集每一步生成的 token
             collect.append(tf.expand_dims(cur_token, axis=-1))
         # 拼接输出序列
-        out = tf.concat(collect, axis=-1).numpy()
-        # 索引转字符
-        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
+        out = tf.concat(collect, axis = -1).numpy()
+        # 将一个数值列表转换为对应的字母字符串
+        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
         return out
 
     # 生成一批测试数据（32个样本，每个序列长度10）
@@ -257,15 +283,16 @@ def is_reverse(seq, rev_seq):
     # 反转rev_seq并与原始seq比较
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     if seq == rev_seq_rev:
-        return True
+        return True # 返回 True 表示预测结果与真实逆序相符
     else:
         return False
 # 测试模型逆序能力的准确性
-print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])# 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
-print(list(zip(*sequence_reversal())))# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
+print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
+print(list(zip(*sequence_reversal())))
+# 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
 
 
-# In[ ]:
 
 
 

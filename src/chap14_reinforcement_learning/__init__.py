@@ -1,46 +1,47 @@
-from gym.envs.registration import registry, register, make, spec
+from gym.envs.registration import registry, register, make, spec# 导入Gym环境注册相关模块
 
-# Algorithmic
-# ----------------------------------------
+# Algorithmic Environments - 算法类环境
+# 设计用于测试序列学习、记忆和模式识别能力
 
+# 复制任务：智能体需记忆并复制输入序列
 register(
     id = 'Copy-v0',
-    entry_point = 'gym.envs.algorithmic:CopyEnv',
-    max_episode_steps = 200,
-    reward_threshold = 25.0,
+    entry_point = 'gym.envs.algorithmic:CopyEnv',# 环境实现类
+    max_episode_steps = 200,# 单次训练最大步数
+    reward_threshold = 25.0,# 视为任务成功的奖励阈值
 )
-
+#重复复制任务：需记忆并多次复制输入序列
 register(
-    id = 'RepeatCopy-v0',
+    id = 'RepeatCopy-v0', # 重复复制任务
     entry_point = 'gym.envs.algorithmic:RepeatCopyEnv',
     max_episode_steps = 200,
-    reward_threshold = 75.0,
+    reward_threshold = 75.0,# 更高阈值反映任务复杂性增加
 )
 
-
+# 反向加法任务：执行反向数字加法运算
 register(
     id = 'ReversedAddition-v0',
     entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs = {'rows' : 2},
+    kwargs = {'rows' : 2},# 自定义参数：操作数行数
     max_episode_steps = 200,
     reward_threshold = 25.0,
 )
-
+# 三操作数反向加法任务
 register(
     id = 'ReversedAddition3-v0',
     entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs = {'rows' : 3},
+    kwargs = {'rows' : 3},# 三行操作数增加难度
     max_episode_steps = 200,
     reward_threshold = 25.0,
 )
-
+# 重复输入检测任务：识别重复出现的输入元素
 register(
-    id = 'DuplicatedInput-v0',
-    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',
+    id = 'DuplicatedInput-v0',  # 环境唯一标识符
+    entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',  # 环境类的导入路径
     max_episode_steps = 200,
-    reward_threshold = 9.0,
+    reward_threshold = 9.0,# 相对较低的阈值
 )
-
+# 序列反转任务：将输入序列完全反转输出
 register(
     id = 'Reverse-v0',
     entry_point = 'gym.envs.algorithmic:ReverseEnv',
@@ -48,23 +49,24 @@ register(
     reward_threshold = 25.0,
 )
 
-# Classic
-# ----------------------------------------
+# Classic Control Environments - 经典控制环境
+# 基于物理模型的简单控制问题，常用于算法基准测试
 # 经典控制环境：基于数学模型的控制问题
 
+# 基础版倒立摆平衡任务
 register(
-    id='CartPole-v0',  # 倒立摆平衡任务
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=200,  # 200步达标
-    reward_threshold=195.0,
+    id = 'CartPole-v0',  
+    entry_point = 'gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps = 200,  # 平衡200步视为成功
+    reward_threshold = 195.0,# 接近最大理论值200
 )
 
 
 register(
-    id='CartPole-v1',  # 更高难度版本
-    entry_point='gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps=500,  # 500步达标
-    reward_threshold=475.0,
+    id = 'CartPole-v1',  # 更高难度版本
+    entry_point = 'gym.envs.classic_control:CartPoleEnv',
+    max_episode_steps = 500,  # 500步达标
+    reward_threshold = 475.0,
 )
 
 register(
@@ -83,7 +85,7 @@ register(
 register(
     id='Pendulum-v0',   # 钟摆任务：摆到垂直位置
     entry_point='gym.envs.classic_control:PendulumEnv',
-    max_episode_steps=200,
+    max_episode_steps = 200,
 )
 
 register(
@@ -97,14 +99,14 @@ register(
 # ----------------------------------------
 
 register(
-    id='LunarLander-v2',    # 月球着陆器
-    entry_point='gym.envs.box2d:LunarLander',
-    max_episode_steps=1000,
-    reward_threshold=200,   # 成功着陆得分
+    id = 'LunarLander-v2',    # 月球着陆器
+    entry_point = 'gym.envs.box2d:LunarLander',
+    max_episode_steps = 1000,
+    reward_threshold = 200,   # 成功着陆得分
 )
-
+# 月球着陆器连续动作版本
 register(
-    id='LunarLanderContinuous-v2',   # 连续控制版本
+    id='LunarLanderContinuous-v2',  
     entry_point='gym.envs.box2d:LunarLanderContinuous',
     max_episode_steps=1000,
     reward_threshold=200,
@@ -113,14 +115,14 @@ register(
 register(
     id='BipedalWalker-v2',   # 双足步行机器人
     entry_point='gym.envs.box2d:BipedalWalker',
-    max_episode_steps=1600,
+    max_episode_steps=1600,# 长时程任务
     reward_threshold=300,     # 完成步行得分
 )
 
 register(
-    id='BipedalWalkerHardcore-v2',   # 困难版本
+    id='BipedalWalkerHardcore-v2',   # 双足步行困难版（复杂地形）
     entry_point='gym.envs.box2d:BipedalWalkerHardcore',
-    max_episode_steps=2000,
+    max_episode_steps=2000,# 更长的步数限制
     reward_threshold=300,  
 )
 
@@ -152,10 +154,10 @@ register(
 
 register(
     id='FrozenLake-v0',   # 冰湖行走任务
-    entry_point='gym.envs.toy_text:FrozenLakeEnv',
-    kwargs={'map_name' : '4x4'},   # 4x4网格
-    max_episode_steps=100,
-    reward_threshold=0.78, # optimum = .8196   # 成功到达目标的平均奖励
+    entry_point = 'gym.envs.toy_text:FrozenLakeEnv',
+    kwargs = {'map_name' : '4x4'},   # 4x4网格
+    max_episode_steps = 100,
+    reward_threshold = 0.78, # optimum = .8196   # 成功到达目标的平均奖励
 )
 
 register(
@@ -177,110 +179,115 @@ register(
     max_episode_steps=1000,
 )
 
+# 注册后可通过gym.make('Roulette-v0')创建环境实例
 register(
-    id='Roulette-v0',
-    entry_point='gym.envs.toy_text:RouletteEnv',
-    max_episode_steps=100,
+    id='Roulette-v0',  # 环境唯一标识符（在代码中引用的名称
+    entry_point='gym.envs.toy_text:RouletteEnv',  # 环境类的导入路径
+                                                  # 格式为：'包名:类名'
+
+    max_episode_steps=100,              # 每个episode的最大步数
+                                        # 达到此步数后，环境自动终止
+                                        # 防止无限循环，控制训练复杂度
 )
 
 register(
-    id='Taxi-v2',
-    entry_point='gym.envs.toy_text.taxi:TaxiEnv',
+    id='Taxi-v2',  # 环境的唯一标识符
+    entry_point='gym.envs.toy_text.taxi:TaxiEnv',  # 指定环境类的位置
     reward_threshold=8, # optimum = 8.46
-    max_episode_steps=200,
+    max_episode_steps=200,  # 设置每个episode的最大步数为200
 )
-
+# 数字猜测游戏
 register(
     id='GuessingGame-v0',
     entry_point='gym.envs.toy_text.guessing_game:GuessingGame',
     max_episode_steps=200,
 )
-
+# 热冷游戏：基于反馈的目标搜索
 register(
     id='HotterColder-v0',
     entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
     max_episode_steps=200,
 )
 
-# Mujoco
-# ----------------------------------------
+# MuJoCo Environments - 机器人控制环境
+# 基于MuJoCo物理引擎的连续控制任务（需要独立许可证）
 
-# 2D
+# 2D机械臂到达目标位置
 
 register(
     id='Reacher-v1',
     entry_point='gym.envs.mujoco:ReacherEnv',
-    max_episode_steps=50,
-    reward_threshold=-3.75,
+    max_episode_steps=50,# 较短步数限制
+    reward_threshold=-3.75,# 负阈值表示最小化距离
 )
-
+# 物体推动任务
 register(
     id='Pusher-v0',
     entry_point='gym.envs.mujoco:PusherEnv',
     max_episode_steps=100,
-    reward_threshold=0.0,
+    reward_threshold=0.0,# 尚未定义明确阈值
 )
-
+# 物体投掷任务
 register(
     id='Thrower-v0',
     entry_point='gym.envs.mujoco:ThrowerEnv',
     max_episode_steps=100,
     reward_threshold=0.0,
 )
-
+# 物体击打任务
 register(
     id='Striker-v0',
     entry_point='gym.envs.mujoco:StrikerEnv',
     max_episode_steps=100,
     reward_threshold=0.0,
 )
-
+# 单级倒立摆
 register(
     id='InvertedPendulum-v1',
     entry_point='gym.envs.mujoco:InvertedPendulumEnv',
     max_episode_steps=1000,
-    reward_threshold=950.0,
+    reward_threshold=950.0,# 高精度控制要求
 )
-
+# 二级倒立摆（更复杂）
 register(
     id='InvertedDoublePendulum-v1',
     entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
     max_episode_steps=1000,
-    reward_threshold=9100.0,
+    reward_threshold=9100.0,# 显著提高的阈值
 )
-
+# 猎豹奔跑任务（速度最大化）
 register(
     id='HalfCheetah-v1',
     entry_point='gym.envs.mujoco:HalfCheetahEnv',
     max_episode_steps=1000,
-    reward_threshold=4800.0,
+    reward_threshold=4800.0,# 高速要求
 )
-
+# 单腿跳跃机器人
 register(
     id='Hopper-v1',
     entry_point='gym.envs.mujoco:HopperEnv',
     max_episode_steps=1000,
-    reward_threshold=3800.0,
+    reward_threshold=3800.0,# 持续跳跃要求
 )
-
+# 游泳者运动控制
 register(
     id='Swimmer-v1',
     entry_point='gym.envs.mujoco:SwimmerEnv',
     max_episode_steps=1000,
-    reward_threshold=360.0,
+    reward_threshold=360.0,# 相对较低阈值
+)
+# 双腿行走机器人
+register(
+    id = 'Walker2d-v1',
+    max_episode_steps = 1000,
+    entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
 
 register(
-    id='Walker2d-v1',
-    max_episode_steps=1000,
-    entry_point='gym.envs.mujoco:Walker2dEnv',
-)
-
-register(
-    id='Ant-v1',
-    entry_point='gym.envs.mujoco:AntEnv',
-    max_episode_steps=1000,
-    reward_threshold=6000.0,
+    id = 'Ant-v1',
+    entry_point = 'gym.envs.mujoco:AntEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 6000.0,
 )
 
 register(
@@ -288,16 +295,17 @@ register(
     entry_point='gym.envs.mujoco:HumanoidEnv',
     max_episode_steps=1000,
 )
-
+# 类人机器人站立任务
 register(
     id='HumanoidStandup-v1',
     entry_point='gym.envs.mujoco:HumanoidStandupEnv',
     max_episode_steps=1000,
 )
 
-# Atari
-# ----------------------------------------
+# Atari Environments - 雅达利游戏环境
+# 通过Arcade Learning Environment封装的2600款经典游戏
 
+# 遍历所有支持的雅达利游戏
 # # print ', '.join(["'{}'".format(name.split('.')[0]) for name in atari_py.list_games()])
 for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', 'atlantis',
     'bank_heist', 'battle_zone', 'beam_rider', 'berzerk', 'bowling', 'boxing', 'breakout', 'carnival',
@@ -313,7 +321,7 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         name = ''.join(g.capitalize() for g in game.split('_'))
         if obs_type == 'ram':
             name = f'{name}-ram'  # RAM观测版本添加-ram后缀
-
+# 处理特殊游戏的非确定性
         nondeterministic = False
         if game == 'elevator_action' and obs_type == 'ram':
             # ElevatorAction-ram-v0 seems to yield slightly
@@ -321,38 +329,38 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
             # should track this down eventually, but for now we just
             # mark it as nondeterministic.
             nondeterministic = True
-
+# 注册基础版本 (v0)
         register(
             id='{}-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type, 'repeat_action_probability': 0.25},
+            kwargs={'game': game, 'obs_type': obs_type, 'repeat_action_probability': 0.25},# 动作重复概率（模拟硬件延迟）
             max_episode_steps=10000,
             nondeterministic=nondeterministic,
         )
-
+# 注册改进版本 (v4)
         register(
             id='{}-v4'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type},
-            max_episode_steps=100000,
+            kwargs={'game': game, 'obs_type': obs_type},# 移除动作重复概率
+            max_episode_steps=100000,# 更长步数限制
             nondeterministic=nondeterministic,
         )
-
+# 设置游戏特定帧跳过策略
         # Standard Deterministic (as in the original DeepMind paper)
         if game == 'space_invaders':
             frameskip = 3
         else:
             frameskip = 4
-
+# 确定性帧跳过版本 (v0)
         # Use a deterministic frame skip.
         register(
             id='{}Deterministic-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type, 'frameskip': frameskip, 'repeat_action_probability': 0.25},
+            kwargs={'game': game, 'obs_type': obs_type, 'frameskip': frameskip, 'repeat_action_probability': 0.25},# 固定帧跳过
             max_episode_steps=100000,
             nondeterministic=nondeterministic,
         )
-
+# 确定性帧跳过版本 (v4)
         register(
             id='{}Deterministic-v4'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
@@ -360,15 +368,15 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
             max_episode_steps=100000,
             nondeterministic=nondeterministic,
         )
-
+# 无帧跳过版本 (v0)
         register(
             id='{}NoFrameskip-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
             kwargs={'game': game, 'obs_type': obs_type, 'frameskip': 1, 'repeat_action_probability': 0.25}, # A frameskip of 1 means we get every frame
-            max_episode_steps=frameskip * 100000,
+            max_episode_steps=frameskip * 100000,# 每帧都处理，按比例增加步数限制
             nondeterministic=nondeterministic,
         )
-
+# 无帧跳过版本 (v4)
         # No frameskip. (Atari has no entropy source, so these are
         # deterministic environments.)
         register(
@@ -380,25 +388,26 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         )
 
 # Board games
-# ----------------------------------------
+# 棋类游戏环境
 
+#9x9围棋环境
 register(
     id='Go9x9-v0',
     entry_point='gym.envs.board_game:GoEnv',
     kwargs={
         'player_color': 'black',
-        'opponent': 'pachi:uct:_2400',
-        'observation_type': 'image3c',
-        'illegal_move_mode': 'lose',
+        'opponent': 'pachi:uct:_2400',# 使用Pachi AI作为对手
+        'observation_type': 'image3c',# 图像观测
+        'illegal_move_mode': 'lose',# 非法移动直接判负
         'board_size': 9,
     },
     # The pachi player seems not to be determistic given a fixed seed.
     # (Reproduce by running 'import gym; h = gym.make('Go9x9-v0'); h.seed(1); h.reset(); h.step(15); h.step(16); h.step(17)' a few times.)
     #
     # This is probably due to a computation time limit.
-    nondeterministic=True,
+    nondeterministic=True,# 因AI计算时间限制导致非确定性
 )
-
+#19x19标准围棋环境
 register(
     id='Go19x19-v0',
     entry_point='gym.envs.board_game:GoEnv',
@@ -407,11 +416,11 @@ register(
         'opponent': 'pachi:uct:_2400',
         'observation_type': 'image3c',
         'illegal_move_mode': 'lose',
-        'board_size': 19,
+        'board_size': 19,# 标准棋盘尺寸
     },
     nondeterministic=True,
 )
-
+# 9x9六边形棋环境
 register(
     id='Hex9x9-v0',
     entry_point='gym.envs.board_game:HexEnv',
@@ -468,23 +477,24 @@ register(
 
 # interpretability envs
 register(
-    id='PredictActionsCartpole-v0',
-    entry_point='gym.envs.safety:PredictActionsCartpoleEnv',
+    id = 'PredictActionsCartpole-v0',
+    entry_point = 'gym.envs.safety:PredictActionsCartpoleEnv',
     max_episode_steps=200,
 )
 
 register(
-    id='PredictObsCartpole-v0',
-    entry_point='gym.envs.safety:PredictObsCartpoleEnv',
+    id = 'PredictObsCartpole-v0',
+    entry_point = 'gym.envs.safety:PredictObsCartpoleEnv',
     max_episode_steps=200,
 )
 
 # semi_supervised envs
     # probably the easiest:
 register(
-    id='SemisuperPendulumNoise-v0',
-    entry_point='gym.envs.safety:SemisuperPendulumNoiseEnv',
-    max_episode_steps=200,
+    id='SemisuperPendulumNoise-v0',                # 环境标识符，用于gym.make()
+    entry_point='gym.envs.safety:SemisuperPendulumNoiseEnv',  # 环境类路径
+    max_episode_steps=200,                 # 每个episode最大步数
+                                               # 与标准CartPole保持一致
 )
     # somewhat harder because of higher variance:
 register(
@@ -503,19 +513,19 @@ register(
 register(
     id='OffSwitchCartpole-v0',
     entry_point='gym.envs.safety:OffSwitchCartpoleEnv',
-    max_episode_steps=200,
+    max_episode_steps = 200,
 )
 
 register(
     id='OffSwitchCartpoleProb-v0',
-    entry_point='gym.envs.safety:OffSwitchCartpoleProbEnv',
-    max_episode_steps=200,
+    entry_point = 'gym.envs.safety:OffSwitchCartpoleProbEnv',
+    max_episode_steps = 200,
 )
 
 register(
     id='Reversi8x8-v0',
-    entry_point='gym.envs.reversi:ReversiEnv',
-    kwargs={
+    entry_point = 'gym.envs.reversi:ReversiEnv',
+    kwargs = {
         'player_color': 'black',
         'opponent': 'random',
         'observation_type': 'numpy3c',

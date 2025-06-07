@@ -1,8 +1,9 @@
 # !/usr/bin/env python
 # coding: utf-8
 # # Tensorflow2.0 小练习
-
+# 导入 numpy 库，并简写为 np（标准约定）
 import numpy as np
+# 导入 TensorFlow 库，并简写为 tf（标准约定）
 import tensorflow as tf
 
 # ## 实现softmax函数
@@ -20,6 +21,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
 
     # 数值稳定性处理：减去最大值避免指数爆炸
     max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
     # 计算指数值
@@ -108,7 +110,7 @@ test_data = np.random.normal(size=[10])
 labels = np.random.randint(0, 2, size=[10]).astype(np.float32)
 
 # 对比 TensorFlow  原始结果和自定义函数结果
-tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=test_data))
+tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels, logits = test_data))
 custom_loss = sigmoid_ce(test_data, labels)
 
 print("tf loss:", tf_loss.numpy())
