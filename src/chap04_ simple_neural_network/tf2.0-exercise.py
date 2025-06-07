@@ -30,6 +30,7 @@ def softmax(x):
     exp_x = tf.exp(x - x_max)
     
     # 计算softmax值，添加小的epsilon值避免除零错误
+    # 1e-10是科学计数法，表示1乘以10的负10次方
     sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
     return exp_x / (sum_exp + 1e-10)
 
