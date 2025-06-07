@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # # 参考 mnist_conv-keras 实现针对 cifar10 的 alexNet 卷积模型
 # 
 # 
@@ -48,6 +47,7 @@ def cifar10_dataset():
     ds = ds.take(20000).shuffle(20000).batch(100)
 
     # 创建测试数据集
+    # 使用tf.data.Dataset.from_tensor_slices从内存中的NumPy数组创建数据集
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).batch(20000)
