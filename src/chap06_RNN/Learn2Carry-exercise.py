@@ -182,6 +182,7 @@ def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
     for step in range(steps):
+         # 生成一批训练数据
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
         Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
