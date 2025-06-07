@@ -21,7 +21,7 @@ def identity_basis(x):
 #将输入转换为多项式特征
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    x = np.expand_dims(x, axis=1)  # 将 x 从 (N,) 转换为 (N, 1)，便于后续幂运算和拼接
     # 初始化特征列表
     feat = [x]
     # 生成多项式特征
