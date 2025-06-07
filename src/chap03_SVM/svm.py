@@ -1,6 +1,7 @@
 # python: 3.5.2
 # encoding: utf-8
 
+# 导入numpy并命名为np
 import numpy as np
 
 def load_data(fname):
