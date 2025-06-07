@@ -1,20 +1,21 @@
-from gym.envs.registration import registry, register, make, spec
+from gym.envs.registration import registry, register, make, spec# 导入Gym环境注册相关模块
 
-# Algorithmic
-# ----------------------------------------
+# Algorithmic Environments - 算法类环境
+# 设计用于测试序列学习、记忆和模式识别能力
 
+# 复制任务：智能体需记忆并复制输入序列
 register(
     id = 'Copy-v0',
-    entry_point = 'gym.envs.algorithmic:CopyEnv',
-    max_episode_steps = 200,
-    reward_threshold = 25.0,
+    entry_point = 'gym.envs.algorithmic:CopyEnv',# 环境实现类
+    max_episode_steps = 200,# 单次训练最大步数
+    reward_threshold = 25.0,# 视为任务成功的奖励阈值
 )
-
+#重复复制任务：需记忆并多次复制输入序列
 register(
     id = 'RepeatCopy-v0',
     entry_point = 'gym.envs.algorithmic:RepeatCopyEnv',
     max_episode_steps = 200,
-    reward_threshold = 75.0,
+    reward_threshold = 75.0,# 更高阈值反映任务复杂性增加
 )
 
 
