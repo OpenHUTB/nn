@@ -104,9 +104,9 @@ register(
     max_episode_steps = 1000,
     reward_threshold = 200,   # 成功着陆得分
 )
-
+# 月球着陆器连续动作版本
 register(
-    id='LunarLanderContinuous-v2',   # 连续控制版本
+    id='LunarLanderContinuous-v2',  
     entry_point='gym.envs.box2d:LunarLanderContinuous',
     max_episode_steps=1000,
     reward_threshold=200,
@@ -115,14 +115,14 @@ register(
 register(
     id='BipedalWalker-v2',   # 双足步行机器人
     entry_point='gym.envs.box2d:BipedalWalker',
-    max_episode_steps=1600,
+    max_episode_steps=1600,# 长时程任务
     reward_threshold=300,     # 完成步行得分
 )
 
 register(
-    id='BipedalWalkerHardcore-v2',   # 困难版本
+    id='BipedalWalkerHardcore-v2',   # 双足步行困难版（复杂地形）
     entry_point='gym.envs.box2d:BipedalWalkerHardcore',
-    max_episode_steps=2000,
+    max_episode_steps=2000,# 更长的步数限制
     reward_threshold=300,  
 )
 
