@@ -220,11 +220,15 @@ if __name__ == '__main__':
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
     def animate(i):
+        # 定义 x 轴的数据范围，从 0 到 10，步长为 0.1
         xx = np.arange(10, step=0.1)
+        # 从 animation_frames 列表中获取当前帧的参数
         a = animation_frames[i][0]
         b = animation_frames[i][1]
         c = animation_frames[i][2]
+        # 计算当前帧的 y 轴数据
         yy = a/-b * xx + c/-b
+        # 更新线性方程的线条数据
         line_d.set_data(xx, yy)
         C1_dots.set_data(C1[:, 0], C1[:, 1])
         C2_dots.set_data(C2[:, 0], C2[:, 1])
