@@ -936,18 +936,18 @@ class HelpText(object):
 # ==============================================================================
 
 
-class CollisionSensor(object):
-    def __init__(self, parent_actor, hud):
-        self.sensor = None
-        self.history = []
-        self._parent = parent_actor
-        self.hud = hud
-        world = self._parent.get_world()
+class CollisionSensor(object): # 碰撞传感器类，用于检测并记录车辆的碰撞事件
+    def __init__(self, parent_actor, hud):  # 初始化传感器属性
+        self.sensor = None                  # 存储Carla传感器对象的引用
+        self.history = []                   # 存储碰撞历史数据
+        self._parent = parent_actor         # 挂载传感器的父Actor
+        self.hud = hud                      # HUD对象，用于显示碰撞信息
+        world = self._parent.get_world()    # 获取世界对象并创建碰撞传感器蓝图
         bp = world.get_blueprint_library().find('sensor.other.collision')
-        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent)
+        self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=self._parent) # 生成传感器并将其附着到父Actor上
         # We need to pass the lambda a weak reference to self to avoid circular
         # reference.
-        weak_self = weakref.ref(self)
+        weak_self = weakref.ref(self) # 设置传感器数据回调函数，使用弱引用避免循环引用
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
 
     def get_collision_history(self):
