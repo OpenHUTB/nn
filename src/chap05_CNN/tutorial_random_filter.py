@@ -28,7 +28,7 @@ class MyConvModel(keras.Model):
 
 
 # In[192]:
-random_conv = MyConvModel()
+random_conv = MyConvModel()# 实例化一个新的卷积神经网络模型
 
 # 打开一张尺寸为 639x516 的随机图片
 img = Image.open(open('corgi.jpg', 'rb'))
