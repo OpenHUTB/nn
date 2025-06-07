@@ -91,17 +91,31 @@ class CNN(nn.Module):
         out2 = self.out2(out1)
         return out2
 
-# 测试函数
+# 测试函数 - 评估模型在测试集上的准确率
 def test(cnn):
-    global prediction              # 声明全局变量
-    y_pre = cnn(test_x)            # 用模型预测测试数据
-     # 这里使用softmax获取概率分布
+    global prediction  # 使用全局变量prediction保存预测结果
+    
+    # 模型预测：输入测试数据，得到原始输出logits（未归一化的预测值）
+    y_pre = cnn(test_x)  
+    
+    # 计算softmax概率分布（将logits转换为概率值，dim=1表示对类别维度做归一化）
     y_prob = F.softmax(y_pre, dim=1)
-    _, pre_index = torch.max(y_pre, 1)      # 获取预测类别（最大概率的索引）
-    pre_index = pre_index.view(-1)          # 调整张量形状
-    prediction = pre_index.data.numpy()     # 转换为 numpy 数组
-    correct = np.sum(prediction == test_y)  # 计算正确预测的数量
-    return correct / 500.0                  # 返回准确率，假设测试集中样本数为 500
+    
+    # 获取预测类别：找到每个样本概率最大的类别索引
+    # torch.max返回(最大值, 最大值的索引)
+    _, pre_index = torch.max(y_pre, 1)  
+    
+    # 调整张量形状为1维向量（例如从[N,1]变为[N]）
+    pre_index = pre_index.view(-1)
+    
+    # 将预测结果从PyTorch张量转换为numpy数组
+    prediction = pre_index.data.numpy()
+    
+    # 计算正确预测的数量（预测值与真实标签test_y比较）
+    correct = np.sum(prediction == test_y)
+    
+    # 返回准确率（假设测试集共500个样本）
+    return correct / 500.0  
 
 
 # 训练函数
