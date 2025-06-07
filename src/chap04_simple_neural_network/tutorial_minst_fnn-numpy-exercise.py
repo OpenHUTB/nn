@@ -56,7 +56,7 @@ class Matmul:
         W = self.mem['W']
 
         '''计算矩阵乘法的对应的梯度'''
-        grad_x = np.matmul(grad_y, W.T)
+        grad_x = np.matmul(grad_y, W.T)# 计算输入x的梯度：将输出梯度grad_y通过权重矩阵W的转置进行反向传播
         grad_W = np.matmul(x.T, grad_y)  # 执行矩形乘法运算，计算梯度
 
         return grad_x, grad_W
