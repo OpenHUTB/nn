@@ -1,8 +1,8 @@
 # python: 3.5.2
 # encoding: utf-8
 
+# 导入numpy并命名为np
 import numpy as np
-
 
 def load_data(fname):
     """载入数据。"""
@@ -27,7 +27,7 @@ class SVM:
     """SVM模型。"""
 
     def __init__(self):
-        self.learning_rate = 0.01
+        self.learning_rate = 0.01 # 学习率：控制梯度下降中参数更新的步长
         self.reg_lambda = 0.01
         self.max_iter = 1000  # 控制模型在优化过程中更新其权重或参数的步长
         self.w = None         # 权重向量
@@ -76,8 +76,11 @@ if __name__ == '__main__':
     svm.train(data_train)  # 训练模型
 
     # 使用SVM模型预测标签
+    # 从训练数据中提取前两列作为特征(x1, x2)
     x_train = data_train[:, :2]  # feature [x1, x2]
+    # 使用训练好的SVM模型对训练数据进行标签预测
     t_train_pred = svm.predict(x_train)     # 预测标签
+    
     x_test = data_test[:, :2]
     t_test = data_test[:, 2]
     t_test_pred = svm.predict(x_test)

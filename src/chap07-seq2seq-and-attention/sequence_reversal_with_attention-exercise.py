@@ -1,12 +1,10 @@
 # !/usr/bin/env python
 # coding: utf-8
-
 # # 序列逆置 （加注意力的seq2seq）
 # 使用attentive sequence to sequence 模型将一个字符串序列逆置。例如 `OIMESIQFIQ` 逆置成 `QIFQISEMIO`(下图来自网络，是一个加attentino的sequence to sequence 模型示意图)
 # ![attentive seq2seq](./seq2seq-attn.jpg)
 
 # In[19]:
-
 
 # 导入NumPy库，用于科学计算和数组操作
 import numpy as np
@@ -27,11 +25,8 @@ import string
 
 # In[20]:
 
-
-
 def randomString(stringLength):  # 定义函数 get_batch，输入参数 batch_size 和 length
     """Generate a random string with the combination of lowercase and uppercase letters """
-
 
     letters = string.ascii_uppercase #生成指定长度的随机大写字母字符串
     return ''.join(random.choice(letters) for i in range(stringLength))
@@ -97,6 +92,7 @@ class mySeq2SeqModel(keras.Model):
         # Attention + Decoder + Output
         #这里的这段代码实现了一个加性注意力机制
         outputs = []
+        # 遍历解码器的每个时间步 T2
         for t in range(dec_emb.shape[1]):
             # 当前时刻的 decoder 输入
             dec_input_t = dec_emb[:, t, :]  # (B, E)
@@ -259,7 +255,7 @@ def is_reverse(seq, rev_seq):# 将待检测序列反转（使用列表推导式+
         return True
     else:
         return False
-
+#使用了Python的zip函数和列表推导式来处理sequence_reversal()函数的输出
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 print(list(zip(*sequence_reversal())))
 

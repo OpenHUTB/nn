@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # ## 准备数据
 
 # In[1]:
@@ -90,8 +89,11 @@ class MyConvModel(keras.Model):
         # 第二层池化，再次降维
         h2_pool = self.pool(h2)
         # 展平特征图，准备输入全连接层
+        # 将多维特征图展平为一维向量，以便输入全连接层。h2_pool 是前一层的输出
         flat_h = self.flat(h2_pool)
+        # 第一个全连接层（Dense Layer），对展平后的特征进行非线性变换
         dense1 = self.dense1(flat_h)
+        # 第二个全连接层（输出层），生成未归一化的分类得分（logits）
         logits = self.dense2(dense1)
         probs = tf.nn.softmax(logits, axis=-1)
         return probs
@@ -103,6 +105,7 @@ optimizer = optimizers.Adam()
 # ## 编译， fit以及evaluate
 
 # In[6]:
+#这段代码片段展示了如何使用Keras API来编译、训练和评估一个神经网络模型。
 model.compile(
     optimizer=optimizer,
     loss='sparse_categorical_crossentropy',

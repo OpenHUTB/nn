@@ -218,7 +218,9 @@ model = myRNNModel()
 
 # In[6]:
 
-
+# 执行模型训练，共进行3000次迭代
+# 每次迭代中，模型将根据优化器策略更新参数以最小化损失函数
+# 训练过程通常包括前向传播、计算损失、反向传播和参数更新
 train(3000, model, optimizer)
 evaluate(model)
 

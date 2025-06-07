@@ -35,7 +35,9 @@ def identity_basis(x):
 
 # 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
-    """多项式基函数"""
+    """多项式基函数：将输入x映射为多项式特征
+    feature_num: 多项式的最高次数
+    返回 shape (N, feature_num)"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 可以替换成 x = identity_basis(x)
@@ -54,7 +56,8 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     """
-    高斯基函数：将输入映射为一组高斯函数响应
+    高斯基函数：将输入x映射为一组高斯分布特征
+    用于提升模型对非线性关系的拟合能力
     """
     # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
@@ -179,9 +182,9 @@ def main(x_train, y_train, use_gradient_descent=False):
     basis_func = identity_basis  
 
     # 生成偏置项和特征矩阵
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)  # 偏置项列
-    phi1 = basis_func(x_train) # 基函数转换
-    phi = np.concatenate([phi0, phi1], axis=1) # 合并特征矩阵
+    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    phi1 = basis_func(x_train)
+    phi = np.concatenate([phi0, phi1], axis=1)
 
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
@@ -229,9 +232,8 @@ def main(x_train, y_train, use_gradient_descent=False):
 def evaluate(ys, ys_pred):
     """评估模型。"""
     # 计算预测值与真实值的标准差
-     # 计算标准差，作为模型预测误差的评估指标
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std#返回f预测值与真实值之间的标准差
+    return std
 
 
 # 程序主入口（建议不要改动以下函数的接口）

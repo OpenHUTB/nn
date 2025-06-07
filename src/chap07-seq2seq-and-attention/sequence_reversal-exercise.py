@@ -132,6 +132,8 @@ class mySeq2SeqModel(keras.Model):
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
+      # 返回模型预测的logits值，通常后续会通过softmax计算概率
+# 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
     
     
@@ -161,6 +163,7 @@ class mySeq2SeqModel(keras.Model):
         # 计算注意力分数
         score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
         # 计算注意力权重
+        # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         # 计算上下文向量

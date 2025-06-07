@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
 # ## 随机 filter
 
 # In[191]:
@@ -15,7 +14,6 @@ import numpy
 import pylab
 from PIL import Image
 import numpy as np
-
 
 # 定义一个简单的卷积模型
 class MyConvModel(keras.Model):
@@ -32,14 +30,13 @@ class MyConvModel(keras.Model):
 # In[192]:
 random_conv = MyConvModel()
 
-
-
 # 打开一张尺寸为 639x516 的随机图片
 img = Image.open(open('corgi.jpg', 'rb'))
 img = numpy.asarray(img, dtype='float64') / 256.
 img = np.expand_dims(img, axis=0)
 img_out = random_conv(img)
 
+#使用pylab（通常是matplotlib.pyplot的别名）来创建一个包含四个子图的图形，并显示图像数据。
 pylab.figure(figsize=(10, 7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img[0, :, :, :])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])

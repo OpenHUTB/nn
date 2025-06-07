@@ -4,8 +4,8 @@ import gym
 import random
 #导入NumPy库，用于高效数值计算和数组操作
 import numpy as np
-
-from RL_QG_agent import RL_QG_agent  # 导入强化学习智能体
+ # 导入强化学习智能体
+from RL_QG_agent import RL_QG_agent 
 
 # 创建初始环境并重置（8*8棋盘）
 env = gym.make('Reversi8x8-v0')#使用openAI Gym接口创建黑白棋环境
