@@ -55,7 +55,7 @@ def convertDigits2Num(Digits):
     '''
     
     digitStrs = [str(o) for o in Digits] # 转换为字符串列表
-    numStr = ''.join(digitStrs)
+    numStr = ''.join(digitStrs) # 将字符串列表连接成一个完整的数字字符串
     Num = int(numStr)
     return Num
 
