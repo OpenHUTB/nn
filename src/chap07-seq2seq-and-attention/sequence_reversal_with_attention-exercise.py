@@ -148,7 +148,7 @@ class mySeq2SeqModel(keras.Model):
 
         # 解码一步
         output, state = self.decoder_cell(rnn_input, [state])  # output: (B, H)
-        logits = self.dense(output)  # (B, V)
+        logits = self.dense(output)  #全连接层 self.dense 将 RNN 输出映射到词表空间
         next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
         return next_token, state[0]
         
