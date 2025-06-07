@@ -99,14 +99,25 @@ def train_one_step(model, optimizer, x, y):
     with tf.GradientTape() as tape:
         logits = model(x)  # 前向传播，获取模型输出
         loss = compute_loss(logits, y)  # 计算损失
-
+        
     # 计算梯度
+    # trainable_vars 是模型的可训练参数列表，包含：
+    #   - model.W1: 第一层权重矩阵
+    #   - model.W2: 第二层权重矩阵
+    #   - model.b1: 第一层偏置向量
+    #   - model.b2: 第二层偏置向量
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
+
+    # 使用梯度带(tape)自动计算损失函数对可训练变量的梯度
+    # tape.gradient(loss, trainable_vars) 返回一个梯度列表，
+    # 其顺序与trainable_vars中的变量顺序一致
     grads = tape.gradient(loss, trainable_vars)
 
     # 更新参数
+    # 遍历梯度和对应的变量(g, v)，使用梯度下降更新参数
     for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01 * g)  # 使用固定学习率更新参数
+    # 使用assign_sub实现参数更新：v = v - learning_rate * gradient
+    v.assign_sub(0.01 * g)  # 使用固定学习率更新参数
 
     # 计算准确率
     accuracy = compute_accuracy(logits, y)
