@@ -132,7 +132,8 @@ class Softmax:
 # 定义 Log 层（计算 log softmax ，用于交叉熵）
 class Log:
     '''
-    softmax over last dimention
+    对最后一个维度执行对数运算
+    用于对数似然计算，通常与Softmax结合使用
     '''
     def __init__(self):
         self.epsilon = 1e-12
