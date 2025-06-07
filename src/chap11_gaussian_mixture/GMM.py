@@ -1,5 +1,7 @@
+# 导入NumPy库，用于科学计算和数值操作
 import numpy as np
-import matplotlib.pyplot as plt # 导入所需模块
+# 导入matplotlib。pyplot模块，用于数据可视化和绘图
+import matplotlib.pyplot as plt 
 
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
