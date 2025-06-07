@@ -1,5 +1,8 @@
+# 操作系统接口模块 - 提供与操作系统交互的功能
 import os
+# 数值计算库 - Python科学计算的核心库
 import numpy as np
+# 深度学习框架 - Google开发的开源机器学习平台
 import tensorflow as tf
 
 class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
