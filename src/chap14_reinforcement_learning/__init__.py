@@ -196,23 +196,23 @@ register(
     reward_threshold=8, # optimum = 8.46
     max_episode_steps=200,  # 设置每个episode的最大步数为200
 )
-
+# 数字猜测游戏
 register(
     id='GuessingGame-v0',
     entry_point='gym.envs.toy_text.guessing_game:GuessingGame',
     max_episode_steps=200,
 )
-
+# 热冷游戏：基于反馈的目标搜索
 register(
     id='HotterColder-v0',
     entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
     max_episode_steps=200,
 )
 
-# Mujoco
-# ----------------------------------------
+# MuJoCo Environments - 机器人控制环境
+# 基于MuJoCo物理引擎的连续控制任务（需要独立许可证）
 
-# 2D
+# 2D机械臂到达目标位置
 
 register(
     id='Reacher-v1',
