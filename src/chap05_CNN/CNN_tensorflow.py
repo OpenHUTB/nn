@@ -52,6 +52,15 @@ def weight_variable(shape):
 
 
 def bias_variable(shape):
+    """
+    初始化卷积层/全连接层的偏置变量
+    
+    参数:
+        shape: 偏置的维度（如[32]）
+    
+    返回:
+        tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
+    """
     initial = tf.constant(0.1, shape=shape)# 使用常数 0.1 初始化偏置，避免神经元输出为 0（死亡神经元问题）
     return tf.Variable(initial)# 创建可训练的 TensorFlow 变量
 
