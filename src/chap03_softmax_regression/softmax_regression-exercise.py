@@ -154,6 +154,8 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :return: 当前批次的损失与准确率
     """
     with tf.GradientTape() as tape:
+# 使用 TensorFlow 的 GradientTape 上下文来自动计算梯度
+# GradientTape 用于记录在前向传播过程中涉及的操作，以便在反向传播时计算梯度
         predictions = model(x_batch)# 前向传播：计算模型对输入批次的预测
         loss, accuracy = compute_loss(predictions, y_batch)# 计算损失和准确率
 
