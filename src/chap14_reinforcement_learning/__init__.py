@@ -405,9 +405,9 @@ register(
     # (Reproduce by running 'import gym; h = gym.make('Go9x9-v0'); h.seed(1); h.reset(); h.step(15); h.step(16); h.step(17)' a few times.)
     #
     # This is probably due to a computation time limit.
-    nondeterministic=True,
+    nondeterministic=True,# 因AI计算时间限制导致非确定性
 )
-
+#19x19标准围棋环境
 register(
     id='Go19x19-v0',
     entry_point='gym.envs.board_game:GoEnv',
@@ -416,11 +416,11 @@ register(
         'opponent': 'pachi:uct:_2400',
         'observation_type': 'image3c',
         'illegal_move_mode': 'lose',
-        'board_size': 19,
+        'board_size': 19,# 标准棋盘尺寸
     },
     nondeterministic=True,
 )
-
+# 9x9六边形棋环境
 register(
     id='Hex9x9-v0',
     entry_point='gym.envs.board_game:HexEnv',
