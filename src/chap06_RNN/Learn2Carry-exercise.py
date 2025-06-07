@@ -149,7 +149,21 @@ def compute_loss(logits, labels):
     return tf.reduce_mean(losses)
 
 @tf.function
+# 定义单步训练函数
 def train_one_step(model, optimizer, x, y, label):
+    """
+    执行单步训练，计算梯度并更新模型参数。
+    
+    参数:
+        model: 模型对象，用于前向传播计算logits。
+        optimizer: 优化器对象，用于更新模型参数。
+        x: 输入数据1，通常是一个张量。
+        y: 输入数据2，通常是一个张量。
+        label: 真实标签，用于计算损失。
+    
+    返回:
+        loss: 当前步骤的损失值。
+    """
     with tf.GradientTape() as tape:
         logits = model(x, y)
         loss = compute_loss(logits, label)
@@ -158,7 +172,8 @@ def train_one_step(model, optimizer, x, y, label):
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
-
+    
+# 定义完整的训练函数
 def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
