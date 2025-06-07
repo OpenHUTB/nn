@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-import numpy as np
+import numpy as np # 导入NumPy库
 import matplotlib.pyplot as plt
 
 
@@ -95,7 +95,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     ValueError: 当 solver 参数不是支持的类型时抛出
     """
     # 检查输入矩阵是否为空
-    if phi.size == 0 or y.size == 0:
+    if phi.size == 0 or y.size == 0: # 如果矩阵 phi 或 y 是空的，抛出 ValueError 异常
         raise ValueError("输入矩阵 phi 和目标值 y 不能为零矩阵")
 
     # 检查维度是否兼容
