@@ -144,7 +144,7 @@ def compute_loss(pred, label):
     pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype=tf.float32))
-    return loss, accuracy
+    return loss, accuracy# 返回计算得到的损失值和准确率
 
 
 @tf.function
