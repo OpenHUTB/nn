@@ -18,30 +18,30 @@ register(
     reward_threshold = 75.0,# 更高阈值反映任务复杂性增加
 )
 
-
+# 反向加法任务：执行反向数字加法运算
 register(
     id = 'ReversedAddition-v0',
     entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs = {'rows' : 2},
+    kwargs = {'rows' : 2},# 自定义参数：操作数行数
     max_episode_steps = 200,
     reward_threshold = 25.0,
 )
-
+# 三操作数反向加法任务
 register(
     id = 'ReversedAddition3-v0',
     entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
-    kwargs = {'rows' : 3},
+    kwargs = {'rows' : 3},# 三行操作数增加难度
     max_episode_steps = 200,
     reward_threshold = 25.0,
 )
-
+# 重复输入检测任务：识别重复出现的输入元素
 register(
     id = 'DuplicatedInput-v0',  # 环境唯一标识符
     entry_point = 'gym.envs.algorithmic:DuplicatedInputEnv',  # 环境类的导入路径
     max_episode_steps = 200,
-    reward_threshold = 9.0,
+    reward_threshold = 9.0,# 相对较低的阈值
 )
-
+# 序列反转任务：将输入序列完全反转输出
 register(
     id = 'Reverse-v0',
     entry_point = 'gym.envs.algorithmic:ReverseEnv',
