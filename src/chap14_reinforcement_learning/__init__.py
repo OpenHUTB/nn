@@ -12,7 +12,7 @@ register(
 )
 #重复复制任务：需记忆并多次复制输入序列
 register(
-    id = 'RepeatCopy-v0',
+    id = 'RepeatCopy-v0', # 重复复制任务
     entry_point = 'gym.envs.algorithmic:RepeatCopyEnv',
     max_episode_steps = 200,
     reward_threshold = 75.0,# 更高阈值反映任务复杂性增加
