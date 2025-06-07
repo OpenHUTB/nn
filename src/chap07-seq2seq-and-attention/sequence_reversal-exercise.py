@@ -163,6 +163,7 @@ class mySeq2SeqModel(keras.Model):
         # 计算注意力分数
         score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
         # 计算注意力权重
+        # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         # 计算上下文向量
