@@ -295,16 +295,17 @@ register(
     entry_point='gym.envs.mujoco:HumanoidEnv',
     max_episode_steps=1000,
 )
-
+# 类人机器人站立任务
 register(
     id='HumanoidStandup-v1',
     entry_point='gym.envs.mujoco:HumanoidStandupEnv',
     max_episode_steps=1000,
 )
 
-# Atari
-# ----------------------------------------
+# Atari Environments - 雅达利游戏环境
+# 通过Arcade Learning Environment封装的2600款经典游戏
 
+# 遍历所有支持的雅达利游戏
 # # print ', '.join(["'{}'".format(name.split('.')[0]) for name in atari_py.list_games()])
 for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', 'atlantis',
     'bank_heist', 'battle_zone', 'beam_rider', 'berzerk', 'bowling', 'boxing', 'breakout', 'carnival',
@@ -320,7 +321,7 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         name = ''.join(g.capitalize() for g in game.split('_'))
         if obs_type == 'ram':
             name = f'{name}-ram'  # RAM观测版本添加-ram后缀
-
+# 处理特殊游戏的非确定性
         nondeterministic = False
         if game == 'elevator_action' and obs_type == 'ram':
             # ElevatorAction-ram-v0 seems to yield slightly
