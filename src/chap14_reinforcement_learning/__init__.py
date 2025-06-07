@@ -49,15 +49,16 @@ register(
     reward_threshold = 25.0,
 )
 
-# Classic
-# ----------------------------------------
+# Classic Control Environments - 经典控制环境
+# 基于物理模型的简单控制问题，常用于算法基准测试
 # 经典控制环境：基于数学模型的控制问题
 
+# 基础版倒立摆平衡任务
 register(
-    id = 'CartPole-v0',  # 倒立摆平衡任务
+    id = 'CartPole-v0',  
     entry_point = 'gym.envs.classic_control:CartPoleEnv',
-    max_episode_steps = 200,  # 200步达标
-    reward_threshold = 195.0,
+    max_episode_steps = 200,  # 平衡200步视为成功
+    reward_threshold = 195.0,# 接近最大理论值200
 )
 
 
