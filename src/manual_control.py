@@ -957,16 +957,17 @@ class CollisionSensor(object): # 碰撞传感器类，用于检测并记录车�
         return history
 
     @staticmethod
-    def _on_collision(weak_self, event):
-        self = weak_self()
+    def _on_collision(weak_self, event): # 碰撞事件回调函数，处理碰撞发生时的逻辑
+        # 通过弱引用获取实例引用，若实例已被销毁则返回
+        self = weak_self() 
         if not self:
-            return
-        actor_type = get_actor_display_name(event.other_actor)
+            return 
+        actor_type = get_actor_display_name(event.other_actor) # 获取碰撞对象的显示名称并在HUD上通知用户 
         self.hud.notification('Collision with %r' % actor_type)
-        impulse = event.normal_impulse
+        impulse = event.normal_impulse # 计算碰撞强度（基于冲量向量的模长）
         intensity = math.sqrt(impulse.x**2 + impulse.y**2 + impulse.z**2)
-        self.history.append((event.frame, intensity))
-        if len(self.history) > 4000:
+        self.history.append((event.frame, intensity))  # 记录碰撞事件（帧号和强度）
+        if len(self.history) > 4000: # 限制历史记录长度，避免内存溢出
             self.history.pop(0)
 
 
