@@ -214,24 +214,24 @@ def reduce_avg(reduce_target, lengths, dim):
     # 验证目标张量的维度是否符合要求
     # shape_of_target: reduce_target张量的维度列表
     # dim+1: 预期的目标张量的最小秩
-    if len(shape_of_target) < dim+1 :
+    if len(shape_of_target) < dim+1 : # 输入验证：确保目标张量的秩至少为 dim+1
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
-    mxlen = tf.shape(reduce_target)[dim]
-    mask = mkMask(lengths, mxlen)
-    if rank_diff!=0:
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算目标张量与长度张量的秩差
+    mxlen = tf.shape(reduce_target)[dim]                         # 获取目标维度的最大长度，并生成掩码矩阵
+    mask = mkMask(lengths, mxlen)                                # mkMask函数生成布尔掩码
+    if rank_diff!=0: # 根据秩差调整掩码和长度张量的形状，以便广播
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
-    lengths_reshape = tf.reshape(lengths, shape=len_shape)
-    mask = tf.reshape(mask, shape=mask_shape)
+    lengths_reshape = tf.reshape(lengths, shape=len_shape) # 重塑张量以匹配目标张量的形状
+    mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-    if len(shape_of_lengths) != dim:
+    if len(shape_of_lengths) != dim: # 再次验证输入
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
     if len(shape_of_target) < dim+1 :
