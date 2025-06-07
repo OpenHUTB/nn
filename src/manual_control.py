@@ -597,20 +597,20 @@ class KeyboardControl(object):
                     elif event.key == K_x:
                         current_lights ^= carla.VehicleLightState.RightBlinker
 
-        if not self._autopilot_enabled:
-            if isinstance(self._control, carla.VehicleControl):
+        if not self._autopilot_enabled: # 仅在手动驾驶模式下执行
+            if isinstance(self._control, carla.VehicleControl): # 确保控制对象类型正确
                 self._parse_vehicle_keys(pygame.key.get_pressed(), clock.get_time())
-                self._control.reverse = self._control.gear < 0
-                # Set automatic control-related vehicle lights
-                if self._control.brake:
+                self._control.reverse = self._control.gear < 0 # 根据当前档位设置倒车状态（负数表示倒车档）
+                # 根据车辆操作自动控制灯光状态
+                if self._control.brake: # 刹车时启用刹车灯
                     current_lights |= carla.VehicleLightState.Brake
-                else: # Remove the Brake flag
+                else: # Remove the Brake flag # 松开刹车时关闭刹车灯
                     current_lights &= ~carla.VehicleLightState.Brake
-                if self._control.reverse:
+                if self._control.reverse: # 倒车时启用倒车灯
                     current_lights |= carla.VehicleLightState.Reverse
-                else: # Remove the Reverse flag
+                else:  # 非倒车状态关闭倒车灯
                     current_lights &= ~carla.VehicleLightState.Reverse
-                if current_lights != self._lights: # Change the light state only if necessary
+                if current_lights != self._lights:# 仅在灯光状态变化时更新车辆灯光，避免不必要的操作
                     self._lights = current_lights
                     world.player.set_light_state(carla.VehicleLightState(self._lights))
                 # Apply control
