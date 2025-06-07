@@ -173,6 +173,7 @@ def train_one_step(model, optimizer, x, y, label):
 
     # compute gradient
     grads = tape.gradient(loss, model.trainable_variables)
+         # 应用梯度更新参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
     
