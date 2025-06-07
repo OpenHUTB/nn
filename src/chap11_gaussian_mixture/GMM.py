@@ -199,6 +199,8 @@ class GaussianMixtureModel:
         plt.xlabel('迭代次数')
         plt.ylabel('对数似然值')
         plt.title('EM算法收敛曲线')
+        # 启用网格线（增强图表可读性，便于查看数据点位置）
+# 可选参数：linestyle='--'（虚线）, alpha=0.5（透明度）等
         plt.grid(True)
         plt.show()
 # 主程序
