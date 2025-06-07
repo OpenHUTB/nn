@@ -20,7 +20,7 @@ def load_data(fname):
 
 def eval_acc(label, pred):
     """计算准确率。"""
-    return np.sum(label == pred) / len(pred)
+    return np.sum(label == pred) / len(pred)    # 计算准确率
 
 
 class SVM:
@@ -28,7 +28,7 @@ class SVM:
 
     def __init__(self):
         self.learning_rate = 0.01 # 学习率：控制梯度下降中参数更新的步长
-        self.reg_lambda = 0.01
+        self.reg_lambda = 0.01    # 正则化参数
         self.max_iter = 1000  # 控制模型在优化过程中更新其权重或参数的步长
         self.w = None         # 权重向量
         self.b = None         # 偏置项
@@ -81,9 +81,9 @@ if __name__ == '__main__':
     # 使用训练好的SVM模型对训练数据进行标签预测
     t_train_pred = svm.predict(x_train)     # 预测标签
     
-    x_test = data_test[:, :2]
-    t_test = data_test[:, 2]
-    t_test_pred = svm.predict(x_test)
+    x_test = data_test[:, :2]               # feature [x1, x2]
+    t_test = data_test[:, 2]                # 真实标签
+    t_test_pred = svm.predict(x_test)       # 预测标签
 
     # 评估结果，计算准确率
     acc_train = eval_acc(t_train, t_train_pred)
