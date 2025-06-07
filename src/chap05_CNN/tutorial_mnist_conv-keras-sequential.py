@@ -64,13 +64,13 @@ def prepare_mnist_features_and_labels(x, y):
 # 构建卷积神经网络（CNN）模型
 model = keras.Sequential([
      # 第1层：卷积层（提取初级图像特征）
-    Conv2D(32, (5, 5), activation='relu', padding='same'),
-    MaxPooling2D(pool_size=2, strides=2),
-    Conv2D(64, (5, 5), activation='relu', padding='same'),
-    MaxPooling2D(pool_size=2, strides=2),
+    Conv2D(32, (5, 5), activation = 'relu', padding = 'same'),
+    MaxPooling2D(pool_size = 2, strides = 2),
+    Conv2D(64, (5, 5), activation = 'relu', padding = 'same'),
+    MaxPooling2D(pool_size = 2, strides = 2),
     Flatten(),  # N*7*7*64 => N*3136
-    layers.Dense(128, activation='tanh'),  # N*128
-    layers.Dense(10, activation='softmax')])  # N*10
+    layers.Dense(128, activation = 'tanh'),  # N*128
+    layers.Dense(10, activation = 'softmax')])  # N*10
 
 optimizer = optimizers.Adam(0.0001)
 # 配置优化器（Adam优化算法）
@@ -79,9 +79,9 @@ optimizer = optimizers.Adam(0.0001)
 
 # In[4]:
 model.compile(
-    optimizer=optimizer,
-    loss='sparse_categorical_crossentropy',
-    metrics=['accuracy']
+    optimizer = optimizer,
+    loss = 'sparse_categorical_crossentropy',
+    metrics = ['accuracy']
 )
 train_ds, test_ds = mnist_dataset()
 model.fit(train_ds, epochs=5)
