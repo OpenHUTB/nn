@@ -196,8 +196,11 @@ def train(steps, model, optimizer):
 #定义了一个名为 evaluate 的函数，其核心功能是评估一个神经网络模型在大数加法任务上的准确率。
 def evaluate(model):
     datas = gen_data_batch(batch_size = 2000, start = 555555555, end = 999999999)
+    # 将数据转换为模型输入格式，最大长度为 11 位
     Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
+    # 使用模型进行预测
     logits = model(tf.constant(Nums1, dtype = tf.int32), tf.constant(Nums2, dtype = tf.int32))
+    # 解码预测结果
     logits = logits.numpy()
     pred = np.argmax(logits, axis = -1)
     res = results_converter(pred)
