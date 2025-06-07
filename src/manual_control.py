@@ -614,18 +614,18 @@ class KeyboardControl(object):
                     self._lights = current_lights
                     world.player.set_light_state(carla.VehicleLightState(self._lights))
                 # Apply control
-                if not self._ackermann_enabled:
-                    world.player.apply_control(self._control)
-                else:
-                    world.player.apply_ackermann_control(self._ackermann_control)
-                    # Update control to the last one applied by the ackermann controller.
-                    self._control = world.player.get_control()
+                if not self._ackermann_enabled: # 非阿克曼模式（普通车辆控制）
+                    world.player.apply_control(self._control) # 直接应用车辆控制参数
+                else: # 阿克曼模式（更精确的车辆转向控制）
+                    world.player.apply_ackermann_control(self._ackermann_control) # 应用阿克曼控制
+                    # Update control to the last one applied by the ackermann controller. 
+                    self._control = world.player.get_control() # 更新控制状态为阿克曼控制器生成的最新值
                     # Update hud with the newest ackermann control
-                    world.hud.update_ackermann_control(self._ackermann_control)
+                    world.hud.update_ackermann_control(self._ackermann_control) # 更新HUD显示阿克曼控制参数
 
-            elif isinstance(self._control, carla.WalkerControl):
-                self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time(), world)
-                world.player.apply_control(self._control)
+            elif isinstance(self._control, carla.WalkerControl): # 行人控制逻辑（当控制对象是行人时）
+                self._parse_walker_keys(pygame.key.get_pressed(), clock.get_time(), world) # 解析行人控制按键
+                world.player.apply_control(self._control) # 应用行人控制参数
 
     def _parse_vehicle_keys(self, keys, milliseconds):
         # 处理加速/前进控制 (W键或上箭头)
