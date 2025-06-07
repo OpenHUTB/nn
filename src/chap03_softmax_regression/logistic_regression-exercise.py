@@ -164,16 +164,32 @@ def train_one_step(model, optimizer, x, y):
 
 
 if __name__ == '__main__':
-    # 实例化逻辑回归模型
-    model = LogisticRegression()
-    # 使用自适应优化器 Adam ，学习率为0.01
-    opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
-    # 从数据集中解包出x1, x2坐标和标签y
-    x1, x2, y = list(zip(*data_set))
-    # 将x1和x2组合成输入数据 x
-    x = list(zip(x1, x2))
-    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
-    animation_frames = []
+   # 实例化逻辑回归模型
+   # LogisticRegression 是一个用于二分类问题的线性模型
+   model = LogisticRegression()
+
+   # 使用自适应优化器 Adam ，学习率为0.01
+   # Adam 是一种自适应学习率的优化算法，结合了 Momentum 和 RMSProp 的优点
+   # learning_rate=0.01 设置了初始学习率为 0.01
+   opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
+
+   # 从数据集中解包出x1, x2坐标和标签y
+   # data_set 是一个包含多个样本的列表，每个样本格式为 (x1, x2, y)
+   # 使用 zip(*data_set) 对数据进行转置，然后转换为列表
+   # 这样可以将所有x1、x2和y分别分组
+   x1, x2, y = list(zip(*data_set))
+
+   # 将x1和x2组合成输入数据 x
+   # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
+   # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
+   x = list(zip(x1, x2))
+
+   # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
+   # animation_frames 列表将记录训练过程中每个步骤或epoch的:
+   #   - 模型参数(如权重和偏置)
+   #   - 当前损失值
+   # 这些信息可以用于后续创建训练过程的动画演示
+   animation_frames = []
 
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
