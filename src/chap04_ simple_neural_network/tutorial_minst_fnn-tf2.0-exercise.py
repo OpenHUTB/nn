@@ -12,7 +12,6 @@ from tensorflow.keras import layers, optimizers, datasets
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
-
 def mnist_dataset():
     """
     加载MNIST数据集并进行预处理：
@@ -74,7 +73,7 @@ def compute_loss(logits, labels):
         )
     )
 
-
+#代码定义了一个 TensorFlow 函数 compute_accuracy，用于根据模型的输出（logits）和真实标签（labels）计算预测的准确率。
 @tf.function
 def compute_accuracy(logits, labels):
     predictions = tf.argmax(logits, axis=1)
