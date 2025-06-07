@@ -60,6 +60,7 @@ class SVM:
 
     def predict(self, x):
         """预测标签。"""
+        # 计算决策函数值：w·x + b
         score = np.dot(x, self.w) + self.b
         return np.where(score >= 0, 1, 0)  # 转换回{0, 1}标签
 
@@ -80,13 +81,14 @@ if __name__ == '__main__':
     x_train = data_train[:, :2]  # feature [x1, x2]
     # 使用训练好的SVM模型对训练数据进行标签预测
     t_train_pred = svm.predict(x_train)     # 预测标签
-    
-    x_test = data_test[:, :2]
-    t_test = data_test[:, 2]
-    t_test_pred = svm.predict(x_test)
+    # 从测试数据中提取特征和标签
+    x_test = data_test[:, :2]    # 测试集特征
+    t_test = data_test[:, 2]     # 测试集真实标签
+    t_test_pred = svm.predict(x_test)  # 对测试集进行预测
 
     # 评估结果，计算准确率
     acc_train = eval_acc(t_train, t_train_pred)
     acc_test = eval_acc(t_test, t_test_pred)
+    # 打印评估结果
     print("train accuracy: {:.1f}%".format(acc_train * 100))
     print("test accuracy: {:.1f}%".format(acc_test * 100))
