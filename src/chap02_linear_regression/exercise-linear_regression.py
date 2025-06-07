@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as np # 导入NumPy科学计算库，使用标准别名np
+# 提供高性能的数组操作和数学函数
 
+import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
+# 用于创建各种静态、交互式和动画可视化图表
 
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
