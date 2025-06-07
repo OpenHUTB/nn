@@ -56,6 +56,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         super(mySeq2SeqModel, self).__init__()
+         # 模型参数配置
         self.v_sz=27 # 词汇表大小（包括可能的特殊符号）
         self.hidden = 128 # 隐藏层维度/RNN单元的大小
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
@@ -69,7 +70,7 @@ class mySeq2SeqModel(keras.Model):
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
                                            return_sequences=True, return_state=True)
         self.dense_attn = tf.keras.layers.Dense(self.hidden)
-        self.dense = tf.keras.layers.Dense(self.v_sz)
+        self.dense = tf.keras.layers.Dense(self.v_sz) # 输出层：将解码器状态映射到词汇表空间（预测下一个词）
         
         
     @tf.function
