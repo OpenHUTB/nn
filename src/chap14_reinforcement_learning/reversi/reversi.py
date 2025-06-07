@@ -64,6 +64,7 @@ class ReversiEnv(gym.Env):
             raise error.Error('Unsupported observation type: {}'.format(self.observation_type))
 
         # One action for each board position and resign and pass
+        #这段代码主要用于 初始化强化学习环境（如游戏环境）的动作空间（action_space）和观察空间（observation_space），并完成环境的初始设置
         self.action_space = spaces.Discrete(self.board_size ** 2 + 2)
         observation = self.reset()
         self.observation_space = spaces.Box(np.zeros(observation.shape), np.ones(observation.shape))
