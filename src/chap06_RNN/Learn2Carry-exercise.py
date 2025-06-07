@@ -51,7 +51,7 @@ def convertNum2Digits(Num):
 
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
-    '''
+    '''# 便于RNN按低位到高位处理
     digitStrs = [str(o) for o in Digits]
     numStr = ''.join(digitStrs)
     Num = int(numStr)
