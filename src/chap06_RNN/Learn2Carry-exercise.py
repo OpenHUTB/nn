@@ -53,7 +53,8 @@ def convertNum2Digits(Num):
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''
-    digitStrs = [str(o) for o in Digits]
+    
+    digitStrs = [str(o) for o in Digits] # 转换为字符串列表
     numStr = ''.join(digitStrs)
     Num = int(numStr)
     return Num
@@ -84,18 +85,23 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
         Nums2: shape(batch_size, maxlen)
         results: shape(batch_size, maxlen)
     '''
+
+    # 将数字转换为数字位列表
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
+
 
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
 
+      # 填充到统一长度
     Nums1 = [pad2len(o, maxlen) for o in Nums1]
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
 
+    
     return Nums1, Nums2, results
 
 
@@ -109,15 +115,17 @@ class myRNNModel(keras.Model):
         super(myRNNModel, self).__init__()
         self.embed_layer = tf.keras.layers.Embedding(10, 32,
                                                     batch_input_shape = [None, None])
+         # 定义RNN单元(SimpleRNNCell)
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
-        self.dense = tf.keras.layers.Dense(10)
+        self.dense = tf.keras.layers.Dense(10) # 定义全连接层，输出10个类别(数字0-9)的概率
 
     @tf.function
     def call(self, num1, num2):
         '''
         此处完成上述图中模型
         '''
+        # 将输入数字序列嵌入到向量空间
         emb1 = self.embed_layer(num1)  # shape: (batch, seq_len, 32)
         emb2 = self.embed_layer(num2)  # shape: (batch, seq_len, 32)
 
@@ -136,25 +144,45 @@ class myRNNModel(keras.Model):
 
 @tf.function
 def compute_loss(logits, labels):
+     # 计算稀疏交叉熵损失(不需要对标签做one-hot编码)
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits = logits , labels = labels)
-    return tf.reduce_mean(losses)
+    return tf.reduce_mean(losses) # 返回平均损失
 
 @tf.function
+# 定义单步训练函数
 def train_one_step(model, optimizer, x, y, label):
+    """
+    执行单步训练，计算梯度并更新模型参数。
+    
+    参数:
+        model: 模型对象，用于前向传播计算logits。
+        optimizer: 优化器对象，用于更新模型参数。
+        x: 输入数据1，通常是一个张量。
+        y: 输入数据2，通常是一个张量。
+        label: 真实标签，用于计算损失。
+    
+    返回:
+        loss: 当前步骤的损失值。
+    """
     with tf.GradientTape() as tape:
+        # 前向传播获取预测结果
         logits = model(x, y)
+        # 计算损失
         loss = compute_loss(logits, label)
 
     # compute gradient
     grads = tape.gradient(loss, model.trainable_variables)
+         # 应用梯度更新参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
-
+    
+# 定义完整的训练函数
 def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
     for step in range(steps):
+         # 生成一批训练数据
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
         Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
@@ -165,6 +193,7 @@ def train(steps, model, optimizer):
             
     return loss
 
+#定义了一个名为 evaluate 的函数，其核心功能是评估一个神经网络模型在大数加法任务上的准确率。
 def evaluate(model):
     datas = gen_data_batch(batch_size = 2000, start = 555555555, end = 999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)

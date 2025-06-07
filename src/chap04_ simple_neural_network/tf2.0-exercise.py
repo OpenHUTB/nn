@@ -81,7 +81,6 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 
 
 # ## 实现 sigmoid 交叉熵loss函数
-
 def sigmoid_ce(x, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''

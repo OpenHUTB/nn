@@ -1,19 +1,26 @@
+#导入OpenAI Gym库，用于创建和管理强化学习环境
 import gym
+#导入随机数生成库，用于策略中的随即决策
 import random
+#导入NumPy库，用于高效数值计算和数组操作
 import numpy as np
 
 from RL_QG_agent import RL_QG_agent  # 导入强化学习智能体
 
-# 创建初始环境并重置
-env = gym.make('Reversi8x8-v0')
-env.reset()
+# 创建初始环境并重置（8*8棋盘）
+env = gym.make('Reversi8x8-v0')#使用openAI Gym接口创建黑白棋环境
+env.reset()#重置环境到初始状态
 
 # 初始化智能体并加载预训练模型
-agent = RL_QG_agent()
-agent.load_model()
+agent = RL_QG_agent()#创建智能体实例
+agent.load_model()#加载预训练模型参数
 
 # 设置最大训练轮数
-max_epochs = 100
+max_epochs = 100#总共进行100局
+# 统计胜负结果的变量
+#black_wins = 0
+#white_wins = 0
+#draws = 0
 
 # 主训练循环（控制训练的总轮数）
 for i_episode in range(max_epochs):
@@ -37,9 +44,14 @@ for i_episode in range(max_epochs):
         else:
             # 随机选择一个合法位置
             action_ = random.choice(enables)
-        action[0] = action_
+        action[0] = action_# 设置落子位置
         action[1] = 0  # 设置为黑棋
         # 黑棋落子并更新环境状态，返回新状态、奖励、是否结束等信息
+        # 执行动作并获取新状态
+        # observation: 更新后的游戏状态(3x8x8张量)
+        # reward: 执行动作后的即时奖励(黑白棋中通常为0，结束时才有奖励)
+        # done: 游戏是否结束
+        # info: 包含额外信息的字典(如获胜方)
         observation, reward, done, info = env.step(action)
 
         ################### 白棋（智能体策略） ###################

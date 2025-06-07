@@ -109,7 +109,7 @@ test_data = np.random.normal(size=[10])
 labels = np.random.randint(0, 2, size=[10]).astype(np.float32)
 
 # 对比 TensorFlow  原始结果和自定义函数结果
-tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=test_data))
+tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels, logits = test_data))
 custom_loss = sigmoid_ce(test_data, labels)
 
 print("tf loss:", tf_loss.numpy())

@@ -89,8 +89,6 @@ class SoftmaxRegression(tf.Module):
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
         
-        
-
     @tf.function
     def __call__(self, x):
         """
@@ -190,9 +188,11 @@ plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
+# 创建网格点用于绘制决策边界
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
 
+# 生成网格坐标矩阵
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
