@@ -8,7 +8,7 @@ import numpy as np
 def weights_init(m):
     classname = m.__class__.__name__  #   obtain the class name
     if classname.find('Linear') != -1:
-        weight_shape = list(m.weight.data.size())
+        weight_shape = list(m.weight.data.size())# 获取权重张量的形状: [输出维度, 输入维度]
         fan_in = weight_shape[1]
         fan_out = weight_shape[0]
         w_bound = np.sqrt(6. / (fan_in + fan_out)) # 计算权重初始化范围
