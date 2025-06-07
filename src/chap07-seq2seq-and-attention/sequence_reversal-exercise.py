@@ -132,6 +132,8 @@ class mySeq2SeqModel(keras.Model):
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
+      # 返回模型预测的logits值，通常后续会通过softmax计算概率
+# 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
     
     
