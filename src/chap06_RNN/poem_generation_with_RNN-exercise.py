@@ -6,7 +6,7 @@
 
 # In[1]:
 # 导入了多个用于构建和训练深度学习模型的Python库和模块
-import numpy as np
+import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
 import tensorflow as tf
 import collections
 from tensorflow import keras
@@ -29,7 +29,7 @@ def process_dataset(fileName):
         id2word: 数字id到词语的映射字典
     """
     examples = []
-    with open(fileName, 'r') as fd:
+    with open(fileName, 'r'，encoding='utf-8', ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
@@ -38,8 +38,6 @@ def process_dataset(fileName):
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
             ### 过滤过长的诗歌
-            if len(ins) > 200:
-
                 continue
             examples.append(ins)
             
@@ -53,7 +51,7 @@ def process_dataset(fileName):
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
-    words, _ = zip(*sorted_counter)
+    words, _ = zip(*sorted_counter) #对tuple进行解压，得到words列表代表所有字符
     words = ('PAD', 'UNK') + words[:len(words)]
     
     # 创建词语到id的映射
@@ -113,6 +111,7 @@ class myRNNModel(keras.Model):
         """
         super().__init__()
         self.v_sz = len(w2id)  # 词汇表大小
+        
         # 嵌入层：将词语id映射为密集向量
         self.embed_layer = tf.keras.layers.Embedding(
             self.v_sz, 64,  # 64维嵌入向量
@@ -120,8 +119,10 @@ class myRNNModel(keras.Model):
         
         # RNN单元：使用SimpleRNNCell
         self.rnncell = tf.keras.layers.SimpleRNNCell(128)  # 128维隐藏状态
+        
         # RNN层：包装RNN单元，处理序列
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        
         # 输出层：预测下一个词的概率分布
         self.dense = tf.keras.layers.Dense(self.v_sz)
         
@@ -144,7 +145,8 @@ class myRNNModel(keras.Model):
         # 3. 输出层：预测下一个词
         logits = self.dense(rnn_out)  # (batch_size, seq_len, vocab_size)
         return logits
-    
+        
+    #定义了一个用于文本生成的函数 get_next_token，其核心作用是基于当前词和 RNN 的隐藏状态，预测下一个词并更新 RNN 状态
     @tf.function
     def get_next_token(self, x, state):
         """生成下一个词（用于文本生成阶段）
@@ -207,7 +209,33 @@ def reduce_avg(reduce_target, lengths, dim):
     shape_of_lengths = lengths.get_shape()
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
+    # 验证输入张量的维度是否符合要求
+   # shape_of_lengths: lengths张量的维度列表
+   # dim: 预期的长度张量的秩(rank)
     if len(shape_of_lengths) != dim:
+        raise ValueError(('Second input tensor should be rank %d, ' +
+                         'while it got rank %d') % (dim, len(shape_of_lengths)))
+    # 验证目标张量的维度是否符合要求
+    # shape_of_target: reduce_target张量的维度列表
+    # dim+1: 预期的目标张量的最小秩
+    if len(shape_of_target) < dim+1 : # 输入验证：确保目标张量的秩至少为 dim+1
+        raise ValueError(('First input tensor should be at least rank %d, ' +
+                         'while it got rank %d') % (dim+1, len(shape_of_target)))
+
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算目标张量与长度张量的秩差
+    mxlen = tf.shape(reduce_target)[dim]                         # 获取目标维度的最大长度，并生成掩码矩阵
+    mask = mkMask(lengths, mxlen)                                # mkMask函数生成布尔掩码
+    if rank_diff!=0: # 根据秩差调整掩码和长度张量的形状，以便广播
+        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+    else:
+        len_shape = tf.shape(lengths)
+        mask_shape = tf.shape(mask)
+    lengths_reshape = tf.reshape(lengths, shape=len_shape) # 重塑张量以匹配目标张量的形状
+    mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
+
+    mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
+    if len(shape_of_lengths) != dim: # 再次验证输入
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
     if len(shape_of_target) < dim+1 :
@@ -340,25 +368,27 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     Returns:
         str: 生成的诗歌字符串（不包含开始和结束标记）
     """
-    # 初始化RNN隐藏状态
+    # 初始化RNN隐藏状态（通常为两个状态变量，如LSTM的cell state和hidden state）
     state = [tf.random.normal(shape=(1, 128), stddev=0.5),
              tf.random.normal(shape=(1, 128), stddev=0.5)]
 
-    # 从开始标记开始生成
+    # 初始化当前token为开始标记
     cur_token = tf.constant([word2id[start_token]], dtype=tf.int32)
     generated_tokens = []
 
-    # 循环生成直到遇到结束标记或达到最大长度
+    # 循环生成token，直到达到最大长度或生成结束标记
     for _ in range(max_len):
+        # 获取下一个token并更新RNN状态
         cur_token, state = model.get_next_token(cur_token, state)
         token_id = cur_token.numpy()[0]
         generated_tokens.append(token_id)
 
-        # 遇到结束标记则停止生成
+        # 检查是否生成了结束标记
         if id2word[token_id] == end_token:
             break
 
-    # 转换为词语并拼接成字符串
+    # 将生成的token ID序列转换为词语字符串
+    # 去除第一个开始标记和最后一个结束标记（如果存在）
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌

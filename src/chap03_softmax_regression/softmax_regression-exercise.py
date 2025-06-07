@@ -88,9 +88,7 @@ class SoftmaxRegression(tf.Module):
             name="W",
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        # 定义模型的可训练变量列表，用于梯度计算和参数更新
-        self.trainable_variables = [self.W, self.b]
-
+        
     @tf.function
     def __call__(self, x):
         """
@@ -136,7 +134,9 @@ def compute_loss(pred, labels, num_classes=3):
             dtype=tf.float32,
         )
     )
-    
+    # 返回损失值和准确率
+    # loss: 预先计算好的损失值（如交叉熵损失）
+    # acc: 当前批次的分类准确率（0-1 标量）
     return loss, acc
 
 @tf.function
@@ -188,9 +188,11 @@ plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
+# 创建网格点用于绘制决策边界
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
 
+# 生成网格坐标矩阵
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
@@ -203,6 +205,12 @@ Z = Z.reshape(X.shape)
 # 绘制决策边界
 plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
+
+# 保存模型
+model.save_weights('softmax_regression_weights')
+
+# 加载模型
+model.load_weights('softmax_regression_weights')
 
 
 # In[ ]:

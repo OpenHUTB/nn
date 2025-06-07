@@ -28,8 +28,7 @@ def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
     # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
-    ret = np.expand_dims(x, axis=1)
-    return ret
+    return np.expand_dims(x, axis=1)
 
 
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
@@ -39,7 +38,7 @@ def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    #可以替换成 x = identity_basis(x)
+    # 可以替换成 x = identity_basis(x)
     # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
@@ -180,9 +179,9 @@ def main(x_train, y_train, use_gradient_descent=False):
     basis_func = identity_basis  
 
     # 生成偏置项和特征矩阵
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
-    phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1)
+    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)  # 偏置项列
+    phi1 = basis_func(x_train) # 基函数转换
+    phi = np.concatenate([phi0, phi1], axis=1) # 合并特征矩阵
 
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
@@ -211,8 +210,10 @@ def main(x_train, y_train, use_gradient_descent=False):
         phi1 = basis_func(x)
         # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
         phi = np.concatenate([phi0, phi1], axis=1)
+        # 判断是否使用梯度下降算法，并且 w_gd 是否已经定义，如果使用梯度下降算法，并且 w_gd 已经定义，则使用 w_gd 进行预测
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
+        # 如果不使用梯度下降算法，或者 w_gd 没有定义，则使用最小二乘法得到的权重 w_lsq 进行预测
         else:
             return np.dot(phi, w_lsq)
 
@@ -228,8 +229,9 @@ def main(x_train, y_train, use_gradient_descent=False):
 def evaluate(ys, ys_pred):
     """评估模型。"""
     # 计算预测值与真实值的标准差
+     # 计算标准差，作为模型预测误差的评估指标
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std
+    return std#返回f预测值与真实值之间的标准差
 
 
 # 程序主入口（建议不要改动以下函数的接口）
@@ -272,11 +274,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    #plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
-    #plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
-    #plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
-    #plt.xlabel("x")  # 设置x轴的标签
-    #plt.ylabel("y")  # 设置y轴的标签
-    #plt.title("Linear Regression")  # 设置图表标题
-    #plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义 # 添加图例，表示每条线的含义
     plt.show()
