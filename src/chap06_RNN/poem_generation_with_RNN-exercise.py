@@ -111,6 +111,7 @@ class myRNNModel(keras.Model):
         """
         super().__init__()
         self.v_sz = len(w2id)  # 词汇表大小
+        
         # 嵌入层：将词语id映射为密集向量
         self.embed_layer = tf.keras.layers.Embedding(
             self.v_sz, 64,  # 64维嵌入向量
@@ -118,8 +119,10 @@ class myRNNModel(keras.Model):
         
         # RNN单元：使用SimpleRNNCell
         self.rnncell = tf.keras.layers.SimpleRNNCell(128)  # 128维隐藏状态
+        
         # RNN层：包装RNN单元，处理序列
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        
         # 输出层：预测下一个词的概率分布
         self.dense = tf.keras.layers.Dense(self.v_sz)
         
