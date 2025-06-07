@@ -74,15 +74,19 @@ def prepare_mnist_features_and_labels(x, y):
 class MyConvModel(keras.Model):
     '''在这里实现alexNet模型'''
     def __init__(self):
+        """
+        初始化自定义卷积神经网络模型。
+        """
         super(MyConvModel, self).__init__()
+        # 第一层卷积层
         self.l1_conv = Conv2D(filters=32, 
                               kernel_size=(5, 5), 
                               activation='relu', padding='same')
-        
+        # 第二层卷积层
         self.l2_conv = Conv2D(filters=64, 
                               kernel_size=(5, 5), 
                               activation='relu', padding='same')
-        
+        # 最大池化层
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
         
         self.flat = Flatten()
