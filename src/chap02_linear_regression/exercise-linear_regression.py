@@ -33,7 +33,7 @@ def identity_basis(x):
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
-def multinomial_basis(x, feature_num=10):
+def multinomial_basis(x, feature_num = 10):
     """多项式基函数"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
@@ -51,7 +51,7 @@ def multinomial_basis(x, feature_num=10):
     return ret
 
 
-def gaussian_basis(x, feature_num=10):
+def gaussian_basis(x, feature_num = 10):
     """
     高斯基函数：将输入映射为一组高斯函数响应
     """
@@ -74,7 +74,7 @@ def gaussian_basis(x, feature_num=10):
 # 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 
-def least_squares(phi, y, alpha=0.0, solver="pinv"):
+def least_squares(phi, y, alpha=0.0, solver = "pinv"):
     """
     带正则化的最小二乘法优化，支持多种求解器
 
