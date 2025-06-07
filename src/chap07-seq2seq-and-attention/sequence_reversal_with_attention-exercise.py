@@ -140,6 +140,7 @@ class mySeq2SeqModel(keras.Model):
         x_embed = self.embed_layer(x)  # (B, E)
 
         # Attention 权重计算
+        #这段代码实现了一个注意力机制（Attention Mechanism），常用于序列到序列（Seq2Seq）模型或Transformer等架构中。它的作用是根据当前的状态（state）对编码器的输出（enc_out）进行加权求和，得到一个上下文向量（context）
         score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
