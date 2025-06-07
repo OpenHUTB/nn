@@ -133,6 +133,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
         # 计算正则化的 SVD 解
         s_reg = s / (s**2 + alpha)
         # 构建对角矩阵
+        # n_features是特征数量，n_samples是样本数量
         S_reg = np.zeros((n_features, n_samples))
         np.fill_diagonal(S_reg, s_reg)
         w = Vt.T @ S_reg @ U.T @ y

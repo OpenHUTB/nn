@@ -1,6 +1,7 @@
 # python: 3.5.2
 # encoding: utf-8
 
+# 导入numpy并命名为np
 import numpy as np
 
 def load_data(fname):
@@ -26,7 +27,7 @@ class SVM:
     """SVM模型。"""
 
     def __init__(self):
-        self.learning_rate = 0.01
+        self.learning_rate = 0.01 # 学习率：控制梯度下降中参数更新的步长
         self.reg_lambda = 0.01
         self.max_iter = 1000  # 控制模型在优化过程中更新其权重或参数的步长
         self.w = None         # 权重向量
