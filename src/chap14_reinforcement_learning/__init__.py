@@ -217,17 +217,17 @@ register(
 register(
     id='Reacher-v1',
     entry_point='gym.envs.mujoco:ReacherEnv',
-    max_episode_steps=50,
-    reward_threshold=-3.75,
+    max_episode_steps=50,# 较短步数限制
+    reward_threshold=-3.75,# 负阈值表示最小化距离
 )
-
+# 物体推动任务
 register(
     id='Pusher-v0',
     entry_point='gym.envs.mujoco:PusherEnv',
     max_episode_steps=100,
-    reward_threshold=0.0,
+    reward_threshold=0.0,# 尚未定义明确阈值
 )
-
+# 物体投掷任务
 register(
     id='Thrower-v0',
     entry_point='gym.envs.mujoco:ThrowerEnv',
