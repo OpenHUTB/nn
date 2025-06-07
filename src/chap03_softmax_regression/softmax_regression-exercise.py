@@ -215,7 +215,3 @@ model.save_weights('softmax_regression_weights')
 
 # 加载模型
 model.load_weights('softmax_regression_weights')
-
-
-# In[ ]:
-
