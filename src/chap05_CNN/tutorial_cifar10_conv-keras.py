@@ -18,6 +18,14 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
+import numpy
+import pylab
+from PIL import Image
+import numpy as np
+import numpy
+import pylab
+from PIL import Image
+import numpy as np
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
@@ -131,10 +139,7 @@ model.fit(train_ds, epochs=10)
 model.evaluate(test_ds) #模型评估
 
 # In[20]:
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
+
 
 ds, test_ds = cifar10_dataset()
 
@@ -194,10 +199,7 @@ pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
 pylab.show()
 
 # In[23]:
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
+
 rand_model = MyConvModel()
 ds, test_ds = cifar10_dataset()
 
