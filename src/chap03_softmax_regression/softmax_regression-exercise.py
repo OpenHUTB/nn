@@ -36,9 +36,11 @@ C1 = np.array([x_p, y_p, y]).T
 x_n = np.random.normal(
     6.0, 1, dot_num
 )
-
+# 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y_n = np.random.normal(3.0, 1, dot_num)
+# 创建一个长度为dot_num的数组，所有元素为0，表示这些点的标签为0
 y = np.zeros(dot_num)
+# 将x坐标、y坐标和标签组合成一个二维数组，每行表示一个数据点
 C2 = np.array([x_n, y_n, y]).T
 
 # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
