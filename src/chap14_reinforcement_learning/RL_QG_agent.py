@@ -49,7 +49,7 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
             filters = 64,                 # 输出通道数：64个卷积核
             kernel_size = 3,             #指的是卷积核的大小为 3×3
             padding = "same",            #这种填充方式能保证输出特征图的尺寸和输入特征图的尺寸相同
-            activation = tf.nn.relu
+            activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
             )
         
         # 扁平化层
