@@ -57,8 +57,8 @@ class CNN(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
             nn.BatchNorm2d(32),  # 添加批量归一化
-            nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.ReLU(),# ReLU激活函数，引入非线性
+            nn.MaxPool2d(2)# 最大池化，减小特征图尺寸
         )
         
         # 第二个卷积层
@@ -69,7 +69,7 @@ class CNN(nn.Module):
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.MaxPool2d(2)# 最大池化，减小特征图尺寸
         )
         
         # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
