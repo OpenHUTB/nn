@@ -119,7 +119,7 @@ class myRNNModel(keras.Model):
        
         # 基础RNN单元和RNN层
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)# 序列输出RNN层
         self.dense = tf.keras.layers.Dense(10)
         
     @tf.function
