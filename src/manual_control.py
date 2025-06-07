@@ -199,26 +199,26 @@ def get_actor_blueprints(world, filter, generation):                            
 #  ==============================================================================
 
 
-class World(object):
-    def __init__(self, carla_world, hud, args):
-        self.world = carla_world
-        self.sync = args.sync
+class World(object): # Carla 仿真世界的核心管理类，负责初始化和控制仿真环境的各个组件
+    def __init__(self, carla_world, hud, args): # 基础环境设置
+        self.world = carla_world                # Carla 服务器的世界对象
+        self.sync = args.sync                   # 主角车辆的角色名称
         self.actor_role_name = args.rolename
-        try:
+        try:                                    # 加载地图数据
             self.map = self.world.get_map()
         except RuntimeError as error:
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
             print('  Make sure it exists, has the same name of your town, and is correct.')
             sys.exit(1)
-        self.hud = hud
-        self.player = None
-        self.collision_sensor = None
-        self.lane_invasion_sensor = None
-        self.gnss_sensor = None
-        self.imu_sensor = None
-        self.radar_sensor = None
-        self.camera_manager = None
+        self.hud = hud     # 显示仿真信息的HUD对象
+        self.player = None # 主角车辆
+        self.collision_sensor = None     # 碰撞传感器
+        self.lane_invasion_sensor = None # 车道入侵传感器
+        self.gnss_sensor = None    # GNSS传感器
+        self.imu_sensor = None     # IMU传感器
+        self.radar_sensor = None   # 雷达传感器
+        self.camera_manager = None # 相机管理器
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
         self._actor_filter = args.filter
