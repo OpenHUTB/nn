@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
+import tensorflow as tf
+#导入TensorFlow
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -20,8 +22,7 @@ def load_data(filename):
     # 将数据拆分为特征和标签
     xs, ys = zip(*xys)
     return np.asarray(xs), np.asarray(ys)
-
-
+    
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
@@ -146,25 +147,29 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     return w
 
 
-def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化
-    :param phi: 特征矩阵
-    :param y: 标签向量
-    :param lr: 学习率（默认为 0.01）
-    :param epochs: 迭代次数（默认为 1000）
-    :return: 优化后的权重向量 w
+def tf_gradient_descent(phi, y, lr=0.01, epochs=1000, verbose=False):
     """
-    # 初始化权重 w 为全零向量
-    w = np.zeros(phi.shape[1])
-    # 迭代训练 epochs 次
+    用TensorFlow 2.0实现线性回归的梯度下降
+    phi: 设计矩阵（NumPy数组，shape=(n_samples, n_features)）
+    y: 标签（NumPy数组，shape=(n_samples,)）
+    """
+    # 转换为Tensor
+    X = tf.constant(phi, dtype=tf.float32)
+    Y = tf.constant(y, dtype=tf.float32)
+
+    w = tf.Variable(tf.zeros([phi.shape[1], 1], dtype=tf.float32))
+    Y = tf.reshape(Y, [-1, 1])
+
     for epoch in range(epochs):
-        # 计算预测值
-        y_pred = phi @ w
-        # 计算梯度
-        gradient = -2 * phi.T @ (y - y_pred) / len(y)
-        # 更新权重 w
-        w -= lr * gradient
-    return w
+        with tf.GradientTape() as tape:
+            y_pred = tf.matmul(X, w)
+            loss = tf.reduce_mean(tf.square(y_pred - Y))
+        grads = tape.gradient(loss, [w])
+        w.assign_sub(lr * grads[0])
+        if verbose and (epoch % 200 == 0 or epoch == epochs - 1):
+            print(f"Epoch {epoch+1}, loss={loss.numpy():.4f}")
+
+    return w.numpy().flatten()
 
 
 def main(x_train, y_train, use_gradient_descent=False):
@@ -185,7 +190,7 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
-
+    w_tf = None
     w_gd = None
     if use_gradient_descent:
         # 梯度下降求解权重（缩进修正）
@@ -253,7 +258,7 @@ if __name__ == "__main__":
     # f: 预测函数 y = f(x)
     # w_lsq: 通过最小二乘法得到的权重向量
     # w_gd: 通过梯度下降法得到的权重向量
-    f, w_lsq, w_gd = main(x_train, y_train)
+    f, w_lsq, w_gd, w_tf = main(x_train, y_train, use_tf_gradient_descent=True)
 
     y_train_pred = f(x_train)  # 对训练数据应用预测函数
     std = evaluate(y_train, y_train_pred)  # 计算预测值与真实值的标准差作为评估指标
