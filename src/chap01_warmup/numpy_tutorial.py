@@ -134,8 +134,8 @@ print("np.add(x,y)\n", np.add(x, y))  # np.add 是 NumPy 库中用于数组相�
 # 14. 利用 13 题目中的 x,y 输出 x-y 和 np.subtract(x,y)
 print("第十四题：\n")
 
-print("x-y\n", x - y)
-print("np.subtract(x,y)\n", np.subtract(x, y))
+print("x-y\n", x - y)# 打印直接使用减法运算符得到的 x 减 y 的结果
+print("np.subtract(x,y)\n", np.subtract(x, y))# 打印使用 numpy 的 subtract 函数得到的 x 减 y 的结果
 
 # 15. 利用 13 题目中的 x,y 输出 x*y , 和 np.multiply(x,y) 还有 np.dot(x,y), 比较差异。然后自己换一个不是方阵的试试。
 print("第十五题：\n")
