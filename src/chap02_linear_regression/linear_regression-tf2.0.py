@@ -14,9 +14,11 @@ from tensorflow.keras import optimizers, layers, Model
 
 def identity_basis(x):
     """恒等基函数"""
+    #保持输入数据不变，仅扩展维度
     return np.expand_dims(x, axis=1)
 
     # 生成多项式基函数
+#将输入转换为多项式特征
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
