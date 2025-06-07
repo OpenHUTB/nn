@@ -5,11 +5,11 @@
 import os
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.utils.data as Data
 import torchvision  # 包含常用的数据集和模型
 import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
 import numpy as np
+from torch.autograd import Variable
 
 # 设置超参数
 learning_rate = 1e-4  #  学习率
@@ -57,8 +57,8 @@ class CNN(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
             nn.BatchNorm2d(32),  # 添加批量归一化
-            nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.ReLU(),# ReLU激活函数，引入非线性
+            nn.MaxPool2d(2)# 最大池化，减小特征图尺寸
         )
         
         # 第二个卷积层
@@ -69,7 +69,7 @@ class CNN(nn.Module):
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
             nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.MaxPool2d(2)
+            nn.MaxPool2d(2)# 最大池化，减小特征图尺寸
         )
         
         # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
@@ -89,18 +89,19 @@ class CNN(nn.Module):
         out1 = F.relu(out1)# 应用ReLU激活函数引入非线性
         out1 = self.dropout(out1)
         out2 = self.out2(out1)
-        output = F.softmax(out2, dim=1)  # 指定softmax维度
-        return output
+        return out2
 
 # 测试函数
 def test(cnn):
     global prediction  # 声明全局变量
     y_pre = cnn(test_x)  # 用模型预测测试数据
+     # 这里使用softmax获取概率分布
+    y_prob = F.softmax(y_pre, dim=1)
     _, pre_index = torch.max(y_pre, 1)  # 获取预测类别（最大概率的索引）
     pre_index = pre_index.view(-1)  # 调整张量形状
     prediction = pre_index.data.numpy()  # 转换为 numpy 数组
     correct = np.sum(prediction == test_y)  # 计算正确预测的数量
-    return correct / 500.0  # 返回准确率
+    return correct / 500.0  # 返回准确率，假设测试集中样本数为 500
 
 
 # 训练函数
