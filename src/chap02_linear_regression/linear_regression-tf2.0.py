@@ -63,59 +63,76 @@ def load_data(filename, basis_func=gaussian_basis):
         return (np.float32(xs), np.float32(ys)), (o_x, o_y)
 
 
-#定义模型
+# 定义线性回归模型类，继承自Keras的Model基类
 class linearModel(Model):
-    """线性回归模型，实现 y = w·x + b"""
+    """实现线性回归模型 y = w·x (无偏置项版本)
+    完整版应为 y = w·x + b，当前实现缺少偏置项b
+    
+    功能说明：
+    1. 实现最基本的线性变换
+    2. 使用TensorFlow变量存储可训练参数
+    3. 支持自动求导和梯度更新
+    """
     
     def __init__(self, ndim):
         """
         初始化线性模型
-        
         参数:
-        ndim: 输入特征的维度
+            ndim: 输入特征的维度，决定权重矩阵的形状
+        属性:
+            w: 权重矩阵，形状为[ndim, 1]，初始值为[-0.1,0.1)的均匀分布
         """
-        # 调用父类(Model)的构造函数
+        # 调用父类Model的初始化方法
         super(linearModel, self).__init__()
         
-        # 定义模型参数：权重矩阵 w
-        # 形状为 [ndim, 1]，表示从 ndim 维输入到 1 维输出的线性变换
-        # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
-        # trainable=True 表示该变量需要在训练过程中被优化
+        # 定义可训练权重参数
         self.w = tf.Variable(
-            shape=[ndim, 1],
+            shape=[ndim, 1],  # 权重矩阵形状
             initial_value=tf.random.uniform(
-                [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
-            )
-            trainable=True,
-            name="weight"
+                [ndim, 1], 
+                minval=-0.1,   # 最小值
+                maxval=0.1,    # 最大值 
+                dtype=tf.float32
+            ),
+            trainable=True,    # 标记为可训练参数
+            name="weight"      # 变量名称
         )
-        
-        # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
-        # 可补充：
+        # 注意：标准线性回归应包含偏置项b
+        # 缺失的偏置项定义示例：
         # self.b = tf.Variable(
-        #     initial_value=tf.zeros([1]),
+        #     initial_value=tf.zeros([1]),  # 初始化为0
         #     trainable=True,
         #     name="bias"
         # )
-        
-    @tf.function
+
+    @tf.function  # 装饰器，将Python函数编译为TensorFlow计算图
     def call(self, x):
-        """模型前向传播
-        
+        """前向传播计算
         参数:
-            x: 输入特征，形状为(batch_size, ndim)
-            
+            x: 输入特征张量，形状为(batch_size, ndim)
         返回:
-            预测值，形状为(batch_size,)
+            y: 预测值，形状为(batch_size,)
+        计算过程:
+            1. 矩阵乘法: x @ w → (batch_size,1)
+            2. 去除多余维度: squeeze → (batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)
+        y = tf.squeeze(  # 去除大小为1的维度
+            tf.matmul(x, self.w),  # 矩阵乘法
+            axis=1
+        )
         return y
 
+# 模型使用示例
+# 加载训练数据
+# xs: 特征矩阵 (n_samples, n_features)
+# ys: 标签向量 (n_samples,)
+(xs, ys), (o_x, o_y) = load_data("train.txt")        
 
-    (xs, ys), (o_x, o_y) = load_data("train.txt")        
-    ndim = xs.shape[1]
+# 获取特征维度
+ndim = xs.shape[1]  # 输入特征的维度数
 
-    model = linearModel(ndim=ndim)
+# 实例化线性模型
+model = linearModel(ndim=ndim)
 
 
 #训练以及评估
