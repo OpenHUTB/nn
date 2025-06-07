@@ -78,6 +78,7 @@ optimizer = optimizers.Adam()
 @tf.function
 def compute_loss(logits, labels):
     # 计算稀疏softmax交叉熵损失，并求平均值
+    # 数学公式：-log(exp(logits[labels]) / Σexp(logits))
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits = logits, labels = labels))
