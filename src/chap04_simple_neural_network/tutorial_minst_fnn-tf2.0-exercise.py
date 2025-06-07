@@ -115,7 +115,6 @@ def test(model, x, y):
     accuracy = compute_accuracy(logits, y)        # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
     return compute_loss(logits, y), compute_accuracy(logits, y)
 
-
 # ## 实际训练
 
 # In[14]:
@@ -127,7 +126,7 @@ for epoch in range(50):
     loss, accuracy = train_one_step(model, optimizer, 
                                     tf.constant(train_data[0], dtype = tf.float32),  # 训练图像数据
                                     tf.constant(train_data[1], dtype = tf.int64))    # 训练标签数据
-    print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
+    print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())    # 打印训练结果
 # 在测试集上测试模型
 loss, accuracy = test(model, 
                       tf.constant(test_data[0], dtype = tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，数据类型为float32
