@@ -3,8 +3,8 @@
 
 # # Tensorflow2.0 小练习
 
-import tensorflow as tf
-import numpy as np
+import tensorflow as tf # 导入TensorFlow深度学习框架，使用标准别名tf
+import numpy as np # 导入NumPy科学计算库，使用标准别名np
 
 
 # ## 实现softmax函数
@@ -45,7 +45,7 @@ test_data = np.random.normal(size=[10, 5])
 def sigmoid(x):
     exp_neg_x = tf.exp(-x)# 计算 -x 的指数
     prob_x = 1.0 / (1.0 + exp_neg_x) # 计算 sigmoid 函数值
-    return prob_x
+    return prob_x # 返回最终概率计算结果
 
 
 # 测试 sigmoid 实现是否正确
