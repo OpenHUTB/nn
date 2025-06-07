@@ -253,8 +253,8 @@ def sequence_reversal():
             collect.append(tf.expand_dims(cur_token, axis=-1))
         # 拼接输出序列
         out = tf.concat(collect, axis = -1).numpy()
-        # 索引转字符
-        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out]
+        # 将一个数值列表转换为对应的字母字符串
+        out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
         return out
 
     # 生成一批测试数据（32个样本，每个序列长度10）
