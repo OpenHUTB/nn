@@ -2,7 +2,6 @@
 # coding: utf-8
 
 # ## 准备数据
-
 # In[29]:
 import os
 import tensorflow as tf
@@ -63,7 +62,7 @@ class MyConvModel(keras.Model):
     网络结构：
     Conv2D(32) → Conv2D(64) → MaxPooling2D → Flatten → Dense(100) → Dense(10)
     """
-
+    #定义了一个卷积神经网络（CNN）模型的初始化部分（__init__） 方法
     def __init__(self):
         super(MyConvModel, self).__init__()
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
@@ -92,7 +91,6 @@ class MyConvModel(keras.Model):
         dense1 = self.dense1(flat_h)
         logits = self.dense2(dense1)
         return logits
-
 
 model = MyConvModel()
 optimizer = optimizers.Adam()
