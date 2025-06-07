@@ -61,7 +61,7 @@ class mySeq2SeqModel(keras.Model):
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden) 
         # 隐藏状态的维度，即输出维度
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
-        
+        # 定义解码器的基本单元：简单循环神经网络(SimpleRNN)
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
                                            return_sequences=True, return_state=True)
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
