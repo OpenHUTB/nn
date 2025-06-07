@@ -248,19 +248,19 @@ register(
     max_episode_steps=1000,
     reward_threshold=950.0,# 高精度控制要求
 )
-
+# 二级倒立摆（更复杂）
 register(
     id='InvertedDoublePendulum-v1',
     entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
     max_episode_steps=1000,
-    reward_threshold=9100.0,
+    reward_threshold=9100.0,# 显著提高的阈值
 )
-
+# 猎豹奔跑任务（速度最大化）
 register(
     id='HalfCheetah-v1',
     entry_point='gym.envs.mujoco:HalfCheetahEnv',
     max_episode_steps=1000,
-    reward_threshold=4800.0,
+    reward_threshold=4800.0,# 高速要求
 )
 
 register(
