@@ -45,7 +45,7 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
 
     # 第2个卷积层：提取更高级特征
         conv2 = tf.layers.conv2d(
-            inputs = conv1,
+            inputs = conv1,               # 输入：上层卷积层（conv1）的输出特征图
             filters = 64,                 # 输出通道数：64个卷积核
             kernel_size = 3,             #指的是卷积核的大小为 3×3
             padding = "same",            #这种填充方式能保证输出特征图的尺寸和输入特征图的尺寸相同
