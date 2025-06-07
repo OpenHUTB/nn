@@ -234,19 +234,19 @@ register(
     max_episode_steps=100,
     reward_threshold=0.0,
 )
-
+# 物体击打任务
 register(
     id='Striker-v0',
     entry_point='gym.envs.mujoco:StrikerEnv',
     max_episode_steps=100,
     reward_threshold=0.0,
 )
-
+# 单级倒立摆
 register(
     id='InvertedPendulum-v1',
     entry_point='gym.envs.mujoco:InvertedPendulumEnv',
     max_episode_steps=1000,
-    reward_threshold=950.0,
+    reward_threshold=950.0,# 高精度控制要求
 )
 
 register(
