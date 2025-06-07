@@ -368,15 +368,15 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
             max_episode_steps=100000,
             nondeterministic=nondeterministic,
         )
-
+# 无帧跳过版本 (v0)
         register(
             id='{}NoFrameskip-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
             kwargs={'game': game, 'obs_type': obs_type, 'frameskip': 1, 'repeat_action_probability': 0.25}, # A frameskip of 1 means we get every frame
-            max_episode_steps=frameskip * 100000,
+            max_episode_steps=frameskip * 100000,# 每帧都处理，按比例增加步数限制
             nondeterministic=nondeterministic,
         )
-
+# 无帧跳过版本 (v4)
         # No frameskip. (Atari has no entropy source, so these are
         # deterministic environments.)
         register(
