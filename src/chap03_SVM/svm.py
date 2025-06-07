@@ -65,11 +65,22 @@ class SVM:
 
 
 if __name__ == '__main__':
-    # 载入数据，实际实用时将x替换为具体名称
-    train_file = 'data/train_linear.txt'
-    test_file = 'data/test_linear.txt'
-    data_train = load_data(train_file)     # 数据格式[x1, x2, t]
+    # 数据加载部分
+
+    # 定义训练数据和测试数据文件路径
+    # 注意：实际使用时需要确保文件路径正确，建议使用绝对路径或检查相对路径
+    train_file = 'data/train_linear.txt'  # 训练集文件路径，包含特征x和目标值t
+    test_file = 'data/test_linear.txt'    # 测试集文件路径，格式与训练集相同
+
+    # 加载训练数据
+    # load_data函数应返回一个numpy数组或类似结构
+    # 返回值data_train将是一个二维数组，形状为(n_samples, 3)
+    data_train = load_data(train_file)
+
+    # 加载测试数据（格式要求与训练集相同）
+    # 用于模型评估，不应参与训练过程
     data_test = load_data(test_file)
+
 
     # 使用训练集训练SVM模型
     svm = SVM()            # 初始化模型
