@@ -15,7 +15,9 @@ import sys
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
 
 # 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
-import numpy as np
+import numpy as np# 导入NumPy库（科学计算基础库）
+                    # 提供多维数组操作、数学函数、线性代数等功能
+                    # 常用于数据预处理、模型输入构建和结果分析
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import datasets, layers, optimizers  # 同一库的子模块合并导入，按字母顺序排列
