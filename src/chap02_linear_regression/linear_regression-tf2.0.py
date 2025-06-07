@@ -112,7 +112,7 @@ class linearModel(Model):
         return y
 
 
-    (xs, ys), (o_x, o_y) = load_data("train.txt")        
+    (xs, ys), (o_x, o_y) = load_data("train.txt")                  
     ndim = xs.shape[1]
 
     model = linearModel(ndim=ndim)
@@ -126,10 +126,10 @@ optimizer = optimizers.Adam(0.1)
 def train_one_step(model, xs, ys):
     # 在梯度带(GradientTape)上下文中记录前向计算过程
     with tf.GradientTape() as tape:
-        y_preds = model(xs)    # 模型前向传播计算预测值
-        loss = tf.keras.losses.MSE(ys, y_preds)   #计算损失函数
-    grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
-    optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
+        y_preds = model(xs)                         # 模型前向传播计算预测值
+        loss = tf.keras.losses.MSE(ys, y_preds)     #计算损失函数
+    grads = tape.gradient(loss, model.w)            # 计算损失函数对模型参数w的梯度
+    optimizer.apply_gradients([(grads, model.w)])   # 更新模型参数
     return loss
 
 
