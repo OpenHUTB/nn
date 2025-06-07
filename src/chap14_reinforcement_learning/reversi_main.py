@@ -41,7 +41,7 @@ for i_episode in range(max_epochs):
         else:
             # 随机选择一个合法位置
             action_ = random.choice(enables)
-        action[0] = action_
+        action[0] = action_# 设置落子位置
         action[1] = 0  # 设置为黑棋
         # 黑棋落子并更新环境状态，返回新状态、奖励、是否结束等信息
         # 执行动作并获取新状态
