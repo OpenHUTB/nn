@@ -52,12 +52,12 @@ y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 绘制正样本，用蓝色加号表示
-plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
+plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
 # 绘制负样本，用绿色圆圈表示
-plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
+plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
 
 # 将正样本和负样本连接成一个数据集
-data_set = np.concatenate((C1, C2), axis=0)
+data_set = np.concatenate((C1, C2), axis = 0)
 # 随机打乱数据集的顺序
 np.random.shuffle(data_set)
 
@@ -124,9 +124,9 @@ def compute_loss(pred, label):
         """
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
-        label = tf.constant(label, dtype=tf.float32)
+        label = tf.constant(label, dtype = tf.float32)
     # 压缩预测结果的维度，从形状(N, 1)变为(N,)
-    pred = tf.squeeze(pred, axis=1)
+    pred = tf.squeeze(pred, axis = 1)
     '''============================='''
     # 输入label shape(N,), pred shape(N,)
     # 输出 losses shape(N,) 每一个样本一个loss
@@ -193,9 +193,9 @@ if __name__ == '__main__':
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
 
-    line_d, = ax.plot([], [], label='fit_line')
-    C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
-    C2_dots, = ax.plot([], [], 'o', c='g', label='actual_dots')
+    line_d, = ax.plot([], [], label = 'fit_line')
+    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
+    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
