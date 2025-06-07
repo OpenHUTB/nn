@@ -144,16 +144,23 @@ def test(model, x, y):
 
 # In[14]:
 
+# 导入MNIST数据集，分割为训练集和测试集
 train_data, test_data = mnist_dataset()
+
+# 进行50个epoch的训练循环
 for epoch in range(50):
+    # 执行单步训练，传入模型、优化器、训练数据和标签
+    # 将numpy数据转换为TensorFlow张量，指定数据类型为float32和int64
+
     loss, accuracy = train_one_step(
         model,
         optimizer,
-        tf.constant(train_data[0], dtype=tf.float32),
-        tf.constant(train_data[1], dtype=tf.int64)
+        tf.constant(train_data[0], dtype=tf.float32),  # 训练图像数据
+        tf.constant(train_data[1], dtype=tf.int64)     # 训练标签数据
     )
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 
+# 在测试集上评估模型性能
 loss, accuracy = test(
     model,
     tf.constant(test_data[0], dtype=tf.float32),
