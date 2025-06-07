@@ -262,21 +262,21 @@ register(
     max_episode_steps=1000,
     reward_threshold=4800.0,# 高速要求
 )
-
+# 单腿跳跃机器人
 register(
     id='Hopper-v1',
     entry_point='gym.envs.mujoco:HopperEnv',
     max_episode_steps=1000,
-    reward_threshold=3800.0,
+    reward_threshold=3800.0,# 持续跳跃要求
 )
-
+# 游泳者运动控制
 register(
     id='Swimmer-v1',
     entry_point='gym.envs.mujoco:SwimmerEnv',
     max_episode_steps=1000,
-    reward_threshold=360.0,
+    reward_threshold=360.0,# 相对较低阈值
 )
-
+# 双腿行走机器人
 register(
     id = 'Walker2d-v1',
     max_episode_steps = 1000,
