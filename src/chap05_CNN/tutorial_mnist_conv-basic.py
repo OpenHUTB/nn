@@ -232,7 +232,11 @@ def test(model, ds):
 # # 训练
 
 # In[26]:
+
+# 数据准备：加载MNIST手写数字数据集
 train_ds, test_ds = mnist_dataset()
+# 模型训练：进行2轮完整数据集迭代
 for epoch in range(2):
+    # 模型评估：在未见过的测试集上验证性能
     loss, accuracy = train(epoch, model, optimizer, train_ds)
 loss, accuracy = test(model, test_ds)
