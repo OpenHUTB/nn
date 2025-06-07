@@ -388,16 +388,17 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         )
 
 # Board games
-# ----------------------------------------
+# 棋类游戏环境
 
+#9x9围棋环境
 register(
     id='Go9x9-v0',
     entry_point='gym.envs.board_game:GoEnv',
     kwargs={
         'player_color': 'black',
-        'opponent': 'pachi:uct:_2400',
-        'observation_type': 'image3c',
-        'illegal_move_mode': 'lose',
+        'opponent': 'pachi:uct:_2400',# 使用Pachi AI作为对手
+        'observation_type': 'image3c',# 图像观测
+        'illegal_move_mode': 'lose',# 非法移动直接判负
         'board_size': 9,
     },
     # The pachi player seems not to be determistic given a fixed seed.
