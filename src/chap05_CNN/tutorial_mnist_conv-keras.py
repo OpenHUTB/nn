@@ -99,7 +99,7 @@ class MyConvModel(keras.Model):
         return probs
 
 model = MyConvModel()
-optimizer = optimizers.Adam()
+optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法
 
 
 # ## 编译， fit以及evaluate
