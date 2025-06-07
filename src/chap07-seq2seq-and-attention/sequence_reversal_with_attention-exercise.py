@@ -17,17 +17,17 @@ import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
-
+# 导入random模块，用于生成随机数和随机操作
+import random
+# 导入string模块，提供与字符串操作相关的常量和工具函数
+import string
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[20]:
 
-# 导入random模块，用于生成随机数和随机操作
-import random
-# 导入string模块，提供与字符串操作相关的常量和工具函数
-import string
+
 
 def randomString(stringLength):  # 定义函数 get_batch，输入参数 batch_size 和 length
     """Generate a random string with the combination of lowercase and uppercase letters """
