@@ -130,7 +130,7 @@ def train_one_step(model, xs, ys):
     optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
     return loss
 
-
+# 使用tf.function装饰器将Python函数转换为静态图，提高执行效率
 @tf.function
 def predict(model, xs):
     y_preds = model(xs) # 模型前向传播
