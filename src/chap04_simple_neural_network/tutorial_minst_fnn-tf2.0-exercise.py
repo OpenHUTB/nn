@@ -87,7 +87,7 @@ def compute_loss(logits, labels):
 @tf.function
 def compute_accuracy(logits, labels):
     # 对logits在axis=1维度上取最大值的索引，得到预测结果
-    predictions = tf.argmax(logits, axis=1)
+    predictions = tf.argmax(logits, axis=1, output_type=tf.int64)  # 确保预测类型与标签一致
     # 计算预测结果与真实标签相等的比例，得到准确率
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
