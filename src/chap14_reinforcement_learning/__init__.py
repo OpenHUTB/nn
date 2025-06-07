@@ -329,15 +329,15 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
             # should track this down eventually, but for now we just
             # mark it as nondeterministic.
             nondeterministic = True
-
+# 注册基础版本 (v0)
         register(
             id='{}-v0'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type, 'repeat_action_probability': 0.25},
+            kwargs={'game': game, 'obs_type': obs_type, 'repeat_action_probability': 0.25},# 动作重复概率（模拟硬件延迟）
             max_episode_steps=10000,
             nondeterministic=nondeterministic,
         )
-
+# 注册改进版本 (v4)
         register(
             id='{}-v4'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
