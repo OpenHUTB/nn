@@ -338,11 +338,16 @@ def compute_accuracy(log_prob, labels):
 
 # 单步训练函数
 def train_one_step(model, x, y):
+    # 前向传播：计算模型的输出
     model.forward(x)
+    # 反向传播：计算梯度
     model.backward(y)
+    # 使用梯度下降法更新权重，学习率为 1e-5
     model.W1 -= 1e-5 * model.W1_grad
     model.W2 -= 1e-5 * model.W2_grad
+    # 计算损失值
     loss = compute_loss(model.h2_log, y)
+    # 计算准确率
     accuracy = compute_accuracy(model.h2_log, y)
     return loss, accuracy
 
