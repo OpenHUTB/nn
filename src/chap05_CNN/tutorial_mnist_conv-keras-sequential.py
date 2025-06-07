@@ -13,7 +13,6 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-
 def mnist_dataset():
     """
     加载并预处理MNIST数据集，返回训练集和测试集的TensorFlow Dataset对象。
@@ -57,8 +56,7 @@ def prepare_mnist_features_and_labels(x, y):
 # In[2]:
 7 * 7 * 64
 
-
-# ## 建立模型
+#建立模型
 
 # In[3]:
 # 构建卷积神经网络（CNN）模型
@@ -78,6 +76,7 @@ optimizer = optimizers.Adam(0.0001)
 # ## 编译， fit以及evaluate
 
 # In[4]:
+#编译和训练一个 TensorFlow/Keras 模型，并评估其在测试集上的性能
 model.compile(
     optimizer = optimizer,
     loss = 'sparse_categorical_crossentropy',
