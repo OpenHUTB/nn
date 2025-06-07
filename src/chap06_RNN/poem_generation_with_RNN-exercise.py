@@ -142,7 +142,8 @@ class myRNNModel(keras.Model):
         # 3. 输出层：预测下一个词
         logits = self.dense(rnn_out)  # (batch_size, seq_len, vocab_size)
         return logits
-    
+        
+    #定义了一个用于文本生成的函数 get_next_token，其核心作用是基于当前词和 RNN 的隐藏状态，预测下一个词并更新 RNN 状态
     @tf.function
     def get_next_token(self, x, state):
         """生成下一个词（用于文本生成阶段）
