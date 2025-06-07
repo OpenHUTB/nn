@@ -51,7 +51,7 @@ def process_dataset(fileName):
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
-    words, _ = zip(*sorted_counter)
+    words, _ = zip(*sorted_counter) #对tuple进行解压，得到words列表代表所有字符
     words = ('PAD', 'UNK') + words[:len(words)]
     
     # 创建词语到id的映射
