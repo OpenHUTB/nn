@@ -15,9 +15,9 @@ def generate_data(n_samples=1000):
     
     # 定义三个高斯分布的协方差矩阵
     sigma_true = np.array([
-        [[1, 0], [0, 1]],  # 第一个分布：圆形分布(各向同性)
-        [[2, 0.5], [0.5, 1]],  # 第二个分布：倾斜的椭圆
-        [[1, -0.5], [-0.5, 2]]  # 第三个分布：反向倾斜的椭圆
+        [[1, 0], [0, 1]],          # 第一个分布：圆形分布(各向同性)
+        [[2, 0.5], [0.5, 1]],      # 第二个分布：倾斜的椭圆
+        [[1, -0.5], [-0.5, 2]]     # 第三个分布：反向倾斜的椭圆
     ])
     
     # 定义每个高斯分布的混合权重(必须和为1)
@@ -94,10 +94,10 @@ class GaussianMixtureModel:
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
         
         # 初始化模型参数
-        self.n_components = n_components  # 高斯分布数量
-        self.max_iter = max_iter          # EM算法最大迭代次数
-        self.tol = tol                    # 收敛阈值
-        self.log_likelihoods = []  # 新增：存储每轮迭代的对数似然值
+        self.n_components = n_components      # 高斯分布数量
+        self.max_iter = max_iter              # EM算法最大迭代次数
+        self.tol = tol                        # 收敛阈值
+        self.log_likelihoods = []             # 新增：存储每轮迭代的对数似然值
 
     # 初始化随机数生成器
         self.rng = np.random.default_rng(random_state)
@@ -173,8 +173,8 @@ class GaussianMixtureModel:
                 break# 退出EM循环
             log_likelihood = current_log_likelihood# 更新记录的对数似然值，用于下一轮的收敛判断
             
-            self.mu = new_mu# 使用新计算的均值向量替换旧的
-            self.sigma = new_sigma# 使用新计算的协方差矩阵替换旧的
+            self.mu = new_mu              # 使用新计算的均值向量替换旧的
+            self.sigma = new_sigma        # 使用新计算的协方差矩阵替换旧的
         
         # 计算最终聚类结果
         self.labels_ = np.argmax(gamma, axis=1) # 返回每个样本所属的聚类
@@ -254,8 +254,8 @@ if __name__ == "__main__":
     #  - 第二个参数2: 表示子图网格的列数
     #  - 第三个参数2: 表示当前选中的子图位置(从左到右、从上到下计数)
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)# 创建二维数据点的散点图，每个点的颜色由预测标签y_pred决定
-#  - X[:, 0]: 所有数据点的第一个特征值(作为x轴坐标)
-#  - X[:, 1]: 所有数据点的第二个特征值(作为y轴坐标)
+    #  - X[:, 0]: 所有数据点的第一个特征值(作为x轴坐标)
+    #  - X[:, 1]: 所有数据点的第二个特征值(作为y轴坐标)
     plt.title("GMM Predicted Clusters") # 子图标题
 
     # 设置坐标轴标签
