@@ -211,7 +211,8 @@ class GaussianMixtureModel:
     #"""可视化对数似然的收敛过程"""
         if not self.log_likelihoods:
            raise ValueError("请先调用fit方法训练模型")
-        
+
+        # 创建一个图形窗口，设置图形大小为宽 10 英寸，高 6 英寸
         plt.figure(figsize=(10, 6))
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
         plt.xlabel('迭代次数')
