@@ -237,6 +237,7 @@ plt.grid(True)
 
 # 显示图例
 plt.legend()
+# 调整图例间距
 plt.tight_layout()
 
 # 显示图像
