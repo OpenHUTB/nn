@@ -81,7 +81,14 @@ def logsumexp(log_p, axis  =1, keepdims = False):
 
 # 高斯混合模型类
 class GaussianMixtureModel:
-    """高斯混合模型(GMM)实现"""
+    """高斯混合模型(GMM)实现
+    
+    参数:
+        n_components: int, 高斯分布数量 (默认=3)
+        max_iter: int, EM算法最大迭代次数 (默认=100)
+        tol: float, 收敛阈值 (默认=1e-6)
+        random_state: int, 随机种子 (可选)
+    """
     def __init__(self, n_components=3, max_iter=100, tol=1e-6):
         
         # 初始化模型参数
@@ -90,8 +97,17 @@ class GaussianMixtureModel:
         self.tol = tol                    # 收敛阈值
         self.log_likelihoods = []  # 新增：存储每轮迭代的对数似然值
 
+    # 初始化随机数生成器
+        self.rng = np.random.default_rng(random_state)
+
     def fit(self, X):
-        """使用EM算法训练模型"""
+         """使用EM算法训练模型
+        
+        参数:
+            X: array-like, shape=(n_samples, n_features)
+               输入数据矩阵
+        """
+        X = np.asarray(X)
         n_samples, n_features = X.shape
         
         # 初始化混合系数（均匀分布）
