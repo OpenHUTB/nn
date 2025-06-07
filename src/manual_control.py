@@ -351,13 +351,13 @@ class World(object):
             # 将self.radar_sensor设置为None，表示雷达传感器已被移除
             self.radar_sensor = None
 
-    def modify_vehicle_physics(self, actor):
-        #If actor is not a vehicle, we cannot use the physics control
+    def modify_vehicle_physics(self, actor): # 修改指定Actor的物理属性，启用轮扫碰撞检测
+        #  # 如果Actor不是车辆，则无法使用物理控制
         try:
-            physics_control = actor.get_physics_control()
-            physics_control.use_sweep_wheel_collision = True
-            actor.apply_physics_control(physics_control)
-        except Exception:
+            physics_control = actor.get_physics_control() # 获取车辆的物理控制对象
+            physics_control.use_sweep_wheel_collision = True # 启用轮扫碰撞检测
+            actor.apply_physics_control(physics_control) # 应用修改后的物理控制
+        except Exception: # 如果Actor不是车辆或操作失败，则忽略错误
             pass
 
     def tick(self, clock):
