@@ -1,5 +1,8 @@
+#导入OpenAI Gym库，用于创建和管理强化学习环境
 import gym
+#导入随机数生成库，用于策略中的随即决策
 import random
+#导入NumPy库，用于高效数值计算和数组操作
 import numpy as np
 
 from RL_QG_agent import RL_QG_agent  # 导入强化学习智能体
