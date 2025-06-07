@@ -204,7 +204,7 @@ class GaussianMixtureModel:
         # 返回多维高斯分布的对数概率密度值
         # 公式为：-0.5 * D * log(2π) - 0.5 * log|Σ| + exponent
         return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
-#新增方法（可视化收敛曲线）
+#定义了一个名为 plot_convergence 的方法，功能是可视化期望最大化（EM）算法在训练过程中的收敛情况
     def plot_convergence(self):
     #"""可视化对数似然的收敛过程"""
         if not self.log_likelihoods:
