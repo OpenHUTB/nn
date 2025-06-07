@@ -220,6 +220,14 @@ if __name__ == '__main__':
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
     def animate(i):
+        """
+        动画的每一帧更新函数
+        参数:
+        i: 当前帧的索引
+        返回:
+        更新后的图形对象
+        """
+        # 具体实现 
         xx = np.arange(10, step=0.1)# 生成x轴数据点，范围0-9.9，步长0.1
         a = animation_frames[i][0]  # 从帧数据中提取当前帧的参数，假设animation_frames是一个列表，每个元素包含[a, b, c, loss]四个值
         b = animation_frames[i][1]  # 从帧数据中提取当前帧的参数b（通常表示偏移量或截距）
