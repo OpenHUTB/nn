@@ -38,13 +38,12 @@ def multinomial_basis(x, feature_num=10):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 可以替换成 x = identity_basis(x)
-  
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
     # 通过列表推导式创建各次项，最后在列方向拼接合并
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 生成 x, x^2, ..., x^(feature_num)
-    ret = [x**i for i in range(1, feature_num + 1)]
+    ret = [x ** i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
     ret = np.concatenate(ret, axis=1)
    
@@ -184,24 +183,13 @@ def main(x_train, y_train, use_gradient_descent=False):
     phi = np.concatenate([phi0, phi1], axis=1) # 合并特征矩阵
 
     # 最小二乘法求解权重
-    w_lsq = np.dot(np.linalg.pinv(phi), y_train)
+    w_lsq = least_squares(phi, y_train)
 
     w_gd = None
     if use_gradient_descent:
-        # 梯度下降求解权重（缩进修正）
-        # 设置学习率为0.01
-        learning_rate = 0.01 
-        # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
-        epochs = 1000  
-        w_gd = np.zeros(phi.shape[1])
-        w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
-        # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs): 
-            y_pred = np.dot(phi, w_gd)
-            error = y_pred - y_train
-            gradient = np.dot(phi.T, error) / len(y_train)
-            w_gd -= learning_rate * gradient
-
+    w_gd = gradient_descent(phi, y_train, lr=0.01, epochs=1000)
+    #之前的代码存在的问题是：手动的 for epoch 在 range(epochs): ... 循环！导致会做两遍迭代，w_gd 得到的就是错的。
+    
     # 定义预测函数
     def f(x):
         # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
