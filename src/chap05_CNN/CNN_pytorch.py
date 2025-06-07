@@ -101,7 +101,7 @@ def test(cnn):
     pre_index = pre_index.view(-1)  # 调整张量形状
     prediction = pre_index.data.numpy()  # 转换为 numpy 数组
     correct = np.sum(prediction == test_y)  # 计算正确预测的数量
-    return correct / 500.0  # 返回准确率
+    return correct / 500.0  # 返回准确率，假设测试集中样本数为 500
 
 
 # 训练函数
