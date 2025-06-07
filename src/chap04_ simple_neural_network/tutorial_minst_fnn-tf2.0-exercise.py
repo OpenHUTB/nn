@@ -72,7 +72,7 @@ def compute_loss(logits, labels):
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels
         )
-    )
+    )# 对所有样本的损失取平均，得到批次平均损失
 
 
 @tf.function
