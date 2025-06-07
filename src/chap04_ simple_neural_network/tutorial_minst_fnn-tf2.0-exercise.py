@@ -77,8 +77,8 @@ def compute_loss(logits, labels):
 
 @tf.function
 def compute_accuracy(logits, labels):
-    predictions = tf.argmax(logits, axis=1)
-    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
+    predictions = tf.argmax(logits, axis=1)     # 获取预测标签
+    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))       # 计算准确率
 
 
 @tf.function
