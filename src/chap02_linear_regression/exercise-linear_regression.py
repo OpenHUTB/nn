@@ -20,6 +20,7 @@ def load_data(filename):
     # 将数据拆分为特征和标签
     xs, ys = zip(*xys)
     return np.asarray(xs), np.asarray(ys)
+    # 返回包含特征和标签的NumPy数组元组
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
