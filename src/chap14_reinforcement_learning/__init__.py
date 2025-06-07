@@ -341,17 +341,17 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
         register(
             id='{}-v4'.format(name),
             entry_point='gym.envs.atari:AtariEnv',
-            kwargs={'game': game, 'obs_type': obs_type},
-            max_episode_steps=100000,
+            kwargs={'game': game, 'obs_type': obs_type},# 移除动作重复概率
+            max_episode_steps=100000,# 更长步数限制
             nondeterministic=nondeterministic,
         )
-
+# 设置游戏特定帧跳过策略
         # Standard Deterministic (as in the original DeepMind paper)
         if game == 'space_invaders':
             frameskip = 3
         else:
             frameskip = 4
-
+# 确定性帧跳过版本 (v0)
         # Use a deterministic frame skip.
         register(
             id='{}Deterministic-v0'.format(name),
