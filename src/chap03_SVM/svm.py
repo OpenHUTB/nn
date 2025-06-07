@@ -83,6 +83,7 @@ if __name__ == '__main__':
     
     x_test = data_test[:, :2]
     t_test = data_test[:, 2]
+    # 对测试数据进行预测，获取预测标签
     t_test_pred = svm.predict(x_test)
 
     # 评估结果，计算准确率
