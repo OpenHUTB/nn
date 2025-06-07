@@ -221,6 +221,7 @@ def test(model, ds):
     """
     loss = 0.0
     accuracy = 0.0
+    
     for step, (x, y) in enumerate(ds):
         loss, accuracy = test_step(model, x, y)
 
