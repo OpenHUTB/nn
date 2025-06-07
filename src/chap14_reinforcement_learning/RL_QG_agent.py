@@ -1,11 +1,14 @@
+# 操作系统接口模块 - 提供与操作系统交互的功能
 import os
+# 数值计算库 - Python科学计算的核心库
 import numpy as np
+# 深度学习框架 - Google开发的开源机器学习平台
 import tensorflow as tf
 
-class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
-    def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
+class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
+    def __init__(self): # __init__  方法是类的构造函数，用于初始化类的实例
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
-        #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
+        # 用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
         os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
         self.sess = None  # TensorFlow会话对象初始化占位
         self.saver = None  # TensorFlow模型保存器初始化占位
@@ -46,7 +49,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
             filters = 64,                 # 输出通道数：64个卷积核
             kernel_size = 3,             #指的是卷积核的大小为 3×3
             padding = "same",            #这种填充方式能保证输出特征图的尺寸和输入特征图的尺寸相同
-            activation = tf.nn.relu
+            activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
             )
         
         # 扁平化层
@@ -72,7 +75,7 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
-        q_vals = self.sess.run(self.q_values, feed_dict = {self.input_state: state_input})
+        q_vals = self.sess.run(self.q_values, feed_dict = {self.input_states: state_input})
         
         # 过滤合法动作并选择最优
         

@@ -11,6 +11,10 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
+import numpy
+import pylab
+from PIL import Image
+import numpy as np
 
 
 # 定义一个简单的卷积模型
@@ -28,10 +32,7 @@ class MyConvModel(keras.Model):
 # In[192]:
 random_conv = MyConvModel()
 
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
+
 
 # 打开一张尺寸为 639x516 的随机图片
 img = Image.open(open('corgi.jpg', 'rb'))

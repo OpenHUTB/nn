@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# ## 设计基函数(basis function) 以及数据读取
+# 设计基函数(basis function) 以及数据读取
 # 导入NumPy库 - 用于高性能科学计算和多维数组处理
 import numpy as np
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
@@ -14,17 +14,20 @@ from tensorflow.keras import optimizers, layers, Model
 
 def identity_basis(x):
     """恒等基函数"""
+    #保持输入数据不变，仅扩展维度
     return np.expand_dims(x, axis=1)
 
-# 生成多项式基函数
+    # 生成多项式基函数
+#将输入转换为多项式特征
 def multinomial_basis(x, feature_num=10):
     """多项式基函数"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
-# 初始化特征列表
+    x = np.expand_dims(x, axis=1)  # 将 x 从 (N,) 转换为 (N, 1)，便于后续幂运算和拼接
+    # 初始化特征列表
     feat = [x]
+    # 生成多项式特征
     for i in range(2, feature_num + 1):
         feat.append(x**i)
-    ret = np.concatenate(feat, axis=1)
+    ret = np.concatenate(feat, axis=1)# 按列拼接
     return ret
 
 
@@ -61,7 +64,7 @@ def load_data(filename, basis_func=gaussian_basis):
         return (np.float32(xs), np.float32(ys)), (o_x, o_y)
 
 
-# ## 定义模型
+#定义模型
 class linearModel(Model):
     """线性回归模型，实现 y = w·x + b"""
     
@@ -110,13 +113,13 @@ class linearModel(Model):
         return y
 
 
-(xs, ys), (o_x, o_y) = load_data("train.txt")        
-ndim = xs.shape[1]
+    (xs, ys), (o_x, o_y) = load_data("train.txt")        
+    ndim = xs.shape[1]
 
-model = linearModel(ndim=ndim)
+    model = linearModel(ndim=ndim)
 
 
-# ## 训练以及评估
+#训练以及评估
 optimizer = optimizers.Adam(0.1)
 
 
@@ -130,22 +133,22 @@ def train_one_step(model, xs, ys):
     optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
     return loss
 
-
+# 使用tf.function装饰器将Python函数转换为静态图，提高执行效率
 @tf.function
 def predict(model, xs):
-    y_preds = model(xs)     # 模型前向传播
+    y_preds = model(xs) # 模型前向传播
     return y_preds
 
 
 def evaluate(ys, ys_pred):
     """评估模型。"""
-    std = np.std(ys - ys_pred)
+    std = np.std(ys - ys_pred)# 计算预测误差的标准差
     return std
 
 
 # 评估指标的计算
-for i in range(1000):
-    loss = train_one_step(model, xs, ys)
+for i in range(1000):# 进行1000次训练迭代
+    loss = train_one_step(model, xs, ys)# 执行单步训练并获取当前损失值
     if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
         print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
                 
@@ -161,11 +164,12 @@ print("训练集预测值与真实值的标准差：{:.1f}".format(std))
 
 plt.plot(o_x, o_y, "ro", markersize=3)
 plt.plot(o_x_test, y_test_preds, "k")
+# 设置x、y轴标签
 plt.xlabel("x")
 plt.ylabel("y")
-plt.title("Linear Regression")
+plt.title("Linear Regression") # 图表标题
 # 虚线网格，半透明灰色
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
-plt.legend(["train", "test", "pred"])
+plt.legend(["train", "test", "pred"]) # 添加图例，元素依次对应
 plt.tight_layout()  # 自动调整布局
 plt.show()
