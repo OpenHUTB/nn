@@ -36,11 +36,32 @@ class SVM():
     def train(self, data_train):
         """训练模型。"""
         # 请补全此处代码
+ # 提取特征和标签
+        X = data_train[:, :2]  # 特征 [x1, x2]
+        y = data_train[:, 2]   # 标签
+        y[y == 0] = -1  # 将标签中的0替换为-1，方便计算
 
+        # 初始化权重和偏置
+        self.w = np.zeros(X.shape[1])
+        self.b = 0
+
+        # 梯度下降法训练
+        for _ in range(self.max_iter):
+            for i in range(len(X)):
+                condition = y[i] * (np.dot(X[i], self.w) + self.b) >= 1
+                if condition:
+                    # 如果满足条件，更新权重和偏置
+                    self.w -= self.learning_rate * (2 * self.reg_lambda * self.w)
+                else:
+                    # 如果不满足条件，更新权重和偏置
+                    self.w -= self.learning_rate * (2 * self.reg_lambda * self.w - np.dot(X[i], y[i]))
+                    self.b -= self.learning_rate * y[i]
     def predict(self, x):
         """预测标签。"""
         # 请补全此处代码
-
+        pred = np.dot(x, self.w) + self.b
+        # 将预测值转换为标签
+        return np.sign(pred).astype(int)
 
 if __name__ == '__main__':
     # 载入数据，实际实用时将x替换为具体名称
