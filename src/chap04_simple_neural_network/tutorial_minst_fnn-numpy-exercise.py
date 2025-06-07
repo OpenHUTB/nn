@@ -282,35 +282,38 @@ with tf.GradientTape() as tape:
 
 class myModel:
     def __init__(self):
-        
+        # 初始化模型参数：添加偏置项的输入层到隐藏层权重矩阵
         self.W1 = np.random.normal(size=[28*28+1, 100])  # 输入层到隐藏层，增加偏置项
         self.W2 = np.random.normal(size=[100, 10])       # 输入层到隐藏层，增加偏置项
-        
-        self.mul_h1 = Matmul()
-        self.mul_h2 = Matmul()
-        self.relu = Relu()
-        self.softmax = Softmax()
-        self.log = Log()
+        # 初始化层操作对象
+        self.mul_h1 = Matmul()     # 第一个矩阵乘法层（输入到隐藏层）
+        self.mul_h2 = Matmul()     # 第二个矩阵乘法层（隐藏层到输出层）
+        self.relu = Relu()         # ReLU激活函数层
+        self.softmax = Softmax()   # Softmax概率分布层
+        self.log = Log()           # 对数运算层
                 
     def forward(self, x):
-        x = x.reshape(-1, 28*28)  # 展平图像
+        x = x.reshape(-1, 28*28)               # 展平图像
         bias = np.ones(shape=[x.shape[0], 1])  # 添加偏置项
-        x = np.concatenate([x, bias], axis=1)
-        
-        self.h1 = self.mul_h1.forward(x, self.W1) # shape(5, 4)
-        self.h1_relu = self.relu.forward(self.h1)
-        self.h2 = self.mul_h2.forward(self.h1_relu, self.W2)
-        self.h2_soft = self.softmax.forward(self.h2)
-        self.h2_log = self.log.forward(self.h2_soft)
+        x = np.concatenate([x, bias], axis=1)  # 将输入特征与偏置项连
+        # 第一层线性变换和激活
+        self.h1 = self.mul_h1.forward(x, self.W1) # shape(5, 4)输入层到隐藏层线性变换
+        self.h1_relu = self.relu.forward(self.h1) # 应用ReLU激活函数
+        # 第二层线性变换和输出处理
+        self.h2 = self.mul_h2.forward(self.h1_relu, self.W2) # 隐藏层到输出层线性变换
+        self.h2_soft = self.softmax.forward(self.h2)         # 应用Softmax得到概率分布
+        self.h2_log = self.log.forward(self.h2_soft)         # 对概率取对数
             
     def backward(self, label):
-        self.h2_log_grad = self.log.backward(-label)
-        self.h2_soft_grad = self.softmax.backward(self.h2_log_grad)
-        self.h2_grad, self.W2_grad = self.mul_h2.backward(self.h2_soft_grad)
-        self.h1_relu_grad = self.relu.backward(self.h2_grad)
-        self.h1_grad, self.W1_grad = self.mul_h1.backward(self.h1_relu_grad)
+        # 从输出层开始反向计算梯度
+        self.h2_log_grad = self.log.backward(-label)                           # 对数层梯度
+        self.h2_soft_grad = self.softmax.backward(self.h2_log_grad)            # Softmax层梯度
+        self.h2_grad, self.W2_grad = self.mul_h2.backward(self.h2_soft_grad)   # 第二层矩阵乘法梯度
+        # 继续反向传播到第一层
+        self.h1_relu_grad = self.relu.backward(self.h2_grad)                   # ReLU层梯度
+        self.h1_grad, self.W1_grad = self.mul_h1.backward(self.h1_relu_grad)   # 第一层矩阵乘法梯度
         
-model = myModel()
+model = myModel()# 创建模型实例
 
 # ## 计算 loss
 
