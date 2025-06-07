@@ -59,7 +59,7 @@ class MyModel:
 
 
 model = MyModel()
-optimizer = optimizers.Adam()
+optimizer = optimizers.Adam()# 配置Adam优化器，自适应调整学习率，参数为默认值
 
 
 # ## 计算 loss
