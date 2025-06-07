@@ -132,27 +132,32 @@ class Softmax:
 # 定义 Log 层（计算 log softmax ，用于交叉熵）
 class Log:
     '''
-    softmax over last dimention
+    softmax over last dimention  # 对最后一个维度计算softmax
     '''
     def __init__(self):
-        self.epsilon = 1e-12
-        self.mem = {}
+        self.epsilon = 1e-12  # 极小值，防止log(0)数值溢出
+        self.mem = {}  # 存储前向传播的值，供反向传播使用
 
     def forward(self, x):
         '''
-        x: shape(N, c)
+        x: shape(N, c)  # 输入x的形状：(样本数, 类别数)
         '''
+        # 计算log(x)，加上极小值epsilon避免x=0时log(0)报错
         out = np.log(x + self.epsilon)
 
+        # 保存输入x，反向传播时使用
         self.mem['x'] = x
         return out
 
     def backward(self, grad_y):
         '''
-        grad_y: same shape as x
+        grad_y: same shape as x  # 梯度形状与输入x相同
         '''
+        # 取出前向传播保存的x
         x = self.mem['x']
 
+        # 计算梯度：d(log(x))/dx = 1/x
+        # 加上极小值1e-12防止除以0
         return 1. / (x + 1e-12) * grad_y
 
 
