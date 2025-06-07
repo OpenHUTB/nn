@@ -156,7 +156,7 @@ img = np.expand_dims(img, axis=0)
 
 # img = test_batch
 img_out = model.getL2_feature_map(img)
-pylab.imshow(img[0, :, :, :])
+pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
 
 pylab.figure(figsize=(10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
