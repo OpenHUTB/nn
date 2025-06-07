@@ -193,6 +193,7 @@ plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
 
+# 生成网格坐标矩阵
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
