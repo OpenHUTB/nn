@@ -10,10 +10,8 @@
 
 # In[1]:
 
-
 import tensorflow as tf
 import matplotlib.pyplot as plt
-
 from matplotlib import animation, rc
 from IPython.display import HTML
 import matplotlib.cm as cm
@@ -38,8 +36,11 @@ C1 = np.array([x_p, y_p, y]).T
 x_n = np.random.normal(
     6.0, 1, dot_num
 )
+# 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
 y_n = np.random.normal(3.0, 1, dot_num)
+# 创建一个长度为dot_num的数组，所有元素为0，表示这些点的标签为0
 y = np.zeros(dot_num)
+# 将x坐标、y坐标和标签组合成一个二维数组，每行表示一个数据点
 C2 = np.array([x_n, y_n, y]).T
 
 # 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
@@ -72,9 +73,7 @@ np.random.shuffle(data_set)
 
 # In[1]:
 
-
 epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
-
 
 class SoftmaxRegression(tf.Module):
     def __init__(self, input_dim=2, num_classes=3):
@@ -91,13 +90,11 @@ class SoftmaxRegression(tf.Module):
             name="W",
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        # 定义模型的可训练变量列表，用于梯度计算和参数更新
-        self.trainable_variables = [self.W, self.b]
-
+        
     @tf.function
     def __call__(self, x):
         """
-        模型前向传播
+        模型前向传播：计算线性变换并应用softmax函数得到概率分布
         :param x: 输入数据，shape = (N, input_dim)
         :return: softmax 概率分布，shape = (N, num_classes)
         """
@@ -105,7 +102,6 @@ class SoftmaxRegression(tf.Module):
         logits = tf.matmul(x, self.W) + self.b
         #应用softmax函数，将logits转换为概率分布
         return tf.nn.softmax(logits)
-
 
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
@@ -133,16 +129,21 @@ def compute_loss(pred, labels, num_classes=3):
     # 计算准确率，比较模型预测的类别和真实类别是否一致
     acc = tf.reduce_mean(
         tf.cast(
-            tf.equal(tf.argmax(pred, axis=1), tf.argmax(one_hot_labels, axis=1)),
+            tf.equal(
+                tf.argmax(pred, axis=1),
+                tf.argmax(one_hot_labels, axis=1)
+            ),
             dtype=tf.float32,
         )
     )
-    
+    # 返回损失值和准确率
+    # loss: 预先计算好的损失值（如交叉熵损失）
+    # acc: 当前批次的分类准确率（0-1 标量）
     return loss, acc
-
 
 @tf.function
 def train_one_step(model, optimizer, x_batch, y_batch):
+    #单步训练：计算梯度并更新参数
     """
     一步梯度下降优化
     :param model: SoftmaxRegression 实例
@@ -152,18 +153,16 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :return: 当前批次的损失与准确率
     """
     with tf.GradientTape() as tape:
-        predictions = model(x_batch)
-        loss, accuracy = compute_loss(predictions, y_batch)
+        predictions = model(x_batch)# 前向传播：计算模型对输入批次的预测
+        loss, accuracy = compute_loss(predictions, y_batch)# 计算损失和准确率
 
-    grads = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    return loss, accuracy
+    grads = tape.gradient(loss, model.trainable_variables)# 自动计算损失函数对模型参数的梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))# 优化步骤：使用优化器将计算出的梯度应用到模型参数上
+    return loss, accuracy# 返回当前批次的损失和准确率
 
-
-# ### 实例化一个模型，进行训练
+# ### 实例化一个模型，进行训练，提取所需的数据
 
 # In[12]:
-
 
 model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
@@ -185,24 +184,36 @@ for i in range(1000):
 
 # In[13]:
 
-# 绘制散点图
+# 绘制三种不同类别的散点图
 # C1[:, 0] 和 C1[:, 1] 分别表示 C1 的第一列和第二列数据（通常是特征）
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
+# 创建网格点用于绘制决策边界
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
 
-
+# 生成网格坐标矩阵
+# 将网格坐标展平并组合为输入特征矩阵
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
+#模型预测
 Z = model(inp)
+# 获取预测的类别
 Z = np.argmax(Z, axis=1)
+# 重塑为网络形状
 Z = Z.reshape(X.shape)
-plt.contour(X, Y, Z)
+# 绘制决策边界
+plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
+
+# 保存模型
+model.save_weights('softmax_regression_weights')
+
+# 加载模型
+model.load_weights('softmax_regression_weights')
 
 
 # In[ ]:

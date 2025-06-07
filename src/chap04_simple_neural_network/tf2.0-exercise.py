@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding: utf-8
 # # Tensorflow2.0 小练习
-
+# 导入 numpy 库，并简写为 np（标准约定）
 import numpy as np
+# 导入 TensorFlow 库，并简写为 tf（标准约定）
 import tensorflow as tf
 
-# ## 实现softmax函数
 # ## 实现softmax函数
 def softmax(x: tf.Tensor) -> tf.Tensor:
     """
@@ -17,10 +17,11 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     返回:
         与输入形状相同的 softmax 概率分布张量。
     """
-    x = tf.cast(x, tf.float32)
+    x = tf.cast(x, tf.float32) # 统一为float32类型，确保计算精度
 
     # 数值稳定性处理：减去最大值避免指数爆炸
     max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
     # 计算指数值
@@ -29,22 +30,19 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     exp_logits = tf.exp(shifted_logits)
     
     sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
-    
-    softmax_output = exp_logits / sum_exp
-
-    return softmax_output
+    return exp_logits / sum_exp
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
 # 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
 
-#数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
+# 数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
 
 def sigmoid(x):
     ##########
     '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
-    #将输入x转换为float32类型，确保数值计算的精度和类型一致性。
+    # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
     x = tf.cast(x, tf.float32)
     # sigmoid 数学定义：1 / (1 + e^{-x})
     prob_x = 1 / (1 + tf.exp(-x))           
@@ -61,8 +59,8 @@ test_data = np.random.normal(size=[10, 5])
 def softmax_ce(logits, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
-    #参数logits: 未经Softmax的原始输出（logits）
-    #参数label: one-hot格式的标签
+    # 参数logits: 未经Softmax的原始输出（logits）
+    # 参数label: one-hot格式的标签
     epsilon = 1e-8
     logits = tf.cast(logits, tf.float32)
     label = tf.cast(label, tf.float32)
@@ -95,6 +93,7 @@ def sigmoid_ce(logits, labels):
     实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
     接收未经过 sigmoid 的 logits 输入
     """
+    # 将 logits 和 labels 转换为 tf.float32 类型，确保后续计算的数值稳定性
     logits = tf.cast(logits, tf.float32)
     labels = tf.cast(labels, tf.float32)
     
@@ -110,8 +109,8 @@ def sigmoid_ce(logits, labels):
 test_data = np.random.normal(size=[10])
 labels = np.random.randint(0, 2, size=[10]).astype(np.float32)
 
-#  对比 TensorFlow  原始结果和自定义函数结果
-tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=test_data))
+# 对比 TensorFlow  原始结果和自定义函数结果
+tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels, logits = test_data))
 custom_loss = sigmoid_ce(test_data, labels)
 
 print("tf loss:", tf_loss.numpy())
