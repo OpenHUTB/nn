@@ -92,6 +92,7 @@ class mySeq2SeqModel(keras.Model):
         # Attention + Decoder + Output
         #这里的这段代码实现了一个加性注意力机制
         outputs = []
+        # 遍历解码器的每个时间步 T2
         for t in range(dec_emb.shape[1]):
             # 当前时刻的 decoder 输入
             dec_input_t = dec_emb[:, t, :]  # (B, E)
