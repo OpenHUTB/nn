@@ -58,7 +58,7 @@ def logsumexp(log_p, axis  =1, keepdims = False):
     #max_val = np.max(log_p, axis = axis, keepdims = True)
     #return max_val + np.log(np.sum(np.exp(log_p - max_val), axis=axis, keepdims = keepdims))
     """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理"""
-    log_p = np.asarray(log_p)
+    log_p = np.asarray(log_p)   # 将对数概率列表转换为NumPy数组
     
     # 处理空输入情况
     if log_p.size == 0:  # 检查输入的对数概率数组是否为空
