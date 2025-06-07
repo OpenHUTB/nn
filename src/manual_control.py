@@ -993,13 +993,13 @@ class LaneInvasionSensor(object): # 车道入侵传感器类，用于检测并�
             self.sensor.listen(lambda event: LaneInvasionSensor._on_invasion(weak_self, event))
 
     @staticmethod
-    def _on_invasion(weak_self, event):
-        self = weak_self()
+    def _on_invasion(weak_self, event): # 车道入侵事件回调函数，处理车辆跨越车道线时的逻辑
+        self = weak_self() # 通过弱引用获取实例引用，若实例已被销毁则返回
         if not self:
             return
-        lane_types = set(x.type for x in event.crossed_lane_markings)
-        text = ['%r' % str(x).split()[-1] for x in lane_types]
-        self.hud.notification('Crossed line %s' % ' and '.join(text))
+        lane_types = set(x.type for x in event.crossed_lane_markings)  # 提取被跨越的车道线类型
+        text = ['%r' % str(x).split()[-1] for x in lane_types]         # 格式化车道线类型文本
+        self.hud.notification('Crossed line %s' % ' and '.join(text))  # 在HUD上显示跨越的车道线类型
 
 
 # ==============================================================================
