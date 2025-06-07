@@ -139,8 +139,6 @@ model.fit(train_ds, epochs=10)
 model.evaluate(test_ds) #模型评估
 
 # In[20]:
-
-
 ds, test_ds = cifar10_dataset()
 
 # 从测试数据集中获取第一个批次的第一张图像
@@ -152,7 +150,7 @@ for i in test_ds:
 img = Image.open(open('corgi.jpg', 'rb'))  # 打开图像文件
 img = numpy.asarray(img, dtype='float32')  # 转换为float32类型的numpy数组
 img = img / 256.0                          # 错误：应除以255.0进行归一化
-# print(img.shape)                         # 打印图像形状，例如 (224, 224, 3)
+print(img.shape)                         # 打印图像形状，例如 (224, 224, 3)
 
 # 在第0维添加一个维度，将图像转换为批次格式 [1, H, W, C]
 # 这是因为模型通常期望输入是批次形式的
@@ -208,7 +206,6 @@ for i in test_ds:
     break
 img = Image.open(open('corgi.jpg', 'rb'))
 img = numpy.asarray(img, dtype='float32') / 256.
-# print(img.shape)
 img = np.expand_dims(img, axis=0)
 
 # img = test_batch
@@ -249,5 +246,3 @@ pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
 pylab.show()
-
-# In[ ]:
