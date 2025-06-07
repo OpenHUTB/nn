@@ -368,25 +368,27 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     Returns:
         str: 生成的诗歌字符串（不包含开始和结束标记）
     """
-    # 初始化RNN隐藏状态
+    # 初始化RNN隐藏状态（通常为两个状态变量，如LSTM的cell state和hidden state）
     state = [tf.random.normal(shape=(1, 128), stddev=0.5),
              tf.random.normal(shape=(1, 128), stddev=0.5)]
 
-    # 从开始标记开始生成
+    # 初始化当前token为开始标记
     cur_token = tf.constant([word2id[start_token]], dtype=tf.int32)
     generated_tokens = []
 
-    # 循环生成直到遇到结束标记或达到最大长度
+    # 循环生成token，直到达到最大长度或生成结束标记
     for _ in range(max_len):
+        # 获取下一个token并更新RNN状态
         cur_token, state = model.get_next_token(cur_token, state)
         token_id = cur_token.numpy()[0]
         generated_tokens.append(token_id)
 
-        # 遇到结束标记则停止生成
+        # 检查是否生成了结束标记
         if id2word[token_id] == end_token:
             break
 
-    # 转换为词语并拼接成字符串
+    # 将生成的token ID序列转换为词语字符串
+    # 去除第一个开始标记和最后一个结束标记（如果存在）
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
