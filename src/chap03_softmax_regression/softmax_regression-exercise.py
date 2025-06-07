@@ -53,15 +53,32 @@ y = np.ones(dot_num) * 2
 C3 = np.array([x_b, y_b, y]).T
 
 # 绘制正样本，用蓝色加号表示
+# C1[:, 0] 表示 C1 数据集中所有样本的第一个特征（x坐标）
+# C1[:, 1] 表示 C1 数据集中所有样本的第二个特征（y坐标）
+# c="b" 设置颜色为蓝色（blue）
+# marker="+" 设置标记形状为加号
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")
+
 # 绘制负样本，用绿色圆圈表示
+# C2[:, 0] 和 C2[:, 1] 分别表示 C2 数据集的 x 和 y 坐标
+# c="g" 设置颜色为绿色（green）
+# marker="o" 设置标记形状为圆圈
 plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
-# 绘制负样本，用红色星号表示
+
+# 绘制另一个类别的样本（或另一种负样本），用红色星号表示
+# C3[:, 0] 和 C3[:, 1] 分别表示 C3 数据集的 x 和 y 坐标
+# c="r" 设置颜色为红色（red）
+# marker="*" 设置标记形状为星号
 plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
 
 # 将正样本和负样本连接成一个数据集
+# np.concatenate 用于沿 axis=0（行方向）合并三个数据集 C1, C2 和 C3
+# 合并后的数据集 data_set 包含所有样本，格式为 [[x1, x2, y], ...]
 data_set = np.concatenate((C1, C2, C3), axis=0)
+
 # 随机打乱数据集的顺序
+# np.random.shuffle 对 data_set 的行进行随机重排
+# 这可以防止模型训练时受到原始数据顺序的影响，提高泛化能力
 np.random.shuffle(data_set)
 
 
