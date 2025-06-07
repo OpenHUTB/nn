@@ -83,17 +83,10 @@ class RBM:
         """
     
         # 请补全此处代码
-<<<<<<< HEAD
-         # 将数据展平为二维数组 [n_samples, n_observe]
-        data_flat = data.reshape(data.shape[0], -1)  
-        n_samples = data_flat.shape[0]  # 样本数量
-        
-=======
         # 将数据展平为二维数组 [n_samples, n_observe]
         data_flat = data.reshape(data.shape[0], -1)  
         n_samples = data_flat.shape[0]  # 样本数量
 
->>>>>>> 5a3e7b54b145fc47f7d3a7f6ec96e27f0b9b600d
         # 定义训练参数
         learning_rate = 0.1 # 学习率，控制参数更新的步长
         epochs = 10 # 训练轮数，整个数据集将被遍历10次v
@@ -114,21 +107,12 @@ class RBM:
                 #这段代码的作用是借助 self._sample_binary 方法，对 h0_prob 进行二值采样，进而得到 h0_sample。在深度学习领域，当处理二值变量或者进行二值掩码操作时，常常会用到这样的采样。
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-<<<<<<< HEAD
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)     
-                v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
-                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
-
-                # 计算梯度      
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)         # 计算权重矩阵的梯度
-=======
                 v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  #将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
                 v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       #计算隐藏单元被激活的概率
 
                 # 计算梯度      
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
->>>>>>> 5a3e7b54b145fc47f7d3a7f6ec96e27f0b9b600d
                 db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
                 db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
 
@@ -136,10 +120,6 @@ class RBM:
                 self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
                 self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
                 self.b_h += learning_rate * db_h / batch_size                         # 更新隐藏层偏置
-<<<<<<< HEAD
-        pass
-=======
->>>>>>> 5a3e7b54b145fc47f7d3a7f6ec96e27f0b9b600d
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""

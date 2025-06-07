@@ -83,20 +83,12 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
         if np.sum(legal_q) == 0:  # 所有合法动作Q值都为 0 的特殊情况处理
             return np.random.choice(np.where(enables)[0])   # 随机选择一个合法动作
         
-<<<<<<< HEAD
-        # 随机选择最优动作（解决多个最大值的情况）
-        action = np.random.choice(candidates)
-
-        return action
-    #save_model和load_model，用于保存和加载TensorFlow模型的参数
-=======
         max_q = np.max(legal_q)  # 找到合法动作中 Q 值最大的值
         candidates = np.where(legal_q == max_q)[0]  # 找到所有 Q 值等于最大 Q 值的动作索引
         
         # 随机选择最优动作 （解决多个最大值的情况）
         return np.random.choice(candidates)
     #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
->>>>>>> 5a3e7b54b145fc47f7d3a7f6ec96e27f0b9b600d
     # 保存模型
     def save_model(self):  
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
