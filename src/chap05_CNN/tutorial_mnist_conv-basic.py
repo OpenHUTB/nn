@@ -11,6 +11,7 @@ from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
+# 设置TensorFlow日志级别，只显示错误信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
