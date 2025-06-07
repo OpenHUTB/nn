@@ -60,6 +60,11 @@ def get_batch(batch_size, length):
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     # 添加起始符
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
+  # 返回一个批次的训练数据，包含四个张量：
+# 1. batched_examples: 批量处理后的原始样本（格式取决于具体实现）
+# 2. enc_x: 编码器输入序列，形状为 [batch_size, enc_seq_len]
+# 3. dec_x: 解码器输入序列（通常包含起始标记），形状为 [batch_size, dec_seq_len]
+# 4. y: 目标输出序列（通常包含结束标记），形状为 [batch_size, dec_seq_len]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
