@@ -151,72 +151,81 @@ class myRNNModel(keras.Model):
         
         return logits
     
-# In[4]:
-
-
+# 使用@tf.function装饰器将函数转换为TensorFlow计算图，提高执行效率
 @tf.function
 def compute_loss(logits, labels):
+    # 计算稀疏softmax交叉熵损失（适用于非one-hot编码的标签）
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 返回batch内损失的平均值
     return tf.reduce_mean(losses)
 
+# 单步训练函数，使用@tf.function加速
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
+    # 使用梯度带记录计算过程，用于自动微分
     with tf.GradientTape() as tape:
+        # 前向传播：获取模型预测结果
         logits = model(x, y)
+        # 计算损失值
         loss = compute_loss(logits, label)
 
-    # compute gradient
+    # 计算梯度：损失函数对模型可训练变量的梯度
     grads = tape.gradient(loss, model.trainable_variables)
+    # 应用梯度更新模型参数
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
-    return loss
+    return loss  # 返回当前batch的损失值
 
 
 def train(steps, model, optimizer):
-    loss = 0.0
-    accuracy = 0.0
+    loss = 0.0  # 初始化损失值
+    accuracy = 0.0  # 初始化准确率（虽然未使用）
     for step in range(steps):
         # 生成训练数据（数值范围0~555,555,554）
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
+        # 准备batch数据：将原始数据转换为模型可接受的格式
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
         # 单步训练：计算损失、更新参数
-        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
-                              tf.constant(Nums2, dtype=tf.int32),
-                              tf.constant(results, dtype=tf.int32))
+        loss = train_one_step(model, optimizer, 
+                             tf.constant(Nums1, dtype=tf.int32),  # 转换为TensorFlow常量
+                             tf.constant(Nums2, dtype=tf.int32),
+                             tf.constant(results, dtype=tf.int32))
+        # 每50步打印一次训练进度
         if step % 50 == 0:
-            print('step', step, ': loss', loss.numpy())
+            print('step', step, ': loss', loss.numpy())  # 将Tensor转换为numpy值打印
 
-    return loss
+    return loss  # 返回最终损失值
 
 def evaluate(model):
+    # 生成测试数据（数值范围555,555,555~999,999,999）
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
+    # 准备测试batch数据
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
-    logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1)
-    res = results_converter(pred)
+    # 模型预测（不计算梯度）
+    logits = model(tf.constant(Nums1, dtype=tf.int32), 
+                   tf.constant(Nums2, dtype=tf.int32))
+    logits = logits.numpy()  # 将Tensor转换为numpy数组
+    pred = np.argmax(logits, axis=-1)  # 获取预测类别（最大概率的索引）
+    res = results_converter(pred)  # 将预测结果转换为可读格式
+    
+    # 打印前20个样本的真实值和预测值对比
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(o[0], o[1], o[0]==o[1])  # 格式：真实值 预测值 是否正确
 
+    # 计算并打印整体准确率
     print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
 
 
-# In[5]:
+    # 以下为实际执行部分
+    # 初始化Adam优化器，学习率设为0.001
+    optimizer = optimizers.Adam(0.001)
+    # 初始化RNN模型实例
+    model = myRNNModel()
 
-
-optimizer = optimizers.Adam(0.001)
-model = myRNNModel()
-
-
-# In[6]:
-
-
-train(3000, model, optimizer)
-evaluate(model)
-
-
-# In[11]:
-
+    # 训练模型（3000步）
+    train(3000, model, optimizer)
+    # 评估模型性能
+    evaluate(model)
 
 
 
