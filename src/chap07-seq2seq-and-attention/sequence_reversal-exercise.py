@@ -285,28 +285,34 @@ def sequence_reversal():
     
 
     # 生成一批测试数据（32个样本，每个序列长度10）
-    batched_examples, enc_x, _, _ = get_batch(32, 10)
-    # 对输入序列进行编码
-    state = model.encode(enc_x)
-    # 解码生成逆序序列，步数等于输入序列长度
-    return decode(state, enc_x.get_shape()[-1]), batched_examples
+# get_batch返回：原始数据、编码后的输入、目标输出、掩码（这里用_忽略不需要的返回值）
+batched_examples, enc_x, _, _ = get_batch(32, 10)  
+
+# 对输入序列进行编码，获取模型的状态表示
+state = model.encode(enc_x)  
+
+# 解码生成逆序序列，步数等于输入序列长度（enc_x.get_shape()[-1]获取序列长度）
+# 返回解码结果和原始样本用于后续验证
+return decode(state, enc_x.get_shape()[-1]), batched_examples  
 
 def is_reverse(seq, rev_seq):
-    """检查 rev_seq 是否为 seq 的逆序"""
-    # 反转rev_seq并与原始seq比较
+    """检查 rev_seq 是否为 seq 的逆序
+    参数:
+        seq: 原始序列（字符串）
+        rev_seq: 待检查的逆序序列（字符串）
+    返回:
+        bool: 如果rev_seq是seq的逆序返回True，否则返回False
+    """
+    # 将待检查序列rev_seq反转（转换为列表反转后再拼接成字符串）
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    
+    # 比较原始序列与反转后的序列
     if seq == rev_seq_rev:
-        return True # 返回 True 表示预测结果与真实逆序相符
+        return True  # 序列匹配，返回True表示预测正确
     else:
-        return False
+        return False  # 序列不匹配，返回False
 # 测试模型逆序能力的准确性
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
 print(list(zip(*sequence_reversal())))
 # 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
-
-
-
-
-
-
