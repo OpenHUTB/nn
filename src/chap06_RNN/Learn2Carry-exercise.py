@@ -179,6 +179,7 @@ def train(steps, model, optimizer):
         # 生成训练数据（数值范围0~555,555,554）
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+        # 单步训练：计算损失、更新参数
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
