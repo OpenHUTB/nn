@@ -184,27 +184,32 @@ def test_step(model, x, y):
 
 def train(epoch, model, optimizer, ds):
     """
-    训练模型。
-
+    训练模型一个完整的epoch（遍历整个训练数据集一次）。
     参数:
-        epoch: 当前训练轮数。
-        model: 模型实例。
-        optimizer: 优化器实例。
-        ds: 训练数据集。
-
+        epoch: 当前训练轮数（整数），用于打印进度信息
+        model: 要训练的模型实例（继承自tf.keras.Model）
+        optimizer: 优化器实例（如Adam/SGD等）
+        ds: 训练数据集（通常为tf.data.Dataset对象）
     返回:
-        loss: 训练损失。
-        accuracy: 训练准确率。
+        loss: 本epoch最后一个batch的损失值（tf.Tensor）
+        accuracy: 本epoch最后一个batch的准确率（tf.Tensor）
     """
-    loss = 0.0
-    accuracy = 0.0
+    # 初始化累计变量（实际仅记录最后一个batch的值）
+    loss = 0.0      # 损失值初始化为0（浮点数）
+    accuracy = 0.0   # 准确率初始化为0（浮点数）
+    
+    # 遍历数据集中的所有batch
     for step, (x, y) in enumerate(ds):
+        # 执行单步训练，返回当前batch的loss和accuracy
         loss, accuracy = train_one_step(model, optimizer, x, y)
-
-        if step % 500 == 0:
+        
+        # 每500个batch打印一次训练进度
+        if step % 500 == 0:  # 使用取模运算控制打印频率
+            # 将Tensor转换为numpy值打印
             print('epoch', epoch, ': loss', loss.numpy(),
                   '; accuracy', accuracy.numpy())
-
+    
+    # 返回最后一个batch的loss和accuracy（注意不是epoch平均值）
     return loss, accuracy
 
 
