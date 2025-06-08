@@ -340,13 +340,17 @@ def sequence_reversal():
 
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
-    if seq == rev_seq_rev:
-        return True
-    else:
-        return False
+    # 使用切片操作反转字符串
+    rev_seq_rev = rev_seq[::-1]
+    # 比较原始序列和反转后的序列
+    return seq == rev_seq_rev
 
+# 假设 sequence_reversal() 是一个生成序列对的函数
+# 使用 zip(*sequence_reversal()) 将生成的序列对解包为两个列表
+# 然后使用列表推导式对每一对序列调用 is_reverse 函数
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+
+# 打印解包后的序列对
 print(list(zip(*sequence_reversal())))
 
 
