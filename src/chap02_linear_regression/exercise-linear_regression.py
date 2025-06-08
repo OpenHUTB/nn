@@ -186,7 +186,7 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         # 4. 参数更新：沿负梯度方向调整权重
         # 学习率控制更新步长
         w -= lr * gradient
-    
+    #计算w的值
     return w
 
 
