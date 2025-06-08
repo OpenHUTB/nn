@@ -179,7 +179,7 @@ def get_actor_blueprints(world, filter, generation):
     #  and therefore, we ignore the generation
     if len(bps) == 1:
         return bps
-
+    #try和except是Python中用于异常处理的关键机制,允许程序在运行时捕获并处理错误,避免因未处理的异常导致程序崩溃
     try:
         int_generation = int(generation)
         # Check if generation is in available generations
