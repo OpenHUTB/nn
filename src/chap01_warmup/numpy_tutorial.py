@@ -4,7 +4,7 @@
 
 # 1. 导入 numpy 库
 import numpy as np  # 将 numpy 库命名为 np
-import matplotlib
+import matplotlib   # 导入Matplotlib库，用于数据可视化
 import matplotlib.pyplot as plt  # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
 matplotlib.use('TkAgg')  # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染

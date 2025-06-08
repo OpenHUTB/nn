@@ -52,7 +52,7 @@ class ReversiEnv(gym.Env):
         except KeyError:
             raise error.Error("player_color must be 'black' or 'white', not {}".format(player_color))
 
-        self.opponent = opponent
+        self.opponent = opponent # 初始化对手对象引用
 
         assert observation_type in ['numpy3c']
         self.observation_type = observation_type
