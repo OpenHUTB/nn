@@ -277,19 +277,35 @@ print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))  # 各行最大值下
 #### 24. 绘制二次函数图像
 ```python
 print("第二十四题：\n")
-x_plot = np.arange(0, 100, 0.1)  # 生成0-100的连续数据（步长0.1）
-y_plot = x_plot ** 2
+# 设置中文字体支持
+plt.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC"]
+plt.rcParams['axes.unicode_minus'] = False    # 解决负号显示问题
 
-plt.figure(figsize=(10, 6))  # 创建画布（宽10英寸，高6英寸）
-plt.plot(x_plot, y_plot, label="y = x^2", color="blue")  # 绘制曲线
+# 生成数据（缩小范围以更清晰展示特征）
+x_plot = np.arange(0, 10, 0.1)  # 范围从 [0,100] 调整为 [0,10]
+a = 1                           # 可调整的系数
+y_plot = a * x_plot ** 2
 
-# 图像美化
-plt.title("Plot of y = x^2")       # 标题
-plt.xlabel("x")                   # x轴标签
-plt.ylabel("y")                   # y轴标签
-plt.grid(True)                    # 显示网格
-plt.legend(loc='upper right')     # 图例位置
-plt.show()                        # 显示图像
+# 绘图
+plt.figure(figsize=(10, 6))   # 设置画布大小为10x6英寸
+# 使用蓝色线条，线宽2，添加数学表达式作为图例
+plt.plot(x_plot, y_plot, label=f"y = {a}x²", color="blue", linewidth=2)  
+
+# 标记关键点
+plt.scatter(0, 0, color='red', s=50, label='顶点')  # 在顶点(0,0)处绘制红色圆点
+
+# 美化图像
+plt.title("二次函数图像")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.grid(True, linestyle='--', alpha=0.7)   # 添加虚线网格，透明度70%
+
+# 添加图例和调整坐标轴范围
+plt.legend(loc='upper right')    # 图例放置在右上角
+plt.axis([-1, 11, -1, 110])      # 设置坐标轴范围：x轴[-1,11]，y轴[-1,110]
+
+# 显示图像 - 在交互式环境中显示绘制的图形
+plt.show()
 ```
 - **图像特点**：开口向上的抛物线，横坐标范围[0,100]，纵坐标自动适配
 
