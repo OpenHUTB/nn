@@ -31,10 +31,19 @@ class MyConvModel(keras.Model):
 random_conv = MyConvModel()# 实例化一个新的卷积神经网络模型
 
 # 打开一张尺寸为 639x516 的随机图片
-img = Image.open(open('corgi.jpg', 'rb'))
-img = numpy.asarray(img, dtype='float64') / 256.
+# 使用Pillow库以二进制模式打开图片文件
+img = Image.open(open('corgi.jpg', 'rb'))  # 返回PIL.Image对象
+
+# 将PIL图像转换为numpy数组，并指定数据类型为float64
+img = numpy.asarray(img, dtype='float64') / 256. 
+
+# 在数组的第0维添加一个维度（批处理维度）
+# 将形状从[H,W,C]变为[1,H,W,C]，符合模型输入要求
 img = np.expand_dims(img, axis=0)
-img_out = random_conv(img)
+
+# 对图像应用随机卷积变换
+# random_conv是自定义的卷积操作函数，可能用于数据增强
+img_out = random_conv(img)  # 输出形状保持[1,H,W,C]
 
 #使用pylab（通常是matplotlib.pyplot的别名）来创建一个包含四个子图的图形，并显示图像数据。
 pylab.figure(figsize=(10, 7))
