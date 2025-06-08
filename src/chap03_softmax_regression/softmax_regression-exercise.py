@@ -18,52 +18,37 @@ from IPython.display import HTML
 import matplotlib.cm as cm
 import numpy as np
 
-# get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
 # 设置数据点数量
 dot_num = 100  
-# 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
-x_p = np.random.normal(
-    3.0, 1, dot_num
-) 
-# x和y坐标
-y_p = np.random.normal(6.0, 1, dot_num)
-# 标签为1
-y = np.ones(dot_num)
-# 组合成(x, y, label)格式
-C1 = np.array([x_p, y_p, y]).T 
 
-# 从均值为6，标准差为1的高斯分布中采样x坐标，用于负样本
-x_n = np.random.normal(
-    6.0, 1, dot_num
-)
-# 从均值为3，标准差为1的高斯分布中采样y坐标，用于负样本
+# 生成类别1的数据：均值为(3,6)，标准差为1
+x_p = np.random.normal(3.0, 1, dot_num) 
+y_p = np.random.normal(6.0, 1, dot_num)
+y = np.ones(dot_num)  # 标签为1
+C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
+
+# 生成类别2的数据：均值为(6,3)，标准差为1
+x_n = np.random.normal(6.0, 1, dot_num)
 y_n = np.random.normal(3.0, 1, dot_num)
-# 创建一个长度为dot_num的数组，所有元素为0，表示这些点的标签为0
-y = np.zeros(dot_num)
-# 将x坐标、y坐标和标签组合成一个二维数组，每行表示一个数据点
+y = np.zeros(dot_num)  # 标签为0
 C2 = np.array([x_n, y_n, y]).T
 
-# 从均值为7，标准差为1的高斯分布中采样x坐标，用于负样本
-x_b = np.random.normal(
-    7.0, 1, dot_num
-)
+# 生成类别3的数据：均值为(7,7)，标准差为1
+x_b = np.random.normal(7.0, 1, dot_num)
 y_b = np.random.normal(7.0, 1, dot_num)
-y = np.ones(dot_num) * 2
+y = np.ones(dot_num) * 2  # 标签为2
 C3 = np.array([x_b, y_b, y]).T
 
-# 绘制正样本，用蓝色加号表示
-plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")
-# 绘制负样本，用绿色圆圈表示
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
-# 绘制负样本，用红色星号表示
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
+# 绘制三类样本的散点图
+plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")  # 类别1：蓝色加号
+plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")  # 类别2：绿色圆圈
+plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")  # 类别3：红色星号
 
-# 将正样本和负样本连接成一个数据集
+# 合并所有类别的数据，形成完整数据集
 data_set = np.concatenate((C1, C2, C3), axis=0)
-# 随机打乱数据集的顺序
-np.random.shuffle(data_set)
-
+np.random.shuffle(data_set)  # 随机打乱数据集顺序
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
@@ -85,7 +70,7 @@ class SoftmaxRegression(tf.Module):
         """
         super().__init__()
         # 初始化权重 W 和偏置 b
-        # 使用均匀分布随机初始化
+        # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
             name="W",
@@ -99,9 +84,9 @@ class SoftmaxRegression(tf.Module):
         :param x: 输入数据，shape = (N, input_dim)
         :return: softmax 概率分布，shape = (N, num_classes)
         """
-        #计算线性变换
+        # 计算线性变换 logits
         logits = tf.matmul(x, self.W) + self.b
-        #应用softmax函数，将logits转换为概率分布
+        # 应用softmax函数，将logits转换为概率分布
         return tf.nn.softmax(logits)
 
 @tf.function
@@ -113,7 +98,7 @@ def compute_loss(pred, labels, num_classes=3):
     :param num_classes: 类别数
     :return: 平均损失值和准确率
     """
-     # 将真实标签转换为one-hot编码形式
+    # 将真实标签转换为one-hot编码形式
     one_hot_labels = tf.one_hot(
         tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32
     )
@@ -144,7 +129,7 @@ def compute_loss(pred, labels, num_classes=3):
 
 @tf.function
 def train_one_step(model, optimizer, x_batch, y_batch):
-    #单步训练：计算梯度并更新参数
+    # 单步训练：计算梯度并更新参数
     """
     一步梯度下降优化
     :param model: SoftmaxRegression 实例
@@ -154,12 +139,12 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :return: 当前批次的损失与准确率
     """
     with tf.GradientTape() as tape:
-        predictions = model(x_batch)# 前向传播：计算模型对输入批次的预测
-        loss, accuracy = compute_loss(predictions, y_batch)# 计算损失和准确率
+        predictions = model(x_batch)  # 前向传播：计算模型对输入批次的预测
+        loss, accuracy = compute_loss(predictions, y_batch)  # 计算损失和准确率
 
-    grads = tape.gradient(loss, model.trainable_variables)# 自动计算损失函数对模型参数的梯度
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))# 优化步骤：使用优化器将计算出的梯度应用到模型参数上
-    return loss, accuracy# 返回当前批次的损失和准确率
+    grads = tape.gradient(loss, model.trainable_variables)  # 自动计算损失函数对模型参数的梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 优化步骤：使用优化器将计算出的梯度应用到模型参数上
+    return loss, accuracy  # 返回当前批次的损失和准确率
 
 # ### 实例化一个模型，进行训练，提取所需的数据
 
@@ -169,12 +154,14 @@ model = SoftmaxRegression()
 # 创建一个 SoftmaxRegression 模型实例 model
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
+
 x1, x2, y = list(zip(*data_set))
 # 转换为 float32
 x = np.array(list(zip(x1, x2)), dtype=np.float32)  
 # 转换为 int32
 y = np.array(y, dtype=np.int32)  
 # 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
+
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
     if i % 50 == 49:
@@ -200,7 +187,7 @@ y = np.arange(0.0, 10.0, 0.1)
 X, Y = np.meshgrid(x, y)
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
-#模型预测
+# 模型预测
 Z = model(inp)
 # 获取预测的类别
 Z = np.argmax(Z, axis=1)
@@ -210,12 +197,10 @@ Z = Z.reshape(X.shape)
 plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
 
-# 保存模型
+# 保存模型权重
 model.save_weights('softmax_regression_weights')
 
-# 加载模型
+# 加载模型权重
 model.load_weights('softmax_regression_weights')
 
-
 # In[ ]:
-
