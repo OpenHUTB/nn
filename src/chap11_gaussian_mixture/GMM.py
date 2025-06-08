@@ -207,13 +207,19 @@ class GaussianMixtureModel:
         # 公式为：-0.5 * D * log(2π) - 0.5 * log|Σ| + exponent
         return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
 #定义了一个名为 plot_convergence 的方法，功能是可视化期望最大化（EM）算法在训练过程中的收敛情况
-    def plot_convergence(self):
-    #"""可视化对数似然的收敛过程"""
-        if not self.log_likelihoods:
-           raise ValueError("请先调用fit方法训练模型")
-        
-        plt.figure(figsize=(10, 6))
-        plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
+def plot_convergence(self):
+    """
+    可视化期望最大化（EM）算法在训练过程中的收敛情况，该方法绘制对数似然值随迭代次数的变化曲线，帮助评估模型的收敛情况。
+    """
+    # 检查是否已经记录了对数似然值
+    if not self.log_likelihoods:
+        # 如果没有记录对数似然值，抛出 ValueError 异常
+        raise ValueError("请先调用 fit 方法训练模型")
+    # 创建一个新的图形窗口，设置图形大小为 10x6 英寸
+    plt.figure(figsize=(10, 6))
+    # 绘制对数似然值随迭代次数的变化曲线
+    # 使用蓝色线条 ('b-') 绘制图形
+    plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
         plt.xlabel('迭代次数')
         plt.ylabel('对数似然值')
         plt.title('EM算法收敛曲线')
