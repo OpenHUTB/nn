@@ -209,6 +209,7 @@ if __name__ == '__main__':
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
 
+   # 使用matplotlib的ax.plot创建三个绘图对象并解包返回的线条对象
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
