@@ -114,10 +114,12 @@ class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
          # 嵌入层：将数字0-9转换为32维向量
+         # 用于将离散的数字转化为神经网络可以处理的连续向量表示
         self.embed_layer = tf.keras.layers.Embedding(10, 32, 
                                                     batch_input_shape=[None, None])
        
         # 基础RNN单元和RNN层
+        # 处理序列数据，捕捉时间依赖关系
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
         self.dense = tf.keras.layers.Dense(10)
