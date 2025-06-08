@@ -247,7 +247,7 @@ if __name__ == '__main__':
         xx = np.arange(10, step=0.1)# 生成x轴数据点，范围0-9.9，步长0.1
         a = animation_frames[i][0]  # 从帧数据中提取当前帧的参数，假设animation_frames是一个列表，每个元素包含[a, b, c, loss]四个值
         b = animation_frames[i][1]  # 从帧数据中提取当前帧的参数b（通常表示偏移量或截距）
-        c = animation_frames[i][2]
+        c = animation_frames[i][2]  # 从帧数据中提取当前帧的参数c
         yy = a/-b * xx + c/-b       # 计算直线方程 y = (-a/b)x + (-c/b)
         line_d.set_data(xx, yy)     # 更新直线数据
         C1_dots.set_data(C1[:, 0], C1[:, 1]) # 更新C1和C2散点数据
