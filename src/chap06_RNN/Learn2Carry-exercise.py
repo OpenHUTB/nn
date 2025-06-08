@@ -36,7 +36,7 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         start: 开始数值
         end: 结束数值
     '''
-    numbers_1 = np.random.randint(start, end, batch_size)
+    numbers_1 = np.random.randint(start, end, batch_size) #在规定范围内生成随机整数
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
