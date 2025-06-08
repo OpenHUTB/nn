@@ -40,7 +40,8 @@ class SVM:
         """训练模型。"""
         X = data_train[:, :2]     # 提取特征部分
         y = data_train[:, 2]      # 提取标签部分
-    #y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
+        # SVM标准形式要求标签为±1
+        y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
         m, n = X.shape            # m为样本数，n为特征数
 
         # 初始化参数
@@ -61,10 +62,17 @@ class SVM:
             # 参数更新
             self.w -= self.learning_rate * dw
             self.b -= self.learning_rate * db
+            # 每100轮打印进度
+            if epoch % 100 == 0:
+                # 计算当前违反KKT条件的样本比例
+                violation_ratio = len(idx) / m
+                print(f"Epoch {epoch}: 违反条件样本比例={violation_ratio:.3f}")
 
     def predict(self, x):
         """预测标签。"""
+        # 计算决策函数值
         score = np.dot(x, self.w) + self.b
+        # 将预测结果从{-1,1}映射回{0,1}
         return np.where(score >= 0, 1, 0)  # 转换回{0, 1}标签
 
 if __name__ == '__main__':
