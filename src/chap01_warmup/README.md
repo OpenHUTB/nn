@@ -204,7 +204,6 @@ print("np.sqrt(x)\n", np.sqrt(x))
 - **输出示例**：  
   `[[1.         1.41421356 1.73205081] [2.         2.23606798 2.44948974]]`
 
-
 #### 18. 矩阵点积
 ```python
 print("第十八题：\n")
@@ -217,7 +216,6 @@ print("np.dot(x,y)\n", np.dot(x, y))
   - 函数 `np.dot()`
 - **输出示例**：  
   `[[58 64] [139 154]]`
-
 
 #### 19. 数组求和
 ```python
@@ -232,7 +230,6 @@ print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 按行求和（行维度
 - **输出示例**：  
   `21 [5 7 9] [6 15]`
 
-
 #### 20. 数组求平均
 ```python
 print("第二十题：\n")
@@ -243,7 +240,6 @@ print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行均值
 - **与求和逻辑一致**：通过`axis`参数控制维度
 - **输出示例**：  
   `3.5 [2.5 3.5 4.5] [2.  5. ]`
-
 
 #### 21. 矩阵转置
 ```python
@@ -264,7 +260,6 @@ print(np.exp(x))
 - **输出示例**：  
   `[[2.71828183e+00 7.38905610e+00 2.00855369e+01] [5.45981500e+01 1.48413159e+02 4.03428793e+02]]`
 
-
 #### 23. 最大值下标查找
 ```python
 print("第二十三题：\n")
@@ -278,7 +273,6 @@ print("print(np.argmax(x, axis=1))", np.argmax(x, axis=1))  # 各行最大值下
   - 行索引：每行最大值在该行中的列索引
 - **输出示例**（假设`x=[[1,3],[2,4]]`）：  
   `3 [1 1] [1 1]`
-
 
 #### 24. 绘制二次函数图像
 ```python
@@ -299,37 +293,45 @@ plt.show()                        # 显示图像
 ```
 - **图像特点**：开口向上的抛物线，横坐标范围[0,100]，纵坐标自动适配
 
-
 #### 25-26. 绘制正余弦函数图像
 ```python
 print("第二十五题：\n")
-x_sin_cos = np.arange(0, 3 * np.pi, 0.1)  # 生成从0到3π的数组（步长0.1）作为x轴数据
-y_sin = np.sin(x_sin_cos) # 计算正弦值
-y_cos = np.cos(x_sin_cos) # 计算余弦值
+=======
+# 设置中文字体支持
+plt.rcParams["font.family"] = ["SimHei", "WenQuanYi Micro Hei", "Heiti TC"]
+plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+
+# 生成数据
+x = np.arange(0, 3 * np.pi, 0.1)
+y_sin = np.sin(x)
+y_cos = np.cos(x)
+
+# 创建画布和子图
+plt.figure(figsize=(12, 5))
 
 # 绘制正弦曲线
-plt.figure(figsize=(10, 6))
-plt.plot(x_sin_cos, y_sin, label="y = sin(x)", color="blue")
-plt.title("Plot of y = sin(x)")
-plt.xlabel("x")
-plt.ylabel("y")
-# 显示网格线
-plt.grid(True)
-# 显示图例（自动调整位置）
+plt.subplot(1, 2, 1)  # 1行2列的第1个子图
+plt.plot(x, y_sin, 'b-', linewidth=2, label='y = sin(x)')
+plt.title('正弦函数图像')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+plt.xticks([0, np.pi, 2*np.pi, 3*np.pi], ['0', 'π', '2π', '3π'])
 plt.legend()
-# 显示图像
-plt.show()
 
-# 绘制余弦曲线（代码结构与正弦一致）
-plt.figure(figsize=(10, 6))
-plt.plot(x_sin_cos, y_cos, label="y = cos(x)", color="red")
-plt.title("Plot of y = cos(x)")
-plt.xlabel("x")
-plt.ylabel("y")
-plt.grid(True) 
-plt.legend() 
-plt.show()    
-```
-- **图像特点**：
-  - 正弦曲线：周期为`2π`，值域[-1,1]
-  - 余弦曲线：与正弦曲线相位差`π/2`，形状相同但平移
+# 绘制余弦曲线
+plt.subplot(1, 2, 2)  # 1行2列的第2个子图
+plt.plot(x, y_cos, 'r-', linewidth=2, label='y = cos(x)')
+plt.title('余弦函数图像')
+plt.xlabel('x')
+plt.ylabel('y')
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.axhline(y=0, color='black', linestyle='-', alpha=0.3)
+plt.xticks([0, np.pi, 2*np.pi, 3*np.pi], ['0', 'π', '2π', '3π'])
+plt.legend()
+
+# 调整布局
+plt.tight_layout()
+plt.show()
+>>>>>>> origin/main
