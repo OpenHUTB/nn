@@ -63,14 +63,34 @@ def prepare_mnist_features_and_labels(x, y):
 # In[3]:
 # 构建卷积神经网络（CNN）模型
 model = keras.Sequential([
-     # 第1层：卷积层（提取初级图像特征）
-    Conv2D(32, (5, 5), activation = 'relu', padding = 'same'),
-    MaxPooling2D(pool_size = 2, strides = 2),
-    Conv2D(64, (5, 5), activation = 'relu', padding = 'same'),
-    MaxPooling2D(pool_size = 2, strides = 2),
-    Flatten(),  # N*7*7*64 => N*3136
-    layers.Dense(128, activation = 'tanh'),  # N*128
-    layers.Dense(10, activation = 'softmax')])  # N*10
+    # 第1层：卷积层（提取初级图像特征）
+    # 32个5x5的卷积核，使用ReLU激活函数，保持输入输出尺寸相同（padding='same'）
+    Conv2D(32, (5, 5), activation='relu', padding='same'),
+    
+    # 第2层：最大池化层（下采样，减少计算量）
+    # 2x2的池化窗口，步长为2（输出尺寸减半）
+    MaxPooling2D(pool_size=2, strides=2),
+    
+    # 第3层：卷积层（提取更高级特征）
+    # 64个5x5的卷积核，ReLU激活，保持尺寸
+    Conv2D(64, (5, 5), activation='relu', padding='same'),
+    
+    # 第4层：最大池化层（进一步下采样）
+    # 同上使用2x2池化窗口，步长2
+    MaxPooling2D(pool_size=2, strides=2),
+    
+    # 第5层：展平层（将3D特征图转换为1D向量）
+    # 例如：输入形状(N,7,7,64) -> 输出形状(N,3136)
+    Flatten(),
+    
+    # 第6层：全连接层（特征整合）
+    # 128个神经元，使用tanh激活函数
+    layers.Dense(128, activation='tanh'),
+    
+    # 第7层：输出层（分类预测）
+    # 10个神经元对应10个类别，softmax激活输出概率分布
+    layers.Dense(10, activation='softmax')
+])
 
 optimizer = optimizers.Adam(0.0001)
 # 配置优化器（Adam优化算法）
