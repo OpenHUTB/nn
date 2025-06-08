@@ -113,7 +113,7 @@ def test(model, x, y):
     logits = model(x)                             # 计算预测结果与真实标签之间的损失值
     loss = compute_loss(logits, y)                # compute_loss函数应实现具体的损失计算逻辑
     accuracy = compute_accuracy(logits, y)        # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
-    return compute_loss(logits, y), compute_accuracy(logits, y)
+    return compute_loss(logits, y), compute_accuracy(logits, y)# 返回: (损失值, 准确率)
 
 
 # ## 实际训练

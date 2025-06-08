@@ -10,6 +10,7 @@
 
 # In[1]:
 
+# 导入运行所需模块
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from matplotlib import animation, rc
