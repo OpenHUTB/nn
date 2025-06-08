@@ -111,11 +111,18 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
 # In[3]:
 
 class myRNNModel(keras.Model):
+    """
+    自定义的 RNN 模型类，继承自 tf.keras.Model。
+    该模型包含一个嵌入层、一个 RNN 层和一个全连接层。
+    """
     def __init__(self):
+        """
+        初始化模型的各个层。
+        """
         super(myRNNModel, self).__init__()
-        self.embed_layer = tf.keras.layers.Embedding(10, 32,
-                                                    batch_input_shape = [None, None])
-         # 定义RNN单元(SimpleRNNCell)
+        # 嵌入层，将输入的整数索引转换为固定大小的密集向量
+        self.embed_layer = tf.keras.layers.Embedding(10, 32,batch_input_shape = [None, None])
+        # 定义RNN单元(SimpleRNNCell)
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
         self.dense = tf.keras.layers.Dense(10) # 定义全连接层，输出10个类别(数字0-9)的概率
