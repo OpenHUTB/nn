@@ -6,7 +6,6 @@
 import tensorflow as tf
 import numpy as np
 
-
 # ## 实现softmax函数
 
 def softmax(x):
@@ -20,38 +19,41 @@ def softmax(x):
     返回:
         tf.Tensor: softmax处理后的概率分布
     """
-    # 检查输入是否为张量
+    # 检查输入是否为张量，如果不是则转换为tf.Tensor
     if not tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
     
     # 计算每个元素的指数值，减去最大值以提高数值稳定性
-    # 使用keepdims=True确保维度正确
+    # keepdims=True 保证维度一致，便于后续广播
     x_max = tf.reduce_max(x, axis=-1, keepdims=True)
     exp_x = tf.exp(x - x_max)
     
-    # 计算softmax值，添加小的epsilon值避免除零错误
-    # 1e-10是科学计数法，表示1乘以10的负10次方
+    # 计算softmax值，分母加上一个很小的epsilon避免除零错误
     sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
     return exp_x / (sum_exp + 1e-10)
 
-
 # 测试 softmax 实现是否正确，使用随机数据对比 TensorFlow 的实现
 test_data = np.random.normal(size=[10, 5])
+# 验证自定义softmax与tf.nn.softmax的输出差异是否足够小
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
-
 
 # ## 实现sigmoid函数
 
 def sigmoid(x):
-    exp_neg_x = tf.exp(-x)# 计算 -x 的指数
-    prob_x = 1.0 / (1.0 + exp_neg_x) # 计算 sigmoid 函数值
+    """
+    实现sigmoid激活函数。
+    参数:
+        x (tf.Tensor): 输入张量
+    返回:
+        tf.Tensor: sigmoid处理后的概率分布
+    """
+    exp_neg_x = tf.exp(-x)  # 计算 -x 的指数
+    prob_x = 1.0 / (1.0 + exp_neg_x)  # 计算 sigmoid 函数值
     return prob_x
-
 
 # 测试 sigmoid 实现是否正确
 test_data = np.random.normal(size=[10, 5])
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
-
 
 # ## 实现 softmax 交叉熵loss函数
 
@@ -66,7 +68,6 @@ def softmax_ce(x, label):
     ##########
     return loss
 
-
 # 构造测试数据并验证 softmax_ce 函数正确性
 test_data = np.random.normal(size=[10, 5])
 # 得到 softmax 概率
@@ -80,11 +81,11 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
   - softmax_ce(prob, label))**2 < 0.0001).numpy()
 
-
 # ## 实现 sigmoid 交叉熵loss函数
+
 def sigmoid_ce(x, label):
     ##########
-    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
+    '''实现 sigmoid 交叉熵loss函数， 不允许用tf自带的sigmoid_cross_entropy函数'''
     ##########
     # clip 避免 log(0) 的数值不稳定问题
     x = tf.clip_by_value(x, 1e-10, 1.0 - 1e-10)
@@ -95,7 +96,6 @@ def sigmoid_ce(x, label):
     )
     ##########
     return loss
-
 
 # 构造测试数据并验证 sigmoid_ce 函数正确性
 test_data = np.random.normal(size=[10])

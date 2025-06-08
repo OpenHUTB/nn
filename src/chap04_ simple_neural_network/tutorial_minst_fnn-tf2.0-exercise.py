@@ -11,28 +11,25 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
-# 设置TensorFlow日志级别，避免输出过多信息
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
+# 设置TensorFlow日志级别，避免输出过多无关信息
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 可选值：{'0', '1', '2'}
 
 def mnist_dataset():
     """
     加载MNIST数据集并进行预处理：
-    - 划分训练集和测试集
+    - 划分为训练集和测试集
     - 像素值归一化到[0, 1]区间
     - 保持原始数据类型（图像为float32，标签为int64）
     """
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    # normalize
+    # 归一化像素值到[0, 1]
     x = x / 255.0
     x_test = x_test / 255.0
-
     return (x, y), (x_test, y_test)
-
 
 # In[8]:
 
-# print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd']))) 测试代码
+# print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))  # 测试代码，可忽略
 
 # ## 建立模型
 
@@ -55,15 +52,14 @@ class MyModel:
         ####################
         '''实现模型函数体，返回未归一化的logits'''
         ####################
-        x = tf.reshape(x, [-1, 784])  # 展平输入图像
-        h1 = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)  # 第一层激活
-        logits = tf.matmul(h1, self.W2) + self.b2  # 输出层
+        x = tf.reshape(x, [-1, 784])  # 将输入图像展平成一维向量
+        h1 = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)  # 第一层全连接+ReLU激活
+        logits = tf.matmul(h1, self.W2) + self.b2         # 输出层全连接，未归一化logits
         return logits
 
-
+# 实例化模型和优化器
 model = MyModel()
-optimizer = optimizers.Adam()# 配置Adam优化器，自适应调整学习率，参数为默认值
-
+optimizer = optimizers.Adam()  # 配置Adam优化器，自适应调整学习率，参数为默认值
 
 # ## 计算 loss
 
@@ -71,18 +67,26 @@ optimizer = optimizers.Adam()# 配置Adam优化器，自适应调整学习率，
 
 @tf.function
 def compute_loss(logits, labels):
+    """
+    计算交叉熵损失（对所有样本的损失取平均，得到批次平均损失）
+    logits: 模型输出的未归一化分数
+    labels: 真实标签
+    """
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels
         )
-    )# 对所有样本的损失取平均，得到批次平均损失
-
+    )
 
 @tf.function
 def compute_accuracy(logits, labels):
+    """
+    计算准确率
+    logits: 模型输出的未归一化分数
+    labels: 真实标签
+    """
     predictions = tf.argmax(logits, axis=1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
-
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
@@ -90,14 +94,14 @@ def train_one_step(model, optimizer, x, y):
     执行一次训练步骤，计算梯度并更新模型参数。
 
     参数:
-        model: 模型实例。
-        optimizer: 优化器实例。
-        x: 输入数据。
-        y: 标签数据。
+        model: 模型实例
+        optimizer: 优化器实例
+        x: 输入数据
+        y: 标签数据
 
     返回:
-        loss: 训练损失。
-        accuracy: 训练准确率。
+        loss: 训练损失
+        accuracy: 训练准确率
     """
     with tf.GradientTape() as tape:
         logits = model(x)  # 前向传播，获取模型输出
@@ -107,9 +111,9 @@ def train_one_step(model, optimizer, x, y):
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
     grads = tape.gradient(loss, trainable_vars)
 
-    # 更新参数
+    # 更新参数（使用固定学习率）
     for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01 * g)  # 使用固定学习率更新参数
+        v.assign_sub(0.01 * g)
 
     # 计算准确率
     accuracy = compute_accuracy(logits, y)
@@ -117,16 +121,17 @@ def train_one_step(model, optimizer, x, y):
     # 返回损失和准确率（都是标量张量）
     return loss, accuracy
 
-
 @tf.function
 def test(model, x, y):
     """
     使用 TensorFlow 图模式执行模型评估的函数
     该函数计算模型在给定输入数据上的损失和准确率
+
     Args:
-        model: 已构建的 Keras 模型或兼容的 TensorFlow 模型
+        model: 已构建的模型实例
         x: 输入特征张量，形状为 [batch_size, ...]
         y: 真实标签张量，形状为 [batch_size] 或 [batch_size, num_classes]
+
     Returns:
         loss: 标量张量，表示当前批次的损失值
         accuracy: 标量张量，表示当前批次的准确率
@@ -134,14 +139,13 @@ def test(model, x, y):
     # 前向传播：通过模型计算预测输出（logits）
     logits = model(x)  # logits 是未经过 softmax 的原始输出
 
-    # 计算损失值（需确保 compute_loss 已定义）
+    # 计算损失值
     loss = compute_loss(logits, y)
 
-    # 计算准确率（需确保 compute_accuracy 已定义）
+    # 计算准确率
     accuracy = compute_accuracy(logits, y)
 
     return loss, accuracy
-
 
 # ## 实际训练
 
@@ -154,7 +158,6 @@ train_data, test_data = mnist_dataset()
 for epoch in range(50):
     # 执行单步训练，传入模型、优化器、训练数据和标签
     # 将numpy数据转换为TensorFlow张量，指定数据类型为float32和int64
-
     loss, accuracy = train_one_step(
         model,
         optimizer,
