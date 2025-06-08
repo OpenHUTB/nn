@@ -120,7 +120,7 @@ class myRNNModel(keras.Model):
         # 基础RNN单元和RNN层
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)#RNN单元（64隐藏层）
         self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
-        self.dense = tf.keras.layers.Dense(10)
+        self.dense = tf.keras.layers.Dense(10) # 分类层（预测每个数位的0-9概率）
         
     @tf.function
     def call(self, num1, num2):
