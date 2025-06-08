@@ -194,7 +194,7 @@ def evaluate(model):
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
     logits = logits.numpy()
     pred = np.argmax(logits, axis=-1)
-    res = results_converter(pred)
+    res = results_converter(pred) # 转换为整数
     for o in list(zip(datas[2], res))[:20]:
         print(o[0], o[1], o[0]==o[1])
 
