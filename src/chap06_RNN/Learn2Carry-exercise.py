@@ -183,7 +183,7 @@ def train(steps, model, optimizer):
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
-        if step%50 == 0:
+        if step % 50 == 0:
             print('step', step, ': loss', loss.numpy())
 
     return loss
