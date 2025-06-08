@@ -28,7 +28,8 @@ def process_dataset(fileName):
         word2id: 词语到数字id的映射字典
         id2word: 数字id到词语的映射字典
     """
-    examples = []
+    examples = []  # 存储处理后的诗歌样本
+    # 以UTF-8编码打开文件，处理每行诗歌
     with open(fileName, 'r'，encoding='utf-8', ) as fd:
         for line in fd:
             # 分割标题和内容
@@ -52,7 +53,7 @@ def process_dataset(fileName):
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter) #对tuple进行解压，得到words列表代表所有字符
-    words = ('PAD', 'UNK') + words[:len(words)]
+    words = ('PAD', 'UNK') + words[:len(words)]# 扩展词汇表：在原始词汇表前添加特殊标记
     
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
@@ -380,8 +381,8 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     for _ in range(max_len):
         # 获取下一个token并更新RNN状态
         cur_token, state = model.get_next_token(cur_token, state)
-        token_id = cur_token.numpy()[0]
-        generated_tokens.append(token_id)
+        token_id = cur_token.numpy()[0]  # 提取标量ID
+        generated_tokens.append(token_id)  # 记录生成的ID
 
         # 检查是否生成了结束标记
         if id2word[token_id] == end_token:

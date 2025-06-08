@@ -16,7 +16,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 def mnist_dataset():
     """
     加载并预处理MNIST数据集，将20000个样本打乱并分批次。
-
     Returns:
         ds (tf.data.Dataset): 处理后的训练数据集。
         test_ds (tf.data.Dataset): 处理后的测试数据集。
@@ -99,7 +98,7 @@ class MyConvModel(keras.Model):
         return probs
 
 model = MyConvModel()
-optimizer = optimizers.Adam()
+optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法
 
 
 # ## 编译， fit以及evaluate
