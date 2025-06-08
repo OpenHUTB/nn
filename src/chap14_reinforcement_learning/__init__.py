@@ -61,20 +61,22 @@ register(
     reward_threshold = 195.0,# 接近最大理论值200
 )
 
-
+# 高难度倒立摆版本（延长测试时长）
 register(
     id = 'CartPole-v1',  # 更高难度版本
     entry_point = 'gym.envs.classic_control:CartPoleEnv',
     max_episode_steps = 500,  # 500步达标
     reward_threshold = 475.0,
 )
-
+# 山车任务：利用动量爬坡
 register(
     id='MountainCar-v0',  # 山车任务：爬坡
     entry_point='gym.envs.classic_control:MountainCarEnv',
     max_episode_steps=200,
     reward_threshold=-110.0,  # 负数表示尽量减少步数
 )
+
+# 山车连续控制版本（精细油门控制）
 register(
     id='MountainCarContinuous-v0',    # 连续动作版本
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
@@ -160,6 +162,7 @@ register(
     reward_threshold = 0.78, # optimum = .8196   # 成功到达目标的平均奖励
 )
 
+# 冰湖行走（8x8网格版）
 register(
     id='FrozenLake8x8-v0',
     entry_point='gym.envs.toy_text:FrozenLakeEnv',
@@ -167,12 +170,12 @@ register(
     max_episode_steps=200,
     reward_threshold=0.99, # optimum = 1
 )
-
+# 悬崖行走路径规划任务
 register(
     id='CliffWalking-v0',
     entry_point='gym.envs.toy_text:CliffWalkingEnv',
 )
-
+# N链问题（探索-利用权衡）
 register(
     id='NChain-v0',
     entry_point='gym.envs.toy_text:NChainEnv',
@@ -180,6 +183,7 @@ register(
 )
 
 # 注册后可通过gym.make('Roulette-v0')创建环境实例
+# 轮盘赌模拟环境
 register(
     id='Roulette-v0',  # 环境唯一标识符（在代码中引用的名称
     entry_point='gym.envs.toy_text:RouletteEnv',  # 环境类的导入路径
@@ -189,7 +193,7 @@ register(
                                         # 达到此步数后，环境自动终止
                                         # 防止无限循环，控制训练复杂度
 )
-
+# 出租车调度任务（乘客接送）
 register(
     id='Taxi-v2',  # 环境的唯一标识符
     entry_point='gym.envs.toy_text.taxi:TaxiEnv',  # 指定环境类的位置
@@ -282,7 +286,7 @@ register(
     max_episode_steps = 1000,
     entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
-
+# 蚂蚁机器人运动控制（四足）
 register(
     id = 'Ant-v1',
     entry_point = 'gym.envs.mujoco:AntEnv',
