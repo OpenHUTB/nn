@@ -87,12 +87,17 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     if not tf.is_tensor(x):
         x = tf.convert_to_tensor(x)
 
+    # 检查权重参数 W 是否为 TensorFlow 张量
     if not tf.is_tensor(W):
-        raise TypeError(f"Expected W to be a tf.Tensor, but got {type(W)}.")
-    
-    # 验证padding参数,如果 padding 无效，抛出 ValueError 异常并提供详细信息
+    # 如果不是张量类型，抛出类型错误异常
+    # 错误信息包含期望的类型和实际传入的类型
+    raise TypeError(f"Expected W to be a tf.Tensor, but got {type(W)}.")
+
+    # 验证卷积操作的 padding 参数是否合法
     if padding not in ['SAME', 'VALID']:
-        raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
+    # 如果 padding 不是 'SAME' 或 'VALID'，抛出值错误异常
+    # 错误信息显示无效的输入值，并提示有效选项
+    raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
 
     # 验证 strides 参数的格式，应该是一个长度为4的列表
     if len(strides) != 4:
