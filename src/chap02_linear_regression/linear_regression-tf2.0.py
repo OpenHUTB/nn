@@ -135,9 +135,13 @@ def train_one_step(model, xs, ys):
     return loss
 
 
+# 使用@tf.function装饰器将Python函数转换为TensorFlow图，以提高执行效率
 @tf.function
 def predict(model, xs):
-    y_preds = model(xs) # 模型前向传播
+    # 使用模型对输入xs进行预测（前向传播）
+    y_preds = model(xs)  # 模型前向传播
+    
+    # 返回模型的预测结果
     return y_preds
 
 
