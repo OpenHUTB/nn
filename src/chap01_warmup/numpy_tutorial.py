@@ -212,7 +212,7 @@ plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
 plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 
 # 添加网格线
-plt.grid(True)
+plt.grid(True, alpha=0.5)
 
 # 显示图例
 plt.legend()
