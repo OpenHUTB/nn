@@ -10,7 +10,6 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
-import numpy
 import pylab
 from PIL import Image
 import numpy as np
@@ -35,7 +34,7 @@ random_conv = MyConvModel()# 实例化一个新的卷积神经网络模型
 img = Image.open(open('corgi.jpg', 'rb'))  # 返回PIL.Image对象
 
 # 将PIL图像转换为numpy数组，并指定数据类型为float64
-img = numpy.asarray(img, dtype='float64') / 256. 
+img = np.asarray(img, dtype='float64') / 256. 
 
 # 在数组的第0维添加一个维度（批处理维度）
 # 将形状从[H,W,C]变为[1,H,W,C]，符合模型输入要求
