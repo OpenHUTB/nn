@@ -29,7 +29,7 @@ import os,sys,tqdm
 # In[2]:
 
 
-def gen_data_batch(batch_size, start, end):
+def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     '''在(start, end)区间采样生成一个batch的整型的数据
     Args :
         batch_size: batch_size
