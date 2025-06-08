@@ -199,11 +199,11 @@ def main(x_train, y_train, use_gradient_descent=False):
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs): 
-            y_pred = np.dot(phi, w_gd)
-            error = y_pred - y_train
-            gradient = np.dot(phi.T, error) / len(y_train)
-            w_gd -= learning_rate * gradient
+        for epoch in range(epochs):     # 梯度下降循环
+            y_pred = np.dot(phi, w_gd)  # 计算预测值
+            error = y_pred - y_train    # 计算误差
+            gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
+            w_gd -= learning_rate * gradient # 更新权重
 
     # 定义预测函数
     def f(x):
@@ -276,4 +276,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    plt.show()
+    plt.show()  # 显示图表
