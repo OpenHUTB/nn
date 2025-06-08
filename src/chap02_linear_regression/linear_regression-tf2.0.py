@@ -23,8 +23,10 @@ def multinomial_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
+    # 生成从 x^2 到 x^feature_num 的多项式特征
     for i in range(2, feature_num + 1):
         feat.append(x**i)
+    # 将所有特征沿着第二维（axis=1）拼接起来
     ret = np.concatenate(feat, axis=1)
     return ret
 
