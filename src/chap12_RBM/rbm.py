@@ -122,27 +122,36 @@ class RBM:
                 self.b_h += learning_rate * db_h / batch_size                        # 更新隐藏层偏置
 
     def sample(self):
-        """从训练好的模型中采样生成新数据（Gibbs采样）"""
-        # 初始化可见层：使用伯努利分布随机生成二值向量（每个像素有50%概率为1）
-        # n_observe是可见层神经元数量（28x28=784）
-        v = np.random.binomial(1, 0.5, self.n_observe)
+    """从训练好的受限玻尔兹曼机(RBM)中采样生成新数据（使用Gibbs采样方法）
+    
+    返回:
+        numpy.ndarray: 生成的28×28图像数据
+    """
+    # 初始化可见层状态：随机生成二值向量（每个像素独立采样）
+    # 使用伯努利分布，每个像素有50%概率为1（白色）
+    # self.n_observe是可见层单元数（对于MNIST是28x28=784）
+    v = np.random.binomial(1, 0.5, self.n_observe)  # 形状(784,)
 
-        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布
-        for _ in xrange(1000):
-            # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
-            h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
+    # 执行1000次Gibbs采样（马尔可夫链蒙特卡洛方法）
+    # 每次迭代包含"正向传播→隐藏层采样→反向传播→可见层采样"的完整步骤
+    for _ in xrange(1000):
+        # 正向传播：基于当前可见层状态，计算隐藏层激活概率
+        # self.W是权重矩阵(784×n_hidden)，self.b_h是隐藏层偏置
+        h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)  # 形状(n_hidden,)
 
-            # 根据激活概率采样得到隐藏层的状态（伯努利采样）
-            h_sample = self._sample_binary(h_prob)
+        # 对隐藏层进行随机采样：根据概率生成二值状态（0或1）
+        h_sample = self._sample_binary(h_prob)  # 形状(n_hidden,)
 
-            # 基于隐藏层的采样结果，重新估算可见层的激活概率（反向传播）
-            v_prob = self._sigmoid(np.dot(h_sample, self.W.T) + self.b_v)
+        # 反向传播：基于隐藏层状态，重建可见层激活概率
+        # 使用相同的权重矩阵转置self.W.T(n_hidden×784)
+        v_prob = self._sigmoid(np.dot(h_sample, self.W.T) + self.b_v)  # 形状(784,)
 
-            # 根据估算的概率采样新的可见层状态
-            v = self._sample_binary(v_prob)
+        # 对可见层进行随机采样，生成新的可见层状态
+        v = self._sample_binary(v_prob)  # 形状(784,)
 
-        # 将最终的可见层向量重塑为 28×28 的图像格式
-        return v.reshape(28, 28)
+    # 将最终的可见层向量重塑为28×28的图像矩阵
+    # 适用于MNIST手写数字等28x28像素的图像数据
+    return v.reshape(28, 28)  # 形状(28,28)
 
 #  用MNIST 手写数字数据集训练一个（RBM），并从训练好的模型中采样生成一张手写数字图像
 if __name__ == '__main__':
