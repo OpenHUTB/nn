@@ -6,9 +6,9 @@ from tensorflow.examples.tutorials.mnist import input_data
 #使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 
-learning_rate = 1e-4 #学习率
-keep_prob_rate = 0.7 # Dropout保留概率0.7
-max_epoch = 2000 #最大训练轮数2000
+learning_rate = 1e-4     #学习率
+keep_prob_rate = 0.7     #Dropout保留概率0.7
+max_epoch = 2000         #最大训练轮数2000
 
 
 def compute_accuracy(v_xs, v_ys):
