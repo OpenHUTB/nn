@@ -52,6 +52,7 @@ def sigmoid(x):
     return prob_x
 
 # 测试 sigmoid 实现是否正确
+# 生成随机测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
 

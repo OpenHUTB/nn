@@ -70,32 +70,46 @@ class MyConvModel(keras.Model):
 
     @tf.function
     def call(self, x):
-        """
-        前向传播函数。
-
-        Args:
-            x: 输入数据。
-
-        Returns:
-            probs: 输出概率。
-        """
-        # 第一层卷积，提取特征
-        h1 = self.l1_conv(x)
-        # 第一层池化，降维
-        h1_pool = self.pool(h1)
-        # 第二层卷积，进一步提取特征
-        h2 = self.l2_conv(h1_pool)
-        # 第二层池化，再次降维
-        h2_pool = self.pool(h2)
-        # 展平特征图，准备输入全连接层
-        # 将多维特征图展平为一维向量，以便输入全连接层。h2_pool 是前一层的输出
-        flat_h = self.flat(h2_pool)
-        # 第一个全连接层（Dense Layer），对展平后的特征进行非线性变换
-        dense1 = self.dense1(flat_h)
-        # 第二个全连接层（输出层），生成未归一化的分类得分（logits）
-        logits = self.dense2(dense1)
-        probs = tf.nn.softmax(logits, axis=-1)
-        return probs
+    """
+    前向传播函数（定义模型的数据流向）。
+    Args:
+        x: 输入数据张量，形状通常为 [batch_size, height, width, channels]
+    Returns:
+        probs: 输出概率分布张量，形状为 [batch_size, num_classes]，
+               每个样本的各类别概率之和为1
+    """
+    # 第一层卷积操作：使用3x3卷积核提取局部特征
+    # 输入形状：[N,H,W,C] -> 输出形状：[N,H,W,conv1_filters]
+    h1 = self.l1_conv(x)  # l1_conv 是第一个卷积层实例
+    
+    # 第一层最大池化：2x2窗口下采样，减少空间维度
+    # 输出形状变为输入的一半（如[N,128,128,32]->[N,64,64,32]）
+    h1_pool = self.pool(h1)  # pool 是 MaxPooling2D 层实例
+    
+    # 第二层卷积操作：在更高层次提取特征
+    # 使用更多卷积核捕获更复杂的模式
+    h2 = self.l2_conv(h1_pool)  # l2_conv 是第二个卷积层实例
+    
+    # 第二层最大池化：进一步压缩空间信息
+    h2_pool = self.pool(h2)
+    
+    # 展平操作：将多维特征图转换为一维特征向量
+    # 例如 [N,7,7,64] -> [N,3136]
+    flat_h = self.flat(h2_pool)  # flat 是 Flatten 层实例
+    
+    # 第一个全连接层：进行高级特征组合和非线性变换
+    # 通常使用ReLU等激活函数引入非线性
+    dense1 = self.dense1(flat_h)  # dense1 是第一个Dense层
+    
+    # 输出层：生成各分类的原始得分（logits）
+    # 不使用激活函数，保持线性输出
+    logits = self.dense2(dense1)  # dense2 是输出层
+    
+    # 应用softmax将logits转换为概率分布
+    # axis=-1 表示在最后一个维度（类别维度）进行归一化
+    probs = tf.nn.softmax(logits, axis=-1)
+    
+    return probs
 
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法

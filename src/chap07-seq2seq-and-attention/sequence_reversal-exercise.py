@@ -234,9 +234,14 @@ def train(model, optimizer, seqlen):
         # 执行单步训练并返回当前loss
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
         
-        # 每500步打印训练进度
+        # 每500步计算并打印训练进度和准确率
         if step % 500 == 0:
-            print('step', step, ': loss', loss.numpy())
+            # 计算训练准确率
+            logits = model(enc_x, dec_x)
+            preds = tf.argmax(logits, axis=-1)
+            acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32)
+            
+            print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
     return loss
 
 
