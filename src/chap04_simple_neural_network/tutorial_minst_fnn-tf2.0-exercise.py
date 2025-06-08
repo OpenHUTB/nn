@@ -78,6 +78,7 @@ optimizer = optimizers.Adam()
 @tf.function
 def compute_loss(logits, labels):
     # 计算稀疏softmax交叉熵损失，并求平均值
+    # 数学公式：-log(exp(logits[labels]) / Σexp(logits))
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits = logits, labels = labels))
@@ -112,7 +113,7 @@ def test(model, x, y):
     logits = model(x)                             # 计算预测结果与真实标签之间的损失值
     loss = compute_loss(logits, y)                # compute_loss函数应实现具体的损失计算逻辑
     accuracy = compute_accuracy(logits, y)        # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
-    return compute_loss(logits, y), compute_accuracy(logits, y)
+    return compute_loss(logits, y), compute_accuracy(logits, y)# 返回: (损失值, 准确率)
 
 
 # ## 实际训练

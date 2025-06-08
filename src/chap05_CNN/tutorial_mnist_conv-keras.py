@@ -16,7 +16,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 def mnist_dataset():
     """
     加载并预处理MNIST数据集，将20000个样本打乱并分批次。
-
     Returns:
         ds (tf.data.Dataset): 处理后的训练数据集。
         test_ds (tf.data.Dataset): 处理后的测试数据集。
@@ -89,14 +88,17 @@ class MyConvModel(keras.Model):
         # 第二层池化，再次降维
         h2_pool = self.pool(h2)
         # 展平特征图，准备输入全连接层
+        # 将多维特征图展平为一维向量，以便输入全连接层。h2_pool 是前一层的输出
         flat_h = self.flat(h2_pool)
+        # 第一个全连接层（Dense Layer），对展平后的特征进行非线性变换
         dense1 = self.dense1(flat_h)
+        # 第二个全连接层（输出层），生成未归一化的分类得分（logits）
         logits = self.dense2(dense1)
         probs = tf.nn.softmax(logits, axis=-1)
         return probs
 
 model = MyConvModel()
-optimizer = optimizers.Adam()
+optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法
 
 
 # ## 编译， fit以及evaluate
