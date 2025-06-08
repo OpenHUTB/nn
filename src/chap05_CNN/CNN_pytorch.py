@@ -10,6 +10,8 @@ import torchvision               # 包含常用的数据集和模型
 import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
 import numpy as np
 
+
+
 # 设置超参数
 learning_rate = 1e-4  # 学习率
 keep_prob_rate = 0.7  # Dropout保留神经元的比例
