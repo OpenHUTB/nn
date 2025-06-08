@@ -4,12 +4,14 @@
 
 # In[7]:
 
+# 导入必要的库
 import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
+# 设置TensorFlow日志级别，避免输出过多信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 
@@ -41,6 +43,7 @@ class MyModel:
         ####################
         '''声明模型对应的参数'''
         ####################
+        # 初始化权重和偏置
         # 输入层784 -> 隐藏层128
         self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
         self.b1 = tf.Variable(tf.zeros([128]))
@@ -72,7 +75,7 @@ def compute_loss(logits, labels):
         tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels
         )
-    )
+    )# 对所有样本的损失取平均，得到批次平均损失
 
 
 @tf.function

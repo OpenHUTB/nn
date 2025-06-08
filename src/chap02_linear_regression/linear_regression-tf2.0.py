@@ -23,8 +23,10 @@ def multinomial_basis(x, feature_num=10):
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
+    # 生成从 x^2 到 x^feature_num 的多项式特征
     for i in range(2, feature_num + 1):
         feat.append(x**i)
+    # 将所有特征沿着第二维（axis=1）拼接起来
     ret = np.concatenate(feat, axis=1)
     return ret
 
@@ -85,7 +87,7 @@ class linearModel(Model):
             shape=[ndim, 1],
             initial_value=tf.random.uniform(
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
-            )
+            ),
             trainable=True,
             name="weight"
         )
@@ -108,14 +110,14 @@ class linearModel(Model):
         返回:
             预测值，形状为(batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)
+        y = tf.squeeze(tf.matmul(x, self.w), axis=1)  # 矩阵乘法后压缩维度
         return y
 
 
-    (xs, ys), (o_x, o_y) = load_data("train.txt")        
-    ndim = xs.shape[1]
+    (xs, ys), (o_x, o_y) = load_data("train.txt")    # 调用load_data函数      
+    ndim = xs.shape[1]  # 获取特征维度
 
-    model = linearModel(ndim=ndim)
+    model = linearModel(ndim=ndim)  # 实例化线性模型
 
 
 #训练以及评估

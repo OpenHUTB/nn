@@ -79,7 +79,7 @@ optimizer = optimizers.Adam(0.0001)
 
 # In[4]:
 model.compile(
-    optimizer = optimizer,
+    optimizer = optimizer,# 使用预定义的优化器（如Adam、SGD）更新模型参数
     loss = 'sparse_categorical_crossentropy',
     metrics = ['accuracy']
 )

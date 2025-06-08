@@ -150,23 +150,43 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
 
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化
-    :param phi: 特征矩阵
-    :param y: 标签向量
-    :param lr: 学习率（默认为 0.01）
-    :param epochs: 迭代次数（默认为 1000）
-    :return: 优化后的权重向量 w
+    """实现批量梯度下降算法优化线性回归权重
+    参数:
+        phi: 设计矩阵（特征矩阵），形状为 (n_samples, n_features)
+        y: 目标值向量，形状为 (n_samples,)
+        lr: 学习率（步长），控制参数更新幅度，默认0.01
+        epochs: 训练轮数，默认1000
+    返回:
+        w: 优化后的权重向量，形状为 (n_features,)
+    数学原理:
+        最小化损失函数 J(w) = 1/m * ||φw - y||²
+        梯度计算: ∇J(w) = 2/m * φ.T @ (φw - y)
+        参数更新: w := w - α * ∇J(w)
     """
-    # 初始化权重 w 为全零向量
+    # 初始化权重向量（全零开始）
+    # 形状与特征数量相同，即每个特征对应一个权重
     w = np.zeros(phi.shape[1])
-    # 迭代训练 epochs 次
+    
+    # 迭代优化循环
     for epoch in range(epochs):
-        # 计算预测值
+        # 1. 前向传播：计算当前权重下的预测值
+        # 矩阵乘法 φw，结果形状 (n_samples,)
         y_pred = phi @ w
-        # 计算梯度
-        gradient = -2 * phi.T @ (y - y_pred) / len(y)
-        # 更新权重 w
+        
+        # 2. 计算误差：预测值与真实值的差
+        # 形状 (n_samples,)
+        error = y - y_pred
+        
+        # 3. 计算梯度（损失函数对权重的导数）
+        # φ.T @ error 计算每个特征上的误差总和
+        # -2/len(y) 是损失函数导数的系数
+        # 最终形状 (n_features,)
+        gradient = -2 * phi.T @ error / len(y)
+        
+        # 4. 参数更新：沿负梯度方向调整权重
+        # 学习率控制更新步长
         w -= lr * gradient
+    
     return w
 
 
@@ -199,11 +219,11 @@ def main(x_train, y_train, use_gradient_descent=False):
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs): 
-            y_pred = np.dot(phi, w_gd)
-            error = y_pred - y_train
-            gradient = np.dot(phi.T, error) / len(y_train)
-            w_gd -= learning_rate * gradient
+        for epoch in range(epochs):     # 梯度下降循环
+            y_pred = np.dot(phi, w_gd)  # 计算预测值
+            error = y_pred - y_train    # 计算误差
+            gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
+            w_gd -= learning_rate * gradient # 更新权重
 
     # 定义预测函数
     def f(x):
@@ -276,4 +296,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    plt.show()
+    plt.show()  # 显示图表

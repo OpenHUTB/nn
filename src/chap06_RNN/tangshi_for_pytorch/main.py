@@ -42,6 +42,7 @@ def process_poems1(file_name):
 
                 # 添加起始和结束标记
                 content = start_token + content + end_token
+                # 将处理后的诗歌内容添加到列表中
                 poems.append(content)
             except ValueError:
                 print("error")  # 如果行不符合“标题:内容”格式则跳过
