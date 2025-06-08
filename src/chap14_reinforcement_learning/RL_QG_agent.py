@@ -52,9 +52,9 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
             activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
             )
         
-        # 扁平化层
+        # 扁平化层：将3D特征图转换为1D向量
         flat = tf.layers.flatten(conv2)
-        # 全连接层
+        # 全连接层：学习高层特征表示
         dense = tf.layers.dense(inputs = flat, units = 512, activation = tf.nn.relu)
         # 输出层，64个动作的Q值
         self.Q_values = tf.layers.dense(inputs = dense, units = 64, name = "q_values")
@@ -90,10 +90,21 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
         return np.random.choice(candidates)
     #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
     # 保存模型
-    def save_model(self):  
-        self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-    # 重新导入模型
-    def load_model(self):
-        self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
+    def save_model(self):
+        """保存模型到文件"""
+        save_path = os.path.join(self.model_dir, 'parameter.ckpt')
+        self.saver.save(self.sess, save_path)
+        print(f"模型已保存至: {save_path}")  # 新增保存提示
 
+    def load_model(self):
+        """从文件加载模型"""
+        save_path = os.path.join(self.model_dir, 'parameter.ckpt')
+        try:
+            self.saver.restore(self.sess, save_path)
+            print(f"模型已从 {save_path} 加载")  # 新增加载提示
+            return True
+        except Exception as e:
+            print(f"加载模型失败: {str(e)}")  # 新增错误处理
+            print("将使用随机初始化的模型")
+            return False
     # 定义自己需要的函数
