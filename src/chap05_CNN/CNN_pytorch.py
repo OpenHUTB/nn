@@ -12,7 +12,7 @@ import numpy as np
 from torch.autograd import Variable
 
 # 设置超参数
-learning_rate = 1e-4  #  学习率
+learning_rate = 1e-4  #  优化器学习率
 keep_prob_rate = 0.7  #  Dropout保留神经元的比例
 max_epoch = 3         # 训练的总轮数
 BATCH_SIZE = 50       # 每批训练数据的大小为50
