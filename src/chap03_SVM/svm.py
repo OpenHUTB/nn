@@ -35,9 +35,9 @@ class SVM:
 
     def train(self, data_train):
         """训练模型。"""
-        X = data_train[:, :2]
-        y = data_train[:, 2]
-        y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
+        X = data_train[:, :2]         # 提取前两列作为特征矩阵 X
+        y = data_train[:, 2]          # 提取第三列作为标签向量 y
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}
         m, n = X.shape
 
         # 初始化参数
