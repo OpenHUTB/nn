@@ -77,17 +77,23 @@ class SoftmaxRegression(tf.Module):
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")
         
-    @tf.function
-    def __call__(self, x):
-        """
-        模型前向传播：计算线性变换并应用softmax函数得到概率分布
-        :param x: 输入数据，shape = (N, input_dim)
-        :return: softmax 概率分布，shape = (N, num_classes)
-        """
-        # 计算线性变换 logits
-        logits = tf.matmul(x, self.W) + self.b
-        # 应用softmax函数，将logits转换为概率分布
-        return tf.nn.softmax(logits)
+    # 使用@tf.function装饰器将Python函数转换为TensorFlow计算图，以提高执行效率
+@tf.function
+def __call__(self, x):
+    """
+    模型前向传播：计算线性变换并应用softmax函数得到概率分布
+    :param x: 输入数据，shape = (N, input_dim)，其中N是batch_size
+    :return: softmax 概率分布，shape = (N, num_classes)
+    """
+    # 计算线性变换 logits = x * W + b
+    # tf.matmul 实现矩阵乘法，self.W 是权重矩阵，shape=(input_dim, num_classes)
+    # self.b 是偏置向量，shape=(num_classes,)
+    # 广播机制会自动将偏置加到每个样本上
+    logits = tf.matmul(x, self.W) + self.b
+    
+    # 应用softmax函数，将logits转换为概率分布
+    # softmax将logits转换为各类别的概率，每行和为1
+    return tf.nn.softmax(logits)
 
 @tf.function
 def compute_loss(pred, labels, num_classes=3):
