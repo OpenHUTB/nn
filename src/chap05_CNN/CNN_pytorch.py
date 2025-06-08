@@ -81,6 +81,7 @@ class CNN(nn.Module):
         # 第二个全连接层：1024维输入，10维输出（对应10个数字类别）
         self.out2 = nn.Linear(1024, 10, bias=True)
 
+    #定义了一个神经网络的前向传播过程，进行特征提取和分类预测
     def forward(self, x):
         x = self.conv1(x)          # 第一卷积层特征提取，输入 -> 卷积 -> 激活 (ReLU由self.conv1定义)
         x = self.conv2(x)          # 第二卷积层特征提取，特征图 -> 卷积 -> 激活
