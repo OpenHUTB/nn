@@ -1101,7 +1101,8 @@ class RadarSensor(object):
         weak_self = weakref.ref(self)
         self.sensor.listen(
             lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))
-
+        
+#定义了一个雷达传感器的回调函数 _Radar_callback，用于处理和可视化 Carla 模拟器中雷达数据
     @staticmethod
     def _Radar_callback(weak_self, radar_data):
         self = weak_self()

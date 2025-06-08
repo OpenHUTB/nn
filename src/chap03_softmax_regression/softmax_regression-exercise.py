@@ -175,8 +175,8 @@ for i in range(1000):
 # 绘制三种不同类别的散点图
 # C1[:, 0] 和 C1[:, 1] 分别表示 C1 的第一列和第二列数据（通常是特征）
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
+plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o") # c="g" 设置颜色为绿色，marker="o" 设置标记为圆形
+plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*") # c="r" 设置颜色为红色，marker="*" 设置标记为星号
 
 # 创建网格点用于绘制决策边界
 x = np.arange(0.0, 10.0, 0.1)
