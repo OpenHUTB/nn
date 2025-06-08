@@ -208,6 +208,7 @@ class Log:
 # # Final Gradient Check
 
 # In[6]:
+#使用了与 TensorFlow 相同的操作来验证自定义实现的梯度计算是否正确
 
 import tensorflow as tf
 
