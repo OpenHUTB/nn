@@ -23,8 +23,9 @@ class RBM:
         if not (isinstance(n_observe, int) and n_observe > 0): # 若条件不满足，后续逻辑可能产生异常或无意义结果
             raise ValueError("可见层单元数量 n_observe 必须为正整数")
         # 初始化模型参数
-        self.n_hidden = n_hidden
-        self.n_observe = n_observe
+        self.n_hidden = n_hidden    # 隐藏层神经元个数
+        self.n_observe = n_observe  # 可见层神经元个数
+        
         # 权重矩阵 (可见层到隐藏层)
         self.W = np.random.normal(
         loc = 0.0,                # 均值
@@ -69,33 +70,47 @@ class RBM:
     
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
-        return 1.0 / (1 + np.exp(-x))
+        return np.where(x >= 0, 
+                        1.0 / (1 + np.exp(-x)), 
+                        np.exp(x) / (1 + np.exp(x)))
 
     def _sample_binary(self, probs):
         """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）"""
-        return np.random.binomial(1, probs)
+        probs = np.clip(probs, 0.001, 0.999)  # 防止概率为0或1导致数值问题
+        return np.random.binomial(1, probs)  # 从伯努利分布中采样
     
-    def train(self, data):
+    def train(self, data, learning_rate=0.1, epochs=10, batch_size=100):
         """
-         使用Contrastive Divergence算法对模型进行训练
-         参数说明：
-         data (numpy.ndarray): 训练数据，形状为 (n_samples, n_observe)。
+         使用对比散度（Contrastive Divergence）算法训练模型
+         
+         参数:
+             data (numpy.ndarray): 训练数据，形状为 (n_samples, height, width)
+             learning_rate (float): 学习率（默认0.1）
+             epochs (int): 训练轮数（默认10）
+             batch_size (int): 批大小（默认100）
         """
     
         # 请补全此处代码
+        # 添加输入数据形状验证
+        if len(data.shape) != 3:
+            raise ValueError("输入数据应为3维数组 (n_samples, height, width)")
         # 将数据展平为二维数组 [n_samples, n_observe]
         data_flat = data.reshape(data.shape[0], -1)  
         n_samples = data_flat.shape[0]  # 样本数量
 
-        # 定义训练参数
-        learning_rate = 0.1 # 学习率，控制参数更新的步长
-        epochs = 10 # 训练轮数，整个数据集将被遍历10次v
-        batch_size = 100 # 批处理大小，每次更新参数使用的样本数量
+        # 添加批大小验证
+        if batch_size > n_samples:
+            print("警告: 批大小大于样本数，使用完整批次")
+            batch_size = n_samples
+
+        # 训练进度跟踪变量
+        print(f"开始训练: 样本数={n_samples}, 批次大小={batch_size}, 轮数={epochs}")
 
        # 开始训练轮数
         for epoch in range(epochs):
             # 打乱数据顺序
             np.random.shuffle(data_flat) # 使用小批量梯度下降法
+            epoch_loss = 0.0  # 损失跟踪
             for i in range(0, n_samples, batch_size):# 获取当前批次的数据
                 batch = data_flat[i:i + batch_size] # 将批次数据转换为 float64 类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
@@ -120,7 +135,16 @@ class RBM:
                 self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
                 self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
                 self.b_h += learning_rate * db_h / batch_size                         # 更新隐藏层偏置
+                
+                # 计算并记录重构误差
+                batch_loss = np.mean((v0 - v1_prob) ** 2)
+                epoch_loss += batch_loss * batch_size
+            
+                # 打印每轮训练进度
+                avg_loss = epoch_loss / n_samples
+                print(f"轮次 {epoch+1}/{epochs} - 平均重构损失: {avg_loss:.4f}")
 
+    
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
         # 初始化可见层：使用伯努利分布随机生成二值向量（每个像素有50%概率为1）
