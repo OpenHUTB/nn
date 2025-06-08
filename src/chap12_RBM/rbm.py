@@ -1,5 +1,6 @@
 # python: 2.7
 # encoding: utf-8
+# 指定该Python文件的字符编码为UTF-8，确保文件中的非ASCII字符能够被正确解析
 # 导入numpy模块并命名为np
 import numpy as np
 import sys
