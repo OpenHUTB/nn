@@ -110,14 +110,14 @@ class linearModel(Model):
         返回:
             预测值，形状为(batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)
+        y = tf.squeeze(tf.matmul(x, self.w), axis=1)  # 矩阵乘法后压缩维度
         return y
 
 
-    (xs, ys), (o_x, o_y) = load_data("train.txt")        
-    ndim = xs.shape[1]
+    (xs, ys), (o_x, o_y) = load_data("train.txt")    # 调用load_data函数      
+    ndim = xs.shape[1]  # 获取特征维度
 
-    model = linearModel(ndim=ndim)
+    model = linearModel(ndim=ndim)  # 实例化线性模型
 
 
 #训练以及评估
