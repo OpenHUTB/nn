@@ -42,7 +42,13 @@ def gen_data_batch(batch_size, start, end):
     return numbers_1, numbers_2, results
 
 def convertNum2Digits(Num):
-    '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
+    '''将一个整数转换成一个数字位的列表
+    Example: 
+        133412 ==> [1, 3, 3, 4, 1, 2]
+    Args:
+        Num: 整数
+    Returns:
+        数字位列表
     '''
     strNum = str(Num)
     chNums = list(strNum)
@@ -50,7 +56,13 @@ def convertNum2Digits(Num):
     return digitNums
 
 def convertDigits2Num(Digits):
-    '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
+    '''将数字位列表转换为整数（注意：输入应是反转后的列表）
+    Example: 
+        [2, 1, 4, 3, 3, 1] ==> 133412 (因为输入是反转的[1,3,3,4,1,2]的反转)
+    Args:
+        Digits: 数字位列表（低位在前）
+    Returns:
+        对应的整数值
     '''
     digitStrs = [str(o) for o in Digits]
     numStr = ''.join(digitStrs)
@@ -58,7 +70,15 @@ def convertDigits2Num(Digits):
     return Num
 
 def pad2len(lst, length, pad=0):
-    '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    '''将一个列表用`pad`填充到`length`的长度 
+    Example: 
+        pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    Args:
+        lst: 输入列表
+        length: 目标长度
+        pad: 填充值
+    Returns:
+        填充后的列表
     '''
     lst+=[pad]*(length - len(lst))
     return lst
