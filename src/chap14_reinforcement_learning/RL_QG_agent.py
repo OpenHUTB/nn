@@ -43,16 +43,20 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
             activation = tf.nn.relu       # ReLU 激活函数
             )
 
-    # 第2个卷积层：提取更高级特征
+        # 第2个卷积层：提取更高级特征
         conv2 = tf.layers.conv2d(
-
-            inputs = conv1,               # 输入：上层卷积层（conv1）的输出特征图
-            filters = 64,                 # 输出通道数：64个卷积核
-            kernel_size = 3,             #指的是卷积核的大小为 3×3
-            padding = "same",            #这种填充方式能保证输出特征图的尺寸和输入特征图的尺寸相同
-
-            activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
-            )
+        inputs=conv1,               # 输入张量：来自上一层conv1的输出特征图
+        filters=64,                 # 卷积核数量：64个，输出64通道的特征图
+        kernel_size=3,              # 卷积核尺寸：3×3（空间感受野大小）
+        strides=1,                  # 卷积步长：默认为1，控制特征图下采样率
+        padding="same",             # 填充方式："same"表示自动补零保持输入输出空间尺寸一致
+                                    # 若为"valid"则不填充，输出尺寸会缩小
+        activation=tf.nn.relu,      # 激活函数：ReLU（Rectified Linear Unit）
+                                    # 公式：f(x)=max(0,x)，提供非线性表达能力
+        use_bias=True,              # 默认启用偏置项，可设为False取消偏置
+        kernel_initializer=None,    # 卷积核初始化器，默认Glorot均匀分布
+        bias_initializer=tf.zeros_initializer()  # 偏置初始化器，默认零初始化
+        )
         
         # 扁平化层
         flat = tf.layers.flatten(conv2)
