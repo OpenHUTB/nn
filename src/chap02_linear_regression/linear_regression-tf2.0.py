@@ -8,31 +8,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
 import tensorflow as tf
-# 从tensorflow.Keras导入常用模块
+# 从Keras导入常用模块
 from tensorflow.keras import optimizers, layers, Model
 
 
 def identity_basis(x):
-    """恒等基函数"""
-    #保持输入数据不变，仅扩展维度
+    """恒等基函数：直接返回输入本身，适用于线性回归"""
     return np.expand_dims(x, axis=1)
 
     # 生成多项式基函数
-#将输入转换为多项式特征
 def multinomial_basis(x, feature_num=10):
-    """多项式基函数"""
-    x = np.expand_dims(x, axis=1)  # 将 x 从 (N,) 转换为 (N, 1)，便于后续幂运算和拼接
+    """多项式基函数：将输入x映射为多项式特征
+    feature_num: 多项式的最高次数"""
+    x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
-    # 生成多项式特征
+    # 生成从 x^2 到 x^feature_num 的多项式特征
     for i in range(2, feature_num + 1):
         feat.append(x**i)
-    ret = np.concatenate(feat, axis=1)# 按列拼接
+    # 将所有特征沿着第二维（axis=1）拼接起来
+    ret = np.concatenate(feat, axis=1)
     return ret
 
 
 def gaussian_basis(x, feature_num=10):
-    """高斯基函数"""
+    """高斯基函数：将输入x映射为一组高斯分布特征
+    用于提升模型对非线性关系的拟合能力"""
     # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
@@ -48,7 +49,8 @@ def gaussian_basis(x, feature_num=10):
 
 
 def load_data(filename, basis_func=gaussian_basis):
-    """载入数据"""
+    """载入数据并进行基函数变换
+    返回：(特征, 标签), (原始x, 原始y)"""
     xys = []
     with open(filename, "r") as f:
         for line in f:
@@ -56,12 +58,11 @@ def load_data(filename, basis_func=gaussian_basis):
             xys.append(list(map(float, line.strip().split()))) # 读取每行数据
         xs, ys = zip(*xys) # 解压为特征和标签
         xs, ys = np.asarray(xs), np.asarray(ys) # 转换为numpy数组
-        
         o_x, o_y = xs, ys # 保存原始数据
         phi0 = np.expand_dims(np.ones_like(xs), axis=1) # 添加偏置项（全1列）
         phi1 = basis_func(xs) # 应用基函数变换
         xs = np.concatenate([phi0, phi1], axis=1) # 拼接偏置和变换后的特征
-        return (np.float32(xs), np.float32(ys)), (o_x, o_y)# 返回预处理后的训练数据(特征矩阵xs和标签ys)以及原始数据副本
+        return (np.float32(xs), np.float32(ys)), (o_x, o_y)
 
 
 #定义模型
@@ -86,7 +87,7 @@ class linearModel(Model):
             shape=[ndim, 1],
             initial_value=tf.random.uniform(
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
-            )
+            ),
             trainable=True,
             name="weight"
         )
@@ -109,14 +110,14 @@ class linearModel(Model):
         返回:
             预测值，形状为(batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)
+        y = tf.squeeze(tf.matmul(x, self.w), axis=1)  # 矩阵乘法后压缩维度
         return y
 
 
-    (xs, ys), (o_x, o_y) = load_data("train.txt")        
-    ndim = xs.shape[1]
+    (xs, ys), (o_x, o_y) = load_data("train.txt")    # 调用load_data函数      
+    ndim = xs.shape[1]  # 获取特征维度
 
-    model = linearModel(ndim=ndim)
+    model = linearModel(ndim=ndim)  # 实例化线性模型
 
 
 #训练以及评估
@@ -133,7 +134,7 @@ def train_one_step(model, xs, ys):
     optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
     return loss
 
-# 使用tf.function装饰器将Python函数转换为静态图，提高执行效率
+
 @tf.function
 def predict(model, xs):
     y_preds = model(xs) # 模型前向传播
@@ -162,7 +163,15 @@ y_test_preds = predict(model, xs_test)
 std = evaluate(ys_test, y_test_preds)
 print("训练集预测值与真实值的标准差：{:.1f}".format(std))
 
-plt.plot(o_x, o_y, "ro", markersize=3)
+# 绘制原始数据点：红色圆点标记，大小3
+# o_x: 原始数据X坐标
+# o_y: 原始数据Y坐标
+# "ro": 红色(r)圆形(o)标记
+plt.plot(o_x, o_y, "ro", markersize=3) 
+# 绘制模型预测曲线：黑色实线
+# o_x_test: 测试集X坐标
+# y_test_preds: 模型在测试集上的预测结果
+# "k": 黑色(k)实线（默认线型）
 plt.plot(o_x_test, y_test_preds, "k")
 # 设置x、y轴标签
 plt.xlabel("x")

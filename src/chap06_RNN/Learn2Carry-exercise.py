@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
+
 # # 加法进位实验
-#
+# 这个实验展示了如何使用RNN学习大整数加法的进位机制
+
 # <img src="https://github.com/JerrikEph/jerrikeph.github.io/raw/master/Learn2Carry.png" width=650>
 
 # In[1]:
@@ -16,31 +18,26 @@ from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
 
 
-# 数据生成
-# 我们随机在 `start->end` 之间采样整数对 `(num1, num2)`，计算结果 `num1+num2` 作为监督信号。
-# 主要步骤：
-# 1. 将数字转换成数字位列表 `convert_num_to_digits`
-# 2. 将数字位列表反向
-# 3. 将数字位列表填充到同样的长度 `pad_to_len`
+# ## 数据生成
+# 我们随机在 `start->end`之间采样除整数对`(num1, num2)`，计算结果`num1+num2`作为监督信号。
+# 
+# * 首先将数字转换成数字位列表 `convertNum2Digits`
+# * 将数字位列表反向
+# * 将数字位列表填充到同样的长度 `pad2len`
+# 
 
 # In[2]:
 
-def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
-    """生成包含随机整数对及其和的批量数据。
 
-    Args:
-        batch_size: 批量大小，必须是正整数
-        start: 随机数范围起始值(包含)
-        end: 随机数范围结束值(不包含)
-
-    Returns:
-        tuple: 包含三个numpy数组的元组(numbers_1, numbers_2, results)，
-               每个数组形状为(batch_size,)
-    """
-    # 随机生成两个整数数组
+def gen_data_batch(batch_size, start, end):
+    '''在(start, end)区间采样生成一个batch的整型的数据
+    Args :
+        batch_size: batch_size
+        start: 开始数值
+        end: 结束数值
+    '''
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
-    # 计算两个整数数组的和
     results = numbers_1 + numbers_2
     return numbers_1, numbers_2, results
 
@@ -61,7 +58,7 @@ def convertDigits2Num(Digits):
     return Num
 
 def pad2len(lst, length, pad=0):
-    '''将一个列表用`pad`填充到`length`的长度,例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
     '''
     lst+=[pad]*(length - len(lst))
     return lst
@@ -71,11 +68,16 @@ def results_converter(res_lst):
     Args:
         res_lst: shape(b_sz, len(digits))
     '''
+    # 反转每个数字位列表，因为我们在输入时反转了数字
     res = [reversed(digits) for digits in res_lst]
     return [convertDigits2Num(digits) for digits in res]
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
     '''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
+    #1. 将整数转换为数字位列表
+    #2. 反转数字位列表(低位在前，高位在后)
+    #3. 填充到固定长度
+    
     Args:
         Nums1: shape(batch_size,)
         Nums2: shape(batch_size,)
@@ -86,49 +88,76 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
         Nums2: shape(batch_size, maxlen)
         results: shape(batch_size, maxlen)
     '''
+     # 将整数转换为数字位列表
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
-
+    # 反转数字位列表，使低位在前，高位在后
+    # 这有助于RNN学习进位机制，因为低位的计算影响高位
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
-
+    # 填充所有列表到相同长度
     Nums1 = [pad2len(o, maxlen) for o in Nums1]
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
-
+    
     return Nums1, Nums2, results
-
 
 
 # # 建模过程， 按照图示完成建模
 
 # In[3]:
 
+
 class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
-        self.embed_layer = tf.keras.layers.Embedding(10, 32,
-                                                    batch_input_shape = [None, None])
+         # 嵌入层：将数字0-9转换为32维向量
+        self.embed_layer = tf.keras.layers.Emb
+                                                    batch_input_shape=[None, None])
+       
+        # 基础RNN单元和RNN层
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
         self.dense = tf.keras.layers.Dense(10)
-
+        
     @tf.function
     def call(self, num1, num2):
-        '''
-        此处完成上述图中模型
-        '''
+        
+         #模型前向传播过程：
+        #1. 将两个输入数字的每个位进行嵌入
+        #2. 将嵌入后的向量相加
+        #3. 通过RNN处理相加后的向量序列
+        #4. 通过全连接层预测每个位的数字
+      Args:
+            num1: 第一个输入数字，shape为(batch_size, maxlen)
+            num2: 第二个输入数字，shape为(batch_size, maxlen)
+            
+        Returns:
+            logits: 预测结果，shape为(batch_size, maxlen, 10)
+        # 嵌入处理
+        embed1 = self.embed_layer(num1)  # [batch_size, maxlen, embed_dim]
+        embed2 = self.embed_layer(num2)  # [batch_size, maxlen, embed_dim]
+        
+        # 将两个输入的嵌入向量相加
+        inputs = embed1 + embed2  # [batch_size, maxlen, embed_dim]
+        
+        # 通过RNN层处理
+        rnn_out = self.rnn_layer(inputs)  # [batch_size, maxlen, rnn_units]
+        
+        # 通过全连接层得到每个位的预测结果
+        logits = self.dense(rnn_out)  # [batch_size, maxlen, 10]
+        
         return logits
-
-
+    
 # In[4]:
+
 
 @tf.function
 def compute_loss(logits, labels):
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits = logits , labels = labels)
+            logits=logits, labels=labels)
     return tf.reduce_mean(losses)
 
 @tf.function
@@ -142,18 +171,19 @@ def train_one_step(model, optimizer, x, y, label):
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
 
+
 def train(steps, model, optimizer):
     loss = 0.0
     accuracy = 0.0
     for step in range(steps):
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32),
+        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
         if step%50 == 0:
             print('step', step, ': loss', loss.numpy())
-            
+
     return loss
 
 def evaluate(model):
@@ -188,22 +218,27 @@ evaluate(model)
 
 
 
-# In[ ]:
-
-
-
 
 # In[ ]:
 
 
 
 
+
+# In[ ]:
+
+
+
+
+
 # In[ ]:
 
 
 
 
+
 # In[ ]:
+
 
 
 
