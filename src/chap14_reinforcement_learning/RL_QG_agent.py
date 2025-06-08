@@ -93,6 +93,8 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
     #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
     # 保存模型
     def save_model(self):  
+    # 使用TensorFlow的Saver对象保存模型参数
+    # 参数保存为checkpoint格式，包含所有可训练变量的值
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
     # 重新导入模型
     def load_model(self):
