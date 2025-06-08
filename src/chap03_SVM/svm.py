@@ -1,7 +1,7 @@
 # python: 3.5.2
 # encoding: utf-8
 
-# 导入numpy并命名为np
+# 导入NumPy科学计算库，并使用缩写np简化调用
 import numpy as np
 
 def load_data(fname):
