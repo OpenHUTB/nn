@@ -35,7 +35,7 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
         self.input_states = tf.placeholder(tf.float32, shape = [None, 8, 8, 3], name = "input_states")
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
-        conv1 = tf.layers.conv2d(
+        conv1 = tf.layers.conv2d(# 自动调整子图参数，优化布局避免元素重叠
             inputs = self.input_states,   # 输入张量，形状应为 [batch_size, height, width, channels]
             filters = 32,                 # 输出通道数：32个卷积核
             kernel_size = 3,              # 卷积核大小 3x3
