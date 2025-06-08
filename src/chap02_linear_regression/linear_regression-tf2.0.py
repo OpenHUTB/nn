@@ -87,7 +87,7 @@ class linearModel(Model):
             shape=[ndim, 1],
             initial_value=tf.random.uniform(
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
-            )
+            ),
             trainable=True,
             name="weight"
         )
