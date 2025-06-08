@@ -23,6 +23,7 @@ max_epochs = 100#总共进行100局
 #draws = 0
 
 # 主训练循环（控制训练的总轮数）
+# max_epochs：决定智能体与环境交互的总次数
 for i_episode in range(max_epochs):
     # 初始化棋局，返回初始 observation（3x8x8 的状态表示）
     #3个通道分别表示：黑棋位置、白棋位置、当前玩家

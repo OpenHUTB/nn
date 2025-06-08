@@ -21,6 +21,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
 
     # 数值稳定性处理：减去最大值避免指数爆炸
     max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
     # 计算指数值
@@ -97,9 +98,11 @@ def sigmoid_ce(logits, labels):
     labels = tf.cast(labels, tf.float32)
     
     # 通过更稳定的方式实现 sigmoid 交叉熵：
+    # 添加epsilon提高数值稳定性
+    epsilon = 1e-7
     loss = tf.reduce_mean(
         tf.nn.relu(logits) - logits * labels + 
-        tf.math.log(1 + tf.exp(-tf.abs(logits)))
+        tf.math.log(1 + tf.exp(-tf.abs(logits)) + epsilon
     )
     
     return loss
