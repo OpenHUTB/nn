@@ -119,7 +119,7 @@ class myRNNModel(keras.Model):
        
         # 基础RNN单元和RNN层
         self.rnncell = tf.keras.layers.SimpleRNNCell(64)#RNN单元（64隐藏层）
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True) #构建一个处理序列的RNN层，输出每个时间步的隐藏状态
         self.dense = tf.keras.layers.Dense(10) # 分类层（预测每个数位的0-9概率）
         
     @tf.function
