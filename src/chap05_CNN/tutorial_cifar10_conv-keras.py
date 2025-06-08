@@ -145,20 +145,27 @@ model.evaluate(test_ds) #模型评估
 ds, test_ds = cifar10_dataset()
 
 # 从测试数据集中获取第一个批次的第一张图像
-for i in test_ds:
-    test_batch = i[0][:1, :, :]  # 提取第一批中的第一张图像 [1, H, W, C]
-    break                        # 只取一个样本，跳出循环
+for i in test_ds:  # 遍历测试数据集（test_ds是一个可迭代对象）
+    # 获取当前批次中的第一张图像
+    # i[0]是图像数据，i[1]是对应的标签
+    # [:1, :, :] 表示取第一个样本的所有高度、宽度和通道
+    test_batch = i[0][:1, :, :]  # 结果形状为 [1, 高度, 宽度, 通道数]
+    break  # 只需要一个样本，立即退出循环
 
-# 打开并预处理自定义图像（示例：柯基犬图片）
-img = Image.open(open('corgi.jpg', 'rb'))  # 打开图像文件
-img = numpy.asarray(img, dtype='float32')  # 转换为float32类型的numpy数组
-img = img / 256.0                          # 错误：应除以255.0进行归一化
-# print(img.shape)                         # 打印图像形状，例如 (224, 224, 3)
+# 打开并预处理自定义图像
+# 以二进制读取模式打开图像文件
+img = Image.open(open('corgi.jpg', 'rb'))  # 使用PIL库打开图像
+# 将PIL图像转换为numpy数组，并指定数据类型为float32
+img = numpy.asarray(img, dtype='float32')  # 形状通常为 (高度, 宽度, 通道数)
+# 图像归一化处理（将像素值从0-255缩放到0-1范围）
+img = img / 256.0  # 错误：应使用 img = img / 255.0
+# 调试时可以打印图像形状查看维度信息
+# print(img.shape)  
 
-# 在第0维添加一个维度，将图像转换为批次格式 [1, H, W, C]
-# 这是因为模型通常期望输入是批次形式的
-img = np.expand_dims(img, axis=0)
-
+# 图像批次维度处理
+# 在第0维添加一个维度，将图像从[H,W,C]转换为[1,H,W,C]格式
+# 因为神经网络模型通常期望输入是批次形式的（即使只有一个图像）
+img = np.expand_dims(img, axis=0)  # 添加批次维度后的形状：[1, 高度, 宽度, 通道数]
 
 # img = test_batch
 img_out = model.getL2_feature_map(img)
