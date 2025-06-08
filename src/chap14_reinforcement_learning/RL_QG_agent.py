@@ -9,11 +9,11 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
     def __init__(self): # __init__  方法是类的构造函数，用于初始化类的实例
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
         # 用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
-        self.sess = None  # TensorFlow会话对象初始化占位
-        self.saver = None  # TensorFlow模型保存器初始化占位
-        self.input_states = None  # 神经网络输入占位符初始化占位
-        self.Q_values = None  # 神经网络输出的Q值初始化占位
+        os.makedirs(self.model_dir, exist_ok = True)    # 创建模型保存目录（如果目录不存在则自动创建）
+        self.sess = None                                # TensorFlow会话对象初始化占位
+        self.saver = None                               # TensorFlow模型保存器初始化占位
+        self.input_states = None                        # 神经网络输入占位符初始化占位
+        self.Q_values = None                            # 神经网络输出的Q值初始化占位
 
 
     def init_model(self):
@@ -45,10 +45,12 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
 
     # 第2个卷积层：提取更高级特征
         conv2 = tf.layers.conv2d(
+
             inputs = conv1,               # 输入：上层卷积层（conv1）的输出特征图
             filters = 64,                 # 输出通道数：64个卷积核
             kernel_size = 3,             #指的是卷积核的大小为 3×3
             padding = "same",            #这种填充方式能保证输出特征图的尺寸和输入特征图的尺寸相同
+
             activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
             )
         
