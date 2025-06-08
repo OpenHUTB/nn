@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
     """载入数据。
@@ -34,11 +35,13 @@ def identity_basis(x):
 
 # 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
-    """多项式基函数"""
+    """多项式基函数：将输入x映射为多项式特征
+    feature_num: 多项式的最高次数
+    返回 shape (N, feature_num)"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 可以替换成 x = identity_basis(x)
-  
+    # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
     # 通过列表推导式创建各次项，最后在列方向拼接合并
@@ -47,13 +50,14 @@ def multinomial_basis(x, feature_num=10):
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
     ret = np.concatenate(ret, axis=1)
-   
+    # ==========
     return ret
 
 
 def gaussian_basis(x, feature_num=10):
     """
-    高斯基函数：将输入映射为一组高斯函数响应
+    高斯基函数：将输入x映射为一组高斯分布特征
+    用于提升模型对非线性关系的拟合能力
     """
     # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
@@ -133,7 +137,6 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
         # 计算正则化的 SVD 解
         s_reg = s / (s**2 + alpha)
         # 构建对角矩阵
-        # n_features是特征数量，n_samples是样本数量
         S_reg = np.zeros((n_features, n_samples))
         np.fill_diagonal(S_reg, s_reg)
         w = Vt.T @ S_reg @ U.T @ y
@@ -147,23 +150,43 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
 
 
 def gradient_descent(phi, y, lr=0.01, epochs=1000):
-    """梯度下降优化
-    :param phi: 特征矩阵
-    :param y: 标签向量
-    :param lr: 学习率（默认为 0.01）
-    :param epochs: 迭代次数（默认为 1000）
-    :return: 优化后的权重向量 w
+    """实现批量梯度下降算法优化线性回归权重
+    参数:
+        phi: 设计矩阵（特征矩阵），形状为 (n_samples, n_features)
+        y: 目标值向量，形状为 (n_samples,)
+        lr: 学习率（步长），控制参数更新幅度，默认0.01
+        epochs: 训练轮数，默认1000
+    返回:
+        w: 优化后的权重向量，形状为 (n_features,)
+    数学原理:
+        最小化损失函数 J(w) = 1/m * ||φw - y||²
+        梯度计算: ∇J(w) = 2/m * φ.T @ (φw - y)
+        参数更新: w := w - α * ∇J(w)
     """
-    # 初始化权重 w 为全零向量
+    # 初始化权重向量（全零开始）
+    # 形状与特征数量相同，即每个特征对应一个权重
     w = np.zeros(phi.shape[1])
-    # 迭代训练 epochs 次
+    
+    # 迭代优化循环
     for epoch in range(epochs):
-        # 计算预测值
+        # 1. 前向传播：计算当前权重下的预测值
+        # 矩阵乘法 φw，结果形状 (n_samples,)
         y_pred = phi @ w
-        # 计算梯度
-        gradient = -2 * phi.T @ (y - y_pred) / len(y)
-        # 更新权重 w
+        
+        # 2. 计算误差：预测值与真实值的差
+        # 形状 (n_samples,)
+        error = y - y_pred
+        
+        # 3. 计算梯度（损失函数对权重的导数）
+        # φ.T @ error 计算每个特征上的误差总和
+        # -2/len(y) 是损失函数导数的系数
+        # 最终形状 (n_features,)
+        gradient = -2 * phi.T @ error / len(y)
+        
+        # 4. 参数更新：沿负梯度方向调整权重
+        # 学习率控制更新步长
         w -= lr * gradient
+    
     return w
 
 
@@ -179,9 +202,9 @@ def main(x_train, y_train, use_gradient_descent=False):
     basis_func = identity_basis  
 
     # 生成偏置项和特征矩阵
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)  # 偏置项列
-    phi1 = basis_func(x_train) # 基函数转换
-    phi = np.concatenate([phi0, phi1], axis=1) # 合并特征矩阵
+    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    phi1 = basis_func(x_train)
+    phi = np.concatenate([phi0, phi1], axis=1)
 
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
@@ -196,11 +219,11 @@ def main(x_train, y_train, use_gradient_descent=False):
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs): 
-            y_pred = np.dot(phi, w_gd)
-            error = y_pred - y_train
-            gradient = np.dot(phi.T, error) / len(y_train)
-            w_gd -= learning_rate * gradient
+        for epoch in range(epochs):     # 梯度下降循环
+            y_pred = np.dot(phi, w_gd)  # 计算预测值
+            error = y_pred - y_train    # 计算误差
+            gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
+            w_gd -= learning_rate * gradient # 更新权重
 
     # 定义预测函数
     def f(x):
@@ -229,9 +252,8 @@ def main(x_train, y_train, use_gradient_descent=False):
 def evaluate(ys, ys_pred):
     """评估模型。"""
     # 计算预测值与真实值的标准差
-     # 计算标准差，作为模型预测误差的评估指标
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std#返回f预测值与真实值之间的标准差
+    return std
 
 
 # 程序主入口（建议不要改动以下函数的接口）
@@ -274,4 +296,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    plt.show()
+    plt.show()  # 显示图表

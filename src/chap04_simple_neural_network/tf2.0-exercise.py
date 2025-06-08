@@ -98,9 +98,11 @@ def sigmoid_ce(logits, labels):
     labels = tf.cast(labels, tf.float32)
     
     # 通过更稳定的方式实现 sigmoid 交叉熵：
+    # 添加epsilon提高数值稳定性
+    epsilon = 1e-7
     loss = tf.reduce_mean(
         tf.nn.relu(logits) - logits * labels + 
-        tf.math.log(1 + tf.exp(-tf.abs(logits)))
+        tf.math.log(1 + tf.exp(-tf.abs(logits)) + epsilon
     )
     
     return loss

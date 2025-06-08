@@ -46,6 +46,7 @@ def weight_variable(shape):
     """
     # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
     initial = tf.truncated_normal(shape, stddev=0.1)
+    # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
 
 

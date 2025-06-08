@@ -60,6 +60,11 @@ def get_batch(batch_size, length):
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     # 添加起始符
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
+  # 返回一个批次的训练数据，包含四个张量：
+# 1. batched_examples: 批量处理后的原始样本（格式取决于具体实现）
+# 2. enc_x: 编码器输入序列，形状为 [batch_size, enc_seq_len]
+# 3. dec_x: 解码器输入序列（通常包含起始标记），形状为 [batch_size, dec_seq_len]
+# 4. y: 目标输出序列（通常包含结束标记），形状为 [batch_size, dec_seq_len]
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
             tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
 print(get_batch(2, 10))
@@ -77,7 +82,8 @@ class mySeq2SeqModel(keras.Model):
         super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
-        self.v_sz = 27
+        self.v_sz = 27 # 词表大小：26个字母+1个起始符（0）
+
 
         # 嵌入层：将每个字符的索引映射成64维的向量表示
         # 输入维度：self.v_sz（即词表大小），输出维度为64
@@ -163,6 +169,7 @@ class mySeq2SeqModel(keras.Model):
         # 计算注意力分数
         score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
         # 计算注意力权重
+        # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         # 计算上下文向量
@@ -270,6 +277,7 @@ def sequence_reversal():
         # 将一个数值列表转换为对应的字母字符串
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
         return out
+    
 
     # 生成一批测试数据（32个样本，每个序列长度10）
     batched_examples, enc_x, _, _ = get_batch(32, 10)
