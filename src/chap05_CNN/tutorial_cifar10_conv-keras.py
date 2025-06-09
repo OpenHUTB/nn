@@ -171,7 +171,7 @@ img = np.expand_dims(img, axis=0)  # 添加批次维度后的形状：[1, 高度
 img_out = model.getL2_feature_map(img)
 pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
 
-pylab.figure(figsize=(10,7))
+pylab.figure(figsize=(10,7))  # 创建一个10x7英寸大小的图形窗口
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
