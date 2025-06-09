@@ -423,7 +423,7 @@ class KeyboardControl(object):
         self._steer_cache = 0.0
          # 在HUD上显示帮助提示信息(4秒)
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
+# 解析游戏世界中的事件并处理用户输入
     def parse_events(self, client, world, clock, sync_mode):
         if isinstance(self._control, carla.VehicleControl):
             current_lights = self._lights
