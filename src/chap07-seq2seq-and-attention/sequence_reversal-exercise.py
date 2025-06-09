@@ -129,17 +129,17 @@ class mySeq2SeqModel(keras.Model):
         前向传播过程：编码器 -> 解码器 -> 全连接层
         '''
         # 编码过程
-        enc_emb = self.embed_layer(enc_ids)  # (batch_size, enc_seq_len, emb_dim)
-        enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (batch_size, enc_seq_len, enc_units)
+        enc_emb = self.embed_layer(enc_ids)            # (batch_size, enc_seq_len, emb_dim)
+        enc_out, enc_state = self.encoder(enc_emb)     # enc_out: (batch_size, enc_seq_len, enc_units)
         
         # 解码过程，使用编码器的最终状态作为初始状态
-        dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
-        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
+        dec_emb = self.embed_layer(dec_ids)                                      # (batch_size, dec_seq_len, emb_dim)
+        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)      # dec_out: (batch_size, dec_seq_len, dec_units)
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
-      # 返回模型预测的logits值，通常后续会通过softmax计算概率
-# 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
+        # 返回模型预测的logits值，通常后续会通过softmax计算概率
+        # 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
     
     
@@ -198,8 +198,8 @@ def compute_loss(logits, labels):
     # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
+  
 # 定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
-
 @tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     """执行一次训练步骤（前向传播+反向传播）"""
