@@ -1,7 +1,7 @@
 # python: 2.7
 # encoding: utf-8
 # 导入numpy模块并命名为np
-import numpy as np# 导入NumPy库用于高效数值计算
+import numpy as np # 导入NumPy库用于高效数值计算
 import sys
 class RBM:
     """Restricted Boltzmann Machine."""
@@ -42,12 +42,6 @@ class RBM:
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         # 神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
-        """
-        参数说明：
-        n_observe (int): 可见层（输入层）神经元的数量，即输入特征维度
-        n_hidden (int): 隐藏层神经元的数量
-        """
-
         self.n_hidden = n_hidden     # 隐藏层神经元个数
         self.n_observe = n_observe   # 可见层神经元个数
 
@@ -83,7 +77,7 @@ class RBM:
         """
     
         # 请补全此处代码
-        # 将数据展平为二维数组 [n_samples, n_observe]
+        # 将数据展平为二维数组 [n_samples, n_observe]，，确保输入数据符合模型要求
         data_flat = data.reshape(data.shape[0], -1)  
         n_samples = data_flat.shape[0]  # 样本数量
 
@@ -96,7 +90,7 @@ class RBM:
         for epoch in range(epochs):
             # 打乱数据顺序
             np.random.shuffle(data_flat) # 使用小批量梯度下降法
-            for i in range(0, n_samples, batch_size):# 获取当前批次的数据
+            for i in range(0, n_samples, batch_size): # 获取当前批次的数据
                 batch = data_flat[i:i + batch_size] # 将批次数据转换为 float64 类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
@@ -104,12 +98,12 @@ class RBM:
                 h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) 
                 # 通过输入层向量v0与权重矩阵self.W的点积，再加上隐藏层偏置self.b_h
                 h0_sample = self._sample_binary(h0_prob) 
-                #这段代码的作用是借助 self._sample_binary 方法，对 h0_prob 进行二值采样，进而得到 h0_sample。在深度学习领域，当处理二值变量或者进行二值掩码操作时，常常会用到这样的采样。
+                # 这段代码的作用是借助 self._sample_binary 方法，对 h0_prob 进行二值采样，进而得到 h0_sample。在深度学习领域，当处理二值变量或者进行二值掩码操作时，常常会用到这样的采样。
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  #将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
+                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  # 将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
                 v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
-                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       #计算隐藏单元被激活的概率
+                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       # 计算隐藏单元被激活的概率
 
                 # 计算梯度      
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
@@ -119,7 +113,7 @@ class RBM:
                 # 更新参数
                 self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
                 self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
-                self.b_h += learning_rate * db_h / batch_size                         # 更新隐藏层偏置
+                self.b_h += learning_rate * db_h / batch_size                        # 更新隐藏层偏置
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
@@ -127,7 +121,7 @@ class RBM:
         # n_observe是可见层神经元数量（28x28=784）
         v = np.random.binomial(1, 0.5, self.n_observe)
 
-        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布
+        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布，使生成的样本更接近训练数据的分布
         for _ in xrange(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
@@ -144,7 +138,7 @@ class RBM:
         # 将最终的可见层向量重塑为 28×28 的图像格式
         return v.reshape(28, 28)
 
-# 使用 MNIST 数据集训练 RBM 模型
+#  用MNIST 手写数字数据集训练一个（RBM），并从训练好的模型中采样生成一张手写数字图像
 if __name__ == '__main__':
     try:
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
