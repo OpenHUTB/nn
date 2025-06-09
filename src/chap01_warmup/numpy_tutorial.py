@@ -211,7 +211,7 @@ plt.ylabel("y")  # y 轴标签
 # 显示半透明网格线
 plt.grid(True, alpha=0.5)
 
-# 在右上角显示图例
+# 添加图例到图表中，并指定图例位置为右上角
 plt.legend(loc='upper right')
 
 plt.show()  # 显示绘制的图像
