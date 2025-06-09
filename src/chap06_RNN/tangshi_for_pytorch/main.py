@@ -89,10 +89,11 @@ def process_poems2(file_name):
     count_pairs = sorted(counter.items(), key=lambda x: -x[1])  # 排序
     words, _ = zip(*count_pairs)
     words = words[:len(words)] + (' ',)
-    word_int_map = dict(zip(words, range(len(words))))
+    word_int_map = dict(zip(words, range(len(words))))  # 构建字符到整数的映射字典
     poems_vector = [list(map(word_int_map.get, poem)) for poem in poems]
     return poems_vector, word_int_map, words
 
+    # 生成训练批次
 def generate_batch(batch_size, poems_vec, word_to_int):
     n_chunk = len(poems_vec) // batch_size
     x_batches = []
@@ -102,7 +103,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         end_index = start_index + batch_size
         x_data = poems_vec[start_index:end_index]
         y_data = []
-        for row in x_data:
+        for row in x_data:  # 构造标签数据 y，即输入序列的下一个字符，用于RNN模型，预测下一个字符
             y  = row[1:]
             y.append(row[-1])
             y_data.append(y)
@@ -114,7 +115,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         # print(x_data[0])
         # print(y_data[0])
         # exit(0)
-        x_batches.append(x_data)
+        x_batches.append(x_data)  #将每个 batch 存入列表中，供后续训练使用
         y_batches.append(y_data)
     return x_batches, y_batches
 
