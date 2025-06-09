@@ -284,6 +284,7 @@ def train(model, optimizer, seqlen):
 
 
 optimizer = optimizers.Adam(0.0005)
+# 学习率设为0.0005，较常用值更小，适合精细调整或敏感模型
 model = mySeq2SeqModel()
 train(model, optimizer, seqlen=20)
 
