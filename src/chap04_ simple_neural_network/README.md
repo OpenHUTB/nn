@@ -3,6 +3,7 @@
 ## 问题描述：
 
 ​	利用numpy 和tensorflow 、pytorch 搭建全连接神经网络。使用numpy 实现此练习需要自己手动求导，而tensorflow 和pytorch 具有自动求导机制。
+	全连接神经网络（Fully Connected Neural Network，简称FCNN）是最基础的神经网络结构之一，也称为多层感知机（MLP）。它的核心特点是每一层的神经元与下一层的每一个神经元全部相连。
 
 
 
