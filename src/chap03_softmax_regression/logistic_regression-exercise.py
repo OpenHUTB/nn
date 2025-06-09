@@ -210,7 +210,7 @@ if __name__ == '__main__':
     ax.set_ylim(0, 10)
     ax.grid(linestyle="--", alpha=0.7)
 
-    line_d, = ax.plot([], [], label = 'fit_line')
+    line_d, = ax.plot([], [], label = 'fit_line')  # 创建一个空的线对象，用于后续动态更新数据，返回的line_d是Line2D对象，用于后续更新拟合线的数据
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
     frame_text = ax.text(
