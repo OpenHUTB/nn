@@ -100,7 +100,7 @@ def sigmoid_ce(logits, labels):
     # 添加epsilon提高数值稳定性
     epsilon = 1e-7
     loss = tf.reduce_mean(
-        tf.nn.relu(logits) - logits * labels + 
+        tf.nn.relu(logits) - logits * labels +  # 通过减去logits*labels实现标签平滑，降低对正确标签的过度自信
         tf.math.log(1 + tf.exp(-tf.abs(logits)) + epsilon
     )
     
