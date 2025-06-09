@@ -47,6 +47,8 @@ def prepare_mnist_features_and_labels(x, y):
         y: 转换为整型的标签。
     """
     x = tf.cast(x, tf.float32) / 255.0
+    # 将标签转换为int64类型
+    # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
     y = tf.cast(y, tf.int64)
     return x, y
 
