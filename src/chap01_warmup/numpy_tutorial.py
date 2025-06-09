@@ -3,11 +3,11 @@
 # numpy 的 array 操作
 
 # 1. 导入 numpy 库
-import numpy as np  # 将 numpy 库命名为 np
-import matplotlib   # 导入Matplotlib库，用于数据可视化
-import matplotlib.pyplot as plt  # 导入 matplotlib 库并将其命名为 plt
+import numpy as np                    # 将 numpy 库命名为 np
+import matplotlib                     # 导入Matplotlib库，用于数据可视化
+import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
-matplotlib.use('TkAgg')  # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染
+matplotlib.use('TkAgg')               # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染
 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 print("第二题：\n")
@@ -83,6 +83,7 @@ print("第九题：\n")
 # 第1行: [4,  5,  6] 
 # 第2行: [7,  8,  9]
 # 第3行: [10, 11, 12]
+
 a = np.array([[1, 2, 3], 
               [4, 5, 6], 
               [7, 8, 9], 
@@ -190,7 +191,7 @@ print(np.exp(x))
 
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
-print("全局最大值的下标:", np.argmax(x))  # 打印整个数组 x 中最大值的下标
+print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
 print("每列最大值的下标:", np.argmax(x, axis=0))  # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
 print("每行最大值的下标:", np.argmax(x, axis=1))  # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
