@@ -172,7 +172,7 @@ img_out = model.getL2_feature_map(img)
 pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
 
 pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
+pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])# 在2x2网格的第1个位置显示第0通道的图像.关闭坐标轴显示，仅展示图像内容
 pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 3])
