@@ -103,14 +103,23 @@ class MyConvModel(keras.Model):
         self.dense2 = layers.Dense(10)
     @tf.function
     def call(self, x):
-        h1 = self.l1_conv(x) 
-        h1_pool = self.pool(h1) 
-        h2 = self.l2_conv(h1_pool)
-        h2_pool = self.pool(h2) 
-        flat_h = self.flat(h2_pool)
-        dense1 = self.dense1(flat_h)
-        logits = self.dense2(dense1)
-        probs = tf.nn.softmax(logits, axis=-1)
+     # 第一层卷积
+        h1 = self.l1_conv(x)  # 应用第一层卷积层
+        h1_pool = self.pool(h1)  # 应用池化层
+
+    # 第二层卷积
+        h2 = self.l2_conv(h1_pool)  # 应用第二层卷积层
+        h2_pool = self.pool(h2)  # 再次应用池化层
+
+    # 展平
+        flat_h = self.flat(h2_pool)  # 将多维张量展平为二维张量，形状为 [batch_size, num_features]
+
+    # 全连接层
+        dense1 = self.dense1(flat_h)  # 应用第一层全连接层
+
+    # 输出层
+        logits = self.dense2(dense1)  # 应用第二层全连接层，得到未归一化的 logits
+        probs = tf.nn.softmax(logits, axis=-1)  # 应用 softmax 函数，将 logits 转换为概率分布
         return probs
     
     @tf.function
