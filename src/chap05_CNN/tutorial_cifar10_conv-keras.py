@@ -127,6 +127,7 @@ class MyConvModel(keras.Model):
         return h2
 
 model = MyConvModel()
+# 实例化自定义卷积神经网络模型
 optimizer = optimizers.Adam(0.001)
 
 
