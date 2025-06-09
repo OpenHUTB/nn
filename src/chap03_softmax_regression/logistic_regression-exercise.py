@@ -209,10 +209,14 @@ if __name__ == '__main__':
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
     ax.grid(linestyle="--", alpha=0.7)
-
+    # 创建线条和点的占位符
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
+
+    # 添加图例
+    ax.legend()  # 显示图例
+
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
