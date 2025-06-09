@@ -46,9 +46,7 @@ def sigmoid(x):
     # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
     x = tf.cast(x, tf.float32)
     # sigmoid 数学定义：1 / (1 + e^{-x})
-    prob_x = 1 / (1 + tf.exp(-x))           
-    
-    return prob_x
+    return 1 / (1 + tf.exp(-x))
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
