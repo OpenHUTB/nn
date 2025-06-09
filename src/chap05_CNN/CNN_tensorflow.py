@@ -135,10 +135,10 @@ def max_pool_2x2(x: tf.Tensor,
     return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
 
 # define placeholder for inputs to network
-xs = tf.placeholder(tf.float32, [None, 784]) / 255.
-ys = tf.placeholder(tf.float32, [None, 10])
-keep_prob = tf.placeholder(tf.float32)
-x_image = tf.reshape(xs, [-1, 28, 28, 1])
+xs = tf.placeholder(tf.float32, [None, 784]) / 255.     # 输入图像 [batch_size, 784]
+ys = tf.placeholder(tf.float32, [None, 10])             # 标签 [batch_size, 10]
+keep_prob = tf.placeholder(tf.float32)                  # Dropout保留率
+x_image = tf.reshape(xs, [-1, 28, 28, 1])         # 重塑为4D张量 [batch, height, width, channels]
 
 # 定义第一个卷积层的权重变量，卷积核大小为 7x7，输入通道数为 1，输出通道数为 32
 W_conv1 = weight_variable([7, 7, 1, 32])

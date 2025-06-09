@@ -105,10 +105,12 @@ class GaussianMixtureModel:
 
     def fit(self, X):
         """使用EM算法训练模型
-        
-        参数:
-            X: array-like, shape=(n_samples, n_features)
-               输入数据矩阵
+
+        EM算法流程：
+        1. 初始化模型参数（混合权重π、均值μ、协方差矩阵Σ）
+        2. 重复以下步骤直到收敛：
+           - E步：计算每个样本属于各高斯成分的后验概率（责任度）
+           - M步：基于后验概率更新模型参数
         """
         X = np.asarray(X)
         n_samples, n_features = X.shape

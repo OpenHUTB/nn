@@ -37,7 +37,11 @@ class SVM:
         self.b = None             # 偏置项
 
     def train(self, data_train):
-        """训练模型。"""
+        """训练 SVM 模型（基于 hinge loss + L2 正则化）
+
+        参数:
+            data_train: 训练数据集，shape=(m, 3)，前两列为特征，第三列为标签（0/1）
+        """
 
         X = data_train[:, :2]         # 提取特征部分
         y = data_train[:, 2]          # 提取标签部分

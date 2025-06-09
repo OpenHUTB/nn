@@ -125,8 +125,15 @@ class mySeq2SeqModel(keras.Model):
     @tf.function
     def call(self, enc_ids, dec_ids):
         '''
-        完成sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好
-        前向传播过程：编码器 -> 解码器 -> 全连接层
+        序列到序列模型的完整前向传播流程：
+        编码器处理输入序列 → 传递状态给解码器 → 解码器生成输出序列 → 全连接层预测
+
+        Args:
+            enc_ids: 编码器输入序列（字符索引），shape=(batch_size, enc_seq_len)
+            dec_ids: 解码器输入序列（字符索引，含起始标记），shape=(batch_size, dec_seq_len)
+
+        Returns:
+            logits: 解码器每个位置的预测概率分布，shape=(batch_size, dec_seq_len, vocab_size)
         '''
         # 编码过程
         enc_emb = self.embed_layer(enc_ids)            # (batch_size, enc_seq_len, emb_dim)
