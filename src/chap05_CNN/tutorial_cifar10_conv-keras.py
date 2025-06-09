@@ -173,7 +173,7 @@ pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
 
 pylab.figure(figsize=(10,7))
 pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
+pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1]) # 在2x2网格的第2个位置显示第1通道的图像
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 3])
 pylab.show()
