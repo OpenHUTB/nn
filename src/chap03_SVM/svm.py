@@ -38,10 +38,12 @@ class SVM:
 
     def train(self, data_train):
         """训练模型。"""
-        X = data_train[:, :2]     # 提取特征部分
-        y = data_train[:, 2]      # 提取标签部分
-    #y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
-        m, n = X.shape            # m为样本数，n为特征数
+
+        X = data_train[:, :2]         # 提取特征部分
+        y = data_train[:, 2]          # 提取标签部分
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}
+        m, n = X.shape                # m为样本数，n为特征数
+
 
         # 初始化参数
         self.w = np.zeros(n)      # 权重初始化为0
@@ -64,8 +66,8 @@ class SVM:
 
     def predict(self, x):
         """预测标签。"""
-        score = np.dot(x, self.w) + self.b
-        return np.where(score >= 0, 1, 0)  # 转换回{0, 1}标签
+        score = np.dot(x, self.w) + self.b     # 计算得分
+        return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签
 
 if __name__ == '__main__':
     # 数据加载部分

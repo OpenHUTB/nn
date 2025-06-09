@@ -166,7 +166,7 @@ def train_one_step(model, optimizer, x, y, label):
         logits = model(x, y)
         loss = compute_loss(logits, label)
 
-    # compute gradient
+    # 计算梯度
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
