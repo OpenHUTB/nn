@@ -161,16 +161,19 @@ for epoch in range(50):
     loss, accuracy = train_one_step(
         model,
         optimizer,
-        tf.constant(train_data[0], dtype=tf.float32),  # 训练图像数据
-        tf.constant(train_data[1], dtype=tf.int64)     # 训练标签数据
+        tf.constant(train_data[0], dtype=tf.float32),  # 训练图像数据，转换为float32类型
+        tf.constant(train_data[1], dtype=tf.int64)     # 训练标签数据，转换为int64类型
     )
+    # 打印每个epoch的损失和准确率
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 
 # 在测试集上评估模型性能
+# 将测试数据转换为TensorFlow张量，指定数据类型为float32和int64
 loss, accuracy = test(
     model,
-    tf.constant(test_data[0], dtype=tf.float32),
-    tf.constant(test_data[1], dtype=tf.int64)
+    tf.constant(test_data[0], dtype=tf.float32), #测试图像数据
+    tf.constant(test_data[1], dtype=tf.int64)    # 测试标签数据
 )
 
+# 打印测试集的损失和准确率
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
