@@ -110,6 +110,7 @@ def sigmoid_ce(logits, labels):
 
 # 测试逻辑
 test_data = np.random.normal(size=[10])
+# 生成测试数据：10个符合标准正态分布（均值0，标准差1）的随机数
 labels = np.random.randint(0, 2, size=[10]).astype(np.float32)
 
 # 对比 TensorFlow  原始结果和自定义函数结果
