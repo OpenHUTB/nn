@@ -152,16 +152,19 @@ for i in range(1000): # 进行1000次训练迭代
     loss = train_one_step(model, xs, ys) # 执行单步训练并获取当前损失值
     if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
         print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
-                
-y_preds = predict(model, xs)
-std = evaluate(ys, y_preds)
-print("训练集预测值与真实值的标准差：{:.1f}".format(std))
 
+ # 使用训练好的模型进行预测
+y_preds = predict(model, xs)  # 对训练集数据进行预测
+std = evaluate(ys, y_preds)  # 计算预测值与真实值的标准差
+print("训练集预测值与真实值的标准差：{:.1f}".format(std))  # 打印标准差，保留1位小数               
+
+# 加载测试集数据
 (xs_test, ys_test), (o_x_test, o_y_test) = load_data("test.txt")
 
-y_test_preds = predict(model, xs_test)
-std = evaluate(ys_test, y_test_preds)
-print("训练集预测值与真实值的标准差：{:.1f}".format(std))
+# 使用训练好的模型对测试集数据进行预测
+y_test_preds = predict(model, xs_test)  # 对测试集数据进行预测
+std = evaluate(ys_test, y_test_preds)  # 计算预测值与真实值的标准差
+print("测试集预测值与真实值的标准差：{:.1f}".format(std))  # 打印标准差，保留1位小数
 
 # 绘制原始数据点：红色圆点标记，大小3
 # o_x: 原始数据X坐标
