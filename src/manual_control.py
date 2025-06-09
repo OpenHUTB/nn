@@ -222,7 +222,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self._weather_presets = find_weather_presets()
         self._weather_index = 0
         self._actor_filter = args.filter
-        self._actor_generation = args.generation
+        self._actor_generation = args.generation #角色生成参数配置
         self._gamma = args.gamma
         self.restart()
         self.world.on_tick(hud.on_world_tick)
