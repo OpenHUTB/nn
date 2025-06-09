@@ -36,6 +36,7 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
             tf.float32, 
             shape = [None, 8, 8, 3], 
             name = "input_states"
+            # 定义输入状态的名称，用于后续模型构建、可视化或数据处理流程中的标识
         )
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
