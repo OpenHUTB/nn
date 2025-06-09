@@ -145,7 +145,7 @@ if __name__ == '__main__':
       mnist = np.load('mnist_bin.npy')  # 60000x28x28
     except IOError:
       print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
-      sys.exit(1)
+      sys.exit(1)  # try和except是Python中用于异常处理的关键机制,允许程序在运行时捕获并处理错误,避免因未处理的异常导致程序崩溃
     n_imgs, n_rows, n_cols = mnist.shape
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
