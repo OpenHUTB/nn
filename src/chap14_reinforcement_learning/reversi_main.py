@@ -27,7 +27,7 @@ max_epochs = 100#总共进行100局
 for i_episode in range(max_epochs):
     # 初始化棋局，返回初始 observation（3x8x8 的状态表示）
     #3个通道分别表示：黑棋位置、白棋位置、当前玩家
-    observation = env.reset()
+    observation = env.reset()  # 重置环境到初始状态
     
     # 每局最多进行 100 步操作（黑白双方交替下棋）
     for t in range(100):
