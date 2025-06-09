@@ -140,25 +140,40 @@ class Log:
     用于对数似然计算，通常与Softmax结合使用
     '''
     def __init__(self):
+        # 添加一个极小值 epsilon，防止对数运算中出现 log(0) 的情况
         self.epsilon = 1e-12
+        # 用于存储前向传播的输入，以便在反向传播时使用
         self.mem = {}
 
     def forward(self, x):
         '''
+        前向传播：计算 log(x + epsilon)
+        x: 输入数据，形状为 (N, c)，其中 N 是样本数量，c 是类别数量 
         x: shape(N, c)
         '''
+        # 计算 log(x + epsilon)，防止 log(0) 导致的数值问题
         out = np.log(x + self.epsilon)
 
+        # 将输入 x 保存到内存中，用于后续的反向传播
         self.mem['x'] = x
         return out
+        
 
     def backward(self, grad_y):
         '''
+        反向传播：计算梯度
+        grad_y: 来自上一层的梯度，形状与 x 相同
         grad_y: same shape as x
         '''
+        # 从内存中取出前向传播时保存的输入 x
         x = self.mem['x']
 
-        return 1. / (x + 1e-12) * grad_y
+        # 根据链式法则，计算当前层的梯度
+        # grad_x = grad_y * d(log(x + epsilon)) / dx = grad_y * (1 / (x + epsilon))
+        grad_x = 1. / (x + self.epsilon) * grad_y
+
+        return grad_x
+      
 
 
 # ## Gradient check
