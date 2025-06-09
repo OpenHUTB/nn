@@ -30,7 +30,7 @@ def process_dataset(fileName):
     """
     examples = []  # 存储处理后的诗歌样本
     # 以UTF-8编码打开文件，处理每行诗歌
-    with open(fileName, 'r'，encoding='utf-8', ) as fd:
+    with open(fileName, 'r',encoding='utf-8', ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
@@ -382,10 +382,11 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     for _ in range(max_len):
         # 获取下一个token并更新RNN状态
         cur_token, state = model.get_next_token(cur_token, state)
+        # 提取标量ID并记录生成结果
         token_id = cur_token.numpy()[0]  # 提取标量ID
         generated_tokens.append(token_id)  # 记录生成的ID
 
-        # 检查是否生成了结束标记
+        # 检查是否生成了结束标记，若是则提前终止
         if id2word[token_id] == end_token:
             break
 
