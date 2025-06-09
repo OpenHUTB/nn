@@ -141,6 +141,7 @@ def train(cnn):
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
                 print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
+                # step != 0: 跳过初始训练前的测试（通常初始准确率无意义）
 # 主程序入口
 if __name__ == '__main__':
     cnn = CNN()  # 创建CNN实例
