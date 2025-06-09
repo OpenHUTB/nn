@@ -204,11 +204,13 @@ if __name__ == '__main__':
     # 创建图形
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
-    plt.ylabel('Y')
-    plt.xlabel('X')
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 10)
-
+    # 设置坐标轴标签
+    plt.ylabel('Y')  # 设置 y 轴标签
+    plt.xlabel('X')  # 设置 x 轴标签
+    # 设置坐标轴范围
+    ax.set_xlim(0, 10)  # 设置 x 轴范围为 0 到 10
+    ax.set_ylim(0, 10)  # 设置 y 轴范围为 0 到 10
+    # 创建线条和点的占位符
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
