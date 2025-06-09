@@ -206,6 +206,7 @@ if __name__ == '__main__':
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
     plt.ylabel('Y')
     plt.xlabel('X')
+   # ax.set_xlim(0, 10)将X轴的最小值设为0，最大值设为10
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
 
