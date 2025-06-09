@@ -23,7 +23,7 @@ register(
     id = 'ReversedAddition-v0',
     entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
     kwargs = {'rows' : 2},# 自定义参数：操作数行数
-    max_episode_steps = 200,
+    max_episode_steps = 200,#限制最大步数，防止陷入循环
     reward_threshold = 25.0,
 )
 # 三操作数反向加法任务
