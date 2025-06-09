@@ -160,7 +160,7 @@ def train_one_step(model, optimizer, x, y):
 
     accuracy = compute_accuracy(logits, y)
     return loss, accuracy
-
+# 返回当前批次的损失值和准确率
 
 @tf.function
 def test_step(model, x, y):
