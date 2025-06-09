@@ -109,7 +109,7 @@ class MyConvModel(keras.Model):
     # axis=-1 表示在最后一个维度（类别维度）进行归一化
     probs = tf.nn.softmax(logits, axis=-1)
     
-    return probs
+    return probs # 返回模型预测的概率值
 
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法
