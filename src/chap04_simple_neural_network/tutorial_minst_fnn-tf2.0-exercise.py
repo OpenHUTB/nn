@@ -60,9 +60,11 @@ class myModel:
         # 隐藏层+ReLU,隐藏层计算：
         # 通过矩阵乘法（x @ self.W1）加上偏置项 self.b1，得到隐藏层的加权和
         # 使用 ReLU 激活函数增加非线性
-        h = tf.nn.relu(x @ self.W1 + self.b1) 
-        
-        # 输出层（未归一化）
+        h = tf.nn.relu(x @ self.W1 + self.b1)
+
+        #  输出层计算：全连接层（无激活函数，直接输出 logits）
+        #  - 隐藏层特征（128维） × 权重矩阵 W2（128×10） → 分类评分（10维）
+        #  - 未应用 softmax，便于后续使用 sparse_softmax_cross_entropy_with_logits 计算损失
         logits = h @ self.W2 + self.b2         
         return logits
         
