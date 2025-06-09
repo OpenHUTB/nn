@@ -208,7 +208,7 @@ def main(x_train, y_train, use_gradient_descent=False):
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1)
 
-    # 最小二乘法求解权重
+   # 使用最小二乘法求解线性回归问题，计算权重向量w，其中φ是设计矩阵，y_train是训练数据的标签向量
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
 
     w_gd = None
