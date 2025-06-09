@@ -77,6 +77,7 @@ for i_episode in range(max_epochs):
         # done: 游戏是否结束
         # info: 额外信息（如获胜方、结束原因）
         observation, reward, done, info = env.step(action)
+        # 执行环境中的一步动作并获取反馈
 
         # 如果对局结束
         if done:
