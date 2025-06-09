@@ -58,8 +58,8 @@ def get_batch(batch_size, length):
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
-
+            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32)) 
+    # 返回批处理后的样本以及编码输入、解码输入和目标输出的张量
 print(get_batch(2, 10))
 
 
