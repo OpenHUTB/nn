@@ -81,7 +81,8 @@ class Relu:
         ####################
         '''计算 relu 激活函数对应的梯度'''
         x = self.mem['x']
-        grad_x = grad_y * (x > 0)  # ReLU的梯度是1（x>0）或0（x<=0）
+        # ReLU的梯度是1（x>0）或0（x<=0）
+        grad_x = grad_y * (x > 0)
         ####################
         return grad_x
 
@@ -123,7 +124,8 @@ class Softmax:
         # 假设 grad_y 是一个形状为 (N, c) 的梯度张量
         # np.expand_dims(grad_y, axis=1) 将其形状变为 (N, 1, c)
         g_y_exp = np.expand_dims(grad_y, axis=1)
-        tmp = np.matmul(g_y_exp, sisj)  # (N, 1, c)
+        # (N, 1, c)
+        tmp = np.matmul(g_y_exp, sisj)
         tmp = np.squeeze(tmp, axis=1)
         tmp = -tmp + grad_y * s
         return tmp
