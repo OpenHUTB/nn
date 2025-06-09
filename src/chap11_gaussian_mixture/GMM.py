@@ -21,7 +21,7 @@ def generate_data(n_samples=1000):
     ])
     
     # 定义每个高斯分布的混合权重(必须和为1)
-    weights_true = np.array([0.3, 0.4, 0.3])
+    weights_true = np.array([0.3, 0.4, 0.3])  # array数组具有同构性,只能存储单一数据类型,类型需预先指定并且高效内存,比列表更节省内存（尤其适合数值数据）。
     
     # 获取混合成分的数量(这里是3)
     n_components = len(weights_true)
