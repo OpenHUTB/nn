@@ -18,17 +18,20 @@ start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
 
 def process_dataset(fileName):
-    """处理诗歌数据集，构建词汇表和数字索引的诗歌数据
-    
+    """
+    处理诗歌数据集，构建词汇表和数字索引的诗歌数据
+
     Args:
-        fileName: 诗歌文本文件路径，格式为"标题:内容"
-        
+        fileName (str): 诗歌文本文件路径，格式为"标题:内容"
+
     Returns:
-        instances: 数字索引化的诗歌列表，每个诗歌是数字id的列表
-        word2id: 词语到数字id的映射字典
-        id2word: 数字id到词语的映射字典
+        instances (list): 数字索引化的诗歌列表，每个诗歌是一个包含数字id的元组 (id序列, 序列长度)
+        word2id (dict): 词语到数字id的映射字典
+        id2word (dict): 数字id到词语的映射字典
     """
     examples = []  # 存储处理后的诗歌样本
+    start_token = "<START>"  # 开始标记
+    end_token = "<END>"  # 结束标记
     # 以UTF-8编码打开文件，处理每行诗歌
     with open(fileName, 'r',encoding='utf-8', ) as fd:
         for line in fd:
@@ -38,7 +41,6 @@ def process_dataset(fileName):
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            ### 过滤过长的诗歌
                 continue
             examples.append(ins)
             
