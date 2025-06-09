@@ -141,14 +141,20 @@ class RBM:
 #  用MNIST 手写数字数据集训练一个（RBM），并从训练好的模型中采样生成一张手写数字图像
 if __name__ == '__main__':
     try:
-    # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
-      mnist = np.load('mnist_bin.npy')  # 60000x28x28
+    # 加载二值化的MNIST数据，形状为 (60000, 28, 28)，表示60000张28x28的二值化图像
+      mnist = np.load('mnist_bin.npy')  # 加载数据文件
     except IOError:
+      # 如果文件加载失败，提示用户检查文件路径并退出程序
       print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
       sys.exit(1)
-    n_imgs, n_rows, n_cols = mnist.shape
+
+    # 获取数据集的形状信息
+    n_imgs, n_rows, n_cols = mnist.shape# 分别表示图像数量、行数和列数
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
-    print(mnist.shape)  # 打印数据维度
+
+    # 打印数据集的形状信息，便于确认数据加载是否正确
+    print(mnist.shape)  # 输出数据集的形状
+   
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
