@@ -28,8 +28,7 @@ def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
     # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
-    ret = np.expand_dims(x, axis=1)
-    return ret
+    return np.expand_dims(x, axis=1)
 
 
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
