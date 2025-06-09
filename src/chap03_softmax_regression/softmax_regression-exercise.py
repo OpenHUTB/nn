@@ -187,8 +187,8 @@ for i in range(1000):
 # 绘制三种不同类别的散点图
 # C1[:, 0] 和 C1[:, 1] 分别表示 C1 的第一列和第二列数据（通常是特征）
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
+plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o") # 设置数据点颜色为绿色，标记形状为"o"
+plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*") # 设置数据点颜色为红色，标记形状为"*"
 
 x = np.arange(0.0, 10.0, 0.1)
 y = np.arange(0.0, 10.0, 0.1)
