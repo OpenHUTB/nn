@@ -104,4 +104,6 @@ model.compile(
 )
 train_ds, test_ds = mnist_dataset()
 model.fit(train_ds, epochs=5)
+# 使用训练数据集对模型进行5个轮次的训练
+
 model.evaluate(test_ds)
