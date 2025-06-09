@@ -146,7 +146,7 @@ if __name__ == '__main__':
     except IOError:
       print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
       sys.exit(1)
-    n_imgs, n_rows, n_cols = mnist.shape
+    n_imgs, n_rows, n_cols = mnist.shape  # 解析MNIST数据集的形状，获取样本数、图像高度和宽度（假设数据为[样本数, 高度, 宽度]格式）
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
     print(mnist.shape)  # 打印数据维度
 
