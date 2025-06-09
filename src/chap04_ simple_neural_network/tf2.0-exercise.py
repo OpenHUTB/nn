@@ -91,7 +91,8 @@ def sigmoid_ce(x, label):
     # clip 避免 log(0) 的数值不稳定问题
     x = tf.clip_by_value(x, 1e-10, 1.0 - 1e-10)
     # 计算二分类交叉熵损失
-    # 公式: -[y*log(p) + (1-y)*log(1-p)]    
+    # 公式: -[y*log(p) + (1-y)*log(1-p)]
+    # 其中y是真实标签，p是预测概率，N是样本数量    
     loss = -tf.reduce_mean(
         label * tf.math.log(x) + (1 - label) * tf.math.log(1 - x)
     )
