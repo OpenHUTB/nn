@@ -90,7 +90,7 @@ class CNN(nn.Module):
         out1 = F.relu(out1)        # 应用ReLU激活函数引入非线性
         out1 = self.dropout(out1)  # 应用dropout正则化，随机丢弃部分神经元输出
         out2 = self.out2(out1)
-        return out2
+        return out2 # 返回最终的输出结果
 
 # 测试函数 - 评估模型在测试集上的准确率
 def test(cnn):
