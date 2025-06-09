@@ -71,9 +71,19 @@ class RBM:
     
     def train(self, data):
         """
-         使用Contrastive Divergence算法对模型进行训练
-         参数说明：
-         data (numpy.ndarray): 训练数据，形状为 (n_samples, n_observe)。
+        使用 k=1 的 Contrastive Divergence (CD-1) 算法训练 RBM
+
+        CD-1 算法流程：
+        1. 从训练数据初始化可见层 v₀
+        2. 正向传播：v₀ → h₀（计算隐藏层激活概率并采样）
+        3. 反向传播：h₀ → v₁（重构可见层）
+        4. 再次正向传播：v₁ → h₁（计算重构后的隐藏层概率）
+        5. 基于正负相位的梯度更新参数
+
+        参数更新公式（最大化对数似然）：
+        ΔW = η · (⟨v₀h₀⟩ - ⟨v₁h₁⟩)
+        Δb_v = η · (v₀ - v₁)
+        Δb_h = η · (h₀ - h₁)
         """
     
         # 请补全此处代码
