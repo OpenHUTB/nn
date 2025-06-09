@@ -58,6 +58,7 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
         flat = tf.layers.flatten(conv2)
         # 全连接层
         dense = tf.layers.dense(inputs = flat, units = 512, activation = tf.nn.relu)
+        # units = 512: 输出维度，即该层包含512个神经元
         # 输出层，64个动作的Q值
         self.Q_values = tf.layers.dense(inputs = dense, units = 64, name = "q_values")
         # 初始化变量和Saver
