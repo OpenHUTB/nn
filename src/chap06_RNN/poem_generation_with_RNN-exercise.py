@@ -247,6 +247,7 @@ def reduce_avg(reduce_target, lengths, dim):
     rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
     mxlen = tf.shape(reduce_target)[dim]
     mask = mkMask(lengths, mxlen)
+    # 当rank_diff不为0时，调整张量形状以匹配目标维度
     if rank_diff!=0:
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
