@@ -54,9 +54,9 @@ class mySeq2SeqModel(keras.Model):
         self.v_sz = 27
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
                                                     batch_input_shape=[None, None])
-        
-        self.encoder_cell = tf.keras.layers.SimpleRNNCell(128)
-        self.decoder_cell = tf.keras.layers.SimpleRNNCell(128)
+
+        self.encoder_cell = layers.LSTMCell(128)
+        self.decoder_cell = layers.LSTMCell(128)
         
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
                                            return_sequences=True, return_state=True)
