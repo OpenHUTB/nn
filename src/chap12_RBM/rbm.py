@@ -30,6 +30,7 @@ class RBM:
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
         size = (n_observe, n_hidden))
+        # 初始化权重矩阵W，使用正态分布随机初始化
         # 可见层偏置（1 x n_observe）
         self.Wv = np.zeros((1, n_observe))
         # 隐藏层偏置（1 x n_hidden）
