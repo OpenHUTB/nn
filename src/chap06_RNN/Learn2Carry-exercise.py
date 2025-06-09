@@ -206,6 +206,7 @@ def evaluate(model):
 
 optimizer = optimizers.Adam(0.001)
 model = myRNNModel()
+# 实例化自定义循环神经网络模型
 
 
 # In[6]:
