@@ -203,7 +203,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
     def __init__(self, carla_world, hud, args): # 基础环境设置
         self.world = carla_world                # Carla 服务器的世界对象
         self.sync = args.sync                   # 主角车辆的角色名称
-        self.actor_role_name = args.rolename
+        self.actor_role_name = args.rolename    # try和except是Python中用于异常处理的关键机制,允许程序在运行时捕获并处理错误,避免因未处理的异常导致程序崩溃
         try:                                    # 加载地图数据
             self.map = self.world.get_map()
         except RuntimeError as error:
