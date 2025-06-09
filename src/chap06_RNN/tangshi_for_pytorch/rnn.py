@@ -7,7 +7,7 @@ import numpy as np
 #对神经网络中的线性层（Linear）进行权重初始化
 def weights_init(m):
     classname = m.__class__.__name__  #   obtain the class name
-    if classname.find('Linear') != -1:
+    if classname.find('Linear') != -1:  # 遍历模型的所有模块，筛选出线性层
         weight_shape = list(m.weight.data.size())# 获取权重张量的形状: [输出维度, 输入维度]
         fan_in = weight_shape[1]
         fan_out = weight_shape[0]
