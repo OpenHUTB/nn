@@ -110,7 +110,7 @@ class GaussianMixtureModel:
             X: array-like, shape=(n_samples, n_features)
                输入数据矩阵
         """
-        X = np.asarray(X)
+        X = np.asarray(X)  # 将输入数据转换为NumPy数组以便进行后续的矩阵运算
         n_samples, n_features = X.shape
         
         # 初始化混合系数（均匀分布）
