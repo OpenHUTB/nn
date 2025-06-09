@@ -32,7 +32,11 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
         # 定义自己的 网络
         self.sess = tf.Session()
         # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
-        self.input_states = tf.placeholder(tf.float32, shape = [None, 8, 8, 3], name = "input_states")
+        self.input_states = tf.placeholder(
+            tf.float32, 
+            shape = [None, 8, 8, 3], 
+            name = "input_states"
+        )
         # 构建卷积神经网络
         # 第1个卷积层：提取局部空间特征
         conv1 = tf.layers.conv2d(# 自动调整子图参数，优化布局避免元素重叠
