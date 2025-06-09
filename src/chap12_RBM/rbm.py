@@ -42,12 +42,6 @@ class RBM:
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         # 神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
-        """
-        参数说明：
-        n_observe (int): 可见层（输入层）神经元的数量，即输入特征维度
-        n_hidden (int): 隐藏层神经元的数量
-        """
-
         self.n_hidden = n_hidden     # 隐藏层神经元个数
         self.n_observe = n_observe   # 可见层神经元个数
 
@@ -83,7 +77,7 @@ class RBM:
         """
     
         # 请补全此处代码
-        # 将数据展平为二维数组 [n_samples, n_observe]
+        # 将数据展平为二维数组 [n_samples, n_observe]，，确保输入数据符合模型要求
         data_flat = data.reshape(data.shape[0], -1)  
         n_samples = data_flat.shape[0]  # 样本数量
 
@@ -127,7 +121,7 @@ class RBM:
         # n_observe是可见层神经元数量（28x28=784）
         v = np.random.binomial(1, 0.5, self.n_observe)
 
-        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布
+        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布，使生成的样本更接近训练数据的分布
         for _ in xrange(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)

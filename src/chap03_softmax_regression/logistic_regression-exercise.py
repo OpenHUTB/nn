@@ -208,6 +208,7 @@ if __name__ == '__main__':
     plt.xlabel('X')
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 10)
+    ax.grid(linestyle="--", alpha=0.7)
 
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
