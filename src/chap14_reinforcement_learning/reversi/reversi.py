@@ -48,7 +48,7 @@ class ReversiEnv(gym.Env):
             'white': ReversiEnv.WHITE,
         }
         try:
-            self.player_color = colormap[player_color]
+            self.player_color = colormap[player_color]  # try和except是Python中用于异常处理的关键机制,允许程序在运行时捕获并处理错误,避免因未处理的异常导致程序崩溃。
         except KeyError:
             raise error.Error("player_color must be 'black' or 'white', not {}".format(player_color))
 
