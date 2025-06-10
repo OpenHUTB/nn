@@ -29,8 +29,8 @@ def softmax(x):
     exp_x = tf.exp(x - x_max)
     
     # 计算softmax值，分母加上一个很小的epsilon避免除零错误
-    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
-    return exp_x / (sum_exp + 1e-10)
+    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)# 在最后一个轴上求和，并保持维度
+    return exp_x / (sum_exp + 1e-10)# 使用 exp_x 除以 sum(exp_x)，得到归一化的概率分布
 
 # 测试 softmax 实现是否正确，使用随机数据对比 TensorFlow 的实现
 test_data = np.random.normal(size=[10, 5])
