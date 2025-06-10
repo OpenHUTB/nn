@@ -239,15 +239,15 @@ def reduce_avg(reduce_target, lengths, dim):
     mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-    if len(shape_of_lengths) != dim: # 再次验证输入
+    if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
-    if len(shape_of_target) < dim+1 :
+    if len(shape_of_target) < dim+1 :  # 确保 reduce_target 的维度至少是 dim + 1
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
     rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
-    mxlen = tf.shape(reduce_target)[dim]
+    mxlen = tf.shape(reduce_target)[dim]  # 获取当前维度的最大长度 mxlen
     mask = mkMask(lengths, mxlen)
     
     # 处理序列长度与掩码张量的维度对齐问题
@@ -351,15 +351,29 @@ def train(epoch, model, optimizer, ds):
 
 # In[5]:
 
-# 初始化优化器
+# 初始化优化器（使用Adam优化器，学习率设为0.0005）
 optimizer = optimizers.Adam(0.0005)  # 学习率0.0005
-# 加载数据集
+
+# 加载诗歌数据集
+# 返回三个对象：
+#   train_ds: 训练数据集
+#   word2id: 词语到ID的映射字典
+#   id2word: ID到词语的映射字典
 train_ds, word2id, id2word = poem_dataset()
-# 初始化模型
+
+# 初始化RNN模型实例
+# 传入word2id字典用于词汇表映射
 model = myRNNModel(word2id)
 
-# 训练10个epoch
+# 训练10个epoch（完整遍历数据集10次）
 for epoch in range(10):
+    # 调用train函数进行一个epoch的训练
+    # 参数说明：
+    #   epoch: 当前epoch编号
+    #   model: 要训练的模型
+    #   optimizer: 优化器
+    #   train_ds: 训练数据集
+    # 返回该epoch的loss值
     loss = train(epoch, model, optimizer, train_ds)
 
 # # 诗歌生成

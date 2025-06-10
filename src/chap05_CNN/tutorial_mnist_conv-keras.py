@@ -119,11 +119,18 @@ optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算
 
 # In[6]:
 #这段代码片段展示了如何使用Keras API来编译、训练和评估一个神经网络模型。
+# 编译模型，指定优化器、损失函数和评估指标
 model.compile(
+    # 指定优化器，例如 Adam 或 SGD
     optimizer=optimizer,
+    # 指定损失函数，适用于多分类任务
     loss='sparse_categorical_crossentropy',
+    # 指定评估指标，这里使用准确率
     metrics=['accuracy']
 )
+# 加载MNIST数据集，返回训练集和测试集
 train_ds, test_ds = mnist_dataset()
+# 训练模型，指定训练数据和训练轮数
 model.fit(train_ds, epochs=5)
+# 评估模型，指定测试数据
 model.evaluate(test_ds)
