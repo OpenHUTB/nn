@@ -374,13 +374,17 @@ def test(model, x, y):
 # In[12]:
 
 def prepare_data():
+    # 加载MNIST数据集
     train_data, test_data = mnist_dataset()
+    # 初始化训练集和测试集的标签矩阵，形状分别为 [样本数量, 10]，初始值为0
     train_label = np.zeros(shape=[train_data[0].shape[0], 10])
     test_label = np.zeros(shape=[test_data[0].shape[0], 10])
+    # 将训练集和测试集的标签转换为one-hot编码格式
+    # 使用numpy的高级索引，将对应位置的值设置为1
     train_label[np.arange(train_data[0].shape[0]), np.array(train_data[1])] = 1.
     test_label[np.arange(test_data[0].shape[0]), np.array(test_data[1])] = 1.
+    # 返回处理后的训练集和测试集数据
     return train_data[0], train_label, test_data[0], test_label
-
 
 def train(model, train_data, train_label, epochs=50, batch_size=128):
     losses = []
