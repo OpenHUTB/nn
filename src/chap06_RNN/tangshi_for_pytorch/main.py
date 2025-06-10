@@ -147,7 +147,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         for row in x_data:# 为每个输入序列生成对应的目标序列,目标序列是输入序列右移一位，最后一个元素复制到末尾
             y  = row[1:]# 移除第一个元素
             y.append(row[-1])# 将原序列的最后一个元素添加到末尾
-=======
+
     """
     生成训练所需的批次数据（x_batches 和 y_batches）
 
@@ -190,7 +190,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         # print(y_data[0])
         # exit(0)
         x_batches.append(x_data)# 将处理好的批次添加到批次列表中
-=======
+
 
         x_batches.append(x_data)
         y_batches.append(y_data)
