@@ -27,7 +27,7 @@ np.random.seed(42)
 # TensorFlow的随机种子
 tf.random.set_seed(42)
 
-# 确保在Jupyter Notebook中内联显示图形
+# 确保在 Jupyter Notebook 中内联显示图形
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
@@ -52,12 +52,12 @@ y = np.zeros(dot_num)
 C2 = np.array([x_n, y_n, y]).T
 
 # 绘制正样本，用蓝色加号表示
-plt.scatter(C1[:, 0], C1[:, 1], c='b', marker='+')
+plt.scatter(C1[:, 0], C1[:, 1], c = 'b', marker = '+')
 # 绘制负样本，用绿色圆圈表示
-plt.scatter(C2[:, 0], C2[:, 1], c='g', marker='o')
+plt.scatter(C2[:, 0], C2[:, 1], c = 'g', marker = 'o')
 
 # 将正样本和负样本连接成一个数据集
-data_set = np.concatenate((C1, C2), axis=0)
+data_set = np.concatenate((C1, C2), axis = 0)
 # 随机打乱数据集的顺序
 np.random.shuffle(data_set)
 
@@ -83,17 +83,26 @@ class LogisticRegression():
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
-            shape=[1], 
-            dtype=tf.float32, 
+            shape=[1],
+            dtype=tf.float32,
             initial_value=tf.zeros(shape=[1])
-        
+        )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
 
     @tf.function
     def __call__(self, inp):
+        """
+           计算神经网络模型的前向传播过程，包括输入数据与权重的矩阵乘法、加偏置、然后应用sigmoid激活函数。
+    
+           参数:
+               inp (tf.Tensor): 输入数据，形状通常为(N, D)，其中N是样本数，D是特征维度。
+    
+           返回:
+                tf.Tensor: 预测的概率值，形状为(N, 1)，值在[0, 1]之间。
+        """
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
-        logits = tf.matmul(inp, self.W) + self.b 
+        logits = tf.matmul(inp, self.W) + self.b
         # 对logits应用sigmoid函数，得到预测概率
         pred = tf.nn.sigmoid(logits)
         return pred
@@ -115,9 +124,9 @@ def compute_loss(pred, label):
         """
     if not isinstance(label, tf.Tensor):
         # 如果标签不是Tensor类型，将其转换为Tensor类型，数据类型为float32
-        label = tf.constant(label, dtype=tf.float32)
+        label = tf.constant(label, dtype = tf.float32)
     # 压缩预测结果的维度，从形状(N, 1)变为(N,)
-    pred = tf.squeeze(pred, axis=1)
+    pred = tf.squeeze(pred, axis = 1)
     '''============================='''
     # 输入label shape(N,), pred shape(N,)
     # 输出 losses shape(N,) 每一个样本一个loss
@@ -135,7 +144,7 @@ def compute_loss(pred, label):
     pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype=tf.float32))
-    return loss, accuracy
+    return loss, accuracy# 返回计算得到的损失值和准确率
 
 
 @tf.function
@@ -155,16 +164,32 @@ def train_one_step(model, optimizer, x, y):
 
 
 if __name__ == '__main__':
-    # 实例化逻辑回归模型
-    model = LogisticRegression()
-    # 使用自适应优化器 Adam ，学习率为0.01
-    opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
-    # 从数据集中解包出x1, x2坐标和标签y
-    x1, x2, y = list(zip(*data_set))
-    # 将x1和x2组合成输入数据 x
-    x = list(zip(x1, x2))
-    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
-    animation_frames = []
+   # 实例化逻辑回归模型
+   # LogisticRegression 是一个用于二分类问题的线性模型
+   model = LogisticRegression()
+
+   # 使用自适应优化器 Adam ，学习率为0.01
+   # Adam 是一种自适应学习率的优化算法，结合了 Momentum 和 RMSProp 的优点
+   # learning_rate=0.01 设置了初始学习率为 0.01
+   opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
+
+   # 从数据集中解包出x1, x2坐标和标签y
+   # data_set 是一个包含多个样本的列表，每个样本格式为 (x1, x2, y)
+   # 使用 zip(*data_set) 对数据进行转置，然后转换为列表
+   # 这样可以将所有x1、x2和y分别分组
+   x1, x2, y = list(zip(*data_set))
+
+   # 将x1和x2组合成输入数据 x
+   # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
+   # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
+   x = list(zip(x1, x2))
+
+   # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
+   # animation_frames 列表将记录训练过程中每个步骤或epoch的:
+   #   - 模型参数(如权重和偏置)
+   #   - 当前损失值
+   # 这些信息可以用于后续创建训练过程的动画演示
+   animation_frames = []
 
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
@@ -177,16 +202,15 @@ if __name__ == '__main__':
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
     # 创建图形
-    f, ax = plt.subplots(figsize=(6, 4))
-    f.suptitle('Logistic Regression Example', fontsize=15)
-    plt.ylabel('Y')
-    plt.xlabel('X')
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 10)
-
-    line_d, = ax.plot([], [], label='fit_line')
-    C1_dots, = ax.plot([], [], '+', c='b', label='actual_dots')
-    C2_dots, = ax.plot([], [], 'o', c='g', label='actual_dots')
+    f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
+    f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
+    plt.ylabel('Y') 
+    plt.xlabel('X')  
+    ax.set_xlim(0, 10)  
+    ax.set_ylim(0, 10) 
+    line_d, = ax.plot([], [], label = 'fit_line')
+    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
+    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
@@ -195,27 +219,46 @@ if __name__ == '__main__':
     )
 
     def init():
+        """
+        初始化动画所需的图形元素
+        该函数将所有动态绘图对象的数据清空，为动画初始化做准备
+        通常用于 Matplotlib 的 FuncAnimation 初始化函数
+        """
+        # 清空线条对象的数据（x, y 坐标）
         line_d.set_data([], [])
+        # 清空类别1的散点数据（C1）
         C1_dots.set_data([], [])
+        # 清空类别2的散点数据（C2）
         C2_dots.set_data([], [])
+        # 返回所有需要动画更新的图形对象（打包为元组）
+        # Matplotlib 动画要求返回值为 Artist 对象的集合
         return (line_d,) + (C1_dots,) + (C2_dots,)
 
     def animate(i):
-        xx = np.arange(10, step=0.1)
-        a = animation_frames[i][0]
-        b = animation_frames[i][1]
-        c = animation_frames[i][2]
-        yy = a/-b * xx + c/-b
-        line_d.set_data(xx, yy)
-        C1_dots.set_data(C1[:, 0], C1[:, 1])
-        C2_dots.set_data(C2[:, 0], C2[:, 1])
-        frame_text.set_text(
+        """
+        动画的每一帧更新函数
+        参数:
+        i: 当前帧的索引
+        返回:
+        更新后的图形对象
+        """
+        # 具体实现 
+        xx = np.arange(10, step=0.1)# 生成x轴数据点，范围0-9.9，步长0.1
+        a = animation_frames[i][0]  # 从帧数据中提取当前帧的参数，假设animation_frames是一个列表，每个元素包含[a, b, c, loss]四个值
+        b = animation_frames[i][1]  # 从帧数据中提取当前帧的参数b（通常表示偏移量或截距）
+        c = animation_frames[i][2]  # 从帧数据中提取当前帧的参数c
+        yy = a/-b * xx + c/-b       # 计算直线方程 y = (-a/b)x + (-c/b)
+        line_d.set_data(xx, yy)     # 更新直线数据
+        C1_dots.set_data(C1[:, 0], C1[:, 1]) # 更新C1和C2散点数据
+        C2_dots.set_data(C2[:, 0], C2[:, 1]) # 更新C2散点数据
+        frame_text.set_text(        # 更新帧文本信息，显示当前时间步和损失值
             'Timestep = %.1d/%.1d\nLoss = %.3f' % 
             (i, len(animation_frames), animation_frames[i][3])
-        return (line_d,) + (C1_dots,) + (C2_dots,)
-
+        )
+        return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象元组，用于blitting优化
+    # 创建FuncAnimation对象
     anim = animation.FuncAnimation(
-        f, animate, init_func=init,
-        frames=len(animation_frames), interval=30, blit=True
+        f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
+        frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
-    HTML(anim.to_html5_video())
+    HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示

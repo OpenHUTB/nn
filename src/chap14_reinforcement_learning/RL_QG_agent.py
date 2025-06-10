@@ -1,17 +1,19 @@
+# 操作系统接口模块 - 提供与操作系统交互的功能
 import os
+# 数值计算库 - Python科学计算的核心库
 import numpy as np
+# 深度学习框架 - Google开发的开源机器学习平台
 import tensorflow as tf
 
-class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
-    def __init__(self): #__init__  方法是类的构造函数，用于初始化类的实例
+class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
+    def __init__(self): # __init__  方法是类的构造函数，用于初始化类的实例
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi") # self.model_dir用于存储模型文件的目录路径。os.path.dirname(os.path.abspath(__file__))获取当前脚本文件的绝对路径，并提取其所在的目录
-    #    pass    # 删掉这句话，并填写相应代码
-        #用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
-        os.makedirs(self.model_dir, exist_ok = True)  # 创建模型保存目录（如果目录不存在则自动创建）
-        self.sess = None  # TensorFlow会话对象初始化占位
-        self.saver = None  # TensorFlow模型保存器初始化占位
-        self.input_states = None  # 神经网络输入占位符初始化占位
-        self.Q_values = None  # 神经网络输出的Q值初始化占位
+        # 用于初始化与模型保存、TensorFlow会话以及输入和输出张量相关的属性
+        os.makedirs(self.model_dir, exist_ok = True)    # 创建模型保存目录（如果目录不存在则自动创建）
+        self.sess = None                                # TensorFlow会话对象初始化占位
+        self.saver = None                               # TensorFlow模型保存器初始化占位
+        self.input_states = None                        # 神经网络输入占位符初始化占位
+        self.Q_values = None                            # 神经网络输出的Q值初始化占位
 
 
     def init_model(self):
@@ -30,47 +32,68 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
         # 定义自己的 网络
         self.sess = tf.Session()
         # 定义输入状态，假设为8x8棋盘，3个通道（如当前玩家棋子、对手棋子、可行位置）
-        self.input_states = tf.placeholder(tf.float32, shape=[None, 8, 8, 3], name = "input_states")
+        self.input_states = tf.placeholder(
+            tf.float32, 
+            shape = [None, 8, 8, 3], 
+            name = "input_states"
+        )
         # 构建卷积神经网络
-        # 第1个卷积层：提取局部空间特征
-        conv1 = tf.layers.conv2d(
-            inputs = self.input_states,
+        # ========== 卷积层1：提取局部特征（如相邻棋子模式） ==========
+        # - 32个3x3卷积核，步长默认1，same填充保持输出尺寸8x8
+        # - ReLU激活增加非线性，输出形状：[None, 8, 8, 32]
+        conv1 = tf.layers.conv2d(# 自动调整子图参数，优化布局避免元素重叠
+            inputs = self.input_states,   # 输入张量，形状应为 [batch_size, height, width, channels]
             filters = 32,                 # 输出通道数：32个卷积核
             kernel_size = 3,              # 卷积核大小 3x3
             padding = "same",             # 输出大小与输入相同
             activation = tf.nn.relu       # ReLU 激活函数
             )
 
-    # 第2个卷积层：提取更高级特征
+    # ========== 卷积层2：提取高层语义特征（如大范围棋子布局） ==========
+    # - 64个3x3卷积核，输出特征图数量翻倍，捕捉更复杂模式
+    # - 输出形状：[None, 8, 8, 64]
         conv2 = tf.layers.conv2d(
-            inputs = conv1,
+
+            inputs = conv1,               # 输入：上层卷积层（conv1）的输出特征图
             filters = 64,                 # 输出通道数：64个卷积核
-            kernel_size = 3,
-            padding = "same",
-            activation = tf.nn.relu
+            kernel_size = 3,             #指的是卷积核的大小为 3×3
+            padding = "same",            #这种填充方式能保证输出特征图的尺寸和输入特征图的尺寸相同
+
+            activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
             )
-        
-        # 扁平化层
+
+        # ========== 扁平化层：将多维特征图转换为一维向量 ==========
+        # - 输入形状[None, 8, 8, 64] → 输出形状[None, 8*8*64=4096]
         flat = tf.layers.flatten(conv2)
-        # 全连接层
-        dense = tf.layers.dense(inputs=flat, units=512, activation=tf.nn.relu)
-        # 输出层，64个动作的Q值
-        self.Q_values = tf.layers.dense(inputs=dense, units=64, name="q_values")
+
+        # ========== 全连接层：提取全局特征关系 ==========
+        # - 512个神经元，通过ReLU激活学习非线性组合
+        # - 输出形状：[None, 512]
+        dense = tf.layers.dense(inputs = flat, units = 512, activation = tf.nn.relu)
+
+        # ========== 输出层：预测每个动作的Q值 ==========
+        # - 64个神经元对应棋盘64个位置（0-63索引）
+        # - 线性激活（无激活函数）直接输出Q值，范围不限
+        self.Q_values = tf.layers.dense(inputs = dense, units = 64, name = "q_values")
+
         # 初始化变量和Saver
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
         # 补全代码
         
     def place(self,state,enables):
-        # 用于测试的函数，返回的action是 0-63 之间的一个数值，
-        # action 表示的是 要下的位置。
-        # action = 123456789
-        # 删掉这句话，并填写相应代码
+        """
+           根据当前棋盘状态和合法落子位置，选择最优落子位置。
+
+           :param state: 当前棋盘状态，形状为 (8, 8, 3) 的数组
+           :param enables: 合法落子位置的索引列表
+           :return: 选择的落子位置索引，范围为 0-63
+           """
         # 状态预处理
         state_input = np.array(state).reshape(1, 8, 8, 3).astype(np.float32)  # 转换为(1,64)形状
         
         # 前向传播获取Q值
-        q_vals = self.sess.run(self.q_values, feed_dict={self.input_state: state_input})
+        q_vals = self.sess.run(self.q_values, feed_dict = {self.input_states: state_input})
         
         # 过滤合法动作并选择最优
         
@@ -86,6 +109,8 @@ class RL_QG_agent: #定义了一个名为 RL_QG_agent 的类
     #save_model  和  load_model，用于保存和加载 TensorFlow 模型的参数
     # 保存模型
     def save_model(self):  
+    # 使用TensorFlow的Saver对象保存模型参数
+    # 参数保存为checkpoint格式，包含所有可训练变量的值
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
     # 重新导入模型
     def load_model(self):
