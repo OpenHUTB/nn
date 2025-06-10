@@ -249,7 +249,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
     # 应用梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     
-    return loss
+    return loss # 返回损失值
 
 def train(model, optimizer, seqlen):
     """
