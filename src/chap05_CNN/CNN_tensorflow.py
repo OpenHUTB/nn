@@ -191,12 +191,16 @@ prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 cross_entropy = tf.reduce_mean(
     -tf.reduce_sum(ys * tf.log(prediction),reduction_indices=[1])
 )
+# 创建优化器 - Adam算法优化损失函数
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
+# 创建TensorFlow会话 - 执行计算图的上下文环境
 with tf.Session() as sess:
+    # 初始化所有全局变量（权重和偏置）
     init = tf.global_variables_initializer()
     sess.run(init)
-    
+
+    # 训练循环 - 迭代多个epoch
     for i in range(max_epoch):
         batch_xs, batch_ys = mnist.train.next_batch(100)
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
