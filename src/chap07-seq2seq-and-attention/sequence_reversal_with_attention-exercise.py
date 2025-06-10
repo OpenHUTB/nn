@@ -219,8 +219,12 @@ class mySeq2SeqModel(keras.Model):
 @tf.function
 def compute_loss(logits, labels):
     """计算模型预测的损失"""
+    # 计算每个样本的稀疏softmax交叉熵损失
+    # logits: 模型的预测输出，形状为 [batch_size, num_classes]
+    # labels: 真实标签，形状为 [batch_size]，每个标签是一个整数索引
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 计算所有样本的平均损失
     losses = tf.reduce_mean(losses)
     return losses
 
@@ -282,11 +286,13 @@ def train(model, optimizer, seqlen):
 
 # In[28]:
 
-
+# 定义优化器，使用Adam优化器，学习率为0.0005
 optimizer = optimizers.Adam(0.0005)
+# 实例化自定义的序列到序列模型
 model = mySeq2SeqModel()
+# 调用训练函数，开始训练模型
+# 指定模型、优化器以及序列长度为20
 train(model, optimizer, seqlen=20)
-
 
 # # 测试模型逆置能力
 # 首先要先对输入的一个字符串进行encode，然后在用decoder解码出逆置的字符串
