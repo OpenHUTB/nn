@@ -73,7 +73,7 @@ class SoftmaxRegression(tf.Module):
         # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
-            name="W",
+            name = "W",
         )
         self.b = tf.Variable(tf.zeros([num_classes]), name="b") # 全0初始化，形状为[类别数]，变量名称为b
 
