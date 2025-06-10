@@ -123,10 +123,10 @@ def compute_loss(pred, labels, num_classes=3):
     acc = tf.reduce_mean(
         tf.cast(
             tf.equal(
-                tf.argmax(pred, axis=1),
-                tf.argmax(one_hot_labels, axis=1)
+                tf.argmax(pred, axis=1),           # 获取预测的类别索引
+                tf.argmax(one_hot_labels, axis=1)  # 获取真实类别索引
             ),
-            dtype=tf.float32,
+            dtype=tf.float32,                      # 将布尔值转换为浮点数
         )
     )
     # 返回损失值和准确率
@@ -145,13 +145,19 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :param y_batch: 标签
     :return: 当前批次的损失与准确率
     """
+    # 使用 tf.GradientTape() 上下文管理器记录前向传播过程，以便后续自动计算梯度
     with tf.GradientTape() as tape:
-        predictions = model(x_batch)  # 前向传播：计算模型对输入批次的预测
-        loss, accuracy = compute_loss(predictions, y_batch)  # 计算损失和准确率
+        # 前向传播：计算模型对输入批次的预测
+        predictions = model(x_batch)
+        # 计算损失和准确率
+        loss, accuracy = compute_loss(predictions, y_batch)
 
-    grads = tape.gradient(loss, model.trainable_variables)  # 自动计算损失函数对模型参数的梯度
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 优化步骤：使用优化器将计算出的梯度应用到模型参数上
-    return loss, accuracy  # 返回当前批次的损失和准确率
+    #自动计算损失函数对模型参数的梯度
+    grads = tape.gradient(loss, model.trainable_variables)
+    # 优化步骤：使用优化器将计算出的梯度应用到模型参数上
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    # 返回当前批次的损失和准确率
+    return loss, accuracy
 
 # ### 实例化一个模型，进行训练，提取所需的数据
 
