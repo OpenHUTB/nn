@@ -75,6 +75,14 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     计算log(sum(exp(log_p)))，通过减去最大值避免数值溢出
     数学公式: log(sum(exp(log_p))) = max(log_p) + log(sum(exp(log_p - max(log_p))))
+    
+    参数：
+    log_p: 输入的对数概率（可能为负无穷）。
+    axis: 沿着哪个轴进行计算，默认为1（即按行计算）。
+    keepdims: 是否保持维度，默认为False。
+
+    返回：
+    计算结果的log(sum(exp(log_p)))，返回与输入数组相同形状的结果。
     """
     log_p = np.asarray(log_p)   # 将对数概率列表转换为NumPy数组
     
@@ -203,34 +211,40 @@ class GaussianMixtureModel:
         
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
+        # 基于软聚类结果确定最终的硬聚类标签
         return self
 
-    def _log_gaussian(self, X, mu, sigma):
-        """计算多维高斯分布的对数概率密度
+   def _log_gaussian(self, X, mu, sigma):
+    """计算多维高斯分布的对数概率密度
+    
+    参数:
+        X: 输入数据点/样本集，形状为(n_samples, n_features)
+        mu: 高斯分布的均值向量，形状为(n_features,)
+        sigma: 高斯分布的协方差矩阵，形状为(n_features, n_features)
         
-        参数:
-            X: 输入数据，shape=(n_samples, n_features)
-            mu: 高斯分布均值，shape=(n_features,)
-            sigma: 高斯分布协方差矩阵，shape=(n_features, n_features)
-            
-        返回:
-            log_prob: 对数概率密度，shape=(n_samples,)
-        """
-        # 获取特征维度数量
-        n_features = mu.shape[0]
+    返回:
+        log_prob: 每个样本的对数概率密度，形状为(n_samples,)
+    """
+    # 获取特征维度数（协方差矩阵的维度）
+    n_features = mu.shape[0]
 
-        # 数据中心化：每个样本减去均值
-        X_centered = X - mu
+    # 数据归一化：将数据减去均值，得到中心化数据
+    # 高斯分布公式中的(x-μ)项
+    X_centered = X - mu  # 形状保持(n_samples, n_features)
 
-        # 计算协方差矩阵的对数行列式和逆矩阵
-        # 行列式用于计算高斯分布的归一化常数
+    # 计算协方差矩阵的行列式符号和对数值
+    # sign: 行列式的符号（正负）
+    # logdet: 行列式的自然对数值
+    sign, logdet = np.linalg.slogdet(sigma)  # 数值稳定的行列式计算方法
+
+    # 处理协方差矩阵可能奇异（不可逆）的情况
+    if sign <= 0:  # 行列式非正（理论上协方差矩阵应是正定的）
+        # 添加一个小的对角扰动项（单位矩阵乘以1e-6）
+        # 确保矩阵可逆且正定，提高数值稳定性
+        sigma += np.eye(n_features) * 1e-6  # 正则化处理
+        
+        # 重新计算调整后的协方差矩阵的行列式
         sign, logdet = np.linalg.slogdet(sigma)
-        
-        # 处理协方差矩阵接近奇异的情况（行列式接近0）
-        if sign <= 0:
-            # 添加微小扰动确保协方差矩阵正定（数值稳定性）
-            sigma += np.eye(n_features) * 1e-6
-            sign, logdet = np.linalg.slogdet(sigma)
 
         # 计算协方差矩阵的逆
         inv = np.linalg.inv(sigma)

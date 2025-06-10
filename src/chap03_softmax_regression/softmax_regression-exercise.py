@@ -73,10 +73,10 @@ class SoftmaxRegression(tf.Module):
         # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
-            name="W",
+            name = "W",
         )
-        self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        
+        self.b = tf.Variable(tf.zeros([num_classes]), name="b") # 全0初始化，形状为[类别数]，变量名称为b
+
     @tf.function
     def __call__(self, x):
         """
@@ -192,6 +192,7 @@ y = np.arange(0.0, 10.0, 0.1)
 # 生成网格坐标矩阵
 # 将网格坐标展平并组合为输入特征矩阵
 X, Y = np.meshgrid(x, y)
+# 将X和Y数组重塑为一维数组后进行配对组合
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 # 模型预测

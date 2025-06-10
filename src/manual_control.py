@@ -164,8 +164,25 @@ def find_weather_presets():                                                     
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
-def get_actor_display_name(actor, truncate=250):                                   # 提取 actor 的类型标识符，并将其格式化为更易读的名称（例如 vehicle.tesla.model3 -> Tesla Model3）
-    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])        # 如果名称过长，则进行截断，并在末尾加上省略号（…）
+def get_actor_display_name(actor, truncate=250):
+    """
+    格式化actor的类型标识符为易读的显示名称
+    参数:
+        actor: 包含type_id属性的对象（如CARLA中的车辆/行人对象）
+        truncate: 最大名称长度限制（默认250字符)
+    返回:
+        str: 格式化后的显示名称（示例：'vehicle.tesla.model3' -> 'Tesla Model3'）
+    """
+    # 处理原始type_id字符串:
+    # 1. 将下划线替换为点（保持统一分隔符）
+    # 2. 每个单词首字母大写（title()方法）
+    # 3. 按点分割后取第1部分之后的内容（跳过类别前缀如'vehicle'）
+    # 示例：'vehicle_tesla_model3' -> ['Vehicle', 'Tesla', 'Model3'] -> 'Tesla Model3'
+    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
+    
+    # 处理超长名称：
+    # 如果超过truncate限制，截断并添加Unicode省略号（…）
+    # 否则返回完整名称
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
@@ -222,7 +239,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self._weather_presets = find_weather_presets()  # 预设的天气配置列表（晴天、雨天、雾天等）
         self._weather_index = 0
         self._actor_filter = args.filter
-        self._actor_generation = args.generation
+        self._actor_generation = args.generation #角色生成参数配置
         self._gamma = args.gamma
         self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)
@@ -475,28 +492,36 @@ class KeyboardControl(object):
                         world.hud.notification("Enabled Constant Velocity Mode at 60 km/h")
                 elif event.key == K_o:
                     try:
+                        # 判断门是否已打开
                         if world.doors_are_open:
+                            # 如果门已经打开，关闭门并显示通知
                             world.hud.notification("Closing Doors")
                             world.doors_are_open = False
                             world.player.close_door(carla.VehicleDoor.All)
                         else:
+                            # 如果门未打开，打开门并显示通知
                             world.hud.notification("Opening doors")
                             world.doors_are_open = True
                             world.player.open_door(carla.VehicleDoor.All)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # 捕获并打印异常信息，便于调试
+                        print(f"Error while toggling vehicle doors: {e}")
                 elif event.key == K_t:
+                    # 检查遥测是否已经启用
                     if world.show_vehicle_telemetry:
+                        # 如果启用，禁用遥测并显示通知
                         world.player.show_debug_telemetry(False)
                         world.show_vehicle_telemetry = False
                         world.hud.notification("Disabled Vehicle Telemetry")
                     else:
                         try:
+                            # 如果未启用，尝试启用遥测并显示通知
                             world.player.show_debug_telemetry(True)
                             world.show_vehicle_telemetry = True
                             world.hud.notification("Enabled Vehicle Telemetry")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            # 捕获并忽略任何异常，可以在此添加日志记录
+                            print(f"Error enabling vehicle telemetry: {e}")
                 elif event.key > K_0 and event.key <= K_9:
                     index_ctrl = 0
                     if pygame.key.get_mods() & KMOD_CTRL:

@@ -122,13 +122,34 @@ def train_one_step(model, optimizer, x, y):
     accuracy = compute_accuracy(logits, y)   # 计算准确率
     return loss, accuracy
 
-# 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
-@tf.function
+# 使用tf.function装饰器将函数编译为TensorFlow静态计算图，以提高执行效率
+# 自动处理自动微分和GPU加速，特别适合模型测试阶段
+@tf.function  
 def test(model, x, y):
-    logits = model(x)                             # 计算预测结果与真实标签之间的损失值
-    loss = compute_loss(logits, y)                # compute_loss函数应实现具体的损失计算逻辑
-    accuracy = compute_accuracy(logits, y)        # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
-    return compute_loss(logits, y), compute_accuracy(logits, y)# 返回: (损失值, 准确率)
+    """
+    模型测试函数（前向传播+指标计算）
+    
+    Args:
+        model: 训练好的模型实例
+        x: 输入数据张量，shape=(batch_size, ...)
+        y: 真实标签张量，shape=(batch_size, num_classes)或(batch_size,)
+    
+    Returns:
+        tuple: (损失值, 准确率) 两个标量张量
+    """
+    # 模型前向传播计算预测logits（未归一化的预测值）
+    logits = model(x)  # shape=(batch_size, num_classes)
+    
+    # 计算预测结果与真实标签之间的损失值（交叉熵等）
+    # 注意：compute_loss函数需事先定义，接收(logits, labels)参数
+    loss = compute_loss(logits, y)  
+    
+    # 计算预测准确率（比较预测类别和真实类别）
+    # 注意：compute_accuracy函数需事先定义，接收(logits, labels)参数
+    accuracy = compute_accuracy(logits, y)  
+    
+    # 显式返回计算结果（虽然loss/accuracy已计算，但避免重复计算）
+    return loss, accuracy  # 返回类型: (tf.Tensor, tf.Tensor)
 
 
 # ## 实际训练
@@ -142,6 +163,9 @@ for epoch in range(50):
     loss, accuracy = train_one_step(model, optimizer, 
                                     tf.constant(train_data[0], dtype = tf.float32),  # 训练图像数据
                                     tf.constant(train_data[1], dtype = tf.int64))    # 训练标签数据
+    # 打印当前epoch的训练损失和准确率
+    # loss.numpy() 将Tensor转换为Python浮点数以便打印
+    # accuracy.numpy() 将Tensor转换为Python浮点数以便打印
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 # 在测试集上测试模型
 loss, accuracy = test(model, 
@@ -149,3 +173,4 @@ loss, accuracy = test(model,
                       tf.constant(test_data[1], dtype = tf.int64))    # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
 # 打印测试集上的最终损失和准确率
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
+# 显示模型在测试数据上的总体误差，值越小表示模型预测越接近真实标签

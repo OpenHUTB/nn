@@ -26,6 +26,7 @@ def mnist_dataset():
     x_test = x_test / 255.0
 
     # 返回处理后的训练集和测试集
+    # 返回格式：(训练图像数组, 训练标签数组), (测试图像数组, 测试标签数组)
     return (x, y), (x_test, y_test)
 
 
@@ -138,27 +139,40 @@ class Log:
     '''
     对最后一个维度执行对数运算
     用于对数似然计算，通常与Softmax结合使用
+    实现数值稳定的对数计算，并保存中间结果用于反向传播
     '''
     def __init__(self):
-        self.epsilon = 1e-12
-        self.mem = {}
+        # 设置一个极小值epsilon防止对数运算中出现log(0)的情况
+        self.epsilon = 1e-12  
+        # 用于存储前向传播的中间结果，供反向传播使用
+        self.mem = {}  
 
     def forward(self, x):
         '''
-        x: shape(N, c)
+        前向传播：计算输入的对数值
+        :param x: 输入数据，shape(N, c) 
+                   N是batch大小，c是类别数/特征维度
+        :return: log(x + epsilon)，保持数值稳定性
         '''
-        out = np.log(x + self.epsilon)
+        # 计算对数，加上epsilon避免x=0时出现NaN
+        out = np.log(x + self.epsilon)  
 
-        self.mem['x'] = x
+        # 保存输入x用于反向传播计算
+        self.mem['x'] = x  
         return out
 
     def backward(self, grad_y):
         '''
-        grad_y: same shape as x
+        反向传播：计算梯度
+        :param grad_y: 上游传来的梯度，shape与forward输入x相同
+        :return: 当前层的梯度 = (1/(x + epsilon)) * grad_y
         '''
-        x = self.mem['x']
+        # 从内存中取出前向传播保存的输入x
+        x = self.mem['x']  
 
-        return 1. / (x + 1e-12) * grad_y
+        # 计算当前层梯度：d(log(x))/dx = 1/x
+        # 乘以来自上游的梯度grad_y（链式法则）
+        return 1. / (x + self.epsilon) * grad_y  
 
 
 # ## Gradient check
@@ -286,6 +300,7 @@ with tf.GradientTape() as tape:
     prob = tf.nn.softmax(h2)
     log_prob = tf.math.log(prob)
     loss = tf.reduce_sum(label * log_prob)
+    # 计算负对数似然损失(Negative Log Likelihood Loss)
     grads = tape.gradient(loss, [prob])
     print(grads[0].numpy())
 
