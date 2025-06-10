@@ -96,15 +96,26 @@ register(
     max_episode_steps=500,
 )
 
-# Box2d
-# Box2d物理引擎环境：复杂物理模拟任务
+# Box2d物理引擎环境：用于复杂物理模拟任务
 # ----------------------------------------
+# 该模块使用Box2D物理引擎实现高保真度的物理模拟
+# 特别适合连续控制任务和刚体动力学仿真
 
+# 注册名为'LunarLander-v2'的自定义环境
 register(
-    id = 'LunarLander-v2',    # 月球着陆器
-    entry_point = 'gym.envs.box2d:LunarLander',
-    max_episode_steps = 1000,
-    reward_threshold = 200,   # 成功着陆得分
+    id='LunarLander-v2',     # 环境唯一标识符，格式：<任务名>-<版本号>
+                            # 此处是月球着陆器环境第2版
+    
+    # 指定环境类的入口点路径：
+    # gym.envs.box2d模块下的LunarLander类
+    entry_point='gym.envs.box2d:LunarLander',  
+    
+    # 每个episode的最大步数限制（防止无限运行）
+    max_episode_steps=1000,  
+    
+    # 奖励阈值：当episode累计奖励超过200时
+    # 视为任务成功（着陆器安全着陆）
+    reward_threshold=200,    
 )
 # 月球着陆器连续动作版本
 register(
