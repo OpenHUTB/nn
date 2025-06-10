@@ -140,7 +140,7 @@ class myRNNModel(keras.Model):
             
         Returns:
             logits: 预测结果，shape为(batch_size, maxlen, 10)
-        # 嵌入处理
+         # 嵌入处理：将数字位（0-9）转换为32维向量
         embed1 = self.embed_layer(num1)  # [batch_size, maxlen, embed_dim]
         embed2 = self.embed_layer(num2)  # [batch_size, maxlen, embed_dim]
         
