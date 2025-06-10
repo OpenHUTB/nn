@@ -238,20 +238,37 @@ def main(x_train, y_train, use_gradient_descent=False):
             gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
             w_gd -= learning_rate * gradient # 更新权重
 
-    # 定义预测函数
+   # 定义预测函数
     def f(x):
-        # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
-        # 调用basis_func函数，对输入x进行某种变换，得到基函数的值
-        phi1 = basis_func(x)
-        # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
-        phi = np.concatenate([phi0, phi1], axis=1)
-        # 判断是否使用梯度下降算法，并且 w_gd 是否已经定义，如果使用梯度下降算法，并且 w_gd 已经定义，则使用 w_gd 进行预测
-        if use_gradient_descent and w_gd is not None:
-            return np.dot(phi, w_gd)
-        # 如果不使用梯度下降算法，或者 w_gd 没有定义，则使用最小二乘法得到的权重 w_lsq 进行预测
-        else:
-            return np.dot(phi, w_lsq)
+    """
+    使用线性模型进行预测，可选择使用梯度下降或最小二乘法的权重
+    
+    参数:
+        x: 输入特征向量/矩阵
+        
+    返回:
+        模型的预测值
+    """
+    # 创建偏置项(截距项)的特征列
+    # np.ones_like(x)生成与x形状相同的全1向量
+    # np.expand_dims增加一个维度，将形状从(n,)变为(n,1)
+    phi0 = np.expand_dims(np.ones_like(x), axis=1)  # 形状变为(n,1)
+    
+    # 调用基函数转换输入特征
+    # basis_func对原始特征进行非线性变换(如多项式扩展)
+    phi1 = basis_func(x)  # 假设返回形状为(n,m)
+    
+    # 构建设计矩阵(特征矩阵)
+    # 将偏置项列phi0和转换后的特征phi1按列拼接
+    phi = np.concatenate([phi0, phi1], axis=1)  # 最终形状(n,m+1)
+    
+    # 根据训练方法选择对应的权重进行预测
+    if use_gradient_descent and w_gd is not None:
+        # 使用梯度下降法训练得到的权重
+        return np.dot(phi, w_gd)  # 矩阵乘法计算预测值
+    else:
+        # 使用最小二乘法训练得到的权重(默认)
+        return np.dot(phi, w_lsq)  # 矩阵乘法计算预测值
 
     # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
