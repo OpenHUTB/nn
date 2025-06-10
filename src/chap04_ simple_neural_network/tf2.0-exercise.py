@@ -79,8 +79,9 @@ label = np.zeros_like(test_data)
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0  
 
 # 对比手动实现和 TensorFlow 实现的 softmax 交叉熵结果
-((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
-  - softmax_ce(prob, label))**2 < 0.0001).numpy()
+((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
+    labels=label, logits=test_data))  # 修正参数顺序为 (labels, logits)
+  - sigmoid_ce(prob, label))** 2 < 0.0001).numpy()
 
 # ## 实现 sigmoid 交叉熵loss函数
 
