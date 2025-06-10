@@ -77,6 +77,9 @@ class myRNNModel(keras.Model):
         
     @tf.function
     def call(self, inp_ids):
+        '''
+        此处完成建模过程，可以参考Learn2Carry
+        '''
         x = self.embed_layer(inp_ids)  # [batch_size, seq_len, embedding_dim]
         x = self.rnn_layer(x)  # [batch_size, seq_len, hidden_dim]
         logits = self.dense(x)  # [batch_size, seq_len, vocab_size]
