@@ -27,7 +27,8 @@ def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
-
+    # 从NumPy数组创建TensorFlow Dataset对象
+    # 每个元素是一个(image, label)对，来自(x, y)
     ds = tf.data.Dataset.from_tensor_slices((x, y))
     ds = ds.map(prepare_mnist_features_and_labels)
     ds = ds.take(20000).shuffle(20000).batch(100)
