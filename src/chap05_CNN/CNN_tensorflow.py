@@ -11,9 +11,9 @@ except Exception as e:
     print(f"数据加载失败: {e}")
     
 
-learning_rate = 1e-4 #学习率
-keep_prob_rate = 0.7 # Dropout保留概率0.7
-max_epoch = 2000 #最大训练轮数2000
+learning_rate = 1e-4     #学习率
+keep_prob_rate = 0.7     #Dropout保留概率0.7
+max_epoch = 2000         #最大训练轮数2000
 
 
 def compute_accuracy(v_xs, v_ys):
