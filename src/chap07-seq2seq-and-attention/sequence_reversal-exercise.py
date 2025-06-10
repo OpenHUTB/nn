@@ -245,10 +245,14 @@ def train(model, optimizer, seqlen):
         # 每500步计算并打印训练进度和准确率
         if step % 500 == 0:
             # 计算训练准确率
+            # 使用模型对当前批次的输入数据进行预测，得到logits
             logits = model(enc_x, dec_x)
+            # 获取预测结果，通过argmax获取概率最高的类别索引
             preds = tf.argmax(logits, axis=-1)
+            # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
             acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32)
-            
+
+            # 打印当前步数、损失和准确率
             print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
     return loss
 
