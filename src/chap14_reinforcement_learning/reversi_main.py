@@ -15,12 +15,13 @@ env.reset()#重置环境到初始状态
 agent = RL_QG_agent()#创建智能体实例
 agent.load_model()#加载预训练模型参数
 
-# 设置最大训练轮数
-max_epochs = 100#总共进行100局
-# 统计胜负结果的变量
-#black_wins = 0
-#white_wins = 0
-#draws = 0
+# 设置最大训练轮数/局数（epochs）
+max_epochs = 100  # 总共进行100局训练，每局包含完整的游戏过程
+
+# 以下为胜负统计变量
+# black_wins = 0    # 统计黑方获胜次数（适用于围棋等双人博弈游戏）
+# white_wins = 0    # 统计白方获胜次数  
+# draws = 0         # 统计平局次数
 
 # 主训练循环（控制训练的总轮数）
 # max_epochs：决定智能体与环境交互的总次数
