@@ -53,6 +53,7 @@ def multinomial_basis(x, feature_num=10):
     return ret
 
 
+
 def gaussian_basis(x, feature_num=10):
     """
     高斯基函数：将输入x映射为一组高斯分布特征

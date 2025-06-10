@@ -88,6 +88,7 @@ def compute_loss(logits, labels):
             logits=logits, labels=labels
         )
     )
+# 计算稀疏标签的softmax交叉熵损失
 
 @tf.function
 def compute_accuracy(logits, labels):

@@ -62,7 +62,7 @@ def load_data(filename, basis_func=gaussian_basis):
         phi0 = np.expand_dims(np.ones_like(xs), axis=1) # 添加偏置项（全1列）
         phi1 = basis_func(xs) # 应用基函数变换
         xs = np.concatenate([phi0, phi1], axis=1) # 拼接偏置和变换后的特征
-        return (np.float32(xs), np.float32(ys)), (o_x, o_y)
+        return (np.float32(xs), np.float32(ys)), (o_x, o_y)# 返回处理好的训练数据和原始数据
 
 
 #定义模型

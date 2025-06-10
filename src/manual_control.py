@@ -492,28 +492,36 @@ class KeyboardControl(object):
                         world.hud.notification("Enabled Constant Velocity Mode at 60 km/h")
                 elif event.key == K_o:
                     try:
+                        # 判断门是否已打开
                         if world.doors_are_open:
+                            # 如果门已经打开，关闭门并显示通知
                             world.hud.notification("Closing Doors")
                             world.doors_are_open = False
                             world.player.close_door(carla.VehicleDoor.All)
                         else:
+                            # 如果门未打开，打开门并显示通知
                             world.hud.notification("Opening doors")
                             world.doors_are_open = True
                             world.player.open_door(carla.VehicleDoor.All)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        # 捕获并打印异常信息，便于调试
+                        print(f"Error while toggling vehicle doors: {e}")
                 elif event.key == K_t:
+                    # 检查遥测是否已经启用
                     if world.show_vehicle_telemetry:
+                        # 如果启用，禁用遥测并显示通知
                         world.player.show_debug_telemetry(False)
                         world.show_vehicle_telemetry = False
                         world.hud.notification("Disabled Vehicle Telemetry")
                     else:
                         try:
+                            # 如果未启用，尝试启用遥测并显示通知
                             world.player.show_debug_telemetry(True)
                             world.show_vehicle_telemetry = True
                             world.hud.notification("Enabled Vehicle Telemetry")
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            # 捕获并忽略任何异常，可以在此添加日志记录
+                            print(f"Error enabling vehicle telemetry: {e}")
                 elif event.key > K_0 and event.key <= K_9:
                     index_ctrl = 0
                     if pygame.key.get_mods() & KMOD_CTRL:
