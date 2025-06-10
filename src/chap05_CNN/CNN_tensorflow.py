@@ -132,6 +132,8 @@ def max_pool_2x2(x: tf.Tensor,
     
     # 构造池化核和步长参数
     if data_format == 'NHWC':
+        # NHWC格式：[batch, height, width, channels]
+        # 池化核大小和步长都作用于height和width维度
         ksize = [1, pool_size, pool_size, 1]
         strides = [1, strides, strides, 1]
     else:  # NCHW
