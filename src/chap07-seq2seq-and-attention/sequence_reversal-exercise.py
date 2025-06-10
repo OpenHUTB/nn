@@ -10,7 +10,7 @@
 
 # 标准库（Python内置模块，按字母顺序排列）
 import collections
-import os
+import os # 导入os库
 import sys
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
 
