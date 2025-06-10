@@ -14,6 +14,8 @@ import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 import os,sys,tqdm
+import random
+import string
 
 
 # ## 玩具序列数据生成
@@ -22,8 +24,6 @@ import os,sys,tqdm
 # In[20]:
 
 
-import random
-import string
 
 def randomString(stringLength):
     """生成一个指定长度的随机字符串，字符串由大写字母组成"""
