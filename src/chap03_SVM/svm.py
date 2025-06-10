@@ -109,7 +109,7 @@ if __name__ == '__main__':
     t_test_pred = svm.predict(x_test)
 
     # 评估结果，计算准确率
-    acc_train = eval_acc(t_train, t_train_pred)
+    acc_train = eval_acc(t_train, t_train_pred)# 使用 eval_acc 函数比较真实标签 t_train 和模型预测结果 t_train_pred
     acc_test = eval_acc(t_test, t_test_pred)
-    print("train accuracy: {:.1f}%".format(acc_train * 100))
+    print("train accuracy: {:.1f}%".format(acc_train * 100))# 打印训练集准确率，格式化为百分比形式，保留一位小数
     print("test accuracy: {:.1f}%".format(acc_test * 100))
