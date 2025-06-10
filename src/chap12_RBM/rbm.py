@@ -4,7 +4,7 @@
 import numpy as np # 导入NumPy库用于高效数值计算
 import sys
 class RBM:
-    """Restricted Boltzmann Machine."""
+     """受限玻尔兹曼机 (Restricted Boltzmann Machine)"""
 
     def __init__(self, n_hidden=2, n_observe=784):
         """
@@ -98,32 +98,28 @@ class RBM:
 
        # 开始训练轮数
         for epoch in range(epochs):
-            # 打乱数据顺序
-            np.random.shuffle(data_flat) # 使用小批量梯度下降法
-            for i in range(0, n_samples, batch_size): # 获取当前批次的数据
-                batch = data_flat[i:i + batch_size] # 将批次数据转换为 float64 类型，确保数值计算的精度
-                v0 = batch.astype(np.float64)  # 确保数据类型正确
+            np.random.shuffle(data_flat)  # 打乱数据
+            for i in range(0, n_samples, batch_size):
+                batch = data_flat[i:i + batch_size].astype(np.float64)
 
-                # 正相传播：从v0计算隐藏层激活概率
-                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) 
-                # 通过输入层向量v0与权重矩阵self.W的点积，再加上隐藏层偏置self.b_h
-                h0_sample = self._sample_binary(h0_prob) 
-                # 这段代码的作用是借助 self._sample_binary 方法，对 h0_prob 进行二值采样，进而得到 h0_sample。在深度学习领域，当处理二值变量或者进行二值掩码操作时，常常会用到这样的采样。
+                # 正相阶段
+                h0_prob = self._sigmoid(np.dot(batch, self.W) + self.b_h)
+                h0_sample = self._sample_binary(h0_prob)
 
-                # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  # 将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
-                v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
-                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       # 计算隐藏单元被激活的概率
+                # 负相阶段
+                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)
+                v1_sample = self._sample_binary(v1_prob)
+                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
-                # 计算梯度      
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
-                db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
-                db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
+                # 梯度计算
+                dW = np.dot(batch.T, h0_sample) - np.dot(v1_sample.T, h1_prob)
+                db_v = np.sum(batch - v1_sample, axis=0)
+                db_h = np.sum(h0_sample - h1_prob, axis=0)
 
-                # 更新参数
-                self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
-                self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
-                self.b_h += learning_rate * db_h / batch_size                        # 更新隐藏层偏置
+                # 参数更新
+                self.W += learning_rate * dW / batch_size
+                self.b_v += learning_rate * db_v / batch_size
+                self.b_h += learning_rate * db_h / batch_size
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）"""
