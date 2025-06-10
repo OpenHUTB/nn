@@ -237,10 +237,10 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.radar_sensor = None   # 雷达传感器
         self.camera_manager = None # 相机管理器
         self._weather_presets = find_weather_presets()  # 预设的天气配置列表（晴天、雨天、雾天等）
-        self._weather_index = 0
-        self._actor_filter = args.filter
+        self._weather_index = 0 # 当前天气预设索引
+        self._actor_filter = args.filter # 车辆生成过滤器
         self._actor_generation = args.generation #角色生成参数配置
-        self._gamma = args.gamma
+        self._gamma = args.gamma # 画面伽马校正值
         self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False  # 录制与控制相关变量
@@ -249,18 +249,18 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.show_vehicle_telemetry = False
         self.doors_are_open = False
         self.current_map_layer = 0
-        self.map_layer_names = [
-            carla.MapLayer.NONE,
-            carla.MapLayer.Buildings,
-            carla.MapLayer.Decals,
-            carla.MapLayer.Foliage,
-            carla.MapLayer.Ground,
-            carla.MapLayer.ParkedVehicles,
-            carla.MapLayer.Particles,
-            carla.MapLayer.Props,
-            carla.MapLayer.StreetLights,
-            carla.MapLayer.Walls,
-            carla.MapLayer.All
+        self.map_layer_names = [           # 可用的地图图层列表
+            carla.MapLayer.NONE,           # 无图层
+            carla.MapLayer.Buildings,      # 建筑物
+            carla.MapLayer.Decals,         # 贴花
+            carla.MapLayer.Foliage,        # 植被
+            carla.MapLayer.Ground,         # 地面
+            carla.MapLayer.ParkedVehicles, # 停放车辆
+            carla.MapLayer.Particles,      # 粒子效果
+            carla.MapLayer.Props,          # 道具
+            carla.MapLayer.StreetLights,   # 街灯
+            carla.MapLayer.Walls,          # 墙壁
+            carla.MapLayer.All             # 全部图层
         ]
 
     def restart(self):
