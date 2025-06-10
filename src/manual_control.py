@@ -244,10 +244,10 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False  # 录制与控制相关变量
-        self.recording_start = 0
-        self.constant_velocity_enabled = False
-        self.show_vehicle_telemetry = False
-        self.doors_are_open = False
+        self.recording_start = 0 # 初始化车辆录制开始时间戳（默认为0，表示未开始录制）
+        self.constant_velocity_enabled = False # 标志位：是否启用恒定速度模式（False表示默认关闭）
+        self.show_vehicle_telemetry = False # 标志位：是否显示车辆遥测数据（False表示默认不显示）
+        self.doors_are_open = False # 标志位：车门是否处于开启状态（False表示默认关闭）
         self.current_map_layer = 0
         self.map_layer_names = [
             carla.MapLayer.NONE,
