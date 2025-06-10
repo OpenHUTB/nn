@@ -245,15 +245,23 @@ class GaussianMixtureModel:
     
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
+        # 检查是否有对数似然值记录
         if not self.log_likelihoods:
             raise ValueError("请先调用fit方法训练模型")
-        
+
+        # 创建一个图形窗口，设置大小为10x6英寸
         plt.figure(figsize=(10, 6))
+        # 绘制对数似然值随迭代次数的变化曲线
+        # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
+        # 设置x轴标签为“迭代次数”
         plt.xlabel('迭代次数')
+        # 设置y轴标签为“对数似然值”
         plt.ylabel('对数似然值')
+        # 设置图表标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
-        plt.grid(True)  # 启用网格线，增强可读性
+        # 启用网格线，增强可读性
+        plt.grid(True)  
         plt.show()
 
 # 主程序
