@@ -22,6 +22,8 @@ def mnist_dataset():
         ds (tf.data.Dataset): 处理后的训练数据集。
         test_ds (tf.data.Dataset): 处理后的测试数据集。
     """
+    # 加载MNIST手写数字数据集
+    # 返回格式：((训练图片, 训练标签), (测试图片, 测试标签))
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     x = x.reshape(x.shape[0], 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)

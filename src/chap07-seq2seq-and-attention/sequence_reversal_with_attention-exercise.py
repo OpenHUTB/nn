@@ -54,6 +54,7 @@ def get_batch(batch_size, length):
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     
     # 解码器输入在目标序列前加一个起始标记(0)，并去掉最后一个字符
+    # 例如目标序列为 [1,2,3]，则解码器输入为 [0,1,2]
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
@@ -65,7 +66,7 @@ print(get_batch(2, 10))
 # # 建立sequence to sequence 模型
 # ##
 # 完成两空，模型搭建以及单步解码逻辑
-
+# 带注意力机制的序列到序列模型实现，包含编码器、解码器和注意力计算
 # In[26]:
 
 
@@ -282,9 +283,21 @@ def train(model, optimizer, seqlen):
 
 # In[28]:
 
-
+# 初始化Adam优化器，设置学习率为0.0005
+# Adam优化器结合了动量法和RMSProp的优点，适合序列学习任务
+# 0.0005是相对较小的学习率，适合精细调优
 optimizer = optimizers.Adam(0.0005)
+
+# 实例化Seq2Seq模型
+# mySeq2SeqModel()应该实现了编码器-解码器架构
+# 用于处理序列到序列的转换任务（如机器翻译、文本摘要等）
 model = mySeq2SeqModel()
+
+# 开始训练模型
+# 参数说明：
+#   model: 要训练的Seq2Seq模型实例
+#   optimizer: 配置好的优化器
+#   seqlen=20: 序列长度设为20（输入/输出序列的最大长度）
 train(model, optimizer, seqlen=20)
 
 
@@ -332,10 +345,10 @@ def sequence_reversal():
     # 生成一批测试数据
     batched_examples, enc_x, _, _ = get_batch(32, 20)
     
-    # 编码输入序列
+    # 编码输入序列（提取特征表示）
     enc_out, state = model.encode(enc_x)
     
-    # 解码生成逆置序列
+    # 解码生成逆置序列（自回归生成）
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
 
 def is_reverse(seq, rev_seq):

@@ -212,7 +212,7 @@ def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
 
     w_gd = None
     if use_gradient_descent:
-        # 直接调用已实现的gradient_descent函数
+# 直接调用已实现的gradient_descent函数
         w_gd = gradient_descent(phi, y_train, lr=0.01, epochs=1000)
 
     def f(x):
@@ -223,6 +223,49 @@ def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
             return np.dot(phi, w_gd)
         else:
             return np.dot(phi, w_lsq)
+    return f, w_lsq, w_gd
+
+
+def evaluate(ys, ys_pred):
+    """评估模型。"""
+    # 计算预测值与真实值的标准差
+    std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
+    return std
+
+
+def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
+    """绘制训练集、测试集和预测结果"""
+    plt.plot(x_train, y_train, "ro", markersize=3)
+    plt.plot(x_test, y_test, "k")
+    plt.plot(x_test, y_test_pred, "k")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("Linear Regression")
+    plt.legend(["train", "test", "pred"])
+    plt.show()
+
+
+# 程序主入口（建议不要改动以下函数的接口）
+if __name__ == "__main__":
+    # 定义训练和测试数据文件路径
+    train_file = "train.txt"  # 训练集文件
+    test_file = "test.txt"  # 测试集文件
+    # 载入数据
+    x_train, y_train = load_data(
+        train_file
+    )  # 从文件加载训练数据，返回特征矩阵x_train和标签向量y_train
+    x_test, y_test = load_data(
+        test_file
+    )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
+    print(x_train.shape)  # x_train.shape 返回训练集特征矩阵的维度信息
+    print(x_test.shape)  # x_test.shape 返回测试集特征矩阵的维度信息
+
+    # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
+    # f: 预测函数 y = f(x)
+    # w_lsq: 通过最小二乘法得到的权重向量
+    # w_gd: 通过梯度下降法得到的权重向量
+    f, w_lsq, w_gd = main(x_train, y_train)
+
     return f, w_lsq, w_gd
 
 
