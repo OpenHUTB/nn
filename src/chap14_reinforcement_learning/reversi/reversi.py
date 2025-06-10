@@ -241,8 +241,19 @@ class ReversiEnv(gym.Env):
     @staticmethod
     def valid_reverse_opponent(board, coords, player_color):
         '''
-        check whether there is any reversible places
-        这里意思应该是 判断这里是否有 翻转的 棋子。
+        判断在指定位置落子后，是否可以翻转对手的棋子。
+    
+        参数:
+              board: 当前棋盘状态，形状为 [3, d, d]：
+            - board[0]: 黑棋位置 (Black)
+            - board[1]: 白棋位置 (White)
+            - board[2]: 可落子位置（可能未使用）
+        position: 落子的坐标 (x, y)，从 0 开始计数
+        player_color: 当前玩家颜色，0 表示黑棋，1 表示白棋
+    
+        返回:
+             bool: 是否可以翻转对手的棋子
+             list of (x, y): 所有可翻转的敌方棋子坐标列表
         '''
         d = board.shape[-1]
         opponent_color = 1 - player_color
