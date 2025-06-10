@@ -520,16 +520,18 @@ register(
     max_episode_steps = 200,
 )
 
+# 注册安全环境：带关闭开关的倒立摆概率环境
 register(
     id='OffSwitchCartpoleProb-v0',
     entry_point = 'gym.envs.safety:OffSwitchCartpoleProbEnv',
     max_episode_steps = 200,
 )
 
+# 注册黑白棋（奥赛罗）游戏环境
 register(
-    id='Reversi8x8-v0',
-    entry_point = 'gym.envs.reversi:ReversiEnv',
-    kwargs = {
+    id='Reversi8x8-v0',   # 环境唯一标识符，指定8x8棋盘版本
+    entry_point = 'gym.envs.reversi:ReversiEnv',  # 入口点指向黑白棋模块
+    kwargs = {  
         'player_color': 'black',
         'opponent': 'random',
         'observation_type': 'numpy3c',
