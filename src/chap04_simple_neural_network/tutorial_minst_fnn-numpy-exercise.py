@@ -372,7 +372,7 @@ def test(model, x, y):
 # ## 实际训练
 
 # In[12]:
-
+#定义预处理函数，从原始数据中提取图像和标签，并将标签进行 one-hot 编码
 def prepare_data():
     train_data, test_data = mnist_dataset()
     train_label = np.zeros(shape=[train_data[0].shape[0], 10])
