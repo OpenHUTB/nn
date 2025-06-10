@@ -255,7 +255,7 @@ def train(model, optimizer, seqlen):
             # 打印当前步数、损失和准确率
             print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
     return loss
-
+# loss.numpy(): 将TensorFlow/PyTorch张量转换为NumPy数组并获取标量值
 
 # # 训练迭代
 
