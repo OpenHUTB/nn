@@ -211,6 +211,7 @@ class GaussianMixtureModel:
         
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
+        # 基于软聚类结果确定最终的硬聚类标签
         return self
 
    def _log_gaussian(self, X, mu, sigma):
