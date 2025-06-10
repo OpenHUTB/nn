@@ -8,7 +8,7 @@
 
 # In[1]:
 
-
+# 导入了多个用于构建和训练深度学习模型的Python库和模块
 import numpy as np
 import tensorflow as tf
 import collections
