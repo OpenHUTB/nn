@@ -239,15 +239,15 @@ def reduce_avg(reduce_target, lengths, dim):
     mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-    if len(shape_of_lengths) != dim: # 再次验证输入
+    if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
-    if len(shape_of_target) < dim+1 :
+    if len(shape_of_target) < dim+1 :  # 确保 reduce_target 的维度至少是 dim + 1
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
     rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
-    mxlen = tf.shape(reduce_target)[dim]
+    mxlen = tf.shape(reduce_target)[dim]  # 获取当前维度的最大长度 mxlen
     mask = mkMask(lengths, mxlen)
     if rank_diff!=0:
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
