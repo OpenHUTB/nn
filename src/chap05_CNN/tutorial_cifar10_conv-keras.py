@@ -96,6 +96,8 @@ class MyConvModel(keras.Model):
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
         
         self.flat = Flatten()   # 展平层：将多维特征张量展开为一维向量
+        # 第一个全连接层(密集层)
+        # 100个神经元，使用tanh激活函数
         self.dense1 = layers.Dense(100, activation='tanh')
         self.dense2 = layers.Dense(10)
     @tf.function
