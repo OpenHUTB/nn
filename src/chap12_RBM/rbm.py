@@ -36,9 +36,9 @@ class RBM:
         # 隐藏层偏置（1 x n_hidden）
         self.Wh = np.zeros((1, n_hidden))
         # 可选：使用 Xavier/Glorot 初始化替代
-        # self.W = np.random.randn(n_observe, n_hidden) * np.sqrt(1.0 / n_observe)
-        # self.Wv = np.zeros((1, n_observe))
-        # self.Wh = np.zeros((1, n_hidden))
+        # self.W = np.random.randn(n_observe, n_hidden) * np.sqrt(1.0 / n_observe) # 初始化权重矩阵
+        # self.Wv = np.zeros((1, n_observe)) # 初始化隐藏层偏置为零向量
+        # self.Wh = np.zeros((1, n_hidden))  # 初始化可见层偏置为零向量
 
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
