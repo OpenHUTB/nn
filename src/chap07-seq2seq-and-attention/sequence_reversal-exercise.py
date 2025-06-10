@@ -180,6 +180,7 @@ class mySeq2SeqModel(keras.Model):
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         # 计算上下文向量
+        # 根据注意力权重加权求和编码器输出，得到上下文向量
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
         # 将嵌入向量和上下文向量拼接作为RNN输入
         rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
