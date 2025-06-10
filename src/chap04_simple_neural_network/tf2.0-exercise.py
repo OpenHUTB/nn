@@ -103,7 +103,7 @@ def sigmoid_ce(logits, labels):
         tf.math.log(1 + tf.exp(-tf.abs(logits)))
     )
     
-    return loss
+    return loss #返回计算得到的损失值
 
 # 测试逻辑
 test_data = np.random.normal(size=[10]).astype(np.float32)
