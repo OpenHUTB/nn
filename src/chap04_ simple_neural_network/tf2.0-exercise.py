@@ -19,16 +19,15 @@ def softmax(x):
     返回:
         tf.Tensor: softmax处理后的概率分布
     """
-    # 检查输入是否为张量，如果不是则转换为tf.Tensor
+    # 如果不是张量，则转换为张量
     if not tf.is_tensor(x):
-        x = tf.convert_to_tensor(x)
-    
-    # 计算每个元素的指数值，减去最大值以提高数值稳定性
-    # keepdims=True 保证维度一致，便于后续广播
+        x = tf.convert_to_tensor(x, dtype=tf.float32)
+
+    # 减去最大值以提高数值稳定性
     x_max = tf.reduce_max(x, axis=-1, keepdims=True)
     exp_x = tf.exp(x - x_max)
-    
-    # 计算softmax值，分母加上一个很小的epsilon避免除零错误
+
+    # 计算softmax，防止除零错误
     sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
     return exp_x / (sum_exp + 1e-10)
 
