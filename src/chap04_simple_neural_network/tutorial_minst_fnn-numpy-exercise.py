@@ -26,6 +26,7 @@ def mnist_dataset():
     x_test = x_test / 255.0
 
     # 返回处理后的训练集和测试集
+    # 返回格式：(训练图像数组, 训练标签数组), (测试图像数组, 测试标签数组)
     return (x, y), (x_test, y_test)
 
 
