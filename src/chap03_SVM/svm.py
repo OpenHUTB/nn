@@ -56,8 +56,12 @@ class SVM:
         for epoch in range(self.max_iter):
             # 计算函数间隔
             margin = y * (np.dot(X, self.w) + self.b)
-            # 找出违反间隔条件的样本（margin < 1）
-            idx = np.where(margin < 1)[0]
+            # 找出违反间隔条件的样本（margin < 1）： 当样本的 margin < 1 时，该样本被认为是错误分类或处于间隔区域内
+            idx = np.where(margin < 1)[0]  # 返回违反间隔条件的样本的索引
+
+            # 如果没有违反间隔条件的样本，则跳过梯度更新：这意味着所有样本都满足 margin >= 1，模型已经达到一个相对稳定的状态
+            if len(idx) == 0:
+                continue
 
             # 计算梯度
             # L2正则化项 + 错误分类样本的平均梯度
