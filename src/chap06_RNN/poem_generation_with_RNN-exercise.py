@@ -351,15 +351,29 @@ def train(epoch, model, optimizer, ds):
 
 # In[5]:
 
-# 初始化优化器
+# 初始化优化器（使用Adam优化器，学习率设为0.0005）
 optimizer = optimizers.Adam(0.0005)  # 学习率0.0005
-# 加载数据集
+
+# 加载诗歌数据集
+# 返回三个对象：
+#   train_ds: 训练数据集
+#   word2id: 词语到ID的映射字典
+#   id2word: ID到词语的映射字典
 train_ds, word2id, id2word = poem_dataset()
-# 初始化模型
+
+# 初始化RNN模型实例
+# 传入word2id字典用于词汇表映射
 model = myRNNModel(word2id)
 
-# 训练10个epoch
+# 训练10个epoch（完整遍历数据集10次）
 for epoch in range(10):
+    # 调用train函数进行一个epoch的训练
+    # 参数说明：
+    #   epoch: 当前epoch编号
+    #   model: 要训练的模型
+    #   optimizer: 优化器
+    #   train_ds: 训练数据集
+    # 返回该epoch的loss值
     loss = train(epoch, model, optimizer, train_ds)
 
 # # 诗歌生成
