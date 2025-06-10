@@ -75,8 +75,8 @@ class SoftmaxRegression(tf.Module):
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
             name="W",
         )
-        self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        
+        self.b = tf.Variable(tf.zeros([num_classes]), name="b") # 全0初始化，形状为[类别数]，变量名称为b
+
     @tf.function
     def __call__(self, x):
         """
