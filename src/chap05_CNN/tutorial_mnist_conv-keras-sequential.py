@@ -105,5 +105,8 @@ model.compile(
     metrics = ['accuracy']
 )
 train_ds, test_ds = mnist_dataset()
+# 使用训练集对模型进行训练，指定训练轮数为5
+# epochs=5 表示整个训练数据集将被模型学习5次
+# 每一轮中，模型会根据优化器(Adam)和损失函数(sparse_categorical_crossentropy)调整参数
 model.fit(train_ds, epochs=5)
 model.evaluate(test_ds)
