@@ -34,7 +34,7 @@ def mnist_dataset():
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
-    return ds, test_ds
+    return ds, test_ds # 返回处理后的训练集和测试集
 
 
 def prepare_mnist_features_and_labels(x, y):
