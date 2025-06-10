@@ -28,7 +28,7 @@ def multinomial_basis(x, feature_num=10):
         feat.append(x**i)
     # 将所有特征沿着第二维（axis=1）拼接起来
     ret = np.concatenate(feat, axis=1)
-    return ret
+    return ret # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
 
 
 def gaussian_basis(x, feature_num=10):
