@@ -46,6 +46,7 @@ def process_dataset(fileName):
             
     # 统计词频
     counter = collections.Counter()
+    # 遍历examples中的每个样本(每个样本是一个句子或单词列表)
     for e in examples:
         for w in e:
             counter[w] += 1

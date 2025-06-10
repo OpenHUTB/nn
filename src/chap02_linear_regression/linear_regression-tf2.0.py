@@ -84,7 +84,7 @@ class linearModel(Model):
         # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
         # trainable=True 表示该变量需要在训练过程中被优化
         self.w = tf.Variable(
-            shape=[ndim, 1],
+            shape=[ndim, 1],    # 权重矩阵形状：ndim×1
             initial_value=tf.random.uniform(
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
