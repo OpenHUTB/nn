@@ -229,6 +229,7 @@ def main(x_train, y_train, use_gradient_descent=False):
         learning_rate = 0.01 
         # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
         epochs = 1000  
+        # 初始化梯度下降法使用的权重向量
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
