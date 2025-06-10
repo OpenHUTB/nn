@@ -169,3 +169,4 @@ loss, accuracy = test(model,
                       tf.constant(test_data[1], dtype = tf.int64))    # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
 # 打印测试集上的最终损失和准确率
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
+# 显示模型在测试数据上的总体误差，值越小表示模型预测越接近真实标签
