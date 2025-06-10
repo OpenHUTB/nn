@@ -272,11 +272,11 @@ relu = Relu()                       # ReLU 激活函数
 softmax = Softmax()
 log = Log()                         # 对数函数
 # 手动实现的前向传播过程：
-h1 = mul_h1.forward(x, W1)  # shape(5, 4)
-h1_relu = relu.forward(h1)
-h2 = mul_h2.forward(h1_relu, W2)
-h2_soft = softmax.forward(h2)
-h2_log = log.forward(h2_soft)
+h1 = mul_h1.forward(x, W1)          # shape(5, 4)# 第一层线性变换：输入 x 与权重 W1 相乘（前向传播）
+h1_relu = relu.forward(h1)          # 对第一层的输出应用 ReLU 激活函数
+h2 = mul_h2.forward(h1_relu, W2)    # 第二层线性变换：ReLU 激活后的输出 h1_relu 与权重 W2 相乘
+h2_soft = softmax.forward(h2)       # 对第二层输出应用 Softmax 激活函数
+h2_log = log.forward(h2_soft)       # 对 Softmax 的输出取自然对数（log）
 # 手动实现的反向传播过程（计算梯度）：
 h2_log_grad = log.backward(-label)
 h2_soft_grad = softmax.backward(h2_log_grad)
