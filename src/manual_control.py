@@ -352,7 +352,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             self.radar_sensor = None
 
     def modify_vehicle_physics(self, actor): # 修改指定Actor的物理属性，启用轮扫碰撞检测
-        #  # 如果Actor不是车辆，则无法使用物理控制
+        # 如果Actor不是车辆，则无法使用物理控制
         try:
             physics_control = actor.get_physics_control() # 获取车辆的物理控制对象
             physics_control.use_sweep_wheel_collision = True # 启用轮扫碰撞检测
