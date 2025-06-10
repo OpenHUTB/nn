@@ -336,6 +336,7 @@ def sequence_reversal():
         
         # 逐步生成输出序列
         for i in range(steps):
+            # 获取下一个token和更新后的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
             collect.append(tf.expand_dims(cur_token, axis=-1))
         
