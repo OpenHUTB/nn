@@ -148,14 +148,15 @@ print("np.multiply(x, y)\n", np.multiply(x, y))  # 对应位置相乘
 print("np.dot(x,y)\n", np.dot(x, y))  # 标准的行乘列求和
 
 # 16. 利用 13 题目中的 x,y, 输出 x / y .(提示：使用函数 np.divide())
-print("第十六题：\n")
+print("第十六题：\n")# 提示：使用 NumPy 的 sqrt 函数（np.sqrt()）
 
 print("x/y\n", x / y)  # 逐元素除法
 print("np.divide(x,y)\n", np.divide(x, y))  # 逐元素除法
 
 # 17. 利用 13 题目中的 x, 输出 x 的 开方。(提示： 使用函数 np.sqrt() )
 print("第十七题：\n")
-
+# np.sqrt(x) 对数组 x 中的每个元素求平方根
+# 要求元素值必须为非负数，否则会产生 nan（not a number）
 print("np.sqrt(x)\n", np.sqrt(x))
 
 # 18. 利用 13 题目中的 x,y , 执行 print(x.dot(y)) 和 print(np.dot(x,y))
