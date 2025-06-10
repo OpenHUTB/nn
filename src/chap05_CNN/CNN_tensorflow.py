@@ -128,6 +128,7 @@ def max_pool_2x2(x: tf.Tensor,
         raise ValueError(f"padding must be 'SAME' or 'VALID', got {padding}.")
     if data_format not in ['NHWC', 'NCHW']:
         raise ValueError(f"data_format must be 'NHWC' or 'NCHW', got {data_format}.")
+    # 验证数据格式参数是否符合TensorFlow规范
     
     # 构造池化核和步长参数
     if data_format == 'NHWC':
