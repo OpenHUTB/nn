@@ -57,8 +57,8 @@ class mySeq2SeqModel(keras.Model):
 
         self.encoder_cell = layers.LSTMCell(128)
         self.decoder_cell = layers.LSTMCell(128)
-        
-        self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
+
+        self.encoder = tf.keras.layers.RNN(self.encoder_cell,
                                            return_sequences=True, return_state=True)
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
                                            return_sequences=True, return_state=True)
