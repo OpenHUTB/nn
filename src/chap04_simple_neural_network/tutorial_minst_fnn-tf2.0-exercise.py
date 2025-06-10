@@ -162,6 +162,9 @@ for epoch in range(50):
     loss, accuracy = train_one_step(model, optimizer, 
                                     tf.constant(train_data[0], dtype = tf.float32),  # 训练图像数据
                                     tf.constant(train_data[1], dtype = tf.int64))    # 训练标签数据
+    # 打印当前epoch的训练损失和准确率
+    # loss.numpy() 将Tensor转换为Python浮点数以便打印
+    # accuracy.numpy() 将Tensor转换为Python浮点数以便打印
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 # 在测试集上测试模型
 loss, accuracy = test(model, 
