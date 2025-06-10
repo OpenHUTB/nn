@@ -334,18 +334,19 @@ class ReversiEnv(gym.Env):
     def game_finished(board):
         # Returns 1 if player 1 wins, -1 if player 2 wins and 0 otherwise
         d = board.shape[-1]
-
+        # 统计双方棋子数
         player_score_x, player_score_y = np.where(board[0, :, :] == 1)
         player_score = len(player_score_x)
         opponent_score_x, opponent_score_y = np.where(board[1, :, :] == 1)
         opponent_score = len(opponent_score_x)
+        # 检查是否有玩家棋子数为0
         if player_score == 0:
             return -1
         elif opponent_score == 0:
             return 1
         else:
             free_x, free_y = np.where(board[2, :, :] == 1)
-            if free_x.size == 0:
+            if free_x.size == 0:   # 比较棋子数量决定胜负
                 if player_score > (d**2)/2:
                     return 1
                 elif player_score == (d**2)/2:
