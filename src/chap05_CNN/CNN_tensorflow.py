@@ -4,7 +4,12 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 #使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+
+try:
+    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+except Exception as e:
+    print(f"数据加载失败: {e}")
+    
 
 learning_rate = 1e-4 #学习率
 keep_prob_rate = 0.7 # Dropout保留概率0.7
