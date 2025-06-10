@@ -215,8 +215,8 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
-    phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1)
+    phi1 = basis_func(x_train)  # 应用基函数转换原始特征，形状为(N, K)
+    phi = np.concatenate([phi0, phi1], axis=1)  # 应用基函数转换原始特征，形状为(N, K)
 
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
