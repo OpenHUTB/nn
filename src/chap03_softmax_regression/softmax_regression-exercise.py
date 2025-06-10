@@ -192,6 +192,7 @@ y = np.arange(0.0, 10.0, 0.1)
 # 生成网格坐标矩阵
 # 将网格坐标展平并组合为输入特征矩阵
 X, Y = np.meshgrid(x, y)
+# 将X和Y数组重塑为一维数组后进行配对组合
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 # 模型预测
