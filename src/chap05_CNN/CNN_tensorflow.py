@@ -4,7 +4,12 @@
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 #使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
-mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+
+try:
+    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+except Exception as e:
+    print(f"数据加载失败: {e}")
+    
 
 learning_rate = 1e-4 #学习率
 keep_prob_rate = 0.7 # Dropout保留概率0.7
@@ -135,10 +140,10 @@ def max_pool_2x2(x: tf.Tensor,
     return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
 
 # define placeholder for inputs to network
-xs = tf.placeholder(tf.float32, [None, 784]) / 255.
-ys = tf.placeholder(tf.float32, [None, 10])
-keep_prob = tf.placeholder(tf.float32)
-x_image = tf.reshape(xs, [-1, 28, 28, 1])
+xs = tf.placeholder(tf.float32, [None, 784]) / 255.     # 输入图像 [batch_size, 784]
+ys = tf.placeholder(tf.float32, [None, 10])             # 标签 [batch_size, 10]
+keep_prob = tf.placeholder(tf.float32)                  # Dropout保留率
+x_image = tf.reshape(xs, [-1, 28, 28, 1])         # 重塑为4D张量 [batch, height, width, channels]
 
 # 定义第一个卷积层的权重变量，卷积核大小为 7x7，输入通道数为 1，输出通道数为 32
 W_conv1 = weight_variable([7, 7, 1, 32])

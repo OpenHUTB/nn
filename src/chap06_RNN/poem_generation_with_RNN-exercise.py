@@ -18,19 +18,22 @@ start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
 
 def process_dataset(fileName):
-    """处理诗歌数据集，构建词汇表和数字索引的诗歌数据
-    
+    """
+    处理诗歌数据集，构建词汇表和数字索引的诗歌数据
+
     Args:
-        fileName: 诗歌文本文件路径，格式为"标题:内容"
-        
+        fileName (str): 诗歌文本文件路径，格式为"标题:内容"
+
     Returns:
-        instances: 数字索引化的诗歌列表，每个诗歌是数字id的列表
-        word2id: 词语到数字id的映射字典
-        id2word: 数字id到词语的映射字典
+        instances (list): 数字索引化的诗歌列表，每个诗歌是一个包含数字id的元组 (id序列, 序列长度)
+        word2id (dict): 词语到数字id的映射字典
+        id2word (dict): 数字id到词语的映射字典
     """
     examples = []  # 存储处理后的诗歌样本
+    start_token = "<START>"  # 开始标记
+    end_token = "<END>"  # 结束标记
     # 以UTF-8编码打开文件，处理每行诗歌
-    with open(fileName, 'r'，encoding='utf-8', ) as fd:
+    with open(fileName, 'r',encoding='utf-8', ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
@@ -38,7 +41,6 @@ def process_dataset(fileName):
             # 构建序列：[开始标记] + 内容字符列表 + [结束标记]
             ins = [start_token] + list(content) + [end_token] 
             if len(ins) > 200:  # 过滤掉长度过长的样本
-            ### 过滤过长的诗歌
                 continue
             examples.append(ins)
             
@@ -52,8 +54,8 @@ def process_dataset(fileName):
     sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
-    words, _ = zip(*sorted_counter) #对tuple进行解压，得到words列表代表所有字符
-    words = ('PAD', 'UNK') + words[:len(words)]# 扩展词汇表：在原始词汇表前添加特殊标记
+    words, _ = zip(*sorted_counter)                     # 对tuple进行解压，得到words列表代表所有字符
+    words = ('PAD', 'UNK') + words[:len(words)]         # 扩展词汇表：在原始词汇表前添加特殊标记
     
     # 创建词语到id的映射
     word2id = dict(zip(words, range(len(words))))
@@ -382,10 +384,11 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     for _ in range(max_len):
         # 获取下一个token并更新RNN状态
         cur_token, state = model.get_next_token(cur_token, state)
+        # 提取标量ID并记录生成结果
         token_id = cur_token.numpy()[0]  # 提取标量ID
         generated_tokens.append(token_id)  # 记录生成的ID
 
-        # 检查是否生成了结束标记
+        # 检查是否生成了结束标记，若是则提前终止
         if id2word[token_id] == end_token:
             break
 

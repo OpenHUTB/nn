@@ -164,6 +164,7 @@ class mySeq2SeqModel(keras.Model):
         enc_out: 编码器各时间步的输出 [batch_size, seq_len, hidden]
         state: 编码器最终状态 [batch_size, hidden]
         """
+        # 将输入的token ID转换为密集向量表示
         enc_emb = self.embed_layer(enc_ids)  # shape(b_sz, len, emb_sz)
         enc_out, enc_state = self.encoder(enc_emb)
         return enc_out, [enc_out[:, -1, :], enc_state]

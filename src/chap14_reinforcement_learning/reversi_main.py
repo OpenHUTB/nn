@@ -79,15 +79,28 @@ for i_episode in range(max_epochs):
         observation, reward, done, info = env.step(action)
 
         # 如果对局结束
+        # 检查游戏是否结束
         if done:
-            # 打印游戏结束信息，显示总回合数(t+1是因为索引从0开始)
-            print("Episode finished after {} timesteps".format(t+1))
-            # 统计黑棋得分（棋盘中为1的个数）
-            black_score = len(np.where(env.state[0,:,:] == 1)[0])
-            # 判断游戏胜负（棋盘总位置数通常为64）
-            if black_score > 32:    # 黑棋数量超过一半
-                print("黑棋赢了！")
-            else:                   # 黑棋数量不超过一半（含平局情况）
-                print("白棋赢了！")
-            print(black_score)      # 打印黑棋得分
-            break # 结束代码
+            # 打印游戏结束信息（总步数 = t+1，因为索引从0开始）
+            print(f"第 {i_episode+1} 局游戏在 {t+1} 步后结束")
+            
+            # 计算黑棋得分（棋盘上黑棋的数量）
+            black_score = len(np.where(env.state[0, :, :] == 1)[0])
+            total_tiles = env.board_size ** 2  # 棋盘总格子数（8x8=64）
+            
+            # 判断游戏结果
+            if black_score > total_tiles / 2:  # 黑棋数量超过一半
+                print("黑棋获胜！")
+            elif black_score < total_tiles / 2:  # 白棋数量超过一半
+                print("白棋获胜！")
+            else:  # 双方棋子数量相等
+                print("平局！")
+            
+            # 打印详细得分
+            white_score = total_tiles - black_score
+            print(f"比分: 黑棋 {black_score} - 白棋 {white_score}")
+            
+            break  # 结束当前游戏，开始下一局
+         # 关闭环境（资源清理）
+         env.close()
+         print("训练完成！共进行了 {max_epochs} 局游戏")

@@ -352,7 +352,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             self.radar_sensor = None
 
     def modify_vehicle_physics(self, actor): # 修改指定Actor的物理属性，启用轮扫碰撞检测
-        #  # 如果Actor不是车辆，则无法使用物理控制
+        # 如果Actor不是车辆，则无法使用物理控制
         try:
             physics_control = actor.get_physics_control() # 获取车辆的物理控制对象
             physics_control.use_sweep_wheel_collision = True # 启用轮扫碰撞检测
@@ -721,15 +721,28 @@ class KeyboardControl(object):
 
 class HUD(object):
     def __init__(self, width, height):
+        """
+        初始化HUD（平视显示器）类。
+
+        参数：
+        width (int): 显示器的宽度。
+        height (int): 显示器的高度。
+        """
+        # 保存显示器的尺寸
         self.dim = (width, height)
+        # 加载默认字体，大小为20
         font = pygame.font.Font(pygame.font.get_default_font(), 20)
-        font_name = 'courier' if os.name == 'nt' else 'mono'
-        fonts = [x for x in pygame.font.get_fonts() if font_name in x]
-        default_font = 'ubuntumono'
-        mono = default_font if default_font in fonts else fonts[0]
-        mono = pygame.font.match_font(mono)
+        # 根据操作系统选择合适的等宽字体
+        font_name = 'courier' if os.name == 'nt' else 'mono'          # Windows系统使用'courier'，其他系统使用'mono'
+        fonts = [x for x in pygame.font.get_fonts() if font_name in x]# 获取所有包含font_name的字体名称
+        default_font = 'ubuntumono'                                   # 默认字体
+        mono = default_font if default_font in fonts else fonts[0]    # 如果默认字体可用则使用，否则使用第一个匹配的字体
+        mono = pygame.font.match_font(mono)                           # 匹配字体路径
+        # 加载等宽字体，大小根据操作系统调整
         self._font_mono = pygame.font.Font(mono, 12 if os.name == 'nt' else 14)
+        # 初始化通知文本对象，位于屏幕底部，高度为40像素
         self._notifications = FadingText(font, (width, 40), (0, height - 40))
+        # 初始化帮助文本对象，使用等宽字体，大小为16
         self.help = HelpText(pygame.font.Font(mono, 16), width, height)
 
         # 性能指标初始化

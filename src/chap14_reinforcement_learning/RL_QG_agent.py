@@ -38,7 +38,9 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
             name = "input_states"
         )
         # 构建卷积神经网络
-        # 第1个卷积层：提取局部空间特征
+        # ========== 卷积层1：提取局部特征（如相邻棋子模式） ==========
+        # - 32个3x3卷积核，步长默认1，same填充保持输出尺寸8x8
+        # - ReLU激活增加非线性，输出形状：[None, 8, 8, 32]
         conv1 = tf.layers.conv2d(# 自动调整子图参数，优化布局避免元素重叠
             inputs = self.input_states,   # 输入张量，形状应为 [batch_size, height, width, channels]
             filters = 32,                 # 输出通道数：32个卷积核
@@ -47,7 +49,9 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
             activation = tf.nn.relu       # ReLU 激活函数
             )
 
-    # 第2个卷积层：提取更高级特征
+    # ========== 卷积层2：提取高层语义特征（如大范围棋子布局） ==========
+    # - 64个3x3卷积核，输出特征图数量翻倍，捕捉更复杂模式
+    # - 输出形状：[None, 8, 8, 64]
         conv2 = tf.layers.conv2d(
 
             inputs = conv1,               # 输入：上层卷积层（conv1）的输出特征图
@@ -57,13 +61,21 @@ class RL_QG_agent: # 定义了一个名为 RL_QG_agent 的类
 
             activation = tf.nn.relu      # 使用 ReLU 激活函数，引入非线性
             )
-        
-        # 扁平化层
+
+        # ========== 扁平化层：将多维特征图转换为一维向量 ==========
+        # - 输入形状[None, 8, 8, 64] → 输出形状[None, 8*8*64=4096]
         flat = tf.layers.flatten(conv2)
-        # 全连接层
+
+        # ========== 全连接层：提取全局特征关系 ==========
+        # - 512个神经元，通过ReLU激活学习非线性组合
+        # - 输出形状：[None, 512]
         dense = tf.layers.dense(inputs = flat, units = 512, activation = tf.nn.relu)
-        # 输出层，64个动作的Q值
+
+        # ========== 输出层：预测每个动作的Q值 ==========
+        # - 64个神经元对应棋盘64个位置（0-63索引）
+        # - 线性激活（无激活函数）直接输出Q值，范围不限
         self.Q_values = tf.layers.dense(inputs = dense, units = 64, name = "q_values")
+
         # 初始化变量和Saver
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()

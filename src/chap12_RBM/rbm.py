@@ -18,9 +18,9 @@ class RBM:
             ValueError: 若输入参数非正整数则抛出异常
         """
         # 参数验证：确保隐藏层和可见层单元数量为正整数
-        if not (isinstance(n_hidden, int) and n_hidden > 0): # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
-            raise ValueError("隐藏层单元数量 n_hidden 必须为正整数") # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
-        if not (isinstance(n_observe, int) and n_observe > 0): # 若条件不满足，后续逻辑可能产生异常或无意义结果
+        if not (isinstance(n_hidden, int) and n_hidden > 0):            # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
+            raise ValueError("隐藏层单元数量 n_hidden 必须为正整数")      # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
+        if not (isinstance(n_observe, int) and n_observe > 0):          # 若条件不满足，后续逻辑可能产生异常或无意义结果
             raise ValueError("可见层单元数量 n_observe 必须为正整数")
         # 初始化模型参数
         self.n_hidden = n_hidden
@@ -71,9 +71,19 @@ class RBM:
     
     def train(self, data):
         """
-         使用Contrastive Divergence算法对模型进行训练
-         参数说明：
-         data (numpy.ndarray): 训练数据，形状为 (n_samples, n_observe)。
+        使用 k=1 的 Contrastive Divergence (CD-1) 算法训练 RBM
+
+        CD-1 算法流程：
+        1. 从训练数据初始化可见层 v₀
+        2. 正向传播：v₀ → h₀（计算隐藏层激活概率并采样）
+        3. 反向传播：h₀ → v₁（重构可见层）
+        4. 再次正向传播：v₁ → h₁（计算重构后的隐藏层概率）
+        5. 基于正负相位的梯度更新参数
+
+        参数更新公式（最大化对数似然）：
+        ΔW = η · (⟨v₀h₀⟩ - ⟨v₁h₁⟩)
+        Δb_v = η · (v₀ - v₁)
+        Δb_h = η · (h₀ - h₁)
         """
     
         # 请补全此处代码
@@ -141,14 +151,20 @@ class RBM:
 #  用MNIST 手写数字数据集训练一个（RBM），并从训练好的模型中采样生成一张手写数字图像
 if __name__ == '__main__':
     try:
-    # 加载二值化的MNIST数据，形状为 (60000, 28, 28)
-      mnist = np.load('mnist_bin.npy')  # 60000x28x28
+    # 加载二值化的MNIST数据，形状为 (60000, 28, 28)，表示60000张28x28的二值化图像
+      mnist = np.load('mnist_bin.npy')  # 加载数据文件
     except IOError:
+      # 如果文件加载失败，提示用户检查文件路径并退出程序
       print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
       sys.exit(1)
-    n_imgs, n_rows, n_cols = mnist.shape
+
+    # 获取数据集的形状信息
+    n_imgs, n_rows, n_cols = mnist.shape# 分别表示图像数量、行数和列数
     img_size = n_rows * n_cols  # 计算单张图片展开后的长度
-    print(mnist.shape)  # 打印数据维度
+
+    # 打印数据集的形状信息，便于确认数据加载是否正确
+    print(mnist.shape)  # 输出数据集的形状
+
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)

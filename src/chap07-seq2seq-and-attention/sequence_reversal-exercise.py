@@ -125,21 +125,28 @@ class mySeq2SeqModel(keras.Model):
     @tf.function
     def call(self, enc_ids, dec_ids):
         '''
-        完成sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好
-        前向传播过程：编码器 -> 解码器 -> 全连接层
+        序列到序列模型的完整前向传播流程：
+        编码器处理输入序列 → 传递状态给解码器 → 解码器生成输出序列 → 全连接层预测
+
+        Args:
+            enc_ids: 编码器输入序列（字符索引），shape=(batch_size, enc_seq_len)
+            dec_ids: 解码器输入序列（字符索引，含起始标记），shape=(batch_size, dec_seq_len)
+
+        Returns:
+            logits: 解码器每个位置的预测概率分布，shape=(batch_size, dec_seq_len, vocab_size)
         '''
         # 编码过程
-        enc_emb = self.embed_layer(enc_ids)  # (batch_size, enc_seq_len, emb_dim)
-        enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (batch_size, enc_seq_len, enc_units)
+        enc_emb = self.embed_layer(enc_ids)            # (batch_size, enc_seq_len, emb_dim)
+        enc_out, enc_state = self.encoder(enc_emb)     # enc_out: (batch_size, enc_seq_len, enc_units)
         
         # 解码过程，使用编码器的最终状态作为初始状态
-        dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
-        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
+        dec_emb = self.embed_layer(dec_ids)                                      # (batch_size, dec_seq_len, emb_dim)
+        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)      # dec_out: (batch_size, dec_seq_len, dec_units)
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
-      # 返回模型预测的logits值，通常后续会通过softmax计算概率
-# 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
+        # 返回模型预测的logits值，通常后续会通过softmax计算概率
+        # 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
     
     
@@ -173,6 +180,7 @@ class mySeq2SeqModel(keras.Model):
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         # 计算上下文向量
+        # 根据注意力权重加权求和编码器输出，得到上下文向量
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
         # 将嵌入向量和上下文向量拼接作为RNN输入
         rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
@@ -198,8 +206,8 @@ def compute_loss(logits, labels):
     # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
+  
 # 定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
-
 @tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     """执行一次训练步骤（前向传播+反向传播）"""
@@ -237,10 +245,14 @@ def train(model, optimizer, seqlen):
         # 每500步计算并打印训练进度和准确率
         if step % 500 == 0:
             # 计算训练准确率
+            # 使用模型对当前批次的输入数据进行预测，得到logits
             logits = model(enc_x, dec_x)
+            # 获取预测结果，通过argmax获取概率最高的类别索引
             preds = tf.argmax(logits, axis=-1)
+            # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
             acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32)
-            
+
+            # 打印当前步数、损失和准确率
             print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
     return loss
 

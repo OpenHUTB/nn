@@ -107,12 +107,19 @@ def compute_loss(pred, labels, num_classes=3):
     pred = tf.clip_by_value(pred, epsilon, 1.0)
     
     # 计算每个样本的交叉熵损失，对于每个样本，计算其真实类别的概率的负对数
+    # 公式：L_i = -Σ_{c=1}^C y_{i,c} · log(p_{i,c})
+    # 其中：
+    #   y_{i,c} 是样本i的真实类别c的one-hot值（0或1）
+    #   p_{i,c} 是模型预测样本i属于类别c的概率
+    #   当y_{i,c}=1时（即样本i的真实类别为c），对应的log(p_{i,c})才会被计入损失
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
     
     # 计算所有样本的平均损失
     loss = tf.reduce_mean(sample_losses)
     
     # 计算准确率，比较模型预测的类别和真实类别是否一致
+    # tf.argmax(pred, axis=1) 获取预测的类别索引（概率最大的位置）
+    # tf.argmax(one_hot_labels, axis=1) 获取真实类别索引
     acc = tf.reduce_mean(
         tf.cast(
             tf.equal(

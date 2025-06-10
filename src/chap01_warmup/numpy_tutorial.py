@@ -3,11 +3,11 @@
 # numpy 的 array 操作
 
 # 1. 导入 numpy 库
-import numpy as np  # 将 numpy 库命名为 np
-import matplotlib   # 导入Matplotlib库，用于数据可视化
-import matplotlib.pyplot as plt  # 导入 matplotlib 库并将其命名为 plt
+import numpy as np                    # 将 numpy 库命名为 np
+import matplotlib                     # 导入Matplotlib库，用于数据可视化
+import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
-matplotlib.use('TkAgg')  # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染
+matplotlib.use('TkAgg')               # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染
 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 print("第二题：\n")
@@ -37,8 +37,8 @@ a = np.zeros((3, 3), dtype=int)
 b = np.ones((4, 5))
 # 单位矩阵，4x4
 c = np.eye(4)
-# 随机数矩阵，3x2
-np.random.seed(42)  # 在生成随机数前设置种子
+# 随机数矩阵，3x2：设置随机种子（42）确保结果可复现，生成0-1之间的浮点数
+np.random.seed(42)  #  固定随机种子，使随机结果可复现
 d = np.random.random((3, 2))# 生成一个形状为(3, 2)的NumPy数组，其中每个元素都是0到1之间的随机浮点数
 
 # 5. 建立一个数组 a,(值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1) 打印 a; (2) 输出数组中下标为 (2,3),(0,0) 这两个元素的值
@@ -83,6 +83,7 @@ print("第九题：\n")
 # 第1行: [4,  5,  6] 
 # 第2行: [7,  8,  9]
 # 第3行: [10, 11, 12]
+
 a = np.array([[1, 2, 3], 
               [4, 5, 6], 
               [7, 8, 9], 
@@ -167,8 +168,8 @@ print("np.dot(x,y)\n", np.dot(x, y))  # 使用 np.dot 函数进行矩阵乘法
 print("第十九题：\n")
 
 print("print(np.sum(x)):", np.sum(x))  # 所有元素求和
-print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
-print("print(np.sum(x, axis=1))", np.sum(x, axis=1))  # 按行求和（行维度）
+print("print(np.sum(x, axis = 0))", np.sum(x, axis = 0))  # 按列求和（列维度）
+print("print(np.sum(x, axis = 1))", np.sum(x, axis = 1))  # 按行求和（行维度）
 
 # 20. 利用 13 题目中的 x, 进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
 print("第二十题：\n")
@@ -190,7 +191,7 @@ print(np.exp(x))
 
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
-print("全局最大值的下标:", np.argmax(x))  # 打印整个数组 x 中最大值的下标
+print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
 print("每列最大值的下标:", np.argmax(x, axis=0))  # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
 print("每行最大值的下标:", np.argmax(x, axis=1))  # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
@@ -237,6 +238,8 @@ plt.grid(True, alpha=0.5)
 
 # 显示图例
 plt.legend()
+
+# 自动调整子图布局，优化图形显示效果
 plt.tight_layout()
 
 # 显示图像

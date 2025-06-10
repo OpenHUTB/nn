@@ -34,6 +34,7 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         start: 开始数值
         end: 结束数值
     '''
+    # 生成随机数
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
@@ -169,7 +170,7 @@ def train_one_step(model, optimizer, x, y, label):
         logits = model(x, y)
         loss = compute_loss(logits, label)
 
-    # compute gradient
+    # 计算梯度
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss
@@ -192,11 +193,12 @@ def train(steps, model, optimizer):
     return loss
 
 def evaluate(model):
+    # 评估模型在大数加法（555,555,555~999,999,998）上的准确率
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1)
+    pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
         print(o[0], o[1], o[0]==o[1])

@@ -37,11 +37,17 @@ class SVM:
         self.b = None             # 偏置项
 
     def train(self, data_train):
-        """训练模型。"""
-        X = data_train[:, :2]     # 提取特征部分
-        y = data_train[:, 2]      # 提取标签部分
-    #y = np.where(y == 0, -1, 1)  # 将标签转换为{-1, 1}
-        m, n = X.shape            # m为样本数，n为特征数
+        """训练 SVM 模型（基于 hinge loss + L2 正则化）
+
+        参数:
+            data_train: 训练数据集，shape=(m, 3)，前两列为特征，第三列为标签（0/1）
+        """
+
+        X = data_train[:, :2]         # 提取特征部分
+        y = data_train[:, 2]          # 提取标签部分
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}
+        m, n = X.shape                # m为样本数，n为特征数
+
 
         # 初始化参数
         self.w = np.zeros(n)      # 权重初始化为0
@@ -50,12 +56,16 @@ class SVM:
         for epoch in range(self.max_iter):
             # 计算函数间隔
             margin = y * (np.dot(X, self.w) + self.b)
-            # 找出违反间隔条件的样本（margin < 1）
-            idx = np.where(margin < 1)[0]
+            # 找出违反间隔条件的样本（margin < 1）： 当样本的 margin < 1 时，该样本被认为是错误分类或处于间隔区域内
+            idx = np.where(margin < 1)[0]  # 返回违反间隔条件的样本的索引
+
+            # 如果没有违反间隔条件的样本，则跳过梯度更新：这意味着所有样本都满足 margin >= 1，模型已经达到一个相对稳定的状态
+            if len(idx) == 0:
+                continue
 
             # 计算梯度
             # L2正则化项 + 错误分类样本的平均梯度
-            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis=0)
+            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis = 0)
             db = -np.mean(y[idx])
 
             # 参数更新

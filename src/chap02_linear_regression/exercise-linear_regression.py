@@ -14,15 +14,21 @@ def load_data(filename):
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
-    xys = []
-    with open(filename, "r") as f:
-        for line in f:
+    xys = []# 用于存储每行的数据，每行数据是一个列表
+    with open(filename, "r") as f:  # 打开文件进行读取
+        for line in f: # 遍历文件的每一行
             # 将每行内容按空格分割并转换为浮点数
+            # strip() 去除行首尾的空白字符，split() 按空格分割字符串
+            # map(float, ...) 将分割后的字符串转换为浮点数
             line_data = list(map(float, line.strip().split()))
             xys.append(line_data)
     # 将数据拆分为特征和标签
-    xs, ys = zip(*xys)
-    return np.asarray(xs), np.asarray(ys)
+    # 假设每行数据的最后一个元素是标签，其余是特征
+    # zip(*xys) 将 xys 列表的行和列进行转置
+    xs, ys = zip(*xys)# xs 是特征列表，ys 是标签列表
+    # 将特征和标签列表转换为 NumPy 数组
+    # NumPy 数组便于后续的数学运算和数据处理
+    return np.asarray(xs), np.asarray(ys) # 返回特征和标签的 NumPy 数组
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
@@ -180,6 +186,10 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         error = y - y_pred
         
         # 3. 计算梯度（损失函数对权重的导数）
+        # 梯度公式推导：
+        #   J(w) = 1/m * ∑(φw - y)²
+        #   ∇J(w) = 2/m * φ.T @ (φw - y)
+        # 其中：
         # φ.T @ error 计算每个特征上的误差总和
         # -2/len(y) 是损失函数导数的系数
         # 最终形状 (n_features,)
@@ -187,6 +197,7 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         
         # 4. 参数更新：沿负梯度方向调整权重
         # 学习率控制更新步长
+        # 公式: w_new = w_old - lr * ∇J(w)
         w -= lr * gradient
     
     return w
