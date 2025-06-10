@@ -163,7 +163,7 @@ class ReversiEnv(gym.Env):
     #     else:
     #         raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))
 
-    def _render(self, mode='human', close=False):
+    def _render(self, mode='human', close=False):  #渲染函数，用于将当前棋盘状态可视化输出到终端或字符串中
         if close:
             return
         board = self.state
