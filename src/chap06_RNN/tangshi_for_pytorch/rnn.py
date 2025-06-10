@@ -1,13 +1,15 @@
+# 引入必要的数据库
 import torch.nn as nn
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
 import numpy as np
 
+# 对神经网络中的线性层（Linear）进行权重初始化
 def weights_init(m):
     classname = m.__class__.__name__  #   obtain the class name
     if classname.find('Linear') != -1:
-        weight_shape = list(m.weight.data.size())
+        weight_shape = list(m.weight.data.size())# 获取权重张量的形状: [输出维度, 输入维度]
         fan_in = weight_shape[1]
         fan_out = weight_shape[0]
         w_bound = np.sqrt(6. / (fan_in + fan_out)) # 计算权重初始化范围
@@ -19,32 +21,31 @@ def weights_init(m):
 # 定义词嵌入模块
 class word_embedding(nn.Module):
     def __init__(self, vocab_length, embedding_dim):
-        super(word_embedding, self).__init__()
-        # 使用均匀分布初始化词向量，范围为[-1, 1]
-        w_embeding_random_intial = np.random.uniform(-1, 1, size=(vocab_length, embedding_dim))
-        # 创建词嵌入层
+        super().__init__()
         self.word_embedding = nn.Embedding(vocab_length, embedding_dim)
-        # 将词嵌入层的权重设置为初始化的随机值
-        self.word_embedding.weight.data.copy_(torch.from_numpy(w_embeding_random_intial))
+        # PyTorch默认使用均匀分布初始化，范围为[-sqrt(1/dim), sqrt(1/dim)]
+        # 如果需要特定范围，可以使用：
+        # nn.init.uniform_(self.word_embedding.weight, -1.0, 1.0)
 
     def forward(self, input_sentence):
         """
         :param input_sentence: 一个包含词索引的张量
         :return: 一个包含对应词向量的张量
         """
-        sen_embed = self.word_embedding(input_sentence)  # 查找词嵌入
-        return sen_embed
+        return self.word_embedding(input_sentence)
+
 
 # 定义RNN模型
 class RNN_model(nn.Module):
     def __init__(self, batch_sz, vocab_len, word_embedding, embedding_dim, lstm_hidden_dim):
         super(RNN_model, self).__init__()
 
+        # 模型组件初始化
         self.word_embedding_lookup = word_embedding  # 使用外部定义的词嵌入模块
-        self.batch_size = batch_sz
-        self.vocab_length = vocab_len
-        self.word_embedding_dim = embedding_dim
-        self.lstm_dim = lstm_hidden_dim
+        self.batch_size = batch_sz  # 批处理大小
+        self.vocab_length = vocab_len  #词汇表大小
+        self.word_embedding_dim = embedding_dim  #词向量维度
+        self.lstm_dim = lstm_hidden_dim  # LSTM隐藏状态维度
 
         # 定义LSTM层
         # input_size=embedding_dim：输入的特征维度，即词嵌入维度
