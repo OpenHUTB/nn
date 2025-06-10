@@ -128,8 +128,8 @@ class GaussianMixtureModel:
            - E步：计算每个样本属于各高斯成分的后验概率（责任度）
            - M步：基于后验概率更新模型参数
         """
-        X = np.asarray(X)
-        n_samples, n_features = X.shape
+        X = np.asarray(X) # 将输入数据 X 转换为 NumPy 数组格式，确保后续操作的兼容性
+        n_samples, n_features = X.shape # 获取数据的样本数量和特征维度
         
         # 初始化混合系数（均匀分布）
         self.pi = np.ones(self.n_components) / self.n_components
