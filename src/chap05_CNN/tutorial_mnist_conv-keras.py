@@ -20,8 +20,17 @@ def mnist_dataset():
         ds (tf.data.Dataset): 处理后的训练数据集。
         test_ds (tf.data.Dataset): 处理后的测试数据集。
     """
+    # 从 TensorFlow 的 datasets 模块中加载 MNIST 数据集
+    # MNIST 是一个手写数字图片数据集，包含 60,000 个训练样本和 10,000 个测试样本
+    # (x, y) 是训练集的图像和标签
+    # (x_test, y_test) 是测试集的图像和标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    # 将训练集图像 x 调整形状（reshape）
+    # 原始图像形状是 (num_samples, 28, 28)，即每张图是 28x28 的灰度图
+    # 调整后变为 (num_samples, 28, 28, 1)，增加一个通道维度（channel），以适配卷积神经网络的输入要求
     x = x.reshape(x.shape[0], 28, 28, 1)
+    # 对测试集图像 x_test 做同样的 reshape 操作
+    # 同样变成 (num_samples, 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
 
     ds = tf.data.Dataset.from_tensor_slices((x, y))
