@@ -164,8 +164,25 @@ def find_weather_presets():                                                     
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
-def get_actor_display_name(actor, truncate=250):                                   # 提取 actor 的类型标识符，并将其格式化为更易读的名称（例如 vehicle.tesla.model3 -> Tesla Model3）
-    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])        # 如果名称过长，则进行截断，并在末尾加上省略号（…）
+def get_actor_display_name(actor, truncate=250):
+    """
+    格式化actor的类型标识符为易读的显示名称
+    参数:
+        actor: 包含type_id属性的对象（如CARLA中的车辆/行人对象）
+        truncate: 最大名称长度限制（默认250字符)
+    返回:
+        str: 格式化后的显示名称（示例：'vehicle.tesla.model3' -> 'Tesla Model3'）
+    """
+    # 处理原始type_id字符串:
+    # 1. 将下划线替换为点（保持统一分隔符）
+    # 2. 每个单词首字母大写（title()方法）
+    # 3. 按点分割后取第1部分之后的内容（跳过类别前缀如'vehicle'）
+    # 示例：'vehicle_tesla_model3' -> ['Vehicle', 'Tesla', 'Model3'] -> 'Tesla Model3'
+    name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
+    
+    # 处理超长名称：
+    # 如果超过truncate限制，截断并添加Unicode省略号（…）
+    # 否则返回完整名称
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
 
