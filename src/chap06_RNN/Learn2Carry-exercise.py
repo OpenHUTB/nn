@@ -166,7 +166,7 @@ def compute_loss(logits, labels):
 
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
-    with tf.GradientTape() as tape:
+    with tf.GradientTape() as tape: #使用 TensorFlow 的梯度磁带（GradientTape）上下文管理器，自动追踪该作用域内的所有可训练变量操作
         logits = model(x, y)
         loss = compute_loss(logits, label)
 
