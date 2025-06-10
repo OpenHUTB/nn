@@ -195,7 +195,7 @@ def evaluate(model):
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
     logits = logits.numpy()
-    pred = np.argmax(logits, axis=-1)
+    pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
         print(o[0], o[1], o[0]==o[1])
