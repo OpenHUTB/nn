@@ -27,23 +27,26 @@ def load_data(filename):
 def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
-    ret = np.expand_dims(x, axis=1)
-    return ret
+    # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
+    return np.expand_dims(x, axis=1)
 
 
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
-    """多项式基函数"""
+    """多项式基函数：将输入x映射为多项式特征
+    feature_num: 多项式的最高次数
+    返回 shape (N, feature_num)"""
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    # 可以替换成 x = identity_basis(x)
     # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
     # 通过列表推导式创建各次项，最后在列方向拼接合并
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 生成 1, x, x^2, ..., x^(feature_num-1)
+    # 生成 x, x^2, ..., x^(feature_num)
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
     ret = np.concatenate(ret, axis=1)
@@ -53,7 +56,8 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     """
-    高斯基函数：将输入映射为一组高斯函数响应
+    高斯基函数：将输入x映射为一组高斯分布特征
+    用于提升模型对非线性关系的拟合能力
     """
     # 定义中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
@@ -153,23 +157,27 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
     :param epochs: 迭代次数（默认为 1000）
     :return: 优化后的权重向量 w
     """
-   w = np.zeros(phi.shape[1])  # 初始化 w
+    # 初始化权重 w 为全零向量
+    w = np.zeros(phi.shape[1])
+    # 迭代训练 epochs 次
     for epoch in range(epochs):
+        # 计算预测值
         y_pred = phi @ w
-        gradient = -2 * phi.T @ (y - y_pred) / len(y)  # 计算梯度
-        w_new = w - lr * gradient  # 更新 w
-        
-        # 提前终止条件
-        if np.linalg.norm(w_new - w) < tol:
-            break
-            
-        w = w_new
-        
+        # 计算梯度
+        gradient = -2 * phi.T @ (y - y_pred) / len(y)
+        # 更新权重 w
+        w -= lr * gradient
     return w
 
 
 def main(x_train, y_train, use_gradient_descent=False):
-    """训练模型，并返回从x到y的映射。"""
+    """训练模型，并返回从x到y的映射。
+    流程:
+    1. 选择基函数（默认恒等基）
+    2. 构建设计矩阵 φ = [1, basis_func(x)]
+    3. 使用最小二乘或梯度下降求解权重 w
+    4. 返回预测函数 f(x) = φ(x) · w
+    """
     # 默认使用恒等基函数
     basis_func = identity_basis  
 
@@ -191,19 +199,24 @@ def main(x_train, y_train, use_gradient_descent=False):
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs): 
-            y_pred = np.dot(phi, w_gd)
-            error = y_pred - y_train
-            gradient = np.dot(phi.T, error) / len(y_train)
-            w_gd -= learning_rate * gradient
+        for epoch in range(epochs):     # 梯度下降循环
+            y_pred = np.dot(phi, w_gd)  # 计算预测值
+            error = y_pred - y_train    # 计算误差
+            gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
+            w_gd -= learning_rate * gradient # 更新权重
 
     # 定义预测函数
     def f(x):
+        # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
         phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        # 调用basis_func函数，对输入x进行某种变换，得到基函数的值
         phi1 = basis_func(x)
+        # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
         phi = np.concatenate([phi0, phi1], axis=1)
+        # 判断是否使用梯度下降算法，并且 w_gd 是否已经定义，如果使用梯度下降算法，并且 w_gd 已经定义，则使用 w_gd 进行预测
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
+        # 如果不使用梯度下降算法，或者 w_gd 没有定义，则使用最小二乘法得到的权重 w_lsq 进行预测
         else:
             return np.dot(phi, w_lsq)
 
@@ -263,11 +276,4 @@ if __name__ == "__main__":
     plt.ylabel("y")  # 设置y轴的标签
     plt.title("Linear Regression")  # 设置图表标题
     plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
-    plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
-    plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
-    plt.xlabel("x")  # 设置x轴的标签
-    plt.ylabel("y")  # 设置y轴的标签
-    plt.title("Linear Regression")  # 设置图表标题
-    plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义 # 添加图例，表示每条线的含义
-    plt.show()
+    plt.show()  # 显示图表
