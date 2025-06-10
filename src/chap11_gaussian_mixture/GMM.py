@@ -282,6 +282,7 @@ class GaussianMixtureModel:
 if __name__ == "__main__":
     # 1. 生成合成数据
     print("生成混合高斯分布数据...")
+    # 调用generate_data函数生成样本数据：
     X, y_true = generate_data(n_samples=1000)
     print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     

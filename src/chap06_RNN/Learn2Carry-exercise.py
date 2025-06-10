@@ -199,7 +199,7 @@ def evaluate(model):
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
     logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
-    logits = logits.numpy()
+    logits = logits.numpy() # 将模型输出的tensor转换为numpy数组，便于后续处理
     pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
