@@ -239,27 +239,33 @@ def reduce_avg(reduce_target, lengths, dim):
     mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-    if len(shape_of_lengths) != dim: # 再次验证输入
+    if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
-    if len(shape_of_target) < dim+1 :
+    if len(shape_of_target) < dim+1 :  # 确保 reduce_target 的维度至少是 dim + 1
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
     rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
-    mxlen = tf.shape(reduce_target)[dim]
+    mxlen = tf.shape(reduce_target)[dim]  # 获取当前维度的最大长度 mxlen
     mask = mkMask(lengths, mxlen)
-    if rank_diff!=0:
+    
+    # 处理序列长度与掩码张量的维度对齐问题
+    if rank_diff!=0: # 如果长度张量(lengths)和掩码张量(mask)的维度(rank)存在差异
+        # 构建新的长度张量形状：保留原始长度维度，并在末尾添加1来扩展维度
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        # 构建新的掩码张量形状：保留原始掩码维度，并在末尾添加1来扩展维度
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
+        # 当维度相同时，直接使用原始形状
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
+    # 重塑长度张量：添加必要的维度使其与掩码张量维度对齐
     lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    # 重塑掩码张量：确保其形状符合广播规则要求
     mask = tf.reshape(mask, shape=mask_shape)
-
+    # 应用掩码到目标张量：将掩码区域的值置零
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
-
     # 在指定维度上求和（不保留归约后的维度）
     red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
     # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）

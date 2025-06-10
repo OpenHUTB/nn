@@ -219,14 +219,14 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.imu_sensor = None     # IMU传感器
         self.radar_sensor = None   # 雷达传感器
         self.camera_manager = None # 相机管理器
-        self._weather_presets = find_weather_presets()
+        self._weather_presets = find_weather_presets()  # 预设的天气配置列表（晴天、雨天、雾天等）
         self._weather_index = 0
         self._actor_filter = args.filter
         self._actor_generation = args.generation
         self._gamma = args.gamma
-        self.restart()
+        self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)
-        self.recording_enabled = False
+        self.recording_enabled = False  # 录制与控制相关变量
         self.recording_start = 0
         self.constant_velocity_enabled = False
         self.show_vehicle_telemetry = False

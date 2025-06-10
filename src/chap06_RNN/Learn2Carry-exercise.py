@@ -159,20 +159,22 @@ class myRNNModel(keras.Model):
 
 
 @tf.function
-def compute_loss(logits, labels):
+def compute_loss(logits, labels):# 使用 sparse_softmax_cross_entropy_with_logits 计算每个样本的交叉熵损失
+    # 输入是 logits 和对应的 labels（真实类别索引）
+    # 输出是一个形状为 (B,) 的损失张量
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
-    return tf.reduce_mean(losses)
+    return tf.reduce_mean(losses)# 对所有样本的损失求平均，得到一个标量值作为最终的 loss
 
 @tf.function
 def train_one_step(model, optimizer, x, y, label):
-    with tf.GradientTape() as tape:
+    with tf.GradientTape() as tape: #使用 TensorFlow 的梯度磁带（GradientTape）上下文管理器，自动追踪该作用域内的所有可训练变量操作
         logits = model(x, y)
-        loss = compute_loss(logits, label)
+        loss = compute_loss(logits, label) #对比模型的预测值 logits 和真实标签 label，输出当前损失值
 
     # 计算梯度
     grads = tape.gradient(loss, model.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    optimizer.apply_gradients(zip(grads, model.trainable_variables)) #将梯度与对应的模型参数配对，使用优化器按梯度方向更新模型参数
     return loss
 
 

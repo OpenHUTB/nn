@@ -180,8 +180,8 @@ for epoch in range(50):
 # 在测试集上评估模型性能
 loss, accuracy = test(
     model,
-    tf.constant(test_data[0], dtype=tf.float32),
+    tf.constant(test_data[0], dtype=tf.float32),# 将测试特征数据转换为TensorFlow常量张量，指定数据类型为float32
     tf.constant(test_data[1], dtype=tf.int64)
 )
-
+# .numpy() 将 TensorFlow 张量转换为 NumPy 数组（或 Python 标量）以便打印
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
