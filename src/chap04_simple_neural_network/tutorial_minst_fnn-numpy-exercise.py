@@ -299,6 +299,7 @@ with tf.GradientTape() as tape:
     prob = tf.nn.softmax(h2)
     log_prob = tf.math.log(prob)
     loss = tf.reduce_sum(label * log_prob)
+    # 计算负对数似然损失(Negative Log Likelihood Loss)
     grads = tape.gradient(loss, [prob])
     print(grads[0].numpy())
 
