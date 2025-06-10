@@ -87,7 +87,8 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 def sigmoid_ce(x, label):
     ##########
     '''实现 sigmoid 交叉熵loss函数， 不允许用tf自带的sigmoid_cross_entropy函数'''
-    ##########
+    #确保输入形状匹配
+    tf.debugging.assert_shapes([(x,('N',)), (label,('N',))])
     # clip 避免 log(0) 的数值不稳定问题
     x = tf.clip_by_value(x, 1e-10, 1.0 - 1e-10)
     # 计算二分类交叉熵损失
