@@ -57,9 +57,8 @@ def multinomial_basis(x, feature_num=10):
     # 生成 x, x^2, ..., x^(feature_num)
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
-    ret = np.concatenate(ret, axis=1)
     # ==========
-    return ret
+    return np.concatenate(ret, axis=1)
 
 
 def gaussian_basis(x, feature_num=10):
