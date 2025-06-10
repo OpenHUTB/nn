@@ -75,6 +75,14 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     计算log(sum(exp(log_p)))，通过减去最大值避免数值溢出
     数学公式: log(sum(exp(log_p))) = max(log_p) + log(sum(exp(log_p - max(log_p))))
+    
+    参数：
+    log_p: 输入的对数概率（可能为负无穷）。
+    axis: 沿着哪个轴进行计算，默认为1（即按行计算）。
+    keepdims: 是否保持维度，默认为False。
+
+    返回：
+    计算结果的log(sum(exp(log_p)))，返回与输入数组相同形状的结果。
     """
     log_p = np.asarray(log_p)   # 将对数概率列表转换为NumPy数组
     
