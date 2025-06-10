@@ -306,8 +306,8 @@ def sequence_reversal():
 def is_reverse(seq, rev_seq):
     """检查 rev_seq 是否为 seq 的逆序"""
     # 反转rev_seq并与原始seq比较
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
-    if seq == rev_seq_rev:
+    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])# 将 rev_seq 转换为字符列表，然后反转该列表，再用 join 拼接成字符串
+    if seq == rev_seq_rev:# 将反转后的 rev_seq_rev 与原始字符串 seq 进行比较
         return True # 返回 True 表示预测结果与真实逆序相符
     else:
         return False
