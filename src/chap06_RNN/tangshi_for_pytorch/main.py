@@ -103,8 +103,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         end_index = start_index + batch_size
         x_data = poems_vec[start_index:end_index]
         y_data = []
-        for row in x_data:  # 构造标签数据 y，即输入序列的下一个字符，用于RNN模型，预测下一个字符
-            y  = row[1:]
+        for row in x_data:  # 构造标签数据 y，即输入序列的下一个字符，用于R            y  = row[1:]
             y.append(row[-1])
             y_data.append(y)
         """
