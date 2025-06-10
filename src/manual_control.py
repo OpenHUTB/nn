@@ -858,18 +858,23 @@ class HUD(object):
                 self._info_text.append('% 4dm %s' % (d, vehicle_type))
 
     def show_ackermann_info(self, enabled):
+        # 设置是否显示Ackermann信息
         self._show_ackermann_info = enabled
 
     def update_ackermann_control(self, ackermann_control):
+        # 更新Ackermann控制参数
         self._ackermann_control = ackermann_control
 
     def toggle_info(self):
+        # 切换信息显示状态
         self._show_info = not self._show_info
 
     def notification(self, text, seconds=2.0):
+        # 显示临时通知
         self._notifications.set_text(text, seconds=seconds)
 
     def error(self, text):
+        # 显示红色错误提示
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
     def render(self, display):
