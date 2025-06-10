@@ -37,6 +37,7 @@ def generate_data(n_samples=1000):
     
     # 从第i个高斯分布生成样本
     for i in range(n_components): 
+        #生成多元正态分布样本
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
         # 将生成的样本添加到列表
         X_list.append(X_i) 
