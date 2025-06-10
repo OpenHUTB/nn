@@ -2,7 +2,7 @@
 # encoding: utf-8
 # 导入numpy模块并命名为np
 import numpy as np # 导入NumPy库用于高效数值计算
-import sys
+import sys # 导入Python标准库中的sys模块，用于系统相关操作
 class RBM:
     """Restricted Boltzmann Machine."""
 
@@ -23,8 +23,8 @@ class RBM:
         if not (isinstance(n_observe, int) and n_observe > 0):          # 若条件不满足，后续逻辑可能产生异常或无意义结果
             raise ValueError("可见层单元数量 n_observe 必须为正整数")
         # 初始化模型参数
-        self.n_hidden = n_hidden
-        self.n_observe = n_observe
+        self.n_hidden = n_hidden # 存储隐藏层神经元数量
+        self.n_observe = n_observe # 存储可观测层（输入层）神经元数量
         # 权重矩阵 (可见层到隐藏层)
         self.W = np.random.normal(
         loc = 0.0,                # 均值
