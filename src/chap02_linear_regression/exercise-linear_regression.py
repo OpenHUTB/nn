@@ -46,19 +46,10 @@ def multinomial_basis(x, feature_num=10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数
     返回 shape (N, feature_num)"""
-    # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 可以替换成 x = identity_basis(x)
-    # ==========
-    # todo '''请实现多项式基函数'''
-    # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
-    # 通过列表推导式创建各次项，最后在列方向拼接合并
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 生成 x, x^2, ..., x^(feature_num)
+    # 生成 x^1, x^2, ..., x^feature_num
     ret = [x**i for i in range(1, feature_num + 1)]
-    # 将生成的列表合并成 shape(N, feature_num) 的二维数组
     ret = np.concatenate(ret, axis=1)
-    # ==========
     return ret
 
 
@@ -203,16 +194,13 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
     return w
 
 
-def main(x_train, y_train, use_gradient_descent=False):
+def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
     """训练模型，并返回从x到y的映射。
-    流程:
-    1. 选择基函数（默认恒等基）
-    2. 构建设计矩阵 φ = [1, basis_func(x)]
-    3. 使用最小二乘或梯度下降求解权重 w
-    4. 返回预测函数 f(x) = φ(x) · w
+    basis_func: 可选，基函数（如identity_basis, multinomial_basis, gaussian_basis），默认恒等基
     """
-    # 默认使用恒等基函数
-    basis_func = identity_basis  
+    # 支持自定义基函数
+    if basis_func is None:
+        basis_func = identity_basis
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
@@ -224,42 +212,18 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     w_gd = None
     if use_gradient_descent:
-        # 梯度下降求解权重（缩进修正）
-        # 设置学习率为0.01
-        learning_rate = 0.01 
-        # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
-        epochs = 1000  
-        w_gd = np.zeros(phi.shape[1])
-        w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
-        # 开始梯度下降的迭代循环，将进行epochs次参数更新。
-        for epoch in range(epochs):     # 梯度下降循环
-            y_pred = np.dot(phi, w_gd)  # 计算预测值
-            error = y_pred - y_train    # 计算误差
-            gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
-            w_gd -= learning_rate * gradient # 更新权重
+        # 直接调用已实现的gradient_descent函数
+        w_gd = gradient_descent(phi, y_train, lr=0.01, epochs=1000)
 
-    # 定义预测函数
     def f(x):
-        # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
         phi0 = np.expand_dims(np.ones_like(x), axis=1)
-        # 调用basis_func函数，对输入x进行某种变换，得到基函数的值
         phi1 = basis_func(x)
-        # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
         phi = np.concatenate([phi0, phi1], axis=1)
-        # 判断是否使用梯度下降算法，并且 w_gd 是否已经定义，如果使用梯度下降算法，并且 w_gd 已经定义，则使用 w_gd 进行预测
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
-        # 如果不使用梯度下降算法，或者 w_gd 没有定义，则使用最小二乘法得到的权重 w_lsq 进行预测
         else:
             return np.dot(phi, w_lsq)
-
-    # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
-
-
-# ## 评估结果
-# ## 评估结果
-# > 没有需要填写的代码，但是建议读懂
 
 
 def evaluate(ys, ys_pred):
@@ -267,6 +231,18 @@ def evaluate(ys, ys_pred):
     # 计算预测值与真实值的标准差
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
     return std
+
+
+def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
+    """绘制训练集、测试集和预测结果"""
+    plt.plot(x_train, y_train, "ro", markersize=3)
+    plt.plot(x_test, y_test, "k")
+    plt.plot(x_test, y_test_pred, "k")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.title("Linear Regression")
+    plt.legend(["train", "test", "pred"])
+    plt.show()
 
 
 # 程序主入口（建议不要改动以下函数的接口）
@@ -300,13 +276,5 @@ if __name__ == "__main__":
     std = evaluate(y_test, y_test_pred)
     print("预测值与真实值的标准差：{:.1f}".format(std))
 
-    # 显示结果
-
-    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
-    plt.plot(x_test, y_test, "k")                   # 红色点为训练集数据
-    plt.plot(x_test, y_test_pred, "k")              # 黑线为预测值（可以用其他颜色区分）
-    plt.xlabel("x")                                 # 设置x轴的标签
-    plt.ylabel("y")                                 # 设置y轴的标签
-    plt.title("Linear Regression")                  # 设置图表标题
-    plt.legend(["train", "test", "pred"])           # 添加图例，表示每条线的含义
-    plt.show()                                      # 显示图表
+    # 使用封装的绘图函数
+    plot_results(x_train, y_train, x_test, y_test, y_test_pred)
