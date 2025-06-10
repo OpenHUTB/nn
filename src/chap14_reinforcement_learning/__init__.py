@@ -141,7 +141,7 @@ register(
 
 register(
     id='CarRacing-v0',    # 赛车游戏
-    entry_point='gym.envs.box2d:CarRacing',
+    entry_point='gym.envs.box2d:CarRacing',# 指定OpenAI Gym环境的入口点
     max_episode_steps=1000,
     reward_threshold=900,   # 完成赛道得分
 )
