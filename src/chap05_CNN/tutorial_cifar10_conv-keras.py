@@ -127,9 +127,17 @@ class MyConvModel(keras.Model):
     
     @tf.function
     def getL2_feature_map(self, x):
+        # 第一个卷积层：输入 x 经过 self.l1_conv 得到 h1
+        # 输入 x 的形状假设为 [32, 28, 28, 1]（例如 MNIST 图像）
+        # 输出 h1 的形状为 [32, 28, 28, 32]，即 batch_size=32，图像尺寸不变，通道数变为32
         h1 = self.l1_conv(x) # [32, 28, 28, 32]
+        # 池化层：对 h1 进行池化操作，降低空间维度
+        # 输出 h1_pool 的形状为 [32, 14, 14, 32]，空间尺寸减半，通道数保持不变
         h1_pool = self.pool(h1) # [32, 14, 14, 32]
+        # 第二个卷积层：输入是 h1_pool
+        # 输出 h2 的形状为 [32, 14, 14, 64]，通道数增加到64
         h2 = self.l2_conv(h1_pool) #[32, 14, 14, 64]
+        # 返回第二层卷积后的特征图
         return h2
 
 model = MyConvModel()
