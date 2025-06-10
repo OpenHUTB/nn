@@ -98,18 +98,23 @@ if __name__ == '__main__':
 
     # 使用SVM模型预测标签
     # 从训练数据中提取前两列作为特征(x1, x2)
-    x_train = data_train[:, :2]  # feature [x1, x2]
+    x_train = data_train[:, :2]  # 训练集特征
     t_train = data_train[:, 2]   # 训练集标签
+
     # 使用训练好的SVM模型对训练数据进行标签预测
     t_train_pred = svm.predict(x_train)     # 预测标签
 
+    # 提取测试数据的前两列作为特征 [x1, x2]
     x_test = data_test[:, :2]    # 测试集特征
     t_test = data_test[:, 2]     # 测试集标签
-    # 对测试数据进行预测，获取预测标签
-    t_test_pred = svm.predict(x_test)
 
-    # 评估结果，计算准确率
+    # 使用训练好的SVM模型对测试数据进行标签预测
+    t_test_pred = svm.predict(x_test)   # 预测测试集标签
+
+    # 评估模型性能，计算准确率
     acc_train = eval_acc(t_train, t_train_pred)
     acc_test = eval_acc(t_test, t_test_pred)
+    
+    # 打印准确率结果
     print("train accuracy: {:.1f}%".format(acc_train * 100))
     print("test accuracy: {:.1f}%".format(acc_test * 100))
