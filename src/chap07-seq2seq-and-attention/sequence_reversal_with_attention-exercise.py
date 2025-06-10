@@ -282,9 +282,21 @@ def train(model, optimizer, seqlen):
 
 # In[28]:
 
-
+# 初始化Adam优化器，设置学习率为0.0005
+# Adam优化器结合了动量法和RMSProp的优点，适合序列学习任务
+# 0.0005是相对较小的学习率，适合精细调优
 optimizer = optimizers.Adam(0.0005)
+
+# 实例化Seq2Seq模型
+# mySeq2SeqModel()应该实现了编码器-解码器架构
+# 用于处理序列到序列的转换任务（如机器翻译、文本摘要等）
 model = mySeq2SeqModel()
+
+# 开始训练模型
+# 参数说明：
+#   model: 要训练的Seq2Seq模型实例
+#   optimizer: 配置好的优化器
+#   seqlen=20: 序列长度设为20（输入/输出序列的最大长度）
 train(model, optimizer, seqlen=20)
 
 
