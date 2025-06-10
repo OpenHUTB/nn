@@ -278,7 +278,7 @@ if __name__ == "__main__":
     y_pred = gmm.labels_
     print(f"完成训练，共进行{len(gmm.log_likelihoods)}次迭代")
     
-    # 3. 可视化收敛过程
+    # 3. 收敛曲线绘制，可以用于判断是否收敛
     print("\n绘制EM算法收敛曲线...")
     gmm.plot_convergence()
     
