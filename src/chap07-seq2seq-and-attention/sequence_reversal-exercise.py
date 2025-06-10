@@ -90,11 +90,9 @@ class mySeq2SeqModel(keras.Model):
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64,
                                                     batch_input_shape=[None, None])
 
-        # 编码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
-        self.encoder_cell = tf.keras.layers.SimpleRNNCell(128)
-
-        # 解码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
-        self.decoder_cell = tf.keras.layers.SimpleRNNCell(128)
+        # 编码器和解码器都改用 LSTMCell
+        self.encoder_cell = tf.keras.layers.LSTMCell(128)  # 隐藏状态维度为128
+        self.decoder_cell = tf.keras.layers.LSTMCell(128)
 
         # 编码器RNN层：将RNNCell包裹成完整RNN，输出整个序列（return_sequences=True），并返回最终状态（return_state=True）
         self.encoder = tf.keras.layers.RNN(
