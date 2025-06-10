@@ -180,39 +180,62 @@ img = np.expand_dims(img, axis=0)  # 添加批次维度后的形状：[1, 高度
 img_out = model.getL2_feature_map(img)
 pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
 
+# 创建第一个图像展示画布：尺寸为10x7英寸（宽x高）
 pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 3])
+
+# 第一行第一列子图：显示第0通道图像
+pylab.subplot(2, 2, 1)  # 创建2行2列布局中的第1个子图
+pylab.axis('off')       # 隐藏坐标轴，使图像更清晰
+pylab.imshow(img_out[0, :, :, 0])  # 显示四维数组img_out中[0]批次、[0]通道的二维图像
+
+# 第一行第二列子图：显示第1通道图像
+pylab.subplot(2, 2, 2)  # 第2个子图位置
+pylab.axis('off')
+pylab.imshow(img_out[0, :, :, 1])  # 显示第1通道
+
+# 第二行第一列子图：显示第2通道图像
+pylab.subplot(2, 2, 3)  # 第3个子图位置
+pylab.axis('off')
+pylab.imshow(img_out[0, :, :, 2])  # 显示第2通道
+
+# 第二行第二列子图：显示第3通道图像
+pylab.subplot(2, 2, 4)  # 第4个子图位置
+pylab.axis('off')
+pylab.imshow(img_out[0, :, :, 3])  # 显示第3通道
+
+pylab.show()  # 渲染并显示当前画布中的所有子图
+
+# 重复上述过程，创建新画布展示后续通道
+# 第二个画布：显示第4-7通道
+pylab.figure(figsize=(10,7))
+pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 4])  # 通道4
+pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 5])  # 通道5
+pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 6])  # 通道6
+pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 7])  # 通道7
 pylab.show()
 
+# 第三个画布：显示第8-11通道
 pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 4])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 5])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 6])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 7])
+pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 8])   # 通道8
+pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 9])   # 通道9
+pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 10])  # 通道10
+pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 11])  # 通道11
 pylab.show()
 
+# 第四个画布：显示第12-15通道
 pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 8])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 9])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 10])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 11])
+pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 12])  # 通道12
+pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 13])  # 通道13
+pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])  # 通道14
+pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])  # 通道15
 pylab.show()
 
+# 第五个画布：显示最后4个通道（16-19）
 pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 12])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 13])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])
-pylab.show()
-
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
+pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])  # 通道16
+pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])  # 通道17
+pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])  # 通道18
+pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])  # 通道19
 pylab.show()
 
 # In[23]:
