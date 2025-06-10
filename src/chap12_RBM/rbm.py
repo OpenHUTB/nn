@@ -143,7 +143,7 @@ class RBM:
         v = np.random.binomial(1, 0.5, self.n_observe)
 
         # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布，使生成的样本更接近训练数据的分布
-        for _ in xrange(1000):
+        for _ in range(1000):
             # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
             h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
 
