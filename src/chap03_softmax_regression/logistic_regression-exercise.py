@@ -205,8 +205,8 @@ if __name__ == '__main__':
 
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
-    plt.ylabel('Y') 
-    plt.xlabel('X')  
+    plt.ylabel('Y')  # 设置Y轴标签为'Y'，用于标识垂直方向的变量
+    plt.xlabel('X')  # 设置X轴标签为'X'，用于标识水平方向的变量
     ax.set_xlim(0, 10)  
     ax.set_ylim(0, 10) 
     

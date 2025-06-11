@@ -115,8 +115,8 @@ if __name__ == '__main__':
     t_test_pred = svm.predict(x_test)   # 预测测试集标签
 
     # 评估模型性能，计算准确率
-    acc_train = eval_acc(t_train, t_train_pred)
-    acc_test = eval_acc(t_test, t_test_pred)
+    acc_train = eval_acc(t_train, t_train_pred) # 计算训练集上的准确率，评估模型对已知数据的拟合能力
+    acc_test = eval_acc(t_test, t_test_pred)    # 计算测试集上的准确率，评估模型对未知数据的泛化能力
     
     # 打印准确率结果
     print("train accuracy: {:.1f}%".format(acc_train * 100))
