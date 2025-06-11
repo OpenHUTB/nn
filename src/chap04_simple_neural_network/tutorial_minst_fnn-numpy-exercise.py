@@ -96,6 +96,7 @@ class Softmax:
     def __init__(self):
         # 初始化类实例的基础参数和状态容器
         self.epsilon = 1e-12
+        # 初始化一个空字典 mem，用于存储中间计算结果（如缓存），避免重复计算。
         self.mem = {}
 
     def forward(self, x):
