@@ -6,7 +6,7 @@ import sys
 class RBM:
     """Restricted Boltzmann Machine."""
 
-    def __init__(self, n_hidden=2, n_observe=784):
+    def __init__(self, n_hidden = 2, n_observe = 784):
         """
         初始化受限玻尔兹曼机（RBM）模型参数
 
