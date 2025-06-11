@@ -64,6 +64,14 @@ class RNN_model(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)  # 明确指定维度，避免警告
 
     def forward(self, sentence, is_test=False):
+        """
+        前向传播函数
+        Args:
+            sentence: 输入句子的单词索引序列 (形状: [序列长度])
+            is_test: 是否为测试模式 (默认False)
+        Returns:
+            output: 模型输出 (测试模式返回最后一个时间步结果，训练模式返回完整序列输出)
+        """
         # 查找词向量并调整形状为 (1, 序列长度, 嵌入维度)
         batch_input = self.word_embedding_lookup(sentence).view(1, -1, self.word_embedding_dim)
 
