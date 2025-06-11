@@ -163,7 +163,7 @@ def compute_loss(logits, labels):# 使用 sparse_softmax_cross_entropy_with_logi
     # 输入是 logits 和对应的 labels（真实类别索引）
     # 输出是一个形状为 (B,) 的损失张量
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits = logits, labels = labels)
     return tf.reduce_mean(losses)# 对所有样本的损失求平均，得到一个标量值作为最终的 loss
 
 @tf.function
