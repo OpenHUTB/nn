@@ -104,6 +104,7 @@ class LogisticRegression():
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
         logits = tf.matmul(inp, self.W) + self.b
         # 对logits应用sigmoid函数，得到预测概率
+        # 数学表达式：pred = sigmoid(logits) = 1 / (1 + exp(-logits))
         pred = tf.nn.sigmoid(logits)
         return pred
 
