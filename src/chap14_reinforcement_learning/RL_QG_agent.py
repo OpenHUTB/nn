@@ -14,8 +14,11 @@ class RL_QG_agent:
         
         # TensorFlow相关组件占位符
         self.sess = None          # 会话对象，管理TensorFlow图的执行
+        
         self.saver = None         # 模型保存器，用于保存和加载参数
+        
         self.input_states = None  # 网络输入张量（棋盘状态）
+        
         self.Q_values = None      # 网络输出张量（各位置Q值）
 
 
@@ -36,8 +39,11 @@ class RL_QG_agent:
         conv1 = tf.layers.conv2d(
             inputs=self.input_states,
             filters=32,         # 32个卷积核，生成32个特征图
+            
             kernel_size=3,      # 3x3卷积核，捕捉局部区域
+            
             padding="same",     # 同尺寸填充，保持输出尺寸与输入一致
+            
             activation=tf.nn.relu  # ReLU激活函数，引入非线性
         )
 
@@ -47,8 +53,11 @@ class RL_QG_agent:
         conv2 = tf.layers.conv2d(
             inputs=conv1,
             filters=64,         # 特征图数量翻倍，增强特征表达能力
+            
             kernel_size=3,      # 使用3×3的卷积核，平衡特征提取能力与参数量
+            
             padding="same",     # 保持输出特征图尺寸与输入一致（补零填充）
+            
             activation=tf.nn.relu   # ReLU激活函数，引入非线性并抑制负梯
         )
 
@@ -94,7 +103,9 @@ class RL_QG_agent:
         
         # 选择Q值最大的位置（若有多个，随机选一个）
         max_q = np.max(legal_q)                # 最大Q值
+        
         best_indices = np.where(legal_q == max_q)[0]  # 所有最大Q值的索引
+        
         return enables[np.random.choice(best_indices)]  # 映射回原始位置
 
 
