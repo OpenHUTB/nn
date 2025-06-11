@@ -74,7 +74,7 @@ class LogisticRegression():
         # L2正则化，防止过拟合，正则化系数为0.01
         # L2正则化通过对权重施加平方惩罚项来防止权重过大
         l2_reg = tf.keras.regularizers.l2(0.01)
-        # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
+        # 初始化权重变量W，形状为[2, 1]表示2维输入到1维输出的线性变换，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
             initial_value = tf.random.uniform(
                 shape = [2, 1], minval = -0.1, maxval = 0.1
