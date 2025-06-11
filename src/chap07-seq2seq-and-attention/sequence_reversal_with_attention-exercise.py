@@ -199,8 +199,13 @@ class mySeq2SeqModel(keras.Model):
         # 应用softmax获取注意力权重
         attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, enc_seq_len]
         
+        attn_weights_expanded = tf.expand_dims(attn_weights, axis=1)  # [batch_size, 1, enc_seq_len]
+        
+        
         # 计算上下文向量
-        context = tf.matmul(attn_weights, enc_out)  # [batch_size, hidden]
+        context = tf.matmul(attn_weights_expanded, enc_out)  # [batch_size, 1, hidden]
+        
+        context = tf.squeeze(context, axis=1)  # [batch_size, hidden]
         
         # 4. 结合上下文向量和解码器输出
         dec_out_with_context = tf.concat([dec_out, context], axis=-1)  # [batch_size, hidden*2]
