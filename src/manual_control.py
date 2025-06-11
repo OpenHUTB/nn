@@ -925,27 +925,68 @@ class HUD(object):
 
 
 class FadingText(object):
+    """渐隐文本类，用于显示会随时间渐隐消失的文本"""
+    
     def __init__(self, font, dim, pos):
-        self.font = font
-        self.dim = dim
-        self.pos = pos
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        """
+        初始化渐隐文本对象
+        
+        参数:
+            font: pygame字体对象 - 用于渲染文本
+            dim: (width, height) - 文本区域尺寸
+            pos: (x, y) - 文本显示位置
+        """
+        self.font = font       # 文本字体
+        self.dim = dim         # 文本区域尺寸(宽,高)
+        self.pos = pos         # 文本显示位置(x,y)
+        self.seconds_left = 0  # 文本剩余显示时间(秒)
+        # 创建透明背景的Surface
+        self.surface = pygame.Surface(self.dim, pygame.SRCALPHA)
 
     def set_text(self, text, color=(255, 255, 255), seconds=2.0):
+        """
+        设置要显示的文本内容
+        
+        参数:
+            text: str - 要显示的文本
+            color: (R,G,B) - 文本颜色(默认白色)
+            seconds: float - 显示持续时间(秒，默认2秒)
+        """
+        # 渲染文本纹理
         text_texture = self.font.render(text, True, color)
-        self.surface = pygame.Surface(self.dim)
-        self.seconds_left = seconds
+        # 重新创建Surface(清除之前内容)
+        self.surface = pygame.Surface(self.dim, pygame.SRCALPHA)
+        self.seconds_left = seconds  # 设置显示时间
+        # 填充透明黑色背景(RGBA: 0,0,0,0)
         self.surface.fill((0, 0, 0, 0))
+        # 将文本绘制到Surface上(位置偏移10,11)
         self.surface.blit(text_texture, (10, 11))
 
     def tick(self, _, clock):
+        """
+        更新渐隐效果(每帧调用)
+        
+        参数:
+            _: 未使用参数(保持接口兼容性)
+            clock: pygame时钟对象 - 用于计算帧间隔时间
+        """
+        # 计算帧间隔时间(转换为秒)
         delta_seconds = 1e-3 * clock.get_time()
+        # 减少剩余时间(不小于0)
         self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
+        # 根据剩余时间设置透明度(500倍系数控制渐隐速度)
         self.surface.set_alpha(500.0 * self.seconds_left)
 
     def render(self, display):
-        display.blit(self.surface, self.pos)
+        """
+        渲染文本到目标Surface
+        
+        参数:
+            display: pygame Surface - 目标显示表面
+        """
+        # 只有当还有剩余时间时才渲染
+        if self.seconds_left > 0:
+            display.blit(self.surface, self.pos)
 
 
 # ==============================================================================
