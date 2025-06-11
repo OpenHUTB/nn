@@ -50,10 +50,13 @@ def random_string(length):
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
     batched_examples = [random_string(length) for i in range(batch_size)]
+  
     # 转成索引：字母 A-Z 映射到 1-26
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
+  
     # 逆序
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
+  
     #等价于y = [list(reversed(e_idx)) for e_idx in enc_x]
     # 添加起始符
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
@@ -110,9 +113,11 @@ class mySeq2SeqModel(keras.Model):
         self.decoder = tf.keras.layers.RNN(
             self.decoder_cell,             # 指定解码器使用的RNN单元
                                            # 例如LSTMCell、GRUCell或自定义单元
+          
             return_sequences = True,       # 返回完整的输出序列
                                            # 适用于序列到序列模型，每个时间步都需要输出
                                            # 输出形状: [batch_size, seq_len, units]
+          
             return_state = True            # 返回最终的隐藏状态
                                            # 对于LSTM单元，返回[h_state, c_state]
                                            # 对于GRU单元，返回[h_state]
@@ -146,6 +151,7 @@ class mySeq2SeqModel(keras.Model):
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
+      
         # 返回模型预测的logits值，通常后续会通过softmax计算概率
         # 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
@@ -180,13 +186,17 @@ class mySeq2SeqModel(keras.Model):
         # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+      
         # 计算上下文向量
         # 根据注意力权重加权求和编码器输出，得到上下文向量
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+      
         # 将嵌入向量和上下文向量拼接作为RNN输入
         rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
+      
         # 通过RNN单元计算输出和更新状态
         output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
+      
         # 通过全连接层计算logits
         logits = self.dense(output)  # (B, V)
         next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
@@ -248,8 +258,10 @@ def train(model, optimizer, seqlen):
             # 计算训练准确率
             # 使用模型对当前批次的输入数据进行预测，得到logits
             logits = model(enc_x, dec_x)
+          
             # 获取预测结果，通过argmax获取概率最高的类别索引
             preds = tf.argmax(logits, axis=-1)
+          
             # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
             acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32))
 
