@@ -203,7 +203,7 @@ def evaluate(model):
     pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(o[0], o[1], o[0] == o[1])
 
     print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
 
