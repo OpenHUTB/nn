@@ -293,7 +293,7 @@ def sequence_reversal():
         out = tf.concat(collect, axis = -1).numpy()
         # 将一个数值列表转换为对应的字母字符串
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
-        return out
+        return out# 返回解码后的字符串列表
     
 
     # 生成一批测试数据（32个样本，每个序列长度10）
