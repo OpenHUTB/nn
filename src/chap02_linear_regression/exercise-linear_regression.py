@@ -193,11 +193,11 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         # -2/len(y) 是损失函数导数的系数
         # 最终形状 (n_features,)
         gradient = -2 * phi.T @ error / len(y)
-        
+        # 计算梯度
         # 4. 参数更新：沿负梯度方向调整权重
         # 学习率控制更新步长
         # 公式: w_new = w_old - lr * ∇J(w)
-        w -= lr * gradient
+        w -= lr * gradient # 更新权重
     
     return w
 
