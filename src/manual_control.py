@@ -264,33 +264,54 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             carla.MapLayer.All
         ]
 
+    
     def restart(self):
-        self.player_max_speed = 1.589
-        self.player_max_speed_fast = 3.713
-        # Keep same camera config if the camera manager exists.
-        cam_index = self.camera_manager.index if self.camera_manager is not None else 0
-        cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
-        # Get a random blueprint.
-        blueprint_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
-        if not blueprint_list:
-            raise ValueError("Couldn't find any blueprints with the specified filters")
-        blueprint = random.choice(blueprint_list)
-        blueprint.set_attribute('role_name', self.actor_role_name)
-        if blueprint.has_attribute('terramechanics'):
-            blueprint.set_attribute('terramechanics', 'true')
-        if blueprint.has_attribute('color'):
-            color = random.choice(blueprint.get_attribute('color').recommended_values)
-            blueprint.set_attribute('color', color)
-        if blueprint.has_attribute('driver_id'):
-            driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
-            blueprint.set_attribute('driver_id', driver_id)
-        if blueprint.has_attribute('is_invincible'):
-            blueprint.set_attribute('is_invincible', 'true')
-        # set the max speed
-        if blueprint.has_attribute('speed'):
-            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
-            self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
+    # 重置或重新生成玩家车辆，并初始化相关参数
+    
+    # 重置玩家车辆的基础速度参数（单位：米/秒）
+    self.player_max_speed = 1.589       # 默认普通模式最高速度
+    self.player_max_speed_fast = 3.713  # 默认加速模式最高速度
 
+    # 保留当前相机配置（如果相机管理器存在）
+    cam_index = self.camera_manager.index if self.camera_manager is not None else 0                     # 当前相机视角索引
+    cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0       # 当前相机位置索引
+
+    # 从满足条件的蓝图列表中随机选择一个车辆蓝图
+    blueprint_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
+    if not blueprint_list:
+        raise ValueError("Couldn't find any blueprints with the specified filters")  # 如果没有可用蓝图则报错
+    blueprint = random.choice(blueprint_list)  # 随机选择车辆蓝图
+
+    # 配置车辆蓝图属性
+    blueprint.set_attribute('role_name', self.actor_role_name)  # 设置角色名称
+    
+    # 如果蓝图支持地形力学，则启用
+    if blueprint.has_attribute('terramechanics'):
+        blueprint.set_attribute('terramechanics', 'true')
+    
+    # 随机设置车辆颜色（如果支持）
+    if blueprint.has_attribute('color'):
+        color = random.choice(blueprint.get_attribute('color').recommended_values)
+        blueprint.set_attribute('color', color)
+    
+    # 随机设置驾驶员ID（如果支持）
+    if blueprint.has_attribute('driver_id'):
+        driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
+        blueprint.set_attribute('driver_id', driver_id)
+    
+    # 设置车辆为无敌状态（防止被摧毁）
+    if blueprint.has_attribute('is_invincible'):
+        blueprint.set_attribute('is_invincible', 'true')
+    
+    # 如果蓝图有速度属性，则覆盖默认速度设置
+    if blueprint.has_attribute('speed'):
+        # 推荐值列表中的第2个值作为普通模式速度
+        self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
+        # 推荐值列表中的第3个值作为加速模式速度  
+        self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
+
+
+    
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
