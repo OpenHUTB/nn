@@ -148,7 +148,9 @@ def predict(model, xs):
 def evaluate(ys, ys_pred):
     """评估模型。"""
     std = np.std(ys - ys_pred) # 计算预测误差的标准差
+    #预测误差的标准差越小，表示模型的预测越准确
     return std
+ 
 
 
 # 评估指标的计算
