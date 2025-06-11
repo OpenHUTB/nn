@@ -296,6 +296,7 @@ with tf.GradientTape() as tape:
     tape.watch(W2)        # 追踪 W2 的梯度
     # 第一层线性变换：输入x与权重W1做矩阵乘法
     h1 = tf.matmul(x, W1)
+    # 对第一层输出应用ReLU激活函数
     h1_relu = tf.nn.relu(h1)
     h2 = tf.matmul(h1_relu, W2)
     prob = tf.nn.softmax(h2)
