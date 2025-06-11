@@ -158,8 +158,9 @@ class mySeq2SeqModel(keras.Model):
         enc_out, enc_state = self.encoder(enc_emb)
 
         # 返回编码器最后一个时间步的输出和最终状态
-        return [enc_out[:, -1, :], enc_state]
-    
+        # 返回完整的编码器输出和最终状态
+        return enc_out, enc_state
+
     def get_next_token(self, x, state):
        '''
     根据当前输入和状态生成下一个token
