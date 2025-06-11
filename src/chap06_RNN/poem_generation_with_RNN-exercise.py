@@ -10,7 +10,6 @@ import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组�
 import tensorflow as tf
 import collections
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
