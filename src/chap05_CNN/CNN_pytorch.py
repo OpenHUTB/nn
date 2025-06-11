@@ -26,8 +26,8 @@ if not(os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
 # 加载训练数据集
 train_data = torchvision.datasets.MNIST(
     root='./mnist/',                              # 数据集保存路径
-    train=True,                                   # 加载训练集
-    transform=torchvision.transforms.ToTensor(),  # 将图像转换为 Tensor 并归一化到[0,1]
+    train=True,                                   # 加载训练集（False则加载测试集）
+    transform=torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
     download=DOWNLOAD_MNIST                       # 如果需要则下载
 )
 
@@ -35,7 +35,7 @@ train_data = torchvision.datasets.MNIST(
 train_loader = Data.DataLoader(
     dataset=train_data,     # 使用的数据集
     batch_size=BATCH_SIZE,  # 每批数据量
-    shuffle=True            # 是否打乱数据
+    shuffle=True            # 是否在每个epoch打乱数据顺序（重要！避免模型学习到顺序信息）
 )
 
 # 加载测试数据集
