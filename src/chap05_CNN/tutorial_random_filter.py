@@ -22,7 +22,7 @@ class MyConvModel(keras.Model):
         
     @tf.function
     def call(self, x):
-        h1 = self.l1_conv(x)
+        h1 = self.l1_conv(x) # 将输入 x 传递给第一层卷积层 l1_conv，并获取输出
         return h1
 
 
