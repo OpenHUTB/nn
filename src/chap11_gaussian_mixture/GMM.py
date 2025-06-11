@@ -36,6 +36,7 @@ def generate_data(n_samples=1000):
     n_components = len(weights_true)
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
+    # 计算每个分布应生成的样本数（浮点转整数可能有误差）
     samples_per_component = (weights_true * n_samples).astype(int)
     
     # 确保样本总数正确（由于浮点转换可能有误差）
@@ -56,10 +57,10 @@ def generate_data(n_samples=1000):
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
         # 将生成的样本添加到列表
         X_list.append(X_i) 
-        # 添加对应标签
+        # 添加对应标签（0、1、2表示三个分布）
         y_true.extend([i] * samples_per_component[i]) 
     
-    # 合并并打乱数据
+    # 合并并打乱数据并打乱顺序（模拟无标签数据）
     # 将多个子数据集合并为一个完整数据集
     X = np.vstack(X_list)  
     # 将Python列表转换为NumPy数组
@@ -96,8 +97,9 @@ def logsumexp(log_p, axis=1, keepdims=False):
         return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
+     # 安全计算指数和：先减去最大值，再计算指数
     safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
-    sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)  # 计算调整后的指数和
+    sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = keepdims)  # 计算调整后的指数和
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
@@ -117,7 +119,7 @@ class GaussianMixtureModel:
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
     """
-    def __init__(self, n_components=3, max_iter=100, tol=1e-6 tol=1e-6, random_state=None):
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6 tol = 1e-6, random_state = None):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
@@ -136,8 +138,8 @@ class GaussianMixtureModel:
            - E步：计算每个样本属于各高斯成分的后验概率（责任度）
            - M步：基于后验概率更新模型参数
         """
-        X = np.asarray(X)
-        n_samples, n_features = X.shape
+        X = np.asarray(X) # 将输入数据 X 转换为 NumPy 数组格式，确保后续操作的兼容性
+        n_samples, n_features = X.shape # 获取数据的样本数量和特征维度
         
         # 初始化混合系数（均匀分布）
         self.pi = np.ones(self.n_components) / self.n_components
@@ -173,8 +175,8 @@ class GaussianMixtureModel:
             self.pi = Nk / n_samples
             
             # 初始化新均值和新协方差矩阵
-            new_mu = np.zeros_like(self.mu)
-            new_sigma = np.zeros_like(self.sigma)
+            new_mu = np.zeros_like(self.mu)# 创建一个与 self.mu 形状相同且全为零的数组，作为新的均值向量
+            new_sigma = np.zeros_like(self.sigma)# 创建一个与 self.sigma 形状相同且全为零的数组，作为新的协方差矩阵
 
             # 对每个高斯成分更新参数
             for k in range(self.n_components):
@@ -311,13 +313,21 @@ if __name__ == "__main__":
     
     # 右图：GMM预测聚类
     plt.subplot(1, 2, 2)
+    # 绘制散点图展示GMM聚类预测结果：
+    # - X[:, 0]: 取数据集第一维特征作为x轴
+    # - X[:, 1]: 取数据集第二维特征作为y轴
+    # - c=y_pred: 使用预测标签作为颜色分类依据
+    # - cmap='viridis': 使用viridis颜色映射
+    # - s=15: 设置点的大小为15
+    # - alpha=0.8: 设置透明度为0.8（轻微透明效果）
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=15, alpha=0.8)
-    plt.title("GMM预测聚类", fontsize=12)
-    plt.xlabel("特征1", fontsize=10)
-    plt.ylabel("特征2", fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.title("GMM预测聚类", fontsize=12) # 设置标题及字体大小
+    plt.xlabel("特征1", fontsize=10)      # 设置x轴标签及字体大小
+    plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
+    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
     
-    plt.tight_layout()
-    plt.savefig('gmm_clustering_results.png', dpi=300)
-    plt.show()
+
+    plt.tight_layout()                                  # 自动调整子图参数，确保图形元素不重叠
+    plt.savefig('gmm_clustering_results.png', dpi=300)  # 保存高分辨率（300 DPI）的GMM聚类结果图像
+    plt.show()                                          # 显示绘制的图形窗口
     print("程序执行完毕")

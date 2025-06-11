@@ -13,7 +13,9 @@ import tensorflow as tf
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
+import os
+import sys
+import tqdm
 import random
 import string
 
@@ -43,6 +45,15 @@ def get_batch(batch_size, length):
     enc_x: 编码器输入，字符转换为索引后的张量
     dec_x: 解码器输入，包含起始标记，字符转换为索引后的张量
     y: 解码器目标输出，原始序列的逆序，字符转换为索引后的张量
+
+    数据格式说明:
+    - 原始字符串: 如 ['ABCD', 'EFGH'] 长度等于 batch_size
+    - 编码器输入 (enc_x): 
+        [[1, 2, 3, 4], [5, 6, 7, 8]] 将字符转换为索引（A=1, B=2,..., Z=26）
+    - 解码器输入 (dec_x):
+        [[0, 1, 2, 3], [0, 5, 6, 7]] 在目标序列前加起始标记(0)并移除最后一个字符
+    - 目标输出 (y):
+        [[4, 3, 2, 1], [8, 7, 6, 5]] 输入序列的逆序索引
     """
     # 生成随机字符串
     batched_examples = [randomString(length) for i in range(batch_size)]
@@ -197,8 +208,13 @@ class mySeq2SeqModel(keras.Model):
         # 应用softmax获取注意力权重
         attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, enc_seq_len]
         
+        attn_weights_expanded = tf.expand_dims(attn_weights, axis=1)  # [batch_size, 1, enc_seq_len]
+        
+        
         # 计算上下文向量
-        context = tf.matmul(attn_weights, enc_out)  # [batch_size, hidden]
+        context = tf.matmul(attn_weights_expanded, enc_out)  # [batch_size, 1, hidden]
+        
+        context = tf.squeeze(context, axis=1)  # [batch_size, hidden]
         
         # 4. 结合上下文向量和解码器输出
         dec_out_with_context = tf.concat([dec_out, context], axis=-1)  # [batch_size, hidden*2]
@@ -253,7 +269,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
     # 应用梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     
-    return loss
+    return loss # 返回损失值
 
 def train(model, optimizer, seqlen):
     """
@@ -272,6 +288,7 @@ def train(model, optimizer, seqlen):
     
     # 训练2000步
     for step in range(2000):
+        # 获取一个批次的训练数据
         batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
         
@@ -357,6 +374,7 @@ def sequence_reversal():
 
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
+    # 反转字符串 rev_seq 两次，恢复原始顺序
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     if seq == rev_seq_rev:
         return True

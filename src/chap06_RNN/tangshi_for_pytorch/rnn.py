@@ -15,7 +15,7 @@ def weights_init(m):
         w_bound = np.sqrt(6. / (fan_in + fan_out)) # 计算权重初始化范围
         m.weight.data.uniform_(-w_bound, w_bound) # 均匀分布初始化权重
         m.bias.data.fill_(0) # 偏置置零
-        print("inital  linear weight ")
+        print("inital  linear weight ")# 打印初始化信息
 
 
 # 定义词嵌入模块
@@ -64,6 +64,14 @@ class RNN_model(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)  # 明确指定维度，避免警告
 
     def forward(self, sentence, is_test=False):
+        """
+        前向传播函数
+        Args:
+            sentence: 输入句子的单词索引序列 (形状: [序列长度])
+            is_test: 是否为测试模式 (默认False)
+        Returns:
+            output: 模型输出 (测试模式返回最后一个时间步结果，训练模式返回完整序列输出)
+        """
         # 查找词向量并调整形状为 (1, 序列长度, 嵌入维度)
         batch_input = self.word_embedding_lookup(sentence).view(1, -1, self.word_embedding_dim)
 
@@ -91,8 +99,8 @@ class RNN_model(nn.Module):
 
         # 如果是测试模式，仅返回最后一个时间步的预测结果
         if is_test:
-            prediction = out[-1, :].view(1, -1)
-            output = prediction
+            prediction = out[-1, :].view(1, -1)  # 提取最后一个时间步的输出作为预测值
+            output = prediction                  # 将预测值赋值给输出变量
         else:
             output = out
 

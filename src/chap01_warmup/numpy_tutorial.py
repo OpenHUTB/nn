@@ -7,7 +7,6 @@ import numpy as np                    # 将 numpy 库命名为 np
 import matplotlib                     # 导入Matplotlib库，用于数据可视化
 import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
-matplotlib.use('TkAgg')               # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染
 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 print("第二题：\n")
@@ -20,22 +19,23 @@ print("(1) 输出 a 的类型（type）\n", type(a))
 print("(2) 输出 a 的各维度的大小（shape）\n", a.shape)
 print("(3) 输出 a 的第一个元素（element）\n", a[0])
 # 使用 array() 函数创建数组，函数可基于序列型的对象。创建了一个一维数组 a，并输出其类型（numpy.ndarray）、形状（(3,)） 和第一个元素（4）。
-
+# 使用 type() 获取数组的类型(numpy.ndarray),使用 shape 属性查看数组维度信息(一维数组的形状表示为 (n,)),通过索引访问数组元素（索引从 0 开始）
 # 3. 建立一个二维数组 b, 初始化为 [ [4, 5, 6], [1, 2, 3]] (1) 输出二维数组 b 的形状（shape）（输出值为（2,3））(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）
 print("第三题：\n")
 b = np.array([[4, 5, 6], [1, 2, 3]])  # 创建一个二维数组 b
-print("(1) 输出各维度的大小（shape）\n", b.shape)  # 输出数组 b 的形状
-print("(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])  # 输出数组 b 的指定元素
+print("(1) 输出各维度的大小（shape）\n", b.shape)  # 输出数组 b 的形状 - 应该是(2,3)
+print("(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])  # 输出数组 b 的指定元素 - b[0,0]是4, b[0,1]是5, b[1,1]是2
+
 
 # 4. (1) 建立一个全 0 矩阵 a, 大小为 3x3; 类型为整型（提示: dtype = int）(2) 建立一个全 1 矩阵 b, 大小为 4x5;  (3) 建立一个单位矩阵 c ,大小为 4x4; (4) 生成一个随机数矩阵 d,
 # 大小为 3x2.
 print("第四题：\n")
 
-# 全 0 矩阵，3x3
+# 全 0 矩阵，3x3，指定数据类型为int
 a = np.zeros((3, 3), dtype=int)
-# 全 1 矩阵，4x5
+# 全 1 矩阵，4x5，默认数据类型为float
 b = np.ones((4, 5))
-# 单位矩阵，4x4
+# 单位矩阵，4x4(对角线为1，其余为0)
 c = np.eye(4)
 # 随机数矩阵，3x2：设置随机种子（42）确保结果可复现，生成0-1之间的浮点数
 np.random.seed(42)  #  固定随机种子，使随机结果可复现
@@ -117,13 +117,13 @@ print("第十一题：\n")
 
 x = np.array([1, 2])
 # 创建一个包含整数1和2的NumPy数组
-print("输出:", type(x))
+print("输出:",x.dtype)
 
 # 12. 执行 x = np.array([1.0, 2.0]) ，然后输出 x 的数据类类型
 print("第十二题：\n")
 
 x = np.array([1.0, 2.0])
-print("输出:", type(x))
+print("输出:", x.dtype)
 
 # 13. 执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype = np.float64)，然后输出 x+y , 和 np.add(x,y)
 print("第十三题：\n")
@@ -203,14 +203,14 @@ x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，�
 y = x * x  # 计算每个 x 对应的 y=x^2 的值
 
 plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
-plt.plot(x, y, label="y = x^2", color="blue")  # 绘制蓝色曲线，并设置图例标签为 y = x^2
+plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
 
 # 添加标题和标签
 plt.title("Plot of y = x^2")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 
-# 显示半透明网格线
+# 显示出半透明网格线
 plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
@@ -240,8 +240,8 @@ plt.grid(True, alpha=0.5)
 # 显示图例
 plt.legend()
 
-# 自动调整子图布局，优化图形显示效果
-plt.tight_layout()
+# 自动调整布局，防止标签被截断
+plt.tight_layout() 
 
 # 显示图像
 plt.show()

@@ -9,13 +9,16 @@
 # In[1]:
 
 
-import numpy as np
-import tensorflow as tf
-import collections
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
+# 导入必要的库和模块
+import numpy as np  # 数值计算库
+import tensorflow as tf  # 深度学习框架
+import collections  # 提供有用的数据结构
+from tensorflow import keras  # TensorFlow的高级API
+from tensorflow.keras import layers  # Keras的层模块
+from tensorflow.keras import layers, optimizers, datasets  # 从Keras导入层、优化器和数据集
+import os  # 操作系统接口
+import sys  # 系统相关参数和函数
+import tqdm  # 进度条工具
 
 
 # 数据生成
@@ -38,10 +41,10 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     numbers_1 = np.random.randint(start, end, batch_size)
     numbers_2 = np.random.randint(start, end, batch_size)
     results = numbers_1 + numbers_2
-    return numbers_1, numbers_2, results
+    return numbers_1, numbers_2, results# 返回生成的随机数数组及其和
 
 def convertNum2Digits(Num):
-    '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
+    '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
     strNum = str(Num)
     chNums = list(strNum)
@@ -57,7 +60,7 @@ def convertDigits2Num(Digits):
     return Num
 
 def pad2len(lst, length, pad=0):
-    '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    '''将一个列表用`pad`填充到`length`的长度，例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
     '''#用0填充数位列表至固定长度，适配批量训练。
     lst+=[pad]*(length - len(lst))
     return lst
@@ -76,17 +79,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     #1. 将整数转换为数字位列表
     #2. 反转数字位列表(低位在前，高位在后)
     #3. 填充到固定长度
-    
-    Args:
-        Nums1: shape(batch_size,)
-        Nums2: shape(batch_size,)
-        results: shape(batch_size,)
-        maxlen:  type(int)
-    Returns:
-        Nums1: shape(batch_size, maxlen)
-        Nums2: shape(batch_size, maxlen)
-        results: shape(batch_size, maxlen)
-    '''
+
      # 将整数转换为数字位列表
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
@@ -104,7 +97,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     return Nums1, Nums2, results
 
 
-# # 建模过程， 按照图示完成建模
+# # 建模过程，按照图示完成建模
 
 # In[3]:
 
@@ -203,10 +196,13 @@ def evaluate(model):
     pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(f"真实值: {o[0]:<20} 预测值: {o[1]:<20} 是否正确: {o[0]==o[1]}")
 
-    print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
+    # 计算整体准确率：统计所有预测中正确的比例
+    accuracy = np.mean([o[0] == o[1] for o in zip(datas[2], res)])
+    print('accuracy is: %g' % accuracy)
 
+    return accuracy
 
 # In[5]:
 

@@ -21,7 +21,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     x = tf.cast(x, tf.float32) # 统一为float32类型，确保计算精度
 
     # 数值稳定性处理：减去最大值避免指数爆炸
-    max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    max_per_row = tf.reduce_max(x, axis = -1, keepdims = True)
     # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
@@ -30,7 +30,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     # tf.exp计算每个元素的指数值，使所有值为正数
     exp_logits = tf.exp(shifted_logits)
     
-    sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+    sum_exp = tf.reduce_sum(exp_logits, axis = -1, keepdims = True)
     return exp_logits / sum_exp
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
@@ -60,6 +60,7 @@ def softmax_ce(logits, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     # 参数logits: 未经Softmax的原始输出（logits）
     # 参数label: one-hot格式的标签
+    # 定义一个极小值epsilon（1e-8），用于数值稳定性，防止log(0)的情况
     epsilon = 1e-8
     logits = tf.cast(logits, tf.float32)
     label = tf.cast(label, tf.float32)
@@ -101,6 +102,7 @@ def sigmoid_ce(logits, labels):
     loss = tf.reduce_mean(
         tf.nn.relu(logits) - logits * labels + 
         tf.math.log(1 + tf.exp(-tf.abs(logits)))
+
     )
     
     return loss #返回计算得到的损失值
