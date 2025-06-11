@@ -49,7 +49,7 @@ def weight_variable(shape):
     返回:
         tf.Variable: 初始化后的权重变量。
     """
-    # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
+    # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练（避免梯度消失/爆炸）
     initial = tf.truncated_normal(shape, stddev=0.1)
     # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
@@ -147,6 +147,8 @@ ys = tf.placeholder(tf.float32, [None, 10])             # 标签 [batch_size, 10
 keep_prob = tf.placeholder(tf.float32)                  # Dropout保留率
 x_image = tf.reshape(xs, [-1, 28, 28, 1])         # 重塑为4D张量 [batch, height, width, channels]
 
+# 构建CNN网络结构
+
 # 定义第一个卷积层的权重变量，卷积核大小为 7x7，输入通道数为 1，输出通道数为 32
 W_conv1 = weight_variable([7, 7, 1, 32])
 # 定义第一个卷积层的偏置变量，输出通道数为 32
@@ -185,6 +187,7 @@ h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 # 全连接层 2
 ## fc2 layer ##
+## 输出层 ##
 W_fc2 = weight_variable([1024, 10])  # 权重矩阵：输入1024维→输出10维(对应10个类别
 b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
@@ -205,7 +208,7 @@ with tf.Session() as sess:
     # 模型训练循环
     for i in range(max_epoch):
         # 获取下一个训练批次
-        batch_xs, batch_ys = mnist.train.next_batch(100)
+        batch_xs, batch_ys = mnist.train.next_batch(100) # 获取小批量数据
 
         # 执行训练步骤（前向传播 + 反向传播 + 参数更新）
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
