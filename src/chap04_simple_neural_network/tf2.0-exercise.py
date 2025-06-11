@@ -60,6 +60,7 @@ def softmax_ce(logits, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     # 参数logits: 未经Softmax的原始输出（logits）
     # 参数label: one-hot格式的标签
+    # 定义一个极小值epsilon（1e-8），用于数值稳定性，防止log(0)的情况
     epsilon = 1e-8
     logits = tf.cast(logits, tf.float32)
     label = tf.cast(label, tf.float32)
