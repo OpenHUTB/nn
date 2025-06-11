@@ -63,7 +63,10 @@ def softmax_ce(x, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     ##########
     # 使用 clip 避免 log(0) 产生数值不稳定
-    x = tf.clip_by_value(x, 1e-10, 1.0)
+    # 计算softmax概率分布
+    probs = tf.nn.softmax(logits)
+    # 防止log(0)的数值不稳定
+    probs = tf.clip_by_value(probs, 1e-10, 1.0)
     # 计算交叉熵损失：-sum(y_true * log(y_pred))
     loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
     ##########
