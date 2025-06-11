@@ -3,7 +3,7 @@
 
 # 导入NumPy科学计算库，并使用缩写np简化调用
 import numpy as np
-import os  # 新增：用于处理路径
+import os  # 新增：导入操作系统模块，用于处理路径
 
 def load_data(fname):
     """载入数据。"""
@@ -52,9 +52,9 @@ class SVM:
         # 初始化参数
         self.w = np.zeros(n)      # 权重初始化为0
         self.b = 0                # 偏置初始化为0
-
+        # 梯度下降迭代优化
         for epoch in range(self.max_iter):
-            # 计算函数间隔
+            # 计算所有样本的函数间隔 y*(w·x + b)
             margin = y * (np.dot(X, self.w) + self.b)
             # 找出违反间隔条件的样本（margin < 1）： 当样本的 margin < 1 时，该样本被认为是错误分类或处于间隔区域内
             idx = np.where(margin < 1)[0]  # 返回违反间隔条件的样本的索引
