@@ -17,12 +17,22 @@ import numpy as np
 # 定义一个简单的卷积模型
 class MyConvModel(keras.Model):
     def __init__(self):
-        super(MyConvModel, self).__init__()
-        self.l1_conv = Conv2D(filters=3, kernel_size=(3, 3), padding='same')
+        """
+        初始化模型结构
+        调用父类(keras.Model)的初始化方法
+        定义模型的各层组件
+        """
+        super(MyConvModel, self).__init__()  # 调用父类构造函数
+        
+        # 定义一个2D卷积层(Conv2D)作为模型的第一层:
+        # - filters=3: 使用3个卷积核/滤波器
+        # - kernel_size=(3,3): 3x3的卷积核大小
+        # - padding='same': 使用相同填充，保持输入输出的空间维度相同
+        self.l1_conv = layers.Conv2D(filters=3, kernel_size=(3, 3), padding='same')
         
     @tf.function
     def call(self, x):
-        h1 = self.l1_conv(x)
+        h1 = self.l1_conv(x) # 将输入x通过卷积层
         return h1
 
 
