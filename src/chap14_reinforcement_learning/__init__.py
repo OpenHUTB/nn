@@ -14,7 +14,7 @@ register(
 
 # 2. 重复复制任务：记忆序列并按指定次数重复输出（难度高于基础复制）
 register(
-    id='RepeatCopy-v0', 
+    id='RepeatCopy-v0',       # 环境唯一标识符，遵循Gym的命名约定（任务名+版本号）
     entry_point='gym.envs.algorithmic:RepeatCopyEnv',
     max_episode_steps=200,    # 与基础复制任务相同步数限制
     reward_threshold=75.0,    # 更高奖励阈值，反映任务复杂度提升
