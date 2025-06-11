@@ -64,6 +64,7 @@ class RBM:
     
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间"""
+        # 1.0 / (1 + np.exp(-x)) 计算最终结果
         return 1.0 / (1 + np.exp(-x))
 
     def _sample_binary(self, probs):
