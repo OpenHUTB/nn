@@ -13,7 +13,9 @@ import tensorflow as tf
 import collections
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
+import os
+import sys
+import tqdm
 import random
 import string
 
