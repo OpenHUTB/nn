@@ -325,6 +325,6 @@ if __name__ == "__main__":
     plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
     
     plt.tight_layout()
-    plt.savefig('gmm_clustering_results.png', dpi=300)
+    plt.savefig('gmm_clustering_results.png', dpi=300)# 保存图形为 PNG 文件，分辨率为 300 DPI
     plt.show()
     print("程序执行完毕")
