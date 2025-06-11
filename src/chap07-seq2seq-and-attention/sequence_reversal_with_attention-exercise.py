@@ -333,6 +333,9 @@ def sequence_reversal():
         
         # 初始输入为0(起始标记)
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        # 初始化状态变量
+        # state 被设置为 init_state，这可能是从模型的编码器部分传递过来的初始状态
+        # 或者是模型内部定义的初始状态
         state = init_state
         collect = []
         
