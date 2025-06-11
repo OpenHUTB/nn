@@ -15,7 +15,7 @@ def weights_init(m):
         w_bound = np.sqrt(6. / (fan_in + fan_out)) # 计算权重初始化范围
         m.weight.data.uniform_(-w_bound, w_bound) # 均匀分布初始化权重
         m.bias.data.fill_(0) # 偏置置零
-        print("inital  linear weight ")
+        print("inital  linear weight ")# 打印初始化信息
 
 
 # 定义词嵌入模块
