@@ -10,7 +10,7 @@
 
 # 标准库（Python内置模块，按字母顺序排列）
 import collections
-import os
+import os # 导入os库
 import sys
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
 
@@ -33,31 +33,28 @@ import string
 
 def random_string(length):
     """
-    生成一个由大写英文字母组成的随机字符串。
+    生成一个随机字符串，字符范围为大写字母 A-Z
     参数:
         length (int): 要生成的字符串长度。
     返回:
         str: 随机生成的字符串。
     """
-    # 步骤 1：定义可用字符集（这里使用大写英文字母）
-    # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    # 步骤 1：定义可用字符集（大写英文字母）
     letters = string.ascii_uppercase
-
-    # 步骤 2：从字符集中随机选择指定数量的字符 ；使用 random.choice(letters) 从 letters 中随机选择一个字符
-    random_chars = [random.choice(letters) for _ in range(length)]
-
-    # 步骤 3：将字符列表拼接成字符串并返回
-    return ''.join(random_chars)
-    # 重复这个过程 stringLength 次，并用 ''.join() 将这些字符连接成一个字符串
-    # 最终返回生成的随机字符串
+    
+    # 步骤 2：使用 random.choices() 一次性生成指定长度的随机字符串
+    # random.choices() 可以直接生成包含多个随机字符的列表
+    # 然后使用 ''.join() 将列表中的字符拼接成字符串
+    return ''.join(random.choices(letters, k=length))
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
     batched_examples = [random_string(length) for i in range(batch_size)]
-    # 转成索引
+    # 转成索引：字母 A-Z 映射到 1-26
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
     # 逆序
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
+    #等价于y = [list(reversed(e_idx)) for e_idx in enc_x]
     # 添加起始符
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
   # 返回一个批次的训练数据，包含四个张量：
@@ -65,8 +62,11 @@ def get_batch(batch_size, length):
 # 2. enc_x: 编码器输入序列，形状为 [batch_size, enc_seq_len]
 # 3. dec_x: 解码器输入序列（通常包含起始标记），形状为 [batch_size, dec_seq_len]
 # 4. y: 目标输出序列（通常包含结束标记），形状为 [batch_size, dec_seq_len]
-    return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), tf.constant(y, dtype=tf.int32))
+    return (batched_examples,
+            tf.constant(enc_x, dtype=tf.int32), 
+            tf.constant(dec_x, dtype=tf.int32), 
+            tf.constant(y, dtype=tf.int32))
+#测试
 print(get_batch(2, 10))
 
 ###
@@ -125,21 +125,28 @@ class mySeq2SeqModel(keras.Model):
     @tf.function
     def call(self, enc_ids, dec_ids):
         '''
-        完成sequence2sequence 模型的搭建，模块已经在`__init__`函数中定义好
-        前向传播过程：编码器 -> 解码器 -> 全连接层
+        序列到序列模型的完整前向传播流程：
+        编码器处理输入序列 → 传递状态给解码器 → 解码器生成输出序列 → 全连接层预测
+
+        Args:
+            enc_ids: 编码器输入序列（字符索引），shape=(batch_size, enc_seq_len)
+            dec_ids: 解码器输入序列（字符索引，含起始标记），shape=(batch_size, dec_seq_len)
+
+        Returns:
+            logits: 解码器每个位置的预测概率分布，shape=(batch_size, dec_seq_len, vocab_size)
         '''
         # 编码过程
-        enc_emb = self.embed_layer(enc_ids)  # (batch_size, enc_seq_len, emb_dim)
-        enc_out, enc_state = self.encoder(enc_emb)  # enc_out: (batch_size, enc_seq_len, enc_units)
+        enc_emb = self.embed_layer(enc_ids)            # (batch_size, enc_seq_len, emb_dim)
+        enc_out, enc_state = self.encoder(enc_emb)     # enc_out: (batch_size, enc_seq_len, enc_units)
         
         # 解码过程，使用编码器的最终状态作为初始状态
-        dec_emb = self.embed_layer(dec_ids)  # (batch_size, dec_seq_len, emb_dim)
-        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)  # dec_out: (batch_size, dec_seq_len, dec_units)
+        dec_emb = self.embed_layer(dec_ids)                                      # (batch_size, dec_seq_len, emb_dim)
+        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)      # dec_out: (batch_size, dec_seq_len, dec_units)
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
-      # 返回模型预测的logits值，通常后续会通过softmax计算概率
-# 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
+        # 返回模型预测的logits值，通常后续会通过softmax计算概率
+        # 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
     
     
@@ -173,6 +180,7 @@ class mySeq2SeqModel(keras.Model):
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
         # 计算上下文向量
+        # 根据注意力权重加权求和编码器输出，得到上下文向量
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
         # 将嵌入向量和上下文向量拼接作为RNN输入
         rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
@@ -198,8 +206,8 @@ def compute_loss(logits, labels):
     # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
+  
 # 定义了一个使用TensorFlow的@tf.function装饰器的函数train_one_step，用于执行一个训练步骤
-
 @tf.function  # 将函数编译为TensorFlow计算图，提升性能
 def train_one_step(model, optimizer, enc_x, dec_x, y):
     """执行一次训练步骤（前向传播+反向传播）"""
@@ -234,11 +242,20 @@ def train(model, optimizer, seqlen):
         # 执行单步训练并返回当前loss
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
         
-        # 每500步打印训练进度
+        # 每500步计算并打印训练进度和准确率
         if step % 500 == 0:
-            print('step', step, ': loss', loss.numpy())
-    return loss
+            # 计算训练准确率
+            # 使用模型对当前批次的输入数据进行预测，得到logits
+            logits = model(enc_x, dec_x)
+            # 获取预测结果，通过argmax获取概率最高的类别索引
+            preds = tf.argmax(logits, axis=-1)
+            # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
+            acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32)
 
+            # 打印当前步数、损失和准确率
+            print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
+    return loss
+# loss.numpy(): 将TensorFlow/PyTorch张量转换为NumPy数组并获取标量值
 
 # # 训练迭代
 
@@ -289,8 +306,10 @@ def sequence_reversal():
 def is_reverse(seq, rev_seq):
     """检查 rev_seq 是否为 seq 的逆序"""
     # 反转rev_seq并与原始seq比较
-    rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
-    if seq == rev_seq_rev:
+    #rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    #if seq == rev_seq_rev:
+    # 使用字符串切片来反转 rev_seq，并与 seq 比较
+    if seq == rev_seq[::-1]:
         return True # 返回 True 表示预测结果与真实逆序相符
     else:
         return False

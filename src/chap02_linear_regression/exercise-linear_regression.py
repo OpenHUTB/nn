@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # coding: utf-8
-import numpy as np
-import matplotlib.pyplot as plt
+import numpy as np # 导入NumPy科学计算库，使用标准别名np
+# 提供高性能的数组操作和数学函数
 
+import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
+# 用于创建各种静态、交互式和动画可视化图表
 
 # 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
 def load_data(filename):
@@ -12,15 +14,21 @@ def load_data(filename):
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
-    xys = []
-    with open(filename, "r") as f:
-        for line in f:
+    xys = []# 用于存储每行的数据，每行数据是一个列表
+    with open(filename, "r") as f:  # 打开文件进行读取
+        for line in f: # 遍历文件的每一行
             # 将每行内容按空格分割并转换为浮点数
+            # strip() 去除行首尾的空白字符，split() 按空格分割字符串
+            # map(float, ...) 将分割后的字符串转换为浮点数
             line_data = list(map(float, line.strip().split()))
             xys.append(line_data)
     # 将数据拆分为特征和标签
-    xs, ys = zip(*xys)
-    return np.asarray(xs), np.asarray(ys)
+    # 假设每行数据的最后一个元素是标签，其余是特征
+    # zip(*xys) 将 xys 列表的行和列进行转置
+    xs, ys = zip(*xys)# xs 是特征列表，ys 是标签列表
+    # 将特征和标签列表转换为 NumPy 数组
+    # NumPy 数组便于后续的数学运算和数据处理
+    return np.asarray(xs), np.asarray(ys) # 返回特征和标签的 NumPy 数组
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
@@ -49,9 +57,8 @@ def multinomial_basis(x, feature_num=10):
     # 生成 x, x^2, ..., x^(feature_num)
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
-    ret = np.concatenate(ret, axis=1)
     # ==========
-    return ret
+    return np.concatenate(ret, axis=1)
 
 
 def gaussian_basis(x, feature_num=10):
@@ -178,6 +185,10 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         error = y - y_pred
         
         # 3. 计算梯度（损失函数对权重的导数）
+        # 梯度公式推导：
+        #   J(w) = 1/m * ∑(φw - y)²
+        #   ∇J(w) = 2/m * φ.T @ (φw - y)
+        # 其中：
         # φ.T @ error 计算每个特征上的误差总和
         # -2/len(y) 是损失函数导数的系数
         # 最终形状 (n_features,)
@@ -185,6 +196,7 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         
         # 4. 参数更新：沿负梯度方向调整权重
         # 学习率控制更新步长
+        # 公式: w_new = w_old - lr * ∇J(w)
         w -= lr * gradient
     
     return w
@@ -216,6 +228,7 @@ def main(x_train, y_train, use_gradient_descent=False):
         learning_rate = 0.01 
         # 设置训练轮数(epochs)为1000，表示整个训练数据集将被遍历1000次。
         epochs = 1000  
+        # 初始化梯度下降法使用的权重向量
         w_gd = np.zeros(phi.shape[1])
         w_gd = gradient_descent(phi, y_train, lr=0.001, epochs=5000)
         # 开始梯度下降的迭代循环，将进行epochs次参数更新。
@@ -225,20 +238,37 @@ def main(x_train, y_train, use_gradient_descent=False):
             gradient = np.dot(phi.T, error) / len(y_train) # 计算梯度
             w_gd -= learning_rate * gradient # 更新权重
 
-    # 定义预测函数
+   # 定义预测函数
     def f(x):
-        # 创建一个全为1的列向量，形状与输入x相同，但增加了一个维度
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
-        # 调用basis_func函数，对输入x进行某种变换，得到基函数的值
-        phi1 = basis_func(x)
-        # 将phi0和phi1沿着列方向（axis=1）拼接起来，形成设计矩阵phi
-        phi = np.concatenate([phi0, phi1], axis=1)
-        # 判断是否使用梯度下降算法，并且 w_gd 是否已经定义，如果使用梯度下降算法，并且 w_gd 已经定义，则使用 w_gd 进行预测
-        if use_gradient_descent and w_gd is not None:
-            return np.dot(phi, w_gd)
-        # 如果不使用梯度下降算法，或者 w_gd 没有定义，则使用最小二乘法得到的权重 w_lsq 进行预测
-        else:
-            return np.dot(phi, w_lsq)
+    """
+    使用线性模型进行预测，可选择使用梯度下降或最小二乘法的权重
+    
+    参数:
+        x: 输入特征向量/矩阵
+        
+    返回:
+        模型的预测值
+    """
+    # 创建偏置项(截距项)的特征列
+    # np.ones_like(x)生成与x形状相同的全1向量
+    # np.expand_dims增加一个维度，将形状从(n,)变为(n,1)
+    phi0 = np.expand_dims(np.ones_like(x), axis=1)  # 形状变为(n,1)
+    
+    # 调用基函数转换输入特征
+    # basis_func对原始特征进行非线性变换(如多项式扩展)
+    phi1 = basis_func(x)  # 假设返回形状为(n,m)
+    
+    # 构建设计矩阵(特征矩阵)
+    # 将偏置项列phi0和转换后的特征phi1按列拼接
+    phi = np.concatenate([phi0, phi1], axis=1)  # 最终形状(n,m+1)
+    
+    # 根据训练方法选择对应的权重进行预测
+    if use_gradient_descent and w_gd is not None:
+        # 使用梯度下降法训练得到的权重
+        return np.dot(phi, w_gd)  # 矩阵乘法计算预测值
+    else:
+        # 使用最小二乘法训练得到的权重(默认)
+        return np.dot(phi, w_lsq)  # 矩阵乘法计算预测值
 
     # 确保返回值为可迭代对象
     return f, w_lsq, w_gd
@@ -289,11 +319,11 @@ if __name__ == "__main__":
 
     # 显示结果
 
-    plt.plot(x_train, y_train, "ro", markersize=3)  #  红色点为训练集数据
-    plt.plot(x_test, y_test, "k")  # 红色点为训练集数据
-    plt.plot(x_test, y_test_pred, "k")  # 黑线为预测值（可以用其他颜色区分）
-    plt.xlabel("x")  # 设置x轴的标签
-    plt.ylabel("y")  # 设置y轴的标签
-    plt.title("Linear Regression")  # 设置图表标题
-    plt.legend(["train", "test", "pred"])  # 添加图例，表示每条线的含义
-    plt.show()  # 显示图表
+    plt.plot(x_train, y_train, "ro", markersize=3)  # 红色点为训练集数据
+    plt.plot(x_test, y_test, "k")                   # 红色点为训练集数据
+    plt.plot(x_test, y_test_pred, "k")              # 黑线为预测值（可以用其他颜色区分）
+    plt.xlabel("x")                                 # 设置x轴的标签
+    plt.ylabel("y")                                 # 设置y轴的标签
+    plt.title("Linear Regression")                  # 设置图表标题
+    plt.legend(["train", "test", "pred"])           # 添加图例，表示每条线的含义
+    plt.show()                                      # 显示图表

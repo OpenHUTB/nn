@@ -73,10 +73,10 @@ class SoftmaxRegression(tf.Module):
         # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
-            name="W",
+            name = "W",
         )
-        self.b = tf.Variable(tf.zeros([num_classes]), name="b")
-        
+        self.b = tf.Variable(tf.zeros([num_classes]), name="b") # 全0初始化，形状为[类别数]，变量名称为b
+
     @tf.function
     def __call__(self, x):
         """
@@ -107,12 +107,19 @@ def compute_loss(pred, labels, num_classes=3):
     pred = tf.clip_by_value(pred, epsilon, 1.0)
     
     # 计算每个样本的交叉熵损失，对于每个样本，计算其真实类别的概率的负对数
+    # 公式：L_i = -Σ_{c=1}^C y_{i,c} · log(p_{i,c})
+    # 其中：
+    #   y_{i,c} 是样本i的真实类别c的one-hot值（0或1）
+    #   p_{i,c} 是模型预测样本i属于类别c的概率
+    #   当y_{i,c}=1时（即样本i的真实类别为c），对应的log(p_{i,c})才会被计入损失
     sample_losses = -tf.reduce_sum(one_hot_labels * tf.math.log(pred), axis=1)
     
     # 计算所有样本的平均损失
     loss = tf.reduce_mean(sample_losses)
     
     # 计算准确率，比较模型预测的类别和真实类别是否一致
+    # tf.argmax(pred, axis=1) 获取预测的类别索引（概率最大的位置）
+    # tf.argmax(one_hot_labels, axis=1) 获取真实类别索引
     acc = tf.reduce_mean(
         tf.cast(
             tf.equal(
@@ -175,8 +182,8 @@ for i in range(1000):
 # 绘制三种不同类别的散点图
 # C1[:, 0] 和 C1[:, 1] 分别表示 C1 的第一列和第二列数据（通常是特征）
 plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")
+plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o") # c="g" 设置颜色为绿色，marker="o" 设置标记为圆形
+plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*") # c="r" 设置颜色为红色，marker="*" 设置标记为星号
 
 # 创建网格点用于绘制决策边界
 x = np.arange(0.0, 10.0, 0.1)
@@ -185,6 +192,7 @@ y = np.arange(0.0, 10.0, 0.1)
 # 生成网格坐标矩阵
 # 将网格坐标展平并组合为输入特征矩阵
 X, Y = np.meshgrid(x, y)
+# 将X和Y数组重塑为一维数组后进行配对组合
 inp = np.array(list(zip(X.reshape(-1), Y.reshape(-1))), dtype=np.float32)
 print(inp.shape)
 # 模型预测

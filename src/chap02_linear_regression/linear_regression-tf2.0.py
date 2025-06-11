@@ -28,7 +28,7 @@ def multinomial_basis(x, feature_num=10):
         feat.append(x**i)
     # 将所有特征沿着第二维（axis=1）拼接起来
     ret = np.concatenate(feat, axis=1)
-    return ret
+    return ret # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
 
 
 def gaussian_basis(x, feature_num=10):
@@ -62,7 +62,7 @@ def load_data(filename, basis_func=gaussian_basis):
         phi0 = np.expand_dims(np.ones_like(xs), axis=1) # 添加偏置项（全1列）
         phi1 = basis_func(xs) # 应用基函数变换
         xs = np.concatenate([phi0, phi1], axis=1) # 拼接偏置和变换后的特征
-        return (np.float32(xs), np.float32(ys)), (o_x, o_y)
+        return (np.float32(xs), np.float32(ys)), (o_x, o_y)# 返回处理好的训练数据和原始数据
 
 
 #定义模型
@@ -84,7 +84,7 @@ class linearModel(Model):
         # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
         # trainable=True 表示该变量需要在训练过程中被优化
         self.w = tf.Variable(
-            shape=[ndim, 1],
+            shape=[ndim, 1],    # 权重矩阵形状：ndim×1
             initial_value=tf.random.uniform(
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
@@ -135,35 +135,54 @@ def train_one_step(model, xs, ys):
     return loss
 
 
+# 使用@tf.function装饰器将Python函数转换为TensorFlow图，以提高执行效率
 @tf.function
 def predict(model, xs):
-    y_preds = model(xs) # 模型前向传播
+    # 使用模型对输入xs进行预测（前向传播）
+    y_preds = model(xs)  # 模型前向传播
+    
+    # 返回模型的预测结果
     return y_preds
 
 
 def evaluate(ys, ys_pred):
     """评估模型。"""
-    std = np.std(ys - ys_pred)# 计算预测误差的标准差
+    std = np.std(ys - ys_pred) # 计算预测误差的标准差
     return std
 
 
 # 评估指标的计算
-for i in range(1000):# 进行1000次训练迭代
-    loss = train_one_step(model, xs, ys)# 执行单步训练并获取当前损失值
+for i in range(1000): # 进行1000次训练迭代
+    loss = train_one_step(model, xs, ys) # 执行单步训练并获取当前损失值
     if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
         print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
-                
-y_preds = predict(model, xs)
-std = evaluate(ys, y_preds)
-print("训练集预测值与真实值的标准差：{:.1f}".format(std))
 
+# 使用模型对训练集数据进行预测
+y_preds = predict(model, xs)
+# 打印测试集预测值与真实值的标准差
+std = evaluate(ys, y_preds)
+# 打印训练集预测值与真实值的标准差
+print("训练集预测值与真实值的标准差：{:.1f}".format(std)) # 格式化输出标准差，保留一位小数
+
+# 加载测试集数据
 (xs_test, ys_test), (o_x_test, o_y_test) = load_data("test.txt")
 
+# 使用模型对测试集数据进行预测
 y_test_preds = predict(model, xs_test)
+# 计算测试集预测值与真实值的标准差
 std = evaluate(ys_test, y_test_preds)
+# 打印测试集预测值与真实值的标准差
 print("训练集预测值与真实值的标准差：{:.1f}".format(std))
 
-plt.plot(o_x, o_y, "ro", markersize=3)
+# 绘制原始数据点：红色圆点标记，大小3
+# o_x: 原始数据X坐标
+# o_y: 原始数据Y坐标
+# "ro": 红色(r)圆形(o)标记
+plt.plot(o_x, o_y, "ro", markersize=3) 
+# 绘制模型预测曲线：黑色实线
+# o_x_test: 测试集X坐标
+# y_test_preds: 模型在测试集上的预测结果
+# "k": 黑色(k)实线（默认线型）
 plt.plot(o_x_test, y_test_preds, "k")
 # 设置x、y轴标签
 plt.xlabel("x")

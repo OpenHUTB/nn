@@ -65,7 +65,7 @@ class CNN(nn.Module):
         self.conv2 = nn.Sequential(
             nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
             nn.BatchNorm2d(64),                                     # 添加批量归一化
-            nn.ReLU(),
+            nn.ReLU(),                                              # ReLU激活函数
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
             nn.BatchNorm2d(64),
             nn.ReLU(),
@@ -81,27 +81,42 @@ class CNN(nn.Module):
         # 第二个全连接层：1024维输入，10维输出（对应10个数字类别）
         self.out2 = nn.Linear(1024, 10, bias=True)
 
+    #定义了一个神经网络的前向传播过程，进行特征提取和分类预测
     def forward(self, x):
         x = self.conv1(x)          # 第一卷积层特征提取，输入 -> 卷积 -> 激活 (ReLU由self.conv1定义)
         x = self.conv2(x)          # 第二卷积层特征提取，特征图 -> 卷积 -> 激活
-        x = x.view(x.size(0), -1)
+        x = x.view(x.size(0), -1)  # 展平张量：保留批量维度，合并其他所有维度
         out1 = self.out1(x)        # 第一个全连接层 + 激活函数，线性变换: [B, in_features] -> [B, hidden_features]
         out1 = F.relu(out1)        # 应用ReLU激活函数引入非线性
-        out1 = self.dropout(out1)
-        out2 = self.out2(out1)
+        out1 = self.dropout(out1)  # 应用dropout正则化，随机丢弃部分神经元输出
+        out2 = self.out2(out1)     # 将上一层输出out1传递给当前层self.out2进行处理
         return out2
 
-# 测试函数
+# 测试函数 - 评估模型在测试集上的准确率
 def test(cnn):
-    global prediction              # 声明全局变量
-    y_pre = cnn(test_x)            # 用模型预测测试数据
-     # 这里使用softmax获取概率分布
+    global prediction  # 使用全局变量prediction保存预测结果
+    
+    # 模型预测：输入测试数据，得到原始输出logits（未归一化的预测值）
+    y_pre = cnn(test_x)  
+    
+    # 计算softmax概率分布（将logits转换为概率值，dim=1表示对类别维度做归一化）
     y_prob = F.softmax(y_pre, dim=1)
-    _, pre_index = torch.max(y_pre, 1)      # 获取预测类别（最大概率的索引）
-    pre_index = pre_index.view(-1)          # 调整张量形状
-    prediction = pre_index.data.numpy()     # 转换为 numpy 数组
-    correct = np.sum(prediction == test_y)  # 计算正确预测的数量
-    return correct / 500.0                  # 返回准确率，假设测试集中样本数为 500
+    
+    # 获取预测类别：找到每个样本概率最大的类别索引
+    # torch.max返回(最大值, 最大值的索引)
+    _, pre_index = torch.max(y_pre, 1)  
+    
+    # 调整张量形状为1维向量（例如从[N,1]变为[N]）
+    pre_index = pre_index.view(-1)
+    
+    # 将预测结果从PyTorch张量转换为numpy数组
+    prediction = pre_index.data.numpy()
+    
+    # 计算正确预测的数量（预测值与真实标签test_y比较）
+    correct = np.sum(prediction == test_y)
+    
+    # 返回准确率（假设测试集共500个样本）
+    return correct / 500.0  
 
 
 # 训练函数
@@ -126,6 +141,7 @@ def train(cnn):
             # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
                 print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
+                # step != 0: 跳过初始训练前的测试（通常初始准确率无意义）
 # 主程序入口
 if __name__ == '__main__':
     cnn = CNN()  # 创建CNN实例

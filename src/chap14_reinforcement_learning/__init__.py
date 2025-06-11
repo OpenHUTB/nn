@@ -23,7 +23,7 @@ register(
     id = 'ReversedAddition-v0',
     entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
     kwargs = {'rows' : 2},# 自定义参数：操作数行数
-    max_episode_steps = 200,
+    max_episode_steps = 200,#限制最大步数，防止陷入循环
     reward_threshold = 25.0,
 )
 # 三操作数反向加法任务
@@ -61,20 +61,22 @@ register(
     reward_threshold = 195.0,# 接近最大理论值200
 )
 
-
+# 高难度倒立摆版本（延长测试时长）
 register(
     id = 'CartPole-v1',  # 更高难度版本
     entry_point = 'gym.envs.classic_control:CartPoleEnv',
     max_episode_steps = 500,  # 500步达标
     reward_threshold = 475.0,
 )
-
+# 山车任务：利用动量爬坡
 register(
     id='MountainCar-v0',  # 山车任务：爬坡
     entry_point='gym.envs.classic_control:MountainCarEnv',
     max_episode_steps=200,
     reward_threshold=-110.0,  # 负数表示尽量减少步数
 )
+
+# 山车连续控制版本（精细油门控制）
 register(
     id='MountainCarContinuous-v0',    # 连续动作版本
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
@@ -94,15 +96,26 @@ register(
     max_episode_steps=500,
 )
 
-# Box2d
-# Box2d物理引擎环境：复杂物理模拟任务
+# Box2d物理引擎环境：用于复杂物理模拟任务
 # ----------------------------------------
+# 该模块使用Box2D物理引擎实现高保真度的物理模拟
+# 特别适合连续控制任务和刚体动力学仿真
 
+# 注册名为'LunarLander-v2'的自定义环境
 register(
-    id = 'LunarLander-v2',    # 月球着陆器
-    entry_point = 'gym.envs.box2d:LunarLander',
-    max_episode_steps = 1000,
-    reward_threshold = 200,   # 成功着陆得分
+    id='LunarLander-v2',     # 环境唯一标识符，格式：<任务名>-<版本号>
+                            # 此处是月球着陆器环境第2版
+    
+    # 指定环境类的入口点路径：
+    # gym.envs.box2d模块下的LunarLander类
+    entry_point='gym.envs.box2d:LunarLander',  
+    
+    # 每个episode的最大步数限制（防止无限运行）
+    max_episode_steps=1000,  
+    
+    # 奖励阈值：当episode累计奖励超过200时
+    # 视为任务成功（着陆器安全着陆）
+    reward_threshold=200,    
 )
 # 月球着陆器连续动作版本
 register(
@@ -128,7 +141,7 @@ register(
 
 register(
     id='CarRacing-v0',    # 赛车游戏
-    entry_point='gym.envs.box2d:CarRacing',
+    entry_point='gym.envs.box2d:CarRacing',# 指定OpenAI Gym环境的入口点
     max_episode_steps=1000,
     reward_threshold=900,   # 完成赛道得分
 )
@@ -160,6 +173,7 @@ register(
     reward_threshold = 0.78, # optimum = .8196   # 成功到达目标的平均奖励
 )
 
+# 冰湖行走（8x8网格版）
 register(
     id='FrozenLake8x8-v0',
     entry_point='gym.envs.toy_text:FrozenLakeEnv',
@@ -167,12 +181,12 @@ register(
     max_episode_steps=200,
     reward_threshold=0.99, # optimum = 1
 )
-
+# 悬崖行走路径规划任务
 register(
     id='CliffWalking-v0',
     entry_point='gym.envs.toy_text:CliffWalkingEnv',
 )
-
+# N链问题（探索-利用权衡）
 register(
     id='NChain-v0',
     entry_point='gym.envs.toy_text:NChainEnv',
@@ -180,6 +194,7 @@ register(
 )
 
 # 注册后可通过gym.make('Roulette-v0')创建环境实例
+# 轮盘赌模拟环境
 register(
     id='Roulette-v0',  # 环境唯一标识符（在代码中引用的名称
     entry_point='gym.envs.toy_text:RouletteEnv',  # 环境类的导入路径
@@ -189,7 +204,7 @@ register(
                                         # 达到此步数后，环境自动终止
                                         # 防止无限循环，控制训练复杂度
 )
-
+# 出租车调度任务（乘客接送）
 register(
     id='Taxi-v2',  # 环境的唯一标识符
     entry_point='gym.envs.toy_text.taxi:TaxiEnv',  # 指定环境类的位置
@@ -282,7 +297,7 @@ register(
     max_episode_steps = 1000,
     entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
-
+# 蚂蚁机器人运动控制（四足）
 register(
     id = 'Ant-v1',
     entry_point = 'gym.envs.mujoco:AntEnv',
@@ -516,16 +531,18 @@ register(
     max_episode_steps = 200,
 )
 
+# 注册安全环境：带关闭开关的倒立摆概率环境
 register(
     id='OffSwitchCartpoleProb-v0',
     entry_point = 'gym.envs.safety:OffSwitchCartpoleProbEnv',
     max_episode_steps = 200,
 )
 
+# 注册黑白棋（奥赛罗）游戏环境
 register(
-    id='Reversi8x8-v0',
-    entry_point = 'gym.envs.reversi:ReversiEnv',
-    kwargs = {
+    id='Reversi8x8-v0',   # 环境唯一标识符，指定8x8棋盘版本
+    entry_point = 'gym.envs.reversi:ReversiEnv',  # 入口点指向黑白棋模块
+    kwargs = {  
         'player_color': 'black',
         'opponent': 'random',
         'observation_type': 'numpy3c',

@@ -1,10 +1,11 @@
+# 引入必要的数据库
 import torch.nn as nn
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
 import numpy as np
 
-#对神经网络中的线性层（Linear）进行权重初始化
+# 对神经网络中的线性层（Linear）进行权重初始化
 def weights_init(m):
     classname = m.__class__.__name__  #   obtain the class name
     if classname.find('Linear') != -1:

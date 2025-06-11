@@ -52,6 +52,7 @@ def sigmoid(x):
     return prob_x
 
 # 测试 sigmoid 实现是否正确
+# 生成随机测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
 
@@ -102,7 +103,8 @@ test_data = np.random.normal(size=[10])
 # 得到 sigmoid 概率
 prob = tf.nn.sigmoid(test_data)  
 # 随机生成 0 或 1 的标签
-label = np.random.randint(0, 2, 10).astype(test_data.dtype)   
+label = np.random.randint(0, 2, 10).astype(test_data.dtype)
+# np.random.randint(0, 2, 10)生成10个范围在[0, 2)之间的随机整数
 print(label)
 
 # 对比手动实现和 TensorFlow 实现的 sigmoid 交叉熵结果

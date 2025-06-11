@@ -1,6 +1,7 @@
 # !/usr/bin/env python
 # coding: utf-8
 # # Tensorflow2.0 小练习
+
 # 导入 numpy 库，并简写为 np（标准约定）
 import numpy as np
 # 导入 TensorFlow 库，并简写为 tf（标准约定）
@@ -45,9 +46,7 @@ def sigmoid(x):
     # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
     x = tf.cast(x, tf.float32)
     # sigmoid 数学定义：1 / (1 + e^{-x})
-    prob_x = 1 / (1 + tf.exp(-x))           
-    
-    return prob_x
+    return 1 / (1 + tf.exp(-x))
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
@@ -104,7 +103,7 @@ def sigmoid_ce(logits, labels):
         tf.math.log(1 + tf.exp(-tf.abs(logits)))
     )
     
-    return loss
+    return loss #返回计算得到的损失值
 
 # 测试逻辑
 test_data = np.random.normal(size=[10]).astype(np.float32)
@@ -114,6 +113,7 @@ labels = np.random.randint(0, 2, size=[10]).astype(np.float32)
 tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels, logits = test_data))
 custom_loss = sigmoid_ce(test_data, labels)
 
+# 打印输出结果
 print("tf loss:", tf_loss.numpy())
 print("custom loss:", custom_loss.numpy())
 print("误差是否小于0.0001:", ((tf_loss - custom_loss) ** 2 < 0.0001).numpy())

@@ -76,10 +76,10 @@ class LogisticRegression():
         l2_reg = tf.keras.regularizers.l2(0.01)
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
-            initial_value=tf.random.uniform(
-                shape=[2, 1], minval=-0.1, maxval=0.1
+            initial_value = tf.random.uniform(
+                shape = [2, 1], minval = -0.1, maxval = 0.1
             ),
-            regularizer=l2_reg
+            regularizer = l2_reg
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
@@ -204,11 +204,10 @@ if __name__ == '__main__':
     # 创建图形
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
-    plt.ylabel('Y')
-    plt.xlabel('X')
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 10)
-
+    plt.ylabel('Y') 
+    plt.xlabel('X')  
+    ax.set_xlim(0, 10)  
+    ax.set_ylim(0, 10) 
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')

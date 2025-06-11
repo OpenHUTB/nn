@@ -26,6 +26,7 @@ def mnist_dataset():
     x_test = x_test / 255.0
 
     # 返回处理后的训练集和测试集
+    # 返回格式：(训练图像数组, 训练标签数组), (测试图像数组, 测试标签数组)
     return (x, y), (x_test, y_test)
 
 
@@ -56,9 +57,11 @@ class Matmul:
         W = self.mem['W']
 
         '''计算矩阵乘法的对应的梯度'''
-        grad_x = np.matmul(grad_y, W.T)# 计算输入x的梯度：将输出梯度grad_y通过权重矩阵W的转置进行反向传播
-        grad_W = np.matmul(x.T, grad_y)  # 执行矩形乘法运算，计算梯度
-
+        # 计算输入x的梯度：将输出梯度grad_y通过权重矩阵W的转置进行反向传播
+        grad_x = np.matmul(grad_y, W.T)
+        # 执行矩形乘法运算，计算梯度
+        grad_W = np.matmul(x.T, grad_y)
+        
         return grad_x, grad_W
 
 
@@ -81,7 +84,8 @@ class Relu:
         ####################
         '''计算 relu 激活函数对应的梯度'''
         x = self.mem['x']
-        grad_x = grad_y * (x > 0)  # ReLU的梯度是1（x>0）或0（x<=0）
+        # ReLU的梯度是1（x>0）或0（x<=0）
+        grad_x = grad_y * (x > 0)
         ####################
         return grad_x
 
@@ -123,7 +127,8 @@ class Softmax:
         # 假设 grad_y 是一个形状为 (N, c) 的梯度张量
         # np.expand_dims(grad_y, axis=1) 将其形状变为 (N, 1, c)
         g_y_exp = np.expand_dims(grad_y, axis=1)
-        tmp = np.matmul(g_y_exp, sisj)  # (N, 1, c)
+        # (N, 1, c)
+        tmp = np.matmul(g_y_exp, sisj)
         tmp = np.squeeze(tmp, axis=1)
         tmp = -tmp + grad_y * s
         return tmp
@@ -134,27 +139,40 @@ class Log:
     '''
     对最后一个维度执行对数运算
     用于对数似然计算，通常与Softmax结合使用
+    实现数值稳定的对数计算，并保存中间结果用于反向传播
     '''
     def __init__(self):
-        self.epsilon = 1e-12
-        self.mem = {}
+        # 设置一个极小值epsilon防止对数运算中出现log(0)的情况
+        self.epsilon = 1e-12  
+        # 用于存储前向传播的中间结果，供反向传播使用
+        self.mem = {}  
 
     def forward(self, x):
         '''
-        x: shape(N, c)
+        前向传播：计算输入的对数值
+        :param x: 输入数据，shape(N, c) 
+                   N是batch大小，c是类别数/特征维度
+        :return: log(x + epsilon)，保持数值稳定性
         '''
-        out = np.log(x + self.epsilon)
+        # 计算对数，加上epsilon避免x=0时出现NaN
+        out = np.log(x + self.epsilon)  
 
-        self.mem['x'] = x
+        # 保存输入x用于反向传播计算
+        self.mem['x'] = x  
         return out
 
     def backward(self, grad_y):
         '''
-        grad_y: same shape as x
+        反向传播：计算梯度
+        :param grad_y: 上游传来的梯度，shape与forward输入x相同
+        :return: 当前层的梯度 = (1/(x + epsilon)) * grad_y
         '''
-        x = self.mem['x']
+        # 从内存中取出前向传播保存的输入x
+        x = self.mem['x']  
 
-        return 1. / (x + 1e-12) * grad_y
+        # 计算当前层梯度：d(log(x))/dx = 1/x
+        # 乘以来自上游的梯度grad_y（链式法则）
+        return 1. / (x + self.epsilon) * grad_y  
 
 
 # ## Gradient check
@@ -256,7 +274,7 @@ softmax = Softmax()
 log = Log()                         # 对数函数
 # 手动实现的前向传播过程：
 h1 = mul_h1.forward(x, W1)  # shape(5, 4)
-h1_relu = relu.forward(h1)
+h1_relu = relu.forward(h1)  # 对第一层输出h1应用ReLU激活函数（保留正值，负值置0）
 h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2)
 h2_log = log.forward(h2_soft)
@@ -282,6 +300,7 @@ with tf.GradientTape() as tape:
     prob = tf.nn.softmax(h2)
     log_prob = tf.math.log(prob)
     loss = tf.reduce_sum(label * log_prob)
+    # 计算负对数似然损失(Negative Log Likelihood Loss)
     grads = tape.gradient(loss, [prob])
     print(grads[0].numpy())
 
@@ -368,7 +387,7 @@ def test(model, x, y):
 # ## 实际训练
 
 # In[12]:
-
+#定义预处理函数，从原始数据中提取图像和标签，并将标签进行 one-hot 编码
 def prepare_data():
     train_data, test_data = mnist_dataset()
     train_label = np.zeros(shape=[train_data[0].shape[0], 10])
@@ -410,8 +429,12 @@ def train(model, train_data, train_label, epochs=50, batch_size=128):
         print(f'Epoch {epoch}: Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
     return losses, accuracies
 
-
 if __name__ == "__main__":
+    # 准备数据：加载并预处理训练和测试数据
+    # train_data: 训练图像数据
+    # train_label: 训练标签数据
+    # test_data: 测试图像数据
+    # test_label: 测试标签数据
     train_data, train_label, test_data, test_label = prepare_data()
     model = myModel()
     losses, accuracies = train(model, train_data, train_label)
