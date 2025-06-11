@@ -41,9 +41,9 @@ def gaussian_basis(x, feature_num=10):
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
     width = 1.0 * (centers[1] - centers[0])
-    # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度
+    # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
     x = np.expand_dims(x, axis=1)
-    # 将x沿着第1维度(axis=1)复制feature_num次并连接
+    # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
     x = np.concatenate([x] * feature_num, axis=1)
     
     out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
@@ -58,9 +58,9 @@ def load_data(filename, basis_func=gaussian_basis):
     xys = []
     with open(filename, "r") as f:
         for line in f:
-            # 读取每一行数据，并将其转换为列表
+            # 读取每一行数据，并将其转换为浮点数列表
             # 改进: 转换为list
-            xys.append(list(map(float, line.strip().split()))) # 读取每行数据
+            xys.append(list(map(float, line.strip().split()))) # 读取每行数据将数据分离为特征和标签
         xs, ys = zip(*xys) # 解压为特征和标签
         xs, ys = np.asarray(xs), np.asarray(ys) # 转换为numpy数组
         o_x, o_y = xs, ys # 保存原始数据
@@ -100,7 +100,7 @@ class linearModel(Model):
         )
         
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
-        # 偏置项 b，形状为 [1]
+        # 定义偏置参数b，形状为 [1]
         self.b = tf.Variable(
             initial_value=tf.zeros([1], dtype=tf.float32),
             trainable=True,

@@ -26,9 +26,16 @@ def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()   # 加载MNIST手写数字数据集，包含60,000张训练图像和10,000张测试图像
     x = x.reshape(x.shape[0], 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
-
+   # 从输入数据 x 和标签 y 创建一个 TensorFlow Dataset 对象
+   # 每个元素是一个 (x_i, y_i) 的元组，表示一个样本和对应的标签
     ds = tf.data.Dataset.from_tensor_slices((x, y))
+   # 使用 map 方法对数据集中的每个元素应用 prepare_mnist_features_and_labels 函数
+   # 这个函数通常用于预处理数据，例如归一化特征、将标签转换为 one-hot 编码等
     ds = ds.map(prepare_mnist_features_and_labels)
+    # 取出前 20000 个样本（限制数据集大小）
+    # 如果原始数据集很大，这一步可以只保留一部分数据用于训练或测试
+    # 对数据集进行打乱（shuffle），确保每个 batch 中的样本是随机选取的
+    # buffer_size=20000 表示用于洗牌的数据缓冲区大小
     ds = ds.take(20000).shuffle(20000).batch(32)
 
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
