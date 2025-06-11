@@ -1438,77 +1438,103 @@ def game_loop(args):
 # ==============================================================================
 
 
-def main():
-    argparser = argparse.ArgumentParser(
-        description='CARLA Manual Control Client')
-    argparser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        dest='debug',
-        help='print debug information')
-    argparser.add_argument(
-        '--host',
-        metavar='H',
-        default='127.0.0.1',
-        help='IP of the host server (default: 127.0.0.1)')
-    argparser.add_argument(
-        '-p', '--port',
-        metavar='P',
-        default=2000,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
-    argparser.add_argument(
-        '-a', '--autopilot',
-        action='store_true',
-        help='enable autopilot')
-    argparser.add_argument(
-        '--res',
-        metavar='WIDTHxHEIGHT',
-        default='1280x720',
-        help='window resolution (default: 1280x720)')
-    argparser.add_argument(
-        '--filter',
-        metavar='PATTERN',
-        default='vehicle.*',
-        help='actor filter (default: "vehicle.*")')
-    argparser.add_argument(
-        '--generation',
-        metavar='G',
-        default='2',
-        help='restrict to certain actor generation (values: "1","2","All" - default: "2")')
-    argparser.add_argument(
-        '--rolename',
-        metavar='NAME',
-        default='hero',
-        help='actor role name (default: "hero")')
-    argparser.add_argument(
-        '--gamma',
-        default=2.2,
-        type=float,
-        help='Gamma correction of the camera (default: 2.2)')
-    argparser.add_argument(
-        '--sync',
-        action='store_true',
-        help='Activate synchronous mode execution')
-    args = argparser.parse_args()
+def parse_arguments():
+    """解析并返回命令行参数"""
+    parser = argparse.ArgumentParser(
+        description='CARLA Manual Control Client',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)  # 显示默认值帮助
+    
+    # 网络连接参数
+    parser.add_argument(
+        '--host', default='127.0.0.1',
+        help='IP of the host server')
+    parser.add_argument(
+        '-p', '--port', type=int, default=2000,
+        help='TCP port to listen to')
+    
+    # 运行模式参数
+    parser.add_argument(
+        '-v', '--verbose', action='store_true',
+        help='enable debug logging')
+    parser.add_argument(
+        '-a', '--autopilot', action='store_true',
+        help='enable autopilot mode')
+    parser.add_argument(
+        '--sync', action='store_true',
+        help='enable synchronous mode')
+    
+    # 显示设置参数
+    parser.add_argument(
+        '--res', metavar='WIDTHxHEIGHT', default='1280x720',
+        help='window resolution')
+    parser.add_argument(
+        '--gamma', type=float, default=2.2,
+        help='gamma correction value')
+    
+    # 车辆生成参数
+    parser.add_argument(
+        '--filter', default='vehicle.*',
+        help='vehicle blueprint filter pattern')
+    parser.add_argument(
+        '--generation', default='2',
+        choices=['1', '2', 'All'],  # 限制可选值
+        help='vehicle generation restriction')
+    parser.add_argument(
+        '--rolename', default='hero',
+        help='actor role name')
+    
+    return parser.parse_args()
 
-    args.width, args.height = [int(x) for x in args.res.split('x')]
+def configure_logging(debug=False):
+    """配置日志系统"""
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=level,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('carla_client.log')  # 增加日志文件记录
+        ])
 
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
-
-    logging.info('listening to server %s:%s', args.host, args.port)
-
-    print(__doc__)
-
+def validate_resolution(resolution_str):
+    """验证并解析分辨率字符串"""
     try:
+        width, height = map(int, resolution_str.lower().split('x'))
+        if width <= 0 or height <= 0:
+            raise ValueError
+        return width, height
+    except ValueError:
+        logging.warning('Invalid resolution format, using default 1280x720')
+        return 1280, 720
 
+def main():
+    """主程序入口"""
+    args = parse_arguments()
+    
+    # 解析分辨率参数
+    args.width, args.height = validate_resolution(args.res)
+    
+    # 配置日志系统
+    configure_logging(args.verbose)
+    
+    logging.info('Connecting to server %s:%s', args.host, args.port)
+    logging.debug('Client settings: %s', vars(args))  # 记录所有参数
+    
+    try:
+        # 显示文档字符串
+        if __doc__:
+            print(__doc__)
+        
+        # 进入主游戏循环
         game_loop(args)
-
+        
     except KeyboardInterrupt:
-        print('\nCancelled by user. Bye!')
-
+        logging.info('Cancelled by user. Exiting...')
+    except Exception as e:
+        logging.error('Unexpected error: %s', e, exc_info=True)
+        sys.exit(1)
+    finally:
+        logging.info('Client shutdown complete')
 
 if __name__ == '__main__':
-
     main()
