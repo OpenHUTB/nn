@@ -191,7 +191,7 @@ def train(steps, model, optimizer):
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
         if step % 50 == 0:
-            print('step', step, ': loss', loss.numpy())
+            print('step', step, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
 
     return loss
 
