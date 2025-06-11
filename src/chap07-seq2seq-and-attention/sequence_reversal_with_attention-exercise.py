@@ -359,6 +359,8 @@ def sequence_reversal():
 
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
+    # 将 rev_seq 转换为列表，然后使用 reversed 函数反转列表
+    # 再使用 ''.join() 将反转后的列表重新组合成字符串
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
