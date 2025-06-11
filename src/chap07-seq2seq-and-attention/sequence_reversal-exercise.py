@@ -22,8 +22,8 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import datasets, layers, optimizers
 # 同一库的子模块合并导入，按字母顺序排列
-import random
-import string
+import random # 导入随机数生成模块，用于生成随机数、随机序列等
+import string # 导入字符串常量模块，提供常用的字符串集合（如字母表、数字等）
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
