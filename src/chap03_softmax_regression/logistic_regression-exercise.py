@@ -192,15 +192,15 @@ if __name__ == '__main__':
    # 这些信息可以用于后续创建训练过程的动画演示
    animation_frames = []
 
-    for i in range(200):
-        # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
-        loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
-        # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
-        animation_frames.append(
-            (W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
-        )
-        if i % 20 == 0:
-            print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
+   for i in range(200):
+       # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
+       loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
+       # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
+       animation_frames.append(
+           (W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
+       )
+       if i % 20 == 0:
+           print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
 
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
@@ -266,4 +266,6 @@ if __name__ == '__main__':
         f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
-    HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
+
+   from IPython.display import display
+display(HTML(anim.to_html5_video()))# 将动画转换为HTML5视频并显示

@@ -74,7 +74,7 @@ test_data = np.random.normal(size=[10, 5])
 # 得到 softmax 概率
 prob = tf.nn.softmax(test_data)
 # 创建 one-hot 标签
-label = np.zeros_like(test_data)
+label = np.zeros_like(test_data, dtype=np.float32)
 # 每行随机一个位置设为 1
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0  
 
@@ -104,7 +104,7 @@ test_data = np.random.normal(size=[10])
 # 得到 sigmoid 概率
 prob = tf.nn.sigmoid(test_data)  
 # 随机生成 0 或 1 的标签
-label = np.random.randint(0, 2, 10).astype(test_data.dtype)
+label = np.random.randint(0, 2, 10).astype(test_data.dtype) 
 # np.random.randint(0, 2, 10)生成10个范围在[0, 2)之间的随机整数
 print(label)
 
