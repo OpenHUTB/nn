@@ -146,10 +146,7 @@ def train_one_step(model, xs, ys):
 @tf.function
 def predict(model, xs):
     # 使用模型对输入xs进行预测（前向传播）
-    y_preds = model(xs)  # 模型前向传播
-    
-    # 返回模型的预测结果
-    return y_preds
+    return model(xs)
 
 
 def evaluate(ys, ys_pred):
