@@ -444,56 +444,101 @@ class KeyboardControl(object):
          # 在HUD上显示帮助提示信息(4秒)
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
-    def parse_events(self, client, world, clock, sync_mode):
-        if isinstance(self._control, carla.VehicleControl):
-            current_lights = self._lights
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+def parse_events(self, client, world, clock, sync_mode):
+    """处理所有pygame事件
+    
+    参数:
+        client: CARLA客户端对象
+        world: 当前CARLA世界对象
+        clock: pygame时钟对象
+        sync_mode: 是否处于同步模式
+        
+    返回:
+        bool: 如果收到退出信号返回True，否则None
+    """
+    
+    # 如果是车辆控制模式，初始化车灯状态
+    if isinstance(self._control, carla.VehicleControl):
+        current_lights = self._lights
+        
+    # 遍历所有pygame事件
+    for event in pygame.event.get():
+        # 1. 退出事件处理
+        if event.type == pygame.QUIT:
+            return True  # 收到退出信号
+            
+        # 2. 键盘释放事件处理
+        elif event.type == pygame.KEYUP:
+            # 退出快捷键检测
+            if self._is_quit_shortcut(event.key):
                 return True
-            elif event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
-                    return True
-                elif event.key == K_BACKSPACE:
-                    if self._autopilot_enabled:
-                        world.player.set_autopilot(False)
-                        world.restart()
-                        world.player.set_autopilot(True)
-                    else:
-                        world.restart()
-                elif event.key == K_F1:
-                    world.hud.toggle_info()
-                elif event.key == K_v and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_map_layer(reverse=True)
-                elif event.key == K_v:
-                    world.next_map_layer()
-                elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.load_map_layer(unload=True)
-                elif event.key == K_b:
-                    world.load_map_layer()
-                elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
-                    world.hud.help.toggle()
-                elif event.key == K_TAB:
-                    world.camera_manager.toggle_camera()
-                elif event.key == K_c and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_weather(reverse=True)
-                elif event.key == K_c:
-                    world.next_weather()
-                elif event.key == K_g:
-                    world.toggle_radar()
-                elif event.key == K_BACKQUOTE:
-                    world.camera_manager.next_sensor()
-                elif event.key == K_n:
-                    world.camera_manager.next_sensor()
-                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL):
-                    if world.constant_velocity_enabled:
-                        world.player.disable_constant_velocity()
-                        world.constant_velocity_enabled = False
-                        world.hud.notification("Disabled Constant Velocity Mode")
-                    else:
-                        world.player.enable_constant_velocity(carla.Vector3D(17, 0, 0))
-                        world.constant_velocity_enabled = True
-                        world.hud.notification("Enabled Constant Velocity Mode at 60 km/h")
-                elif event.key == K_o:
+                
+            # 3. 具体按键功能处理
+            elif event.key == K_BACKSPACE:
+                # 退格键：重启场景
+                if self._autopilot_enabled:
+                    world.player.set_autopilot(False)
+                    world.restart()
+                    world.player.set_autopilot(True)
+                else:
+                    world.restart()
+                    
+            elif event.key == K_F1:
+                # F1键：切换HUD信息显示
+                world.hud.toggle_info()
+                
+            elif event.key == K_v and pygame.key.get_mods() & KMOD_SHIFT:
+                # Shift+V：反向切换地图图层
+                world.next_map_layer(reverse=True)
+            elif event.key == K_v:
+                # V键：切换地图图层
+                world.next_map_layer()
+                
+            elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
+                # Shift+B：卸载地图图层
+                world.load_map_layer(unload=True)
+            elif event.key == K_b:
+                # B键：加载地图图层
+                world.load_map_layer()
+                
+            elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
+                # H或Shift+/：切换帮助菜单
+                world.hud.help.toggle()
+                
+            elif event.key == K_TAB:
+                # Tab键：切换摄像机视角
+                world.camera_manager.toggle_camera()
+                
+            elif event.key == K_c and pygame.key.get_mods() & KMOD_SHIFT:
+                # Shift+C：反向切换天气
+                world.next_weather(reverse=True)
+            elif event.key == K_c:
+                # C键：切换天气
+                world.next_weather()
+                
+            elif event.key == K_g:
+                # G键：切换雷达显示
+                world.toggle_radar()
+                
+            elif event.key == K_BACKQUOTE or event.key == K_n:
+                # `键或N键：切换传感器
+                world.camera_manager.next_sensor()
+                
+            elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL):
+                # Ctrl+W：切换恒定速度模式
+                if world.constant_velocity_enabled:
+                    world.player.disable_constant_velocity()
+                    world.constant_velocity_enabled = False
+                    world.hud.notification("Disabled Constant Velocity Mode")
+                else:
+                    # 设置恒定速度为17m/s≈60km/h
+                    world.player.enable_constant_velocity(carla.Vector3D(17, 0, 0))
+                    world.constant_velocity_enabled = True
+                    world.hud.notification("Enabled Constant Velocity Mode at 60 km/h")
+                    
+            elif event.key == K_o:
+                # O键：功能未实现(预留)
+                pass
                     try:
                         # 判断门是否已打开
                         if world.doors_are_open:
