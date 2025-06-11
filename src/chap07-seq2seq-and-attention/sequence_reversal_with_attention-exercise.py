@@ -360,6 +360,7 @@ def sequence_reversal():
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
         return True
     else:
