@@ -525,106 +525,137 @@ class KeyboardControl(object):
                         except Exception as e:
                             # 捕获并忽略任何异常，可以在此添加日志记录
                             print(f"Error enabling vehicle telemetry: {e}")
-                elif event.key > K_0 and event.key <= K_9:
-                    index_ctrl = 0
-                    if pygame.key.get_mods() & KMOD_CTRL:
-                        index_ctrl = 9
-                    world.camera_manager.set_sensor(event.key - 1 - K_0 + index_ctrl)
-                elif event.key == K_r and not (pygame.key.get_mods() & KMOD_CTRL):
-                    world.camera_manager.toggle_recording()
-                elif event.key == K_r and (pygame.key.get_mods() & KMOD_CTRL):
-                    if (world.recording_enabled):
-                        client.stop_recorder()
-                        world.recording_enabled = False
-                        world.hud.notification("Recorder is OFF")
-                    else:
-                        client.start_recorder("manual_recording.rec")
-                        world.recording_enabled = True
-                        world.hud.notification("Recorder is ON")
-                elif event.key == K_p and (pygame.key.get_mods() & KMOD_CTRL):
-                    # stop recorder
-                    client.stop_recorder()
-                    world.recording_enabled = False
-                    # work around to fix camera at start of replaying
-                    current_index = world.camera_manager.index
-                    world.destroy_sensors()
-                    # disable autopilot
-                    self._autopilot_enabled = False
-                    world.player.set_autopilot(self._autopilot_enabled)
-                    world.hud.notification("Replaying file 'manual_recording.rec'")
-                    # replayer
-                    client.replay_file("manual_recording.rec", world.recording_start, 0, 0)
-                    world.camera_manager.set_sensor(current_index)
-                elif event.key == K_MINUS and (pygame.key.get_mods() & KMOD_CTRL):
-                    if pygame.key.get_mods() & KMOD_SHIFT:
-                        world.recording_start -= 10
-                    else:
-                        world.recording_start -= 1
-                    world.hud.notification("Recording start time is %d" % (world.recording_start))
-                elif event.key == K_EQUALS and (pygame.key.get_mods() & KMOD_CTRL):
-                    if pygame.key.get_mods() & KMOD_SHIFT:
-                        world.recording_start += 10
-                    else:
-                        world.recording_start += 1
-                    world.hud.notification("Recording start time is %d" % (world.recording_start))
-                if isinstance(self._control, carla.VehicleControl):
-                    if event.key == K_f:
-                        # Toggle ackermann controller
-                        self._ackermann_enabled = not self._ackermann_enabled
-                        world.hud.show_ackermann_info(self._ackermann_enabled)
-                        world.hud.notification("Ackermann Controller %s" %
-                                               ("Enabled" if self._ackermann_enabled else "Disabled"))
-                    if event.key == K_q:
-                        if not self._ackermann_enabled:
-                            self._control.gear = 1 if self._control.reverse else -1
-                        else:
-                            self._ackermann_reverse *= -1
-                            # Reset ackermann control
-                            self._ackermann_control = carla.VehicleAckermannControl()
-                    elif event.key == K_m:
-                        self._control.manual_gear_shift = not self._control.manual_gear_shift
-                        self._control.gear = world.player.get_control().gear
-                        world.hud.notification('%s Transmission' %
-                                               ('Manual' if self._control.manual_gear_shift else 'Automatic'))
-                    elif self._control.manual_gear_shift and event.key == K_COMMA:
-                        self._control.gear = max(-1, self._control.gear - 1)
-                    elif self._control.manual_gear_shift and event.key == K_PERIOD:
-                        self._control.gear = self._control.gear + 1
-                    elif event.key == K_p and not pygame.key.get_mods() & KMOD_CTRL:
-                        if not self._autopilot_enabled and not sync_mode:
-                            print("WARNING: You are currently in asynchronous mode and could "
-                                  "experience some issues with the traffic simulation")
-                        self._autopilot_enabled = not self._autopilot_enabled
-                        world.player.set_autopilot(self._autopilot_enabled)
-                        world.hud.notification(
-                            'Autopilot %s' % ('On' if self._autopilot_enabled else 'Off'))
-                    elif event.key == K_l and pygame.key.get_mods() & KMOD_CTRL:
-                        current_lights ^= carla.VehicleLightState.Special1
-                    elif event.key == K_l and pygame.key.get_mods() & KMOD_SHIFT:
-                        current_lights ^= carla.VehicleLightState.HighBeam
-                    elif event.key == K_l:
-                        # Use 'L' key to switch between lights:
-                        # closed -> position -> low beam -> fog
-                        if not self._lights & carla.VehicleLightState.Position:
-                            world.hud.notification("Position lights")
-                            current_lights |= carla.VehicleLightState.Position
-                        else:
-                            world.hud.notification("Low beam lights")
-                            current_lights |= carla.VehicleLightState.LowBeam
-                        if self._lights & carla.VehicleLightState.LowBeam:
-                            world.hud.notification("Fog lights")
-                            current_lights |= carla.VehicleLightState.Fog
-                        if self._lights & carla.VehicleLightState.Fog:
-                            world.hud.notification("Lights off")
-                            current_lights ^= carla.VehicleLightState.Position
-                            current_lights ^= carla.VehicleLightState.LowBeam
-                            current_lights ^= carla.VehicleLightState.Fog
-                    elif event.key == K_i:
-                        current_lights ^= carla.VehicleLightState.Interior
-                    elif event.key == K_z:
-                        current_lights ^= carla.VehicleLightState.LeftBlinker
-                    elif event.key == K_x:
-                        current_lights ^= carla.VehicleLightState.RightBlinker
+elif event.key > K_0 and event.key <= K_9:
+    # 数字键1-9切换摄像头传感器
+    index_ctrl = 0
+    if pygame.key.get_mods() & KMOD_CTRL:  # 如果按住CTRL键
+        index_ctrl = 9  # 使用数字键切换后9个摄像头(10-18)
+    world.camera_manager.set_sensor(event.key - 1 - K_0 + index_ctrl)
+
+elif event.key == K_r and not (pygame.key.get_mods() & KMOD_CTRL):
+    # 单独按R键：切换录制状态
+    world.camera_manager.toggle_recording()
+
+elif event.key == K_r and (pygame.key.get_mods() & KMOD_CTRL):
+    # CTRL+R：控制主录制器
+    if (world.recording_enabled):
+        client.stop_recorder()
+        world.recording_enabled = False
+        world.hud.notification("Recorder is OFF")
+    else:
+        client.start_recorder("manual_recording.rec")  # 开始录制到指定文件
+        world.recording_enabled = True
+        world.hud.notification("Recorder is ON")
+
+elif event.key == K_p and (pygame.key.get_mods() & KMOD_CTRL):
+    # CTRL+P：回放录制内容
+    client.stop_recorder()  # 先停止录制
+    world.recording_enabled = False
+    # 保存当前摄像头索引
+    current_index = world.camera_manager.index
+    world.destroy_sensors()  # 销毁现有传感器
+    # 关闭自动驾驶
+    self._autopilot_enabled = False
+    world.player.set_autopilot(self._autopilot_enabled)
+    world.hud.notification("Replaying file 'manual_recording.rec'")
+    # 开始回放录制文件
+    client.replay_file("manual_recording.rec", world.recording_start, 0, 0)
+    world.camera_manager.set_sensor(current_index)  # 恢复之前的摄像头
+
+elif event.key == K_MINUS and (pygame.key.get_mods() & KMOD_CTRL):
+    # CTRL+-：调整录制开始时间
+    if pygame.key.get_mods() & KMOD_SHIFT:  # 如果同时按住SHIFT
+        world.recording_start -= 10  # 快退10秒
+    else:
+        world.recording_start -= 1  # 快退1秒
+    world.hud.notification("Recording start time is %d" % (world.recording_start))
+
+elif event.key == K_EQUALS and (pygame.key.get_mods() & KMOD_CTRL):
+    # CTRL+=：调整录制开始时间
+    if pygame.key.get_mods() & KMOD_SHIFT:  # 如果同时按住SHIFT
+        world.recording_start += 10  # 快进10秒
+    else:
+        world.recording_start += 1  # 快进1秒
+    world.hud.notification("Recording start time is %d" % (world.recording_start))
+
+if isinstance(self._control, carla.VehicleControl):
+    # 以下为车辆控制相关快捷键
+    if event.key == K_f:
+        # F键：切换阿克曼控制器
+        self._ackermann_enabled = not self._ackermann_enabled
+        world.hud.show_ackermann_info(self._ackermann_enabled)
+        world.hud.notification("Ackermann Controller %s" %
+                               ("Enabled" if self._ackermann_enabled else "Disabled"))
+    
+    if event.key == K_q:
+        # Q键：切换倒车档
+        if not self._ackermann_enabled:
+            self._control.gear = 1 if self._control.reverse else -1
+        else:
+            self._ackermann_reverse *= -1  # 阿克曼模式下的倒车控制
+            self._ackermann_control = carla.VehicleAckermannControl()  # 重置阿克曼控制
+    
+    elif event.key == K_m:
+        # M键：切换手动/自动换挡
+        self._control.manual_gear_shift = not self._control.manual_gear_shift
+        self._control.gear = world.player.get_control().gear
+        world.hud.notification('%s Transmission' %
+                               ('Manual' if self._control.manual_gear_shift else 'Automatic'))
+    
+    elif self._control.manual_gear_shift and event.key == K_COMMA:
+        # 逗号键：手动降档
+        self._control.gear = max(-1, self._control.gear - 1)
+    
+    elif self._control.manual_gear_shift and event.key == K_PERIOD:
+        # 句号键：手动升档
+        self._control.gear = self._control.gear + 1
+    
+    elif event.key == K_p and not pygame.key.get_mods() & KMOD_CTRL:
+        # P键：切换自动驾驶
+        if not self._autopilot_enabled and not sync_mode:
+            print("WARNING: You are currently in asynchronous mode and could "
+                  "experience some issues with the traffic simulation")
+        self._autopilot_enabled = not self._autopilot_enabled
+        world.player.set_autopilot(self._autopilot_enabled)
+        world.hud.notification('Autopilot %s' % ('On' if self._autopilot_enabled else 'Off'))
+    
+    # 以下为车灯控制相关快捷键
+    elif event.key == K_l and pygame.key.get_mods() & KMOD_CTRL:
+        # CTRL+L：切换特殊灯1
+        current_lights ^= carla.VehicleLightState.Special1
+    
+    elif event.key == K_l and pygame.key.get_mods() & KMOD_SHIFT:
+        # SHIFT+L：切换远光灯
+        current_lights ^= carla.VehicleLightState.HighBeam
+    
+    elif event.key == K_l:
+        # L键：循环切换车灯模式(关闭->位置灯->近光灯->雾灯)
+        if not self._lights & carla.VehicleLightState.Position:
+            world.hud.notification("Position lights")
+            current_lights |= carla.VehicleLightState.Position
+        else:
+            world.hud.notification("Low beam lights")
+            current_lights |= carla.VehicleLightState.LowBeam
+        if self._lights & carla.VehicleLightState.LowBeam:
+            world.hud.notification("Fog lights")
+            current_lights |= carla.VehicleLightState.Fog
+        if self._lights & carla.VehicleLightState.Fog:
+            world.hud.notification("Lights off")
+            current_lights ^= carla.VehicleLightState.Position
+            current_lights ^= carla.VehicleLightState.LowBeam
+            current_lights ^= carla.VehicleLightState.Fog
+    
+    elif event.key == K_i:
+        # I键：切换车内灯
+        current_lights ^= carla.VehicleLightState.Interior
+    
+    elif event.key == K_z:
+        # Z键：切换左转向灯
+        current_lights ^= carla.VehicleLightState.LeftBlinker
+    
+    elif event.key == K_x:
+        # X键：切换右转向灯
+        current_lights ^= carla.VehicleLightState.RightBlinker
 
         if not self._autopilot_enabled: # 仅在手动驾驶模式下执行
             if isinstance(self._control, carla.VehicleControl): # 确保控制对象类型正确
