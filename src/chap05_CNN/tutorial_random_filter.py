@@ -19,7 +19,7 @@ class MyConvModel(keras.Model):
     def __init__(self):
         super(MyConvModel, self).__init__()
         self.l1_conv = Conv2D(filters=3, kernel_size=(3, 3), padding='same')
-        
+# 使用 TensorFlow 的 tf.function 装饰器，将函数编译为 TensorFlow 图执行，提高性能   
     @tf.function
     def call(self, x):
         h1 = self.l1_conv(x)
