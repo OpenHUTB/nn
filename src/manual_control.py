@@ -86,12 +86,11 @@ except IndexError:
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
 
-
+#导入 CARLA 相关模块
 import carla
-
 from carla import ColorConverter as cc
 
-
+#导入 Python 标准库
 import argparse
 import collections
 import datetime
@@ -101,6 +100,7 @@ import random
 import re
 import weakref
 
+#尝试导入 Pygame（用于可视化 & 用户交互）
 try:
     import pygame
     from pygame.locals import KMOD_CTRL
@@ -146,6 +146,7 @@ try:
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed') # 抛出运行时错误：提示pygame库导入失败
 
+#尝试导入 NumPy（用于数值计算）
 try:
     import numpy as np
 except ImportError:
