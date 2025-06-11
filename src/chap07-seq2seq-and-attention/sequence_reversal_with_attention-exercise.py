@@ -367,6 +367,7 @@ def is_reverse(seq, rev_seq):
         return False
 # 测试函数功能
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
 
 
