@@ -42,6 +42,7 @@ test_data = np.random.normal(size=[10, 5])
 def sigmoid(x):
     """
     实现sigmoid激活函数。
+    数学形式：p = 1 / (1 + e^(-x))
     参数:
         x (tf.Tensor): 输入张量
     返回:
