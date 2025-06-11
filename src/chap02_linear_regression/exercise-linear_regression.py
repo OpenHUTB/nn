@@ -109,7 +109,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
             f"设计矩阵 phi 的样本数 ({phi.shape[0]}) 与目标值 y 的样本数 ({y.shape[0]}) 不匹配"
         )
 
-    n_samples, n_features = phi.shape
+    n_samples, n_features = phi.shape # 获取样本数和特征数
 
     # 根据选择的求解器执行计算
     if solver == "pinv":
