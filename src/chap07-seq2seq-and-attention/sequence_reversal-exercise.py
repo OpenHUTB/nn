@@ -11,19 +11,19 @@
 # 标准库（Python内置模块，按字母顺序排列）
 import collections
 import os # 导入os库
-import sys
-import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
+import sys # 导入sys库，用于系统相关参数和函数
+import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后，用于显示循环进度
 
 # 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
 import numpy as np# 导入NumPy库（科学计算基础库）
                     # 提供多维数组操作、数学函数、线性代数等功能
                     # 常用于数据预处理、模型输入构建和结果分析
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import datasets, layers, optimizers
+import tensorflow as tf # 导入TensorFlow深度学习框架
+from tensorflow import keras # 从TensorFlow导入Keras高级API
+from tensorflow.keras import datasets, layers, optimizers # 导入Keras的子模块
 # 同一库的子模块合并导入，按字母顺序排列
-import random
-import string
+import random # 导入随机数生成模块，用于生成随机数、随机序列等
+import string # 导入字符串常量模块，提供常用的字符串集合（如字母表、数字等）
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
@@ -79,6 +79,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
+       """初始化Seq2Seq模型组件"""
         super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
@@ -250,7 +251,7 @@ def train(model, optimizer, seqlen):
             # 获取预测结果，通过argmax获取概率最高的类别索引
             preds = tf.argmax(logits, axis=-1)
             # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
-            acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32)
+            acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32))
 
             # 打印当前步数、损失和准确率
             print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
@@ -273,7 +274,22 @@ train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程�
 
 
 def sequence_reversal():
-    """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
+    """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果
+    流程说明:
+    1. 内部定义decode函数：用于执行自回归解码过程
+        - 从起始标记开始，逐步生成每个字符
+        - 使用模型预测下一个token
+        - 收集所有生成的token形成最终输出
+    2. 获取测试数据: 生成一批随机字符串样本
+    3. 编码输入序列: 提取输入序列的特征表示和初始状态
+    4. 解码生成逆序: 从初始状态开始逐步生成逆序序列
+    5. 返回: 包含逆序结果和原始序列的元组
+    
+    返回格式:
+        (decoded_strings, original_strings)
+        decoded_strings: 模型生成的逆序字符串列表
+        original_strings: 原始输入字符串列表
+    """
     def decode(init_state, steps=10):
         # 获取批次大小
         b_sz = tf.shape(init_state[0])[0]
@@ -293,7 +309,7 @@ def sequence_reversal():
         out = tf.concat(collect, axis = -1).numpy()
         # 将一个数值列表转换为对应的字母字符串
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
-        return out
+        return out# 返回解码后的字符串列表
     
 
     # 生成一批测试数据（32个样本，每个序列长度10）
@@ -318,9 +334,3 @@ print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
 print(list(zip(*sequence_reversal())))
 # 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
-
-
-
-
-
-

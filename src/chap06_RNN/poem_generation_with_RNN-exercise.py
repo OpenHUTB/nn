@@ -10,7 +10,6 @@ import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组�
 import tensorflow as tf
 import collections
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
@@ -52,7 +51,7 @@ def process_dataset(fileName):
             counter[w] += 1
     
     ## 按词频从高到低排序
-    sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+    sorted_counter = sorted(counter.items(), key = lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)                     # 对tuple进行解压，得到words列表代表所有字符
@@ -171,7 +170,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(h)  # (batch_size, vocab_size)
         # 4. 选择概率最高的词
         out = tf.argmax(logits, axis=-1)
-        return out, state
+        return out, state# 返回预测的下一个词id和更新后的RNN状态
 
 
 # ## 辅助函数：计算序列损失
@@ -197,7 +196,7 @@ def mkMask(input_tensor, maxLen):
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
     
-    return tf.reshape(flat_mask, shape_of_output)
+    return tf.reshape(flat_mask, shape_of_output)   # 将展平的掩码恢复为原始输入张量形状+maxLen的形状
 
 def reduce_avg(reduce_target, lengths, dim):
     """沿指定维度计算掩码后的平均值（忽略填充部分）
@@ -223,21 +222,33 @@ def reduce_avg(reduce_target, lengths, dim):
     # 验证目标张量的维度是否符合要求
     # shape_of_target: reduce_target张量的维度列表
     # dim+1: 预期的目标张量的最小秩
-    if len(shape_of_target) < dim+1 : # 输入验证：确保目标张量的秩至少为 dim+1
+    # 输入验证：确保目标张量的秩至少为 dim+1
+    if len(shape_of_target) < dim+1 :
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算目标张量与长度张量的秩差
-    mxlen = tf.shape(reduce_target)[dim]                         # 获取目标维度的最大长度，并生成掩码矩阵
-    mask = mkMask(lengths, mxlen)                                # mkMask函数生成布尔掩码
-    if rank_diff!=0: # 根据秩差调整掩码和长度张量的形状，以便广播
+    # 计算目标张量与长度张量的秩差
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
+    # 获取目标维度的最大长度，并生成掩码矩阵
+    mxlen = tf.shape(reduce_target)[dim]
+    # mkMask函数生成布尔掩码
+    mask = mkMask(lengths, mxlen)
+    
+    # 根据秩差调整掩码和长度张量的形状，以便广播
+    if rank_diff!=0:
+        # 计算长度张量的新形状
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        # 计算掩码的新形状
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
+        # 如果秩差为0，保持原形状
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
-    lengths_reshape = tf.reshape(lengths, shape=len_shape) # 重塑张量以匹配目标张量的形状
-    mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
+
+    # 重塑张量以匹配目标张量的形状
+    lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    # 将掩码应用到目标张量上
+    mask = tf.reshape(mask, shape=mask_shape)
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim

@@ -15,15 +15,15 @@ from PIL import Image
 import numpy as np
 
 # 定义一个简单的卷积模型
-class MyConvModel(keras.Model):
+class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自定义卷积神经网络模型
     def __init__(self):
         super(MyConvModel, self).__init__()
         self.l1_conv = Conv2D(filters=3, kernel_size=(3, 3), padding='same')
-        
+# 使用 TensorFlow 的 tf.function 装饰器，将函数编译为 TensorFlow 图执行，提高性能   
     @tf.function
     def call(self, x):
         h1 = self.l1_conv(x)
-        return h1
+        return h1# 直接返回卷积结果
 
 
 # In[192]:
@@ -45,9 +45,9 @@ img = np.expand_dims(img, axis=0)
 img_out = random_conv(img)  # 输出形状保持[1,H,W,C]
 
 #使用pylab（通常是matplotlib.pyplot的别名）来创建一个包含四个子图的图形，并显示图像数据。
-pylab.figure(figsize=(10, 7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img[0, :, :, :])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
-pylab.show()
+pylab.figure(figsize=(10, 7))# 创建一个绘图窗口，并设置图像显示的画布大小为 10x7 英寸
+pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img[0, :, :, :])# 第一个子图：绘制原始输入图像
+pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])# 第二个子图：显示输出图像的第一个通道（feature map）
+pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])# 第三个子图：显示输出图像的第二个通道（feature map）
+pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])# 第四个子图：显示输出图像的第三个通道（feature map）
+pylab.show()# 显示所有绘制的图像
