@@ -45,7 +45,7 @@ class SVM:
 
         X = data_train[:, :2]         # 提取特征部分
         y = data_train[:, 2]          # 提取标签部分
-        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，SVM要求标签为正负1
         m, n = X.shape                # m为样本数，n为特征数
 
 
@@ -54,7 +54,7 @@ class SVM:
         self.b = 0                # 偏置初始化为0
 
         for epoch in range(self.max_iter):
-            # 计算函数间隔
+            # 计算函数间隔：每个样本的标签乘以其到超平面的距离
             margin = y * (np.dot(X, self.w) + self.b)
             # 找出违反间隔条件的样本（margin < 1）： 当样本的 margin < 1 时，该样本被认为是错误分类或处于间隔区域内
             idx = np.where(margin < 1)[0]  # 返回违反间隔条件的样本的索引
