@@ -244,7 +244,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False  # 录制与控制相关变量
-        self.recording_start = 0
+        self.recording_start = 0 # 初始化录音开始时间的标记变量
         self.constant_velocity_enabled = False
         self.show_vehicle_telemetry = False
         self.doors_are_open = False
