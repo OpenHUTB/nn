@@ -201,16 +201,19 @@ if __name__ == '__main__':
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
-    # 创建图形
+
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
     plt.ylabel('Y') 
     plt.xlabel('X')  
     ax.set_xlim(0, 10)  
     ax.set_ylim(0, 10) 
+    
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
+
+    # 创建用于显示动态文本的文本对象（位于左上角）
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
