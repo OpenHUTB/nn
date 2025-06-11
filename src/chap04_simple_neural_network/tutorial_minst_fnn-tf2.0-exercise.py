@@ -95,8 +95,8 @@ def compute_loss(logits, labels):
     # tf.reduce_mean() 对batch中所有样本的损失求平均
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits,  # 模型原始输出（未归一化）
-            labels=labels))  # 真实类别索引（0到num_classes-1）
+            logits = logits,  # 模型原始输出（未归一化）
+            labels = labels))  # 真实类别索引（0到num_classes-1）
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
