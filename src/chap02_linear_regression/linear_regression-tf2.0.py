@@ -41,9 +41,9 @@ def gaussian_basis(x, feature_num=10):
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
     width = 1.0 * (centers[1] - centers[0])
-    # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度
+    # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
     x = np.expand_dims(x, axis=1)
-    # 将x沿着第1维度(axis=1)复制feature_num次并连接
+    # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
     x = np.concatenate([x] * feature_num, axis=1)
     
     out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
