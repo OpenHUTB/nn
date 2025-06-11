@@ -956,25 +956,54 @@ class FadingText(object):
 class HelpText(object):
     """Helper class to handle text output using pygame"""
     def __init__(self, font, width, height):
+        # 分割类文档字符串为多行文本
         lines = __doc__.split('\n')
+        
+        # 初始化字体对象
         self.font = font
+        
+        # 设置行间距为18像素
         self.line_space = 18
+        
+        # 计算文本区域尺寸：(宽度780px, 总高度=行数×行距+12px边距)
         self.dim = (780, len(lines) * self.line_space + 12)
+        
+        # 计算文本区域位置(居中显示):
+        # x坐标 = 屏幕宽度一半 - 文本宽度一半
+        # y坐标 = 屏幕高度一半 - 文本高度一半
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
+        
+        # 初始化显示时间计数器(未直接使用)
         self.seconds_left = 0
+        
+        # 创建半透明背景表面
         self.surface = pygame.Surface(self.dim)
+        
+        # 填充透明黑色(RGBA: 0,0,0,0)
         self.surface.fill((0, 0, 0, 0))
+        
+        # 逐行渲染文本
         for n, line in enumerate(lines):
+            # 渲染单行文本(抗锯齿白色文字)
             text_texture = self.font.render(line, True, (255, 255, 255))
+            
+            # 将文本绘制到表面上(x坐标22px, y坐标按行号×行距)
             self.surface.blit(text_texture, (22, n * self.line_space))
+            
+            # 初始设置为不渲染状态
             self._render = False
+        
+        # 设置表面整体透明度为220(半透明)
         self.surface.set_alpha(220)
 
     def toggle(self):
+        """切换显示/隐藏状态"""
         self._render = not self._render
 
     def render(self, display):
-        if self._render:
+        """将帮助文本渲染到指定显示表面"""
+        if self._render:  # 只有在显示状态下才渲染
+            # 将文本表面绘制到目标display的指定位置
             display.blit(self.surface, self.pos)
 
 
