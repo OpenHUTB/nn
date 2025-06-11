@@ -6,6 +6,9 @@ from tensorflow.examples.tutorials.mnist import input_data
 #使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 
 try:
+    # 参数说明：
+    # 'MNIST_data' - 数据集存储目录
+    # one_hot=True - 将标签转换为one-hot编码格式
     mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 except Exception as e:
     print(f"数据加载失败: {e}")
