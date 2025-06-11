@@ -49,7 +49,7 @@ def sigmoid(x):
     """
     exp_neg_x = tf.exp(-x)  # 计算 -x 的指数
     prob_x = 1.0 / (1.0 + exp_neg_x)  # 计算 sigmoid 函数值
-    return prob_x
+    return prob_x  # 返回最终的 sigmoid 概率值，将输入映射到 [0,1] 区间
 
 # 测试 sigmoid 实现是否正确
 # 生成随机测试数据，形状为 [10, 5] 的正态分布随机数
