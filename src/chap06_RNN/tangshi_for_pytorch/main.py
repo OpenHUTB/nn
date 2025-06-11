@@ -33,8 +33,8 @@ def process_poems1(file_name):
                 content = content.replace(' ', '')
 
                 # 跳过包含特殊字符或起始/结束标记的诗句
-                if '_' in content or '(' in content or '（' in content or '《' in content or '[' in content or \
-                        start_token in content or end_token in content:
+                #if '_' in content or '(' in content or '（' in content or '《' in content or '[' in content or \ start_token in content or end_token in content
+                if any(token in content for token in ['_', '(', '（', '《', '[', start_token, end_token]):
                     continue
                 # 跳过长度不合理的诗句
                 if len(content) < 5 or len(content) > 80:
