@@ -9,9 +9,7 @@
 import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
 import tensorflow as tf
 import collections
-from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-
+from tensorflow.keras import layers, optimizers
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
