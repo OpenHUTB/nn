@@ -292,7 +292,7 @@ def sequence_reversal():
     """
     def decode(init_state, steps=10):
         # 获取批次大小
-        b_sz = tf.shape(init_state[0])[0]
+        batch_size = tf.shape(init_state)[0]
         # 起始 token（全为 0）
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
         # 初始化状态为编码器输出的状态
