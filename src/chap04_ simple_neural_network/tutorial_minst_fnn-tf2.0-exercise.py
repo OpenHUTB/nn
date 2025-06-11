@@ -53,11 +53,11 @@ class MyModel:
         ####################
         # 初始化权重和偏置
         # 输入层784 -> 隐藏层128
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
-        self.b1 = tf.Variable(tf.zeros([128]))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))   # stddev=0.1 表示标准差为 0.1，用于控制初始值的范围，避免梯度消失或爆炸
+        self.b1 = tf.Variable(tf.zeros([128]))   # 偏置项的维度应与隐藏层神经元数量一致，即 [128]
         # 隐藏层128 -> 输出层10
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
-        self.b2 = tf.Variable(tf.zeros([10]))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))  # 隐藏层（128 个神经元）到输出层（10 个类别）的权重 W2
+        self.b2 = tf.Variable(tf.zeros([10]))  # 初始化第二层的偏置 b2，同样初始化为 0，维度为 [10]
 
     def __call__(self, x):
         ####################

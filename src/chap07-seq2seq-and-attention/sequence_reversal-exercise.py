@@ -22,8 +22,8 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import datasets, layers, optimizers
 # 同一库的子模块合并导入，按字母顺序排列
-import random
-import string
+import random # 导入随机数生成模块，用于生成随机数、随机序列等
+import string # 导入字符串常量模块，提供常用的字符串集合（如字母表、数字等）
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
@@ -79,6 +79,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
+       """初始化Seq2Seq模型组件"""
         super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）

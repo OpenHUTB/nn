@@ -3,8 +3,6 @@
 # ## 准备数据
 # In[1]:
 
-# 导入操作系统接口模块，提供与操作系统交互的功能
-import os
 # 导入 NumPy 数值计算库，用于高效处理多维数组和矩阵运算
 import numpy as np
 # 导入 TensorFlow 深度学习框架

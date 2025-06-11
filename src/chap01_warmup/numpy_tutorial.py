@@ -7,7 +7,6 @@ import numpy as np                    # 将 numpy 库命名为 np
 import matplotlib                     # 导入Matplotlib库，用于数据可视化
 import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
-matplotlib.use('TkAgg')               # 关键代码，临时指定 matplotlib 后端代码，指定 TkAgg 可以确保图形能在标准窗口中正常渲染
 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 print("第二题：\n")
@@ -117,13 +116,13 @@ print("第十一题：\n")
 
 x = np.array([1, 2])
 # 创建一个包含整数1和2的NumPy数组
-print("输出:", type(x))
+print("输出:",x.dtype)
 
 # 12. 执行 x = np.array([1.0, 2.0]) ，然后输出 x 的数据类类型
 print("第十二题：\n")
 
 x = np.array([1.0, 2.0])
-print("输出:", type(x))
+print("输出:", x.dtype)
 
 # 13. 执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype = np.float64)，然后输出 x+y , 和 np.add(x,y)
 print("第十三题：\n")

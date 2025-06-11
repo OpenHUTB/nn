@@ -322,7 +322,9 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.hud.notification(actor_type)
 
         if self.sync:
-            self.world.tick()
+            self.world.tick()# 如果是同步模式，调用tick()方法
+                             # tick()方法通常用于推进模拟世界的时钟
+                             # 在同步模式下，程序会主动控制时间步进的节奏
         else:
             self.world.wait_for_tick()
 

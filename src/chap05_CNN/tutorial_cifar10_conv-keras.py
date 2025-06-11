@@ -11,15 +11,34 @@
 # ## 准备所需要的数据
 
 # In[17]:
+# 导入操作系统接口模块，提供与操作系统交互的功能
 import os
+
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
+
+# 从TensorFlow中导入Keras高级API，用于构建和训练深度学习模型
 from tensorflow import keras
+
+# 从Keras中导入常用模块，用于构建神经网络层、优化器等
 from tensorflow.keras import layers, optimizers, datasets
+
+# 从Keras层模块中导入特定的层类型
 from tensorflow.keras.layers import Dense, Dropout, Flatten
+
+# 从Keras层模块中导入卷积和池化层，用于构建卷积神经网络
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
+
+# 导入NumPy库，用于科学计算（尤其是多维数组操作）
 import numpy
+
+# 导入Pylab模块，通常用于数据可视化和绘图（Matplotlib的一部分）
 import pylab
+
+# 从Python Imaging Library (PIL)中导入Image模块，用于图像处理
 from PIL import Image
+
+# 导入NumPy库的别名，通常用于数值计算和数组操作
 import numpy as np
 
 # 设置TensorFlow日志级别，避免输出过多信息
