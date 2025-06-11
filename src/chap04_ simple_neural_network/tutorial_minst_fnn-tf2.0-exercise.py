@@ -83,9 +83,9 @@ def compute_loss(logits, labels):
     logits: 模型输出的未归一化分数
     labels: 真实标签
     """
-    return tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels
+    return tf.reduce_mean(   # 对所有样本的损失值求平均
+        tf.nn.sparse_softmax_cross_entropy_with_logits(   # TensorFlow内置的交叉熵损失函数
+            logits=logits, labels=labels   # 输入模型原始输出，输入真实标签
         )
     )
 # 计算稀疏标签的softmax交叉熵损失
