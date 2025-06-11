@@ -173,8 +173,8 @@ class GaussianMixtureModel:
             self.pi = Nk / n_samples
             
             # 初始化新均值和新协方差矩阵
-            new_mu = np.zeros_like(self.mu)
-            new_sigma = np.zeros_like(self.sigma)
+            new_mu = np.zeros_like(self.mu)# 创建一个与 self.mu 形状相同且全为零的数组，作为新的均值向量
+            new_sigma = np.zeros_like(self.sigma)# 创建一个与 self.sigma 形状相同且全为零的数组，作为新的协方差矩阵
 
             # 对每个高斯成分更新参数
             for k in range(self.n_components):
