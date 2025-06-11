@@ -179,7 +179,7 @@ y_test_preds = predict(model, xs_test)
 # 计算测试集预测值与真实值的标准差
 std = evaluate(ys_test, y_test_preds)
 # 打印测试集预测值与真实值的标准差
-print("训练集预测值与真实值的标准差：{:.1f}".format(std))
+print("测试集预测值与真实值的标准差：{:.1f}".format(std))
 
 # 绘制原始数据点：红色圆点标记，大小3
 # o_x: 原始数据X坐标
