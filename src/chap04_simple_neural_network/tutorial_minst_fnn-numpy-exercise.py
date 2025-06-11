@@ -279,11 +279,12 @@ h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2)
 h2_log = log.forward(h2_soft)
 # 手动实现的反向传播过程（计算梯度）：
-h2_log_grad = log.backward(-label)
-h2_soft_grad = softmax.backward(h2_log_grad)
-h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)
-h1_relu_grad = relu.backward(h2_grad)
-h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)
+# 反向传播流程（从后向前）：
+h2_log_grad = log.backward(-label)                # 计算损失梯度
+h2_soft_grad = softmax.backward(h2_log_grad)      # Softmax梯度
+h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)  # 第二层权重梯度
+h1_relu_grad = relu.backward(h2_grad)             # ReLU梯度
+h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)  # 第一层权重梯度
 
 print(h2_log_grad)
 print('--' * 20)
