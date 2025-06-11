@@ -291,36 +291,55 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
             self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
 
-        # Spawn the player.
-        if self.player is not None:
-            spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
-            spawn_point.rotation.roll = 0.0
-            spawn_point.rotation.pitch = 0.0
-            self.destroy()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-            self.show_vehicle_telemetry = False
-            self.modify_vehicle_physics(self.player)
-        while self.player is None:
-            if not self.map.get_spawn_points():
-                print('There are no spawn points available in your map/town.')
-                print('Please add some Vehicle Spawn Point to your UE4 scene.')
-                sys.exit(1)
-            spawn_points = self.map.get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)  # 尝试使用蓝图从生成点生成玩家
-            self.show_vehicle_telemetry = False
-            self.modify_vehicle_physics(self.player)
-        # Set up the sensors.
-        self.collision_sensor = CollisionSensor(self.player, self.hud)
-        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
-        self.gnss_sensor = GnssSensor(self.player)
-        self.imu_sensor = IMUSensor(self.player)
-        self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
-        self.camera_manager.transform_index = cam_pos_index
-        self.camera_manager.set_sensor(cam_index, notify=False)
-        actor_type = get_actor_display_name(self.player)
-        self.hud.notification(actor_type)
+# 生成玩家车辆
+if self.player is not None:  # 如果玩家车辆已存在
+    # 获取当前玩家车辆的变换信息作为新生成点
+    spawn_point = self.player.get_transform()
+    spawn_point.location.z += 2.0  # 将生成点高度提升2米（避免碰撞）
+    spawn_point.rotation.roll = 0.0  # 重置横滚角为0（保持水平）
+    spawn_point.rotation.pitch = 0.0  # 重置俯仰角为0（保持水平）
+    
+    self.destroy()  # 销毁现有玩家车辆
+    # 尝试在新位置生成车辆
+    self.player = self.world.try_spawn_actor(blueprint, spawn_point)
+    self.show_vehicle_telemetry = False  # 重置车辆遥测显示状态
+    self.modify_vehicle_physics(self.player)  # 应用自定义物理参数
+
+# 如果玩家车辆生成失败（self.player为None），则循环尝试生成
+while self.player is None:
+    # 检查地图是否有可用的生成点
+    if not self.map.get_spawn_points():
+        print('There are no spawn points available in your map/town.')
+        print('Please add some Vehicle Spawn Point to your UE4 scene.')
+        sys.exit(1)  # 无生成点时退出程序
+    
+    # 获取所有生成点并随机选择一个
+    spawn_points = self.map.get_spawn_points()
+    spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+    
+    # 尝试在选定生成点创建车辆
+    self.player = self.world.try_spawn_actor(blueprint, spawn_point)
+    self.show_vehicle_telemetry = False  # 重置遥测显示
+    self.modify_vehicle_physics(self.player)  # 应用物理参数
+
+# ----- 传感器设置 -----
+# 1. 碰撞传感器（检测车辆碰撞事件）
+self.collision_sensor = CollisionSensor(self.player, self.hud)
+# 2. 车道入侵传感器（检测车辆压线行为）
+self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
+# 3. GNSS传感器（提供全球定位数据）
+self.gnss_sensor = GnssSensor(self.player)
+# 4. IMU传感器（提供惯性测量数据）
+self.imu_sensor = IMUSensor(self.player)
+
+# 相机管理器设置
+self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
+self.camera_manager.transform_index = cam_pos_index  # 恢复之前的相机位置索引
+self.camera_manager.set_sensor(cam_index, notify=False)  # 设置传感器但不触发通知
+
+# 在HUD上显示当前车辆类型名称
+actor_type = get_actor_display_name(self.player)
+self.hud.notification(actor_type)
 
         if self.sync:
             self.world.tick()# 如果是同步模式，调用tick()方法
