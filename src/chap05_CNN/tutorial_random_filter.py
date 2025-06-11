@@ -23,7 +23,7 @@ class MyConvModel(keras.Model):
     @tf.function
     def call(self, x):
         h1 = self.l1_conv(x)
-        return h1
+        return h1# 直接返回卷积结果
 
 
 # In[192]:

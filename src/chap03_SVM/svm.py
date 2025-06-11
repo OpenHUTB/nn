@@ -45,7 +45,7 @@ class SVM:
 
         X = data_train[:, :2]         # 提取特征部分
         y = data_train[:, 2]          # 提取标签部分
-        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，SVM要求标签为正负1
         m, n = X.shape                # m为样本数，n为特征数
 
 
@@ -54,7 +54,7 @@ class SVM:
         self.b = 0                # 偏置初始化为0
 
         for epoch in range(self.max_iter):
-            # 计算函数间隔
+            # 计算函数间隔：每个样本的标签乘以其到超平面的距离
             margin = y * (np.dot(X, self.w) + self.b)
             # 找出违反间隔条件的样本（margin < 1）： 当样本的 margin < 1 时，该样本被认为是错误分类或处于间隔区域内
             idx = np.where(margin < 1)[0]  # 返回违反间隔条件的样本的索引
@@ -63,14 +63,17 @@ class SVM:
             if len(idx) == 0:
                 continue
 
+            # 基于间隔违规样本计算梯度，结合L2正则化项，执行梯度下降更新
             # 计算梯度
             # L2正则化项 + 错误分类样本的平均梯度
-            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis = 0)
+            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis = 0) # reshape(-1,1) 确保 y 能与 X 正确广播计算
             db = -np.mean(y[idx])
 
             # 参数更新
             self.w -= self.learning_rate * dw
             self.b -= self.learning_rate * db
+
+            # 核心训练逻辑：对间隔违规样本梯度下降，优化间隔最大化目标
 
     def predict(self, x):
         """预测标签。"""
