@@ -60,7 +60,7 @@ class myModel:
         # 隐藏层+ReLU,隐藏层计算：
         # 通过矩阵乘法（x @ self.W1）加上偏置项 self.b1，得到隐藏层的加权和
         # 使用 ReLU 激活函数增加非线性
-        h = tf.nn.relu(x @ self.W1 + self.b1)
+         h = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)
 
         #  输出层计算：全连接层（无激活函数，直接输出 logits）
         #  - 隐藏层特征（128维） × 权重矩阵 W2（128×10） → 分类评分（10维）
