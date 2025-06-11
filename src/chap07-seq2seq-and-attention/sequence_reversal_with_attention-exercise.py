@@ -241,6 +241,8 @@ def compute_loss(logits, labels):
     # - labels: 真实标签（形状[batch_size]，每个元素是类别索引）
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 计算平均损失
+    # 使用 tf.reduce_mean 函数对所有样本的损失值求平均
     losses = tf.reduce_mean(losses)
     return losses
 
