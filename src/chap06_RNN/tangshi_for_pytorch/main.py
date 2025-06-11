@@ -143,7 +143,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         start_index = i * batch_size# 计算当前批次在数据中的起始和结束索引
         end_index = start_index + batch_size
         x_data = poems_vec[start_index:end_index]# 提取当前批次的输入数据
-        y_data = []
+        y_data = # 存储当前批次的目标序列
         for row in x_data:# 为每个输入序列生成对应的目标序列,目标序列是输入序列右移一位，最后一个元素复制到末尾
             y  = row[1:]# 移除第一个元素
             y.append(row[-1])# 将原序列的最后一个元素添加到末尾
