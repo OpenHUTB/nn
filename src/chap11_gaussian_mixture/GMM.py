@@ -36,6 +36,7 @@ def generate_data(n_samples=1000):
     n_components = len(weights_true)
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
+    # 计算每个分布应生成的样本数（浮点转整数可能有误差）
     samples_per_component = (weights_true * n_samples).astype(int)
     
     # 确保样本总数正确（由于浮点转换可能有误差）
@@ -56,10 +57,10 @@ def generate_data(n_samples=1000):
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
         # 将生成的样本添加到列表
         X_list.append(X_i) 
-        # 添加对应标签
+        # 添加对应标签（0、1、2表示三个分布）
         y_true.extend([i] * samples_per_component[i]) 
     
-    # 合并并打乱数据
+    # 合并并打乱数据并打乱顺序（模拟无标签数据）
     # 将多个子数据集合并为一个完整数据集
     X = np.vstack(X_list)  
     # 将Python列表转换为NumPy数组
@@ -96,6 +97,7 @@ def logsumexp(log_p, axis=1, keepdims=False):
         return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
+     # 安全计算指数和：先减去最大值，再计算指数
     safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
     sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)  # 计算调整后的指数和
     
