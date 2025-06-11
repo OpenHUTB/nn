@@ -63,7 +63,7 @@ np.random.shuffle(data_set)
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
-# 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
+# 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss函数)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
 epsilon = 1e-12
 
@@ -144,7 +144,7 @@ def compute_loss(pred, label):
     # 将预测概率大于0.5的设置为1，小于等于0.5的设置为0，得到预测标签
     pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype=tf.float32))
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype = tf.float32))
     return loss, accuracy# 返回计算得到的损失值和准确率
 
 
