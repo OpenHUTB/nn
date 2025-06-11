@@ -371,7 +371,7 @@ def compute_loss(log_prob, labels):
     数学公式:
         loss = - (1/N) * ΣΣ y_ij * log(p_ij)
     """
-    return np.mean(np.sum(-log_prob * labels, axis=1))
+    return -np.mean(np.sum(labels * log_prob, axis=1))
 
 
 def compute_accuracy(log_prob, labels):
