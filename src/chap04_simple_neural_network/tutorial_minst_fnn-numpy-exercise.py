@@ -301,9 +301,9 @@ with tf.GradientTape() as tape:
     log_prob = tf.math.log(prob)
     loss = tf.reduce_sum(label * log_prob)
     # 计算负对数似然损失(Negative Log Likelihood Loss)
-    grads = tape.gradient(loss, [prob])
-    print(grads[0].numpy())
-
+    grads = tape.gradient(loss, [W1, W2])
+    print("W1 Gradient Check:", grads[0].numpy())
+    print("W2 Gradient Check:", grads[1].numpy())
 
 # ## 建立模型
 
