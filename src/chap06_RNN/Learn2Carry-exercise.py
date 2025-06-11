@@ -187,8 +187,8 @@ def train(steps, model, optimizer):
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
         # 单步训练：计算损失、更新参数
         loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
-                              tf.constant(Nums2, dtype=tf.int32),
-                              tf.constant(results, dtype=tf.int32))
+                              tf.constant(Nums2, dtype = tf.int32),
+                              tf.constant(results, dtype = tf.int32))
         if step % 50 == 0:
             print('step', step, ': loss', loss.numpy())
 
