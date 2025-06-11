@@ -81,7 +81,7 @@ class LogisticRegression():
             ),
             regularizer = l2_reg
         )
-        # 初始化偏置变量b，形状为[1]，初始值为0
+        # 初始化偏置变量b，形状为[1]，数据类型为tf.float32，初始值为0
         self.b = tf.Variable(
             shape = [1],
             dtype = tf.float32,
