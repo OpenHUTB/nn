@@ -244,7 +244,7 @@ def compute_loss(logits, labels):
     # 计算平均损失
     # 使用 tf.reduce_mean 函数对所有样本的损失值求平均
     losses = tf.reduce_mean(losses)
-    return losses
+    return losses# 返回平均损失值
 
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
