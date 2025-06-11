@@ -1192,109 +1192,170 @@ class RadarSensor(object):
 
 
 class CameraManager(object):
+    """相机管理器类，用于管理Carla模拟器中的各种传感器"""
+    
     def __init__(self, parent_actor, hud, gamma_correction):
-        self.sensor = None
-        self.surface = None
-        self._parent = parent_actor
-        self.hud = hud
-        self.recording = False
+        # 初始化成员变量
+        self.sensor = None  # 当前传感器对象
+        self.surface = None  # 渲染表面
+        self._parent = parent_actor  # 父actor(通常是车辆)
+        self.hud = hud  # HUD显示对象
+        self.recording = False  # 录制状态标志
+        
+        # 计算父物体边界框范围(增加0.5m基础偏移)
         bound_x = 0.5 + self._parent.bounding_box.extent.x
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         bound_z = 0.5 + self._parent.bounding_box.extent.z
-        Attachment = carla.AttachmentType
+        
+        Attachment = carla.AttachmentType  # 传感器附着类型
 
+        # 根据父物体类型设置不同的相机变换(车辆/行人)
         if not self._parent.type_id.startswith("walker.pedestrian"):
+            # 车辆的相机位置配置
             self._camera_transforms = [
-                (carla.Transform(carla.Location(x=-2.0*bound_x, y=+0.0*bound_y, z=2.0*bound_z), carla.Rotation(pitch=8.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=+0.8*bound_x, y=+0.0*bound_y, z=1.3*bound_z)), Attachment.Rigid),
-                (carla.Transform(carla.Location(x=+1.9*bound_x, y=+1.0*bound_y, z=1.2*bound_z)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=-2.8*bound_x, y=+0.0*bound_y, z=4.6*bound_z), carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=-1.0, y=-1.0*bound_y, z=0.4*bound_z)), Attachment.Rigid)]
+                # 后视视角(弹簧臂)
+                (carla.Transform(carla.Location(x=-2.0*bound_x, z=2.0*bound_z), 
+                 carla.Rotation(pitch=8.0)), Attachment.SpringArmGhost),
+                # 第一人称视角(刚性附着)
+                (carla.Transform(carla.Location(x=+0.8*bound_x, z=1.3*bound_z)), 
+                 Attachment.Rigid),
+                # 右前侧视角(弹簧臂)
+                (carla.Transform(carla.Location(x=+1.9*bound_x, y=+1.0*bound_y, z=1.2*bound_z)), 
+                 Attachment.SpringArmGhost),
+                # 远距离后视视角(弹簧臂)
+                (carla.Transform(carla.Location(x=-2.8*bound_x, z=4.6*bound_z), 
+                 carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
+                # 左下视角(刚性附着)
+                (carla.Transform(carla.Location(x=-1.0, y=-1.0*bound_y, z=0.4*bound_z)), 
+                 Attachment.Rigid)]
         else:
+            # 行人的相机位置配置
             self._camera_transforms = [
-                (carla.Transform(carla.Location(x=-2.5, z=0.0), carla.Rotation(pitch=-8.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=1.6, z=1.7)), Attachment.Rigid),
-                (carla.Transform(carla.Location(x=2.5, y=0.5, z=0.0), carla.Rotation(pitch=-8.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=-4.0, z=2.0), carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=0, y=-2.5, z=-0.0), carla.Rotation(yaw=90.0)), Attachment.Rigid)]
+                # 后方视角(弹簧臂)
+                (carla.Transform(carla.Location(x=-2.5, z=0.0), 
+                 carla.Rotation(pitch=-8.0)), Attachment.SpringArmGhost),
+                # 第一人称视角(刚性附着)
+                (carla.Transform(carla.Location(x=1.6, z=1.7)), 
+                 Attachment.Rigid),
+                # 右侧视角(弹簧臂)
+                (carla.Transform(carla.Location(x=2.5, y=0.5, z=0.0), 
+                 carla.Rotation(pitch=-8.0)), Attachment.SpringArmGhost),
+                # 远距离后方视角(弹簧臂)
+                (carla.Transform(carla.Location(x=-4.0, z=2.0), 
+                 carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
+                # 左侧视角(刚性附着，yaw=90度)
+                (carla.Transform(carla.Location(x=0, y=-2.5, z=-0.0), 
+                 carla.Rotation(yaw=90.0)), Attachment.Rigid)]
 
-        self.transform_index = 1
+        # 当前使用的相机变换索引
+        self.transform_index = 1  
+        
+        # 可用的传感器配置列表，每个元素包含:
+        # [传感器类型, 色彩编码, 显示名称, 额外属性]
         self.sensors = [
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],
-            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],
-            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)', {}],
-            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)', {}],
-            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)', {}],
-            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette, 'Camera Semantic Segmentation (CityScapes Palette)', {}],
-            ['sensor.camera.instance_segmentation', cc.CityScapesPalette, 'Camera Instance Segmentation (CityScapes Palette)', {}],
-            ['sensor.camera.instance_segmentation', cc.Raw, 'Camera Instance Segmentation (Raw)', {}],
-            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)', {'range': '50'}],
-            ['sensor.camera.dvs', cc.Raw, 'Dynamic Vision Sensor', {}],
-            ['sensor.camera.rgb', cc.Raw, 'Camera RGB Distorted',
+            ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],  # RGB相机
+            ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],  # 深度图(原始)
+            ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)', {}],  # 深度图(灰度)
+            ['sensor.camera.depth', cc.LogarithmicDepth, 'Camera Depth (Logarithmic Gray Scale)', {}],  # 对数深度
+            ['sensor.camera.semantic_segmentation', cc.Raw, 'Camera Semantic Segmentation (Raw)', {}],  # 语义分割(原始)
+            ['sensor.camera.semantic_segmentation', cc.CityScapesPalette, 'Camera Semantic Segmentation (CityScapes Palette)', {}],  # 语义分割(城市景观配色)
+            ['sensor.camera.instance_segmentation', cc.CityScapesPalette, 'Camera Instance Segmentation (CityScapes Palette)', {}],  # 实例分割(城市景观配色)
+            ['sensor.camera.instance_segmentation', cc.Raw, 'Camera Instance Segmentation (Raw)', {}],  # 实例分割(原始)
+            ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)', {'range': '50'}],  # 激光雷达
+            ['sensor.camera.dvs', cc.Raw, 'Dynamic Vision Sensor', {}],  # 动态视觉传感器
+            ['sensor.camera.rgb', cc.Raw, 'Camera RGB Distorted',  # 畸变RGB相机
                 {'lens_circle_multiplier': '3.0',
-                'lens_circle_falloff': '3.0',
-                'chromatic_aberration_intensity': '0.5',
-                'chromatic_aberration_offset': '0'}],
-            ['sensor.camera.optical_flow', cc.Raw, 'Optical Flow', {}],
-            ['sensor.camera.normals', cc.Raw, 'Camera Normals', {}],
+                 'lens_circle_falloff': '3.0',
+                 'chromatic_aberration_intensity': '0.5',
+                 'chromatic_aberration_offset': '0'}],
+            ['sensor.camera.optical_flow', cc.Raw, 'Optical Flow', {}],  # 光流
+            ['sensor.camera.normals', cc.Raw, 'Camera Normals', {}],  # 法线图
         ]
+        
+        # 获取世界对象和蓝图库
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
+        
+        # 初始化所有传感器蓝图
         for item in self.sensors:
-            bp = bp_library.find(item[0])
+            bp = bp_library.find(item[0])  # 查找传感器蓝图
+            
             if item[0].startswith('sensor.camera'):
+                # 设置相机分辨率(匹配HUD尺寸)
                 bp.set_attribute('image_size_x', str(hud.dim[0]))
                 bp.set_attribute('image_size_y', str(hud.dim[1]))
+                
+                # 设置伽马校正
                 if bp.has_attribute('gamma'):
                     bp.set_attribute('gamma', str(gamma_correction))
+                
+                # 设置额外属性
                 for attr_name, attr_value in item[3].items():
                     bp.set_attribute(attr_name, attr_value)
+                    
             elif item[0].startswith('sensor.lidar'):
-                self.lidar_range = 50
-
+                self.lidar_range = 50  # 默认激光雷达范围
+                
+                # 设置激光雷达属性
                 for attr_name, attr_value in item[3].items():
                     bp.set_attribute(attr_name, attr_value)
                     if attr_name == 'range':
                         self.lidar_range = float(attr_value)
-
+            
+            # 将蓝图添加到传感器配置中
             item.append(bp)
-        self.index = None
+        
+        self.index = None  # 当前传感器索引
 
     def toggle_camera(self):
+        """切换相机视角"""
         self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
         self.set_sensor(self.index, notify=False, force_respawn=True)
 
     def set_sensor(self, index, notify=True, force_respawn=False):
-        index = index % len(self.sensors)
+        """设置当前传感器"""
+        index = index % len(self.sensors)  # 确保索引有效
+        
+        # 判断是否需要重新生成传感器
         needs_respawn = True if self.index is None else \
             (force_respawn or (self.sensors[index][2] != self.sensors[self.index][2]))
+        
         if needs_respawn:
+            # 销毁现有传感器
             if self.sensor is not None:
                 self.sensor.destroy()
                 self.surface = None
+            
+            # 生成新传感器
             self.sensor = self._parent.get_world().spawn_actor(
-                self.sensors[index][-1],
-                self._camera_transforms[self.transform_index][0],
-                attach_to = self._parent,
-                attachment_type = self._camera_transforms[self.transform_index][1])
-            # We need to pass the lambda a weak reference to self to avoid
-            # circular reference.
+                self.sensors[index][-1],  # 传感器蓝图
+                self._camera_transforms[self.transform_index][0],  # 变换
+                attach_to=self._parent,
+                attachment_type=self._camera_transforms[self.transform_index][1])
+            
+            # 设置传感器回调(使用弱引用避免循环引用)
             weak_self = weakref.ref(self)
             self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
+        
+        # 在HUD上显示通知
         if notify:
             self.hud.notification(self.sensors[index][2])
-        self.index = index
+        
+        self.index = index  # 更新当前索引
 
     def next_sensor(self):
+        """切换到下一个传感器"""
         self.set_sensor(self.index + 1)
 
     def toggle_recording(self):
+        """切换录制状态"""
         self.recording = not self.recording
         self.hud.notification('Recording %s' % ('On' if self.recording else 'Off'))
 
     def render(self, display):
+        """渲染当前传感器图像到显示表面"""
         if self.surface is not None:
-            display.blit(self.surface, (0, 0))
+            display.blit(self.surface, (0, 0))  # 在左上角(0,0)位置渲染
 
 @staticmethod
 def _parse_image(weak_self, image):
