@@ -22,8 +22,8 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import datasets, layers, optimizers
 # 同一库的子模块合并导入，按字母顺序排列
-import random
-import string
+import random # 导入随机数生成模块
+import string # 导入字符串处理模块
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
@@ -260,9 +260,9 @@ def train(model, optimizer, seqlen):
 # # 训练迭代
 
 # In[5]:
-optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数。
+optimizer = optimizers.Adam(0.0005) #创建一个 Adam 优化器，用于更新模型参数，学习率为0.0005
 model = mySeq2SeqModel() #实例化一个序列到序列（Seq2Seq）模型。
-train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程。
+train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程，序列长度为20
 
 
 # # 测试模型逆置能力
