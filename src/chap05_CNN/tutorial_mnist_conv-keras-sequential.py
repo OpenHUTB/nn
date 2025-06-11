@@ -105,6 +105,16 @@ model.compile(
     loss = 'sparse_categorical_crossentropy',
     metrics = ['accuracy']# 训练和评估时监控准确率指标
 )
+# 加载 MNIST 数据集，并将其分为训练集和测试集。
+# mnist_dataset 函数可能是自定义的，或者是从某个库中导入的，
+# 它应该返回两个数据集对象：train_ds 和 test_ds，分别用于训练和测试。
 train_ds, test_ds = mnist_dataset()
+# 使用模型对训练数据集进行拟合（即训练）。
+# model 是已经构建好的神经网络模型。
+# fit 方法会根据设定的批次大小、周期数（epochs）等参数来训练模型。
+# epochs=5 表示整个训练集将被遍历 5 次，目的是最小化损失函数。
 model.fit(train_ds, epochs=5)
+# 在测试数据集上评估模型性能。
+# evaluate 方法会计算并返回模型在测试数据集上的损失值和评估指标（例如准确率）。
+# 这一步骤用来验证模型的泛化能力，确保模型不仅仅是在训练集上表现良好。
 model.evaluate(test_ds)
