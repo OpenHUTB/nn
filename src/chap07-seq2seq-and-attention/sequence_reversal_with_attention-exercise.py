@@ -8,13 +8,13 @@
 # In[19]:
 
 
-import numpy as np
-import tensorflow as tf
-import collections
-from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
-import random
+import numpy as np             # 导入 NumPy 库，用于高效的数值计算和数组操作
+import tensorflow as tf        # 导入 TensorFlow 库，用于构建和训练深度学习模型
+import collections             # 导入 collections 模块，它提供了许多有用的容器类型，例如 Counter、OrderedDict 等
+from tensorflow import keras   # 导入 TensorFlow 的 Keras API，Keras 是一个高级神经网络 API，可以快速构建和训练模型
+from tensorflow.keras import layers, optimizers, datasets   
+import os,sys,tqdm  
+import random                  # 导入 random 模块，用于生成随机数
 import string
 
 
