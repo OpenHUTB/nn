@@ -52,7 +52,7 @@ class SVM:
         # 初始化参数
         self.w = np.zeros(n)      # 权重初始化为0
         self.b = 0                # 偏置初始化为0
-
+        
         for epoch in range(self.max_iter):
             # 计算函数间隔
             margin = y * (np.dot(X, self.w) + self.b)
@@ -64,8 +64,9 @@ class SVM:
                 continue
 
             # 计算梯度
-            # L2正则化项 + 错误分类样本的平均梯度
+            # 对于权重w: 2*λ*w - 1/m*Σ(yi*xi) (仅对违反样本求和)
             dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis = 0)
+            # 对于偏置b: -1/m*Σ(yi) (仅对违反样本求和)
             db = -np.mean(y[idx])
 
             # 参数更新
