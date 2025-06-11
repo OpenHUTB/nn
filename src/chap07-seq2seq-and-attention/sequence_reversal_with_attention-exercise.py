@@ -384,6 +384,9 @@ def is_reverse(seq, rev_seq):
     else:
         return False
 # 测试函数功能
+# 假设 sequence_reversal() 是一个函数，返回两个序列的列表
+# 使用 zip(*sequence_reversal()) 将两个序列的列表解包并配对
+# 然后对每一对序列调用 is_reverse 函数，检查是否为逆序
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
