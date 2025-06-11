@@ -215,6 +215,7 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    # 构造偏置项1
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1) # 将偏置项和特征矩阵拼接成完整的特征矩阵
 
