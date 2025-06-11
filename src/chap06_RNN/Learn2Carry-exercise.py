@@ -44,7 +44,7 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     return numbers_1, numbers_2, results# 返回生成的随机数数组及其和
 
 def convertNum2Digits(Num):
-    '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
+    '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
     strNum = str(Num)
     chNums = list(strNum)
@@ -60,7 +60,7 @@ def convertDigits2Num(Digits):
     return Num
 
 def pad2len(lst, length, pad=0):
-    '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    '''将一个列表用`pad`填充到`length`的长度，例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
     '''#用0填充数位列表至固定长度，适配批量训练。
     lst+=[pad]*(length - len(lst))
     return lst
@@ -97,7 +97,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     return Nums1, Nums2, results
 
 
-# # 建模过程， 按照图示完成建模
+# # 建模过程，按照图示完成建模
 
 # In[3]:
 
