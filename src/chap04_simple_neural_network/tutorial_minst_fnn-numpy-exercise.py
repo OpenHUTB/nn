@@ -351,6 +351,23 @@ model = myModel()
 # In[11]:
 
 def compute_loss(log_prob, labels):
+    """
+    计算交叉熵损失的均值。
+    
+    参数:
+    - log_prob: numpy.ndarray
+        形状为 (N, C) 的数组，表示每个样本属于每个类别的对数概率（log-probabilities）。
+        通常来自模型输出并经过 log_softmax 处理。
+    - labels: numpy.ndarray
+        形状为 (N, C) 的 one-hot 编码标签数组，每个样本对应一个类别分布。
+
+    返回:
+    - loss: float
+        所有样本的平均交叉熵损失。
+        
+    数学公式:
+        loss = - (1/N) * ΣΣ y_ij * log(p_ij)
+    """
     return np.mean(np.sum(-log_prob * labels, axis=1))
 
 
