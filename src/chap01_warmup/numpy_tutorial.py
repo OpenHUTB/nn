@@ -116,7 +116,7 @@ print("第十一题：\n")
 
 x = np.array([1, 2])
 # 创建一个包含整数1和2的NumPy数组
-print("输出:", type(x))
+print("输出:",x.dtype)
 
 # 12. 执行 x = np.array([1.0, 2.0]) ，然后输出 x 的数据类类型
 print("第十二题：\n")
