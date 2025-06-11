@@ -83,8 +83,8 @@ class LogisticRegression():
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
-            shape=[1],
-            dtype=tf.float32,
+            shape = [1],
+            dtype = tf.float32,
             initial_value=tf.zeros(shape=[1])
         )
         # 定义模型的可训练变量，即权重W和偏置b
