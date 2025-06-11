@@ -792,74 +792,113 @@ class HUD(object):
         self.frame = timestamp.frame    # 更新当前帧数
         self.simulation_time = timestamp.elapsed_seconds # 更新仿真时间
 
-    def tick(self, world, clock):
-        self._notifications.tick(world, clock)
-        if not self._show_info:
-            return
-        t = world.player.get_transform()
-        v = world.player.get_velocity()
-        c = world.player.get_control()
-        compass = world.imu_sensor.compass
-        heading = 'N' if compass > 270.5 or compass < 89.5 else ''
-        heading += 'S' if 90.5 < compass < 269.5 else ''
-        heading += 'E' if 0.5 < compass < 179.5 else ''
-        heading += 'W' if 180.5 < compass < 359.5 else ''
-        colhist = world.collision_sensor.get_collision_history()
-        collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
-        max_col = max(1.0, max(collision))
-        collision = [x / max_col for x in collision]
-        vehicles = world.world.get_actors().filter('vehicle.*')
-        self._info_text = [
-            'Server:  % 16.0f FPS' % self.server_fps,
-            'Client:  % 16.0f FPS' % clock.get_fps(),
-            '',
-            'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
-            'Map:     % 20s' % world.map.name.split('/')[-1],
-            'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
-            '',
-            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
-            u'Compass:% 17.0f\N{DEGREE SIGN} % 2s' % (compass, heading),
-            'Accelero: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.accelerometer),
-            'Gyroscop: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.gyroscope),
-            'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),
-            'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
-            'Height:  % 18.0f m' % t.location.z,
-            '']
-        if isinstance(c, carla.VehicleControl):
-            self._info_text += [
-                ('Throttle:', c.throttle, 0.0, 1.0),
-                ('Steer:', c.steer, -1.0, 1.0),
-                ('Brake:', c.brake, 0.0, 1.0),
-                ('Reverse:', c.reverse),
-                ('Hand brake:', c.hand_brake),
-                ('Manual:', c.manual_gear_shift),
-                'Gear:        %s' % {-1: 'R', 0: 'N'}.get(c.gear, c.gear)]
-            if self._show_ackermann_info:
-                self._info_text += [
-                    '',
-                    'Ackermann Controller:',
-                    '  Target speed: % 8.0f km/h' % (3.6*self._ackermann_control.speed),
-                ]
-        elif isinstance(c, carla.WalkerControl):
-            self._info_text += [
-                ('Speed:', c.speed, 0.0, 5.556),
-                ('Jump:', c.jump)]
+def tick(self, world, clock):
+    """每帧更新信息显示
+    
+    参数:
+        world: 包含仿真状态的CARLA世界对象
+        clock: 用于跟踪帧率的游戏时钟对象
+    """
+    
+    # 首先更新通知信息
+    self._notifications.tick(world, clock)
+    
+    # 如果信息显示关闭，则直接返回
+    if not self._show_info:
+        return
+    
+    # 获取玩家车辆的当前状态
+    t = world.player.get_transform()  # 当前变换信息(位置+旋转)
+    v = world.player.get_velocity()   # 当前速度向量
+    c = world.player.get_control()    # 当前控制输入
+    
+    # 计算指南针方向(N/S/E/W)
+    compass = world.imu_sensor.compass
+    heading = 'N' if compass > 270.5 or compass < 89.5 else ''
+    heading += 'S' if 90.5 < compass < 269.5 else ''
+    heading += 'E' if 0.5 < compass < 179.5 else ''
+    heading += 'W' if 180.5 < compass < 359.5 else ''
+    
+    # 处理碰撞历史数据用于可视化
+    colhist = world.collision_sensor.get_collision_history()
+    # 获取最近200帧的碰撞数据
+    collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
+    # 归一化碰撞数据显示
+    max_col = max(1.0, max(collision))  # 避免除以零
+    collision = [x / max_col for x in collision]
+    
+    # 获取世界中的所有车辆
+    vehicles = world.world.get_actors().filter('vehicle.*')
+    
+    # 构建信息文本显示
+    self._info_text = [
+        # 服务器和客户端性能指标
+        'Server:  % 16.0f FPS' % self.server_fps,
+        'Client:  % 16.0f FPS' % clock.get_fps(),
+        '',
+        # 车辆和地图信息
+        'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
+        'Map:     % 20s' % world.map.name.split('/')[-1],
+        'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
+        '',
+        # 运动和传感器数据
+        'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),  # 将m/s转换为km/h
+        u'Compass:% 17.0f\N{DEGREE SIGN} % 2s' % (compass, heading),  # 带度数的指南针方向
+        'Accelero: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.accelerometer),  # 加速度计读数
+        'Gyroscop: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.gyroscope),  # 陀螺仪读数
+        'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),  # X,Y坐标
+        'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),  # GPS坐标
+        'Height:  % 18.0f m' % t.location.z,  # Z坐标(高度)
+        '']
+    
+    # 添加车辆特定的控制信息
+    if isinstance(c, carla.VehicleControl):
         self._info_text += [
-            '',
-            'Collision:',
-            collision,
-            '',
-            'Number of vehicles: % 8d' % len(vehicles)]
-        if len(vehicles) > 1:
-            self._info_text += ['Nearby vehicles:']
-            distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
-            vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
-            for d, vehicle in sorted(vehicles, key=lambda vehicles: vehicles[0]):
-                if d > 200.0:
-                    break
-                vehicle_type = get_actor_display_name(vehicle, truncate=22)
-                self._info_text.append('% 4dm %s' % (d, vehicle_type))
-
+            # 车辆控制输入(包含有效值范围)
+            ('Throttle:', c.throttle, 0.0, 1.0),  # 油门
+            ('Steer:', c.steer, -1.0, 1.0),      # 转向
+            ('Brake:', c.brake, 0.0, 1.0),       # 刹车
+            ('Reverse:', c.reverse),             # 倒车(布尔值)
+            ('Hand brake:', c.hand_brake),       # 手刹(布尔值)
+            ('Manual:', c.manual_gear_shift),   # 手动换挡(布尔值)
+            'Gear:        %s' % {-1: 'R', 0: 'N'}.get(c.gear, c.gear)]  # 档位显示
+        
+        # 可选的阿克曼控制器信息
+        if self._show_ackermann_info:
+            self._info_text += [
+                '',
+                'Ackermann Controller:',
+                '  Target speed: % 8.0f km/h' % (3.6*self._ackermann_control.speed),
+            ]
+    
+    # 添加行人特定的控制信息
+    elif isinstance(c, carla.WalkerControl):
+        self._info_text += [
+            ('Speed:', c.speed, 0.0, 5.556),  # 5.556 m/s = 20 km/h
+            ('Jump:', c.jump)]  # 跳跃(布尔值)
+    
+    # 添加碰撞和车辆数量信息
+    self._info_text += [
+        '',
+        'Collision:',
+        collision,  # 这将显示碰撞历史的可视化条
+        '',
+        'Number of vehicles: % 8d' % len(vehicles)]
+    
+    # 显示附近车辆(200米内)
+    if len(vehicles) > 1:
+        self._info_text += ['Nearby vehicles:']
+        # 计算到玩家距离的辅助函数
+        distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
+        # 创建(距离,车辆)元组列表，排除自我车辆
+        vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
+        
+        # 按距离排序并显示200米内的车辆
+        for d, vehicle in sorted(vehicles, key=lambda vehicles: vehicles[0]):
+            if d > 200.0:
+                break
+            vehicle_type = get_actor_display_name(vehicle, truncate=22)
+            self._info_text.append('% 4dm %s' % (d, vehicle_type))
     def show_ackermann_info(self, enabled):
         # 设置是否显示Ackermann信息
         self._show_ackermann_info = enabled
