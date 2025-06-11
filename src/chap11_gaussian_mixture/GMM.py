@@ -324,7 +324,7 @@ if __name__ == "__main__":
     plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
     plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
     
-    plt.tight_layout()
-    plt.savefig('gmm_clustering_results.png', dpi=300)
-    plt.show()
+    plt.tight_layout()                                  # 自动调整子图参数，确保图形元素不重叠
+    plt.savefig('gmm_clustering_results.png', dpi=300)  # 保存高分辨率（300 DPI）的GMM聚类结果图像
+    plt.show()                                          # 显示绘制的图形窗口
     print("程序执行完毕")
