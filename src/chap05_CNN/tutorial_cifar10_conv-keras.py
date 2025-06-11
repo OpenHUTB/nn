@@ -133,7 +133,9 @@ class MyConvModel(keras.Model):
         h1_pool = self.pool(h1) # [32, 14, 14, 32]
         h2 = self.l2_conv(h1_pool) #[32, 14, 14, 64]
         return h2
-
+    # 第一层卷积 + ReLU激活
+    # 输入: [32, 28, 28, 1] -> 输出: [32, 28, 28, 32]
+    # (假设l1_conv是Conv2D(32个滤波器, kernel_size=3, padding='same'))
 model = MyConvModel()
 optimizer = optimizers.Adam(0.001)
 
