@@ -11,16 +11,16 @@
 # 标准库（Python内置模块，按字母顺序排列）
 import collections
 import os # 导入os库
-import sys
-import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
+import sys # 导入sys库，用于系统相关参数和函数
+import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后，用于显示循环进度
 
 # 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
 import numpy as np# 导入NumPy库（科学计算基础库）
                     # 提供多维数组操作、数学函数、线性代数等功能
                     # 常用于数据预处理、模型输入构建和结果分析
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import datasets, layers, optimizers
+import tensorflow as tf # 导入TensorFlow深度学习框架
+from tensorflow import keras # 从TensorFlow导入Keras高级API
+from tensorflow.keras import datasets, layers, optimizers # 导入Keras的子模块
 # 同一库的子模块合并导入，按字母顺序排列
 import random
 import string
