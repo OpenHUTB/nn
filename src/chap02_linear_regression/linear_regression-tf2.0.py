@@ -54,6 +54,7 @@ def load_data(filename, basis_func=gaussian_basis):
     xys = []
     with open(filename, "r") as f:
         for line in f:
+            # 读取每一行数据，并将其转换为列表
             # 改进: 转换为list
             xys.append(list(map(float, line.strip().split()))) # 读取每行数据
         xs, ys = zip(*xys) # 解压为特征和标签
