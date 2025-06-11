@@ -261,4 +261,6 @@ if __name__ == '__main__':
         f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
-    HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
+
+   from IPython.display import display
+display(HTML(anim.to_html5_video()))# 将动画转换为HTML5视频并显示
