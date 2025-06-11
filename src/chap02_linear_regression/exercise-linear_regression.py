@@ -136,7 +136,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
             # 处理非正定矩阵的情况，回退到 pinv
             print("警告: Cholesky 分解失败，矩阵可能非正定，回退到伪逆求解")
             w = np.linalg.pinv(A) @ phi.T @ y
-
+    # 主逻辑
     elif solver == "svd":
         # 直接使用 SVD 分解求解
         # 对病态矩阵最稳定，但计算成本较高
