@@ -149,6 +149,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
         w = Vt.T @ S_reg @ U.T @ y
 
     else:
+         # 如果 solver 不是支持的选项，抛出 ValueError
         raise ValueError(
             f"不支持的求解器: {solver}，支持的选项有 'pinv', 'cholesky', 'svd'"
         )
