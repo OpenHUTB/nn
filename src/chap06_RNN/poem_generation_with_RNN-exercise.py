@@ -9,9 +9,7 @@
 import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
 import tensorflow as tf
 import collections
-from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-
+from tensorflow.keras import layers, optimizers
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
@@ -190,7 +188,10 @@ def mkMask(input_tensor, maxLen):
     """
     # 获取输入张量的形状
     shape_of_input = tf.shape(input_tensor) 
-    shape_of_output = tf.concat(axis=0, values=[shape_of_input, [maxLen]])
+    shape_of_output = tf.concat(
+        axis=0, 
+        values=[shape_of_input, [maxLen]]
+    )
     #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask

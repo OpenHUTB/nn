@@ -63,7 +63,10 @@ def softmax_ce(x, label):
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
     ##########
     # 使用 clip 避免 log(0) 产生数值不稳定
-    x = tf.clip_by_value(x, 1e-10, 1.0)
+    # 计算softmax概率分布
+    probs = tf.nn.softmax(logits)
+    # 防止log(0)的数值不稳定
+    probs = tf.clip_by_value(probs, 1e-10, 1.0)
     # 计算交叉熵损失：-sum(y_true * log(y_pred))
     loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
     ##########
@@ -74,7 +77,7 @@ test_data = np.random.normal(size=[10, 5])
 # 得到 softmax 概率
 prob = tf.nn.softmax(test_data)
 # 创建 one-hot 标签
-label = np.zeros_like(test_data)
+label = np.zeros_like(test_data, dtype=np.float32)
 # 每行随机一个位置设为 1
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0  
 
@@ -104,7 +107,7 @@ test_data = np.random.normal(size=[10])
 # 得到 sigmoid 概率
 prob = tf.nn.sigmoid(test_data)  
 # 随机生成 0 或 1 的标签
-label = np.random.randint(0, 2, 10).astype(test_data.dtype)
+label = np.random.randint(0, 2, 10).astype(test_data.dtype) 
 # np.random.randint(0, 2, 10)生成10个范围在[0, 2)之间的随机整数
 print(label)
 

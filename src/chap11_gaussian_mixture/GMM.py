@@ -277,7 +277,7 @@ class GaussianMixtureModel:
         # 设置图表标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
         # 启用网格线，增强可读性
-        plt.grid(True)  
+        plt.grid(True, alpha=0.5) 
         plt.show()
 
 # 主程序
