@@ -124,8 +124,8 @@ def train_one_step(model, optimizer, x, y):
     grads = tape.gradient(loss, trainable_vars)
 
     # 更新参数（使用固定学习率）
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01 * g)
+    # 使用优化器更新参数
+    optimizer.apply_gradients(zip(grads, trainable_vars))
 
     # 计算准确率
     accuracy = compute_accuracy(logits, y)
