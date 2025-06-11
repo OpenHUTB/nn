@@ -193,9 +193,9 @@ class GaussianMixtureModel:
                 
                 # 正则化：添加小的对角矩阵，防止协方差矩阵奇异
                 eps = 1e-6  # 正则化系数
-                new_sigma_k += np.eye(n_features) * eps
+                new_sigma_k += np.eye(n_features) * eps  # 添加单位矩阵的eps倍
                 
-                new_sigma[k] = new_sigma_k
+                new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
 
             # 计算对数似然（模型对数据的拟合程度）
             current_log_likelihood = np.sum(log_prob_sum)  # 所有样本的对数似然之和
