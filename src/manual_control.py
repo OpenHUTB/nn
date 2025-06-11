@@ -1124,67 +1124,94 @@ class IMUSensor(object):
 
 
 class RadarSensor(object):
+    """雷达传感器类，用于在Carla模拟器中处理雷达数据"""
+    
     def __init__(self, parent_actor):
-        self.sensor = None
-        self._parent = parent_actor
+        # 初始化传感器对象
+        self.sensor = None  
+        # 父级actor(通常是车辆)
+        self._parent = parent_actor  
+        
+        # 计算父物体边界框范围(增加0.5m基础偏移)
         bound_x = 0.5 + self._parent.bounding_box.extent.x
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         bound_z = 0.5 + self._parent.bounding_box.extent.z
 
-        self.velocity_range = 7.5 # m/s
+        # 设置速度显示范围(±7.5 m/s)
+        self.velocity_range = 7.5  
+        
+        # 获取世界对象和调试工具
         world = self._parent.get_world()
-        self.debug = world.debug
+        self.debug = world.debug  
+        
+        # 获取雷达蓝图并设置属性
         bp = world.get_blueprint_library().find('sensor.other.radar')
-        bp.set_attribute('horizontal_fov', str(35))
-        bp.set_attribute('vertical_fov', str(20))
+        bp.set_attribute('horizontal_fov', str(35))  # 水平视野35度
+        bp.set_attribute('vertical_fov', str(20))    # 垂直视野20度
+        
+        # 生成雷达传感器(安装在车辆前部稍高位置)
         self.sensor = world.spawn_actor(
             bp,
             carla.Transform(
-                carla.Location(x=bound_x + 0.05, z=bound_z+0.05),
-                carla.Rotation(pitch=5)),
+                carla.Location(x=bound_x + 0.05, z=bound_z+0.05),  # 前部偏移
+                carla.Rotation(pitch=5)),  # 5度俯角
             attach_to=self._parent)
-        # We need a weak reference to self to avoid circular reference.
+        
+        # 使用弱引用避免循环引用
         weak_self = weakref.ref(self)
+        # 设置雷达数据回调函数
         self.sensor.listen(
             lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))
-        
-#定义了一个雷达传感器的回调函数 _Radar_callback，用于处理和可视化 Carla 模拟器中雷达数据
+
     @staticmethod
     def _Radar_callback(weak_self, radar_data):
+        """雷达数据回调函数，处理并可视化雷达检测点"""
         self = weak_self()
-        if not self:
+        if not self:  # 如果对象已销毁则返回
             return
-        # To get a numpy [[vel, altitude, azimuth, depth],...[,,,]]:
-        # points = np.frombuffer(radar_data.raw_data, dtype=np.dtype('f4'))
-        # points = np.reshape(points, (len(radar_data), 4))
-
+        
+        # 获取当前雷达传感器的旋转信息
         current_rot = radar_data.transform.rotation
+        
+        # 处理每个检测点
         for detect in radar_data:
-            azi = math.degrees(detect.azimuth)
-            alt = math.degrees(detect.altitude)
-            # The 0.25 adjusts a bit the distance so the dots can
-            # be properly seen
+            # 将方位角和高度角转换为度数
+            azi = math.degrees(detect.azimuth)  # 水平方位角
+            alt = math.degrees(detect.altitude)  # 垂直高度角
+            
+            # 计算检测点的前向向量(深度减0.25m使显示更清晰)
             fw_vec = carla.Vector3D(x=detect.depth - 0.25)
+            
+            # 转换向量到世界坐标系
             carla.Transform(
                 carla.Location(),
                 carla.Rotation(
-                    pitch=current_rot.pitch + alt,
-                    yaw=current_rot.yaw + azi,
-                    roll=current_rot.roll)).transform(fw_vec)
+                    pitch=current_rot.pitch + alt,  # 叠加当前俯仰角
+                    yaw=current_rot.yaw + azi,     # 叠加当前偏航角
+                    roll=current_rot.roll)).transform(fw_vec)  # 叠加当前滚转角
 
+            # 定义数值限制函数
             def clamp(min_v, max_v, value):
                 return max(min_v, min(value, max_v))
 
-            norm_velocity = detect.velocity / self.velocity_range # range [-1, 1]
+            # 计算归一化速度(范围[-1,1])
+            norm_velocity = detect.velocity / self.velocity_range  
+            
+            # 根据速度值计算颜色:
+            # - 红色分量: 1.0 - norm_velocity (后退显示更红)
+            # - 绿色分量: 1.0 - abs(norm_velocity) (静止时最绿)
+            # - 蓝色分量: abs(-1.0 - norm_velocity) (前进显示更蓝)
             r = int(clamp(0.0, 1.0, 1.0 - norm_velocity) * 255.0)
             g = int(clamp(0.0, 1.0, 1.0 - abs(norm_velocity)) * 255.0)
-            b = int(abs(clamp(- 1.0, 0.0, - 1.0 - norm_velocity)) * 255.0)
+            b = int(abs(clamp(-1.0, 0.0, -1.0 - norm_velocity)) * 255.0)
+            
+            # 绘制检测点(彩色点)
             self.debug.draw_point(
-                radar_data.transform.location + fw_vec,
-                size=0.075,
-                life_time=0.06,
-                persistent_lines=False,
-                color=carla.Color(r, g, b))
+                radar_data.transform.location + fw_vec,  # 世界坐标位置
+                size=0.075,          # 点大小
+                life_time=0.06,      # 显示时长(秒)
+                persistent_lines=False,  # 非持续显示
+                color=carla.Color(r, g, b))  # 速度相关颜色
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
