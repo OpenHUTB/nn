@@ -20,12 +20,12 @@ def identity_basis(x):
 def multinomial_basis(x, feature_num=10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 初始化特征列表
+    x = np.expand_dims(x, 2axis=1)  # shape(N, 1) # 将x从(N,)变为(N,1)
+    # 初始化特征列表，包含x^1
     feat = [x]
     # 生成从 x^2 到 x^feature_num 的多项式特征
     for i in range(2, feature_num + 1):
-        feat.append(x**i)
+        feat.append(x**i) # 添加x的更高次方
     # 将所有特征沿着第二维（axis=1）拼接起来
     ret = np.concatenate(feat, axis=1)
     return ret # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
