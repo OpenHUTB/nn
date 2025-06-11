@@ -880,43 +880,78 @@ class HUD(object):
         # 显示红色错误提示
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
-    def render(self, display):
-        if self._show_info:
-            info_surface = pygame.Surface((220, self.dim[1]))
-            info_surface.set_alpha(100)
-            display.blit(info_surface, (0, 0))
-            v_offset = 4
-            bar_h_offset = 100
-            bar_width = 106
-            for item in self._info_text:
-                if v_offset + 18 > self.dim[1]:
-                    break
-                if isinstance(item, list):
-                    if len(item) > 1:
-                        points = [(x + 8, v_offset + 8 + (1.0 - y) * 30) for x, y in enumerate(item)]
-                        pygame.draw.lines(display, (255, 136, 0), False, points, 2)
-                    item = None
-                    v_offset += 18
-                elif isinstance(item, tuple):
-                    if isinstance(item[1], bool):
-                        rect = pygame.Rect((bar_h_offset, v_offset + 8), (6, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect, 0 if item[1] else 1)
-                    else:
-                        rect_border = pygame.Rect((bar_h_offset, v_offset + 8), (bar_width, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect_border, 1)
-                        f = (item[1] - item[2]) / (item[3] - item[2])
-                        if item[2] < 0.0:
-                            rect = pygame.Rect((bar_h_offset + f * (bar_width - 6), v_offset + 8), (6, 6))
-                        else:
-                            rect = pygame.Rect((bar_h_offset, v_offset + 8), (f * bar_width, 6))
-                        pygame.draw.rect(display, (255, 255, 255), rect)
-                    item = item[0]
-                if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
-                    display.blit(surface, (8, v_offset))
-                v_offset += 18
-        self._notifications.render(display)
-        self.help.render(display)
+def render(self, display):
+    """渲染HUD信息到显示表面，包括车辆状态、通知和帮助文本"""
+    
+    # 检查是否需要显示信息面板
+    if self._show_info:
+        # 创建半透明背景面板(宽度220px，高度与HUD相同)
+        info_surface = pygame.Surface((220, self.dim[1]))
+        info_surface.set_alpha(100)  # 设置透明度(0-255)
+        display.blit(info_surface, (0, 0))  # 在左上角绘制背景
+        
+        v_offset = 4  # 垂直偏移初始值
+        bar_h_offset = 100  # 进度条水平起始位置
+        bar_width = 106  # 进度条宽度
+        
+        # 遍历所有信息文本
+        for item in self._info_text:
+            # 如果超出显示区域则停止渲染
+            if v_offset + 18 > self.dim[1]:
+                break
+                
+            # 处理列表类型数据(用于绘制折线图)
+            if isinstance(item, list):
+                if len(item) > 1:
+                    # 生成折线点坐标(x从0开始递增，y归一化到0-1)
+                    points = [(x + 8, v_offset + 8 + (1.0 - y) * 30) 
+                             for x, y in enumerate(item)]
+                    # 绘制橙色折线(宽度2px)
+                    pygame.draw.lines(display, (255, 136, 0), False, points, 2)
+                item = None  # 清空item避免后续文本渲染
+                v_offset += 18  # 增加行高
+                
+            # 处理元组类型数据(用于显示状态或进度条)
+            elif isinstance(item, tuple):
+                # 布尔值类型(显示复选框)
+                if isinstance(item[1], bool):
+                    rect = pygame.Rect((bar_h_offset, v_offset + 8), (6, 6))
+                    # 实心矩形表示True，空心矩形表示False
+                    pygame.draw.rect(display, (255, 255, 255), rect, 0 if item[1] else 1)
+                else:
+                    # 数值类型(显示进度条)
+                    # 绘制进度条边框
+                    rect_border = pygame.Rect((bar_h_offset, v_offset + 8), 
+                                            (bar_width, 6))
+                    pygame.draw.rect(display, (255, 255, 255), rect_border, 1)
+                    
+                    # 计算进度比例(当前值在最小最大值之间)
+                    f = (item[1] - item[2]) / (item[3] - item[2])
+                    
+                    # 根据值范围不同显示不同方向的进度条
+                    if item[2] < 0.0:  # 包含负值(从中间开始)
+                        rect = pygame.Rect((bar_h_offset + f * (bar_width - 6), 
+                                         v_offset + 8), (6, 6))
+                    else:  # 正值(从左到右)
+                        rect = pygame.Rect((bar_h_offset, v_offset + 8), 
+                                         (f * bar_width, 6))
+                    # 绘制进度条填充
+                    pygame.draw.rect(display, (255, 255, 255), rect)
+                
+                item = item[0]  # 提取元组中的文本部分
+            
+            # 渲染文本(8px左侧边距)
+            if item:  # 此时item应为字符串
+                surface = self._font_mono.render(item, True, (255, 255, 255))
+                display.blit(surface, (8, v_offset))
+            
+            v_offset += 18  # 每行增加18px垂直间距
+    
+    # 渲染通知信息(如"Recording On/Off")
+    self._notifications.render(display)
+    
+    # 渲染帮助文本(按键说明)
+    self.help.render(display)
 
 
 # ==============================================================================
