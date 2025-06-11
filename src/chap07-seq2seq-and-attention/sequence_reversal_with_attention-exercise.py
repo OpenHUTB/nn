@@ -272,6 +272,7 @@ def train(model, optimizer, seqlen):
     
     # 训练2000步
     for step in range(2000):
+        # 获取一个批次的训练数据
         batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
         loss = train_one_step(model, optimizer, enc_x, dec_x, y)
         
