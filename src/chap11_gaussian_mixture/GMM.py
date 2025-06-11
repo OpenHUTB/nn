@@ -256,6 +256,11 @@ class GaussianMixtureModel:
         # 返回对数概率密度
         # 公式：log_p(x) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T·Σ^(-1)·(x-μ)
         return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
+    else:
+        # 处理非奇异协方差矩阵
+        inv = np.linalg.inv(sigma)
+        exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
     
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
