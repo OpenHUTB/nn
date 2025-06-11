@@ -1296,49 +1296,89 @@ class CameraManager(object):
         if self.surface is not None:
             display.blit(self.surface, (0, 0))
 
-    @staticmethod
-    def _parse_image(weak_self, image):
-        self = weak_self()
-        if not self:
-            return
-        if self.sensors[self.index][0].startswith('sensor.lidar'):
-            points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
-            points = np.reshape(points, (int(points.shape[0] / 4), 4))
-            lidar_data = np.array(points[:, :2])
-            lidar_data *= min(self.hud.dim) / (2.0 * self.lidar_range)
-            lidar_data += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])
-            lidar_data = np.fabs(lidar_data)  # pylint: disable=E1111
-            lidar_data = lidar_data.astype(np.int32)
-            lidar_data = np.reshape(lidar_data, (-1, 2))
-            lidar_img_size = (self.hud.dim[0], self.hud.dim[1], 3)
-            lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
-            lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
-            self.surface = pygame.surfarray.make_surface(lidar_img)
-        elif self.sensors[self.index][0].startswith('sensor.camera.dvs'):
-            # Example of converting the raw_data from a carla.DVSEventArray
-            # sensor into a NumPy array and using it as an image
-            dvs_events = np.frombuffer(image.raw_data, dtype=np.dtype([
-                ('x', np.uint16), ('y', np.uint16), ('t', np.int64), ('pol', np.bool)]))
-            dvs_img = np.zeros((image.height, image.width, 3), dtype=np.uint8)
-            # Blue is positive, red is negative
-            dvs_img[dvs_events[:]['y'], dvs_events[:]['x'], dvs_events[:]['pol'] * 2] = 255
-            self.surface = pygame.surfarray.make_surface(dvs_img.swapaxes(0, 1))
-        elif self.sensors[self.index][0].startswith('sensor.camera.optical_flow'):
-            image = image.get_color_coded_flow()
-            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-            array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]
-            array = array[:, :, ::-1]
-            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        else:
-            image.convert(self.sensors[self.index][1])
-            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-            array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]
-            array = array[:, :, ::-1]
-            self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
-        if self.recording:
-            image.save_to_disk('_out/%08d' % image.frame)
+@staticmethod
+def _parse_image(weak_self, image):
+    # 将弱引用转换为强引用
+    self = weak_self()
+    if not self:
+        return  # 如果对象已被销毁则直接返回
+    
+    # 判断当前传感器是否为激光雷达(LIDAR)
+    if self.sensors[self.index][0].startswith('sensor.lidar'):
+        # 将原始LIDAR数据转换为float32类型的numpy数组(每个浮点数4字节)
+        points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
+        # 重塑为(N个点, 4)的数组，每行包含(x,y,z,强度)
+        points = np.reshape(points, (int(points.shape[0] / 4), 4))
+        # 只取x,y坐标(忽略z和强度值)
+        lidar_data = np.array(points[:, :2])
+        
+        # 将LIDAR点坐标缩放到HUD显示范围内
+        # 通过激光雷达范围归一化后乘以HUD最小尺寸的一半
+        lidar_data *= min(self.hud.dim) / (2.0 * self.lidar_range)
+        # 将点云中心移动到HUD中央
+        lidar_data += (0.5 * self.hud.dim[0], 0.5 * self.hud.dim[1])
+        # 取绝对值(防止出现负坐标)
+        lidar_data = np.fabs(lidar_data)  # pylint: disable=E1111
+        # 转换为整数坐标(像素位置)
+        lidar_data = lidar_data.astype(np.int32)
+        # 重塑为(N个点, 2)的(x,y)坐标数组
+        lidar_data = np.reshape(lidar_data, (-1, 2))
+        
+        # 创建全黑的HUD尺寸图像(宽度, 高度, 3通道)
+        lidar_img_size = (self.hud.dim[0], self.hud.dim[1], 3)
+        lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
+        # 将LIDAR点位置设为白色(255,255,255)
+        lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
+        # 将numpy数组转换为Pygame显示表面
+        self.surface = pygame.surfarray.make_surface(lidar_img)
+    
+    # 判断是否为动态视觉传感器(DVS相机)
+    elif self.sensors[self.index][0].startswith('sensor.camera.dvs'):
+        # 解析DVS事件数据(每个事件包含x坐标,y坐标,时间戳,极性)
+        dvs_events = np.frombuffer(image.raw_data, dtype=np.dtype([
+            ('x', np.uint16), ('y', np.uint16), ('t', np.int64), ('pol', np.bool)]))
+        # 创建全黑的相机尺寸图像
+        dvs_img = np.zeros((image.height, image.width, 3), dtype=np.uint8)
+        # 根据事件极性着色:
+        # - 正极性(True)显示为蓝色(第0通道)
+        # - 负极性(False)显示为红色(第2通道)
+        dvs_img[dvs_events[:]['y'], dvs_events[:]['x'], dvs_events[:]['pol'] * 2] = 255
+        # 转换为Pygame表面(交换坐标轴因为Pygame使用(宽,高)顺序)
+        self.surface = pygame.surfarray.make_surface(dvs_img.swapaxes(0, 1))
+    
+    # 判断是否为光流相机
+    elif self.sensors[self.index][0].startswith('sensor.camera.optical_flow'):
+        # 从图像获取颜色编码的光流表示
+        image = image.get_color_coded_flow()
+        # 将原始数据转换为numpy数组
+        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+        # 重塑为(高度, 宽度, 4通道)RGBA格式
+        array = np.reshape(array, (image.height, image.width, 4))
+        # 只取RGB通道(忽略Alpha)
+        array = array[:, :, :3]
+        # 从BGR转换为RGB(OpenCV默认使用BGR)
+        array = array[:, :, ::-1]
+        # 转换为Pygame表面(交换坐标轴适应Pygame坐标系)
+        self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+    
+    # 常规RGB相机的默认处理
+    else:
+        # 将图像转换为指定的颜色格式(存储在self.sensors[self.index][1]中)
+        image.convert(self.sensors[self.index][1])
+        # 将原始数据转换为numpy数组
+        array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+        # 重塑为(高度, 宽度, 4通道)RGBA格式
+        array = np.reshape(array, (image.height, image.width, 4))
+        # 只取RGB通道(忽略Alpha)
+        array = array[:, :, :3]
+        # 从BGR转换为RGB(OpenCV默认使用BGR)
+        array = array[:, :, ::-1]
+        # 转换为Pygame表面(交换坐标轴适应Pygame坐标系)
+        self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+    
+    # 如果启用了录制功能，将图像保存到磁盘，文件名使用8位零填充的帧编号
+    if self.recording:
+        image.save_to_disk('_out/%08d' % image.frame)
 
 
 # ==============================================================================
