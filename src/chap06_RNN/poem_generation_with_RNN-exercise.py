@@ -196,7 +196,7 @@ def mkMask(input_tensor, maxLen):
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
     
-    return tf.reshape(flat_mask, shape_of_output)
+    return tf.reshape(flat_mask, shape_of_output)   # 将展平的掩码恢复为原始输入张量形状+maxLen的形状
 
 def reduce_avg(reduce_target, lengths, dim):
     """沿指定维度计算掩码后的平均值（忽略填充部分）
@@ -214,8 +214,8 @@ def reduce_avg(reduce_target, lengths, dim):
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     # 验证输入张量的维度是否符合要求
-    # shape_of_lengths: lengths张量的维度列表
-    # dim: 预期的长度张量的秩(rank)
+   # shape_of_lengths: lengths张量的维度列表
+   # dim: 预期的长度张量的秩(rank)
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
