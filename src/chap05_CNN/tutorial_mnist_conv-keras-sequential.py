@@ -103,7 +103,7 @@ optimizer = optimizers.Adam(0.0001)
 model.compile(
     optimizer = optimizer,# 使用预定义的优化器（如Adam、SGD）更新模型参数
     loss = 'sparse_categorical_crossentropy',
-    metrics = ['accuracy']
+    metrics = ['accuracy']# 训练和评估时监控准确率指标
 )
 train_ds, test_ds = mnist_dataset()
 model.fit(train_ds, epochs=5)

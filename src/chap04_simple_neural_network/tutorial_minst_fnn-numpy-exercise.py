@@ -279,11 +279,12 @@ h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2)
 h2_log = log.forward(h2_soft)
 # 手动实现的反向传播过程（计算梯度）：
-h2_log_grad = log.backward(-label)
-h2_soft_grad = softmax.backward(h2_log_grad)
-h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)
-h1_relu_grad = relu.backward(h2_grad)
-h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)
+# 反向传播流程（从后向前）：
+h2_log_grad = log.backward(-label)                # 计算损失梯度
+h2_soft_grad = softmax.backward(h2_log_grad)      # Softmax梯度
+h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)  # 第二层权重梯度
+h1_relu_grad = relu.backward(h2_grad)             # ReLU梯度
+h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)  # 第一层权重梯度
 
 print(h2_log_grad)
 print('--' * 20)
@@ -311,6 +312,7 @@ with tf.GradientTape() as tape:
 
 class myModel:
     def __init__(self):# 初始化模型参数，使用随机正态分布初始化权重矩阵
+        # 权重矩阵包含偏置项，通过增加输入特征维度实现
         self.W1 = np.random.normal(size=[28 * 28 + 1, 100])  # 输入层到隐藏层，增加偏置项，W1: 连接输入层(784+1)和隐藏层(100)的权重矩阵
         self.W2 = np.random.normal(size=[100, 10])           # 输入层到隐藏层，增加偏置项，W2: 连接隐藏层(100)和输出层(10)的权重矩阵
         # 初始化各层操作对象
@@ -429,8 +431,12 @@ def train(model, train_data, train_label, epochs=50, batch_size=128):
         print(f'Epoch {epoch}: Loss {epoch_loss:.4f}; Accuracy {epoch_accuracy:.4f}')
     return losses, accuracies
 
-
 if __name__ == "__main__":
+    # 准备数据：加载并预处理训练和测试数据
+    # train_data: 训练图像数据
+    # train_label: 训练标签数据
+    # test_data: 测试图像数据
+    # test_label: 测试标签数据
     train_data, train_label, test_data, test_label = prepare_data()
     model = myModel()
     losses, accuracies = train(model, train_data, train_label)

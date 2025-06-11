@@ -42,9 +42,9 @@ y = np.ones(dot_num) * 2  # 标签为2
 C3 = np.array([x_b, y_b, y]).T
 
 # 绘制三类样本的散点图
-plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")  # 类别1：蓝色加号
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")  # 类别2：绿色圆圈
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")  # 类别3：红色星号
+plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
+plt.scatter(C2[:, 0], C2[:, 1], c = "g", marker = "o")  # 类别2：绿色圆圈
+plt.scatter(C3[:, 0], C3[:, 1], c = "r", marker = "*")  # 类别3：红色星号
 
 # 合并所有类别的数据，形成完整数据集
 data_set = np.concatenate((C1, C2, C3), axis=0)
@@ -62,7 +62,7 @@ np.random.shuffle(data_set)  # 随机打乱数据集顺序
 epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 class SoftmaxRegression(tf.Module):
-    def __init__(self, input_dim=2, num_classes=3):
+    def __init__(self, input_dim = 2, num_classes = 3):
         """
         初始化 Softmax 回归模型参数
         :param input_dim: 输入特征维度
@@ -209,6 +209,6 @@ plt.show()
 model.save_weights('softmax_regression_weights')
 
 # 加载模型权重
-model.load_weights('softmax_regression_weights')
+model.load_weights('softmax_regression_weights') # 模型权重加载后即可用于新数据的多类别概率预测
 
 # In[ ]:
