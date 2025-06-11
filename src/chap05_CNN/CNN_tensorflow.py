@@ -8,10 +8,11 @@ from tensorflow.examples.tutorials.mnist import input_data
 try:
     mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 except Exception as e:
-    print(f"数据加载失败: {e}")
-    
+    print(f"数据加载失败: {e}")# 异常处理：打印错误信息
 
-learning_rate = 1e-4     #学习率
+    
+# 超参数设置
+learning_rate = 1e-4     #学习率：控制参数更新步长
 keep_prob_rate = 0.7     #Dropout保留概率0.7
 max_epoch = 2000         #最大训练轮数2000
 
@@ -28,11 +29,12 @@ def compute_accuracy(v_xs, v_ys):
         result: 模型的准确率。
     """
     global prediction
-    # 获取模型预测结果
+    # 获取模型预测结果（禁用Dropout，keep_prob=1）
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
+    # tf.argmax获取概率最大值的索引（即预测类别）
     correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
-    # 计算准确率
+    # 计算准确率：将布尔值转换为浮点数后求平均
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
