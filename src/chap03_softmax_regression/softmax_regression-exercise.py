@@ -168,7 +168,7 @@ model = SoftmaxRegression()
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
 
-x1, x2, y = list(zip(*data_set))
+x1, x2, y = list(zip(*data_set))  #从data_set中提取特征和标签，并将它们分别存储到x1、x2 和 y 中
 # 转换为 float32
 x = np.array(list(zip(x1, x2)), dtype=np.float32)  
 # 转换为 int32
