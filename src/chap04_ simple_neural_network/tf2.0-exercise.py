@@ -74,7 +74,7 @@ test_data = np.random.normal(size=[10, 5])
 # 得到 softmax 概率
 prob = tf.nn.softmax(test_data)
 # 创建 one-hot 标签
-label = np.zeros_like(test_data)
+label = np.zeros_like(test_data, dtype=np.float32)
 # 每行随机一个位置设为 1
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0  
 
