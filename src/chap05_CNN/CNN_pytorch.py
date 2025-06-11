@@ -38,13 +38,12 @@ train_loader = Data.DataLoader(
     shuffle=True            # 是否打乱数据
 )
 
-# 加载测试数据集
+# 加载测试数据集（不用于训练，仅用于评估）
 # torchvision.datasets.MNIST用于加载 MNIST 数据集
 # root='./mnist/'指定数据集的存储路径
 # train=False表示加载测试集（而不是训练集）
 test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
-
-# 预处理测试数据：转换为 Variable ，调整维度，归一化，只取前500个样本
+# 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
@@ -86,15 +85,11 @@ class CNN(nn.Module):
     def forward(self, x):
         x = self.conv1(x)          # 第一卷积层特征提取，输入 -> 卷积 -> 激活 (ReLU由self.conv1定义)
         x = self.conv2(x)          # 第二卷积层特征提取，特征图 -> 卷积 -> 激活
-        
-        # 展平张量：保留批量维度，合并其他所有维度
-        x = x.view(x.size(0), -1)  
-        # 全连接层计算
+        x = x.view(x.size(0), -1)  # 展平张量：保留批量维度，合并其他所有维度
         out1 = self.out1(x)        # 第一个全连接层 + 激活函数，线性变换: [B, in_features] -> [B, hidden_features]
         out1 = F.relu(out1)        # 应用ReLU激活函数引入非线性
         out1 = self.dropout(out1)  # 应用dropout正则化，随机丢弃部分神经元输出
-        out2 = self.out2(out1)     # 第二个全连接层
-
+        out2 = self.out2(out1)     # 将上一层输出out1传递给当前层self.out2进行处理
         return out2
 
 # 测试函数 - 评估模型在测试集上的准确率
@@ -143,7 +138,7 @@ def train(cnn):
             loss.backward()                         # 反向传播计算梯度
             optimizer.step()                        # 更新参数
 
-            # 每20个batch打印一次测试准确率（跳过第0步，避免初始未训练时计算）
+            # 每20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
                 print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
                 # step != 0: 跳过初始训练前的测试（通常初始准确率无意义）
