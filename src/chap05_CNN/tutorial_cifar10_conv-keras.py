@@ -21,7 +21,6 @@ import numpy
 import pylab
 from PIL import Image
 import numpy as np
-import numpy
 
 # 设置TensorFlow日志级别，避免输出过多信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
