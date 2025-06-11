@@ -222,6 +222,7 @@ if __name__ == '__main__':
         transform=ax.transAxes
     )
 
+    # 决策边界为直线：W1·x1 + W2·x2 + b = 0，动态显示损失下降过程
     def init():
         """
         初始化动画所需的图形元素

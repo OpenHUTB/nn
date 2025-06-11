@@ -13,13 +13,15 @@ from tensorflow.keras import optimizers, layers, Model
 
 
 def identity_basis(x):
-    """恒等基函数：直接返回输入本身，适用于线性回归"""
+    """恒等基函数：直接返回输入本身，适用于线性回归
+    返回形状为 (N, 1) 的数组，其中 N 是输入样本数"""
     return np.expand_dims(x, axis=1)
 
     # 生成多项式基函数
 def multinomial_basis(x, feature_num=10):
     """多项式基函数：将输入x映射为多项式特征
-    feature_num: 多项式的最高次数"""
+    feature_num: 多项式的最高次数
+    返回形状为 (N, feature_num) 的数组"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
@@ -33,7 +35,8 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     """高斯基函数：将输入x映射为一组高斯分布特征
-    用于提升模型对非线性关系的拟合能力"""
+    用于提升模型对非线性关系的拟合能力
+    返回形状为 (N, feature_num) 的数组"""
     # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
@@ -50,7 +53,8 @@ def gaussian_basis(x, feature_num=10):
 
 def load_data(filename, basis_func=gaussian_basis):
     """载入数据并进行基函数变换
-    返回：(特征, 标签), (原始x, 原始y)"""
+    返回：(特征, 标签), (原始x, 原始y)
+    在特征矩阵中，phi0是偏置项（全1列），phi1是基函数变换后的特征"""
     xys = []
     with open(filename, "r") as f:
         for line in f:

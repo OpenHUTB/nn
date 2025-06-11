@@ -209,6 +209,6 @@ plt.show()
 model.save_weights('softmax_regression_weights')
 
 # 加载模型权重
-model.load_weights('softmax_regression_weights')
+model.load_weights('softmax_regression_weights') # 模型权重加载后即可用于新数据的多类别概率预测
 
 # In[ ]:

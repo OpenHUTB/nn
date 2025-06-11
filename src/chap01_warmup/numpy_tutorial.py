@@ -240,8 +240,8 @@ plt.grid(True, alpha=0.5)
 # 显示图例
 plt.legend()
 
-# 自动调整子图布局，优化图形显示效果
-plt.tight_layout()
+# 自动调整布局，防止标签被截断
+plt.tight_layout() 
 
 # 显示图像
 plt.show()

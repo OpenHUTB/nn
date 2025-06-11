@@ -202,9 +202,17 @@ with tf.Session() as sess:
     init = tf.global_variables_initializer()
     sess.run(init)
 
-    # 训练循环 - 迭代多个epoch
+    # 模型训练循环
     for i in range(max_epoch):
+        # 获取下一个训练批次
         batch_xs, batch_ys = mnist.train.next_batch(100)
+
+        # 执行训练步骤（前向传播 + 反向传播 + 参数更新）
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
-        if i % 100 == 0:  #每 100 个迭代在测试集的前 1000 个样本上评估准确率
-            print(compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000]))
+
+        # 每100次迭代评估一次模型性能
+        if i % 100 == 0:
+            # 计算模型在测试集前1000个样本上的准确率
+            acc = compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000])
+            # 显示当前训练进度和准确率
+            print(f"迭代 {i}/{max_epoch}, 测试准确率: {acc:.4f}")

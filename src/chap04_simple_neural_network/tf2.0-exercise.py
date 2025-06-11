@@ -101,6 +101,7 @@ def sigmoid_ce(logits, labels):
     loss = tf.reduce_mean(
         tf.nn.relu(logits) - logits * labels + 
         tf.math.log(1 + tf.exp(-tf.abs(logits)))
+
     )
     
     return loss #返回计算得到的损失值
