@@ -213,7 +213,7 @@ register(
     id='Taxi-v2',
     entry_point='gym.envs.toy_text.taxi:TaxiEnv',
     reward_threshold=8,        # 接近最优得分
-    max_episode_steps=200,
+    max_episode_steps=200,     # 超过单次最大步数限制200步未完成任务则自动终止
 )
 
 # 8. 数字猜测游戏：通过反馈猜测目标数字（适合演示Q学习）
