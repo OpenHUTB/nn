@@ -210,7 +210,7 @@ plt.title("Plot of y = x^2")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 
-# 显示半透明网格线
+# 显示出半透明网格线
 plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
