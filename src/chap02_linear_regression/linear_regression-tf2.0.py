@@ -89,6 +89,7 @@ class linearModel(Model):
         # 形状为 [ndim, 1]，表示从 ndim 维输入到 1 维输出的线性变换
         # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
         # trainable=True 表示该变量需要在训练过程中被优化
+        # 创建一个TensorFlow变量作为模型权重
         self.w = tf.Variable(
             shape=[ndim, 1],    # 权重矩阵形状：ndim×1
             initial_value=tf.random.uniform(
