@@ -70,8 +70,8 @@ class SVM:
             db = -np.mean(y[idx])
 
             # 参数更新
-            self.w -= self.learning_rate * dw
-            self.b -= self.learning_rate * db
+            self.w -= self.learning_rate * dw  # 更新权重参数
+            self.b -= self.learning_rate * db  # 更新偏置参数
 
             # 核心训练逻辑：对间隔违规样本梯度下降，优化间隔最大化目标
 
