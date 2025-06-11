@@ -76,10 +76,10 @@ class LogisticRegression():
         l2_reg = tf.keras.regularizers.l2(0.01)
         # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
-            initial_value=tf.random.uniform(
-                shape=[2, 1], minval=-0.1, maxval=0.1
+            initial_value = tf.random.uniform(
+                shape = [2, 1], minval = -0.1, maxval = 0.1
             ),
-            regularizer=l2_reg
+            regularizer = l2_reg
         )
         # 初始化偏置变量b，形状为[1]，初始值为0
         self.b = tf.Variable(
@@ -104,6 +104,7 @@ class LogisticRegression():
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
         logits = tf.matmul(inp, self.W) + self.b
         # 对logits应用sigmoid函数，得到预测概率
+        # 数学表达式：pred = sigmoid(logits) = 1 / (1 + exp(-logits))
         pred = tf.nn.sigmoid(logits)
         return pred
 
@@ -201,16 +202,19 @@ if __name__ == '__main__':
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
-    # 创建图形
+
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
     plt.ylabel('Y') 
     plt.xlabel('X')  
     ax.set_xlim(0, 10)  
     ax.set_ylim(0, 10) 
+    
     line_d, = ax.plot([], [], label = 'fit_line')
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
+
+    # 创建用于显示动态文本的文本对象（位于左上角）
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
@@ -218,6 +222,7 @@ if __name__ == '__main__':
         transform=ax.transAxes
     )
 
+    # 决策边界为直线：W1·x1 + W2·x2 + b = 0，动态显示损失下降过程
     def init():
         """
         初始化动画所需的图形元素

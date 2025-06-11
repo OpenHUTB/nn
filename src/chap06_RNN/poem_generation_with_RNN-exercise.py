@@ -10,7 +10,6 @@ import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组�
 import tensorflow as tf
 import collections
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras import layers, optimizers, datasets
 
 # 定义特殊标记：开始标记和结束标记
@@ -52,7 +51,7 @@ def process_dataset(fileName):
             counter[w] += 1
     
     ## 按词频从高到低排序
-    sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+    sorted_counter = sorted(counter.items(), key = lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)                     # 对tuple进行解压，得到words列表代表所有字符
