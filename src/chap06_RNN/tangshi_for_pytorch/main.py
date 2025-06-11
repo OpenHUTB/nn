@@ -136,7 +136,6 @@ def process_poems2(file_name):
     return poems_vector, word_int_map, words
 
 def generate_batch(batch_size, poems_vec, word_to_int):
-<<<<<<< HEAD
     n_chunk = len(poems_vec) // batch_size# 计算可生成的完整批次数量
     x_batches = []# 存储输入序列批次
     y_batches = []# 存储目标序列批次
@@ -148,7 +147,7 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         for row in x_data:# 为每个输入序列生成对应的目标序列,目标序列是输入序列右移一位，最后一个元素复制到末尾
             y  = row[1:]# 移除第一个元素
             y.append(row[-1])# 将原序列的最后一个元素添加到末尾
-=======
+
     """
     生成训练所需的批次数据（x_batches 和 y_batches）
 
@@ -179,7 +178,6 @@ def generate_batch(batch_size, poems_vec, word_to_int):
             # 构造目标序列 y：将原序列向后偏移一位，并补上最后一个词（常用于语言模型预测下一个词）
             y = row[1:]          # 将序列右移一位
             y.append(row[-1])    # 最后一个词复制一份填充，确保长度一致
->>>>>>> 5a735ea8a8cbb391818b5d2b86302469c1000d24
             y_data.append(y)
 
         """
@@ -188,15 +186,13 @@ def generate_batch(batch_size, poems_vec, word_to_int):
         [6,2,4,6,9]       [2,4,6,9,9]  # 下一个词的预测目标
         [1,4,2,8,5]       [4,2,8,5,5]
         """
-<<<<<<< HEAD
         # print(x_data[0])
         # print(y_data[0])
         # exit(0)
         x_batches.append(x_data)# 将处理好的批次添加到批次列表中
-=======
+
 
         x_batches.append(x_data)
->>>>>>> 5a735ea8a8cbb391818b5d2b86302469c1000d24
         y_batches.append(y_data)
 
     return x_batches, y_batches
