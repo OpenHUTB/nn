@@ -190,7 +190,10 @@ def mkMask(input_tensor, maxLen):
     """
     # 获取输入张量的形状
     shape_of_input = tf.shape(input_tensor) 
-    shape_of_output = tf.concat(axis=0, values=[shape_of_input, [maxLen]])
+    shape_of_output = tf.concat(
+        axis=0, 
+        values=[shape_of_input, [maxLen]]
+    )
     #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
