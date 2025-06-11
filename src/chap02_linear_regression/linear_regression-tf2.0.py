@@ -89,7 +89,7 @@ class linearModel(Model):
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
             trainable=True,
-            name="weight"
+            name = "weight"
         )
         
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
