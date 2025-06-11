@@ -32,7 +32,8 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     exp_logits = tf.exp(shifted_logits) # 所有值<=1，避免数值溢出
     # 计算归一化分母（每行的指数和）
     sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
-    return exp_logits / sum_exp
+    # 返回概率分布
+    return exp_logits / sum_exp # 形状与输入x相同
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
