@@ -311,11 +311,18 @@ if __name__ == "__main__":
     
     # 右图：GMM预测聚类
     plt.subplot(1, 2, 2)
+    # 绘制散点图展示GMM聚类预测结果：
+    # - X[:, 0]: 取数据集第一维特征作为x轴
+    # - X[:, 1]: 取数据集第二维特征作为y轴
+    # - c=y_pred: 使用预测标签作为颜色分类依据
+    # - cmap='viridis': 使用viridis颜色映射
+    # - s=15: 设置点的大小为15
+    # - alpha=0.8: 设置透明度为0.8（轻微透明效果）
     plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=15, alpha=0.8)
-    plt.title("GMM预测聚类", fontsize=12)
-    plt.xlabel("特征1", fontsize=10)
-    plt.ylabel("特征2", fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.title("GMM预测聚类", fontsize=12) # 设置标题及字体大小
+    plt.xlabel("特征1", fontsize=10)      # 设置x轴标签及字体大小
+    plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
+    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
     
     plt.tight_layout()
     plt.savefig('gmm_clustering_results.png', dpi=300)
