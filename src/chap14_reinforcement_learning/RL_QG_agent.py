@@ -45,11 +45,11 @@ class RL_QG_agent:
         # 64个3x3卷积核，捕捉更复杂的棋子布局模式
         # 输出形状：[None, 8, 8, 64]
         conv2 = tf.layers.conv2d(
-            inputs=conv1,
+            inputs=conv1,       # 输入张量，来自上一层的输出
             filters=64,         # 特征图数量翻倍，增强特征表达能力
-            kernel_size=3,
-            padding="same",
-            activation=tf.nn.relu
+            kernel_size=3,      # 卷积核尺寸为3x3
+            padding="same",     # 使用"same"填充方式
+            activation=tf.nn.relu # 激活函数采用ReLU
         )
 
         # ========== 扁平化层：将多维特征转为一维向量 ==========
