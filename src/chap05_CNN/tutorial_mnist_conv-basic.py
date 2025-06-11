@@ -239,7 +239,20 @@ def test(model, ds):
 
 # In[26]:、
 #调用mnist_dataset()函数获取处理好的MNIST训练集和测试集，train_ds是训练数据集，test_ds是测试数据集
-train_ds, test_ds = mnist_dataset()
-for epoch in range(2):
+# 加载MNIST数据集，返回训练集和测试集
+train_ds, test_ds = mnist_dataset()  # train_ds: 训练数据集, test_ds: 测试数据集
+
+# 训练循环，进行2个epoch的训练
+for epoch in range(2):  # epoch: 训练轮次
+    # 调用train函数进行训练，返回当前epoch的损失和准确率
+    # 参数说明:
+    # - epoch: 当前训练轮次
+    # - model: 要训练的模型
+    # - optimizer: 优化器
+    # - train_ds: 训练数据集
     loss, accuracy = train(epoch, model, optimizer, train_ds)
+# 调用test函数进行测试，返回模型在测试集上的损失和准确率
+# 参数说明:
+# - model: 要测试的模型
+# - test_ds: 测试数据集
 loss, accuracy = test(model, test_ds)

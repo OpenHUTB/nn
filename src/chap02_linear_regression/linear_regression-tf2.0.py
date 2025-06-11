@@ -13,13 +13,15 @@ from tensorflow.keras import optimizers, layers, Model
 
 
 def identity_basis(x):
-    """恒等基函数：直接返回输入本身，适用于线性回归"""
+    """恒等基函数：直接返回输入本身，适用于线性回归
+    返回形状为 (N, 1) 的数组，其中 N 是输入样本数"""
     return np.expand_dims(x, axis=1)
 
     # 生成多项式基函数
 def multinomial_basis(x, feature_num=10):
     """多项式基函数：将输入x映射为多项式特征
-    feature_num: 多项式的最高次数"""
+    feature_num: 多项式的最高次数
+    返回形状为 (N, feature_num) 的数组"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
@@ -33,7 +35,8 @@ def multinomial_basis(x, feature_num=10):
 
 def gaussian_basis(x, feature_num=10):
     """高斯基函数：将输入x映射为一组高斯分布特征
-    用于提升模型对非线性关系的拟合能力"""
+    用于提升模型对非线性关系的拟合能力
+    返回形状为 (N, feature_num) 的数组"""
     # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
@@ -50,10 +53,12 @@ def gaussian_basis(x, feature_num=10):
 
 def load_data(filename, basis_func=gaussian_basis):
     """载入数据并进行基函数变换
-    返回：(特征, 标签), (原始x, 原始y)"""
+    返回：(特征, 标签), (原始x, 原始y)
+    在特征矩阵中，phi0是偏置项（全1列），phi1是基函数变换后的特征"""
     xys = []
     with open(filename, "r") as f:
         for line in f:
+            # 读取每一行数据，并将其转换为列表
             # 改进: 转换为list
             xys.append(list(map(float, line.strip().split()))) # 读取每行数据
         xs, ys = zip(*xys) # 解压为特征和标签
@@ -61,7 +66,8 @@ def load_data(filename, basis_func=gaussian_basis):
         o_x, o_y = xs, ys # 保存原始数据
         phi0 = np.expand_dims(np.ones_like(xs), axis=1) # 添加偏置项（全1列）
         phi1 = basis_func(xs) # 应用基函数变换
-        xs = np.concatenate([phi0, phi1], axis=1) # 拼接偏置和变换后的特征
+        xs = np.concatenate([phi0, phi1], axis=1) 
+        # 拼接偏置和变换后的特征
         return (np.float32(xs), np.float32(ys)), (o_x, o_y)# 返回处理好的训练数据和原始数据
 
 
@@ -93,12 +99,12 @@ class linearModel(Model):
         )
         
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
-        # 可补充：
-        # self.b = tf.Variable(
-        #     initial_value=tf.zeros([1]),
-        #     trainable=True,
-        #     name="bias"
-        # )
+        # 偏置项 b，形状为 [1]
+        self.b = tf.Variable(
+            initial_value=tf.zeros([1], dtype=tf.float32),
+            trainable=True,
+            name="bias"
+        )
         
     @tf.function
     def call(self, x):

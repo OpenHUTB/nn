@@ -4,9 +4,9 @@
 import numpy as np # 导入NumPy库用于高效数值计算
 import sys
 class RBM:
-    """Restricted Boltzmann Machine."""
+    """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
 
-    def __init__(self, n_hidden=2, n_observe=784):
+    def __init__(self, n_hidden = 2, n_observe = 784):
         """
         初始化受限玻尔兹曼机（RBM）模型参数
 
@@ -43,6 +43,7 @@ class RBM:
         # 请补全此处代码
         # 确保隐藏层和可见层的单元数量为正整数
         # 神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
+        # 参数初始化
         self.n_hidden = n_hidden     # 隐藏层神经元个数
         self.n_observe = n_observe   # 可见层神经元个数
 
