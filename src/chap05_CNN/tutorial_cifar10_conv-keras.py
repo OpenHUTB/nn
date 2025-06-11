@@ -66,7 +66,7 @@ def bias_variable(shape):
         tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
     """
     # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
-    initial = tf.constant(0.1, shape=shape)
+    initial = tf.constant(0.1, shape=shape) # 创建一个所有元素值为0.1的常量张量
     return tf.Variable(initial)
 
 

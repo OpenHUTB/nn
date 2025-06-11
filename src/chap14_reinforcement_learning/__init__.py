@@ -25,8 +25,8 @@ register(
     id='ReversedAddition-v0', 
     entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
     kwargs={'rows': 2},       # 输入参数：2行操作数（两数相加）
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    max_episode_steps=200, # 每个episode的最大步数限制，超过则终止
+    reward_threshold=25.0, # 判定任务成功的奖励阈值，达到则认为训练完成
 )
 
 # 三操作数反向加法（难度提升：处理三个数相加）

@@ -58,7 +58,7 @@ class ReversiEnv(gym.Env):
         self.observation_type = observation_type
 
         assert illegal_place_mode in ['lose', 'raise']
-        self.illegal_place_mode = illegal_place_mode
+        self.illegal_place_mode = illegal_place_mode # 控制如何处理非法放置操作的标志
 
         if self.observation_type != 'numpy3c':
             raise error.Error('Unsupported observation type: {}'.format(self.observation_type))
