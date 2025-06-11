@@ -19,9 +19,11 @@ register(
 )
 
 # 反向加法任务：执行反向数字加法运算
+# 使用 Gym 库的 register 函数注册一个自定义环境
+# 注册一个两操作数的反向加法环境
 register(
-    id = 'ReversedAddition-v0',
-    entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv',
+    id = 'ReversedAddition-v0', # 环境的唯一标识符
+    entry_point = 'gym.envs.algorithmic:ReversedAdditionEnv', # 环境的入口点，指定环境类的位置
     kwargs = {'rows' : 2},# 自定义参数：操作数行数
     max_episode_steps = 200,#限制最大步数，防止陷入循环
     reward_threshold = 25.0,
