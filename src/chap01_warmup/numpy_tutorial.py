@@ -237,7 +237,7 @@ plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 plt.grid(True, alpha=0.5)
 
 # 显示图例
-plt.legend()
+plt.legend(loc='best')
 
 # 自动调整布局，防止标签被截断
 plt.tight_layout() 
