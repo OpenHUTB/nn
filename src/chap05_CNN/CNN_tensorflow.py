@@ -125,13 +125,14 @@ def max_pool_2x2(x: tf.Tensor,
 ) -> tf.Tensor:
     # 验证参数合法性
     if padding not in ['SAME', 'VALID']:
-        raise ValueError(f"padding must be 'SAME' or 'VALID', got {padding}.")
+        raise ValueError(f"padding must be 'SAME' or 'VALID', got {padding}.")            # 验证padding参数
     if data_format not in ['NHWC', 'NCHW']:
-        raise ValueError(f"data_format must be 'NHWC' or 'NCHW', got {data_format}.")
-    # 验证数据格式参数是否符合TensorFlow规范
+        raise ValueError(f"data_format must be 'NHWC' or 'NCHW', got {data_format}.")     # 验证data_format参数
     
     # 构造池化核和步长参数
     if data_format == 'NHWC':
+        # NHWC格式：[batch, height, width, channels]
+        # 池化核大小和步长都作用于height和width维度
         ksize = [1, pool_size, pool_size, 1]
         strides = [1, strides, strides, 1]
     else:  # NCHW
@@ -184,7 +185,7 @@ h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 # 全连接层 2
 ## fc2 layer ##
-W_fc2 = weight_variable([1024, 10])
+W_fc2 = weight_variable([1024, 10])  # 权重矩阵：输入1024维→输出10维(对应10个类别
 b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
@@ -201,9 +202,17 @@ with tf.Session() as sess:
     init = tf.global_variables_initializer()
     sess.run(init)
 
-    # 训练循环 - 迭代多个epoch
+    # 模型训练循环
     for i in range(max_epoch):
+        # 获取下一个训练批次
         batch_xs, batch_ys = mnist.train.next_batch(100)
+
+        # 执行训练步骤（前向传播 + 反向传播 + 参数更新）
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob:keep_prob_rate})
-        if i % 100 == 0:  #每 100 个迭代在测试集的前 1000 个样本上评估准确率
-            print(compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000]))
+
+        # 每100次迭代评估一次模型性能
+        if i % 100 == 0:
+            # 计算模型在测试集前1000个样本上的准确率
+            acc = compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000])
+            # 显示当前训练进度和准确率
+            print(f"迭代 {i}/{max_epoch}, 测试准确率: {acc:.4f}")

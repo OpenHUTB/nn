@@ -21,7 +21,6 @@ import numpy
 import pylab
 from PIL import Image
 import numpy as np
-import numpy
 
 # 设置TensorFlow日志级别，避免输出过多信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
@@ -36,8 +35,8 @@ def cifar10_dataset():
         test_ds (tf.data.Dataset): 处理后的测试数据集
     """
     # 加载CIFAR-10数据集
-    # x: 图像数据 (50000张训练图像 + 10000张测试图像，32x32像素RGB)
-    # y: 对应标签 (0-9的整数标签)
+    # x: 图像数据 
+    # y: 对应标签 
     (x, y), (x_test, y_test) = datasets.cifar10.load_data()
     # 创建训练数据集
     ds = tf.data.Dataset.from_tensor_slices((x, y))
@@ -63,12 +62,10 @@ def prepare_mnist_features_and_labels(x, y):
     x: 归一化后的图像数据，数据类型 float32，范围 [0, 1]
     y: 转换为int64类型的标签数据
     """
-    # 将图像数据从uint8类型转换为float32类型
     # 并将像素值从[0, 255]归一化到[0, 1]范围
     # 归一化有助于梯度下降优化过程更稳定
     x = tf.cast(x, tf.float32) / 255.0
     
-    # 将标签数据转换为int64类型
     # 这是TensorFlow中稀疏分类交叉熵损失函数要求的类型
     y = tf.cast(y, tf.int64)
     
@@ -96,17 +93,19 @@ class MyConvModel(keras.Model):
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
         
         self.flat = Flatten()   # 展平层：将多维特征张量展开为一维向量
+        # 第一个全连接层(密集层)
+        # 100个神经元，使用tanh激活函数
         self.dense1 = layers.Dense(100, activation='tanh')
         self.dense2 = layers.Dense(10)
     @tf.function
     def call(self, x):
      # 第一层卷积
-        h1 = self.l1_conv(x)  # 应用第一层卷积层
-        h1_pool = self.pool(h1)  # 应用池化层
+        h1 = self.l1_conv(x)  
+        h1_pool = self.pool(h1)  
 
     # 第二层卷积
-        h2 = self.l2_conv(h1_pool)  # 应用第二层卷积层
-        h2_pool = self.pool(h2)  # 再次应用池化层
+        h2 = self.l2_conv(h1_pool)  
+        h2_pool = self.pool(h2)  
 
     # 展平
         flat_h = self.flat(h2_pool)  # 将多维张量展平为二维张量，形状为 [batch_size, num_features]

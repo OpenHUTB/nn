@@ -154,7 +154,7 @@ def test(model, x, y):
 # ## 实际训练
 
 # In[14]:
-# 加载MNIST数据集
+# 加载并预处理MNIST手写数字数据集
 train_data, test_data = mnist_dataset()
 # 进行50个epoch的训练
 for epoch in range(50):
