@@ -9,7 +9,7 @@ import torch.utils.data as Data
 import torchvision               # 包含常用的数据集和模型
 import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
 import numpy as np
-from torch.autograd import Variable
+from torch.autograd import Variable # 导入自动微分变量，用于构建计算图和自动求导
 
 # 设置超参数
 learning_rate = 1e-4  #  学习率
