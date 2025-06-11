@@ -357,7 +357,9 @@ def train(epoch, model, optimizer, ds):
 
         # 定期打印损失
         if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy())
+            print('epoch', epoch, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
+
+    # 返回最后一次训练的损失值
 
     return loss
 
