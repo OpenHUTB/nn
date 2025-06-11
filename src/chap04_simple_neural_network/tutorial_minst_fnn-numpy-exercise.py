@@ -294,6 +294,7 @@ with tf.GradientTape() as tape:
     x, W1, W2, label = tf.constant(x), tf.constant(W1), tf.constant(W2), tf.constant(label)
     tape.watch(W1)        # 追踪 W1 的梯度
     tape.watch(W2)        # 追踪 W2 的梯度
+    # 第一层线性变换：输入x与权重W1做矩阵乘法
     h1 = tf.matmul(x, W1)
     h1_relu = tf.nn.relu(h1)
     h2 = tf.matmul(h1_relu, W2)
