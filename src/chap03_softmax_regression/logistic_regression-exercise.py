@@ -183,7 +183,8 @@ if __name__ == '__main__':
    # 将x1和x2组合成输入数据 x
    # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
    # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
-   x = list(zip(x1, x2))
+   x = np.array(list(zip(x1, x2)), dtype=np.float32)
+   y = np.array(y, dtype=np.float32)
 
    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
    # animation_frames 列表将记录训练过程中每个步骤或epoch的:
@@ -201,7 +202,6 @@ if __name__ == '__main__':
            animation_frames.append((W_np[0, 0], W_np[1, 0], b_np, loss_np))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
-
 
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
@@ -266,4 +266,6 @@ if __name__ == '__main__':
         f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
-    HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
+
+   from IPython.display import display
+display(HTML(anim.to_html5_video()))# 将动画转换为HTML5视频并显示
