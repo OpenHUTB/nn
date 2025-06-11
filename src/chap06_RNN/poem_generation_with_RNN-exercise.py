@@ -170,7 +170,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(h)  # (batch_size, vocab_size)
         # 4. 选择概率最高的词
         out = tf.argmax(logits, axis=-1)
-        return out, state
+        return out, state# 返回预测的下一个词id和更新后的RNN状态
 
 
 # ## 辅助函数：计算序列损失
