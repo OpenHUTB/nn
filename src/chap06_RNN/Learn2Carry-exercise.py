@@ -79,17 +79,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     #1. 将整数转换为数字位列表
     #2. 反转数字位列表(低位在前，高位在后)
     #3. 填充到固定长度
-    
-    Args:
-        Nums1: shape(batch_size,)
-        Nums2: shape(batch_size,)
-        results: shape(batch_size,)
-        maxlen:  type(int)
-    Returns:
-        Nums1: shape(batch_size, maxlen)
-        Nums2: shape(batch_size, maxlen)
-        results: shape(batch_size, maxlen)
-    '''
+
      # 将整数转换为数字位列表
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
@@ -206,10 +196,13 @@ def evaluate(model):
     pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(f"真实值: {o[0]:<20} 预测值: {o[1]:<20} 是否正确: {o[0]==o[1]}")
 
-    print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
+    # 计算整体准确率：统计所有预测中正确的比例
+    accuracy = np.mean([o[0] == o[1] for o in zip(datas[2], res)])
+    print('accuracy is: %g' % accuracy)
 
+    return accuracy
 
 # In[5]:
 
