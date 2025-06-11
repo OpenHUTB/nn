@@ -380,34 +380,58 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         except Exception: # 如果Actor不是车辆或操作失败，则忽略错误
             pass
 
-    def tick(self, clock):
-        self.hud.tick(self, clock)
+def tick(self, clock):
+    """更新游戏状态（每帧调用）
+    
+    Args:
+        clock: pygame时钟对象，用于获取帧率等信息
+    """
+    self.hud.tick(self, clock)  # 更新HUD(抬头显示器)状态
 
-    def render(self, display):
-        self.camera_manager.render(display)
-        self.hud.render(display)
 
-    def destroy_sensors(self):
-        self.camera_manager.sensor.destroy()
-        self.camera_manager.sensor = None
-        self.camera_manager.index = None
+def render(self, display):
+    """渲染游戏画面（每帧调用）
+    
+    Args:
+        display: pygame显示表面，用于绘制画面
+    """
+    self.camera_manager.render(display)  # 渲染相机画面
+    self.hud.render(display)            # 渲染HUD界面
 
-    def destroy(self):
-        """清理并销毁所有创建的传感器和车辆对象"""
-        if self.radar_sensor is not None:
-            self.toggle_radar()
-        sensors = [
-            self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
-            self.gnss_sensor.sensor,
-            self.imu_sensor.sensor]
-        for sensor in sensors:
-            if sensor is not None:
-                sensor.stop()
-                sensor.destroy()
-        if self.player is not None:
-            self.player.destroy()
+
+def destroy_sensors(self):
+    """销毁相机传感器并重置相关状态"""
+    if self.camera_manager.sensor:  # 安全检查
+        self.camera_manager.sensor.destroy()  # 销毁相机传感器对象
+    self.camera_manager.sensor = None  # 清除传感器引用
+    self.camera_manager.index = None   # 重置相机索引
+
+
+def destroy(self):
+    """清理并销毁所有创建的传感器和车辆对象"""
+    
+    # 如果雷达传感器存在，先关闭雷达
+    if self.radar_sensor is not None:
+        self.toggle_radar()  # 调用雷达开关方法
+    
+    # 需要销毁的传感器列表
+    sensors = [
+        self.camera_manager.sensor,      # 相机
+        self.collision_sensor.sensor,    # 碰撞传感器
+        self.lane_invasion_sensor.sensor, # 车道入侵传感器
+        self.gnss_sensor.sensor,         # GNSS定位传感器
+        self.imu_sensor.sensor           # IMU惯性传感器
+    ]
+    
+    # 遍历并销毁所有传感器
+    for sensor in sensors:
+        if sensor is not None:  # 安全检查
+            sensor.stop()      # 先停止传感器数据采集
+            sensor.destroy()   # 销毁传感器对象
+    
+    # 销毁玩家车辆
+    if self.player is not None:
+        self.player.destroy()  # 销毁车辆actor
 
 
 # ==============================================================================
