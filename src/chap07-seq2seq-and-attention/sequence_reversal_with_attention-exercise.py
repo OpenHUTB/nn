@@ -244,7 +244,7 @@ def compute_loss(logits, labels):
     # 计算平均损失
     # 使用 tf.reduce_mean 函数对所有样本的损失值求平均
     losses = tf.reduce_mean(losses)
-    return losses
+    return losses# 返回平均损失值
 
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
@@ -378,12 +378,17 @@ def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
     # 反转字符串 rev_seq 两次，恢复原始顺序
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
         return True
     else:
         return False
 # 测试函数功能
+# 假设 sequence_reversal() 是一个函数，返回两个序列的列表
+# 使用 zip(*sequence_reversal()) 将两个序列的列表解包并配对
+# 然后对每一对序列调用 is_reverse 函数，检查是否为逆序
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
 
 

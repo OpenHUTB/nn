@@ -45,7 +45,7 @@ def random_string(length):
     # 步骤 2：使用 random.choices() 一次性生成指定长度的随机字符串
     # random.choices() 可以直接生成包含多个随机字符的列表
     # 然后使用 ''.join() 将列表中的字符拼接成字符串
-    return ''.join(random.choices(letters, k=length))
+    return ''.join(random.choices(letters, k = length))
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
@@ -63,9 +63,9 @@ def get_batch(batch_size, length):
 # 3. dec_x: 解码器输入序列（通常包含起始标记），形状为 [batch_size, dec_seq_len]
 # 4. y: 目标输出序列（通常包含结束标记），形状为 [batch_size, dec_seq_len]
     return (batched_examples,
-            tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), 
-            tf.constant(y, dtype=tf.int32))
+            tf.constant(enc_x, dtype = tf.int32), 
+            tf.constant(dec_x, dtype = tf.int32), 
+            tf.constant(y, dtype = tf.int32))
 #测试
 print(get_batch(2, 10))
 

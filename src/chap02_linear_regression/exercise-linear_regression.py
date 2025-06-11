@@ -138,7 +138,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     elif solver == "svd":
         # 直接使用 SVD 分解求解
         # 对病态矩阵最稳定，但计算成本较高
-        U, s, Vt = np.linalg.svd(phi, full_matrices=False)
+        U, s, Vt = np.linalg.svd(phi, full_matrices = False)
         # 计算正则化的 SVD 解
         s_reg = s / (s**2 + alpha)
         # 构建对角矩阵
@@ -155,7 +155,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     return w
 
 
-def gradient_descent(phi, y, lr=0.01, epochs=1000):
+def gradient_descent(phi, y, lr = 0.01, epochs = 1000):
     """实现批量梯度下降算法优化线性回归权重
     参数:
         phi: 设计矩阵（特征矩阵），形状为 (n_samples, n_features)
