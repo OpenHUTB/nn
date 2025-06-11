@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
-import numpy as np # 导入NumPy科学计算库，使用标准别名np
-# 提供高性能的数组操作和数学函数
+import numpy as np # 导入NumPy库
+import matplotlib.pyplot as plt
 
 import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
 # 用于创建各种静态、交互式和动画可视化图表
@@ -102,7 +102,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     ValueError: 当 solver 参数不是支持的类型时抛出
     """
     # 检查输入矩阵是否为空
-    if phi.size == 0 or y.size == 0:
+    if phi.size == 0 or y.size == 0: # 如果矩阵 phi 或 y 是空的，抛出 ValueError 异常
         raise ValueError("输入矩阵 phi 和目标值 y 不能为零矩阵")
 
     # 检查维度是否兼容
