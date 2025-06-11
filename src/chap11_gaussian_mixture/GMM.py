@@ -322,9 +322,9 @@ if __name__ == "__main__":
     plt.title("GMM预测聚类", fontsize=12) # 设置标题及字体大小
     plt.xlabel("特征1", fontsize=10)      # 设置x轴标签及字体大小
     plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
-    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
-    
-    plt.tight_layout()
+    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：   
+    plt.tight_layout()  # 调整子图的布局，确保子图之间没有重叠
     plt.savefig('gmm_clustering_results.png', dpi=300)# 保存图形为 PNG 文件，分辨率为 300 DPI
-    plt.show()
+    plt.show() # 显示图形
+    
     print("程序执行完毕")
