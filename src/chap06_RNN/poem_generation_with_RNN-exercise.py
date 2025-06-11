@@ -349,13 +349,17 @@ def train(epoch, model, optimizer, ds):
     loss = 0.0
     accuracy = 0.0
     # 遍历数据集
+    # ds 是一个数据集对象，通常是一个 TensorFlow 的 Dataset 对象
+    # enumerate(ds) 会返回每个元素的索引（step）和内容（x, y, seqlen）
     for step, (x, y, seqlen) in enumerate(ds):
         # 训练一步
         loss = train_one_step(model, optimizer, x, y, seqlen)
 
         # 定期打印损失
         if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy())
+            print('epoch', epoch, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
+
+    # 返回最后一次训练的损失值
 
     return loss
 

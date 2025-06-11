@@ -73,8 +73,8 @@ def softmax_ce(logits, label):
     exp_logits = tf.exp(stable_logits)
     prob = exp_logits / tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
     # 计算交叉熵
-    loss = -tf.reduce_mean(tf.reduce_sum(label * log_softmax, axis=-1))
-    #简化计算：使用log_softmax代替log(exp_logits / sum_exp)
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
+    ##########
     return loss
 
 # 生成测试数据，形状为 [10, 5] 的正态随机数

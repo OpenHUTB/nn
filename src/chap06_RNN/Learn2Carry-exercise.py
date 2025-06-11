@@ -176,6 +176,7 @@ def train(steps, model, optimizer):
     accuracy = 0.0
     for step in range(steps):
         # 生成训练数据（数值范围0~555,555,554）
+        # 调用 gen_data_batch 函数生成一批训练数据，batch_size 为 200，数值范围从 0 到 555,555,554
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
         # 单步训练：计算损失、更新参数
@@ -183,7 +184,7 @@ def train(steps, model, optimizer):
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
         if step % 50 == 0:
-            print('step', step, ': loss', loss.numpy())
+            print('step', step, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
 
     return loss
 
@@ -191,7 +192,7 @@ def evaluate(model):
     # 评估模型在大数加法（555,555,555~999,999,998）上的准确率
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
+    logits = model(tf.constant(Nums1, dtype = tf.int32), tf.constant(Nums2, dtype = tf.int32))
     logits = logits.numpy() # 将模型输出的tensor转换为numpy数组，便于后续处理
     pred = np.argmax(logits, axis=-1) # 预测数位列表
     res = results_converter(pred)
