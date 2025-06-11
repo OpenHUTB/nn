@@ -22,7 +22,15 @@ def load_data(fname):
         return np.array(data)          # 返回numpy数组，方便后续数值计算
 
 def eval_acc(label, pred):
-    """计算准确率。"""
+    """计算准确率。
+    
+    参数:
+        label: 真实标签数组
+        pred: 预测标签数组
+        
+    返回:
+        准确率 (0到1之间的浮点数)
+    """
     return np.sum(label == pred) / len(pred)  # 统计预测正确的样本比例
 
 class SVM:
