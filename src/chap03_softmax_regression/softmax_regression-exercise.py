@@ -43,7 +43,9 @@ C3 = np.array([x_b, y_b, y]).T
 
 # 绘制三类样本的散点图
 plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
+
 plt.scatter(C2[:, 0], C2[:, 1], c = "g", marker = "o")  # 类别2：绿色圆圈
+
 plt.scatter(C3[:, 0], C3[:, 1], c = "r", marker = "*")  # 类别3：红色星号
 
 # 合并所有类别的数据，形成完整数据集
@@ -83,6 +85,7 @@ class SoftmaxRegression(tf.Module):
         模型前向传播：计算线性变换并应用softmax函数得到概率分布
         :param x: 输入数据，shape = (N, input_dim)
         :return: softmax 概率分布，shape = (N, num_classes)
+        
         """
         # 计算线性变换 logits
         logits = tf.matmul(x, self.W) + self.b
@@ -129,6 +132,7 @@ def compute_loss(pred, labels, num_classes=3):
             dtype=tf.float32,                      # 将布尔值转换为浮点数
         )
     )
+    
     # 返回损失值和准确率
     # loss: 预先计算好的损失值（如交叉熵损失）
     # acc: 当前批次的分类准确率（0-1 标量）
@@ -149,13 +153,16 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     with tf.GradientTape() as tape:
         # 前向传播：计算模型对输入批次的预测
         predictions = model(x_batch)
+        
         # 计算损失和准确率
         loss, accuracy = compute_loss(predictions, y_batch)
 
     #自动计算损失函数对模型参数的梯度
     grads = tape.gradient(loss, model.trainable_variables)
+    
     # 优化步骤：使用优化器将计算出的梯度应用到模型参数上
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    
     # 返回当前批次的损失和准确率
     return loss, accuracy
 
@@ -164,21 +171,26 @@ def train_one_step(model, optimizer, x_batch, y_batch):
 # In[12]:
 
 model = SoftmaxRegression()
+
 # 创建一个 SoftmaxRegression 模型实例 model
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
+
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
 
 x1, x2, y = list(zip(*data_set))
 # 转换为 float32
 x = np.array(list(zip(x1, x2)), dtype=np.float32)  
+
 # 转换为 int32
 y = np.array(y, dtype=np.int32)  
+
 # 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
 
 for i in range(1000):
     loss, accuracy = train_one_step(model, opt, x, y)
     if i % 50 == 49:
         print(f"loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}")
+        
 # 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
 
 # # 结果展示，无需填写代码
