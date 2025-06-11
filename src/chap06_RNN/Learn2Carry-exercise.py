@@ -34,8 +34,8 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     '''在(start, end)区间采样生成一个batch的整型的数据
     Args :
         batch_size: batch_size
-        start: 开始数值
-        end: 结束数值
+        start: 开始
+        end: 结束
     '''
     # 生成随机数
     numbers_1 = np.random.randint(start, end, batch_size)
