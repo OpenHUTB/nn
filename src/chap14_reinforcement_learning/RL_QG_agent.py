@@ -47,7 +47,7 @@ class RL_QG_agent:
         conv2 = tf.layers.conv2d(
             inputs=conv1,
             filters=64,         # 特征图数量翻倍，增强特征表达能力
-            kernel_size=3,
+            kernel_size=3,      # 更多特征图，学习更抽象的布局模式
             padding="same",
             activation=tf.nn.relu
         )
