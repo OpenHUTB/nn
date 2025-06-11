@@ -378,12 +378,14 @@ def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
     # 反转字符串 rev_seq 两次，恢复原始顺序
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
         return True
     else:
         return False
 # 测试函数功能
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
 
 
