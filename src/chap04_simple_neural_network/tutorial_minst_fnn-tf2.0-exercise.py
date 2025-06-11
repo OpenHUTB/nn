@@ -18,10 +18,11 @@ def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
-    x = x / 255.0
-    x_test = x_test / 255.0
+    x = x / 255.0         # 将训练集图像数据 x 归一化到 [0.0, 1.0] 范围
+    x_test = x_test / 255.0        # 对测试集图像数据 x_test 做同样的归一化处理
     
-    return (x, y), (x_test, y_test)
+    return (x, y), (x_test, y_test) # 返回处理后的训练集和测试集
+                                    # 每个集合都包含图像数据和对应的标签
 
 # In[8]:
 # 打印两个列表对应元素组成的元组列表，这里是示例代码，与后续模型训练测试无直接关系
