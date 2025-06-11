@@ -14,9 +14,9 @@
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from matplotlib import animation, rc
-from IPython.display import HTML
-import matplotlib.cm as cm
-import numpy as np
+from IPython.display import HTML # 在Jupyter中显示动画
+import matplotlib.cm as cm # 颜色映射
+import numpy as np # 数值计算库
 
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
