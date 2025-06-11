@@ -80,7 +80,7 @@ class RBM:
         if np.any(probs < 0) or np.any(probs > 1):
             raise ValueError("概率值probs应在0和1之间。")
         # 通过np.random.binomial进行伯努利采样，n=1表示单次试验，probs表示成功的概率
-        return np.random.binomial(1, probs)
+        return np.random.binomial(1, probs)  # 生成伯努利随机变量，以概率probs返回1，否则返回0
     
     def train(self, data):
         """

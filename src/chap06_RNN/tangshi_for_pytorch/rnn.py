@@ -91,8 +91,8 @@ class RNN_model(nn.Module):
 
         # 如果是测试模式，仅返回最后一个时间步的预测结果
         if is_test:
-            prediction = out[-1, :].view(1, -1)
-            output = prediction
+            prediction = out[-1, :].view(1, -1)  # 提取最后一个时间步的输出作为预测值
+            output = prediction                  # 将预测值赋值给输出变量
         else:
             output = out
 
