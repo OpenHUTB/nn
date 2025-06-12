@@ -309,12 +309,12 @@ if __name__ == "__main__":
     plt.figure(figsize=(12, 5))
     
     # 左图：真实聚类
-    plt.subplot(1, 2, 1)
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=15, alpha=0.8)
-    plt.title("真实聚类", fontsize=12)
-    plt.xlabel("特征1", fontsize=10)
-    plt.ylabel("特征2", fontsize=10)
-    plt.grid(True, linestyle='--', alpha=0.5)
+    plt.subplot(1, 2, 1) # 创建左子图
+    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=15, alpha=0.8)  # 绘制散点图展示数据点
+    plt.title("真实聚类", fontsize=12)  # 设置标题为"真实聚类"，字体大小为12
+    plt.xlabel("特征1", fontsize=10)    # 设置x轴标签为"特征1"，字体大小为10
+    plt.ylabel("特征2", fontsize=10)    # 设置y轴标签为"特征2"，字体大小为10
+    plt.grid(True, linestyle='--', alpha=0.5)  # 添加网格线
     
     # 右图：GMM预测聚类
     plt.subplot(1, 2, 2)
