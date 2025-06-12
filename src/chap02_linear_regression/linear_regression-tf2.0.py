@@ -37,17 +37,25 @@ def gaussian_basis(x, feature_num=10):
     """高斯基函数：将输入x映射为一组高斯分布特征
     用于提升模型对非线性关系的拟合能力
     返回形状为 (N, feature_num) 的数组"""
+    # 输入验证
+    if not isinstance(x, np.ndarray):
+        x = np.asarray(x)
+    if x.ndim != 1:
+        raise ValueError("输入 x 必须是一维数组")
+    if not isinstance(feature_num, int) or feature_num <= 0:
+        raise ValueError("feature_num 必须是正整数")
+    
     # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
     width = 1.0 * (centers[1] - centers[0])
-    # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
-    x = np.expand_dims(x, axis=1)
-    # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
-    x = np.concatenate([x] * feature_num, axis=1) # 将 x 沿着第 1 维度复制 feature_num 次
     
-    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
-    ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
+    # 利用广播机制计算每个样本点到每个中心点的标准化距离
+    out = (x[:, np.newaxis] - centers) / width
+    
+    # 对标准化距离应用高斯函数
+    ret = np.exp(-0.5 * out ** 2)
+    
     return ret
 
 
