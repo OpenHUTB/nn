@@ -292,6 +292,7 @@ print('--' * 20)
 with tf.GradientTape() as tape:
     # 将数据转换为 TensorFlow 常量
     x, W1, W2, label = tf.constant(x), tf.constant(W1), tf.constant(W2), tf.constant(label)
+    # 将NumPy数组转换为TensorFlow常量（不可变张量）
     tape.watch(W1)        # 追踪 W1 的梯度
     tape.watch(W2)        # 追踪 W2 的梯度
     # 第一层线性变换：输入x与权重W1做矩阵乘法
