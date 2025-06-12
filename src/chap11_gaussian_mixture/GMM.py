@@ -85,29 +85,29 @@ def logsumexp(log_p, axis=1, keepdims=False):
     返回：
     计算结果的log(sum(exp(log_p)))，返回与输入数组相同形状的结果。
     """
-    log_p = np.asarray(log_p)   # 将对数概率列表转换为NumPy数组
+    log_p = np.asarray(log_p)                                               # 将对数概率列表转换为NumPy数组
     
     # 处理空输入情况
-    if log_p.size == 0:  # 检查输入的对数概率数组是否为空
-        return np.array(-np.inf, dtype=log_p.dtype)  # 返回与输入相同数据类型的负无穷值
+    if log_p.size == 0:                                                     # 检查输入的对数概率数组是否为空
+        return np.array(-np.inf, dtype=log_p.dtype)                         # 返回与输入相同数据类型的负无穷值
     
     # 计算最大值（处理全-inf输入）
-    max_val = np.max(log_p, axis=axis, keepdims=True)  # 计算沿指定轴的最大值
-    if np.all(np.isneginf(max_val)):  # 检查是否所有最大值都是负无穷
-        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
+    max_val = np.max(log_p, axis=axis, keepdims=True)                       # 计算沿指定轴的最大值
+    if np.all(np.isneginf(max_val)):                                        # 检查是否所有最大值都是负无穷
+        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)   # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
-     # 安全计算指数和：先减去最大值，再计算指数
-    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
+    # 安全计算指数和：先减去最大值，再计算指数
+    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)     # 安全调整对数概率
     sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = keepdims)  # 计算调整后的指数和
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
     
     # 处理全-inf输入的特殊case
-    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):  # 判断是否所有有效值都是-inf
+    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):       # 判断是否所有有效值都是-inf
         result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) # 根据keepdims参数的值返回max_val的适当形式
-    return result  # 返回处理后的结果，保持与正常情况相同的接口
+    return result                                                           # 返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类
 class GaussianMixtureModel:
