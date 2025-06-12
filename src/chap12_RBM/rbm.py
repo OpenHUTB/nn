@@ -198,13 +198,19 @@ class RBM:
 # 用MNIST 手写数字数据集训练一个（RBM），并从训练好的模型中采样生成一张手写数字图像
 if __name__ == '__main__':
     try:
-    # 加载二值化的MNIST数据，形状为 (60000, 28, 28)，表示60000张28x28的二值化图像
-      mnist = np.load('mnist_bin.npy')  # 加载数据文件
-        
+        mnist = np.load('mnist_bin.npy')  # 尝试加载文件
     except IOError:
-      # 如果文件加载失败，提示用户检查文件路径并退出程序
-      print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
-      sys.exit(1)
+        # 如果文件不存在或加载失败，生成新的二值化MNIST数据
+        (train_images, _), (_, _) = mnist.load_data() # 加载MNIST数据
+        mnist_bin = (train_images >= 128).astype(np.int8) # 二值化处理
+        np.save('mnist_bin.npy', mnist_bin) # 保存为.npy文件
+        # 重新加载刚生成的文件
+        mnist = np.load('mnist_bin.npy')
+    except Exception as e:
+        # 如果加载失败（其他错误，如文件损坏），保持原报错逻辑
+        print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
+        print(f"错误详情: {e}")
+        sys.exit(1)
 
     # 获取数据集的形状信息
     n_imgs, n_rows, n_cols = mnist.shape# 分别表示图像数量、行数和列数

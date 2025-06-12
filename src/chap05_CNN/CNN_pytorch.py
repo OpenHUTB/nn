@@ -57,7 +57,7 @@ class CNN(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
             nn.BatchNorm2d(32),                                    # 添加批量归一化
-            nn.ReLU(),                                             # ReLU激活函数，引入非线性
+            nn.ReLU(),                                             # ReLU激活函数，引入非线性，ReLU 函数的公式为 f(x) = max(0, x)，可以将负值置为0。
             nn.MaxPool2d(2)                                        # 最大池化，减小特征图尺寸
         )
         

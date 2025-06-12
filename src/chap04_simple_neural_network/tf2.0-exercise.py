@@ -118,6 +118,10 @@ tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels
 custom_loss = sigmoid_ce(test_data, labels)
 
 # 打印输出结果
+# 打印 TensorFlow 计算的损失值
 print("tf loss:", tf_loss.numpy())
+# 打印自定义实现的损失值
 print("custom loss:", custom_loss.numpy())
+# 检查两种实现的误差是否小于阈值（0.0001），并打印结果
+# 通过计算平方差 (tf_loss - custom_loss)^2，判断是否小于 0.0001
 print("误差是否小于0.0001:", ((tf_loss - custom_loss) ** 2 < 0.0001).numpy())

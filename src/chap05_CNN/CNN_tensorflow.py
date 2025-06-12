@@ -13,7 +13,7 @@ try:
     # one_hot=True - 将标签转换为one-hot编码格式
     mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 except Exception as e:
-    print(f"数据加载失败: {e}")
+    print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
 
 learning_rate = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
