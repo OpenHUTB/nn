@@ -14,7 +14,7 @@ register(
 
 # 2. 重复复制任务：记忆序列并按指定次数重复输出（难度高于基础复制）
 register(
-    id='RepeatCopy-v0', 
+    id='RepeatCopy-v0',       # 环境唯一标识符，遵循Gym的命名约定（任务名+版本号）
     entry_point='gym.envs.algorithmic:RepeatCopyEnv',
     max_episode_steps=200,    # 与基础复制任务相同步数限制
     reward_threshold=75.0,    # 更高奖励阈值，反映任务复杂度提升
@@ -34,15 +34,15 @@ register(
     id='ReversedAddition3-v0',
     entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
     kwargs={'rows': 3},       # 3行操作数，需同时处理三个数的加法进位
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    max_episode_steps=200,    # 每个episode的最大步数限制
+    reward_threshold=25.0,    # 认为任务解决的成功阈值
 )
 
 # 4. 重复输入检测：识别序列中重复出现的元素（考察模式识别能力）
 register(
-    id='DuplicatedInput-v0',
-    entry_point='gym.envs.algorithmic:DuplicatedInputEnv',
-    max_episode_steps=200,
+    id='DuplicatedInput-v0', # 环境的唯一标识符
+    entry_point='gym.envs.algorithmic:DuplicatedInputEnv', # 指定环境类的导入路径
+    max_episode_steps=200, # 设置该环境的最大步数限制
     reward_threshold=9.0,     # 较低阈值，因任务本质为二分类问题
 )
 
@@ -85,8 +85,8 @@ register(
 register(
     id='MountainCarContinuous-v0',
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
-    max_episode_steps=999,
-    reward_threshold=90.0,
+    max_episode_steps=999,   # 每个episode的最大步数限制
+    reward_threshold=90.0,   # 成功阈值
 )
 
 # 3. 钟摆任务：将摆锤从下垂位置摆到垂直向上位置
@@ -213,7 +213,7 @@ register(
     id='Taxi-v2',
     entry_point='gym.envs.toy_text.taxi:TaxiEnv',
     reward_threshold=8,        # 接近最优得分
-    max_episode_steps=200,
+    max_episode_steps=200,     # 超过单次最大步数限制200步未完成任务则自动终止
 )
 
 # 8. 数字猜测游戏：通过反馈猜测目标数字（适合演示Q学习）

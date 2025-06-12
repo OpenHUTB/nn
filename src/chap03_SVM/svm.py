@@ -4,10 +4,10 @@ import os
 def load_data(fname):
     """载入数据。"""
     # 检查文件是否存在，确保数据加载的可靠性
-    if not os.path.exists(fname):
-        raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}")
-    with open(fname, 'r') as f:
-        data = []
+    if not os.path.exists(fname): 
+        raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}") # 如果文件不存在，抛出异常
+    with open(fname, 'r') as f: # 打开文件
+        data = [] # 初始化一个空列表，用于存储数据
         line = f.readline()  # 跳过表头行
         for line in f:
             line = line.strip().split()  # 去除空白并按空格分割

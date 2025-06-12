@@ -123,10 +123,15 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
 
 
 def max_pool_2x2(x: tf.Tensor,
+                 
     pool_size: int = 2,
+  # 池化操作的步幅（默认 2，即窗口不重叠）
     strides: int = 2,
+  # 填充方式（'SAME' 保持输出尺寸与输入相近，'VALID' 不填充）
     padding: str = 'SAME',
+  # 数据格式（'NHWC' 或 'NCHW'，默认 'NHWC'）
     data_format: str = 'NHWC'
+  # 返回池化后的 4D 张量
 ) -> tf.Tensor:
     """
     实现2x2最大池化操作，减少特征图尺寸，增强特征不变性
