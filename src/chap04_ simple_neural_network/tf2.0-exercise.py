@@ -7,7 +7,8 @@ import tensorflow as tf
 import numpy as np
 
 # ## 实现softmax函数
-
+#softmax函数是一种常用的归一化指数函数，主要用于将一组实数
+# （通常是神经网络的原始输出或“logits”）转换为概率分布，使得每个输出的值落在0到1之间，且所有输出之和为1。
 def softmax(x):
     """
     实现数值稳定的softmax函数，对输入张量的最后一维进行归一化。
