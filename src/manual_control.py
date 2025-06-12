@@ -1425,7 +1425,7 @@ def game_loop(args):
             sim_world.apply_settings(original_settings)
 
         if (world and world.recording_enabled):
-            client.stop_recorder()
+            client.stop_recorder() # 如果世界对象存在且启用了录制功能，则停止录制
 
         if world is not None:
             world.destroy()
