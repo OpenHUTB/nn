@@ -27,6 +27,7 @@ class RBM:
         self.n_observe = n_observe  # 设置可见层的神经元数量
         
         # 权重矩阵 (可见层到隐藏层)
+        # 使用标准正态分布，标准差为0.1，确保权重初始值较小且分布合理
         self.W = np.random.normal(
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
@@ -60,7 +61,7 @@ class RBM:
 
         # 可选替代方案：使用更小的固定标准差进行初始化。
         # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-
+        # 最终使用的偏置向量（与上方Wv/Wh重复，统一使用b_h和b_v）
         self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
 
         self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
@@ -120,7 +121,8 @@ class RBM:
 
         # 开始训练轮数
         for epoch in range(epochs):
-            # 打乱数据顺序，提高训练稳定性和泛化能力
+            # 打乱数据顺序，提高训练稳定性和泛化能力，避免模型学习到特定的样本顺序
+            
             np.random.shuffle(data_flat) 
             
             # 使用小批量梯度下降法
@@ -133,6 +135,7 @@ class RBM:
 
                 # 正相传播：从v0计算隐藏层激活概率
                 # 计算可见层对隐藏层的输入：输入层向量v0与权重矩阵self.W的点积，再加上隐藏层偏置self.b_h
+                # 条件概率：P(h_j=1|v) = σ(b_j + Σ_i v_i·W_ij)
                 h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) 
                 
                 # 对隐藏层激活概率进行二值采样，得到隐藏层的状态
@@ -141,6 +144,7 @@ class RBM:
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
                 # 计算隐藏层对可见层的重构输入：隐藏层状态h0_sample与权重矩阵转置self.W.T的点积，再加上可见层偏置self.b_v
+                # 条件概率：P(v_i=1|h) = σ(a_i + Σ_j h_j·W_ij)
                 v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  # 将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
                 
                 # 对可见层重构概率进行二值采样，得到重构的可见层状态
@@ -222,7 +226,10 @@ if __name__ == '__main__':
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
-    
+    # 训练RBM
+    errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+    # 生成并可视化样本
+    samples = rbm.sample(n_samples=5, gibbs_steps=1000)
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 
