@@ -212,8 +212,8 @@ plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
 
 # 保存模型参数
-ckpt = tf.train.Checkpoint(model=model)
-ckpt.write('softmax_regression_weights')
+ckpt = tf.train.Checkpoint(model=model) # 创建检查点
+ckpt.write('softmax_regression_weights') # 保存模型
 
 # 加载模型参数
 ckpt.read('softmax_regression_weights')# 模型权重加载后即可用于新数据的多类别概率预测
