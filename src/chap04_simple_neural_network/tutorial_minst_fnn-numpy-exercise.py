@@ -34,7 +34,8 @@ def mnist_dataset():
 
 # 定义矩阵乘法层
 class Matmul:
-    def __init__(self):
+    def __init__(self):      
+# 初始化内存字典，用于存储前向传播中的变量以便反向传播使用
         self.mem = {}
 
     def forward(self, x, W):
