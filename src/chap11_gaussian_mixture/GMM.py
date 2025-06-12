@@ -5,7 +5,16 @@ import matplotlib.pyplot as plt
 
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
-    np.random.seed(42)
+    """生成混合高斯分布数据集
+    
+    参数:
+        n_samples: 总样本数量 (默认=1000)
+    
+    返回:
+        X: 特征矩阵 (n_samples, 2)
+        y_true: 真实标签 (n_samples,)
+    """
+    np.random.seed(42)  # 固定随机种子以确保结果可复现
     # 定义三个高斯分布的中心点
     mu_true = np.array([ 
         [0, 0],  # 第一个高斯分布的均值
@@ -27,7 +36,14 @@ def generate_data(n_samples=1000):
     n_components = len(weights_true)
     
     # 生成一个合成数据集，该数据集由多个多元正态分布的样本组成
+    # 计算每个分布应生成的样本数（浮点转整数可能有误差）
     samples_per_component = (weights_true * n_samples).astype(int)
+    
+    # 确保样本总数正确（由于浮点转换可能有误差）
+    total_samples = np.sum(samples_per_component)
+    if total_samples < n_samples:
+        # 将缺少的样本添加到权重最大的成分中
+        samples_per_component[np.argmax(weights_true)] += n_samples - total_samples
     
     # 用于存储每个高斯分布生成的数据点
     X_list = []  
@@ -37,13 +53,14 @@ def generate_data(n_samples=1000):
     
     # 从第i个高斯分布生成样本
     for i in range(n_components): 
+        #生成多元正态分布样本
         X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
         # 将生成的样本添加到列表
         X_list.append(X_i) 
-        # 添加对应标签
+        # 添加对应标签（0、1、2表示三个分布）
         y_true.extend([i] * samples_per_component[i]) 
     
-    # 合并并打乱数据
+    # 合并并打乱数据并打乱顺序（模拟无标签数据）
     # 将多个子数据集合并为一个完整数据集
     X = np.vstack(X_list)  
     # 将Python列表转换为NumPy数组
@@ -59,6 +76,14 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     计算log(sum(exp(log_p)))，通过减去最大值避免数值溢出
     数学公式: log(sum(exp(log_p))) = max(log_p) + log(sum(exp(log_p - max(log_p))))
+    
+    参数：
+    log_p: 输入的对数概率（可能为负无穷）。
+    axis: 沿着哪个轴进行计算，默认为1（即按行计算）。
+    keepdims: 是否保持维度，默认为False。
+
+    返回：
+    计算结果的log(sum(exp(log_p)))，返回与输入数组相同形状的结果。
     """
     log_p = np.asarray(log_p)   # 将对数概率列表转换为NumPy数组
     
@@ -72,8 +97,9 @@ def logsumexp(log_p, axis=1, keepdims=False):
         return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
+     # 安全计算指数和：先减去最大值，再计算指数
     safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
-    sum_exp = np.sum(np.exp(safe_log_p), axis=axis, keepdims=keepdims)  # 计算调整后的指数和
+    sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = keepdims)  # 计算调整后的指数和
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
@@ -93,26 +119,27 @@ class GaussianMixtureModel:
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
     """
-    def __init__(self, n_components=3, max_iter=100, tol=1e-6):
-        
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6 tol = 1e-6, random_state = None):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
-        self.log_likelihoods = []  # 新增：存储每轮迭代的对数似然值
+        self.log_likelihoods = []         #存储每轮迭代的对数似然值
 
-    # 初始化随机数生成器
+        # 初始化随机数生成器
         self.rng = np.random.default_rng(random_state)
 
     def fit(self, X):
         """使用EM算法训练模型
-        
-        参数:
-            X: array-like, shape=(n_samples, n_features)
-               输入数据矩阵
+
+        EM算法流程：
+        1. 初始化模型参数（混合权重π、均值μ、协方差矩阵Σ）
+        2. 重复以下步骤直到收敛：
+           - E步：计算每个样本属于各高斯成分的后验概率（责任度）
+           - M步：基于后验概率更新模型参数
         """
-        X = np.asarray(X)
-        n_samples, n_features = X.shape
+        X = np.asarray(X) # 将输入数据 X 转换为 NumPy 数组格式，确保后续操作的兼容性
+        n_samples, n_features = X.shape # 获取数据的样本数量和特征维度
         
         # 初始化混合系数（均匀分布）
         self.pi = np.ones(self.n_components) / self.n_components
@@ -148,8 +175,8 @@ class GaussianMixtureModel:
             self.pi = Nk / n_samples
             
             # 初始化新均值和新协方差矩阵
-            new_mu = np.zeros_like(self.mu)
-            new_sigma = np.zeros_like(self.sigma)
+            new_mu = np.zeros_like(self.mu)# 创建一个与 self.mu 形状相同且全为零的数组，作为新的均值向量
+            new_sigma = np.zeros_like(self.sigma)# 创建一个与 self.sigma 形状相同且全为零的数组，作为新的协方差矩阵
 
             # 对每个高斯成分更新参数
             for k in range(self.n_components):
@@ -166,9 +193,9 @@ class GaussianMixtureModel:
                 
                 # 正则化：添加小的对角矩阵，防止协方差矩阵奇异
                 eps = 1e-6  # 正则化系数
-                new_sigma_k += np.eye(n_features) * eps
+                new_sigma_k += np.eye(n_features) * eps  # 添加单位矩阵的eps倍
                 
-                new_sigma[k] = new_sigma_k
+                new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
 
             # 计算对数似然（模型对数据的拟合程度）
             current_log_likelihood = np.sum(log_prob_sum)  # 所有样本的对数似然之和
@@ -186,34 +213,40 @@ class GaussianMixtureModel:
         
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
+        # 基于软聚类结果确定最终的硬聚类标签
         return self
 
-    def _log_gaussian(self, X, mu, sigma):
-        """计算多维高斯分布的对数概率密度
+   def _log_gaussian(self, X, mu, sigma):
+    """计算多维高斯分布的对数概率密度
+    
+    参数:
+        X: 输入数据点/样本集，形状为(n_samples, n_features)
+        mu: 高斯分布的均值向量，形状为(n_features,)
+        sigma: 高斯分布的协方差矩阵，形状为(n_features, n_features)
         
-        参数:
-            X: 输入数据，shape=(n_samples, n_features)
-            mu: 高斯分布均值，shape=(n_features,)
-            sigma: 高斯分布协方差矩阵，shape=(n_features, n_features)
-            
-        返回:
-            log_prob: 对数概率密度，shape=(n_samples,)
-        """
-        # 获取特征维度数量
-        n_features = mu.shape[0]
+    返回:
+        log_prob: 每个样本的对数概率密度，形状为(n_samples,)
+    """
+    # 获取特征维度数（协方差矩阵的维度）
+    n_features = mu.shape[0]
 
-        # 数据中心化：每个样本减去均值
-        X_centered = X - mu
+    # 数据归一化：将数据减去均值，得到中心化数据
+    # 高斯分布公式中的(x-μ)项
+    X_centered = X - mu  # 形状保持(n_samples, n_features)
 
-        # 计算协方差矩阵的对数行列式和逆矩阵
-        # 行列式用于计算高斯分布的归一化常数
+    # 计算协方差矩阵的行列式符号和对数值
+    # sign: 行列式的符号（正负）
+    # logdet: 行列式的自然对数值
+    sign, logdet = np.linalg.slogdet(sigma)  # 数值稳定的行列式计算方法
+
+    # 处理协方差矩阵可能奇异（不可逆）的情况
+    if sign <= 0:  # 行列式非正（理论上协方差矩阵应是正定的）
+        # 添加一个小的对角扰动项（单位矩阵乘以1e-6）
+        # 确保矩阵可逆且正定，提高数值稳定性
+        sigma += np.eye(n_features) * 1e-6  # 正则化处理
+        
+        # 重新计算调整后的协方差矩阵的行列式
         sign, logdet = np.linalg.slogdet(sigma)
-        
-        # 处理协方差矩阵接近奇异的情况（行列式接近0）
-        if sign <= 0:
-            # 添加微小扰动确保协方差矩阵正定（数值稳定性）
-            sigma += np.eye(n_features) * 1e-6
-            sign, logdet = np.linalg.slogdet(sigma)
 
         # 计算协方差矩阵的逆
         inv = np.linalg.inv(sigma)
@@ -225,51 +258,81 @@ class GaussianMixtureModel:
         # 返回对数概率密度
         # 公式：log_p(x) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T·Σ^(-1)·(x-μ)
         return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
+    else:
+        # 处理非奇异协方差矩阵
+        inv = np.linalg.inv(sigma)
+        exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
     
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
+        # 检查是否有对数似然值记录
         if not self.log_likelihoods:
             raise ValueError("请先调用fit方法训练模型")
-        
+
+        # 创建一个图形窗口，设置大小为10x6英寸
         plt.figure(figsize=(10, 6))
+        # 绘制对数似然值随迭代次数的变化曲线
+        # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
+        # 设置x轴标签为“迭代次数”
         plt.xlabel('迭代次数')
+        # 设置y轴标签为“对数似然值”
         plt.ylabel('对数似然值')
+        # 设置图表标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
-        plt.grid(True)  # 启用网格线，增强可读性
+        # 启用网格线，增强可读性
+        plt.grid(True, alpha=0.5) 
         plt.show()
 
 # 主程序
 if __name__ == "__main__":
-    # 生成混合高斯分布数据
-    X, y_true = generate_data()
+    # 1. 生成合成数据
+    print("生成混合高斯分布数据...")
+    # 调用generate_data函数生成样本数据：
+    X, y_true = generate_data(n_samples=1000)
+    print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     
-    # 训练GMM模型
-    gmm = GaussianMixtureModel(n_components=3)  # 创建GMM实例，指定聚类数为3
-    gmm.fit(X)  # 用数据X训练模型
-    y_pred = gmm.labels_  # 获取每个样本的聚类标签
+    # 2. 训练GMM模型
+    print("\n训练高斯混合模型...")
+    gmm = GaussianMixtureModel(n_components=3, random_state=42)
+    gmm.fit(X)
+    y_pred = gmm.labels_
+    print(f"完成训练，共进行{len(gmm.log_likelihoods)}次迭代")
     
-    # 绘制收敛曲线：对数似然随迭代次数的变化
+    # 3. 收敛曲线绘制，可以用于判断是否收敛
+    print("\n绘制EM算法收敛曲线...")
     gmm.plot_convergence()
     
-    # 可视化结果
+    # 4. 可视化聚类结果
+    print("\n可视化聚类结果...")
     plt.figure(figsize=(12, 5))
     
-    # 左图：真实聚类结果
+    # 左图：真实聚类
     plt.subplot(1, 2, 1)
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
-    plt.title("真实聚类")
-    plt.xlabel("特征1")
-    plt.ylabel("特征2")
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=15, alpha=0.8)
+    plt.title("真实聚类", fontsize=12)
+    plt.xlabel("特征1", fontsize=10)
+    plt.ylabel("特征2", fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.5)
     
-    # 右图：GMM预测的聚类结果
+    # 右图：GMM预测聚类
     plt.subplot(1, 2, 2)
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
-    plt.title("GMM预测的聚类")
-    plt.xlabel("特征1")
-    plt.ylabel("特征2")
-    plt.grid(True, linestyle='--', alpha=0.7)
+    # 绘制散点图展示GMM聚类预测结果：
+    # - X[:, 0]: 取数据集第一维特征作为x轴
+    # - X[:, 1]: 取数据集第二维特征作为y轴
+    # - c=y_pred: 使用预测标签作为颜色分类依据
+    # - cmap='viridis': 使用viridis颜色映射
+    # - s=15: 设置点的大小为15
+    # - alpha=0.8: 设置透明度为0.8（轻微透明效果）
+    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=15, alpha=0.8)
+    plt.title("GMM预测聚类", fontsize=12) # 设置标题及字体大小
+    plt.xlabel("特征1", fontsize=10)      # 设置x轴标签及字体大小
+    plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
+    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
     
-    plt.tight_layout()  # 自动调整子图布局
-    plt.show()  # 显示图形
+
+    plt.tight_layout()                                  # 自动调整子图参数，确保图形元素不重叠
+    plt.savefig('gmm_clustering_results.png', dpi=300)  # 保存高分辨率（300 DPI）的GMM聚类结果图像
+    plt.show()                                          # 显示绘制的图形窗口
+    print("程序执行完毕")
