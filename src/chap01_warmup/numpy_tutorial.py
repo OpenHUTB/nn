@@ -181,8 +181,8 @@ print("print(np.sum(x, axis = 1))", np.sum(x, axis = 1))  # 按行求和（行�
 print("第二十题：\n")
 
 print("print(np.mean(x))", np.mean(x))  # 全局均值
-print("print(np.mean(x,axis = 0))", np.mean(x, axis=0))  # 列均值
-print("print(np.mean(x,axis = 1))", np.mean(x, axis=1))  # 行均值
+print("print(np.mean(x, axis = 0))", np.mean(x, axis=0))  # 列均值
+print("print(np.mean(x, axis = 1))", np.mean(x, axis=1))  # 行均值
 
 # 21. 利用 13 题目中的 x，对 x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
 print("第二十一题：\n")
