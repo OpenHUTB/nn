@@ -85,8 +85,8 @@ register(
 register(
     id='MountainCarContinuous-v0',
     entry_point='gym.envs.classic_control:Continuous_MountainCarEnv',
-    max_episode_steps=999,
-    reward_threshold=90.0,
+    max_episode_steps=999,   # 每个episode的最大步数限制
+    reward_threshold=90.0,   # 成功阈值
 )
 
 # 3. 钟摆任务：将摆锤从下垂位置摆到垂直向上位置
