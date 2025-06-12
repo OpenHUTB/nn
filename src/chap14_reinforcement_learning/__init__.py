@@ -49,8 +49,8 @@ register(
 # 5. 序列反转任务：将输入序列完全逆序输出（基础序列处理任务）
 register(
     id='Reverse-v0',
-    entry_point='gym.envs.algorithmic:ReverseEnv',
-    max_episode_steps=200,
+    entry_point='gym.envs.algorithmic:ReverseEnv',#指定了如何导入和实例化这个环境
+    max_episode_steps=200,#定义了一个回合（episode）的最大步数
     reward_threshold=25.0,
 )
 
