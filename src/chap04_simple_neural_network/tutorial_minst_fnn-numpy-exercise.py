@@ -284,7 +284,7 @@ h2_soft_grad = softmax.backward(h2_log_grad)      # Softmax梯度
 h2_grad, W2_grad = mul_h2.backward(h2_soft_grad)  # 第二层权重梯度
 h1_relu_grad = relu.backward(h2_grad)             # ReLU梯度
 h1_grad, W1_grad = mul_h1.backward(h1_relu_grad)  # 第一层权重梯度
-
+# 打印手动实现的反向传播梯度结果（h2_log的梯度）
 print(h2_log_grad)
 print('--' * 20)
 # print(W2_grad)
