@@ -104,7 +104,7 @@ optimizer = optimizers.Adam(0.0001)
 # In[4]:
 model.compile(
     optimizer = optimizer,# 使用预定义的优化器（如Adam、SGD）更新模型参数
-    loss = 'sparse_categorical_crossentropy',
+    loss = 'sparse_categorical_crossentropy', # 稀疏分类交叉熵损失函数
     metrics = ['accuracy']# 训练和评估时监控准确率指标
 )
 # 加载 MNIST 数据集，并将其分为训练集和测试集。
