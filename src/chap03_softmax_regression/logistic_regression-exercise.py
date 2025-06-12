@@ -77,9 +77,9 @@ class LogisticRegression():
         # 初始化权重变量W，形状为[2, 1]表示2维输入到1维输出的线性变换，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
             initial_value = tf.random.uniform(
-                shape = [2, 1], minval = -0.1, maxval = 0.1
+                shape = [2, 1], minval = -0.1, maxval = 0.1  # 权重矩阵形状、最小值、最大值
             ),
-            regularizer = l2_reg
+            regularizer = l2_reg    # 应用L2正则化
         )
         # 初始化偏置变量b，形状为[1]，数据类型为tf.float32，初始值为0
         self.b = tf.Variable(
