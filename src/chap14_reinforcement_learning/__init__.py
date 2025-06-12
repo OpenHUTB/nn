@@ -40,9 +40,9 @@ register(
 
 # 4. 重复输入检测：识别序列中重复出现的元素（考察模式识别能力）
 register(
-    id='DuplicatedInput-v0',
-    entry_point='gym.envs.algorithmic:DuplicatedInputEnv',
-    max_episode_steps=200,
+    id='DuplicatedInput-v0', # 环境的唯一标识符
+    entry_point='gym.envs.algorithmic:DuplicatedInputEnv', # 指定环境类的导入路径
+    max_episode_steps=200, # 设置该环境的最大步数限制
     reward_threshold=9.0,     # 较低阈值，因任务本质为二分类问题
 )
 
