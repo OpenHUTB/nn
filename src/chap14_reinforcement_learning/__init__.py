@@ -51,7 +51,7 @@ register(
     id='Reverse-v0',
     entry_point='gym.envs.algorithmic:ReverseEnv',#指定了如何导入和实例化这个环境
     max_episode_steps=200,#定义了一个回合（episode）的最大步数
-    reward_threshold=25.0,
+    reward_threshold=25.0,#用于定义一个回合的奖励阈值
 )
 
 
