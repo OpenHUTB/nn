@@ -1239,9 +1239,15 @@ class CameraManager(object):
             ['sensor.camera.normals', cc.Raw, 'Camera Normals', {}],
         ]
         world = self._parent.get_world()
+        
+        # 获取世界的蓝图库
         bp_library = world.get_blueprint_library()
+
+        # 遍历之前定义的传感器配置列表
         for item in self.sensors:
             bp = bp_library.find(item[0])
+            
+            # 判断是否为摄像头类传感器
             if item[0].startswith('sensor.camera'):
                 bp.set_attribute('image_size_x', str(hud.dim[0]))
                 bp.set_attribute('image_size_y', str(hud.dim[1]))
@@ -1249,6 +1255,8 @@ class CameraManager(object):
                     bp.set_attribute('gamma', str(gamma_correction))
                 for attr_name, attr_value in item[3].items():
                     bp.set_attribute(attr_name, attr_value)
+
+            # 判断是否为激光雷达类传感器
             elif item[0].startswith('sensor.lidar'):
                 self.lidar_range = 50
 
