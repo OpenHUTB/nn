@@ -41,9 +41,9 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
-    strNum = str(Num)
-    chNums = list(strNum)
-    digitNums = [int(o) for o in strNum]
+    strNum = str(Num)   # 将输入的整数转换为字符串形式
+    chNums = list(strNum)  将字符串转换为单个字符组成的列表
+    digitNums = [int(o) for o in strNum]  # 将字符列表中的每个字符转换为整数
     return digitNums
 
 def convertDigits2Num(Digits):
