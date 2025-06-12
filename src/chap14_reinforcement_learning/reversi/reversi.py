@@ -100,7 +100,7 @@ class ReversiEnv(gym.Env):
         self.done = False
 
         # Let the opponent play if it's not the agent's turn
-        if self.player_color != self.to_play:
+        if self.player_color != self.to_play:# 如果当前不是玩家回合(由对手回合)
             a = self.opponent_policy(self.state)
             ReversiEnv.make_place(self.state, a, ReversiEnv.BLACK)
             self.to_play = ReversiEnv.WHITE
