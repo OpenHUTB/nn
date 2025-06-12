@@ -210,8 +210,8 @@ if __name__ == '__main__':
     plt.xlabel('X')  # 设置X轴标签为'X'，用于标识水平方向的变量
     ax.set_xlim(0, 10)  
     ax.set_ylim(0, 10) 
-    
-    line_d, = ax.plot([], [], label = 'fit_line')
+
+    line_d, = ax.plot([], [], label = 'fit_line')  # 创建用于绘制决策边界的线条对象
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
 
