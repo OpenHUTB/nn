@@ -33,10 +33,10 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         end: 结束数值
     '''
     # 生成随机数
-    numbers_1 = np.random.randint(start, end, batch_size)
-    numbers_2 = np.random.randint(start, end, batch_size)
-    results = numbers_1 + numbers_2
-    return numbers_1, numbers_2, results# 返回生成的随机数数组及其和
+    numbers_1 = np.random.randint(start, end, batch_size)  # 生成指定范围和数量的随机整数数组作为第一个加数
+    numbers_2 = np.random.randint(start, end, batch_size)  # 同样生成第二个加数数组
+    results = numbers_1 + numbers_2  # 对两个数组逐元素相加，得到每对随机数的和
+    return numbers_1, numbers_2, results  # 返回两个加数数组以及它们的和数组
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
