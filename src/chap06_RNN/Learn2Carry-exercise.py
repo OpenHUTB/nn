@@ -12,13 +12,8 @@
 # 导入必要的库和模块
 import numpy as np  # 数值计算库
 import tensorflow as tf  # 深度学习框架
-import collections  # 提供有用的数据结构
 from tensorflow import keras  # TensorFlow的高级API
-from tensorflow.keras import layers  # Keras的层模块
 from tensorflow.keras import layers, optimizers, datasets  # 从Keras导入层、优化器和数据集
-import os  # 操作系统接口
-import sys  # 系统相关参数和函数
-import tqdm  # 进度条工具
 
 
 # 数据生成
