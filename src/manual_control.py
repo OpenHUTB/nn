@@ -224,7 +224,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.actor_role_name = args.rolename
         try:                                    # 加载地图数据
             self.map = self.world.get_map()
-        except RuntimeError as error:
+        except RuntimeError as error:  # 地图加载失败时的错误处理
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
             print('  Make sure it exists, has the same name of your town, and is correct.')
