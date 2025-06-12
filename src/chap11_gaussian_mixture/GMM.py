@@ -193,9 +193,9 @@ class GaussianMixtureModel:
                 
                 # 正则化：添加小的对角矩阵，防止协方差矩阵奇异
                 eps = 1e-6  # 正则化系数
-                new_sigma_k += np.eye(n_features) * eps
+                new_sigma_k += np.eye(n_features) * eps  # 添加单位矩阵的eps倍
                 
-                new_sigma[k] = new_sigma_k
+                new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
 
             # 计算对数似然（模型对数据的拟合程度）
             current_log_likelihood = np.sum(log_prob_sum)  # 所有样本的对数似然之和
@@ -257,6 +257,11 @@ class GaussianMixtureModel:
 
         # 返回对数概率密度
         # 公式：log_p(x) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T·Σ^(-1)·(x-μ)
+        return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
+    else:
+        # 处理非奇异协方差矩阵
+        inv = np.linalg.inv(sigma)
+        exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
         return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
     
     def plot_convergence(self):

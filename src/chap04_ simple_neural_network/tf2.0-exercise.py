@@ -53,7 +53,10 @@ def sigmoid(x):
 # 测试 sigmoid 实现是否正确
 # 生成随机测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
-(sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
+(sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001 
+# 计算自定义的 sigmoid 函数与 TensorFlow 内置的 tf.nn.sigmoid 函数的输出差值的平方
+# 并检查这个差值是否小于一个非常小的阈值（0.0001），以验证两者是否足够接近
+
 
 # ## 实现 softmax 交叉熵loss函数
 

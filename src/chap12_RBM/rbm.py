@@ -25,16 +25,20 @@ class RBM:
         # 初始化模型参数
         self.n_hidden = n_hidden    # 设置隐藏层的神经元数量
         self.n_observe = n_observe  # 设置可见层的神经元数量
+        
         # 权重矩阵 (可见层到隐藏层)
         self.W = np.random.normal(
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
         size = (n_observe, n_hidden))
+        
         # 初始化权重矩阵W，使用正态分布随机初始化
         # 可见层偏置（1 x n_observe）
         self.Wv = np.zeros((1, n_observe))
+        
         # 隐藏层偏置（1 x n_hidden）
         self.Wh = np.zeros((1, n_hidden))
+        
         # 可选：使用 Xavier/Glorot 初始化替代
         # self.W = np.random.randn(n_observe, n_hidden) * np.sqrt(1.0 / n_observe)
         # self.Wv = np.zeros((1, n_observe))
@@ -66,7 +70,7 @@ class RBM:
         """Sigmoid激活函数，用于将输入映射到概率空间
         将任意实数映射到(0,1)区间，适合表示神经元的激活概率
         """
-        return 1.0 / (1 + np.exp(-x))
+        return 1.0 / (1 + np.exp(-x)) # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
 
     def _sample_binary(self, probs):
         """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）
@@ -79,6 +83,7 @@ class RBM:
         # 确保probs的取值在[0, 1]范围内
         if np.any(probs < 0) or np.any(probs > 1):
             raise ValueError("概率值probs应在0和1之间。")
+            
         # 通过np.random.binomial进行伯努利采样，n=1表示单次试验，probs表示成功的概率
         return np.random.binomial(1, probs)  # 生成伯努利随机变量，以概率probs返回1，否则返回0
     
@@ -108,7 +113,9 @@ class RBM:
 
         # 定义训练参数
         learning_rate = 0.1 # 学习率，控制参数更新的步长
+        
         epochs = 10 # 训练轮数，整个数据集将被遍历10次
+        
         batch_size = 100 # 批处理大小，每次更新参数使用的样本数量
 
         # 开始训练轮数
@@ -193,6 +200,7 @@ if __name__ == '__main__':
     try:
     # 加载二值化的MNIST数据，形状为 (60000, 28, 28)，表示60000张28x28的二值化图像
       mnist = np.load('mnist_bin.npy')  # 加载数据文件
+        
     except IOError:
       # 如果文件加载失败，提示用户检查文件路径并退出程序
       print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")

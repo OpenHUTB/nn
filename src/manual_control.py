@@ -145,11 +145,12 @@ try:
     from pygame.locals import K_EQUALS
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed') # 抛出运行时错误：提示pygame库导入失败
-
+    
+# 尝试导入NumPy科学计算库
 try:
     import numpy as np
 except ImportError:
-    raise RuntimeError('cannot import numpy, make sure numpy package is installed')
+    raise RuntimeError('cannot import numpy, make sure numpy package is installed') # 抛出运行时错误：提示numpy库导入失败
 
 
 # ==============================================================================

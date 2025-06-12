@@ -18,9 +18,9 @@ def make_random_policy(np_random):
             d = state.shape[-1]#动态获取棋盘的边长
             return d**2 + 1    # pass动作
         # 随机选择一个可能的动作
-        a = np_random.randint(len(possible_places))
-        return possible_places[a]
-    return random_policy
+        a = np_random.randint(len(possible_places)) # 生成一个随机索引
+        return possible_places[a] # 返回对应索引的放置位置
+    return random_policy # 返回定义好的随机策略函数
 
 class ReversiEnv(gym.Env):
     """

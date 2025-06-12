@@ -25,9 +25,9 @@ class RL_QG_agent:
         
         # 定义网络输入：[批次大小, 棋盘高度, 棋盘宽度, 通道数]
         self.input_states = tf.placeholder(
-            tf.float32, 
-            shape=[None, 8, 8, 3], 
-            name="input_states"
+            tf.float32,              # 输入数据类型为32位浮点数
+            shape=[None, 8, 8, 3],   # 输入张量的形状
+            name="input_states"      # 该张量在计算图中的名称
         )
         
         # ========== 卷积层1：提取局部棋子模式特征 ==========

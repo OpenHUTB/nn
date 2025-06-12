@@ -8,17 +8,16 @@
 # In[19]:
 
 
-import numpy as np
-import tensorflow as tf
-import collections
-from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-import os
-import sys
-import tqdm
-import random
-import string
-
+import numpy as np  # 导入NumPy库
+import tensorflow as tf  # 导入TensorFlow库
+import collections  # 导入collections模块
+from tensorflow import keras  # 从TensorFlow中导入Keras API，用于构建和训练深度学习模型
+from tensorflow.keras import layers, optimizers, datasets  # 从Keras中导入层、优化器和数据集模块
+import os  # 导入操作系统接口模块
+import sys  # 导入系统相关参数和函数模块
+import tqdm  # 导入tqdm库，用于显示进度条
+import random  # 导入随机数生成模块
+import string  # 导入字符串模块
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
