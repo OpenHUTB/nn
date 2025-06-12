@@ -69,7 +69,7 @@ class SoftmaxRegression(tf.Module):
         :param num_classes: 类别数量
         """
         super().__init__()
-        # 初始化权重 W 和偏置 b
+        # 初始化权重 W形状为[input_dim, num_classes] ：初始化偏置向量b，形状为[num_classes]
         # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
