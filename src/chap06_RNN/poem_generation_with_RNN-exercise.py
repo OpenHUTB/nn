@@ -190,7 +190,7 @@ def mkMask(input_tensor, maxLen):
     shape_of_input = tf.shape(input_tensor) 
     shape_of_output = tf.concat(
         axis=0, 
-        values=[shape_of_input, [maxLen]]
+        values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表
     )
     #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
@@ -243,7 +243,7 @@ def reduce_avg(reduce_target, lengths, dim):
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
         # 如果秩差为0，保持原形状
-        len_shape = tf.shape(lengths)
+        len_shape = tf.shape(lengths) # 获取张量 lengths 的形状
         mask_shape = tf.shape(mask)
 
     # 重塑张量以匹配目标张量的形状
