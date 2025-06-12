@@ -160,7 +160,7 @@ def max_pool_2x2(x: tf.Tensor,
         strides = [1, strides, strides, 1]
     else:  # NCHW
         ksize = [1, 1, pool_size, pool_size]#定义池化窗口的大小
-        strides = [1, 1, strides, strides]
+        strides = [1, 1, strides, strides]#定义池化窗口的步幅
     
     # 最大池化操作：每个2x2区域选择最大值，实现特征降维，保留主要特征
     return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
