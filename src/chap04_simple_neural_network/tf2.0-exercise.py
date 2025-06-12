@@ -18,50 +18,32 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     返回:
         与输入形状相同的 softmax 概率分布张量。
     """
-    x = tf.cast(x, tf.float32) # 统一为float32类型，确保计算精度
-
+    x = tf.cast(x, tf.float32)  # 统一为float32类型，确保计算精度
     # 数值稳定性处理：减去最大值避免指数爆炸
-    max_per_row = tf.reduce_max(x, axis = -1, keepdims = True)
+    max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
     # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
-
     # 计算指数值
-    # shifted_logits是模型的原始输出（logits），形状通常为(batch_size, n_classes)
-    # tf.exp计算每个元素的指数值，使所有值为正数
     exp_logits = tf.exp(shifted_logits)
-    
-    sum_exp = tf.reduce_sum(exp_logits, axis = -1, keepdims = True)
+    sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
     return exp_logits / sum_exp
 
-# 生成测试数据，形状为 [10, 5] 的正态分布随机数
-test_data = np.random.normal(size=[10, 5])
-# 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
-(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
-
-# 数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
-
+# 实现sigmoid函数
 def sigmoid(x):
-    ##########
-    '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
-    # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
-    x = tf.cast(x, tf.float32)
-    # sigmoid 数学定义：1 / (1 + e^{-x})
+    """
+    实现sigmoid函数， 不允许用tf自带的sigmoid函数
+    """
+    x = tf.cast(x, tf.float32)  # 确保数值计算的精度和类型一致性
     return 1 / (1 + tf.exp(-x))
 
-# 生成测试数据，形状为 [10, 5] 的正态分布随机数
-test_data = np.random.normal(size=[10, 5])
-# 比较自定义的sigmoid函数结果和tf自带的结果，误差小于 0.0001 则认为相等
-(sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
-
-# ## 实现 softmax 交叉熵loss函数
-
+# 实现 softmax 交叉熵loss函数
 def softmax_ce(logits, label):
-    ##########
-    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
-    # 参数logits: 未经Softmax的原始输出（logits）
-    # 参数label: one-hot格式的标签
-    # 定义一个极小值epsilon（1e-8），用于数值稳定性，防止log(0)的情况
-    epsilon = 1e-8
+    """
+    实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数
+    参数logits: 未经Softmax的原始输出（logits）
+    参数label: one-hot格式的标签
+    """
+    epsilon = 1e-8  # 用于数值稳定性，防止log(0)的情况
     logits = tf.cast(logits, tf.float32)
     label = tf.cast(label, tf.float32)
     # 数值稳定处理：减去最大值
@@ -74,50 +56,49 @@ def softmax_ce(logits, label):
     loss = -tf.reduce_mean(
         tf.reduce_sum(label * tf.math.log(prob + epsilon), axis=1)
     )
-    ##########
     return loss
 
-# 生成测试数据，形状为 [10, 5] 的正态随机数
-test_data = np.random.normal(size=[10, 5]).astype(np.float32)
-# 进行softmax转换
-# 正确测试逻辑：直接使用原始logits
-test_logits = np.random.normal(size=[10, 5]).astype(np.float32)
-label = np.zeros_like(test_logits, dtype=np.float32)
-label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
-# 比较自定义的损失值和tf自带结果，误差小于 0.0001 则认为相等
-
-((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
-  - softmax_ce(prob, label))**2 < 0.0001).numpy()
-
-# ## 实现 sigmoid 交叉熵loss函数
-
+# 实现 sigmoid 交叉熵loss函数
 def sigmoid_ce(logits, labels):
     """
     实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
     接收未经过 sigmoid 的 logits 输入
     """
-    # 将 logits 和 labels 转换为 tf.float32 类型，确保后续计算的数值稳定性
     logits = tf.cast(logits, tf.float32)
     labels = tf.cast(labels, tf.float32)
-    
-    # 通过更稳定的方式实现 sigmoid 交叉熵：
+    # 通过更稳定的方式实现 sigmoid 交叉熵
     loss = tf.reduce_mean(
         tf.nn.relu(logits) - logits * labels + 
         tf.math.log(1 + tf.exp(-tf.abs(logits)))
-
     )
-    
-    return loss #返回计算得到的损失值
+    return loss
 
-# 测试逻辑
-test_data = np.random.normal(size=[10]).astype(np.float32)  # 生成随机的测试数据
-labels = np.random.randint(0, 2, size=[10]).astype(np.float32) # 生成随机的二分类标签
+# 测试函数，用于比较自定义函数和tf自带函数的结果
+def test_function(custom_func, tf_func, *args):
+    custom_result = custom_func(*args)
+    tf_result = tf_func(*args)
+    error = ((tf_result - custom_result) ** 2 < 0.0001).numpy()
+    return custom_result, tf_result, error
 
-# 对比 TensorFlow  原始结果和自定义函数结果
-tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels, logits = test_data))
-custom_loss = sigmoid_ce(test_data, labels)
+# 测试 softmax 函数
+test_data_softmax = np.random.normal(size=[10, 5])
+custom_softmax, tf_softmax, softmax_error = test_function(softmax, tf.nn.softmax, test_data_softmax, axis=-1)
+print("Softmax 误差是否小于0.0001:", softmax_error)
 
-# 打印输出结果
-print("tf loss:", tf_loss.numpy())
-print("custom loss:", custom_loss.numpy())
-print("误差是否小于0.0001:", ((tf_loss - custom_loss) ** 2 < 0.0001).numpy())
+# 测试 sigmoid 函数
+test_data_sigmoid = np.random.normal(size=[10, 5])
+custom_sigmoid, tf_sigmoid, sigmoid_error = test_function(sigmoid, tf.nn.sigmoid, test_data_sigmoid)
+print("Sigmoid 误差是否小于0.0001:", sigmoid_error)
+
+# 测试 softmax 交叉熵 loss 函数
+test_logits = np.random.normal(size=[10, 5]).astype(np.float32)
+label = np.zeros_like(test_logits, dtype=np.float32)
+label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
+custom_softmax_ce, tf_softmax_ce, softmax_ce_error = test_function(softmax_ce, lambda x, y: tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, x)), test_logits, label)
+print("Softmax 交叉熵误差是否小于0.0001:", softmax_ce_error)
+
+# 测试 sigmoid 交叉熵 loss 函数
+test_data_sigmoid_ce = np.random.normal(size=[10]).astype(np.float32)
+labels_sigmoid_ce = np.random.randint(0, 2, size=[10]).astype(np.float32)
+custom_sigmoid_ce, tf_sigmoid_ce, sigmoid_ce_error = test_function(sigmoid_ce, lambda x, y: tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=x)), test_data_sigmoid_ce, labels_sigmoid_ce)
+print("Sigmoid 交叉熵误差是否小于0.0001:", sigmoid_ce_error)
