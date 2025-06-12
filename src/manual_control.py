@@ -797,7 +797,7 @@ class HUD(object):
         if not self._show_info:
             return
         t = world.player.get_transform()
-        v = world.player.get_velocity()
+        v = world.player.get_velocity()# 获取车辆速度
         c = world.player.get_control()
         compass = world.imu_sensor.compass
         heading = 'N' if compass > 270.5 or compass < 89.5 else ''
