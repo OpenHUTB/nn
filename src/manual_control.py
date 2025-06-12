@@ -274,7 +274,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         blueprint_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
         if not blueprint_list:
             raise ValueError("Couldn't find any blueprints with the specified filters")
-        blueprint = random.choice(blueprint_list)
+        blueprint = random.choice(blueprint_list)  # 从符合条件的蓝图列表中随机选择一个
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('terramechanics'):
             blueprint.set_attribute('terramechanics', 'true')
