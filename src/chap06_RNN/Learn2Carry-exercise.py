@@ -202,8 +202,8 @@ def evaluate(model):
 # In[5]:
 
 
-optimizer = optimizers.Adam(0.001)
-model = myRNNModel()
+optimizer = optimizers.Adam(0.001) # 创建优化器实例
+model = myRNNModel() # 创建模型实例
 
 
 # In[6]:
