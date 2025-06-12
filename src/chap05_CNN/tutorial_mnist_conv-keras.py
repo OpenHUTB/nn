@@ -121,7 +121,7 @@ class MyConvModel(keras.Model):
     probs = tf.nn.softmax(logits, axis=-1)
     
     return probs
-
+# 创建一个神经网络模型的实例
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法
 
