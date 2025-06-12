@@ -30,7 +30,13 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     # tf.exp计算每个元素的指数值，使所有值为正数
     exp_logits = tf.exp(shifted_logits)
     
-    sum_exp = tf.reduce_sum(exp_logits, axis = -1, keepdims = True)
+    # 沿着最后一个维度（类别维度）对指数值求和，得到每条样本的指数和
+    # axis=-1 表示对最后一个维度进行操作，即类别维度
+    # keepdims=True 保持输出的维度与输入相同，便于后续进行广播除法
+    sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+
+    # 将每个类别的指数值除以对应样本的指数和，得到归一化的概率分布（softmax）
+    # 输出结果表示每个类别的概率，形状与 exp_logits 相同
     return exp_logits / sum_exp
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
