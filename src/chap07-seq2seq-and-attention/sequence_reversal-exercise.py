@@ -9,7 +9,7 @@
 # In[1]:
 
 # 标准库（Python内置模块，按字母顺序排列）
-import collections
+import collections  # 导入Python标准库中的collections模块
 import os # 导入os库
 import sys # 导入sys库，用于系统相关参数和函数
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后，用于显示循环进度
