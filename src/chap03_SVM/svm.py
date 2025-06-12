@@ -125,5 +125,5 @@ if __name__ == '__main__':
     acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
     acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
     
-    print("train accuracy: {:.1f}%".format(acc_train * 100))
+    print("train accuracy: {:.1f}%".format(acc_train * 100))#输出训练集准确率
     print("test accuracy: {:.1f}%".format(acc_test * 100))
