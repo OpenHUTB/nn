@@ -375,8 +375,24 @@ def compute_loss(log_prob, labels):
 
 
 def compute_accuracy(log_prob, labels):
+    """
+    计算模型预测准确率。
+    
+    参数:
+    - log_prob: 对数概率，通常是模型输出经过 log_softmax 后的结果，形状为 (batch_size, num_classes)
+    - labels: 真实标签，可以是 one-hot 编码形式，形状为 (batch_size, num_classes)
+    
+    返回:
+    - 准确率（正确预测的比例）
+    """
+    
+    # 获取每个样本的预测类别编号（取对数概率最大的类别作为预测）
     predictions = np.argmax(log_prob, axis=1)
+    
+    # 获取真实标签对应的类别编号（如果是 one-hot 编码，也用 argmax 转换为类别编号）
     truth = np.argmax(labels, axis=1)
+    
+    # 比较预测结果与真实标签，计算正确率（布尔值数组的均值即为准确率）
     return np.mean(predictions == truth)
 
 
