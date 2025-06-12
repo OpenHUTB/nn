@@ -117,7 +117,7 @@ class linearModel(Model):
         返回:
             预测值，形状为(batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)  # 矩阵乘法后压缩维度
+        y = tf.squeeze(tf.matmul(x, self.w), axis=1) + self.b  # 矩阵乘法后压缩维度
         return y
 
 
