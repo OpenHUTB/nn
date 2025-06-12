@@ -100,8 +100,11 @@ class RL_QG_agent:
 
     def save_model(self):
         """保存训练好的模型参数到指定目录"""
-        self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
-        print("模型已保存至", self.model_dir)
+        try:
+            self.saver.save(self.sess, model_path)
+            self.logger.info("模型已保存至 %s", model_path)
+        except Exception as e:
+            self.logger.error("保存模型时出错: %s", e)
 
 
     def load_model(self):

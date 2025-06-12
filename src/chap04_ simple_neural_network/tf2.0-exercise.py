@@ -25,6 +25,7 @@ def softmax(x):
 
     # 减去最大值以提高数值稳定性
     x_max = tf.reduce_max(x, axis=-1, keepdims=True)
+    # 计算 x - x_max 的指数
     exp_x = tf.exp(x - x_max)
 
     # 计算softmax，防止除零错误
