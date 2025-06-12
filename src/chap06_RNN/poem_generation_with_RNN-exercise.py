@@ -190,7 +190,7 @@ def mkMask(input_tensor, maxLen):
     shape_of_input = tf.shape(input_tensor) 
     shape_of_output = tf.concat(
         axis=0, 
-        values=[shape_of_input, [maxLen]]
+        values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表
     )
     #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
