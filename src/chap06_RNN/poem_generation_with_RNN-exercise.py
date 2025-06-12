@@ -243,7 +243,7 @@ def reduce_avg(reduce_target, lengths, dim):
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
         # 如果秩差为0，保持原形状
-        len_shape = tf.shape(lengths)
+        len_shape = tf.shape(lengths) # 获取张量 lengths 的形状
         mask_shape = tf.shape(mask)
 
     # 重塑张量以匹配目标张量的形状
