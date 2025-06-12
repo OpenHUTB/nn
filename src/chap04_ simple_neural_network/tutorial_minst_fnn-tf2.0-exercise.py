@@ -120,12 +120,12 @@ def train_one_step(model, optimizer, x, y):
         loss = compute_loss(logits, y)  # 计算损失
 
     # 计算梯度
-    trainable_vars = [model.W1, model.W2, model.b1, model.b2]
-    grads = tape.gradient(loss, trainable_vars)
+    trainable_vars = [model.W1, model.W2, model.b1, model.b2]  # 可训练的参数列表
+    grads = tape.gradient(loss, trainable_vars) 
 
     # 更新参数（使用固定学习率）
     # 使用优化器更新参数
-    optimizer.apply_gradients(zip(grads, trainable_vars))
+    optimizer.apply_gradients(zip(grads, trainable_vars)) 
 
     # 计算准确率
     accuracy = compute_accuracy(logits, y)
