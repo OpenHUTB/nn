@@ -445,14 +445,20 @@ class KeyboardControl(object):
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock, sync_mode):
+        
+        # 初始化车辆灯光状态
         if isinstance(self._control, carla.VehicleControl):
             current_lights = self._lights
+
+        # 遍历所有PyGame事件
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
             elif event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+
+                # 重置场景
                 elif event.key == K_BACKSPACE:
                     if self._autopilot_enabled:
                         world.player.set_autopilot(False)
@@ -461,30 +467,30 @@ class KeyboardControl(object):
                     else:
                         world.restart()
                 elif event.key == K_F1:
-                    world.hud.toggle_info()
+                    world.hud.toggle_info() # 切换HUD信息显示
                 elif event.key == K_v and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_map_layer(reverse=True)
+                    world.next_map_layer(reverse=True) # 反向切换地图图层
                 elif event.key == K_v:
-                    world.next_map_layer()
+                    world.next_map_layer()  # 切换地图图层
                 elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.load_map_layer(unload=True)
+                    world.load_map_layer(unload=True)  # 卸载地图图层
                 elif event.key == K_b:
-                    world.load_map_layer()
+                    world.load_map_layer() # 加载地图图层
                 elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
-                    world.hud.help.toggle()
+                    world.hud.help.toggle() # 切换帮助信息
                 elif event.key == K_TAB:
-                    world.camera_manager.toggle_camera()
+                    world.camera_manager.toggle_camera() # 切换相机视角
                 elif event.key == K_c and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_weather(reverse=True)
+                    world.next_weather(reverse=True) # 反向切换天气
                 elif event.key == K_c:
-                    world.next_weather()
+                    world.next_weather() # 切换天气
                 elif event.key == K_g:
-                    world.toggle_radar()
+                    world.toggle_radar() # 切换雷达显示
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key == K_n:
-                    world.camera_manager.next_sensor()
-                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL):
+                    world.camera_manager.next_sensor() # 切换传感器
+                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL): # 切换恒定速度模式
                     if world.constant_velocity_enabled:
                         world.player.disable_constant_velocity()
                         world.constant_velocity_enabled = False
