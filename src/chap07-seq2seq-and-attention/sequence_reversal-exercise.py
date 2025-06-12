@@ -200,7 +200,7 @@ class mySeq2SeqModel(keras.Model):
       
         # 通过全连接层计算logits
         logits = self.dense(output)  # (B, V)
-        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)，获取 logits 张量中每个元素的最大值所在的索引
         return next_token, new_state[0]  # 返回单个状态向量
 
 
