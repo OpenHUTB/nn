@@ -54,13 +54,13 @@ def prepare_mnist_features_and_labels(x, y):
         x: 归一化后的图像数据。
         y: 转换为整型的标签。
     """
-    x = tf.cast(x, tf.float32) / 255.0
-    y = tf.cast(y, tf.int64)
+    x = tf.cast(x, tf.float32) / 255.0 # 归一化
+    y = tf.cast(y, tf.int64) # 类型转换
     return x, y
 
 
 # In[2]:
-7 * 7 * 64
+7 * 7 * 64 # 计算展平后的特征维度：7x7特征图，64个通道 → 3136维向量
 
 
 # 创建一个基于Keras Sequential API的卷积神经网络模型
