@@ -205,7 +205,7 @@ class GaussianMixtureModel:
             if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
                 
-            log_likelihood = current_log_likelihood
+            log_likelihood = current_log_likelihood   # 更新记录的上一次迭代的对数似然值
             
             # 更新模型参数
             self.mu = new_mu
