@@ -70,7 +70,7 @@ class RBM:
         """Sigmoid激活函数，用于将输入映射到概率空间
         将任意实数映射到(0,1)区间，适合表示神经元的激活概率
         """
-        return 1.0 / (1 + np.exp(-x))
+        return 1.0 / (1 + np.exp(-x)) # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
 
     def _sample_binary(self, probs):
         """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）
