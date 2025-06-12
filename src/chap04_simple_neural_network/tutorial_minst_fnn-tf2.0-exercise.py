@@ -18,10 +18,11 @@ def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
-    x = x / 255.0
-    x_test = x_test / 255.0
+    x = x / 255.0         # 将训练集图像数据 x 归一化到 [0.0, 1.0] 范围
+    x_test = x_test / 255.0        # 对测试集图像数据 x_test 做同样的归一化处理
     
-    return (x, y), (x_test, y_test)
+    return (x, y), (x_test, y_test) # 返回处理后的训练集和测试集
+                                    # 每个集合都包含图像数据和对应的标签
 
 # In[8]:
 # 打印两个列表对应元素组成的元组列表，这里是示例代码，与后续模型训练测试无直接关系
@@ -60,7 +61,7 @@ class myModel:
         # 隐藏层+ReLU,隐藏层计算：
         # 通过矩阵乘法（x @ self.W1）加上偏置项 self.b1，得到隐藏层的加权和
         # 使用 ReLU 激活函数增加非线性
-        h = tf.nn.relu(x @ self.W1 + self.b1)
+         h = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)
 
         #  输出层计算：全连接层（无激活函数，直接输出 logits）
         #  - 隐藏层特征（128维） × 权重矩阵 W2（128×10） → 分类评分（10维）
@@ -94,8 +95,8 @@ def compute_loss(logits, labels):
     # tf.reduce_mean() 对batch中所有样本的损失求平均
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits,  # 模型原始输出（未归一化）
-            labels=labels))  # 真实类别索引（0到num_classes-1）
+            logits = logits,  # 模型原始输出（未归一化）
+            labels = labels))  # 真实类别索引（0到num_classes-1）
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
@@ -154,7 +155,7 @@ def test(model, x, y):
 # ## 实际训练
 
 # In[14]:
-# 加载MNIST数据集
+# 加载并预处理MNIST手写数字数据集
 train_data, test_data = mnist_dataset()
 # 进行50个epoch的训练
 for epoch in range(50):

@@ -18,9 +18,9 @@ def make_random_policy(np_random):
             d = state.shape[-1]#动态获取棋盘的边长
             return d**2 + 1    # pass动作
         # 随机选择一个可能的动作
-        a = np_random.randint(len(possible_places))
-        return possible_places[a]
-    return random_policy
+        a = np_random.randint(len(possible_places)) # 生成一个随机索引
+        return possible_places[a] # 返回对应索引的放置位置
+    return random_policy # 返回定义好的随机策略函数
 
 class ReversiEnv(gym.Env):
     """
@@ -58,7 +58,7 @@ class ReversiEnv(gym.Env):
         self.observation_type = observation_type
 
         assert illegal_place_mode in ['lose', 'raise']
-        self.illegal_place_mode = illegal_place_mode
+        self.illegal_place_mode = illegal_place_mode # 控制如何处理非法放置操作的标志
 
         if self.observation_type != 'numpy3c':
             raise error.Error('Unsupported observation type: {}'.format(self.observation_type))
@@ -241,8 +241,19 @@ class ReversiEnv(gym.Env):
     @staticmethod
     def valid_reverse_opponent(board, coords, player_color):
         '''
-        check whether there is any reversible places
-        这里意思应该是 判断这里是否有 翻转的 棋子。
+        判断在指定位置落子后，是否可以翻转对手的棋子。
+    
+        参数:
+              board: 当前棋盘状态，形状为 [3, d, d]：
+            - board[0]: 黑棋位置 (Black)
+            - board[1]: 白棋位置 (White)
+            - board[2]: 可落子位置（可能未使用）
+        position: 落子的坐标 (x, y)，从 0 开始计数
+        player_color: 当前玩家颜色，0 表示黑棋，1 表示白棋
+    
+        返回:
+             bool: 是否可以翻转对手的棋子
+             list of (x, y): 所有可翻转的敌方棋子坐标列表
         '''
         d = board.shape[-1]
         opponent_color = 1 - player_color
@@ -334,18 +345,19 @@ class ReversiEnv(gym.Env):
     def game_finished(board):
         # Returns 1 if player 1 wins, -1 if player 2 wins and 0 otherwise
         d = board.shape[-1]
-
+        # 统计双方棋子数
         player_score_x, player_score_y = np.where(board[0, :, :] == 1)
         player_score = len(player_score_x)
         opponent_score_x, opponent_score_y = np.where(board[1, :, :] == 1)
         opponent_score = len(opponent_score_x)
+        # 检查是否有玩家棋子数为0
         if player_score == 0:
             return -1
         elif opponent_score == 0:
             return 1
         else:
             free_x, free_y = np.where(board[2, :, :] == 1)
-            if free_x.size == 0:
+            if free_x.size == 0:   # 比较棋子数量决定胜负
                 if player_score > (d**2)/2:
                     return 1
                 elif player_score == (d**2)/2:

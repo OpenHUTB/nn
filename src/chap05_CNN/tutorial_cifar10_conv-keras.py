@@ -1,290 +1,250 @@
 #!/usr/bin/env python
 # coding: utf-8
-# # 参考 mnist_conv-keras 实现针对 cifar10 的 alexNet 卷积模型
-# 
-# 
-# #### 链接: https://pan.baidu.com/s/1LcCPcK9DgLS3W_DUPZS8kQ   提取码: 5vwz
-# ### 解压放到 ~/.keras/datasets/
-# 
-# ## tar zxvf cifar***.tar.zip
-
-# ## 准备所需要的数据
-
-# In[17]:
-import os
+# In[ ]:
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
-import numpy
-import pylab
-from PIL import Image
-import numpy as np
-import numpy
+from tensorflow.examples.tutorials.mnist import input_data
+# 使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 
-# 设置TensorFlow日志级别，避免输出过多信息
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-
-
-def cifar10_dataset():
-    """
-    加载并预处理CIFAR-10数据集，返回训练集和测试集的TensorFlow Dataset对象
+try:
+    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+except Exception as e:
+    print(f"数据加载失败: {e}")
     
+
+learning_rate = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
+keep_prob_rate = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
+max_epoch = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
+
+
+def compute_accuracy(v_xs, v_ys):
+    """
+    计算模型在给定数据集上的准确率。
+
+    参数:
+        v_xs: 输入数据。
+        v_ys: 真实标签。
+
     返回:
-        ds (tf.data.Dataset): 处理后的训练数据集
-        test_ds (tf.data.Dataset): 处理后的测试数据集
+        result: 模型的准确率。
     """
-    # 加载CIFAR-10数据集
-    # x: 图像数据 (50000张训练图像 + 10000张测试图像，32x32像素RGB)
-    # y: 对应标签 (0-9的整数标签)
-    (x, y), (x_test, y_test) = datasets.cifar10.load_data()
-    # 创建训练数据集
-    ds = tf.data.Dataset.from_tensor_slices((x, y))
-    ds = ds.map(prepare_mnist_features_and_labels)
-    ds = ds.take(20000).shuffle(20000).batch(100)
+    global prediction
+    # 获取模型预测结果
+    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
+    # 比较预测与真实标签
+    correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
+    # 计算准确率
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    # 运行准确率计算
+    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
+    return result
 
-    # 创建测试数据集
-    # 使用tf.data.Dataset.from_tensor_slices从内存中的NumPy数组创建数据集
-    test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
-    test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).batch(20000)
-    return ds, test_ds
 
-def prepare_mnist_features_and_labels(x, y):
+def weight_variable(shape):
     """
-    预处理MNIST数据集的特征和标签
+    初始化权重变量。使用截断正态分布防止梯度消失或爆炸。
+
+    参数:
+        shape: 权重的形状。
+
+    返回:
+        tf.Variable: 初始化后的权重变量。
+    """
+    # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
+    initial = tf.truncated_normal(shape, stddev=0.1)
+    # 将初始化值转换为可训练的TensorFlow变量
+    return tf.Variable(initial)
+
+
+def bias_variable(shape):
+    """
+    初始化卷积层/全连接层的偏置变量
     
     参数:
-    x: 图像数据，形状为 [样本数, 28, 28]，像素值范围 [0, 255]
-    y: 标签数据，形状为 [样本数]，标签值范围 [0, 9]
+        shape: 偏置的维度（如[32]）
     
     返回:
-    x: 归一化后的图像数据，数据类型 float32，范围 [0, 1]
-    y: 转换为int64类型的标签数据
+        tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
     """
-    # 将图像数据从uint8类型转换为float32类型
-    # 并将像素值从[0, 255]归一化到[0, 1]范围
-    # 归一化有助于梯度下降优化过程更稳定
-    x = tf.cast(x, tf.float32) / 255.0
-    
-    # 将标签数据转换为int64类型
-    # 这是TensorFlow中稀疏分类交叉熵损失函数要求的类型
-    y = tf.cast(y, tf.int64)
-    
-    return x, y
-# In[ ]:
-# ## 开始建立模型
+    # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
+    initial = tf.constant(0.1, shape=shape) # 创建一个所有元素值为0.1的常量张量
+    return tf.Variable(initial)
 
-# In[18]:
-class MyConvModel(keras.Model):
-    '''在这里实现alexNet模型'''
-    def __init__(self):
-        """
-        初始化自定义卷积神经网络模型。
-        """
-        super(MyConvModel, self).__init__()
-        # 第一层卷积层
-        self.l1_conv = Conv2D(filters=32, 
-                              kernel_size=(5, 5), 
-                              activation='relu', padding='same')
-        # 第二层卷积层
-        self.l2_conv = Conv2D(filters=64, 
-                              kernel_size=(5, 5), 
-                              activation='relu', padding='same')
-        # 最大池化层
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+
+def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+    """
+    实现二维卷积操作，增加了参数灵活性和异常处理
+    
+    参数:
+        x (tf.Tensor): 输入张量，形状为[batch, height, width, channels]
+        W (tf.Tensor): 卷积核权重，形状为[filter_height, filter_width, in_channels, out_channels]
+        padding (str): 填充方式，'SAME'或'VALID'
+        strides (list): 步长列表，[1, stride_h, stride_w, 1]
         
-        self.flat = Flatten()   # 展平层：将多维特征张量展开为一维向量
-        self.dense1 = layers.Dense(100, activation='tanh')
-        self.dense2 = layers.Dense(10)
-    @tf.function
-    def call(self, x):
-     # 第一层卷积
-        h1 = self.l1_conv(x)  # 应用第一层卷积层
-        h1_pool = self.pool(h1)  # 应用池化层
+    返回:
+        tf.Tensor: 卷积结果
+    异常:
+        ValueError: 如果 padding 不是 'SAME' 或 'VALID'，会抛出异常。
+        TypeError: 如果输入参数类型不正确，会抛出异常。
+    """
+    # 验证输入类型
+    if not tf.is_tensor(x):
+        x = tf.convert_to_tensor(x)
 
-    # 第二层卷积
-        h2 = self.l2_conv(h1_pool)  # 应用第二层卷积层
-        h2_pool = self.pool(h2)  # 再次应用池化层
+    # 检查权重参数 W 是否为 TensorFlow 张量
+    if not tf.is_tensor(W):
+        # 如果不是张量类型，抛出类型错误异常
+        # 错误信息包含期望的类型和实际传入的类型
+        raise TypeError(f"Expected W to be a tf.Tensor, but got {type(W)}.")
 
-    # 展平
-        flat_h = self.flat(h2_pool)  # 将多维张量展平为二维张量，形状为 [batch_size, num_features]
+    # 验证卷积操作的 padding 参数是否合法
+    if padding not in ['SAME', 'VALID']:
+        # 如果 padding 不是 'SAME' 或 'VALID'，抛出值错误异常
+        # 错误信息显示无效的输入值，并提示有效选项
+        raise ValueError(f"Invalid padding value: {padding}. Must be 'SAME' or 'VALID'.")
 
-    # 全连接层
-        dense1 = self.dense1(flat_h)  # 应用第一层全连接层
-
-    # 输出层
-        logits = self.dense2(dense1)  # 应用第二层全连接层，得到未归一化的 logits
-        probs = tf.nn.softmax(logits, axis=-1)  # 应用 softmax 函数，将 logits 转换为概率分布
-        return probs
+    # 验证 strides 参数的格式，应该是一个长度为4的列表
+    if len(strides) != 4:
+        raise ValueError(f"Strides should be a list of length 4, but got list of length {len(strides)}.")
     
-    @tf.function
-    def getL1_feature_map(self, x):
-        h1 = self.l1_conv(x) # [32, 28, 28, 32]
+    # 执行卷积操作：使用指定的卷积核W对输入x进行卷积，步长为strides，填充方式为padding
+    # SAME填充确保输出尺寸与输入相同，VALID填充则不进行填充
+    conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
+    
+    # 添加批归一化以提高训练稳定性
+    # 注意：在实际应用中，是否使用批归一化取决于网络结构和需求
+    # conv = tf.layers.batch_normalization(conv, training=is_training)
+    
+    return conv
+
+
+def max_pool_2x2(x: tf.Tensor, # 输入张量
+    pool_size: int = 2, # 池化窗口大小
+    strides: int = 2,  # 池化步长
+    padding: str = 'SAME',  # 填充方式
+    data_format: str = 'NHWC' # 数据格式
+) -> tf.Tensor:
+    """
+    实现2x2最大池化操作，减少特征图尺寸，增强特征不变性
+    
+    参数:
+        x: 输入张量
+        pool_size: 池化窗口大小
+        strides: 池化步长
+        padding: 填充方式
+        data_format: 数据格式，NHWC或NCHW
         
-        return h1
+    返回:
+        池化后的张量
+    """
+    # 验证参数合法性
+    if padding not in ['SAME', 'VALID']:
+        raise ValueError(f"padding must be 'SAME' or 'VALID', got {padding}.")            # 验证padding参数
+    if data_format not in ['NHWC', 'NCHW']:
+        raise ValueError(f"data_format must be 'NHWC' or 'NCHW', got {data_format}.")     # 验证data_format参数
     
-    @tf.function
-    def getL2_feature_map(self, x):
-        h1 = self.l1_conv(x) # [32, 28, 28, 32]
-        h1_pool = self.pool(h1) # [32, 14, 14, 32]
-        h2 = self.l2_conv(h1_pool) #[32, 14, 14, 64]
-        return h2
-
-model = MyConvModel()
-optimizer = optimizers.Adam(0.001)
-
-
-# ## 编译， fit 以及 evaluate
-# In[19]:
-model.compile(optimizer=optimizer,
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-train_ds, test_ds = cifar10_dataset()
-model.fit(train_ds, epochs=10)
-model.evaluate(test_ds) #模型评估
-
-# In[20]:
+    # 构造池化核和步长参数
+    if data_format == 'NHWC':
+        # NHWC格式：[batch, height, width, channels]
+        # 池化核大小和步长都作用于height和width维度
+        ksize = [1, pool_size, pool_size, 1]
+        strides = [1, strides, strides, 1]
+    else:  # NCHW
+        ksize = [1, 1, pool_size, pool_size]
+        strides = [1, 1, strides, strides]
+    
+    # 最大池化操作：每个2x2区域选择最大值，实现特征降维，保留主要特征
+    return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
 
 
-ds, test_ds = cifar10_dataset()
+# define placeholder for inputs to network
+# 输入层：MNIST图像为28x28=784像素，None表示批量大小可变
+xs = tf.placeholder(tf.float32, [None, 784]) / 255.     # 输入图像 [batch_size, 784]，归一化处理
+ys = tf.placeholder(tf.float32, [None, 10])             # 标签 [batch_size, 10]，10个类别(0-9)
+keep_prob = tf.placeholder(tf.float32)                  # Dropout保留率
+# 将一维向量重塑为4D张量 [batch, height, width, channels]，便于卷积操作
+x_image = tf.reshape(xs, [-1, 28, 28, 1])        
 
-# 从测试数据集中获取第一个批次的第一张图像
-for i in test_ds:  # 遍历测试数据集（test_ds是一个可迭代对象）
-    # 获取当前批次中的第一张图像
-    # i[0]是图像数据，i[1]是对应的标签
-    # [:1, :, :] 表示取第一个样本的所有高度、宽度和通道
-    test_batch = i[0][:1, :, :]  # 结果形状为 [1, 高度, 宽度, 通道数]
-    break  # 只需要一个样本，立即退出循环
 
-# 打开并预处理自定义图像
-# 以二进制读取模式打开图像文件
-img = Image.open(open('corgi.jpg', 'rb'))  # 使用PIL库打开图像
-# 将PIL图像转换为numpy数组，并指定数据类型为float32
-img = numpy.asarray(img, dtype='float32')  # 形状通常为 (高度, 宽度, 通道数)
-# 图像归一化处理（将像素值从0-255缩放到0-1范围）
-img = img / 256.0  # 错误：应使用 img = img / 255.0
-# 调试时可以打印图像形状查看维度信息
-# print(img.shape)  
+# 第一个卷积层：提取基础特征（边缘、纹理等）
+# 定义第一个卷积层的权重变量，卷积核大小为 7x7，输入通道数为 1，输出通道数为 32
+# 7x7卷积核捕获更大范围的特征，32个特征图提取多种不同特征
+W_conv1 = weight_variable([7, 7, 1, 32])
+# 定义第一个卷积层的偏置变量，输出通道数为 32
+b_conv1 = bias_variable([32])
+# 执行第一个卷积操作 + ReLU激活：提取非线性特征
+h_conv1 = tf.nn.relu(conv2d(x_image, W_conv1) + b_conv1)
+# 执行第一个最大池化操作：降低空间维度，增强特征不变性
+h_pool1 = max_pool_2x2(h_conv1)
+# 输出尺寸：[batch, 14, 14, 32] (池化后尺寸减半，特征图数量32)
 
-# 图像批次维度处理
-# 在第0维添加一个维度，将图像从[H,W,C]转换为[1,H,W,C]格式
-# 因为神经网络模型通常期望输入是批次形式的（即使只有一个图像）
-img = np.expand_dims(img, axis=0)  # 添加批次维度后的形状：[1, 高度, 宽度, 通道数]
 
-# img = test_batch
-img_out = model.getL2_feature_map(img)
-pylab.imshow(img[0, :, :, :])# 显示原始输入图像（RGB）
+# 第二个卷积层：提取更复杂特征
+# 定义第二个卷积层的权重变量，卷积核大小为 5x5，输入通道数为 32，输出通道数为 64
+# 5x5卷积核更精细地提取特征，64个特征图进一步丰富特征表示
+W_conv2 = weight_variable([5, 5, 32, 64])
+# 定义第二个卷积层的偏置变量，输出通道数为 64
+b_conv2 = bias_variable([64])
+# 执行第二个卷积操作 + ReLU激活
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+# 执行第二个最大池化操作
+h_pool2 = max_pool_2x2(h_conv2)
+# 输出尺寸：[batch, 7, 7, 64] (再次池化后尺寸减半，特征图数量64)
 
-# 创建第一个图像展示画布：尺寸为10x7英寸（宽x高）
-pylab.figure(figsize=(10,7))
 
-# 第一行第一列子图：显示第0通道图像
-pylab.subplot(2, 2, 1)  # 创建2行2列布局中的第1个子图
-pylab.axis('off')       # 隐藏坐标轴，使图像更清晰
-pylab.imshow(img_out[0, :, :, 0])  # 显示四维数组img_out中[0]批次、[0]通道的二维图像
+# 全连接层 1：整合卷积层提取的特征
+# 定义全连接层1的权重（W_fc1），维度是 [7*7*64, 1024]：
+# 输入是前一层池化输出展平后的长度（7x7x64=3136），输出是1024个神经元
+W_fc1 = weight_variable([7*7*64, 1024])
 
-# 第一行第二列子图：显示第1通道图像
-pylab.subplot(2, 2, 2)  # 第2个子图位置
-pylab.axis('off')
-pylab.imshow(img_out[0, :, :, 1])  # 显示第1通道
+# 定义全连接层1的偏置（b_fc1），大小为1024，对应输出维度
+b_fc1 = bias_variable([1024])
 
-# 第二行第一列子图：显示第2通道图像
-pylab.subplot(2, 2, 3)  # 第3个子图位置
-pylab.axis('off')
-pylab.imshow(img_out[0, :, :, 2])  # 显示第2通道
+# 将上一层池化层的输出展平成一维向量，-1 表示自动计算 batch size
+h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
 
-# 第二行第二列子图：显示第3通道图像
-pylab.subplot(2, 2, 4)  # 第4个子图位置
-pylab.axis('off')
-pylab.imshow(img_out[0, :, :, 3])  # 显示第3通道
+# 全连接计算 + ReLU激活函数：学习特征之间的复杂关系
+# matmul 矩阵乘法，得到的是一个 [batch_size, 1024] 的激活输出
+h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 
-pylab.show()  # 渲染并显示当前画布中的所有子图
+# 应用 Dropout 防止过拟合，keep_prob 是保留节点的概率（在 feed_dict 中提供）
+# 训练时随机"关闭"30%的神经元，测试时保留所有神经元
+h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
-# 重复上述过程，创建新画布展示后续通道
-# 第二个画布：显示第4-7通道
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 4])  # 通道4
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 5])  # 通道5
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 6])  # 通道6
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 7])  # 通道7
-pylab.show()
 
-# 第三个画布：显示第8-11通道
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 8])   # 通道8
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 9])   # 通道9
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 10])  # 通道10
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 11])  # 通道11
-pylab.show()
+# 全连接层 2：输出层，进行分类预测
+## fc2 layer ##
+W_fc2 = weight_variable([1024, 10])  # 权重矩阵：输入1024维→输出10维(对应10个类别)
+b_fc2 = bias_variable([10])
+# 线性变换 + softmax激活：将输出转换为10个类别的概率分布
+prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
-# 第四个画布：显示第12-15通道
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 12])  # 通道12
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 13])  # 通道13
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])  # 通道14
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])  # 通道15
-pylab.show()
 
-# 第五个画布：显示最后4个通道（16-19）
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])  # 通道16
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])  # 通道17
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])  # 通道18
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])  # 通道19
-pylab.show()
+# 损失函数：交叉熵，衡量预测分布与真实分布的差异
+cross_entropy = tf.reduce_mean(
+    -tf.reduce_sum(ys * tf.log(prediction), reduction_indices=[1])
+)
+# 创建优化器 - Adam算法优化损失函数
+# Adam优化器结合了AdaGrad和RMSProp的优点，自适应调整学习率
+train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
-# In[23]:
 
-rand_model = MyConvModel()
-ds, test_ds = cifar10_dataset()
+# 创建TensorFlow会话 - 执行计算图的上下文环境
+with tf.Session() as sess:
+    # 初始化所有全局变量（权重和偏置）
+    init = tf.global_variables_initializer()
+    sess.run(init)
 
-for i in test_ds:
-    test_batch = i[0][:1, :, :]
-    break
-img = Image.open(open('corgi.jpg', 'rb'))
-img = numpy.asarray(img, dtype='float32') / 256.
-# print(img.shape)
-img = np.expand_dims(img, axis=0)
+    # 模型训练循环
+    for i in range(max_epoch):
+        # 获取下一个训练批次（小批量随机梯度下降）
+        batch_xs, batch_ys = mnist.train.next_batch(100)
 
-# img = test_batch
-img_out = rand_model.getL1_feature_map(img)
-pylab.imshow(img[0, :, :, :])
+        # 执行训练步骤（前向传播 + 反向传播 + 参数更新）
+        sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob: keep_prob_rate})
 
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 3])
-pylab.show()
-
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 4])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 5])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 6])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 7])
-pylab.show()
-
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 8])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 9])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 10])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 11])
-pylab.show()
-
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 12])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 13])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 14])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 15])
-pylab.show()
-
-pylab.figure(figsize=(10,7))
-pylab.subplot(2, 2, 1); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 16])
-pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 17])
-pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 18])
-pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 19])
-pylab.show()
-
-# In[ ]:
+        # 每100次迭代评估一次模型性能
+        if i % 100 == 0:
+            # 计算模型在测试集前1000个样本上的准确率
+            acc = compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000])
+            # 显示当前训练进度和准确率
+            print(f"迭代 {i}/{max_epoch}, 测试准确率: {acc:.4f}")

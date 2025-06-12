@@ -145,11 +145,12 @@ try:
     from pygame.locals import K_EQUALS
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed') # 抛出运行时错误：提示pygame库导入失败
-
+    
+# 尝试导入NumPy科学计算库
 try:
     import numpy as np
 except ImportError:
-    raise RuntimeError('cannot import numpy, make sure numpy package is installed')
+    raise RuntimeError('cannot import numpy, make sure numpy package is installed') # 抛出运行时错误：提示numpy库导入失败
 
 
 # ==============================================================================
@@ -164,7 +165,7 @@ def find_weather_presets():                                                     
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
-def get_actor_display_name(actor, truncate=250):
+def get_actor_display_name(actor, truncate = 250):
     """
     格式化actor的类型标识符为易读的显示名称
     参数:
@@ -244,8 +245,8 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False  # 录制与控制相关变量
-        self.recording_start = 0
-        self.constant_velocity_enabled = False
+        self.recording_start = 0 # 初始化录音开始时间的标记变量
+        self.constant_velocity_enabled = False # 设置类的属性 constant_velocity_enabled 为 False，这个属性用于指示是否启用了“恒定速度”模式
         self.show_vehicle_telemetry = False
         self.doors_are_open = False
         self.current_map_layer = 0
@@ -322,7 +323,9 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.hud.notification(actor_type)
 
         if self.sync:
-            self.world.tick()
+            self.world.tick()# 如果是同步模式，调用tick()方法
+                             # tick()方法通常用于推进模拟世界的时钟
+                             # 在同步模式下，程序会主动控制时间步进的节奏
         else:
             self.world.wait_for_tick()
 
@@ -858,18 +861,23 @@ class HUD(object):
                 self._info_text.append('% 4dm %s' % (d, vehicle_type))
 
     def show_ackermann_info(self, enabled):
+        # 设置是否显示Ackermann信息
         self._show_ackermann_info = enabled
 
     def update_ackermann_control(self, ackermann_control):
+        # 更新Ackermann控制参数
         self._ackermann_control = ackermann_control
 
     def toggle_info(self):
+        # 切换信息显示状态
         self._show_info = not self._show_info
 
     def notification(self, text, seconds=2.0):
+        # 显示临时通知
         self._notifications.set_text(text, seconds=seconds)
 
     def error(self, text):
+        # 显示红色错误提示
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
     def render(self, display):
@@ -1267,8 +1275,8 @@ class CameraManager(object):
             self.sensor = self._parent.get_world().spawn_actor(
                 self.sensors[index][-1],
                 self._camera_transforms[self.transform_index][0],
-                attach_to=self._parent,
-                attachment_type=self._camera_transforms[self.transform_index][1])
+                attach_to = self._parent,
+                attachment_type = self._camera_transforms[self.transform_index][1])
             # We need to pass the lambda a weak reference to self to avoid
             # circular reference.
             weak_self = weakref.ref(self)

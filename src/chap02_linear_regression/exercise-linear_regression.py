@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
-import numpy as np # 导入NumPy科学计算库，使用标准别名np
-# 提供高性能的数组操作和数学函数
+import numpy as np # 导入NumPy库
+import matplotlib.pyplot as plt
 
 import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
 # 用于创建各种静态、交互式和动画可视化图表
@@ -15,20 +15,20 @@ def load_data(filename):
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
     xys = []# 用于存储每行的数据，每行数据是一个列表
-    with open(filename, "r") as f:  # 打开文件进行读取
+    with open(filename, "r") as f:  # 以只读模式打开文件进行读取
         for line in f: # 遍历文件的每一行
             # 将每行内容按空格分割并转换为浮点数
             # strip() 去除行首尾的空白字符，split() 按空格分割字符串
             # map(float, ...) 将分割后的字符串转换为浮点数
             line_data = list(map(float, line.strip().split()))
             xys.append(line_data)
-    # 将数据拆分为特征和标签
+    # 使用zip(*xys)转置数据，将数据拆分为特征和标签
     # 假设每行数据的最后一个元素是标签，其余是特征
     # zip(*xys) 将 xys 列表的行和列进行转置
     xs, ys = zip(*xys)# xs 是特征列表，ys 是标签列表
     # 将特征和标签列表转换为 NumPy 数组
     # NumPy 数组便于后续的数学运算和数据处理
-    return np.asarray(xs), np.asarray(ys) # 返回特征和标签的 NumPy 数组
+    return np.asarray(xs), np.asarray(ys) # 将Python列表转换为NumPy数组并返回
 
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
@@ -36,7 +36,7 @@ def identity_basis(x):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     # 用于适配线性回归的矩阵运算格式
     # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
-    return np.expand_dims(x, axis=1)
+    return np.expand_dims(x, axis = 1)
 
 
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
@@ -49,7 +49,6 @@ def multinomial_basis(x, feature_num=10):
     # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
     # 可以替换成 x = identity_basis(x)
-    # ==========
     # todo '''请实现多项式基函数'''
     # 在 x 的最后一个维度上增加一个维度，将其转换为三维数组
     # 通过列表推导式创建各次项，最后在列方向拼接合并
@@ -57,7 +56,6 @@ def multinomial_basis(x, feature_num=10):
     # 生成 x, x^2, ..., x^(feature_num)
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将生成的列表合并成 shape(N, feature_num) 的二维数组
-    # ==========
     return np.concatenate(ret, axis=1)
 
 
@@ -74,7 +72,7 @@ def gaussian_basis(x, feature_num=10):
     return np.exp(-0.5 * ((x[:, np.newaxis] - centers) / sigma) ** 2)
 
 
-# ## 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化
+# 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化
 # ## 填空顺序 3 用梯度下降进行模型优化
 # > 先完成最小二乘法的优化 (参考书中第二章 2.3中的公式)
 #
@@ -102,7 +100,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     ValueError: 当 solver 参数不是支持的类型时抛出
     """
     # 检查输入矩阵是否为空
-    if phi.size == 0 or y.size == 0:
+    if phi.size == 0 or y.size == 0: # 如果矩阵 phi 或 y 是空的，抛出 ValueError 异常
         raise ValueError("输入矩阵 phi 和目标值 y 不能为零矩阵")
 
     # 检查维度是否兼容
@@ -111,7 +109,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
             f"设计矩阵 phi 的样本数 ({phi.shape[0]}) 与目标值 y 的样本数 ({y.shape[0]}) 不匹配"
         )
 
-    n_samples, n_features = phi.shape
+    n_samples, n_features = phi.shape # 获取样本数和特征数
 
     # 根据选择的求解器执行计算
     if solver == "pinv":
@@ -140,7 +138,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     elif solver == "svd":
         # 直接使用 SVD 分解求解
         # 对病态矩阵最稳定，但计算成本较高
-        U, s, Vt = np.linalg.svd(phi, full_matrices=False)
+        U, s, Vt = np.linalg.svd(phi, full_matrices = False)
         # 计算正则化的 SVD 解
         s_reg = s / (s**2 + alpha)
         # 构建对角矩阵
@@ -149,6 +147,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
         w = Vt.T @ S_reg @ U.T @ y
 
     else:
+         # 如果 solver 不是支持的选项，抛出 ValueError
         raise ValueError(
             f"不支持的求解器: {solver}，支持的选项有 'pinv', 'cholesky', 'svd'"
         )
@@ -156,7 +155,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     return w
 
 
-def gradient_descent(phi, y, lr=0.01, epochs=1000):
+def gradient_descent(phi, y, lr = 0.01, epochs = 1000):
     """实现批量梯度下降算法优化线性回归权重
     参数:
         phi: 设计矩阵（特征矩阵），形状为 (n_samples, n_features)
@@ -215,9 +214,9 @@ def main(x_train, y_train, use_gradient_descent=False):
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    # 构造偏置项1
     phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1)
-
+    phi = np.concatenate([phi0, phi1], axis=1) # 将偏置项和特征矩阵拼接成完整的特征矩阵
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
 
@@ -274,7 +273,6 @@ def main(x_train, y_train, use_gradient_descent=False):
     return f, w_lsq, w_gd
 
 
-# ## 评估结果
 # ## 评估结果
 # > 没有需要填写的代码，但是建议读懂
 

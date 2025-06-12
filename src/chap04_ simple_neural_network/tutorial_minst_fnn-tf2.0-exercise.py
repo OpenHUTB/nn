@@ -53,11 +53,11 @@ class MyModel:
         ####################
         # 初始化权重和偏置
         # 输入层784 -> 隐藏层128
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
-        self.b1 = tf.Variable(tf.zeros([128]))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))   # stddev=0.1 表示标准差为 0.1，用于控制初始值的范围，避免梯度消失或爆炸
+        self.b1 = tf.Variable(tf.zeros([128]))   # 偏置项的维度应与隐藏层神经元数量一致，即 [128]
         # 隐藏层128 -> 输出层10
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
-        self.b2 = tf.Variable(tf.zeros([10]))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))  # 隐藏层（128 个神经元）到输出层（10 个类别）的权重 W2
+        self.b2 = tf.Variable(tf.zeros([10]))  # 初始化第二层的偏置 b2，同样初始化为 0，维度为 [10]
 
     def __call__(self, x):
         ####################
@@ -83,9 +83,9 @@ def compute_loss(logits, labels):
     logits: 模型输出的未归一化分数
     labels: 真实标签
     """
-    return tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels
+    return tf.reduce_mean(   # 对所有样本的损失值求平均
+        tf.nn.sparse_softmax_cross_entropy_with_logits(   # TensorFlow内置的交叉熵损失函数
+            logits=logits, labels=labels   # 输入模型原始输出，输入真实标签
         )
     )
 # 计算稀疏标签的softmax交叉熵损失
@@ -124,8 +124,8 @@ def train_one_step(model, optimizer, x, y):
     grads = tape.gradient(loss, trainable_vars)
 
     # 更新参数（使用固定学习率）
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01 * g)
+    # 使用优化器更新参数
+    optimizer.apply_gradients(zip(grads, trainable_vars))
 
     # 计算准确率
     accuracy = compute_accuracy(logits, y)

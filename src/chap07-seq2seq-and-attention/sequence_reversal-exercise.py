@@ -9,21 +9,21 @@
 # In[1]:
 
 # 标准库（Python内置模块，按字母顺序排列）
-import collections
+import collections  # 导入Python标准库中的collections模块
 import os # 导入os库
-import sys
-import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后
+import sys # 导入sys库，用于系统相关参数和函数
+import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后，用于显示循环进度
 
 # 第三方库（按字母顺序排列，优先导入独立库，再导入子模块）
 import numpy as np# 导入NumPy库（科学计算基础库）
                     # 提供多维数组操作、数学函数、线性代数等功能
                     # 常用于数据预处理、模型输入构建和结果分析
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import datasets, layers, optimizers
+import tensorflow as tf # 导入TensorFlow深度学习框架
+from tensorflow import keras # 从TensorFlow导入Keras高级API
+from tensorflow.keras import datasets, layers, optimizers # 导入Keras的子模块
 # 同一库的子模块合并导入，按字母顺序排列
-import random
-import string
+import random # 导入随机数生成模块，用于生成随机数、随机序列等
+import string # 导入字符串常量模块，提供常用的字符串集合（如字母表、数字等）
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
@@ -45,15 +45,18 @@ def random_string(length):
     # 步骤 2：使用 random.choices() 一次性生成指定长度的随机字符串
     # random.choices() 可以直接生成包含多个随机字符的列表
     # 然后使用 ''.join() 将列表中的字符拼接成字符串
-    return ''.join(random.choices(letters, k=length))
+    return ''.join(random.choices(letters, k = length))
 
 def get_batch(batch_size, length):
     # 生成batch_size个随机字符串
     batched_examples = [random_string(length) for i in range(batch_size)]
+  
     # 转成索引：字母 A-Z 映射到 1-26
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
+  
     # 逆序
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
+  
     #等价于y = [list(reversed(e_idx)) for e_idx in enc_x]
     # 添加起始符
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
@@ -63,9 +66,9 @@ def get_batch(batch_size, length):
 # 3. dec_x: 解码器输入序列（通常包含起始标记），形状为 [batch_size, dec_seq_len]
 # 4. y: 目标输出序列（通常包含结束标记），形状为 [batch_size, dec_seq_len]
     return (batched_examples,
-            tf.constant(enc_x, dtype=tf.int32), 
-            tf.constant(dec_x, dtype=tf.int32), 
-            tf.constant(y, dtype=tf.int32))
+            tf.constant(enc_x, dtype = tf.int32), 
+            tf.constant(dec_x, dtype = tf.int32), 
+            tf.constant(y, dtype = tf.int32))
 #测试
 print(get_batch(2, 10))
 
@@ -79,6 +82,7 @@ print(get_batch(2, 10))
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
+       """初始化Seq2Seq模型组件"""
         super().__init__()
 
         # 词表大小为27：A-Z共26个大写字母，加上1个特殊的起始符（用0表示）
@@ -109,9 +113,11 @@ class mySeq2SeqModel(keras.Model):
         self.decoder = tf.keras.layers.RNN(
             self.decoder_cell,             # 指定解码器使用的RNN单元
                                            # 例如LSTMCell、GRUCell或自定义单元
+          
             return_sequences = True,       # 返回完整的输出序列
                                            # 适用于序列到序列模型，每个时间步都需要输出
                                            # 输出形状: [batch_size, seq_len, units]
+          
             return_state = True            # 返回最终的隐藏状态
                                            # 对于LSTM单元，返回[h_state, c_state]
                                            # 对于GRU单元，返回[h_state]
@@ -145,6 +151,7 @@ class mySeq2SeqModel(keras.Model):
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
+      
         # 返回模型预测的logits值，通常后续会通过softmax计算概率
         # 可通过argmax获取预测的词索引：pred_ids = tf.argmax(logits, axis=-1)
         return logits
@@ -158,8 +165,9 @@ class mySeq2SeqModel(keras.Model):
         enc_out, enc_state = self.encoder(enc_emb)
 
         # 返回编码器最后一个时间步的输出和最终状态
-        return [enc_out[:, -1, :], enc_state]
-    
+        # 返回完整的编码器输出和最终状态
+        return enc_out, enc_state
+
     def get_next_token(self, x, state):
        '''
     根据当前输入和状态生成下一个token
@@ -179,16 +187,20 @@ class mySeq2SeqModel(keras.Model):
         # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
         score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
+      
         # 计算上下文向量
         # 根据注意力权重加权求和编码器输出，得到上下文向量
         context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+      
         # 将嵌入向量和上下文向量拼接作为RNN输入
         rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
+      
         # 通过RNN单元计算输出和更新状态
         output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
+      
         # 通过全连接层计算logits
         logits = self.dense(output)  # (B, V)
-        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)，获取 logits 张量中每个元素的最大值所在的索引
         return next_token, new_state[0]  # 返回单个状态向量
 
 
@@ -247,10 +259,12 @@ def train(model, optimizer, seqlen):
             # 计算训练准确率
             # 使用模型对当前批次的输入数据进行预测，得到logits
             logits = model(enc_x, dec_x)
+          
             # 获取预测结果，通过argmax获取概率最高的类别索引
             preds = tf.argmax(logits, axis=-1)
+          
             # 计算准确率，比较预测结果与真实标签是否一致，并计算平均值
-            acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32)
+            acc = tf.reduce_mean(tf.cast(tf.equal(preds, y), tf.float32))
 
             # 打印当前步数、损失和准确率
             print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
@@ -273,10 +287,25 @@ train(model, optimizer, seqlen=20) #调用 train 函数开启模型训练流程�
 
 
 def sequence_reversal():
-    """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果"""
+    """测试阶段：对一个字符串执行encode，然后逐步decode得到逆序结果
+    流程说明:
+    1. 内部定义decode函数：用于执行自回归解码过程
+        - 从起始标记开始，逐步生成每个字符
+        - 使用模型预测下一个token
+        - 收集所有生成的token形成最终输出
+    2. 获取测试数据: 生成一批随机字符串样本
+    3. 编码输入序列: 提取输入序列的特征表示和初始状态
+    4. 解码生成逆序: 从初始状态开始逐步生成逆序序列
+    5. 返回: 包含逆序结果和原始序列的元组
+    
+    返回格式:
+        (decoded_strings, original_strings)
+        decoded_strings: 模型生成的逆序字符串列表
+        original_strings: 原始输入字符串列表
+    """
     def decode(init_state, steps=10):
         # 获取批次大小
-        b_sz = tf.shape(init_state[0])[0]
+        batch_size = tf.shape(init_state)[0]
         # 起始 token（全为 0）
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
         # 初始化状态为编码器输出的状态
@@ -293,7 +322,7 @@ def sequence_reversal():
         out = tf.concat(collect, axis = -1).numpy()
         # 将一个数值列表转换为对应的字母字符串
         out = [''.join([chr(idx+ord('A')-1) for idx in exp]) for exp in out] 
-        return out
+        return out# 返回解码后的字符串列表
     
 
     # 生成一批测试数据（32个样本，每个序列长度10）
@@ -318,9 +347,3 @@ print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 列表推导式对 sequence_reversal() 生成的序列对中的每个元素应用 is_reverse() 函数，zip(*sequence_reversal()) 会将两个序列的对应位置元素配对
 print(list(zip(*sequence_reversal())))
 # 打印 sequence_reversal() 生成的序列对（经过 zip 转置后的结果），这里会显示实际被 is_reverse 函数比较的各个元素对
-
-
-
-
-
-

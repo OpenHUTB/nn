@@ -6,7 +6,7 @@
 import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
+from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
@@ -20,8 +20,17 @@ def mnist_dataset():
         ds (tf.data.Dataset): 处理后的训练数据集。
         test_ds (tf.data.Dataset): 处理后的测试数据集。
     """
+    # 从 TensorFlow 的 datasets 模块中加载 MNIST 数据集
+    # MNIST 是一个手写数字图片数据集，包含 60,000 个训练样本和 10,000 个测试样本
+    # (x, y) 是训练集的图像和标签
+    # (x_test, y_test) 是测试集的图像和标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    # 将训练集图像 x 调整形状（reshape）
+    # 原始图像形状是 (num_samples, 28, 28)，即每张图是 28x28 的灰度图
+    # 调整后变为 (num_samples, 28, 28, 1)，增加一个通道维度（channel），以适配卷积神经网络的输入要求
     x = x.reshape(x.shape[0], 28, 28, 1)
+    # 对测试集图像 x_test 做同样的 reshape 操作
+    # 同样变成 (num_samples, 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
 
     ds = tf.data.Dataset.from_tensor_slices((x, y))
@@ -30,7 +39,7 @@ def mnist_dataset():
 
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
+    test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
     return ds, test_ds
 
 
@@ -47,6 +56,8 @@ def prepare_mnist_features_and_labels(x, y):
         y: 转换为整型的标签。
     """
     x = tf.cast(x, tf.float32) / 255.0
+    # 将标签转换为int64类型
+    # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
     y = tf.cast(y, tf.int64)
     return x, y
 

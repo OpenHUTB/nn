@@ -9,10 +9,7 @@
 import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
 import tensorflow as tf
 import collections
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras import layers, optimizers, datasets
-
+from tensorflow.keras import layers, optimizers
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
@@ -46,12 +43,13 @@ def process_dataset(fileName):
             
     # 统计词频
     counter = collections.Counter()
+    # 遍历examples中的每个样本(每个样本是一个句子或单词列表)
     for e in examples:
         for w in e:
             counter[w] += 1
     
     ## 按词频从高到低排序
-    sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+    sorted_counter = sorted(counter.items(), key = lambda x: -x[1])
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)                     # 对tuple进行解压，得到words列表代表所有字符
@@ -170,7 +168,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(h)  # (batch_size, vocab_size)
         # 4. 选择概率最高的词
         out = tf.argmax(logits, axis=-1)
-        return out, state
+        return out, state# 返回预测的下一个词id和更新后的RNN状态
 
 
 # ## 辅助函数：计算序列损失
@@ -190,13 +188,16 @@ def mkMask(input_tensor, maxLen):
     """
     # 获取输入张量的形状
     shape_of_input = tf.shape(input_tensor) 
-    shape_of_output = tf.concat(axis=0, values=[shape_of_input, [maxLen]])
+    shape_of_output = tf.concat(
+        axis=0, 
+        values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表
+    )
     #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
     
-    return tf.reshape(flat_mask, shape_of_output)
+    return tf.reshape(flat_mask, shape_of_output)   # 将展平的掩码恢复为原始输入张量形状+maxLen的形状
 
 def reduce_avg(reduce_target, lengths, dim):
     """沿指定维度计算掩码后的平均值（忽略填充部分）
@@ -222,21 +223,33 @@ def reduce_avg(reduce_target, lengths, dim):
     # 验证目标张量的维度是否符合要求
     # shape_of_target: reduce_target张量的维度列表
     # dim+1: 预期的目标张量的最小秩
-    if len(shape_of_target) < dim+1 : # 输入验证：确保目标张量的秩至少为 dim+1
+    # 输入验证：确保目标张量的秩至少为 dim+1
+    if len(shape_of_target) < dim+1 :
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算目标张量与长度张量的秩差
-    mxlen = tf.shape(reduce_target)[dim]                         # 获取目标维度的最大长度，并生成掩码矩阵
-    mask = mkMask(lengths, mxlen)                                # mkMask函数生成布尔掩码
-    if rank_diff!=0: # 根据秩差调整掩码和长度张量的形状，以便广播
+    # 计算目标张量与长度张量的秩差
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
+    # 获取目标维度的最大长度，并生成掩码矩阵
+    mxlen = tf.shape(reduce_target)[dim]
+    # mkMask函数生成布尔掩码
+    mask = mkMask(lengths, mxlen)
+    
+    # 根据秩差调整掩码和长度张量的形状，以便广播
+    if rank_diff!=0:
+        # 计算长度张量的新形状
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        # 计算掩码的新形状
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
-        len_shape = tf.shape(lengths)
+        # 如果秩差为0，保持原形状
+        len_shape = tf.shape(lengths) # 获取张量 lengths 的形状
         mask_shape = tf.shape(mask)
-    lengths_reshape = tf.reshape(lengths, shape=len_shape) # 重塑张量以匹配目标张量的形状
-    mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
+
+    # 重塑张量以匹配目标张量的形状
+    lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    # 将掩码应用到目标张量上
+    mask = tf.reshape(mask, shape=mask_shape)
 
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
@@ -336,13 +349,17 @@ def train(epoch, model, optimizer, ds):
     loss = 0.0
     accuracy = 0.0
     # 遍历数据集
+    # ds 是一个数据集对象，通常是一个 TensorFlow 的 Dataset 对象
+    # enumerate(ds) 会返回每个元素的索引（step）和内容（x, y, seqlen）
     for step, (x, y, seqlen) in enumerate(ds):
         # 训练一步
         loss = train_one_step(model, optimizer, x, y, seqlen)
 
         # 定期打印损失
         if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy())
+            print('epoch', epoch, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
+
+    # 返回最后一次训练的损失值
 
     return loss
 

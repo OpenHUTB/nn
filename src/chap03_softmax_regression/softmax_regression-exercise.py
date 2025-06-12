@@ -14,9 +14,9 @@
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from matplotlib import animation, rc
-from IPython.display import HTML
-import matplotlib.cm as cm
-import numpy as np
+from IPython.display import HTML # 在Jupyter中显示动画
+import matplotlib.cm as cm # 颜色映射
+import numpy as np # 数值计算库
 
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
@@ -42,9 +42,9 @@ y = np.ones(dot_num) * 2  # 标签为2
 C3 = np.array([x_b, y_b, y]).T
 
 # 绘制三类样本的散点图
-plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+")  # 类别1：蓝色加号
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o")  # 类别2：绿色圆圈
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*")  # 类别3：红色星号
+plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
+plt.scatter(C2[:, 0], C2[:, 1], c = "g", marker = "o")  # 类别2：绿色圆圈
+plt.scatter(C3[:, 0], C3[:, 1], c = "r", marker = "*")  # 类别3：红色星号
 
 # 合并所有类别的数据，形成完整数据集
 data_set = np.concatenate((C1, C2, C3), axis=0)
@@ -62,7 +62,7 @@ np.random.shuffle(data_set)  # 随机打乱数据集顺序
 epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 class SoftmaxRegression(tf.Module):
-    def __init__(self, input_dim=2, num_classes=3):
+    def __init__(self, input_dim = 2, num_classes = 3):
         """
         初始化 Softmax 回归模型参数
         :param input_dim: 输入特征维度
@@ -123,10 +123,10 @@ def compute_loss(pred, labels, num_classes=3):
     acc = tf.reduce_mean(
         tf.cast(
             tf.equal(
-                tf.argmax(pred, axis=1),
-                tf.argmax(one_hot_labels, axis=1)
+                tf.argmax(pred, axis=1),           # 获取预测的类别索引
+                tf.argmax(one_hot_labels, axis=1)  # 获取真实类别索引
             ),
-            dtype=tf.float32,
+            dtype=tf.float32,                      # 将布尔值转换为浮点数
         )
     )
     # 返回损失值和准确率
@@ -145,13 +145,19 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :param y_batch: 标签
     :return: 当前批次的损失与准确率
     """
+    # 使用 tf.GradientTape() 上下文管理器记录前向传播过程，以便后续自动计算梯度
     with tf.GradientTape() as tape:
-        predictions = model(x_batch)  # 前向传播：计算模型对输入批次的预测
-        loss, accuracy = compute_loss(predictions, y_batch)  # 计算损失和准确率
+        # 前向传播：计算模型对输入批次的预测
+        predictions = model(x_batch)
+        # 计算损失和准确率
+        loss, accuracy = compute_loss(predictions, y_batch)
 
-    grads = tape.gradient(loss, model.trainable_variables)  # 自动计算损失函数对模型参数的梯度
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 优化步骤：使用优化器将计算出的梯度应用到模型参数上
-    return loss, accuracy  # 返回当前批次的损失和准确率
+    #自动计算损失函数对模型参数的梯度
+    grads = tape.gradient(loss, model.trainable_variables)
+    # 优化步骤：使用优化器将计算出的梯度应用到模型参数上
+    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    # 返回当前批次的损失和准确率
+    return loss, accuracy
 
 # ### 实例化一个模型，进行训练，提取所需的数据
 
@@ -162,7 +168,7 @@ model = SoftmaxRegression()
 opt = tf.keras.optimizers.SGD(learning_rate=0.01)
 # 创建随机梯度下降（SGD）优化器实例 opt，设置学习率为 0.01
 
-x1, x2, y = list(zip(*data_set))
+x1, x2, y = list(zip(*data_set))  #从data_set中提取特征和标签，并将它们分别存储到x1、x2 和 y 中
 # 转换为 float32
 x = np.array(list(zip(x1, x2)), dtype=np.float32)  
 # 转换为 int32
@@ -181,9 +187,9 @@ for i in range(1000):
 
 # 绘制三种不同类别的散点图
 # C1[:, 0] 和 C1[:, 1] 分别表示 C1 的第一列和第二列数据（通常是特征）
-plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+") # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
-plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o") # c="g" 设置颜色为绿色，marker="o" 设置标记为圆形
-plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*") # c="r" 设置颜色为红色，marker="*" 设置标记为星号
+plt.scatter(C1[:, 0], C1[:, 1], c="b", marker="+", s=80) # c="b" 设置颜色为蓝色，marker="+" 设置标记为加号
+plt.scatter(C2[:, 0], C2[:, 1], c="g", marker="o", s=80) # c="g" 设置颜色为绿色，marker="o" 设置标记为圆形
+plt.scatter(C3[:, 0], C3[:, 1], c="r", marker="*", s=80) # c="r" 设置颜色为红色，marker="*" 设置标记为星号
 
 # 创建网格点用于绘制决策边界
 x = np.arange(0.0, 10.0, 0.1)
@@ -205,10 +211,11 @@ Z = Z.reshape(X.shape)
 plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
 
-# 保存模型权重
-model.save_weights('softmax_regression_weights')
+# 保存模型参数
+ckpt = tf.train.Checkpoint(model=model)
+ckpt.write('softmax_regression_weights')
 
-# 加载模型权重
-model.load_weights('softmax_regression_weights')
+# 加载模型参数
+ckpt.read('softmax_regression_weights')# 模型权重加载后即可用于新数据的多类别概率预测
 
 # In[ ]:
