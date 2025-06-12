@@ -295,9 +295,9 @@ if __name__ == "__main__":
     
     # 2. 训练GMM模型
     print("\n训练高斯混合模型...")
-    gmm = GaussianMixtureModel(n_components=3, random_state=42)
-    gmm.fit(X)
-    y_pred = gmm.labels_
+    gmm = GaussianMixtureModel(n_components=3, random_state=42) # 初始化高斯混合模型
+    gmm.fit(X) # 使用数据 X 训练 GMM 模型
+    y_pred = gmm.labels_ # 获取每个样本的预测聚类标签
     print(f"完成训练，共进行{len(gmm.log_likelihoods)}次迭代")
     
     # 3. 收敛曲线绘制，可以用于判断是否收敛
