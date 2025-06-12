@@ -224,7 +224,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.actor_role_name = args.rolename
         try:                                    # 加载地图数据
             self.map = self.world.get_map()
-        except RuntimeError as error:
+        except RuntimeError as error:  # 地图加载失败时的错误处理
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
             print('  Make sure it exists, has the same name of your town, and is correct.')
@@ -294,7 +294,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
+            spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
             self.destroy()
@@ -1425,7 +1425,7 @@ def game_loop(args):
             sim_world.apply_settings(original_settings)
 
         if (world and world.recording_enabled):
-            client.stop_recorder()
+            client.stop_recorder() # 如果世界对象存在且启用了录制功能，则停止录制
 
         if world is not None:
             world.destroy()

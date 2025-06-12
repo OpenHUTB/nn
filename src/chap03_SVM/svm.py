@@ -31,7 +31,7 @@ def eval_acc(label, pred):
 
 class SVM:
     """SVM模型：基于最大间隔分类的监督学习算法。"""
-
+#支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
     def __init__(self):
         # 超参数设置
         self.learning_rate = 0.01  # 控制梯度下降步长

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-import numpy as np # 导入NumPy库
+import numpy as np # 导入NumPy库。NumPy（Numerical Python）是 Python 中最基础、最强大的科学计算库之一
 import matplotlib.pyplot as plt
 
 import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
