@@ -174,7 +174,7 @@ class ReversiEnv(gym.Env):
             outfile.write(' ' +  str(j + 1) + '  | ')
         outfile.write('\n')
         outfile.write(' ' * 5)
-        outfile.write('-' * (board.shape[1] * 6 - 1))
+        outfile.write('-' * (board.shape[1] * 6 - 1))# 根据列数计算分隔线长度
         outfile.write('\n')
         for i in range(board.shape[1]):
             outfile.write(' ' +  str(i + 1) + '  |')
