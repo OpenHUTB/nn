@@ -32,7 +32,9 @@ def mnist_dataset():
 # In[3]:
 
 
-# 定义矩阵乘法层
+# 定义矩阵乘法层。矩阵乘法层是神经网络的“线性变换引擎”，通过权重矩阵实现高维空间的映射，为非线性计算提供基础。
+
+
 class Matmul:
     def __init__(self):
         self.mem = {}
