@@ -34,8 +34,8 @@ register(
     id='ReversedAddition3-v0',
     entry_point='gym.envs.algorithmic:ReversedAdditionEnv',
     kwargs={'rows': 3},       # 3行操作数，需同时处理三个数的加法进位
-    max_episode_steps=200,
-    reward_threshold=25.0,
+    max_episode_steps=200,    # 每个episode的最大步数限制
+    reward_threshold=25.0,    # 认为任务解决的成功阈值
 )
 
 # 4. 重复输入检测：识别序列中重复出现的元素（考察模式识别能力）
