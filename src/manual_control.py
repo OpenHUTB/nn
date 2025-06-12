@@ -880,23 +880,31 @@ class HUD(object):
         # 显示红色错误提示
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
+    # 将HUD信息渲染到指定显示表面
     def render(self, display):
         if self._show_info:
+            # 创建一个半透明的信息背景表面 (宽度220，高度与HUD相同)
             info_surface = pygame.Surface((220, self.dim[1]))
-            info_surface.set_alpha(100)
-            display.blit(info_surface, (0, 0))
+            info_surface.set_alpha(100)# 设置透明度为100
+            display.blit(info_surface, (0, 0))# 将背景绘制到显示表面左上角
             v_offset = 4
             bar_h_offset = 100
             bar_width = 106
+            
+            # 遍历所有信息文本项
             for item in self._info_text:
                 if v_offset + 18 > self.dim[1]:
                     break
+                    
+                # 处理列表类型项
                 if isinstance(item, list):
                     if len(item) > 1:
                         points = [(x + 8, v_offset + 8 + (1.0 - y) * 30) for x, y in enumerate(item)]
                         pygame.draw.lines(display, (255, 136, 0), False, points, 2)
                     item = None
                     v_offset += 18
+
+                # 处理元组类型项
                 elif isinstance(item, tuple):
                     if isinstance(item[1], bool):
                         rect = pygame.Rect((bar_h_offset, v_offset + 8), (6, 6))
@@ -910,10 +918,10 @@ class HUD(object):
                         else:
                             rect = pygame.Rect((bar_h_offset, v_offset + 8), (f * bar_width, 6))
                         pygame.draw.rect(display, (255, 255, 255), rect)
-                    item = item[0]
+                    item = item[0] # 提取元组中的文本内容
                 if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
-                    display.blit(surface, (8, v_offset))
+                    surface = self._font_mono.render(item, True, (255, 255, 255))# 使用等宽字体渲染白色文本
+                    display.blit(surface, (8, v_offset))# 将文本绘制到显示表面 (左侧8像素偏移)
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
