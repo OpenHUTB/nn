@@ -176,7 +176,7 @@ for epoch in range(50):
         tf.constant(train_data[0], dtype=tf.float32),  # 训练图像数据
         tf.constant(train_data[1], dtype=tf.int64)     # 训练标签数据
     )
-    print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
+    print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy()) # 打印当前epoch的损失和准确率
 
 # 在测试集上评估模型性能
 loss, accuracy = test(
@@ -185,4 +185,4 @@ loss, accuracy = test(
     tf.constant(test_data[1], dtype=tf.int64)    # 将测试标签数据转换为TensorFlow常量张量，指定数据类型为int64
 )
 # .numpy() 将 TensorFlow 张量转换为 NumPy 数组（或 Python 标量）以便打印
-print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
+print('test loss', loss.numpy(), '; accuracy', accuracy.numpy()) # 打印测试集上的损失和准确率
