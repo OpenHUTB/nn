@@ -291,7 +291,7 @@ def gen_poem(begin_word):
 
     poem = begin_word
     word = begin_word
-    while word != end_token:
+    while word != end_token:# 将当前诗歌内容转换为整数索引序列
         input = np.array([word_int_map[w] for w in poem],dtype= np.int64)
         input = Variable(torch.from_numpy(input))
         output = rnn_model(input, is_test=True)
