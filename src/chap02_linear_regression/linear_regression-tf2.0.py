@@ -139,7 +139,7 @@ def train_one_step(model, xs, ys):
         loss = tf.keras.losses.MSE(ys, y_preds)   #计算损失函数
     grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
     optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
-    return loss
+    return loss # 返回模型的预测结果，即模型对输入数据 xs 的输出
 
 
 # 使用@tf.function装饰器将Python函数转换为TensorFlow图，以提高执行效率
