@@ -1,129 +1,219 @@
 import numpy as np
 import os
+from pathlib import Path
+from typing import Optional, Tuple
 
-def load_data(fname):
-    """载入数据。"""
-    # 检查文件是否存在，确保数据加载的可靠性
-    if not os.path.exists(fname): 
-        raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}") # 如果文件不存在，抛出异常
-    with open(fname, 'r') as f: # 打开文件
-        data = [] # 初始化一个空列表，用于存储数据
-        line = f.readline()  # 跳过表头行
-        for line in f:
-            line = line.strip().split()  # 去除空白并按空格分割
-            x1 = float(line[0])  # 特征1：例如坐标x
-            x2 = float(line[1])  # 特征2：例如坐标y
-            t = int(line[2])     # 标签：0或1
-            data.append([x1, x2, t])
-        return np.array(data)  # 返回numpy数组，便于矩阵运算
-
-def eval_acc(label, pred):
-    """计算准确率。
+def load_data(fname: str) -> np.ndarray:
+    """
+    加载数据文件，自动处理路径和数据格式
     
     参数:
-        label: 真实标签数组
-        pred: 预测标签数组
-        
+        fname: 数据文件路径
+    
     返回:
-        准确率 (0到1之间的浮点数)
+        包含特征和标签的二维数组，形状为(n_samples, n_features+1)
     """
-    return np.sum(label == pred) / len(pred)  # 正确预测的样本比例
+    file_path = Path(fname).resolve()
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"数据文件未找到: {file_path}\n"
+            f"当前工作目录为: {Path.cwd()}"
+        )
+    
+    with file_path.open('r') as f:
+        # 自动跳过表头（假设首行以#开头或包含标题）
+        first_line = f.readline()
+        while first_line.startswith('#') or 'label' in first_line.lower():
+            first_line = f.readline()
+        
+        data = []
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = list(map(float, line.split()))
+            data.append(parts)
+    
+    return np.array(data, dtype=np.float32)
+
+def standardize_features(X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    特征标准化处理（均值为0，方差为1）
+    
+    参数:
+        X: 特征矩阵，形状为(n_samples, n_features)
+    
+    返回:
+        标准化后的特征矩阵，均值向量，标准差向量
+    """
+    mean = np.mean(X, axis=0)
+    std = np.std(X, axis=0, ddof=1)  # 使用无偏标准差
+    std = np.where(std < 1e-8, 1.0, std)  # 防止除零
+    X_standardized = (X - mean) / std
+    return X_standardized, mean, std
+
+def eval_acc(true_labels: np.ndarray, pred_labels: np.ndarray) -> float:
+    """
+    计算准确率（包含边界检查）
+    
+    参数:
+        true_labels: 真实标签数组
+        pred_labels: 预测标签数组
+    
+    返回:
+        准确率（0到1之间的浮点数）
+    
+    抛出:
+        ValueError: 标签数组长度不一致
+    """
+    if len(true_labels) != len(pred_labels):
+        raise ValueError("真实标签和预测标签长度必须一致")
+    return np.mean(true_labels == pred_labels)
 
 class SVM:
-    """SVM模型：基于最大间隔分类的监督学习算法。"""
-
-    def __init__(self):
-        # 超参数设置
-        self.learning_rate = 0.01  # 控制梯度下降步长
-        self.reg_lambda = 0.01     # L2正则化系数，平衡间隔最大化与分类误差
-        self.max_iter = 1000       # 最大训练迭代次数
-        self.w = None              # 权重向量，决定分类超平面的方向
-        self.b = None              # 偏置项，决定分类超平面的位置
-
-    def train(self, data_train):
-        """训练SVM模型（基于hinge loss + L2正则化）
+    """
+    线性SVM分类器（使用随机梯度下降优化Hinge Loss + L2正则化）
+    
+    参数:
+        learning_rate: 学习率（默认0.01）
+        reg_lambda: L2正则化系数（默认0.01）
+        max_iter: 最大迭代次数（默认1000）
+        tol: 收敛阈值（默认1e-3）
+        random_state: 随机种子（默认None）
+    """
+    def __init__(
+        self,
+        learning_rate: float = 0.01,
+        reg_lambda: float = 0.01,
+        max_iter: int = 1000,
+        tol: float = 1e-3,
+        random_state: Optional[int] = None
+    ):
+        self.learning_rate = learning_rate
+        self.reg_lambda = reg_lambda
+        self.max_iter = max_iter
+        self.tol = tol
+        self.random_state = random_state
         
-        算法核心：
-        1. 寻找能最大化间隔的超平面 wx + b = 0
-        2. 间隔定义为：样本到超平面的最小距离
-        3. 使用hinge loss处理分类错误和边界样本
-        4. 添加L2正则化防止过拟合
+        self.w: Optional[np.ndarray] = None  # 权重向量
+        self.b: float = 0.0                # 偏置项
+        self.loss_history: list = []       # 损失历史记录
+        self.rng = np.random.RandomState(random_state)
+        
+    def _hinge_loss(self, X: np.ndarray, y: np.ndarray) -> float:
+        """计算Hinge Loss（带L2正则化）"""
+        margins = y * (np.dot(X, self.w) + self.b)
+        hinge_loss = np.mean(np.maximum(0, 1 - margins))
+        l2_loss = self.reg_lambda * np.sum(self.w ** 2)
+        return hinge_loss + l2_loss
+    
+    def train(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        standardize: bool = True
+    ) -> None:
         """
-        X = data_train[:, :2]         # 提取特征矩阵
-        y = data_train[:, 2]          # 提取标签
-        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，符合SVM理论要求
-        m, n = X.shape                # m:样本数，n:特征数
-
-        # 初始化模型参数
-        self.w = np.zeros(n)  # 权重向量初始化为0
-        self.b = 0            # 偏置项初始化为0
-
+        训练SVM模型
+        
+        参数:
+            X: 特征矩阵，形状为(n_samples, n_features)
+            y: 标签数组（0/1格式，将自动转为-1/1）
+            standardize: 是否进行特征标准化（默认True）
+        """
+        # 数据预处理
+        y = np.where(y == 0, -1, 1).astype(np.float32)  # 转换为-1/1标签
+        if standardize:
+            X, self.mean, self.std = standardize_features(X)
+        else:
+            self.mean = np.zeros(X.shape[1])
+            self.std = np.ones(X.shape[1])
+        
+        m, n = X.shape
+        self.w = self.rng.randn(n).astype(np.float32)  # 随机初始化权重
+        self.b = 0.0
+        
         for epoch in range(self.max_iter):
-            # 计算函数间隔：y(wx+b)，衡量样本到超平面的距离和方向
-            margin = y * (np.dot(X, self.w) + self.b)
+            # 随机选择单个样本进行SGD
+            idx = self.rng.randint(m)
+            xi = X[idx]
+            yi = y[idx]
             
-            # 找出违反间隔条件的样本（margin < 1）
-            # 这些样本包括：误分类样本(margin<0)和间隔内样本(0<=margin<1)
-            idx = np.where(margin < 1)[0]
+            # 计算函数间隔
+            margin = yi * (np.dot(xi, self.w) + self.b)
             
-            # 如果所有样本都满足margin>=1，说明已找到完美超平面
-            # 移除continue语句，确保即使所有样本都满足间隔条件
-            # 也会更新权重以优化正则化项
-
-            # 计算梯度：正则化项梯度 + 误分类样本梯度
-            # L2正则化：减小权重，防止过拟合
-            # hinge loss梯度：只对误分类和边界样本计算梯度
-            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis=0)
-            db = -np.mean(y[idx])
-
-            # 梯度下降更新参数
-            self.w -= self.learning_rate * dw
-            self.b -= self.learning_rate * db
+            # 计算梯度
+            if margin < 1:
+                # 对违反间隔的样本进行梯度更新
+                dw = 2 * self.reg_lambda * self.w - yi * xi
+                db = -yi
+            else:
+                # 仅正则化项梯度
+                dw = 2 * self.reg_lambda * self.w
+                db = 0.0
             
-            # 训练逻辑总结：
-            # - 对误分类样本，向正确方向调整超平面
-            # - 对间隔内样本，微调超平面使其远离
-            # - 正则化项约束权重大小，使间隔更平滑
-
-    def predict(self, x):
-        """预测标签。
-        
-        预测逻辑：
-        1. 计算样本到超平面的有符号距离 wx + b
-        2. 距离为正 -> 预测为正类(1)
-        3. 距离为负 -> 预测为负类(0)
+            # 梯度下降更新
+            self.w -= self.learning_rate * dw / m
+            self.b -= self.learning_rate * db / m
+            
+            # 记录损失并检查收敛
+            if epoch % 100 == 0:
+                loss = self._hinge_loss(X, y)
+                self.loss_history.append(loss)
+                if len(self.loss_history) > 1:
+                    if np.abs(self.loss_history[-1] - self.loss_history[-2]) < self.tol:
+                        print(f"提前停止，迭代次数: {epoch}")
+                        break
+    
+    def predict(self, X: np.ndarray) -> np.ndarray:
         """
-        score = np.dot(x, self.w) + self.b     # 计算决策函数值
-        return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签格式
+        预测样本标签
+        
+        参数:
+            X: 特征矩阵，形状为(n_samples, n_features)
+        
+        返回:
+            预测标签数组（0/1格式）
+        """
+        # 特征标准化（使用训练时的均值和标准差）
+        X_standardized = (X - self.mean) / self.std
+        scores = np.dot(X_standardized, self.w) + self.b
+        return np.where(scores >= 0, 1, 0).astype(np.int32)
 
 if __name__ == '__main__':
-    # 数据加载部分
-    base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
-    train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
-    test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
-
-    # 加载训练数据
-    data_train = load_data(train_file)
-    # 加载测试数据
-    data_test = load_data(test_file)
-
-    # 模型训练
-    svm = SVM()            # 初始化SVM模型
-    svm.train(data_train)  # 训练模型寻找最优超平面
-
-    # 训练集评估
-    x_train = data_train[:, :2]  # 训练特征
-    t_train = data_train[:, 2]   # 训练标签
-    t_train_pred = svm.predict(x_train)  # 预测训练集标签
-
-    # 测试集评估
-    x_test = data_test[:, :2]    # 测试特征
-    t_test = data_test[:, 2]     # 测试标签
-    t_test_pred = svm.predict(x_test)  # 预测测试集标签
-
-    # 计算并打印准确率
-    acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
-    acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
+    # 路径处理优化
+    base_path = Path(__file__).parent.resolve()
+    data_dir = base_path / "data"
+    train_file = data_dir / "train_linear.txt"
+    test_file = data_dir / "test_linear.txt"
     
-    print("train accuracy: {:.1f}%".format(acc_train * 100))
-    print("test accuracy: {:.1f}%".format(acc_test * 100))
+    # 加载数据
+    try:
+        data_train = load_data(train_file)
+        data_test = load_data(test_file)
+    except FileNotFoundError as e:
+        print(f"数据加载失败: {e}")
+        exit(1)
+    
+    # 拆分特征和标签
+    X_train, y_train = data_train[:, :-1], data_train[:, -1]
+    X_test, y_test = data_test[:, :-1], data_test[:, -1]
+    
+    # 模型训练
+    svm = SVM(
+        learning_rate=0.001,
+        reg_lambda=0.1,
+        max_iter=2000,
+        tol=1e-4,
+        random_state=42
+    )
+    svm.train(X_train, y_train)
+    
+    # 模型评估
+    def evaluate_model(model, X, y, name: str):
+        pred = model.predict(X)
+        acc = eval_acc(y, pred)
+        print(f"{name}准确率: {acc * 100:.1f}%")
+    
+    evaluate_model(svm, X_train, y_train, "训练集")
+    evaluate_model(svm, X_test, y_test, "测试集")
