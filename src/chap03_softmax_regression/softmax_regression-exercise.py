@@ -11,9 +11,9 @@
 # In[1]:
 
 # 导入运行所需模块
-import tensorflow as tf
-import matplotlib.pyplot as plt
-from matplotlib import animation, rc
+import tensorflow as tf # TensorFlow深度学习框架
+import matplotlib.pyplot as plt # 数据可视化库
+from matplotlib import animation, rc # 动画功能
 from IPython.display import HTML # 在Jupyter中显示动画
 import matplotlib.cm as cm # 颜色映射
 import numpy as np # 数值计算库
