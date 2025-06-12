@@ -127,8 +127,8 @@ class Softmax:
         # np.expand_dims(grad_y, axis=1) 将其形状变为 (N, 1, c)
         g_y_exp = np.expand_dims(grad_y, axis=1)
         # (N, 1, c)
-        tmp = np.matmul(g_y_exp, sisj)
-        tmp = np.squeeze(tmp, axis=1)
+        tmp = np.matmul(g_y_exp, sisj) # 计算矩阵乘法结果
+        tmp = np.squeeze(tmp, axis=1)  # 去掉结果矩阵的单维度条目
         tmp = -tmp + grad_y * s
         return tmp
 
