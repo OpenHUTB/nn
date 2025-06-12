@@ -31,9 +31,10 @@ def mnist_dataset():
     # 从NumPy数组创建TensorFlow Dataset对象
     # 每个元素是一个(image, label)对，来自(x, y)
     ds = tf.data.Dataset.from_tensor_slices((x, y))
-    ds = ds.map(prepare_mnist_features_and_labels)
-    ds = ds.take(20000).shuffle(20000).batch(100)
+    ds = ds.map(prepare_mnist_features_and_labels) # 应用预处理
+    ds = ds.take(20000).shuffle(20000).batch(100) # 取20000样本，混洗后分100的批次
 
+    # 创建测试数据集管道
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
     test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
