@@ -263,6 +263,7 @@ label[1, 0] = 1
 label[2, 3] = 1
 label[3, 5] = 1
 label[4, 0] = 1
+# 重新生成输入数据（覆盖之前的x，保持代码块独立性）
 
 x = np.random.normal(size=[5, 6])   # 5 个样本，每个样本 6 维特征
 W1 = np.random.normal(size=[6, 5])  # 第一层权重 (6→5)
