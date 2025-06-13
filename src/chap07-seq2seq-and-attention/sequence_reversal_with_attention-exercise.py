@@ -8,14 +8,16 @@
 # In[19]:
 
 
-import numpy as np
-import tensorflow as tf
-import collections
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
-
+import numpy as np  # 导入NumPy库
+import tensorflow as tf  # 导入TensorFlow库
+import collections  # 导入collections模块
+from tensorflow import keras  # 从TensorFlow中导入Keras API，用于构建和训练深度学习模型
+from tensorflow.keras import layers, optimizers, datasets  # 从Keras中导入层、优化器和数据集模块
+import os  # 导入操作系统接口模块
+import sys  # 导入系统相关参数和函数模块
+import tqdm  # 导入tqdm库，用于显示进度条
+import random  # 导入随机数生成模块
+import string  # 导入字符串模块
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
@@ -23,8 +25,6 @@ import os,sys,tqdm
 # In[20]:
 
 
-import random
-import string
 
 def randomString(stringLength):
     """生成一个指定长度的随机字符串，字符串由大写字母组成"""
@@ -44,6 +44,15 @@ def get_batch(batch_size, length):
     enc_x: 编码器输入，字符转换为索引后的张量
     dec_x: 解码器输入，包含起始标记，字符转换为索引后的张量
     y: 解码器目标输出，原始序列的逆序，字符转换为索引后的张量
+
+    数据格式说明:
+    - 原始字符串: 如 ['ABCD', 'EFGH'] 长度等于 batch_size
+    - 编码器输入 (enc_x): 
+        [[1, 2, 3, 4], [5, 6, 7, 8]] 将字符转换为索引（A=1, B=2,..., Z=26）
+    - 解码器输入 (dec_x):
+        [[0, 1, 2, 3], [0, 5, 6, 7]] 在目标序列前加起始标记(0)并移除最后一个字符
+    - 目标输出 (y):
+        [[4, 3, 2, 1], [8, 7, 6, 5]] 输入序列的逆序索引
     """
     # 生成随机字符串
     batched_examples = [randomString(length) for i in range(batch_size)]
@@ -55,6 +64,7 @@ def get_batch(batch_size, length):
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
     
     # 解码器输入在目标序列前加一个起始标记(0)，并去掉最后一个字符
+    # 例如目标序列为 [1,2,3]，则解码器输入为 [0,1,2]
     dec_x = [[0]+e_idx[:-1] for e_idx in y]
     
     return (batched_examples, tf.constant(enc_x, dtype=tf.int32), 
@@ -66,7 +76,7 @@ print(get_batch(2, 10))
 # # 建立sequence to sequence 模型
 # ##
 # 完成两空，模型搭建以及单步解码逻辑
-
+# 带注意力机制的序列到序列模型实现，包含编码器、解码器和注意力计算
 # In[26]:
 
 
@@ -164,6 +174,7 @@ class mySeq2SeqModel(keras.Model):
         enc_out: 编码器各时间步的输出 [batch_size, seq_len, hidden]
         state: 编码器最终状态 [batch_size, hidden]
         """
+        # 将输入的token ID转换为密集向量表示
         enc_emb = self.embed_layer(enc_ids)  # shape(b_sz, len, emb_sz)
         enc_out, enc_state = self.encoder(enc_emb)
         return enc_out, [enc_out[:, -1, :], enc_state]
@@ -196,8 +207,13 @@ class mySeq2SeqModel(keras.Model):
         # 应用softmax获取注意力权重
         attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, enc_seq_len]
         
+        attn_weights_expanded = tf.expand_dims(attn_weights, axis=1)  # [batch_size, 1, enc_seq_len]
+        
+        
         # 计算上下文向量
-        context = tf.matmul(attn_weights, enc_out)  # [batch_size, hidden]
+        context = tf.matmul(attn_weights_expanded, enc_out)  # [batch_size, 1, hidden]
+        
+        context = tf.squeeze(context, axis=1)  # [batch_size, hidden]
         
         # 4. 结合上下文向量和解码器输出
         dec_out_with_context = tf.concat([dec_out, context], axis=-1)  # [batch_size, hidden*2]
@@ -219,10 +235,15 @@ class mySeq2SeqModel(keras.Model):
 @tf.function
 def compute_loss(logits, labels):
     """计算模型预测的损失"""
+    # 计算稀疏softmax交叉熵损失（适用于分类任务）
+    # - logits: 模型输出的未归一化预测值（形状[batch_size, num_classes]）
+    # - labels: 真实标签（形状[batch_size]，每个元素是类别索引）
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 计算平均损失
+    # 使用 tf.reduce_mean 函数对所有样本的损失值求平均
     losses = tf.reduce_mean(losses)
-    return losses
+    return losses# 返回平均损失值
 
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
@@ -244,12 +265,12 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
         loss = compute_loss(logits, y)
 
     # 计算梯度
-    grads = tape.gradient(loss, model.trainable_variables)
+    grads = tape.gradient(loss, model.trainable_variables) # 使用自动微分计算损失函数相对于模型可训练变量的梯度
     
     # 应用梯度
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    optimizer.apply_gradients(zip(grads, model.trainable_variables)) # 使用优化器应用梯度更新模型的可训练变量
     
-    return loss
+    return loss # 返回损失值
 
 def train(model, optimizer, seqlen):
     """
@@ -267,24 +288,41 @@ def train(model, optimizer, seqlen):
     accuracy = 0.0
     
     # 训练2000步
-    for step in range(2000):
-        batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
-        loss = train_one_step(model, optimizer, enc_x, dec_x, y)
-        
-        # 每500步打印一次损失
-        if step % 500 == 0:
-            print('step', step, ': loss', loss.numpy())
+for step in range(2000):
+    # 获取一个批次的训练数据
+    batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
     
-    return loss
+    # 执行一次训练步骤：前向传播 + 反向传播 + 参数更新
+    loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+    
+    # 每500步打印一次损失
+    if step % 500 == 0:
+        # 将当前步数与损失值打印出来，用于监控训练过程
+        print('step', step, ': loss', loss.numpy())
+        
+# 返回最后一次计算的 loss 值（可用于调试或后续处理）
+return loss
 
 
 # # 训练迭代
 
 # In[28]:
 
-
+# 初始化Adam优化器，设置学习率为0.0005
+# Adam优化器结合了动量法和RMSProp的优点，适合序列学习任务
+# 0.0005是相对较小的学习率，适合精细调优
 optimizer = optimizers.Adam(0.0005)
+
+# 实例化Seq2Seq模型
+# mySeq2SeqModel()应该实现了编码器-解码器架构
+# 用于处理序列到序列的转换任务（如机器翻译、文本摘要等）
 model = mySeq2SeqModel()
+
+# 开始训练模型
+# 参数说明：
+#   model: 要训练的Seq2Seq模型实例
+#   optimizer: 配置好的优化器
+#   seqlen=20: 序列长度设为20（输入/输出序列的最大长度）
 train(model, optimizer, seqlen=20)
 
 
@@ -320,6 +358,7 @@ def sequence_reversal():
         
         # 逐步生成输出序列
         for i in range(steps):
+            # 获取下一个token和更新后的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
             collect.append(tf.expand_dims(cur_token, axis=-1))
         
@@ -332,21 +371,27 @@ def sequence_reversal():
     # 生成一批测试数据
     batched_examples, enc_x, _, _ = get_batch(32, 20)
     
-    # 编码输入序列
+    # 编码输入序列（提取特征表示）
     enc_out, state = model.encode(enc_x)
     
-    # 解码生成逆置序列
+    # 解码生成逆置序列（自回归生成）
     return decode(state, enc_x.get_shape()[-1], enc_out), batched_examples
 
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
+    # 反转字符串 rev_seq 两次，恢复原始顺序
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
         return True
     else:
         return False
 # 测试函数功能
+# 假设 sequence_reversal() 是一个函数，返回两个序列的列表
+# 使用 zip(*sequence_reversal()) 将两个序列的列表解包并配对
+# 然后对每一对序列调用 is_reverse 函数，检查是否为逆序
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
 
 

@@ -21,7 +21,7 @@ import matplotlib.cm as cm
 # 导入 NumPy 数值计算库
 import numpy as np
 
-# 设置随机种子（确保结果可复现）
+# 设置随机种子（确保结果可复现）随机种子（Random Seed） 是用于初始化伪随机数生成器的起始值，它决定了随机数序列的“起点”。
 # NumPy的随机种子
 np.random.seed(42)
 # TensorFlow的随机种子
@@ -63,7 +63,7 @@ np.random.shuffle(data_set)
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
-# 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss 函数)
+# 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss函数)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
 epsilon = 1e-12
 
@@ -74,17 +74,17 @@ class LogisticRegression():
         # L2正则化，防止过拟合，正则化系数为0.01
         # L2正则化通过对权重施加平方惩罚项来防止权重过大
         l2_reg = tf.keras.regularizers.l2(0.01)
-        # 初始化权重变量W，形状为[2, 1]，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
+        # 初始化权重变量W，形状为[2, 1]表示2维输入到1维输出的线性变换，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
-            initial_value=tf.random.uniform(
-                shape=[2, 1], minval=-0.1, maxval=0.1
+            initial_value = tf.random.uniform(
+                shape = [2, 1], minval = -0.1, maxval = 0.1  # 权重矩阵形状、最小值、最大值
             ),
-            regularizer=l2_reg
+            regularizer = l2_reg    # 应用L2正则化
         )
-        # 初始化偏置变量b，形状为[1]，初始值为0
+        # 初始化偏置变量b，形状为[1]，数据类型为tf.float32，初始值为0
         self.b = tf.Variable(
-            shape=[1],
-            dtype=tf.float32,
+            shape = [1],
+            dtype = tf.float32,
             initial_value=tf.zeros(shape=[1])
         )
         # 定义模型的可训练变量，即权重W和偏置b
@@ -104,6 +104,7 @@ class LogisticRegression():
         # 计算输入数据与权重的矩阵乘法，再加上偏置，得到logits，形状为(N, 1)
         logits = tf.matmul(inp, self.W) + self.b
         # 对logits应用sigmoid函数，得到预测概率
+        # 数学表达式：pred = sigmoid(logits) = 1 / (1 + exp(-logits))
         pred = tf.nn.sigmoid(logits)
         return pred
 
@@ -143,8 +144,9 @@ def compute_loss(pred, label):
     # 将预测概率大于0.5的设置为1，小于等于0.5的设置为0，得到预测标签
     pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype=tf.float32))
-    return loss, accuracy# 返回计算得到的损失值和准确率
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype = tf.float32))
+    # 返回计算得到的损失值和准确率
+    return loss, accuracy
 
 
 @tf.function
@@ -182,7 +184,8 @@ if __name__ == '__main__':
    # 将x1和x2组合成输入数据 x
    # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
    # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
-   x = list(zip(x1, x2))
+   x = np.array(list(zip(x1, x2)), dtype=np.float32)
+   y = np.array(y, dtype=np.float32)
 
    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
    # animation_frames 列表将记录训练过程中每个步骤或epoch的:
@@ -195,24 +198,34 @@ if __name__ == '__main__':
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
-        animation_frames.append(
-            (W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
-        )
+        
+            W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
+           animation_frames.append((W_np[0, 0], W_np[1, 0], b_np, loss_np))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
-    # 创建图形
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
-    plt.ylabel('Y')
-    plt.xlabel('X')
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 10)
-    ax.grid(linestyle="--", alpha=0.7)
+    plt.ylabel('Y')  # 设置Y轴标签为'Y'，用于标识垂直方向的变量
+    plt.xlabel('X')  # 设置X轴标签为'X'，用于标识水平方向的变量
+    ax.set_xlim(0, 10)  # X轴显示范围0-10
+    ax.set_ylim(0, 10)  # Y轴显示范围0-10
 
-    line_d, = ax.plot([], [], label = 'fit_line')
-    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
-    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
+    line_d, = ax.plot([], [], label = 'fit_line')  # 创建用于绘制决策边界的线条对象
+
+    # 创建两个类别的数据点：
+    # C1_dots：类别1的样本点，用蓝色'+'表示
+    # C2_dots：类别2的样本点，用绿色'o'表示
+    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')   # 正样本
+    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')   # 负样本
+
+    # 创建用于显示动态文本的文本对象（位于左上角）
+    # 参数说明：
+    # 0.02, 0.95：文本位置坐标（x=2%轴宽度，y=95%轴高度），使用相对坐标系统
+    # ''：初始空文本内容
+    # horizontalalignment='left'：水平左对齐（使文本紧贴左侧边界）
+    # verticalalignment='top'：垂直顶部对齐（使文本紧贴顶部边界）
+    # transform=ax.transAxes：使用坐标轴相对坐标系（0-1范围，而非数据坐标系）
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
@@ -220,6 +233,7 @@ if __name__ == '__main__':
         transform=ax.transAxes
     )
 
+    # 决策边界为直线：W1·x1 + W2·x2 + b = 0，动态显示损失下降过程
     def init():
         """
         初始化动画所需的图形元素
@@ -263,4 +277,6 @@ if __name__ == '__main__':
         f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
-    HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
+
+   from IPython.display import display
+display(HTML(anim.to_html5_video()))# 将动画转换为HTML5视频并显示
