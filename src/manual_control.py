@@ -748,6 +748,7 @@ class KeyboardControl(object):
 
 
 class HUD(object):
+        
     def __init__(self, width, height):
         """
         初始化HUD（平视显示器）类。
