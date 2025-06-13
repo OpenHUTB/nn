@@ -102,7 +102,7 @@ import re
 import weakref
 
 try:
-    import pygame
+    import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
     from pygame.locals import KMOD_CTRL
     from pygame.locals import KMOD_SHIFT
     from pygame.locals import K_0
