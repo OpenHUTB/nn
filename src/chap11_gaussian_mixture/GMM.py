@@ -311,12 +311,14 @@ if __name__ == "__main__":
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.subplot(1, 2, 2)
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
+    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)#绘制散点图，x 轴和 y 轴与第一个子图相同。点颜色由 y_pred 决定（GMM 预测的聚类标签），
+    # 使用相同的 viridis 颜色映射。点大小同样为 10。
     plt.title("GMM Predicted Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7)
-    plt.show()
+    plt.show()#显示创建的图形窗口
+    #打印信息
     print("生成混合高斯分布数据...")
     print("生成混合高斯分布数据...")
     print("生成混合高斯分布数据...")
