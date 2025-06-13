@@ -393,16 +393,16 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             pass
 
     def tick(self, clock):
-        self.hud.tick(self, clock)
-
+        self.hud.tick(self, clock) # 调用HUD的tick方法更新信息
+    
     def render(self, display):
-        self.camera_manager.render(display)
-        self.hud.render(display)
+        self.camera_manager.render(display) # 渲染相机画面
+        self.hud.render(display)  # 渲染HUD界面
 
     def destroy_sensors(self):
-        self.camera_manager.sensor.destroy()
-        self.camera_manager.sensor = None
-        self.camera_manager.index = None
+        self.camera_manager.sensor.destroy() # 销毁相机传感器
+        self.camera_manager.sensor = None # 清空传感器引用
+        self.camera_manager.index = None # 重置相机索引
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
