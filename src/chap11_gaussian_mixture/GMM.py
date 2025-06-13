@@ -275,11 +275,11 @@ class GaussianMixtureModel:
         # 绘制对数似然值随迭代次数的变化曲线
         # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
-        # 设置x轴标签为“迭代次数”
+        # 设置x轴的标签为“迭代次数”
         plt.xlabel('迭代次数')
-        # 设置y轴标签为“对数似然值”
+        # 设置y轴的标签为“对数似然值”
         plt.ylabel('对数似然值')
-        # 设置图表标题为“EM算法收敛曲线”
+        # 设置图表的标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
         # 启用网格线，增强可读性
         plt.grid(True, alpha=0.5) 
