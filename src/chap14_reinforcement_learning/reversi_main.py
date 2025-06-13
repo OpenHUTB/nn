@@ -100,3 +100,5 @@ for i_episode in range(max_epochs):
 # 清理环境资源
 env.close()
 print(f"训练完成！共进行了 {max_epochs} 局游戏")
+print(f"训练完成！共进行了 {max_epochs} 局游戏")
+print(f"训练完成！共进行了 {max_epochs} 局游戏")

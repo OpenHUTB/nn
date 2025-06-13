@@ -437,3 +437,4 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
 
 # 生成并打印诗歌
 print(''.join(gen_sentence()))
+print(''.join(gen_sentence()))
