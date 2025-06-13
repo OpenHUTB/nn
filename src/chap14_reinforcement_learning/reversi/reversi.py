@@ -206,14 +206,17 @@ class ReversiEnv(gym.Env):
     def pass_place(board_size, action):
         return action == board_size ** 2 + 1
 
+    # 获取当前玩家在棋盘上所有合法的落子位置
     @staticmethod
     def get_possible_actions(board, player_color):
         actions=[]
-        d = board.shape[-1]
-        opponent_color = 1 - player_color
+        d = board.shape[-1]        # 棋盘维度
+        opponent_color = 1 - player_color  # 对手颜色
+
+        # 遍历棋盘上所有可落子位置
         for pos_x in range(d):
             for pos_y in range(d):
-                if (board[2, pos_x, pos_y]==0):
+                if (board[2, pos_x, pos_y]==0): # 如果该位置不是可落子点，跳过
                     continue
                 for dx in [-1, 0, 1]:
                     for dy in [-1, 0, 1]:
@@ -222,9 +225,9 @@ class ReversiEnv(gym.Env):
                         nx = pos_x + dx
                         ny = pos_y + dy
                         n = 0
-                        if (nx not in range(d) or ny not in range(d)):
+                        if (nx not in range(d) or ny not in range(d)): # 检查相邻位置是否在棋盘内 
                             continue
-                        while(board[opponent_color, nx, ny] == 1):
+                        while(board[opponent_color, nx, ny] == 1):     # 沿着该方向搜索连续的对手棋子
                             tmp_nx = nx + dx
                             tmp_ny = ny + dy
                             if (tmp_nx not in range(d) or tmp_ny not in range(d)):
