@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Dense, Dropout, Flatten # 引入全连接层
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 import pylab # Matplotlib的绘图接口
 from PIL import Image
-import numpy as np
+import numpy as np # 数值计算库
 
 # 定义一个简单的卷积模型
 class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自定义卷积神经网络模型
