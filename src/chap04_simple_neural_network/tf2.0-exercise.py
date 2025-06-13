@@ -1,8 +1,10 @@
-#!/usr/bin/env python
+# !/usr/bin/env python
 # coding: utf-8
 # # Tensorflow2.0 小练习
 
+# 导入 numpy 库，并简写为 np（标准约定）
 import numpy as np
+# 导入 TensorFlow 库，并简写为 tf（标准约定）
 import tensorflow as tf
 
 # ## 实现softmax函数
@@ -16,10 +18,12 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     返回:
         与输入形状相同的 softmax 概率分布张量。
     """
-    x = tf.cast(x, tf.float32)
+    x = tf.cast(x, tf.float32) # 统一为float32类型，确保计算精度
 
     # 数值稳定性处理：减去最大值避免指数爆炸
-    max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    # 沿最后一个维度（通常是类别维度）取最大值，并保持维度以便广播
+    max_per_row = tf.reduce_max(x, axis = -1, keepdims = True)
+    # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
     # 计算指数值
@@ -27,26 +31,29 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     # tf.exp计算每个元素的指数值，使所有值为正数
     exp_logits = tf.exp(shifted_logits)
     
+    # 沿着最后一个维度（类别维度）对指数值求和，得到每条样本的指数和
+    # axis=-1 表示对最后一个维度进行操作，即类别维度
+    # keepdims=True 保持输出的维度与输入相同，便于后续进行广播除法
     sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
-    
-    softmax_output = exp_logits / sum_exp
 
-    return softmax_output
+    # 将每个类别的指数值除以对应样本的指数和，得到归一化的概率分布（softmax）
+    # 输出结果表示每个类别的概率，形状与 exp_logits 相同
+    return exp_logits / sum_exp
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
 # 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
 
-#数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
+# 数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
 
 def sigmoid(x):
     ##########
     '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
-    x = tf.cast(x, tf.float32) #将输入x转换为float32类型，确保数值计算的精度和类型一致性。
-    prob_x = 1 / (1 + tf.exp(-x))           # sigmoid 数学定义：1 / (1 + e^{-x})
-    
-    return prob_x
+    # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
+    x = tf.cast(x, tf.float32)
+    # sigmoid 数学定义：1 / (1 + e^{-x})
+    return 1 / (1 + tf.exp(-x))
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
@@ -58,59 +65,70 @@ test_data = np.random.normal(size=[10, 5])
 def softmax_ce(logits, label):
     ##########
     '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
-    #参数logits: 未经Softmax的原始输出（logits）
-    #参数label: one-hot格式的标签
+    logits = tf.cast(logits, tf.float32)
+    label = tf.cast(label, tf.float32)
+    # 参数logits: 未经Softmax的原始输出（logits）
+    # 参数label: one-hot格式的标签
+    # 定义一个极小值epsilon（1e-8），用于数值稳定性，防止log(0)的情况
     epsilon = 1e-8
     logits = tf.cast(logits, tf.float32)
     label = tf.cast(label, tf.float32)
     # 数值稳定处理：减去最大值
-    logits_max = tf.reduce_max(logits, axis=-1, keepdims=True)
+    logits_max = tf.stop_gradient(tf.reduce_max(logits, axis=-1, keepdims=True))
     stable_logits = logits - logits_max
     # 计算Softmax概率
     exp_logits = tf.exp(stable_logits)
     prob = exp_logits / tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
     # 计算交叉熵
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(prob + epsilon), axis=1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
     ##########
     return loss
 
 # 生成测试数据，形状为 [10, 5] 的正态随机数
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size=[10, 5]).astype(np.float32)
 # 进行softmax转换
-prob = tf.nn.softmax(test_data)
-# 生成标签，每个样本只有一个类别为 1
-label = np.zeros_like(test_data)
+# 正确测试逻辑：直接使用原始logits
+test_logits = np.random.normal(size=[10, 5]).astype(np.float32)
+label = np.zeros_like(test_logits, dtype=np.float32)
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 # 比较自定义的损失值和tf自带结果，误差小于 0.0001 则认为相等
+
 ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
   - softmax_ce(prob, label))**2 < 0.0001).numpy()
 
 # ## 实现 sigmoid 交叉熵loss函数
 
-def sigmoid_ce(x, label):
-    ##########
-    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
-    epsilon = 1e-8
-    x = tf.cast(x, tf.float32)
-    label = tf.cast(label, tf.float32) # 将标签转换为float32
-    # 计算sigmoid交叉熵损失，先计算每个样本的交叉熵，再求平均值
-    loss = -tf.reduce_mean(
-        label * tf.math.log(x + epsilon) +
-        (1 - label) * tf.math.log(1 - x + epsilon)
+def sigmoid_ce(logits, labels):
+    """
+    实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
+    接收未经过 sigmoid 的 logits 输入
+    """
+    # 将 logits 和 labels 转换为 tf.float32 类型，确保后续计算的数值稳定性
+    logits = tf.cast(logits, tf.float32)
+    labels = tf.cast(labels, tf.float32)
+    
+    # 通过更稳定的方式实现 sigmoid 交叉熵：
+    loss = tf.reduce_mean(
+        tf.nn.relu(logits) - logits * labels + 
+        tf.math.log(1 + tf.exp(-tf.abs(logits)))
+
     )
-    ##########
-    return loss
+    
+    return loss #返回计算得到的损失值
 
-# 生成测试数据，形状为 [10] 的正态随机数
-test_data = np.random.normal(size=[10])
-# 进行sigmoid转换
-prob = tf.nn.sigmoid(test_data)
-# 生成标签，取值为 0 或 1
-label = np.random.randint(0, 2, 10).astype(test_data.dtype)
-print(label)
-# 比较自定义的损失值和tf自带的结果，误差小于 0.0001 则认为相等
-((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data)) - sigmoid_ce(prob, label))**2 < 0.0001).numpy()
+# 测试逻辑
+test_data = np.random.normal(size=[10]).astype(np.float32)  # 生成随机的测试数据
+labels = np.random.randint(0, 2, size=[10]).astype(np.float32) # 生成随机的二分类标签
 
+# 对比 TensorFlow  原始结果和自定义函数结果
+tf_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels = labels, logits = test_data))
+custom_loss = sigmoid_ce(test_data, labels)
 
-
-
+# 打印输出结果
+# 打印 TensorFlow 计算的损失值
+print("tf loss:", tf_loss.numpy())
+# 打印自定义实现的损失值
+print("custom loss:", custom_loss.numpy())
+# 检查两种实现的误差是否小于阈值（0.0001），并打印结果
+# 通过计算平方差 (tf_loss - custom_loss)^2，判断是否小于 0.0001
+print("误差是否小于0.0001:", ((tf_loss - custom_loss) ** 2 < 0.0001).numpy())

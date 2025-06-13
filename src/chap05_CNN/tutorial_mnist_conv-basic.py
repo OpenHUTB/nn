@@ -1,56 +1,97 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# ## 准备数据
+
 # In[29]:
-#导入了用于构建和训练卷积神经网络（CNN）的TensorFlow和Keras模块
 import os
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Conv2D, MaxPooling2D # 导入卷积神经网络核心层：二维卷积层和最大池化层
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
-#构建 MNIST 手写数字数据集的 TensorFlow 数据加载管道，包含数据预处理、批处理和随机打乱等操作
-def mnist_dataset():#加载MNIST数据集
-    (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    x = x.reshape(x.shape[0], 28, 28,1)
-    x_test = x_test.reshape(x_test.shape[0], 28, 28,1)
-    
-    ds = tf.data.Dataset.from_tensor_slices((x, y))#从numpy数组创建Dataset
-    ds = ds.map(prepare_mnist_features_and_labels)#应用预处理函数
-    ds = ds.take(20000).shuffle(20000).batch(32)#取20000样本，打乱，分32的batch
-    
+# 设置TensorFlow日志级别，只显示错误信息
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+
+def mnist_dataset():
+    """
+    加载并预处理MNIST数据集，返回训练集和测试集的TensorFlow Dataset对象。
+
+    返回:
+        ds (tf.data.Dataset): 处理后的训练数据集。
+        test_ds (tf.data.Dataset): 处理后的测试数据集。
+    """
+    (x, y), (x_test, y_test) = datasets.mnist.load_data()   # 加载MNIST手写数字数据集，包含60,000张训练图像和10,000张测试图像
+    x = x.reshape(x.shape[0], 28, 28, 1)
+    x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
+   # 从输入数据 x 和标签 y 创建一个 TensorFlow Dataset 对象
+   # 每个元素是一个 (x_i, y_i) 的元组，表示一个样本和对应的标签
+    ds = tf.data.Dataset.from_tensor_slices((x, y))
+   # 使用 map 方法对数据集中的每个元素应用 prepare_mnist_features_and_labels 函数
+   # 这个函数通常用于预处理数据，例如归一化特征、将标签转换为 one-hot 编码等
+    ds = ds.map(prepare_mnist_features_and_labels)
+    # 取出前 20000 个样本（限制数据集大小）
+    # 如果原始数据集很大，这一步可以只保留一部分数据用于训练或测试
+    # 对数据集进行打乱（shuffle），确保每个 batch 中的样本是随机选取的
+    # buffer_size=20000 表示用于洗牌的数据缓冲区大小
+    ds = ds.take(20000).shuffle(20000).batch(32)
+
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
-    return ds, test_ds#测试集整批处理
+    test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+    return ds, test_ds # 返回处理后的训练集和测试集
+
 
 def prepare_mnist_features_and_labels(x, y):
+    """
+    对MNIST数据集的特征和标签进行预处理。
+
+    参数:
+        x: 输入图像数据。
+        y: 对应的标签。
+
+    返回:
+        x: 归一化后的图像数据。
+        y: 转换为整型的标签。
+    """
     x = tf.cast(x, tf.float32) / 255.0
     y = tf.cast(y, tf.int64)
     return x, y
 
 
-# In[ ]:
-
 # ## 建立模型
 
 # In[24]:
+class MyConvModel(keras.Model):
+    """
+    自定义卷积神经网络模型，用于图像分类任务。
 
+    网络结构：
+    Conv2D(32) → Conv2D(64) → MaxPooling2D → Flatten → Dense(100) → Dense(10)
+    """
 
-class myConvModel(keras.Model):
     def __init__(self):
-        super(myConvModel, self).__init__()
-        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')#定义第一层卷积层,有32个过滤器,每个过滤器大小为5x5,使用ReLU激活函数
-        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')#第二层卷积层
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)#池化层
-        self.flat = Flatten() # 展平层：将多维张量转为一维向量
-        self.dense1 = layers.Dense(100, activation='tanh')#全连接层,有100个神经元,使用tanh激活函数
-        self.dense2 = layers.Dense(10)#输出层,有10个神经元
+        super(MyConvModel, self).__init__()
+        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
+        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
+        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+        self.flat = Flatten()
+        self.dense1 = layers.Dense(100, activation='tanh')
+        self.dense2 = layers.Dense(10)
+
     @tf.function
     def call(self, x):
-        #前向传播
+        """
+        模型的前向传播过程。
+
+        参数:
+            x: 输入数据。
+
+        返回:
+            logits: 模型输出的logits。
+        """
         h1 = self.l1_conv(x)
         h1_pool = self.pool(h1)
         h2 = self.l2_conv(h1_pool)
@@ -60,89 +101,165 @@ class myConvModel(keras.Model):
         logits = self.dense2(dense1)
         return logits
 
-model = myConvModel()
+
+model = MyConvModel()
 optimizer = optimizers.Adam()
 
 
 # ## 定义loss以及train loop
 
 # In[25]:
-
-
 @tf.function
 def compute_loss(logits, labels):
-    #计算交叉熵损失
+    """
+    计算稀疏softmax交叉熵损失。
+
+    参数:
+        logits: 模型输出的logits。
+        labels: 真实标签。
+
+    返回:
+        loss: 计算得到的损失值。
+    """
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels))
+            logits=logits, labels=labels)
+    )
+
 
 @tf.function
 def compute_accuracy(logits, labels):
-    #计算预测准确率
+    """
+    计算模型的准确率。
+
+    参数:
+        logits: 模型输出的logits。
+        labels: 真实标签。
+
+    返回:
+        accuracy: 模型的准确率。
+    """
     predictions = tf.argmax(logits, axis=1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
+
 @tf.function
 def train_one_step(model, optimizer, x, y):
+    """
+    执行单步训练过程。
 
+    参数:
+        model: 模型实例。
+        optimizer: 优化器实例。
+        x: 输入数据。
+        y: 真实标签。
+
+    返回:
+        loss: 训练损失。
+        accuracy: 训练准确率。
+    """
     with tf.GradientTape() as tape:
         logits = model(x)
         loss = compute_loss(logits, y)
 
-    # compute gradient(梯度)
     grads = tape.gradient(loss, model.trainable_variables)
-    # update to weights(权重)
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
 
     accuracy = compute_accuracy(logits, y)
-
-    # loss and accuracy is scalar tensor
     return loss, accuracy
+
 
 @tf.function
 def test_step(model, x, y):
+    """
+    执行单步测试过程。
+
+    参数:
+        model: 模型实例。
+        x: 输入数据。
+        y: 真实标签。
+
+    返回:
+        loss: 测试损失。
+        accuracy: 测试准确率。
+    """
     logits = model(x)
     loss = compute_loss(logits, y)
     accuracy = compute_accuracy(logits, y)
     return loss, accuracy
 
+
 def train(epoch, model, optimizer, ds):
-    loss = 0.0
-    accuracy = 0.0
+    """
+    训练模型一个完整的epoch（遍历整个训练数据集一次）。
+    参数:
+        epoch: 当前训练轮数（整数），用于打印进度信息
+        model: 要训练的模型实例（继承自tf.keras.Model）
+        optimizer: 优化器实例（如Adam/SGD等）
+        ds: 训练数据集（通常为tf.data.Dataset对象）
+    返回:
+        loss: 本epoch最后一个batch的损失值（tf.Tensor）
+        accuracy: 本epoch最后一个batch的准确率（tf.Tensor）
+    """
+    # 初始化累计变量（实际仅记录最后一个batch的值）
+    loss = 0.0      # 损失值初始化为0（浮点数）
+    accuracy = 0.0   # 准确率初始化为0（浮点数）
+    
+    # 遍历数据集中的所有batch
     for step, (x, y) in enumerate(ds):
+        # 执行单步训练，返回当前batch的loss和accuracy
         loss, accuracy = train_one_step(model, optimizer, x, y)
-
-        if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
-
+        
+        # 每500个batch打印一次训练进度
+        if step % 500 == 0:  # 使用取模运算控制打印频率
+            # 将Tensor转换为numpy值打印
+            print('epoch', epoch, ': loss', loss.numpy(),
+                  '; accuracy', accuracy.numpy())
+    
+    # 返回最后一个batch的loss和accuracy（注意不是epoch平均值）
     return loss, accuracy
+
+
 def test(model, ds):
+    """
+    测试模型。
+
+    参数:
+        model: 模型实例。
+        ds: 测试数据集。
+
+    返回:
+        loss: 测试损失。
+        accuracy: 测试准确率。
+    """
     loss = 0.0
     accuracy = 0.0
+    
     for step, (x, y) in enumerate(ds):
-        loss, accuracy = test_step(model, x, y)    
+        loss, accuracy = test_step(model, x, y)
+
     print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
     return loss, accuracy
 
+
 # # 训练
 
-# In[26]:
+# In[26]:、
+#调用mnist_dataset()函数获取处理好的MNIST训练集和测试集，train_ds是训练数据集，test_ds是测试数据集
+# 加载MNIST数据集，返回训练集和测试集
+train_ds, test_ds = mnist_dataset()  # train_ds: 训练数据集, test_ds: 测试数据集
 
-
-train_ds, test_ds = mnist_dataset()
-for epoch in range(2):
+# 训练循环，进行2个epoch的训练
+for epoch in range(2):  # epoch: 训练轮次
+    # 调用train函数进行训练，返回当前epoch的损失和准确率
+    # 参数说明:
+    # - epoch: 当前训练轮次
+    # - model: 要训练的模型
+    # - optimizer: 优化器
+    # - train_ds: 训练数据集
     loss, accuracy = train(epoch, model, optimizer, train_ds)
+# 调用test函数进行测试，返回模型在测试集上的损失和准确率
+# 参数说明:
+# - model: 要测试的模型
+# - test_ds: 测试数据集
 loss, accuracy = test(model, test_ds)
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-

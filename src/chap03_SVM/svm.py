@@ -1,108 +1,129 @@
-# python: 3.5.2
-# encoding: utf-8
-
 import numpy as np
+import os
 
 def load_data(fname):
-    """载入数据"""
-    with open(fname, 'r') as f:
-        data = []
-        line = f.readline() # 首行是标题行，自动跳过
+    """载入数据。"""
+    # 检查文件是否存在，确保数据加载的可靠性
+    if not os.path.exists(fname): 
+        raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}") # 如果文件不存在，抛出异常
+    with open(fname, 'r') as f: # 打开文件
+        data = [] # 初始化一个空列表，用于存储数据
+        line = f.readline()  # 跳过表头行
         for line in f:
-            line = line.strip().split()
-            x1 = float(line[0])
-            x2 = float(line[1])
-            t = int(line[2])
+            line = line.strip().split()  # 去除空白并按空格分割
+            x1 = float(line[0])  # 特征1：例如坐标x
+            x2 = float(line[1])  # 特征2：例如坐标y
+            t = int(line[2])     # 标签：0或1
             data.append([x1, x2, t])
-        return np.array(data)
-
+        return np.array(data)  # 返回numpy数组，便于矩阵运算
 
 def eval_acc(label, pred):
-    """计算准确率"""
-    return np.sum(label == pred) / len(pred)#准确率 = 正确预测的样本数 / 总样本数
-  
-#SVM模型 实现了线性SVM分类
-class SVM():
-    """SVM模型"""
-    #目标函数：(1/2)||w||² + C * Σmax(0, 1 - y_i(w·x_i + b))
-    def __init__(self, lr=0.001, epochs=1000, lambda_=0.001, tolerance=1e-3):
-        # 补全此处代码
-        self.w = None  # w: 权重向量(决定分类超平面的方向)
-        self.b = 0     # b: 偏置项(决定分类超平面的位置)
-        self.lr = lr   # 学习率
-        self.epochs = epochs  # 训练轮数
-        self.lambda_ = lambda_  # 正则化参数
-        self.tolerance = tolerance  # 提前停止的阈值
-        pass
+    """计算准确率。
     
+    参数:
+        label: 真实标签数组
+        pred: 预测标签数组
+        
+    返回:
+        准确率 (0到1之间的浮点数)
+    """
+    return np.sum(label == pred) / len(pred)  # 正确预测的样本比例
+
+class SVM:
+    """SVM模型：基于最大间隔分类的监督学习算法。"""
+#支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
+    def __init__(self):
+        # 超参数设置
+        self.learning_rate = 0.01  # 控制梯度下降步长
+        self.reg_lambda = 0.01     # L2正则化系数，平衡间隔最大化与分类误差
+        self.max_iter = 1000       # 最大训练迭代次数
+        self.w = None              # 权重向量，决定分类超平面的方向
+        self.b = None              # 偏置项，决定分类超平面的位置
 
     def train(self, data_train):
+        """训练SVM模型（基于hinge loss + L2正则化）
+        
+        算法核心：
+        1. 寻找能最大化间隔的超平面 wx + b = 0
+        2. 间隔定义为：样本到超平面的最小距离
+        3. 使用hinge loss处理分类错误和边界样本
+        4. 添加L2正则化防止过拟合
         """
-        训练 SVM 模型。
-        :param data_train: 包含特征和标签的 NumPy 数组，形状为 (n_samples, n_features + 1)
-        """
-        X = data_train[:, :-1] #从data_train中提取特征矩阵X
-        y = np.where(data_train[:, -1] == 0, -1, 1) #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
-        y = data_train[:, -1] #处理标签列，将0类标签转换为-1，非0类标签转换为1，data_train[:, -1]选择最后一列(标签列)，np.where(condition, x, y)：如果condition为True则选x，否则选y
+        X = data_train[:, :2]         # 提取特征矩阵
+        y = data_train[:, 2]          # 提取标签
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，符合SVM理论要求
+        m, n = X.shape                # m:样本数，n:特征数
 
-        n_samples, n_features = X.shape #获取样本数量和特征数量
-        self.w = np.zeros(n_features) #初始化权重向量w为零向量
-        self.b = 0
+        # 初始化模型参数
+        self.w = np.zeros(n)  # 权重向量初始化为0
+        self.b = 0            # 偏置项初始化为0
 
-        for epoch in range(self.epochs):
-            # 计算 margins
-            margin = y * (X @ self.w + self.b)
-            misclassified = margin < 1
+        for epoch in range(self.max_iter):
+            # 计算函数间隔：y(wx+b)，衡量样本到超平面的距离和方向
+            margin = y * (np.dot(X, self.w) + self.b)
+            
+            # 找出违反间隔条件的样本（margin < 1）
+            # 这些样本包括：误分类样本(margin<0)和间隔内样本(0<=margin<1)
+            idx = np.where(margin < 1)[0]
+            
+            # 如果所有样本都满足margin>=1，说明已找到完美超平面
+            # 移除continue语句，确保即使所有样本都满足间隔条件
+            # 也会更新权重以优化正则化项
 
-            # 梯度计算
-            dw = self.lambda_ * self.w - np.mean((misclassified * y)[:, np.newaxis] * X, axis=0)
-            db = -np.mean(misclassified * y)
+            # 计算梯度：正则化项梯度 + 误分类样本梯度
+            # L2正则化：减小权重，防止过拟合
+            # hinge loss梯度：只对误分类和边界样本计算梯度
+            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx].reshape(-1, 1) * X[idx], axis=0)
+            db = -np.mean(y[idx])
 
-            # 参数更新
-            self.w -= self.lr * dw
-            self.b -= self.lr * db
-
-            # 提前停止：权重更新变化太小
-            if np.linalg.norm(self.lr * dw) < self.tolerance:
-                break
-        # 请补全此处代码
+            # 梯度下降更新参数
+            self.w -= self.learning_rate * dw
+            self.b -= self.learning_rate * db
+            
+            # 训练逻辑总结：
+            # - 对误分类样本，向正确方向调整超平面
+            # - 对间隔内样本，微调超平面使其远离
+            # - 正则化项约束权重大小，使间隔更平滑
 
     def predict(self, x):
+        """预测标签。
+        
+        预测逻辑：
+        1. 计算样本到超平面的有符号距离 wx + b
+        2. 距离为正 -> 预测为正类(1)
+        3. 距离为负 -> 预测为负类(0)
         """
-        预测标签
-        """
-        # 请补全此处代码
-        # 计算决策函数值
-        if x.ndim == 1:
-           x = np.expand_dims(x, axis=0)  # 处理单样本输入
-        decision_values = np.dot(x, self.w) + self.b  # logits = x·w + b
-        # 返回预测标签（0或1）
-        return np.where(decision_values >= 0, 1, -1)
-
+        score = np.dot(x, self.w) + self.b     # 计算决策函数值
+        return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签格式
 
 if __name__ == '__main__':
-    # 载入数据，实际使用时将x替换为具体名称
-    train_file = 'data/train_linear.txt'
-    test_file = 'data/test_linear.txt'
-    data_train = load_data(train_file)  # 数据格式[x1, x2, t]
+    # 数据加载部分
+    base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
+    train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
+    test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
+
+    # 加载训练数据
+    data_train = load_data(train_file)
+    # 加载测试数据
     data_test = load_data(test_file)
 
-    #print(data_train[:1000])  # 查看前5行数据
+    # 模型训练
+    svm = SVM()            # 初始化SVM模型
+    svm.train(data_train)  # 训练模型寻找最优超平面
 
-    # 使用训练集训练SVM模型
-    svm = SVM()  # 初始化模型
-    svm.train(data_train)  # 训练模型
+    # 训练集评估
+    x_train = data_train[:, :2]  # 训练特征
+    t_train = data_train[:, 2]   # 训练标签
+    t_train_pred = svm.predict(x_train)  # 预测训练集标签
 
-    # 使用SVM模型预测标签
-    x_train = data_train[:, :2]  # feature [x1, x2]
-    t_train = data_train[:, 2]  # 真实标签
-    t_train_pred = svm.predict(x_train)  # 预测标签
-    x_test = data_test[:, :2]  # 提取测试集特征（x1, x2）
-    t_test = data_test[:, 2] # 提取测试集真实标签
-    t_test_pred = svm.predict(x_test) # 对测试集进行预测，得到预测标签
+    # 测试集评估
+    x_test = data_test[:, :2]    # 测试特征
+    t_test = data_test[:, 2]     # 测试标签
+    t_test_pred = svm.predict(x_test)  # 预测测试集标签
 
-    # 评估结果，计算准确率
-    acc_train = eval_acc(t_train, t_train_pred)
-    acc_test = eval_acc(t_test, t_test_pred)
-    print("train accuracy: {:.1f}%".format(acc_train * 100))
-    print("test accuracy: {:.1f}%".format(acc_test * 100))
+    # 计算并打印准确率
+    acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
+    acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
+    
+    print("train accuracy: {:.1f}%".format(acc_train * 100))#输出训练集准确率
+    print("test accuracy: {:.1f}%".format(acc_test * 100))#输出测试集准确率

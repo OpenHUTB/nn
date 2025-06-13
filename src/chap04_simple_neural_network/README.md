@@ -125,3 +125,122 @@ loss = sigmoid_ce(x=tf.constant([0.5, 0.8]), label=tf.constant([1.0, 0.0]))
 ## 测试
 
 代码中包含测试用例，用于验证自定义函数的正确性。通过比较自定义函数与 TensorFlow 内置函数的结果，确保实现的准确性。
+
+----
+
+# MNIST FNN with Numpy
+
+## 项目简介
+
+该项目实现了一个简单的前馈神经网络（Feedforward Neural Network, FNN），用于识别手写数字。网络使用 Numpy 实现，并通过自动微分计算梯度。数据集使用的是经典的 MNIST 数据集。
+
+## 目录结构
+
+```
+.
+├── tutorial_minst_fnn-numpy-exercise.py  # 主代码文件
+```
+
+## 环境要求
+
+-   Python 3.x
+-   Numpy
+-   TensorFlow
+
+## 安装依赖
+
+使用以下命令安装所需的 Python 包：
+
+```bash
+pip install numpy tensorflow
+```
+
+## 使用方法
+
+1.  **准备数据**
+     通过调用 `mnist_dataset()` 函数加载并预处理 MNIST 数据集。
+2.  **定义模型**
+     创建 `myModel` 类，包含前向传播和反向传播的方法。
+3.  **训练模型**
+     使用 `train()` 函数训练模型，训练过程中会打印每个 epoch 的损失和准确率。
+4.  **测试模型**
+     使用 `test()` 函数在测试集上评估模型性能。
+
+## 代码说明
+
+-   **Matmul**: 实现矩阵乘法及其梯度计算。
+-   **Relu**: 实现 ReLU 激活函数及其梯度计算。
+-   **Softmax**: 实现 Softmax 函数及其梯度计算。
+-   **Log**: 实现 Log Softmax 函数及其梯度计算。
+-   **compute_loss**: 计算损失函数。
+-   **compute_accuracy**: 计算模型准确率。
+
+## 示例
+
+在主程序中调用以下代码开始训练和测试：
+
+```python
+if __name__ == "__main__":
+    train_data, train_label, test_data, test_label = prepare_data()
+    model = myModel()
+    losses, accuracies = train(model, train_data, train_label)
+    test_loss, test_accuracy = test(model, test_data, test_label)
+    print(f'Test Loss {test_loss:.4f}; Test Accuracy {test_accuracy:.4f}')
+```
+
+---
+
+# MNIST 手写数字识别教程
+
+## 简介
+
+本项目使用 TensorFlow 2.0 实现一个简单的前馈神经网络（Feedforward Neural Network, FNN），用于识别 MNIST 数据集中的手写数字。该项目主要包括数据准备、模型定义、训练和测试过程。
+
+## 环境要求
+
+-   Python 3.x
+-   TensorFlow 2.0+
+-   NumPy
+
+## 文件结构
+
+-   `tutorial_minst_fnn-tf2.0-exercise.py`：主程序，包含数据加载、模型定义、训练和测试逻辑。
+
+## 使用说明
+
+### 1. 准备数据
+
+程序首先加载 MNIST 数据集，并对图像数据进行归一化处理，将像素值缩放到 [0, 1] 之间。
+
+### 2. 定义模型
+
+创建了一个简单的两层神经网络模型，包含：
+
+-   输入层：784 个节点（28x28 像素展平）
+-   隐藏层：128 个 ReLU 激活的节点
+-   输出层：10 个节点（数字 0-9）
+
+### 3. 训练模型
+
+使用 Adam 优化器进行模型训练，执行 50 个 epoch。每个 epoch 将输出当前的损失和准确率。
+
+### 4. 测试模型
+
+在测试集上评估训练后的模型，输出测试损失和准确率。
+
+## 如何运行
+
+确保安装了所需的库后，可以通过以下命令运行该程序：
+
+```bash
+python tutorial_minst_fnn-tf2.0-exercise.py
+```
+
+## 代码说明
+
+-   **数据加载**：通过 `mnist_dataset()` 函数加载数据。
+-   **模型定义**：使用 `myModel` 类定义模型的结构和前向传播逻辑。
+-   **损失和准确率计算**：通过 `compute_loss()` 和 `compute_accuracy()` 函数计算损失和准确率。
+-   **训练步骤**：`train_one_step()` 函数执行一次训练步骤并更新模型参数。
+-   **测试步骤**：`test()` 函数计算测试集上的损失和准确率。
+

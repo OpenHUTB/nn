@@ -9,16 +9,18 @@ from gym import spaces
 import numpy as np
 from gym import error
 from gym.utils import seeding
-
+ #这段代码定义了一个随机策略函数 random_policy，用于在黑白棋（Reversi/Othello）游戏中为当前玩家随机选择一个合法的落子动作（包括“跳过”动作）
 def make_random_policy(np_random):
     def random_policy(state, player_color):
         possible_places = ReversiEnv.get_possible_actions(state, player_color)
-        # No places left
+        # 没有可落子位置，返回"pass"动作
         if len(possible_places) == 0:
-            return d**2 + 1
-        a = np_random.randint(len(possible_places))
-        return possible_places[a]
-    return random_policy
+            d = state.shape[-1]#动态获取棋盘的边长
+            return d**2 + 1    # pass动作
+        # 随机选择一个可能的动作
+        a = np_random.randint(len(possible_places)) # 生成一个随机索引
+        return possible_places[a] # 返回对应索引的放置位置
+    return random_policy # 返回定义好的随机策略函数
 
 class ReversiEnv(gym.Env):
     """
@@ -30,16 +32,17 @@ class ReversiEnv(gym.Env):
 
     def __init__(self, player_color, opponent, observation_type, illegal_place_mode, board_size):
         """
-        Args:
-            player_color: Stone color for the agent. Either 'black' or 'white'
-            opponent: An opponent policy
-            observation_type: State encoding
-            illegal_place_mode: What to do when the agent makes an illegal place. Choices: 'raise' or 'lose'
-            board_size: size of the Reversi board
+        参数:
+            player_color: 代理(玩家)的棋子颜色，'black'或'white'
+            opponent: 对手策略，可以是'random'或自定义策略函数
+            observation_type: 状态编码方式，目前仅支持'numpy3c'
+            illegal_place_mode: 处理非法落子的方式，'lose'(自动输)或'raise'(抛出异常)
+            board_size: 棋盘大小，默认8x8
         """
         assert isinstance(board_size, int) and board_size >= 1, 'Invalid board size: {}'.format(board_size)
         self.board_size = board_size
 
+        # 将颜色字符串映射为内部表示
         colormap = {
             'black': ReversiEnv.BLACK,
             'white': ReversiEnv.WHITE,
@@ -49,18 +52,19 @@ class ReversiEnv(gym.Env):
         except KeyError:
             raise error.Error("player_color must be 'black' or 'white', not {}".format(player_color))
 
-        self.opponent = opponent
+        self.opponent = opponent # 初始化对手对象引用
 
         assert observation_type in ['numpy3c']
         self.observation_type = observation_type
 
         assert illegal_place_mode in ['lose', 'raise']
-        self.illegal_place_mode = illegal_place_mode
+        self.illegal_place_mode = illegal_place_mode # 控制如何处理非法放置操作的标志
 
         if self.observation_type != 'numpy3c':
             raise error.Error('Unsupported observation type: {}'.format(self.observation_type))
 
         # One action for each board position and resign and pass
+        #这段代码主要用于 初始化强化学习环境（如游戏环境）的动作空间（action_space）和观察空间（observation_space），并完成环境的初始设置
         self.action_space = spaces.Discrete(self.board_size ** 2 + 2)
         observation = self.reset()
         self.observation_space = spaces.Box(np.zeros(observation.shape), np.ones(observation.shape))
@@ -96,7 +100,7 @@ class ReversiEnv(gym.Env):
         self.done = False
 
         # Let the opponent play if it's not the agent's turn
-        if self.player_color != self.to_play:
+        if self.player_color != self.to_play:# 如果当前不是玩家回合(由对手回合)
             a = self.opponent_policy(self.state)
             ReversiEnv.make_place(self.state, a, ReversiEnv.BLACK)
             self.to_play = ReversiEnv.WHITE
@@ -159,7 +163,7 @@ class ReversiEnv(gym.Env):
     #     else:
     #         raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))
 
-    def _render(self, mode='human', close=False):
+    def _render(self, mode='human', close=False):  #渲染函数，用于将当前棋盘状态可视化输出到终端或字符串中
         if close:
             return
         board = self.state
@@ -170,7 +174,7 @@ class ReversiEnv(gym.Env):
             outfile.write(' ' +  str(j + 1) + '  | ')
         outfile.write('\n')
         outfile.write(' ' * 5)
-        outfile.write('-' * (board.shape[1] * 6 - 1))
+        outfile.write('-' * (board.shape[1] * 6 - 1))# 根据列数计算分隔线长度
         outfile.write('\n')
         for i in range(board.shape[1]):
             outfile.write(' ' +  str(i + 1) + '  |')
@@ -237,8 +241,19 @@ class ReversiEnv(gym.Env):
     @staticmethod
     def valid_reverse_opponent(board, coords, player_color):
         '''
-        check whether there is any reversible places
-        这里意思应该是 判断这里是否有 翻转的 棋子。
+        判断在指定位置落子后，是否可以翻转对手的棋子。
+    
+        参数:
+              board: 当前棋盘状态，形状为 [3, d, d]：
+            - board[0]: 黑棋位置 (Black)
+            - board[1]: 白棋位置 (White)
+            - board[2]: 可落子位置（可能未使用）
+        position: 落子的坐标 (x, y)，从 0 开始计数
+        player_color: 当前玩家颜色，0 表示黑棋，1 表示白棋
+    
+        返回:
+             bool: 是否可以翻转对手的棋子
+             list of (x, y): 所有可翻转的敌方棋子坐标列表
         '''
         d = board.shape[-1]
         opponent_color = 1 - player_color
@@ -330,18 +345,19 @@ class ReversiEnv(gym.Env):
     def game_finished(board):
         # Returns 1 if player 1 wins, -1 if player 2 wins and 0 otherwise
         d = board.shape[-1]
-
+        # 统计双方棋子数
         player_score_x, player_score_y = np.where(board[0, :, :] == 1)
         player_score = len(player_score_x)
         opponent_score_x, opponent_score_y = np.where(board[1, :, :] == 1)
         opponent_score = len(opponent_score_x)
+        # 检查是否有玩家棋子数为0
         if player_score == 0:
             return -1
         elif opponent_score == 0:
             return 1
         else:
             free_x, free_y = np.where(board[2, :, :] == 1)
-            if free_x.size == 0:
+            if free_x.size == 0:   # 比较棋子数量决定胜负
                 if player_score > (d**2)/2:
                     return 1
                 elif player_score == (d**2)/2:
