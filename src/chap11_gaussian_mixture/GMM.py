@@ -304,6 +304,7 @@ if __name__ == "__main__":
     plt.subplot(1, 2, 1)
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
     plt.title("True Clusters")
+    # 注意：此处重复设置标题是为了确保在某些环境中标题能够正确显示
     plt.title("True Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
