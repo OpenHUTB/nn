@@ -308,7 +308,8 @@ class ReversiEnv(gym.Env):
                 return False
         else:
             return False
-
+         
+    #  在指定位置执行落子操作，并翻转被夹住的对手棋子
     @staticmethod
     def make_place(board, action, player_color):
         coords = ReversiEnv.action_to_coordinate(board, action)
