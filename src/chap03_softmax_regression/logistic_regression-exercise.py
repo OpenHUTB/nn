@@ -212,8 +212,12 @@ if __name__ == '__main__':
     ax.set_ylim(0, 10)  # Y轴显示范围0-10
 
     line_d, = ax.plot([], [], label = 'fit_line')  # 创建用于绘制决策边界的线条对象
-    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
-    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
+
+    # 创建两个类别的数据点：
+    # C1_dots：类别1的样本点，用蓝色'+'表示
+    # C2_dots：类别2的样本点，用绿色'o'表示
+    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')   # 正样本
+    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')   # 负样本
 
     # 创建用于显示动态文本的文本对象（位于左上角）
     frame_text = ax.text(
