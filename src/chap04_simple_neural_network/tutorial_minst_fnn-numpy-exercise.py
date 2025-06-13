@@ -303,7 +303,7 @@ with tf.GradientTape() as tape:
     h1 = tf.matmul(x, W1)
     # 对第一层输出应用ReLU激活函数
     h1_relu = tf.nn.relu(h1)
-    h2 = tf.matmul(h1_relu, W2)
+    h2 = tf.matmul(h1_relu, W2) # [5,5] @ [5,6] → [5,6]
     prob = tf.nn.softmax(h2)
     log_prob = tf.math.log(prob)
     loss = tf.reduce_sum(label * log_prob)
