@@ -8,7 +8,10 @@ class RL_QG_agent:
     
     def __init__(self):
         """初始化智能体，设置模型保存路径和TensorFlow相关组件"""
-        # 确定模型保存目录：当前脚本所在目录下的Reversi文件夹
+        #初始化操作：
+        #1. 确定模型保存的目录路径
+        #2. 创建模型保存目录（若不存在）
+        #3. 初始化TensorFlow会话、模型保存器等组件的占位符
         self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
         os.makedirs(self.model_dir, exist_ok=True)  # 创建目录（若不存在）
         
@@ -21,6 +24,11 @@ class RL_QG_agent:
 
     def init_model(self):
         """构建卷积神经网络模型，用于预测黑白棋落子位置的Q值"""
+        #网络结构设计：
+        #1. 输入层：接收8×8棋盘的三通道状态（黑棋、白棋、当前玩家）
+        #2. 两层卷积层：提取局部模式和全局布局特征
+        #3. 全连接层：学习特征间的非线性关系
+        #4. 输出层：直接预测64个位置的Q值
         self.sess = tf.Session()  # 创建TensorFlow会话
         
         # 定义网络输入：[批次大小, 棋盘高度, 棋盘宽度, 通道数]
@@ -66,7 +74,7 @@ class RL_QG_agent:
         # 64个神经元对应棋盘64个位置，直接输出Q值（无激活函数）
         self.Q_values = tf.layers.dense(inputs=dense, units=64, name="q_values")
 
-        # 初始化所有变量并创建模型保存器
+        # 初始化所有变量并创建模型保存器（默认保存所有变量）
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
 
@@ -111,14 +119,27 @@ class RL_QG_agent:
         print("模型已保存至", self.model_dir)
         
         try:
+             # 使用Saver保存模型参数，global_step可用于版本控制
             self.saver.save(self.sess, model_path)
             self.logger.info("模型已保存至 %s", model_path)
         except Exception as e:
+             # 异常处理（原代码中model_path未定义，此处保留注释逻辑）
             self.logger.error("保存模型时出错: %s", e)
 
 
 
     def load_model(self):
         """从指定目录加载预训练的模型参数"""
+         #加载逻辑：
+        #1. 从预设路径读取模型检查点
+        #2. 反序列化参数并恢复到当前会话
+        #3. 打印加载成功信息
+         # 构建完整的模型加载路径
+        model_path = os.path.join(self.model_dir, 'parameter.ckpt')
+        
+        try:
+            # 从检查点恢复模型参数
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已从", self.model_dir, "加载")
+         except Exception as e:
+            print(f"加载模型时出错: {e}")
