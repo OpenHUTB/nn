@@ -103,6 +103,7 @@ import weakref
 
 try:
     import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
+    # 从pygame.locals导入键盘常量（用于处理键盘输入事件）
     from pygame.locals import KMOD_CTRL
     from pygame.locals import KMOD_SHIFT
     from pygame.locals import K_0
