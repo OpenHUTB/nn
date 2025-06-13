@@ -2,14 +2,29 @@
 # coding: utf-8
 
 # 导入必要的库
+# 导入操作系统模块，用于环境变量设置、路径管理等系统相关操作
 import os
+
+# 导入 NumPy，用于高效的数值计算（如矩阵、向量操作）
 import numpy as np
+
+# 导入 PyTorch 主库
 import torch
+
+# 从 PyTorch 中导入神经网络模块（构建模型的基础类和层）
 import torch.nn as nn
+
+# 导入常用的函数接口模块，包括激活函数、损失函数等
 import torch.nn.functional as F
+
+# 从 PyTorch 中导入自动求导模块，用于构建支持梯度的变量
 from torch.autograd import Variable
+
+# 导入数据处理模块，包括 Dataset 封装与 DataLoader 批处理等功能
 import torch.utils.data as Data
-import torchvision 
+
+# 导入 torchvision 库，它包含了常用的计算机视觉数据集、模型结构和图像处理工具
+import torchvision
 
 # 设置超参数
 learning_rate = 1e-4  #  学习率：控制参数更新步长

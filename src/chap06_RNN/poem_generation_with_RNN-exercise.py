@@ -215,8 +215,8 @@ def reduce_avg(reduce_target, lengths, dim):
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     # 验证输入张量的维度是否符合要求
-   # shape_of_lengths: lengths张量的维度列表
-   # dim: 预期的长度张量的秩(rank)
+    # shape_of_lengths: lengths张量的维度列表
+    # dim: 预期的长度张量的秩(rank)
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
@@ -251,6 +251,8 @@ def reduce_avg(reduce_target, lengths, dim):
     # 将掩码应用到目标张量上
     mask = tf.reshape(mask, shape=mask_shape)
 
+    # 应用掩码：将目标张量中超出序列长度的位置置零
+    # 通过类型转换确保掩码与目标张量数据类型一致
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
@@ -434,4 +436,5 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
+print(''.join(gen_sentence()))
 print(''.join(gen_sentence()))

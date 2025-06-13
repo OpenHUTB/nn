@@ -34,7 +34,7 @@ random_conv = MyConvModel()# 实例化一个新的卷积神经网络模型
 img = Image.open(open('corgi.jpg', 'rb'))  # 返回PIL.Image对象
 
 # 将PIL图像转换为numpy数组，并指定数据类型为float64
-img = np.asarray(img, dtype='float64') / 256. 
+img = np.asarray(img, dtype='float32') / 255.0  # 归一化到0-1范围，使用float32更高效
 
 # 在数组的第0维添加一个维度（批处理维度）
 # 将形状从[H,W,C]变为[1,H,W,C]，符合模型输入要求

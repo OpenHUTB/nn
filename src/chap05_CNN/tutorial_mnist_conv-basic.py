@@ -40,7 +40,8 @@ def mnist_dataset():
 
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+    test_ds = test_ds.batch(100)  # 直接批处理，无需take和shuffle
+    # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
     return ds, test_ds # 返回处理后的训练集和测试集
 
 

@@ -7,6 +7,7 @@
 import numpy as np
 # 导入 TensorFlow 深度学习框架
 import tensorflow as tf
+# 从 tqdm 库中导入 tqdm 函数
 from tqdm import tqdm
 # 从 TensorFlow 中导入 Keras 高级 API
 from tensorflow import keras
@@ -130,7 +131,7 @@ class Softmax:
         # (N, 1, c)
         tmp = np.matmul(g_y_exp, sisj) # 计算矩阵乘法结果
         tmp = np.squeeze(tmp, axis=1)  # 去掉结果矩阵的单维度条目
-        tmp = -tmp + grad_y * s
+        tmp = -tmp + grad_y * s # 对变量 tmp 进行更新操作
         return tmp
 
 
@@ -280,7 +281,7 @@ h1 = mul_h1.forward(x, W1)  # shape(5, 4)
 h1_relu = relu.forward(h1)  # 对第一层输出h1应用ReLU激活函数（保留正值，负值置0）
 h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2) # 将logits转换为概率分布（[5,6]）
-h2_log = log.forward(h2_soft)
+h2_log = log.forward(h2_soft) # 对经过 softmax 处理后的输出 h2_soft 进行对数变换
 # 手动实现的反向传播过程（计算梯度）：
 # 反向传播流程（从后向前）：
 h2_log_grad = log.backward(-label)                # 计算损失梯度
@@ -419,10 +420,10 @@ def train_one_step(model, x, y):
 
 # 测试函数
 def test(model, x, y):
-    model.forward(x)
-    loss = compute_loss(model.h2_log, y)
-    accuracy = compute_accuracy(model.h2_log, y)
-    return loss, accuracy
+    model.forward(x)                             # 执行模型的正向传播，计算预测结果
+    loss = compute_loss(model.h2_log, y)         # 计算损失值
+    accuracy = compute_accuracy(model.h2_log, y) # 计算准确率
+    return loss, accuracy                        # 返回损失值和准确率
 
 
 # ## 实际训练

@@ -70,7 +70,7 @@ def get_batch(batch_size, length):
             tf.constant(dec_x, dtype = tf.int32),    # 将 dec_x 转换为 int32 类型的张量，作为解码器（Decoder）的输入
             tf.constant(y, dtype = tf.int32))        # 将 y 转换为 int32 类型的张量，作为标签（Label）或目标输出，用于计算损失
 #测试
-print(get_batch(2, 10))
+print(get_batch(2, 10)) # 调用 get_batch 函数，并打印其返回值，参数2和10分别表示批次的起始索引和批次大小
 
 ###
 

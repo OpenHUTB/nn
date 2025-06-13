@@ -25,9 +25,9 @@ class RL_QG_agent:
         
         # 定义网络输入：[批次大小, 棋盘高度, 棋盘宽度, 通道数]
         self.input_states = tf.placeholder(
-            tf.float32,              # 输入数据类型为32位浮点数
-            shape=[None, 8, 8, 3],   # 输入张量的形状
-            name="input_states"      # 该张量在计算图中的名称
+            tf.float32,             # 输入数据类型为32位浮点数
+            shape=[None, 8, 8, 3],  # 输入张量的形状
+            name="input_states"     # 该张量在计算图中的名称
         )
         
         # ========== 卷积层1：提取局部棋子模式特征 ==========
@@ -35,9 +35,9 @@ class RL_QG_agent:
         # 输出形状：[None, 8, 8, 32]
         conv1 = tf.layers.conv2d(
             inputs=self.input_states,
-            filters=32,         # 32个卷积核，生成32个特征图
-            kernel_size=3,      # 3x3卷积核，捕捉局部区域
-            padding="same",     # 同尺寸填充，保持输出尺寸与输入一致
+            filters=32,            # 32个卷积核，生成32个特征图
+            kernel_size=3,         # 3x3卷积核，捕捉局部区域
+            padding="same",        # 同尺寸填充，保持输出尺寸与输入一致
             activation=tf.nn.relu  # ReLU激活函数，引入非线性
         )
 
@@ -45,11 +45,11 @@ class RL_QG_agent:
         # 64个3x3卷积核，捕捉更复杂的棋子布局模式
         # 输出形状：[None, 8, 8, 64]
         conv2 = tf.layers.conv2d(
-            inputs = conv1,
-            filters = 64,         # 特征图数量翻倍，增强特征表达能力
-            kernel_size = 3,      # 使用3×3的卷积核，平衡特征提取能力与参数量
-            padding = "same",     # 保持输出特征图尺寸与输入一致（补零填充）
-            activation = tf.nn.relu   # ReLU激活函数，引入非线性并抑制负梯
+            inputs=conv1,
+            filters=64,            # 特征图数量翻倍，增强特征表达能力
+            kernel_size=3,         # 使用3×3的卷积核，平衡特征提取能力与参数量
+            padding="same",        # 保持输出特征图尺寸与输入一致（补零填充）
+            activation=tf.nn.relu  # ReLU激活函数，引入非线性并抑制负梯
         )
 
         # ========== 扁平化层：将多维特征转为一维向量 ==========

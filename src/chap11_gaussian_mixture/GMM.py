@@ -293,46 +293,32 @@ if __name__ == "__main__":
     X, y_true = generate_data(n_samples=1000)
     print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     
-    # 2. 训练GMM模型
-    print("\n训练高斯混合模型...")
-    gmm = GaussianMixtureModel(n_components=3, random_state=42) # 初始化高斯混合模型
-    gmm.fit(X) # 使用数据 X 训练 GMM 模型
-    y_pred = gmm.labels_ # 获取每个样本的预测聚类标签
-    print(f"完成训练，共进行{len(gmm.log_likelihoods)}次迭代")
-    
-    # 3. 收敛曲线绘制，可以用于判断是否收敛
-    print("\n绘制EM算法收敛曲线...")
-    gmm.plot_convergence()
-    
-    # 4. 可视化聚类结果
-    print("\n可视化聚类结果...")
+    # 训练GMM模型
+    gmm = GaussianMixtureModel(n_components=3)
+    gmm.fit(X)
+    y_pred = gmm.labels_
+     #
+     
+    # 可视化结果
     plt.figure(figsize=(12, 5))
-    
-    # 左图：真实聚类
-    plt.subplot(1, 2, 1) # 创建左子图
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=15, alpha=0.8)  # 绘制散点图展示数据点
-    plt.title("真实聚类", fontsize=12)  # 设置标题为"真实聚类"，字体大小为12
-    plt.xlabel("特征1", fontsize=10)    # 设置x轴标签为"特征1"，字体大小为10
-    plt.ylabel("特征2", fontsize=10)    # 设置y轴标签为"特征2"，字体大小为10
-    plt.grid(True, linestyle='--', alpha=0.5)  # 添加网格线
-    
-    # 右图：GMM预测聚类
-    plt.subplot(1, 2, 2)  # 创建1行2列的子图布局，并选择第2个子图
-    # 绘制散点图展示GMM聚类预测结果：
-    # - X[:, 0]: 取数据集第一维特征作为x轴
-    # - X[:, 1]: 取数据集第二维特征作为y轴
-    # - c=y_pred: 使用预测标签作为颜色分类依据
-    # - cmap='viridis': 使用viridis颜色映射
-    # - s=15: 设置点的大小为15
-    # - alpha=0.8: 设置透明度为0.8（轻微透明效果）
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=15, alpha=0.8)
-    plt.title("GMM预测聚类", fontsize=12) # 设置标题及字体大小
-    plt.xlabel("特征1", fontsize=10)      # 设置x轴标签及字体大小
-    plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
-    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
-    
+    plt.subplot(1, 2, 1)
+    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
+    plt.title("True Clusters")
+    plt.title("True Clusters")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.subplot(1, 2, 2)
+    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)
+    plt.title("GMM Predicted Clusters")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.show()
+    print("生成混合高斯分布数据...")
+    print("生成混合高斯分布数据...")
+    print("生成混合高斯分布数据...")
 
-    plt.tight_layout()                                  # 自动调整子图参数，确保图形元素不重叠
-    plt.savefig('gmm_clustering_results.png', dpi=300)  # 保存高分辨率（300 DPI）的GMM聚类结果图像
-    plt.show()                                          # 显示绘制的图形窗口
-    print("程序执行完毕")
+
+
+

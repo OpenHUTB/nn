@@ -78,7 +78,7 @@ try: # 尝试将Carla的egg文件路径添加到Python搜索路径中
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0]) # 根据操作系统选择平台
 except IndexError:
     pass # 若未找到匹配的egg文件，忽略错误
 
@@ -86,7 +86,7 @@ except IndexError:
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
 
-
+#导入CARLA相关模块
 import carla
 
 from carla import ColorConverter as cc
@@ -265,8 +265,12 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         ]
 
     def restart(self):
+        """重置车辆和传感器配置，用于重新开始或初始化场景"""
+
+        # 重置车辆速度参数（默认值）
         self.player_max_speed = 1.589
         self.player_max_speed_fast = 3.713
+        
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -276,14 +280,22 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             raise ValueError("Couldn't find any blueprints with the specified filters")
         blueprint = random.choice(blueprint_list)  # 从符合条件的蓝图列表中随机选择一个
         blueprint.set_attribute('role_name', self.actor_role_name)
+
+        # 配置车辆物理属性
         if blueprint.has_attribute('terramechanics'):
             blueprint.set_attribute('terramechanics', 'true')
+
+        # 随机化车辆外观
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
+
+        # 随机化驾驶员ID
         if blueprint.has_attribute('driver_id'):
             driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
             blueprint.set_attribute('driver_id', driver_id)
+
+        #设置车辆为无敌模式
         if blueprint.has_attribute('is_invincible'):
             blueprint.set_attribute('is_invincible', 'true')
         # set the max speed
@@ -381,16 +393,16 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             pass
 
     def tick(self, clock):
-        self.hud.tick(self, clock)
-
+        self.hud.tick(self, clock) # 调用HUD的tick方法更新信息
+    
     def render(self, display):
-        self.camera_manager.render(display)
-        self.hud.render(display)
+        self.camera_manager.render(display) # 渲染相机画面
+        self.hud.render(display)  # 渲染HUD界面
 
     def destroy_sensors(self):
-        self.camera_manager.sensor.destroy()
-        self.camera_manager.sensor = None
-        self.camera_manager.index = None
+        self.camera_manager.sensor.destroy() # 销毁相机传感器
+        self.camera_manager.sensor = None # 清空传感器引用
+        self.camera_manager.index = None # 重置相机索引
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
@@ -445,14 +457,20 @@ class KeyboardControl(object):
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock, sync_mode):
+        
+        # 初始化车辆灯光状态
         if isinstance(self._control, carla.VehicleControl):
             current_lights = self._lights
+
+        # 遍历所有PyGame事件
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
             elif event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+
+                # 重置场景
                 elif event.key == K_BACKSPACE:
                     if self._autopilot_enabled:
                         world.player.set_autopilot(False)
@@ -461,30 +479,30 @@ class KeyboardControl(object):
                     else:
                         world.restart()
                 elif event.key == K_F1:
-                    world.hud.toggle_info()
+                    world.hud.toggle_info() # 切换HUD信息显示
                 elif event.key == K_v and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_map_layer(reverse=True)
+                    world.next_map_layer(reverse=True) # 反向切换地图图层
                 elif event.key == K_v:
-                    world.next_map_layer()
+                    world.next_map_layer()  # 切换地图图层
                 elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.load_map_layer(unload=True)
+                    world.load_map_layer(unload=True)  # 卸载地图图层
                 elif event.key == K_b:
-                    world.load_map_layer()
+                    world.load_map_layer() # 加载地图图层
                 elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
-                    world.hud.help.toggle()
+                    world.hud.help.toggle() # 切换帮助信息
                 elif event.key == K_TAB:
-                    world.camera_manager.toggle_camera()
+                    world.camera_manager.toggle_camera() # 切换相机视角
                 elif event.key == K_c and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_weather(reverse=True)
+                    world.next_weather(reverse=True) # 反向切换天气
                 elif event.key == K_c:
-                    world.next_weather()
+                    world.next_weather() # 切换天气
                 elif event.key == K_g:
-                    world.toggle_radar()
+                    world.toggle_radar() # 切换雷达显示
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key == K_n:
-                    world.camera_manager.next_sensor()
-                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL):
+                    world.camera_manager.next_sensor() # 切换传感器
+                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL): # 切换恒定速度模式
                     if world.constant_velocity_enabled:
                         world.player.disable_constant_velocity()
                         world.constant_velocity_enabled = False
@@ -748,6 +766,7 @@ class KeyboardControl(object):
 
 
 class HUD(object):
+        
     def __init__(self, width, height):
         """
         初始化HUD（平视显示器）类。
@@ -800,7 +819,7 @@ class HUD(object):
         v = world.player.get_velocity()# 获取车辆速度
         c = world.player.get_control()
         compass = world.imu_sensor.compass
-        heading = 'N' if compass > 270.5 or compass < 89.5 else ''
+        heading = 'N' if compass > 270.5 or compass < 89.5 else ''#一种简易方向判断逻辑
         heading += 'S' if 90.5 < compass < 269.5 else ''
         heading += 'E' if 0.5 < compass < 179.5 else ''
         heading += 'W' if 180.5 < compass < 359.5 else ''
