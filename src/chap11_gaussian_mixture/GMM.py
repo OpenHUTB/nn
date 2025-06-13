@@ -296,8 +296,8 @@ if __name__ == "__main__":
     # 训练GMM模型
     gmm = GaussianMixtureModel(n_components=3)
     gmm.fit(X)
-    y_pred = gmm.labels_
-     #
+       y_pred = gmm.labels_
+    # 获取GMM模型对每个样本的聚类预测结果
      
     # 可视化结果
     plt.figure(figsize=(12, 5))
