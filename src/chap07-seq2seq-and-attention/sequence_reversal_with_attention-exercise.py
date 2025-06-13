@@ -265,7 +265,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
         loss = compute_loss(logits, y)
 
     # 计算梯度
-    grads = tape.gradient(loss, model.trainable_variables)
+    grads = tape.gradient(loss, model.trainable_variables) # 使用自动微分计算损失函数相对于模型可训练变量的梯度
     
     # 应用梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables)) # 使用优化器应用梯度更新模型的可训练变量

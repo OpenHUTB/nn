@@ -65,10 +65,8 @@ from __future__ import print_function
 # -- find carla module ---------------------------------------------------------
 # ==============================================================================
 
-    
-       
-       
-import glob
+
+import glob # 导入glob模块,查找符合特定模式的Carla egg文件路径
 import os
 import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 
@@ -88,7 +86,7 @@ except IndexError:
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
 
-
+#导入CARLA相关模块
 import carla
 
 from carla import ColorConverter as cc
@@ -104,7 +102,7 @@ import re
 import weakref
 
 try:
-    import pygame
+    import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
     from pygame.locals import KMOD_CTRL
     from pygame.locals import KMOD_SHIFT
     from pygame.locals import K_0

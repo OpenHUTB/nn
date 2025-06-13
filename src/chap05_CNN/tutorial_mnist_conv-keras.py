@@ -33,13 +33,28 @@ def mnist_dataset():
     # 同样变成 (num_samples, 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
 
+    # 从训练数据 x 和 y 创建一个 TensorFlow Dataset 对象
     ds = tf.data.Dataset.from_tensor_slices((x, y))
+
+    # 使用 map 函数对每个样本应用预处理函数 prepare_mnist_features_and_labels（通常包括归一化、类型转换等）
     ds = ds.map(prepare_mnist_features_and_labels)
+
+    # 取出前 20000 个样本，并对其进行打乱（shuffle），然后按每批 100 个样本进行分批
     ds = ds.take(20000).shuffle(20000).batch(100)
 
+
+    # 从测试数据 x_test 和 y_test 创建测试集 Dataset
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+
+    # 同样应用预处理函数对测试集进行处理
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+
+    # 从测试集中取出 20000 个样本，进行打乱后一次性全部放入一个 batch（用于评估时批量推理）
+    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)  
+    # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+
+
+    # 返回训练集和测试集
     return ds, test_ds
 
 
