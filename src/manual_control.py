@@ -957,12 +957,30 @@ class HUD(object):
 
 
 class FadingText(object):
+    """
+       用于显示渐隐文本的类。
+
+       该类用于在屏幕上显示一段文本，并在指定的时间内逐渐淡出。
+       主要功能包括：
+       - 初始化文本的字体、尺寸和位置。
+       - 设置文本内容、颜色和显示时长。
+       - 每帧更新文本的透明度，实现渐隐效果。
+       - 将文本渲染到指定的显示表面上。
+    """
     def __init__(self, font, dim, pos):
-        self.font = font
-        self.dim = dim
-        self.pos = pos
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        """
+        初始化渐隐文本对象。
+
+        参数:
+        - font: 字体对象，用于渲染文本。
+        - dim: 文本表面的尺寸 (宽度, 高度)。
+        - pos: 文本在屏幕上的位置 (x, y)。
+        """
+        self.font = font       # 字体对象
+        self.dim = dim         # 文本表面的尺寸
+        self.pos = pos         # 文本在屏幕上的位置
+        self.seconds_left = 0  # 剩余显示时间（秒）
+        self.surface = pygame.Surface(self.dim)  # 创建一个与指定尺寸匹配的表面
 
     def set_text(self, text, color=(255, 255, 255), seconds=2.0):
         text_texture = self.font.render(text, True, color)
