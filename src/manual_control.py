@@ -1534,51 +1534,71 @@ def game_loop(args):
 def main():
     argparser = argparse.ArgumentParser(
         description='CARLA Manual Control Client')
+
+    # 添加调试参数
     argparser.add_argument(
         '-v', '--verbose',
         action='store_true',
         dest='debug',
         help='print debug information')
+    
+    # 添加服务器主机IP参数
     argparser.add_argument(
         '--host',
         metavar='H',
         default='127.0.0.1',
         help='IP of the host server (default: 127.0.0.1)')
+
+    # 添加端口参数
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
         default=2000,
         type=int,
         help='TCP port to listen to (default: 2000)')
+
+    # 添加自动驾驶模式参数
     argparser.add_argument(
         '-a', '--autopilot',
         action='store_true',
         help='enable autopilot')
+
+    # 添加分辨率参数
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
         default='1280x720',
         help='window resolution (default: 1280x720)')
+
+    # 添加角色过滤器参数
     argparser.add_argument(
         '--filter',
         metavar='PATTERN',
-        default='vehicle.*',
+        default='vehicle.*',  # 默认匹配所有车辆
         help='actor filter (default: "vehicle.*")')
+
+    # 添加角色生成版本参数
     argparser.add_argument(
         '--generation',
         metavar='G',
         default='2',
         help='restrict to certain actor generation (values: "1","2","All" - default: "2")')
+
+    # 添加角色名称参数
     argparser.add_argument(
         '--rolename',
         metavar='NAME',
         default='hero',
         help='actor role name (default: "hero")')
+
+    # 添加伽马校正参数
     argparser.add_argument(
         '--gamma',
         default=2.2,
         type=float,
         help='Gamma correction of the camera (default: 2.2)')
+
+    # 添加同步模式参数
     argparser.add_argument(
         '--sync',
         action='store_true',
