@@ -107,6 +107,22 @@ class ReversiEnv(gym.Env):
         return self.state
 
     def _step(self, action):
+         """
+        执行一个落子动作，并更新环境状态。
+    
+        参数:
+            action (int): 玩家选择的动作，表示棋盘上的一个位置或特殊动作（如跳过或认输）。
+                          动作空间包括:
+                            - 0 到 board_size^2 - 1: 棋盘上的具体位置 (x, y) 转换后的索引
+                            - board_size^2: 跳过（pass）
+                            - board_size^2 + 1: 认输（resign）
+    
+        返回:
+            state (np.ndarray): 更新后的棋盘状态
+            reward (float): 当前动作的即时奖励
+            done (bool): 是否游戏结束
+            info (dict): 包含额外信息的字典，如当前棋盘状态
+        """
         color = action[1]
         action = action[0]
         
