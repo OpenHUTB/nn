@@ -1585,18 +1585,19 @@ def main():
         help='Activate synchronous mode execution')
     args = argparser.parse_args()
 
+    # 从分辨率参数中提取宽度和高度
     args.width, args.height = [int(x) for x in args.res.split('x')]
 
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    log_level = logging.DEBUG if args.debug else logging.INFO  # 根据调试参数设置日志级别
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level) # 配置基础日志格式：显示日志级别和消息内容
 
-    logging.info('listening to server %s:%s', args.host, args.port)
+    logging.info('listening to server %s:%s', args.host, args.port) # 记录日志信息，显示正在连接的服务器地址和端口
 
     print(__doc__)
 
     try:
 
-        game_loop(args)
+        game_loop(args) # 进入主游戏循环，传入解析后的参数
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
