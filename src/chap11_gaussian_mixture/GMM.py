@@ -315,6 +315,8 @@ if __name__ == "__main__":
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.show()
     print("生成混合高斯分布数据...")
+    print("生成混合高斯分布数据...")
+    print("生成混合高斯分布数据...")
 
 
 
