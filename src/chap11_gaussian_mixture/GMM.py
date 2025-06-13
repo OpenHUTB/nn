@@ -260,7 +260,7 @@ class GaussianMixtureModel:
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
         else:
             # 处理非奇异协方差矩阵
-            inv = np.linalg.inv(sigma)
+            inv = np.linalg.inv(sigma) #计算协方差矩阵的逆
             exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
         
