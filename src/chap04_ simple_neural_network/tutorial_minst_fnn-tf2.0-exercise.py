@@ -97,8 +97,8 @@ def compute_accuracy(logits, labels):
     logits: 模型输出的未归一化分数
     labels: 真实标签
     """
-    predictions = tf.argmax(logits, axis=1)
-    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
+    predictions = tf.argmax(logits, axis=1) # 获取预测类别
+    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32)) # 计算准确率
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
