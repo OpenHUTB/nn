@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 
 def question_2():
-print("第二题：\n")
+  print("第二题：\n") #格式修改为缩进
 # 创建一个一维NumPy数组，存储整数类型的数值
 # 数组元素为[4, 5, 6]，数据类型默认推断为numpy.int64
 # 形状：a.shape = (3,)，表示包含3个元素的一维数组     
