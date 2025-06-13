@@ -281,7 +281,7 @@ h1 = mul_h1.forward(x, W1)  # shape(5, 4)
 h1_relu = relu.forward(h1)  # 对第一层输出h1应用ReLU激活函数（保留正值，负值置0）
 h2 = mul_h2.forward(h1_relu, W2)
 h2_soft = softmax.forward(h2) # 将logits转换为概率分布（[5,6]）
-h2_log = log.forward(h2_soft)
+h2_log = log.forward(h2_soft) # 对经过 softmax 处理后的输出 h2_soft 进行对数变换
 # 手动实现的反向传播过程（计算梯度）：
 # 反向传播流程（从后向前）：
 h2_log_grad = log.backward(-label)                # 计算损失梯度
