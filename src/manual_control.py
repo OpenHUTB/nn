@@ -265,8 +265,12 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         ]
 
     def restart(self):
+        """重置车辆和传感器配置，用于重新开始或初始化场景"""
+
+        # 重置车辆速度参数（默认值）
         self.player_max_speed = 1.589
         self.player_max_speed_fast = 3.713
+        
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -276,14 +280,22 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             raise ValueError("Couldn't find any blueprints with the specified filters")
         blueprint = random.choice(blueprint_list)  # 从符合条件的蓝图列表中随机选择一个
         blueprint.set_attribute('role_name', self.actor_role_name)
+
+        # 配置车辆物理属性
         if blueprint.has_attribute('terramechanics'):
             blueprint.set_attribute('terramechanics', 'true')
+
+        # 随机化车辆外观
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
+
+        # 随机化驾驶员ID
         if blueprint.has_attribute('driver_id'):
             driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
             blueprint.set_attribute('driver_id', driver_id)
+
+        #设置车辆为无敌模式
         if blueprint.has_attribute('is_invincible'):
             blueprint.set_attribute('is_invincible', 'true')
         # set the max speed
