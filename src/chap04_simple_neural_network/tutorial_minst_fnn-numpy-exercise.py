@@ -305,7 +305,7 @@ with tf.GradientTape() as tape:
     h1_relu = tf.nn.relu(h1)
     h2 = tf.matmul(h1_relu, W2) # [5,5] @ [5,6] → [5,6]
     prob = tf.nn.softmax(h2)
-    log_prob = tf.math.log(prob)
+    log_prob = tf.math.log(prob) # 对数概率
     loss = tf.reduce_sum(label * log_prob)
     # 计算负对数似然损失(Negative Log Likelihood Loss)
     grads = tape.gradient(loss, [W1, W2])
