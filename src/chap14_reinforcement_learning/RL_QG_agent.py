@@ -95,7 +95,7 @@ class RL_QG_agent:
         
         # 选择Q值最大的位置（若有多个，随机选一个）
         max_q = np.max(legal_q)                # 最大Q值
-        best_indices = np.where(legal_q == max_q)[0]  # 所有最大Q值的索引
+        best_indices = np.where(legal_q == max_q)[0]  # 在合法动作中找出所有具有最大Q值的动作索引
         return enables[np.random.choice(best_indices)]  # 映射回原始位置
 
 
