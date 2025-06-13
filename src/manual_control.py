@@ -66,7 +66,7 @@ from __future__ import print_function
 # ==============================================================================
 
 
-import glob
+import glob # 导入glob模块,查找符合特定模式的Carla egg文件路径
 import os
 import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 
@@ -102,7 +102,7 @@ import re
 import weakref
 
 try:
-    import pygame
+    import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
     from pygame.locals import KMOD_CTRL
     from pygame.locals import KMOD_SHIFT
     from pygame.locals import K_0
@@ -224,7 +224,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.actor_role_name = args.rolename
         try:                                    # 加载地图数据
             self.map = self.world.get_map()
-        except RuntimeError as error:
+        except RuntimeError as error:  # 地图加载失败时的错误处理
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
             print('  Make sure it exists, has the same name of your town, and is correct.')
@@ -274,7 +274,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         blueprint_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
         if not blueprint_list:
             raise ValueError("Couldn't find any blueprints with the specified filters")
-        blueprint = random.choice(blueprint_list)
+        blueprint = random.choice(blueprint_list)  # 从符合条件的蓝图列表中随机选择一个
         blueprint.set_attribute('role_name', self.actor_role_name)
         if blueprint.has_attribute('terramechanics'):
             blueprint.set_attribute('terramechanics', 'true')
@@ -294,7 +294,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
+            spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
             self.destroy()
@@ -797,7 +797,7 @@ class HUD(object):
         if not self._show_info:
             return
         t = world.player.get_transform()
-        v = world.player.get_velocity()
+        v = world.player.get_velocity()# 获取车辆速度
         c = world.player.get_control()
         compass = world.imu_sensor.compass
         heading = 'N' if compass > 270.5 or compass < 89.5 else ''
@@ -1425,7 +1425,7 @@ def game_loop(args):
             sim_world.apply_settings(original_settings)
 
         if (world and world.recording_enabled):
-            client.stop_recorder()
+            client.stop_recorder() # 如果世界对象存在且启用了录制功能，则停止录制
 
         if world is not None:
             world.destroy()

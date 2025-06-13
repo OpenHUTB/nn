@@ -100,7 +100,7 @@ class ReversiEnv(gym.Env):
         self.done = False
 
         # Let the opponent play if it's not the agent's turn
-        if self.player_color != self.to_play:
+        if self.player_color != self.to_play:# 如果当前不是玩家回合(由对手回合)
             a = self.opponent_policy(self.state)
             ReversiEnv.make_place(self.state, a, ReversiEnv.BLACK)
             self.to_play = ReversiEnv.WHITE
@@ -174,7 +174,7 @@ class ReversiEnv(gym.Env):
             outfile.write(' ' +  str(j + 1) + '  | ')
         outfile.write('\n')
         outfile.write(' ' * 5)
-        outfile.write('-' * (board.shape[1] * 6 - 1))
+        outfile.write('-' * (board.shape[1] * 6 - 1))# 根据列数计算分隔线长度
         outfile.write('\n')
         for i in range(board.shape[1]):
             outfile.write(' ' +  str(i + 1) + '  |')

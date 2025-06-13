@@ -100,8 +100,21 @@ class RL_QG_agent:
 
     def save_model(self):
         """保存训练好的模型参数到指定目录"""
+
+        # 使用 TensorFlow 的 Saver 对象保存模型参数到指定路径
+        # self.sess 是当前的 TensorFlow 会话对象，用于执行计算图中的操作
+        # os.path.join(self.model_dir, 'parameter.ckpt') 用于构建保存模型参数的完整文件路径
+        # self.model_dir 是保存模型的目录路径
+        # 'parameter.ckpt' 是保存模型参数的文件名
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已保存至", self.model_dir)
+        
+        try:
+            self.saver.save(self.sess, model_path)
+            self.logger.info("模型已保存至 %s", model_path)
+        except Exception as e:
+            self.logger.error("保存模型时出错: %s", e)
+
 
 
     def load_model(self):

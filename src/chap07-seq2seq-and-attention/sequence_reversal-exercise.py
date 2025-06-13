@@ -65,10 +65,10 @@ def get_batch(batch_size, length):
 # 2. enc_x: 编码器输入序列，形状为 [batch_size, enc_seq_len]
 # 3. dec_x: 解码器输入序列（通常包含起始标记），形状为 [batch_size, dec_seq_len]
 # 4. y: 目标输出序列（通常包含结束标记），形状为 [batch_size, dec_seq_len]
-    return (batched_examples,
-            tf.constant(enc_x, dtype = tf.int32), 
-            tf.constant(dec_x, dtype = tf.int32), 
-            tf.constant(y, dtype = tf.int32))
+    return (batched_examples,                        # 返回一个批次的原始样本数据
+            tf.constant(enc_x, dtype = tf.int32),    # 将 enc_x 转换为 TensorFlow 的 int32 类型常量张量，作为编码器（Encoder）的输入
+            tf.constant(dec_x, dtype = tf.int32),    # 将 dec_x 转换为 int32 类型的张量，作为解码器（Decoder）的输入
+            tf.constant(y, dtype = tf.int32))        # 将 y 转换为 int32 类型的张量，作为标签（Label）或目标输出，用于计算损失
 #测试
 print(get_batch(2, 10))
 

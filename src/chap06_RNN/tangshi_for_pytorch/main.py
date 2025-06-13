@@ -262,15 +262,18 @@ def to_word(predict, vocabs):  # 预测的结果转化成汉字
 
 
 def pretty_print_poem(poem):  # 格式化打印古诗，令打印的结果更工整
-    shige=[]  # 存储有效诗句的列表
+    shige = []  # 存储有效诗句的列表
+
     for w in poem:
         if w == start_token or w == end_token:  # 遇到开始或结束标记则停止
             break
-        shige.append(w)
-    poem_sentences = poem.split('。')
+        shige.append(w)  # 将非开始/结束标记的字符加入诗句列表
+
+    poem_sentences = poem.split('。')  # 按句号分割成多个句子
+
     for s in poem_sentences:
-        if s != '' and len(s) > 10:
-            print(s + '。')
+        if s != '' and len(s) > 10:  # 排除空句，并筛选长度大于10的句子
+            print(s + '。')  # 打印完整的一句诗，并补上句号
 
 # 生成古诗的主函数
 def gen_poem(begin_word):
@@ -288,7 +291,7 @@ def gen_poem(begin_word):
 
     poem = begin_word
     word = begin_word
-    while word != end_token:
+    while word != end_token:# 将当前诗歌内容转换为整数索引序列
         input = np.array([word_int_map[w] for w in poem],dtype= np.int64)
         input = Variable(torch.from_numpy(input))
         output = rnn_model(input, is_test=True)

@@ -21,7 +21,7 @@ import matplotlib.cm as cm
 # 导入 NumPy 数值计算库
 import numpy as np
 
-# 设置随机种子（确保结果可复现）
+# 设置随机种子（确保结果可复现）随机种子（Random Seed） 是用于初始化伪随机数生成器的起始值，它决定了随机数序列的“起点”。
 # NumPy的随机种子
 np.random.seed(42)
 # TensorFlow的随机种子
@@ -77,9 +77,9 @@ class LogisticRegression():
         # 初始化权重变量W，形状为[2, 1]表示2维输入到1维输出的线性变换，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
             initial_value = tf.random.uniform(
-                shape = [2, 1], minval = -0.1, maxval = 0.1
+                shape = [2, 1], minval = -0.1, maxval = 0.1  # 权重矩阵形状、最小值、最大值
             ),
-            regularizer = l2_reg
+            regularizer = l2_reg    # 应用L2正则化
         )
         # 初始化偏置变量b，形状为[1]，数据类型为tf.float32，初始值为0
         self.b = tf.Variable(
@@ -145,7 +145,8 @@ def compute_loss(pred, label):
     pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype = tf.float32))
-    return loss, accuracy# 返回计算得到的损失值和准确率
+    # 返回计算得到的损失值和准确率
+    return loss, accuracy
 
 
 @tf.function

@@ -265,7 +265,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
         loss = compute_loss(logits, y)
 
     # 计算梯度
-    grads = tape.gradient(loss, model.trainable_variables)
+    grads = tape.gradient(loss, model.trainable_variables) # 使用自动微分计算损失函数相对于模型可训练变量的梯度
     
     # 应用梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables)) # 使用优化器应用梯度更新模型的可训练变量
@@ -288,16 +288,20 @@ def train(model, optimizer, seqlen):
     accuracy = 0.0
     
     # 训练2000步
-    for step in range(2000):
-        # 获取一个批次的训练数据
-        batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
-        loss = train_one_step(model, optimizer, enc_x, dec_x, y)
-        
-        # 每500步打印一次损失
-        if step % 500 == 0:
-            print('step', step, ': loss', loss.numpy())
+for step in range(2000):
+    # 获取一个批次的训练数据
+    batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
     
-    return loss
+    # 执行一次训练步骤：前向传播 + 反向传播 + 参数更新
+    loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+    
+    # 每500步打印一次损失
+    if step % 500 == 0:
+        # 将当前步数与损失值打印出来，用于监控训练过程
+        print('step', step, ': loss', loss.numpy())
+        
+# 返回最后一次计算的 loss 值（可用于调试或后续处理）
+return loss
 
 
 # # 训练迭代
