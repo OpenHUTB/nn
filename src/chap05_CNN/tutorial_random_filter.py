@@ -4,15 +4,15 @@
 
 # In[191]:
 # 导入必要的库
-import os
+import os # 提供操作系统相关功能，如文件路径操作
 import tensorflow as tf
-from tensorflow import keras
+from tensorflow import keras # 引入Keras高级API接口
 from tensorflow.keras import layers, optimizers, datasets
-from tensorflow.keras.layers import Dense, Dropout, Flatten
+from tensorflow.keras.layers import Dense, Dropout, Flatten # 引入全连接层、Dropout层和展平层
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
-import pylab
+import pylab # Matplotlib的绘图接口
 from PIL import Image
-import numpy as np
+import numpy as np # 数值计算库
 
 # 定义一个简单的卷积模型
 class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自定义卷积神经网络模型

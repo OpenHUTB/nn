@@ -10,7 +10,7 @@
 
 # 标准库（Python内置模块，按字母顺序排列）
 import collections  # 导入Python标准库中的collections模块
-import os # 导入os库
+import os # 导入os库，用于与操作系统交互
 import sys # 导入sys库，用于系统相关参数和函数
 import tqdm  # 虽然tqdm是第三方库，但常作为工具库放在标准库后，用于显示循环进度
 
@@ -307,7 +307,7 @@ def sequence_reversal():
         # 获取批次大小
         batch_size = tf.shape(init_state)[0]
         # 起始 token（全为 0）
-        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        cur_token = tf.zeros(shape=[batch_size], dtype=tf.int32)
         # 初始化状态为编码器输出的状态
         state = init_state
         # 存储每一步生成的token

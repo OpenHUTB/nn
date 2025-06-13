@@ -59,7 +59,9 @@ for i_episode in range(max_epochs):
 
         # 处理无合法动作的情况
         if not enables:
-            action_ = env.board_size ** 2 + 1  # 执行"跳过"操作
+           # 当没有合法落子位置时，使用特殊值board_size**2+1表示"跳过"这一轮
+           # 这是环境API中定义的约定，用于处理一方无法行动的情况
+             action_ = env.board_size ** 2 + 1  # 执行"跳过"操作
         else:  
             # 使用训练好的智能体选择最佳动作
             # observation: 当前环境观测

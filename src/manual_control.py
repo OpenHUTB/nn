@@ -103,6 +103,7 @@ import weakref
 
 try:
     import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
+    # 从pygame.locals导入键盘常量（用于处理键盘输入事件）
     from pygame.locals import KMOD_CTRL
     from pygame.locals import KMOD_SHIFT
     from pygame.locals import K_0
@@ -957,27 +958,68 @@ class HUD(object):
 
 
 class FadingText(object):
+    """
+       用于显示渐隐文本的类。
+
+       该类用于在屏幕上显示一段文本，并在指定的时间内逐渐淡出。
+       主要功能包括：
+       - 初始化文本的字体、尺寸和位置。
+       - 设置文本内容、颜色和显示时长。
+       - 每帧更新文本的透明度，实现渐隐效果。
+       - 将文本渲染到指定的显示表面上。
+    """
     def __init__(self, font, dim, pos):
-        self.font = font
-        self.dim = dim
-        self.pos = pos
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        """
+        初始化渐隐文本对象。
+
+        参数:
+        - font: 字体对象，用于渲染文本。
+        - dim: 文本表面的尺寸 (宽度, 高度)。
+        - pos: 文本在屏幕上的位置 (x, y)。
+        """
+        self.font = font       # 字体对象
+        self.dim = dim         # 文本表面的尺寸
+        self.pos = pos         # 文本在屏幕上的位置
+        self.seconds_left = 0  # 剩余显示时间（秒）
+        self.surface = pygame.Surface(self.dim)  # 创建一个与指定尺寸匹配的表面
 
     def set_text(self, text, color=(255, 255, 255), seconds=2.0):
-        text_texture = self.font.render(text, True, color)
-        self.surface = pygame.Surface(self.dim)
-        self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
+        """
+        设置要显示的文本内容、颜色和显示时长。
+
+        参数:
+        - text: 要显示的文本字符串。
+        - color: 文本颜色，默认为白色 (255, 255, 255)。
+        - seconds: 文本显示的时长，默认为2秒。
+        """
+        text_texture = self.font.render(text, True, color)  # 渲染文本到纹理
+        self.surface = pygame.Surface(self.dim)             # 创建一个新的表面
+        self.seconds_left = seconds                         # 设置剩余显示时间
+        self.surface.fill((0, 0, 0, 0))                     # 用透明黑色填充表面
+        self.surface.blit(text_texture, (10, 11))           # 将文本纹理绘制到表面，偏移 (10, 11)
 
     def tick(self, _, clock):
-        delta_seconds = 1e-3 * clock.get_time()
-        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
+        """
+        更新渐隐效果。
+
+        每帧调用此方法以减少剩余显示时间，并根据剩余时间调整文本的透明度。
+
+        参数:
+        - _: 未使用的参数（占位符）。
+        - clock: 时钟对象，用于获取时间间隔。
+        """
+        delta_seconds = 1e-3 * clock.get_time()                          # 获取自上次调用以来的时间（秒）
+        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)  # 减少剩余时间
+        self.surface.set_alpha(500.0 * self.seconds_left)                # 根据剩余时间调整透明度
 
     def render(self, display):
-        display.blit(self.surface, self.pos)
+        """
+        将渐隐文本渲染到指定的显示表面上。
+
+        参数:
+        - display: 显示表面，用于绘制文本。
+        """
+        display.blit(self.surface, self.pos)  # 将文本表面绘制到指定位置
 
 
 # ==============================================================================

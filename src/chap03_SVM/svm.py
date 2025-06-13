@@ -77,8 +77,8 @@ class SVM:
             db = -np.mean(y[idx])
 
             # 梯度下降更新参数
-            self.w -= self.learning_rate * dw
-            self.b -= self.learning_rate * db
+            self.w -= self.learning_rate * dw # 权重更新：w = w - η*dw/dw
+            self.b -= self.learning_rate * db # 偏置更新：b = b - η*db/db
             
             # 训练逻辑总结：
             # - 对误分类样本，向正确方向调整超平面

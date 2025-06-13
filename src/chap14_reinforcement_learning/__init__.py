@@ -93,7 +93,7 @@ register(
 register(
     id='Pendulum-v0',
     entry_point='gym.envs.classic_control:PendulumEnv',
-    max_episode_steps=200,
+    max_episode_steps=200,  # 每个episode的最大步数限制
 )
 
 # 4. 双连杆机械臂：通过关节控制使末端到达目标位置（无奖励阈值，仅考察控制）

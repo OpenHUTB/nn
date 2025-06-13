@@ -1,7 +1,7 @@
 # 导入必要的库
-import os           # 操作系统接口，用于文件路径处理和目录操作
-import numpy as np  # 数值计算库，用于数组操作和数学计算
-import tensorflow as tf  # 深度学习框架，用于构建和训练神经网络
+import os           # 导入操作系统接口，用于文件路径处理和目录操作
+import numpy as np  # 导入数值计算库，用于数组操作和数学计算
+import tensorflow as tf  # 导入深度学习框架，用于构建和训练神经网络
 
 class RL_QG_agent:
     """黑白棋强化学习智能体，基于Q学习和卷积神经网络实现落子策略"""
@@ -34,6 +34,7 @@ class RL_QG_agent:
         # 32个3x3卷积核，捕捉相邻棋子的局部关系
         # 输出形状：[None, 8, 8, 32]
         conv1 = tf.layers.conv2d(
+            # 输入数据：状态特征图
             inputs=self.input_states,
             filters=32,            # 32个卷积核，生成32个特征图
             kernel_size=3,         # 3x3卷积核，捕捉局部区域

@@ -6,10 +6,12 @@
 
 # In[1]:
 # 导入了多个用于构建和训练深度学习模型的Python库和模块
-import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
-import tensorflow as tf
-import collections
-from tensorflow.keras import layers, optimizers
+import numpy as np # 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
+import tensorflow as tf # 导入 TensorFlow 深度学习框架，提供神经网络构建、训练、评估等全面的功能，适用于机器学习和深度学习任务
+import collections # 导入 collections 标准库模块，提供了许多有用的集合类，比如 Counter、namedtuple、deque、defaultdict 等
+from tensorflow.keras import layers, optimizers # 从 TensorFlow 的 Keras 高级 API 中导入：
+# - layers：用于构建神经网络层（如 Dense、Conv2D、Dropout 等）
+# - optimizers：用于优化模型参数的优化器（如 SGD、Adam、RMSprop 等）
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
 end_token = 'eos'    # End of sentence
@@ -187,7 +189,7 @@ def mkMask(input_tensor, maxLen):
         与input_tensor形状相同的布尔掩码
     """
     # 获取输入张量的形状
-    shape_of_input = tf.shape(input_tensor) 
+    shape_of_input = tf.shape(input_tensor) # 返回一个形状为 [ndim] 的张量 
     shape_of_output = tf.concat(
         axis=0, 
         values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表

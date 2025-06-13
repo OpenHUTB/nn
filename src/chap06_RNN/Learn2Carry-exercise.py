@@ -66,8 +66,8 @@ def results_converter(res_lst):
         res_lst: shape(b_sz, len(digits))
     '''
     # 反转每个数字位列表，因为我们在输入时反转了数字
-    res = [reversed(digits) for digits in res_lst]
-    return [convertDigits2Num(digits) for digits in res]
+    res = [reversed(digits) for digits in res_lst]       # 反转每个数字序列中的数字顺序
+    return [convertDigits2Num(digits) for digits in res] # 返回转换后的数值列表
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
     '''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度

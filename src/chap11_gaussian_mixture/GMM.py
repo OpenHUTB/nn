@@ -260,9 +260,9 @@ class GaussianMixtureModel:
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
         else:
             # 处理非奇异协方差矩阵
-            inv = np.linalg.inv(sigma)
-            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
-            return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
+            inv = np.linalg.inv(sigma) #计算协方差矩阵的逆
+            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
+            return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
         
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
@@ -275,11 +275,11 @@ class GaussianMixtureModel:
         # 绘制对数似然值随迭代次数的变化曲线
         # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
-        # 设置x轴标签为“迭代次数”
+        # 设置x轴的标签为“迭代次数”
         plt.xlabel('迭代次数')
-        # 设置y轴标签为“对数似然值”
+        # 设置y轴的标签为“对数似然值”
         plt.ylabel('对数似然值')
-        # 设置图表标题为“EM算法收敛曲线”
+        # 设置图表的标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
         # 启用网格线，增强可读性
         plt.grid(True, alpha=0.5) 
@@ -304,6 +304,7 @@ if __name__ == "__main__":
     plt.subplot(1, 2, 1)
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
     plt.title("True Clusters")
+    # 注意：此处重复设置标题是为了确保在某些环境中标题能够正确显示
     plt.title("True Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
