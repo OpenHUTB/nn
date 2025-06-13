@@ -66,7 +66,7 @@ from __future__ import print_function
 # ==============================================================================
 
 
-import glob
+import glob # 导入glob模块,查找符合特定模式的Carla egg文件路径
 import os
 import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 
