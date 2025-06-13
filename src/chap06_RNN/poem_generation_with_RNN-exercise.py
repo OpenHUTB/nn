@@ -259,7 +259,7 @@ def reduce_avg(reduce_target, lengths, dim):
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算形状差异：目标张量的维度数减去长度张量的维度数再减1
     mxlen = tf.shape(reduce_target)[dim]  # 获取当前维度的最大长度 mxlen
     mask = mkMask(lengths, mxlen)
     
