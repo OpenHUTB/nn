@@ -119,4 +119,5 @@ model.fit(train_ds, epochs=5)
 # 在测试数据集上评估模型性能。
 # evaluate 方法会计算并返回模型在测试数据集上的损失值和评估指标（例如准确率）。
 # 这一步骤用来验证模型的泛化能力，确保模型不仅仅是在训练集上表现良好。
-model.evaluate(test_ds)
+# 在测试集上评估模型，批次大小设为100
+model.evaluate(test_ds, batch_size=100)
