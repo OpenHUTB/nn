@@ -273,7 +273,7 @@ W2 = np.random.normal(size=[5, 6])  # 第二层权重 (5→6)
 mul_h1 = Matmul()                   # 第一层矩阵乘法
 mul_h2 = Matmul()                   # 第二层矩阵乘法
 relu = Relu()                       # ReLU 激活函数
-softmax = Softmax()
+softmax = Softmax()                 # Softmax归一化：将输出转换为概率分布
 log = Log()                         # 对数函数
 # 手动实现的前向传播过程：
 h1 = mul_h1.forward(x, W1)  # shape(5, 4)
