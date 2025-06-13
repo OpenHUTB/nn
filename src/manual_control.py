@@ -1166,9 +1166,15 @@ class RadarSensor(object):
         self.velocity_range = 7.5 # m/s
         world = self._parent.get_world()
         self.debug = world.debug
+        
+        # 从蓝图库中查找雷达传感器蓝图
         bp = world.get_blueprint_library().find('sensor.other.radar')
+        
+        # 设置雷达属性
         bp.set_attribute('horizontal_fov', str(35))
         bp.set_attribute('vertical_fov', str(20))
+
+        # 在世界中生成雷达传感器实例
         self.sensor = world.spawn_actor(
             bp,
             carla.Transform(
@@ -1178,7 +1184,7 @@ class RadarSensor(object):
         # We need a weak reference to self to avoid circular reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(
-            lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))
+            lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))# 使用lambda表达式传递弱引用和雷达数据
         
 #定义了一个雷达传感器的回调函数 _Radar_callback，用于处理和可视化 Carla 模拟器中雷达数据
     @staticmethod
