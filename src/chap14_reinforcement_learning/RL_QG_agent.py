@@ -34,6 +34,7 @@ class RL_QG_agent:
         # 32个3x3卷积核，捕捉相邻棋子的局部关系
         # 输出形状：[None, 8, 8, 32]
         conv1 = tf.layers.conv2d(
+            # 输入数据：状态特征图
             inputs=self.input_states,
             filters=32,            # 32个卷积核，生成32个特征图
             kernel_size=3,         # 3x3卷积核，捕捉局部区域
