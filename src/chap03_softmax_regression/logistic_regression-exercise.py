@@ -208,8 +208,8 @@ if __name__ == '__main__':
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
     plt.ylabel('Y')  # 设置Y轴标签为'Y'，用于标识垂直方向的变量
     plt.xlabel('X')  # 设置X轴标签为'X'，用于标识水平方向的变量
-    ax.set_xlim(0, 10)  
-    ax.set_ylim(0, 10) 
+    ax.set_xlim(0, 10)  # X轴显示范围0-10
+    ax.set_ylim(0, 10)  # Y轴显示范围0-10
 
     line_d, = ax.plot([], [], label = 'fit_line')  # 创建用于绘制决策边界的线条对象
     C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
