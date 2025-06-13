@@ -300,9 +300,10 @@ if __name__ == "__main__":
      #
      
     # 可视化结果
-    plt.figure(figsize=(12, 5))
+    plt.figure(figsize=(12, 5))#创建图形和子图
     plt.subplot(1, 2, 1)
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)
+    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)#绘制散点图，x 轴为 X 的第一列（Feature 1），y 轴为 X 的第二列（Feature 2）；点颜色由 y_true 决定（真实聚类标签）
+    # 使用 viridis 颜色映射；s=10 设置点的大小为 10
     plt.title("True Clusters")
     plt.title("True Clusters")
     plt.xlabel("Feature 1")
