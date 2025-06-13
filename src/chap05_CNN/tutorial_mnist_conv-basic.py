@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import Conv2D, MaxPooling2D # 导入卷积神经网络核心层：二维卷积层和最大池化层
 
 # 设置TensorFlow日志级别，只显示错误信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -26,15 +26,23 @@ def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()   # 加载MNIST手写数字数据集，包含60,000张训练图像和10,000张测试图像
     x = x.reshape(x.shape[0], 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
-
+   # 从输入数据 x 和标签 y 创建一个 TensorFlow Dataset 对象
+   # 每个元素是一个 (x_i, y_i) 的元组，表示一个样本和对应的标签
     ds = tf.data.Dataset.from_tensor_slices((x, y))
+   # 使用 map 方法对数据集中的每个元素应用 prepare_mnist_features_and_labels 函数
+   # 这个函数通常用于预处理数据，例如归一化特征、将标签转换为 one-hot 编码等
     ds = ds.map(prepare_mnist_features_and_labels)
+    # 取出前 20000 个样本（限制数据集大小）
+    # 如果原始数据集很大，这一步可以只保留一部分数据用于训练或测试
+    # 对数据集进行打乱（shuffle），确保每个 batch 中的样本是随机选取的
+    # buffer_size=20000 表示用于洗牌的数据缓冲区大小
     ds = ds.take(20000).shuffle(20000).batch(32)
 
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
-    return ds, test_ds
+    test_ds = test_ds.batch(100)  # 直接批处理，无需take和shuffle
+    # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+    return ds, test_ds # 返回处理后的训练集和测试集
 
 
 def prepare_mnist_features_and_labels(x, y):
@@ -66,34 +74,51 @@ class MyConvModel(keras.Model):
     """
 
     def __init__(self):
-        super(MyConvModel, self).__init__()
+        super(MyConvModel, self).__init__()  # 调用父类（Model）的构造函数，初始化模型基础结构
+
+        # 定义第一层卷积层：32个5x5的卷积核，使用ReLU激活函数，same填充保证输出尺寸不变
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
+
+        # 第二层卷积层：64个5x5的卷积核，同样使用ReLU激活函数和same填充
         self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
+
+        # 最大池化层：池化窗口大小为2x2，步长为2，用于降低特征图的空间维度
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+
+        # 展平层：将输入从(batch_size, height, width, channels)展平为一维向量，便于后续全连接层处理
         self.flat = Flatten()
+
+        # 第一个全连接层：100个神经元，使用tanh激活函数
         self.dense1 = layers.Dense(100, activation='tanh')
+
+        # 输出层：10个神经元，对应10个类别（如MNIST中的数字0~9），无激活函数（通常配合softmax或交叉熵损失使用）
         self.dense2 = layers.Dense(10)
 
-    @tf.function
+
+    @tf.function  # 使用装饰器加速模型训练过程，自动构建计算图（适用于TensorFlow）
     def call(self, x):
         """
         模型的前向传播过程。
 
         参数:
-            x: 输入数据。
+            x: 输入数据，形状为 (batch_size, height, width, channels)
 
         返回:
-            logits: 模型输出的logits。
+            logits: 模型输出的logits（未经过softmax的概率输出）
         """
-        h1 = self.l1_conv(x)
-        h1_pool = self.pool(h1)
-        h2 = self.l2_conv(h1_pool)
-        h2_pool = self.pool(h2)
-        flat_h = self.flat(h2_pool)
-        dense1 = self.dense1(flat_h)
-        logits = self.dense2(dense1)
-        return logits
+        h1 = self.l1_conv(x)              # 经过第一层卷积
+        h1_pool = self.pool(h1)           # 第一层后的最大池化，压缩空间维度
 
+        h2 = self.l2_conv(h1_pool)        # 第二层卷积提取更高级特征
+        h2_pool = self.pool(h2)           # 第二层后池化
+
+        flat_h = self.flat(h2_pool)       # 展平操作，为全连接层做准备
+
+        dense1 = self.dense1(flat_h)      # 第一个全连接层，引入非线性变换
+
+        logits = self.dense2(dense1)      # 输出层，得到最终分类结果（logits）
+
+        return logits
 
 model = MyConvModel()
 optimizer = optimizers.Adam()
@@ -237,8 +262,22 @@ def test(model, ds):
 
 # # 训练
 
-# In[26]:
-train_ds, test_ds = mnist_dataset()
-for epoch in range(2):
+# In[26]:、
+#调用mnist_dataset()函数获取处理好的MNIST训练集和测试集，train_ds是训练数据集，test_ds是测试数据集
+# 加载MNIST数据集，返回训练集和测试集
+train_ds, test_ds = mnist_dataset()  # train_ds: 训练数据集, test_ds: 测试数据集
+
+# 训练循环，进行2个epoch的训练
+for epoch in range(2):  # epoch: 训练轮次
+    # 调用train函数进行训练，返回当前epoch的损失和准确率
+    # 参数说明:
+    # - epoch: 当前训练轮次
+    # - model: 要训练的模型
+    # - optimizer: 优化器
+    # - train_ds: 训练数据集
     loss, accuracy = train(epoch, model, optimizer, train_ds)
+# 调用test函数进行测试，返回模型在测试集上的损失和准确率
+# 参数说明:
+# - model: 要测试的模型
+# - test_ds: 测试数据集
 loss, accuracy = test(model, test_ds)

@@ -6,7 +6,7 @@
 import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
+from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
 from tensorflow.keras.layers import Dense, Dropout, Flatten
 from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
@@ -20,17 +20,41 @@ def mnist_dataset():
         ds (tf.data.Dataset): 处理后的训练数据集。
         test_ds (tf.data.Dataset): 处理后的测试数据集。
     """
+    # 从 TensorFlow 的 datasets 模块中加载 MNIST 数据集
+    # MNIST 是一个手写数字图片数据集，包含 60,000 个训练样本和 10,000 个测试样本
+    # (x, y) 是训练集的图像和标签
+    # (x_test, y_test) 是测试集的图像和标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
+    # 将训练集图像 x 调整形状（reshape）
+    # 原始图像形状是 (num_samples, 28, 28)，即每张图是 28x28 的灰度图
+    # 调整后变为 (num_samples, 28, 28, 1)，增加一个通道维度（channel），以适配卷积神经网络的输入要求
     x = x.reshape(x.shape[0], 28, 28, 1)
+    # 对测试集图像 x_test 做同样的 reshape 操作
+    # 同样变成 (num_samples, 28, 28, 1)
     x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
 
+    # 从训练数据 x 和 y 创建一个 TensorFlow Dataset 对象
     ds = tf.data.Dataset.from_tensor_slices((x, y))
+
+    # 使用 map 函数对每个样本应用预处理函数 prepare_mnist_features_and_labels（通常包括归一化、类型转换等）
     ds = ds.map(prepare_mnist_features_and_labels)
+
+    # 取出前 20000 个样本，并对其进行打乱（shuffle），然后按每批 100 个样本进行分批
     ds = ds.take(20000).shuffle(20000).batch(100)
 
+
+    # 从测试数据 x_test 和 y_test 创建测试集 Dataset
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
+
+    # 同样应用预处理函数对测试集进行处理
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)
+
+    # 从测试集中取出 20000 个样本，进行打乱后一次性全部放入一个 batch（用于评估时批量推理）
+    test_ds = test_ds.take(20000).shuffle(20000).batch(20000)  
+    # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+
+
+    # 返回训练集和测试集
     return ds, test_ds
 
 
@@ -47,6 +71,8 @@ def prepare_mnist_features_and_labels(x, y):
         y: 转换为整型的标签。
     """
     x = tf.cast(x, tf.float32) / 255.0
+    # 将标签转换为int64类型
+    # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
     y = tf.cast(y, tf.int64)
     return x, y
 
@@ -89,7 +115,7 @@ class MyConvModel(keras.Model):
     # 第二层卷积操作：在更高层次提取特征
     # 使用更多卷积核捕获更复杂的模式
     h2 = self.l2_conv(h1_pool)  # l2_conv 是第二个卷积层实例
-    
+    h2_pool = self.pool(h2)  # 对第二个卷积层的输出应用池化
     # 第二层最大池化：进一步压缩空间信息
     h2_pool = self.pool(h2)
     
@@ -110,7 +136,7 @@ class MyConvModel(keras.Model):
     probs = tf.nn.softmax(logits, axis=-1)
     
     return probs
-
+# 创建一个神经网络模型的实例
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法
 
@@ -119,11 +145,18 @@ optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算
 
 # In[6]:
 #这段代码片段展示了如何使用Keras API来编译、训练和评估一个神经网络模型。
+# 编译模型，指定优化器、损失函数和评估指标
 model.compile(
+    # 指定优化器，例如 Adam 或 SGD
     optimizer=optimizer,
+    # 指定损失函数，适用于多分类任务
     loss='sparse_categorical_crossentropy',
+    # 指定评估指标，这里使用准确率
     metrics=['accuracy']
 )
+# 加载MNIST数据集，返回训练集和测试集
 train_ds, test_ds = mnist_dataset()
+# 训练模型，指定训练数据和训练轮数
 model.fit(train_ds, epochs=5)
+# 评估模型，指定测试数据
 model.evaluate(test_ds)

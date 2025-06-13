@@ -18,10 +18,11 @@ def mnist_dataset():
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     
     # 对图像数据进行归一化处理，将像素值缩放到0到1之间
-    x = x / 255.0
-    x_test = x_test / 255.0
+    x = x / 255.0         # 将训练集图像数据 x 归一化到 [0.0, 1.0] 范围
+    x_test = x_test / 255.0        # 对测试集图像数据 x_test 做同样的归一化处理
     
-    return (x, y), (x_test, y_test)
+    return (x, y), (x_test, y_test) # 返回处理后的训练集和测试集
+                                    # 每个集合都包含图像数据和对应的标签
 
 # In[8]:
 # 打印两个列表对应元素组成的元组列表，这里是示例代码，与后续模型训练测试无直接关系
@@ -60,9 +61,11 @@ class myModel:
         # 隐藏层+ReLU,隐藏层计算：
         # 通过矩阵乘法（x @ self.W1）加上偏置项 self.b1，得到隐藏层的加权和
         # 使用 ReLU 激活函数增加非线性
-        h = tf.nn.relu(x @ self.W1 + self.b1) 
-        
-        # 输出层（未归一化）
+         h = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)
+
+        #  输出层计算：全连接层（无激活函数，直接输出 logits）
+        #  - 隐藏层特征（128维） × 权重矩阵 W2（128×10） → 分类评分（10维）
+        #  - 未应用 softmax，便于后续使用 sparse_softmax_cross_entropy_with_logits 计算损失
         logits = h @ self.W2 + self.b2         
         return logits
         
@@ -92,8 +95,8 @@ def compute_loss(logits, labels):
     # tf.reduce_mean() 对batch中所有样本的损失求平均
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits,  # 模型原始输出（未归一化）
-            labels=labels))  # 真实类别索引（0到num_classes-1）
+            logits = logits,  # 模型原始输出（未归一化）
+            labels = labels))  # 真实类别索引（0到num_classes-1）
 
 # 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
 @tf.function
@@ -112,26 +115,48 @@ def train_one_step(model, optimizer, x, y):
     with tf.GradientTape() as tape:     # 记录计算图以计算梯度
         logits = model(x)               # 前向传播
         loss = compute_loss(logits, y)  # 计算损失
-
+        grads = tape.gradient(loss,model.trainable_variables)
+        #添加梯度裁剪 控制在1.0以内
     grads = tape.gradient(loss, model.trainable_variables)            # 计算梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
     accuracy = compute_accuracy(logits, y)   # 计算准确率
     return loss, accuracy
 
-# 使用tf.function装饰器将函数编译为TensorFlow图，提高执行效率
-@tf.function
+# 使用tf.function装饰器将函数编译为TensorFlow静态计算图，以提高执行效率
+# 自动处理自动微分和GPU加速，特别适合模型测试阶段
+@tf.function  
 def test(model, x, y):
-    logits = model(x)                             # 计算预测结果与真实标签之间的损失值
-    loss = compute_loss(logits, y)                # compute_loss函数应实现具体的损失计算逻辑
-    accuracy = compute_accuracy(logits, y)        # 计算预测结果的准确率，compute_accuracy函数应实现准确率的计算逻辑
-    return compute_loss(logits, y), compute_accuracy(logits, y)# 返回: (损失值, 准确率)
+    """
+    模型测试函数（前向传播+指标计算）
+    
+    Args:
+        model: 训练好的模型实例
+        x: 输入数据张量，shape=(batch_size, ...)
+        y: 真实标签张量，shape=(batch_size, num_classes)或(batch_size,)
+    
+    Returns:
+        tuple: (损失值, 准确率) 两个标量张量
+    """
+    # 模型前向传播计算预测logits（未归一化的预测值）
+    logits = model(x)  # shape=(batch_size, num_classes)
+    
+    # 计算预测结果与真实标签之间的损失值（交叉熵等）
+    # 注意：compute_loss函数需事先定义，接收(logits, labels)参数
+    loss = compute_loss(logits, y)  
+    
+    # 计算预测准确率（比较预测类别和真实类别）
+    # 注意：compute_accuracy函数需事先定义，接收(logits, labels)参数
+    accuracy = compute_accuracy(logits, y)  
+    
+    # 显式返回计算结果（虽然loss/accuracy已计算，但避免重复计算）
+    return loss, accuracy  # 返回类型: (tf.Tensor, tf.Tensor)
 
 
 # ## 实际训练
 
 # In[14]:
-# 加载MNIST数据集
+# 加载并预处理MNIST手写数字数据集
 train_data, test_data = mnist_dataset()
 # 进行50个epoch的训练
 for epoch in range(50):
@@ -139,6 +164,9 @@ for epoch in range(50):
     loss, accuracy = train_one_step(model, optimizer, 
                                     tf.constant(train_data[0], dtype = tf.float32),  # 训练图像数据
                                     tf.constant(train_data[1], dtype = tf.int64))    # 训练标签数据
+    # 打印当前epoch的训练损失和准确率
+    # loss.numpy() 将Tensor转换为Python浮点数以便打印
+    # accuracy.numpy() 将Tensor转换为Python浮点数以便打印
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 # 在测试集上测试模型
 loss, accuracy = test(model, 
@@ -146,3 +174,4 @@ loss, accuracy = test(model,
                       tf.constant(test_data[1], dtype = tf.int64))    # 将测试标签数据转换为TensorFlow常量张量，数据类型为int64
 # 打印测试集上的最终损失和准确率
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
+# 显示模型在测试数据上的总体误差，值越小表示模型预测越接近真实标签

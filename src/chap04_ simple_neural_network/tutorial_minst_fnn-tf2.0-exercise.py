@@ -1,14 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
-# ## 准备数据
+# ========================== #
+#       准备数据部分        #
+# ========================== #
 
 # In[7]:
 
-# 导入必要的库
+# 导入操作系统接口模块，用于文件/目录操作
 import os
+
+# 导入NumPy库，用于科学计算（尤其是多维数组操作）
 import numpy as np
+
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
+
+# 从TensorFlow中导入Keras高级API
 from tensorflow import keras
+
+# 从Keras中导入核心组件：
+# layers - 神经网络层（如全连接层、卷积层等）
+# optimizers - 优化器（如SGD、Adam等）
+# datasets - 内置数据集（如MNIST、CIFAR等）
 from tensorflow.keras import layers, optimizers, datasets
 
 # 设置TensorFlow日志级别，避免输出过多无关信息
@@ -42,11 +55,11 @@ class MyModel:
         ####################
         # 初始化权重和偏置
         # 输入层784 -> 隐藏层128
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
-        self.b1 = tf.Variable(tf.zeros([128]))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))   # stddev=0.1 表示标准差为 0.1，用于控制初始值的范围，避免梯度消失或爆炸
+        self.b1 = tf.Variable(tf.zeros([128]))   # 偏置项的维度应与隐藏层神经元数量一致，即 [128]
         # 隐藏层128 -> 输出层10
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
-        self.b2 = tf.Variable(tf.zeros([10]))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))  # 隐藏层（128 个神经元）到输出层（10 个类别）的权重 W2
+        self.b2 = tf.Variable(tf.zeros([10]))  # 初始化第二层的偏置 b2，同样初始化为 0，维度为 [10]
 
     def __call__(self, x):
         ####################
@@ -72,11 +85,12 @@ def compute_loss(logits, labels):
     logits: 模型输出的未归一化分数
     labels: 真实标签
     """
-    return tf.reduce_mean(
-        tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels
+    return tf.reduce_mean(   # 对所有样本的损失值求平均
+        tf.nn.sparse_softmax_cross_entropy_with_logits(   # TensorFlow内置的交叉熵损失函数
+            logits=logits, labels=labels   # 输入模型原始输出，输入真实标签
         )
     )
+# 计算稀疏标签的softmax交叉熵损失
 
 @tf.function
 def compute_accuracy(logits, labels):
@@ -85,8 +99,8 @@ def compute_accuracy(logits, labels):
     logits: 模型输出的未归一化分数
     labels: 真实标签
     """
-    predictions = tf.argmax(logits, axis=1)
-    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
+    predictions = tf.argmax(logits, axis=1) # 获取预测类别
+    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32)) # 计算准确率
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
@@ -112,8 +126,8 @@ def train_one_step(model, optimizer, x, y):
     grads = tape.gradient(loss, trainable_vars)
 
     # 更新参数（使用固定学习率）
-    for g, v in zip(grads, trainable_vars):
-        v.assign_sub(0.01 * g)
+    # 使用优化器更新参数
+    optimizer.apply_gradients(zip(grads, trainable_vars))
 
     # 计算准确率
     accuracy = compute_accuracy(logits, y)
@@ -169,8 +183,8 @@ for epoch in range(50):
 # 在测试集上评估模型性能
 loss, accuracy = test(
     model,
-    tf.constant(test_data[0], dtype=tf.float32),
-    tf.constant(test_data[1], dtype=tf.int64)
+    tf.constant(test_data[0], dtype=tf.float32), # 将测试特征数据转换为TensorFlow常量张量，指定数据类型为float32
+    tf.constant(test_data[1], dtype=tf.int64)    # 将测试标签数据转换为TensorFlow常量张量，指定数据类型为int64
 )
-
+# .numpy() 将 TensorFlow 张量转换为 NumPy 数组（或 Python 标量）以便打印
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())
