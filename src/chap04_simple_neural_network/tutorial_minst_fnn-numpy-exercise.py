@@ -7,6 +7,7 @@
 import numpy as np
 # 导入 TensorFlow 深度学习框架
 import tensorflow as tf
+# 从 tqdm 库中导入 tqdm 函数
 from tqdm import tqdm
 # 从 TensorFlow 中导入 Keras 高级 API
 from tensorflow import keras
