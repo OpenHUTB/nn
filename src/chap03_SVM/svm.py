@@ -21,8 +21,8 @@ def eval_acc(label, pred):
     """计算准确率。
     
     参数:
-        label: 真实标签数组
-        pred: 预测标签数组
+        label: 真实标签的数组
+        pred: 预测标签的数组
         
     返回:
         准确率 (0到1之间的浮点数)
