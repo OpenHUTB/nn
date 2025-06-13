@@ -2,7 +2,7 @@
 # encoding: utf-8
 # 导入numpy模块并命名为np
 import numpy as np # 导入NumPy库用于高效数值计算
-import sys
+import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 class RBM:
     """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
 
