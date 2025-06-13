@@ -3,20 +3,37 @@
 # coding: utf-8
 
 # 导入必要的库
-import os         # 操作系统接口模块，用于文件和目录操作
-import torch# PyTorch深度学习框架的核心库
-import torch.nn as nn# PyTorch的神经网络模块，包含各种层和损失函数
-import torch.utils.data as Data  # PyTorch的数据处理工具，用于数据加载和批处理
-import torchvision               # 包含常用的数据集和模型
-import torch.nn.functional as F  # 包含常用的函数式API，如ReLU, softmax等
-import numpy as np               # 数值计算库，用于高效的多维数组操作
-from torch.autograd import Variable  # PyTorch的自动微分模块，用于计算梯度
+
+# 导入操作系统模块，用于环境变量设置、路径管理等系统相关操作
+import os
+
+# 导入 NumPy，用于高效的数值计算（如矩阵、向量操作）
+import numpy as np
+
+# 导入 PyTorch 主库
+import torch
+
+# 从 PyTorch 中导入神经网络模块（构建模型的基础类和层）
+import torch.nn as nn
+
+# 导入常用的函数接口模块，包括激活函数、损失函数等
+import torch.nn.functional as F
+
+# 从 PyTorch 中导入自动求导模块，用于构建支持梯度的变量
+from torch.autograd import Variable
+
+# 导入数据处理模块，包括 Dataset 封装与 DataLoader 批处理等功能
+import torch.utils.data as Data
+
+# 导入 torchvision 库，它包含了常用的计算机视觉数据集、模型结构和图像处理工具
+import torchvision
 
 # 设置超参数
-learning_rate = 1e-4  #  学习率
-keep_prob_rate = 0.7  #  Dropout保留神经元的比例
+learning_rate = 1e-4  #  学习率：控制参数更新步长
+keep_prob_rate = 0.7  #  Dropout保留神经元的比例：防止过拟合
 max_epoch = 3         # 训练的总轮数
-BATCH_SIZE = 50       # 每批训练数据的大小为50
+BATCH_SIZE = 50       # 每批训练数据的大小为50：影响内存使用和训练稳定性
+
 
 # 检查是否需要下载 MNIST 数据集
 DOWNLOAD_MNIST = False
@@ -27,8 +44,10 @@ if not(os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
 # 加载训练数据集
 train_data = torchvision.datasets.MNIST(
     root='./mnist/',                              # 数据集保存路径
-    train=True,                                   # 加载训练集
-    transform=torchvision.transforms.ToTensor(),  # 将图像转换为 Tensor 并归一化到[0,1]
+
+    train=True,                                   # 加载训练集（False则加载测试集）
+    transform=torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
+
     download=DOWNLOAD_MNIST                       # 如果需要则下载
 )
 
@@ -36,15 +55,18 @@ train_data = torchvision.datasets.MNIST(
 train_loader = Data.DataLoader(
     dataset=train_data,     # 使用的数据集
     batch_size=BATCH_SIZE,  # 每批数据量
-    shuffle=True            # 是否打乱数据
+    shuffle=True            # 是否在每个epoch打乱数据顺序（重要！避免模型学习到顺序信息）
 )
 
-# 加载测试数据集
+# 加载测试数据集（不用于训练，仅用于评估）
+
 # torchvision.datasets.MNIST用于加载 MNIST 数据集
 # root='./mnist/'指定数据集的存储路径
 # train=False表示加载测试集（而不是训练集）
 test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
-# 预处理测试数据：转换为 Variable ，调整维度，归一化，只取前500个样本
+
+# 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
+
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
@@ -58,18 +80,22 @@ class CNN(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
             nn.BatchNorm2d(32),                                    # 添加批量归一化
-            nn.ReLU(),                                             # ReLU激活函数，引入非线性
+
+            nn.ReLU(),                                             # ReLU激活函数，引入非线性，ReLU 函数的公式为 f(x) = max(0, x)，可以将负值置为0。
+
             nn.MaxPool2d(2)                                        # 最大池化，减小特征图尺寸
         )
         
         # 第二个卷积层
         self.conv2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3,  padding=1, bias=False),  # 移除冗余参数
+
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
             nn.BatchNorm2d(64),                                     # 添加批量归一化
-            nn.ReLU(inplace=True),  # 节省20%显存
+            nn.ReLU(),                                              # ReLU激活函数
             nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
+            nn.BatchNorm2d(64),                                     # 批量归一化，加速训练并提高模型稳定性
+            nn.ReLU(),                                              # ReLU激活函数，引入非线性变换
+
             nn.MaxPool2d(2)                                         # 最大池化，减小特征图尺寸
         )
         
@@ -140,7 +166,9 @@ def train(cnn):
             optimizer.step()                        # 更新参数
 
             # 每20个batch打印一次测试准确率
-            if step != 0 and step % 20 == 0:
+
+            if step != 0 and step % 20 == 0:        # 跳过初始训练前的测试（通常初始准确率无意义）
+
                 print("=" * 10, step, "=" * 5, "=" * 5, "测试准确率: ", test(cnn), "=" * 10)
                 # step != 0: 跳过初始训练前的测试（通常初始准确率无意义）
 # 主程序入口

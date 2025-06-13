@@ -9,14 +9,14 @@
 
 # In[1]:
 
-# 导入必要的Python库和模块
-import numpy as np     # 数值计算库，提供高效的数组操作和数学函数
-import tensorflow as tf    # 谷歌开发的深度学习框架
-import collections        # Python标准库，提供有用的容器数据类型
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
+
+
+# 导入必要的库和模块
+import numpy as np  # 数值计算库
+import tensorflow as tf  # 深度学习框架
+from tensorflow import keras  # TensorFlow的高级API
+from tensorflow.keras import layers, optimizers, datasets  # 从Keras导入层、优化器和数据集
+
 
 
 # 数据生成
@@ -36,29 +36,33 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         end: 结束数值
     '''
     # 生成随机数
-    numbers_1 = np.random.randint(start, end, batch_size)
-    numbers_2 = np.random.randint(start, end, batch_size)
-    results = numbers_1 + numbers_2
-    return numbers_1, numbers_2, results
+
+    numbers_1 = np.random.randint(start, end, batch_size)  # 生成指定范围和数量的随机整数数组作为第一个加数
+    numbers_2 = np.random.randint(start, end, batch_size)  # 同样生成第二个加数数组
+    results = numbers_1 + numbers_2  # 对两个数组逐元素相加，得到每对随机数的和
+    return numbers_1, numbers_2, results  # 返回两个加数数组以及它们的和数组
+
 
 def convertNum2Digits(Num):
-    '''将一个整数转换成一个数字位的列表,例如 133412 ==> [1, 3, 3, 4, 1, 2]
+    '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
-    strNum = str(Num)
-    chNums = list(strNum)
-    digitNums = [int(o) for o in strNum]
+    strNum = str(Num)                       # 将输入的整数转换为字符串形式
+    chNums = list(strNum)                   # 将字符串转换为单个字符组成的列表
+    digitNums = [int(o) for o in strNum]    # 将字符列表中的每个字符转换为整数
     return digitNums
 
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''# 便于RNN按低位到高位处理
-    digitStrs = [str(o) for o in Digits]
-    numStr = ''.join(digitStrs)
-    Num = int(numStr)
+
+    digitStrs = [str(o) for o in Digits]   # 将数字列表中的每个元素转为字符串形式
+    numStr = ''.join(digitStrs)            # 将字符串列表拼接成一个完整的数字字符串
+    Num = int(numStr)                      # 将字符串转换为整数
     return Num
 
 def pad2len(lst, length, pad=0):
-    '''将一个列表用`pad`填充到`length`的长度 例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+    '''将一个列表用`pad`填充到`length`的长度，例如 pad2len([1, 3, 2, 3], 6, pad=0) ==> [1, 3, 2, 3, 0, 0]
+
     '''#用0填充数位列表至固定长度，适配批量训练。
     lst+=[pad]*(length - len(lst))
     return lst
@@ -69,29 +73,25 @@ def results_converter(res_lst):
         res_lst: shape(b_sz, len(digits))
     '''
     # 反转每个数字位列表，因为我们在输入时反转了数字
-    res = [reversed(digits) for digits in res_lst]
-    return [convertDigits2Num(digits) for digits in res]
+
+    res = [reversed(digits) for digits in res_lst]       # 为每个数字序列创建反转迭代器（不立即执行）
+
+    # 将反转后的数字序列转换为实际数值
+    return [convertDigits2Num(digits) for digits in res] # 返回转换后的数值列表
+
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
     '''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
     #1. 将整数转换为数字位列表
     #2. 反转数字位列表(低位在前，高位在后)
     #3. 填充到固定长度
-    
-    Args:
-        Nums1: shape(batch_size,)
-        Nums2: shape(batch_size,)
-        results: shape(batch_size,)
-        maxlen:  type(int)
-    Returns:
-        Nums1: shape(batch_size, maxlen)
-        Nums2: shape(batch_size, maxlen)
-        results: shape(batch_size, maxlen)
-    '''
-    # 使用函数处理三个列表
-    Nums1 = process_numbers(Nums1, maxlen)
-    Nums2 = process_numbers(Nums2, maxlen) 
-    results = process_numbers(results, maxlen)
+
+
+     # 将整数转换为数字位列表
+    Nums1 = [convertNum2Digits(o) for o in Nums1]
+    Nums2 = [convertNum2Digits(o) for o in Nums2]
+    results = [convertNum2Digits(o) for o in results]
+
     # 反转数字位列表，使低位在前，高位在后
     # 这有助于RNN学习进位机制，因为低位的计算影响高位
     Nums1 = [list(reversed(o)) for o in Nums1]
@@ -105,7 +105,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     return Nums1, Nums2, results
 
 
-# # 建模过程， 按照图示完成建模
+# # 建模过程，按照图示完成建模
 
 # In[3]:
 
@@ -168,12 +168,13 @@ def compute_loss(logits, labels):# 使用 sparse_softmax_cross_entropy_with_logi
     return tf.reduce_mean(losses)# 对所有样本的损失求平均，得到一个标量值作为最终的 loss
 
 @tf.function
-def train_one_step(model, optimizer, x, y, label):
-    with tf.GradientTape() as tape: #使用 TensorFlow 的梯度磁带（GradientTape）上下文管理器，自动追踪该作用域内的所有可训练变量操作
-        logits = model(x, y)
-        loss = compute_loss(logits, label) #对比模型的预测值 logits 和真实标签 label，输出当前损失值
 
-    # 计算梯度
+def train_one_step(model, optimizer, num1, num2, label_digits):
+    with tf.GradientTape() as tape:
+        logits = model(num1, num2)
+        loss = compute_loss(logits, label_digits)
+
+
     grads = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(grads, model.trainable_variables)) #将梯度与对应的模型参数配对，使用优化器按梯度方向更新模型参数
     return loss
@@ -184,6 +185,9 @@ def train(steps, model, optimizer):
     accuracy = 0.0
     for step in range(steps):
         # 生成训练数据（数值范围0~555,555,554）
+
+        # 调用 gen_data_batch 函数生成一批训练数据，batch_size 为 200，数值范围从 0 到 555,555,554
+
         datas = gen_data_batch(batch_size=200, start=0, end=555555555)
         Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
         # 单步训练：计算损失、更新参数
@@ -191,7 +195,8 @@ def train(steps, model, optimizer):
                               tf.constant(Nums2, dtype=tf.int32),
                               tf.constant(results, dtype=tf.int32))
         if step % 50 == 0:
-            print('step', step, ': loss', loss.numpy())
+
+            print('step', step, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
 
     return loss
 
@@ -199,23 +204,26 @@ def evaluate(model):
     # 评估模型在大数加法（555,555,555~999,999,998）上的准确率
     datas = gen_data_batch(batch_size=2000, start=555555555, end=999999999)
     Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
-    logits = model(tf.constant(Nums1, dtype=tf.int32), tf.constant(Nums2, dtype=tf.int32))
+
+    logits = model(tf.constant(Nums1, dtype = tf.int32), tf.constant(Nums2, dtype = tf.int32))
     logits = logits.numpy() # 将模型输出的tensor转换为numpy数组，便于后续处理
     pred = np.argmax(logits, axis=-1) # 预测数位列表
-    res = results_converter(pred)    # 将模型预测结果转换为可比较的格式
-    
-# 打印前20个样本的真实标签、预测标签及比较结果
+    res = results_converter(pred)
+
     for o in list(zip(datas[2], res))[:20]:
-        print(o[0], o[1], o[0]==o[1])
+        print(f"真实值: {o[0]:<20} 预测值: {o[1]:<20} 是否正确: {o[0]==o[1]}")
 
-    print('accuracy is: %g' % np.mean([o[0]==o[1] for o in zip(datas[2], res)]))
+    # 计算整体准确率：统计所有预测中正确的比例
+    accuracy = np.mean([o[0] == o[1] for o in zip(datas[2], res)])
+    print('accuracy is: %g' % accuracy)
 
+    return accuracy
 
 # In[5]:
 
 
-optimizer = optimizers.Adam(0.001)
-model = myRNNModel()
+optimizer = optimizers.Adam(0.001) # 创建优化器实例
+model = myRNNModel() # 创建模型实例
 
 
 # In[6]:

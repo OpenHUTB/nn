@@ -1,4 +1,3 @@
-
 # numpy exercise
 
 ## 题目要求： 
@@ -334,4 +333,3 @@ plt.legend()
 # 调整布局
 plt.tight_layout()
 plt.show()
-

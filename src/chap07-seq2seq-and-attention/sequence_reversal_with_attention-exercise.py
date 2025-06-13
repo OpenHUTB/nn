@@ -9,14 +9,17 @@
 # In[19]:
 
 
-import numpy as np
-import tensorflow as tf
-import collections
-from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets
-import os,sys,tqdm
-import random
-import string
+
+import numpy as np  # 导入NumPy库
+import tensorflow as tf  # 导入TensorFlow库
+import collections  # 导入collections模块
+from tensorflow import keras  # 从TensorFlow中导入Keras API，用于构建和训练深度学习模型
+from tensorflow.keras import layers, optimizers, datasets  # 从Keras中导入层、优化器和数据集模块
+import os  # 导入操作系统接口模块
+import sys  # 导入系统相关参数和函数模块
+import tqdm  # 导入tqdm库，用于显示进度条
+import random  # 导入随机数生成模块
+import string  # 导入字符串模块
 
 
 # ## 玩具序列数据生成
@@ -44,6 +47,17 @@ def get_batch(batch_size, length):
     enc_x: 编码器输入，字符转换为索引后的张量
     dec_x: 解码器输入，包含起始标记，字符转换为索引后的张量
     y: 解码器目标输出，原始序列的逆序，字符转换为索引后的张量
+
+
+    数据格式说明:
+    - 原始字符串: 如 ['ABCD', 'EFGH'] 长度等于 batch_size
+    - 编码器输入 (enc_x): 
+        [[1, 2, 3, 4], [5, 6, 7, 8]] 将字符转换为索引（A=1, B=2,..., Z=26）
+    - 解码器输入 (dec_x):
+        [[0, 1, 2, 3], [0, 5, 6, 7]] 在目标序列前加起始标记(0)并移除最后一个字符
+    - 目标输出 (y):
+        [[4, 3, 2, 1], [8, 7, 6, 5]] 输入序列的逆序索引
+
     """
     # 生成随机字符串
     batched_examples = [randomString(length) for i in range(batch_size)]
@@ -192,14 +206,23 @@ class mySeq2SeqModel(keras.Model):
         # 3. 注意力计算
         # 计算当前解码器状态与编码器各时间步输出的相似度
         dec_out_expanded = tf.expand_dims(dec_out, axis=1)  # [batch_size, 1, hidden]
-        attn_scores = tf.matmul(dec_out_expanded, enc_out, transpose_b = True)  # [batch_size, 1, enc_seq_len]
+
+        attn_scores = tf.matmul(dec_out_expanded, enc_out, transpose_b=True)  # [batch_size, 1, enc_seq_len]
+
         attn_scores = tf.squeeze(attn_scores, axis=1)  # [batch_size, enc_seq_len]
         
         # 应用softmax获取注意力权重
         attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, enc_seq_len]
         
+
+        attn_weights_expanded = tf.expand_dims(attn_weights, axis=1)  # [batch_size, 1, enc_seq_len]
+        
+        
         # 计算上下文向量
-        context = tf.matmul(attn_weights, enc_out)  # [batch_size, hidden]
+        context = tf.matmul(attn_weights_expanded, enc_out)  # [batch_size, 1, hidden]
+        
+        context = tf.squeeze(context, axis=1)  # [batch_size, hidden]
+
         
         # 4. 结合上下文向量和解码器输出
         dec_out_with_context = tf.concat([dec_out, context], axis=-1)  # [batch_size, hidden*2]
@@ -226,8 +249,10 @@ def compute_loss(logits, labels):
     # - labels: 真实标签（形状[batch_size]，每个元素是类别索引）
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
+    # 计算平均损失
+    # 使用 tf.reduce_mean 函数对所有样本的损失值求平均
     losses = tf.reduce_mean(losses)
-    return losses
+    return losses# 返回平均损失值
 
 @tf.function
 def train_one_step(model, optimizer, enc_x, dec_x, y):
@@ -249,12 +274,14 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
         loss = compute_loss(logits, y)
 
     # 计算梯度
-    grads = tape.gradient(loss, model.trainable_variables)
+
+    grads = tape.gradient(loss, model.trainable_variables) # 使用自动微分计算损失函数相对于模型可训练变量的梯度
     
     # 应用梯度
-    optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    optimizer.apply_gradients(zip(grads, model.trainable_variables)) # 使用优化器应用梯度更新模型的可训练变量
     
-    return loss
+    return loss # 返回损失值
+
 
 def train(model, optimizer, seqlen):
     """
@@ -272,15 +299,22 @@ def train(model, optimizer, seqlen):
     accuracy = 0.0
     
     # 训练2000步
-    for step in range(2000):
-        batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
-        loss = train_one_step(model, optimizer, enc_x, dec_x, y)
-        
-        # 每500步打印一次损失
-        if step % 500 == 0:
-            print('step', step, ': loss', loss.numpy())
+
+for step in range(2000):
+    # 获取一个批次的训练数据
+    batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
     
-    return loss
+    # 执行一次训练步骤：前向传播 + 反向传播 + 参数更新
+    loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+    
+    # 每500步打印一次损失
+    if step % 500 == 0:
+        # 将当前步数与损失值打印出来，用于监控训练过程
+        print('step', step, ': loss', loss.numpy())
+        
+# 返回最后一次计算的 loss 值（可用于调试或后续处理）
+return loss
+
 
 
 # # 训练迭代
@@ -337,6 +371,7 @@ def sequence_reversal():
         
         # 逐步生成输出序列
         for i in range(steps):
+            # 获取下一个token和更新后的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
             collect.append(tf.expand_dims(cur_token, axis=-1))
         
@@ -357,13 +392,21 @@ def sequence_reversal():
 
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
+
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
+    # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
         return True
     else:
         return False
 # 测试函数功能
+
+# 假设 sequence_reversal() 是一个函数，返回两个序列的列表
+# 使用 zip(*sequence_reversal()) 将两个序列的列表解包并配对
+# 然后对每一对序列调用 is_reverse 函数，检查是否为逆序
+
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
+# 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
 
 

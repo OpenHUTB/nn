@@ -7,12 +7,13 @@
 
 # In[1]:
 # 导入了多个用于构建和训练深度学习模型的Python库和模块
-import numpy as np# 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
-import tensorflow as tf       # 导入TensorFlow深度学习框架  提供：自动微分、GPU加速、分布式训练等功能
-import collections            # Python标准库  导入collections容器数据类型库
-from tensorflow import keras  # Keras高层API  导入Keras高层神经网络API
-from tensorflow.keras import layers   # 神经网络组件  导入神经网络层实现
-from tensorflow.keras import layers, optimizers, datasets
+
+import numpy as np # 导入NumPy库，用于高性能科学计算和多维数组处理 常用功能：数组操作、数学函数、线性代数等
+import tensorflow as tf # 导入 TensorFlow 深度学习框架，提供神经网络构建、训练、评估等全面的功能，适用于机器学习和深度学习任务
+import collections # 导入 collections 标准库模块，提供了许多有用的集合类，比如 Counter、namedtuple、deque、defaultdict 等
+from tensorflow.keras import layers, optimizers # 从 TensorFlow 的 Keras 高级 API 中导入：
+# - layers：用于构建神经网络层（如 Dense、Conv2D、Dropout 等）
+# - optimizers：用于优化模型参数的优化器（如 SGD、Adam、RMSprop 等）
 
 # 定义特殊标记：开始标记和结束标记
 start_token = 'bos'  # Beginning of sentence
@@ -47,12 +48,15 @@ def process_dataset(fileName):
             
     # 统计词频
     counter = collections.Counter()
+    # 遍历examples中的每个样本(每个样本是一个句子或单词列表)
     for e in examples:
         for w in e:
             counter[w] += 1
     
     ## 按词频从高到低排序
-    sorted_counter = sorted(counter.items(), key=lambda x: -x[1])
+
+    sorted_counter = sorted(counter.items(), key = lambda x: -x[1])
+
     
     # 构建词汇表：添加PAD(填充)和UNK(未知词)标记
     words, _ = zip(*sorted_counter)                     # 对tuple进行解压，得到words列表代表所有字符
@@ -96,7 +100,9 @@ def poem_dataset():
     # 批处理并填充到相同长度
     ds = ds.padded_batch(100, padded_shapes=(tf.TensorShape([None]), tf.TensorShape([])))
     # 为语言模型准备输入输出对：输入是前n-1个词，输出是后n-1个词
-    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1))
+
+    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1)) # 对数据集中的每个元素应用映射函数
+
     return ds, word2id, id2word
 
 
@@ -170,7 +176,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(h)  # (batch_size, vocab_size)
         # 4. 选择概率最高的词
         out = tf.argmax(logits, axis=-1)
-        return out, state
+        return out, state# 返回预测的下一个词id和更新后的RNN状态
 
 
 # ## 辅助函数：计算序列损失
@@ -178,8 +184,10 @@ class myRNNModel(keras.Model):
 # In[3]:
 
 
-def mkMask(input_tensor: tf.Tensor, maxLen: int) -> tf.Tensor:
-    """创建变长序列的布尔掩码（优化形状处理版）
+
+def mkMask(input_tensor, maxLen):
+    """创建掩码，用于处理变长序列
+
     
     Args:
         input_tensor: 包含序列长度的张量
@@ -188,15 +196,22 @@ def mkMask(input_tensor: tf.Tensor, maxLen: int) -> tf.Tensor:
     Returns:
         与input_tensor形状相同的布尔掩码
     """
-      # 直接展平并生成掩码，避免多余的concat操作
-    flat_lengths = tf.reshape(input_tensor, [-1])  # 更清晰的命名
-    flat_mask = tf.sequence_mask(flat_lengths, maxlen=maxLen)
+
+    # 获取输入张量的形状
+    shape_of_input = tf.shape(input_tensor) # 返回一个形状为 [ndim] 的张量 
+    shape_of_output = tf.concat(
+        axis=0, 
+        values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表
+    )
+
     #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
     oneDtensor = tf.reshape(input_tensor, shape=(-1,))
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
     flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
     
-    return tf.reshape(flat_mask, shape_of_output)
+=
+    return tf.reshape(flat_mask, shape_of_output)   # 将展平的掩码恢复为原始输入张量形状+maxLen的形状
+
 
 def reduce_avg(reduce_target, lengths, dim):
     """沿指定维度计算掩码后的平均值（忽略填充部分）
@@ -214,30 +229,50 @@ def reduce_avg(reduce_target, lengths, dim):
     # 获取目标张量的形状
     shape_of_target = reduce_target.get_shape()
     # 验证输入张量的维度是否符合要求
-   # shape_of_lengths: lengths张量的维度列表
-   # dim: 预期的长度张量的秩(rank)
+
+    # shape_of_lengths: lengths张量的维度列表
+    # dim: 预期的长度张量的秩(rank)
+
     if len(shape_of_lengths) != dim:
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
     # 验证目标张量的维度是否符合要求
     # shape_of_target: reduce_target张量的维度列表
     # dim+1: 预期的目标张量的最小秩
-    if len(shape_of_target) < dim+1 : # 输入验证：确保目标张量的秩至少为 dim+1
+
+    # 输入验证：确保目标张量的秩至少为 dim+1
+    if len(shape_of_target) < dim+1 :
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算目标张量与长度张量的秩差
-    mxlen = tf.shape(reduce_target)[dim]                         # 获取目标维度的最大长度，并生成掩码矩阵
-    mask = mkMask(lengths, mxlen)                                # mkMask函数生成布尔掩码
-    if rank_diff!=0: # 根据秩差调整掩码和长度张量的形状，以便广播
+    # 计算目标张量与长度张量的秩差
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
+    # 获取目标维度的最大长度，并生成掩码矩阵
+    mxlen = tf.shape(reduce_target)[dim]
+    # mkMask函数生成布尔掩码
+    mask = mkMask(lengths, mxlen)
+    
+    # 根据秩差调整掩码和长度张量的形状，以便广播
+    if rank_diff!=0:
+        # 计算长度张量的新形状
+
         len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        # 计算掩码的新形状
         mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
     else:
-        len_shape = tf.shape(lengths)
+        # 如果秩差为0，保持原形状
+        len_shape = tf.shape(lengths) # 获取张量 lengths 的形状
         mask_shape = tf.shape(mask)
-    lengths_reshape = tf.reshape(lengths, shape=len_shape) # 重塑张量以匹配目标张量的形状
-    mask = tf.reshape(mask, shape=mask_shape) # 将掩码应用到目标张量上
 
+
+    # 重塑张量以匹配目标张量的形状
+    lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    # 将掩码应用到目标张量上
+    mask = tf.reshape(mask, shape=mask_shape)
+
+
+    # 应用掩码：将目标张量中超出序列长度的位置置零
+    # 通过类型转换确保掩码与目标张量数据类型一致
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
@@ -246,7 +281,9 @@ def reduce_avg(reduce_target, lengths, dim):
         raise ValueError(('First input tensor should be at least rank %d, ' +
                          'while it got rank %d') % (dim+1, len(shape_of_target)))
 
-    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1
+
+    rank_diff = len(shape_of_target) - len(shape_of_lengths) - 1 # 计算形状差异：目标张量的维度数减去长度张量的维度数再减1
+
     mxlen = tf.shape(reduce_target)[dim]  # 获取当前维度的最大长度 mxlen
     mask = mkMask(lengths, mxlen)
     
@@ -332,17 +369,23 @@ def train(epoch, model, optimizer, ds):
         
     Returns:
         最后一个批次的损失值
-    """ # 初始化损失值和准确率（虽然准确率未实际使用）
+
+    """
     loss = 0.0
-    accuracy = 0.0      # 注意：这个变量声明了但未使用
+    accuracy = 0.0
     # 遍历数据集
+    # ds 是一个数据集对象，通常是一个 TensorFlow 的 Dataset 对象
+    # enumerate(ds) 会返回每个元素的索引（step）和内容（x, y, seqlen）
+
     for step, (x, y, seqlen) in enumerate(ds):
         # 训练一步
         loss = train_one_step(model, optimizer, x, y, seqlen)
 
         # 定期打印损失
         if step % 500 == 0:
-            print('epoch', epoch, ': loss', loss.numpy())
+            print('epoch', epoch, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
+
+    # 返回最后一次训练的损失值
 
     return loss
 
@@ -417,4 +460,6 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
+
+print(''.join(gen_sentence()))
 print(''.join(gen_sentence()))
