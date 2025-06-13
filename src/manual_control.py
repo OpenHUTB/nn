@@ -800,7 +800,7 @@ class HUD(object):
         v = world.player.get_velocity()# 获取车辆速度
         c = world.player.get_control()
         compass = world.imu_sensor.compass
-        heading = 'N' if compass > 270.5 or compass < 89.5 else ''
+        heading = 'N' if compass > 270.5 or compass < 89.5 else ''#一种简易方向判断逻辑
         heading += 'S' if 90.5 < compass < 269.5 else ''
         heading += 'E' if 0.5 < compass < 179.5 else ''
         heading += 'W' if 180.5 < compass < 359.5 else ''
