@@ -251,6 +251,8 @@ def reduce_avg(reduce_target, lengths, dim):
     # 将掩码应用到目标张量上
     mask = tf.reshape(mask, shape=mask_shape)
 
+    # 应用掩码：将目标张量中超出序列长度的位置置零
+    # 通过类型转换确保掩码与目标张量数据类型一致
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
