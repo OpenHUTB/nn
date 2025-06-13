@@ -813,21 +813,26 @@ class HUD(object):
 
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
+        # 如果不显示HUD信息则直接返回
         if not self._show_info:
             return
-        t = world.player.get_transform()
+        t = world.player.get_transform()# 获取玩家车辆的当前变换信息
         v = world.player.get_velocity()# 获取车辆速度
-        c = world.player.get_control()
+        c = world.player.get_control()# 获取玩家车辆的控制输入
+        # 处理罗盘数据获取基本方位
         compass = world.imu_sensor.compass
         heading = 'N' if compass > 270.5 or compass < 89.5 else ''#一种简易方向判断逻辑
         heading += 'S' if 90.5 < compass < 269.5 else ''
         heading += 'E' if 0.5 < compass < 179.5 else ''
         heading += 'W' if 180.5 < compass < 359.5 else ''
+        # 获取碰撞历史数据
         colhist = world.collision_sensor.get_collision_history()
+        # 提取最近200帧的碰撞强度数据
         collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
+        # 归一化碰撞数据(缩放到0-1范围)
         max_col = max(1.0, max(collision))
         collision = [x / max_col for x in collision]
-        vehicles = world.world.get_actors().filter('vehicle.*')
+        vehicles = world.world.get_actors().filter('vehicle.*')# 获取世界中的所有车辆
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
             'Client:  % 16.0f FPS' % clock.get_fps(),
