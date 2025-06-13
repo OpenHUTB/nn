@@ -1239,7 +1239,7 @@ class CameraManager(object):
         bound_x = 0.5 + self._parent.bounding_box.extent.x
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         bound_z = 0.5 + self._parent.bounding_box.extent.z
-        Attachment = carla.AttachmentType
+        Attachment = carla.AttachmentType # 导入CARLA的附件类型枚举
 
         if not self._parent.type_id.startswith("walker.pedestrian"):
             self._camera_transforms = [
