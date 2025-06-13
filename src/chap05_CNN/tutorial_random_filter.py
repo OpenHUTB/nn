@@ -4,7 +4,7 @@
 
 # In[191]:
 # 导入必要的库
-import os
+import os # 提供操作系统相关功能，如文件路径操作
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
