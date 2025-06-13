@@ -304,7 +304,7 @@ if __name__ == "__main__":
     plt.figure(figsize=(12, 5))
     
     # 左图：真实聚类
-    plt.subplot(1, 2, 1)
+    plt.subplot(1, 2, 1) #创建一个1行2列的子图，并选择第1个子图
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=15, alpha=0.8)
     plt.title("真实聚类", fontsize=12)
     plt.xlabel("特征1", fontsize=10)
