@@ -16,7 +16,7 @@ class RBM:
             n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
 
         Raises:
-            ValueError: 若输入参数非正整数则抛出异常
+            ValueError: 若输入的参数非正整数则抛出异常
         """
         # 参数验证：确保隐藏层和可见层单元数量为正整数
         if not (isinstance(n_hidden, int) and n_hidden > 0):            # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
