@@ -256,6 +256,7 @@ class Log:
 # In[6]:
 
 x = np.random.normal(size=[5, 6])   # 示例：生成 5 个样本，每个样本 6 维特征
+# 初始化网络参数
 label = np.zeros_like(x)            # 创建了一个与 x 形状相同的全零标签矩阵
 # 手动设置每个样本的类别标签
 label[0, 1] = 1.
