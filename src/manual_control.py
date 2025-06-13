@@ -78,7 +78,7 @@ try: # 尝试将Carla的egg文件路径添加到Python搜索路径中
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0]) # 根据操作系统选择平台
 except IndexError:
     pass # 若未找到匹配的egg文件，忽略错误
 
