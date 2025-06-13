@@ -983,19 +983,42 @@ class FadingText(object):
         self.surface = pygame.Surface(self.dim)  # 创建一个与指定尺寸匹配的表面
 
     def set_text(self, text, color=(255, 255, 255), seconds=2.0):
-        text_texture = self.font.render(text, True, color)
-        self.surface = pygame.Surface(self.dim)
-        self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
+        """
+        设置要显示的文本内容、颜色和显示时长。
+
+        参数:
+        - text: 要显示的文本字符串。
+        - color: 文本颜色，默认为白色 (255, 255, 255)。
+        - seconds: 文本显示的时长，默认为2秒。
+        """
+        text_texture = self.font.render(text, True, color)  # 渲染文本到纹理
+        self.surface = pygame.Surface(self.dim)             # 创建一个新的表面
+        self.seconds_left = seconds                         # 设置剩余显示时间
+        self.surface.fill((0, 0, 0, 0))                     # 用透明黑色填充表面
+        self.surface.blit(text_texture, (10, 11))           # 将文本纹理绘制到表面，偏移 (10, 11)
 
     def tick(self, _, clock):
-        delta_seconds = 1e-3 * clock.get_time()
-        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
+        """
+        更新渐隐效果。
+
+        每帧调用此方法以减少剩余显示时间，并根据剩余时间调整文本的透明度。
+
+        参数:
+        - _: 未使用的参数（占位符）。
+        - clock: 时钟对象，用于获取时间间隔。
+        """
+        delta_seconds = 1e-3 * clock.get_time()                          # 获取自上次调用以来的时间（秒）
+        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)  # 减少剩余时间
+        self.surface.set_alpha(500.0 * self.seconds_left)                # 根据剩余时间调整透明度
 
     def render(self, display):
-        display.blit(self.surface, self.pos)
+        """
+        将渐隐文本渲染到指定的显示表面上。
+
+        参数:
+        - display: 显示表面，用于绘制文本。
+        """
+        display.blit(self.surface, self.pos)  # 将文本表面绘制到指定位置
 
 
 # ==============================================================================
