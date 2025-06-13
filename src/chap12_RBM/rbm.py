@@ -71,9 +71,9 @@ class RBM:
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)
 
                 # 计算梯度
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)
-                db_v = np.sum(v0 - v1_sample, axis=0)
-                db_h = np.sum(h0_sample - h1_prob, axis=0)
+                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)#计算权重矩阵W的梯度
+                db_v = np.sum(v0 - v1_sample, axis=0)#计算可见层偏置b_v的梯度
+                db_h = np.sum(h0_sample - h1_prob, axis=0)#计算隐藏层偏置b_h的梯度
 
                 # 更新参数
                 self.W += learning_rate * dW / batch_size
