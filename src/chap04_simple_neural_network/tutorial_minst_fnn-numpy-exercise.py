@@ -131,7 +131,7 @@ class Softmax:
         # (N, 1, c)
         tmp = np.matmul(g_y_exp, sisj) # 计算矩阵乘法结果
         tmp = np.squeeze(tmp, axis=1)  # 去掉结果矩阵的单维度条目
-        tmp = -tmp + grad_y * s
+        tmp = -tmp + grad_y * s # 对变量 tmp 进行更新操作
         return tmp
 
 
