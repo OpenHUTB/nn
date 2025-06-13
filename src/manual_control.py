@@ -1347,8 +1347,9 @@ class CameraManager(object):
             display.blit(self.surface, (0, 0))
 
     @staticmethod
+    # 解析和处理来自CARLA各种传感器的图像数据
     def _parse_image(weak_self, image):
-        self = weak_self()
+        self = weak_self() # 从弱引用中获取实际对象
         if not self:
             return
         if self.sensors[self.index][0].startswith('sensor.lidar'):
@@ -1364,7 +1365,7 @@ class CameraManager(object):
             lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
             lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
             self.surface = pygame.surfarray.make_surface(lidar_img)
-        elif self.sensors[self.index][0].startswith('sensor.camera.dvs'):
+        elif self.sensors[self.index][0].startswith('sensor.camera.dvs'):# 处理动态视觉传感器(DVS)事件数据
             # Example of converting the raw_data from a carla.DVSEventArray
             # sensor into a NumPy array and using it as an image
             dvs_events = np.frombuffer(image.raw_data, dtype=np.dtype([
@@ -1373,7 +1374,7 @@ class CameraManager(object):
             # Blue is positive, red is negative
             dvs_img[dvs_events[:]['y'], dvs_events[:]['x'], dvs_events[:]['pol'] * 2] = 255
             self.surface = pygame.surfarray.make_surface(dvs_img.swapaxes(0, 1))
-        elif self.sensors[self.index][0].startswith('sensor.camera.optical_flow'):
+        elif self.sensors[self.index][0].startswith('sensor.camera.optical_flow'):# 处理光流数据
             image = image.get_color_coded_flow()
             array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
             array = np.reshape(array, (image.height, image.width, 4))
