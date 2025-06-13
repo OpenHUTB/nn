@@ -41,17 +41,17 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
-    strNum = str(Num)   # 将输入的整数转换为字符串形式
-    chNums = list(strNum)  将字符串转换为单个字符组成的列表
-    digitNums = [int(o) for o in strNum]  # 将字符列表中的每个字符转换为整数
+    strNum = str(Num)                       # 将输入的整数转换为字符串形式
+    chNums = list(strNum)                   # 将字符串转换为单个字符组成的列表
+    digitNums = [int(o) for o in strNum]    # 将字符列表中的每个字符转换为整数
     return digitNums
 
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''# 便于RNN按低位到高位处理
-    digitStrs = [str(o) for o in Digits] # 将数字列表中的每个元素转为字符串形式
-    numStr = ''.join(digitStrs)  # 将字符串列表拼接成一个完整的数字字符串
-    Num = int(numStr) # 将字符串转换为整数
+    digitStrs = [str(o) for o in Digits]   # 将数字列表中的每个元素转为字符串形式
+    numStr = ''.join(digitStrs)            # 将字符串列表拼接成一个完整的数字字符串
+    Num = int(numStr)                      # 将字符串转换为整数
     return Num
 
 def pad2len(lst, length, pad=0):
