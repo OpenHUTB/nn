@@ -93,7 +93,7 @@ def poem_dataset():
     # 批处理并填充到相同长度
     ds = ds.padded_batch(100, padded_shapes=(tf.TensorShape([None]), tf.TensorShape([])))
     # 为语言模型准备输入输出对：输入是前n-1个词，输出是后n-1个词
-    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1))
+    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1)) # 对数据集中的每个元素应用映射函数
     return ds, word2id, id2word
 
 
