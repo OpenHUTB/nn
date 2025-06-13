@@ -189,7 +189,7 @@ def mkMask(input_tensor, maxLen):
         与input_tensor形状相同的布尔掩码
     """
     # 获取输入张量的形状
-    shape_of_input = tf.shape(input_tensor) 
+    shape_of_input = tf.shape(input_tensor) # 返回一个形状为 [ndim] 的张量 
     shape_of_output = tf.concat(
         axis=0, 
         values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表
