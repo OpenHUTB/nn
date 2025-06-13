@@ -220,6 +220,12 @@ if __name__ == '__main__':
     C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')   # 负样本
 
     # 创建用于显示动态文本的文本对象（位于左上角）
+    # 参数说明：
+    # 0.02, 0.95：文本位置坐标（x=2%轴宽度，y=95%轴高度），使用相对坐标系统
+    # ''：初始空文本内容
+    # horizontalalignment='left'：水平左对齐（使文本紧贴左侧边界）
+    # verticalalignment='top'：垂直顶部对齐（使文本紧贴顶部边界）
+    # transform=ax.transAxes：使用坐标轴相对坐标系（0-1范围，而非数据坐标系）
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',
