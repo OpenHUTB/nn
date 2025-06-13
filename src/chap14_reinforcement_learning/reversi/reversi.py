@@ -9,13 +9,15 @@ from gym import spaces
 import numpy as np
 from gym import error
 from gym.utils import seeding
-
+ #这段代码定义了一个随机策略函数 random_policy，用于在黑白棋（Reversi/Othello）游戏中为当前玩家随机选择一个合法的落子动作（包括“跳过”动作）
 def make_random_policy(np_random):
     def random_policy(state, player_color):
         possible_places = ReversiEnv.get_possible_actions(state, player_color)
-        # No places left
+        # 没有可落子位置，返回"pass"动作
         if len(possible_places) == 0:
-            return d**2 + 1
+            d = state.shape[-1]#动态获取棋盘的边长
+            return d**2 + 1    # pass动作
+        # 随机选择一个可能的动作
         a = np_random.randint(len(possible_places))
         return possible_places[a]
     return random_policy
@@ -30,16 +32,17 @@ class ReversiEnv(gym.Env):
 
     def __init__(self, player_color, opponent, observation_type, illegal_place_mode, board_size):
         """
-        Args:
-            player_color: Stone color for the agent. Either 'black' or 'white'
-            opponent: An opponent policy
-            observation_type: State encoding
-            illegal_place_mode: What to do when the agent makes an illegal place. Choices: 'raise' or 'lose'
-            board_size: size of the Reversi board
+        参数:
+            player_color: 代理(玩家)的棋子颜色，'black'或'white'
+            opponent: 对手策略，可以是'random'或自定义策略函数
+            observation_type: 状态编码方式，目前仅支持'numpy3c'
+            illegal_place_mode: 处理非法落子的方式，'lose'(自动输)或'raise'(抛出异常)
+            board_size: 棋盘大小，默认8x8
         """
         assert isinstance(board_size, int) and board_size >= 1, 'Invalid board size: {}'.format(board_size)
         self.board_size = board_size
 
+        # 将颜色字符串映射为内部表示
         colormap = {
             'black': ReversiEnv.BLACK,
             'white': ReversiEnv.WHITE,
@@ -49,7 +52,7 @@ class ReversiEnv(gym.Env):
         except KeyError:
             raise error.Error("player_color must be 'black' or 'white', not {}".format(player_color))
 
-        self.opponent = opponent
+        self.opponent = opponent # 初始化对手对象引用
 
         assert observation_type in ['numpy3c']
         self.observation_type = observation_type
@@ -61,6 +64,7 @@ class ReversiEnv(gym.Env):
             raise error.Error('Unsupported observation type: {}'.format(self.observation_type))
 
         # One action for each board position and resign and pass
+        #这段代码主要用于 初始化强化学习环境（如游戏环境）的动作空间（action_space）和观察空间（observation_space），并完成环境的初始设置
         self.action_space = spaces.Discrete(self.board_size ** 2 + 2)
         observation = self.reset()
         self.observation_space = spaces.Box(np.zeros(observation.shape), np.ones(observation.shape))
@@ -159,7 +163,7 @@ class ReversiEnv(gym.Env):
     #     else:
     #         raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))
 
-    def _render(self, mode='human', close=False):
+    def _render(self, mode='human', close=False):  #渲染函数，用于将当前棋盘状态可视化输出到终端或字符串中
         if close:
             return
         board = self.state
