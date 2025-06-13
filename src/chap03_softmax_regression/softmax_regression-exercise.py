@@ -149,7 +149,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     with tf.GradientTape() as tape:
         # 前向传播：计算模型对输入批次的预测
         predictions = model(x_batch)
-        # 计算损失和准确率
+        # 计算损失和准确率，计算预测结果与真实标签y_batch之间的损失值和准确率
         loss, accuracy = compute_loss(predictions, y_batch)
 
     #自动计算损失函数对模型参数的梯度
