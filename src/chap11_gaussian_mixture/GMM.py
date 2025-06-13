@@ -160,7 +160,7 @@ class GaussianMixtureModel:
             # 对每个高斯成分，计算样本的对数概率密度
             for k in range(self.n_components):
                 # 对数概率 = log(混合权重) + log(高斯概率密度)
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k])
+                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯混合成分的对数概率密度，并存储在log_prob的第k列
             
             # 使用logsumexp计算归一化因子，确保数值稳定性
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
