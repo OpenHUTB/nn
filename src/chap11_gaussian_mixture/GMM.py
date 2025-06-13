@@ -154,7 +154,8 @@ if __name__ == "__main__":
     gmm = GaussianMixtureModel(n_components=3)
     gmm.fit(X)
     y_pred = gmm.labels_
-    
+     
+     
     # 可视化结果
     plt.figure(figsize=(12, 5))
     plt.subplot(1, 2, 1)
@@ -170,3 +171,7 @@ if __name__ == "__main__":
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.show()
+
+
+
+
