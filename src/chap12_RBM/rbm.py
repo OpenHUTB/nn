@@ -153,6 +153,12 @@ class RBM:
                 # 基于重构的可见层状态，再次计算隐藏层激活概率
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       # 计算隐藏单元被激活的概率
 
+<<<<<<< HEAD
+                # 计算梯度
+                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)#计算权重矩阵W的梯度
+                db_v = np.sum(v0 - v1_sample, axis=0)#计算可见层偏置b_v的梯度
+                db_h = np.sum(h0_sample - h1_prob, axis=0)#计算隐藏层偏置b_h的梯度
+=======
                 # 计算梯度      
                 # 权重矩阵梯度：数据驱动的正相位与模型生成的负相位之差
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
@@ -162,6 +168,7 @@ class RBM:
                 
                 # 隐藏层偏置梯度：原始数据生成的隐藏层状态与重构数据生成的隐藏层状态之差
                 db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
+>>>>>>> c0098b20e94dc97f6c0576a825794e37efb01eca
 
                 # 更新参数
                 # 按批次大小归一化梯度，并乘以学习率更新权重矩阵
