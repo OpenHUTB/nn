@@ -307,7 +307,7 @@ def sequence_reversal():
         # 获取批次大小
         batch_size = tf.shape(init_state)[0]
         # 起始 token（全为 0）
-        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        cur_token = tf.zeros(shape=[batch_size], dtype=tf.int32)
         # 初始化状态为编码器输出的状态
         state = init_state
         # 存储每一步生成的token
