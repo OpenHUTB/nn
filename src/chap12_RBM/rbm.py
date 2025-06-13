@@ -128,7 +128,7 @@ class RBM:
             # 使用小批量梯度下降法
             for i in range(0, n_samples, batch_size): 
                 # 获取当前批次的数据
-                batch = data_flat[i:i + batch_size] 
+                batch = data_flat[i:i + batch_size]  # 使用切片操作从ata_flat中提取从第i行到第i+batch_size行的子数组
                 
                 # 将批次数据转换为 float64 类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
