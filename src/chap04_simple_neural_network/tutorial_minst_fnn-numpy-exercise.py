@@ -420,10 +420,10 @@ def train_one_step(model, x, y):
 
 # 测试函数
 def test(model, x, y):
-    model.forward(x)
-    loss = compute_loss(model.h2_log, y)
-    accuracy = compute_accuracy(model.h2_log, y)
-    return loss, accuracy
+    model.forward(x)                             # 执行模型的正向传播，计算预测结果
+    loss = compute_loss(model.h2_log, y)         # 计算损失值
+    accuracy = compute_accuracy(model.h2_log, y) # 计算准确率
+    return loss, accuracy                        # 返回损失值和准确率
 
 
 # ## 实际训练
