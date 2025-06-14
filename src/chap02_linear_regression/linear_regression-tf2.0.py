@@ -7,7 +7,7 @@ import numpy as np
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
 import matplotlib.pyplot as plt
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
-import tensorflow as tf
+import tensorflow as tf # 导入TensorFlow深度学习框架，并使用别名'tf'简化调用
 # 从Keras导入常用模块
 from tensorflow.keras import optimizers, layers, Model
 
