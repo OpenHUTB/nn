@@ -220,7 +220,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
-plt.legend(loc='upper right')
+plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
 plt.savefig('quadratic.png')   # 保存图像
 plt.show()  # 显示绘制的图像
 
