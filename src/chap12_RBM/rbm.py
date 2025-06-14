@@ -220,7 +220,7 @@ if __name__ == '__main__':
         # 如果加载失败（其他错误，如文件损坏），保持原报错逻辑
         print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
         print(f"错误详情: {e}")
-        sys.exit(1)
+        sys.exit(1) # 退出Python程序，并返回状态码1
 
     # 获取数据集的形状信息
     n_imgs, n_rows, n_cols = mnist.shape  # 分别表示图像数量、行数和列数
