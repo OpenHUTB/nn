@@ -289,7 +289,7 @@ def train(model, optimizer, seqlen):
 
 
             # 打印当前步数、损失和准确率
-            print(f'step {step}: loss={loss.numpy():.4f}, acc={acc.numpy():.4f}')
+            print(f'step {step}: loss = {loss.numpy():.4f}, acc = {acc.numpy():.4f}')
     return loss
 # loss.numpy(): 将TensorFlow/PyTorch张量转换为NumPy数组并获取标量值
 
@@ -326,11 +326,11 @@ def sequence_reversal():
         decoded_strings: 模型生成的逆序字符串列表
         original_strings: 原始输入字符串列表
     """
-    def decode(init_state, steps=10):
+    def decode(init_state, steps = 10):
         # 获取批次大小
         batch_size = tf.shape(init_state)[0]
         # 起始 token（全为 0）
-        cur_token = tf.zeros(shape=[batch_size], dtype=tf.int32)
+        cur_token = tf.zeros(shape=[batch_size], dtype = tf.int32)
         # 初始化状态为编码器输出的状态
         state = init_state
         # 存储每一步生成的token

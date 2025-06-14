@@ -97,7 +97,7 @@ class mySeq2SeqModel(keras.Model):
         
         # 嵌入层，将字符索引转换为向量表示
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape = [None, None])
         
         # 编码器和解码器的RNN单元
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
@@ -107,9 +107,9 @@ class mySeq2SeqModel(keras.Model):
         # return_sequences=True: 返回所有时间步的输出
         # return_state=True: 返回最终状态
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
-                                           return_sequences=True, return_state=True)
+                                           return_sequences = True, return_state = True)
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
-                                           return_sequences=True, return_state=True)
+                                           return_sequences = True, return_state = True)
         
         # 注意力机制相关的全连接层
         self.dense_attn = tf.keras.layers.Dense(self.hidden)
@@ -149,11 +149,11 @@ class mySeq2SeqModel(keras.Model):
         
         # 双线性注意力: score = dec_out * W * enc_out
         # 这里简化为: score = dec_out * enc_out (通过点积实现)
-        attn_scores = tf.matmul(dec_out_expanded, enc_out_expanded, transpose_b=True)  # [batch_size, dec_seq_len, 1, enc_seq_len]
+        attn_scores = tf.matmul(dec_out_expanded, enc_out_expanded, transpose_b = True)  # [batch_size, dec_seq_len, 1, enc_seq_len]
         attn_scores = tf.squeeze(attn_scores, axis=2)  # [batch_size, dec_seq_len, enc_seq_len]
         
         # 应用softmax获取注意力权重
-        attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, dec_seq_len, enc_seq_len]
+        attn_weights = tf.nn.softmax(attn_scores, axis = -1)  # [batch_size, dec_seq_len, enc_seq_len]
         
         # 计算上下文向量
         context = tf.matmul(attn_weights, enc_out)  # [batch_size, dec_seq_len, hidden]
@@ -315,8 +315,6 @@ for step in range(2000):
 # 返回最后一次计算的 loss 值（可用于调试或后续处理）
 return loss
 
-
-
 # # 训练迭代
 
 # In[28]:
@@ -365,7 +363,7 @@ def sequence_reversal():
         b_sz = tf.shape(init_state[0])[0]
         
         # 初始输入为0(起始标记)
-        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        cur_token = tf.zeros(shape = [b_sz], dtype = tf.int32)
         state = init_state
         collect = []
         
@@ -373,7 +371,7 @@ def sequence_reversal():
         for i in range(steps):
             # 获取下一个token和更新后的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
-            collect.append(tf.expand_dims(cur_token, axis=-1))
+            collect.append(tf.expand_dims(cur_token, axis = -1))
         
         # 将生成的索引转换为字符串
         out = tf.concat(collect, axis=-1).numpy()
