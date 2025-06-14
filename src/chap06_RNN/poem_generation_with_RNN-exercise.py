@@ -107,10 +107,15 @@ def poem_dataset():
 class myRNNModel(keras.Model):
     """基于RNN的诗歌生成模型"""
     def __init__(self, w2id):
-        """初始化模型
+        """初始化基于RNN的诗歌生成模型
         
         Args:
             w2id: 词语到id的映射字典，用于确定词汇表大小
+            vocab_size: 词汇表大小
+            embed_layer: 词嵌入层
+            rnn_cell: RNN单元
+            rnn_layer: RNN层
+            dense: 输出层
         """
         super().__init__()
         self.v_sz = len(w2id)  # 词汇表大小
