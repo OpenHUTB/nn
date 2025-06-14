@@ -1376,15 +1376,15 @@ def game_loop(args):
     finally:
 
         if original_settings:
-            sim_world.apply_settings(original_settings)
+            sim_world.apply_settings(original_settings) #恢复初始状态
 
         if (world and world.recording_enabled):
-            client.stop_recorder()
+            client.stop_recorder()                      #world存在且录制功能开启时停止录制
 
         if world is not None:
-            world.destroy()
+            world.destroy()                           #world存在，就释放资源
 
-        pygame.quit()
+        pygame.quit()                                 #结束图形界面相关操作
 
 
 # ==============================================================================
