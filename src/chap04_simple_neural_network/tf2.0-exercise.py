@@ -78,16 +78,16 @@ def softmax_ce(logits, label):
     return loss
 
 # 生成测试数据，形状为 [10, 5] 的正态随机数
-test_data = np.random.normal(size=[10, 5]).astype(np.float32)
+test_logits = np.random.normal(size=[10, 5]).astype(np.float32)
 # 进行softmax转换
 # 正确测试逻辑：直接使用原始logits
-test_logits = np.random.normal(size=[10, 5]).astype(np.float32)
+
 label = np.zeros_like(test_logits, dtype=np.float32)
 label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 # 比较自定义的损失值和tf自带结果，误差小于 0.0001 则认为相等
 
-((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
-  - softmax_ce(prob, label))**2 < 0.0001).numpy()
+((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_logits))
+  - softmax_ce(test_logits, label))**2 < 0.0001).numpy()
 
 # ## 实现 sigmoid 交叉熵loss函数
 

@@ -166,7 +166,7 @@ for epoch in range(50):
     # 打印当前epoch的训练损失和准确率
     # loss.numpy() 将Tensor转换为Python浮点数以便打印
     # accuracy.numpy() 将Tensor转换为Python浮点数以便打印
-    print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
+    print(f'epoch, {epoch} : loss = {loss.numpy():.4f} , accuracy= {accuracy.numpy():.4f})
 # 在测试集上测试模型
 loss, accuracy = test(model, 
                       tf.constant(test_data[0], dtype = tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，数据类型为float32
