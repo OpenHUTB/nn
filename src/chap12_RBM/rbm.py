@@ -232,10 +232,13 @@ if __name__ == '__main__':
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
+   
     # 训练RBM
     errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+   
     # 生成并可视化样本
     samples = rbm.sample(n_samples=5, gibbs_steps=1000)
+   
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 
