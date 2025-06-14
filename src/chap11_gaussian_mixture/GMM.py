@@ -44,13 +44,13 @@ def generate_data(n_samples=1000):
         y_true.extend([i] * samples_per_component[i]) 
     
     # 合并并打乱数据
-    # 将多个子数据集合并为一个完整数据集
+    # 使用函数将X_list中的数组沿行拼成一个二维数组X
     X = np.vstack(X_list)  
     # 将Python列表转换为NumPy数组
     y_true = np.array(y_true) 
-    # 生成0到n_samples-1的随机排列
+    # 生成0到n_samples-1的随机排列，打乱顺序
     shuffle_idx = np.random.permutation(n_samples) 
-    # 使用相同的随机索引同时打乱特征和标签
+    # 随机索引同时打乱特征矩阵和标签，确保数据与标签的对应关系不变。
     return X[shuffle_idx], y_true[shuffle_idx]
 
 # 自定义logsumexp函数
