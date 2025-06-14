@@ -53,7 +53,7 @@ class RNN_model(nn.Module):
         # hidden_size=lstm_hidden_dim：LSTM隐藏状态的维度
         # num_layers=2：堆叠两层LSTM
         # batch_first=False：输入张量的维度顺序为(seq_len, batch, input_size)
-        self.rnn_lstm = nn.LSTM(input_size=embedding_dim, hidden_size=lstm_hidden_dim, num_layers=2, batch_first=False)
+        self.rnn_lstm = nn.LSTM(input_size = embedding_dim, hidden_size = lstm_hidden_dim, num_layers = 2, batch_first = False)
 
         # 定义全连接层，将LSTM的输出映射到词汇表大小
         self.fc = nn.Linear(lstm_hidden_dim, vocab_len)

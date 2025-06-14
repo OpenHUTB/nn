@@ -26,7 +26,7 @@ def process_poems1(file_name):
     """
 
     poems = []  # 存储处理后的诗歌
-    with open(file_name, "r", encoding='utf-8') as f:
+    with open(file_name, "r", encoding = 'utf-8') as f:
         for line in f.readlines():
             try:
                 # 尝试按“标题:内容”格式解析
@@ -51,7 +51,7 @@ def process_poems1(file_name):
                 pass
 
     # 按诗的长度进行排序，便于后续按批处理
-    poems = sorted(poems, key=lambda line: len(line))
+    poems = sorted(poems, key = lambda line: len(line))
 
     # 统计所有诗句中的字频
     all_words = []
@@ -59,7 +59,7 @@ def process_poems1(file_name):
         all_words += [word for word in poem]  # 拆成单字列表
 
     counter = collections.Counter(all_words)  # 统计每个字的出现次数
-    count_pairs = sorted(counter.items(), key=lambda x: -x[1])  # 按频率降序排序
+    count_pairs = sorted(counter.items(), key = lambda x: -x[1])  # 按频率降序排序
 
     # 提取所有字，按频率排列，加一个空格符用于补齐
     words, _ = zip(*count_pairs)
@@ -114,7 +114,7 @@ def process_poems2(file_name):
                 pass
 
     # 按诗的长度进行排序（便于后续批处理时填充对齐）
-    poems = sorted(poems, key=lambda line: len(line))
+    poems = sorted(poems, key = lambda line: len(line))
 
     # 统计所有诗中每个字出现的频率
     all_words = []
@@ -123,7 +123,7 @@ def process_poems2(file_name):
 
     # 使用Counter统计词频，并按频率降序排序
     counter = collections.Counter(all_words)
-    count_pairs = sorted(counter.items(), key=lambda x: -x[1])
+    count_pairs = sorted(counter.items(), key = lambda x: -x[1])
 
     # 提取所有字，添加空格字符用于填充
     words, _ = zip(*count_pairs)
@@ -232,7 +232,7 @@ def run_training():
             for index in range(BATCH_SIZE): # 处理批次中的每个样本
                 x = np.array(batch_x[index], dtype = np.int64)# 样本输入序列
                 y = np.array(batch_y[index], dtype = np.int64)# 样本目标序列
-                x = Variable(torch.from_numpy(np.expand_dims(x,axis=1)))# 转换为PyTorch张量并调整维度
+                x = Variable(torch.from_numpy(np.expand_dims(x,axis = 1)))# 转换为PyTorch张量并调整维度
                 y = Variable(torch.from_numpy(y ))
                 pre = rnn_model(x)
                 loss += loss_fun(pre , y)

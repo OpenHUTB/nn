@@ -188,8 +188,6 @@ class myRNNModel(keras.Model):
 
 # In[3]:
 
-
-
 def mkMask(input_tensor, maxLen):
     """创建掩码，用于处理变长序列
 
@@ -309,9 +307,9 @@ def reduce_avg(reduce_target, lengths, dim):
     # 应用掩码到目标张量：将掩码区域的值置零
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     # 在指定维度上求和（不保留归约后的维度）
-    red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
+    red_sum = tf.reduce_sum(mask_target, axis = [dim], keepdims = False)
     # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）
-    red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
+    red_avg = red_sum / (tf.cast(lengths_reshape, dtype = tf.float32) + 1e-30)
     # 返回计算得到的平均值张量
     return red_avg
 
@@ -332,9 +330,9 @@ def compute_loss(logits, labels, seqlen):
     """
     # 计算每个位置的交叉熵
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits=logits, labels = labels)
     # 对变长序列求平均（忽略填充部分）
-    losses = reduce_avg(losses, seqlen, dim=1)
+    losses = reduce_avg(losses, seqlen, dim = 1)
     return tf.reduce_mean(losses)
 
 @tf.function
