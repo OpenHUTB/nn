@@ -27,6 +27,10 @@ def compute_accuracy(v_xs, v_ys):
 
     返回:
         result: 模型的准确率。
+    注意:
+        1. 评估时设置 keep_prob=1.0，禁用 dropout
+        2. 使用 argmax 处理 one-hot 编码的预测和标签
+        3. 计算整个批次的平均准确率
     """
     global prediction
     # 获取模型预测结果

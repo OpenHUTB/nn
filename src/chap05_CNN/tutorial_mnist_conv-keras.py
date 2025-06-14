@@ -72,10 +72,10 @@ def prepare_mnist_features_and_labels(x, y):
         x: 归一化后的图像数据。
         y: 转换为整型的标签。
     """
-    x = tf.cast(x, tf.float32) / 255.0
+    x = tf.cast(x, tf.float32) / 255.0# 显式转换为float32后除255
     # 将标签转换为int64类型
     # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
-    y = tf.cast(y, tf.int64)
+    y = tf.cast(y, tf.int64)# 使用int64避免平台相关差异
     return x, y
 
 

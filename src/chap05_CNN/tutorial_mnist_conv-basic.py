@@ -249,6 +249,11 @@ def test(model, ds):
     返回:
         loss: 测试损失。
         accuracy: 测试准确率。
+    实现说明:
+        1. 遍历测试集所有批次
+        2. 累积计算损失和准确率
+        3. 返回整个测试集的平均指标
+        4. 使用@tf.function加速的test_step进行单批次评估
     """
     loss = 0.0
     accuracy = 0.0
