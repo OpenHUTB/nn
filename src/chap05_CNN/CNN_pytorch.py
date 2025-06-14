@@ -119,7 +119,7 @@ def test(cnn):
     
     # 获取预测类别：找到每个样本概率最大的类别索引
     # torch.max返回(最大值, 最大值的索引)
-    _, pre_index = torch.max(y_prob, 1)  # 基于概率分布获取预测类别  
+    _, pre_index = torch.max(y_prob, 1) 
     
     # 调整张量形状为1维向量（例如从[N,1]变为[N]）
     pre_index = pre_index.view(-1)
