@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+0#!/usr/bin/env python
 # coding: utf-8
 import numpy as np # 导入NumPy库
 import matplotlib.pyplot as plt
@@ -239,8 +239,9 @@ def main(x_train, y_train, use_gradient_descent=False):
 
    # 定义预测函数
     def f(x):
+
     """
-    使用线性模型进行预测，可选择使用梯度下降或最小二乘法的权重
+    使用线性模型进行预测,可选择使用梯度下降或最小二乘法的权重
     
     参数:
         x: 输入特征向量/矩阵
