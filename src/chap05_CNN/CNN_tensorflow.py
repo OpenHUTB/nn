@@ -156,11 +156,11 @@ def max_pool_2x2(x: tf.Tensor,
     if data_format == 'NHWC':
         # NHWC格式：[batch, height, width, channels]
         # 池化核大小和步长都作用于height和width维度
-        ksize = [1, pool_size, pool_size, 1]
-        strides = [1, strides, strides, 1]
+        ksize = [1, pool_size, pool_size, 1] # 定义池化窗口的大小（kernel size）
+        strides = [1, strides, strides, 1] # 定义池化操作的步长（strides）
     else:  # NCHW
-        ksize = [1, 1, pool_size, pool_size]
-        strides = [1, 1, strides, strides]
+        ksize = [1, 1, pool_size, pool_size]#定义池化窗口的大小
+        strides = [1, 1, strides, strides]#定义池化窗口的步幅
     
     # 最大池化操作：每个2x2区域选择最大值，实现特征降维，保留主要特征
     return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)

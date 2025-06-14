@@ -33,25 +33,25 @@ def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
         end: 结束数值
     '''
     # 生成随机数
-    numbers_1 = np.random.randint(start, end, batch_size)
-    numbers_2 = np.random.randint(start, end, batch_size)
-    results = numbers_1 + numbers_2
-    return numbers_1, numbers_2, results# 返回生成的随机数数组及其和
+    numbers_1 = np.random.randint(start, end, batch_size)  # 生成指定范围和数量的随机整数数组作为第一个加数
+    numbers_2 = np.random.randint(start, end, batch_size)  # 同样生成第二个加数数组
+    results = numbers_1 + numbers_2  # 对两个数组逐元素相加，得到每对随机数的和
+    return numbers_1, numbers_2, results  # 返回两个加数数组以及它们的和数组
 
 def convertNum2Digits(Num):
     '''将一个整数转换成一个数字位的列表, 例如 133412 ==> [1, 3, 3, 4, 1, 2]
     '''
-    strNum = str(Num)   # 将输入的整数转换为字符串形式
-    chNums = list(strNum)  将字符串转换为单个字符组成的列表
-    digitNums = [int(o) for o in strNum]  # 将字符列表中的每个字符转换为整数
+    strNum = str(Num)                       # 将输入的整数转换为字符串形式
+    chNums = list(strNum)                   # 将字符串转换为单个字符组成的列表
+    digitNums = [int(o) for o in strNum]    # 将字符列表中的每个字符转换为整数
     return digitNums
 
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
     '''# 便于RNN按低位到高位处理
-    digitStrs = [str(o) for o in Digits]
-    numStr = ''.join(digitStrs)
-    Num = int(numStr)
+    digitStrs = [str(o) for o in Digits]   # 将数字列表中的每个元素转为字符串形式
+    numStr = ''.join(digitStrs)            # 将字符串列表拼接成一个完整的数字字符串
+    Num = int(numStr)                      # 将字符串转换为整数
     return Num
 
 def pad2len(lst, length, pad=0):
@@ -66,8 +66,10 @@ def results_converter(res_lst):
         res_lst: shape(b_sz, len(digits))
     '''
     # 反转每个数字位列表，因为我们在输入时反转了数字
-    res = [reversed(digits) for digits in res_lst]
-    return [convertDigits2Num(digits) for digits in res]
+    res = [reversed(digits) for digits in res_lst]       # 为每个数字序列创建反转迭代器（不立即执行）
+
+    # 将反转后的数字序列转换为实际数值
+    return [convertDigits2Num(digits) for digits in res] # 返回转换后的数值列表
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
     '''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度

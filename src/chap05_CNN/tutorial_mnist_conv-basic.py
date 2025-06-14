@@ -5,7 +5,7 @@
 
 # In[29]:
 import os
-import tensorflow as tf
+import tensorflow as tf # 导入TensorFlow库并简称为tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
@@ -40,7 +40,8 @@ def mnist_dataset():
 
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+    test_ds = test_ds.batch(100)  # 直接批处理，无需take和shuffle
+    # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
     return ds, test_ds # 返回处理后的训练集和测试集
 
 
@@ -73,34 +74,51 @@ class MyConvModel(keras.Model):
     """
 
     def __init__(self):
-        super(MyConvModel, self).__init__()
+        super(MyConvModel, self).__init__()  # 调用父类（Model）的构造函数，初始化模型基础结构
+
+        # 定义第一层卷积层：32个5x5的卷积核，使用ReLU激活函数，same填充保证输出尺寸不变
         self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
+
+        # 第二层卷积层：64个5x5的卷积核，同样使用ReLU激活函数和same填充
         self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
+
+        # 最大池化层：池化窗口大小为2x2，步长为2，用于降低特征图的空间维度
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+
+        # 展平层：将输入从(batch_size, height, width, channels)展平为一维向量，便于后续全连接层处理
         self.flat = Flatten()
+
+        # 第一个全连接层：100个神经元，使用tanh激活函数
         self.dense1 = layers.Dense(100, activation='tanh')
+
+        # 输出层：10个神经元，对应10个类别（如MNIST中的数字0~9），无激活函数（通常配合softmax或交叉熵损失使用）
         self.dense2 = layers.Dense(10)
 
-    @tf.function
+
+    @tf.function  # 使用装饰器加速模型训练过程，自动构建计算图（适用于TensorFlow）
     def call(self, x):
         """
         模型的前向传播过程。
 
         参数:
-            x: 输入数据。
+            x: 输入数据，形状为 (batch_size, height, width, channels)
 
         返回:
-            logits: 模型输出的logits。
+            logits: 模型输出的logits（未经过softmax的概率输出）
         """
-        h1 = self.l1_conv(x)
-        h1_pool = self.pool(h1)
-        h2 = self.l2_conv(h1_pool)
-        h2_pool = self.pool(h2)
-        flat_h = self.flat(h2_pool)
-        dense1 = self.dense1(flat_h)
-        logits = self.dense2(dense1)
-        return logits
+        h1 = self.l1_conv(x)              # 经过第一层卷积
+        h1_pool = self.pool(h1)           # 第一层后的最大池化，压缩空间维度
 
+        h2 = self.l2_conv(h1_pool)        # 第二层卷积提取更高级特征
+        h2_pool = self.pool(h2)           # 第二层后池化
+
+        flat_h = self.flat(h2_pool)       # 展平操作，为全连接层做准备
+
+        dense1 = self.dense1(flat_h)      # 第一个全连接层，引入非线性变换
+
+        logits = self.dense2(dense1)      # 输出层，得到最终分类结果（logits）
+
+        return logits
 
 model = MyConvModel()
 optimizer = optimizers.Adam()

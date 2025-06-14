@@ -85,29 +85,29 @@ def logsumexp(log_p, axis=1, keepdims=False):
     返回：
     计算结果的log(sum(exp(log_p)))，返回与输入数组相同形状的结果。
     """
-    log_p = np.asarray(log_p)   # 将对数概率列表转换为NumPy数组
+    log_p = np.asarray(log_p)                                               # 将对数概率列表转换为NumPy数组
     
     # 处理空输入情况
-    if log_p.size == 0:  # 检查输入的对数概率数组是否为空
-        return np.array(-np.inf, dtype=log_p.dtype)  # 返回与输入相同数据类型的负无穷值
+    if log_p.size == 0:                                                     # 检查输入的对数概率数组是否为空
+        return np.array(-np.inf, dtype=log_p.dtype)                         # 返回与输入相同数据类型的负无穷值
     
     # 计算最大值（处理全-inf输入）
-    max_val = np.max(log_p, axis=axis, keepdims=True)  # 计算沿指定轴的最大值
-    if np.all(np.isneginf(max_val)):  # 检查是否所有最大值都是负无穷
-        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)  # 根据keepdims返回适当形式
+    max_val = np.max(log_p, axis=axis, keepdims=True)                       # 计算沿指定轴的最大值
+    if np.all(np.isneginf(max_val)):                                        # 检查是否所有最大值都是负无穷
+        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)   # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
-     # 安全计算指数和：先减去最大值，再计算指数
-    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)  # 安全调整对数概率
+    # 安全计算指数和：先减去最大值，再计算指数
+    safe_log_p = np.where(np.isneginf(log_p), -np.inf, log_p - max_val)     # 安全调整对数概率
     sum_exp = np.sum(np.exp(safe_log_p), axis = axis, keepdims = keepdims)  # 计算调整后的指数和
     
     # 计算最终结果
     result = max_val + np.log(sum_exp)
     
     # 处理全-inf输入的特殊case
-    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):  # 判断是否所有有效值都是-inf
+    if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):       # 判断是否所有有效值都是-inf
         result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) # 根据keepdims参数的值返回max_val的适当形式
-    return result  # 返回处理后的结果，保持与正常情况相同的接口
+    return result                                                           # 返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类
 class GaussianMixtureModel:
@@ -160,7 +160,7 @@ class GaussianMixtureModel:
             # 对每个高斯成分，计算样本的对数概率密度
             for k in range(self.n_components):
                 # 对数概率 = log(混合权重) + log(高斯概率密度)
-                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k])
+                log_prob[:, k] = np.log(self.pi[k]) + self._log_gaussian(X, self.mu[k], self.sigma[k]) # 计算第k个高斯混合成分的对数概率密度，并存储在log_prob的第k列
             
             # 使用logsumexp计算归一化因子，确保数值稳定性
             log_prob_sum = logsumexp(log_prob, axis=1, keepdims=True)
@@ -260,9 +260,9 @@ class GaussianMixtureModel:
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
         else:
             # 处理非奇异协方差矩阵
-            inv = np.linalg.inv(sigma)
-            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
-            return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent
+            inv = np.linalg.inv(sigma) #计算协方差矩阵的逆
+            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
+            return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
         
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
@@ -275,11 +275,11 @@ class GaussianMixtureModel:
         # 绘制对数似然值随迭代次数的变化曲线
         # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
-        # 设置x轴标签为“迭代次数”
+        # 设置x轴的标签为“迭代次数”
         plt.xlabel('迭代次数')
-        # 设置y轴标签为“对数似然值”
+        # 设置y轴的标签为“对数似然值”
         plt.ylabel('对数似然值')
-        # 设置图表标题为“EM算法收敛曲线”
+        # 设置图表的标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
         # 启用网格线，增强可读性
         plt.grid(True, alpha=0.5) 
@@ -293,46 +293,36 @@ if __name__ == "__main__":
     X, y_true = generate_data(n_samples=1000)
     print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     
-    # 2. 训练GMM模型
-    print("\n训练高斯混合模型...")
-    gmm = GaussianMixtureModel(n_components=3, random_state=42) # 初始化高斯混合模型
-    gmm.fit(X) # 使用数据 X 训练 GMM 模型
-    y_pred = gmm.labels_ # 获取每个样本的预测聚类标签
-    print(f"完成训练，共进行{len(gmm.log_likelihoods)}次迭代")
-    
-    # 3. 收敛曲线绘制，可以用于判断是否收敛
-    print("\n绘制EM算法收敛曲线...")
-    gmm.plot_convergence()
-    
-    # 4. 可视化聚类结果
-    print("\n可视化聚类结果...")
-    plt.figure(figsize=(12, 5))
-    
-    # 左图：真实聚类
-    plt.subplot(1, 2, 1) # 创建左子图
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=15, alpha=0.8)  # 绘制散点图展示数据点
-    plt.title("真实聚类", fontsize=12)  # 设置标题为"真实聚类"，字体大小为12
-    plt.xlabel("特征1", fontsize=10)    # 设置x轴标签为"特征1"，字体大小为10
-    plt.ylabel("特征2", fontsize=10)    # 设置y轴标签为"特征2"，字体大小为10
-    plt.grid(True, linestyle='--', alpha=0.5)  # 添加网格线
-    
-    # 右图：GMM预测聚类
+    # 训练GMM模型
+    gmm = GaussianMixtureModel(n_components=3)
+    gmm.fit(X)
+    y_pred = gmm.labels_
+     #
+     
+    # 可视化结果
+    plt.figure(figsize=(12, 5))#创建图形和子图
+    plt.subplot(1, 2, 1)
+    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)#绘制散点图，x 轴为 X 的第一列（Feature 1），y 轴为 X 的第二列（Feature 2）；点颜色由 y_true 决定（真实聚类标签）
+    # 使用 viridis 颜色映射；s=10 设置点的大小为 10
+    plt.title("True Clusters")
+    # 注意：此处重复设置标题是为了确保在某些环境中标题能够正确显示
+    plt.title("True Clusters")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True, linestyle='--', alpha=0.7)
     plt.subplot(1, 2, 2)
-    # 绘制散点图展示GMM聚类预测结果：
-    # - X[:, 0]: 取数据集第一维特征作为x轴
-    # - X[:, 1]: 取数据集第二维特征作为y轴
-    # - c=y_pred: 使用预测标签作为颜色分类依据
-    # - cmap='viridis': 使用viridis颜色映射
-    # - s=15: 设置点的大小为15
-    # - alpha=0.8: 设置透明度为0.8（轻微透明效果）
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=15, alpha=0.8)
-    plt.title("GMM预测聚类", fontsize=12) # 设置标题及字体大小
-    plt.xlabel("特征1", fontsize=10)      # 设置x轴标签及字体大小
-    plt.ylabel("特征2", fontsize=10)      # 设置y轴标签及字体大小
-    plt.grid(True, linestyle='--', alpha=0.5) # 添加网格线：
-    
+    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)#绘制散点图，x 轴和 y 轴与第一个子图相同。点颜色由 y_pred 决定（GMM 预测的聚类标签），
+    # 使用相同的 viridis 颜色映射。点大小同样为 10。
+    plt.title("GMM Predicted Clusters")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
+    plt.show()#显示创建的图形窗口
+    #打印信息
+    print("生成混合高斯分布数据...")
+    print("生成混合高斯分布数据...")
+    print("生成混合高斯分布数据...")
 
-    plt.tight_layout()                                  # 自动调整子图参数，确保图形元素不重叠
-    plt.savefig('gmm_clustering_results.png', dpi=300)  # 保存高分辨率（300 DPI）的GMM聚类结果图像
-    plt.show()                                          # 显示绘制的图形窗口
-    print("程序执行完毕")
+
+
+

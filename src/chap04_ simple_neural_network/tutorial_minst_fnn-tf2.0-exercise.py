@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
-# ## 准备数据
+# ========================== #
+#       准备数据部分        #
+# ========================== #
 
 # In[7]:
 
@@ -97,8 +99,8 @@ def compute_accuracy(logits, labels):
     logits: 模型输出的未归一化分数
     labels: 真实标签
     """
-    predictions = tf.argmax(logits, axis=1)
-    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
+    predictions = tf.argmax(logits, axis=1) # 获取预测类别
+    return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32)) # 计算准确率
 
 @tf.function
 def train_one_step(model, optimizer, x, y):
@@ -181,8 +183,8 @@ for epoch in range(50):
 # 在测试集上评估模型性能
 loss, accuracy = test(
     model,
-    tf.constant(test_data[0], dtype=tf.float32),# 将测试特征数据转换为TensorFlow常量张量，指定数据类型为float32
-    tf.constant(test_data[1], dtype=tf.int64)
+    tf.constant(test_data[0], dtype=tf.float32), # 将测试特征数据转换为TensorFlow常量张量，指定数据类型为float32
+    tf.constant(test_data[1], dtype=tf.int64)    # 将测试标签数据转换为TensorFlow常量张量，指定数据类型为int64
 )
 # .numpy() 将 TensorFlow 张量转换为 NumPy 数组（或 Python 标量）以便打印
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())

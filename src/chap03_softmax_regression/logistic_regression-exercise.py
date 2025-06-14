@@ -77,9 +77,9 @@ class LogisticRegression():
         # 初始化权重变量W，形状为[2, 1]表示2维输入到1维输出的线性变换，初始值在-0.1到0.1之间均匀分布，并应用L2正则化
         self.W = tf.Variable(
             initial_value = tf.random.uniform(
-                shape = [2, 1], minval = -0.1, maxval = 0.1
+                shape = [2, 1], minval = -0.1, maxval = 0.1  # 权重矩阵形状、最小值、最大值
             ),
-            regularizer = l2_reg
+            regularizer = l2_reg    # 应用L2正则化
         )
         # 初始化偏置变量b，形状为[1]，数据类型为tf.float32，初始值为0
         self.b = tf.Variable(
@@ -145,7 +145,8 @@ def compute_loss(pred, label):
     pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
     # 计算预测标签与真实标签相等的比例，即准确率
     accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype = tf.float32))
-    return loss, accuracy# 返回计算得到的损失值和准确率
+    # 返回计算得到的损失值和准确率
+    return loss, accuracy
 
 
 @tf.function
@@ -193,29 +194,38 @@ if __name__ == '__main__':
    # 这些信息可以用于后续创建训练过程的动画演示
    animation_frames = []
 
-   for i in range(200):
-       # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
-       loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
-       # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
-       animation_frames.append(
-           (W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
-       )
-       if i % 20 == 0:
-           print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
-
+    for i in range(200):
+        # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
+        loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
+        # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
+        
+            W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
+           animation_frames.append((W_np[0, 0], W_np[1, 0], b_np, loss_np))
+        if i % 20 == 0:
+            print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
     f, ax = plt.subplots(figsize=(6, 4))  # 创建一个图形和坐标轴
     f.suptitle('Logistic Regression Example', fontsize=15)  # 设置图形的标题
     plt.ylabel('Y')  # 设置Y轴标签为'Y'，用于标识垂直方向的变量
     plt.xlabel('X')  # 设置X轴标签为'X'，用于标识水平方向的变量
-    ax.set_xlim(0, 10)  
-    ax.set_ylim(0, 10) 
+    ax.set_xlim(0, 10)  # X轴显示范围0-10
+    ax.set_ylim(0, 10)  # Y轴显示范围0-10
 
     line_d, = ax.plot([], [], label = 'fit_line')  # 创建用于绘制决策边界的线条对象
-    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')
-    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')
+
+    # 创建两个类别的数据点：
+    # C1_dots：类别1的样本点，用蓝色'+'表示
+    # C2_dots：类别2的样本点，用绿色'o'表示
+    C1_dots, = ax.plot([], [], '+', c = 'b', label = 'actual_dots')   # 正样本
+    C2_dots, = ax.plot([], [], 'o', c = 'g', label = 'actual_dots')   # 负样本
 
     # 创建用于显示动态文本的文本对象（位于左上角）
+    # 参数说明：
+    # 0.02, 0.95：文本位置坐标（x=2%轴宽度，y=95%轴高度），使用相对坐标系统
+    # ''：初始空文本内容
+    # horizontalalignment='left'：水平左对齐（使文本紧贴左侧边界）
+    # verticalalignment='top'：垂直顶部对齐（使文本紧贴顶部边界）
+    # transform=ax.transAxes：使用坐标轴相对坐标系（0-1范围，而非数据坐标系）
     frame_text = ax.text(
         0.02, 0.95, '',
         horizontalalignment='left',

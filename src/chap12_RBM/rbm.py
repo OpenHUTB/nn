@@ -1,12 +1,13 @@
 # python: 2.7
 # encoding: utf-8
 # 导入numpy模块并命名为np
-import numpy as np # 导入NumPy库用于高效数值计算
-import sys
+import numpy as np  # 导入NumPy库用于高效数值计算
+import sys  # 导入系统相关模块，用于获取Python版本、操作路径等
+
 class RBM:
     """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
 
-    def __init__(self, n_hidden = 2, n_observe = 784):
+    def __init__(self, n_hidden=2, n_observe=784):
         """
         初始化受限玻尔兹曼机（RBM）模型参数
 
@@ -15,7 +16,7 @@ class RBM:
             n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
 
         Raises:
-            ValueError: 若输入参数非正整数则抛出异常
+            ValueError: 若输入的参数非正整数则抛出异常
         """
         # 参数验证：确保隐藏层和可见层单元数量为正整数
         if not (isinstance(n_hidden, int) and n_hidden > 0):            # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
@@ -27,10 +28,11 @@ class RBM:
         self.n_observe = n_observe  # 设置可见层的神经元数量
         
         # 权重矩阵 (可见层到隐藏层)
+        # 使用标准正态分布，标准差为0.1，确保权重初始值较小且分布合理
         self.W = np.random.normal(
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
-        size = (n_observe, n_hidden))
+        size = (n_observe, n_hidden)) # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
         
         # 初始化权重矩阵W，使用正态分布随机初始化
         # 可见层偏置（1 x n_observe）
@@ -60,7 +62,7 @@ class RBM:
 
         # 可选替代方案：使用更小的固定标准差进行初始化。
         # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-
+        # 最终使用的偏置向量（与上方Wv/Wh重复，统一使用b_h和b_v）
         self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
 
         self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
@@ -70,7 +72,7 @@ class RBM:
         """Sigmoid激活函数，用于将输入映射到概率空间
         将任意实数映射到(0,1)区间，适合表示神经元的激活概率
         """
-        return 1.0 / (1 + np.exp(-x)) # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
+        return 1.0 / (1 + np.exp(-x))  # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
 
     def _sample_binary(self, probs):
         """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）
@@ -112,27 +114,29 @@ class RBM:
         n_samples = data_flat.shape[0]  # 样本数量
 
         # 定义训练参数
-        learning_rate = 0.1 # 学习率，控制参数更新的步长
+        learning_rate = 0.1  # 学习率，控制参数更新的步长
         
-        epochs = 10 # 训练轮数，整个数据集将被遍历10次
+        epochs = 10  # 训练轮数，整个数据集将被遍历10次
         
-        batch_size = 100 # 批处理大小，每次更新参数使用的样本数量
+        batch_size = 100  # 批处理大小，每次更新参数使用的样本数量
 
         # 开始训练轮数
         for epoch in range(epochs):
-            # 打乱数据顺序，提高训练稳定性和泛化能力
+            # 打乱数据顺序，提高训练稳定性和泛化能力，避免模型学习到特定的样本顺序
+            
             np.random.shuffle(data_flat) 
             
             # 使用小批量梯度下降法
             for i in range(0, n_samples, batch_size): 
                 # 获取当前批次的数据
-                batch = data_flat[i:i + batch_size] 
+                batch = data_flat[i:i + batch_size]  # 使用切片操作从ata_flat中提取从第i行到第i+batch_size行的子数组
                 
                 # 将批次数据转换为 float64 类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
 
                 # 正相传播：从v0计算隐藏层激活概率
                 # 计算可见层对隐藏层的输入：输入层向量v0与权重矩阵self.W的点积，再加上隐藏层偏置self.b_h
+                # 条件概率：P(h_j=1|v) = σ(b_j + Σ_i v_i·W_ij)
                 h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) 
                 
                 # 对隐藏层激活概率进行二值采样，得到隐藏层的状态
@@ -141,10 +145,11 @@ class RBM:
 
                 # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
                 # 计算隐藏层对可见层的重构输入：隐藏层状态h0_sample与权重矩阵转置self.W.T的点积，再加上可见层偏置self.b_v
+                # 条件概率：P(v_i=1|h) = σ(a_i + Σ_j h_j·W_ij)
                 v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  # 将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
                 
                 # 对可见层重构概率进行二值采样，得到重构的可见层状态
-                v1_sample = self._sample_binary(v1_prob)        # 对可见层进行二值采样
+                v1_sample = self._sample_binary(v1_prob)  # 对可见层进行二值采样
                 
                 # 基于重构的可见层状态，再次计算隐藏层激活概率
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       # 计算隐藏单元被激活的概率
@@ -201,9 +206,10 @@ if __name__ == '__main__':
         mnist = np.load('mnist_bin.npy')  # 尝试加载文件
     except IOError:
         # 如果文件不存在或加载失败，生成新的二值化MNIST数据
-        (train_images, _), (_, _) = mnist.load_data() # 加载MNIST数据
-        mnist_bin = (train_images >= 128).astype(np.int8) # 二值化处理
-        np.save('mnist_bin.npy', mnist_bin) # 保存为.npy文件
+        (train_images, _), (_, _) = mnist.load_data()  # 加载MNIST数据
+        mnist_bin = (train_images >= 128).astype(np.int8)  # 二值化处理
+        np.save('mnist_bin.npy', mnist_bin)  # 保存为.npy文件
+
         # 重新加载刚生成的文件
         mnist = np.load('mnist_bin.npy')
     except Exception as e:
@@ -213,8 +219,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # 获取数据集的形状信息
-    n_imgs, n_rows, n_cols = mnist.shape# 分别表示图像数量、行数和列数
-    img_size = n_rows * n_cols  # 计算单张图片展开后的长度
+    n_imgs, n_rows, n_cols = mnist.shape  # 分别表示图像数量、行数和列数
+    img_size = n_rows * n_cols            # 计算单张图片展开后的长度
 
     # 打印数据集的形状信息，便于确认数据加载是否正确
     print(mnist.shape)  # 输出数据集的形状
@@ -222,7 +228,10 @@ if __name__ == '__main__':
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
-    
+    # 训练RBM
+    errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+    # 生成并可视化样本
+    samples = rbm.sample(n_samples=5, gibbs_steps=1000)
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 

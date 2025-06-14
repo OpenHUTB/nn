@@ -1,7 +1,7 @@
 # 导入必要的库
-import os           # 操作系统接口，用于文件路径处理和目录操作
-import numpy as np  # 数值计算库，用于数组操作和数学计算
-import tensorflow as tf  # 深度学习框架，用于构建和训练神经网络
+import os           # 导入操作系统接口，用于文件路径处理和目录操作
+import numpy as np  # 导入数值计算库，用于数组操作和数学计算
+import tensorflow as tf  # 导入深度学习框架，用于构建和训练神经网络
 
 class RL_QG_agent:
     """黑白棋强化学习智能体，基于Q学习和卷积神经网络实现落子策略"""
@@ -20,24 +20,34 @@ class RL_QG_agent:
 
 
     def init_model(self):
-        """构建卷积神经网络模型，用于预测黑白棋落子位置的Q值"""
+        """
+        构建并初始化卷积神经网络模型
+        
+        网络结构:
+            1. 卷积层1: 32个3x3卷积核(提取局部棋子模式)
+            2. 卷积层2: 64个3x3卷积核(提取全局布局特征)
+            3. 扁平化层: 将特征图转换为一维向量
+            4. 全连接层: 512个神经元(学习特征组合)
+            5. 输出层: 64个神经元(对应棋盘各位置Q值)
+        """
         self.sess = tf.Session()  # 创建TensorFlow会话
         
         # 定义网络输入：[批次大小, 棋盘高度, 棋盘宽度, 通道数]
         self.input_states = tf.placeholder(
-            tf.float32,              # 输入数据类型为32位浮点数
-            shape=[None, 8, 8, 3],   # 输入张量的形状
-            name="input_states"      # 该张量在计算图中的名称
+            tf.float32,             # 输入数据类型为32位浮点数
+            shape=[None, 8, 8, 3],  # 输入张量的形状
+            name="input_states"     # 该张量在计算图中的名称
         )
         
         # ========== 卷积层1：提取局部棋子模式特征 ==========
         # 32个3x3卷积核，捕捉相邻棋子的局部关系
         # 输出形状：[None, 8, 8, 32]
         conv1 = tf.layers.conv2d(
+            # 输入数据：状态特征图
             inputs=self.input_states,
-            filters=32,         # 32个卷积核，生成32个特征图
-            kernel_size=3,      # 3x3卷积核，捕捉局部区域
-            padding="same",     # 同尺寸填充，保持输出尺寸与输入一致
+            filters=32,            # 32个卷积核，生成32个特征图
+            kernel_size=3,         # 3x3卷积核，捕捉局部区域
+            padding="same",        # 同尺寸填充，保持输出尺寸与输入一致
             activation=tf.nn.relu  # ReLU激活函数，引入非线性
         )
 
@@ -45,11 +55,11 @@ class RL_QG_agent:
         # 64个3x3卷积核，捕捉更复杂的棋子布局模式
         # 输出形状：[None, 8, 8, 64]
         conv2 = tf.layers.conv2d(
-            inputs = conv1,
-            filters = 64,         # 特征图数量翻倍，增强特征表达能力
-            kernel_size = 3,      # 使用3×3的卷积核，平衡特征提取能力与参数量
-            padding = "same",     # 保持输出特征图尺寸与输入一致（补零填充）
-            activation = tf.nn.relu   # ReLU激活函数，引入非线性并抑制负梯
+            inputs=conv1,
+            filters=64,            # 特征图数量翻倍，增强特征表达能力
+            kernel_size=3,         # 使用3×3的卷积核，平衡特征提取能力与参数量
+            padding="same",        # 保持输出特征图尺寸与输入一致（补零填充）
+            activation=tf.nn.relu  # ReLU激活函数，引入非线性并抑制负梯
         )
 
         # ========== 扁平化层：将多维特征转为一维向量 ==========
@@ -94,14 +104,27 @@ class RL_QG_agent:
         
         # 选择Q值最大的位置（若有多个，随机选一个）
         max_q = np.max(legal_q)                # 最大Q值
-        best_indices = np.where(legal_q == max_q)[0]  # 所有最大Q值的索引
+        best_indices = np.where(legal_q == max_q)[0]  # 在合法动作中找出所有具有最大Q值的动作索引
         return enables[np.random.choice(best_indices)]  # 映射回原始位置
 
 
     def save_model(self):
         """保存训练好的模型参数到指定目录"""
+
+        # 使用 TensorFlow 的 Saver 对象保存模型参数到指定路径
+        # self.sess 是当前的 TensorFlow 会话对象，用于执行计算图中的操作
+        # os.path.join(self.model_dir, 'parameter.ckpt') 用于构建保存模型参数的完整文件路径
+        # self.model_dir 是保存模型的目录路径
+        # 'parameter.ckpt' 是保存模型参数的文件名
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已保存至", self.model_dir)
+        
+        try:
+            self.saver.save(self.sess, model_path)
+            self.logger.info("模型已保存至 %s", model_path)
+        except Exception as e:
+            self.logger.error("保存模型时出错: %s", e)
+
 
 
     def load_model(self):

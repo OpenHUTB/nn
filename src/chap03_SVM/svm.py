@@ -21,8 +21,8 @@ def eval_acc(label, pred):
     """计算准确率。
     
     参数:
-        label: 真实标签数组
-        pred: 预测标签数组
+        label: 真实标签的数组
+        pred: 预测标签的数组
         
     返回:
         准确率 (0到1之间的浮点数)
@@ -77,8 +77,8 @@ class SVM:
             db = -np.mean(y[idx])
 
             # 梯度下降更新参数
-            self.w -= self.learning_rate * dw
-            self.b -= self.learning_rate * db
+            self.w -= self.learning_rate * dw # 权重更新：w = w - η*dw/dw
+            self.b -= self.learning_rate * db # 偏置更新：b = b - η*db/db
             
             # 训练逻辑总结：
             # - 对误分类样本，向正确方向调整超平面
@@ -97,7 +97,7 @@ class SVM:
         return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签格式
 
 if __name__ == '__main__':
-    # 数据加载部分
+    # 数据加载部分以及数据路径配置
     base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
     train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
     test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
@@ -125,5 +125,6 @@ if __name__ == '__main__':
     acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
     acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
     
-    print("train accuracy: {:.1f}%".format(acc_train * 100))
-    print("test accuracy: {:.1f}%".format(acc_test * 100))
+    print("train accuracy: {:.1f}%".format(acc_train * 100))  # 输出训练集准确率
+    print("test accuracy: {:.1f}%".format(acc_test * 100))  # 输出测试集准确率
+

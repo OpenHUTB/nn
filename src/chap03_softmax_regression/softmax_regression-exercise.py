@@ -11,9 +11,9 @@
 # In[1]:
 
 # 导入运行所需模块
-import tensorflow as tf
-import matplotlib.pyplot as plt
-from matplotlib import animation, rc
+import tensorflow as tf # TensorFlow深度学习框架
+import matplotlib.pyplot as plt # 数据可视化库
+from matplotlib import animation, rc # 动画功能
 from IPython.display import HTML # 在Jupyter中显示动画
 import matplotlib.cm as cm # 颜色映射
 import numpy as np # 数值计算库
@@ -21,11 +21,11 @@ import numpy as np # 数值计算库
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
 # 设置数据点数量
-dot_num = 100  
+dot_num = 100  # 每类样本的数量
 
 # 生成类别1的数据：均值为(3,6)，标准差为1
-x_p = np.random.normal(3.0, 1, dot_num) 
-y_p = np.random.normal(6.0, 1, dot_num)
+x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
+y_p = np.random.normal(6.0, 1, dot_num)  # y坐标
 y = np.ones(dot_num)  # 标签为1
 C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 
@@ -69,7 +69,7 @@ class SoftmaxRegression(tf.Module):
         :param num_classes: 类别数量
         """
         super().__init__()
-        # 初始化权重 W 和偏置 b
+        # 初始化权重 W形状为[input_dim, num_classes] ：初始化偏置向量b，形状为[num_classes]
         # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
@@ -149,7 +149,7 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     with tf.GradientTape() as tape:
         # 前向传播：计算模型对输入批次的预测
         predictions = model(x_batch)
-        # 计算损失和准确率
+        # 计算损失和准确率，计算预测结果与真实标签y_batch之间的损失值和准确率
         loss, accuracy = compute_loss(predictions, y_batch)
 
     #自动计算损失函数对模型参数的梯度
@@ -212,8 +212,8 @@ plt.contour(X, Y, Z, alpha=0.5)
 plt.show()
 
 # 保存模型参数
-ckpt = tf.train.Checkpoint(model=model)
-ckpt.write('softmax_regression_weights')
+ckpt = tf.train.Checkpoint(model=model) # 创建检查点
+ckpt.write('softmax_regression_weights') # 保存模型
 
 # 加载模型参数
 ckpt.read('softmax_regression_weights')# 模型权重加载后即可用于新数据的多类别概率预测

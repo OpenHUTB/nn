@@ -8,7 +8,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 try:
     mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 except Exception as e:
-    print(f"数据加载失败: {e}")
+    print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
 
 learning_rate = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
@@ -67,7 +67,7 @@ def bias_variable(shape):
     """
     # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
     initial = tf.constant(0.1, shape=shape) # 创建一个所有元素值为0.1的常量张量
-    return tf.Variable(initial)
+    return tf.Variable(initial)#将常量张量 initial 包装为一个可训练的变量张量
 
 
 def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):

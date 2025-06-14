@@ -66,7 +66,7 @@ from __future__ import print_function
 # ==============================================================================
 
 
-import glob
+import glob # 导入glob模块,查找符合特定模式的Carla egg文件路径
 import os
 import sys # 导入系统相关模块，用于获取Python版本、操作路径等
 
@@ -78,7 +78,7 @@ try: # 尝试将Carla的egg文件路径添加到Python搜索路径中
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0]) # 根据操作系统选择平台
 except IndexError:
     pass # 若未找到匹配的egg文件，忽略错误
 
@@ -86,7 +86,7 @@ except IndexError:
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
 
-
+#导入CARLA相关模块
 import carla
 
 from carla import ColorConverter as cc
@@ -102,7 +102,8 @@ import re
 import weakref
 
 try:
-    import pygame
+    import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
+    # 从pygame.locals导入键盘常量（用于处理键盘输入事件）
     from pygame.locals import KMOD_CTRL
     from pygame.locals import KMOD_SHIFT
     from pygame.locals import K_0
@@ -224,7 +225,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.actor_role_name = args.rolename
         try:                                    # 加载地图数据
             self.map = self.world.get_map()
-        except RuntimeError as error:
+        except RuntimeError as error:  # 地图加载失败时的错误处理
             print('RuntimeError: {}'.format(error))
             print('  The server could not send the OpenDRIVE (.xodr) file:')
             print('  Make sure it exists, has the same name of your town, and is correct.')
@@ -265,8 +266,12 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         ]
 
     def restart(self):
+        """重置车辆和传感器配置，用于重新开始或初始化场景"""
+
+        # 重置车辆速度参数（默认值）
         self.player_max_speed = 1.589
         self.player_max_speed_fast = 3.713
+        
         # Keep same camera config if the camera manager exists.
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
@@ -274,16 +279,24 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         blueprint_list = get_actor_blueprints(self.world, self._actor_filter, self._actor_generation)
         if not blueprint_list:
             raise ValueError("Couldn't find any blueprints with the specified filters")
-        blueprint = random.choice(blueprint_list)
+        blueprint = random.choice(blueprint_list)  # 从符合条件的蓝图列表中随机选择一个
         blueprint.set_attribute('role_name', self.actor_role_name)
+
+        # 配置车辆物理属性
         if blueprint.has_attribute('terramechanics'):
             blueprint.set_attribute('terramechanics', 'true')
+
+        # 随机化车辆外观
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
+
+        # 随机化驾驶员ID
         if blueprint.has_attribute('driver_id'):
             driver_id = random.choice(blueprint.get_attribute('driver_id').recommended_values)
             blueprint.set_attribute('driver_id', driver_id)
+
+        #设置车辆为无敌模式
         if blueprint.has_attribute('is_invincible'):
             blueprint.set_attribute('is_invincible', 'true')
         # set the max speed
@@ -294,7 +307,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         # Spawn the player.
         if self.player is not None:
             spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
+            spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
             self.destroy()
@@ -381,16 +394,16 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             pass
 
     def tick(self, clock):
-        self.hud.tick(self, clock)
-
+        self.hud.tick(self, clock) # 调用HUD的tick方法更新信息
+    
     def render(self, display):
-        self.camera_manager.render(display)
-        self.hud.render(display)
+        self.camera_manager.render(display) # 渲染相机画面
+        self.hud.render(display)  # 渲染HUD界面
 
     def destroy_sensors(self):
-        self.camera_manager.sensor.destroy()
-        self.camera_manager.sensor = None
-        self.camera_manager.index = None
+        self.camera_manager.sensor.destroy() # 销毁相机传感器
+        self.camera_manager.sensor = None # 清空传感器引用
+        self.camera_manager.index = None # 重置相机索引
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
@@ -445,14 +458,20 @@ class KeyboardControl(object):
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
 
     def parse_events(self, client, world, clock, sync_mode):
+        
+        # 初始化车辆灯光状态
         if isinstance(self._control, carla.VehicleControl):
             current_lights = self._lights
+
+        # 遍历所有PyGame事件
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
             elif event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+
+                # 重置场景
                 elif event.key == K_BACKSPACE:
                     if self._autopilot_enabled:
                         world.player.set_autopilot(False)
@@ -461,30 +480,30 @@ class KeyboardControl(object):
                     else:
                         world.restart()
                 elif event.key == K_F1:
-                    world.hud.toggle_info()
+                    world.hud.toggle_info() # 切换HUD信息显示
                 elif event.key == K_v and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_map_layer(reverse=True)
+                    world.next_map_layer(reverse=True) # 反向切换地图图层
                 elif event.key == K_v:
-                    world.next_map_layer()
+                    world.next_map_layer()  # 切换地图图层
                 elif event.key == K_b and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.load_map_layer(unload=True)
+                    world.load_map_layer(unload=True)  # 卸载地图图层
                 elif event.key == K_b:
-                    world.load_map_layer()
+                    world.load_map_layer() # 加载地图图层
                 elif event.key == K_h or (event.key == K_SLASH and pygame.key.get_mods() & KMOD_SHIFT):
-                    world.hud.help.toggle()
+                    world.hud.help.toggle() # 切换帮助信息
                 elif event.key == K_TAB:
-                    world.camera_manager.toggle_camera()
+                    world.camera_manager.toggle_camera() # 切换相机视角
                 elif event.key == K_c and pygame.key.get_mods() & KMOD_SHIFT:
-                    world.next_weather(reverse=True)
+                    world.next_weather(reverse=True) # 反向切换天气
                 elif event.key == K_c:
-                    world.next_weather()
+                    world.next_weather() # 切换天气
                 elif event.key == K_g:
-                    world.toggle_radar()
+                    world.toggle_radar() # 切换雷达显示
                 elif event.key == K_BACKQUOTE:
                     world.camera_manager.next_sensor()
                 elif event.key == K_n:
-                    world.camera_manager.next_sensor()
-                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL):
+                    world.camera_manager.next_sensor() # 切换传感器
+                elif event.key == K_w and (pygame.key.get_mods() & KMOD_CTRL): # 切换恒定速度模式
                     if world.constant_velocity_enabled:
                         world.player.disable_constant_velocity()
                         world.constant_velocity_enabled = False
@@ -748,6 +767,7 @@ class KeyboardControl(object):
 
 
 class HUD(object):
+        
     def __init__(self, width, height):
         """
         初始化HUD（平视显示器）类。
@@ -794,21 +814,26 @@ class HUD(object):
 
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
+        # 如果不显示HUD信息则直接返回
         if not self._show_info:
             return
-        t = world.player.get_transform()
-        v = world.player.get_velocity()
-        c = world.player.get_control()
+        t = world.player.get_transform()# 获取玩家车辆的当前变换信息
+        v = world.player.get_velocity()# 获取车辆速度
+        c = world.player.get_control()# 获取玩家车辆的控制输入
+        # 处理罗盘数据获取基本方位
         compass = world.imu_sensor.compass
-        heading = 'N' if compass > 270.5 or compass < 89.5 else ''
+        heading = 'N' if compass > 270.5 or compass < 89.5 else ''#一种简易方向判断逻辑
         heading += 'S' if 90.5 < compass < 269.5 else ''
         heading += 'E' if 0.5 < compass < 179.5 else ''
         heading += 'W' if 180.5 < compass < 359.5 else ''
+        # 获取碰撞历史数据
         colhist = world.collision_sensor.get_collision_history()
+        # 提取最近200帧的碰撞强度数据
         collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
+        # 归一化碰撞数据(缩放到0-1范围)
         max_col = max(1.0, max(collision))
         collision = [x / max_col for x in collision]
-        vehicles = world.world.get_actors().filter('vehicle.*')
+        vehicles = world.world.get_actors().filter('vehicle.*')# 获取世界中的所有车辆
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
             'Client:  % 16.0f FPS' % clock.get_fps(),
@@ -880,23 +905,31 @@ class HUD(object):
         # 显示红色错误提示
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
+    # 将HUD信息渲染到指定显示表面
     def render(self, display):
         if self._show_info:
+            # 创建一个半透明的信息背景表面 (宽度220，高度与HUD相同)
             info_surface = pygame.Surface((220, self.dim[1]))
-            info_surface.set_alpha(100)
-            display.blit(info_surface, (0, 0))
+            info_surface.set_alpha(100)# 设置透明度为100
+            display.blit(info_surface, (0, 0))# 将背景绘制到显示表面左上角
             v_offset = 4
             bar_h_offset = 100
             bar_width = 106
+            
+            # 遍历所有信息文本项
             for item in self._info_text:
                 if v_offset + 18 > self.dim[1]:
                     break
+                    
+                # 处理列表类型项
                 if isinstance(item, list):
                     if len(item) > 1:
                         points = [(x + 8, v_offset + 8 + (1.0 - y) * 30) for x, y in enumerate(item)]
                         pygame.draw.lines(display, (255, 136, 0), False, points, 2)
                     item = None
                     v_offset += 18
+
+                # 处理元组类型项
                 elif isinstance(item, tuple):
                     if isinstance(item[1], bool):
                         rect = pygame.Rect((bar_h_offset, v_offset + 8), (6, 6))
@@ -910,10 +943,10 @@ class HUD(object):
                         else:
                             rect = pygame.Rect((bar_h_offset, v_offset + 8), (f * bar_width, 6))
                         pygame.draw.rect(display, (255, 255, 255), rect)
-                    item = item[0]
+                    item = item[0] # 提取元组中的文本内容
                 if item:  # At this point has to be a str.
-                    surface = self._font_mono.render(item, True, (255, 255, 255))
-                    display.blit(surface, (8, v_offset))
+                    surface = self._font_mono.render(item, True, (255, 255, 255))# 使用等宽字体渲染白色文本
+                    display.blit(surface, (8, v_offset))# 将文本绘制到显示表面 (左侧8像素偏移)
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
@@ -925,27 +958,68 @@ class HUD(object):
 
 
 class FadingText(object):
+    """
+       用于显示渐隐文本的类。
+
+       该类用于在屏幕上显示一段文本，并在指定的时间内逐渐淡出。
+       主要功能包括：
+       - 初始化文本的字体、尺寸和位置。
+       - 设置文本内容、颜色和显示时长。
+       - 每帧更新文本的透明度，实现渐隐效果。
+       - 将文本渲染到指定的显示表面上。
+    """
     def __init__(self, font, dim, pos):
-        self.font = font
-        self.dim = dim
-        self.pos = pos
-        self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        """
+        初始化渐隐文本对象。
+
+        参数:
+        - font: 字体对象，用于渲染文本。
+        - dim: 文本表面的尺寸 (宽度, 高度)。
+        - pos: 文本在屏幕上的位置 (x, y)。
+        """
+        self.font = font       # 字体对象
+        self.dim = dim         # 文本表面的尺寸
+        self.pos = pos         # 文本在屏幕上的位置
+        self.seconds_left = 0  # 剩余显示时间（秒）
+        self.surface = pygame.Surface(self.dim)  # 创建一个与指定尺寸匹配的表面
 
     def set_text(self, text, color=(255, 255, 255), seconds=2.0):
-        text_texture = self.font.render(text, True, color)
-        self.surface = pygame.Surface(self.dim)
-        self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
+        """
+        设置要显示的文本内容、颜色和显示时长。
+
+        参数:
+        - text: 要显示的文本字符串。
+        - color: 文本颜色，默认为白色 (255, 255, 255)。
+        - seconds: 文本显示的时长，默认为2秒。
+        """
+        text_texture = self.font.render(text, True, color)  # 渲染文本到纹理
+        self.surface = pygame.Surface(self.dim)             # 创建一个新的表面
+        self.seconds_left = seconds                         # 设置剩余显示时间
+        self.surface.fill((0, 0, 0, 0))                     # 用透明黑色填充表面
+        self.surface.blit(text_texture, (10, 11))           # 将文本纹理绘制到表面，偏移 (10, 11)
 
     def tick(self, _, clock):
-        delta_seconds = 1e-3 * clock.get_time()
-        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
+        """
+        更新渐隐效果。
+
+        每帧调用此方法以减少剩余显示时间，并根据剩余时间调整文本的透明度。
+
+        参数:
+        - _: 未使用的参数（占位符）。
+        - clock: 时钟对象，用于获取时间间隔。
+        """
+        delta_seconds = 1e-3 * clock.get_time()                          # 获取自上次调用以来的时间（秒）
+        self.seconds_left = max(0.0, self.seconds_left - delta_seconds)  # 减少剩余时间
+        self.surface.set_alpha(500.0 * self.seconds_left)                # 根据剩余时间调整透明度
 
     def render(self, display):
-        display.blit(self.surface, self.pos)
+        """
+        将渐隐文本渲染到指定的显示表面上。
+
+        参数:
+        - display: 显示表面，用于绘制文本。
+        """
+        display.blit(self.surface, self.pos)  # 将文本表面绘制到指定位置
 
 
 # ==============================================================================
@@ -1134,9 +1208,15 @@ class RadarSensor(object):
         self.velocity_range = 7.5 # m/s
         world = self._parent.get_world()
         self.debug = world.debug
+        
+        # 从蓝图库中查找雷达传感器蓝图
         bp = world.get_blueprint_library().find('sensor.other.radar')
+        
+        # 设置雷达属性
         bp.set_attribute('horizontal_fov', str(35))
         bp.set_attribute('vertical_fov', str(20))
+
+        # 在世界中生成雷达传感器实例
         self.sensor = world.spawn_actor(
             bp,
             carla.Transform(
@@ -1146,7 +1226,7 @@ class RadarSensor(object):
         # We need a weak reference to self to avoid circular reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(
-            lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))
+            lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))# 使用lambda表达式传递弱引用和雷达数据
         
 #定义了一个雷达传感器的回调函数 _Radar_callback，用于处理和可视化 Carla 模拟器中雷达数据
     @staticmethod
@@ -1201,8 +1281,9 @@ class CameraManager(object):
         bound_x = 0.5 + self._parent.bounding_box.extent.x
         bound_y = 0.5 + self._parent.bounding_box.extent.y
         bound_z = 0.5 + self._parent.bounding_box.extent.z
-        Attachment = carla.AttachmentType
+        Attachment = carla.AttachmentType # 导入CARLA的附件类型枚举
 
+        # 判断父级actor是否为行人
         if not self._parent.type_id.startswith("walker.pedestrian"):
             self._camera_transforms = [
                 (carla.Transform(carla.Location(x=-2.0*bound_x, y=+0.0*bound_y, z=2.0*bound_z), carla.Rotation(pitch=8.0)), Attachment.SpringArmGhost),
@@ -1218,7 +1299,10 @@ class CameraManager(object):
                 (carla.Transform(carla.Location(x=-4.0, z=2.0), carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
                 (carla.Transform(carla.Location(x=0, y=-2.5, z=-0.0), carla.Rotation(yaw=90.0)), Attachment.Rigid)]
 
+        # 初始化当前传感器变换索引
         self.transform_index = 1
+        
+        # 可用的传感器配置列表
         self.sensors = [
             ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],
             ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],
@@ -1239,9 +1323,15 @@ class CameraManager(object):
             ['sensor.camera.normals', cc.Raw, 'Camera Normals', {}],
         ]
         world = self._parent.get_world()
+        
+        # 获取世界的蓝图库
         bp_library = world.get_blueprint_library()
+
+        # 遍历之前定义的传感器配置列表
         for item in self.sensors:
             bp = bp_library.find(item[0])
+            
+            # 判断是否为摄像头类传感器
             if item[0].startswith('sensor.camera'):
                 bp.set_attribute('image_size_x', str(hud.dim[0]))
                 bp.set_attribute('image_size_y', str(hud.dim[1]))
@@ -1249,6 +1339,8 @@ class CameraManager(object):
                     bp.set_attribute('gamma', str(gamma_correction))
                 for attr_name, attr_value in item[3].items():
                     bp.set_attribute(attr_name, attr_value)
+
+            # 判断是否为激光雷达类传感器
             elif item[0].startswith('sensor.lidar'):
                 self.lidar_range = 50
 
@@ -1297,8 +1389,9 @@ class CameraManager(object):
             display.blit(self.surface, (0, 0))
 
     @staticmethod
+    # 解析和处理来自CARLA各种传感器的图像数据
     def _parse_image(weak_self, image):
-        self = weak_self()
+        self = weak_self() # 从弱引用中获取实际对象
         if not self:
             return
         if self.sensors[self.index][0].startswith('sensor.lidar'):
@@ -1314,7 +1407,7 @@ class CameraManager(object):
             lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
             lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
             self.surface = pygame.surfarray.make_surface(lidar_img)
-        elif self.sensors[self.index][0].startswith('sensor.camera.dvs'):
+        elif self.sensors[self.index][0].startswith('sensor.camera.dvs'):# 处理动态视觉传感器(DVS)事件数据
             # Example of converting the raw_data from a carla.DVSEventArray
             # sensor into a NumPy array and using it as an image
             dvs_events = np.frombuffer(image.raw_data, dtype=np.dtype([
@@ -1323,7 +1416,7 @@ class CameraManager(object):
             # Blue is positive, red is negative
             dvs_img[dvs_events[:]['y'], dvs_events[:]['x'], dvs_events[:]['pol'] * 2] = 255
             self.surface = pygame.surfarray.make_surface(dvs_img.swapaxes(0, 1))
-        elif self.sensors[self.index][0].startswith('sensor.camera.optical_flow'):
+        elif self.sensors[self.index][0].startswith('sensor.camera.optical_flow'):# 处理光流数据
             image = image.get_color_coded_flow()
             array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
             array = np.reshape(array, (image.height, image.width, 4))
@@ -1425,7 +1518,7 @@ def game_loop(args):
             sim_world.apply_settings(original_settings)
 
         if (world and world.recording_enabled):
-            client.stop_recorder()
+            client.stop_recorder() # 如果世界对象存在且启用了录制功能，则停止录制
 
         if world is not None:
             world.destroy()
@@ -1441,69 +1534,90 @@ def game_loop(args):
 def main():
     argparser = argparse.ArgumentParser(
         description='CARLA Manual Control Client')
+
+    # 添加调试参数
     argparser.add_argument(
         '-v', '--verbose',
         action='store_true',
         dest='debug',
         help='print debug information')
+    
+    # 添加服务器主机IP参数
     argparser.add_argument(
         '--host',
         metavar='H',
         default='127.0.0.1',
         help='IP of the host server (default: 127.0.0.1)')
+
+    # 添加端口参数
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
         default=2000,
         type=int,
         help='TCP port to listen to (default: 2000)')
+
+    # 添加自动驾驶模式参数
     argparser.add_argument(
         '-a', '--autopilot',
         action='store_true',
         help='enable autopilot')
+
+    # 添加分辨率参数
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
         default='1280x720',
         help='window resolution (default: 1280x720)')
+
+    # 添加角色过滤器参数
     argparser.add_argument(
         '--filter',
         metavar='PATTERN',
-        default='vehicle.*',
+        default='vehicle.*',  # 默认匹配所有车辆
         help='actor filter (default: "vehicle.*")')
+
+    # 添加角色生成版本参数
     argparser.add_argument(
         '--generation',
         metavar='G',
         default='2',
         help='restrict to certain actor generation (values: "1","2","All" - default: "2")')
+
+    # 添加角色名称参数
     argparser.add_argument(
         '--rolename',
         metavar='NAME',
         default='hero',
         help='actor role name (default: "hero")')
+
+    # 添加伽马校正参数
     argparser.add_argument(
         '--gamma',
         default=2.2,
         type=float,
         help='Gamma correction of the camera (default: 2.2)')
+
+    # 添加同步模式参数
     argparser.add_argument(
         '--sync',
         action='store_true',
         help='Activate synchronous mode execution')
     args = argparser.parse_args()
 
+    # 从分辨率参数中提取宽度和高度
     args.width, args.height = [int(x) for x in args.res.split('x')]
 
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    log_level = logging.DEBUG if args.debug else logging.INFO  # 根据调试参数设置日志级别
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level) # 配置基础日志格式：显示日志级别和消息内容
 
-    logging.info('listening to server %s:%s', args.host, args.port)
+    logging.info('listening to server %s:%s', args.host, args.port) # 记录日志信息，显示正在连接的服务器地址和端口
 
     print(__doc__)
 
     try:
 
-        game_loop(args)
+        game_loop(args) # 进入主游戏循环，传入解析后的参数
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')

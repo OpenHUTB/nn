@@ -26,6 +26,7 @@ def softmax(x):
 
     # 减去最大值以提高数值稳定性
     x_max = tf.reduce_max(x, axis=-1, keepdims=True)
+    # 计算 x - x_max 的指数
     exp_x = tf.exp(x - x_max)
 
     # 计算softmax，防止除零错误
@@ -94,7 +95,8 @@ label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
 def sigmoid_ce(x, label):
     ##########
     '''实现 sigmoid 交叉熵loss函数， 不允许用tf自带的sigmoid_cross_entropy函数'''
-    ##########
+    #确保输入形状匹配
+    tf.debugging.assert_shapes([(x,('N',)), (label,('N',))])
     # clip 避免 log(0) 的数值不稳定问题
     x = tf.clip_by_value(x, 1e-10, 1.0 - 1e-10)
     # 计算二分类交叉熵损失
