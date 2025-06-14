@@ -6,7 +6,7 @@
 import numpy as np                    # 将 numpy 库命名为 np
 import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
-
+# 原本的第七行，把它删掉，原因是删除冗余导入
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 print("第二题：\n")
 # 创建一个一维NumPy数组，存储整数类型的数值
