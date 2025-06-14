@@ -35,7 +35,7 @@ def compute_accuracy(v_xs, v_ys):
     # 计算准确率
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
+    result = sess.run(accuracy, feed_dict={xs: v_xs, keep_prob: 1})
     return result
 
 

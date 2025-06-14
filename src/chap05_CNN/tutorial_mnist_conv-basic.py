@@ -213,8 +213,7 @@ def train(epoch, model, optimizer, ds):
         # 每500个batch打印一次训练进度
         if step % 500 == 0:  # 使用取模运算控制打印频率
             # 将Tensor转换为numpy值打印
-            print('epoch', epoch, ': loss', loss.numpy(),
-                  '; accuracy', accuracy.numpy())
+            print(f'epoch, {epoch}: loss { loss.numpy():.4f};accuracy{accuracy.numpy():.4f}')
     
     # 返回最后一个batch的loss和accuracy（注意不是epoch平均值）
     return loss, accuracy

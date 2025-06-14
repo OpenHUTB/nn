@@ -131,7 +131,7 @@ def train(cnn):
         # 遍历训练数据加载器
         for step, (x_, y_) in enumerate(train_loader):
             # 将数据转换为Variable（自动求导需要）
-            x, y = Variable(x_), Variable(y_)
+            x, y = x_, y_
             output = cnn(x)                         # 前向传播得到预测结果
             loss = loss_func(output, y)             # 计算损失
             optimizer.zero_grad(set_to_none=True)   # 清空模型参数的梯度缓存，set_to_none=True可减少内存占用
