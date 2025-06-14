@@ -145,6 +145,9 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :param y_batch: 标签
     :return: 当前批次的损失与准确率
     """
+    # 检查模型是否有可训练参数
+    if not hasattr(model, 'trainable_variables') or not model.trainable_variables:
+        raise ValueError("模型没有可训练参数")
     # 使用 tf.GradientTape() 上下文管理器记录前向传播过程，以便后续自动计算梯度
     with tf.GradientTape() as tape:
         # 前向传播：计算模型对输入批次的预测

@@ -278,5 +278,5 @@ if __name__ == '__main__':
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
 
-   from IPython.display import display
-display(HTML(anim.to_html5_video()))# 将动画转换为HTML5视频并显示
+   from IPython.display import HTML
+   HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
