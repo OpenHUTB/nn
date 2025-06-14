@@ -121,6 +121,7 @@ if __name__ == '__main__':
     t_test = data_test[:, 2]     # 测试标签
     t_test_pred = svm.predict(x_test)  # 预测测试集标签
 
+   
     # 计算并打印准确率
     acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
     acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
