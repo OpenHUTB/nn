@@ -75,13 +75,17 @@ class RBM:
         return 1.0 / (1 + np.exp(-x))  # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
 
     def _sample_binary(self, probs):
-        """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）
-           伯努利分布是二项分布的一种特殊情况，输出只有两种可能的值（0或1）。
-           通过给定的概率值probs，决定每次采样的输出：
-           - 如果probs为0，则始终输出0；
-           - 如果probs为1，则始终输出1；
-           - 如果probs介于0和1之间，则按照概率生成0或1。
-        """
+        """伯努利采样生成二进制值
+    
+    Args:
+        probs (ndarray): 概率值数组，范围[0,1]
+        
+    Returns:
+        ndarray: 采样结果（0或1）
+        
+    Raises:
+        ValueError: 概率值超出[0,1]范围时抛出
+    """
         # 确保probs的取值在[0, 1]范围内
         if np.any(probs < 0) or np.any(probs > 1):
             raise ValueError("概率值probs应在0和1之间。")
