@@ -110,7 +110,7 @@ def train_one_step(model, optimizer, x, y):
         optimizer: 优化器实例
         x: 输入数据
         y: 标签数据
-
+g
     返回:
         loss: 训练损失
         accuracy: 训练准确率
@@ -123,7 +123,7 @@ def train_one_step(model, optimizer, x, y):
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
     grads = tape.gradient(loss, trainable_vars)
 
-    # 更新参数（使用固定学习率）
+    # 更新参数（使用优化器，Adam会自动调整学习率）
     # 使用优化器更新参数
     optimizer.apply_gradients(zip(grads, trainable_vars))
 
