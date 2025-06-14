@@ -1,13 +1,4 @@
-# 标准库导入
-import sys
-
-# 第三方库导入
-from gym.envs.registration import (
-    registry,
-    register,
-    make,
-    spec
-)  # 导入Gym环境注册核心模块，用于创建和管理强化学习环境
+from gym.envs.registration import registry, register, make, spec  # 导入Gym环境注册核心模块，用于创建和管理强化学习环境
 
 ### 一、算法类环境（Algorithmic Environments）
 # 设计用于测试序列处理、记忆能力和模式识别算法，适合研究长短期记忆机制
@@ -16,7 +7,7 @@ from gym.envs.registration import (
 # 1. 复制任务：智能体需记忆任意输入序列并完整复现
 register(
     id='Copy-v0',             # 环境唯一标识，通过gym.make('Copy-v0')调用
-    entry_point='gym.envs.algorithmic:CopyEnv',  # 环境类的路径（模块:类名）
+    entry_point='gym.envs.algorithmic:CopyEnv',  #环境库初始化，定义模块中的具体类名。
     max_episode_steps=200,    # 单个episode的最大步数限制，防止无限循环
     reward_threshold=25.0,    # 平均奖励达到此值视为任务成功
 )
