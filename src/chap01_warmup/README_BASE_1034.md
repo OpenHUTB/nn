@@ -43,7 +43,7 @@ print("b(1,1):", b[1, 1])
 
 #### 4. 创建全零矩阵、全一矩阵、单位矩阵和随机矩阵
 ```python
-a = np.zeros((3, 3), dtype=int)
+a = np.zeros((3, 3), dtype = int)
 b = np.ones((4, 5))
 c = np.eye(4)
 d = np.random.rand(3, 2)
