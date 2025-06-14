@@ -265,7 +265,7 @@ if __name__ == '__main__':
     # 创建FuncAnimation对象
     anim = animation.FuncAnimation(
         f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
-        frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
+        frames=len(animation_frames), interval=50, blit=False, repeat=True # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
 
    from IPython.display import display
