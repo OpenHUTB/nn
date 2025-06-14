@@ -8,7 +8,7 @@ import sys  # 导入系统相关模块，用于获取Python版本、操作路径
 class RBM:
     """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
 
-    def __init__(self, n_hidden=2, n_observe=784):
+    def __init__(self, n_hidden = 2, n_observe = 784):
         """
         初始化受限玻尔兹曼机（RBM）模型参数
 
@@ -235,10 +235,10 @@ if __name__ == '__main__':
     rbm = RBM(2, img_size)
    
     # 训练RBM
-    errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+    errors = rbm.train(mnist, learning_rate = 0.1, epochs = 10, batch_size = 100)
    
     # 生成并可视化样本
-    samples = rbm.sample(n_samples=5, gibbs_steps=1000)
+    samples = rbm.sample(n_samples = 5, gibbs_steps = 1000)
    
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
