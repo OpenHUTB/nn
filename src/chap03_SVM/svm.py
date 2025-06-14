@@ -1,4 +1,4 @@
-
+#导入numpy库，导入os模块
 import numpy as np
 import os
 
@@ -80,7 +80,6 @@ class SVM:
             # 梯度下降更新参数
             self.w -= self.learning_rate * dw # 权重更新：w = w - η*dw/dw
             self.b -= self.learning_rate * db # 偏置更新：b = b - η*db/db
-            
             # 训练逻辑总结：
             # - 对误分类样本，向正确方向调整超平面
             # - 对间隔内样本，微调超平面使其远离
