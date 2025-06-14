@@ -4,9 +4,9 @@
 
 # 1. 导入 numpy 库
 import numpy as np                    # 将 numpy 库命名为 np
+import matplotlib.pyplot
 import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
 # import 放一起代码美观
-# 原本的第七行，把它删掉，原因是删除冗余导入
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 print("第二题：\n")
 # 创建一个一维NumPy数组，存储整数类型的数值
@@ -37,7 +37,7 @@ b = np.ones((4, 5))
 # 单位矩阵，4x4(对角线为1，其余为0)
 c = np.eye(4)
 # 随机数矩阵，3x2：设置随机种子（42）确保结果可复现，生成0-1之间的浮点数
-np.random.seed(42)  #  固定随机种子，使随机结果可复现
+np.random.seed(42)  # 固定随机种子，使随机结果可复现
 d = np.random.random((3, 2))# 生成一个形状为(3, 2)的NumPy数组，其中每个元素都是0到1之间的随机浮点数
 
 # 5. 建立一个数组 a,(值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1) 打印 a; (2) 输出数组中下标为 (2,3),(0,0) 这两个元素的值
