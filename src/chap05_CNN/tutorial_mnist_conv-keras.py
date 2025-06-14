@@ -12,7 +12,9 @@ from tensorflow.keras.layers import (
     Flatten, MaxPooling2D
 )
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'# 设置环境变量，控制 TensorFlow 的日志输出等级
+                                        # 'TF_CPP_MIN_LOG_LEVEL' 可以用来过滤不必要的日志信息，提升可读性
+                                        # 值为 '2' 表示屏蔽 Info 和 Warning 级别的日志
 
 
 def mnist_dataset():
