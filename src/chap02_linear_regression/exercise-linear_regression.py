@@ -258,8 +258,7 @@ def main(x_train, y_train, use_gradient_descent=False):
 def evaluate(ys, ys_pred):
     """评估模型。"""
     # 计算预测值与真实值的标准差
-    std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std
+    return np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
 
 
 # 程序主入口（建议不要改动以下函数的接口）
