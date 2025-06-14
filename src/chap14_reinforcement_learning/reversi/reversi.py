@@ -300,6 +300,7 @@ class ReversiEnv(gym.Env):
                     return True
         return False
 
+    # 检查在指定位置落子是否合法
     @staticmethod
     def valid_place(board, action, player_color):
         coords = ReversiEnv.action_to_coordinate(board, action)
