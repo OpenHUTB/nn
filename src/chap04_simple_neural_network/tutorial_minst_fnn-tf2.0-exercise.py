@@ -38,11 +38,11 @@ class MyModel:
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
         # 定义第一层的权重矩阵 ; 权重矩阵 W1 的形状为 [784, 128]，初始值为均值为 0，标准差为 0.1 的正态分布随机数
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev = 0.1))
         # 定义第一层的偏置向量 ; 偏置向量 b1 的形状为 [128]，初始化为全 0
         self.b1 = tf.Variable(tf.zeros([128]))
         # 定义第二层的权重矩阵
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev = 0.1))
         # 定义第二层的偏置向量
         self.b2 = tf.Variable(tf.zeros([10]))
         

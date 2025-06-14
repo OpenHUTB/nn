@@ -148,7 +148,6 @@ class Softmax:
         tmp = -tmp + grad_y * s # 对变量 tmp 进行更新操作
         return tmp
 
-
 # 定义 Log 层（计算 log softmax ，用于交叉熵）
 class Log:
     '''
@@ -270,7 +269,7 @@ class Log:
 
 # In[6]:
 
-x = np.random.normal(size=[5, 6])   # 示例：生成 5 个样本，每个样本 6 维特征
+x = np.random.normal(size = [5, 6])   # 示例：生成 5 个样本，每个样本 6 维特征
 
 # 初始化网络参数
 label = np.zeros_like(x)            # 创建了一个与 x 形状相同的全零标签矩阵
@@ -284,9 +283,9 @@ label[4, 0] = 1
 # 重新生成输入数据（覆盖之前的x，保持代码块独立性）
 
 
-x = np.random.normal(size=[5, 6])   # 5 个样本，每个样本 6 维特征
-W1 = np.random.normal(size=[6, 5])  # 第一层权重 (6→5)
-W2 = np.random.normal(size=[5, 6])  # 第二层权重 (5→6)
+x = np.random.normal(size = [5, 6])   # 5 个样本，每个样本 6 维特征
+W1 = np.random.normal(size = [6, 5])  # 第一层权重 (6→5)
+W2 = np.random.normal(size = [5, 6])  # 第二层权重 (5→6)
 
 mul_h1 = Matmul()                   # 第一层矩阵乘法
 mul_h2 = Matmul()                   # 第二层矩阵乘法
@@ -344,8 +343,8 @@ class myModel:
     def __init__(self):# 初始化模型参数，使用随机正态分布初始化权重矩阵
 
         # 权重矩阵包含偏置项，通过增加输入特征维度实现
-        self.W1 = np.random.normal(size=[28 * 28 + 1, 100])  # 输入层到隐藏层，增加偏置项，W1: 连接输入层(784+1)和隐藏层(100)的权重矩阵
-        self.W2 = np.random.normal(size=[100, 10])           # 输入层到隐藏层，增加偏置项，W2: 连接隐藏层(100)和输出层(10)的权重矩阵
+        self.W1 = np.random.normal(size = [28 * 28 + 1, 100])  # 输入层到隐藏层，增加偏置项，W1: 连接输入层(784+1)和隐藏层(100)的权重矩阵
+        self.W2 = np.random.normal(size = [100, 10])           # 输入层到隐藏层，增加偏置项，W2: 连接隐藏层(100)和输出层(10)的权重矩阵
         # 初始化各层操作对象
         self.mul_h1 = Matmul()      # 第一个矩阵乘法层(输入到隐藏层)
         self.mul_h2 = Matmul()      # 第二个矩阵乘法层(隐藏层到输出层)
@@ -355,7 +354,7 @@ class myModel:
 
     def forward(self, x):
         x = x.reshape(-1, 28 * 28)                 # 展平图像
-        bias = np.ones(shape=[x.shape[0], 1])      # 添加偏置项
+        bias = np.ones(shape = [x.shape[0], 1])      # 添加偏置项
         x = np.concatenate([x, bias], axis=1)      # 将偏置向量添加到输入数据中
         
         # 第一层计算：输入层 -> 隐藏层
@@ -402,7 +401,7 @@ def compute_loss(log_prob, labels):
     数学公式:
         loss = - (1/N) * ΣΣ y_ij * log(p_ij)
     """
-    return -np.mean(np.sum(labels * log_prob, axis=1))
+    return -np.mean(np.sum(labels * log_prob, axis = 1))
 
 
 def compute_accuracy(log_prob, labels):
@@ -418,10 +417,10 @@ def compute_accuracy(log_prob, labels):
     """
     
     # 获取每个样本的预测类别编号（取对数概率最大的类别作为预测）
-    predictions = np.argmax(log_prob, axis=1)
+    predictions = np.argmax(log_prob, axis = 1)
     
     # 获取真实标签对应的类别编号（如果是 one-hot 编码，也用 argmax 转换为类别编号）
-    truth = np.argmax(labels, axis=1)
+    truth = np.argmax(labels, axis = 1)
     
     # 比较预测结果与真实标签，计算正确率（布尔值数组的均值即为准确率）
 
