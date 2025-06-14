@@ -71,6 +71,7 @@ class ReversiEnv(gym.Env):
 
         self._seed()
 
+    # 设置环境的随机数种子
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
 
