@@ -434,4 +434,4 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
 # 生成并打印诗歌
-print(''.join(gen_sentence()))
+print(''.join(gen_sentence(model, word2id, id2word)))
