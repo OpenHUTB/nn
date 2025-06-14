@@ -11,7 +11,8 @@ from torch.autograd import Variable
 import torch.utils.data as Data
 import torchvision 
 
-# 设置超参数
+# 设置超参数。超参数（Hyperparameters）是机器学习模型在训练前需要手动设定（或通过算法优化）的配置参数，
+# 它们不直接从数据中学习，而是控制模型的整体行为和性能。
 learning_rate = 1e-4  #  学习率：控制参数更新步长
 keep_prob_rate = 0.7  #  Dropout保留神经元的比例：防止过拟合
 max_epoch = 3         # 训练的总轮数
