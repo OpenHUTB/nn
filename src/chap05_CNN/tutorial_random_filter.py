@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # coding: utf-8
 # ## 随机 filter
@@ -18,7 +19,7 @@ import numpy as np # 数值计算库
 class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自定义卷积神经网络模型
     def __init__(self):
         super(MyConvModel, self).__init__() # 调用父类的构造函数
-        self.l1_conv = Conv2D(filters=3, kernel_size=(3, 3), padding='same')
+        self.l1_conv = Conv2D(filters=3, kernel_size=(3, 3), padding = 'same')
 # 使用 TensorFlow 的 tf.function 装饰器，将函数编译为 TensorFlow 图执行，提高性能   
     @tf.function
     def call(self, x):
@@ -51,3 +52,4 @@ pylab.subplot(2, 2, 2); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 0])    
 pylab.subplot(2, 2, 3); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 1])    # 第三个子图：显示输出图像的第二个通道（feature map）
 pylab.subplot(2, 2, 4); pylab.axis('off'); pylab.imshow(img_out[0, :, :, 2])    # 第四个子图：显示输出图像的第三个通道（feature map）
 pylab.show()                                                                    # 显示所有绘制的图像
+

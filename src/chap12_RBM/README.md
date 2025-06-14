@@ -1,3 +1,4 @@
+
 # 受限玻尔兹曼机
 
 
@@ -94,3 +95,4 @@ plt.show()
 
 * Hinton, G. E. (2002). "Training products of experts by minimizing contrastive divergence"
 * MNIST 数据集：[http://yann.lecun.com/exdb/mnist/](http://yann.lecun.com/exdb/mnist/)
+

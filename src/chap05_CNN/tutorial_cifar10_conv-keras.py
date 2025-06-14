@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # coding: utf-8
 # In[ ]:
@@ -71,7 +72,7 @@ def bias_variable(shape):
     return tf.Variable(initial)#将常量张量 initial 包装为一个可训练的变量张量
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding='SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -249,3 +250,4 @@ with tf.Session() as sess:
             acc = compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000])
             # 显示当前训练进度和准确率
             print(f"迭代 {i}/{max_epoch}, 测试准确率: {acc:.4f}")
+

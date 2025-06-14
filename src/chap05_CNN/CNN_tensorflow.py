@@ -1,17 +1,21 @@
+
 #!/usr/bin/env python
 # coding: utf-8
 # In[ ]:
+
 #导入TensorFlow库
+
 import tensorflow as tf
 #导入MNIST数据集加载工具
 from tensorflow.examples.tutorials.mnist import input_data
+
 # 使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 
 try:
     # 参数说明：
     # 'MNIST_data' - 数据集存储目录
     # one_hot=True - 将标签转换为one-hot编码格式
-    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+    mnist = input_data.read_data_sets('MNIST_data', one_hot = True)
 except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
@@ -19,6 +23,7 @@ except Exception as e:
 LEARNING_RATE = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
 KEEP_PROB_RATE = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
 MAX_EPOCH = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
+
 
 
 def compute_accuracy(v_xs, v_ys):
@@ -33,20 +38,23 @@ def compute_accuracy(v_xs, v_ys):
         result: 模型的准确率。
     """
     global prediction
+
     # 获取模型预测结果
-    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
+    y_pre = sess.run(prediction, feed_dict = {xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
     correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
     # 计算准确率
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
+
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
 
 def weight_variable(shape):
     """
-    初始化权重变量。使用截断正态分布防止梯度消失或爆炸。
+初始化权重变量。使用截断正态分布防止梯度消失或爆炸。
+
 
     参数:
         shape: 权重的形状。
@@ -55,7 +63,7 @@ def weight_variable(shape):
         tf.Variable: 初始化后的权重变量。
     """
     # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
-    initial = tf.truncated_normal(shape, stddev=0.1)
+    initial = tf.truncated_normal(shape, stddev = 0.1)
     # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
 
@@ -71,11 +79,11 @@ def bias_variable(shape):
         tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
     """
     # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
-    initial = tf.constant(0.1, shape=shape)
+    initial = tf.constant(0.1, shape = shape)
     return tf.Variable(initial)
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding = 'SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -113,6 +121,7 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     
     # 执行卷积操作：使用指定的卷积核W对输入x进行卷积，步长为strides，填充方式为padding
     # SAME填充确保输出尺寸与输入相同，VALID填充则不进行填充
+
     conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
     
     # 添加批归一化以提高训练稳定性
@@ -120,6 +129,7 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     # conv = tf.layers.batch_normalization(conv, training=is_training)
     
     return conv
+
 
 
 def max_pool_2x2(x: tf.Tensor,
@@ -204,6 +214,7 @@ h_pool2 = max_pool_2x2(h_conv2)
 # 全连接层 1：整合卷积层提取的特征
 # 定义全连接层1的权重（W_fc1），维度是 [7*7*64, 1024]：
 # 输入是前一层池化输出展平后的长度（7x7x64=3136），输出是1024个神经元
+
 W_fc1 = weight_variable([7*7*64, 1024])
 
 # 定义全连接层1的偏置（b_fc1），大小为1024，对应输出维度
@@ -212,12 +223,15 @@ b_fc1 = bias_variable([1024])
 # 将上一层池化层的输出展平成一维向量，-1 表示自动计算 batch size
 h_pool2_flat = tf.reshape(h_pool2, [-1, 7*7*64])
 
+
 # 全连接计算 + ReLU激活函数：学习特征之间的复杂关系
 # matmul 矩阵乘法，得到的是一个 [batch_size, 1024] 的激活输出
 h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
 
 # 应用 Dropout 防止过拟合，keep_prob 是保留节点的概率（在 feed_dict 中提供）
+
 # 训练时随机"关闭"30%的神经元，测试时保留所有神经元
+
 h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
 
 
@@ -230,6 +244,7 @@ prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 
 # 使用带logits的交叉熵损失函数，避免数值不稳定
+
 cross_entropy = tf.reduce_mean(
     tf.nn.softmax_cross_entropy_with_logits(
         labels=ys, 
@@ -241,11 +256,13 @@ cross_entropy = tf.reduce_mean(
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy)
 
 
+
 # 创建TensorFlow会话 - 执行计算图的上下文环境
 with tf.Session() as sess:
     # 初始化所有全局变量（权重和偏置）
     init = tf.global_variables_initializer()
     sess.run(init)
+
 
     # 模型训练循环
     for i in range(max_epoch):

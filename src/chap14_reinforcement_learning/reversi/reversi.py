@@ -1,3 +1,4 @@
+
 """
 Game of Reversi
 """
@@ -389,3 +390,4 @@ class ReversiEnv(gym.Env):
             else:
                 return 0
         return 0
+

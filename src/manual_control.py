@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # 参考：https://github.com/marcgpuig/carla_py_clients/blob/master/imu_plot.py
 
@@ -146,8 +147,10 @@ try:
     from pygame.locals import K_EQUALS
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed') # 抛出运行时错误：提示pygame库导入失败
+
     
 # 尝试导入NumPy科学计算库
+
 try:
     import numpy as np
 except ImportError:
@@ -166,7 +169,9 @@ def find_weather_presets():                                                     
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 
+
 def get_actor_display_name(actor, truncate = 250):
+
     """
     格式化actor的类型标识符为易读的显示名称
     参数:
@@ -246,8 +251,10 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.restart()  # 重启函数调用和 Tick 回调注册
         self.world.on_tick(hud.on_world_tick)# 注册HUD的世界tick回调函数，用于每帧更新HUD显示
         self.recording_enabled = False  # 录制与控制相关变量
+
         self.recording_start = 0 # 初始化录音开始时间的标记变量
         self.constant_velocity_enabled = False # 设置类的属性 constant_velocity_enabled 为 False，这个属性用于指示是否启用了“恒定速度”模式
+
         self.show_vehicle_telemetry = False
         self.doors_are_open = False
         self.current_map_layer = 0
@@ -1226,7 +1233,9 @@ class RadarSensor(object):
         # We need a weak reference to self to avoid circular reference.
         weak_self = weakref.ref(self)
         self.sensor.listen(
+
             lambda radar_data: RadarSensor._Radar_callback(weak_self, radar_data))# 使用lambda表达式传递弱引用和雷达数据
+
         
 #定义了一个雷达传感器的回调函数 _Radar_callback，用于处理和可视化 Carla 模拟器中雷达数据
     @staticmethod
@@ -1626,3 +1635,4 @@ def main():
 if __name__ == '__main__':
 
     main()
+

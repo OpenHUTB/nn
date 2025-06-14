@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # coding: utf-8
 
@@ -6,6 +7,7 @@
 # ![attentive seq2seq](./seq2seq-attn.jpg)
 
 # In[19]:
+
 
 
 import numpy as np  # 导入NumPy库
@@ -18,6 +20,7 @@ import sys  # 导入系统相关参数和函数模块
 import tqdm  # 导入tqdm库，用于显示进度条
 import random  # 导入随机数生成模块
 import string  # 导入字符串模块
+
 
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
@@ -45,6 +48,7 @@ def get_batch(batch_size, length):
     dec_x: 解码器输入，包含起始标记，字符转换为索引后的张量
     y: 解码器目标输出，原始序列的逆序，字符转换为索引后的张量
 
+
     数据格式说明:
     - 原始字符串: 如 ['ABCD', 'EFGH'] 长度等于 batch_size
     - 编码器输入 (enc_x): 
@@ -53,6 +57,7 @@ def get_batch(batch_size, length):
         [[0, 1, 2, 3], [0, 5, 6, 7]] 在目标序列前加起始标记(0)并移除最后一个字符
     - 目标输出 (y):
         [[4, 3, 2, 1], [8, 7, 6, 5]] 输入序列的逆序索引
+
     """
     # 生成随机字符串
     batched_examples = [randomString(length) for i in range(batch_size)]
@@ -92,7 +97,7 @@ class mySeq2SeqModel(keras.Model):
         
         # 嵌入层，将字符索引转换为向量表示
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64, 
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape = [None, None])
         
         # 编码器和解码器的RNN单元
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
@@ -102,9 +107,9 @@ class mySeq2SeqModel(keras.Model):
         # return_sequences=True: 返回所有时间步的输出
         # return_state=True: 返回最终状态
         self.encoder = tf.keras.layers.RNN(self.encoder_cell, 
-                                           return_sequences=True, return_state=True)
+                                           return_sequences = True, return_state = True)
         self.decoder = tf.keras.layers.RNN(self.decoder_cell, 
-                                           return_sequences=True, return_state=True)
+                                           return_sequences = True, return_state = True)
         
         # 注意力机制相关的全连接层
         self.dense_attn = tf.keras.layers.Dense(self.hidden)
@@ -144,11 +149,11 @@ class mySeq2SeqModel(keras.Model):
         
         # 双线性注意力: score = dec_out * W * enc_out
         # 这里简化为: score = dec_out * enc_out (通过点积实现)
-        attn_scores = tf.matmul(dec_out_expanded, enc_out_expanded, transpose_b=True)  # [batch_size, dec_seq_len, 1, enc_seq_len]
+        attn_scores = tf.matmul(dec_out_expanded, enc_out_expanded, transpose_b = True)  # [batch_size, dec_seq_len, 1, enc_seq_len]
         attn_scores = tf.squeeze(attn_scores, axis=2)  # [batch_size, dec_seq_len, enc_seq_len]
         
         # 应用softmax获取注意力权重
-        attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, dec_seq_len, enc_seq_len]
+        attn_weights = tf.nn.softmax(attn_scores, axis = -1)  # [batch_size, dec_seq_len, enc_seq_len]
         
         # 计算上下文向量
         context = tf.matmul(attn_weights, enc_out)  # [batch_size, dec_seq_len, hidden]
@@ -201,12 +206,15 @@ class mySeq2SeqModel(keras.Model):
         # 3. 注意力计算
         # 计算当前解码器状态与编码器各时间步输出的相似度
         dec_out_expanded = tf.expand_dims(dec_out, axis=1)  # [batch_size, 1, hidden]
+
         attn_scores = tf.matmul(dec_out_expanded, enc_out, transpose_b=True)  # [batch_size, 1, enc_seq_len]
+
         attn_scores = tf.squeeze(attn_scores, axis=1)  # [batch_size, enc_seq_len]
         
         # 应用softmax获取注意力权重
         attn_weights = tf.nn.softmax(attn_scores, axis=-1)  # [batch_size, enc_seq_len]
         
+
         attn_weights_expanded = tf.expand_dims(attn_weights, axis=1)  # [batch_size, 1, enc_seq_len]
         
         
@@ -214,6 +222,7 @@ class mySeq2SeqModel(keras.Model):
         context = tf.matmul(attn_weights_expanded, enc_out)  # [batch_size, 1, hidden]
         
         context = tf.squeeze(context, axis=1)  # [batch_size, hidden]
+
         
         # 4. 结合上下文向量和解码器输出
         dec_out_with_context = tf.concat([dec_out, context], axis=-1)  # [batch_size, hidden*2]
@@ -265,12 +274,14 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
         loss = compute_loss(logits, y)
 
     # 计算梯度
+
     grads = tape.gradient(loss, model.trainable_variables) # 使用自动微分计算损失函数相对于模型可训练变量的梯度
     
     # 应用梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables)) # 使用优化器应用梯度更新模型的可训练变量
     
     return loss # 返回损失值
+
 
 def train(model, optimizer, seqlen):
     """
@@ -288,6 +299,7 @@ def train(model, optimizer, seqlen):
     accuracy = 0.0
     
     # 训练2000步
+
 for step in range(2000):
     # 获取一个批次的训练数据
     batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
@@ -302,7 +314,6 @@ for step in range(2000):
         
 # 返回最后一次计算的 loss 值（可用于调试或后续处理）
 return loss
-
 
 # # 训练迭代
 
@@ -352,7 +363,7 @@ def sequence_reversal():
         b_sz = tf.shape(init_state[0])[0]
         
         # 初始输入为0(起始标记)
-        cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
+        cur_token = tf.zeros(shape = [b_sz], dtype = tf.int32)
         state = init_state
         collect = []
         
@@ -360,7 +371,7 @@ def sequence_reversal():
         for i in range(steps):
             # 获取下一个token和更新后的状态
             cur_token, state = model.get_next_token(cur_token, state, enc_out)
-            collect.append(tf.expand_dims(cur_token, axis=-1))
+            collect.append(tf.expand_dims(cur_token, axis = -1))
         
         # 将生成的索引转换为字符串
         out = tf.concat(collect, axis=-1).numpy()
@@ -379,7 +390,7 @@ def sequence_reversal():
 
 def is_reverse(seq, rev_seq):
     """检查一个序列是否是另一个序列的逆序"""
-    # 反转字符串 rev_seq 两次，恢复原始顺序
+
     rev_seq_rev = ''.join([i for i in reversed(list(rev_seq))])
     # 比较原始序列 seq 和反转后的 rev_seq_rev 是否相等
     if seq == rev_seq_rev:
@@ -387,9 +398,11 @@ def is_reverse(seq, rev_seq):
     else:
         return False
 # 测试函数功能
+
 # 假设 sequence_reversal() 是一个函数，返回两个序列的列表
 # 使用 zip(*sequence_reversal()) 将两个序列的列表解包并配对
 # 然后对每一对序列调用 is_reverse 函数，检查是否为逆序
+
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))

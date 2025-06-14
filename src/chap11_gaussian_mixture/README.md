@@ -1,3 +1,4 @@
+
 # 混合高斯模型
 
 ## 问题描述：
@@ -114,4 +115,5 @@ python gmm.py
 * PRML《Pattern Recognition and Machine Learning》
 * 《机器学习》周志华
 * [https://scikit-learn.org/stable/modules/mixture.html](https://scikit-learn.org/stable/modules/mixture.html)
+
 

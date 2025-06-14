@@ -1,3 +1,4 @@
+
 # 1. 全连接神经网络
 
 ## 问题描述：
@@ -243,4 +244,5 @@ python tutorial_minst_fnn-tf2.0-exercise.py
 -   **损失和准确率计算**：通过 `compute_loss()` 和 `compute_accuracy()` 函数计算损失和准确率。
 -   **训练步骤**：`train_one_step()` 函数执行一次训练步骤并更新模型参数。
 -   **测试步骤**：`test()` 函数计算测试集上的损失和准确率。
+
 

@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 # coding: utf-8
 # ## 准备数据
@@ -160,3 +161,4 @@ train_ds, test_ds = mnist_dataset()
 model.fit(train_ds, epochs=5)
 # 评估模型，指定测试数据
 model.evaluate(test_ds)
+
