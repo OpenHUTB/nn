@@ -68,7 +68,6 @@ np.random.shuffle(data_set)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
 EPSILON = 1e-12
 
-
 class LogisticRegression():
     def __init__(self):
         # 正则化常见目的：防止过拟合、提高稳定性、降低方差、提高泛化能力
@@ -90,7 +89,6 @@ class LogisticRegression():
         )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
-
     @tf.function
     def __call__(self, inp):
         """
@@ -149,7 +147,6 @@ def compute_loss(pred, label):
     # 返回计算得到的损失值和准确率
     return loss, accuracy
 
-
 @tf.function
 def train_one_step(model, optimizer, x, y):
     # 使用GradientTape记录计算图，以便计算梯度
@@ -164,7 +161,6 @@ def train_one_step(model, optimizer, x, y):
     # 使用优化器更新模型的可训练变量
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
     return loss, accuracy, model.W, model.b
-
 
 if __name__ == '__main__':
    # 实例化逻辑回归模型
@@ -260,7 +256,7 @@ if __name__ == '__main__':
         更新后的图形对象
         """
         # 具体实现 
-        xx = np.arange(10, step=0.1)# 生成x轴数据点，范围0-9.9，步长0.1
+        xx = np.arange(10, step = 0.1)# 生成x轴数据点，范围0-9.9，步长0.1
         a = animation_frames[i][0]  # 从帧数据中提取当前帧的参数，假设animation_frames是一个列表，每个元素包含[a, b, c, loss]四个值
         b = animation_frames[i][1]  # 从帧数据中提取当前帧的参数b（通常表示偏移量或截距）
         c = animation_frames[i][2]  # 从帧数据中提取当前帧的参数c
@@ -275,8 +271,8 @@ if __name__ == '__main__':
         return (line_d,) + (C1_dots,) + (C2_dots,)  # 返回需要更新的对象元组，用于blitting优化
     # 创建FuncAnimation对象
     anim = animation.FuncAnimation(
-        f, animate, init_func=init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
-        frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
+        f, animate, init_func = init, # 要绘制的图形对象，动画更新函数，初始化函数，设置动画初始状态
+        frames = len(animation_frames), interval = 50, blit=True, repeat = False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
 
    from IPython.display import display
