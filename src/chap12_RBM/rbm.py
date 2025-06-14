@@ -121,7 +121,8 @@ class RBM:
         # 开始训练轮数
         for epoch in range(epochs):
             # 打乱数据顺序，提高训练稳定性和泛化能力
-            np.random.shuffle(data_flat) 
+            np.random.shuffle(data_flat)
+            print(f"Epoch {epoch+1}/{epochs}")  # 添加训练进度显示
             
             # 使用小批量梯度下降法
             for i in range(0, n_samples, batch_size): 
