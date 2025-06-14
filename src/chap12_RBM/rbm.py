@@ -75,13 +75,17 @@ class RBM:
         return 1.0 / (1 + np.exp(-x))  # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
 
     def _sample_binary(self, probs):
-        """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）
-           伯努利分布是二项分布的一种特殊情况，输出只有两种可能的值（0或1）。
-           通过给定的概率值probs，决定每次采样的输出：
-           - 如果probs为0，则始终输出0；
-           - 如果probs为1，则始终输出1；
-           - 如果probs介于0和1之间，则按照概率生成0或1。
-        """
+        """伯努利采样生成二进制值
+    
+    Args:
+        probs (ndarray): 概率值数组，范围[0,1]
+        
+    Returns:
+        ndarray: 采样结果（0或1）
+        
+    Raises:
+        ValueError: 概率值超出[0,1]范围时抛出
+    """
         # 确保probs的取值在[0, 1]范围内
         if np.any(probs < 0) or np.any(probs > 1):
             raise ValueError("概率值probs应在0和1之间。")
@@ -216,7 +220,7 @@ if __name__ == '__main__':
         # 如果加载失败（其他错误，如文件损坏），保持原报错逻辑
         print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
         print(f"错误详情: {e}")
-        sys.exit(1)
+        sys.exit(1) # 退出Python程序，并返回状态码1
 
     # 获取数据集的形状信息
     n_imgs, n_rows, n_cols = mnist.shape  # 分别表示图像数量、行数和列数
@@ -228,10 +232,13 @@ if __name__ == '__main__':
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
+   
     # 训练RBM
     errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+   
     # 生成并可视化样本
     samples = rbm.sample(n_samples=5, gibbs_steps=1000)
+   
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 

@@ -72,7 +72,7 @@ def load_data(filename, basis_func=gaussian_basis):
 
 
 #定义模型
-class linearModel(Model):
+class LinearModel(Model):
     """线性回归模型，实现 y = w·x + b"""
     
     def __init__(self, ndim):
@@ -83,7 +83,7 @@ class linearModel(Model):
         ndim: 输入特征的维度
         """
         # 调用父类(Model)的构造函数
-        super(linearModel, self).__init__()
+        super(LinearModel, self).__init__()
         
         # 定义模型参数：权重矩阵 w
         # 形状为 [ndim, 1]，表示从 ndim 维输入到 1 维输出的线性变换
@@ -96,7 +96,7 @@ class linearModel(Model):
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
             trainable=True,
-            name="weight"
+            name="weight"# 参数名称(用于TensorBoard等可视化工具)
         )
         
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
@@ -124,7 +124,7 @@ class linearModel(Model):
     (xs, ys), (o_x, o_y) = load_data("train.txt")    # 加载训练数据，调用load_data函数      
     ndim = xs.shape[1]  # 获取特征维度
 
-    model = linearModel(ndim=ndim)  # 实例化线性模型
+    model = LinearModel(ndim=ndim)  # 实例化线性模型
 
 
 #训练以及评估
@@ -195,4 +195,4 @@ plt.title("Linear Regression") # 图表标题
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
 plt.legend(["train", "test", "pred"]) # 添加图例，元素依次对应
 plt.tight_layout()  # 自动调整布局
-plt.show()
+plt.show()# 显示图形
