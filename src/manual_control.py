@@ -244,7 +244,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self._actor_generation = args.generation #角色生成参数配置
         self._gamma = args.gamma
         self.restart()  # 重启函数调用和 Tick 回调注册
-        self.world.on_tick(hud.on_world_tick)
+        self.world.on_tick(hud.on_world_tick)# 注册HUD的世界tick回调函数，用于每帧更新HUD显示
         self.recording_enabled = False  # 录制与控制相关变量
         self.recording_start = 0 # 初始化录音开始时间的标记变量
         self.constant_velocity_enabled = False # 设置类的属性 constant_velocity_enabled 为 False，这个属性用于指示是否启用了“恒定速度”模式
