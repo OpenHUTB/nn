@@ -257,7 +257,18 @@ with tf.Session() as sess:
 
         # 每100次迭代评估一次模型性能
         if i % 100 == 0:
-            # 计算模型在测试集前1000个样本上的准确率
-            acc = compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000])
-            # 显示当前训练进度和准确率
-            print(f"迭代 {i}/{max_epoch}, 测试准确率: {acc:.4f}")
+            # 使用分批测试，避免内存问题
+            test_accuracy = 0.0
+            test_batch_size = 100
+            test_steps = len(mnist.test.images) // test_batch_size
+            
+            for j in range(test_steps):
+                batch_start = j * test_batch_size
+                batch_end = (j + 1) * test_batch_size
+                test_accuracy += compute_accuracy(
+                    mnist.test.images[batch_start:batch_end],
+                    mnist.test.labels[batch_start:batch_end]
+                )
+            
+            test_accuracy /= test_steps
+            print(f"迭代 {i}/{max_epoch}, 测试准确率: {test_accuracy:.4f}")
