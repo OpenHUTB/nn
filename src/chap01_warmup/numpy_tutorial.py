@@ -4,8 +4,7 @@
 
 # 1. 导入 numpy 库
 import numpy as np                    # 将 numpy 库命名为 np
-import matplotlib                     # 导入Matplotlib库，用于绘图
-import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
+import matplotlib.pyplot as plt       # 仅保留需要使用的导入
 # import 放一起代码美观
 
 
@@ -174,7 +173,7 @@ print("np.dot(x,y)\n", np.dot(x, y))  # 使用 np.dot 函数进行矩阵乘法
 print("第十九题：\n")
 
 print("print(np.sum(x)):", np.sum(x))  # 所有元素求和
-print("print(np.sum(x, axis = 0))", np.sum(x, axis = 0))  # 按列求和（列维度）
+print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
 print("print(np.sum(x, axis = 1))", np.sum(x, axis = 1))  # 按行求和（行维度）
 
 # 20. 利用 13 题目中的 x, 进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）

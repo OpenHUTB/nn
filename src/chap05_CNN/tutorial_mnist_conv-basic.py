@@ -262,7 +262,7 @@ def test(model, ds):
 
 # # 训练
 
-# In[26]:、
+# In[26]:
 #调用mnist_dataset()函数获取处理好的MNIST训练集和测试集，train_ds是训练数据集，test_ds是测试数据集
 # 加载MNIST数据集，返回训练集和测试集
 train_ds, test_ds = mnist_dataset()  # train_ds: 训练数据集, test_ds: 测试数据集

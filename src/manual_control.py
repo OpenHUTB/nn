@@ -244,7 +244,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self._actor_generation = args.generation #角色生成参数配置
         self._gamma = args.gamma
         self.restart()  # 重启函数调用和 Tick 回调注册
-        self.world.on_tick(hud.on_world_tick)
+        self.world.on_tick(hud.on_world_tick)# 注册HUD的世界tick回调函数，用于每帧更新HUD显示
         self.recording_enabled = False  # 录制与控制相关变量
         self.recording_start = 0 # 初始化录音开始时间的标记变量
         self.constant_velocity_enabled = False # 设置类的属性 constant_velocity_enabled 为 False，这个属性用于指示是否启用了“恒定速度”模式
@@ -306,7 +306,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
         # Spawn the player.
         if self.player is not None:
-            spawn_point = self.player.get_transform()
+            spawn_point = self.player.get_transform() # 获取玩家当前的变换信息（位置和旋转）
             spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
@@ -330,7 +330,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
-        self.camera_manager.transform_index = cam_pos_index
+        self.camera_manager.transform_index = cam_pos_index  # 设置相机管理器的初始变换索引
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
@@ -407,7 +407,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
-        if self.radar_sensor is not None:
+        if self.radar_sensor is not None:# 如果雷达传感器存在，则切换雷达状态（开启/关闭）
             self.toggle_radar()
         sensors = [
             self.camera_manager.sensor,
