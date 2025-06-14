@@ -74,29 +74,12 @@ def process_dataset(fileName):
     
     return instances, word2id, id2word
 
-def poem_dataset():
-    """创建诗歌数据集的TensorFlow Dataset对象
-    
-    Returns:
-        ds: 处理好的tf.data.Dataset对象
-        word2id: 词语到id的映射
-        id2word: id到词语的映射
-    """
-    # 处理原始数据
-    instances, word2id, id2word = process_dataset('../poems.txt')
-    # 创建Dataset
+def poem_dataset(file_path='../poems.txt'):  # 添加默认参数
+    instances, word2id, id2word = process_dataset(file_path)  # 使用参数
     ds = tf.data.Dataset.from_generator(
-        lambda: [ins for ins in instances], 
-        (tf.int64, tf.int64),  # 输出类型：诗歌序列和长度
-        (tf.TensorShape([None]), tf.TensorShape([])))  # 输出形状
-    
-    # 数据预处理
-    ds = ds.shuffle(buffer_size=10240)  # 打乱数据
-    # 批处理并填充到相同长度
-    ds = ds.padded_batch(100, padded_shapes=(tf.TensorShape([None]), tf.TensorShape([])))
-    # 为语言模型准备输入输出对：输入是前n-1个词，输出是后n-1个词
-    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1)) # 对数据集中的每个元素应用映射函数
-    return ds, word2id, id2word
+        lambda: [ins for ins in instances],
+        (tf.int64, tf.int64),
+        (tf.TensorShape([None]), tf.TensorShape([])))
 
 
 # # 模型代码
