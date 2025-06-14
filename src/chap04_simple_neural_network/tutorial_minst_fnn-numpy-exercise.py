@@ -319,7 +319,7 @@ with tf.GradientTape() as tape:
 
 # In[10]:
 
-class myModel:
+class MyModel:
     def __init__(self):# 初始化模型参数，使用随机正态分布初始化权重矩阵
         # 权重矩阵包含偏置项，通过增加输入特征维度实现
         self.W1 = np.random.normal(size=[28 * 28 + 1, 100])  # 输入层到隐藏层，增加偏置项，W1: 连接输入层(784+1)和隐藏层(100)的权重矩阵
@@ -354,7 +354,7 @@ class myModel:
         self.h1_grad, self.W1_grad = self.mul_h1.backward(self.h1_relu_grad) # 计算W1梯度
 
 
-model = myModel()
+model = MyModel()
 
 
 # ## 计算 loss
@@ -480,7 +480,7 @@ if __name__ == "__main__":
     # test_data: 测试图像数据
     # test_label: 测试标签数据
     train_data, train_label, test_data, test_label = prepare_data()
-    model = myModel()
+    model = MyModel()
     losses, accuracies = train(model, train_data, train_label)
     test_loss, test_accuracy = test(model, test_data, test_label)
     print(f'Test Loss {test_loss:.4f}; Test Accuracy {test_accuracy:.4f}')
