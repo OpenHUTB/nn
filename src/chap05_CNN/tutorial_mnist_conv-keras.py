@@ -116,10 +116,8 @@ class MyConvModel(keras.Model):
     
     # 第二层卷积操作：在更高层次提取特征
     # 使用更多卷积核捕获更复杂的模式
-    h2 = self.l2_conv(h1_pool)  # l2_conv 是第二个卷积层实例
-    h2_pool = self.pool(h2)  # 对第二个卷积层的输出应用池化
-    # 第二层最大池化：进一步压缩空间信息
-    h2_pool = self.pool(h2)
+    h2 = self.l2_conv(h1_pool)
+    h2_pool = self.pool(h2)  # 只保留一次池化操作
     
     # 展平操作：将多维特征图转换为一维特征向量
     # 例如 [N,7,7,64] -> [N,3136]
