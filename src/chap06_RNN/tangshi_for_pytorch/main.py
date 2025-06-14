@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np # 导入NumPy库并简称为np
 import collections
 import torch
 from torch.autograd import Variable

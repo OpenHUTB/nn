@@ -27,10 +27,17 @@ from tensorflow.keras import layers, optimizers, datasets  # 从Keras导入层�
 
 def gen_data_batch(batch_size: int, start: int, end: int) -> tuple:
     '''在(start, end)区间采样生成一个batch的整型的数据
-    Args :
-        batch_size: batch_size
-        start: 开始数值
-        end: 结束数值
+    
+    Args:
+        batch_size: 批量大小
+        start: 数值范围下限(包含)
+        end: 数值范围上限(不包含)
+        
+    Returns:
+        tuple: (numbers_1, numbers_2, results) 包含:
+            numbers_1: 第一个加数数组 [batch_size]
+            numbers_2: 第二个加数数组 [batch_size]
+            results: 和数组 [batch_size]
     '''
     # 生成随机数
     numbers_1 = np.random.randint(start, end, batch_size)  # 生成指定范围和数量的随机整数数组作为第一个加数
@@ -66,7 +73,9 @@ def results_converter(res_lst):
         res_lst: shape(b_sz, len(digits))
     '''
     # 反转每个数字位列表，因为我们在输入时反转了数字
-    res = [reversed(digits) for digits in res_lst]       # 反转每个数字序列中的数字顺序
+    res = [reversed(digits) for digits in res_lst]       # 为每个数字序列创建反转迭代器（不立即执行）
+
+    # 将反转后的数字序列转换为实际数值
     return [convertDigits2Num(digits) for digits in res] # 返回转换后的数值列表
 
 def prepare_batch(Nums1, Nums2, results, maxlen):

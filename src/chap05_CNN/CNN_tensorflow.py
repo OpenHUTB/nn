@@ -16,9 +16,9 @@ except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
 
-learning_rate = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
-keep_prob_rate = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
-max_epoch = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
+LEARNING_RATE = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
+KEEP_PROB_RATE = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
+MAX_EPOCH = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
 
 
 def compute_accuracy(v_xs, v_ys):
@@ -229,9 +229,12 @@ b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 
-# 损失函数：交叉熵，衡量预测分布与真实分布的差异
+# 使用带logits的交叉熵损失函数，避免数值不稳定
 cross_entropy = tf.reduce_mean(
-    -tf.reduce_sum(ys * tf.log(prediction), reduction_indices=[1])
+    tf.nn.softmax_cross_entropy_with_logits(
+        labels=ys, 
+        logits=tf.matmul(h_fc1_drop, W_fc2) + b_fc2  # 直接使用未经过softmax的logits
+    )
 )
 # 创建优化器 - Adam算法优化损失函数
 # Adam优化器结合了AdaGrad和RMSProp的优点，自适应调整学习率
@@ -254,7 +257,18 @@ with tf.Session() as sess:
 
         # 每100次迭代评估一次模型性能
         if i % 100 == 0:
-            # 计算模型在测试集前1000个样本上的准确率
-            acc = compute_accuracy(mnist.test.images[:1000], mnist.test.labels[:1000])
-            # 显示当前训练进度和准确率
-            print(f"迭代 {i}/{max_epoch}, 测试准确率: {acc:.4f}")
+            # 使用分批测试，避免内存问题
+            test_accuracy = 0.0
+            test_batch_size = 100
+            test_steps = len(mnist.test.images) // test_batch_size
+            
+            for j in range(test_steps):
+                batch_start = j * test_batch_size
+                batch_end = (j + 1) * test_batch_size
+                test_accuracy += compute_accuracy(
+                    mnist.test.images[batch_start:batch_end],
+                    mnist.test.labels[batch_start:batch_end]
+                )
+            
+            test_accuracy /= test_steps
+            print(f"迭代 {i}/{max_epoch}, 测试准确率: {test_accuracy:.4f}")

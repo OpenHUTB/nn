@@ -125,7 +125,10 @@ class Softmax:
         grad_y: same shape as x
         '''
         s = self.mem['out']
-        sisj = np.matmul(np.expand_dims(s, axis=2), np.expand_dims(s, axis=1))  # (N, c, c)
+        sisj = np.matmul(
+             np.expand_dims(s, axis=2), 
+             np.expand_dims(s, axis=1)
+        )  # (N, c, c)
         # 对 grad_y 进行维度扩展
         # 假设 grad_y 是一个形状为 (N, c) 的梯度张量
         # np.expand_dims(grad_y, axis=1) 将其形状变为 (N, 1, c)

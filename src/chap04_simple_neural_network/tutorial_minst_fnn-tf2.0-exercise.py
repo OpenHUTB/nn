@@ -32,7 +32,7 @@ print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
 #定义了一个简单的两层神经网络模型，用于处理 MNIST 手写数字识别任务
 
 # In[9]:
-class myModel:
+class MyModel:
     def __init__(self):
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
@@ -69,7 +69,7 @@ class myModel:
         logits = h @ self.W2 + self.b2         
         return logits
         
-model = myModel()
+model = MyModel()
 
 # 使用Adam优化器，用于训练过程中更新模型参数
 optimizer = optimizers.Adam()
