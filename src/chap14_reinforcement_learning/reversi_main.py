@@ -76,7 +76,8 @@ for i_episode in range(max_epochs):
 
         # 检查游戏是否结束
         if done:
-            # 打印游戏结果摘要
+            # 显示最终棋盘状态并打印游戏结果摘要
+            env.render()
             print(f"第 {i_episode+1} 局游戏在 {t+1} 步后结束")
             
             # 计算双方得分

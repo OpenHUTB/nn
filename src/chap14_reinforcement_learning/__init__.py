@@ -276,7 +276,7 @@ register(
 
 # 6. 二级倒立摆：控制两个连杆保持平衡（难度远高于单级）
 register(
-    id='InvertedDoublePendulum-v1',
+    id='InvertedDoublePendulum-v2',
     entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
     max_episode_steps=1000,
     reward_threshold=9100.0,  # 极高的奖励阈值，要求长期稳定控制

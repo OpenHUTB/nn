@@ -17,6 +17,7 @@ class RL_QG_agent:
         self.saver = None         # 模型保存器，用于保存和加载参数
         self.input_states = None  # 网络输入张量（棋盘状态）
         self.Q_values = None      # 网络输出张量（各位置Q值）
+        self.model_initialized = False  # 模型初始化状态标志
 
 
     def init_model(self):
