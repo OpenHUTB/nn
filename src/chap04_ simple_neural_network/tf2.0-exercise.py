@@ -68,11 +68,11 @@ def softmax_ce(x, label):
     ##########
     # 使用 clip 避免 log(0) 产生数值不稳定
     # 计算softmax概率分布
-    probs = tf.nn.softmax(logits)
+    probs = tf.nn.softmax(x)
     # 防止log(0)的数值不稳定
     probs = tf.clip_by_value(probs, 1e-10, 1.0)
     # 计算交叉熵损失：-sum(y_true * log(y_pred))
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(probs), axis=-1))
     ##########
     return loss
 
