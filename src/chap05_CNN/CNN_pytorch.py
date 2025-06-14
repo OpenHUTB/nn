@@ -47,7 +47,7 @@ train_data = torchvision.datasets.MNIST(
     root='./mnist/',                              # 数据集保存路径
 
     train=True,                                   # 加载训练集（False则加载测试集）
-    transform=torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
+    transform = torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
 
     download=DOWNLOAD_MNIST                       # 如果需要则下载
 )
@@ -68,7 +68,7 @@ test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
 
 # 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
 
-test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
+test_x = Variable(torch.unsqueeze(test_data.test_data, dim = 1), volatile = True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
 

@@ -78,11 +78,11 @@ model = keras.Sequential([
     
     # 第3层：卷积层（提取更高级特征）
     # 64个5x5的卷积核，ReLU激活，保持尺寸
-    Conv2D(64, (5, 5), activation='relu', padding='same'),
+    Conv2D(64, (5, 5), activation = 'relu', padding = 'same'),
     
     # 第4层：最大池化层（进一步下采样）
     # 同上使用2x2池化窗口，步长2
-    MaxPooling2D(pool_size=2, strides=2),
+    MaxPooling2D(pool_size = 2, strides = 2),
     
     # 第5层：展平层（将3D特征图转换为1D向量）
     # 例如：输入形状(N,7,7,64) -> 输出形状(N,3136)
@@ -94,7 +94,7 @@ model = keras.Sequential([
     
     # 第7层：输出层（分类预测）
     # 10个神经元对应10个类别，softmax激活输出概率分布
-    layers.Dense(10, activation='softmax')
+    layers.Dense(10, activation = 'softmax')
 ])
 
 optimizer = optimizers.Adam(0.0001)

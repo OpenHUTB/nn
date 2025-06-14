@@ -72,7 +72,7 @@ def bias_variable(shape):
     return tf.Variable(initial)#将常量张量 initial 包装为一个可训练的变量张量
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding='SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     

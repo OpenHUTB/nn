@@ -78,10 +78,10 @@ class MyConvModel(keras.Model):
         super(MyConvModel, self).__init__()  # 调用父类（Model）的构造函数，初始化模型基础结构
 
         # 定义第一层卷积层：32个5x5的卷积核，使用ReLU激活函数，same填充保证输出尺寸不变
-        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
+        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding = 'same')
 
         # 第二层卷积层：64个5x5的卷积核，同样使用ReLU激活函数和same填充
-        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
+        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding = 'same')
 
         # 最大池化层：池化窗口大小为2x2，步长为2，用于降低特征图的空间维度
         self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)

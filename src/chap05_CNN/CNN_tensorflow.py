@@ -15,7 +15,7 @@ try:
     # 参数说明：
     # 'MNIST_data' - 数据集存储目录
     # one_hot=True - 将标签转换为one-hot编码格式
-    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+    mnist = input_data.read_data_sets('MNIST_data', one_hot = True)
 except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
@@ -40,7 +40,7 @@ def compute_accuracy(v_xs, v_ys):
     global prediction
 
     # 获取模型预测结果
-    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
+    y_pre = sess.run(prediction, feed_dict = {xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
     correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
     # 计算准确率
@@ -63,7 +63,7 @@ def weight_variable(shape):
         tf.Variable: 初始化后的权重变量。
     """
     # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
-    initial = tf.truncated_normal(shape, stddev=0.1)
+    initial = tf.truncated_normal(shape, stddev = 0.1)
     # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
 
@@ -79,11 +79,11 @@ def bias_variable(shape):
         tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
     """
     # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
-    initial = tf.constant(0.1, shape=shape)
+    initial = tf.constant(0.1, shape = shape)
     return tf.Variable(initial)
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding = 'SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
