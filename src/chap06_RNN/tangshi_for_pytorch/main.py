@@ -277,6 +277,15 @@ def pretty_print_poem(poem):  # 格式化打印古诗，令打印的结果更工
 
 # 生成古诗的主函数
 def gen_poem(begin_word):
+    """
+    基于LSTM模型生成古诗
+    
+    参数:
+        begin_word: 诗歌起始字（必须是训练词汇表中的字）
+        
+    返回:
+        str: 生成的诗歌字符串
+    """
     # poems_vector, word_int_map, vocabularies = process_poems2('./tangshi.txt')  #  use the other dataset to train the network
     poems_vector, word_int_map, vocabularies = process_poems1('./poems.txt')
     
