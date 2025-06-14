@@ -5,7 +5,7 @@
 # In[1]:
 import os
 import tensorflow as tf
-from tensorflow import keras
+from tensorflow import keras    # 从 TensorFlow 中导入 keras 模块，构建和训练深度学习模型
 from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
 from tensorflow.keras.layers import ( 
     Conv2D, Dense, Dropout, 
