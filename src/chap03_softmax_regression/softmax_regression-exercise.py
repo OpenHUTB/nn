@@ -10,13 +10,15 @@
 
 # In[1]:
 
-# 导入运行所需模块
-import tensorflow as tf # TensorFlow深度学习框架
-import matplotlib.pyplot as plt # 数据可视化库
-from matplotlib import animation, rc # 动画功能
-from IPython.display import HTML # 在Jupyter中显示动画
-import matplotlib.cm as cm # 颜色映射
-import numpy as np # 数值计算库
+# 标准库导入
+import numpy as np  # 数值计算库
+
+# 第三方库导入
+import tensorflow as tf  # 深度学习框架
+import matplotlib.pyplot as plt  # 数据可视化
+from matplotlib import animation, rc  # 动画功能
+from IPython.display import HTML  # Notebook显示
+import matplotlib.cm as cm  # 颜色映射
 
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
@@ -27,17 +29,19 @@ dot_num = 100  # 每类样本的数量
 x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
 y_p = np.random.normal(6.0, 1, dot_num)  # y坐标
 y = np.ones(dot_num)  # 标签为1
-C1 = np.column_stack([x_p, y_p, np.ones(dot_num)]) 
+C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
 
-# 类别2 (绿色圆圈): 均值(6,3) 
+# 生成类别2的数据：均值为(6,3)，标准差为1
 x_n = np.random.normal(6.0, 1, dot_num)
 y_n = np.random.normal(3.0, 1, dot_num)
-C2 = np.column_stack([x_n, y_n, np.zeros(dot_num)])
+y = np.zeros(dot_num)  # 标签为0
+C2 = np.array([x_n, y_n, y]).T
 
-# 类别3 (红色星号): 均值(7,7)
+# 生成类别3的数据：均值为(7,7)，标准差为1
 x_b = np.random.normal(7.0, 1, dot_num)
 y_b = np.random.normal(7.0, 1, dot_num)
-C3 = np.column_stack([x_b, y_b, np.full(dot_num, 2)]) 
+y = np.ones(dot_num) * 2  # 标签为2
+C3 = np.array([x_b, y_b, y]).T
 
 # 绘制三类样本的散点图
 plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
