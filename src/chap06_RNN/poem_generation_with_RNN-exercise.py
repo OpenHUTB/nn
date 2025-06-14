@@ -32,7 +32,7 @@ def process_dataset(fileName):
     start_token = "<START>"  # 开始标记
     end_token = "<END>"  # 结束标记
     # 以UTF-8编码打开文件，处理每行诗歌
-    with open(fileName, 'r',encoding='utf-8', ) as fd:
+    with open(fileName, 'r',encoding='utf-8' ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
