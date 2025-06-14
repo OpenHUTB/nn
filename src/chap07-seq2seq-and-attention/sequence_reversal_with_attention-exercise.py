@@ -349,7 +349,7 @@ def sequence_reversal():
         
         # 初始输入为0(起始标记)
         cur_token = tf.zeros(shape=[b_sz], dtype=tf.int32)
-        state = init_state
+        state = init_state[1]
         collect = []
         
         # 逐步生成输出序列

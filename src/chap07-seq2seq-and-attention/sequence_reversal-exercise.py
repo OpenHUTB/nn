@@ -174,6 +174,7 @@ class mySeq2SeqModel(keras.Model):
     参数:
         x: 当前输入token，shape=[b_sz,]
         state: 当前RNN状态
+        enc_out: 编码器输出 (用于注意力机制)
     返回:
         next_token: 预测的下一个token
         new_state: 更新后的RNN状态
