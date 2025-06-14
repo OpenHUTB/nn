@@ -19,11 +19,11 @@ def identity_basis(x):
     return np.expand_dims(x, axis=1)
 
     # 生成多项式基函数
-def multinomial_basis(x, feature_num=10):
+def multinomial_basis(x, feature_num = 10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数
     返回形状为 (N, feature_num) 的数组"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    x = np.expand_dims(x, axis = 1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
     # 生成从 x^2 到 x^feature_num 的多项式特征
@@ -34,7 +34,7 @@ def multinomial_basis(x, feature_num=10):
     return ret # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
 
 
-def gaussian_basis(x, feature_num=10):
+def gaussian_basis(x, feature_num = 10):
     """高斯基函数：将输入x映射为一组高斯分布特征
     用于提升模型对非线性关系的拟合能力
     返回形状为 (N, feature_num) 的数组"""
@@ -45,14 +45,14 @@ def gaussian_basis(x, feature_num=10):
     # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
     x = np.expand_dims(x, axis=1)
     # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
-    x = np.concatenate([x] * feature_num, axis=1) # 将 x 沿着第 1 维度复制 feature_num 次
+    x = np.concatenate([x] * feature_num, axis = 1) # 将 x 沿着第 1 维度复制 feature_num 次
     
     out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
     ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
     return ret
 
 
-def load_data(filename, basis_func=gaussian_basis):
+def load_data(filename, basis_func = gaussian_basis):
     """载入数据并进行基函数变换
     返回：(特征, 标签), (原始x, 原始y)
     在特征矩阵中，phi0是偏置项（全1列），phi1是基函数变换后的特征"""
