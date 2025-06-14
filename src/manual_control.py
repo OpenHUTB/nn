@@ -407,7 +407,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
-        if self.radar_sensor is not None:
+        if self.radar_sensor is not None:# 如果雷达传感器存在，则切换雷达状态（开启/关闭）
             self.toggle_radar()
         sensors = [
             self.camera_manager.sensor,
