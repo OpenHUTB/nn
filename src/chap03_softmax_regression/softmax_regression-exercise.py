@@ -27,28 +27,21 @@ dot_num = 100  # 每类样本的数量
 x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
 y_p = np.random.normal(6.0, 1, dot_num)  # y坐标
 y = np.ones(dot_num)  # 标签为1
-C1 = np.array([x_p, y_p, y]).T  # 组合成(x, y, label)格式
+C1 = np.column_stack([x_p, y_p, np.ones(dot_num)]) 
 
-# 生成类别2的数据：均值为(6,3)，标准差为1
+# 类别2 (绿色圆圈): 均值(6,3) 
 x_n = np.random.normal(6.0, 1, dot_num)
 y_n = np.random.normal(3.0, 1, dot_num)
-y = np.zeros(dot_num)  # 标签为0
-C2 = np.array([x_n, y_n, y]).T
+C2 = np.column_stack([x_n, y_n, np.zeros(dot_num)])
 
-# 生成类别3的数据：均值为(7,7)，标准差为1
+# 类别3 (红色星号): 均值(7,7)
 x_b = np.random.normal(7.0, 1, dot_num)
 y_b = np.random.normal(7.0, 1, dot_num)
-y = np.ones(dot_num) * 2  # 标签为2
-C3 = np.array([x_b, y_b, y]).T
+C3 = np.column_stack([x_b, y_b, np.full(dot_num, 2)]) 
 
-# 绘制三类样本的散点图
-plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
-plt.scatter(C2[:, 0], C2[:, 1], c = "g", marker = "o")  # 类别2：绿色圆圈
-plt.scatter(C3[:, 0], C3[:, 1], c = "r", marker = "*")  # 类别3：红色星号
-
-# 合并所有类别的数据，形成完整数据集
+# 合并并打乱数据集
 data_set = np.concatenate((C1, C2, C3), axis=0)
-np.random.shuffle(data_set)  # 随机打乱数据集顺序
+np.random.shuffle(data_set)
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
