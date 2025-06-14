@@ -1,7 +1,6 @@
-0#!/usr/bin/env python
+#!/usr/bin/env python
 # coding: utf-8
 import numpy as np # 导入NumPy库
-import matplotlib.pyplot as plt
 
 import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
 # 用于创建各种静态、交互式和动画可视化图表

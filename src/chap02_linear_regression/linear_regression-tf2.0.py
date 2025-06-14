@@ -137,8 +137,8 @@ def train_one_step(model, xs, ys):
     with tf.GradientTape() as tape:
         y_preds = model(xs)    # 模型前向传播计算预测值
         loss = tf.keras.losses.MSE(ys, y_preds)   #计算损失函数
-    grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
-    optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
+    grads = tape.gradient(loss, model.trainable_variables)    # 计算损失函数对模型参数w的梯度
+    optimizer.apply_gradients(zip(grads, model.trainable_variablea))    # 更新模型参数
     return loss # 返回模型的预测结果，即模型对输入数据 xs 的输出
 
 
