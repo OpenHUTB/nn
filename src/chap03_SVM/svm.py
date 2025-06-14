@@ -97,7 +97,7 @@ class SVM:
         return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签格式
 
 if __name__ == '__main__':
-    # 数据加载部分
+    # 数据加载部分以及数据路径配置
     base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
     train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
     test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
