@@ -316,7 +316,7 @@ if __name__ == "__main__":
     plt.title("GMM Predicted Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
     plt.show()#显示创建的图形窗口
     #打印信息
     print("生成混合高斯分布数据...")
