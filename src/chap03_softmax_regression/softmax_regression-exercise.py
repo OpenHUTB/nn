@@ -39,9 +39,14 @@ x_b = np.random.normal(7.0, 1, dot_num)
 y_b = np.random.normal(7.0, 1, dot_num)
 C3 = np.column_stack([x_b, y_b, np.full(dot_num, 2)]) 
 
-# 合并并打乱数据集
+# 绘制三类样本的散点图
+plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
+plt.scatter(C2[:, 0], C2[:, 1], c = "g", marker = "o")  # 类别2：绿色圆圈
+plt.scatter(C3[:, 0], C3[:, 1], c = "r", marker = "*")  # 类别3：红色星号
+
+# 合并所有类别的数据，形成完整数据集
 data_set = np.concatenate((C1, C2, C3), axis=0)
-np.random.shuffle(data_set)
+np.random.shuffle(data_set)  # 随机打乱数据集顺序
 
 # ## 建立模型
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
