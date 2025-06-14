@@ -59,7 +59,7 @@ class SVM:
         self.b = 0            # 偏置项初始化为0
 
         for epoch in range(self.max_iter):
-            # 计算函数间隔：y(wx+b)，衡量样本到超平面的距离和方向
+            # 计算函数间隔：y*(wx+b)，衡量样本到超平面的距离和方向
             margin = y * (np.dot(X, self.w) + self.b)
             
             # 找出违反间隔条件的样本（margin < 1）
