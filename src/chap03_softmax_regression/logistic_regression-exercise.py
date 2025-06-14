@@ -193,7 +193,7 @@ if __name__ == '__main__':
    #   - 当前损失值
    # 这些信息可以用于后续创建训练过程的动画演示
    animation_frames = []
-
+   #训练循环（200次迭代）
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
