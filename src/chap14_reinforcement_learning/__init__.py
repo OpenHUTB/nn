@@ -1,5 +1,15 @@
 
-from gym.envs.registration import registry, register, make, spec  # 导入Gym环境注册核心模块，用于创建和管理强化学习环境
+# 标准库导入
+import sys
+
+# 第三方库导入
+from gym.envs.registration import (
+    registry,
+    register,
+    make,
+    spec
+)  # 导入Gym环境注册核心模块，用于创建和管理强化学习环境
+
 
 ### 一、算法类环境（Algorithmic Environments）
 # 设计用于测试序列处理、记忆能力和模式识别算法，适合研究长短期记忆机制

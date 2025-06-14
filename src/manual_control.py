@@ -249,7 +249,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self._actor_generation = args.generation #角色生成参数配置
         self._gamma = args.gamma
         self.restart()  # 重启函数调用和 Tick 回调注册
-        self.world.on_tick(hud.on_world_tick)
+        self.world.on_tick(hud.on_world_tick)# 注册HUD的世界tick回调函数，用于每帧更新HUD显示
         self.recording_enabled = False  # 录制与控制相关变量
 
         self.recording_start = 0 # 初始化录音开始时间的标记变量
@@ -313,7 +313,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
         # Spawn the player.
         if self.player is not None:
-            spawn_point = self.player.get_transform()
+            spawn_point = self.player.get_transform() # 获取玩家当前的变换信息（位置和旋转）
             spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
             spawn_point.rotation.roll = 0.0
             spawn_point.rotation.pitch = 0.0
@@ -337,7 +337,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
-        self.camera_manager.transform_index = cam_pos_index
+        self.camera_manager.transform_index = cam_pos_index  # 设置相机管理器的初始变换索引
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
@@ -414,7 +414,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
-        if self.radar_sensor is not None:
+        if self.radar_sensor is not None:# 如果雷达传感器存在，则切换雷达状态（开启/关闭）
             self.toggle_radar()
         sensors = [
             self.camera_manager.sensor,
@@ -1543,69 +1543,90 @@ def game_loop(args):
 def main():
     argparser = argparse.ArgumentParser(
         description='CARLA Manual Control Client')
+
+    # 添加调试参数
     argparser.add_argument(
         '-v', '--verbose',
         action='store_true',
         dest='debug',
         help='print debug information')
+    
+    # 添加服务器主机IP参数
     argparser.add_argument(
         '--host',
         metavar='H',
         default='127.0.0.1',
         help='IP of the host server (default: 127.0.0.1)')
+
+    # 添加端口参数
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
         default=2000,
         type=int,
         help='TCP port to listen to (default: 2000)')
+
+    # 添加自动驾驶模式参数
     argparser.add_argument(
         '-a', '--autopilot',
         action='store_true',
         help='enable autopilot')
+
+    # 添加分辨率参数
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
         default='1280x720',
         help='window resolution (default: 1280x720)')
+
+    # 添加角色过滤器参数
     argparser.add_argument(
         '--filter',
         metavar='PATTERN',
-        default='vehicle.*',
+        default='vehicle.*',  # 默认匹配所有车辆
         help='actor filter (default: "vehicle.*")')
+
+    # 添加角色生成版本参数
     argparser.add_argument(
         '--generation',
         metavar='G',
         default='2',
         help='restrict to certain actor generation (values: "1","2","All" - default: "2")')
+
+    # 添加角色名称参数
     argparser.add_argument(
         '--rolename',
         metavar='NAME',
         default='hero',
         help='actor role name (default: "hero")')
+
+    # 添加伽马校正参数
     argparser.add_argument(
         '--gamma',
         default=2.2,
         type=float,
         help='Gamma correction of the camera (default: 2.2)')
+
+    # 添加同步模式参数
     argparser.add_argument(
         '--sync',
         action='store_true',
         help='Activate synchronous mode execution')
     args = argparser.parse_args()
 
+    # 从分辨率参数中提取宽度和高度
     args.width, args.height = [int(x) for x in args.res.split('x')]
 
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    log_level = logging.DEBUG if args.debug else logging.INFO  # 根据调试参数设置日志级别
+    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level) # 配置基础日志格式：显示日志级别和消息内容
 
-    logging.info('listening to server %s:%s', args.host, args.port)
+    logging.info('listening to server %s:%s', args.host, args.port) # 记录日志信息，显示正在连接的服务器地址和端口
 
     print(__doc__)
 
     try:
 
-        game_loop(args)
+        game_loop(args) # 进入主游戏循环，传入解析后的参数
 
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')

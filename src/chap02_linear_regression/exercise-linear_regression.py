@@ -48,7 +48,7 @@ def multinomial_basis(x, feature_num=10):
     feature_num: 多项式的最高次数
     返回 shape (N, feature_num)"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 生成 x^1, x^2, ..., x^feature_num
+    # 生成各次幂特征：x^1, x^2, ..., x^feature_num，将其拼接
     ret = [x**i for i in range(1, feature_num + 1)]
     ret = np.concatenate(ret, axis=1)
     return ret

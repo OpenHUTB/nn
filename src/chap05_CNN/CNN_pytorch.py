@@ -28,7 +28,8 @@ import torch.utils.data as Data
 # 导入 torchvision 库，它包含了常用的计算机视觉数据集、模型结构和图像处理工具
 import torchvision
 
-# 设置超参数
+# 设置超参数。超参数（Hyperparameters）是机器学习模型在训练前需要手动设定（或通过算法优化）的配置参数，
+# 它们不直接从数据中学习，而是控制模型的整体行为和性能。
 learning_rate = 1e-4  #  学习率：控制参数更新步长
 keep_prob_rate = 0.7  #  Dropout保留神经元的比例：防止过拟合
 max_epoch = 3         # 训练的总轮数
@@ -131,7 +132,7 @@ def test(cnn):
     
     # 获取预测类别：找到每个样本概率最大的类别索引
     # torch.max返回(最大值, 最大值的索引)
-    _, pre_index = torch.max(y_pre, 1)  
+    _, pre_index = torch.max(y_prob, 1) 
     
     # 调整张量形状为1维向量（例如从[N,1]变为[N]）
     pre_index = pre_index.view(-1)

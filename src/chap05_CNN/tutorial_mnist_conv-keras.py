@@ -8,8 +8,10 @@ import os
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
-from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
+from tensorflow.keras.layers import ( 
+    Conv2D, Dense, Dropout, 
+    Flatten, MaxPooling2D
+)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -115,10 +117,8 @@ class MyConvModel(keras.Model):
     
     # 第二层卷积操作：在更高层次提取特征
     # 使用更多卷积核捕获更复杂的模式
-    h2 = self.l2_conv(h1_pool)  # l2_conv 是第二个卷积层实例
-    h2_pool = self.pool(h2)  # 对第二个卷积层的输出应用池化
-    # 第二层最大池化：进一步压缩空间信息
-    h2_pool = self.pool(h2)
+    h2 = self.l2_conv(h1_pool)
+    h2_pool = self.pool(h2)  # 只保留一次池化操作
     
     # 展平操作：将多维特征图转换为一维特征向量
     # 例如 [N,7,7,64] -> [N,3136]
@@ -136,7 +136,7 @@ class MyConvModel(keras.Model):
     # axis=-1 表示在最后一个维度（类别维度）进行归一化
     probs = tf.nn.softmax(logits, axis=-1)
     
-    return probs
+    return logits
 # 创建一个神经网络模型的实例
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法

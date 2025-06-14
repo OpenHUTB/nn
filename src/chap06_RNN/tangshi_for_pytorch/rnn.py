@@ -1,6 +1,6 @@
 
 # 引入必要的数据库
-import torch.nn as nn
+import torch.nn as nn # 导入PyTorch的神经网络模块(nn) 并将它简称为"nn"
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F

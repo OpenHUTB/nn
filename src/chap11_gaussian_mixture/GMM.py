@@ -3,17 +3,21 @@
 import numpy as np
 # 导入matplotlib.pyplot模块，用于数据可视化和绘图
 import matplotlib.pyplot as plt 
+#添加类型提示支持
+from typing import Tuple, List 
 
 # 生成混合高斯分布数据
 def generate_data(n_samples=1000):
     """生成混合高斯分布数据集
     
-    参数:
-        n_samples: 总样本数量 (默认=1000)
-    
-    返回:
-        X: 特征矩阵 (n_samples, 2)
-        y_true: 真实标签 (n_samples,)
+    Args:
+        n_samples: 样本数量 (default=1000)
+        random_state: 随机种子 (default=42)
+        
+    Returns:
+        Tuple: (X, y_true)
+            X: 特征矩阵 (n_samples, 2)
+            y_true: 真实标签 (n_samples,)
     """
     np.random.seed(42)  # 固定随机种子以确保结果可复现
     # 定义三个高斯分布的中心点
@@ -317,10 +321,11 @@ if __name__ == "__main__":
     plt.title("GMM Predicted Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
     plt.show()#显示创建的图形窗口
     #打印信息
     print("生成混合高斯分布数据...")
     print("生成混合高斯分布数据...")
     print("生成混合高斯分布数据...")
+
 

@@ -32,7 +32,7 @@ random_conv = MyConvModel()# 实例化一个新的卷积神经网络模型
 
 # 打开一张尺寸为 639x516 的随机图片
 # 使用Pillow库以二进制模式打开图片文件
-img = Image.open(open('corgi.jpg', 'rb'))  # 返回PIL.Image对象
+img = Image.open(open('corgi.jpg', 'rb')).convert('RGB')  # 返回PIL.Image对象
 
 # 将PIL图像转换为numpy数组，并指定数据类型为float64
 img = np.asarray(img, dtype='float32') / 255.0  # 归一化到0-1范围，使用float32更高效

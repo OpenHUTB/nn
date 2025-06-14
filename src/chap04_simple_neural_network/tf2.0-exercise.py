@@ -23,7 +23,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
 
     # 数值稳定性处理：减去最大值避免指数爆炸
     # 沿最后一个维度（通常是类别维度）取最大值，并保持维度以便广播
-    max_per_row = tf.reduce_max(x, axis = -1, keepdims = True)
+    max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
     # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
