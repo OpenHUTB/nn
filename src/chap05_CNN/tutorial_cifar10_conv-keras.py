@@ -11,9 +11,9 @@ except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
 
-learning_rate = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
-keep_prob_rate = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
-max_epoch = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
+LEARNING_RATE = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
+KEEP_PROB_RATE = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
+MAX_EPOCH = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
 
 
 def compute_accuracy(v_xs, v_ys):
