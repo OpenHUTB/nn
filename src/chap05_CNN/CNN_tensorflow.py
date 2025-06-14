@@ -229,9 +229,12 @@ b_fc2 = bias_variable([10])
 prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 
-# 损失函数：交叉熵，衡量预测分布与真实分布的差异
+# 使用带logits的交叉熵损失函数，避免数值不稳定
 cross_entropy = tf.reduce_mean(
-    -tf.reduce_sum(ys * tf.log(prediction), reduction_indices=[1])
+    tf.nn.softmax_cross_entropy_with_logits(
+        labels=ys, 
+        logits=tf.matmul(h_fc1_drop, W_fc2) + b_fc2  # 直接使用未经过softmax的logits
+    )
 )
 # 创建优化器 - Adam算法优化损失函数
 # Adam优化器结合了AdaGrad和RMSProp的优点，自适应调整学习率
