@@ -153,7 +153,7 @@ class GaussianMixtureModel:
         log_likelihood = -np.inf  # 初始化对数似然值为负无穷
         
         # EM算法主循环：交替执行E步(期望)和M步(最大化)
-        for iter in range(self.max_iter):
+        for iteration in range(self.max_iter):
             # E步：计算后验概率（每个样本属于各个高斯成分的概率）
             log_prob = np.zeros((n_samples, self.n_components)) # 初始化对数概率矩阵
             
@@ -202,7 +202,7 @@ class GaussianMixtureModel:
             self.log_likelihoods.append(current_log_likelihood)  # 记录当前对数似然
             
             # 检查收敛条件：如果对数似然变化小于阈值，则停止迭代
-            if iter > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
+            if iteration > 0 and abs(current_log_likelihood - log_likelihood) < self.tol:
                 break
                 
             log_likelihood = current_log_likelihood   # 更新记录的上一次迭代的对数似然值
