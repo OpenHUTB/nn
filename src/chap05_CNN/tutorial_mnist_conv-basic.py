@@ -5,7 +5,7 @@
 
 # In[29]:
 import os
-import tensorflow as tf
+import tensorflow as tf # 导入TensorFlow库并简称为tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten
