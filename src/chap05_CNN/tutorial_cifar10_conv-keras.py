@@ -9,7 +9,8 @@ try:
     mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
-    
+    # 提示：若首次运行失败，可能因未下载数据集，可检查网络连接或手动创建'MNIST_data'目录
+
 
 LEARNING_RATE = 1e-4     # 学习率：控制参数更新步长，太小会导致收敛慢，太大会导致震荡
 KEEP_PROB_RATE = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
