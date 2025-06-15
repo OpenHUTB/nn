@@ -7,7 +7,7 @@ import numpy as np
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
 import matplotlib.pyplot as plt
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
-import tensorflow as tf # 导入TensorFlow深度学习框架，并使用别名'tf'简化调用
+import tensorflow as tf
 # 从Keras导入常用模块
 from tensorflow.keras import optimizers, layers, Model
 
@@ -193,6 +193,6 @@ plt.ylabel("y")
 plt.title("Linear Regression") # 图表标题
 # 虚线网格，半透明灰色
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
-plt.legend(["train", "test", "pred"])  # 添加图例，元素依次对应
+plt.legend(["train", "test", "pred"]) # 添加图例，元素依次对应
 plt.tight_layout()  # 自动调整布局
-plt.show()# 显示图形
+plt.show()

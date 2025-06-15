@@ -242,7 +242,7 @@ def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
     # 初始化训练指标
     loss = 0.0 # 记录loss值 (初始为0)
-    accuracy = 0.0  # 可扩展性占位 (当前未实际计算准确率)
+    accuracy = 0.0 # 可扩展性占位 (当前未实际计算准确率)
     for step in range(3000):
         # 获取训练batch数据:
         # - batched_examples: 原始样本 (用于调试/可视化)

@@ -79,7 +79,7 @@ def results_converter(res_lst):
     return [convertDigits2Num(digits) for digits in res] # 返回转换后的数值列表
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
-    #'''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
+    '''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
     #1. 将整数转换为数字位列表
     #2. 反转数字位列表(低位在前，高位在后)
     #3. 填充到固定长度
@@ -125,26 +125,24 @@ class myRNNModel(keras.Model):
         
     @tf.function
     def call(self, num1, num2):
-        """
-        模型前向传播过程：
-        1. 对两个输入数字的每一位进行嵌入表示
-        2. 将嵌入后的向量拼接
-        3. 通过RNN处理拼接后的向量序列
-        4. 通过全连接层预测每一位的数字
         
-        参数：
-            num1: 第一个输入数字，形状 (batch_size, maxlen)
-            num2: 第二个输入数字，形状 (batch_size, maxlen)
-                
-        返回：
-            logits: 预测结果，形状 (batch_size, maxlen, 10)
-        """
+         #模型前向传播过程：
+        #1. 将两个输入数字的每个位进行嵌入
+        #2. 将嵌入后的向量相加
+        #3. 通过RNN处理相加后的向量序列
+        #4. 通过全连接层预测每个位的数字
+      Args:
+            num1: 第一个输入数字，shape为(batch_size, maxlen)
+            num2: 第二个输入数字，shape为(batch_size, maxlen)
+            
+        Returns:
+            logits: 预测结果，shape为(batch_size, maxlen, 10)
         # 嵌入处理
         embed1 = self.embed_layer(num1)  # [batch_size, maxlen, embed_dim]
         embed2 = self.embed_layer(num2)  # [batch_size, maxlen, embed_dim]
         
-        # 将两个输入的嵌入向量在最后一维拼接
-        inputs = tf.concat([embed1, embed2], axis=-1)  # [batch_size, maxlen, embed_dim*2]
+        # 将两个输入的嵌入向量相加
+        inputs = tf.concat([emb1, emb2], axis=-1)  # [batch_size, maxlen, embed_dim]
         
         # 通过RNN层处理
         rnn_out = self.rnn_layer(inputs)  # [batch_size, maxlen, rnn_units]
@@ -153,6 +151,7 @@ class myRNNModel(keras.Model):
         logits = self.dense(rnn_out)  # [batch_size, maxlen, 10]
         
         return logits
+    
 # In[4]:
 
 

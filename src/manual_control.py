@@ -561,17 +561,17 @@ class KeyboardControl(object):
                         world.recording_enabled = True
                         world.hud.notification("Recorder is ON")
                 elif event.key == K_p and (pygame.key.get_mods() & KMOD_CTRL):
-                    # 停止录像
+                    # stop recorder
                     client.stop_recorder()
                     world.recording_enabled = False
-                    # 通过重播开始时固定摄像头的临时解决方案
+                    # work around to fix camera at start of replaying
                     current_index = world.camera_manager.index
                     world.destroy_sensors()
-                    # 禁用自动驾驶
+                    # disable autopilot
                     self._autopilot_enabled = False
                     world.player.set_autopilot(self._autopilot_enabled)
                     world.hud.notification("Replaying file 'manual_recording.rec'")
-                    # 重放器
+                    # replayer
                     client.replay_file("manual_recording.rec", world.recording_start, 0, 0)
                     world.camera_manager.set_sensor(current_index)
                 elif event.key == K_MINUS and (pygame.key.get_mods() & KMOD_CTRL):
@@ -588,7 +588,7 @@ class KeyboardControl(object):
                     world.hud.notification("Recording start time is %d" % (world.recording_start))
                 if isinstance(self._control, carla.VehicleControl):
                     if event.key == K_f:
-                        # 切换 ackermann 控制
+                        # Toggle ackermann controller
                         self._ackermann_enabled = not self._ackermann_enabled
                         world.hud.show_ackermann_info(self._ackermann_enabled)
                         world.hud.notification("Ackermann Controller %s" %
@@ -598,7 +598,7 @@ class KeyboardControl(object):
                             self._control.gear = 1 if self._control.reverse else -1
                         else:
                             self._ackermann_reverse *= -1
-                            # 重置 ackermann 控制
+                            # Reset ackermann control
                             self._ackermann_control = carla.VehicleAckermannControl()
                     elif event.key == K_m:
                         self._control.manual_gear_shift = not self._control.manual_gear_shift
@@ -622,8 +622,8 @@ class KeyboardControl(object):
                     elif event.key == K_l and pygame.key.get_mods() & KMOD_SHIFT:
                         current_lights ^= carla.VehicleLightState.HighBeam
                     elif event.key == K_l:
-                        # 使用 'L' 键切换灯光模式：
-                        # 关闭 -> 示廓灯 -> 近光灯 -> 雾灯
+                        # Use 'L' key to switch between lights:
+                        # closed -> position -> low beam -> fog
                         if not self._lights & carla.VehicleLightState.Position:
                             world.hud.notification("Position lights")
                             current_lights |= carla.VehicleLightState.Position

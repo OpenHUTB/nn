@@ -32,7 +32,7 @@ class RBM:
         self.W = np.random.normal(
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
-        size = (n_observe, n_hidden))  # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
+        size = (n_observe, n_hidden)) # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
         
         # 初始化权重矩阵W，使用正态分布随机初始化
         # 可见层偏置（1 x n_observe）
@@ -220,7 +220,7 @@ if __name__ == '__main__':
         # 如果加载失败（其他错误，如文件损坏），保持原报错逻辑
         print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
         print(f"错误详情: {e}")
-        sys.exit(1) # 退出Python程序，并返回状态码1
+        sys.exit(1)
 
     # 获取数据集的形状信息
     n_imgs, n_rows, n_cols = mnist.shape  # 分别表示图像数量、行数和列数
@@ -232,13 +232,10 @@ if __name__ == '__main__':
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
-   
     # 训练RBM
     errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
-   
     # 生成并可视化样本
     samples = rbm.sample(n_samples=5, gibbs_steps=1000)
-   
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 
