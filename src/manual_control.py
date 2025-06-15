@@ -327,6 +327,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         # Set up the sensors.
         # 初始化碰撞传感器，传入玩家角色(player)和HUD对象(hud)用于显示碰撞信息
         self.collision_sensor = CollisionSensor(self.player, self.hud)
+        # 初始化车道入侵传感器，用于检测车辆是否偏离车道，同样需要player和hud参数
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
