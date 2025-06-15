@@ -19,12 +19,6 @@ import tqdm  # 导入tqdm库，用于显示进度条
 import random  # 导入随机数生成模块
 import string  # 导入字符串模块
 
-# ## 玩具序列数据生成
-# 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
-
-# In[20]:
-
-
 
 def randomString(stringLength):
     """生成一个指定长度的随机字符串，字符串由大写字母组成"""
