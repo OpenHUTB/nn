@@ -1177,19 +1177,19 @@ class IMUSensor(object):
 
     @staticmethod
     def _IMU_callback(weak_self, sensor_data):
-        self = weak_self()
-        if not self:
+        self = weak_self()  # 将弱引用转为强引用
+        if not self:  # 如果父对象已被销毁则直接返回
             return
-        limits = (-99.9, 99.9)
-        self.accelerometer = (
-            max(limits[0], min(limits[1], sensor_data.accelerometer.x)),
-            max(limits[0], min(limits[1], sensor_data.accelerometer.y)),
-            max(limits[0], min(limits[1], sensor_data.accelerometer.z)))
-        self.gyroscope = (
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.x))),
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.y))),
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.z))))
-        self.compass = math.degrees(sensor_data.compass)
+        limits = (-99.9, 99.9)  # 定义传感器数值的有效范围(防止极端值)
+        self.accelerometer = (  # 处理加速度计数据:
+            max(limits[0], min(limits[1], sensor_data.accelerometer.x)),  # x轴限幅
+            max(limits[0], min(limits[1], sensor_data.accelerometer.y)),  # y轴限幅
+            max(limits[0], min(limits[1], sensor_data.accelerometer.z)))  # z轴限幅
+        self.gyroscope = (  # 处理陀螺仪数据:
+            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.x))),  # x轴转换并限幅 
+            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.y))),  # y轴转换并限幅
+            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.z))))  # z轴转换并限幅
+        self.compass = math.degrees(sensor_data.compass)  # 处理罗盘数据:
 
 
 # ==============================================================================
@@ -1515,15 +1515,15 @@ def game_loop(args):
     finally:
 
         if original_settings:
-            sim_world.apply_settings(original_settings)
+            sim_world.apply_settings(original_settings)# 用于恢复初始状态
 
         if (world and world.recording_enabled):
             client.stop_recorder() # 如果世界对象存在且启用了录制功能，则停止录制
 
         if world is not None:
-            world.destroy()
+            world.destroy()# 无论是否录制，只要world存在，就释放资源
 
-        pygame.quit()
+        pygame.quit()# 结束图形相关操作
 
 
 # ==============================================================================
