@@ -31,7 +31,7 @@ tf.random.set_seed(42)
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
-dot_num = 100
+DOT_NUM = 100
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
 x_p = np.random.normal(3., 1, dot_num)
 # 从均值为6，标准差为1的高斯分布中采样y坐标，用于正样本
@@ -65,7 +65,7 @@ np.random.shuffle(data_set)
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss函数)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
-epsilon = 1e-12
+EPSILON = 1e-12
 
 
 class LogisticRegression():

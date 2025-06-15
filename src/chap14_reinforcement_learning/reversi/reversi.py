@@ -81,7 +81,7 @@ class ReversiEnv(gym.Env):
                 self.opponent_policy = make_random_policy(self.np_random)
                 print("################################################################")
             else:
-                raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))
+                raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))# 如果不是可识别的对手策略，抛出错误
         else:
             self.opponent_policy = self.opponent
 

@@ -19,12 +19,6 @@ import tqdm  # 导入tqdm库，用于显示进度条
 import random  # 导入随机数生成模块
 import string  # 导入字符串模块
 
-# ## 玩具序列数据生成
-# 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
-
-# In[20]:
-
-
 
 def randomString(stringLength):
     """生成一个指定长度的随机字符串，字符串由大写字母组成"""
@@ -87,7 +81,7 @@ class mySeq2SeqModel(keras.Model):
         # 词汇表大小: 26个字母 + 1个填充标记(0)
         self.v_sz = 27
         
-        # 隐藏层大小
+        # 隐藏层大小为128
         self.hidden = 128
         
         # 嵌入层，将字符索引转换为向量表示
@@ -392,7 +386,3 @@ def is_reverse(seq, rev_seq):
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
-
-
-# In[ ]:
-
