@@ -122,7 +122,7 @@ def test(cnn):
     y_pre = cnn(test_x)  
     
     # 计算softmax概率分布（将logits转换为概率值，dim=1表示对类别维度做归一化）
-    y_prob = F.softmax(y_pre, dim=1)
+    y_prob = F.softmax(y_pre, dim = 1)
     
     # 获取预测类别：找到每个样本概率最大的类别索引
     # torch.max返回(最大值, 最大值的索引)
