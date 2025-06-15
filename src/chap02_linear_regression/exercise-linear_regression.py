@@ -268,10 +268,14 @@ if __name__ == "__main__":
     # w_lsq: 通过最小二乘法得到的权重向量
     # w_gd: 通过梯度下降法得到的权重向量
     f, w_lsq, w_gd = main(x_train, y_train)
-
-    return f, w_lsq, w_gd
-
-
+    y_pred = f(x_test)
+    mse = np.mean((y_test - y_pred) ** 2)
+    print(f"均方误差(MSE): {mse:.4f}")
+    print("\n最小二乘法权重:")
+    print(w_lsq)
+    print("\n梯度下降法权重:")
+    print(w_gd)
+    
 
 def evaluate(ys, ys_pred):
     """评估模型。"""
