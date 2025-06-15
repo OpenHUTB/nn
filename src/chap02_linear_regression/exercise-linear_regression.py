@@ -324,5 +324,11 @@ if __name__ == "__main__":
     print("预测值与真实值的标准差：{:.1f}".format(std))
 
     # 使用封装的绘图函数
+    # 参数说明:
+    # x_train: 训练数据特征
+    # y_train: 训练数据标签
+    # x_test: 测试数据特征
+    # y_test: 测试数据真实标签
+    # y_test_pred: 测试数据预测标签
     plot_results(x_train, y_train, x_test, y_test, y_test_pred)
 
