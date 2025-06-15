@@ -58,7 +58,7 @@ train_loader = Data.DataLoader(
 # torchvision.datasets.MNIST用于加载 MNIST 数据集
 # root='./mnist/'指定数据集的存储路径
 # train=False表示加载测试集（而不是训练集）
-test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
+test_data = torchvision.datasets.MNIST(root='./mnist/', train = False)
 # 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
