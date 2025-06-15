@@ -279,23 +279,22 @@ def train(model, optimizer, seqlen):
     loss: 最终损失值
     """
     loss = 0.0
-    accuracy = 0.0
     
     # 训练2000步
-for step in range(2000):
-    # 获取一个批次的训练数据
-    batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
-    
-    # 执行一次训练步骤：前向传播 + 反向传播 + 参数更新
-    loss = train_one_step(model, optimizer, enc_x, dec_x, y)
-    
-    # 每500步打印一次损失
-    if step % 500 == 0:
-        # 将当前步数与损失值打印出来，用于监控训练过程
-        print('step', step, ': loss', loss.numpy())
+    for step in range(2000):
+        # 获取一个批次的训练数据
+        batched_examples, enc_x, dec_x, y = get_batch(32, seqlen)
         
-# 返回最后一次计算的 loss 值（可用于调试或后续处理）
-return loss
+        # 执行一次训练步骤：前向传播 + 反向传播 + 参数更新
+        loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+        
+        # 每500步打印一次损失
+        if step % 500 == 0:
+            # 将当前步数与损失值打印出来，用于监控训练过程
+            print('step', step, ': loss', loss.numpy())
+            
+    # 返回最后一次计算的 loss 值（可用于调试或后续处理）
+    return loss
 
 
 # # 训练迭代
