@@ -6,7 +6,11 @@
 import os
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
+# 从Keras中导入核心组件：
+# layers - 包含各种神经网络层的实现
+# optimizers - 包含各种优化算法（如SGD, Adam等）
+# datasets - 包含常用数据集（如MNIST, CIFAR等）的便捷加载方式
+from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import ( 
     Conv2D, Dense, Dropout, 
     Flatten, MaxPooling2D
