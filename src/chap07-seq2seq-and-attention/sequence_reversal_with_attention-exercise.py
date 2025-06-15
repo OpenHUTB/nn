@@ -87,7 +87,7 @@ class mySeq2SeqModel(keras.Model):
         # 词汇表大小: 26个字母 + 1个填充标记(0)
         self.v_sz = 27
         
-        # 隐藏层大小
+        # 隐藏层大小为128
         self.hidden = 128
         
         # 嵌入层，将字符索引转换为向量表示
