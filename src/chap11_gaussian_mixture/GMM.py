@@ -300,7 +300,7 @@ if __name__ == "__main__":
     # 训练GMM模型
     gmm = GaussianMixtureModel(n_components=3)
     gmm.fit(X)
-    y_pred = gmm.labels_
+    y_pred = gmm.labels_#训练后存储预测标签的属性，将其赋值给 y_pred 以便后续使用
      #
      
     # 可视化结果
