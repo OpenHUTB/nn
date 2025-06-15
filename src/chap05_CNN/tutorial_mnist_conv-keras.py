@@ -4,6 +4,7 @@
 
 # In[1]:
 import os
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
 from tensorflow import keras
 # 从Keras中导入核心组件：
