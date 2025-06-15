@@ -74,7 +74,7 @@ def generate_data(n_samples=1000):
     # 使用相同的随机索引同时打乱特征和标签
     return X[shuffle_idx], y_true[shuffle_idx]
 
-# 自定义logsumexp函数
+# 自定义logsumexp函数.LogSumExp（LSE）函数 是一种常见的数值计算函数，主要用于对数域求和的场景。
 def logsumexp(log_p, axis=1, keepdims=False):
     """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理
     
