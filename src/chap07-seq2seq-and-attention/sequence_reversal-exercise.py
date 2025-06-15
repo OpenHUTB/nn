@@ -92,7 +92,7 @@ class mySeq2SeqModel(keras.Model):
         # 嵌入层：将每个字符的索引映射成64维的向量表示
         # 输入维度：self.v_sz（即词表大小），输出维度为64
         self.embed_layer = tf.keras.layers.Embedding(self.v_sz, 64,
-                                                    batch_input_shape=[None, None])
+                                                    batch_input_shape = [None, None])
 
         # 编码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.encoder_cell = tf.keras.layers.SimpleRNNCell(128)
@@ -100,7 +100,7 @@ class mySeq2SeqModel(keras.Model):
         # 解码器RNN单元：使用SimpleRNNCell，隐藏状态维度为128
         self.decoder_cell = tf.keras.layers.SimpleRNNCell(128)
 
-        # 编码器RNN层：将RNNCell包裹成完整RNN，输出整个序列（return_sequences=True），并返回最终状态（return_state=True）
+        # 编码器RNN层：将RNNCell包裹成完整RNN，输出整个序列（return_sequences = True），并返回最终状态（return_state = True）
         self.encoder = tf.keras.layers.RNN(
             self.encoder_cell,
             # 返回每个时间步的输出
@@ -135,11 +135,11 @@ class mySeq2SeqModel(keras.Model):
         编码器处理输入序列 → 传递状态给解码器 → 解码器生成输出序列 → 全连接层预测
 
         Args:
-            enc_ids: 编码器输入序列（字符索引），shape=(batch_size, enc_seq_len)
-            dec_ids: 解码器输入序列（字符索引，含起始标记），shape=(batch_size, dec_seq_len)
+            enc_ids: 编码器输入序列（字符索引），shape = (batch_size, enc_seq_len)
+            dec_ids: 解码器输入序列（字符索引，含起始标记），shape = (batch_size, dec_seq_len)
 
         Returns:
-            logits: 解码器每个位置的预测概率分布，shape=(batch_size, dec_seq_len, vocab_size)
+            logits: 解码器每个位置的预测概率分布，shape = (batch_size, dec_seq_len, vocab_size)
         '''
         # 编码过程
         enc_emb = self.embed_layer(enc_ids)            # (batch_size, enc_seq_len, emb_dim)
@@ -147,7 +147,7 @@ class mySeq2SeqModel(keras.Model):
         
         # 解码过程，使用编码器的最终状态作为初始状态
         dec_emb = self.embed_layer(dec_ids)                                      # (batch_size, dec_seq_len, emb_dim)
-        dec_out, dec_state = self.decoder(dec_emb, initial_state=enc_state)      # dec_out: (batch_size, dec_seq_len, dec_units)
+        dec_out, dec_state = self.decoder(dec_emb, initial_state = enc_state)      # dec_out: (batch_size, dec_seq_len, dec_units)
         
         # 计算logits 
         logits = self.dense(dec_out)  # (batch_size, dec_seq_len, vocab_size)
@@ -185,22 +185,22 @@ class mySeq2SeqModel(keras.Model):
         score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
         # 计算注意力权重
         # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
-        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
+        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis = -1)  # (B, T1)
         attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
       
         # 计算上下文向量
         # 根据注意力权重加权求和编码器输出，得到上下文向量
-        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
+        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis = 1)  # (B, H)
       
         # 将嵌入向量和上下文向量拼接作为RNN输入
-        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
+        rnn_input = tf.concat([x_embed, context], axis = -1)  # (B, E+H)
       
         # 通过RNN单元计算输出和更新状态
         output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
       
         # 通过全连接层计算logits
         logits = self.dense(output)  # (B, V)
-        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)，获取 logits 张量中每个元素的最大值所在的索引
+        next_token = tf.argmax(logits, axis = -1, output_type = tf.int32)  # (B,)，获取 logits 张量中每个元素的最大值所在的索引
         return next_token, new_state[0]  # 返回单个状态向量
 
 
@@ -217,7 +217,7 @@ def compute_loss(logits, labels):
     """
     # 计算稀疏交叉熵损失
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits = logits, labels = labels)
     # 计算平均损失
     losses = tf.reduce_mean(losses)
     return losses
