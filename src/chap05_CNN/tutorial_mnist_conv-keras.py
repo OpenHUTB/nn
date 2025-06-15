@@ -6,6 +6,7 @@
 import os
 # 导入TensorFlow深度学习框架
 import tensorflow as tf
+# 从TensorFlow中导入Keras高级API（TensorFlow的内置Keras实现）
 from tensorflow import keras
 # 从Keras中导入核心组件：
 # layers - 包含各种神经网络层的实现
