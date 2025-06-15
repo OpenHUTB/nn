@@ -284,7 +284,7 @@ class GaussianMixtureModel:
             raise ValueError("请先调用fit方法训练模型")
 
         # 创建一个图形窗口，设置大小为10x6英寸
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize = (10, 6))
         # 绘制对数似然值随迭代次数的变化曲线
         # 使用蓝色实线绘制，范围从1到len(self.log_likelihoods)
         plt.plot(range(1, len(self.log_likelihoods) + 1), self.log_likelihoods, 'b-')
@@ -295,7 +295,7 @@ class GaussianMixtureModel:
         # 设置图表的标题为“EM算法收敛曲线”
         plt.title('EM算法收敛曲线')
         # 启用网格线，增强可读性
-        plt.grid(True, alpha=0.5) 
+        plt.grid(True, alpha = 0.5) 
         plt.show()
 
 # 主程序
@@ -303,34 +303,34 @@ if __name__ == "__main__":
     # 1. 生成合成数据
     print("生成混合高斯分布数据...")
     # 调用generate_data函数生成样本数据：
-    X, y_true = generate_data(n_samples=1000)
+    X, y_true = generate_data(n_samples = 1000)
     print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     
     # 训练GMM模型
     # 初始化高斯混合模型，指定3个高斯成分
-    gmm = GaussianMixtureModel(n_components=3)
+    gmm = GaussianMixtureModel(n_components = 3)
     gmm.fit(X)
     y_pred = gmm.labels_#训练后存储预测标签的属性，将其赋值给 y_pred 以便后续使用
      #
      
     # 可视化结果
-    plt.figure(figsize=(12, 5))#创建图形和子图
+    plt.figure(figsize = (12, 5))#创建图形和子图
     plt.subplot(1, 2, 1)
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)#绘制散点图，x 轴为 X 的第一列（Feature 1），y 轴为 X 的第二列（Feature 2）；点颜色由 y_true 决定（真实聚类标签）
-    # 使用 viridis 颜色映射；s=10 设置点的大小为 10
+    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap = 'viridis', s = 10)#绘制散点图，x 轴为 X 的第一列（Feature 1），y 轴为 X 的第二列（Feature 2）；点颜色由 y_true 决定（真实聚类标签）
+    # 使用 viridis 颜色映射；s = 10 设置点的大小为 10
     plt.title("True Clusters")
     # 注意：此处重复设置标题是为了确保在某些环境中标题能够正确显示
     plt.title("True Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.grid(True, linestyle = '--', alpha = 0.7)
     plt.subplot(1, 2, 2)
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)#绘制散点图，x 轴和 y 轴与第一个子图相同。点颜色由 y_pred 决定（GMM 预测的聚类标签），
+    plt.scatter(X[:, 0], X[:, 1], c = y_pred, cmap = 'viridis', s = 10)#绘制散点图，x 轴和 y 轴与第一个子图相同。点颜色由 y_pred 决定（GMM 预测的聚类标签），
     # 使用相同的 viridis 颜色映射。点大小同样为 10。
     plt.title("GMM Predicted Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
+    plt.grid(True, linestyle = '--', alpha = 0.7) # 在当前图表中添加网格线，并进行样式配置
     plt.show()#显示创建的图形窗口
     #打印信息
     print("生成混合高斯分布数据...")
