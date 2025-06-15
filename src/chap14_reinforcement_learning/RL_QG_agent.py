@@ -123,7 +123,7 @@ class RL_QG_agent:
             self.saver.save(self.sess, model_path)
             self.logger.info("模型已保存至 %s", model_path)
         except Exception as e:
-            self.logger.error("保存模型时出错: %s", e)
+            self.logger.error("保存模型时出错: %s", e) # 使用logger记录一条错误日志信息
 
 
 

@@ -256,7 +256,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
     """
     with tf.GradientTape() as tape:
         logits = model(enc_x, dec_x)
-        loss = compute_loss(logits, y)
+        loss = compute_loss(logits, y) # 计算模型预测结果与真实标签之间的损失值
 
     # 计算梯度
     grads = tape.gradient(loss, model.trainable_variables) # 使用自动微分计算损失函数相对于模型可训练变量的梯度
