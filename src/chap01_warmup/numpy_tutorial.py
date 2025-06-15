@@ -231,7 +231,7 @@ plt.title("Plot of y = x^2")  # 图像标题
 plt.xlabel("x")  # x 轴标签
 plt.ylabel("y")  # y 轴标签
 
-# 显示出半透明网格线
+# 显示出半透明网格线，并设置网格线的透明度为0.5（0-1之间，数值越小越透明）
 plt.grid(True, alpha = 0.5)
 
 
