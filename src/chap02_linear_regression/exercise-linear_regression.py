@@ -50,6 +50,7 @@ def multinomial_basis(x, feature_num=10):
     # 生成各次幂特征：x^1, x^2, ..., x^feature_num，将其拼接
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将存储不同次幂特征的数组在第二个维度（列方向）上进行拼接
+    # 例如，若每个特征数组形状为 (N, 1)，拼接后形状变为 (N, feature_num)
     ret = np.concatenate(ret, axis=1)
     return ret
 
