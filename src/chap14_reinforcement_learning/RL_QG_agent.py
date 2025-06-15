@@ -122,6 +122,8 @@ class RL_QG_agent:
         # 尝试调用saver的save方法保存当前会话(sess)的模型参数
         # model_path 指定了模型保存的路径和文件名
         self.saver.save(self.sess, model_path)
+        
+        # 如果保存过程中发生任何异常，将会被捕获并处理
         except Exception as e:
             self.logger.error("保存模型时出错: %s", e) # 使用logger记录一条错误日志信息
 
