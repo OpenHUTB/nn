@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # coding: utf-8
 # numpy 的 array 操作
+
 # 1. 导入 numpy 库
 import numpy as np                    # 将 numpy 库命名为 np
 import matplotlib.pyplot as plt       # 仅保留需要使用的导入
 # import 放一起代码美观
+
+
 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 
@@ -20,15 +23,17 @@ print("(2) 输出 a 的各维度的大小（shape）\n", a.shape)
 print("(3) 输出 a 的第一个元素（element）\n", a[0])
 # 使用 array() 函数创建数组，函数可基于序列型的对象。创建了一个一维数组 a，并输出其类型（numpy.ndarray）、形状（(3,)） 和第一个元素（4）。
 # 使用 type() 获取数组的类型(numpy.ndarray),使用 shape 属性查看数组维度信息(一维数组的形状表示为 (n,)),通过索引访问数组元素（索引从 0 开始）
-
 # 3. 建立一个二维数组 b, 初始化为 [ [4, 5, 6], [1, 2, 3]] (1) 输出二维数组 b 的形状（shape）（输出值为（2,3））(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）
 print("第三题：\n")
 b = np.array([[4, 5, 6], [1, 2, 3]])  # 创建一个二维数组 b
 print("(1) 输出各维度的大小（shape）\n", b.shape)  # 输出数组 b 的形状 - 应该是(2,3)
 print("(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])  # 输出数组 b 的指定元素 - b[0,0]是4, b[0,1]是5, b[1,1]是2
+
+
 # 4. (1) 建立一个全 0 矩阵 a, 大小为 3x3; 类型为整型（提示: dtype = int）(2) 建立一个全 1 矩阵 b, 大小为 4x5;  (3) 建立一个单位矩阵 c ,大小为 4x4; (4) 生成一个随机数矩阵 d,
 # 大小为 3x2.
 print("第四题：\n")
+
 # 全 0 矩阵，3x3，指定数据类型为int
 a = np.zeros((3, 3), dtype=int)
 # 全 1 矩阵，4x5，默认数据类型为float
@@ -41,7 +46,7 @@ d = np.random.random((3, 2))# 生成一个形状为(3, 2)的NumPy数组，其中
 
 # 5. 建立一个数组 a,(值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1) 打印 a; (2) 输出数组中下标为 (2,3),(0,0) 这两个元素的值
 def question_5():
-  print("第五题：\n")
+print("第五题：\n")
 # 创建一个 3x4 的二维数组 a，值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
 a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
 # 输出数组 a
@@ -192,13 +197,13 @@ print(np.exp(x))
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
 print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
-print("每列最大值的下标:", np.argmax(x, axis=0))  # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-print("每行最大值的下标:", np.argmax(x, axis=1))  # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
+print("每列最大值的下标:", np.argmax(x, axis=0))   # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
+print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 def plot_quadratic():
 
- print("\n第二十四题：绘制二次函数")
+print("\n第二十四题：绘制二次函数")
 
 x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
 y = x * x  # 计算每个 x 对应的 y=x^2 的值
@@ -215,13 +220,13 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
-plt.legend(loc='upper right')
+plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
 plt.savefig('quadratic.png')   # 保存图像
 plt.show()  # 显示绘制的图像
 
 # 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 print("第二十五题：\n")
-
+# 改用linspace确保包含端点
 x = np.arange(0, 3 * np.pi, 0.1)  ## 生成从 0 到 3π 的 x 值，步长为 0.1
 y_sin = np.sin(x)  # 计算对应的正弦值
 y_cos = np.cos(x)  # 计算对应的余弦值
