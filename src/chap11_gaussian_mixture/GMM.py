@@ -216,7 +216,12 @@ class GaussianMixtureModel:
             log_likelihood = current_log_likelihood   # 更新记录的上一次迭代的对数似然值
             
             # 更新模型参数
+
+            # 更新模型的均值参数（self.mu）为计算得到的新均值（new_mu）
+            # new_mu通常是通过优化算法（如EM算法、梯度下降）得到的当前最优估计值
             self.mu = new_mu
+            # 更新模型的协方差参数（self.sigma）为计算得到的新协方差（new_sigma）
+            # new_sigma需保证为正定矩阵，常见实现中会通过Cholesky分解等方法确保数值稳定性
             self.sigma = new_sigma
         
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
