@@ -3,16 +3,25 @@
 # ## 准备数据
 
 # In[1]:
+# 导入操作系统相关功能模块，用于文件路径操作等系统级功能
 import os
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
+# 从TensorFlow中导入Keras高级API（TensorFlow的内置Keras实现）
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
+# 从Keras中导入核心组件：
+# layers - 包含各种神经网络层的实现
+# optimizers - 包含各种优化算法（如SGD, Adam等）
+# datasets - 包含常用数据集（如MNIST, CIFAR等）的便捷加载方式
+from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import ( 
     Conv2D, Dense, Dropout, 
     Flatten, MaxPooling2D
 )
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'# 设置环境变量，控制 TensorFlow 的日志输出等级
+                                        # 'TF_CPP_MIN_LOG_LEVEL' 可以用来过滤不必要的日志信息，提升可读性
+                                        # 值为 '2' 表示屏蔽 Info 和 Warning 级别的日志
 
 
 def mnist_dataset():

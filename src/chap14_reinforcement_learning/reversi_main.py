@@ -13,6 +13,7 @@ import numpy as np
 from RL_QG_agent import RL_QG_agent
 
 # 创建黑白棋环境实例（8x8标准棋盘）
+# RL_QG_agent类实现了策略网络、价值函数和动作选择逻辑
 env = gym.make('Reversi8x8-v0')  # 使用Gym接口创建特定环境
 env.reset()  # 初始化环境状态
 
@@ -22,6 +23,7 @@ agent.load_model()  # 加载已训练的模型参数，加速学习过程
 
 # 设置训练参数
 max_epochs = 100  # 总共进行的训练局数，每局是完整的游戏
+render_interval = 10  # 每10局渲染一次，减少性能开销
 
 # 训练主循环
 for i_episode in range(max_epochs):
