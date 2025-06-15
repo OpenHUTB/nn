@@ -79,7 +79,7 @@ class CNN(nn.Module):
         
         # 第一个卷积层
         self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
+            nn.Conv2d(1, 32, kernel_size = 3, stride = 1, padding = 1),  # 3x3卷积核
             nn.BatchNorm2d(32),                                    # 添加批量归一化
 
             nn.ReLU(),                                             # ReLU激活函数，引入非线性，ReLU 函数的公式为 f(x) = max(0, x)，可以将负值置为0。
@@ -90,10 +90,10 @@ class CNN(nn.Module):
         # 第二个卷积层
         self.conv2 = nn.Sequential(
 
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
+            nn.Conv2d(32, 64, kernel_size = 3, stride = 1, padding = 1),  # 3x3卷积核
             nn.BatchNorm2d(64),                                     # 添加批量归一化
             nn.ReLU(),                                              # ReLU激活函数
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
+            nn.Conv2d(64, 64, kernel_size = 3, stride = 1, padding = 1),  # 增加一层3x3卷积
             nn.BatchNorm2d(64),                                     # 批量归一化，加速训练并提高模型稳定性
             nn.ReLU(),                                              # ReLU激活函数，引入非线性变换
 
@@ -128,7 +128,7 @@ def test(cnn):
     y_pre = cnn(test_x)  
     
     # 计算softmax概率分布（将logits转换为概率值，dim=1表示对类别维度做归一化）
-    y_prob = F.softmax(y_pre, dim=1)
+    y_prob = F.softmax(y_pre, dim = 1)
     
     # 获取预测类别：找到每个样本概率最大的类别索引
     # torch.max返回(最大值, 最大值的索引)
@@ -150,7 +150,7 @@ def test(cnn):
 # 训练函数
 def train(cnn):
     # 使用Adam优化器，学习率为learning_rate
-    optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate)
     # 使用交叉熵损失函数
     loss_func = nn.CrossEntropyLoss()
 
