@@ -247,6 +247,7 @@ register(
 register(
     id='Reacher-v1',
     entry_point='gym.envs.mujoco:ReacherEnv',
+# Reacher是一个经典的连续控制任务，智能体控制机械臂末端到达目标位置
     max_episode_steps=50,     # 短步数限制
     reward_threshold=-3.75,   # 负阈值表示最小化末端与目标的距离
 )
