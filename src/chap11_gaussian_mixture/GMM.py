@@ -176,6 +176,10 @@ class GaussianMixtureModel:
             Nk = np.sum(gamma, axis=0) # 每个高斯成分的"有效样本数"
             
             # 更新混合权重
+            # 计算类别先验概率（class prior），即每个类别在样本中的比例
+            # Nk: 当前类别k的样本数量
+            # n_samples: 总样本数量
+           # 结果self.pi表示类别k在总体中的出现频率，用于后续的概率计算
             self.pi = Nk / n_samples
             
             # 初始化新均值和新协方差矩阵
