@@ -465,18 +465,18 @@ class KeyboardControl(object):
 
         # 遍历所有PyGame事件
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            elif event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
-                    return True
+            if event.type == pygame.QUIT:   # 处理窗口关闭事件（点击窗口X按钮）
+                return True  # 返回True表示需要退出程序
+            elif event.type == pygame.KEYUP:  # 处理键盘按键释放事件
+                if self._is_quit_shortcut(event.key):  # 检查是否是退出快捷键（如ESC等）
+                    return True  # 返回True表示需要退出程序
 
                 # 重置场景
-                elif event.key == K_BACKSPACE:
-                    if self._autopilot_enabled:
-                        world.player.set_autopilot(False)
-                        world.restart()
-                        world.player.set_autopilot(True)
+                elif event.key == K_BACKSPACE:  # 处理Backspace键 - 场景重置功能 
+                    if self._autopilot_enabled:   # 如果当前处于自动驾驶模式
+                        world.player.set_autopilot(False)   # 先暂时关闭自动驾驶
+                        world.restart()  # 重置游戏世界/场景
+                        world.player.set_autopilot(True)  # 重新启用自动驾驶
                     else:
                         world.restart()
                 elif event.key == K_F1:
