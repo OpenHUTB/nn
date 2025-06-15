@@ -407,20 +407,20 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
-        if self.radar_sensor is not None:# 如果雷达传感器存在，则切换雷达状态（开启/关闭）
+        if self.radar_sensor is not None: # 如果雷达传感器存在，则切换雷达状态（开启/关闭）
             self.toggle_radar()
-        sensors = [
-            self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
-            self.gnss_sensor.sensor,
-            self.imu_sensor.sensor]
-        for sensor in sensors:
-            if sensor is not None:
-                sensor.stop()
-                sensor.destroy()
-        if self.player is not None:
-            self.player.destroy()
+        sensors = [  # 定义需要处理的传感器列表
+            self.camera_manager.sensor,  # - 摄像头管理器的主传感器
+            self.collision_sensor.sensor,  # - 碰撞检测传感器
+            self.lane_invasion_sensor.sensor,  # - 车道入侵检测传感器
+            self.gnss_sensor.sensor,  # - GNSS定位传感器 
+            self.imu_sensor.sensor]  # - IMU惯性测量单元传感器
+        for sensor in sensors:  # 遍历所有传感器进行处理
+            if sensor is not None:  # 检查传感器是否存在
+                sensor.stop()  # 停止传感器数据采集
+                sensor.destroy()  # 销毁传感器对象释放资源
+        if self.player is not None:  # 检查玩家角色是否存在
+            self.player.destroy()  # 销毁玩家角色对象
 
 
 # ==============================================================================
