@@ -95,13 +95,13 @@ class CNN(nn.Module):
         )
         
         # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
-        self.out1 = nn.Linear(7*7*64, 1024, bias=True)
+        self.out1 = nn.Linear(7*7*64, 1024, bias = True)
         
         # Dropout层：训练时随机丢弃神经元，防止过拟合
         self.dropout = nn.Dropout(keep_prob_rate)
         
         # 第二个全连接层：1024维输入，10维输出（对应10个数字类别）
-        self.out2 = nn.Linear(1024, 10, bias=True)
+        self.out2 = nn.Linear(1024, 10, bias = True)
 
     #定义了一个神经网络的前向传播过程，进行特征提取和分类预测
     def forward(self, x):
