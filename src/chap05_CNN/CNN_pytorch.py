@@ -41,16 +41,16 @@ if not(os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
 
 # 加载训练数据集
 train_data = torchvision.datasets.MNIST(
-    root='./mnist/',                              # 数据集保存路径
-    train=True,                                   # 加载训练集（False则加载测试集）
+    root = './mnist/',                              # 数据集保存路径
+    train = True,                                   # 加载训练集（False则加载测试集）
     transform=torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
     download=DOWNLOAD_MNIST                       # 如果需要则下载
 )
 
 # 创建数据加载器，用于批量加载数据
 train_loader = Data.DataLoader(
-    dataset=train_data,     # 使用的数据集
-    batch_size=BATCH_SIZE,  # 每批数据量
+    dataset = train_data,     # 使用的数据集
+    batch_size = BATCH_SIZE,  # 每批数据量
     shuffle=True            # 是否在每个epoch打乱数据顺序（重要！避免模型学习到顺序信息）
 )
 
@@ -58,9 +58,9 @@ train_loader = Data.DataLoader(
 # torchvision.datasets.MNIST用于加载 MNIST 数据集
 # root='./mnist/'指定数据集的存储路径
 # train=False表示加载测试集（而不是训练集）
-test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
+test_data = torchvision.datasets.MNIST(root = './mnist/', train = False)
 # 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
-test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
+test_x = Variable(torch.unsqueeze(test_data.test_data, dim = 1), volatile = True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
 
@@ -77,7 +77,7 @@ class CNN(nn.Module):
         """
         # 第一个卷积层
         self.conv1 = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
+            nn.Conv2d(1, 32, kernel_size = 3, stride = 1, padding = 1),  # 3x3卷积核
             nn.BatchNorm2d(32),                                    # 添加批量归一化
             nn.ReLU(),                                             # ReLU激活函数，引入非线性，ReLU 函数的公式为 f(x) = max(0, x)，可以将负值置为0。
             nn.MaxPool2d(2)                                        # 最大池化，减小特征图尺寸
@@ -85,23 +85,23 @@ class CNN(nn.Module):
         
         # 第二个卷积层
         self.conv2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
+            nn.Conv2d(32, 64, kernel_size = 3, stride = 1, padding = 1),  # 3x3卷积核
             nn.BatchNorm2d(64),                                     # 添加批量归一化
             nn.ReLU(),                                              # ReLU激活函数
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),  # 增加一层3x3卷积
+            nn.Conv2d(64, 64, kernel_size = 3, stride = 1, padding = 1),  # 增加一层3x3卷积
             nn.BatchNorm2d(64),                                     # 批量归一化，加速训练并提高模型稳定性
             nn.ReLU(),                                              # ReLU激活函数，引入非线性变换
             nn.MaxPool2d(2)                                         # 最大池化，减小特征图尺寸
         )
         
         # 第一个全连接层：输入是7*7*64=3136（两次池化后图像尺寸变为7x7），输出1024维
-        self.out1 = nn.Linear(7*7*64, 1024, bias=True)
+        self.out1 = nn.Linear(7*7*64, 1024, bias = True)
         
         # Dropout层：训练时随机丢弃神经元，防止过拟合
         self.dropout = nn.Dropout(keep_prob_rate)
         
         # 第二个全连接层：1024维输入，10维输出（对应10个数字类别）
-        self.out2 = nn.Linear(1024, 10, bias=True)
+        self.out2 = nn.Linear(1024, 10, bias = True)
 
     #定义了一个神经网络的前向传播过程，进行特征提取和分类预测
     def forward(self, x):
