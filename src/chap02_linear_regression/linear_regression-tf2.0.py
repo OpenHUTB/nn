@@ -93,11 +93,13 @@ class linearModel(Model):
         self.w = tf.Variable(
             shape=[ndim, 1],    # 权重矩阵形状：ndim×1
             initial_value=tf.random.uniform(
+                # [ndim, 1] 表示这是一个二维矩阵，有 ndim 行和 1 列
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
             trainable=True,
             name="weight"
         )
+
         
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
         # 定义偏置参数b，形状为 [1]
