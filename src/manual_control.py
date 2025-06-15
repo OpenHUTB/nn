@@ -333,6 +333,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self.gnss_sensor = GnssSensor(self.player)
         # 初始化IMU（惯性测量单元）传感器，用于检测加速度和角速度等惯性数据
         self.imu_sensor = IMUSensor(self.player)
+        # 设置当前激活的相机传感器，notify=False表示不立即通知HUD更新显示
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
         self.camera_manager.transform_index = cam_pos_index  # 设置相机管理器的初始变换索引
         self.camera_manager.set_sensor(cam_index, notify=False)
