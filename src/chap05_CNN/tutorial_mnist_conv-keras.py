@@ -4,6 +4,7 @@
 
 # In[1]:
 import os
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
