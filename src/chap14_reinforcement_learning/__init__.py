@@ -17,7 +17,7 @@ from gym.envs.registration import (
 register(
     id='Copy-v0',             # 环境唯一标识，通过gym.make('Copy-v0')调用
     entry_point='gym.envs.algorithmic:CopyEnv',  # 环境类的路径（模块:类名）
-    max_episode_steps=200,    # 单个episode的最大步数限制，防止无限循环
+    max_episode_steps = 200,    # 单个episode的最大步数限制，防止无限循环
     reward_threshold=25.0,    # 平均奖励达到此值视为任务成功
 )
 
