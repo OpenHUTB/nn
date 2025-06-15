@@ -193,6 +193,6 @@ plt.ylabel("y")
 plt.title("Linear Regression") # 图表标题
 # 虚线网格，半透明灰色
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
-plt.legend(["train", "test", "pred"]) # 添加图例，元素依次对应
+plt.legend(["train", "test", "pred"])  # 添加图例，元素依次对应
 plt.tight_layout()  # 自动调整布局
 plt.show()# 显示图形
