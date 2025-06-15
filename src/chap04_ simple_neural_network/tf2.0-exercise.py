@@ -22,21 +22,21 @@ def softmax(x):
     """
     # 如果不是张量，则转换为张量
     if not tf.is_tensor(x):
-        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        x = tf.convert_to_tensor(x, dtype = tf.float32)
 
     # 减去最大值以提高数值稳定性
-    x_max = tf.reduce_max(x, axis=-1, keepdims=True)
+    x_max = tf.reduce_max(x, axis = -1, keepdims = True)
     # 计算 x - x_max 的指数
     exp_x = tf.exp(x - x_max)
 
     # 计算softmax，防止除零错误
-    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
+    sum_exp = tf.reduce_sum(exp_x, axis = -1, keepdims = True)
     return exp_x / (sum_exp + 1e-10)
 
 # 测试 softmax 实现是否正确，使用随机数据对比 TensorFlow 的实现
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size = [10, 5])
 # 验证自定义softmax与tf.nn.softmax的输出差异是否足够小
-(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
+(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis = -1).numpy())**2 < 0.0001
 
 # ## 实现sigmoid函数
 
