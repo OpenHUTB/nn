@@ -35,7 +35,7 @@ print("(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,
 print("第四题：\n")
 
 # 全 0 矩阵，3x3，指定数据类型为int
-a = np.zeros((3, 3), dtype=int)
+a = np.zeros((3, 3), dtype = int)
 # 全 1 矩阵，4x5，默认数据类型为float
 b = np.ones((4, 5))
 # 单位矩阵，4x4(对角线为1，其余为0)
