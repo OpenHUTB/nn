@@ -130,7 +130,7 @@ class myRNNModel(keras.Model):
         self.rnncell = tf.keras.layers.SimpleRNNCell(128)  # 128维隐藏状态
         
         # RNN层：包装RNN单元，处理序列
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
         
         # 输出层：预测下一个词的概率分布
         self.dense = tf.keras.layers.Dense(self.v_sz)
