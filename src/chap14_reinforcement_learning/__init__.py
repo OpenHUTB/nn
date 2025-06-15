@@ -229,14 +229,14 @@ register(
 register(
     id='GuessingGame-v0',
     entry_point='gym.envs.toy_text.guessing_game:GuessingGame',
-    max_episode_steps=200,
+    max_episode_steps=200,# 设置强化学习环境的最大步数限制，每个episode最多执行200步
 )
 
 # 9. 热冷游戏：根据"热/冷"反馈搜索目标位置（空间探索任务）
 register(
     id='HotterColder-v0',# 环境ID，遵循gym命名规范：<名称>-<版本号>
     entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
-    max_episode_steps=200,
+    max_episode_steps=200,# 设置强化学习环境的最大步数限制，每个episode最多执行200步
 )
 
 
