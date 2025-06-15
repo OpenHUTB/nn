@@ -118,4 +118,4 @@ print(label)
 
 # 对比手动实现和 TensorFlow 实现的 sigmoid 交叉熵结果
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data))
-  - sigmoid_ce(prob, label))**2 < 0.0001).numpy()
+  - sigmoid_ce(prob, label))**2 < 0.0001).numpy()  # 判断差异是否小于 0.0001，结果转为 numpy 布尔值，用于验证两者计算是否一致
