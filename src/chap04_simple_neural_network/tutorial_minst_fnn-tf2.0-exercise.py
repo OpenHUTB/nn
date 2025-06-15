@@ -112,6 +112,9 @@ def compute_accuracy(logits, labels):
 def train_one_step(model, optimizer, x, y):
     """
     执行一次训练步骤，计算梯度并更新模型参数。
+    注意:
+        1. 使用梯度裁剪防止梯度爆炸
+        2. 所有计算都在GradientTape上下文中进行自动微分
     """
     with tf.GradientTape() as tape:     # 记录计算图以计算梯度
         logits = model(x)               # 前向传播

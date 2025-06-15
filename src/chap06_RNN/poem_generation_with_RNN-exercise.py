@@ -127,6 +127,7 @@ class myRNNModel(keras.Model):
         self.v_sz = len(w2id)  # 词汇表大小
         
         # 嵌入层：将词语id映射为密集向量
+        # 自动处理变长序列(batch_input_shape=[None, None])
         self.embed_layer = tf.keras.layers.Embedding(
             self.v_sz, 64,  # 64维嵌入向量
             batch_input_shape=[None, None])  # 支持变长序列

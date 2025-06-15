@@ -56,6 +56,7 @@ class RNN_model(nn.Module):
         self.rnn_lstm = nn.LSTM(input_size = embedding_dim, hidden_size = lstm_hidden_dim, num_layers = 2, batch_first = False)
 
         # 定义全连接层，将LSTM的输出映射到词汇表大小
+        # 使用Linear+LogSoftmax替代CrossEntropyLoss要求的LogSoftmax
         self.fc = nn.Linear(lstm_hidden_dim, vocab_len)
 
         # 调用权重初始化函数（需要你自定义weights_init函数）

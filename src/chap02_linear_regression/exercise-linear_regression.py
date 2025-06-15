@@ -151,7 +151,7 @@ def least_squares(phi, y, alpha = 0.0, solver = "pinv"):
     return w
 
 
-def gradient_descent(phi, y, lr = 0.01, epochs = 1000):
+def gradient_descent(phi, y, lr=0.01, epochs=1000):
     """实现批量梯度下降算法优化线性回归权重
     参数:
         phi: 设计矩阵（特征矩阵），形状为 (n_samples, n_features)
@@ -226,7 +226,7 @@ def main(x_train, y_train, use_gradient_descent = False, basis_func = None):
             return np.dot(phi, w_gd)
         else:
             return np.dot(phi, w_lsq)
-    return f, w_lsq, w_gd
+    return f, w_lsq, w_gd# 返回预测函数、最小二乘权重和梯度下降权重
 
 
 def evaluate(ys, ys_pred):

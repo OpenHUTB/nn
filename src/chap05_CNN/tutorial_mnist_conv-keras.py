@@ -10,11 +10,12 @@ import os
 import tensorflow as tf
 # 从TensorFlow中导入Keras高级API（TensorFlow的内置Keras实现）
 from tensorflow import keras
+
+from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
 # 从Keras中导入核心组件：
 # layers - 包含各种神经网络层的实现
 # optimizers - 包含各种优化算法（如SGD, Adam等）
 # datasets - 包含常用数据集（如MNIST, CIFAR等）的便捷加载方式
-from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import ( 
     Conv2D, Dense, Dropout, 
     Flatten, MaxPooling2D
@@ -82,10 +83,10 @@ def prepare_mnist_features_and_labels(x, y):
         x: 归一化后的图像数据。
         y: 转换为整型的标签。
     """
-    x = tf.cast(x, tf.float32) / 255.0
+    x = tf.cast(x, tf.float32) / 255.0# 显式转换为float32后除255
     # 将标签转换为int64类型
     # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
-    y = tf.cast(y, tf.int64)
+    y = tf.cast(y, tf.int64)# 使用int64避免平台相关差异
     return x, y
 
 

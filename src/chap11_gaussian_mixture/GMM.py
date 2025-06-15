@@ -299,9 +299,10 @@ if __name__ == "__main__":
     print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     
     # 训练GMM模型
+    # 初始化高斯混合模型，指定3个高斯成分
     gmm = GaussianMixtureModel(n_components=3)
     gmm.fit(X)
-    y_pred = gmm.labels_
+    y_pred = gmm.labels_#训练后存储预测标签的属性，将其赋值给 y_pred 以便后续使用
      #
      
     # 可视化结果

@@ -131,6 +131,12 @@ class Softmax:
     def backward(self, grad_y):
         '''
         grad_y: same shape as x
+        数学原理:
+        设 softmax 输出为 s = [s1, s2, ..., sc]
+        雅可比矩阵 J = diag(s) - s·s^T
+        反向传播公式:
+            grad_x = grad_y @ J = grad_y * s - <grad_y, s> * s
+        其中 @ 表示矩阵乘法，* 表示逐元素乘法，<,> 表示内积
         '''
         s = self.mem['out']
         sisj = np.matmul(

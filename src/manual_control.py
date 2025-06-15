@@ -306,21 +306,21 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         #设置车辆为无敌模式
         if blueprint.has_attribute('is_invincible'):
             blueprint.set_attribute('is_invincible', 'true')
-        # set the max speed
-        if blueprint.has_attribute('speed'):
-            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
+        # 设置最大速度
+        if blueprint.has_attribute('speed'): # 检查蓝图是否有'speed'属性
+            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])# 从蓝图获取推荐速度值并转换为浮点数
             self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
 
-        # Spawn the player.
+        # 如果玩家车辆已存在
         if self.player is not None:
             spawn_point = self.player.get_transform() # 获取玩家当前的变换信息（位置和旋转）
             spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
-            spawn_point.rotation.roll = 0.0
+            spawn_point.rotation.roll = 0.0 # 重置横滚角
             spawn_point.rotation.pitch = 0.0
-            self.destroy()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-            self.show_vehicle_telemetry = False
-            self.modify_vehicle_physics(self.player)
+            self.destroy()# 销毁现有玩家车辆
+            self.player = self.world.try_spawn_actor(blueprint, spawn_point)# 尝试在新位置生成玩家车辆
+            self.show_vehicle_telemetry = False # 关闭车辆遥测显示
+            self.modify_vehicle_physics(self.player) # 应用自定义车辆物理参数
         while self.player is None:
             if not self.map.get_spawn_points():
                 print('There are no spawn points available in your map/town.')

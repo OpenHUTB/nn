@@ -123,6 +123,7 @@ def train_one_step(model, optimizer, x, y):
         loss = compute_loss(logits, y)  # 计算损失
 
     # 计算梯度
+    # tape.gradient()执行反向传播算法
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
     grads = tape.gradient(loss, trainable_vars)
 

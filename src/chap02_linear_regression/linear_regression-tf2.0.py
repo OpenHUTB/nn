@@ -97,7 +97,7 @@ class LinearModel(Model):
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
             trainable=True,
-            name="weight"
+            name="weight"# 参数名称(用于TensorBoard等可视化工具)
         )
         
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
@@ -118,7 +118,7 @@ class LinearModel(Model):
         返回:
             预测值，形状为(batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1)  # 矩阵乘法后压缩维度
+        y = tf.squeeze(tf.matmul(x, self.w), axis=1) + self.b  # 矩阵乘法后压缩维度
         return y
 
 

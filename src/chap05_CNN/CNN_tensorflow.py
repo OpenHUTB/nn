@@ -278,7 +278,7 @@ with tf.Session() as sess:
             test_accuracy = 0.0
             test_batch_size = 100
             test_steps = len(mnist.test.images) // test_batch_size
-            
+
             for j in range(test_steps):
                 batch_start = j * test_batch_size
                 batch_end = (j + 1) * test_batch_size

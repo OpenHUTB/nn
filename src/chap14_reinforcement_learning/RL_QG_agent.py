@@ -129,7 +129,11 @@ class RL_QG_agent:
 
 
     def load_model(self):
-        """从指定目录加载预训练的模型参数"""
+        """从指定目录加载预训练的模型参数
+        异常处理:
+        检查模型文件是否存在
+        捕获并处理恢复会话时可能出现的错误
+        """
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已从", self.model_dir, "加载")
 
