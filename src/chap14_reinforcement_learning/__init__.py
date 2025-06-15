@@ -296,53 +296,53 @@ register(
 register(
     id='HalfCheetah-v1',
     entry_point='gym.envs.mujoco:HalfCheetahEnv',
-    max_episode_steps=1000,
-    reward_threshold=4800.0,  # 高速奔跑的得分要求
+    max_episode_steps = 1000,
+    reward_threshold = 4800.0,  # 高速奔跑的得分要求
 )
 
 # 8. 单腿跳跃机器人：控制机器人持续跳跃（考察动态平衡）
 register(
     id='Hopper-v1',
-    entry_point='gym.envs.mujoco:HopperEnv',
-    max_episode_steps=1000,
-    reward_threshold=3800.0,  # 持续跳跃的得分
+    entry_point = 'gym.envs.mujoco:HopperEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 3800.0,  # 持续跳跃的得分
 )
 
 # 9. 游泳者：控制多关节机器人在水中前进
 register(
     id='Swimmer-v1',
     entry_point='gym.envs.mujoco:SwimmerEnv',
-    max_episode_steps=1000,
-    reward_threshold=360.0,   # 相对较低的阈值，因水中阻力较大
+    max_episode_steps = 1000,
+    reward_threshold = 360.0,   # 相对较低的阈值，因水中阻力较大
 )
 
 # 10. 双腿行走机器人：双足直立行走（类人运动控制）
 register(
     id='Walker2d-v1',
-    max_episode_steps=1000,
-    entry_point='gym.envs.mujoco:Walker2dEnv',
+    max_episode_steps = 1000,
+    entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
 
 # 11. 蚂蚁机器人：四足运动控制（复杂步态规划）
 register(
     id='Ant-v1',
     entry_point='gym.envs.mujoco:AntEnv',
-    max_episode_steps=1000,
-    reward_threshold=6000.0,  # 高移动效率要求
+    max_episode_steps = 1000,
+    reward_threshold = 6000.0,  # 高移动效率要求
 )
 
 # 12. 类人机器人：全身关节控制（高维状态空间和动作空间）
 register(
     id='Humanoid-v1',
     entry_point='gym.envs.mujoco:HumanoidEnv',
-    max_episode_steps=1000,
+    max_episode_steps = 1000,
 )
 
 # 类人机器人站立：从摔倒状态站立起来（初始状态困难）
 register(
     id='HumanoidStandup-v1',
     entry_point='gym.envs.mujoco:HumanoidStandupEnv',
-    max_episode_steps=1000,
+    max_episode_steps = 1000,
 )
 
 
