@@ -246,22 +246,22 @@ def reduce_avg(reduce_target, lengths, dim):
     # 根据秩差调整掩码和长度张量的形状，以便广播
     if rank_diff!=0:
         # 计算长度张量的新形状
-        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        len_shape = tf.concat(axis = 0, values = [tf.shape(lengths), [1]*rank_diff])
         # 计算掩码的新形状
-        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+        mask_shape = tf.concat(axis = 0, values = [tf.shape(mask), [1]*rank_diff])
     else:
         # 如果秩差为0，保持原形状
         len_shape = tf.shape(lengths) # 获取张量 lengths 的形状
         mask_shape = tf.shape(mask)
 
     # 重塑张量以匹配目标张量的形状
-    lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    lengths_reshape = tf.reshape(lengths, shape = len_shape)
     # 将掩码应用到目标张量上
-    mask = tf.reshape(mask, shape=mask_shape)
+    mask = tf.reshape(mask, shape = mask_shape)
 
     # 应用掩码：将目标张量中超出序列长度的位置置零
     # 通过类型转换确保掩码与目标张量数据类型一致
-    mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
+    mask_target = reduce_target * tf.cast(mask, dtype = reduce_target.dtype)
     if len(shape_of_lengths) != dim: # 验证 lengths 的维度是否等于 dim
         raise ValueError(('Second input tensor should be rank %d, ' +
                          'while it got rank %d') % (dim, len(shape_of_lengths)))
@@ -274,25 +274,25 @@ def reduce_avg(reduce_target, lengths, dim):
     mask = mkMask(lengths, mxlen)
     
     # 处理序列长度与掩码张量的维度对齐问题
-    if rank_diff!=0: # 如果长度张量(lengths)和掩码张量(mask)的维度(rank)存在差异
+    if rank_diff != 0: # 如果长度张量(lengths)和掩码张量(mask)的维度(rank)存在差异
         # 构建新的长度张量形状：保留原始长度维度，并在末尾添加1来扩展维度
-        len_shape = tf.concat(axis=0, values=[tf.shape(lengths), [1]*rank_diff])
+        len_shape = tf.concat(axis = 0, values = [tf.shape(lengths), [1]*rank_diff])
         # 构建新的掩码张量形状：保留原始掩码维度，并在末尾添加1来扩展维度
-        mask_shape = tf.concat(axis=0, values=[tf.shape(mask), [1]*rank_diff])
+        mask_shape = tf.concat(axis = 0, values = [tf.shape(mask), [1]*rank_diff])
     else:
         # 当维度相同时，直接使用原始形状
         len_shape = tf.shape(lengths)
         mask_shape = tf.shape(mask)
     # 重塑长度张量：添加必要的维度使其与掩码张量维度对齐
-    lengths_reshape = tf.reshape(lengths, shape=len_shape)
+    lengths_reshape = tf.reshape(lengths, shape  = len_shape)
     # 重塑掩码张量：确保其形状符合广播规则要求
-    mask = tf.reshape(mask, shape=mask_shape)
+    mask = tf.reshape(mask, shape = mask_shape)
     # 应用掩码到目标张量：将掩码区域的值置零
-    mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
+    mask_target = reduce_target * tf.cast(mask, dtype = reduce_target.dtype)
     # 在指定维度上求和（不保留归约后的维度）
-    red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
+    red_sum = tf.reduce_sum(mask_target, axis = [dim], keepdims = False)
     # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）
-    red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
+    red_avg = red_sum / (tf.cast(lengths_reshape, dtype = tf.float32) + 1e-30)
     # 返回计算得到的平均值张量
     return red_avg
 
@@ -313,9 +313,9 @@ def compute_loss(logits, labels, seqlen):
     """
     # 计算每个位置的交叉熵
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits = logits, labels = labels)
     # 对变长序列求平均（忽略填充部分）
-    losses = reduce_avg(losses, seqlen, dim=1)
+    losses = reduce_avg(losses, seqlen, dim = 1)
     return tf.reduce_mean(losses)
 
 @tf.function
@@ -420,11 +420,11 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
         str: 生成的诗歌字符串（不包含开始和结束标记）
     """
     # 初始化RNN隐藏状态（通常为两个状态变量，如LSTM的cell state和hidden state）
-    state = [tf.random.normal(shape=(1, 128), stddev=0.5),
-             tf.random.normal(shape=(1, 128), stddev=0.5)]
+    state = [tf.random.normal(shape = (1, 128), stddev = 0.5),
+             tf.random.normal(shape = (1, 128), stddev = 0.5)]
 
     # 初始化当前token为开始标记
-    cur_token = tf.constant([word2id[start_token]], dtype=tf.int32)
+    cur_token = tf.constant([word2id[start_token]], dtype = tf.int32)
     generated_tokens = []
 
     # 循环生成token，直到达到最大长度或生成结束标记
