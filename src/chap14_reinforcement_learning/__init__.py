@@ -264,32 +264,32 @@ register(
 register(
     id='Thrower-v0',
     entry_point='gym.envs.mujoco:ThrowerEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 # 4. 物体击打：控制机械臂击打物体到目标位置
 register(
     id='Striker-v0',
     entry_point='gym.envs.mujoco:StrikerEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 # 5. 倒立摆（向上平衡）：与Classic Control中的倒立摆不同，此为向上控制
 register(
     id='InvertedPendulum-v1',
-    entry_point='gym.envs.mujoco:InvertedPendulumEnv',
-    max_episode_steps=1000,
-    reward_threshold=950.0,   # 高精度控制要求（接近1000分）
+    entry_point = 'gym.envs.mujoco:InvertedPendulumEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 950.0,   # 高精度控制要求（接近1000分）
 )
 
 # 6. 二级倒立摆：控制两个连杆保持平衡（难度远高于单级）
 register(
     id='InvertedDoublePendulum-v1',
     entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
-    max_episode_steps=1000,
-    reward_threshold=9100.0,  # 极高的奖励阈值，要求长期稳定控制
+    max_episode_steps = 1000,
+    reward_threshold = 9100.0,  # 极高的奖励阈值，要求长期稳定控制
 )
 
 # 7. 猎豹奔跑：控制四足机器人最大化奔跑速度
