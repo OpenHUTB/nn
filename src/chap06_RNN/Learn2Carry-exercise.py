@@ -144,7 +144,7 @@ class myRNNModel(keras.Model):
         embed2 = self.embed_layer(num2)  # [batch_size, maxlen, embed_dim]
         
         # 将两个输入的嵌入向量在最后一维拼接
-        inputs = tf.concat([embed1, embed2], axis=-1)  # [batch_size, maxlen, embed_dim*2]
+        inputs = tf.concat([embed1, embed2], axis = -1)  # [batch_size, maxlen, embed_dim*2]
         
         # 通过RNN层处理
         rnn_out = self.rnn_layer(inputs)  # [batch_size, maxlen, rnn_units]
@@ -161,7 +161,7 @@ def compute_loss(logits, labels):# 使用 sparse_softmax_cross_entropy_with_logi
     # 输入是 logits 和对应的 labels（真实类别索引）
     # 输出是一个形状为 (B,) 的损失张量
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits = logits, labels = labels)
     return tf.reduce_mean(losses)# 对所有样本的损失求平均，得到一个标量值作为最终的 loss
 
 @tf.function
@@ -181,12 +181,12 @@ def train(steps, model, optimizer):
     for step in range(steps):
         # 生成训练数据（数值范围0~555,555,554）
         # 调用 gen_data_batch 函数生成一批训练数据，batch_size 为 200，数值范围从 0 到 555,555,554
-        datas = gen_data_batch(batch_size=200, start=0, end=555555555)
-        Nums1, Nums2, results = prepare_batch(*datas, maxlen=11)
+        datas = gen_data_batch(batch_size = 200, start = 0, end = 555555555)
+        Nums1, Nums2, results = prepare_batch(*datas, maxlen = 11)
         # 单步训练：计算损失、更新参数
-        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype=tf.int32), 
-                              tf.constant(Nums2, dtype=tf.int32),
-                              tf.constant(results, dtype=tf.int32))
+        loss = train_one_step(model, optimizer, tf.constant(Nums1, dtype = tf.int32), 
+                              tf.constant(Nums2, dtype = tf.int32),
+                              tf.constant(results, dtype = tf.int32))
         if step % 50 == 0:
             print('step', step, ': loss', loss.numpy())# 使用 loss.numpy() 将损失值转换为 NumPy 类型以便打印
 
