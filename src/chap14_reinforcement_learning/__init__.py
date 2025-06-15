@@ -25,7 +25,7 @@ register(
 register(
     id='RepeatCopy-v0',       # 环境唯一标识符，遵循Gym的命名约定（任务名+版本号）
     entry_point='gym.envs.algorithmic:RepeatCopyEnv',
-    max_episode_steps=200,    # 与基础复制任务相同步数限制
+    max_episode_steps = 200,    # 与基础复制任务相同步数限制
     reward_threshold=75.0,    # 更高奖励阈值，反映任务复杂度提升
 )
 
@@ -229,14 +229,14 @@ register(
 register(
     id='GuessingGame-v0',
     entry_point='gym.envs.toy_text.guessing_game:GuessingGame',
-    max_episode_steps=200,
+    max_episode_steps=200,# 设置强化学习环境的最大步数限制，每个episode最多执行200步
 )
 
 # 9. 热冷游戏：根据"热/冷"反馈搜索目标位置（空间探索任务）
 register(
     id='HotterColder-v0',# 环境ID，遵循gym命名规范：<名称>-<版本号>
     entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
-    max_episode_steps=200,
+    max_episode_steps=200,# 设置强化学习环境的最大步数限制，每个episode最多执行200步
 )
 
 
@@ -247,6 +247,7 @@ register(
 register(
     id='Reacher-v1',
     entry_point='gym.envs.mujoco:ReacherEnv',
+# Reacher是一个经典的连续控制任务，智能体控制机械臂末端到达目标位置
     max_episode_steps=50,     # 短步数限制
     reward_threshold=-3.75,   # 负阈值表示最小化末端与目标的距离
 )
@@ -263,85 +264,85 @@ register(
 register(
     id='Thrower-v0',
     entry_point='gym.envs.mujoco:ThrowerEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 # 4. 物体击打：控制机械臂击打物体到目标位置
 register(
     id='Striker-v0',
     entry_point='gym.envs.mujoco:StrikerEnv',
-    max_episode_steps=100,
-    reward_threshold=0.0,
+    max_episode_steps = 100,
+    reward_threshold = 0.0,
 )
 
 # 5. 倒立摆（向上平衡）：与Classic Control中的倒立摆不同，此为向上控制
 register(
     id='InvertedPendulum-v1',
-    entry_point='gym.envs.mujoco:InvertedPendulumEnv',
-    max_episode_steps=1000,
-    reward_threshold=950.0,   # 高精度控制要求（接近1000分）
+    entry_point = 'gym.envs.mujoco:InvertedPendulumEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 950.0,   # 高精度控制要求（接近1000分）
 )
 
 # 6. 二级倒立摆：控制两个连杆保持平衡（难度远高于单级）
 register(
     id='InvertedDoublePendulum-v1',
     entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
-    max_episode_steps=1000,
-    reward_threshold=9100.0,  # 极高的奖励阈值，要求长期稳定控制
+    max_episode_steps = 1000,
+    reward_threshold = 9100.0,  # 极高的奖励阈值，要求长期稳定控制
 )
 
 # 7. 猎豹奔跑：控制四足机器人最大化奔跑速度
 register(
     id='HalfCheetah-v1',
     entry_point='gym.envs.mujoco:HalfCheetahEnv',
-    max_episode_steps=1000,
-    reward_threshold=4800.0,  # 高速奔跑的得分要求
+    max_episode_steps = 1000,
+    reward_threshold = 4800.0,  # 高速奔跑的得分要求
 )
 
 # 8. 单腿跳跃机器人：控制机器人持续跳跃（考察动态平衡）
 register(
     id='Hopper-v1',
-    entry_point='gym.envs.mujoco:HopperEnv',
-    max_episode_steps=1000,
-    reward_threshold=3800.0,  # 持续跳跃的得分
+    entry_point = 'gym.envs.mujoco:HopperEnv',
+    max_episode_steps = 1000,
+    reward_threshold = 3800.0,  # 持续跳跃的得分
 )
 
 # 9. 游泳者：控制多关节机器人在水中前进
 register(
     id='Swimmer-v1',
     entry_point='gym.envs.mujoco:SwimmerEnv',
-    max_episode_steps=1000,
-    reward_threshold=360.0,   # 相对较低的阈值，因水中阻力较大
+    max_episode_steps = 1000,
+    reward_threshold = 360.0,   # 相对较低的阈值，因水中阻力较大
 )
 
 # 10. 双腿行走机器人：双足直立行走（类人运动控制）
 register(
     id='Walker2d-v1',
-    max_episode_steps=1000,
-    entry_point='gym.envs.mujoco:Walker2dEnv',
+    max_episode_steps = 1000,
+    entry_point = 'gym.envs.mujoco:Walker2dEnv',
 )
 
 # 11. 蚂蚁机器人：四足运动控制（复杂步态规划）
 register(
     id='Ant-v1',
     entry_point='gym.envs.mujoco:AntEnv',
-    max_episode_steps=1000,
-    reward_threshold=6000.0,  # 高移动效率要求
+    max_episode_steps = 1000,
+    reward_threshold = 6000.0,  # 高移动效率要求
 )
 
 # 12. 类人机器人：全身关节控制（高维状态空间和动作空间）
 register(
     id='Humanoid-v1',
     entry_point='gym.envs.mujoco:HumanoidEnv',
-    max_episode_steps=1000,
+    max_episode_steps = 1000,
 )
 
 # 类人机器人站立：从摔倒状态站立起来（初始状态困难）
 register(
     id='HumanoidStandup-v1',
     entry_point='gym.envs.mujoco:HumanoidStandupEnv',
-    max_episode_steps=1000,
+    max_episode_steps = 1000,
 )
 
 

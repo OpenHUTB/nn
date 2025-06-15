@@ -7,7 +7,7 @@ import sys  # 导入系统相关模块，用于获取Python版本、操作路径
 class RBM:
     """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
 
-    def __init__(self, n_hidden=2, n_observe=784):
+    def __init__(self, n_hidden = 2, n_observe = 784):
         """
         初始化受限玻尔兹曼机（RBM）模型参数
 
@@ -57,7 +57,7 @@ class RBM:
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
 
         self.W = np.random.normal(
-            0, init_std, size=(self.n_observe, self.n_hidden)
+            0, init_std, size = (self.n_observe, self.n_hidden)
         )  # 初始化权重矩阵（可见层 -> 隐藏层）
 
         # 可选替代方案：使用更小的固定标准差进行初始化。
@@ -163,10 +163,10 @@ class RBM:
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
                 
                 # 可见层偏置梯度：原始数据与重构数据之差
-                db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
+                db_v = np.sum(v0 - v1_sample, axis = 0)                                # 计算可见层偏置的梯度
                 
                 # 隐藏层偏置梯度：原始数据生成的隐藏层状态与重构数据生成的隐藏层状态之差
-                db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
+                db_h = np.sum(h0_sample - h1_prob, axis = 0)                           # 计算隐藏层偏置的梯度
 
                 # 更新参数
                 # 按批次大小归一化梯度，并乘以学习率更新权重矩阵
@@ -236,10 +236,10 @@ if __name__ == '__main__':
     rbm = RBM(2, img_size)
    
     # 训练RBM
-    errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+    errors = rbm.train(mnist, learning_rate = 0.1, epochs = 10, batch_size = 100)
    
     # 生成并可视化样本
-    samples = rbm.sample(n_samples=5, gibbs_steps=1000)
+    samples = rbm.sample(n_samples = 5, gibbs_steps = 1000)
    
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
