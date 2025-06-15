@@ -325,6 +325,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             self.show_vehicle_telemetry = False
             self.modify_vehicle_physics(self.player)
         # Set up the sensors.
+        # 初始化碰撞传感器，传入玩家角色(player)和HUD对象(hud)用于显示碰撞信息
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
