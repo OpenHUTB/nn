@@ -3,6 +3,7 @@
 # ## 准备数据
 
 # In[1]:
+# 导入操作系统相关功能模块，用于文件路径操作等系统级功能
 import os
 import tensorflow as tf
 from tensorflow import keras
