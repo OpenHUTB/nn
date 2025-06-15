@@ -121,16 +121,16 @@ class myRNNModel(keras.Model):
         self.v_sz = len(w2id)  # 词汇表大小
         
         # 嵌入层：将词语id映射为密集向量
-        # 自动处理变长序列(batch_input_shape=[None, None])
+        # 自动处理变长序列(batch_input_shape = [None, None])
         self.embed_layer = tf.keras.layers.Embedding(
             self.v_sz, 64,  # 64维嵌入向量
-            batch_input_shape=[None, None])  # 支持变长序列
+            batch_input_shape = [None, None])  # 支持变长序列
         
         # RNN单元：使用SimpleRNNCell
         self.rnncell = tf.keras.layers.SimpleRNNCell(128)  # 128维隐藏状态
         
         # RNN层：包装RNN单元，处理序列
-        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences=True)
+        self.rnn_layer = tf.keras.layers.RNN(self.rnncell, return_sequences = True)
         
         # 输出层：预测下一个词的概率分布
         self.dense = tf.keras.layers.Dense(self.v_sz)
@@ -175,7 +175,7 @@ class myRNNModel(keras.Model):
         # 3. 预测下一个词
         logits = self.dense(h)  # (batch_size, vocab_size)
         # 4. 选择概率最高的词
-        out = tf.argmax(logits, axis=-1)
+        out = tf.argmax(logits, axis = -1)
         return out, state# 返回预测的下一个词id和更新后的RNN状态
 
 
@@ -200,10 +200,10 @@ def mkMask(input_tensor, maxLen):
         axis=0, 
         values=[shape_of_input, [maxLen]] # 定义一个包含两个元素的列表
     )
-    #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape=(-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
-    oneDtensor = tf.reshape(input_tensor, shape=(-1,))
+    #使用tf.reshape将input_tensor展平为一维张量oneDtensor。shape = (-1,)表示将张量展平为一维，长度由输入张量的总元素数决定
+    oneDtensor = tf.reshape(input_tensor, shape = (-1,))
     #使用tf.sequence_mask函数生成一个掩码张量flat_mask
-    flat_mask = tf.sequence_mask(oneDtensor, maxlen=maxLen)
+    flat_mask = tf.sequence_mask(oneDtensor, maxlen = maxLen)
     
     return tf.reshape(flat_mask, shape_of_output)   # 将展平的掩码恢复为原始输入张量形状+maxLen的形状
 
