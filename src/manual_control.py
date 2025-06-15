@@ -314,19 +314,19 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)# 尝试在新位置生成玩家车辆
             self.show_vehicle_telemetry = False # 关闭车辆遥测显示
             self.modify_vehicle_physics(self.player) # 应用自定义车辆物理参数
-        while self.player is None:
+        while self.player is None:# 检查地图是否有可用的生成点
             if not self.map.get_spawn_points():
                 print('There are no spawn points available in your map/town.')
                 print('Please add some Vehicle Spawn Point to your UE4 scene.')
-                sys.exit(1)
+                sys.exit(1)# 无生成点时退出程序
             spawn_points = self.map.get_spawn_points()
             spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)  # 尝试使用蓝图从生成点生成玩家
             self.show_vehicle_telemetry = False
             self.modify_vehicle_physics(self.player)
-        # Set up the sensors.
+        # 尝试在随机生成点创建玩家车辆
         self.collision_sensor = CollisionSensor(self.player, self.hud)
-        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
+        self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)# 设置传感器系统
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
