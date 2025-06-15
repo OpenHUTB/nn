@@ -22,7 +22,7 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
 
     # 数值稳定性处理：减去最大值避免指数爆炸
     # 沿最后一个维度（通常是类别维度）取最大值，并保持维度以便广播
-    max_per_row = tf.reduce_max(x, axis=-1, keepdims=True)
+    max_per_row = tf.reduce_max(x, axis = -1, keepdims = True)
     # 平移后的logits：每行最大值变为0，其他值为负数
     shifted_logits = x - max_per_row
 
@@ -34,16 +34,16 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
     # 沿着最后一个维度（类别维度）对指数值求和，得到每条样本的指数和
     # axis=-1 表示对最后一个维度进行操作，即类别维度
     # keepdims=True 保持输出的维度与输入相同，便于后续进行广播除法
-    sum_exp = tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+    sum_exp = tf.reduce_sum(exp_logits, axis = -1, keepdims = True)
 
     # 将每个类别的指数值除以对应样本的指数和，得到归一化的概率分布（softmax）
     # 输出结果表示每个类别的概率，形状与 exp_logits 相同
     return exp_logits / sum_exp
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size = [10, 5])
 # 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
-(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
+(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis = -1).numpy())**2 < 0.0001
 
 # 数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
 
@@ -56,7 +56,7 @@ def sigmoid(x):
     return 1 / (1 + tf.exp(-x))
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size = [10, 5])
 # 比较自定义的sigmoid函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
 
@@ -74,23 +74,23 @@ def softmax_ce(logits, label):
     logits = tf.cast(logits, tf.float32)
     label = tf.cast(label, tf.float32)
     # 数值稳定处理：减去最大值
-    logits_max = tf.stop_gradient(tf.reduce_max(logits, axis=-1, keepdims=True))
+    logits_max = tf.stop_gradient(tf.reduce_max(logits, axis = -1, keepdims = True))
     stable_logits = logits - logits_max
     # 计算Softmax概率
     exp_logits = tf.exp(stable_logits)
-    prob = exp_logits / tf.reduce_sum(exp_logits, axis=-1, keepdims=True)
+    prob = exp_logits / tf.reduce_sum(exp_logits, axis = -1, keepdims = True)
     # 计算交叉熵
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis = -1))
     ##########
     return loss
 
 # 生成测试数据，形状为 [10, 5] 的正态随机数
-test_data = np.random.normal(size=[10, 5]).astype(np.float32)
+test_data = np.random.normal(size = [10, 5]).astype(np.float32)
 # 进行softmax转换
 # 正确测试逻辑：直接使用原始logits
-test_logits = np.random.normal(size=[10, 5]).astype(np.float32)
-label = np.zeros_like(test_logits, dtype=np.float32)
-label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0
+test_logits = np.random.normal(size = [10, 5]).astype(np.float32)
+label = np.zeros_like(test_logits, dtype = np.float32)
+label[np.arange(10), np.random.randint(0, 5, size = 10)] = 1.0
 # 比较自定义的损失值和tf自带结果，误差小于 0.0001 则认为相等
 
 ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
