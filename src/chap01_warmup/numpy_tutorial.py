@@ -197,8 +197,8 @@ print(np.exp(x))
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
 print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
-print("每列最大值的下标:", np.argmax(x, axis=0))  # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-print("每行最大值的下标:", np.argmax(x, axis=1))  # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
+print("每列最大值的下标:", np.argmax(x, axis=0))   # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
+print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 def plot_quadratic():
@@ -220,7 +220,7 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
-plt.legend(loc='upper right')
+plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
 plt.savefig('quadratic.png')   # 保存图像
 plt.show()  # 显示绘制的图像
 

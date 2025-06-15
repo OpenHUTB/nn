@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten # 导入常用网络层：全连接层、正则化层和维度展平层
-from tensorflow.keras.layers import Conv2D, MaxPooling2D # 导入卷积层和最大池化层
+from tensorflow.keras.layers import Conv2D, MaxPooling2D  # 导入卷积层和最大池化层
 
 #设置TensorFlow日志级别，只显示错误信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
