@@ -261,14 +261,7 @@ with tf.Session() as sess:
             test_accuracy = 0.0
             test_batch_size = 100
             test_steps = len(mnist.test.images) // test_batch_size
-            """
-            测试集评估说明：
-            1. 分批计算避免内存溢出
-            2. 每批计算部分准确率
-            3. 最后取所有批次的平均值
-            这样可以准确评估模型在完整测试集上的表现，
-            同时保持内存使用可控
-            """
+
             for j in range(test_steps):
                 batch_start = j * test_batch_size
                 batch_end = (j + 1) * test_batch_size
