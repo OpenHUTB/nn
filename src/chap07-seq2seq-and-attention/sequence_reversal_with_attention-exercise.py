@@ -22,10 +22,12 @@ import random  # 导入随机数生成模块
 import string  # 导入字符串模块
 
 
+
 # ## 玩具序列数据生成
 # 生成只包含[A-Z]的字符串，并且将encoder输入以及decoder输入以及decoder输出准备好（转成index）
 
 # In[20]:
+
 
 
 
@@ -92,7 +94,7 @@ class mySeq2SeqModel(keras.Model):
         # 词汇表大小: 26个字母 + 1个填充标记(0)
         self.v_sz = 27
         
-        # 隐藏层大小
+        # 隐藏层大小为128
         self.hidden = 128
         
         # 嵌入层，将字符索引转换为向量表示
@@ -271,7 +273,7 @@ def train_one_step(model, optimizer, enc_x, dec_x, y):
     """
     with tf.GradientTape() as tape:
         logits = model(enc_x, dec_x)
-        loss = compute_loss(logits, y)
+        loss = compute_loss(logits, y) # 计算模型预测结果与真实标签之间的损失值
 
     # 计算梯度
 
@@ -296,9 +298,9 @@ def train(model, optimizer, seqlen):
     loss: 最终损失值
     """
     loss = 0.0
-    accuracy = 0.0
     
     # 训练2000步
+
 
 for step in range(2000):
     # 获取一个批次的训练数据
@@ -311,9 +313,18 @@ for step in range(2000):
     if step % 500 == 0:
         # 将当前步数与损失值打印出来，用于监控训练过程
         print('step', step, ': loss', loss.numpy())
+
         
-# 返回最后一次计算的 loss 值（可用于调试或后续处理）
-return loss
+        # 执行一次训练步骤：前向传播 + 反向传播 + 参数更新
+        loss = train_one_step(model, optimizer, enc_x, dec_x, y)
+        
+        # 每500步打印一次损失
+        if step % 500 == 0:
+            # 将当前步数与损失值打印出来，用于监控训练过程
+            print('step', step, ': loss', loss.numpy())
+            
+    # 返回最后一次计算的 loss 值（可用于调试或后续处理）
+    return loss
 
 # # 训练迭代
 
@@ -406,7 +417,3 @@ def is_reverse(seq, rev_seq):
 print([is_reverse(*item) for item in list(zip(*sequence_reversal()))])
 # 打印解包后的序列对，用于验证输入数据
 print(list(zip(*sequence_reversal())))
-
-
-# In[ ]:
-

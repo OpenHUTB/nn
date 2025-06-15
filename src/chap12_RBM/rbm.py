@@ -33,7 +33,7 @@ class RBM:
         self.W = np.random.normal(
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
-        size = (n_observe, n_hidden)) # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
+        size = (n_observe, n_hidden))  # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
         
         # 初始化权重矩阵W，使用正态分布随机初始化
         # 可见层偏置（1 x n_observe）

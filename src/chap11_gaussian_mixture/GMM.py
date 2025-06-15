@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 from typing import Tuple, List 
 
 # 生成混合高斯分布数据
-def generate_data(n_samples = 1000):
+def generate_data(n_samples=1000):
     """生成混合高斯分布数据集
     
     Args:
-        n_samples: 样本数量 (default = 1000)
+        n_samples: 样本数量 (default=1000)
         random_state: 随机种子 (default=42)
         
     Returns:
@@ -97,9 +97,9 @@ def logsumexp(log_p, axis=1, keepdims=False):
         return np.array(-np.inf, dtype=log_p.dtype)                         # 返回与输入相同数据类型的负无穷值
     
     # 计算最大值（处理全-inf输入）
-    max_val = np.max(log_p, axis = axis, keepdims=True)                       # 计算沿指定轴的最大值
+    max_val = np.max(log_p, axis=axis, keepdims=True)                       # 计算沿指定轴的最大值
     if np.all(np.isneginf(max_val)):                                        # 检查是否所有最大值都是负无穷
-        return max_val.copy() if keepdims else max_val.squeeze(axis = axis)   # 根据keepdims返回适当形式
+        return max_val.copy() if keepdims else max_val.squeeze(axis=axis)   # 根据keepdims返回适当形式
     
     # 计算修正后的指数和（处理-inf输入）
     # 安全计算指数和：先减去最大值，再计算指数
@@ -111,7 +111,7 @@ def logsumexp(log_p, axis=1, keepdims=False):
     
     # 处理全-inf输入的特殊case
     if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):       # 判断是否所有有效值都是-inf
-        result = max_val.copy() if keepdims else max_val.squeeze(axis = axis) # 根据keepdims参数的值返回max_val的适当形式
+        result = max_val.copy() if keepdims else max_val.squeeze(axis=axis) # 根据keepdims参数的值返回max_val的适当形式
     return result                                                           # 返回处理后的结果，保持与正常情况相同的接口
 
 # 高斯混合模型类
@@ -143,7 +143,7 @@ class GaussianMixtureModel:
            - E步：计算每个样本属于各高斯成分的后验概率（责任度）
            - M步：基于后验概率更新模型参数
         """
-        X = np.asarray(X) # 将输入数据 X 转换为 NumPy 数组格式，确保后续操作的兼容性
+        X = np.asarray(X)  # 将输入数据 X 转换为 NumPy 数组格式，确保后续操作的兼容性
         n_samples, n_features = X.shape # 获取数据的样本数量和特征维度
         
         # 初始化混合系数（均匀分布）
