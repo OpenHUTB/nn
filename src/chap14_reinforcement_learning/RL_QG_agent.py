@@ -119,9 +119,9 @@ class RL_QG_agent:
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已保存至", self.model_dir)
         
-        try:
-            self.saver.save(self.sess, model_path)
-            self.logger.info("模型已保存至 %s", model_path)
+        # 尝试调用saver的save方法保存当前会话(sess)的模型参数
+        # model_path 指定了模型保存的路径和文件名
+        self.saver.save(self.sess, model_path)
         except Exception as e:
             self.logger.error("保存模型时出错: %s", e) # 使用logger记录一条错误日志信息
 
