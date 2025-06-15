@@ -7,8 +7,14 @@ import os
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
-from tensorflow.keras.layers import ( 
-    Conv2D, Dense, Dropout, 
+# 从Keras的layers模块中导入常用的神经网络层：
+# Conv2D - 二维卷积层，用于处理图像等二维数据
+# Dense - 全连接层（密集连接层）
+# Dropout - 随机失活层，用于防止过拟合
+# Flatten - 展平层，将多维输入一维化
+# MaxPooling2D - 二维最大池化层，用于下采样
+from tensorflow.keras.layers import (
+    Conv2D, Dense, Dropout,
     Flatten, MaxPooling2D
 )
 
