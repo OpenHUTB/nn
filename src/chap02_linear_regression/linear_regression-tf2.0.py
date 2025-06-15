@@ -129,6 +129,9 @@ class LinearModel(Model):
 
 
 #训练以及评估
+# 配置Adam优化器，学习率设置为0.1
+# 学习率控制参数更新的步长，过大可能导致训练不稳定，过小会导致收敛缓慢
+# Adam优化器结合了AdaGrad和RMSProp的优点，自适应调整每个参数的学习率
 optimizer = optimizers.Adam(0.1)
 
 
