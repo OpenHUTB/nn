@@ -220,7 +220,7 @@ def main(x_train, y_train, use_gradient_descent = False, basis_func = None):
 
     def f(x):
         phi0 = np.expand_dims(np.ones_like(x), axis = 1)# 创建全1的列向量作为基函数的第一项（对应截距项）
-        phi1 = basis_func(x)
+        phi1 = basis_func(x) # 调用外部基函数（如多项式、高斯核等）处理输入特征
         phi = np.concatenate([phi0, phi1], axis = 1)
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
