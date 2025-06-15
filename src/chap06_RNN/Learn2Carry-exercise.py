@@ -51,7 +51,7 @@ def convertNum2Digits(Num):
     strNum = str(Num)                       # 将输入的整数转换为字符串形式
     chNums = list(strNum)                   # 将字符串转换为单个字符组成的列表
     digitNums = [int(o) for o in strNum]    # 将字符列表中的每个字符转换为整数
-    return digitNums
+    return digitNums                        # 返回数字位数统计结果
 
 def convertDigits2Num(Digits):
     '''将数字位列表反向， 例如 [1, 3, 3, 4, 1, 2] ==> [2, 1, 4, 3, 3, 1]
@@ -105,7 +105,7 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
 
 # In[3]:
 
-
+# 定义自定义循环神经网络(RNN)模型，继承自Keras的Model类
 class myRNNModel(keras.Model):
     def __init__(self):
         super(myRNNModel, self).__init__()
