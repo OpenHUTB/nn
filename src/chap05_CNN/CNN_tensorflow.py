@@ -11,7 +11,7 @@ try:
     # 参数说明：
     # 'MNIST_data' - 数据集存储目录
     # one_hot=True - 将标签转换为one-hot编码格式
-    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+    mnist = input_data.read_data_sets('MNIST_data', one_hot = True)
 except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     
@@ -34,13 +34,13 @@ def compute_accuracy(v_xs, v_ys):
     """
     global prediction
     # 获取模型预测结果
-    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
+    y_pre = sess.run(prediction, feed_dict = {xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
     correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
     # 计算准确率
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
+    result = sess.run(accuracy, feed_dict = {xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
 
@@ -55,7 +55,7 @@ def weight_variable(shape):
         tf.Variable: 初始化后的权重变量。
     """
     # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
-    initial = tf.truncated_normal(shape, stddev=0.1)
+    initial = tf.truncated_normal(shape, stddev = 0.1)
     # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
 
@@ -71,11 +71,11 @@ def bias_variable(shape):
         tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
     """
     # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
-    initial = tf.constant(0.1, shape=shape)
+    initial = tf.constant(0.1, shape = shape)
     return tf.Variable(initial)
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding = 'SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -113,7 +113,7 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     
     # 执行卷积操作：使用指定的卷积核W对输入x进行卷积，步长为strides，填充方式为padding
     # SAME填充确保输出尺寸与输入相同，VALID填充则不进行填充
-    conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
+    conv = tf.nn.conv2d(x, W, strides=strides, padding = padding)
     
     # 添加批归一化以提高训练稳定性
     # 注意：在实际应用中，是否使用批归一化取决于网络结构和需求
@@ -163,7 +163,7 @@ def max_pool_2x2(x: tf.Tensor,
         strides = [1, 1, strides, strides]#定义池化窗口的步幅
     
     # 最大池化操作：每个2x2区域选择最大值，实现特征降维，保留主要特征
-    return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
+    return tf.nn.max_pool(x, ksize = ksize, strides = strides, padding = padding, data_format = data_format)
 
 
 # define placeholder for inputs to network
