@@ -110,7 +110,7 @@ class Softmax:
         # 对输入数据应用指数函数，确保所有值为正
         x_exp = np.exp(x)
         # 计算每个样本的归一化分母（分区函数）
-        partition = np.sum(x_exp, axis=1, keepdims=True)
+        partition = np.sum(x_exp, axis = 1, keepdims = True)
         # 计算 softmax 输出：指数值 / 分区函数
         # 添加 epsilon 防止除零错误（数值稳定性）
         out = x_exp / (partition + self.epsilon)
@@ -132,16 +132,16 @@ class Softmax:
         '''
         s = self.mem['out']
         sisj = np.matmul(
-             np.expand_dims(s, axis=2), 
-             np.expand_dims(s, axis=1)
+             np.expand_dims(s, axis = 2), 
+             np.expand_dims(s, axis = 1)
         )  # (N, c, c)
         # 对 grad_y 进行维度扩展
         # 假设 grad_y 是一个形状为 (N, c) 的梯度张量
         # np.expand_dims(grad_y, axis=1) 将其形状变为 (N, 1, c)
-        g_y_exp = np.expand_dims(grad_y, axis=1)
+        g_y_exp = np.expand_dims(grad_y, axis = 1)
         # (N, 1, c)
         tmp = np.matmul(g_y_exp, sisj) # 计算矩阵乘法结果
-        tmp = np.squeeze(tmp, axis=1)  # 去掉结果矩阵的单维度条目
+        tmp = np.squeeze(tmp, axis = 1)  # 去掉结果矩阵的单维度条目
         tmp = -tmp + grad_y * s # 对变量 tmp 进行更新操作
         return tmp
 
