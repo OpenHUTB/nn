@@ -234,7 +234,7 @@ register(
 
 # 9. 热冷游戏：根据"热/冷"反馈搜索目标位置（空间探索任务）
 register(
-    id='HotterColder-v0',
+    id='HotterColder-v0',# 环境ID，遵循gym命名规范：<名称>-<版本号>
     entry_point='gym.envs.toy_text.hotter_colder:HotterColder',
     max_episode_steps=200,
 )

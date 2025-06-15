@@ -22,7 +22,7 @@ class MyConvModel(keras.Model): # 定义一个继承自Keras模型基类的自�
 # 使用 TensorFlow 的 tf.function 装饰器，将函数编译为 TensorFlow 图执行，提高性能   
     @tf.function
     def call(self, x):
-        h1 = self.l1_conv(x)
+        h1 = self.l1_conv(x)# 应用3x3卷积，保持输入尺寸不变
         return h1# 直接返回卷积结果
 
 

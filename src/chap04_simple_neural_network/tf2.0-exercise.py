@@ -102,6 +102,17 @@ def sigmoid_ce(logits, labels):
     """
     实现 sigmoid 交叉熵 loss 函数（不使用 tf 内置函数）
     接收未经过 sigmoid 的 logits 输入
+    参数:
+        logits: 模型原始输出，shape=(batch_size,)
+        labels: 真实标签 {0,1}，shape=(batch_size,)
+        
+    返回:
+        tf.Tensor: 计算得到的损失值
+        
+    数值稳定性说明:
+        使用数学等价形式避免数值溢出：
+        loss = max(logits,0) - logits*labels + log(1 + exp(-|logits|))
+        这种形式避免了直接计算 exp(logits) 可能导致的数值溢出问题
     """
     # 将 logits 和 labels 转换为 tf.float32 类型，确保后续计算的数值稳定性
     logits = tf.cast(logits, tf.float32)

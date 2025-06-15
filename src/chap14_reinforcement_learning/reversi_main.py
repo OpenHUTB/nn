@@ -81,6 +81,10 @@ for i_episode in range(max_epochs):
         action[1] = 1  # 设置棋子颜色为白色
         
         # 执行白棋动作，更新环境状态
+        # observation: 新的棋盘状态
+        # reward: 即时奖励
+        # done: 是否结束标志
+        # info: 附加信息字典
         observation, reward, done, info = env.step(action)
 
         # 检查游戏是否结束
