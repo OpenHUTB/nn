@@ -522,15 +522,15 @@ class KeyboardControl(object):
                         # 判断门是否已打开
                         if world.doors_are_open:
                             # 如果门已经打开，关闭门并显示通知
-                            world.hud.notification("Closing Doors")
-                            world.doors_are_open = False
-                            world.player.close_door(carla.VehicleDoor.All)
+                            world.hud.notification("Closing Doors")  # 在HUD上显示"正在关门"的通知
+                            world.doors_are_open = False  # 将门状态标记为关闭
+                            world.player.close_door(carla.VehicleDoor.All)  # 关闭车辆所有门
                         else:
                             # 如果门未打开，打开门并显示通知
-                            world.hud.notification("Opening doors")
-                            world.doors_are_open = True
-                            world.player.open_door(carla.VehicleDoor.All)
-                    except Exception as e:
+                            world.hud.notification("Opening doors")  # 在HUD上显示"正在开门"的通知
+                            world.doors_are_open = True  # 将门状态标记为打开
+                            world.player.open_door(carla.VehicleDoor.All)  # 打开车辆所有门
+                    except Exception as e:  # 异常处理块，捕获并处理可能出现的任何异常
                         # 捕获并打印异常信息，便于调试
                         print(f"Error while toggling vehicle doors: {e}")
                 elif event.key == K_t:
