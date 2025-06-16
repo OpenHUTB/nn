@@ -86,20 +86,19 @@ except IndexError:
 # -- imports -------------------------------------------------------------------
 # ==============================================================================
 
-#导入CARLA相关模块
-import carla
+#导入CARLA相关模块import carla  # 导入Carla仿真引擎核心库
 
-from carla import ColorConverter as cc
+from carla import ColorConverter as cc  # 导入颜色转换工具，用于图像后处理
 
 
-import argparse
-import collections
-import datetime
-import logging
-import math
-import random
-import re
-import weakref
+import argparse  # 命令行参数解析库，用于设置仿真选项
+import collections  # 提供额外数据结构，如deque、defaultdict等
+import datetime  # 日期时间处理库
+import logging  # 日志记录工具，用于调试和监控
+import math  # 数学函数库
+import random  # 随机数生成库，用于场景随机化
+import re  # 正则表达式库，用于字符串处理
+import weakref  # 弱引用库，用于管理对象引用，避免内存泄漏
 
 try:
     import pygame    # 导入Pygame图形界面库（用于创建HUD和控制器）
