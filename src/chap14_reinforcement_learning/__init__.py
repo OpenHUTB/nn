@@ -288,12 +288,16 @@ register(
 )
 
 # 6. 二级倒立摆：控制两个连杆保持平衡（难度远高于单级）
+# 注册二级倒立摆环境，这是一个具有挑战性的连续控制任务
+# 目标：通过施加水平力，同时控制两个连杆保持垂直平衡状态
 register(
-    id='InvertedDoublePendulum-v1',
-    entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',
-    max_episode_steps = 1000,
-    reward_threshold = 9100.0,  # 极高的奖励阈值，要求长期稳定控制
+    id='InvertedDoublePendulum-v1',  # 环境标识符，用于在代码中引用
+    entry_point='gym.envs.mujoco:InvertedDoublePendulumEnv',  # 环境实现类
+    max_episode_steps=1000,  # 每个episode的最大步数，超过则终止
+    reward_threshold=9100.0,  # 极高的奖励阈值，要求长期稳定控制
+    # 达到此阈值视为任务解决（例如：连续100个episode平均奖励≥9100）
 )
+
 
 # 7. 猎豹奔跑：控制四足机器人最大化奔跑速度
 register(
