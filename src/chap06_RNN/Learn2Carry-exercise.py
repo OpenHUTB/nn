@@ -85,9 +85,17 @@ def prepare_batch(Nums1, Nums2, results, maxlen):
     #3. 填充到固定长度
 
      # 将整数转换为数字位列表
-    Nums1 = [convertNum2Digits(o) for o in Nums1]
-    Nums2 = [convertNum2Digits(o) for o in Nums2]
-    results = [convertNum2Digits(o) for o in results]
+    # 将Nums1中的每个数值转换为数字列表表示
+# 例如：123 → [1, 2, 3]，适用于需要逐位处理的场景
+Nums1 = [convertNum2Digits(o) for o in Nums1]
+
+# 同理，将Nums2中的每个数值转换为数字列表
+# 常用于对齐两个数值的位数，便于后续计算
+Nums2 = [convertNum2Digits(o) for o in Nums2]
+
+# 将计算结果也转换为数字列表
+# 例如：加法结果256 → [2, 5, 6]，用于模型输出后处理
+results = [convertNum2Digits(o) for o in results]
     # 反转数字位列表，使低位在前，高位在后
     # 这有助于RNN学习进位机制，因为低位的计算影响高位
     Nums1 = [list(reversed(o)) for o in Nums1]
