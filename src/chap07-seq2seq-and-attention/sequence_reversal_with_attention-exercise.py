@@ -89,8 +89,14 @@ class mySeq2SeqModel(keras.Model):
                                                     batch_input_shape=[None, None])
         
         # 编码器和解码器的RNN单元
-        self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
-        self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
+        # 初始化编码器的RNN单元，用于处理输入序列并生成隐藏状态
+        # self.hidden指定隐藏层维度，控制模型表示能力
+        # SimpleRNNCell是基础RNN单元，包含单个全连接层
+self.encoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
+
+        # 初始化解码器的RNN单元，用于根据编码器状态生成输出序列
+        # 解码器与编码器通常共享隐藏层维度，但可使用不同的RNN单元
+self.decoder_cell = tf.keras.layers.SimpleRNNCell(self.hidden)
         
         # 编码器和解码器RNN
         # return_sequences=True: 返回所有时间步的输出
