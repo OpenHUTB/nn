@@ -114,15 +114,23 @@ class RBM:
         """
     
         # 将数据展平为二维数组 [n_samples, n_observe]，确保输入数据符合模型要求
-        data_flat = data.reshape(data.shape[0], -1)  
-        n_samples = data_flat.shape[0]  # 样本数量
+# data.shape[0] 保持样本数量不变，-1 表示自动计算剩余维度
+# 示例：若 data 形状为 [100, 28, 28]，则展平后为 [100, 784]
+data_flat = data.reshape(data.shape[0], -1)  
+n_samples = data_flat.shape[0]  # 样本数量
 
-        # 定义训练参数
-        learning_rate = 0.1  # 学习率，控制参数更新的步长
-        
-        epochs = 10  # 训练轮数，整个数据集将被遍历10次
-        
-        batch_size = 100  # 批处理大小，每次更新参数使用的样本数量
+# 定义训练参数
+learning_rate = 0.1  # 学习率，控制参数更新的步长
+                     # 较大值：训练速度快，但可能错过最优解
+                     # 较小值：训练稳定，但收敛速度慢
+
+epochs = 10  # 训练轮数，整个数据集将被遍历10次
+             # 过多：可能导致过拟合
+             # 过少：可能导致欠拟合
+
+batch_size = 100  # 批处理大小，每次更新参数使用的样本数量
+                  # 较大值：梯度估计更稳定，但内存需求高
+                  # 较小值：引入随机性，可能跳出局部最优
 
         # 开始训练轮数
         for epoch in range(epochs):
