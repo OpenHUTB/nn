@@ -54,7 +54,7 @@ def sigmoid(x):
 
 # 测试 sigmoid 实现是否正确
 # 生成随机测试数据，形状为 [10, 5] 的正态分布随机数
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size = [10, 5])
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001 
 # 计算自定义的 sigmoid 函数与 TensorFlow 内置的 tf.nn.sigmoid 函数的输出差值的平方
 # 并检查这个差值是否小于一个非常小的阈值（0.0001），以验证两者是否足够接近
@@ -72,22 +72,22 @@ def softmax_ce(x, label):
     # 防止log(0)的数值不稳定
     probs = tf.clip_by_value(probs, 1e-10, 1.0)
     # 计算交叉熵损失：-sum(y_true * log(y_pred))
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(probs), axis=-1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(probs), axis = -1))
     ##########
     return loss
 
 # 构造测试数据并验证 softmax_ce 函数正确性
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size = [10, 5])
 # 得到 softmax 概率
 prob = tf.nn.softmax(test_data)
 # 创建 one-hot 标签
-label = np.zeros_like(test_data, dtype=np.float32)
+label = np.zeros_like(test_data, dtype = np.float32)
 # 每行随机一个位置设为 1
-label[np.arange(10), np.random.randint(0, 5, size=10)] = 1.0  
+label[np.arange(10), np.random.randint(0, 5, size = 10)] = 1.0  
 
 # 对比手动实现和 TensorFlow 实现的 softmax 交叉熵结果
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(
-    labels=label, logits=test_data))  # 修正参数顺序为 (labels, logits)
+    labels = label, logits = test_data))  # 修正参数顺序为 (labels, logits)
   - sigmoid_ce(prob, label))** 2 < 0.0001).numpy()
 
 # ## 实现 sigmoid 交叉熵loss函数
@@ -108,7 +108,7 @@ def sigmoid_ce(x, label):
     return loss
 
 # 构造测试数据并验证 sigmoid_ce 函数正确性
-test_data = np.random.normal(size=[10])
+test_data = np.random.normal(size = [10])
 # 得到 sigmoid 概率
 prob = tf.nn.sigmoid(test_data)  
 # 随机生成 0 或 1 的标签
