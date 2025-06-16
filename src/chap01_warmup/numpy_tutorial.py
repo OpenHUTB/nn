@@ -211,9 +211,16 @@ y = x * x  # 计算每个 x 对应的 y=x^2 的值
 plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
 plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
 
-# 添加标题和标签
+# 添加标题和标签# 设置图像标题，使用LaTeX格式渲染数学表达式
+# 支持多行标题，可通过\n分隔
 plt.title("Plot of y = x^2")  # 图像标题
+
+# 设置x轴标签，指定标签文本和字体属性
+# loc参数可选：'center'（默认）、'left'、'right'
 plt.xlabel("x")  # x 轴标签
+
+# 设置y轴标签，指定标签文本和旋转角度
+# rotation参数默认为90（垂直），可设为0（水平）等
 plt.ylabel("y")  # y 轴标签
 
 # 显示出半透明网格线
