@@ -42,21 +42,21 @@ def identity_basis(x):
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
-def multinomial_basis(x, feature_num=10):
+def multinomial_basis(x, feature_num = 10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数
     返回 shape (N, feature_num)"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    x = np.expand_dims(x, axis = 1)  # shape(N, 1)
     # 生成各次幂特征：x^1, x^2, ..., x^feature_num，将其拼接
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将存储不同次幂特征的数组在第二个维度（列方向）上进行拼接
     # 例如，若每个特征数组形状为 (N, 1)，拼接后形状变为 (N, feature_num)
-    ret = np.concatenate(ret, axis=1)
+    ret = np.concatenate(ret, axis = 1)
     return ret
 
 
 
-def gaussian_basis(x, feature_num=10):
+def gaussian_basis(x, feature_num = 10):
     """
     高斯基函数：将输入x映射为一组高斯分布特征
     用于提升模型对非线性关系的拟合能力
@@ -80,7 +80,7 @@ def gaussian_basis(x, feature_num=10):
 # 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
 
 
-def least_squares(phi, y, alpha=0.0, solver="pinv"):
+def least_squares(phi, y, alpha = 0.0, solver = "pinv"):
     """
     带正则化的最小二乘法优化，支持多种求解器
 
@@ -152,7 +152,7 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
     return w
 
 
-def gradient_descent(phi, y, lr=0.01, epochs=1000):
+def gradient_descent(phi, y, lr = 0.01, epochs = 1000):
     """实现批量梯度下降算法优化线性回归权重
     参数:
         phi: 设计矩阵（特征矩阵），形状为 (n_samples, n_features)
@@ -198,7 +198,7 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
     return w
 
 
-def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
+def main(x_train, y_train, use_gradient_descent = False, basis_func = None):
     """训练模型，并返回从x到y的映射。
     basis_func: 可选，基函数（如identity_basis, multinomial_basis, gaussian_basis），默认恒等基
     """
@@ -207,22 +207,22 @@ def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
         basis_func = identity_basis
 
     # 生成偏置项和特征矩阵
-    phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
+    phi0 = np.expand_dims(np.ones_like(x_train), axis = 1)
     # 构造偏置项1
     phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1) # 将偏置项和特征矩阵拼接成完整的特征矩阵
+    phi = np.concatenate([phi0, phi1], axis = 1) # 将偏置项和特征矩阵拼接成完整的特征矩阵
     # 最小二乘法求解权重
     w_lsq = np.dot(np.linalg.pinv(phi), y_train)
 
     w_gd = None
     if use_gradient_descent:
 # 直接调用已实现的gradient_descent函数
-        w_gd = gradient_descent(phi, y_train, lr=0.01, epochs=1000)
+        w_gd = gradient_descent(phi, y_train, lr = 0.01, epochs = 1000)
 
     def f(x):
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
+        phi0 = np.expand_dims(np.ones_like(x), axis = 1)
         phi1 = basis_func(x)
-        phi = np.concatenate([phi0, phi1], axis=1)
+        phi = np.concatenate([phi0, phi1], axis = 1)
         if use_gradient_descent and w_gd is not None:
             return np.dot(phi, w_gd)
         else:
@@ -287,7 +287,7 @@ def evaluate(ys, ys_pred):
 
 def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
     """绘制训练集、测试集和预测结果"""
-    plt.plot(x_train, y_train, "ro", markersize=3)
+    plt.plot(x_train, y_train, "ro", markersize = 3)
     plt.plot(x_test, y_test, "k")
     plt.plot(x_test, y_test_pred, "k")
     plt.xlabel("x")
