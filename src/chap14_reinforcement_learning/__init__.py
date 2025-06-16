@@ -126,9 +126,12 @@ register(
 
 # 月球着陆器（连续动作版本，控制推力大小）
 register(
+    # 注册一个名为 'LunarLanderContinuous-v2' 的强化学习环境
     id='LunarLanderContinuous-v2',
     entry_point='gym.envs.box2d:LunarLanderContinuous',
+    # 'entry_point' 指定了该环境对应的类所在的模块路径以及类名，这里表明该环境类位于 'gym.envs.box2d' 模块下，类名为 'LunarLanderContinuous'
     max_episode_steps=1000,
+     # 可以认为智能体在这个任务上达到了一定的成功标准，常用于衡量训练效果以及判断是否收敛等情况
     reward_threshold=200,
 )
 
