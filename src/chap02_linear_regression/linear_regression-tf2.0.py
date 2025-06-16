@@ -15,25 +15,25 @@ from tensorflow.keras import optimizers, layers, Model
 def identity_basis(x):
     """恒等基函数：直接返回输入本身，适用于线性回归
     返回形状为 (N, 1) 的数组，其中 N 是输入样本数"""
-    return np.expand_dims(x, axis=1)
+    return np.expand_dims(x, axis = 1)
 
     # 生成多项式基函数
-def multinomial_basis(x, feature_num=10):
+def multinomial_basis(x, feature_num = 10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数
     返回形状为 (N, feature_num) 的数组"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
+    x = np.expand_dims(x, axis = 1)  # shape(N, 1)
     # 初始化特征列表
     feat = [x]
     # 生成从 x^2 到 x^feature_num 的多项式特征
     for i in range(2, feature_num + 1):
         feat.append(x**i)
-    # 将所有特征沿着第二维（axis=1）拼接起来
+    # 将所有特征沿着第二维（axis = 1）拼接起来
     ret = np.concatenate(feat, axis=1)
     return ret # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
 
 
-def gaussian_basis(x, feature_num=10):
+def gaussian_basis(x, feature_num = 10):
     """高斯基函数：将输入x映射为一组高斯分布特征
     用于提升模型对非线性关系的拟合能力
     返回形状为 (N, feature_num) 的数组"""
@@ -42,16 +42,16 @@ def gaussian_basis(x, feature_num=10):
     # 计算高斯函数的宽度(标准差)
     width = 1.0 * (centers[1] - centers[0])
     # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
-    x = np.expand_dims(x, axis=1)
+    x = np.expand_dims(x, axis = 1)
     # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
-    x = np.concatenate([x] * feature_num, axis=1) # 将 x 沿着第 1 维度复制 feature_num 次
+    x = np.concatenate([x] * feature_num, axis = 1) # 将 x 沿着第 1 维度复制 feature_num 次
     
     out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
     ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
     return ret
 
 
-def load_data(filename, basis_func=gaussian_basis):
+def load_data(filename, basis_func = gaussian_basis):
     """载入数据并进行基函数变换
     返回：(特征, 标签), (原始x, 原始y)
     在特征矩阵中，phi0是偏置项（全1列），phi1是基函数变换后的特征"""
@@ -64,9 +64,9 @@ def load_data(filename, basis_func=gaussian_basis):
         xs, ys = zip(*xys) # 解压为特征和标签
         xs, ys = np.asarray(xs), np.asarray(ys) # 转换为numpy数组
         o_x, o_y = xs, ys # 保存原始数据
-        phi0 = np.expand_dims(np.ones_like(xs), axis=1) # 添加偏置项（全1列）
+        phi0 = np.expand_dims(np.ones_like(xs), axis = 1) # 添加偏置项（全1列）
         phi1 = basis_func(xs) # 应用基函数变换
-        xs = np.concatenate([phi0, phi1], axis=1) 
+        xs = np.concatenate([phi0, phi1], axis = 1) 
         # 拼接偏置和变换后的特征
         return (np.float32(xs), np.float32(ys)), (o_x, o_y)# 返回处理好的训练数据和原始数据
 
@@ -91,13 +91,13 @@ class LinearModel(Model):
         # trainable=True 表示该变量需要在训练过程中被优化
         # 创建一个TensorFlow变量作为模型权重
         self.w = tf.Variable(
-            shape=[ndim, 1],    # 权重矩阵形状：ndim×1
-            initial_value=tf.random.uniform(
+            shape = [ndim, 1],    # 权重矩阵形状：ndim×1
+            initial_value = tf.random.uniform(
                 # [ndim, 1] 表示这是一个二维矩阵，有 ndim 行和 1 列
-                [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
+                [ndim, 1], minval = -0.1, maxval = 0.1, dtype = tf.float32
             ),
-            trainable=True,
-            name="weight"# 参数名称(用于TensorBoard等可视化工具)
+            trainable = True,
+            name = "weight"# 参数名称(用于TensorBoard等可视化工具)
         )
 
         
@@ -105,9 +105,9 @@ class LinearModel(Model):
         # 定义偏置参数b，形状为 [1]
        
         self.b = tf.Variable(# 定义偏置参数b，它是一个TensorFlow的变量（Variable）
-            initial_value=tf.zeros([1], dtype=tf.float32),
-            trainable=True,
-            name="bias"
+            initial_value = tf.zeros([1], dtype = tf.float32),
+            trainable = True,
+            name = "bias"
         )
         
     @tf.function
@@ -120,14 +120,14 @@ class LinearModel(Model):
         返回:
             预测值，形状为(batch_size,)
         """
-        y = tf.squeeze(tf.matmul(x, self.w), axis=1) + self.b  # 矩阵乘法后压缩维度
+        y = tf.squeeze(tf.matmul(x, self.w), axis = 1) + self.b  # 矩阵乘法后压缩维度
         return y
 
 
     (xs, ys), (o_x, o_y) = load_data("train.txt")    # 加载训练数据，调用load_data函数      
     ndim = xs.shape[1]  # 获取特征维度
 
-    model = LinearModel(ndim=ndim)  # 实例化线性模型
+    model = LinearModel(ndim = ndim)  # 实例化线性模型
 
 
 #训练以及评估
