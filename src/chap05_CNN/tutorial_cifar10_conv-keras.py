@@ -6,7 +6,7 @@ from tensorflow.examples.tutorials.mnist import input_data
 # 使用input_data.read_data_sets函数加载MNIST数据集，'MNIST_data'是数据集存储的目录路径，one_hot=True表示将标签转换为one-hot编码格式
 
 try:
-    mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+    mnist = input_data.read_data_sets('MNIST_data', one_hot = True)
 except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
     # 提示：若首次运行失败，可能因未下载数据集，可检查网络连接或手动创建'MNIST_data'目录
@@ -34,13 +34,13 @@ def compute_accuracy(v_xs, v_ys):
     """
     global prediction
     # 获取模型预测结果
-    y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
+    y_pre = sess.run(prediction, feed_dict = {xs: v_xs, keep_prob: 1})
     # 比较预测与真实标签
     correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
     # 计算准确率
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
-    result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
+    result = sess.run(accuracy, feed_dict = {xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
 
@@ -54,8 +54,8 @@ def weight_variable(shape):
     返回:
         tf.Variable: 初始化后的权重变量。
     """
-    # 使用截断正态分布初始化权重，stddev=0.1，有助于稳定训练
-    initial = tf.truncated_normal(shape, stddev=0.1)
+    # 使用截断正态分布初始化权重，stddev = 0.1，有助于稳定训练
+    initial = tf.truncated_normal(shape, stddev = 0.1)
     # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
 
@@ -71,11 +71,11 @@ def bias_variable(shape):
         tf.Variable: 使用常数0.1初始化的偏置变量（避免死神经元）
     """
     # 使用常数0.1初始化偏置，避免ReLU激活函数下的"死亡神经元"问题
-    initial = tf.constant(0.1, shape=shape) # 创建一个所有元素值为0.1的常量张量
+    initial = tf.constant(0.1, shape = shape) # 创建一个所有元素值为0.1的常量张量
     return tf.Variable(initial)#将常量张量 initial 包装为一个可训练的变量张量
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(x, W, padding = 'SAME', strides = [1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -113,7 +113,7 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     
     # 执行卷积操作：使用指定的卷积核W对输入x进行卷积，步长为strides，填充方式为padding
     # SAME填充确保输出尺寸与输入相同，VALID填充则不进行填充
-    conv = tf.nn.conv2d(x, W, strides=strides, padding=padding)
+    conv = tf.nn.conv2d(x, W, strides = strides, padding = padding)
     
     # 添加批归一化以提高训练稳定性
     # 注意：在实际应用中，是否使用批归一化取决于网络结构和需求
@@ -158,7 +158,7 @@ def max_pool_2x2(x: tf.Tensor, # 输入张量
         strides = [1, 1, strides, strides]
     
     # 最大池化操作：每个2x2区域选择最大值，实现特征降维，保留主要特征
-    return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
+    return tf.nn.max_pool(x, ksize = ksize, strides = strides, padding = padding, data_format = data_format)
 
 
 # define placeholder for inputs to network
@@ -226,7 +226,7 @@ prediction = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
 # 损失函数：交叉熵，衡量预测分布与真实分布的差异
 cross_entropy = tf.reduce_mean(
-    -tf.reduce_sum(ys * tf.log(prediction), reduction_indices=[1])
+    -tf.reduce_sum(ys * tf.log(prediction), reduction_indices = [1])
 )
 # 创建优化器 - Adam算法优化损失函数
 # Adam优化器结合了AdaGrad和RMSProp的优点，自适应调整学习率
