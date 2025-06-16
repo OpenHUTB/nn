@@ -48,17 +48,23 @@ def random_string(length):
     return ''.join(random.choices(letters, k = length))
 
 def get_batch(batch_size, length):
-    # 生成batch_size个随机字符串
+    # 生成batch_size个随机字符串，每个字符串长度为length
+    # 示例：['ABC', 'XYZ', ...]
     batched_examples = [random_string(length) for i in range(batch_size)]
   
-    # 转成索引：字母 A-Z 映射到 1-26
+    # 将每个字符串转换为索引序列（A→1, B→2, ..., Z→26）
+    # 示例：['ABC'] → [[1, 2, 3]]
     enc_x = [[ord(ch) - ord('A') + 1 for ch in list(exp)] for exp in batched_examples]
   
-    # 逆序
+    # 生成目标序列：将输入序列逆序
+    # 示例：[[1, 2, 3]] → [[3, 2, 1]]
     y = [[o for o in reversed(e_idx)] for e_idx in enc_x]
   
-    #等价于y = [list(reversed(e_idx)) for e_idx in enc_x]
-    # 添加起始符
+    # 等价写法：y = [list(reversed(e_idx)) for e_idx in enc_x]
+    
+    # 构建设置解码器的输入序列：添加起始标记(0)并移除最后一个元素
+    # 起始标记(0)用于触发解码器开始生成序列
+    # 示例：[[3, 2, 1]] → [[0, 3, 2]]
     dec_x = [[0] + e_idx[:-1] for e_idx in y]
   # 返回一个批次的训练数据，包含四个张量：
 # 1. batched_examples: 批量处理后的原始样本（格式取决于具体实现）
