@@ -4,6 +4,8 @@
 # # Softmax Regression Example
 
 # ### 生成数据集， 看明白即可无需填写代码
+# 本示例展示了如何使用TensorFlow实现一个完整的Softmax回归模型，用于多分类任务。
+# 我们将从三个不同的高斯分布中生成样本数据，然后训练模型对这些数据进行分类。
 # #### '<font color="blue">+</font>' 从高斯分布采样 (X, Y) ~ N(3, 6, 1, 1, 0).<br>
 # #### '<font color="green">o</font>' 从高斯分布采样  (X, Y) ~ N(6, 3, 1, 1, 0)<br>
 # #### '<font color="red">*</font>' 从高斯分布采样  (X, Y) ~ N(7, 7, 1, 1, 0)<br>
@@ -45,7 +47,11 @@ C3 = np.array([x_b, y_b, y]).T
 plt.scatter(C1[:, 0], C1[:, 1], c = "b", marker = "+")  # 类别1：蓝色加号
 plt.scatter(C2[:, 0], C2[:, 1], c = "g", marker = "o")  # 类别2：绿色圆圈
 plt.scatter(C3[:, 0], C3[:, 1], c = "r", marker = "*")  # 类别3：红色星号
-
+plt.legend()
+plt.title('Three-Class Dataset Visualization')
+plt.xlabel('X coordinate')
+plt.ylabel('Y coordinate')
+plt.grid(True, linestyle='--', alpha=0.7)
 # 合并所有类别的数据，形成完整数据集
 data_set = np.concatenate((C1, C2, C3), axis=0)
 np.random.shuffle(data_set)  # 随机打乱数据集顺序
@@ -99,6 +105,7 @@ def compute_loss(pred, labels, num_classes=3):
     :return: 平均损失值和准确率
     """
     # 将真实标签转换为one-hot编码形式
+     # 例如：标签2 → [0, 0, 1, 0, ...]
     one_hot_labels = tf.one_hot(
         tf.cast(labels, tf.int32), depth=num_classes, dtype=tf.float32
     )
