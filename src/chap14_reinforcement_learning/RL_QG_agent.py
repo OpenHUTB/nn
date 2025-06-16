@@ -6,17 +6,26 @@ import tensorflow as tf  # 导入深度学习框架，用于构建和训练神�
 class RL_QG_agent:
     """黑白棋强化学习智能体，基于Q学习和卷积神经网络实现落子策略"""
     
-    def __init__(self):
-        """初始化智能体，设置模型保存路径和TensorFlow相关组件"""
-        # 确定模型保存目录：当前脚本所在目录下的Reversi文件夹
-        self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
-        os.makedirs(self.model_dir, exist_ok=True)  # 创建目录（若不存在）
-        
-        # TensorFlow相关组件占位符
-        self.sess = None          # 会话对象，管理TensorFlow图的执行
-        self.saver = None         # 模型保存器，用于保存和加载参数
-        self.input_states = None  # 网络输入张量（棋盘状态）
-        self.Q_values = None      # 网络输出张量（各位置Q值）
+   def __init__(self):
+    """初始化智能体，设置模型保存路径和TensorFlow相关组件"""
+    # 确定模型保存目录：当前脚本所在目录下的Reversi文件夹
+    # 使用os.path确保路径跨平台兼容
+    self.model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Reversi")
+    os.makedirs(self.model_dir, exist_ok=True)  # 创建目录（若不存在）
+    
+    # TensorFlow相关组件占位符
+    self.sess = None          # 会话对象，管理TensorFlow图的执行
+                              # 用于运行计算图中的操作
+    
+    self.saver = None         # 模型保存器，用于保存和加载参数
+                              # 通过checkpoint文件持久化模型权重
+    
+    self.input_states = None  # 网络输入张量（棋盘状态）
+                              # 形状通常为 [batch_size, board_size, board_size, features]
+    
+    self.Q_values = None      # 网络输出张量（各位置Q值）
+                              # 形状通常为 [batch_size, board_size * board_size]
+                              # 表示每个棋盘位置的预期价值
 
 
     def init_model(self):
