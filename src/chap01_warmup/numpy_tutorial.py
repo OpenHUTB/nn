@@ -3,8 +3,8 @@
 # numpy 的 array 操作
 
 # 1. 导入 numpy 库
-import numpy as np                    # 将 numpy 库命名为 np
-import matplotlib.pyplot as plt       # 仅保留需要使用的导入
+import numpy as np                    # 将 numpy 库命名为 np，便于后续的调用
+import matplotlib.pyplot as plt       # 仅保留需要使用的导入，导入matplotlib用于绘图
 # import 放一起代码美观
 
 
@@ -58,9 +58,9 @@ print(a[2, 3], a[0, 0])
 print("第六题：\n")
 
 # 0:2 表示取第 0 行（包含）到第 2 行（不包含），即实际取第 0 行和第 1 行；2:4 表示取第 2 列（包含）到第 4 列（不包含），即实际取第 2 列和第 3 列
-b = a[0:2, 2:4]
-print("(1) 输出 b\n", b)
-print("(2) 输出 b 的（0,0）这个元素的值\n", b[0, 0])
+b = a[0:2, 2:4]   # 0:2表示取0和1行，2:4表示取2和3列
+print("(1) 输出 b\n", b)    # 输出子数组
+print("(2) 输出 b 的（0,0）这个元素的值\n", b[0, 0])  # 输出b的第1行第1列
 
 # 7. 把第 5 题中数组 a 的最后两行所有元素放到 c 中 (1) 输出 c ; (2) 输出 c 中第一行的最后一个元素（提示，使用 -1 表示最后一个元素）
 print("第七题：\n")
