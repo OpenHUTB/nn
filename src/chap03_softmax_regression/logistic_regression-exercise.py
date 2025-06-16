@@ -152,16 +152,27 @@ def compute_loss(pred, label):
 @tf.function
 def train_one_step(model, optimizer, x, y):
     # 使用GradientTape记录计算图，以便计算梯度
+    # 所有在上下文中执行的操作都会被梯度带追踪
     with tf.GradientTape() as tape:
         # 使用模型对输入数据x进行预测
+        # x形状: [batch_size, feature_dim]
+        # pred形状: [batch_size, num_classes]
         pred = model(x)
+        
         # 计算预测结果的损失和准确率
+        # compute_loss函数应返回标量损失和准确率指标
         loss, accuracy = compute_loss(pred, y)
         
     # 计算损失对可训练变量的梯度
+    # grads是与model.trainable_variables对应的梯度列表
     grads = tape.gradient(loss, model.trainable_variables)
+    
     # 使用优化器更新模型的可训练变量
+    # zip(grads, model.trainable_variables)将梯度与对应变量配对
     optimizer.apply_gradients(zip(grads, model.trainable_variables))
+    
+    # 返回当前批次的损失、准确率以及模型权重和偏置
+    # 注意：直接返回model.W和model.b需要确保模型中定义了这些属性
     return loss, accuracy, model.W, model.b
 
 
