@@ -126,6 +126,7 @@ class GaussianMixtureModel:
     def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
+        # 把传入构造函数的 `max_iter` 参数值赋给实例变量 `self.max_iter`，
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
         self.log_likelihoods = []         #存储每轮迭代的对数似然值
