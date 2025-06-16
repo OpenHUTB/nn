@@ -322,11 +322,18 @@ if __name__ == "__main__":
     std = evaluate(y_train, y_train_pred)  # 计算预测值与真实值的标准差作为评估指标
     print("训练集预测值与真实值的标准差：{:.1f}".format(std))
 
-    # 计算预测的输出值
-    y_test_pred = f(x_test)
-    # 使用测试集评估模型
-    std = evaluate(y_test, y_test_pred)
-    print("预测值与真实值的标准差：{:.1f}".format(std))
+    # 计算测试集上的预测结果
+# x_test: 测试集输入特征，形状为 [n_samples, n_features]
+# y_test_pred: 模型预测输出，形状为 [n_samples]
+y_test_pred = f(x_test)
 
-    # 使用封装的绘图函数
-    plot_results(x_train, y_train, x_test, y_test, y_test_pred)
+# 使用评估函数计算预测误差
+# evaluate函数通常返回预测值与真实值的标准差或RMSE
+# std: 预测误差的标准差，衡量模型泛化能力
+std = evaluate(y_test, y_test_pred)
+print("预测值与真实值的标准差：{:.1f}".format(std))
+
+# 可视化模型性能
+# 绘制训练数据点、真实测试数据点和模型预测结果
+# 用于直观比较模型预测效果与实际数据分布
+plot_results(x_train, y_train, x_test, y_test, y_test_pred)
