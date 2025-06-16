@@ -81,11 +81,18 @@ for i_episode in range(max_epochs):
         action[1] = 1  # 设置棋子颜色为白色
         
         # 执行白棋动作，更新环境状态
+        # observation: 新的棋盘状态
+        # reward: 即时奖励
+        # done: 是否结束标志
+        # info: 附加信息字典
         observation, reward, done, info = env.step(action)
 
         # 检查游戏是否结束
         if done:
             # 打印游戏结果摘要
+            # 使用f-string格式化输出，展示当前训练的局数和每局游戏的步数
+            # i_episode+1：将从0开始的局数索引转换为从1开始的自然计数
+           # t+1：将从0开始的步数索引转换为从1开始的自然计数，直观展示每局游戏的总步数
             print(f"第 {i_episode+1} 局游戏在 {t+1} 步后结束")
             
             # 计算双方得分

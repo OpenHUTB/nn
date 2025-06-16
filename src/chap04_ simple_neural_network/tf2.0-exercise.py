@@ -68,11 +68,11 @@ def softmax_ce(x, label):
     ##########
     # 使用 clip 避免 log(0) 产生数值不稳定
     # 计算softmax概率分布
-    probs = tf.nn.softmax(logits)
+    probs = tf.nn.softmax(x)
     # 防止log(0)的数值不稳定
     probs = tf.clip_by_value(probs, 1e-10, 1.0)
     # 计算交叉熵损失：-sum(y_true * log(y_pred))
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(probs), axis=-1))
     ##########
     return loss
 
@@ -118,4 +118,4 @@ print(label)
 
 # 对比手动实现和 TensorFlow 实现的 sigmoid 交叉熵结果
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data))
-  - sigmoid_ce(prob, label))**2 < 0.0001).numpy()
+  - sigmoid_ce(prob, label))**2 < 0.0001).numpy()  # 判断差异是否小于 0.0001，结果转为 numpy 布尔值，用于验证两者计算是否一致

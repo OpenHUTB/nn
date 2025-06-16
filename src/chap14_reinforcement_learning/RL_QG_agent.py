@@ -44,22 +44,22 @@ class RL_QG_agent:
         # 输出形状：[None, 8, 8, 32]
         conv1 = tf.layers.conv2d(
             # 输入数据：状态特征图
-            inputs=self.input_states,
-            filters=32,            # 32个卷积核，生成32个特征图
-            kernel_size=3,         # 3x3卷积核，捕捉局部区域
-            padding="same",        # 同尺寸填充，保持输出尺寸与输入一致
-            activation=tf.nn.relu  # ReLU激活函数，引入非线性
+            inputs = self.input_states,
+            filters = 32,            # 32个卷积核，生成32个特征图
+            kernel_size = 3,         # 3x3卷积核，捕捉局部区域
+            padding = "same",        # 同尺寸填充，保持输出尺寸与输入一致
+            activation = tf.nn.relu  # ReLU激活函数，引入非线性
         )
 
         # ========== 卷积层2：提取全局布局特征 ==========
         # 64个3x3卷积核，捕捉更复杂的棋子布局模式
         # 输出形状：[None, 8, 8, 64]
         conv2 = tf.layers.conv2d(
-            inputs=conv1,
-            filters=64,            # 特征图数量翻倍，增强特征表达能力
-            kernel_size=3,         # 使用3×3的卷积核，平衡特征提取能力与参数量
-            padding="same",        # 保持输出特征图尺寸与输入一致（补零填充）
-            activation=tf.nn.relu  # ReLU激活函数，引入非线性并抑制负梯
+            inputs = conv1,
+            filters = 64,            # 特征图数量翻倍，增强特征表达能力
+            kernel_size = 3,         # 使用3×3的卷积核，平衡特征提取能力与参数量
+            padding = "same",        # 保持输出特征图尺寸与输入一致（补零填充）
+            activation = tf.nn.relu  # ReLU激活函数，引入非线性并抑制负梯
         )
 
         # ========== 扁平化层：将多维特征转为一维向量 ==========
@@ -69,11 +69,11 @@ class RL_QG_agent:
         # ========== 全连接层：学习特征间的全局关系 ==========
         # 512个神经元，通过ReLU激活学习非线性组合
         # 输出形状：[None, 512]
-        dense = tf.layers.dense(inputs=flat, units=512, activation=tf.nn.relu)
+        dense = tf.layers.dense(inputs = flat, units = 512, activation = tf.nn.relu)
 
         # ========== 输出层：预测各位置的Q值 ==========
         # 64个神经元对应棋盘64个位置，直接输出Q值（无激活函数）
-        self.Q_values = tf.layers.dense(inputs=dense, units=64, name="q_values")
+        self.Q_values = tf.layers.dense(inputs = dense, units = 64, name = "q_values")
 
         # 初始化所有变量并创建模型保存器
         self.sess.run(tf.global_variables_initializer())
@@ -119,15 +119,21 @@ class RL_QG_agent:
         self.saver.save(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已保存至", self.model_dir)
         
-        try:
-            self.saver.save(self.sess, model_path)
-            self.logger.info("模型已保存至 %s", model_path)
+        # 尝试调用saver的save方法保存当前会话(sess)的模型参数
+        # model_path 指定了模型保存的路径和文件名
+        self.saver.save(self.sess, model_path)
+        
+        # 如果保存过程中发生任何异常，将会被捕获并处理
         except Exception as e:
             self.logger.error("保存模型时出错: %s", e) # 使用logger记录一条错误日志信息
 
 
 
     def load_model(self):
-        """从指定目录加载预训练的模型参数"""
+        """从指定目录加载预训练的模型参数
+        异常处理:
+        检查模型文件是否存在
+        捕获并处理恢复会话时可能出现的错误
+        """
         self.saver.restore(self.sess, os.path.join(self.model_dir, 'parameter.ckpt'))
         print("模型已从", self.model_dir, "加载")

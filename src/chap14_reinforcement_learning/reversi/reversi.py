@@ -89,6 +89,7 @@ class ReversiEnv(gym.Env):
 
     def _reset(self):
         # init board setting
+        # 初始化3通道棋盘状态
         self.state = np.zeros((3, self.board_size, self.board_size))
         self.state[2, :, :] = 1.0
         self.state[2, 3:5, 3:5] = 0

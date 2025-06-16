@@ -68,7 +68,13 @@ test_y = test_data.test_labels[:500].numpy()
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()                                # 调用父类构造函数
-        
+        """
+        设计特点:
+        使用小尺寸卷积核(3x3)保留更多局部特征
+        - 批量归一化(BN)加速训练收敛
+        - 最大池化逐步降低空间维度
+        - Dropout层防止过拟合
+        """
         # 第一个卷积层
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),  # 3x3卷积核
