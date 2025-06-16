@@ -265,10 +265,10 @@ register(
 
 # 3. 物体投掷：控制机械臂投掷物体到目标区域
 register(
-    id='Thrower-v0',
-    entry_point='gym.envs.mujoco:ThrowerEnv',
-    max_episode_steps = 100,
-    reward_threshold = 0.0,
+    id='Thrower-v0',                      # 环境ID（唯一标识符）
+    entry_point='gym.envs.mujoco:ThrowerEnv',  # 入口点（模块路径:类名）
+    max_episode_steps=100,                # 每个episode的最大步数
+    reward_threshold=0.0,                 # 认为任务已解决的最低奖励阈值
 )
 
 # 4. 物体击打：控制机械臂击打物体到目标位置
