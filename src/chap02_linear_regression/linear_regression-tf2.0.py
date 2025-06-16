@@ -137,12 +137,24 @@ optimizer = optimizers.Adam(0.1)
 @tf.function
 def train_one_step(model, xs, ys):
     # 在梯度带(GradientTape)上下文中记录前向计算过程
+    # 梯度带会追踪所有与TensorFlow张量相关的操作，用于后续梯度计算
     with tf.GradientTape() as tape:
         y_preds = model(xs)    # 模型前向传播计算预测值
-        loss = tf.keras.losses.MSE(ys, y_preds)   #计算损失函数
-    grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
-    optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
-    return loss # 返回模型的预测结果，即模型对输入数据 xs 的输出
+                               # 输入：训练批次xs，形状为[batch_size, feature_dim]
+                               # 输出：预测值y_preds，形状为[batch_size, output_dim]
+        
+        loss = tf.keras.losses.MSE(ys, y_preds)   # 计算均方误差损失
+                                                   # ys为真实标签，形状为[batch_size, output_dim]
+    
+    # 计算损失函数对模型参数model.w的梯度
+    # grads形状与model.w一致，代表各参数位置的梯度值
+    grads = tape.gradient(loss, model.w)
+    
+    # 使用优化器应用梯度更新模型参数
+    # optimizer可以是SGD、Adam等，此处假设model.w为模型可训练参数
+    optimizer.apply_gradients([(grads, model.w)])
+    
+    return loss  # 返回当前批次的训练损失，用于监控训练进度
 
 
 # 使用@tf.function装饰器将Python函数转换为TensorFlow图，以提高执行效率
