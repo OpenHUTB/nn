@@ -50,6 +50,7 @@ def multinomial_basis(x, feature_num=10):
     # 生成各次幂特征：x^1, x^2, ..., x^feature_num，将其拼接
     ret = [x**i for i in range(1, feature_num + 1)]
     # 将存储不同次幂特征的数组在第二个维度（列方向）上进行拼接
+    # 例如，若每个特征数组形状为 (N, 1)，拼接后形状变为 (N, feature_num)
     ret = np.concatenate(ret, axis=1)
     return ret
 
@@ -268,10 +269,14 @@ if __name__ == "__main__":
     # w_lsq: 通过最小二乘法得到的权重向量
     # w_gd: 通过梯度下降法得到的权重向量
     f, w_lsq, w_gd = main(x_train, y_train)
-
-    return f, w_lsq, w_gd
-
-
+    y_pred = f(x_test)
+    mse = np.mean((y_test - y_pred) ** 2)
+    print(f"均方误差(MSE): {mse:.4f}")
+    print("\n最小二乘法权重:")
+    print(w_lsq)
+    print("\n梯度下降法权重:")
+    print(w_gd)
+    
 
 def evaluate(ys, ys_pred):
     """评估模型。"""
