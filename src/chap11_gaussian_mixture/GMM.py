@@ -56,13 +56,20 @@ def generate_data(n_samples = 1000):
     y_true = []  
     
     # 从第i个高斯分布生成样本
-    for i in range(n_components): 
-        #生成多元正态分布样本
-        X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
-        # 将生成的样本添加到列表
-        X_list.append(X_i) 
-        # 添加对应标签（0、1、2表示三个分布）
-        y_true.extend([i] * samples_per_component[i]) 
+ for i in range(n_components): 
+    # 从第i个真实高斯分量生成样本
+    # mu_true[i]: 第i个分量的均值向量
+    # sigma_true[i]: 第i个分量的协方差矩阵
+    # samples_per_component[i]: 第i个分量生成的样本数
+    X_i = np.random.multivariate_normal(mu_true[i], sigma_true[i], samples_per_component[i])
+    
+    # 将生成的样本添加到总样本列表
+    # X_list最终形状: [n_samples, n_features]
+    X_list.append(X_i) 
+    
+    # 为当前分量的所有样本分配类别标签i
+    # y_true最终长度: n_samples
+    y_true.extend([i] * samples_per_component[i]) 
     
     # 合并并打乱数据并打乱顺序（模拟无标签数据）
     # 使用函数将X_list中的数组沿垂直方向拼接成一个二维数组X
