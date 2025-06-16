@@ -89,6 +89,7 @@ test_data = np.random.normal(size = [10, 5]).astype(np.float32)
 # 进行softmax转换
 # 正确测试逻辑：直接使用原始logits
 test_logits = np.random.normal(size = [10, 5]).astype(np.float32)
+# 创建一个与test_logits形状相同且数据类型为np.float32的全零数组，
 label = np.zeros_like(test_logits, dtype = np.float32)
 label[np.arange(10), np.random.randint(0, 5, size = 10)] = 1.0
 # 比较自定义的损失值和tf自带结果，误差小于 0.0001 则认为相等
