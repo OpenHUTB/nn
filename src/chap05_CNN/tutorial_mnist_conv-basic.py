@@ -77,19 +77,19 @@ class MyConvModel(keras.Model):
         super(MyConvModel, self).__init__()  # 调用父类（Model）的构造函数，初始化模型基础结构
 
         # 定义第一层卷积层：32个5x5的卷积核，使用ReLU激活函数，same填充保证输出尺寸不变
-        self.l1_conv = Conv2D(32, (5, 5), activation='relu', padding='same')
+        self.l1_conv = Conv2D(32, (5, 5), activation = 'relu', padding = 'same')
 
         # 第二层卷积层：64个5x5的卷积核，同样使用ReLU激活函数和same填充
-        self.l2_conv = Conv2D(64, (5, 5), activation='relu', padding='same')
+        self.l2_conv = Conv2D(64, (5, 5), activation = 'relu', padding = 'same')
 
         # 最大池化层：池化窗口大小为2x2，步长为2，用于降低特征图的空间维度
-        self.pool = MaxPooling2D(pool_size=(2, 2), strides=2)
+        self.pool = MaxPooling2D(pool_size = (2, 2), strides = 2)
 
         # 展平层：将输入从(batch_size, height, width, channels)展平为一维向量，便于后续全连接层处理
         self.flat = Flatten()
 
         # 第一个全连接层：100个神经元，使用tanh激活函数
-        self.dense1 = layers.Dense(100, activation='tanh')
+        self.dense1 = layers.Dense(100, activation = 'tanh')
 
         # 输出层：10个神经元，对应10个类别（如MNIST中的数字0~9），无激活函数（通常配合softmax或交叉熵损失使用）
         self.dense2 = layers.Dense(10)
@@ -141,7 +141,7 @@ def compute_loss(logits, labels):
     """
     return tf.reduce_mean(
         tf.nn.sparse_softmax_cross_entropy_with_logits(
-            logits=logits, labels=labels)
+            logits = logits, labels = labels)
     )
 
 
@@ -157,7 +157,7 @@ def compute_accuracy(logits, labels):
     返回:
         accuracy: 模型的准确率。
     """
-    predictions = tf.argmax(logits, axis=1)
+    predictions = tf.argmax(logits, axis = 1)
     return tf.reduce_mean(tf.cast(tf.equal(predictions, labels), tf.float32))
 
 
