@@ -116,7 +116,7 @@ for i_episode in range(max_epochs):
 # 清理环境资源
 # 关闭创建的强化学习环境，释放相关的系统资源，例如关闭可能打开的文件描述符、
 env.close()
-
+# 输出提示信息，告知用户训练已经完成，并通过格式化字符串的方式展示总共进行的训练局数。
 print(f"训练完成！共进行了 {max_epochs} 局游戏")
 print(f"训练完成！共进行了 {max_epochs} 局游戏")
 print(f"训练完成！共进行了 {max_epochs} 局游戏")
