@@ -10,8 +10,8 @@ def generate_data(n_samples = 1000):
     """生成混合高斯分布数据集
     
     Args:
-        n_samples: 样本数量 (default=1000)
-        random_state: 随机种子 (default=42)
+        n_samples: 样本数量 (default = 1000)
+        random_state: 随机种子 (default = 42)
         
     Returns:
         Tuple: (X, y_true)
@@ -75,7 +75,7 @@ def generate_data(n_samples = 1000):
     return X[shuffle_idx], y_true[shuffle_idx]
 
 # 自定义logsumexp函数.LogSumExp（LSE）函数 是一种常见的数值计算函数，主要用于对数域求和的场景。
-def logsumexp(log_p, axis=1, keepdims=False):
+def logsumexp(log_p, axis = 1, keepdims = False):
     """优化后的logsumexp实现，包含数值稳定性增强和特殊case处理
     
     计算log(sum(exp(log_p)))，通过减去最大值避免数值溢出
