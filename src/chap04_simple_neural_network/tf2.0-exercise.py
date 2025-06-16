@@ -96,7 +96,7 @@ label[np.arange(10), np.random.randint(0, 5, size = 10)] = 1.0
 
 ((tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(label, test_data))
   - softmax_ce(prob, label))**2 < 0.0001).numpy()
-
+# np.arange(10)会生成一个从0到9的一维数组，代表10个样本的索引。
 # ## 实现 sigmoid 交叉熵loss函数
 
 def sigmoid_ce(logits, labels):
