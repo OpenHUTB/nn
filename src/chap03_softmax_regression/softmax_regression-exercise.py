@@ -70,11 +70,14 @@ class SoftmaxRegression(tf.Module):
         """
         super().__init__()
         # 初始化权重 W形状为[input_dim, num_classes] ：初始化偏置向量b，形状为[num_classes]
+         # W的每一列对应一个类别的线性分类器参数
         # 使用均匀分布随机初始化权重，偏置初始化为0
         self.W = tf.Variable(
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
             name = "W",
         )
+         # 初始化偏置向量 b [num_classes]
+        # 每个类别对应一个偏置值，调整分类边界的位置
         self.b = tf.Variable(tf.zeros([num_classes]), name="b")  # 全0初始化，形状为[类别数]，变量名称为b
 
     @tf.function
