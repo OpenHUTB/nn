@@ -40,27 +40,28 @@ if not(os.path.exists('./mnist/')) or not os.listdir('./mnist/'):
     DOWNLOAD_MNIST = True
 
 # 加载训练数据集
+# 加载MNIST手写数字数据集，这是一个经典的图像分类基准数据集
 train_data = torchvision.datasets.MNIST(
-    root='./mnist/',                              # 数据集保存路径
-    train=True,                                   # 加载训练集（False则加载测试集）
-    transform=torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
-    download=DOWNLOAD_MNIST                       # 如果需要则下载
+    root = './mnist/',                              # 数据集保存路径
+    train = True,                                   # 加载训练集（False则加载测试集）
+    transform = torchvision.transforms.ToTensor(),  # 将PIL图像转换为 Tensor 并归一化到[0,1]
+    download = DOWNLOAD_MNIST                       # 如果需要则下载
 )
 
 # 创建数据加载器，用于批量加载数据
 train_loader = Data.DataLoader(
-    dataset=train_data,     # 使用的数据集
-    batch_size=BATCH_SIZE,  # 每批数据量
-    shuffle=True            # 是否在每个epoch打乱数据顺序（重要！避免模型学习到顺序信息）
+    dataset = train_data,     # 使用的数据集
+    batch_size = BATCH_SIZE,  # 每批数据量
+    shuffle = True            # 是否在每个epoch打乱数据顺序（重要！避免模型学习到顺序信息）
 )
 
 # 加载测试数据集（不用于训练，仅用于评估）
 # torchvision.datasets.MNIST用于加载 MNIST 数据集
 # root='./mnist/'指定数据集的存储路径
 # train=False表示加载测试集（而不是训练集）
-test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
+test_data = torchvision.datasets.MNIST(root = './mnist/', train = False)
 # 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
-test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
+test_x = Variable(torch.unsqueeze(test_data.test_data, dim = 1), volatile = True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
 test_y = test_data.test_labels[:500].numpy()
 
@@ -122,7 +123,7 @@ def test(cnn):
     y_pre = cnn(test_x)  
     
     # 计算softmax概率分布（将logits转换为概率值，dim=1表示对类别维度做归一化）
-    y_prob = F.softmax(y_pre, dim=1)
+    y_prob = F.softmax(y_pre, dim = 1)
     
     # 获取预测类别：找到每个样本概率最大的类别索引
     # torch.max返回(最大值, 最大值的索引)
@@ -144,7 +145,7 @@ def test(cnn):
 # 训练函数
 def train(cnn):
     # 使用Adam优化器，学习率为learning_rate
-    optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(cnn.parameters(), lr = learning_rate)
     # 使用交叉熵损失函数
     loss_func = nn.CrossEntropyLoss()
 
@@ -156,7 +157,7 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)                         # 前向传播得到预测结果
             loss = loss_func(output, y)             # 计算损失
-            optimizer.zero_grad(set_to_none=True)   # 清空模型参数的梯度缓存，set_to_none=True可减少内存占用
+            optimizer.zero_grad(set_to_none = True)   # 清空模型参数的梯度缓存，set_to_none=True可减少内存占用
             loss.backward()                         # 反向传播计算梯度
             optimizer.step()                        # 更新参数
 
