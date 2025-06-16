@@ -244,7 +244,7 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         self._actor_generation = args.generation #角色生成参数配置
         self._gamma = args.gamma
         self.restart()  # 重启函数调用和 Tick 回调注册
-        self.world.on_tick(hud.on_world_tick)
+        self.world.on_tick(hud.on_world_tick)# 注册HUD的世界tick回调函数，用于每帧更新HUD显示
         self.recording_enabled = False  # 录制与控制相关变量
         self.recording_start = 0 # 初始化录音开始时间的标记变量
         self.constant_velocity_enabled = False # 设置类的属性 constant_velocity_enabled 为 False，这个属性用于指示是否启用了“恒定速度”模式
@@ -299,21 +299,21 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
         #设置车辆为无敌模式
         if blueprint.has_attribute('is_invincible'):
             blueprint.set_attribute('is_invincible', 'true')
-        # set the max speed
-        if blueprint.has_attribute('speed'):
-            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])
+        # 设置最大速度
+        if blueprint.has_attribute('speed'): # 检查蓝图是否有'speed'属性
+            self.player_max_speed = float(blueprint.get_attribute('speed').recommended_values[1])# 从蓝图获取推荐速度值并转换为浮点数
             self.player_max_speed_fast = float(blueprint.get_attribute('speed').recommended_values[2])
 
-        # Spawn the player.
+        # 如果玩家车辆已存在
         if self.player is not None:
-            spawn_point = self.player.get_transform()
+            spawn_point = self.player.get_transform() # 获取玩家当前的变换信息（位置和旋转）
             spawn_point.location.z += 2.0 # 将生成点的高度(z轴)提高2.0个单位
-            spawn_point.rotation.roll = 0.0
+            spawn_point.rotation.roll = 0.0 # 重置横滚角
             spawn_point.rotation.pitch = 0.0
-            self.destroy()
-            self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-            self.show_vehicle_telemetry = False
-            self.modify_vehicle_physics(self.player)
+            self.destroy()# 销毁现有玩家车辆
+            self.player = self.world.try_spawn_actor(blueprint, spawn_point)# 尝试在新位置生成玩家车辆
+            self.show_vehicle_telemetry = False # 关闭车辆遥测显示
+            self.modify_vehicle_physics(self.player) # 应用自定义车辆物理参数
         while self.player is None:
             if not self.map.get_spawn_points():
                 print('There are no spawn points available in your map/town.')
@@ -325,12 +325,17 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
             self.show_vehicle_telemetry = False
             self.modify_vehicle_physics(self.player)
         # Set up the sensors.
+        # 初始化碰撞传感器，传入玩家角色(player)和HUD对象(hud)用于显示碰撞信息
         self.collision_sensor = CollisionSensor(self.player, self.hud)
+        # 初始化车道入侵传感器，用于检测车辆是否偏离车道，同样需要player和hud参数
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
+        # 初始化GNSS（全球导航卫星系统）传感器，仅需player参数，用于获取全球定位数据
         self.gnss_sensor = GnssSensor(self.player)
+        # 初始化IMU（惯性测量单元）传感器，用于检测加速度和角速度等惯性数据
         self.imu_sensor = IMUSensor(self.player)
+        # 在HUD上显示当前控制的角色类型通知
         self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
-        self.camera_manager.transform_index = cam_pos_index
+        self.camera_manager.transform_index = cam_pos_index  # 设置相机管理器的初始变换索引
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
@@ -407,20 +412,20 @@ class World(object): # Carla 仿真世界的核心管理类，负责初始化和
 
     def destroy(self):
         """清理并销毁所有创建的传感器和车辆对象"""
-        if self.radar_sensor is not None:
+        if self.radar_sensor is not None: # 如果雷达传感器存在，则切换雷达状态（开启/关闭）
             self.toggle_radar()
-        sensors = [
-            self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
-            self.gnss_sensor.sensor,
-            self.imu_sensor.sensor]
-        for sensor in sensors:
-            if sensor is not None:
-                sensor.stop()
-                sensor.destroy()
-        if self.player is not None:
-            self.player.destroy()
+        sensors = [  # 定义需要处理的传感器列表
+            self.camera_manager.sensor,  # - 摄像头管理器的主传感器
+            self.collision_sensor.sensor,  # - 碰撞检测传感器
+            self.lane_invasion_sensor.sensor,  # - 车道入侵检测传感器
+            self.gnss_sensor.sensor,  # - GNSS定位传感器 
+            self.imu_sensor.sensor]  # - IMU惯性测量单元传感器
+        for sensor in sensors:  # 遍历所有传感器进行处理
+            if sensor is not None:  # 检查传感器是否存在
+                sensor.stop()  # 停止传感器数据采集
+                sensor.destroy()  # 销毁传感器对象释放资源
+        if self.player is not None:  # 检查玩家角色是否存在
+            self.player.destroy()  # 销毁玩家角色对象
 
 
 # ==============================================================================
@@ -465,18 +470,18 @@ class KeyboardControl(object):
 
         # 遍历所有PyGame事件
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            elif event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
-                    return True
+            if event.type == pygame.QUIT:   # 处理窗口关闭事件（点击窗口X按钮）
+                return True  # 返回True表示需要退出程序
+            elif event.type == pygame.KEYUP:  # 处理键盘按键释放事件
+                if self._is_quit_shortcut(event.key):  # 检查是否是退出快捷键（如ESC等）
+                    return True  # 返回True表示需要退出程序
 
                 # 重置场景
-                elif event.key == K_BACKSPACE:
-                    if self._autopilot_enabled:
-                        world.player.set_autopilot(False)
-                        world.restart()
-                        world.player.set_autopilot(True)
+                elif event.key == K_BACKSPACE:  # 处理Backspace键 - 场景重置功能 
+                    if self._autopilot_enabled:   # 如果当前处于自动驾驶模式
+                        world.player.set_autopilot(False)   # 先暂时关闭自动驾驶
+                        world.restart()  # 重置游戏世界/场景
+                        world.player.set_autopilot(True)  # 重新启用自动驾驶
                     else:
                         world.restart()
                 elif event.key == K_F1:
@@ -517,15 +522,15 @@ class KeyboardControl(object):
                         # 判断门是否已打开
                         if world.doors_are_open:
                             # 如果门已经打开，关闭门并显示通知
-                            world.hud.notification("Closing Doors")
-                            world.doors_are_open = False
-                            world.player.close_door(carla.VehicleDoor.All)
+                            world.hud.notification("Closing Doors")  # 在HUD上显示"正在关门"的通知
+                            world.doors_are_open = False  # 将门状态标记为关闭
+                            world.player.close_door(carla.VehicleDoor.All)  # 关闭车辆所有门
                         else:
                             # 如果门未打开，打开门并显示通知
-                            world.hud.notification("Opening doors")
-                            world.doors_are_open = True
-                            world.player.open_door(carla.VehicleDoor.All)
-                    except Exception as e:
+                            world.hud.notification("Opening doors")  # 在HUD上显示"正在开门"的通知
+                            world.doors_are_open = True  # 将门状态标记为打开
+                            world.player.open_door(carla.VehicleDoor.All)  # 打开车辆所有门
+                    except Exception as e:  # 异常处理块，捕获并处理可能出现的任何异常
                         # 捕获并打印异常信息，便于调试
                         print(f"Error while toggling vehicle doors: {e}")
                 elif event.key == K_t:
@@ -561,17 +566,17 @@ class KeyboardControl(object):
                         world.recording_enabled = True
                         world.hud.notification("Recorder is ON")
                 elif event.key == K_p and (pygame.key.get_mods() & KMOD_CTRL):
-                    # stop recorder
+                    # 停止录像
                     client.stop_recorder()
                     world.recording_enabled = False
-                    # work around to fix camera at start of replaying
+                    # 通过重播开始时固定摄像头的临时解决方案
                     current_index = world.camera_manager.index
                     world.destroy_sensors()
-                    # disable autopilot
+                    # 禁用自动驾驶
                     self._autopilot_enabled = False
                     world.player.set_autopilot(self._autopilot_enabled)
                     world.hud.notification("Replaying file 'manual_recording.rec'")
-                    # replayer
+                    # 重放器
                     client.replay_file("manual_recording.rec", world.recording_start, 0, 0)
                     world.camera_manager.set_sensor(current_index)
                 elif event.key == K_MINUS and (pygame.key.get_mods() & KMOD_CTRL):
@@ -588,7 +593,7 @@ class KeyboardControl(object):
                     world.hud.notification("Recording start time is %d" % (world.recording_start))
                 if isinstance(self._control, carla.VehicleControl):
                     if event.key == K_f:
-                        # Toggle ackermann controller
+                        # 切换 ackermann 控制
                         self._ackermann_enabled = not self._ackermann_enabled
                         world.hud.show_ackermann_info(self._ackermann_enabled)
                         world.hud.notification("Ackermann Controller %s" %
@@ -598,7 +603,7 @@ class KeyboardControl(object):
                             self._control.gear = 1 if self._control.reverse else -1
                         else:
                             self._ackermann_reverse *= -1
-                            # Reset ackermann control
+                            # 重置 ackermann 控制
                             self._ackermann_control = carla.VehicleAckermannControl()
                     elif event.key == K_m:
                         self._control.manual_gear_shift = not self._control.manual_gear_shift
@@ -622,8 +627,8 @@ class KeyboardControl(object):
                     elif event.key == K_l and pygame.key.get_mods() & KMOD_SHIFT:
                         current_lights ^= carla.VehicleLightState.HighBeam
                     elif event.key == K_l:
-                        # Use 'L' key to switch between lights:
-                        # closed -> position -> low beam -> fog
+                        # 使用 'L' 键切换灯光模式：
+                        # 关闭 -> 示廓灯 -> 近光灯 -> 雾灯
                         if not self._lights & carla.VehicleLightState.Position:
                             world.hud.notification("Position lights")
                             current_lights |= carla.VehicleLightState.Position
@@ -1177,19 +1182,19 @@ class IMUSensor(object):
 
     @staticmethod
     def _IMU_callback(weak_self, sensor_data):
-        self = weak_self()
-        if not self:
+        self = weak_self()  # 将弱引用转为强引用
+        if not self:  # 如果父对象已被销毁则直接返回
             return
-        limits = (-99.9, 99.9)
-        self.accelerometer = (
-            max(limits[0], min(limits[1], sensor_data.accelerometer.x)),
-            max(limits[0], min(limits[1], sensor_data.accelerometer.y)),
-            max(limits[0], min(limits[1], sensor_data.accelerometer.z)))
-        self.gyroscope = (
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.x))),
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.y))),
-            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.z))))
-        self.compass = math.degrees(sensor_data.compass)
+        limits = (-99.9, 99.9)  # 定义传感器数值的有效范围(防止极端值)
+        self.accelerometer = (  # 处理加速度计数据:
+            max(limits[0], min(limits[1], sensor_data.accelerometer.x)),  # x轴限幅
+            max(limits[0], min(limits[1], sensor_data.accelerometer.y)),  # y轴限幅
+            max(limits[0], min(limits[1], sensor_data.accelerometer.z)))  # z轴限幅
+        self.gyroscope = (  # 处理陀螺仪数据:
+            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.x))),  # x轴转换并限幅 
+            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.y))),  # y轴转换并限幅
+            max(limits[0], min(limits[1], math.degrees(sensor_data.gyroscope.z))))  # z轴转换并限幅
+        self.compass = math.degrees(sensor_data.compass)  # 处理罗盘数据:
 
 
 # ==============================================================================
@@ -1515,15 +1520,15 @@ def game_loop(args):
     finally:
 
         if original_settings:
-            sim_world.apply_settings(original_settings)
+            sim_world.apply_settings(original_settings)# 用于恢复初始状态
 
         if (world and world.recording_enabled):
             client.stop_recorder() # 如果世界对象存在且启用了录制功能，则停止录制
 
         if world is not None:
-            world.destroy()
+            world.destroy()# 无论是否录制，只要world存在，就释放资源
 
-        pygame.quit()
+        pygame.quit()# 结束图形相关操作
 
 
 # ==============================================================================

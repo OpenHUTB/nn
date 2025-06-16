@@ -3,14 +3,26 @@
 # ## 准备数据
 
 # In[1]:
+# 导入操作系统相关功能模块，用于文件路径操作等系统级功能
 import os
+# 导入TensorFlow深度学习框架
 import tensorflow as tf
+# 从TensorFlow中导入Keras高级API（TensorFlow的内置Keras实现）
 from tensorflow import keras
-from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
-from tensorflow.keras.layers import Dense, Dropout, Flatten
-from tensorflow.keras.layers import Conv2D, MaxPooling2D
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+from tensorflow.keras import layers, optimizers, datasets # 导入Keras核心组件：层定义、优化器和常用数据集
+# 从Keras中导入核心组件：
+# layers - 包含各种神经网络层的实现
+# optimizers - 包含各种优化算法（如SGD, Adam等）
+# datasets - 包含常用数据集（如MNIST, CIFAR等）的便捷加载方式
+from tensorflow.keras.layers import ( 
+    Conv2D, Dense, Dropout, 
+    Flatten, MaxPooling2D
+)
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'# 设置环境变量，控制 TensorFlow 的日志输出等级
+                                        # 'TF_CPP_MIN_LOG_LEVEL' 可以用来过滤不必要的日志信息，提升可读性
+                                        # 值为 '2' 表示屏蔽 Info 和 Warning 级别的日志
 
 
 def mnist_dataset():
@@ -70,10 +82,10 @@ def prepare_mnist_features_and_labels(x, y):
         x: 归一化后的图像数据。
         y: 转换为整型的标签。
     """
-    x = tf.cast(x, tf.float32) / 255.0
+    x = tf.cast(x, tf.float32) / 255.0# 显式转换为float32后除255
     # 将标签转换为int64类型
     # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
-    y = tf.cast(y, tf.int64)
+    y = tf.cast(y, tf.int64)# 使用int64避免平台相关差异
     return x, y
 
 
@@ -114,10 +126,8 @@ class MyConvModel(keras.Model):
     
     # 第二层卷积操作：在更高层次提取特征
     # 使用更多卷积核捕获更复杂的模式
-    h2 = self.l2_conv(h1_pool)  # l2_conv 是第二个卷积层实例
-    h2_pool = self.pool(h2)  # 对第二个卷积层的输出应用池化
-    # 第二层最大池化：进一步压缩空间信息
-    h2_pool = self.pool(h2)
+    h2 = self.l2_conv(h1_pool)
+    h2_pool = self.pool(h2)  # 只保留一次池化操作
     
     # 展平操作：将多维特征图转换为一维特征向量
     # 例如 [N,7,7,64] -> [N,3136]
@@ -135,7 +145,7 @@ class MyConvModel(keras.Model):
     # axis=-1 表示在最后一个维度（类别维度）进行归一化
     probs = tf.nn.softmax(logits, axis=-1)
     
-    return probs
+    return logits
 # 创建一个神经网络模型的实例
 model = MyConvModel()
 optimizer = optimizers.Adam()# 配置Adam优化器：自适应矩估计优化算法

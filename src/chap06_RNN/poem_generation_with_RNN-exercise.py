@@ -32,7 +32,7 @@ def process_dataset(fileName):
     start_token = "<START>"  # 开始标记
     end_token = "<END>"  # 结束标记
     # 以UTF-8编码打开文件，处理每行诗歌
-    with open(fileName, 'r',encoding='utf-8', ) as fd:
+    with open(fileName, 'r',encoding='utf-8' ) as fd:
         for line in fd:
             # 分割标题和内容
             outs = line.strip().split(':')
@@ -95,7 +95,7 @@ def poem_dataset():
     # 批处理并填充到相同长度
     ds = ds.padded_batch(100, padded_shapes=(tf.TensorShape([None]), tf.TensorShape([])))
     # 为语言模型准备输入输出对：输入是前n-1个词，输出是后n-1个词
-    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1)) # 对数据集中的每个元素应用映射函数
+    ds = ds.map(lambda x, seqlen: (x[:, :-1], x[:, 1:], seqlen-1))  # 对数据集中的每个元素应用映射函数
     return ds, word2id, id2word
 
 
@@ -107,15 +107,21 @@ def poem_dataset():
 class myRNNModel(keras.Model):
     """基于RNN的诗歌生成模型"""
     def __init__(self, w2id):
-        """初始化模型
+        """初始化基于RNN的诗歌生成模型
         
         Args:
             w2id: 词语到id的映射字典，用于确定词汇表大小
+            vocab_size: 词汇表大小
+            embed_layer: 词嵌入层
+            rnn_cell: RNN单元
+            rnn_layer: RNN层
+            dense: 输出层
         """
         super().__init__()
         self.v_sz = len(w2id)  # 词汇表大小
         
         # 嵌入层：将词语id映射为密集向量
+        # 自动处理变长序列(batch_input_shape=[None, None])
         self.embed_layer = tf.keras.layers.Embedding(
             self.v_sz, 64,  # 64维嵌入向量
             batch_input_shape=[None, None])  # 支持变长序列
@@ -437,6 +443,6 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     # 去除第一个开始标记和最后一个结束标记（如果存在）
     return ''.join([id2word[t] for t in generated_tokens[1:-1]])  # 去除开始和结束标记
 
-# 生成并打印诗歌
-print(''.join(gen_sentence()))
-print(''.join(gen_sentence()))
+# 生成并打印两首诗歌
+print(gen_sentence(model, word2id, id2word))
+print(gen_sentence(model, word2id, id2word))

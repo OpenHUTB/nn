@@ -211,7 +211,10 @@ class mySeq2SeqModel(keras.Model):
 # 定义了一个使用TensorFlow的@tf.function装饰器的函数compute_loss，用于计算模型预测的损失值
 @tf.function
 def compute_loss(logits, labels):
-    """计算交叉熵损失"""
+    """计算交叉熵损失
+    数学公式:
+        loss = -1/N * Σ_{i=1}^N log(exp(logits[i,label[i]]) / Σ_j exp(logits[i,j]))
+    """
     # 计算稀疏交叉熵损失
     losses = tf.nn.sparse_softmax_cross_entropy_with_logits(
             logits=logits, labels=labels)
@@ -242,7 +245,7 @@ def train(model, optimizer, seqlen):
     """训练过程，迭代 3000 步"""
     # 初始化训练指标
     loss = 0.0 # 记录loss值 (初始为0)
-    accuracy = 0.0 # 可扩展性占位 (当前未实际计算准确率)
+    accuracy = 0.0  # 可扩展性占位 (当前未实际计算准确率)
     for step in range(3000):
         # 获取训练batch数据:
         # - batched_examples: 原始样本 (用于调试/可视化)

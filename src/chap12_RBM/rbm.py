@@ -7,7 +7,7 @@ import sys  # 导入系统相关模块，用于获取Python版本、操作路径
 class RBM:
     """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
 
-    def __init__(self, n_hidden=2, n_observe=784):
+    def __init__(self, n_hidden = 2, n_observe = 784):
         """
         初始化受限玻尔兹曼机（RBM）模型参数
 
@@ -32,7 +32,7 @@ class RBM:
         self.W = np.random.normal(
         loc = 0.0,                # 均值
         scale = 0.1,              # 标准差（常见初始化方法）
-        size = (n_observe, n_hidden)) # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
+        size = (n_observe, n_hidden))  # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
         
         # 初始化权重矩阵W，使用正态分布随机初始化
         # 可见层偏置（1 x n_observe）
@@ -57,7 +57,7 @@ class RBM:
         init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
 
         self.W = np.random.normal(
-            0, init_std, size=(self.n_observe, self.n_hidden)
+            0, init_std, size = (self.n_observe, self.n_hidden)
         )  # 初始化权重矩阵（可见层 -> 隐藏层）
 
         # 可选替代方案：使用更小的固定标准差进行初始化。
@@ -75,13 +75,17 @@ class RBM:
         return 1.0 / (1 + np.exp(-x))  # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
 
     def _sample_binary(self, probs):
-        """伯努利采样：根据给定概率生成0或1（用于模拟神经元激活）
-           伯努利分布是二项分布的一种特殊情况，输出只有两种可能的值（0或1）。
-           通过给定的概率值probs，决定每次采样的输出：
-           - 如果probs为0，则始终输出0；
-           - 如果probs为1，则始终输出1；
-           - 如果probs介于0和1之间，则按照概率生成0或1。
-        """
+        """伯努利采样生成二进制值
+    
+    Args:
+        probs (ndarray): 概率值数组，范围[0,1]
+        
+    Returns:
+        ndarray: 采样结果（0或1）
+        
+    Raises:
+        ValueError: 概率值超出[0,1]范围时抛出
+    """
         # 确保probs的取值在[0, 1]范围内
         if np.any(probs < 0) or np.any(probs > 1):
             raise ValueError("概率值probs应在0和1之间。")
@@ -159,10 +163,10 @@ class RBM:
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
                 
                 # 可见层偏置梯度：原始数据与重构数据之差
-                db_v = np.sum(v0 - v1_sample, axis=0)                                # 计算可见层偏置的梯度
+                db_v = np.sum(v0 - v1_sample, axis = 0)                                # 计算可见层偏置的梯度
                 
                 # 隐藏层偏置梯度：原始数据生成的隐藏层状态与重构数据生成的隐藏层状态之差
-                db_h = np.sum(h0_sample - h1_prob, axis=0)                           # 计算隐藏层偏置的梯度
+                db_h = np.sum(h0_sample - h1_prob, axis = 0)                           # 计算隐藏层偏置的梯度
 
                 # 更新参数
                 # 按批次大小归一化梯度，并乘以学习率更新权重矩阵
@@ -177,6 +181,8 @@ class RBM:
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）
         通过多次Gibbs采样迭代，模型能够从学习到的数据分布中生成新样本
+        数学过程:
+        v_0 → p(h|v_0) → h_0 → p(v|h_0) → v_1 → ... → v_n
         """
         # 初始化可见层：使用伯努利分布随机生成二值向量（每个像素有50%概率为1）
         # n_observe是可见层神经元数量（28x28=784）
@@ -216,7 +222,7 @@ if __name__ == '__main__':
         # 如果加载失败（其他错误，如文件损坏），保持原报错逻辑
         print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
         print(f"错误详情: {e}")
-        sys.exit(1)
+        sys.exit(1) # 退出Python程序，并返回状态码1
 
     # 获取数据集的形状信息
     n_imgs, n_rows, n_cols = mnist.shape  # 分别表示图像数量、行数和列数
@@ -228,10 +234,13 @@ if __name__ == '__main__':
 
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
+   
     # 训练RBM
-    errors = rbm.train(mnist, learning_rate=0.1, epochs=10, batch_size=100)
+    errors = rbm.train(mnist, learning_rate = 0.1, epochs = 10, batch_size = 100)
+   
     # 生成并可视化样本
-    samples = rbm.sample(n_samples=5, gibbs_steps=1000)
+    samples = rbm.sample(n_samples = 5, gibbs_steps = 1000)
+   
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
 

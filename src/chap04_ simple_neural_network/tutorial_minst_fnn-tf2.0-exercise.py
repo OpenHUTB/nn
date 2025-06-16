@@ -55,10 +55,10 @@ class MyModel:
         ####################
         # 初始化权重和偏置
         # 输入层784 -> 隐藏层128
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))   # stddev=0.1 表示标准差为 0.1，用于控制初始值的范围，避免梯度消失或爆炸
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev = 0.1))   # stddev=0.1 表示标准差为 0.1，用于控制初始值的范围，避免梯度消失或爆炸
         self.b1 = tf.Variable(tf.zeros([128]))   # 偏置项的维度应与隐藏层神经元数量一致，即 [128]
         # 隐藏层128 -> 输出层10
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))  # 隐藏层（128 个神经元）到输出层（10 个类别）的权重 W2
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev = 0.1))  # 隐藏层（128 个神经元）到输出层（10 个类别）的权重 W2
         self.b2 = tf.Variable(tf.zeros([10]))  # 初始化第二层的偏置 b2，同样初始化为 0，维度为 [10]
 
     def __call__(self, x):
@@ -87,7 +87,7 @@ def compute_loss(logits, labels):
     """
     return tf.reduce_mean(   # 对所有样本的损失值求平均
         tf.nn.sparse_softmax_cross_entropy_with_logits(   # TensorFlow内置的交叉熵损失函数
-            logits=logits, labels=labels   # 输入模型原始输出，输入真实标签
+            logits = logits, labels=labels   # 输入模型原始输出，输入真实标签
         )
     )
 # 计算稀疏标签的softmax交叉熵损失
@@ -122,6 +122,7 @@ def train_one_step(model, optimizer, x, y):
         loss = compute_loss(logits, y)  # 计算损失
 
     # 计算梯度
+    # tape.gradient()执行反向传播算法
     trainable_vars = [model.W1, model.W2, model.b1, model.b2]
     grads = tape.gradient(loss, trainable_vars)
 
@@ -175,16 +176,16 @@ for epoch in range(50):
     loss, accuracy = train_one_step(
         model,
         optimizer,
-        tf.constant(train_data[0], dtype=tf.float32),  # 训练图像数据
-        tf.constant(train_data[1], dtype=tf.int64)     # 训练标签数据
+        tf.constant(train_data[0], dtype = tf.float32),  # 训练图像数据
+        tf.constant(train_data[1], dtype = tf.int64)     # 训练标签数据
     )
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 
 # 在测试集上评估模型性能
 loss, accuracy = test(
     model,
-    tf.constant(test_data[0], dtype=tf.float32), # 将测试特征数据转换为TensorFlow常量张量，指定数据类型为float32
-    tf.constant(test_data[1], dtype=tf.int64)    # 将测试标签数据转换为TensorFlow常量张量，指定数据类型为int64
+    tf.constant(test_data[0], dtype = tf.float32),  # 将测试特征数据转换为TensorFlow常量张量，指定数据类型为float32
+    tf.constant(test_data[1], dtype = tf.int64)    # 将测试标签数据转换为TensorFlow常量张量，指定数据类型为int64
 )
 # .numpy() 将 TensorFlow 张量转换为 NumPy 数组（或 Python 标量）以便打印
 print('test loss', loss.numpy(), '; accuracy', accuracy.numpy())

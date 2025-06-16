@@ -22,21 +22,21 @@ def softmax(x):
     """
     # 如果不是张量，则转换为张量
     if not tf.is_tensor(x):
-        x = tf.convert_to_tensor(x, dtype=tf.float32)
+        x = tf.convert_to_tensor(x, dtype = tf.float32)
 
     # 减去最大值以提高数值稳定性
-    x_max = tf.reduce_max(x, axis=-1, keepdims=True)
+    x_max = tf.reduce_max(x, axis = -1, keepdims = True)
     # 计算 x - x_max 的指数
     exp_x = tf.exp(x - x_max)
 
     # 计算softmax，防止除零错误
-    sum_exp = tf.reduce_sum(exp_x, axis=-1, keepdims=True)
+    sum_exp = tf.reduce_sum(exp_x, axis = -1, keepdims = True)
     return exp_x / (sum_exp + 1e-10)
 
 # 测试 softmax 实现是否正确，使用随机数据对比 TensorFlow 的实现
-test_data = np.random.normal(size=[10, 5])
+test_data = np.random.normal(size = [10, 5])
 # 验证自定义softmax与tf.nn.softmax的输出差异是否足够小
-(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy())**2 < 0.0001
+(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis = -1).numpy())**2 < 0.0001
 
 # ## 实现sigmoid函数
 
@@ -68,11 +68,11 @@ def softmax_ce(x, label):
     ##########
     # 使用 clip 避免 log(0) 产生数值不稳定
     # 计算softmax概率分布
-    probs = tf.nn.softmax(logits)
+    probs = tf.nn.softmax(x)
     # 防止log(0)的数值不稳定
     probs = tf.clip_by_value(probs, 1e-10, 1.0)
     # 计算交叉熵损失：-sum(y_true * log(y_pred))
-    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(x), axis=-1))
+    loss = -tf.reduce_mean(tf.reduce_sum(label * tf.math.log(probs), axis=-1))
     ##########
     return loss
 
@@ -118,4 +118,4 @@ print(label)
 
 # 对比手动实现和 TensorFlow 实现的 sigmoid 交叉熵结果
 ((tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(label, test_data))
-  - sigmoid_ce(prob, label))**2 < 0.0001).numpy()
+  - sigmoid_ce(prob, label))**2 < 0.0001).numpy()  # 判断差异是否小于 0.0001，结果转为 numpy 布尔值，用于验证两者计算是否一致

@@ -9,7 +9,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 from tensorflow.keras.layers import Dense, Dropout, Flatten # 导入常用网络层：全连接层、正则化层和维度展平层
-from tensorflow.keras.layers import Conv2D, MaxPooling2D # 导入卷积层和最大池化层
+from tensorflow.keras.layers import Conv2D, MaxPooling2D  # 导入卷积层和最大池化层
 
 #设置TensorFlow日志级别，只显示错误信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -26,8 +26,8 @@ def mnist_dataset():
     # 加载MNIST手写数字数据集
     # 返回格式：((训练图片, 训练标签), (测试图片, 测试标签))
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    x = x.reshape(x.shape[0], 28, 28, 1)
-    x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)
+    x = x.reshape(x.shape[0], 28, 28, 1)# shape=(60000,28,28,1)
+    x_test = x_test.reshape(x_test.shape[0], 28, 28, 1)# shape=(10000,28,28,1
     # 从NumPy数组创建TensorFlow Dataset对象
     # 每个元素是一个(image, label)对，来自(x, y)
     ds = tf.data.Dataset.from_tensor_slices((x, y))

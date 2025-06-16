@@ -32,16 +32,16 @@ print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))
 #定义了一个简单的两层神经网络模型，用于处理 MNIST 手写数字识别任务
 
 # In[9]:
-class myModel:
+class MyModel:
     def __init__(self):
         ####################
         '''声明模型对应的参数，这里未实现，实际应添加权重和偏置等参数声明'''
         # 定义第一层的权重矩阵 ; 权重矩阵 W1 的形状为 [784, 128]，初始值为均值为 0，标准差为 0.1 的正态分布随机数
-        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev=0.1))
+        self.W1 = tf.Variable(tf.random.normal([784, 128], stddev = 0.1))
         # 定义第一层的偏置向量 ; 偏置向量 b1 的形状为 [128]，初始化为全 0
         self.b1 = tf.Variable(tf.zeros([128]))
         # 定义第二层的权重矩阵
-        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev=0.1))
+        self.W2 = tf.Variable(tf.random.normal([128, 10], stddev = 0.1))
         # 定义第二层的偏置向量
         self.b2 = tf.Variable(tf.zeros([10]))
         
@@ -69,7 +69,7 @@ class myModel:
         logits = h @ self.W2 + self.b2         
         return logits
         
-model = myModel()
+model = MyModel()
 
 # 使用Adam优化器，用于训练过程中更新模型参数
 optimizer = optimizers.Adam()
@@ -111,6 +111,9 @@ def compute_accuracy(logits, labels):
 def train_one_step(model, optimizer, x, y):
     """
     执行一次训练步骤，计算梯度并更新模型参数。
+    注意:
+        1. 使用梯度裁剪防止梯度爆炸
+        2. 所有计算都在GradientTape上下文中进行自动微分
     """
     with tf.GradientTape() as tape:     # 记录计算图以计算梯度
         logits = model(x)               # 前向传播

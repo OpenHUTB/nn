@@ -31,7 +31,7 @@ tf.random.set_seed(42)
 get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
-dot_num = 100
+DOT_NUM = 100
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
 x_p = np.random.normal(3., 1, dot_num)
 # 从均值为6，标准差为1的高斯分布中采样y坐标，用于正样本
@@ -65,7 +65,7 @@ np.random.shuffle(data_set)
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss函数)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
-epsilon = 1e-12
+EPSILON = 1e-12
 
 
 class LogisticRegression():
@@ -85,7 +85,7 @@ class LogisticRegression():
         self.b = tf.Variable(
             shape = [1],
             dtype = tf.float32,
-            initial_value=tf.zeros(shape=[1])
+            initial_value=tf.zeros(shape = [1])
         )
         # 定义模型的可训练变量，即权重W和偏置b
         self.trainable_variables = [self.W, self.b]
@@ -173,7 +173,7 @@ if __name__ == '__main__':
    # 使用自适应优化器 Adam ，学习率为0.01
    # Adam 是一种自适应学习率的优化算法，结合了 Momentum 和 RMSProp 的优点
    # learning_rate=0.01 设置了初始学习率为 0.01
-   opt = tf.keras.optimizers.Adam(learning_rate=0.01)  # 或Nadam/RMSprop
+   opt = tf.keras.optimizers.Adam(learning_rate = 0.01)  # 或Nadam/RMSprop
 
    # 从数据集中解包出x1, x2坐标和标签y
    # data_set 是一个包含多个样本的列表，每个样本格式为 (x1, x2, y)
@@ -184,8 +184,8 @@ if __name__ == '__main__':
    # 将x1和x2组合成输入数据 x
    # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
    # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
-   x = np.array(list(zip(x1, x2)), dtype=np.float32)
-   y = np.array(y, dtype=np.float32)
+   x = np.array(list(zip(x1, x2)), dtype = np.float32)
+   y = np.array(y, dtype = np.float32)
 
    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
    # animation_frames 列表将记录训练过程中每个步骤或epoch的:
@@ -278,5 +278,5 @@ if __name__ == '__main__':
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
 
-   from IPython.display import display
-display(HTML(anim.to_html5_video()))# 将动画转换为HTML5视频并显示
+   from IPython.display import HTML
+   HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示

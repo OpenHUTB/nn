@@ -37,8 +37,9 @@ def mnist_dataset():
 
 
 class Matmul:
-    def __init__(self):      
-# 初始化内存字典，用于存储前向传播中的变量以便反向传播使用
+
+    def __init__(self):
+        # 初始化内存字典，用于存储前向传播中的变量以便反向传播使用
         self.mem = {}
 
     def forward(self, x, W):
@@ -55,15 +56,18 @@ class Matmul:
         grad_y: shape(N, d')
         '''
         # 反向传播计算 x 和 W 的梯度
+        # 从模型内存缓存中获取输入特征张量x
+        # 通常是经过预处理或特征提取后的中间表示
         x = self.mem['x']
+        # 从模型内存缓存中获取权重矩阵W
+        # 通常用于线性变换或注意力机制中的权重参数
         W = self.mem['W']
-
         '''计算矩阵乘法的对应的梯度'''
         # 计算输入x的梯度：将输出梯度grad_y通过权重矩阵W的转置进行反向传播
         grad_x = np.matmul(grad_y, W.T)
         # 执行矩形乘法运算，计算梯度
         grad_W = np.matmul(x.T, grad_y)
-        
+
         return grad_x, grad_W
 
 
@@ -123,9 +127,18 @@ class Softmax:
     def backward(self, grad_y):
         '''
         grad_y: same shape as x
+        数学原理:
+        设 softmax 输出为 s = [s1, s2, ..., sc]
+        雅可比矩阵 J = diag(s) - s·s^T
+        反向传播公式:
+            grad_x = grad_y @ J = grad_y * s - <grad_y, s> * s
+        其中 @ 表示矩阵乘法，* 表示逐元素乘法，<,> 表示内积
         '''
         s = self.mem['out']
-        sisj = np.matmul(np.expand_dims(s, axis=2), np.expand_dims(s, axis=1))  # (N, c, c)
+        sisj = np.matmul(
+             np.expand_dims(s, axis=2),
+             np.expand_dims(s, axis=1)
+        )  # (N, c, c)
         # 对 grad_y 进行维度扩展
         # 假设 grad_y 是一个形状为 (N, c) 的梯度张量
         # np.expand_dims(grad_y, axis=1) 将其形状变为 (N, 1, c)
@@ -146,9 +159,9 @@ class Log:
     '''
     def __init__(self):
         # 设置一个极小值epsilon防止对数运算中出现log(0)的情况
-        self.epsilon = 1e-12  
+        self.epsilon = 1e-12
         # 用于存储前向传播的中间结果，供反向传播使用
-        self.mem = {}  
+        self.mem = {}
 
     def forward(self, x):
         '''
@@ -158,10 +171,10 @@ class Log:
         :return: log(x + epsilon)，保持数值稳定性
         '''
         # 计算对数，加上epsilon避免x=0时出现NaN
-        out = np.log(x + self.epsilon)  
+        out = np.log(x + self.epsilon)
 
         # 保存输入x用于反向传播计算
-        self.mem['x'] = x  
+        self.mem['x'] = x
         return out
 
     def backward(self, grad_y):
@@ -171,11 +184,11 @@ class Log:
         :return: 当前层的梯度 = (1/(x + epsilon)) * grad_y
         '''
         # 从内存中取出前向传播保存的输入x
-        x = self.mem['x']  
+        x = self.mem['x']
 
         # 计算当前层梯度：d(log(x))/dx = 1/x
         # 乘以来自上游的梯度grad_y（链式法则）
-        return 1. / (x + self.epsilon) * grad_y  
+        return 1. / (x + self.epsilon) * grad_y
 
 
 # ## Gradient check
@@ -335,7 +348,7 @@ class myModel:
         x = x.reshape(-1, 28 * 28)                 # 展平图像
         bias = np.ones(shape=[x.shape[0], 1])      # 添加偏置项
         x = np.concatenate([x, bias], axis=1)      # 将偏置向量添加到输入数据中
-        
+
         # 第一层计算：输入层 -> 隐藏层
         self.h1 = self.mul_h1.forward(x, self.W1)  # shape(5, 4),#线性变换
         self.h1_relu = self.relu.forward(self.h1)  # 应用ReLU激活函数
@@ -393,13 +406,13 @@ def compute_accuracy(log_prob, labels):
     返回:
     - 准确率（正确预测的比例）
     """
-    
+
     # 获取每个样本的预测类别编号（取对数概率最大的类别作为预测）
     predictions = np.argmax(log_prob, axis=1)
-    
+
     # 获取真实标签对应的类别编号（如果是 one-hot 编码，也用 argmax 转换为类别编号）
     truth = np.argmax(labels, axis=1)
-    
+
     # 比较预测结果与真实标签，计算正确率（布尔值数组的均值即为准确率）
     return np.mean(predictions == truth)
 

@@ -81,7 +81,7 @@ class ReversiEnv(gym.Env):
                 self.opponent_policy = make_random_policy(self.np_random)
                 print("################################################################")
             else:
-                raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))
+                raise error.Error('Unrecognized opponent policy {}'.format(self.opponent))# 如果不是可识别的对手策略，抛出错误
         else:
             self.opponent_policy = self.opponent
 
@@ -89,6 +89,7 @@ class ReversiEnv(gym.Env):
 
     def _reset(self):
         # init board setting
+        # 初始化3通道棋盘状态
         self.state = np.zeros((3, self.board_size, self.board_size))
         self.state[2, :, :] = 1.0
         self.state[2, 3:5, 3:5] = 0

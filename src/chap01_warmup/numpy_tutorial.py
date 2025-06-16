@@ -4,8 +4,7 @@
 
 # 1. 导入 numpy 库
 import numpy as np                    # 将 numpy 库命名为 np
-import matplotlib                     # 导入Matplotlib库，用于绘图
-import matplotlib.pyplot as plt       # 导入 matplotlib 库并将其命名为 plt
+import matplotlib.pyplot as plt       # 仅保留需要使用的导入
 # import 放一起代码美观
 
 
@@ -47,7 +46,7 @@ d = np.random.random((3, 2))# 生成一个形状为(3, 2)的NumPy数组，其中
 
 # 5. 建立一个数组 a,(值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1) 打印 a; (2) 输出数组中下标为 (2,3),(0,0) 这两个元素的值
 def question_5():
-print("第五题：\n")
+    print("第五题：\n")
 # 创建一个 3x4 的二维数组 a，值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
 a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
 # 输出数组 a
@@ -174,7 +173,7 @@ print("np.dot(x,y)\n", np.dot(x, y))  # 使用 np.dot 函数进行矩阵乘法
 print("第十九题：\n")
 
 print("print(np.sum(x)):", np.sum(x))  # 所有元素求和
-print("print(np.sum(x, axis = 0))", np.sum(x, axis = 0))  # 按列求和（列维度）
+print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
 print("print(np.sum(x, axis = 1))", np.sum(x, axis = 1))  # 按行求和（行维度）
 
 # 20. 利用 13 题目中的 x, 进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
@@ -198,13 +197,13 @@ print(np.exp(x))
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 print("第二十三题：\n")
 print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
-print("每列最大值的下标:", np.argmax(x, axis=0))  # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-print("每行最大值的下标:", np.argmax(x, axis=1))  # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
+print("每列最大值的下标:", np.argmax(x, axis=0))   # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
+print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
-def plot_quadratic():
+def plot_quadratic():  #绘制二次函数 y = x^2 的图像。
 
-print("\n第二十四题：绘制二次函数")
+    print("\n第二十四题：绘制二次函数")
 
 x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
 y = x * x  # 计算每个 x 对应的 y=x^2 的值
@@ -221,13 +220,13 @@ plt.ylabel("y")  # y 轴标签
 plt.grid(True, alpha=0.5)
 
 # 在右上角显示图例
-plt.legend(loc='upper right')
+plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
 plt.savefig('quadratic.png')   # 保存图像
 plt.show()  # 显示绘制的图像
 
 # 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 print("第二十五题：\n")
-
+# 改用linspace确保包含端点
 x = np.arange(0, 3 * np.pi, 0.1)  ## 生成从 0 到 3π 的 x 值，步长为 0.1
 y_sin = np.sin(x)  # 计算对应的正弦值
 y_cos = np.cos(x)  # 计算对应的余弦值
@@ -237,7 +236,7 @@ plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
 plt.plot(x, y_cos, label="y = cos(x)", color="red")  # 绘制余弦函数曲线
 
 # 添加标题和标签
-plt.title("Sine and Cosine Functions")
+plt.title("Sine and Cosine Functions")  # 设置图像的标题为 "Sine and Cosine Functions"
 plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
 plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 

@@ -21,7 +21,7 @@ import numpy as np # 数值计算库
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
 # 设置数据点数量
-dot_num = 100  # 每类样本的数量
+DOT_NUM = 100  # 每类样本的数量
 
 # 生成类别1的数据：均值为(3,6)，标准差为1
 x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
@@ -59,7 +59,7 @@ np.random.shuffle(data_set)  # 随机打乱数据集顺序
 
 # In[1]:
 
-epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
+EPSILON = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 class SoftmaxRegression(tf.Module):
     def __init__(self, input_dim = 2, num_classes = 3):
@@ -75,7 +75,7 @@ class SoftmaxRegression(tf.Module):
             tf.random.uniform([input_dim, num_classes], minval=-0.1, maxval=0.1),
             name = "W",
         )
-        self.b = tf.Variable(tf.zeros([num_classes]), name="b") # 全0初始化，形状为[类别数]，变量名称为b
+        self.b = tf.Variable(tf.zeros([num_classes]), name="b")  # 全0初始化，形状为[类别数]，变量名称为b
 
     @tf.function
     def __call__(self, x):
@@ -145,6 +145,9 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     :param y_batch: 标签
     :return: 当前批次的损失与准确率
     """
+    # 检查模型是否有可训练参数
+    if not hasattr(model, 'trainable_variables') or not model.trainable_variables:
+        raise ValueError("模型没有可训练参数")
     # 使用 tf.GradientTape() 上下文管理器记录前向传播过程，以便后续自动计算梯度
     with tf.GradientTape() as tape:
         # 前向传播：计算模型对输入批次的预测
