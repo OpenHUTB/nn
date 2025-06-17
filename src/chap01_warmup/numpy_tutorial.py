@@ -18,6 +18,7 @@ def question_2():
 # 形状：a.shape = (3,)，表示包含3个元素的一维数组     
 a = np.array([4, 5, 6])
 
+
 print("(1) 输出 a 的类型（type）\n", type(a))
 print("(2) 输出 a 的各维度的大小（shape）\n", a.shape)
 print("(3) 输出 a 的第一个元素（element）\n", a[0])
