@@ -1277,38 +1277,40 @@ class RadarSensor(object):
 
 
 class CameraManager(object):
-    def __init__(self, parent_actor, hud, gamma_correction):
-        self.sensor = None
-        self.surface = None
-        self._parent = parent_actor
-        self.hud = hud
-        self.recording = False
-        bound_x = 0.5 + self._parent.bounding_box.extent.x
-        bound_y = 0.5 + self._parent.bounding_box.extent.y
-        bound_z = 0.5 + self._parent.bounding_box.extent.z
-        Attachment = carla.AttachmentType # 导入CARLA的附件类型枚举
+   def __init__(self, parent_actor, hud, gamma_correction):
+    # 基础属性初始化
+    self.sensor = None          # 传感器对象（后续会被具体传感器实例填充）
+    self.surface = None         # 存储传感器数据（如图像）的表面（Surface）
+    self._parent = parent_actor # 父对象（通常是一个CARLA车辆Actor）
+    self.hud = hud              # 人机界面（Head-Up Display）对象
+    self.recording = False      # 是否正在录制数据的标志位
+
+    # 计算父对象的边界框（Bounding Box）偏移量
+    bound_x = 0.5 + self._parent.bounding_box.extent.x
+    bound_y = 0.5 + self._parent.bounding_box.extent.y
+    bound_z = 0.5 + self._parent.bounding_box.extent.z
+
+    # 导入CARLA的附件类型枚举（用于传感器安装位置）
+    Attachment = carla.AttachmentType
 
         # 判断父级actor是否为行人
-        if not self._parent.type_id.startswith("walker.pedestrian"):
-            self._camera_transforms = [
-                (carla.Transform(carla.Location(x=-2.0*bound_x, y=+0.0*bound_y, z=2.0*bound_z), carla.Rotation(pitch=8.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=+0.8*bound_x, y=+0.0*bound_y, z=1.3*bound_z)), Attachment.Rigid),
-                (carla.Transform(carla.Location(x=+1.9*bound_x, y=+1.0*bound_y, z=1.2*bound_z)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=-2.8*bound_x, y=+0.0*bound_y, z=4.6*bound_z), carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=-1.0, y=-1.0*bound_y, z=0.4*bound_z)), Attachment.Rigid)]
-        else:
-            self._camera_transforms = [
-                (carla.Transform(carla.Location(x=-2.5, z=0.0), carla.Rotation(pitch=-8.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=1.6, z=1.7)), Attachment.Rigid),
-                (carla.Transform(carla.Location(x=2.5, y=0.5, z=0.0), carla.Rotation(pitch=-8.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=-4.0, z=2.0), carla.Rotation(pitch=6.0)), Attachment.SpringArmGhost),
-                (carla.Transform(carla.Location(x=0, y=-2.5, z=-0.0), carla.Rotation(yaw=90.0)), Attachment.Rigid)]
+def __init__(self, parent_actor, hud, gamma_correction):
+    # 基础属性初始化
+    self.sensor = None          # 传感器对象（后续会被具体传感器实例填充）
+    self.surface = None         # 存储传感器数据（如图像）的表面（Surface）
+    self._parent = parent_actor # 父对象（通常是一个CARLA车辆Actor）
+    self.hud = hud              # 人机界面（Head-Up Display）对象
+    self.recording = False      # 是否正在录制数据的标志位
 
-        # 初始化当前传感器变换索引
-        self.transform_index = 1
-        
+    # 计算父对象的边界框（Bounding Box）偏移量
+    bound_x = 0.5 + self._parent.bounding_box.extent.x
+    bound_y = 0.5 + self._parent.bounding_box.extent.y
+    bound_z = 0.5 + self._parent.bounding_box.extent.z
+
+    # 导入CARLA的附件类型枚举（用于传感器安装位置）
+    Attachment = carla.AttachmentType
         # 可用的传感器配置列表
-        self.sensors = [
+    self.sensors = [
             ['sensor.camera.rgb', cc.Raw, 'Camera RGB', {}],
             ['sensor.camera.depth', cc.Raw, 'Camera Depth (Raw)', {}],
             ['sensor.camera.depth', cc.Depth, 'Camera Depth (Gray Scale)', {}],
@@ -1327,13 +1329,13 @@ class CameraManager(object):
             ['sensor.camera.optical_flow', cc.Raw, 'Optical Flow', {}],
             ['sensor.camera.normals', cc.Raw, 'Camera Normals', {}],
         ]
-        world = self._parent.get_world()
+    world = self._parent.get_world()
         
         # 获取世界的蓝图库
-        bp_library = world.get_blueprint_library()
+    bp_library = world.get_blueprint_library()
 
         # 遍历之前定义的传感器配置列表
-        for item in self.sensors:
+    for item in self.sensors:
             bp = bp_library.find(item[0])
             
             # 判断是否为摄像头类传感器
@@ -1355,7 +1357,7 @@ class CameraManager(object):
                         self.lidar_range = float(attr_value)
 
             item.append(bp)
-        self.index = None
+    self.index = None
 
     def toggle_camera(self):
         self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
