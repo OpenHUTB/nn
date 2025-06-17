@@ -60,7 +60,8 @@ test_data = np.random.normal(size = [10, 5])
 # 比较自定义的sigmoid函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
 
-# ## 实现 softmax 交叉熵loss函数
+# ## 实现 Softmax交叉熵损失函数。（Softmax Cross-Entropy Loss） 是深度学习中用于多分类问题的核心损失函数。它结合了Softmax和交叉熵两个部分
+
 
 def softmax_ce(logits, label):
     ##########
