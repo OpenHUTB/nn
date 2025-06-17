@@ -7,7 +7,7 @@ import numpy as np
 # 导入 TensorFlow 库，并简写为 tf（标准约定）
 import tensorflow as tf
 
-# ## 实现softmax函数
+# ## 实现softmax函数，Softmax函数是一种常用的数学函数，主要用于将一组数值（通常是神经网络的原始输出）转换为概率分布。
 def softmax(x: tf.Tensor) -> tf.Tensor:
     """
     实现数值稳定的 softmax 函数，仅在最后一维进行归一化。
@@ -60,7 +60,8 @@ test_data = np.random.normal(size = [10, 5])
 # 比较自定义的sigmoid函数结果和tf自带的结果，误差小于 0.0001 则认为相等
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001
 
-# ## 实现 softmax 交叉熵loss函数
+# ## 实现 Softmax交叉熵损失函数。（Softmax Cross-Entropy Loss） 是深度学习中用于多分类问题的核心损失函数。它结合了Softmax和交叉熵两个部分
+
 
 def softmax_ce(logits, label):
     ##########
