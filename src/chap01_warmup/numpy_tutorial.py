@@ -12,17 +12,18 @@ import matplotlib.pyplot as plt       # 仅保留需要使用的导入
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 
 def question_2():
-  print("第二题：\n") #格式修改为缩进
-# 创建一个一维NumPy数组，存储整数类型的数值
-# 数组元素为[4, 5, 6]，数据类型默认推断为numpy.int64
-# 形状：a.shape = (3,)，表示包含3个元素的一维数组     
-a = np.array([4, 5, 6])
+    print("第二题：\n") #格式修改为缩进
+    # 创建一个一维NumPy数组，存储整数类型的数值
+    # 数组元素为[4, 5, 6]，数据类型默认推断为numpy.int64
+    # 形状：a.shape = (3,)，表示包含3个元素的一维数组     
+    a = np.array([4, 5, 6])
 
-print("(1) 输出 a 的类型（type）\n", type(a))
-print("(2) 输出 a 的各维度的大小（shape）\n", a.shape)
-print("(3) 输出 a 的第一个元素（element）\n", a[0])
-# 使用 array() 函数创建数组，函数可基于序列型的对象。创建了一个一维数组 a，并输出其类型（numpy.ndarray）、形状（(3,)） 和第一个元素（4）。
-# 使用 type() 获取数组的类型(numpy.ndarray),使用 shape 属性查看数组维度信息(一维数组的形状表示为 (n,)),通过索引访问数组元素（索引从 0 开始）
+    print("(1) 输出 a 的类型（type）\n", type(a))
+    print("(2) 输出 a 的各维度的大小（shape）\n", a.shape)
+    print("(3) 输出 a 的第一个元素（element）\n", a[0])
+    # 使用 array() 函数创建数组，函数可基于序列型的对象。创建了一个一维数组 a，并输出其类型（numpy.ndarray）、形状（(3,)） 和第一个元素（4）。
+    # 使用 type() 获取数组的类型(numpy.ndarray),使用 shape 属性查看数组维度信息(一维数组的形状表示为 (n,)),通过索引访问数组元素（索引从 0 开始）
+
 # 3. 建立一个二维数组 b, 初始化为 [ [4, 5, 6], [1, 2, 3]] (1) 输出二维数组 b 的形状（shape）（输出值为（2,3））(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）
 print("第三题：\n")
 b = np.array([[4, 5, 6], [1, 2, 3]])  # 创建一个二维数组 b
@@ -47,12 +48,12 @@ d = np.random.random((3, 2))# 生成一个形状为(3, 2)的NumPy数组，其中
 # 5. 建立一个数组 a,(值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1) 打印 a; (2) 输出数组中下标为 (2,3),(0,0) 这两个元素的值
 def question_5():
     print("第五题：\n")
-# 创建一个 3x4 的二维数组 a，值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
-a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
-# 输出数组 a
-print(a)
-# 输出数组 a 中下标为 (2,3) 和 (0,0) 的两个元素的值
-print(a[2, 3], a[0, 0])
+    # 创建一个 3x4 的二维数组 a，值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
+    a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
+    # 输出数组 a
+    print(a)
+    # 输出数组 a 中下标为 (2,3) 和 (0,0) 的两个元素的值
+    print(a[2, 3], a[0, 0])
 
 # 6. 把上一题的 a 数组的 0 到 1 行，2 到 3 列，放到 b 里面去，（此处不需要从新建立 a, 直接调用即可）(1) 输出 b; (2) 输出 b 数组中（0,0）这个元素的值
 print("第六题：\n")
@@ -202,27 +203,25 @@ print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿�
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 def plot_quadratic():  #绘制二次函数 y = x^2 的图像。
-
     print("\n第二十四题：绘制二次函数")
+    x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
+    y = x * x  # 计算每个 x 对应的 y=x^2 的值
 
-x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
-y = x * x  # 计算每个 x 对应的 y=x^2 的值
+    plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
+    plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
 
-plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
-plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
+    # 添加标题和标签
+    plt.title("Plot of y = x^2")  # 图像标题
+    plt.xlabel("x")  # x 轴标签
+    plt.ylabel("y")  # y 轴标签
 
-# 添加标题和标签
-plt.title("Plot of y = x^2")  # 图像标题
-plt.xlabel("x")  # x 轴标签
-plt.ylabel("y")  # y 轴标签
+    # 显示出半透明网格线
+    plt.grid(True, alpha=0.5)
 
-# 显示出半透明网格线
-plt.grid(True, alpha=0.5)
-
-# 在右上角显示图例
-plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
-plt.savefig('quadratic.png')   # 保存图像
-plt.show()  # 显示绘制的图像
+    # 在右上角显示图例
+    plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
+    plt.savefig('quadratic.png')   # 保存图像
+    plt.show()  # 显示绘制的图像
 
 # 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 print("第二十五题：\n")
