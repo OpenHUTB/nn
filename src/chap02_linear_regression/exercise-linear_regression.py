@@ -241,7 +241,7 @@ def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
     """绘制训练集、测试集和预测结果"""
     plt.plot(x_train, y_train, "ro", markersize=3)
     plt.plot(x_test, y_test, "k")
-    plt.plot(x_test, y_test_pred, "k")
+    plt.plot(x_test, y_test_pred, "k--")# 绘制预测值，黑色虚线
     plt.xlabel("x")
     plt.ylabel("y")
     plt.title("Linear Regression")
