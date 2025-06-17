@@ -161,7 +161,7 @@ def max_pool_2x2(x: tf.Tensor, # 输入张量
     return tf.nn.max_pool(x, ksize=ksize, strides=strides, padding=padding, data_format=data_format)
 
 
-# define placeholder for inputs to network
+# define placeholder for inputs to network 定义网络输入的占位符
 # 输入层：MNIST图像为28x28=784像素，None表示批量大小可变
 xs = tf.placeholder(tf.float32, [None, 784]) / 255.     # 输入图像 [batch_size, 784]，归一化处理
 ys = tf.placeholder(tf.float32, [None, 10])             # 标签 [batch_size, 10]，10个类别(0-9)
