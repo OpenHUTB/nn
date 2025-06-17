@@ -1566,10 +1566,10 @@ def main():
 
     # 添加自动驾驶模式参数
     argparser.add_argument(
-        '-a', '--autopilot',
-        action='store_true',
-        help='enable autopilot')
-
+    '-a', '--autopilot',  # 短选项 -a 和长选项 --autopilot
+    action='store_true',   # 当选项出现时存储 True，否则为 False
+    help='enable autopilot' # 帮助文本
+)
     # 添加分辨率参数
     argparser.add_argument(
         '--res',
