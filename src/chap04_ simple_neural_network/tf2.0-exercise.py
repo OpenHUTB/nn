@@ -52,7 +52,7 @@ def sigmoid(x):
     exp_neg_x = tf.exp(-x)  # 计算 -x 的指数
     return 1.0 / (1.0 + exp_neg_x)  
 
-# 测试 sigmoid 实现是否正确
+# 测试 sigmoid ：用随机数据对比TF函数，验证实现正确性
 # 生成随机测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size=[10, 5])
 (sigmoid(test_data).numpy() - tf.nn.sigmoid(test_data).numpy())**2 < 0.0001 
