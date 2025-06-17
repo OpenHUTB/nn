@@ -66,7 +66,7 @@ def gaussian_basis(x, feature_num=10):
     # 每个高斯函数的标准差（带宽）
     sigma = 25 / feature_num
     # 计算每个输入 x 对所有中心的响应，输出 shape (N, feature_num)
-    return np.exp(-0.5 * ((x[:, np.newaxis] - centers) / sigma) ** 2)
+    return np.exp(-0.5 * ((np.asarray(x).reshape(-1, 1) - centers) / sigma) ** 2)
 
 
 # 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化
