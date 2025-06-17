@@ -52,6 +52,7 @@ def multinomial_basis(x, feature_num=10):
     # 将存储不同次幂特征的数组在第二个维度（列方向）上进行拼接
     # 例如，若每个特征数组形状为 (N, 1)，拼接后形状变为 (N, feature_num)
     ret = np.concatenate(ret, axis=1)
+      
     return ret
 
 
