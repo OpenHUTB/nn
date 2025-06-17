@@ -25,6 +25,10 @@ from tensorflow import keras
 from tensorflow.keras import layers, optimizers, datasets
 
 # 设置TensorFlow日志级别，避免输出过多无关信息
+# 0: 显示所有日志信息
+# 1: 过滤INFO日志
+# 2: 额外过滤WARNING日志
+# 3: 过滤所有日志，只显示ERROR信息
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 可选值：{'0', '1', '2'}
 
 def mnist_dataset():
@@ -36,6 +40,7 @@ def mnist_dataset():
     """
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     # 归一化像素值到[0, 1]
+     # 归一化有助于模型更快收敛，并避免梯度消失/爆炸问题
     x = x / 255.0
     x_test = x_test / 255.0
     return (x, y), (x_test, y_test)
@@ -44,7 +49,7 @@ def mnist_dataset():
 
 # print(list(zip([1, 2, 3, 4], ['a', 'b', 'c', 'd'])))  # 测试代码，可忽略
 
-# ## 建立模型
+# ## 建立模型：使用全连接神经网络处理MNIST分类任务
 
 # In[9]:
 
@@ -179,6 +184,7 @@ for epoch in range(50):
         tf.constant(train_data[0], dtype = tf.float32),  # 训练图像数据
         tf.constant(train_data[1], dtype = tf.int64)     # 训练标签数据
     )
+    # 打印每个epoch的训练结果
     print('epoch', epoch, ': loss', loss.numpy(), '; accuracy', accuracy.numpy())
 
 # 在测试集上评估模型性能
