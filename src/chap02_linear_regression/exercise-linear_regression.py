@@ -42,17 +42,17 @@ def identity_basis(x):
 # 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
 
 # 其中以及训练集的x的范围在0-25之间
-def multinomial_basis(x, feature_num=10):
-    """多项式基函数：将输入x映射为多项式特征
-    feature_num: 多项式的最高次数
-    返回 shape (N, feature_num)"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 生成各次幂特征：x^1, x^2, ..., x^feature_num，将其拼接
-    ret = [x**i for i in range(1, feature_num + 1)]
-    # 将存储不同次幂特征的数组在第二个维度（列方向）上进行拼接
-    # 例如，若每个特征数组形状为 (N, 1)，拼接后形状变为 (N, feature_num)
-    ret = np.concatenate(ret, axis=1)
-    return ret
+def gaussian_basis(x, feature_num=10):
+    """
+    高斯基函数：将输入x映射为一组高斯分布特征
+    用于提升模型对非线性关系的拟合能力
+    """
+    # 定义中心在区间 [0, 25] 内均匀分布
+    centers = np.linspace(0, 25, feature_num)
+    # 每个高斯函数的标准差（带宽）
+    sigma = 25 / feature_num
+    # 计算每个输入 x 对所有中心的响应，输出 shape (N, feature_num)
+    return np.exp(-0.5 * ((np.asarray(x).reshape(-1, 1) - centers) / sigma) ** 2)
 
 
 
