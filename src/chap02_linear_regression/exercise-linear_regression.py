@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 import numpy as np # 导入NumPy库。NumPy（Numerical Python）是 Python 中最基础、最强大的科学计算库之一
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # 导入Matplotlib库用于绘图
 
 import matplotlib.pyplot as plt # 导入Matplotlib的pyplot模块并命名为plt
 # 用于创建各种静态、交互式和动画可视化图表
@@ -33,7 +33,7 @@ def load_data(filename):
 
 # ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
 def identity_basis(x):
-    # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
+    # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组,同时便于后续矩阵的拼接
     # 用于适配线性回归的矩阵运算格式
     # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
     return np.expand_dims(x, axis = 1)
@@ -61,7 +61,7 @@ def gaussian_basis(x, feature_num=10):
     高斯基函数：将输入x映射为一组高斯分布特征
     用于提升模型对非线性关系的拟合能力
     """
-    # 定义中心在区间 [0, 25] 内均匀分布
+    # 定义高斯中心在区间 [0, 25] 内均匀分布
     centers = np.linspace(0, 25, feature_num)
     # 每个高斯函数的标准差（带宽）
     sigma = 25 / feature_num
@@ -199,7 +199,7 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
 
 
 def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
-    """训练模型，并返回从x到y的映射。
+    """训练模型，并返回从x到y的映射，即返回预测函数和权重
     basis_func: 可选，基函数（如identity_basis, multinomial_basis, gaussian_basis），默认恒等基
     """
     # 支持自定义基函数
