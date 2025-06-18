@@ -262,13 +262,17 @@ with tf.Session() as sess:
             test_batch_size = 100
             test_steps = len(mnist.test.images) // test_batch_size
 
-            for j in range(test_steps):
-                batch_start = j * test_batch_size
-                batch_end = (j + 1) * test_batch_size
-                test_accuracy += compute_accuracy(
-                    mnist.test.images[batch_start:batch_end],
-                    mnist.test.labels[batch_start:batch_end]
-                )
+           # 遍历测试集的所有批次
+for j in range(test_steps):
+    # 计算当前批次的起始和结束索引
+    batch_start = j * test_batch_size
+    batch_end = (j + 1) * test_batch_size
+    
+    # 计算当前批次的准确率，并累加到总准确率
+    test_accuracy += compute_accuracy(
+        mnist.test.images[batch_start:batch_end],  # 当前批次的测试图像
+        mnist.test.labels[batch_start:batch_end]   # 当前批次的测试标签
+    )
             
             test_accuracy /= test_steps
             print(f"迭代 {i}/{max_epoch}, 测试准确率: {test_accuracy:.4f}")
