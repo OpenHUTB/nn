@@ -33,13 +33,13 @@ def compute_accuracy(v_xs, v_ys):
         3. 计算整个批次的平均准确率
     """
     global prediction
-    # 获取模型预测结果
+  # 获取模型预测结果（评估时关闭Dropout，保留所有神经元）
     y_pre = sess.run(prediction, feed_dict={xs: v_xs, keep_prob: 1})
-    # 比较预测与真实标签
+   # 比较预测与真实标签（one-hot编码需先转换为类别索引）
     correct_prediction = tf.equal(tf.argmax(y_pre, 1), tf.argmax(v_ys, 1))
-    # 计算准确率
+   # 计算准确率（将布尔值转换为浮点数后求平均值）
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-    # 运行准确率计算
+    # 运行准确率计算（传入真实标签以验证）
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
