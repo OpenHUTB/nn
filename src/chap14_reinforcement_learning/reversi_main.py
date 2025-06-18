@@ -96,7 +96,7 @@ for i_episode in range(max_epochs):
             print(f"第 {i_episode+1} 局游戏在 {t+1} 步后结束")
             
             # 计算双方得分
-            black_score = len(np.where(env.state[0, :, :] == 1)[0])  # 统计黑棋数量
+            black_score = np.count_nonzero(env.state[0, :, :] == 1)  # 统计黑棋数量（优化后）
             total_tiles = env.board_size ** 2  # 棋盘总格子数 (8x8=64)
             
             # 判断胜负
