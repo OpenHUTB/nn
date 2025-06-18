@@ -1,8 +1,16 @@
 import numpy as np
 import os
 
+
+
 def load_data(fname):
-    """载入数据。"""
+    """载入数据。
+    参数:
+        fname (str): 数据文件路径
+
+    返回:
+        np.ndarray: 包含特征和标签的数据数组
+    """
     # 检查文件是否存在，确保数据加载的可靠性
     if not os.path.exists(fname): 
         raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}") # 如果文件不存在，抛出异常
