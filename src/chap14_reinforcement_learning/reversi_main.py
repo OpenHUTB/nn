@@ -108,7 +108,7 @@ for i_episode in range(max_epochs):
                 print("平局！")
             
             # 打印详细比分
-            white_score = total_tiles - black_score
+            white_score = env.board_size ** 2 - black_score  # 直接计算白棋得分（优化后）
             print(f"比分: 黑棋 {black_score} - 白棋 {white_score}")
             
             break  # 结束当前游戏，开始下一局
