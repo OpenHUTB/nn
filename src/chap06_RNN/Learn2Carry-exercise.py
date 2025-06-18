@@ -79,21 +79,35 @@ def results_converter(res_lst):
     return [convertDigits2Num(digits) for digits in res] # 返回转换后的数值列表
 
 def prepare_batch(Nums1, Nums2, results, maxlen):
-    #'''准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
-    #1. 将整数转换为数字位列表
-    #2. 反转数字位列表(低位在前，高位在后)
-    #3. 填充到固定长度
-
-     # 将整数转换为数字位列表
+    """
+    准备一个batch的数据，将数值转换成反转的数位列表并且填充到固定长度
+    主要用于实现类似序列到序列的加法运算，例如让模型学习 123+456=579
+    
+    参数:
+        Nums1: 第一个数字列表，每个元素为整数
+        Nums2: 第二个数字列表，每个元素为整数
+        results: 结果数字列表，每个元素为整数
+        maxlen: 填充的目标长度，所有数字列表将被填充为此长度
+    
+    返回:
+        三个列表，分别为处理后的Nums1、Nums2和results
+    """
+    # 将整数转换为数字位列表
+    # 例如: 123 → [1, 2, 3]
     Nums1 = [convertNum2Digits(o) for o in Nums1]
     Nums2 = [convertNum2Digits(o) for o in Nums2]
     results = [convertNum2Digits(o) for o in results]
+    
     # 反转数字位列表，使低位在前，高位在后
     # 这有助于RNN学习进位机制，因为低位的计算影响高位
+    # 例如: [1, 2, 3] → [3, 2, 1] 表示 3 + 20 + 100
     Nums1 = [list(reversed(o)) for o in Nums1]
     Nums2 = [list(reversed(o)) for o in Nums2]
     results = [list(reversed(o)) for o in results]
-    # 填充所有列表到相同长度
+    
+    # 填充所有列表到相同长度，使用0在右侧填充
+    # 例如: [3, 2, 1] → [3, 2, 1, 0, 0] (当maxlen=5时)
+    # 确保所有序列长度一致，便于批量处理
     Nums1 = [pad2len(o, maxlen) for o in Nums1]
     Nums2 = [pad2len(o, maxlen) for o in Nums2]
     results = [pad2len(o, maxlen) for o in results]
