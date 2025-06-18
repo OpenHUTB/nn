@@ -239,7 +239,7 @@ if __name__ == '__main__':
     errors = rbm.train(mnist, learning_rate = 0.1, epochs = 10, batch_size = 100)
    
     # 生成并可视化样本
-    samples = rbm.sample(n_samples = 5, gibbs_steps = 1000)
+    samples = rbm.sample()  # 移除错误的参数，因为sample方法只接受gibbs_steps参数
    
     # 使用 MNIST 数据进行训练
     rbm.train(mnist)
