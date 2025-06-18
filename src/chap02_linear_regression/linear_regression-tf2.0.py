@@ -104,10 +104,17 @@ class LinearModel(Model):
         # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
         # 定义偏置参数b，形状为 [1]
        
-        self.b = tf.Variable(# 定义偏置参数b，它是一个TensorFlow的变量（Variable）
-            initial_value=tf.zeros([1], dtype=tf.float32),
-            trainable=True,
-            name="bias"
+      self.b = tf.Variable(
+    # 定义偏置参数b，它是一个TensorFlow的变量（Variable），用于线性变换中的偏移项
+    # 初始值设置为全0的一维张量，形状为[1]，表示单个偏置值
+    initial_value=tf.zeros([1], dtype=tf.float32),
+    
+    # trainable=True表示该变量可被训练，在反向传播中会计算梯度并更新
+    trainable=True,
+    
+    # 为变量指定名称"bias"，便于在TensorBoard等工具中识别和调试
+    name="bias"
+)
         )
         
     @tf.function
