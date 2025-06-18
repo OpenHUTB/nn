@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # Tensorflow2.0 小练习
+"""Tensorflow2.0 小练习"""
 
 import tensorflow as tf
 import numpy as np
@@ -44,8 +44,10 @@ def sigmoid(x):
     """
     实现sigmoid激活函数。
     数学形式：p = 1 / (1 + e^(-x))
+
     参数:
         x (tf.Tensor): 输入张量
+
     返回:
         tf.Tensor: sigmoid处理后的概率分布
     """
@@ -64,7 +66,15 @@ test_data = np.random.normal(size=[10, 5])
 
 def softmax_ce(x, label):
     ##########
-    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数'''
+    '''实现 softmax 交叉熵loss函数， 不允许用tf自带的softmax_cross_entropy函数。
+    
+    参数:
+        x (tf.Tensor): logits
+        label (tf.Tensor): one-hot标签
+
+    返回:
+        tf.Tensor: 交叉熵损失
+    '''
     ##########
     # 使用 clip 避免 log(0) 产生数值不稳定
     # 计算softmax概率分布
