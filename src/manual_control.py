@@ -87,18 +87,28 @@ except IndexError:
 # ==============================================================================
 
 #导入CARLA相关模块
+# 导入Carla仿真引擎核心库
 import carla
 
+# 导入颜色转换工具，用于处理传感器图像数据
 from carla import ColorConverter as cc
 
 
+# 导入命令行参数解析库，用于配置仿真参数
 import argparse
+# 导入集合模块，提供如deque、defaultdict等数据结构
 import collections
+# 导入日期时间处理库，用于记录仿真时间戳
 import datetime
+# 导入日志记录模块，用于调试和错误追踪
 import logging
+# 导入数学函数库，提供常用数学运算
 import math
+# 导入随机数生成库，用于场景随机化
 import random
+# 导入正则表达式库，用于字符串处理
 import re
+# 导入弱引用库，用于管理对象引用，避免内存泄漏
 import weakref
 
 try:
