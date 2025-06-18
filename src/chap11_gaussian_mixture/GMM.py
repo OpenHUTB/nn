@@ -280,7 +280,7 @@ class GaussianMixtureModel:
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
         # 检查是否有对数似然值记录
-        if not self.log_likelihoods:
+        if len(self.log_likelihoods) == 0:
             raise ValueError("请先调用fit方法训练模型")
 
         # 创建一个图形窗口，设置大小为10x6英寸
