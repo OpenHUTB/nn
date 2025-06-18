@@ -116,7 +116,4 @@ for i_episode in range(max_epochs):
 # 清理环境资源
 # 关闭创建的强化学习环境，释放相关的系统资源，例如关闭可能打开的文件描述符、
 env.close()
-
-print(f"训练完成！共进行了 {max_epochs} 局游戏")
-print(f"训练完成！共进行了 {max_epochs} 局游戏")
-print(f"训练完成！共进行了 {max_epochs} 局游戏")
+print(f"训练完成！共进行了 {max_epochs} 局游戏")  # 保留一行，移除重复
