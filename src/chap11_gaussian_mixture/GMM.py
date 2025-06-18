@@ -123,15 +123,30 @@ class GaussianMixtureModel:
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
     """
-    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None):
-        # 初始化模型参数
-        self.n_components = n_components  # 高斯分布数量
-        self.max_iter = max_iter          # EM算法最大迭代次数
-        self.tol = tol                    # 收敛阈值
-        self.log_likelihoods = []         #存储每轮迭代的对数似然值
+   def __init__(self, n_components=3, max_iter=100, tol=1e-6, random_state=None):
+    """
+    高斯混合模型(GMM)初始化函数，设置模型结构和训练参数
+    
+    参数:
+        n_components: 高斯分布组件数量，决定模型复杂度（默认3）
+        max_iter: EM算法最大迭代次数，防止不收敛（默认100）
+        tol: 收敛阈值，当对数似然变化小于此值时停止迭代（默认1e-6）
+        random_state: 随机数种子，用于复现实验结果（默认None）
+    """
+    # 初始化模型结构参数
+    self.n_components = n_components  # 高斯分布数量，例如3个不同均值的分布
+    self.max_iter = max_iter          # EM算法最大迭代次数，控制训练时长
+    self.tol = tol                    # 收敛判断阈值，衡量模型是否稳定
+    
+    # 初始化迭代记录容器
+    self.log_likelihoods = []         # 存储每轮迭代的对数似然值，用于监控收敛过程
 
-        # 初始化随机数生成器
-        self.rng = np.random.default_rng(random_state)
+    # 初始化随机数生成器（支持numpy新API）
+    self.rng = np.random.default_rng(random_state)
+    # 作用：
+    # 1. 初始化模型参数（均值、协方差、权重）
+    # 2. 生成随机初始化数据
+    # 3. 实现算法中的随机步骤
 
     def fit(self, X):
         """使用EM算法训练模型
