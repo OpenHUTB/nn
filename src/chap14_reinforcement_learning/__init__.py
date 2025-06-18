@@ -145,10 +145,15 @@ register(
 
 # 双足步行机器人（困难版，含障碍物和复杂地形）
 register(
-    id='BipedalWalkerHardcore-v2',
-    entry_point='gym.envs.box2d:BipedalWalkerHardcore',
-    max_episode_steps=2000,   # 进一步延长步数
-    reward_threshold=300,
+    id='BipedalWalkerHardcore-v2',  # 环境标识符，用于gym.make()调用
+    entry_point='gym.envs.box2d:BipedalWalkerHardcore',  # 指定环境类路径
+    
+    # 环境参数配置
+    max_episode_steps=2000,   # 每个episode的最大步数，延长至2000步
+                              # 允许智能体有更充足的时间探索复杂地形
+    
+    reward_threshold=300,     # 环境解决阈值，当平均奖励达到300时视为成功
+                              # 反映了完成困难地形行走的奖励要求
 )
 
 # 3. 赛车游戏：控制赛车在赛道上行驶并获得高分
