@@ -74,7 +74,7 @@ for i_episode in range(max_epochs):
             # observation: 当前环境观测
             # enables: 合法动作列表
             # 返回: 选择的动作索引
-            action_ = agent.place(observation, enables)
+            action_ = agent.place(observation=observation, enables=enables)  # 显式指定参数名
         
         # 构建完整动作
         action[0] = action_  # 设置落子位置
