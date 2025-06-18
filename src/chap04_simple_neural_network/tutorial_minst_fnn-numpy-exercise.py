@@ -346,7 +346,7 @@ class myModel:
 
     def forward(self, x):
         x = x.reshape(-1, 28 * 28)                 # 展平图像
-        bias = np.ones(shape=[x.shape[0], 1])      # 添加偏置项
+        bias = np.zeros(shape=[x.shape[0], 1])    # 添加偏置项
         x = np.concatenate([x, bias], axis=1)      # 将偏置向量添加到输入数据中
 
         # 第一层计算：输入层 -> 隐藏层
