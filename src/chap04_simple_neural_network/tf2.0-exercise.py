@@ -42,14 +42,22 @@ def softmax(x: tf.Tensor) -> tf.Tensor:
 
 # 生成测试数据，形状为 [10, 5] 的正态分布随机数
 test_data = np.random.normal(size = [10, 5])
+
 # 比较自定义的softmax函数结果和tf自带的结果，误差小于 0.0001 则认为相等
-(softmax(test_data).numpy() - tf.nn.softmax(test_data, axis = -1).numpy())**2 < 0.0001
+assert np.all((softmax(test_data).numpy() - tf.nn.softmax(test_data, axis=-1).numpy()) ** 2 < 0.0001)
 
 # 数值稳定的 Softmax 函数，用于将原始预测值（logits）转换为概率分布
-
 def sigmoid(x):
     ##########
-    '''实现sigmoid函数， 不允许用tf自带的sigmoid函数'''
+    '''    
+    实现 sigmoid 函数，不允许用 tf 自带的 sigmoid 函数。
+
+    参数:
+        x: 输入张量
+
+    返回:
+        sigmoid 激活后的张量
+    '''
     # 将输入x转换为float32类型，确保数值计算的精度和类型一致性。
     x = tf.cast(x, tf.float32)
     # sigmoid 数学定义：1 / (1 + e^{-x})
