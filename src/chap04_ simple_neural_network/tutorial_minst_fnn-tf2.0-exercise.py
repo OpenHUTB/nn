@@ -6,26 +6,13 @@
 
 # In[7]:
 
-# 导入操作系统接口模块，用于文件/目录操作
-import os
+import os  # 导入操作系统接口模块，用于文件/目录操作
+import numpy as np  # 导入NumPy库，用于科学计算（尤其是多维数组操作）
+import tensorflow as tf  # 导入TensorFlow深度学习框架
+from tensorflow import keras  # 从TensorFlow中导入Keras高级API
+from tensorflow.keras import layers, optimizers, datasets  # Keras核心组件
 
-# 导入NumPy库，用于科学计算（尤其是多维数组操作）
-import numpy as np
-
-# 导入TensorFlow深度学习框架
-import tensorflow as tf
-
-# 从TensorFlow中导入Keras高级API
-from tensorflow import keras
-
-# 从Keras中导入核心组件：
-# layers - 神经网络层（如全连接层、卷积层等）
-# optimizers - 优化器（如SGD、Adam等）
-# datasets - 内置数据集（如MNIST、CIFAR等）
-from tensorflow.keras import layers, optimizers, datasets
-
-# 设置TensorFlow日志级别，避免输出过多无关信息
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 可选值：{'0', '1', '2'}
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 设置TensorFlow日志级别，避免输出过多无关信息，可选值：{'0', '1', '2'}
 
 def mnist_dataset():
     """
@@ -35,8 +22,7 @@ def mnist_dataset():
     - 保持原始数据类型（图像为float32，标签为int64）
     """
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
-    # 归一化像素值到[0, 1]
-    x = x / 255.0
+    x = x / 255.0  # 将像素值归一化到[0, 1]
     x_test = x_test / 255.0
     return (x, y), (x_test, y_test)
 
