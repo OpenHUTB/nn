@@ -75,7 +75,12 @@ def bias_variable(shape):
     return tf.Variable(initial)
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(
+    x: tf.Tensor,
+    W: tf.Tensor,
+    padding: str = "SAME",
+    strides: list = [1, 1, 1, 1]
+) -> tf.Tensor:
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -192,7 +197,7 @@ h_pool1 = max_pool_2x2(h_conv1)
 # 定义第二个卷积层的权重变量，卷积核大小为 5x5，输入通道数为 32，输出通道数为 64
 # 5x5卷积核更精细地提取特征，64个特征图进一步丰富特征表示
 W_conv2 = weight_variable([5, 5, 32, 64])
-# 定义第二个卷积层的偏置变量，输出通道数为 64
+# 第二个卷积层偏置
 b_conv2 = bias_variable([64])
 # 执行第二个卷积操作 + ReLU激活
 h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
