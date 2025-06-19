@@ -75,7 +75,12 @@ def bias_variable(shape):
     return tf.Variable(initial)#将常量张量 initial 包装为一个可训练的变量张量
 
 
-def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
+def conv2d(
+    x: tf.Tensor,
+    W: tf.Tensor,
+    padding: str = "SAME",
+    strides: list = [1, 1, 1, 1]
+) -> tf.Tensor:
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
     
@@ -244,7 +249,7 @@ with tf.Session() as sess:
         # 获取下一个训练批次（小批量随机梯度下降）
         batch_xs, batch_ys = mnist.train.next_batch(100)
 
-        # 执行训练步骤（前向传播 + 反向传播 + 参数更新）
+        # 执行训练步骤：前向传播 + 反向传播 + 参数更新
         sess.run(train_step, feed_dict={xs: batch_xs, ys: batch_ys, keep_prob: keep_prob_rate})
 
         # 每100次迭代评估一次模型性能
