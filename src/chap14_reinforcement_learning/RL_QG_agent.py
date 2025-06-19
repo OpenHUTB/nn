@@ -18,7 +18,7 @@ class RL_QG_agent:
         self.input_states = None  # 网络输入张量（棋盘状态）
         self.Q_values = None      # 网络输出张量（各位置Q值）
 
-
+#模型构建模块
     def init_model(self):
         """
         构建并初始化卷积神经网络模型
@@ -79,7 +79,7 @@ class RL_QG_agent:
         self.sess.run(tf.global_variables_initializer())
         self.saver = tf.train.Saver()
 
-
+#落子策略模块
     def place(self, state, enables):
         """
         根据当前棋盘状态和合法落子位置，选择最优落子位置
@@ -107,7 +107,7 @@ class RL_QG_agent:
         best_indices = np.where(legal_q == max_q)[0]  # 在合法动作中找出所有具有最大Q值的动作索引
         return enables[np.random.choice(best_indices)]  # 映射回原始位置
 
-
+#模型存储模块
     def save_model(self):
         """保存训练好的模型参数到指定目录"""
 
