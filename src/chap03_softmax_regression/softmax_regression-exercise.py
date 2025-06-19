@@ -104,7 +104,7 @@ def compute_loss(pred, labels, num_classes=3):
     )
     
     # 防止log(0)的情况，将预测概率限制在[epsilon, 1.0]范围内
-    pred = tf.clip_by_value(pred, epsilon, 1.0)
+   pred = tf.clip_by_value(pred, EPSILON, 1.0)  # 使用全局定义的EPSILON常量
     
     # 计算每个样本的交叉熵损失，对于每个样本，计算其真实类别的概率的负对数
     # 公式：L_i = -Σ_{c=1}^C y_{i,c} · log(p_{i,c})
