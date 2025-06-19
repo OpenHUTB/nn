@@ -49,7 +49,7 @@ def mnist_dataset():
     return ds, test_ds
 
 
-def prepare_mnist_features_and_labels(x, y):
+def prepare_mnist_features_and_labels(x: tf.Tensor, y: tf.Tensor) -> tuple:
     """
     对MNIST数据集的特征和标签进行预处理。
 
@@ -74,9 +74,9 @@ def prepare_mnist_features_and_labels(x, y):
 # In[3]:
 # 构建卷积神经网络（CNN）模型
 model = keras.Sequential([
-    # 第1层：卷积层（提取初级图像特征）
+    # 第1层：提取基础特征
     # 32个5x5的卷积核，使用ReLU激活函数，保持输入输出尺寸相同（padding='same'）
-    Conv2D(32, (5, 5), activation='relu', padding='same'),
+    Conv2D(32, (5, 5), activation='relu', padding='same'),  
     
     # 第2层：最大池化层（下采样，减少计算量）
     # 2x2的池化窗口，步长为2（输出尺寸减半）
@@ -103,8 +103,7 @@ model = keras.Sequential([
     layers.Dense(10, activation='softmax')
 ])
 
-optimizer = optimizers.Adam(0.0001)
-# 配置优化器（Adam优化算法）
+optimizer = optimizers.Adam(0.0001) # 定义优化器
 
 # ## 编译， fit以及evaluate
 
