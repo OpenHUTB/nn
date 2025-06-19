@@ -37,7 +37,7 @@ def mnist_dataset():
 
 
 class Matmul:
-
+    """矩阵乘法层，实现前向和反向传播。"""
     def __init__(self):
         # 初始化内存字典，用于存储前向传播中的变量以便反向传播使用
         self.mem = {}
@@ -73,6 +73,7 @@ class Matmul:
 
 # 定义 ReLU 激活层
 class Relu:
+    """ReLU激活层，实现前向和反向传播。"""
     def __init__(self):
         self.mem = {}
         # 初始化记忆字典，用于存储前向传播的输入
