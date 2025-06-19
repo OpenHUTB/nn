@@ -14,6 +14,8 @@ from tensorflow.keras import layers, optimizers, datasets
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # or any {'0', '1', '2'}
 
 def mnist_dataset():
+    """加载并归一化MNIST数据集。"""
+
     # 加载MNIST数据集，包含训练集和测试集的图像及标签
     (x, y), (x_test, y_test) = datasets.mnist.load_data()
     
@@ -61,9 +63,9 @@ class MyModel:
         # 隐藏层+ReLU,隐藏层计算：
         # 通过矩阵乘法（x @ self.W1）加上偏置项 self.b1，得到隐藏层的加权和
         # 使用 ReLU 激活函数增加非线性
-         h = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)
+        h = tf.nn.relu(tf.matmul(x, self.W1) + self.b1)
 
-        #  输出层计算：全连接层（无激活函数，直接输出 logits）
+        # 输出层计算：全连接层（无激活函数，直接输出 logits）
         #  - 隐藏层特征（128维） × 权重矩阵 W2（128×10） → 分类评分（10维）
         #  - 未应用 softmax，便于后续使用 sparse_softmax_cross_entropy_with_logits 计算损失
         logits = h @ self.W2 + self.b2         
@@ -118,7 +120,7 @@ def train_one_step(model, optimizer, x, y):
     with tf.GradientTape() as tape:     # 记录计算图以计算梯度
         logits = model(x)               # 前向传播
         loss = compute_loss(logits, y)  # 计算损失
-        grads = tape.gradient(loss,model.trainable_variables)
+    grads = tape.gradient(loss,model.trainable_variables)
         #添加梯度裁剪 控制在1.0以内
     grads = tape.gradient(loss, model.trainable_variables)            # 计算梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
