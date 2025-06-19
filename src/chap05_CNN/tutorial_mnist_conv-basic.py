@@ -57,8 +57,8 @@ def prepare_mnist_features_and_labels(x, y):
         x: 归一化后的图像数据。
         y: 转换为整型的标签。
     """
-    x = tf.cast(x, tf.float32) / 255.0
-    y = tf.cast(y, tf.int64)
+    x = tf.cast(x, tf.float32) / 255.0  # 归一化到 [0, 1]
+    y = tf.cast(y, tf.int64)            # 转换为整型标签
     return x, y
 
 
@@ -110,7 +110,7 @@ class MyConvModel(keras.Model):
         h1_pool = self.pool(h1)           # 第一层后的最大池化，压缩空间维度
 
         h2 = self.l2_conv(h1_pool)        # 第二层卷积提取更高级特征
-        h2_pool = self.pool(h2)           # 第二层后池化
+        h2_pool = self.pool(h2)           # 第二层池化
 
         flat_h = self.flat(h2_pool)       # 展平操作，为全连接层做准备
 
@@ -146,7 +146,7 @@ def compute_loss(logits, labels):
 
 
 @tf.function
-def compute_accuracy(logits, labels):
+def compute_accuracy(logits: tf.Tensor, labels: tf.Tensor) -> tf.Tensor:
     """
     计算模型的准确率。
 
