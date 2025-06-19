@@ -82,10 +82,9 @@ def prepare_mnist_features_and_labels(x, y):
         x: 归一化后的图像数据。
         y: 转换为整型的标签。
     """
-    x = tf.cast(x, tf.float32) / 255.0# 显式转换为float32后除255
-    # 将标签转换为int64类型
-    # 确保标签类型与损失函数要求匹配（如sparse_categorical_crossentropy需要int类型标签）
-    y = tf.cast(y, tf.int64)# 使用int64避免平台相关差异
+    x = tf.cast(x, tf.float32) / 255.0  # 显式转换为float32后除255
+
+    y = tf.cast(y, tf.int64)            # 转换为整型标签
     return x, y
 
 
@@ -107,27 +106,26 @@ class MyConvModel(keras.Model):
         self.dense2 = layers.Dense(10)                                        # 第二层全连接层
 
     @tf.function
-    def call(self, x):
-    """
-    前向传播函数（定义模型的数据流向）。
+    def call(self, x: tf.Tensor) -> tf.Tensor:
+        """
+        前向传播函数（定义模型的数据流向）。
     Args:
         x: 输入数据张量，形状通常为 [batch_size, height, width, channels]
     Returns:
         probs: 输出概率分布张量，形状为 [batch_size, num_classes]，
                每个样本的各类别概率之和为1
-    """
+        """
     # 第一层卷积操作：使用3x3卷积核提取局部特征
-    # 输入形状：[N,H,W,C] -> 输出形状：[N,H,W,conv1_filters]
-    h1 = self.l1_conv(x)  # l1_conv 是第一个卷积层实例
+    h1 = self.l1_conv(x)        # l1_conv 是第一个卷积层实例
     
     # 第一层最大池化：2x2窗口下采样，减少空间维度
     # 输出形状变为输入的一半（如[N,128,128,32]->[N,64,64,32]）
-    h1_pool = self.pool(h1)  # pool 是 MaxPooling2D 层实例
+    h1_pool = self.pool(h1)     # pool 是 MaxPooling2D 层实例
     
     # 第二层卷积操作：在更高层次提取特征
     # 使用更多卷积核捕获更复杂的模式
     h2 = self.l2_conv(h1_pool)
-    h2_pool = self.pool(h2)  # 只保留一次池化操作
+    h2_pool = self.pool(h2)     # 只保留一次池化操作
     
     # 展平操作：将多维特征图转换为一维特征向量
     # 例如 [N,7,7,64] -> [N,3136]
