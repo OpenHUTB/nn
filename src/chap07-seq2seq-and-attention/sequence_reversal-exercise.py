@@ -78,7 +78,7 @@ print(get_batch(2, 10)) # 调用 get_batch 函数，并打印其返回值，参�
 
 # In[3]:
 
-
+#模型架构模块
 class mySeq2SeqModel(keras.Model):
     def __init__(self):
         # 初始化父类 keras.Model，必须调用
