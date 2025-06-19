@@ -66,7 +66,9 @@ test_y = test_data.test_labels[:500].numpy()
 
 # 定义CNN模型
 class CNN(nn.Module):
+    """卷积神经网络模型，用于 MNIST 手写数字识别任务"""
     def __init__(self):
+        """初始化网络结构：包括两组卷积层 + 池化层 + 全连接层"""
         super(CNN, self).__init__()                                # 调用父类构造函数
         """
         设计特点:
@@ -116,6 +118,14 @@ class CNN(nn.Module):
 
 # 测试函数 - 评估模型在测试集上的准确率
 def test(cnn):
+    """评估模型在测试集上的准确率
+    
+    Args:
+        cnn (nn.Module): 已训练好的 CNN 模型
+        
+    Returns:
+        float: 测试集准确率
+    """
     global prediction  # 使用全局变量prediction保存预测结果
     
     # 模型预测：输入测试数据，得到原始输出logits（未归一化的预测值）
@@ -143,6 +153,7 @@ def test(cnn):
 
 # 训练函数
 def train(cnn):
+    """训练 CNN 模型"""
     # 使用Adam优化器，学习率为learning_rate
     optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
     # 使用交叉熵损失函数
