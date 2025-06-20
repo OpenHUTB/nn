@@ -40,6 +40,7 @@ def compute_accuracy(v_xs, v_ys):
     # 计算准确率
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     # 运行准确率计算
+    # 将验证集的输入特征(xs)、真实标签(ys)传入计算图
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
