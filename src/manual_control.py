@@ -532,16 +532,16 @@ class KeyboardControl(object):
                     # 检查遥测是否已经启用
                     if world.show_vehicle_telemetry:
                         # 如果启用，禁用遥测并显示通知
-                        world.player.show_debug_telemetry(False)
-                        world.show_vehicle_telemetry = False
-                        world.hud.notification("Disabled Vehicle Telemetry")
+                        world.player.show_debug_telemetry(False)  # 关闭玩家的调试遥测显示
+                        world.show_vehicle_telemetry = False  # 将车辆遥测显示标志设为False
+                        world.hud.notification("Disabled Vehicle Telemetry")  # 在HUD上显示"已禁用车辆遥测"的通知
                     else:
-                        try:
+                        try:  
                             # 如果未启用，尝试启用遥测并显示通知
-                            world.player.show_debug_telemetry(True)
-                            world.show_vehicle_telemetry = True
-                            world.hud.notification("Enabled Vehicle Telemetry")
-                        except Exception as e:
+                            world.player.show_debug_telemetry(True)  # 开启玩家的调试遥测显示
+                            world.show_vehicle_telemetry = True  # 将车辆遥测显示标志设为True
+                            world.hud.notification("Enabled Vehicle Telemetry")  # 在HUD上显示"已启用车辆遥测"的通知
+                        except Exception as e:  # 捕获可能出现的任何异常
                             # 捕获并忽略任何异常，可以在此添加日志记录
                             print(f"Error enabling vehicle telemetry: {e}")
                 elif event.key > K_0 and event.key <= K_9:
