@@ -109,6 +109,7 @@ def logsumexp(log_p, axis = 1, keepdims = False):
     result = max_val + np.log(sum_exp)
     
     # 处理全-inf输入的特殊case
+    # 判断是否所有有效值都是负无穷
     if np.any(np.isneginf(log_p)) and not np.any(np.isfinite(log_p)):       # 判断是否所有有效值都是-inf
         result = max_val.copy() if keepdims else max_val.squeeze(axis = axis) # 根据keepdims参数的值返回max_val的适当形式
     return result                                                           # 返回处理后的结果，保持与正常情况相同的接口
