@@ -213,6 +213,7 @@ if __name__ == '__main__':
     except IOError:
         # 如果文件不存在或加载失败，生成新的二值化MNIST数据
         (train_images, _), (_, _) = mnist.load_data()  # 加载MNIST数据
+        # 二值化阈值设为128（0-255的中值），简单有效
         mnist_bin = (train_images >= 128).astype(np.int8)  # 二值化处理
         np.save('mnist_bin.npy', mnist_bin)  # 保存为.npy文件
 
