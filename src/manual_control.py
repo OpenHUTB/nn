@@ -562,15 +562,15 @@ class KeyboardControl(object):
                         world.hud.notification("Recorder is ON")
                 elif event.key == K_p and (pygame.key.get_mods() & KMOD_CTRL):
                     # 停止录像
-                    client.stop_recorder()
-                    world.recording_enabled = False
+                    client.stop_recorder()  # 停止记录器（停止当前的数据记录）
+                    world.recording_enabled = False  # 设置世界状态为"记录功能已禁用"
                     # 通过重播开始时固定摄像头的临时解决方案
-                    current_index = world.camera_manager.index
-                    world.destroy_sensors()
+                    current_index = world.camera_manager.index  # 保存当前摄像头的索引位置
+                    world.destroy_sensors()  # 销毁所有传感器（可能是为了重置或清理场景）
                     # 禁用自动驾驶
                     self._autopilot_enabled = False
-                    world.player.set_autopilot(self._autopilot_enabled)
-                    world.hud.notification("Replaying file 'manual_recording.rec'")
+                    world.player.set_autopilot(self._autopilot_enabled)  # 将玩家的自动驾驶模式设置为禁用状态
+                    world.hud.notification("Replaying file 'manual_recording.rec'")  # 在HUD(平视显示器)上显示通知消息："正在重放文件'manual_recording.rec'"
                     # 重放器
                     client.replay_file("manual_recording.rec", world.recording_start, 0, 0)
                     world.camera_manager.set_sensor(current_index)
