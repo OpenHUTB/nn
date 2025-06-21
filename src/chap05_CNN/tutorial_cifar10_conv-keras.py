@@ -16,7 +16,7 @@ LEARNING_RATE = 1e-4     # 学习率：控制参数更新步长，太小会导�
 KEEP_PROB_RATE = 0.7     # Dropout保留概率：随机保留70%的神经元，防止过拟合
 MAX_EPOCH = 2000         # 最大训练轮数：模型将看到全部训练数据2000次
 
-
+#计算准确率
 def compute_accuracy(v_xs, v_ys):
     """
     计算模型在给定数据集上的准确率。
@@ -43,7 +43,7 @@ def compute_accuracy(v_xs, v_ys):
     result = sess.run(accuracy, feed_dict={xs: v_xs, ys: v_ys, keep_prob: 1})
     return result
 
-
+#权重初始化
 def weight_variable(shape):
     """
     初始化权重变量。使用截断正态分布防止梯度消失或爆炸。
@@ -59,7 +59,7 @@ def weight_variable(shape):
     # 将初始化值转换为可训练的TensorFlow变量
     return tf.Variable(initial)
 
-
+#偏置初始化
 def bias_variable(shape):
     """
     初始化卷积层/全连接层的偏置变量
@@ -74,7 +74,7 @@ def bias_variable(shape):
     initial = tf.constant(0.1, shape=shape) # 创建一个所有元素值为0.1的常量张量
     return tf.Variable(initial)#将常量张量 initial 包装为一个可训练的变量张量
 
-
+#二维卷积层
 def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     """
     实现二维卷积操作，增加了参数灵活性和异常处理
@@ -121,7 +121,7 @@ def conv2d(x, W, padding='SAME', strides=[1, 1, 1, 1]):
     
     return conv
 
-
+#最大池化层
 def max_pool_2x2(x: tf.Tensor, # 输入张量
     pool_size: int = 2, # 池化窗口大小
     strides: int = 2,  # 池化步长
