@@ -21,7 +21,8 @@ def make_random_policy(np_random):
         a = np_random.randint(len(possible_places)) # 生成一个随机索引
         return possible_places[a] # 返回对应索引的放置位置
     return random_policy # 返回定义好的随机策略函数
-
+ 
+#黑白棋环境初始化与配置
 class ReversiEnv(gym.Env):
     """
     Reversi environment. Play against a fixed opponent.
@@ -86,7 +87,8 @@ class ReversiEnv(gym.Env):
             self.opponent_policy = self.opponent
 
         return [seed]
-
+     
+    #重置环境
     def _reset(self):
         # init board setting
         # 初始化3通道棋盘状态
@@ -108,6 +110,7 @@ class ReversiEnv(gym.Env):
             self.to_play = ReversiEnv.WHITE
         return self.state
 
+        #执行动作
     def _step(self, action):
          """
         执行一个落子动作，并更新环境状态。
