@@ -236,23 +236,23 @@ def question_24(): #绘制二次函数 y = x^2 的图像。
     plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
     plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
 
-# 添加标题和标签
+    # 添加标题和标签
     plt.title("Plot of y = x^2")  # 图像标题
     plt.xlabel("x")  # x 轴标签
     plt.ylabel("y")  # y 轴标签
 
-# 显示出半透明网格线
+    # 显示出半透明网格线
     plt.grid(True, alpha=0.5)
 
-# 在右上角显示图例
+    # 在右上角显示图例
     plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
-    plt.savefig('quadratic.png')   # 保存图像
     plt.show()  # 显示绘制的图像
+    plt.close()  # 关闭图形，释放内存
 
 # 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 def question_25():
     print("第二十五题：绘制正弦和余弦函数")
-# 改用linspace确保包含端点
+    # 改用linspace确保包含端点
     x = np.arange(0, 3 * np.pi, 0.1)  ## 生成从 0 到 3π 的 x 值，步长为 0.1
     y_sin = np.sin(x)  # 计算对应的正弦值
     y_cos = np.cos(x)  # 计算对应的余弦值
@@ -261,22 +261,23 @@ def question_25():
     plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
     plt.plot(x, y_cos, label="y = cos(x)", color="red")  # 绘制余弦函数曲线
 
-# 添加标题和标签
+    # 添加标题和标签
     plt.title("Sine and Cosine Functions")  # 设置图像的标题为 "Sine and Cosine Functions"
     plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
     plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
 
-# 添加网格线
+    # 添加网格线
     plt.grid(True, alpha=0.5)
 
-# 显示图例
+    # 显示图例
     plt.legend(loc='best')
 
-# 自动调整布局，防止标签被截断
+    # 自动调整布局，防止标签被截断
     plt.tight_layout() 
 
-# 显示图像
+    # 显示图像
     plt.show()
+    plt.close()  # 关闭图形，释放内存
 if __name__ == "__main__":
     # 按顺序执行所有问题
     question_2()
