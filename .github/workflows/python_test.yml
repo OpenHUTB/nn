@@ -1,0 +1,26 @@
+# 参考：https://github.com/Tiryoh/actions-mkdocs
+name: Deploy
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    name: Deploy docs to GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v2
+      # 任务名称：设置Python环境
+      - name: Set up Python
+        # This is the version of the action for setting up Python, not the Python version.
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' # 指定python版本
+          # Optional - x64 or x86 architecture, defaults to x64
+          architecture: 'x64'
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Python script testing
+        working-directory: ./src
+        run: python chap01_warmup/numpy_tutorial.py  # 执行
