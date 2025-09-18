@@ -1,4 +1,9 @@
 # 神经网络实现代理
+<<<<<<< HEAD
+#DFKPAOJGEIOPRJ
+
+
+=======
 
 利用 神经网络/ROS 实现 Carla、AirSim、Mujoco 中人和载具的代理。
 
@@ -45,4 +50,5 @@ mkdocs serve
 * 已有相关 [无人车](https://openhutb.github.io/carla_doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://github.com/google-deepmind/mujoco/network/dependents) 实现
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
 
+>>>>>>> 91bc8b452c228b741df571d7f427a4d964594af8
 
