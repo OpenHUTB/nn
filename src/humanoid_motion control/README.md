@@ -25,7 +25,7 @@ humanoid_mujoco_py/
    - 设置初始姿势为「深蹲（squat）」（可修改代码切换其他姿势）
    - 启动可视化窗口，实时渲染机器人运动
    - 在终端输出实时仿真时间与躯干位置（格式：`时间: X.XX, 躯干位置: (X.XX, X.XX, X.XX)`）
-   - 模拟持续20秒（1200步，每步0.005秒）后自动结束
+   - 无限循环启动模拟
 
 ## 交互操作
 
@@ -49,7 +49,7 @@ humanoid_mujoco_py/
   - 数据初始化：通过`mujoco.MjData(model)`创建仿真状态容器（存储关节位置`qpos`、时间`time`等）
   - 初始姿势设置：通过`mujoco.mj_resetDataKeyframe(model, data, 0)`设置为深蹲姿势（索引`0~3`对应4种预设姿势）
   - 可视化启动：通过`viewer.launch_passive()`启动被动式Viewer（手动控制仿真步长与视图更新）
-  - 仿真循环：1200步循环中，通过`mujoco.mj_step()`执行物理计算，`viewer.sync()`更新视图，`time.sleep(0.005)`控制帧率
+  - 仿真循环：循环中，通过`mujoco.mj_step()`执行物理计算，`viewer.sync()`更新视图，`time.sleep(0.005)`控制帧率
 
 ## 扩展方向
 
