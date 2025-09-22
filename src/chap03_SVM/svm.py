@@ -53,7 +53,6 @@ class SVM:
         y = data_train[:, 2]          # 提取标签
         y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，符合SVM理论要求
         m, n = X.shape                # m:样本数，n:特征数
-
         # 初始化模型参数
         self.w = np.zeros(n)  # 权重向量初始化为0
         self.b = 0            # 偏置项初始化为0
