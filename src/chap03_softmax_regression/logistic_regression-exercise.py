@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 # rc：运行时配置(runtime configuration)，用于设置图形默认参数
 from matplotlib import animation, rc
 # 导入 IPython 的 HTML 显示功能，用于在 Notebook 中嵌入动画
-from IPython.display import HTML
+# from IPython.display import HTML
 # 导入 matplotlib 的 colormap 模块，用于颜色映射
 import matplotlib.cm as cm
 # 导入 NumPy 数值计算库
@@ -28,10 +28,10 @@ np.random.seed(42)
 tf.random.set_seed(42)
 
 # 确保在 Jupyter Notebook 中内联显示图形
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 # 设置数据点数量
-DOT_NUM = 100
+dot_num = 100
 # 从均值为3，标准差为1的高斯分布中采样x坐标，用于正样本
 x_p = np.random.normal(3., 1, dot_num)
 # 从均值为6，标准差为1的高斯分布中采样y坐标，用于正样本
@@ -166,41 +166,41 @@ def train_one_step(model, optimizer, x, y):
 
 
 if __name__ == '__main__':
-   # 实例化逻辑回归模型
-   # LogisticRegression 是一个用于二分类问题的线性模型
-   model = LogisticRegression()
+    # 实例化逻辑回归模型
+    # LogisticRegression 是一个用于二分类问题的线性模型
+    model = LogisticRegression()
 
-   # 使用自适应优化器 Adam ，学习率为0.01
-   # Adam 是一种自适应学习率的优化算法，结合了 Momentum 和 RMSProp 的优点
-   # learning_rate=0.01 设置了初始学习率为 0.01
-   opt = tf.keras.optimizers.Adam(learning_rate = 0.01)  # 或Nadam/RMSprop
+    # 使用自适应优化器 Adam ，学习率为0.01
+    # Adam 是一种自适应学习率的优化算法，结合了 Momentum 和 RMSProp 的优点
+    # learning_rate=0.01 设置了初始学习率为 0.01
+    opt = tf.keras.optimizers.Adam(learning_rate = 0.01)  # 或Nadam/RMSprop
 
-   # 从数据集中解包出x1, x2坐标和标签y
-   # data_set 是一个包含多个样本的列表，每个样本格式为 (x1, x2, y)
-   # 使用 zip(*data_set) 对数据进行转置，然后转换为列表
-   # 这样可以将所有x1、x2和y分别分组
-   x1, x2, y = list(zip(*data_set))
+    # 从数据集中解包出x1, x2坐标和标签y
+    # data_set 是一个包含多个样本的列表，每个样本格式为 (x1, x2, y)
+    # 使用 zip(*data_set) 对数据进行转置，然后转换为列表
+    # 这样可以将所有x1、x2和y分别分组
+    x1, x2, y = list(zip(*data_set))
 
-   # 将x1和x2组合成输入数据 x
-   # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
-   # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
-   x = np.array(list(zip(x1, x2)), dtype = np.float32)
-   y = np.array(y, dtype = np.float32)
+    # 将x1和x2组合成输入数据 x
+    # 使用 zip(x1, x2) 将每个样本的x1和x2特征重新组合成特征对
+    # 最终 x 的形式是 [(x1_1, x2_1), (x1_2, x2_2), ...]
+    x = np.array(list(zip(x1, x2)), dtype = np.float32)
+    y = np.array(y, dtype = np.float32)
 
-   # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
-   # animation_frames 列表将记录训练过程中每个步骤或epoch的:
-   #   - 模型参数(如权重和偏置)
-   #   - 当前损失值
-   # 这些信息可以用于后续创建训练过程的动画演示
-   animation_frames = []
+    # 用于存储训练过程中每一步的模型参数和损失值，便于动画可视化
+    # animation_frames 列表将记录训练过程中每个步骤或epoch的:
+    #   - 模型参数(如权重和偏置)
+    #   - 当前损失值
+    # 这些信息可以用于后续创建训练过程的动画演示
+    animation_frames = []
 
     for i in range(200):
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
         
-            W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy())
-           animation_frames.append((W_np[0, 0], W_np[1, 0], b_np, loss_np))
+        W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()
+        animation_frames.append((W_np[0, 0], W_np[1, 0], b_np, loss_np))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
@@ -278,5 +278,5 @@ if __name__ == '__main__':
         frames=len(animation_frames), interval=50, blit=True, repeat=False # 帧间隔(毫秒)，是否使用blitting优化，# 是否循环播放
     )
 
-   from IPython.display import HTML
-   HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
+    # from IPython.display import HTML
+    # HTML(anim.to_html5_video())# 将动画转换为HTML5视频并显示
