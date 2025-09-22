@@ -1,12 +1,11 @@
 # 参考：https://github.com/Tiryoh/actions-mkdocs
-name: Deploy
-on:
-  push:
-    branches:
-      - main
+name: Testing
+on:  [push, pull_request]
+
+
 jobs:
   build:
-    name: Deploy docs to GitHub Pages
+    name: Test Python script
     runs-on: ubuntu-latest
     steps:
       - name: Checkout 
@@ -22,5 +21,10 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
       - name: Python script testing
-        working-directory: ./src
-        run: python chap01_warmup/numpy_tutorial.py  # 执行
+        # working-directory: ./src
+        run: |
+          cd src/chap01_warmup && python numpy_tutorial.py && cd ../..
+          cd src/chap02_linear_regression && python exercise-linear_regression.py && cd ../..
+          cd src/chap02_linear_regression && python linear_regression-tf2.0.py && cd ../..
+
+
