@@ -14,22 +14,22 @@
 1. 下载适用于Windows系统的指定版本CARLA仿真器压缩包：
 https://github.com/carla-simulator/carla/releases
 plaintext
- 
+
 2. 参考官方文档安装CARLA\_0.9.11
 
 3. 克隆本项目仓库：
 plaintext
 https://github.com/William4861/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator
- 
+
 4. 安装所需的Python库：（执行该命令前确保cd到requirements.txt文件目录）
 plaintext
 pip install -r requirements.txt
- 
+
 使用方法
 1. 将 object\_detection.py 文件复制到CARLA的PythonAPI示例目录中：
 plaintext
 cp object\_detection.py \\CARLA\_0.9.11\\WindowsNoEditor\\PythonAPI\\examples
- 
+
 2. 下载yolov3.weights和yolo3.cfg文件至examples目录
 https://huggingface.co/spaces/Epitech/Scarecrow/resolve/main/yolov3.weights
 https://www.kaggle.com/datasets/ravi02516/trained-weights-and-cfg?select=yolov3.cfg
@@ -38,18 +38,18 @@ https://www.kaggle.com/datasets/ravi02516/trained-weights-and-cfg?select=yolov3.
 plaintext
 cd CARLA\_0.9.11
 ./CarlaUE4.exe
- 
+
 4. 打开新的终端，导航至PythonAPI示例目录并运行脚本：
 plaintext
 cd CARLA\_0.9.11/PythonAPI/examples
 python object\_detection.py
- 
+
 模型性能监控
 通过TensorBoard监控和跟踪YOLOv3模型性能的步骤如下：
 1. 启动TensorBoard：
 plaintext
 tensorboard --logdir=path/to/logs
- 
+
 2. 打开网页浏览器，访问 http://localhost:6006 以查看TensorBoard仪表板。
 项目结构
 ⦁	 object\_detection.py ：目标检测与轨迹规划的主Python脚本
