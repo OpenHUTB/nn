@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 
 def question_2():
-<<<<<<< HEAD
+    <<<<<<< HEAD
     """第二题：一维数组的基本操作"""
     print("=" * 50)
     print("第二题：一维数组的基本操作")
