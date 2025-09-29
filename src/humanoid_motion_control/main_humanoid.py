@@ -17,7 +17,7 @@ def main():
     mujoco.mj_resetDataKeyframe(model, target_data, 1) 
     target_qpos = target_data.qpos.copy()  
     
-    # 初始姿势设为深蹲（索引0），从蹲下开始站起
+    # 初始姿势设为深蹲（索引0），从蹲下开始站起'+
     mujoco.mj_resetDataKeyframe(model, data, 0)
     
     # 控制参数（软体机器人需较小增益，避免震荡）
