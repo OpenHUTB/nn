@@ -4,7 +4,7 @@
 
 ## 环境配置
 
-* 平台：Ubuntu 18.04
+* 平台：Ubuntu 22.04
 * 软件：Python 3.6.9、pip 21.3.1、TensorFlow 1.14.0
 * 相关依赖：见requirements.txt
 
