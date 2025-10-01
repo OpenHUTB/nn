@@ -58,7 +58,7 @@ np.random.shuffle(data_set)  # 随机打乱数据集顺序
 
 # In[1]:
 
-EPSILON = 1e-12  # 防止 log(0)，处理数值稳定性问题
+epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 class SoftmaxRegression(tf.Module):
     def __init__(self, input_dim = 2, num_classes = 3):
