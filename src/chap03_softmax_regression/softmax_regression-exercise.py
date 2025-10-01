@@ -20,7 +20,7 @@ import numpy as np # 数值计算库
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
 # 设置数据点数量
-DOT_NUM = 100  # 每类样本的数量
+dot_num = 100  # 每类样本的数量
 
 # 生成类别1的数据：均值为(3,6)，标准差为1
 x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
