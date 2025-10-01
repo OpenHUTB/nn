@@ -65,7 +65,7 @@ np.random.shuffle(data_set)
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss函数)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
-EPSILON = 1e-12
+epsilon = 1e-12
 
 
 class LogisticRegression():
