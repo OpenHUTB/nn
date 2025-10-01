@@ -200,7 +200,7 @@ if __name__ == '__main__':
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
         
         W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()
-        animation_frames.append((W_opt[0, 0], W_opt[1, 0], b_np, loss_np))
+        animation_frames.append((W_opt[0, 0], W_opt[1, 0], b_opt, loss))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
