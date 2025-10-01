@@ -29,3 +29,4 @@ jobs:
           cd src/chap03_softmax_regression  && python logistic_regression-exercise.py  && cd ../..
           cd src/chap03_softmax_regression  && python softmax_regression-exercise.py   && cd ../..
 
+
