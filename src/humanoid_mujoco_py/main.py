@@ -22,7 +22,7 @@ def main():
     # 加载MJCF模型文件
     # 模型定义了物理场景：包含平面、光源和一个自由下落的盒子
     # from_xml_path方法支持从XML文件加载模型，替代C++中的mj_loadXML
-    model = mujoco.MjModel.from_xml_path("src\humanoid_control\hello.xml")
+    model = mujoco.MjModel.from_xml_path("src/humanoid_control/hello.xml")
     
     # 创建与模型对应的动态数据结构
     # 存储模拟过程中的状态变量（位置、速度等），类似C++中的mjData
