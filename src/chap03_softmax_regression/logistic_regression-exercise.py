@@ -65,7 +65,7 @@ np.random.shuffle(data_set)
 # 建立模型类，定义loss函数，定义一步梯度下降过程函数
 # 填空一：实现sigmoid的交叉熵损失函数(不使用tf内置的loss函数)
 # 防止对数运算出现数值不稳定问题，添加一个极小值
-EPSILON = 1e-12
+epsilon = 1e-12
 
 
 class LogisticRegression():
@@ -200,7 +200,7 @@ if __name__ == '__main__':
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
         
         W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()
-        animation_frames.append((W_np[0, 0], W_np[1, 0], b_np, loss_np))
+        animation_frames.append((W_opt[0, 0], W_opt[1, 0], b_opt, loss))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
