@@ -21,7 +21,7 @@ def control_robot(model_path):
 
                 # 计算控制信号
                 elapsed_time = time.time() - start_time
-                data.ctrl[0] = 5.0 if (elapsed_time % 4 < 2) else -5.0
+                data.ctrl[0] = 0.5 if (elapsed_time % 20 < 10) else -0.5
 
                 # 运行仿真步
                 mujoco.mj_step(model, data)
@@ -31,6 +31,7 @@ def control_robot(model_path):
 
                 # 控制仿真速度
                 time.sleep(model.opt.timestep)
+
 
         except KeyboardInterrupt:
             print("\n仿真被用户中断")

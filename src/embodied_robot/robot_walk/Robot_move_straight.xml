@@ -23,10 +23,10 @@
     <!-- 机器人主体 -->
       <!--名为robot_base的机器人基座的坐标为(0 0 0.2),Z轴为0.2避免与地面直接接触-->
     <body name="robot_base" pos="0 0 0.2">
-      <!-- 新增关节定义，允许机器人在X轴方向移动 -->
-       <joint name="base_joint" type="slide" axis="1 0 0" range="-10 10"/>
+      <!-- 关节定义，允许机器人在X轴方向移动,移动范围在-20到20之间 -->
+       <joint name="base_joint" type="slide" axis="1 0 0" range="-20 20"/>
        <!--定义物理惯性,质量为1.0单位,物体绕三维坐标旋转的阻力(0.1 0.1 0.1 )值越大，物体越难改变旋转状态 -->
-      <inertial pos="0 0 0" mass="1.0" diaginertia="0.1 0.1 0.1"/>
+      <inertial pos="0 0 0" mass="1.0" diaginertia="1 1 1"/>
        <!--引用了<asset>的材质模版和default中定义的geom -->
       <geom material="red"/>
     </body>
@@ -35,6 +35,6 @@
   <!-- 4. 执行器 (电机等) -->
   <actuator>
       <!-- joint用来指定电机驱动的关节;gear为电机传动比,值越大,力矩越大-->
-    <motor name="joint_motor" joint="base_joint" gear="100"/>
+    <motor name="joint_motor" joint="base_joint" gear="5"/>
   </actuator>
 </mujoco>
