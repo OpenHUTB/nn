@@ -32,18 +32,28 @@
 ```plaintext
   https://github.com/William4861/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator
 ```
-4. 安装所需的Python库：（执行该命令前确保cd到requirements.txt文件目录）
+4. 安装所需的Python库： （执行该命令前确保cd到requirements.txt文件目录）
 ```plaintext
   pip install -r requirements.txt
+```  
+```commandline
+  pip install setuptools
+```
+(执行该命令前确保cd到CARLA_0.9.11\WindowsNoEditor\PythonAPI\carla\dist目录)
+```commandline
+  easy_install carla-0.9.11-py3.7-win-amd64.egg
 ```
 
   
 
 ## 使用方法
 
-1. 将 object\_detection.py 文件复制到CARLA的PythonAPI示例目录中： 
+1. 将 object\_detection.py 文件和 generate_traffic.py 文件复制到CARLA的PythonAPI示例目录中： 
 ```plaintext
   cp object\_detection.py \\CARLA\_0.9.11\\WindowsNoEditor\\PythonAPI\\examples
+```
+```plaintext
+  cp generate_traffic.py \\CARLA\_0.9.11\\WindowsNoEditor\\PythonAPI\\examples
 ```
 
 2. 下载yolov3.weights和yolo3.cfg文件至examples目录
@@ -62,6 +72,13 @@
 ```
 
 4. 打开新的终端，导航至PythonAPI示例目录并运行脚本：
+```plaintext
+  cd CARLA\_0.9.11/PythonAPI/examples
+```
+```commandline
+  python generate_traffic.py
+```
+5. 打开新的终端，导航至PythonAPI示例目录并运行脚本：
 ```plaintext
   cd CARLA\_0.9.11/PythonAPI/examples
 ```
