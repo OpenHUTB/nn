@@ -26,5 +26,7 @@ jobs:
           cd src/chap01_warmup && python numpy_tutorial.py && cd ../..
           cd src/chap02_linear_regression && python exercise-linear_regression.py && cd ../..
           cd src/chap02_linear_regression && python linear_regression-tf2.0.py && cd ../..
+          cd src/chap03_softmax_regression  && python logistic_regression-exercise.py  && cd ../..
+          cd src/chap03_softmax_regression  && python softmax_regression-exercise.py   && cd ../..
 
 
