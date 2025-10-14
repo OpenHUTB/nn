@@ -17,7 +17,7 @@ def create_environment():
     """创建带墙壁走廊的人形机器人环境"""
     walker = cmu_humanoid.CMUHumanoidPositionControlled(
         observable_options={'egocentric_camera': dict(enabled=True)})
-    
+
     arena = corr_arenas.WallsCorridor(
         wall_gap=4.,
         wall_width=distributions.Uniform(1, 7),
@@ -39,7 +39,6 @@ def create_environment():
         task=task,
         strip_singleton_obs_buffer_dim=True)
 
-
 def random_policy(timestep):
     """随机动作策略：使用全局环境变量获取动作空间"""
     global global_env
@@ -49,7 +48,6 @@ def random_policy(timestep):
         high=action_spec.maximum,
         size=action_spec.shape
     )
-
 
 def main(unused_argv):
     """主函数：初始化全局环境并启动viewer"""
@@ -65,5 +63,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-
     app.run(main)
