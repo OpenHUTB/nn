@@ -128,3 +128,8 @@
 
   ⦁	感谢YOLOv3开发者研发了高效的目标检测算法 
 
+
+
+  ## 参考文档
+  *[自动驾驶汽车物体检测和轨迹规划使用YOLOv3和CARLA模拟器](https://github.com/ROBERT-ADDO-ASANTE-DARKO/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator)
+
