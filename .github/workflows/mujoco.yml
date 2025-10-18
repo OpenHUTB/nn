@@ -14,5 +14,4 @@ jobs:
       - name: Unity build
         shell: cmd
         run: |
-          cd Unity
-          build.cmd
+          run_mujoco.bat
