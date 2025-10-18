@@ -1,7 +1,7 @@
 name: Ubuntu Run
 
 # Controls when the action will run.
-on: [push, pull_request, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
   build:
@@ -19,6 +19,7 @@ jobs:
         run: |
           wget https://github.com/google-deepmind/mujoco/releases/download/3.3.7/mujoco-3.3.7-linux-x86_64.tar.gz
           tar zxvf mujoco-3.3.7-linux-x86_64.tar.gz
+          # No such file or directory
           ls /usr/lib/x86_64-linux-gnu/libGLEW.so
           # fix: ERROR: could not create window
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
