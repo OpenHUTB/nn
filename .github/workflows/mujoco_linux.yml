@@ -23,5 +23,5 @@ jobs:
           # fix: ERROR: could not create window
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
           # fix: ERROR: could not initialize GLFW
-          export DISPLAY=:0
+          sudo apt-get install libglfw3 libglew2.0 libgl1-mesa-glx libosmesa6
           ./mujoco-3.3.7/bin/simulate
