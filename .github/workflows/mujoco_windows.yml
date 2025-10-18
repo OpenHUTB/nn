@@ -1,7 +1,7 @@
 name: Run Mujoco on Windows 
 
 # Controls when the action will run.
-on: [push, pull_request, workflow_dispatch]
+on: [workflow_dispatch]
 
 jobs:
   build:
