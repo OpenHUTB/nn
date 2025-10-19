@@ -51,6 +51,7 @@ jobs:
           # fix: ERROR: could not create window
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
           # fix: ERROR: could not initialize GLFW
+          sudo apt install libffi-dev
           ls /usr/lib/x86_64-linux-gnu/libGLEW.so
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
           ./mujoco-3.3.7/bin/simulate
