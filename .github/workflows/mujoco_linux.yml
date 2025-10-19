@@ -25,4 +25,10 @@ jobs:
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
           # fix: ERROR: could not initialize GLFW
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
-          ./mujoco-3.3.7/bin/simulate
+          # ./mujoco-3.3.7/bin/simulate
+
+      - name: Install glfw3.4
+        run: |
+          wget https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz
+          tar zxvf 3.4.tar.gz
+          ls
