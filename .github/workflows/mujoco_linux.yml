@@ -38,7 +38,8 @@ jobs:
           tar zxvf 3.4.tar.gz
           ls
           cd glfw-3.4/
-          mkdir build & cd build
+          mkdir build
+          cd build
           cmake ../
           make
           sudo make install
