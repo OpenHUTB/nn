@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 def evaluate_trained_model():
-    """
+   
     加载训练好的图像分类模型并在测试集上进行评估
-    """
-    # ========== 路径配置 ==========
+  
+    #  路径配置 
     base_dir = os.path.abspath("./saved_models")
     test_dir = os.path.join(base_dir, "test_dataset")
     
@@ -18,7 +18,7 @@ def evaluate_trained_model():
     img_height, img_width = 150, 150
     batch_size = 32
     
-    # ========== 数据预处理 ==========
+    #  数据预处理 
     print("正在加载和预处理测试数据...")
     
     # 创建测试数据生成器
@@ -38,7 +38,7 @@ def evaluate_trained_model():
     print(f"找到 {test_generator.samples} 张测试图像")
     print(f"类别: {list(test_generator.class_indices.keys())}")
     
-    # ========== 加载预训练模型 ==========
+    # 加载预训练模型 
     print("\n正在加载预训练模型...")
     model_path = os.path.join(base_dir, "trained_model.h5")
     
@@ -49,14 +49,14 @@ def evaluate_trained_model():
     model = tf.keras.models.load_model(model_path)
     print("模型加载成功!")
     
-    # ========== 模型评估 ==========
+    #  模型评估 
     print("\n正在评估模型性能...")
     test_loss, test_accuracy = model.evaluate(test_generator)
     print(f"测试集损失: {test_loss:.4f}")
     print(f"测试集准确率: {test_accuracy:.4f}")
     print(f"测试集准确率: {test_accuracy*100:.2f}%")
     
-    # ========== 详细预测分析 ==========
+    # 详细预测分析
     print("\n正在进行详细预测分析...")
     
     # 获取预测结果
@@ -67,14 +67,14 @@ def evaluate_trained_model():
     # 获取类别标签
     class_labels = list(test_generator.class_indices.keys())
     
-    # ========== 分类报告 ==========
+    #  分类报告 
     print("\n" + "="*50)
     print("详细分类报告")
     print("="*50)
     print(classification_report(true_classes, predicted_classes, 
                               target_names=class_labels, digits=4))
     
-    # ========== 混淆矩阵 ==========
+    # 混淆矩阵 
     print("\n生成混淆矩阵...")
     cm = confusion_matrix(true_classes, predicted_classes)
     
@@ -92,7 +92,7 @@ def evaluate_trained_model():
     plt.savefig('confusion_matrix.png', dpi=300, bbox_inches='tight')
     plt.show()
     
-    # ========== 额外统计分析 ==========
+    #  额外统计分析 
     print("\n" + "="*50)
     print("额外统计信息")
     print("="*50)
@@ -113,7 +113,7 @@ def evaluate_trained_model():
     print(f"\n最难分类的类别: {hardest_class} (准确率: {class_accuracy[hardest_class]:.4f})")
     print(f"最易分类的类别: {easiest_class} (准确率: {class_accuracy[easiest_class]:.4f})")
     
-    # ========== 预测置信度分析 ==========
+    #  预测置信度分析 
     print("\n预测置信度分析:")
     confidence_scores = np.max(predictions, axis=1)
     print(f"平均预测置信度: {np.mean(confidence_scores):.4f}")
@@ -144,4 +144,5 @@ def main():
         print("3. 图像尺寸是否与训练时一致")
 
 if __name__ == "__main__":
+
     main()
