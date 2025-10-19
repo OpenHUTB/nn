@@ -36,6 +36,7 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y libglew-dev
           # 配置环境变量
+          ls /usr/lib/x86_64-linux-gnu/libGLEW.so
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
 
 
@@ -51,7 +52,7 @@ jobs:
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
           # fix: ERROR: could not initialize GLFW
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
-          # ./mujoco-3.3.7/bin/simulate
+          ./mujoco-3.3.7/bin/simulate
 
 
           
