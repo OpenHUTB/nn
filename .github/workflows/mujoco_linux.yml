@@ -13,19 +13,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # fix: cannot find -lunwind: No such file or directory
-      # https://blog.csdn.net/weixin_52000358/article/details/146281075
-      - name: Setup
-        run: |
-          wget https://github.com/google-deepmind/mujoco/releases/download/3.3.7/mujoco-3.3.7-linux-x86_64.tar.gz
-          tar zxvf mujoco-3.3.7-linux-x86_64.tar.gz
-          # No such file or directory
-          # ls /usr/lib/x86_64-linux-gnu/libGLEW.so
-          # fix: ERROR: could not create window
-          export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
-          # fix: ERROR: could not initialize GLFW
-          export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
-          # ./mujoco-3.3.7/bin/simulate
 
       - name: Install glfw3.4
         run: |
@@ -35,6 +22,7 @@ jobs:
           sudo apt-get install libxi-dev
           sudo apt install doxygen
           sudo apt install libwayland-dev
+          sudo apt install libxkbcommon-x11-dev
           wget https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz
           tar zxvf 3.4.tar.gz
           ls
@@ -49,4 +37,21 @@ jobs:
           sudo apt-get install -y libglew-dev
           # 配置环境变量
           export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
+
+
+      # fix: cannot find -lunwind: No such file or directory
+      # https://blog.csdn.net/weixin_52000358/article/details/146281075
+      - name: Setup
+        run: |
+          wget https://github.com/google-deepmind/mujoco/releases/download/3.3.7/mujoco-3.3.7-linux-x86_64.tar.gz
+          tar zxvf mujoco-3.3.7-linux-x86_64.tar.gz
+          # No such file or directory
+          # ls /usr/lib/x86_64-linux-gnu/libGLEW.so
+          # fix: ERROR: could not create window
+          export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libstdc++.so.6
+          # fix: ERROR: could not initialize GLFW
+          export LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
+          # ./mujoco-3.3.7/bin/simulate
+
+
           
