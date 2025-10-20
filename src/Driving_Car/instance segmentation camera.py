@@ -288,7 +288,7 @@ class SelfDrivingCarSimulator:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     self.running = False
-                elif event.key == pygame.K_c:  # 添加车辆
+                elif event.key == pygame.K_c:  #   添加车辆
                     x = random.randint(50, self.camera_width - 100)
                     y = random.randint(50, self.camera_height - 100)
                     self.camera.add_object(Car(x, y))
