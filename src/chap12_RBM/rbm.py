@@ -118,7 +118,7 @@ class RBM:
         n_samples = data_flat.shape[0]  # 样本数量
 
         # 定义训练参数
-        learning_rate = 0.1  # 学习率，控制参数更新的步长
+        learning_rate = 0.01  # 学习率，控制参数更新的步长
         
         epochs = 10  # 训练轮数，整个数据集将被遍历10次
         
