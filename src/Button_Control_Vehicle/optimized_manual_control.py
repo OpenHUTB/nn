@@ -392,6 +392,8 @@ class KeyboardControl(object):
             raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
+        # 新增：启动时显示基础控制提示（持续5秒）
+        world.hud.notification("W=加速 | S=刹车 | A/D=转向 | P=切换自动驾驶", seconds=5.0)
 
     def parse_events(self, client, world, clock, sync_mode):
         if isinstance(self._control, carla.VehicleControl):
@@ -1069,12 +1071,19 @@ class RadarSensor(object):
             r = int(clamp(0.0, 1.0, 1.0 - norm_velocity) * 255.0)
             g = int(clamp(0.0, 1.0, 1.0 - abs(norm_velocity)) * 255.0)
             b = int(abs(clamp(- 1.0, 0.0, - 1.0 - norm_velocity)) * 255.0)
+            # self.debug.draw_point(
+            #     radar_data.transform.location + fw_vec,
+            #     size=0.075,
+            #     life_time=0.06,
+            #     persistent_lines=False,
+            #     color=carla.Color(r, g, b))
+         # 修改后（放大尺寸+延长显示时间）：
             self.debug.draw_point(
-                radar_data.transform.location + fw_vec,
-                size=0.075,
-                life_time=0.06,
-                persistent_lines=False,
-                color=carla.Color(r, g, b))
+            radar_data.transform.location + fw_vec,
+            size=0.12,  # 从0.075放大到0.12，更易看清
+            life_time=0.1,  # 从0.06延长到0.1，避免快速消失
+            persistent_lines=False,
+            color=carla.Color(r, g, b))
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
