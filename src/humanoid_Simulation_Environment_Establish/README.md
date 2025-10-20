@@ -1,106 +1,102 @@
+# 人形机器人仿真环境（基于MuJoCo与dm_control）
 
-  # 人形机器人走廊奔跑仿真（基于dm_control）
+## 项目概述
+本项目构建了一系列人形机器人仿真环境，基于MuJoCo物理引擎和dm_control框架，支持机器人运动控制、走廊导航、目标追踪等多种任务。通过模块化设计，实现了机器人模型加载、环境配置、控制策略与可视化展示的完整流程，适用于机器人控制算法研究与验证。
 
-  ## 项目概述
-  本项目核心为基于**dm_control框架**构建的人形机器人走廊奔跑仿真环境。dm_control是DeepMind基于MuJoCo物理引擎开发的高级仿真工具，简化了强化学习环境的搭建、任务定义与可视化流程。本项目中，CMU人形机器人需在带随机墙壁的走廊中以目标速度奔跑，展示了dm_control在复杂运动任务仿真中的应用。
+## 环境准备
 
-  ## 环境准备
-  ### 依赖库
-  需安装以下核心依赖（含dm_control及其底层依赖）：
-  ```bash
-  pip install mujoco dm-control absl-py
-  ```
-  - `dm_control`：提供环境构建、任务定义和交互可视化功能
-  - `mujoco`：dm_control依赖的物理引擎核心
-  - `absl-py`：用于命令行参数处理
+### 依赖库安装
+```bash
+pip install mujoco dm-control absl-py numpy
+```
+- `mujoco`：物理引擎核心，负责动力学计算
+- `dm-control`：DeepMind开发的高级仿真框架，简化环境与任务构建
+- `absl-py`：命令行参数处理工具
+- `numpy`：数值计算支持
 
-  ## 项目结构
-  | 文件名             | 功能描述                                                     |
-  | ------------------ | ------------------------------------------------------------ |
-  | `run_walls.py`     | **核心文件**：基于dm_control构建带墙壁的走廊环境，实现CMU人形机器人奔跑任务 |
-  | `humanoid.xml`     | MJCF格式模型文件，定义机器人结构（辅助文件）                 |
-  | `main_humanoid.py` | 软体机器人弹跳仿真程序                                       |
+## 项目结构
 
-  ## 核心功能：走廊奔跑环境（run_walls.py）
-  ### 1. dm_control框架组件应用
-  ```python
-  # dm_control核心模块使用
-  from dm_control import composer  # 环境组合框架
-  from dm_control.locomotion.arenas import corridors  # 走廊场景
-  from dm_control.locomotion.tasks import corridors  # 走廊任务
-  from dm_control.locomotion.walkers import cmu_humanoid  # 机器人模型
-  from dm_control import viewer  # 可视化工具
-  ```
+| 文件名             | 功能描述                                                     |
+|-------------------|--------------------------------------------------------------|
+| `main.py`         | 核心控制程序，实现工作目录自动切换、模型加载与基础运动控制       |
+| `main_humanoid.py`| 软体机器人弹跳仿真程序，基于比例控制实现从蹲姿到站姿的运动       |
+| `run_walls.py`    | 带随机墙壁的走廊奔跑环境，使用dm_control构建强化学习任务         |
+| `motion_main.py`  | 扩展运动环境，支持墙壁走廊和间隙走廊两种场景切换                 |
+| `go_to_target.py` | 目标点追踪任务环境，实现机器人向指定目标位置移动的仿真           |
+| `humanoid.xml`    | MJCF格式机器人模型文件，定义人形机器人的结构、关节与执行器       |
+| `README.md`       | 项目说明文档                                                   |
 
-  ### 2. 环境构建流程
-  #### （1）机器人配置
-  创建位置控制的CMU人形机器人，启用第一视角相机观测：
-  ```python
-  walker = cmu_humanoid.CMUHumanoidPositionControlled(
-      observable_options={'egocentric_camera': dict(enabled=True)}
-  )
-  ```
+## 核心功能
 
-  #### （2）走廊场景设计
-  通过`WallsCorridor`类构建带随机墙壁的动态环境：
-  ```python
-  arena = corr_arenas.WallsCorridor(
-      wall_gap=4.,  # 墙壁间隙宽度（机器人需穿过的空间）
-      wall_width=distributions.Uniform(1, 7),  # 墙壁宽度随机化（1-7单位）
-      wall_height=3.0,  # 防止翻越的墙壁高度
-      corridor_width=10,  # 走廊总宽度
-      corridor_length=100,  # 走廊总长度
-      include_initial_padding=False  # 无初始空白区域
-  )
-  ```
+### 1. 基础运动控制（main.py & main_humanoid.py）
+- 自动路径处理：程序启动时自动切换到项目根目录，确保相对路径正确
+- 模型加载验证：检查并加载人形机器人模型，提供清晰的加载状态反馈
+- 关键帧控制：基于预定义的"深蹲"和"站立"关键帧，通过比例控制实现平滑运动过渡
+- 实时可视化：使用MuJoCo viewer展示机器人运动状态，输出时间与躯干高度等关键信息
 
-  #### （3）任务定义
-  通过`RunThroughCorridor`类定义奔跑任务规则：
-  ```python
-  task = corr_tasks.RunThroughCorridor(
-      walker=walker,
-      arena=arena,
-      walker_spawn_position=(0.5, 0, 0),  # 初始位置
-      target_velocity=3.0,  # 目标速度（影响奖励计算）
-      physics_timestep=0.005,  # 物理仿真步长
-      control_timestep=0.03  # 控制决策步长（≈33Hz）
-  )
-  ```
+```python
+# 核心控制逻辑示例
+qpos_error = target_qpos[7:] - data.qpos[7:]  # 计算关节位置误差
+data.ctrl[:] = Kp * qpos_error  # 比例控制输出
+```
 
-  #### （4）环境封装
-  组合场景与任务，生成强化学习可用环境：
-  ```python
-  environment = composer.Environment(
-      time_limit=30,  # 单次仿真时长30秒
-      task=task,
-      strip_singleton_obs_buffer_dim=True  # 简化观测数据结构
-  )
-  ```
+### 2. 走廊奔跑环境（run_walls.py & motion_main.py）
+- 动态场景生成：支持两种走廊类型（带墙壁/带间隙），墙壁宽度和间隙长度可随机化
+- 任务定义：设定目标速度（3.0单位/秒），通过奖励函数引导机器人高效移动
+- 多视角观测：支持第一视角相机和全局视角，便于观察与调试
+- 参数可配置：走廊长度、宽度、墙壁高度等参数可灵活调整
 
-  ## 使用方法
-  1. 运行走廊奔跑仿真：
-     ```bash
-     python run_walls.py
-     ```
-  2. 交互操作：
-     - 可视化窗口展示机器人第一视角和全局视角
-     - 按`Ctrl+C`终止仿真
+```python
+# 走廊环境配置示例
+arena = corr_arenas.WallsCorridor(
+    wall_gap=4.,  # 墙壁间隙宽度
+    wall_width=distributions.Uniform(1, 7),  # 随机墙壁宽度
+    wall_height=3.0,  # 墙壁高度
+    corridor_length=100  # 走廊总长度
+)
+```
 
-  ## dm_control核心特性体现
-  1. **模块化设计**：通过`composer`模块分离机器人（walker）、场景（arena）和任务（task），便于独立修改
-  2. **随机性支持**：使用`distributions`生成随机墙壁宽度，增强环境多样性
-  3. **灵活观测配置**：通过`observable_options`轻松启用第一视角相机等观测项
-  4. **高效可视化**：`viewer`模块提供实时交互界面，支持视角切换与状态查看
+### 3. 目标追踪任务（go_to_target.py）
+- 目标点导航：在平面环境中随机生成目标点，机器人需移动至目标位置
+- 灵活的时间限制：单次仿真时长可配置（默认30秒）
+- 兼容强化学习：环境接口符合强化学习标准，可直接用于训练策略
 
-  ## 参数调整指南
-  | 参数               | 调整范围 | 效果说明                         |
-  | ------------------ | -------- | -------------------------------- |
-  | `wall_gap`         | 2.0~6.0  | 减小值增加穿过难度               |
-  | `target_velocity`  | 1.0~5.0  | 提高值要求机器人跑得更快         |
-  | `control_timestep` | 0.01~0.1 | 减小值提高控制精度（增加计算量） |
+## 使用方法
 
-  ## 参考资料
-  - [dm_control官方文档](https://github.com/deepmind/dm_control)
-  - [MuJoCo物理引擎文档](https://mujoco.readthedocs.io/)
-  - [CMU人形机器人模型说明](https://github.com/deepmind/dm_control/tree/main/dm_control/locomotion/walkers)
+1. 基础运动控制仿真：
+```bash
+python main.py
+```
 
+2. 走廊奔跑仿真（带墙壁）：
+```bash
+python run_walls.py
+```
+
+3. 间隙走廊仿真：
+```bash
+python motion_main.py
+```
+
+4. 目标追踪仿真：
+```bash
+python go_to_target.py
+```
+
+### 交互操作
+- 仿真窗口支持视角旋转、缩放和平移
+- 按`Ctrl+C`终止仿真程序
+
+## 参数调整指南
+
+| 参数               | 调整范围 | 效果说明                         |
+|-------------------|----------|----------------------------------|
+| `Kp`（比例增益）   | 1.0~10.0 | 增大会加快响应速度，过大会导致震荡 |
+| `wall_gap`        | 2.0~6.0  | 减小值增加走廊穿过难度           |
+| `target_velocity` | 1.0~5.0  | 提高值要求机器人运动速度更快     |
+| `control_timestep`| 0.01~0.1 | 减小值提高控制精度（增加计算量） |
+
+## 参考资料
+- [MuJoCo官方文档](https://mujoco.readthedocs.io/)
+- [dm_control框架文档](https://github.com/deepmind/dm_control)
+- [CMU人形机器人模型说明](https://github.com/deepmind/dm_control/tree/main/dm_control/locomotion/walkers)
