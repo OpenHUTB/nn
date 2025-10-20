@@ -15,7 +15,7 @@ from dm_control import composer
 
 # 全局环境变量，供策略函数访问
 global_env = None
-
+    
 def create_environment():
     """建立一个任务，奖励代理去一个目标"""
     walker = cmu_humanoid.CMUHumanoidPositionControlled()
