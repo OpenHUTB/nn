@@ -34,30 +34,59 @@ def generate_random_name(length: int = 8) -> str:
 
 
 def get_checkpoint_path(checkpoint_dir: str, args_checkpoint: Optional[str], resume: bool) -> Optional[str]:
-    """获取 checkpoint 路径（处理 --checkpoint 和 --resume 参数）"""
+    """
+    获取 checkpoint 路径（处理 --checkpoint 和 --resume 参数）
+
+    Args:
+        checkpoint_dir: checkpoint 存储目录
+        args_checkpoint: 命令行指定的 checkpoint 文件名
+        resume: 是否自动恢复最新 checkpoint
+
+    Returns:
+        有效的 checkpoint 路径或 None
+
+    Raises:
+        FileNotFoundError: 当目录不存在或 checkpoint 不存在时
+        ValueError: 当参数组合无效时
+    """
+    # 检查参数合法性
+    if args_checkpoint and resume:
+        raise ValueError("同时指定 --checkpoint 和 --resume 参数，参数冲突")
+
     if not (args_checkpoint or resume):
         return None
 
+    # 验证目录存在性
     if not os.path.isdir(checkpoint_dir):
         raise FileNotFoundError(f"Checkpoint 目录不存在: {checkpoint_dir}")
 
+    # 获取所有有效的 checkpoint 文件
     existing_checkpoints = [
         os.path.join(checkpoint_dir, f)
         for f in os.listdir(checkpoint_dir)
         if os.path.isfile(os.path.join(checkpoint_dir, f)) and f.endswith('.zip')
     ]
 
+    # 检查是否有可用 checkpoint
     if not existing_checkpoints:
-        raise FileNotFoundError(f"Checkpoint 目录为空: {checkpoint_dir}")
+        raise FileNotFoundError(f"Checkpoint 目录为空（未找到 .zip 文件）: {checkpoint_dir}")
 
+    # 处理指定 checkpoint 的情况
     if args_checkpoint:
         checkpoint_path = os.path.join(checkpoint_dir, args_checkpoint)
+        # 检查文件是否存在且是 zip 文件
         if not os.path.isfile(checkpoint_path):
-            raise FileNotFoundError(f"指定的 checkpoint 不存在: {checkpoint_path}")
+            raise FileNotFoundError(f"指定的 checkpoint 文件不存在: {checkpoint_path}")
+        if not checkpoint_path.endswith('.zip'):
+            raise ValueError(f"指定的 checkpoint 不是 zip 文件: {checkpoint_path}")
         return checkpoint_path
     else:
         # 按创建时间排序，取最新的 checkpoint
-        return sorted(existing_checkpoints, key=os.path.getctime)[-1]
+        # 增加排序稳定性（如果创建时间相同则按文件名排序）
+        return sorted(
+            existing_checkpoints,
+            key=lambda x: (os.path.getctime(x), x)
+        )[-1]
 
 
 def backup_checkpoints(checkpoint_dir: str) -> None:
