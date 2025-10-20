@@ -1,16 +1,17 @@
-  <!-- 给当前模型定义名称：Robot_move_straight,方便后续代码调用时区分模型-->
-<mujoco model="Robot_move_straight">
+<!-- 给当前模型定义名称：Robot_with_Legs,方便后续代码调用时区分模型-->
+<mujoco model="Robot_with_Legs">
   <!-- 1. 仿真环境全局参数设置 :步长：0.01秒;gravity为沿Z轴负方向的重力加速度 -->
   <option timestep="0.01" gravity="0 0 -9.81"/>
 
   <default>
-     <!-- 定义几何形状模版名为box_geom的立方体(box),size表示box在X,Y,Z轴的半边长均为0.1 -->
+     <!-- 定义几何形状模版名为box_geom的立方体(box),size表示box在X,Y,Z轴的半边长 -->
     <geom type="box" size="0.1 0.1 0.1"/>
   </default>
   <!-- 2. <asset>来资源定义 (可复用的模板) -->
   <asset>
-    <!-- 定义材质模版名为：red,rgba表示颜色和透明度：“1 0 0”表示纯红,后面的1表示完全不透明-->
+    <!-- 定义材质模版名为：red（红色）、blue（蓝色）,rgba表示颜色和透明度 -->
     <material name="red" rgba="1 0 0 1"/>
+    <material name="blue" rgba="0 0 1 1"/>
   </asset>
 
   <!-- 3. 世界实体 (所有物体在这里) -->
@@ -18,23 +19,79 @@
     <!-- 定义地面 -->
     <body name="ground">
       <!-- 地面形状为plane:无线延伸的平面，通过size限制可视范围 -->
-      <geom type="plane" size="5 5 0.1"/>
+      <geom type="plane" size="10 10 0.1"/>
     </body>
     <!-- 机器人主体 -->
-      <!--名为robot_base的机器人基座的坐标为(0 0 0.2),Z轴为0.2避免与地面直接接触-->
-    <body name="robot_base" pos="0 0 0.2">
-      <!-- 关节定义，允许机器人在X轴方向移动,移动范围在-20到20之间 -->
-       <joint name="base_joint" type="slide" axis="1 0 0" range="-20 20"/>
-       <!--定义物理惯性,质量为1.0单位,物体绕三维坐标旋转的阻力(0.1 0.1 0.1 )值越大，物体越难改变旋转状态 -->
-      <inertial pos="0 0 0" mass="1.0" diaginertia="1 1 1"/>
-       <!--引用了<asset>的材质模版和default中定义的geom -->
-      <geom material="red"/>
+    <body name="robot_torso" pos="0 0 0.5">
+      <!-- 修复1：球关节range起始值改为0（原-0.5 0.5 → 0 1.0，转动范围不变） -->
+      <joint name="torso_joint" type="ball" limited="true" pos="0 0 0" axis="1 0 0" range="0 1.0"/>
+      <!-- 躯干的惯性和几何形状 -->
+      <inertial pos="0 0 0" mass="2.0" diaginertia="1 1 1"/>
+      <geom size="0.2 0.2 0.1" material="red"/>
+
+      <!-- 左大腿 -->
+      <body name="left_thigh" pos="0.2 0 0">
+        <!-- 修复2：左髋关节range起始值改为0 -->
+        <joint name="left_hip" type="ball" limited="true" pos="0 0 0" axis="0 1 0" range="0 1.0"/>
+        <inertial pos="0 0 0" mass="1.0" diaginertia="0.5 0.5 0.5"/>
+        <geom size="0.1 0.1 0.3" material="blue"/>
+
+        <!-- 左小腿 -->
+        <body name="left_calf" pos="0 0 -0.3">
+          <!-- 修复3：左膝关节range起始值改为0 -->
+          <joint name="left_knee" type="ball" limited="true" pos="0 0 0" axis="0 1 0" range="0 1.0"/>
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.3 0.3 0.3"/>
+          <geom size="0.1 0.1 0.2" material="blue"/>
+
+          <!-- 左脚 -->
+          <body name="left_foot" pos="0 0 -0.2">
+            <!-- 修复4：左踝关节range起始值改为0 -->
+            <joint name="left_ankle" type="ball" limited="true" pos="0 0 0" axis="0 1 0" range="0 1.0"/>
+            <inertial pos="0 0 0" mass="0.3" diaginertia="0.2 0.2 0.2"/>
+            <geom size="0.15 0.1 0.05" material="blue"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- 右大腿 -->
+      <body name="right_thigh" pos="-0.2 0 0">
+        <!-- 修复5：右髋关节range起始值改为0 -->
+        <joint name="right_hip" type="ball" limited="true" pos="0 0 0" axis="0 1 0" range="0 1.0"/>
+        <inertial pos="0 0 0" mass="1.0" diaginertia="0.5 0.5 0.5"/>
+        <geom size="0.1 0.1 0.3" material="blue"/>
+
+        <!-- 右小腿 -->
+        <body name="right_calf" pos="0 0 -0.3">
+          <!-- 修复6：右膝关节range起始值改为0 -->
+          <joint name="right_knee" type="ball" limited="true" pos="0 0 0" axis="0 1 0" range="0 1.0"/>
+          <inertial pos="0 0 0" mass="0.5" diaginertia="0.3 0.3 0.3"/>
+          <geom size="0.1 0.1 0.2" material="blue"/>
+
+          <!-- 右脚 -->
+          <body name="right_foot" pos="0 0 -0.2">
+            <!-- 修复7：右踝关节range起始值改为0 -->
+            <joint name="right_ankle" type="ball" limited="true" pos="0 0 0" axis="0 1 0" range="0 1.0"/>
+            <inertial pos="0 0 0" mass="0.3" diaginertia="0.2 0.2 0.2"/>
+            <geom size="0.15 0.1 0.05" material="blue"/>
+          </body>
+        </body>
+      </body>
     </body>
   </worldbody>
 
   <!-- 4. 执行器 (电机等) -->
   <actuator>
-      <!-- joint用来指定电机驱动的关节;gear为电机传动比,值越大,力矩越大-->
-    <motor name="joint_motor" joint="base_joint" gear="5"/>
+      <!-- 驱动左髋关节的电机 -->
+    <motor name="left_hip_motor" joint="left_hip" gear="5"/>
+      <!-- 驱动左膝关节的电机 -->
+    <motor name="left_knee_motor" joint="left_knee" gear="5"/>
+      <!-- 驱动左踝关节的电机 -->
+    <motor name="left_ankle_motor" joint="left_ankle" gear="5"/>
+      <!-- 驱动右髋关节的电机 -->
+    <motor name="right_hip_motor" joint="right_hip" gear="5"/>
+      <!-- 驱动右膝关节的电机 -->
+    <motor name="right_knee_motor" joint="right_knee" gear="5"/>
+      <!-- 驱动右踝关节的电机 -->
+    <motor name="right_ankle_motor" joint="right_ankle" gear="5"/>
   </actuator>
 </mujoco>
