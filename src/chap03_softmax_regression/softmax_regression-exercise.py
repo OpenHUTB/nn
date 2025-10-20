@@ -14,14 +14,13 @@
 import tensorflow as tf # TensorFlow深度学习框架
 import matplotlib.pyplot as plt # 数据可视化库
 from matplotlib import animation, rc # 动画功能
-from IPython.display import HTML # 在Jupyter中显示动画
 import matplotlib.cm as cm # 颜色映射
 import numpy as np # 数值计算库
 
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
 # 设置数据点数量
-DOT_NUM = 100  # 每类样本的数量
+dot_num = 100  # 每类样本的数量
 
 # 生成类别1的数据：均值为(3,6)，标准差为1
 x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
@@ -59,7 +58,7 @@ np.random.shuffle(data_set)  # 随机打乱数据集顺序
 
 # In[1]:
 
-EPSILON = 1e-12  # 防止 log(0)，处理数值稳定性问题
+epsilon = 1e-12  # 防止 log(0)，处理数值稳定性问题
 
 class SoftmaxRegression(tf.Module):
     def __init__(self, input_dim = 2, num_classes = 3):
