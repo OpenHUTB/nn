@@ -229,18 +229,24 @@ class GaussianMixtureModel:
         # 基于软聚类结果确定最终的硬聚类标签
         return self
 
-    def _log_gaussian(self, X, mu, sigma):
+    def _log_gaussian(self, X: np.ndarray, mu: np.ndarray, sigma: np.ndarray) -> np.ndarray:
         """计算多维高斯分布的对数概率密度
-        
+
         参数:
-            X: 输入数据点/样本集，形状为(n_samples, n_features)
-            mu: 高斯分布的均值向量，形状为(n_features,)
-            sigma: 高斯分布的协方差矩阵，形状为(n_features, n_features)
-            
+            X: 输入数据矩阵，形状为(n_samples, n_features)，每行是一个样本
+            mu: 均值向量，形状为(n_features,)，表示高斯分布的中心
+            sigma: 协方差矩阵，形状为(n_features, n_features)，描述数据的分布形状
+
         返回:
-            log_prob: 每个样本的对数概率密度，形状为(n_samples,)
+            log_prob: 对数概率密度向量，形状为(n_samples,)，每个元素是对应样本的对数概率
+
+        数学原理:
+            多元高斯分布的概率密度函数为：
+                p(x) = (2π)^{-d/2} |Σ|^{-1/2} exp(-0.5*(x-μ)^T Σ^{-1} (x-μ))
+            取对数后得到：
+                log p(x) = -0.5*d*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T Σ^{-1} (x-μ)
+            其中d为特征维度，|Σ|为协方差矩阵的行列式。
         """
-        # 获取特征维度数（协方差矩阵的维度）
         n_features = mu.shape[0]
 
         # 数据归一化：将数据减去均值，得到中心化数据
