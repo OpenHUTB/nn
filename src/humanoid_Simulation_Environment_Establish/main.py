@@ -49,6 +49,3 @@ def main():
             rospy.loginfo("用户中断，停止仿真")
         finally:
             rospy.loginfo("核心控制节点关闭")
-
-if __name__ == "__main__":
-    main()
