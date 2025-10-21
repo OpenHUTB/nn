@@ -11,7 +11,7 @@ from Hyperparameters import*
 
 
 
-MODEL_PATH = 'models\YY____86.00max____0.00avg___19.00min__1760930742.model'
+MODEL_PATH = 'models\YY___153.00max____0.00avg__153.00min__1761010159.model'
 
 if __name__ == '__main__':
 
