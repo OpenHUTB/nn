@@ -1,0 +1,25 @@
+# CARLA Simulator requirements
+#carla==0.9.11
+
+# Deep learning and computer vision
+tensorflow==2.4.1
+opencv-python==4.5.3.56
+numpy==1.19.5
+Pillow==8.3.1
+
+# YOLOv3 specific requirements
+#darknet53==1.0.0
+
+# Trajectory planning
+scipy==1.7.1
+matplotlib==3.4.3
+
+# Utilities
+tqdm==4.62.2
+
+# Visualization and monitoring
+tensorboard==2.6.0
+
+# Optional: GPU support for TensorFlow
+# Uncomment the following line if you have a CUDA-capable GPU
+# tensorflow-gpu==2.4.1 

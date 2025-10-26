@@ -1,0 +1,40 @@
+  <!-- 给当前模型定义名称：Robot_move_straight,方便后续代码调用时区分模型-->
+<mujoco model="Robot_move_straight">
+  <!-- 1. 仿真环境全局参数设置 :步长：0.01秒;gravity为沿Z轴负方向的重力加速度 -->
+  <option timestep="0.01" gravity="0 0 -9.81"/>
+
+  <default>
+     <!-- 定义几何形状模版名为box_geom的立方体(box),size表示box在X,Y,Z轴的半边长均为0.1 -->
+    <geom type="box" size="0.1 0.1 0.1"/>
+  </default>
+  <!-- 2. <asset>来资源定义 (可复用的模板) -->
+  <asset>
+    <!-- 定义材质模版名为：red,rgba表示颜色和透明度：“1 0 0”表示纯红,后面的1表示完全不透明-->
+    <material name="red" rgba="1 0 0 1"/>
+  </asset>
+
+  <!-- 3. 世界实体 (所有物体在这里) -->
+  <worldbody>
+    <!-- 定义地面 -->
+    <body name="ground">
+      <!-- 地面形状为plane:无线延伸的平面，通过size限制可视范围 -->
+      <geom type="plane" size="5 5 0.1"/>
+    </body>
+    <!-- 机器人主体 -->
+      <!--名为robot_base的机器人基座的坐标为(0 0 0.2),Z轴为0.2避免与地面直接接触-->
+    <body name="robot_base" pos="0 0 0.2">
+      <!-- 新增关节定义，允许机器人在X轴方向移动 -->
+       <joint name="base_joint" type="slide" axis="1 0 0" range="-10 10"/>
+       <!--定义物理惯性,质量为1.0单位,物体绕三维坐标旋转的阻力(0.1 0.1 0.1 )值越大，物体越难改变旋转状态 -->
+      <inertial pos="0 0 0" mass="1.0" diaginertia="0.1 0.1 0.1"/>
+       <!--引用了<asset>的材质模版和default中定义的geom -->
+      <geom material="red"/>
+    </body>
+  </worldbody>
+
+  <!-- 4. 执行器 (电机等) -->
+  <actuator>
+      <!-- joint用来指定电机驱动的关节;gear为电机传动比,值越大,力矩越大-->
+    <motor name="joint_motor" joint="base_joint" gear="100"/>
+  </actuator>
+</mujoco>
