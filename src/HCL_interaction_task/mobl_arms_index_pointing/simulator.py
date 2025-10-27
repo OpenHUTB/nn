@@ -2,6 +2,7 @@ import mujoco
 import yaml
 import numpy as np
 import cv2
+import time
 
 class Simulator:
     def __init__(self, config_path, model_path):
@@ -15,6 +16,12 @@ class Simulator:
         self.viewer = self._init_viewer()
         # 4. 初始化MediaPipe手势追踪
         self.init_mediapipe()
+        self.start_time = time.time()  # 记录开始时间
+        self.target_joint_ids = [
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "target_x"),
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "target_y"),
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "target_z")
+        ]
 
     def _init_viewer(self):
         """初始化viewer，适配不同版本的mujoco"""
@@ -62,12 +69,37 @@ class Simulator:
             return joint_angles
         return np.zeros(5)
 
+    def update_target_position(self):
+        """根据配置更新小球位置"""
+        if "target_movement" not in self.config:
+            return
+            
+        t = time.time() - self.start_time
+        movement = self.config["target_movement"]
+        freq = movement["frequency"]
+        amp = movement["amplitude"]
+        
+        # 正弦曲线运动（可根据需要修改运动轨迹）
+        if movement["mode"] == "sinusoidal":
+            x = self.config["target_pos"][0] + amp * np.sin(2 * np.pi * freq * t)
+            y = self.config["target_pos"][1] + amp * np.cos(2 * np.pi * freq * t) * 0.5
+            z = self.config["target_pos"][2]
+        else:
+            x, y, z = self.config["target_pos"]
+            
+        # 设置小球关节位置
+        self.data.qpos[self.target_joint_ids[0]] = x
+        self.data.qpos[self.target_joint_ids[1]] = y
+        self.data.qpos[self.target_joint_ids[2]] = z
+
     def step(self):
         """推进仿真：手势映射→驱动手指→渲染"""
         # 1. 获取手势映射的关节角度
         joint_angles = self.map_gesture_to_finger()
         # 2. 应用关节角度到虚拟手指
         self.data.qpos[:len(joint_angles)] = joint_angles
+        
+        self.update_target_position()
         # 3. 推进仿真
         mujoco.mj_step(self.model, self.data)
         # 4. 渲染界面
