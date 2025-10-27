@@ -1,6 +1,5 @@
 import numpy as np
 import os
-import matplotlib.pyplot as plt
 
 
 def load_data(fname):
@@ -24,42 +23,17 @@ def eval_acc(label, pred):
     return np.sum(label == pred) / len(pred)
 
 
-def plot_data(data, title):
-    """绘制数据分布"""
-    plt.figure(figsize=(10, 8))
-
-    # 分离不同类别的数据
-    class_1 = data[data[:, 2] == 1]
-    class_neg1 = data[data[:, 2] == -1]
-    class_0 = data[data[:, 2] == 0]
-
-    if len(class_1) > 0:
-        plt.scatter(class_1[:, 0], class_1[:, 1], c='red', label='Class 1', alpha=0.6)
-    if len(class_neg1) > 0:
-        plt.scatter(class_neg1[:, 0], class_neg1[:, 1], c='blue', label='Class -1', alpha=0.6)
-    if len(class_0) > 0:
-        plt.scatter(class_0[:, 0], class_0[:, 1], c='green', label='Class 0', alpha=0.6)
-
-    plt.xlabel('x1')
-    plt.ylabel('x2')
-    plt.title(title)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
-
-
 class KernelSVM:
     """核函数SVM（支持线性、多项式、高斯核）"""
 
-    def __init__(self, kernel='linear', degree=3, gamma=0.1, C=1.0, max_iter=1000, learning_rate=0.001):
+    def __init__(self, kernel='linear', degree=3, gamma=0.1, C=1.0, max_iter=1000):
         self.kernel = kernel
         self.degree = degree
         self.gamma = gamma
         self.C = C
         self.max_iter = max_iter
-        self.learning_rate = learning_rate
         self.alpha = None
-        self.b = 0
+        self.b = None
         self.X_train = None
         self.y_train = None
         self.support_vectors = None
@@ -80,106 +54,114 @@ class KernelSVM:
         """训练核函数SVM"""
         X = data_train[:, :2]
         y = data_train[:, 2]
-
-        # 检查标签范围并转换
-        unique_labels = np.unique(y)
-        print(f"数据标签: {unique_labels}")
-
-        if len(unique_labels) == 1:
-            print("警告: 数据集中只有一个类别!")
-            # 如果是单类别，创建一个虚拟的负类
-            y = np.ones(len(y))
-        elif set(unique_labels) == {0, 1}:
-            y = np.where(y == 0, -1, 1)  # 转换为{-1, 1}
-        elif set(unique_labels) == {-1, 1}:
-            # 已经是正确的格式
-            pass
-        else:
-            raise ValueError(f"不支持的标签格式: {unique_labels}")
-
-<<<<<<< HEAD
+        y = np.where(y == 0, -1, 1)  # 转换为{-1, 1}
         m, n = X.shape
+
         self.X_train = X
         self.y_train = y
-=======
-            # 计算梯度：正则化项梯度 + 误分类样本梯度
-            # L2正则化：减小权重，防止过拟合
-            # hinge loss梯度：只对误分类和边界样本计算梯度
-            dw = (2 * self.reg_lambda * self.w) - (np.sum(y[idx, None] * X[idx], axis=0) / len(y)) if len(
-                idx) > 0 else 2 * self.reg_lambda * self.w
-            db = -np.mean(y[idx]) if len(idx) > 0 else 0
->>>>>>> 920dda3310c60ef314b23bc2867a2ca2acc75fc3
 
         # 初始化参数
-        self.alpha = np.random.randn(m) * 0.01
+        self.alpha = np.zeros(m)
         self.b = 0
 
-        # 梯度下降优化
-        for iteration in range(self.max_iter):
-            total_loss = 0
-
+        # 简化的SMO算法
+        for _ in range(self.max_iter):
             for i in range(m):
-                # 计算当前样本的预测
-                prediction = 0
-                for j in range(m):
-                    prediction += self.alpha[j] * self.y_train[j] * self.kernel_function(X[j], X[i])
-                prediction += self.b
+                # 计算预测误差
+                Ei = self.decision_function(X[i]) - y[i]
 
-                # hinge loss
-                loss = max(0, 1 - self.y_train[i] * prediction)
-                total_loss += loss
+                # 检查KKT条件
+                if (y[i] * Ei < -0.001 and self.alpha[i] < self.C) or \
+                        (y[i] * Ei > 0.001 and self.alpha[i] > 0):
 
-                # 计算梯度并更新
-                if loss > 0:
-                    # 对于误分类样本，更新所有alpha
-                    for j in range(m):
-                        kernel_val = self.kernel_function(X[j], X[i])
-                        grad_alpha = self.C * self.alpha[j] - self.y_train[i] * self.y_train[j] * kernel_val
-                        self.alpha[j] -= self.learning_rate * grad_alpha
+                    # 随机选择另一个样本
+                    j = np.random.randint(0, m)
+                    while j == i:
+                        j = np.random.randint(0, m)
 
-                    # 更新偏置
-                    grad_b = -self.y_train[i]
-                    self.b -= self.learning_rate * grad_b
-                else:
-                    # 只更新正则化项
-                    for j in range(m):
-                        self.alpha[j] -= self.learning_rate * self.C * self.alpha[j]
+                    Ej = self.decision_function(X[j]) - y[j]
 
-            # 打印训练进度
-            if iteration % 200 == 0:
-                avg_loss = total_loss / m if m > 0 else 0
-                print(f"迭代 {iteration}, 平均损失: {avg_loss:.4f}")
+                    # 保存旧的alpha值
+                    alpha_i_old = self.alpha[i]
+                    alpha_j_old = self.alpha[j]
 
-        # 提取支持向量 (alpha > 阈值)
-        sv_threshold = 1e-4
-        sv_indices = np.abs(self.alpha) > sv_threshold
+                    # 计算边界
+                    if y[i] != y[j]:
+                        L = max(0, self.alpha[j] - self.alpha[i])
+                        H = min(self.C, self.C + self.alpha[j] - self.alpha[i])
+                    else:
+                        L = max(0, self.alpha[i] + self.alpha[j] - self.C)
+                        H = min(self.C, self.alpha[i] + self.alpha[j])
+
+                    if L == H:
+                        continue
+
+                    # 计算eta
+                    eta = 2 * self.kernel_function(X[i], X[j]) - \
+                          self.kernel_function(X[i], X[i]) - \
+                          self.kernel_function(X[j], X[j])
+
+                    if eta >= 0:
+                        continue
+
+                    # 更新alpha[j]
+                    self.alpha[j] -= y[j] * (Ei - Ej) / eta
+
+                    # 裁剪alpha[j]
+                    if self.alpha[j] > H:
+                        self.alpha[j] = H
+                    if self.alpha[j] < L:
+                        self.alpha[j] = L
+
+                    # 检查alpha[j]变化是否显著
+                    if abs(self.alpha[j] - alpha_j_old) < 1e-5:
+                        continue
+
+                    # 更新alpha[i]
+                    self.alpha[i] += y[i] * y[j] * (alpha_j_old - self.alpha[j])
+
+                    # 更新偏置b
+                    b1 = self.b - Ei - y[i] * (self.alpha[i] - alpha_i_old) * \
+                         self.kernel_function(X[i], X[i]) - \
+                         y[j] * (self.alpha[j] - alpha_j_old) * \
+                         self.kernel_function(X[i], X[j])
+
+                    b2 = self.b - Ej - y[i] * (self.alpha[i] - alpha_i_old) * \
+                         self.kernel_function(X[i], X[j]) - \
+                         y[j] * (self.alpha[j] - alpha_j_old) * \
+                         self.kernel_function(X[j], X[j])
+
+                    if 0 < self.alpha[i] < self.C:
+                        self.b = b1
+                    elif 0 < self.alpha[j] < self.C:
+                        self.b = b2
+                    else:
+                        self.b = (b1 + b2) / 2
+
+        # 提取支持向量
+        sv_indices = self.alpha > 1e-5
         self.support_vectors = X[sv_indices]
         self.support_vector_labels = y[sv_indices]
         self.alpha = self.alpha[sv_indices]
 
-        print(f"训练完成，找到 {len(self.support_vectors)} 个支持向量")
+    def decision_function(self, x):
+        """决策函数"""
+        result = 0
+        for i in range(len(self.alpha)):
+            result += self.alpha[i] * self.support_vector_labels[i] * \
+                      self.kernel_function(self.support_vectors[i], x)
+        return result + self.b
 
     def predict(self, x):
         """预测标签"""
         if len(x.shape) == 1:
             # 单样本预测
-            score = 0
-            for i in range(len(self.alpha)):
-                score += self.alpha[i] * self.support_vector_labels[i] * \
-                         self.kernel_function(self.support_vectors[i], x)
-            score += self.b
+            score = self.decision_function(x)
             return 1 if score >= 0 else 0
         else:
             # 多样本预测
-            predictions = []
-            for sample in x:
-                score = 0
-                for i in range(len(self.alpha)):
-                    score += self.alpha[i] * self.support_vector_labels[i] * \
-                             self.kernel_function(self.support_vectors[i], sample)
-                score += self.b
-                predictions.append(1 if score >= 0 else 0)
-            return np.array(predictions)
+            scores = np.array([self.decision_function(xi) for xi in x])
+            return np.where(scores >= 0, 1, 0)
 
 
 def test_kernel_svm():
@@ -192,85 +174,27 @@ def test_kernel_svm():
     data_train = load_data(train_file)
     data_test = load_data(test_file)
 
-    print(f"训练集大小: {len(data_train)}")
-    print(f"测试集大小: {len(data_test)}")
+    # 测试不同核函数
+    kernels = ['linear', 'poly', 'rbf']
 
-    # 分析数据
-    print("\n=== 训练数据分析 ===")
-    unique_train = np.unique(data_train[:, 2])
-    print(f"训练集标签: {unique_train}")
+    print("=== 核函数SVM比较 ===")
+    for kernel in kernels:
+        if kernel == 'linear':
+            svm = KernelSVM(kernel='linear', C=1.0)
+        elif kernel == 'poly':
+            svm = KernelSVM(kernel='poly', degree=3, C=1.0)
+        else:  # rbf
+            svm = KernelSVM(kernel='rbf', gamma=0.1, C=1.0)
 
-    print("\n=== 测试数据分析 ===")
-    unique_test = np.unique(data_test[:, 2])
-    print(f"测试集标签: {unique_test}")
+        # 训练模型
+        svm.train(data_train)
 
-    # 绘制数据分布
-    plot_data(data_train, "训练数据分布")
-    plot_data(data_test, "测试数据分布")
-
-    # 检查数据文件内容
-    print("\n=== 检查数据文件前10行 ===")
-    with open(train_file, 'r') as f:
-        for i, line in enumerate(f):
-            if i < 10:  # 前10行
-                print(f"行 {i}: {line.strip()}")
-            else:
-                break
-
-    # 重新加载数据，确保正确处理标签
-    print("\n重新加载数据并检查标签分布...")
-    data_train = load_data(train_file)
-    data_test = load_data(test_file)
-
-    # 手动检查标签
-    train_labels = data_train[:, 2]
-    test_labels = data_test[:, 2]
-
-    print(f"训练集标签统计:")
-    for label in np.unique(train_labels):
-        count = np.sum(train_labels == label)
-        print(f"  标签 {label}: {count} 个样本")
-
-    print(f"测试集标签统计:")
-    for label in np.unique(test_labels):
-        count = np.sum(test_labels == label)
-        print(f"  标签 {label}: {count} 个样本")
-
-    # 如果数据有问题，使用正确的数据集
-    print("\n=== 使用线性数据集进行测试 ===")
-    train_linear_file = os.path.join(base_dir, 'data', 'train_linear.txt')
-    test_linear_file = os.path.join(base_dir, 'data', 'test_linear.txt')
-
-    if os.path.exists(train_linear_file) and os.path.exists(test_linear_file):
-        print("使用线性数据集进行测试...")
-        data_train = load_data(train_linear_file)
-        data_test = load_data(test_linear_file)
-
-        # 分析线性数据
-        print("\n=== 线性训练数据分析 ===")
-        unique_train = np.unique(data_train[:, 2])
-        print(f"训练集标签: {unique_train}")
-
-        print("\n=== 线性测试数据分析 ===")
-        unique_test = np.unique(data_test[:, 2])
-        print(f"测试集标签: {unique_test}")
-
-        plot_data(data_train, "线性训练数据分布")
-        plot_data(data_test, "线性测试数据分布")
-
+        # 预测
         x_train = data_train[:, :2]
         t_train = data_train[:, 2]
         x_test = data_test[:, :2]
         t_test = data_test[:, 2]
 
-        print("\n=== 核函数SVM比较 (线性数据) ===")
-
-        # 测试线性核
-        print("\n训练 linear 核SVM...")
-        svm = KernelSVM(kernel='linear', C=1.0, max_iter=1000, learning_rate=0.001)
-        svm.train(data_train)
-
-        # 预测
         train_pred = svm.predict(x_train)
         test_pred = svm.predict(x_test)
 
@@ -278,7 +202,7 @@ def test_kernel_svm():
         train_acc = eval_acc(t_train, train_pred)
         test_acc = eval_acc(t_test, test_pred)
 
-        print(f"linear核SVM - 训练集准确率: {train_acc * 100:.1f}%, 测试集准确率: {test_acc * 100:.1f}%")
+        print(f"{kernel.upper()}核SVM - 训练集准确率: {train_acc * 100:.1f}%, 测试集准确率: {test_acc * 100:.1f}%")
         print(f"  支持向量数量: {len(svm.support_vectors)}")
 
 
