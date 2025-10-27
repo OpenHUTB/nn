@@ -1,0 +1,4 @@
+这是无人机的感知模块的修改
+
+ 
+image_classification为图像分类模块，laterpicture为在有一个训练图片下模型分类的运行截图
