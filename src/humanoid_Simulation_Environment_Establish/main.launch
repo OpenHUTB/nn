@@ -1,0 +1,10 @@
+<launch>
+    <node name="humanoid_core" 
+            pkg="humanoid_motion"  
+            type="main.py" 
+            output="screen"
+            args="$(find humanoid_motion)/">  
+        <param name="model_path" value="$(find humanoid_motion)/src/humanoid_motion/xml/humanoid.xml"/>
+        <param name="kp_gain" value="5.0"/>
+    </node>
+</launch>
