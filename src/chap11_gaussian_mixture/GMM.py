@@ -266,7 +266,7 @@ class GaussianMixtureModel:
             
             # 计算二次型：(x-μ)^T·Σ^(-1)·(x-μ)
             # 使用einsum高效计算多个样本的二次型
-            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
+            exponent = -0.5 * np.sum(X_centered @ inv * X_centered, axis=1)
 
             # 返回对数概率密度
             # 公式：log_p(x) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T·Σ^(-1)·(x-μ)
