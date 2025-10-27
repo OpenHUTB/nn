@@ -5,34 +5,31 @@ from mujoco import viewer
 from pathlib import Path
 import time
 
-# 彻底解决字体警告：使用matplotlib默认字体，避免指定中文字体（若无需中文可关闭）
-# 若需要中文显示，可先运行下方注释的代码查看系统可用字体并替换
-plt.rcParams["font.family"] = ["sans-serif"]  # 使用系统默认无衬线字体
-plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
+# 解决字体警告
+plt.rcParams["font.family"] = ["sans-serif"]
+plt.rcParams["axes.unicode_minus"] = False
 
-
-# 查看系统可用字体（可选：运行一次找到可用的中文字体名称替换）
-# import matplotlib.font_manager
-# fonts = [f.name for f in matplotlib.font_manager.fontManager.ttflist]
-# for font in sorted(fonts):
-#     print(font)
 
 class HumanoidWalker:
     def __init__(self, model_path):
-        # 加载模型（添加异常处理）
+        # 强制确认路径是字符串（双重保险）
+        if not isinstance(model_path, str):
+            raise TypeError(f"模型路径必须是字符串，当前是 {type(model_path)} 类型")
+
+        # 加载模型
         try:
             self.model = mujoco.MjModel.from_xml_path(model_path)
             self.data = mujoco.MjData(self.model)
         except Exception as e:
-            raise RuntimeError(f"模型加载失败：{e}，请检查模型文件是否正确")
+            raise RuntimeError(f"模型加载失败：{e}\n请检查：1.路径是否为字符串 2.文件是否存在 3.文件是否完整")
 
-        # 仿真参数（延长初始等待时间，避免窗口闪退）
-        self.sim_duration = 20.0  # 仿真时长
+        # 仿真参数
+        self.sim_duration = 20.0
         self.dt = self.model.opt.timestep
-        self.init_wait_time = 1.0  # 初始等待1秒，确保窗口稳定打开
+        self.init_wait_time = 1.0
 
-        # PID参数（降低增益，避免初始力矩过大导致失衡）
-        self.kp = 30.0  # 降低比例增益，减少震荡
+        # PID参数
+        self.kp = 30.0
         self.ki = 0.01
         self.kd = 5.0
 
@@ -40,70 +37,60 @@ class HumanoidWalker:
         self.joint_errors = np.zeros(self.model.nu)
         self.joint_integrals = np.zeros(self.model.nu)
 
-        # 初始化姿势（确保从稳定状态开始）
-        mujoco.mj_resetData(self.model, self.data)  # 重置到零状态
-        mujoco.mj_forward(self.model, self.data)  # 计算初始状态
+        # 初始化姿势
+        mujoco.mj_resetData(self.model, self.data)
+        mujoco.mj_forward(self.model, self.data)
 
         # 存储数据
         self.times = []
         self.root_pos = []
 
     def get_gait_trajectory(self, t):
-        """生成步态轨迹（兼容不同模型关节索引的容错设计）"""
-        # 延迟启动步态（前2秒保持站立，避免初始动作过大）
+        """生成步态轨迹"""
         if t < 2.0:
             return np.zeros(self.model.nu)
 
-        t_adjusted = t - 2.0  # 从第2秒开始计算步态
-        cycle = t_adjusted % 1.5  # 更长的周期，更稳定
+        t_adjusted = t - 2.0
+        cycle = t_adjusted % 1.5
         phase = 2 * np.pi * cycle / 1.5
 
-        # 关节目标角度（使用比例系数，适应不同模型关节范围）
-        leg_amp = 0.3  # 腿部摆动幅度（缩小幅度，提高稳定性）
-        arm_amp = 0.2  # 手臂摆动幅度
-        torso_amp = 0.05  # 躯干摆动幅度
+        leg_amp = 0.3
+        arm_amp = 0.2
+        torso_amp = 0.05
 
-        # 腿部轨迹（通用化设计，不依赖固定索引）
         target = np.zeros(self.model.nu)
-        # 假设前6个自由度是根节点（不控制），从第7个开始是关节
-        # 若模型关节索引不同，只需调整以下索引偏移
-        leg_joint_offset = 5  # 腿部关节起始索引（根据模型调整）
-        if len(target) > leg_joint_offset + 6:  # 确保索引不越界
-            # 右腿（髋关节、膝关节、踝关节）
+        leg_joint_offset = 5
+        if len(target) > leg_joint_offset + 6:
             target[leg_joint_offset] = -leg_amp * np.sin(phase)
             target[leg_joint_offset + 1] = leg_amp * 1.5 * np.sin(phase + np.pi)
             target[leg_joint_offset + 2] = leg_amp * 0.5 * np.sin(phase)
-            # 左腿（与右腿反相）
             target[leg_joint_offset + 3] = -leg_amp * np.sin(phase + np.pi)
             target[leg_joint_offset + 4] = leg_amp * 1.5 * np.sin(phase)
             target[leg_joint_offset + 5] = leg_amp * 0.5 * np.sin(phase + np.pi)
 
-        # 上身和手臂（容错设计）
         if len(target) > 0:
-            target[0] = torso_amp * np.sin(phase + np.pi / 2)  # 躯干
+            target[0] = torso_amp * np.sin(phase + np.pi / 2)
         if len(target) > 16:
-            target[16] = arm_amp * np.sin(phase + np.pi)  # 右臂
+            target[16] = arm_amp * np.sin(phase + np.pi)
         if len(target) > 20:
-            target[20] = arm_amp * np.sin(phase)  # 左臂
+            target[20] = arm_amp * np.sin(phase)
 
         return target
 
     def pid_controller(self, target_pos):
-        """PID控制器（增加安全限制）"""
-        current_pos = self.data.qpos[7:]  # 跳过根节点6自由度
+        """PID控制器"""
+        current_pos = self.data.qpos[7:]
         if len(current_pos) != len(target_pos):
-            # 关节数量不匹配时，返回零力矩避免崩溃
             return np.zeros_like(target_pos)
 
         error = target_pos - current_pos
         self.joint_integrals += error * self.dt
-        self.joint_integrals = np.clip(self.joint_integrals, -2.0, 2.0)  # 更严格的积分限制
+        self.joint_integrals = np.clip(self.joint_integrals, -2.0, 2.0)
 
         derivative = (error - self.joint_errors) / self.dt if self.dt != 0 else 0
         self.joint_errors = error.copy()
 
         torque = self.kp * error + self.ki * self.joint_integrals + self.kd * derivative
-        # 力矩限制在安全范围（进一步缩小，避免失控）
         return np.clip(torque, -5.0, 5.0)
 
     def simulate_with_visualization(self):
@@ -112,7 +99,7 @@ class HumanoidWalker:
             print("可视化窗口已启动（前2秒保持静止，随后开始步行）")
             print("操作：鼠标拖动旋转视角，滚轮缩放，W/A/S/D平移，关闭窗口结束")
 
-            # 初始等待，确保窗口稳定打开
+            # 初始等待
             start_time = time.time()
             while time.time() - start_time < self.init_wait_time:
                 v.sync()
@@ -120,17 +107,12 @@ class HumanoidWalker:
 
             # 仿真主循环
             while self.data.time < self.sim_duration:
-                # 生成目标轨迹
                 target = self.get_gait_trajectory(self.data.time)
-                # 计算控制力矩
                 self.data.ctrl[:] = self.pid_controller(target)
-                # 单步仿真
                 mujoco.mj_step(self.model, self.data)
-                # 刷新窗口（增加延迟，避免窗口刷新过快）
                 v.sync()
                 time.sleep(0.001)
 
-                # 记录数据
                 self.times.append(self.data.time)
                 self.root_pos.append(self.data.qpos[:3].copy())
 
@@ -140,9 +122,8 @@ class HumanoidWalker:
         }
 
     def plot_results(self, data):
-        """绘制结果（使用英文标签避免字体问题）"""
+        """绘制结果"""
         plt.figure(figsize=(12, 6))
-        # 前进距离（X轴）
         plt.subplot(121)
         plt.plot(data["time"], data["root_pos"][:, 0], label="Forward Distance (X)")
         plt.ylabel("Position (m)")
@@ -151,7 +132,6 @@ class HumanoidWalker:
         plt.grid(alpha=0.3)
         plt.legend()
 
-        # 躯干高度（Z轴）
         plt.subplot(122)
         plt.plot(data["time"], data["root_pos"][:, 2], label="Torso Height (Z)", color='orange')
         plt.xlabel("Time (s)")
@@ -165,13 +145,28 @@ class HumanoidWalker:
 
 
 if __name__ == "__main__":
-    model_path = "D:\\Github\\file\\nn\\src\\Mujoco_manrun\\humanoid.xml" #应为自己的humanoid.xml的位置
+    # 1. 手动拼接字符串路径（完全避开 Path 对象传递问题）
+    # 原理：直接用字符串表示路径，不依赖 Path 对象的转换
+    import os
 
-    # 检查模型文件
-    if not Path(model_path).exists():
-        raise FileNotFoundError(f"模型文件不存在：{model_path}，请检查路径")
+    # 获取当前脚本所在目录的字符串路径
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 拼接 XML 文件的字符串路径
+    model_path = os.path.join(current_dir, "humanoid.xml")
 
-    # 运行仿真
+    # 2. 打印路径信息（方便排查）
+    print(f"当前脚本目录：{current_dir}")
+    print(f"模型文件路径：{model_path}")
+    print(f"路径类型：{type(model_path)}")  # 应显示 <class 'str'>
+
+    # 3. 检查文件是否存在
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(
+            f"模型文件不存在！\n查找路径：{model_path}\n"
+            f"请确认 humanoid.xml 放在以下目录：{current_dir}"
+        )
+
+    # 4. 运行仿真
     try:
         walker = HumanoidWalker(model_path)
         print("开始仿真...")
