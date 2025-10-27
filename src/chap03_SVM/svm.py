@@ -97,9 +97,18 @@ class KernelSVM:
         else:
             raise ValueError(f"不支持的标签格式: {unique_labels}")
 
+<<<<<<< HEAD
         m, n = X.shape
         self.X_train = X
         self.y_train = y
+=======
+            # 计算梯度：正则化项梯度 + 误分类样本梯度
+            # L2正则化：减小权重，防止过拟合
+            # hinge loss梯度：只对误分类和边界样本计算梯度
+            dw = (2 * self.reg_lambda * self.w) - (np.sum(y[idx, None] * X[idx], axis=0) / len(y)) if len(
+                idx) > 0 else 2 * self.reg_lambda * self.w
+            db = -np.mean(y[idx]) if len(idx) > 0 else 0
+>>>>>>> 920dda3310c60ef314b23bc2867a2ca2acc75fc3
 
         # 初始化参数
         self.alpha = np.random.randn(m) * 0.01
