@@ -3,7 +3,7 @@ from mujoco import viewer
 import time
 
 def control_robot(model_path):
-    # 加载模型和数据（修复后模型可正常加载）
+    # 加载优化后的拟人化机器人模型
     model = mujoco.MjModel.from_xml_path(model_path)
     data = mujoco.MjData(model)
 
@@ -17,48 +17,67 @@ def control_robot(model_path):
                 if not viewer_instance.is_running():
                     break
 
-                # 步态周期：2秒1步（交替迈腿）
+                # 步态周期：2秒1步（双腿+双臂协同）
                 elapsed_time = time.time() - start_time
                 cycle = elapsed_time % 2
 
-                # -------------------------- 双腿交替控制 --------------------------
-                # 0~1秒：左腿向前迈步，右腿支撑
+                # -------------------------- 核心控制逻辑 --------------------------
+                # 0~1秒：左腿向前迈步，右腿支撑；左臂向后摆，右臂向前摆
                 if cycle < 1:
-                    # 左腿：髋关节向前转（控制信号0.3，对应关节range 0~1.0）
-                    data.ctrl[0] = 0.3  # left_hip_motor
-                    # 左腿：膝关节弯曲（控制信号0.6）
-                    data.ctrl[1] = 0.6  # left_knee_motor
-                    # 右腿：髋关节向后转（控制信号0.2，支撑身体）
+                    # ------------------- 腿部控制 -------------------
+                    # 左腿：髋关节向前转，膝关节弯曲（迈步）
+                    data.ctrl[0] = 0.4  # left_hip_motor（扭矩增大适配腿部质量）
+                    data.ctrl[1] = 0.7  # left_knee_motor
+                    data.ctrl[2] = 0.2  # left_ankle_motor（轻微调整保持平衡）
+                    # 右腿：髋关节向后转，膝关节伸直（支撑）
                     data.ctrl[3] = 0.2  # right_hip_motor
-                    # 右腿：膝关节伸直（控制信号0.1）
                     data.ctrl[4] = 0.1  # right_knee_motor
+                    data.ctrl[5] = 0.1  # right_ankle_motor
 
-                # 1~2秒：右腿向前迈步，左腿支撑
+                    # ------------------- 手臂控制（协同摆动） -------------------
+                    # 左臂：肩关节向后摆，肘关节微屈
+                    data.ctrl[6] = 0.2  # left_shoulder_motor
+                    data.ctrl[7] = 0.5  # left_elbow_motor
+                    data.ctrl[8] = 0.0  # left_wrist_motor（固定）
+                    # 右臂：肩关节向前摆，肘关节微屈
+                    data.ctrl[9] = 0.7  # right_shoulder_motor
+                    data.ctrl[10] = 0.5  # right_elbow_motor
+                    data.ctrl[11] = 0.0  # right_wrist_motor（固定）
+
+                # 1~2秒：右腿向前迈步，左腿支撑；右臂向后摆，左臂向前摆
                 else:
-                    # 左腿：髋关节向后转（控制信号0.2，支撑身体）
+                    # ------------------- 腿部控制 -------------------
+                    # 左腿：髋关节向后转，膝关节伸直（支撑）
                     data.ctrl[0] = 0.2  # left_hip_motor
-                    # 左腿：膝关节伸直（控制信号0.1）
                     data.ctrl[1] = 0.1  # left_knee_motor
-                    # 右腿：髋关节向前转（控制信号0.3）
-                    data.ctrl[3] = 0.3  # right_hip_motor
-                    # 右腿：膝关节弯曲（控制信号0.6）
-                    data.ctrl[4] = 0.6  # right_knee_motor
+                    data.ctrl[2] = 0.1  # left_ankle_motor
+                    # 右腿：髋关节向前转，膝关节弯曲（迈步）
+                    data.ctrl[3] = 0.4  # right_hip_motor
+                    data.ctrl[4] = 0.7  # right_knee_motor
+                    data.ctrl[5] = 0.2  # right_ankle_motor
 
-                # 踝关节固定（暂时不转动，保证站立稳定）
-                data.ctrl[2] = 0.0  # left_ankle_motor
-                data.ctrl[5] = 0.0  # right_ankle_motor
+                    # ------------------- 手臂控制（协同摆动） -------------------
+                    # 左臂：肩关节向前摆，肘关节微屈
+                    data.ctrl[6] = 0.7  # left_shoulder_motor
+                    data.ctrl[7] = 0.5  # left_elbow_motor
+                    data.ctrl[8] = 0.0  # left_wrist_motor
+                    # 右臂：肩关节向后摆，肘关节微屈
+                    data.ctrl[9] = 0.2  # right_shoulder_motor
+                    data.ctrl[10] = 0.5  # right_elbow_motor
+                    data.ctrl[11] = 0.0  # right_wrist_motor
 
-                # 运行仿真步
-                mujoco.mj_step(model, data)
-                # 同步可视化（解决模糊问题，与仿真步同步）
-                viewer_instance.sync()
-                # 控制仿真速度（与模型timestep一致）
-                time.sleep(model.opt.timestep)
+                # 颈部固定（避免头部晃动）
+                data.ctrl[12] = 0.5  # neck_motor（中间位置固定）
+
+                # -------------------------- 仿真推进 --------------------------
+                mujoco.mj_step(model, data)  # 运行一步物理仿真
+                viewer_instance.sync()       # 同步渲染（解决模糊问题）
+                time.sleep(model.opt.timestep)  # 控制仿真速度与物理步长匹配
 
         except KeyboardInterrupt:
             print("\n仿真被用户中断")
 
 if __name__ == "__main__":
-    # 模型文件名用你提供的 "Robot_with_Legs.xml"（若要改名为Robot_move_straight.xml，这里同步改）
+    # 确保模型文件名与实际保存的一致（这里用你要求的"Robot_move_straight.xml"）
     model_file = "Robot_move_straight.xml"
     control_robot(model_file)
