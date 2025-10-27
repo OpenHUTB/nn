@@ -102,6 +102,7 @@ def main():
             execute_maneuver(client, -0.5, 0, 3, gear_mode="reverse", description="Go reverse")
             apply_brake(client)
 
+            # 捕获图像
             capture_images(client, tmp_dir, idx)
 
     finally:
