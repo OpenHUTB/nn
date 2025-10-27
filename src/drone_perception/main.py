@@ -17,17 +17,17 @@ test_dir = os.path.join(base_dir, "test")  # 测试集目录路径
 # 模型参数设置
 img_size = (128, 128)  # 图像调整尺寸为128x128像素
 batch_size = 32  # 每个训练批次的样本数量
-epochs = 70  # 训练总轮数
+epochs = 70 # 训练总轮数
 
 # 图像数据预处理与增强（用于训练集）
 train_datagen = ImageDataGenerator(
-    rescale=1. / 255,  # 像素值归一化到0-1范围
-    rotation_range=30,  # 随机旋转角度范围±30度
-    width_shift_range=0.1,  # 水平随机平移范围10%
-    height_shift_range=0.1,  # 垂直随机平移范围10%
-    shear_range=0.2,  # 剪切变换强度
-    zoom_range=0.2,  # 随机缩放范围
-    horizontal_flip=True  # 启用水平翻转
+    rescale=1. / 255, # 像素值归一化到0-1范围
+    rotation_range=30, # 随机旋转角度范围±30度
+    width_shift_range=0.1, # 水平随机平移范围10%
+    height_shift_range=0.1, # 垂直随机平移范围10%
+    shear_range=0.2, # 剪切变换强度
+    zoom_range=0.2,# 随机缩放范围
+    horizontal_flip=True # 启用水平翻转
 )
 
 # 测试集数据预处理（只做归一化，不进行增强）
@@ -43,7 +43,7 @@ train_gen = train_datagen.flow_from_directory(
 
 # 创建测试数据生成器
 test_gen = test_datagen.flow_from_directory(
-    test_dir,  # 测试集目录
+    test_dir, # 测试集目录
     target_size=img_size,  # 调整图像大小
     batch_size=batch_size,  # 批次大小
     class_mode="categorical"  # 多分类模式
@@ -56,7 +56,7 @@ from tensorflow.keras.layers import GlobalAveragePooling2D
 # 加载预训练的MobileNetV2基础模型
 base_model = MobileNetV2(
     input_shape=(128, 128, 3),  # 输入图像尺寸
-    include_top=False,  # 不包含原始顶层分类器
+    include_top=False, # 不包含原始顶层分类器
     weights='imagenet'  # 使用在ImageNet上预训练的权重
 )
 base_model.trainable = False  # 冻结基础模型权重，不参与训练
@@ -64,9 +64,9 @@ base_model.trainable = False  # 冻结基础模型权重，不参与训练
 # 构建迁移学习模型
 model = tf.keras.Sequential([
     base_model,  # 预训练的特征提取器
-    GlobalAveragePooling2D(),  # 全局平均池化层，减少参数数量
-    Dense(128, activation="relu"),  # 全连接层，128个神经元，ReLU激活
-    Dropout(0.5),  # 丢弃层，丢弃率50%，防止过拟合
+    GlobalAveragePooling2D(), # 全局平均池化层，减少参数数量
+    Dense(128, activation="relu"), # 全连接层，128个神经元，ReLU激活
+    Dropout(0.5), # 丢弃层，丢弃率50%，防止过拟合
     Dense(train_gen.num_classes, activation="softmax")  # 输出层，使用softmax激活
 ])
 
@@ -84,21 +84,21 @@ model.summary()
 # 早停回调：监控验证集损失，连续5轮无改善则停止训练
 early_stop = EarlyStopping(
     monitor='val_loss',  # 监控验证集损失
-    patience=5,  # 容忍轮数
+    patience=5, # 容忍轮数
     restore_best_weights=True  # 恢复最佳权重
 )
 
 # 模型检查点回调：保存最佳模型
 checkpoint = ModelCheckpoint(
     filepath=os.path.join(base_dir, "best_model.h5"),  # 模型保存路径
-    monitor='val_accuracy',  # 监控验证集准确率
-    save_best_only=True,  # 只保存最佳模型
-    verbose=1  # 显示保存信息
+    monitor='val_accuracy', # 监控验证集准确率
+    save_best_only=True, # 只保存最佳模型
+    verbose=1 # 显示保存信息
 )
 
 # 开始训练模型
 history = model.fit(
-    train_gen,  # 训练数据生成器
+    train_gen, # 训练数据生成器
     epochs=epochs,  # 训练轮数
     validation_data=test_gen,  # 验证数据
     callbacks=[early_stop, checkpoint]  # 使用回调函数
@@ -160,7 +160,7 @@ def analyze_errors(model, test_gen, class_labels, num_samples=16):
     print(f"总样本数: {len(true_classes)}")
     print(f"错误率: {len(misclassified_indices) / len(true_classes):.4f}")
 
-    # 显示一些错误分类的样本
+     # 显示一些错误分类的样本
     if len(misclassified_indices) > 0:
         # 随机选择一些错误样本进行可视化
         if len(misclassified_indices) > num_samples:
