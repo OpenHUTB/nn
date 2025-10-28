@@ -3,8 +3,8 @@
             pkg="humanoid_motion"  
             type="main.py" 
             output="screen"
-            args="$(find humanoid_motion)/">  
-        <param name="model_path" value="$(find humanoid_motion)/src/humanoid_motion/xml/humanoid.xml"/>
+            args="$(find humanoid_Simulation_Environment_Establish)/">  
+        <param name="model_path" value="$(find humanoid_Simulation_Environment_Establish)/humanoid.xml"/>  <!-- humanoid.xml文件目录 -->
         <param name="kp_gain" value="5.0"/>
     </node>
 </launch>
