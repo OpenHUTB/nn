@@ -11,7 +11,7 @@ import seaborn as sns
 
 # 路径设置
 base_dir = os.path.abspath("../data")  # 数据根目录，包含'train'和'test'文件夹
-train_dir = os.path.join(base_dir, "train") # 训练集目录路径
+train_dir = os.path.join(base_dir, "train")# 训练集目录路径
 test_dir = os.path.join(base_dir, "test")  # 测试集目录路径
 
 # 模型参数设置
