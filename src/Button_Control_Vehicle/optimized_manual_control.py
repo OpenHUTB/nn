@@ -65,14 +65,22 @@ from __future__ import print_function
 import glob
 import os
 import sys
-
 try:
-    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
+    # 先找当前目录下的carla/dist
+    carla_egg = glob.glob(os.path.join(os.getcwd(), 'carla', 'dist', 'carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64')))
+    # 再找上级目录下的carla/dist
+    if not carla_egg:
+        carla_egg = glob.glob(os.path.join(os.path.dirname(os.getcwd()), 'carla', 'dist', 'carla-*%d.%d-%s.egg' % (
+            sys.version_info.major,
+            sys.version_info.minor,
+            'win-amd64' if os.name == 'nt' else 'linux-x86_64')))
+    sys.path.append(carla_egg[0])
 except IndexError:
     pass
+
 
 
 # ==============================================================================
