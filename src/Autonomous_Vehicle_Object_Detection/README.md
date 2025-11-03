@@ -29,15 +29,15 @@
 2. 参考官方文档安装CARLA\_0.9.11
 
 3. 克隆本项目仓库：
-```plaintext
-  https://github.com/William4861/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator
+```bash
+  git clone https://github.com/William4861/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator
 ```
 4. 安装所需的Python库： （执行该命令前确保cd到requirements.txt文件目录）
 ```plaintext
   pip install -r requirements.txt
 ```  
 ```commandline
-  pip install setuptools
+  pip install setuptools==40.8.0
 ```
 (执行该命令前确保cd到CARLA_0.9.11\WindowsNoEditor\PythonAPI\carla\dist目录)
 ```commandline
@@ -50,40 +50,43 @@
 
 1. 将 object\_detection.py 文件和 generate_traffic.py 文件复制到CARLA的PythonAPI示例目录中： 
 ```plaintext
-  cp object\_detection.py \\CARLA\_0.9.11\\WindowsNoEditor\\PythonAPI\\examples
-```
-```plaintext
-  cp generate_traffic.py \\CARLA\_0.9.11\\WindowsNoEditor\\PythonAPI\\examples
+  # Linux/macOS 系统
+  cp object_detection.py /CARLA_0.9.11/WindowsNoEditor/PythonAPI/examples
+  cp generate_traffic.py /CARLA_0.9.11/WindowsNoEditor/PythonAPI/examples
+
+  # Windows 系统（PowerShell 或 cmd）
+  copy object_detection.py \CARLA_0.9.11\WindowsNoEditor\PythonAPI\examples
+  copy generate_traffic.py \CARLA_0.9.11\WindowsNoEditor\PythonAPI\examples
 ```
 
-2. 下载yolov3.weights和yolo3.cfg文件至examples目录
+2. 下载yolov3-tiny.weights和yolov3-tiny.cfg文件至examples目录
 ```
-  https://huggingface.co/spaces/Epitech/Scarecrow/resolve/main/yolov3.weights
+  https://pjreddie.com/media/files/yolov3-tiny.weights
 ```
 ```
-  https://www.kaggle.com/datasets/ravi02516/trained-weights-and-cfg?select=yolov3.cfg
+  https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg
 ```
 3. 运行CARLA仿真器： 
 ```plaintext
-  cd CARLA\_0.9.11
+  cd CARLA_0.9.11
 ```
 ```
   ./CarlaUE4.exe
 ```
 
-4. 打开新的终端，导航至PythonAPI示例目录并运行脚本：
+4. 打开新的终端，cd至PythonAPI示例目录并运行脚本：
 ```plaintext
-  cd CARLA\_0.9.11/PythonAPI/examples
+  cd CARLA_0.9.11/PythonAPI/examples
 ```
 ```commandline
   python generate_traffic.py
 ```
-5. 打开新的终端，导航至PythonAPI示例目录并运行脚本：
+5. 打开新的终端，cd至PythonAPI示例目录并运行脚本：
 ```plaintext
-  cd CARLA\_0.9.11/PythonAPI/examples
+  cd CARLA_0.9.11/PythonAPI/examples
 ```
-```
-  python object\_detection.py
+```plaintext
+  python object_detection.py
 ```
 
   
@@ -93,7 +96,8 @@
 
 1. 启动TensorBoard：
 ```plaintext
-  tensorboard --logdir=path/to/logs
+  # 日志文件默认生成在CARLA_0.9.11/PythonAPI/examples/logs目录下（与object_detection.py同级）
+  tensorboard --logdir=./logs
 ```
 
 2. 打开网页浏览器，访问 http://localhost:6006 以查看TensorBoard仪表板。
@@ -103,11 +107,9 @@
   ## 项目结构
   ⦁	 object\_detection.py ：目标检测与轨迹规划的主Python脚本
 
+  ⦁ generate_traffic.py ：交通流生成脚本
+
   ⦁	 requirements.txt ：所需Python库的清单
-
-  ⦁	 models/ ：存放训练好的YOLOv3模型权重的目录
-
-  ⦁	 config/ ：存放训练好的YOLOv3模型配置文件的目录
 
   ⦁	 logs/ ：用于性能监控的TensorBoard日志文件
 
@@ -131,5 +133,14 @@
 
 
   ## 参考文档
-  *[自动驾驶汽车物体检测和轨迹规划使用YOLOv3和CARLA模拟器](https://github.com/ROBERT-ADDO-ASANTE-DARKO/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator)
+  * [自动驾驶汽车物体检测和轨迹规划使用YOLOv3和CARLA模拟器](https://github.com/ROBERT-ADDO-ASANTE-DARKO/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator)
 
+#  常见问题
+  ###  CARLA 连接失败：
+  确保 CARLA 仿真器已启动，且脚本与仿真器版本严格一致（均为 0.9.11）；若仍失败，检查终端是否有权限访问 CARLA 进程。
+  ###  模型加载错误：
+  确认 yolov3.weights 和 yolov3.cfg 已放在 examples 目录下，文件未损坏（可重新下载官方链接文件）；检查 object_detection.py 中模型路径是否指向 examples 目录（默认无需修改，若修改过需还原为相对路径）。
+  ###  依赖安装失败：
+  建议使用 Python 3.7 虚拟环境（如 conda create -n carla_env python=3.7），避免与其他 Python 版本的库冲突；执行 pip install 时若网络超时，可添加国内镜像源（如 - i https://pypi.tuna.tsinghua.edu.cn/simple）。
+  ###  TensorBoard 无法打开：
+  检查 logs 目录是否存在且有日志文件，若未生成日志，需先运行 object_detection.py 至少 1 次；确保终端当前目录为 examples 目录（与 logs 同级），再执行 tensorboard 命令。
