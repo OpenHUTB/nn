@@ -38,16 +38,17 @@ def gaussian_basis(x, feature_num=10):
     用于提升模型对非线性关系的拟合能力
     返回形状为 (N, feature_num) 的数组"""
     # 使用np.linspace在区间[0, 25]上均匀生成feature_num个中心点
+    # 这些中心点作为高斯分布的均值位置
     centers = np.linspace(0, 25, feature_num)
     # 计算高斯函数的宽度(标准差)
+    # 基于相邻中心点的间距确定高斯函数的宽度，保证函数间有适当重叠
     width = 1.0 * (centers[1] - centers[0])
     # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
     x = np.expand_dims(x, axis=1)
     # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
     x = np.concatenate([x] * feature_num, axis=1) # 将 x 沿着第 1 维度复制 feature_num 次
-    
-    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
-    ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
+    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离，将输入值减去对应的中心点，然后除以宽度进行标准化
+    ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数，-0.5 * out**2 对应高斯分布的概率密度函数形式
     return ret
 
 
