@@ -35,27 +35,24 @@ logger.debug(f"Observation Space: {observation_size}")
 logger.debug(f"Action Space: {env.action_space.shape[0]}")
 precision = 0.25
 
-# action_size_for_acceleration = [round(a, 2) for a in np.arange(0.75, 1.01, precision)]
-action_size_for_acceleration = [1.0]
-logger.debug(f"Possible Actions for Acceleration: {action_size_for_acceleration}")
-logger.debug(f"Possible Actions for Acceleration: {len(action_size_for_acceleration)}")
+steers = [-1.0, 0.0, 1.0]
+gases  = [0.0, 0.5, 1.0]
+brakes = [0.0, 0.5, 0.75]  # CarRacing 刹车范围 [0,1]
 
-# action_size_for_brake = [round(a, 2) for a in np.arange(0.25, 0.5, precision)]
-action_size_for_brake = [0.75]
-logger.debug(f"Possible Actions for Braking: {action_size_for_brake}")
-logger.debug(f"Possible Actions for Braking: {len(action_size_for_brake)}")
-
-# action_size_for_steer = [round(a, 2) for a in np.arange(-1., 1.01, precision)]
-action_size_for_steer = [-1.0, 0.00, 1.0]
-logger.debug(f"Possible Actions for Steering: {action_size_for_steer}")
-logger.debug(f"Possible Actions for Steering: {len(action_size_for_steer)}")
+logger.debug(f"Possible Actions for Steering: {steers} (count={len(steers)})")
+logger.debug(f"Possible Actions for Gas: {gases} (count={len(gases)})")
+logger.debug(f"Possible Actions for Brake: {brakes} (count={len(brakes)})")
 
 action_space = []
-for action_space_acc in action_size_for_acceleration:
-    for action_space_brake in action_size_for_brake:
-        for action_space_steer in action_size_for_steer:
-            action_space.append([action_space_steer, action_space_acc, action_space_brake])
-logger.debug(f"Possible Actions: {len(action_space)}")
+for s in steers:
+    for g in gases:
+        for b in brakes:
+            # 互斥：同一动作不允许同时给油且刹车
+            if g > 0 and b > 0:
+                continue
+            action_space.append([s, g, b])
+
+logger.debug(f"Possible Actions (after mutex filter): {len(action_space)}")
 
 car = CarAgent(
     action_size=len(action_space),
