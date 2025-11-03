@@ -7,182 +7,149 @@ import os
 from typing import List, Tuple
 
 
-class YOLOv3Detector:
-    """YOLOv3目标检测器，封装模型加载和检测逻辑"""
-    def __init__(self, cfg_path: str, weights_path: str, classes_path: str):
-        # 检查模型文件是否存在
-        self._check_file_exists(cfg_path, weights_path, classes_path)
+class YOLOv3TinyDetector:
+    """使用YOLOv3-Tiny（轻量版，速度提升50%+）"""
 
-        # 加载模型
+    def __init__(self, cfg_path: str, weights_path: str, classes_path: str):
+        self._check_file_exists(cfg_path, weights_path, classes_path)
         self.net = cv2.dnn.readNetFromDarknet(cfg_path, weights_path)
         self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
-        # 加载类别名称
         with open(classes_path, "r") as f:
             self.classes = [line.strip() for line in f.readlines()]
 
-        # 手动指定YOLOv3输出层（避免自动获取错误）
-        self.output_layers = ["yolo_82", "yolo_94", "yolo_106"]
-
-        # 检测参数（可调整）
-        self.conf_threshold = 0.5  # 置信度阈值
-        self.nms_threshold = 0.4   # NMS重叠阈值
+        # YOLOv3-Tiny输出层（固定值）
+        self.output_layers = ["yolo_16", "yolo_23"]
+        self.conf_threshold = 0.2  # 进一步降低阈值，提高检测灵敏度
+        self.nms_threshold = 0.25
 
     def _check_file_exists(self, *paths: str):
-        """检查文件是否存在，不存在则报错"""
         for path in paths:
             if not os.path.exists(path):
-                raise FileNotFoundError(f"模型文件不存在：{path}，请检查路径")
+                raise FileNotFoundError(f"文件不存在：{path}")
 
     def detect(self, image: np.ndarray) -> List[Tuple[int, int, int, int, str, float]]:
-        """
-        对输入图像进行目标检测
-        返回：[(x1, y1, x2, y2, 类别名称, 置信度), ...]
-        """
         height, width = image.shape[:2]
-
-        # 图像预处理（转换为YOLO输入格式）
+        # 预处理：缩小图像尺寸至320x320（进一步降低计算量）
         blob = cv2.dnn.blobFromImage(
-            image, 1/255.0, (416, 416),
+            image, 1 / 255.0, (320, 320),
             mean=(0, 0, 0), swapRB=True, crop=False
         )
         self.net.setInput(blob)
-
-        # 前向传播获取检测结果
         outputs = self.net.forward(self.output_layers)
 
-        # 解析检测结果
         boxes = []
         confidences = []
         class_ids = []
-
         for output in outputs:
             for detection in output:
                 scores = detection[5:]
                 class_id = np.argmax(scores)
                 confidence = scores[class_id]
-
                 if confidence > self.conf_threshold:
-                    # 转换为图像实际坐标
+                    # 转换为原图像坐标（因输入尺寸缩小，需按比例还原）
                     center_x = int(detection[0] * width)
                     center_y = int(detection[1] * height)
                     w = int(detection[2] * width)
                     h = int(detection[3] * height)
                     x = int(center_x - w / 2)
                     y = int(center_y - h / 2)
-
                     boxes.append([x, y, w, h])
                     confidences.append(float(confidence))
                     class_ids.append(class_id)
 
-        # 非极大值抑制（NMS）去除重叠框
-        indices = cv2.dnn.NMSBoxes(
-            boxes, confidences, self.conf_threshold, self.nms_threshold
-        )
-        # 处理NMS返回的索引（兼容嵌套数组）
-        indices = np.squeeze(indices).astype(int).tolist() if len(indices) > 0 else []
+        # 彻底修复indices迭代错误：强制转换为列表，无论单元素还是多元素
+        indices_arr = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_threshold, self.nms_threshold)
+        indices = []
+        if len(indices_arr) > 0:
+            indices_arr = np.squeeze(indices_arr).astype(int)
+            # 若为单个int，包装成列表；若为数组，转成列表
+            indices = [indices_arr] if isinstance(indices_arr, np.integer) else indices_arr.tolist()
 
-        # 整理最终结果
         results = []
         for i in indices:
-            i = i if isinstance(i, int) else i[0]  # 确保索引为整数
+            i = int(i)  # 强制确保为int
             if 0 <= i < len(boxes):
                 x, y, w, h = boxes[i]
                 x1, y1, x2, y2 = x, y, x + w, y + h
                 class_name = self.classes[class_ids[i]] if class_ids[i] < len(self.classes) else "unknown"
                 results.append((x1, y1, x2, y2, class_name, confidences[i]))
-
         return results
 
 
 class CarlaObjectDetector:
-    """CARLA目标检测主类，整合车辆、相机和YOLO检测器"""
-    def __init__(self, yolo_cfg: str, yolo_weights: str, yolo_classes: str):
-        # 初始化CARLA客户端
+    def __init__(self, detector):
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(10.0)
         self.world = self.client.get_world()
         self.blueprint_library = self.world.get_blueprint_library()
-
-        # 初始化YOLO检测器
-        self.detector = YOLOv3Detector(yolo_cfg, yolo_weights, yolo_classes)
-
-        # CARLA Actors（车辆、相机）
+        self.detector = detector
         self.vehicle = None
         self.camera = None
-
-        # Pygame显示
         self.display = None
         self.running = True
 
     def _spawn_actors(self):
-        """生成车辆和相机传感器"""
-        # 生成车辆（Tesla Model3）
         vehicle_bp = self.blueprint_library.filter("model3")[0]
         spawn_points = self.world.get_map().get_spawn_points()
         self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_points[0])
-        self.vehicle.set_autopilot(True)  # 开启自动驾驶（可改为False手动控制）
+        self.vehicle.set_autopilot(True)
 
-        # 生成RGB相机（安装在车辆前方）
+        # 降低相机分辨率（进一步减少计算量）
         camera_bp = self.blueprint_library.find("sensor.camera.rgb")
-        camera_bp.set_attribute("image_size_x", "800")  # 图像宽度
-        camera_bp.set_attribute("image_size_y", "600")  # 图像高度
-        camera_bp.set_attribute("fov", "90")           # 视野角度
-        # 相机位置：车辆前方1.5m，上方2.4m
-        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
+        camera_bp.set_attribute("image_size_x", "640")
+        camera_bp.set_attribute("image_size_y", "480")
+        camera_bp.set_attribute("fov", "90")
+        camera_transform = carla.Transform(
+            carla.Location(x=0.8, y=0, z=1.2),
+            carla.Rotation(pitch=-1)
+        )
         self.camera = self.world.spawn_actor(
             camera_bp, camera_transform, attach_to=self.vehicle
         )
-
-        # 注册相机回调（处理图像并检测）
         self.camera.listen(self._process_image)
 
     def _process_image(self, image: carla.Image):
-        """相机图像回调：转换格式→目标检测→可视化"""
         if not self.running:
             return
-
-        # 将CARLA图像（BGRA）转换为OpenCV格式（BGR）
+        # 转换图像格式并确保内存连续
         img = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
             (image.height, image.width, 4)
-        )[:, :, :3]  # 去除Alpha通道
+        )[:, :, :3]
+        img = np.ascontiguousarray(img)
 
-        # 目标检测
-        detections = self.detector.detect(img)
+        try:
+            detections = self.detector.detect(img)
+        except Exception as e:
+            print(f"检测出错：{e}")
+            detections = []
 
         # 绘制检测框
         for (x1, y1, x2, y2, class_name, conf) in detections:
-            # 绘制矩形框（绿色，线宽2）
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            # 绘制标签（类别+置信度）
             label = f"{class_name}: {conf:.2f}"
             cv2.putText(
                 img, label, (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2
             )
 
-        # 转换为Pygame格式（BGR→RGB + 维度交换）
+        # Pygame渲染优化：使用convert()加速
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        surf = pygame.surfarray.make_surface(img_rgb.swapaxes(0, 1))
+        surf = pygame.surfarray.make_surface(img_rgb.swapaxes(0, 1)).convert()
         self.display.blit(surf, (0, 0))
         pygame.display.flip()
 
     def run(self):
-        """启动主循环"""
+        pygame.init()
+        self.display = pygame.display.set_mode(
+            (640, 480), pygame.HWSURFACE | pygame.DOUBLEBUF
+        )
+        pygame.display.set_caption("CARLA 目标检测（YOLOv3-Tiny）")
+        self._spawn_actors()
+        print("程序启动成功！按ESC键退出...")
+
         try:
-            # 初始化Pygame
-            pygame.init()
-            self.display = pygame.display.set_mode(
-                (800, 600), pygame.HWSURFACE | pygame.DOUBLEBUF
-            )
-            pygame.display.set_caption("CARLA + YOLOv3 目标检测")
-
-            # 生成车辆和相机
-            self._spawn_actors()
-            print("启动成功！按ESC键退出...")
-
-            # 主循环
             while self.running:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
@@ -190,29 +157,25 @@ class CarlaObjectDetector:
                     elif event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_ESCAPE:
                             self.running = False
-                time.sleep(0.01)  # 降低CPU占用
-
+                time.sleep(0.01)
         except Exception as e:
-            print(f"运行出错：{e}")
+            print(f"运行错误：{e}")
         finally:
-            # 清理资源
             self.running = False
             if self.camera:
                 self.camera.destroy()
-                print("相机已销毁")
             if self.vehicle:
                 self.vehicle.destroy()
-                print("车辆已销毁")
             pygame.quit()
-            print("程序已退出")
 
 
 if __name__ == "__main__":
-    # YOLO模型文件路径（确保与脚本在同一目录）
-    YOLO_CFG = "yolov3.cfg"
-    YOLO_WEIGHTS = "yolov3.weights"
+    # 需下载YOLOv3-Tiny的cfg和weights（轻量版，速度更快）
+    # 下载地址：https://pjreddie.com/media/files/yolov3-tiny.weights
+    #          https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg
+    YOLO_CFG = "yolov3-tiny.cfg"
+    YOLO_WEIGHTS = "yolov3-tiny.weights"
     YOLO_CLASSES = "coco.names"
-
-    # 启动检测
-    detector = CarlaObjectDetector(YOLO_CFG, YOLO_WEIGHTS, YOLO_CLASSES)
-    detector.run()
+    detector = YOLOv3TinyDetector(YOLO_CFG, YOLO_WEIGHTS, YOLO_CLASSES)
+    carla_detector = CarlaObjectDetector(detector)
+    carla_detector.run()
