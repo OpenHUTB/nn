@@ -102,7 +102,7 @@ def avoid_obstacle():
 
 
 # 控制参数
-throttle = 0.3  # 油门
+throttle = 0.4  # 油门
 steer = 0.0  # 转向角
 
 try:
