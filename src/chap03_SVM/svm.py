@@ -1,211 +1,133 @@
 import numpy as np
 import os
 
-
 def load_data(fname):
     """载入数据。"""
-    if not os.path.exists(fname):
-        raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}")
-    with open(fname, 'r') as f:
-        data = []
+    # 检查文件是否存在，确保数据加载的可靠性
+    if not os.path.exists(fname): 
+        raise FileNotFoundError(f"数据文件未找到: {fname}\n请确认文件路径是否正确，当前工作目录为: {os.getcwd()}") # 如果文件不存在，抛出异常
+    with open(fname, 'r') as f: # 打开文件
+        data = [] # 初始化一个空列表，用于存储数据
         line = f.readline()  # 跳过表头行
         for line in f:
-            line = line.strip().split()
-            x1 = float(line[0])
-            x2 = float(line[1])
-            t = int(line[2])
+            line = line.strip().split()  # 去除空白并按空格分割
+            x1 = float(line[0])  # 特征1：例如坐标x
+            x2 = float(line[1])  # 特征2：例如坐标y
+            t = int(line[2])     # 标签：0或1
             data.append([x1, x2, t])
-        return np.array(data)
-
+        return np.array(data)  # 返回numpy数组，便于矩阵运算
 
 def eval_acc(label, pred):
-    """计算准确率。"""
-    return np.sum(label == pred) / len(pred)
+    """计算准确率。
+    
+    参数:
+        label: 真实标签的数组
+        pred: 预测标签的数组
+        
+    返回:
+        准确率 (0到1之间的浮点数)
+    """
+    return np.sum(label == pred) / len(pred)  # 正确预测的样本比例
 
-
-class KernelSVM:
-    """核函数SVM（支持线性、多项式、高斯核）"""
-
-    def __init__(self, kernel='linear', degree=3, gamma=0.1, C=1.0, max_iter=1000):
-        self.kernel = kernel
-        self.degree = degree
-        self.gamma = gamma
-        self.C = C
-        self.max_iter = max_iter
-        self.alpha = None
-        self.b = None
-        self.X_train = None
-        self.y_train = None
-        self.support_vectors = None
-        self.support_vector_labels = None
-
-    def kernel_function(self, x1, x2):
-        """核函数"""
-        if self.kernel == 'linear':
-            return np.dot(x1, x2)
-        elif self.kernel == 'poly':
-            return (np.dot(x1, x2) + 1) ** self.degree
-        elif self.kernel == 'rbf':
-            return np.exp(-self.gamma * np.linalg.norm(x1 - x2) ** 2)
-        else:
-            raise ValueError("不支持的核函数类型")
+class SVM:
+    """SVM模型：基于最大间隔分类的监督学习算法。"""
+#支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
+    def __init__(self):
+        # 超参数设置
+        self.learning_rate = 0.01  # 控制梯度下降步长
+        self.reg_lambda = 0.01     # L2正则化系数，平衡间隔最大化与分类误差
+        self.max_iter = 1000       # 最大训练迭代次数
+        self.w = None              # 权重向量，决定分类超平面的方向
+        self.b = None              # 偏置项，决定分类超平面的位置
 
     def train(self, data_train):
-        """训练核函数SVM"""
-        X = data_train[:, :2]
-        y = data_train[:, 2]
-        y = np.where(y == 0, -1, 1)  # 转换为{-1, 1}
-        m, n = X.shape
+        """训练SVM模型（基于hinge loss + L2正则化）
+        
+        算法核心：
+        1. 寻找能最大化间隔的超平面 wx + b = 0
+        2. 间隔定义为：样本到超平面的最小距离
+        3. 使用hinge loss处理分类错误和边界样本
+        4. 添加L2正则化防止过拟合
+        """
+        X = data_train[:, :2]         # 提取特征矩阵
+        y = data_train[:, 2]          # 提取标签
+        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，符合SVM理论要求
+        m, n = X.shape                # m:样本数，n:特征数
 
-        self.X_train = X
-        self.y_train = y
+        # 初始化模型参数
+        self.w = np.zeros(n)  # 权重向量初始化为0
+        self.b = 0            # 偏置项初始化为0
 
-        # 初始化参数
-        self.alpha = np.zeros(m)
-        self.b = 0
+        for epoch in range(self.max_iter):
+            # 计算函数间隔：y(wx+b)，衡量样本到超平面的距离和方向
+            margin = y * (np.dot(X, self.w) + self.b)
+            
+            # 找出违反间隔条件的样本（margin < 1）
+            # 这些样本包括：误分类样本(margin<0)和间隔内样本(0<=margin<1)
+            idx = np.where(margin < 1)[0]
+            
+            # 如果所有样本都满足margin>=1，说明已找到完美超平面
+            # 移除continue语句，确保即使所有样本都满足间隔条件
+            # 也会更新权重以优化正则化项
 
-        # 简化的SMO算法
-        for _ in range(self.max_iter):
-            for i in range(m):
-                # 计算预测误差
-                Ei = self.decision_function(X[i]) - y[i]
+            # 计算梯度：正则化项梯度 + 误分类样本梯度
+            # L2正则化：减小权重，防止过拟合
+            # hinge loss梯度：只对误分类和边界样本计算梯度
+            dw = (2 * self.reg_lambda * self.w) - (np.sum(y[idx, None] * X[idx], axis=0) / len(y)) if len(
+                idx) > 0 else 2 * self.reg_lambda * self.w
+            db = -np.mean(y[idx]) if len(idx) > 0 else 0
 
-                # 检查KKT条件
-                if (y[i] * Ei < -0.001 and self.alpha[i] < self.C) or \
-                        (y[i] * Ei > 0.001 and self.alpha[i] > 0):
-
-                    # 随机选择另一个样本
-                    j = np.random.randint(0, m)
-                    while j == i:
-                        j = np.random.randint(0, m)
-
-                    Ej = self.decision_function(X[j]) - y[j]
-
-                    # 保存旧的alpha值
-                    alpha_i_old = self.alpha[i]
-                    alpha_j_old = self.alpha[j]
-
-                    # 计算边界
-                    if y[i] != y[j]:
-                        L = max(0, self.alpha[j] - self.alpha[i])
-                        H = min(self.C, self.C + self.alpha[j] - self.alpha[i])
-                    else:
-                        L = max(0, self.alpha[i] + self.alpha[j] - self.C)
-                        H = min(self.C, self.alpha[i] + self.alpha[j])
-
-                    if L == H:
-                        continue
-
-                    # 计算eta
-                    eta = 2 * self.kernel_function(X[i], X[j]) - \
-                          self.kernel_function(X[i], X[i]) - \
-                          self.kernel_function(X[j], X[j])
-
-                    if eta >= 0:
-                        continue
-
-                    # 更新alpha[j]
-                    self.alpha[j] -= y[j] * (Ei - Ej) / eta
-
-                    # 裁剪alpha[j]
-                    if self.alpha[j] > H:
-                        self.alpha[j] = H
-                    if self.alpha[j] < L:
-                        self.alpha[j] = L
-
-                    # 检查alpha[j]变化是否显著
-                    if abs(self.alpha[j] - alpha_j_old) < 1e-5:
-                        continue
-
-                    # 更新alpha[i]
-                    self.alpha[i] += y[i] * y[j] * (alpha_j_old - self.alpha[j])
-
-                    # 更新偏置b
-                    b1 = self.b - Ei - y[i] * (self.alpha[i] - alpha_i_old) * \
-                         self.kernel_function(X[i], X[i]) - \
-                         y[j] * (self.alpha[j] - alpha_j_old) * \
-                         self.kernel_function(X[i], X[j])
-
-                    b2 = self.b - Ej - y[i] * (self.alpha[i] - alpha_i_old) * \
-                         self.kernel_function(X[i], X[j]) - \
-                         y[j] * (self.alpha[j] - alpha_j_old) * \
-                         self.kernel_function(X[j], X[j])
-
-                    if 0 < self.alpha[i] < self.C:
-                        self.b = b1
-                    elif 0 < self.alpha[j] < self.C:
-                        self.b = b2
-                    else:
-                        self.b = (b1 + b2) / 2
-
-        # 提取支持向量
-        sv_indices = self.alpha > 1e-5
-        self.support_vectors = X[sv_indices]
-        self.support_vector_labels = y[sv_indices]
-        self.alpha = self.alpha[sv_indices]
-
-    def decision_function(self, x):
-        """决策函数"""
-        result = 0
-        for i in range(len(self.alpha)):
-            result += self.alpha[i] * self.support_vector_labels[i] * \
-                      self.kernel_function(self.support_vectors[i], x)
-        return result + self.b
+            # 梯度下降更新参数
+            self.w -= self.learning_rate * dw # 权重更新：w = w - η*dw/dw
+            self.b -= self.learning_rate * db # 偏置更新：b = b - η*db/db
+            
+            # 训练逻辑总结：
+            # - 对误分类样本，向正确方向调整超平面
+            # - 对间隔内样本，微调超平面使其远离
+            # - 正则化项约束权重大小，使间隔更平滑
 
     def predict(self, x):
-        """预测标签"""
-        if len(x.shape) == 1:
-            # 单样本预测
-            score = self.decision_function(x)
-            return 1 if score >= 0 else 0
-        else:
-            # 多样本预测
-            scores = np.array([self.decision_function(xi) for xi in x])
-            return np.where(scores >= 0, 1, 0)
-
-
-def test_kernel_svm():
-    """测试核函数SVM"""
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    train_file = os.path.join(base_dir, 'data', 'train_kernel.txt')
-    test_file = os.path.join(base_dir, 'data', 'test_kernel.txt')
-
-    # 加载数据
-    data_train = load_data(train_file)
-    data_test = load_data(test_file)
-
-    # 测试不同核函数
-    kernels = ['linear', 'poly', 'rbf']
-
-    print("=== 核函数SVM比较 ===")
-    for kernel in kernels:
-        if kernel == 'linear':
-            svm = KernelSVM(kernel='linear', C=1.0)
-        elif kernel == 'poly':
-            svm = KernelSVM(kernel='poly', degree=3, C=1.0)
-        else:  # rbf
-            svm = KernelSVM(kernel='rbf', gamma=0.1, C=1.0)
-
-        # 训练模型
-        svm.train(data_train)
-
-        # 预测
-        x_train = data_train[:, :2]
-        t_train = data_train[:, 2]
-        x_test = data_test[:, :2]
-        t_test = data_test[:, 2]
-
-        train_pred = svm.predict(x_train)
-        test_pred = svm.predict(x_test)
-
-        # 计算准确率
-        train_acc = eval_acc(t_train, train_pred)
-        test_acc = eval_acc(t_test, test_pred)
-
-        print(f"{kernel.upper()}核SVM - 训练集准确率: {train_acc * 100:.1f}%, 测试集准确率: {test_acc * 100:.1f}%")
-        print(f"  支持向量数量: {len(svm.support_vectors)}")
-
+        """预测标签。
+        数学原理:
+        决策函数: f(x) = w·x + b
+        决策边界: w·x + b = 0
+        预测逻辑：
+        1. 计算样本到超平面的有符号距离 wx + b
+        2. 距离为正 -> 预测为正类(1)
+        3. 距离为负 -> 预测为负类(0)
+        """
+        score = np.dot(x, self.w) + self.b     # 计算决策函数值
+        return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签格式
 
 if __name__ == '__main__':
-    # 运行核函数SVM测试
-    test_kernel_svm()
+    # 数据加载部分以及数据路径配置
+    base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
+    train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
+    test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
+
+    # 加载训练数据
+    data_train = load_data(train_file)
+    # 加载测试数据
+    data_test = load_data(test_file)
+
+    # 模型训练
+    svm = SVM()            # 初始化SVM模型
+    svm.train(data_train)  # 训练模型寻找最优超平面
+
+    # 训练集评估
+    x_train = data_train[:, :2]  # 训练特征
+    t_train = data_train[:, 2]   # 训练标签
+    t_train_pred = svm.predict(x_train)  # 预测训练集标签
+
+    # 测试集评估
+    x_test = data_test[:, :2]    # 测试特征
+    t_test = data_test[:, 2]     # 测试标签
+    t_test_pred = svm.predict(x_test)  # 预测测试集标签
+
+    # 计算并打印准确率
+    acc_train = eval_acc(t_train, t_train_pred)  # 训练集准确率
+    acc_test = eval_acc(t_test, t_test_pred)     # 测试集准确率
+    
+    print("train accuracy: {:.1f}%".format(acc_train * 100))  # 输出训练集准确率
+    print("test accuracy: {:.1f}%".format(acc_test * 100))  # 输出测试集准确率
+
