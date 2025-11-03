@@ -8,8 +8,6 @@ from typing import List, Tuple
 
 
 class YOLOv3TinyDetector:
-    """使用YOLOv3-Tiny（轻量版，速度提升50%+）"""
-
     def __init__(self, cfg_path: str, weights_path: str, classes_path: str):
         self._check_file_exists(cfg_path, weights_path, classes_path)
         self.net = cv2.dnn.readNetFromDarknet(cfg_path, weights_path)
@@ -19,9 +17,8 @@ class YOLOv3TinyDetector:
         with open(classes_path, "r") as f:
             self.classes = [line.strip() for line in f.readlines()]
 
-        # YOLOv3-Tiny输出层（固定值）
-        self.output_layers = ["yolo_16", "yolo_23"]
-        self.conf_threshold = 0.2  # 进一步降低阈值，提高检测灵敏度
+        self.output_layers = ["yolo_16", "yolo_23"]  # YOLOv3-Tiny输出层
+        self.conf_threshold = 0.2  # 降低阈值以识别远处目标
         self.nms_threshold = 0.25
 
     def _check_file_exists(self, *paths: str):
@@ -31,7 +28,6 @@ class YOLOv3TinyDetector:
 
     def detect(self, image: np.ndarray) -> List[Tuple[int, int, int, int, str, float]]:
         height, width = image.shape[:2]
-        # 预处理：缩小图像尺寸至320x320（进一步降低计算量）
         blob = cv2.dnn.blobFromImage(
             image, 1 / 255.0, (320, 320),
             mean=(0, 0, 0), swapRB=True, crop=False
@@ -48,7 +44,6 @@ class YOLOv3TinyDetector:
                 class_id = np.argmax(scores)
                 confidence = scores[class_id]
                 if confidence > self.conf_threshold:
-                    # 转换为原图像坐标（因输入尺寸缩小，需按比例还原）
                     center_x = int(detection[0] * width)
                     center_y = int(detection[1] * height)
                     w = int(detection[2] * width)
@@ -59,17 +54,15 @@ class YOLOv3TinyDetector:
                     confidences.append(float(confidence))
                     class_ids.append(class_id)
 
-        # 彻底修复indices迭代错误：强制转换为列表，无论单元素还是多元素
+        # 核心修复：强制转换为可迭代列表
         indices_arr = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_threshold, self.nms_threshold)
         indices = []
         if len(indices_arr) > 0:
-            indices_arr = np.squeeze(indices_arr).astype(int)
-            # 若为单个int，包装成列表；若为数组，转成列表
-            indices = [indices_arr] if isinstance(indices_arr, np.integer) else indices_arr.tolist()
+            indices = indices_arr.flatten().tolist()  # 确保是列表
 
         results = []
         for i in indices:
-            i = int(i)  # 强制确保为int
+            i = int(i)
             if 0 <= i < len(boxes):
                 x, y, w, h = boxes[i]
                 x1, y1, x2, y2 = x, y, x + w, y + h
@@ -96,11 +89,10 @@ class CarlaObjectDetector:
         self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_points[0])
         self.vehicle.set_autopilot(True)
 
-        # 降低相机分辨率（进一步减少计算量）
         camera_bp = self.blueprint_library.find("sensor.camera.rgb")
         camera_bp.set_attribute("image_size_x", "640")
         camera_bp.set_attribute("image_size_y", "480")
-        camera_bp.set_attribute("fov", "90")
+        camera_bp.set_attribute("fov", "100")  # 增大FOV以捕捉更多远处目标
         camera_transform = carla.Transform(
             carla.Location(x=0.8, y=0, z=1.2),
             carla.Rotation(pitch=-1)
@@ -113,7 +105,6 @@ class CarlaObjectDetector:
     def _process_image(self, image: carla.Image):
         if not self.running:
             return
-        # 转换图像格式并确保内存连续
         img = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
             (image.height, image.width, 4)
         )[:, :, :3]
@@ -125,7 +116,6 @@ class CarlaObjectDetector:
             print(f"检测出错：{e}")
             detections = []
 
-        # 绘制检测框
         for (x1, y1, x2, y2, class_name, conf) in detections:
             cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
             label = f"{class_name}: {conf:.2f}"
@@ -134,7 +124,6 @@ class CarlaObjectDetector:
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2
             )
 
-        # Pygame渲染优化：使用convert()加速
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         surf = pygame.surfarray.make_surface(img_rgb.swapaxes(0, 1)).convert()
         self.display.blit(surf, (0, 0))
@@ -145,7 +134,7 @@ class CarlaObjectDetector:
         self.display = pygame.display.set_mode(
             (640, 480), pygame.HWSURFACE | pygame.DOUBLEBUF
         )
-        pygame.display.set_caption("CARLA 目标检测（YOLOv3-Tiny）")
+        pygame.display.set_caption("CARLA 目标检测（修复版）")
         self._spawn_actors()
         print("程序启动成功！按ESC键退出...")
 
@@ -170,9 +159,6 @@ class CarlaObjectDetector:
 
 
 if __name__ == "__main__":
-    # 需下载YOLOv3-Tiny的cfg和weights（轻量版，速度更快）
-    # 下载地址：https://pjreddie.com/media/files/yolov3-tiny.weights
-    #          https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg
     YOLO_CFG = "yolov3-tiny.cfg"
     YOLO_WEIGHTS = "yolov3-tiny.weights"
     YOLO_CLASSES = "coco.names"
