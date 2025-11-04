@@ -73,8 +73,8 @@ class SVM:
             # 计算梯度：正则化项梯度 + 误分类样本梯度
             # L2正则化：减小权重，防止过拟合
             # hinge loss梯度：只对误分类和边界样本计算梯度
-            dw = (2 * self.reg_lambda * self.w) - (np.sum(y[idx, None] * X[idx], axis=0) / m if len(idx) > 0 else 0)
-
+            dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m if len(
+                idx) > 0 else 2 * self.reg_lambda * self.w
             db = -np.mean(y[idx]) if len(idx) > 0 else 0
 
             # 梯度下降更新参数
