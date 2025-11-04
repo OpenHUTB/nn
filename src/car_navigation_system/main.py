@@ -13,7 +13,6 @@ settings = world.get_settings()
 settings.synchronous_mode = True  # 同步模式，便于控制
 world.apply_settings(settings)
 
-# 获取地图 spawn 点
 spawn_points = world.get_map().get_spawn_points()
 if not spawn_points:
     raise Exception("No spawn points available")
@@ -102,7 +101,7 @@ def avoid_obstacle():
 
 
 # 控制参数
-throttle = 0.4  # 油门
+throttle = 0.5  # 更改油门
 steer = 0.0  # 转向角
 
 try:
