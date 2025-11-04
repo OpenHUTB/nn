@@ -1,0 +1,12 @@
+<launch>
+    <!-- 人形机器人起身控制节点 -->
+    <node name="humanoid_standup"
+            pkg="humanoid_motion"  
+            type="main_humanoid.py"
+            output="screen">
+        <!-- 控制参数（可根据需要调整） -->
+        <param name="kp_gain" value="5.0" />  <!-- 比例增益 -->
+        <!-- 模型路径（相对功能包的路径） -->
+        <param name="model_path" value="xml/humanoid.xml" />
+    </node>
+</launch>

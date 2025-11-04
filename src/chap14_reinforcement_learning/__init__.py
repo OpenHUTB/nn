@@ -366,12 +366,7 @@ for game in ['air_raid', 'alien', 'amidar', 'assault', 'asterix', 'asteroids', '
     for obs_type in ['image', 'ram']:
         # 生成环境名称（如将space_invaders转换为SpaceInvaders）
         name = ''.join(g.capitalize() for g in game.split('_'))
-        if obs_type == 'ram':
-            name = f'{name}-ram'  # RAM观测版本添加-ram后缀（使用游戏内存状态而非图像）
-            
-        # 处理特殊游戏的非确定性（仅ElevatorAction-ram-v0有此问题）
-        nondeterministic = False
-        if game == 'elevator_action' and obs_type == 'ram':
-            nondeterministic = True
+        name = f'{name}-ram' if obs_type == 'ram' else name  # RAM观测版本添加-ram后缀（使用游戏内存状态而非图像）
+        nondeterministic = (game == 'elevator_action' and obs_type == 'ram')  # 仅ElevatorAction-ram-v0具有非确定性
 
         # 注册基础版本（v0）：包含动作重复概率（模拟真实游戏机
