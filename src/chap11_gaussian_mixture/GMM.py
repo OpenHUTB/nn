@@ -261,8 +261,8 @@ class GaussianMixtureModel:
             # 重新计算调整后的协方差矩阵的行列式
             sign, logdet = np.linalg.slogdet(sigma)
 
-            # 计算协方差矩阵的逆
-            inv = np.linalg.inv(sigma)
+            # 使用solve方法计算逆矩阵，更稳定高效
+            inv = np.linalg.solve(sigma, np.eye(n_features))
             
             # 计算二次型：(x-μ)^T·Σ^(-1)·(x-μ)
             # 使用einsum高效计算多个样本的二次型
