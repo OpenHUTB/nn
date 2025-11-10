@@ -1,0 +1,9 @@
+<robot name="mycar">
+    <link name="base_link">
+        <visual>
+            <geometry>
+                <mesh filename="package://urdf01_rviz/meshes/autolabor_mini.stl"/>
+            </geometry>
+        </visual>
+    </link>
+</robot>
