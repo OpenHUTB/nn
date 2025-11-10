@@ -1,6 +1,6 @@
 # 参考：https://github.com/Tiryoh/actions-mkdocs
 name: Testing
-on:  [workflow_dispatch]
+on: [push, pull_request]
 
 
 jobs:
