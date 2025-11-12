@@ -257,13 +257,13 @@ try:
         # 动态调整油门：根据障碍物距离
         if need_avoid:
             if min_dist < 8.0:
-                throttle = 0.2  # 很近时减速
+                throttle = 0.15  # 很近时减速
             elif min_dist < 15.0:
-                throttle = 0.3  # 较近时减速
+                throttle = 0.25  # 较近时减速
             else:
                 throttle = 0.4  # 保持一定速度
         else:
-            throttle = 0.5  # 正常速度
+            throttle = 0.4  # 正常速度
 
         # 应用控制
         vehicle.apply_control(carla.VehicleControl(
