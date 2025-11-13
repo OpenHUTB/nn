@@ -42,7 +42,7 @@ mkdocs serve
 ## 参考
 
 * [代理模拟器文档](https://openhutb.github.io)
-* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://github.com/google-deepmind/mujoco/network/dependents) （整理之后的 [链接](https://openhutb.github.io/doc/pedestrian/humanoid/) ） 的实现
+* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
 
 
