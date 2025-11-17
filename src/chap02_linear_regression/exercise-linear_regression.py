@@ -250,32 +250,21 @@ def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
 
 
 # 程序主入口（建议不要改动以下函数的接口）
+# 程序主入口（建议不要改动以下函数的接口）
 if __name__ == "__main__":
     # 定义训练和测试数据文件路径
     train_file = "train.txt"  # 训练集文件
     test_file = "test.txt"  # 测试集文件
     # 载入数据
-    x_train, y_train = load_data(
-        train_file
-    )  # 从文件加载训练数据，返回特征矩阵x_train和标签向量y_train
-    x_test, y_test = load_data(
-        test_file
-    )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)  # x_train.shape 返回训练集特征矩阵的维度信息
-    print(x_test.shape)  # x_test.shape 返回测试集特征矩阵的维度信息
+    x_train, y_train = load_data(train_file)
+    x_test, y_test = load_data(test_file)
+    print(x_train.shape)
+    print(x_test.shape)
 
     # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
-    # f: 预测函数 y = f(x)
-    # w_lsq: 通过最小二乘法得到的权重向量
-    # w_gd: 通过梯度下降法得到的权重向量
     f, w_lsq, w_gd = main(x_train, y_train)
-    y_pred = f(x_test)
-    mse = np.mean((y_test - y_pred) ** 2)
-    print(f"均方误差(MSE): {mse:.4f}")
-    print("\n最小二乘法权重:")
-    print(w_lsq)
-    print("\n梯度下降法权重:")
-    print(w_gd)
+    y_test_pred = f(x_test)  # 修改这一行：将y_pred改为y_test_pred
+    # 删除下面三行关于MSE和权重的打印
     
 
 def evaluate(ys, ys_pred):
