@@ -15,63 +15,62 @@ MODEL_PATH = r'D:\Work\T_Unmanned_vehicle_AD_DQN\models\YY_best_74.00.model'  # 
 
 if __name__ == '__main__':
 
-    # Memory fraction
+    # GPU内存配置
     gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=MEMORY_FRACTION)
     tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options)))
 
-    # Load the model
+    # 加载训练好的模型
     model = load_model(MODEL_PATH)
 
-    # Create environment
+    # 创建测试环境
     env = CarEnv()
 
-    # For agent speed measurements - keeps last 60 frametimes
+    # FPS计数器 - 保存最近60帧的时间
     fps_counter = deque(maxlen=60)
 
-    # Initialize predictions - first prediction takes longer as of initialization that has to be done
-    # It's better to do a first prediction then before we start iterating over episode steps
+    # 初始化预测 - 第一次预测需要较长时间进行初始化
     model.predict(np.ones((1, env.im_height, env.im_width, 3)))
 
-    # Loop over episodes
+    # 循环测试多个episode
     while True:
 
-        print('Restarting episode')
+        print('开始新的测试轮次')
 
-        # Reset environment and get initial state
+        # 重置环境并获取初始状态
         current_state = env.reset()
-        env.collision_hist = []
+        env.collision_hist = []  # 重置碰撞历史
 
         done = False
 
-        # Loop over steps
+        # 单次episode内的循环
         while True:
 
-            # For FPS counter
+            # FPS计数开始
             step_start = time.time()
 
-            # Show current frame
-            cv2.imshow(f'Agent - preview', current_state)
+            # 显示当前帧
+            cv2.imshow(f'智能体预览', current_state)
             cv2.waitKey(1)
 
-            # Predict an action based on current observation space
+            # 基于当前观察空间预测动作
             qs = model.predict(np.array(current_state).reshape(-1, *current_state.shape)/255)[0]
-            action = np.argmax(qs)
+            action = np.argmax(qs)  # 选择Q值最大的动作
 
-            # Step environment (additional flag informs environment to not break an episode by time limit)
+            # 执行环境步进
             new_state, reward, done, _ = env.step(action)
 
-            # Set current step for next loop iteration
+            # 更新当前状态
             current_state = new_state
 
-            # If done - agent crashed, break an episode
+            # 如果完成（碰撞等），结束当前episode
             if done:
                 break
 
-            # Measure step time, append to a deque, then print mean FPS for last 60 frames, q values and taken action
+            # 计算帧时间，更新FPS计数器，打印统计信息
             frame_time = time.time() - step_start
             fps_counter.append(frame_time)
-            print(f'Agent: {len(fps_counter)/sum(fps_counter):>4.1f} FPS | Action: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action} | Reward: {reward}')
+            print(f'智能体: {len(fps_counter)/sum(fps_counter):>4.1f} FPS | 动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action} | 奖励: {reward}')
 
-        # Destroy an actor at end of episode
+        # episode结束时销毁所有actor
         for actor in env.actor_list:
             actor.destroy()
