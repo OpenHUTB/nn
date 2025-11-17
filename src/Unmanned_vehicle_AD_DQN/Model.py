@@ -1,3 +1,4 @@
+# Model.py
 import glob
 import os
 import sys
@@ -12,7 +13,7 @@ from tensorflow.keras.applications.xception import Xception
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input, Concatenate, Conv2D, AveragePooling2D, Activation, \
-    Flatten, Dropout, BatchNormalization
+    Flatten, Dropout, BatchNormalization, MaxPooling2D
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import TensorBoard
@@ -20,52 +21,39 @@ import tensorflow as tf
 import tensorflow.keras.backend as backend
 from threading import Thread
 from Environment import *
+from Hyperparameters import *
 
 
 # Own Tensorboard class
 class ModifiedTensorBoard(TensorBoard):
-
-    # Overriding init to set initial step and writer (we want one log file for all .fit() calls)
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._log_write_dir = self.log_dir
         self.step = 1
         self.writer = self.writer = tf.summary.create_file_writer(self.log_dir)
 
-    # Overriding this method to stop creating default log writer
     def set_model(self, model):
         self.model = model
-        #
         self._train_dir = os.path.join(self._log_write_dir, 'train')
         self._train_step = self.model._train_counter
-        #
         self._val_dir = os.path.join(self._log_write_dir, 'validation')
         self._val_step = self.model._test_counter
-        #
         self._should_write_train_graph = False
 
-    # Overrided, saves logs with our step number
-    # (otherwise every .fit() will start writing from 0th step)
     def on_epoch_end(self, epoch, logs=None):
         self.update_stats(**logs)
 
-    # Overrided
-    # We train for one batch only, no need to save anything at epoch end
     def on_batch_end(self, batch, logs=None):
         pass
 
-    # Overrided, so won't close writer
     def on_train_end(self, logs=None):
         pass
 
-    # Custom method for saving own metrics
-    # Creates writer, writes custom metrics and closes writer
     def update_stats(self, **stats):
         with self.writer.as_default():
             for key, value in stats.items():
                 tf.summary.scalar(key, value, step=self.step)
                 self.writer.flush()
-                # self.step = self.step + 10
 
 
 class DQNAgent:
@@ -86,26 +74,47 @@ class DQNAgent:
         self.training_initialized = False
 
     def create_model(self):
+        # 使用更强大的网络架构
         model = Sequential()
-
-        model.add(Conv2D(64, (3, 3), input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same'))
+        
+        # 第一卷积块
+        model.add(Conv2D(32, (5, 5), strides=(2, 2), input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same'))
         model.add(Activation('relu'))
-        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-
+        model.add(BatchNormalization())
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        
+        # 第二卷积块
         model.add(Conv2D(64, (3, 3), padding='same'))
         model.add(Activation('relu'))
-        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-
-        model.add(Conv2D(64, (3, 3), padding='same'))
+        model.add(BatchNormalization())
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        
+        # 第三卷积块
+        model.add(Conv2D(128, (3, 3), padding='same'))
         model.add(Activation('relu'))
-        model.add(AveragePooling2D(pool_size=(5, 5), strides=(3, 3), padding='same'))
-
+        model.add(BatchNormalization())
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        
+        # 第四卷积块
+        model.add(Conv2D(256, (3, 3), padding='same'))
+        model.add(Activation('relu'))
+        model.add(BatchNormalization())
+        
         model.add(Flatten())
-
-        model.add(Dense(3, activation='softmax'))  # Three output units for binary classification
-
-        # model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
-        model.compile(loss="mse", optimizer=Adam(lr=0.001), metrics=["accuracy"])
+        
+        # 全连接层
+        model.add(Dense(512, activation='relu'))
+        model.add(Dropout(0.3))
+        model.add(Dense(256, activation='relu'))
+        model.add(Dropout(0.3))
+        model.add(Dense(128, activation='relu'))
+        model.add(Dropout(0.2))
+        
+        # 输出层 - 使用线性激活函数用于Q值回归
+        model.add(Dense(3, activation='linear'))
+        
+        # 使用更稳定的优化器配置
+        model.compile(loss="huber", optimizer=Adam(lr=LEARNING_RATE), metrics=["mae"])
         return model
 
     def update_replay_memory(self, transition):
@@ -113,50 +122,54 @@ class DQNAgent:
         self.replay_memory.append(transition)
 
     def minibatch_chooser(self):
-        # Initialize lists to store dangerous and non-dangerous samples
-        dangerous_samples = []
-        non_dangerous_samples = []
-
-        # Iterate over the replay memory
+        # 改进的经验采样策略
+        if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
+            return random.sample(self.replay_memory, min(len(self.replay_memory), MINIBATCH_SIZE))
+            
+        # 分类经验
+        positive_samples = []    # 高奖励
+        negative_samples = []    # 负奖励/碰撞
+        neutral_samples = []     # 中性奖励
+        
         for sample in self.replay_memory:
-            current_state, action, reward, new_state, done = sample
-
-            # Check if the reward is considered low
-            if reward < LOW_REWARD_THRESHOLD:
-                # Append the sample to the dangerous samples list
-                dangerous_samples.append(sample)
-            else:
-                # Append the sample to the non-dangerous samples list
-                non_dangerous_samples.append(sample)
-
-        # Shuffle the dangerous and non-dangerous samples
-        random.shuffle(dangerous_samples)
-
-        successful_counter = 0
-        successful_samples = []
-        for sample in non_dangerous_samples:
-            if sample[2] == 2 and successful_counter < SUCCESSFUL_THRESHOLD:
-                successful_counter += 1
-                successful_samples.append(sample)
-
-        random.shuffle(non_dangerous_samples)
-
-        # Determine the number of dangerous and non-dangerous samples to include in the minibatch
-        num_dangerous_samples = min(len(dangerous_samples), MINIBATCH_SIZE // 8)
-        remaining_samples = MINIBATCH_SIZE - num_dangerous_samples - successful_counter
-
-        # Select dangerous and non-dangerous samples for the minibatch
-        minibatch = random.sample(dangerous_samples, num_dangerous_samples) + random.sample(self.replay_memory,
-                                                                                            remaining_samples) + successful_samples
-        random.shuffle(minibatch)
-        return minibatch
+            _, _, reward, _, done = sample
+            
+            if done and reward < -5:  # 碰撞或严重错误
+                negative_samples.append(sample)
+            elif reward > 1:  # 积极经验
+                positive_samples.append(sample)
+            else:  # 中性经验
+                neutral_samples.append(sample)
+        
+        # 平衡采样
+        batch = []
+        
+        # 采样负经验 (20%)
+        num_negative = min(len(negative_samples), MINIBATCH_SIZE // 5)
+        batch.extend(random.sample(negative_samples, num_negative))
+        
+        # 采样正经验 (30%)
+        num_positive = min(len(positive_samples), MINIBATCH_SIZE // 3)
+        batch.extend(random.sample(positive_samples, num_positive))
+        
+        # 用中性经验补全批次
+        remaining = MINIBATCH_SIZE - len(batch)
+        if remaining > 0:
+            batch.extend(random.sample(neutral_samples, min(remaining, len(neutral_samples))))
+        
+        # 从整个记忆库随机采样
+        if len(batch) < MINIBATCH_SIZE:
+            additional = MINIBATCH_SIZE - len(batch)
+            batch.extend(random.sample(self.replay_memory, additional))
+            
+        random.shuffle(batch)
+        return batch
 
     def train(self):
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
             return
 
         minibatch = self.minibatch_chooser()
-        # minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
         print([transition[2] for transition in minibatch])
 
         current_states = np.array([transition[0] for transition in minibatch]) / 255
@@ -207,7 +220,6 @@ class DQNAgent:
         while True:
             if self.terminate:
                 return
-            # print("Memory: ", len(self.replay_memory))
             self.train()
             time.sleep(0.01)
 
