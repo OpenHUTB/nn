@@ -1,3 +1,4 @@
+# Test.py
 import random
 from collections import deque
 import numpy as np
@@ -7,11 +8,10 @@ import tensorflow as tf
 import tensorflow.keras.backend as backend
 from tensorflow.keras.models import load_model
 from Environment import CarEnv, MEMORY_FRACTION
-from Hyperparameters import*
+from Hyperparameters import *
 
 
-
-MODEL_PATH = 'models\YY___153.00max____0.00avg__153.00min__1761010159.model'
+MODEL_PATH = r'D:\Work\T_Unmanned_vehicle_AD_DQN\models\YY_best_74.00.model'  # 请替换为实际的最佳模型路径
 
 if __name__ == '__main__':
 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
             # Measure step time, append to a deque, then print mean FPS for last 60 frames, q values and taken action
             frame_time = time.time() - step_start
             fps_counter.append(frame_time)
-            print(f'Agent: {len(fps_counter)/sum(fps_counter):>4.1f} FPS | Action: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action}')
+            print(f'Agent: {len(fps_counter)/sum(fps_counter):>4.1f} FPS | Action: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action} | Reward: {reward}')
 
         # Destroy an actor at end of episode
         for actor in env.actor_list:
