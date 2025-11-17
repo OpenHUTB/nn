@@ -198,9 +198,8 @@ if __name__ == '__main__':
         # 执行一次训练步骤，返回损失、准确率、当前的权重 W 和偏置 b
         loss, accuracy, W_opt, b_opt = train_one_step(model, opt, x, y)
         # 将当前的权重W的第一个元素、第二个元素、偏置b和损失值添加到animation_frames中
-        
-        W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy(), loss.numpy()
-        animation_frames.append((W_opt[0, 0], W_opt[1, 0], b_opt, loss))
+
+        animation_frames.append((W_opt.numpy()[0, 0], W_opt.numpy()[1, 0], b_opt.numpy()[0], loss.numpy()))
         if i % 20 == 0:
             print(f'loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}')
 
