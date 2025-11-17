@@ -355,4 +355,5 @@ print(f"- 测试样本: {len(test_dataset)}")
 print(f"- 最佳模型: {os.path.join(base_dir, 'best_model.pth')}")
 print(f"- 最终模型: {os.path.join(base_dir, 'final_model.pth')}")
 print(f"- 训练曲线: {os.path.join(base_dir, 'training_plot.png')}")
+
 print("=" * 50)
