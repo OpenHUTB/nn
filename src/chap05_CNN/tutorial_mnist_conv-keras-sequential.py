@@ -44,7 +44,7 @@ def mnist_dataset():
     # 创建测试数据集管道
     test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test))
     test_ds = test_ds.map(prepare_mnist_features_and_labels)
-    test_ds = test_ds.take(20000).shuffle(20000).batch(20000) # 对取出的 20000 个样本进行随机打乱，shuffle 的参数 20000 表示缓冲区大小，用于随机打乱数据
+    test_ds = test_ds.take(10000).batch(10000) # 对取出的 10000 个测试样本进行批量处理，批量大小为10000
     # 返回数据集 ds 和处理后的测试数据集 test_ds
     return ds, test_ds
 
@@ -127,4 +127,4 @@ model.fit(train_ds, epochs=5)
 # evaluate 方法会计算并返回模型在测试数据集上的损失值和评估指标（例如准确率）。
 # 这一步骤用来验证模型的泛化能力，确保模型不仅仅是在训练集上表现良好。
 # 在测试集上评估模型，批次大小设为100
-model.evaluate(test_ds, batch_size=100)
+model.evaluate(test_ds)
