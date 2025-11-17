@@ -60,8 +60,9 @@ def convert_model(input_path: str, output_path: str) -> bool:
     返回:
         转换成功返回True，失败返回False
     """
-    model, _ = load_model(input_path)
-    if not model:
+    # 修复点：加载模型时同时获取model和data（原代码只用到了model，忽略了data）
+    model, data = load_model(input_path)
+    if not model or not data:
         return False
 
     # 确保输出目录存在
@@ -79,8 +80,9 @@ def convert_model(input_path: str, output_path: str) -> bool:
             mujoco.save_model(model, output_path)
             logger.info(f"二进制模型已保存至: {output_path}")
         else:
-            # 处理XML格式保存
-            xml_content = mujoco.mj_saveLastXMLToString(model, output_path)
+            # 修复核心bug：mj_saveLastXMLToString需要接收MjData实例，而非MjModel
+            # 同时使用正确的XML保存流程，确保模型参数完整导出
+            xml_content = mujoco.mj_saveLastXMLToString(data)
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(xml_content)
             logger.info(f"XML模型已保存至: {output_path}")
@@ -117,8 +119,13 @@ def test_speed(
         logger.error("线程数必须为正数")
         return
 
-    # 生成控制噪声
-    ctrl = ctrlnoise * np.random.randn(nstep, model.nu)
+    # 生成控制噪声（处理model.nu=0的情况）
+    if model.nu > 0:
+        ctrl = ctrlnoise * np.random.randn(nstep, model.nu)
+    else:
+        ctrl = None
+        logger.warning("模型无控制输入（nu=0），将跳过控制噪声设置")
+        
     logger.info(f"开始速度测试: 线程数={nthread}, 每线程步数={nstep}")
 
     def simulate_thread(thread_id: int) -> float:
@@ -126,7 +133,8 @@ def test_speed(
         mj_data = mujoco.MjData(model)
         start = time.perf_counter()
         for i in range(nstep):
-            mj_data.ctrl[:] = ctrl[i]
+            if ctrl is not None:
+                mj_data.ctrl[:] = ctrl[i]
             mujoco.mj_step(model, mj_data)
         end = time.perf_counter()
         duration = end - start
@@ -219,4 +227,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    
