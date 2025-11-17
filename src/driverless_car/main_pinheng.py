@@ -291,7 +291,7 @@ def visualize_control(model):
             history['pos'] = history['pos'][:, -max_history:]
             history['actions'] = history['actions'][:, -max_history:]
 
-        # 更新3D无人机图
+        #  更新3D无人机图
         draw_drone(ax3d, state)
 
         # 更新姿态角度图
