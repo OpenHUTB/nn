@@ -434,47 +434,24 @@ try:
         else:
             # 正常行驶 - 使用强力油门
             brake = 0.0
-            steer = base_steer*0.1
+            steer = base_steer * 0.5
 
             # 强力油门策略
             if vehicle_speed < 2.0:  # 低速时最大油门
-                throttle = 0.5
-            elif vehicle_speed < 5.0:
                 throttle = 0.4
-            elif vehicle_speed < 7.0:
+            elif vehicle_speed < 5.0:
                 throttle = 0.3
-            else:
+            elif vehicle_speed < 7.0:
                 throttle = 0.2
+            else:
+                throttle = 0.1
 
         # 应用平滑滤波
         steer_filter.append(steer)
         throttle_filter.append(throttle)
 
-        main
         smoothed_steer = np.mean(steer_filter)
         smoothed_throttle = np.mean(throttle_filter)
-
-        else:
-            # 无障碍物时保持直行或回正
-            if abs(steer) > 0.1:
-                steer *= 0.85  # 平滑回正
-            else:
-                steer = 0.0
-            avoid_state = 0
-            avoid_timer = 0
-            recovery_timer = 0
-
-        # 动态调整油门：根据障碍物距离
-        if need_avoid:
-            if min_dist < 8.0:
-                throttle = 0.15  # 很近时减速
-            elif min_dist < 15.0:
-                throttle = 0.25  # 较近时减速
-            else:
-                throttle = 0.4  # 保持一定速度
-        else:
-            throttle = 0.4  # 正常速度
-        main
 
         # 应用强力控制
         control = carla.VehicleControl(
