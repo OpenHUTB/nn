@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 # coding: utf-8
-# numpy 的 array 操作
+"""
+运行环境要求：
+- Python 3.6+
+- 必需库：
+  numpy >= 1.19.0
+  matplotlib >= 3.3.0
 
-# 1. 导入 numpy 库
-import numpy as np                    # 将 numpy 库命名为 np
-import matplotlib.pyplot as plt       # 仅保留需要使用的导入
-# import 放一起代码美观
+安装命令：
+pip install numpy matplotlib
 
+或使用requirements.txt：
+pip install -r requirements.txt
+"""
+
+# 1. numpy 的 array 操作
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 # 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
@@ -15,7 +25,7 @@ def question_2():
     print("第二题：\n") #格式修改为缩进
 # 创建一个一维NumPy数组，存储整数类型的数值
 # 数组元素为[4, 5, 6]，数据类型默认推断为numpy.int64
-# 形状：a.shape = (3,)，表示包含3个元素的一维数组     
+# 形状：a.shape = (3,)，表示包含3个元素的一维数组
     a = np.array([4, 5, 6])
 
     print("(1) 输出 a 的类型（type）\n", type(a))
@@ -75,18 +85,18 @@ def question_7(a):
     print("第七题：")
 
 # -2: 提取最后两行的所有列元素
-    c = a[-2:, :]  
+    c = a[-2:, :]
     print("(1) 输出 c \n", c)
 # -1 表示选取该行的最后一个元素
-    print("(2) 输出 c 中第一行的最后一个元素\n", c[0, -1]) 
+    print("(2) 输出 c 中第一行的最后一个元素\n", c[0, -1])
 
 # 8. 建立数组 a, 创建数组 a 为 [[1, 2], [3, 4], [5, 6]]，输出 （0,0）（1,1）（2,0） 这三个元素（提示： 使用 print(a[[0, 1, 2], [0, 1, 0]]) ）
 def question_8():
     print("第八题：")
 
     a = np.array([[1, 2], [3, 4], [5, 6]])
-# a[行索引列表, 列索引列表] 表示依次获取到的元素是第 0 行第 0 列的 1 、第 1 行第 1 列的 4 、第 2 行第 0 列的 5 
-    print("输出:\n", a[[0, 1, 2], [0, 1, 0]])  
+# a[行索引列表, 列索引列表] 表示依次获取到的元素是第 0 行第 0 列的 1 、第 1 行第 1 列的 4 、第 2 行第 0 列的 5
+    print("输出:\n", a[[0, 1, 2], [0, 1, 0]])
 
 # 9：使用NumPy高级索引提取矩阵特定元素
 def question_9():
@@ -95,19 +105,19 @@ def question_9():
 # 创建一个4行3列的二维数组（矩阵）a，并初始化数值
 # 矩阵结构：
 # 第0行: [1,  2,  3]
-# 第1行: [4,  5,  6] 
+# 第1行: [4,  5,  6]
 # 第2行: [7,  8,  9]
 # 第3行: [10, 11, 12]
 
-    a = np.array([[1, 2, 3], 
-              [4, 5, 6], 
-              [7, 8, 9], 
+    a = np.array([[1, 2, 3],
+              [4, 5, 6],
+              [7, 8, 9],
               [10, 11, 12]])
 
 # 创建一个列索引数组b，用于指定每行要提取的元素所在的列
 # b[0]=0: 第0行取第0列
 # b[1]=2: 第1行取第2列
-# b[2]=0: 第2行取第0列 
+# b[2]=0: 第2行取第0列
 # b[3]=1: 第3行取第1列
     b = np.array([0, 2, 0, 1])
 
@@ -215,7 +225,7 @@ def question_21(x):
 def question_22(x):
     print("第二十二题：")
 
-    print("e 的指数：np.exp(x)")  
+    print("e 的指数：np.exp(x)")
     print(np.exp(x))
 
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
@@ -228,7 +238,6 @@ def question_23(x):
     print("验证 - 每行最大值:", np.max(x, axis=1))  # 显示每行的实际最大值
     print("验证 - 每列最大值:", np.max(x, axis=0))  # 显示每列的实际最大值
 
-# 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 def question_24():
     print("第二十四题：绘制二次函数")
     x = np.arange(0, 100, 0.1)
@@ -253,7 +262,7 @@ def question_25():
     y_sin = np.sin(x)  # 计算对应的正弦值
     y_cos = np.cos(x)  # 计算对应的余弦值
 
-    plt.figure(figsize=(10, 6))  # 创建一个图像窗口，设置大小为 10×6 英寸 
+    plt.figure(figsize=(10, 6))  # 创建一个图像窗口，设置大小为 10×6 英寸
     plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
     plt.plot(x, y_cos, label="y = cos(x)", color="red")  # 绘制余弦函数曲线
 
@@ -269,7 +278,7 @@ def question_25():
     plt.legend(loc='best')
 
     # 自动调整布局，防止标签被截断
-    plt.tight_layout() 
+    plt.tight_layout()
 
     # 显示图像
     plt.show()
