@@ -140,3 +140,4 @@ dmypy.json
 # Ignoring Data folder
 data/train/
 data/test/
+
