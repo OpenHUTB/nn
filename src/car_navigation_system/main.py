@@ -422,29 +422,29 @@ try:
 
         # 综合控制输出 - 简化逻辑，专注于让车动起来
         if emergency_brake:
-            throttle = 0.0
-            brake = 1.0
-            steer = base_steer * 0.3
+            throttle = 0.2
+            brake = 0.1
+            steer = base_steer * 0.1
             print("!!! 紧急制动 !!!")
         elif detection_result['obstacle_detected']:
             brake = avoid_brake
-            throttle = 0.8  # 避障时也保持高油门
-            steer = avoid_steer * 0.8 + base_steer * 0.2
+            throttle = 0.4  # 避障时也保持高油门
+            steer = avoid_steer * 0.1 + base_steer * 0.1
             print(f"避障中 - 距离:{detection_result['min_distance']:.1f}m")
         else:
             # 正常行驶 - 使用强力油门
             brake = 0.0
-            steer = base_steer
+            steer = base_steer*0.1
 
             # 强力油门策略
-            if vehicle_speed < 10.0:  # 低速时最大油门
-                throttle = 1.0
-            elif vehicle_speed < 20.0:
-                throttle = 0.8
-            elif vehicle_speed < 30.0:
-                throttle = 0.6
-            else:
+            if vehicle_speed < 2.0:  # 低速时最大油门
+                throttle = 0.5
+            elif vehicle_speed < 5.0:
                 throttle = 0.4
+            elif vehicle_speed < 7.0:
+                throttle = 0.3
+            else:
+                throttle = 0.2
 
         # 应用平滑滤波
         steer_filter.append(steer)
