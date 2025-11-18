@@ -62,7 +62,7 @@ test_data = torchvision.datasets.MNIST(root='./mnist/', train=False)
 # 预处理测试数据：转换为 Variable（旧版PyTorch自动求导机制） ，调整维度（原始MNIST是28x28，需要变为1x28x28），转换为FloatTensor类型，归一化到[0,1]范围（/255.），只取前500个样本
 test_x = Variable(torch.unsqueeze(test_data.test_data, dim=1), volatile=True).type(torch.FloatTensor)[:500]/255.
 # 获取测试集的标签（前500个），并转换为 numpy 数组
-test_y = test_data.test_labels[:500].numpy()
+test_y = test_data.targets[:500].numpy()
 
 # 定义CNN模型
 class CNN(nn.Module):
@@ -117,16 +117,15 @@ class CNN(nn.Module):
 # 测试函数 - 评估模型在测试集上的准确率
 def test(cnn):
     global prediction  # 使用全局变量prediction保存预测结果
-    
+
     # 模型预测：输入测试数据，得到原始输出logits（未归一化的预测值）
-    y_pre = cnn(test_x)  
-    
+    y_pre = cnn(test_x)
+
     # 计算softmax概率分布（将logits转换为概率值，dim=1表示对类别维度做归一化）
-    y_prob = F.softmax(y_pre, dim=1)
-    
+
     # 获取预测类别：找到每个样本概率最大的类别索引
     # torch.max返回(最大值, 最大值的索引)
-    _, pre_index = torch.max(y_prob, 1) 
+    _, pre_index = torch.max(y_prob, 1)
     
     # 调整张量形状为1维向量（例如从[N,1]变为[N]）
     pre_index = pre_index.view(-1)
@@ -156,7 +155,7 @@ def train(cnn):
             x, y = Variable(x_), Variable(y_)
             output = cnn(x)                         # 前向传播得到预测结果
             loss = loss_func(output, y)             # 计算损失
-            optimizer.zero_grad(set_to_none=True)   # 清空模型参数的梯度缓存，set_to_none=True可减少内存占用
+            optimizer.zero_grad()   # 清空模型参数的梯度缓存，set_to_none=True可减少内存占用
             loss.backward()                         # 反向传播计算梯度
             optimizer.step()                        # 更新参数
 
