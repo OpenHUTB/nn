@@ -290,11 +290,8 @@ def reduce_avg(reduce_target, lengths, dim):
     # 应用掩码到目标张量：将掩码区域的值置零
     mask_target = reduce_target * tf.cast(mask, dtype=reduce_target.dtype)
     # 在指定维度上求和（不保留归约后的维度）
-    red_sum = tf.reduce_sum(mask_target, axis=[dim], keepdims=False)
-    # 计算平均值：总和 / 有效元素数量 + 极小值（防止除以零）
-    red_avg = red_sum / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
-    # 返回计算得到的平均值张量
-    return red_avg
+    return tf.reduce_sum(mask_target, axis=[dim], keepdims=False) / (tf.cast(lengths_reshape, dtype=tf.float32) + 1e-30)
+    # 合并计算步骤：直接在返回语句中计算掩码张量在指定维度上的和，然后除以序列长度（加上极小值防止除零错误）
 
 
 # # 定义损失函数和训练函数
