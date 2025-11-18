@@ -1,10 +1,30 @@
-<!-- -->
 <launch>
+  <!-- 
+    Carla自动驾驶仿真中，用于启动"手动控制节点"的launch文件
+    功能：通过键盘/手柄手动控制仿真场景中的目标车辆（如ego_vehicle），实现车辆启停、转向、加减速等操作
+  -->
+
+  <!-- 
+    定义参数"role_name"：指定被控制车辆的角色名称
+    - default="ego_vehicle"：默认值为"ego_vehicle"（Carla中默认的主车辆角色名）
+    - 作用：若场景中有多辆车，可通过修改此参数控制不同角色的车辆（如"vehicle_1"、"truck"等）
+  -->
   <arg name="role_name" default="ego_vehicle"/>
 
+  <!-- 
+    启动Carla手动控制节点：核心功能节点，负责接收用户输入并控制车辆
+    - pkg="carla_manual_control"：节点所属的功能包名称（Carla官方提供的手动控制功能包）
+    - type="carla_manual_control.py"：节点的可执行文件（Python脚本，实现手动控制逻辑）
+    - name="carla_manual_control_$(arg role_name)"：节点名称，通过$(arg role_name)拼接参数值，
+      避免多车辆控制时节点名称冲突（如控制ego_vehicle时，节点名为"carla_manual_control_ego_vehicle"）
+    - output="screen"：节点的日志输出到终端屏幕（方便调试，查看控制状态和报错信息）
+  -->
   <node pkg="carla_manual_control" type="carla_manual_control.py" name="carla_manual_control_$(arg role_name)" output="screen">
+    <!-- 
+      向节点传递参数"role_name"：将外部定义的"role_name"参数值传入节点内部
+      - 作用：节点通过读取此参数，确定当前要控制的车辆角色，避免控制错误目标
+    -->
     <param name="role_name" value="$(arg role_name)"/>
   </node>
 
 </launch>
-
