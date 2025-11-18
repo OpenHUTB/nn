@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
-# 导入必要的系统库和第三方库
 import sys
 import os
-import numpy as np  # 用于数值计算和数组处理
-import cv2  # OpenCV库，用于视频读取、图像处理
-import matplotlib.pyplot as plt  # 用于可视化预测结果
-from tqdm import tqdm  # 进度条显示（本代码未直接使用，保留原导入）
-from tensorflow.keras.models import load_model  # 用于加载预训练的Keras模型
 
-# 导入自定义模块：相机图像变换、模型内参、输出解析工具
+# 直接写死项目根目录（你的nn文件夹路径），无需计算，100%生效
+# 修改此行以适配你的项目结构（示例假设 common 在 ~/nn/src/common）
+sys.path.append('/home/dacun/nn/src')
+
+
+# 以下导入顺序不变
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+from tensorflow.keras.models import load_model
+
+# 现在肯定能找到common模块了
 from common.transformations.camera import transform_img, eon_intrinsics
 from common.transformations.model import medmodel_intrinsics
 from common.tools.lib.parser import parser
+# ... 其余代码不变 ...
+
 
 def frames_to_tensor(frames):
     """
