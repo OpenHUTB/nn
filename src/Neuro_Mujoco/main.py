@@ -60,8 +60,9 @@ def convert_model(input_path: str, output_path: str) -> bool:
     返回:
         转换成功返回True，失败返回False
     """
-    model, _ = load_model(input_path)
-    if not model:
+    # 关键修改1：加载模型时同时获取model和data（原代码只用到model，忽略data）
+    model, data = load_model(input_path)
+    if not model or not data:
         return False
 
     # 确保输出目录存在
@@ -79,8 +80,9 @@ def convert_model(input_path: str, output_path: str) -> bool:
             mujoco.save_model(model, output_path)
             logger.info(f"二进制模型已保存至: {output_path}")
         else:
-            # 处理XML格式保存
-            xml_content = mujoco.mj_saveLastXMLToString(model, output_path)
+            # 关键修改2：修复函数参数错误——传递MjData实例（data）而非MjModel实例（model）
+            # 关键修改3：移除多余的output_path参数（该函数无需指定输出路径，直接返回XML字符串）
+            xml_content = mujoco.mj_saveLastXMLToString(data)
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(xml_content)
             logger.info(f"XML模型已保存至: {output_path}")
@@ -219,4 +221,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    

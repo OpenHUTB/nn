@@ -140,3 +140,7 @@ dmypy.json
 # Ignoring Data folder
 data/train/
 data/test/
+
+data/
+Car-Racing-main/data/
+

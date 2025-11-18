@@ -1,514 +1,366 @@
+# -*- coding: utf-8 -*-
 import carla
 import pygame
-import time
+import logging
 import numpy as np
 import cv2
+import time
 import os
-import logging
-import random
 import shutil
-from threading import Lock
+import threading
+from logging import StreamHandler
+import sys
 from datetime import datetime
+from ultralytics import YOLO
+from sklearn.metrics import precision_score, recall_score, f1_score
 
-# -------------------------- 配置参数 --------------------------
-# 数据集保存路径
-DATASET_ROOT = "carla_dataset"
-IMAGES_DIR = os.path.join(DATASET_ROOT, "images")
-LABELS_DIR = os.path.join(DATASET_ROOT, "labels")
-# 类别映射（CARLA目标→YOLO类别ID）
-CLASS_MAP = {"car": 0, "truck": 1, "bus": 2, "person": 3}
-# 训练参数
-TRAIN_EPOCHS = 50  # 训练轮次
-TRAIN_BATCH_SIZE = 16  # 批次大小
-# --------------------------------------------------------------
+# -------------------------- 配置参数（平衡效率与精度） --------------------------
+class Config:
+    # 检测参数
+    DETECT_CONF = 0.5  # 检测置信度阈值（平衡召回率与误检）
+    DETECT_CLASSES = [0, 2, 3, 5, 7]  # 行人、汽车、摩托、公交、卡车
+    IMG_WIDTH, IMG_HEIGHT = 1024, 768  # 兼顾精度与速度的分辨率
 
-# 初始化数据集目录
-os.makedirs(IMAGES_DIR, exist_ok=True)
-os.makedirs(LABELS_DIR, exist_ok=True)
-logging.basicConfig(
-    filename='dataset_training.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s'
-)
+    # 数据采集参数
+    DATASET_DIR = "carla_yolo_dataset"  # 数据集根目录
+    IMG_DIR = os.path.join(DATASET_DIR, "images")
+    LABEL_DIR = os.path.join(DATASET_DIR, "labels")
 
+    # 训练参数（效率与精度平衡）
+    MODEL_PATH = "yolov8m.pt"  # 中等规模模型（比n大，比x小）
+    TRAIN_EPOCHS = 50  # 基础训练轮次
+    BATCH_SIZE = 8  # 根据GPU显存调整（8G显存推荐8）
+    LEARNING_RATE = 0.001  # 适中学习率
+    RESUME_TRAIN = False  # 是否续训
+    LAST_WEIGHTS = ""  # 续训权重路径
+    MIXED_PRECISION = True  # 混合精度训练（加速且不损失精度）
 
-class YOLODetector:
-    def __init__(self, cfg_path=None, weights_path=None, classes_path="coco.names"):
-        self.classes = self._load_classes(classes_path)
-        # 支持加载自定义训练的模型
-        if cfg_path and weights_path:
-            self.net = cv2.dnn.readNetFromDarknet(cfg_path, weights_path)
-            self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-            self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-            layer_names = self.net.getLayerNames()
-            self.output_layers = [layer_names[i - 1] for i in self.net.getUnconnectedOutLayers()]
-            self.conf_threshold = 0.3
-            self.nms_threshold = 0.3
-        else:
-            self.net = None  # 训练阶段可能不需要检测
-
-    def _load_classes(self, classes_path):
-        with open(classes_path, 'r') as f:
-            return [line.strip() for line in f.readlines()]
-
-    def detect(self, image):
-        if not self.net:
-            return []
-        height, width = image.shape[:2]
-        blob = cv2.dnn.blobFromImage(image, 1/255.0, (256, 256), swapRB=True, crop=False)
-        self.net.setInput(blob)
-        outputs = self.net.forward(self.output_layers)
-
-        boxes = []
-        confidences = []
-        class_ids = []
-
-        for output in outputs:
-            for detection in output:
-                scores = detection[5:]
-                class_id = np.argmax(scores)
-                confidence = scores[class_id]
-                if confidence > self.conf_threshold:
-                    center_x = int(detection[0] * width)
-                    center_y = int(detection[1] * height)
-                    w = int(detection[2] * width)
-                    h = int(detection[3] * height)
-                    x = int(center_x - w/2)
-                    y = int(center_y - h/2)
-                    boxes.append([x, y, w, h])
-                    confidences.append(float(confidence))
-                    class_ids.append(class_id)
-
-        indices = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_threshold, self.nms_threshold)
-        if len(indices) == 0:
-            return []
-        if isinstance(indices, tuple):
-            indices = indices[0] if len(indices) > 0 else []
-        indices = indices.flatten().tolist() if hasattr(indices, 'flatten') else indices
-
-        results = []
-        for i in indices:
-            if 0 <= i < len(boxes):
-                x, y, w, h = boxes[i]
-                class_name = self.classes[class_ids[i]] if 0 <= class_ids[i] < len(self.classes) else "unknown"
-                if class_name in CLASS_MAP:
-                    results.append({
-                        "box": (x, y, x + w, y + h),
-                        "class": class_name,
-                        "confidence": round(confidences[i], 2)
-                    })
-        return results
+    # 评测参数
+    EVAL_INTERVAL = 10  # 每10轮评测一次
 
 
-class DataCollector:
-    """图片标签采集器：保存图像和YOLO格式标签"""
-    def __init__(self):
-        self.sample_count = 0  # 样本计数器
+# -------------------------- 日志与初始化 --------------------------
+def init_logger():
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    handler = StreamHandler(sys.stdout)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+init_logger()
 
-    def save_sample(self, image, ground_truth):
-        """保存单帧数据（图像+标签）"""
-        if not ground_truth:
-            return  # 跳过无真实目标的帧
+
+class CarlaYoloTrainer:
+    def __init__(self, carla_host="localhost", carla_port=2000):
+        # CARLA客户端（仅获取摄像头数据，不生成实体）
+        self.client = carla.Client(carla_host, carla_port)
+        self.client.set_timeout(10.0)
+        self.world = self.client.get_world()
+        self.blueprint_lib = self.world.get_blueprint_library()
+        self.camera = None
+        self.camera_img = None  # 摄像头图像（RGB）
+
+        self.vehicle = None  # 新增：自动驾驶车辆
+
+        # YOLO模型（检测+训练）
+        self.model = YOLO(Config.MODEL_PATH)
+        self.detections = []  # 检测结果缓存
+        self.gt_labels = []  # 真实标签（用于评测）
+        self.pred_labels = []  # 预测标签（用于评测）
+
+        # 训练状态
+        self.is_training = False
+        self.train_thread = None
+        self.pause_training = False
+        self.best_map = 0.0  # 最佳mAP
+
+        # 可视化
+        pygame.init()
+        self.screen = pygame.display.set_mode((Config.IMG_WIDTH, Config.IMG_HEIGHT))
+        pygame.display.set_caption("目标检测与训练系统")
+        self.font = pygame.font.SysFont(["SimHei", "WenQuanYi Micro Hei"], 22)
+
+        # 类别颜色
+        self.class_colors = {
+            "person": (255, 0, 0), "car": (0, 255, 0), "motorcycle": (0, 0, 255),
+            "bus": (255, 255, 0), "truck": (255, 0, 255)
+        }
+        self.default_color = (128, 128, 128)
+
+        # 初始化数据集目录
+        os.makedirs(Config.IMG_DIR, exist_ok=True)
+        os.makedirs(Config.LABEL_DIR, exist_ok=True)
+        self.sample_count = len(os.listdir(Config.IMG_DIR))  # 已有样本数
+
+        # 运行控制
+        self.running = True
+
+
+    # -------------------------- 摄像头初始化（仅获取数据） --------------------------
+    def setup_camera(self):
+        """生成自动驾驶车辆 + 将摄像头挂载到车辆上（实现视角跟随）"""
+        # 1. 生成自动驾驶车辆
+        vehicle_bp = self.blueprint_lib.filter("model3")[0]  # 选择特斯拉Model3蓝图
+        spawn_points = self.world.get_map().get_spawn_points()
+        if not spawn_points:
+            logging.error("CARLA中无可用生成点，无法生成车辆")
+            return
+        self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_points[0])
+        self.vehicle.set_autopilot(True)  # 开启自动驾驶
+        logging.info("生成自动驾驶车辆并开启自动行驶")
+
+        # 2. 将摄像头挂载到车辆车顶（跟随车辆移动）
+        camera_bp = self.blueprint_lib.find("sensor.camera.rgb")
+        camera_bp.set_attribute("image_size_x", str(Config.IMG_WIDTH))
+        camera_bp.set_attribute("image_size_y", str(Config.IMG_HEIGHT))
+        camera_bp.set_attribute("fov", "90")
+        # 摄像头安装位置：车辆前方1.5米、上方2.4米（模拟真实自动驾驶视角）
+        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
+        self.camera = self.world.spawn_actor(
+            camera_bp, camera_transform, attach_to=self.vehicle
+        )
+        self.camera.listen(lambda img: self._process_image(img))
+        logging.info("摄像头已挂载到自动驾驶车辆，视角跟随车辆移动")
+
+
+    def _process_image(self, img):
+        """转换CARLA图像为RGB格式"""
+        img_array = np.frombuffer(img.raw_data, dtype=np.uint8)
+        img_array = img_array.reshape((img.height, img.width, 4))  # BGRA
+        self.camera_img = cv2.cvtColor(img_array, cv2.COLOR_BGRA2RGB)  # 转为RGB
+
+
+    # -------------------------- 自动数据采集与标签生成 --------------------------
+    def collect_data(self):
+        """采集当前帧图像与检测标签（YOLO格式）"""
+        if self.camera_img is None:
+            logging.warning("无图像数据，无法采集")
+            return
 
         # 生成唯一文件名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"frame_{timestamp}_{self.sample_count}"
-        img_path = os.path.join(IMAGES_DIR, f"{filename}.jpg")
-        label_path = os.path.join(LABELS_DIR, f"{filename}.txt")
+        img_name = f"sample_{self.sample_count}_{timestamp}.jpg"
+        img_path = os.path.join(Config.IMG_DIR, img_name)
+        label_path = os.path.join(Config.LABEL_DIR, img_name.replace(".jpg", ".txt"))
 
         # 保存图像
-        cv2.imwrite(img_path, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        cv2.imwrite(img_path, cv2.cvtColor(self.camera_img, cv2.COLOR_RGB2BGR))
 
-        # 生成YOLO格式标签（归一化坐标）
-        height, width = image.shape[:2]
-        with open(label_path, 'w') as f:
-            for gt in ground_truth:
-                cls = gt["class"]
-                if cls not in CLASS_MAP:
-                    continue
-                cls_id = CLASS_MAP[cls]
-                x1, y1, x2, y2 = gt["box"]
-                # 计算中心点和宽高（归一化到0-1）
-                cx = (x1 + x2) / 2 / width
-                cy = (y1 + y2) / 2 / height
-                w = (x2 - x1) / width
-                h = (y2 - y1) / height
-                f.write(f"{cls_id} {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
+        # 生成标签（YOLO格式：class x_center y_center width height（归一化））
+        with open(label_path, "w", encoding="utf-8") as f:
+            for det in self.detections:
+                x, y, w, h = det["bbox"]
+                # 归一化坐标
+                x_center = (x + w/2) / Config.IMG_WIDTH
+                y_center = (y + h/2) / Config.IMG_HEIGHT
+                width = w / Config.IMG_WIDTH
+                height = h / Config.IMG_HEIGHT
+                cls_id = Config.DETECT_CLASSES.index(det["class_id"])  # 映射到0-4
+                f.write(f"{cls_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
 
         self.sample_count += 1
-        logging.info(f"保存样本 {self.sample_count}：{img_path} 和 {label_path}")
-        return self.sample_count
+        logging.info(f"已采集样本 {self.sample_count}：{img_name}")
 
 
-class ModelTrainer:
-    """模型训练器：基于YOLOv5微调模型"""
-    def __init__(self, dataset_root=DATASET_ROOT):
-        self.dataset_root = dataset_root
-        self.yolov5_repo = "https://github.com/ultralytics/yolov5.git"
-        self.requirements = "requirements.txt"
-
-    def _prepare_env(self):
-        """准备训练环境（安装YOLOv5和依赖）"""
-        if not os.path.exists("yolov5"):
-            os.system(f"git clone {self.yolov5_repo}")
-        os.system(f"pip install -r yolov5/{self.requirements}")
-        os.system(f"pip install ultralytics")
-
-    def _split_dataset(self, train_ratio=0.8):
-        """划分训练集和验证集"""
-        images = [f for f in os.listdir(IMAGES_DIR) if f.endswith(".jpg")]
-        random.shuffle(images)
-        train_size = int(len(images) * train_ratio)
-
-        # 创建划分目录
-        for split in ["train", "val"]:
-            os.makedirs(os.path.join(self.dataset_root, split, "images"), exist_ok=True)
-            os.makedirs(os.path.join(self.dataset_root, split, "labels"), exist_ok=True)
-
-        # 复制文件
-        for i, img in enumerate(images):
-            prefix = img.split(".")[0]
-            src_img = os.path.join(IMAGES_DIR, img)
-            src_label = os.path.join(LABELS_DIR, f"{prefix}.txt")
-
-            if i < train_size:
-                split = "train"
-            else:
-                split = "val"
-
-            dst_img = os.path.join(self.dataset_root, split, "images", img)
-            dst_label = os.path.join(self.dataset_root, split, "labels", f"{prefix}.txt")
-            shutil.copy(src_img, dst_img)
-            shutil.copy(src_label, dst_label)
-
-        logging.info(f"数据集划分完成：训练集 {train_size} 张，验证集 {len(images)-train_size} 张")
-
-    def _generate_yaml(self):
-        """生成YOLOv5所需的数据集配置文件"""
-        yaml_content = f"""
-train: {os.path.abspath(os.path.join(self.dataset_root, "train", "images"))}
-val: {os.path.abspath(os.path.join(self.dataset_root, "val", "images"))}
-
-nc: {len(CLASS_MAP)}
-names: {list(CLASS_MAP.keys())}
-        """
-        with open("carla_dataset.yaml", "w") as f:
-            f.write(yaml_content.strip())
-        return "carla_dataset.yaml"
-
-    def train(self):
-        """启动模型训练"""
-        if len(os.listdir(IMAGES_DIR)) < 10:
-            raise ValueError("数据集样本不足（至少需要10张图像），请先采集更多数据")
-
-        print("开始准备训练环境...")
-        self._prepare_env()
-        print("划分训练集和验证集...")
-        self._split_dataset()
-        yaml_path = self._generate_yaml()
-        print(f"开始训练（{TRAIN_EPOCHS}轮）...")
-
-        # 调用YOLOv5训练命令
-        os.system(
-            f"python yolov5/train.py "
-            f"--img 640 "
-            f"--batch {TRAIN_BATCH_SIZE} "
-            f"--epochs {TRAIN_EPOCHS} "
-            f"--data {yaml_path} "
-            f"--weights yolov5s.pt "  # 基于小模型微调，速度快
-            f"--project carla_train_results "
-            f"--name exp"
-        )
-        print("训练完成！模型保存路径：carla_train_results/exp/weights/best.pt")
-        logging.info("模型训练完成，最佳权重保存至 carla_train_results/exp/weights/best.pt")
-
-
-class CarlaDetectionSystem:
-    def __init__(self, detector):
-        self.client = carla.Client("localhost", 2000)
-        self.client.set_timeout(15.0)
-        self.world = self.client.get_world()
-        settings = self.world.get_settings()
-        settings.synchronous_mode = True
-        settings.fixed_delta_seconds = 0.05
-        self.world.apply_settings(settings)
-        self.blueprint_library = self.world.get_blueprint_library()
-        self.detector = detector
-        self.data_collector = DataCollector()  # 数据采集器
-        self.vehicle = None
-        self.camera = None
-        self.camera_bp = self.blueprint_library.find("sensor.camera.rgb")
-        self.display = None
-        self.running = True
-        self.image = None
-        self.lock = Lock()
-        self.frame_count = 0
-        self.collect_data = False  # 是否开启数据采集（默认关闭）
-
-    def _spawn_actors(self):
-        try:
-            spawn_points = self.world.get_map().get_spawn_points()
-            if not spawn_points:
-                print("错误：未找到生成点")
-                return False
-
-            main_vehicle_bp = self.blueprint_library.filter("model3")[0]
-            self.vehicle = self.world.spawn_actor(main_vehicle_bp, spawn_points[0])
-            self.vehicle.set_autopilot(True)
-            print(f"主车辆生成（ID: {self.vehicle.id}）")
-
-            self.camera_bp.set_attribute("image_size_x", "640")
-            self.camera_bp.set_attribute("image_size_y", "480")
-            self.camera_bp.set_attribute("fov", "90")
-            self.camera_bp.set_attribute("sensor_tick", "0.2")
-            camera_transform = carla.Transform(
-                carla.Location(x=1.5, y=0, z=2.0),
-                carla.Rotation(pitch=-2)
-            )
-            self.camera = self.world.spawn_actor(self.camera_bp, camera_transform, attach_to=self.vehicle)
-            self.camera.listen(self._on_image)
-            print("相机生成完成")
-            return True
-        except Exception as e:
-            print(f"生成失败: {e}")
-            return False
-
-    def _get_ground_truth(self):
-        gt = []
-        if not self.camera:
-            return gt
-
-        cam_transform = self.camera.get_transform()
-        cam_loc = cam_transform.location
-        cam_rot = cam_transform.rotation
-        width, height = 640, 480
-        fov = float(self.camera_bp.get_attribute("fov"))
-        fx = width / (2 * np.tan(np.radians(fov) / 2))
-        fy = fx
-        cx, cy = width / 2, height / 2
-
-        for actor in self.world.get_actors():
-            is_vehicle = actor.type_id.startswith("vehicle.")
-            is_walker = actor.type_id.startswith("walker.pedestrian.")
-            if not (is_vehicle or is_walker):
-                continue
-            if self.vehicle and actor.id == self.vehicle.id:
-                continue
-
-            try:
-                actor_loc = actor.get_transform().location
-                actor_bbox = actor.bounding_box
-            except:
-                continue
-
-            if actor_loc.distance(cam_loc) > 50:
-                continue
-
-            bbox_2d = self._project_3d_to_2d(
-                actor_loc, actor_bbox, cam_loc, cam_rot, fx, fy, cx, cy
-            )
-            if bbox_2d:
-                x1, y1, x2, y2 = bbox_2d
-                cls = "car" if is_vehicle else "person"
-                gt.append({"box": (x1, y1, x2, y2), "class": cls})
-        return gt
-
-    def _project_3d_to_2d(self, loc, bbox, cam_loc, cam_rot, fx, fy, cx, cy):
-        dx = loc.x - cam_loc.x
-        dy = loc.y - cam_loc.y
-        dz = loc.z - cam_loc.z
-
-        pitch = np.radians(cam_rot.pitch)
-        yaw = np.radians(cam_rot.yaw)
-        roll = np.radians(cam_rot.roll)
-
-        cos_p, sin_p = np.cos(pitch), np.sin(pitch)
-        cos_y, sin_y = np.cos(yaw), np.sin(yaw)
-        cos_r, sin_r = np.cos(roll), np.sin(roll)
-
-        R = np.array([
-            [cos_y * cos_p, cos_y * sin_p * sin_r - sin_y * cos_r, cos_y * sin_p * cos_r + sin_y * sin_r],
-            [sin_y * cos_p, sin_y * sin_p * sin_r + cos_y * cos_r, sin_y * sin_p * cos_r - cos_y * sin_r],
-            [-sin_p, cos_p * sin_r, cos_p * cos_r]
-        ])
-
-        x_cam, y_cam, z_cam = R @ np.array([dx, dy, dz])
-        if z_cam < 0.5:
-            return None
-
-        px = (fx * x_cam) / z_cam + cx
-        py = (fy * y_cam) / z_cam + cy
-
-        bbox_width = bbox.extent.x * 2
-        bbox_height = bbox.extent.z * 2
-        w = int((fx * bbox_width) / z_cam)
-        h = int((fy * bbox_height) / z_cam)
-
-        x1 = max(0, int(px - w//2))
-        y1 = max(0, int(py - h//2))
-        x2 = min(639, int(px + w//2))
-        y2 = min(479, int(py + h//2))
-        return (x1, y1, x2, y2)
-
-    def _calculate_iou(self, box1, box2):
-        x1, y1, x2, y2 = box1
-        x1g, y1g, x2g, y2g = box2
-
-        inter_x1 = max(x1, x1g)
-        inter_y1 = max(y1, y1g)
-        inter_x2 = min(x2, x2g)
-        inter_y2 = min(y2, y2g)
-        inter_area = max(0, inter_x2 - inter_x1) * max(0, inter_y2 - inter_y1)
-
-        area1 = (x2 - x1) * (y2 - y1)
-        area2 = (x2g - x1g) * (y2g - y1g)
-        union_area = area1 + area2 - inter_area
-
-        return inter_area / union_area if union_area > 0 else 0
-
-    def _evaluate_precision(self, detections, ground_truth):
-        gt_count = len(ground_truth)
-        det_count = len(detections)
-        correct_count = 0
-        matched_gt = [False] * gt_count
-
-        for det in detections:
-            det_box = det["box"]
-            det_cls = det["class"]
-            for i, gt in enumerate(ground_truth):
-                if matched_gt[i]:
-                    continue
-                gt_box = gt["box"]
-                gt_cls = gt["class"]
-                if det_cls == gt_cls and self._calculate_iou(det_box, gt_box) > 0.3:
-                    correct_count += 1
-                    matched_gt[i] = True
-                    break
-
-        recall = correct_count / gt_count if gt_count > 0 else 0.0
-        precision = correct_count / det_count if det_count > 0 else 0.0
-        return {
-            "recall": round(recall, 2),
-            "precision": round(precision, 2),
-            "gt_count": gt_count,
-            "det_count": det_count,
-            "correct_count": correct_count
-        }
-
-    def _on_image(self, image):
-        with self.lock:
-            if self.running:
-                self.image = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
-                    (image.height, image.width, 4)
-                )[:, :, [2, 1, 0]]
-
-    def run(self):
-        pygame.init()
-        self.display = pygame.display.set_mode(
-            (640, 480), pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.HWACCEL
-        )
-        pygame.display.set_caption("CARLA 检测系统（带数据采集和训练）")
-
-        if not self._spawn_actors():
-            self.cleanup()
+    # -------------------------- 模型训练（支持断点续训） --------------------------
+    def train_model(self):
+        """训练线程（不阻塞检测可视化）"""
+        if not os.listdir(Config.IMG_DIR):
+            logging.error("数据集为空，无法训练，请先采集数据")
+            self.is_training = False
             return
 
-        print("程序运行中！按键说明：")
-        print(" - ESC: 退出程序")
-        print(" - C: 开启/关闭数据采集（默认关闭）")
-        print(" - T: 开始模型训练（需先采集足够数据）")
+        # 准备训练配置
+        train_args = {
+            "data": self._generate_data_yaml(),  # 自动生成数据集配置
+            "epochs": Config.TRAIN_EPOCHS,
+            "batch": Config.BATCH_SIZE,
+            "lr0": Config.LEARNING_RATE,
+            "device": "0" if self._check_cuda() else "cpu",
+            "imgsz": (Config.IMG_HEIGHT, Config.IMG_WIDTH),
+            "mixed_precision": "fp16" if Config.MIXED_PRECISION else "None",
+            "project": "carla_yolo_results",
+            "name": "train",
+            "save_period": 5,  # 每5轮保存一次权重
+            "resume": Config.RESUME_TRAIN and Config.LAST_WEIGHTS != ""
+        }
 
-        trainer = ModelTrainer()  # 初始化训练器
+        # 加载续训权重
+        if Config.RESUME_TRAIN and Config.LAST_WEIGHTS:
+            self.model = YOLO(Config.LAST_WEIGHTS)
+            logging.info(f"从 {Config.LAST_WEIGHTS} 继续训练")
+
+        # 开始训练
+        logging.info("开始训练...")
         try:
-            while self.running:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        self.running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_ESCAPE:
-                            self.running = False
-                        elif event.key == pygame.K_c:
-                            self.collect_data = not self.collect_data
-                            status = "开启" if self.collect_data else "关闭"
-                            print(f"数据采集已{status}")
-                        elif event.key == pygame.K_t:
-                            print("开始模型训练...")
-                            try:
-                                trainer.train()
-                                print("训练完成！可加载新模型继续检测")
-                            except Exception as e:
-                                print(f"训练失败: {e}")
-
-                self.world.tick()
-                self.frame_count += 1
-
-                with self.lock:
-                    if self.image is not None:
-                        img = self.image.copy()
-                        detections = self.detector.detect(img)
-                        ground_truth = self._get_ground_truth()
-
-                        # 数据采集（按C开启后）
-                        if self.collect_data and ground_truth:
-                            self.data_collector.save_sample(img, ground_truth)
-
-                        # 绘制真实目标（红框）
-                        for gt in ground_truth:
-                            x1, y1, x2, y2 = gt["box"]
-                            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                            cv2.putText(
-                                img, f"GT:{gt['class']}", (x1, y1-5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2
-                            )
-
-                        # 绘制检测结果（绿框）
-                        for det in detections:
-                            x1, y1, x2, y2 = det["box"]
-                            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            cv2.putText(
-                                img, f"Det:{det['class']}", (x1, y1-5),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2
-                            )
-
-                        # 显示数据采集状态
-                        cv2.putText(
-                            img, f"采集: {'开' if self.collect_data else '关'}", (10, 65),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2
-                        )
-
-                        surf = pygame.surfarray.make_surface(img.swapaxes(0, 1))
-                        self.display.blit(surf, (0, 0))
-                        pygame.display.flip()
-
-                time.sleep(0.01)
+            for epoch in range(Config.TRAIN_EPOCHS):
+                if not self.is_training:  # 外部终止
+                    break
+                if self.pause_training:  # 暂停
+                    while self.pause_training and self.is_training:
+                        time.sleep(1)
+                # 单轮训练
+                self.model.train(**train_args, epochs=epoch+1, resume=True)
+                # 定期评测
+                if (epoch + 1) % Config.EVAL_INTERVAL == 0:
+                    self.evaluate_model()
         except Exception as e:
-            print(f"运行错误: {e}")
+            logging.error(f"训练出错：{str(e)}")
         finally:
-            self.cleanup()
+            self.is_training = False
+            logging.info("训练结束，保存最终权重")
+            final_weight = os.path.join("carla_yolo_results", "train", "weights", "last.pt")
+            Config.LAST_WEIGHTS = final_weight
+            logging.info(f"最终权重保存至：{final_weight}")
 
-    def cleanup(self):
-        self.running = False
-        settings = self.world.get_settings()
-        settings.synchronous_mode = False
-        self.world.apply_settings(settings)
-        if self.camera:
-            self.camera.stop()
+
+    def _generate_data_yaml(self):
+        """自动生成YOLO训练所需的data.yaml"""
+        yaml_path = os.path.join(Config.DATASET_DIR, "data.yaml")
+        with open(yaml_path, "w", encoding="utf-8") as f:
+            f.write(f"""
+train: {os.path.abspath(Config.IMG_DIR)}
+val: {os.path.abspath(Config.IMG_DIR)}  # 简化：用训练集当验证集，实际应拆分
+nc: {len(Config.DETECT_CLASSES)}
+names: {[self.model.names[c] for c in Config.DETECT_CLASSES]}
+            """.strip())
+        return yaml_path
+
+
+    # -------------------------- 检测精度评测 --------------------------
+    def evaluate_model(self):
+        """评测mAP、Precision、Recall等指标"""
+        if not os.listdir(Config.LABEL_DIR):
+            logging.warning("无标签数据，无法评测")
+            return
+
+        # 加载最新权重
+        latest_weight = os.path.join("carla_yolo_results", "train", "weights", "last.pt")
+        if os.path.exists(latest_weight):
+            self.model = YOLO(latest_weight)
+
+        # 运行验证
+        results = self.model.val(
+            data=self._generate_data_yaml(),
+            imgsz=(Config.IMG_HEIGHT, Config.IMG_WIDTH),
+            device="0" if self._check_cuda() else "cpu"
+        )
+
+        # 输出关键指标
+        logging.info("="*50)
+        logging.info(f"评测结果（mAP@0.5）：{results.box.map50:.4f}")
+        logging.info(f"Precision：{results.box.p:.4f} | Recall：{results.box.r:.4f}")
+        logging.info("="*50)
+
+        # 更新最佳模型
+        if results.box.map50 > self.best_map:
+            self.best_map = results.box.map50
+            shutil.copy2(
+                latest_weight,
+                os.path.join("carla_yolo_results", "train", "weights", "best.pt")
+            )
+            logging.info(f"更新最佳模型（mAP@0.5：{self.best_map:.4f}）")
+
+
+    # -------------------------- 辅助功能 --------------------------
+    def _check_cuda(self):
+        """检查CUDA是否可用"""
+        try:
+            import torch
+            return torch.cuda.is_available()
+        except:
+            return False
+
+
+    def _draw_detections(self):
+        """绘制检测结果与状态信息"""
+        if self.camera_img is not None:
+            # 绘制图像
+            img_surf = pygame.surfarray.make_surface(np.swapaxes(self.camera_img, 0, 1))
+            self.screen.blit(img_surf, (0, 0))
+
+            # 绘制检测框
+            for det in self.detections:
+                x, y, w, h = det["bbox"]
+                cls_name = det["class"]
+                color = self.class_colors.get(cls_name, self.default_color)
+                pygame.draw.rect(self.screen, color, (x, y, w, h), 2)
+                label = f"{cls_name} {det['confidence']:.2f}"
+                self.screen.blit(self.font.render(label, True, color), (x, max(0, y-25)))
+
+        # 绘制状态文本
+        status = [
+            f"样本数: {self.sample_count}",
+            f"训练状态: {'训练中' if self.is_training else '未训练'}",
+            f"最佳mAP: {self.best_map:.4f}"
+        ]
+        for i, text in enumerate(status):
+            self.screen.blit(self.font.render(text, True, (255, 255, 255)), (10, 10 + i*30))
+
+
+    # -------------------------- 主循环 --------------------------
+    def run(self):
+        self.setup_camera()
+        clock = pygame.time.Clock()
+
+        while self.running:
+            # 处理按键事件
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_c:  # 采集数据
+                        self.collect_data()
+                    elif event.key == pygame.K_t and not self.is_training:  # 开始训练
+                        self.is_training = True
+                        self.pause_training = False
+                        self.train_thread = threading.Thread(target=self.train_model, daemon=True)
+                        self.train_thread.start()
+                    elif event.key == pygame.K_p and self.is_training:  # 暂停/继续训练
+                        self.pause_training = not self.pause_training
+                        state = "暂停" if self.pause_training else "继续"
+                        logging.info(f"训练{state}")
+                    elif event.key == pygame.K_v:  # 手动评测
+                        self.evaluate_model()
+                    elif event.key == pygame.K_ESCAPE:  # 退出
+                        self.running = False
+                        self.is_training = False  # 终止训练
+
+            # 实时检测（训练时也保持检测）
+            if self.camera_img is not None and not self.pause_training:
+                results = self.model(
+                    self.camera_img,
+                    conf=Config.DETECT_CONF,
+                    classes=Config.DETECT_CLASSES,
+                    device="0" if self._check_cuda() else "cpu"
+                )
+                # 解析检测结果
+                self.detections = []
+                for result in results:
+                    for box in result.boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        cls_id = int(box.cls[0])
+                        self.detections.append({
+                            "bbox": (x1, y1, x2-x1, y2-y1),
+                            "class": result.names[cls_id],
+                            "class_id": cls_id,
+                            "confidence": float(box.conf[0])
+                        })
+
+            # 刷新画面
+            self._draw_detections()
+            pygame.display.flip()
+            clock.tick(30)
+
+        # 资源清理
+        if self.camera and not self.camera.is_alive():
             self.camera.destroy()
-        if self.vehicle:
-            self.vehicle.destroy()
         pygame.quit()
-        print("程序退出")
+        logging.info("程序退出")
 
 
 if __name__ == "__main__":
-    # 初始使用YOLOv3-tiny，训练后可替换为自定义模型
-    YOLO_CFG = "yolov3-tiny.cfg"
-    YOLO_WEIGHTS = "yolov3-tiny.weights"
-    YOLO_CLASSES = "coco.names"
-
-    try:
-        yolo = YOLODetector(YOLO_CFG, YOLO_WEIGHTS, YOLO_CLASSES)
-        system = CarlaDetectionSystem(yolo)
-        system.run()
-    except Exception as e:
-        print(f"初始化失败: {e}")
+    trainer = CarlaYoloTrainer()
+    trainer.run()
