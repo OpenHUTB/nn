@@ -221,9 +221,12 @@ def question_22(x):
 # 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
 def question_23(x):
     print("第二十三题：")
-    print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
-    print("每列最大值的下标:", np.argmax(x, axis=0))   # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-    print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
+    print("全局最大值的下标:", np.argmax(x))  # 所有元素中最大值的索引
+    print("每列最大值的下标:", np.argmax(x, axis=0))  # 每列最大值的索引
+    print("每行最大值的下标:", np.argmax(x, axis=1))  # 每行最大值的索引
+    print("验证 - 数组 x:\n", x)  # 添加验证输出
+    print("验证 - 每行最大值:", np.max(x, axis=1))  # 显示每行的实际最大值
+    print("验证 - 每列最大值:", np.max(x, axis=0))  # 显示每列的实际最大值
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
 def question_24(): #绘制二次函数 y = x^2 的图像。
