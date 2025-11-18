@@ -1,0 +1,91 @@
+FileVersion: 4
+Uuid: {6508f4f7-7a1b-4dda-8f85-783d75db03f0}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 340 300.54" style="enable-background:new 0 0 340 300.54;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#0079C1;}
+	.st2{fill:#EC1D24;}
+	.st3{clip-path:url(#SVGID_2_);}
+	.st4{fill:none;stroke:#0079C1;stroke-width:10;}
+	.st5{clip-path:url(#SVGID_4_);}
+	.st6{fill:none;stroke:#0079C1;stroke-width:3.7514;}
+	.st7{fill:#FFFFFF;stroke:#0079C1;}
+	.st8{display:none;fill:#FFFFFF;}
+	.st9{fill:#FFFFFF;stroke:#29ABE2;stroke-miterlimit:10;}
+	.st10{fill:#FFFFFF;stroke:#0079C1;stroke-width:0.3;}
+	.st11{clip-path:url(#SVGID_6_);}
+	.st12{fill:none;stroke:#0079C1;stroke-miterlimit:10;}
+	.st13{fill:#E31E26;}
+	.st14{fill:#E10000;}
+	.st15{fill:#FFFFFF;stroke:#1478C7;stroke-width:6;}
+	.st16{fill:#1478C7;}
+	.st17{fill:#E22739;}
+	.st18{fill:none;stroke:#1477C6;}
+	.st19{fill:#231F20;}
+	.st20{fill:none;stroke:#0079C1;stroke-width:2.9228;}
+	.st21{fill:#808080;}
+	.st22{fill:none;stroke:#000000;}
+	.st23{fill:#FFFFFF;stroke:#0079C1;stroke-width:3;}
+	.st24{fill:#FFD421;}
+	.st25{fill:none;stroke:#FFFFFF;stroke-width:2.1836;}
+	.st26{fill:#FFFFFF;stroke:#000000;stroke-width:0.3;}
+	.st27{fill:none;stroke:#EC1D24;stroke-width:90;stroke-linejoin:round;}
+	.st28{fill:#FAFAFB;}
+	.st29{fill:none;stroke:#000000;stroke-width:0.18;stroke-miterlimit:10;}
+	.st30{fill:none;stroke:#231F20;stroke-width:0.5084;stroke-miterlimit:10;}
+	.st31{fill:none;stroke:#EC1D24;stroke-width:10;}
+	.st32{opacity:0.99;enable-background:new    ;}
+	.st33{fill:#4D9523;}
+</style>
+<g>
+	<g id="g10_26_" transform="matrix(1.25,0,0,-1.25,-3.4738088,341.06251)">
+		<path id="path12_15_" inkscape:connector-curvature="0" class="st2" d="M257.14,32.42c6.07,0.14,11.94,3.36,15.24,9
+			c3.24,5.69,3.1,12.39,0.21,17.78L154.17,264.17c-3.13,5.16-8.85,8.63-15.34,8.68c-6.58-0.05-12.31-3.52-15.45-8.68L4.96,59.19
+			C2.09,53.8,1.95,47.1,5.17,41.41c3.31-5.63,9.18-8.85,15.24-9H257.14"/>
+		<path id="path14_23_" inkscape:connector-curvature="0" class="st0" d="M138.83,242.48L31.2,56.12h215.14L138.83,242.48"/>
+		<path id="path16_19_" inkscape:connector-curvature="0" d="M229.62,64.27L218.3,84.06h-66.25V64.27H229.62"/>
+		<path id="path18_16_" inkscape:connector-curvature="0" d="M144.12,82.26l-3.92-7.2l0.85-0.42l3.92,7.2L144.12,82.26"/>
+		<path id="path20_16_" inkscape:connector-curvature="0" d="M145.07,69.99l1.69,4.23l-0.85,0.32l-2.01-4.66l3.07-4.55l0.74,0.53
+			L145.07,69.99"/>
+		<path id="path22_19_" inkscape:connector-curvature="0" d="M131.52,72.95l3.49-7.83l0.85,0.42l-3.39,7.83L131.52,72.95"/>
+		<path id="path24_18_" inkscape:connector-curvature="0" d="M124.64,69.24l0.95-0.21l1.8,10.69l-0.95,0.21L124.64,69.24"/>
+		<path id="path26_16_" inkscape:connector-curvature="0" d="M120.09,78.87l-0.85-0.53l2.43-3.17l-0.21-6.88l0.95-0.11l0.21,7.3
+			L120.09,78.87"/>
+		<path id="path28_14_" inkscape:connector-curvature="0" d="M107.61,66.6l0.53-0.74l4.87,3.17l-0.63,0.74L107.61,66.6"/>
+		<path id="path30_15_" inkscape:connector-curvature="0" d="M99.88,78.24l-1.9,2.96l-0.85-0.53l1.8-2.75v-4.97l1.8-5.82l0.95,0.21
+			l-1.8,5.71V78.24"/>
+		<path id="path32_13_" inkscape:connector-curvature="0" d="M94.06,72.31l-2.75,1.69l-0.53-0.85l2.54-1.48l2.01-4.23l0.85,0.42
+			L94.06,72.31"/>
+		<path id="path34_14_" inkscape:connector-curvature="0" d="M87.39,75.49l-0.95-0.11l0.42-4.44l-0.53-4.23l0.95-0.11l0.63,4.34
+			L87.39,75.49"/>
+		<path id="path36_8_" inkscape:connector-curvature="0" d="M74.91,73.9l3.07-5.71l0.85,0.53l-3.07,5.71L74.91,73.9"/>
+		<path id="path38_9_" inkscape:connector-curvature="0" d="M68.24,70.2l0.95-0.42l3.49,6.77l-0.85,0.42L68.24,70.2"/>
+		<path id="path40_4_" inkscape:connector-curvature="0" d="M59.14,78.56l1.27-9.1l0.95,0.11l-1.27,9.1L59.14,78.56"/>
+		<path id="path42_7_" inkscape:connector-curvature="0" d="M52.16,67.97L53,67.55l3.6,6.98l-0.85,0.42L52.16,67.97"/>
+		<path id="path44_4_" inkscape:connector-curvature="0" d="M65.38,78.98l-1.9-1.38l1.16-1.9l2.86-0.32l0.74,1.8L65.38,78.98"/>
+		<path id="path46_5_" inkscape:connector-curvature="0" d="M65.38,69.88l-1.27-2.43l2.01-0.95l0.53,1.8L65.38,69.88"/>
+		<path id="path48_2_" inkscape:connector-curvature="0" d="M74.48,68.19l-3.17-0.85l4.34-1.9L74.48,68.19"/>
+		<path id="path50_4_" inkscape:connector-curvature="0" d="M82.84,74.96v4.44h-2.96l-0.74-3.49L82.84,74.96"/>
+		<path id="path52_1_" inkscape:connector-curvature="0" d="M95.54,80.57h-2.96l-2.01-3.07l3.7-1.48L95.54,80.57"/>
+		<path id="path54_3_" inkscape:connector-curvature="0" d="M118.82,69.77h-3.39l1.16-3.07L118.82,69.77"/>
+		<path id="path56_4_" inkscape:connector-curvature="0" d="M128.98,68.93l-2.22-1.69l3.07-0.85L128.98,68.93"/>
+		<path id="path58_2_" inkscape:connector-curvature="0" d="M135.97,78.03h-4.23l3.28-2.65L135.97,78.03"/>
+		<path id="path60_3_" inkscape:connector-curvature="0" d="M140.62,68.5v3.17l-1.8,0.95l-1.69-1.48l0.85-2.96L140.62,68.5"/>
+		<path id="path62_2_" inkscape:connector-curvature="0" d="M137.66,92.42c6.81,1.8,22.54,6.88,22.54,6.88l3.07-11.32
+			c0,0,2.24-2.33,6.24-1.27c3.97,1.08,5.08,4.23,5.08,4.23l-3.28,12.38c2.52,2.58,1.48,5.5,1.48,5.5l-4.23,15.87
+			c-1.51,5.49-6.77,4.44-6.77,4.44l-7.51,16.93c-3.17,7.11-9.49,6.8-11.96,6.14l-38.63-10.37c-2.52-0.66-8.15-3.55-7.3-11.32
+			l1.9-18.41c0,0-5.07-1.7-3.6-7.2l4.23-15.87c0,0,0.57-3.06,4.02-4.02l3.28-12.38c0,0,2.63-2.16,6.67-1.06
+			c3.93,1.03,4.76,4.23,4.76,4.23l-3.07,11.32C114.59,87.13,130.77,90.55,137.66,92.42"/>
+		<path id="path64_3_" inkscape:connector-curvature="0" class="st0" d="M128.98,124.7c4.79,1.29,19.23,4.27,23.07,5.29
+			c4.92,1.33,2.75,5.71,2.75,5.71l-2.12,5.08c-2.12,4.29-6.32,5.25-9.63,4.76c-0.59-0.1-11.44-2.21-12.49-2.43l-12.28-3.28
+			c-0.95-0.32-11.4-3.92-11.96-4.13c-3.12-1.23-6.28-4.16-5.93-8.89l0.63-5.5c0,0,0.35-4.89,5.29-3.6
+			C110.16,118.77,124.15,123.41,128.98,124.7"/>
+	</g>
+</g>
+</svg>

@@ -1,0 +1,211 @@
+<?xml version="1.0"?>
+<OpenDriveAssetData>
+	<Objects>
+		<!-- Props -->
+		<Object>
+			<Type>obstacle</Type>
+			<FilePath>Props/TrafficControl/TrafficCone01.fbx</FilePath>
+		</Object>
+		<Object>
+			<Type>tree</Type>
+			<FilePath>Props/Trees/Eucalyptus_Sm01.fbx</FilePath>  
+		</Object>
+		<Object>
+			<Type>vegetation</Type>
+			<FilePath>Props/Trees/Bush_Sm01.fbx</FilePath>  
+		</Object>
+		<Object>
+			<Type>pole</Type>
+			<Height>3</Height>
+			<Name>SignPost_10ft</Name>
+			<FilePath>Props/Signals/SignPost_10ft.fbx</FilePath>  
+		</Object>
+		<Object>
+			<Type>pole</Type>
+			<Height>9</Height>
+			<Name>Signal_Post_30ft</Name>
+			<FilePath>Props/Signals/Signal_Post_30ft.fbx</FilePath>  
+		</Object>
+		<Object>
+			<Ignore>true</Ignore>
+			<FilePath>Props/Signals/Signal_MastArm_15ft.fbx</FilePath>  
+		</Object>
+		<Object>
+			<Ignore>true</Ignore>
+			<FilePath>Props/Signals/Signal_MastArm_25ft.fbx</FilePath>  
+		</Object>
+		<Object>
+			<Type>trafficIsland</Type>
+			<FilePath>Materials/Concrete1.rrmtl</FilePath>
+		</Object>
+		<!-- End Props -->
+		<!-- Extrusions -->
+		<Object>
+			<Type>barrier</Type>
+			<Name>guardRail</Name>
+			<FilePath>Extrusions/GuardRail.rrext</FilePath>
+		</Object>
+		<Object>
+			<Type>railing</Type>
+			<Name>guardrail</Name>
+			<FilePath>Extrusions/GuardRail.rrext</FilePath>
+		</Object>
+		<Object>
+			<Type>railing</Type>
+			<Name>concrete_barrier</Name>
+			<FilePath>Extrusions/FShapeBarrier.rrext</FilePath>
+		</Object>
+		<Object>
+			<Type>barrier</Type>
+			<FilePath>Extrusions/Fence.rrext</FilePath>
+		</Object>
+		<!-- End Extrusions -->
+		<!-- Stencils -->
+		<Object>
+			<Type>roadMark</Type>
+			<Name>Stencil_ArrowType4L</Name>
+			<FilePath>Stencils/Stencil_ArrowType4L.svg</FilePath>
+		</Object>
+		<Object>
+			<Type>roadMark</Type>
+			<Name>Stencil_ArrowType4R</Name>
+			<FilePath>Stencils/Stencil_ArrowType4R.svg</FilePath>
+		</Object>
+		<Object>
+			<Type>roadMark</Type>
+			<Name>Stencil_STOP</Name>
+			<FilePath>Stencils/Stencil_STOP.svg</FilePath>
+		</Object>
+		<!-- End Stencils -->
+		<!-- Markings -->
+		<Object>
+			<Type>crosswalk</Type>
+			<FilePath>Markings/ContinentalCrosswalk.rrcws</FilePath>
+		</Object>
+		<Object>
+			<Type>crosswalk</Type>
+			<FilePath>Markings/LadderCrosswalk.rrcws</FilePath>
+		</Object>
+		<Object>
+			<Type>crosswalk</Type>
+			<FilePath>Markings/SimpleCrosswalk.rrcws</FilePath>
+		</Object>
+		<Object>
+			<Type>roadMark</Type>
+			<Name>StripedRegion</Name>
+			<FilePath>Markings/StripedRegion.rrpms</FilePath>
+		</Object>
+		<Object>
+			<Type>roadMark</Type>
+			<Name>StopLine</Name>
+			<FilePath>Markings/StopLine.rrlms</FilePath>
+		</Object>
+		<!-- End Markings -->
+		<!-- Damage -->
+		<Object>
+			<Type>patch</Type>
+			<FilePath>Damage/AsphaltPatch01.rrpms</FilePath>
+		</Object>
+		<Object>
+			<Ignore>true</Ignore>
+			<FilePath>Damage/LinearCracks01.rrlms</FilePath>
+		</Object>
+		<Object>
+			<Ignore>true</Ignore>
+			<FilePath>Damage/OilPath01.rrlms</FilePath>
+		</Object>
+		<Object>
+			<Ignore>true</Ignore>
+			<FilePath>Damage/OilStains01.rrmtl</FilePath>
+		</Object>
+		<Object>
+			<Ignore>true</Ignore>
+			<FilePath>Damage/Materials/OilStains01_Diff.png</FilePath>
+		</Object>
+		<!-- End Damage -->
+	</Objects>
+	<Markings>
+		<RoadMark>
+			<Type>broken</Type>
+			<FilePath>Markings/DashedSingleWhite.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>broken</Type>
+			<Color>white</Color>
+			<FilePath>Markings/DashedSingleWhite.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>broken</Type>
+			<Color>yellow</Color>
+			<FilePath>Markings/DashedSingleYellow.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>solid</Type>
+			<Color>white</Color>
+			<FilePath>Markings/SolidSingleWhite.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>solid</Type>
+			<FilePath>Markings/SolidSingleWhite.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>solid</Type>
+			<Color>yellow</Color>
+			<FilePath>Markings/SolidSingleYellow.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>solid solid</Type>
+			<Color>yellow</Color>
+			<FilePath>Markings/SolidDoubleYellow.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>solid broken</Type>
+			<Color>yellow</Color>
+			<FilePath>Markings/DashedSolidYellow.rrlms</FilePath>
+		</RoadMark>
+		<RoadMark>
+			<Type>broken solid</Type>
+			<Color>yellow</Color>
+			<FilePath>Markings/DashedSolidYellow.rrlms</FilePath>
+		</RoadMark>
+	</Markings>
+	<Signals>
+		<!-- Signs -->
+		<Signal>
+			<Type>205</Type>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R1-2.svg</FilePath>
+		</Signal>
+		<Signal>
+			<Type>206</Type>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R1-1.svg</FilePath>
+		</Signal>
+		<Signal>
+			<Type>215</Type>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R6-5P.svg</FilePath>
+		</Signal>
+		<Signal>
+			<Type>272</Type>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-4.svg</FilePath>
+		</Signal>
+		<!-- End Signs -->
+		<!-- Traffic Signals -->
+		<Signal>
+			<Type>1000001</Type>
+			<Variant>0</Variant>
+			<FilePath>Props/Signals/Signal_3Light_Post01.fbx</FilePath>
+		</Signal>
+		<Signal>
+			<Type>1000011</Type>
+			<SubType>10</SubType>
+			<Variant>1</Variant>
+			<FilePath>Props/Signals/Signal_3Light_Post01.fbx</FilePath>
+		</Signal>
+		<Signal>
+			<Type>1000011</Type>
+			<SubType>20</SubType>
+			<Variant>2</Variant>
+			<FilePath>Props/Signals/Signal_3Light_Post01.fbx</FilePath>
+		</Signal>
+		<!-- End Traffic Signals -->
+	</Signals>
+</OpenDriveAssetData>

@@ -1,0 +1,64 @@
+FileVersion: 4
+Uuid: {e1ddb4a8-0d9d-4e10-af08-ce01efde1d60}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 56.83 42.75" style="enable-background:new 0 0 56.83 42.75;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st3{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#BF311A;}
+	.st5{fill-rule:evenodd;clip-rule:evenodd;fill:#1F1B17;}
+	.st6{fill:#BF311A;}
+	.st7{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st8{fill:#006F53;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#005A9C;}
+	.st10{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st11{fill:#F7921E;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st13{fill:#FFD046;}
+	.st14{fill:#1F1B17;}
+	.st15{fill:#6C2769;}
+	.st16{fill:#919395;}
+	.st17{fill:#BED73D;}
+	.st18{fill-rule:evenodd;clip-rule:evenodd;fill:#BED73D;}
+	.st19{fill:#EF3E42;}
+	.st20{fill:#F7F8F9;}
+	.st21{fill:#6ABC45;}
+	.st22{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st23{fill:#010101;}
+	.st24{fill:none;stroke:#221F1F;stroke-width:0.5;}
+</style>
+<g>
+	<g>
+		<path class="st0" d="M56.58,38.98c0,1.94-1.57,3.52-3.52,3.52H3.77c-1.95,0-3.52-1.58-3.52-3.52V3.77c0-1.94,1.58-3.52,3.52-3.52
+			h49.29c1.95,0,3.52,1.58,3.52,3.52V38.98z"/>
+		<path class="st1" d="M53.06,42.75H3.77C1.69,42.75,0,41.06,0,38.98V3.77C0,1.69,1.69,0,3.77,0h49.29c2.08,0,3.77,1.69,3.77,3.77
+			v35.21C56.83,41.06,55.14,42.75,53.06,42.75z M3.77,0.5c-1.8,0-3.27,1.47-3.27,3.27v35.21c0,1.8,1.47,3.27,3.27,3.27h49.29
+			c1.8,0,3.27-1.47,3.27-3.27V3.77c0-1.8-1.47-3.27-3.27-3.27H3.77z"/>
+	</g>
+	<path class="st1" d="M53.06,1.13H3.77c-1.45,0-2.64,1.18-2.64,2.64v35.21c0,1.46,1.19,2.64,2.64,2.64h49.29
+		c1.46,0,2.64-1.18,2.64-2.64V3.77C55.7,2.31,54.52,1.13,53.06,1.13 M54.23,38.98c0,0.65-0.53,1.17-1.17,1.17H3.77
+		c-0.65,0-1.17-0.53-1.17-1.17V3.77c0-0.65,0.52-1.17,1.17-1.17h49.29c0.65,0,1.17,0.53,1.17,1.17V38.98z"/>
+	<path class="st1" d="M24.6,11.15c0,1.1-0.39,1.87-1.16,2.32c-0.4,0.23-0.8,0.35-1.18,0.35h-1.6v4.04h-1.31V8.46h2.91
+		c0.39,0,0.79,0.11,1.18,0.34C24.21,9.25,24.6,10.03,24.6,11.15 M23.29,11.15c0-0.82-0.32-1.28-0.97-1.37h-1.66v2.72h1.66
+		C22.97,12.47,23.29,12.02,23.29,11.15"/>
+	<path class="st1" d="M31.74,17.85H30.4l-0.61-2.54h-2.11l-0.61,2.54h-1.33L28,8.46h1.47L31.74,17.85z M29.47,14l-0.74-3.05
+		L27.99,14H29.47z"/>
+	<polygon class="st1" points="38.31,8.46 35.96,13.52 35.96,17.85 34.65,17.85 34.65,13.52 32.3,8.46 33.72,8.46 35.31,11.86 
+		36.88,8.46 	"/>
+	<polygon class="st1" points="21.06,26.21 19.32,26.21 19.32,34.28 18.01,34.28 18.01,26.21 16.27,26.21 16.27,24.89 21.06,24.89 	
+		"/>
+	<path class="st1" d="M27.73,29.59c0,1.15-0.13,2.11-0.39,2.86c-0.45,1.28-1.24,1.93-2.38,1.93c-1.14,0-1.93-0.64-2.38-1.93
+		c-0.26-0.76-0.39-1.71-0.39-2.86c0-3.19,0.92-4.79,2.77-4.79S27.73,26.39,27.73,29.59 M26.42,29.59c0-0.8-0.08-1.5-0.25-2.1
+		c-0.24-0.92-0.65-1.38-1.21-1.38c-0.57,0-0.97,0.46-1.21,1.38c-0.16,0.6-0.24,1.3-0.24,2.1c0,0.8,0.08,1.5,0.24,2.1
+		c0.24,0.92,0.65,1.38,1.21,1.38c0.56,0,0.97-0.46,1.21-1.38C26.33,31.09,26.42,30.39,26.42,29.59"/>
+	<polygon class="st1" points="34.39,34.28 29.6,34.28 29.6,24.89 30.91,24.89 30.91,32.97 34.39,32.97 	"/>
+	<polygon class="st1" points="40.49,34.28 35.7,34.28 35.7,24.89 37.02,24.89 37.02,32.97 40.49,32.97 	"/>
+</g>
+</svg>

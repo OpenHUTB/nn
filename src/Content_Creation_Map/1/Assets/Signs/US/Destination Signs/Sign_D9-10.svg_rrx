@@ -1,0 +1,48 @@
+FileVersion: 4
+Uuid: {6f383216-bd85-4b62-9a90-a7ec59e979cc}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 65.3 65.3" style="enable-background:new 0 0 65.3 65.3;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;stroke:#000000;stroke-miterlimit:10;}
+	.st1{fill:#221F1F;}
+	.st2{fill:#FFFFFF;}
+	.st3{fill:#006F53;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#005A9C;}
+	.st5{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st6{fill:#005A9C;}
+	.st7{fill:#1F1B17;}
+	.st8{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st10{fill:#F7921E;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st12{fill:#F1607C;}
+	.st13{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+	.st14{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st15{fill:none;stroke:#231F20;stroke-width:0.25;}
+	.st16{fill:none;stroke:#231F20;stroke-width:0.5;}
+</style>
+<g>
+	<path class="st2" d="M4.55,0.25h56.19c2.37,0,4.3,1.94,4.3,4.3v56.19c0,2.36-1.94,4.3-4.3,4.3H4.55c-2.37,0-4.31-1.94-4.31-4.3
+		V4.55C0.25,2.19,2.19,0.25,4.55,0.25"/>
+	<path class="st1" d="M60.75,65.3H4.55C2.04,65.3,0,63.26,0,60.75V4.55C0,2.04,2.04,0,4.55,0h56.19c2.51,0,4.55,2.04,4.55,4.55
+		v56.19C65.3,63.26,63.26,65.3,60.75,65.3z M4.55,0.5C2.32,0.5,0.5,2.32,0.5,4.55v56.19c0,2.23,1.82,4.05,4.05,4.05h56.19
+		c2.24,0,4.05-1.82,4.05-4.05V4.55c0-2.24-1.82-4.05-4.05-4.05H4.55z"/>
+	<path class="st4" d="M4.55,1.87h56.19c1.48,0,2.68,1.21,2.68,2.69v56.19c0,1.47-1.21,2.68-2.68,2.68H4.55
+		c-1.48,0-2.69-1.21-2.69-2.68V4.55C1.87,3.08,3.08,1.87,4.55,1.87"/>
+	<rect x="7.8" y="18.25" class="st2" width="3.75" height="28.8"/>
+	<polygon class="st2" points="28.12,47.05 24.67,47.05 19.5,30.55 19.5,47.05 15.75,47.05 15.75,18.25 19.48,18.25 24.37,33.74 
+		24.37,18.25 28.12,18.25 	"/>
+	<polygon class="st2" points="32.28,47.05 32.28,18.25 43.23,18.25 43.23,22 36.03,22 36.03,29.78 40.36,29.78 40.36,33.53 
+		36.03,33.53 36.03,47.05 	"/>
+	<path class="st2" d="M50.87,17.95c2.67,0,4.49,1.36,5.47,4.06c0.77,2.11,1.15,5.66,1.15,10.64c0,4.86-0.35,8.32-1.04,10.38
+		c-0.98,2.88-2.84,4.32-5.59,4.32c-2.8,0-4.69-1.5-5.65-4.5c-0.65-2.02-0.98-5.42-0.98-10.2c0-4.88,0.41-8.43,1.24-10.64
+		C46.5,19.3,48.3,17.95,50.87,17.95 M50.87,21.7c-1.13,0-1.92,1.01-2.36,3.03C48.17,26.36,48,29,48,32.65c0,3.21,0.07,5.36,0.2,6.45
+		c0.4,3,1.29,4.49,2.67,4.49c1.34,0,2.21-1.5,2.62-4.49c0.17-1.27,0.26-3.42,0.26-6.45c0-3.65-0.17-6.29-0.52-7.93
+		C52.79,22.71,52,21.7,50.87,21.7"/>
+</g>
+</svg>

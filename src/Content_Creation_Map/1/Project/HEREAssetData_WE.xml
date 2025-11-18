@@ -1,0 +1,263 @@
+<HEREAssetData>
+<Poles>
+<Pole>
+<Type>Utility</Type>
+<Diameter>0.27</Diameter>
+<FilePath>Props/ElectricPoles/UtilityPole_60ft.fbx_rrx</FilePath>
+</Pole>
+<Pole>
+<Type>LIGHT</Type>
+<Diameter>0.17</Diameter>
+<FilePath>Props/Signals/Signal_Post_30ft.fbx_rrx</FilePath>
+</Pole>
+<Pole>
+<Type>LIGHT</Type>
+<Diameter>0.27</Diameter>
+<FilePath>Props/Signals/Signal_Post_30ft.fbx_rrx</FilePath>
+</Pole>
+<Pole>
+<Type>GANTRY</Type>
+<Diameter>0.27</Diameter>
+<FilePath>Props/FreewayTrusses/Custom_PostArm_A_38ft.fbx_rrx</FilePath>
+</Pole>
+</Poles>
+<Barriers>
+<Barrier>
+<Type>JERSEY_BARRIER</Type>
+<FilePath>Extrusions/JerseyBarrier.rrext</FilePath>
+</Barrier>
+<Barrier>
+<Type>GUARDRAIL</Type>
+<FilePath>Extrusions/GuardRail.rrext</FilePath>
+</Barrier>
+<Barrier>
+<Type>WALL</Type>
+<FilePath>Extrusions/HighwayBorderwall01.rrext</FilePath>
+</Barrier>
+<Barrier>
+<Type>FENCE</Type>
+<FilePath>Extrusions/Fence.rrext</FilePath>
+</Barrier>
+</Barriers>
+<Signs>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Color>WHITE</Color>
+<Value>5</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(5).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>10</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(10).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>20</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(20).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>30</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(30).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>40</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(40).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>50</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(50).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>60</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(60).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>70</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(70).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>80</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(80).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>90</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(90).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>100</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(100).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>110</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(110).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>CIRCLE</Shape>
+<Value>120</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(120).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>5</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(5).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>10</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(10).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>20</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(20).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>30</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(30).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>40</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(40).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>50</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(50).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>60</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(60).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>70</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(70).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>80</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(80).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>90</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(90).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>100</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(100).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>110</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(110).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>120</Value>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_274(120).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>DO_NOT_ENTER</Type>
+<Shape>CIRCLE</Shape>
+<Color>RED</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_267.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>NO_ACCESS</Type>
+<Shape>CIRCLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_250.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>NO_OVERTAKING</Type>
+<Shape>CIRCLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_276.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>STOP</Type>
+<Shape>OCTAGON</Shape>
+<Color>RED</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_206.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>YIELD</Type>
+<Shape>TRIANGLE</Shape>
+<Color>RED</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_206.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>WARNING</Type>
+<Shape>DIAMOND</Shape>
+<Color>YELLOW</Color>
+<FilePath>Signs/US/Sign_BlankYellowPanel.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<Color>YELLOW</Color>
+<FilePath>Signs/US/Sign_BlankYellow.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>YIELD</Type>
+<Shape>TRIANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/Germany/Regulatory Signs/Sign_205.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>OTHER</Type>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+</Signs>
+</HEREAssetData>

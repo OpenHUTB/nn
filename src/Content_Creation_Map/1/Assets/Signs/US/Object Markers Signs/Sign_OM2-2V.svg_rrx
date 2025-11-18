@@ -1,0 +1,40 @@
+FileVersion: 4
+Uuid: {715ee980-a27e-4a3b-9900-a95a27519164}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 18.4 36.31" style="enable-background:new 0 0 18.4 36.31;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#BF311A;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#BF311A;}
+	.st3{fill:#FFD046;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st5{fill:#FFFFFF;}
+	.st6{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st7{fill-rule:evenodd;clip-rule:evenodd;fill:#005A9C;}
+	.st8{fill-rule:evenodd;clip-rule:evenodd;fill:#794400;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st10{fill:#794400;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st13{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st14{fill:#6C2769;}
+	.st15{fill:#6ABC45;}
+	.st16{fill:#006F53;}
+	.st17{fill:#F7921E;}
+	.st18{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st19{fill:#F1607C;}
+	.st20{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+</style>
+<g>
+	<path class="st3" d="M14.57,36.06H3.83c-1.97,0-3.58-1.61-3.58-3.58V3.83c0-1.97,1.61-3.58,3.58-3.58h10.74
+		c1.97,0,3.58,1.61,3.58,3.58v28.65C18.15,34.45,16.55,36.06,14.57,36.06"/>
+	<path class="st1" d="M14.57,36.31H3.83C1.72,36.31,0,34.59,0,32.48V3.83C0,1.72,1.72,0,3.83,0h10.74c2.11,0,3.83,1.72,3.83,3.83
+		v28.65C18.4,34.59,16.68,36.31,14.57,36.31z M3.83,0.5C1.99,0.5,0.5,2,0.5,3.83v28.65c0,1.84,1.49,3.33,3.33,3.33h10.74
+		c1.84,0,3.33-1.49,3.33-3.33V3.83c0-1.84-1.49-3.33-3.33-3.33H3.83z"/>
+</g>
+</svg>

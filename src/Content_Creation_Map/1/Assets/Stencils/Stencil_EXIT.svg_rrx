@@ -1,0 +1,27 @@
+FileVersion: 4
+Uuid: {fffbe227-c0d6-486f-b592-56ca590cc389}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 53.67 72.35" style="enable-background:new 0 0 53.67 72.35;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<g id="Layer_1">
+	<polygon class="st0" points="14.27,0.23 18.89,0.23 23.33,28.19 27.16,0.13 31.66,0.23 25.52,35.63 32.06,72.3 27.49,72.3 
+		23.38,43.3 17.85,72.3 13.29,72.3 21.46,35.67 	"/>
+</g>
+<g id="Layer_2">
+	<polygon class="st0" points="0,0 12,0 12,12.05 3,12.05 3,30.13 9,30.13 9,42.18 3,42.18 3,60.25 12,60.25 12,72.3 0,72.3 	"/>
+	<rect x="35.39" y="0" class="st0" width="3" height="72.35"/>
+	<polygon class="st0" points="41.67,0 53.67,0 53.67,12.05 49.17,12.05 49.17,72.3 46.17,72.3 46.17,12.05 41.67,12.05 	"/>
+</g>
+<g id="Layer_4">
+</g>
+<g id="Layer_3">
+</g>
+</svg>

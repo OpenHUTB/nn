@@ -1,0 +1,34 @@
+FileVersion: 4
+Uuid: {b37c18a9-6eb7-4358-836c-1b4ca41b2319}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 70.22 80.26" style="enable-background:new 0 0 70.22 80.26;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<g id="Layer_1">
+</g>
+<g id="Layer_2">
+	<g>
+		<path class="st0" d="M3.34,0H0v80.26h3.34V53.51c0.97,0,2.17-0.42,3.34-1.17l3.34,27.92h3.34l-3.34-31.08
+			c1.88-2.38,3.34-5.56,3.34-9.05V13.38C13.38,5.99,7.04,0,3.34,0z M10.03,20.07v12.24C10.03,36,7.04,39,3.34,39V13.38v-1.14
+			c3.69,0,6.69,2.99,6.69,6.69V20.07z"/>
+		<rect x="16.72" y="0" class="st0" width="3.34" height="80.26"/>
+		<polygon class="st0" points="56.85,0 56.85,13.38 61.86,13.38 61.86,80.26 65.21,80.26 65.21,13.38 70.22,13.38 70.22,0 		"/>
+		<polygon class="st0" points="50.16,33.44 43.47,33.44 43.47,0 40.13,0 40.13,80.26 43.47,80.26 43.47,46.82 50.16,46.82 
+			50.16,80.26 53.5,80.26 53.5,0 50.16,0 		"/>
+		<path class="st0" d="M30.09,0c-3.69,0-6.69,5.99-6.69,13.38v53.51c0,7.39,2.99,13.38,6.69,13.38c3.69,0,6.69-5.99,6.69-13.38
+			V40.13h-6.69v13.38h3.34v6.69c0,3.69-1.5,6.69-3.34,6.69c-1.85,0-3.34-2.99-3.34-6.69V20.07c0-3.69,1.5-6.69,3.34-6.69
+			c1.85,0,3.34,2.99,3.34,6.69v1.67l3.34-1.67v-6.69C36.78,5.99,33.79,0,30.09,0z"/>
+	</g>
+</g>
+<g id="Layer_4">
+</g>
+<g id="Layer_3">
+</g>
+</svg>

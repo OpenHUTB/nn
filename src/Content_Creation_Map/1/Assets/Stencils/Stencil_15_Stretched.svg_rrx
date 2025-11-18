@@ -1,0 +1,28 @@
+FileVersion: 4
+Uuid: {4960ba39-5a18-480d-9087-40f3e3f5f49c}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 19.75 71.75" style="enable-background:new 0 0 19.75 71.75;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<g id="Layer_1">
+	<path class="st0" d="M0,18.17v12.6c0,0,2.82-4.25,4.06-10.47c0,2.47,0,51.38,0,51.38h3.21V0.09h-2.6C4.67,0.09,3.87,11.95,0,18.17z
+		"/>
+	<path class="st0" d="M10.6,0h8.37v12.91H13l-0.45,11.92c0,0,1.43-3.36,3.14-1.84s3.09,7.18,3.76,14.69
+		c0.18,2.77,1.12,16.01-1.61,27.93c-0.73,2.5-2.2,8.5-5.61,5.14c-3.4-3.36-3.64-18.77-3.64-18.77l3.17-1.45
+		c0,0,0.34,10.14,2.41,10.01c0.49-0.2,1.84-1.05,2.21-10.08c0.07-3.16,0.37-16.14-2.3-16.93c-0.54,0.13-1.55,0.59-2.53,5.27
+		c-0.3-0.13-2.6-1.52-2.6-1.52L10.6,0z"/>
+</g>
+<g id="Layer_2">
+</g>
+<g id="Layer_4">
+</g>
+<g id="Layer_3">
+</g>
+</svg>

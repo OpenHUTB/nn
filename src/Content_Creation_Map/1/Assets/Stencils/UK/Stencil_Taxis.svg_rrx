@@ -1,0 +1,24 @@
+FileVersion: 4
+Uuid: {b2e975a8-647f-4346-90d5-941f62fac8b1}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 47.51 12.36" style="enable-background:new 0 0 47.51 12.36;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st1{fill:#FFFFFF;}
+</style>
+<g>
+	<rect x="33.1" y="0.2" class="st1" width="1.98" height="11.78"/>
+	<path class="st1" d="M40.77,3.4c0-1.8,3.13-2.38,5.01-0.32L47.18,2c-2.48-3.31-8.46-2.27-8.46,1.41c0,4.86,6.84,2.48,6.84,5.33
+		c0,2.23-3.49,2.7-5.73,0.11l-1.55,1.19c3.35,3.85,9.22,2.59,9.22-1.3C47.51,3.76,40.77,6.36,40.77,3.4z"/>
+	<polygon class="st1" points="0,2 3.24,2 3.24,6.21 3.24,11.97 5.19,11.97 5.19,2 8.43,2 8.43,0.38 0,0.38 	"/>
+	<polygon class="st1" points="30,0.41 27.91,0.41 25.57,4.27 23.34,0.41 22.22,0.41 21.25,0.41 24.6,5.81 20.75,12.04 22.87,12.04 
+		25.57,7.44 28.34,12.04 30.43,12.04 26.65,5.81 	"/>
+	<path class="st1" d="M13.07,0.2L9.36,12.15h1.76l0.7-2.16h4.99l0.69,2.16h1.91L15.45,0.2H13.07z M12.35,8.37l1.99-6.16l1.96,6.16
+		H12.35z"/>
+</g>
+</svg>

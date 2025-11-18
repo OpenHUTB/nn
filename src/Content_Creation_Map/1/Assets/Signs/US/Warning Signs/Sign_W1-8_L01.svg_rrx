@@ -1,0 +1,42 @@
+FileVersion: 4
+Uuid: {397407b1-3e64-4947-856d-fa4914475c5a}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 39.14 51.97" style="enable-background:new 0 0 39.14 51.97;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFD046;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st3{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st5{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st6{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st7{fill:#FFFFFF;}
+	.st8{fill:#1F1B17;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#1F1B17;}
+	.st10{fill:#F7921E;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st13{fill:#F1607C;}
+	.st14{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+	.st15{fill:#BED73D;}
+	.st16{fill-rule:evenodd;clip-rule:evenodd;fill:#BED73D;}
+	.st17{fill:#231F20;}
+	.st18{fill:#010101;}
+</style>
+<g>
+	<path class="st3" d="M36.43,51.66H2.71c-0.64,0-1.26-0.25-1.71-0.7c-0.45-0.44-0.7-1.06-0.7-1.69V2.69c0-0.63,0.26-1.24,0.7-1.69
+		c0.45-0.44,1.07-0.7,1.71-0.7h33.72c0.63,0,1.26,0.26,1.7,0.7c0.45,0.45,0.71,1.06,0.71,1.69v46.59c0,0.82-0.44,1.59-1.14,2.03
+		C37.31,51.56,36.89,51.62,36.43,51.66"/>
+	<path class="st1" d="M36.44,51.97H2.71c-0.72,0-1.42-0.29-1.92-0.79C0.29,50.68,0,49.98,0,49.28V2.69c0-0.71,0.29-1.4,0.79-1.9
+		C1.3,0.29,2,0,2.71,0h33.72c0.71,0,1.41,0.29,1.92,0.79c0.51,0.5,0.8,1.2,0.8,1.9v46.59c0,0.91-0.49,1.79-1.28,2.29
+		c-0.44,0.28-0.9,0.35-1.41,0.4L36.44,51.97z M2.71,0.61c-0.56,0-1.1,0.22-1.49,0.61C0.83,1.61,0.61,2.14,0.61,2.69v46.59
+		c0,0.55,0.22,1.08,0.61,1.47c0.39,0.39,0.93,0.61,1.49,0.61h33.7c0.44-0.05,0.8-0.1,1.13-0.31c0.61-0.39,1-1.07,1-1.77V2.69
+		c0-0.54-0.23-1.08-0.62-1.47c-0.39-0.39-0.93-0.61-1.49-0.61H2.71z"/>
+	<polygon class="st2" points="19.57,3.46 1.71,26.2 19.57,48.81 37.43,48.82 19.57,26.19 37.32,3.46 	"/>
+</g>
+</svg>

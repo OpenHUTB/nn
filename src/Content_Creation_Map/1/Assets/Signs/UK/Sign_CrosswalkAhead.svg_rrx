@@ -1,0 +1,100 @@
+FileVersion: 4
+Uuid: {c88a5b6d-a094-48fa-9caf-1745ccd2e085}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 340 300.28" style="enable-background:new 0 0 340 300.28;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#0079C1;}
+	.st2{fill:#EC1D24;}
+	.st3{clip-path:url(#SVGID_2_);}
+	.st4{fill:none;stroke:#0079C1;stroke-width:10;}
+	.st5{clip-path:url(#SVGID_4_);}
+	.st6{fill:none;stroke:#0079C1;stroke-width:3.7514;}
+	.st7{fill:#FFFFFF;stroke:#0079C1;}
+	.st8{display:none;fill:#FFFFFF;}
+	.st9{fill:#FFFFFF;stroke:#29ABE2;stroke-miterlimit:10;}
+	.st10{fill:#FFFFFF;stroke:#0079C1;stroke-width:0.3;}
+	.st11{clip-path:url(#SVGID_6_);}
+	.st12{fill:none;stroke:#0079C1;stroke-miterlimit:10;}
+	.st13{fill:#E31E26;}
+	.st14{fill:#E10000;}
+	.st15{fill:#FFFFFF;stroke:#1478C7;stroke-width:6;}
+	.st16{fill:#1478C7;}
+	.st17{fill:#E22739;}
+	.st18{fill:none;stroke:#1477C6;}
+	.st19{fill:#231F20;}
+	.st20{fill:none;stroke:#0079C1;stroke-width:2.9228;}
+	.st21{fill:#808080;}
+	.st22{fill:none;stroke:#000000;}
+	.st23{fill:#FFFFFF;stroke:#0079C1;stroke-width:3;}
+	.st24{fill:#FFD421;}
+	.st25{fill:none;stroke:#FFFFFF;stroke-width:2.1836;}
+	.st26{fill:#FFFFFF;stroke:#000000;stroke-width:0.3;}
+	.st27{fill:none;stroke:#EC1D24;stroke-width:90;stroke-linejoin:round;}
+	.st28{fill:#FAFAFB;}
+	.st29{fill:none;stroke:#000000;stroke-width:0.18;stroke-miterlimit:10;}
+	.st30{fill:none;stroke:#231F20;stroke-width:0.5084;stroke-miterlimit:10;}
+	.st31{fill:none;stroke:#EC1D24;stroke-width:10;}
+	.st32{opacity:0.99;enable-background:new    ;}
+	.st33{fill:#4D9523;}
+</style>
+<g>
+	<path id="path3101_6_" inkscape:connector-curvature="0" sodipodi:nodetypes="scccscscccss" class="st2" d="M22.55,300.28
+		c-8.11,0-15.54-4.27-19.53-11.24c-4.02-6.96-4.02-15.56,0-22.54L150.47,11.21C154.5,4.25,161.89,0,169.91,0c0.03,0,0.06,0,0.09,0
+		c0.03,0,0.06,0,0.09,0c8.02,0,15.41,4.25,19.45,11.21l147.45,255.28c4.02,6.98,4.02,15.58,0,22.54c-4,6.97-11.43,11.24-19.53,11.24
+		H22.55z"/>
+	<path id="path3121_6_" inkscape:connector-curvature="0" sodipodi:nodetypes="cccc" class="st0" d="M35.56,270.23h268.89L170,37.49
+		L35.56,270.23z"/>
+	<path id="path3971_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M72.85,262.87v-4.96h-12.4v4.96H72.85z"/>
+	<path id="path4245_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M91.64,262.87v-4.96h-12.4v4.96H91.64z"/>
+	<path id="path4247_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M110.43,262.87v-4.96h-12.4v4.96H110.43z"
+		/>
+	<path id="path4249_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M129.22,262.87v-4.96h-12.4v4.96H129.22z"
+		/>
+	<path id="path4251_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M148.01,262.87v-4.96h-12.4v4.96H148.01z"
+		/>
+	<path id="path4253_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M166.8,262.87v-4.96h-12.4v4.96H166.8z"/>
+	<path id="path4255_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M185.59,262.87v-4.96h-12.4v4.96H185.59z"
+		/>
+	<path id="path4257_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M204.39,262.87v-4.96h-12.4v4.96H204.39z"
+		/>
+	<path id="path4259_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M223.18,262.87v-4.96h-12.4v4.96H223.18z"
+		/>
+	<path id="path4261_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M241.97,262.87v-4.96h-12.4v4.96H241.97z"
+		/>
+	<path id="path4263_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M260.76,262.87v-4.96h-12.4v4.96H260.76z"
+		/>
+	<path id="path4265_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M279.55,262.87v-4.96h-12.4v4.96H279.55z"
+		/>
+	<path id="path4289_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M91.64,222.93v-4.96h-12.4v4.96H91.64z"/>
+	<path id="path4315_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M129.22,222.93v-4.96h-12.4v4.96H129.22z"
+		/>
+	<path id="path4331_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M148.01,222.93v-4.96h-12.4v4.96H148.01z"
+		/>
+	<path id="path4333_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M166.8,222.93v-4.96h-12.4v4.96H166.8z"/>
+	<path id="path4335_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M185.59,222.93v-4.96h-12.4v4.96H185.59z"
+		/>
+	<path id="path4339_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M223.18,222.93v-4.96h-12.4v4.96H223.18z"
+		/>
+	<path id="path4341_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M241.97,222.93v-4.96h-12.4v4.96H241.97z"
+		/>
+	<path id="path4343_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" d="M260.76,222.93v-4.96h-12.4v4.96H260.76z"
+		/>
+	<path id="path4376_1_" inkscape:connector-curvature="0" d="M182.83,98.8c4.54-2.31,7.7-7.11,7.76-12.48
+		c-0.07-7.75-6.26-13.94-13.87-13.87c-7.67-0.07-13.86,6.12-13.87,13.87c0.01,3.06,1.07,5.99,2.77,8.32
+		c0.38,0.36,2.03,3.07-1.66,3.6c-3.54,0.29-13.98,0.83-20.24,7.21c-12.41,13.04-20.87,28.46-23.02,50.47
+		c-0.71,0.21-3.17,1.11-3.05,3.88c-0.12,2.65,4.97,8.49,12.2,8.6c1.75-0.11,4.19-1.24,4.16-3.88c0.03-1.49,0.03-2.47-0.28-3.6
+		c-0.51-1.17-0.76-4.29-0.83-9.43c0.07-5.21,5.17-16.88,12.48-21.91c0,0,5.78,47-42.98,90.96c0,0,7.49,13.98,7.76,14.42
+		c1.59,3.29,4.91,4.4,6.66,4.71c0.75,0.19,6.13,0.77,6.38,0.83c0.49,0.02,2.3,0.34,2.22-0.83c0.08-1.45-0.42-1.75-0.83-1.94
+		c-1.36-0.82-3.09-1.52-3.88-4.71c0,0-2.19-8.23-2.22-9.43c0,0,23.37-14.78,40.49-50.47c0,0,24.17,27.76,34.11,75.7l26.34-11.65
+		c0,0,1.06-0.62,1.11-1.66c-0.05-0.81-1.1-1.24-1.66-1.39c-0.79-0.1-15.45-1.58-15.53-1.66c-0.3,0.09-1.03-0.04-1.11-0.83
+		c0.07-10.36-4.09-27.62-7.49-37.16c-0.76-2.22-1.5-4.32-2.5-5.55c-11.38-18.22-15.4-31.52-9.98-53.24c0,0,10.67,24.27,38.54,26.9
+		c0,0,1.03,1.26,2.5,1.39c3.65-0.13,4.82-9.71,4.71-10.81c0.11-2.72-2.3-2.84-2.22-2.77c-0.57-0.07-1.56-0.16-2.5,1.39
+		c0,0-21.11-6.25-27.18-27.45c-2.42-8.5-7.62-16.24-13.31-21.08C181.71,102.39,179.46,100.18,182.83,98.8L182.83,98.8z"/>
+</g>
+</svg>

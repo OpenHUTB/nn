@@ -1,0 +1,47 @@
+FileVersion: 4
+Uuid: {2b72b1ca-88a7-4602-81aa-26fd00789c11}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 72.44 27.48" style="enable-background:new 0 0 72.44 27.48;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFD046;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st3{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st5{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st6{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st7{fill:#FFFFFF;}
+	.st8{fill:#1F1B17;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#1F1B17;}
+	.st10{fill:#F7921E;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st13{fill:#F1607C;}
+	.st14{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+	.st15{fill:#BED73D;}
+	.st16{fill-rule:evenodd;clip-rule:evenodd;fill:#BED73D;}
+	.st17{fill:#231F20;}
+	.st18{fill:#010101;}
+</style>
+<g>
+	<path class="st0" d="M72.19,22.73c0,2.48-2.01,4.5-4.5,4.5H4.75c-2.48,0-4.5-2.01-4.5-4.5V4.75c0-2.48,2.01-4.5,4.5-4.5H67.7
+		c2.48,0,4.5,2.01,4.5,4.5V22.73z"/>
+	<path class="st1" d="M67.7,27.48H4.75C2.13,27.48,0,25.35,0,22.73V4.75C0,2.13,2.13,0,4.75,0H67.7c2.62,0,4.75,2.13,4.75,4.75
+		v17.99C72.44,25.35,70.31,27.48,67.7,27.48z M4.75,0.5C2.41,0.5,0.5,2.41,0.5,4.75v17.99c0,2.34,1.91,4.25,4.25,4.25H67.7
+		c2.34,0,4.25-1.91,4.25-4.25V4.75c0-2.34-1.9-4.25-4.25-4.25H4.75z"/>
+	<path class="st1" d="M67.7,1.37H4.75c-1.86,0-3.37,1.51-3.37,3.37v17.99c0,1.86,1.51,3.37,3.37,3.37H67.7
+		c1.86,0,3.37-1.51,3.37-3.37V4.75C71.07,2.89,69.56,1.37,67.7,1.37 M69.2,22.73c0,0.83-0.67,1.5-1.5,1.5H4.75
+		c-0.83,0-1.5-0.67-1.5-1.5V4.75c0-0.83,0.67-1.5,1.5-1.5H67.7c0.83,0,1.5,0.67,1.5,1.5V22.73z"/>
+	<polygon class="st1" points="30.45,21.23 30.45,6.25 41.43,6.25 41.43,8.93 33.19,8.93 33.19,11.71 37.68,11.71 37.68,14.45 
+		33.19,14.45 33.19,18.55 41.69,18.55 41.69,21.23 	"/>
+	<polygon class="st1" points="24.23,21.23 17.04,10.93 17.04,21.23 14.4,21.23 14.4,6.25 17.04,6.25 23.96,16.13 23.96,6.25 
+		26.55,6.25 26.55,21.23 	"/>
+	<polygon class="st1" points="56.55,21.23 53.71,21.23 51.29,11.19 48.92,21.23 46.08,21.23 43.34,6.25 46.13,6.25 47.76,15.92 
+		49.97,6.25 52.66,6.25 54.97,15.92 56.5,6.25 59.24,6.25 	"/>
+</g>
+</svg>

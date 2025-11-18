@@ -1,0 +1,769 @@
+<?xml version="1.0"?>
+<TomTomAssetData>
+	<LaneTypes>
+		<LaneType>
+			<Type>NON_DRIVABLE_LANE</Type>
+			<RRType>None</RRType>
+		</LaneType>
+		<LaneType>
+			<Type>DRIVABLE_LANE</Type>
+			<RRType>Driving</RRType>
+		</LaneType>
+		<LaneType>
+			<Type>PARKING_LANE</Type>
+			<RRType>Parking</RRType>
+		</LaneType>		
+		<LaneType>
+			<Type>BICYLCE_LANE</Type>
+			<RRType>Biking</RRType>
+		</LaneType>
+		<LaneType>
+			<Type>EMERGENCY_LANE</Type>
+			<RRType>Shoulder</RRType>
+		</LaneType>
+		<LaneType>
+			<Type>BUS_LANE</Type>
+			<RRType>Driving</RRType>
+		</LaneType>
+		<LaneType>
+			<Type>HOV_LANE</Type>
+			<RRType>Driving</RRType>
+		</LaneType>
+		<LaneType>
+			<Type>RESTRICTED_LANE</Type>
+			<RRType>Driving</RRType>
+		</LaneType>
+	</LaneTypes>
+	<Markings>
+		<LaneMark>
+			<Type>SHORT_DASHED_LINE</Type>
+			<Color>WHITE</Color>
+			<FilePath>Markings/DashedShortSingleWhite.rrlms</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>SHORT_DASHED_LINE</Type>
+			<Color>YELLOW</Color>
+			<FilePath>Markings/DashedShortSingleYellow.rrlms</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>LONG_DASHED_LINE</Type>
+			<Color>WHITE</Color>
+			<FilePath>Markings/DashedSingleWhite.rrlms</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>LONG_DASHED_LINE</Type>
+			<Color>YELLOW</Color>
+			<FilePath>Markings/DashedSingleYellow.rrlms</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>SINGLE_SOLID_LINE</Type>
+			<Color>WHITE</Color>
+			<FilePath>Markings/SolidSingleWhite.rrlms</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>SINGLE_SOLID_LINE</Type>
+			<Color>YELLOW</Color>
+			<FilePath>Markings/SolidSingleYellow.rrlms</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>GUARDRAIL</Type>
+			<Color>UNDEFINED</Color>
+			<FilePath>Extrusions/GuardRail.rrext</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>FENCE</Type>
+			<Color>UNDEFINED</Color>
+			<FilePath>Extrusions/Fence.rrext</FilePath>
+		</LaneMark>
+		<LaneMark>
+			<Type>BARRIER_JERSEY</Type>
+			<Color>UNDEFINED</Color>
+			<FilePath>Extrusions/JerseyBarrier.rrext</FilePath>
+		</LaneMark>
+	</Markings>
+	<Signs>
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Cul de sac</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W14-1a.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Cyclist crossing</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W11-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>End road work</SubType>
+			<FilePath>Signs/US/Temporary Signs/Sign_G20-2.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Express road end</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W19-4.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Ferry</SubType>
+			<FilePath>Signs/US/Information Signs/Sign_I-9.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Highway end</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Highway start</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>One Way</SubType>
+			<Shape>rectangle</Shape>
+			<Color>black;white</Color>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R6-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>One Way End</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R6-7.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Parking</SubType>
+			<Shape>rectangle</Shape>
+			<Color>blue;white</Color>
+			<FilePath>Signs/US/Destination Signs/Sign_D4-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Truck route</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R14-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>U Turn Allowed</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-24b.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<!-- LANE INFORMATION TYPE-->
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>Lane added left</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W4-3_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>Lane added right</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W4-3_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>Lane ends Center</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W4-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>Lane ends left</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W4-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>Lane ends right</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W4-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>Lane merge</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W4-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+		<Type>Overtaking</Type>
+		<SubType>Cancellation</SubType>
+		<FilePath>Signs/UK/Sign_NoOvertaking.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No Entry</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R5-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No parking</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R7-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No pedestrians</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R8-3a.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No Stopping</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R8-5.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No Turn</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-3.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No Turn Left</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-2.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No Turn Right</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No U Turn</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-4.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No Waiting</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R8-5.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>No way</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W14-2.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>Vehicle Restriction</SubType>
+			<FilePath>Signs/UK/Sign_AllVehiclesProhibited.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>RailwayCrossing</Type>
+			<SubType>Cross</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R15-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>RailwayCrossing</Type>
+			<SubType>Guarded warning</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W10-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>RailwayCrossing</Type>
+			<SubType>Unguarded Warning</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W10-1.svg_rrx</FilePath>
+		</TrafficSign>
+
+		<TrafficSign>
+			<Type>RNR</Type>
+			<SubType>RNR</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R15-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Stop</Type>
+			<SubType>Stop sign</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R1-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<!-- WARNING -->
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Aircraft</SubType>
+			<FilePath>Signs/US/Information Signs/Sign_I-5.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Animal crossing</SubType>
+			<Shape>diamond</Shape>
+			<FilePath>Signs/US/Warning Signs/Sign_W11-16.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Bus</SubType>
+			<FilePath>Signs/US/Information Signs/Sign_I-6.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Dangerous Curve</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W1-11.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Dead end</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W14-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Divided highway start</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Divided highway end</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Divided road start</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Divided road end</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Exit left</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-33.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Exit right</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R3-33.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Falling rocks</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-14_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Fire trucks</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W11-10_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Foggy area</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-22.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Icy conditions</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-5aP.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Left junction</SubType>
+			<FilePath>Signs/US/Marker Signs/Sign_M2-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Left lane closing</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W9-1_L01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Left merging traffic</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W9-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Loose gravel</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-7_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Narrow bridge</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W5-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Pedestrian crossing</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R9-8.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Pedestrian crossing ahead</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R9-8.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Pedestrians</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W11-2.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Road closed</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R11-2.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Road narrows</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W5-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Road narrows left</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W5-4a.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Road narrows right</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W5-4a.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Road Works</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W20-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Roadabout</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W2-6.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Sharp curve left</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W1-2_L01.svg_rrx</FilePath>
+		</TrafficSign>
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Sharp curve right</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W1-2_R01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Shoulder</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-9_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Slippery road</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-5_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Speed bump</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Speed limit warning</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_AdvisorySpeed.svg_rrx</FilePath>	
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Speed limit warning No Value</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(Blank).svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Steep hill down</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W7-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Steep hill up</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W7-1.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Stop ahead</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W3-1_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Traffic Lights</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W3-3_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Trucks</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W11-10_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Two Way Traffic</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W6-3_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Uneven road</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W8-11_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Wild life</SubType>
+			<FilePath>Signs/UK/Sign_WildAnimalsAhead.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Wind</SubType>
+			<FilePath>Signs/UK/Sign_SideWindsAhead.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Winding road starting left</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W1-5.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Winding road starting right</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W1-5.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Yield</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R1-2.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Yield ahead</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W3-2_01.svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Roundabout</SubType>
+			<FilePath>Signs/US/Warning Signs/Sign_W2-6.svg_rrx</FilePath>
+		</TrafficSign>
+				
+		<!-- Following mappings can be improved/customised -->
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Other</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Name</Type>
+			<SubType>Street Name</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>POI</Type>
+			<SubType>POI</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Name</Type>
+			<SubType>River Name</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Name</Type>
+			<SubType>Brunnel Name</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>LaneInformation</Type>
+			<SubType>LaneInformation</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Other</SubType>
+			<Shape>rectangle</Shape>
+			<Color>black;white</Color>			
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>Other</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>Maximum Dimension</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Prohibition</Type>
+			<SubType>Unreadable</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Pedestrian crossing</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>InformationSign</Type>
+			<SubType>Unreadable</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+			<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>General danger</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Unreadable</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>SignPost</Type>
+			<SubType>Sign Post</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>SpeedRestriction</Type>
+			<SubType>Recommended Speed</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(Blank).svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Overtaking Lane</Type>
+			<SubType>Overtaking lane Speed</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Mandatory</Type>
+			<SubType>Maneuver</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Mandatory</Type>
+			<SubType>Other</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>OvertakingLane</Type>
+			<SubType>Overtaking lane</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Overtaking</Type>
+			<SubType>Start</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Maximum Dimension</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Name</Type>
+			<SubType>Brunnel Name</SubType>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>SpeedRestriction</Type>
+			<SubType>Speed</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(Blank).svg_rrx</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Road branch</SubType>
+			<Shape>diamond</Shape>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>Warning</Type>
+			<SubType>Intersection</SubType>
+			<Shape>diamond</Shape>
+			<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+		</TrafficSign>
+		
+		<TrafficSign>
+			<Type>SpeedRestriction</Type>
+			<SubType>Minimum Speed</SubType>
+			<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(Blank).svg_rrx</FilePath>
+		</TrafficSign>
+		
+	</Signs>
+</TomTomAssetData>

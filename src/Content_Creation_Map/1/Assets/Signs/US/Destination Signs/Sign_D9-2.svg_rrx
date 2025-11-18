@@ -1,0 +1,40 @@
+FileVersion: 4
+Uuid: {e8893035-88c1-441b-848b-52c6345503b9}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 65.3 65.3" style="enable-background:new 0 0 65.3 65.3;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;stroke:#000000;stroke-miterlimit:10;}
+	.st1{fill:#221F1F;}
+	.st2{fill:#FFFFFF;}
+	.st3{fill:#006F53;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#005A9C;}
+	.st5{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st6{fill:#005A9C;}
+	.st7{fill:#1F1B17;}
+	.st8{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st10{fill:#F7921E;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st12{fill:#F1607C;}
+	.st13{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+	.st14{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st15{fill:none;stroke:#231F20;stroke-width:0.25;}
+	.st16{fill:none;stroke:#231F20;stroke-width:0.5;}
+</style>
+<g>
+	<path class="st2" d="M4.55,0.25h56.19c2.37,0,4.3,1.94,4.3,4.3v56.19c0,2.37-1.94,4.3-4.3,4.3H4.55c-2.37,0-4.3-1.94-4.3-4.3V4.55
+		C0.25,2.19,2.19,0.25,4.55,0.25"/>
+	<path class="st1" d="M60.75,65.3H4.55C2.04,65.3,0,63.26,0,60.75V4.55C0,2.04,2.04,0,4.55,0h56.19c2.51,0,4.55,2.04,4.55,4.55
+		v56.19C65.3,63.26,63.26,65.3,60.75,65.3z M4.55,0.5C2.32,0.5,0.5,2.32,0.5,4.55v56.19c0,2.23,1.82,4.05,4.05,4.05h56.19
+		c2.23,0,4.05-1.82,4.05-4.05V4.55c0-2.23-1.82-4.05-4.05-4.05H4.55z"/>
+	<path class="st4" d="M4.55,1.87h56.19c1.48,0,2.68,1.21,2.68,2.68v56.19c0,1.48-1.21,2.68-2.68,2.68H4.55
+		c-1.48,0-2.68-1.21-2.68-2.68V4.55C1.87,3.08,3.08,1.87,4.55,1.87"/>
+	<polygon class="st5" points="54.32,59.62 54.32,5.65 43.72,5.65 43.72,25.15 21.38,25.15 21.38,5.65 10.77,5.65 10.77,59.62 
+		21.38,59.62 21.38,35.95 43.72,35.95 43.72,59.62 	"/>
+</g>
+</svg>

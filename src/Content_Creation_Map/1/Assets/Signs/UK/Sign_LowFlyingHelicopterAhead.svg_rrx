@@ -1,0 +1,71 @@
+FileVersion: 4
+Uuid: {1706ec0b-6b4f-43bc-8610-87cfa4973165}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 340 300.54" style="enable-background:new 0 0 340 300.54;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#0079C1;}
+	.st2{fill:#EC1D24;}
+	.st3{clip-path:url(#SVGID_2_);}
+	.st4{fill:none;stroke:#0079C1;stroke-width:10;}
+	.st5{clip-path:url(#SVGID_4_);}
+	.st6{fill:none;stroke:#0079C1;stroke-width:3.7514;}
+	.st7{fill:#FFFFFF;stroke:#0079C1;}
+	.st8{display:none;fill:#FFFFFF;}
+	.st9{fill:#FFFFFF;stroke:#29ABE2;stroke-miterlimit:10;}
+	.st10{fill:#FFFFFF;stroke:#0079C1;stroke-width:0.3;}
+	.st11{clip-path:url(#SVGID_6_);}
+	.st12{fill:none;stroke:#0079C1;stroke-miterlimit:10;}
+	.st13{fill:#E31E26;}
+	.st14{fill:#E10000;}
+	.st15{fill:#FFFFFF;stroke:#1478C7;stroke-width:6;}
+	.st16{fill:#1478C7;}
+	.st17{fill:#E22739;}
+	.st18{fill:none;stroke:#1477C6;}
+	.st19{fill:#231F20;}
+	.st20{fill:none;stroke:#0079C1;stroke-width:2.9228;}
+	.st21{fill:#808080;}
+	.st22{fill:none;stroke:#000000;}
+	.st23{fill:#FFFFFF;stroke:#0079C1;stroke-width:3;}
+	.st24{fill:#FFD421;}
+	.st25{fill:none;stroke:#FFFFFF;stroke-width:2.1836;}
+	.st26{fill:#FFFFFF;stroke:#000000;stroke-width:0.3;}
+	.st27{fill:none;stroke:#EC1D24;stroke-width:90;stroke-linejoin:round;}
+	.st28{fill:#FAFAFB;}
+	.st29{fill:none;stroke:#000000;stroke-width:0.18;stroke-miterlimit:10;}
+	.st30{fill:none;stroke:#231F20;stroke-width:0.5084;stroke-miterlimit:10;}
+	.st31{fill:none;stroke:#EC1D24;stroke-width:10;}
+	.st32{opacity:0.99;enable-background:new    ;}
+	.st33{fill:#4D9523;}
+</style>
+<g>
+	<g id="g10_25_" transform="matrix(1.25,0,0,-1.25,-3.4738088,341.06251)">
+		<path id="path12_12_" inkscape:connector-curvature="0" class="st2" d="M257.14,32.42c6.07,0.14,11.94,3.36,15.24,9
+			c3.24,5.69,3.1,12.39,0.21,17.78L154.17,264.17c-3.13,5.16-8.85,8.63-15.34,8.68c-6.58-0.05-12.31-3.52-15.45-8.68L4.96,59.19
+			C2.09,53.8,1.95,47.1,5.17,41.41c3.31-5.63,9.18-8.85,15.24-9H257.14"/>
+		<path id="path14_22_" inkscape:connector-curvature="0" class="st0" d="M138.83,242.48L31.2,56.12h215.14L138.83,242.48"/>
+		<path id="path16_18_" inkscape:connector-curvature="0" d="M129.41,114.43v2.65l47.2,5.19c0,0,1.18,1.43,1.16,2.96
+			c0.01,1.64-1.27,3.17-1.27,3.17l-41.27-4.66c-2.68-4.06-6.31-3.9-7.3-3.92c-0.93,0.02-4.56-0.15-7.3,3.92l-41.17,4.66
+			c0,0-1.32-1.54-1.38-3.17c0.05-1.54,1.16-2.96,1.16-2.96l47.2-5.19v-2.65c0,0-1.08,0.24-1.9-1.27l-1.9-3.28
+			c0,0-1.11-1.69-2.96-1.27c-1.82,0.42-9,1.92-14.29,1.9c-17.21,0.02-16.81-14.98-16.83-16.4c0.02-19.79,18.52-17.36,18.52-17.36
+			v-8.78h-9.74c0,0-1.71,0.21-2.54,1.38c-0.84,1.09-1.38,1.05-1.69,1.06c-0.36-0.01-1.86-0.34-1.9-1.69
+			c0.04-1.32,2.51-4.25,5.93-4.23h44.23c3.42-0.01,5.89,2.91,5.93,4.23c-0.04,1.35-1.54,1.68-1.9,1.69
+			c-0.31-0.01-0.85,0.03-1.69-1.06c-0.83-1.16-2.54-1.38-2.54-1.38h-7.3v8.78c-0.01,2.81,1.25,7.88,8.36,9.1l51.96,9.95
+			c0,0,5.08,0.74,5.4,6.14c0,0,6.63,1.87,6.67,8.36c-0.03,6.41-5.42,9.17-9.21,9.21c-3.86-0.04-8.74-3.48-8.78-8.68
+			c0.04-6.51,5.19-8.36,5.19-8.36s-0.76-1.29-2.54-1.16l-56.09,5.71l-3.49,6.14C131.31,113.16,130.94,114.21,129.41,114.43"/>
+		<path id="path18_15_" inkscape:connector-curvature="0" class="st0" d="M110.25,67.97h20.42v8.78h-20.42
+			C110.25,76.76,110.25,67.97,110.25,67.97z"/>
+		<path id="path20_15_" inkscape:connector-curvature="0" class="st0" d="M199.46,104.91c0,0,3.86,1.53,3.81,5.61
+			c0.05,4.07-3.84,6.07-5.93,6.03c-2.17,0.04-6.18-1.46-6.14-6.03c-0.04-4.28,3.17-5.29,3.17-5.29l2.22,6.46
+			c0,0,0.26,1.03,1.16,1.06c0.98-0.03,1.29-1.16,1.27-1.48L199.46,104.91"/>
+		<path id="path22_18_" inkscape:connector-curvature="0" class="st0" d="M121.89,100.36c0.38,0.86,1.22,3.29-1.9,4.34
+			c-3.06,0.95-8.32,2.37-13.33,2.33c-5.01,0.04-5.68-0.33-6.56-0.53c-0.87-0.22-7.84-2.64-7.83-11.64c-0.01-5.2,3.53-6.66,5.71-6.67
+			h19.68L121.89,100.36"/>
+	</g>
+</g>
+</svg>

@@ -1,0 +1,46 @@
+FileVersion: 4
+Uuid: {557fecd1-5126-406a-9b8f-b5588899f287}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 50.9 36.5" style="enable-background:new 0 0 50.9 36.5;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#BF311A;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#BF311A;}
+	.st3{fill:#FFD046;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st5{fill:#FFFFFF;}
+	.st6{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st7{fill-rule:evenodd;clip-rule:evenodd;fill:#005A9C;}
+	.st8{fill-rule:evenodd;clip-rule:evenodd;fill:#794400;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st10{fill:#794400;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st13{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st14{fill:#6C2769;}
+	.st15{fill:#6ABC45;}
+	.st16{fill:#006F53;}
+	.st17{fill:#F7921E;}
+	.st18{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st19{fill:#F1607C;}
+	.st20{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+</style>
+<g>
+	<path class="st5" d="M3.85,0.25h43.2c1.99,0,3.6,1.61,3.6,3.6v28.8c0,1.99-1.61,3.6-3.6,3.6H3.85c-1.99,0-3.6-1.61-3.6-3.6V3.85
+		C0.25,1.86,1.86,0.25,3.85,0.25"/>
+	<path class="st1" d="M47.05,36.5H3.85C1.73,36.5,0,34.77,0,32.65V3.85C0,1.73,1.73,0,3.85,0h43.2c2.12,0,3.85,1.73,3.85,3.85v28.8
+		C50.9,34.77,49.17,36.5,47.05,36.5z M3.85,0.5C2,0.5,0.5,2,0.5,3.85v28.8C0.5,34.5,2,36,3.85,36h43.2c1.85,0,3.35-1.5,3.35-3.35
+		V3.85c0-1.85-1.5-3.35-3.35-3.35H3.85z"/>
+	<path class="st16" d="M3.85,1.45h43.2c1.33,0,2.4,1.07,2.4,2.4v28.8c0,1.33-1.07,2.4-2.4,2.4H3.85c-1.33,0-2.4-1.07-2.4-2.4V3.85
+		C1.45,2.53,2.53,1.45,3.85,1.45"/>
+	<path class="st9" d="M33.81,17.99l-6.53-5.17l3.23-2.26c0.1-0.07,0.18-0.15,0.26-0.24c0.4-0.51,0.32-1.25-0.19-1.66
+		c-0.17-0.13-0.36-0.21-0.55-0.24L14.68,6.85l5.03,14.59c0.07,0.19,0.2,0.35,0.36,0.49c0.51,0.4,1.25,0.32,1.66-0.19
+		c0.08-0.1,0.13-0.2,0.18-0.31l1.47-3.67l4.45,3.52c0.22,0.16,0.36,0.43,0.36,0.72v9.3h6.3V19.4
+		C34.48,18.83,34.23,18.32,33.81,17.99"/>
+</g>
+</svg>

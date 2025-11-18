@@ -1,0 +1,25 @@
+FileVersion: 4
+Uuid: {b5ced1ab-20d5-43e3-8a68-26a4870a549d}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 87.33 207" style="enable-background:new 0 0 87.33 207;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<g id="Layer_1">
+	<path class="st0" d="M86.87,124.84L65.35,99.01l0.04,25.4c-7.7,9.27-13.59,20.04-17.25,31.8v-0.57h-0.01V68.88l11.48,8.61L43.82,0
+		L28.04,77.49l11.48-8.61v87.39c-3.66-11.78-9.55-22.57-17.26-31.86l0.04-25.4L0.78,124.84l21.52,43.05V146
+		c11.08,12.22,17.22,28.24,17.22,46.04v14.59h8.61v-14.59c0-17.8,6.14-33.81,17.22-46.04v21.88L86.87,124.84z"/>
+</g>
+<g id="Layer_2">
+</g>
+<g id="Layer_4">
+</g>
+<g id="Layer_3">
+</g>
+</svg>

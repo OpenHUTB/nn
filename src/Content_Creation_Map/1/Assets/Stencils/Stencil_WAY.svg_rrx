@@ -1,0 +1,28 @@
+FileVersion: 4
+Uuid: {d6231b90-91c4-480b-8192-2a59d06a3a33}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 39.99 72" style="enable-background:new 0 0 39.99 72;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+</style>
+<g id="Layer_1">
+</g>
+<g id="Layer_2">
+	<g>
+		<path class="st0" d="M18.66,0l-4.5,72h3l0.33-6h5.33l0.33,6h3l-4.5-72H18.66z M18.66,58.71v-0.09h0l1.49-30l1.5,30h-2.99
+			L18.66,58.71z"/>
+		<polygon class="st0" points="36.91,0 33.91,30 30.91,0 27.91,0 32.41,45 32.41,72 35.41,72 35.47,44.43 39.91,0 		"/>
+		<polygon class="st0" points="8,42 6,24 4,42 3,0 0,0 1.5,72 4.5,72 6,48 7.5,72 10.5,72 12,0 9,0 		"/>
+	</g>
+</g>
+<g id="Layer_4">
+</g>
+<g id="Layer_3">
+</g>
+</svg>

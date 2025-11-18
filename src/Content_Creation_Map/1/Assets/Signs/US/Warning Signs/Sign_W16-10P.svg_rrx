@@ -1,0 +1,52 @@
+FileVersion: 4
+Uuid: {27c9cc2a-943c-4c93-8e34-3e74caee36fa}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 72.5 36.5" style="enable-background:new 0 0 72.5 36.5;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFD046;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st3{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st5{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st6{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st7{fill:#FFFFFF;}
+	.st8{fill:#1F1B17;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#1F1B17;}
+	.st10{fill:#F7921E;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st13{fill:#F1607C;}
+	.st14{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+	.st15{fill:#BED73D;}
+	.st16{fill-rule:evenodd;clip-rule:evenodd;fill:#BED73D;}
+	.st17{fill:#231F20;}
+	.st18{fill:#010101;}
+	.st19{font-family:'Helvetica';}
+	.st20{font-size:0.5px;}
+</style>
+<path class="st0" d="M72.25,31.75c0,2.49-2.02,4.5-4.5,4.5h-63c-2.49,0-4.5-2.01-4.5-4.5v-27c0-2.48,2.01-4.5,4.5-4.5h63
+	c2.48,0,4.5,2.02,4.5,4.5V31.75z"/>
+<path class="st17" d="M67.75,36.5h-63C2.13,36.5,0,34.37,0,31.75v-27C0,2.13,2.13,0,4.75,0h63c2.62,0,4.75,2.13,4.75,4.75v27
+	C72.5,34.37,70.37,36.5,67.75,36.5z M4.75,0.5C2.41,0.5,0.5,2.41,0.5,4.75v27C0.5,34.09,2.41,36,4.75,36h63
+	c2.34,0,4.25-1.91,4.25-4.25v-27c0-2.34-1.91-4.25-4.25-4.25H4.75z"/>
+<path class="st17" d="M67.75,1.38h-63c-1.86,0-3.38,1.52-3.38,3.38v27c0,1.86,1.51,3.38,3.38,3.38h63c1.86,0,3.38-1.51,3.38-3.38
+	v-27C71.12,2.89,69.61,1.38,67.75,1.38 M69.81,31.75c0,1.14-0.93,2.06-2.06,2.06h-63c-1.14,0-2.06-0.93-2.06-2.06v-27
+	c0-1.14,0.92-2.06,2.06-2.06h63c1.14,0,2.06,0.92,2.06,2.06V31.75z"/>
+<text transform="matrix(1 0 0 1 36.0609 18.3811)" class="st18 st19 st20"> </text>
+<path class="st18" d="M40.51,16.74c0,0.49-0.4,0.89-0.89,0.89h-6.75c-0.49,0-0.89-0.4-0.89-0.89v-2.77c0-0.49,0.4-0.89,0.89-0.89
+	h6.75c0.49,0,0.89,0.4,0.89,0.89V16.74z"/>
+<path class="st17" d="M47.5,18.39H25c-0.49,0-0.89,0.4-0.89,0.89v11.13c0,0.49,0.4,0.89,0.89,0.89H47.5c0.49,0,0.89-0.4,0.89-0.89
+	V19.28C48.38,18.79,47.99,18.39,47.5,18.39 M36.25,29.52c-2.59,0-4.68-2.09-4.68-4.68c0-2.58,2.09-4.68,4.68-4.68
+	c2.58,0,4.68,2.09,4.68,4.68C40.93,27.43,38.83,29.52,36.25,29.52"/>
+<rect x="35.9" y="5.21" class="st18" width="0.7" height="6.7"/>
+<rect x="39.33" y="9.61" transform="matrix(0.7869 -0.617 0.617 0.7869 2.9508 28.4553)" class="st18" width="6.7" height="0.7"/>
+<polygon class="st18" points="41.66,15.49 41.5,14.81 48.01,13.26 48.18,13.94 "/>
+<polygon class="st18" points="32.24,12.29 32.67,11.74 27.4,7.62 26.96,8.17 "/>
+<rect x="27.31" y="11.03" transform="matrix(0.2314 -0.9729 0.9729 0.2314 7.2742 37.96)" class="st18" width="0.7" height="6.7"/>
+</svg>

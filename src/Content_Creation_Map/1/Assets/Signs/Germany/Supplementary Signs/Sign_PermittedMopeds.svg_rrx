@@ -1,0 +1,91 @@
+FileVersion: 4
+Uuid: {65841bdd-4ed1-44b3-a83a-b42a687c47d3}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 600 330" style="enable-background:new 0 0 600 330;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#C1121C;}
+	.st2{fill:#008754;}
+	.st3{fill:#F0CA00;}
+	.st4{fill:#FFFFFF;stroke:#000000;stroke-width:0.8;}
+	.st5{fill:#FFFFFF;stroke:#000000;stroke-width:3;}
+	.st6{fill:#FFFEFE;}
+	.st7{fill:none;stroke:#C1121C;stroke-width:64.3168;}
+	.st8{fill:#154889;}
+	.st9{fill:none;stroke:#000000;stroke-width:1.6;stroke-linejoin:round;}
+	.st10{fill:#FFFFFF;stroke:#000000;stroke-width:0.6054;}
+	.st11{fill:#0C0B09;}
+	.st12{fill:#808080;}
+	.st13{fill:#8A8A8A;}
+	.st14{fill:none;stroke:#000000;stroke-width:12.2292;}
+	.st15{fill:none;stroke:#000000;stroke-width:29.3837;stroke-linecap:round;stroke-linejoin:round;}
+	.st16{fill:none;stroke:#000000;stroke-width:17.3835;stroke-linecap:round;stroke-linejoin:round;}
+	.st17{clip-path:url(#SVGID_2_);}
+	.st18{fill:#CC0000;}
+	.st19{fill:#AF151B;}
+	.st20{fill:#F7BA0B;}
+	.st21{fill:#231F20;}
+	.st22{clip-path:url(#SVGID_4_);}
+	.st23{clip-path:url(#SVGID_6_);}
+	.st24{fill:none;stroke:#000000;stroke-width:12.7731;stroke-linecap:round;stroke-linejoin:round;}
+	.st25{clip-path:url(#SVGID_8_);}
+	.st26{fill:none;stroke:#000000;stroke-width:12.6788;stroke-linecap:round;stroke-linejoin:round;}
+	.st27{fill:#040404;}
+	.st28{fill:none;stroke:#FFFFFF;stroke-width:0.151;}
+	.st29{fill:#005EA8;}
+	.st30{fill:#FFED00;}
+	.st31{fill:none;stroke:#FFFFFF;stroke-width:0.261;}
+</style>
+<g>
+	<g id="g4872_1_" transform="matrix(1.25,0,0,-1.25,0,330)">
+		<g id="g4874_1_">
+			<g id="g4876_1_">
+				<g id="g4884_1_">
+					<g>
+						<defs>
+							<rect id="SVGID_7_" x="-60" y="-33" width="600" height="330"/>
+						</defs>
+						<clipPath id="SVGID_2_">
+							<use xlink:href="#SVGID_7_"  style="overflow:visible;"/>
+						</clipPath>
+						<g id="g4886_1_" class="st17">
+							<g id="g4888_1_">
+								<path id="path4890_1_" class="st0" d="M32,263.76c-17.51,0-31.75-14.25-31.75-31.77V32C0.24,14.48,14.48,0.24,32,0.24H448
+									c17.51,0,31.75,14.24,31.75,31.75v200c0,17.52-14.24,31.77-31.75,31.77"/>
+								<path id="path4892_1_" d="M32,0.47C14.61,0.47,0.48,14.61,0.48,32v200c0,17.38,14.13,31.53,31.52,31.53H448
+									c17.38,0,31.52-14.15,31.52-31.53V32c0-17.38-14.13-31.53-31.52-31.53L32,0.47L32,0.47z M448,264H32
+									c-17.68,0-32-14.33-32-32.01V32C0,14.33,14.32,0,32,0H448c17.67,0,32,14.33,32,32v200C480,249.67,465.67,264,448,264"/>
+							</g>
+						</g>
+					</g>
+				</g>
+			</g>
+		</g>
+		<g id="g4894_1_">
+			<path id="path4896_1_" d="M32,20H448c6.63,0,12,5.37,12,12v200c0,6.63-5.37,12-12,12H32c-6.63,0-12-5.37-12-12V32
+				C20,25.37,25.37,20,32,20z M32,8C18.74,8,8,18.74,8,32v200c0,13.26,10.74,24,24,24H448c13.26,0,24-10.74,24-24V32
+				c0-13.26-10.74-24-24-24"/>
+			<g id="g4898_1_" transform="matrix(1,0,0,-1,0,264)">
+				<path id="path4900_1_" class="st26" d="M190.4,160.18c0,24.15-19.58,43.73-43.73,43.73c-24.16,0-43.73-19.58-43.73-43.73
+					c0-24.16,19.58-43.74,43.73-43.74C170.82,116.44,190.4,136.02,190.4,160.18L190.4,160.18z"/>
+			</g>
+			<path id="path4902_1_" d="M373.12,173.97H281.3c-3.46-1.34-5.94-3.54-3.97-9.59l23.71-15.35c10.13,7.59,20.63,8.85,31.11,10.41
+				l41.25,0.14L373.12,173.97z"/>
+			<path id="path4904_1_" d="M344.7,92.49l-95.57,0.11c-19.96,0.61-31.36,17.15-43.76,35.04c-21.68,31.32-24.8,31.65-29.25,46.2
+				l31.82-0.03c2.12-0.65,4.24-0.96,6.36-3.59l19.16-27.27c1.6-6.75,0.27-12.21-1.4-18c-1.93-6.68,5.75-18.59,17.74-18.1l95.13,5.56
+				L344.7,92.49L344.7,92.49z"/>
+			<path id="path4906_1_" d="M140.35,107.18c0.78,2.33,36.93,90.45,36.93,90.45c4.4,7.88,10.56,12.22,18.61,12.79h24.81l-0.14-14.57
+				h-23.92c-2.93,0.27-5.12-1.57-6.95-6.75l-36.05-87.99C150.14,92.93,136.82,95.81,140.35,107.18z"/>
+			<g id="g4908_1_" transform="matrix(1,0,0,-1,0,264)">
+				<path id="path4910_1_" class="st26" d="M377.07,160.34c0,24.16-19.58,43.73-43.73,43.73c-24.15,0-43.73-19.58-43.73-43.73
+					c0-24.15,19.58-43.73,43.73-43.73C357.49,116.61,377.07,136.19,377.07,160.34z"/>
+			</g>
+		</g>
+	</g>
+</g>
+</svg>

@@ -1,0 +1,46 @@
+FileVersion: 4
+Uuid: {b12b01cd-4858-40da-821e-8c67924bdb89}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 25.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 35.57 105.7" style="enable-background:new 0 0 35.57 105.7;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#BF311A;}
+	.st1{fill:#221F1F;}
+	.st2{fill-rule:evenodd;clip-rule:evenodd;fill:#BF311A;}
+	.st3{fill:#FFD046;}
+	.st4{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD046;}
+	.st5{fill:#FFFFFF;}
+	.st6{fill-rule:evenodd;clip-rule:evenodd;fill:#FFD200;}
+	.st7{fill-rule:evenodd;clip-rule:evenodd;fill:#005A9C;}
+	.st8{fill-rule:evenodd;clip-rule:evenodd;fill:#794400;}
+	.st9{fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st10{fill:#794400;}
+	.st11{fill-rule:evenodd;clip-rule:evenodd;fill:#006F53;}
+	.st12{fill-rule:evenodd;clip-rule:evenodd;fill:#C41230;}
+	.st13{fill-rule:evenodd;clip-rule:evenodd;fill:#221F1F;}
+	.st14{fill:#6C2769;}
+	.st15{fill:#6ABC45;}
+	.st16{fill:#006F53;}
+	.st17{fill:#F7921E;}
+	.st18{fill-rule:evenodd;clip-rule:evenodd;fill:#F7921E;}
+	.st19{fill:#F1607C;}
+	.st20{fill-rule:evenodd;clip-rule:evenodd;fill:#F1607C;}
+</style>
+<g>
+	<path class="st4" d="M30.64,0.25H4.93c-2.57,0-4.68,2.1-4.68,4.68v95.85c0,2.57,2.1,4.68,4.68,4.68h25.72
+		c2.57,0,4.68-2.1,4.68-4.68V4.93C35.32,2.35,33.22,0.25,30.64,0.25"/>
+	<path class="st1" d="M30.64,105.7H4.93c-2.72,0-4.93-2.21-4.93-4.93V4.93C0,2.21,2.21,0,4.93,0h25.71c2.72,0,4.93,2.21,4.93,4.93
+		v95.85C35.57,103.49,33.36,105.7,30.64,105.7z M4.93,0.5C2.49,0.5,0.5,2.49,0.5,4.93v95.85c0,2.44,1.99,4.43,4.43,4.43h25.71
+		c2.44,0,4.43-1.99,4.43-4.43V4.93c0-2.44-1.99-4.43-4.43-4.43H4.93z"/>
+	<path class="st1" d="M35.34,4.93v7.83L22.86,0.27l7.81-0.02C33.24,0.25,35.34,2.35,35.34,4.93"/>
+	<path class="st1" d="M35.29,63.92l0.05-13.13L0.21,15.66v13.19C0.21,28.85,35.23,63.87,35.29,63.92"/>
+	<polygon class="st1" points="35.34,89.59 35.34,76.41 0.27,41.33 0.21,54.46 	"/>
+	<path class="st1" d="M0.27,100.77v-7.82l12.48,12.48l-7.81,0.02C2.37,105.45,0.27,103.35,0.27,100.77"/>
+	<path class="st1" d="M30.84,105.46c2.1,0,3.97-1.46,4.5-3.47l0-0.01L0.21,66.9v13.18l25.46,25.37L30.84,105.46z"/>
+	<path class="st1" d="M0.37,3.44l34.97,34.98V25.16L10.47,0.25L4.79,0.24C2.78,0.24,0.99,1.57,0.37,3.44"/>
+</g>
+</svg>

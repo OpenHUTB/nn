@@ -1,0 +1,63 @@
+FileVersion: 4
+Uuid: {21e69c8e-cb12-487a-88c2-632f08593cf0}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 342.18 342.18" style="enable-background:new 0 0 342.18 342.18;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#0079C1;}
+	.st2{fill:#EC1D24;}
+	.st3{clip-path:url(#SVGID_2_);}
+	.st4{fill:none;stroke:#0079C1;stroke-width:10;}
+	.st5{clip-path:url(#SVGID_4_);}
+	.st6{fill:none;stroke:#0079C1;stroke-width:3.7514;}
+	.st7{fill:#FFFFFF;stroke:#0079C1;}
+	.st8{display:none;fill:#FFFFFF;}
+	.st9{fill:#FFFFFF;stroke:#29ABE2;stroke-miterlimit:10;}
+	.st10{fill:#FFFFFF;stroke:#0079C1;stroke-width:0.3;}
+	.st11{clip-path:url(#SVGID_6_);}
+	.st12{fill:none;stroke:#0079C1;stroke-miterlimit:10;}
+	.st13{fill:#E31E26;}
+	.st14{fill:#E10000;}
+	.st15{fill:#FFFFFF;stroke:#1478C7;stroke-width:6;}
+	.st16{fill:#1478C7;}
+	.st17{fill:#E22739;}
+	.st18{fill:none;stroke:#1477C6;}
+	.st19{fill:#231F20;}
+	.st20{fill:none;stroke:#0079C1;stroke-width:2.9228;}
+	.st21{fill:#808080;}
+	.st22{fill:none;stroke:#000000;}
+	.st23{fill:#FFFFFF;stroke:#0079C1;stroke-width:3;}
+	.st24{fill:#FFD421;}
+	.st25{fill:none;stroke:#FFFFFF;stroke-width:2.1836;}
+	.st26{fill:#FFFFFF;stroke:#000000;stroke-width:0.3;}
+	.st27{fill:none;stroke:#EC1D24;stroke-width:90;stroke-linejoin:round;}
+	.st28{fill:#FAFAFB;}
+	.st29{fill:none;stroke:#000000;stroke-width:0.18;stroke-miterlimit:10;}
+	.st30{fill:none;stroke:#231F20;stroke-width:0.5084;stroke-miterlimit:10;}
+	.st31{fill:none;stroke:#EC1D24;stroke-width:10;}
+	.st32{opacity:0.99;enable-background:new    ;}
+	.st33{fill:#4D9523;}
+</style>
+<g>
+	<path id="path3015_2_" class="st0" d="M319.43,171.09c0.02,81.93-66.38,148.35-148.31,148.37
+		C89.2,319.48,22.77,253.08,22.75,171.16c0-0.02,0-0.04,0-0.06C22.74,89.17,89.13,22.74,171.06,22.72
+		c81.93-0.02,148.35,66.38,148.37,148.31C319.43,171.05,319.43,171.07,319.43,171.09z"/>
+	<path id="path16_7_" d="M171.02,72.17c-19.6-0.01-38.06,7.62-51.88,21.45c-6.71,6.69-11.92,14.37-15.5,22.78
+		c-4.1,9.4-6.11,20.35-6.11,29.22v127.24l22.36-22.36l22.36,22.36V170.2c0.25-10.38-1.26-19,0.75-31.14
+		c1.21-5.15,3.84-9.93,7.75-13.86c5.39-5.37,12.62-8.35,20.28-8.34c7.71-0.02,14.93,2.97,20.42,8.34c5.37,5.49,8.37,12.7,8.35,20.4
+		v26.23l-0.02,31.58v46.64l22.36,22.8l22.36-22.8v-20.87l0.02-31.44v-52.15c0.02-19.64-7.63-38.07-21.47-51.99
+		C209.12,79.79,190.67,72.15,171.02,72.17z"/>
+	<path id="path8_4_" class="st2" d="M171.16,1.1C77.19,1.15,1.07,77.24,1.1,171.09c-0.03,93.88,76.1,169.98,170.07,170
+		c93.85-0.02,169.98-76.11,169.93-170C341.14,77.24,265.01,1.15,171.16,1.1z M171.16,36.25c74.44,0,134.85,60.38,134.9,134.84
+		c-0.05,19.71-4.28,38.41-11.93,55.27l-116.25-67.04v-0.02L61.75,92.13C86.2,58.31,126.07,36.25,171.16,36.25L171.16,36.25z
+		 M48.05,115.82l116.25,67.04l116.27,67.2c-24.57,33.84-64.44,55.9-109.41,55.88c-74.56,0.02-134.97-60.35-134.9-134.84
+		C36.19,151.41,40.43,132.7,48.05,115.82z"/>
+	<path id="path10_4_" class="st25" d="M171.16,1.09c93.85,0.05,169.98,76.15,169.93,170c0.05,93.88-76.08,169.98-169.93,170
+		c-93.97-0.02-170.1-76.12-170.07-170C1.06,77.24,77.19,1.14,171.16,1.09z"/>
+</g>
+</svg>

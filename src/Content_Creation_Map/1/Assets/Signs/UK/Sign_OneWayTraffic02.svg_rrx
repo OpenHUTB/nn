@@ -1,0 +1,77 @@
+FileVersion: 4
+Uuid: {aae9e298-fde7-4986-b5a4-e7a3941c9b65}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 513 343" style="enable-background:new 0 0 513 343;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#0079C1;}
+	.st2{fill:#EC1D24;}
+	.st3{clip-path:url(#SVGID_2_);}
+	.st4{fill:none;stroke:#0079C1;stroke-width:10;}
+	.st5{clip-path:url(#SVGID_4_);}
+	.st6{fill:none;stroke:#0079C1;stroke-width:3.7514;}
+	.st7{fill:#FFFFFF;stroke:#0079C1;}
+	.st8{display:none;fill:#FFFFFF;}
+	.st9{fill:#FFFFFF;stroke:#29ABE2;stroke-miterlimit:10;}
+	.st10{fill:#FFFFFF;stroke:#0079C1;stroke-width:0.3;}
+	.st11{clip-path:url(#SVGID_6_);}
+	.st12{fill:none;stroke:#0079C1;stroke-miterlimit:10;}
+	.st13{fill:#E31E26;}
+	.st14{fill:#E10000;}
+	.st15{fill:#FFFFFF;stroke:#1478C7;stroke-width:6;}
+	.st16{fill:#1478C7;}
+	.st17{fill:#E22739;}
+	.st18{fill:none;stroke:#1477C6;}
+	.st19{fill:#231F20;}
+	.st20{fill:none;stroke:#0079C1;stroke-width:2.9228;}
+	.st21{fill:#808080;}
+	.st22{fill:none;stroke:#000000;}
+	.st23{fill:#FFFFFF;stroke:#0079C1;stroke-width:3;}
+	.st24{fill:#FFD421;}
+	.st25{fill:none;stroke:#FFFFFF;stroke-width:2.1836;}
+	.st26{fill:#FFFFFF;stroke:#000000;stroke-width:0.3;}
+	.st27{fill:none;stroke:#EC1D24;stroke-width:90;stroke-linejoin:round;}
+	.st28{fill:#FAFAFB;}
+	.st29{fill:none;stroke:#000000;stroke-width:0.18;stroke-miterlimit:10;}
+	.st30{fill:none;stroke:#231F20;stroke-width:0.5084;stroke-miterlimit:10;}
+	.st31{fill:none;stroke:#EC1D24;stroke-width:10;}
+	.st32{opacity:0.99;enable-background:new    ;}
+	.st33{fill:#4D9523;}
+</style>
+<g>
+	<g id="g3013_2_" transform="matrix(0.1,0,0,0.1,-178.52917,71.51418)">
+		<path id="path3811_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="sssssssss" class="st23" d="M6900.29-385.64
+			c0-173.69-140.8-314.5-314.5-314.5h-4471c-173.7,0-314.5,140.81-314.5,314.5v2771c0,173.69,140.8,314.5,314.5,314.5h4471
+			c173.7,0,314.5-140.81,314.5-314.5V-385.64z"/>
+		<path id="path3813_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="sssssssss" class="st1" d="M6736.98-383.3
+			c0-84.78-68.75-153.53-153.53-153.53H2117.14c-84.78,0-153.53,68.75-153.53,153.53v2766.31c0,84.78,68.75,153.53,153.53,153.53
+			h4466.31c84.78,0,153.53-68.75,153.53-153.53V-383.3z"/>
+		<path id="path3933_1_" inkscape:connector-curvature="0" class="st0" d="M2640.23,1659.7c183.36,0,280.16,131.61,280.16,312.44
+			c0,179.98-90.01,314.97-281.02,314.97c-172.34,0-278.47-120.55-278.47-314.97C2360.9,1795.54,2457.69,1659.7,2640.23,1659.7z"/>
+		<path id="path3935_1_" inkscape:connector-curvature="0" class="st1" d="M2463.62,1971.27c0,141.79,50.94,223.29,176.61,223.29
+			c129.88,0,176.57-88.3,176.57-223.29c0-145.17-65.36-218.17-177.43-218.17C2509.47,1753.1,2463.62,1842.23,2463.62,1971.27
+			L2463.62,1971.27z"/>
+		<path id="path3937_1_" inkscape:connector-curvature="0" class="st0" d="M3072.93,1685.17h110.37l292.04,424.49v-424.49h100.19
+			v590.9h-110.37l-292.9-422.81v422.81h-99.33V1685.17z"/>
+		<path id="path3939_1_" inkscape:connector-curvature="0" class="st0" d="M4146.33,1928.84v87.44h-247.9v168.94h286.09v90.85
+			h-391.38v-593.43h374.42v88.29h-275.07v157.91L4146.33,1928.84L4146.33,1928.84z"/>
+		<path id="path3941_1_" inkscape:connector-curvature="0" class="st0" d="M4559.05,1680.92h105.27l101.03,392.25l89.15-392.25
+			h117.16l95.93,392.25l94.25-392.25h102.74l-135.87,595.16h-112.9l-101.9-438.09l-98.46,438.08h-112.92L4559.05,1680.92z"/>
+		<path id="path3943_1_" inkscape:connector-curvature="0" class="st0" d="M5544.35,1682.64h123.12l198.65,593.43h-100.17
+			l-37.37-110.39h-241.96l-35.66,110.39H5345.7L5544.35,1682.64z"/>
+		<path id="path3945_1_" inkscape:connector-curvature="0" class="st1" d="M5604.65,1802.33l-87.46,278.46h180.86L5604.65,1802.33z"
+			/>
+		<path id="path3947_1_" inkscape:connector-curvature="0" class="st0" d="M6026.21,1681.78l126.49,242.81l125.63-242.81h118.02
+			l-195.26,351.49v242.81h-96.78v-242.81l-196.12-351.49H6026.21L6026.21,1681.78z"/>
+		<path id="path4005_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccc" class="st0" d="M6052.56,280.93h-2781.2
+			l0,561h2781.2L6052.56,280.93z"/>
+		<path id="path4007_1_" inkscape:connector-curvature="0" sodipodi:nodetypes="ccccccc" class="st0" d="M3498.02,1411.43l-850-850
+			l850-850l841.5,0l-850,850l850,850H3498.02z"/>
+	</g>
+</g>
+</svg>

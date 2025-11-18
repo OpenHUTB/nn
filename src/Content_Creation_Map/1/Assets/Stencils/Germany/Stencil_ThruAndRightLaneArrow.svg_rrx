@@ -1,0 +1,19 @@
+FileVersion: 4
+Uuid: {3f799425-1cb4-49f8-8304-0a86b54511b5}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 24.83 125.92" style="enable-background:new 0 0 24.83 125.92;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+</style>
+<g id="Layer_1">
+</g>
+<g id="Layer_2">
+	<path class="st0" d="M7.33,0l6.54,49.75H9.04l0.33,24.46c0,0,1.17-2.04,2.96-2.88c1.79-0.83,4.17-0.92,4.17-0.92V54.96l8.33,21.92
+		l-8.75,17.54V80c0,0-2.75,0.75-4,2.79c-1.25,2.04-2.17,6.58-2.29,8.17c-0.13,1.58,0.38,34.96,0.38,34.96h-7.5L5,49.88H0L7.33,0z"/>
+</g>
+</svg>

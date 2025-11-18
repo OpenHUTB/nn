@@ -1,0 +1,70 @@
+FileVersion: 4
+Uuid: {a7177906-b0b2-4c59-86c7-dc1b864f98f4}
+SavedWith: 
+Restriction: AssetLibrary
+Content: 
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 22.0.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 340 300.54" style="enable-background:new 0 0 340 300.54;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#0079C1;}
+	.st2{fill:#EC1D24;}
+	.st3{clip-path:url(#SVGID_2_);}
+	.st4{fill:none;stroke:#0079C1;stroke-width:10;}
+	.st5{clip-path:url(#SVGID_4_);}
+	.st6{fill:none;stroke:#0079C1;stroke-width:3.7514;}
+	.st7{fill:#FFFFFF;stroke:#0079C1;}
+	.st8{display:none;fill:#FFFFFF;}
+	.st9{fill:#FFFFFF;stroke:#29ABE2;stroke-miterlimit:10;}
+	.st10{fill:#FFFFFF;stroke:#0079C1;stroke-width:0.3;}
+	.st11{clip-path:url(#SVGID_6_);}
+	.st12{fill:none;stroke:#0079C1;stroke-miterlimit:10;}
+	.st13{fill:#E31E26;}
+	.st14{fill:#E10000;}
+	.st15{fill:#FFFFFF;stroke:#1478C7;stroke-width:6;}
+	.st16{fill:#1478C7;}
+	.st17{fill:#E22739;}
+	.st18{fill:none;stroke:#1477C6;}
+	.st19{fill:#231F20;}
+	.st20{fill:none;stroke:#0079C1;stroke-width:2.9228;}
+	.st21{fill:#808080;}
+	.st22{fill:none;stroke:#000000;}
+	.st23{fill:#FFFFFF;stroke:#0079C1;stroke-width:3;}
+	.st24{fill:#FFD421;}
+	.st25{fill:none;stroke:#FFFFFF;stroke-width:2.1836;}
+	.st26{fill:#FFFFFF;stroke:#000000;stroke-width:0.3;}
+	.st27{fill:none;stroke:#EC1D24;stroke-width:90;stroke-linejoin:round;}
+	.st28{fill:#FAFAFB;}
+	.st29{fill:none;stroke:#000000;stroke-width:0.18;stroke-miterlimit:10;}
+	.st30{fill:none;stroke:#231F20;stroke-width:0.5084;stroke-miterlimit:10;}
+	.st31{fill:none;stroke:#EC1D24;stroke-width:10;}
+	.st32{opacity:0.99;enable-background:new    ;}
+	.st33{fill:#4D9523;}
+</style>
+<g>
+	<g id="g10_24_" transform="matrix(1.25,0,0,-1.25,-3.4738088,341.06251)">
+		<path id="path12_11_" inkscape:connector-curvature="0" class="st2" d="M257.14,32.42c6.07,0.14,11.94,3.36,15.24,9
+			c3.24,5.69,3.1,12.39,0.21,17.78L154.17,264.17c-3.13,5.16-8.85,8.63-15.34,8.68c-6.58-0.05-12.31-3.52-15.45-8.68L4.96,59.19
+			C2.09,53.8,1.95,47.1,5.17,41.41c3.31-5.63,9.18-8.85,15.24-9H257.14"/>
+		<path id="path14_21_" inkscape:connector-curvature="0" class="st0" d="M138.83,242.48L31.2,56.12h215.14L138.83,242.48"/>
+		<path id="path16_16_" inkscape:connector-curvature="0" d="M199.14,120.04L44.43,63.74h187.31L199.14,120.04"/>
+		<path id="path18_14_" inkscape:connector-curvature="0" d="M173.96,128.93c-4.29-1.55-6.51-6.32-4.97-10.58
+			c1.6-4.37,6.38-6.59,10.69-4.97c4.32,1.52,6.54,6.3,4.97,10.58C183.08,128.3,178.3,130.52,173.96,128.93"/>
+		<path id="path20_14_" inkscape:connector-curvature="0" d="M112.16,106.49c-4.3-1.61-6.52-6.38-4.97-10.69
+			c1.59-4.32,6.36-6.55,10.69-4.97c4.31,1.57,6.53,6.34,4.97,10.69C121.26,105.8,116.49,108.03,112.16,106.49"/>
+		<path id="path22_17_" inkscape:connector-curvature="0" d="M170.26,155.7c0,0,4.17,1.72,6.77-2.75l6.24-10.69
+			c0,0,2.34,0.19,3.17-2.12c0.21-0.55,0.32-1.16,0.32-1.16l1.9-13.55l-3.17-1.16c-1.76,4.82-7.03,7.26-11.85,5.5
+			c-4.74-1.72-7.2-7.01-5.5-11.75l-44.45-16.19c-1.76,4.73-7.05,7.19-11.85,5.5c-4.75-1.79-7.21-7.07-5.5-11.85l-9.1-3.28
+			L83.8,129.25c0,0-0.82,2.11,1.16,2.86l61.59,22.43c1.99,0.68,2.75-1.48,2.75-1.48l6.35-17.36l3.92,1.48l-3.81,10.69
+			c0,0-0.81,2.18,1.06,2.86L170.26,155.7"/>
+		<path id="path24_17_" inkscape:connector-curvature="0" class="st0" d="M175.44,125.01c-2.19-0.75-3.3-3.14-2.54-5.29
+			c0.81-2.16,3.2-3.28,5.4-2.54c2.11,0.84,3.23,3.22,2.43,5.4C179.95,124.72,177.57,125.83,175.44,125.01"/>
+		<path id="path26_15_" inkscape:connector-curvature="0" class="st0" d="M113.64,102.58c-2.2-0.82-3.31-3.2-2.54-5.4
+			c0.8-2.12,3.18-3.23,5.29-2.43c2.21,0.77,3.32,3.16,2.54,5.29C118.14,102.22,115.75,103.33,113.64,102.58"/>
+		<path id="path28_13_" inkscape:connector-curvature="0" class="st0" d="M178.4,143.96l-11.75-4.23l-3.6,9.74l7.73,2.96
+			c0,0,2.35,0.76,3.07-0.63L178.4,143.96"/>
+	</g>
+</g>
+</svg>

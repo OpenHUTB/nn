@@ -1,0 +1,267 @@
+<HEREAssetData>
+<Poles>
+<Pole>
+<Type>Utility</Type>
+<Diameter>0.27</Diameter>
+<FilePath>Props/ElectricPoles/UtilityPole_60ft.fbx_rrx</FilePath>
+</Pole>
+<Pole>
+<Type>LIGHT</Type>
+<Diameter>0.17</Diameter>
+<FilePath>Props/Signals/Signal_Post_30ft.fbx_rrx</FilePath>
+</Pole>
+<Pole>
+<Type>LIGHT</Type>
+<Diameter>0.27</Diameter>
+<FilePath>Props/Signals/Signal_Post_30ft.fbx_rrx</FilePath>
+</Pole>
+<Pole>
+<Type>GANTRY</Type>
+<Diameter>0.27</Diameter>
+<FilePath>Props/FreewayTrusses/Custom_PostArm_A_38ft.fbx_rrx</FilePath>
+</Pole>
+</Poles>
+<Barriers>
+<Barrier>
+<Type>JERSEY_BARRIER</Type>
+<FilePath>Extrusions/JerseyBarrier.rrext</FilePath>
+</Barrier>
+<Barrier>
+<Type>GUARDRAIL</Type>
+<FilePath>Extrusions/GuardRail.rrext</FilePath>
+</Barrier>
+<Barrier>
+<Type>WALL</Type>
+<FilePath>Extrusions/HighwayBorderwall01.rrext</FilePath>
+</Barrier>
+<Barrier>
+<Type>FENCE</Type>
+<FilePath>Extrusions/Fence.rrext</FilePath>
+</Barrier>
+</Barriers>
+<Signs>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>RECTANGLE</Shape>
+<Color>YELLOW</Color>
+<FilePath>Signs/US/Warning Signs/Sign_W13-2_02.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>DIAMOND</Shape>
+<Value>25</Value>
+<Color>YELLOW</Color>
+<FilePath>Signs/US/Warning Signs/Sign_W1-1a.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>ADVISORY_SPEED_LIMIT</Type>
+<Shape>RECTANGLE</Shape>
+<Value>30</Value>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Warning Signs/Sign_W13-3(30).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(Blank).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>5</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(5).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>10</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(10).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>15</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(15).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>20</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(20).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>25</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(25).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>30</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(30).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>35</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(35).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>40</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(40).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>45</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(45).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>50</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(50).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>55</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(55).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>60</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(60).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>65</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(65).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>70</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(70).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>75</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(75).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Value>80</Value>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(80).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>SPEED_LIMIT</Type>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R2-1(Blank).svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>DO_NOT_ENTER</Type>
+<Shape>CIRCLE</Shape>
+<Color>RED</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R5-1.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>NO_OVERTAKING</Type>
+<Shape>CIRCLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R4-1_01.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>STOP</Type>
+<Shape>OCTAGON</Shape>
+<Color>RED</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R1-1.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>NO_ACCESS</Type>
+<Shape>CIRCLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R4-1_01.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>YIELD</Type>
+<Shape>TRIANGLE</Shape>
+<Color>RED</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R1-2.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>WARNING</Type>
+<Shape>DIAMOND</Shape>
+<Color>YELLOW</Color>
+<FilePath>Signs/US/Sign_BlankYellowPanel.svg_rrx</FilePath>
+</Sign>
+<Sign>
+<Type>YIELD</Type>
+<Shape>TRIANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Regulatory Signs/Sign_R1-2.svg</FilePath>
+</Sign>
+<Sign>
+<Type>END_SPEED_LIMIT</Type>
+<Shape>RECTANGLE</Shape>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>OTHER</Type>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<Color>GREEN</Color>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<Color>BLUE</Color>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<Color>YELLOW</Color>
+<FilePath>Signs/US/Sign_BlankYellow.rrsign</FilePath>
+</Sign>
+<Sign>
+<Type>SIGN_CLASSIFICATION_TYPE_OTHER</Type>
+<Shape>RECTANGLE</Shape>
+<Color>WHITE</Color>
+<FilePath>Signs/US/Sign_BlankWhite.rrsign</FilePath>
+</Sign>
+</Signs>
+</HEREAssetData>
