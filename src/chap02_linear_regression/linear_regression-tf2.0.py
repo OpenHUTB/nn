@@ -75,14 +75,34 @@ def load_data(filename, basis_func=gaussian_basis):
 #定义模型
 class LinearModel(Model):
     """线性回归模型，实现 y = w·x + b"""
-
+    
     def __init__(self, ndim):
-        """初始化线性模型"""
+        """
+        初始化线性模型
+        
+        参数:
+        ndim: 输入特征的维度
+        """
+        # 调用父类(Model)的构造函数
         super(LinearModel, self).__init__()
-        # 定义权重参数w，形状为[ndim, 1]，初始值从均匀分布[-0.1, 0.1)中随机生成
-        self.w = tf.Variable(tf.random.uniform([ndim, 1], -0.1, 0.1), trainable=True, name="weight")
-        # 定义偏置参数b，形状为[1]，初始值为0，确保模型能学习数据偏移量
-        self.b = tf.Variable(tf.zeros([1]), trainable=True, name="bias")
+        
+        # 定义模型参数：权重矩阵 w
+        # 形状为 [ndim, 1]，表示从 ndim 维输入到 1 维输出的线性变换
+        # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
+        # trainable=True 表示该变量需要在训练过程中被优化
+        # 创建一个TensorFlow变量作为模型权重
+        self.w = tf.Variable(
+            shape=[ndim, 1],    # 权重矩阵形状：ndim×1
+            initial_value=tf.random.uniform(
+                # [ndim, 1] 表示这是一个二维矩阵，有 ndim 行和 1 列
+                [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
+            ),
+            trainable=True,
+            name="weight"# 参数名称(用于TensorBoard等可视化工具)
+        )
+
+        
+        # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
         # 定义偏置参数b，形状为 [1]
        
         self.b = tf.Variable(# 定义偏置参数b，它是一个TensorFlow的变量（Variable）
