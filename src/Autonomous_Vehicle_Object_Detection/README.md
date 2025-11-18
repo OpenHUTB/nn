@@ -1,18 +1,19 @@
-# 自动驾驶车辆目标检测系统（基于YOLO和CARLA）
+# 自动驾驶车辆目标检测系统（基于 YOLOv8 和 CARLA）
 
 ## 项目概述
-本项目聚焦于基于 YOLO 算法和 CARLA 仿真器的自动驾驶车辆目标检测。通过 CARLA 仿真环境采集真实场景数据，利用 YOLOv5 进行模型微调，实现对车辆、行人等目标的实时检测。系统支持数据采集、模型训练和实时检测一体化流程。
+本项目聚焦于基于 YOLOv8 算法和 CARLA 仿真器的自动驾驶车辆目标检测。通过 CARLA 仿真环境实时采集场景图像，利用 YOLOv8 模型实现对车辆、行人、摩托车、公交车、卡车等目标的实时检测，并通过 Pygame 进行可视化展示，支持中文显示。  
 
 ### 核心功能：
-⦁	基于 YOLOv3-tiny 进行初始目标检测（通过 OpenCV DNN 模块实现），支持加载自定义训练模型
+⦁	基于 YOLOv8 模型（默认使用 yolov8n.pt）进行实时目标检测，支持指定置信度阈值和检测类别
 
-⦁	与 CARLA 仿真器集成，实时获取场景图像（640x480 分辨率）和目标真实位置
+⦁	与 CARLA 0.9.11 仿真器深度集成，实时获取车辆搭载摄像头的场景图像（1024x768 分辨率）
 
-⦁	自动采集带标注的数据集（YOLO 格式标签），支持的目标类别包括：车辆（car）、卡车（truck）、公交车（bus）、行人（person）
+⦁	支持对行人、汽车、摩托车、公交车、卡车五类目标的检测与分类
 
-⦁	基于 YOLOv5s 模型进行微调，提升特定场景检测性能
+⦁	实时可视化检测结果（不同类别目标使用不同颜色边框标注），显示类别名称及置信度
 
-⦁	实时可视化真实目标（红框）与检测结果（绿框），计算检测精度（精确率、召回率，IOU 阈值 0.3）
+⦁	自动清理 CARLA 仿真资源（车辆、摄像头），确保程序退出时资源释放  
+
 ## 安装步骤
 
 ### 前置条件：
@@ -37,6 +38,7 @@
 ```bash
   pip install -r requirements.txt
   pip install setuptools==40.8.0
+  pip install ultralytics==8.0.151
 ```
 5. 安装 CARLA Python API：（执行该命令前确保 cd 到 CARLA_0.9.11\WindowsNoEditor\PythonAPI\carla\dist 目录）
 (执行该命令前确保cd到CARLA_0.9.11\WindowsNoEditor\PythonAPI\carla\dist目录)
@@ -59,13 +61,8 @@
   copy generate_traffic.py \CARLA_0.9.11\WindowsNoEditor\PythonAPI\examples
 ```
 
-2. 下载yolov3-tiny.weights和yolov3-tiny.cfg文件至examples目录
-```plaintext
-  https://pjreddie.com/media/files/yolov3-tiny.weights
-```
-```plaintext
-  https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg
-```
+2. YOLOv8 模型文件（yolov8n.pt）会在首次运行时由 ultralytics 库自动下载，无需手动下载  
+
 3. 运行CARLA仿真器： 
 ```bash
   cd CARLA_0.9.11
@@ -84,31 +81,21 @@
 ```
 6. 操作指令：  
 ESC：退出程序  
-C：开启 / 关闭数据采集（默认关闭，开启后自动保存带标注的图像）  
-T：开始模型训练（需先采集至少 10 张图像，训练基于 YOLOv5s 进行）
+关闭 Pygame 窗口：退出程序
 
   
 
-## 模型训练与评估
-1. 数据采集：  
-⦁	按C键开启数据采集，系统会自动保存图像（至carla_dataset/images）和对应 YOLO 格式标签（至carla_dataset/labels）  
-⦁	标签格式遵循 YOLO 标准：[类别ID] [中心x归一化] [中心y归一化] [宽度归一化] [高度归一化]  
-⦁	类别 ID 映射：car→0，truck→1，bus→2，person→3  
-⦁	建议采集多样化场景数据（不同光照、交通密度）以提升模型泛化能力  
+## 检测类别与可视化说明
+1. 支持检测的目标类别及对应边框颜色： 
+⦁	行人（person）：红色边框
+⦁	汽车（car）：绿色边框  
+⦁	摩托车（motorcycle）：蓝色边框
+⦁	公交车（bus）：黄色边框  
+⦁	卡车（truck）：洋红色边框
 
-2. 模型训练：  
-按T键启动训练，系统会自动：  
-⦁	克隆 YOLOv5 仓库并安装依赖（包括 ultralytics 库）  
-⦁	划分训练集（80%）和验证集（20%）  
-⦁	生成 YOLOv5 所需的数据集配置文件（carla_dataset.yaml）  
-⦁	基于 YOLOv5s 模型进行微调（默认 50 轮训练，批次大小 16）  
-⦁	训练结果保存在carla_train_results/exp/weights，其中best.pt为最佳权重文件  
+2. 可视化窗口显示摄像头实时画面，每个检测目标会标注边框、类别名称及置信度（保留两位小数）
 
-3. 性能评估：  
-⦁	实时显示检测结果（绿框）与真实目标（红框），并标注类别名称  
-⦁	日志文件dataset_training.log记录数据采集和训练过程  
-⦁	内部通过 IOU（交并比）计算检测精度，IOU 阈值为 0.3  
-⦁	训练过程中可通过 YOLOv5 自带的可视化工具查看损失曲线  
+3. 窗口分辨率固定为 1024x768（与摄像头参数一致）
   
 
   ## 项目结构
@@ -118,45 +105,34 @@ T：开始模型训练（需先采集至少 10 张图像，训练基于 YOLOv5s 
 
 ⦁	requirements.txt：所需Python库的清单
 
-⦁	carla_dataset/：自动生成，存储采集的图像（images）和标签（labels），训练时会自动划分为 train/val 子集
-
-⦁	carla_train_results/：自动生成，存储训练后的模型权重  
-
-⦁   dataset_training.log：系统运行日志（数据采集、训练记录）
-
   ## 贡献方式
   欢迎通过贡献代码改进本项目。您可自由分叉（fork）仓库、修改代码，并提交拉取请求（pull request）。
 
-  
+
 
   ## 许可协议
   本项目基于MIT许可协议开源，详情请参见LICENSE文件。
 
-  
+
 
   ## 致谢
   ⦁	感谢CARLA仿真器团队提供了稳健的自动驾驶仿真平台
 
-  ⦁	感谢YOLOv3开发者研发了高效的目标检测算法 
+  ⦁	感谢YOLOv8开发者研发了高效的目标检测算法 
 
 
 
   ## 参考文档
   * [自动驾驶汽车物体检测和轨迹规划使用YOLOv3和CARLA模拟器](https://github.com/ROBERT-ADDO-ASANTE-DARKO/Autonomous-Vehicle-Object-Detection-and-Trajectory-Planning-using-YOLOv3-and-CARLA-Simulator)
+  * [YOLOv8 官方文档](https://docs.ultralytics.com/)
+
 
 #  常见问题
   ###  CARLA 连接失败：
   确保 CARLA 仿真器已启动，且脚本与仿真器版本严格一致（均为 0.9.11）；若仍失败，检查终端是否有权限访问 CARLA 进程。
   ###  模型加载错误：
-  确认 yolov3-tiny.weights、yolov3-tiny.cfg 和 coco.names 已放在 examples 目录下，文件未损坏（可重新下载官方链接文件）。
-  ###  训练失败：  
-⦁	提示 "数据集样本不足"：需按C键采集至少 10 张带目标的图像  
-⦁	依赖安装错误：确保网络通畅，训练时会自动安装 YOLOv5 依赖（yolov5/requirements.txt），网络问题可手动安装  
-⦁	权限问题：部分系统可能需要管理员权限执行训练命令  
-###  数据采集无反应：  
-⦁	检查场景中是否有目标（车辆、行人），系统会跳过无真实目标的帧  
-⦁	确认按C键后终端显示 "数据采集已开启"  
-⦁	检查存储路径是否有写入权限（carla_dataset目录需可写）  
-###  可视化窗口问题：  
-⦁    窗口分辨率固定为 640x480（与相机参数一致）  
-⦁    若窗口无响应，检查 CARLA 仿真器是否正常运行（需保持仿真器窗口打开）  
+⦁	确认网络通畅，YOLOv8 模型（yolov8n.pt）会自动下载至用户目录下的 .cache/ultralytics 文件夹  
+⦁	若自动下载失败，可手动下载模型文件并放置于脚本运行目录，下载地址：https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
+  ###  可视化窗口问题：  
+⦁	窗口无响应时，检查 CARLA 仿真器是否正常运行（需保持仿真器窗口打开）  
+⦁	中文显示异常时，确保系统中已安装 SimHei 或 WenQuanYi Micro Hei 字体
