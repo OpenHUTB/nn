@@ -17,7 +17,7 @@ town2 = {1: [80, 306.6, 5, 0], 2:[150,306.6]}
 curves = [0, town2]
 
 epsilon = 0
-MODEL_PATH = "models/Braking___282.model"
+MODEL_PATH = "models/Braking___282.00max__282.00avg__282.00min__1679121006.model"
 
 def setup_tensorflow():
     """设置 TensorFlow 2.x 配置"""

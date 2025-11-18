@@ -10,7 +10,7 @@ from tensorflow.keras.models import load_model
 from driving_dqn import CarEnv, MEMORY_FRACTION
 
 epsilon = 0.05
-MODEL_PATH = "models/Driving__6030.model"
+MODEL_PATH = "models/Driving__6030.00max_6030.00avg_6030.00min__1679109656.model"
 
 def setup_tensorflow():
     """设置 TensorFlow 2.x 配置"""
