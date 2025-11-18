@@ -229,28 +229,21 @@ def question_23(x):
     print("验证 - 每列最大值:", np.max(x, axis=0))  # 显示每列的实际最大值
 
 # 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
-def question_24(): #绘制二次函数 y = x^2 的图像。
+def question_24():
+    print("第二十四题：绘制二次函数")
+    x = np.arange(0, 100, 0.1)
+    y = x * x
 
-    print("\n第二十四题：绘制二次函数")
-
-    x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
-    y = x * x  # 计算每个 x 对应的 y=x^2 的值
-
-    plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
-    plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
-
-    # 添加标题和标签
-    plt.title("Plot of y = x^2")  # 图像标题
-    plt.xlabel("x")  # x 轴标签
-    plt.ylabel("y")  # y 轴标签
-
-    # 显示出半透明网格线
-    plt.grid(True, alpha=0.5)
-
-    # 在右上角显示图例
-    plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
-    plt.show()  # 显示绘制的图像
-    plt.close()  # 关闭图形，释放内存
+    plt.figure(figsize=(10, 6))
+    plt.plot(x, y, label="y = x²", color="blue", linewidth=2)
+    plt.title("二次函数 y = x²")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+    plt.close()
 
 # 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
 def question_25():
