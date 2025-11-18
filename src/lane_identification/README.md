@@ -71,6 +71,83 @@ pip install tkinter  # 通常Python自带
    python lane_detection_app.py
    ```
 
+## 快速开始
+
+### 基础使用示例
+```python
+import cv2
+import numpy as np
+
+def quick_detect_direction(image_path):
+    """快速道路方向检测函数"""
+    # 读取图像
+    image = cv2.imread(image_path)
+    if image is None:
+        return "无法读取图像"
+    
+    height, width = image.shape[:2]
+    
+    # 转换为HSV颜色空间
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    # 定义道路颜色范围
+    lower_gray = np.array([0, 0, 50])
+    upper_gray = np.array([180, 50, 200])
+    
+    # 创建道路掩码
+    road_mask = cv2.inRange(hsv, lower_gray, upper_gray)
+    
+    # 形态学操作
+    kernel = np.ones((5, 5), np.uint8)
+    road_mask = cv2.morphologyEx(road_mask, cv2.MORPH_CLOSE, kernel)
+    
+    # 查找轮廓
+    contours, _ = cv2.findContours(road_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    if contours:
+        # 找到最大轮廓
+        largest_contour = max(contours, key=cv2.contourArea)
+        
+        # 计算轮廓的凸包
+        hull = cv2.convexHull(largest_contour)
+        
+        # 计算轮廓质心
+        M = cv2.moments(largest_contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            
+            # 判断方向
+            if cx < width // 2 - width * 0.15:
+                return "左转"
+            elif cx > width // 2 + width * 0.15:
+                return "右转"
+            else:
+                return "直行"
+    
+    return "未知方向"
+
+# 使用示例
+if __name__ == "__main__":
+    result = quick_detect_direction("test_road.jpg")
+    print(f"检测结果: {result}")
+```
+
+### 完整系统使用
+```python
+# 完整的道路方向识别系统
+from lane_detection_app import LaneDetectionApp
+import tkinter as tk
+
+def run_complete_system():
+    """运行完整的道路方向识别系统"""
+    root = tk.Tk()
+    app = LaneDetectionApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    run_complete_system()
+```
+
 ## 使用说明
 
 ### 基本操作流程
@@ -94,6 +171,89 @@ pip install tkinter  # 通常Python自带
 - PNG (.png)
 - BMP (.bmp)
 - TIFF (.tiff)
+
+## 核心代码解析
+
+### 道路轮廓检测核心代码
+```python
+def detect_road_contour(image):
+    """道路轮廓检测核心函数"""
+    # 转换为HSV颜色空间
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    
+    # 道路颜色范围定义
+    lower_gray = np.array([0, 0, 50])
+    upper_gray = np.array([180, 50, 200])
+    
+    # 创建道路掩码
+    road_mask = cv2.inRange(hsv, lower_gray, upper_gray)
+    
+    # 形态学操作去除噪声
+    kernel = np.ones((5, 5), np.uint8)
+    road_mask = cv2.morphologyEx(road_mask, cv2.MORPH_CLOSE, kernel)
+    road_mask = cv2.morphologyEx(road_mask, cv2.MORPH_OPEN, kernel)
+    
+    # 提取轮廓
+    contours, _ = cv2.findContours(road_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    if contours:
+        # 找到最大轮廓并使用凸包
+        largest_contour = max(contours, key=cv2.contourArea)
+        hull = cv2.convexHull(largest_contour)
+        return hull
+    return None
+```
+
+### 方向判断核心代码
+```python
+def determine_direction(contour, image_width, image_height):
+    """方向判断核心函数"""
+    # 计算轮廓边界框
+    x, y, w, h = cv2.boundingRect(contour)
+    
+    # 计算轮廓质心
+    M = cv2.moments(contour)
+    if M["m00"] != 0:
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+    else:
+        cx, cy = x + w//2, y + h//2
+    
+    # 分析轮廓点
+    contour_points = contour.reshape(-1, 2)
+    
+    # 计算顶部和底部宽度
+    top_y = image_height // 3
+    bottom_y = image_height * 2 // 3
+    
+    top_points = [p for p in contour_points if abs(p[1] - top_y) < 5]
+    bottom_points = [p for p in contour_points if abs(p[1] - bottom_y) < 5]
+    
+    if top_points and bottom_points:
+        top_min_x = min(p[0] for p in top_points)
+        top_max_x = max(p[0] for p in top_points)
+        top_width = top_max_x - top_min_x
+        
+        bottom_min_x = min(p[0] for p in bottom_points)
+        bottom_max_x = max(p[0] for p in bottom_points)
+        bottom_width = bottom_max_x - bottom_min_x
+        
+        # 判断收敛方向
+        if top_width < bottom_width * 0.7:
+            top_center = (top_min_x + top_max_x) // 2
+            if top_center < image_width // 2:
+                return "左转"
+            else:
+                return "右转"
+    
+    # 基于质心位置判断
+    if cx < image_width // 2 - image_width * 0.15:
+        return "左转"
+    elif cx > image_width // 2 + image_width * 0.15:
+        return "右转"
+    else:
+        return "直行"
+```
 
 ## 算法原理
 
@@ -133,6 +293,11 @@ lane-direction-detection/
 │   ├── left_turn.jpg
 │   └── right_turn.jpg
 │
+├── utils/                    # 工具函数
+│   ├── image_processing.py
+│   ├── contour_analysis.py
+│   └── visualization.py
+│
 └── docs/                     # 文档资料
     ├── algorithm_explanation.md
     └── user_manual.md
@@ -162,6 +327,43 @@ edges = cv2.Canny(blur, 50, 150)     # 调整阈值
 # 霍夫变换参数
 lines = cv2.HoughLinesP(edges, rho=1, theta=np.pi/180, 
                        threshold=30, minLineLength=20, maxLineGap=50)
+```
+
+## 实用工具函数
+
+### 批量处理函数
+```python
+import os
+from pathlib import Path
+
+def batch_process_images(input_folder, output_folder):
+    """批量处理文件夹中的道路图片"""
+    input_path = Path(input_folder)
+    output_path = Path(output_folder)
+    output_path.mkdir(exist_ok=True)
+    
+    results = []
+    for image_file in input_path.glob("*.jpg"):
+        # 处理每张图片
+        direction, result_image = detect_road_direction(str(image_file))
+        
+        # 保存结果
+        output_file = output_path / f"result_{image_file.name}"
+        cv2.imwrite(str(output_file), result_image)
+        
+        results.append({
+            'file': image_file.name,
+            'direction': direction,
+            'output_file': output_file.name
+        })
+    
+    return results
+
+# 使用示例
+if __name__ == "__main__":
+    results = batch_process_images("input_images", "output_results")
+    for result in results:
+        print(f"{result['file']}: {result['direction']}")
 ```
 
 ## 常见问题解答
