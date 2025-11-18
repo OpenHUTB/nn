@@ -71,7 +71,7 @@ class LaneDetectionApp:
         self.original_label.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 结果图显示区域
-        result_frame = ttk.LabelFrame(images_frame, text="道路高亮图", padding="5")
+        result_frame = ttk.LabelFrame(images_frame, text="道路轮廓标出", padding="5")
         result_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(5, 0))
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(0, weight=1)
@@ -200,6 +200,153 @@ class LaneDetectionApp:
         result_image = image.copy()
         height, width = image.shape[:2]
         
+        # 转换为HSV颜色空间，便于道路区域分割
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        
+        # 定义道路颜色范围（根据实际道路颜色调整）
+        # 对于沥青道路
+        lower_gray = np.array([0, 0, 50])
+        upper_gray = np.array([180, 50, 200])
+        
+        # 创建道路掩码
+        road_mask = cv2.inRange(hsv, lower_gray, upper_gray)
+        
+        # 形态学操作，去除噪声
+        kernel = np.ones((5, 5), np.uint8)
+        road_mask = cv2.morphologyEx(road_mask, cv2.MORPH_CLOSE, kernel)
+        road_mask = cv2.morphologyEx(road_mask, cv2.MORPH_OPEN, kernel)
+        
+        # 提取道路区域轮廓
+        contours, _ = cv2.findContours(road_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        # 找到最大的轮廓（假设为道路）
+        if contours:
+            largest_contour = max(contours, key=cv2.contourArea)
+            
+            # 计算轮廓的凸包，得到道路的大致轮廓
+            hull = cv2.convexHull(largest_contour)
+            
+            # 在结果图像上绘制道路轮廓
+            cv2.drawContours(result_image, [hull], -1, (0, 255, 255), 3)
+            
+            # 填充道路区域（半透明）
+            overlay = result_image.copy()
+            cv2.fillPoly(overlay, [hull], (0, 255, 0))
+            cv2.addWeighted(overlay, 0.2, result_image, 0.8, 0, result_image)
+            
+            # 计算轮廓的边界框和中心
+            x, y, w, h = cv2.boundingRect(hull)
+            center_x = x + w // 2
+            center_y = y + h // 2
+            
+            # 绘制中心点
+            cv2.circle(result_image, (center_x, center_y), 10, (255, 0, 0), -1)
+            
+            # 判断道路方向
+            direction = self._determine_direction_from_contour(hull, width, height)
+            
+            # 绘制方向指示线
+            self._draw_direction_indicator(result_image, hull, direction, width, height)
+            
+        else:
+            # 如果没有找到轮廓，回退到基于车道线的方法
+            direction, result_image = self._fallback_lane_detection(image, result_image)
+        
+        # 添加方向文本
+        cv2.putText(result_image, f"Direction: {direction}", (50, 50), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+        return direction, result_image
+    
+    def _determine_direction_from_contour(self, contour, width, height):
+        """根据道路轮廓判断方向"""
+        # 计算轮廓的边界框
+        x, y, w, h = cv2.boundingRect(contour)
+        
+        # 计算轮廓的质心
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+        else:
+            cx, cy = x + w//2, y + h//2
+        
+        # 计算轮廓在图像上半部分和下半部分的宽度
+        top_y = height // 3
+        bottom_y = height * 2 // 3
+        
+        # 提取轮廓点
+        contour_points = contour.reshape(-1, 2)
+        
+        # 找到在top_y和bottom_y水平线上的轮廓点
+        top_points = [p for p in contour_points if abs(p[1] - top_y) < 5]
+        bottom_points = [p for p in contour_points if abs(p[1] - bottom_y) < 5]
+        
+        if top_points and bottom_points:
+            # 计算顶部和底部的宽度
+            top_min_x = min(p[0] for p in top_points)
+            top_max_x = max(p[0] for p in top_points)
+            top_width = top_max_x - top_min_x
+            
+            bottom_min_x = min(p[0] for p in bottom_points)
+            bottom_max_x = max(p[0] for p in bottom_points)
+            bottom_width = bottom_max_x - bottom_min_x
+            
+            # 计算顶部和底部的中心
+            top_center = (top_min_x + top_max_x) // 2
+            bottom_center = (bottom_min_x + bottom_max_x) // 2
+            
+            # 判断方向
+            if top_width < bottom_width * 0.7:  # 顶部明显变窄
+                if top_center < width // 2 - width * 0.1:
+                    return "左转"
+                elif top_center > width // 2 + width * 0.1:
+                    return "右转"
+                else:
+                    return "直行"
+            else:
+                # 根据轮廓质心位置判断
+                if cx < width // 2 - width * 0.15:
+                    return "左转"
+                elif cx > width // 2 + width * 0.15:
+                    return "右转"
+                else:
+                    return "直行"
+        else:
+            # 如果无法提取足够的点，使用质心位置判断
+            if cx < width // 2 - width * 0.15:
+                return "左转"
+            elif cx > width // 2 + width * 0.15:
+                return "右转"
+            else:
+                return "直行"
+    
+    def _draw_direction_indicator(self, image, contour, direction, width, height):
+        """绘制方向指示器"""
+        # 计算轮廓的质心
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+        else:
+            cx, cy = width // 2, height // 2
+        
+        # 根据方向绘制箭头
+        arrow_length = min(width, height) // 4
+        if direction == "左转":
+            end_point = (cx - arrow_length, cy)
+            cv2.arrowedLine(image, (cx, cy), end_point, (0, 0, 255), 8, tipLength=0.3)
+        elif direction == "右转":
+            end_point = (cx + arrow_length, cy)
+            cv2.arrowedLine(image, (cx, cy), end_point, (0, 0, 255), 8, tipLength=0.3)
+        else:  # 直行
+            end_point = (cx, cy - arrow_length)
+            cv2.arrowedLine(image, (cx, cy), end_point, (0, 0, 255), 8, tipLength=0.3)
+    
+    def _fallback_lane_detection(self, image, result_image):
+        """回退到基于车道线的检测方法"""
+        height, width = image.shape[:2]
+        
         # 转换为灰度图
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
@@ -271,10 +418,8 @@ class LaneDetectionApp:
             return "未知 - 未检测到有效的车道线", result_image
         elif not left_lines:
             direction = "右转 - 只检测到右侧车道线"
-            color = (0, 165, 255)  # 橙色
         elif not right_lines:
             direction = "左转 - 只检测到左侧车道线"
-            color = (0, 165, 255)  # 橙色
         else:
             # 计算左右车道线在图像顶部的平均位置
             left_x_top = np.mean([line[1] for line in left_lines])  # 使用y1作为顶部参考
@@ -290,20 +435,17 @@ class LaneDetectionApp:
             
             if deviation_ratio < 0.1:  # 阈值可根据需要调整
                 direction = "直行"
-                color = (0, 255, 0)  # 绿色
             elif deviation > 0:
                 direction = "右转"
-                color = (0, 165, 255)  # 橙色
             else:
                 direction = "左转"
-                color = (0, 165, 255)  # 橙色
         
         # 在结果图像上绘制车道线和区域
-        self._draw_lanes(result_image, left_lines, right_lines, roi_vertices, direction, color)
+        self._draw_lanes(result_image, left_lines, right_lines, roi_vertices, direction)
         
         return direction, result_image
     
-    def _draw_lanes(self, image, left_lines, right_lines, roi_vertices, direction, color):
+    def _draw_lanes(self, image, left_lines, right_lines, roi_vertices, direction):
         """在图像上绘制车道线和区域"""
         height, width = image.shape[:2]
         
@@ -357,14 +499,6 @@ class LaneDetectionApp:
                 overlay = image.copy()
                 cv2.fillPoly(overlay, [lane_polygon], (0, 255, 0))
                 cv2.addWeighted(overlay, 0.3, image, 0.7, 0, image)
-        
-        # 添加方向文本
-        cv2.putText(image, f"Direction: {direction}", (50, 50), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-        
-        # 添加检测到的线条数量
-        cv2.putText(image, f"Left lines: {len(left_lines)}, Right lines: {len(right_lines)}", 
-                   (50, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
 def main():
     """主函数"""
