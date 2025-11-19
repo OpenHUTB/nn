@@ -52,7 +52,7 @@ MathWorks 的密码要求比较严格，请确保您的密码包含：
 
 
 # 一个简单的roadrunner场景
-<<<<<<< HEAD
+
 
 通过网盘分享的文件：1.zip
 链接: https://pan.baidu.com/s/1JmsUv6jfPXRF-SCJmUjzkg?pwd=1aaa 提取码: 1aaa
@@ -66,13 +66,14 @@ MathWorks 的密码要求比较严格，请确保您的密码包含：
 
 ![A simple RoadRunner scene](https://ww2.mathworks.cn/help/roadrunner/ug/gs_final_scene.png)
 
+
 ### 前提条件
 
 在开始此示例之前，请确保您的系统满足以下前提条件：
 
--   您已按照[安装并激活 RoadRunner](https://ww2.mathworks.cn/help/roadrunner/ug/install-and-activate-roadrunner.html)中描述的说明下载、安装并激活 RoadRunner。
+-   您已安装并激活 RoadRunner。
     
--   您拥有 [RoadRunner Asset Library 附加组件](https://ww2.mathworks.cn/help/roadrunner/roadrunner-asset-library.html) 的许可证。此示例使用仅在该库中可用的素材。
+-   您拥有 RoadRunner Asset Library 附加组件的许可证。此示例使用仅在该库中可用的素材。
     
 
 虽然此示例涵盖了一些基本的相机操作，但为了更全面地了解 RoadRunner 相机的工作原理，请先查看 [RoadRunner 中的相机控制](https://ww2.mathworks.cn/help/roadrunner/ug/camera-control-in-roadrunner.html) 示例。
@@ -392,13 +393,3 @@ RoadRunner 打开一个新场景，其中有一个空白的场景编辑画布。
 -   使用信号工具在交叉路口添加交通信号灯。要修改每个转向信号处的车道路径，请使用操纵工具。有关示例，请参阅。
     
 -   向场景添加额外的道具，例如桶、建筑物和交通标志。要修改标志的文字，请使用标志工具。
-    
-=======
->>>>>>> 8e86e410f27590e270dd9e096b10624f76bb261c
-
-通过网盘分享的文件：1.zip
-链接: https://pan.baidu.com/s/1JmsUv6jfPXRF-SCJmUjzkg?pwd=1aaa 提取码: 1aaa
-
-## 使用方法
-- **将文件解压缩到本地**：确保完整解压
-- **找到文件地址**："1/Scenes/1.rrscene"，右键选择打开方式为roadrunner
