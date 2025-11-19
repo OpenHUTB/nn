@@ -52,6 +52,7 @@ MathWorks 的密码要求比较严格，请确保您的密码包含：
 
 
 # 一个简单的roadrunner场景
+<<<<<<< HEAD
 
 通过网盘分享的文件：1.zip
 链接: https://pan.baidu.com/s/1JmsUv6jfPXRF-SCJmUjzkg?pwd=1aaa 提取码: 1aaa
@@ -392,4 +393,12 @@ RoadRunner 打开一个新场景，其中有一个空白的场景编辑画布。
     
 -   向场景添加额外的道具，例如桶、建筑物和交通标志。要修改标志的文字，请使用标志工具。
     
+=======
+>>>>>>> 8e86e410f27590e270dd9e096b10624f76bb261c
 
+通过网盘分享的文件：1.zip
+链接: https://pan.baidu.com/s/1JmsUv6jfPXRF-SCJmUjzkg?pwd=1aaa 提取码: 1aaa
+
+## 使用方法
+- **将文件解压缩到本地**：确保完整解压
+- **找到文件地址**："1/Scenes/1.rrscene"，右键选择打开方式为roadrunner
