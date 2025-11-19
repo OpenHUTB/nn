@@ -458,28 +458,83 @@ class GlobalPlannerNode(Node):
         )
         self.marker_pub.publish(new_marker)
 
-    def _visualize_goal_point(self, header, goal_wp):
-        """可视化目标点"""
+from typing import Optional
+import logging
+from visualization_msgs.msg import Marker  # 确保导入对应ROS消息类型
+
+# 提取硬编码常量，便于统一维护和修改
+MARKER_NAMESPACE = "carla_goal"
+GOAL_MARKER_ID = 1
+GOAL_MARKER_SCALE = (2.0, 2.0, 2.0)  # x, y, z 缩放
+GOAL_MARKER_COLOR = (1.0, 0.0, 0.0, 0.8)  # r, g, b, alpha
+Z_AXIS_OFFSET = 1.0  # z轴偏移量（提升可视化效果）
+
+class CarlaVisualizer:  # 假设所属类名，可根据实际调整
+    def __init__(self):
+        self.marker_pub = None  # 初始化发布器，需在实际场景中赋值
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def _visualize_goal_point(
+        self,
+        header: Optional[object],  # ROS Header类型，根据实际导入补充类型
+        goal_wp: Optional[object]   # Carla Waypoint类型，补充具体类型注解
+    ) -> None:
+        """
+        可视化Carla目标路点（ROS Marker形式发布）
+
+        Args:
+            header: ROS消息头（包含frame_id、stamp等），用于Marker的坐标系和时间戳
+            goal_wp: Carla路点对象，需包含transform.location属性（x/y/z坐标）
+
+        Raises:
+            AttributeError: 当goal_wp缺少transform/location属性时抛出
+            ValueError: 当header为空时抛出
+        """
+        # 1. 参数合法性校验，提前拦截异常
+        if not header:
+            self.logger.error("可视化目标点失败：Header不能为空")
+            raise ValueError("Header cannot be None for goal marker visualization")
+        
+        if not goal_wp:
+            self.logger.warning("目标路点为空，跳过可视化")
+            return
+
+        # 2. 提取路点坐标（增加属性校验）
+        try:
+            loc = goal_wp.transform.location
+            goal_x = loc.x
+            goal_y = -loc.y  # 注释说明：Carla与ROS坐标系y轴方向相反
+            goal_z = loc.z + Z_AXIS_OFFSET
+        except AttributeError as e:
+            self.logger.error(f"目标路点属性异常：{e}")
+            raise AttributeError(f"Invalid goal waypoint structure: {e}") from e
+
+        # 3. 构建ROS Marker对象（结构化配置，便于阅读和修改）
         goal_marker = Marker()
+        # 基础配置
         goal_marker.header = header
-        goal_marker.ns = "carla_goal"
-        goal_marker.id = 1
+        goal_marker.ns = MARKER_NAMESPACE
+        goal_marker.id = GOAL_MARKER_ID
         goal_marker.type = Marker.SPHERE
         goal_marker.action = Marker.ADD
 
-        goal_marker.pose.position.x = goal_wp.transform.location.x
-        goal_marker.pose.position.y = -goal_wp.transform.location.y
-        goal_marker.pose.position.z = goal_wp.transform.location.z + 1.0
+        # 位置配置（坐标系转换）
+        goal_marker.pose.position.x = goal_x
+        goal_marker.pose.position.y = goal_y
+        goal_marker.pose.position.z = goal_z
+        # 姿态默认（球体无需旋转，保持单位四元数）
+        goal_marker.pose.orientation.w = 1.0
 
-        goal_marker.scale.x = 2.0
-        goal_marker.scale.y = 2.0
-        goal_marker.scale.z = 2.0
-        goal_marker.color.a = 0.8
-        goal_marker.color.r = 1.0
-        goal_marker.color.g = 0.0
-        goal_marker.color.b = 0.0
+        # 外观配置
+        goal_marker.scale.x, goal_marker.scale.y, goal_marker.scale.z = GOAL_MARKER_SCALE
+        goal_marker.color.r, goal_marker.color.g, goal_marker.color.b, goal_marker.color.a = GOAL_MARKER_COLOR
 
-        self.marker_pub.publish(goal_marker)
+        # 4. 发布Marker（增加发布器校验）
+        if self.marker_pub and self.marker_pub.get_num_connections() > 0:
+            self.marker_pub.publish(goal_marker)
+            self.logger.debug(f"成功发布目标点Marker：({goal_x:.2f}, {goal_y:.2f}, {goal_z:.2f})")
+        else:
+            self.logger.warning("Marker发布器未初始化或无订阅者，跳过发布")
 
     def _create_path_marker(self, header, action=Marker.ADD, points=None, line_width=0.6):
         """创建路径标记"""
