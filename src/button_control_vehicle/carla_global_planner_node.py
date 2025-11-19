@@ -208,21 +208,83 @@ class GlobalPlannerNode(Node):
                 self.get_logger().warning(f"CARLA连接丢失: {str(e)}")
                 self.carla_connected = False
 
-    def _monitor_resource_usage(self):
-        """资源监控（内存占用）"""
+import psutil
+import os
+from typing import Optional
+import logging
+
+# 提取硬编码常量，便于统一调整
+MEM_UNIT_CONVERT = 1024 * 1024  # 字节转MB的系数
+MEM_AVG_WEIGHT_OLD = 0.9        # 历史平均内存权重
+MEM_AVG_WEIGHT_NEW = 0.1        # 当前内存权重
+MAX_MEM_PARAM_NAME = "max_memory_threshold_mb"  # 内存阈值参数名
+
+
+class ResourceMonitor:  # 假设所属类，可根据实际场景调整
+    def __init__(self):
+        self.avg_memory_usage: Optional[float] = 0.0  # 初始化平均内存，避免None值
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def _monitor_resource_usage(self) -> None:
+        """
+        监控进程内存占用（滑动平均计算 + 阈值告警）
+
+        核心逻辑：
+        1. 获取当前进程的物理内存占用（RSS）并转换为MB
+        2. 计算内存占用的滑动平均值（历史占90%，当前占10%）
+        3. 对比内存阈值，超过则输出告警日志
+        """
+        # 1. 获取当前进程对象（基础校验）
         try:
-            process = psutil.Process(os.getpid())
-            mem_usage_mb = process.memory_info().rss / (1024 * 1024)
-            self.avg_memory_usage = (self.avg_memory_usage * 0.9) + (mem_usage_mb * 0.1)
+            current_pid = os.getpid()
+            process = psutil.Process(current_pid)
+        except psutil.NoSuchProcess:
+            self.logger.error(f"进程ID {current_pid} 不存在，无法监控内存")
+            return
+        except psutil.AccessDenied:
+            self.logger.error(f"无权限访问进程 {current_pid} 的内存信息")
+            return
 
-            max_mem = self.get_parameter('max_memory_threshold_mb').value
-            if mem_usage_mb > max_mem:
-                self.get_logger().warning(
-                    f"内存占用超过阈值！当前: {mem_usage_mb:.1f}MB, 阈值: {max_mem}MB"
-                )
+        # 2. 计算当前内存占用（MB）
+        try:
+            mem_rss_bytes = process.memory_info().rss
+            mem_usage_mb = mem_rss_bytes / MEM_UNIT_CONVERT
+        except AttributeError as e:
+            self.logger.error(f"获取内存信息失败：属性异常 {str(e)}")
+            return
 
-        except Exception as e:
-            self.get_logger().error(f"资源监控失败: {str(e)}")
+        # 3. 计算滑动平均内存（避免初始值为None的情况）
+        if self.avg_memory_usage is None:
+            self.avg_memory_usage = mem_usage_mb  # 首次初始化
+        else:
+            self.avg_memory_usage = (self.avg_memory_usage * MEM_AVG_WEIGHT_OLD) + (mem_usage_mb * MEM_AVG_WEIGHT_NEW)
+
+        # 4. 读取内存阈值并校验
+        try:
+            max_mem_threshold = self.get_parameter(MAX_MEM_PARAM_NAME).value
+            if not isinstance(max_mem_threshold, (int, float)):
+                raise ValueError(f"内存阈值参数类型错误，应为数字，实际为 {type(max_mem_threshold)}")
+        except (AttributeError, ValueError) as e:
+            self.logger.error(f"读取内存阈值参数失败：{str(e)}，跳过阈值检查")
+            max_mem_threshold = None
+
+        # 5. 阈值检查 & 日志输出
+        self.logger.debug(
+            f"内存监控 - 当前占用：{mem_usage_mb:.1f}MB，平均占用：{self.avg_memory_usage:.1f}MB"
+        )
+        if max_mem_threshold and mem_usage_mb > max_mem_threshold:
+            self.logger.warning(
+                f"⚠️ 内存占用超过阈值！当前: {mem_usage_mb:.1f}MB, 阈值: {max_mem_threshold}MB"
+            )
+
+    # 模拟类内get_parameter方法（实际需根据框架调整，如ROS2的Node.get_parameter）
+    def get_parameter(self, param_name: str):
+        """示例：获取参数（需根据实际框架实现）"""
+        # 实际场景中替换为框架原生方法，如ROS2: super().get_parameter(param_name)
+        class DummyParam:
+            def __init__(self, value):
+                self.value = value
+        return DummyParam(1024)  # 默认阈值示例
 
     def _publish_performance_stats(self):
         """性能统计输出"""
