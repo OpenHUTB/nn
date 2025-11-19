@@ -97,7 +97,7 @@ class SVM:
         3. 距离为负 -> 预测为负类(0)
         """
         score = np.dot(x, self.w) + self.b     # 计算决策函数值
-        return np.where(score >= 0, 1, 0)      # 转换回{0, 1}标签格式
+        return (score >= 0).astype(np.int32)   # 更简洁高效的布尔转整数方法
 
 if __name__ == '__main__':
     # 数据加载部分以及数据路径配置
