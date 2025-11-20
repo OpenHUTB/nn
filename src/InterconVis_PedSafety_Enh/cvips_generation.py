@@ -27,7 +27,7 @@ def main():
     # 3. 配置天气和时段（让参数实际生效）
     configure_weather_and_time(world, args.weather, args.time_of_day)
 
-    # 4. 基于路口类型生成场景（预留核心逻辑，可根据需求扩展）
+    # 4. 基于路口类型生成场景（基础逻辑）
     generate_intersection_scene(world, args.intersection)
 
     # 5. 保持场景运行（按 Ctrl+C 退出并清理资源）
@@ -63,47 +63,53 @@ def connect_carla_with_retry(town_name, max_retries=3, retry_interval=5):
     return None, None
 
 def configure_weather_and_time(world, weather_type, time_of_day):
-    """配置CARLA的天气和时段（让命令行参数生效）"""
-    # CARLA预设天气映射（对应自定义参数）
-    base_weather_mapping = {
-        'clear': carla.WeatherParameters.ClearNoon,
-        'rainy': carla.WeatherParameters.RainyNoon,
-        'cloudy': carla.WeatherParameters.CloudyNoon
-    }
-
-    # 获取基础天气参数并根据时段调整
-    weather = base_weather_mapping[weather_type]
-    if time_of_day == 'sunset':
-        weather.sun_altitude_angle = -15.0  # 日落：太阳高度角为负（地平线以下）
-        weather.ambient_light = 0.3          # 降低环境光强度
-        weather.directional_light_intensity = 0.5  # 降低直射光强度
-        weather.fog_density = 0.1            # 日落添加轻微雾气
+    """配置CARLA的天气和时段（细化不同天气-时段的环境参数）"""
+    # 初始化天气参数
+    weather = carla.WeatherParameters()
+    
+    # 配置天气类型
+    if weather_type == 'clear':
+        weather.cloudiness = 0.0
+        weather.precipitation = 0.0
+    elif weather_type == 'rainy':
+        weather.cloudiness = 80.0
+        weather.precipitation = 50.0
+        weather.precipitation_deposits = 30.0
+        weather.wind_intensity = 10.0  # 雨天增加风力
+    elif weather_type == 'cloudy':
+        weather.cloudiness = 70.0
+        weather.precipitation = 0.0
+        weather.fog_density = 0.2  # 阴天增加雾气
+    
+    # 配置时段（通过太阳高度角、环境光等参数）
+    if time_of_day == 'noon':
+        weather.sun_altitude_angle = 90.0  # 正午太阳高度角
+        weather.ambient_light = 1.0
+        weather.directional_light_intensity = 2.0
+    elif time_of_day == 'sunset':
+        weather.sun_altitude_angle = -15.0  # 日落太阳高度角（地平线以下）
+        weather.ambient_light = 0.3
+        weather.directional_light_intensity = 0.5
+        weather.fog_density = 0.1  # 日落雾气
     elif time_of_day == 'night':
-        weather.sun_altitude_angle = -60.0  # 夜晚：太阳高度角极低
-        weather.ambient_light = 0.05         # 极低环境光
-        weather.directional_light_intensity = 0.01  # 几乎无直射光
-        weather.moon_altitude_angle = 45.0   # 月亮高度角
-        weather.moon_intensity = 0.8         # 月亮亮度
-        weather.stars_intensity = 0.5        # 星星亮度
-    # noon（中午）：使用默认预设，无需额外调整
-
+        weather.sun_altitude_angle = -60.0  # 夜间太阳高度角
+        weather.ambient_light = 0.05
+        weather.directional_light_intensity = 0.01
+        weather.moon_altitude_angle = 45.0  # 月亮高度角
+        weather.moon_intensity = 0.8       # 月亮亮度
+        weather.stars_intensity = 0.5      # 星星亮度
+    
     # 应用天气设置
     world.set_weather(weather)
     print(f"✅ 已配置环境：天气={weather_type}，时段={time_of_day}")
 
 def generate_intersection_scene(world, intersection_type):
-    """基于路口类型生成场景（核心逻辑，可扩展）"""
+    """基于路口类型生成基础场景（可后续扩展）"""
     print(f"📌 开始生成{intersection_type}路口场景...")
     
-    # ------------------------------
-    # 此处为预留逻辑，可根据需求扩展：
-    # 1. 定位地图中对应类型的路口坐标（需提前调研目标地图的路口位置）
-    # 2. 在路口周围生成车辆、行人、红绿灯等Actor
-    # 3. 设置车辆行驶路线、交通规则等
-    # ------------------------------
     example_spawn_point = get_example_spawn_point(world)
     if example_spawn_point:
-        # 示例：生成1辆测试车辆（添加到全局列表，方便退出时清理）
+        # 示例：生成1辆测试车辆
         vehicle_bp = world.get_blueprint_library().find('vehicle.tesla.model3')
         vehicle = world.spawn_actor(vehicle_bp, example_spawn_point)
         generated_actors.append(vehicle)
@@ -112,13 +118,12 @@ def generate_intersection_scene(world, intersection_type):
         print("⚠️  未找到合适的车辆生成点，路口场景生成失败")
 
 def get_example_spawn_point(world):
-    """获取示例生成点（可根据实际地图路口位置修改）"""
+    """获取示例生成点"""
     spawn_points = world.get_map().get_spawn_points()
-    # 取前10个生成点中的第3个作为示例（可根据地图路口位置调整索引）
     return spawn_points[2] if len(spawn_points) > 2 else None
 
 def clean_up_actors():
-    """退出时清理所有生成的Actor（车辆、传感器等）"""
+    """退出时清理所有生成的Actor"""
     if generated_actors:
         print(f"🧹 正在清理 {len(generated_actors)} 个仿真对象...")
         for actor in generated_actors:
