@@ -608,44 +608,67 @@ class KeyboardControl(object):
                 world.player.apply_control(self._control)
 
     def _parse_vehicle_keys(self, keys, milliseconds):
+        """
+        解析车辆控制按键输入，更新车辆控制参数
+        
+        Args:
+            keys: pygame按键状态ScancodeWrapper对象
+            milliseconds: 按键持续时间(毫秒)
+        """
+        # 常量定义 - 提升可读性和可维护性
+        STEER_LIMIT = 0.7
+        STEER_INCREMENT_FACTOR = 5e-4
+        THROTTLE_STEP = 0.1                                    
+        MAX_THROTTLE = 1.0
+        MAX_BRAKE = 1.0
+
+        # --------------------------- 油门控制 ---------------------------
         if keys[K_UP] or keys[K_w]:
             if not self._ackermann_enabled:
-                self._control.throttle = min(self._control.throttle + 0.1, 1.00)
+                self._control.throttle = min(self._control.throttle + THROTTLE_STEP, MAX_THROTTLE)
             else:
-                self._ackermann_control.speed += round(milliseconds * 0.005, 2) * self._ackermann_reverse
-        else:
-            if not self._ackermann_enabled:
-                self._control.throttle = 0.0
+                speed_delta = round(milliseconds * SPEED_CHANGE_FACTOR, 2) * self._ackermann_reverse
+                self._ackermann_control.speed += speed_delta
+        elif not self._ackermann_enabled:
+            # 仅在非阿克曼模式下重置油门
+            self._control.throttle = 0.0
 
+        # --------------------------- 刹车控制 ---------------------------
         if keys[K_DOWN] or keys[K_s]:
             if not self._ackermann_enabled:
-                self._control.brake = min(self._control.brake + 0.2, 1)
+                self._control.brake = min(self._control.brake + BRAKE_STEP, MAX_BRAKE)
             else:
-                self._ackermann_control.speed -= min(abs(self._ackermann_control.speed), round(milliseconds * 0.005, 2)) * self._ackermann_reverse
-                self._ackermann_control.speed = max(0, abs(self._ackermann_control.speed)) * self._ackermann_reverse
-        else:
-            if not self._ackermann_enabled:
-                self._control.brake = 0
+                current_speed_abs = abs(self._ackermann_control.speed)
+                speed_delta = min(current_speed_abs, round(milliseconds * SPEED_CHANGE_FACTOR, 2)) * self._ackermann_reverse
+                self._ackermann_control.speed -= speed_delta
+                # 保持速度方向并确保非负绝对值
+                self._ackermann_control.speed = max(0.0, abs(self._ackermann_control.speed)) * self._ackermann_reverse
+        elif not self._ackermann_enabled:
+            # 仅在非阿克曼模式下重置刹车
+            self._control.brake = 0.0
 
-        steer_increment = 5e-4 * milliseconds
+        # --------------------------- 转向控制 ---------------------------
+        steer_increment = STEER_INCREMENT_FACTOR * milliseconds
+        
+        # 重置转向缓存的条件判断优化
         if keys[K_LEFT] or keys[K_a]:
-            if self._steer_cache > 0:
-                self._steer_cache = 0
-            else:
-                self._steer_cache -= steer_increment
+            self._steer_cache = 0.0 if self._steer_cache > 0 else self._steer_cache - steer_increment
         elif keys[K_RIGHT] or keys[K_d]:
-            if self._steer_cache < 0:
-                self._steer_cache = 0
-            else:
-                self._steer_cache += steer_increment
+            self._steer_cache = 0.0 if self._steer_cache < 0 else self._steer_cache + steer_increment
         else:
             self._steer_cache = 0.0
-        self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
+
+        # 限制转向范围并应用
+        self._steer_cache = max(-STEER_LIMIT, min(STEER_LIMIT, self._steer_cache))
+        steer_value = round(self._steer_cache, 1)
+
         if not self._ackermann_enabled:
-            self._control.steer = round(self._steer_cache, 1)
+            self._control.steer = steer_value
             self._control.hand_brake = keys[K_SPACE]
         else:
-            self._ackermann_control.steer = round(self._steer_cache, 1)
+            self._ackermann_control.steer = steer_value
+
+
 
     def _parse_walker_keys(self, keys, milliseconds, world):
         self._control.speed = 0.0
