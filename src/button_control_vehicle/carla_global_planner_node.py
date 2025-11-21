@@ -9,8 +9,11 @@ CARLA全局路径规划节点 - Docker兼容增强版
 - 依赖版本兼容处理
 - 配置文件支持（可选从文件加载参数）
 """
-
+import psutil
+import os
+import logging
 import rclpy
+from typing import Optional
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from nav_msgs.msg import Path
@@ -18,21 +21,35 @@ from geometry_msgs.msg import PoseStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from carla_global_planner.srv import PlanGlobalPath
 from utilities.planner import compute_route_waypoints
+from tf_transformations import quaternion_from_euler
+from ament_index_python.packages import get_package_share_directory
+import yaml
 
 import carla
 import random
 import time
 import math
 import signal
-import os
-import psutil
-from tf_transformations import quaternion_from_euler
-from ament_index_python.packages import get_package_share_directory
-import yaml
+
+
+# 全局常量定义（统一维护，避免分散）
+# 内存监控相关
+MEM_UNIT_CONVERT = 1024 * 1024  # 字节转MB的系数
+MEM_AVG_WEIGHT_OLD = 0.9        # 历史平均内存权重
+MEM_AVG_WEIGHT_NEW = 0.1        # 当前内存权重
+MAX_MEM_PARAM_NAME = "max_memory_threshold_mb"  # 内存阈值参数名
+
+# 可视化Marker相关
+MARKER_NAMESPACE_PATH = "carla_path"
+MARKER_NAMESPACE_GOAL = "carla_goal"
+GOAL_MARKER_ID = 1
+GOAL_MARKER_SCALE = (2.0, 2.0, 2.0)  # x, y, z 缩放
+GOAL_MARKER_COLOR = (1.0, 0.0, 0.0, 0.8)  # r, g, b, alpha
+Z_AXIS_OFFSET = 1.0  # z轴偏移量（提升可视化效果）
 
 
 class GlobalPlannerNode(Node):
-    """全局路径规划节点类 - Docker兼容版"""
+    """全局路径规划节点类 - Docker兼容版（整合资源监控+可视化功能）"""
 
     def __init__(self):
         super().__init__('carla_global_planner_node')
@@ -44,7 +61,7 @@ class GlobalPlannerNode(Node):
         self.planning_count = 0
         self.total_planning_time = 0.0
         self.last_planning_time = 0.0
-        self.avg_memory_usage = 0.0
+        self.avg_memory_usage = 0.0  # 滑动平均内存占用（MB）
 
         # CARLA客户端核心变量
         self.client = None
@@ -69,8 +86,8 @@ class GlobalPlannerNode(Node):
 
         # ROS服务
         self.srv = self.create_service(
-            PlanGlobalPath, 
-            'plan_to_random_goal', 
+            PlanGlobalPath,
+            'plan_to_random_goal',
             self.plan_path_cb,
             qos_profile=QoSProfile(depth=1)
         )
@@ -208,21 +225,47 @@ class GlobalPlannerNode(Node):
                 self.get_logger().warning(f"CARLA连接丢失: {str(e)}")
                 self.carla_connected = False
 
-    def _monitor_resource_usage(self):
-        """资源监控（内存占用）"""
+    def _monitor_resource_usage(self) -> None:
+        """监控进程内存占用（滑动平均计算 + 阈值告警）"""
+        # 1. 获取当前进程对象（基础校验）
         try:
-            process = psutil.Process(os.getpid())
-            mem_usage_mb = process.memory_info().rss / (1024 * 1024)
-            self.avg_memory_usage = (self.avg_memory_usage * 0.9) + (mem_usage_mb * 0.1)
+            current_pid = os.getpid()
+            process = psutil.Process(current_pid)
+        except psutil.NoSuchProcess:
+            self.get_logger().error(f"进程ID {current_pid} 不存在，无法监控内存")
+            return
+        except psutil.AccessDenied:
+            self.get_logger().error(f"无权限访问进程 {current_pid} 的内存信息")
+            return
 
-            max_mem = self.get_parameter('max_memory_threshold_mb').value
-            if mem_usage_mb > max_mem:
-                self.get_logger().warning(
-                    f"内存占用超过阈值！当前: {mem_usage_mb:.1f}MB, 阈值: {max_mem}MB"
-                )
+        # 2. 计算当前内存占用（MB）
+        try:
+            mem_rss_bytes = process.memory_info().rss
+            mem_usage_mb = mem_rss_bytes / MEM_UNIT_CONVERT
+        except AttributeError as e:
+            self.get_logger().error(f"获取内存信息失败：属性异常 {str(e)}")
+            return
 
-        except Exception as e:
-            self.get_logger().error(f"资源监控失败: {str(e)}")
+        # 3. 计算滑动平均内存
+        self.avg_memory_usage = (self.avg_memory_usage * MEM_AVG_WEIGHT_OLD) + (mem_usage_mb * MEM_AVG_WEIGHT_NEW)
+
+        # 4. 读取内存阈值并校验
+        try:
+            max_mem_threshold = self.get_parameter(MAX_MEM_PARAM_NAME).value
+            if not isinstance(max_mem_threshold, (int, float)):
+                raise ValueError(f"内存阈值参数类型错误，应为数字，实际为 {type(max_mem_threshold)}")
+        except (AttributeError, ValueError) as e:
+            self.get_logger().error(f"读取内存阈值参数失败：{str(e)}，跳过阈值检查")
+            max_mem_threshold = None
+
+        # 5. 阈值检查 & 日志输出
+        self.get_logger().debug(
+            f"内存监控 - 当前占用：{mem_usage_mb:.1f}MB，平均占用：{self.avg_memory_usage:.1f}MB"
+        )
+        if max_mem_threshold and mem_usage_mb > max_mem_threshold:
+            self.get_logger().warning(
+                f"⚠️ 内存占用超过阈值！当前: {mem_usage_mb:.1f}MB, 阈值: {max_mem_threshold}MB"
+            )
 
     def _publish_performance_stats(self):
         """性能统计输出"""
@@ -241,19 +284,19 @@ class GlobalPlannerNode(Node):
         self.get_logger().info(stats_msg)
 
     def _handle_sigterm(self, signum, frame):
-        """处理SIGTERM信号"""
+        """处理SIGTERM信号（容器停止）"""
         self.get_logger().info("接收到容器停止信号（SIGTERM），正在清理资源...")
         self._cleanup_resources()
         rclpy.shutdown()
 
     def _handle_sigint(self, signum, frame):
-        """处理SIGINT信号"""
+        """处理SIGINT信号（键盘中断）"""
         self.get_logger().info("接收到中断信号（SIGINT），正在清理资源...")
         self._cleanup_resources()
         rclpy.shutdown()
 
     def _cleanup_resources(self):
-        """资源清理"""
+        """资源清理（定时器、Marker、CARLA连接）"""
         # 停止定时器
         if hasattr(self, 'connection_check_timer'):
             self.connection_check_timer.cancel()
@@ -262,13 +305,9 @@ class GlobalPlannerNode(Node):
         if hasattr(self, 'resource_monitor_timer'):
             self.resource_monitor_timer.cancel()
 
-        # 发布删除标记
-        delete_marker = Marker()
-        delete_marker.header.frame_id = 'map'
-        delete_marker.ns = "carla_path"
-        delete_marker.id = 0
-        delete_marker.action = Marker.DELETE
-        self.marker_pub.publish(delete_marker)
+        # 发布删除标记（路径+目标点）
+        self._publish_delete_marker(MARKER_NAMESPACE_PATH, 0)
+        self._publish_delete_marker(MARKER_NAMESPACE_GOAL, GOAL_MARKER_ID)
 
         # 关闭CARLA连接
         if self.client:
@@ -279,25 +318,30 @@ class GlobalPlannerNode(Node):
             except Exception as e:
                 self.get_logger().warning(f"CARLA客户端清理失败: {str(e)}")
 
+    def _publish_delete_marker(self, ns: str, marker_id: int):
+        """发布Marker删除消息"""
+        delete_marker = Marker()
+        delete_marker.header.frame_id = 'map'
+        delete_marker.ns = ns
+        delete_marker.id = marker_id
+        delete_marker.action = Marker.DELETE
+        self.marker_pub.publish(delete_marker)
+
     def plan_path_cb(self, request, response):
-        """路径规划服务回调"""
+        """路径规划服务回调（仅保留核心逻辑）"""
         start_time = time.time()
-        response.success = False
-        response.error_msg = ""
 
         if not self.carla_connected or not self.map:
-            error_msg = "CARLA连接未建立或地图未初始化"
-            self.get_logger().error(f"[PLAN_FAILED] {error_msg}")
-            response.error_msg = error_msg
+            self.get_logger().error(f"[PLAN_FAILED] CARLA未连接")
+            response.path = Path()  # 返回空路径
             return response
 
         try:
             start_location = self._ros_to_carla_location(request.start)
             start_wp = self.map.get_waypoint(start_location)
             if not start_wp:
-                error_msg = f"起始位置无效（x:{start_location.x:.2f}, y:{start_location.y:.2f}）"
-                self.get_logger().error(f"[PLAN_FAILED] {error_msg}")
-                response.error_msg = error_msg
+                self.get_logger().error(f"[PLAN_FAILED] 起始位置无效")
+                response.path = Path()
                 return response
 
             min_waypoints = self.get_parameter('min_waypoints').value
@@ -305,50 +349,37 @@ class GlobalPlannerNode(Node):
             route, goal_wp = self._get_valid_route(start_wp, min_waypoints, max_attempts)
 
             if not route:
-                error_msg = f"达到最大尝试次数（{max_attempts}次），未生成有效路径"
-                self.get_logger().error(f"[PLAN_FAILED] {error_msg}")
-                response.error_msg = error_msg
+                self.get_logger().error(f"[PLAN_FAILED] 未生成有效路径")
+                response.path = Path()
                 return response
 
-            total_distance = self._calculate_path_distance(route)
             path_msg = self._build_path_message(route)
-            
             self.path_pub.publish(path_msg)
             self._visualize_path_and_goal(path_msg, goal_wp)
 
+            # 仅赋值path，无其他多余字段
             response.path = path_msg
-            response.success = True
-            response.path_length = total_distance
 
-            # 更新性能统计
-            planning_time = time.time() - start_time
-            self.last_planning_time = planning_time
-            self.total_planning_time += planning_time
-            self.planning_count += 1
-
-            self.get_logger().info(
-                f"[PLAN_SUCCESS] 路点数: {len(route)}, "
-                f"距离: {total_distance:.2f}m, "
-                f"用时: {planning_time:.3f}s"
-            )
+            self.get_logger().info(f"[PLAN_SUCCESS] 路点数: {len(route)}")
             return response
 
         except Exception as e:
-            error_msg = f"规划过程出错: {str(e)}"
-            self.get_logger().error(f"[PLAN_FAILED] {error_msg}")
-            response.error_msg = error_msg
+            self.get_logger().error(f"[PLAN_FAILED] 规划出错: {str(e)}")
+            response.path = Path()
             return response
 
+
+
     def _ros_to_carla_location(self, odom_msg):
-        """ROS到CARLA坐标转换"""
+        """ROS到CARLA坐标转换（Y轴反向）"""
         return carla.Location(
             x=odom_msg.pose.pose.position.x,
-            y=-odom_msg.pose.pose.position.y,  # Y轴方向转换
+            y=-odom_msg.pose.pose.position.y,
             z=odom_msg.pose.pose.position.z
         )
 
     def _get_valid_route(self, start_wp, min_waypoints=50, max_attempts=10):
-        """获取有效路径"""
+        """获取有效路径（多次尝试，确保路点数达标）"""
         best_route = None
         best_goal = None
         best_length = 0
@@ -410,7 +441,7 @@ class GlobalPlannerNode(Node):
         return total_distance
 
     def _build_path_message(self, route):
-        """构建路径消息"""
+        """构建ROS Path消息"""
         path_msg = Path()
         path_msg.header.frame_id = 'map'
         path_msg.header.stamp = self.get_clock().now().to_msg()
@@ -442,53 +473,18 @@ class GlobalPlannerNode(Node):
             self._visualize_goal_point(path_msg.header, goal_wp)
 
     def _visualize_path(self, path_msg):
-        """可视化路径"""
-        # 删除旧标记
-        delete_marker = self._create_path_marker(
-            path_msg.header, action=Marker.DELETE)
-        self.marker_pub.publish(delete_marker)
+        """可视化路径（发布LINE_STRIP Marker）"""
+        # 删除旧路径标记
+        self._publish_delete_marker(MARKER_NAMESPACE_PATH, 0)
 
-        # 发布新标记
+        # 发布新路径标记
         line_width = self.get_parameter('path_line_width').value
-        new_marker = self._create_path_marker(
-            path_msg.header,
-            action=Marker.ADD,
-            points=[pose.pose.position for pose in path_msg.poses],
-            line_width=line_width
-        )
-        self.marker_pub.publish(new_marker)
-
-    def _visualize_goal_point(self, header, goal_wp):
-        """可视化目标点"""
-        goal_marker = Marker()
-        goal_marker.header = header
-        goal_marker.ns = "carla_goal"
-        goal_marker.id = 1
-        goal_marker.type = Marker.SPHERE
-        goal_marker.action = Marker.ADD
-
-        goal_marker.pose.position.x = goal_wp.transform.location.x
-        goal_marker.pose.position.y = -goal_wp.transform.location.y
-        goal_marker.pose.position.z = goal_wp.transform.location.z + 1.0
-
-        goal_marker.scale.x = 2.0
-        goal_marker.scale.y = 2.0
-        goal_marker.scale.z = 2.0
-        goal_marker.color.a = 0.8
-        goal_marker.color.r = 1.0
-        goal_marker.color.g = 0.0
-        goal_marker.color.b = 0.0
-
-        self.marker_pub.publish(goal_marker)
-
-    def _create_path_marker(self, header, action=Marker.ADD, points=None, line_width=0.6):
-        """创建路径标记"""
         marker = Marker()
-        marker.header = header
-        marker.ns = "carla_path"
+        marker.header = path_msg.header
+        marker.ns = MARKER_NAMESPACE_PATH
         marker.id = 0
         marker.type = Marker.LINE_STRIP
-        marker.action = action
+        marker.action = Marker.ADD
 
         marker.scale.x = line_width
         marker.color.a = 1.0
@@ -497,10 +493,38 @@ class GlobalPlannerNode(Node):
         marker.color.b = 0.0
         marker.lifetime.sec = 60
 
-        if points and action == Marker.ADD:
-            marker.points = points
+        marker.points = [pose.pose.position for pose in path_msg.poses]
+        self.marker_pub.publish(marker)
 
-        return marker
+    def _visualize_goal_point(self, header, goal_wp):
+        """可视化目标点（适配Foxy，删除连接数判断）"""
+        if not header or not goal_wp:
+            return
+        try:
+            loc = goal_wp.transform.location
+            goal_x = loc.x
+            goal_y = -loc.y
+            goal_z = loc.z + Z_AXIS_OFFSET
+
+            goal_marker = Marker()
+            goal_marker.header = header
+            goal_marker.ns = MARKER_NAMESPACE_GOAL
+            goal_marker.id = GOAL_MARKER_ID
+            goal_marker.type = Marker.SPHERE
+            goal_marker.action = Marker.ADD
+            goal_marker.pose.position.x = goal_x
+            goal_marker.pose.position.y = goal_y
+            goal_marker.pose.position.z = goal_z
+            goal_marker.pose.orientation.w = 1.0
+            goal_marker.scale.x, goal_marker.scale.y, goal_marker.scale.z = GOAL_MARKER_SCALE
+            goal_marker.color.r, goal_marker.color.g, goal_marker.color.b, goal_marker.color.a = GOAL_MARKER_COLOR
+
+            # 直接发布，不判断连接数
+            self.marker_pub.publish(goal_marker)
+        except Exception as e:
+            self.get_logger().error(f"可视化目标点失败: {str(e)}")
+
+        
 
 
 def main(args=None):
@@ -511,12 +535,14 @@ def main(args=None):
         node = GlobalPlannerNode()
         rclpy.spin(node)
     except Exception as e:
-        print(f"节点运行失败: {str(e)}")
+        # 简化报错输出，只打印核心异常
+        print(f"节点运行异常: {str(e)}")
     finally:
         try:
             rclpy.shutdown()
         except Exception:
             pass
+
 
 
 if __name__ == '__main__':
