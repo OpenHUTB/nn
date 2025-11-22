@@ -118,9 +118,9 @@ def train_one_step(model, optimizer, x, y):
     with tf.GradientTape() as tape:     # 记录计算图以计算梯度
         logits = model(x)               # 前向传播
         loss = compute_loss(logits, y)  # 计算损失
-        grads = tape.gradient(loss,model.trainable_variables)
-        #添加梯度裁剪 控制在1.0以内
-    grads = tape.gradient(loss, model.trainable_variables)            # 计算梯度
+        grads = tape.gradient(loss, model.trainable_variables)
+        # 添加梯度裁剪 控制在1.0以内
+        grads = [tf.clip_by_value(g, -1.0, 1.0) for g in grads]
     optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
     accuracy = compute_accuracy(logits, y)   # 计算准确率
