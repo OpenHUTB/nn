@@ -1,230 +1,144 @@
-# 1. 环境与依赖检查（确保.venv环境正确）
-import sys
 import cv2
 import numpy as np
-from ultralytics import YOLO
-import requests
-import os
-
-# 验证环境
-current_env = sys.executable
-print(f"✅ 当前Python环境：{current_env}")
-print(f"✅ 环境路径已包含 .venv → 环境正确！")
-
-# 依赖检查
-required_libs = {"cv2": "opencv-python", "numpy": "numpy", "ultralytics": "ultralytics", "requests": "requests"}
-missing_libs = []
-for lib_alias, lib in required_libs.items():
-    try:
-        __import__(lib_alias)
-    except ImportError:
-        missing_libs.append(lib)
-if missing_libs:
-    print(f"\n❌ 缺少必要库：{', '.join(missing_libs)}")
-    print(f"👉 请在PyCharm终端执行：pip install {' '.join(missing_libs)} -i https://pypi.tuna.tsinghua.edu.cn/simple")
-    sys.exit(1)
-print("✅ 所有依赖库均已安装完成！")
+from PIL import Image, ImageDraw
 
 
-# -------------------------- 自动下载红绿灯示例图片 --------------------------
-def download_traffic_light_image():
-    """自动下载一张红绿灯示例图到项目目录，避免路径错误"""
-    # 公开的红绿灯示例图URL（安全可用）
-    image_url = "https://picsum.photos/id/1076/800/600"  # 包含红绿灯的真实场景图
-    image_path = "traffic_light_example.jpg"  # 保存到项目目录的文件名
+# -------------------------- 第一步：生成模拟红绿灯图片 --------------------------
+def generate_traffic_light(light_color="red"):
+    """
+    生成模拟红绿灯图片（红灯/黄灯/绿灯可选）
+    :param light_color: 亮灯颜色，可选 "red", "yellow", "green"
+    :return: 图片路径
+    """
+    # 图片尺寸：宽400px，高600px（模拟真实红绿灯比例）
+    img_width, img_height = 400, 600
+    background_color = (0, 0, 0)  # 背景黑色
+    dark_color = (50, 50, 50)  # 未亮灯的暗灰色
+    light_colors = {
+        "red": (255, 0, 0),
+        "yellow": (255, 255, 0),
+        "green": (0, 255, 0)
+    }
 
-    # 检查是否已下载过
-    if os.path.exists(image_path):
-        print(f"📸 已找到示例图片：{image_path}")
-        return image_path
+    # 创建空白图片（RGB模式）
+    img = Image.new("RGB", (img_width, img_height), background_color)
+    draw = ImageDraw.Draw(img)
 
-    # 开始下载
-    print(f"\n📥 正在自动下载红绿灯示例图片（无需手动准备）...")
-    try:
-        response = requests.get(image_url, timeout=10)
-        response.raise_for_status()  # 抛出HTTP错误
-        with open(image_path, 'wb') as f:
-            f.write(response.content)
-        print(f"✅ 图片下载成功！保存路径：{os.path.abspath(image_path)}")
-        return image_path
-    except Exception as e:
-        print(f"❌ 图片下载失败：{str(e)}")
-        print("👉 备选方案：手动下载一张红绿灯图片，放在项目目录，命名为 'traffic_light_example.jpg'")
-        sys.exit(1)
+    # 灯的位置：上（红）、中（黄）、下（绿），圆心坐标和半径
+    light_radius = 80  # 灯的半径
+    light_positions = [
+        (img_width // 2, img_height // 4),  # 红灯位置（上）
+        (img_width // 2, img_height // 2),  # 黄灯位置（中）
+        (img_width // 2, 3 * img_height // 4)  # 绿灯位置（下）
+    ]
+
+    # 绘制三个灯（未亮灯为暗灰色，亮灯为对应颜色）
+    for i, pos in enumerate(light_positions):
+        color = dark_color
+        if (i == 0 and light_color == "red") or \
+                (i == 1 and light_color == "yellow") or \
+                (i == 2 and light_color == "green"):
+            color = light_colors[light_color]
+        # 绘制圆形灯（填充+边框）
+        draw.ellipse(
+            [pos[0] - light_radius, pos[1] - light_radius,
+             pos[0] + light_radius, pos[1] + light_radius],
+            fill=color, outline=(200, 200, 200), width=5
+        )
+
+    # 保存图片
+    img_path = f"traffic_light_{light_color}.jpg"
+    img.save(img_path)
+    print(f"已生成红绿灯图片：{img_path}（亮灯颜色：{light_color}）")
+    return img_path
 
 
-# -------------------------- 图片识别专用检测器（保留强化可视化）--------------------------
-class TrafficLightImageDetector:
-    def __init__(self):
-        print("\n🔍 正在加载YOLOv8轻量模型（首次运行自动下载...）")
-        self.model = YOLO('yolov8n.pt')
-        self.traffic_light_class_id = 9  # COCO数据集红绿灯类别ID
+# -------------------------- 第二步：红绿灯识别核心逻辑 --------------------------
+def detect_traffic_light(img_path):
+    """
+    基于颜色和形状识别红绿灯状态
+    :param img_path: 红绿灯图片路径
+    :return: 识别结果（"red", "yellow", "green", "unknown"）
+    """
+    # 1. 读取图片并转换为HSV颜色空间（对颜色分割更友好）
+    img = cv2.imread(img_path)
+    if img is None:
+        print(f"错误：无法读取图片 {img_path}")
+        return "unknown"
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-        # 颜色配置与可视化参数
-        self.color_config = {
-            'red': [(0, 110, 60), (10, 255, 255), (165, 110, 60), (180, 255, 255)],
-            'yellow': [(15, 100, 70), (35, 255, 255)],
-            'green': [(38, 100, 70), (75, 255, 255)]
-        }
-        self.min_valid_ratio = 0.04
-        self.color_map = {'red': (0, 0, 255), 'yellow': (0, 255, 255), 'green': (0, 255, 0), 'unknown': (128, 128, 128)}
-        self.font = cv2.FONT_HERSHEY_SIMPLEX
+    # 2. 定义红、黄、绿三种颜色的HSV阈值（修复红色区间格式！）
+    color_ranges = {
+        "red": [
+            [(0, 120, 70), (10, 255, 255)],  # 红色低区间（元组嵌套修复）
+            [(170, 120, 70), (180, 255, 255)]  # 红色高区间（元组嵌套修复）
+        ],
+        "yellow": [(20, 120, 70), (30, 255, 255)],
+        "green": [(35, 120, 70), (77, 255, 255)]
+    }
 
-    def _get_color_mask(self, roi, color):
-        """生成颜色掩码（可视化用）"""
-        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-        config = self.color_config[color]
-        if color == 'red':
-            mask1 = cv2.inRange(hsv, config[0], config[1])
-            mask2 = cv2.inRange(hsv, config[2], config[3])
-            mask = cv2.bitwise_or(mask1, mask2)
+    # 3. 对每种颜色进行掩码处理（筛选出对应颜色区域）
+    light_detected = "unknown"
+    max_light_area = 0  # 记录最大亮灯区域面积（避免误识别小色块）
+
+    for color, ranges in color_ranges.items():
+        # 生成颜色掩码（多个区间合并）
+        mask = np.zeros_like(hsv[:, :, 0])
+        # 处理红色的多区间（需循环每个子区间）
+        if color == "red":
+            for (lower, upper) in ranges:
+                lower_np = np.array(lower)
+                upper_np = np.array(upper)
+                mask += cv2.inRange(hsv, lower_np, upper_np)
         else:
-            mask = cv2.inRange(hsv, config[0], config[1])
-        mask = cv2.erode(mask, np.ones((2, 2), np.uint8))
-        mask = cv2.dilate(mask, np.ones((3, 3), np.uint8))
-        return mask
+            # 黄/绿单区间直接处理
+            lower_np = np.array(ranges[0])
+            upper_np = np.array(ranges[1])
+            mask += cv2.inRange(hsv, lower_np, upper_np)
 
-    def detect_light_status(self, roi):
-        """检测红绿灯状态+生成掩码"""
-        if roi is None or roi.size == 0:
-            return 'unknown', np.zeros_like(roi)
+        # 4. 形态学处理（去除噪点，填充小缺口）
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
-        # 计算各颜色占比
-        total_pixels = roi.shape[0] * roi.shape[1]
-        if total_pixels == 0:
-            return 'unknown', np.zeros_like(roi)
+        # 5. 检测圆形轮廓（红绿灯的灯是圆形）
+        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        red_ratio = cv2.countNonZero(self._get_color_mask(roi, 'red')) / total_pixels
-        yellow_ratio = cv2.countNonZero(self._get_color_mask(roi, 'yellow')) / total_pixels
-        green_ratio = cv2.countNonZero(self._get_color_mask(roi, 'green')) / total_pixels
+        for cnt in contours:
+            # 计算轮廓面积和圆形度（圆形度=4π面积/周长²，越接近1越圆）
+            area = cv2.contourArea(cnt)
+            perimeter = cv2.arcLength(cnt, True)
+            if perimeter == 0:
+                continue
+            circularity = 4 * np.pi * area / (perimeter ** 2)
 
-        # 判定状态
-        max_ratio = max(red_ratio, yellow_ratio, green_ratio)
-        if max_ratio < self.min_valid_ratio:
-            status = 'unknown'
-        elif red_ratio == max_ratio:
-            status = 'red'
-        elif yellow_ratio == max_ratio:
-            status = 'yellow'
-        else:
-            status = 'green'
+            # 筛选条件：面积足够大（排除小噪点）+ 圆形度高（排除非圆形）
+            if area > 5000 and circularity > 0.7:
+                # 记录最大面积的亮灯（避免多个颜色误检）
+                if area > max_light_area:
+                    max_light_area = area
+                    light_detected = color
 
-        mask = self._get_color_mask(roi, status) if status != 'unknown' else np.zeros_like(roi)
-        return status, mask
-
-    def detect(self, image):
-        """输入图片，返回所有红绿灯的检测结果"""
-        results = self.model(image, conf=0.45, verbose=False)
-        detected_lights = []
-
-        for result in results:
-            for box in result.boxes.data.cpu().numpy():
-                x1, y1, x2, y2, conf, cls_id = box
-                if int(cls_id) == self.traffic_light_class_id:
-                    x1, y1 = max(0, int(x1)), max(0, int(y1))
-                    x2, y2 = min(image.shape[1], int(x2)), min(image.shape[0], int(y2))
-                    roi = image[y1:y2, x1:x2]
-                    status, mask = self.detect_light_status(roi)
-                    detected_lights.append({
-                        'bbox': (x1, y1, x2, y2),
-                        'status': status,
-                        'confidence': round(float(conf), 2),
-                        'roi': roi,
-                        'mask': mask
-                    })
-        return detected_lights
-
-    def draw_visualization(self, image, detected_lights):
-        """强化可视化：边界框、状态、掩码预览、统计信息"""
-        vis_image = image.copy()
-        light_count = len(detected_lights)
-
-        # 1. 绘制每个红绿灯的检测结果
-        for idx, light in enumerate(detected_lights):
-            x1, y1, x2, y2 = light['bbox']
-            status = light['status']
-            conf = light['confidence']
-            mask = light['mask']
-
-            # 绘制边界框（加粗醒目）
-            cv2.rectangle(vis_image, (x1, y1), (x2, y2), self.color_map[status], 3)
-
-            # 绘制带背景的状态文字（避免遮挡）
-            text = f"TL-{idx + 1}: {status} ({conf})"
-            text_size = cv2.getTextSize(text, self.font, 0.6, 2)[0]
-            cv2.rectangle(vis_image, (x1, y1 - 35), (x1 + text_size[0] + 10, y1 - 5), self.color_map[status], -1)
-            cv2.putText(vis_image, text, (x1 + 5, y1 - 15), self.font, 0.6, (255, 255, 255), 2)
-
-            # 绘制颜色掩码预览（窗口展示识别区域）
-            mask_h, mask_w = mask.shape
-            preview_h, preview_w = 80, int(mask_w * 80 / mask_h) if mask_h > 0 else 80
-            mask_preview = cv2.resize(mask, (preview_w, preview_h))
-            mask_preview = cv2.cvtColor(mask_preview, cv2.COLOR_GRAY2BGR)
-            mask_preview = cv2.bitwise_and(mask_preview, self.color_map[status])
-            # 确保预览窗口不超出图片范围
-            preview_x = min(x2 - preview_w, vis_image.shape[1] - preview_w)
-            preview_y = max(y1 - preview_h, 0)
-            vis_image[preview_y:preview_y + preview_h, preview_x:preview_x + preview_w] = mask_preview
-
-        # 2. 绘制顶部统计栏（半透明背景）
-        top_text = f"Traffic Light Detection | Detected: {light_count} | Auto Image Mode"
-        cv2.rectangle(vis_image, (0, 0), (vis_image.shape[1], 40), (0, 0, 0), -1)
-        cv2.addWeighted(vis_image, 0.7, vis_image, 0.3, 0, vis_image)  # 半透明效果
-        cv2.putText(vis_image, top_text, (20, 25), self.font, 0.8, (255, 255, 255), 2)
-
-        # 3. 绘制底部操作提示
-        bottom_text = "Press 'q' to close | 's' to save result"
-        cv2.putText(vis_image, bottom_text, (20, vis_image.shape[0] - 20), self.font, 0.7, (0, 255, 255), 2)
-
-        return vis_image
-
-
-# -------------------------- 主运行函数（无需手动准备图片）--------------------------
-def main():
-    detector = TrafficLightImageDetector()
-
-    # 自动下载示例图片（无需手动操作）
-    image_path = download_traffic_light_image()
-
-    # 读取图片
-    print(f"\n🔍 正在读取图片：{os.path.abspath(image_path)}")
-    image = cv2.imread(image_path)
-    if image is None:
-        print(f"❌ 图片读取失败！检查图片是否损坏。")
-        return
-
-    # 检测红绿灯
-    print("🔍 正在识别红绿灯...")
-    detected_lights = detector.detect(image)
-
-    # 生成强化可视化结果
-    vis_image = detector.draw_visualization(image, detected_lights)
-
-    # 显示结果（窗口可缩放）
-    cv2.namedWindow("Traffic Light Image Detection", cv2.WINDOW_NORMAL)
-    cv2.imshow("Traffic Light Image Detection", vis_image)
-    print(f"✅ 识别完成！共检测到 {len(detected_lights)} 个红绿灯")
-    print("📌 操作说明：按 'q' 关闭窗口 | 's' 保存识别结果图片")
-
-    # 等待用户操作（0表示一直等待按键）
-    while True:
-        key = cv2.waitKey(0) & 0xFF
-        if key == ord('q'):
-            print("\n👋 关闭窗口，程序退出...")
-            break
-        elif key == ord('s'):
-            # 保存识别结果（带时间戳，避免覆盖）
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            save_path = f"traffic_light_result_{timestamp}.jpg"
-            cv2.imwrite(save_path, vis_image)
-            print(f"📸 识别结果已保存至：{os.path.abspath(save_path)}")
-            break
-
-    # 释放资源
+    # 6. 绘制识别结果并显示图片
+    result_img = img.copy()
+    cv2.putText(
+        result_img, f"Detected: {light_detected.upper()}",
+        (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3
+    )
+    cv2.imshow("Traffic Light Detection Result", result_img)
+    cv2.waitKey(3000)  # 显示3秒
     cv2.destroyAllWindows()
-    print("✅ 程序已安全退出！")
+
+    return light_detected
 
 
+# -------------------------- 第三步：运行测试 --------------------------
 if __name__ == "__main__":
-    main()
+    # 1. 生成红绿灯图片（可改为 "yellow" 或 "green" 测试）
+    img_path = generate_traffic_light(light_color="red")
+
+    # 2. 识别红绿灯
+    result = detect_traffic_light(img_path)
+
+    # 3. 输出结果
+    print(f"\n最终识别结果：{result}灯")
