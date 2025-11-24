@@ -141,3 +141,6 @@ dmypy.json
 data/train/
 data/test/
 
+data/
+Car-Racing-main/data/
+
