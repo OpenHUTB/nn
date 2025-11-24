@@ -550,6 +550,9 @@ try:
         elif detection_result['obstacle_detected']:
             # 检测到障碍物，应用避障控制
             brake = avoid_brake
+            # 动态调整油门：距离越近，油门越小，以获得更好的操控性
+            obstacle_distance_factor = max(0.2, min(1.0, detection_result['min_distance'] / 15.0))
+            throttle = 0.3 * obstacle_distance_factor  # 基础油门0.3，并根据距离动态调整
             throttle = 0.4  # 避障时也保持较高油门
             steer = avoid_steer * 0.1 + base_steer * 0.2
             print("!!! 检测到障碍物，准备避障 !!!")
