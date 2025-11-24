@@ -190,7 +190,7 @@ def main():
     print(f"\n🔍 正在读取图片：{os.path.abspath(image_path)}")
     image = cv2.imread(image_path)
     if image is None:
-        print(f"❌ 图片读取失败！请检查图片是否损坏。")
+        print(f"❌ 图片读取失败！检查图片是否损坏。")
         return
 
     # 检测红绿灯
