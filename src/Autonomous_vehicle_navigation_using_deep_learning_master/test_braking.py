@@ -7,10 +7,17 @@ import cv2
 import time
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from driving_dqn import CarEnv, MEMORY_FRACTION
+from braking_dqn import CarEnv, MEMORY_FRACTION
+import carla
+from carla import Transform 
+from carla import Location
+from carla import Rotation
 
-epsilon = 0.05
-MODEL_PATH = "models/Driving__6030.model"
+town2 = {1: [80, 306.6, 5, 0], 2:[150,306.6]}
+curves = [0, town2]
+
+epsilon = 0
+MODEL_PATH = "models/Braking___282.00max__282.00avg__282.00min__1679121006.model"
 
 def setup_tensorflow():
     """设置 TensorFlow 2.x 配置"""
@@ -68,27 +75,6 @@ def safe_load_model(model_path):
         print(f"❌ 加载模型时发生错误 {model_path}: {e}")
         return None
 
-def create_compatible_model(input_shape=(4,), output_units=5):
-    """创建兼容的模型（如果加载失败时使用）"""
-    print("创建新的驾驶模型...")
-    
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(128, activation='relu', input_shape=input_shape),
-        tf.keras.layers.Dropout(0.3),
-        tf.keras.layers.Dense(64, activation='relu'),
-        tf.keras.layers.Dropout(0.2),
-        tf.keras.layers.Dense(32, activation='relu'),
-        tf.keras.layers.Dense(output_units, activation='linear')
-    ])
-    
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-        loss='mse',
-        metrics=['mae']
-    )
-    
-    return model
-
 def preprocess_state_for_prediction(state_data):
     """预处理状态数据用于模型预测"""
     try:
@@ -105,27 +91,27 @@ def preprocess_state_for_prediction(state_data):
     except Exception as e:
         print(f"状态预处理错误: {e}")
         # 返回默认状态
-        return np.array([[0, 0, 0, 0]])
+        return np.array([[0, 0]])
 
 if __name__ == '__main__':
     
     FPS = 60
-    EPISODES = 10
+    EPISODES = 1
 
     # 设置 TensorFlow
     setup_tensorflow()
 
     # 加载模型
     print("\n" + "="*50)
-    print("加载驾驶模型")
+    print("加载刹车模型")
     print("="*50)
     
     model = safe_load_model(MODEL_PATH)
     
     # 如果模型加载失败，创建新的模型
     if model is None:
-        print("创建新的驾驶模型...")
-        model = create_compatible_model(input_shape=(4,), output_units=5)
+        print("❌ 无法加载模型，程序退出")
+        exit(1)
     
     print(f"✅ 模型加载完成:")
     print(f"   - 输入形状: {model.input_shape}")
@@ -142,7 +128,7 @@ if __name__ == '__main__':
     print("预热模型...")
     try:
         # 使用正确的预处理
-        dummy_state = preprocess_state_for_prediction([0, 0, 0, 0])
+        dummy_state = preprocess_state_for_prediction([0, 0])
         model.predict(dummy_state, verbose=0)
         print("✅ 模型预热完成")
     except Exception as e:
@@ -154,18 +140,19 @@ if __name__ == '__main__':
         print(f'开始 Episode {episode + 1}/{EPISODES}')
         print(f'{"="*50}')
 
+        # 设置路径点
+        try:
+            env.waypoint = env.client.get_world().get_map().get_waypoint(
+                Location(x=curves[env.curves][1][0], y=curves[env.curves][1][1], z=curves[env.curves][1][2]), 
+                project_to_road=True
+            )
+        except Exception as e:
+            print(f"⚠️ 设置路径点错误: {e}")
+
         # 重置环境并获取初始状态
         current_state = env.reset()
-        
-        # 重置环境数据
         if hasattr(env, 'collision_hist'):
             env.collision_hist = []
-        
-        # 初始化数据记录列表
-        env.phi = []
-        env.dc = []
-        env.vel = []
-        env.time = []
         
         # 生成轨迹
         if hasattr(env, 'trajectory'):
@@ -182,23 +169,24 @@ if __name__ == '__main__':
             step_start = time.time()
 
             # 显示当前帧（可选）
-            # if len(current_state) > 0 and isinstance(current_state[0], np.ndarray):
-            #     cv2.imshow(f'Agent - preview', current_state[0])
-            #     cv2.waitKey(1)
+            if len(current_state) > 0 and isinstance(current_state[0], np.ndarray):
+                print("当前帧")
+                cv2.imshow(f'Agent - preview', current_state[0])
+                cv2.waitKey(1)
 
             # 预测基于当前观察空间的动作
             action = None
             qs = None
             
             try:
-                if np.random.random() > epsilon or step_count == 1:
+                if np.random.random() > epsilon:
                     # 从 Q 表获取动作
                     state_for_prediction = preprocess_state_for_prediction(current_state)
                     qs = model.predict(state_for_prediction, verbose=0)[0]
                     action = np.argmax(qs)
                 else:
                     # 获取随机动作
-                    action = np.random.randint(0, 5)
+                    action = np.random.randint(0, 2)
                     # 这不需要时间，所以我们添加匹配 60 FPS 的延迟（上面的预测需要更长时间）
                     if len(fps_counter) > 0:
                         time.sleep(sum(fps_counter) / len(fps_counter))
@@ -208,10 +196,12 @@ if __name__ == '__main__':
             except Exception as e:
                 print(f"❌ 预测错误: {e}")
                 action = 0  # 默认安全动作
-                qs = np.zeros(5)  # 默认 Q 值
-
+                qs = np.zeros(2)  # 默认 Q 值
+            
+            
             # 环境步骤（额外的标志通知环境不要因时间限制而中断episode）
             try:
+        
                 new_state, reward, done, waypoint = env.step(action, current_state)
 
                 # 设置下一步的当前状态
@@ -220,16 +210,16 @@ if __name__ == '__main__':
                 # 保存路径点
                 if hasattr(env, 'waypoint'):
                     env.waypoint = waypoint
-
+                
             except Exception as e:
                 print(f"❌ 环境步骤错误: {e}")
                 done = True
-
+            
             # 如果完成 - 代理崩溃，中断episode
             if done:
                 print(f"Episode {episode + 1} 完成，步数: {step_count}")
                 break
-
+            
             # 测量步骤时间，添加到deque，然后打印最近60帧的平均FPS、q值和采取的动作
             frame_time = time.time() - step_start
             fps_counter.append(frame_time)
@@ -242,32 +232,13 @@ if __name__ == '__main__':
             # 安全地打印Q值
             try:
                 if qs is not None:
-                    qs_display = f"[{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}]"
+                    qs_display = f"[{qs[0]:>5.2f}, {qs[1]:>5.2f}]"
                 else:
-                    qs_display = "[N/A, N/A, N/A, N/A, N/A]"
+                    qs_display = "[N/A, N/A]"
                     
                 print(f'Step: {step_count:>3d} | FPS: {current_fps:>4.1f} | Q-values: {qs_display} | Action: {action}')
             except Exception as e:
                 print(f'Step: {step_count:>3d} | FPS: {current_fps:>4.1f} | Action: {action}')
-
-        # 保存数据
-        print(f"保存 Episode {episode + 1} 的数据...")
-        try:
-            os.makedirs(f"data/traj4/file{episode}", exist_ok=True)
-            
-            # 安全地保存数据，检查列表是否为空
-            if hasattr(env, 'phi') and env.phi:
-                np.savetxt(f"data/traj4/file{episode}/phi.txt", env.phi)
-            if hasattr(env, 'dc') and env.dc:
-                np.savetxt(f"data/traj4/file{episode}/d.txt", env.dc)
-            if hasattr(env, 'vel') and env.vel:
-                np.savetxt(f"data/traj4/file{episode}/vel.txt", env.vel)
-            if hasattr(env, 'time') and env.time:
-                np.savetxt(f"data/traj4/file{episode}/time.txt", env.time)
-                
-            print(f"✅ Episode {episode + 1} 数据保存完成")
-        except Exception as e:
-            print(f"❌ 保存数据错误: {e}")
 
         # 在episode结束时销毁actor
         print(f"清理 Episode {episode + 1} 的actor...")
