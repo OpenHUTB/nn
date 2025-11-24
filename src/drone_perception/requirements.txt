@@ -1,11 +1,6 @@
-Python 3.6+
-
-PyTorch 和 torchvision
-
-NumPy
-
-PIL (Pillow)
-
+torch
+torchvision
+numpy
+Pillow
 scikit-learn
-
 matplotlib
