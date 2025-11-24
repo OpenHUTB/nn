@@ -55,6 +55,9 @@
     <camera name="for_testing" pos="-0.8 -0.6 1.5" quat="0.718027 0.437104 -0.31987 -0.437104"/>
     <light name="scene_directional_light" pos="0.9 0.3 2.5" dir="0 0 -1" directional="true" castshadow="false" cutoff="4" exponent="20" diffuse="1 1 1" specular="0 0 0"/>
     <body name="target" pos="0.5 0 0.8">
+      <joint name="target_x" type="slide" axis="1 0 0" range="-0.5 1.0"/>  <!-- X轴移动关节 -->
+      <joint name="target_y" type="slide" axis="0 1 0" range="-0.5 0.5"/>   <!-- Y轴移动关节 -->
+      <joint name="target_z" type="slide" axis="0 0 1" range="0.5 1.5"/>   <!-- Z轴移动关节 -->
       <geom name="target" size="0.025" rgba="0.1 0.8 0.1 1"/>
     </body>
     <body name="target-plane" pos="0.532445 -0.27 0.993">
