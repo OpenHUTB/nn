@@ -155,7 +155,7 @@ class TrafficLightImageDetector:
             cv2.rectangle(vis_image, (x1, y1 - 35), (x1 + text_size[0] + 10, y1 - 5), self.color_map[status], -1)
             cv2.putText(vis_image, text, (x1 + 5, y1 - 15), self.font, 0.6, (255, 255, 255), 2)
 
-            # 绘制颜色掩码预览（小窗口展示识别区域）
+            # 绘制颜色掩码预览（窗口展示识别区域）
             mask_h, mask_w = mask.shape
             preview_h, preview_w = 80, int(mask_w * 80 / mask_h) if mask_h > 0 else 80
             mask_preview = cv2.resize(mask, (preview_w, preview_h))
