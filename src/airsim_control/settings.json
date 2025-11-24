@@ -5,22 +5,24 @@
   "Vehicles": {
     "Drone_1": {
       "VehicleType": "SimpleFlight",
-      "X": 0, "Y": 0, "Z": 0,
+      "X": 0,
+      "Y": 0,
+      "Z": 0,
       "Sensors": {
         "lidar_1": {
           "SensorType": 6,
           "Enabled": true,
           "Range": 100,
-          "NumberOfChannels": 32,
-          "PointsPerSecond": 100000,
-          "RotationsPerSecond": 10,
-          "VerticalFOVUpper": 20,
-          "VerticalFOVLower": -45,
+          "NumberOfChannels": 16,
+          "PointsPerSecond": 50000,
+          "VerticalFOVUpper": 10,
+          "VerticalFOVLower": -15,
           "HorizontalFOVStart": -90,
           "HorizontalFOVEnd": 90,
-          "X": 0, "Y": 0, "Z": -1.0,
-          "DrawDebugPoints": true,
-          "DataFrame": "SensorLocalFrame"
+          "X": 0,
+          "Y": 0,
+          "Z": -0.1,
+          "DrawDebugPoints": true
         }
       }
     }
