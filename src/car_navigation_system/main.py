@@ -494,13 +494,14 @@ try:
         print(
             f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, 位置=({vehicle_location.x:.1f}, {vehicle_location.y:.1f})")
 
-        # 检测车辆是否卡住
+        # 检测车辆是否卡住（速度为零或移动极慢）
         current_position = vehicle_location
-        distance_moved = current_position.distance(last_position) # 计算与上一帧位置的距离
-        if distance_moved < 0.1: # 如果移动距离小于0.1米，认为车辆卡住了
+        distance_moved = current_position.distance(last_position)
+        is_almost_stopped = vehicle_speed < 0.1  # 新增：判断车辆是否几乎静止
+        if distance_moved < 0.1 and is_almost_stopped: # 同时满足位置不动和速度为零
             stuck_count += 1
         else:
-            stuck_count = 0 # 否则重置卡住计数器
+            stuck_count = 0
 
         last_position = current_position # 更新上一帧位置
 
@@ -576,7 +577,7 @@ try:
             elif vehicle_speed < 7.0: # 中高速时，进一步减小油门
                 throttle = 0.2
             else: # 高速时，使用最小油门维持速度
-                throttle = 0.1
+                throttle = 0.2
 
             steer = base_steer # 使用基础转向角
 
