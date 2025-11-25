@@ -32,6 +32,7 @@ class KeyboardController:
         self.step_time = 0.0
         self.step_frequency = 1.6  # 步频 (Hz)
         
+
         self._print_help()
     
     def _print_help(self):
