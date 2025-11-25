@@ -120,6 +120,6 @@ https://private-user-images.githubusercontent.com/221759988/504662359-96d717f3-8
 本项目基于Apache-2.0许可证发布。
 
 ## 贡献参考
-[MuJoCo](https://github.com/deepmind/mujoco) - 高性能物理引擎
-[ROS 2](https://github.com/ros2) - 机器人操作系统
-[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box) - 项目参考
+- [MuJoCo](https://github.com/deepmind/mujoco) - 高性能物理引擎
+- [ROS 2](https://github.com/ros2) - 机器人操作系统
+- [User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box) - 项目参考
