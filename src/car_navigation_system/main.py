@@ -508,22 +508,24 @@ try:
         # 如果车辆卡住超过10帧，尝试强力脱困
         if stuck_count > 10:
             print("车辆卡住，尝试强力脱困...")
-            # 先短暂倒车
+            # 记录当前转向角，用于脱困时保持方向
+            current_steer = steer
+            # 先短暂倒车，保持当前转向角
             vehicle.apply_control(carla.VehicleControl(
                 throttle=0.0,
-                steer=0.0,
+                steer=current_steer,  # 保持当前转向
                 brake=1.0,
                 hand_brake=False,
-                reverse=True # 启用倒车
+                reverse=True
             ))
-            time.sleep(0.5) # 倒车0.5秒
-            # 然后向前猛冲
+            time.sleep(0.5)
+            # 然后向前猛冲，保持相同转向角
             vehicle.apply_control(carla.VehicleControl(
                 throttle=1.0,
-                steer=0.0,
+                steer=current_steer,  # 保持当前转向
                 brake=0.0,
                 hand_brake=False,
-                reverse=False # 关闭倒车
+                reverse=False
             ))
             stuck_count = 0 # 重置卡住计数器
 
