@@ -1,123 +1,569 @@
-Carla 无人车仿真项目
+Carla 无人车仿真开发项目
+
+基于 Carla 仿真平台的全栈自动驾驶算法开发与验证框架
+
 项目概述
-本项目基于 Carla 开源自动驾驶仿真器，构建了一套功能完善的无人车仿真平台，支持自主导航、障碍物避障、交通灯识别、车道保持、动态场景交互等核心自动驾驶任务。通过模块化设计，实现了 Carla 客户端连接、车辆控制、环境感知、场景配置与数据可视化的完整流程，适用于自动驾驶算法（路径规划、感知融合、决策控制）的研究、开发与验证。
-环境准备
-依赖安装
-1. Carla 仿真器安装
-下载 Carla 对应版本（推荐 0.9.15 稳定版）：Carla 官方下载地址
-解压后设置环境变量（Windows/Linux/macOS 通用）：
-Windows：将 Carla 解压目录下的 PythonAPI\carla\dist\carla-0.9.15-py3.7-win-amd64.egg 添加到系统 PYTHONPATH
-Linux/macOS：将 PythonAPI/carla/dist/carla-0.9.15-py3.7-linux-x86_64.egg 添加到 PYTHONPATH
-验证安装：终端执行 python -c "import carla; print('Carla installed successfully')"
-2. Python 依赖库安装
-bash
-运行
-pip install numpy opencv-python matplotlib absl-py pyyaml scipy
-carla：Carla 仿真器核心 API，负责车辆控制、环境交互
-numpy：数值计算与传感器数据处理
-opencv-python：图像传感器数据解析与可视化
-matplotlib：行驶轨迹、速度曲线等数据绘图
-absl-py：命令行参数解析
-pyyaml：配置文件读取
-scipy：路径规划算法（如 A*、RRT*）支持
-项目结构
-文件名	功能描述
-main.py	核心控制程序，实现 Carla 客户端连接、车辆加载、基础控制与传感器配置
-navigate_autonomous.py	自主导航任务程序，结合路径规划（A*/RRT*）与车道保持控制
-obstacle_avoidance.py	障碍物避障专项任务，支持动态 / 静态障碍物检测与规避
-traffic_light_detection.py	交通灯识别与响应任务，实现红灯停、绿灯行的交通规则遵守
-scene_generator.py	动态场景生成工具，支持随机车辆、行人、交通事件（如突发障碍物）配置
-carla_utils.py	工具类封装，包含传感器数据解析、坐标转换、路径平滑等通用功能
-config.yaml	配置文件，存储车辆参数、传感器类型、任务参数（车速限制、安全距离等）
-README.md	项目说明文档
-核心功能
-1. 基础控制与环境交互（main.py）
-自动客户端连接：启动时自动检测 Carla 服务器，支持 IP / 端口配置，提供连接状态反馈
-灵活车辆配置：支持加载不同车型（如 Tesla Model 3、林肯 MKZ），自定义传感器组合（摄像头、激光雷达、毫米波雷达、GPS/IMU）
-实时数据采集：同步获取传感器数据（图像、点云、定位信息），支持数据本地存储
-基础控制模式：支持手动键盘控制与自动速度 / 转向控制切换
-python
-运行
-核心客户端连接与车辆加载示例（main.py）
-client = carla.Client('localhost', 2000)  # 连接Carla服务器（默认IP:localhost，端口:2000）
-client.set_timeout(10.0)  # 超时时间10秒
-world = client.load_world('Town05')  # 加载地图（Town01-Town10可选）
-blueprint_library = world.get_blueprint_library()
-vehicle_bp = blueprint_library.find('vehicle.tesla.model3')  # 选择车型
-spawn_point = world.get_map().get_spawn_points()[0]  # 选择初始 spawn 点
-vehicle = world.spawn_actor(vehicle_bp, spawn_point)  # 生成车辆
-2. 自主导航系统（navigate_autonomous.py）
-多算法路径规划：集成 A*、RRT * 路径规划算法，支持从起点到目标点的最优路径生成
-地图解析：自动解析 Carla 地图的车道线、路口、交通标志位置信息
-车道保持控制：基于 PID 控制实现精准车道居中，支持弯道速度自适应调整
-目标点配置：支持手动设置目标点或随机生成目标点，适配不同测试场景
-python
-运行
-路径规划配置示例（navigate_autonomous.py）
-from carla_utils import AStarPlanner
-planner = AStarPlanner(world_map)  # 初始化A*规划器
-start_pos = vehicle.get_transform().location  # 获取车辆当前位置
-target_pos = carla.Location(x=100, y=50, z=0)  # 设置目标位置（世界坐标系）
-waypoints = planner.plan(start_pos, target_pos)  # 生成路径航点
-3. 避障与交通规则遵守（obstacle_avoidance.py & traffic_light_detection.py）
-多传感器融合避障：结合激光雷达点云和摄像头图像，检测车辆、行人、静态障碍物（如路沿、锥桶）
-动态避障策略：根据障碍物速度、距离调整避障路径，支持减速、绕行两种模式
-交通灯识别：基于图像颜色识别与 Carla 交通灯 API，实现红绿灯状态实时检测与响应
-安全距离控制：可配置最小安全距离（默认 2 米），自动调整车速避免碰撞
-4. 动态场景生成（scene_generator.py）
-随机化场景元素：支持配置随机车辆数量（5-50 辆）、行人数量（10-30 人）、障碍物类型（锥桶、石墩）
-交通事件模拟：可生成突发场景（如行人横穿马路、前车急刹），用于算法鲁棒性测试
-场景参数可配置：通过config.yaml调整车辆密度、行人速度、事件触发概率
-5. 可视化与数据记录
-实时画面展示：支持车辆第一视角（摄像头）、全局俯瞰视角、传感器数据（点云 / 图像）同步显示
-数据记录功能：自动保存行驶轨迹、车速曲线、传感器原始数据，用于后续算法分析
-可视化工具：通过 matplotlib 绘制实时速度、转向角、距离障碍物距离等关键指标
-使用方法
-1. 启动 Carla 服务器
-Windows：双击 Carla 解压目录下的 CarlaUE4.exe（默认端口 2000）
-Linux：终端进入 Carla 目录，执行 ./CarlaUE4.sh
-可选参数（如加载特定地图）：./CarlaUE4.sh /Game/Carla/Maps/Town03
-2. 运行仿真任务
-基础控制（支持键盘手动控制）
-bash
-运行
-python main.py --map Town05 --vehicle tesla.model3
-自主导航（自动规划路径到目标点）
-bash
-运行
-python navigate_autonomous.py --target_x 150 --target_y 80 --speed_limit 30
-障碍物避障测试
-bash
-运行
-python obstacle_avoidance.py --obstacle_count 10 --safe_distance 2.5
-交通灯识别与响应
-bash
-运行
-python traffic_light_detection.py --map Town04  # Town04包含完整交通灯系统
-动态场景生成 + 自主导航
-bash
-运行
-python scene_generator.py --vehicle_count 30 --pedestrian_count 20 --run_navigation
-交互操作
-操作	功能
-鼠标左键拖拽	调整仿真全局视角
-鼠标滚轮	视角缩放
-WASD 键	手动控制车辆（仅 main.py 手动模式）
-空格键	紧急刹车
-Ctrl+C	终止仿真程序
-F1 键	切换第一视角 / 全局视角
-F2 键	显示 / 隐藏激光雷达点云
-参数调整指南
-参数	调整范围	效果说明
-speed_limit	10~60（km/h）	无人车最大行驶速度，提高值增加任务难度
-safe_distance	1.0~5.0（米）	与障碍物的最小安全距离，增大值提高安全性但降低通行效率
-pid_kp（转向 PID 比例增益）	0.5~2.0	增大会加快转向响应，过大会导致车道震荡
-obstacle_count	5~50（个）	动态障碍物数量，增多会提升避障算法测试强度
-lidar_points	8192~65536	激光雷达点数，增多提高检测精度但增加计算量
-planning_algorithm	A*/RRT*	路径规划算法选择，A效率高，RRT更适用于复杂障碍物场景
-参考资料
-Carla 官方文档
-Carla GitHub 仓库
-自动驾驶路径规划算法详解（A*/RRT*）
-OpenCV 图像识别官方教程
-激光雷达点云处理入门
+
+1.1 项目定位
+
+本项目是一套基于 Carla 仿真平台的全栈自动驾驶开发工具链，覆盖感知、定位、规划、控制四大核心模块，支持从算法原型开发、模块联调到场景化验证的全流程需求。适用于自动驾驶算法工程师、高校科研人员及相关专业学生进行技术研究与工程实践。
+
+1.2 核心价值
+
+低门槛入门：提供完整环境配置脚本与最小化演示用例，新手可快速上手
+
+高可扩展性：模块间解耦设计，支持替换自定义算法（如将YOLOv8替换为Faster R-CNN）
+
+贴近工程实践：还原真实自动驾驶系统的数据流向与容错机制
+
+完善的评估体系：内置多维度性能指标统计与可视化工具
+
+1.3 支持的 Carla 特性
+
+特性类别
+
+支持内容
+
+使用场景
+
+传感器类型
+
+RGB摄像头、深度摄像头、语义分割摄像头、激光雷达（LiDAR）、毫米波雷达、GPS/IMU、超声波雷达
+
+多源数据融合、感知算法开发
+
+仿真场景
+
+城市道路（Town01-Town12）、高速公路、雨天/雾天/夜间环境、动态交通流
+
+算法鲁棒性测试、场景化验证
+
+车辆控制
+
+油门/刹车/转向控制、车辆动力学模型、多车协同
+
+控制算法开发、编队行驶仿真
+
+环境配置
+
+2.1 系统配置要求
+
+硬件/软件
+
+基础配置（可运行）
+
+推荐配置（流畅开发）
+
+备注
+
+操作系统
+
+Ubuntu 18.04 LTS
+
+Ubuntu 20.04 LTS
+
+不推荐Windows（Carla兼容性较差）
+
+CPU
+
+Intel i5-8400 / AMD Ryzen 5 3600
+
+Intel i7-12700H / AMD Ryzen 7 5800X
+
+多线程性能影响交通流仿真效率
+
+GPU
+
+NVIDIA GTX 1660 Ti（6GB）
+
+NVIDIA RTX 3070（8GB）及以上
+
+必须支持CUDA，显存影响LiDAR点云处理
+
+内存
+
+16GB DDR4
+
+32GB DDR4
+
+多传感器数据缓存需大内存支持
+
+磁盘
+
+100GB SSD（空闲）
+
+200GB NVMe SSD
+
+Carla安装包+数据集需大量存储空间
+
+2.2 分步安装指南
+
+2.2.1 基础依赖安装
+
+先安装系统级依赖与Python基础环境：
+
+# 更新系统源
+sudo apt update && sudo apt upgrade -y
+
+# 安装系统依赖
+sudo apt install -y build-essential clang-10 libomp5 libpng16-16 libtiff5 libjpeg8 \
+                    python3-pip python3-dev python3-venv git wget unzip
+
+# 安装NVIDIA驱动（若未安装）
+sudo ubuntu-drivers autoinstall
+
+
+安装完成后需重启电脑，通过 nvidia-smi 命令验证驱动是否生效，确保显示GPU信息与CUDA版本。
+
+2.2.2 Carla 仿真平台安装
+
+提供两种安装方式，推荐预编译版本（适合开发），源码编译适合二次开发：
+
+方式1：预编译版本（推荐）
+
+# 选择版本（0.9.14稳定版），创建安装目录
+mkdir -p ~/carla && cd ~/carla
+
+# 下载预编译包（约20GB，建议用迅雷等工具加速后传输）
+wget https://carla-releases.s3.eu-west-3.amazonaws.com/Linux/CARLA_0.9.14.tar.gz
+
+# 解压（耗时约5分钟）
+tar -xzf CARLA_0.9.14.tar.gz
+
+# 安装Carla额外资产（交通标志、植被等，约10GB）
+cd CARLA_0.9.14
+./ImportAssets.sh
+
+
+方式2：源码编译版本（进阶）
+
+# 安装Unreal Engine 4.26（Carla依赖版本）
+git clone --depth 1 --branch 4.26 https://github.com/EpicGames/UnrealEngine.git ~/UnrealEngine
+cd ~/UnrealEngine
+./Setup.sh && ./GenerateProjectFiles.sh && make
+
+# 编译Carla源码
+git clone https://github.com/carla-simulator/carla.git ~/carla-source
+cd ~/carla-source
+make launch  # 编译并启动编辑器
+
+
+2.2.3 项目环境配置
+
+# 1. 克隆项目仓库
+git clone https://github.com/your-username/carla-autonomous-driving.git ~/carla-project
+cd ~/carla-project
+
+# 2. 创建Python虚拟环境（隔离依赖）
+python3.8 -m venv venv
+# 激活环境（每次开发前需执行）
+source venv/bin/activate
+
+# 3. 安装Python依赖（分基础依赖与可选依赖）
+# 基础依赖（核心功能）
+pip install -r requirements/base.txt
+# 可选依赖（可视化、模型训练等）
+pip install -r requirements/optional.txt
+
+# 4. 配置Carla Python API环境变量（永久生效）
+echo "export PYTHONPATH=\$PYTHONPATH:~/carla/CARLA_0.9.14/PythonAPI/carla/dist/carla-0.9.14-py3.8-linux-x86_64.egg" >> ~/.bashrc
+source ~/.bashrc
+
+
+2.2.4 环境验证
+
+# 1. 启动Carla服务（新开终端1）
+cd ~/carla/CARLA_0.9.14
+./CarlaUE4.sh -windowed -ResX=1024 -ResY=768  # 窗口模式启动
+
+# 2. 运行连接测试脚本（终端2，需激活虚拟环境）
+cd ~/carla-project
+source venv/bin/activate
+python scripts/test_carla_connection.py
+
+
+若终端输出 [SUCCESS] Connected to Carla server at 127.0.0.1:2000，说明环境配置成功。
+
+快速开始
+
+3.1 核心演示流程
+
+按以下步骤快速运行自动驾驶演示，体验完整功能：
+
+1. 启动Carla服务# 基础启动（带可视化界面）
+./CarlaUE4.sh -windowed -ResX=1024 -ResY=768 -carla-port=2000
+
+# 高性能启动（无头模式，无界面，适合服务器运行）
+./CarlaUE4.sh -RenderOffScreen -carla-port=2000 -carla-world-port=2001
+
+
+2. 运行全栈自动驾驶演示cd ~/carla-project
+source venv/bin/activate
+# 选择Town07场景，特斯拉Model 3车辆，开启可视化
+python scripts/full_stack_demo.py --town Town07 --vehicle tesla3 --visualize True
+
+
+3. 观察演示效果Carla窗口：车辆自动沿车道行驶，躲避行人与障碍物，遵守红绿灯
+
+4. 终端输出：实时打印车速、航向角、障碍物距离等信息
+
+5. 可视化窗口：显示LiDAR点云、摄像头图像、规划路径等数据
+
+3.2 常用命令速查
+
+功能
+
+命令
+
+说明
+
+启动指定场景
+
+./CarlaUE4.sh -windowed -carla-town=Town05
+
+直接加载Town05场景，无需手动切换
+
+多车仿真
+
+python scripts/multi_vehicle_demo.py --num-vehicles 5
+
+启动5辆自动驾驶车辆协同行驶
+
+数据采集
+
+python scripts/data_collector.py --output ./data --duration 120
+
+采集2分钟多传感器数据，保存至./data
+
+性能评估
+
+python scripts/evaluate_performance.py --log ./logs/driving.log
+
+分析驾驶日志，生成性能报告
+
+核心模块详解
+
+项目核心代码位于 src/ 目录，模块间通过ROS2消息机制通信（可选），也支持直接函数调用，模块结构如下：
+
+src/
+├── perception/  # 感知模块（目标检测、车道线识别等）
+├── localization/ # 定位模块（GPS+IMU融合、SLAM）
+├── planning/    # 规划模块（全局路径+局部避障）
+├── control/     # 控制模块（PID/MPC控制器）
+├── scenario/    # 场景管理（交通流、天气控制）
+└── common/      # 公共工具（数据结构、日志、配置）
+
+
+4.1 感知模块（src/perception/）
+
+4.1.1 模块功能
+
+输入多传感器数据，输出障碍物位置、车道线参数、交通灯状态等环境信息，核心流程：传感器数据同步 → 数据预处理 → 目标检测 → 融合后处理。
+
+4.1.2 关键算法实现
+
+子模块
+
+算法选型
+
+输入数据
+
+输出结果
+
+配置文件
+
+2D目标检测
+
+YOLOv8（预训练模型）
+
+RGB摄像头图像（1280×720）
+
+目标类别、2D边界框、置信度
+
+config/perception/yolov8.yaml
+
+3D目标检测
+
+PointPillars（TensorRT加速）
+
+LiDAR点云（10万点/秒）
+
+目标3D边界框、速度、航向角
+
+config/perception/pointpillars.yaml
+
+车道线检测
+
+语义分割（SegFormer）+ 多项式拟合
+
+语义分割图像
+
+车道线多项式参数、车道宽度
+
+config/perception/lane_detection.yaml
+
+传感器融合
+
+卡尔曼滤波 + 匈牙利算法
+
+2D检测结果、3D检测结果
+
+融合后的目标信息（置信度提升）
+
+config/perception/fusion.yaml
+
+4.1.3 快速测试
+
+# 启动感知模块单独测试
+python src/perception/perception_demo.py --visualize True
+
+
+将弹出可视化窗口，显示原始图像、检测结果、点云融合效果。
+
+4.2 规划模块（src/planning/）
+
+4.2.1 分层规划架构
+
+1. 全局路径规划：基于A*算法，输入起点/终点与地图拓扑，输出全局导航路径（道路级）
+
+2. 行为决策：基于有限状态机（FSM），处理跟车、变道、红绿灯等场景决策
+
+3. 局部路径规划：基于MPC（模型预测控制），输入全局路径与障碍物信息，输出可执行的局部路径
+
+4.2.2 关键参数调整
+
+核心参数位于 config/planning/mpc_params.yaml，常用调整项：
+
+mpc:
+  horizon: 10          # 预测步长（越大越稳定，耗时越长）
+  speed_weight: 1.0    # 速度跟踪权重
+  tracking_weight: 5.0 # 路径跟踪权重
+  control_weight: 0.1  # 控制量平滑权重
+  max_steer: 0.5       # 最大转向角（弧度）
+  max_accel: 2.0       # 最大加速度（m/s²）
+
+
+4.3 控制模块（src/control/）
+
+支持两种控制器，可通过配置文件切换：
+
+控制器类型
+
+优点
+
+缺点
+
+适用场景
+
+切换命令
+
+PID控制器
+
+实现简单、响应快、参数易调
+
+高速场景鲁棒性差
+
+低速行驶、停车场景
+
+--controller pid
+
+MPC控制器
+
+考虑车辆动力学约束，稳定鲁棒
+
+计算耗时较长，需GPU加速
+
+高速行驶、复杂避障
+
+--controller mpc
+
+数据采集与评估
+
+5.1 多传感器数据采集
+
+5.1.1 采集配置
+
+修改 config/data_collection/sensor_config.yaml 配置需要采集的传感器：
+
+sensors:
+  front_rgb:          # 前向RGB摄像头
+    type: "sensor.camera.rgb"
+    position: [1.5, 0, 2.4]  # 相对于车辆的安装位置（x前，y左，z上）
+    resolution: [1280, 720]
+    fps: 15
+  top_lidar:          # 车顶LiDAR
+    type: "sensor.lidar.ray_cast"
+    position: [0, 0, 2.8]
+    range: 100.0
+    points_per_second: 1000000
+  gps_imu:            # GPS+IMU组合
+    type: "sensor.other.gnss"
+    frequency: 10
+
+
+5.1.2 启动采集
+
+# 启动采集脚本，指定输出目录、采集时长、场景
+python scripts/data_collector.py \
+  --output ./data/town07_rain \
+  --duration 300 \  # 采集5分钟
+  --town Town07 \   # 场景
+  --weather rain    # 雨天环境
+
+
+5.1.3 数据格式
+
+采集的数据按时间戳对齐，存储结构如下：
+
+data/town07_rain/
+├── 20251126_100000/  # 采集时间戳
+│   ├── front_rgb/    # RGB图像（PNG格式）
+│   │   ├── 1732584000.0.png
+│   │   └── ...
+│   ├── top_lidar/    # LiDAR点云（PCD格式）
+│   ├── gps_imu/      # GPS/IMU数据（CSV格式）
+│   └── annotations/  # 自动标注的目标信息（JSON格式）
+└── collect_info.yaml # 采集配置信息
+
+
+5.2 性能评估体系
+
+5.2.1 评估指标
+
+评估维度
+
+核心指标
+
+计算方式
+
+优秀阈值
+
+安全性
+
+碰撞率、最小安全距离
+
+碰撞次数/行驶里程，最小距离统计
+
+碰撞率=0，最小距离>1.5m
+
+舒适性
+
+加加速度（Jerk）、转向波动
+
+加速度变化率、转向角标准差
+
+Jerk<2m/s³
+
+效率
+
+平均车速、行程时间
+
+总里程/总时间
+
+≥设计车速的80%
+
+稳定性
+
+路径跟踪误差、车速跟踪误差
+
+横向误差标准差、车速误差绝对值
+
+横向误差<0.3m
+
+5.2.2 生成评估报告
+
+# 1. 先运行自动驾驶并保存日志
+python scripts/full_stack_demo.py --save-log ./logs/town07_demo.log
+
+# 2. 生成评估报告（支持HTML/CSV格式）
+python scripts/evaluate_performance.py \
+  --log ./logs/town07_demo.log \
+  --output ./reports/town07_report.html \
+  --format html
+
+
+打开HTML报告可查看指标图表与详细分析。
+
+调试与扩展
+
+6.1 常见问题排查
+
+6.2 模块扩展指南
+
+6.2.1 新增自定义算法（以替换目标检测算法为例）
+
+1. 添加算法代码：在 src/perception/detectors/ 目录下新建 faster_rcnn_detector.py
+
+2. 实现统一接口：必须包含 init()（初始化模型）和 detect(image)（执行检测）方法
+
+3. 修改配置文件：在 config/perception/yolov8.yaml 中修改 detector_type: faster_rcnn
+
+4. 添加依赖：在 requirements/optional.txt 中添加Faster R-CNN相关依赖（如torchvision）
+
+5. 测试验证：运行感知模块测试脚本，确认新算法正常输出结果
+
+6.2.2 自定义仿真场景
+
+通过 src/scenario/scenario_builder.py 构建自定义场景，示例：
+
+def build_intersection_scenario(world):
+    # 1. 设置天气
+    weather = carla.WeatherParameters(rain_intensity=0.8)
+    world.set_weather(weather)
+    
+    # 2. 生成动态障碍物（3辆社会车辆+2个行人）
+    spawn_points = world.get_map().get_spawn_points()
+    # 生成社会车辆
+    for i in range(3):
+        vehicle_bp = world.get_blueprint_library().find("vehicle.audi.a2")
+        world.spawn_actor(vehicle_bp, spawn_points[i+5])
+    # 生成行人
+    for i in range(2):
+        pedestrian_bp = world.get_blueprint_library().find("walker.pedestrian.0001")
+        world.spawn_actor(pedestrian_bp, spawn_points[i+10])
+    
+    # 3. 设置目标点
+    goal_location = carla.Location(x=100, y=200, z=0)
+    return goal_location
+
+
+贡献指南
+
+7.1 代码提交规范
+
+提交代码时遵循以下规范，便于代码审查与版本管理：
+
+commit格式：[模块名] 功能描述（动词开头）
+示例1：[perception] 新增Faster R-CNN目标检测算法
+示例2：[control] 修复MPC控制器高速抖动问题
+示例3：[docs] 补充环境配置的常见问题
+
+
+7.2 贡献流程
+
+1. Fork本仓库到个人GitHub账号
+
+2. 创建功能分支：git checkout -b feature/your-feature-name
+
+3. 提交代码并按规范写commit信息
+
+4. 推送分支到个人仓库：git push origin feature/your-feature-name
+
+5. 在GitHub上提交Pull Request，描述功能细节与测试结果
+
+许可证与参考资料
+
+8.1 许可证
+
+本项目采用 MIT许可证 开源，允许非商业与商业使用，但需保留原作者信息。
+
+8.2 参考资料
+
+- Carla官方文档：https://carla.readthedocs.io/
+
+- YOLOv8官方仓库：https://github.com/ultralytics/ultralytics
+
+- 自动驾驶算法入门：Awesome-Autonomous-Driving
+
+- Model Predictive Control for Autonomous Vehicles: Theory and Practice
+
