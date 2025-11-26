@@ -96,25 +96,6 @@ NVIDIA RTX 3070（8GB）及以上
 
 Carla安装包+数据集需大量存储空间
 
-2.2 分步安装指南
-
-2.2.1 基础依赖安装
-
-先安装系统级依赖与Python基础环境：
-
-# 更新系统源
-sudo apt update && sudo apt upgrade -y
-
-# 安装系统依赖
-sudo apt install -y build-essential clang-10 libomp5 libpng16-16 libtiff5 libjpeg8 \
-                    python3-pip python3-dev python3-venv git wget unzip
-
-# 安装NVIDIA驱动（若未安装）
-sudo ubuntu-drivers autoinstall
-
-
-安装完成后需重启电脑，通过 nvidia-smi 命令验证驱动是否生效，确保显示GPU信息与CUDA版本。
-
 2.2.2 Carla 仿真平台安装
 
 提供两种安装方式，推荐预编译版本（适合开发），源码编译适合二次开发：
