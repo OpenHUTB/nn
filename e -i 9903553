@@ -1,0 +1,340 @@
+[33m36dcb8f[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m 无人车激光雷达
+[33m9903553[m 自动驾驶汽车车道与路径检测系统 (#2530)
+[33m17da389[m 我的选题 (#2529)
+[33m951717c[m 无人车控制 (#2527)
+[33mf6fd28b[m 人形机器人感知模块 (#2522)
+[33mc13dcdf[m 重新进行了编写,测试 (#2518)
+[33mcc541f0[m 构建一个基础人形机器人模型 (#2516)
+[33mfdbc174[m Update main.py (#2515)
+[33m4ddcae0[m 新建项目文档 (#2514)
+[33m91bc8b4[m 人车控制系统模块开发 (#2503)
+[33mf6de7dc[m 添加道路识别模块说明 (#2506)
+[33mfea94bd[m 具身人视觉识别 (#2499)
+[33m24f868e[m 修改具身人感知功能模块说明文件格式 (#2502)
+[33m2ed0db2[m 为语句引入变量名 (#2501)
+[33mfae6a5d[m 修改文件夹名称，解决中文拼音问题 (#2500)
+[33mba3127f[m 具身人视觉识别 (#2498)
+[33m969db8c[m 具身人感知模块功能开发说明 (#2495)
+[33m20c4d1d[m 实现了人车模拟的路径规划功能 (#2493)
+[33m679f876[m 补充详细注释、结构化代码 (#2492)
+[33mc04b6e4[m 调整项目目标 (#2491)
+[33m47478fb[m 提高行人安全项目创立 (#2487)
+[33mb621547[m 重置无人机控制模块说明（删除）
+[33maa29f35[m 添加无人控制说明
+[33mc3f1cfe[m 添加键盘控制车辆项目示例
+[33mb6e1b53[m 移除不相关文件
+[33m2e23d96[m 添加注释 (#2382)
+[33m4448228[m 增加注释11 (#2370)
+[33meabea7a[m Merge pull request #2369 from 19970823tao/main
+[33mbc61904[m zhang
+[33m00f5f6f[m zhang
+[33m4c70076[m Merge branch 'main' of https://github.com/19970823tao/nn
+[33m2e405e6[m zhang
+[33m7983759[m Update tutorial_minst_fnn-tf2.0-exercise.py (#2348)
+[33m3cda4ad[m 添加注释，理解代码含义 (#2347)
+[33mec31083[m Update tf2.0-exercise.py (#2346)
+[33m13130f2[m Update tutorial_minst_fnn-tf2.0-exercise.py (#2345)
+[33m4c8a66d[m Update tf2.0-exercise.py (#2344)
+[33m9768adc[m 增强代码可读性 (#2343)
+[33mfa114a2[m Update logistic_regression-exercise.py (#2342)
+[33m81ee4ea[m 添加注释 (#2341)
+[33m7b945a2[m zhang (#2339)
+[33m331be4b[m 修复48和204行在函数定义后没有缩进的代码块 (#2337)
+[33m8d02f21[m Merge pull request #2367 from pyy12l38/patch-20
+[33m8bc0fb7[m Update RL_QG_agent.py
+[33meb0d2a0[m Merge pull request #2366 from pyy12l38/patch-18
+[33m114a7b7[m Update RL_QG_agent.py
+[33m5531991[m Merge pull request #2365 from pyy12l38/patch-19
+[33m4a3fe10[m Update manual_control.py
+[33m578683c[m Merge pull request #2360 from pyy12l38/patch-14
+[33m7c953bd[m Update manual_control.py
+[33m092737a[m Merge pull request #2359 from pyy12l38/patch-13
+[33mbbec20c[m Update manual_control.py
+[33m3fe5714[m Merge pull request #2357 from pyy12l38/patch-12
+[33m3b5e22e[m Update manual_control.py
+[33mb10d75c[m Merge pull request #2354 from pyy12l38/patch-11
+[33m7be719d[m Update manual_control.py
+[33m2774887[m zhang
+[33m9596aeb[m zhang
+[33m7858436[m zhang
+[33md98817f[m Merge pull request #2338 from 19970823tao/main
+[33ma0f1758[m zhang
+[33m92bc7a6[m 添加注释 (#2327)
+[33m80cd34a[m Merge pull request #2324 from xyx0708/main
+[33m28eb0f8[m 添加注释
+[33m3f804ca[m 更改注释 (#2321)
+[33m1297cd8[m add (#2320)
+[33mdbf1130[m Merge pull request #2318 from xyx0708/main
+[33m93e462f[m Merge pull request #2319 from ASL505/main
+[33mf528fd8[m 添加空格
+[33ma2b3a87[m 添加注释
+[33mce02cac[m 添加注释 (#2315)
+[33m6971ff7[m 添加未完成的注释 (#2314)
+[33m1482a30[m My feature (#2312)
+[33m2c22e59[m Merge pull request #2309 from 11lijing/main
+[33m03dc777[m Merge branch 'OpenHUTB:main' into main
+[33m39a7069[m Merge branch 'main' of https://github.com/11lijing/nn
+[33m46ea44f[m 修复语法问题
+[33mff13484[m add space (#2299)
+[33m274cc74[m 英文注释译制 (#2294)
+[33m27a6c4c[m Update linear_regression-tf2.0.py (#2292)
+[33mfc7cddc[m Update numpy_tutorial.py (#2290)
+[33ma58ef69[m Update sequence_reversal_with_attention-exercise.py (#2289)
+[33mce9c350[m Update RL_QG_agent.py117行注释 (#2287)
+[33m5e68191[m 添加注释 (#2285)
+[33m6ae7873[m Fix syntax errors
+[33mf2c4ea9[m Merge pull request #2303 from pyy12l38/patch-6
+[33mac3b71b[m Merge pull request #2305 from pyy12l38/patch-8
+[33mfdeec4d[m Merge pull request #2304 from pyy12l38/patch-7
+[33m1a48270[m Merge pull request #2307 from pyy12l38/patch-10
+[33mc37a9dc[m Update tutorial_mnist_conv-keras.py
+[33m2163508[m Update tutorial_mnist_conv-keras.py
+[33m4a06ce6[m Update tutorial_mnist_conv-keras.py
+[33m0d36877[m 添加注释tutorial_mnist_conv-keras.py
+[33m6140f5e[m Merge pull request #2301 from pyy12l38/patch-4
+[33mc1c32ea[m Merge pull request #2302 from pyy12l38/patch-5
+[33mc61fc36[m Merge pull request #2300 from pyy12l38/patch-3
+[33m0126855[m 去除无效代码sequence_reversal_with_attention-exercise.py
+[33m20362b5[m 去除无效代码sequence_reversal_with_attention-exercise.py
+[33m7120dc8[m 为sequence_reversal_with_attention-exercise.py添加注释
+[33mf04ad9c[m Merge pull request #2295 from chen-xuyi/main
+[33m2b6009d[m 完善代码和批注
+[33m8376c01[m Update rbm.py219行注释 (#2284)
+[33mdfce4bf[m Update rnn.py (#2283)
+[33mfc0227f[m 添加注释 (#2282)
+[33m8daf2c6[m 加强代码 (#2280)
+[33m838bcbf[m 优化 (#2277)
+[33m2a900d2[m 优化 (#2275)
+[33mfed58f0[m 优化 (#2274)
+[33m3c262dd[m 13420214236 patch 9 (#2273)
+[33m5b63600[m 13420214236 patch 8 (#2272)
+[33m84fd375[m 13420214236 patch 7 (#2271)
+[33m46271a8[m 优化 (#2270)
+[33m3a9e1f5[m 优化 (#2269)
+[33mb33b5f8[m 13420214236 patch 6 (#2268)
+[33m4e4a7db[m 13420214236 patch 5 (#2267)
+[33m44e6df3[m 优化 (#2266)
+[33m089be51[m 13420214236 patch 3 (#2264)
+[33m86dd9bc[m 优化 (#2262)
+[33mb863d51[m 优化 (#2261)
+[33m17fddbd[m 优化 (#2260)
+[33m364daaa[m 优化 (#2258)
+[33m4b12490[m 优化 (#2257)
+[33m6393cd6[m 优化 (#2256)
+[33m7181890[m 优化 (#2255)
+[33m0211644[m 优化 (#2254)
+[33ma5a072f[m 优化 (#2253)
+[33m9eaff56[m 增加超参数解释 (#2252)
+[33mf777f0b[m 添加注释 (#2246)
+[33m539fa9c[m 添加注释 (#2245)
+[33mfe10e46[m 添加注释 (#2243)
+[33md49fbee[m Update poem_generation_with_RNN-exercise.py (#2242)
+[33m95193f0[m 添加注释 (#2241)
+[33m90201c2[m 添加代码注释 (#2240)
+[33m22d1115[m Update poem_generation_with_RNN-exercise.py (#2239)
+[33m0669f11[m Update numpy_tutorial.py (#2234)
+[33m9acfc38[m Update numpy_tutorial.py (#2232)
+[33m6896e4e[m Merge branch 'main' of https://github.com/11lijing/nn
+[33m2b49534[m 解释超参数
+[33mcf82186[m Update svm.py (#2227)
+[33m5c2ee2b[m 添加注释 (#2226)
+[33mfdd88c1[m Add a comment (#2225)
+[33m260f77b[m Add a comment (#2224)
+[33mcf8980c[m Add a comment (#2223)
+[33mdba3e4a[m Add a comment (#2222)
+[33mb2e043e[m Add a comment (#2221)
+[33m68c79ec[m Add a comment (#2220)
+[33me7f3f57[m Update GMM.py (#2219)
+[33m36aa3e5[m 添加注释 (#2218)
+[33ma84121e[m Update main.py (#2217)
+[33mec241c8[m Update tutorial_mnist_conv-basic.py (#2216)
+[33m0fae59b[m 增加了对init_model函数的具体过程，可以更好理解初始化每层的过程 (#2214)
+[33mcc5538c[m 补充了嵌套函数_step的注释，可以更好理解每个落子步骤的过程 (#2212)
+[33m1a8adc7[m 添加注释Update Learn2Carry-exercise.py (#2208)
+[33maeb5d3b[m 添加注释Update RL_QG_agent.py (#2207)
+[33m7745cf7[m Merge pull request #2211 from boyu111/main
+[33m49bca9d[m 添加注释
+[33m4fec6ac[m Merge pull request #2210 from boyu111/main
+[33ma02d9e1[m 添加注释
+[33m3b0b221[m Merge pull request #2206 from boyu111/main
+[33m1940196[m 添加注释
+[33mf1276a5[m 添加注释
+[33m1dbda24[m 添加注释”
+[33mf8306b0[m line 106 add note (#2205)
+[33mdf4ebfb[m Update sequence_reversal-exercise.py (#2202)
+[33m0d77e39[m Update GMM.py (#2201)
+[33m13153ef[m Update reversi_main.py (#2198)
+[33m700f2f3[m Update Learn2Carry-exercise (#2197)
+[33m733553b[m Update poem_generation_with_RNN-exercise.py注释 (#2196)
+[33m794f55b[m Update CNN_tensorflow.py注释 (#2195)
+[33me393672[m Update svm.py注释 (#2194)
+[33m40fb48f[m Update sequence_reversal-exercise.py (#2192)
+[33mfe73c65[m Update poem_generation_with_RNN-exercise.py (#2191)
+[33me4fefcd[m Update RL_QG_agent.py (#2190)
+[33m09d2c88[m Update rbm.py (#2189)
+[33ma471f26[m Update GMM.py (#2188)
+[33mef9e57e[m 为set_text、tick、render方法添加注释 (#2187)
+[33m39c0af7[m 为__init__方法添加注释 (#2185)
+[33mf4ba081[m 补充注释 (#2184)
+[33m147f55a[m 补充注释 (#2183)
+[33mabf8478[m 补充注释 (#2181)
+[33m51998e6[m 补充注释 (#2179)
+[33mcd32376[m Update tutorial_random_filter.py (#2177)
+[33m6768ec7[m line 37 add note (#2175)
+[33m146b471[m line 96 add note (#2173)
+[33m78c9eee[m 增加注释4 (#2170)
+[33m29c6410[m Add a comment (#2164)
+[33me7e43e7[m Add a comment (#2161)
+[33m23c804a[m Add a comment (#2160)
+[33m2b0db86[m Add a comment (#2159)
+[33m571a4e7[m Add a comment (#2157)
+[33m82dad26[m Add a comment (#2156)
+[33m1d57176[m Add a comment (#2155)
+[33m6e429c9[m Add a comment (#2153)
+[33m7091bab[m PEP 8风格调整 (#2149)
+[33m3e876a8[m Merge pull request #2176 from zaxxxiaolan/main
+[33m21e85b7[m 添加注释
+[33m626d5d1[m 添加注释
+[33ma0398ae[m Merge pull request #2174 from zaxxxiaolan/main
+[33mff07389[m 添加注释
+[33m49499c8[m Add a comment (#2151)
+[33mb2634d7[m Add a comment (#2147)
+[33m73a3a97[m Add a comment (#2145)
+[33mfc1dff0[m Update tutorial_mnist_conv-basic.py (#2144)
+[33m4bbb9f4[m Update tutorial_mnist_conv-keras-sequential.py (#2141)
+[33m8fd1728[m 解释第70行代码 (#2138)
+[33med210f6[m 为第10-11行代码添加注释 (#2137)
+[33mea3c3ae[m 补充第122行代码注释，增强可读性 (#2135)
+[33m9f420f9[m Update tutorial_mnist_conv-keras.py (#2133)
+[33mb0a0f95[m Update tutorial_random_filter.py (#2132)
+[33m802288b[m Update CNN_pytorch.py (#2130)
+[33m9c7087e[m Update tf2.0-exercise.py (#2128)
+[33mc3d380a[m Update tutorial_minst_fnn-tf2.0-exercise.py (#2127)
+[33m253f7fc[m 添加了注释 (#2126)
+[33m9bc1897[m Update svm.py (#2123)
+[33m9eacf8c[m Update rbm.py (#2106)
+[33mf3f52bf[m 添加注释Update softmax_regression-exercise.py (#2105)
+[33m429d3ea[m Update tutorial_minst_fnn-tf2.0-exercise.py (#2104)
+[33m9d62004[m 添加poem_generation_with_RNN-exercise.py注释 (#2102)
+[33m85ace16[m Update tutorial (#2101)
+[33m179abf4[m Update (#2099)
+[33m6dd626c[m Update logistic_regression-exercise.py (#2098)
+[33me31bb7e[m Update tutorial_minst_fnn-numpy-exercise.py注释 (#2097)
+[33m440b199[m 添加logistic_regression-exercise.py注释 (#2096)
+[33me83681e[m Update tutorial_minst_fnn-numpy-exercise.py (#2095)
+[33m263d824[m Update logistic_regression-exercise.py (#2094)
+[33m005bd1b[m line 81 add note (#2092)
+[33m88961f2[m 添加注释
+[33m1e2728f[m Merge pull request #2169 from zaxxxiaolan/main
+[33m234f1b0[m 添加注释
+[33m5e5a4c8[m 添加代码
+[33md914cc9[m line 89 add note (#2090)
+[33mc1aafcd[m 添加注释
+[33m5930fbd[m Merge pull request #2125 from OpenHUTB/woaishimoxi-patch-15
+[33md6b7ca0[m Merge pull request #2122 from OpenHUTB/woaishimoxi-patch-14
+[33m9f22306[m Merge pull request #2119 from OpenHUTB/woaishimoxi-patch-13
+[33me4df24b[m Merge pull request #2117 from OpenHUTB/woaishimoxi-patch-12
+[33mf235e2a[m Merge pull request #2116 from OpenHUTB/woaishimoxi-patch-11
+[33m224ae40[m Merge pull request #2111 from OpenHUTB/woaishimoxi-patch-9
+[33mc2c266b[m Merge pull request #2107 from OpenHUTB/woaishimoxi-patch-7
+[33mb3b6c2f[m line 105 add note (#2089)
+[33m2f3ff8e[m line 69 add note (#2086)
+[33m9466f9f[m rbm.py add note (#2085)
+[33m7e3159d[m Update (#2084)
+[33me904446[m Update poem_generation_with_RNN-exercise.py (#2083)
+[33mb287bae[m 完善代码和批注 (#2081)
+[33mcbd4f3a[m Update sequence_reversal_with_attention-exercise.py (#2079)
+[33me600ead[m Update GMM (#2078)
+[33mae54d2a[m 补充注释 (#2073)
+[33m648318d[m Cxchenxi666 patch 39 (#2072)
+[33m73b6da2[m 添加注释
+[33mc0098b2[m 补充注释 (#2070)
+[33m1229503[m 补充注释 (#2059)
+[33mf57869b[m 补充注释 (#2058)
+[33m6d8fa83[m 补充注释 (#2057)
+[33mfa7574e[m 补充注释 (#2055)
+[33mcf05609[m 添加代码
+[33m6d6cedf[m 添加注释
+[33m520ad87[m 补充注释 (#2050)
+[33m386fb5e[m 补充注释 (#2048)
+[33m14d21e4[m 增加注释4
+[33m7ed3dbf[m Merge pull request #2165 from boyu111/main
+[33ma15d8ce[m Merge branch 'main' into main
+[33m849ef34[m 添加注释
+[33m42a854a[m Merge pull request #2163 from boyu111/main
+[33mf74ac6c[m Merge pull request #2162 from 11lijing/main
+[33m5dce280[m 补充注释 (#2046)
+[33md5c8ea7[m 添加注释
+[33m882f08e[m Merge pull request #2158 from boyu111/main
+[33m917cfb2[m 添加注释
+[33m34693cd[m Merge pull request #2154 from boyu111/main
+[33md427ec4[m 解释softmax函数
+[33m1b079ee[m Merge pull request #2150 from 11lijing/main
+[33m0b4acaa[m 添加注释
+[33md277be9[m 概念解释svm
+[33m895b2aa[m Merge pull request #2148 from boyu111/main
+[33md9754e4[m 注释
+[33mb276df2[m Merge pull request #2146 from 11lijing/main
+[33m3d40246[m Merge pull request #2049 from wgl333/wgl333-patch-23
+[33ma473e25[m Merge pull request #2051 from wgl333/wgl333-patch-24
+[33m7557eec[m 增加注释3
+[33me7a6224[m Merge pull request #2054 from wgl333/wgl333-patch-25
+[33m80fa915[m Merge pull request #2056 from wgl333/wgl333-patch-26
+[33mf27536d[m Merge pull request #2143 from boyu111/main
+[33m0265a92[m Merge pull request #2069 from wgl333/wgl333-patch-29
+[33m9a51b49[m Merge pull request #2140 from 11lijing/main
+[33m985f4c0[m Merge pull request #2074 from wgl333/wgl333-patch-30
+[33mbbaf202[m 增加注释2
+[33mc53f9ff[m 添加注释
+[33ma41a045[m Merge pull request #2136 from boyu111/main
+[33m453734b[m 添加注释“
+[33m2d6fb0e[m Merge pull request #2134 from boyu111/main
+[33m95e2626[m 补充注释 (#2045)
+[33mc93a645[m 补充注释 (#2044)
+[33mc28e624[m 添加注释
+[33m4c0fc6c[m 补充注释 (#2043)
+[33me2d7a25[m 增加异常处理 (#2041)
+[33me0f5a30[m 补充注释 (#2039)
+[33mc96d3b9[m 补充注释 (#2037)
+[33m3810661[m 补充注释 (#2035)
+[33m4ef8bb3[m 补充注释 (#2034)
+[33mb9ce180[m Merge pull request #2129 from boyu111/main
+[33me3fd0db[m 添加注释
+[33m3aa156f[m 修改注释布局，便于代码理解与阅读
+[33meb74cac[m Merge pull request #2124 from boyu111/main
+[33m3027c70[m 添加注释，有助于阅读
+[33m27b63c5[m 添加注释
+[33mdea8769[m Merge pull request #2118 from boyu111/main
+[33mbcf67a6[m 修改注释布局，便于代码理解与阅读
+[33ma2fb3a7[m 修改注释布局，便于代码理解与阅读
+[33mba50649[m 修改注释布局，便于代码理解与阅读
+[33m2f77a43[m 优化代码注释，修改布局
+[33m1606275[m 修改代码布局，添加代码注释
+[33m6fe63fd[m Merge pull request #2038 from OpenHUTB/woaishimoxi-patch-6
+[33m78c7c2b[m Merge pull request #2036 from OpenHUTB/woaishimoxi-patch-5
+[33md83eda1[m 添加注释
+[33mec12d65[m 补充注释 (#2068)
+[33me348a9c[m 添加注释 (#2066)
+[33m8d20946[m 添加代码注释 (#2065)
+[33m0ba15a1[m 补充注释 (#2064)
+[33m22b7fdb[m Cxchenxi666 patch 33 (#2061)
+[33m2a24320[m 修改代码与注释布局 (#2033)
+[33m4d4c979[m Update logistic_regression-exercise.py (#2032)
+[33mcb98cbd[m Update GMM.py (#2031)
+[33m6c7fa45[m 完善细节，补齐注释 (#2030)
+[33m6503376[m 添加代码注释 (#2029)
+[33m4d590fd[m 统一布局，修改注释位置 (#2028)
+[33m223fd55[m Merge pull request #2077 from xietianle0214/main
+[33ma59189c[m Merge branch 'OpenHUTB:main' into main
+[33m13a3fe0[m Update Learn2Carry-exercise.py (#2027)
+[33meb0a6a4[m 添加注释
+[33mbe31804[m 添加注释
+[33m4575cfc[m Merge branch 'OpenHUTB:main' into main
+[33m95e00ea[m 添加代码注释
+[33m85e03d1[m 添加代码注释
+[33m77325ac[m 添加代码注释
+[33m4f12b91[m 添加代码注释
+[33me8d4fc1[m 修改代码布局，添加代码注释
+[33mb76734f[m 修改代码布局，添加代码注释
+[33mefed4b8[m Update GMM.py (#2026)
+[33m87124aa[m 解释第248行代码 (#2023)
