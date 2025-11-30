@@ -36,12 +36,46 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
 注：该脚本将连接到 CARLA 服务器，并根据指定的参数生成数据集,需要单独创建运行脚本。 请根据你特定的设置需求，调整 cvips_generation.py 中的 CARLA 服务器路径以及任何配置参数。
 ### 配置虚拟环境
 - CARLA 对 Python 版本（推荐 3.7-3.9）和依赖库版本有严格要求，虚拟环境可避免与其他项目的依赖冲突
-## 示例及格式说明
+### 下载Anaconda
+- 下载 [Anaconda](https://repo.anaconda.com/archive/Anaconda3-2021.05-Windows-x86_64.exe)。
+- 安装时勾选 “Add Anaconda to PATH”（Windows 需手动勾选，Linux/Mac 默认添加）。
+- 验证安装：打开终端，输入conda --version，显示版本号即成功。
+### 创建激活虚拟环境（仅需执行一次）
+1. 打开终端（或 Anaconda Prompt），运行以下命令：
+   ```bash
+   # 创建名为cvips_env的虚拟环境（Python3.7适配CARLA 0.9.14）
+   conda create -n cvips_env python=3.7
+   ```
+2. 激活虚拟环境（每次运行脚本前都需执行）
+   ```bash
+   conda activate cvips_env  # Windows
+   ```
+### 在虚拟环境中安装 CARLA 依赖（仅需执行一次）
+- 激活环境后，直接安装匹配版本的 CARLA Python API：
+   ```bash
+   pip install carla==0.9.14
+   ```
+### 使用说明
+- 激活虚拟环境（每次运行脚本前都需执行）
+   ```bash
+   conda activate cvips_env  # Windows
+   ```
+- 打开 CARLA 0.9.14 模拟器（CarlaUE4.exe/./CarlaUE4.sh）。
+- 进入 cvips 文件夹目录（cd 你的cvips路径）
+- 输入想要运行的脚本
+## 使用示例及格式说明
 - 命令格式
    ```shell
    python cvips_generation.py --town <城镇名称> [--num_vehicles < 数量 >] [--num_pedestrians < 数量 >] [--weather < 天气类型 >] [--time_of_day < 时段 >] [--seed < 种子值 >]
 ## 参数说明
---town: (必填) CARLA 城镇地图名称 (例如: Town01, Town04)--num_vehicles: (可选) 生成车辆数量，默认值为 20--num_pedestrians:(可选) 生成行人数量，默认值为 100--weather: (可选) 天气类型，可选值: clear (晴天), rainy (雨天), cloudy (多云)，默认值为 clear--time_of_day: (可选) 时段，可选值: noon (中午), sunset (日落), night (夜晚)，默认值为 noon--seed: (可选) 随机种子，用于复现相同场景
+|参数名|类型|默认值|可选值|作用说明|
+|:---:|:---:|:---:|:---:|:---:|
+|--town|字符串|town01|town01,town04等|指定要加载的CARLA地图|
+|--num_vehicles|整数|20|>=0|要生成的自动驾驶车辆数量|
+|--num_pedestrians|整数|100|>=0|要生成的自主行走的行人数量|
+|--seed|整数|None|任意整数|随机种子，设置后可保证每次运行完全相同的场景，便于复现。|
+|--weather|字符串|clear|clear，rainy，cloudy|设置天气，rainy会有明显的降雨和地面反光效果|
+|--time_of_day|字符串|noon|noon，sunset，night|设置时间，night会切换到夜晚并开启月光|
 ### 一、基础场景命令 (核心参数覆盖)
 1. Town01 + 晴天 + 中午 (默认配置)
    ```shell
