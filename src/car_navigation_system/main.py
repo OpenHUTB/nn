@@ -470,7 +470,7 @@ vehicle.apply_control(carla.VehicleControl(
 ))
 
 try:
-    print("自动驾驶系统启动（强力油门版本）")
+    print("自动驾驶系统启动（超级强力油门版本）")
     print("控制键: q-退出, w-加速, s-减速, a-左转向, d-右转向, r-重置方向, 空格-紧急制动")
 
     frame_count = 0 # 帧计数器
@@ -507,7 +507,7 @@ try:
 
         # 如果车辆卡住超过10帧，尝试强力脱困
         if stuck_count > 10:
-            print("车辆卡住，尝试强力脱困...")
+            print("车辆卡住，尝试超级强力脱困...")
             # 记录当前转向角，用于脱困时保持方向
             current_steer = steer
             # 先短暂倒车，保持当前转向角
@@ -555,15 +555,15 @@ try:
             brake = avoid_brake
             # 动态调整油门：距离越近，油门越小，以获得更好的操控性
             obstacle_distance_factor = max(0.2, min(1.0, detection_result['min_distance'] / 15.0))
-            throttle = 0.3 * obstacle_distance_factor  # 基础油门0.3，并根据距离动态调整
-            throttle = 0.4  # 避障时也保持较高油门
+            throttle = 0.5 * obstacle_distance_factor  # 基础油门提高到0.5，更猛的避障油门
+            throttle = 0.6  # 避障时也保持更高油门
             steer = avoid_steer * 0.1 + base_steer * 0.2
             print("!!! 检测到障碍物，准备避障 !!!")
         elif detection_result['obstacle_detected']:
             # （注：此处原代码逻辑有重复，第二个elif条件与第一个相同，可能是笔误。
             # 它永远不会被执行。保留原样以符合用户"代码不要改变"的要求。）
             brake = avoid_brake
-            throttle = 0.3  # 避障时也保持高油门
+            throttle = 0.4  # 避障时也保持更高油门
             steer = avoid_steer * 0.8 + base_steer * 0.2
             print(f"避障中 - 距离:{detection_result['min_distance']:.1f}m")
         else:
@@ -571,15 +571,15 @@ try:
             brake = 0.0
             steer = base_steer * 0.5
 
-            # 强力油门策略：根据当前速度动态调整油门大小
-            if vehicle_speed < 2.0:  # 低速时，使用较大油门加速
+            # 超级强力油门策略：根据当前速度动态调整油门大小
+            if vehicle_speed < 3.0:  # 低速阈值提高到3m/s，使用更大油门加速
+                throttle = 0.8
+            elif vehicle_speed < 6.0: # 中低速阈值提高到6m/s，适当减小油门
+                throttle = 0.6
+            elif vehicle_speed < 9.0: # 中高速阈值提高到9m/s，进一步减小油门
                 throttle = 0.4
-            elif vehicle_speed < 5.0: # 中低速时，适当减小油门
+            else: # 高速时，使用更高的维持油门
                 throttle = 0.3
-            elif vehicle_speed < 7.0: # 中高速时，进一步减小油门
-                throttle = 0.2
-            else: # 高速时，使用最小油门维持速度
-                throttle = 0.2
 
             steer = base_steer # 使用基础转向角
 
@@ -629,7 +629,7 @@ try:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2) # 绿色文本表示无障碍物
 
             # 显示图像窗口
-            cv2.imshow('第三视角 - 强力油门系统', display_image)
+            cv2.imshow('第三视角 - 超级强力油门系统', display_image)
 
             # 监听键盘输入
             key = cv2.waitKey(1) & 0xFF
