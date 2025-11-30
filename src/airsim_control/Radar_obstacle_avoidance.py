@@ -6,15 +6,18 @@ import time
 # --- 配置 ---
 VEHICLE_NAME = "Drone_1"
 LIDAR_NAME = "lidar_1"
-H_SPEED = 3.0
-V_SPEED = 2.0
+
+# 速度设置
+H_SPEED = 3.0  # 水平移动速度 (m/s)
+V_SPEED = 2.0  # 垂直升降速度 (m/s)
+YAW_SPEED = 40.0  # 旋转速度 (度/秒)
 MIN_DIST = 3.5  # 避障距离
 
 
 def print_red(text): print(f"\033[91m{text}\033[0m")
 
 
-# --- 连接 ---
+# --- 连接与起飞 ---
 client = airsim.MultirotorClient()
 client.confirmConnection()
 client.enableApiControl(True, vehicle_name=VEHICLE_NAME)
@@ -23,14 +26,16 @@ client.takeoffAsync(vehicle_name=VEHICLE_NAME).join()
 client.moveToPositionAsync(0, 0, -2, 3, vehicle_name=VEHICLE_NAME).join()
 
 print("\n=== 避障系统启动 ===")
+print("  控制键位:")
+print("  [W/S] 前进/后退")
+print("  [A/D] 向左/向右 (平移)")
+print("  [Q/E] 左转/右转 (旋转机头) ")
+print("  [↑/↓] 上升/下降")
+print("  [Space] 悬停")
+
 
 def analyze_lidar(client):
-    """
-    分析雷达数据
-    返回:
-    1. blocked (方向封锁状态 dict)
-    2. front_dist (正前方墙壁的精确距离，如果没有则为 999)
-    """
+    """雷达避障分析 (保持之前的逻辑)"""
     lidar_data = client.getLidarData(lidar_name=LIDAR_NAME, vehicle_name=VEHICLE_NAME)
     blocked = {'front': False, 'back': False, 'left': False, 'right': False}
     front_dist = 999.0
@@ -41,31 +46,24 @@ def analyze_lidar(client):
     points = np.array(lidar_data.point_cloud, dtype=np.float32)
     points = np.reshape(points, (int(points.shape[0] / 3), 3))
 
-    # --- 1. 核心过滤：只看无人机高度范围内的点 ---
-    # Z轴过滤：保留上下 1.5米 范围内的点 (过滤掉地面)
+    # Z轴过滤 (保留上下1.5m范围)
     z_mask = (points[:, 2] > -1.5) & (points[:, 2] < 1.5)
     valid_points = points[z_mask]
 
-    if len(valid_points) == 0:
-        return blocked, front_dist
+    if len(valid_points) == 0: return blocked, front_dist
 
-    # --- 2. 计算正前方距离 (调试用) ---
-    # 定义正前方：X > 0 且 |Y| < 1.0 (只看正中间 2米宽的走廊)
+    # 计算正前方距离
     front_corridor_mask = (valid_points[:, 0] > 0) & (np.abs(valid_points[:, 1]) < 1.0)
     front_objs = valid_points[front_corridor_mask]
-
     if len(front_objs) > 0:
-        # 在正前方走廊里，找 X 最小的值
         front_dist = np.min(front_objs[:, 0])
 
-    # --- 3. 避障判定 (控制用) ---
-    # 使用平面距离平方来判定
+    # 避障判定
     dist_sq = valid_points[:, 0] ** 2 + valid_points[:, 1] ** 2
     danger_mask = dist_sq < (MIN_DIST ** 2)
     danger_points = valid_points[danger_mask]
 
-    # 判定方位
-    width_threshold = 2.0  # 判定宽度
+    width_threshold = 2.0
     for p in danger_points:
         x, y = p[0], p[1]
         if x > 0.5 and abs(y) < width_threshold:
@@ -83,30 +81,42 @@ def analyze_lidar(client):
 try:
     last_print = time.time()
     while True:
-        # 获取分析结果
+        # 1. 获取避障状态
         is_blocked, front_wall_dist = analyze_lidar(client)
 
-        # 实时打印前方距离 (每0.2秒刷新一次)
+        # 2. 打印状态
         if time.time() - last_print > 0.2:
             dist_str = f"{front_wall_dist:.2f}m" if front_wall_dist < 999 else "安全"
-            # 这里的 \r 保证在同一行刷新
-            print(
-                f"\r[雷达监测] 正前方墙壁距离: {dist_str}  |  状态: {'🛑阻挡' if is_blocked['front'] else '✅通行'}      ",
-                end="", flush=True)
+            print(f"\r[雷达] 前方距离: {dist_str} | 阻挡: {'🛑' if is_blocked['front'] else '✅'}      ", end="",
+                  flush=True)
             last_print = time.time()
 
-        # 读取键盘
+        # 3. 初始化速度
         vx, vy, vz = 0.0, 0.0, 0.0
+        yaw_rate = 0.0  # 初始化旋转速度
+
+        # 4. 读取键盘输入
+        # --- 移动 ---
         if keyboard.is_pressed('w'): vx = H_SPEED
         if keyboard.is_pressed('s'): vx = -H_SPEED
         if keyboard.is_pressed('a'): vy = -H_SPEED
         if keyboard.is_pressed('d'): vy = H_SPEED
+
+        # --- 升降 ---
         if keyboard.is_pressed('up'): vz = -V_SPEED
         if keyboard.is_pressed('down'): vz = V_SPEED
-        if keyboard.is_pressed('space'): vx, vy, vz = 0.0, 0.0, 0.0
+
+        # --- 旋转 (新增逻辑) ---
+        if keyboard.is_pressed('q'): yaw_rate = -YAW_SPEED  # 左转 (逆时针)
+        if keyboard.is_pressed('e'): yaw_rate = YAW_SPEED  # 右转 (顺时针)
+
+        # --- 刹车 ---
+        if keyboard.is_pressed('space'):
+            vx, vy, vz, yaw_rate = 0.0, 0.0, 0.0, 0.0
+
         if keyboard.is_pressed('esc'): break
 
-        # 避障介入
+        # 5. 避障介入 (强制刹车)
         intervention = False
         if vx > 0 and is_blocked['front']: vx = 0.0; intervention = True
         if vx < 0 and is_blocked['back']: vx = 0.0; intervention = True
@@ -114,15 +124,20 @@ try:
         if vy > 0 and is_blocked['right']: vy = 0.0; intervention = True
 
         if intervention:
-            # 如果触发避障，强制刷新一行红字，防止被 \r 覆盖看不清
-            print(f"\n\033[91m🛑 [避障系统] 强制刹车! 前方距离: {front_wall_dist:.2f}m\033[0m")
-            last_print = time.time()  # 重置打印时间
+            print(f"\n\033[91m🛑 [避障] 强制刹车! 距离: {front_wall_dist:.2f}m\033[0m")
+            last_print = time.time()
 
-        # 执行指令
+        # 6. 发送指令 (关键修改)
         client.moveByVelocityAsync(
-            vx=float(vx), vy=float(vy), vz=float(vz), duration=0.1,
+            vx=float(vx),
+            vy=float(vy),
+            vz=float(vz),
+            duration=0.1,
             drivetrain=airsim.DrivetrainType.MaxDegreeOfFreedom,
-            yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=0),
+            # --- 这里修改了 YawMode ---
+            # is_rate=True 表示我们要控制旋转的“速度”
+            # yaw_or_rate=yaw_rate 就是我们设置的度数/秒
+            yaw_mode=airsim.YawMode(is_rate=True, yaw_or_rate=float(yaw_rate)),
             vehicle_name=VEHICLE_NAME
         ).join()
 
