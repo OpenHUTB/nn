@@ -22,30 +22,7 @@ CARLA无人车障碍物识别系统
 • 多传感器数据可视化
 • 深度图和激光雷达点云显示
 • 交互式操作界面
-系统架构
-￼
-复制
-carla_obstacle_detection/
-├── src/                          # 源代码
-│   ├── carla_obstacle_detection.py  # 主程序
-│   ├── obstacle_detector.py         # 障碍物检测器
-│   ├── sensor_manager.py            # 传感器管理器
-│   ├── data_logger.py               # 数据记录器
-│   └── visualizer.py                # 可视化器
-├── config/                        # 配置文件
-│   └── sensor_config.yaml          # 传感器配置
-├── data/                          # 数据文件
-│   ├── test_images/               # 测试图像
-│   └── models/                    # 模型文件
-├── tests/                         # 测试代码
-│   └── test_detector.py           # 检测器测试
-├── examples/                      # 示例代码
-│   └── demo.py                    # 演示程序
-├── output/                        # 输出结果
-└── logs/                          # 日志文件
-安装要求
-Python依赖
-￼
+
 复制
 pip install numpy opencv-python torch torchvision
 pip install PyYAML carla
@@ -58,7 +35,6 @@ CARLA仿真环境
 快速开始
 1. 环境配置
 bash
-￼
 复制
 # 克隆或下载项目文件
 cd
@@ -73,7 +49,6 @@ pip install
 ./CarlaUE4.sh
 2. 运行演示程序
 bash
-￼
 复制
 # 进入项目目录
 cd
@@ -83,13 +58,11 @@ cd
 python examples/demo.py
 3. 运行测试
 bash
-￼
 复制
 # 运行检测器测试
 python tests/test_detector.py
 4. 完整CARLA仿真
 bash
-￼
 复制
 # 运行完整的CARLA仿真（需要先启动CARLA服务器）
 python src/carla_obstacle_detection.py
@@ -98,7 +71,6 @@ python src/carla_obstacle_detection.py
 1. 配置传感器
 编辑 config/sensor_config.yaml 文件：
 yaml
-￼
 复制
 carla_settings:
   town: "Town01"  # 选择地图
@@ -111,7 +83,6 @@ sensors:
     fov: 90
 2. 运行检测
 python
-￼
 复制
 from src.obstacle_detector import
  ObstacleDetector
@@ -129,7 +100,6 @@ cv2.imshow("Detection Result", result)
 高级功能
 1. 自定义检测参数
 python
-￼
 复制
 detection_params = {
     'yolo': {
@@ -140,7 +110,6 @@ detection_params = {
 }
 2. 风险评估
 python
-￼
 复制
 # 获取障碍物风险等级
 obstacle_type = detector.predict_obstacle_type(detection)
@@ -149,7 +118,6 @@ print(f"风险等级: {obstacle_type['risk_level']}")
 print(f"建议行动: {obstacle_type['action']}")
 3. 数据记录
 python
-￼
 复制
 from src.data_logger import
  DataLogger
@@ -206,91 +174,3 @@ logger.save_summary()
 • screenshots/: 截图文件夹
 • output/: 检测结果图像
 • test_results_visualization.png: 测试结果图表
-日志文件
-• logs/: 系统运行日志
-• summary.json: 运行汇总报告
-故障排除
-常见问题
-1. CARLA连接失败
-￼
-复制
-错误: 连接CARLA失败
-解决: 确保CARLA服务器正在运行，检查端口2000是否可用
-2. YOLO模型加载失败
-￼
-复制
-错误: 模型文件不存在
-解决: 系统会自动使用预训练模型，或下载指定模型文件
-3. 检测性能问题
-￼
-复制
-解决: 
-1. 降低图像分辨率
-2. 提高置信度阈值
-3. 减少检测类别数量
-4. 使用GPU加速
-4. 内存不足
-￼
-复制
-解决:
-1. 减小缓冲区大小
-2. 减少并发处理
-3. 优化数据存储
-调试模式
-python
-￼
-复制
-# 启用详细日志
-import
- logging
-logging.basicConfig(level=logging.DEBUG)
-
-# 保存中间结果
-visualizer.record_video(image, "debug_output.mp4")
-扩展开发
-添加新的检测类别
-1.
-在配置文件中添加类别
-2.
-准备训练数据
-3.
-训练自定义YOLO模型
-4.
-更新检测器配置
-集成新的传感器
-1.
-在sensor_manager.py中添加传感器类型
-2.
-实现数据处理回调
-3.
-更新可视化器支持
-4.
-添加相应的测试用例
-自定义分析算法
-1.
-继承ObstacleDetector类
-2.
-重写检测和分析方法
-3.
-添加新的评估指标
-4.
-更新配置文件
-许可证
-本项目采用MIT许可证，详见LICENSE文件。
-贡献指南
-欢迎贡献代码和报告问题。请遵循以下步骤：
-1.
-Fork项目仓库
-2.
-创建功能分支
-3.
-提交更改
-4.
-创建Pull Request
-更新日志
-v1.0.0 (2025-12-01)
-• 初始版本发布
-• 基本障碍物检测功能
-• 多传感器数据处理
-• 可视化和数据记录
-• 测试数据集和演示程序
