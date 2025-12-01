@@ -19,7 +19,7 @@ class CarEnv:
     im_height = IM_HEIGHT  # 图像高度
 
     def __init__(self):
-        self.actor_list = None  # 存储所有actor的列表
+        self.actor_list = []  # 存储所有actor的列表
         self.sem_cam = None  # 语义分割摄像头
         self.client = carla.Client("localhost", 2000)  # CARLA客户端
         self.client.set_timeout(20.0)  # 连接超时设置
@@ -38,6 +38,7 @@ class CarEnv:
         self.walker_list = []
         self.collision_history = []
         self.slow_counter = 0  # 慢速计数器
+        self.steer_counter = 0  # 转向计数器，用于限制过度转向
 
     def setup_observer_view(self):
         """设置观察者视角，让用户可以在CARLA窗口中看到场景"""
@@ -63,7 +64,10 @@ class CarEnv:
             print(f"设置观察者视角时出错: {e}")
 
     def spawn_pedestrians_general(self, number, isCross):
-        """生成指定数量的行人"""
+        """生成指定数量的行人 - 大幅减少数量"""
+        # 限制最大生成数量
+        number = min(number, 8)  # 最多8个行人
+        
         for i in range(number):
             isLeft = random.choice([True, False])  # 随机选择左右侧
             if isLeft:
@@ -74,124 +78,115 @@ class CarEnv:
     def spawn_pedestrians_right(self, isCross):
         """在右侧生成行人"""
         blueprints_walkers = self.world.get_blueprint_library().filter("walker.pedestrian.*")
-        walker_bp = random.choice(blueprints_walkers)
+        
+        # 设置生成区域
+        min_x = -50
+        max_x = 140
+        min_y = -188
+        max_y = -183
 
-        for i in range(1):
-            walker_bp = random.choice(blueprints_walkers)
+        # 如果是十字路口，调整生成位置
+        if isCross:
+            isFirstCross = random.choice([True, False])
+            if isFirstCross:
+                min_x = -14
+                max_x = -10.5
+            else:
+                min_x = 17
+                max_x = 20.5
 
-            # 设置生成区域
-            min_x = -50
-            max_x = 140
-            min_y = -188
-            max_y = -183
+        # 随机生成位置
+        x = random.uniform(min_x, max_x)
+        y = random.uniform(min_y, max_y)
 
-            # 如果是十字路口，调整生成位置
-            if isCross:
-                isFirstCross = random.choice([True, False])
-                if isFirstCross:
-                    min_x = -14
-                    max_x = -10.5
-                else:
-                    min_x = 17
-                    max_x = 20.5
+        spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-            # 随机生成位置
+        # 避免在特定区域生成
+        while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
             x = random.uniform(min_x, max_x)
             y = random.uniform(min_y, max_y)
-
             spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-            # 避免在特定区域生成
-            while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
-                x = random.uniform(min_x, max_x)
-                y = random.uniform(min_y, max_y)
-                spawn_point = carla.Transform(carla.Location(x, y, 2.0))
+        # 尝试生成行人
+        walker_bp = random.choice(blueprints_walkers)
+        npc = self.world.try_spawn_actor(walker_bp, spawn_point)
 
-            # 尝试生成行人
-            if spawn_point:
-                npc = self.world.try_spawn_actor(walker_bp, spawn_point)
-
-            if npc is not None:
-                # 设置行人控制参数
-                ped_control = carla.WalkerControl()
-                ped_control.speed = random.uniform(0.5, 1.0)  # 随机速度
-                ped_control.direction.y = -1  # 主要移动方向
-                ped_control.direction.x = 0.15  # 轻微横向移动
-                npc.apply_control(ped_control)
-                npc.set_simulate_physics(True)  # 启用物理模拟
+        if npc is not None:
+            # 设置行人控制参数
+            ped_control = carla.WalkerControl()
+            ped_control.speed = random.uniform(0.5, 1.0)  # 随机速度
+            ped_control.direction.y = -1  # 主要移动方向
+            ped_control.direction.x = 0.15  # 轻微横向移动
+            npc.apply_control(ped_control)
+            npc.set_simulate_physics(True)  # 启用物理模拟
+            self.walker_list.append(npc)  # 添加到行人列表
 
     def spawn_pedestrians_left(self, isCross):
         """在左侧生成行人"""
         blueprints_walkers = self.world.get_blueprint_library().filter("walker.pedestrian.*")
-        walker_bp = random.choice(blueprints_walkers)
+        
+        # 设置生成区域
+        min_x = -50
+        max_x = 140
+        min_y = -216
+        max_y = -210
 
-        for i in range(1):
-            walker_bp = random.choice(blueprints_walkers)
+        # 如果是十字路口，调整生成位置
+        if isCross:
+            isFirstCross = random.choice([True, False])
+            if isFirstCross:
+                min_x = -14
+                max_x = -10.5
+            else:
+                min_x = 17
+                max_x = 20.5
 
-            # 设置生成区域
-            min_x = -50
-            max_x = 140
-            min_y = -216
-            max_y = -210
+        # 随机生成位置
+        x = random.uniform(min_x, max_x)
+        y = random.uniform(min_y, max_y)
 
-            # 如果是十字路口，调整生成位置
-            if (isCross):
-                isFirstCross = random.choice([True, False])
-                if isFirstCross:
-                    min_x = -14
-                    max_x = -10.5
-                else:
-                    min_x = 17
-                    max_x = 20.5
+        spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-            # 随机生成位置
+        # 避免在特定区域生成
+        while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
             x = random.uniform(min_x, max_x)
             y = random.uniform(min_y, max_y)
-
             spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-            # 避免在特定区域生成
-            while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
-                x = random.uniform(min_x, max_x)
-                y = random.uniform(min_y, max_y)
-                spawn_point = carla.Transform(carla.Location(x, y, 2.0))
+        # 尝试生成行人
+        walker_bp = random.choice(blueprints_walkers)
+        npc = self.world.try_spawn_actor(walker_bp, spawn_point)
 
-            # 尝试生成行人
-            if spawn_point:
-                npc = self.world.try_spawn_actor(walker_bp, spawn_point)
-
-            if npc is not None:
-                # 设置行人控制参数
-                ped_control = carla.WalkerControl()
-                ped_control.speed = random.uniform(0.7, 1.3)  # 随机速度
-                ped_control.direction.y = 1  # 主要移动方向
-                ped_control.direction.x = -0.05  # 轻微横向移动
-                npc.apply_control(ped_control)
-                npc.set_simulate_physics(True)  # 启用物理模拟
+        if npc is not None:
+            # 设置行人控制参数
+            ped_control = carla.WalkerControl()
+            ped_control.speed = random.uniform(0.7, 1.3)  # 随机速度
+            ped_control.direction.y = 1  # 主要移动方向
+            ped_control.direction.x = -0.05  # 轻微横向移动
+            npc.apply_control(ped_control)
+            npc.set_simulate_physics(True)  # 启用物理模拟
+            self.walker_list.append(npc)  # 添加到行人列表
 
     def reset(self):
         """重置环境"""
         # 清理现有的行人和车辆
-        walkers = self.world.get_actors().filter('walker.*')
-        for walker in walkers:
-            walker.destroy()
+        self.cleanup_actors()
+        
+        # 重置行人列表
+        self.walker_list = []
 
-        vehicles = self.world.get_actors().filter('vehicle.*')
-        for v in vehicles:
-            v.destroy()
-
-        # 课程学习 - 根据训练阶段调整难度
-        self.spawn_pedestrians_general(30, True)
-        self.spawn_pedestrians_general(10, False)
+        # 大幅减少行人数量 - 从30+10减少到8+4
+        self.spawn_pedestrians_general(8, True)
+        self.spawn_pedestrians_general(4, False)
 
         # 重置状态变量
         self.collision_history = []
         self.actor_list = []
         self.slow_counter = 0
+        self.steer_counter = 0
 
         # 设置车辆生成点
-        spawn_points = self.world.get_map().get_spawn_points()
-        spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
+        spawn_point = carla.Transform()
         spawn_point.location.x = -81.0
         spawn_point.location.y = -195.0
         spawn_point.location.z = 2.0
@@ -217,7 +212,7 @@ class CarEnv:
 
         # 初始化车辆控制
         self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0, steer=0.0))
-        time.sleep(4)  # 等待环境稳定
+        time.sleep(2)  # 等待环境稳定
 
         # 设置碰撞传感器
         colsensor = self.blueprint_library.find("sensor.other.collision")
@@ -237,6 +232,27 @@ class CarEnv:
         self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0, steer=0.0))
 
         return self.front_camera
+
+    def cleanup_actors(self):
+        """清理所有actors"""
+        # 清理车辆
+        vehicles = self.world.get_actors().filter('vehicle.*')
+        for vehicle in vehicles:
+            if vehicle.is_alive:
+                vehicle.destroy()
+        
+        # 清理行人
+        walkers = self.world.get_actors().filter('walker.*')
+        for walker in walkers:
+            if walker.is_alive:
+                walker.destroy()
+                
+        # 清理传感器
+        for actor in self.actor_list:
+            if actor.is_alive:
+                actor.destroy()
+                
+        self.actor_list = []
 
     def setup_follow_camera(self):
         """设置跟随车辆的相机，用于在CARLA窗口中观察"""
@@ -276,7 +292,7 @@ class CarEnv:
         self.front_camera = processed_image  # 更新前置摄像头图像
 
     def reward(self):
-        """计算奖励函数"""
+        """计算奖励函数 - 增强方向控制奖励"""
         reward = 0
         done = False
 
@@ -301,16 +317,22 @@ class CarEnv:
         else:
             reward -= 0.2  # 不理想速度
             
-        # 方向奖励 - 确保车辆朝正确方向行驶
-        if -45 <= vehicle_rotation <= 45:  # 大致朝东方向
-            reward += 0.2
+        # 增强方向奖励 - 确保车辆朝正确方向行驶
+        if -20 <= vehicle_rotation <= 20:  # 严格限制在正东方向附近
+            reward += 0.5  # 增加直行奖励
+            self.steer_counter = max(0, self.steer_counter - 1)  # 减少转向计数
+        elif -45 <= vehicle_rotation <= 45:
+            reward += 0.1  # 较小奖励
         else:
-            reward -= 0.5
+            reward -= 1.0  # 严重偏离惩罚
+            self.steer_counter += 2  # 增加转向计数
             
         # 行人距离检测
         min_dist = float('inf')  # 最小距离初始化为无穷大
-        walkers = self.world.get_actors().filter('walker.*')
-        for walker in walkers:
+        for walker in self.walker_list:
+            if not walker.is_alive:
+                continue
+                
             ped_location = walker.get_location()
             dx = vehicle_location.x - ped_location.x
             dy = vehicle_location.y - ped_location.y
@@ -318,10 +340,14 @@ class CarEnv:
             min_dist = min(min_dist, distance)  # 更新最小距离
             
             # 清理边界外的行人
-            player_direction = walker.get_control().direction
-            if (ped_location.y < -214 and player_direction.y == -1) or \
-               (ped_location.y > -191 and player_direction.y == 1):
-                walker.destroy()
+            try:
+                player_direction = walker.get_control().direction
+                if (ped_location.y < -214 and player_direction.y == -1) or \
+                   (ped_location.y > -191 and player_direction.y == 1):
+                    if walker.is_alive:
+                        walker.destroy()
+            except:
+                pass  # 如果无法获取控制信息，跳过
 
         # 基于行人距离的奖励
         if min_dist < 3.0:  # 非常危险距离
@@ -353,14 +379,56 @@ class CarEnv:
         return reward, done
 
     def step(self, action):
-        """执行动作并返回新状态"""
-        # 更平滑的控制策略
+        """执行动作并返回新状态 - 扩展为5个动作包含转向"""
+        # 扩展的动作空间: 0-减速, 1-保持, 2-加速, 3-左转, 4-右转
+        
+        # 限制连续转向次数，避免过度转向
+        max_continuous_steer = 3
+        current_steer = 0.0
+        
+        if action == 3:  # 左转
+            if self.steer_counter < max_continuous_steer:
+                current_steer = -0.3  # 小角度左转
+                self.steer_counter += 1
+            else:
+                # 强制直行一段时间
+                current_steer = 0.0
+                action = 1  # 改为保持动作
+        elif action == 4:  # 右转
+            if self.steer_counter < max_continuous_steer:
+                current_steer = 0.3  # 小角度右转
+                self.steer_counter += 1
+            else:
+                # 强制直行一段时间
+                current_steer = 0.0
+                action = 1  # 改为保持动作
+        else:
+            # 非转向动作时逐渐减少转向计数
+            self.steer_counter = max(0, self.steer_counter - 0.5)
+        
+        # 速度控制
+        throttle = 0.0
+        brake = 0.0
+        
         if action == 0:  # 减速
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.3))
+            throttle = 0.0
+            brake = 0.3
         elif action == 1:  # 保持/轻微加速
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, brake=0.0))
+            throttle = 0.3
+            brake = 0.0
         elif action == 2:  # 加速
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.7, brake=0.0))
+            throttle = 0.7
+            brake = 0.0
+        elif action == 3 or action == 4:  # 转向时保持适中速度
+            throttle = 0.4
+            brake = 0.0
+
+        # 应用控制
+        self.vehicle.apply_control(carla.VehicleControl(
+            throttle=throttle, 
+            brake=brake, 
+            steer=current_steer
+        ))
 
         # 等待物理更新
         time.sleep(0.05)
