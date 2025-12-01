@@ -1,9 +1,15 @@
 import mujoco
 from mujoco import viewer
 import time
+import numpy as np
+
 
 def control_robot(model_path):
-    # 加载优化后的拟人化机器人模型
+    """
+    控制优化后的拟人化机器人模型行走。
+    适配新的关节结构和初始姿态，实现更自然的步态。
+    """
+    # 加载优化后的机器人模型
     model = mujoco.MjModel.from_xml_path(model_path)
     data = mujoco.MjData(model)
 
@@ -17,67 +23,78 @@ def control_robot(model_path):
                 if not viewer_instance.is_running():
                     break
 
-                # 步态周期：2秒1步（双腿+双臂协同）
+                # 步态周期：2.5秒一步，保持稳定性
                 elapsed_time = time.time() - start_time
-                cycle = elapsed_time % 2
+                cycle = elapsed_time % 2.5
 
-                # -------------------------- 核心控制逻辑 --------------------------
-                # 0~1秒：左腿向前迈步，右腿支撑；左臂向后摆，右臂向前摆
-                if cycle < 1:
-                    # ------------------- 腿部控制 -------------------
-                    # 左腿：髋关节向前转，膝关节弯曲（迈步）
-                    data.ctrl[0] = 0.4  # left_hip_motor（扭矩增大适配腿部质量）
-                    data.ctrl[1] = 0.7  # left_knee_motor
-                    data.ctrl[2] = 0.2  # left_ankle_motor（轻微调整保持平衡）
-                    # 右腿：髋关节向后转，膝关节伸直（支撑）
-                    data.ctrl[3] = 0.2  # right_hip_motor
-                    data.ctrl[4] = 0.1  # right_knee_motor
-                    data.ctrl[5] = 0.1  # right_ankle_motor
+                # -------------------------- 核心步态逻辑 --------------------------
+                # 使用正弦波生成平滑的控制信号，围绕初始姿态(ref)进行摆动
+                # 0~1.25秒：左腿摆动，右腿支撑；左臂后摆，右臂前摆
+                if cycle < 1.25:
+                    # swing_phase 从 0 变化到 1，表示摆动腿的一个完整摆动过程
+                    swing_phase = (cycle / 1.25)
 
-                    # ------------------- 手臂控制（协同摆动） -------------------
-                    # 左臂：肩关节向后摆，肘关节微屈
-                    data.ctrl[6] = 0.2  # left_shoulder_motor
-                    data.ctrl[7] = 0.5  # left_elbow_motor
-                    data.ctrl[8] = 0.0  # left_wrist_motor（固定）
-                    # 右臂：肩关节向前摆，肘关节微屈
-                    data.ctrl[9] = 0.7  # right_shoulder_motor
-                    data.ctrl[10] = 0.5  # right_elbow_motor
-                    data.ctrl[11] = 0.0  # right_wrist_motor（固定）
+                    # --- 腿部控制 ---
+                    # 左腿（摆动腿）：髋关节前摆，膝关节弯曲
+                    data.ctrl[0] = 0.05 + 0.25 * np.sin(swing_phase * np.pi)  # left_hip
+                    data.ctrl[1] = -0.15 - 0.3 * np.sin(swing_phase * np.pi)  # left_knee
+                    data.ctrl[2] = 0.0 + 0.1 * np.cos(swing_phase * np.pi)  # left_ankle
 
-                # 1~2秒：右腿向前迈步，左腿支撑；右臂向后摆，左臂向前摆
+                    # 右腿（支撑腿）：保持稳定，轻微调整以平衡身体
+                    data.ctrl[3] = -0.05 - 0.05 * np.sin(swing_phase * np.pi)  # right_hip
+                    data.ctrl[4] = -0.15 + 0.05 * np.sin(swing_phase * np.pi)  # right_knee
+                    data.ctrl[5] = 0.0 - 0.05 * np.cos(swing_phase * np.pi)  # right_ankle
+
+                    # --- 手臂协同控制 ---
+                    # 左臂（与摆动腿反向）：肩关节后摆，肘关节随动弯曲
+                    data.ctrl[6] = 0.0 - 0.2 * np.sin(swing_phase * np.pi)  # left_shoulder
+                    data.ctrl[7] = -0.8 + 0.15 * np.sin(swing_phase * np.pi)  # left_elbow
+
+                    # 右臂（与摆动腿同向）：肩关节前摆，肘关节随动弯曲
+                    data.ctrl[9] = 0.0 + 0.2 * np.sin(swing_phase * np.pi)  # right_shoulder
+                    data.ctrl[10] = -0.8 - 0.15 * np.sin(swing_phase * np.pi)  # right_elbow
+
+                # 1.25~2.5秒：右腿摆动，左腿支撑；右臂后摆，左臂前摆
                 else:
-                    # ------------------- 腿部控制 -------------------
-                    # 左腿：髋关节向后转，膝关节伸直（支撑）
-                    data.ctrl[0] = 0.2  # left_hip_motor
-                    data.ctrl[1] = 0.1  # left_knee_motor
-                    data.ctrl[2] = 0.1  # left_ankle_motor
-                    # 右腿：髋关节向前转，膝关节弯曲（迈步）
-                    data.ctrl[3] = 0.4  # right_hip_motor
-                    data.ctrl[4] = 0.7  # right_knee_motor
-                    data.ctrl[5] = 0.2  # right_ankle_motor
+                    # swing_phase 从 0 变化到 1
+                    swing_phase = ((cycle - 1.25) / 1.25)
 
-                    # ------------------- 手臂控制（协同摆动） -------------------
-                    # 左臂：肩关节向前摆，肘关节微屈
-                    data.ctrl[6] = 0.7  # left_shoulder_motor
-                    data.ctrl[7] = 0.5  # left_elbow_motor
-                    data.ctrl[8] = 0.0  # left_wrist_motor
-                    # 右臂：肩关节向后摆，肘关节微屈
-                    data.ctrl[9] = 0.2  # right_shoulder_motor
-                    data.ctrl[10] = 0.5  # right_elbow_motor
-                    data.ctrl[11] = 0.0  # right_wrist_motor
+                    # --- 腿部控制 ---
+                    # 右腿（摆动腿）
+                    data.ctrl[3] = -0.05 - 0.25 * np.sin(swing_phase * np.pi)  # right_hip
+                    data.ctrl[4] = -0.15 - 0.3 * np.sin(swing_phase * np.pi)  # right_knee
+                    data.ctrl[5] = 0.0 + 0.1 * np.cos(swing_phase * np.pi)  # right_ankle
 
-                # 颈部固定（避免头部晃动）
-                data.ctrl[12] = 0.5  # neck_motor（中间位置固定）
+                    # 左腿（支撑腿）
+                    data.ctrl[0] = 0.05 + 0.05 * np.sin(swing_phase * np.pi)  # left_hip
+                    data.ctrl[1] = -0.15 + 0.05 * np.sin(swing_phase * np.pi)  # left_knee
+                    data.ctrl[2] = 0.0 - 0.05 * np.cos(swing_phase * np.pi)  # left_ankle
+
+                    # --- 手臂协同控制 ---
+                    # 右臂（与摆动腿反向）
+                    data.ctrl[9] = 0.0 - 0.2 * np.sin(swing_phase * np.pi)  # right_shoulder
+                    data.ctrl[10] = -0.8 + 0.15 * np.sin(swing_phase * np.pi)  # right_elbow
+
+                    # 左臂（与摆动腿同向）
+                    data.ctrl[6] = 0.0 + 0.2 * np.sin(swing_phase * np.pi)  # left_shoulder
+                    data.ctrl[7] = -0.8 - 0.15 * np.sin(swing_phase * np.pi)  # left_elbow
+
+                # 固定关节：腕关节保持下垂，颈部保持中立
+                data.ctrl[8] = -0.2  # left_wrist (保持微微下垂)
+                data.ctrl[11] = -0.2  # right_wrist (保持微微下垂)
+                data.ctrl[12] = 0.5  # neck (中间位置)
 
                 # -------------------------- 仿真推进 --------------------------
-                mujoco.mj_step(model, data)  # 运行一步物理仿真
-                viewer_instance.sync()       # 同步渲染（解决模糊问题）
-                time.sleep(model.opt.timestep)  # 控制仿真速度与物理步长匹配
+                mujoco.mj_step(model, data)
+                viewer_instance.sync()
+                # 控制仿真速度，使其更易于观察
+                time.sleep(model.opt.timestep * 1.5)
 
         except KeyboardInterrupt:
             print("\n仿真被用户中断")
 
+
 if __name__ == "__main__":
-    # 确保模型文件名与实际保存的一致（这里用你要求的"Robot_move_straight.xml"）
+    # 确保模型文件名与实际保存的一致
     model_file = "Robot_move_straight.xml"
     control_robot(model_file)
