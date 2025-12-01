@@ -9,10 +9,6 @@ import cv2
 import math
 from Hyperparameters import *
 
-# 全局统计变量
-avg_score = 0
-average_reward = 0
-
 import carla
 from carla import ColorConverter
 
@@ -31,6 +27,10 @@ class CarEnv:
 
         # 加载世界和蓝图
         self.world = self.client.load_world('Town03')
+        
+        # 设置观察者视角，让CARLA窗口显示
+        self.setup_observer_view()
+        
         self.blueprint_library = self.world.get_blueprint_library()
         self.model_3 = self.blueprint_library.filter("model3")[0]  # Tesla Model3车辆
 
@@ -38,6 +38,29 @@ class CarEnv:
         self.walker_list = []
         self.collision_history = []
         self.slow_counter = 0  # 慢速计数器
+
+    def setup_observer_view(self):
+        """设置观察者视角，让用户可以在CARLA窗口中看到场景"""
+        try:
+            # 获取当前地图的生成点
+            spawn_points = self.world.get_map().get_spawn_points()
+            if spawn_points:
+                # 选择一个合适的观察者位置
+                spectator = self.world.get_spectator()
+                
+                # 设置观察者位置在车辆起始位置附近
+                transform = carla.Transform()
+                transform.location.x = -81.0
+                transform.location.y = -195.0
+                transform.location.z = 15.0  # 提高视角高度
+                transform.rotation.pitch = -45.0  # 向下倾斜视角
+                transform.rotation.yaw = 0.0
+                transform.rotation.roll = 0.0
+                
+                spectator.set_transform(transform)
+                print("观察者视角已设置")
+        except Exception as e:
+            print(f"设置观察者视角时出错: {e}")
 
     def spawn_pedestrians_general(self, number, isCross):
         """生成指定数量的行人"""
@@ -206,11 +229,31 @@ class CarEnv:
         while self.front_camera is None:
             time.sleep(0.01)
 
+        # 设置跟随相机（用于观察）
+        self.setup_follow_camera()
+
         # 记录episode开始时间并重置控制
         self.episode_start = time.time()
         self.vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.0, steer=0.0))
 
         return self.front_camera
+
+    def setup_follow_camera(self):
+        """设置跟随车辆的相机，用于在CARLA窗口中观察"""
+        try:
+            # 创建RGB相机
+            camera_bp = self.blueprint_library.find('sensor.camera.rgb')
+            camera_bp.set_attribute('image_size_x', '800')
+            camera_bp.set_attribute('image_size_y', '600')
+            camera_bp.set_attribute('fov', '110')
+            
+            # 相机位置相对于车辆（后方上方）
+            camera_transform = carla.Transform(carla.Location(x=-8, z=6), carla.Rotation(pitch=-20))
+            follow_camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
+            self.actor_list.append(follow_camera)
+            print("跟随相机已设置")
+        except Exception as e:
+            print(f"设置跟随相机时出错: {e}")
 
     def collision_data(self, event):
         """处理碰撞事件"""
