@@ -56,7 +56,7 @@ AGGREGATE_STATS_EVERY = 10
 # 计算和聚合统计信息（如平均得分、奖励）的频率
 
 SHOW_PREVIEW = False
-# 是否显示预览窗口
+# 是否显示预览窗口 - 测试时设为False以显示CARLA主窗口
 
 IM_WIDTH = 640
 # 预览或模拟中捕获图像的宽度

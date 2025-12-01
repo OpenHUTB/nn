@@ -74,12 +74,12 @@ if __name__ == '__main__':
         # 课程学习 - 随训练进度调整难度
         if episode > EPISODES // 2:
             # 训练后期增加行人数量以提高难度
-            env.spawn_pedestrians_general(40, True)
-            env.spawn_pedestrians_general(15, False)
+            env.spawn_pedestrians_general(8, True)  # 减少数量
+            env.spawn_pedestrians_general(4, False)  # 减少数量
         else:
             # 训练前期减少行人数量以降低难度
-            env.spawn_pedestrians_general(25, True)
-            env.spawn_pedestrians_general(8, False)
+            env.spawn_pedestrians_general(6, True)  # 减少数量
+            env.spawn_pedestrians_general(3, False)  # 减少数量
 
         # 重置每轮统计 - 重置得分和步数
         score = 0
@@ -103,10 +103,10 @@ if __name__ == '__main__':
                 # 从Q网络获取动作（利用）
                 qs = agent.get_qs(current_state)
                 action = np.argmax(qs)
-                print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action}')
+                print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] {action}')
             else:
-                # 随机选择动作（探索）
-                action = np.random.randint(0, 3)
+                # 随机选择动作（探索）- 扩展为5个动作
+                action = np.random.randint(0, 5)
                 # 添加延迟以匹配60FPS
                 time.sleep(1 / FPS)
 
@@ -124,8 +124,7 @@ if __name__ == '__main__':
                 break
 
         # 本轮结束 - 销毁所有actor
-        for actor in env.actor_list:
-            actor.destroy()
+        env.cleanup_actors()
 
         # 更新成功计数
         if score > 5:  # 成功完成的阈值
