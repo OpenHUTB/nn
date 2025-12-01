@@ -1,0 +1,30 @@
+{
+  "SeeDocsAt": "https://github.com/Microsoft/AirSim/blob/main/docs/settings.md",
+  "SettingsVersion": 1.2,
+  "SimMode": "Multirotor",
+  "Vehicles": {
+    "Drone_1": {
+      "VehicleType": "SimpleFlight",
+      "X": 0,
+      "Y": 0,
+      "Z": 0,
+      "Sensors": {
+        "lidar_1": {
+          "SensorType": 6,
+          "Enabled": true,
+          "Range": 100,
+          "NumberOfChannels": 16,
+          "PointsPerSecond": 50000,
+          "VerticalFOVUpper": 10,
+          "VerticalFOVLower": -15,
+          "HorizontalFOVStart": -90,
+          "HorizontalFOVEnd": 90,
+          "X": 0,
+          "Y": 0,
+          "Z": -0.1,
+          "DrawDebugPoints": true
+        }
+      }
+    }
+  }
+}
