@@ -1,0 +1,26 @@
+<launch>
+  <!-- MuJoCo 核心节点（main.py + ROS模式） -->
+  <node 
+    name="mujoco_core" 
+    pkg="mujoco_ros" 
+    type="main.py" 
+    output="screen"
+    args="visualize /home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b/anymal_b.xml --ros"
+  />
+
+  <!-- 控制指令发布者 -->
+  <node 
+    name="mujoco_ctrl_publisher" 
+    pkg="mujoco_ros" 
+    type="publisher.py" 
+    output="screen"
+  />
+
+  <!-- 状态订阅者 -->
+  <node 
+    name="mujoco_state_subscriber" 
+    pkg="mujoco_ros" 
+    type="subscriber.py" 
+    output="screen"
+  />
+</launch>
