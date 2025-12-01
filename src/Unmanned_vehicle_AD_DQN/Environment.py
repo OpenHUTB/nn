@@ -63,6 +63,29 @@ class CarEnv:
         except Exception as e:
             print(f"设置观察者视角时出错: {e}")
 
+    def setup_observer_view(self):
+        """设置观察者视角，让用户可以在CARLA窗口中看到场景"""
+        try:
+            # 获取当前地图的生成点
+            spawn_points = self.world.get_map().get_spawn_points()
+            if spawn_points:
+                # 选择一个合适的观察者位置
+                spectator = self.world.get_spectator()
+                
+                # 设置观察者位置在车辆起始位置附近
+                transform = carla.Transform()
+                transform.location.x = -81.0
+                transform.location.y = -195.0
+                transform.location.z = 15.0  # 提高视角高度
+                transform.rotation.pitch = -45.0  # 向下倾斜视角
+                transform.rotation.yaw = 0.0
+                transform.rotation.roll = 0.0
+                
+                spectator.set_transform(transform)
+                print("观察者视角已设置")
+        except Exception as e:
+            print(f"设置观察者视角时出错: {e}")
+
     def spawn_pedestrians_general(self, number, isCross):
         """生成指定数量的行人 - 大幅减少数量"""
         # 限制最大生成数量
