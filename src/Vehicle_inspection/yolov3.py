@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+import object
+
 
 class YOLO(object):
     _defaults = {
@@ -15,7 +17,7 @@ class YOLO(object):
         self.__dict__.update(self._defaults)
         self.labelsName = self._get_labels()
         self.net = cv2.dnn.readNetFromDarknet(self.configPath, self.weightsPath)
-        self.output = [self.net.getLayerNames()[i[0] - 1] for i in self.net.getUnconnectedOutLayers()]
+        self.output = [self.net.getLayerNames()[i - 1] for i in self.net.getUnconnectedOutLayers()]
         self.W = None
         self.H = None
         self.COLORS = np.random.randint(0, 255, size=(200, 3), dtype='uint8')

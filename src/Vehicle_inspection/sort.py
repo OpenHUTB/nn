@@ -4,7 +4,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from filterpy.kalman import KalmanFilter
 
-@jit
+@jit(nopython=True)
 def iou(bb_test, bb_gt):
     """
     在两个box间计算IOU
