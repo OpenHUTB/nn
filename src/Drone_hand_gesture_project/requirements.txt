@@ -1,0 +1,4 @@
+opencv-python>=4.8.1.78
+mediapipe>=0.10.0
+numpy>=1.24.3
+pymavlink>=2.4.37
