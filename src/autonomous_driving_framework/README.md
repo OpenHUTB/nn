@@ -1,2 +1,1 @@
-AUTO : A Parameterized Decision-making Framework with Multi-modality Perception for Autonomous Driving
-
+AUTO是一个基于CARLA仿真器的端到端自动驾驶决策框架，它通过多模态感知数据预处理、车道导向交叉注意力（LCA）状态编码、演员-评论家架构下的分层动作决策（P-DQN算法）、混合奖励函数引导以及多工作者分布式训练，实现了高效的自动驾驶决策与控制。
