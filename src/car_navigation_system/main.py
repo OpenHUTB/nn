@@ -494,35 +494,38 @@ try:
         print(
             f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, 位置=({vehicle_location.x:.1f}, {vehicle_location.y:.1f})")
 
-        # 检测车辆是否卡住
+        # 检测车辆是否卡住（速度为零或移动极慢）
         current_position = vehicle_location
-        distance_moved = current_position.distance(last_position) # 计算与上一帧位置的距离
-        if distance_moved < 0.1: # 如果移动距离小于0.1米，认为车辆卡住了
+        distance_moved = current_position.distance(last_position)
+        is_almost_stopped = vehicle_speed < 0.1  # 新增：判断车辆是否几乎静止
+        if distance_moved < 0.1 and is_almost_stopped: # 同时满足位置不动和速度为零
             stuck_count += 1
         else:
-            stuck_count = 0 # 否则重置卡住计数器
+            stuck_count = 0
 
         last_position = current_position # 更新上一帧位置
 
         # 如果车辆卡住超过10帧，尝试强力脱困
         if stuck_count > 10:
             print("车辆卡住，尝试强力脱困...")
-            # 先短暂倒车
+            # 记录当前转向角，用于脱困时保持方向
+            current_steer = steer
+            # 先短暂倒车，保持当前转向角
             vehicle.apply_control(carla.VehicleControl(
                 throttle=0.0,
-                steer=0.0,
+                steer=current_steer,  # 保持当前转向
                 brake=1.0,
                 hand_brake=False,
-                reverse=True # 启用倒车
+                reverse=True
             ))
-            time.sleep(0.5) # 倒车0.5秒
-            # 然后向前猛冲
+            time.sleep(0.5)
+            # 然后向前猛冲，保持相同转向角
             vehicle.apply_control(carla.VehicleControl(
                 throttle=1.0,
-                steer=0.0,
+                steer=current_steer,  # 保持当前转向
                 brake=0.0,
                 hand_brake=False,
-                reverse=False # 关闭倒车
+                reverse=False
             ))
             stuck_count = 0 # 重置卡住计数器
 
@@ -550,6 +553,9 @@ try:
         elif detection_result['obstacle_detected']:
             # 检测到障碍物，应用避障控制
             brake = avoid_brake
+            # 动态调整油门：距离越近，油门越小，以获得更好的操控性
+            obstacle_distance_factor = max(0.2, min(1.0, detection_result['min_distance'] / 15.0))
+            throttle = 0.3 * obstacle_distance_factor  # 基础油门0.3，并根据距离动态调整
             throttle = 0.4  # 避障时也保持较高油门
             steer = avoid_steer * 0.1 + base_steer * 0.2
             print("!!! 检测到障碍物，准备避障 !!!")
@@ -573,7 +579,7 @@ try:
             elif vehicle_speed < 7.0: # 中高速时，进一步减小油门
                 throttle = 0.2
             else: # 高速时，使用最小油门维持速度
-                throttle = 0.1
+                throttle = 0.2
 
             steer = base_steer # 使用基础转向角
 
