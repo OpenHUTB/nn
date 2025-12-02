@@ -1,25 +1,212 @@
+# --------------------------
+# 1. 初始化CARLA连接和环境
+# --------------------------
 import carla
 import time
 import numpy as np
 import cv2
 import math
 from collections import deque
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import random
+import os
 
-# --------------------------
-# 1. 初始化CARLA连接和环境
-# --------------------------
+
+# 修复1: 简化的神经网络架构
+class SimpleDrivingNetwork(nn.Module):
+    """
+    简化的驾驶网络 - 更适合实时控制
+    """
+
+    def __init__(self):
+        super(SimpleDrivingNetwork, self).__init__()
+
+        # 图像处理分支 (简化)
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(3, 8, kernel_size=5, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(8, 16, kernel_size=5, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((4, 4))
+        )
+
+        # 状态信息维度: 速度 + 转向历史
+        state_dim = 4
+
+        # 融合层
+        self.fc_layers = nn.Sequential(
+            nn.Linear(32 * 4 * 4 + state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 3)  # [throttle, brake, steer]
+        )
+
+    def forward(self, image, state):
+        # 处理图像
+        visual_features = self.conv_layers(image)
+        visual_features = visual_features.view(visual_features.size(0), -1)
+
+        # 融合特征
+        combined = torch.cat([visual_features, state], dim=1)
+
+        # 输出控制
+        control = self.fc_layers(combined)
+        throttle_brake = torch.sigmoid(control[:, :2])
+        steer = torch.tanh(control[:, 2:])
+
+        return torch.cat([throttle_brake, steer], dim=1)
+
+
+# 修复2: 改进的神经网络控制器
+class ImprovedNeuralController:
+    def __init__(self):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"使用设备: {self.device}")
+
+        # 使用简化网络
+        self.model = SimpleDrivingNetwork().to(self.device)
+        self.model.eval()
+
+        # 控制历史，用于平滑
+        self.control_history = deque(maxlen=5)
+
+        # 修复3: 更保守的初始控制
+        self.last_throttle = 0.3
+        self.last_brake = 0.0
+        self.last_steer = 0.0
+
+    def preprocess_image(self, image):
+        """修复图像预处理"""
+        if image is None:
+            # 返回黑色图像
+            return torch.zeros((1, 3, 120, 160), device=self.device)
+
+        try:
+            # 调整图像尺寸，减少计算量
+            small_img = cv2.resize(image, (160, 120))
+            img_tensor = torch.from_numpy(small_img).float().to(self.device)
+            img_tensor = img_tensor.permute(2, 0, 1).unsqueeze(0) / 255.0
+            return img_tensor
+        except Exception as e:
+            print(f"图像预处理错误: {e}")
+            return torch.zeros((1, 3, 120, 160), device=self.device)
+
+    def preprocess_state(self, speed, steer_history):
+        """修复状态预处理"""
+        state_data = [
+            speed / 20.0,  # 归一化速度
+            steer_history[-1] if steer_history else 0.0,  # 最近转向
+            steer_history[-2] if len(steer_history) > 1 else 0.0,  # 前一次转向
+            np.mean(steer_history) if steer_history else 0.0  # 平均转向
+        ]
+        return torch.tensor(state_data, device=self.device).unsqueeze(0)
+
+    def get_control(self, image, speed, steer_history):
+        """修复控制生成逻辑"""
+        try:
+            with torch.no_grad():
+                # 预处理
+                img_tensor = self.preprocess_image(image)
+                state_tensor = self.preprocess_state(speed, steer_history)
+
+                # 神经网络推理
+                control_output = self.model(img_tensor, state_tensor)
+
+                # 提取控制指令
+                throttle = control_output[0, 0].item()
+                brake = control_output[0, 1].item()
+                steer = control_output[0, 2].item()
+
+                # 修复4: 添加安全限制
+                throttle = max(0.0, min(0.8, throttle))  # 限制最大油门
+                brake = max(0.0, min(0.5, brake))  # 限制最大刹车
+                steer = max(-0.5, min(0.5, steer))  # 限制转向幅度
+
+                return throttle, brake, steer
+
+        except Exception as e:
+            print(f"神经网络控制错误: {e}")
+            # 返回安全默认值
+            return 0.3, 0.0, 0.0
+
+
+# 修复5: 传统控制器作为备份
+class TraditionalController:
+    """可靠的传统控制逻辑"""
+
+    def __init__(self, world):
+        self.world = world
+        self.map = world.get_map()
+        self.waypoint_distance = 10.0
+        self.last_waypoint = None
+
+    def get_control(self, vehicle):
+        """基于路点的传统控制"""
+        # 获取车辆状态
+        transform = vehicle.get_transform()
+        location = vehicle.get_location()
+        velocity = vehicle.get_velocity()
+        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+
+        # 获取路点
+        waypoint = self.map.get_waypoint(location, project_to_road=True)
+        next_waypoints = waypoint.next(self.waypoint_distance)
+
+        if not next_waypoints:
+            # 如果没有找到路点，尝试获取当前路点
+            next_waypoints = [waypoint]
+
+        target_waypoint = next_waypoints[0]
+        self.last_waypoint = target_waypoint
+
+        # 计算转向
+        vehicle_yaw = math.radians(transform.rotation.yaw)
+        target_loc = target_waypoint.transform.location
+
+        dx = target_loc.x - location.x
+        dy = target_loc.y - location.y
+
+        local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
+        local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
+
+        if abs(local_x) < 0.1:
+            steer = 0.0
+        else:
+            angle = math.atan2(local_y, local_x)
+            steer = np.clip(angle / math.radians(45), -1.0, 1.0)
+
+        # 速度控制
+        if speed < 5.0:  # 18 km/h
+            throttle = 0.6
+            brake = 0.0
+        elif speed < 10.0:  # 36 km/h
+            throttle = 0.3
+            brake = 0.0
+        else:
+            throttle = 0.1
+            brake = 0.1
+
+        return throttle, brake, steer
+
+
+# CARLA初始化部分保持不变...
+# 连接到本地CARLA服务器，端口2000
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
 world = client.load_world('Town01')
 
+# 获取并设置世界的运行参数
 settings = world.get_settings()
 settings.synchronous_mode = True
 settings.fixed_delta_seconds = 0.1
-settings.substepping = True
-settings.max_substep_delta_time = 0.01
-settings.max_substeps = 10
 world.apply_settings(settings)
 
+# 定义天气参数
 weather = carla.WeatherParameters(
     cloudiness=30.0,
     precipitation=0.0,
@@ -27,31 +214,30 @@ weather = carla.WeatherParameters(
 )
 world.set_weather(weather)
 
+# 获取地图和出生点
 map = world.get_map()
 spawn_points = map.get_spawn_points()
 if not spawn_points:
     raise Exception("No spawn points available")
 
-# 选择一个更好的出生点
-spawn_point = spawn_points[10]  # 选择更靠前的出生点
+# 选择更合适的出生点
+spawn_point = spawn_points[10]
 
-# --------------------------
-# 2. 生成车辆和障碍物
-# --------------------------
+# 生成车辆
 blueprint_library = world.get_blueprint_library()
-
-# 主车辆（红色）
 vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
 vehicle_bp.set_attribute('color', '255,0,0')
 vehicle = world.spawn_actor(vehicle_bp, spawn_point)
+
 if not vehicle:
     raise Exception("无法生成主车辆")
+
 vehicle.set_autopilot(False)
 vehicle.set_simulate_physics(True)
 
 print(f"车辆生成在位置: {spawn_point.location}")
 
-# 生成障碍物
+# 生成障碍物车辆
 obstacle_count = 3
 for i in range(obstacle_count):
     if i >= len(spawn_points):
@@ -63,9 +249,7 @@ for i in range(obstacle_count):
     if other_vehicle:
         other_vehicle.set_autopilot(True)
 
-# --------------------------
-# 3. 配置传感器
-# --------------------------
+# 配置传感器（简化配置）
 third_camera_bp = blueprint_library.find('sensor.camera.rgb')
 third_camera_bp.set_attribute('image_size_x', '640')
 third_camera_bp.set_attribute('image_size_y', '480')
@@ -76,22 +260,19 @@ third_camera_transform = carla.Transform(
 )
 third_camera = world.spawn_actor(third_camera_bp, third_camera_transform, attach_to=vehicle)
 
-# 激光雷达配置
-lidar_bp = blueprint_library.find('sensor.lidar.ray_cast')
-lidar_bp.set_attribute('channels', '32')
-lidar_bp.set_attribute('range', '50')
-lidar_bp.set_attribute('points_per_second', '100000')
-lidar_bp.set_attribute('rotation_frequency', '10')
-lidar_bp.set_attribute('upper_fov', '15')
-lidar_bp.set_attribute('lower_fov', '-25')
-lidar_transform = carla.Transform(carla.Location(x=0.0, z=2.5))
-lidar = world.spawn_actor(lidar_bp, lidar_transform, attach_to=vehicle)
+front_camera_bp = blueprint_library.find('sensor.camera.rgb')
+front_camera_bp.set_attribute('image_size_x', '640')
+front_camera_bp.set_attribute('image_size_y', '480')
+front_camera_bp.set_attribute('fov', '90')
+front_camera_transform = carla.Transform(
+    carla.Location(x=2.0, y=0.0, z=1.5),
+    carla.Rotation(pitch=0.0)
+)
+front_camera = world.spawn_actor(front_camera_bp, front_camera_transform, attach_to=vehicle)
 
-# --------------------------
-# 4. 传感器数据处理
-# --------------------------
+# 传感器数据存储
 third_image = None
-lidar_data = None
+front_image = None
 
 
 def third_camera_callback(image):
@@ -101,413 +282,179 @@ def third_camera_callback(image):
     third_image = array[:, :, :3]
 
 
-def lidar_callback(point_cloud):
-    global lidar_data
-    data = np.frombuffer(point_cloud.raw_data, dtype=np.dtype('f4'))
-    data = np.reshape(data, (int(data.shape[0] / 4), 4))
-    lidar_data = data
+def front_camera_callback(image):
+    global front_image
+    array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+    array = np.reshape(array, (image.height, image.width, 4))
+    front_image = array[:, :, :3]
 
 
 third_camera.listen(third_camera_callback)
-lidar.listen(lidar_callback)
+front_camera.listen(front_camera_callback)
 
-time.sleep(2.0)  # 增加等待时间确保传感器初始化
+time.sleep(2.0)
 
+# 修复6: 初始化控制器
+nn_controller = ImprovedNeuralController()
+traditional_controller = TraditionalController(world)
 
-# --------------------------
-# 5. 路径规划与导航逻辑
-# --------------------------
-def get_next_waypoint(vehicle_location, distance=8.0):
-    """获取车辆前方指定距离的路点"""
-    waypoint = map.get_waypoint(vehicle_location, project_to_road=True)
-
-    next_waypoints = waypoint.next(distance)
-    if next_waypoints:
-        return next_waypoints[0]
-
-    if waypoint.is_junction:
-        for wp in waypoint.next(distance):
-            if wp.road_id == waypoint.road_id:
-                return wp
-
-        if waypoint.lane_change & carla.LaneChange.Right:
-            right_way = waypoint.get_right_lane()
-            if right_way:
-                return right_way.next(distance)[0]
-        elif waypoint.lane_change & carla.LaneChange.Left:
-            left_way = waypoint.get_left_lane()
-            if left_way:
-                return left_way.next(distance)[0]
-
-    return waypoint
-
-
-def calculate_steering_angle(vehicle_transform, target_waypoint):
-    """计算到达目标路点所需的转向角"""
-    vehicle_location = vehicle_transform.location
-    target_location = target_waypoint.transform.location
-
-    vehicle_yaw = math.radians(vehicle_transform.rotation.yaw)
-    dx = target_location.x - vehicle_location.x
-    dy = target_location.y - vehicle_location.y
-
-    local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
-    local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
-
-    if abs(local_x) < 0.1:
-        return 0.0
-
-    angle = math.atan2(local_y, local_x)
-    max_angle = math.radians(60)
-    steering = angle / max_angle
-
-    return np.clip(steering, -1.0, 1.0)
-
-
-# --------------------------
-# 6. 优化避障控制逻辑
-# --------------------------
-class ObstacleAvoidance:
-    def __init__(self):
-        self.obstacle_history = deque(maxlen=10)
-        self.emergency_brake = False
-        self.last_avoid_direction = 0
-
-    def detect_obstacles(self, lidar_data, vehicle_speed):
-        """修复版的障碍物检测算法"""
-        if lidar_data is None:
-            return self._get_default_detection_result()
-
-        if len(lidar_data) == 0:
-            return self._get_default_detection_result()
-
-        try:
-            # 地面过滤
-            ground_threshold = -0.5
-            valid_mask = lidar_data[:, 2] > ground_threshold
-            valid_points = lidar_data[valid_mask]
-
-            if len(valid_points) == 0:
-                return self._get_default_detection_result()
-
-            # 计算距离和角度
-            distances = np.sqrt(valid_points[:, 0] ** 2 + valid_points[:, 1] ** 2)
-            angles = np.arctan2(valid_points[:, 1], valid_points[:, 0])
-
-            # 定义检测区域
-            front_angle_range = np.radians(75)
-            front_mask = (np.abs(angles) <= front_angle_range) & (distances > 1.0)
-
-            front_points = valid_points[front_mask]
-            front_distances = distances[front_mask]
-            front_angles = angles[front_mask]
-
-            if len(front_points) == 0:
-                return self._get_default_detection_result()
-
-            # 分区域检测
-            near_zone = front_distances < 8.0
-            mid_zone = (front_distances >= 8.0) & (front_distances < 20.0)
-            far_zone = (front_distances >= 20.0) & (front_distances < 35.0)
-
-            # 紧急制动检测
-            emergency_points = front_points[near_zone & (front_distances < 4.0)]
-            self.emergency_brake = len(emergency_points) > 10
-
-            # 计算最小距离和障碍物角度
-            min_distance = np.min(front_distances)
-            min_idx = np.argmin(front_distances)
-            obstacle_angle = front_angles[min_idx] if len(front_angles) > min_idx else 0.0
-
-            # 分左右区域分析
-            left_points_distances = front_distances[front_angles > 0]
-            right_points_distances = front_distances[front_angles < 0]
-
-            # 计算左右侧最小距离
-            left_min = np.min(left_points_distances) if len(left_points_distances) > 0 else float('inf')
-            right_min = np.min(right_points_distances) if len(right_points_distances) > 0 else float('inf')
-
-            # 计算自由空间
-            safe_threshold = 15.0
-            left_free = np.sum(left_points_distances > safe_threshold) if len(left_points_distances) > 0 else 1000
-            right_free = np.sum(right_points_distances > safe_threshold) if len(right_points_distances) > 0 else 1000
-
-            # 障碍物检测条件
-            obstacle_detected = (np.sum(near_zone) > 5 or
-                                 np.sum(mid_zone) > 10 or
-                                 min_distance < 12.0)
-
-            return {
-                'obstacle_detected': obstacle_detected,
-                'min_distance': min_distance,
-                'left_clearance': left_min,
-                'right_clearance': right_min,
-                'left_free_space': left_free,
-                'right_free_space': right_free,
-                'obstacle_angle': obstacle_angle,
-                'emergency_brake': self.emergency_brake
-            }
-
-        except Exception as e:
-            print(f"障碍物检测错误: {e}")
-            return self._get_default_detection_result()
-
-    def _get_default_detection_result(self):
-        """返回默认的检测结果"""
-        return {
-            'obstacle_detected': False,
-            'min_distance': 30.0,
-            'left_clearance': float('inf'),
-            'right_clearance': float('inf'),
-            'left_free_space': 1000,
-            'right_free_space': 1000,
-            'obstacle_angle': 0.0,
-            'emergency_brake': False
-        }
-
-    def decide_avoidance_direction(self, detection_result, current_steer, vehicle_speed):
-        """避障决策逻辑"""
-        if not detection_result['obstacle_detected']:
-            self.last_avoid_direction = 0
-            return 0, 0, False
-
-        min_dist = detection_result['min_distance']
-        left_clear = detection_result['left_clearance']
-        right_clear = detection_result['right_clearance']
-        left_free = detection_result['left_free_space']
-        right_free = detection_result['right_free_space']
-        obstacle_angle = detection_result['obstacle_angle']
-
-        # 紧急制动情况
-        if detection_result['emergency_brake']:
-            return 0, 1.0, True
-
-        # 基于安全距离的避障决策
-        safety_margin = max(3.0, vehicle_speed * 0.5)
-
-        # 计算左右侧的安全得分
-        left_score = (left_clear - safety_margin) + (left_free * 0.1)
-        right_score = (right_clear - safety_margin) + (right_free * 0.1)
-
-        # 考虑当前转向的连续性
-        if self.last_avoid_direction != 0:
-            if self.last_avoid_direction == 1:
-                right_score += 2.0
-            else:
-                left_score += 2.0
-
-        # 决策避障方向
-        avoid_steer = 0.0
-        avoid_brake = 0.0
-
-        if min_dist < safety_margin + 2.0:
-            avoid_brake = 0.3 + (safety_margin - min_dist) * 0.1
-
-        if right_score > left_score + 1.0:
-            avoid_steer = -0.5
-            self.last_avoid_direction = -1
-        elif left_score > right_score + 1.0:
-            avoid_steer = 0.5
-            self.last_avoid_direction = 1
-        else:
-            # 两侧条件相似，基于障碍物角度决策
-            if obstacle_angle > 0:
-                avoid_steer = -0.4
-                self.last_avoid_direction = 1
-            else:
-                avoid_steer = 0.4
-                self.last_avoid_direction = -1
-
-        return avoid_steer, avoid_brake, False
-
-
-# --------------------------
-# 7. 主控制循环
-# --------------------------
-# 初始化避障控制器
-obstacle_avoidance = ObstacleAvoidance()
-
-# 控制状态变量
-throttle = 1.0  # 直接使用最大油门
+# 控制变量
+throttle = 0.3  # 更保守的初始油门
 steer = 0.0
 brake = 0.0
-waypoint_distance = 8.0
+NEURAL_NETWORK_MODE = False  # 默认使用传统控制，更稳定
 
-# 获取初始路点
-vehicle_location = vehicle.get_location()
-waypoint = get_next_waypoint(vehicle_location, waypoint_distance)
-
-# 控制平滑滤波器
-steer_filter = deque(maxlen=3)
-throttle_filter = deque(maxlen=2)
+# 转向历史，用于平滑
+steer_history = deque(maxlen=10)
 
 print("初始化车辆状态...")
-# 确保车辆物理引擎开启
 vehicle.set_simulate_physics(True)
 
-# 直接应用强力控制
-print("应用强力启动控制...")
+# 修复7: 更温和的启动控制
+print("应用启动控制...")
 vehicle.apply_control(carla.VehicleControl(
-    throttle=1.0,  # 最大油门
+    throttle=0.5,  # 降低初始油门
     steer=0.0,
     brake=0.0,
     hand_brake=False
 ))
 
 try:
-    print("自动驾驶系统启动（强力油门版本）")
-    print("控制键: q-退出, w-加速, s-减速, a-左转向, d-右转向, r-重置方向, 空格-紧急制动")
+    print("自动驾驶系统启动 - 初始模式: 传统控制")
+    print("控制键: q-退出, m-切换控制模式, r-重置车辆, t-传统模式, n-神经网络模式")
 
     frame_count = 0
     stuck_count = 0
     last_position = vehicle.get_location()
+    success_count = 0  # 成功运行计数器
 
+    # 主循环
     while True:
         world.tick()
         frame_count += 1
 
+        # 获取车辆状态
         vehicle_transform = vehicle.get_transform()
         vehicle_location = vehicle.get_location()
         vehicle_velocity = vehicle.get_velocity()
         vehicle_speed = math.sqrt(vehicle_velocity.x ** 2 + vehicle_velocity.y ** 2 + vehicle_velocity.z ** 2)
 
-        # 每帧都打印状态信息
         print(
-            f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, 位置=({vehicle_location.x:.1f}, {vehicle_location.y:.1f})")
+            f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, 模式={'神经网络' if NEURAL_NETWORK_MODE else '传统'}")
 
-        # 检测是否卡住
+        # 修复8: 改进的卡住检测
         current_position = vehicle_location
         distance_moved = current_position.distance(last_position)
-        if distance_moved < 0.1:  # 几乎没移动
+
+        # 更精确的卡住检测
+        is_moving = distance_moved > 0.2 or vehicle_speed > 1.0
+        if not is_moving:
             stuck_count += 1
         else:
             stuck_count = 0
+            success_count += 1  # 成功运行一帧
 
         last_position = current_position
 
-        # 如果卡住超过10帧，尝试强力脱困
-        if stuck_count > 10:
-            print("车辆卡住，尝试强力脱困...")
-            # 先倒车再前进
+        # 修复9: 更智能的卡住恢复
+        if stuck_count > 15:  # 1.5秒后认为卡住
+            print("检测到车辆卡住，执行恢复程序...")
+
+            # 先完全停止
             vehicle.apply_control(carla.VehicleControl(
-                throttle=0.0,
-                steer=0.0,
-                brake=1.0,
-                hand_brake=False,
-                reverse=True
+                throttle=0.0, steer=0.0, brake=1.0, hand_brake=True
             ))
             time.sleep(0.5)
+
+            # 然后尝试不同方向的脱困
+            recovery_steer = random.choice([-0.5, 0.5])  # 随机选择方向
             vehicle.apply_control(carla.VehicleControl(
-                throttle=1.0,
-                steer=0.0,
-                brake=0.0,
-                hand_brake=False,
-                reverse=False
+                throttle=0.8, steer=recovery_steer, brake=0.0, hand_brake=False
             ))
+            time.sleep(1.0)
+
             stuck_count = 0
+            success_count = 0
 
-        # 更新目标路点
-        current_distance = vehicle_location.distance(waypoint.transform.location)
-        if current_distance < 4.0:
-            waypoint = get_next_waypoint(vehicle_location, waypoint_distance)
+        # 每成功运行100帧显示一次状态
+        if success_count % 100 == 0:
+            print(f"已成功运行 {success_count} 帧")
 
-        # 计算基础转向角
-        base_steer = calculate_steering_angle(vehicle_transform, waypoint)
+        # 控制逻辑
+        if NEURAL_NETWORK_MODE:
+            # 神经网络控制
+            nn_throttle, nn_brake, nn_steer = nn_controller.get_control(
+                front_image, vehicle_speed, steer_history
+            )
 
-        # 检测障碍物并决策避障
-        detection_result = obstacle_avoidance.detect_obstacles(lidar_data, vehicle_speed)
-        avoid_steer, avoid_brake, emergency_brake = obstacle_avoidance.decide_avoidance_direction(
-            detection_result, steer, vehicle_speed
-        )
+            # 修复10: 更激进的控制平滑
+            throttle = 0.3 * throttle + 0.7 * nn_throttle
+            brake = 0.3 * brake + 0.7 * nn_brake
+            steer = 0.2 * steer + 0.8 * nn_steer
 
-        # 综合控制输出 - 简化逻辑，专注于让车动起来
-        if emergency_brake:
-            throttle = 0.2
-            brake = 0.1
-            steer = base_steer * 0.1
-            print("!!! 紧急制动 !!!")
-        elif detection_result['obstacle_detected']:
-            brake = avoid_brake
-            throttle = 0.4  # 避障时也保持高油门
-            steer = avoid_steer * 0.1 + base_steer * 0.2
-            print("!!! 紧急制动 !!!")
-        elif detection_result['obstacle_detected']:
-            brake = avoid_brake
-            throttle = 0.3  # 避障时也保持高油门
-            steer = avoid_steer * 0.8 + base_steer * 0.2
-            print(f"避障中 - 距离:{detection_result['min_distance']:.1f}m")
+            # 记录转向历史
+            steer_history.append(steer)
+
         else:
-            # 正常行驶 - 使用强力油门
-            brake = 0.0
-            steer = base_steer * 0.5
+            # 传统控制 - 更稳定
+            throttle, brake, steer = traditional_controller.get_control(vehicle)
+            steer_history.append(steer)
 
-            # 强力油门策略
-            if vehicle_speed < 2.0:  # 低速时最大油门
-                throttle = 0.4
-            elif vehicle_speed < 5.0:
-                throttle = 0.3
-            elif vehicle_speed < 7.0:
-                throttle = 0.2
-            else:
-                throttle = 0.1
-
-            steer = base_steer
-
-        # 应用平滑滤波
-        steer_filter.append(steer)
-        throttle_filter.append(throttle)
-
-        smoothed_steer = np.mean(steer_filter)
-        smoothed_throttle = np.mean(throttle_filter)
-
-        # 应用强力控制
+        # 应用控制
         control = carla.VehicleControl(
-            throttle=smoothed_throttle,
-            steer=smoothed_steer,
+            throttle=throttle,
+            steer=steer,
             brake=brake,
             hand_brake=False,
             reverse=False
         )
 
-        print(f"控制输出: 油门={control.throttle:.2f}, 刹车={control.brake:.2f}, 转向={control.steer:.2f}")
         vehicle.apply_control(control)
 
-        # 可视化显示
+        # 显示和输入处理
         if third_image is not None:
             display_image = third_image.copy()
+
+            # 显示信息
             cv2.putText(display_image, f"Speed: {vehicle_speed * 3.6:.1f} km/h", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(display_image, f"Throttle: {throttle:.2f}", (10, 60),
+            cv2.putText(display_image, f"Mode: {'Neural' if NEURAL_NETWORK_MODE else 'Traditional'}",
+                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(display_image, f"Throttle: {throttle:.2f}", (10, 90),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 90),
+            cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 120),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(display_image, f"Brake: {brake:.2f}", (10, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            if detection_result['obstacle_detected']:
-                status_text = f"OBSTACLE: {detection_result['min_distance']:.1f}m"
-                cv2.putText(display_image, status_text, (10, 120),
+            # 卡住警告
+            if stuck_count > 5:
+                cv2.putText(display_image, "STUCK DETECTED!", (10, 180),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            else:
-                cv2.putText(display_image, "CLEAR", (10, 120),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
-            cv2.imshow('第三视角 - 强力油门系统', display_image)
+            cv2.imshow('自动驾驶系统 - 修复版', display_image)
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 break
-            elif key == ord('w'):
-                throttle = min(1.0, throttle + 0.1)
-            elif key == ord('s'):
-                throttle = max(0.0, throttle - 0.1)
-            elif key == ord('a'):
-                steer = max(-1.0, steer - 0.1)
-            elif key == ord('d'):
-                steer = min(1.0, steer + 0.1)
+            elif key == ord('m'):
+                NEURAL_NETWORK_MODE = not NEURAL_NETWORK_MODE
+                print(f"切换到{'神经网络' if NEURAL_NETWORK_MODE else '传统'}控制模式")
+            elif key == ord('t'):
+                NEURAL_NETWORK_MODE = False
+                print("切换到传统控制模式")
+            elif key == ord('n'):
+                NEURAL_NETWORK_MODE = True
+                print("切换到神经网络控制模式")
             elif key == ord('r'):
+                # 重置车辆
+                vehicle.set_transform(spawn_point)
+                throttle = 0.3
                 steer = 0.0
-            elif key == ord(' '):
                 brake = 1.0
-                throttle = 0.0
+                stuck_count = 0
+                success_count = 0
+                steer_history.clear()
 
         time.sleep(0.01)
 
@@ -522,12 +469,14 @@ except Exception as e:
 finally:
     print("正在清理资源...")
     third_camera.stop()
-    lidar.stop()
+    front_camera.stop()
 
+    # 销毁actor
     for actor in world.get_actors():
         if actor.type_id.startswith('vehicle.') or actor.type_id.startswith('sensor.'):
             actor.destroy()
 
+    # 恢复设置
     settings.synchronous_mode = False
     world.apply_settings(settings)
     cv2.destroyAllWindows()

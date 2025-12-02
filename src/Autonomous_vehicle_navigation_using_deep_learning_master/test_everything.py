@@ -70,17 +70,29 @@ def setup_tensorflow():
         print("ℹ️ 未找到GPU，使用CPU运行")
 
 def set_spectator_to_vehicle(world, vehicle):
-    """设置观察者视角"""
+    """设置观察者视角 - 车辆正后方跟随"""
     try:
         spectator = world.get_spectator()
         transform = vehicle.get_transform()
         
-        # 更安全的视角
+        # 计算车辆后方的位置
+        # 使用车辆的旋转来确定方向
+        rotation = transform.rotation
+        yaw = np.radians(rotation.yaw)
+        
+        # 在车辆后方一定距离（例如8米），高度3米
+        distance_behind = 8.0
+        height = 3.0
+        
+        # 计算后方位置（与车辆朝向相反的方向）
+        behind_x = transform.location.x - distance_behind * np.cos(yaw)
+        behind_y = transform.location.y - distance_behind * np.sin(yaw)
+        
+        # 设置观察者在车辆正后方，稍微高一点
         spectator.set_transform(Transform(
-            transform.location + Location(z=15, x=-15),
-            Rotation(pitch=-30)
+            Location(x=behind_x, y=behind_y, z=transform.location.z + height),
+            Rotation(pitch=-15, yaw=rotation.yaw)  # 与车辆相同的水平朝向
         ))
-        print("✅ 观察者视角已设置")
         
     except Exception as e:
         print(f"⚠️ 设置视角时出错: {e}")
@@ -200,7 +212,7 @@ def main():
             step_start = time.time()
             
             # 定期更新视角
-            if step_count % 20 == 0:
+            if step_count%5==0:
                 set_spectator_to_vehicle(world, ego_vehicle)
             
             # 动作预测
