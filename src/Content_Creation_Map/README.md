@@ -521,8 +521,10 @@ OpenStreetMap（简称OSM）是一个免费且开源的世界地图数据库，�
 2. **打开或新建项目并选择目标场景（后缀为.rrscene的文件）**
   ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112045_67_69.jpg)
 3. **在上方工具栏找到SD Map Viewer Tool工具并选择（如下图圈注）**
-
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112121_68_69.jpg)
 4. **在左侧的工具栏找到Open Street Map File并打开**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112213_69_69.jpg)
 5. **在弹出的窗口中找到从OpenStreetMap官网导出的后缀为.osm的文件打开**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112324_70_69.jpg)
 6. **导入结果如下图**
-   ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112350_71_69.png)
+   ![](https://github.com/2382613701lzynetizen/image/blob/main/20251201112350_71_69.png)
