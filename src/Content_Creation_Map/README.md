@@ -514,3 +514,12 @@ OpenStreetMap（简称OSM）是一个免费且开源的世界地图数据库，�
    - 备份原始文件
 
 通过以上步骤获取的OSM文件，可以用于后续在RoadRunner中创建真实道路网络。建议先从小的测试区域开始，熟悉整个流程后再处理大型项目。
+
+
+## 向roadrunner中导入osm文件的步骤
+1. **打开roadrunner**
+2. **打开或新建项目并选择目标场景（后缀为.rrscene的文件）**
+3. **在上方工具栏找到SD Map Viewer Tool工具并选择（如下图圈注）**
+4. **在左侧的工具栏找到Open Street Map File并打开**
+5. **在弹出的窗口中找到从OpenStreetMap官网导出的后缀为.osm的文件打开**
+6. **导入结果如下图**
