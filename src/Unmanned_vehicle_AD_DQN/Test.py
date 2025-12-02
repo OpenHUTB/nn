@@ -11,7 +11,7 @@ from Environment import CarEnv, MEMORY_FRACTION
 from Hyperparameters import *
 
 
-MODEL_PATH = r'D:\Work\T_Unmanned_vehicle_AD_DQN\models\YY_Optimized_best_240.26.model'  # 请替换为实际的最佳模型路径
+MODEL_PATH = r'D:\Work\T_Unmanned_vehicle_AD_DQN\models\YY_Optimized___290.14max___97.16avg___13.42min__1764553908.model'  # 请替换为实际的最佳模型路径
 
 if __name__ == '__main__':
 
@@ -76,14 +76,13 @@ if __name__ == '__main__':
                 frame_time = time.time() - step_start
                 fps_counter.append(frame_time)
                 if step_count % 10 == 0:  # 每10步打印一次信息
-                    print(f'轮次 {episode_count} | 步数: {step_count} | FPS: {len(fps_counter)/sum(fps_counter):>4.1f} | 动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action} | 奖励: {reward:.2f} | 累计奖励: {total_reward:.2f}')
+                    print(f'轮次 {episode_count} | 步数: {step_count} | FPS: {len(fps_counter)/sum(fps_counter):>4.1f} | 动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] {action} | 奖励: {reward:.2f} | 累计奖励: {total_reward:.2f}')
 
             # episode结束时显示结果并销毁所有actor
             result = "成功到达终点!" if reward > 5 else "发生碰撞或失败"
             print(f'第 {episode_count} 轮结束: {result} | 总步数: {step_count} | 总奖励: {total_reward:.2f}')
             
-            for actor in env.actor_list:
-                actor.destroy()
+            env.cleanup_actors()
                 
             # 短暂暂停后开始下一轮
             time.sleep(2)
@@ -93,5 +92,4 @@ if __name__ == '__main__':
     finally:
         # 清理环境
         print("清理环境...")
-        for actor in env.actor_list:
-            actor.destroy()
+        env.cleanup_actors()
