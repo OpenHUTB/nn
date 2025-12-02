@@ -117,7 +117,7 @@ class CarlaEnvironment(gym.Env):
         return next_state, reward, done, {}
 
     def close(self):
-
+        
         if self.camera is not None:
             self.camera.destroy()
         if self.vehicle is not None:
