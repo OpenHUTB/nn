@@ -5,14 +5,14 @@ class DecisionModule(nn.Module):
     def __init__(self):
         super(DecisionModule, self).__init__()
         self.policy_net = nn.Sequential(
-            nn.Linear(64, 128),
+            nn.Linear(256, 128),  # 64改为256，与注意力输出匹配
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 2)  # 输出：转向角和油门
         )
         self.value_net = nn.Sequential(
-            nn.Linear(64, 128),
+            nn.Linear(256, 128),  # 64改为256，与注意力输出匹配
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
