@@ -1,0 +1,14 @@
+# 视频文件（排除sample.hevc）
+../../sample.hevc
+*.hevc
+*.mp4
+*.avi
+
+# 备份/临时文件
+*.save
+*.old
+*.launch
+
+# 模型目录（若models里有超大文件，先排除；如需提交则用Git LFS）
+models/
+
