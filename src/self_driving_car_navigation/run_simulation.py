@@ -1,6 +1,7 @@
 import torch
 import time
 import sys
+import math
 from models.perception_module import PerceptionModule
 from models.attention_module import CrossDomainAttention
 from models.decision_module import DecisionModule
@@ -52,10 +53,14 @@ def run_simulation():
         print(f"[车辆状态] 生成成功（ID: {env.vehicle.id}）")
         sys.stdout.flush()
 
+        # 获取CARLA可视化镜头控制器
+        spectator = env.world.get_spectator()
+
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"\n[设备信息] 模型运行在 {device} 上")
         sys.stdout.flush()
         system = IntegratedSystem(device=device)
+
 
         # 新增：转向平滑参数（减少晃动）
         steer_buffer = []  # 存储最近3步转向值
@@ -64,6 +69,7 @@ def run_simulation():
         max_steer_delta = 0.03  # 转向最大变化量（限制高频波动）
 
         print("\n[仿真开始] 共运行100步（车辆将明显移动）...")
+
         sys.stdout.flush()
         for step in range(100):
             # 获取摄像头观测
@@ -79,6 +85,7 @@ def run_simulation():
 
             # 模型推理
             policy, _ = system.forward(image, lidar_data, imu_data)
+
 
             # 关键调整1：放大油门值（确保车辆明显移动，最低0.4）
             raw_throttle = float(policy[0][0].clamp(-0.3, 0.8))  # 原始油门
@@ -98,11 +105,14 @@ def run_simulation():
             final_steer = max(-1.0, min(1.0, final_steer))  # 最终限制
             last_steer = final_steer  # 更新历史值
 
+
             # 执行控制指令
             control = carla.VehicleControl(throttle=throttle, steer=final_steer)
             env.vehicle.apply_control(control)
 
+
             # 打印详细控制参数
+
             print(f"[步骤 {step+1}/100] 油门: {throttle:.2f} | 转向: {final_steer:.2f}")
             sys.stdout.flush()
             time.sleep(0.1)  # 控制仿真速度
