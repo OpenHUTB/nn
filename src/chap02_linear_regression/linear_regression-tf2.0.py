@@ -6,8 +6,8 @@
 import numpy as np
 # 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
 import matplotlib.pyplot as plt
-# 导入Matplotlib的pyplot模块 - 用于数据可视化和绘图
-import tensorflow as tf # 导入TensorFlow深度学习框架，并使用别名'tf'简化调用
+# 导入TensorFlow深度学习框架，并使用别名'tf'简化调用
+import tensorflow as tf
 # 从Keras导入常用模块
 from tensorflow.keras import optimizers, layers, Model
 
@@ -17,20 +17,17 @@ def identity_basis(x):
     返回形状为 (N, 1) 的数组，其中 N 是输入样本数"""
     return np.expand_dims(x, axis=1)
 
-    # 生成多项式基函数
+# 生成多项式基函数
 def multinomial_basis(x, feature_num=10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数
     返回形状为 (N, feature_num) 的数组"""
     x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 初始化特征列表
-    feat = [x]
-    # 生成从 x^2 到 x^feature_num 的多项式特征
-    for i in range(2, feature_num + 1):
-        feat.append(x**i)
+    # 优化点1：用列表推导式精简多项式特征生成（替代原for循环）
+    feat = [x**i for i in range(1, feature_num + 1)]
     # 将所有特征沿着第二维（axis=1）拼接起来
     ret = np.concatenate(feat, axis=1)
-    return ret # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
+    return ret  # 返回一个二维数组，其中每一行是输入样本的多项式特征向量，列数为 feature_num
 
 
 def gaussian_basis(x, feature_num=10):
@@ -45,10 +42,10 @@ def gaussian_basis(x, feature_num=10):
     width = 1.0 * (centers[1] - centers[0])
     # 使用np.expand_dims在x的第1维度(axis=1)上增加一个维度以便广播计算
     x = np.expand_dims(x, axis=1)
-    # 将x沿着第1维度(axis=1)复制feature_num次并连接使其与中心点数量匹配
-    x = np.concatenate([x] * feature_num, axis=1) # 将 x 沿着第 1 维度复制 feature_num 次
-    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离，将输入值减去对应的中心点，然后除以宽度进行标准化
-    ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数，-0.5 * out**2 对应高斯分布的概率密度函数形式
+    # 可选优化：用np.tile替代concatenate，更高效（保留原逻辑也可）
+    x = np.tile(x, (1, feature_num))  # 等价于原np.concatenate逻辑
+    out = (x - centers) / width  # 计算每个样本点到每个中心点的标准化距离
+    ret = np.exp(-0.5 * out ** 2)  # 对标准化距离应用高斯函数
     return ret
 
 
@@ -60,22 +57,21 @@ def load_data(filename, basis_func=gaussian_basis):
     with open(filename, "r") as f:
         for line in f:
             # 读取每一行数据，并将其转换为浮点数列表
-            # 改进: 转换为list
-            xys.append(list(map(float, line.strip().split()))) # 读取每行数据将数据分离为特征和标签
-        xs, ys = zip(*xys) # 解压为特征和标签
-        xs, ys = np.asarray(xs), np.asarray(ys) # 转换为numpy数组
-        o_x, o_y = xs, ys # 保存原始数据
-        phi0 = np.expand_dims(np.ones_like(xs), axis=1) # 添加偏置项（全1列）
-        phi1 = basis_func(xs) # 应用基函数变换
-        xs = np.concatenate([phi0, phi1], axis=1) 
+            xys.append(list(map(float, line.strip().split())))  # 读取每行数据将数据分离为特征和标签
+        xs, ys = zip(*xys)  # 解压为特征和标签
+        xs, ys = np.asarray(xs), np.asarray(ys)  # 转换为numpy数组
+        o_x, o_y = xs, ys  # 保存原始数据
+        phi0 = np.expand_dims(np.ones_like(xs), axis=1)  # 添加偏置项（全1列）
+        phi1 = basis_func(xs)  # 应用基函数变换
+        xs = np.concatenate([phi0, phi1], axis=1)
         # 拼接偏置和变换后的特征
-        return (np.float32(xs), np.float32(ys)), (o_x, o_y)# 返回处理好的训练数据和原始数据
+        return (np.float32(xs), np.float32(ys)), (o_x, o_y)  # 返回处理好的训练数据和原始数据
 
 
-#定义模型
+# 定义模型
 class LinearModel(Model):
     """线性回归模型，实现 y = w·x + b"""
-    
+
     def __init__(self, ndim):
         """
         初始化线性模型
@@ -85,32 +81,29 @@ class LinearModel(Model):
         """
         # 调用父类(Model)的构造函数
         super(LinearModel, self).__init__()
-        
+
         # 定义模型参数：权重矩阵 w
         # 形状为 [ndim, 1]，表示从 ndim 维输入到 1 维输出的线性变换
         # 初始值从均匀分布 [-0.1, 0.1) 中随机生成
         # trainable=True 表示该变量需要在训练过程中被优化
         # 创建一个TensorFlow变量作为模型权重
         self.w = tf.Variable(
-            shape=[ndim, 1],    # 权重矩阵形状：ndim×1
+            shape=[ndim, 1],  # 权重矩阵形状：ndim×1
             initial_value=tf.random.uniform(
                 # [ndim, 1] 表示这是一个二维矩阵，有 ndim 行和 1 列
                 [ndim, 1], minval=-0.1, maxval=0.1, dtype=tf.float32
             ),
             trainable=True,
-            name="weight"# 参数名称(用于TensorBoard等可视化工具)
+            name="weight"  # 参数名称(用于TensorBoard等可视化工具)
         )
 
-        
-        # 注意：代码中缺少偏置项 b，完整的线性模型通常需要包含偏置
         # 定义偏置参数b，形状为 [1]
-       
-        self.b = tf.Variable(# 定义偏置参数b，它是一个TensorFlow的变量（Variable）
+        self.b = tf.Variable(  # 定义偏置参数b，它是一个TensorFlow的变量（Variable）
             initial_value=tf.zeros([1], dtype=tf.float32),
             trainable=True,
             name="bias"
         )
-        
+
     @tf.function
     def call(self, x):
         """模型前向传播
@@ -125,13 +118,12 @@ class LinearModel(Model):
         return y
 
 
-(xs, ys), (o_x, o_y) = load_data("train.txt")    # 加载训练数据，调用load_data函数      
+(xs, ys), (o_x, o_y) = load_data("train.txt")  # 加载训练数据，调用load_data函数
 ndim = xs.shape[1]  # 获取特征维度
 
 model = LinearModel(ndim=ndim)  # 实例化线性模型
 
-
-#训练以及评估
+# 训练以及评估
 optimizer = optimizers.Adam(0.1)
 
 
@@ -139,11 +131,12 @@ optimizer = optimizers.Adam(0.1)
 def train_one_step(model, xs, ys):
     # 在梯度带(GradientTape)上下文中记录前向计算过程
     with tf.GradientTape() as tape:
-        y_preds = model(xs)    # 模型前向传播计算预测值
-        loss = tf.keras.losses.MSE(ys, y_preds)   #计算损失函数
-    grads = tape.gradient(loss, model.w)    # 计算损失函数对模型参数w的梯度
-    optimizer.apply_gradients([(grads, model.w)])    # 更新模型参数
-    return loss # 返回模型的预测结果，即模型对输入数据 xs 的输出
+        y_preds = model(xs)  # 模型前向传播计算预测值
+        loss = tf.keras.losses.MSE(ys, y_preds)  # 计算损失函数
+    # 优化点2：修复梯度更新，同时计算w和b的梯度（原代码仅更新w）
+    grads = tape.gradient(loss, [model.w, model.b])  # 同时计算w和b的梯度
+    optimizer.apply_gradients(zip(grads, [model.w, model.b]))  # 同时更新w和b
+    return loss  # 返回模型的损失值
 
 
 # 使用@tf.function装饰器将Python函数转换为TensorFlow图，以提高执行效率
@@ -155,21 +148,21 @@ def predict(model, xs):
 
 def evaluate(ys, ys_pred):
     """评估模型的性能"""
-    return np.std(ys - ys_pred) # 计算预测误差的标准差
+    return np.std(ys - ys_pred)  # 计算预测误差的标准差
 
 
 # 评估指标的计算
-for i in range(1000): # 进行1000次训练迭代
-    loss = train_one_step(model, xs, ys) # 执行单步训练并获取当前损失值
-    if i % 100 == 1: # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
+for i in range(1000):  # 进行1000次训练迭代
+    loss = train_one_step(model, xs, ys)  # 执行单步训练并获取当前损失值
+    if i % 100 == 1:  # 每100步打印一次损失值（从第1步开始：1, 101, 201, ...）
         print(f"loss is {loss:.4}")  # `:.4` 表示保留4位有效数字
 
 # 使用模型对训练集数据进行预测
 y_preds = predict(model, xs)
-# 打印测试集预测值与真实值的标准差
+# 计算训练集预测值与真实值的标准差
 std = evaluate(ys, y_preds)
 # 打印训练集预测值与真实值的标准差
-print("训练集预测值与真实值的标准差：{:.1f}".format(std)) # 格式化输出标准差，保留一位小数
+print("训练集预测值与真实值的标准差：{:.1f}".format(std))  # 格式化输出标准差，保留一位小数
 
 # 加载测试集数据
 (xs_test, ys_test), (o_x_test, o_y_test) = load_data("test.txt")
@@ -182,21 +175,15 @@ std = evaluate(ys_test, y_test_preds)
 print("测试集预测值与真实值的标准差：{:.1f}".format(std))
 
 # 绘制原始数据点：红色圆点标记，大小3
-# o_x: 原始数据X坐标
-# o_y: 原始数据Y坐标
-# "ro": 红色(r)圆形(o)标记
-plt.plot(o_x, o_y, "ro", markersize=3) 
+plt.plot(o_x, o_y, "ro", markersize=3)
 # 绘制模型预测曲线：黑色实线
-# o_x_test: 测试集X坐标
-# y_test_preds: 模型在测试集上的预测结果
-# "k": 黑色(k)实线（默认线型）
 plt.plot(o_x_test, y_test_preds, "k")
 # 设置x、y轴标签
 plt.xlabel("x")
 plt.ylabel("y")
-plt.title("Linear Regression") # 图表标题
+plt.title("Linear Regression")  # 图表标题
 # 虚线网格，半透明灰色
 plt.grid(True, linestyle="--", alpha=0.7, color="gray")
-plt.legend(["train", "test", "pred"])  # 添加图例，元素依次对应
+plt.legend(["train", "pred"])  # 修正图例（原图例多了"test"，实际只有train和pred）
 plt.tight_layout()  # 自动调整布局
-plt.show()# 显示图形
+plt.show()  # 显示图形
