@@ -30,7 +30,7 @@ class ModifiedTensorBoard(TensorBoard):
         super().__init__(**kwargs)
         self._log_write_dir = self.log_dir
         self.step = 1
-        self.writer = self.writer = tf.summary.create_file_writer(self.log_dir)
+        self.writer = tf.summary.create_file_writer(self.log_dir)
 
     def set_model(self, model):
         self.model = model
@@ -78,7 +78,7 @@ class DQNAgent:
         self.training_initialized = False
 
     def create_model(self):
-        """创建深度Q网络模型"""
+        """创建深度Q网络模型 - 扩展为5个输出"""
         model = Sequential()
         
         # 第一卷积块
@@ -115,8 +115,8 @@ class DQNAgent:
         model.add(Dense(128, activation='relu'))
         model.add(Dropout(0.2))
         
-        # 输出层 - 使用线性激活函数用于Q值回归
-        model.add(Dense(3, activation='linear'))
+        # 输出层 - 扩展为5个动作: 0-减速, 1-保持, 2-加速, 3-左转, 4-右转
+        model.add(Dense(5, activation='linear'))
         
         # 编译模型，使用Huber损失和Adam优化器
         model.compile(loss="huber", optimizer=Adam(lr=LEARNING_RATE), metrics=["mae"])
@@ -178,7 +178,6 @@ class DQNAgent:
 
         # 选择小批量经验
         minibatch = self.minibatch_chooser()
-        print([transition[2] for transition in minibatch])  # 打印奖励值
 
         # 准备训练数据
         current_states = np.array([transition[0] for transition in minibatch]) / 255
@@ -228,7 +227,7 @@ class DQNAgent:
         """在单独线程中持续训练"""
         # 预热训练
         x = np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)
-        y = np.random.uniform(size=(1, 3)).astype(np.float32)
+        y = np.random.uniform(size=(1, 5)).astype(np.float32)  # 改为5个输出
 
         self.model.fit(x, y, verbose=False, batch_size=1)
         self.training_initialized = True

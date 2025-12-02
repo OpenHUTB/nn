@@ -11,18 +11,17 @@ H_SPEED = 2.0  # 水平移动速度
 V_SPEED = 1.0  # 垂直移动速度
 YAW_SPEED = 30.0  # 旋转速度
 
-# ---设置绝对路径---
+# 保存路径
 OUTPUT_FILE = r"D:\Others\map_output.asc"
 
-# --- 检查目录是否存在 ---
+# 检查目录
 output_dir = os.path.dirname(OUTPUT_FILE)
 if not os.path.exists(output_dir):
-    print(f"错误: 找不到文件夹 '{output_dir}'")
-    print("请先手动创建这个文件夹，或者修改代码中的保存路径。")
+    print(f"错误: 找不到文件夹 '{output_dir}'，请先创建。")
     exit()
 
 
-#数学工具：四元数转旋转矩阵
+# --- 数学工具 ---
 def get_rotation_matrix(q):
     w, x, y, z = q.w_val, q.x_val, q.y_val, q.z_val
     return np.array([
@@ -32,7 +31,7 @@ def get_rotation_matrix(q):
     ])
 
 
-# 初始化
+# --- 初始化 ---
 client = airsim.MultirotorClient()
 client.confirmConnection()
 client.enableApiControl(True, vehicle_name=VEHICLE_NAME)
@@ -40,11 +39,12 @@ client.armDisarm(True, vehicle_name=VEHICLE_NAME)
 client.takeoffAsync(vehicle_name=VEHICLE_NAME).join()
 client.moveToPositionAsync(0, 0, -2, 3, vehicle_name=VEHICLE_NAME).join()
 
-print("=== 3D 扫描模式启动 ===")
-print("🎮 控制键位: [WASD]移动  [QE]旋转  [↑↓]升降")
-print(f"📁 数据将保存到: {OUTPUT_FILE}")
+print("\n3D 扫描系统 手动控制版 ")
+print("飞行控制: [WASD]移动  [QE]旋转  [↑↓]升降")
+print("扫描开关: 按 [R] 键开启/停止录制")
+print(f"文件路径: {OUTPUT_FILE}")
 
-# 清空旧文件
+# 清空/初始化文件
 with open(OUTPUT_FILE, "w") as f:
     f.write("")
 
@@ -53,42 +53,60 @@ try:
     last_save_time = time.time()
     points_buffer = []
 
+    # --- 新增：扫描状态标记 ---
+    is_scanning = False
+
     while True:
-        # 1. 获取位姿
-        state = client.simGetVehiclePose(vehicle_name=VEHICLE_NAME)
-        pos = state.position
-        orientation = state.orientation
+        # --- 1. 监听开关按键 [R] ---
+        if keyboard.is_pressed('r'):
+            is_scanning = not is_scanning  # 切换状态
+            if is_scanning:
+                print(f"\n>>>开始录制数据... (当前总点数: {total_points_captured})")
+            else:
+                print(f"\n>>>暂停录制数据。")
 
-        # 2. 获取雷达数据
-        lidar_data = client.getLidarData(lidar_name=LIDAR_NAME, vehicle_name=VEHICLE_NAME)
+            time.sleep(0.3)  # 简单的防抖动，防止按一下触发多次
 
-        if lidar_data and len(lidar_data.point_cloud) >= 3:
-            raw_points = np.array(lidar_data.point_cloud, dtype=np.float32)
-            local_points = np.reshape(raw_points, (int(raw_points.shape[0] / 3), 3))
+        # --- 2. 仅在开启状态下处理数据 ---
+        if is_scanning:
+            # 获取位姿
+            state = client.simGetVehiclePose(vehicle_name=VEHICLE_NAME)
+            pos = state.position
+            orientation = state.orientation
 
-            # --- 坐标转换 ---
-            R = get_rotation_matrix(orientation)
-            rotated_points = np.dot(local_points, R.T)
-            t_vec = np.array([pos.x_val, pos.y_val, pos.z_val])
-            global_points = rotated_points + t_vec
+            # 获取雷达
+            lidar_data = client.getLidarData(lidar_name=LIDAR_NAME, vehicle_name=VEHICLE_NAME)
 
-            points_buffer.extend(global_points)
-            total_points_captured += len(global_points)
+            if lidar_data and len(lidar_data.point_cloud) >= 3:
+                raw_points = np.array(lidar_data.point_cloud, dtype=np.float32)
+                local_points = np.reshape(raw_points, (int(raw_points.shape[0] / 3), 3))
 
-        # 3. 写入文件
-        if time.time() - last_save_time > 0.5:
-            if points_buffer:
-                with open(OUTPUT_FILE, "a") as f:
-                    for p in points_buffer:
-                        f.write(f"{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n")
+                # 坐标转换
+                R = get_rotation_matrix(orientation)
+                rotated_points = np.dot(local_points, R.T)
+                t_vec = np.array([pos.x_val, pos.y_val, pos.z_val])
+                global_points = rotated_points + t_vec
 
-                print(f"\r[扫描中] 已采集点数: {total_points_captured} | 写入 D:\\Others...", end="")
-                points_buffer = []
-                last_save_time = time.time()
+                points_buffer.extend(global_points)
+                total_points_captured += len(global_points)
 
-        # 4. 飞行控制
-        vx, vy, vz = 0.0, 0.0, 0.0
-        yaw_rate = 0.0
+            # 写入文件 (每0.5秒)
+            if time.time() - last_save_time > 0.5:
+                if points_buffer:
+                    with open(OUTPUT_FILE, "a") as f:
+                        for p in points_buffer:
+                            f.write(f"{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n")
+
+                    # 使用 \r 动态刷新同一行，不刷屏
+                    print(f"\r[录制中] 已采集: {total_points_captured} 点 | 正在写入...", end="")
+                    points_buffer = []
+                    last_save_time = time.time()
+        else:
+            # 暂停状态下，稍微sleep一下减少CPU占用，且不打印刷屏
+            time.sleep(0.05)
+
+        # --- 3. 飞行控制 (始终有效) ---
+        vx, vy, vz, yaw_rate = 0.0, 0.0, 0.0, 0.0
 
         if keyboard.is_pressed('w'): vx = H_SPEED
         if keyboard.is_pressed('s'): vx = -H_SPEED
@@ -103,6 +121,7 @@ try:
 
         if keyboard.is_pressed('esc'): break
 
+        # 发送控制指令
         client.moveByVelocityAsync(
             vx, vy, vz, 0.1,
             drivetrain=airsim.DrivetrainType.MaxDegreeOfFreedom,
@@ -113,10 +132,12 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
+    # 保存最后残留的数据
     if points_buffer:
         with open(OUTPUT_FILE, "a") as f:
             for p in points_buffer:
                 f.write(f"{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n")
 
-    print(f"\n扫描结束！文件已保存至: {OUTPUT_FILE}")
+    print(f"\n\n任务结束！最终点数: {total_points_captured}")
+    print(f"结果已保存: {OUTPUT_FILE}")
     client.reset()
