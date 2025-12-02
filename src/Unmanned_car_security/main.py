@@ -5,10 +5,64 @@ import time
 import numpy as np
 import random
 
-# -------------------------- 1. 配置 Carla 路径（方法 1：脚本内临时添加）--------------------------
-carla_api_path = "D:/CARLA_0.9.10/WindowsNoEditor/PythonAPI"
+
+# -------------------------- 1. 智能查找 Carla 路径 ---------------------------
+def find_carla_path():
+    """智能查找 CARLA 安装路径"""
+
+    # 先检查环境变量
+    if 'CARLA_ROOT' in os.environ:
+        base_path = os.environ['CARLA_ROOT']
+        print(f"📁 使用环境变量 CARLA_ROOT: {base_path}")
+    else:
+        # 常见的安装路径
+        possible_paths = [
+            "D:/CARLA_0.9.10",
+            "D:/CARLA_0.9.11",
+            "D:/CARLA_0.9.12",
+            "D:/CARLA_0.9.13",
+            "D:/CARLA_0.9.14",
+            "C:/CARLA_0.9.10",
+            "C:/CARLA_0.9.11",
+            "C:/CARLA_0.9.12",
+            "C:/CARLA_0.9.13",
+            "C:/CARLA_0.9.14",
+            # 默认路径
+            "D:/CARLA_0.9.10"
+        ]
+
+        base_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                base_path = path
+                print(f"📁 自动检测到 CARLA 路径: {path}")
+                break
+
+        if not base_path:
+            print("❌ 未找到 CARLA 安装路径")
+            print("   请将 CARLA 安装在以下位置之一:")
+            for path in possible_paths[:5]:
+                print(f"   - {path}")
+            return None
+
+    # 构建 PythonAPI 完整路径
+    carla_api_path = os.path.join(base_path, "WindowsNoEditor", "PythonAPI")
+
+    if not os.path.exists(carla_api_path):
+        print(f"❌ PythonAPI 路径不存在: {carla_api_path}")
+        return None
+
+    return carla_api_path
+
+
+# 查找并设置 CARLA 路径
+carla_api_path = find_carla_path()
+if not carla_api_path:
+    sys.exit(1)
+
 if carla_api_path not in sys.path:
     sys.path.append(carla_api_path)
+    print(f"✅ CARLA 路径设置成功: {carla_api_path}")
 
 # -------------------------- 2. 全局变量 --------------------------
 HOST = "localhost"  # Carla 服务器 IP（本地默认 localhost）
@@ -229,4 +283,4 @@ def main():
 
 # -------------------------- 4. 运行主函数 --------------------------
 if __name__ == "__main__":
-    main()
+ main()
