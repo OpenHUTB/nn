@@ -114,7 +114,7 @@ def main():
 
             command = detector.get_command(gesture)
             if command != "none":
-                print(f"🎯 检测到手势: {gesture} -> 执行: {command}")
+                print(f"检测到手势: {gesture} -> 执行: {command}")
                 controller.send_command(command)
                 last_command_time = current_time
 
