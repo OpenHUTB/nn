@@ -1,0 +1,4 @@
+dt: 0.05                # 仿真步长
+render_mode: "human"    # 显示可视化窗口
+resolution: [1280, 960] # 窗口分辨率
+target_pos: [0.4, 0, 0.7] # 追踪目标位置（可选）

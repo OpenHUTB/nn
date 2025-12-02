@@ -1,6 +1,6 @@
 # 神经网络实现代理
 
-利用 神经网络/ROS 实现 Carla、AirSim、Mujoco 中人和载具的代理。
+利用神经网络/ROS 实现 Carla（车辆、行人的感知、规划、控制）、AirSim、Mujoco 中人和载具的代理。
 
 ## 环境配置
 
@@ -16,9 +16,9 @@
 
 ### 约定
 
-* 每个模块位于`src/{模块名}`目录下
-* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等
-* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行效果截图，README.md文档中提供运行环境和运行步骤的说明
+* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
+* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
+* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
 * 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
 
 
@@ -41,8 +41,8 @@ mkdocs serve
 
 ## 参考
 
-* [代理模拟器文档](https://openhutb.github.io/carla_doc/)
-* 已有相关 [无人车](https://openhutb.github.io/carla_doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://github.com/google-deepmind/mujoco/network/dependents) 实现
+* [代理模拟器文档](https://openhutb.github.io)
+* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
 
 

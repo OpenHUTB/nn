@@ -197,11 +197,11 @@ class GaussianMixtureModel:
                 
                 # 使用einsum高效计算协方差矩阵
                 # 等价于: new_sigma_k = (X_centered.T @ diag(gamma[:,k]) @ X_centered) / Nk[k]
-                new_sigma_k = np.einsum('ni,nj->ij', X_centered, weighted_X) / Nk[k]
-                
-                # 正则化：添加小的对角矩阵，防止协方差矩阵奇异
-                eps = 1e-6  # 正则化系数
-                new_sigma_k += np.eye(n_features) * eps  # 添加单位矩阵的eps倍
+                # 更稳定的协方差计算方式
+                new_sigma_k = np.einsum('ki,kj->ij', gamma[:, k, None] * X_centered, X_centered) / Nk[k]
+
+                # 统一正则化处理，确保协方差矩阵正定
+                new_sigma_k += np.eye(n_features) * 1e-6
                 
                 new_sigma[k] = new_sigma_k  # 存储更新后的协方差矩阵
 
@@ -261,12 +261,12 @@ class GaussianMixtureModel:
             # 重新计算调整后的协方差矩阵的行列式
             sign, logdet = np.linalg.slogdet(sigma)
 
-            # 计算协方差矩阵的逆
-            inv = np.linalg.inv(sigma)
+            # 使用solve方法计算逆矩阵，更稳定高效
+            inv = np.linalg.solve(sigma, np.eye(n_features))
             
             # 计算二次型：(x-μ)^T·Σ^(-1)·(x-μ)
             # 使用einsum高效计算多个样本的二次型
-            exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered)
+            exponent = -0.5 * np.sum(X_centered @ inv * X_centered, axis=1)
 
             # 返回对数概率密度
             # 公式：log_p(x) = -0.5*D*log(2π) - 0.5*log|Σ| - 0.5*(x-μ)^T·Σ^(-1)·(x-μ)
