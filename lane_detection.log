@@ -1,0 +1,3 @@
+2025-12-02 10:06:55,939 - LaneDetection - INFO - 增强版应用程序初始化完成
+2025-12-02 10:07:00,649 - LaneDetection - INFO - 图片加载成功: C:/Users/li/source/repos/nn/src/lane_identification/OIP-C.jpg
+2025-12-02 10:07:01,289 - LaneDetection - INFO - 检测完成: 直行, 置信度: 100.00%, 耗时: 0.58秒
