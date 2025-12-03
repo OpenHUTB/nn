@@ -2,8 +2,6 @@ import pyvista as pv
 import numpy as np
 import vtk
 
-
-
 # 生成更像人形的仿真机器人模型（优化比例+结构）
 def create_robot(return_parts=False):
     # 1. 躯干（更修长，接近人形）
