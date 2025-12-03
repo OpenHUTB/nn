@@ -422,23 +422,24 @@ class GlobalPlannerNode(Node):
 
         return None, None
 
+
     def _calculate_path_distance(self, route):
         """计算路径总长度"""
         if len(route) < 2:
             return 0.0
 
         total_distance = 0.0
-        for i in range(len(route) - 1):
-            current_wp = route[i][0]
-            next_wp = route[i + 1][0]
-
-            dx = next_wp.transform.location.x - current_wp.transform.location.x
-            dy = next_wp.transform.location.y - current_wp.transform.location.y
-            dz = next_wp.transform.location.z - current_wp.transform.location.z
-
+        # 1. 提前提取所有location，减少重复属性访问
+        locations = [item[0].transform.location for item in route]
+        # 2. 用zip成对遍历，简化循环
+        for curr_loc, next_loc in zip(locations[:-1], locations[1:]):
+            dx = next_loc.x - curr_loc.x
+            dy = next_loc.y - curr_loc.y
+            dz = next_loc.z - curr_loc.z
             total_distance += math.sqrt(dx * dx + dy * dy + dz * dz)
 
         return total_distance
+
 
     def _build_path_message(self, route):
         """构建ROS Path消息"""

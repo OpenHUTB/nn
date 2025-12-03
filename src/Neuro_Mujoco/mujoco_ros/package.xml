@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<package>
+  <name>mujoco_ros</name>
+  <version>0.0.0</version>
+  <description>ROS 1 Noetic 版本的 MuJoCo 封装包，含发布者、订阅者和启动文件</description>
+  <maintainer email="your_email@example.com">your_name</maintainer>
+  <license>MIT</license>
+
+  <!-- 编译依赖 -->
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <!-- 运行依赖（关键修改：将 exec_depend 改为 run_depend，适配 ROS 1 格式） -->
+  <run_depend>rospy</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>std_msgs</run_depend>
+
+  <!-- 导出配置 -->
+  <export>
+    <build_type>catkin</build_type>
+  </export>
+</package>
