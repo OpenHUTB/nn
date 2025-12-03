@@ -1,96 +1,185 @@
-# 生物模型交互任务--食指追踪小球
+# 生物模型交互与ROS 2集成项目
 
-- 一个基于 MuJoCo 的人体手臂和手部运动仿真项目，专注于食指指向功能。该项目集成了手部追踪与基于物理的仿真，以复现逼真的类人指向手势。
+## 项目概述
 
-## 概述
+本项目融合了基于MuJoCo的人体上肢物理仿真与ROS 2机器人操作系统，实现了兼具高精度食指追踪功能与分布式通信能力的综合仿真系统。项目核心包含两大部分：一是通过MediaPipe手部追踪驱动的食指指向仿真，二是基于ROS 2的关节数据发布与感知处理模块，可实现虚拟模型与外部系统的实时数据交互。
 
-- 本仓库包含人体上肢的物理仿真，专门设计用于模拟食指指向动作。仿真使用MuJoCo作为物理引擎，并并结合MediaPipe进行实时手部追踪，能够将现实世界的手部手势映射到虚拟化身的动作中。
+### 演示视频
 
-- **运行视频**
-
-https://private-user-images.githubusercontent.com/221759988/503032303-50f5a090-a7d4-49a9-b313-ae538ed95eb8.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjA5MjM4MTQsIm5iZiI6MTc2MDkyMzUxNCwicGF0aCI6Ii8yMjE3NTk5ODgvNTAzMDMyMzAzLTUwZjVhMDkwLWE3ZDQtNDlhOS1iMzEzLWFlNTM4ZWQ5NWViOC5tcDQ_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMDIwJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTAyMFQwMTI1MTRaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1kM2M5YThjMmIwZGFlNmFiYTMyNzJmZmU3ZmQwYjFjZTZhNGZlZjc0OTZiZDQ5MWYwZGQ0MzNlMWI0ZDM5MjVmJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.ydhE1SWUqfp2FgXnAgZIftV8ONJws_CA0JaZcnvhK44
-
+- **食指指向功能演示**：
+![ezgif-72b271013158aed5](https://github.com/user-attachments/assets/937c5994-4cfe-42ae-8f77-2eb0ebb1b41a)
 ## 主要特点
 
-- **高精度骨骼模型**：在原框架基础上扩展了手部骨骼细节，包含掌骨、指骨（近节/中节/远节）的完整结构
-- **增强型肌肉驱动**：新增食指相关肌肉群（如FDPI、EDM等）的肌腱路径定义，提升指向动作真实性
-- **实时手势映射**：集成MediaPipe手部追踪，可将真实手势实时映射到虚拟模型
+- **高精度骨骼模型**：包含上肢完整骨骼结构，细化手部掌骨、指骨（近节/中节/远节）的几何与物理参数
+- **增强型肌肉驱动**：新增食指相关肌肉群（FDPI、EDM等）的肌腱路径定义，提升指向动作真实性
+- **实时手势映射**：集成MediaPipe手部追踪，将真实手势实时映射到虚拟模型
 - **目标追踪功能**：支持配置目标坐标，实现食指自动指向指定位置
-- **兼容性设计**：保持与[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box)原项目的模型格式与仿真逻辑兼容
+- **ROS 2分布式通信**：通过ROS 2节点实现关节数据发布、感知数据处理与外部系统交互
+- **模块化设计**：保持与[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box)原项目的兼容性，同时扩展ROS 2接口
 
 ## 文件说明
+
 | 文件名 | 描述 |
 |--------|------|
-| **config.yaml**（仿真参数配置文件） | 包含仿真步长（dt）、渲染模式（render_mode）、窗口分辨率（resolution）及目标追踪位置（target_pos）等关键参数，可直接修改以调整仿真行为 |
-| **simulation.xml**（MuJoCo 模型定义文件） | 包含完整的上肢骨骼结构（锁骨、肱骨、尺骨、手部掌骨及指骨等）、肌肉与肌腱参数（如长度范围、增益参数）、标记点（用于肌肉附着与关键位置定位）及关节活动范围等核心物理仿真信息，是整个仿真的几何与物理基础 |
-| **evaluator.py**（程序入口脚本） | 通过命令行参数接收配置文件（--config）和模型文件（--model）路径，初始化仿真器并启动仿真循环，按 ESC 键可退出仿真 |
-| **simulator.py**（仿真器核心逻辑实现） | 包含 MuJoCo 环境初始化、Viewer（可视化窗口）适配（兼容不同版本 MuJoCo API）、仿真循环控制及手势映射等关键功能，是连接模型与交互逻辑的核心模块 |
-| **assets/**（模型资源文件夹） | 存放模型所需的网格文件（.stl）和纹理文件，用于定义骨骼、手部等组件的几何形状与外观，是 simulation.xml 中引用的可视化资源基础 |
+| **config.yaml** | 仿真参数配置文件，包含仿真步长（dt）、渲染模式、窗口分辨率及目标位置（target_pos）等 |
+| **simulation.xml** | MuJoCo模型定义文件，包含骨骼结构、肌肉肌腱参数、标记点及关节活动范围等核心信息 |
+| **evaluator.py** | 程序入口脚本，通过命令行参数接收配置文件和模型文件路径，初始化并启动仿真 |
+| **simulator.py** | 仿真器核心逻辑，包含MuJoCo环境初始化、Viewer适配、仿真循环控制及手势映射功能 |
+| **assets/** | 模型资源文件夹，存放网格文件（.stl）和纹理文件，定义骨骼与手部的几何形状 |
+| **mujoco_ros_demo/** | ROS 2功能包目录 |
+
 
 ## 模型结构
 
-仿真模型定义在simulation.xml中，包含以下核心组件：
-- **骨骼结构**：详细的上肢骨骼模型，包括锁骨、尺骨、手部掌骨及指骨（如 index0、index1 对应食指的不同节段），并通过网格文件（.stl）定义几何形状。
-- **标记点（sites）**：用于定位肌肉附着点和关键位置，如手指关节（FDPI-P3 至 FDPI-P9 对应食指相关点位）、肌肉路径点（BIClong-P1 至 BIClong-P11 对应肱二头肌长头）。
-- **肌腱与肌肉**：定义了主要肌肉的路径（如三角肌 TRI、肱二头肌 BIC、肱三头肌 TRI 等）及物理参数（长度范围、增益参数等），实现逼真的肌肉驱动效果。
-- **关节**：定义了各关节的活动范围和轴方向，如肘关节弯曲（elbow_flexion）的活动角度限制。
+仿真模型定义在`simulation.xml`中，核心组件包括：
+- **骨骼结构**：详细的上肢骨骼（锁骨、尺骨、掌骨及指骨等），通过网格文件定义几何形状
+- **标记点（sites）**：用于定位肌肉附着点和关键位置（如手指关节、肌肉路径点）
+- **肌腱与肌肉**：定义主要肌肉的路径（三角肌、肱二头肌等）及物理参数，实现逼真驱动
+- **关节**：定义各关节的活动范围和轴方向（如肘关节弯曲角度限制）
 
 ## 系统要求
 
-- ubuntu 22.04(humble)
-- Python 3.8+
-- MuJoCo 2.3.0+
+- Ubuntu 22.04 LTS (ROS 2 Humble)
+- Python 3.8+（3.10.18）
+- MuJoCo 2.3.0+（3.3.7）
 - OpenCV
 - MediaPipe
 - NumPy
 - PyYAML
+- Conda 环境管理器
 
-## 安装
+## 安装步骤
 
-1. **克隆本仓库**
-```python
+### 1. 克隆仓库
+
+```bash
 # 克隆主项目
 git clone https://github.com/yourusername/mobl-arms-index-pointing.git
 cd mobl-arms-index-pointing
 
-# 克隆 User-in-the-Box 核心依赖（如需要）
+# 克隆依赖项目（如需要）
 git clone https://github.com/User-in-the-Box/user-in-the-box.git
 ```
 
-2. **安装依赖**
+### 2. 安装ROS 2 Humble
 
-- 创建conda环境(本地虚拟环境名为*mjoco*)，根据需要的包(mujoco, mediapipe, numpy, pyyaml等)下载依赖
-- **推荐**：或者在[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box)原项目的[安装/设置](https://github.com/User-in-the-Box/user-in-the-box?tab=readme-ov-file#installation--setup)配置
-```python
-#需要先激活虚拟环境
+按照官方指南安装：https://docs.ros.org/en/humble/Installation.html
+
+### 3. 创建并配置环境
+
+```bash
+# 创建并激活conda环境
+conda create -n mjoco_ros python=3.10
+conda activate mjoco_ros
+
+# 安装核心依赖
+pip install mujoco mediapipe numpy opencv-python pyyaml
+
+# 安装ROS 2相关依赖（如需要）
+sudo apt install ros-humble-ros-base
+
+# 安装项目包
 pip install -e .
 ```
 
+### 4. 模型文件准备
+
+完整模型文件集（包含40+手部精细模型文件）可通过以下链接下载：
+[完整模型文件集网盘链接](https://pan.baidu.com/s/1SN5SWpyfKR7KYDbE8lzvBw?pwd=9e9u)
+
+下载后解压到 `mujoco_ros_demo/config/assets/` 目录
+
 ## 配置说明
 
-配置文件config.yaml用于设置仿真参数，与原项目格式保持一致,主要包含以下选项：
-```python
-dt: 0.05                # 仿真步长
-render_mode: "human"    # 显示可视化窗口（可选值："human" 显示窗口，"offscreen" 无窗口运行）
+### 仿真参数配置（config.yaml）
+
+```yaml
+dt: 0.05                # 仿真步长（越小精度越高，性能消耗越大）
+render_mode: "human"    # 渲染模式（"human"显示窗口，"offscreen"无窗口运行）
 resolution: [1280, 960] # 窗口分辨率 [宽度, 高度]
-target_pos: [0.4, 0, 0.7] # 追踪目标位置（可选，用于指定食指指向的目标坐标）
-``` 
-可根据需求修改上述参数，例如调整仿真精度（dt 越小精度越高但速度越慢）或窗口大小。
+target_pos: [0.4, 0, 0.7] # 食指追踪目标坐标
+```
 
-## 使用/运行
+### ROS 2功能包结构
 
-运行仿真程序：
-```python
+```
+mujoco_ros_demo/
+├── config/
+│   ├── assets/           # 3D模型文件(STL格式)
+│   └── humanoid.xml      # 机器人模型配置文件
+├── launch/
+│   └── main.launch.py    # ROS2启动文件
+├── mujoco_ros_demo/
+│   ├── __init__.py
+│   ├── mujoco_publisher.py   # 关节角度发布节点
+│   ├── data_subscriber.py    # 关节数据订阅节点
+│   ├── data_acquire.py       # 外部数据采集节点
+│   └── perception_node.py    # 感知处理节点
+├── package.xml           # ROS2包配置
+└── setup.py              # 安装配置
+```
+
+## 节点说明
+
+1. **MujocoPublisher** (mujoco_publisher.py)
+   - 功能：加载MuJoCo模型并发布关节角度数据
+   - 发布主题：/joint_angles (std_msgs/Float64MultiArray)
+   - 参数：model_path - 机器人模型文件路径
+
+2. **DataSubscriber** (data_subscriber.py)
+   - 功能：订阅关节角度数据并计算平均值
+   - 订阅主题：/joint_angles (std_msgs/Float64MultiArray)
+   - 输出：终端打印关节角度及平均值
+
+3. **DataAcquire** (data_acquire.py)
+   - 功能：采集外部传感器或设备数据（如手势追踪原始数据）
+   - 发布主题：/raw_sensor_data (自定义消息类型)
+   - 支持：MediaPipe原始数据、外部传感器输入等
+![ezgif-59ef5d64b961194d](https://github.com/user-attachments/assets/8baece71-eefd-40f8-8197-a92a7c6f9d02)
+4. **PerceptionNode** (perception_node.py)
+   - 功能：处理感知数据，实现手势识别与解析
+   - 订阅主题：/raw_sensor_data
+   - 发布主题：/processed_gesture (包含解析后的手势指令)
+![ezgif-40d1cc7854d18dd9](https://github.com/user-attachments/assets/3510e8f7-bf61-466b-9bae-2a55a86406e0)
+
+6. **Main** (main.launch.py)
+  - 功能：启动ROS 2系统并连接各个节点
+  - 启动节点：MujocoPublisher、DataSubscriber
+![ezgif-7dec2645d82e4788](https://github.com/user-attachments/assets/97475b38-4876-409b-b52d-ce0e535c520b)
+
+
+
+## 使用方法
+
+### 1. 基础仿真运行
+
+```bash
 python evaluator.py --config config.yaml --model simulation.xml
 ```
-启动后，程序将初始化仿真环境并进入循环，实时渲染手臂运动。按 ESC 键可退出仿真。
 
-## 扩展与定制
+### 2. ROS 2系统运行
 
-- 模型扩展：可通过修改 simulation.xml 调整骨骼结构、肌肉参数或添加新的标记点。
-- 手势追踪：如需自定义追踪逻辑，可修改仿真器核心代码（simulator.py）中的手势映射部分。
-- 目标设置：通过修改 config.yaml 中的 target_pos 可让食指指向不同的三维坐标。
+```bash
+# 构建项目
+colcon build
+source install/setup.bash
+
+# 启动ROS 2节点
+ros2 launch mujoco_ros_demo main.launch.py
+```
+
+### 3. 查看运行状态
+
+- 查看节点信息：`ros2 node list`
+- 查看话题信息：`ros2 topic list`
+- 可视化工具：`rqt`
 
 ## 项目来源/参考
 
-[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box)
+- [MuJoCo](https://github.com/deepmind/mujoco) - 高性能物理引擎
+- [ROS 2](https://github.com/ros2) - 机器人操作系统
+- [User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box) - 基础模型参考
+
+## 许可证
+
+本项目基于Apache-2.0许可证发布。
