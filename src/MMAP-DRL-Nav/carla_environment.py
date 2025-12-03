@@ -8,14 +8,18 @@ class CarlaEnvironment(gym.Env):
     def __init__(self):
         super(CarlaEnvironment, self).__init__()
         self.client = carla.Client('localhost', 2000)
+
         self.client.set_timeout(10.0)
         self.world = self.client.get_world()
         self.blueprint_library = self.world.get_blueprint_library()
         
+
         self.action_space = gym.spaces.Discrete(4)
         self.observation_space = gym.spaces.Box(low=0, high=255, shape=(128, 128, 3), dtype=np.uint8)
         
         self.vehicle = None
+
+
         self.camera = None
         
         # 新增：镜头跟随参数（仅用于初始化跳转）
@@ -23,6 +27,7 @@ class CarlaEnvironment(gym.Env):
         self.spectator_distance = -5.0
         self.spectator_pitch = -10
         
+
         # 新增：初始化时先清理所有残留actor
         self._clean_all_actors()
         
@@ -52,6 +57,7 @@ class CarlaEnvironment(gym.Env):
         # 第一步：先清理残留车辆（增强版）
         self._clean_all_actors()
 
+
         vehicle_bp = self.blueprint_library.filter('vehicle.*')[0]
         vehicle_bp.set_attribute('role_name', 'hero')
         
@@ -59,6 +65,7 @@ class CarlaEnvironment(gym.Env):
         if not spawn_points:
             spawn_point = carla.Transform(carla.Location(x=20, y=0, z=0.5))
         else:
+
             # 改动1：随机打乱spawn点，避免固定选前几个
             random.shuffle(spawn_points)
         
@@ -75,6 +82,7 @@ class CarlaEnvironment(gym.Env):
         # 最终检查：如果所有点都失败，抛出更友好的错误
         if self.vehicle is None:
             raise RuntimeError(f"尝试了{max_attempts}个spawn点仍无法生成车辆，请检查CARLA模拟器状态或手动清理地图")
+
         
         self.vehicle.set_autopilot(False)
         self.world.tick()
@@ -99,18 +107,24 @@ class CarlaEnvironment(gym.Env):
         spectator.set_transform(carla.Transform(camera_location, camera_rotation))
 
     def get_observation(self):
+
+
         if self.camera is None:
             camera_bp = self.blueprint_library.find('sensor.camera.rgb')
             camera_bp.set_attribute('image_size_x', '128')
             camera_bp.set_attribute('image_size_y', '128')
+
             camera_transform = carla.Transform(carla.Location(x=1.5, z=2.0))
             self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
+
         return np.random.randint(0, 256, size=(128, 128, 3), dtype=np.uint8)
 
     def step(self, action):
         if self.vehicle is None:
             raise RuntimeError("车辆未初始化，请先调用reset()")
         
+
+
         throttle = 0.0
         steer = 0.0
         if action == 0:
@@ -126,13 +140,21 @@ class CarlaEnvironment(gym.Env):
         
         self.vehicle.apply_control(carla.VehicleControl(throttle=throttle, steer=steer))
         self.world.tick()
+
+        # 已删除：step里的镜头跟随逻辑 → 后续车辆移动，镜头不再更新
+        # self.follow_vehicle()  # 这行已删掉
         
         next_state = self.get_observation()
         reward = 1.0
+
+
         done = False
         return next_state, reward, done, {}
 
     def close(self):
+
         # 改动3：关闭时调用全局清理，确保无残留
         self._clean_all_actors()
         print("环境已清理，所有actor已销毁")
+
+
