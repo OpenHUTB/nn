@@ -2,7 +2,10 @@ import torch
 import time
 import sys
 import math
+
 import carla
+
+
 from models.perception_module import PerceptionModule
 from models.attention_module import CrossDomainAttention
 from models.decision_module import DecisionModule
@@ -73,26 +76,28 @@ def run_simulation():
             raise RuntimeError("车辆生成失败，请检查CARLA是否正常运行")
         print(f"[车辆状态] 生成成功（ID: {env.vehicle.id}）")
 
-        # 镜头跟随
+
+        # 获取CARLA可视化镜头控制器
         spectator = env.world.get_spectator()
 
-        # 模型设备
+
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"\n[设备信息] 模型运行在 {device} 上")
         system = IntegratedSystem(device=device)
 
-        # 控制参数
-        max_forward_throttle = 0.5
-        max_backward_throttle = -0.3
-        max_steer = 0.6
-        last_steer = 0.0
-        steer_smooth_factor = 0.2
 
-        print("\n[仿真开始] 共运行100步...")
+        # 新增：转向平滑参数（减少晃动）
+        steer_buffer = []  # 存储最近3步转向值
+        smooth_window = 3  # 滑动平均窗口
+        last_steer = 0.0  # 上一步转向值
+        max_steer_delta = 0.03  # 转向最大变化量（限制高频波动）
+
+        print("\n[仿真开始] 共运行100步（车辆将明显移动）...")
+
         sys.stdout.flush()
+        for step in range(100):
+            # 获取摄像头观测
 
-        for step in range(200):
-            # 获取传感器数据SZ
             observation = env.get_observation()
             image = observation['image']
             lidar_distances = observation['lidar_distances']
@@ -104,48 +109,46 @@ def run_simulation():
                   f"左{obstacle_distances['left']:.1f}m | 右{obstacle_distances['right']:.1f}m")
             sys.stdout.flush()
 
-            # 避障策略
-            avoid_action = apply_urgent_avoidance(obstacle_distances)
-            if avoid_action is not None:
-                throttle, steer, brake = avoid_action
-                print(f"[策略执行] 油门={throttle:.2f}, 转向={steer:.2f}, 刹车={brake:.2f}")
-            else:
-                # 模型控制
-                image_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float().to(device) / 255.0
-                lidar_tensor = torch.from_numpy(lidar_distances).unsqueeze(0).unsqueeze(0).float().to(device)
-                imu_tensor = torch.from_numpy(imu_data).unsqueeze(0).float().to(device)
 
-                with torch.no_grad():
-                    policy, _ = system.forward(image_tensor, lidar_tensor, imu_tensor)
+            # 转换为模型输入格式
+            image = torch.from_numpy(observation.copy()).permute(2, 0, 1).unsqueeze(0).float().to(device) / 255.0
+            lidar_data = torch.randn(1, 256, 256).unsqueeze(0).to(device)
+            imu_data = torch.randn(1, 6).to(device)
 
-                throttle = float(policy[0][0].clamp(max_backward_throttle, max_forward_throttle))
-                raw_steer = float(policy[0][1].clamp(-max_steer, max_steer))
-                brake = 0.0
+            # 模型推理
+            policy, _ = system.forward(image, lidar_data, imu_data)
 
-                # 平滑转向
-                steer = last_steer * (1 - steer_smooth_factor) + raw_steer * steer_smooth_factor
-                last_steer = steer
 
-            # 执行控制
-            control = carla.VehicleControl(
-                throttle=throttle,
-                steer=steer,
-                brake=brake,
-                hand_brake=False
-            )
+            # 关键调整1：放大油门值（确保车辆明显移动，最低0.4）
+            raw_throttle = float(policy[0][0].clamp(-0.3, 0.8))  # 原始油门
+            throttle = max(0.4, min(1.0, raw_throttle * 5))  # 放大5倍，最低0.4
+
+            # 关键调整2：平滑转向（减少轮胎晃动）
+            raw_steer = float(policy[0][1].clamp(-0.5, 0.5))  # 原始转向
+            # 滑动平均+限制变化速率
+            steer_buffer.append(raw_steer)
+            if len(steer_buffer) > smooth_window:
+                steer_buffer.pop(0)
+            smooth_steer = sum(steer_buffer) / len(steer_buffer)  # 平均
+            # 限制与上一步的差值
+            delta = smooth_steer - last_steer
+            delta = max(-max_steer_delta, min(max_steer_delta, delta))
+            final_steer = last_steer + delta
+            final_steer = max(-1.0, min(1.0, final_steer))  # 最终限制
+            last_steer = final_steer  # 更新历史值
+
+
+            # 执行控制指令
+            control = carla.VehicleControl(throttle=throttle, steer=final_steer)
             env.vehicle.apply_control(control)
 
-            # 镜头跟随设置
-            vehicle_transform = env.vehicle.get_transform()
-            cam_loc = vehicle_transform.transform(carla.Location(x=-5.0, z=2.0))
-            dir_x = vehicle_transform.location.x - cam_loc.x
-            dir_y = vehicle_transform.location.y - cam_loc.y
-            yaw = math.atan2(dir_y, dir_x) * 180 / math.pi
-            spectator.set_transform(carla.Transform(cam_loc, carla.Rotation(pitch=-10, yaw=yaw)))
 
-            print(f"[步骤 {step+1}/00] 油门: {throttle:.2f} | 转向: {steer:.2f} | 刹车: {brake:.2f}")
+            # 打印详细控制参数
+
+            print(f"[步骤 {step+1}/100] 油门: {throttle:.2f} | 转向: {final_steer:.2f}")
+
             sys.stdout.flush()
-            time.sleep(0.1)
+            time.sleep(0.1)  # 控制仿真速度
 
         print("\n[仿真结束]")
         sys.stdout.flush()

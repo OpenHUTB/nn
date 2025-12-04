@@ -56,9 +56,12 @@ class CarlaEnvironment(gym.Env):
         """处理摄像头数据，转换为RGB格式"""
         try:
             array = np.frombuffer(image.raw_data, dtype=np.uint8)
-            array = np.reshape(array, (image.height, image.width, 4))  # (H,W,4)
+
+            array = np.reshape(array, (image.height, image.width, 4))
             array = array[:, :, :3]  # 移除alpha通道
-            array = array[:, :, ::-1].copy()  # BGR转RGB
+            array = array[:, :, ::-1]  # BGR转RGB
+            array = array.copy()  # 消除负步长
+
             if self.image_queue.full():
                 self.image_queue.get()
             self.image_queue.put(array)
@@ -107,25 +110,33 @@ class CarlaEnvironment(gym.Env):
         time.sleep(0.5)
         self._spawn_vehicle()
         if self.vehicle:
-            self._spawn_sensors()
+
+            self._spawn_camera()
+
         time.sleep(1.0)  # 等待传感器就绪
         return self.get_observation()
 
     def _spawn_vehicle(self):
-        """生成车辆（特斯拉Model3）"""
-        vehicle_bp = self.blueprint_library.find('vehicle.tesla.model3')
-        vehicle_bp.set_attribute('color', '255,0,0')  # 红色
-        vehicle_bp.set_attribute('role_name', 'ego_vehicle')
 
-        # 选择主路生成点（降低初始碰撞概率）
-        spawn_index = 10
+        # 选择稳定车型（特斯拉Model3）
+        vehicle_bp = self.blueprint_library.find('vehicle.tesla.model3')
+        vehicle_bp.set_attribute('color', '255,0,0')  # 红色，便于观察
+        vehicle_bp.set_attribute('role_name', 'drone')
+
+        # 关键调整：使用第10个生成点（通常在主路中央，避免障碍物）
+        spawn_index = 10  # 可根据场景调整（0~264）
         for i in range(3):
+            # 优先用指定生成点，失败则重试
             spawn_point = self.spawn_points[(spawn_index + i) % len(self.spawn_points)]
+            print(f"[车辆生成] 尝试在生成点 {spawn_index + i} 生成车辆（主路中央）...")
+            sys.stdout.flush()
             self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
             if self.vehicle:
                 self.vehicle.set_autopilot(False)
-                self.vehicle.set_simulate_physics(True)
-                print(f"[车辆生成] 成功（ID: {self.vehicle.id}）")
+                self.vehicle.set_simulate_physics(True)  # 强制启用物理引擎
+                print(f"[车辆生成] 成功（ID: {self.vehicle.id}）- 位置：主路中央")
+                sys.stdout.flush()
+
                 return
         raise RuntimeError("车辆生成失败，请重启CARLA或更换场景（如Town03）")
 
@@ -137,6 +148,10 @@ class CarlaEnvironment(gym.Env):
         camera_bp.set_attribute('image_size_y', '128')
         camera_bp.set_attribute('fov', '90')
         camera_bp.set_attribute('sensor_tick', '0.05')
+
+        # 摄像头位置：车辆前方1.5米，高度2.4米（驾驶员视角）
+        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
+
         self.camera = self.world.spawn_actor(
             camera_bp, carla.Transform(carla.Location(x=1.5, z=2.4)), attach_to=self.vehicle
         )

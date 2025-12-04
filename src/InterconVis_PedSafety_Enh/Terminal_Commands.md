@@ -3,7 +3,14 @@
 python cvips_generation.py --town <城镇名称> [--num_vehicles < 数量 >] [--num_pedestrians < 数量 >] [--weather < 天气类型 >] [--time_of_day < 时段 >] [--seed < 种子值 >]
 ```
 ## 参数说明
---town: (必填) CARLA 城镇地图名称 (例如: Town01, Town04)--num_vehicles: (可选) 生成车辆数量，默认值为 20--num_pedestrians:(可选) 生成行人数量，默认值为 100--weather: (可选) 天气类型，可选值: clear (晴天), rainy (雨天), cloudy (多云)，默认值为 clear--time_of_day: (可选) 时段，可选值: noon (中午), sunset (日落), night (夜晚)，默认值为 noon--seed: (可选) 随机种子，用于复现相同场景
+|参数名|类型|默认值|可选值|作用说明|
+|:---:|:---:|:---:|:---:|:---:|
+|--town|字符串|town01|town01,town04等|指定要加载的CARLA地图|
+|--num_vehicles|整数|20|>=0|要生成的自动驾驶车辆数量|
+|--num_pedestrians|整数|100|>=0|要生成的自主行走的行人数量|
+|--seed|整数|None|任意整数|随机种子，设置后可保证每次运行完全相同的场景，便于复现。|
+|--weather|字符串|clear|clear，rainy，cloudy|设置天气，rainy会有明显的降雨和地面反光效果|
+|--time_of_day|字符串|noon|noon，sunset，night|设置时间，night会切换到夜晚并开启月光|
 ## 一、基础场景命令 (核心参数覆盖)
 ### 1. Town01 + 晴天 + 中午 (默认配置)
 ```shell
