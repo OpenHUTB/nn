@@ -92,29 +92,47 @@ class KeyboardController:
         counter_lift = np.maximum(0.0, np.sin(phase + np.pi))
         direction = 1 if forward else -1
         
-        torso_pitch = 0.25 * direction
-        self._set_action(action, "abdomen_y", torso_pitch)
+        # 躯干控制
+        self._set_action(action, "abdomen_y", 0.25 * direction)
         self._set_action(action, "abdomen_x", 0.15 * turn_direction)
         
-        # 右腿
+        # 右腿（减小抬腿幅度，防止在无重力环境下飞得太高）
         self._set_action(action, "hip_x_right", 0.6 * direction * swing)
-        self._set_action(action, "hip_y_right", -0.4 * lift)
+        self._set_action(action, "hip_y_right", -0.15 * lift)
         self._set_action(action, "knee_right", 0.7 * (0.5 - 0.5 * np.cos(phase)))
-        self._set_action(action, "ankle_y_right", -0.3 * lift)
+        self._set_action(action, "ankle_y_right", -0.1 * lift)
         self._set_action(action, "ankle_x_right", 0.2 * swing)
         
         # 左腿（相位相反）
         self._set_action(action, "hip_x_left", -0.6 * direction * counter_swing)
-        self._set_action(action, "hip_y_left", -0.4 * counter_lift)
+        self._set_action(action, "hip_y_left", -0.15 * counter_lift)
         self._set_action(action, "knee_left", 0.7 * (0.5 - 0.5 * np.cos(phase + np.pi)))
-        self._set_action(action, "ankle_y_left", -0.3 * counter_lift)
+        self._set_action(action, "ankle_y_left", -0.1 * counter_lift)
         self._set_action(action, "ankle_x_left", -0.2 * counter_swing)
         
-        # 转向控制通过髋关节外展实现
+        # 转向控制
         if turn_direction != 0:
             turn_strength = 0.5 * turn_direction
             self._set_action(action, "hip_z_right", turn_strength)
             self._set_action(action, "hip_z_left", -turn_strength)
+        
+        return action
+    
+    def _create_turning_only_action(self, turn_direction):
+        """创建仅转向动作（不产生腿部摆动，只在原地转向）"""
+        action = np.zeros(self.action_dim)
+        
+        if not self.actuator_indices:
+            return action
+        
+        # 只设置转向相关的动作，不产生腿部摆动
+        # 转向控制通过髋关节外展实现
+        turn_strength = 0.3 * turn_direction  # 减小转向强度
+        self._set_action(action, "hip_z_right", turn_strength)
+        self._set_action(action, "hip_z_left", -turn_strength)
+        
+        # 可以添加轻微的躯干倾斜来辅助转向
+        self._set_action(action, "abdomen_x", 0.1 * turn_direction)
         
         return action
     
@@ -126,42 +144,25 @@ class KeyboardController:
             key_char = key if isinstance(key, str) and len(key) == 1 else None
         
         # 处理移动指令（切换模式：每次按键切换状态）
-        if (key_char and key_char == 'w') or key == '\x1b[A':
-            if self.move_forward:
-                self.move_forward = False
-                print("[键盘] 停止前进")
-            else:
-                self.move_forward = True
-                self.move_backward = False
-                print("[键盘] 前进")
-            return
-        elif (key_char and key_char == 's') or key == '\x1b[B':
-            if self.move_backward:
-                self.move_backward = False
-                print("[键盘] 停止后退")
-            else:
-                self.move_backward = True
-                self.move_forward = False
-                print("[键盘] 后退")
-            return
-        elif (key_char and key_char == 'a') or key == '\x1b[D':
-            if self.turn_left:
-                self.turn_left = False
-                print("[键盘] 停止左转")
-            else:
-                self.turn_left = True
-                self.turn_right = False
-                print("[键盘] 左转")
-            return
-        elif (key_char and key_char == 'd') or key == '\x1b[C':
-            if self.turn_right:
-                self.turn_right = False
-                print("[键盘] 停止右转")
-            else:
-                self.turn_right = True
-                self.turn_left = False
-                print("[键盘] 右转")
-            return
+        move_commands = {
+            ('w', '\x1b[A'): ('move_forward', 'move_backward', '前进', '停止前进'),
+            ('s', '\x1b[B'): ('move_backward', 'move_forward', '后退', '停止后退'),
+            ('a', '\x1b[D'): ('turn_left', 'turn_right', '左转', '停止左转'),
+            ('d', '\x1b[C'): ('turn_right', 'turn_left', '右转', '停止右转'),
+        }
+        
+        for (key1, key2), (attr, opposite_attr, start_msg, stop_msg) in move_commands.items():
+            if (key_char == key1) or (key == key2):
+                current_state = getattr(self, attr)
+                if current_state:
+                    setattr(self, attr, False)
+                    print(f"[键盘] {stop_msg}")
+                else:
+                    setattr(self, attr, True)
+                    if hasattr(self, opposite_attr):
+                        setattr(self, opposite_attr, False)
+                    print(f"[键盘] {start_msg}")
+                return
         
         if key == ' ':
             self.paused = not self.paused
@@ -210,8 +211,9 @@ class KeyboardController:
                 turn_dir = -1
             self.current_action = self._create_walking_action(forward=False, turn_direction=turn_dir)
         elif self.turn_left or self.turn_right:
+            # 只转向时，不产生腿部摆动，只在原地转向
             turn_dir = -1 if self.turn_left else 1
-            self.current_action = self._create_walking_action(forward=False, turn_direction=turn_dir)
+            self.current_action = self._create_turning_only_action(turn_dir)
         else:
             # 没有移动指令时，返回零动作或保持平衡的微小动作
             self.current_action = np.zeros(self.action_dim)
@@ -233,24 +235,30 @@ class KeyboardController:
 
 class GapCorridorEnvironment:
     """基于mujoco的带空隙走廊环境（使用自定义人形机器人模型）"""
-    def __init__(self, corridor_length=100, corridor_width=10, robot_xml_path=None):
+    def __init__(self, corridor_length=100, corridor_width=10, robot_xml_path=None, use_gravity=True):
         """
         Args:
             corridor_length: 走廊总长度
             corridor_width: 走廊宽度
             robot_xml_path: 自定义人形机器人XML文件路径
+            use_gravity: 是否启用重力（False 表示无重力）
         """
         self.corridor_length = corridor_length
         self.corridor_width = corridor_width
-        if robot_xml_path is None:
-            default_path = Path(__file__).resolve().parent / "model" / "humanoid" / "humanoid.xml"
-        else:
-            default_path = Path(robot_xml_path)
-        if not default_path.is_file():
-            raise FileNotFoundError(f"无法找到机器人XML文件: {default_path}")
-        self.robot_xml_path = default_path
+        self.use_gravity = use_gravity
+        # if robot_xml_path is None:
+        #     default_path = Path(__file__).resolve().parent / "model" / "humanoid" / "humanoid.xml"
+        # else:
+        #     default_path = Path(robot_xml_path)
+        # if not default_path.is_file():
+        #     raise FileNotFoundError(f"无法找到机器人XML文件: {default_path}")
+        # self.robot_xml_path = default_path
+        self.robot_xml_path = "humanoid.xml"
         xml_string = self._build_model()
         self.model = mujoco.MjModel.from_xml_string(xml_string)
+        # 保险起见，在模型创建后再次根据标志位设置重力（即使 XML 中已经设置）
+        if not self.use_gravity:
+            self.model.opt.gravity[:] = 0.0
         self.data = mujoco.MjData(self.model)
         self.timestep = self.model.opt.timestep
         self.control_timestep = 0.03
@@ -258,6 +266,16 @@ class GapCorridorEnvironment:
         self._max_episode_steps = 30 / self.control_timestep
         self.current_step = 0
         self._actuator_indices = self._build_actuator_indices()
+        
+        # 无重力模式：只固定Z高度，允许XY平移和姿态变化
+        if not self.use_gravity:
+            self._initial_z_height = None
+            self._root_joint_qpos_start = None
+            self._root_joint_qvel_start = None
+            self._root_body_id = None
+            self._max_xy_velocity = 2.0  # 最大XY速度 (m/s)
+            self._xy_damping = 0.995  # XY速度阻尼系数（减小阻尼，允许更大移动）
+            self._find_root_joint_indices()
 
     def _parse_robot_xml(self):
         """解析自定义机器人XML，提取需要的节点（身体、执行器、肌腱等）"""
@@ -265,7 +283,7 @@ class GapCorridorEnvironment:
         root = tree.getroot()
         
         robot_body = root.find("worldbody").find("body[@name='torso']")
-        robot_body.set("pos", "1.0 0.5 2")
+        robot_body.set("pos", "1.0 0.5 1.5")
         
         # 提取XML节点并转换为字符串
         single_nodes = ["actuator", "tendon", "contact", "asset", "visual", "keyframe", "statistic"]
@@ -283,11 +301,14 @@ class GapCorridorEnvironment:
         # 解析自定义机器人XML
         robot_parts = self._parse_robot_xml()
 
+        # 根据是否使用重力设置 gravity 参数
+        gravity_z = -9.81 if self.use_gravity else 0.0
+
         # 基础XML结构（走廊环境+机器人）
         xml = f"""
         <mujoco model="gap_corridor_with_custom_humanoid">
-            <!-- 物理参数（使用机器人XML中的timestep） -->
-            <option timestep="0.005" gravity="0 0 -9.81"/>
+            <!-- 物理参数 -->
+            <option timestep="0.005" gravity="0 0 {gravity_z}"/>
             
             <!-- 整合机器人的材质和可视化配置 -->
             {robot_parts['visual']}
@@ -363,12 +384,37 @@ class GapCorridorEnvironment:
     
     def get_actuator_indices(self):
         return self._actuator_indices.copy()
+    
+    def _find_root_joint_indices(self):
+        """找到根关节（freejoint）的位置和速度在qpos/qvel中的索引"""
+        try:
+            root_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "root")
+            if root_joint_id >= 0:
+                self._root_joint_qpos_start = self.model.jnt_qposadr[root_joint_id]
+                self._root_joint_qvel_start = self.model.jnt_dofadr[root_joint_id]
+                self._root_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "torso")
+                print(f"[无重力模式] 找到根关节: qpos={self._root_joint_qpos_start}, qvel={self._root_joint_qvel_start}")
+                return
+        except Exception as e:
+            print(f"[警告] 查找根关节时出错: {e}")
+        
+        # 使用默认值（通常freejoint是第一个关节）
+        self._root_joint_qpos_start = 0
+        self._root_joint_qvel_start = 0
+        self._root_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "torso") if self.model else None
+        print(f"[无重力模式] 使用默认根关节索引")
 
     def reset(self):
         """重置环境到初始状态"""
         self.current_step = 0
         mujoco.mj_resetData(self.model, self.data)
         mujoco.mj_forward(self.model, self.data)
+        
+        # 无重力模式：记录根关节的初始Z高度和姿态
+        if not self.use_gravity and self._root_joint_qpos_start is not None:
+            self._initial_z_height = float(self.data.qpos[self._root_joint_qpos_start + 2])
+            print(f"[无重力模式] 记录初始Z高度: {self._initial_z_height:.4f}，允许上身自由移动")
+        
         return self._get_observation()
 
     def _get_observation(self):
@@ -404,13 +450,82 @@ class GapCorridorEnvironment:
                 break
         return reward
 
+    def _apply_zero_gravity_constraints(self, action, before_step=True):
+        """应用无重力模式的约束：只固定Z高度，允许上身自由移动"""
+        if self.use_gravity or self._initial_z_height is None:
+            return
+        
+        pos_start = self._root_joint_qpos_start
+        vel_start = self._root_joint_qvel_start
+        
+        if pos_start is None or vel_start is None:
+            return
+        
+        if before_step:
+            # mj_step前：只固定Z位置，不干扰其他物理量
+            if (pos_start + 2) < len(self.data.qpos):
+                self.data.qpos[pos_start + 2] = self._initial_z_height
+            # 清零Z方向速度，防止飘起
+            if (vel_start + 2) < len(self.data.qvel):
+                self.data.qvel[vel_start + 2] = 0.0
+        else:
+            # mj_step后：固定Z位置，应用XY速度控制
+            if (pos_start + 2) < len(self.data.qpos):
+                self.data.qpos[pos_start + 2] = self._initial_z_height
+            if (vel_start + 2) < len(self.data.qvel):
+                self.data.qvel[vel_start + 2] = 0.0
+            
+            # XY速度控制（只在mj_step后）
+            if (vel_start + 2) <= len(self.data.qvel):
+                vx, vy = self.data.qvel[vel_start], self.data.qvel[vel_start + 1]
+                
+                # 检测是否有主动移动
+                has_motion = False
+                if self._actuator_indices:
+                    for name in ["hip_x_right", "hip_x_left"]:
+                        idx = self._actuator_indices.get(name)
+                        if idx is not None and abs(action[idx]) > 0.1:
+                            has_motion = True
+                            break
+                
+                # 只在有主动移动时才应用轻微阻尼，允许自然移动
+                if has_motion:
+                    # 有主动移动时，应用很小的阻尼，几乎不衰减
+                    vx *= self._xy_damping
+                    vy *= self._xy_damping
+                else:
+                    # 没有主动移动时，应用中等阻尼以逐渐停止
+                    damping = 0.90
+                    vx *= damping
+                    vy *= damping
+                
+                # 只限制最大速度，不干扰正常移动
+                speed = np.sqrt(vx * vx + vy * vy)
+                if speed > self._max_xy_velocity:
+                    scale = self._max_xy_velocity / speed
+                    vx *= scale
+                    vy *= scale
+                
+                self.data.qvel[vel_start] = vx
+                self.data.qvel[vel_start + 1] = vy
+    
     def step(self, action):
         """执行动作并推进环境"""
         self.current_step += 1
         self.data.ctrl[:] = np.clip(action, -1.0, 1.0)
         
         for _ in range(self.control_steps):
+            # mj_step前应用约束
+            self._apply_zero_gravity_constraints(action, before_step=True)
+            
             mujoco.mj_step(self.model, self.data)
+            
+            # mj_step后应用约束
+            self._apply_zero_gravity_constraints(action, before_step=False)
+            
+            # 更新物理状态
+            if not self.use_gravity:
+                mujoco.mj_forward(self.model, self.data)
         
         obs = self._get_observation()
         reward = self._get_reward()
@@ -431,7 +546,8 @@ class GapCorridorEnvironment:
 
 
 def main():
-    env = GapCorridorEnvironment(corridor_length=100, corridor_width=10)
+    # 将环境切换为“无重力”模式
+    env = GapCorridorEnvironment(corridor_length=100, corridor_width=10, use_gravity=False)
     
     print("\n环境已初始化")
     print(f"执行器数量: {env.model.nu}")
