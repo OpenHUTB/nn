@@ -2,34 +2,26 @@ import torch
 import time
 import sys
 import math
+import carla
 from models.perception_module import PerceptionModule
 from models.attention_module import CrossDomainAttention
 from models.decision_module import DecisionModule
 from _agent.carla_environment import CarlaEnvironment
-import carla
 
 print("="*60)
 print(f"[启动时间] {time.strftime('%Y-%m-%d %H:%M:%S')}")
 print(f"[Python解释器] {sys.executable}")
-print(f"[虚拟环境] {sys.prefix}")
 print("="*60)
 sys.stdout.flush()
 
 class IntegratedSystem:
     def __init__(self, device='cpu'):
-        print("\n[模型初始化] 开始加载感知、注意力和决策模块...")
-        sys.stdout.flush()
+        print("\n[模型初始化] 加载感知、注意力和决策模块...")
         self.device = device
-        try:
-            self.perception = PerceptionModule().to(self.device)
-            self.attention = CrossDomainAttention(num_blocks=6).to(self.device)
-            self.decision = DecisionModule().to(self.device)
-            print("[模型初始化] 所有模块加载完成")
-            sys.stdout.flush()
-        except Exception as e:
-            print(f"[模型初始化失败] {str(e)}")
-            sys.stdout.flush()
-            raise
+        self.perception = PerceptionModule().to(device)
+        self.attention = CrossDomainAttention(num_blocks=6).to(device)
+        self.decision = DecisionModule().to(device)
+        print("[模型初始化] 完成")
 
     def forward(self, image, lidar_data, imu_data):
         scene_info, segmentation, odometry, obstacles, boundary = self.perception(imu_data, image, lidar_data)
@@ -37,101 +29,125 @@ class IntegratedSystem:
         policy, value = self.decision(fused_features)
         return torch.mean(policy, dim=1), value
 
+def apply_urgent_avoidance(obstacle_distances):
+    """分级避障+逃生策略"""
+    # 1. 前方碰撞危险（≤1.5米）→ 紧急刹车
+    if obstacle_distances['front'] <= 1.5:
+        return (0.0, 0.0, 1.0)
+    
+    # 2. 侧方碰撞危险（≤1.2米）→ 微调避让
+    if obstacle_distances['left'] <= 1.2 or obstacle_distances['right'] <= 1.2:
+        if obstacle_distances['left'] > obstacle_distances['right']:
+            return (0.1, 0.3, 0.0)  # 左微调
+        else:
+            return (0.1, -0.3, 0.0)  # 右微调
+    
+    # 3. 前方近距离（≤3米）→ 转向绕开
+    if obstacle_distances['front'] <= 3.0:
+        if obstacle_distances['left'] > obstacle_distances['right']:
+            return (0.2, 0.4, 0.0)  # 左转向
+        else:
+            return (0.2, -0.4, 0.0)  # 右转向
+    
+    # 4. 后方过近（≤1.5米）→ 后退逃生
+    if obstacle_distances['rear'] <= 1.5:
+        if obstacle_distances['left'] > 2.0:
+            return (-0.2, 0.3, 0.0)  # 左转向+后退
+        elif obstacle_distances['right'] > 2.0:
+            return (-0.2, -0.3, 0.0)  # 右转向+后退
+        else:
+            return (-0.2, 0.0, 0.0)  # 直接后退
+    
+    return None  # 无紧急情况
+
 def run_simulation():
     env = None
     try:
-        print("\n[CARLA连接] 开始创建环境...")
-        sys.stdout.flush()
+        print("\n[CARLA连接] 创建环境...")
         env = CarlaEnvironment()
         
-        print("\n[环境重置] 开始生成车辆和传感器...")
-        sys.stdout.flush()
+        print("\n[环境重置] 生成车辆和传感器...")
         env.reset()
         
         if not env.vehicle or not env.vehicle.is_alive:
-            raise RuntimeError("车辆生成失败！请重启CARLA或更换场景（如Town03）")
+            raise RuntimeError("车辆生成失败，请检查CARLA是否正常运行")
         print(f"[车辆状态] 生成成功（ID: {env.vehicle.id}）")
-        sys.stdout.flush()
 
-        # 获取CARLA可视化镜头控制器
+        # 镜头跟随
         spectator = env.world.get_spectator()
 
+        # 模型设备
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"\n[设备信息] 模型运行在 {device} 上")
-        sys.stdout.flush()
         system = IntegratedSystem(device=device)
 
-        # 转向平滑参数
-        steer_buffer = []
-        smooth_window = 3
+        # 控制参数
+        max_forward_throttle = 0.5
+        max_backward_throttle = -0.3
+        max_steer = 0.6
         last_steer = 0.0
-        max_steer_delta = 0.03
+        steer_smooth_factor = 0.2
 
-        print("\n[仿真开始] 共运行100步（镜头固定正后方5m、上方2m，实时跟随）...")
+        print("\n[仿真开始] 共运行100步...")
         sys.stdout.flush()
-        for step in range(100):
-            # 获取摄像头观测
+
+        for step in range(200):
+            # 获取传感器数据SZ
             observation = env.get_observation()
-            if observation is None or observation.size == 0:
-                print(f"[警告] 第{step+1}步未获取到图像数据")
-                sys.stdout.flush()
+            image = observation['image']
+            lidar_distances = observation['lidar_distances']
+            imu_data = observation['imu']
 
-            # 转换为模型输入格式
-            image = torch.from_numpy(observation.copy()).permute(2, 0, 1).unsqueeze(0).float().to(device) / 255.0
-            lidar_data = torch.randn(1, 256, 256).unsqueeze(0).to(device)
-            imu_data = torch.randn(1, 6).to(device)
+            # 障碍物检测
+            obstacle_distances = env.get_obstacle_directions(lidar_distances)
+            print(f"\n[障碍物] 前{obstacle_distances['front']:.1f}m | 后{obstacle_distances['rear']:.1f}m | "
+                  f"左{obstacle_distances['left']:.1f}m | 右{obstacle_distances['right']:.1f}m")
+            sys.stdout.flush()
 
-            # 模型推理
-            policy, _ = system.forward(image, lidar_data, imu_data)
+            # 避障策略
+            avoid_action = apply_urgent_avoidance(obstacle_distances)
+            if avoid_action is not None:
+                throttle, steer, brake = avoid_action
+                print(f"[策略执行] 油门={throttle:.2f}, 转向={steer:.2f}, 刹车={brake:.2f}")
+            else:
+                # 模型控制
+                image_tensor = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float().to(device) / 255.0
+                lidar_tensor = torch.from_numpy(lidar_distances).unsqueeze(0).unsqueeze(0).float().to(device)
+                imu_tensor = torch.from_numpy(imu_data).unsqueeze(0).float().to(device)
 
-            # 放大油门
-            raw_throttle = float(policy[0][0].clamp(-0.3, 0.8))
-            throttle = max(0.4, min(1.0, raw_throttle * 5))
+                with torch.no_grad():
+                    policy, _ = system.forward(image_tensor, lidar_tensor, imu_tensor)
 
-            # 平滑转向
-            raw_steer = float(policy[0][1].clamp(-0.5, 0.5))
-            steer_buffer.append(raw_steer)
-            if len(steer_buffer) > smooth_window:
-                steer_buffer.pop(0)
-            smooth_steer = sum(steer_buffer) / len(steer_buffer)
-            delta = smooth_steer - last_steer
-            delta = max(-max_steer_delta, min(max_steer_delta, delta))
-            final_steer = last_steer + delta
-            final_steer = max(-1.0, min(1.0, final_steer))
-            last_steer = final_steer
+                throttle = float(policy[0][0].clamp(max_backward_throttle, max_forward_throttle))
+                raw_steer = float(policy[0][1].clamp(-max_steer, max_steer))
+                brake = 0.0
 
-            # 执行控制指令
-            control = carla.VehicleControl(throttle=throttle, steer=final_steer)
+                # 平滑转向
+                steer = last_steer * (1 - steer_smooth_factor) + raw_steer * steer_smooth_factor
+                last_steer = steer
+
+            # 执行控制
+            control = carla.VehicleControl(
+                throttle=throttle,
+                steer=steer,
+                brake=brake,
+                hand_brake=False
+            )
             env.vehicle.apply_control(control)
 
-            # ========== 修复API错误：手动计算镜头朝向（严格正后方+看向车辆） ==========
+            # 镜头跟随设置
             vehicle_transform = env.vehicle.get_transform()
-            # 1. 车辆局部坐标系转世界坐标系（严格正后方5m、上方2m）
-            local_cam_loc = carla.Location(x=-5.0, y=0.0, z=2.0)  # 车辆自身正后方
-            camera_location = vehicle_transform.transform(local_cam_loc)
-            
-            # 2. 手动计算镜头朝向（看向车辆）
-            # 计算镜头到车辆的方向向量
-            dir_x = vehicle_transform.location.x - camera_location.x
-            dir_y = vehicle_transform.location.y - camera_location.y
-            dir_z = vehicle_transform.location.z - camera_location.z
-            # 计算水平旋转角yaw（绕z轴）
+            cam_loc = vehicle_transform.transform(carla.Location(x=-5.0, z=2.0))
+            dir_x = vehicle_transform.location.x - cam_loc.x
+            dir_y = vehicle_transform.location.y - cam_loc.y
             yaw = math.atan2(dir_y, dir_x) * 180 / math.pi
-            # 计算俯仰角pitch（绕y轴，轻微俯视）
-            pitch = -10.0  # 固定俯视10度，确保看到车辆
-            # 构建旋转对象
-            camera_rotation = carla.Rotation(pitch=pitch, yaw=yaw, roll=0.0)
-            
-            # 3. 应用镜头设置
-            spectator.set_transform(carla.Transform(camera_location, camera_rotation))
-            # ======================================================================
+            spectator.set_transform(carla.Transform(cam_loc, carla.Rotation(pitch=-10, yaw=yaw)))
 
-            # 打印控制参数
-            print(f"[步骤 {step+1}/100] 油门: {throttle:.2f} | 转向: {final_steer:.2f}")
+            print(f"[步骤 {step+1}/00] 油门: {throttle:.2f} | 转向: {steer:.2f} | 刹车: {brake:.2f}")
             sys.stdout.flush()
             time.sleep(0.1)
 
-        print("\n[仿真结束] 已完成100步运行")
+        print("\n[仿真结束]")
         sys.stdout.flush()
 
     except Exception as e:
@@ -139,11 +155,9 @@ def run_simulation():
         sys.stdout.flush()
     finally:
         if env is not None:
-            print("\n[资源清理] 正在销毁车辆和传感器...")
-            sys.stdout.flush()
+            print("\n[资源清理] 销毁资源...")
             env.close()
-        print("\n[程序退出] 所有操作已完成")
-        sys.stdout.flush()
+        print("\n[程序退出]")
 
 if __name__ == "__main__":
     run_simulation()
