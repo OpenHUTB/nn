@@ -1,5 +1,5 @@
-<!-- 拟人化双腿双臂机器人模型（优化关节结构+双手下垂） -->
-<mujoco model="Humanoid_Robot">
+<!-- 拟人化双腿双臂机器人模型（添加墙壁障碍） -->
+<mujoco model="Humanoid_Robot_With_Wall">
   <!-- 仿真环境参数：优化积分器和步长，提升运动流畅度 -->
   <option timestep="0.008" gravity="0 0 -9.81" integrator="RK4" solver="CG" tolerance="1e-6"/>
 
@@ -16,6 +16,7 @@
     <material name="foot_green" rgba="0.3 0.7 0.3 1"/>    <!-- 脚部深绿色（增强抓地视觉） -->
     <material name="hand_brown" rgba="0.8 0.6 0.4 1"/>   <!-- 手部棕黄色（贴近肤色） -->
     <material name="head_skin" rgba="0.95 0.8 0.65 1"/>  <!-- 头部肤色 -->
+    <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>     <!-- 墙壁灰色材质 -->
   </asset>
 
   <!-- 世界实体 -->
@@ -23,6 +24,12 @@
     <!-- 地面：优化摩擦，适配机器人步态 -->
     <body name="ground">
       <geom type="plane" size="15 15 0.1" rgba="0.35 0.35 0.35 1" friction="1.8 0.15 0.15"/>
+    </body>
+
+    <!-- 墙壁障碍：位于机器人正前方3米处，高度2米，厚度0.1米 -->
+    <body name="wall" pos="3 0 1">
+      <geom type="box" size="0.1 2 1" material="wall_gray" friction="1.0 0.1 0.1"/>
+      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/> <!-- 固定墙壁，质量大防止被推动 -->
     </body>
 
     <!-- 机器人躯干（核心主体）：优化尺寸比例，更接近人体 -->
