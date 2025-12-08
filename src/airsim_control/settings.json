@@ -14,7 +14,7 @@
           "Enabled": true,
           "Range": 100,
           "NumberOfChannels": 16,
-          "PointsPerSecond": 50000,
+          "PointsPerSecond": 15000,
           "VerticalFOVUpper": 10,
           "VerticalFOVLower": -15,
           "HorizontalFOVStart": -90,
