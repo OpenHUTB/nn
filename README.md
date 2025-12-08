@@ -1,126 +1,48 @@
-# Lane Line Prediction with OpenPilot Supercombo Model
-基于 OpenPilot 的 supercombo 预训练模型实现视频车道线实时预测，通过 OpenCV 可视化车道线（左车道-蓝、右车道-红、预测路径-绿），适配 Ubuntu 虚拟机环境。
+# 神经网络实现代理
 
-## 📌 项目功能
-- 读取 HEVC 格式视频文件，提取帧并预处理为模型输入格式
-- 使用 supercombo 模型推理车道线坐标
-- 基于 OpenCV 实时可视化车道线（放大圆点，解决偏左问题）
-- 适配 Ubuntu 虚拟机环境，无 Matplotlib 渲染依赖
-- 完善的异常处理（文件不存在、帧数不足、模型加载失败等）
+利用神经网络/ROS 实现 Carla（车辆、行人的感知、规划、控制）、AirSim、Mujoco 中人和载具的代理。
 
-## 🛠️ 环境要求
-| 依赖项 | 版本要求 |
-|--------|----------|
-| Python | 3.8+ (测试环境：3.10) |
-| TensorFlow | 2.x |
-| OpenCV-Python | 4.5.5.62+ |
-| NumPy | 1.21+ |
-| Ubuntu | 20.04/22.04 (虚拟机/物理机) |
+## 环境配置
 
-## 🚀 快速开始
+* 平台：Windows 10/11，Ubuntu 20.04/22.04
+* 软件：Python 3.7-3.12（需支持3.7）、Pytorch（尽量不使用Tensorflow）
+* 相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
 
-### 1. 克隆仓库（可选）
-```bash
-git clone <你的GitHub仓库地址>
-cd <仓库名称>
+
+## 贡献指南
+
+准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
+代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
+
+### 约定
+
+* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
+* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
+* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
+* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
+
+
+### 文档生成
+
+测试生成的文档：
+1. 安装python 3.11，并使用以下命令安装`mkdocs`和相关依赖：
+```shell
+pip install mkdocs -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
+pip install -r requirements.txt
 ```
+（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
 
-### 2. 创建并激活虚拟环境
-```bash
-# 创建虚拟环境
-python3 -m venv venv
-
-# 激活虚拟环境
-source venv/bin/activate
+2. 在命令行中进入`nn`目录下，运行：
+```shell
+mkdocs build
+mkdocs serve
 ```
+然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
 
-### 3. 安装依赖
-```bash
-# 安装核心依赖
-pip install tensorflow opencv-python==4.5.5.62 numpy
+## 参考
 
-# 安装虚拟机显示依赖（可选，解决OpenCV窗口问题）
-sudo apt update && sudo apt install -y libgtk-3-dev libgl1-mesa-glx
-```
+* [代理模拟器文档](https://openhutb.github.io)
+* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
+* [神经网络原理](https://github.com/OpenHUTB/neuro)
 
-### 4. 准备模型和视频文件
-- 将 `supercombo.h5` 模型文件放入路径：`/home/dacun/桌面/openpilot-modeld-main/models/`
-- 将 HEVC 格式视频文件（如 `sample.hevc`）放入路径：`/home/dacun/nn/`
 
-### 5. 运行程序
-```bash
-# 进入脚本目录
-cd /home/dacun/nn/src/openpilot_model/
-
-# 直接运行（无需传参，路径已写死适配环境）
-python3 main.py
-```
-
-## 📝 使用说明
-1. 程序启动后会依次显示：
-   - `Loading model...`：模型加载中
-   - `Preprocessing frames...`：视频帧预处理中
-   - 视频画面 + 车道线可视化（蓝=左车道、红=右车道、绿=预测路径）
-2. 按 `Q` 键可退出程序（需先点击视频窗口激活）
-3. 终端会输出推理进度和异常信息（如某帧推理失败）
-
-## 🔍 核心逻辑
-### 1. 视频预处理
-- 将视频帧转换为 YUV420 格式，缩放至 512x384（模型输入尺寸）
-- 对帧进行归一化和张量转换，适配 supercombo 模型输入要求
-
-### 2. 模型推理
-- 使用连续 2 帧作为模型输入，推理得到车道线 x 坐标（共 192 个点）
-- 模型输出坐标映射到视频显示尺寸（800x600），并右移 100 像素解决偏左问题
-
-### 3. 可视化
-- 放大车道线圆点（8px），确保肉眼可见
-- 仅依赖 OpenCV 绘制，避免 Matplotlib 虚拟机渲染问题
-- 异常帧保底显示原始视频画面，不中断程序
-
-## 📸 效果展示
-> 请替换为你的实际运行截图（虚拟机截屏方法见下文）
-![Lane Line Prediction Demo](demo.png)
-- 左侧为原始视频帧，右侧为叠加车道线后的效果
-- 蓝色圆点：左车道线；红色圆点：右车道线；绿色圆点：预测行驶路径
-
-## ❌ 常见问题解决
-### 1. 窗口显示问号/乱码
-- 原因：Ubuntu 虚拟机缺少中文字体
-- 解决：程序已替换为全英文提示，无需额外配置
-
-### 2. 车道线偏左
-- 原因：模型输出坐标范围与视频显示尺寸不匹配
-- 解决：程序已默认将 x 坐标右移 100 像素，可修改 `+100` 调整偏移量
-
-### 3. OpenCV 窗口黑屏/无内容
-- 步骤1：启用虚拟机 3D 加速（设置 → 显示 → 勾选 3D 加速）
-- 步骤2：重装 OpenCV 依赖：
-  ```bash
-  pip uninstall -y opencv-python
-  pip install opencv-python==4.5.5.62
-  ```
-- 步骤3：验证视频文件完整性：`ffplay /home/dacun/nn/sample.hevc`
-
-### 4. 模型加载失败
-- 检查模型路径：`/home/dacun/桌面/openpilot-modeld-main/models/supercombo.h5`
-- 确保模型文件完整（未损坏、未截断）
-
-## 🖥️ 虚拟机截屏方法
-```bash
-# Ubuntu 虚拟机内部截屏
-# 全屏截图
-Print Screen
-
-# 区域截图
-Shift + Print Screen
-
-# 保存到剪贴板（当前窗口）
-Alt + Print Screen
-```
-
-## 📄 许可证
-本项目仅用于学习交流，supercombo 模型版权归 OpenPilot 官方所有。
-
-## 📧 联系作者
-如有问题，可提交 Issue 或联系：<你的邮箱/联系方式>
