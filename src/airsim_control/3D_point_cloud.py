@@ -159,6 +159,7 @@ try:
         if keyboard.is_pressed('e'): yaw_rate = YAW_SPEED
         if keyboard.is_pressed('esc'): break
 
+        # 发送控制指令
         client.moveByVelocityAsync(
             vx, vy, vz, 0.1,
             drivetrain=airsim.DrivetrainType.MaxDegreeOfFreedom,
@@ -169,6 +170,7 @@ try:
 except KeyboardInterrupt:
     pass
 finally:
+    # 保存最后残留的数据
     if points_buffer:
         with open(OUTPUT_FILE, "a") as f:
             for p in points_buffer:
