@@ -4,55 +4,77 @@ import queue
 import os
 import argparse
 import time
+import threading
 
 # ================= 配置区域 =================
-OUTPUT_FOLDER = "_out_cvips_data"
+# 输出文件夹名称
+OUTPUT_FOLDER = "_out_cvips_final"
 
-# 【重要】改成 True 开启保存。建议先跑一次 False 确认画面正常
+# 是否开启保存 (调试视角时可设为 False)
 ENABLE_SAVING = True 
 
-# 每隔几帧保存一次？(建议 10-20，太小会卡，太大错过细节)
-SAVE_INTERVAL = 10 
+# 采集间隔：每 15 帧保存一次 (平衡 1080P 的存储压力)
+SAVE_INTERVAL = 15  
 # ===========================================
 
+# 全局标志位，控制后台线程何时停止
+writing_thread_running = True
+
 def main():
-    argparser = argparse.ArgumentParser(description="CVIPS 数据采集脚本 V4")
+    argparser = argparse.ArgumentParser(description="CVIPS 最终版数据采集脚本")
     argparser.add_argument('--town', default='Town01', help='地图名称')
-    argparser.add_argument('--num_vehicles', default=20, type=int, help='背景车辆数')
-    argparser.add_argument('--num_walkers', default=30, type=int, help='行人数')
+    argparser.add_argument('--num_vehicles', default=25, type=int, help='背景车辆数')
+    argparser.add_argument('--num_walkers', default=40, type=int, help='行人数')
     args = argparser.parse_args()
 
-    # 创建目录
+    # 1. 创建保存目录
     if ENABLE_SAVING:
         os.makedirs(f"{OUTPUT_FOLDER}/ego_rgb", exist_ok=True)
         os.makedirs(f"{OUTPUT_FOLDER}/rsu_rgb", exist_ok=True)
-        print(f"📁 图片将保存在: {os.path.abspath(OUTPUT_FOLDER)}")
+        print(f"📁 数据保存路径: {os.path.abspath(OUTPUT_FOLDER)}")
 
-    client = carla.Client('localhost', 2000)
-    client.set_timeout(60.0)
-    
-    print(f"正在加载地图 {args.town} (可能需要几秒)...")
-    world = client.load_world(args.town)
-    
-    # 设置同步模式
+    # 2. 连接 CARLA (使用 127.0.0.1 避免 Windows 防火墙问题)
+    try:
+        client = carla.Client('127.0.0.1', 2000)
+        client.set_timeout(60.0)
+        print(f"正在加载地图 {args.town} ...")
+        world = client.load_world(args.town)
+    except RuntimeError as e:
+        print(f"❌ 连接失败: {e}")
+        print("请确保 CARLA 模拟器已启动！")
+        return
+
+    # 3. 设置高画质天气 (正午晴天)
+    world.set_weather(carla.WeatherParameters.ClearNoon)
+
+    # 4. 设置同步模式
     settings = world.get_settings()
     settings.synchronous_mode = True 
-    settings.fixed_delta_seconds = 0.05 
+    settings.fixed_delta_seconds = 0.05 # 固定 20 FPS
     world.apply_settings(settings)
 
     traffic_manager = client.get_trafficmanager(8000)
     traffic_manager.set_synchronous_mode(True)
 
-    # 这里的队列用于接收传感器数据
-    sensor_queue = queue.Queue()
+    # 5. 初始化队列和列表
+    sensor_queue = queue.Queue() # 接收原始数据
+    save_queue = queue.Queue()   # 后台保存队列
     actor_list = [] 
 
+    # 6. 启动后台保存线程
+    global writing_thread_running
+    writing_thread_running = True
+    save_thread = threading.Thread(target=save_worker, args=(save_queue,))
+    save_thread.start()
+    print("✅ 后台保存服务已启动")
+
     try:
-        # --- 1. 生成环境 ---
-        print("正在构建场景...")
+        # --- 生成环境 ---
+        print("正在构建交通场景...")
         blueprint_library = world.get_blueprint_library()
         spawn_points = world.get_map().get_spawn_points()
 
+        # 分离主车点和NPC点，防止碰撞
         ego_spawn_point = spawn_points[0]
         npc_spawn_points = spawn_points[1:]
 
@@ -73,7 +95,7 @@ def main():
                 w = world.try_spawn_actor(walker_bp, carla.Transform(loc))
                 if w: actor_list.append(w)
 
-        # --- 2. 主车 (Ego) ---
+        # --- 生成主车 (Ego) ---
         print("生成主车...")
         ego_bp = blueprint_library.find('vehicle.tesla.model3')
         ego_bp.set_attribute('role_name', 'hero')
@@ -81,23 +103,24 @@ def main():
         ego_vehicle.set_autopilot(True)
         actor_list.append(ego_vehicle)
 
-        # --- 3. RSU (路侧单元) ---
+        # --- 生成 RSU (路侧单元) ---
         rsu_loc = ego_spawn_point.location
-        rsu_loc.z += 8.0 
+        rsu_loc.z += 12.0 # 12米高空
         rsu_loc.x += 5.0
-        # 俯视 45 度
-        rsu_transform = carla.Transform(rsu_loc, carla.Rotation(pitch=-45, yaw=ego_spawn_point.rotation.yaw))
+        rsu_transform = carla.Transform(rsu_loc, carla.Rotation(pitch=-70, yaw=ego_spawn_point.rotation.yaw))
 
-        # --- 4. 传感器设置 (关键修改) ---
+        # --- 传感器设置 (1080P 高画质) ---
         camera_bp = blueprint_library.find('sensor.camera.rgb')
-        camera_bp.set_attribute('image_size_x', '800')
-        camera_bp.set_attribute('image_size_y', '600')
-        camera_bp.set_attribute('fov', '90') # 视野广一点
+        camera_bp.set_attribute('image_size_x', '1920')
+        camera_bp.set_attribute('image_size_y', '1080')
+        camera_bp.set_attribute('fov', '90')
+        # 优化画质属性
+        camera_bp.set_attribute('exposure_mode', 'histogram') 
+        camera_bp.set_attribute('motion_blur_intensity', '0.2')
 
-        # 【关键修改：微调主车相机位置】
-        # 之前的 x=1.5, z=2.4 可能在某些车型的车顶里。
-        # 改为 x=1.0 (靠后一点), z=2.0 (低一点)，通常在挡风玻璃内侧。
-        cam_transform = carla.Transform(carla.Location(x=1.0, z=2.0))
+        # 主车相机：第三人称 (车后6米，高3米)，防遮挡
+        cam_transform = carla.Transform(carla.Location(x=-6.0, z=3.0), carla.Rotation(pitch=-20))
+        
         ego_cam = world.spawn_actor(camera_bp, cam_transform, attach_to=ego_vehicle)
         actor_list.append(ego_cam)
         
@@ -108,86 +131,110 @@ def main():
         ego_cam.listen(lambda image: sensor_queue.put((image.frame, 'ego_rgb', image)))
         rsu_cam.listen(lambda image: sensor_queue.put((image.frame, 'rsu_rgb', image)))
 
-        print("\n🔥 正在预热仿真 (Warm Up) ... 等待 50 帧让画面稳定")
-        # --- 5. 热身阶段 (不保存数据) ---
+        print("\n🔥 正在预热 (Warm Up)... 请保持 CARLA 窗口在前台！")
         for _ in range(50):
             world.tick()
-            # 把产生的垃圾数据从队列里清空
             try:
+                # 清空预热期的垃圾数据
                 for _ in range(2): sensor_queue.get(timeout=1.0)
             except: pass
 
-        print("🚀 仿真正式开始！正在采集数据...")
+        print("🚀 采集开始！按 Ctrl+C 优雅退出...")
         
-        # --- 6. 正式循环 ---
         frame_number = 0
         spectator = world.get_spectator() 
 
         while True:
-            # 1. 推动世界一帧
+            # 1. 物理计算一帧
             world.tick()
             w_frame = world.get_snapshot().frame
             
-            # 2. 视角跟随 (保持 V3 的跟随逻辑)
-            ego_tf = ego_vehicle.get_transform()
-            ego_fv = ego_tf.get_forward_vector()
-            spectator_loc = ego_tf.location - (ego_fv * 6.0) + carla.Location(z=3.0)
-            spectator_rot = ego_tf.rotation
-            spectator_rot.pitch = -15.0
-            spectator.set_transform(carla.Transform(spectator_loc, spectator_rot))
+            # 2. 移动观众视角跟随主车 (方便你观察)
+            spectator.set_transform(ego_cam.get_transform())
 
-            # 3. 严格的数据获取逻辑
-            # 我们需要确保取出的 2 张图，确实属于当前的这一帧 w_frame
             try:
-                current_frame_data = {} # 用字典存：{'ego_rgb': img, 'rsu_rgb': img}
-                
-                # 尝试从队列取数据，直到把这一帧的两个相机都取到
-                # 设置超时防止死循环
+                # 3. 获取数据
+                current_frame_data = {}
                 timeout_counter = 0
+                # 尝试凑齐两个相机的数据
                 while len(current_frame_data) < 2 and timeout_counter < 10:
                     data = sensor_queue.get(timeout=1.0)
                     frame_id, s_type, img_obj = data
-                    
-                    # 只有当数据帧号 == 世界帧号，才算有效数据
-                    # (允许有 1 帧的误差，因为CARLA有时候会差1帧)
+                    # 允许 1 帧的误差
                     if abs(frame_id - w_frame) <= 1:
                         current_frame_data[s_type] = img_obj
-                    else:
-                        # 丢弃旧数据
-                        pass
                     timeout_counter += 1
 
-                # 4. 保存数据
+                # 4. 放入后台队列
                 if ENABLE_SAVING and (frame_number % SAVE_INTERVAL == 0):
-                    # 确保两个相机的数据都齐了才保存
                     if len(current_frame_data) == 2:
-                        print(f"💾 保存帧 [{w_frame}] | Ego & RSU OK", end='\r')
+                        print(f"Frame: {w_frame} | 待存队列: {save_queue.qsize()}", end='\r')
+                        save_queue.put(current_frame_data)
                         
-                        # 保存 Ego
-                        fname_ego = f"{OUTPUT_FOLDER}/ego_rgb/{w_frame:06d}.png"
-                        current_frame_data['ego_rgb'].save_to_disk(fname_ego)
-                        
-                        # 保存 RSU
-                        fname_rsu = f"{OUTPUT_FOLDER}/rsu_rgb/{w_frame:06d}.png"
-                        current_frame_data['rsu_rgb'].save_to_disk(fname_rsu)
-                    else:
-                        print(f"⚠️ 丢帧: 数据不完整", end='\r')
-
             except queue.Empty:
-                print("⚠️ 传感器数据超时")
                 continue
             
             frame_number += 1
 
     except KeyboardInterrupt:
-        print("\n🛑 用户停止")
+        print("\n🛑 用户请求停止")
+
     finally:
-        print("\n🧹 清理现场...")
-        settings.synchronous_mode = False
-        world.apply_settings(settings)
+        print("\n🧹 正在执行清理程序...")
+        
+        # 1. 停止后台线程
+        writing_thread_running = False
+        
+        # 2. 等待剩余照片保存完毕 (解决报错的关键)
+        if not save_queue.empty():
+            print(f"⏳ 正在保存剩余的 {save_queue.qsize()} 张照片，请不要关闭窗口...", end='', flush=True)
+            save_thread.join()
+            print(" 保存完毕！")
+        else:
+            save_thread.join()
+
+        # 3. 恢复 CARLA 设置 (防止下次启动变卡)
+        try:
+            if world:
+                settings = world.get_settings()
+                settings.synchronous_mode = False
+                settings.fixed_delta_seconds = None
+                world.apply_settings(settings)
+        except:
+            pass
+
+        # 4. 安全销毁所有对象
+        print("🗑️ 销毁车辆和传感器...")
         for actor in actor_list:
-            if actor.is_alive: actor.destroy()
-        print("✅ 完成。")
+            try:
+                if actor.is_alive:
+                    actor.destroy()
+            except:
+                pass # 忽略销毁时的错误
+                
+        print("✅ 全部完成，程序安全退出。")
+
+# --- 后台工作线程 ---
+def save_worker(q):
+    while writing_thread_running or not q.empty():
+        try:
+            data_dict = q.get(timeout=1.0) 
+            ego_img = data_dict['ego_rgb']
+            rsu_img = data_dict['rsu_rgb']
+            
+            # 保存 Ego
+            path_ego = f"{OUTPUT_FOLDER}/ego_rgb/{ego_img.frame:06d}.png"
+            ego_img.save_to_disk(path_ego)
+            
+            # 保存 RSU
+            path_rsu = f"{OUTPUT_FOLDER}/rsu_rgb/{rsu_img.frame:06d}.png"
+            rsu_img.save_to_disk(path_rsu)
+            
+            q.task_done()
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"保存错误: {e}")
 
 if __name__ == '__main__':
     main()
