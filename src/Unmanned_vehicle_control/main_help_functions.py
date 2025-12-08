@@ -41,6 +41,24 @@ def get_eight_trajectory(x_init, y_init, total_points=100):
     theta_ref.append(theta_ref[-1])
 
     return x_traj_rotated, y_traj_rotated, v_ref, theta_ref
+def get_circle_trajectory(x_center, y_center, radius=25, total_points=200):
+    """生成圆形轨迹"""
+    t_values = np.linspace(0, 2 * np.pi, total_points)
+    x_traj = x_center + radius * np.cos(t_values)
+    y_traj = y_center + radius * np.sin(t_values)
+
+    v_ref = [V_REF for _ in range(total_points)]
+
+    # 计算参考角度（切线方向）
+    theta_ref = []
+    for i in range(total_points - 1):
+        dx = x_traj[i + 1] - x_traj[i]
+        dy = y_traj[i + 1] - y_traj[i]
+        theta = np.arctan2(dy, dx)
+        theta_ref.append(theta)
+    theta_ref.append(theta_ref[-1])  # 最后一个点保持与前一个相同
+
+    return x_traj, y_traj, v_ref, theta_ref
 
 def get_ref_trajectory(x_traj, y_traj, theta_traj, current_idx):
     if current_idx + N < len(x_traj):
