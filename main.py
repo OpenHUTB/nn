@@ -38,14 +38,14 @@ def preprocess_frames(imgs):
             processed[i] = np.zeros((384, 512), dtype=np.uint8)
     return frames_to_tensor(processed)
 
-# -------------------------- 主函数（无参数、全英文、车道线优化） --------------------------
+# -------------------------- 主函数（v1.1优化版） --------------------------
 def main():
-    # 1. 初始化显示窗口（800x600，固定尺寸）
-    win_name = "Lane Line Prediction (Blue=Left | Red=Right | Green=Path)"
+    # 1. 初始化显示窗口（新增v1.1版本标识）
+    win_name = "Lane Line Prediction v1.1 (Blue=Left | Red=Right | Green=Path)"
     cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(win_name, 800, 600)
 
-    # 2. 读取视频（写死路径，无需传参）
+    # 2. 读取视频（固定路径）
     video_path = "/home/dacun/nn/sample.hevc"
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -56,17 +56,17 @@ def main():
         cv2.destroyAllWindows()
         return
 
-    # 读取前10帧（用于推理，保留原始帧和模型输入帧）
-    raw_display_frames = []  # 用于显示的800x600帧
-    model_input_imgs = []    # 用于模型的512x384 YUV帧
+    # 读取前10帧（分离显示帧和模型输入帧）
+    raw_display_frames = []
+    model_input_imgs = []
     for _ in range(10):
         ret, frame = cap.read()
         if not ret:
             break
-        # 缩放为显示尺寸（800x600）
+        # 缩放为显示尺寸
         display_frame = cv2.resize(frame, (800, 600))
         raw_display_frames.append(display_frame)
-        # 转换为模型需要的YUV格式并缩放
+        # 转换为模型所需YUV格式
         yuv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420)
         model_frame = cv2.resize(yuv_frame, (512, 384), cv2.INTER_AREA)
         model_input_imgs.append(model_frame)
@@ -81,16 +81,16 @@ def main():
         cv2.destroyAllWindows()
         return
 
-    # 3. 加载模型（显示英文提示，无乱码）
+    # 3. 加载模型（新增成功提示）
     load_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
     cv2.putText(load_frame, "Loading model...", (200, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
     cv2.imshow(win_name, load_frame)
-    cv2.waitKey(200)  # 刷新显示
+    cv2.waitKey(200)
 
-    # 模型路径（写死，无需修改）
     model_path = "/home/dacun/桌面/openpilot-modeld-main/models/supercombo.h5"
     try:
         supercombo_model = load_model(model_path, compile=False)
+        print("✅ Model loaded successfully (supercombo.h5)")  # 新增提示
     except Exception as e:
         empty_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
         cv2.putText(empty_frame, "Model load failed", (180, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
@@ -99,7 +99,7 @@ def main():
         cv2.destroyAllWindows()
         return
 
-    # 4. 预处理帧（显示英文提示）
+    # 4. 预处理帧
     preprocess_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
     cv2.putText(preprocess_frame, "Preprocessing frames...", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
     cv2.imshow(win_name, preprocess_frame)
@@ -118,57 +118,40 @@ def main():
     model_state = np.zeros((1, 512))
     model_desire = np.zeros((1, 8))
 
-    # 6. 逐帧推理+绘制（核心优化：车道线右移+放大圆点）
+    # 6. 逐帧推理+绘制（优化圆点大小：8→9/6→7）
     print("✅ Start inference and display (Press Q to exit)")
     for i in range(len(frame_tensors) - 1):
-        # 确保帧存在，避免索引越界
-        if i >= len(raw_display_frames):
-            current_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-        else:
-            current_frame = raw_display_frames[i].copy()  # 复制原始帧，避免修改
-
+        current_frame = raw_display_frames[i].copy() if i < len(raw_display_frames) else np.ones((600, 800, 3), dtype=np.uint8) * 255
         try:
-            # 模型推理（连续两帧作为输入）
             input_data = [np.vstack(frame_tensors[i:i+2])[None], model_desire, model_state]
             model_output = supercombo_model.predict(input_data, verbose=0)
             parsed_result = parser(model_output)
             model_state = model_output[-1]
 
-            # -------------------------- 车道线绘制优化 --------------------------
-            # 提取模型输出的车道线/路径x坐标
+            # 车道线坐标映射+右移+圆点优化
             left_lane_x = parsed_result["lll"][0]
             right_lane_x = parsed_result["rll"][0]
             path_x = parsed_result["path"][0]
-            
-            # 窗口尺寸
             win_h, win_w = 600, 800
-            # y坐标映射（0-191 → 0-599）
             y_points = np.linspace(0, win_h - 1, 192).astype(int)
-            # x坐标映射（0-512 → 0-799）+ 右移100像素（解决偏左问题）+ 放大圆点到8px
             left_x_mapped = (left_lane_x / 512 * win_w + 100).astype(int)
             right_x_mapped = (right_lane_x / 512 * win_w + 100).astype(int)
             path_x_mapped = (path_x / 512 * win_w + 100).astype(int)
 
-            # 绘制左车道线（蓝色，8px实心圆）
+            # 左车道（蓝，9px）、右车道（红，9px）、路径（绿，7px）
             for x, y in zip(left_x_mapped, y_points):
                 if 0 <= x < win_w and 0 <= y < win_h:
-                    cv2.circle(current_frame, (x, y), 8, (255, 0, 0), -1)
-            # 绘制右车道线（红色，8px实心圆）
+                    cv2.circle(current_frame, (x, y), 9, (255, 0, 0), -1)
             for x, y in zip(right_x_mapped, y_points):
                 if 0 <= x < win_w and 0 <= y < win_h:
-                    cv2.circle(current_frame, (x, y), 8, (0, 0, 255), -1)
-            # 绘制预测路径（绿色，6px实心圆）
+                    cv2.circle(current_frame, (x, y), 9, (0, 0, 255), -1)
             for x, y in zip(path_x_mapped, y_points):
                 if 0 <= x < win_w and 0 <= y < win_h:
-                    cv2.circle(current_frame, (x, y), 6, (0, 255, 0), -1)
-
+                    cv2.circle(current_frame, (x, y), 7, (0, 255, 0), -1)
         except Exception as e:
-            # 推理失败时仅打印错误，仍显示原始帧
             print(f"⚠️ Frame {i+1} inference error: {str(e)[:30]}")
 
-        # 强制显示当前帧
         cv2.imshow(win_name, current_frame)
-        # 按Q退出
         if cv2.waitKey(100) & 0xFF == ord('q'):
             print("🛑 Exit by user (Q pressed)")
             break
@@ -179,4 +162,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# 重新提交PR：车道线预测核心代码
