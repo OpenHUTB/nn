@@ -4,7 +4,11 @@
 
 目标检测模块：
 
-数据集与数据集的标注为images和labels
+数据集与数据集的标注为images和labels：
+
+我用夸克网盘给你分享了「labels」，点击链接或复制整段内容，打开「夸克APP」即可获取。
+/~647038y3D7~:/
+链接：https://pan.quark.cn/s/bedc07168289
 
 yolov_bricksdetect中的test数据以及模型在该链接：
 
