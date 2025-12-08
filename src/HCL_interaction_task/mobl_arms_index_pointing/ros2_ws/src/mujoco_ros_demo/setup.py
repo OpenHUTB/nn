@@ -35,6 +35,7 @@ setup(
             'mujoco_pub = mujoco_ros_demo.mujoco_publisher:main',
             'data_sub = mujoco_ros_demo.data_subscriber:main',
             'data_acquire = mujoco_ros_demo.data_acquire:main',
+            'perception_node = mujoco_ros_demo.perception_node:main',
         ],
     },
 )

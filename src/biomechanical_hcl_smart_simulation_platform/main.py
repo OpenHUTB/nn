@@ -1,125 +1,92 @@
-#!/usr/bin/env python3
-"""
-Main entry (render-capable) for MOBL pointing demo.
-
-"""
-
-import os
-import sys
 import argparse
-import shutil
-import subprocess
+from pathlib import Path
 
-def run_window(episodes: int, steps: int) -> None:
-    # 不要设置 MUJOCO_GL=egl；用默认的窗口渲染
-    from uitb import Simulator
-    sim = Simulator.get("simulators/mobl_arms_index_pointing")
-    for ep in range(episodes):
-        obs, info = sim.reset()
-        total = 0.0
-        for t in range(steps):
-            # 尝试弹窗渲染；如果环境不支持会抛错
-            try:
-                sim.render()
-            except Exception as e:
-                print("render warn:", e)
-                raise
-            obs, r, term, trunc, info = sim.step(sim.action_space.sample())
-            total += float(r)
-            if term or trunc:
-                break
-        print(f"[window] episode {ep+1}/{episodes} reward={total:.3f}")
-    sim.close()
-    print("DONE (window) ✅")
+from uitb import Simulator
 
-def run_record(outfile: str, episodes: int, steps: int, fps: int) -> None:
-    # 用 Gymnasium 的 rgb_array 离屏渲染，并通过 ffmpeg 写 mp4
-    os.environ.setdefault("MUJOCO_GL", "egl")
-    if shutil.which("ffmpeg") is None:
-        print("未找到 ffmpeg：请先安装 `sudo apt install -y ffmpeg`")
-        sys.exit(1)
-    try:
-        import gymnasium as gym
-    except Exception as e:
-        print("未安装 gymnasium，请先安装：pip install gymnasium")
-        print("错误：", e)
-        sys.exit(1)
 
-    env_id = "uitb:mobl_arms_index_pointing-v0"
-    try:
-        env = gym.make(env_id, render_mode="rgb_array")
-    except TypeError:
-        # 某些版本不接受 render_mode 关键字，退回默认创建
-        env = gym.make(env_id)
-    obs, info = env.reset()
+def make_simulator(task_name: str):
+    """
+    根据任务名称返回对应的 simulator 环境。
 
-    # 先拿一帧确定分辨率
-    frame = env.render()
-    h, w = frame.shape[0], frame.shape[1]
+    task_name: "pointing"、"tracking" 或 "choice_reaction"
+    """
+    project_root = Path(__file__).resolve().parent
 
-    ffmpeg_cmd = [
-        "ffmpeg", "-y",
-        "-f", "rawvideo", "-vcodec", "rawvideo",
-        "-pix_fmt", "rgb24",
-        "-s", f"{w}x{h}",
-        "-r", str(fps),
-        "-i", "-",
-        "-an", "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        outfile,
-    ]
-    os.makedirs(os.path.dirname(outfile), exist_ok=True)
-    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+    if task_name == "pointing":
+        sim_dir = project_root / "simulators" / "mobl_arms_index_pointing"
+    elif task_name == "tracking":
+        sim_dir = project_root / "simulators" / "mobl_arms_index_tracking"
+    elif task_name == "choice_reaction":
+        # 🔹 新增 Choice Reaction 任务入口
+        sim_dir = project_root / "simulators" / "mobl_arms_index_choice_reaction"
+    else:
+        raise ValueError(f"Unknown task: {task_name}")
 
-    import numpy as np  # 只为确保 tobytes 可用；若没装 numpy，uitb 依赖里一般会带
-    for ep in range(episodes):
+    # README 里说明：Simulator.get(simulator_folder) 会返回一个 gym 风格的环境
+    # 可以直接调用 reset / step / render 等方法。
+    simulator = Simulator.get(str(sim_dir))
+    return simulator
+
+
+def run_episodes(env, num_episodes: int, max_steps: int):
+    """
+    用随机动作跑若干个 episode，主要是演示 env 的使用。
+    """
+    for ep in range(num_episodes):
         obs, info = env.reset()
-        total = 0.0
-        for t in range(steps):
-            frame = env.render()
-            if not isinstance(frame, np.ndarray):
-                frame = np.asarray(frame)
-            proc.stdin.write(frame.tobytes())
-            obs, r, term, trunc, info = env.step(env.action_space.sample())
-            total += float(r)
-            if term or trunc:
-                break
-        print(f"[record] episode {ep+1}/{episodes} reward={total:.3f}")
+        done = False
+        step = 0
+        episode_reward = 0.0
 
-    proc.stdin.close()
-    proc.wait()
-    env.close()
-    print(f"DONE (record) → {outfile} ✅")
+        print(f"\n=== Episode {ep + 1}/{num_episodes} ===")
+
+        while not done and step < max_steps:
+            # 这里先用随机策略，作业如果需要你可以换成自己的策略
+            action = env.action_space.sample()
+
+            # gymnasium 接口：obs, reward, terminated, truncated, info
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
+            episode_reward += reward
+            step += 1
+
+            # 如果你想看实时画面（而不是只出视频），可以打开这一行：
+            # env.render()
+
+        print(f"Episode reward: {episode_reward:.3f} (steps: {step})")
+
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--mode", choices=["window", "record", "auto"], default="record",
-                   help="window=弹窗渲染; record=离屏录制MP4; auto=先window失败则record")
-    p.add_argument("--out", default="assets/demo.mp4", help="record 模式输出 mp4 路径")
-    p.add_argument("--episodes", type=int, default=1)
-    p.add_argument("--steps", type=int, default=300)
-    p.add_argument("--fps", type=int, default=20)
-    args = p.parse_args()
+    parser = argparse.ArgumentParser(
+        description="User-in-the-Box demo for Pointing, Tracking & Choice Reaction"
+    )
+    parser.add_argument(
+        "--task",
+        # 🔹 在命令行参数里加入 choice_reaction 选项
+        choices=["pointing", "tracking", "choice_reaction"],
+        default="pointing",
+        help="选择要运行的任务：pointing / tracking / choice_reaction",
+    )
+    parser.add_argument(
+        "--num_episodes",
+        type=int,
+        default=1,
+        help="要运行的 episode 数",
+    )
+    parser.add_argument(
+        "--max_steps",
+        type=int,
+        default=200,
+        help="每个 episode 最多运行多少步（防止无限循环）",
+    )
+    args = parser.parse_args()
 
-    # 依赖提示
+    env = make_simulator(args.task)
     try:
-        import uitb  # noqa
-    except Exception as e:
-        print("未检测到 uitb（user-in-the-box）。请按 README 安装依赖后再运行。")
-        print("原始错误：", e)
-        sys.exit(1)
+        run_episodes(env, args.num_episodes, args.max_steps)
+    finally:
+        env.close()
 
-    if args.mode == "window":
-        run_window(args.episodes, args.steps)
-    elif args.mode == "record":
-        run_record(args.out, args.episodes, args.steps, args.fps)
-    else:  # auto
-        try:
-            run_window(args.episodes, args.steps)
-        except Exception:
-            print("窗口渲染失败，自动切换到 record(EGL) 模式……")
-            run_record(args.out, args.episodes, args.steps, args.fps)
 
 if __name__ == "__main__":
     main()
