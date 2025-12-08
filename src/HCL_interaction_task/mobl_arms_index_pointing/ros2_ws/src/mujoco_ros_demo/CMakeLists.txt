@@ -29,10 +29,14 @@ ament_target_dependencies(mujoco_publisher_cpp
   rclcpp std_msgs Eigen3 ament_index_cpp)
 target_link_libraries(mujoco_publisher_cpp mujoco)  # 链接MuJoCo库
 
+# data_subscriber_cpp（基础数据订阅节点）
+add_executable(data_subscriber_cpp mujoco_demo_cpp/data_subscriber.cpp)
+ament_target_dependencies(data_subscriber_cpp rclcpp std_msgs)
 
 # 安装C++节点
 install(TARGETS
   mujoco_publisher_cpp
+  data_subscriber_cpp
   DESTINATION lib/${PROJECT_NAME}
 )
 
