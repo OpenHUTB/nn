@@ -339,6 +339,24 @@ class KeyboardController:
         
         return action
     
+    def _create_turning_only_action(self, turn_direction):
+        """创建仅转向动作（不产生腿部摆动，只在原地转向）"""
+        action = np.zeros(self.action_dim)
+        
+        if not self.actuator_indices:
+            return action
+        
+        # 只设置转向相关的动作，不产生腿部摆动
+        # 转向控制通过髋关节外展实现
+        turn_strength = 0.3 * turn_direction  # 减小转向强度
+        self._set_action(action, "hip_z_right", turn_strength)
+        self._set_action(action, "hip_z_left", -turn_strength)
+        
+        # 可以添加轻微的躯干倾斜来辅助转向
+        self._set_action(action, "abdomen_x", 0.1 * turn_direction)
+        
+        return action
+    
     def _process_key(self, key):
         """处理按键输入"""
         if isinstance(key, str) and key.startswith('\x1b['):
