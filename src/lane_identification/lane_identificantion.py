@@ -9,18 +9,6 @@ import time
 import json
 from dataclasses import dataclass
 from typing import Optional, Tuple, List, Dict, Any
-import logging
-
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("lane_detection.log"),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("LaneDetection")
 
 @dataclass
 class DetectionConfig:
@@ -49,10 +37,14 @@ class DetectionConfig:
     blur_kernel_size: int = 5
     
     # 新算法参数
-    roi_top_ratio: float = 0.4  # ROI顶部位置
-    roi_bottom_ratio: float = 0.9  # ROI底部位置
-    lane_width_ratio: float = 0.3  # 车道宽度比例
-    min_contour_area_ratio: float = 0.02  # 最小轮廓面积比例
+    roi_top_ratio: float = 0.4
+    roi_bottom_ratio: float = 0.9
+    lane_width_ratio: float = 0.3
+    min_contour_area_ratio: float = 0.02
+    
+    # 路径预测参数
+    prediction_steps: int = 5  # 预测步数
+    prediction_distance: float = 0.7  # 预测距离（相对于图像高度）
 
 class EnhancedImageProcessor:
     """增强图像处理器"""
@@ -98,42 +90,14 @@ class EnhancedImageProcessor:
     
     def remove_shadows_and_glare(self, image: np.ndarray) -> np.ndarray:
         """去除阴影和反光"""
-        # 使用同态滤波增强细节
-        def homomorphic_filter(img):
-            # 转换到对数域
-            img_log = np.log1p(np.float32(img))
-            
-            # 傅里叶变换
-            img_fft = np.fft.fft2(img_log)
-            
-            # 创建高斯高通滤波器
-            rows, cols = img.shape[:2]
-            crow, ccol = rows // 2, cols // 2
-            d0 = 30
-            gaussian_high = 1 - np.exp(-((np.arange(rows)[:, None] - crow)**2 + (np.arange(cols) - ccol)**2) / (2 * d0**2))
-            
-            # 应用滤波器
-            img_fft_filtered = img_fft * gaussian_high
-            
-            # 逆傅里叶变换
-            img_filtered = np.fft.ifft2(img_fft_filtered)
-            img_filtered = np.exp(np.real(img_filtered)) - 1
-            
-            # 归一化
-            img_filtered = cv2.normalize(img_filtered, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-            return img_filtered
-        
-        # 对每个通道分别处理
-        if len(image.shape) == 3:
-            b, g, r = cv2.split(image)
-            b_filtered = homomorphic_filter(b)
-            g_filtered = homomorphic_filter(g)
-            r_filtered = homomorphic_filter(r)
-            result = cv2.merge([b_filtered, g_filtered, r_filtered])
-        else:
-            result = homomorphic_filter(image)
-        
-        return result
+        rgb_planes = cv2.split(image)
+        result_planes = []
+        for plane in rgb_planes:
+            dilated_img = cv2.dilate(plane, np.ones((7,7), np.uint8))
+            bg_img = cv2.medianBlur(dilated_img, 21)
+            diff_img = 255 - cv2.absdiff(plane, bg_img)
+            result_planes.append(diff_img)
+        return cv2.merge(result_planes)
     
     def extract_roi(self, image: np.ndarray) -> np.ndarray:
         """提取感兴趣区域"""
@@ -235,7 +199,7 @@ class EnhancedRoadDetector:
             return {'mask': fused_mask, 'contour': None, 'roi_vertices': roi_vertices}
             
         except Exception as e:
-            logger.error(f"道路区域检测失败: {str(e)}")
+            print(f"道路区域检测失败: {str(e)}")
             return {'mask': None, 'contour': None, 'roi_vertices': None}
     
     def _detect_by_hsv(self, image: np.ndarray) -> Dict[str, Any]:
@@ -401,17 +365,22 @@ class EnhancedRoadDetector:
             center_line = self._calculate_center_line(left_lane, right_lane, height) \
                 if left_lane and right_lane else None
             
+            # 预测未来路径
+            future_path = self._predict_future_path(left_lane, right_lane, center_line, height) \
+                if left_lane and right_lane else None
+            
             return {
                 "left_lines": left_segments,
                 "right_lines": right_segments,
                 "left_lane": left_lane,
                 "right_lane": right_lane,
                 "center_line": center_line,
+                "future_path": future_path,
                 "num_lines": len(lines)
             }
             
         except Exception as e:
-            logger.error(f"车道线检测失败: {str(e)}")
+            print(f"车道线检测失败: {str(e)}")
             return {"left_lines": [], "right_lines": [], "center_line": None}
     
     def _classify_lanes_enhanced(self, lines: np.ndarray, image_width: int) -> Tuple[List, List]:
@@ -557,6 +526,61 @@ class EnhancedRoadDetector:
             }
         except:
             return None
+    
+    def _predict_future_path(self, left_lane: Dict, right_lane: Dict, center_line: Dict, image_height: int) -> Dict:
+        """预测未来路径"""
+        if not left_lane or not right_lane:
+            return None
+        
+        try:
+            # 获取车道线函数
+            left_func = left_lane['func']
+            right_func = right_lane['func']
+            center_func = center_line['func'] if center_line else None
+            
+            if not center_func:
+                # 如果没有中心线，计算一个
+                def center_func(y):
+                    return (left_func(y) + right_func(y)) / 2
+            
+            # 确定预测范围
+            current_y = image_height  # 当前位置（图像底部）
+            prediction_end_y = int(image_height * (1 - self.config.prediction_distance))
+            
+            # 生成预测点
+            y_values = np.linspace(current_y, prediction_end_y, self.config.prediction_steps)
+            
+            # 预测中心线路径
+            path_points = []
+            for y in y_values:
+                x = center_func(y)
+                if 0 <= x < image_height * 2:  # 合理的x范围
+                    path_points.append((int(x), int(y)))
+            
+            # 预测左右边界
+            left_boundary = []
+            right_boundary = []
+            
+            for y in y_values:
+                left_x = left_func(y)
+                right_x = right_func(y)
+                
+                if 0 <= left_x < image_height * 2:
+                    left_boundary.append((int(left_x), int(y)))
+                if 0 <= right_x < image_height * 2:
+                    right_boundary.append((int(right_x), int(y)))
+            
+            return {
+                'center_path': path_points,
+                'left_boundary': left_boundary,
+                'right_boundary': right_boundary,
+                'prediction_distance': self.config.prediction_distance,
+                'num_points': len(path_points)
+            }
+            
+        except Exception as e:
+            print(f"路径预测失败: {str(e)}")
+            return None
 
 class EnhancedDirectionAnalyzer:
     """增强方向分析器"""
@@ -580,14 +604,12 @@ class EnhancedDirectionAnalyzer:
         # 2. 基于车道线的方向分析
         lane_direction, lane_confidence = self._analyze_from_lanes(lane_info, image_size)
         
-        # 3. 基于消失点的方向分析
-        vanishing_direction, vanishing_confidence = self._analyze_vanishing_point(
-            lane_info, image_size
-        )
+        # 3. 基于路径预测的方向分析
+        path_direction, path_confidence = self._analyze_from_path(lane_info, image_size)
         
         # 4. 综合判断
-        directions = [contour_direction, lane_direction, vanishing_direction]
-        confidences = [contour_confidence, lane_confidence, vanishing_confidence]
+        directions = [contour_direction, lane_direction, path_direction]
+        confidences = [contour_confidence, lane_confidence, path_confidence]
         
         # 加权投票
         final_direction, final_confidence = self._weighted_vote(directions, confidences)
@@ -603,7 +625,7 @@ class EnhancedDirectionAnalyzer:
                 'confidence': smoothed_confidence,
                 'contour_direction': contour_direction,
                 'lane_direction': lane_direction,
-                'vanishing_direction': vanishing_direction,
+                'path_direction': path_direction,
                 'raw_confidences': confidences
             }
         else:
@@ -612,7 +634,7 @@ class EnhancedDirectionAnalyzer:
                 'confidence': final_confidence,
                 'contour_direction': contour_direction,
                 'lane_direction': lane_direction,
-                'vanishing_direction': vanishing_direction,
+                'path_direction': path_direction,
                 'raw_confidences': confidences
             }
     
@@ -665,7 +687,7 @@ class EnhancedDirectionAnalyzer:
                     return shape_direction, shape_confidence * 0.8
             
         except Exception as e:
-            logger.error(f"轮廓分析失败: {str(e)}")
+            print(f"轮廓分析失败: {str(e)}")
             return "未知方向", 0.0
     
     def _analyze_contour_shape(self, contour_points: np.ndarray, height: int, width: int) -> Tuple[str, float]:
@@ -766,72 +788,50 @@ class EnhancedDirectionAnalyzer:
             return direction, confidence
             
         except Exception as e:
-            logger.error(f"车道线分析失败: {str(e)}")
+            print(f"车道线分析失败: {str(e)}")
             return "未知方向", 0.0
     
-    def _analyze_vanishing_point(self, lane_info: Dict[str, Any], image_size: Tuple[int, int]) -> Tuple[str, float]:
-        """基于消失点分析方向"""
+    def _analyze_from_path(self, lane_info: Dict[str, Any], image_size: Tuple[int, int]) -> Tuple[str, float]:
+        """基于路径预测分析方向"""
         width, height = image_size
         
-        left_lines = lane_info.get('left_lines', [])
-        right_lines = lane_info.get('right_lines', [])
-        
-        if len(left_lines) < 2 or len(right_lines) < 2:
+        if not lane_info.get('future_path'):
             return "未知方向", 0.0
         
+        future_path = lane_info['future_path']
+        
         try:
-            # 收集所有线段的端点
-            all_left_points = []
-            all_right_points = []
+            if not future_path.get('center_path') or len(future_path['center_path']) < 2:
+                return "未知方向", 0.0
             
-            for seg in left_lines:
-                all_left_points.extend(seg['points'])
+            # 获取路径点
+            path_points = future_path['center_path']
             
-            for seg in right_lines:
-                all_right_points.extend(seg['points'])
-            
-            # 拟合左右车道线的延长线
-            if len(all_left_points) >= 2 and len(all_right_points) >= 2:
-                # 提取坐标
-                left_x = [p[0] for p in all_left_points]
-                left_y = [p[1] for p in all_left_points]
-                right_x = [p[0] for p in all_right_points]
-                right_y = [p[1] for p in all_right_points]
+            # 分析路径方向
+            if len(path_points) >= 2:
+                # 计算起点和终点
+                start_point = path_points[0]  # 当前位置
+                end_point = path_points[-1]   # 预测终点
                 
-                # 线性拟合
-                left_coeffs = np.polyfit(left_y, left_x, 1)
-                right_coeffs = np.polyfit(right_y, right_x, 1)
+                # 计算方向变化
+                start_x, start_y = start_point
+                end_x, end_y = end_point
                 
-                # 计算消失点（两条线的交点）
-                # 解方程：a1*y + b1 = a2*y + b2
-                a1, b1 = left_coeffs[0], left_coeffs[1]
-                a2, b2 = right_coeffs[0], right_coeffs[1]
+                # 计算水平偏移
+                horizontal_shift = end_x - start_x
                 
-                if a1 != a2:
-                    vp_y = (b2 - b1) / (a1 - a2)
-                    vp_x = a1 * vp_y + b1
-                    
-                    # 判断消失点位置
-                    if vp_y < 0:  # 消失点在图像上方
-                        if vp_x < width * 0.4:
-                            return "左转", 0.8
-                        elif vp_x > width * 0.6:
-                            return "右转", 0.8
-                        else:
-                            return "直行", 0.7
-                    else:
-                        # 消失点在图像内，根据位置判断
-                        if vp_x < width * 0.4:
-                            return "左转", 0.6
-                        elif vp_x > width * 0.6:
-                            return "右转", 0.6
-                        else:
-                            return "直行", 0.5
+                # 根据偏移判断方向
+                if abs(horizontal_shift) < width * 0.05:
+                    return "直行", 0.7
+                elif horizontal_shift > 0:
+                    return "右转", min(0.8, abs(horizontal_shift) / (width * 0.2))
+                else:
+                    return "左转", min(0.8, abs(horizontal_shift) / (width * 0.2))
             
             return "未知方向", 0.0
             
         except Exception as e:
-            logger.error(f"消失点分析失败: {str(e)}")
+            print(f"路径分析失败: {str(e)}")
             return "未知方向", 0.0
     
     def _weighted_vote(self, directions: List[str], confidences: List[float]) -> Tuple[str, float]:
@@ -909,10 +909,10 @@ class EnhancedVisualizationEngine:
             'left_lane': (255, 0, 0),   # 蓝色 - 左车道线
             'right_lane': (0, 0, 255),  # 红色 - 右车道线
             'center_line': (255, 255, 0), # 青色 - 中心线
+            'future_path': (255, 0, 255), # 紫色 - 未来路径
             'direction': (0, 0, 255),   # 红色 - 方向指示
             'roi': (0, 255, 255),       # 黄色 - ROI区域
             'text': (255, 255, 255),    # 白色 - 文本
-            'vanishing_point': (255, 0, 255) # 紫色 - 消失点
         }
     
     def draw_detection_results(self, image: np.ndarray, road_info: Dict[str, Any], 
@@ -932,9 +932,9 @@ class EnhancedVisualizationEngine:
         # 绘制车道线
         self._draw_enhanced_lane_lines(result, lane_info)
         
-        # 绘制消失点
-        if 'vanishing_point' in lane_info:
-            self._draw_vanishing_point(result, lane_info['vanishing_point'])
+        # 绘制未来路径
+        if lane_info.get('future_path'):
+            self._draw_future_path(result, lane_info['future_path'])
         
         # 添加增强的信息文本
         self._draw_enhanced_info_text(result, direction_info, height, width)
@@ -982,49 +982,66 @@ class EnhancedVisualizationEngine:
                 cv2.line(image, tuple(points[0]), tuple(points[1]), 
                         self.colors['center_line'], 3, cv2.LINE_AA)
     
-    def _draw_vanishing_point(self, image: np.ndarray, vanishing_point: Tuple[float, float]):
-        """绘制消失点"""
-        vp_x, vp_y = vanishing_point
-        if 0 <= vp_x < image.shape[1] and 0 <= vp_y < image.shape[0]:
-            cv2.circle(image, (int(vp_x), int(vp_y)), 10, self.colors['vanishing_point'], -1)
-            cv2.circle(image, (int(vp_x), int(vp_y)), 12, self.colors['text'], 2)
+    def _draw_future_path(self, image: np.ndarray, future_path: Dict[str, Any]):
+        """绘制未来路径"""
+        # 绘制中心路径
+        center_path = future_path.get('center_path', [])
+        if len(center_path) >= 2:
+            # 将点转换为整数坐标
+            points = np.array(center_path, np.int32)
+            
+            # 绘制路径线（使用抗锯齿）
+            for i in range(len(points) - 1):
+                cv2.line(image, tuple(points[i]), tuple(points[i + 1]), 
+                        self.colors['future_path'], 4, cv2.LINE_AA)
+            
+            # 绘制路径点
+            for point in points:
+                cv2.circle(image, tuple(point), 4, self.colors['future_path'], -1)
+        
+        # 绘制路径边界（可选）
+        left_boundary = future_path.get('left_boundary', [])
+        right_boundary = future_path.get('right_boundary', [])
+        
+        if left_boundary and len(left_boundary) >= 2:
+            left_points = np.array(left_boundary, np.int32)
+            for i in range(len(left_points) - 1):
+                cv2.line(image, tuple(left_points[i]), tuple(left_points[i + 1]), 
+                        (255, 150, 255), 2, cv2.LINE_AA)
+        
+        if right_boundary and len(right_boundary) >= 2:
+            right_points = np.array(right_boundary, np.int32)
+            for i in range(len(right_points) - 1):
+                cv2.line(image, tuple(right_points[i]), tuple(right_points[i + 1]), 
+                        (255, 150, 255), 2, cv2.LINE_AA)
     
     def _draw_enhanced_info_text(self, image: np.ndarray, direction_info: Dict[str, Any], height: int, width: int):
         """绘制增强的信息文本"""
         direction = direction_info.get('direction', '未知方向')
         confidence = direction_info.get('confidence', 0.0)
         
-        # 背景框
-        bg_color = (0, 0, 0)
-        text_color = self.colors['text']
-        
         # 主方向信息
         direction_text = f"方向: {direction}"
         confidence_text = f"置信度: {confidence:.2%}"
         
-        # 详细信息
-        details_texts = []
-        for key in ['contour_direction', 'lane_direction', 'vanishing_direction']:
-            if key in direction_info and direction_info[key] != "未知方向":
-                details_texts.append(f"{key.split('_')[0]}: {direction_info[key]}")
+        # 路径预测信息
+        prediction_text = "路径预测: 已启用"
         
         # 绘制主信息
         font_scale_large = 0.9
         font_scale_small = 0.6
         
         cv2.putText(image, direction_text, (10, 30), 
-                   cv2.FONT_HERSHEY_SIMPLEX, font_scale_large, text_color, 2)
+                   cv2.FONT_HERSHEY_SIMPLEX, font_scale_large, self.colors['text'], 2)
         
         # 根据置信度设置颜色
         conf_color = (0, 255, 0) if confidence > 0.7 else (0, 165, 255) if confidence > 0.5 else (0, 0, 255)
         cv2.putText(image, confidence_text, (10, 65), 
                    cv2.FONT_HERSHEY_SIMPLEX, font_scale_small, conf_color, 2)
         
-        # 绘制详细信息
-        y_offset = 90
-        for i, detail_text in enumerate(details_texts):
-            cv2.putText(image, detail_text, (10, y_offset + i * 25), 
-                       cv2.FONT_HERSHEY_SIMPLEX, font_scale_small, text_color, 1)
+        # 绘制路径预测信息
+        cv2.putText(image, prediction_text, (10, 95), 
+                   cv2.FONT_HERSHEY_SIMPLEX, font_scale_small, (255, 255, 255), 1)
     
     def _draw_enhanced_direction_indicator(self, image: np.ndarray, direction: str, 
                                           confidence: float, width: int, height: int):
@@ -1078,7 +1095,7 @@ class EnhancedLaneDetectionApp:
         # 创建UI
         self._create_enhanced_ui()
         
-        logger.info("增强版应用程序初始化完成")
+        print("增强版应用程序初始化完成")
     
     def _create_enhanced_ui(self):
         """创建增强的用户界面"""
@@ -1125,6 +1142,12 @@ class EnhancedLaneDetectionApp:
         ttk.Scale(param_frame, from_=0.1, to=1.0, variable=self.sensitivity_var,
                  command=self._on_sensitivity_change, orient=tk.HORIZONTAL, length=200).grid(row=0, column=1, sticky=(tk.W, tk.E))
         
+        # 路径预测参数
+        ttk.Label(param_frame, text="预测距离:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
+        self.prediction_var = tk.DoubleVar(value=self.config.prediction_distance)
+        ttk.Scale(param_frame, from_=0.3, to=0.9, variable=self.prediction_var,
+                 command=self._on_prediction_change, orient=tk.HORIZONTAL, length=200).grid(row=1, column=1, sticky=(tk.W, tk.E), pady=(5, 0))
+        
         # 结果显示
         self.result_var = tk.StringVar(value="等待检测...")
         self.confidence_var = tk.StringVar(value="")
@@ -1139,7 +1162,6 @@ class EnhancedLaneDetectionApp:
     
     def _create_image_display(self, parent):
         """创建图像显示区域"""
-        # 这部分与之前版本相同，保持不变
         display_frame = ttk.Frame(parent)
         display_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=10)
         display_frame.columnconfigure(0, weight=1)
@@ -1163,7 +1185,7 @@ class EnhancedLaneDetectionApp:
         self.original_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # 结果图显示
-        result_frame = ttk.LabelFrame(display_frame, text="检测结果", padding="10")
+        result_frame = ttk.LabelFrame(display_frame, text="检测结果（含路径预测）", padding="10")
         result_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(10, 0))
         result_frame.columnconfigure(0, weight=1)
         result_frame.rowconfigure(0, weight=1)
@@ -1229,11 +1251,11 @@ class EnhancedLaneDetectionApp:
             self._display_image_on_canvas(self.original_image, self.original_canvas, "原始图像")
             
             self.status_var.set("图片加载成功")
-            logger.info(f"图片加载成功: {file_path}")
+            print(f"图片加载成功: {file_path}")
             
         except Exception as e:
             messagebox.showerror("错误", f"无法加载图片: {str(e)}")
-            logger.error(f"图片加载失败: {str(e)}")
+            print(f"图片加载失败: {str(e)}")
     
     def _display_image_on_canvas(self, image: np.ndarray, canvas: tk.Canvas, title: str):
         """在Canvas上显示图像"""
@@ -1256,7 +1278,7 @@ class EnhancedLaneDetectionApp:
             canvas.config(scrollregion=canvas.bbox(tk.ALL))
             
         except Exception as e:
-            logger.error(f"图像显示失败: {str(e)}")
+            print(f"图像显示失败: {str(e)}")
             canvas.create_text(300, 250, text=f"{title}显示失败", font=("Arial", 16), fill="red")
     
     def _start_detection(self):
@@ -1305,7 +1327,7 @@ class EnhancedLaneDetectionApp:
             self.root.after(0, self._update_enhanced_results, direction_info, result_image, processing_time)
             
         except Exception as e:
-            logger.error(f"检测过程出错: {str(e)}")
+            print(f"检测过程出错: {str(e)}")
             self.root.after(0, self._show_error, f"检测失败: {str(e)}")
     
     def _update_enhanced_results(self, direction_info: Dict[str, Any], result_image: np.ndarray, processing_time: float):
@@ -1323,19 +1345,9 @@ class EnhancedLaneDetectionApp:
         self.result_var.set(f"检测结果: {direction}")
         self.confidence_var.set(f" (置信度: {confidence:.2%})")
         
-        # 根据置信度设置文本颜色
-        if confidence > 0.7:
-            color = "green"
-        elif confidence > 0.5:
-            color = "orange"
-        else:
-            color = "red"
-        
-        self.confidence_var.set(f" (置信度: {confidence:.2%})")
-        
         self.status_var.set(f"分析完成 - 耗时: {processing_time:.2f}秒")
         
-        logger.info(f"检测完成: {direction}, 置信度: {confidence:.2%}, 耗时: {processing_time:.2f}秒")
+        print(f"检测完成: {direction}, 置信度: {confidence:.2%}, 耗时: {processing_time:.2f}秒")
     
     def _show_error(self, error_msg: str):
         """显示错误信息"""
@@ -1345,7 +1357,7 @@ class EnhancedLaneDetectionApp:
         self.status_var.set("检测失败")
         self.result_var.set("检测失败")
         self.confidence_var.set("")
-        logger.error(f"检测错误: {error_msg}")
+        print(f"检测错误: {error_msg}")
     
     def _redetect(self):
         """重新检测"""
@@ -1358,7 +1370,17 @@ class EnhancedLaneDetectionApp:
         # 根据敏感度调整配置参数
         self.config.width_ratio_threshold = 0.3 + sensitivity * 0.4
         self.config.center_deviation_threshold = 0.1 + sensitivity * 0.1
-        logger.info(f"敏感度调整为: {sensitivity:.2f}")
+        print(f"敏感度调整为: {sensitivity:.2f}")
+        
+        # 如果已有图像，自动重新检测
+        if self.current_image_path and not self.is_processing:
+            self._start_detection()
+    
+    def _on_prediction_change(self, value):
+        """预测距离变化回调"""
+        prediction_distance = float(value)
+        self.config.prediction_distance = prediction_distance
+        print(f"预测距离调整为: {prediction_distance:.2f}")
         
         # 如果已有图像，自动重新检测
         if self.current_image_path and not self.is_processing:
@@ -1369,7 +1391,7 @@ class EnhancedLaneDetectionApp:
         try:
             self.root.mainloop()
         except Exception as e:
-            logger.error(f"应用程序运行错误: {str(e)}")
+            print(f"应用程序运行错误: {str(e)}")
 
 def main():
     """主函数"""
@@ -1378,7 +1400,7 @@ def main():
         app = EnhancedLaneDetectionApp(root)
         app.run()
     except Exception as e:
-        logger.critical(f"应用程序启动失败: {str(e)}")
+        print(f"应用程序启动失败: {str(e)}")
         messagebox.showerror("致命错误", f"应用程序启动失败: {str(e)}")
 
 if __name__ == "__main__":
