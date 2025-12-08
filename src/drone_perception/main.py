@@ -1,266 +1,242 @@
 import os
+import sys
+
+# 获取当前脚本所在的目录
+if hasattr(sys, '_MEIPASS'):
+    # 如果是打包后的exe，使用临时解压目录
+    current_dir = sys._MEIPASS
+else:
+    # 否则使用脚本所在目录
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 设置工作目录为脚本所在目录
+os.chdir(current_dir)
+import os
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from PIL import Image
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms, models
+from sklearn.metrics import accuracy_score
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, confusion_matrix
-import seaborn as sns
+
+# 导入其他模块的功能
+from Data_classfication import split_dataset
+from image_classification import ImageDataset, ImageClassifier
+from visual_navigation import main as run_visual_navigation
+from forecast import predict_image, batch_predict
 
 # 路径设置
-base_dir = os.path.abspath("../data")  # 数据根目录，包含'train'和'test'文件夹
-train_dir = os.path.join(base_dir, "train")# 训练集目录路径
-test_dir = os.path.join(base_dir, "test")  # 测试集目录路径
+base_dir = "data"
+train_dir = os.path.join(base_dir, "train")
+test_dir = os.path.join(base_dir, "test")
+dataset_dir = os.path.join(base_dir, "dataset")
 
-# 模型参数设置
-img_size = (128, 128)  # 图像调整尺寸为128x128像素
-batch_size = 32 # 每个训练批次的样本数量
-epochs = 70# 训练总轮数
-
-# 图像数据预处理与增强（用于训练集）
-train_datagen = ImageDataGenerator(
-    rescale=1. /255,# 像素值归一化到0-1范围
-    rotation_range=30,# 随机旋转角度范围±30度
-    width_shift_range=0.1,# 水平随机平移范围10%
-    height_shift_range=0.1,# 垂直随机平移范围10%
-    shear_range=0.2,# 剪切变换强度
-    zoom_range=0.2,# 随机缩放范围
-    horizontal_flip=True# 启用水平翻转
-)
-
-# 测试集数据预处理（只做归一化，不进行增强）
-test_datagen = ImageDataGenerator(rescale=1. / 255)
-
-# 创建训练数据生成器
-train_gen = train_datagen.flow_from_directory(
-    train_dir, # 训练集目录
-    target_size=img_size, # 调整图像大小
-    batch_size=batch_size, # 批次大小
-    class_mode="categorical"  # 多分类模式
-)
-
-# 创建测试数据生成器
-test_gen = test_datagen.flow_from_directory(
-    test_dir,# 测试集目录
-    target_size=img_size, # 调整图像大小
-    batch_size=batch_size, # 批次大小
-    class_mode="categorical"  # 多分类模式
-)
-
-# 导入迁移学习相关模块
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.layers import GlobalAveragePooling2D
-
-# 加载预训练的MobileNetV2基础模型
-base_model = MobileNetV2(
-    input_shape=(128, 128, 3),  # 输入图像尺寸
-    include_top=False,# 不包含原始顶层分类器
-    weights='imagenet' # 使用在ImageNet上预训练的权重
-)
-base_model.trainable = False # 冻结基础模型权重，不参与训练
-
-# 构建迁移学习模型
-model = tf.keras.Sequential([
-    base_model, # 预训练的特征提取器
-    GlobalAveragePooling2D(),# 全局平均池化层，减少参数数量
-    Dense(128, activation="relu"), # 全连接层，128个神经元，ReLU激活
-    Dropout(0.5),# 丢弃层，丢弃率50%，防止过拟合
-    Dense(train_gen.num_classes, activation="softmax")  # 输出层，使用softmax激活
-])
-
-# 编译模型
-model.compile(
-    optimizer="adam", # 使用Adam优化器
-    loss="categorical_crossentropy", # 分类交叉熵损失函数
-    metrics=["accuracy"] # 评估指标为准确率
-)
-
-# 打印模型结构摘要
-model.summary()
-
-# 设置训练回调函数
-# 早停回调：监控验证集损失，连续5轮无改善则停止训练
-early_stop = EarlyStopping(
-    monitor='val_loss', # 监控验证集损失
-    patience=5,# 容忍轮数
-    restore_best_weights=True  # 恢复最佳权重
-)
-
-# 模型检查点回调：保存最佳模型
-checkpoint = ModelCheckpoint(
-    filepath=os.path.join(base_dir, "best_model.h5"),  # 模型保存路径
-    monitor='val_accuracy',# 监控验证集准确率
-    save_best_only=True,# 只保存最佳模型
-    verbose=1# 显示保存信息
-)
-
-# 开始训练模型
-history = model.fit(
-    train_gen, # 训练数据生成器
-    epochs=epochs,  # 训练轮数
-    validation_data=test_gen,  # 验证数据
-    callbacks=[early_stop, checkpoint]  # 使用回调函数
-)
-
-# 保存最终训练完成的模型
-model.save(os.path.join(base_dir, "cnn_model.h5"))
-
-# 训练完成提示
-print("模型训练完成并已保存。")
-
-
-# 错误分析函数
-def analyze_errors(model, test_gen, class_labels, num_samples=16):
-    """
-    分析模型在测试集上的错误分类情况
-
-    参数:
-    - model: 训练好的模型
-    - test_gen: 测试数据生成器
-    - class_labels: 类别标签列表
-    - num_samples: 要显示的错误样本数量
-    """
-
-    # 重置测试生成器
-    test_gen.reset()
-
-    # 获取所有预测和真实标签
-    predictions = model.predict(test_gen, verbose=1)
-    predicted_classes = np.argmax(predictions, axis=1)
-    true_classes = test_gen.classes
-
-    # 计算准确率
-    accuracy = np.mean(predicted_classes == true_classes)
-    print(f"测试集准确率: {accuracy:.4f}")
-
-    # 分类报告
-    print("\n分类报告:")
-    print(classification_report(true_classes, predicted_classes, target_names=class_labels))
-
-    # 混淆矩阵
-    cm = confusion_matrix(true_classes, predicted_classes)
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
-                xticklabels=class_labels, yticklabels=class_labels)
-    plt.title('混淆矩阵')
-    plt.xlabel('预测标签')
-    plt.ylabel('真实标签')
-    plt.xticks(rotation=45)
-    plt.yticks(rotation=0)
-    plt.tight_layout()
-    plt.savefig(os.path.join(base_dir, 'confusion_matrix.png'))
-    plt.show()
-
-    # 找出错误分类的样本
-    misclassified_indices = np.where(predicted_classes != true_classes)[0]
-
-    print(f"\n总错误分类样本数: {len(misclassified_indices)}")
-    print(f"总样本数: {len(true_classes)}")
-    print(f"错误率: {len(misclassified_indices) / len(true_classes):.4f}")
-
-     # 显示一些错误分类的样本
-    if len(misclassified_indices) > 0:
-        # 随机选择一些错误样本进行可视化
-        if len(misclassified_indices) > num_samples:
-            selected_indices = np.random.choice(misclassified_indices, num_samples, replace=False)
+def setup_directories():
+    """设置数据目录"""
+    print("=" * 50)
+    print("设置数据目录...")
+    
+    # 检查并创建目录
+    os.makedirs(base_dir, exist_ok=True)
+    os.makedirs(train_dir, exist_ok=True)
+    os.makedirs(test_dir, exist_ok=True)
+    
+    # 检查是否需要分割数据集
+    if not os.path.exists(train_dir) or not os.listdir(train_dir):
+        print("训练集不存在或为空，开始自动分割数据集...")
+        if os.path.exists(dataset_dir):
+            success = split_dataset(dataset_dir, train_dir, test_dir, split_ratio=0.8)
+            if not success:
+                print("❌ 数据集分割失败，请检查原始数据集路径")
+                return False
         else:
-            selected_indices = misclassified_indices
-
-        # 获取文件名
-        filenames = test_gen.filenames
-
-        # 创建错误分类可视化
-        plot_misclassified_samples(selected_indices, filenames, true_classes,
-                                   predicted_classes, predictions, class_labels, test_gen)
-
-    return misclassified_indices
-
-
-def plot_misclassified_samples(indices, filenames, true_classes, predicted_classes,
-                               predictions, class_labels, test_gen):
-    """
-    绘制错误分类的样本图像
-    """
-    # 计算网格大小
-    n_cols = 4
-    n_rows = (len(indices) + n_cols - 1) // n_cols
-
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(15, n_rows * 3))
-    if n_rows == 1:
-        axes = [axes] if n_cols == 1 else axes
+            print(f"❌ 原始数据集路径不存在: {dataset_dir}")
+            print("请将数据集放入 ./data/dataset/ 目录")
+            print("数据集结构应为:")
+            print("data/dataset/")
+            print("├── 类别1/")
+            print("│   ├── image1.jpg")
+            print("│   └── image2.jpg")
+            print("├── 类别2/")
+            print("│   ├── image1.jpg")
+            print("│   └── image2.jpg")
+            print("└── ...")
+            return False
     else:
-        axes = axes.flatten()
+        print("✅ 训练集已存在，跳过数据集分割步骤")
+    
+    return True
 
-    # 重置生成器以获取原始图像
-    test_gen.reset()
-    all_images = []
-    all_batches = len(test_gen)
-
-    # 收集所有图像
-    for i in range(all_batches):
-        images, _ = test_gen[i]
-        all_images.extend(images)
-
-    for i, idx in enumerate(indices):
-        if i < len(axes):
-            ax = axes[i]
-
-            # 显示图像
-            ax.imshow(all_images[idx])
-
-            # 设置标题
-            true_label = class_labels[true_classes[idx]]
-            pred_label = class_labels[predicted_classes[idx]]
-            confidence = np.max(predictions[idx])
-
-            title = f"True: {true_label}\nPred: {pred_label}\nConf: {confidence:.3f}"
-            ax.set_title(title, fontsize=10, color='red')
-
-            # 获取文件名（不包含路径）
-            filename = os.path.basename(filenames[idx])
-            ax.set_xlabel(f"File: {filename}", fontsize=8)
-
-            ax.axis('off')
-
-    # 隐藏多余的子图
-    for j in range(len(indices), len(axes)):
-        axes[j].axis('off')
-
-    plt.suptitle('错误分类样本示例', fontsize=16, y=1.02)
+def train_pytorch_model():
+    """使用PyTorch训练模型"""
+    print("\n" + "=" * 50)
+    print("开始PyTorch模型训练...")
+    
+    # 参数配置
+    img_size = (128, 128)
+    batch_size = 32
+    epochs = 70
+    
+    # 设置设备
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"使用设备: {device}")
+    
+    # 数据预处理
+    train_transform = transforms.Compose([
+        transforms.Resize(img_size),
+        transforms.RandomRotation(30),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), shear=0.2),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    test_transform = transforms.Compose([
+        transforms.Resize(img_size),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    # 创建数据集
+    train_dataset = ImageDataset(train_dir, transform=train_transform)
+    test_dataset = ImageDataset(test_dir, transform=test_transform)
+    
+    if len(train_dataset) == 0:
+        print("❌ 训练集为空，无法训练模型")
+        return None, [], []
+    
+    num_classes = len(train_dataset.class_to_idx)
+    print(f"检测到 {num_classes} 个类别: {train_dataset.class_to_idx}")
+    
+    # 创建数据加载器
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    # 初始化模型
+    model = ImageClassifier(num_classes=num_classes).to(device)
+    
+    # 定义损失函数和优化器
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.1)
+    
+    # 训练模型
+    best_accuracy = 0.0
+    train_losses = []
+    val_accuracies = []
+    
+    for epoch in range(epochs):
+        model.train()
+        running_loss = 0.0
+        
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+            
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            running_loss += loss.item() * images.size(0)
+        
+        epoch_loss = running_loss / len(train_loader.dataset)
+        train_losses.append(epoch_loss)
+        
+        # 验证
+        model.eval()
+        all_preds = []
+        all_labels = []
+        
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images, labels = images.to(device), labels.to(device)
+                outputs = model(images)
+                _, preds = torch.max(outputs, 1)
+                all_preds.extend(preds.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+        
+        accuracy = accuracy_score(all_labels, all_preds)
+        val_accuracies.append(accuracy)
+        
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {epoch_loss:.4f}, Accuracy: {accuracy:.4f}')
+        
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            torch.save(model.state_dict(), os.path.join(base_dir, "best_model.pth"))
+            print(f"✅ 保存最佳模型，准确率: {accuracy:.4f}")
+        
+        scheduler.step()
+    
+    # 保存最终模型
+    torch.save(model.state_dict(), os.path.join(base_dir, "final_model.pth"))
+    print("✅ 最终模型已保存")
+    
+    # 绘制训练曲线
+    plt.figure(figsize=(12, 4))
+    plt.subplot(1, 2, 1)
+    plt.plot(train_losses)
+    plt.title('Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    
+    plt.subplot(1, 2, 2)
+    plt.plot(val_accuracies)
+    plt.title('Validation Accuracy')
+    plt.xlabel('Epoch')
+    plt.ylabel('Accuracy')
+    
     plt.tight_layout()
-    plt.savefig(os.path.join(base_dir, 'misclassified_samples.png'),
-                bbox_inches='tight', dpi=300)
+    plt.savefig(os.path.join(base_dir, "training_plot.png"))
     plt.show()
+    
+    return model, train_losses, val_accuracies
 
-    # 打印错误样本的详细信息
-    print("\n错误分类样本详情:")
-    print("-" * 80)
-    for i, idx in enumerate(indices[:10]):  # 只显示前10个的详细信息
-        true_label = class_labels[true_classes[idx]]
-        pred_label = class_labels[predicted_classes[idx]]
-        confidence = np.max(predictions[idx])
-        filename = os.path.basename(filenames[idx])
+def main():
+    """主函数"""
+    print("🚀 开始图像分类系统...")
+    # 1. 设置数据目录
+    if not setup_directories():
+        return
+    
+    # 2. 训练PyTorch模型
+    model, train_losses, val_accuracies = train_pytorch_model()
+    
+    if model is None:
+        print("❌ 模型训练失败")
+        return
+    
+    # 3. 提供预测功能
+    print("\n" + "=" * 50)
+    choice = input("是否进行图像预测？(y/n): ")
+    if choice.lower() == 'y':
+        test_image_path = input("请输入测试图像路径: ")
+        if os.path.exists(test_image_path):
+            result = predict_image(
+                os.path.join(base_dir, "best_model.pth"),
+                test_image_path,
+                train_dir
+            )
+        else:
+            print("❌ 指定的路径不存在")
+    
+    # 4. 启动视觉导航（可选）
+    print("\n" + "=" * 50)
+    choice = input("是否启动视觉导航系统？(y/n): ")
+    if choice.lower() == 'y':
+        try:
+            from visual_navigation import main as nav_main
+            nav_main()
+        except ImportError as e:
+            print(f"❌ 无法启动视觉导航: {e}")
+    
+    print("\n🎉 所有任务完成！")
 
-        print(f"{i + 1:2d}. 文件: {filename:20s} | 真实: {true_label:15s} | "
-              f"预测: {pred_label:15s} | 置信度: {confidence:.4f}")
-
-
-# 在训练完成后调用错误分析
-print("开始错误分析...")
-
-# 获取类别标签
-class_labels = list(train_gen.class_indices.keys())
-
-# 加载最佳模型进行错误分析（如果有保存的最佳模型）
-best_model_path = os.path.join(base_dir, "best_model.h5")
-if os.path.exists(best_model_path):
-    print("加载最佳模型进行错误分析...")
-    best_model = tf.keras.models.load_model(best_model_path)
-    misclassified_indices = analyze_errors(best_model, test_gen, class_labels)
-else:
-    print("使用最终训练模型进行错误分析...")
-    misclassified_indices = analyze_errors(model, test_gen, class_labels)
-
-print("\n错误分析完成！")
+if __name__ == "__main__":
+    # 添加必要的导入
+    import torch.optim as optim
+    main()
