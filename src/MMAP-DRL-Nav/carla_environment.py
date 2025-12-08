@@ -1,160 +1,161 @@
 import carla
 import numpy as np
 import gym
-import random  # 新增：用于随机选spawn点
-import time    # 新增：用于销毁后延迟
+import time
 
 class CarlaEnvironment(gym.Env):
     def __init__(self):
         super(CarlaEnvironment, self).__init__()
+        # 初始化CARLA客户端
         self.client = carla.Client('localhost', 2000)
-
         self.client.set_timeout(10.0)
         self.world = self.client.get_world()
         self.blueprint_library = self.world.get_blueprint_library()
-        
 
-        self.action_space = gym.spaces.Discrete(4)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(128, 128, 3), dtype=np.uint8)
-        
+        # 定义动作空间和观测空间
+        self.action_space = gym.spaces.Discrete(4)  # 前进、左转、右转、后退
+        self.observation_space = gym.spaces.Box(
+            low=0, high=255, shape=(128, 128, 3), dtype=np.uint8
+        )  # 128x128 RGB图像
+
+        # 核心对象初始化
         self.vehicle = None
-
-
         self.camera = None
-        
-        # 新增：镜头跟随参数（仅用于初始化跳转）
-        self.spectator_offset = carla.Location(x=0, y=0, z=2.5)
-        self.spectator_distance = -5.0
-        self.spectator_pitch = -10
-        
+        self.image_data = None  # 存储相机采集的图像数据
 
-        # 新增：初始化时先清理所有残留actor
-        self._clean_all_actors()
-        
-        self.reset()
-
-    # 新增：核心清理函数 - 销毁所有残留的车辆/传感器/行人等actor
-    def _clean_all_actors(self):
-        # 获取当前世界所有actor
-        actor_list = self.world.get_actors()
-        for actor in actor_list:
-            # 筛选需要销毁的actor类型：车辆、传感器、行人（可根据需求调整）
-            if actor.type_id.startswith('vehicle') or actor.type_id.startswith('sensor') or actor.type_id.startswith('walker'):
-                try:
-                    actor.destroy()
-                    time.sleep(0.05)  # 短暂延迟，确保销毁完成
-                except Exception as e:
-                    print(f"销毁actor失败: {e}")
-        # 额外清理当前实例的车辆和相机
-        if self.camera is not None:
-            self.camera.destroy()
-            self.camera = None
-        if self.vehicle is not None:
-            self.vehicle.destroy()
-            self.vehicle = None
+        # 镜头跟随参数（spectator视角）
+        self.spectator_offset = carla.Location(x=0, y=0, z=2.5)  # 高度偏移
+        self.spectator_distance = -5.0  # 车辆后方5米
+        self.spectator_pitch = -10  # 向下俯视10度
 
     def reset(self):
-        # 第一步：先清理残留车辆（增强版）
-        self._clean_all_actors()
+        """重置环境，生成新车辆和相机，返回初始观测"""
+        # 清理旧的车辆和相机资源
+        if self.vehicle is not None:
+            self.vehicle.destroy()
+        if self.camera is not None:
+            self.camera.destroy()
+            self.image_data = None
 
-
-        vehicle_bp = self.blueprint_library.filter('vehicle.*')[0]
-        vehicle_bp.set_attribute('role_name', 'hero')
-        
+        # 生成车辆（特斯拉Model3）
+        vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
         spawn_points = self.world.get_map().get_spawn_points()
-        if not spawn_points:
-            spawn_point = carla.Transform(carla.Location(x=20, y=0, z=0.5))
-        else:
-
-            # 改动1：随机打乱spawn点，避免固定选前几个
-            random.shuffle(spawn_points)
-        
-        # 改动2：循环尝试多个spawn点（最多尝试10个），提高生成成功率
-        self.vehicle = None
-        max_attempts = min(10, len(spawn_points))  # 最多试10个点（或所有点）
-        for i in range(max_attempts):
-            spawn_point = spawn_points[i] if spawn_points else carla.Transform(carla.Location(x=20, y=0, z=0.5))
-            self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
-            if self.vehicle is not None:
-                break  # 生成成功，退出循环
-            time.sleep(0.1)  # 失败后短暂延迟，再试下一个点
-        
-        # 最终检查：如果所有点都失败，抛出更友好的错误
-        if self.vehicle is None:
-            raise RuntimeError(f"尝试了{max_attempts}个spawn点仍无法生成车辆，请检查CARLA模拟器状态或手动清理地图")
-
-        
+        spawn_point = spawn_points[0] if spawn_points else carla.Transform(carla.Location(x=0, y=0, z=0))
+        self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
         self.vehicle.set_autopilot(False)
-        self.world.tick()
 
-        # 仅保留：车辆生成时，镜头跳转到车辆旁（核心需求）
+        # 初始化RGB相机
+        self._init_camera()
+
+        # 等待相机采集到第一帧数据
+        while self.image_data is None:
+            time.sleep(0.01)
+
+        # 镜头跳转到车辆位置并跟随
         self.follow_vehicle()
-        
-        return self.get_observation()
 
-    # 镜头跳转核心方法（仅初始化时调用一次）
+        self.world.tick()
+        return self.image_data.copy()
+
+    def _init_camera(self):
+        """初始化挂载在车辆上的RGB相机"""
+        # 创建相机蓝图并设置参数
+        camera_bp = self.blueprint_library.find('sensor.camera.rgb')
+        camera_bp.set_attribute('image_size_x', '128')
+        camera_bp.set_attribute('image_size_y', '128')
+        camera_bp.set_attribute('fov', '90')  # 视野角度
+
+        # 相机挂载位置：车辆前上方（x=1.5米，z=2.0米）
+        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.0))
+        self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
+
+        # 注册相机数据回调函数
+        self.camera.listen(lambda img: self._camera_callback(img))
+
+    def _camera_callback(self, image):
+        """相机数据回调：将原始数据转换为RGB numpy数组"""
+        # CARLA相机输出为RGBA格式（4通道），转换为RGB（3通道）
+        array = np.frombuffer(image.raw_data, dtype=np.uint8)
+        array = array.reshape((image.height, image.width, 4))
+        self.image_data = array[:, :, :3]  # 去掉Alpha通道
+
     def follow_vehicle(self):
+        """调整spectator视角，让镜头跟随车辆"""
         spectator = self.world.get_spectator()
         if not spectator or not self.vehicle:
             return
+
+        # 计算镜头位置（车辆后方+高度偏移）
         vehicle_transform = self.vehicle.get_transform()
         camera_location = vehicle_transform.location + carla.Location(x=self.spectator_distance) + self.spectator_offset
+        # 计算镜头朝向（与车辆一致，向下俯视）
         camera_rotation = carla.Rotation(
             pitch=self.spectator_pitch,
             yaw=vehicle_transform.rotation.yaw,
             roll=0
         )
+        # 设置镜头位置和朝向
         spectator.set_transform(carla.Transform(camera_location, camera_rotation))
 
     def get_observation(self):
-
-
-        if self.camera is None:
-            camera_bp = self.blueprint_library.find('sensor.camera.rgb')
-            camera_bp.set_attribute('image_size_x', '128')
-            camera_bp.set_attribute('image_size_y', '128')
-
-            camera_transform = carla.Transform(carla.Location(x=1.5, z=2.0))
-            self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
-
-        return np.random.randint(0, 256, size=(128, 128, 3), dtype=np.uint8)
+        """获取当前相机图像（模型输入的观测值）"""
+        if self.image_data is not None:
+            return self.image_data.copy()
+        # 兜底：相机未就绪时返回全零图像
+        return np.zeros((128, 128, 3), dtype=np.uint8)
 
     def step(self, action):
+        """执行动作，返回新状态、奖励、终止标志等"""
         if self.vehicle is None:
             raise RuntimeError("车辆未初始化，请先调用reset()")
-        
 
-
+        # 将动作映射为车辆控制指令
         throttle = 0.0
         steer = 0.0
-        if action == 0:
+        if action == 0:  # 前进
+            throttle = 1.0
+        elif action == 1:  # 左转
             throttle = 0.5
-        elif action == 1:
-            throttle = 0.3
-            steer = -0.5
-        elif action == 2:
-            throttle = 0.3
-            steer = 0.5
-        elif action == 3:
-            throttle = -0.3
-        
+            steer = -1.0
+        elif action == 2:  # 右转
+            throttle = 0.5
+            steer = 1.0
+        elif action == 3:  # 后退
+            throttle = -1.0
+
+        # 应用车辆控制
         self.vehicle.apply_control(carla.VehicleControl(throttle=throttle, steer=steer))
         self.world.tick()
 
-        # 已删除：step里的镜头跟随逻辑 → 后续车辆移动，镜头不再更新
-        # self.follow_vehicle()  # 这行已删掉
-        
+        # 镜头实时跟随车辆
+        self.follow_vehicle()
+
+        # 获取新状态、计算奖励、判断终止
         next_state = self.get_observation()
-        reward = 1.0
+        reward = self._calculate_reward(throttle)  # 自定义奖励函数
+        done = self._check_done()  # 自定义终止条件
 
-
-        done = False
         return next_state, reward, done, {}
 
-    def close(self):
+    def _calculate_reward(self, throttle):
+        """奖励函数：鼓励前进，惩罚后退"""
+        if throttle > 0:
+            return 0.1  # 前进奖励
+        elif throttle < 0:
+            return -0.1  # 后退惩罚
+        return 0.0  # 无动作无奖励
 
-        # 改动3：关闭时调用全局清理，确保无残留
-        self._clean_all_actors()
-        print("环境已清理，所有actor已销毁")
+    def _check_done(self):
+        """终止条件：示例为永不终止（可根据需求修改）"""
+        # 可扩展：碰撞检测、到达目标、超时等
+        return False
+
+    def close(self):
+        """关闭环境，清理所有资源"""
+        if self.vehicle is not None:
+            self.vehicle.destroy()
+        if self.camera is not None:
+            self.camera.destroy()
+        print("CARLA环境已关闭，资源清理完成")
 
 
