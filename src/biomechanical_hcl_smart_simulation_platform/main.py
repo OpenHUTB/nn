@@ -8,7 +8,7 @@ def make_simulator(task_name: str):
     """
     根据任务名称返回对应的 simulator 环境。
 
-    task_name: "pointing" 或 "tracking"
+    task_name: "pointing"、"tracking" 或 "choice_reaction"
     """
     project_root = Path(__file__).resolve().parent
 
@@ -16,11 +16,14 @@ def make_simulator(task_name: str):
         sim_dir = project_root / "simulators" / "mobl_arms_index_pointing"
     elif task_name == "tracking":
         sim_dir = project_root / "simulators" / "mobl_arms_index_tracking"
+    elif task_name == "choice_reaction":
+        # 🔹 新增 Choice Reaction 任务入口
+        sim_dir = project_root / "simulators" / "mobl_arms_index_choice_reaction"
     else:
         raise ValueError(f"Unknown task: {task_name}")
 
     # README 里说明：Simulator.get(simulator_folder) 会返回一个 gym 风格的环境
-    # 可以直接调用 reset / step / render 等方法。:contentReference[oaicite:5]{index=5}
+    # 可以直接调用 reset / step / render 等方法。
     simulator = Simulator.get(str(sim_dir))
     return simulator
 
@@ -54,12 +57,15 @@ def run_episodes(env, num_episodes: int, max_steps: int):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="User-in-the-Box demo for Pointing & Tracking")
+    parser = argparse.ArgumentParser(
+        description="User-in-the-Box demo for Pointing, Tracking & Choice Reaction"
+    )
     parser.add_argument(
         "--task",
-        choices=["pointing", "tracking"],
+        # 🔹 在命令行参数里加入 choice_reaction 选项
+        choices=["pointing", "tracking", "choice_reaction"],
         default="pointing",
-        help="选择要运行的任务：pointing 或 tracking",
+        help="选择要运行的任务：pointing / tracking / choice_reaction",
     )
     parser.add_argument(
         "--num_episodes",
