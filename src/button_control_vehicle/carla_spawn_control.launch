@@ -1,0 +1,42 @@
+<launch>
+  <!-- ====================== 公共参数配置 ====================== -->
+  <!-- 车辆角色名（统一两个节点的车辆标识） -->
+  <arg name="role_name" default="ego_vehicle"/>
+  
+  <!-- ====================== Carla 生成物体参数 ====================== -->
+  <!-- 物体定义文件路径 -->
+  <arg name="objects_definition_file" default='$(find carla_spawn_objects)/config/objects.json'/>
+  <!-- 车辆生成位置 "x,y,z,roll,pitch,yaw"，留空则使用默认位置 -->
+  <arg name="spawn_point_ego_vehicle" default=""/>
+  <!-- 是否仅生成传感器（不生成车辆） -->
+  <arg name="spawn_sensors_only" default="false"/>
+
+  <!-- ====================== 启动 Carla 生成物体节点 ====================== -->
+  <node 
+    pkg="carla_spawn_objects" 
+    type="carla_spawn_objects.py" 
+    name="$(anon carla_spawn_objects)" 
+    output="screen"
+    required="true"  <!-- 确保该节点启动成功后再启动后续节点 -->
+    launch-prefix="bash -c 'sleep 2; $0 $@' "  <!-- 延迟2秒启动（可选，避免时序问题） -->
+  >
+    <param name="objects_definition_file" value="$(arg objects_definition_file)" />
+    <param name="spawn_point_$(arg role_name)" value="$(arg spawn_point_ego_vehicle)" />
+    <param name="spawn_sensors_only" value="$(arg spawn_sensors_only)" />
+    <!-- 传递角色名参数（如果生成节点需要） -->
+    <param name="role_name" value="$(arg role_name)"/>
+  </node>
+
+  <!-- ====================== 启动 Carla 手动控制节点 ====================== -->
+  <node 
+    pkg="carla_manual_control" 
+    type="carla_manual_control.py" 
+    name="carla_manual_control_$(arg role_name)" 
+    output="screen"
+    required="true"
+    launch-prefix="bash -c 'sleep 5; $0 $@' "  <!-- 延迟5秒启动（确保车辆已生成） -->
+  >
+    <param name="role_name" value="$(arg role_name)"/>
+  </node>
+
+</launch>
