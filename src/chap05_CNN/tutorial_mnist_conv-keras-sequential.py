@@ -22,13 +22,13 @@ from tensorflow.keras.layers import Conv2D, MaxPooling2D  # 导入卷积层和�
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
-def mnist_dataset():
+# 清晰知道输入输出类型
+def load_mnist_data() -> Tuple[tf.data.Dataset, tf.data.Dataset]:
     """
-    加载并预处理MNIST数据集，返回训练集和测试集的TensorFlow Dataset对象。
-    #代码是使用TensorFlow处理MNIST数据集的预处理流程。MNIST是一个手写数字识别数据集，包含60,000个训练样本和10,000个测试样本，每个样本是28x28像素的灰度图像
+    加载并预处理MNIST数据集
+
     Returns:
-        ds (tf.data.Dataset): 处理后的训练数据集。
-        test_ds (tf.data.Dataset): 处理后的测试数据集。
+        训练数据集和测试数据集的元组
     """
     # 加载MNIST手写数字数据集
     # 返回格式：((训练图片, 训练标签), (测试图片, 测试标签))
