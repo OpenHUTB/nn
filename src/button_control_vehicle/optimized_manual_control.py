@@ -615,10 +615,10 @@ class KeyboardControl(object):
             keys: pygame按键状态ScancodeWrapper对象
             milliseconds: 按键持续时间(毫秒)
         """
-        # 常量定义 - 提升可读性和可维护性
+        # 常量定义 - 提升可读性和可维护性                                                                                                  
         STEER_LIMIT = 0.7
         STEER_INCREMENT_FACTOR = 5e-4
-        THROTTLE_STEP = 0.1                                    
+        THROTTLE_STEP = 0.1                                                                    
         MAX_THROTTLE = 1.0
         MAX_BRAKE = 1.0
 
