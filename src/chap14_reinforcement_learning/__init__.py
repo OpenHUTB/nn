@@ -166,13 +166,13 @@ register(
 # 1. 21点游戏：经典扑克牌游戏（考察决策策略）
 register(
     id='Blackjack-v0',
-    entry_point='gym.envs.toy_text:BlackjackEnv',
+    entry_point='gym.envs.reversi:ReversiEnv',
 )
 
 # 2. 凯利判赌任务：基于概率的赌博决策（考察期望收益计算）
 register(
     id='KellyCoinflip-v0',
-    entry_point='gym.envs.toy_text:KellyCoinflipEnv',
+    entry_point='gym.envs.reversi:ReversiEnv',
     reward_threshold=246.61,  # 理论最优收益阈值
 )
 

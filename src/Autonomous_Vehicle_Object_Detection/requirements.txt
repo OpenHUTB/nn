@@ -1,25 +1,23 @@
-# CARLA Simulator requirements
-#carla==0.9.11
+---
 
-# Deep learning and computer vision
-tensorflow==2.4.1
-opencv-python==4.5.3.56
-numpy==1.19.5
-Pillow==8.3.1
+### 更新后的 requirements.txt
+```txt
+# 核心依赖（与最新代码兼容）
+carla==0.9.11
+torch==1.13.1+cu117
+torchvision==0.14.1+cu117
+ultralytics==8.0.151
+numpy==1.21.6
+opencv-python==4.5.5.64
+pygame==2.1.0
+scikit-learn==1.0.2
+setuptools==40.8.0
 
-# YOLOv3 specific requirements
-#darknet53==1.0.0
-
-# Trajectory planning
-scipy==1.7.1
-matplotlib==3.4.3
-
-# Utilities
+# 工具类依赖
 tqdm==4.62.2
+logging==0.5.1.2
 
-# Visualization and monitoring
-tensorboard==2.6.0
-
-# Optional: GPU support for TensorFlow
-# Uncomment the following line if you have a CUDA-capable GPU
-# tensorflow-gpu==2.4.1 
+# 说明：
+# 1. CUDA 支持：需安装对应版本 NVIDIA 驱动（支持 CUDA 11.7）
+# 2. 无 GPU 时，移除 torch/torchvision 的 +cu117 后缀，安装 CPU 版本
+# 3. 标准库（threading、multiprocessing、os、sys 等）无需额外安装
