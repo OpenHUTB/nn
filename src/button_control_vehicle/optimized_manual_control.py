@@ -65,22 +65,14 @@ from __future__ import print_function
 import glob
 import os
 import sys
+
 try:
-    # 先找当前目录下的carla/dist
-    carla_egg = glob.glob(os.path.join(os.getcwd(), 'carla', 'dist', 'carla-*%d.%d-%s.egg' % (
+    sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
         sys.version_info.major,
         sys.version_info.minor,
-        'win-amd64' if os.name == 'nt' else 'linux-x86_64')))
-    # 再找上级目录下的carla/dist
-    if not carla_egg:
-        carla_egg = glob.glob(os.path.join(os.path.dirname(os.getcwd()), 'carla', 'dist', 'carla-*%d.%d-%s.egg' % (
-            sys.version_info.major,
-            sys.version_info.minor,
-            'win-amd64' if os.name == 'nt' else 'linux-x86_64')))
-    sys.path.append(carla_egg[0])
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
 except IndexError:
     pass
-
 
 
 # ==============================================================================
@@ -400,8 +392,6 @@ class KeyboardControl(object):
             raise NotImplementedError("Actor type not supported")
         self._steer_cache = 0.0
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-        # 新增：启动时显示基础控制提示（持续5秒）
-        world.hud.notification("W=加速 | S=刹车 | A/D=转向 | P=切换自动驾驶", seconds=5.0)
 
     def parse_events(self, client, world, clock, sync_mode):
         if isinstance(self._control, carla.VehicleControl):
@@ -608,67 +598,44 @@ class KeyboardControl(object):
                 world.player.apply_control(self._control)
 
     def _parse_vehicle_keys(self, keys, milliseconds):
-        """
-        解析车辆控制按键输入，更新车辆控制参数
-        
-        Args:
-            keys: pygame按键状态ScancodeWrapper对象
-            milliseconds: 按键持续时间(毫秒)
-        """
-        # 常量定义 - 提升可读性和可维护性
-        STEER_LIMIT = 0.7
-        STEER_INCREMENT_FACTOR = 5e-4
-        THROTTLE_STEP = 0.1                                    
-        MAX_THROTTLE = 1.0
-        MAX_BRAKE = 1.0
-
-        # --------------------------- 油门控制 ---------------------------
         if keys[K_UP] or keys[K_w]:
             if not self._ackermann_enabled:
-                self._control.throttle = min(self._control.throttle + THROTTLE_STEP, MAX_THROTTLE)
+                self._control.throttle = min(self._control.throttle + 0.1, 1.00)
             else:
-                speed_delta = round(milliseconds * SPEED_CHANGE_FACTOR, 2) * self._ackermann_reverse
-                self._ackermann_control.speed += speed_delta
-        elif not self._ackermann_enabled:
-            # 仅在非阿克曼模式下重置油门
-            self._control.throttle = 0.0
+                self._ackermann_control.speed += round(milliseconds * 0.005, 2) * self._ackermann_reverse
+        else:
+            if not self._ackermann_enabled:
+                self._control.throttle = 0.0
 
-        # --------------------------- 刹车控制 ---------------------------
         if keys[K_DOWN] or keys[K_s]:
             if not self._ackermann_enabled:
-                self._control.brake = min(self._control.brake + BRAKE_STEP, MAX_BRAKE)
+                self._control.brake = min(self._control.brake + 0.2, 1)
             else:
-                current_speed_abs = abs(self._ackermann_control.speed)
-                speed_delta = min(current_speed_abs, round(milliseconds * SPEED_CHANGE_FACTOR, 2)) * self._ackermann_reverse
-                self._ackermann_control.speed -= speed_delta
-                # 保持速度方向并确保非负绝对值
-                self._ackermann_control.speed = max(0.0, abs(self._ackermann_control.speed)) * self._ackermann_reverse
-        elif not self._ackermann_enabled:
-            # 仅在非阿克曼模式下重置刹车
-            self._control.brake = 0.0
+                self._ackermann_control.speed -= min(abs(self._ackermann_control.speed), round(milliseconds * 0.005, 2)) * self._ackermann_reverse
+                self._ackermann_control.speed = max(0, abs(self._ackermann_control.speed)) * self._ackermann_reverse
+        else:
+            if not self._ackermann_enabled:
+                self._control.brake = 0
 
-        # --------------------------- 转向控制 ---------------------------
-        steer_increment = STEER_INCREMENT_FACTOR * milliseconds
-        
-        # 重置转向缓存的条件判断优化
+        steer_increment = 5e-4 * milliseconds
         if keys[K_LEFT] or keys[K_a]:
-            self._steer_cache = 0.0 if self._steer_cache > 0 else self._steer_cache - steer_increment
+            if self._steer_cache > 0:
+                self._steer_cache = 0
+            else:
+                self._steer_cache -= steer_increment
         elif keys[K_RIGHT] or keys[K_d]:
-            self._steer_cache = 0.0 if self._steer_cache < 0 else self._steer_cache + steer_increment
+            if self._steer_cache < 0:
+                self._steer_cache = 0
+            else:
+                self._steer_cache += steer_increment
         else:
             self._steer_cache = 0.0
-
-        # 限制转向范围并应用
-        self._steer_cache = max(-STEER_LIMIT, min(STEER_LIMIT, self._steer_cache))
-        steer_value = round(self._steer_cache, 1)
-
+        self._steer_cache = min(0.7, max(-0.7, self._steer_cache))
         if not self._ackermann_enabled:
-            self._control.steer = steer_value
+            self._control.steer = round(self._steer_cache, 1)
             self._control.hand_brake = keys[K_SPACE]
         else:
-            self._ackermann_control.steer = steer_value
-
-
+            self._ackermann_control.steer = round(self._steer_cache, 1)
 
     def _parse_walker_keys(self, keys, milliseconds, world):
         self._control.speed = 0.0
@@ -724,39 +691,100 @@ class HUD(object):
         self.frame = timestamp.frame
         self.simulation_time = timestamp.elapsed_seconds
 
+
     def tick(self, world, clock):
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
-        t = world.player.get_transform()
-        v = world.player.get_velocity()
-        c = world.player.get_control()
-        compass = world.imu_sensor.compass
-        heading = 'N' if compass > 270.5 or compass < 89.5 else ''
-        heading += 'S' if 90.5 < compass < 269.5 else ''
-        heading += 'E' if 0.5 < compass < 179.5 else ''
-        heading += 'W' if 180.5 < compass < 359.5 else ''
-        colhist = world.collision_sensor.get_collision_history()
-        collision = [colhist[x + self.frame - 200] for x in range(0, 200)]
-        max_col = max(1.0, max(collision))
-        collision = [x / max_col for x in collision]
-        vehicles = world.world.get_actors().filter('vehicle.*')
+
+        # -------------------------- 优化点1：安全访问传感器和player --------------------------
+        # 防御性获取player，避免空引用
+        player = getattr(world, 'player', None)
+        if not player:
+            self._info_text = ["Player not found"]
+            return
+        
+        # 防御性获取各类传感器，缺失时使用默认值
+        imu_sensor = getattr(world, 'imu_sensor', None)
+        gnss_sensor = getattr(world, 'gnss_sensor', None)
+        collision_sensor = getattr(world, 'collision_sensor', None)
+
+        # -------------------------- 优化点2：减少重复属性查找，缓存局部变量 --------------------------
+        # 缓存常用属性，避免重复查找
+        t = player.get_transform()
+        player_location = t.location
+        v = player.get_velocity()
+        c = player.get_control()
+
+        # 预计算速度(km/h)，避免重复计算（优化点5）
+        speed_m_s = math.sqrt(v.x**2 + v.y**2 + v.z**2)
+        speed_kmh = 3.6 * speed_m_s
+
+        # 安全获取罗盘数据
+        compass = imu_sensor.compass if (imu_sensor and hasattr(imu_sensor, 'compass')) else 0.0
+
+        # -------------------------- 优化点3：航向计算更清晰可读 --------------------------
+        # 重构航向计算逻辑，使用清晰的条件判断和变量命名
+        heading = []
+        # 北：270.5° - 360° 或 0° - 89.5°
+        if 270.5 < compass <= 360 or 0 <= compass < 89.5:
+            heading.append('N')
+        # 南：90.5° - 269.5°
+        if 90.5 < compass < 269.5:
+            heading.append('S')
+        # 东：0.5° - 179.5°
+        if 0.5 < compass < 179.5:
+            heading.append('E')
+        # 西：180.5° - 359.5°
+        if 180.5 < compass < 359.5:
+            heading.append('W')
+        heading_str = ''.join(heading)
+
+        # -------------------------- 优化点4：碰撞历史访问更稳健 --------------------------
+        # 防御性读取碰撞历史，使用get避免KeyError，规范归一化处理
+        collision_data = []
+        if collision_sensor and hasattr(collision_sensor, 'get_collision_history'):
+            colhist = collision_sensor.get_collision_history()
+            # 计算有效帧范围，避免索引越界
+            start_idx = self.frame - 200
+            collision_raw = [colhist.get(x + start_idx, 0.0) for x in range(200)]
+            # 归一化处理，避免除以0
+            max_col = max(1.0, max(collision_raw))
+            collision_data = [x / max_col for x in collision_raw]
+
+        # -------------------------- 基础信息构建 --------------------------
+        # 安全获取地图名称
+        map_name = world.map.name.split('/')[-1] if (hasattr(world, 'map') and world.map) else "Unknown"
+        
         self._info_text = [
             'Server:  % 16.0f FPS' % self.server_fps,
             'Client:  % 16.0f FPS' % clock.get_fps(),
             '',
-            'Vehicle: % 20s' % get_actor_display_name(world.player, truncate=20),
-            'Map:     % 20s' % world.map.name.split('/')[-1],
+            'Vehicle: % 20s' % self._get_actor_display_name(player, truncate=20),
+            'Map:     % 20s' % map_name,
             'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
             '',
-            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)),
-            u'Compass:% 17.0f\N{DEGREE SIGN} % 2s' % (compass, heading),
-            'Accelero: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.accelerometer),
-            'Gyroscop: (%5.1f,%5.1f,%5.1f)' % (world.imu_sensor.gyroscope),
-            'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (t.location.x, t.location.y)),
-            'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
-            'Height:  % 18.0f m' % t.location.z,
-            '']
+            'Speed:   % 15.0f km/h' % speed_kmh,  # 使用预计算的速度
+            u'Compass:% 17.0f\N{DEGREE SIGN} % 2s' % (compass, heading_str),
+            # 安全访问IMU传感器数据
+            'Accelero: (%5.1f,%5.1f,%5.1f)' % (
+                imu_sensor.accelerometer if (imu_sensor and hasattr(imu_sensor, 'accelerometer')) else (0.0, 0.0, 0.0)
+            ),
+            'Gyroscop: (%5.1f,%5.1f,%5.1f)' % (
+                imu_sensor.gyroscope if (imu_sensor and hasattr(imu_sensor, 'gyroscope')) else (0.0, 0.0, 0.0)
+            ),
+            'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (player_location.x, player_location.y)),
+            # 安全访问GNSS传感器数据
+            'GNSS:% 24s' % (
+                '(% 2.6f, % 3.6f)' % (gnss_sensor.lat, gnss_sensor.lon)
+                if (gnss_sensor and hasattr(gnss_sensor, 'lat') and hasattr(gnss_sensor, 'lon'))
+                else 'Unknown'
+            ),
+            'Height:  % 18.0f m' % player_location.z,
+            ''
+        ]
+
+        # -------------------------- 控制信息构建 --------------------------
         if isinstance(c, carla.VehicleControl):
             self._info_text += [
                 ('Throttle:', c.throttle, 0.0, 1.0),
@@ -765,32 +793,67 @@ class HUD(object):
                 ('Reverse:', c.reverse),
                 ('Hand brake:', c.hand_brake),
                 ('Manual:', c.manual_gear_shift),
-                'Gear:        %s' % {-1: 'R', 0: 'N'}.get(c.gear, c.gear)]
-            if self._show_ackermann_info:
+                'Gear:        %s' % {-1: 'R', 0: 'N'}.get(c.gear, c.gear)
+            ]
+            if self._show_ackermann_info and hasattr(self, '_ackermann_control'):
                 self._info_text += [
                     '',
                     'Ackermann Controller:',
-                    '  Target speed: % 8.0f km/h' % (3.6*self._ackermann_control.speed),
+                    '  Target speed: % 8.0f km/h' % (3.6 * self._ackermann_control.speed),
                 ]
         elif isinstance(c, carla.WalkerControl):
             self._info_text += [
                 ('Speed:', c.speed, 0.0, 5.556),
-                ('Jump:', c.jump)]
+                ('Jump:', c.jump)
+            ]
+
+        # -------------------------- 碰撞和车辆信息 --------------------------
         self._info_text += [
             '',
             'Collision:',
-            collision,
+            collision_data,
             '',
-            'Number of vehicles: % 8d' % len(vehicles)]
-        if len(vehicles) > 1:
-            self._info_text += ['Nearby vehicles:']
-            distance = lambda l: math.sqrt((l.x - t.location.x)**2 + (l.y - t.location.y)**2 + (l.z - t.location.z)**2)
-            vehicles = [(distance(x.get_location()), x) for x in vehicles if x.id != world.player.id]
-            for d, vehicle in sorted(vehicles, key=lambda vehicles: vehicles[0]):
-                if d > 200.0:
-                    break
-                vehicle_type = get_actor_display_name(vehicle, truncate=22)
-                self._info_text.append('% 4dm %s' % (d, vehicle_type))
+            'Number of vehicles: % 8d' % (len(world.world.get_actors().filter('vehicle.*')) if hasattr(world, 'world') else 0)
+        ]
+
+        # -------------------------- 附近车辆信息 --------------------------
+        if hasattr(world, 'world'):
+            vehicles = world.world.get_actors().filter('vehicle.*')
+            vehicle_count = len(vehicles)
+            if vehicle_count > 1:
+                self._info_text += ['Nearby vehicles:']
+                
+                # 优化点5：修复lambda参数命名，避免遮蔽外层变量
+                def calculate_distance(target_loc):
+                    """计算目标位置与玩家位置的距离（提取为函数，提升可读性）"""
+                    return math.sqrt(
+                        (target_loc.x - player_location.x)**2 +
+                        (target_loc.y - player_location.y)**2 +
+                        (target_loc.z - player_location.z)**2
+                    )
+
+                # 筛选非玩家车辆并计算距离
+                nearby_vehicles = []
+                player_id = player.id
+                for vehicle in vehicles:
+                    if vehicle.id != player_id:
+                        veh_loc = vehicle.get_location()
+                        dist = calculate_distance(veh_loc)
+                        nearby_vehicles.append((dist, vehicle))
+
+                # 按距离排序（优化lambda参数命名）
+                for dist, vehicle in sorted(nearby_vehicles, key=lambda x: x[0]):
+                    if dist > 200.0:
+                        break
+                    # 优化点6：距离格式化为整数米显示
+                    vehicle_type = self._get_actor_display_name(vehicle, truncate=22)
+                    self._info_text.append('% 4dm %s' % (int(dist), vehicle_type))
+
+    # 补充缺失的辅助函数（保持代码完整性）
+    def _get_actor_display_name(self, actor, truncate=20):
+        name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
+        return (name[:truncate-1] + '…') if len(name) > truncate else name
+
 
     def show_ackermann_info(self, enabled):
         self._show_ackermann_info = enabled
@@ -1102,19 +1165,12 @@ class RadarSensor(object):
             r = int(clamp(0.0, 1.0, 1.0 - norm_velocity) * 255.0)
             g = int(clamp(0.0, 1.0, 1.0 - abs(norm_velocity)) * 255.0)
             b = int(abs(clamp(- 1.0, 0.0, - 1.0 - norm_velocity)) * 255.0)
-            # self.debug.draw_point(
-            #     radar_data.transform.location + fw_vec,
-            #     size=0.075,
-            #     life_time=0.06,
-            #     persistent_lines=False,
-            #     color=carla.Color(r, g, b))
-         # 修改后（放大尺寸+延长显示时间）：
             self.debug.draw_point(
-            radar_data.transform.location + fw_vec,
-            size=0.12,  # 从0.075放大到0.12，更易看清
-            life_time=0.1,  # 从0.06延长到0.1，避免快速消失
-            persistent_lines=False,
-            color=carla.Color(r, g, b))
+                radar_data.transform.location + fw_vec,
+                size=0.075,
+                life_time=0.06,
+                persistent_lines=False,
+                color=carla.Color(r, g, b))
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
