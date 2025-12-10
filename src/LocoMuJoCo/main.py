@@ -1,33 +1,42 @@
+import numpy as np
 from loco_mujoco.task_factories import ImitationFactory, LAFAN1DatasetConf, DefaultDatasetConf, AMASSDatasetConf
 
 
 # # example --> you can add as many datasets as you want in the lists!
 env = ImitationFactory.make("UnitreeH1",
-                            default_dataset_conf=DefaultDatasetConf(["squat"]),
-                            lafan1_dataset_conf=LAFAN1DatasetConf(["dance2_subject4", "walk1_subject1"]),
+                            default_dataset_conf=DefaultDatasetConf(["squat", "walk"]),
+                            lafan1_dataset_conf=LAFAN1DatasetConf(["dance2_subject4"]),
                             # if SMPL and AMASS are installed, you can use the following:
-                            #amass_dataset_conf=AMASSDatasetConf(["DanceDB/DanceDB/20120911_TheodorosSourmelis/Capoeira_Theodoros_v2_C3D_poses"])
-                            )
+                            # amass_dataset_conf=AMASSDatasetConf(["DanceDB/DanceDB/20120911_TheodorosSourmelis/Capoeira_Theodoros_v2_C3D_poses",
+                            #                                     "KIT/12/WalkInClockwiseCircle11_poses",
+                            #                                     "HUMAN4D/HUMAN4D/Subject3_Medhi/INF_JumpingJack_S3_01_poses",
+                            #                                     'KIT/359/walking_fast05_poses']),
+                            n_substeps=20)
 
-env.play_trajectory(n_episodes=3, n_steps_per_episode=1000, render=True)
-
+env.play_trajectory(n_episodes=3, n_steps_per_episode=500, render=True)
 
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
 import mujoco
+import ssl
+import urllib3
+# 禁用SSL验证，解决huggingface证书问题
+ssl._create_default_https_context = ssl._create_unverified_context
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 from loco_mujoco.task_factories import ImitationFactory, LAFAN1DatasetConf, DefaultDatasetConf
 
-# 自定义机器人行走环境（彻底修复所有报错）
+# -------------------------- 1. 正确定义WalkerEnv类（无内部实例化） --------------------------
 class WalkerEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
     def __init__(self, render_mode=None):
         super().__init__()
-        # 创建UnitreeH1环境（简化数据集，加速加载）
+        # 创建UnitreeH1环境（简化数据集，减少网络请求）
         self.env = ImitationFactory.make(
             "UnitreeH1",
-            default_dataset_conf=DefaultDatasetConf(["walk"]),
+            default_dataset_conf=DefaultDatasetConf(["walk"]),  # 仅保留walk，减少下载
             lafan1_dataset_conf=LAFAN1DatasetConf(["walk1_subject1"])
         )
         
@@ -110,15 +119,13 @@ class WalkerEnv(gym.Env):
         self.env.render()
 
     def close(self):
-        # 彻底容错的资源释放（不访问任何可能不存在的属性）
+        # 彻底容错的资源释放
         try:
             self.env.close()
         except AttributeError:
-            # 1. 不访问self.env.sim，直接跳过渲染窗口关闭（避免报错）
-            # （loco-mujoco的渲染窗口会自动随程序退出释放）
             pass
         
-        # 2. 安全释放Mujoco模型和数据（先检查属性是否存在）
+        # 安全释放Mujoco模型和数据
         if hasattr(self, 'robot_model') and self.robot_model is not None:
             try:
                 mujoco.mj_deleteModel(self.robot_model)
@@ -133,12 +140,12 @@ class WalkerEnv(gym.Env):
                 pass
             del self.robot_data
         
-        # 3. 清空环境引用
         if hasattr(self, 'env'):
             del self.env
 
-# 优化后的训练函数（30万步，20-30分钟）
+# -------------------------- 2. 训练函数（类定义完成后再实例化） --------------------------
 def train_ppo():
+    # 类定义完成后，再创建实例（核心修复NameError）
     env = WalkerEnv(render_mode=None)
     
     from stable_baselines3 import PPO
@@ -189,10 +196,10 @@ def train_ppo():
     model.save("unitree_h1_walker_optimized")
     print("训练完成！模型已保存为 unitree_h1_walker_optimized")
 
-# 修复后的测试函数
+# -------------------------- 3. 测试函数 --------------------------
 def test_ppo():
     from stable_baselines3 import PPO
-    # 使用上下文管理器自动管理环境（避免手动调用close()）
+    # 使用上下文管理器自动管理环境
     with WalkerEnv(render_mode="human") as env:
         model = PPO.load("unitree_h1_walker_optimized", env=env)
         print("开始测试...（按ESC退出）")
@@ -202,8 +209,8 @@ def test_ppo():
             obs, reward, done, _, _ = env.step(action)
             if done:
                 obs, _ = env.reset()
-    # 退出with块自动调用close()，无需手动调用
 
+# -------------------------- 4. 主函数（执行训练+测试） --------------------------
 if __name__ == "__main__":
     train_ppo()
     test_ppo()
