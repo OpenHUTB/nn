@@ -1,7 +1,0 @@
-llc:
-  simulator_name: "llc_simulator"
-  checkpoint: "best_model.zip"
-  llc_ratio: 100
-  dwell_threshold: 50
-  target_radius: 0.05
-  joints: ["joint1", "joint2"]
