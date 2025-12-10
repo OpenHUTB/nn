@@ -27,7 +27,7 @@
     <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <!-- 新增墙壁材质 -->
+    <!-- 障碍物材质（保留） -->
     <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>
   </asset>
 
@@ -101,9 +101,11 @@
 
   <worldbody>
     <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3"/>
-    <!-- 新增墙壁障碍：机器人正前方3米处 -->
-    <body name="wall" pos="3 0 1">
-      <geom type="box" size="0.1 2 1" material="wall_gray" friction="1.0 0.1 0.1"/>
+    <!-- 核心修改：删除原有wall，新增机器人正前方3米处的障碍物 -->
+    <!-- 障碍物位置：x=3（正前方）、y=0（中轴线）、z=0.5（底部贴地，高度适配） -->
+    <!-- 障碍物尺寸：size="0.5 1 0.8" → 宽0.5m、长1m、高0.8m，确保机器人行走时会触发避障 -->
+    <body name="wall" pos="3 0 0.5">
+      <geom type="box" size="0.5 1 0.8" material="wall_gray" friction="1.0 0.1 0.1"/>
       <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
     </body>
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
