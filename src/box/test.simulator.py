@@ -6,7 +6,7 @@ import numpy as np
 # 1. 手动指定 simulator.py 的绝对路径
 simulator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "simulator.py"))
 
-# 2. 检查文件是否存在
+
 if not os.path.exists(simulator_path):
     raise FileNotFoundError(f"simulator.py 不存在：{simulator_path}")
 

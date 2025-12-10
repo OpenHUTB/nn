@@ -84,7 +84,7 @@ class Simulator:
         if self.model is not None:
             nq = self.model.nq
         else:
-            nq = 1  # 默认值
+            nq = 1  
             
         self.config["simulation"].setdefault("target_joint_pos", [0.0] * nq)
         self.config["simulation"].setdefault("max_steps", 1000)
