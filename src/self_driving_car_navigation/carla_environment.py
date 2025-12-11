@@ -1,9 +1,10 @@
 import gym
 import carla
 import numpy as np
-import sys
 import time
+import sys
 from queue import Queue
+from gym import spaces
 
 class CarlaEnvironment(gym.Env):
     def __init__(self):
@@ -56,12 +57,9 @@ class CarlaEnvironment(gym.Env):
         """处理摄像头数据，转换为RGB格式"""
         try:
             array = np.frombuffer(image.raw_data, dtype=np.uint8)
-
-            array = np.reshape(array, (image.height, image.width, 4))
+            array = np.reshape(array, (image.height, image.width, 4))  # (H,W,4)
             array = array[:, :, :3]  # 移除alpha通道
-            array = array[:, :, ::-1]  # BGR转RGB
-            array = array.copy()  # 消除负步长
-
+            array = array[:, :, ::-1].copy()  # BGR转RGB
             if self.image_queue.full():
                 self.image_queue.get()
             self.image_queue.put(array)
@@ -110,48 +108,51 @@ class CarlaEnvironment(gym.Env):
         time.sleep(0.5)
         self._spawn_vehicle()
         if self.vehicle:
-
-            self._spawn_camera()
-
+            self._spawn_sensors()
         time.sleep(1.0)  # 等待传感器就绪
         return self.get_observation()
 
     def _spawn_vehicle(self):
-
-        # 选择稳定车型（特斯拉Model3）
+        """生成车辆（特斯拉Model3）- 优化生成点选择逻辑"""
+        import random  # 仅在此方法内导入随机模块
         vehicle_bp = self.blueprint_library.find('vehicle.tesla.model3')
-        vehicle_bp.set_attribute('color', '255,0,0')  # 红色，便于观察
-        vehicle_bp.set_attribute('role_name', 'drone')
+        vehicle_bp.set_attribute('color', '255,0,0')  # 红色
+        vehicle_bp.set_attribute('role_name', 'ego_vehicle')
 
-        # 关键调整：使用第10个生成点（通常在主路中央，避免障碍物）
-        spawn_index = 10  # 可根据场景调整（0~264）
+        # 核心优化：随机选择生成点（解决固定位置问题）
+        if self.spawn_points:
+            # 随机打乱生成点顺序
+            random.shuffle(self.spawn_points)
+            # 尝试前5个随机生成点（避免位置被占用）
+            for spawn_point in self.spawn_points[:5]:
+                self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                if self.vehicle:
+                    self.vehicle.set_autopilot(False)
+                    self.vehicle.set_simulate_physics(True)
+                    print(f"[车辆生成] 成功在随机位置生成（ID: {self.vehicle.id}）")
+                    return
+        
+        # 若随机位置失败，fallback到原逻辑（确保兼容性）
+        spawn_index = 10
         for i in range(3):
-            # 优先用指定生成点，失败则重试
             spawn_point = self.spawn_points[(spawn_index + i) % len(self.spawn_points)]
-            print(f"[车辆生成] 尝试在生成点 {spawn_index + i} 生成车辆（主路中央）...")
-            sys.stdout.flush()
             self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
             if self.vehicle:
                 self.vehicle.set_autopilot(False)
-                self.vehicle.set_simulate_physics(True)  # 强制启用物理引擎
-                print(f"[车辆生成] 成功（ID: {self.vehicle.id}）- 位置：主路中央")
-                sys.stdout.flush()
-
+                self.vehicle.set_simulate_physics(True)
+                print(f"[车辆生成] 随机位置失败，使用备用位置（ID: {self.vehicle.id}）")
                 return
+        
         raise RuntimeError("车辆生成失败，请重启CARLA或更换场景（如Town03）")
 
     def _spawn_sensors(self):
-        """生成摄像头、激光雷达、IMU传感器（核心修正：兼容激光雷达参数）"""
+        """生成摄像头、激光雷达、IMU传感器（兼容激光雷达参数）"""
         # 1. 前视摄像头
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
         camera_bp.set_attribute('image_size_y', '128')
         camera_bp.set_attribute('fov', '90')
         camera_bp.set_attribute('sensor_tick', '0.05')
-
-        # 摄像头位置：车辆前方1.5米，高度2.4米（驾驶员视角）
-        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
         self.camera = self.world.spawn_actor(
             camera_bp, carla.Transform(carla.Location(x=1.5, z=2.4)), attach_to=self.vehicle
         )
@@ -208,11 +209,18 @@ class CarlaEnvironment(gym.Env):
 
     def step(self, action):
         """执行动作并返回环境反馈"""
-        control = carla.VehicleControl(
-            throttle=float(action[0]),
-            steer=float(action[1]),
-            brake=float(action[2])
-        )
+        # 适配离散动作到连续控制（根据原始测试代码的动作定义）
+        if action == 0:  # 前进
+            control = carla.VehicleControl(throttle=0.5, steer=0.0, brake=0.0)
+        elif action == 1:  # 左转
+            control = carla.VehicleControl(throttle=0.3, steer=0.5, brake=0.0)
+        elif action == 2:  # 右转
+            control = carla.VehicleControl(throttle=0.3, steer=-0.5, brake=0.0)
+        elif action == 3:  # 后退
+            control = carla.VehicleControl(throttle=0.0, steer=0.0, brake=0.0, reverse=True)
+        else:  # 默认空动作
+            control = carla.VehicleControl(throttle=0.0, steer=0.0, brake=1.0)
+
         self.vehicle.apply_control(control)
         observation = self.get_observation()
         reward = 1.0  # 基础存活奖励
