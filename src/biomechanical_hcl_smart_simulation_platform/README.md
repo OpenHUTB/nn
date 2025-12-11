@@ -205,7 +205,7 @@ python uitb/test/evaluator.py simulators/mobl_arms_index_pointing --num_episodes
 - 运行 `python uitb/test/evaluator.py --help` 查看所有参数。
 
 
-## 6. 预训练模拟器与示例
+## 6. 预训练模拟器总结
 ### 6.1 预训练模拟器介绍
 本子项目基于 User-in-the-Box 框架，是其中一个已经训练完成的预训练模拟器：mobl_arms_index_remote_driving – Controlling an RC Car via Joystick。
 在该模拟器中：“用户”被建模为一个带肌肉驱动的上肢生物力学模型（mobl_arms_index），拥有视觉 / 本体感觉等感知能力；
@@ -213,10 +213,10 @@ python uitb/test/evaluator.py simulators/mobl_arms_index_pointing --num_episodes
 整个环境遵循 OpenAI Gym 接口，可以与现有强化学习库（如 stable-baselines3）直接对接。
 
 ### 6.1 示例演示（GIF）
-- 指向任务：<video controls src="QQ2025113-114055-2.mp4" title="Title"></video>
-- 追踪任务：<video controls src="QQ20251124-15739-1.mp4" title="Title"></video>
-- 选择反应任务：<video controls src="QQ2025125-212624-1.mp4" title="Title"></video>
-- 遥控车任务：<video controls src="QQ2025129-104340-1.mp4" title="Title"></video>
+- 指向任务：![alt text](image.png)
+- 追踪任务：![alt text](image-1.png)
+- 选择反应任务：![alt text](image-2.png)
+- 遥控车任务：![alt text](image-3.png)
 
 ### 6.3 操作流程
 1. 克隆仓库并安装依赖  
@@ -228,15 +228,49 @@ python uitb/test/evaluator.py simulators/mobl_arms_index_pointing --num_episodes
    conda env create -f conda_env.yml
    conda activate uitb
 
-   # 安装 Python 包
-   pip install -e 
+   # 安装 Python 包（可编辑模式，方便后续修改）
+   pip install -e .
+
 2. 构建 RC Car 预训练模拟器
+   python - << 'EOF'
+   from uitb import Simulator
+   config_file = "uitb/configs/mobl_arms_index_remote_driving.yaml"
+   sim_folder = Simulator.build(config_file)
+   print("Built simulator at:", sim_folder)
+   EOF
+
 运行后会在 simulators/mobl_arms_index_remote_driving/ 下生成独立模拟器包。
 
 3. 用随机策略测试环境是否正常工作
+   
+python - << 'EOF'
+from uitb import Simulator
+
+sim_folder = "simulators/mobl_arms_index_remote_driving"
+env = Simulator.get(sim_folder)
+
+obs, info = env.reset()
+for step in range(1000):
+    action = env.action_space.sample()
+    obs, reward, terminated, truncated, info = env.step(action)
+    env.render()
+    if terminated or truncated:
+        print(f"Episode finished at step {step}, resetting...")
+        obs, info = env.reset()
+
+env.close()
+EOF
+      
 
 4. 使用评估脚本查看预训练策略表现并录制视频
-生成的视频和日志会保存在 simulators/mobl_arms_index_remote_driving/evaluate/ 目录下。
+  
+   python uitb/test/evaluator.py simulators/mobl_arms_index_remote_driving \
+  --num_episodes 10 \
+  --record \
+  --logging \
+  --action_sample_freq 100
+
+视频和日志保存在 simulators/mobl_arms_index_remote_driving/evaluate/ 目录下。
 
 ## 7. 扩展开发指南
 ### 7.1 新增生物力学模型
