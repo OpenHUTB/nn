@@ -27,8 +27,9 @@
     <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <!-- 障碍物材质（保留） -->
+    <!-- 障碍物材质（区分两个障碍） -->
     <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>
+    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>  <!-- 新增随机障碍材质 -->
   </asset>
 
   <default>
@@ -101,13 +102,19 @@
 
   <worldbody>
     <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3"/>
-    <!-- 核心修改：删除原有wall，新增机器人正前方3米处的障碍物 -->
-    <!-- 障碍物位置：x=3（正前方）、y=0（中轴线）、z=0.5（底部贴地，高度适配） -->
-    <!-- 障碍物尺寸：size="0.5 1 0.8" → 宽0.5m、长1m、高0.8m，确保机器人行走时会触发避障 -->
-    <body name="wall" pos="3 0 0.5">
+
+    <!-- 障碍1：固定位置（机器人正前方3米） -->
+    <body name="wall1" pos="3 0 0.5">
       <geom type="box" size="0.5 1 0.8" material="wall_gray" friction="1.0 0.1 0.1"/>
       <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
     </body>
+
+    <!-- 障碍2：固定占位位置（由Python脚本动态修改为随机位置） -->
+    <body name="wall2" pos="3.0 0.0 0.5">
+      <geom type="box" size="0.4 0.8 0.7" material="wall_blue" friction="1.0 0.1 0.1"/>
+      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
+    </body>
+
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <light name="top" pos="0 0 2" mode="trackcom"/>
     <body name="torso" pos="0 0 1.282" childclass="body">
