@@ -206,25 +206,37 @@ python uitb/test/evaluator.py simulators/mobl_arms_index_pointing --num_episodes
 
 
 ## 6. 预训练模拟器与示例
-项目提供 4 个预训练模拟器，覆盖典型 HCI 任务，可直接加载使用：
-
-| 任务名称                | 模拟器路径                                                                 | 配置文件路径                                                                 | 功能说明                     |
-|-------------------------|--------------------------------------------------------------------------|--------------------------------------------------------------------------|------------------------------|
-| 指向（Pointing）        | simulators/mobl_arms_index_pointing                                      | uitb/configs/mobl_arms_index_pointing.yaml                               | 控制手臂模型指向目标位置     |
-| 追踪（Tracking）        | simulators/mobl_arms_index_tracking                                      | uitb/configs/mobl_arms_index_tracking.yaml                               | 控制手臂模型追踪移动目标     |
-| 选择反应（Choice Reaction） | simulators/mobl_arms_index_choice_reaction                              | uitb/configs/mobl_arms_index_choice_reaction.yaml                       | 对随机出现的目标做出反应选择 |
-| 摇杆控制遥控车          | simulators/mobl_arms_index_remote_driving                                | uitb/configs/mobl_arms_index_remote_driving.yaml                         | 通过摇杆模型控制遥控车行驶   |
+### 6.1 预训练模拟器介绍
+本子项目基于 User-in-the-Box 框架，是其中一个已经训练完成的预训练模拟器：mobl_arms_index_remote_driving – Controlling an RC Car via Joystick。
+在该模拟器中：“用户”被建模为一个带肌肉驱动的上肢生物力学模型（mobl_arms_index），拥有视觉 / 本体感觉等感知能力；
+“交互设备”是一个虚拟 RC 小车 + 手柄环境，用户通过操纵手柄（Joystick）来控制小车移动；
+整个环境遵循 OpenAI Gym 接口，可以与现有强化学习库（如 stable-baselines3）直接对接。
 
 ### 6.1 示例演示（GIF）
-- 指向任务：<img src="figs/mobl_arms_index/pointing/video1.gif" width="25%"> <img src="figs/mobl_arms_index/pointing/video2.gif" width="25%">
-- 追踪任务：<img src="figs/mobl_arms_index/tracking/video1.gif" width="25%"> <img src="figs/mobl_arms_index/tracking/video2.gif" width="25%">
-- 选择反应任务：<img src="figs/mobl_arms_index/choice-reaction/video1.gif" width="25%"> <img src="figs/mobl_arms_index/choice-reaction/video2.gif" width="25%">
-- 遥控车任务：<img src="figs/mobl_arms_index/remote-driving/video1.gif" width="25%"> <img src="figs/mobl_arms_index/remote-driving/video2.gif" width="25%">
+- 指向任务：<video controls src="QQ2025113-114055-2.mp4" title="Title"></video>
+- 追踪任务：<video controls src="QQ20251124-15739-1.mp4" title="Title"></video>
+- 选择反应任务：<video controls src="QQ2025125-212624-1.mp4" title="Title"></video>
+- 遥控车任务：<video controls src="QQ2025129-104340-1.mp4" title="Title"></video>
 
-### 6.2 学术复现资源
-UIST 2022 论文中使用的模拟器、训练数据及图表复现脚本，可在独立分支获取：
-- 分支链接：[https://github.com/aikkala/user-in-the-box/tree/uist-submission-aleksi](https://github.com/aikkala/user-in-the-box/tree/uist-submission-aleksi)
+### 6.3 操作流程
+1. 克隆仓库并安装依赖  
+   ```bash
+   git clone <your-user-in-the-box-repo-url>
+   cd user-in-the-box
 
+   # 创建并启用 Conda 环境（推荐）
+   conda env create -f conda_env.yml
+   conda activate uitb
+
+   # 安装 Python 包
+   pip install -e 
+2. 构建 RC Car 预训练模拟器
+运行后会在 simulators/mobl_arms_index_remote_driving/ 下生成独立模拟器包。
+
+3. 用随机策略测试环境是否正常工作
+
+4. 使用评估脚本查看预训练策略表现并录制视频
+生成的视频和日志会保存在 simulators/mobl_arms_index_remote_driving/evaluate/ 目录下。
 
 ## 7. 扩展开发指南
 ### 7.1 新增生物力学模型
