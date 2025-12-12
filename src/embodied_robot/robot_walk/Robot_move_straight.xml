@@ -10,7 +10,7 @@
      limitations under the License.
 -->
 
-<mujoco model="Humanoid_With_Wall">
+<mujoco model="Humanoid_With_Dynamic_Wall">
   <option timestep="0.005"/>
 
   <visual>
@@ -27,9 +27,9 @@
     <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <!-- 障碍物材质（区分两个障碍） -->
-    <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>
-    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>  <!-- 新增随机障碍材质 -->
+    <!-- 障碍物材质（区分固定/动态障碍） -->
+    <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>    <!-- 固定障碍 -->
+    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>    <!-- 动态障碍 -->
   </asset>
 
   <default>
@@ -97,6 +97,10 @@
       <default class="elbow">
         <joint range="-100 50" stiffness="0"/>
       </default>
+      <!-- 动态障碍关节默认配置 -->
+      <default class="dynamic_wall_joint">
+        <joint type="slide" damping="10" stiffness="0" limited="true"/>
+      </default>
     </default>
   </default>
 
@@ -109,10 +113,15 @@
       <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
     </body>
 
-    <!-- 障碍2：固定占位位置（由Python脚本动态修改为随机位置） -->
-    <body name="wall2" pos="3.0 0.0 0.5">
-      <geom type="box" size="0.4 0.8 0.7" material="wall_blue" friction="1.0 0.1 0.1"/>
-      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
+    <!-- 障碍2：动态障碍（沿Y轴左右移动，X轴固定3米） -->
+    <body name="wall2_base" pos="3.0 0.0 0.5">
+      <!-- 滑动关节：沿Y轴移动，范围-2~2米 -->
+      <joint name="wall2_slide_y" class="dynamic_wall_joint" axis="0 1 0" range="-2.0 2.0"/>
+      <!-- 动态障碍本体 -->
+      <body name="wall2" pos="0 0 0">
+        <geom type="box" size="0.4 0.8 0.7" material="wall_blue" friction="1.0 0.1 0.1"/>
+        <inertial pos="0 0 0" mass="50" diaginertia="1 1 1"/> <!-- 降低质量便于移动 -->
+      </body>
     </body>
 
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
@@ -233,6 +242,8 @@
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
+    <!-- 动态障碍驱动电机 -->
+    <motor name="wall2_motor" gear="50" joint="wall2_slide_y" ctrlrange="-1 1"/>
   </actuator>
 
   <keyframe>
