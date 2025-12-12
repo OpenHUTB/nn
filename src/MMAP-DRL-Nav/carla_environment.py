@@ -12,150 +12,176 @@ class CarlaEnvironment(gym.Env):
         self.world = self.client.get_world()
         self.blueprint_library = self.world.get_blueprint_library()
 
-        # 定义动作空间和观测空间
-        self.action_space = gym.spaces.Discrete(4)  # 前进、左转、右转、后退
+        # ========== 同步模式核心配置（锁帧率，避免卡死） ==========
+        self.sync_settings = self.world.get_settings()
+        self.sync_settings.synchronous_mode = True  # 启用同步模式
+        self.sync_settings.fixed_delta_seconds = 1.0 / 30  # 锁30fps（平衡流畅+稳定）
+        self.sync_settings.no_rendering_mode = False  # 启用渲染（保证视角可见）
+        self.world.apply_settings(self.sync_settings)
+
+        # 动作/观测空间
+        self.action_space = gym.spaces.Discrete(4)
         self.observation_space = gym.spaces.Box(
             low=0, high=255, shape=(128, 128, 3), dtype=np.uint8
-        )  # 128x128 RGB图像
+        )
 
-        # 核心对象初始化
+        # 核心对象
         self.vehicle = None
         self.camera = None
-        self.image_data = None  # 存储相机采集的图像数据
+        self.collision_sensor = None
+        self.image_data = None
+        self.has_collision = False
 
-        # 镜头跟随参数（spectator视角）
-        self.spectator_offset = carla.Location(x=0, y=0, z=2.5)  # 高度偏移
-        self.spectator_distance = -5.0  # 车辆后方5米
-        self.spectator_pitch = -10  # 向下俯视10度
+        # 视角参数（同步模式最优配置）
+        self.view_height = 3.8    # 超高视角（3.8米）
+        self.view_pitch = -6.0    # 仅俯视6度（接近平视）
+        self.view_distance = 4.5  # 正后方4.5米
 
     def reset(self):
-        """重置环境，生成新车辆和相机，返回初始观测"""
-        # 清理旧的车辆和相机资源
-        if self.vehicle is not None:
+        """重置环境（同步模式下安全初始化）"""
+        # 清理旧资源
+        if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
-        if self.camera is not None:
+        if self.camera is not None and self.camera.is_alive:
             self.camera.destroy()
-            self.image_data = None
+        if self.collision_sensor is not None and self.collision_sensor.is_alive:
+            self.collision_sensor.destroy()
+        self.image_data = None
+        self.has_collision = False
 
-        # 生成车辆（特斯拉Model3）
+        # 生成车辆（同步模式下容错处理）
         vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
         spawn_points = self.world.get_map().get_spawn_points()
-        spawn_point = spawn_points[0] if spawn_points else carla.Transform(carla.Location(x=0, y=0, z=0))
+        spawn_point = spawn_points[0] if spawn_points else carla.Transform(carla.Location(x=100, y=100, z=0.5))
         self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
         self.vehicle.set_autopilot(False)
 
-        # 初始化RGB相机
+        # 初始化传感器（同步模式下低延迟配置）
         self._init_camera()
+        self._init_collision_sensor()
 
-        # 等待相机采集到第一帧数据
-        while self.image_data is None:
-            time.sleep(0.01)
+        # 等待传感器就绪（同步模式下精确等待）
+        timeout = 0
+        while self.image_data is None and timeout < 30:  # 30帧超时（1秒）
+            self.world.tick()  # 同步tick，保证传感器数据更新
+            time.sleep(0.001)
+            timeout += 1
 
-        # 镜头跳转到车辆位置并跟随
+        # 同步模式下强制绑定视角（无延迟）
         self.follow_vehicle()
-
         self.world.tick()
-        return self.image_data.copy()
+        return self.image_data.copy() if self.image_data is not None else np.zeros((128,128,3), dtype=np.uint8)
 
     def _init_camera(self):
-        """初始化挂载在车辆上的RGB相机"""
-        # 创建相机蓝图并设置参数
+        """同步模式下低延迟相机初始化"""
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
         camera_bp.set_attribute('image_size_y', '128')
-        camera_bp.set_attribute('fov', '90')  # 视野角度
-
-        # 相机挂载位置：车辆前上方（x=1.5米，z=2.0米）
+        camera_bp.set_attribute('fov', '90')
+        camera_bp.set_attribute('sensor_tick', '0.0')  # 同步模式下无传感器延迟
+        # 相机挂载在车辆前方（不影响视角）
         camera_transform = carla.Transform(carla.Location(x=1.5, z=2.0))
         self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
-
-        # 注册相机数据回调函数
         self.camera.listen(lambda img: self._camera_callback(img))
 
+    def _init_collision_sensor(self):
+        """同步模式下碰撞传感器"""
+        collision_bp = self.blueprint_library.find('sensor.other.collision')
+        collision_transform = carla.Transform(carla.Location(x=0, y=0, z=0))
+        self.collision_sensor = self.world.spawn_actor(
+            collision_bp, collision_transform, attach_to=self.vehicle
+        )
+        self.collision_sensor.listen(lambda event: self._collision_callback(event))
+
+    def _collision_callback(self, event):
+        """碰撞回调（同步模式下即时响应）"""
+        self.has_collision = True
+
     def _camera_callback(self, image):
-        """相机数据回调：将原始数据转换为RGB numpy数组"""
-        # CARLA相机输出为RGBA格式（4通道），转换为RGB（3通道）
+        """相机回调（同步模式下无延迟处理）"""
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
-        array = array.reshape((image.height, image.width, 4))
-        self.image_data = array[:, :, :3]  # 去掉Alpha通道
+        self.image_data = array.reshape((image.height, image.width, 4))[:, :, :3]
 
     def follow_vehicle(self):
-        """调整spectator视角，让镜头跟随车辆"""
+        """同步模式下丝滑视角更新（每帧必更，无延迟）"""
         spectator = self.world.get_spectator()
-        if not spectator or not self.vehicle:
+        if not spectator or not self.vehicle or not self.vehicle.is_alive:
             return
 
-        # 计算镜头位置（车辆后方+高度偏移）
-        vehicle_transform = self.vehicle.get_transform()
-        camera_location = vehicle_transform.location + carla.Location(x=self.spectator_distance) + self.spectator_offset
-        # 计算镜头朝向（与车辆一致，向下俯视）
-        camera_rotation = carla.Rotation(
-            pitch=self.spectator_pitch,
-            yaw=vehicle_transform.rotation.yaw,
-            roll=0
-        )
-        # 设置镜头位置和朝向
-        spectator.set_transform(carla.Transform(camera_location, camera_rotation))
+        # 同步模式下精准计算正后方位置（无误差）
+        vehicle_tf = self.vehicle.get_transform()
+        yaw_rad = np.radians(vehicle_tf.rotation.yaw)
+        # 正后方绝对坐标（同步模式下无偏移）
+        cam_x = vehicle_tf.location.x - (np.cos(yaw_rad) * self.view_distance)
+        cam_y = vehicle_tf.location.y - (np.sin(yaw_rad) * self.view_distance)
+        cam_z = self.view_height
+
+        # 同步模式下强制更新视角（无延迟）
+        spectator.set_transform(carla.Transform(
+            carla.Location(x=cam_x, y=cam_y, z=cam_z),
+            carla.Rotation(pitch=self.view_pitch, yaw=vehicle_tf.rotation.yaw, roll=0.0)
+        ))
 
     def get_observation(self):
-        """获取当前相机图像（模型输入的观测值）"""
-        if self.image_data is not None:
-            return self.image_data.copy()
-        # 兜底：相机未就绪时返回全零图像
-        return np.zeros((128, 128, 3), dtype=np.uint8)
+        """同步模式下即时获取观测"""
+        return self.image_data.copy() if self.image_data is not None else np.zeros((128, 128, 3), dtype=np.uint8)
 
     def step(self, action):
-        """执行动作，返回新状态、奖励、终止标志等"""
-        if self.vehicle is None:
-            raise RuntimeError("车辆未初始化，请先调用reset()")
+        """同步模式下step（每帧同步，丝滑无延迟）"""
+        if self.vehicle is None or not self.vehicle.is_alive:
+            raise RuntimeError("车辆未初始化/已销毁，请先调用reset()")
 
-        # 将动作映射为车辆控制指令
+        # 同步模式下极致平滑车辆控制（零抖动）
         throttle = 0.0
         steer = 0.0
         if action == 0:  # 前进
-            throttle = 1.0
+            throttle = 0.5  # 超平缓加速（匹配30fps）
         elif action == 1:  # 左转
-            throttle = 0.5
-            steer = -1.0
+            throttle = 0.4
+            steer = -0.1    # 微转向（零物理抖动）
         elif action == 2:  # 右转
-            throttle = 0.5
-            steer = 1.0
+            throttle = 0.4
+            steer = 0.1     # 微转向
         elif action == 3:  # 后退
-            throttle = -1.0
+            throttle = -0.2 # 超平缓后退
 
-        # 应用车辆控制
-        self.vehicle.apply_control(carla.VehicleControl(throttle=throttle, steer=steer))
-        self.world.tick()
+        # 同步模式下应用车辆控制（无物理波动）
+        self.vehicle.apply_control(carla.VehicleControl(
+            throttle=throttle, 
+            steer=steer,
+            hand_brake=False,
+            reverse=(throttle < 0),
+            gear=1,
+            manual_gear_shift=True
+        ))
+        
+        # ========== 同步模式核心：先tick再更新视角（无延迟） ==========
+        self.world.tick()  # 同步帧推进（30fps）
+        self.follow_vehicle()  # 视角与帧同步更新（丝滑）
 
-        # 镜头实时跟随车辆
-        self.follow_vehicle()
-
-        # 获取新状态、计算奖励、判断终止
+        # 同步模式下碰撞检测（即时响应）
         next_state = self.get_observation()
-        reward = self._calculate_reward(throttle)  # 自定义奖励函数
-        done = self._check_done()  # 自定义终止条件
+        reward = 0.1 if throttle > 0 else (-0.1 if throttle < 0 else 0.0)
+        done = self.has_collision
 
         return next_state, reward, done, {}
 
-    def _calculate_reward(self, throttle):
-        """奖励函数：鼓励前进，惩罚后退"""
-        if throttle > 0:
-            return 0.1  # 前进奖励
-        elif throttle < 0:
-            return -0.1  # 后退惩罚
-        return 0.0  # 无动作无奖励
-
-    def _check_done(self):
-        """终止条件：示例为永不终止（可根据需求修改）"""
-        # 可扩展：碰撞检测、到达目标、超时等
-        return False
-
     def close(self):
-        """关闭环境，清理所有资源"""
-        if self.vehicle is not None:
+        """同步模式下安全关闭（必做：恢复异步模式）"""
+        # 第一步：恢复CARLA异步模式（避免卡死）
+        self.sync_settings.synchronous_mode = False
+        self.world.apply_settings(self.sync_settings)
+
+        # 第二步：销毁所有对象
+        if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
-        if self.camera is not None:
+        if self.camera is not None and self.camera.is_alive:
             self.camera.destroy()
-        print("CARLA环境已关闭，资源清理完成")
+        if self.collision_sensor is not None and self.collision_sensor.is_alive:
+            self.collision_sensor.destroy()
+
+        # 第三步：延迟释放（同步模式下必要）
+        time.sleep(0.5)
+        print("CARLA环境已关闭（同步模式已恢复为异步）")
 
 
