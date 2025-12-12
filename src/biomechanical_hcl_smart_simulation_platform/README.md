@@ -213,10 +213,10 @@ python uitb/test/evaluator.py simulators/mobl_arms_index_pointing --num_episodes
 整个环境遵循 OpenAI Gym 接口，可以与现有强化学习库（如 stable-baselines3）直接对接。
 
 ### 6.1 示例演示（GIF）
-- 指向任务：![alt text](image.png)
-- 追踪任务：![alt text](image-1.png)
-- 选择反应任务：![alt text](image-2.png)
-- 遥控车任务：![alt text](image-3.png)
+- 指向任务：https://imgur.com/a/CHzVeBK
+- 追踪任务：https://imgur.com/a/CHzVeBK
+- 选择反应任务：https://imgur.com/a/CHzVeBK
+- 遥控车任务：https://imgur.com/a/CHzVeBK
 
 ### 6.3 操作流程
 1. 克隆仓库并安装依赖  
