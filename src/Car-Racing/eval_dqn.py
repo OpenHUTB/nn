@@ -2,7 +2,7 @@ import os
 import DQN_model as DQN
 
 # Load the saved model
-save_dir = 'C:\\Users\\25012\\Desktop\\rl-car-ddqn-main\\training\\saved_models'  # Match DQN_model.py
+save_dir = 'training\saved_models'  # Match DQN_model.py
 model_file = 'DQN.pt'  # Specify the exact file
 driver = DQN.Agent(
     state_space_shape=(4, 84, 84),  # Adjust to your state shape
