@@ -27,7 +27,6 @@ class Simulator:
         # 3. 最后校验配置
         self._validate_config()
 
-        # 初始化动作空间、观测空间、渲染
         self._init_action_space()
         self._init_observation_space()
         

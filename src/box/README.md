@@ -23,7 +23,7 @@ pip install numpy==1.26.4 scipy==1.11.4 matplotlib==3.8.4 ruamel.yaml==0.18.6 ce
 1.simulator.py（仿真器核心） 
 功能：继承 gym.Env，实现仿真环境的初始化、步骤推进（step）、环境重置（reset）和可视化渲染（render），集成生物力学模型、感知模块和任务逻辑。 运行方式：需通过调用脚本（如 test_simulator.py）运行，示例见 “三、运行步骤”。
 2.main.py（辅助脚本） 功能：基于 certifi 查询 CA 证书信息（路径或内容），用于验证网络请求的安全性。 
-运行方式：
+对MoblArmsIndex生物力学模型运行方式：
 # 查看证书路径
 python main.py
 

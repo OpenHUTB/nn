@@ -268,32 +268,3 @@ if __name__ == "__main__":
         print("\n" + "=" * 60)
         print("注意: 缺少 MuJoCo 模型文件，但导入测试成功")
         print("=" * 60)
-
-
-# ================ 使用示例 ================
-"""
-在您的项目中这样使用:
-
-# 方法1: 直接导入使用
-from moblARMslndex import MoblArmsIndex
-
-# 创建 MuJoCo 模型和数据
-model = mujoco.MjModel.from_xml_path("path/to/model.xml")
-data = mujoco.MjData(model)
-
-# 创建生物力学模型实例
-bm_model = MoblArmsIndex(model, data, shoulder_variant="patch-v1")
-
-# 在每个时间步更新
-for step in range(100):
-    # ... 设置控制信号 ...
-    mujoco.mj_step(model, data)
-    bm_model._update(model, data)
-
-# 方法2: 在模拟器环境中使用
-# 在配置文件中指定:
-# bm_model:
-#   cls: "MoblArmsIndex"
-#   kwargs:
-#     shoulder_variant: "patch-v1"
-"""

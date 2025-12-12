@@ -83,7 +83,7 @@ except Exception as e:
     traceback.print_exc()
     
 finally:
-    # 关闭环境
+   
     print("\n关闭仿真环境...")
     try:
         if 'env' in locals():
