@@ -43,3 +43,9 @@ https://github.com/robfiras/loco-mujoco/tree/master/loco_mujoco/models/unitree_h
 # _数据集百度网盘地址_
 
 链接: https://pan.baidu.com/s/1Viqlg9VYZBuKgj7TiVo-Tw 提取码: 68aa
+
+# _文件说明_
+
+1  main:使用直接locomujoco的接口实现轨迹动画
+2  mujoco:学习使用mujoco的接口和locomujoco数据实现轨迹动画
+3  robot_RL:使用mujoco的接口实现机器人RL算法
