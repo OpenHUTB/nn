@@ -1,15 +1,31 @@
 import os
 import sys
+
+import matplotlib
 import torch
 import datetime
 import csv
+
 import gymnasium as gym
 import gymnasium.wrappers as gym_wrap
+import matplotlib.pyplot as plt
 import numpy as np
+
 # Adjust sys.path to include the parent directory where .dqn_model resides
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import DQN_model as DQN
+
 from gymnasium.spaces import Box
+from tensordict import TensorDict
+from torch import nn
+from torchrl.data import TensorDictReplayBuffer, LazyMemmapStorage
+
+is_ipython = 'inline' in matplotlib.get_backend()
+if is_ipython:
+    from IPython import display
+
+plt.ion()
+
 
 # Environment setup
 env = gym.make("CarRacing-v3", continuous=False)  # Explicitly set continuous=False
@@ -22,6 +38,7 @@ state, info = env.reset()
 action_n = env.action_space.n
 print(f"Action space size: {action_n}")  # Debug print
 print(f"Action space details: {env.action_space}")  # Additional debug
+
 # Agent initialization
 driver = DQN.Agent(
     state_space_shape=state.shape,
@@ -46,7 +63,10 @@ when2save = 100000  # in timesteps
 when2report = 5000  # in timesteps
 when2eval = 50000  # in timesteps
 when2log = 10  # in episodes
-report_type = 'text'  # 'text', 'plot', None
+
+report_type = 'plot'  # 'text', 'plot', None
+
+
 
 # Training loop
 while episode < play_n_episodes:
@@ -111,6 +131,10 @@ while episode < play_n_episodes:
     episode_time_list.append(now_time.time().strftime('%H:%M:%S'))
 
 
+    if report_type == 'plot':
+        DQN.plot_reward(episode, episode_reward_list, timestep_n)
+
+
     if episode % when2log == 0:
         driver.write_log(
             episode_date_list,
@@ -150,6 +174,8 @@ def evaluate_agent(agent, num_episodes=2, render=False):
 avg_score = evaluate_agent(driver, num_episodes=2)
 print(f"\nAverage DQN evaluation score: {avg_score:.1f}")
 
+plt.show()
+
 if report_type == 'text':
     rewards_tensor = torch.tensor(episode_reward_list, dtype=torch.float)
     eval_reward = torch.clone(rewards_tensor[-100:])
@@ -179,4 +205,6 @@ driver.write_log(
     log_filename='DQN_log_test.csv'
 )
 env.close()
+
+plt.ioff()
 
