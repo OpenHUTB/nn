@@ -47,6 +47,13 @@ class CarlaEnvironment(gym.Env):
                 self.world = self.client.get_world()
                 self.blueprint_library = self.world.get_blueprint_library()
                 
+                # 关键修改：清除地图中所有默认静态车辆
+                actors = self.world.get_actors()
+                for actor in actors:
+                    if actor.type_id.startswith('vehicle.'):  # 筛选所有车辆类型
+                        actor.destroy()
+                        print(f"[清除默认车辆] 销毁静态车辆（ID: {actor.id}）")
+                
                 # 启用同步模式（关键优化：解决数据不同步问题）
                 self.settings = self.world.get_settings()
                 self.settings.synchronous_mode = True
