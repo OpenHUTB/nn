@@ -1,9 +1,10 @@
 import gym
 import carla
 import numpy as np
-import sys
 import time
+import sys
 from queue import Queue
+from gym import spaces
 
 class CarlaEnvironment(gym.Env):
     def __init__(self):
@@ -11,6 +12,7 @@ class CarlaEnvironment(gym.Env):
         self.client = None
         self.world = None
         self.blueprint_library = None
+        self.settings = None  # 用于保存世界设置
         self._connect_carla()
 
         # 观测空间定义
@@ -35,16 +37,23 @@ class CarlaEnvironment(gym.Env):
         sys.stdout.flush()
 
     def _connect_carla(self):
-        """连接CARLA服务器，支持重试"""
+        """连接CARLA服务器，支持重试并启用同步模式"""
         retry_count = 3
         for i in range(retry_count):
             try:
                 print(f"[CARLA连接] 尝试第{i+1}次连接（localhost:2000）...")
                 self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(15.0)  # 超时时间15秒
+                self.client.set_timeout(15.0)
                 self.world = self.client.get_world()
                 self.blueprint_library = self.world.get_blueprint_library()
-                print("[CARLA连接] 成功连接到模拟器")
+                
+                # 启用同步模式（关键优化：解决数据不同步问题）
+                self.settings = self.world.get_settings()
+                self.settings.synchronous_mode = True
+                self.settings.fixed_delta_seconds = 1/30  # 固定30帧
+                self.world.apply_settings(self.settings)
+                
+                print("[CARLA连接] 成功连接到模拟器并启用同步模式")
                 return
             except Exception as e:
                 print(f"[CARLA连接失败] {str(e)}")
@@ -56,12 +65,9 @@ class CarlaEnvironment(gym.Env):
         """处理摄像头数据，转换为RGB格式"""
         try:
             array = np.frombuffer(image.raw_data, dtype=np.uint8)
-
             array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]  # 移除alpha通道
-            array = array[:, :, ::-1]  # BGR转RGB
-            array = array.copy()  # 消除负步长
-
+            array = array[:, :, :3]
+            array = array[:, :, ::-1].copy()  # BGR转RGB
             if self.image_queue.full():
                 self.image_queue.get()
             self.image_queue.put(array)
@@ -71,15 +77,12 @@ class CarlaEnvironment(gym.Env):
     def process_lidar(self, data):
         """处理激光雷达数据，生成360度距离数组"""
         try:
-            # 解析点云数据 (x,y,z,intensity)
             points = np.frombuffer(data.raw_data, dtype=np.dtype('f4')).reshape(-1, 4)[:, :3]
-            distances = np.linalg.norm(points, axis=1)  # 计算每个点到车辆的距离
-            angles = np.arctan2(points[:, 1], points[:, 0]) * 180 / np.pi  # 计算角度（度）
-            angles = (angles + 360) % 360  # 归一化到0-360度
+            distances = np.linalg.norm(points, axis=1)
+            angles = np.arctan2(points[:, 1], points[:, 0]) * 180 / np.pi
+            angles = (angles + 360) % 360
 
-            # 初始化360度距离数组（默认50米）
             lidar_distances = np.full(360, 50.0, dtype=np.float32)
-            # 填充每个角度的最近距离
             for angle, dist in zip(angles, distances):
                 angle_idx = int(round(angle)) % 360
                 if dist < lidar_distances[angle_idx]:
@@ -105,81 +108,85 @@ class CarlaEnvironment(gym.Env):
             print(f"[IMU处理错误] {str(e)}")
 
     def reset(self):
-        """重置环境，生成车辆和传感器"""
+        """重置环境，生成车辆和传感器（启用CARLA原生自动驾驶）"""
         self.close()
         time.sleep(0.5)
         self._spawn_vehicle()
         if self.vehicle:
-
-            self._spawn_camera()
-
-        time.sleep(1.0)  # 等待传感器就绪
+            self._spawn_sensors()
+            # 启用CARLA原生自动驾驶（关键优化：使用成熟的车道保持逻辑）
+            self.vehicle.set_autopilot(True)
+        time.sleep(1.0)
         return self.get_observation()
 
     def _spawn_vehicle(self):
-
-        # 选择稳定车型（特斯拉Model3）
+        """生成车辆（特斯拉Model3）- 选择车道内的生成点"""
+        import random
         vehicle_bp = self.blueprint_library.find('vehicle.tesla.model3')
-        vehicle_bp.set_attribute('color', '255,0,0')  # 红色，便于观察
-        vehicle_bp.set_attribute('role_name', 'drone')
+        vehicle_bp.set_attribute('color', '255,0,0')
+        vehicle_bp.set_attribute('role_name', 'ego_vehicle')
 
-        # 关键调整：使用第10个生成点（通常在主路中央，避免障碍物）
-        spawn_index = 10  # 可根据场景调整（0~264）
+        # 优先选择车道内的生成点（减少初始偏离）
+        if self.spawn_points:
+            random.shuffle(self.spawn_points)
+            # 尝试前10个生成点，确保车辆在道路上
+            for spawn_point in self.spawn_points[:10]:
+                self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                if self.vehicle:
+                    self.vehicle.set_autopilot(False)
+                    self.vehicle.set_simulate_physics(True)
+                    print(f"[车辆生成] 成功在道路生成点生成（ID: {self.vehicle.id}）")
+                    return
+        
+        # 备用生成逻辑
+        spawn_index = 10
         for i in range(3):
-            # 优先用指定生成点，失败则重试
             spawn_point = self.spawn_points[(spawn_index + i) % len(self.spawn_points)]
-            print(f"[车辆生成] 尝试在生成点 {spawn_index + i} 生成车辆（主路中央）...")
-            sys.stdout.flush()
             self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
             if self.vehicle:
                 self.vehicle.set_autopilot(False)
-                self.vehicle.set_simulate_physics(True)  # 强制启用物理引擎
-                print(f"[车辆生成] 成功（ID: {self.vehicle.id}）- 位置：主路中央")
-                sys.stdout.flush()
-
+                self.vehicle.set_simulate_physics(True)
+                print(f"[车辆生成] 使用备用位置（ID: {self.vehicle.id}）")
                 return
-        raise RuntimeError("车辆生成失败，请重启CARLA或更换场景（如Town03）")
+        
+        raise RuntimeError("车辆生成失败，请重启CARLA或更换场景")
 
     def _spawn_sensors(self):
-        """生成摄像头、激光雷达、IMU传感器（核心修正：兼容激光雷达参数）"""
-        # 1. 前视摄像头
+        """生成传感器（适配0.9.11版本参数，修正激光雷达垂直视野）"""
+        # 前视摄像头（优化视角，更贴近驾驶视角）
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
         camera_bp.set_attribute('image_size_y', '128')
-        camera_bp.set_attribute('fov', '90')
-        camera_bp.set_attribute('sensor_tick', '0.05')
-
-        # 摄像头位置：车辆前方1.5米，高度2.4米（驾驶员视角）
-        camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
-
+        camera_bp.set_attribute('fov', '100')  # 扩大视野
+        camera_bp.set_attribute('sensor_tick', '0.033')  # 30Hz
         self.camera = self.world.spawn_actor(
-            camera_bp, carla.Transform(carla.Location(x=1.5, z=2.4)), attach_to=self.vehicle
+            camera_bp, carla.Transform(carla.Location(x=2.0, z=1.5)), attach_to=self.vehicle
         )
         self.camera.listen(self.process_image)
 
-        # 2. 激光雷达（关键修正：用upper_fov和lower_fov替代vertical_fov）
+        # 激光雷达（0.9.11兼容参数：用upper_fov和lower_fov替代vertical_fov）
         lidar_bp = self.blueprint_library.find('sensor.lidar.ray_cast')
-        lidar_bp.set_attribute('channels', '64')  # 64线
-        lidar_bp.set_attribute('range', '50')  # 最大50米
-        lidar_bp.set_attribute('points_per_second', '200000')
-        lidar_bp.set_attribute('rotation_frequency', '20')  # 20Hz
-        lidar_bp.set_attribute('horizontal_fov', '360')  # 全向扫描
-        # 垂直角度范围：-30°到30°（兼容所有版本）
-        lidar_bp.set_attribute('upper_fov', '30.0')    # 上角度
-        lidar_bp.set_attribute('lower_fov', '-30.0')   # 下角度
+        lidar_bp.set_attribute('channels', '32')
+        lidar_bp.set_attribute('range', '50')
+        lidar_bp.set_attribute('points_per_second', '100000')
+        lidar_bp.set_attribute('rotation_frequency', '10')
+        lidar_bp.set_attribute('horizontal_fov', '360')
+        # 0.9.11专用：垂直视野通过上下视角差定义（15 - (-15) = 30度）
+        lidar_bp.set_attribute('upper_fov', '15.0')   # 上视角
+        lidar_bp.set_attribute('lower_fov', '-15.0')  # 下视角
         self.lidar = self.world.spawn_actor(
             lidar_bp, carla.Transform(carla.Location(x=0.0, z=2.0)), attach_to=self.vehicle
         )
         self.lidar.listen(self.process_lidar)
 
-        # 3. IMU传感器
+        # IMU传感器
         imu_bp = self.blueprint_library.find('sensor.other.imu')
-        imu_bp.set_attribute('sensor_tick', '0.05')
+        imu_bp.set_attribute('sensor_tick', '0.033')
         self.imu = self.world.spawn_actor(
             imu_bp, carla.Transform(), attach_to=self.vehicle
         )
         self.imu.listen(self.process_imu)
-        print("[传感器] 全向激光雷达+摄像头+IMU初始化成功")
+        print("[传感器] 初始化成功")
 
     def get_observation(self):
         """获取传感器数据（确保数据就绪）"""
@@ -192,12 +199,11 @@ class CarlaEnvironment(gym.Env):
         }
 
     def get_obstacle_directions(self, lidar_distances):
-        """计算前/后/左/右四个方向的最近障碍物距离"""
-        # 角度范围定义（度）
-        front_angles = np.concatenate([np.arange(345, 360), np.arange(0, 16)])  # 前方：-15~15°
-        rear_angles = np.arange(165, 196)  # 后方：165~195°
-        left_angles = np.arange(75, 106)  # 左方：75~105°
-        right_angles = np.arange(255, 286)  # 右方：255~285°（-105~-75°）
+        """计算四个方向的最近障碍物距离"""
+        front_angles = np.concatenate([np.arange(345, 360), np.arange(0, 16)])
+        rear_angles = np.arange(165, 196)
+        left_angles = np.arange(75, 106)
+        right_angles = np.arange(255, 286)
 
         return {
             'front': np.min(lidar_distances[front_angles]),
@@ -206,21 +212,16 @@ class CarlaEnvironment(gym.Env):
             'right': np.min(lidar_distances[right_angles])
         }
 
-    def step(self, action):
-        """执行动作并返回环境反馈"""
-        control = carla.VehicleControl(
-            throttle=float(action[0]),
-            steer=float(action[1]),
-            brake=float(action[2])
-        )
-        self.vehicle.apply_control(control)
+    def step(self, action=None):
+        """执行动作（使用自动驾驶时可忽略action）"""
+        # 当启用autopilot时，不需要手动控制
         observation = self.get_observation()
-        reward = 1.0  # 基础存活奖励
+        reward = 1.0
         done = False
         return observation, reward, done, {}
 
     def close(self):
-        """清理资源（传感器和车辆）"""
+        """清理资源并恢复世界设置"""
         # 销毁传感器
         for sensor in [self.camera, self.lidar, self.imu]:
             if sensor is not None and sensor.is_alive:
@@ -233,4 +234,8 @@ class CarlaEnvironment(gym.Env):
         for q in [self.image_queue, self.lidar_queue, self.imu_queue]:
             while not q.empty():
                 q.get()
+        # 恢复世界设置
+        if self.settings:
+            self.settings.synchronous_mode = False
+            self.world.apply_settings(self.settings)
         print("[资源清理] 所有传感器和车辆已销毁")
