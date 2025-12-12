@@ -3,6 +3,7 @@ import numpy as np
 import gym
 import time
 import socket  # 端口检测
+import random  # 仅新增：随机生成NPC位置/选择蓝图
 
 class CarlaEnvironment(gym.Env):
     def __init__(self):
@@ -49,6 +50,14 @@ class CarlaEnvironment(gym.Env):
         self.sync_settings.no_rendering_mode = False
         self.world.apply_settings(self.sync_settings)
 
+        # ========== 仅新增：NPC基础配置（不卡的少量数量） ==========
+        self.traffic_manager = self.client.get_trafficmanager(8000)
+        self.traffic_manager.set_synchronous_mode(True)
+        self.npc_vehicle_list = []  # 存储NPC车辆
+        self.npc_pedestrian_list = []  # 存储NPC行人
+        self.hit_vehicle = False  # 撞车标记（终止）
+        self.hit_pedestrian = False  # 撞人标记（不终止）
+
         # 动作/观测空间
         self.action_space = gym.spaces.Discrete(4)
         self.observation_space = gym.spaces.Box(
@@ -67,6 +76,41 @@ class CarlaEnvironment(gym.Env):
         self.view_pitch = -6.0    # 仅俯视6度（接近平视）
         self.view_distance = 4.5  # 正后方4.5米
 
+    # ========== 仅新增：生成少量NPC（10车+5行人，保证不卡） ==========
+    def _spawn_small_npc(self):
+        # 清理旧NPC
+        for v in self.npc_vehicle_list:
+            if v.is_alive:
+                v.destroy()
+        self.npc_vehicle_list.clear()
+        for p in self.npc_pedestrian_list:
+            if p.is_alive:
+                p.destroy()
+        self.npc_pedestrian_list.clear()
+
+        # 生成10辆NPC车辆（少量不卡）
+        vehicle_bps = self.blueprint_library.filter('vehicle.*')
+        spawn_points = self.world.get_map().get_spawn_points()[:10]  # 仅取前10个生成点
+        for sp in spawn_points:
+            try:
+                npc_vehicle = self.world.spawn_actor(random.choice(vehicle_bps), sp)
+                self.npc_vehicle_list.append(npc_vehicle)
+                npc_vehicle.set_autopilot(True, self.traffic_manager.get_port())
+            except:
+                continue
+
+        # 生成5个NPC行人（少量不卡）
+        pedestrian_bps = self.blueprint_library.filter('walker.pedestrian.*')
+        for _ in range(5):
+            # 随机生成行人位置（地图内合法范围）
+            loc = carla.Location(x=random.uniform(-100, 100), y=random.uniform(-100, 100), z=0)
+            try:
+                pedestrian = self.world.try_spawn_actor(random.choice(pedestrian_bps), carla.Transform(loc))
+                if pedestrian:
+                    self.npc_pedestrian_list.append(pedestrian)
+            except:
+                continue
+
     def reset(self):
         """重置环境（仅随机出生点，无地图切换/额外打印）"""
         # 清理旧资源
@@ -78,6 +122,10 @@ class CarlaEnvironment(gym.Env):
             self.collision_sensor.destroy()
         self.image_data = None
         self.has_collision = False
+
+        # ========== 仅新增：重置碰撞标记 ==========
+        self.hit_vehicle = False
+        self.hit_pedestrian = False
 
         # ========== 仅随机选择出生点（无任何打印） ==========
         vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
@@ -99,6 +147,9 @@ class CarlaEnvironment(gym.Env):
         # 初始化传感器
         self._init_camera()
         self._init_collision_sensor()
+
+        # ========== 仅新增：调用生成少量NPC ==========
+        self._spawn_small_npc()
 
         # 等待传感器就绪
         timeout = 0
@@ -124,7 +175,7 @@ class CarlaEnvironment(gym.Env):
         self.camera.listen(lambda img: self._camera_callback(img))
 
     def _init_collision_sensor(self):
-        """初始化碰撞传感器（原配置）"""
+        """初始化碰撞传感器（仅修改回调函数）"""
         collision_bp = self.blueprint_library.find('sensor.other.collision')
         collision_transform = carla.Transform(carla.Location(x=0, y=0, z=0))
         self.collision_sensor = self.world.spawn_actor(
@@ -132,9 +183,15 @@ class CarlaEnvironment(gym.Env):
         )
         self.collision_sensor.listen(lambda event: self._collision_callback(event))
 
+    # ========== 仅修改：碰撞回调（区分撞车/撞人） ==========
     def _collision_callback(self, event):
-        """碰撞回调（原配置）"""
+        """碰撞回调（区分撞车/撞人）"""
         self.has_collision = True
+        other_actor_type = event.other_actor.type_id
+        if 'vehicle' in other_actor_type:
+            self.hit_vehicle = True  # 撞车标记
+        elif 'walker' in other_actor_type:
+            self.hit_pedestrian = True  # 撞人标记
 
     def _camera_callback(self, image):
         """相机数据回调（原配置）"""
@@ -165,7 +222,7 @@ class CarlaEnvironment(gym.Env):
         return self.image_data.copy() if self.image_data is not None else np.zeros((128, 128, 3), dtype=np.uint8)
 
     def step(self, action):
-        """执行单步动作（原无抖动逻辑，仅同步tick）"""
+        """执行单步动作（原无抖动逻辑，仅修改终止条件）"""
         if self.vehicle is None or not self.vehicle.is_alive:
             raise RuntimeError("车辆未初始化/已销毁，请先调用reset()")
 
@@ -197,12 +254,24 @@ class CarlaEnvironment(gym.Env):
 
         next_state = self.get_observation()
         reward = 0.1 if throttle > 0 else (-0.1 if throttle < 0 else 0.0)
-        done = self.has_collision
+        
+        # ========== 仅修改：终止条件（撞车才结束，撞人/其他碰撞不结束） ==========
+        done = self.hit_vehicle
 
         return next_state, reward, done, {}
 
     def close(self):
-        """安全关闭环境（原配置+容错）"""
+        """安全关闭环境（原配置+容错，仅新增清理NPC）"""
+        # ========== 仅新增：清理NPC ==========
+        for v in self.npc_vehicle_list:
+            if v.is_alive:
+                v.destroy()
+        for p in self.npc_pedestrian_list:
+            if p.is_alive:
+                p.destroy()
+        self.traffic_manager.set_synchronous_mode(False)
+
+        # 原有清理逻辑（完全保留）
         try:
             self.sync_settings.synchronous_mode = False
             self.world.apply_settings(self.sync_settings)
