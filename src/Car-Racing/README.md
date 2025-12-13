@@ -3,5 +3,6 @@
 链接: https://pan.baidu.com/s/1Pdorjhu2OaBUCKC1o3xHtw?pwd=2vib 提取码: 2vib 
 2.代码路径需要改成本地的，需要注意
 3.下图是运行入口训练代码三个小时的奖励曲线图
+4.configs里的文件是训练模型的超参数配置文件，可以改参数
 ![rewardline](https://raw.githubusercontent.com/GODDDDD22311/assets/main/rewardline.PNG)
 
