@@ -197,7 +197,8 @@ class GaussianMixtureModel:
                 
                 # 使用einsum高效计算协方差矩阵
                 # 等价于: new_sigma_k = (X_centered.T @ diag(gamma[:,k]) @ X_centered) / Nk[k]
-                new_sigma_k = np.dot(weighted_X.T, X_centered) / Nk[k]
+                # 更稳定的协方差计算方式
+                new_sigma_k = np.einsum('ki,kj->ij', gamma[:, k, None] * X_centered, X_centered) / Nk[k]
 
                 # 统一正则化处理，确保协方差矩阵正定
                 new_sigma_k += np.eye(n_features) * 1e-6
