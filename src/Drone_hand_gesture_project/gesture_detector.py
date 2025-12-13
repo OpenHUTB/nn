@@ -23,14 +23,14 @@ class GestureDetector:
 
         # 手势到控制指令的映射
         self.gesture_commands = {
-            "open_palm": "takeoff",  # 张开手掌 - 起飞
-            "closed_fist": "land",  # 握拳 - 降落
-            "pointing_up": "up",  # 食指上指 - 上升
-            "pointing_down": "down",  # 食指向下 - 下降
-            "victory": "forward",  # 胜利手势 - 前进
-            "thumb_up": "backward",  # 大拇指 - 后退
-            "thumb_down": "stop",  # 大拇指向下 - 停止
-            "ok_sign": "hover"  # OK手势 - 悬停
+            "open_palm": "起飞",  # 张开手掌 - 起飞
+            "closed_fist": "降落",  # 握拳 - 降落
+            "pointing_up": "上升",  # 食指上指 - 上升
+            "pointing_down": "下降",  # 食指向下 - 下降
+            "victory": "前进",  # 胜利手势 - 前进
+            "thumb_up": "后退",  # 大拇指 - 后退
+            "thumb_down": "停止",  # 大拇指向下 - 停止
+            "ok_sign": "悬停"  # OK手势 - 悬停
         }
 
     def detect_gestures(self, image):
@@ -73,7 +73,7 @@ class GestureDetector:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
                 # 显示控制指令
-                command = self.gesture_commands.get(gesture, "none")
+                command = self.gesture_commands.get(gesture, "无")
                 cv2.putText(image, f"Command: {command}", (10, 110),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
