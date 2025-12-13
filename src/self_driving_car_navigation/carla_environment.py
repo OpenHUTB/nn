@@ -3,6 +3,7 @@ import carla
 import numpy as np
 import time
 import sys
+import random
 from queue import Queue
 from gym import spaces
 
@@ -22,11 +23,12 @@ class CarlaEnvironment(gym.Env):
             'imu': gym.spaces.Box(low=-10, high=10, shape=(6,), dtype=np.float32)
         })
 
-        # 传感器和车辆实例
+        # 传感器、车辆和NPC实例
         self.vehicle = None
         self.camera = None
         self.lidar = None
         self.imu = None
+        self.npc_vehicles = []  # 存储NPC车辆实例
         # 数据队列
         self.image_queue = Queue(maxsize=1)
         self.lidar_queue = Queue(maxsize=1)
@@ -46,6 +48,13 @@ class CarlaEnvironment(gym.Env):
                 self.client.set_timeout(15.0)
                 self.world = self.client.get_world()
                 self.blueprint_library = self.world.get_blueprint_library()
+                
+                # 清除地图中所有默认静态车辆
+                actors = self.world.get_actors()
+                for actor in actors:
+                    if actor.type_id.startswith('vehicle.'):  # 筛选所有车辆类型
+                        actor.destroy()
+                        print(f"[清除默认车辆] 销毁静态车辆（ID: {actor.id}）")
                 
                 # 启用同步模式（关键优化：解决数据不同步问题）
                 self.settings = self.world.get_settings()
@@ -108,20 +117,24 @@ class CarlaEnvironment(gym.Env):
             print(f"[IMU处理错误] {str(e)}")
 
     def reset(self):
-        """重置环境，生成车辆和传感器（启用CARLA原生自动驾驶）"""
+        """重置环境，生成车辆、传感器和NPC（启用自动驾驶）"""
         self.close()
         time.sleep(0.5)
         self._spawn_vehicle()
         if self.vehicle:
             self._spawn_sensors()
-            # 启用CARLA原生自动驾驶（关键优化：使用成熟的车道保持逻辑）
+            # 启用主角车自动驾驶
             self.vehicle.set_autopilot(True)
-        time.sleep(1.0)
+            # 生成NPC车辆（20辆）
+            self._spawn_npcs(20)
+        # 额外同步确保所有车辆启动
+        for _ in range(2):
+            self.world.tick()
+            time.sleep(0.5)
         return self.get_observation()
 
     def _spawn_vehicle(self):
-        """生成车辆（特斯拉Model3）- 选择车道内的生成点"""
-        import random
+        """生成主角车辆（特斯拉Model3）- 选择车道内的生成点"""
         vehicle_bp = self.blueprint_library.find('vehicle.tesla.model3')
         vehicle_bp.set_attribute('color', '255,0,0')
         vehicle_bp.set_attribute('role_name', 'ego_vehicle')
@@ -151,29 +164,71 @@ class CarlaEnvironment(gym.Env):
         
         raise RuntimeError("车辆生成失败，请重启CARLA或更换场景")
 
+    def _spawn_npcs(self, count):
+        """生成指定数量的NPC车辆并激活自动驾驶"""
+        if not self.spawn_points:
+            print("[NPC生成] 没有可用的生成点")
+            return
+
+        # 筛选可用车辆蓝图（排除主角车）
+        vehicle_blueprints = self.blueprint_library.filter('vehicle')
+        vehicle_blueprints = [bp for bp in vehicle_blueprints if bp.id != 'vehicle.tesla.model3']
+        if not vehicle_blueprints:
+            print("[NPC生成] 没有可用的NPC蓝图")
+            return
+
+        print(f"[NPC生成] 开始生成{count}辆NPC车辆...")
+        spawned_count = 0
+        used_spawn_points = []  # 避免生成点重叠
+
+        # 循环尝试生成
+        while spawned_count < count and len(used_spawn_points) < len(self.spawn_points):
+            # 随机选择未使用的生成点
+            spawn_point = random.choice([p for p in self.spawn_points if p not in used_spawn_points])
+            used_spawn_points.append(spawn_point)
+            
+            # 随机选择车辆蓝图
+            npc_bp = random.choice(vehicle_blueprints)
+            
+            # 尝试生成NPC
+            npc = self.world.try_spawn_actor(npc_bp, spawn_point)
+            if npc:
+                self.npc_vehicles.append(npc)
+                # 启用自动驾驶
+                npc.set_autopilot(True)
+                spawned_count += 1
+                
+                # 每生成5辆同步一次
+                if spawned_count % 5 == 0:
+                    self.world.tick()
+                    time.sleep(0.1)
+
+        # 生成完成后同步
+        self.world.tick()
+        print(f"[NPC生成] 完成，实际生成{spawned_count}辆NPC")
+
     def _spawn_sensors(self):
-        """生成传感器（适配0.9.11版本参数，修正激光雷达垂直视野）"""
-        # 前视摄像头（优化视角，更贴近驾驶视角）
+        """生成传感器（适配0.9.11版本参数）"""
+        # 前视摄像头
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
         camera_bp.set_attribute('image_size_y', '128')
-        camera_bp.set_attribute('fov', '100')  # 扩大视野
-        camera_bp.set_attribute('sensor_tick', '0.033')  # 30Hz
+        camera_bp.set_attribute('fov', '100')
+        camera_bp.set_attribute('sensor_tick', '0.033')
         self.camera = self.world.spawn_actor(
             camera_bp, carla.Transform(carla.Location(x=2.0, z=1.5)), attach_to=self.vehicle
         )
         self.camera.listen(self.process_image)
 
-        # 激光雷达（0.9.11兼容参数：用upper_fov和lower_fov替代vertical_fov）
+        # 激光雷达（0.9.11兼容参数）
         lidar_bp = self.blueprint_library.find('sensor.lidar.ray_cast')
         lidar_bp.set_attribute('channels', '32')
         lidar_bp.set_attribute('range', '50')
         lidar_bp.set_attribute('points_per_second', '100000')
         lidar_bp.set_attribute('rotation_frequency', '10')
         lidar_bp.set_attribute('horizontal_fov', '360')
-        # 0.9.11专用：垂直视野通过上下视角差定义（15 - (-15) = 30度）
-        lidar_bp.set_attribute('upper_fov', '15.0')   # 上视角
-        lidar_bp.set_attribute('lower_fov', '-15.0')  # 下视角
+        lidar_bp.set_attribute('upper_fov', '15.0')
+        lidar_bp.set_attribute('lower_fov', '-15.0')
         self.lidar = self.world.spawn_actor(
             lidar_bp, carla.Transform(carla.Location(x=0.0, z=2.0)), attach_to=self.vehicle
         )
@@ -214,20 +269,24 @@ class CarlaEnvironment(gym.Env):
 
     def step(self, action=None):
         """执行动作（使用自动驾驶时可忽略action）"""
-        # 当启用autopilot时，不需要手动控制
         observation = self.get_observation()
         reward = 1.0
         done = False
         return observation, reward, done, {}
 
     def close(self):
-        """清理资源并恢复世界设置"""
+        """清理所有资源（包括NPC）"""
         # 销毁传感器
         for sensor in [self.camera, self.lidar, self.imu]:
             if sensor is not None and sensor.is_alive:
                 sensor.stop()
                 sensor.destroy()
-        # 销毁车辆
+        # 销毁NPC车辆
+        for npc in self.npc_vehicles:
+            if npc and npc.is_alive:
+                npc.destroy()
+        self.npc_vehicles.clear()
+        # 销毁主角车辆
         if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
         # 清空队列
@@ -238,4 +297,4 @@ class CarlaEnvironment(gym.Env):
         if self.settings:
             self.settings.synchronous_mode = False
             self.world.apply_settings(self.settings)
-        print("[资源清理] 所有传感器和车辆已销毁")
+        print("[资源清理] 所有传感器、车辆和NPC已销毁")
