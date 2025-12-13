@@ -3,6 +3,7 @@ import numpy as np
 import time
 import sys
 import os
+from PIL import Image, ImageDraw, ImageFont
 
 # 添加路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -11,13 +12,36 @@ from gesture_detector import GestureDetector
 from drone_controller import DroneController
 
 
+def cv2_add_chinese_text(img, text, position, text_color=(0, 255, 0), text_size=30):
+    """
+    在OpenCV图像上添加中文文字
+    """
+    if isinstance(img, np.ndarray):
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+
+    draw = ImageDraw.Draw(img)
+
+    # 尝试加载中文字体，如果失败使用默认字体
+    try:
+        font = ImageFont.truetype("simsun.ttc", text_size, encoding="utf-8")
+    except:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", text_size, encoding="utf-8")
+        except:
+            font = ImageFont.load_default()
+
+    draw.text(position, text, text_color, font=font)
+
+    return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+
+
 def create_test_frame(message="手势控制无人机 - 虚拟模式"):
-    """创建测试帧"""
+    """创建测试帧（支持中文）"""
+    # 创建白色背景
     frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
 
     # 添加标题
-    cv2.putText(frame, message, (50, 50),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+    frame = cv2_add_chinese_text(frame, message, (50, 50), (0, 0, 255), 30)
 
     # 添加手势说明
     gestures = [
@@ -35,11 +59,9 @@ def create_test_frame(message="手势控制无人机 - 虚拟模式"):
     for i, text in enumerate(gestures):
         y_pos = 90 + i * 25
         color = (0, 0, 255) if i == 0 else (0, 100, 0)
-        cv2.putText(frame, text, (50, y_pos),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        frame = cv2_add_chinese_text(frame, text, (50, y_pos), color, 20)
 
-    cv2.putText(frame, "按 'q' 键退出程序", (50, 430),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+    frame = cv2_add_chinese_text(frame, "按 'q' 键退出程序", (50, 430), (0, 0, 0), 20)
 
     return frame
 
