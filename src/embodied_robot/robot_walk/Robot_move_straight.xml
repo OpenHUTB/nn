@@ -10,7 +10,7 @@
      limitations under the License.
 -->
 
-<mujoco model="Humanoid_With_Dynamic_Wall">
+<mujoco model="Humanoid_With_Dynamic_Wall_Navigation">
   <option timestep="0.005"/>
 
   <visual>
@@ -30,6 +30,9 @@
     <!-- 障碍物材质（区分固定/动态障碍） -->
     <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>    <!-- 固定障碍 -->
     <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>    <!-- 动态障碍 -->
+    <!-- 目标点材质 -->
+    <material name="target_material" rgba="1 0 0 1"/>     <!-- 红色目标点 -->
+    <material name="target_base_material" rgba="1 0.5 0 1"/> <!-- 橙色基座 -->
   </asset>
 
   <default>
@@ -106,6 +109,12 @@
 
   <worldbody>
     <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3"/>
+
+    <!-- ====================== 导航目标点（固定位置 x=8, y=0, z=0.2） ====================== -->
+    <body name="navigation_target" pos="8 0 0.2">
+      <geom name="target_marker" type="sphere" size="0.15" material="target_material" condim="3"/>
+      <geom name="target_base" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
+    </body>
 
     <!-- 障碍1：固定位置（机器人正前方3米） -->
     <body name="wall1" pos="3 0 0.5">
