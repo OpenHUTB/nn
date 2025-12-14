@@ -58,6 +58,10 @@ class CarlaEnvironment(gym.Env):
         self.hit_vehicle = False  # 撞车标记（终止）
         self.hit_pedestrian = False  # 撞人标记（不终止）
 
+        # 新增：出生点碰撞检测配置
+        self.spawn_retry_times = 20  # 出生点重试次数
+        self.spawn_safe_radius = 2.0  # 安全半径（避免近距离碰撞）
+
         # 动作/观测空间
         self.action_space = gym.spaces.Discrete(4)
         self.observation_space = gym.spaces.Box(
@@ -77,7 +81,40 @@ class CarlaEnvironment(gym.Env):
         self.view_distance = 8.0     # 正后方距离从6→8米（大幅后移，必看车屁股）
         self.z_offset = 0.5          # z轴补偿保留，避免上坡卡地下
 
-    # ========== NPC生成逻辑（完全保留） ==========
+    # ========== 新增：安全生成车辆（解决碰撞问题） ==========
+    def _spawn_vehicle_safely(self, vehicle_bp):
+        """安全生成主角车辆，避免出生点碰撞"""
+        # 1. 获取所有可用出生点
+        spawn_points = self.world.get_map().get_spawn_points()
+        if not spawn_points:
+            # 无预设出生点则生成随机位置
+            spawn_points = [carla.Transform(
+                carla.Location(x=random.uniform(-50, 50), y=random.uniform(-50, 50), z=0.5),
+                carla.Rotation(yaw=random.uniform(0, 360))
+            )]
+
+        # 2. 重试生成车辆，直到成功或达到最大次数
+        for attempt in range(self.spawn_retry_times):
+            # 随机选一个出生点
+            spawn_point = random.choice(spawn_points)
+            
+            # 微调出生点高度（避免地面碰撞）
+            spawn_point.location.z += 0.2
+
+            try:
+                # 检测该位置是否有碰撞
+                vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                if vehicle is not None:
+                    print(f"✅ 车辆生成成功（重试{attempt}次）")
+                    return vehicle
+            except RuntimeError as e:
+                print(f"⚠️ 出生点碰撞，重试第{attempt+1}次...")
+                continue
+
+        # 所有重试失败，抛出异常
+        raise RuntimeError("❌ 所有出生点都有碰撞，无法生成车辆！")
+
+    # ========== 优化NPC生成（避免与主角车辆碰撞） ==========
     def _spawn_small_npc(self):
         # 清理旧NPC
         for v in self.npc_vehicle_list:
@@ -112,20 +149,31 @@ class CarlaEnvironment(gym.Env):
         else:
             spawn_points = spawn_points[:50]
 
-        # 生成50辆NPC车辆
+        # 生成50辆NPC车辆（增加碰撞检测）
         for sp in spawn_points:
             try:
-                npc_vehicle = self.world.spawn_actor(random.choice(vehicle_bps), sp)
-                self.npc_vehicle_list.append(npc_vehicle)
-                npc_vehicle.set_autopilot(True, self.traffic_manager.get_port())
+                # 微调NPC出生点高度，避免碰撞
+                sp.location.z += 0.1
+                npc_vehicle = self.world.try_spawn_actor(random.choice(vehicle_bps), sp)
+                if npc_vehicle is not None:
+                    self.npc_vehicle_list.append(npc_vehicle)
+                    npc_vehicle.set_autopilot(True, self.traffic_manager.get_port())
             except:
                 continue
 
-        # 生成5个NPC行人（数量不变）
+        # 生成5个NPC行人（数量不变，增加碰撞检测）
         pedestrian_bps = self.blueprint_library.filter('walker.pedestrian.*')
         for _ in range(5):
-            # 随机生成行人位置（地图内合法范围）
-            loc = carla.Location(x=random.uniform(-100, 100), y=random.uniform(-100, 100), z=0)
+            # 随机生成行人位置（远离主角车辆）
+            if self.vehicle is not None:
+                hero_loc = self.vehicle.get_transform().location
+                random_x = hero_loc.x + random.uniform(20, 50) * (1 if random.random()>0.5 else -1)
+                random_y = hero_loc.y + random.uniform(20, 50) * (1 if random.random()>0.5 else -1)
+            else:
+                random_x = np.random.uniform(-100, 100)
+                random_y = np.random.uniform(-100, 100)
+            
+            loc = carla.Location(x=random_x, y=random_y, z=0.1)
             try:
                 pedestrian = self.world.try_spawn_actor(random.choice(pedestrian_bps), carla.Transform(loc))
                 if pedestrian:
@@ -155,7 +203,7 @@ class CarlaEnvironment(gym.Env):
         self.camera.listen(lambda img: self._camera_callback(img))
 
     def reset(self):
-        """重置环境（完全保留）"""
+        """重置环境（修复车辆生成碰撞问题）"""
         # 清理旧资源
         if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
@@ -172,26 +220,15 @@ class CarlaEnvironment(gym.Env):
 
         # 仅随机选择出生点（无任何打印）
         vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
-        spawn_points = self.world.get_map().get_spawn_points()
         
-        # 随机选预设出生点（优先），无则随机生成坐标
-        if len(spawn_points) > 0:
-            spawn_point = np.random.choice(spawn_points)
-        else:
-            # 随机生成合法范围坐标
-            random_x = np.random.uniform(-200, 200)
-            random_y = np.random.uniform(-200, 200)
-            spawn_point = carla.Transform(carla.Location(x=random_x, y=random_y, z=0.5))
-
-        # 生成车辆
-        self.vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-        self.vehicle.set_autopilot(False)
+        # 核心修复：使用安全生成方法替代直接生成
+        self.vehicle = self._spawn_vehicle_safely(vehicle_bp)
 
         # 初始化传感器（调用补全的方法）
         self._init_camera()
         self._init_collision_sensor()
 
-        # 调用生成NPC
+        # 调用生成NPC（已优化碰撞）
         self._spawn_small_npc()
 
         # 等待传感器就绪
@@ -325,4 +362,3 @@ class CarlaEnvironment(gym.Env):
 
         time.sleep(0.5)
         print("✅ CARLA环境已关闭（同步模式已恢复为异步）")
-
