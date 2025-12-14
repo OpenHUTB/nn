@@ -1,5 +1,5 @@
 <launch>
-  <!-- MuJoCo核心节点（去掉scripts/前缀） -->
+  <!-- MuJoCo核心节点（去掉scripts/前缀>
   <node 
     name="mujoco_core" 
     pkg="mujoco_ros" 
@@ -8,7 +8,7 @@
     args="visualize /home/lan/mujoco_models/anybotics_anymal_b/anymal_b.xml --ros"
   />
 
-  <!-- 控制指令发布者（去掉scripts/前缀） -->
+  <!-- 控制指令发布者（去掉scripts/前缀>
   <node 
     name="mujoco_ctrl_publisher" 
     pkg="mujoco_ros" 
@@ -16,7 +16,7 @@
     output="screen"
   />
 
-  <!-- 状态订阅者（去掉scripts/前缀） -->
+  <!-- 状态订阅者（去掉scripts/前缀>
   <node 
     name="mujoco_state_subscriber" 
     pkg="mujoco_ros" 

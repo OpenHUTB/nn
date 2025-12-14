@@ -8,7 +8,7 @@ class MujocoCtrlPublisher:
         rospy.init_node("mujoco_ctrl_publisher", anonymous=True)
         self.pub = rospy.Publisher("/mujoco/ctrl_cmd", Float32MultiArray, queue_size=10)
         self.rate = rospy.Rate(10)
-        self.model_nu = 8  # ant 模型 nu=8，若你的模型不同请修改
+        self.model_nu = 8  # ant 模型 nu=8
         rospy.loginfo("控制指令发布者已启动，发布 /mujoco/ctrl_cmd")
 
     def run(self):

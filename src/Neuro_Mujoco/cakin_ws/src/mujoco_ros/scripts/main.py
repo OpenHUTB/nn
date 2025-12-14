@@ -63,11 +63,9 @@ def load_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujo
 def convert_model(input_path: str, output_path: str) -> bool:
     """
     转换模型格式（XML↔MJB）
-    
     参数:
         input_path: 输入模型路径
         output_path: 输出模型路径（需指定扩展名.xml或.mjb）
-        
     返回:
         转换成功返回True，失败返回False
     """

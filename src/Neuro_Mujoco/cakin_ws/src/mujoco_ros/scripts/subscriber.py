@@ -31,6 +31,6 @@ class MujocoStateSubscriber:
 if __name__ == "__main__":
     try:
         subscriber = MujocoStateSubscriber()
-        rospy.spin()  # 阻塞等待消息
+        rospy.spin() 
     except rospy.ROSInterruptException:
         rospy.loginfo("状态订阅者退出")
