@@ -2,6 +2,9 @@ import carla
 import pygame
 import time
 import random
+import queue
+import cv2
+import numpy as np
 from threading import Lock
 
 # 自定义线性插值函数（适配同步帧）
@@ -49,7 +52,40 @@ for _ in range(5):
 if not vehicle:
     raise Exception("主角车辆生成失败，请重启CARLA服务器")
 
-# 4. 生成NPC车辆（减少至100辆，确保同步性能）
+# 4. 初始化实时RGB摄像头（新增模块）
+def init_camera(vehicle):
+    """初始化绑定到主角车的RGB摄像头，返回摄像头actor和图像队列"""
+    # 摄像头蓝图配置
+    camera_bp = bp_lib.find('sensor.camera.rgb')
+    camera_bp.set_attribute('image_size_x', '1024')  # 图像宽度
+    camera_bp.set_attribute('image_size_y', '720')   # 图像高度
+    camera_bp.set_attribute('fov', '90')             # 视场角
+    camera_bp.set_attribute('shutter_speed', '100')  # 减少运动模糊
+
+    # 摄像头安装位置：车前方2米，高度1.5米，略微上仰（便于观察前方路况）
+    camera_transform = carla.Transform(
+        carla.Location(x=2.0, z=1.5),
+        carla.Rotation(pitch=-5)
+    )
+
+    # 生成摄像头并绑定到主角车
+    camera = world.spawn_actor(
+        camera_bp,
+        camera_transform,
+        attach_to=vehicle
+    )
+
+    # 创建图像队列（线程安全）
+    image_queue = queue.Queue()
+    camera.listen(image_queue.put)  # 摄像头数据存入队列
+
+    print("RGB摄像头初始化完成，实时画面将在窗口显示（按'q'关闭）")
+    return camera, image_queue
+
+# 初始化摄像头
+camera, image_queue = init_camera(vehicle)
+
+# 5. 生成NPC车辆（减少至100辆，确保同步性能）
 npc_count = 100  # 500辆会导致同步延迟，100辆是性能与效果的平衡
 print(f"开始生成{npc_count}辆NPC车辆...")
 for i in range(npc_count):
@@ -71,13 +107,13 @@ all_vehicles = world.get_actors().filter('*vehicle*')
 actual_npc_count = len(all_vehicles) - 1
 print(f"NPC生成完成 | 实际数量: {actual_npc_count}辆（总车辆: {len(all_vehicles)}）")
 
-# 5. 启动所有车辆自动驾驶（绑定交通管理器同步端口）
+# 6. 启动所有车辆自动驾驶（绑定交通管理器同步端口）
 tm = client.get_trafficmanager(8000)
 tm.set_synchronous_mode(True)  # 交通管理器也启用同步模式
 for v in all_vehicles:
     v.set_autopilot(True, tm.get_port())  # 所有车辆通过TM控制，确保行为同步
 
-# 6. 平滑视角函数（基于当前帧快照数据）
+# 7. 平滑视角函数（基于当前帧快照数据）
 def set_spectator_smooth(last_transform=None):
     """
     基于当前帧快照更新视角，彻底避免异步抖动
@@ -93,7 +129,7 @@ def set_spectator_smooth(last_transform=None):
             return last_transform
         vehicle_tf = vehicle_snapshot.get_transform()  # 这是当前帧的精确位置
     
-    # 目标视角：车后8米、上方3米，轻微右偏
+    # 目标视角：车后8米、上方3米，轻微右偏（便于观察整车和周围环境）
     target_tf = carla.Transform(
         vehicle_tf.transform(carla.Location(x=-8, z=3, y=0.5)),
         vehicle_tf.rotation
@@ -119,9 +155,9 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 7. 主循环（严格按帧推进）
-print("\n程序运行中（强同步模式），按Ctrl+C退出...")
-print("镜头基于当前帧数据更新，已解决异步抖动问题")
+# 8. 主循环（整合实时摄像头画面与原有逻辑）
+print("\n程序运行中（强同步模式），按Ctrl+C或摄像头窗口按'q'退出...")
+print("功能：实时RGB摄像头画面 + 车辆自动驾驶 + 平滑视角")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -131,22 +167,43 @@ try:
     last_spectator_tf = set_spectator_smooth()
     
     while True:
-        # 推进一帧（触发on_world_tick更新快照）
+        # 推进一帧（触发世界更新和摄像头数据采集）
         world.tick()
-        # 基于当前帧快照更新视角（确保数据时序一致）
+        
+        # 更新 spectator 视角（平滑跟随）
         last_spectator_tf = set_spectator_smooth(last_spectator_tf)
-        # 严格控制客户端帧率（与服务器帧间隔一致）
+        
+        # 处理实时摄像头画面（新增逻辑）
+        if not image_queue.empty():
+            image = image_queue.get()
+            # 将原始数据转换为RGBA格式并reshape
+            img = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
+            # 显示图像（OpenCV窗口）
+            cv2.imshow('CARLA RGB Camera', img)
+            # 按'q'键退出
+            if cv2.waitKey(1) == ord('q'):
+                break
+        
+        # 控制客户端帧率与服务器同步
         clock.tick(30)
 
 except KeyboardInterrupt:
     print("\n用户中断，清理资源...")
 finally:
-    # 恢复CARLA默认设置（关键：避免影响后续使用）
+    # 清理摄像头资源（关键：避免残留传感器）
+    camera.stop()  # 停止摄像头监听
+    camera.destroy()  # 销毁摄像头actor
+    
+    # 恢复CARLA默认设置
     settings.synchronous_mode = False
     tm.set_synchronous_mode(False)
     world.apply_settings(settings)
+    
     # 销毁所有车辆
     for v in all_vehicles:
         if v.is_alive:
             v.destroy()
+    
+    # 关闭所有OpenCV窗口
+    cv2.destroyAllWindows()
     print("资源清理完成，同步模式已关闭")
