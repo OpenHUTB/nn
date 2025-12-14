@@ -81,12 +81,12 @@ def main():
 
     # 测试显示
     test_frame = create_test_frame("显示测试中...")
-    cv2.imshow('手势控制无人机 - 虚拟机版', test_frame)
+    cv2.imshow('Test window', test_frame)
     cv2.waitKey(1000)  # 显示1秒
 
     # 尝试打开摄像头
     cap = None
-    for cam_id in [0, 1, 2]:
+    for cam_id in [1]:#需要视不同情况更改数字，选择摄像头
         cap = cv2.VideoCapture(cam_id)
         if cap.isOpened():
             print(f"摄像头 {cam_id} 打开成功")
@@ -143,7 +143,7 @@ def main():
                 last_command_time = current_time
 
         # 显示帧
-        cv2.imshow('手势控制无人机系统', processed_frame)
+        cv2.imshow('Main window', processed_frame)
 
         # 退出检测
         key = cv2.waitKey(1) & 0xFF
