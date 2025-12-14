@@ -44,14 +44,14 @@ class DroneController:
 
     def _simulate_command(self, command):
         commands = {
-            "takeoff": "无人机起飞",
-            "land": "无人机降落",
-            "up": "无人机上升",
-            "down": "无人机下降",
-            "forward": "无人机前进",
-            "backward": "无人机后退",
-            "hover": "无人机悬停",
-            "stop": "无人机停止",
+            "takeoff": "无人机起飞！",
+            "land": "无人机降落！",
+            "up": "无人机上升！",
+            "down": "无人机下降！",
+            "forward": "无人机前进！",
+            "backward": "无人机后退！",
+            "hover": "无人机悬停！",
+            "stop": "无人机停止！",
             "none": "等待指令..."
         }
         message = commands.get(command, f"未知命令: {command}")
