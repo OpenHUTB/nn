@@ -641,4 +641,3 @@ if __name__ == "__main__":
         """关闭环境"""
         if self.render_mode == "human":
             pygame.quit()
- main
