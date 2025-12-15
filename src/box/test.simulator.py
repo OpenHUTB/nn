@@ -6,6 +6,7 @@ import numpy as np
 # 1. 手动指定 simulator.py 的绝对路径
 simulator_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "simulator.py"))
 
+<<<<<<< HEAD
 
 if not os.path.exists(simulator_path):
     raise FileNotFoundError(f"simulator.py 不存在：{simulator_path}")
@@ -16,6 +17,10 @@ simulator_module = importlib.util.module_from_spec(spec)
 sys.modules["simulator"] = simulator_module
 spec.loader.exec_module(simulator_module)
 
+<<<<<<< HEAD
+=======
+=======
+>>>>>>> eeafa3d55c53ad4469c54fd3097a4ee7343b419c
 # 2. 检查文件是否存在
 if not os.path.exists(simulator_path):
     raise FileNotFoundError(f"simulator.py 不存在：{simulator_path}")
@@ -26,6 +31,10 @@ simulator_module = importlib.util.module_from_spec(spec)
 sys.modules["simulator"] = simulator_module
 spec.loader.exec_module(simulator_module)
 
+<<<<<<< HEAD
+=======
+>>>>>>> f5c965a634bc42a4261d8907d2ed5530a8647006
+>>>>>>> eeafa3d55c53ad4469c54fd3097a4ee7343b419c
 # 4. 从加载的模块中导入 Simulator 类
 Simulator = simulator_module.Simulator
 
@@ -93,4 +102,18 @@ except Exception as e:
     traceback.print_exc()
     
 finally:
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+   
+=======
+    # 关闭环境
+>>>>>>> f5c965a634bc42a4261d8907d2ed5530a8647006
+    print("\n关闭仿真环境...")
+    try:
+        if 'env' in locals():
+            env.close()
+    except:
+        pass
+>>>>>>> eeafa3d55c53ad4469c54fd3097a4ee7343b419c
     print("仿真结束")
