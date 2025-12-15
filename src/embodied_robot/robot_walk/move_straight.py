@@ -12,17 +12,38 @@ random.seed(42)
 
 def control_robot(model_path):
     """
-    控制DeepMind Humanoid模型：复杂动态环境下的目标导航
-    特性：多动态障碍（正弦组合/随机游走/圆周运动）+ 多障碍优先级避障 + 目标导航
+    控制DeepMind Humanoid模型：复杂动态环境下的多目标点巡逻导航
+    特性：
+    1. 多动态障碍（正弦组合/随机游走/圆周运动）+ 多障碍优先级避障
+    2. 5个固定巡逻目标点，按顺序导航，完成后循环巡逻
+    3. 实时显示巡逻进度和目标点状态
     """
     # 加载模型和数据
     model = mujoco.MjModel.from_xml_path(model_path)
     data = mujoco.MjData(model)
 
-    # -------------------------- 核心配置：固定导航目标点 --------------------------
-    TARGET_POS = np.array([12.0, 0.0])  # 目标点后移至12米，适配更多障碍
-    target_reached_threshold = 0.8  # 增大到达阈值，适配复杂环境
-    navigation_target_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "navigation_target")
+    # -------------------------- 多目标点巡逻配置（核心新增） --------------------------
+    # 定义巡逻目标点（名称、坐标、显示名称）
+    PATROL_POINTS = [
+        {"name": "patrol_target_1", "pos": np.array([0.0, 0.0]), "label": "起点"},
+        {"name": "patrol_target_2", "pos": np.array([4.0, -2.0]), "label": "巡逻点1（西南）"},
+        {"name": "patrol_target_3", "pos": np.array([8.0, 2.0]), "label": "巡逻点2（东北）"},
+        {"name": "patrol_target_4", "pos": np.array([10.0, -1.0]), "label": "巡逻点3（西北）"},
+        {"name": "patrol_target_5", "pos": np.array([12.0, 0.0]), "label": "终点"}
+    ]
+    target_reached_threshold = 0.8  # 到达目标点的判定阈值
+    current_target_index = 0  # 当前导航的目标点索引
+    patrol_cycles = 0  # 完成的巡逻循环次数
+    patrol_completed = False  # 是否完成一轮巡逻
+    target_switch_cooldown = 2.0  # 切换目标点的冷却时间（防止频繁切换）
+    last_target_switch_time = 0  # 上次切换目标点的时间
+
+    # 初始化目标点ID
+    patrol_point_ids = {}
+    for point in PATROL_POINTS:
+        point_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, point["name"])
+        patrol_point_ids[point["name"]] = point_id
+        print(f"🔹 巡逻目标点 {point['label']}：({point['pos'][0]}, {point['pos'][1]}) ID={point_id}")
 
     # -------------------------- 多动态障碍初始化 --------------------------
     # 障碍1（wall2）：正弦组合运动（Y+Z轴）
@@ -72,15 +93,16 @@ def control_robot(model_path):
     }
 
     # 打印障碍配置
-    print("=" * 60)
-    print("复杂动态环境配置：")
-    print(f"• 导航目标点：({TARGET_POS[0]}, {TARGET_POS[1]})，到达阈值：{target_reached_threshold}m")
+    print("\n" + "=" * 80)
+    print("🚀 复杂动态环境多目标点巡逻配置：")
+    print(f"📌 巡逻目标点数量：{len(PATROL_POINTS)} 个 | 到达阈值：{target_reached_threshold}m")
+    print(f"🔄 巡逻模式：顺序导航 → 完成循环 → 自动重启")
     print(f"• 动态障碍1（wall2）：Y轴正弦(振幅{wall2_params['y_amp']}, 频率{wall2_params['y_freq']}) + Z轴正弦")
     print(f"• 动态障碍2（wall3）：X/Y轴随机游走（速度{wall3_params['x_speed']}, {wall3_params['y_speed']}）")
     print(f"• 动态障碍3（wall4）：圆周运动（转速{wall4_params['rot_speed']}, 径向振幅{wall4_params['rad_amp']}）")
-    print("=" * 60)
+    print("=" * 80 + "\n")
 
-    # -------------------------- 障碍检测初始化（修复核心问题） --------------------------
+    # -------------------------- 障碍检测初始化 --------------------------
     # 只检测真正的障碍本体（wall1, wall2, wall3, wall4），排除base/rot_base等基座
     valid_wall_names = ["wall1", "wall2", "wall3", "wall4"]
     wall_ids = []
@@ -103,7 +125,7 @@ def control_robot(model_path):
                 wall_types[wall_name] = "dynamic3"
 
     torso_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "torso")
-    print(f"检测到有效障碍：{[(name, wall_types[name]) for name in wall_names]}")
+    print(f"🛡️  检测到有效障碍：{[(name, wall_types[name]) for name in wall_names]}")
 
     # -------------------------- 核心参数配置 --------------------------
     # 多障碍避障参数
@@ -116,7 +138,6 @@ def control_robot(model_path):
     return_time = 0
     return_duration = 4.0
     stop_walk = False
-    target_reached = False
     closest_wall_id = -1
     closest_wall_type = ""
     closest_wall_name = ""  # 初始化closest_wall_name
@@ -140,8 +161,9 @@ def control_robot(model_path):
     # 启动可视化器
     mujoco.set_mjcb_control(None)
     with viewer.launch_passive(model, data) as viewer_instance:
-        print("\nDeepMind Humanoid复杂动态环境导航仿真启动！")
-        print(f"导航逻辑：向目标点({TARGET_POS[0]},{TARGET_POS[1]})移动 → 多障碍检测 → 优先级避障 → 回归路径 → 到达目标")
+        print("\n🤖 DeepMind Humanoid多目标点巡逻仿真启动！")
+        print(
+            f"🗺️  巡逻路线：{PATROL_POINTS[0]['label']} → {PATROL_POINTS[1]['label']} → {PATROL_POINTS[2]['label']} → {PATROL_POINTS[3]['label']} → {PATROL_POINTS[4]['label']}")
         start_time = time.time()
 
         try:
@@ -150,23 +172,20 @@ def control_robot(model_path):
                     break
 
                 elapsed_time = time.time() - start_time
+                current_target = PATROL_POINTS[current_target_index]
 
                 # -------------------------- 1. 多动态障碍运动控制 --------------------------
                 # 障碍1（wall2）：Y+Z轴正弦组合运动
                 if all(id != -1 for id in wall2_motor_ids.values()):
-                    # Y轴：主正弦运动
                     wall2_y_target = wall2_params["y_amp"] * np.sin(
                         wall2_params["y_freq"] * elapsed_time + wall2_params["y_phase"])
-                    # Z轴：副正弦运动（垂直方向）
                     wall2_z_target = wall2_params["z_amp"] * np.sin(
                         wall2_params["z_freq"] * elapsed_time + wall2_params["z_phase"]) + 0.75
-                    # PD控制
                     data.ctrl[wall2_motor_ids["y"]] = (wall2_y_target - data.qpos[wall2_joint_ids["y"]]) * 2.5
                     data.ctrl[wall2_motor_ids["z"]] = (wall2_z_target - data.qpos[wall2_joint_ids["z"]]) * 1.8
 
                 # 障碍2（wall3）：随机游走运动
                 if all(id != -1 for id in wall3_motor_ids.values()):
-                    # 随机切换运动方向
                     if elapsed_time - wall3_last_switch["x"] > wall3_params["x_switch"]:
                         wall3_params["x_dir"] *= -1
                         wall3_params["x_switch"] = random.uniform(2.0, 4.0)
@@ -176,45 +195,63 @@ def control_robot(model_path):
                         wall3_params["y_switch"] = random.uniform(1.5, 3.5)
                         wall3_last_switch["y"] = elapsed_time
 
-                    # 计算目标位置
                     wall3_x_target = wall3_params["x_base"] + wall3_params["x_dir"] * wall3_params["x_speed"] * (
                                 elapsed_time % 5)
                     wall3_y_target = wall3_params["y_base"] + wall3_params["y_dir"] * wall3_params["y_speed"] * (
                                 elapsed_time % 4)
-                    # 限制范围
                     wall3_x_target = np.clip(wall3_x_target, 5.0, 7.0)
                     wall3_y_target = np.clip(wall3_y_target, -2.5, 2.5)
-                    # PD控制
                     data.ctrl[wall3_motor_ids["x"]] = (wall3_x_target - data.qpos[wall3_joint_ids["x"]]) * 2.2
                     data.ctrl[wall3_motor_ids["y"]] = (wall3_y_target - data.qpos[wall3_joint_ids["y"]]) * 2.0
 
                 # 障碍3（wall4）：圆周运动
                 if all(id != -1 for id in wall4_motor_ids.values()):
-                    # 旋转运动
                     wall4_rot_target = wall4_params["rot_dir"] * wall4_params["rot_speed"] * elapsed_time
-                    # 径向运动（正弦变化半径）
                     wall4_rad_target = wall4_params["rad_base"] + wall4_params["rad_amp"] * np.sin(
                         wall4_params["rad_freq"] * elapsed_time + wall4_params["rad_phase"])
-                    # PD控制
                     data.ctrl[wall4_motor_ids["rot"]] = (wall4_rot_target - data.qpos[wall4_joint_ids["rot"]]) * 1.5
                     data.ctrl[wall4_motor_ids["rad"]] = (wall4_rad_target - data.qpos[wall4_joint_ids["rad"]]) * 2.0
 
-                # -------------------------- 2. 导航状态计算 --------------------------
+                # -------------------------- 2. 多目标点导航逻辑（核心新增） --------------------------
                 yaw_error = 0.0  # 初始化
-                if torso_id != -1 and not target_reached:
+                distance_to_target = float('inf')
+
+                if torso_id != -1 and not stop_walk:
                     torso_pos = data.xpos[torso_id]
                     robot_xy = torso_pos[:2]
-                    target_vector = TARGET_POS - robot_xy
+
+                    # 计算到当前目标点的距离
+                    target_vector = current_target["pos"] - robot_xy
                     distance_to_target = np.linalg.norm(target_vector)
 
-                    # 检查是否到达目标点
-                    if distance_to_target < target_reached_threshold:
-                        target_reached = True
-                        stop_walk = True
-                        print(f"\n\n✅ 到达目标点！")
-                        print(f"最终位置：x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f}")
-                        print(f"目标点：x={TARGET_POS[0]}, y={TARGET_POS[1]} | 剩余距离：{distance_to_target:.2f}m")
-                        continue
+                    # 检查是否到达当前目标点
+                    if (distance_to_target < target_reached_threshold and
+                            not patrol_completed and
+                            elapsed_time - last_target_switch_time > target_switch_cooldown):
+
+                        print(f"\n✅ 到达目标点：{current_target['label']}")
+                        print(
+                            f"   位置：x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f} | 目标：x={current_target['pos'][0]}, y={current_target['pos'][1]}")
+
+                        # 更新目标点切换时间
+                        last_target_switch_time = elapsed_time
+
+                        # 切换到下一个目标点
+                        if current_target_index < len(PATROL_POINTS) - 1:
+                            current_target_index += 1
+                            print(f"🔄 切换到下一个目标点：{PATROL_POINTS[current_target_index]['label']}")
+                        else:
+                            # 完成一轮巡逻
+                            patrol_completed = True
+                            patrol_cycles += 1
+                            print(f"\n🏁 完成第 {patrol_cycles} 轮巡逻！")
+                            print(f"   总耗时：{elapsed_time:.1f}秒 | 休息{target_switch_cooldown}秒后重新开始...")
+
+                            # 重置巡逻状态（循环巡逻）
+                            time.sleep(target_switch_cooldown)
+                            current_target_index = 0
+                            patrol_completed = False
+                            last_target_switch_time = time.time()
 
                     # 计算机器人朝向和目标方向
                     torso_quat = data.xquat[torso_id]
@@ -228,10 +265,9 @@ def control_robot(model_path):
                 # -------------------------- 3. 多障碍检测与优先级排序 --------------------------
                 distance_to_closest_wall = float('inf')
                 closest_wall_pos = np.zeros(2)
-                # 障碍优先级：dynamic1（wall2）> dynamic2（wall3）> dynamic3（wall4）> fixed（wall1）
                 wall_priority = {"dynamic1": 4, "dynamic2": 3, "dynamic3": 2, "fixed": 1}
 
-                if wall_ids and torso_id != -1 and not stop_walk and not target_reached:
+                if wall_ids and torso_id != -1 and not stop_walk and not patrol_completed:
                     torso_pos = data.xpos[torso_id]
                     wall_distances = []
 
@@ -239,26 +275,19 @@ def control_robot(model_path):
                         wall_name = wall_names[idx]
                         wall_type = wall_types.get(wall_name, "fixed")
 
-                        # 获取当前位置并缓存
                         wall_pos = data.xpos[wall_id]
                         wall_pos_history[wall_name].append(wall_pos[:2])
-                        # 计算距离
                         current_distance = np.linalg.norm(torso_pos[:2] - wall_pos[:2])
 
-                        # 动态障碍位置预判（基于历史数据）
+                        # 动态障碍位置预判
                         predicted_distance = current_distance
                         if len(wall_pos_history[wall_name]) > 5 and wall_type != "fixed":
-                            # 计算运动趋势
                             pos_history = np.array(wall_pos_history[wall_name])
                             velocity = (pos_history[-1] - pos_history[0]) / len(pos_history) * model.opt.timestep * 10
-                            # 预测0.8秒后的位置
                             future_pos = wall_pos[:2] + velocity * 0.8
                             predicted_distance = np.linalg.norm(torso_pos[:2] - future_pos)
 
-                        # 加入优先级权重
-                        priority_weight = wall_priority[wall_type]
-                        weighted_distance = predicted_distance / priority_weight
-
+                        weighted_distance = predicted_distance / wall_priority[wall_type]
                         wall_distances.append({
                             "name": wall_name,
                             "type": wall_type,
@@ -269,9 +298,7 @@ def control_robot(model_path):
                             "weighted_dist": weighted_distance
                         })
 
-                    # 按加权距离排序（最近的优先）
                     wall_distances.sort(key=lambda x: x["weighted_dist"])
-
                     if wall_distances:
                         closest_wall = wall_distances[0]
                         closest_wall_id = closest_wall["id"]
@@ -281,19 +308,15 @@ def control_robot(model_path):
                         distance_to_closest_wall = closest_wall["predicted_dist"]
 
                 # -------------------------- 4. 多障碍避障状态切换 --------------------------
-                if closest_wall_id != -1 and torso_id != -1 and not stop_walk and not target_reached:
+                if closest_wall_id != -1 and torso_id != -1 and not stop_walk and not patrol_completed:
                     # 触发避障
                     if (distance_to_closest_wall < obstacle_distance_threshold and
                             not avoid_obstacle and not return_to_path):
                         avoid_obstacle = True
                         obstacle_avoidance_time = time.time()
-                        # 智能选择转向方向：远离障碍+朝向目标
                         torso_pos = data.xpos[torso_id]
-                        # 计算障碍相对于机器人的位置
                         wall_relative = closest_wall_pos - torso_pos[:2]
-                        # 计算目标相对于机器人的位置
-                        target_relative = TARGET_POS - torso_pos[:2]
-                        # 叉乘判断转向方向（优先绕开障碍且朝向目标）
+                        target_relative = current_target["pos"] - torso_pos[:2]
                         cross_product = np.cross(np.append(wall_relative, 0), np.append(target_relative, 0))[2]
                         turn_direction = -1 if cross_product > 0 else 1
                         dir_name = "左转" if turn_direction == -1 else "右转"
@@ -311,7 +334,7 @@ def control_robot(model_path):
                     # 回归完成，继续向目标点移动
                     if return_to_path and (time.time() - return_time) > return_duration:
                         return_to_path = False
-                        print(f"✅ 回归路径完成，继续向目标点移动...")
+                        print(f"✅ 回归路径完成，继续向{current_target['label']}移动...")
 
                 # -------------------------- 5. 步态周期计算 --------------------------
                 cycle = elapsed_time % gait_period
@@ -320,21 +343,20 @@ def control_robot(model_path):
                 # -------------------------- 6. 关节控制核心逻辑 --------------------------
                 data.ctrl[:model.nu - 6] = 0.0  # 重置机器人控制指令（保留障碍电机）
 
-                if stop_walk or target_reached:
+                if stop_walk or patrol_completed:
                     continue
 
                 elif return_to_path:
-                    # 回归导航路径：精准朝向目标点
+                    # 回归导航路径：精准朝向当前目标点
                     return_phase = (time.time() - return_time) / return_duration
                     return_speed = 1.5 * np.cos(return_phase * np.pi)
 
-                    # 朝向目标点回正
                     if torso_id != -1:
                         torso_quat = data.xquat[torso_id]
                         robot_yaw = np.arctan2(2 * (torso_quat[2] * torso_quat[3] - torso_quat[0] * torso_quat[1]),
                                                torso_quat[0] ** 2 - torso_quat[1] ** 2 - torso_quat[2] ** 2 +
                                                torso_quat[3] ** 2)
-                        target_vector = TARGET_POS - data.xpos[torso_id][:2]
+                        target_vector = current_target["pos"] - data.xpos[torso_id][:2]
                         target_yaw = np.arctan2(target_vector[1], target_vector[0])
                         yaw_error = target_yaw - robot_yaw
                         yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
@@ -393,18 +415,18 @@ def control_robot(model_path):
                             data.ctrl[ankle_x_act_id] = 0.3
 
                 else:
-                    # 正常导航模式：向目标点移动
+                    # 正常导航模式：向当前目标点移动
                     if torso_id != -1:
                         torso_quat = data.xquat[torso_id]
                         robot_yaw = np.arctan2(2 * (torso_quat[2] * torso_quat[3] - torso_quat[0] * torso_quat[1]),
                                                torso_quat[0] ** 2 - torso_quat[1] ** 2 - torso_quat[2] ** 2 +
                                                torso_quat[3] ** 2)
-                        target_vector = TARGET_POS - data.xpos[torso_id][:2]
+                        target_vector = current_target["pos"] - data.xpos[torso_id][:2]
                         target_yaw = np.arctan2(target_vector[1], target_vector[0])
                         yaw_error = target_yaw - robot_yaw
                         yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
 
-                        # 朝向目标点的转向控制
+                        # 朝向当前目标点的转向控制
                         abdomen_z_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
                         if 0 <= abdomen_z_act_id < model.nu - 6:
                             data.ctrl[abdomen_z_act_id] = heading_kp * yaw_error * 0.12
@@ -475,9 +497,9 @@ def control_robot(model_path):
 
                 # -------------------------- 8. 实时状态输出 --------------------------
                 if torso_id != -1 and int(elapsed_time * 1) % 1 == 0:
-                    if target_reached:
-                        status = "✅ 到达目标点"
-                        nav_info = f"剩余距离：0.00m"
+                    if patrol_completed:
+                        status = f"🏁 完成巡逻！循环次数：{patrol_cycles}"
+                        nav_info = f"等待重新开始..."
                         obstacle_info = "—"
                     elif stop_walk:
                         status = "已停止"
@@ -489,11 +511,11 @@ def control_robot(model_path):
                         elif avoid_obstacle:
                             status = f"避障中（{dir_name} | {closest_wall_name}）"
                         else:
-                            status = "向目标点移动中"
+                            status = f"向{current_target['label']}移动中"
 
                         # 导航信息
-                        distance_to_target = np.linalg.norm(TARGET_POS - data.xpos[torso_id][:2])
-                        nav_info = f"剩余{distance_to_target:.2f}m | 朝向误差{np.degrees(yaw_error):.1f}°"
+                        nav_progress = f"{current_target_index + 1}/{len(PATROL_POINTS)}"
+                        nav_info = f"剩余{distance_to_target:.2f}m | 朝向误差{np.degrees(yaw_error):.1f}° | 进度{nav_progress}"
 
                         # 障碍信息
                         if closest_wall_name:
@@ -503,17 +525,23 @@ def control_robot(model_path):
 
                     torso_pos = data.xpos[torso_id]
                     print(
-                        f"\r时间：{elapsed_time:.1f}s | 位置：x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f} | 导航：{nav_info} | 障碍：{obstacle_info} | 状态：{status}",
+                        f"\r🕒 时间：{elapsed_time:.1f}s | 📍 位置：x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f} | 🗺️  导航：{nav_info} | 🛡️  障碍：{obstacle_info} | 📊 状态：{status}",
                         end="")
 
                 time.sleep(model.opt.timestep * 2)
 
         except KeyboardInterrupt:
-            print("\n\n仿真被用户中断")
+            print("\n\n🛑 仿真被用户中断")
         except Exception as e:
-            print(f"\n\n运行错误：{e}")
+            print(f"\n\n❌ 运行错误：{e}")
             import traceback
             traceback.print_exc()
+        finally:
+            print(f"\n\n📋 仿真结束统计：")
+            print(f"   总运行时间：{elapsed_time:.1f}秒")
+            print(f"   完成巡逻循环次数：{patrol_cycles}")
+            print(f"   最后到达的目标点：{PATROL_POINTS[current_target_index]['label']}")
+            print(f"   最后位置：x={data.xpos[torso_id][0]:.2f}, y={data.xpos[torso_id][1]:.2f}")
 
 
 if __name__ == "__main__":
