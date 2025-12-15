@@ -1,18 +1,20 @@
-# cvips_smart_final.py
+# cvips_clear_images.py
 """
-CVIPS 智能版本 - 不再关闭运行的CARLA，并修复所有问题
+CVIPS 清晰图像版本 - 修复图像模糊问题
 """
 
 import sys
 import os
 import time
-import random  # 添加这行
+import random
+import argparse
 import traceback
+import json
 from datetime import datetime
 
-print("=" * 70)
-print("CVIPS 数据生成器 - 智能版本")
-print("=" * 70)
+print("=" * 80)
+print("CVIPS 清晰图像数据生成器")
+print("=" * 80)
 
 # ============================================================
 # 1. 设置CARLA路径
@@ -22,7 +24,7 @@ CARLA_EGG = r"D:\carla\carla0914\CARLA_0.9.14\WindowsNoEditor\PythonAPI\carla\di
 
 if os.path.exists(CARLA_EGG):
     sys.path.append(CARLA_EGG)
-    print(f"✓ CARLA路径: {os.path.basename(CARLA_EGG)}")
+    print(f"✓ CARLA路径设置成功")
 else:
     print(f"✗ 找不到egg文件: {CARLA_EGG}")
     sys.exit(1)
@@ -41,197 +43,528 @@ except ImportError as e:
 
 
 # ============================================================
-# 3. 智能连接CARLA服务器
+# 3. 高清图像生成器类
 # ============================================================
-def smart_connect_to_carla(max_retries=10, retry_delay=3):
-    """智能连接CARLA服务器，不关闭已有服务器"""
-    print(f"\n[3/5] 连接到CARLA服务器 (最多尝试{max_retries}次)...")
+class CVIPSHDGenerator:
+    def __init__(self, args):
+        self.args = args
+        self.client = None
+        self.world = None
+        self.actors = []
+        self.sensors = []
+        self.frame_count = 0
 
-    for attempt in range(1, max_retries + 1):
+        # 创建输出目录
+        self.setup_output()
+
+    def setup_output(self):
+        """设置输出目录"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.output_dir = f"cvips_hd/{self.args.scenario}_{timestamp}"
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # 创建传感器子目录
+        self.sensor_dirs = {}
+        for sensor in ['front_hd', 'rear_hd', 'left_hd', 'right_hd']:
+            dir_path = os.path.join(self.output_dir, sensor)
+            os.makedirs(dir_path, exist_ok=True)
+            self.sensor_dirs[sensor] = dir_path
+
+        print(f"高清输出目录: {self.output_dir}")
+
+    def connect_with_retry(self):
+        """带重试的连接到CARLA服务器"""
+        print("\n[3/5] 连接到CARLA服务器...")
+
+        for attempt in range(1, 6):
+            try:
+                print(f"  尝试 {attempt}/5...")
+
+                self.client = carla.Client('localhost', 2000)
+                self.client.set_timeout(10.0)
+
+                # 加载指定地图
+                if self.args.town:
+                    self.world = self.client.load_world(self.args.town)
+                else:
+                    self.world = self.client.get_world()
+
+                print(f"✓ 连接成功! 地图: {self.world.get_map().name}")
+
+                # 设置异步模式
+                settings = self.world.get_settings()
+                settings.synchronous_mode = False
+                self.world.apply_settings(settings)
+
+                return True
+
+            except Exception as e:
+                print(f"  尝试 {attempt} 失败: {str(e)[:80]}...")
+                if attempt < 5:
+                    print("  等待3秒后重试...")
+                    time.sleep(3)
+
+        print("✗ 连接失败")
+        return False
+
+    def setup_scene(self):
+        """设置高清场景"""
+        print("\n[4/5] 设置高清场景...")
+
+        # 1. 设置高清渲染质量
+        self.set_high_quality_settings()
+
+        # 2. 设置天气和时间
+        self.set_weather_and_time()
+
+        # 3. 等待世界稳定
+        time.sleep(3.0)
+
+        # 4. 生成主车辆
+        ego_vehicle = self.spawn_ego_vehicle()
+        if not ego_vehicle:
+            print("⚠ 无法生成主车辆")
+            return None
+
+        # 5. 生成交通
+        self.spawn_traffic()
+
+        # 6. 等待交通稳定
+        time.sleep(5.0)
+
+        return ego_vehicle
+
+    def set_high_quality_settings(self):
+        """设置高质量渲染设置"""
         try:
-            print(f"  尝试 {attempt}/{max_retries}...")
+            # 设置高质量渲染参数
+            quality_settings = {
+                'epic': {
+                    'QualityLevel': 'Epic',
+                    'r.ShadowQuality': 3,  # 高质量阴影
+                    'r.ReflectionQuality': 3,  # 高质量反射
+                    'r.PostProcessAAQuality': 6,  # 高质量抗锯齿
+                    'r.TextureStreaming': True,
+                    'r.MotionBlurQuality': 0,  # 关闭运动模糊（重要！）
+                    'r.DepthOfFieldQuality': 0,  # 关闭景深模糊
+                    'r.BloomQuality': 0,  # 关闭光晕效果
+                    'r.TonemapperQuality': 0,  # 关闭色调映射
+                    'r.LensFlareQuality': 0,  # 关闭镜头光晕
+                    'r.SSAOQuality': 0,  # 关闭环境光遮蔽
+                }
+            }
 
-            # 创建客户端
-            client = carla.Client('localhost', 2000)
-            client.set_timeout(15.0)
+            # 应用设置
+            for key, value in quality_settings['epic'].items():
+                self.world.get_settings().set(str(key), str(value))
 
-            # 获取服务器版本
-            server_version = client.get_server_version()
-            print(f"  ✓ 连接成功! 服务器版本: {server_version}")
-
-            # 获取世界
-            world = client.get_world()
-            print(f"  ✓ 地图: {world.get_map().name}")
-
-            return client, world
+            print("✓ 高质量渲染设置已应用")
+            print("  - 关闭运动模糊")
+            print("  - 关闭景深效果")
+            print("  - 高质量抗锯齿")
 
         except Exception as e:
-            error_msg = str(e)
-            print(f"  尝试 {attempt} 失败: {error_msg[:80]}...")
+            print(f"设置高质量渲染失败: {e}")
 
-            # 给出具体建议
-            if "time-out" in error_msg:
-                if attempt == 1:
-                    print(f"  ℹ 请确保CARLA服务器正在运行")
-                    print(f"  ℹ 如果CARLA正在启动中，请等待几秒钟")
-                elif attempt == 3:
-                    print(f"  ℹ 如果CARLA窗口无响应，请尝试在窗口中点击一下")
+    def set_weather_and_time(self):
+        """设置天气和时间（优化版）"""
+        weather = carla.WeatherParameters()
 
-            if attempt < max_retries:
-                print(f"  等待 {retry_delay} 秒后重试...")
-                time.sleep(retry_delay)
-            else:
-                print(f"\n✗ 所有连接尝试失败")
-                print(f"\n请检查:")
-                print(f"1. CARLA服务器是否正在运行 (应该能看到3D窗口)")
-                print(f"2. CARLA窗口是否在前台 (尝试点击一下CARLA窗口)")
-                print(f"3. 如果CARLA刚启动，可能需要更多时间加载")
-                return None, None
+        # 天气设置（增加光照强度）
+        if self.args.weather == 'clear':
+            weather.sun_altitude_angle = 90  # 正午太阳
+            weather.sun_azimuth_angle = 0
+            weather.cloudiness = 0.0
+            weather.precipitation = 0.0
+            weather.wind_intensity = 0.0
+            weather.fog_density = 0.0
+            weather.wetness = 0.0
+            weather.scattering_intensity = 1.0  # 增加散射强度
+            weather.mie_scattering_scale = 1.0
+            weather.rayleigh_scattering_scale = 1.0
 
-    return None, None
+        elif self.args.weather == 'rainy':
+            weather.sun_altitude_angle = 45  # 较低但仍有光线
+            weather.cloudiness = 90.0
+            weather.precipitation = 80.0
+            weather.precipitation_deposits = 60.0
+            weather.wind_intensity = 40.0
+            weather.fog_density = 20.0
+            weather.wetness = 80.0
+            weather.scattering_intensity = 1.5  # 增加散射以补偿阴天
 
+        elif self.args.weather == 'cloudy':
+            weather.sun_altitude_angle = 60
+            weather.cloudiness = 70.0
+            weather.precipitation = 0.0
+            weather.wind_intensity = 10.0
+            weather.fog_density = 5.0
+            weather.wetness = 0.0
+            weather.scattering_intensity = 1.2
 
-# 智能连接
-client, world = smart_connect_to_carla()
+        # 时间设置
+        if self.args.time_of_day == 'night':
+            weather.sun_altitude_angle = -15  # 夜晚但有一定月光
+            weather.fog_density = 0.1  # 轻微雾气增加真实感
+        elif self.args.time_of_day == 'sunset':
+            weather.sun_altitude_angle = 0  # 日落
+            weather.cloudiness = 40.0  # 晚霞效果
 
-if not client or not world:
-    print("\n" + "=" * 70)
-    print("连接失败！")
-    print("=" * 70)
-    sys.exit(1)
+        self.world.set_weather(weather)
+        print(f"✓ 天气: {self.args.weather}, 时间: {self.args.time_of_day}")
 
-# ============================================================
-# 4. 创建简单场景
-# ============================================================
-print("\n[4/5] 创建数据收集场景...")
+    def spawn_ego_vehicle(self):
+        """生成主车辆"""
+        blueprint_lib = self.world.get_blueprint_library()
 
-try:
-    # 创建输出目录
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = f"cvips_data/success_{timestamp}"
-    os.makedirs(output_dir, exist_ok=True)
+        # 选择高清模型车辆
+        vehicle_types = [
+            'vehicle.tesla.model3',  # 特斯拉模型细节丰富
+            'vehicle.audi.a2',  # 奥迪模型高清
+            'vehicle.bmw.grandtourer',
+            'vehicle.mercedes.coupe'
+        ]
 
-    print(f"输出目录: {output_dir}")
+        vehicle_bp = None
+        for vtype in vehicle_types:
+            if blueprint_lib.filter(vtype):
+                vehicle_bp = random.choice(blueprint_lib.filter(vtype))
+                break
 
-    # 保存配置
-    with open(f"{output_dir}/config.txt", "w") as f:
-        f.write(f"生成时间: {datetime.now()}\n")
-        f.write(f"地图: {world.get_map().name}\n")
+        if not vehicle_bp:
+            vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
 
-    # 设置异步模式（更稳定）
-    settings = world.get_settings()
-    settings.synchronous_mode = False
-    world.apply_settings(settings)
+        # 获取生成点（选择光照好的位置）
+        spawn_points = self.world.get_map().get_spawn_points()
+        if not spawn_points:
+            print("⚠ 没有生成点")
+            return None
 
-    # 设置简单天气
-    weather = carla.WeatherParameters(
-        sun_altitude_angle=90,
-        cloudiness=0,
-        precipitation=0,
-        fog_density=0
-    )
-    world.set_weather(weather)
-    print("✓ 天气设置完成")
+        # 选择一个开阔区域的生成点（避免在阴影中）
+        spawn_point = spawn_points[0]  # 通常第一个点位置较好
 
-    # 生成车辆
-    blueprint_lib = world.get_blueprint_library()
+        try:
+            vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+            self.actors.append(vehicle)
 
-    # 选择简单车辆
-    vehicle_bp = None
-    vehicle_types = [
-        'vehicle.tesla.model3',
-        'vehicle.audi.tt',
-        'vehicle.nissan.micra',
-        'vehicle.mini.cooperst'
-    ]
+            # 设置自动驾驶，但速度较慢便于清晰拍摄
+            vehicle.set_autopilot(True)
 
-    for vtype in vehicle_types:
-        if blueprint_lib.filter(vtype):
-            vehicle_bp = random.choice(blueprint_lib.filter(vtype))
-            break
+            # 限制速度（可选）
+            vehicle.apply_control(carla.VehicleControl(throttle=0.3, brake=0.0))
 
-    if not vehicle_bp:
-        vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+            print(f"✓ 生成主车辆: {vehicle.type_id}")
+            return vehicle
 
-    # 获取生成点
-    spawn_points = world.get_map().get_spawn_points()
-    if spawn_points:
-        spawn_point = random.choice(spawn_points)
-        print(f"使用生成点: ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
+        except Exception as e:
+            print(f"生成车辆失败: {e}")
+            return None
 
-        # 生成车辆
-        vehicle = world.spawn_actor(vehicle_bp, spawn_point)
-        print(f"✓ 生成车辆: {vehicle.type_id}")
+    def spawn_traffic(self):
+        """生成交通"""
+        blueprint_lib = self.world.get_blueprint_library()
 
-        # 设置自动驾驶
-        vehicle.set_autopilot(True)
+        print(f"生成 {self.args.num_vehicles} 辆车和 {self.args.num_pedestrians} 个行人")
 
-        # 添加简单摄像头
-        camera_bp = blueprint_lib.find('sensor.camera.rgb')
-        camera_bp.set_attribute('image_size_x', '640')
-        camera_bp.set_attribute('image_size_y', '480')
-        camera_bp.set_attribute('fov', '90')
+        # 生成其他车辆
+        vehicles_spawned = 0
+        for i in range(self.args.num_vehicles):
+            try:
+                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+                spawn_points = self.world.get_map().get_spawn_points()
 
-        # 前摄像头
-        camera_transform = carla.Transform(
-            carla.Location(x=1.5, z=1.4),
-            carla.Rotation(pitch=0, yaw=0, roll=0)
-        )
-        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
+                if spawn_points and len(spawn_points) > i + 5:  # 避免位置冲突
+                    spawn_point = spawn_points[i + 5]  # 使用稍远的位置
+                    vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+                    self.actors.append(vehicle)
+                    vehicle.set_autopilot(True)
+                    vehicles_spawned += 1
+            except:
+                pass
 
-        # 图像保存回调
-        frame_count = [0]
+        # 生成行人（只在白天生成，夜晚行人看不清）
+        pedestrians_spawned = 0
+        if self.args.time_of_day != 'night' or self.args.num_pedestrians > 0:
+            for i in range(self.args.num_pedestrians):
+                try:
+                    ped_bp = random.choice(blueprint_lib.filter('walker.pedestrian.*'))
+                    location = self.world.get_random_location_from_navigation()
 
+                    if location:
+                        location.z += 1.0
+                        pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
+                        self.actors.append(pedestrian)
 
-        def save_image(image):
-            frame_count[0] += 1
-            if frame_count[0] <= 30:  # 只保存30张
-                image.save_to_disk(f"{output_dir}/frame_{frame_count[0]:03d}.png")
-                if frame_count[0] % 10 == 0:
-                    print(f"    已保存 {frame_count[0]}/30 帧")
+                        # 添加控制器
+                        controller_bp = blueprint_lib.find('controller.ai.walker')
+                        controller = self.world.spawn_actor(controller_bp, carla.Transform(), attach_to=pedestrian)
+                        controller.start()
+                        self.actors.append(controller)
 
+                        # 设置目标
+                        target = self.world.get_random_location_from_navigation()
+                        if target:
+                            controller.go_to_location(target)
 
-        camera.listen(save_image)
-        print("✓ 摄像头已安装")
+                        pedestrians_spawned += 1
+                except:
+                    pass
 
-        # 收集数据
-        print("\n[5/5] 收集数据 (15秒)...")
-        print("按 Ctrl+C 可提前结束")
+        print(f"✓ 实际生成 {vehicles_spawned} 辆车和 {pedestrians_spawned} 个行人")
+
+    def setup_hd_cameras(self, vehicle):
+        """设置高清摄像头"""
+        if not vehicle:
+            return
+
+        blueprint_lib = self.world.get_blueprint_library()
+
+        # 摄像头位置配置
+        camera_configs = [
+            ('front_hd', carla.Transform(
+                carla.Location(x=2.0, z=1.8),  # 更靠前，更高
+                carla.Rotation(pitch=-5.0)  # 稍微向下看
+            )),
+            ('rear_hd', carla.Transform(
+                carla.Location(x=-1.8, z=1.8),
+                carla.Rotation(pitch=-5.0, yaw=180)
+            )),
+            ('left_hd', carla.Transform(
+                carla.Location(x=0.0, y=-1.2, z=1.6),
+                carla.Rotation(pitch=-3.0, yaw=-90)
+            )),
+            ('right_hd', carla.Transform(
+                carla.Location(x=0.0, y=1.2, z=1.6),
+                carla.Rotation(pitch=-3.0, yaw=90)
+            ))
+        ]
+
+        for name, transform in camera_configs:
+            try:
+                camera_bp = blueprint_lib.find('sensor.camera.rgb')
+
+                # ========== 关键：高清摄像头设置 ==========
+                camera_bp.set_attribute('image_size_x', '1920')  # 全高清宽度
+                camera_bp.set_attribute('image_size_y', '1080')  # 全高清高度
+                camera_bp.set_attribute('fov', '80')  # 合适的视野
+                camera_bp.set_attribute('motion_blur_intensity', '0.0')  # 关闭运动模糊
+                camera_bp.set_attribute('motion_blur_max_distortion', '0.0')
+                camera_bp.set_attribute('motion_blur_min_object_screen_size', '0.0')
+                camera_bp.set_attribute('enable_postprocess_effects', 'False')  # 关闭后期效果
+                camera_bp.set_attribute('gamma', '2.2')  # 标准gamma
+                camera_bp.set_attribute('shutter_speed', '200')  # 较快快门减少模糊
+                camera_bp.set_attribute('iso', '100')  # 低ISO减少噪点
+                camera_bp.set_attribute('fstop', '1.8')  # 较大光圈
+                camera_bp.set_attribute('lens_circle_multiplier', '0.0')  # 关闭镜头畸变
+                camera_bp.set_attribute('lens_circle_falloff', '0.0')
+                camera_bp.set_attribute('chromatic_aberration_intensity', '0.0')  # 关闭色差
+                camera_bp.set_attribute('chromatic_aberration_offset', '0.0')
+                # ========================================
+
+                camera = self.world.spawn_actor(camera_bp, transform, attach_to=vehicle)
+
+                # 图像保存回调函数
+                def make_save_callback(save_dir, sensor_name):
+                    def save_image(image):
+                        self.frame_count += 1
+
+                        # 使用最高质量保存
+                        image.save_to_disk(
+                            f"{save_dir}/frame_{self.frame_count:06d}.png",
+                            carla.ColorConverter.Raw  # 保存为原始格式
+                        )
+
+                        # 打印第一帧的信息用于调试
+                        if self.frame_count == 1:
+                            print(f"  第一帧保存: {sensor_name}, 尺寸: {image.width}x{image.height}")
+
+                    return save_image
+
+                camera.listen(make_save_callback(self.sensor_dirs[name], name))
+                self.actors.append(camera)
+                self.sensors.append(camera)
+
+                print(f"✓ 安装{name}摄像头 (1920x1080)")
+
+            except Exception as e:
+                print(f"安装{name}摄像头失败: {e}")
+
+        print(f"✓ 总共安装 {len(self.sensors)} 个高清摄像头")
+
+    def collect_data(self):
+        """收集高清数据"""
+        print("\n[5/5] 收集高清数据...")
+        print(f"持续时间: {self.args.duration}秒")
+        print("提示: 车辆低速行驶，图像更清晰")
+        print("按 Ctrl+C 提前结束")
 
         start_time = time.time()
-        try:
-            for i in range(15):
-                print(f"  进度: {i + 1}/15 秒")
-                time.sleep(1.0)
+        initial_count = self.frame_count
 
-            print(f"\n✓ 数据收集完成!")
-            print(f"  总帧数: {frame_count[0]}")
-            print(f"  数据保存到: {output_dir}")
+        try:
+            while time.time() - start_time < self.args.duration:
+                elapsed = time.time() - start_time
+
+                # 每5秒显示进度
+                if int(elapsed) % 5 == 0 and elapsed % 5 < 0.1:
+                    collected = self.frame_count - initial_count
+                    remaining = self.args.duration - elapsed
+                    fps = collected / elapsed if elapsed > 0 else 0
+
+                    print(f"  进度: {elapsed:.1f}/{self.args.duration}秒 | "
+                          f"帧数: {collected} | "
+                          f"FPS: {fps:.1f}")
+
+                time.sleep(0.1)
+
+            # 收集完成
+            collected = self.frame_count - initial_count
+            elapsed = time.time() - start_time
+            fps = collected / elapsed if elapsed > 0 else 0
+
+            print(f"\n✓ 高清数据收集完成!")
+            print(f"  总帧数: {collected}")
+            print(f"  持续时间: {elapsed:.1f}秒")
+            print(f"  平均帧率: {fps:.1f} FPS")
+            print(f"  分辨率: 1920x1080")
+
+            # 保存统计信息
+            self.save_statistics(collected, elapsed, fps)
 
         except KeyboardInterrupt:
-            print(f"\n数据收集中断，已保存 {frame_count[0]} 帧")
+            collected = self.frame_count - initial_count
+            print(f"\n数据收集中断，已收集 {collected} 帧高清图像")
 
-        # 清理
+    def save_statistics(self, frames, duration, fps):
+        """保存统计信息"""
+        stats = {
+            'total_frames': frames,
+            'duration_seconds': duration,
+            'average_fps': fps,
+            'resolution': '1920x1080',
+            'scenario': self.args.scenario,
+            'town': self.args.town,
+            'weather': self.args.weather,
+            'time_of_day': self.args.time_of_day,
+            'timestamp': datetime.now().isoformat(),
+            'notes': '高清版本，关闭了运动模糊和后期效果'
+        }
+
+        stats_file = os.path.join(self.output_dir, 'hd_statistics.json')
+        with open(stats_file, 'w') as f:
+            json.dump(stats, f, indent=2)
+
+        # 也保存一份图像质量说明
+        quality_note = """
+图像质量设置说明：
+1. 分辨率: 1920x1080 (全高清)
+2. 关闭了所有运动模糊效果
+3. 关闭了景深、光晕等后期效果
+4. 优化了曝光和光照设置
+5. 使用Raw格式保存，无压缩损失
+
+如果图像仍然模糊，请检查：
+1. CARLA图形设置是否为最高质量
+2. 显卡驱动是否更新
+3. 是否有足够的显存
+"""
+
+        note_file = os.path.join(self.output_dir, 'image_quality_note.txt')
+        with open(note_file, 'w') as f:
+            f.write(quality_note)
+
+        print("✓ 统计信息和质量说明已保存")
+
+    def cleanup(self):
+        """清理场景"""
         print("\n清理场景...")
-        camera.stop()
-        camera.destroy()
-        vehicle.destroy()
-        print("✓ 场景已清理")
 
-    else:
-        print("⚠ 没有找到生成点，跳过车辆生成")
+        # 先停止所有传感器
+        for sensor in self.sensors:
+            try:
+                sensor.stop()
+            except:
+                pass
 
-except Exception as e:
-    print(f"✗ 创建场景时出错: {e}")
-    traceback.print_exc()
+        # 然后销毁所有actor
+        destroyed = 0
+        for actor in self.actors:
+            try:
+                if actor and actor.is_alive:
+                    actor.destroy()
+                    destroyed += 1
+            except:
+                pass
+
+        print(f"销毁 {destroyed} 个actor")
+        self.actors.clear()
+        self.sensors.clear()
+
 
 # ============================================================
-# 完成
+# 4. 主函数
 # ============================================================
-print("\n" + "=" * 70)
-print("🎉 CVIPS 数据生成完成！")
-print("=" * 70)
-print(f"CARLA服务器仍在运行，可以继续使用")
-print("=" * 70)
+def main():
+    parser = argparse.ArgumentParser(description='CVIPS 高清图像数据生成器')
 
-input("\n按Enter键退出...")
+    # 基本参数
+    parser.add_argument('--scenario', type=str, default='hd_test',
+                        help='场景名称')
+    parser.add_argument('--town', type=str, default='Town10HD',
+                        help='CARLA地图（推荐Town10HD细节更丰富）')
+
+    # 环境参数（推荐使用白天晴天获取最清晰图像）
+    parser.add_argument('--weather', type=str, default='clear',
+                        choices=['clear', 'rainy', 'cloudy'],
+                        help='天气条件（推荐clear）')
+    parser.add_argument('--time-of-day', type=str, default='noon',
+                        choices=['noon', 'sunset', 'night'],
+                        help='时间（推荐noon）')
+
+    # 交通参数
+    parser.add_argument('--num-vehicles', type=int, default=3,
+                        help='交通车辆数（较少减少遮挡）')
+    parser.add_argument('--num-pedestrians', type=int, default=5,
+                        help='行人数（白天才有效）')
+
+    # 收集参数
+    parser.add_argument('--duration', type=int, default=30,
+                        help='收集时间(秒)')
+
+    args = parser.parse_args()
+
+    # 创建高清生成器
+    generator = CVIPSHDGenerator(args)
+
+    try:
+        # 1. 连接
+        if not generator.connect_with_retry():
+            return
+
+        # 2. 设置高清场景
+        ego_vehicle = generator.setup_scene()
+
+        # 3. 设置高清摄像头
+        if ego_vehicle:
+            generator.setup_hd_cameras(ego_vehicle)
+
+        # 4. 收集高清数据
+        generator.collect_data()
+
+    except KeyboardInterrupt:
+        print("\n程序被用户中断")
+    except Exception as e:
+        print(f"\n运行出错: {e}")
+        traceback.print_exc()
+    finally:
+        # 5. 清理
+        generator.cleanup()
+
+        print("\n" + "=" * 80)
+        print(f"高清数据保存到: {generator.output_dir}")
+        print("建议: 打开输出目录查看第一张图像是否清晰")
+        print("=" * 80)
+
+
+if __name__ == "__main__":
+    main()
