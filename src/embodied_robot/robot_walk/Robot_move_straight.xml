@@ -10,11 +10,11 @@
      limitations under the License.
 -->
 
-<mujoco model="Humanoid_With_Dynamic_Wall">
+<mujoco model="Humanoid_Complex_Dynamic_Env_Navigation">
   <option timestep="0.005"/>
 
   <visual>
-    <map force="0.1" zfar="30"/>
+    <map force="0.1" zfar="50"/>  <!-- 增大可视距离适配更多障碍 -->
     <rgba haze="0.15 0.25 0.35 1"/>
     <global offwidth="2560" offheight="1440" elevation="-20" azimuth="120"/>
   </visual>
@@ -27,9 +27,14 @@
     <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <!-- 障碍物材质（区分固定/动态障碍） -->
+    <!-- 障碍物材质（区分固定/不同动态障碍） -->
     <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>    <!-- 固定障碍 -->
-    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>    <!-- 动态障碍 -->
+    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>    <!-- 动态障碍1：正弦组合运动 -->
+    <material name="wall_green" rgba="0.3 0.8 0.5 1"/>   <!-- 动态障碍2：随机游走 -->
+    <material name="wall_purple" rgba="0.7 0.4 0.8 1"/>  <!-- 动态障碍3：圆周运动 -->
+    <!-- 目标点材质 -->
+    <material name="target_material" rgba="1 0 0 1"/>     <!-- 红色目标点 -->
+    <material name="target_base_material" rgba="1 0.5 0 1"/> <!-- 橙色基座 -->
   </asset>
 
   <default>
@@ -97,9 +102,12 @@
       <default class="elbow">
         <joint range="-100 50" stiffness="0"/>
       </default>
-      <!-- 动态障碍关节默认配置 -->
-      <default class="dynamic_wall_joint">
-        <joint type="slide" damping="10" stiffness="0" limited="true"/>
+      <!-- 动态障碍关节默认配置（不同阻尼适配不同运动） -->
+      <default class="dynamic_wall_joint_slide">
+        <joint type="slide" damping="8" stiffness="0" limited="true"/>
+      </default>
+      <default class="dynamic_wall_joint_rotate">
+        <joint type="slide" damping="5" stiffness="0" limited="true"/>
       </default>
     </default>
   </default>
@@ -107,28 +115,63 @@
   <worldbody>
     <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3"/>
 
-    <!-- 障碍1：固定位置（机器人正前方3米） -->
+    <!-- ====================== 导航目标点（固定位置 x=12, y=0, z=0.2） ====================== -->
+    <body name="navigation_target" pos="12 0 0.2">
+      <geom name="target_marker" type="sphere" size="0.15" material="target_material" condim="3"/>
+      <geom name="target_base" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
+    </body>
+
+    <!-- 障碍1：固定障碍（机器人正前方3米） -->
     <body name="wall1" pos="3 0 0.5">
       <geom type="box" size="0.5 1 0.8" material="wall_gray" friction="1.0 0.1 0.1"/>
       <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
     </body>
 
-    <!-- 障碍2：动态障碍（沿Y轴左右移动，X轴固定3米） -->
-    <body name="wall2_base" pos="3.0 0.0 0.5">
-      <!-- 滑动关节：沿Y轴移动，范围-2~2米 -->
-      <joint name="wall2_slide_y" class="dynamic_wall_joint" axis="0 1 0" range="-2.0 2.0"/>
+    <!-- 障碍2：动态障碍1（X=4米，Y/Z组合正弦运动） -->
+    <body name="wall2_base" pos="4.0 0.0 0.5">
+      <!-- Y轴滑动关节 -->
+      <joint name="wall2_slide_y" class="dynamic_wall_joint_slide" axis="0 1 0" range="-3.0 3.0"/>
+      <!-- Z轴滑动关节（增加垂直方向运动） -->
+      <joint name="wall2_slide_z" class="dynamic_wall_joint_slide" axis="0 0 1" range="0.3 1.2"/>
       <!-- 动态障碍本体 -->
       <body name="wall2" pos="0 0 0">
         <geom type="box" size="0.4 0.8 0.7" material="wall_blue" friction="1.0 0.1 0.1"/>
-        <inertial pos="0 0 0" mass="50" diaginertia="1 1 1"/> <!-- 降低质量便于移动 -->
+        <inertial pos="0 0 0" mass="50" diaginertia="1 1 1"/>
+      </body>
+    </body>
+
+    <!-- 障碍3：动态障碍2（X=6米，随机游走运动） -->
+    <body name="wall3_base" pos="6.0 0.0 0.5">
+      <!-- X轴滑动关节（小幅前后移动） -->
+      <joint name="wall3_slide_x" class="dynamic_wall_joint_slide" axis="1 0 0" range="5.0 7.0"/>
+      <!-- Y轴滑动关节（左右移动） -->
+      <joint name="wall3_slide_y" class="dynamic_wall_joint_slide" axis="0 1 0" range="-2.5 2.5"/>
+      <!-- 动态障碍本体 -->
+      <body name="wall3" pos="0 0 0">
+        <geom type="box" size="0.6 0.7 0.8" material="wall_green" friction="1.0 0.1 0.1"/>
+        <inertial pos="0 0 0" mass="60" diaginertia="1 1 1"/>
+      </body>
+    </body>
+
+    <!-- 障碍4：动态障碍3（圆周运动，中心X=8,Y=1） -->
+    <body name="wall4_rot_base" pos="8.0 1.0 0.5">
+      <!-- 旋转关节（圆周运动的中心） -->
+      <joint name="wall4_rotate" type="hinge" axis="0 0 1" damping="3" stiffness="0"/>
+      <!-- 径向滑动关节（调整圆周半径） -->
+      <joint name="wall4_radial" class="dynamic_wall_joint_rotate" axis="1 0 0" range="0.5 2.0"/>
+      <!-- 动态障碍本体 -->
+      <body name="wall4" pos="1.0 0 0">
+        <geom type="cylinder" size="0.5 0.7" material="wall_purple" friction="1.0 0.1 0.1"/>
+        <inertial pos="0 0 0" mass="40" diaginertia="1 1 1"/>
       </body>
     </body>
 
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
-    <light name="top" pos="0 0 2" mode="trackcom"/>
+    <light name="top" pos="0 0 4" mode="trackcom"/>  <!-- 提高顶光高度 -->
     <body name="torso" pos="0 0 1.282" childclass="body">
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
+      <camera name="wide" pos="-5 -5 3" xyaxes="1 1 0 0 0 1" mode="trackcom"/> <!-- 新增广角相机 -->
       <freejoint name="root"/>
       <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
       <geom name="waist_upper" fromto="-.01 -.06 -.12 -.01 .06 -.12" size=".06"/>
@@ -207,6 +250,10 @@
   <contact>
     <exclude body1="waist_lower" body2="thigh_right"/>
     <exclude body1="waist_lower" body2="thigh_left"/>
+    <!-- 排除障碍间的碰撞 -->
+    <exclude body1="wall2" body2="wall3"/>
+    <exclude body1="wall3" body2="wall4"/>
+    <exclude body1="wall2" body2="wall4"/>
   </contact>
 
   <tendon>
@@ -242,8 +289,13 @@
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
-    <!-- 动态障碍驱动电机 -->
-    <motor name="wall2_motor" gear="50" joint="wall2_slide_y" ctrlrange="-1 1"/>
+    <!-- 动态障碍驱动电机（新增多个） -->
+    <motor name="wall2_motor_y" gear="50" joint="wall2_slide_y" ctrlrange="-1 1"/>
+    <motor name="wall2_motor_z" gear="30" joint="wall2_slide_z" ctrlrange="-1 1"/>
+    <motor name="wall3_motor_x" gear="40" joint="wall3_slide_x" ctrlrange="-1 1"/>
+    <motor name="wall3_motor_y" gear="45" joint="wall3_slide_y" ctrlrange="-1 1"/>
+    <motor name="wall4_motor_rot" gear="25" joint="wall4_rotate" ctrlrange="-1 1"/>
+    <motor name="wall4_motor_rad" gear="35" joint="wall4_radial" ctrlrange="-1 1"/>
   </actuator>
 
   <keyframe>
