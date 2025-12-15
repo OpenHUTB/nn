@@ -23,13 +23,12 @@ include_directories(
 )
 
 ## 安装 Python 脚本（main.py 用绝对路径，彻底避免歧义）
-catkin_install_python(
-  PROGRAMS
-    scripts/publisher.py
-    scripts/subscriber.py
-    /home/lan/桌面/nn/src/Neuro_Mujoco/main.py  # 绝对路径！绝对路径！绝对路径！
-  DESTINATION
-    \${CATKIN_PACKAGE_BIN_DESTINATION}
+catkin_install_python(PROGRAMS
+  scripts/main.py
+  scripts/publisher.py
+  scripts/subscriber.py
+  scripts/camera_capture.py 
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## 安装 launch 文件

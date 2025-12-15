@@ -11,7 +11,26 @@ from Environment import CarEnv, MEMORY_FRACTION
 from Hyperparameters import *
 
 
-MODEL_PATH = r'D:\Work\T_Unmanned_vehicle_AD_DQN\models\YY_Optimized___290.14max___97.16avg___13.42min__1764553908.model'  # 请替换为实际的最佳模型路径
+MODEL_PATH = r'D:\Work\T_Unmanned_vehicle_AD_DQN\models\YY_Optimized_best_363.53.model'  # 请替换为实际的最佳模型路径
+
+def get_safe_action(model, state, env, previous_action):
+    """结合模型预测和安全规则的混合动作选择"""
+    # 模型预测
+    qs = model.predict(np.array(state).reshape(-1, *state.shape)/255)[0]
+    
+    # 如果有建议的避让动作（来自环境），优先考虑
+    if hasattr(env, 'suggested_action') and env.suggested_action is not None:
+        suggested_q = qs[env.suggested_action]
+        qs[env.suggested_action] += 1.0  # 提高建议动作的Q值
+        env.suggested_action = None  # 重置
+    
+    # 避免频繁切换动作（平滑性）
+    if previous_action in [3, 4]:  # 如果是转向动作
+        qs[previous_action] += 0.3  # 稍微提高继续当前转向的倾向
+    
+    # 选择动作
+    action = np.argmax(qs)
+    return action, qs
 
 if __name__ == '__main__':
 
@@ -37,13 +56,16 @@ if __name__ == '__main__':
 
     # 循环测试多个episode
     episode_count = 0
+    previous_action = 1  # 初始动作为保持
+    
     try:
         while True:
             episode_count += 1
             print(f'\n开始第 {episode_count} 个测试轮次')
 
             # 重置环境并获取初始状态
-            current_state = env.reset()
+            # 测试时使用正常难度（相当于训练的第3阶段）
+            current_state = env.reset(401)  # 401表示使用正常难度
             env.collision_hist = []  # 重置碰撞历史
 
             done = False
@@ -56,9 +78,9 @@ if __name__ == '__main__':
                 # FPS计数开始
                 step_start = time.time()
 
-                # 基于当前观察空间预测动作
-                qs = model.predict(np.array(current_state).reshape(-1, *current_state.shape)/255)[0]
-                action = np.argmax(qs)  # 选择Q值最大的动作
+                # 基于当前观察空间预测动作（使用安全版本）
+                action, qs = get_safe_action(model, current_state, env, previous_action)
+                previous_action = action
 
                 # 执行环境步进
                 new_state, reward, done, _ = env.step(action)
