@@ -21,7 +21,6 @@ except ImportError:
     ROS_AVAILABLE = False
     logging.warning("未检测到 ROS 环境，ROS 功能已禁用（如需启用，请安装 ROS 1 Noetic 并配置环境）")
 
-
 # 配置日志系统
 logging.basicConfig(
     level=logging.INFO,
@@ -187,6 +186,9 @@ def visualize(model_path: str, use_ros: bool = False) -> None:
         model_path = model_files[0]
         logger.info(f"自动选择目录中的模型文件: {model_path}")
     
+        model_path: 模型文件路径
+        use_ros: 是否启用ROS模式（默认False）
+    """
     model, data = load_model(model_path)
     if not model:
         return
@@ -334,6 +336,7 @@ def visualize(model_path: str, use_ros: bool = False) -> None:
         logger.error(f"可视化过程出错: {str(e)}", exc_info=True)
 
 # ===================== 主函数（仅优化model参数help+保持其他逻辑不变）=====================
+# ===================== 主函数（完全保持原有逻辑不变）=====================
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="MuJoCo功能整合工具（支持ROS 1消息封装）",
@@ -344,6 +347,7 @@ def main() -> None:
     # 1. 可视化命令（优化model参数help为通用提示，移除硬编码路径）
     viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
     viz_parser.add_argument("model", help="模型文件路径或包含模型的目录（支持.xml/.mjb格式）")
+    viz_parser.add_argument("model", help="/home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b")
     viz_parser.add_argument(
         "--ros",
         action="store_true",
