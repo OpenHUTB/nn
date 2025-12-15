@@ -43,3 +43,10 @@ https://github.com/robfiras/loco-mujoco/tree/master/loco_mujoco/models/unitree_h
 # _数据集百度网盘地址_
 
 链接: https://pan.baidu.com/s/1Viqlg9VYZBuKgj7TiVo-Tw 提取码: 68aa
+下载好的数据集放在当前文件夹下
+
+# _文件说明_
+
+- `main`:使用locomujoco的简单示例
+- `mujoco`:使用mujoco的简单实例
+- `robot_RL`:使用mujoco进行的强化学习训练
