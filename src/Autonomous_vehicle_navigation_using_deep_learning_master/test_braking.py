@@ -13,11 +13,11 @@ from carla import Transform
 from carla import Location
 from carla import Rotation
 
-town2 = {1: [80, 306.6, 5, 0], 2:[150,306.6]}
+town2 = {1: [53.12553405761719,137.06280517578125,1.3652913570404053, 0], 2:[105.81783294677734,97.80741882324219]}
 curves = [0, town2]
 
 epsilon = 0
-MODEL_PATH = "models/Braking___282.00max__282.00avg__282.00min__1679121006.model"
+MODEL_PATH = "models/Braking___282.model"
 
 def setup_tensorflow():
     """设置 TensorFlow 2.x 配置"""

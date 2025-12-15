@@ -78,6 +78,8 @@ if __name__ == "__main__":
     main()
 import sys
 import os
+
+main
 import importlib.util
 import numpy as np
 
