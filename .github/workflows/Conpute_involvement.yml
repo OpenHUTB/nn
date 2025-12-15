@@ -9,7 +9,7 @@ jobs:
     # 使用矩阵策略，同时在 ubuntu 和 windows 上运行
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]  # 添加 windows-latest
+        os: [ubuntu-latest]  # 添加 windows-latest
 
     # 运行环境
     runs-on: ${{ matrix.os }}

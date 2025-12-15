@@ -16,6 +16,16 @@ simulator_module = importlib.util.module_from_spec(spec)
 sys.modules["simulator"] = simulator_module
 spec.loader.exec_module(simulator_module)
 
+# 2. 检查文件是否存在
+if not os.path.exists(simulator_path):
+    raise FileNotFoundError(f"simulator.py 不存在：{simulator_path}")
+
+# 3. 动态加载 simulator.py 模块
+spec = importlib.util.spec_from_file_location("simulator", simulator_path)
+simulator_module = importlib.util.module_from_spec(spec)
+sys.modules["simulator"] = simulator_module
+spec.loader.exec_module(simulator_module)
+
 # 4. 从加载的模块中导入 Simulator 类
 Simulator = simulator_module.Simulator
 
@@ -83,11 +93,4 @@ except Exception as e:
     traceback.print_exc()
     
 finally:
-   
-    print("\n关闭仿真环境...")
-    try:
-        if 'env' in locals():
-            env.close()
-    except:
-        pass
     print("仿真结束")

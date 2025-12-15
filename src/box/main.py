@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 import moblARMslndex 
 import argparse
 from certifi import where
+=======
+import argparse
+from certifi import where
+
+>>>>>>> f5c965a634bc42a4261d8907d2ed5530a8647006
 parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--contents", action="store_true", help="查看证书文件内容")
 args = parser.parse_args()
