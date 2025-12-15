@@ -113,6 +113,12 @@ def get_lidar_info():
     if not lidar_data or len(lidar_data.point_cloud) < 3: return 99, 99, 99
     points = np.array(lidar_data.point_cloud, dtype=np.float32)
     points = np.reshape(points, (int(points.shape[0] / 3), 3))
+    valid = points[(points[:, 2] > -0.5) & (points[:, 2] < 0.5)]
+    if len(valid) == 0: return 99, 99, 99
+
+    f_mask = (valid[:, 0] > 0) & (np.abs(valid[:, 1]) < 1.0)
+    l_mask = (valid[:, 1] < -1.0) & (np.abs(valid[:, 0]) < 1.0)
+    r_mask = (valid[:, 1] > 1.0) & (np.abs(valid[:, 0]) < 1.0)
 
     valid = points[(points[:, 2] > -0.4) & (points[:, 2] < 0.4)]
     if len(valid) == 0: return 99, 99, 99
@@ -160,8 +166,13 @@ def turn_to_angle_gentle(target_angle_rel):
                                    yaw_mode=airsim.YawMode(is_rate=True, yaw_or_rate=float(yaw_rate)),
                                    vehicle_name=VEHICLE_NAME).join()
 
+def scan_and_decide():
+    print("\n🛑 决策中...")
     client.moveByVelocityAsync(0, 0, 0, 0.5, vehicle_name=VEHICLE_NAME).join()
 
+    pos = client.simGetVehiclePose(vehicle_name=VEHICLE_NAME).position
+    curr_yaw = get_global_yaw()
+    f_d, l_d, r_d = get_lidar_info()
 
 def scan_and_decide():
     # ⚡ 急刹！多停一会儿，完全消除惯性
@@ -246,6 +257,7 @@ def scan_and_decide():
         turn_to_angle_gentle(180)
         return False
 
+        candidates.sort(key=lambda x: (x["score"], 1 if x["angle"] == 0 else 0, x["dist"]), reverse=True)
 
 try:
     cooldown_until = 0
