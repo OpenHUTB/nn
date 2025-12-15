@@ -335,8 +335,9 @@ with tf.GradientTape() as tape:
 class myModel:
     def __init__(self):# 初始化模型参数，使用随机正态分布初始化权重矩阵
         # 权重矩阵包含偏置项，通过增加输入特征维度实现
-        self.W1 = np.random.normal(size=[28 * 28 + 1, 100])  # 输入层到隐藏层，增加偏置项，W1: 连接输入层(784+1)和隐藏层(100)的权重矩阵
-        self.W2 = np.random.normal(size=[100, 10])           # 输入层到隐藏层，增加偏置项，W2: 连接隐藏层(100)和输出层(10)的权重矩阵
+        # 优化：添加 scale=0.1。原代码默认标准差为1.0，会导致初始权重过大，使Softmax饱和、梯度消失，模型难以训练。
+        self.W1 = np.random.normal(scale=0.1, size=[28 * 28 + 1, 100])
+        self.W2 = np.random.normal(scale=0.1, size=[100, 10])
         # 初始化各层操作对象
         self.mul_h1 = Matmul()      # 第一个矩阵乘法层(输入到隐藏层)
         self.mul_h2 = Matmul()      # 第二个矩阵乘法层(隐藏层到输出层)
