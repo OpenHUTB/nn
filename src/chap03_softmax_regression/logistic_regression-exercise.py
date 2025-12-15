@@ -141,10 +141,8 @@ def compute_loss(pred, label):
     # 计算所有样本损失的平均值
     loss = tf.reduce_mean(losses)
     
-    # 将预测概率大于0.5的设置为1，小于等于0.5的设置为0，得到预测标签
-    pred = tf.where(pred > 0.5, tf.ones_like(pred), tf.zeros_like(pred))
-    # 计算预测标签与真实标签相等的比例，即准确率
-    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, pred), dtype = tf.float32))
+    # 优化：直接使用 tf.round 四舍五入进行二分类判别，替代冗余的 where/ones_like/zeros_like 操作
+    accuracy = tf.reduce_mean(tf.cast(tf.equal(label, tf.round(pred)), dtype=tf.float32))
     # 返回计算得到的损失值和准确率
     return loss, accuracy
 
