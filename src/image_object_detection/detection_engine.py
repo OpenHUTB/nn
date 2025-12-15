@@ -25,7 +25,11 @@ class DetectionEngine:
         return model
     
     def detect(self, frame):
-        """对输入帧进行检测"""
+        """
+        对输入帧进行检测。
+        返回: (annotated_frame: np.ndarray, results: List[Results])
+        即使无检测框，annotated_frame 也是原始图像（HWC格式）。
+        """
         old_stdout = sys.stdout
         old_stderr = sys.stderr
         sys.stdout = io.StringIO()
@@ -37,21 +41,6 @@ class DetectionEngine:
             sys.stdout = old_stdout
             sys.stderr = old_stderr
         
-        annotated_frame = results[0].plot()
+        # YOLOv8 always returns at least one result
+        annotated_frame = results[0].plot()  # numpy array (H, W, C)
         return annotated_frame, results
-    
-    def find_objects(self, frame):
-        """检测并分类图像中的对象"""
-        _, results = self.detect(frame)
-        objects = []
-        for box in results[0].boxes:
-            cls_index = int(box.cls)
-            cls_name = self.model.names[cls_index]
-            coords = box.xyxy.tolist()[0]
-            confidence = box.conf.item()
-            objects.append({
-                "type": cls_name,
-                "bbox": coords,
-                "confidence": confidence
-            })
-        return objects
