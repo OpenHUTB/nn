@@ -108,6 +108,7 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
 
 我们提供了可视化结果来展示我们数据集中的不同视角:
 
+
 ## 致谢 (Acknowledgement)
 本项目基于以下开源项目: BEVerse, Fiery, open-mmlab, 以及 DeepAccident。
 
