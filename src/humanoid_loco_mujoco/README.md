@@ -36,3 +36,10 @@ pip install -e .
 - flax
 - gymnasium
 
+# _模型地址_
+
+https://github.com/robfiras/loco-mujoco/tree/master/loco_mujoco/models/unitree_h1
+
+# _数据集百度网盘地址_
+
+链接: https://pan.baidu.com/s/1Viqlg9VYZBuKgj7TiVo-Tw 提取码: 68aa

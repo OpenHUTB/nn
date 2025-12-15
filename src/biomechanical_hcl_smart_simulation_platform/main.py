@@ -1,85 +1,111 @@
-import argparse
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import os
 from pathlib import Path
+
+import rospy
+from std_msgs.msg import Float32MultiArray, Float32, Bool
 
 from uitb import Simulator
 
 
-def make_simulator(task_name: str):
-    """
-    根据任务名称返回对应的 simulator 环境。
+class RCCarNode(object):
+    def __init__(self, simulator_folder, rate_hz=30.0):
+        rospy.loginfo("RCCarNode init, simulator_folder: %s", simulator_folder)
 
-    task_name: "pointing" 或 "tracking"
-    """
-    project_root = Path(__file__).resolve().parent
+        # 创建 simulator（RC Car via Joystick）
+        self.env = Simulator.get(simulator_folder)
 
-    if task_name == "pointing":
-        sim_dir = project_root / "simulators" / "mobl_arms_index_pointing"
-    elif task_name == "tracking":
-        sim_dir = project_root / "simulators" / "mobl_arms_index_tracking"
-    else:
-        raise ValueError(f"Unknown task: {task_name}")
+        self.rate = rospy.Rate(rate_hz)
 
-    # README 里说明：Simulator.get(simulator_folder) 会返回一个 gym 风格的环境
-    # 可以直接调用 reset / step / render 等方法。:contentReference[oaicite:5]{index=5}
-    simulator = Simulator.get(str(sim_dir))
-    return simulator
+        # 当前 action（从 ROS 话题拿）
+        self.current_action = None
 
+        # 发布者：观测 / 奖励 / 终止标志
+        self.obs_pub = rospy.Publisher(
+            "/rc_car/obs", Float32MultiArray, queue_size=1
+        )
+        self.reward_pub = rospy.Publisher(
+            "/rc_car/reward", Float32, queue_size=1
+        )
+        self.done_pub = rospy.Publisher(
+            "/rc_car/done", Bool, queue_size=1
+        )
 
-def run_episodes(env, num_episodes: int, max_steps: int):
-    """
-    用随机动作跑若干个 episode，主要是演示 env 的使用。
-    """
-    for ep in range(num_episodes):
-        obs, info = env.reset()
-        done = False
-        step = 0
-        episode_reward = 0.0
+        # 订阅 action（你后面可以用别的节点发布这个话题，比如摇杆转指令）
+        rospy.Subscriber(
+            "/rc_car/action", Float32MultiArray, self.action_callback
+        )
 
-        print(f"\n=== Episode {ep + 1}/{num_episodes} ===")
+        # 先 reset 一次
+        self.reset_env()
 
-        while not done and step < max_steps:
-            # 这里先用随机策略，作业如果需要你可以换成自己的策略
-            action = env.action_space.sample()
+    def action_callback(self, msg):
+        # 保存最新的动作
+        self.current_action = list(msg.data)
 
-            # gymnasium 接口：obs, reward, terminated, truncated, info
-            obs, reward, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
-            episode_reward += reward
-            step += 1
+    def reset_env(self):
+        obs, info = self.env.reset()
+        self.publish_obs(obs)
+        rospy.loginfo("Environment reset")
 
-            # 如果你想看实时画面（而不是只出视频），可以打开这一行：
-            # env.render()
+    def publish_obs(self, obs):
+        msg = Float32MultiArray()
+        # obs 可能是 numpy 数组，统一转 list
+        try:
+            data = obs.flatten().tolist()
+        except AttributeError:
+            # 已经是 list/tuple
+            data = list(obs)
+        msg.data = data
+        self.obs_pub.publish(msg)
 
-        print(f"Episode reward: {episode_reward:.3f} (steps: {step})")
+    def step_once(self):
+        # 如果还没收到 action，就用零动作（或随机动作，看你需求）
+        if self.current_action is None:
+            # 用零向量动作（假设 action_space 是 Box）
+            import numpy as np
+
+            action_dim = self.env.action_space.shape[0]
+            action = np.zeros(action_dim, dtype=float)
+        else:
+            action = self.current_action
+
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated or truncated
+
+        # 发布结果
+        self.publish_obs(obs)
+        self.reward_pub.publish(Float32(data=float(reward)))
+        self.done_pub.publish(Bool(data=done))
+
+        if done:
+            rospy.loginfo("Episode done, auto reset")
+            self.reset_env()
+
+    def spin(self):
+        rospy.loginfo("RCCarNode spinning...")
+        while not rospy.is_shutdown():
+            self.step_once()
+            self.rate.sleep()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="User-in-the-Box demo for Pointing & Tracking")
-    parser.add_argument(
-        "--task",
-        choices=["pointing", "tracking"],
-        default="pointing",
-        help="选择要运行的任务：pointing 或 tracking",
-    )
-    parser.add_argument(
-        "--num_episodes",
-        type=int,
-        default=1,
-        help="要运行的 episode 数",
-    )
-    parser.add_argument(
-        "--max_steps",
-        type=int,
-        default=200,
-        help="每个 episode 最多运行多少步（防止无限循环）",
-    )
-    args = parser.parse_args()
+    rospy.init_node("rc_car_sim_node")
 
-    env = make_simulator(args.task)
-    try:
-        run_episodes(env, args.num_episodes, args.max_steps)
-    finally:
-        env.close()
+    # 从参数服务器取 simulator_folder，如果没给就用默认路径
+    default_sim_folder = str(
+        Path(__file__).resolve().parents[2]
+        / "simulators"
+        / "mobl_arms_index_remote_driving"
+    )
+    simulator_folder = rospy.get_param("~simulator_folder", default_sim_folder)
+
+    rate_hz = rospy.get_param("~rate", 30.0)
+
+    node = RCCarNode(simulator_folder=simulator_folder, rate_hz=rate_hz)
+    node.spin()
 
 
 if __name__ == "__main__":
