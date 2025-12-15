@@ -3,6 +3,7 @@ import numpy as np
 import time
 import sys
 import os
+from PIL import Image, ImageDraw, ImageFont
 
 # 添加路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -11,35 +12,56 @@ from gesture_detector import GestureDetector
 from drone_controller import DroneController
 
 
-def create_test_frame(message="Gesture Drone Control - VM Mode"):
-    """创建测试帧"""
+def cv2_add_chinese_text(img, text, position, text_color=(0, 255, 0), text_size=30):
+    """
+    在OpenCV图像上添加中文文字
+    """
+    if isinstance(img, np.ndarray):
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+
+    draw = ImageDraw.Draw(img)
+
+    # 尝试加载中文字体，如果失败使用默认字体
+    try:
+        font = ImageFont.truetype("simsun.ttc", text_size, encoding="utf-8")
+    except:
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", text_size, encoding="utf-8")
+        except:
+            font = ImageFont.load_default()
+
+    draw.text(position, text, text_color, font=font)
+
+    return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+
+
+def create_test_frame(message="手势控制无人机 - 虚拟模式"):
+    """创建测试帧（支持中文）"""
+    # 创建白色背景
     frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
 
     # 添加标题
-    cv2.putText(frame, message, (50, 50),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+    frame = cv2_add_chinese_text(frame, message, (50, 50), (0, 0, 255), 30)
 
     # 添加手势说明
     gestures = [
-        "Gesture Commands:",
-        "Open Palm - Takeoff",
-        "Closed Fist - Land",
-        "Victory - Forward",
-        "Thumb Up - Backward",
-        "Point Up - Up",
-        "Point Down - Down",
-        "OK Sign - Hover",
-        "Thumb Down - Stop"
+        "手势指令对照表:",
+        "张开手掌 - 起飞",
+        "握拳 - 降落",
+        "胜利手势 - 前进",
+        "大拇指 - 后退",
+        "食指上指 - 上升",
+        "食指向下 - 下降",
+        "OK手势 - 悬停",
+        "大拇指向下 - 停止"
     ]
 
     for i, text in enumerate(gestures):
         y_pos = 90 + i * 25
         color = (0, 0, 255) if i == 0 else (0, 100, 0)
-        cv2.putText(frame, text, (50, y_pos),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        frame = cv2_add_chinese_text(frame, text, (50, y_pos), color, 20)
 
-    cv2.putText(frame, "Press 'q' to quit", (50, 430),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+    frame = cv2_add_chinese_text(frame, "按 'q' 键退出程序", (50, 430), (0, 0, 0), 20)
 
     return frame
 
@@ -50,19 +72,21 @@ def main():
     print("=" * 60)
     print("程序已启动，正在尝试显示窗口...")
     print("如果看不到窗口，请检查虚拟机显示设置")
+    print("按 'q' 键退出程序")
+    print("按 'c' 键切换摄像头")
     print("=" * 60)
 
     detector = GestureDetector()
     controller = DroneController(simulation_mode=True)
 
     # 测试显示
-    test_frame = create_test_frame("Testing Display...")
-    cv2.imshow('Gesture Drone - VM', test_frame)
+    test_frame = create_test_frame("显示测试中...")
+    cv2.imshow('Test window', test_frame)
     cv2.waitKey(1000)  # 显示1秒
 
     # 尝试打开摄像头
     cap = None
-    for cam_id in [0, 1, 2]:
+    for cam_id in [1]:#需要视不同情况更改数字，选择摄像头
         cap = cv2.VideoCapture(cam_id)
         if cap.isOpened():
             print(f"摄像头 {cam_id} 打开成功")
@@ -85,19 +109,19 @@ def main():
             if ret:
                 frame = cv2.flip(frame, 1)
             else:
-                frame = create_test_frame("Camera Error - Virtual Mode")
+                frame = create_test_frame("摄像头错误 - 虚拟模式")
         else:
             # 虚拟模式 - 创建动态测试帧
             if frame_count % 30 == 0:  # 每30帧切换消息
                 messages = [
-                    "Virtual Camera Mode - Make gestures",
-                    "Hand Detection Active - VM",
-                    "Gesture Recognition Ready"
+                    "虚拟摄像头模式 - 请做出手势",
+                    "手势检测已激活 - 虚拟机",
+                    "手势识别系统准备就绪"
                 ]
                 message = messages[(frame_count // 30) % len(messages)]
                 frame = create_test_frame(message)
             else:
-                frame = create_test_frame("Virtual Camera Mode - Make gestures")
+                frame = create_test_frame("虚拟摄像头模式 - 请做出手势")
 
         # 手势检测
         try:
@@ -119,7 +143,7 @@ def main():
                 last_command_time = current_time
 
         # 显示帧
-        cv2.imshow('Gesture Drone Control - VM', processed_frame)
+        cv2.imshow('Main window', processed_frame)
 
         # 退出检测
         key = cv2.waitKey(1) & 0xFF
