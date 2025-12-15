@@ -23,6 +23,9 @@ class Simulator:
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "target_z")
         ]
 
+        self.finger_tip_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "index3")  # 食指末端body名称
+        self.target_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target")  # 目标小球body名称
+
     def _init_viewer(self):
         """初始化viewer，适配不同版本的mujoco"""
         try:

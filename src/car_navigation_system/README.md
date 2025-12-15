@@ -17,6 +17,8 @@
 - ```bash
   pip install -r requirements.txt
   pip install carla numpy opencv-python matplotlib
+  pip install setuptools==40.2.0
+  pip insatll wheel
   ```
 ## 快速启动
 

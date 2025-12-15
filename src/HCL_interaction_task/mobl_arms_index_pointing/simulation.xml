@@ -51,22 +51,35 @@
     <mesh name="hand_1mc" file="assets/hand_1mc.stl"/>
     <mesh name="eye" file="assets/basic_eye_2.stl" scale="0.05 0.05 0.05"/>
   </asset>
+  <!-- 世界体：包含仿真场景中的所有物体（相机、光源、骨骼、目标点等） -->
   <worldbody>
-    <camera name="for_testing" pos="-0.8 -0.6 1.5" quat="0.718027 0.437104 -0.31987 -0.437104"/>
+    <!-- 测试用相机：位置(-0.8, -0.6, 1.5)m，四元数定义朝向（对应特定视角） -->
+    <camera name="for_testing" pos="0 -1.5 1" quat="0.718027 0.437104 -0.31987 -0.437104"/>
+    <!-- 场景平行光：位置(0.9, 0.3, 2.5)m，方向垂直向下(0,0,-1)，无阴影，照射范围和强度参数优化 -->
     <light name="scene_directional_light" pos="0.9 0.3 2.5" dir="0 0 -1" directional="true" castshadow="false" cutoff="4" exponent="20" diffuse="1 1 1" specular="0 0 0"/>
-    <body name="target" pos="0.5 0 0.8">
-      <joint name="target_x" type="slide" axis="1 0 0" range="-0.5 1.0"/>  <!-- X轴移动关节 -->
-      <joint name="target_y" type="slide" axis="0 1 0" range="-0.5 0.5"/>   <!-- Y轴移动关节 -->
-      <joint name="target_z" type="slide" axis="0 0 1" range="0.5 1.5"/>   <!-- Z轴移动关节 -->
-      <geom name="target" size="0.025" rgba="0.1 0.8 0.1 1"/>
+    
+    <!-- 目标点：用于上肢运动跟踪（如抓取目标） -->
+    <body name="target" pos="0.5 0 0.3">
+      <joint name="target_x" type="slide" axis="1 0 0" range="-0.5 1.0"/>  <!-- X轴移动关节：范围-0.5~1.0m -->
+      <joint name="target_y" type="slide" axis="0 1 0" range="-0.5 0.5"/>   <!-- Y轴移动关节：范围-0.5~0.5m -->
+      <joint name="target_z" type="slide" axis="0 0 1" range="0.5 1.5"/>   <!-- Z轴移动关节：范围0.5~1.5m -->
+      <geom name="target" size="0.025" rgba="0.1 0.8 0.1 1"/> <!-- 目标点几何：半径0.025m的球体，绿色不透明 -->
     </body>
+    
+    <!-- 目标平面：辅助碰撞检测或视觉参考，完全透明（rgba最后一位为0） -->
     <body name="target-plane" pos="0.532445 -0.27 0.993">
       <geom name="target-plane" size="0.005 0.3 0.3" type="box" rgba="0.1 0.8 0.1 0"/>
     </body>
-    <body name="thorax" pos="0 0 1" quat="0.707107 0.707107 0 0">
+    
+    <!-- 胸骨（躯干基础骨骼，所有上肢骨骼的父节点） -->
+    <body name="thorax" pos="0 0 0.03" quat="0.707107 0.707107 0 0">
+      <!-- 惯性参数：质量8.01418kg，惯性张量对角线元素，位置和姿态偏移（适配人体解剖学位置） -->
       <inertial pos="-0.0194693 -0.124635 3.52071e-05" quat="0.982593 0.00053772 0.000250291 0.185769" mass="8.01418" diaginertia="0.0768128 0.0574863 0.0458735"/>
+      <!-- 躯干绕Z轴旋转关节：无刚度、无转动惯量、无阻尼，旋转范围±2π（360°自由旋转） -->
       <joint name="r_z" pos="0 0 0" axis="0 0 1" stiffness="0" range="-6.28319 6.28319" armature="0" damping="0"/>
+      <!-- 胸骨几何：引用STL网格模型 -->
       <geom name="thorax" type="mesh" mesh="thorax"/>
+
       <site name="PECM1-P3" pos="-7e-05 0.00821 0.10454"/>
       <site name="PECM2-P4" pos="0.03091 -0.03922 0.09705"/>
       <site name="PECM2-P5" pos="0.02769 -0.04498 0.02271"/>
@@ -470,8 +483,11 @@
         </body>
       </body>
     </body>
-    <body name="fixed-eye" pos="0 0 1.2" quat="0.583833 0.399104 -0.399421 -0.583368">
+     <!-- 固定眼睛模型：用于视觉仿真（如第一视角观察），不参与动力学计算 -->
+    <body name="fixed-eye" pos="0 0 0.2" quat="0.583833 0.399104 -0.399421 -0.583368">
+      <!-- 眼睛几何：引用蓝色眼睛材质和网格模型，白色不透明显示 -->
       <geom name="fixed-eye" quat="0.7106 0.25537 0.616985 0.221728" type="mesh" material="blue-eye" rgba="1 1 1 1" mesh="eye"/>
+      <!-- 眼睛视角相机：位置与眼睛重合，视场角90°，用于模拟第一人称视角 -->
       <camera name="fixed-eye" pos="0 0 0" fovy="90"/>
     </body>
   </worldbody>
