@@ -74,8 +74,8 @@ class SVM:
             # 计算梯度：正则化项梯度 + 误分类样本梯度
             # L2正则化：减小权重，防止过拟合
             # hinge loss梯度：只对误分类和边界样本计算梯度
-            # 优化点：利用NumPy广播机制，移除不必要的reshape操作，提升效率
-            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx] * X[idx], axis=0)
+            # 优化：给 y 增加一个轴以匹配 X 的维度，解决广播错误，确保梯度计算可运行
+            dw = (2 * self.reg_lambda * self.w) - np.mean(y[idx, np.newaxis] * X[idx], axis=0)
             db = -np.mean(y[idx])
 
             # 梯度下降更新参数
