@@ -1,176 +1,290 @@
-<!-- 拟人化双腿双臂机器人模型（添加墙壁障碍） -->
-<mujoco model="Humanoid_Robot_With_Wall">
-  <!-- 仿真环境参数：优化积分器和步长，提升运动流畅度 -->
-  <option timestep="0.008" gravity="0 0 -9.81" integrator="RK4" solver="CG" tolerance="1e-6"/>
+<!-- Copyright 2021 DeepMind Technologies Limited
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+         http://www.apache.org/licenses/LICENSE-2.0
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
 
-  <default>
-    <geom rgba="0.8 0.8 0.8 1" condim="6"/> <!-- condim=6增强接触稳定性 -->
-    <joint type="hinge" limited="true" damping="0.25" stiffness="0.5"/> <!-- 适中阻尼+轻微刚度，运动更顺滑 -->
-  </default>
+<mujoco model="Humanoid_With_Dynamic_Wall_Navigation">
+  <option timestep="0.005"/>
 
-  <!-- 资源定义：优化材质颜色，更贴近人体肤色和衣物质感 -->
+  <visual>
+    <map force="0.1" zfar="30"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global offwidth="2560" offheight="1440" elevation="-20" azimuth="120"/>
+  </visual>
+
+  <statistic center="0 0 0.7"/>
+
   <asset>
-    <material name="torso_red" rgba="0.9 0.3 0.3 1"/>    <!-- 躯干深红色（类似衣物） -->
-    <material name="limb_blue" rgba="0.3 0.4 0.9 1"/>    <!-- 四肢深蓝色（区分躯干） -->
-    <material name="joint_gray" rgba="0.45 0.45 0.45 1"/> <!-- 关节深灰色（更显一体化） -->
-    <material name="foot_green" rgba="0.3 0.7 0.3 1"/>    <!-- 脚部深绿色（增强抓地视觉） -->
-    <material name="hand_brown" rgba="0.8 0.6 0.4 1"/>   <!-- 手部棕黄色（贴近肤色） -->
-    <material name="head_skin" rgba="0.95 0.8 0.65 1"/>  <!-- 头部肤色 -->
-    <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>     <!-- 墙壁灰色材质 -->
+    <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="32" height="512"/>
+    <texture name="body" type="cube" builtin="flat" mark="cross" width="128" height="128" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" markrgb="1 1 1"/>
+    <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
+    <!-- 障碍物材质（区分固定/动态障碍） -->
+    <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>    <!-- 固定障碍 -->
+    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>    <!-- 动态障碍 -->
+    <!-- 目标点材质 -->
+    <material name="target_material" rgba="1 0 0 1"/>     <!-- 红色目标点 -->
+    <material name="target_base_material" rgba="1 0.5 0 1"/> <!-- 橙色基座 -->
   </asset>
 
-  <!-- 世界实体 -->
+  <default>
+    <motor ctrlrange="-1 1" ctrllimited="true"/>
+    <default class="body">
+      <!-- geoms -->
+      <geom type="capsule" condim="1" friction=".7" solimp=".9 .99 .003" solref=".015 1" material="body" group="1"/>
+      <default class="thigh">
+        <geom size=".06"/>
+      </default>
+      <default class="shin">
+        <geom fromto="0 0 0 0 0 -.3"  size=".049"/>
+      </default>
+      <default class="foot">
+        <geom size=".027"/>
+        <default class="foot1">
+          <geom fromto="-.07 -.01 0 .14 -.03 0"/>
+        </default>
+        <default class="foot2">
+          <geom fromto="-.07 .01 0 .14  .03 0"/>
+        </default>
+      </default>
+      <default class="arm_upper">
+        <geom size=".04"/>
+      </default>
+      <default class="arm_lower">
+        <geom size=".031"/>
+      </default>
+      <default class="hand">
+        <geom type="sphere" size=".04"/>
+      </default>
+
+      <!-- joints -->
+      <joint type="hinge" damping=".2" stiffness="1" armature=".01" limited="true" solimplimit="0 .99 .01"/>
+      <default class="joint_big">
+        <joint damping="5" stiffness="10"/>
+        <default class="hip_x">
+          <joint range="-30 10"/>
+        </default>
+        <default class="hip_z">
+          <joint range="-60 35"/>
+        </default>
+        <default class="hip_y">
+          <joint axis="0 1 0" range="-150 20"/>
+        </default>
+        <default class="joint_big_stiff">
+          <joint stiffness="20"/>
+        </default>
+      </default>
+      <default class="knee">
+        <joint pos="0 0 .02" axis="0 -1 0" range="-160 2"/>
+      </default>
+      <default class="ankle">
+        <joint range="-50 50"/>
+        <default class="ankle_y">
+          <joint pos="0 0 .08" axis="0 1 0" stiffness="6"/>
+        </default>
+        <default class="ankle_x">
+          <joint pos="0 0 .04" stiffness="3"/>
+        </default>
+      </default>
+      <default class="shoulder">
+        <joint range="-85 60"/>
+      </default>
+      <default class="elbow">
+        <joint range="-100 50" stiffness="0"/>
+      </default>
+      <!-- 动态障碍关节默认配置 -->
+      <default class="dynamic_wall_joint">
+        <joint type="slide" damping="10" stiffness="0" limited="true"/>
+      </default>
+    </default>
+  </default>
+
   <worldbody>
-    <!-- 地面：优化摩擦，适配机器人步态 -->
-    <body name="ground">
-      <geom type="plane" size="15 15 0.1" rgba="0.35 0.35 0.35 1" friction="1.8 0.15 0.15"/>
+    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3"/>
+
+    <!-- ====================== 导航目标点（固定位置 x=8, y=0, z=0.2） ====================== -->
+    <body name="navigation_target" pos="8 0 0.2">
+      <geom name="target_marker" type="sphere" size="0.15" material="target_material" condim="3"/>
+      <geom name="target_base" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
     </body>
 
-    <!-- 墙壁障碍：位于机器人正前方3米处，高度2米，厚度0.1米 -->
-    <body name="wall" pos="3 0 1">
-      <geom type="box" size="0.1 2 1" material="wall_gray" friction="1.0 0.1 0.1"/>
-      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/> <!-- 固定墙壁，质量大防止被推动 -->
+    <!-- 障碍1：固定位置（机器人正前方3米） -->
+    <body name="wall1" pos="3 0 0.5">
+      <geom type="box" size="0.5 1 0.8" material="wall_gray" friction="1.0 0.1 0.1"/>
+      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
     </body>
 
-    <!-- 机器人躯干（核心主体）：优化尺寸比例，更接近人体 -->
-    <body name="torso" pos="0 0 1.15">
-      <inertial pos="0 0 -0.08" mass="3.2" diaginertia="0.5 0.4 0.35"/> <!-- 重心微调，增强直立稳定性 -->
-      <geom type="box" size="0.28 0.18 0.38" material="torso_red"/> <!-- 躯干更纤细，比例协调 -->
-
-      <!-- 颈部关节（优化转动轴，支持轻微俯仰） -->
-      <body name="neck" pos="0 0 0.38">
-        <joint name="neck_joint" axis="0 1 0" range="-0.2 0.2" pos="0 0 0" damping="0.3"/>
-        <geom type="sphere" size="0.14" material="head_skin"/> <!-- 头部肤色，更拟人 -->
-        <inertial pos="0 0 0" mass="0.45" diaginertia="0.04 0.04 0.04"/>
+    <!-- 障碍2：动态障碍（沿Y轴左右移动，X轴固定3米） -->
+    <body name="wall2_base" pos="3.0 0.0 0.5">
+      <!-- 滑动关节：沿Y轴移动，范围-2~2米 -->
+      <joint name="wall2_slide_y" class="dynamic_wall_joint" axis="0 1 0" range="-2.0 2.0"/>
+      <!-- 动态障碍本体 -->
+      <body name="wall2" pos="0 0 0">
+        <geom type="box" size="0.4 0.8 0.7" material="wall_blue" friction="1.0 0.1 0.1"/>
+        <inertial pos="0 0 0" mass="50" diaginertia="1 1 1"/> <!-- 降低质量便于移动 -->
       </body>
+    </body>
 
-      <!-- =================== 左臂结构（优化关节+自然下垂） =================== -->
-      <body name="left_shoulder" pos="0.28 0 0.15">
-        <!-- 肩关节：优化转动范围，模拟人体肩部活动 -->
-        <joint name="left_shoulder_joint" axis="0 1 0" range="-0.1 0.9" pos="0 0 0" ref="0.0" damping="0.3"/> <!-- ref=0：初始无抬起 -->
-        <geom type="sphere" size="0.09" material="joint_gray" pos="0 0 0"/> <!-- 关节与躯干贴合 -->
-
-        <!-- 左上臂：优化长度和角度，让手臂自然下垂 -->
-        <body name="left_upper_arm" pos="0 0 0">
-          <joint name="left_elbow_joint" axis="0 1 0" range="-1.4 0.1" pos="0 0 0.28" ref="-0.8" damping="0.3"/> <!-- ref=-0.8：肘部弯曲下垂 -->
-          <geom type="capsule" size="0.065 0.14" fromto="0 0 0 0 0 0.28" material="limb_blue"/> <!-- 上臂更纤细 -->
-          <inertial pos="0 0 0.14" mass="0.55" diaginertia="0.08 0.08 0.08"/> <!-- 质量适配，避免下垂过度 -->
-
-          <!-- 左前臂：长度适配，自然下垂 -->
-          <body name="left_forearm" pos="0 0 0.28">
-            <joint name="left_wrist_joint" axis="0 1 0" range="-0.8 0.8" pos="0 0 0.22" ref="-0.2" damping="0.25"/> <!-- 手腕微屈，下垂更自然 -->
-            <geom type="capsule" size="0.055 0.11" fromto="0 0 0 0 0 0.22" material="limb_blue"/>
-            <inertial pos="0 0 0.11" mass="0.35" diaginertia="0.04 0.04 0.04"/>
-
-            <!-- 左手：优化尺寸，贴合前臂下垂方向 -->
-            <body name="left_hand" pos="0 0 0.22">
-              <geom type="box" size="0.08 0.06 0.045" material="hand_brown" pos="0 0 -0.02"/> <!-- 手部微向下 -->
-              <inertial pos="0 0 -0.02" mass="0.12" diaginertia="0.015 0.015 0.015"/>
+    <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
+    <light name="top" pos="0 0 2" mode="trackcom"/>
+    <body name="torso" pos="0 0 1.282" childclass="body">
+      <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
+      <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
+      <freejoint name="root"/>
+      <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
+      <geom name="waist_upper" fromto="-.01 -.06 -.12 -.01 .06 -.12" size=".06"/>
+      <body name="head" pos="0 0 .19">
+        <geom name="head" type="sphere" size=".09"/>
+        <camera name="egocentric" pos=".09 0 0" xyaxes="0 -1 0 .1 0 1" fovy="80"/>
+      </body>
+      <body name="waist_lower" pos="-.01 0 -.26">
+        <geom name="waist_lower" fromto="0 -.06 0 0 .06 0" size=".06"/>
+        <joint name="abdomen_z" pos="0 0 .065" axis="0 0 1" range="-45 45" class="joint_big_stiff"/>
+        <joint name="abdomen_y" pos="0 0 .065" axis="0 1 0" range="-75 30" class="joint_big"/>
+        <body name="pelvis" pos="0 0 -.165">
+          <joint name="abdomen_x" pos="0 0 .1" axis="1 0 0" range="-35 35" class="joint_big"/>
+          <geom name="butt" fromto="-.02 -.07 0 -.02 .07 0" size=".09"/>
+          <body name="thigh_right" pos="0 -.1 -.04">
+            <joint name="hip_x_right" axis="1 0 0" class="hip_x"/>
+            <joint name="hip_z_right" axis="0 0 1" class="hip_z"/>
+            <joint name="hip_y_right" class="hip_y"/>
+            <geom name="thigh_right" fromto="0 0 0 0 .01 -.34" class="thigh"/>
+            <body name="shin_right" pos="0 .01 -.4">
+              <joint name="knee_right" class="knee"/>
+              <geom name="shin_right" class="shin"/>
+              <body name="foot_right" pos="0 0 -.39">
+                <joint name="ankle_y_right" class="ankle_y"/>
+                <joint name="ankle_x_right" class="ankle_x" axis="1 0 .5"/>
+                <geom name="foot1_right" class="foot1"/>
+                <geom name="foot2_right" class="foot2"/>
+              </body>
+            </body>
+          </body>
+          <body name="thigh_left" pos="0 .1 -.04">
+            <joint name="hip_x_left" axis="-1 0 0" class="hip_x"/>
+            <joint name="hip_z_left" axis="0 0 -1" class="hip_z"/>
+            <joint name="hip_y_left" class="hip_y"/>
+            <geom name="thigh_left" fromto="0 0 0 0 -.01 -.34" class="thigh"/>
+            <body name="shin_left" pos="0 -.01 -.4">
+              <joint name="knee_left" class="knee"/>
+              <geom name="shin_left" fromto="0 0 0 0 0 -.3" class="shin"/>
+              <body name="foot_left" pos="0 0 -.39">
+                <joint name="ankle_y_left" class="ankle_y"/>
+                <joint name="ankle_x_left" class="ankle_x" axis="-1 0 -.5"/>
+                <geom name="foot1_left" class="foot1"/>
+                <geom name="foot2_left" class="foot2"/>
+              </body>
             </body>
           </body>
         </body>
       </body>
-
-      <!-- =================== 右臂结构（与左臂完全对称，自然下垂） =================== -->
-      <body name="right_shoulder" pos="-0.28 0 0.15">
-        <joint name="right_shoulder_joint" axis="0 1 0" range="-0.9 0.1" pos="0 0 0" ref="0.0" damping="0.3"/>
-        <geom type="sphere" size="0.09" material="joint_gray" pos="0 0 0"/>
-
-        <!-- 右上臂：对称下垂 -->
-        <body name="right_upper_arm" pos="0 0 0">
-          <joint name="right_elbow_joint" axis="0 1 0" range="-1.4 0.1" pos="0 0 0.28" ref="-0.8" damping="0.3"/>
-          <geom type="capsule" size="0.065 0.14" fromto="0 0 0 0 0 0.28" material="limb_blue"/>
-          <inertial pos="0 0 0.14" mass="0.55" diaginertia="0.08 0.08 0.08"/>
-
-          <!-- 右前臂：对称下垂 -->
-          <body name="right_forearm" pos="0 0 0.28">
-            <joint name="right_wrist_joint" axis="0 1 0" range="-0.8 0.8" pos="0 0 0.22" ref="-0.2" damping="0.25"/>
-            <geom type="capsule" size="0.055 0.11" fromto="0 0 0 0 0 0.22" material="limb_blue"/>
-            <inertial pos="0 0 0.11" mass="0.35" diaginertia="0.04 0.04 0.04"/>
-
-            <!-- 右手：对称下垂 -->
-            <body name="right_hand" pos="0 0 0.22">
-              <geom type="box" size="0.08 0.06 0.045" material="hand_brown" pos="0 0 -0.02"/>
-              <inertial pos="0 0 -0.02" mass="0.12" diaginertia="0.015 0.015 0.015"/>
-            </body>
+      <body name="upper_arm_right" pos="0 -.17 .06">
+        <joint name="shoulder1_right" axis="2 1 1"  class="shoulder"/>
+        <joint name="shoulder2_right" axis="0 -1 1" class="shoulder"/>
+        <geom name="upper_arm_right" fromto="0 0 0 .16 -.16 -.16" class="arm_upper"/>
+        <body name="lower_arm_right" pos=".18 -.18 -.18">
+          <joint name="elbow_right" axis="0 -1 1" class="elbow"/>
+          <geom name="lower_arm_right" fromto=".01 .01 .01 .17 .17 .17" class="arm_lower"/>
+          <body name="hand_right" pos=".18 .18 .18">
+            <geom name="hand_right" zaxis="1 1 1" class="hand"/>
           </body>
         </body>
       </body>
-
-      <!-- =================== 左腿结构（优化关节，模拟人体步态） =================== -->
-      <body name="left_hip" pos="0.14 0 -0.28">
-        <!-- 髋关节：优化转动范围，贴合人体迈步角度 -->
-        <joint name="left_hip_joint" axis="0 1 0" range="-0.3 0.7" pos="0 0 0" ref="0.05" damping="0.3"/> <!-- 初始微抬，直立更自然 -->
-        <geom type="sphere" size="0.11" material="joint_gray" pos="0 0 0"/> <!-- 关节与躯干贴合 -->
-
-        <!-- 左大腿：优化长度比例 -->
-        <body name="left_thigh" pos="0 0 0">
-          <joint name="left_knee_joint" axis="0 1 0" range="-1.3 0.05" pos="0 0 -0.38" ref="-0.15" damping="0.3"/> <!-- 膝盖微屈，直立稳定 -->
-          <geom type="capsule" size="0.085 0.19" fromto="0 0 0 0 0 -0.38" material="limb_blue"/>
-          <inertial pos="0 0 -0.19" mass="1.1" diaginertia="0.15 0.15 0.15"/>
-
-          <!-- 左小腿：长度适配，自然垂直 -->
-          <body name="left_calf" pos="0 0 -0.38">
-            <joint name="left_ankle_joint" axis="0 1 0" range="-0.25 0.25" pos="0 0 -0.32" ref="0.0" damping="0.25"/>
-            <geom type="capsule" size="0.075 0.16" fromto="0 0 0 0 0 -0.32" material="limb_blue"/>
-            <inertial pos="0 0 -0.16" mass="0.65" diaginertia="0.08 0.08 0.08"/>
-
-            <!-- 左脚：优化形状，更像人类脚掌 -->
-            <body name="left_foot" pos="0 0 -0.32">
-              <geom type="box" size="0.14 0.09 0.035" material="foot_green" pos="0 0 -0.015"/> <!-- 扁平脚掌，贴合地面 -->
-              <inertial pos="0 0 -0.015" mass="0.28" diaginertia="0.025 0.025 0.008"/>
-            </body>
-          </body>
-        </body>
-      </body>
-
-      <!-- =================== 右腿结构（与左腿完全对称） =================== -->
-      <body name="right_hip" pos="-0.14 0 -0.28">
-        <joint name="right_hip_joint" axis="0 1 0" range="-0.7 0.3" pos="0 0 0" ref="-0.05" damping="0.3"/>
-        <geom type="sphere" size="0.11" material="joint_gray" pos="0 0 0"/>
-
-        <!-- 右大腿：对称比例 -->
-        <body name="right_thigh" pos="0 0 0">
-          <joint name="right_knee_joint" axis="0 1 0" range="-1.3 0.05" pos="0 0 -0.38" ref="-0.15" damping="0.3"/>
-          <geom type="capsule" size="0.085 0.19" fromto="0 0 0 0 0 -0.38" material="limb_blue"/>
-          <inertial pos="0 0 -0.19" mass="1.1" diaginertia="0.15 0.15 0.15"/>
-
-          <!-- 右小腿：对称垂直 -->
-          <body name="right_calf" pos="0 0 -0.38">
-            <joint name="right_ankle_joint" axis="0 1 0" range="-0.25 0.25" pos="0 0 -0.32" ref="0.0" damping="0.25"/>
-            <geom type="capsule" size="0.075 0.16" fromto="0 0 0 0 0 -0.32" material="limb_blue"/>
-            <inertial pos="0 0 -0.16" mass="0.65" diaginertia="0.08 0.08 0.08"/>
-
-            <!-- 右脚：对称脚掌 -->
-            <body name="right_foot" pos="0 0 -0.32">
-              <geom type="box" size="0.14 0.09 0.035" material="foot_green" pos="0 0 -0.015"/>
-              <inertial pos="0 0 -0.015" mass="0.28" diaginertia="0.025 0.025 0.008"/>
-            </body>
+      <body name="upper_arm_left" pos="0 .17 .06">
+        <joint name="shoulder1_left" axis="-2 1 -1" class="shoulder"/>
+        <joint name="shoulder2_left" axis="0 -1 -1"  class="shoulder"/>
+        <geom name="upper_arm_left" fromto="0 0 0 .16 .16 -.16" class="arm_upper"/>
+        <body name="lower_arm_left" pos=".18 .18 -.18">
+          <joint name="elbow_left" axis="0 -1 -1" class="elbow"/>
+          <geom name="lower_arm_left" fromto=".01 -.01 .01 .17 -.17 .17" class="arm_lower"/>
+          <body name="hand_left" pos=".18 -.18 .18">
+            <geom name="hand_left" zaxis="1 -1 1" class="hand"/>
           </body>
         </body>
       </body>
     </body>
   </worldbody>
 
-  <!-- 执行器：优化电机参数，适配关节结构和运动需求 -->
+  <contact>
+    <exclude body1="waist_lower" body2="thigh_right"/>
+    <exclude body1="waist_lower" body2="thigh_left"/>
+  </contact>
+
+  <tendon>
+    <fixed name="hamstring_right" limited="true" range="-0.3 2">
+      <joint joint="hip_y_right" coef=".5"/>
+      <joint joint="knee_right" coef="-.5"/>
+    </fixed>
+    <fixed name="hamstring_left" limited="true" range="-0.3 2">
+      <joint joint="hip_y_left" coef=".5"/>
+      <joint joint="knee_left" coef="-.5"/>
+    </fixed>
+  </tendon>
+
   <actuator>
-    <!-- 腿部电机：扭矩适配，避免动作过猛 -->
-    <motor name="left_hip_motor" joint="left_hip_joint" gear="11" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="left_knee_motor" joint="left_knee_joint" gear="9" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="left_ankle_motor" joint="left_ankle_joint" gear="5" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="right_hip_motor" joint="right_hip_joint" gear="11" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="right_knee_motor" joint="right_knee_joint" gear="9" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="right_ankle_motor" joint="right_ankle_joint" gear="5" ctrllimited="true" ctrlrange="0 1.0"/>
-
-    <!-- 手臂电机：扭矩降低，适配下垂状态，摆动更柔和 -->
-    <motor name="left_shoulder_motor" joint="left_shoulder_joint" gear="7" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="left_elbow_motor" joint="left_elbow_joint" gear="5" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="left_wrist_motor" joint="left_wrist_joint" gear="3" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="right_shoulder_motor" joint="right_shoulder_joint" gear="7" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="right_elbow_motor" joint="right_elbow_joint" gear="5" ctrllimited="true" ctrlrange="0 1.0"/>
-    <motor name="right_wrist_motor" joint="right_wrist_joint" gear="3" ctrllimited="true" ctrlrange="0 1.0"/>
-
-    <!-- 颈部电机：扭矩最小，仅微调 -->
-    <motor name="neck_motor" joint="neck_joint" gear="2.5" ctrllimited="true" ctrlrange="0 1.0"/>
+    <motor name="abdomen_z"       gear="40"  joint="abdomen_z"/>
+    <motor name="abdomen_y"       gear="40"  joint="abdomen_y"/>
+    <motor name="abdomen_x"       gear="40"  joint="abdomen_x"/>
+    <motor name="hip_x_right"     gear="40"  joint="hip_x_right"/>
+    <motor name="hip_z_right"     gear="40"  joint="hip_z_right"/>
+    <motor name="hip_y_right"     gear="120" joint="hip_y_right"/>
+    <motor name="knee_right"      gear="80"  joint="knee_right"/>
+    <motor name="ankle_y_right"   gear="20"  joint="ankle_y_right"/>
+    <motor name="ankle_x_right"   gear="20"  joint="ankle_x_right"/>
+    <motor name="hip_x_left"      gear="40"  joint="hip_x_left"/>
+    <motor name="hip_z_left"      gear="40"  joint="hip_z_left"/>
+    <motor name="hip_y_left"      gear="120" joint="hip_y_left"/>
+    <motor name="knee_left"       gear="80"  joint="knee_left"/>
+    <motor name="ankle_y_left"    gear="20"  joint="ankle_y_left"/>
+    <motor name="ankle_x_left"    gear="20"  joint="ankle_x_left"/>
+    <motor name="shoulder1_right" gear="20"  joint="shoulder1_right"/>
+    <motor name="shoulder2_right" gear="20"  joint="shoulder2_right"/>
+    <motor name="elbow_right"     gear="40"  joint="elbow_right"/>
+    <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
+    <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
+    <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
+    <!-- 动态障碍驱动电机 -->
+    <motor name="wall2_motor" gear="50" joint="wall2_slide_y" ctrlrange="-1 1"/>
   </actuator>
+
+  <keyframe>
+    <key name="squat"
+         qpos="0 0 0.596
+               0.988015 0 0.154359 0
+               0 0.4 0
+               -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+               -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+               0 0 0 0 0 0"/>
+    <key name="stand_on_left_leg"
+         qpos="0 0 1.21948
+               0.971588 -0.179973 0.135318 -0.0729076
+               -0.0516 -0.202 0.23
+               -0.24 -0.007 -0.34 -1.76 -0.466 -0.0415
+               -0.08 -0.01 -0.37 -0.685 -0.35 -0.09
+               0.109 -0.067 -0.7 -0.05 0.12 0.16"/>
+    <key name="prone"
+         qpos="0.4 0 0.0757706
+               0.7325 0 0.680767 0
+               0 0.0729 0
+               0.0077 0.0019 -0.026 -0.351 -0.27 0
+               0.0077 0.0019 -0.026 -0.351 -0.27 0
+               0.56 -0.62 -1.752
+               0.56 -0.62 -1.752"/>
+    <key name="supine"
+         qpos="-0.4 0 0.08122
+               0.722788 0 -0.69107 0
+               0 -0.25 0
+               0.0182 0.0142 0.3 0.042 -0.44 -0.02
+               0.0182 0.0142 0.3 0.042 -0.44 -0.02
+               0.186 -0.73 -1.73
+               0.186 -0.73 -1.73"/>
+  </keyframe>
 </mujoco>

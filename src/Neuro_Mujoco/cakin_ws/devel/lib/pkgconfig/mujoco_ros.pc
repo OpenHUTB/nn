@@ -1,0 +1,8 @@
+prefix=/home/lan/桌面/nn/src/Neuro_Mujoco/catkin_ws/devel
+
+Name: mujoco_ros
+Description: Description of mujoco_ros
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: rospy sensor_msgs geometry_msgs std_msgs
