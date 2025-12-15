@@ -71,8 +71,8 @@ class MyModel:
         
 model = MyModel()
 
-# 使用Adam优化器，用于训练过程中更新模型参数
-optimizer = optimizers.Adam()
+# 优化：针对全量数据训练(Full Batch)，默认的0.001学习率太慢，改为0.01能显著加快收敛
+optimizer = optimizers.Adam(learning_rate=0.01)
 
 # ## 计算 loss
 
