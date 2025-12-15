@@ -1,8 +1,0 @@
-prefix=/home/lan/桌面/nn/src/Neuro_Mujoco/catkin_ws/devel
-
-Name: mujoco_vision_control
-Description: Description of mujoco_vision_control
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

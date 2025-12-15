@@ -1,2 +1,0 @@
-mujoco_ros:mujoco_vision_control
--DPYTHON_EXECUTABLE=/usr/bin/python3 -DCATKIN_DEVEL_PREFIX=/home/lan/桌面/nn/src/Neuro_Mujoco/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/lan/桌面/nn/src/Neuro_Mujoco/catkin_ws/install -G Unix Makefiles
