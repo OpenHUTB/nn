@@ -75,45 +75,34 @@ MIN_EPSILON = 0.01
 
 AGGREGATE_STATS_EVERY = 1
 
-# path for training
-town2 = {1: [193.75,269.2610168457031, 5, 270], 2:[135.25,206]} #left turn
-
-curves = [0, town2]
+# 路径配置 - 现在由外部传入
+default_town2 = {1: [193.75,269.2610168457031, 5, 270], 2:[135.25,206]} #left turn
+curves = [0, default_town2]
 
 '''
 Custom Tensorboard class. Updates logs after every episode
 '''
 class ModifiedTensorBoard(TensorBoard):
-    # Overriding init to set initial step and writer (we want one log file for all .fit() calls)
     def __init__(self, model, log_dir):
         super().__init__(log_dir)
         self.log_dir = log_dir
         self.model = model
         self.step = 1
         print("SELF: LOG DIR:      ", self.log_dir)
-        # TensorFlow 2.x 使用 tf.summary.create_file_writer
         self.writer = tf.summary.create_file_writer(self.log_dir)
 
-    # Overriding this method to stop creating default log writer
     def set_model(self, model):
         self.model = model
-        # 在 TensorFlow 2.x 中不需要额外的设置
 
-    # Overrided, saves logs with our step number
     def on_epoch_end(self, epoch, logs=None):
         self.update_stats(**logs)
 
-    # Overrided
-    # We train for one batch only, no need to save anything at epoch end
     def on_batch_end(self, batch, logs=None):
         pass
 
-    # Overrided, so won't close writer
     def on_train_end(self, _):
         pass
 
-    # Custom method for saving own metrics
-    # Creates writer, writes custom metrics and closes writer
     def update_stats(self, **stats):
         self._write_logs(stats, self.step)
 
@@ -128,13 +117,12 @@ Defining the Carla Environment Class.
 '''
 class CarEnv:
     SHOW_CAM = SHOW_PREVIEW
-    STEER_AMT = 1.0   # actions that the agent can take [-1, 0, 1] --> [turn left, go straight, turn right]
+    STEER_AMT = 1.0
     im_width = IM_WIDTH
     im_height = IM_HEIGHT
     front_camera = None
 
-    def __init__(self):
-        # to initialize
+    def __init__(self, start_point=None, end_point=None):
         self.client = carla.Client("localhost", 2000)
         self.client.set_timeout(20.0)
         self.world = self.client.get_world()
@@ -144,12 +132,28 @@ class CarEnv:
         self.crossing = 0
         self.curves = 1
         self.reached = 0
-        self.start = town2[1]
+        
+        # 允许从外部传入起点终点
+        self.custom_start = start_point
+        self.custom_end = end_point
+        
+        # 如果提供了自定义起点，使用它
+        if start_point is not None:
+            self.start = start_point
+        else:
+            self.start = default_town2[1]
+            
+        # 存储自定义终点
+        self.end_point = end_point if end_point is not None else default_town2[2]
+        
         self.phi = []
         self.dc = []
         self.vel = []
         self.time = []
-        
+        self.last_position = None
+        self.current_waypoint_index = 0
+        self.path_progress = 0  # 路径进度跟踪
+
     def reset(self):
         # store any collision detected
         self.collision_history = []
@@ -158,78 +162,131 @@ class CarEnv:
         # store the number of times the vehicles crosses the lane marking
         self.lanecrossing_history = []
         
+        # 重置路径跟踪
+        self.current_waypoint_index = 0
+        self.path_progress = 0
+        self.last_position = None
+        
         '''
         To spawn the Vehicle (agent)
         '''
         initial_pos = self.start
+        print(f"生成车辆在起点: ({initial_pos[0]:.2f}, {initial_pos[1]:.2f}), 航向: {initial_pos[3]}°")
+        
         self.transform = Transform(Location(x=initial_pos[0], y=initial_pos[1], z=initial_pos[2]), Rotation(yaw=initial_pos[3]))
-        # to spawn the actor; the veichle
-        self.vehicle = self.world.spawn_actor(self.model_3, self.transform)
-        self.actor_list.append(self.vehicle)
+        
+        # 尝试生成车辆
+        try:
+            self.vehicle = self.world.spawn_actor(self.model_3, self.transform)
+            self.actor_list.append(self.vehicle)
+            print("✓ 车辆生成成功")
+        except Exception as e:
+            print(f"❌ 车辆生成失败: {e}")
+            # 尝试使用默认位置
+            default_transform = Transform(Location(x=0, y=0, z=5), Rotation(yaw=0))
+            self.vehicle = self.world.spawn_actor(self.model_3, default_transform)
+            self.actor_list.append(self.vehicle)
 
-        # 相机传感器设置（如果需要）
+        # 相机传感器设置
         self.camera_spawn_point = carla.Transform(carla.Location(x=2, y=0, z=1.4))
 
         # to initialize the car quickly and get it going
         self.vehicle.apply_control(carla.VehicleControl(throttle = 0.0, brake = 0.0))
-        time.sleep(4)
+        time.sleep(1)  # 减少等待时间
 
         '''
         To spawn the collision sensor
         '''
-        # to introduce the collision sensor to detect what type of collision is happening
         col_sensor = self.blueprint_library.find("sensor.other.collision")
-        
-        # keeping the location of the sensor to be same as that of the RGB camera
         self.collision_sensor = self.world.spawn_actor(col_sensor, self.camera_spawn_point, attach_to = self.vehicle)
         self.actor_list.append(self.collision_sensor)
-
-        # to record the data from the collision sensor
         self.collision_sensor.listen(lambda event: self.collision_data(event))
 
-        # to introduce the lanecrossing sensor to identify vehicles trajectory
+        # to introduce the lanecrossing sensor
         lane_crossing_sensor = self.blueprint_library.find("sensor.other.lane_invasion")
-
-        # keeping the location of the sensor to be same as that of RGM Camera
         self.lanecrossing_sensor = self.world.spawn_actor(lane_crossing_sensor, self.camera_spawn_point, attach_to = self.vehicle)
         self.actor_list.append(self.lanecrossing_sensor)
-
-        # to record the data from the lanecrossing_sensor
         self.lanecrossing_sensor.listen(lambda event: self.lanecrossing_data(event))
         
+        # 生成轨迹
         traj = self.trajectory()
         self.path = []
         for el in traj:
             self.path.append(el[0])
-
-        # going to keep an episode length of 10 seconds otherwise the car learns to go around a circle and keeps doing the same thing
-        self.episode_start = time.time()
-
-        self.vehicle.apply_control(carla.VehicleControl(throttle = 1.0, brake = 0.0))
         
-        return [0,0] #return [self.front_camera, 0,0, initial_pos[0], initial_pos[1]]
+        print(f"生成的路径点数量: {len(self.path)}")
+        if len(self.path) > 0:
+            print(f"第一个路径点方向: {self.path[0].transform.rotation.yaw:.1f}°")
+            print(f"最后一个路径点方向: {self.path[-1].transform.rotation.yaw:.1f}°")
+        
+        # 获取车辆初始方向
+        vehicle_transform = self.vehicle.get_transform()
+        print(f"车辆初始方向: {vehicle_transform.rotation.yaw:.1f}°")
+        
+        # 检查车辆与第一个路径点的方向差
+        if len(self.path) > 0:
+            first_wp_direction = self.path[0].transform.rotation.yaw
+            direction_diff = first_wp_direction - vehicle_transform.rotation.yaw
+            phi_initial = direction_diff % 360 - 360 * (direction_diff % 360 > 180)
+            print(f"初始方向差: {phi_initial:.1f}°")
+
+        self.episode_start = time.time()
+        
+        # 设置初始控制，让车辆开始移动
+        self.vehicle.apply_control(carla.VehicleControl(throttle = 0.5, brake = 0.0, steer = 0.0))
+        time.sleep(0.5)  # 给车辆一点时间开始移动
+        
+        # 获取初始状态
+        pos = self.vehicle.get_transform().location
+        rot = self.vehicle.get_transform().rotation
+        
+        # 获取最近的路径点
+        waypoint = self.client.get_world().get_map().get_waypoint(pos, project_to_road=True)
+        closest_index = self.get_closest_waypoint(self.path, waypoint)
+        self.current_waypoint_index = max(0, min(closest_index, len(self.path)-1))
+        
+        if len(self.path) > self.current_waypoint_index:
+            wp = self.path[self.current_waypoint_index]
+            wp_rot = wp.transform.rotation
+            direction_diff = wp_rot.yaw - rot.yaw
+            phi = direction_diff % 360 - 360 * (direction_diff % 360 > 180)
+        else:
+            phi = 0
+        
+        return [phi, 0]  # 初始状态
 
     def collision_data(self, event):
         self.collision_history.append(event)
     
     def lanecrossing_data(self, event):
         self.lanecrossing_history.append(event)
-        print("Lane crossing history: ", event)
 
     def step(self, action, current_state):
         '''
         Take 5 actions; go straight, turn left, turn right, turn slightly left, turn slightly right
         '''
+        # 增加油门值，让车辆更快移动
         if action == 0:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.6, steer=0*self.STEER_AMT))
         if action == 1:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=-0.6*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=-0.6*self.STEER_AMT))
         if action == 2:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=0.6*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0.6*self.STEER_AMT))
         if action == 3:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=-0.1*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.7, steer=-0.1*self.STEER_AMT))
         if action == 4:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=0.1*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.7, steer=0.1*self.STEER_AMT))
+
+        # 检查移动距离
+        current_pos = self.vehicle.get_transform().location
+        if self.last_position:
+            distance_moved = math.sqrt(
+                (current_pos.x - self.last_position.x)**2 +
+                (current_pos.y - self.last_position.y)**2
+            )
+            if distance_moved < 0.1 and hasattr(self, 'step_count') and self.step_count > 20:
+                print(f"⚠️ 警告: 车辆移动距离太小! ({distance_moved:.2f}米)")
+        self.last_position = current_pos
 
         # initialize a reward for a single action 
         reward = 0
@@ -241,23 +298,60 @@ class CarEnv:
         pos = self.vehicle.get_transform().location
         rot = self.vehicle.get_transform().rotation
         
+        print(f"车辆位置: ({pos.x:.1f}, {pos.y:.1f}), 方向: {rot.yaw:.1f}°, 速度: {kmh} km/h")
+        
         # to get the closest waypoint to the car
         waypoint = self.client.get_world().get_map().get_waypoint(pos, project_to_road=True)
-        waypoint_ind = self.get_closest_waypoint(self.path, waypoint) + 1
-        print(waypoint_ind)
-        waypoint = self.path[waypoint_ind]
-        if len(self.path) != 1:
-            next_waypoint = self.path[waypoint_ind+1]
+        
+        # 安全地获取路径点索引
+        if not hasattr(self, 'path') or len(self.path) == 0:
+            self.trajectory()
+        
+        # 使用改进的最近路径点查找
+        closest_index = self.get_closest_waypoint(self.path, waypoint)
+        
+        # 确保索引在有效范围内
+        closest_index = min(closest_index, len(self.path) - 1)
+        closest_index = max(closest_index, 0)
+        
+        # 更新当前路径点索引（允许前进，限制回退）
+        if closest_index > self.current_waypoint_index:
+            self.current_waypoint_index = closest_index
+        elif closest_index < self.current_waypoint_index - 2:  # 允许少量回退
+            self.current_waypoint_index = max(0, closest_index)
+        
+        # 获取当前路径点
+        if len(self.path) > self.current_waypoint_index:
+            current_waypoint = self.path[self.current_waypoint_index]
         else:
-            next_waypoint = waypoint
-        waypoint_loc = waypoint.transform.location
-        waypoint_rot = waypoint.transform.rotation
+            current_waypoint = self.path[-1] if len(self.path) > 0 else waypoint
+        
+        # 计算到当前路径点的距离
+        wp_location = current_waypoint.transform.location
+        distance_to_wp = math.sqrt((pos.x - wp_location.x)**2 + (pos.y - wp_location.y)**2)
+        
+        print(f"当前路径点: {self.current_waypoint_index}/{len(self.path)-1}")
+        print(f"路径点位置: ({wp_location.x:.1f}, {wp_location.y:.1f})")
+        print(f"到路径点距离: {distance_to_wp:.2f}")
+        
+        # 如果接近当前路径点且不是最后一个，前进到下一个
+        if distance_to_wp < 5.0 and self.current_waypoint_index < len(self.path) - 1:
+            next_index = self.current_waypoint_index + 1
+            next_waypoint = self.path[next_index]
+        else:
+            next_index = self.current_waypoint_index
+            next_waypoint = current_waypoint
+        
+        waypoint = current_waypoint
         next_waypoint_loc = next_waypoint.transform.location
         next_waypoint_rot = next_waypoint.transform.rotation
         
-        final = [curves[self.curves][2][0], curves[self.curves][2][1]]
-        final_destination = [curves[self.curves][self.via][0], curves[self.curves][self.via][1]]
-        dist_from_goal = np.sqrt((pos.x - final_destination[0])**2 + (pos.y-final_destination[1])**2)
+        waypoint_loc = waypoint.transform.location
+        waypoint_rot = waypoint.transform.rotation
+        
+        # 计算到终点的距离
+        final_destination = self.end_point
+        dist_from_goal = np.sqrt((pos.x - final_destination[0])**2 + (pos.y - final_destination[1])**2)
 
         done = False
 
@@ -266,28 +360,35 @@ class CarEnv:
         '''
         # to get the orientation difference between the car and the road "phi"
         orientation_diff = waypoint_rot.yaw - rot.yaw
-        phi = orientation_diff%360 -360*(orientation_diff%360>180)
+        phi = orientation_diff % 360 - 360 * (orientation_diff % 360 > 180)
         
-        current_state[1] = current_state[1]/15
+        print(f"车辆方向: {rot.yaw:.1f}°, 路径点方向: {waypoint_rot.yaw:.1f}°")
+        print(f"方向差: {orientation_diff:.1f}°, phi: {phi:.1f}°")
         
-        u = [waypoint_loc.x-next_waypoint_loc.x, waypoint_loc.y-next_waypoint_loc.y]
-        v = [pos.x-next_waypoint_loc.x, pos.y-next_waypoint_loc.y]
+        current_state[1] = current_state[1] / 15
+        
+        # 计算横向偏移
+        u = [waypoint_loc.x - next_waypoint_loc.x, waypoint_loc.y - next_waypoint_loc.y]
+        v = [pos.x - next_waypoint_loc.x, pos.y - next_waypoint_loc.y]
+        
         if np.linalg.norm(u) > 0.1 and np.linalg.norm(v) > 0.1:
-            signed_dis = np.linalg.norm(v)*np.sin(np.sign(np.cross(u,v))*np.arccos(np.dot(u,v)/(np.linalg.norm(u)*np.linalg.norm(v))))
+            cross_product = u[0]*v[1] - u[1]*v[0]
+            dot_product = u[0]*v[0] + u[1]*v[1]
+            angle = np.arctan2(cross_product, dot_product)
+            signed_dis = np.linalg.norm(v) * np.sin(angle)
         else:
             signed_dis = 0
 
-        print(current_state[0]) 
-        print(current_state[1]) 
+        print(f"当前状态: phi={current_state[0]:.1f}, d={current_state[1]:.1f}")
 
         # Defining the Reward function by comparing the action taken to a suboptimal policy
-        if abs(current_state[0])<5:
+        if abs(current_state[0]) < 5:
             if action == 0:
                 reward += 2
             else:
                 reward -= 1
-        elif abs(current_state[0])<10:
-            if current_state[0]<0:
+        elif abs(current_state[0]) < 10:
+            if current_state[0] < 0:
                 if action == 3:
                     reward += 2
                 elif action == 1:
@@ -302,7 +403,7 @@ class CarEnv:
                 else:
                     reward -= 1
         else:
-            if current_state[0]<0:
+            if current_state[0] < 0:
                 if action == 1:
                     reward += 2
                 elif action == 3:
@@ -316,14 +417,14 @@ class CarEnv:
                     reward += 1
                 else:
                     reward -= 1
-                    
-        if abs(current_state[1])<0.1:
+                
+        if abs(current_state[1]) < 0.1:
             if action == 0:
                 reward += 4
             else:
                 reward -= 2
-        elif abs(current_state[1])<0.5:
-            if current_state[1]<0:
+        elif abs(current_state[1]) < 0.5:
+            if current_state[1] < 0:
                 if action == 3:
                     reward += 2
                 elif action == 1:
@@ -338,7 +439,7 @@ class CarEnv:
                 else:
                     reward -= 1
         else:
-            if current_state[1]<0:
+            if current_state[1] < 0:
                 if action == 1:
                     reward += 2
                 elif action == 3:
@@ -352,36 +453,53 @@ class CarEnv:
                     reward += 1
                 else:
                     reward -= 1
-                    
-        
-        if abs(signed_dis)>2:
+                
+        # 添加速度奖励
+        if kmh > 20:
+            reward += 1
+        elif kmh < 5:
+            reward -= 1
+            
+        if abs(signed_dis) > 2:
             reward -= 10
         
+        # 检查距离路径点是否过远
+        if distance_to_wp > 30:
+            print(f"⚠️ 警告: 车辆距离路径点过远 ({distance_to_wp:.1f} > 30)")
+            done = True
+            reward = -100
+            
         # to avoid collisions
         if len(self.collision_history) != 0:
             done = True
-            reward = - 200
+            reward = -200
+            print("❌ 发生碰撞!")
 
         # to end the episode if phi value goes high
-        if abs(phi)>100:
+        if abs(phi) > 100:
             done = True
             reward = -200
+            print("❌ 方向偏差过大!")
             
         # Ending the episode if the distance to the centerline of the road is greater than 3
-        if abs(signed_dis)>3:
+        if abs(signed_dis) > 3:
             done = True
             reward = -200
+            print("❌ 偏离道路中心线过远!")
             
         # to end the episode if the car reaches close to the final destination
         if dist_from_goal < 5:
             self.reached = 1
             done = True
+            reward += 100
+            print("✅ 成功到达目的地!")
 
-        # to run each episode for just 30 secodns
+        # to run each episode for just 30 seconds
         if self.episode_start + 200 < time.time():
             done = True
+            print("⏰ 时间到!")
 
-        print(reward)
+        print(f"奖励: {reward}")
         
         self.phi.append(phi)
         self.dc.append(signed_dis)
@@ -390,19 +508,43 @@ class CarEnv:
 
         return [phi, signed_dis*15], reward, done, waypoint
 
-    def trajectory(self, draw = False):
+    def trajectory(self, draw=False):
         amap = self.world.get_map()
         sampling_resolution = 0.5
         grp = GlobalRoutePlanner(amap, sampling_resolution)
         
+        # 使用自定义终点或默认终点
+        if hasattr(self, 'end_point') and self.end_point is not None:
+            end_x, end_y = self.end_point
+        else:
+            end_x, end_y = default_town2[2][0], default_town2[2][1]
+            
         start_location = carla.Location(x=self.start[0], y=self.start[1], z=0)
-        end_location = carla.Location(x=town2[2][0], y=town2[2][1], z=0)
+        end_location = carla.Location(x=end_x, y=end_y, z=0)
+        
+        print(f"生成轨迹: 从 ({self.start[0]:.1f}, {self.start[1]:.1f}) 到 ({end_x:.1f}, {end_y:.1f})")
+        
         a = amap.get_waypoint(start_location, project_to_road=True)
         b = amap.get_waypoint(end_location, project_to_road=True)
-        spawn_points = self.world.get_map().get_spawn_points()
-        a = a.transform.location
-        b = b.transform.location
-        w1 = grp.trace_route(a, b)
+        
+        if a is None:
+            print("❌ 无法找到起点对应的道路点!")
+            # 尝试使用车辆当前位置
+            if hasattr(self, 'vehicle'):
+                vehicle_loc = self.vehicle.get_transform().location
+                a = amap.get_waypoint(vehicle_loc, project_to_road=True)
+        
+        if b is None:
+            print("❌ 无法找到终点对应的道路点!")
+            return []
+        
+        a_loc = a.transform.location
+        b_loc = b.transform.location
+        
+        w1 = grp.trace_route(a_loc, b_loc)
+        
+        print(f"生成的路径段数: {len(w1)}")
+        
         i = 0
         if draw:
             for w in w1:
@@ -418,14 +560,30 @@ class CarEnv:
         return w1
 
     def get_closest_waypoint(self, waypoint_list, target_waypoint):
-        closest_waypoint = None
+        if not waypoint_list:
+            return 0
+            
+        closest_waypoint = self.current_waypoint_index
         closest_distance = float('inf')
-        for i, waypoint in enumerate(waypoint_list):
-            distance = math.sqrt((waypoint.transform.location.x - target_waypoint.transform.location.x)**2 +
-                                 (waypoint.transform.location.y - target_waypoint.transform.location.y)**2)
+        
+        # 车辆位置
+        vehicle_location = target_waypoint.transform.location
+        
+        # 从当前索引开始搜索，但允许查看前面的几个点
+        start_index = max(0, self.current_waypoint_index - 3)
+        
+        for i in range(start_index, len(waypoint_list)):
+            waypoint = waypoint_list[i]
+            waypoint_location = waypoint.transform.location
+            distance = math.sqrt(
+                (waypoint_location.x - vehicle_location.x)**2 +
+                (waypoint_location.y - vehicle_location.y)**2
+            )
+            
             if distance < closest_distance:
                 closest_waypoint = i
                 closest_distance = distance
+        
         return closest_waypoint
 
 '''
@@ -438,9 +596,6 @@ class DQNAgent:
         self.target_model.set_weights(self.model.get_weights())
 
         self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
-
-        # TensorFlow 2.x 不再需要显式获取计算图
-        # self.graph = tf.compat.v1.get_default_graph()
 
         self.tensorboard = ModifiedTensorBoard(self.model, log_dir=f"logs/{MODEL_NAME}-{int(time.time())}")
         self.target_update_counter = 0
@@ -455,26 +610,20 @@ class DQNAgent:
         model3.add(Dense(5, activation='linear', name='output'))
         combined_model = Model(inputs=model3.input, outputs=model3.output)
         
-        # compile the model - 使用新的学习率参数名
         combined_model.compile(loss='mse', optimizer=Adam(learning_rate=0.0001), metrics=['accuracy'])
         
         return combined_model
 
     def update_replay_memory(self, transition):
-        # transition = (current_state, action, reward, new_state, done)
         self.replay_memory.append(transition)
 
     def train(self):
         if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
             return
 
-        # to sample a minibatch
         minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
 
-        # to normalize the image
         current_data = np.array([[transition[0][i] for i in range(2)] for transition in minibatch])
-        # predicting all the datapoints present in the mini-batch
-        # TensorFlow 2.x 不再需要显式使用计算图
         current_qs_list = self.model.predict(current_data, PREDICTION_BATCH_SIZE, verbose=0)
 
         new_current_data = np.array([[transition[3][i] for i in range(2)] for transition in minibatch])
@@ -499,10 +648,8 @@ class DQNAgent:
         log_this_step = False
         if self.tensorboard.step > self.last_logged_episode:
             log_this_step = True
-            self.last_logged_episode = self.tensorboard.step  # 修复变量名错误
+            self.last_logged_episode = self.tensorboard.step
 
-        # to continuously train the base model 
-        # TensorFlow 2.x 不再需要显式使用计算图
         self.model.fit(np.array(X_data), np.array(y), batch_size=TRAINING_BATCH_SIZE, 
                       verbose=0, shuffle=False, 
                       callbacks=[self.tensorboard] if log_this_step else None)
@@ -510,7 +657,6 @@ class DQNAgent:
         if log_this_step:
             self.target_update_counter += 1
 
-        # to assign the weights of the base model to the target model 
         if self.target_update_counter > UPDATE_TARGET_EVERY:
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0
@@ -530,126 +676,3 @@ class DQNAgent:
                 return
             self.train()
             time.sleep(0.01)
-           
-if __name__ == '__main__':
-    FPS = 400
-    # For stats
-    ep_rewards = [-200]
-
-    # For more repetitive results
-    random.seed(1)
-    np.random.seed(1)
-    tf.random.set_seed(1)  # TensorFlow 2.x 设置随机种子
-
-    # TensorFlow 2.x GPU 配置
-    gpus = tf.config.list_physical_devices('GPU')
-    if gpus:
-        try:
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-            print(f"找到 {len(gpus)} 个GPU，已启用内存增长")
-        except RuntimeError as e:
-            print(f"GPU设置错误: {e}")
-
-    # 创建模型目录
-    model_dir = "models"
-    if not os.path.isdir(model_dir):
-        os.makedirs(model_dir)
-
-    # Create agent and environment
-    agent = DQNAgent()
-    env = CarEnv()
-
-    # Start training thread and wait for training to be initialized
-    trainer_thread = Thread(target=agent.train_in_loop, daemon=True)
-    trainer_thread.start()
-    while not agent.training_initialized:
-        time.sleep(0.01)
-        
-    # Initialize predictions - first prediction takes longer as of initialization that has to be done
-    agent.get_qs([0,0])
-
-    # Iterate over episodes
-    for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
-        if episode%2 == 0:
-            town2 = {1: [182.65191650390625,236.9, 5, 180], 2:[135.25,206]}
-            env.start = town2[1]
-        else:
-            town2 = {1: [193.75,269.2610168457031, 5, 270], 2:[135.25,206]}
-            env.start = town2[1]
-        env.reached = 0
-        env.collision_hist = []
-        # Update tensorboard step every episode
-        agent.tensorboard.step = episode
-
-        # Restarting episode - reset episode reward and step number
-        episode_reward = 0
-        step = 1
-
-        # Reset environment and get initial state
-        current_state = env.reset()
-        
-        # Reset flag and start iterating until episode ends
-        done = False
-        episode_start = time.time()
-
-        # Play for given number of seconds only
-        while True:
-            # This part stays mostly the same, the change is to query a model for Q values
-            if np.random.random() > epsilon:
-                # Get action from Q table
-                qs = agent.get_qs(current_state)
-                print(qs)
-                action = np.argmax(qs)
-            else:
-                # Get random action
-                action = np.random.randint(0, 5)
-                time.sleep(1/FPS)
-                
-            new_state, reward, done, waypoint = env.step(action, current_state)
-            
-            # Transform new continous state to new discrete state and count reward
-            episode_reward += reward
-
-            # Every step we update replay memory
-            agent.update_replay_memory((current_state, action, reward, new_state, done))
-
-            current_state = new_state
-            step += 1
-
-            if done:
-                break
-
-        print("EPISODE {} REWARD IS: {}".format(episode, episode_reward))
-        
-        # End of episode - destroy agents
-        for actor in env.actor_list:
-            actor.destroy()
-        
-        # Append episode reward to a list and log stats (every given number of episodes)
-        ep_rewards.append(episode_reward)
-        if not episode % AGGREGATE_STATS_EVERY or episode == 1:
-            average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:])/len(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-            agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
-
-            # Save model, but only when min reward is greater or equal a set value
-            if min_reward >= MIN_REWARD:
-                agent.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
-
-        # Decay epsilon
-        if epsilon > MIN_EPSILON:
-            epsilon *= EPSILON_DECAY
-            epsilon = max(MIN_EPSILON, epsilon)
-
-    # Set termination flag for training thread and wait for it to finish
-    agent.terminate = True
-    trainer_thread.join()
-    
-    # 保存最终模型
-    if len(ep_rewards) > 1:
-        average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:])/len(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        agent.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
