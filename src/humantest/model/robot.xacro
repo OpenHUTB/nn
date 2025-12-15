@@ -6,4 +6,7 @@
    <xacro:include filename="gazebo/move.xacro" />
    <xacro:include filename="gazebo/laser.xacro" />
    <xacro:include filename="gazebo/camera.xacro" />
+    <xacro:include filename="gazebo/kinect.xacro" />
+
+
 </robot>
