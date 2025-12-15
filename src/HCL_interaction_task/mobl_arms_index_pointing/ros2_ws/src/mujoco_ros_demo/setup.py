@@ -38,4 +38,7 @@ setup(
             'perception_node = mujoco_ros_demo.perception_node:main',
         ],
     },
+    ament_cmake_options={
+        'install_extra_files': ['CMakeLists.txt'],
+    },
 )
