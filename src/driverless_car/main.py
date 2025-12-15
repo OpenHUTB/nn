@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 
-# --------------------------
+
 # 修复1：解决中文字体问题（改用英文显示，避免字体依赖）
 # 若需中文，可注释以下行并使用系统自带中文字体，如：
 # plt.rcParams["font.family"] = ["Microsoft YaHei", "SimSun", "Arial"]
