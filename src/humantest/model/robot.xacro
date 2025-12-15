@@ -4,5 +4,5 @@
    <xacro:include filename="demo06_car_camera.xacro" />
    <xacro:include filename="demo07_laser.xacro" />
    <xacro:include filename="gazebo/move.xacro" />
-
+   <xacro:include filename="gazebo/laser.xacro" />
 </robot>
