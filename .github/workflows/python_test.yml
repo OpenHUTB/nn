@@ -1,6 +1,6 @@
 # 参考：https://github.com/Tiryoh/actions-mkdocs
 name: Testing
-on:  [push, pull_request]
+on: [push, pull_request]
 
 
 jobs:
