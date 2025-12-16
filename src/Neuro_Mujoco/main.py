@@ -170,6 +170,22 @@ def visualize(model_path: str, use_ros: bool = False) -> None:
     可视化模型并运行模拟（支持ROS 1模式）
     
     参数:
+        model_path: 模型文件/目录路径
+        use_ros: 是否启用ROS模式（默认False）
+    """
+    # 新增：模型路径智能校验（支持目录自动找XML/MJB文件）
+    if os.path.isdir(model_path):
+        # 遍历目录找第一个XML/MJB文件
+        model_files = []
+        for file in os.listdir(model_path):
+            if file.endswith(('.xml', '.mjb')):
+                model_files.append(os.path.join(model_path, file))
+        if not model_files:
+            logger.error(f"目录 {model_path} 中未找到.xml/.mjb模型文件")
+            return
+        model_path = model_files[0]
+        logger.info(f"自动选择目录中的模型文件: {model_path}")
+    
         model_path: 模型文件路径
         use_ros: 是否启用ROS模式（默认False）
     """
@@ -319,6 +335,7 @@ def visualize(model_path: str, use_ros: bool = False) -> None:
     except Exception as e:
         logger.error(f"可视化过程出错: {str(e)}", exc_info=True)
 
+# ===================== 主函数（仅优化model参数help+保持其他逻辑不变）=====================
 # ===================== 主函数（完全保持原有逻辑不变）=====================
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -327,8 +344,9 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # 1. 可视化命令（新增--ros选项）
+    # 1. 可视化命令（优化model参数help为通用提示，移除硬编码路径）
     viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
+    viz_parser.add_argument("model", help="模型文件路径或包含模型的目录（支持.xml/.mjb格式）")
     viz_parser.add_argument("model", help="/home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b")
     viz_parser.add_argument(
         "--ros",
