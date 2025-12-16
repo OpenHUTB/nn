@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 import os
 import sys
 import time
@@ -19,7 +20,6 @@ try:
 except ImportError:
     ROS_AVAILABLE = False
     logging.warning("未检测到 ROS 环境，ROS 功能已禁用（如需启用，请安装 ROS 1 Noetic 并配置环境）")
-
 
 # 配置日志系统
 logging.basicConfig(
@@ -62,11 +62,9 @@ def load_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujo
 def convert_model(input_path: str, output_path: str) -> bool:
     """
     转换模型格式（XML↔MJB）
-    
     参数:
         input_path: 输入模型路径
         output_path: 输出模型路径（需指定扩展名.xml或.mjb）
-        
     返回:
         转换成功返回True，失败返回False
     """
@@ -166,124 +164,28 @@ def test_speed(
     logger.info(f"实时因子: {realtime_factor:.2f}x")
     logger.info(f"线程平均耗时: {np.mean(thread_durations):.2f}秒 (±{np.std(thread_durations):.2f})")
 
-
-# ===================== ROS管理器类（新增模块化ROS功能）=====================
-class ROSManager:
-    """ROS管理器类（模块化ROS功能）"""
-    
-    def __init__(self, model: mujoco.MjModel):
-        if not ROS_AVAILABLE:
-            raise RuntimeError("ROS环境未就绪，无法启用ROS模式")
-        
-        self.model = model
-        self.ctrl_cmd = None
-        self.joint_msg = None
-        self.njnt = 0
-        self.initialized = False
-        
-        # ROS发布者
-        self.joint_state_pub = None
-        self.pose_pub = None
-        self.ros_rate = None
-        
-    def initialize(self):
-        """初始化ROS节点和发布者/订阅者"""
-        rospy.init_node("mujoco_ros_node", anonymous=True)
-        self.ros_rate = rospy.Rate(100)  # 100Hz发布频率
-        
-        # 创建发布者
-        self.joint_state_pub = rospy.Publisher(
-            "/mujoco/joint_states",
-            JointState,
-            queue_size=10
-        )
-        
-        self.pose_pub = rospy.Publisher(
-            "/mujoco/pose",
-            PoseStamped,
-            queue_size=10
-        )
-        
-        # 初始化关节状态消息
-        self.joint_msg = JointState()
-        joint_names = []
-        
-        for i in range(self.model.njnt):
-            joint_type = self.model.joint(i).type
-            if joint_type != mujoco.mjtJoint.mjJNT_FREE:
-                joint_names.append(self.model.joint(i).name)
-        
-        self.joint_msg.name = joint_names
-        self.njnt = len(joint_names)
-        
-        # 初始化控制命令
-        if self.model.nu > 0:
-            self.ctrl_cmd = np.zeros(self.model.nu)
-            rospy.Subscriber(
-                "/mujoco/ctrl_cmd",
-                Float32MultiArray,
-                self._ctrl_callback,
-                queue_size=5
-            )
-        
-        self.initialized = True
-        return self
-    
-    def _ctrl_callback(self, msg: Float32MultiArray):
-        """控制指令回调函数"""
-        if self.model.nu == len(msg.data):
-            self.ctrl_cmd = np.array(msg.data)
-            logger.debug(f"收到ROS控制指令，前5个值: {self.ctrl_cmd[:5]}...")
-    
-    def apply_control(self, data: mujoco.MjData):
-        """将ROS控制指令应用到MuJoCo数据"""
-        if self.ctrl_cmd is not None and self.model.nu > 0:
-            data.ctrl[:] = self.ctrl_cmd
-    
-    def publish_states(self, data: mujoco.MjData):
-        """发布关节状态和姿态"""
-        if not self.initialized:
-            return
-        
-        # 发布关节状态
-        self.joint_msg.header.stamp = rospy.Time.now()
-        self.joint_msg.position = data.qpos[:self.njnt].tolist()
-        self.joint_msg.velocity = data.qvel[:self.njnt].tolist()
-        self.joint_state_pub.publish(self.joint_msg)
-        
-        # 发布基座姿态
-        pose_msg = PoseStamped()
-        pose_msg.header.stamp = rospy.Time.now()
-        pose_msg.header.frame_id = "world"
-        
-        if self.model.nq >= 1:
-            pose_msg.pose.position.x = data.qpos[0]
-        if self.model.nq >= 2:
-            pose_msg.pose.position.y = data.qpos[1]
-        if self.model.nq >= 3:
-            pose_msg.pose.position.z = data.qpos[2]
-        
-        if self.model.nq >= 4:
-            pose_msg.pose.orientation.x = data.qpos[3]
-        if self.model.nq >= 5:
-            pose_msg.pose.orientation.y = data.qpos[4]
-        if self.model.nq >= 6:
-            pose_msg.pose.orientation.z = data.qpos[5]
-        if self.model.nq >= 7:
-            pose_msg.pose.orientation.w = data.qpos[6]
-        
-        self.pose_pub.publish(pose_msg)
-        
-        # 控制发布频率
-        self.ros_rate.sleep()
-
-
-# ===================== 可视化函数（使用ROSManager类）=====================
+# ===================== 可视化函数（仅优化ROS关节状态发布逻辑）=====================
 def visualize(model_path: str, use_ros: bool = False) -> None:
     """
     可视化模型并运行模拟（支持ROS 1模式）
     
     参数:
+        model_path: 模型文件/目录路径
+        use_ros: 是否启用ROS模式（默认False）
+    """
+    # 新增：模型路径智能校验（支持目录自动找XML/MJB文件）
+    if os.path.isdir(model_path):
+        # 遍历目录找第一个XML/MJB文件
+        model_files = []
+        for file in os.listdir(model_path):
+            if file.endswith(('.xml', '.mjb')):
+                model_files.append(os.path.join(model_path, file))
+        if not model_files:
+            logger.error(f"目录 {model_path} 中未找到.xml/.mjb模型文件")
+            return
+        model_path = model_files[0]
+        logger.info(f"自动选择目录中的模型文件: {model_path}")
+    
         model_path: 模型文件路径
         use_ros: 是否启用ROS模式（默认False）
     """
@@ -291,51 +193,150 @@ def visualize(model_path: str, use_ros: bool = False) -> None:
     if not model:
         return
 
-    # ROS管理器初始化
-    ros_manager = None
+    # ===================== ROS 1 初始化（新增）=====================
+    ros_publishers = None
+    ros_subscribers = None
+    ros_rate = None
+    ctrl_cmd = None
+    joint_msg = None
+    # 新增：存储非自由关节的ID和对应的qpos/qvel索引（解决索引错位+支持多自由度）
+    joint_ids = []
+    joint_qpos_idxs = []
+    joint_qvel_idxs = []
+
     if use_ros:
         if not ROS_AVAILABLE:
             logger.error("ROS 环境未就绪，无法启用 ROS 模式（请检查ROS安装和环境配置）")
             return
         
-        try:
-            ros_manager = ROSManager(model).initialize()
-            logger.info("="*60)
-            logger.info("ROS 1 模式已启用！")
-            logger.info(f"发布话题：/mujoco/joint_states（{ros_manager.njnt}个非自由关节）")
-            logger.info(f"发布话题：/mujoco/pose（基座姿态）")
-            logger.info(f"订阅话题：/mujoco/ctrl_cmd（控制指令，长度={model.nu}）")
-            logger.info("="*60)
-        except Exception as e:
-            logger.error(f"ROS初始化失败: {str(e)}")
-            return
+        # 初始化ROS节点
+        rospy.init_node("mujoco_ros_node", anonymous=True)
+        ros_rate = rospy.Rate(100)  # 100Hz发布频率（与MuJoCo默认步长0.01s匹配）
+        logger.info("="*60)
+        logger.info("ROS 1 模式已启用！")
+        logger.info(f"发布话题：/mujoco/joint_states（关节状态）、/mujoco/pose（基座姿态）")
+        logger.info(f"订阅话题：/mujoco/ctrl_cmd（控制指令，长度={model.nu}）")
+        logger.info("="*60)
 
-    # ===================== 可视化主循环 =====================
+        # 1. 创建ROS发布者
+        joint_state_pub = rospy.Publisher(
+            "/mujoco/joint_states",
+            JointState,
+            queue_size=10  # 消息队列大小
+        )
+        pose_pub = rospy.Publisher(
+            "/mujoco/pose",
+            PoseStamped,
+            queue_size=10
+        )
+        ros_publishers = (joint_state_pub, pose_pub)
+
+        # 2. 初始化关节状态消息（精准映射非自由关节的索引，支持多自由度）
+        joint_msg = JointState()
+        joint_msg.name = []
+        for i in range(model.njnt):
+            joint_type = model.joint(i).type
+            if joint_type != mujoco.mjtJoint.mjJNT_FREE:
+                joint_msg.name.append(model.joint(i).name)
+                joint_ids.append(i)
+                # 获取该关节在qpos中的起始索引（mjJNT_FREE=7维, mjJNT_BALL=3维, mjJNT_HINGE/SLIDE=1维）
+                joint_qpos_idxs.append(model.jnt_qposadr[i])
+                # 获取该关节在qvel中的起始索引
+                joint_qvel_idxs.append(model.jnt_dofadr[i])
+        
+        njnt = len(joint_msg.name)
+        logger.info(f"ROS将发布 {njnt} 个非自由关节状态：{joint_msg.name}")
+        if njnt > 0:
+            logger.debug(f"关节qpos索引映射：{dict(zip(joint_msg.name, joint_qpos_idxs))}")
+
+        # 3. 创建ROS订阅者（接收控制指令）
+        ctrl_cmd = np.zeros(model.nu) if model.nu > 0 else None
+        def ctrl_callback(msg: Float32MultiArray):
+            nonlocal ctrl_cmd
+            if model.nu == len(msg.data):
+                ctrl_cmd = np.array(msg.data)
+                logger.debug(f"收到ROS控制指令：{ctrl_cmd[:5]}...")  # 只打印前5个值，避免日志冗余
+            else:
+                logger.warning(f"控制指令长度不匹配！期望 {model.nu} 个值，实际收到 {len(msg.data)} 个")
+        
+        if model.nu > 0:
+            ros_subscribers = rospy.Subscriber(
+                "/mujoco/ctrl_cmd",
+                Float32MultiArray,
+                ctrl_callback,
+                queue_size=5
+            )
+        else:
+            logger.warning("模型无控制输入（nu=0），不订阅控制指令话题")
+
+    # ===================== 可视化主循环（原有逻辑+优化ROS发布）=====================
     logger.info("启动可视化窗口（按ESC键退出，鼠标可交互：拖拽旋转、滚轮缩放）")
     try:
         with viewer.launch_passive(model, data) as v:
             while v.is_running() and (not use_ros or not rospy.is_shutdown()):
-                # ROS模式：应用控制指令
-                if ros_manager:
-                    ros_manager.apply_control(data)
-                
-                # 执行MuJoCo模拟步
+                # ROS模式：应用控制指令（新增）
+                if use_ros and ctrl_cmd is not None:
+                    data.ctrl[:] = ctrl_cmd
+
+                # 执行MuJoCo模拟步（原有逻辑）
                 mujoco.mj_step(model, data)
                 v.sync()
-                
-                # ROS模式：发布状态
-                if ros_manager:
-                    ros_manager.publish_states(data)
-        
+
+                # ===================== ROS 消息发布（仅优化关节状态部分）=====================
+                if use_ros and ros_publishers is not None:
+                    joint_state_pub, pose_pub = ros_publishers
+
+                    # 1. 发布关节状态（位置、速度）- 优化后：精准映射+支持多自由度
+                    joint_msg.header.stamp = rospy.Time.now()
+                    joint_msg.position = []
+                    joint_msg.velocity = []
+                    for idx, (joint_id, qpos_idx, qvel_idx) in enumerate(zip(joint_ids, joint_qpos_idxs, joint_qvel_idxs)):
+                        joint_type = model.joint(joint_id).type
+                        # 球关节（3自由度）：补充3维位置/速度
+                        if joint_type == mujoco.mjtJoint.mjJNT_BALL:
+                            joint_msg.position.extend(data.qpos[qpos_idx:qpos_idx+3])
+                            joint_msg.velocity.extend(data.qvel[qvel_idx:qvel_idx+3])
+                        # 铰链/滑动关节（1自由度）：仅取1维
+                        elif joint_type in [mujoco.mjtJoint.mjJNT_HINGE, mujoco.mjtJoint.mjJNT_SLIDE]:
+                            joint_msg.position.append(data.qpos[qpos_idx])
+                            joint_msg.velocity.append(data.qvel[qvel_idx])
+                    
+                    joint_state_pub.publish(joint_msg)
+
+                    # 2. 发布基座姿态（原有逻辑不变）
+                    pose_msg = PoseStamped()
+                    pose_msg.header.stamp = rospy.Time.now()
+                    pose_msg.header.frame_id = "world"  # 坐标系名称（可自定义）
+                    
+                    # 位置信息（x,y,z）
+                    if model.nq >= 1:
+                        pose_msg.pose.position.x = data.qpos[0]
+                    if model.nq >= 2:
+                        pose_msg.pose.position.y = data.qpos[1]
+                    if model.nq >= 3:
+                        pose_msg.pose.position.z = data.qpos[2]
+                    
+                    # 姿态信息（四元数 qx,qy,qz,qw）
+                    if model.nq >= 4:
+                        pose_msg.pose.orientation.x = data.qpos[3]
+                    if model.nq >= 5:
+                        pose_msg.pose.orientation.y = data.qpos[4]
+                    if model.nq >= 6:
+                        pose_msg.pose.orientation.z = data.qpos[5]
+                    if model.nq >= 7:
+                        pose_msg.pose.orientation.w = data.qpos[6]
+                    
+                    pose_pub.publish(pose_msg)
+
+                    # 按ROS频率休眠，确保消息发布稳定
+                    ros_rate.sleep()
+
         logger.info("可视化窗口已关闭")
     except Exception as e:
         logger.error(f"可视化过程出错: {str(e)}", exc_info=True)
-    finally:
-        if ros_manager:
-            logger.info("ROS管理器已关闭")
 
-
-# ===================== 主函数（新增--ros选项）=====================
+# ===================== 主函数（仅优化model参数help+保持其他逻辑不变）=====================
+# ===================== 主函数（完全保持原有逻辑不变）=====================
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="MuJoCo功能整合工具（支持ROS 1消息封装）",
@@ -343,9 +344,10 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # 1. 可视化命令（新增--ros选项）
+    # 1. 可视化命令（优化model参数help为通用提示，移除硬编码路径）
     viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
-    viz_parser.add_argument("model", help="模型文件路径")
+    viz_parser.add_argument("model", help="模型文件路径或包含模型的目录（支持.xml/.mjb格式）")
+    viz_parser.add_argument("model", help="/home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b")
     viz_parser.add_argument(
         "--ros",
         action="store_true",
@@ -364,7 +366,8 @@ def main() -> None:
     convert_parser.add_argument("input", help="输入模型路径")
     convert_parser.add_argument("output", help="输出模型路径（需指定.xml或.mjb扩展名）")
 
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+
 
     # 命令映射（更新visualize，支持use_ros参数）
     command_handlers: Dict[str, callable] = {
@@ -382,6 +385,7 @@ def main() -> None:
     except Exception as e:
         logger.critical(f"程序执行失败: {str(e)}", exc_info=True)
         sys.exit(1)
+
 
 
 if __name__ == "__main__":
