@@ -1,10 +1,11 @@
 import time
 import threading
-from src.carla_simulator import CarlaSimulator
+import numpy as np
+from src.main_carla_simulator import CarlaSimulator
 from src.config import X_INIT_M, Y_INIT_M, N, dt, V_REF, LAPS
-from src.help_functions import get_eight_trajectory, get_ref_trajectory, update_reference_point
-from src.logger import Logger
-from src.mpc_controller import MpcController
+from src.main_help_functions import get_eight_trajectory, get_ref_trajectory, get_circle_trajectory, update_reference_point
+from src.main_logger import Logger
+from src.main_mpc_controller import MpcController
 
 def draw_trajectory_in_thread(carla, x_traj, y_traj, dt):
     while True:
@@ -13,13 +14,40 @@ def draw_trajectory_in_thread(carla, x_traj, y_traj, dt):
 
 carla = CarlaSimulator()
 carla.load_world('Town02_Opt')
-carla.spawn_ego_vehicle('vehicle.tesla.model3', x=X_INIT_M, y=Y_INIT_M, z=0.1)
+#carla.spawn_ego_vehicle('vehicle.tesla.model3', x=X_INIT_M, y=Y_INIT_M, z=0.1)
 carla.print_ego_vehicle_characteristics()
 carla.set_spectator(X_INIT_M, Y_INIT_M, z=50, pitch=-90)
 
-logger = Logger()
+#logger = Logger()
 
-x_traj, y_traj, v_ref, theta_traj = get_eight_trajectory(X_INIT_M, Y_INIT_M)
+#x_traj, y_traj, v_ref, theta_traj = get_eight_trajectory(X_INIT_M, Y_INIT_M) #“8”形状轨迹
+#current_idx = 0
+#laps = 0
+# 圆形轨迹参数：圆心（X_INIT_M, Y_INIT_M），半径20米，200个点
+x_traj, y_traj, v_ref, theta_traj = get_circle_trajectory(
+    x_center=X_INIT_M,
+    y_center=Y_INIT_M,
+    radius=20,
+    total_points=200
+)
+
+# 从圆形轨迹的第一个点生成车辆（确保车辆在轨迹上）
+init_x, init_y = x_traj[0], y_traj[0]
+# 获取初始角度（轨迹切线方向）
+init_yaw = np.rad2deg(theta_traj[0])
+carla.spawn_ego_vehicle(
+    'vehicle.tesla.model3',
+    x=init_x,
+    y=init_y,
+    z=0.1,
+    yaw=init_yaw  # 初始方向与轨迹一致
+)
+
+carla.print_ego_vehicle_characteristics()
+# 调整 spectator 位置以便更好观察圆形轨迹
+carla.set_spectator(X_INIT_M, Y_INIT_M, z=80, pitch=-90)  # 从圆心正上方俯视
+
+logger = Logger()
 current_idx = 0
 laps = 0
 
