@@ -14,16 +14,10 @@ import random
 import os
 
 
-
 # 修复1: 简化的神经网络架构（增加障碍物检测通道）
 class SimpleDrivingNetwork(nn.Module):
     """
     简化的驾驶网络 - 增加障碍物感知
-=======
-# 修复1: 简化的神经网络架构
-class SimpleDrivingNetwork(nn.Module):
-    """
-
     """
 
     def __init__(self):
@@ -40,7 +34,6 @@ class SimpleDrivingNetwork(nn.Module):
             nn.AdaptiveAvgPool2d((4, 4))
         )
 
-
         # 状态信息维度: 速度 + 转向历史 + 障碍物信息
         state_dim = 7  # 增加障碍物相关维度
 
@@ -50,14 +43,6 @@ class SimpleDrivingNetwork(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.1),  # 添加dropout防止过拟合
             nn.Linear(128, 64),
-
-        # 状态信息维度: 速度 + 转向历史
-        state_dim = 4
-
-        # 融合层
-        self.fc_layers = nn.Sequential(
-            nn.Linear(32 * 4 * 4 + state_dim, 64),
-
             nn.ReLU(),
             nn.Linear(64, 32),
             nn.ReLU(),
@@ -78,7 +63,6 @@ class SimpleDrivingNetwork(nn.Module):
         steer = torch.tanh(control[:, 2:])
 
         return torch.cat([throttle_brake, steer], dim=1)
-
 
 
 # 新增：障碍物检测器类
@@ -219,11 +203,6 @@ class ObstacleDetector:
 # 修复2: 改进的神经网络控制器（整合障碍物检测）
 class ImprovedNeuralController:
     def __init__(self, obstacle_detector=None):
-
-# 修复2: 改进的神经网络控制器
-class ImprovedNeuralController:
-    def __init__(self):
-
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"使用设备: {self.device}")
 
@@ -234,7 +213,6 @@ class ImprovedNeuralController:
         # 控制历史，用于平滑
         self.control_history = deque(maxlen=5)
 
-
         # 障碍物检测器
         self.obstacle_detector = obstacle_detector
 
@@ -243,12 +221,10 @@ class ImprovedNeuralController:
         self.last_brake = 0.0
         self.last_steer = 0.0
 
-
         # 避障参数
         self.emergency_brake_distance = 5.0  # 紧急刹车距离
         self.safe_following_distance = 8.0  # 安全跟车距离
         self.obstacle_avoidance_steer = 0.0
-
 
     def preprocess_image(self, image):
         """修复图像预处理"""
@@ -266,21 +242,16 @@ class ImprovedNeuralController:
             print(f"图像预处理错误: {e}")
             return torch.zeros((1, 3, 120, 160), device=self.device)
 
-
     def preprocess_state(self, speed, steer_history, obstacle_info):
         """修复状态预处理，加入障碍物信息"""
         has_obstacle = 1.0 if obstacle_info['has_obstacle'] else 0.0
         normalized_distance = min(obstacle_info['distance'] / 50.0, 1.0) if obstacle_info['has_obstacle'] else 1.0
         normalized_angle = obstacle_info['relative_angle'] / 60.0 if obstacle_info['has_obstacle'] else 0.0
 
-    def preprocess_state(self, speed, steer_history):
-        """修复状态预处理"""
-
         state_data = [
             speed / 20.0,  # 归一化速度
             steer_history[-1] if steer_history else 0.0,  # 最近转向
             steer_history[-2] if len(steer_history) > 1 else 0.0,  # 前一次转向
-
             np.mean(steer_history) if steer_history else 0.0,  # 平均转向
             has_obstacle,  # 是否有障碍物
             normalized_distance,  # 归一化距离
@@ -342,23 +313,11 @@ class ImprovedNeuralController:
 
     def get_control(self, image, speed, steer_history, obstacle_info):
         """修复控制生成逻辑，加入避障"""
-
-            np.mean(steer_history) if steer_history else 0.0  # 平均转向
-        ]
-        return torch.tensor(state_data, device=self.device).unsqueeze(0)
-
-    def get_control(self, image, speed, steer_history):
-        """修复控制生成逻辑"""
-
         try:
             with torch.no_grad():
                 # 预处理
                 img_tensor = self.preprocess_image(image)
-
                 state_tensor = self.preprocess_state(speed, steer_history, obstacle_info)
-
-                state_tensor = self.preprocess_state(speed, steer_history)
-
 
                 # 神经网络推理
                 control_output = self.model(img_tensor, state_tensor)
@@ -373,12 +332,10 @@ class ImprovedNeuralController:
                 brake = max(0.0, min(0.5, brake))  # 限制最大刹车
                 steer = max(-0.5, min(0.5, steer))  # 限制转向幅度
 
-
                 # 应用避障逻辑
                 throttle, brake, steer = self.apply_obstacle_avoidance(
                     throttle, brake, steer, obstacle_info, speed
                 )
-
 
                 return throttle, brake, steer
 
@@ -388,30 +345,22 @@ class ImprovedNeuralController:
             return 0.3, 0.0, 0.0
 
 
-
 # 修复5: 传统控制器作为备份（整合障碍物检测）
 class TraditionalController:
     """可靠的传统控制逻辑"""
 
     def __init__(self, world, obstacle_detector=None):
-
-# 修复5: 传统控制器作为备份
-class TraditionalController:
-    """可靠的传统控制逻辑"""
-
-    def __init__(self, world):
-
         self.world = world
         self.map = world.get_map()
         self.waypoint_distance = 10.0
         self.last_waypoint = None
-
         self.obstacle_detector = obstacle_detector
         self.emergency_brake_distance = 6.0
         self.safe_following_distance = 10.0
 
+    # 在 TraditionalController 类的 apply_obstacle_avoidance 方法中，修改以下部分：
     def apply_obstacle_avoidance(self, throttle, brake, steer, vehicle, obstacle_info):
-        """传统控制器的避障逻辑"""
+        """传统控制器的避障逻辑 - 优化版本"""
         if not obstacle_info['has_obstacle']:
             return throttle, brake, steer
 
@@ -429,58 +378,51 @@ class TraditionalController:
         # 减速跟随
         elif distance < self.safe_following_distance:
             # 计算所需的安全距离（基于速度）
-            required_distance = max(5.0, vehicle_speed * 0.3)  # 0.3秒车距
+            required_distance = max(5.0, vehicle_speed * 0.4)  # 增加到0.4秒车距
 
             if distance < required_distance:
                 # 距离太近，减速
+                speed_ratio = distance / required_distance
                 if vehicle_speed > 10:
                     throttle = 0.0
-                    brake = 0.4
+                    brake = 0.6 * (1.0 - speed_ratio)
                 else:
-                    throttle = 0.1
+                    throttle = 0.2 * speed_ratio
                     brake = 0.0
 
                 # 如果障碍物在正前方，尝试变道
-                if abs(angle) < 15:
-                    # 获取当前车道和相邻车道
+                if abs(angle) < 20:  # 放宽角度范围
                     location = vehicle.get_location()
                     waypoint = self.map.get_waypoint(location)
 
-                    # 尝试获取左侧车道
+                    # 检查相邻车道是否可用
                     left_lane = waypoint.get_left_lane()
                     right_lane = waypoint.get_right_lane()
 
+                    # 优先选择转向较小的方向
                     if left_lane and left_lane.lane_type == carla.LaneType.Driving:
-                        steer = -0.3  # 向左变道
+                        # 检查左侧是否有足够空间
+                        steer = -0.25
                     elif right_lane and right_lane.lane_type == carla.LaneType.Driving:
-                        steer = 0.3  # 向右变道
+                        steer = 0.25
                     else:
-                        # 没有可用的相邻车道，轻微转向避开
-                        steer = 0.2 if angle >= 0 else -0.2
+                        # 没有可用的相邻车道，保持车道轻微避开
+                        steer = 0.15 if angle >= 0 else -0.15
 
         return throttle, brake, steer
 
     def get_control(self, vehicle):
         """基于路点的传统控制，整合避障"""
-
-
-    def get_control(self, vehicle):
-        """基于路点的传统控制"""
-
         # 获取车辆状态
         transform = vehicle.get_transform()
         location = vehicle.get_location()
         velocity = vehicle.get_velocity()
-
         speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6  # km/h
 
         # 获取障碍物信息
         obstacle_info = None
         if self.obstacle_detector:
             obstacle_info = self.obstacle_detector.get_obstacle_info()
-
-        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
-
 
         # 获取路点
         waypoint = self.map.get_waypoint(location, project_to_road=True)
@@ -508,7 +450,6 @@ class TraditionalController:
         else:
             angle = math.atan2(local_y, local_x)
             steer = np.clip(angle / math.radians(45), -1.0, 1.0)
-
 
         # 速度控制（基于障碍物距离调整）
         throttle = 0.0
@@ -564,24 +505,10 @@ class TraditionalController:
                 throttle, brake, steer, vehicle, obstacle_info
             )
 
-        # 速度控制
-        if speed < 5.0:  # 18 km/h
-            throttle = 0.6
-            brake = 0.0
-        elif speed < 10.0:  # 36 km/h
-            throttle = 0.3
-            brake = 0.0
-        else:
-            throttle = 0.1
-            brake = 0.1
-
-
         return throttle, brake, steer
 
 
-
 # CARLA初始化部分...
-# CARLA初始化部分保持不变...
 # 连接到本地CARLA服务器，端口2000
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
@@ -669,7 +596,6 @@ def third_camera_callback(image):
     third_image = array[:, :, :3]
 
 
-
 def front_camera_callback(image):
     global front_image
     array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
@@ -702,33 +628,6 @@ steer_history = deque(maxlen=10)
 # 障碍物信息历史
 obstacle_history = deque(maxlen=5)
 
-
-def front_camera_callback(image):
-    global front_image
-    array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-    array = np.reshape(array, (image.height, image.width, 4))
-    front_image = array[:, :, :3]
-
-
-third_camera.listen(third_camera_callback)
-front_camera.listen(front_camera_callback)
-
-time.sleep(2.0)
-
-# 修复6: 初始化控制器
-nn_controller = ImprovedNeuralController()
-traditional_controller = TraditionalController(world)
-
-# 控制变量
-throttle = 0.3  # 更保守的初始油门
-steer = 0.0
-brake = 0.0
-NEURAL_NETWORK_MODE = False  # 默认使用传统控制，更稳定
-
-# 转向历史，用于平滑
-steer_history = deque(maxlen=10)
-
-
 print("初始化车辆状态...")
 vehicle.set_simulate_physics(True)
 
@@ -749,10 +648,8 @@ try:
     stuck_count = 0
     last_position = vehicle.get_location()
     success_count = 0  # 成功运行计数器
-
     collision_count = 0  # 碰撞计数器
     last_collision_time = 0  # 上次碰撞时间
-
 
     # 主循环
     while True:
@@ -764,7 +661,6 @@ try:
         vehicle_location = vehicle.get_location()
         vehicle_velocity = vehicle.get_velocity()
         vehicle_speed = math.sqrt(vehicle_velocity.x ** 2 + vehicle_velocity.y ** 2 + vehicle_velocity.z ** 2)
-
 
         # 检测障碍物
         obstacle_info = obstacle_detector.get_obstacle_info()
@@ -780,11 +676,6 @@ try:
               f"模式={'神经网络' if NEURAL_NETWORK_MODE else '传统'}, "
               f"障碍物={'有' if obstacle_info['has_obstacle'] else '无'}")
 
-
-        print(
-            f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, 模式={'神经网络' if NEURAL_NETWORK_MODE else '传统'}")
-
-
         # 修复8: 改进的卡住检测
         current_position = vehicle_location
         distance_moved = current_position.distance(last_position)
@@ -797,15 +688,6 @@ try:
             stuck_count = 0
             success_count += 1  # 成功运行一帧
 
-
-        last_position = current_position
-
-        # 修复9: 更智能的卡住恢复
-        if stuck_count > 15:  # 1.5秒后认为卡住
-            print("检测到车辆卡住，执行恢复程序...")
-
-
-
         last_position = current_position
 
         # 修复9: 更智能的卡住恢复
@@ -817,7 +699,6 @@ try:
                 throttle=0.0, steer=0.0, brake=1.0, hand_brake=True
             ))
             time.sleep(0.5)
-
 
             # 检查是否有前方障碍物
             if obstacle_info['has_obstacle'] and obstacle_info['distance'] < 10:
@@ -857,37 +738,6 @@ try:
             # 记录转向历史
             steer_history.append(steer)
 
-
-
-            # 然后尝试不同方向的脱困
-            recovery_steer = random.choice([-0.5, 0.5])  # 随机选择方向
-            vehicle.apply_control(carla.VehicleControl(
-                throttle=0.8, steer=recovery_steer, brake=0.0, hand_brake=False
-            ))
-            time.sleep(1.0)
-
-            stuck_count = 0
-            success_count = 0
-
-        # 每成功运行100帧显示一次状态
-        if success_count % 100 == 0:
-            print(f"已成功运行 {success_count} 帧")
-
-        # 控制逻辑
-        if NEURAL_NETWORK_MODE:
-            # 神经网络控制
-            nn_throttle, nn_brake, nn_steer = nn_controller.get_control(
-                front_image, vehicle_speed, steer_history
-            )
-
-            # 修复10: 更激进的控制平滑
-            throttle = 0.3 * throttle + 0.7 * nn_throttle
-            brake = 0.3 * brake + 0.7 * nn_brake
-            steer = 0.2 * steer + 0.8 * nn_steer
-
-            # 记录转向历史
-            steer_history.append(steer)
-
         else:
             # 传统控制 - 更稳定
             throttle, brake, steer = traditional_controller.get_control(vehicle)
@@ -908,7 +758,6 @@ try:
         if third_image is not None:
             display_image = third_image.copy()
 
-
             # 可视化障碍物检测结果
             display_image = obstacle_detector.visualize_obstacles(display_image, vehicle_transform)
 
@@ -918,7 +767,6 @@ try:
             cv2.putText(display_image, f"Mode: {'Neural' if NEURAL_NETWORK_MODE else 'Traditional'}",
                         (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             cv2.putText(display_image, f"Throttle: {throttle:.2f}", (10, 90),
-
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
             cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 120),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -943,20 +791,6 @@ try:
 
             cv2.imshow('自动驾驶系统 - 带障碍物检测', display_image)
 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 120),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(display_image, f"Brake: {brake:.2f}", (10, 150),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-            # 卡住警告
-            if stuck_count > 5:
-                cv2.putText(display_image, "STUCK DETECTED!", (10, 180),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-
-            cv2.imshow('自动驾驶系统 - 修复版', display_image)
-
-
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 break
@@ -977,14 +811,10 @@ try:
                 brake = 1.0
                 stuck_count = 0
                 success_count = 0
-
                 collision_count = 0
                 steer_history.clear()
                 obstacle_history.clear()
                 print("车辆已重置")
-
-                steer_history.clear()
-
 
         time.sleep(0.01)
 
