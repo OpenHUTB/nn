@@ -1,7 +1,5 @@
 # Test.py
 import random
-import os
-import glob
 from collections import deque
 import numpy as np
 import cv2
@@ -11,413 +9,607 @@ import tensorflow.keras.backend as backend
 from tensorflow.keras.models import load_model
 from Environment import CarEnv, MEMORY_FRACTION
 from Hyperparameters import *
+import os
+import json
+import glob
 
 
-def find_latest_model(model_dir=None, pattern="*.model"):
-    """
-    自动查找最新训练的模型
-    
-    Args:
-        model_dir: 模型目录路径，如果为None则使用默认目录
-        pattern: 模型文件匹配模式
-    
-    Returns:
-        最新模型的路径，如果没有找到则返回None
-    """
-    if model_dir is None:
-        model_dir = r'D:\Robots\nn\src\Unmanned_vehicle_AD_DQN\models'
-    
-    if not os.path.exists(model_dir):
-        print(f"警告: 模型目录不存在: {model_dir}")
-        return None
-    
-    # 查找所有模型文件
-    model_files = glob.glob(os.path.join(model_dir, pattern))
-    
-    if not model_files:
-        print(f"警告: 在目录 {model_dir} 中没有找到模型文件")
-        return None
-    
-    # 按修改时间排序，获取最新的模型
-    latest_model = max(model_files, key=os.path.getmtime)
-    
-    # 也可以按文件名中的数字排序（如果文件名包含训练步数或episode数）
-    # 例如: model_1000.model, model_2000.model
-    try:
-        # 尝试按文件名中的数字排序
-        def extract_number(filename):
-            import re
-            numbers = re.findall(r'\d+', os.path.basename(filename))
-            return int(numbers[-1]) if numbers else 0
-        
-        # 按数字大小排序，获取最大的（通常是最新的）
-        latest_by_name = max(model_files, key=extract_number)
-        
-        # 如果按名称找到的比按时间找到的更新（数字更大），则使用按名称找到的
-        if extract_number(latest_by_name) > extract_number(latest_model):
-            latest_model = latest_by_name
-            print(f"按文件名排序选择模型: {os.path.basename(latest_model)}")
-        else:
-            print(f"按修改时间选择模型: {os.path.basename(latest_model)}")
-    except:
-        print(f"按修改时间选择模型: {os.path.basename(latest_model)}")
-    
-    return latest_model
+def get_script_directory():
+    """获取Test.py脚本所在的目录"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return script_dir
 
 
-def list_available_models(model_dir=None):
+def find_model_files(model_dir="models", pattern="*.model"):
     """
-    列出所有可用的模型
-    
-    Args:
-        model_dir: 模型目录路径
-    
-    Returns:
-        模型文件列表，按修改时间排序
+    自动查找模型文件（只在Test.py所在目录及其子目录中查找）
     """
-    if model_dir is None:
-        model_dir = r'D:\Robots\nn\src\Unmanned_vehicle_AD_DQN\models'
+    script_dir = get_script_directory()
     
-    if not os.path.exists(model_dir):
-        print(f"警告: 模型目录不存在: {model_dir}")
-        return []
+    # 只在Test.py所在目录及其子目录中查找
+    possible_paths = [
+        os.path.join(script_dir, model_dir),  # 脚本目录下的models文件夹
+        os.path.join(script_dir, "models"),  # 脚本目录下的models
+        os.path.join(script_dir, "saved_models"),  # 脚本目录下的saved_models
+        os.path.join(script_dir, "model"),  # 脚本目录下的model
+        script_dir,  # 脚本目录本身（可能模型文件直接放在这里）
+    ]
     
-    model_files = glob.glob(os.path.join(model_dir, "*.model"))
+    model_files = []
     
-    if not model_files:
-        print(f"目录 {model_dir} 中没有模型文件")
-        return []
+    for path in possible_paths:
+        if os.path.exists(path):
+            files = glob.glob(os.path.join(path, pattern))
+            if files:
+                # 显示相对路径（相对于脚本目录）
+                rel_path = os.path.relpath(path, script_dir)
+                if rel_path == ".":
+                    rel_path = "当前目录"
+                print(f"在目录 '{rel_path}' 中找到 {len(files)} 个模型文件")
+                model_files.extend(files)
     
-    # 按修改时间排序（最新的在前）
+    # 去重
+    model_files = list(set(model_files))
+    
+    # 按修改时间排序（最新的在前面）
     model_files.sort(key=os.path.getmtime, reverse=True)
-    
-    print("\n可用的模型文件:")
-    print("-" * 80)
-    for i, model_file in enumerate(model_files):
-        filename = os.path.basename(model_file)
-        mtime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(model_file)))
-        size = os.path.getsize(model_file) / (1024 * 1024)  # 转换为MB
-        print(f"{i+1:3d}. {filename:50s} | 修改时间: {mtime} | 大小: {size:.1f} MB")
-    print("-" * 80)
     
     return model_files
 
 
-def get_safe_action_improved(model, state, env, previous_action, uncertainty_threshold=1.0):
+def select_best_model(model_files, preferred_keywords=None, excluded_keywords=None):
     """
-    改进的安全动作选择，结合模型预测、安全规则和不确定性估计
+    从模型文件列表中选择最佳模型
+    """
+    if not model_files:
+        return None
+    
+    if preferred_keywords is None:
+        preferred_keywords = ["best", "advanced", "dueling_per"]
+    
+    if excluded_keywords is None:
+        excluded_keywords = ["min", "avg", "final"]  # 排除统计文件
+    
+    # 评分系统：根据关键词和文件属性给模型打分
+    scored_models = []
+    
+    for file_path in model_files:
+        filename = os.path.basename(file_path)
+        score = 0
+        
+        # 基于文件名关键词打分
+        for keyword in preferred_keywords:
+            if keyword.lower() in filename.lower():
+                score += 10
+        
+        # 排除包含特定关键词的文件
+        exclude = False
+        for keyword in excluded_keywords:
+            if keyword.lower() in filename.lower() and not filename.lower().endswith(".model"):
+                exclude = True
+                break
+        
+        if exclude:
+            continue
+        
+        # 基于文件大小和修改时间打分
+        try:
+            file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+            if file_size > 100:  # 大于100MB的模型可能更复杂
+                score += 5
+            
+            # 文件修改时间（越新越好）
+            days_old = (time.time() - os.path.getmtime(file_path)) / (24 * 3600)
+            if days_old < 7:  # 一周内的文件
+                score += 10
+            elif days_old < 30:  # 一个月内的文件
+                score += 5
+        except:
+            pass
+        
+        scored_models.append((file_path, score, filename))
+    
+    if not scored_models:
+        return None
+    
+    # 按分数排序
+    scored_models.sort(key=lambda x: x[1], reverse=True)
+    
+    print("\n找到的模型文件（按优先级排序）:")
+    for i, (path, score, name) in enumerate(scored_models[:5]):  # 显示前5个
+        # 显示相对路径
+        script_dir = get_script_directory()
+        rel_path = os.path.relpath(path, script_dir)
+        print(f"  {i+1}. [{score:3d}分] {name}")
+        print(f"      路径: {rel_path}")
+    
+    return scored_models[0][0]  # 返回最佳模型的路径
+
+
+def get_safe_action_advanced(model, state, env, previous_action, uncertainty_threshold=1.0):
+    """
+    高级安全动作选择，结合模型预测、安全规则、不确定性估计和多目标优化
     """
     # 模型预测
     state_normalized = np.array(state).reshape(-1, *state.shape) / 255
     qs = model.predict(state_normalized, verbose=0)[0]
     
-    # 计算不确定性（如果模型有多个输出头）
-    uncertainty = 0.0
-    if hasattr(model, 'output'):
-        if isinstance(model.output, list):
-            # 如果是Dueling DQN，可以分别获取价值和优势
-            predictions = model.predict(state_normalized, verbose=0)
-            if isinstance(predictions, list):
-                value = predictions[0][0] if len(predictions) > 0 else 0
-                advantage = predictions[1][0] if len(predictions) > 1 else np.zeros(5)
-                # 计算不确定性作为价值和优势的差异
-                uncertainty = np.std(advantage)
-    
-    # 安全规则：高不确定性时更加保守
-    if uncertainty > uncertainty_threshold:
-        # 降低激进动作的Q值
-        qs[2] *= 0.5  # 降低加速倾向
-        qs[3] *= 0.7  # 降低左转倾向
-        qs[4] *= 0.7  # 降低右转倾向
-    
-    # 如果有建议的避让动作（来自环境），优先考虑
-    if hasattr(env, 'suggested_action') and env.suggested_action is not None:
-        suggested_q = qs[env.suggested_action]
-        qs[env.suggested_action] += 2.0  # 大幅提高建议动作的Q值
-        print(f"安全建议: 执行动作 {env.suggested_action} 以避让行人")
-        env.suggested_action = None  # 重置
-    
-    # 避免频繁切换动作（平滑性）
-    if previous_action in [3, 4]:  # 如果是转向动作
-        qs[previous_action] += 0.5  # 提高继续当前转向的倾向
-    
-    # 防止过度转向
-    if env.same_steer_counter > 3:  # 连续同向转向超过3次
-        qs[previous_action] -= 1.0  # 降低当前转向动作的Q值
-    
-    # 速度相关的动作调整
+    # 获取车辆速度
     velocity = env.vehicle.get_velocity()
     speed_kmh = 3.6 * np.linalg.norm([velocity.x, velocity.y, velocity.z])
     
-    if speed_kmh > 40:  # 高速时更加谨慎
-        qs[2] *= 0.8  # 降低加速倾向
-    elif speed_kmh < 10:  # 低速时鼓励加速
-        qs[0] *= 0.7  # 降低减速倾向
-        qs[2] *= 1.2  # 提高加速倾向
+    # 1. 速度自适应调整
+    speed_factor = max(0.3, min(1.0, 30.0 / max(1.0, speed_kmh)))
+    
+    if speed_kmh > 40:  # 高速时更加保守
+        qs[2] *= 0.6  # 降低加速倾向
+        qs[3] *= 0.5  # 大幅降低左转倾向
+        qs[4] *= 0.5  # 大幅降低右转倾向
+    elif speed_kmh < 10:  # 低速时鼓励前进
+        qs[0] *= 0.5  # 降低减速倾向
+        qs[1] *= 1.2  # 提高保持倾向
+        qs[2] *= 1.3  # 提高加速倾向
+    
+    # 2. 行人避障优先级
+    if hasattr(env, 'suggested_action') and env.suggested_action is not None:
+        qs[env.suggested_action] += 3.0  # 大幅提高建议动作的Q值
+        print(f"🚨 安全避让: 执行动作 {env.suggested_action}")
+        env.suggested_action = None
+    
+    # 3. 防止过度转向
+    if hasattr(env, 'same_steer_counter') and env.same_steer_counter > 2:
+        if previous_action in [3, 4]:
+            qs[previous_action] -= 1.5  # 降低连续同向转向的倾向
+    
+    # 4. 动作平滑性
+    if previous_action in [3, 4]:  # 转向动作
+        qs[previous_action] += 0.8 * speed_factor  # 速度相关的平滑性
+    elif previous_action in [0, 2]:  # 加减速动作
+        qs[previous_action] += 0.3  # 轻微的惯性保持
+    
+    # 5. 道路保持倾向
+    # 如果车辆方向偏差小，鼓励保持直行
+    if hasattr(env, 'vehicle'):
+        vehicle_rotation = env.vehicle.get_transform().rotation.yaw
+        if abs(vehicle_rotation) < 10:  # 方向良好
+            qs[1] += 0.5  # 鼓励保持
+        elif abs(vehicle_rotation) > 30:  # 方向偏差大
+            # 鼓励向相反方向转向以回正
+            if vehicle_rotation > 0:  # 偏左，鼓励右转
+                qs[4] += 1.0
+            else:  # 偏右，鼓励左转
+                qs[3] += 1.0
+    
+    # 6. 紧急情况处理
+    min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
+    if min_ped_distance < 5.0:  # 紧急避让距离
+        # 大幅调整Q值以确保安全
+        qs[0] += 2.0  # 紧急制动
+        if min_ped_distance < 3.0:  # 极危险
+            qs[2] = -float('inf')  # 禁止加速
+            print("⚠️ 紧急制动!")
     
     # 选择动作
     action = np.argmax(qs)
     
-    # 安全检查：避免危险动作
-    if speed_kmh > 35 and action in [3, 4]:  # 高速时避免急转
-        # 检查是否有更安全的替代动作
-        alternative_actions = [1, 0, 2]  # 保持、减速、加速
-        safe_qs = [qs[a] for a in alternative_actions]
-        if max(safe_qs) > qs[action] * 0.8:  # 如果安全动作的Q值接近
-            action = alternative_actions[np.argmax(safe_qs)]
-            print(f"安全调整: 高速时避免急转，选择动作 {action}")
+    # 最终安全检查
+    if speed_kmh > 35 and action in [3, 4]:
+        # 高速急转检查
+        steer_magnitude = abs(qs[3]) if action == 3 else abs(qs[4])
+        if steer_magnitude > 2.0:  # 急转倾向强
+            # 考虑更安全的替代动作
+            safe_alternatives = [1, 0]  # 保持或减速
+            safe_qs = [qs[a] for a in safe_alternatives]
+            if max(safe_qs) > qs[action] * 0.7:
+                action = safe_alternatives[np.argmax(safe_qs)]
+                print(f"安全调整: 高速时避免急转，选择动作 {action}")
     
-    return action, qs, uncertainty
+    return action, qs
 
 
-def select_model_interactively():
-    """
-    交互式选择模型
-    """
-    model_dir = r'D:\Robots\nn\src\Unmanned_vehicle_AD_DQN\models'
+def run_test_episode(model, env, episode_num, use_advanced_safety=True):
+    """运行单个测试episode"""
+    print(f"\n{'='*50}")
+    print(f"测试 Episode {episode_num}")
+    print(f"{'='*50}")
     
-    # 列出所有可用模型
-    model_files = list_available_models(model_dir)
+    # 重置环境
+    current_state = env.reset(401)  # 正常难度
+    env.collision_hist = []
+    
+    # 初始化统计
+    total_reward = 0
+    step_count = 0
+    done = False
+    previous_action = 1
+    fps_counter = deque(maxlen=30)
+    
+    # 运行episode
+    max_steps = SECONDS_PER_EPISODE * 60
+    
+    while not done and step_count < max_steps:
+        step_start = time.time()
+        
+        # 选择动作
+        if use_advanced_safety:
+            action, qs = get_safe_action_advanced(model, current_state, env, previous_action)
+        else:
+            # 基础动作选择
+            state_normalized = np.array(current_state).reshape(-1, *current_state.shape) / 255
+            qs = model.predict(state_normalized, verbose=0)[0]
+            action = np.argmax(qs)
+        
+        previous_action = action
+        
+        # 执行动作
+        new_state, reward, done, _ = env.step(action)
+        
+        # 更新状态
+        current_state = new_state
+        total_reward += reward
+        step_count += 1
+        
+        # 计算FPS
+        frame_time = time.time() - step_start
+        fps_counter.append(frame_time)
+        
+        # 每30步显示一次状态
+        if step_count % 30 == 0:
+            fps = len(fps_counter)/sum(fps_counter) if fps_counter else 0
+            velocity = env.vehicle.get_velocity()
+            speed_kmh = 3.6 * np.linalg.norm([velocity.x, velocity.y, velocity.z])
+            
+            status = "✅" if reward > 0 else "⚠️" if reward < -1 else "➡️"
+            
+            print(f"{status} 步数: {step_count:4d} | FPS: {fps:4.1f} | "
+                  f"速度: {speed_kmh:5.1f} km/h | 奖励: {reward:6.2f} | 累计: {total_reward:7.2f}")
+        
+        if done:
+            break
+    
+    # 清理环境
+    env.cleanup_actors()
+    
+    # 判断结果
+    success = total_reward > 5
+    result = "成功" if success else "失败"
+    
+    print(f"\nEpisode {episode_num} 结果: {result}")
+    print(f"总步数: {step_count}, 总奖励: {total_reward:.2f}")
+    
+    return success, total_reward, step_count
+
+
+def load_model_with_fallback(model_path):
+    """加载模型，支持多种格式和回退机制"""
+    print(f"尝试加载模型: {model_path}")
+    
+    # 如果是相对路径，尝试转换为绝对路径（相对于脚本目录）
+    if not os.path.isabs(model_path):
+        script_dir = get_script_directory()
+        model_path = os.path.join(script_dir, model_path)
+    
+    if not os.path.exists(model_path):
+        # 尝试在当前目录下查找
+        model_name = os.path.basename(model_path)
+        script_dir = get_script_directory()
+        possible_paths = [
+            os.path.join(script_dir, model_name),
+            os.path.join(script_dir, "models", model_name),
+            os.path.join(script_dir, "saved_models", model_name),
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                print(f"找到模型文件: {model_path}")
+                break
+        else:
+            raise FileNotFoundError(f"找不到模型文件: {model_path}")
+    
+    # 定义自定义层
+    custom_objects = {
+        'Add': tf.keras.layers.Add, 
+        'Subtract': tf.keras.layers.Subtract,
+        'Lambda': tf.keras.layers.Lambda,
+        'Multiply': tf.keras.layers.Multiply
+    }
+    
+    try:
+        # 尝试加载完整模型
+        model = load_model(model_path, custom_objects=custom_objects)
+        print(f"✅ 模型加载成功 (使用自定义层)")
+        return model
+    except Exception as e1:
+        print(f"使用自定义层加载失败: {e1}")
+        try:
+            # 尝试不加载自定义层
+            model = load_model(model_path)
+            print(f"✅ 模型加载成功 (基础加载)")
+            return model
+        except Exception as e2:
+            print(f"基础加载失败: {e2}")
+            
+            # 尝试使用 tf.keras.models.load_model 的不同参数
+            try:
+                model = tf.keras.models.load_model(
+                    model_path, 
+                    compile=False,
+                    custom_objects=custom_objects
+                )
+                print(f"✅ 模型加载成功 (不编译)")
+                return model
+            except Exception as e3:
+                print(f"所有加载尝试失败: {e3}")
+                raise ValueError(f"无法加载模型: {model_path}")
+
+
+def comprehensive_model_evaluation(model_path, num_episodes=5):
+    """综合模型评估"""
+    print(f"\n{'='*60}")
+    print(f"开始综合模型评估")
+    print(f"模型路径: {model_path}")
+    print(f"测试轮次: {num_episodes}")
+    print(f"{'='*60}")
+    
+    # GPU配置
+    gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=MEMORY_FRACTION)
+    tf.compat.v1.keras.backend.set_session(
+        tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options)))
+    
+    # 加载模型
+    model = load_model_with_fallback(model_path)
+    
+    # 创建环境
+    env = CarEnv()
+    env.SHOW_CAM = False
+    
+    # 预热模型
+    print("预热模型...")
+    model.predict(np.ones((1, env.im_height, env.im_width, 3)), verbose=0)
+    
+    # 运行测试
+    results = {
+        'successes': 0,
+        'total_rewards': [],
+        'episode_lengths': [],
+        'start_time': time.time()
+    }
+    
+    try:
+        for episode in range(1, num_episodes + 1):
+            success, reward, length = run_test_episode(model, env, episode, use_advanced_safety=True)
+            
+            if success:
+                results['successes'] += 1
+            results['total_rewards'].append(reward)
+            results['episode_lengths'].append(length)
+            
+            # 短暂暂停
+            time.sleep(1)
+            
+    except KeyboardInterrupt:
+        print("\n测试被用户中断")
+    except Exception as e:
+        print(f"测试过程中发生错误: {e}")
+    finally:
+        # 清理环境
+        env.cleanup_actors()
+        
+        # 计算统计
+        results['end_time'] = time.time()
+        results['total_time'] = results['end_time'] - results['start_time']
+        
+        if results['total_rewards']:
+            results['success_rate'] = results['successes'] / len(results['total_rewards']) * 100
+            results['avg_reward'] = np.mean(results['total_rewards'])
+            results['avg_length'] = np.mean(results['episode_lengths'])
+            results['max_reward'] = max(results['total_rewards'])
+            results['min_reward'] = min(results['total_rewards'])
+        
+        # 显示评估报告
+        print(f"\n{'='*60}")
+        print("综合评估报告")
+        print(f"{'='*60}")
+        print(f"测试轮次: {num_episodes}")
+        print(f"成功次数: {results['successes']}")
+        print(f"成功率: {results.get('success_rate', 0):.1f}%")
+        print(f"平均奖励: {results.get('avg_reward', 0):.2f}")
+        print(f"平均步数: {results.get('avg_length', 0):.1f}")
+        print(f"最佳表现: {results.get('max_reward', 0):.2f}")
+        print(f"最差表现: {results.get('min_reward', 0):.2f}")
+        print(f"总测试时间: {results.get('total_time', 0):.1f}秒")
+        print(f"模型路径: {model_path}")
+        
+        # 保存评估结果到脚本所在目录
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        model_name = os.path.basename(model_path).replace('.model', '')
+        script_dir = get_script_directory()
+        eval_file = os.path.join(script_dir, f"model_evaluation_{model_name}_{timestamp}.json")
+        
+        # 转换numpy类型为Python原生类型
+        serializable_results = {}
+        for key, value in results.items():
+            if isinstance(value, np.ndarray):
+                serializable_results[key] = value.tolist()
+            elif isinstance(value, np.generic):
+                serializable_results[key] = value.item()
+            else:
+                serializable_results[key] = value
+        
+        serializable_results['model_path'] = model_path
+        serializable_results['model_name'] = model_name
+        serializable_results['evaluation_date'] = timestamp
+        serializable_results['num_episodes'] = num_episodes
+        
+        with open(eval_file, 'w') as f:
+            json.dump(serializable_results, f, indent=2)
+        
+        print(f"\n评估结果已保存到: {eval_file}")
+        
+        return results
+
+
+def interactive_model_selection(model_files):
+    """交互式模型选择"""
+    if not model_files:
+        print("❌ 未找到任何模型文件")
+        return None
+    
+    script_dir = get_script_directory()
+    
+    print(f"\n找到 {len(model_files)} 个模型文件:")
+    for i, file_path in enumerate(model_files):
+        # 显示相对路径
+        rel_path = os.path.relpath(file_path, script_dir)
+        filename = os.path.basename(file_path)
+        file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+        mod_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(file_path)))
+        print(f"  {i+1}. {filename} ({file_size:.1f} MB, 修改于: {mod_time})")
+        print(f"      路径: {rel_path}")
+    
+    while True:
+        try:
+            choice = input(f"\n请选择模型 (1-{len(model_files)}) 或按回车选择最新模型: ").strip()
+            
+            if choice == "":
+                # 选择最新的模型
+                selected = model_files[0]
+                rel_path = os.path.relpath(selected, script_dir)
+                print(f"选择最新的模型: {os.path.basename(selected)}")
+                print(f"路径: {rel_path}")
+                return selected
+            
+            choice_idx = int(choice) - 1
+            if 0 <= choice_idx < len(model_files):
+                selected = model_files[choice_idx]
+                rel_path = os.path.relpath(selected, script_dir)
+                print(f"选择模型: {os.path.basename(selected)}")
+                print(f"路径: {rel_path}")
+                return selected
+            else:
+                print(f"请输入 1 到 {len(model_files)} 之间的数字")
+        except ValueError:
+            print("请输入有效的数字")
+        except KeyboardInterrupt:
+            print("\n选择被用户中断")
+            return None
+
+
+def main():
+    """主函数 - 自动查找和测试模型"""
+    print(f"\n{'='*60}")
+    print("自动驾驶模型测试系统")
+    print(f"{'='*60}")
+    
+    # 显示当前脚本所在目录
+    script_dir = get_script_directory()
+    print(f"脚本所在目录: {script_dir}")
+    
+    # 自动查找模型文件（只在脚本目录及其子目录中查找）
+    print("\n正在搜索模型文件（仅在当前项目目录中）...")
+    model_files = find_model_files()
     
     if not model_files:
-        print("没有找到模型文件，请手动指定模型路径。")
-        manual_path = input("请输入模型完整路径: ").strip()
-        if os.path.exists(manual_path):
-            return manual_path
-        else:
-            print(f"错误: 文件不存在: {manual_path}")
-            return None
-    
-    print("\n选择模型:")
-    print("1. 使用最新模型")
-    print("2. 从列表中选择")
-    print("3. 手动输入模型路径")
-    
-    choice = input("请输入选择 (1-3): ").strip()
-    
-    if choice == "1":
-        # 使用最新模型
-        latest_model = find_latest_model(model_dir)
-        if latest_model:
-            print(f"选择最新模型: {os.path.basename(latest_model)}")
-            return latest_model
-        else:
-            print("无法找到最新模型")
-            return None
-    
-    elif choice == "2":
-        # 从列表中选择
-        if not model_files:
-            print("没有可用的模型文件")
-            return None
+        print("❌ 未找到任何模型文件 (.model)")
+        print("请确保:")
+        print("  1. 已经训练过模型")
+        print("  2. 模型文件保存在当前目录或 'models' 子目录中")
+        print("  3. 模型文件扩展名为 .model")
         
-        try:
-            index = int(input(f"请输入模型编号 (1-{len(model_files)}): ").strip())
-            if 1 <= index <= len(model_files):
-                selected_model = model_files[index-1]
-                print(f"选择模型: {os.path.basename(selected_model)}")
-                return selected_model
-            else:
-                print("无效的编号")
-                return None
-        except ValueError:
-            print("无效的输入")
-            return None
+        # 尝试搜索其他可能的扩展名
+        for ext in [".h5", ".keras", ".tf"]:
+            alt_files = find_model_files(pattern=f"*{ext}")
+            if alt_files:
+                print(f"\n找到 {len(alt_files)} 个 {ext} 格式的模型文件")
+                model_files = alt_files
+                break
+        
+        if not model_files:
+            return
     
-    elif choice == "3":
-        # 手动输入路径
-        manual_path = input("请输入模型完整路径: ").strip()
-        if os.path.exists(manual_path):
-            return manual_path
-        else:
-            print(f"错误: 文件不存在: {manual_path}")
-            return None
+    # 交互式选择模型
+    selected_model = interactive_model_selection(model_files)
     
-    else:
-        print("无效的选择，将使用最新模型")
-        latest_model = find_latest_model(model_dir)
-        if latest_model:
-            print(f"使用最新模型: {os.path.basename(latest_model)}")
-            return latest_model
-        else:
-            print("无法找到最新模型")
-            return None
+    if not selected_model:
+        print("未选择模型，退出测试")
+        return
+    
+    # 开始测试
+    comprehensive_model_evaluation(selected_model, num_episodes=3)
+
+
+def quick_test():
+    """快速测试 - 自动选择最佳模型并运行少量测试"""
+    print("\n正在执行快速测试...")
+    
+    # 显示当前脚本所在目录
+    script_dir = get_script_directory()
+    print(f"脚本所在目录: {script_dir}")
+    
+    # 查找模型（只在脚本目录及其子目录中查找）
+    model_files = find_model_files()
+    
+    if not model_files:
+        print("❌ 未找到模型文件")
+        return
+    
+    # 自动选择最佳模型
+    selected_model = select_best_model(model_files)
+    
+    if not selected_model:
+        print("❌ 无法选择模型")
+        return
+    
+    rel_path = os.path.relpath(selected_model, script_dir)
+    print(f"自动选择模型: {os.path.basename(selected_model)}")
+    print(f"路径: {rel_path}")
+    
+    # 运行1个episode进行快速测试
+    comprehensive_model_evaluation(selected_model, num_episodes=1)
 
 
 if __name__ == '__main__':
-    # GPU内存配置
-    gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=MEMORY_FRACTION)
-    tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options)))
-
-    # 选择模型
-    print("="*60)
-    print("模型选择")
-    print("="*60)
+    import argparse
     
-    # 使用交互式选择模型
-    MODEL_PATH = select_model_interactively()
+    parser = argparse.ArgumentParser(description='自动驾驶模型测试')
+    parser.add_argument('--quick', action='store_true', help='快速测试模式')
+    parser.add_argument('--model', type=str, help='指定模型文件路径')
+    parser.add_argument('--episodes', type=int, default=3, help='测试轮次数量')
     
-    if MODEL_PATH is None:
-        print("无法加载模型，程序退出")
-        exit(1)
+    args = parser.parse_args()
     
-    # 加载训练好的模型
-    print(f"\n加载模型: {MODEL_PATH}")
-    try:
-        model = load_model(MODEL_PATH, custom_objects={'Add': tf.keras.layers.Add, 
-                                                      'Subtract': tf.keras.layers.Subtract,
-                                                      'Lambda': tf.keras.layers.Lambda})
-    except Exception as e:
-        print(f"使用自定义对象加载失败，尝试标准加载: {e}")
-        try:
-            model = load_model(MODEL_PATH)
-        except Exception as e2:
-            print(f"加载模型失败: {e2}")
-            print("请检查模型文件是否完整，或尝试其他模型")
-            exit(1)
-    
-    print("模型加载成功!")
-    print(f"模型架构: {model.layers[-1].name}")
-    
-    # 检查是否是Dueling DQN
-    is_dueling = any('value' in layer.name or 'advantage' in layer.name for layer in model.layers)
-    print(f"模型类型: {'Dueling DQN' if is_dueling else 'Standard DQN'}")
-
-    # 创建测试环境
-    env = CarEnv()
-    env.SHOW_CAM = False  # 关闭小窗口预览
-
-    # 性能统计
-    fps_counter = deque(maxlen=60)
-    episode_rewards = []
-    episode_lengths = []
-    success_count = 0
-    total_episodes = 0
-
-    # 初始化预测
-    model.predict(np.ones((1, env.im_height, env.im_width, 3)), verbose=0)
-
-    print("\n" + "="*60)
-    print("开始测试改进的DQN模型!")
-    print("="*60)
-    print("请查看CARLA窗口观看智能体运行...")
-    print("按Ctrl+C停止测试")
-    print(f"模型类型: {'Dueling DQN with PER' if is_dueling else 'Standard DQN'}")
-    print(f"使用模型: {os.path.basename(MODEL_PATH)}")
-
-    # 循环测试多个episode
-    episode_count = 0
-    previous_action = 1  # 初始动作为保持
-    
-    try:
-        while True:
-            episode_count += 1
-            total_episodes += 1
-            print(f'\n{"="*40}')
-            print(f'开始第 {episode_count} 个测试轮次')
-            print(f'{"="*40}')
-
-            # 重置环境并获取初始状态
-            # 测试时使用正常难度（相当于训练的第3阶段）
-            current_state = env.reset(401)  # 401表示使用正常难度
-            env.collision_hist = []  # 重置碰撞历史
-
-            done = False
-            total_reward = 0
-            step_count = 0
-            max_steps = SECONDS_PER_EPISODE * 60  # 最大步数限制
-
-            # 单次episode内的循环
-            while not done and step_count < max_steps:
-                # FPS计数开始
-                step_start = time.time()
-
-                # 基于当前观察空间预测动作（使用改进的安全版本）
-                action, qs, uncertainty = get_safe_action_improved(
-                    model, current_state, env, previous_action
-                )
-                previous_action = action
-
-                # 执行环境步进
-                new_state, reward, done, _ = env.step(action)
-
-                # 更新当前状态
-                current_state = new_state
-                total_reward += reward
-                step_count += 1
-
-                # 计算帧时间，更新FPS计数器
-                frame_time = time.time() - step_start
-                fps_counter.append(frame_time)
-                
-                # 每20步打印一次详细信息
-                if step_count % 20 == 0:
-                    fps = len(fps_counter)/sum(fps_counter) if fps_counter else 0
-                    speed_vector = env.vehicle.get_velocity()
-                    speed_kmh = 3.6 * np.linalg.norm([speed_vector.x, speed_vector.y, speed_vector.z])
-                    
-                    print(f'轮次 {episode_count} | 步数: {step_count:3d} | FPS: {fps:4.1f} | '
-                          f'速度: {speed_kmh:4.1f} km/h | '
-                          f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] {action} | '
-                          f'奖励: {reward:5.2f} | 累计: {total_reward:6.2f}')
-
-                # 如果完成（碰撞等），结束当前episode
-                if done:
+    if args.model:
+        # 使用指定的模型文件
+        script_dir = get_script_directory()
+        
+        # 如果指定的是相对路径，转换为绝对路径
+        if not os.path.isabs(args.model):
+            args.model = os.path.join(script_dir, args.model)
+        
+        if os.path.exists(args.model):
+            print(f"使用指定模型: {args.model}")
+            comprehensive_model_evaluation(args.model, num_episodes=args.episodes)
+        else:
+            print(f"❌ 指定的模型文件不存在: {args.model}")
+            # 尝试在脚本目录下查找
+            model_name = os.path.basename(args.model)
+            possible_paths = [
+                os.path.join(script_dir, model_name),
+                os.path.join(script_dir, "models", model_name),
+                os.path.join(script_dir, "saved_models", model_name),
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    print(f"找到模型文件: {path}")
+                    comprehensive_model_evaluation(path, num_episodes=args.episodes)
                     break
-
-            # episode结束时显示结果
-            result = "成功到达终点!" if reward > 5 else "发生碰撞或失败"
-            success = reward > 5
-            
-            if success:
-                success_count += 1
-                print(f"✓ 第 {episode_count} 轮: {result}")
             else:
-                print(f"✗ 第 {episode_count} 轮: {result}")
-                
-            print(f'总步数: {step_count} | 总奖励: {total_reward:.2f}')
-            
-            # 记录统计
-            episode_rewards.append(total_reward)
-            episode_lengths.append(step_count)
-            
-            # 显示统计摘要
-            if len(episode_rewards) >= 5:
-                avg_reward = np.mean(episode_rewards[-5:])
-                avg_steps = np.mean(episode_lengths[-5:])
-                success_rate = (success_count / 5) * 100 if len(episode_rewards) >= 5 else 0
-                
-                print(f"\n最近5轮统计:")
-                print(f"  平均奖励: {avg_reward:.2f}")
-                print(f"  平均步数: {avg_steps:.1f}")
-                print(f"  成功率: {success_rate:.1f}%")
-            
-            env.cleanup_actors()
-                
-            # 短暂暂停后开始下一轮
-            time.sleep(2)
-
-    except KeyboardInterrupt:
-        print("\n测试被用户中断")
-    finally:
-        # 显示最终统计
-        print("\n" + "="*60)
-        print("测试完成!")
-        print("="*60)
-        
-        if total_episodes > 0:
-            success_rate = (success_count / total_episodes) * 100
-            avg_reward = np.mean(episode_rewards) if episode_rewards else 0
-            avg_steps = np.mean(episode_lengths) if episode_lengths else 0
-            
-            print(f"总测试轮次: {total_episodes}")
-            print(f"成功次数: {success_count}")
-            print(f"成功率: {success_rate:.1f}%")
-            print(f"平均奖励: {avg_reward:.2f}")
-            print(f"平均步数: {avg_steps:.1f}")
-            print(f"模型类型: {'Dueling DQN with PER' if is_dueling else 'Standard DQN'}")
-            print(f"使用模型: {os.path.basename(MODEL_PATH)}")
-        
-        # 清理环境
-        print("\n清理环境...")
-        env.cleanup_actors()
+                print("无法找到指定的模型文件")
+    elif args.quick:
+        # 快速测试模式
+        quick_test()
+    else:
+        # 交互式测试模式
+        main()
