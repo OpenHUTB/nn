@@ -77,13 +77,13 @@ for _ in range(5):
 if not vehicle:
     raise Exception("主角车辆生成失败，请重启CARLA服务器")
 
-# 4. 初始化RGB摄像头（保留shutter_speed，该传感器支持）
+# 4. 初始化RGB摄像头
 def init_rgb_camera(vehicle):
     camera_bp = bp_lib.find('sensor.camera.rgb')
     camera_bp.set_attribute('image_size_x', '1024')
     camera_bp.set_attribute('image_size_y', '720')
     camera_bp.set_attribute('fov', '90')
-    camera_bp.set_attribute('shutter_speed', '100')  # RGB摄像头支持此属性
+    camera_bp.set_attribute('shutter_speed', '100')
     camera_transform = carla.Transform(
         carla.Location(x=2.0, z=1.5),
         carla.Rotation(pitch=-5)
@@ -94,30 +94,27 @@ def init_rgb_camera(vehicle):
     print("RGB摄像头初始化完成")
     return camera, image_queue
 
-# 5. 初始化语义分割摄像头（移除shutter_speed，该传感器不支持）
+# 5. 初始化语义分割摄像头
 def init_semantic_camera(vehicle):
-    """初始化语义分割摄像头，返回传感器和数据队列"""
     sem_bp = bp_lib.find('sensor.camera.semantic_segmentation')
-    # 仅保留语义分割摄像头支持的属性
     sem_bp.set_attribute('image_size_x', '1024')
     sem_bp.set_attribute('image_size_y', '720')
     sem_bp.set_attribute('fov', '90')
-    # 移除shutter_speed设置（语义分割摄像头不支持）
     sem_transform = carla.Transform(
         carla.Location(x=2.0, z=1.5),
         carla.Rotation(pitch=-5)
     )
     sem_camera = world.spawn_actor(sem_bp, sem_transform, attach_to=vehicle)
     sem_queue = queue.Queue()
-    sem_camera.listen(sem_queue.put)  # 语义数据存入队列
+    sem_camera.listen(sem_queue.put)
     print("语义分割摄像头初始化完成")
     return sem_camera, sem_queue
 
-# 初始化摄像头（同时初始化RGB和语义分割）
+# 初始化摄像头
 rgb_camera, rgb_queue = init_rgb_camera(vehicle)
-sem_camera, sem_queue = init_semantic_camera(vehicle)  # 新增语义摄像头
+sem_camera, sem_queue = init_semantic_camera(vehicle)
 
-# 6. 生成NPC车辆（保留原有逻辑）
+# 6. 生成NPC车辆
 npc_count = 100
 print(f"开始生成{npc_count}辆NPC车辆...")
 for i in range(npc_count):
@@ -143,7 +140,7 @@ tm.set_synchronous_mode(True)
 for v in all_vehicles:
     v.set_autopilot(True, tm.get_port())
 
-# 8. 平滑视角函数（保留原有逻辑）
+# 8. 平滑视角函数
 def set_spectator_smooth(last_transform=None):
     spectator = world.get_spectator()
     with frame_lock:
@@ -177,9 +174,9 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（处理图像显示）
-print("\n程序运行中，按Ctrl+C或任一窗口按'q'退出...")
-print("功能：RGB摄像头 + 语义分割摄像头 + 车辆自动驾驶 + 平滑视角")
+# 9. 主循环（核心：RGB与语义分割图像拼接显示）
+print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
+print("功能：RGB与语义分割图像拼接显示 + 车辆自动驾驶 + 平滑视角")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -191,26 +188,30 @@ try:
         world.tick()
         last_spectator_tf = set_spectator_smooth(last_spectator_tf)
         
-        # 处理RGB图像
-        if not rgb_queue.empty():
+        # 同时获取RGB和语义分割图像（确保帧同步）
+        if not rgb_queue.empty() and not sem_queue.empty():
+            # 处理RGB图像（移除alpha通道，保留RGB）
             rgb_image = rgb_queue.get()
             rgb_img = np.reshape(np.copy(rgb_image.raw_data), 
-                                (rgb_image.height, rgb_image.width, 4))
-            cv2.imshow('RGB Camera', rgb_img)
-            if cv2.waitKey(1) == ord('q'):
-                break
-        
-        # 处理语义分割图像
-        if not sem_queue.empty():
+                                (rgb_image.height, rgb_image.width, 4))[:, :, :3]  # 取前3通道（RGB）
+            
+            # 处理语义分割图像（转换为彩色可视化）
             sem_image = sem_queue.get()
-            # 提取语义分割原始数据（单通道类别ID）
             sem_data = np.reshape(np.copy(sem_image.raw_data), 
                                 (sem_image.height, sem_image.width, 4))[:, :, 2].astype(np.int32)
-            # 映射到Cityscapes调色板（转换为RGB可视化）
             sem_rgb = np.zeros((sem_image.height, sem_image.width, 3), dtype=np.uint8)
             for i in range(len(CITYSCAPES_PALETTE)):
                 sem_rgb[sem_data == i] = CITYSCAPES_PALETTE[i]
-            cv2.imshow('Semantic Segmentation', sem_rgb)
+            
+            # 横向拼接两张图像（宽度合并，高度不变）
+            combined_img = cv2.hconcat([rgb_img, sem_rgb])
+            
+            # 添加标题区分左右区域
+            cv2.putText(combined_img, "RGB Image | Semantic Segmentation", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            
+            # 显示拼接后的图像
+            cv2.imshow('RGB + Semantic Segmentation', combined_img)
             if cv2.waitKey(1) == ord('q'):
                 break
         
@@ -219,7 +220,7 @@ try:
 except KeyboardInterrupt:
     print("\n用户中断，清理资源...")
 finally:
-    # 清理所有传感器
+    # 清理传感器
     rgb_camera.stop()
     rgb_camera.destroy()
     sem_camera.stop()
