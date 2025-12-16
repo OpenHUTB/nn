@@ -7,34 +7,34 @@ from pathlib import Path
 
 def setup_environment():
     """
-    初始化运行环境，适配实际目录结构：
-    main.py 与 robot_walk 同级，脚本/模型在 robot_walk 子目录中
+    Initialize runtime environment - adapt to directory structure:
+    main.py is at the same level as robot_walk, scripts/models in robot_walk subdirectory
     """
-    # 获取main.py所在目录（项目根目录：embodied_robot）
+    # Get project root (directory of main.py)
     project_root = Path(__file__).resolve().parent
-    print(f"📁 项目根目录：{project_root}")
+    print(f"📁 Project root directory: {project_root}")
 
-    # 定义子目录和关键文件路径（适配你的目录结构）
+    # Define paths
     robot_walk_dir = project_root / "robot_walk"
     script_file = robot_walk_dir / "move_straight.py"
     model_file = robot_walk_dir / "Robot_move_straight.xml"
 
-    # 检查目录是否存在
+    # Check subdirectory existence
     if not robot_walk_dir.exists():
-        print(f"\n❌ 缺失子目录：{robot_walk_dir}")
-        print("📋 请确保目录结构正确：")
+        print(f"\n❌ Missing subdirectory: {robot_walk_dir}")
+        print("📋 Required directory structure:")
         print("   embodied_robot/")
         print("   ├── main.py")
         print("   └── robot_walk/")
         print("       ├── move_straight.py")
         print("       └── Robot_move_straight.xml")
         sys.exit(1)
-    print(f"✅ 找到子目录：{robot_walk_dir}")
+    print(f"✅ Found subdirectory: {robot_walk_dir}")
 
-    # 检查文件是否存在
+    # Check file existence
     files_to_check = [
-        ("机器人控制脚本", script_file),
-        ("Mujoco模型文件", model_file)
+        ("Robot control script", script_file),
+        ("Mujoco model file", model_file)
     ]
 
     missing_files = []
@@ -42,16 +42,16 @@ def setup_environment():
         if not file_path.exists():
             missing_files.append(f"{file_desc}: {file_path}")
         else:
-            print(f"✅ {file_desc} 已找到：{file_path}")
+            print(f"✅ {file_desc} found: {file_path}")
 
-    # 如果有缺失文件，报错并退出
+    # Handle missing files
     if missing_files:
-        print("\n❌ 缺失必要文件：")
+        print("\n❌ Missing required files:")
         for missing in missing_files:
             print(f"   - {missing}")
-        print("\n📋 请确保 robot_walk 目录下包含：")
-        print("   1. move_straight.py (机器人控制脚本)")
-        print("   2. Robot_move_straight.xml (Mujoco模型文件)")
+        print("\n📋 Ensure robot_walk directory contains:")
+        print("   1. move_straight.py (Robot control script)")
+        print("   2. Robot_move_straight.xml (Mujoco model file)")
         sys.exit(1)
 
     return project_root, robot_walk_dir, script_file, model_file
@@ -59,13 +59,12 @@ def setup_environment():
 
 def get_python_executable():
     """
-    获取正确的Python解释器路径（优先使用虚拟环境）
+    Get correct Python interpreter path (priority to virtual environment)
     """
-    # 优先使用当前环境的Python
     python_exe = sys.executable
-    print(f"\n🐍 使用Python解释器：{python_exe}")
+    print(f"\n🐍 Using Python interpreter: {python_exe}")
 
-    # 验证Python版本
+    # Verify Python version
     try:
         version_result = subprocess.run(
             [python_exe, "--version"],
@@ -74,23 +73,23 @@ def get_python_executable():
             check=True
         )
         python_version = version_result.stdout.strip()
-        print(f"🔍 Python版本：{python_version}")
+        print(f"🔍 Python version: {python_version}")
 
-        # 检查是否至少是Python 3.8+（Mujoco要求）
+        # Check minimum version (3.8+)
         version_parts = python_version.split()[1].split('.')
         major = int(version_parts[0])
         minor = int(version_parts[1])
         if major < 3 or (major == 3 and minor < 8):
-            print("⚠️  警告：Mujoco推荐使用Python 3.8+，可能存在兼容性问题")
+            print("⚠️  Warning: Mujoco recommends Python 3.8+, compatibility issues may occur")
     except Exception as e:
-        print(f"⚠️  无法检测Python版本：{e}")
+        print(f"⚠️  Failed to detect Python version: {e}")
 
     return python_exe
 
 
 def check_dependencies():
     """
-    检查必要的依赖包是否安装
+    Check required packages installation
     """
     required_packages = [
         "mujoco",
@@ -101,48 +100,47 @@ def check_dependencies():
     for pkg in required_packages:
         try:
             __import__(pkg)
-            print(f"✅ 依赖包 {pkg} 已安装")
+            print(f"✅ Package {pkg} is installed")
         except ImportError:
             missing_packages.append(pkg)
 
     if missing_packages:
-        print("\n❌ 缺失依赖包：")
+        print("\n❌ Missing required packages:")
         for pkg in missing_packages:
             print(f"   - {pkg}")
-        print("\n📦 请运行以下命令安装：")
+        print("\n📦 Install missing packages with:")
         print(f"   {sys.executable} -m pip install {' '.join(missing_packages)}")
 
-        # 询问是否自动安装
-        if input("\n📥 是否自动安装缺失的依赖包？(y/n): ").lower() == 'y':
+        # Ask for auto-install
+        if input("\n📥 Auto-install missing packages? (y/n): ").lower() == 'y':
             try:
                 subprocess.run(
                     [sys.executable, "-m", "pip", "install"] + missing_packages,
                     check=True
                 )
-                print("✅ 依赖包安装完成")
+                print("✅ Packages installed successfully")
             except subprocess.CalledProcessError as e:
-                print(f"❌ 依赖包安装失败：{e}")
+                print(f"❌ Package installation failed: {e}")
                 sys.exit(1)
 
 
 def run_robot_simulation(python_exe, robot_walk_dir, script_file):
     """
-    启动机器人仿真脚本（切换到robot_walk目录运行，确保路径正确）
+    Launch robot simulation script (run in robot_walk directory for correct path resolution)
     """
-    print("\n🚀 启动机器人多目标点巡逻仿真...")
+    print("\n🚀 Starting robot patrol simulation...")
     print("=" * 50)
 
     try:
-        # 设置环境变量（确保无日志、路径正确）
+        # Set environment variables (no logs)
         env = os.environ.copy()
         env['MUJOCO_QUIET'] = '1'
-        # 将项目根目录加入Python路径，确保脚本能正确导入模块
         env['PYTHONPATH'] = str(Path(__file__).resolve().parent) + os.pathsep + env.get('PYTHONPATH', '')
 
-        # 切换到robot_walk目录运行脚本（关键：确保脚本能找到同目录的模型文件）
+        # Run script in robot_walk directory
         result = subprocess.run(
             [python_exe, str(script_file)],
-            cwd=str(robot_walk_dir),  # 运行目录切换到robot_walk
+            cwd=str(robot_walk_dir),
             env=env,
             stdout=sys.stdout,
             stderr=sys.stderr,
@@ -150,17 +148,17 @@ def run_robot_simulation(python_exe, robot_walk_dir, script_file):
         )
 
         print("=" * 50)
-        print("🏁 仿真运行完成")
+        print("🏁 Simulation completed successfully")
         return result.returncode
 
     except subprocess.CalledProcessError as e:
-        print(f"\n❌ 仿真运行出错，返回码：{e.returncode}")
+        print(f"\n❌ Simulation error, return code: {e.returncode}")
         return e.returncode
     except KeyboardInterrupt:
-        print("\n🛑 仿真被用户中断")
+        print("\n🛑 Simulation interrupted by user")
         return 0
     except Exception as e:
-        print(f"\n❌ 未知错误：{e}")
+        print(f"\n❌ Unexpected error: {e}")
         import traceback
         traceback.print_exc()
         return 1
@@ -168,42 +166,42 @@ def run_robot_simulation(python_exe, robot_walk_dir, script_file):
 
 def main():
     """
-    主启动函数
+    Main launcher function
     """
-    # 打印欢迎信息
+    # Welcome message
     print("=" * 50)
-    print("🤖 DeepMind Humanoid 机器人仿真启动器")
-    print("📌 多目标点巡逻 + 动态障碍避障")
+    print("🤖 DeepMind Humanoid Robot Simulation Launcher")
+    print("📌 Multi-target patrol + Dynamic obstacle avoidance")
     print("=" * 50)
 
-    # 1. 初始化环境和路径（适配你的目录结构）
+    # 1. Setup environment
     try:
         project_root, robot_walk_dir, script_file, model_file = setup_environment()
     except Exception as e:
-        print(f"\n❌ 环境初始化失败：{e}")
+        print(f"\n❌ Environment initialization failed: {e}")
         sys.exit(1)
 
-    # 2. 检查Python解释器
+    # 2. Get Python executable
     python_exe = get_python_executable()
 
-    # 3. 检查依赖包
-    print("\n🔍 检查依赖包...")
+    # 3. Check dependencies
+    print("\n🔍 Checking dependencies...")
     check_dependencies()
 
-    # 4. 运行仿真（切换到robot_walk目录）
+    # 4. Run simulation
     exit_code = run_robot_simulation(python_exe, robot_walk_dir, script_file)
 
-    # 5. 退出
+    # 5. Exit
     sys.exit(exit_code)
 
 
 if __name__ == "__main__":
-    # 设置Windows控制台编码（解决中文乱码）
+    # Fix Windows encoding issues
     if platform.system() == "Windows":
         try:
             os.system("chcp 65001 > nul")
         except:
             pass
 
-    # 启动主程序
+    # Launch main program
     main()
