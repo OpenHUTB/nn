@@ -3,3 +3,4 @@ opencv-python>=4.5.0
 numpy>=1.19.0
 tensorflow==2.10.0
 tflite-runtime>=2.5.0
+pillow>=9.0.0
