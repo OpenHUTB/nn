@@ -47,6 +47,7 @@
 - NumPy
 - PyYAML
 - Conda 环境管理器
+- 额外依赖（C++）：libglfw3-dev、libyaml-cpp-dev、libeigen3-dev
 
 ## 安装步骤
 
@@ -106,27 +107,33 @@ target_pos: [0.4, 0, 0.7] # 食指追踪目标坐标
 mujoco_ros_demo/
 ├── config/
 │   ├── assets/           # 3D模型文件(STL格式)
-│   └── humanoid.xml      # 机器人模型配置文件
+│   ├── humanoid.xml      # 机器人模型配置文件
+│   └── config.yaml       # 仿真参数配置文件（C++版本）
 ├── launch/
-│   └── main.launch.py    # ROS2启动文件
-├── mujoco_ros_demo/
+│   └── main.launch.py    # ROS2启动文件（支持Python/C++节点）
+├── mujoco_ros_demo/      # Python节点目录
 │   ├── __init__.py
-│   ├── mujoco_publisher.py   # 关节角度发布节点
-│   ├── data_subscriber.py    # 关节数据订阅节点
-│   ├── data_acquire.py       # 外部数据采集节点
-│   └── perception_node.py    # 感知处理节点
-├── package.xml           # ROS2包配置
-└── setup.py              # 安装配置
+│   ├── mujoco_publisher.py   # Python版：发布关节角度数据的节点
+│   └── data_subscriber.py    # Python版：订阅并处理数据的节点
+├── mujoco_demo_cpp/      # C++节点目录（新增）
+│   ├── simulator.cpp/.hpp    # C++版：MuJoCo仿真核心逻辑
+│   ├── mujoco_publisher.cpp  # C++版：发布关节角度数据的节点
+│   ├── data_subscriber.cpp   # C++版：订阅并处理数据的节点
+│   ├── data_acquire.cpp      # C++版：感知数据采集节点
+│   └── perception_node.cpp   # C++版：感知数据处理节点
+├── CMakeLists.txt        # C++编译配置文件（新增）
+├── package.xml           # ROS2包配置文件（更新依赖）
+├── setup.py              # Python包安装配置
 ```
 
 ## 节点说明
 
-1. **MujocoPublisher** (mujoco_publisher.py)
+1. **MujocoPublisher** (mujoco_publisher.py/mujoco_publisher.cpp)
    - 功能：加载MuJoCo模型并发布关节角度数据
    - 发布主题：/joint_angles (std_msgs/Float64MultiArray)
    - 参数：model_path - 机器人模型文件路径
 
-2. **DataSubscriber** (data_subscriber.py)
+2. **DataSubscriber** (data_subscriber.py/data_subscriber.cpp)
    - 功能：订阅关节角度数据并计算平均值
    - 订阅主题：/joint_angles (std_msgs/Float64MultiArray)
    - 输出：终端打印关节角度及平均值
@@ -164,8 +171,11 @@ python evaluator.py --config config.yaml --model simulation.xml
 colcon build
 source install/setup.bash
 
-# 启动ROS 2节点
+# 启动ROS 2节点(python)
 ros2 launch mujoco_ros_demo main.launch.py
+
+# 运行数据采集节点(C++)
+ros2 run mujoco_ros_demo data_acquire_cpp
 ```
 
 ### 3. 查看运行状态
