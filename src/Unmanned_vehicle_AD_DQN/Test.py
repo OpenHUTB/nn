@@ -14,18 +14,25 @@ import json
 import glob
 
 
+def get_script_directory():
+    """获取Test.py脚本所在的目录"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    return script_dir
+
+
 def find_model_files(model_dir="models", pattern="*.model"):
     """
-    自动查找模型文件
+    自动查找模型文件（只在Test.py所在目录及其子目录中查找）
     """
-    # 检查多种可能的目录结构
+    script_dir = get_script_directory()
+    
+    # 只在Test.py所在目录及其子目录中查找
     possible_paths = [
-        model_dir,  # 当前目录下的models
-        os.path.join(os.path.dirname(__file__), model_dir),  # 脚本同级目录
-        os.path.join(os.path.dirname(__file__), "..", model_dir),  # 上一级目录
-        "../models",  # 相对路径
-        "./models",  # 当前目录
-        "models",  # 直接models目录
+        os.path.join(script_dir, model_dir),  # 脚本目录下的models文件夹
+        os.path.join(script_dir, "models"),  # 脚本目录下的models
+        os.path.join(script_dir, "saved_models"),  # 脚本目录下的saved_models
+        os.path.join(script_dir, "model"),  # 脚本目录下的model
+        script_dir,  # 脚本目录本身（可能模型文件直接放在这里）
     ]
     
     model_files = []
@@ -34,7 +41,11 @@ def find_model_files(model_dir="models", pattern="*.model"):
         if os.path.exists(path):
             files = glob.glob(os.path.join(path, pattern))
             if files:
-                print(f"在目录 '{path}' 中找到 {len(files)} 个模型文件")
+                # 显示相对路径（相对于脚本目录）
+                rel_path = os.path.relpath(path, script_dir)
+                if rel_path == ".":
+                    rel_path = "当前目录"
+                print(f"在目录 '{rel_path}' 中找到 {len(files)} 个模型文件")
                 model_files.extend(files)
     
     # 去重
@@ -106,7 +117,11 @@ def select_best_model(model_files, preferred_keywords=None, excluded_keywords=No
     
     print("\n找到的模型文件（按优先级排序）:")
     for i, (path, score, name) in enumerate(scored_models[:5]):  # 显示前5个
+        # 显示相对路径
+        script_dir = get_script_directory()
+        rel_path = os.path.relpath(path, script_dir)
         print(f"  {i+1}. [{score:3d}分] {name}")
+        print(f"      路径: {rel_path}")
     
     return scored_models[0][0]  # 返回最佳模型的路径
 
@@ -269,6 +284,29 @@ def load_model_with_fallback(model_path):
     """加载模型，支持多种格式和回退机制"""
     print(f"尝试加载模型: {model_path}")
     
+    # 如果是相对路径，尝试转换为绝对路径（相对于脚本目录）
+    if not os.path.isabs(model_path):
+        script_dir = get_script_directory()
+        model_path = os.path.join(script_dir, model_path)
+    
+    if not os.path.exists(model_path):
+        # 尝试在当前目录下查找
+        model_name = os.path.basename(model_path)
+        script_dir = get_script_directory()
+        possible_paths = [
+            os.path.join(script_dir, model_name),
+            os.path.join(script_dir, "models", model_name),
+            os.path.join(script_dir, "saved_models", model_name),
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                print(f"找到模型文件: {model_path}")
+                break
+        else:
+            raise FileNotFoundError(f"找不到模型文件: {model_path}")
+    
     # 定义自定义层
     custom_objects = {
         'Add': tf.keras.layers.Add, 
@@ -383,10 +421,11 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
         print(f"总测试时间: {results.get('total_time', 0):.1f}秒")
         print(f"模型路径: {model_path}")
         
-        # 保存评估结果
+        # 保存评估结果到脚本所在目录
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         model_name = os.path.basename(model_path).replace('.model', '')
-        eval_file = f"model_evaluation_{model_name}_{timestamp}.json"
+        script_dir = get_script_directory()
+        eval_file = os.path.join(script_dir, f"model_evaluation_{model_name}_{timestamp}.json")
         
         # 转换numpy类型为Python原生类型
         serializable_results = {}
@@ -417,12 +456,17 @@ def interactive_model_selection(model_files):
         print("❌ 未找到任何模型文件")
         return None
     
+    script_dir = get_script_directory()
+    
     print(f"\n找到 {len(model_files)} 个模型文件:")
     for i, file_path in enumerate(model_files):
+        # 显示相对路径
+        rel_path = os.path.relpath(file_path, script_dir)
         filename = os.path.basename(file_path)
         file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
         mod_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(file_path)))
         print(f"  {i+1}. {filename} ({file_size:.1f} MB, 修改于: {mod_time})")
+        print(f"      路径: {rel_path}")
     
     while True:
         try:
@@ -431,13 +475,17 @@ def interactive_model_selection(model_files):
             if choice == "":
                 # 选择最新的模型
                 selected = model_files[0]
+                rel_path = os.path.relpath(selected, script_dir)
                 print(f"选择最新的模型: {os.path.basename(selected)}")
+                print(f"路径: {rel_path}")
                 return selected
             
             choice_idx = int(choice) - 1
             if 0 <= choice_idx < len(model_files):
                 selected = model_files[choice_idx]
+                rel_path = os.path.relpath(selected, script_dir)
                 print(f"选择模型: {os.path.basename(selected)}")
+                print(f"路径: {rel_path}")
                 return selected
             else:
                 print(f"请输入 1 到 {len(model_files)} 之间的数字")
@@ -454,15 +502,19 @@ def main():
     print("自动驾驶模型测试系统")
     print(f"{'='*60}")
     
-    # 自动查找模型文件
-    print("\n正在搜索模型文件...")
+    # 显示当前脚本所在目录
+    script_dir = get_script_directory()
+    print(f"脚本所在目录: {script_dir}")
+    
+    # 自动查找模型文件（只在脚本目录及其子目录中查找）
+    print("\n正在搜索模型文件（仅在当前项目目录中）...")
     model_files = find_model_files()
     
     if not model_files:
         print("❌ 未找到任何模型文件 (.model)")
         print("请确保:")
         print("  1. 已经训练过模型")
-        print("  2. 模型文件保存在 'models' 目录中")
+        print("  2. 模型文件保存在当前目录或 'models' 子目录中")
         print("  3. 模型文件扩展名为 .model")
         
         # 尝试搜索其他可能的扩展名
@@ -491,7 +543,11 @@ def quick_test():
     """快速测试 - 自动选择最佳模型并运行少量测试"""
     print("\n正在执行快速测试...")
     
-    # 查找模型
+    # 显示当前脚本所在目录
+    script_dir = get_script_directory()
+    print(f"脚本所在目录: {script_dir}")
+    
+    # 查找模型（只在脚本目录及其子目录中查找）
     model_files = find_model_files()
     
     if not model_files:
@@ -505,7 +561,9 @@ def quick_test():
         print("❌ 无法选择模型")
         return
     
+    rel_path = os.path.relpath(selected_model, script_dir)
     print(f"自动选择模型: {os.path.basename(selected_model)}")
+    print(f"路径: {rel_path}")
     
     # 运行1个episode进行快速测试
     comprehensive_model_evaluation(selected_model, num_episodes=1)
@@ -523,11 +581,32 @@ if __name__ == '__main__':
     
     if args.model:
         # 使用指定的模型文件
+        script_dir = get_script_directory()
+        
+        # 如果指定的是相对路径，转换为绝对路径
+        if not os.path.isabs(args.model):
+            args.model = os.path.join(script_dir, args.model)
+        
         if os.path.exists(args.model):
             print(f"使用指定模型: {args.model}")
             comprehensive_model_evaluation(args.model, num_episodes=args.episodes)
         else:
             print(f"❌ 指定的模型文件不存在: {args.model}")
+            # 尝试在脚本目录下查找
+            model_name = os.path.basename(args.model)
+            possible_paths = [
+                os.path.join(script_dir, model_name),
+                os.path.join(script_dir, "models", model_name),
+                os.path.join(script_dir, "saved_models", model_name),
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    print(f"找到模型文件: {path}")
+                    comprehensive_model_evaluation(path, num_episodes=args.episodes)
+                    break
+            else:
+                print("无法找到指定的模型文件")
     elif args.quick:
         # 快速测试模式
         quick_test()
