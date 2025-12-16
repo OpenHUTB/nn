@@ -1,49 +1,111 @@
-# 神经网络实现代理
+# openpilot-model 车道线与路径预测工具
 
-利用神经网络/ROS 实现 Carla（车辆、行人的感知、规划、控制）、AirSim、Mujoco 中人和载具的代理。
+## 项目简介
+`openpilot-model` 是一个基于 TensorFlow 的轻量化车道线与行驶路径预测工具，支持通过视频文件输入，利用 `supercombo` 预训练模型实时推理左/右车道线及车辆行驶路径，并提供简洁的可视化界面。  
+核心设计目标：在保证预测精度的前提下，通过减少帧处理数量、简化可视化渲染，降低 CPU/内存占用，适配资源有限的运行环境（如虚拟机、低配电脑）。
 
-## 环境配置
+## 核心功能
+1. **视频帧预处理**  
+   - 自动将视频帧从 BGR 格式转为 YUV_I420 格式（匹配模型输入要求）；  
+   - 调整帧尺寸至 512×384（统一输入规格）；  
+   - 转换为模型所需的张量格式（6通道特征图，归一化到 [-1, 1]）。
 
-* 平台：Windows 10/11，Ubuntu 20.04/22.04
-* 软件：Python 3.7-3.12（需支持3.7）、Pytorch（尽量不使用Tensorflow）
-* 相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
+2. **supercombo 模型推理**  
+   - 加载预训练的 `supercombo.h5` 模型，预测左车道线（lll）、右车道线（rll）及车辆行驶路径（path）；  
+   - 维护模型推理状态（state）和行驶意图（desire），保证帧间预测连续性；  
+   - 详细错误捕获（模型加载失败、推理异常均有明确提示）。
+
+3. **轻量化可视化**  
+   - 双窗口实时展示：  
+     - 原始视频帧窗口（缩小至 480×270，降低渲染压力）；  
+     - 预测结果窗口（蓝色=左车道线、红色=右车道线、绿色=行驶路径，固定坐标轴减少重绘计算）；  
+   - 支持按 `Q` 键快速退出可视化，避免资源残留。
+
+4. **健壮的错误处理**  
+   - 检测视频文件是否存在、是否可正常打开；  
+   - 验证模型文件路径有效性，提示缺失解决方案；  
+   - 捕获帧读取、预处理、推理过程中的异常，不中断整体程序运行。
+
+## 环境依赖
+### 1. 基础环境
+- Python 3.7 ~ 3.10（TensorFlow 2.x 对 Python 3.11+ 兼容性较差，推荐 2.15.0 版本）
+
+### 2. 依赖库
+通过 `pip` 安装以下库（建议指定版本以避免兼容性问题）：
+```bash
+pip install numpy==1.24.3          # 适配SciPy，避免版本冲突
+pip install opencv-python>=4.5.0   # 视频读取与帧处理
+pip install tensorflow==2.15.0     # 模型加载与推理（稳定兼容supercombo模型）
+pip install matplotlib>=3.4.0      # 预测结果可视化
+pip install tqdm>=4.62.0           # （潜在依赖，部分预处理逻辑可能用到）
 
 
-## 贡献指南
-
-准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
-代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
-
-### 约定
-
-* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
-* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
-* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
-* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
+### 3. 额外依赖
+- **FFmpeg**：OpenCV 读取视频需依赖，Ubuntu/Debian 系统安装命令：  
+  ```bash
+  sudo apt update && sudo apt install ffmpeg -y
+  ```
+- **common 模块**：项目中 `from common.transformations.xxx` 和 `from common.tools.lib.parser import parser` 依赖 openpilot 开源项目的 `common` 模块，获取方式：  
+  1. 克隆 openpilot 仓库：`git clone https://github.com/commaai/openpilot.git`  
+  2. 将 `openpilot/common` 文件夹复制到 `openpilot-model` 目录下，或通过 `sys.path.append` 添加模块路径（需修改 `main.py` 开头代码）。
 
 
-### 文档生成
 
-测试生成的文档：
-1. 安装python 3.11，并使用以下命令安装`mkdocs`和相关依赖：
-```shell
-pip install mkdocs -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
-pip install -r requirements.txt
+
+## 使用步骤
+### 1. 准备模型文件
+1. 获取 `supercombo.h5` 预训练模型（可从 openpilot 相关资源或合法渠道获取）；  
+2. 将模型文件放入 `models/` 目录下，确保路径为 `models/supercombo.h5`（若路径不同，需修改 `main.py` 中 `model_path` 变量）。
+
+### 2. 准备测试视频
+1. 准备一个视频文件（如 `test_video.mp4`），支持 MP4、AVI 等 OpenCV 兼容格式；  
+2. 记住视频文件的完整路径（如 `./test_video.mp4` 或 `/home/user/videos/drive.mp4`）。
+
+### 3. 运行程序
+在终端进入 `openpilot-model` 目录，执行以下命令（替换视频路径为实际路径）：
+```bash
+python main.py ./test_video.mp4
 ```
-（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
 
-2. 在命令行中进入`nn`目录下，运行：
-```shell
-mkdocs build
-mkdocs serve
-```
-然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
+### 4. 操作说明
+- 程序运行后会弹出两个窗口：  
+  1. **原始帧窗口**：显示缩小后的视频原始帧（480×270）；  
+  2. **预测结果窗口**：显示车道线（蓝/红）和行驶路径（绿）的预测结果；  
+- 按键盘 `Q` 键可退出所有窗口，终止程序运行。
 
-## 参考
 
-* [代理模拟器文档](https://openhutb.github.io)
-* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
-* [神经网络原理](https://github.com/OpenHUTB/neuro)
+## 关键参数调整
+可根据运行环境和需求，修改 `main.py` 中的以下参数：
+| 参数名        | 位置                | 默认值 | 说明                                                                 |
+|---------------|---------------------|--------|----------------------------------------------------------------------|
+| `max_frames`  | `read_video_with_opencv` 函数 | 10     | 最大处理帧数（减少此值可降低 CPU 压力，如改为 5；增大可处理更长视频） |
+| `model_path`  | `main` 函数         | "models/supercombo.h5" | 模型文件路径（若模型放在其他位置，需同步修改）                       |
+| `cv2.waitKey` | 可视化循环中        | 100    | 帧间等待时间（单位：ms，增大此值可降低窗口刷新频率，减少资源占用）   |
+| 预测窗口尺寸  | `plt.subplots`      | (8,6)  | 可修改 `figsize=(6,4)` 缩小窗口，进一步降低渲染压力                  |
 
-通过网盘分享的文件：supercombo.h5
-链接: https://pan.baidu.com/s/1yYc4aPBLnXRuWXEb0hyKMA?pwd=1234 提取码: 1234
+
+## 常见问题解决
+### 1. 模型加载失败（`模型加载失败：XXX`）
+- 检查 `model_path` 是否正确，确保 `supercombo.h5` 存在；  
+- 确认 TensorFlow 版本（建议 2.6~2.10，过高版本可能不兼容旧模型）；  
+- 验证模型文件完整性（重新下载模型，避免文件损坏）。
+
+### 2. 视频无法打开（`无法打开视频：XXX，请安装FFmpeg`）
+- 执行 `sudo apt install ffmpeg` 安装视频解码依赖；  
+- 检查视频文件路径是否正确，确保文件未损坏；  
+- 尝试更换视频格式（如将 AVI 转为 MP4）。
+
+### 3. `common` 模块导入错误（`No module named 'common'`）
+- 确认 `common` 文件夹已放在 `openpilot-model` 目录下；  
+- 若放在其他位置，可在 `main.py` 开头添加路径：  
+  ```python
+  import sys
+  sys.path.append("/path/to/common")  # 替换为 common 文件夹的实际路径
+  ```
+
+### 4. 可视化窗口卡住
+- 减少 `max_frames` 或增大 `cv2.waitKey` 时间；  
+- 关闭其他占用资源的程序（如浏览器、虚拟机快照工具）；  
+- 若支持 GPU，可安装 `tensorflow-gpu` 替代 `tensorflow`，利用 GPU 加速推理。
+
+
