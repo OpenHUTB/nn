@@ -9,14 +9,7 @@ import cv2
 import math
 import matplotlib.pyplot as plt
 from collections import deque
-from tensorflow.keras.applications.xception import Xception
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input, Concatenate, Conv2D, AveragePooling2D, Activation, \
-    Flatten
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import TensorBoard
 import tensorflow as tf
 import tensorflow.keras.backend as backend
 from threading import Thread
@@ -46,8 +39,8 @@ if __name__ == '__main__':
     if not os.path.isdir('models'):
         os.makedirs('models')
 
-    # 创建智能体和环境
-    agent = DQNAgent()
+    # 创建智能体和环境 - 启用Dueling DQN和PER
+    agent = DQNAgent(use_dueling=True, use_per=True)  # 开启新功能
     env = CarEnv()
 
     # 启动训练线程并等待训练初始化完成
@@ -65,28 +58,24 @@ if __name__ == '__main__':
     scores = []  # 存储每轮得分
     avg_scores = []  # 存储平均得分
     
+    # 记录PER相关统计
+    per_stats = {
+        'avg_td_error': [],
+        'buffer_size': []
+    }
+    
     # 迭代训练轮次
     epds = []
     for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
         env.collision_hist = []  # 重置碰撞历史
         agent.tensorboard.step = episode  # 设置TensorBoard步数
 
-        # 课程学习 - 随训练进度调整难度
-        if episode > EPISODES // 2:
-            # 训练后期增加行人数量以提高难度
-            env.spawn_pedestrians_general(40, True)
-            env.spawn_pedestrians_general(15, False)
-        else:
-            # 训练前期减少行人数量以降低难度
-            env.spawn_pedestrians_general(25, True)
-            env.spawn_pedestrians_general(8, False)
-
         # 重置每轮统计 - 重置得分和步数
         score = 0
         step = 1
 
         # 重置环境并获取初始状态
-        current_state = env.reset()
+        current_state = env.reset(episode)
 
         # 重置完成标志并开始迭代直到本轮结束
         done = False
@@ -103,10 +92,10 @@ if __name__ == '__main__':
                 # 从Q网络获取动作（利用）
                 qs = agent.get_qs(current_state)
                 action = np.argmax(qs)
-                print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action}')
+                print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] {action}')
             else:
-                # 随机选择动作（探索）
-                action = np.random.randint(0, 3)
+                # 随机选择动作（探索）- 扩展为5个动作
+                action = np.random.randint(0, 5)
                 # 添加延迟以匹配60FPS
                 time.sleep(1 / FPS)
 
@@ -124,8 +113,7 @@ if __name__ == '__main__':
                 break
 
         # 本轮结束 - 销毁所有actor
-        for actor in env.actor_list:
-            actor.destroy()
+        env.cleanup_actors()
 
         # 更新成功计数
         if score > 5:  # 成功完成的阈值
@@ -140,21 +128,43 @@ if __name__ == '__main__':
         scores.append(score)
         avg_scores.append(np.mean(scores[-10:]))  # 计算最近10轮平均分
 
+        # 记录PER缓冲区信息（如果使用PER）
+        if hasattr(agent, 'replay_buffer'):
+            per_stats['buffer_size'].append(len(agent.replay_buffer))
+            print(f"PER缓冲区大小: {len(agent.replay_buffer)}/{REPLAY_MEMORY_SIZE}")
+
         # 定期聚合统计信息
         if not episode % AGGREGATE_STATS_EVERY or episode == 1:
             average_reward = np.mean(scores[-AGGREGATE_STATS_EVERY:])  # 平均奖励
             min_reward = min(scores[-AGGREGATE_STATS_EVERY:])  # 最小奖励
             max_reward = max(scores[-AGGREGATE_STATS_EVERY:])  # 最大奖励
-            agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward,
-                                           epsilon=Hyperparameters.EPSILON)
+            
+            # 添加PER统计到TensorBoard
+            if hasattr(agent, 'replay_buffer'):
+                avg_buffer = np.mean(per_stats['buffer_size'][-AGGREGATE_STATS_EVERY:]) if per_stats['buffer_size'] else 0
+                agent.tensorboard.update_stats(
+                    reward_avg=average_reward, 
+                    reward_min=min_reward, 
+                    reward_max=max_reward,
+                    epsilon=Hyperparameters.EPSILON,
+                    buffer_size=avg_buffer
+                )
+            else:
+                agent.tensorboard.update_stats(
+                    reward_avg=average_reward, 
+                    reward_min=min_reward, 
+                    reward_max=max_reward,
+                    epsilon=Hyperparameters.EPSILON
+                )
 
             # 保存模型，仅当最小奖励达到设定值时
             if min_reward >= MIN_REWARD and (episode not in epds):
+                model_suffix = "dueling_per" if agent.use_dueling and agent.use_per else "baseline"
                 agent.model.save(
-                    f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+                    f'models/{MODEL_NAME}_{model_suffix}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
         epds.append(episode)
-        print('轮次: ', episode, '得分 %.2f' % score, '成功次数:', success_count)
+        print(f'轮次: {episode}, 得分: {score:.2f}, 成功次数: {success_count}')
         
         # 衰减探索率
         if Hyperparameters.EPSILON > Hyperparameters.MIN_EPSILON:
@@ -164,15 +174,59 @@ if __name__ == '__main__':
     # 设置训练线程终止标志并等待其结束
     agent.terminate = True
     trainer_thread.join()
+    
     # 保存最终模型
-    agent.model.save(
-        f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+    if len(scores) > 0:
+        final_max_reward = max(scores[-AGGREGATE_STATS_EVERY:] if len(scores) >= AGGREGATE_STATS_EVERY else scores)
+        final_avg_reward = np.mean(scores[-AGGREGATE_STATS_EVERY:] if len(scores) >= AGGREGATE_STATS_EVERY else scores)
+        final_min_reward = min(scores[-AGGREGATE_STATS_EVERY:] if len(scores) >= AGGREGATE_STATS_EVERY else scores)
+        
+        model_suffix = "dueling_per_final" if agent.use_dueling and agent.use_per else "baseline_final"
+        agent.model.save(
+            f'models/{MODEL_NAME}_{model_suffix}__{final_max_reward:_>7.2f}max_{final_avg_reward:_>7.2f}avg_{final_min_reward:_>7.2f}min__{int(time.time())}.model')
 
     # 绘制训练曲线
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    plt.plot(scores)  # 得分曲线
-    plt.plot(avg_scores)  # 平均得分曲线
-    plt.ylabel('得分')
-    plt.xlabel('训练轮次')
+    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+    
+    # 1. 得分曲线
+    axes[0, 0].plot(scores, label='每轮得分', alpha=0.6)
+    axes[0, 0].plot(avg_scores, label='平均得分(最近10轮)', linewidth=2)
+    axes[0, 0].set_ylabel('得分')
+    axes[0, 0].set_xlabel('训练轮次')
+    axes[0, 0].set_title('训练进度')
+    axes[0, 0].legend()
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    # 2. 探索率衰减曲线
+    eps_values = [max(MIN_EPSILON, 1.0 * (EPSILON_DECAY ** i)) for i in range(len(scores))]
+    axes[0, 1].plot(eps_values, color='red')
+    axes[0, 1].set_ylabel('探索率 (ε)')
+    axes[0, 1].set_xlabel('训练轮次')
+    axes[0, 1].set_title('探索率衰减曲线')
+    axes[0, 1].grid(True, alpha=0.3)
+    
+    # 3. PER缓冲区大小（如果使用PER）
+    if per_stats['buffer_size']:
+        axes[1, 0].plot(per_stats['buffer_size'], color='green')
+        axes[1, 0].axhline(y=REPLAY_MEMORY_SIZE, color='r', linestyle='--', alpha=0.5, label='最大容量')
+        axes[1, 0].set_ylabel('缓冲区大小')
+        axes[1, 0].set_xlabel('训练轮次')
+        axes[1, 0].set_title('PER缓冲区使用情况')
+        axes[1, 0].legend()
+        axes[1, 0].grid(True, alpha=0.3)
+    
+    # 4. 成功次数统计
+    success_rates = []
+    for i in range(len(scores)):
+        window = scores[max(0, i-9):i+1]
+        success_rate = sum(1 for s in window if s > 5) / len(window) * 100
+        success_rates.append(success_rate)
+    
+    axes[1, 1].plot(success_rates, color='purple')
+    axes[1, 1].set_ylabel('成功率 (%)')
+    axes[1, 1].set_xlabel('训练轮次')
+    axes[1, 1].set_title('最近10轮成功率')
+    axes[1, 1].grid(True, alpha=0.3)
+    
+    plt.tight_layout()
     plt.show()
