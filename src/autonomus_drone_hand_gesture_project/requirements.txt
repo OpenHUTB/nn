@@ -1,0 +1,6 @@
+mediapipe==0.10.7
+opencv-python==4.8.1.78
+numpy==1.24.4
+tensorflow==2.14.0
+pandas==2.1.4
+pillow==10.1.0

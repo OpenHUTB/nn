@@ -3,8 +3,13 @@ import time
 import sys
 import pygame
 import carla
+import os
+import sys
 
-# 修正导入路径：适配_agent子目录下的carla_environment.py
+# 添加当前目录到Python路径，确保可以导入_agent模块
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# 从_agent子目录导入CarlaEnvironment
 from _agent.carla_environment import CarlaEnvironment
 
 print("="*60)
@@ -46,6 +51,9 @@ def set_spectator_smooth(world, vehicle, last_transform=None):
     return smooth_tf
 
 def run_simulation():
+    # 初始化pygame
+    pygame.init()
+    
     env = None
     try:
         print("\n[CARLA连接] 创建环境...")
@@ -71,6 +79,11 @@ def run_simulation():
         # 持续运行仿真（不限制步数）
         step = 0
         while True:
+            # 处理pygame事件
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    raise KeyboardInterrupt
+            
             # 同步CARLA帧（关键优化：保证控制时序稳定）
             env.world.tick()
             
@@ -100,6 +113,8 @@ def run_simulation():
         if env is not None:
             print("\n[资源清理] 销毁资源...")
             env.close()
+        # 退出pygame
+        pygame.quit()
         print("\n[程序退出]")
 
 if __name__ == "__main__":
