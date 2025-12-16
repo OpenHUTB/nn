@@ -19,6 +19,7 @@ import tensorflow.keras.backend as backend
 from threading import Thread
 from Environment import *
 from Hyperparameters import *
+from TrainingStrategies import *
 
 
 # 自定义TensorBoard类
@@ -53,75 +54,14 @@ class ModifiedTensorBoard(TensorBoard):
                 self.writer.flush()
 
 
-# 优先经验回放缓冲区
-class PrioritizedReplayBuffer:
-    def __init__(self, max_size=REPLAY_MEMORY_SIZE, alpha=0.6, beta_start=0.4, beta_frames=100000):
-        self.max_size = max_size
-        self.alpha = alpha  # 优先级程度 (0 = 均匀采样, 1 = 完全优先级)
-        self.beta_start = beta_start  # 重要性采样权重起始值
-        self.beta_frames = beta_frames  # beta线性增长的帧数
-        self.frame = 1
-        
-        # 使用循环缓冲区
-        self.buffer = deque(maxlen=max_size)
-        self.priorities = deque(maxlen=max_size)
-        
-    def __len__(self):
-        return len(self.buffer)
-    
-    def beta(self):
-        """线性递增的beta值，用于重要性采样权重"""
-        return min(1.0, self.beta_start + self.frame * (1.0 - self.beta_start) / self.beta_frames)
-    
-    def add(self, experience, error=None):
-        """添加经验到缓冲区"""
-        if error is None:
-            priority = max(self.priorities) if self.priorities else 1.0
-        else:
-            priority = (abs(error) + 1e-5) ** self.alpha
-            
-        self.buffer.append(experience)
-        self.priorities.append(priority)
-        
-    def sample(self, batch_size):
-        """从缓冲区中采样一批经验"""
-        if len(self.buffer) == 0:
-            return [], [], [], []
-            
-        # 计算采样概率
-        priorities = np.array(self.priorities, dtype=np.float32)
-        probs = priorities ** self.alpha
-        probs /= probs.sum()
-        
-        # 采样索引
-        indices = np.random.choice(len(self.buffer), batch_size, p=probs)
-        
-        # 获取样本
-        samples = [self.buffer[i] for i in indices]
-        
-        # 计算重要性采样权重
-        total = len(self.buffer)
-        weights = (total * probs[indices]) ** (-self.beta())
-        weights /= weights.max()  # 归一化
-        
-        # 更新帧计数器
-        self.frame += 1
-        
-        return indices, samples, weights
-    
-    def update_priorities(self, indices, errors):
-        """更新采样经验的优先级"""
-        for idx, error in zip(indices, errors):
-            if 0 <= idx < len(self.priorities):
-                self.priorities[idx] = (abs(error) + 1e-5) ** self.alpha
-
-
-# DQN智能体类 - 升级版
+# DQN智能体类 - 升级版（整合训练策略）
 class DQNAgent:
-    def __init__(self, use_dueling=True, use_per=True):
+    def __init__(self, use_dueling=True, use_per=True, use_curriculum=True, use_multi_objective=True):
         # 创建主网络和目标网络
         self.use_dueling = use_dueling
         self.use_per = use_per
+        self.use_curriculum = use_curriculum
+        self.use_multi_objective = use_multi_objective
         
         if use_dueling:
             self.model = self.create_dueling_model()
@@ -141,12 +81,29 @@ class DQNAgent:
         # 自定义TensorBoard
         self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{MODEL_NAME}-{int(time.time())}")
         self.target_update_counter = 0  # 目标网络更新计数器
-        self.graph = tf.compat.v1.get_default_graph()
 
         # 训练控制标志
         self.terminate = False
         self.last_logged_episode = 0
         self.training_initialized = False
+        
+        # 训练策略组件
+        self.curriculum_manager = None
+        self.multi_objective_optimizer = None
+        self.imitation_manager = None
+        
+    def setup_training_strategies(self, env=None):
+        """设置训练策略组件"""
+        if self.use_curriculum and env:
+            self.curriculum_manager = CurriculumManager(env)
+            print("课程学习管理器已启用")
+        
+        if self.use_multi_objective:
+            self.multi_objective_optimizer = MultiObjectiveOptimizer()
+            print("多目标优化器已启用")
+        
+        # 模仿学习管理器（需要时手动启用）
+        self.imitation_manager = ImitationLearningManager()
 
     def create_model(self):
         """创建标准深度Q网络模型"""
@@ -244,7 +201,6 @@ class DQNAgent:
         advantage = Dense(5, activation='linear', name='advantage')(advantage_stream)
         
         # 合并: Q(s,a) = V(s) + (A(s,a) - mean(A(s,a)))
-        # 减去均值使得优势函数的均值为0
         mean_advantage = Lambda(lambda a: tf.reduce_mean(a, axis=1, keepdims=True))(advantage)
         advantage_centered = Subtract()([advantage, mean_advantage])
         q_values = Add()([value, advantage_centered])
