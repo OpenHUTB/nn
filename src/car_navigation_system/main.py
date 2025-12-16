@@ -288,9 +288,13 @@ class ImprovedNeuralController:
         ]
         return torch.tensor(state_data, device=self.device).unsqueeze(0)
 
+
     # 在 ImprovedNeuralController 类的 apply_obstacle_avoidance 方法中，修改以下部分：
     def apply_obstacle_avoidance(self, throttle, brake, steer, obstacle_info, speed):
         """应用避障逻辑 - 优化版本"""
+
+    def apply_obstacle_avoidance(self, throttle, brake, steer, obstacle_info, speed):
+
         if not obstacle_info['has_obstacle']:
             return throttle, brake, steer
 
@@ -300,11 +304,16 @@ class ImprovedNeuralController:
         # 紧急情况：前方有近距离障碍物
         if distance < self.emergency_brake_distance:
             print(f"紧急刹车！距离障碍物: {distance:.1f}m")
+
             return 0.0, 1.0, 0.0  # 紧急情况下保持直行，只刹车
+
+            return 0.0, 1.0, steer  # 全力刹车
+
 
         # 中距离障碍物：减速并准备转向
         elif distance < self.safe_following_distance:
             # 计算安全速度比例
+
             safe_speed_ratio = (distance - 3.0) / (self.safe_following_distance - 3.0)
             safe_speed_ratio = max(0.1, min(1.0, safe_speed_ratio))
 
@@ -337,6 +346,33 @@ class ImprovedNeuralController:
             if abs(angle) < 20:
                 avoid_steer = 0.15 if angle >= 0 else -0.15
                 steer = 0.9 * steer + 0.1 * avoid_steer
+
+            safe_speed_ratio = (distance - 2.0) / (self.safe_following_distance - 2.0)
+            safe_speed_ratio = max(0.1, min(1.0, safe_speed_ratio))
+
+            # 如果当前速度过高，减速
+            if speed > 5.0 * safe_speed_ratio:
+                throttle = 0.0
+                brake = 0.3
+
+            # 如果障碍物在正前方，尝试轻微转向避开
+            if abs(angle) < 10:  # 正前方±10度内
+                # 根据障碍物距离决定转向幅度
+                avoid_steer = 0.5 if angle >= 0 else -0.5
+                # 平滑转向
+                steer = 0.7 * steer + 0.3 * avoid_steer
+
+        # 远距离障碍物：轻微调整
+        elif distance < 20.0:
+            # 轻微减速
+            if speed > 10.0:
+                throttle *= 0.8
+
+            # 如果障碍物在正前方，轻微转向
+            if abs(angle) < 15:
+                avoid_steer = 0.2 if angle >= 0 else -0.2
+                steer = 0.8 * steer + 0.2 * avoid_steer
+
 
         return throttle, brake, steer
 
