@@ -75,3 +75,20 @@ SUCCESSFUL_THRESHOLD = 3
 
 LEARNING_RATE = 0.00005
 # 优化器的学习率 - 降低以获得更稳定训练
+
+# PER (优先经验回放) 参数
+PER_ALPHA = 0.6
+# 优先级程度 (0 = 均匀采样, 1 = 完全优先级)
+
+PER_BETA_START = 0.4
+# 重要性采样权重起始值
+
+PER_BETA_FRAMES = 100000
+# beta线性增长的帧数
+
+# Dueling DQN 参数
+USE_DUELING = True
+# 是否使用Dueling DQN架构
+
+USE_PER = True
+# 是否使用优先经验回放
