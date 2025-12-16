@@ -1,5 +1,5 @@
-opencv-python>=4.5.0
 mediapipe>=0.8.0
+opencv-python>=4.5.0
 numpy>=1.19.0
-tflite-runtime>=2.5.0  # 用于TFLite模型推理
-airsim>=1.8.0  # AirSim Python客户端
+tensorflow==2.10.0
+tflite-runtime>=2.5.0
