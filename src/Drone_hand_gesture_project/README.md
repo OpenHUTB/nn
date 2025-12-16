@@ -1,12 +1,18 @@
 # 通过手势来控制无人机行动
 
 ### 运行目录结构
-gesture_drone_project/
-├── main.py # 主程序入口
-├── gesture_detector.py # 手势检测模块
-├── drone_controller.py # 无人机控制模块
-├── requirements.txt # 依赖包列表
-└── README.md # 项目说明
+    ```text
+    Drone_hand_gesture_project/
+    ├── main.py                    # 主程序
+    ├── drone_controller.py        # 无人机控制
+    ├── simulation_3d.py          # 3D仿真
+    ├── gesture_detector.py       # 基础手势检测器
+    ├── gesture_data_collector.py         # 手势图像数据收集
+    ├── dataset/                  # 数据集目录
+    │   ├── raw/                  # 原始数据
+    │   ├── processed/            # 处理后的数据
+    │   └── models/               # 训练好的模型
+    └──  requirements.txt          # 依赖列表
 
 ### 运行步骤(在ubuntu或是xubuntu下)
 1. 进入项目目录：
