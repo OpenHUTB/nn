@@ -1,4 +1,7 @@
 # main.py
+import matplotlib
+matplotlib.use('Agg')  # 必须在最前，禁用 GUI 后端
+
 from ui_handler import UIHandler
 from config import Config
 
