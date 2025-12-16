@@ -254,7 +254,7 @@ if __name__ == '__main__':
     # print('模型已加载')
 
     # 第三步：模拟无人机实时图像输入
-    drone_image_folder = r"C:\Users\hyq52\Desktop\P1\potoh"
+    drone_image_folder = r".\driverless_car\data\potoh"
     if not os.path.exists(drone_image_folder):
         os.makedirs(drone_image_folder)
         print(f'已创建文件夹：{drone_image_folder}，请放入测试图片后重新运行！')
