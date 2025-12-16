@@ -15,11 +15,13 @@ import tensorflow.keras.backend as backend
 from threading import Thread
 
 from tqdm import tqdm
+import pickle
 
 import Hyperparameters
 from Environment import *
 from Model import *
 from Hyperparameters import *
+from TrainingStrategies import *
 
 def extended_reward_calculation(env, action, reward, done, step_info):
     """
@@ -89,11 +91,6 @@ def extended_reward_calculation(env, action, reward, done, step_info):
 if __name__ == '__main__':
     FPS = 60  # 帧率
     ep_rewards = [-200]  # 存储每轮奖励
-
-    # 为了结果可重复性（注释掉）
-    # random.seed(1)
-    # np.random.seed(1)
-    # tf.compat.v1.set_random_seed(1)
 
     # GPU内存配置，主要用于多智能体训练
     gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=MEMORY_FRACTION)
@@ -186,8 +183,6 @@ if __name__ == '__main__':
         # 应用课程学习配置
         if agent.curriculum_manager:
             config = agent.curriculum_manager.get_current_config()
-            # 这里可以根据配置调整环境难度
-            # 例如：调整行人数量、速度等
             print(f"课程学习 - 阶段 {agent.curriculum_manager.current_stage}: "
                   f"行人(十字路口={config['pedestrian_cross']}, 普通={config['pedestrian_normal']})")
             curriculum_stages.append(agent.curriculum_manager.current_stage)
