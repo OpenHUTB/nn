@@ -29,7 +29,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## 📁 项目结构
+## 项目结构
 
 ```
 ├── main.py                    # 主程序入口
@@ -42,7 +42,7 @@ python main.py
 └── requirements.txt           # 依赖包列表
 ```
 
-## 🎯 核心功能
+## 核心功能
 
 ### 1. 自定义轨迹规划
 使用 `get_location.py` 获取当前摄像头坐标，配置到 `config.py`:
@@ -64,7 +64,7 @@ TRAJECTORIES = {
 ### 3. 行人模拟
 - `pedestrians_1.py` - 随机行人生成（模式1）
 - `pedestrians_2.py` - 随机行人生成（模式2）
-## 🔧 配置说明
+## 配置说明
 
 ### 关键配置文件
 `config.py` 包含所有可调整参数：
@@ -72,7 +72,7 @@ TRAJECTORIES = {
 - 深度学习模型参数
 - 仿真环境设置
 
-## 🤝 参考项目
+## 参考项目
 本项目参考自: [varunpratap222/Autonomous-Vehicle-Navigation-Using-Deep-Learning](https://github.com/varunpratap222/Autonomous-Vehicle-Navigation-Using-Deep-Learning.git)
 
 ## 📝 注意事项
