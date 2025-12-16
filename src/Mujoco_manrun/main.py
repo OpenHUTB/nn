@@ -1,221 +1,437 @@
-# 导入必要的库
-import mujoco  # 导入MuJoCo物理仿真引擎核心库
-import numpy as np  # 导入NumPy库，用于高效的数值计算，特别是数组操作
-from mujoco import viewer  # 从MuJoCo导入viewer模块，用于创建交互式可视化窗口
-import time  # 导入time模块，用于控制仿真速度和等待时间
+import mujoco
+import numpy as np
+from mujoco import viewer
+import time
+import os
 
 
-# 人形机器人行走控制器类
-class HumanoidWalker:
-    """
-    一个封装了人形机器人行走控制逻辑的类。
-    它负责加载模型、生成步态、计算控制力矩、运行仿真和可视化。
-    """
+class G1Stabilizer:
+    """修复踮脚后仰的G1机器人稳定站立控制器（新增行走功能）"""
 
     def __init__(self, model_path):
-        """
-        类的初始化方法，在创建类的实例时自动调用。
-
-        :param model_path: 字符串类型，指向机器人模型XML文件的路径。
-        """
-        # 强制确认传入的路径是字符串类型，避免因路径类型错误导致后续加载失败
+        # 类型检查与模型加载
         if not isinstance(model_path, str):
-            # 如果不是字符串，抛出类型错误异常
             raise TypeError(f"模型路径必须是字符串，当前是 {type(model_path)} 类型")
 
-        # 尝试从指定路径加载并编译MuJoCo模型
         try:
-            # 从XML文件路径加载模型，返回一个MjModel对象，包含了机器人的所有物理和几何信息
             self.model = mujoco.MjModel.from_xml_path(model_path)
-            # 创建一个与模型关联的MjData对象，用于存储仿真过程中的所有动态状态（如位置、速度、力等）
             self.data = mujoco.MjData(self.model)
         except Exception as e:
-            # 如果加载过程中出现任何错误，抛出运行时错误，并给出排查建议
-            raise RuntimeError(f"模型加载失败：{e}\n请检查：1.路径是否为字符串 2.文件是否存在 3.文件是否完整")
+            raise RuntimeError(f"模型加载失败：{e}\n请检查路径和文件完整性")
 
-        # 设置仿真相关的参数
-        self.sim_duration = 20.0  # 设定仿真的总时长，单位为秒
-        self.dt = self.model.opt.timestep  # 获取模型中定义的仿真步长，单位为秒。这是物理世界更新一次的时间
-        self.init_wait_time = 1.0  # 设定仿真开始前的等待时间，单位为秒，用于让可视化窗口稳定显示初始状态
+        # 仿真核心参数（强化稳定性）
+        self.sim_duration = 120.0
+        self.dt = 0.001
+        self.model.opt.timestep = self.dt
+        self.init_wait_time = 4.0  # 延长初始稳定时间
+        self.model.opt.gravity[2] = -9.81
+        self.model.opt.iterations = 200
+        self.model.opt.tolerance = 1e-8
 
-        # 设置PID控制器的参数
-        self.kp = 30.0  # 比例增益 (Proportional Gain)，用于快速响应当前的位置误差
-        self.ki = 0.01  # 积分增益 (Integral Gain)，用于消除长期存在的静差（稳态误差）
-        self.kd = 5.0  # 微分增益 (Derivative Gain)，用于抑制系统震荡，提高稳定性
+        # 关节名称映射
+        self.joint_names = [
+            # 左腿关节
+            "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
+            "left_knee_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
+            # 右腿关节
+            "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
+            "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint",
+            # 腰部关节
+            "waist_yaw_joint",
+            # 左臂关节
+            "left_shoulder_pitch_joint", "left_shoulder_roll_joint",
+            "left_shoulder_yaw_joint", "left_elbow_joint", "left_wrist_roll_joint",
+            # 右臂关节
+            "right_shoulder_pitch_joint", "right_shoulder_roll_joint",
+            "right_shoulder_yaw_joint", "right_elbow_joint", "right_wrist_roll_joint"
+        ]
 
-        # 初始化PID控制器所需的状态变量，用于存储历史误差信息
-        # self.model.nu 是机器人可驱动关节的数量
-        self.joint_errors = np.zeros(self.model.nu)  # 存储上一次的关节位置误差
-        self.joint_integrals = np.zeros(self.model.nu)  # 存储关节位置误差的积分值
+        self.joint_name_to_idx = {name: i for i, name in enumerate(self.joint_names)}
+        self.num_joints = len(self.joint_names)
 
-        # 将模型的所有数据重置到其初始状态（如初始位置、速度为零等）
+        # 关键修复：PD增益（抑制踮脚/后仰）
+        self.kp_roll = 120.0  # 降低侧倾增益，避免过度修正
+        self.kd_roll = 40.0  # 提高侧倾阻尼
+        self.kp_pitch = 100.0  # 大幅降低俯仰增益（核心：防止后仰）
+        self.kd_pitch = 35.0  # 提高俯仰阻尼
+        self.kp_yaw = 30.0
+        self.kd_yaw = 15.0
+
+        # 腿部关节增益（重点优化踝关节）
+        self.kp_hip = 250.0  # 【增大】髋关节增益，确保有足够力矩迈步
+        self.kd_hip = 45.0  # 提高髋关节阻尼
+        self.kp_knee = 280.0  # 【增大】膝关节增益
+        self.kd_knee = 50.0
+        self.kp_ankle = 200.0  # 提高踝关节比例增益（防止踮脚）
+        self.kd_ankle = 60.0  # 大幅提高踝关节阻尼（核心：抑制踮脚）
+
+        # 腰部/手臂增益（几乎固定）
+        self.kp_waist = 40.0
+        self.kd_waist = 20.0
+        self.kp_arm = 20.0
+        self.kd_arm = 20.0
+
+        # 重心目标（核心修复：前移+降低重心）
+        self.com_target = np.array([0.05, 0.0, 0.78])  # 重心前移5cm，高度降至0.78m
+        self.kp_com = 50.0  # 降低重心补偿，避免过度修正
+        self.foot_contact_threshold = 1.5  # 降低接触阈值，提高检测灵敏度
+
+        # 状态变量
+        self.joint_targets = np.zeros(self.num_joints)
+        self.prev_com = np.zeros(3)
+        self.foot_contact = np.zeros(2)
+        self.integral_roll = 0.0
+        self.integral_pitch = 0.0
+        self.integral_limit = 0.15  # 进一步收紧积分限幅
+
+        # 【行走功能新增】步态参数（核心：增大偏移量确保动作明显）
+        self.gait_phase = 0.0  # 步态相位（0-1循环）
+        self.gait_cycle = 2.0  # 步态周期（秒，放慢周期让动作更明显）
+        self.step_offset_hip = 0.8  # 髋关节俯仰偏移量（【大幅增大】原0.1→0.8）
+        self.step_offset_knee = 1.2  # 膝关节偏移量（【大幅增大】原0.4→1.2）
+        self.step_offset_ankle = 0.5  # 踝关节偏移量
+        self.walk_start_time = None  # 行走开始时间标记
+
+        # 初始化稳定姿态（核心修复：关节角度）
+        self._init_stable_pose()
+
+    def _init_stable_pose(self):
+        """修复：调整关节角度，让脚掌完全落地，重心前移"""
         mujoco.mj_resetData(self.model, self.data)
-        # 执行一次前向动力学计算，根据当前状态更新所有派生量（如世界坐标系下的位置、 Jacobian 等）
+
+        # 躯干初始位置（更低+更稳）
+        self.data.qpos[2] = 0.78  # 初始高度匹配重心目标
+        self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
+        self.data.qvel[:] = 0.0
+        self.data.xfrc_applied[:] = 0.0
+
+        # 核心修复：腿部关节角度（避免踮脚/后仰）
+        # 左腿关节（脚掌完全落地，无背屈）
+        self.joint_targets[self.joint_name_to_idx["left_hip_pitch_joint"]] = 0.1  # 降低髋俯仰，避免重心后移
+        self.joint_targets[self.joint_name_to_idx["left_hip_roll_joint"]] = 0.02
+        self.joint_targets[self.joint_name_to_idx["left_hip_yaw_joint"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["left_knee_joint"]] = -0.4  # 膝盖稍弯，增加缓冲
+        self.joint_targets[self.joint_name_to_idx["left_ankle_pitch_joint"]] = 0.0  # 踝关节0度，脚掌完全落地（核心）
+        self.joint_targets[self.joint_name_to_idx["left_ankle_roll_joint"]] = 0.0
+
+        # 右腿关节（镜像左腿）
+        self.joint_targets[self.joint_name_to_idx["right_hip_pitch_joint"]] = 0.1
+        self.joint_targets[self.joint_name_to_idx["right_hip_roll_joint"]] = -0.02
+        self.joint_targets[self.joint_name_to_idx["right_hip_yaw_joint"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["right_knee_joint"]] = -0.4
+        self.joint_targets[self.joint_name_to_idx["right_ankle_pitch_joint"]] = 0.0  # 踝关节0度（核心）
+        self.joint_targets[self.joint_name_to_idx["right_ankle_roll_joint"]] = 0.0
+
+        # 腰部/手臂（固定）
+        self.joint_targets[self.joint_name_to_idx["waist_yaw_joint"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["left_shoulder_pitch_joint"]] = 0.6
+        self.joint_targets[self.joint_name_to_idx["left_elbow_joint"]] = 1.8
+        self.joint_targets[self.joint_name_to_idx["right_shoulder_pitch_joint"]] = 0.6
+        self.joint_targets[self.joint_name_to_idx["right_elbow_joint"]] = 1.8
+
         mujoco.mj_forward(self.model, self.data)
 
-    def get_gait_trajectory(self, t):
-        """
-        根据当前仿真时间t，生成一个目标步态轨迹（即每个关节的期望角度）。
-        这是一个基于正弦函数的简单步态生成器。
+    def _quat_to_euler_xyz(self, quat):
+        """纯Numpy四元数转欧拉角"""
+        w, x, y, z = quat
+        # Roll (X)
+        sinr_cosp = 2 * (w * x + y * z)
+        cosr_cosp = 1 - 2 * (x * x + y * y)
+        roll = np.arctan2(sinr_cosp, cosr_cosp)
+        # Pitch (Y)
+        sinp = 2 * (w * y - z * x)
+        pitch = np.where(np.abs(sinp) >= 1, np.copysign(np.pi / 2, sinp), np.arcsin(sinp))
+        # Yaw (Z)
+        siny_cosp = 2 * (w * z + x * y)
+        cosy_cosp = 1 - 2 * (y * y + z * z)
+        yaw = np.arctan2(siny_cosp, cosy_cosp)
+        return np.array([roll, pitch, yaw])
 
-        :param t: 当前的仿真时间，单位为秒。
-        :return: 一个NumPy数组，包含了每个可驱动关节的目标角度（弧度）。
-        """
-        # 在仿真开始的前2秒，让机器人保持初始的零角度姿势，不进行任何动作
-        if t < 2.0:
-            return np.zeros(self.model.nu)  # 返回一个全为零的数组作为目标
+    def _get_root_euler(self):
+        """提取躯干欧拉角"""
+        quat = self.data.qpos[3:7].astype(np.float64).copy()
+        euler = self._quat_to_euler_xyz(quat)
+        euler = np.mod(euler + np.pi, 2 * np.pi) - np.pi
+        return np.clip(euler, -0.3, 0.3)  # 进一步限制最大倾角
 
-        # 从第2秒开始，调整时间基准，使得步态周期从0开始计算
-        t_adjusted = t - 2.0
-        cycle = t_adjusted % 1.5  # 设定步态周期为1.5秒，计算当前时间处于哪个周期内
-        phase = 2 * np.pi * cycle / 1.5  # 将周期转换为相位（0到2π之间），用于正弦函数
+    def _detect_foot_contact(self):
+        """优化接触检测，确保脚掌落地判定准确"""
+        try:
+            left_foot_geoms = ["left_foot_1_col", "left_foot_2_col", "left_foot_3_col", "left_foot_4_col"]
+            right_foot_geoms = ["right_foot_1_col", "right_foot_2_col", "right_foot_3_col", "right_foot_4_col"]
 
-        # 定义步态中各个关节的摆动幅度（最大角度）
-        leg_amp = 0.3  # 腿部关节的摆动幅度
-        arm_amp = 0.2  # 手臂关节的摆动幅度
-        torso_amp = 0.05  # 躯干关节的摆动幅度
+            left_force = 0.0
+            for geom_name in left_foot_geoms:
+                geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+                force = np.zeros(6, dtype=np.float64)
+                mujoco.mj_contactForce(self.model, self.data, geom_id, force)
+                left_force += np.linalg.norm(force[:3])
 
-        # 初始化一个全为零的目标关节角度数组
-        target = np.zeros(self.model.nu)
+            right_force = 0.0
+            for geom_name in right_foot_geoms:
+                geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+                force = np.zeros(6, dtype=np.float64)
+                mujoco.mj_contactForce(self.model, self.data, geom_id, force)
+                right_force += np.linalg.norm(force[:3])
 
-        # 假设模型中腿部关节从索引5开始（这取决于你的XML模型定义）
-        leg_joint_offset = 5
-        # 检查目标数组长度是否足够容纳腿部关节
-        if len(target) > leg_joint_offset + 5:
-            # 为左右腿的髋、膝、踝关节设置目标角度
-            # 通过不同相位的正弦函数组合，模拟出腿部的摆动和蹬地动作
-            target[leg_joint_offset] = -leg_amp * np.sin(phase)
-            target[leg_joint_offset + 1] = leg_amp * 1.5 * np.sin(phase + np.pi)
-            target[leg_joint_offset + 2] = leg_amp * 0.5 * np.sin(phase)
-            target[leg_joint_offset + 3] = -leg_amp * np.sin(phase + np.pi)
-            target[leg_joint_offset + 4] = leg_amp * 1.5 * np.sin(phase)
-            target[leg_joint_offset + 5] = leg_amp * 0.5 * np.sin(phase + np.pi)
+            # 迟滞优化：防止接触状态频繁切换
+            self.foot_contact[1] = 1 if left_force > self.foot_contact_threshold else 0
+            self.foot_contact[0] = 1 if right_force > self.foot_contact_threshold else 0
 
-        # 为躯干和手臂关节设置目标角度，以协调行走姿态，保持平衡
-        if len(target) > 0:
-            target[0] = torso_amp * np.sin(phase + np.pi / 2)
-        if len(target) > 16:
-            target[16] = arm_amp * np.sin(phase + np.pi)
-        if len(target) > 20:
-            target[20] = arm_amp * np.sin(phase)
+        except Exception as e:
+            print(f"接触检测警告: {e}")
+            self.foot_contact = np.ones(2)
 
-        # 返回计算好的目标关节角度数组
-        return target
+    # 【行走功能新增】更新步态相位
+    def _update_gait_phase(self):
+        """更新步态相位，确保初始稳定后触发行走"""
+        if self.walk_start_time is None:
+            self.walk_start_time = self.data.time  # 标记行走开始时间
+        # 计算归一化步态相位（0-1循环）
+        self.gait_phase = (self.data.time - self.walk_start_time) % self.gait_cycle / self.gait_cycle
 
-    def pid_controller(self, target_pos):
-        """
-        PID控制器的核心计算函数。根据当前关节位置和目标位置，计算出每个关节需要施加的力矩。
+    # 【行走功能新增】生成行走的关节目标角度
+    def _update_walk_joint_targets(self):
+        """基于步态相位更新关节目标角度（核心行走逻辑）"""
+        # 仅在初始稳定期结束后启动行走
+        if self.data.time < self.init_wait_time:
+            return  # 初始稳定期不修改目标角度
 
-        :param target_pos: 目标关节位置数组（弧度）。
-        :return: 计算出的关节控制力矩数组（牛顿·米）。
-        """
-        # 从仿真数据中获取当前关节的实际位置。
-        # self.data.qpos 包含了所有自由度的位置（7个根节点自由度 + 关节自由度）
-        # [7:] 切片操作，跳过前7个根节点自由度，获取所有关节的位置
-        current_pos = self.data.qpos[7:]
+        self._update_gait_phase()
+        phase = self.gait_phase  # 0-1
 
-        # 安全检查：确保目标位置数组和当前位置数组长度一致
-        if len(current_pos) != len(target_pos):
-            # 如果不一致，返回一个全为零的力矩数组，防止程序崩溃
-            return np.zeros_like(target_pos)
+        # ========== 左腿/右腿交替摆动逻辑 ==========
+        if phase < 0.5:
+            # 0-0.5周期：右腿摆动（向前迈），左腿支撑
+            # 右腿髋关节：向前摆（正弦曲线，0→最大值→0）
+            right_hip_pitch = 0.1 + self.step_offset_hip * np.sin(phase * 2 * np.pi)
+            # 右腿膝关节：弯曲抬腿（正弦曲线，0→最小值→0）
+            right_knee = -0.4 - self.step_offset_knee * np.sin(phase * 2 * np.pi)
+            # 右腿踝关节：协调（随膝关节联动）
+            right_ankle = 0.0 + self.step_offset_ankle * np.sin(phase * 2 * np.pi)
 
-        # 1. 计算比例项 (P)
-        # error 是一个数组，每个元素代表对应关节的目标位置与当前位置的差值
-        error = target_pos - current_pos
+            # 更新右腿目标角度
+            self.joint_targets[self.joint_name_to_idx["right_hip_pitch_joint"]] = right_hip_pitch
+            self.joint_targets[self.joint_name_to_idx["right_knee_joint"]] = right_knee
+            self.joint_targets[self.joint_name_to_idx["right_ankle_pitch_joint"]] = right_ankle
 
-        # 2. 计算积分项 (I)
-        # 将当前误差乘以时间步dt，累加到积分误差数组上
-        self.joint_integrals += error * self.dt
-        # 对积分值进行限幅（clipping），防止积分饱和导致控制器失控
-        self.joint_integrals = np.clip(self.joint_integrals, -2.0, 2.0)
+            # 左腿保持支撑姿态（小幅调整平衡）
+            self.joint_targets[self.joint_name_to_idx["left_hip_pitch_joint"]] = 0.1 - self.step_offset_hip * 0.2
+            self.joint_targets[self.joint_name_to_idx["left_knee_joint"]] = -0.4 + self.step_offset_knee * 0.1
+        else:
+            # 0.5-1.0周期：左腿摆动（向前迈），右腿支撑
+            # 左腿髋关节：向前摆
+            left_hip_pitch = 0.1 + self.step_offset_hip * np.sin((phase - 0.5) * 2 * np.pi)
+            # 左腿膝关节：弯曲抬腿
+            left_knee = -0.4 - self.step_offset_knee * np.sin((phase - 0.5) * 2 * np.pi)
+            # 左腿踝关节：协调
+            left_ankle = 0.0 + self.step_offset_ankle * np.sin((phase - 0.5) * 2 * np.pi)
 
-        # 3. 计算微分项 (D)
-        # 微分项是误差的变化率，即 (当前误差 - 上次误差) / 时间步
-        derivative = (error - self.joint_errors) / self.dt if self.dt != 0 else 0
+            # 更新左腿目标角度
+            self.joint_targets[self.joint_name_to_idx["left_hip_pitch_joint"]] = left_hip_pitch
+            self.joint_targets[self.joint_name_to_idx["left_knee_joint"]] = left_knee
+            self.joint_targets[self.joint_name_to_idx["left_ankle_pitch_joint"]] = left_ankle
 
-        # 更新上次误差记录，为下一次计算微分项做准备
-        self.joint_errors = error.copy()
+            # 右腿保持支撑姿态
+            self.joint_targets[self.joint_name_to_idx["right_hip_pitch_joint"]] = 0.1 - self.step_offset_hip * 0.2
+            self.joint_targets[self.joint_name_to_idx["right_knee_joint"]] = -0.4 + self.step_offset_knee * 0.1
 
-        # 4. 计算PID总输出力矩
-        torque = self.kp * error + self.ki * self.joint_integrals + self.kd * derivative
+    def _calculate_stabilizing_torques(self):
+        """优化力矩计算，抑制踮脚/后仰 + 集成行走控制"""
+        # 【新增】先更新行走的关节目标角度
+        self._update_walk_joint_targets()
 
-        # 对计算出的力矩进行限幅，防止超过电机或关节的最大承受能力
-        return np.clip(torque, -5.0, 5.0)
+        torques = np.zeros(self.num_joints, dtype=np.float64)
 
-    def simulate_with_visualization(self):
-        """
-        启动带可视化的仿真主循环。这是整个程序的核心执行部分。
-        """
-        # 使用viewer.launch_passive创建一个被动模式的可视化窗口。
-        # "被动"意味着我们需要手动调用v.sync()来更新画面，这给了我们对仿真循环的完全控制。
-        # 这是一个上下文管理器（with语句），确保窗口能被正确关闭。
+        # 1. 躯干姿态控制（更保守）
+        root_euler = self._get_root_euler()
+        root_vel = self.data.qvel[3:6].astype(np.float64).copy()
+        root_vel = np.clip(root_vel, -3.0, 3.0)  # 严格限制躯干角速度
+
+        roll_error = -root_euler[0]
+        self.integral_roll += roll_error * self.dt
+        self.integral_roll = np.clip(self.integral_roll, -self.integral_limit, self.integral_limit)
+        roll_torque = self.kp_roll * roll_error + self.kd_roll * (-root_vel[0]) + 5.0 * self.integral_roll
+
+        pitch_error = -root_euler[1]
+        self.integral_pitch += pitch_error * self.dt
+        self.integral_pitch = np.clip(self.integral_pitch, -self.integral_limit, self.integral_limit)
+        pitch_torque = self.kp_pitch * pitch_error + self.kd_pitch * (-root_vel[1]) + 4.0 * self.integral_pitch
+
+        yaw_error = -root_euler[2]
+        yaw_torque = self.kp_yaw * yaw_error + self.kd_yaw * (-root_vel[2])
+
+        torso_torque = np.array([roll_torque, pitch_torque, yaw_torque])
+        torso_torque = np.clip(torso_torque, -30.0, 30.0)  # 降低躯干修正力矩上限
+
+        # 2. 重心补偿（更柔和）
+        com = self.data.subtree_com[0].astype(np.float64).copy()
+        com_error = self.com_target - com
+        com_error = np.clip(com_error, -0.03, 0.03)
+        com_compensation = self.kp_com * com_error
+
+        # 3. 关节控制（重点优化踝关节）
+        self._detect_foot_contact()
+        current_joints = self.data.qpos[7:7 + self.num_joints].astype(np.float64)
+        current_vel = self.data.qvel[6:6 + self.num_joints].astype(np.float64)
+        current_vel = np.clip(current_vel, -8.0, 8.0)  # 限制关节速度
+
+        # 腿部关节控制
+        leg_joints = [
+            "left_hip_pitch_joint", "left_hip_roll_joint", "left_hip_yaw_joint",
+            "left_knee_joint", "left_ankle_pitch_joint", "left_ankle_roll_joint",
+            "right_hip_pitch_joint", "right_hip_roll_joint", "right_hip_yaw_joint",
+            "right_knee_joint", "right_ankle_pitch_joint", "right_ankle_roll_joint"
+        ]
+
+        for joint_name in leg_joints:
+            idx = self.joint_name_to_idx[joint_name]
+            joint_error = self.joint_targets[idx] - current_joints[idx]
+            joint_error = np.clip(joint_error, -0.3, 0.3)  # 【放宽】关节误差限制，允许更大动作
+
+            # 关节增益匹配
+            if "hip" in joint_name:
+                kp = self.kp_hip
+                kd = self.kd_hip
+                # 核心：降低髋关节俯仰的姿态补偿，避免后仰
+                if "pitch" in joint_name:
+                    if "left" in joint_name:
+                        joint_error += torso_torque[1] * 0.02  # 大幅降低补偿系数
+                    else:
+                        joint_error += torso_torque[1] * 0.02
+
+            elif "knee" in joint_name:
+                kp = self.kp_knee
+                kd = self.kd_knee
+                joint_error += com_compensation[2] * 0.05
+
+            elif "ankle" in joint_name:
+                kp = self.kp_ankle
+                kd = self.kd_ankle
+                # 核心：踝关节仅保留极小的姿态补偿，防止踮脚
+                if "pitch" in joint_name:
+                    joint_error += torso_torque[1] * 0.01  # 几乎无补偿
+
+            # 非支撑腿增益调整（【修改】摆动腿增益仅小幅降低，确保有力气摆动）
+            if ("left" in joint_name and self.foot_contact[1] == 0) or \
+                    ("right" in joint_name and self.foot_contact[0] == 0):
+                kp *= 0.8  # 原0.1→0.8，大幅提高摆动腿增益
+                kd *= 0.9
+
+            torques[idx] = kp * joint_error - kd * current_vel[idx]
+
+        # 腰部/手臂控制（几乎无动作）
+        waist_joint = "waist_yaw_joint"
+        idx = self.joint_name_to_idx[waist_joint]
+        joint_error = self.joint_targets[idx] - current_joints[idx]
+        torques[idx] = self.kp_waist * joint_error - self.kd_waist * current_vel[idx]
+
+        arm_joints = [
+            "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint",
+            "left_elbow_joint", "left_wrist_roll_joint", "right_shoulder_pitch_joint",
+            "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint",
+            "right_wrist_roll_joint"
+        ]
+        for joint_name in arm_joints:
+            idx = self.joint_name_to_idx[joint_name]
+            joint_error = self.joint_targets[idx] - current_joints[idx]
+            torques[idx] = self.kp_arm * joint_error - self.kd_arm * current_vel[idx]
+
+        # 力矩限幅（【放宽】腿部力矩限制，确保能驱动行走）
+        torque_limits = {
+            "left_hip_pitch_joint": 150, "left_hip_roll_joint": 150, "left_hip_yaw_joint": 150,  # 原70→150
+            "left_knee_joint": 200, "left_ankle_pitch_joint": 120, "left_ankle_roll_joint": 100,  # 原100→200
+            "right_hip_pitch_joint": 150, "right_hip_roll_joint": 150, "right_hip_yaw_joint": 150,
+            "right_knee_joint": 200, "right_ankle_pitch_joint": 120, "right_ankle_roll_joint": 100,
+            "waist_yaw_joint": 50,
+            "left_shoulder_pitch_joint": 10, "left_shoulder_roll_joint": 10,
+            "left_shoulder_yaw_joint": 10, "left_elbow_joint": 10, "left_wrist_roll_joint": 10,
+            "right_shoulder_pitch_joint": 10, "right_shoulder_roll_joint": 10,
+            "right_shoulder_yaw_joint": 10, "right_elbow_joint": 10, "right_wrist_roll_joint": 10
+        }
+        for joint_name, limit in torque_limits.items():
+            idx = self.joint_name_to_idx[joint_name]
+            torques[idx] = np.clip(torques[idx], -limit, limit)
+
+        # 【新增】调试输出：查看关键参数（确认行走逻辑在运行）
+        if self.data.time % 1 < 0.1 and self.data.time > self.init_wait_time:
+            print(f"=== 行走调试 ===")
+            print(f"步态相位: {self.gait_phase:.2f}")
+            print(f"右腿髋俯仰目标: {self.joint_targets[self.joint_name_to_idx['right_hip_pitch_joint']]:.2f}")
+            print(f"左腿髋俯仰目标: {self.joint_targets[self.joint_name_to_idx['left_hip_pitch_joint']]:.2f}")
+            print(f"右脚接触: {self.foot_contact[0]}, 左脚接触: {self.foot_contact[1]}")
+
+        self.prev_com = com
+        return torques
+
+    def simulate_stable_standing(self):
+        """运行稳定站立+行走仿真（原方法保留，新增行走逻辑）"""
         with viewer.launch_passive(self.model, self.data) as v:
-            print("可视化窗口已启动（前2秒保持静止，随后开始步行）")
-            print("操作：鼠标拖动旋转视角，滚轮缩放，W/A/S/D平移，关闭窗口结束")
+            # 优化相机视角
+            v.cam.distance = 3.0  # 拉远相机，方便看行走
+            v.cam.azimuth = 90
+            v.cam.elevation = -25
+            v.cam.lookat = [0, 0, 0.6]
 
-            # 初始等待阶段
-            start_time = time.time()  # 记录开始等待的时间
-            # 循环等待，直到等待时间超过设定的self.init_wait_time
+            print("G1机器人稳定站立+行走仿真启动...")
+            print(f"初始稳定{self.init_wait_time}秒后自动开始行走")
+
+            # 初始落地阶段（更强阻尼）
+            start_time = time.time()
             while time.time() - start_time < self.init_wait_time:
-                v.sync()  # 同步可视化窗口，更新一帧画面
-                time.sleep(0.01)  # 短暂休眠，降低CPU占用
+                alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
+                torques = self._calculate_stabilizing_torques() * alpha
+                self.data.ctrl[:] = torques
+                mujoco.mj_step(self.model, self.data)
+                self.data.qvel[:] *= 0.97  # 更强的速度衰减，防止初始后仰
+                v.sync()
+                time.sleep(self.dt)
 
-            # 仿真主循环
-            # 持续运行，直到仿真时间达到设定的总时长self.sim_duration
+            # 主仿真循环（行走阶段）
+            print("=== 开始行走 ===")
             while self.data.time < self.sim_duration:
-                # 1. 规划：根据当前仿真时间获取目标步态
-                target_joint_positions = self.get_gait_trajectory(self.data.time)
-
-                # 2. 控制：根据目标位置和当前位置，使用PID控制器计算控制力矩
-                control_torques = self.pid_controller(target_joint_positions)
-
-                # 3. 执行：将计算出的控制力矩赋值给机器人的执行器
-                self.data.ctrl[:] = control_torques
-
-                # 4. 步进：执行一步物理仿真。MuJoCo会根据当前状态和控制力矩计算下一个状态
+                torques = self._calculate_stabilizing_torques()
+                self.data.ctrl[:] = torques
                 mujoco.mj_step(self.model, self.data)
 
-                # 5. 可视化：同步可视化窗口，将新的仿真状态绘制出来
+                # 状态监测
+                if self.data.time % 2 < 0.1:
+                    com = self.data.subtree_com[0]
+                    euler = self._get_root_euler()
+                    print(
+                        f"时间:{self.data.time:.1f}s | 重心(x/z):{com[0]:.3f}/{com[2]:.3f}m | "
+                        f"姿态(roll/pitch):{euler[0]:.3f}/{euler[1]:.3f}rad | 脚接触:{self.foot_contact}"
+                    )
+
                 v.sync()
+                time.sleep(self.dt * 0.5)
 
-                # 6. 速度控制：短暂休眠，以控制仿真的实时速度，使其不至于过快
-                time.sleep(0.001)
+                # 跌倒判定
+                com = self.data.subtree_com[0]
+                euler = self._get_root_euler()
+                if com[2] < 0.4 or abs(euler[0]) > 0.6 or abs(euler[1]) > 0.6:
+                    print(
+                        f"跌倒！时间:{self.data.time:.1f}s | 重心(z):{com[2]:.3f}m | "
+                        f"最大倾角:{max(abs(euler[0]), abs(euler[1])):.3f}rad"
+                    )
+                    break
 
-        # 当仿真循环结束后（窗口关闭或时间到期），打印提示信息
         print("仿真完成！")
 
 
 if __name__ == "__main__":
-    # 这部分代码只有在当前脚本作为主程序直接运行时才会执行
-
-    # 1. 构建模型文件的完整路径
-    import os  # 导入os模块，用于处理文件路径
-
-    # os.path.abspath(__file__) 获取当前脚本的绝对路径
-    # os.path.dirname(...) 获取该路径的目录部分
     current_directory = os.path.dirname(os.path.abspath(__file__))
-    # os.path.join(...) 安全地拼接目录和文件名，跨平台兼容
-    model_file_path = os.path.join(current_directory, "humanoid.xml")
+    model_file_path = os.path.join(current_directory, "g1_23dof.xml")
 
-    # 2. 打印路径信息，方便用户排查路径问题
-    print(f"当前脚本所在目录：{current_directory}")
-    print(f"模型文件完整路径：{model_file_path}")
-
-    # 3. 检查模型文件是否存在
+    print(f"模型路径：{model_file_path}")
     if not os.path.exists(model_file_path):
-        # 如果文件不存在，抛出文件未找到异常
-        raise FileNotFoundError(
-            f"模型文件不存在！\n查找路径：{model_file_path}\n"
-            f"请确认 'humanoid.xml' 文件放在以下目录中：{current_directory}"
-        )
+        raise FileNotFoundError(f"模型文件不存在：{model_file_path}")
 
-    # 4. 实例化控制器并启动仿真
     try:
-        # 创建HumanoidWalker类的实例，并传入模型文件路径
-        walker = HumanoidWalker(model_file_path)
-        print("\n开始仿真...")
-        # 调用实例的simulate_with_visualization方法，启动仿真
-        walker.simulate_with_visualization()
+        stabilizer = G1Stabilizer(model_file_path)
+        stabilizer.simulate_stable_standing()  # 原方法不变，内部已集成行走
     except Exception as e:
-        # 如果在整个过程中发生任何未捕获的异常，打印错误信息
-        print(f"\n仿真过程中发生错误：{e}")
+        print(f"错误：{e}")
+        import traceback
+
+        traceback.print_exc()
