@@ -1,0 +1,5 @@
+__pycache__/
+assets/*
+!assets/.keep
+img/examples/*
+!img/examples/.keep
