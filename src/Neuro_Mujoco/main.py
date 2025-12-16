@@ -309,6 +309,7 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
                     if ctrl_range is not None:
                         action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2  # 核心映射：[-1,1]→[ctrl_min,ctrl_max] 线性缩放
                         action = np.clip(action, ctrl_range[:, 0], ctrl_range[:, 1])  # 强制裁剪，保证指令符合执行器物理极限
+                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2  # 核心映射：[-1,1]→[ctrl_min,ctrl_max] 线性缩放，保证指令符合执行器物理极限
                     
                     data.ctrl[:] = action
 

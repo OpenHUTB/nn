@@ -9,6 +9,7 @@ import tensorflow.keras.backend as backend
 from tensorflow.keras.models import load_model
 from Environment import CarEnv, MEMORY_FRACTION
 from Hyperparameters import *
+from TrainingStrategies import *
 import os
 import json
 import glob
