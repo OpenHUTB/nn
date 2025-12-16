@@ -67,6 +67,14 @@ class CarlaEnvironment(gym.Env):
         self.has_triggered_red = False    # 红灯触发标记
         self.has_triggered_green = False  # 绿灯触发标记
 
+        # ========== 新增：超速检测配置 ==========
+        self.speed_limit_urban = 30.0  # 城区限速（km/h）
+        self.speed_limit_highway = 50.0  # 高速/郊区限速（km/h）
+        self.over_speed_light_penalty = -1.0  # 轻度超速（超10km/h内）扣分/帧
+        self.over_speed_heavy_penalty = -3.0  # 重度超速（超10km/h以上）扣分/帧
+        self.last_over_speed_time = 0  # 上次超速扣分时间（避免刷屏）
+        self.over_speed_cooldown = 1.0  # 超速扣分冷却（1秒/次）
+
         # 出生点碰撞检测配置
         self.spawn_retry_times = 20
         self.spawn_safe_radius = 2.0
@@ -141,6 +149,44 @@ class CarlaEnvironment(gym.Env):
         if not has_near_light:
             self.has_triggered_red = False
             self.has_triggered_green = False
+
+        return reward
+
+    # ========== 新增：超速检测与惩罚 ==========
+    def _check_over_speed(self):
+        """
+        超速检测逻辑：
+        1. 将车辆速度从m/s转换为km/h（1 m/s = 3.6 km/h）
+        2. 区分城区/高速限速（默认按城区30km/h）
+        3. 轻度/重度超速分级惩罚，1秒冷却避免刷屏
+        """
+        current_time = time.time()
+        if current_time - self.last_over_speed_time < self.over_speed_cooldown:
+            return 0.0
+
+        if not self.vehicle or not self.vehicle.is_alive:
+            return 0.0
+
+        # 获取车辆速度（m/s）并转换为km/h
+        velocity = self.vehicle.get_velocity()
+        speed_m_s = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        speed_km_h = speed_m_s * 3.6
+
+        # 简化：默认按城区限速30km/h（可扩展为按车道/地图区分）
+        speed_limit = self.speed_limit_urban
+        over_speed = speed_km_h - speed_limit
+
+        reward = 0.0
+        if over_speed > 0:
+            # 轻度超速（0~10km/h）
+            if 0 < over_speed <= 10:
+                reward = self.over_speed_light_penalty
+                print(f"⚠️ 轻度超速！当前{speed_km_h:.1f}km/h，限速{speed_limit}km/h，扣分{self.over_speed_light_penalty}")
+            # 重度超速（>10km/h）
+            else:
+                reward = self.over_speed_heavy_penalty
+                print(f"❌ 重度超速！当前{speed_km_h:.1f}km/h，限速{speed_limit}km/h，扣分{self.over_speed_heavy_penalty}")
+            self.last_over_speed_time = current_time
 
         return reward
 
@@ -247,7 +293,7 @@ class CarlaEnvironment(gym.Env):
         self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
         self.camera.listen(lambda img: self._camera_callback(img))
 
-    # ========== 重置环境（保留+重置红绿灯标记） ==========
+    # ========== 重置环境（保留+重置超速标记） ==========
     def reset(self):
         # 清理旧资源
         if self.vehicle is not None and self.vehicle.is_alive:
@@ -267,6 +313,9 @@ class CarlaEnvironment(gym.Env):
         self.last_traffic_light_time = 0
         self.has_triggered_red = False
         self.has_triggered_green = False
+
+        # 重置超速标记
+        self.last_over_speed_time = 0
 
         # 生成车辆
         vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
@@ -328,7 +377,7 @@ class CarlaEnvironment(gym.Env):
     def get_observation(self):
         return self.image_data.copy() if self.image_data is not None else np.zeros((128, 128, 3), dtype=np.uint8)
 
-    # ========== 执行单步动作（保留+红绿灯奖惩） ==========
+    # ========== 执行单步动作（修改：加入超速奖惩） ==========
     def step(self, action):
         if self.vehicle is None or not self.vehicle.is_alive:
             raise RuntimeError("车辆未初始化/已销毁，请先调用reset()")
@@ -359,10 +408,11 @@ class CarlaEnvironment(gym.Env):
         self.world.tick()
         self.follow_vehicle()
 
-        # 计算总奖励（基础奖励+红绿灯奖惩）
+        # 计算总奖励（基础+红绿灯+超速）
         base_reward = 0.1 if throttle > 0 else (-0.1 if throttle < 0 else 0.0)
         traffic_light_reward = self._check_traffic_light()
-        total_reward = base_reward + traffic_light_reward
+        over_speed_reward = self._check_over_speed()  # 新增：超速奖惩
+        total_reward = base_reward + traffic_light_reward + over_speed_reward
 
         next_state = self.get_observation()
         done = self.hit_vehicle
@@ -370,6 +420,7 @@ class CarlaEnvironment(gym.Env):
         return next_state, total_reward, done, {
             "base_reward": base_reward,
             "traffic_light_reward": traffic_light_reward,
+            "over_speed_reward": over_speed_reward,  # 新增：返回超速奖励
             "total_reward": total_reward
         }
 
