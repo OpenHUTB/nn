@@ -11,16 +11,18 @@ print("CVIPS v3.0 - 行人安全数据生成器")
 print("=" * 80)
 
 # ============================================================
-# 1. 设置CARLA路径
+# 1. 设置CARLA路径（建议改为命令行参数或环境变量）
 # ============================================================
 print("\n[1/5] 初始化CARLA环境...")
-CARLA_EGG = r"D:\carla\carla0914\CARLA_0.9.14\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.14-py3.7-win-amd64.egg"
+# 注意：请替换为你本地的CARLA egg文件路径
+CARLA_EGG = r"D:\carla\carla0914\CARLA_0.9.14\WindowsNoEditor\PythonAPI\carla\dist"
 
 if os.path.exists(CARLA_EGG):
     sys.path.append(CARLA_EGG)
     print(f"✓ CARLA路径设置成功")
 else:
     print(f"✗ 找不到egg文件: {CARLA_EGG}")
+    print("提示：请修改CARLA_EGG变量为你本地的carla egg文件路径")
     sys.exit(1)
 
 # ============================================================
@@ -48,6 +50,8 @@ class PedestrianSafetyGenerator:
         self.sensors = []
         self.frame_count = 0
         self.last_save_time = time.time()
+        # 为每个摄像头单独记录最后保存时间，解决闭包作用域问题
+        self.camera_last_save = {}
 
         # 创建输出目录
         self.setup_output_directory()
@@ -131,30 +135,23 @@ class PedestrianSafetyGenerator:
 
         except Exception as e:
             print(f"设置场景失败: {e}")
+            traceback.print_exc()
             return None
 
     def set_high_quality_settings(self):
         """设置高质量渲染设置（专门为行人检测优化）"""
         try:
-            # 关闭所有可能导致模糊的效果
-            quality_settings = {
-                'r.MotionBlurQuality': 0,  # 关闭运动模糊
-                'r.DepthOfFieldQuality': 0,  # 关闭景深
-                'r.BloomQuality': 0,  # 关闭光晕
-                'r.LensFlareQuality': 0,  # 关闭镜头光晕
-                'r.TonemapperQuality': 0,  # 关闭色调映射
-                'r.AmbientOcclusionLevels': 0,  # 关闭环境光遮蔽
-                'r.ShadowQuality': 3,  # 高质量阴影
-                'r.TextureStreaming': True,  # 启用纹理流
-            }
-
-            for key, value in quality_settings.items():
-                self.world.get_settings().set(str(key), str(value))
-
-            print("✓ 高质量行人检测设置已应用")
+            # 正确的CARLA引擎参数设置方式：使用client的set_timeout后，通过world的apply_settings或command
+            # 对于渲染参数，CARLA 0.9.14中可通过以下方式设置（部分参数需在UE4中配置，代码中仅能设置部分）
+            print("✓ 应用行人检测优化的渲染设置（部分参数需在CARLA UE4端配置）")
+            # 注：以下参数为CARLA支持的代码可设置的部分，其余需在UE4编辑器中调整
+            settings = self.world.get_settings()
+            settings.no_rendering_mode = False
+            self.world.apply_settings(settings)
 
         except Exception as e:
             print(f"设置渲染质量失败: {e}")
+            traceback.print_exc()
 
     def set_pedestrian_friendly_environment(self):
         """设置行人友好的环境（良好的光照条件）"""
@@ -212,24 +209,28 @@ class PedestrianSafetyGenerator:
         print(f"✓ 行人友好环境设置: {self.args.weather}, {self.args.time_of_day}")
 
     def find_crosswalk_locations(self):
-        """寻找行人过马路区域"""
-        # 获取地图的所有生成点
-        spawn_points = self.world.get_map().get_spawn_points()
-
-        if not spawn_points:
-            return []
-
-        # 选择适合行人过马路的区域（通常是路口）
+        """寻找行人过马路区域（完全兼容CARLA 0.9.14：移除Crosswalk枚举，仅用交叉路口和人行道）"""
+        # 获取地图的waypoint，步长10米
+        waypoints = self.world.get_map().generate_waypoints(10.0)
         crosswalk_points = []
 
-        # 简单策略：选择前几个生成点（通常在地图的重要位置）
-        for i, point in enumerate(spawn_points[:10]):
-            crosswalk_points.append(point)
+        for wp in waypoints:
+            # CARLA 0.9.14兼容：只判断是否为交叉路口，或是否为人行道（Sidewalk）
+            # 交叉路口是行人过马路的主要区域，人行道则是行人聚集的区域
+            if wp.is_junction or wp.lane_type == carla.LaneType.Sidewalk:
+                crosswalk_points.append(wp.transform)
+                if len(crosswalk_points) >= 3:  # 最多3个
+                    break
 
-        return crosswalk_points[:3]  # 最多选择3个过马路点
+        # 如果没找到，使用原策略（取生成点）
+        if not crosswalk_points:
+            spawn_points = self.world.get_map().get_spawn_points()
+            crosswalk_points = spawn_points[:3]
+
+        return crosswalk_points
 
     def spawn_ego_vehicle_near_crosswalk(self):
-        """在行人过马路区域附近生成主车辆"""
+        """在行人过马路区域附近生成主车辆（修复自动驾驶与控制冲突，兼容CARLA 0.9.14速度设置）"""
         blueprint_lib = self.world.get_blueprint_library()
 
         # 选择视野好的车辆（高底盘，大窗户）
@@ -280,17 +281,12 @@ class PedestrianSafetyGenerator:
             vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
             self.actors.append(vehicle)
 
-            # 设置自动驾驶，但速度较慢以便观察行人
+            # 修复：要么用自动驾驶，要么用手动控制，二选一
+            # 这里选择自动驾驶，并通过交通管理器设置低速
             vehicle.set_autopilot(True)
-
-            # 控制速度（行人安全场景需要慢速）
-            vehicle.apply_control(carla.VehicleControl(
-                throttle=0.2,  # 低速
-                brake=0.0,
-                steer=0.0,
-                hand_brake=False,
-                reverse=False
-            ))
+            # 兼容CARLA 0.9.14：使用set_desired_speed设置车辆期望速度（单位：m/s）
+            tm = self.client.get_trafficmanager(8000)
+            tm.set_desired_speed(vehicle, 10.0)  # 限制最大速度为10m/s（0.9.14支持的方法）
 
             print(f"✓ 生成主车辆: {vehicle.type_id}")
             print(f"  位置: ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
@@ -299,10 +295,11 @@ class PedestrianSafetyGenerator:
 
         except Exception as e:
             print(f"生成主车辆失败: {e}")
+            traceback.print_exc()
             return None
 
     def spawn_crossing_pedestrians(self):
-        """生成过马路的行人（重点行人）"""
+        """生成过马路的行人（重点行人，修复CARLA 0.9.14无set_target_speed的问题）"""
         blueprint_lib = self.world.get_blueprint_library()
 
         # 寻找过马路区域
@@ -328,20 +325,24 @@ class PedestrianSafetyGenerator:
                 # 在过马路点附近生成
                 crosswalk_point = crosswalk_points[i % len(crosswalk_points)]
 
-                # 在过马路点附近稍微偏移
-                offset_x = random.uniform(-3.0, 3.0)
-                offset_y = random.uniform(-3.0, 3.0)
+                # 在过马路点附近稍微偏移（更小的偏移，确保在斑马线上）
+                offset_x = random.uniform(-1.0, 1.0)
+                offset_y = random.uniform(-1.0, 1.0)
 
                 location = carla.Location(
                     x=crosswalk_point.location.x + offset_x,
                     y=crosswalk_point.location.y + offset_y,
-                    z=crosswalk_point.location.z + 1.0  # 确保在地面上
+                    z=crosswalk_point.location.z + 0.1  # 降低高度，避免悬浮
                 )
 
+                # 检查位置是否在地面上（CARLA的导航检测）
                 spawn_point = carla.Transform(location)
+                # 尝试生成，若失败则跳过
+                pedestrian = self.world.try_spawn_actor(ped_bp, spawn_point)
+                if not pedestrian:
+                    print(f"  行人 {i+1} 生成位置无效，跳过")
+                    continue
 
-                # 生成行人
-                pedestrian = self.world.spawn_actor(ped_bp, spawn_point)
                 self.actors.append(pedestrian)
 
                 # 添加AI控制器
@@ -352,50 +353,69 @@ class PedestrianSafetyGenerator:
                         carla.Transform(),
                         attach_to=pedestrian
                     )
-
-                    # 设置过马路行为
-                    controller.start()
-
-                    # 计算过马路的目标点（对面）
-                    target_location = carla.Location(
-                        x=location.x + random.uniform(10.0, 20.0) * (1 if random.random() > 0.5 else -1),
-                        y=location.y + random.uniform(10.0, 20.0) * (1 if random.random() > 0.5 else -1),
-                        z=location.z
-                    )
-
-                    controller.go_to_location(target_location)
-
-                    crossing_pedestrians.append(pedestrian)
                     self.actors.append(controller)
 
+                    # 设置过马路行为（兼容CARLA 0.9.14，移除set_target_speed）
+                    controller.start()
+                    controller.set_max_speed(1.0)  # 行人慢速过马路（仅保留set_max_speed）
+
+                    # 计算过马路的目标点（对面，更合理的方向）
+                    # 获取当前位置的waypoint，向对面方向移动
+                    wp = self.world.get_map().get_waypoint(pedestrian.get_location())
+                    if wp:
+                        # 向车道的反方向移动10米
+                        target_location = wp.transform.location + carla.Location(
+                            x=10 * (-wp.transform.rotation.yaw / 90),
+                            y=10 * (wp.transform.rotation.yaw / 90),
+                            z=wp.transform.location.z
+                        )
+                    else:
+                        # 原逻辑，确保不为None
+                        target_location = carla.Location(
+                            x=location.x + random.uniform(10.0, 20.0) * (1 if random.random() > 0.5 else -1),
+                            y=location.y + random.uniform(10.0, 20.0) * (1 if random.random() > 0.5 else -1),
+                            z=location.z
+                        )
+
+                    controller.go_to_location(target_location)
+                    # 移除set_target_speed，仅用set_max_speed控制速度
+
+                    crossing_pedestrians.append(pedestrian)
                     print(f"  过马路行人 {i + 1} 已生成")
 
             except Exception as e:
                 print(f"  生成过马路行人失败: {e}")
+                traceback.print_exc()
                 continue
 
         print(f"✓ 生成 {len(crossing_pedestrians)} 个过马路行人")
         return crossing_pedestrians
 
     def spawn_background_traffic(self):
-        """生成背景交通（其他车辆和行人）"""
+        """生成背景交通（其他车辆和行人，修复CARLA 0.9.14无set_target_speed的问题）"""
         blueprint_lib = self.world.get_blueprint_library()
 
         # 生成其他车辆（数量较少，避免干扰）
         vehicles_spawned = 0
+        spawn_points = self.world.get_map().get_spawn_points()
         for i in range(min(5, self.args.num_background_vehicles)):
             try:
                 vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
-                spawn_points = self.world.get_map().get_spawn_points()
-
-                if spawn_points and len(spawn_points) > i + 10:  # 避免位置冲突
-                    spawn_point = spawn_points[i + 10]
-                    vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-                    self.actors.append(vehicle)
-                    vehicle.set_autopilot(True)
-                    vehicles_spawned += 1
-            except:
-                pass
+                # 随机选择生成点，避免冲突
+                if spawn_points:
+                    spawn_point = random.choice(spawn_points)
+                    # 使用try_spawn_actor避免位置冲突
+                    vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_point)
+                    if vehicle:
+                        self.actors.append(vehicle)
+                        vehicle.set_autopilot(True)
+                        # 兼容CARLA 0.9.14：设置背景车辆期望速度
+                        tm = self.client.get_trafficmanager(8000)
+                        tm.set_desired_speed(vehicle, 15.0)
+                        vehicles_spawned += 1
+            except Exception as e:
+                print(f"  生成背景车辆失败: {e}")
+                continue
 
         # 生成背景行人（不在过马路）
         pedestrians_spawned = 0
@@ -405,33 +425,41 @@ class PedestrianSafetyGenerator:
                 location = self.world.get_random_location_from_navigation()
 
                 if location:
-                    location.z += 1.0
-                    pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
-                    self.actors.append(pedestrian)
+                    location.z += 0.1  # 降低高度
+                    # 使用try_spawn_actor
+                    pedestrian = self.world.try_spawn_actor(ped_bp, carla.Transform(location))
+                    if pedestrian:
+                        self.actors.append(pedestrian)
 
-                    # 添加控制器
-                    controller_bp = blueprint_lib.find('controller.ai.walker')
-                    controller = self.world.spawn_actor(
-                        controller_bp,
-                        carla.Transform(),
-                        attach_to=pedestrian
-                    )
-                    controller.start()
+                        # 添加控制器（兼容CARLA 0.9.14，移除set_target_speed）
+                        controller_bp = blueprint_lib.find('controller.ai.walker')
+                        controller = self.world.spawn_actor(
+                            controller_bp,
+                            carla.Transform(),
+                            attach_to=pedestrian
+                        )
+                        controller.start()
+                        controller.set_max_speed(0.8)  # 背景行人更慢（仅保留set_max_speed）
 
-                    # 设置随机目标（非过马路）
-                    target_location = self.world.get_random_location_from_navigation()
-                    if target_location:
-                        controller.go_to_location(target_location)
+                        # 设置随机目标（非过马路）
+                        target_location = self.world.get_random_location_from_navigation()
+                        if target_location:
+                            controller.go_to_location(target_location)
+                        else:
+                            # 若目标为None，设置为当前位置附近
+                            controller.go_to_location(location + carla.Location(x=5, y=5))
 
-                    pedestrians_spawned += 1
-                    self.actors.append(controller)
-            except:
-                pass
+                        # 移除set_target_speed，仅用set_max_speed控制速度
+                        pedestrians_spawned += 1
+                        self.actors.append(controller)
+            except Exception as e:
+                print(f"  生成背景行人失败: {e}")
+                continue
 
         print(f"✓ 生成 {vehicles_spawned} 辆背景车辆和 {pedestrians_spawned} 个背景行人")
 
     def setup_pedestrian_safety_cameras(self, vehicle):
-        """设置行人安全专用的摄像头系统"""
+        """设置行人安全专用的摄像头系统（修复回调函数作用域问题）"""
         if not vehicle:
             return
 
@@ -497,27 +525,29 @@ class PedestrianSafetyGenerator:
                 camera_dir = os.path.join(self.output_dir, name)
                 os.makedirs(camera_dir, exist_ok=True)
 
-                # 图像保存回调函数（带时间间隔控制）
-                def make_save_callback(save_dir, cam_name, cam_desc):
-                    def save_image(image):
-                        current_time = time.time()
+                # 初始化摄像头的最后保存时间
+                self.camera_last_save[name] = time.time()
 
-                        # 控制保存间隔（至少2秒一张）
-                        if current_time - self.last_save_time >= self.args.capture_interval:
-                            self.frame_count += 1
-                            self.last_save_time = current_time
+                # 图像保存回调函数（修复作用域问题，使用默认参数传递变量）
+                def save_image(image, save_dir=camera_dir, cam_name=name):
+                    current_time = time.time()
 
-                            # 保存图像
-                            filename = f"{save_dir}/ped_frame_{self.frame_count:04d}.png"
-                            image.save_to_disk(filename, carla.ColorConverter.Raw)
+                    # 控制保存间隔（每个摄像头独立控制）
+                    if current_time - self.camera_last_save[cam_name] >= self.args.capture_interval:
+                        # 全局帧计数
+                        self.frame_count += 1
+                        # 更新当前摄像头的保存时间
+                        self.camera_last_save[cam_name] = current_time
 
-                            # 每10帧打印一次信息
-                            if self.frame_count % 10 == 0:
-                                print(f"  [{cam_name}] 保存第 {self.frame_count} 帧")
+                        # 保存图像（按摄像头分类，帧号统一）
+                        filename = f"{save_dir}/ped_frame_{self.frame_count:04d}.png"
+                        image.save_to_disk(filename, carla.ColorConverter.Raw)
 
-                    return save_image
+                        # 每10帧打印一次信息
+                        if self.frame_count % 10 == 0:
+                            print(f"  [{cam_name}] 保存第 {self.frame_count} 帧")
 
-                camera.listen(make_save_callback(camera_dir, name, description))
+                camera.listen(save_image)
                 self.actors.append(camera)
                 self.sensors.append(camera)
 
@@ -526,6 +556,8 @@ class PedestrianSafetyGenerator:
 
             except Exception as e:
                 print(f"  安装{name}摄像头失败: {e}")
+                traceback.print_exc()
+                continue
 
         print(f"✓ 总共安装 {installed_cameras} 个行人安全摄像头")
 
@@ -540,7 +572,9 @@ class PedestrianSafetyGenerator:
 
         start_time = time.time()
         self.frame_count = 0
-        self.last_save_time = start_time
+        # 重置摄像头保存时间
+        for cam_name in self.camera_last_save:
+            self.camera_last_save[cam_name] = start_time
 
         try:
             # 创建进度显示
@@ -607,8 +641,9 @@ class PedestrianSafetyGenerator:
                 if actor and actor.is_alive:
                     actor.destroy()
                     destroyed += 1
-            except:
-                pass
+            except Exception as e:
+                print(f"  销毁actor失败: {e}")
+                continue
 
         print(f"销毁 {destroyed} 个actor")
         self.actors.clear()
