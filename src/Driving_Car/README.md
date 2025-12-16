@@ -9,7 +9,7 @@
 
 ## 核心功能
 
-**路径规划**: 基于A*算法和RRT算法的智能路径规划
+**路径规划**: 基于A*算法和RRT算法的智能路径规划。
 
 **障碍物检测**: 使用YOLO和OpenCV进行实时目标检测与识别
 
@@ -36,4 +36,3 @@
 
 1. 克隆项目到PyCharm
 2. 安装依赖: `pip install -r requirements.txt`
-3. 运行主程序: `python main.py`
