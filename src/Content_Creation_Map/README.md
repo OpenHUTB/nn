@@ -514,3 +514,68 @@ OpenStreetMap（简称OSM）是一个免费且开源的世界地图数据库，�
    - 备份原始文件
 
 通过以上步骤获取的OSM文件，可以用于后续在RoadRunner中创建真实道路网络。建议先从小的测试区域开始，熟悉整个流程后再处理大型项目。
+
+
+## 向roadrunner中导入osm文件的步骤
+1. **打开roadrunner**
+2. **打开或新建项目并选择目标场景（后缀为.rrscene的文件）**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112045_67_69.jpg)
+3. **在上方工具栏找到SD Map Viewer Tool工具并选择（如下图圈注）**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112121_68_69.jpg)
+4. **在左侧的工具栏找到Open Street Map File并打开**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112213_69_69.jpg)
+5. **在弹出的窗口中找到从OpenStreetMap官网导出的后缀为.osm的文件打开**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112324_70_69.jpg)
+6. **导入结果如下图**
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112350_71_69.png)
+
+# QGIS 下载、安装与中文界面设置完整指南
+以下是QGIS软件从下载、安装到完成中文界面设置的完整步骤。整个过程主要分为下载、安装、设置语言以及获取学习数据四个部分。
+
+### 第一步：下载QGIS
+前往QGIS官方网站的下载页面 https://qgis.org/download/ 。页面会根据你的操作系统推荐合适的版本。
+![](https://github.com/2382613701lzy-netizen/image/blob/main/20251216121655_88_69.png)
+操作系统：软件支持 Windows、macOS、Linux、Android 和 iOS。
+
+版本选择：
+
+最新版：页面会提供最新的稳定版本（例如 QGIS 3.36.x），包含最新功能。
+
+长期支持版 (LTR)：对于追求稳定性的用户或组织部署，推荐选择 QGIS 3.34 LTR，它经过了更长时间的测试。
+
+Windows用户注意：官方自QGIS 3.20起，仅提供64位安装包。
+
+### 第二步：安装QGIS
+根据你的操作系统，参考以下步骤完成安装。
+
+#### *Windows*	
+
+安装步骤
+1. 运行下载的 .exe 安装程序。
+2. 在安装类型界面，普通用户建议选择“标准安装(Standard Install)”。
+3. 按照安装向导提示完成后续步骤。
+#### *macOS*	
+1. 双击下载的 .dmg 磁盘映像文件。
+2. 将QGIS图标拖拽到“应用程序(Applications)”文件夹中。
+3. 首次启动需右键点击应用并选择“打开”，以通过系统安全验证。
+#### *Linux*	
+根据你的发行版，使用对应的软件包管理器（如apt、yum）或从官方仓库安装。
+### 第三步：设置为中文界面
+QGIS内置了多语言支持，切换为中文无需安装额外语言包。
+
+打开QGIS，在顶部菜单栏点击 Settings (设置) → Options (选项)。
+
+在弹出的选项窗口中，在左侧选择 General (常规) 选项卡。
+
+在右侧找到 Locale (区域设置) 板块，你会看到 Override system locale (覆盖系统区域设置) 的选项。
+
+勾选此选项，然后在下方 Language (语言) 的下拉菜单中，选择 中文(简体) 或 中文(繁体)。
+
+点击右下角的 OK (确定) 保存设置。
+
+完全关闭并重新启动QGIS，界面就会切换为中文了。
+
+注：如果重启后界面未改变，请检查是否成功保存了设置，并确认在Language下拉菜单中正确选择了“中文(中国)”。
+
+最后的应用界面如下图说明你的QGIS已经成功配置可以使用了
+![](https://github.com/2382613701lzy-netizen/image/blob/main/20251216121909_89_69.png)
