@@ -220,8 +220,13 @@ class CarlaEnvironment(gym.Env):
         print(f"[清理] 车辆{cleared_count['vehicle']} | 自行车{cleared_count['bicycle']} | 静态车辆{cleared_count['static_vehicle']}")
 
     def process_image(self, image):
-        """处理摄像头数据"""
+        """处理摄像头数据 - 修复frame属性访问问题"""
         try:
+            # 检查是否为有效的图像对象
+            if not hasattr(image, 'raw_data') or not hasattr(image, 'height') or not hasattr(image, 'width'):
+                print("[图像处理错误] 无效的图像数据")
+                return
+                
             array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape((image.height, image.width, 4))[:, :, :3]
             array = array[:, :, ::-1].copy()
             if self.image_queue.full():
@@ -231,8 +236,13 @@ class CarlaEnvironment(gym.Env):
             print(f"[图像处理错误] {str(e)}")
 
     def process_lidar(self, data):
-        """处理激光雷达数据"""
+        """处理激光雷达数据 - 修复frame属性访问问题"""
         try:
+            # 检查是否为有效的激光雷达数据
+            if not hasattr(data, 'raw_data'):
+                print("[激光雷达处理错误] 无效的激光雷达数据")
+                return
+                
             points = np.frombuffer(data.raw_data, dtype=np.dtype('f4')).reshape(-1, 4)[:, :3]
             distances = np.linalg.norm(points, axis=1)
             angles = np.arctan2(points[:, 1], points[:, 0]) * 180 / np.pi
@@ -251,8 +261,13 @@ class CarlaEnvironment(gym.Env):
             print(f"[激光雷达处理错误] {str(e)}")
 
     def process_imu(self, data):
-        """处理IMU数据"""
+        """处理IMU数据 - 修复frame属性访问问题"""
         try:
+            # 检查是否为有效的IMU数据
+            if not hasattr(data, 'accelerometer') or not hasattr(data, 'gyroscope'):
+                print("[IMU处理错误] 无效的IMU数据")
+                return
+                
             imu_data = np.array([
                 data.accelerometer.x, data.accelerometer.y, data.accelerometer.z,
                 data.gyroscope.x, data.gyroscope.y, data.gyroscope.z
