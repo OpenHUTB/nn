@@ -234,11 +234,17 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：RGB与语义分割图像拼接显示）
+# 9. 主循环（核心：RGB与语义分割图像拼接显示 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：RGB与语义分割图像拼接显示 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 平滑视角")
+print(f"功能：RGB与语义分割图像拼接显示 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 平滑视角 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
+
+# ==================== 新增：性能监控初始化 ====================
+start_time = time.time()
+frame_counter = 0
+current_fps = 0.0
+# =================================================================
 
 try:
     world.tick()
@@ -247,6 +253,16 @@ try:
     while True:
         world.tick()
         last_spectator_tf = set_spectator_smooth(last_spectator_tf)
+        
+        # ==================== 新增：实时FPS计算 ====================
+        frame_counter += 1
+        # 每30帧更新一次FPS（避免频繁计算）
+        if frame_counter % 30 == 0:
+            elapsed_time = time.time() - start_time
+            current_fps = 30.0 / elapsed_time if elapsed_time > 0 else 0.0
+            start_time = time.time()
+            frame_counter = 0
+        # =================================================================
         
         # 同时获取RGB和语义分割图像（确保帧同步）
         if not rgb_queue.empty() and not sem_queue.empty():
@@ -266,13 +282,43 @@ try:
             # 横向拼接两张图像（宽度合并，高度不变）
             combined_img = cv2.hconcat([rgb_img, sem_rgb])
             
-            # 添加标题（纯英文，避免中文乱码/问号）
+            # ==================== 修复：调整标题位置，为性能监控腾出空间 ====================
             cv2.putText(combined_img, 
                        f"RGB Image | Semantic Segmentation (Vehicles:{actual_npc_count} Pedestrians:{actual_walker_count})", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # =================================================================
             
-            # 显示拼接后的图像（窗口标题纯英文）
-            cv2.imshow('CARLA RGB + Semantic Segmentation (with Pedestrians)', combined_img)
+            # ==================== 修复：性能监控移到左上角标题下方，避免被裁剪 ====================
+            # 性能信息列表
+            perf_info = [
+                f"FPS: {current_fps:.1f}",
+                f"RGB Queue: {rgb_queue.qsize()}",
+                f"Sem Queue: {sem_queue.qsize()}",
+                f"Sync Frame: {world.get_snapshot().frame}",
+                f"Fixed Delta: {settings.fixed_delta_seconds:.3f}s"
+            ]
+            
+            # 绘制位置：左上角，标题下方（y从60开始）
+            perf_x = 10
+            perf_y = 60  # 标题在30位置，这里从60开始
+            perf_line_height = 25
+            perf_color = (0, 255, 255)  # 黄色字体
+            
+            for idx, info in enumerate(perf_info):
+                y_pos = perf_y + idx * perf_line_height
+                # 绘制半透明黑色背景（提升可读性）
+                cv2.rectangle(combined_img, 
+                              (perf_x - 5, y_pos - 15), 
+                              (perf_x + 220, y_pos + 5), 
+                              (0, 0, 0), -1)
+                # 绘制性能文本
+                cv2.putText(combined_img, info, 
+                           (perf_x, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, perf_color, 2)
+            # =================================================================
+            
+            # 显示拼接后的图像
+            cv2.imshow('CARLA RGB + Semantic Segmentation (with Pedestrians & Performance)', combined_img)
             if cv2.waitKey(1) == ord('q'):
                 break
         
