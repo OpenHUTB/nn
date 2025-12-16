@@ -75,3 +75,36 @@ SUCCESSFUL_THRESHOLD = 3
 
 LEARNING_RATE = 0.00005
 # 优化器的学习率 - 降低以获得更稳定训练
+
+# PER (优先经验回放) 参数
+PER_ALPHA = 0.6
+# 优先级程度 (0 = 均匀采样, 1 = 完全优先级)
+
+PER_BETA_START = 0.4
+# 重要性采样权重起始值
+
+PER_BETA_FRAMES = 100000
+# beta线性增长的帧数
+
+# 训练策略参数
+USE_CURRICULUM_LEARNING = True
+# 是否使用课程学习
+
+USE_MULTI_OBJECTIVE = True
+# 是否使用多目标优化
+
+USE_IMITATION_LEARNING = False
+# 是否使用模仿学习（预训练）
+
+# 多目标优化权重（这些权重会自动调整）
+SAFETY_WEIGHT = 0.40
+EFFICIENCY_WEIGHT = 0.25
+COMFORT_WEIGHT = 0.20
+RULE_FOLLOWING_WEIGHT = 0.15
+
+# 课程学习参数
+CURRICULUM_STAGES = 5
+# 课程学习阶段数量
+
+CURRICULUM_SUCCESS_THRESHOLDS = [0.3, 0.5, 0.7, 0.85, 0.9]
+# 每个阶段进入下一阶段所需的成功率阈值

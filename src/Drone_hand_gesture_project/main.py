@@ -1,166 +1,597 @@
+#!/usr/bin/env python3
+"""
+手势控制无人机仿真系统 - 主程序（取消自动起飞版本）
+集成：手势识别 + 无人机控制 + 3D仿真
+"""
 import cv2
 import numpy as np
 import time
+import threading
 import sys
 import os
-from PIL import Image, ImageDraw, ImageFont
+import json
 
-# 添加路径
+# 添加项目路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# 导入自定义模块
 from gesture_detector import GestureDetector
 from drone_controller import DroneController
+from simulation_3d import Drone3DViewer
+
+# 注意：physics_engine.py 是可选的，如果没有可以先注释掉
+try:
+    from physics_engine import PhysicsEngine
+
+    HAS_PHYSICS_ENGINE = True
+except ImportError:
+    print("警告：未找到 physics_engine.py，使用简化的物理模拟")
+    HAS_PHYSICS_ENGINE = False
 
 
-def cv2_add_chinese_text(img, text, position, text_color=(0, 255, 0), text_size=30):
-    """
-    在OpenCV图像上添加中文文字
-    """
-    if isinstance(img, np.ndarray):
-        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+class IntegratedDroneSimulation:
+    """集成的无人机仿真系统"""
 
-    draw = ImageDraw.Draw(img)
+    def __init__(self, config=None):
+        # 配置
+        self.config = config or {}
 
-    # 尝试加载中文字体，如果失败使用默认字体
-    try:
-        font = ImageFont.truetype("simsun.ttc", text_size, encoding="utf-8")
-    except:
-        try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", text_size, encoding="utf-8")
-        except:
-            font = ImageFont.load_default()
+        # 系统状态
+        self.running = True
+        self.paused = False
 
-    draw.text(position, text, text_color, font=font)
+        # 初始化模块
+        print("正在初始化手势检测器...")
+        self.gesture_detector = GestureDetector()
 
-    return cv2.cvtColor(np.asarray(img), cv2.COLOR_RGB2BGR)
+        print("正在初始化无人机控制器...")
+        self.drone_controller = DroneController(simulation_mode=True)
 
+        print("正在初始化3D仿真显示...")
+        self.viewer = Drone3DViewer(
+            width=self.config.get('window_width', 1024),
+            height=self.config.get('window_height', 768)
+        )
 
-def create_test_frame(message="手势控制无人机 - 虚拟模式"):
-    """创建测试帧（支持中文）"""
-    # 创建白色背景
-    frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
-
-    # 添加标题
-    frame = cv2_add_chinese_text(frame, message, (50, 50), (0, 0, 255), 30)
-
-    # 添加手势说明
-    gestures = [
-        "手势指令对照表:",
-        "张开手掌 - 起飞",
-        "握拳 - 降落",
-        "胜利手势 - 前进",
-        "大拇指 - 后退",
-        "食指上指 - 上升",
-        "食指向下 - 下降",
-        "OK手势 - 悬停",
-        "大拇指向下 - 停止"
-    ]
-
-    for i, text in enumerate(gestures):
-        y_pos = 90 + i * 25
-        color = (0, 0, 255) if i == 0 else (0, 100, 0)
-        frame = cv2_add_chinese_text(frame, text, (50, y_pos), color, 20)
-
-    frame = cv2_add_chinese_text(frame, "按 'q' 键退出程序", (50, 430), (0, 0, 0), 20)
-
-    return frame
-
-
-def main():
-    print("=" * 60)
-    print("  手势控制无人机系统 - 虚拟机版本")
-    print("=" * 60)
-    print("程序已启动，正在尝试显示窗口...")
-    print("如果看不到窗口，请检查虚拟机显示设置")
-    print("按 'q' 键退出程序")
-    print("按 'c' 键切换摄像头")
-    print("=" * 60)
-
-    detector = GestureDetector()
-    controller = DroneController(simulation_mode=True)
-
-    # 测试显示
-    test_frame = create_test_frame("显示测试中...")
-    cv2.imshow('Test window', test_frame)
-    cv2.waitKey(1000)  # 显示1秒
-
-    # 尝试打开摄像头
-    cap = None
-    for cam_id in [1]:#需要视不同情况更改数字，选择摄像头
-        cap = cv2.VideoCapture(cam_id)
-        if cap.isOpened():
-            print(f"摄像头 {cam_id} 打开成功")
-            break
+        # 初始化物理引擎（可选）
+        if HAS_PHYSICS_ENGINE:
+            print("正在初始化物理引擎...")
+            self.physics_engine = PhysicsEngine(
+                mass=self.config.get('drone_mass', 1.0),
+                gravity=self.config.get('gravity', 9.81)
+            )
         else:
-            cap = None
+            self.physics_engine = None
 
-    if cap is None:
-        print("使用虚拟摄像头模式")
+        # 线程
+        self.gesture_thread = None
+        self.simulation_thread = None
 
-    last_command_time = time.time()
-    frame_count = 0
+        # 数据共享
+        self.current_frame = None
+        self.current_gesture = None
+        self.gesture_confidence = 0.0
+        self.hand_landmarks = None
 
-    while True:
-        frame_count += 1
+        # 控制参数（降低阈值以提高识别率）
+        self.control_intensity = 1.0
+        self.last_command_time = time.time()
+        self.command_cooldown = 1.5  # 命令冷却时间（秒），从2.0降低到1.5
 
-        # 获取帧
-        if cap and cap.isOpened():
-            ret, frame = cap.read()
-            if ret:
-                frame = cv2.flip(frame, 1)
+        # 手势识别阈值（降低以提高灵敏度）
+        self.gesture_thresholds = {
+            'open_palm': 0.6,  # 降低到0.6
+            'closed_fist': 0.65,  # 降低到0.65
+            'victory': 0.65,  # 降低到0.65
+            'thumb_up': 0.65,  # 降低到0.65
+            'thumb_down': 0.65,  # 降低到0.65
+            'pointing_up': 0.6,  # 降低到0.6
+            'pointing_down': 0.6,  # 降低到0.6
+            'ok_sign': 0.7,  # 稍微降低
+            'default': 0.6  # 默认阈值
+        }
+
+        # 初始化摄像头
+        self.cap = self._initialize_camera()
+
+        # 数据记录
+        self.data_log = []
+        self.log_file = "flight_log.json"
+
+        # 不再自动起飞 - 完全由手势控制
+        print("无人机初始化完成，等待手势指令...")
+
+        print("无人机仿真系统初始化完成 ✓")
+
+    def _initialize_camera(self):
+        """初始化摄像头"""
+        # 尝试多个摄像头ID，优先使用1，如果失败则尝试0
+        camera_ids = [1, 0]  # 优先使用摄像头1
+
+        for camera_id in camera_ids:
+            print(f"尝试打开摄像头 {camera_id}...")
+            cap = cv2.VideoCapture(camera_id)
+
+            if cap.isOpened():
+                # 设置摄像头参数
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_FPS, 30)
+
+                # 尝试读取一帧测试
+                ret, test_frame = cap.read()
+                if ret:
+                    # 获取实际参数
+                    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                    fps = cap.get(cv2.CAP_PROP_FPS)
+
+                    print(f"✅ 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
+                    return cap
+                else:
+                    cap.release()
+                    print(f"摄像头 {camera_id} 能打开但无法读取帧")
             else:
-                frame = create_test_frame("摄像头错误 - 虚拟模式")
+                print(f"摄像头 {camera_id} 无法打开")
+
+        print("❌ 所有摄像头尝试失败，使用虚拟模式")
+        return None
+
+    def _gesture_recognition_loop(self):
+        """手势识别循环"""
+        print("手势识别线程启动...")
+
+        # 显示虚拟模式提示（如果摄像头未连接）
+        if self.cap is None:
+            print("⚠️ 使用虚拟摄像头模式，请连接摄像头进行真实手势识别")
+
+        while self.running:
+            if self.paused:
+                time.sleep(0.1)
+                continue
+
+            # 获取图像帧
+            if self.cap and self.cap.isOpened():
+                ret, frame = self.cap.read()
+                if ret:
+                    frame = cv2.flip(frame, 1)  # 镜像，更自然
+                else:
+                    # 创建虚拟帧
+                    frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
+                    cv2.putText(frame, "Camera Error - Virtual Mode", (50, 50),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    cv2.putText(frame, "Connect camera for real gesture detection", (50, 100),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+            else:
+                # 虚拟模式
+                frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
+                cv2.putText(frame, "Virtual Camera Mode", (50, 50),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.putText(frame, "Gesture Commands:", (50, 100),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
+                cv2.putText(frame, "Open Palm - Takeoff", (50, 140),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "Closed Fist - Land", (50, 170),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "Victory - Forward", (50, 200),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "Thumb Up - Backward", (50, 230),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "Press 'q' to quit", (50, 280),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+
+            # 手势检测
+            try:
+                processed_frame, gesture, confidence, landmarks = \
+                    self.gesture_detector.detect_gestures(frame, simulation_mode=True)
+
+                # 更新共享数据
+                self.current_frame = processed_frame
+                self.current_gesture = gesture
+                self.gesture_confidence = confidence
+                self.hand_landmarks = landmarks
+
+                # 处理手势命令（使用降低的阈值）
+                self._process_gesture_command(gesture, confidence)
+
+                # 显示手势识别窗口
+                cv2.imshow('手势控制 - Gesture Control', processed_frame)
+
+            except Exception as e:
+                print(f"手势检测错误: {e}")
+                self.current_frame = frame
+                self.current_gesture = None
+
+            # 检查退出
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                print("收到退出指令...")
+                self.running = False
+                break
+            elif key == ord('c'):
+                # 切换摄像头功能
+                self._switch_camera()
+            elif key == ord('d'):  # 调试模式
+                self._debug_gesture_detection()
+
+        print("手势识别线程结束")
+
+    def _switch_camera(self):
+        """切换摄像头"""
+        if self.cap:
+            self.cap.release()
+            print("释放当前摄像头...")
+
+        # 获取当前摄像头ID
+        current_id = 1 if self.cap is None else 0
+
+        print(f"切换到摄像头 {current_id}...")
+        self.cap = cv2.VideoCapture(current_id)
+
+        if self.cap.isOpened():
+            print(f"✅ 切换到摄像头 {current_id} 成功")
         else:
-            # 虚拟模式 - 创建动态测试帧
-            if frame_count % 30 == 0:  # 每30帧切换消息
-                messages = [
-                    "虚拟摄像头模式 - 请做出手势",
-                    "手势检测已激活 - 虚拟机",
-                    "手势识别系统准备就绪"
-                ]
-                message = messages[(frame_count // 30) % len(messages)]
-                frame = create_test_frame(message)
-            else:
-                frame = create_test_frame("虚拟摄像头模式 - 请做出手势")
+            print(f"❌ 切换到摄像头 {current_id} 失败")
+            self.cap = None
 
-        # 手势检测
-        try:
-            processed_frame, gesture, confidence = detector.detect_gestures(frame)
-        except Exception as e:
-            print(f"手势检测错误: {e}")
-            processed_frame = frame
-            gesture = "no_hand"
+    def _debug_gesture_detection(self):
+        """调试手势检测"""
+        print("\n[手势调试信息]")
+        print(f"当前手势: {self.current_gesture}")
+        print(f"置信度: {self.gesture_confidence:.2f}")
+        print(f"冷却时间: {time.time() - self.last_command_time:.1f}s")
+        print(f"无人机解锁: {self.drone_controller.state['armed']}")
+        print(f"无人机模式: {self.drone_controller.state['mode']}")
+        print(f"无人机位置: ({self.drone_controller.state['position'][0]:.1f}, "
+              f"{self.drone_controller.state['position'][1]:.1f}, "
+              f"{self.drone_controller.state['position'][2]:.1f})")
 
-        # 处理命令
+    def _process_gesture_command(self, gesture, confidence):
+        """处理手势命令（使用降低的阈值）"""
         current_time = time.time()
+
+        # 获取该手势的阈值（降低以提高识别率）
+        threshold = self.gesture_thresholds.get(gesture, self.gesture_thresholds['default'])
+
+        # 检查是否在冷却期内
+        in_cooldown = current_time - self.last_command_time <= self.command_cooldown
+
+        # 只处理置信度高于阈值的手势且不在冷却期
         if (gesture not in ["no_hand", "hand_detected"] and
-                current_time - last_command_time > 2.0):
+                confidence > threshold and
+                not in_cooldown):
 
-            command = detector.get_command(gesture)
+            # 获取控制命令
+            command = self.gesture_detector.get_command(gesture)
+
             if command != "none":
-                print(f"检测到手势: {gesture} -> 执行: {command}")
-                controller.send_command(command)
-                last_command_time = current_time
+                # 计算手势强度（如果有手部关键点）
+                intensity = 1.0
+                if self.hand_landmarks:
+                    intensity = self.gesture_detector.get_gesture_intensity(
+                        self.hand_landmarks, gesture
+                    )
 
-        # 显示帧
-        cv2.imshow('Main window', processed_frame)
+                # 添加调试信息
+                print(
+                    f"🎯 检测到手势: {gesture} (置信度: {confidence:.2f}, 阈值: {threshold}) -> 执行: {command} (强度: {intensity:.2f})")
 
-        # 退出检测
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q'):
-            break
-        elif key == ord('c'):
-            print("切换摄像头...")
-            if cap:
-                cap.release()
-            cap = None
+                # 发送命令到控制器
+                self.drone_controller.send_command(command, intensity)
 
-    # 清理
-    if cap:
-        cap.release()
-    cv2.destroyAllWindows()
-    print("程序退出")
+                # 记录命令
+                self._log_command(gesture, command, confidence, intensity)
+
+                # 更新最后命令时间
+                self.last_command_time = current_time
+        elif gesture not in ["no_hand", "hand_detected"] and confidence > 0.3:
+            # 显示检测到但未触发的情况（仅调试用，可注释掉）
+            if in_cooldown:
+                # 冷却期内，不显示信息避免干扰
+                pass
+            elif confidence < threshold:
+                # 置信度不足，显示信息
+                print(f"  [手势检测] {gesture} 置信度不足: {confidence:.2f} < {threshold}")
+
+    def _simulation_loop(self):
+        """仿真主循环"""
+        print("3D仿真线程启动...")
+
+        last_time = time.time()
+        frame_count = 0
+        last_status_print = time.time()
+
+        print("\n🎮 键盘提示：按 'R' 键重置无人机位置到原点")
+        print("           按 'T' 键手动起飞")
+        print("           按 'L' 键手动降落")
+        print("           按 'H' 键悬停")
+
+        # 按键防抖记录
+        self._last_key_press = {}
+
+        while self.running:
+            current_time = time.time()
+            dt = current_time - last_time
+            last_time = current_time
+
+            # 每3秒打印一次状态
+            if current_time - last_status_print > 3:
+                status = self.drone_controller.get_status_string()
+                print(f"[状态监控] {status}")
+                if self.current_gesture:
+                    print(f"[状态监控] 当前手势: {self.current_gesture} (置信度: {self.gesture_confidence:.2f})")
+                last_status_print = current_time
+
+            if dt <= 0:
+                dt = 0.016
+            elif dt > 0.1:
+                dt = 0.1
+
+            if self.paused:
+                if not self.viewer.handle_events():
+                    self.running = False
+                time.sleep(0.01)
+                continue
+
+            keys = pygame.key.get_pressed()
+
+            # 检查重置键 R
+            if keys[pygame.K_r]:
+                if ('r' not in self._last_key_press or
+                        current_time - self._last_key_press['r'] > 1.0):
+                    print("🎮 键盘：重置无人机位置")
+                    self.drone_controller.reset()
+                    print("  无人机已重置到原点位置")
+                    self._last_key_press['r'] = current_time
+
+            # 检查起飞键 T
+            if keys[pygame.K_t]:
+                if ('t' not in self._last_key_press or
+                        current_time - self._last_key_press['t'] > 1.0):
+                    print("🎮 键盘：起飞")
+                    self.drone_controller.send_command("takeoff", 0.8)
+                    self._last_key_press['t'] = current_time
+
+            # 检查降落键 L
+            if keys[pygame.K_l]:
+                if ('l' not in self._last_key_press or
+                        current_time - self._last_key_press['l'] > 1.0):
+                    print("🎮 键盘：降落")
+                    self.drone_controller.send_command("land", 0.5)
+                    self._last_key_press['l'] = current_time
+
+            # 检查悬停键 H
+            if keys[pygame.K_h]:
+                if ('h' not in self._last_key_press or
+                        current_time - self._last_key_press['h'] > 1.0):
+                    print("🎮 键盘：悬停")
+                    self.drone_controller.send_command("hover")
+                    self._last_key_press['h'] = current_time
+
+            # 检查停止键 S
+            if keys[pygame.K_s]:
+                if ('s' not in self._last_key_press or
+                        current_time - self._last_key_press['s'] > 1.0):
+                    print("🎮 键盘：停止")
+                    self.drone_controller.send_command("stop")
+                    self._last_key_press['s'] = current_time
+
+            if not self.viewer.handle_events():
+                self.running = False
+                break
+
+            if not self.running:
+                break
+
+            drone_state = self.drone_controller.get_state()
+            self.drone_controller.update_physics(dt)
+
+            if self.physics_engine and self.drone_controller.state['armed']:
+                control_input = self._get_control_input_from_state(drone_state)
+                physics_state = self.physics_engine.update(dt, control_input)
+
+            trajectory = self.drone_controller.get_trajectory()
+
+            drone_state_with_gesture = drone_state.copy()
+            if self.current_gesture:
+                drone_state_with_gesture['current_gesture'] = self.current_gesture
+                drone_state_with_gesture['gesture_confidence'] = self.gesture_confidence
+
+            self.viewer.render(drone_state_with_gesture, trajectory)
+
+            frame_count += 1
+            if frame_count % 120 == 0:
+                fps = 1.0 / dt if dt > 0 else 0
+                print(f"3D仿真帧率: {fps:.1f} FPS")
+
+        print("3D仿真线程结束")
+
+    def _get_control_input_from_state(self, drone_state):
+        """从无人机状态生成控制输入"""
+        control_input = {
+            'throttle': 0.5,  # 默认油门
+            'roll': 0.0,
+            'pitch': 0.0,
+            'yaw_rate': 0.0
+        }
+
+        # 如果检测到手部关键点，可以用于精细控制
+        if self.hand_landmarks and self.current_gesture:
+            # 简单示例：根据手势调整控制
+            if self.current_gesture == "pointing_up":
+                control_input['throttle'] = 0.8
+            elif self.current_gesture == "pointing_down":
+                control_input['throttle'] = 0.2
+            elif self.current_gesture == "victory":
+                control_input['pitch'] = 0.3  # 轻微前倾
+            elif self.current_gesture == "thumb_up":
+                control_input['pitch'] = -0.3  # 轻微后倾
+
+        return control_input
+
+    def _log_command(self, gesture, command, confidence, intensity):
+        """记录命令到日志"""
+        log_entry = {
+            'timestamp': time.time(),
+            'gesture': gesture,
+            'command': command,
+            'confidence': confidence,
+            'intensity': intensity,
+            'position': self.drone_controller.state['position'].tolist(),
+            'battery': self.drone_controller.state['battery'],
+            'armed': self.drone_controller.state['armed'],
+            'mode': self.drone_controller.state['mode']
+        }
+        self.data_log.append(log_entry)
+
+        # 实时显示
+        pos = self.drone_controller.state['position']
+        print(f"  位置: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f}) | "
+              f"电池: {self.drone_controller.state['battery']:.1f}%")
+
+    def _save_log(self):
+        """保存日志到文件"""
+        if self.data_log:
+            try:
+                with open(self.log_file, 'w', encoding='utf-8') as f:
+                    json.dump(self.data_log, f, indent=2, ensure_ascii=False)
+                print(f"飞行日志已保存到: {self.log_file} ({len(self.data_log)}条记录)")
+            except Exception as e:
+                print(f"保存日志失败: {e}")
+        else:
+            print("没有飞行记录需要保存")
+
+    def run(self):
+        """运行主程序"""
+        print("=" * 60)
+        print("     手势控制无人机仿真系统（完全手势控制版）")
+        print("=" * 60)
+        print("系统功能:")
+        print("  1. 实时手势识别 (8种手势)")
+        print("  2. 无人机控制仿真")
+        print("  3. 3D可视化 (OpenGL渲染)")
+        print("  4. 飞行数据记录")
+        print("=" * 60)
+        print("手势指令:")
+        print("  张开手掌 - 起飞")
+        print("  握拳 - 降落")
+        print("  胜利手势 - 前进")
+        print("  大拇指 - 后退")
+        print("  食指上指 - 上升")
+        print("  食指向下 - 下降")
+        print("  OK手势 - 悬停")
+        print("  大拇指向下 - 停止")
+        print("=" * 60)
+        print("使用说明:")
+        print("  手势控制窗口: 按 'q' 退出")
+        print("  手势控制窗口: 按 'c' 切换摄像头")
+        print("  手势控制窗口: 按 'd' 显示调试信息")
+        print("  3D仿真窗口: 按 'ESC' 退出")
+        print("  3D窗口按键控制:")
+        print("    G - 切换网格显示")
+        print("    T - 切换轨迹显示")
+        print("    A - 切换坐标轴显示")
+        print("    ↑↓←→ - 旋转视角")
+        print("    +/- - 缩放视角")
+        print("    空格 - 重置视角")
+        print("=" * 60)
+        print("提示:")
+        print("  1. 无人机初始在地面，等待手势指令")
+        print("  2. 手势识别阈值已降低，更容易触发")
+        print("  3. 做手势时保持手在摄像头中心")
+        print("  4. 每个手势保持1.5秒以上")
+        print("=" * 60)
+        print("系统启动中...")
+
+        try:
+            # 启动手势识别线程
+            self.gesture_thread = threading.Thread(
+                target=self._gesture_recognition_loop,
+                name="GestureThread",
+                daemon=True
+            )
+            self.gesture_thread.start()
+
+            print("手势识别线程已启动")
+            print("3D仿真窗口即将打开...")
+            time.sleep(1)  # 给手势窗口一点时间显示
+
+            # 主线程运行仿真
+            self._simulation_loop()
+
+            # 等待手势线程结束
+            if self.gesture_thread.is_alive():
+                self.gesture_thread.join(timeout=2.0)
+
+        except KeyboardInterrupt:
+            print("\n系统被用户中断")
+        except Exception as e:
+            print(f"系统运行错误: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # 清理资源
+            self.running = False
+
+            if self.cap:
+                self.cap.release()
+                print("摄像头已释放")
+
+            cv2.destroyAllWindows()
+            print("OpenCV窗口已关闭")
+
+            # 保存日志
+            self._save_log()
+
+            print("无人机仿真系统已安全关闭 ✓")
+
+
+def load_config():
+    """加载配置文件"""
+    config = {
+        'camera_id': 1,  # 默认使用摄像头1
+        'window_width': 1024,
+        'window_height': 768,
+        'drone_mass': 1.0,
+        'gravity': 9.81,
+        'simulation_fps': 60,
+        'gesture_threshold': 0.6  # 降低默认阈值
+    }
+    return config
 
 
 if __name__ == "__main__":
-    main()
+    print("手势控制无人机仿真系统 - 启动（完全手势控制版）")
+    print("=" * 60)
+
+    # 检查必要的模块
+    try:
+        import pygame
+
+        print("✅ Pygame 已安装")
+    except ImportError:
+        print("❌ 错误: Pygame 未安装!")
+        print("请运行: pip install pygame")
+        sys.exit(1)
+
+    try:
+        import OpenGL
+
+        print("✅ PyOpenGL 已安装")
+    except ImportError:
+        print("❌ 错误: PyOpenGL 未安装!")
+        print("请运行: pip install PyOpenGL PyOpenGL-accelerate")
+        sys.exit(1)
+
+    # 加载配置
+    config = load_config()
+
+    # 创建并运行仿真系统
+    try:
+        simulation = IntegratedDroneSimulation(config)
+        simulation.run()
+    except Exception as e:
+        print(f"系统启动失败: {e}")
+        import traceback
+
+        traceback.print_exc()
