@@ -115,12 +115,13 @@ def train_one_step(model, optimizer, x, y):
         1. 使用梯度裁剪防止梯度爆炸
         2. 所有计算都在GradientTape上下文中进行自动微分
     """
-    with tf.GradientTape() as tape:     # 记录计算图以计算梯度
-        logits = model(x)               # 前向传播
-        loss = compute_loss(logits, y)  # 计算损失
-        grads = tape.gradient(loss, model.trainable_variables)
-        # 添加梯度裁剪 控制在1.0以内
-        grads = [tf.clip_by_value(g, -1.0, 1.0) for g in grads]
+    with tf.GradientTape() as tape:
+        logits = model(x)
+        loss = compute_loss(logits, y)
+    # 移出with块，只计算一次梯度，并添加梯度裁剪
+    grads = tape.gradient(loss, model.trainable_variables)
+    grads = [tf.clip_by_value(grad, -1.0, 1.0) for grad in grads]  # 添加梯度裁剪
+    # 计算梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
     accuracy = compute_accuracy(logits, y)   # 计算准确率

@@ -10,12 +10,10 @@ import math
 import matplotlib.pyplot as plt
 from collections import deque
 from tensorflow.keras.applications.xception import Xception
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Input, Concatenate, Conv2D, AveragePooling2D, Activation, \
-    Flatten, Dropout, BatchNormalization, MaxPooling2D
+    Flatten, Dropout, BatchNormalization, MaxPooling2D, Multiply
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.models import Model
+from tensorflow.keras.models import Sequential, Model
 from tensorflow.keras.callbacks import TensorBoard
 import tensorflow as tf
 import tensorflow.keras.backend as backend
@@ -30,7 +28,7 @@ class ModifiedTensorBoard(TensorBoard):
         super().__init__(**kwargs)
         self._log_write_dir = self.log_dir
         self.step = 1
-        self.writer = self.writer = tf.summary.create_file_writer(self.log_dir)
+        self.writer = tf.summary.create_file_writer(self.log_dir)
 
     def set_model(self, model):
         self.model = model
@@ -78,47 +76,52 @@ class DQNAgent:
         self.training_initialized = False
 
     def create_model(self):
-        """创建深度Q网络模型"""
-        model = Sequential()
+        """创建深度Q网络模型 - 优化网络结构"""
+        # 使用函数式API以支持注意力机制
+        inputs = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
         
         # 第一卷积块
-        model.add(Conv2D(32, (5, 5), strides=(2, 2), input_shape=(IM_HEIGHT, IM_WIDTH, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())  # 批归一化
-        model.add(MaxPooling2D(pool_size=(2, 2)))
+        x = Conv2D(32, (5, 5), strides=(2, 2), padding='same')(inputs)
+        x = Activation('relu')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
         
         # 第二卷积块
-        model.add(Conv2D(64, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(MaxPooling2D(pool_size=(2, 2)))
+        x = Conv2D(64, (3, 3), padding='same')(x)
+        x = Activation('relu')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
         
         # 第三卷积块
-        model.add(Conv2D(128, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(MaxPooling2D(pool_size=(2, 2)))
+        x = Conv2D(128, (3, 3), padding='same')(x)
+        x = Activation('relu')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
         
-        # 第四卷积块
-        model.add(Conv2D(256, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
+        # 空间注意力机制
+        attention = Conv2D(1, (1, 1), padding='same', activation='sigmoid')(x)
+        x = Multiply()([x, attention])
         
         # 展平层
-        model.add(Flatten())
+        x = Flatten()(x)
         
-        # 全连接层
-        model.add(Dense(512, activation='relu'))
-        model.add(Dropout(0.3))  # 防止过拟合
-        model.add(Dense(256, activation='relu'))
-        model.add(Dropout(0.3))
-        model.add(Dense(128, activation='relu'))
-        model.add(Dropout(0.2))
+        # 全连接层 - 增加层深度
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.3)(x)
+        x = Dense(256, activation='relu')(x)
+        x = Dropout(0.3)(x)
+        x = Dense(128, activation='relu')(x)
+        x = Dropout(0.2)(x)
+        x = Dense(64, activation='relu')(x)
+        x = Dropout(0.1)(x)
         
-        # 输出层 - 使用线性激活函数用于Q值回归
-        model.add(Dense(3, activation='linear'))
+        # 输出层 - 5个动作
+        outputs = Dense(5, activation='linear')(x)
         
-        # 编译模型，使用Huber损失和Adam优化器
+        # 创建模型
+        model = Model(inputs=inputs, outputs=outputs)
+        
+        # 编译模型
         model.compile(loss="huber", optimizer=Adam(lr=LEARNING_RATE), metrics=["mae"])
         return model
 
@@ -178,7 +181,6 @@ class DQNAgent:
 
         # 选择小批量经验
         minibatch = self.minibatch_chooser()
-        print([transition[2] for transition in minibatch])  # 打印奖励值
 
         # 准备训练数据
         current_states = np.array([transition[0] for transition in minibatch]) / 255
@@ -228,7 +230,7 @@ class DQNAgent:
         """在单独线程中持续训练"""
         # 预热训练
         x = np.random.uniform(size=(1, IM_HEIGHT, IM_WIDTH, 3)).astype(np.float32)
-        y = np.random.uniform(size=(1, 3)).astype(np.float32)
+        y = np.random.uniform(size=(1, 5)).astype(np.float32)  # 改为5个输出
 
         self.model.fit(x, y, verbose=False, batch_size=1)
         self.training_initialized = True
