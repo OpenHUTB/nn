@@ -189,6 +189,27 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
     :param model_path: 模型文件/目录路径
     :param use_ros: 是否启用ROS模式
     :param policy_path: 预训练策略模型路径（.pth）
+    可视化模型并运行模拟（支持ROS 1模式）
+    
+    参数:
+        model_path: 模型文件/目录路径
+        use_ros: 是否启用ROS模式（默认False）
+    """
+    # 新增：模型路径智能校验（支持目录自动找XML/MJB文件）
+    if os.path.isdir(model_path):
+        # 遍历目录找第一个XML/MJB文件
+        model_files = []
+        for file in os.listdir(model_path):
+            if file.endswith(('.xml', '.mjb')):
+                model_files.append(os.path.join(model_path, file))
+        if not model_files:
+            logger.error(f"目录 {model_path} 中未找到.xml/.mjb模型文件")
+            return
+        model_path = model_files[0]
+        logger.info(f"自动选择目录中的模型文件: {model_path}")
+    
+        model_path: 模型文件路径
+        use_ros: 是否启用ROS模式（默认False）
     """
     # 智能校验模型路径（支持目录自动找XML/MJB）
     if os.path.isdir(model_path):
@@ -367,6 +388,8 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
         logger.error(f"可视化过程出错: {str(e)}", exc_info=True)
 
 # ===================== 主函数（命令行入口） =====================
+# ===================== 主函数（仅优化model参数help+保持其他逻辑不变）=====================
+# ===================== 主函数（完全保持原有逻辑不变）=====================
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="MuJoCo功能整合工具（支持强化学习策略控制 + ROS 1通信）",
@@ -379,6 +402,15 @@ def main() -> None:
     viz_parser.add_argument("model", help="模型文件路径/目录（支持.xml/.mjb）")
     viz_parser.add_argument("--ros", action="store_true", help="启用ROS 1模式")
     viz_parser.add_argument("--policy", help="预训练策略模型路径（.pth文件）")
+    # 1. 可视化命令（优化model参数help为通用提示，移除硬编码路径）
+    viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
+    viz_parser.add_argument("model", help="模型文件路径或包含模型的目录（支持.xml/.mjb格式）")
+    viz_parser.add_argument("model", help="/home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b")
+    viz_parser.add_argument(
+        "--ros",
+        action="store_true",
+        help="启用ROS模式（发布关节状态/基座姿态，订阅控制指令）"
+    )
 
     # 2. 速度测试命令
     speed_parser = subparsers.add_parser("testspeed", help="测试模型模拟速度（多线程）")
