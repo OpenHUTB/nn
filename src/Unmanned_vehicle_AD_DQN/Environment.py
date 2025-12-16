@@ -24,6 +24,14 @@ class CarEnv:
         self.client = carla.Client("localhost", 2000)  # CARLA客户端
         self.client.set_timeout(20.0)  # 连接超时设置
         self.front_camera = None  # 前置摄像头图像
+        
+        # 新增变量
+        self.last_action = 1  # 上一个动作，默认保持
+        self.same_steer_counter = 0  # 连续同向转向计数器
+        self.suggested_action = None  # 建议的避让动作
+        self.episode_start_time = None  # 每轮开始时间
+        self.last_ped_distance = float('inf')  # 上次最近行人距离
+        self.current_episode = 1  # 当前episode编号
 
         # 加载世界和蓝图
         self.world = self.client.load_world('Town03')
@@ -63,40 +71,36 @@ class CarEnv:
         except Exception as e:
             print(f"设置观察者视角时出错: {e}")
 
-    def setup_observer_view(self):
-        """设置观察者视角，让用户可以在CARLA窗口中看到场景"""
-        try:
-            # 获取当前地图的生成点
-            spawn_points = self.world.get_map().get_spawn_points()
-            if spawn_points:
-                # 选择一个合适的观察者位置
-                spectator = self.world.get_spectator()
-                
-                # 设置观察者位置在车辆起始位置附近
-                transform = carla.Transform()
-                transform.location.x = -81.0
-                transform.location.y = -195.0
-                transform.location.z = 15.0  # 提高视角高度
-                transform.rotation.pitch = -45.0  # 向下倾斜视角
-                transform.rotation.yaw = 0.0
-                transform.rotation.roll = 0.0
-                
-                spectator.set_transform(transform)
-                print("观察者视角已设置")
-        except Exception as e:
-            print(f"设置观察者视角时出错: {e}")
-
     def spawn_pedestrians_general(self, number, isCross):
-        """生成指定数量的行人 - 大幅减少数量"""
-        # 限制最大生成数量
-        number = min(number, 8)  # 最多8个行人
+        """生成指定数量的行人"""
+        # 记录要生成的数量
+        target_number = number
         
-        for i in range(number):
+        # 记录成功生成的数量
+        success_count = 0
+        
+        # 尝试生成指定数量的行人
+        attempts = 0
+        max_attempts = number * 3  # 最多尝试3倍次数
+        
+        while success_count < target_number and attempts < max_attempts:
+            attempts += 1
             isLeft = random.choice([True, False])  # 随机选择左右侧
-            if isLeft:
-                self.spawn_pedestrians_left(isCross)
-            else:
-                self.spawn_pedestrians_right(isCross)
+            
+            try:
+                if isLeft:
+                    if self.spawn_pedestrians_left(isCross):
+                        success_count += 1
+                else:
+                    if self.spawn_pedestrians_right(isCross):
+                        success_count += 1
+            except Exception as e:
+                # 如果生成失败，继续尝试
+                print(f"生成行人失败: {e}")
+                continue
+        
+        print(f"成功生成 {success_count}/{target_number} 个行人 (isCross={isCross})")
+        return success_count
 
     def spawn_pedestrians_right(self, isCross):
         """在右侧生成行人"""
@@ -118,31 +122,40 @@ class CarEnv:
                 min_x = 17
                 max_x = 20.5
 
-        # 随机生成位置
-        x = random.uniform(min_x, max_x)
-        y = random.uniform(min_y, max_y)
-
-        spawn_point = carla.Transform(carla.Location(x, y, 2.0))
-
-        # 避免在特定区域生成
-        while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
+        # 尝试多次生成直到成功
+        for attempt in range(3):  # 尝试3次
+            # 随机生成位置
             x = random.uniform(min_x, max_x)
             y = random.uniform(min_y, max_y)
+
             spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-        # 尝试生成行人
-        walker_bp = random.choice(blueprints_walkers)
-        npc = self.world.try_spawn_actor(walker_bp, spawn_point)
+            # 避免在特定区域生成
+            while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
+                x = random.uniform(min_x, max_x)
+                y = random.uniform(min_y, max_y)
+                spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-        if npc is not None:
-            # 设置行人控制参数
-            ped_control = carla.WalkerControl()
-            ped_control.speed = random.uniform(0.5, 1.0)  # 随机速度
-            ped_control.direction.y = -1  # 主要移动方向
-            ped_control.direction.x = 0.15  # 轻微横向移动
-            npc.apply_control(ped_control)
-            npc.set_simulate_physics(True)  # 启用物理模拟
-            self.walker_list.append(npc)  # 添加到行人列表
+            # 尝试生成行人
+            try:
+                walker_bp = random.choice(blueprints_walkers)
+                npc = self.world.try_spawn_actor(walker_bp, spawn_point)
+
+                if npc is not None:
+                    # 设置行人控制参数
+                    ped_control = carla.WalkerControl()
+                    ped_control.speed = random.uniform(0.5, 1.0)  # 随机速度
+                    ped_control.direction.y = -1  # 主要移动方向
+                    ped_control.direction.x = 0.15  # 轻微横向移动
+                    npc.apply_control(ped_control)
+                    npc.set_simulate_physics(True)  # 启用物理模拟
+                    self.walker_list.append(npc)  # 添加到行人列表
+                    return True  # 生成成功
+            except Exception as e:
+                print(f"生成右侧行人失败 (尝试 {attempt+1}): {e}")
+                continue
+        
+        return False  # 生成失败
 
     def spawn_pedestrians_left(self, isCross):
         """在左侧生成行人"""
@@ -164,49 +177,75 @@ class CarEnv:
                 min_x = 17
                 max_x = 20.5
 
-        # 随机生成位置
-        x = random.uniform(min_x, max_x)
-        y = random.uniform(min_y, max_y)
-
-        spawn_point = carla.Transform(carla.Location(x, y, 2.0))
-
-        # 避免在特定区域生成
-        while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
+        # 尝试多次生成直到成功
+        for attempt in range(3):  # 尝试3次
+            # 随机生成位置
             x = random.uniform(min_x, max_x)
             y = random.uniform(min_y, max_y)
+
             spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-        # 尝试生成行人
-        walker_bp = random.choice(blueprints_walkers)
-        npc = self.world.try_spawn_actor(walker_bp, spawn_point)
+            # 避免在特定区域生成
+            while (-10 < spawn_point.location.x < 17) or (70 < spawn_point.location.x < 100):
+                x = random.uniform(min_x, max_x)
+                y = random.uniform(min_y, max_y)
+                spawn_point = carla.Transform(carla.Location(x, y, 2.0))
 
-        if npc is not None:
-            # 设置行人控制参数
-            ped_control = carla.WalkerControl()
-            ped_control.speed = random.uniform(0.7, 1.3)  # 随机速度
-            ped_control.direction.y = 1  # 主要移动方向
-            ped_control.direction.x = -0.05  # 轻微横向移动
-            npc.apply_control(ped_control)
-            npc.set_simulate_physics(True)  # 启用物理模拟
-            self.walker_list.append(npc)  # 添加到行人列表
+            # 尝试生成行人
+            try:
+                walker_bp = random.choice(blueprints_walkers)
+                npc = self.world.try_spawn_actor(walker_bp, spawn_point)
 
-    def reset(self):
-        """重置环境"""
+                if npc is not None:
+                    # 设置行人控制参数
+                    ped_control = carla.WalkerControl()
+                    ped_control.speed = random.uniform(0.7, 1.3)  # 随机速度
+                    ped_control.direction.y = 1  # 主要移动方向
+                    ped_control.direction.x = -0.05  # 轻微横向移动
+                    npc.apply_control(ped_control)
+                    npc.set_simulate_physics(True)  # 启用物理模拟
+                    self.walker_list.append(npc)  # 添加到行人列表
+                    return True  # 生成成功
+            except Exception as e:
+                print(f"生成左侧行人失败 (尝试 {attempt+1}): {e}")
+                continue
+        
+        return False  # 生成失败
+
+    def reset(self, episode=1):
+        """重置环境，根据episode参数生成不同数量的行人"""
+        self.current_episode = episode
+        
         # 清理现有的行人和车辆
         self.cleanup_actors()
         
         # 重置行人列表
         self.walker_list = []
 
-        # 大幅减少行人数量 - 从30+10减少到8+4
-        self.spawn_pedestrians_general(8, True)
-        self.spawn_pedestrians_general(4, False)
+        # 根据训练阶段生成不同数量的行人
+        if episode < 100:  # 第一阶段：少量行人
+            print(f"Episode {episode}: 生成少量行人 (4十字路口 + 2非十字路口)")
+            self.spawn_pedestrians_general(4, True)   # 十字路口行人
+            self.spawn_pedestrians_general(2, False)  # 非十字路口行人
+        elif episode < 400:  # 第二阶段：中等数量行人
+            print(f"Episode {episode}: 生成中等数量行人 (6十字路口 + 3非十字路口)")
+            self.spawn_pedestrians_general(6, True)
+            self.spawn_pedestrians_general(3, False)
+        else:  # 第三阶段：正常难度
+            print(f"Episode {episode}: 生成正常数量行人 (8十字路口 + 4非十字路口)")
+            self.spawn_pedestrians_general(8, True)
+            self.spawn_pedestrians_general(4, False)
 
         # 重置状态变量
         self.collision_history = []
         self.actor_list = []
         self.slow_counter = 0
         self.steer_counter = 0
+        self.same_steer_counter = 0
+        self.suggested_action = None
+        self.last_action = 1
+        self.episode_start_time = time.time()
+        self.last_ped_distance = float('inf')
 
         # 设置车辆生成点
         spawn_point = carla.Transform()
@@ -276,6 +315,7 @@ class CarEnv:
                 actor.destroy()
                 
         self.actor_list = []
+        self.walker_list = []  # 清空行人列表
 
     def setup_follow_camera(self):
         """设置跟随车辆的相机，用于在CARLA窗口中观察"""
@@ -314,152 +354,182 @@ class CarEnv:
 
         self.front_camera = processed_image  # 更新前置摄像头图像
 
-    def reward(self):
-        """计算奖励函数 - 增强方向控制奖励"""
+    def reward(self, speed_kmh, current_steer):
+        """增强的奖励函数 - 特别强调行人避障"""
         reward = 0
         done = False
-
-        # 计算车辆速度
-        velocity = self.vehicle.get_velocity()
-        velocity_kmh = int(3.6 * math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2))
         
-        # 获取车辆位置和方向
+        # 获取车辆状态
         vehicle_location = self.vehicle.get_location()
         vehicle_rotation = self.vehicle.get_transform().rotation.yaw
         
-        # 计算距离终点的进度奖励
-        progress_reward = (vehicle_location.x + 81) / 236.0  # 从-81到155，总共236单位
+        # 1. 道路保持奖励（重要的基础）
+        heading_error = abs(vehicle_rotation)
         
-        # 速度奖励 - 更加平滑
-        if velocity_kmh == 0:
-            reward -= 0.5  # 停车惩罚减少
-        elif 20 <= velocity_kmh <= 40:  # 理想速度区间
-            reward += 0.8
-        elif 10 <= velocity_kmh < 20 or 40 < velocity_kmh <= 50:
-            reward += 0.3  # 可接受速度区间
-        else:
-            reward -= 0.2  # 不理想速度
-            
-        # 增强方向奖励 - 确保车辆朝正确方向行驶
-        if -20 <= vehicle_rotation <= 20:  # 严格限制在正东方向附近
-            reward += 0.5  # 增加直行奖励
-            self.steer_counter = max(0, self.steer_counter - 1)  # 减少转向计数
-        elif -45 <= vehicle_rotation <= 45:
-            reward += 0.1  # 较小奖励
-        else:
-            reward -= 1.0  # 严重偏离惩罚
-            self.steer_counter += 2  # 增加转向计数
-            
-        # 行人距离检测
-        min_dist = float('inf')  # 最小距离初始化为无穷大
+        if heading_error < 5:  # 完美保持方向
+            reward += 0.8  # 略微降低权重，给行人避障更多空间
+        elif heading_error < 15:  # 良好保持
+            reward += 0.4
+        elif heading_error < 30:  # 可接受
+            reward += 0.1
+        else:  # 方向偏差过大
+            reward -= 0.3 * (heading_error / 30.0)  # 降低惩罚强度
+        
+        # 2. 行人避障（最高优先级） - 增强奖励机制
+        min_ped_distance = float('inf')
+        closest_pedestrian = None
+        
+        # 统计有效行人数量
+        active_pedestrians = 0
+        
         for walker in self.walker_list:
             if not walker.is_alive:
                 continue
                 
+            active_pedestrians += 1
             ped_location = walker.get_location()
             dx = vehicle_location.x - ped_location.x
             dy = vehicle_location.y - ped_location.y
             distance = math.sqrt(dx**2 + dy**2)
-            min_dist = min(min_dist, distance)  # 更新最小距离
             
-            # 清理边界外的行人
-            try:
-                player_direction = walker.get_control().direction
-                if (ped_location.y < -214 and player_direction.y == -1) or \
-                   (ped_location.y > -191 and player_direction.y == 1):
-                    if walker.is_alive:
-                        walker.destroy()
-            except:
-                pass  # 如果无法获取控制信息，跳过
-
-        # 基于行人距离的奖励
-        if min_dist < 3.0:  # 非常危险距离
-            reward -= 3.0
-            done = True
-        elif min_dist < 5.0:  # 危险距离
-            reward -= 1.0
-        elif min_dist < 8.0:  # 警告距离
-            reward -= 0.3
-        elif min_dist > 15.0:  # 安全距离
-            reward += 0.2
-            
-        # 碰撞检测
-        if len(self.collision_history) != 0:
-            reward = -10  # 碰撞惩罚
-            done = True
-            
-        # 进度奖励
-        reward += progress_reward * 0.5
+            if distance < min_ped_distance:
+                min_ped_distance = distance
+                closest_pedestrian = walker
         
-        # 完成条件判断
+        # 如果当前没有有效行人，重置距离
+        if active_pedestrians == 0:
+            min_ped_distance = float('inf')
+        
+        # 行人距离分级奖励 - 增强避障激励
+        if min_ped_distance < 100:  # 只考虑100米内的行人
+            if min_ped_distance < 3.0:  # 紧急避让距离
+                reward -= 8.0  # 增加惩罚
+                done = True
+                print(f"Episode {self.current_episode}: 与行人距离过近 ({min_ped_distance:.1f}m)!")
+            elif min_ped_distance < 5.0:  # 危险距离
+                reward -= 3.0  # 增加惩罚
+                # 计算避让方向
+                if closest_pedestrian:
+                    ped_y = closest_pedestrian.get_location().y
+                    veh_y = vehicle_location.y
+                    # 如果行人在车辆左侧，鼓励右转；反之鼓励左转
+                    if ped_y < veh_y:  # 行人在左侧
+                        self.suggested_action = 4  # 右转
+                    else:  # 行人在右侧
+                        self.suggested_action = 3  # 左转
+            elif min_ped_distance < 8.0:  # 预警距离
+                reward -= 0.8
+            elif min_ped_distance < 12.0:  # 安全距离
+                reward += 0.5  # 增加安全距离奖励
+            else:  # 非常安全
+                reward += 0.2
+        
+        # 3. 成功避障奖励 - 当成功避开行人后给予额外奖励
+        if self.last_ped_distance < 8.0 and min_ped_distance > self.last_ped_distance:
+            # 如果上次距离危险，这次距离更远了，说明成功避让
+            reward += 0.3
+        
+        self.last_ped_distance = min_ped_distance  # 保存当前距离
+        
+        # 4. 速度奖励（平衡避障和前进）
+        if 15 <= speed_kmh <= 35:  # 理想速度区间
+            reward += 0.4
+        elif 5 <= speed_kmh < 15:  # 较慢但安全（避障时可能需要减速）
+            reward += 0.2
+        elif 35 < speed_kmh <= 45:  # 稍快
+            reward += 0.1
+        elif speed_kmh > 45:  # 过快，在行人环境中危险
+            reward -= 0.5  # 增加惩罚
+        else:  # 停车或极慢
+            reward -= 0.05  # 轻微惩罚
+        
+        # 5. 转向平滑性奖励（避障时可能需要适当转向）
+        steer_penalty = abs(current_steer) * 0.3  # 降低惩罚，给避障转向更多空间
+        reward -= steer_penalty
+        
+        # 6. 碰撞检测
+        if len(self.collision_history) != 0:
+            reward = -15  # 增加碰撞惩罚
+            done = True
+            print(f"Episode {self.current_episode}: 发生碰撞!")
+        
+        # 7. 进度奖励（次要于避障）
+        progress = (vehicle_location.x + 81) / 236.0  # 从-81到155
+        reward += progress * 0.2  # 降低进度权重
+        
+        # 8. 边界检查
         if vehicle_location.x > 155:  # 成功到达终点
-            reward += 10  # 成功到达奖励
+            reward += 20  # 增加到达终点的奖励
             done = True
-        elif vehicle_location.x < -90:  # 倒退太多
-            reward -= 5
+            print(f"Episode {self.current_episode}: 成功到达终点!")
+        elif vehicle_location.x < -90 or abs(vehicle_location.y + 195) > 30:  # 偏离道路
+            reward -= 3  # 降低偏离惩罚
             done = True
-            
+            print(f"Episode {self.current_episode}: 偏离道路!")
+        
         return reward, done
 
     def step(self, action):
-        """执行动作并返回新状态 - 扩展为5个动作包含转向"""
-        # 扩展的动作空间: 0-减速, 1-保持, 2-加速, 3-左转, 4-右转
+        """执行动作并返回新状态 - 增强平滑性和安全性"""
+        # 获取当前速度
+        velocity = self.vehicle.get_velocity()
+        speed_kmh = 3.6 * math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         
-        # 限制连续转向次数，避免过度转向
-        max_continuous_steer = 3
-        current_steer = 0.0
+        # 5个动作: 0-减速, 1-保持, 2-加速, 3-左转, 4-右转
         
-        if action == 3:  # 左转
-            if self.steer_counter < max_continuous_steer:
-                current_steer = -0.3  # 小角度左转
-                self.steer_counter += 1
-            else:
-                # 强制直行一段时间
-                current_steer = 0.0
-                action = 1  # 改为保持动作
-        elif action == 4:  # 右转
-            if self.steer_counter < max_continuous_steer:
-                current_steer = 0.3  # 小角度右转
-                self.steer_counter += 1
-            else:
-                # 强制直行一段时间
-                current_steer = 0.0
-                action = 1  # 改为保持动作
-        else:
-            # 非转向动作时逐渐减少转向计数
-            self.steer_counter = max(0, self.steer_counter - 0.5)
+        # 根据速度调整转向幅度 - 速度越快，转向越平滑
+        speed_factor = max(0.5, min(1.0, 30.0 / max(1.0, speed_kmh)))
         
-        # 速度控制
+        # 基础控制参数
         throttle = 0.0
         brake = 0.0
+        steer = 0.0
         
+        # 速度控制
         if action == 0:  # 减速
             throttle = 0.0
-            brake = 0.3
+            brake = 0.5
         elif action == 1:  # 保持/轻微加速
             throttle = 0.3
             brake = 0.0
         elif action == 2:  # 加速
             throttle = 0.7
             brake = 0.0
-        elif action == 3 or action == 4:  # 转向时保持适中速度
+        elif action == 3:  # 左转
             throttle = 0.4
             brake = 0.0
-
+            steer = -0.2 * speed_factor  # 速度相关的转向幅度
+        elif action == 4:  # 右转
+            throttle = 0.4
+            brake = 0.0
+            steer = 0.2 * speed_factor   # 速度相关的转向幅度
+        
+        # 限制连续同向转向 - 防止过度转向
+        if (action == 3 and self.last_action == 3) or (action == 4 and self.last_action == 4):
+            self.same_steer_counter += 1
+            if self.same_steer_counter > 3:  # 连续3次同向转向后强制回正
+                steer *= 0.5  # 减小转向幅度
+                throttle *= 0.8  # 减速
+        else:
+            self.same_steer_counter = 0
+        
+        # 记录上一个动作
+        self.last_action = action
+        
         # 应用控制
         self.vehicle.apply_control(carla.VehicleControl(
             throttle=throttle, 
             brake=brake, 
-            steer=current_steer
+            steer=steer
         ))
-
+        
         # 等待物理更新
         time.sleep(0.05)
         
         # 计算奖励和完成状态
-        reward, done = self.reward()
+        reward, done = self.reward(speed_kmh, steer)
         
         # 限制极端奖励值
-        reward = np.clip(reward, -10, 10)
+        reward = np.clip(reward, -15, 20)
         
         return self.front_camera, reward, done, None

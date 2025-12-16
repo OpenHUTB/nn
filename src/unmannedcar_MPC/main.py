@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+##!/usr/bin/env python3
 
 import carla
 import config as Config
@@ -46,6 +46,10 @@ class Main():
         # get forward speed
         velocity = self.ego.get_velocity()
         speed_m_s = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+
+        # 计算并保存当前速度（km/h）
+        current_speed_kmh = speed_m_s * 3.6  # m/s to km/h
+
         dt = 1 / Config.PYGAME_FPS
 
         # generate control signal
@@ -55,6 +59,9 @@ class Main():
 
         # apply control signal
         self.ego.apply_control(control)
+
+        # 在屏幕上显示速度
+        self.drawer.display_speed(current_speed_kmh)
 
 if __name__ == '__main__':
     Main()
