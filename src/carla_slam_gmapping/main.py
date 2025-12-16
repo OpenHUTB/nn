@@ -256,24 +256,17 @@ class GlobalPlannerNode(Node):
         return None, None
 
     def _calculate_path_distance(self, route):
-        """新增：计算路径总长度"""
+        """计算路径总长度 - 优化版"""
         if len(route) < 2:
             return 0.0
-
-        total_distance = 0.0
-        for i in range(len(route) - 1):
-            current_wp = route[i][0]
-            next_wp = route[i + 1][0]
-
-            # 计算两个路点之间的欧几里得距离
-            dx = next_wp.transform.location.x - current_wp.transform.location.x
-            dy = next_wp.transform.location.y - current_wp.transform.location.y
-            dz = next_wp.transform.location.z - current_wp.transform.location.z
-
-            distance = math.sqrt(dx * dx + dy * dy + dz * dz)
-            total_distance += distance
-
-        return total_distance
+        return sum(
+            math.sqrt(
+                (next_wp.transform.location.x - current_wp.transform.location.x) ** 2 +
+                (next_wp.transform.location.y - current_wp.transform.location.y) ** 2 +
+                (next_wp.transform.location.z - current_wp.transform.location.z) ** 2
+            )
+            for (current_wp, _), (next_wp, _) in zip(route, route[1:])
+        )
 
     def _build_path_message(self, route):
         """将CARLA路径转换为ROS Path消息"""
