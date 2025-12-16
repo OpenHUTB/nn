@@ -86,9 +86,25 @@ PER_BETA_START = 0.4
 PER_BETA_FRAMES = 100000
 # beta线性增长的帧数
 
-# Dueling DQN 参数
-USE_DUELING = True
-# 是否使用Dueling DQN架构
+# 训练策略参数
+USE_CURRICULUM_LEARNING = True
+# 是否使用课程学习
 
-USE_PER = True
-# 是否使用优先经验回放
+USE_MULTI_OBJECTIVE = True
+# 是否使用多目标优化
+
+USE_IMITATION_LEARNING = False
+# 是否使用模仿学习（预训练）
+
+# 多目标优化权重（这些权重会自动调整）
+SAFETY_WEIGHT = 0.40
+EFFICIENCY_WEIGHT = 0.25
+COMFORT_WEIGHT = 0.20
+RULE_FOLLOWING_WEIGHT = 0.15
+
+# 课程学习参数
+CURRICULUM_STAGES = 5
+# 课程学习阶段数量
+
+CURRICULUM_SUCCESS_THRESHOLDS = [0.3, 0.5, 0.7, 0.85, 0.9]
+# 每个阶段进入下一阶段所需的成功率阈值
