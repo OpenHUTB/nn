@@ -527,8 +527,7 @@ OpenStreetMap（简称OSM）是一个免费且开源的世界地图数据库，�
 5. **在弹出的窗口中找到从OpenStreetMap官网导出的后缀为.osm的文件打开**
   ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112324_70_69.jpg)
 6. **导入结果如下图**
-   ![](https://github.com/2382613701lz-ynetizen/image/blob/main/20251201112350_71_69.png)
-
+  ![](https://github.com/2382613701lzy-netizen/image/blob/main/20251201112350_71_69.png)
 
 # QGIS 下载、安装与中文界面设置完整指南
 以下是QGIS软件从下载、安装到完成中文界面设置的完整步骤。整个过程主要分为下载、安装、设置语言以及获取学习数据四个部分。
