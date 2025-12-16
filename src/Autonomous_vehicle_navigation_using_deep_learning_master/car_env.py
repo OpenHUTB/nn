@@ -420,19 +420,19 @@ class CarEnv:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0, brake=1.0))
             print("执行动作: 刹车")
         elif action == 1:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.5, steer=   0*self.STEER_AMT))
             print("执行动作: 直行")
         elif action == 2:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=-0.3*self.STEER_AMT))
             print("执行动作: 左转")
         elif action == 3:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=0.3*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer= 0.3*self.STEER_AMT))
             print("执行动作: 右转")
         elif action == 4:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=-0.05*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=-0.1*self.STEER_AMT))
             print("执行动作: 微左")
         elif action == 5:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0.05*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer= 0.1*self.STEER_AMT))
             print("执行动作: 微右")
             
         # 处理图像
@@ -498,7 +498,7 @@ class CarEnv:
             reward = -200
             print("❌ 方向偏差过大!")
             
-        if abs(signed_dis) > 3:
+        if abs(signed_dis) > 2:
             reward = -50
             print("⚠️ 横向偏差过大")
         
