@@ -1,75 +1,101 @@
 # ui_handler.py
+import os
 import cv2
+import argparse
 from detection_engine import DetectionEngine
 from image_detector import ImageDetector
 from camera_detector import CameraDetector
-import sys
-import os
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="YOLOv8 Detection System")
+    parser.add_argument("--image", type=str, help="Path to input image file")
+    parser.add_argument("--camera", action="store_true", help="Start live camera detection")
+    return parser.parse_args()
 
 class UIHandler:
     def __init__(self, config):
         self.config = config
-        self.detection_engine = DetectionEngine()
-        self.image_detector = ImageDetector(self.detection_engine)
-        self.camera_detector = CameraDetector(self.detection_engine)
-    
-    def print_debug(self, message):
-        """调试输出函数"""
-        print(f"[DEBUG] {message}")
-        sys.stdout.flush()  # 强制刷新输出缓冲区
-    
-    def display_menu(self):
-        """显示主菜单"""
-        print("=" * 60)
-        print("           欢迎使用 YOLO 对象检测系统")
-        print("=" * 60)
-        
-        print(f"\n测试图像路径: {self.config.test_image_path}")
-        print(f"图像文件存在: {os.path.exists(self.config.test_image_path)}")
-        
-        print("\n请选择检测模式:")
-        print("1. 检测静态图像")
-        print("2. 检测摄像头实时画面")
-        print("3. 退出程序")
-    
-    def handle_choice(self, choice):
-        """处理用户选择"""
-        if choice == '1':
-            print("\n您选择了: 检测静态图像")
-            self.image_detector.detect_static_image(self.config.test_image_path)
-            return True
-        elif choice == '2':
-            print("\n您选择了: 检测摄像头实时画面")
-            print("注意：要退出摄像头模式，请按 Ctrl+C ！")
-            self.camera_detector.detect_camera()
-            return True
-        elif choice == '3':
-            print("\n程序已退出。")
-            return False
-        else:
-            print("\n无效选择，请输入 1、2 或 3")
-            return True
-    
+        self.engine = DetectionEngine(
+            model_path=config.model_path,
+            conf_threshold=config.confidence_threshold
+        )
+
     def run(self):
-        """运行主程序"""
-        self.print_debug("程序开始执行")
-        self.display_menu()
+        args = parse_args()
+
+        if args.image is not None:
+            print(f"[CLI Mode] Detecting static image: {args.image}")
+            self._run_static_detection(image_path=args.image)
+        elif args.camera:
+            print("[CLI Mode] Starting live camera detection...")
+            self._run_camera_detection()
+        else:
+            self._interactive_menu()
+
+    def _interactive_menu(self):
+        print("=== YOLO Detection System ===")
+        print("1. Static Image Detection")
+        print("2. Live Camera Detection")
+        print("3. Exit")
+
+        choice = input("Please select an option (1-3): ").strip()
+
+        if choice == "1":
+            self._choose_image_source()
+        elif choice == "2":
+            self._run_camera_detection()
+        elif choice == "3":
+            print("Exiting program.")
+        else:
+            print("Invalid option. Please enter 1, 2, or 3.")
+
+    def _choose_image_source(self):
+        """让用户选择使用默认图还是自定义路径"""
+        default_image_path = r"C:\Users\apple\OneDrive\桌面\test.jpg"
         
-        running = True
-        while running:
-            try:
-                choice = input("\n请输入您的选择 (1/2/3): ").strip()
-                self.print_debug(f"用户输入: {choice}")
-                running = self.handle_choice(choice)
-                
-            except KeyboardInterrupt:
-                print("\n\n程序被用户中断。")
-                break
-            except EOFError:
-                print("\n输入结束，程序退出。")
-                break
-            except Exception as e:
-                print(f"\n发生错误: {e}")
-                break
-        
-        self.print_debug("程序结束")
+        print("\n--- Static Image Detection ---")
+        print(f"a) Use default test image at: {default_image_path}")
+        print("b) Enter custom image path")
+        sub_choice = input("Choose (a/b): ").strip().lower()
+
+        if sub_choice == "a":
+            if not os.path.exists(default_image_path):
+                print(f"\n⚠️  Default image not found at:\n    {default_image_path}")
+                print("💡 Please place a 'test.jpg' file in the specified location, or choose option (b).")
+                return
+            print(f"Using default image: {default_image_path}")
+            self._run_static_detection(image_path=default_image_path)
+
+        elif sub_choice == "b":
+            custom_path = input("Enter full or relative image path: ").strip()
+            # 支持 ~ 和相对路径
+            custom_path = os.path.expanduser(custom_path)
+            if not os.path.exists(custom_path):
+                print(f"❌ Error: File not found at: {custom_path}")
+                return
+            self._run_static_detection(image_path=custom_path)
+        else:
+            print("Invalid choice. Returning to main menu.")
+
+    def _run_static_detection(self, image_path):
+        """执行静态图像检测"""
+        print(f"🔍 Detecting objects in: {image_path}")
+        try:
+            detector = ImageDetector(self.engine)
+            detector.detect_static_image(image_path)
+        except Exception as e:
+            print(f"❌ Detection failed: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _run_camera_detection(self):
+        try:
+            detector = CameraDetector(
+                detection_engine=self.engine,
+                output_interval=self.config.output_interval
+            )
+            detector.start_detection(camera_index=self.config.camera_index)
+        except Exception as e:
+            print(f"❌ Camera detection failed: {e}")
+            import traceback
+            traceback.print_exc()
