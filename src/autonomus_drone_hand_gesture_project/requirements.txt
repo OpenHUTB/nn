@@ -1,6 +1,5 @@
-mediapipe==0.10.7
-opencv-python==4.8.1.78
-numpy==1.24.4
-tensorflow==2.14.0
-pandas==2.1.4
-pillow==10.1.0
+opencv-python>=4.5.0
+mediapipe>=0.8.0
+numpy>=1.19.0
+tflite-runtime>=2.5.0  # 用于TFLite模型推理
+airsim>=1.8.0  # AirSim Python客户端
