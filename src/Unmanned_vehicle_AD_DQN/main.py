@@ -71,22 +71,13 @@ if __name__ == '__main__':
         env.collision_hist = []  # 重置碰撞历史
         agent.tensorboard.step = episode  # 设置TensorBoard步数
 
-        # 课程学习 - 随训练进度调整难度
-        if episode > EPISODES // 2:
-            # 训练后期增加行人数量以提高难度
-            env.spawn_pedestrians_general(40, True)
-            env.spawn_pedestrians_general(15, False)
-        else:
-            # 训练前期减少行人数量以降低难度
-            env.spawn_pedestrians_general(25, True)
-            env.spawn_pedestrians_general(8, False)
-
         # 重置每轮统计 - 重置得分和步数
         score = 0
         step = 1
 
         # 重置环境并获取初始状态
-        current_state = env.reset()
+        # 将episode编号传递给环境，环境会根据episode生成相应数量的行人
+        current_state = env.reset(episode)
 
         # 重置完成标志并开始迭代直到本轮结束
         done = False
@@ -103,10 +94,10 @@ if __name__ == '__main__':
                 # 从Q网络获取动作（利用）
                 qs = agent.get_qs(current_state)
                 action = np.argmax(qs)
-                print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}] {action}')
+                print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] {action}')
             else:
-                # 随机选择动作（探索）
-                action = np.random.randint(0, 3)
+                # 随机选择动作（探索）- 扩展为5个动作
+                action = np.random.randint(0, 5)
                 # 添加延迟以匹配60FPS
                 time.sleep(1 / FPS)
 
@@ -124,8 +115,7 @@ if __name__ == '__main__':
                 break
 
         # 本轮结束 - 销毁所有actor
-        for actor in env.actor_list:
-            actor.destroy()
+        env.cleanup_actors()
 
         # 更新成功计数
         if score > 5:  # 成功完成的阈值
@@ -154,7 +144,7 @@ if __name__ == '__main__':
                     f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
         epds.append(episode)
-        print('轮次: ', episode, '得分 %.2f' % score, '成功次数:', success_count)
+        print(f'轮次: {episode}, 得分: {score:.2f}, 成功次数: {success_count}')
         
         # 衰减探索率
         if Hyperparameters.EPSILON > Hyperparameters.MIN_EPSILON:
@@ -164,15 +154,23 @@ if __name__ == '__main__':
     # 设置训练线程终止标志并等待其结束
     agent.terminate = True
     trainer_thread.join()
+    
     # 保存最终模型
-    agent.model.save(
-        f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+    if len(scores) > 0:
+        final_max_reward = max(scores[-AGGREGATE_STATS_EVERY:] if len(scores) >= AGGREGATE_STATS_EVERY else scores)
+        final_avg_reward = np.mean(scores[-AGGREGATE_STATS_EVERY:] if len(scores) >= AGGREGATE_STATS_EVERY else scores)
+        final_min_reward = min(scores[-AGGREGATE_STATS_EVERY:] if len(scores) >= AGGREGATE_STATS_EVERY else scores)
+        agent.model.save(
+            f'models/{MODEL_NAME}__{final_max_reward:_>7.2f}max_{final_avg_reward:_>7.2f}avg_{final_min_reward:_>7.2f}min__{int(time.time())}.model')
 
     # 绘制训练曲线
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    plt.plot(scores)  # 得分曲线
-    plt.plot(avg_scores)  # 平均得分曲线
+    plt.plot(scores, label='每轮得分')
+    plt.plot(avg_scores, label='平均得分(最近10轮)', linewidth=2)
     plt.ylabel('得分')
     plt.xlabel('训练轮次')
+    plt.title('训练进度')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
     plt.show()
