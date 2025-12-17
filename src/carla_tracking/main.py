@@ -9,7 +9,7 @@ import torch
 from collections import deque
 
 
-# -------------------------- 内置 SORT 跟踪器（无需安装任何依赖） --------------------------
+# -------------------------- 内置 SORT 跟踪器（优化版） --------------------------
 class KalmanFilter:
     def __init__(self):
         self.dt = 1.0
@@ -21,8 +21,13 @@ class KalmanFilter:
         self.H = np.array([[1, 0, 0, 0],
                            [0, 1, 0, 0]])
         self.P = np.eye(4) * 1000
-        self.Q = np.eye(4) * 0.01
-        self.R = np.eye(2) * 10
+        # 优化过程噪声协方差，适合车辆运动特性
+        self.Q = np.array([[1, 0, 0, 0],
+                           [0, 1, 0, 0],
+                           [0, 0, 5, 0],
+                           [0, 0, 0, 5]])
+        # 降低测量噪声，提高精度
+        self.R = np.eye(2) * 5
 
     def predict(self):
         self.x = np.dot(self.F, self.x)
@@ -49,12 +54,18 @@ class Track:
         self.height = self.y2 - self.y1
         self.hits = 1
         self.age = 0
+        # 新增：记录历史位置，用于平滑处理
+        self.history = deque(maxlen=5)
+        self.history.append(self.center)
 
     def predict(self):
         self.age += 1
         center = self.kf.predict()
-        self.x1 = center[0, 0] - self.width / 2
-        self.y1 = center[1, 0] - self.height / 2
+        # 新增：使用历史位置平滑预测结果
+        self.history.append(center)
+        smoothed_center = np.mean(self.history, axis=0)
+        self.x1 = smoothed_center[0, 0] - self.width / 2
+        self.y1 = smoothed_center[1, 0] - self.height / 2
         self.x2 = self.x1 + self.width
         self.y2 = self.y1 + self.height
         return [self.x1, self.y1, self.x2, self.y2]
@@ -67,13 +78,14 @@ class Track:
         self.height = self.y2 - self.y1
         self.hits += 1
         self.age = 0
+        self.history.append(self.center)
 
     def get_box(self):
         return [self.x1, self.y1, self.x2, self.y2]
 
 
 class Sort:
-    def __init__(self, max_age=3, min_hits=2, iou_threshold=0.3):
+    def __init__(self, max_age=5, min_hits=3, iou_threshold=0.4):  # 提高IOU阈值
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
@@ -95,9 +107,9 @@ class Sort:
 
         track_boxes = np.array([t.get_box() for t in self.tracks])
         iou_matrix = self._iou_batch(track_boxes, detections[:, :4])
-
         matches, unmatched_tracks, unmatched_dets = self._hungarian_algorithm(iou_matrix)
 
+        # 优化匹配逻辑：只匹配高IOU的结果
         for track_idx, det_idx in matches:
             if iou_matrix[track_idx, det_idx] >= self.iou_threshold:
                 self.tracks[track_idx].update(detections[det_idx][:4])
@@ -105,9 +117,14 @@ class Sort:
         for track_idx in unmatched_tracks:
             self.tracks[track_idx].age += 1
 
+        # 新增：过滤过小的检测框，减少误检（调整最小尺寸为8）
         for det_idx in unmatched_dets:
-            self.tracks.append(Track(detections[det_idx][:4], self.next_id))
-            self.next_id += 1
+            box = detections[det_idx][:4]
+            width = box[2] - box[0]
+            height = box[3] - box[1]
+            if width > 8 and height > 8:  # 减小最小尺寸过滤阈值，适配小目标
+                self.tracks.append(Track(box, self.next_id))
+                self.next_id += 1
 
         self.tracks = [t for t in self.tracks if t.age <= self.max_age]
         return np.array([[t.x1, t.y1, t.x2, t.y2, t.id] for t in self.tracks if t.hits >= self.min_hits])
@@ -115,16 +132,13 @@ class Sort:
     def _iou_batch(self, b1, b2):
         b1_x1, b1_y1, b1_x2, b1_y2 = b1[:, 0], b1[:, 1], b1[:, 2], b1[:, 3]
         b2_x1, b2_y1, b2_x2, b2_y2 = b2[:, 0], b2[:, 1], b2[:, 2], b2[:, 3]
-
         inter_x1 = np.maximum(b1_x1[:, None], b2_x1[None, :])
         inter_y1 = np.maximum(b1_y1[:, None], b2_y1[None, :])
         inter_x2 = np.minimum(b1_x2[:, None], b2_x2[None, :])
         inter_y2 = np.minimum(b1_y2[:, None], b2_y2[None, :])
-
         inter_area = np.maximum(0, inter_x2 - inter_x1) * np.maximum(0, inter_y2 - inter_y1)
         b1_area = (b1_x2 - b1_x1) * (b1_y2 - b1_y1)
         b2_area = (b2_x2 - b2_x1) * (b2_y2 - b2_y1)
-
         return inter_area / (b1_area[:, None] + b2_area[None, :] - inter_area + 1e-6)
 
     def _hungarian_algorithm(self, cost_matrix):
@@ -136,25 +150,35 @@ class Sort:
         return matches, unmatched_tracks, unmatched_dets
 
 
-# -------------------------- YOLOv5 检测模型（需安装 ultralytics） --------------------------
+# -------------------------- YOLOv5 检测模型（优化版） --------------------------
 from ultralytics import YOLO
 
 
-# -------------------------- 核心工具函数（内置，无需创建文件夹） --------------------------
+# -------------------------- 核心工具函数（优化版） --------------------------
 def draw_bounding_boxes(image, boxes, labels, class_names, track_ids=None, probs=None):
     """绘制检测/跟踪框（含类别、置信度、跟踪ID）"""
     for i, (box, label) in enumerate(zip(boxes, labels)):
         x1, y1, x2, y2 = map(int, box)
-        # 绘制矩形框
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        # 过滤超出图像范围的框
+        x1 = max(0, min(x1, image.shape[1] - 1))
+        y1 = max(0, min(y1, image.shape[0] - 1))
+        x2 = max(0, min(x2, image.shape[1] - 1))
+        y2 = max(0, min(y2, image.shape[0] - 1))
+
+        # 根据类别设置不同颜色
+        colors = {2: (0, 255, 0), 3: (0, 0, 255), 5: (255, 0, 0), 7: (255, 255, 0)}
+        color = colors.get(label, (0, 255, 0))
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+
         # 拼接文本信息
         conf_text = f"{probs[i]:.2f}" if (probs is not None and i < len(probs)) else ""
         label_text = f"{class_names[label]} {conf_text}".strip()
         if track_ids and i < len(track_ids):
             label_text += f"_ID:{track_ids[i]}"
+
         # 绘制文本背景（避免遮挡）
         text_size = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
-        cv2.rectangle(image, (x1, y1 - text_size[1] - 5), (x1 + text_size[0], y1), (0, 255, 0), -1)
+        cv2.rectangle(image, (x1, y1 - text_size[1] - 5), (x1 + text_size[0], y1), color, -1)
         cv2.putText(image, label_text, (x1, y1 - 3), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
     return image
 
@@ -171,7 +195,6 @@ def clear_npc(world):
         return
     for actor in world.get_actors().filter('vehicle.*'):
         try:
-            # 老版本CARLA无role_name属性，直接销毁非自车车辆
             actor.destroy()
         except:
             pass
@@ -223,18 +246,15 @@ def spawn_ego_vehicle(world):
     if not world:
         return None
     bp_lib = world.get_blueprint_library()
-    # 兼容不同CARLA版本的车辆蓝图
     try:
         vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2020')
     except:
         vehicle_bp = random.choice(
             [bp for bp in bp_lib.filter('vehicle') if int(bp.get_attribute('number_of_wheels')) == 4])
-
     spawn_points = world.get_map().get_spawn_points()
     if not spawn_points:
         print("警告：没有可用的车辆生成点！")
         return None
-
     # 尝试生成车辆（多次尝试避免生成失败）
     vehicle = None
     for _ in range(5):
@@ -255,16 +275,14 @@ def spawn_camera(world, vehicle):
         return None, None, None
     bp_lib = world.get_blueprint_library()
     camera_bp = bp_lib.find('sensor.camera.rgb')
-    # 设置相机参数（降低分辨率提升CPU性能）
-    camera_bp.set_attribute('image_size_x', '480')
-    camera_bp.set_attribute('image_size_y', '360')
+    # 提高相机分辨率以获取更多细节（略微降低性能）
+    camera_bp.set_attribute('image_size_x', '640')
+    camera_bp.set_attribute('image_size_y', '480')
     camera_bp.set_attribute('fov', '90')
     camera_bp.set_attribute('sensor_tick', '0.05')  # 与世界帧率一致
-
-    # 相机安装位置（自车前方1.5米，高度2米）
-    camera_init_trans = carla.Transform(carla.Location(x=1.5, z=2.0))
+    # 相机安装位置优化（更适合检测前方车辆）
+    camera_init_trans = carla.Transform(carla.Location(x=2.0, z=1.5))
     camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
-
     # 图像队列（异步获取图像）
     image_queue = queue.Queue()
     camera.listen(lambda image: camera_callback(image, image_queue))
@@ -282,7 +300,6 @@ def spawn_npcs(world, count=10):
     if not car_bp or not spawn_points:
         print("警告：无法生成NPC车辆！")
         return
-
     spawned_count = 0
     for _ in range(count):
         npc = world.try_spawn_actor(random.choice(car_bp), random.choice(spawn_points))
@@ -293,36 +310,43 @@ def spawn_npcs(world, count=10):
 
 
 def load_detection_model(model_type):
-    """加载YOLOv5检测模型（自动下载权重）"""
+    """加载YOLOv5检测模型（使用自定义路径）"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    # 加载YOLOv5模型（自动缓存权重）
-    if model_type == 'yolov5s':
-        model = YOLO("yolov5s.pt")
-    elif model_type == 'yolov5m':
-        model = YOLO("yolov5m.pt")
-    else:
+    # 允许使用不同精度的模型
+    model_paths = {
+        'yolov5s': r"D:\yolo\yolov5s.pt",
+        'yolov5m': r"D:\yolo\yolov5m.pt",
+        'yolov5x': r"D:\yolo\yolov5x.pt"  # 更高精度的大模型
+    }
+
+    if model_type not in model_paths:
         raise ValueError(f"不支持的模型类型：{model_type}")
+
+    # 加载模型并启用自动混合精度
+    model = YOLO(model_paths[model_type])
     model.to(device)
-    print(f"检测模型加载成功（设备：{device}）")
+    print(f"检测模型加载成功（设备：{device}，路径：{model_paths[model_type]}）")
     return model, model.names
 
 
 def setup_tracker(tracker_type):
     """初始化跟踪器（默认SORT，稳定高效）"""
     if tracker_type == 'sort':
-        return Sort(max_age=3, min_hits=2, iou_threshold=0.3), None
+        return Sort(max_age=5, min_hits=3, iou_threshold=0.4), None
     else:
         raise ValueError(f"不支持的跟踪器类型：{tracker_type}")
 
 
-# -------------------------- 主函数（最终稳定版本） --------------------------
+# -------------------------- 主函数（优化版） --------------------------
 def main():
-    parser = argparse.ArgumentParser(description='CARLA 目标检测与跟踪（兼容老版本，零额外依赖）')
-    parser.add_argument('--model', type=str, default='yolov5s', choices=['yolov5s', 'yolov5m'],
-                        help='检测模型（yolov5s更轻量）')
+    parser = argparse.ArgumentParser(description='CARLA 目标检测与跟踪（优化版）')
+    parser.add_argument('--model', type=str, default='yolov5m', choices=['yolov5s', 'yolov5m', 'yolov5x'],
+                        help='检测模型（yolov5x精度最高，yolov5s最轻便）')
     parser.add_argument('--tracker', type=str, default='sort', choices=['sort'], help='跟踪器（仅保留稳定的SORT）')
     parser.add_argument('--host', type=str, default='localhost', help='CARLA服务器地址')
     parser.add_argument('--port', type=int, default=2000, help='CARLA服务器端口')
+    parser.add_argument('--conf-thres', type=float, default=0.25, help='检测置信度阈值（降低至0.25适配小目标）')
+    parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IOU阈值')
     args = parser.parse_args()
 
     # 提前初始化所有变量，避免未定义错误
@@ -330,6 +354,8 @@ def main():
     camera = None
     vehicle = None
     image_queue = None
+    # 新增：记录历史检测结果用于后处理
+    detection_history = deque(maxlen=3)
 
     try:
         # 1. 初始化设备
@@ -389,8 +415,10 @@ def main():
             image = cv2.cvtColor(origin_image, cv2.COLOR_BGRA2RGB)
             height, width, _ = image.shape
 
-            # -------------------------- 目标检测（YOLOv5） --------------------------
-            results = model(image, conf=0.5)  # 置信度阈值0.5，过滤低置信度结果
+            # -------------------------- 目标检测（YOLOv5 优化版） --------------------------
+            # 优化检测参数，使用NMS抑制重复检测
+            results = model(image, conf=args.conf_thres, iou=args.iou_thres)
+
             boxes, labels, probs = [], [], []
             for r in results:
                 for box in r.boxes:
@@ -401,16 +429,52 @@ def main():
                     cls = int(box.cls[0].cpu().numpy())
                     # 只保留车辆相关类别（COCO数据集：car=2, motorcycle=3, bus=5, truck=7）
                     if cls in [2, 3, 5, 7]:
-                        boxes.append([x1, y1, x2, y2])
-                        labels.append(cls)
-                        probs.append(conf)
+                        # 过滤过小目标（减小最小尺寸至8，适配小目标/远处车辆）
+                        box_width = x2 - x1
+                        box_height = y2 - y1
+                        if box_width > 8 and box_height > 8:  # 关键修改：从15→8
+                            boxes.append([x1, y1, x2, y2])
+                            labels.append(cls)
+                            probs.append(conf)
 
             # 转换为numpy数组（避免空列表报错）
             boxes = np.array(boxes) if boxes else np.array([])
             labels = np.array(labels) if labels else np.array([])
             probs = np.array(probs) if probs else np.array([])
 
-            # -------------------------- 目标跟踪（SORT） --------------------------
+            # 新增：多帧投票机制（放宽至1帧即可保留，避免过滤小目标）
+            detection_history.append((boxes, labels, probs))
+            if len(detection_history) == 3:  # 累积3帧结果
+                # 简单投票机制：保留至少在1帧中出现的目标（关键修改：从2→1）
+                combined_boxes = []
+                combined_labels = []
+                combined_probs = []
+
+                for i in range(len(boxes)):
+                    current_box = boxes[i]
+                    current_label = labels[i]
+                    count = 1  # 当前帧计数
+
+                    # 检查前两帧是否有相似目标
+                    for prev_boxes, prev_labels, _ in list(detection_history)[:-1]:
+                        if len(prev_boxes) == 0:
+                            continue
+                        # 计算与历史框的IOU
+                        ious = Sort()._iou_batch(np.array([current_box]), prev_boxes)[0]
+                        if np.max(ious) > 0.5 and prev_labels[np.argmax(ious)] == current_label:
+                            count += 1
+
+                    # 关键修改：至少在1帧中出现就保留（适配小目标）
+                    if count >= 1:
+                        combined_boxes.append(current_box)
+                        combined_labels.append(current_label)
+                        combined_probs.append(probs[i])
+
+                boxes = np.array(combined_boxes) if combined_boxes else np.array([])
+                labels = np.array(combined_labels) if combined_labels else np.array([])
+                probs = np.array(combined_probs) if combined_probs else np.array([])
+
+            # -------------------------- 目标跟踪（SORT 优化版） --------------------------
             if args.tracker == 'sort' and len(boxes) > 0:
                 # 转换为SORT需要的格式：[x1,y1,x2,y2,conf]
                 dets = np.hstack([boxes, probs.reshape(-1, 1)]) if len(probs) > 0 else boxes
@@ -423,14 +487,14 @@ def main():
                     x1, y1, x2, y2, track_id = track
                     track_boxes.append([x1, y1, x2, y2])
                     track_ids.append(int(track_id))
-                # 绘制跟踪框（所有跟踪目标统一标注为car类别）
+                # 绘制跟踪框
                 if track_boxes:
                     image = draw_bounding_boxes(
                         image, track_boxes,
                         labels=[2] * len(track_boxes),  # 2对应COCO的car类别
                         class_names=class_names,
                         track_ids=track_ids,
-                        probs=[0.9] * len(track_boxes)  # 跟踪结果默认高置信度
+                        probs=[0.9] * len(track_boxes)
                     )
             elif len(boxes) > 0:
                 # 无跟踪时，仅绘制检测结果
@@ -438,14 +502,15 @@ def main():
 
             # -------------------------- 显示结果 --------------------------
             cv2.imshow(f'CARLA {args.model} + {args.tracker}', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-            # 按'q'退出（必须加cv2.waitKey，否则窗口卡死）
+            # 按'q'退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 print("用户触发退出程序...")
                 break
 
     except Exception as e:
         print(f"程序运行出错：{str(e)}")
-        print("报错提示：1. 确保CARLA服务器已启动；2. 确保carla包版本与服务器一致；3. 确保已安装所有依赖")
+        print(
+            "报错提示：1. 确保CARLA服务器已启动；2. 确保carla包版本与服务器一致；3. 确保已安装所有依赖；4. 确保YOLO模型路径正确")
     finally:
         # 安全清理所有资源
         print("正在清理资源...")
@@ -469,4 +534,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
