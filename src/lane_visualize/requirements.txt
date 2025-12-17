@@ -1,5 +1,3 @@
-python-markdown-math
-imageio
-numpy
-matplotlib
-tensorflow
+opencv-python>=4.8.0
+numpy>=1.24.0
+matplotlib>=3.7.0
