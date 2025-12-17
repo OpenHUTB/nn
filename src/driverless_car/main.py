@@ -1,431 +1,262 @@
-#基于深度学习的无人机控制与可视化系统
-import pygame
-import sys
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from pygame.locals import *
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+from PIL import Image
 import random
-import math
 
-# 初始化pygame
-pygame.init()
+# --------------------------
+# 1. 基础配置（解决可视化和字体问题）
+# --------------------------
+import matplotlib
+matplotlib.use('TkAgg')  # 更换后端，兼容PyCharm的可视化
 
-# 设置中文字体
-pygame.font.init()
-font_path = pygame.font.match_font('simsun')  # 尝试匹配宋体
-if not font_path:
-    # 如果找不到宋体，使用默认字体
-    font = pygame.font.Font(None, 36)
-else:
-    font = pygame.font.Font(font_path, 24)
+# 类别名称（对应CIFAR-10的10类）
+classes = ('Airplane', 'Car', 'Bird', 'Cat', 'Deer', 'Dog', 'Frog', 'Horse', 'Ship', 'Truck')
 
-# 屏幕设置
-WIDTH, HEIGHT = 800, 600
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("无人机深度学习控制系统")
+# --------------------------
+# 2. 数据预处理（简化，减少计算量）
+# --------------------------
+# 简化变换：移除数据增强（加快训练，牺牲一点泛化能力）
+basic_transform = transforms.Compose([
+    transforms.Resize((32, 32)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
 
-# 颜色定义
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-GRAY = (200, 200, 200)
+# 加载CIFAR-10数据集（使用简化变换）
+train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=basic_transform)
+test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=basic_transform)
+# 增大批次大小，加快训练（根据内存调整，默认128）
+train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
 
-
-# 无人机类
-class Drone:
+# --------------------------
+# 3. 搭建轻量化CNN模型（原模型，参数少，速度快）
+# --------------------------
+class DroneCNN(nn.Module):
     def __init__(self):
-        self.x = WIDTH // 2
-        self.y = HEIGHT // 2
-        self.z = 100  # 高度
-        self.angle = 0  # 角度（度）
-        self.speed = 2
-        self.size = 20
-        self.max_height = 300
-        self.min_height = 50
-
-    def move(self, dx, dy, dz=0):
-        # 根据当前角度调整移动方向
-        rad = math.radians(self.angle)
-        self.x += dx * math.cos(rad) - dy * math.sin(rad)
-        self.y += dx * math.sin(rad) + dy * math.cos(rad)
-
-        # 限制在屏幕内
-        self.x = max(self.size, min(WIDTH - self.size, self.x))
-        self.y = max(self.size, min(HEIGHT - self.size, self.y))
-
-        # 调整高度
-        self.z = max(self.min_height, min(self.max_height, self.z + dz))
-
-    def rotate(self, delta_angle):
-        self.angle = (self.angle + delta_angle) % 360
-
-    def draw(self, surface):
-        # 绘制无人机（根据高度调整大小和颜色深浅）
-        size_factor = self.z / self.max_height
-        draw_size = int(self.size * (0.5 + size_factor * 0.5))
-
-        # 无人机中心点
-        center = (int(self.x), int(self.y))
-
-        # 绘制无人机机身
-        pygame.draw.circle(surface,
-                           (int(50 + size_factor * 205),
-                            int(50 + size_factor * 105),
-                            int(50 + size_factor * 205)),
-                           center, draw_size)
-
-        # 绘制无人机旋翼
-        rad = math.radians(self.angle)
-        rotor_length = draw_size * 0.8
-
-        # 前旋翼
-        front_x = self.x + math.cos(rad) * rotor_length
-        front_y = self.y + math.sin(rad) * rotor_length
-        pygame.draw.line(surface, BLACK, center, (front_x, front_y), 3)
-
-        # 后旋翼
-        back_x = self.x - math.cos(rad) * rotor_length
-        back_y = self.y - math.sin(rad) * rotor_length
-        pygame.draw.line(surface, BLACK, center, (back_x, back_y), 3)
-
-        # 左旋翼
-        left_x = self.x - math.sin(rad) * rotor_length
-        left_y = self.y + math.cos(rad) * rotor_length
-        pygame.draw.line(surface, BLACK, center, (left_x, left_y), 3)
-
-        # 右旋翼
-        right_x = self.x + math.sin(rad) * rotor_length
-        right_y = self.y - math.cos(rad) * rotor_length
-        pygame.draw.line(surface, BLACK, center, (right_x, right_y), 3)
-
-        # 显示高度
-        height_text = font.render(f"高度: {int(self.z)}", True, BLACK)
-        surface.blit(height_text, (self.x + draw_size, self.y - draw_size))
-
-
-# 目标点类
-class Target:
-    def __init__(self):
-        self.x = random.randint(50, WIDTH - 50)
-        self.y = random.randint(50, HEIGHT - 50)
-        self.z = random.randint(80, 250)
-        self.radius = 15
-
-    def draw(self, surface):
-        # 绘制目标点
-        pygame.draw.circle(surface, RED, (self.x, self.y), self.radius, 2)
-        pygame.draw.circle(surface, RED, (self.x, self.y), 3)
-
-        # 显示目标高度
-        z_text = font.render(f"Z: {self.z}", True, RED)
-        surface.blit(z_text, (self.x + self.radius, self.y - self.radius))
-
-    def reset(self):
-        self.x = random.randint(50, WIDTH - 50)
-        self.y = random.randint(50, HEIGHT - 50)
-        self.z = random.randint(80, 250)
-
-
-# 深度学习控制器模型
-class DroneController(nn.Module):
-    def __init__(self, input_size=6, hidden_size=32, output_size=4):
-        super(DroneController, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
+        super(DroneCNN, self).__init__()
+        self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
+        self.fc1 = nn.Linear(128 * 4 * 4, 512)
+        self.fc2 = nn.Linear(512, 10)
         self.relu = nn.ReLU()
-        self.tanh = nn.Tanh()  # 输出范围[-1, 1]
+        self.dropout = nn.Dropout(0.3)  # 降低dropout比例，加快计算
 
     def forward(self, x):
+        x = self.pool(self.relu(self.conv1(x)))
+        x = self.pool(self.relu(self.conv2(x)))
+        x = self.pool(self.relu(self.conv3(x)))
+        x = x.view(-1, 128 * 4 * 4)
         x = self.relu(self.fc1(x))
-        x = self.relu(self.fc2(x))
-        x = self.tanh(self.fc3(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
         return x
 
+# 初始化模型、损失函数、优化器
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = DroneCNN().to(device)
+criterion = nn.CrossEntropyLoss()
+# 使用SGD优化器（比Adam稍快，或保留Adam，影响不大）
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-# 强化学习环境
-class DroneEnv:
-    def __init__(self):
-        self.drone = Drone()
-        self.target = Target()
-        self.max_steps = 500
-        self.current_step = 0
-        self.reset()
+# --------------------------
+# 4. 训练函数（大幅优化速度）
+# --------------------------
+# 全局开启交互模式，用于实时绘图
+plt.ion()
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))  # 训练曲线窗口
 
-    def reset(self):
-        self.drone = Drone()
-        self.target.reset()
-        self.current_step = 0
-        return self.get_state()
+def plot_training_curve(train_losses, train_accs, test_accs):
+    """更新训练曲线窗口，减少绘图开销"""
+    ax1.clear()
+    ax2.clear()
+    # 损失曲线
+    ax1.plot(train_losses, label='Training Loss', color='blue')
+    ax1.set_xlabel('Iteration (Batch)')
+    ax1.set_ylabel('Loss')
+    ax1.set_title('Training Loss Change')
+    ax1.legend()
+    ax1.grid(True)
+    # 准确率曲线
+    ax2.plot(train_accs, label='Training Accuracy', color='green')
+    ax2.plot(test_accs, label='Test Accuracy', color='red')
+    ax2.set_xlabel('Iteration (Batch)')
+    ax2.set_ylabel('Accuracy (%)')
+    ax2.set_title('Training/Test Accuracy Change')
+    ax2.legend()
+    ax2.grid(True)
+    plt.draw()
+    plt.pause(0.01)  # 减少暂停时间，加快绘图
 
-    def get_state(self):
-        # 状态包括无人机位置、角度、目标位置
-        return np.array([
-            self.drone.x / WIDTH,
-            self.drone.y / HEIGHT,
-            self.drone.z / self.drone.max_height,
-            self.drone.angle / 360,
-            self.target.x / WIDTH,
-            self.target.y / HEIGHT,
-            self.target.z / self.drone.max_height
-        ])
+def calculate_test_acc_fast(test_loader, sample_batches=5):
+    """快速计算测试集准确率：只抽取少量批次，不遍历整个测试集"""
+    test_correct = 0
+    test_total = 0
+    model.eval()
+    with torch.no_grad():
+        # 只取前sample_batches个批次，大幅减少耗时
+        for i, (test_inputs, test_labels) in enumerate(test_loader):
+            if i >= sample_batches:
+                break
+            test_inputs, test_labels = test_inputs.to(device), test_labels.to(device)
+            test_outputs = model(test_inputs)
+            _, test_predicted = torch.max(test_outputs.data, 1)
+            test_total += test_labels.size(0)
+            test_correct += (test_predicted == test_labels).sum().item()
+    model.train()
+    if test_total == 0:
+        return 0.0
+    return 100 * test_correct / test_total
 
-    def step(self, action):
-        # 动作：[前进/后退, 左右移动, 旋转, 高度调整]
-        forward_back = action[0] * self.drone.speed
-        left_right = action[1] * self.drone.speed
-        rotate = action[2] * 5  # 旋转角度
-        height_adjust = action[3] * 3  # 高度调整
+def train_model(epochs=1):  # 减少训练轮数，默认1轮
+    train_losses = []
+    train_accs = []
+    test_accs = []
+    model.train()
 
-        # 执行动作
-        self.drone.move(forward_back, left_right, height_adjust)
-        self.drone.rotate(rotate)
+    for epoch in range(epochs):
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        # 每200个批次更新一次曲线（原100，减少更新频率）
+        update_interval = 200
+        for i, (inputs, labels) in enumerate(train_loader):
+            inputs, labels = inputs.to(device), labels.to(device)
 
-        # 计算距离目标的距离
-        distance = math.sqrt(
-            (self.drone.x - self.target.x) ** 2 +
-            (self.drone.y - self.target.y) ** 2 +
-            ((self.drone.z - self.target.z) * 0.5) ** 2  # 高度权重稍低
-        )
+            # 前向传播+反向传播+优化
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
 
-        # 计算奖励
-        reward = 100.0 / (1.0 + distance)  # 距离越近奖励越高
+            # 统计指标
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-        # 检查是否到达目标
-        done = distance < 30 or self.current_step >= self.max_steps
+            # 降低更新频率，减少计算和绘图开销
+            if i % update_interval == update_interval - 1:
+                train_loss = running_loss / update_interval
+                train_acc = 100 * correct / total
+                train_losses.append(train_loss)
+                train_accs.append(train_acc)
 
-        if done and self.current_step < self.max_steps:
-            reward += 100  # 到达目标额外奖励
+                # 快速计算测试集准确率（只取5个批次）
+                test_acc = calculate_test_acc_fast(test_loader, sample_batches=5)
+                test_accs.append(test_acc)
 
-        self.current_step += 1
+                print(f'Epoch {epoch+1}, Batch {i+1} | Loss: {train_loss:.3f} | Train Acc: {train_acc:.2f}% | Test Acc: {test_acc:.2f}%')
+                running_loss = 0.0
+                correct = 0
+                total = 0
 
-        return self.get_state(), reward, done
+                plot_training_curve(train_losses, train_accs, test_accs)
 
-    def render(self, surface):
-        # 绘制环境
-        surface.fill(WHITE)
+    # 保存模型
+    torch.save(model.state_dict(), 'drone_model.pth')
+    print('模型已保存为drone_model.pth')
+    model.eval()
+    plt.ioff()  # 关闭交互模式
+    plt.show(block=False)
 
-        # 绘制网格背景
-        for x in range(0, WIDTH, 50):
-            pygame.draw.line(surface, GRAY, (x, 0), (x, HEIGHT), 1)
-        for y in range(0, HEIGHT, 50):
-            pygame.draw.line(surface, GRAY, (0, y), (WIDTH, y), 1)
+# --------------------------
+# 5. 模拟无人机实时图像输入（优化推理速度）
+# --------------------------
+def load_drone_images(folder_path):
+    """读取本地文件夹中的图像，模拟无人机采集的图像流"""
+    img_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif']
+    img_paths = []
+    for file in os.listdir(folder_path):
+        if os.path.splitext(file)[1].lower() in img_extensions:
+            img_paths.append(os.path.join(folder_path, file))
+    if not img_paths:
+        raise ValueError(f'文件夹{folder_path}中未找到任何图像文件！')
+    return img_paths
 
-        # 绘制目标和无人机
-        self.target.draw(surface)
-        self.drone.draw(surface)
+def preprocess_image(img_path):
+    """预处理单张图像，简化操作"""
+    # 读取图像（RGB模式）
+    img = Image.open(img_path).convert('RGB')
+    original_img = img.copy()
+    # 预处理
+    img = basic_transform(img)
+    # 添加batch维度
+    img = torch.unsqueeze(img, 0)
+    return original_img, img.to(device)
 
+def drone_real_time_inference(folder_path, delay=0.1):  # 降低延迟，默认0.1秒
+    """模拟无人机实时图像输入，优化推理速度"""
+    print(f'\n开始模拟无人机实时图像流（读取文件夹：{folder_path}），每{delay}秒处理一张图像...')
+    img_paths = load_drone_images(folder_path)
+    # 创建单个显示窗口，减少窗口创建开销
+    fig, ax = plt.subplots(figsize=(6, 4))  # 缩小窗口，加快绘图
+    plt.ion()
 
-# 训练代理
-class Agent:
-    def __init__(self, state_size=7, action_size=4, lr=0.001, gamma=0.99):
-        self.model = DroneController(input_size=state_size, output_size=action_size)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=lr)
-        self.gamma = gamma  # 折扣因子
-        self.memory = []  # 存储经验
+    for img_path in img_paths:
+        try:
+            # 预处理图像
+            original_img, input_tensor = preprocess_image(img_path)
 
-    def get_action(self, state, epsilon=0.1):
-        # epsilon-贪婪策略
-        if random.random() < epsilon:
-            # 随机动作
-            return np.random.uniform(-1, 1, size=4)
-        else:
-            # 模型预测动作
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            # 模型预测（简化，减少计算）
             with torch.no_grad():
-                action = self.model(state_tensor).numpy()[0]
-            return action
+                outputs = model(input_tensor)
+                probabilities = torch.softmax(outputs, dim=1)
+                pred_idx = torch.argmax(probabilities, dim=1).item()
+                pred_class = classes[pred_idx]
+                pred_conf = probabilities[0][pred_idx].item() * 100
 
-    def remember(self, state, action, reward, next_state, done):
-        self.memory.append((state, action, reward, next_state, done))
+            # 可视化优化：只更新图像和文本，不重建窗口
+            ax.clear()
+            ax.imshow(original_img)
+            ax.axis('off')
+            # 简化文本显示，减少渲染开销
+            text = f'{pred_class} ({pred_conf:.1f}%)'
+            ax.text(5, 5, text, fontsize=10, color='red',
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none'))
+            ax.set_title('Drone Real-Time View', fontsize=12)
+            plt.draw()
+            plt.pause(delay)
 
-    def train(self, batch_size=32):
-        if len(self.memory) < batch_size:
-            return 0.0
+            # 简化控制台输出
+            print(f'图像：{os.path.basename(img_path)} → {pred_class} ({pred_conf:.1f}%)')
 
-        # 随机采样批次
-        batch = random.sample(self.memory, batch_size)
+        except Exception as e:
+            print(f'处理图像{img_path}时出错：{e}')
+            continue
 
-        states = torch.FloatTensor([s for s, _, _, _, _ in batch])
-        actions = torch.FloatTensor([a for _, a, _, _, _ in batch])
-        rewards = torch.FloatTensor([r for _, _, r, _, _ in batch])
-        next_states = torch.FloatTensor([ns for _, _, _, ns, _ in batch])
-        dones = torch.FloatTensor([d for _, _, _, _, d in batch])
+    # 结束后保持窗口
+    plt.ioff()
+    ax.text(0.5, 0.5, 'Done!', fontsize=14, ha='center', va='center',
+            transform=ax.transAxes, bbox=dict(facecolor='red', alpha=0.8))
+    plt.draw()
+    plt.show(block=True)
 
-        # 计算目标Q值
-        with torch.no_grad():
-            next_q = self.model(next_states)
-            target_q = rewards + (1 - dones) * self.gamma * next_q.max(dim=1)[0]
+# --------------------------
+# 主程序运行
+# --------------------------
+if __name__ == '__main__':
+    # 第一步：训练模型（优化后速度大幅提升）
+    train_model(epochs=1)  # 可改为2轮，仍比原来快很多
 
-        # 计算当前Q值
-        current_q = self.model(states).gather(1, actions.argmax(dim=1).unsqueeze(1)).squeeze(1)
+    # 第二步：加载模型（可选）
+    # model.load_state_dict(torch.load('drone_model.pth', map_location=device))
+    # model.eval()
+    # print('模型已加载')
 
-        # 计算损失
-        loss = nn.MSELoss()(current_q, target_q)
-
-        # 反向传播和优化
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-
-        return loss.item()
-
-
-# 主函数
-def main():
-    clock = pygame.time.Clock()
-    env = DroneEnv()
-    agent = Agent()
-
-    episodes = 1000
-    batch_size = 32
-    epsilon = 1.0  # 初始探索率
-    epsilon_decay = 0.995
-    epsilon_min = 0.01
-
-    # 记录训练信息
-    total_rewards = []
-    avg_rewards = []
-    losses = []
-
-    # 训练模式开关
-    training_mode = True
-    show_info = True
-
-    running = True
-    current_episode = 0
-    state = env.reset()
-    total_reward = 0
-
-    while running:
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                running = False
-            elif event.type == KEYDOWN:
-                # 按T切换训练模式
-                if event.key == K_t:
-                    training_mode = not training_mode
-                    print(f"训练模式: {'开启' if training_mode else '关闭'}")
-                # 按I切换信息显示
-                elif event.key == K_i:
-                    show_info = not show_info
-                # 按R重置环境
-                elif event.key == K_r:
-                    state = env.reset()
-                    total_reward = 0
-
-            # 手动控制（非训练模式）
-            if not training_mode:
-                keys = pygame.key.get_pressed()
-                action = [0, 0, 0, 0]
-
-                if keys[K_w]:
-                    action[0] = 1  # 前进
-                elif keys[K_s]:
-                    action[0] = -1  # 后退
-
-                if keys[K_a]:
-                    action[1] = 1  # 左移
-                elif keys[K_d]:
-                    action[1] = -1  # 右移
-
-                if keys[K_q]:
-                    action[2] = 1  # 左转
-                elif keys[K_e]:
-                    action[2] = -1  # 右转
-
-                if keys[K_SPACE]:
-                    action[3] = 1  # 上升
-                elif keys[K_LSHIFT]:
-                    action[3] = -1  # 下降
-
-                next_state, reward, done = env.step(action)
-                total_reward += reward
-                state = next_state
-
-                if done:
-                    state = env.reset()
-                    total_reward = 0
-
-        # 训练模式
-        if training_mode and running:
-            # 获取动作
-            action = agent.get_action(state, epsilon)
-
-            # 执行动作
-            next_state, reward, done = env.step(action)
-            total_reward += reward
-
-            # 存储经验
-            agent.remember(state, action, reward, next_state, done)
-
-            # 训练模型
-            loss = agent.train(batch_size)
-            if loss > 0:
-                losses.append(loss)
-
-            state = next_state
-
-            #  episode结束
-            if done:
-                current_episode += 1
-                total_rewards.append(total_reward)
-
-                # 计算平均奖励
-                window_size = min(10, len(total_rewards))
-                avg_reward = sum(total_rewards[-window_size:]) / window_size
-                avg_rewards.append(avg_reward)
-
-                # 衰减探索率
-                epsilon = max(epsilon_min, epsilon * epsilon_decay)
-
-                # 打印进度
-                if current_episode % 10 == 0:
-                    print(
-                        f"Episode {current_episode}/{episodes}, 奖励: {total_reward:.2f}, 平均奖励: {avg_reward:.2f}, Epsilon: {epsilon:.3f}")
-
-                # 重置环境
-                state = env.reset()
-                total_reward = 0
-
-                # 达到最大训练轮次
-                if current_episode >= episodes:
-                    print("训练完成!")
-                    training_mode = False
-
-        # 渲染环境
-        env.render(screen)
-
-        # 显示信息
-        if show_info:
-            mode_text = font.render(f"模式: {'训练' if training_mode else '手动'}", True, BLACK)
-            screen.blit(mode_text, (10, 10))
-
-            if training_mode and current_episode > 0:
-                episode_text = font.render(f"轮次: {current_episode}/{episodes}", True, BLACK)
-                screen.blit(episode_text, (10, 40))
-
-                reward_text = font.render(f"当前奖励: {total_reward:.1f}", True, BLACK)
-                screen.blit(reward_text, (10, 70))
-
-                if len(avg_rewards) > 0:
-                    avg_text = font.render(f"平均奖励: {avg_rewards[-1]:.1f}", True, BLACK)
-                    screen.blit(avg_text, (10, 100))
-
-                epsilon_text = font.render(f"探索率: {epsilon:.3f}", True, BLACK)
-                screen.blit(epsilon_text, (10, 130))
-
-        pygame.display.flip()
-        clock.tick(60)
-
-    pygame.quit()
-    sys.exit()
-
-
-if __name__ == "__main__":
-    main()
+    # 第三步：模拟无人机实时图像输入
+    drone_image_folder = r".\driverless_car\data\potoh"
+    if not os.path.exists(drone_image_folder):
+        os.makedirs(drone_image_folder)
+        print(f'已创建文件夹：{drone_image_folder}，请放入测试图片后重新运行！')
+    else:
+        drone_real_time_inference(drone_image_folder, delay=0.1)  # 低延迟，快速播放

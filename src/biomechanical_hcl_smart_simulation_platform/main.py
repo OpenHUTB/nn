@@ -1,125 +1,112 @@
-#!/usr/bin/env python3
-"""
-Main entry (render-capable) for MOBL pointing demo.
-
-"""
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import os
-import sys
-import argparse
-import shutil
-import subprocess
+from pathlib import Path
 
-def run_window(episodes: int, steps: int) -> None:
-    # 不要设置 MUJOCO_GL=egl；用默认的窗口渲染
-    from uitb import Simulator
-    sim = Simulator.get("simulators/mobl_arms_index_pointing")
-    for ep in range(episodes):
-        obs, info = sim.reset()
-        total = 0.0
-        for t in range(steps):
-            # 尝试弹窗渲染；如果环境不支持会抛错
-            try:
-                sim.render()
-            except Exception as e:
-                print("render warn:", e)
-                raise
-            obs, r, term, trunc, info = sim.step(sim.action_space.sample())
-            total += float(r)
-            if term or trunc:
-                break
-        print(f"[window] episode {ep+1}/{episodes} reward={total:.3f}")
-    sim.close()
-    print("DONE (window) ✅")
+import rospy
+from std_msgs.msg import Float32MultiArray, Float32, Bool
 
-def run_record(outfile: str, episodes: int, steps: int, fps: int) -> None:
-    # 用 Gymnasium 的 rgb_array 离屏渲染，并通过 ffmpeg 写 mp4
-    os.environ.setdefault("MUJOCO_GL", "egl")
-    if shutil.which("ffmpeg") is None:
-        print("未找到 ffmpeg：请先安装 `sudo apt install -y ffmpeg`")
-        sys.exit(1)
-    try:
-        import gymnasium as gym
-    except Exception as e:
-        print("未安装 gymnasium，请先安装：pip install gymnasium")
-        print("错误：", e)
-        sys.exit(1)
+from uitb import Simulator
 
-    env_id = "uitb:mobl_arms_index_pointing-v0"
-    try:
-        env = gym.make(env_id, render_mode="rgb_array")
-    except TypeError:
-        # 某些版本不接受 render_mode 关键字，退回默认创建
-        env = gym.make(env_id)
-    obs, info = env.reset()
 
-    # 先拿一帧确定分辨率
-    frame = env.render()
-    h, w = frame.shape[0], frame.shape[1]
+class RCCarNode(object):
+    def __init__(self, simulator_folder, rate_hz=30.0):
+        rospy.loginfo("RCCarNode init, simulator_folder: %s", simulator_folder)
 
-    ffmpeg_cmd = [
-        "ffmpeg", "-y",
-        "-f", "rawvideo", "-vcodec", "rawvideo",
-        "-pix_fmt", "rgb24",
-        "-s", f"{w}x{h}",
-        "-r", str(fps),
-        "-i", "-",
-        "-an", "-c:v", "libx264",
-        "-pix_fmt", "yuv420p",
-        "-movflags", "+faststart",
-        outfile,
-    ]
-    os.makedirs(os.path.dirname(outfile), exist_ok=True)
-    proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
+        # 创建 simulator（RC Car via Joystick）
+        self.env = Simulator.get(simulator_folder)
 
-    import numpy as np  # 只为确保 tobytes 可用；若没装 numpy，uitb 依赖里一般会带
-    for ep in range(episodes):
-        obs, info = env.reset()
-        total = 0.0
-        for t in range(steps):
-            frame = env.render()
-            if not isinstance(frame, np.ndarray):
-                frame = np.asarray(frame)
-            proc.stdin.write(frame.tobytes())
-            obs, r, term, trunc, info = env.step(env.action_space.sample())
-            total += float(r)
-            if term or trunc:
-                break
-        print(f"[record] episode {ep+1}/{episodes} reward={total:.3f}")
+        self.rate = rospy.Rate(rate_hz)
 
-    proc.stdin.close()
-    proc.wait()
-    env.close()
-    print(f"DONE (record) → {outfile} ✅")
+        # 当前 action（从 ROS 话题拿）
+        self.current_action = None
+
+        # 发布者：观测 / 奖励 / 终止标志
+        self.obs_pub = rospy.Publisher(
+            "/rc_car/obs", Float32MultiArray, queue_size=1
+        )
+        self.reward_pub = rospy.Publisher(
+            "/rc_car/reward", Float32, queue_size=1
+        )
+        self.done_pub = rospy.Publisher(
+            "/rc_car/done", Bool, queue_size=1
+        )
+
+        # 订阅 action（你后面可以用别的节点发布这个话题，比如摇杆转指令）
+        rospy.Subscriber(
+            "/rc_car/action", Float32MultiArray, self.action_callback
+        )
+
+        # 先 reset 一次
+        self.reset_env()
+
+    def action_callback(self, msg):
+        # 保存最新的动作
+        self.current_action = list(msg.data)
+
+    def reset_env(self):
+        obs, info = self.env.reset()
+        self.publish_obs(obs)
+        rospy.loginfo("Environment reset")
+
+    def publish_obs(self, obs):
+        msg = Float32MultiArray()
+        # obs 可能是 numpy 数组，统一转 list
+        try:
+            data = obs.flatten().tolist()
+        except AttributeError:
+            # 已经是 list/tuple
+            data = list(obs)
+        msg.data = data
+        self.obs_pub.publish(msg)
+
+    def step_once(self):
+        # 如果还没收到 action，就用零动作（或随机动作，看你需求）
+        if self.current_action is None:
+            # 用零向量动作（假设 action_space 是 Box）
+            import numpy as np
+
+            action_dim = self.env.action_space.shape[0]
+            action = np.zeros(action_dim, dtype=float)
+        else:
+            action = self.current_action
+
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated or truncated
+
+        # 发布结果
+        self.publish_obs(obs)
+        self.reward_pub.publish(Float32(data=float(reward)))
+        self.done_pub.publish(Bool(data=done))
+
+        if done:
+            rospy.loginfo("Episode done, auto reset")
+            self.reset_env()
+
+    def spin(self):
+        rospy.loginfo("RCCarNode spinning...")
+        while not rospy.is_shutdown():
+            self.step_once()
+            self.rate.sleep()
+
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--mode", choices=["window", "record", "auto"], default="record",
-                   help="window=弹窗渲染; record=离屏录制MP4; auto=先window失败则record")
-    p.add_argument("--out", default="assets/demo.mp4", help="record 模式输出 mp4 路径")
-    p.add_argument("--episodes", type=int, default=1)
-    p.add_argument("--steps", type=int, default=300)
-    p.add_argument("--fps", type=int, default=20)
-    args = p.parse_args()
+    rospy.init_node("rc_car_sim_node")
 
-    # 依赖提示
-    try:
-        import uitb  # noqa
-    except Exception as e:
-        print("未检测到 uitb（user-in-the-box）。请按 README 安装依赖后再运行。")
-        print("原始错误：", e)
-        sys.exit(1)
+    # 从参数服务器取 simulator_folder，如果没给就用默认路径
+    default_sim_folder = str(
+        Path(__file__).resolve().parents[2]
+        / "simulators"
+        / "mobl_arms_index_remote_driving"
+    )
+    simulator_folder = rospy.get_param("~simulator_folder", default_sim_folder)
 
-    if args.mode == "window":
-        run_window(args.episodes, args.steps)
-    elif args.mode == "record":
-        run_record(args.out, args.episodes, args.steps, args.fps)
-    else:  # auto
-        try:
-            run_window(args.episodes, args.steps)
-        except Exception:
-            print("窗口渲染失败，自动切换到 record(EGL) 模式……")
-            run_record(args.out, args.episodes, args.steps, args.fps)
+    rate_hz = rospy.get_param("~rate", 30.0)
+
+    node = RCCarNode(simulator_folder=simulator_folder, rate_hz=rate_hz)
+    node.spin()
+
 
 if __name__ == "__main__":
     main()
