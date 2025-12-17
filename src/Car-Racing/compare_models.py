@@ -45,7 +45,7 @@ def evaluate_dqn(agent, num_episodes=5):  # Adjust num_episodes as needed
     from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation, RecordVideo
     from dqn_model.DQN_model import SkipFrame  # Import SkipFrame from DQN_model
     env = gym.make("CarRacing-v3", continuous=False, render_mode="rgb_array")
-    env = RecordVideo(env, video_folder='C:\\Users\\25012\\Desktop\\rl-car-ddqn-main\\videos\\DQN')
+    env = RecordVideo(env, video_folder='videos\\DQN')
     env = SkipFrame(env, skip=4)
     env = GrayscaleObservation(env)
     env = ResizeObservation(env, (84, 84))
