@@ -1,226 +1,298 @@
+# 1. 切换到冲突分支（已在该分支可跳过）
+git checkout main-py-fix-cv2-chinese-label
+
+# 2. 用最终版代码强制覆盖本地main.py（关键！确保文件是最新的）
+cat > /home/dacun/nn/src/openpilot_model/main.py << 'EOF'
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-  # 声明编码，解决中文注释/输出乱码
+# -*- coding: utf-8 -*-
 """
-车道线预测程序（优化版）
-核心功能：读取MP4视频帧 → 预处理 → 模型推理 → 车道线/路径可视化
-适配环境：Linux虚拟机（Python3 + TensorFlow + OpenCV + Matplotlib）
+车道线预测程序（最终版·标注中文正常显示）
+核心：用Matplotlib绘制中文标注（替代OpenCV的putText）
 """
 import sys
 import os
+import logging
+import argparse
+import time
 import numpy as np
 import cv2
+import matplotlib
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 from tensorflow.keras.models import load_model
 
-# ===================== 基础配置（核心！解决中文乱码+路径问题） =====================
-# 项目根目录（绝对路径，适配虚拟机）
+# ===================== 环境初始化（核心解决中文显示） =====================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger(__name__)
+
+# 设置Matplotlib后端
+matplotlib.use('Agg') if os.environ.get('DISPLAY') is None else matplotlib.use('TkAgg')
+
+# 加载中文字体（仅给Matplotlib用）
+def setup_chinese_font():
+    font_path = '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc'
+    if os.path.exists(font_path):
+        font_prop = matplotlib.font_manager.FontProperties(fname=font_path)
+        plt.rcParams['font.sans-serif'] = [font_prop.get_name()]
+        logger.info(f"✅ 中文字体加载成功：{font_path}")
+    else:
+        logger.warning("⚠️  未找到wqy-microhei字体，使用默认英文字体")
+        plt.rcParams['font.sans-serif'] = ['DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.rcParams['figure.dpi'] = 96
+    plt.rcParams['savefig.dpi'] = 100
+
+setup_chinese_font()
+
+# 项目根目录
 PROJECT_ROOT = "/home/dacun/nn"
 sys.path.append(PROJECT_ROOT)
 
-# 解决Matplotlib中文显示乱码（关键优化）
-plt.rcParams['font.sans-serif'] = ['DejaVu Sans', 'SimHei', 'WenQuanYi Micro Hei']
-plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+# 依赖检测
+def check_dependencies():
+    required_libs = {
+        'numpy': np.__version__,
+        'cv2': cv2.__version__,
+        'matplotlib': matplotlib.__version__,
+        'tensorflow': '2.x'
+    }
+    for lib, ver in required_libs.items():
+        try:
+            if lib == 'tensorflow':
+                import tensorflow as tf
+                assert tf.__version__.startswith('2.'), f"TensorFlow版本需≥2.0，当前：{tf.__version__}"
+            logger.info(f"✅ 依赖检测通过：{lib} (版本：{ver})")
+        except (ImportError, AssertionError) as e:
+            logger.error(f"❌ 依赖缺失/版本错误：{lib} - {e}")
+            logger.error(f"💡 修复命令：pip install {lib}>={ver.split('.')[0]}")
+            sys.exit(1)
 
-# 导入项目本地模块
+# 导入项目模块
 try:
     from common.transformations.camera import transform_img, eon_intrinsics
     from common.transformations.model import medmodel_intrinsics
     from common.tools.lib.parser import parser
+    logger.info("✅ 项目模块导入成功")
 except ImportError as e:
-    print(f"❌ 导入common模块失败：{e}")
-    print("💡 请确保common文件夹在项目根目录：/home/dacun/nn/common/")
+    logger.error(f"❌ 项目模块导入失败：{e}")
+    logger.error("💡 确认common文件夹路径：/home/dacun/nn/common/")
     sys.exit(1)
 
-# ===================== 核心函数（规范化+精简冗余） =====================
-def frames_to_tensor(frames):
-    """
-    将视频帧转换为模型输入张量
-    :param frames: 原始视频帧数组 (N, H, W, C)
-    :return: 归一化后的张量 (N, 6, H//2, W//2)
-    """
-    if len(frames) == 0:
+# ===================== 核心函数 =====================
+def frames_to_tensor(frames: np.ndarray) -> np.ndarray:
+    if frames.size == 0:
+        logger.warning("输入帧为空，返回空张量")
         return np.array([])
     H = (frames.shape[1] * 2) // 3
     W = frames.shape[2]
     tensor = np.zeros((frames.shape[0], 6, H//2, W//2), dtype=np.float32)
-    # 张量维度映射（模型输入要求）
     tensor[:, 0] = frames[:, 0:H:2, 0::2]
     tensor[:, 1] = frames[:, 1:H:2, 0::2]
     tensor[:, 2] = frames[:, 0:H:2, 1::2]
     tensor[:, 3] = frames[:, 1:H:2, 1::2]
     tensor[:, 4] = frames[:, H:H+H//4].reshape(-1, H//2, W//2)
     tensor[:, 5] = frames[:, H+H//4:H+H//2].reshape(-1, H//2, W//2)
-    return tensor / 128.0 - 1.0  # 归一化到[-1, 1]
+    return tensor / 128.0 - 1.0
 
-def preprocess_frames(imgs):
-    """
-    视频帧预处理（适配模型输入格式）
-    :param imgs: 原始YUV帧列表
-    :return: 预处理后的张量
-    """
+def preprocess_frame(img: np.ndarray) -> np.ndarray:
+    try:
+        return transform_img(
+            img,
+            from_intr=eon_intrinsics,
+            to_intr=medmodel_intrinsics,
+            yuv=True,
+            output_size=(512, 256)
+        )
+    except Exception as e:
+        logger.warning(f"单帧预处理失败：{e}，返回空帧")
+        return np.zeros((384, 512), dtype=np.uint8)
+
+def preprocess_frames(imgs: list) -> np.ndarray:
     if not imgs:
         return np.array([])
-    processed = np.zeros((len(imgs), 384, 512), dtype=np.uint8)
-    # 精准捕获异常，避免通捕导致问题隐藏
-    for i, img in enumerate(imgs):
-        try:
-            processed[i] = transform_img(
-                img, 
-                from_intr=eon_intrinsics, 
-                to_intr=medmodel_intrinsics, 
-                yuv=True, 
-                output_size=(512, 256)
-            )
-        except (TypeError, ValueError) as e:
-            print(f"⚠️  第{i+1}帧预处理失败：{str(e)}，填充空帧")
-            processed[i] = np.zeros((384, 512), dtype=np.uint8)
-    return frames_to_tensor(processed)
+    processed_frames = [preprocess_frame(img) for img in imgs]
+    processed_frames = np.array(processed_frames)
+    empty_frames = np.sum(np.all(processed_frames == 0, axis=(1, 2)))
+    if empty_frames > 0:
+        logger.warning(f"共{empty_frames}帧预处理失败，已填充空帧")
+    return frames_to_tensor(processed_frames)
 
-def read_video_frames(video_path, max_frames=10):
-    """
-    读取视频帧（仅支持MP4），简化函数名更直观
-    :param video_path: 视频文件路径
-    :param max_frames: 最大读取帧数
-    :return: 预处理用YUV帧 + 原始BGR帧
-    """
-    # 精准校验视频格式
+def read_video(video_path: str, max_frames: int = 10) -> tuple:
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"视频文件不存在：{video_path}")
     if not video_path.lower().endswith('.mp4'):
-        raise ValueError("仅支持MP4格式视频，请更换文件格式")
-    
+        raise ValueError("仅支持MP4格式视频")
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise RuntimeError(f"无法打开视频（请安装FFmpeg）：{video_path}")
-    
-    # 降低缓存，减少虚拟机内存占用
+    fps = int(cap.get(cv2.CAP_PROP_FPS)) or 10
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    save_path = os.path.join(PROJECT_ROOT, "lane_pred_result.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    video_writer = cv2.VideoWriter(save_path, fourcc, fps, (width, height))
+    logger.info(f"✅ 结果视频保存路径：{save_path}")
     cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     yuv_frames = []
     raw_frames = []
-    
-    # 进度条可视化（核心保留优化）
-    for i in tqdm(range(max_frames), desc="读取视频帧", ncols=80):
+    for i in range(max_frames):
         ret, frame = cap.read()
         if not ret:
-            tqdm.write(f"⚠️  视频读取完毕，共读取{i}帧（不足{max_frames}帧）")
+            logger.info(f"视频读取完毕，共读取{i}帧（目标：{max_frames}帧）")
             break
         raw_frames.append(frame)
-        # BGR转YUV_I420（模型输入要求）
         yuv = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420)
         yuv_resized = cv2.resize(yuv, (512, 384), interpolation=cv2.INTER_LINEAR)
         yuv_frames.append(yuv_resized)
-    
     cap.release()
-    return yuv_frames, raw_frames
+    return yuv_frames, raw_frames, video_writer
 
-# ===================== 主函数（精简+可视化升级） =====================
+def draw_lane_lines(frame: np.ndarray, pred: dict) -> np.ndarray:
+    """仅绘制车道线（文字标注交给Matplotlib）"""
+    h, w = frame.shape[:2]
+    pred_lll = np.interp(pred["lll"][0], (0, 191), (0, h))
+    pred_rll = np.interp(pred["rll"][0], (0, 191), (0, h))
+    pred_path = np.interp(pred["path"][0], (0, 191), (0, h))
+    x_coords = np.linspace(0, w, len(pred_lll))
+    frame_copy = frame.copy()
+    # 左车道线（蓝）
+    for i in range(len(x_coords)-1):
+        cv2.line(
+            frame_copy,
+            (int(x_coords[i]), int(pred_lll[i])),
+            (int(x_coords[i+1]), int(pred_lll[i+1])),
+            (255, 0, 0), 3, cv2.LINE_AA
+        )
+    # 右车道线（红）
+    for i in range(len(x_coords)-1):
+        cv2.line(
+            frame_copy,
+            (int(x_coords[i]), int(pred_rll[i])),
+            (int(x_coords[i+1]), int(pred_rll[i+1])),
+            (0, 0, 255), 3, cv2.LINE_AA
+        )
+    # 预测路径（绿）
+    for i in range(len(x_coords)-1):
+        cv2.line(
+            frame_copy,
+            (int(x_coords[i]), int(pred_path[i])),
+            (int(x_coords[i+1]), int(pred_path[i+1])),
+            (0, 255, 0), 2, cv2.LINE_AA
+        )
+    return cv2.addWeighted(frame_copy, 0.7, frame, 0.3, 0)
+
+# ===================== 主函数 =====================
 def main():
-    # 1. 参数校验（精简且专业）
-    if len(sys.argv) != 2:
-        print("🚨 使用错误：缺少视频文件路径")
-        print("✅ 正确用法：python main.py <视频文件绝对路径>")
-        print("💡 示例：python main.py /home/dacun/nn/test.mp4")
-        sys.exit(1)
-    video_path = sys.argv[1]
-
-    # 2. 加载模型（精准路径+异常捕获）
+    parser_arg = argparse.ArgumentParser(description="车道线预测程序（标注中文正常）")
+    parser_arg.add_argument("video_path", type=str, help="视频文件绝对路径")
+    parser_arg.add_argument("--max-frames", type=int, default=10, help="最大读取帧数")
+    parser_arg.add_argument("--save-result", action="store_true", default=True, help="保存结果视频")
+    args = parser_arg.parse_args()
+    
+    check_dependencies()
+    
+    # 加载模型
     model_path = os.path.join(PROJECT_ROOT, "models/supercombo.h5")
     if not os.path.exists(model_path):
-        raise FileNotFoundError(f"模型文件不存在：{model_path}（请放入models目录）")
-    
+        logger.error(f"模型文件不存在：{model_path}")
+        sys.exit(1)
     try:
-        print(f"📌 加载模型：{model_path}")
+        logger.info(f"开始加载模型：{model_path}")
+        start_time = time.time()
         model = load_model(model_path, compile=False)
-    except (IOError, ValueError) as e:
-        print(f"❌ 模型加载失败：{str(e)}")
-        sys.exit(1)
-
-    # 3. 读取+预处理视频帧
-    try:
-        yuv_frames, raw_frames = read_video_frames(video_path)
-        if not yuv_frames:
-            raise RuntimeError("未读取到有效视频帧")
-        frame_tensor = preprocess_frames(yuv_frames)
-        if frame_tensor.size == 0:
-            raise RuntimeError("帧预处理后无有效数据")
+        logger.info(f"✅ 模型加载完成，耗时{round(time.time()-start_time,2)}秒")
     except Exception as e:
-        print(f"❌ 视频处理失败：{str(e)}")
+        logger.error(f"❌ 模型加载失败：{e}")
         sys.exit(1)
-
-    # 4. 模型推理初始化
-    state = np.zeros((1, 512))  # 模型状态初始化
-    desire = np.zeros((1, 8))   # 行驶意图初始化
-    total_frames = len(frame_tensor) - 1
-
-    # 5. 可视化升级（解决乱码+效果优化）
-    plt.ion()  # 交互式模式
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))  # 分屏显示：原始帧+预测结果
-    fig.suptitle("车道线预测结果", fontsize=14, fontweight='bold')
-
-    # 子图1：原始视频帧
-    ax1.set_title("原始视频帧", fontsize=12)
-    ax1.axis('off')  # 关闭坐标轴，更清晰
-    img_display = ax1.imshow(cv2.cvtColor(raw_frames[0], cv2.COLOR_BGR2RGB))
-
-    # 子图2：车道线预测（优化线条+标注）
-    ax2.set_title("车道线/路径预测", fontsize=12)
-    ax2.set_xlabel("横向像素", fontsize=10)
-    ax2.set_ylabel("纵向像素", fontsize=10)
-    ax2.set_ylim(0, 191)
-    ax2.invert_xaxis()  # 匹配驾驶视角（左/右对齐）
-    ax2.grid(alpha=0.2, linestyle='--')  # 轻量化网格
-
-    # 初始化预测线条（颜色标准化+标签清晰）
-    left_line, = ax2.plot([], [], 'b-', linewidth=2.5, label='左车道线')
-    right_line, = ax2.plot([], [], 'r-', linewidth=2.5, label='右车道线')
-    path_line, = ax2.plot([], [], 'g-', linewidth=2, label='预测路径')
-    ax2.legend(loc='lower left', fontsize=9)  # 图例位置优化
-
-    # 6. 逐帧推理+可视化更新
-    print(f"\n🚀 开始推理（共{total_frames}帧，按Q键退出）")
+    
+    # 读取视频
     try:
-        for i in range(total_frames):
-            # 模型推理（核心逻辑无改动）
+        yuv_frames, raw_frames, video_writer = read_video(args.video_path, args.max_frames)
+        if not raw_frames:
+            logger.error("未读取到有效视频帧")
+            sys.exit(1)
+        logger.info(f"✅ 视频读取完成，共{len(raw_frames)}帧")
+    except Exception as e:
+        logger.error(f"❌ 视频读取失败：{e}")
+        sys.exit(1)
+    
+    # 预处理
+    frame_tensor = preprocess_frames(yuv_frames)
+    if frame_tensor.size == 0:
+        logger.error("帧预处理后无有效数据")
+        sys.exit(1)
+    
+    # 推理初始化
+    state = np.zeros((1, 512))
+    desire = np.zeros((1, 8))
+    total_frames = len(frame_tensor) - 1
+    logger.info(f"开始推理，共{total_frames}帧（按Q键退出）")
+    
+    # 可视化（用Matplotlib添加中文标注）
+    plt.ion()
+    fig, ax = plt.subplots(figsize=(10, 6))
+    fig.suptitle("车道线预测结果（叠加可视化）", fontsize=14, fontweight='bold')
+    # 添加中文图例标注（Matplotlib支持中文）
+    ax.text(
+        0.02, 0.95, 
+        "左车道线(蓝) | 右车道线(红) | 预测路径(绿)",
+        transform=ax.transAxes,
+        fontsize=10,
+        color='white',
+        bbox=dict(facecolor='black', alpha=0.5)
+    )
+    ax.set_axis_off()
+    img_display = ax.imshow(cv2.cvtColor(raw_frames[0], cv2.COLOR_BGR2RGB))
+    
+    for i in range(total_frames):
+        try:
+            # 推理
             input_tensor = np.vstack(frame_tensor[i:i+2])[None]
             outputs = model.predict([input_tensor, desire, state], verbose=0)
             pred_result = parser(outputs)
             state = outputs[-1]
-
-            # 更新预测线条（对齐维度）
-            left_line.set_data(pred_result["lll"][0], range(192))
-            right_line.set_data(pred_result["rll"][0], range(192))
-            path_line.set_data(pred_result["path"][0], range(192))
-
-            # 更新原始帧显示
-            if i < len(raw_frames):
-                img_display.set_data(cv2.cvtColor(raw_frames[i], cv2.COLOR_BGR2RGB))
-
-            # 刷新画布
+            
+            # 绘制车道线
+            result_frame = draw_lane_lines(raw_frames[i], pred_result)
+            
+            # 更新显示
+            img_display.set_data(cv2.cvtColor(result_frame, cv2.COLOR_BGR2RGB))
             fig.canvas.draw()
             fig.canvas.flush_events()
-
-            # 键盘退出（仅保留Q键，删除冗余自动退出）
-            if cv2.waitKey(50) & 0xFF == ord('q'):
-                print("🛑 用户按Q键退出推理")
+            
+            # 保存结果
+            if args.save_result:
+                video_writer.write(result_frame)
+            
+            # 退出
+            if cv2.waitKey(30) & 0xFF == ord('q'):
+                logger.info("用户按Q键退出")
                 break
-
-            print(f"✅ 完成第{i+1}/{total_frames}帧推理")
-
-    finally:
-        # 资源释放（彻底+规范）
-        print("\n🧹 释放资源中...")
-        plt.ioff()
-        plt.close(fig)
-        cv2.destroyAllWindows()
-        # 强制清除CV2残留
-        cv2.waitKey(1)
-        print("🎉 程序正常结束")
+            
+            logger.info(f"✅ 完成第{i+1}/{total_frames}帧推理")
+        
+        except Exception as e:
+            logger.warning(f"⚠️  第{i+1}帧推理失败：{e}，跳过")
+            continue
+    
+    # 资源释放
+    plt.ioff()
+    plt.close(fig)
+    video_writer.release()
+    cv2.destroyAllWindows()
+    cv2.waitKey(1)
+    
+    # 成果提示
+    logger.info("\n🎉 程序执行完成！")
+    logger.info(f"📁 结果视频：{os.path.join(PROJECT_ROOT, 'lane_pred_result.mp4')}")
 
 if __name__ == "__main__":
-    # 全局异常捕获（更专业）
     try:
         main()
     except Exception as e:
-        print(f"\n❌ 程序异常终止：{str(e)}")
+        logger.error(f"\n❌ 程序异常终止：{e}")
         sys.exit(1)
+EOF
