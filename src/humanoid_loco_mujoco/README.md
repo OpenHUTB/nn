@@ -50,3 +50,4 @@ https://github.com/robfiras/loco-mujoco/tree/master/loco_mujoco/models/unitree_h
 - `main`:使用locomujoco的简单示例
 - `mujoco`:使用mujoco的简单实例
 - `robot_RL`:使用mujoco进行的强化学习训练
+- `mujoco_ros2_sim`:使用mujoco和ros2进行仿真
