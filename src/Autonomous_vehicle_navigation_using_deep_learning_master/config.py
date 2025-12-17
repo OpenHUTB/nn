@@ -1,7 +1,7 @@
 """
 配置文件 - 存储所有配置参数
 """
-import os
+
 # ==================== 轨迹配置 ====================
 TRAJECTORIES = {
     "custom_trajectory": {
@@ -27,17 +27,10 @@ def get_current_trajectory():
         print(f"❌ 轨迹 '{CURRENT_TRAJECTORY}' 不存在")
         return None
 
-
 # ==================== 模型配置 ====================
-# 设置基础路径
-current_dir = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.dirname(current_dir)  # 上一级目录
-MODELS_DIR = os.path.join(base_dir, 'models')
-braking = os.path.join(MODELS_DIR, 'Braking___282.model')
-driving = os.path.join(MODELS_DIR, 'Driving__6030.model')
 MODEL_PATHS = {
-    'braking': braking ,
-    'driving': driving
+    'braking': "models/Braking___282.model",
+    'driving': "models/Driving__6030.model"
 }
 
 # ==================== 动作配置 ====================
@@ -50,8 +43,8 @@ EPISODE_INTERVAL = 2.0                # episode之间的间隔秒数
 
 # ==================== 交通配置 ====================
 ENABLE_TRAFFIC = True                # 是否启用交通流（暂时关闭，避免干扰）
-TRAFFIC_VEHICLES = 30                 # 交通车辆数量
-TRAFFIC_WALKERS = 50                  # 交通行人数量
+TRAFFIC_VEHICLES = 15                 # 交通车辆数量
+TRAFFIC_WALKERS = 20                  # 交通行人数量
 TRAFFIC_SAFE_MODE = True              # 交通安全模式
 TRAFFIC_HYBRID_MODE = True            # 混合物理模式
 TRAFFIC_SYNC_MODE = False             # 交通同步模式
@@ -60,7 +53,7 @@ TRAFFIC_RESPAWN = False               # 是否重生休眠车辆
 # ==================== 可视化配置 ====================
 ROUTE_COLOR = (255, 0, 0)            # 路线颜色 (红色)
 PATH_COLOR = (0, 100, 255)           # 路径颜色 (蓝色)
-VEHICLE_COLOR = (0, 0, 0)          # 车辆颜色 (绿色)
+VEHICLE_COLOR = (0, 255, 0)          # 车辆颜色 (绿色)
 
 ROUTE_HEIGHT = 0.3                   # 路线显示高度
 PATH_HEIGHT = 0.2                    # 路径显示高度
@@ -69,16 +62,16 @@ VEHICLE_HEIGHT = 0.25                # 车辆显示高度
 # ==================== 视角配置 ====================
 TOP_DOWN_HEIGHT = 30.0               # 俯视视角高度（提高）
 TOP_DOWN_PITCH = -85.0               # 俯视角 (几乎垂直向下，-90是完全垂直)
-SMOOTH_FOLLOW_FACTOR = 0.01           # 视角平滑系数 (0-1，越小越平滑)
-MIN_SMOOTH_FACTOR = 0.001             # 最小平滑系数
+SMOOTH_FOLLOW_FACTOR = 0.001           # 视角平滑系数 (0-1，越小越平滑)
+MIN_SMOOTH_FACTOR = 0             # 最小平滑系数
 MAX_SMOOTH_FACTOR = 0.3              # 最大平滑系数
 SMOOTH_FACTOR_ADAPTIVE = True        # 是否自适应平滑系数
 DISTANCE_THRESHOLD = 5.0             # 距离阈值，超过此值加大平滑系数
 
 # ==================== 性能配置 ====================
 DEBUG_MODE = True                    # 调试模式
-FPS_LIMIT = 120                        # FPS限制 (0为无限制，提高性能)
-UPDATE_RATE = 0.5                    # 更新率 (1.0 = 每步更新)
+FPS_LIMIT = 0                        # FPS限制 (0为无限制，提高性能)
+UPDATE_RATE = 1.0                    # 更新率 (1.0 = 每步更新)
 USE_SMOOTH_INTERPOLATION = True      # 使用平滑插值
 INTERPOLATION_STEPS = 5              # 插值步数
 MAX_FRAME_SKIP = 2                   # 最大跳帧数

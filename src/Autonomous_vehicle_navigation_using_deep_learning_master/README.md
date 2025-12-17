@@ -26,54 +26,20 @@ pip install -r requirements.txt
 
 3. **运行主程序**:
 ```bash
-cd main
 python main.py
 ```
 
-4. **运行测试程序**:
-```bash
-cd test
-python test_driving.py
-```
 ## 项目结构
 
 ```
-│  README.md
-│  requirements.txt
-├─agents
-│  │  __init__.py
-│  ├─navigation
-│  │      basic_agent.py
-│  │      behavior_agent.py
-│  │      behavior_types.py
-│  │      controller.py
-│  │      global_route_planner.py
-│  │      local_planner.py
-│  │      __init__.py
-│  └─tools
-│          misc.py
-│          __init__.py
-├─main
-│      car_env.py
-│      config.py
-│      config_manager.py
-│      get_location.py
-│      main.py
-│      model_manager.py
-│      route_visualizer.py
-│      traffic_manager.py
-│      trajectory_manager.py
-│      vehicle_tracker.py
-├─models
-│      Braking___282.00max__282.00avg__282.00min__1679121006.model
-│      Driving__6030.00max_6030.00avg_6030.00min__1679109656.model
-└─test
-        braking_dqn.py
-        driving_dqn.py
-        pedestrians_1.py
-        pedestrians_2.py
-        test_braking.py
-        test_driving.py
+├── main.py                    # 主程序入口
+├── config.py                  # 配置文件
+├── get_location.py            # 位置坐标获取工具
+├── test_braking.py            # 刹车模型测试
+├── test_driving.py            # 驾驶模型测试
+├── pedestrians_1.py           # 行人生成器1
+├── pedestrians_2.py           # 行人生成器2
+└── requirements.txt           # 依赖包列表
 ```
 
 ## 核心功能
