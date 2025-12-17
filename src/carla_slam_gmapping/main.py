@@ -3,11 +3,7 @@
 CARLA全局路径规划节点 - 增强版
 提供从起始点到随机目标点的路径规划服务，并将规划结果通过ROS消息发布和可视化
 新增功能：
-- 路径长度估算
-- 连接状态监控
-- 改进的错误处理
-- 性能统计
-- 配置参数化
+
 """
 
 import rclpy
@@ -23,6 +19,7 @@ import random
 import time  # 新增：用于性能统计
 import math  # 新增：用于距离计算
 from tf_transformations import quaternion_from_euler
+from typing import Optional, Tuple, List, Any
 
 
 class GlobalPlannerNode(Node):
@@ -134,62 +131,73 @@ class GlobalPlannerNode(Node):
 
     def plan_path_cb(self, request, response):
         """
-        路径规划服务回调函数 - 增强版
-        接收起始点，规划到随机目标点的路径并返回
-        新增性能统计和更好的错误处理
+    
+        不足：原方法过长，包含多个职责，难以维护和测试。
+        优化：拆分为子方法，提高可读性和可维护性。
         """
-        start_time = time.time()  # 新增：开始计时
+        start_time = time.time()
 
-        # 新增：检查CARLA连接状态
-        if not self.carla_connected or not self.map:
-            self.get_logger().error("CARLA连接未建立或地图未初始化，无法规划路径")
-            response.success = False  # 假设服务定义中有success字段
+        if not self._validate_connection(response):
             return response
 
         try:
-            # 将ROS坐标转换为CARLA坐标
-            start_location = self._ros_to_carla_location(request.start)
-            start_wp = self.map.get_waypoint(start_location)
-
-            if not start_wp:  # 新增：检查起始路点有效性
+            start_wp = self._get_start_waypoint(request.start)
+            if not start_wp:
                 self.get_logger().error("无法在起始位置找到有效的路点")
                 return response
 
-            # 规划足够长的路径
-            min_waypoints = self.get_parameter('min_waypoints').value
-            max_attempts = self.get_parameter('max_planning_attempts').value
-
-            route, goal_wp = self._get_valid_route(start_wp, min_waypoints, max_attempts)
+            route, goal_wp = self._plan_route(start_wp)
             if not route:
                 self.get_logger().error("无法生成有效的路径")
                 return response
 
-            # 新增：计算路径总长度
-            total_distance = self._calculate_path_distance(route)
-
-            # 构建路径消息并可视化
-            path_msg = self._build_path_message(route)
-            self._visualize_path_and_goal(path_msg, goal_wp)  # 修改：同时可视化路径和目标点
-
+            path_msg = self._process_route(route, goal_wp)
             response.path = path_msg
 
-            # 新增：更新性能统计
-            planning_time = time.time() - start_time
-            self.last_planning_time = planning_time
-            self.total_planning_time += planning_time
-            self.planning_count += 1
+            self._update_performance_stats(time.time() - start_time, len(route), self._calculate_path_distance(route))
 
-            self.get_logger().info(
-                f"成功规划路径 - "
-                f"路点数: {len(route)}, "
-                f"总距离: {total_distance:.2f}m, "
-                f"用时: {planning_time:.3f}s"
-            )
             return response
 
         except Exception as e:
             self.get_logger().error(f"路径规划过程中发生错误: {str(e)}")
             return response
+
+    def _validate_connection(self, response) -> bool:
+        """验证CARLA连接状态"""
+        if not self.carla_connected or not self.map:
+            self.get_logger().error("CARLA连接未建立或地图未初始化，无法规划路径")
+            response.success = False
+            return False
+        return True
+
+    def _get_start_waypoint(self, start_msg) -> Optional[carla.Waypoint]:
+        """获取起始路点"""
+        start_location = self._ros_to_carla_location(start_msg)
+        return self.map.get_waypoint(start_location)
+
+    def _plan_route(self, start_wp: carla.Waypoint) -> Tuple[Optional[List], Optional[carla.Waypoint]]:
+        """规划路径"""
+        min_waypoints = self.get_parameter('min_waypoints').value
+        max_attempts = self.get_parameter('max_planning_attempts').value
+        return self._get_valid_route(start_wp, min_waypoints, max_attempts)
+
+    def _process_route(self, route: List, goal_wp: Optional[carla.Waypoint]) -> Path:
+        """处理路径：构建消息并可视化"""
+        path_msg = self._build_path_message(route)
+        self._visualize_path_and_goal(path_msg, goal_wp)
+        return path_msg
+
+    def _update_performance_stats(self, planning_time: float, waypoint_count: int, total_distance: float):
+        """更新性能统计"""
+        self.last_planning_time = planning_time
+        self.total_planning_time += planning_time
+        self.planning_count += 1
+        self.get_logger().info(
+            f"成功规划路径 - "
+            f"路点数: {waypoint_count}, "
+            f"总距离: {total_distance:.2f}m, "
+            f"用时: {planning_time:.3f}s"
+        )
 
     def _ros_to_carla_location(self, odom_msg):
         """将ROS里程计消息中的位置转换为CARLA坐标"""
@@ -201,7 +209,7 @@ class GlobalPlannerNode(Node):
 
     def _get_valid_route(self, start_wp, min_waypoints=50, max_attempts=10):
         """
-        获取有效的路径 - 增强版
+        获取有效的路径 -
         返回路径和目标路点元组
         尝试多次生成路径，直到满足最小路点数量要求或达到最大尝试次数
         """
@@ -245,7 +253,6 @@ class GlobalPlannerNode(Node):
             if len(route) >= min_waypoints:
                 return route, goal_wp  # 找到满足要求的路径，直接返回
 
-        # 返回最佳路径（即使不满足最小长度要求）
         if best_route:
             self.get_logger().warning(
                 f"达到最大尝试次数({max_attempts})，返回最长路径 "
@@ -362,10 +369,10 @@ class GlobalPlannerNode(Node):
         marker.color.g = 1.0  # 绿色
         marker.color.b = 0.0
 
-        # 新增：设置生存时间，自动清理旧标记
+   
         marker.lifetime.sec = 60  # 60秒后自动删除
 
-        # 添加点集（仅用于ADD动作）
+    
         if points and action == Marker.ADD:
             marker.points = points
 
