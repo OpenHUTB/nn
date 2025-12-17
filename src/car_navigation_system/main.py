@@ -259,7 +259,6 @@ class ImprovedNeuralController:
         ]
         return torch.tensor(state_data, device=self.device).unsqueeze(0)
 
-
     # 在 ImprovedNeuralController 类的 apply_obstacle_avoidance 方法中，修改以下部分：
     def apply_obstacle_avoidance(self, throttle, brake, steer, obstacle_info, speed):
         """应用避障逻辑 - 优化版本"""
@@ -343,7 +342,6 @@ class ImprovedNeuralController:
             if abs(angle) < 15:
                 avoid_steer = 0.2 if angle >= 0 else -0.2
                 steer = 0.8 * steer + 0.2 * avoid_steer
-
 
         return throttle, brake, steer
 
@@ -587,17 +585,78 @@ vehicle.set_simulate_physics(True)
 
 print(f"车辆生成在位置: {spawn_point.location}")
 
-# 生成障碍物车辆
+# 改进的NPC车辆生成和设置
+print("生成NPC车辆...")
 obstacle_count = 3
-for i in range(obstacle_count):
-    if i >= len(spawn_points):
-        break
-    other_vehicles = blueprint_library.filter('vehicle.*')
-    other_vehicle_bp = np.random.choice(other_vehicles)
-    spawn_idx = (i + 15) % len(spawn_points)
-    other_vehicle = world.try_spawn_actor(other_vehicle_bp, spawn_points[spawn_idx])
-    if other_vehicle:
-        other_vehicle.set_autopilot(True)
+npc_vehicles = []  # 存储NPC车辆以便后续管理
+
+# 获取所有可用的车辆蓝图
+vehicle_blueprints = blueprint_library.filter('vehicle.*')
+
+# 选择远离主车辆的出生点（避免直接堵塞）
+valid_spawn_points = []
+main_spawn_location = spawn_point.location
+
+for point in spawn_points:
+    distance = main_spawn_location.distance(point.location)
+    # 选择距离主车辆50米以上的出生点，避免直接碰撞
+    if distance > 50.0:
+        valid_spawn_points.append(point)
+        if len(valid_spawn_points) >= obstacle_count:
+            break
+
+# 如果找不到足够远的点，使用所有点
+if len(valid_spawn_points) < obstacle_count:
+    print("警告：找不到足够远的出生点，使用所有可用点")
+    valid_spawn_points = spawn_points[:obstacle_count]
+
+# 生成NPC车辆
+for i in range(min(obstacle_count, len(valid_spawn_points))):
+    try:
+        # 随机选择车辆类型（排除特斯拉，使场景更丰富）
+        available_blueprints = [bp for bp in vehicle_blueprints if 'tesla' not in bp.id]
+        if not available_blueprints:
+            available_blueprints = vehicle_blueprints
+
+        npc_bp = random.choice(available_blueprints)
+
+        # 设置车辆颜色
+        if npc_bp.has_attribute('color'):
+            colors = npc_bp.get_attribute('color').recommended_values
+            if colors:
+                npc_bp.set_attribute('color', random.choice(colors))
+
+        # 生成车辆
+        npc_vehicle = world.try_spawn_actor(npc_bp, valid_spawn_points[i])
+
+        if npc_vehicle:
+            # 启用自动驾驶模式并设置速度限制
+            npc_vehicle.set_autopilot(True)
+
+            # 设置NPC车辆的速度限制（让它们能正常行驶）
+            traffic_manager = client.get_trafficmanager()
+            traffic_manager.set_global_distance_to_leading_vehicle(2.5)  # 设置跟车距离
+            traffic_manager.set_random_device_seed(12345)  # 设置随机种子确保一致性
+
+            # 为每个NPC车辆设置不同的速度限制（避免所有车速度相同导致堵塞）
+            target_speed = random.uniform(30.0, 50.0)  # 30-50 km/h
+            traffic_manager.vehicle_percentage_speed_difference(npc_vehicle, random.uniform(-10, 10))
+
+            # 设置NPC车辆的驾驶行为（更安全、更智能）
+            traffic_manager.auto_lane_change(npc_vehicle, True)  # 允许自动变道
+            traffic_manager.distance_to_leading_vehicle(npc_vehicle, 3.0)  # 设置跟车距离
+            traffic_manager.collision_detection(npc_vehicle, world, True)  # 启用碰撞检测
+
+            npc_vehicles.append(npc_vehicle)
+            print(f"生成NPC车辆 {i + 1}: {npc_bp.id} 在位置 {valid_spawn_points[i].location}")
+
+            # 短暂暂停，避免生成时的碰撞
+            time.sleep(0.1)
+
+    except Exception as e:
+        print(f"生成NPC车辆 {i + 1} 时出错: {e}")
+
+print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
 
 # 配置传感器（简化配置）
 third_camera_bp = blueprint_library.find('sensor.camera.rgb')
@@ -676,9 +735,40 @@ vehicle.apply_control(carla.VehicleControl(
     hand_brake=False
 ))
 
+
+# 添加NPC车辆管理函数
+def check_and_reset_stuck_npcs():
+    """检查并重置卡住的NPC车辆"""
+    for npc in npc_vehicles:
+        try:
+            npc_speed = math.sqrt(
+                npc.get_velocity().x ** 2 + npc.get_velocity().y ** 2 + npc.get_velocity().z ** 2) * 3.6
+            # 如果NPC车辆速度过低（小于1km/h）且没有碰撞，可能是卡住了
+            if npc_speed < 1.0:
+                print(f"检测到NPC车辆 {npc.id} 可能卡住，尝试重置...")
+                # 获取当前位置
+                current_transform = npc.get_transform()
+                # 寻找最近的可用出生点
+                closest_point = None
+                min_distance = float('inf')
+                for point in spawn_points:
+                    distance = point.location.distance(current_transform.location)
+                    if distance < min_distance and distance > 10.0:  # 避免重置到太近的位置
+                        min_distance = distance
+                        closest_point = point
+
+                if closest_point:
+                    npc.set_transform(closest_point)
+                    npc.set_autopilot(True)
+                    print(f"重置NPC车辆 {npc.id} 到新位置")
+        except:
+            pass
+
+
 try:
     print("自动驾驶系统启动 - 初始模式: 传统控制")
     print("控制键: q-退出, m-切换控制模式, r-重置车辆, t-传统模式, n-神经网络模式")
+    print(f"当前有 {len(npc_vehicles)} 辆NPC车辆在运行")
 
     frame_count = 0
     stuck_count = 0
@@ -686,11 +776,17 @@ try:
     success_count = 0  # 成功运行计数器
     collision_count = 0  # 碰撞计数器
     last_collision_time = 0  # 上次碰撞时间
+    last_npc_check_time = 0  # 上次检查NPC的时间
 
     # 主循环
     while True:
         world.tick()
         frame_count += 1
+
+        # 定期检查NPC车辆状态（每100帧检查一次）
+        if frame_count - last_npc_check_time > 100:
+            check_and_reset_stuck_npcs()
+            last_npc_check_time = frame_count
 
         # 获取车辆状态
         vehicle_transform = vehicle.get_transform()
@@ -870,7 +966,10 @@ finally:
     # 销毁actor
     for actor in world.get_actors():
         if actor.type_id.startswith('vehicle.') or actor.type_id.startswith('sensor.'):
-            actor.destroy()
+            try:
+                actor.destroy()
+            except:
+                pass
 
     # 恢复设置
     settings.synchronous_mode = False
