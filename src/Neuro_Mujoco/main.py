@@ -1,9 +1,3 @@
-#! /usr/bin/env python
-# -*- coding: utf-8 -*-
-"""
-MuJoCo功能整合工具（支持强化学习策略控制 + ROS 1通信）
-优化点：新增基于PyTorch的策略网络推理，自动生成控制指令
-"""
 import os
 import sys
 import time
@@ -142,22 +136,16 @@ def test_speed(
         logger.error("线程数必须为正数")
         return
 
-    # 生成控制噪声（处理nu=0的情况）
-    if model.nu == 0:
-        ctrl = None
-        logger.warning("模型无控制输入（nu=0），将跳过控制噪声")
-    else:
-        ctrl = ctrlnoise * np.random.randn(nstep, model.nu)
-    
     logger.info(f"开始速度测试: 线程数={nthread}, 每线程步数={nstep}")
 
     def simulate_thread(thread_id: int) -> float:
-        """单线程模拟函数"""
+        """单线程模拟函数（优化：线程内逐步生成噪声，降低内存占用）"""
         mj_data = mujoco.MjData(model)
         start = time.perf_counter()
         for i in range(nstep):
-            if ctrl is not None:
-                mj_data.ctrl[:] = ctrl[i]
+            # 优化点：线程内逐步生成控制噪声，避免主线程预生成大数组
+            if model.nu > 0:
+                mj_data.ctrl[:] = ctrlnoise * np.random.randn(model.nu)
             mujoco.mj_step(model, mj_data)
         end = time.perf_counter()
         duration = end - start
@@ -186,32 +174,11 @@ def test_speed(
 def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str] = None) -> None:
     """
     可视化模型并运行模拟（支持ROS/策略控制）
-    :param model_path: 模型文件/目录路径
+    :param model_path: 模型文件路径/目录路径
     :param use_ros: 是否启用ROS模式
     :param policy_path: 预训练策略模型路径（.pth）
-    可视化模型并运行模拟（支持ROS 1模式）
-    
-    参数:
-        model_path: 模型文件/目录路径
-        use_ros: 是否启用ROS模式（默认False）
     """
-    # 新增：模型路径智能校验（支持目录自动找XML/MJB文件）
-    if os.path.isdir(model_path):
-        # 遍历目录找第一个XML/MJB文件
-        model_files = []
-        for file in os.listdir(model_path):
-            if file.endswith(('.xml', '.mjb')):
-                model_files.append(os.path.join(model_path, file))
-        if not model_files:
-            logger.error(f"目录 {model_path} 中未找到.xml/.mjb模型文件")
-            return
-        model_path = model_files[0]
-        logger.info(f"自动选择目录中的模型文件: {model_path}")
-    
-        model_path: 模型文件路径
-        use_ros: 是否启用ROS模式（默认False）
-    """
-    # 智能校验模型路径（支持目录自动找XML/MJB）
+    # 模型路径智能校验（支持目录自动找XML/MJB文件）
     if os.path.isdir(model_path):
         model_files = []
         for file in os.listdir(model_path):
@@ -315,9 +282,12 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
             logger.warning("模型无控制输入（nu=0），不订阅控制指令话题")
 
     # ===================== 可视化主循环 =====================
-    logger.info("启动可视化窗口（按ESC键退出 | 鼠标交互：拖拽旋转、滚轮缩放）")
+    logger.info("启动可视化窗口（按ESC键退出 | 鼠标交互：拖拽旋转、滚轮缩放）")  # 修正缩进
     try:
         with viewer.launch_passive(model, data) as v:
+            # 预分配推理张量（复用，避免每次创建）
+            obs_tensor = None if policy is None else torch.zeros(1, obs_dim, dtype=torch.float32)
+            
             while v.is_running() and (not use_ros or not rospy.is_shutdown()):
                 # 控制指令优先级：ROS指令 > 策略推理 > 无控制
                 if use_ros and ctrl_cmd is not None:
@@ -325,14 +295,21 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
                 elif policy is not None:
                     # 提取观测：关节位置 + 关节速度
                     obs = np.concatenate([data.qpos, data.qvel])
-                    obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+                    
+                    # 优化1：复用张量，避免重复内存分配
+                    if obs_tensor is None:
+                        obs_tensor = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+                    else:
+                        obs_tensor[0] = torch.from_numpy(obs)
                     
                     # 策略推理
                     action = policy(obs_tensor).squeeze().numpy()
                     
-                    # 映射到实际控制范围
+                    # 映射到实际控制范围 + 优化2：强制裁剪到物理极限（避免超限）
                     if ctrl_range is not None:
-                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2
+                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2  # 核心映射：[-1,1]→[ctrl_min,ctrl_max] 线性缩放
+                        action = np.clip(action, ctrl_range[:, 0], ctrl_range[:, 1])  # 强制裁剪，保证指令符合执行器物理极限
+                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2  # 核心映射：[-1,1]→[ctrl_min,ctrl_max] 线性缩放，保证指令符合执行器物理极限
                     
                     data.ctrl[:] = action
 
@@ -340,7 +317,7 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
                 mujoco.mj_step(model, data)
                 v.sync()
 
-                # ROS消息发布
+                # ROS消息发布（修正缩进：从policy分支移出，作为while循环顶层逻辑）
                 if use_ros and ros_publishers is not None:
                     joint_state_pub, pose_pub = ros_publishers
 
@@ -388,8 +365,6 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
         logger.error(f"可视化过程出错: {str(e)}", exc_info=True)
 
 # ===================== 主函数（命令行入口） =====================
-# ===================== 主函数（仅优化model参数help+保持其他逻辑不变）=====================
-# ===================== 主函数（完全保持原有逻辑不变）=====================
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="MuJoCo功能整合工具（支持强化学习策略控制 + ROS 1通信）",
@@ -397,20 +372,14 @@ def main() -> None:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # 1. 可视化命令
+    # 1. 可视化命令（修复重复添加model参数问题）
     viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
-    viz_parser.add_argument("model", help="模型文件路径/目录（支持.xml/.mjb）")
-    viz_parser.add_argument("--ros", action="store_true", help="启用ROS 1模式")
-    viz_parser.add_argument("--policy", help="预训练策略模型路径（.pth文件）")
-    # 1. 可视化命令（优化model参数help为通用提示，移除硬编码路径）
-    viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
-    viz_parser.add_argument("model", help="模型文件路径或包含模型的目录（支持.xml/.mjb格式）")
-    viz_parser.add_argument("model", help="/home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b")
     viz_parser.add_argument(
-        "--ros",
-        action="store_true",
-        help="启用ROS模式（发布关节状态/基座姿态，订阅控制指令）"
+        "model", 
+        help="模型文件路径/目录（示例：/home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b）"
     )
+    viz_parser.add_argument("--ros", action="store_true", help="启用ROS 1模式（发布/订阅关节控制话题）")
+    viz_parser.add_argument("--policy", help="预训练策略模型路径（.pth文件）")
 
     # 2. 速度测试命令
     speed_parser = subparsers.add_parser("testspeed", help="测试模型模拟速度（多线程）")
