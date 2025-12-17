@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-  # 强制声明文件编码为UTF-8
+# 或简化版：
+# coding=utf-8
 import os
 import sys
 import subprocess
