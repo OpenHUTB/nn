@@ -115,44 +115,43 @@ def train_one_step(model, optimizer, x, y):
         1. 使用梯度裁剪防止梯度爆炸
         2. 所有计算都在GradientTape上下文中进行自动微分
     """
-    with tf.GradientTape() as tape:     # 记录计算图以计算梯度
-        logits = model(x)               # 前向传播
-        loss = compute_loss(logits, y)  # 计算损失
-        grads = tape.gradient(loss,model.trainable_variables)
-        #添加梯度裁剪 控制在1.0以内
-    grads = tape.gradient(loss, model.trainable_variables)            # 计算梯度
+    with tf.GradientTape() as tape:
+        logits = model(x)
+        loss = compute_loss(logits, y)
+    # 移出with块，只计算一次梯度，并添加梯度裁剪
+    grads = tape.gradient(loss, model.trainable_variables)
+    grads = [tf.clip_by_value(grad, -1.0, 1.0) for grad in grads]  # 添加梯度裁剪
+    # 计算梯度
     optimizer.apply_gradients(zip(grads, model.trainable_variables))  # 更新参数
 
     accuracy = compute_accuracy(logits, y)   # 计算准确率
     return loss, accuracy
 
+
 # 使用tf.function装饰器将函数编译为TensorFlow静态计算图，以提高执行效率
 # 自动处理自动微分和GPU加速，特别适合模型测试阶段
-@tf.function  
+@tf.function
 def test(model, x, y):
     """
     模型测试函数（前向传播+指标计算）
-    
+
     Args:
         model: 训练好的模型实例
         x: 输入数据张量，shape=(batch_size, ...)
         y: 真实标签张量，shape=(batch_size, num_classes)或(batch_size,)
-    
+
     Returns:
         tuple: (损失值, 准确率) 两个标量张量
     """
     # 模型前向传播计算预测logits（未归一化的预测值）
     logits = model(x)  # shape=(batch_size, num_classes)
-    
-    # 计算预测结果与真实标签之间的损失值（交叉熵等）
-    # 注意：compute_loss函数需事先定义，接收(logits, labels)参数
-    loss = compute_loss(logits, y)  
-    
-    # 计算预测准确率（比较预测类别和真实类别）
-    # 注意：compute_accuracy函数需事先定义，接收(logits, labels)参数
-    accuracy = compute_accuracy(logits, y)  
-    
-    # 显式返回计算结果（虽然loss/accuracy已计算，但避免重复计算）
+
+    # 计算预测结果与真实标签之间的损失值和准确率
+    # 使用已定义的compute_loss和compute_accuracy函数
+    loss = compute_loss(logits, y)  # 计算交叉熵损失
+    accuracy = compute_accuracy(logits, y)  # 计算分类准确率
+
+    # 返回计算结果
     return loss, accuracy  # 返回类型: (tf.Tensor, tf.Tensor)
 
 
