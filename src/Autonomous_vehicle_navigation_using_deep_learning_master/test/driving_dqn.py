@@ -12,6 +12,11 @@ try:
 except IndexError:
     pass
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取父目录
+parent_dir = os.path.dirname(current_dir)
+# 将父目录添加到系统路径
+sys.path.append(parent_dir)
 from agents.navigation.global_route_planner import GlobalRoutePlanner
 
 import carla
