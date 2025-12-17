@@ -66,7 +66,7 @@ def select_best_model(model_files, preferred_keywords=None, excluded_keywords=No
         return None
     
     if preferred_keywords is None:
-        preferred_keywords = ["best", "advanced", "dueling_per"]
+        preferred_keywords = ["best", "advanced", "dueling_per", "v2"]
     
     if excluded_keywords is None:
         excluded_keywords = ["min", "avg", "final"]  # 排除统计文件
@@ -151,16 +151,22 @@ def get_safe_action_advanced(model, state, env, previous_action, uncertainty_thr
         qs[1] *= 1.2  # 提高保持倾向
         qs[2] *= 1.3  # 提高加速倾向
     
-    # 2. 行人避障优先级
+    # 2. 行人避障优先级 - 增强版
     if hasattr(env, 'suggested_action') and env.suggested_action is not None:
-        qs[env.suggested_action] += 3.0  # 大幅提高建议动作的Q值
-        print(f"🚨 安全避让: 执行动作 {env.suggested_action}")
+        # 根据距离调整优先级
+        min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
+        if min_ped_distance < 8.0:  # 危险距离
+            qs[env.suggested_action] += 5.0  # 大幅提高建议动作的Q值
+            print(f"🚨 紧急避让: 执行动作 {env.suggested_action}, 距离: {min_ped_distance:.1f}m")
+        elif min_ped_distance < 12.0:  # 预警距离
+            qs[env.suggested_action] += 2.0
+            print(f"⚠️ 安全避让: 执行动作 {env.suggested_action}, 距离: {min_ped_distance:.1f}m")
         env.suggested_action = None
     
     # 3. 防止过度转向
     if hasattr(env, 'same_steer_counter') and env.same_steer_counter > 2:
         if previous_action in [3, 4]:
-            qs[previous_action] -= 1.5  # 降低连续同向转向的倾向
+            qs[previous_action] -= 2.0  # 降低连续同向转向的倾向
     
     # 4. 动作平滑性
     if previous_action in [3, 4]:  # 转向动作
@@ -177,18 +183,24 @@ def get_safe_action_advanced(model, state, env, previous_action, uncertainty_thr
         elif abs(vehicle_rotation) > 30:  # 方向偏差大
             # 鼓励向相反方向转向以回正
             if vehicle_rotation > 0:  # 偏左，鼓励右转
-                qs[4] += 1.0
+                qs[4] += 1.5
             else:  # 偏右，鼓励左转
-                qs[3] += 1.0
+                qs[3] += 1.5
     
-    # 6. 紧急情况处理
+    # 6. 紧急情况处理 - 增强版
     min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
     if min_ped_distance < 5.0:  # 紧急避让距离
         # 大幅调整Q值以确保安全
-        qs[0] += 2.0  # 紧急制动
+        qs[0] += 3.0  # 紧急制动
         if min_ped_distance < 3.0:  # 极危险
             qs[2] = -float('inf')  # 禁止加速
-            print("⚠️ 紧急制动!")
+            qs[1] = -float('inf')  # 禁止保持
+            print("⚠️ 紧急制动! 危险距离!")
+    
+    # 7. 考虑运动检测结果
+    if hasattr(env, 'motion_detected') and env.motion_detected:
+        # 如果检测到运动，提高警惕
+        qs[0] += 0.5  # 鼓励减速观察
     
     # 选择动作
     action = np.argmax(qs)
@@ -225,6 +237,9 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
     previous_action = 1
     fps_counter = deque(maxlen=30)
     
+    # 反应时间统计
+    reaction_times = []
+    
     # 运行episode
     max_steps = SECONDS_PER_EPISODE * 60
     
@@ -241,6 +256,12 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
             action = np.argmax(qs)
         
         previous_action = action
+        
+        # 记录反应开始时间（如果有障碍物）
+        if hasattr(env, 'obstacle_detected_time') and env.obstacle_detected_time is not None:
+            if hasattr(env, 'reaction_start_time') and env.reaction_start_time is not None:
+                reaction_time = time.time() - env.reaction_start_time
+                reaction_times.append(reaction_time)
         
         # 执行动作
         new_state, reward, done, _ = env.step(action)
@@ -260,10 +281,14 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
             velocity = env.vehicle.get_velocity()
             speed_kmh = 3.6 * np.linalg.norm([velocity.x, velocity.y, velocity.z])
             
+            # 获取最近行人距离
+            min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
+            
             status = "✅" if reward > 0 else "⚠️" if reward < -1 else "➡️"
             
             print(f"{status} 步数: {step_count:4d} | FPS: {fps:4.1f} | "
-                  f"速度: {speed_kmh:5.1f} km/h | 奖励: {reward:6.2f} | 累计: {total_reward:7.2f}")
+                  f"速度: {speed_kmh:5.1f} km/h | 行人距离: {min_ped_distance:5.1f}m | "
+                  f"奖励: {reward:6.2f} | 累计: {total_reward:7.2f}")
         
         if done:
             break
@@ -275,10 +300,14 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
     success = total_reward > 5
     result = "成功" if success else "失败"
     
+    # 计算平均反应时间
+    avg_reaction_time = np.mean(reaction_times) if reaction_times else 0
+    
     print(f"\nEpisode {episode_num} 结果: {result}")
     print(f"总步数: {step_count}, 总奖励: {total_reward:.2f}")
+    print(f"平均反应时间: {avg_reaction_time:.2f}秒")
     
-    return success, total_reward, step_count
+    return success, total_reward, step_count, avg_reaction_time
 
 
 def load_model_with_fallback(model_path):
@@ -374,17 +403,19 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
         'successes': 0,
         'total_rewards': [],
         'episode_lengths': [],
+        'reaction_times': [],
         'start_time': time.time()
     }
     
     try:
         for episode in range(1, num_episodes + 1):
-            success, reward, length = run_test_episode(model, env, episode, use_advanced_safety=True)
+            success, reward, length, avg_rt = run_test_episode(model, env, episode, use_advanced_safety=True)
             
             if success:
                 results['successes'] += 1
             results['total_rewards'].append(reward)
             results['episode_lengths'].append(length)
+            results['reaction_times'].append(avg_rt)
             
             # 短暂暂停
             time.sleep(1)
@@ -407,6 +438,7 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
             results['avg_length'] = np.mean(results['episode_lengths'])
             results['max_reward'] = max(results['total_rewards'])
             results['min_reward'] = min(results['total_rewards'])
+            results['avg_reaction_time'] = np.mean(results['reaction_times']) if results['reaction_times'] else 0
         
         # 显示评估报告
         print(f"\n{'='*60}")
@@ -417,6 +449,7 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
         print(f"成功率: {results.get('success_rate', 0):.1f}%")
         print(f"平均奖励: {results.get('avg_reward', 0):.2f}")
         print(f"平均步数: {results.get('avg_length', 0):.1f}")
+        print(f"平均反应时间: {results.get('avg_reaction_time', 0):.2f}秒")
         print(f"最佳表现: {results.get('max_reward', 0):.2f}")
         print(f"最差表现: {results.get('min_reward', 0):.2f}")
         print(f"总测试时间: {results.get('total_time', 0):.1f}秒")
@@ -500,7 +533,7 @@ def interactive_model_selection(model_files):
 def main():
     """主函数 - 自动查找和测试模型"""
     print(f"\n{'='*60}")
-    print("自动驾驶模型测试系统")
+    print("自动驾驶模型测试系统 - 优化版")
     print(f"{'='*60}")
     
     # 显示当前脚本所在目录
