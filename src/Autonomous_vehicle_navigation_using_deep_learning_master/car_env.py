@@ -12,7 +12,6 @@ try:
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
 except IndexError:
     pass
-
 from agents.navigation.global_route_planner import GlobalRoutePlanner
 
 import carla
@@ -420,7 +419,7 @@ class CarEnv:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0, brake=1.0))
             print("执行动作: 刹车")
         elif action == 1:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.5, steer=   0*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=   0*self.STEER_AMT))
             print("执行动作: 直行")
         elif action == 2:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=-0.3*self.STEER_AMT))
