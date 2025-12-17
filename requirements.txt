@@ -1,5 +1,11 @@
-python-markdown-math
-imageio
-numpy
-matplotlib
-tensorflow
+absl-py==2.3.1
+etils==1.13.0
+fsspec==2025.12.0
+glfw==2.10.0
+importlib_resources==6.5.2
+mujoco==3.4.0
+numpy==2.3.5
+PyOpenGL==3.1.10
+PyOpenGL-accelerate==3.1.10
+typing_extensions==4.15.0
+zipp==3.23.0
