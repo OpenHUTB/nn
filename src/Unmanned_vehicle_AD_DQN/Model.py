@@ -17,8 +17,27 @@ from tensorflow.keras.callbacks import TensorBoard
 import tensorflow as tf
 import tensorflow.keras.backend as backend
 from threading import Thread
-from Environment import *
-from Hyperparameters import *
+
+# 导入本地模块
+from TrainingStrategies import PrioritizedReplayBuffer
+
+# 导入超参数
+try:
+    from Hyperparameters import *
+except ImportError:
+    # 如果在导入Hyperparameters时出错，使用默认值
+    DISCOUNT = 0.97
+    MEMORY_FRACTION = 0.35
+    REPLAY_MEMORY_SIZE = 10000
+    MIN_REPLAY_MEMORY_SIZE = 3000
+    MINIBATCH_SIZE = 64
+    PREDICTION_BATCH_SIZE = 1
+    TRAINING_BATCH_SIZE = 16
+    UPDATE_TARGET_EVERY = 20
+    LEARNING_RATE = 0.00005
+    IM_HEIGHT = 480
+    IM_WIDTH = 640
+    MODEL_NAME = "YY_Optimized"
 
 
 # 自定义TensorBoard类
@@ -53,75 +72,14 @@ class ModifiedTensorBoard(TensorBoard):
                 self.writer.flush()
 
 
-# 优先经验回放缓冲区
-class PrioritizedReplayBuffer:
-    def __init__(self, max_size=REPLAY_MEMORY_SIZE, alpha=0.6, beta_start=0.4, beta_frames=100000):
-        self.max_size = max_size
-        self.alpha = alpha  # 优先级程度 (0 = 均匀采样, 1 = 完全优先级)
-        self.beta_start = beta_start  # 重要性采样权重起始值
-        self.beta_frames = beta_frames  # beta线性增长的帧数
-        self.frame = 1
-        
-        # 使用循环缓冲区
-        self.buffer = deque(maxlen=max_size)
-        self.priorities = deque(maxlen=max_size)
-        
-    def __len__(self):
-        return len(self.buffer)
-    
-    def beta(self):
-        """线性递增的beta值，用于重要性采样权重"""
-        return min(1.0, self.beta_start + self.frame * (1.0 - self.beta_start) / self.beta_frames)
-    
-    def add(self, experience, error=None):
-        """添加经验到缓冲区"""
-        if error is None:
-            priority = max(self.priorities) if self.priorities else 1.0
-        else:
-            priority = (abs(error) + 1e-5) ** self.alpha
-            
-        self.buffer.append(experience)
-        self.priorities.append(priority)
-        
-    def sample(self, batch_size):
-        """从缓冲区中采样一批经验"""
-        if len(self.buffer) == 0:
-            return [], [], [], []
-            
-        # 计算采样概率
-        priorities = np.array(self.priorities, dtype=np.float32)
-        probs = priorities ** self.alpha
-        probs /= probs.sum()
-        
-        # 采样索引
-        indices = np.random.choice(len(self.buffer), batch_size, p=probs)
-        
-        # 获取样本
-        samples = [self.buffer[i] for i in indices]
-        
-        # 计算重要性采样权重
-        total = len(self.buffer)
-        weights = (total * probs[indices]) ** (-self.beta())
-        weights /= weights.max()  # 归一化
-        
-        # 更新帧计数器
-        self.frame += 1
-        
-        return indices, samples, weights
-    
-    def update_priorities(self, indices, errors):
-        """更新采样经验的优先级"""
-        for idx, error in zip(indices, errors):
-            if 0 <= idx < len(self.priorities):
-                self.priorities[idx] = (abs(error) + 1e-5) ** self.alpha
-
-
-# DQN智能体类 - 升级版
+# DQN智能体类 - 升级版（整合训练策略）
 class DQNAgent:
-    def __init__(self, use_dueling=True, use_per=True):
+    def __init__(self, use_dueling=True, use_per=True, use_curriculum=True, use_multi_objective=True):
         # 创建主网络和目标网络
         self.use_dueling = use_dueling
         self.use_per = use_per
+        self.use_curriculum = use_curriculum
+        self.use_multi_objective = use_multi_objective
         
         if use_dueling:
             self.model = self.create_dueling_model()
@@ -141,20 +99,40 @@ class DQNAgent:
         # 自定义TensorBoard
         self.tensorboard = ModifiedTensorBoard(log_dir=f"logs/{MODEL_NAME}-{int(time.time())}")
         self.target_update_counter = 0  # 目标网络更新计数器
-        self.graph = tf.compat.v1.get_default_graph()
 
         # 训练控制标志
         self.terminate = False
         self.last_logged_episode = 0
         self.training_initialized = False
+        
+        # 训练策略组件
+        self.curriculum_manager = None
+        self.multi_objective_optimizer = None
+        self.imitation_manager = None
+        
+    def setup_training_strategies(self, env=None):
+        """设置训练策略组件"""
+        if self.use_curriculum and env:
+            from TrainingStrategies import CurriculumManager
+            self.curriculum_manager = CurriculumManager(env)
+            print("课程学习管理器已启用")
+        
+        if self.use_multi_objective:
+            from TrainingStrategies import MultiObjectiveOptimizer
+            self.multi_objective_optimizer = MultiObjectiveOptimizer()
+            print("多目标优化器已启用")
+        
+        # 模仿学习管理器（需要时手动启用）
+        from TrainingStrategies import ImitationLearningManager
+        self.imitation_manager = ImitationLearningManager()
 
     def create_model(self):
         """创建标准深度Q网络模型"""
         # 使用函数式API
         inputs = Input(shape=(IM_HEIGHT, IM_WIDTH, 3))
         
-        # 第一卷积块
-        x = Conv2D(32, (5, 5), strides=(2, 2), padding='same')(inputs)
+        # 第一卷积块 - 使用较小的卷积核
+        x = Conv2D(32, (3, 3), strides=(1, 1), padding='same')(inputs)
         x = Activation('relu')(x)
         x = BatchNormalization()(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
@@ -178,14 +156,14 @@ class DQNAgent:
         # 展平层
         x = Flatten()(x)
         
-        # 全连接层
-        x = Dense(512, activation='relu')(x)
-        x = Dropout(0.3)(x)
+        # 全连接层 - 减少神经元数量
         x = Dense(256, activation='relu')(x)
         x = Dropout(0.3)(x)
         x = Dense(128, activation='relu')(x)
-        x = Dropout(0.2)(x)
+        x = Dropout(0.3)(x)
         x = Dense(64, activation='relu')(x)
+        x = Dropout(0.2)(x)
+        x = Dense(32, activation='relu')(x)
         x = Dropout(0.1)(x)
         
         # 输出层 - 5个动作
@@ -204,7 +182,7 @@ class DQNAgent:
         
         # 共享的特征提取层
         # 第一卷积块
-        x = Conv2D(32, (5, 5), strides=(2, 2), padding='same')(inputs)
+        x = Conv2D(32, (3, 3), strides=(1, 1), padding='same')(inputs)
         x = Activation('relu')(x)
         x = BatchNormalization()(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
@@ -229,22 +207,21 @@ class DQNAgent:
         x = Flatten()(x)
         
         # 共享的全连接层
-        shared = Dense(512, activation='relu')(x)
+        shared = Dense(256, activation='relu')(x)
         shared = Dropout(0.3)(shared)
-        shared = Dense(256, activation='relu')(shared)
+        shared = Dense(128, activation='relu')(shared)
         
         # 价值流 (V(s))
-        value_stream = Dense(128, activation='relu')(shared)
+        value_stream = Dense(64, activation='relu')(shared)
         value_stream = Dropout(0.2)(value_stream)
         value = Dense(1, activation='linear', name='value')(value_stream)
         
         # 优势流 (A(s,a))
-        advantage_stream = Dense(128, activation='relu')(shared)
+        advantage_stream = Dense(64, activation='relu')(shared)
         advantage_stream = Dropout(0.2)(advantage_stream)
         advantage = Dense(5, activation='linear', name='advantage')(advantage_stream)
         
         # 合并: Q(s,a) = V(s) + (A(s,a) - mean(A(s,a)))
-        # 减去均值使得优势函数的均值为0
         mean_advantage = Lambda(lambda a: tf.reduce_mean(a, axis=1, keepdims=True))(advantage)
         advantage_centered = Subtract()([advantage, mean_advantage])
         q_values = Add()([value, advantage_centered])
@@ -271,10 +248,10 @@ class DQNAgent:
         if self.use_per:
             # PER采样
             if len(self.replay_buffer) < MIN_REPLAY_MEMORY_SIZE:
-                return [], [], [], []
+                return []
                 
             indices, samples, weights = self.replay_buffer.sample(MINIBATCH_SIZE)
-            return indices, samples, weights
+            return samples
         else:
             # 标准采样
             if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
@@ -339,10 +316,10 @@ class DQNAgent:
 
         # 准备训练数据
         current_states = np.array([transition[0] for transition in minibatch]) / 255
-        current_qs_list = self.model.predict(current_states, batch_size=PREDICTION_BATCH_SIZE)
+        current_qs_list = self.model.predict(current_states, batch_size=PREDICTION_BATCH_SIZE, verbose=0)
 
         new_current_states = np.array([transition[3] for transition in minibatch]) / 255
-        future_qs_list = self.target_model.predict(new_current_states, batch_size=PREDICTION_BATCH_SIZE)
+        future_qs_list = self.target_model.predict(new_current_states, batch_size=PREDICTION_BATCH_SIZE, verbose=0)
 
         x = []  # 输入状态
         y = []  # 目标Q值
@@ -412,4 +389,4 @@ class DQNAgent:
 
     def get_qs(self, state):
         """获取状态的Q值"""
-        return self.model.predict(np.array(state).reshape(-1, *state.shape) / 255)[0]
+        return self.model.predict(np.array(state).reshape(-1, *state.shape) / 255, verbose=0)[0]

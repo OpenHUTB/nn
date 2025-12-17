@@ -23,27 +23,29 @@ class GestureDetector:
 
         # 手势到控制指令的映射
         self.gesture_commands = {
-            "open_palm": "起飞",  # 张开手掌 - 起飞
-            "closed_fist": "降落",  # 握拳 - 降落
-            "pointing_up": "上升",  # 食指上指 - 上升
-            "pointing_down": "下降",  # 食指向下 - 下降
-            "victory": "前进",  # 胜利手势 - 前进
-            "thumb_up": "后退",  # 大拇指 - 后退
-            "thumb_down": "停止",  # 大拇指向下 - 停止
-            "ok_sign": "悬停"  # OK手势 - 悬停
+            "open_palm": "takeoff",  # 张开手掌 - 起飞
+            "closed_fist": "land",  # 握拳 - 降落
+            "pointing_up": "up",  # 食指上指 - 上升
+            "pointing_down": "down",  # 食指向下 - 下降
+            "victory": "forward",  # 胜利手势 - 前进
+            "thumb_up": "backward",  # 大拇指 - 后退
+            "thumb_down": "stop",  # 大拇指向下 - 停止
+            "ok_sign": "hover"  # OK手势 - 悬停
         }
 
-    def detect_gestures(self, image):
+    def detect_gestures(self, image, simulation_mode=False):
         """
         检测图像中的手势
 
         Args:
             image: 输入图像
+            simulation_mode: 是否为仿真模式
 
         Returns:
             processed_image: 处理后的图像
             gesture: 识别到的手势
             confidence: 置信度
+            landmarks: 关键点坐标（仅仿真模式返回）
         """
         # 转换颜色空间
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -51,6 +53,7 @@ class GestureDetector:
 
         gesture = "no_hand"
         confidence = 0.0
+        landmarks_data = None
 
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
@@ -66,6 +69,10 @@ class GestureDetector:
                 # 识别具体手势
                 gesture, confidence = self._classify_gesture(hand_landmarks)
 
+                # 在仿真模式下提取关键点数据
+                if simulation_mode:
+                    landmarks_data = self._get_normalized_landmarks(hand_landmarks)
+
                 # 在图像上显示手势信息
                 cv2.putText(image, f"Gesture: {gesture}", (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -73,11 +80,31 @@ class GestureDetector:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
                 # 显示控制指令
-                command = self.gesture_commands.get(gesture, "无")
+                command = self.gesture_commands.get(gesture, "none")
                 cv2.putText(image, f"Command: {command}", (10, 110),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
-        return image, gesture, confidence
+        return image, gesture, confidence, landmarks_data
+
+    def _get_normalized_landmarks(self, hand_landmarks):
+        """
+        获取归一化的关键点坐标（用于仿真模式）
+
+        Args:
+            hand_landmarks: 手部关键点
+
+        Returns:
+            list: 包含21个关键点的字典列表，每个点有x,y,z坐标
+        """
+        landmarks = []
+        for landmark in hand_landmarks.landmark:
+            landmarks.append({
+                'x': landmark.x,
+                'y': landmark.y,
+                'z': landmark.z,
+                'visibility': landmark.visibility if hasattr(landmark, 'visibility') else 1.0
+            })
+        return landmarks
 
     def _classify_gesture(self, landmarks):
         """
@@ -105,13 +132,24 @@ class GestureDetector:
         is_victory = self._is_victory_gesture(points)
         is_ok_sign = self._is_ok_sign(points)
 
+        # 调试输出
+        print(f"[手势特征] "
+              f"拇指上:{is_thumb_up} "
+              f"拇指向下:{is_thumb_down} "
+              f"张开掌:{is_open_palm} "
+              f"握拳:{is_closed_fist} "
+              f"指上:{is_pointing_up} "
+              f"指下:{is_pointing_down} "
+              f"胜利:{is_victory} "
+              f"OK:{is_ok_sign}")
+
         # 根据优先级返回手势
         gestures = [
             (is_thumb_up, "thumb_up", 0.95),
             (is_thumb_down, "thumb_down", 0.95),
             (is_ok_sign, "ok_sign", 0.90),
             (is_victory, "victory", 0.85),
-            (is_open_palm, "open_palm", 0.80),
+            (is_open_palm, "open_palm", 0.80),  # 提高优先级
             (is_closed_fist, "closed_fist", 0.80),
             (is_pointing_up, "pointing_up", 0.75),
             (is_pointing_down, "pointing_down", 0.75),
@@ -150,15 +188,16 @@ class GestureDetector:
     def _is_open_palm(self, points):
         """检测张开手掌手势"""
         finger_tips = [8, 12, 16, 20]  # 食指、中指、无名指、小指指尖
-        finger_dips = [6, 10, 14, 18]  # 对应的指间关节
+        finger_mcps = [5, 9, 13, 17]  # 掌指关节
 
         extended_fingers = 0
-        for tip, dip in zip(finger_tips, finger_dips):
-            if points[tip][1] < points[dip][1]:  # 指尖在指间关节上方
+        for tip, mcp in zip(finger_tips, finger_mcps):
+            # 放宽条件：指尖比掌指关节高（y值小），增加容差0.15
+            if points[tip][1] < points[mcp][1] + 0.15:
                 extended_fingers += 1
 
-        # 至少3个手指伸直
-        return extended_fingers >= 3
+        # 放宽条件：至少2个手指伸直
+        return extended_fingers >= 4
 
     def _is_closed_fist(self, points):
         """检测握拳手势"""
@@ -167,10 +206,11 @@ class GestureDetector:
 
         bent_fingers = 0
         for tip, mcp in zip(finger_tips, finger_mcps):
-            if points[tip][1] > points[mcp][1]:  # 指尖在掌指关节下方
+            # 放宽条件：指尖在掌指关节下方或接近
+            if points[tip][1] > points[mcp][1] - 0.1:
                 bent_fingers += 1
 
-        # 所有4个手指都弯曲
+        # 放宽条件：至少3个手指弯曲
         return bent_fingers >= 3
 
     def _is_pointing_up(self, points):
@@ -239,6 +279,79 @@ class GestureDetector:
             command: 控制指令
         """
         return self.gesture_commands.get(gesture, "none")
+
+    def get_gesture_intensity(self, landmarks, gesture_type):
+        """
+        获取手势强度（用于精细控制）
+
+        Args:
+            landmarks: 关键点数据
+            gesture_type: 手势类型
+
+        Returns:
+            float: 手势强度 (0.0-1.0)
+        """
+        if not landmarks or len(landmarks) < 21:
+            return 0.5  # 默认强度
+
+        if gesture_type == "pointing_up":
+            # 基于食指的角度计算强度
+            index_tip = landmarks[8]
+            index_mcp = landmarks[5]
+            if index_tip['y'] < index_mcp['y']:
+                intensity = (index_mcp['y'] - index_tip['y']) * 2
+                return min(max(intensity, 0.1), 1.0)
+
+        elif gesture_type == "pointing_down":
+            # 基于食指的角度计算强度
+            index_tip = landmarks[8]
+            index_mcp = landmarks[5]
+            if index_tip['y'] > index_mcp['y']:
+                intensity = (index_tip['y'] - index_mcp['y']) * 2
+                return min(max(intensity, 0.1), 1.0)
+
+        elif gesture_type in ["open_palm", "closed_fist"]:
+            # 基于手掌张开程度计算强度
+            thumb_tip = landmarks[4]
+            pinky_tip = landmarks[20]
+            distance = math.sqrt(
+                (thumb_tip['x'] - pinky_tip['x']) ** 2 +
+                (thumb_tip['y'] - pinky_tip['y']) ** 2
+            )
+            if gesture_type == "open_palm":
+                return min(max(distance * 3, 0.1), 1.0)
+            else:
+                return min(max((0.2 - distance) * 5, 0.1), 1.0)
+
+        return 0.5  # 默认强度
+
+    def get_hand_position(self, landmarks):
+        """
+        获取手部在画面中的位置
+
+        Args:
+            landmarks: 关键点数据
+
+        Returns:
+            dict: 包含手部中心位置和大小
+        """
+        if not landmarks or len(landmarks) < 21:
+            return None
+
+        # 计算手部边界框
+        x_coords = [p['x'] for p in landmarks]
+        y_coords = [p['y'] for p in landmarks]
+
+        min_x, max_x = min(x_coords), max(x_coords)
+        min_y, max_y = min(y_coords), max(y_coords)
+
+        return {
+            'center_x': (min_x + max_x) / 2,
+            'center_y': (min_y + max_y) / 2,
+            'width': max_x - min_x,
+            'height': max_y - min_y,
+            'bbox': (min_x, min_y, max_x, max_y)
+        }
 
     def release(self):
         """释放资源"""
