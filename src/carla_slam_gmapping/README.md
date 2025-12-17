@@ -1,8 +1,8 @@
 # 人车模拟
-# CARLA 全局路径规划节点
+# CARLA 全局路径规划和SLAM节点
 
 实现基于 CARLA 模拟器的车辆全局路径规划功能，支持从车辆自身位置（通过里程计输入）到地图中随机目标点的路径生成，并通过 ROS 2 话题可视化规划结果，模拟用户预订行程后车辆的全局路径规划过程。
-
+新增支持 3D 建图功能，集成 GMapping 算法实现三维环境下的地图构建。
 
 ## 功能概述
 该节点是 CARLA 自动驾驶仿真系统中的核心模块之一，主要功能包括：
@@ -10,7 +10,7 @@
 - **路径规划服务**：提供 ROS 2 服务 `plan_to_random_goal`，接收起始点里程计信息，生成到随机目标点的全局路径
 - **路径可视化**：通过 `visualization_marker` 话题发布路径标记，在 RViz 中以绿色线条直观展示规划结果
 - **鲁棒性保障**：包含路径有效性校验（确保路径长度满足需求）、异常捕获和错误日志输出，避免无限循环或崩溃
-
+- **3D 建图**：集成 GMapping 算法，利用激光雷达数据进行实时三维地图构建
 
 ## 环境配置
 ### 基础环境
@@ -45,8 +45,11 @@
    ```bash
    sudo apt install -y python3-colcon-common-extensions
    ```
-
-
+5. **GMapping 依赖**  安装 slam_gmapping 包以支持 3D 建图功能：
+'''
+bash
+sudo apt install ros-foxy-slam-gmapping
+'''
 ## 快速开始
 ### 1. 工作空间准备
 假设你的 ROS 2 工作空间为 `carla_ws`，将该节点所在的功能包 `carla_global_planner` 放入 `src` 目录：
@@ -83,10 +86,11 @@ cd ~/carla_ws
 # 激活 ROS 2 环境和工作空间环境
 source /opt/ros/foxy/setup.bash
 source install/setup.bash
-# 启动节点
-ros2 run carla_global_planner carla_global_planner_node
+# 启动节点和建图功能
+ros2 launch carla_global_planner carla_slam_launch.py
 ```
 - 节点启动成功后，会输出日志 `CARLA全局路径规划服务已启动`
+- GMapping 建图节点同时启动，开始接收激光雷达数据并构建地图
 - 若脚本卡住无报错，说明节点正常运行（等待服务请求）；若报错 "CARLA客户端初始化失败"，需检查 CARLA 服务器是否已启动，或连接地址/端口是否正确
 
 #### 步骤 3：调用路径规划服务
@@ -101,7 +105,7 @@ ros2 service call /plan_to_random_goal carla_global_planner/srv/PlanGlobalPath "
 - 服务调用成功后，节点会输出路径信息（如 `成功规划路径，包含XX个路点`）
 
 #### 步骤 4：可视化路径
-打开新终端，启动 RViz 查看路径：
+打开新终端，启动 RViz 查看路径和建图结果：
 ```bash
 source /opt/ros/foxy/setup.bash
 rviz2
@@ -110,7 +114,32 @@ rviz2
 1. 设置 `Fixed Frame` 为 `map`
 2. 添加 `Marker` 显示项，设置 `Topic` 为 `/visualization_marker`
 3. 路径会以绿色线条显示在场景中
+4.  添加 Map 显示项，设置 Topic 为 /map 查看实时构建的地图
 
+3D 建图算法说明
+GMapping 算法原理
+本项目采用经典的 GMapping 算法实现 3D 建图功能。GMapping 是一种基于粒子滤波的 SLAM（ simultaneous localization and mapping）算法，它通过以下步骤实现地图构建：
+
+粒子滤波: 使用多个粒子表示机器人的可能位姿，每个粒子都携带一个地图副本
+运动模型更新: 根据里程计数据预测每个粒子的新位姿
+观测模型评估: 利用激光雷达扫描数据评估每个粒子的权重
+重采样: 根据权重重新分布粒子集，保留高似然的粒子
+地图更新: 基于最优粒子的位姿估计更新全局地图
+数据流
+输入传感器数据:
+激光雷达扫描数据 (/scan)
+里程计数据 (/odom)
+输出:
+2D 占据栅格地图 (/map)
+机器人位姿估计 (/map 坐标系下的变换)
+参数配置
+GMapping 算法的关键参数已在 launch 文件中预设，可根据具体场景调整：
+
+maxUrange: 激光雷达最大使用距离 (单位: 米)
+sigma: 扫描匹配的标准差
+particles: 粒子数量
+delta: 地图分辨率 (单位: 米/cell)
+temporalUpdate: 地图更新频率
 
 ## 核心接口说明
 ### 1. ROS 2 服务
@@ -131,9 +160,12 @@ nav_msgs/Path path
 ```
 
 ### 2. ROS 2 话题
-| 话题名称               | 消息类型                          | 功能描述                                  |
-|------------------------|-----------------------------------|-------------------------------------------|
-| `/visualization_marker`| `visualization_msgs/Marker`       | 发布路径可视化标记（绿色 LINE_STRIP 类型） |
+话题名称	消息类型	功能描述
+/visualization_marker	visualization_msgs/Marker	发布路径可视化标记（绿色 LINE_STRIP 类型）
+/scan	sensor_msgs/LaserScan	激光雷达扫描数据，用于建图
+/odom	nav_msgs/Odometry	里程计数据，用于定位和建图
+/map	nav_msgs/OccupancyGrid	构建的 2D 占据栅格地图
+
 
 
 ## 常见问题排查
@@ -157,6 +189,11 @@ nav_msgs/Path path
 
 4. **编译报错 "找不到 carla_global_planner/srv/PlanGlobalPath"**  
    - 确认 `srv` 目录下已定义 `PlanGlobalPath.srv` 文件，且 `CMakeLists.txt`/`package.xml` 已正确配置服务依赖
+5. **RViz 中看不到地图**  
+
+确认 Map 显示项已添加且 Topic 设置为 /map
+检查是否有地图数据发布：ros2 topic echo /map
+确保激光雷达数据正常：ros2 topic echo /scan
 
 
 ## 代码结构说明
@@ -168,6 +205,8 @@ carla_global_planner/
 │   └── PlanGlobalPath.srv            # 路径规划服务定义
 ├── utilities/
 │   └── planner.py                    # 路径计算工具（compute_route_waypoints 函数）
+├── launch/
+│   └── carla_slam_launch.py          # 启动文件，包含建图功能
 ├── CMakeLists.txt                    # 编译配置
 └── package.xml                       # 依赖和包信息配置
 ```
@@ -186,10 +225,13 @@ carla_global_planner/
    - 关键逻辑变更需同步更新 README.md
 
 2. **功能扩展建议**  
-   - 支持自定义目标点（而非仅随机目标点）
-   - 增加路径规划算法选择（如 A*、RRT*）
-   - 添加路径平滑处理，优化车辆行驶轨迹
-   - 增加单元测试（基于 `pytest` 和 `ros2 test`）
+   支持自定义目标点（而非仅随机目标点）
+   增加路径规划算法选择（如 A*、RRT*）
+   添加路径平滑处理，优化车辆行驶轨迹
+   增加单元测试（基于 pytest 和 ros2 test）
+   集成其他 SLAM 算法（如 Hector SLAM、Karto SLAM）以提供更多建图选项
+ 
+ 
 
 3. **提交流程**  
    准备提交代码前，请确保：
@@ -203,3 +245,4 @@ carla_global_planner/
 2. [ROS 2 Foxy 官方文档](https://docs.ros.org/en/foxy/) - 学习 ROS 2 服务、话题和节点开发
 3. [nav_msgs/Path 消息定义](https://docs.ros.org/en/foxy/api/nav_msgs/html/msg/Path.html) - 路径消息格式说明
 4. [visualization_msgs/Marker 消息定义](https://docs.ros.org/en/foxy/api/visualization_msgs/html/msg/Marker.html) - 可视化标记格式说明
+5. slam_gmapping 官方文档 - GMapping 算法详细说明
