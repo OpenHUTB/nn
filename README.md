@@ -45,5 +45,4 @@ mkdocs serve
 * 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
 
-通过网盘分享的文件：supercombo.h5
-链接: https://pan.baidu.com/s/1yYc4aPBLnXRuWXEb0hyKMA?pwd=1234 提取码: 1234
+
