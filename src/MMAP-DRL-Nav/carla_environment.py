@@ -94,30 +94,55 @@ class CarlaEnvironment(gym.Env):
         self.collision_pedestrian_penalty = -100.0 # 碰撞行人惩罚
         self.collision_static_penalty = -15.0    # 碰撞静态物体惩罚
 
-        # 基础配置
+        # ========== 天气系统：仅修改此处（新增+调整） ==========
+        self.weather_mode = "dynamic"  # 动态模式：每次reset必切换不同天气
+        self.preset_weathers = [
+            carla.WeatherParameters.ClearNoon,
+            carla.WeatherParameters.CloudyNoon,
+            carla.WeatherParameters.WetNoon,
+            carla.WeatherParameters.WetCloudyNoon,
+            carla.WeatherParameters.MidRainyNoon,
+            carla.WeatherParameters.HardRainNoon,
+            carla.WeatherParameters.SoftRainNoon
+        ]
+        # 初始化：启动就随机选天气（不是固定晴天）
+        self.current_weather = random.choice(self.preset_weathers)
+        self.world.set_weather(self.current_weather)
+        print(f"天气系统初始化完成，模式：{self.weather_mode}，当前天气：{self.current_weather}")
+
+        # 基础配置（完全保留）
         self.spawn_retry_times = 20
         self.spawn_safe_radius = 2.0
 
-        # 动作/观测空间
+        # 动作/观测空间（完全保留）
         self.action_space = gym.spaces.Discrete(4)
         self.observation_space = gym.spaces.Box(
             low=0, high=255, shape=(128, 128, 3), dtype=np.uint8
         )
 
-        # 核心对象
+        # 核心对象（完全保留）
         self.vehicle = None
         self.camera = None
         self.collision_sensor = None
         self.image_data = None
         self.has_collision = False
 
-        # 视角参数
+        # 视角参数（完全保留）
         self.view_height = 6.0
         self.view_pitch = -15.0
         self.view_distance = 8.0
         self.z_offset = 0.5
 
-    # ========== 红绿灯判定（移除特殊符号） ==========
+    # ========== 天气切换：仅新增此函数（保证不重复） ==========
+    def switch_weather(self):
+        # 过滤当前天气，确保每次切换都换不同的
+        available_weathers = [w for w in self.preset_weathers if w != self.current_weather]
+        new_weather = random.choice(available_weathers)
+        self.world.set_weather(new_weather)
+        self.current_weather = new_weather
+        print(f"天气已切换：{self.current_weather}")
+
+    # ========== 红绿灯判定（完全保留原始代码） ==========
     def _check_traffic_light(self):
         current_time = time.time()
         if current_time - self.last_traffic_light_time < self.traffic_light_cooldown:
@@ -171,7 +196,7 @@ class CarlaEnvironment(gym.Env):
 
         return reward
 
-    # ========== 超速检测（无日志） ==========
+    # ========== 超速检测（完全保留原始代码） ==========
     def _check_over_speed(self):
         current_time = time.time()
         if current_time - self.last_over_speed_time < self.over_speed_cooldown:
@@ -197,7 +222,7 @@ class CarlaEnvironment(gym.Env):
 
         return reward
 
-    # ========== 车道偏离检测（3秒检测 + 10秒日志 + 无特殊符号） ==========
+    # ========== 车道偏离检测（完全保留原始代码） ==========
     def _check_lane_offset(self):
         current_time = time.time()
         # 仅每3秒执行一次检测
@@ -254,7 +279,7 @@ class CarlaEnvironment(gym.Env):
 
         return reward
 
-    # ========== 安全生成车辆（移除特殊符号） ==========
+    # ========== 安全生成车辆（完全保留原始代码） ==========
     def _spawn_vehicle_safely(self, vehicle_bp):
         spawn_points = self.world.get_map().get_spawn_points()
         if not spawn_points:
@@ -278,7 +303,7 @@ class CarlaEnvironment(gym.Env):
 
         raise RuntimeError("所有出生点都有碰撞，无法生成车辆！")
 
-    # ========== 优化NPC生成 ==========
+    # ========== 优化NPC生成（完全保留原始代码） ==========
     def _spawn_small_npc(self):
         for v in self.npc_vehicle_list:
             if v.is_alive:
@@ -337,7 +362,7 @@ class CarlaEnvironment(gym.Env):
             except:
                 continue
 
-    # ========== 初始化碰撞传感器 ==========
+    # ========== 初始化碰撞传感器（完全保留原始代码） ==========
     def _init_collision_sensor(self):
         collision_bp = self.blueprint_library.find('sensor.other.collision')
         collision_transform = carla.Transform(carla.Location(x=0, y=0, z=0))
@@ -346,7 +371,7 @@ class CarlaEnvironment(gym.Env):
         )
         self.collision_sensor.listen(lambda event: self._collision_callback(event))
 
-    # ========== 碰撞回调（仅标记状态） ==========
+    # ========== 碰撞回调（完全保留原始代码） ==========
     def _collision_callback(self, event):
         self.has_collision = True
         other_actor = event.other_actor
@@ -358,7 +383,7 @@ class CarlaEnvironment(gym.Env):
         elif 'static' in other_actor_type or 'building' in other_actor_type or 'guardrail' in other_actor_type:
             self.hit_static = True
 
-    # ========== 初始化相机 ==========
+    # ========== 初始化相机（完全保留原始代码） ==========
     def _init_camera(self):
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
@@ -369,9 +394,9 @@ class CarlaEnvironment(gym.Env):
         self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
         self.camera.listen(lambda img: self._camera_callback(img))
 
-    # ========== 重置环境（重置所有标记） ==========
+    # ========== 重置环境（仅修改天气逻辑：每次reset必切换） ==========
     def reset(self):
-        # 清理旧资源
+        # 清理旧资源（完全保留）
         if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
         if self.camera is not None and self.camera.is_alive:
@@ -380,49 +405,52 @@ class CarlaEnvironment(gym.Env):
             self.collision_sensor.destroy()
         self.image_data = None
         
-        # 重置所有碰撞标记
+        # 重置所有碰撞标记（完全保留）
         self.has_collision = False
         self.hit_vehicle = False
         self.hit_pedestrian = False
         self.hit_static = False
         self.collision_penalty_applied = False
 
-        # 重置红绿灯标记
+        # 重置红绿灯标记（完全保留）
         self.last_traffic_light_time = 0
         self.has_triggered_red = False
         self.has_triggered_green = False
 
-        # 重置超速标记
+        # 重置超速标记（完全保留）
         self.last_over_speed_time = 0
 
-        # 重置车道检测/日志标记
+        # 重置车道检测/日志标记（完全保留）
         self.last_lane_check_time = 0
         self.last_lane_log_time = 0
 
-        # 生成车辆
+        # ========== 仅修改此处：强制切换天气（不管什么模式都换） ==========
+        self.switch_weather()
+
+        # 生成车辆（完全保留）
         vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
         self.vehicle = self._spawn_vehicle_safely(vehicle_bp)
 
-        # 初始化传感器
+        # 初始化传感器（完全保留）
         self._init_camera()
         self._init_collision_sensor()
 
-        # 生成NPC
+        # 生成NPC（完全保留）
         self._spawn_small_npc()
 
-        # 等待传感器就绪
+        # 等待传感器就绪（完全保留）
         timeout = 0
         while self.image_data is None and timeout < 30:
             self.world.tick()
             time.sleep(0.001)
             timeout += 1
 
-        # 绑定视角
+        # 绑定视角（完全保留）
         self.follow_vehicle()
         self.world.tick()
         return self.image_data.copy() if self.image_data is not None else np.zeros((128,128,3), dtype=np.uint8)
 
-    # ========== 视角跟随 ==========
+    # ========== 视角跟随（完全保留原始代码） ==========
     def follow_vehicle(self):
         spectator = self.world.get_spectator()
         if not spectator or not self.vehicle or not self.vehicle.is_alive:
@@ -441,21 +469,21 @@ class CarlaEnvironment(gym.Env):
             carla.Rotation(pitch=self.view_pitch, yaw=vehicle_tf.rotation.yaw, roll=0.0)
         ))
 
-    # ========== 获取观测 ==========
+    # ========== 获取观测（完全保留原始代码） ==========
     def get_observation(self):
         return self.image_data.copy() if self.image_data is not None else np.zeros((128, 128, 3), dtype=np.uint8)
 
-    # ========== 相机回调 ==========
+    # ========== 相机回调（完全保留原始代码） ==========
     def _camera_callback(self, image):
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
         self.image_data = array.reshape((image.height, image.width, 4))[:, :, :3]
 
-    # ========== 核心：奖励函数（碰撞仅扣一次分 + 移除特殊符号） ==========
+    # ========== 核心：奖励函数（完全保留原始代码） ==========
     def step(self, action):
         if self.vehicle is None or not self.vehicle.is_alive:
             raise RuntimeError("车辆未初始化/已销毁，请先调用reset()")
 
-        # 车辆控制逻辑
+        # 车辆控制逻辑（完全保留）
         throttle = 0.0
         steer = 0.0
         if action == 0:  # 前进
@@ -481,19 +509,19 @@ class CarlaEnvironment(gym.Env):
         self.world.tick()
         self.follow_vehicle()
 
-        # ========== 1. 基础行驶奖励 ==========
+        # ========== 1. 基础行驶奖励（完全保留） ==========
         base_reward = 0.1 if throttle > 0 else (-0.1 if throttle < 0 else 0.0)
 
-        # ========== 2. 红绿灯奖惩 ==========
+        # ========== 2. 红绿灯奖惩（完全保留） ==========
         traffic_light_reward = self._check_traffic_light()
 
-        # ========== 3. 超速奖惩 ==========
+        # ========== 3. 超速奖惩（完全保留） ==========
         over_speed_reward = self._check_over_speed()
 
-        # ========== 4. 车道偏离奖惩（3秒检测 + 10秒日志） ==========
+        # ========== 4. 车道偏离奖惩（3秒检测 + 10秒日志）（完全保留） ==========
         lane_reward = self._check_lane_offset()
 
-        # ========== 5. 碰撞奖惩（仅扣一次分 + 移除特殊符号） ==========
+        # ========== 5. 碰撞奖惩（仅扣一次分 + 移除特殊符号）（完全保留） ==========
         collision_reward = 0.0
         done = False
         if self.has_collision and not self.collision_penalty_applied:
@@ -514,7 +542,7 @@ class CarlaEnvironment(gym.Env):
             # 标记惩罚已执行，避免重复扣分
             self.collision_penalty_applied = True
 
-        # ========== 总奖励计算 ==========
+        # ========== 总奖励计算（完全保留） ==========
         total_reward = (
             base_reward          # 基础行驶
             + traffic_light_reward  # 红绿灯
@@ -534,7 +562,7 @@ class CarlaEnvironment(gym.Env):
             "total_reward": total_reward
         }
 
-    # ========== 关闭环境（移除特殊符号） ==========
+    # ========== 关闭环境（完全保留原始代码） ==========
     def close(self):
         # 清理NPC
         for v in self.npc_vehicle_list:
