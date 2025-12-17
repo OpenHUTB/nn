@@ -171,7 +171,7 @@ def main():
     """
     Main launcher function
     """
-    # Welcome message
+
     print("=" * 50)
     print("🤖 DeepMind Humanoid Robot Simulation Launcher")
     print("📌 Multi-target patrol + Dynamic obstacle avoidance")
