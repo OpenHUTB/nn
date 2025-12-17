@@ -18,8 +18,8 @@ class CurriculumManager:
         self.stage_configs = [
             # 阶段0: 入门
             {
-                'pedestrian_cross': 4,      # 十字路口行人数量
-                'pedestrian_normal': 2,     # 普通路段行人数量
+                'pedestrian_cross': 2,      # 十字路口行人数量（减少）
+                'pedestrian_normal': 1,     # 普通路段行人数量（减少）
                 'pedestrian_speed_min': 0.5,  # 行人最低速度
                 'pedestrian_speed_max': 1.0,  # 行人最高速度
                 'max_episode_steps': 1200,   # 最大步数 (20秒 * 60FPS)
@@ -27,8 +27,8 @@ class CurriculumManager:
             },
             # 阶段1: 初级
             {
-                'pedestrian_cross': 6,
-                'pedestrian_normal': 3,
+                'pedestrian_cross': 4,      # 逐步增加
+                'pedestrian_normal': 2,
                 'pedestrian_speed_min': 0.7,
                 'pedestrian_speed_max': 1.3,
                 'max_episode_steps': 1800,   # 30秒
@@ -36,8 +36,8 @@ class CurriculumManager:
             },
             # 阶段2: 中级
             {
-                'pedestrian_cross': 8,
-                'pedestrian_normal': 4,
+                'pedestrian_cross': 6,
+                'pedestrian_normal': 3,
                 'pedestrian_speed_min': 0.8,
                 'pedestrian_speed_max': 1.5,
                 'max_episode_steps': 2400,   # 40秒
@@ -45,8 +45,8 @@ class CurriculumManager:
             },
             # 阶段3: 高级 (正常难度)
             {
-                'pedestrian_cross': 10,
-                'pedestrian_normal': 5,
+                'pedestrian_cross': 8,
+                'pedestrian_normal': 4,
                 'pedestrian_speed_min': 1.0,
                 'pedestrian_speed_max': 2.0,
                 'max_episode_steps': 3600,   # 60秒
@@ -54,8 +54,8 @@ class CurriculumManager:
             },
             # 阶段4: 专家 (挑战)
             {
-                'pedestrian_cross': 12,
-                'pedestrian_normal': 6,
+                'pedestrian_cross': 10,     # 适当减少
+                'pedestrian_normal': 5,
                 'pedestrian_speed_min': 1.2,
                 'pedestrian_speed_max': 2.5,
                 'max_episode_steps': 3600,
@@ -78,7 +78,9 @@ class CurriculumManager:
             success_rate = sum(self.success_history) / len(self.success_history)
             avg_reward = np.mean(self.reward_history) if self.reward_history else 0
             
-            print(f"课程学习 - 当前阶段: {self.current_stage}, 成功率: {success_rate:.2f}, 平均奖励: {avg_reward:.2f}")
+            # 减少打印频率
+            if len(self.success_history) % 10 == 0:
+                print(f"课程学习 - 当前阶段: {self.current_stage}, 成功率: {success_rate:.2f}, 平均奖励: {avg_reward:.2f}")
             
             # 检查是否可以进入下一阶段
             if self.current_stage < len(self.stage_configs) - 1:
@@ -112,17 +114,17 @@ class MultiObjectiveOptimizer:
         # 定义优化目标及其权重（可动态调整）
         self.objectives = {
             'safety': {
-                'weight': 0.4,
+                'weight': 0.35,  # 稍微降低安全权重
                 'description': '安全避障和避免碰撞',
                 'metrics': ['collision_avoidance', 'pedestrian_distance']
             },
             'efficiency': {
-                'weight': 0.25,
+                'weight': 0.30,  # 提高效率权重
                 'description': '快速到达目的地',
                 'metrics': ['progress_speed', 'total_time']
             },
             'comfort': {
-                'weight': 0.2,
+                'weight': 0.20,
                 'description': '平稳驾驶体验',
                 'metrics': ['smoothness', 'steering_changes']
             },
@@ -156,11 +158,11 @@ class MultiObjectiveOptimizer:
         
         # 特殊惩罚项
         if metrics.get('collision', False):
-            composite -= 10
+            composite -= 8  # 减少碰撞惩罚
         if metrics.get('off_road', False):
-            composite -= 5
+            composite -= 3  # 减少偏离道路惩罚
         if metrics.get('dangerous_action', False):
-            composite -= 3
+            composite -= 2  # 减少危险动作惩罚
             
         return composite
     
@@ -194,7 +196,7 @@ class MultiObjectiveOptimizer:
             
             # 如果最差目标表现低于阈值，增加其权重
             if recent_performance[worst_obj] < 0.3:
-                adjustment = 0.05
+                adjustment = 0.02  # 减少调整幅度
                 self.objectives[worst_obj]['weight'] += adjustment
                 self.objectives[best_obj]['weight'] -= adjustment
                 
@@ -203,7 +205,8 @@ class MultiObjectiveOptimizer:
                 for obj in self.objectives:
                     self.objectives[obj]['weight'] /= total
                 
-                print(f"动态权重调整: {worst_obj}权重↑ {adjustment:.3f}, {best_obj}权重↓ {adjustment:.3f}")
+                if adjustment != 0:
+                    print(f"动态权重调整: {worst_obj}权重↑ {adjustment:.3f}, {best_obj}权重↓ {adjustment:.3f}")
     
     def get_performance_report(self):
         """生成性能报告"""
@@ -255,7 +258,10 @@ class ImitationLearningManager:
             done = False
             episode_data = []
             
-            while not done:
+            step_count = 0
+            max_steps = 60 * 60  # 最大60秒
+            
+            while not done and step_count < max_steps:
                 # 这里可以使用规则控制器或手动控制
                 # 示例：简单的规则控制器
                 action = self._rule_based_controller(env)
@@ -272,6 +278,7 @@ class ImitationLearningManager:
                 })
                 
                 state = new_state
+                step_count += 1
             
             demonstrations.extend(episode_data)
             env.cleanup_actors()
@@ -294,10 +301,10 @@ class ImitationLearningManager:
         velocity = env.vehicle.get_velocity()
         speed_kmh = 3.6 * math.sqrt(velocity.x**2 + velocity.y**2)
         
-        # 简单规则：保持速度在20-40 km/h，避免障碍物
+        # 简单规则：保持速度在20-35 km/h，避免障碍物
         if speed_kmh < 20:
             return 2  # 加速
-        elif speed_kmh > 40:
+        elif speed_kmh > 35:
             return 0  # 减速
         else:
             # 检查前方障碍物
@@ -387,10 +394,12 @@ class ImitationLearningManager:
                 
                 state = env.reset(episode)
                 done = False
+                step_count = 0
+                max_steps = 60 * 60
                 
-                while not done:
+                while not done and step_count < max_steps:
                     # 使用当前策略选择动作
-                    qs = model.predict(np.array(state).reshape(-1, *state.shape) / 255)[0]
+                    qs = model.predict(np.array(state).reshape(-1, *state.shape) / 255, verbose=0)[0]
                     action = np.argmax(qs)
                     
                     # 执行动作
@@ -410,6 +419,7 @@ class ImitationLearningManager:
                     })
                     
                     state = new_state
+                    step_count += 1
                 
                 env.cleanup_actors()
             
@@ -423,6 +433,18 @@ class ImitationLearningManager:
             states = np.array(states) / 255.0
             actions_onehot = tf.keras.utils.to_categorical(actions, num_classes=5)
             
+            # 备份原始编译设置
+            original_loss = model.loss
+            original_optimizer = model.optimizer
+            original_metrics = model.metrics_names
+            
+            # 重新编译用于分类
+            model.compile(
+                optimizer=Adam(learning_rate=0.0001),
+                loss='categorical_crossentropy',
+                metrics=['accuracy']
+            )
+            
             # 训练模型
             history = model.fit(
                 states, actions_onehot,
@@ -430,6 +452,13 @@ class ImitationLearningManager:
                 epochs=10,
                 validation_split=0.1,
                 verbose=0
+            )
+            
+            # 恢复原始编译设置
+            model.compile(
+                optimizer=original_optimizer,
+                loss=original_loss,
+                metrics=original_metrics
             )
             
             print(f"  训练完成 - 准确率: {history.history['accuracy'][-1]:.3f}")
@@ -471,7 +500,7 @@ class PrioritizedReplayBuffer:
     def sample(self, batch_size):
         """从缓冲区中采样一批经验"""
         if len(self.buffer) == 0:
-            return [], [], [], []
+            return [], [], []
             
         # 计算采样概率
         priorities = np.array(self.priorities, dtype=np.float32)
@@ -479,7 +508,7 @@ class PrioritizedReplayBuffer:
         probs /= probs.sum()
         
         # 采样索引
-        indices = np.random.choice(len(self.buffer), batch_size, p=probs)
+        indices = np.random.choice(len(self.buffer), min(batch_size, len(self.buffer)), p=probs, replace=False)
         
         # 获取样本
         samples = [self.buffer[i] for i in indices]
