@@ -2,7 +2,6 @@
 """
 CARLA全局路径规划节点 - 增强版
 提供从起始点到随机目标点的路径规划服务，并将规划结果通过ROS消息发布和可视化
-新增功能：
 
 """
 
@@ -18,6 +17,10 @@ import carla
 import random
 import time  # 新增：用于性能统计
 import math  # 新增：用于距离计算
+from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import TransformStamped
+import tf2_ros
 from tf_transformations import quaternion_from_euler
 from typing import Optional, Tuple, List, Any
 
@@ -92,6 +95,15 @@ class GlobalPlannerNode(Node):
             version = self.client.get_server_version()
             self.world = self.client.get_world()
             self.map = self.world.get_map()
+            # SLAM功能相关
+            self.laser_sub = self.create_subscription(
+                LaserScan, '/carla/ego_vehicle/lidar', self.laser_callback, 10)
+
+            self.map_pub = self.create_publisher(
+                OccupancyGrid, '/map', 10)
+
+            # TF broadcaster for SLAM
+            self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
             self.carla_connected = True  # 新增：设置连接状态
             self.get_logger().info(
@@ -186,6 +198,32 @@ class GlobalPlannerNode(Node):
         path_msg = self._build_path_message(route)
         self._visualize_path_and_goal(path_msg, goal_wp)
         return path_msg
+    def laser_callback(self, msg: LaserScan):
+        """
+        处理激光雷达数据，用于SLAM
+        """
+        # 这里实现激光雷达数据的处理逻辑
+        # 可以转发给gmapping或其他SLAM算法处理
+        pass
+    def publish_tf_transform(self, position, orientation, frame_id, child_frame_id):
+        """
+        发布TF变换
+        """
+        t = TransformStamped()
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = frame_id
+        t.child_frame_id = child_frame_id
+        
+        t.transform.translation.x = position[0]
+        t.transform.translation.y = position[1]
+        t.transform.translation.z = position[2]
+        
+        t.transform.rotation.x = orientation[0]
+        t.transform.rotation.y = orientation[1]
+        t.transform.rotation.z = orientation[2]
+        t.transform.rotation.w = orientation[3]
+        
+        self.tf_broadcaster.sendTransform(t)
 
     def _update_performance_stats(self, planning_time: float, waypoint_count: int, total_distance: float):
         """更新性能统计"""
