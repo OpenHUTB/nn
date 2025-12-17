@@ -385,7 +385,7 @@ def main():
     data = predictor.load_real_traffic_data(5000)
 
     # 特征工程
-    print("\n🔧 第二步: 特征工程.")
+    print("\n🔧 第二步: 特征工程")
     X, y = predictor.prepare_features(data)
     print(f"特征数量: {X.shape[1]}")
     print(f"样本数量: {X.shape[0]}")
