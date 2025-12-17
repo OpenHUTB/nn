@@ -6,205 +6,303 @@ import argparse
 import traceback
 import math
 import threading
+import json
+import csv
 from datetime import datetime
-from PIL import Image, ImageDraw, ImageFont
+from collections import deque
 
 from carla_utils import setup_carla_path, import_carla_module
+from config_manager import ConfigManager
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
 
 
-class ImageStitcher:
+class Logger:
+    """简化日志类"""
+
+    @staticmethod
+    def info(msg):
+        print(f"[INFO] {msg}")
+
+    @staticmethod
+    def warning(msg):
+        print(f"[WARNING] {msg}")
+
+    @staticmethod
+    def error(msg):
+        print(f"[ERROR] {msg}")
+
+    @staticmethod
+    def debug(msg):
+        print(f"[DEBUG] {msg}")
+
+    @staticmethod
+    def get_progress_bar(iteration, total, length=50):
+        percent = iteration / total
+        filled = int(length * percent)
+        bar = '█' * filled + '░' * (length - filled)
+        return f"[{bar}] {percent:.1%}"
+
+
+class Constants:
+    VEHICLE_TYPES = [
+        'vehicle.tesla.model3',
+        'vehicle.audi.tt',
+        'vehicle.mini.cooperst',
+        'vehicle.nissan.micra',
+        'vehicle.mercedes.coupe'
+    ]
+
+    PEDESTRIAN_BEHAVIORS = ['crossing', 'walking', 'waiting']
+
+    CAMERA_CONFIGS = {
+        'front_wide': {'loc': (2.0, 0, 1.8), 'rot': (0, -3, 0), 'fov': 100},
+        'front_narrow': {'loc': (2.0, 0, 1.6), 'rot': (0, 0, 0), 'fov': 60},
+        'right_side': {'loc': (0.5, 1.0, 1.5), 'rot': (0, -2, 45), 'fov': 90},
+        'left_side': {'loc': (0.5, -1.0, 1.5), 'rot': (0, -2, -45), 'fov': 90}
+    }
+
+    INFRA_POSITIONS = [
+        {'name': 'north', 'offset': (0, -20, 12), 'rotation': (0, -25, 180)},
+        {'name': 'south', 'offset': (0, 20, 12), 'rotation': (0, -25, 0)},
+        {'name': 'east', 'offset': (20, 0, 12), 'rotation': (0, -25, -90)},
+        {'name': 'west', 'offset': (-20, 0, 12), 'rotation': (0, -25, 90)}
+    ]
+
+
+class WeatherManager:
+    @staticmethod
+    def create_weather(weather_type, time_of_day):
+        weather = carla.WeatherParameters()
+
+        if weather_type == 'clear':
+            weather.cloudiness = 15.0
+            weather.precipitation = 0.0
+            weather.wind_intensity = 5.0
+        elif weather_type == 'rainy':
+            weather.cloudiness = 90.0
+            weather.precipitation = 70.0
+            weather.precipitation_deposits = 60.0
+            weather.wind_intensity = 20.0
+        elif weather_type == 'cloudy':
+            weather.cloudiness = 80.0
+            weather.precipitation = 10.0
+            weather.wind_intensity = 10.0
+        elif weather_type == 'foggy':
+            weather.cloudiness = 60.0
+            weather.fog_density = 50.0
+            weather.fog_distance = 15.0
+        else:
+            weather.cloudiness = 30.0
+
+        if time_of_day == 'noon':
+            weather.sun_altitude_angle = 75
+        elif time_of_day == 'sunset':
+            weather.sun_altitude_angle = 10
+        elif time_of_day == 'night':
+            weather.sun_altitude_angle = -20
+        else:
+            weather.sun_altitude_angle = 45
+
+        return weather
+
+
+class ImageProcessor:
     def __init__(self, output_dir):
         self.output_dir = output_dir
-        self.stitched_dir = os.path.join(output_dir, "stitched_images")
+        self.stitched_dir = os.path.join(output_dir, "stitched")
         os.makedirs(self.stitched_dir, exist_ok=True)
 
-        self.font = self._load_font()
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            self.has_pil = True
+            self.Image = Image
+            self.ImageDraw = ImageDraw
+            self.ImageFont = ImageFont
+            self.font = ImageFont.load_default()
+        except ImportError:
+            self.has_pil = False
+            Logger.warning("PIL未安装，图像拼接功能禁用")
+            Logger.warning("请安装: pip install pillow")
 
-    def _load_font(self):
-        font_paths = [
-            "arial.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/System/Library/Fonts/Helvetica.ttc"
-        ]
-
-        for font_path in font_paths:
-            try:
-                return ImageFont.truetype(font_path, 20)
-            except:
-                continue
-        return ImageFont.load_default()
-
-    def stitch_ego_vehicle_images(self, image_paths, frame_num):
-        positions = {
-            'front_wide': (10, 10),
-            'front_narrow': (660, 10),
-            'right_side': (10, 390),
-            'left_side': (660, 390)
-        }
-
-        images = []
-        for cam_name in positions.keys():
-            img_path = image_paths.get(cam_name)
-            if img_path and os.path.exists(img_path):
-                try:
-                    img = Image.open(img_path).resize((640, 360))
-                    images.append((cam_name, img))
-                except:
-                    images.append((cam_name, Image.new('RGB', (640, 360), (100, 100, 100))))
-            else:
-                images.append((cam_name, Image.new('RGB', (640, 360), (100, 100, 100))))
-
-        if len(images) < 4:
+    def stitch(self, image_paths, frame_num, prefix="vehicle"):
+        if not self.has_pil:
             return False
 
-        canvas = Image.new('RGB', (640 * 2 + 20, 360 * 2 + 20), (50, 50, 50))
+        if len(image_paths) < 4:
+            return False
 
-        for cam_name, img in images:
-            x, y = positions[cam_name]
-            canvas.paste(img, (x, y))
-            draw = ImageDraw.Draw(canvas)
+        positions = [(10, 10), (660, 10), (10, 390), (660, 390)]
+
+        canvas = self.Image.new('RGB', (640 * 2 + 20, 360 * 2 + 20), (40, 40, 40))
+        draw = self.ImageDraw.Draw(canvas)
+
+        for idx, (cam_name, img_path) in enumerate(list(image_paths.items())[:4]):
+            img = self._load_image(img_path)
+            canvas.paste(img, positions[idx])
+
             label = cam_name.replace('_', ' ').title()
-            draw.text((x + 10, y + 10), label, fill=(255, 255, 255), font=self.font)
+            draw.text((positions[idx][0] + 5, positions[idx][1] + 5),
+                      label, fill=(255, 255, 200), font=self.font)
 
-        draw = ImageDraw.Draw(canvas)
-        title = f"CVIPS - Frame {frame_num:04d}"
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        draw.text((canvas.width // 2 - 150, 5), title, fill=(255, 255, 255), font=self.font)
-        draw.text((10, canvas.height - 30), timestamp, fill=(200, 200, 200), font=self.font)
-
-        output_path = os.path.join(self.stitched_dir, f"ego_stitched_{frame_num:04d}.jpg")
-        canvas.save(output_path, "JPEG", quality=95)
-
+        output_path = os.path.join(self.stitched_dir, f"{prefix}_{frame_num:06d}.jpg")
+        canvas.save(output_path, "JPEG", quality=90)
         return True
 
+    def _load_image(self, img_path):
+        if img_path and os.path.exists(img_path):
+            try:
+                img = self.Image.open(img_path)
+                return img.resize((640, 360))
+            except:
+                pass
 
-class PedestrianController:
-    STATE_WAITING = "waiting"
-    STATE_CROSSING = "crossing"
-    STATE_WALKING = "walking"
-    STATE_STOPPED = "stopped"
+        return self.Image.new('RGB', (640, 360), (80, 80, 80))
 
-    def __init__(self, world):
+
+class TrafficSystem:
+    def __init__(self, world, config):
         self.world = world
+        self.config = config
+        self.vehicles = []
         self.pedestrians = []
-        self.running = True
 
-    def spawn_pedestrian(self, location, behavior_type="crossing"):
+        seed = config['scenario'].get('seed', 42)
+        random.seed(seed)
+        Logger.info(f"随机种子: {seed}")
+
+    def spawn_ego_vehicle(self):
         blueprint_lib = self.world.get_blueprint_library()
-        ped_bps = list(blueprint_lib.filter('walker.pedestrian.*'))
 
-        if not ped_bps:
+        for vtype in Constants.VEHICLE_TYPES:
+            if blueprint_lib.filter(vtype):
+                vehicle_bp = random.choice(blueprint_lib.filter(vtype))
+                break
+        else:
+            vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+
+        spawn_points = self.world.get_map().get_spawn_points()
+        if not spawn_points:
             return None
 
-        ped_bp = random.choice(ped_bps)
-        location.z += 1.0
+        for _ in range(5):
+            spawn_point = random.choice(spawn_points)
+            try:
+                vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+                vehicle.set_autopilot(True)
+                vehicle.apply_control(carla.VehicleControl(throttle=0.2))
 
-        try:
-            pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
-            controller_bp = blueprint_lib.find('controller.ai.walker')
-            controller = self.world.spawn_actor(controller_bp, carla.Transform(), attach_to=pedestrian)
-            controller.start()
-
-            behavior_state = {
-                'state': self.STATE_WAITING if behavior_type in ["crossing", "hesitant"] else self.STATE_WALKING,
-                'wait_start': time.time(),
-                'wait_duration': random.uniform(2.0, 5.0),
-                'target': None,
-                'original': location,
-                'behavior': behavior_type
-            }
-
-            if behavior_type == "walking":
-                behavior_state['target'] = self._get_random_location()
-
-            self.pedestrians.append((pedestrian, controller, behavior_state))
-            return pedestrian
-
-        except Exception as e:
-            print(f"生成行人失败: {e}")
-            return None
-
-    def _get_random_location(self):
-        try:
-            return self.world.get_random_location_from_navigation()
-        except:
-            return None
-
-    def update_behaviors(self):
-        current_time = time.time()
-
-        for pedestrian, controller, state in self.pedestrians:
-            if not pedestrian.is_alive or not controller.is_alive:
+                Logger.info(f"主车: {vehicle.type_id}")
+                return vehicle
+            except:
                 continue
 
-            if state['behavior'] == "crossing":
-                self._update_crossing(pedestrian, controller, state, current_time)
-            elif state['behavior'] == "hesitant":
-                self._update_hesitant(pedestrian, controller, state, current_time)
-            else:
-                self._update_walking(pedestrian, controller, state, current_time)
+        return None
 
-    def _update_crossing(self, pedestrian, controller, state, current_time):
-        if state['state'] == self.STATE_WAITING:
-            if current_time - state['wait_start'] >= state['wait_duration']:
-                target = carla.Location(
-                    x=state['original'].x + random.uniform(15.0, 25.0),
-                    y=state['original'].y + random.uniform(-5.0, 5.0),
-                    z=state['original'].z
+    def spawn_background_vehicles(self, center_location):
+        blueprint_lib = self.world.get_blueprint_library()
+        spawn_points = self.world.get_map().get_spawn_points()
+
+        if not spawn_points:
+            return 0
+
+        num_vehicles = min(self.config['traffic']['background_vehicles'], 15)
+        spawned = 0
+
+        for _ in range(num_vehicles):
+            try:
+                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+                spawn_point = random.choice(spawn_points)
+
+                vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+                vehicle.set_autopilot(True)
+
+                speed = random.uniform(0.7, 1.3)
+                vehicle.apply_control(carla.VehicleControl(throttle=0.2 * speed))
+
+                self.vehicles.append(vehicle)
+                spawned += 1
+            except:
+                continue
+
+        Logger.info(f"背景车辆: {spawned} 辆")
+        return spawned
+
+    def spawn_pedestrians(self, center_location):
+        blueprint_lib = self.world.get_blueprint_library()
+        controller_bp = blueprint_lib.find('controller.ai.walker')
+
+        num_peds = min(self.config['traffic']['pedestrians'], 20)
+        spawned = 0
+
+        for _ in range(num_peds):
+            try:
+                ped_bps = list(blueprint_lib.filter('walker.pedestrian.*'))
+                if not ped_bps:
+                    continue
+
+                ped_bp = random.choice(ped_bps)
+
+                angle = random.uniform(0, 2 * math.pi)
+                distance = random.uniform(5.0, 15.0)
+
+                location = carla.Location(
+                    x=center_location.x + distance * math.cos(angle),
+                    y=center_location.y + distance * math.sin(angle),
+                    z=center_location.z + 1.0
                 )
-                state['target'] = target
-                state['state'] = self.STATE_CROSSING
-                state['cross_start'] = current_time
-                controller.go_to_location(target)
 
-        elif state['state'] == self.STATE_CROSSING:
-            distance = pedestrian.get_location().distance(state['target'])
-            if distance < 2.0 or current_time - state['cross_start'] > 15.0:
-                state['state'] = self.STATE_STOPPED
+                pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
+                controller = self.world.spawn_actor(controller_bp, carla.Transform(), attach_to=pedestrian)
+                controller.start()
 
-    def _update_hesitant(self, pedestrian, controller, state, current_time):
-        if state['state'] == self.STATE_WAITING:
-            if current_time - state['wait_start'] >= state['wait_duration']:
-                target = self._get_random_location()
+                behavior = random.choice(Constants.PEDESTRIAN_BEHAVIORS)
+                self._setup_behavior(pedestrian, controller, behavior)
+
+                self.pedestrians.append((pedestrian, controller, behavior))
+                spawned += 1
+            except Exception as e:
+                Logger.debug(f"生成行人失败: {e}")
+
+        Logger.info(f"行人: {spawned} 个")
+        return spawned
+
+    def _setup_behavior(self, pedestrian, controller, behavior):
+        try:
+            if behavior == 'crossing' and random.random() < 0.5:
+                target = self.world.get_random_location_from_navigation()
                 if target:
-                    state['target'] = target
-                    state['state'] = self.STATE_WALKING
-                    state['walk_start'] = current_time
-                    state['walk_duration'] = random.uniform(3.0, 8.0)
                     controller.go_to_location(target)
+            elif behavior == 'walking':
+                target = self.world.get_random_location_from_navigation()
+                if target:
+                    controller.go_to_location(target)
+        except:
+            pass
 
-        elif state['state'] == self.STATE_WALKING:
-            if current_time - state['walk_start'] >= state['walk_duration']:
-                state['state'] = self.STATE_WAITING
-                state['wait_start'] = current_time
-                state['wait_duration'] = random.uniform(1.0, 4.0)
+    def update_traffic(self):
+        if not self.config['traffic'].get('traffic_lights', True):
+            return
 
-    def _update_walking(self, pedestrian, controller, state, current_time):
-        if state['state'] == self.STATE_WALKING and state['target']:
-            distance = pedestrian.get_location().distance(state['target'])
-            if distance < 2.0:
-                new_target = self._get_random_location()
-                if new_target:
-                    state['target'] = new_target
-                    controller.go_to_location(new_target)
-
-    def start_updates(self):
-        def update_loop():
-            while self.running:
-                try:
-                    self.update_behaviors()
-                    time.sleep(0.5)
-                except Exception as e:
-                    print(f"行为更新错误: {e}")
-                    time.sleep(1.0)
-
-        threading.Thread(target=update_loop, daemon=True).start()
+        for actor in self.world.get_actors():
+            if 'traffic_light' in actor.type_id:
+                if random.random() < 0.001:
+                    if actor.state == carla.TrafficLightState.Red:
+                        actor.set_state(carla.TrafficLightState.Green)
+                    elif actor.state == carla.TrafficLightState.Green:
+                        actor.set_state(carla.TrafficLightState.Yellow)
 
     def cleanup(self):
-        self.running = False
+        Logger.info("清理交通...")
+
+        for vehicle in self.vehicles:
+            try:
+                if vehicle.is_alive:
+                    vehicle.destroy()
+            except:
+                pass
+
         for pedestrian, controller, _ in self.pedestrians:
             try:
                 if controller.is_alive:
@@ -214,353 +312,396 @@ class PedestrianController:
                     pedestrian.destroy()
             except:
                 pass
+
+        self.vehicles.clear()
         self.pedestrians.clear()
 
 
-class DataGenerator:
-    def __init__(self, args):
-        self.args = args
-        self.client = None
-        self.world = None
-        self.actors = []
+class SensorSystem:
+    def __init__(self, world, config, data_dir):
+        self.world = world
+        self.config = config
+        self.data_dir = data_dir
         self.sensors = []
-        self.frame_count = 0
-        self.last_capture_time = 0
 
-        self.setup_output_directory()
-        self.stitcher = ImageStitcher(self.output_dir)
-        self.ped_controller = None
-
-        self.image_buffer = {}
+        self.frame_counter = 0
+        self.last_capture = 0
+        self.vehicle_buffer = {}
+        self.infra_buffer = {}
         self.buffer_lock = threading.Lock()
 
-    def setup_output_directory(self):
+        self.image_processor = ImageProcessor(data_dir)
+
+    def setup_vehicle_sensors(self, vehicle):
+        if not vehicle:
+            return 0
+
+        num_cams = min(self.config['sensors']['vehicle_cameras'], 4)
+        installed = 0
+
+        for idx, (cam_name, preset) in enumerate(list(Constants.CAMERA_CONFIGS.items())[:num_cams]):
+            if self._create_camera(cam_name, preset, vehicle, 'vehicle'):
+                installed += 1
+                Logger.debug(f"车辆摄像头: {cam_name}")
+
+        return installed
+
+    def setup_infrastructure_sensors(self, center_location):
+        num_cams = min(self.config['sensors']['infrastructure_cameras'], 4)
+        installed = 0
+
+        for infra_cfg in Constants.INFRA_POSITIONS[:num_cams]:
+            preset = {
+                'loc': (
+                    center_location.x + infra_cfg['offset'][0],
+                    center_location.y + infra_cfg['offset'][1],
+                    center_location.z + infra_cfg['offset'][2]
+                ),
+                'rot': infra_cfg['rotation'],
+                'fov': 90
+            }
+
+            if self._create_camera(infra_cfg['name'], preset, None, 'infrastructure'):
+                installed += 1
+                Logger.debug(f"基础设施摄像头: {infra_cfg['name']}")
+
+        return installed
+
+    def _create_camera(self, name, preset, parent, sensor_type):
+        try:
+            blueprint = self.world.get_blueprint_library().find('sensor.camera.rgb')
+
+            img_size = self.config['sensors']['image_size']
+            blueprint.set_attribute('image_size_x', str(img_size[0]))
+            blueprint.set_attribute('image_size_y', str(img_size[1]))
+            blueprint.set_attribute('fov', str(preset.get('fov', 90)))
+
+            location = carla.Location(preset['loc'][0], preset['loc'][1], preset['loc'][2])
+            rotation = carla.Rotation(preset['rot'][0], preset['rot'][1], preset['rot'][2])
+            transform = carla.Transform(location, rotation)
+
+            if parent:
+                camera = self.world.spawn_actor(blueprint, transform, attach_to=parent)
+            else:
+                camera = self.world.spawn_actor(blueprint, transform)
+
+            save_dir = os.path.join(self.data_dir, "raw", sensor_type, name)
+            os.makedirs(save_dir, exist_ok=True)
+
+            callback = self._create_callback(save_dir, name, sensor_type)
+            camera.listen(callback)
+
+            self.sensors.append(camera)
+            return True
+
+        except Exception as e:
+            Logger.warning(f"创建摄像头失败 {name}: {e}")
+            return False
+
+    def _create_callback(self, save_dir, name, sensor_type):
+        capture_interval = self.config['sensors']['capture_interval']
+
+        def callback(image):
+            current = time.time()
+
+            if current - self.last_capture >= capture_interval:
+                self.frame_counter += 1
+                self.last_capture = current
+
+                filename = os.path.join(save_dir, f"{name}_{self.frame_counter:06d}.png")
+                image.save_to_disk(filename, carla.ColorConverter.Raw)
+
+                with self.buffer_lock:
+                    if sensor_type == 'vehicle':
+                        self.vehicle_buffer[name] = filename
+                        if len(self.vehicle_buffer) >= 4:
+                            self.image_processor.stitch(self.vehicle_buffer, self.frame_counter, 'vehicle')
+                            self.vehicle_buffer.clear()
+                    else:
+                        self.infra_buffer[name] = filename
+                        if len(self.infra_buffer) >= 4:
+                            self.image_processor.stitch(self.infra_buffer, self.frame_counter, 'infra')
+                            self.infra_buffer.clear()
+
+        return callback
+
+    def get_frame_count(self):
+        return self.frame_counter
+
+    def cleanup(self):
+        Logger.info(f"清理 {len(self.sensors)} 个传感器...")
+        for sensor in self.sensors:
+            try:
+                sensor.stop()
+                sensor.destroy()
+            except:
+                pass
+        self.sensors.clear()
+
+
+class DataCollector:
+    def __init__(self, config):
+        self.config = config
+        self.client = None
+        self.world = None
+        self.ego_vehicle = None
+        self.scene_center = None
+
+        self.setup_directories()
+        self.traffic_system = None
+        self.sensor_system = None
+
+        self.start_time = None
+        self.is_running = False
+
+    def setup_directories(self):
+        scenario = self.config['scenario']
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.output_dir = os.path.join("cvips_data", f"{self.args.scenario}_{timestamp}")
 
-        self.raw_dirs = {}
-        for view in ['front_wide', 'front_narrow', 'right_side', 'left_side']:
-            dir_path = os.path.join(self.output_dir, "raw", "ego_vehicle", view)
-            os.makedirs(dir_path, exist_ok=True)
-            self.raw_dirs[view] = dir_path
+        self.output_dir = os.path.join(
+            self.config['output']['data_dir'],
+            f"{scenario['name']}_{scenario['town']}_{timestamp}"
+        )
 
-        print(f"数据输出目录: {self.output_dir}")
+        for subdir in ["raw/vehicle", "raw/infrastructure", "stitched", "metadata"]:
+            os.makedirs(os.path.join(self.output_dir, subdir), exist_ok=True)
 
-    def connect_to_server(self):
+        Logger.info(f"输出目录: {self.output_dir}")
+
+    def connect(self):
         for attempt in range(1, 6):
             try:
                 self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(15.0)
+                self.client.set_timeout(10.0)
 
-                if self.args.town:
-                    self.world = self.client.load_world(self.args.town)
-                else:
-                    self.world = self.client.get_world()
+                town = self.config['scenario']['town']
+                self.world = self.client.load_world(town)
 
                 settings = self.world.get_settings()
                 settings.synchronous_mode = False
                 self.world.apply_settings(settings)
 
-                print(f"连接成功! 地图: {self.world.get_map().name}")
+                Logger.info(f"连接到CARLA: {town}")
                 return True
 
             except Exception as e:
-                print(f"尝试 {attempt}/5 失败: {str(e)[:80]}")
-                if attempt < 5:
-                    time.sleep(3)
+                Logger.warning(f"连接尝试 {attempt}/5 失败: {str(e)[:50]}")
+                time.sleep(2)
 
         return False
 
     def setup_scene(self):
-        self.ped_controller = PedestrianController(self.world)
-
-        self.set_weather()
-        time.sleep(2.0)
-
-        ego_vehicle = self.spawn_ego_vehicle()
-        if not ego_vehicle:
-            return None
-
-        self.spawn_pedestrians()
-        self.spawn_background_vehicles()
-        time.sleep(5.0)
-
-        self.ped_controller.start_updates()
-        return ego_vehicle
-
-    def set_weather(self):
-        weather = carla.WeatherParameters()
-
-        if self.args.weather == 'clear':
-            weather.sun_altitude_angle = 75
-            weather.cloudiness = 5.0
-        elif self.args.weather == 'rainy':
-            weather.sun_altitude_angle = 40
-            weather.cloudiness = 90.0
-            weather.precipitation = 60.0
-        else:
-            weather.sun_altitude_angle = 60
-            weather.cloudiness = 70.0
-
-        if self.args.time_of_day == 'night':
-            weather.sun_altitude_angle = -10
-        elif self.args.time_of_day == 'sunset':
-            weather.sun_altitude_angle = 5
-
+        weather_cfg = self.config['scenario']
+        weather = WeatherManager.create_weather(weather_cfg['weather'], weather_cfg['time_of_day'])
         self.world.set_weather(weather)
-
-    def spawn_ego_vehicle(self):
-        blueprint_lib = self.world.get_blueprint_library()
-        vehicle_types = ['vehicle.tesla.model3', 'vehicle.audi.tt', 'vehicle.mini.cooperst']
-
-        vehicle_bp = None
-        for vtype in vehicle_types:
-            if blueprint_lib.filter(vtype):
-                vehicle_bp = random.choice(blueprint_lib.filter(vtype))
-                break
-
-        if not vehicle_bp:
-            vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+        Logger.info(f"天气: {weather_cfg['weather']}, 时间: {weather_cfg['time_of_day']}")
 
         spawn_points = self.world.get_map().get_spawn_points()
-        if not spawn_points:
-            return None
+        if spawn_points:
+            self.scene_center = spawn_points[len(spawn_points) // 2].location
+        else:
+            self.scene_center = carla.Location(0, 0, 0)
 
-        spawn_point = random.choice(spawn_points)
+        self.traffic_system = TrafficSystem(self.world, self.config)
 
-        try:
-            vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-            self.actors.append(vehicle)
-            vehicle.set_autopilot(True)
-            vehicle.apply_control(carla.VehicleControl(throttle=0.2, steer=0.0))
-
-            print(f"主车辆: {vehicle.type_id}")
-            return vehicle
-        except Exception as e:
-            print(f"生成主车辆失败: {e}")
-            return None
-
-    def spawn_pedestrians(self):
-        spawn_points = self.world.get_map().get_spawn_points()
-        if not spawn_points:
-            return
-
-        print(f"生成 {self.args.num_smart_pedestrians} 个行人...")
-
-        behaviors = ['crossing', 'hesitant', 'walking']
-
-        for _ in range(self.args.num_smart_pedestrians):
-            behavior = random.choice(behaviors)
-            spawn_point = random.choice(spawn_points)
-
-            if self.ped_controller.spawn_pedestrian(spawn_point.location, behavior):
-                self.actors.append(self.ped_controller.pedestrians[-1][0])
-
-    def spawn_background_vehicles(self):
-        blueprint_lib = self.world.get_blueprint_library()
-        spawn_points = self.world.get_map().get_spawn_points()
-
-        if not spawn_points:
-            return
-
-        spawned = 0
-        for _ in range(min(5, self.args.num_background_vehicles)):
-            try:
-                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
-                spawn_point = random.choice(spawn_points)
-
-                vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-                self.actors.append(vehicle)
-                vehicle.set_autopilot(True)
-                spawned += 1
-            except:
-                pass
-
-        print(f"背景车辆: {spawned} 辆")
-
-    def setup_cameras(self, vehicle):
-        if not vehicle:
+        self.ego_vehicle = self.traffic_system.spawn_ego_vehicle()
+        if not self.ego_vehicle:
+            Logger.error("无法生成主车")
             return False
 
-        blueprint_lib = self.world.get_blueprint_library()
+        self.traffic_system.spawn_background_vehicles(self.scene_center)
+        self.traffic_system.spawn_pedestrians(self.scene_center)
 
-        camera_configs = [
-            ('front_wide', carla.Location(x=2.0, z=1.8), carla.Rotation(pitch=-3.0), 100),
-            ('front_narrow', carla.Location(x=2.0, z=1.6), carla.Rotation(pitch=0), 60),
-            ('right_side', carla.Location(x=0.5, y=1.0, z=1.5), carla.Rotation(pitch=-2.0, yaw=45), 90),
-            ('left_side', carla.Location(x=0.5, y=-1.0, z=1.5), carla.Rotation(pitch=-2.0, yaw=-45), 90),
-        ]
+        time.sleep(3.0)
+        return True
 
-        installed = 0
+    def setup_sensors(self):
+        self.sensor_system = SensorSystem(self.world, self.config, self.output_dir)
 
-        for name, location, rotation, fov in camera_configs:
-            try:
-                camera_bp = blueprint_lib.find('sensor.camera.rgb')
-                camera_bp.set_attribute('image_size_x', '1280')
-                camera_bp.set_attribute('image_size_y', '720')
-                camera_bp.set_attribute('fov', str(fov))
+        vehicle_cams = self.sensor_system.setup_vehicle_sensors(self.ego_vehicle)
+        infra_cams = self.sensor_system.setup_infrastructure_sensors(self.scene_center)
 
-                camera = self.world.spawn_actor(
-                    camera_bp,
-                    carla.Transform(location, rotation),
-                    attach_to=vehicle
-                )
+        total_cams = vehicle_cams + infra_cams
+        if total_cams == 0:
+            Logger.error("未安装任何摄像头")
+            return False
 
-                def make_callback(save_dir, cam_name):
-                    def callback(image):
-                        current_time = time.time()
+        Logger.info(f"传感器就绪: {vehicle_cams}车辆 + {infra_cams}基础设施")
+        return True
 
-                        if current_time - self.last_capture_time >= self.args.capture_interval:
-                            self.frame_count += 1
-                            self.last_capture_time = current_time
+    def run(self):
+        duration = self.config['scenario']['duration']
+        Logger.info(f"开始数据收集，时长: {duration}秒")
 
-                            raw_filename = f"{save_dir}/{cam_name}_{self.frame_count:04d}.png"
-                            image.save_to_disk(raw_filename, carla.ColorConverter.Raw)
+        self.start_time = time.time()
+        self.is_running = True
 
-                            with self.buffer_lock:
-                                self.image_buffer[cam_name] = raw_filename
-
-                                if len(self.image_buffer) == 4:
-                                    self.stitcher.stitch_ego_vehicle_images(self.image_buffer, self.frame_count)
-                                    self.image_buffer.clear()
-
-                    return callback
-
-                camera.listen(make_callback(self.raw_dirs[name], name))
-                self.actors.append(camera)
-                self.sensors.append(camera)
-                installed += 1
-
-            except Exception as e:
-                print(f"安装 {name} 摄像头失败: {e}")
-
-        print(f"摄像头安装: {installed}/4")
-        return installed == 4
-
-    def collect_data(self):
-        print(f"\n开始数据收集...")
-        print(f"时长: {self.args.total_dura.tion}秒, 间隔: {self.args.capture_interval}秒")
-
-        start_time = time.time()
-        self.frame_count = 0
-        self.last_capture_time = start_time
+        last_update = time.time()
+        update_interval = 5.0
 
         try:
-            while time.time() - start_time < self.args.total_duration:
-                elapsed = time.time() - start_time
-                remaining = self.args.total_duration - elapsed
+            while time.time() - self.start_time < duration and self.is_running:
+                elapsed = time.time() - self.start_time
 
-                if int(elapsed) % 10 == 0:
-                    progress = (elapsed / self.args.total_duration) * 100
-                    print(f"进度: {elapsed:.0f}/{self.args.total_duration}秒 ({progress:.1f}%) | "
-                          f"批次: {self.frame_count} | 剩余: {remaining:.0f}秒")
+                if time.time() - last_update >= update_interval:
+                    frames = self.sensor_system.get_frame_count() if self.sensor_system else 0
+                    progress = elapsed / duration
 
-                time.sleep(0.1)
+                    bar = Logger.get_progress_bar(elapsed, duration)
+                    Logger.info(f"{bar} | 时间: {elapsed:.0f}/{duration}s | 帧数: {frames}")
+                    last_update = time.time()
 
-            print(f"\n数据收集完成! 总批次: {self.frame_count}")
+                if self.traffic_system:
+                    self.traffic_system.update_traffic()
+
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
-            print(f"\n数据收集中断, 已收集 {self.frame_count} 批次")
+            Logger.info("数据收集被用户中断")
+        finally:
+            self.is_running = False
+            elapsed = time.time() - self.start_time
 
-        self.display_summary()
+            frames = self.sensor_system.get_frame_count() if self.sensor_system else 0
+            Logger.info(f"收集完成: {frames}帧, 用时: {elapsed:.1f}秒")
+
+            self.save_metadata(frames, elapsed)
+            self.display_summary()
+
+    def save_metadata(self, total_frames, elapsed_time):
+        metadata = {
+            'scenario': self.config['scenario'],
+            'traffic': self.config['traffic'],
+            'sensors': self.config['sensors'],
+            'collection': {
+                'start_time': datetime.fromtimestamp(self.start_time).isoformat(),
+                'duration': elapsed_time,
+                'total_frames': total_frames,
+                'frame_rate': total_frames / elapsed_time if elapsed_time > 0 else 0
+            },
+            'output': {
+                'directory': self.output_dir,
+                'total_size': self._get_directory_size(self.output_dir)
+            }
+        }
+
+        meta_path = os.path.join(self.output_dir, "metadata", "scene_info.json")
+        with open(meta_path, 'w') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        Logger.info(f"元数据保存: {meta_path}")
+
+    def _get_directory_size(self, path):
+        total = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if os.path.exists(fp):
+                    total += os.path.getsize(fp)
+        return round(total / (1024 * 1024), 2)  # MB
 
     def display_summary(self):
-        print("\n" + "=" * 60)
-        print("数据收集摘要:")
-        print("=" * 60)
+        Logger.info("=" * 60)
+        Logger.info("数据收集摘要")
+        Logger.info("=" * 60)
 
-        stitched_dir = os.path.join(self.output_dir, "stitched_images")
+        stitched_dir = os.path.join(self.output_dir, "stitched")
         if os.path.exists(stitched_dir):
-            stitched_files = [f for f in os.listdir(stitched_dir) if f.endswith('.jpg')]
-            print(f"拼接图像: {len(stitched_files)} 张")
+            files = [f for f in os.listdir(stitched_dir) if f.endswith(('.jpg', '.png'))]
+            Logger.info(f"拼接图像: {len(files)} 张")
 
-        raw_dir = os.path.join(self.output_dir, "raw")
-        if os.path.exists(raw_dir):
-            total_raw = 0
-            for root, dirs, files in os.walk(raw_dir):
-                total_raw += len([f for f in files if f.endswith('.png')])
-            print(f"原始图像: {total_raw} 张")
+        raw_dirs = ["vehicle", "infrastructure"]
+        for raw_dir in raw_dirs:
+            path = os.path.join(self.output_dir, "raw", raw_dir)
+            if os.path.exists(path):
+                total = 0
+                for root, dirs, files in os.walk(path):
+                    total += len([f for f in files if f.endswith('.png')])
+                Logger.info(f"原始图像 ({raw_dir}): {total} 张")
 
-        print(f"\n数据目录: {self.output_dir}")
+        total_size = self._get_directory_size(self.output_dir)
+        Logger.info(f"总数据大小: {total_size} MB")
+        Logger.info(f"输出目录: {self.output_dir}")
+        Logger.info("=" * 60)
 
     def cleanup(self):
-        if self.ped_controller:
-            self.ped_controller.cleanup()
+        Logger.info("清理场景...")
 
-        for sensor in self.sensors:
+        if self.sensor_system:
+            self.sensor_system.cleanup()
+
+        if self.traffic_system:
+            self.traffic_system.cleanup()
+
+        if self.ego_vehicle and self.ego_vehicle.is_alive:
             try:
-                sensor.stop()
+                self.ego_vehicle.destroy()
             except:
                 pass
 
-        destroyed = 0
-        for actor in self.actors:
-            try:
-                if actor.is_alive:
-                    actor.destroy()
-                    destroyed += 1
-            except:
-                pass
-
-        print(f"清理 {destroyed} 个actor")
-        self.actors.clear()
-        self.sensors.clear()
+        Logger.info("清理完成")
 
 
 def main():
-    parser = argparse.ArgumentParser(description='CVIPS 数据生成器')
+    parser = argparse.ArgumentParser(description='CVIPS 交通场景数据生成器')
 
-    parser.add_argument('--scenario', type=str, default='pedestrian_scene', help='场景名称')
+    parser.add_argument('--config', type=str, help='配置文件路径 (JSON/YAML)')
+    parser.add_argument('--scenario', type=str, default='intersection', help='场景名称')
     parser.add_argument('--town', type=str, default='Town10HD',
-                        choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='CARLA地图')
+                        choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
     parser.add_argument('--weather', type=str, default='clear',
-                        choices=['clear', 'rainy', 'cloudy'], help='天气条件')
+                        choices=['clear', 'rainy', 'cloudy', 'foggy'], help='天气')
     parser.add_argument('--time-of-day', type=str, default='noon',
                         choices=['noon', 'sunset', 'night'], help='时间')
-    parser.add_argument('--num-smart-pedestrians', type=int, default=6, help='行人数')
-    parser.add_argument('--num-background-vehicles', type=int, default=4, help='背景车辆数')
-    parser.add_argument('--total-duration', type=int, default=90, help='总时长(秒)')
-    parser.add_argument('--capture-interval', type=float, default=2.5, help='捕捉间隔(秒)')
+    parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
+    parser.add_argument('--num-pedestrians', type=int, default=10, help='行人数')
+    parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
+    parser.add_argument('--capture-interval', type=float, default=2.0, help='捕捉间隔(秒)')
+    parser.add_argument('--seed', type=int, help='随机种子')
 
     args = parser.parse_args(remaining_argv)
 
-    if args.capture_interval < 2.0:
-        args.capture_interval = 2.0
+    config = ConfigManager.load_config(args.config)
+    config = ConfigManager.merge_args(config, args)
 
-    print(f"\n场景配置:")
-    print(f"  场景: {args.scenario}")
-    print(f"  地图: {args.town}")
-    print(f"  天气/时间: {args.weather}/{args.time_of_day}")
-    print(f"  行人: {args.num_smart_pedestrians}个")
-    print(f"  车辆: {args.num_background_vehicles}辆")
-    print(f"  时长: {args.total_duration}秒")
-    print(f"  间隔: {args.capture_interval}秒")
+    print("\n" + "=" * 60)
+    print("CVIPS 交通场景数据生成器")
+    print("=" * 60)
 
-    generator = DataGenerator(args)
+    print(f"场景: {config['scenario']['name']}")
+    print(f"地图: {config['scenario']['town']}")
+    print(f"天气/时间: {config['scenario']['weather']}/{config['scenario']['time_of_day']}")
+    print(f"时长: {config['scenario']['duration']}秒")
+    print(f"交通: {config['traffic']['background_vehicles']}车辆 + {config['traffic']['pedestrians']}行人")
+    print(f"摄像头: {config['sensors']['vehicle_cameras']}车辆 + {config['sensors']['infrastructure_cameras']}基础设施")
+
+    collector = DataCollector(config)
 
     try:
-        if not generator.connect_to_server():
+        if not collector.connect():
+            print("连接CARLA服务器失败")
             return
 
-        ego_vehicle = generator.setup_scene()
-        if not ego_vehicle:
-            generator.cleanup()
+        if not collector.setup_scene():
+            print("场景设置失败")
+            collector.cleanup()
             return
 
-        if not generator.setup_cameras(ego_vehicle):
-            generator.cleanup()
+        if not collector.setup_sensors():
+            print("传感器设置失败")
+            collector.cleanup()
             return
 
-        generator.collect_data()
+        collector.run()
 
     except KeyboardInterrupt:
-        print("\n程序中断")
+        print("\n程序被用户中断")
     except Exception as e:
         print(f"\n运行错误: {e}")
         traceback.print_exc()
     finally:
-        generator.cleanup()
-        print(f"\n数据保存到: {generator.output_dir}")
+        collector.cleanup()
+        print(f"\n数据保存到: {collector.output_dir}")
 
 
 if __name__ == "__main__":
