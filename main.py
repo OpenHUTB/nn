@@ -1,182 +1,180 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
 import sys
 import os
-# 替换绝对路径为相对路径：基于main.py所在目录向上找src文件夹（适配任意部署环境）
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
-import numpy as np
-import cv2
-from tensorflow.keras.models import load_model
-from common.transformations.camera import transform_img, eon_intrinsics
-from common.transformations.model import medmodel_intrinsics
-from common.tools.lib.parser import parser
 
-# 关闭TensorFlow所有冗余警告
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+class LaneDetector:
+    def __init__(self):
+        # 霍夫变换参数
+        self.rho = 1
+        self.theta = np.pi / 180
+        self.threshold = 15
+        self.min_line_length = 40
+        self.max_line_gap = 20
+        self.vertices = None
 
-# -------------------------- 核心工具函数 --------------------------
-def frames_to_tensor(frames):
-    if len(frames) == 0:
-        return np.array([])
-    H = (frames.shape[1] * 2) // 3
-    W = frames.shape[2]
-    tensor = np.zeros((frames.shape[0], 6, H//2, W//2), dtype=np.float32)
-    tensor[:, 0] = frames[:, 0:H:2, 0::2]
-    tensor[:, 1] = frames[:, 1:H:2, 0::2]
-    tensor[:, 2] = frames[:, 0:H:2, 1::2]
-    tensor[:, 3] = frames[:, 1:H:2, 1::2]
-    tensor[:, 4] = frames[:, H:H+H//4].reshape((-1, H//2, W//2))
-    tensor[:, 5] = frames[:, H+H//4:H+H//2].reshape((-1, H//2, W//2))
-    return tensor / 128.0 - 1.0
+    def region_of_interest(self, img):
+        """定义感兴趣区域（ROI）"""
+        mask = np.zeros_like(img)
+        if self.vertices is None:
+            height, width = img.shape
+            # 调整梯形区域以适应大多数行车记录仪视角
+            self.vertices = np.array([[
+                (width * 0.1, height),  # 左下
+                (width * 0.45, height * 0.6),  # 左上
+                (width * 0.55, height * 0.6),  # 右上
+                (width * 0.9, height)  # 右下
+            ]], dtype=np.int32)
+        cv2.fillPoly(mask, self.vertices, 255)
+        masked_img = cv2.bitwise_and(img, mask)
+        return masked_img
 
-def preprocess_frames(imgs):
-    if not imgs:
-        return np.array([])
-    processed = np.zeros((len(imgs), 384, 512), dtype=np.uint8)
-    for i, img in enumerate(imgs):
+    def detect_edges(self, img):
+        """Canny边缘检测"""
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blur, 50, 150)
+        return edges
+
+    def detect_lines(self, edges):
+        """霍夫变换检测直线"""
+        lines = cv2.HoughLinesP(edges, self.rho, self.theta, self.threshold,
+                                np.array([]), minLineLength=self.min_line_length,
+                                maxLineGap=self.max_line_gap)
+        return lines
+
+    def average_slope_intercept(self, lines):
+        """计算左右车道线的平均斜率和截距"""
+        left_lines = []
+        right_lines = []
+
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                if x2 - x1 == 0: continue
+                slope = (y2 - y1) / (x2 - x1)
+
+                # 过滤不合理的斜率 (太水平或太垂直)
+                if abs(slope) < 0.5 or abs(slope) > 2:
+                    continue
+
+                intercept = y1 - slope * x1
+                # 图像坐标系中，y轴向下，所以斜率为负是左车道，正为右车道
+                if slope < 0:
+                    left_lines.append((slope, intercept))
+                else:
+                    right_lines.append((slope, intercept))
+
+        left_avg = np.average(left_lines, axis=0) if left_lines else None
+        right_avg = np.average(right_lines, axis=0) if right_lines else None
+        return left_avg, right_avg
+
+    def make_line_points(self, avg_line, y_min, y_max):
+        """生成绘制用的坐标点"""
+        if avg_line is None:
+            return None
+        slope, intercept = avg_line
+        # 防止除以0
+        if slope == 0:
+            return None
+
         try:
-            processed[i] = transform_img(img, from_intr=eon_intrinsics, to_intr=medmodel_intrinsics, yuv=True, output_size=(512, 256))
-        except:
-            processed[i] = np.zeros((384, 512), dtype=np.uint8)
-    return frames_to_tensor(processed)
+            x_min = int((y_min - intercept) / slope)
+            x_max = int((y_max - intercept) / slope)
+            return [(x_min, y_min), (x_max, y_max)]
+        except OverflowError:
+            return None
 
-# -------------------------- 主函数（无参数、全英文、车道线优化） --------------------------
+    def draw_lane(self, img, left_line, right_line):
+        """绘制半透明车道区域"""
+        lane_img = np.zeros_like(img)
+
+        # 确保两条线都检测到了才画多边形
+        if left_line is not None and right_line is not None:
+            left_pts = np.array([left_line[0], left_line[1]], dtype=np.int32)
+            right_pts = np.array([right_line[0], right_line[1]], dtype=np.int32)
+
+            # 创建多边形顶点
+            pts = np.vstack([left_pts, np.flipud(right_pts)])
+            cv2.fillPoly(lane_img, [pts], (0, 255, 0))  # 绿色填充
+
+        # 无论是否形成区域，都尝试画线
+        if left_line is not None:
+            cv2.line(lane_img, left_line[0], left_line[1], (255, 0, 0), 10)  # 蓝色线
+        if right_line is not None:
+            cv2.line(lane_img, right_line[0], right_line[1], (255, 0, 0), 10)  # 蓝色线
+
+        result = cv2.addWeighted(img, 0.8, lane_img, 0.4, 0)
+        return result
+
+    def process_frame(self, frame):
+        if frame is None: return None
+        edges = self.detect_edges(frame)
+        roi_edges = self.region_of_interest(edges)
+        lines = self.detect_lines(roi_edges)
+
+        height, width = frame.shape[:2]
+        left_avg, right_avg = self.average_slope_intercept(lines)
+
+        y_min = int(height * 0.65)  # 稍作调整，不要画太远
+        y_max = height
+
+        left_line = self.make_line_points(left_avg, y_min, y_max)
+        right_line = self.make_line_points(right_avg, y_min, y_max)
+
+        result = self.draw_lane(frame, left_line, right_line)
+        return result
+
+
 def main():
-    # 1. 初始化显示窗口（800x600，固定尺寸）
-    win_name = "Lane Line Prediction (Blue=Left | Red=Right | Green=Path)"
-    cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(win_name, 800, 600)
+    detector = LaneDetector()
 
-    # 2. 读取视频（修改为相对路径：main.py所在文件夹下的sample.hevc）
-    video_path = "./sample.hevc"  # 仅改这里：绝对路径→相对路径
-    cap = cv2.VideoCapture(video_path)
+    # 逻辑：如果有命令行参数，读取视频；否则读取摄像头
+    input_source = 0  # 默认摄像头
+
+    if len(sys.argv) > 1:
+        input_path = sys.argv[1]
+        if os.path.exists(input_path):
+            input_source = input_path
+            print(f"正在打开视频文件: {input_path}")
+        else:
+            print(f"错误: 找不到文件 {input_path}")
+            return
+    else:
+        print("未提供视频路径，正在打开默认摄像头...")
+
+    cap = cv2.VideoCapture(input_source)
+
     if not cap.isOpened():
-        empty_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-        cv2.putText(empty_frame, "Cannot open video", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
-        cv2.imshow(win_name, empty_frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        print("错误: 无法打开视频源")
         return
 
-    # 读取前10帧（用于推理，保留原始帧和模型输入帧）
-    raw_display_frames = []  # 用于显示的800x600帧
-    model_input_imgs = []    # 用于模型的512x384 YUV帧
-    for _ in range(10):
+    print("按 'q' 键退出程序")
+
+    while True:
         ret, frame = cap.read()
         if not ret:
+            print("视频播放结束或无法读取帧")
             break
-        # 缩放为显示尺寸（800x600）
-        display_frame = cv2.resize(frame, (800, 600))
-        raw_display_frames.append(display_frame)
-        # 转换为模型需要的YUV格式并缩放
-        yuv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420)
-        model_frame = cv2.resize(yuv_frame, (512, 384), cv2.INTER_AREA)
-        model_input_imgs.append(model_frame)
-    cap.release()
 
-    # 校验帧数是否足够
-    if len(raw_display_frames) < 2:
-        empty_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-        cv2.putText(empty_frame, "Insufficient video frames", (100, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
-        cv2.imshow(win_name, empty_frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        return
+        # 处理帧
+        processed_frame = detector.process_frame(frame)
 
-    # 3. 加载模型（显示英文提示，无乱码）
-    load_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-    cv2.putText(load_frame, "Loading model...", (200, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
-    cv2.imshow(win_name, load_frame)
-    cv2.waitKey(200)  # 刷新显示
-
-    # 模型路径（修改为相对路径：main.py所在文件夹下的models/supercombo.h5）
-    model_path = "./models/supercombo.h5"  # 仅改这里：绝对路径→相对路径
-    try:
-        supercombo_model = load_model(model_path, compile=False)
-    except Exception as e:
-        empty_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-        cv2.putText(empty_frame, "Model load failed", (180, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
-        cv2.imshow(win_name, empty_frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        return
-
-    # 4. 预处理帧（显示英文提示）
-    preprocess_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-    cv2.putText(preprocess_frame, "Preprocessing frames...", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
-    cv2.imshow(win_name, preprocess_frame)
-    cv2.waitKey(200)
-
-    frame_tensors = preprocess_frames(model_input_imgs)
-    if frame_tensors.size == 0:
-        empty_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
-        cv2.putText(empty_frame, "Preprocessing failed", (180, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
-        cv2.imshow(win_name, empty_frame)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
-        return
-
-    # 5. 模型状态初始化
-    model_state = np.zeros((1, 512))
-    model_desire = np.zeros((1, 8))
-
-    # 6. 逐帧推理+绘制（核心优化：车道线右移+放大圆点）
-    print("✅ Start inference and display (Press Q to exit)")
-    for i in range(len(frame_tensors) - 1):
-        # 确保帧存在，避免索引越界
-        if i >= len(raw_display_frames):
-            current_frame = np.ones((600, 800, 3), dtype=np.uint8) * 255
+        # 显示结果
+        if processed_frame is not None:
+            cv2.imshow('Lane Detection System', processed_frame)
         else:
-            current_frame = raw_display_frames[i].copy()  # 复制原始帧，避免修改
+            cv2.imshow('Lane Detection System', frame)
 
-        try:
-            # 模型推理（连续两帧作为输入）
-            input_data = [np.vstack(frame_tensors[i:i+2])[None], model_desire, model_state]
-            model_output = supercombo_model.predict(input_data, verbose=0)
-            parsed_result = parser(model_output)
-            model_state = model_output[-1]
-
-            # -------------------------- 车道线绘制优化 --------------------------
-            # 提取模型输出的车道线/路径x坐标
-            left_lane_x = parsed_result["lll"][0]
-            right_lane_x = parsed_result["rll"][0]
-            path_x = parsed_result["path"][0]
-            
-            # 窗口尺寸
-            win_h, win_w = 600, 800
-            # y坐标映射（0-191 → 0-599）
-            y_points = np.linspace(0, win_h - 1, 192).astype(int)
-            # x坐标映射（0-512 → 0-799）+ 右移100像素（解决偏左问题）+ 放大圆点到8px
-            left_x_mapped = (left_lane_x / 512 * win_w + 100).astype(int)
-            right_x_mapped = (right_lane_x / 512 * win_w + 100).astype(int)
-            path_x_mapped = (path_x / 512 * win_w + 100).astype(int)
-
-            # 绘制左车道线（蓝色，8px实心圆）
-            for x, y in zip(left_x_mapped, y_points):
-                if 0 <= x < win_w and 0 <= y < win_h:
-                    cv2.circle(current_frame, (x, y), 8, (255, 0, 0), -1)
-            # 绘制右车道线（红色，8px实心圆）
-            for x, y in zip(right_x_mapped, y_points):
-                if 0 <= x < win_w and 0 <= y < win_h:
-                    cv2.circle(current_frame, (x, y), 8, (0, 0, 255), -1)
-            # 绘制预测路径（绿色，6px实心圆）
-            for x, y in zip(path_x_mapped, y_points):
-                if 0 <= x < win_w and 0 <= y < win_h:
-                    cv2.circle(current_frame, (x, y), 6, (0, 255, 0), -1)
-
-        except Exception as e:
-            # 推理失败时仅打印错误，仍显示原始帧
-            print(f"⚠️ Frame {i+1} inference error: {str(e)[:30]}")
-
-        # 强制显示当前帧
-        cv2.imshow(win_name, current_frame)
-        # 按Q退出
-        if cv2.waitKey(100) & 0xFF == ord('q'):
-            print("🛑 Exit by user (Q pressed)")
+        # 按 'q' 退出，设置 25ms 延时（约 40fps）
+        if cv2.waitKey(25) & 0xFF == ord('q'):
             break
 
-    # 7. 程序收尾
+    cap.release()
     cv2.destroyAllWindows()
-    print("🎉 All frames processed successfully!")
+
 
 if __name__ == "__main__":
     main()
