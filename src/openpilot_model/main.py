@@ -1,12 +1,23 @@
 #!/usr/bin/env python3
+# 第一步：优先配置Python搜索路径，确保能找到common模块
 import sys
 import os
+
+# 项目根目录（绝对路径，适配你的虚拟机路径）
+PROJECT_ROOT = "/home/dacun/nn"
+# 将根目录加入Python搜索路径
+sys.path.append(PROJECT_ROOT)
+# 验证路径是否添加成功（可选，可删除）
+print(f"✅ 项目根目录已添加到Python搜索路径：{PROJECT_ROOT}")
+
+# 第二步：导入依赖库（包括common模块）
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from tensorflow.keras.models import load_model
 
+# 现在能正常导入common模块
 from common.transformations.camera import transform_img, eon_intrinsics
 from common.transformations.model import medmodel_intrinsics
 from common.tools.lib.parser import parser
@@ -63,14 +74,16 @@ def main():
         sys.exit(1)
 
     model_path = "models/supercombo.h5"
-    if not os.path.exists(model_path):
-        print(f"错误：模型文件不存在 - {model_path}")
+    # 拼接模型绝对路径（避免相对路径问题）
+    model_abs_path = os.path.join(PROJECT_ROOT, model_path)
+    if not os.path.exists(model_abs_path):
+        print(f"错误：模型文件不存在 - {model_abs_path}")
         sys.exit(1)
 
     # 加载模型
     try:
-        print(f"加载模型：{model_path}")
-        supercombo = load_model(model_path, compile=False)
+        print(f"加载模型：{model_abs_path}")
+        supercombo = load_model(model_abs_path, compile=False)
     except Exception as e:
         print(f"模型加载失败：{str(e)}")
         sys.exit(1)
