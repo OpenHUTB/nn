@@ -13,29 +13,29 @@ def lerp(a, b, t):
 
 # 语义分割调色板（Cityscapes格式，兼容所有CARLA版本）
 CITYSCAPES_PALETTE = [
-    (0, 0, 0),          # 0: 未标注
-    (70, 70, 70),       # 1: 建筑物
-    (100, 40, 40),      # 2: 围栏
-    (55, 90, 80),       # 3: 其他
-    (220, 20, 60),      # 4: 行人
-    (153, 153, 153),    # 5: 杆子
-    (157, 234, 50),     # 6: 道路线
-    (128, 64, 128),     # 7: 道路
-    (244, 35, 232),     # 8: 人行道
-    (107, 142, 35),     # 9: 植被
-    (0, 0, 142),        # 10: 车辆
-    (102, 102, 156),    # 11: 墙壁
-    (220, 220, 0),      # 12: 交通灯
-    (70, 130, 180),     # 13: 交通标志
-    (81, 0, 81),        # 14: 天
-    (150, 100, 100),    # 15: 地形
-    (230, 150, 140),    # 16: 护栏
-    (180, 165, 180),    # 17: 栅栏
-    (250, 170, 30),     # 18: 静态
-    (110, 190, 160),    # 19: 动态
-    (170, 120, 50),     # 20: 其他
-    (45, 60, 150),      # 21: 水
-    (145, 170, 100)     # 22: 路面标记
+    (0, 0, 0),          # 0: Unlabeled
+    (70, 70, 70),       # 1: Building
+    (100, 40, 40),      # 2: Fence
+    (55, 90, 80),       # 3: Other
+    (220, 20, 60),      # 4: Pedestrian (red)
+    (153, 153, 153),    # 5: Pole
+    (157, 234, 50),     # 6: RoadLine
+    (128, 64, 128),     # 7: Road
+    (244, 35, 232),     # 8: Sidewalk
+    (107, 142, 35),     # 9: Vegetation
+    (0, 0, 142),        # 10: Vehicle (blue)
+    (102, 102, 156),    # 11: Wall
+    (220, 220, 0),      # 12: TrafficLight
+    (70, 130, 180),     # 13: TrafficSign
+    (81, 0, 81),        # 14: Sky
+    (150, 100, 100),    # 15: Terrain
+    (230, 150, 140),    # 16: GuardRail
+    (180, 165, 180),    # 17: Fence
+    (250, 170, 30),     # 18: Static
+    (110, 190, 160),    # 19: Dynamic
+    (170, 120, 50),     # 20: Other
+    (45, 60, 150),      # 21: Water
+    (145, 170, 100)     # 22: RoadMarking
 ]
 
 # 1. 连接CARLA服务器并配置强同步模式
@@ -134,6 +134,66 @@ all_vehicles = world.get_actors().filter('*vehicle*')
 actual_npc_count = len(all_vehicles) - 1
 print(f"NPC生成完成 | 实际数量: {actual_npc_count}辆（总车辆: {len(all_vehicles)}）")
 
+# ==================== 行人生成核心逻辑 ====================
+# 6.1 生成行人（walker）
+walker_count = 50  # 生成50个行人（可调整）
+walkers = []       # 存储行人actor
+walker_controllers = []  # 存储行人控制器（用于移动）
+print(f"\n开始生成{walker_count}个行人...")
+
+# 获取行人蓝图（随机选择不同行人模型）
+walker_bps = bp_lib.filter('walker.pedestrian.*')
+
+# 获取行人生成点（使用地图的行人专用生成点，或随机点）
+walker_spawn_points = []
+for _ in range(walker_count * 2):  # 生成双倍候选点，避免重叠
+    spawn_point = carla.Transform()
+    # 随机位置（围绕主角车，半径50-200米，避免太近）
+    spawn_point.location = world.get_random_location_from_navigation()
+    if spawn_point.location is not None:
+        # 确保行人不在车辆正前方（避免生成失败）
+        if spawn_point.location.distance(vehicle.get_location()) > 20:
+            walker_spawn_points.append(spawn_point)
+
+# 生成行人
+for i in range(walker_count):
+    if i >= len(walker_spawn_points):
+        break  # 候选点用完则停止
+    walker_bp = random.choice(walker_bps)
+    # 设置行人为不可碰撞（避免卡死）
+    walker_bp.set_attribute('is_invincible', 'false')
+    try:
+        walker = world.spawn_actor(walker_bp, walker_spawn_points[i])
+        walkers.append(walker)
+        # 每生成10个行人同步一次，避免服务器卡顿
+        if i % 10 == 0:
+            world.tick()
+            time.sleep(0.05)
+    except:
+        continue
+
+# 6.2 生成行人控制器并启动自主移动
+if walkers:
+    # 获取行人控制器蓝图
+    controller_bp = bp_lib.find('controller.ai.walker')
+    # 启动交通管理器（行人也需要同步）
+    tm = client.get_trafficmanager(8000)
+    tm.set_synchronous_mode(True)
+    
+    for walker in walkers:
+        # 生成控制器并绑定到行人
+        controller = world.spawn_actor(controller_bp, carla.Transform(), walker)
+        walker_controllers.append(controller)
+        # 启动行人自主行走（随机目标点，速度1-3 m/s）
+        controller.start()
+        controller.go_to_location(world.get_random_location_from_navigation())
+        controller.set_max_speed(random.uniform(1.0, 3.0))
+
+# 统计实际生成的行人数量
+actual_walker_count = len(walkers)
+print(f"行人生成完成 | 实际数量: {actual_walker_count}个")
+# =================================================================
+
 # 7. 启动所有车辆自动驾驶
 tm = client.get_trafficmanager(8000)
 tm.set_synchronous_mode(True)
@@ -176,7 +236,7 @@ def set_spectator_smooth(last_transform=None):
 
 # 9. 主循环（核心：RGB与语义分割图像拼接显示）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print("功能：RGB与语义分割图像拼接显示 + 车辆自动驾驶 + 平滑视角")
+print(f"功能：RGB与语义分割图像拼接显示 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 平滑视角")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -206,12 +266,13 @@ try:
             # 横向拼接两张图像（宽度合并，高度不变）
             combined_img = cv2.hconcat([rgb_img, sem_rgb])
             
-            # 添加标题区分左右区域
-            cv2.putText(combined_img, "RGB Image | Semantic Segmentation", 
+            # 添加标题（纯英文，避免中文乱码/问号）
+            cv2.putText(combined_img, 
+                       f"RGB Image | Semantic Segmentation (Vehicles:{actual_npc_count} Pedestrians:{actual_walker_count})", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             
-            # 显示拼接后的图像
-            cv2.imshow('RGB + Semantic Segmentation', combined_img)
+            # 显示拼接后的图像（窗口标题纯英文）
+            cv2.imshow('CARLA RGB + Semantic Segmentation (with Pedestrians)', combined_img)
             if cv2.waitKey(1) == ord('q'):
                 break
         
@@ -220,6 +281,19 @@ try:
 except KeyboardInterrupt:
     print("\n用户中断，清理资源...")
 finally:
+    # ==================== 清理行人资源 ====================
+    # 停止并销毁行人控制器
+    for controller in walker_controllers:
+        if controller.is_alive:
+            controller.stop()
+            controller.destroy()
+    # 销毁行人
+    for walker in walkers:
+        if walker.is_alive:
+            walker.destroy()
+    print(f"已销毁{len(walker_controllers)}个行人控制器 + {len(walkers)}个行人")
+    # =================================================================
+    
     # 清理传感器
     rgb_camera.stop()
     rgb_camera.destroy()
@@ -237,4 +311,4 @@ finally:
             v.destroy()
     
     cv2.destroyAllWindows()
-    print("资源清理完成，同步模式已关闭")
+    print(f"资源清理完成，同步模式已关闭（销毁{len(all_vehicles)}辆车辆）")
