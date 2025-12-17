@@ -169,5 +169,3 @@ A: 检查光线条件，调整配置文件中的参数
 查看 `docs/usage_guide.md` 了解详细使用说明
 运行 `python tests/test_basic.py` 进行功能测试
 检查日志文件了解运行状态
-
----
