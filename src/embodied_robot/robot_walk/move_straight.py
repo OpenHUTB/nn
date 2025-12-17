@@ -554,5 +554,5 @@ def control_robot(model_path):
 if __name__ == "__main__":
     model_file = "Robot_move_straight.xml"
 
-    # 确保不生成任何临时文件（通用版，适配所有Mujoco版本）
+    # 确保不生成任何临时文件
     control_robot(model_file)
