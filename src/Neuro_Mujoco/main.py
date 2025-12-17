@@ -136,22 +136,16 @@ def test_speed(
         logger.error("线程数必须为正数")
         return
 
-    # 生成控制噪声（处理nu=0的情况）
-    if model.nu == 0:
-        ctrl = None
-        logger.warning("模型无控制输入（nu=0），将跳过控制噪声")
-    else:
-        ctrl = ctrlnoise * np.random.randn(nstep, model.nu)
-    
     logger.info(f"开始速度测试: 线程数={nthread}, 每线程步数={nstep}")
 
     def simulate_thread(thread_id: int) -> float:
-        """单线程模拟函数"""
+        """单线程模拟函数（优化：线程内逐步生成噪声，降低内存占用）"""
         mj_data = mujoco.MjData(model)
         start = time.perf_counter()
         for i in range(nstep):
-            if ctrl is not None:
-                mj_data.ctrl[:] = ctrl[i]
+            # 优化点：线程内逐步生成控制噪声，避免主线程预生成大数组
+            if model.nu > 0:
+                mj_data.ctrl[:] = ctrlnoise * np.random.randn(model.nu)
             mujoco.mj_step(model, mj_data)
         end = time.perf_counter()
         duration = end - start
@@ -180,7 +174,7 @@ def test_speed(
 def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str] = None) -> None:
     """
     可视化模型并运行模拟（支持ROS/策略控制）
-    :param model_path: 模型文件/目录路径
+    :param model_path: 模型文件路径/目录路径
     :param use_ros: 是否启用ROS模式
     :param policy_path: 预训练策略模型路径（.pth）
     """
