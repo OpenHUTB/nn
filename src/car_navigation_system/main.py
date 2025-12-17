@@ -277,12 +277,19 @@ class ImprovedNeuralController:
 
             return 0.0, 1.0, 0.0  # 紧急情况下保持直行，只刹车
 
+
+            return 0.0, 1.0, 0.0  # 紧急情况下保持直行，只刹车
+
             return 0.0, 1.0, steer  # 全力刹车
+
 
 
         # 中距离障碍物：减速并准备转向
         elif distance < self.safe_following_distance:
             # 计算安全速度比例
+
+            safe_speed_ratio = (distance - 3.0) / (self.safe_following_distance - 3.0)
+
 
             safe_speed_ratio = (distance - 3.0) / (self.safe_following_distance - 3.0)
             safe_speed_ratio = max(0.1, min(1.0, safe_speed_ratio))
@@ -318,30 +325,38 @@ class ImprovedNeuralController:
                 steer = 0.9 * steer + 0.1 * avoid_steer
 
             safe_speed_ratio = (distance - 2.0) / (self.safe_following_distance - 2.0)
+
             safe_speed_ratio = max(0.1, min(1.0, safe_speed_ratio))
 
             # 如果当前速度过高，减速
-            if speed > 5.0 * safe_speed_ratio:
+            target_speed = 15.0 * safe_speed_ratio  # 目标速度最大15km/h
+            current_speed_kmh = speed * 3.6
+
+            if current_speed_kmh > target_speed:
                 throttle = 0.0
-                brake = 0.3
+                brake = 0.4 * ((current_speed_kmh - target_speed) / current_speed_kmh)
+            else:
+                throttle = 0.3 * safe_speed_ratio
+                brake = 0.0
 
             # 如果障碍物在正前方，尝试轻微转向避开
-            if abs(angle) < 10:  # 正前方±10度内
+            if abs(angle) < 15:  # 正前方±15度内
                 # 根据障碍物距离决定转向幅度
-                avoid_steer = 0.5 if angle >= 0 else -0.5
-                # 平滑转向
-                steer = 0.7 * steer + 0.3 * avoid_steer
+                avoid_factor = max(0, 1.0 - distance / self.safe_following_distance)
+                avoid_steer = 0.3 * avoid_factor if angle >= 0 else -0.3 * avoid_factor
+                # 平滑转向 - 保持更多原始转向
+                steer = 0.8 * steer + 0.2 * avoid_steer
 
         # 远距离障碍物：轻微调整
-        elif distance < 20.0:
+        elif distance < 25.0:
             # 轻微减速
-            if speed > 10.0:
-                throttle *= 0.8
+            if speed > 8.0:
+                throttle *= 0.7
 
             # 如果障碍物在正前方，轻微转向
-            if abs(angle) < 15:
-                avoid_steer = 0.2 if angle >= 0 else -0.2
-                steer = 0.8 * steer + 0.2 * avoid_steer
+            if abs(angle) < 20:
+                avoid_steer = 0.15 if angle >= 0 else -0.15
+                steer = 0.9 * steer + 0.1 * avoid_steer
 
         return throttle, brake, steer
 
@@ -435,12 +450,12 @@ class TraditionalController:
 
                     # 优先选择转向较小的方向
                     if left_lane and left_lane.lane_type == carla.LaneType.Driving:
-                        # 检查左侧是否有足够空间
+
                         steer = -0.25
                     elif right_lane and right_lane.lane_type == carla.LaneType.Driving:
                         steer = 0.25
                     else:
-                        # 没有可用的相邻车道，保持车道轻微避开
+
                         steer = 0.15 if angle >= 0 else -0.15
 
         return throttle, brake, steer
