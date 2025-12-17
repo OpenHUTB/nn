@@ -10,7 +10,7 @@ import math
 # =========================================================
 # 请确保这三个坐标是你 UE 里显示的真实数值 (单位: cm)
 UE_START = np.array([1180.0, 610.0, 28.0])  # 出生点
-UE_GOAL = np.array([790.0, 3360.0, -50.0])  # 终点位置
+UE_GOAL = np.array([790.0, 3360.0, -50.0])  # 正方体位置
 
 # 计算 AirSim 中的相对目标向量 (单位: 米)
 # 逻辑: (目标 - 起点) / 100
@@ -78,17 +78,25 @@ class AirSimMazeEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
+
+        # 1. 重置整个物理世界
         self.client.reset()
         self.client.enableApiControl(True)
         self.client.armDisarm(True)
 
-        # 起飞并悬停
-        self.client.takeoffAsync().join()
-        self.client.moveToZAsync(-1.5, 1).join()
+        # --- 优化点：直接瞬移 (Teleport) ---
+        # 不要用 takeoff，直接设置位姿 (Pose)
+        # Position: x=0, y=0, z=-1.5 (AirSim坐标)
+        # Orientation: (0,0,0,1) 即不旋转
+        pose = airsim.Pose(airsim.Vector3r(0, 0, -1.5), airsim.Quaternionr(0, 0, 0, 1))
+        self.client.simSetVehiclePose(pose, True)
 
-        # 初始化距离 (3D距离)
-        state = self.client.getMultirotorState().kinematics_estimated.position
-        curr_pos = np.array([state.x_val, state.y_val, state.z_val])
+        # 瞬移后，物理引擎可能会有短暂的不稳定，稍微暂停一帧让它稳住
+        # 或者不做这一步通常也没事，因为一开始速度是0
+        # self.client.simContinueForTime(0.01)
+
+        # 初始化距离
+        curr_pos = np.array([0.0, 0.0, -1.5])  # 我们知道它就在这
         self.last_dist = np.linalg.norm(curr_pos - TARGET_POS_AIRSIM)
 
         return self._get_obs(), {}
@@ -167,7 +175,7 @@ class AirSimMazeEnv(gym.Env):
         if dist_to_goal < 5.0:
             reward = 100.0  # 大奖
             done = True  # 结束回合 -> 触发 reset -> 回到出生点
-            print(f"✅ 成功到达终点范围! (误差: {dist_to_goal:.2f}m)")
+            print(f"✅ 成功到达正方体范围! (误差: {dist_to_goal:.2f}m)")
             return reward, done
 
         # --- C. 防止乱飞 (Geofence) ---
