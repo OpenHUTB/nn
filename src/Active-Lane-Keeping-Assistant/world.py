@@ -47,12 +47,23 @@ class World():
         # Use Tesla Model 3 as Car
         self.bp = self.blueprint_library.filter('model3')[0]
 
-        # === 修复 2: 随机选择出生点，防止车位被占导致无法生成 ===
-        spawn_points = self.world.get_map().get_spawn_points()
-        if spawn_points:
-            self.spawn_point = random.choice(spawn_points)
-        else:
-            self.spawn_point = carla.Transform()  # 防止没有生成点的情况
+        # === 修改: 将出生点设置为当前上帝视角相机的位置 ===
+        # 1. 获取上帝视角的观察者对象
+        spectator = self.world.get_spectator()
+
+        # 2. 获取观察者现在的坐标和朝向
+        transform = spectator.get_transform()
+
+        # 3.稍微把位置抬高一点（+2米），防止相机贴地导致车卡在地里
+        transform.location.z += 2.0
+
+        # 4. 稍微把位置往前挪一点（+5米），让你能直接看到车出现在眼前
+        # (利用朝向向量计算前方的位置)
+        forward_vector = transform.get_forward_vector()
+        transform.location.x += forward_vector.x * 5.0
+        transform.location.y += forward_vector.y * 5.0
+
+        self.spawn_point = transform
         # ====================================================
 
         self.vehicle = None
