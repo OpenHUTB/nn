@@ -10,7 +10,7 @@ import random
 import imageio
 import matplotlib
 
-matplotlib.use('TkAgg')  # 解决动画显示问题
+matplotlib.use('TkAgg')  # 解决动画5显示问题
 
 
 # --------------------------
