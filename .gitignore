@@ -11,15 +11,3 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
-
-# 其他缓存（按需补充）
-*.log
-*.tmp
-"src/2d-carla-tracking/" 
-"src/AI_Drone_Face_Recognition_Human_Tracking/" 
-"src/Active-Lane-Keeping-Assistant/" 
-"src/Car-Racing/plot_comparison.py" 
-"src/Driving_Car/Autonomous_vehicle_battery_gauge.py" 
-"src/Driving_Car/Unmanned_vehicle_directional_movemen.py" 
-"src/Yolov4_Vehicle_inspection/model_data/" 
-"src/Yolov4_Vehicle_inspection/utils/" 
