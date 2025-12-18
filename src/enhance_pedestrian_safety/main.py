@@ -8,7 +8,6 @@ import math
 import threading
 import json
 from datetime import datetime
-from collections import defaultdict
 
 from carla_utils import setup_carla_path, import_carla_module
 from config_manager import ConfigManager
@@ -16,14 +15,13 @@ from annotation_generator import AnnotationGenerator
 from data_validator import DataValidator
 from scene_manager import SceneManager
 from data_analyzer import DataAnalyzer
+from lidar_processor import LidarProcessor, MultiSensorFusion
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
 
 
 class Log:
-    """简单日志类"""
-
     @staticmethod
     def info(msg):
         print(f"[INFO] {msg}")
@@ -42,14 +40,11 @@ class Log:
 
 
 class WeatherSystem:
-    """天气管理系统"""
-
     WEATHER_PRESETS = {
         'clear': {'cloudiness': 10, 'precipitation': 0, 'wind': 5},
         'rainy': {'cloudiness': 90, 'precipitation': 80, 'wind': 15},
         'cloudy': {'cloudiness': 70, 'precipitation': 10, 'wind': 10},
-        'foggy': {'cloudiness': 50, 'precipitation': 0, 'fog_density': 40},
-        'stormy': {'cloudiness': 95, 'precipitation': 90, 'wind': 25, 'fog_density': 20}
+        'foggy': {'cloudiness': 50, 'precipitation': 0, 'fog_density': 40}
     }
 
     @staticmethod
@@ -64,209 +59,132 @@ class WeatherSystem:
             if 'fog_density' in preset:
                 weather.fog_density = preset['fog_density']
 
-        # 时间设置
         if time_of_day == 'noon':
             weather.sun_altitude_angle = 75
         elif time_of_day == 'sunset':
             weather.sun_altitude_angle = 15
         elif time_of_day == 'night':
             weather.sun_altitude_angle = -20
-        elif time_of_day == 'morning':
-            weather.sun_altitude_angle = 30
-        elif time_of_day == 'dawn':
-            weather.sun_altitude_angle = 5
 
         return weather
 
 
 class ImageProcessor:
-    """图像处理器 - 支持多种输出格式"""
-
     def __init__(self, output_dir):
         self.output_dir = output_dir
         self.stitched_dir = os.path.join(output_dir, "stitched")
         os.makedirs(self.stitched_dir, exist_ok=True)
 
-        self.has_pil = self._check_pil()
-
-    def _check_pil(self):
-        try:
-            from PIL import Image
-            return True
-        except ImportError:
-            Log.warning("PIL未安装，图像处理功能受限")
-            return False
-
-    def stitch_4_view(self, image_paths, frame_num, view_type="vehicle"):
-        """四视角拼接"""
-        if not self.has_pil:
-            return False
-
+    def stitch(self, image_paths, frame_num, view_type="vehicle"):
         try:
             from PIL import Image, ImageDraw
-
-            positions = [(10, 10), (660, 10), (10, 390), (660, 390)]
-
-            canvas = Image.new('RGB', (640 * 2 + 20, 360 * 2 + 20), (40, 40, 40))
-            draw = ImageDraw.Draw(canvas)
-
-            for idx, (cam_name, img_path) in enumerate(list(image_paths.items())[:4]):
-                img = self._load_image(img_path)
-                canvas.paste(img, positions[idx])
-
-                label = cam_name.replace('_', ' ').title()
-                draw.text((positions[idx][0] + 5, positions[idx][1] + 5),
-                          label, fill=(255, 255, 200))
-
-            # 添加帧信息和时间戳
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            draw.text((canvas.width // 2 - 100, 5), f"Frame {frame_num:06d}",
-                      fill=(255, 255, 255))
-            draw.text((canvas.width - 150, canvas.height - 25), timestamp,
-                      fill=(200, 200, 200))
-
-            output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
-            canvas.save(output_path, "JPEG", quality=95)
-
-            return True
-
-        except Exception as e:
-            Log.error(f"图像拼接失败: {e}")
+        except ImportError:
+            Log.warning("PIL未安装，跳过图像拼接")
             return False
 
-    def _load_image(self, img_path):
-        """加载图像，处理异常"""
-        if not self.has_pil:
-            return None
+        positions = [(10, 10), (660, 10), (10, 390), (660, 390)]
 
-        try:
-            from PIL import Image
+        canvas = Image.new('RGB', (640 * 2 + 20, 360 * 2 + 20), (40, 40, 40))
+        draw = ImageDraw.Draw(canvas)
 
+        for idx, (cam_name, img_path) in enumerate(list(image_paths.items())[:4]):
             if img_path and os.path.exists(img_path):
-                img = Image.open(img_path)
-                return img.resize((640, 360))
+                try:
+                    img = Image.open(img_path).resize((640, 360))
+                except:
+                    img = Image.new('RGB', (640, 360), (80, 80, 80))
+            else:
+                img = Image.new('RGB', (640, 360), (80, 80, 80))
 
-        except Exception as e:
-            Log.debug(f"加载图像失败 {img_path}: {e}")
+            canvas.paste(img, positions[idx])
+            draw.text((positions[idx][0] + 5, positions[idx][1] + 5),
+                      cam_name, fill=(255, 255, 200))
 
-        # 返回灰色占位图像
-        from PIL import Image
-        return Image.new('RGB', (640, 360), (80, 80, 80))
+        output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
+        canvas.save(output_path, "JPEG", quality=90)
+        return True
 
 
 class TrafficManager:
-    """交通管理器 - 增强版"""
-
     def __init__(self, world, config):
         self.world = world
         self.config = config
         self.vehicles = []
         self.pedestrians = []
-        self.static_obstacles = []
 
-        # 设置随机种子
         seed = config['scenario'].get('seed', random.randint(1, 1000))
         random.seed(seed)
         Log.info(f"随机种子: {seed}")
 
-    def spawn_ego_vehicle(self, vehicle_type=None):
-        """生成主车"""
+    def spawn_ego_vehicle(self):
         blueprint_lib = self.world.get_blueprint_library()
 
-        if vehicle_type:
-            if blueprint_lib.filter(vehicle_type):
-                vehicle_bp = random.choice(blueprint_lib.filter(vehicle_type))
-            else:
-                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
-        else:
-            # 常用车辆类型
-            common_vehicles = [
-                'vehicle.tesla.model3',
-                'vehicle.audi.tt',
-                'vehicle.mini.cooperst',
-                'vehicle.nissan.micra',
-                'vehicle.mercedes.coupe',
-                'vehicle.bmw.grandtourer'
-            ]
+        common_vehicles = [
+            'vehicle.tesla.model3',
+            'vehicle.audi.tt',
+            'vehicle.mini.cooperst',
+            'vehicle.nissan.micra'
+        ]
 
-            for vtype in common_vehicles:
-                if blueprint_lib.filter(vtype):
-                    vehicle_bp = random.choice(blueprint_lib.filter(vtype))
-                    break
-            else:
-                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+        for vtype in common_vehicles:
+            if blueprint_lib.filter(vtype):
+                vehicle_bp = random.choice(blueprint_lib.filter(vtype))
+                break
+        else:
+            vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
 
         spawn_points = self.world.get_map().get_spawn_points()
         if not spawn_points:
-            Log.error("没有可用的生成点")
             return None
 
-        # 尝试多个生成点
-        for _ in range(3):
-            spawn_point = random.choice(spawn_points)
-            try:
-                vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-                vehicle.set_autopilot(True)
+        spawn_point = random.choice(spawn_points)
+        try:
+            vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+            vehicle.set_autopilot(True)
+            vehicle.apply_control(carla.VehicleControl(throttle=0.2))
+            Log.info(f"主车: {vehicle.type_id}")
+            return vehicle
+        except Exception as e:
+            Log.warning(f"主车生成失败: {e}")
+            return None
 
-                # 初始控制
-                control = carla.VehicleControl()
-                control.throttle = 0.3
-                control.steer = random.uniform(-0.1, 0.1)
-                vehicle.apply_control(control)
+    def spawn_traffic(self, center_location):
+        vehicles = self._spawn_vehicles()
+        pedestrians = self._spawn_pedestrians(center_location)
 
-                Log.info(f"主车: {vehicle.type_id}")
-                return vehicle
+        Log.info(f"交通生成: {vehicles}辆车, {pedestrians}个行人")
+        return vehicles + pedestrians
 
-            except Exception as e:
-                Log.debug(f"车辆生成失败: {e}")
-
-        return None
-
-    def spawn_traffic(self, center_location, num_vehicles=8, num_pedestrians=6):
-        """生成交通"""
-        vehicles_spawned = self._spawn_vehicles(center_location, num_vehicles)
-        pedestrians_spawned = self._spawn_pedestrians(center_location, num_pedestrians)
-
-        Log.info(f"交通生成: {vehicles_spawned}辆车, {pedestrians_spawned}个行人")
-        return vehicles_spawned + pedestrians_spawned
-
-    def _spawn_vehicles(self, center_location, count):
-        """生成车辆"""
+    def _spawn_vehicles(self):
         blueprint_lib = self.world.get_blueprint_library()
         spawn_points = self.world.get_map().get_spawn_points()
 
         if not spawn_points:
             return 0
 
+        num_vehicles = min(self.config['traffic']['background_vehicles'], 10)
         spawned = 0
-        for i in range(min(count, 15)):
+
+        for _ in range(num_vehicles):
             try:
                 vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
                 spawn_point = random.choice(spawn_points)
-
                 vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
                 vehicle.set_autopilot(True)
-
-                # 设置不同速度
-                speed_factor = random.uniform(0.6, 1.2)
-                control = carla.VehicleControl()
-                control.throttle = 0.25 * speed_factor
-                vehicle.apply_control(control)
-
                 self.vehicles.append(vehicle)
                 spawned += 1
-
-            except Exception as e:
-                Log.debug(f"背景车辆生成失败: {e}")
+            except:
+                pass
 
         return spawned
 
-    def _spawn_pedestrians(self, center_location, count):
-        """生成行人"""
+    def _spawn_pedestrians(self, center_location):
         blueprint_lib = self.world.get_blueprint_library()
 
+        num_peds = min(self.config['traffic']['pedestrians'], 8)
         spawned = 0
-        for i in range(min(count, 12)):
+
+        for _ in range(num_peds):
             try:
                 ped_bps = list(blueprint_lib.filter('walker.pedestrian.*'))
                 if not ped_bps:
@@ -274,9 +192,8 @@ class TrafficManager:
 
                 ped_bp = random.choice(ped_bps)
 
-                # 在中心位置周围生成
                 angle = random.uniform(0, 2 * math.pi)
-                distance = random.uniform(3.0, 15.0)
+                distance = random.uniform(5.0, 12.0)
 
                 location = carla.Location(
                     x=center_location.x + distance * math.cos(angle),
@@ -285,83 +202,16 @@ class TrafficManager:
                 )
 
                 pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
-
-                # 尝试添加AI控制器
-                try:
-                    controller_bp = blueprint_lib.find('controller.ai.walker')
-                    if controller_bp:
-                        controller = self.world.spawn_actor(
-                            controller_bp,
-                            carla.Transform(),
-                            attach_to=pedestrian
-                        )
-                        controller.start()
-
-                        # 设置随机目标
-                        target = self.world.get_random_location_from_navigation()
-                        if target:
-                            controller.go_to_location(target)
-
-                        self.pedestrians.append((pedestrian, controller))
-                    else:
-                        self.pedestrians.append((pedestrian, None))
-
-                except:
-                    self.pedestrians.append((pedestrian, None))
-
+                self.pedestrians.append(pedestrian)
                 spawned += 1
-
             except Exception as e:
                 Log.debug(f"行人生成失败: {e}")
 
         return spawned
 
-    def add_static_obstacles(self, center_location):
-        """添加静态障碍物"""
-        try:
-            cones = SceneManager.spawn_traffic_cones(self.world, center_location, 6)
-            barriers = SceneManager.spawn_construction_barriers(self.world, center_location, 3)
-
-            self.static_obstacles.extend(cones)
-            self.static_obstacles.extend(barriers)
-
-            Log.info(f"添加障碍物: {len(cones)}个锥桶, {len(barriers)}个路障")
-
-        except Exception as e:
-            Log.warning(f"添加障碍物失败: {e}")
-
-    def setup_accident_scene(self, center_location):
-        """设置事故场景"""
-        try:
-            accidents, emergency = SceneManager.setup_traffic_accident(
-                self.world, center_location, 'minor'
-            )
-
-            self.vehicles.extend(accidents)
-            self.vehicles.extend(emergency)
-
-            Log.info(f"事故场景: {len(accidents)}辆事故车, {len(emergency)}辆应急车")
-
-        except Exception as e:
-            Log.warning(f"设置事故场景失败: {e}")
-
-    def update_traffic_flow(self):
-        """更新交通流"""
-        # 随机改变一些车辆的速度
-        for vehicle in self.vehicles[:10]:  # 只处理前10辆车
-            try:
-                if random.random() < 0.01:  # 1%概率
-                    control = vehicle.get_control()
-                    control.throttle *= random.uniform(0.8, 1.2)
-                    vehicle.apply_control(control)
-            except:
-                pass
-
     def cleanup(self):
-        """清理交通"""
-        Log.info("清理交通系统...")
+        Log.info("清理交通...")
 
-        # 清理车辆
         for vehicle in self.vehicles:
             try:
                 if vehicle.is_alive:
@@ -369,33 +219,18 @@ class TrafficManager:
             except:
                 pass
 
-        # 清理行人
-        for pedestrian, controller in self.pedestrians:
+        for pedestrian in self.pedestrians:
             try:
-                if controller and controller.is_alive:
-                    controller.stop()
-                    controller.destroy()
                 if pedestrian.is_alive:
                     pedestrian.destroy()
             except:
                 pass
 
-        # 清理障碍物
-        for obstacle in self.static_obstacles:
-            try:
-                if obstacle.is_alive:
-                    obstacle.destroy()
-            except:
-                pass
-
         self.vehicles.clear()
         self.pedestrians.clear()
-        self.static_obstacles.clear()
 
 
-class SensorSystem:
-    """传感器系统 - 支持多类型传感器"""
-
+class SensorManager:
     def __init__(self, world, config, data_dir):
         self.world = world
         self.config = config
@@ -410,65 +245,57 @@ class SensorSystem:
         self.buffer_lock = threading.Lock()
 
         self.image_processor = ImageProcessor(data_dir)
-        self.annotation_generator = None
+        self.lidar_processor = None
+        self.fusion_manager = None
 
-        # 摄像头配置
-        self.camera_configs = {
-            'vehicle': {
-                'front_wide': {'loc': (2.0, 0, 1.8), 'rot': (0, -3, 0), 'fov': 100},
-                'front_narrow': {'loc': (2.0, 0, 1.6), 'rot': (0, 0, 0), 'fov': 60},
-                'right_side': {'loc': (0.5, 1.0, 1.5), 'rot': (0, -2, 45), 'fov': 90},
-                'left_side': {'loc': (0.5, -1.0, 1.5), 'rot': (0, -2, -45), 'fov': 90},
-                'rear': {'loc': (-1.5, 0, 1.5), 'rot': (0, -2, 180), 'fov': 90}
-            },
-            'infrastructure': [
-                {'name': 'north', 'loc': (0, -25, 15), 'rot': (0, -25, 180)},
-                {'name': 'south', 'loc': (0, 25, 15), 'rot': (0, -25, 0)},
-                {'name': 'east', 'loc': (25, 0, 15), 'rot': (0, -25, -90)},
-                {'name': 'west', 'loc': (-25, 0, 15), 'rot': (0, -25, 90)},
-                {'name': 'top', 'loc': (0, 0, 25), 'rot': (-90, 0, 0)}
-            ]
-        }
+        if config['sensors'].get('lidar_sensors', 0) > 0:
+            self.lidar_processor = LidarProcessor(data_dir)
 
-    def enable_annotations(self):
-        """启用自动标注"""
-        self.annotation_generator = AnnotationGenerator(self.data_dir)
+        if config['output'].get('save_fusion', False):
+            self.fusion_manager = MultiSensorFusion(data_dir)
 
-    def setup_cameras(self, vehicle, center_location, enable_vehicle=True, enable_infra=True):
-        """设置摄像头系统"""
-        installed = 0
+    def setup_cameras(self, vehicle, center_location):
+        vehicle_cams = self._setup_vehicle_cameras(vehicle)
+        infra_cams = self._setup_infrastructure_cameras(center_location)
 
-        if enable_vehicle and vehicle:
-            installed += self._setup_vehicle_cameras(vehicle)
-
-        if enable_infra:
-            installed += self._setup_infrastructure_cameras(center_location)
-
-        Log.info(f"摄像头安装: {installed}个")
-        return installed
+        Log.info(f"摄像头: {vehicle_cams}车辆 + {infra_cams}基础设施")
+        return vehicle_cams + infra_cams
 
     def _setup_vehicle_cameras(self, vehicle):
-        """设置车辆摄像头"""
-        installed = 0
+        if not vehicle:
+            return 0
 
-        for cam_name, config_data in self.camera_configs['vehicle'].items():
+        camera_configs = {
+            'front_wide': {'loc': (2.0, 0, 1.8), 'rot': (0, -3, 0), 'fov': 100},
+            'front_narrow': {'loc': (2.0, 0, 1.6), 'rot': (0, 0, 0), 'fov': 60},
+            'right_side': {'loc': (0.5, 1.0, 1.5), 'rot': (0, -2, 45), 'fov': 90},
+            'left_side': {'loc': (0.5, -1.0, 1.5), 'rot': (0, -2, -45), 'fov': 90}
+        }
+
+        installed = 0
+        for cam_name, config_data in camera_configs.items():
             if self._create_camera(cam_name, config_data, vehicle, 'vehicle'):
                 installed += 1
 
         return installed
 
     def _setup_infrastructure_cameras(self, center_location):
-        """设置基础设施摄像头"""
-        installed = 0
+        camera_configs = [
+            {'name': 'north', 'offset': (0, -20, 12), 'rotation': (0, -25, 180)},
+            {'name': 'south', 'offset': (0, 20, 12), 'rotation': (0, -25, 0)},
+            {'name': 'east', 'offset': (20, 0, 12), 'rotation': (0, -25, -90)},
+            {'name': 'west', 'offset': (-20, 0, 12), 'rotation': (0, -25, 90)}
+        ]
 
-        for cam_config in self.camera_configs['infrastructure']:
+        installed = 0
+        for cam_config in camera_configs:
             sensor_config = {
                 'loc': (
-                    center_location.x + cam_config['loc'][0],
-                    center_location.y + cam_config['loc'][1],
-                    center_location.z + cam_config['loc'][2]
+                    center_location.x + cam_config['offset'][0],
+                    center_location.y + cam_config['offset'][1],
+                    center_location.z + cam_config['offset'][2]
                 ),
-                'rot': cam_config['rot'],
+                'rot': cam_config['rotation'],
                 'fov': 90
             }
 
@@ -477,37 +304,90 @@ class SensorSystem:
 
         return installed
 
+    def setup_lidar(self, vehicle):
+        if not vehicle or not self.config['sensors'].get('lidar_sensors', 0) > 0:
+            return 0
+
+        try:
+            blueprint_lib = self.world.get_blueprint_library()
+            lidar_bp = blueprint_lib.find('sensor.lidar.ray_cast')
+
+            lidar_config = self.config['sensors'].get('lidar_config', {})
+
+            lidar_bp.set_attribute('channels', str(lidar_config.get('channels', 32)))
+            lidar_bp.set_attribute('range', str(lidar_config.get('range', 100)))
+            lidar_bp.set_attribute('points_per_second', str(lidar_config.get('points_per_second', 56000)))
+            lidar_bp.set_attribute('rotation_frequency', str(lidar_config.get('rotation_frequency', 10)))
+
+            # 添加更多LiDAR参数
+            lidar_bp.set_attribute('upper_fov', '10')
+            lidar_bp.set_attribute('lower_fov', '-20')
+            lidar_bp.set_attribute('horizontal_fov', '360')
+
+            lidar_location = carla.Location(x=0, y=0, z=2.5)
+            lidar_rotation = carla.Rotation(0, 0, 0)
+            lidar_transform = carla.Transform(lidar_location, lidar_rotation)
+
+            lidar_sensor = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=vehicle)
+
+            def lidar_callback(lidar_data):
+                current_time = time.time()
+                if current_time - self.last_capture_time >= self.config['sensors']['capture_interval']:
+                    if self.lidar_processor:
+                        try:
+                            metadata = self.lidar_processor.process_lidar_data(lidar_data, self.frame_counter)
+                            if metadata and self.fusion_manager:
+                                # 尝试获取最新的车辆图像
+                                vehicle_image_path = None
+                                with self.buffer_lock:
+                                    if self.vehicle_buffer:
+                                        # 取第一个摄像头的图像
+                                        for cam_name, img_path in self.vehicle_buffer.items():
+                                            if os.path.exists(img_path):
+                                                vehicle_image_path = img_path
+                                                break
+
+                                sensor_data = {
+                                    'lidar': os.path.join(self.data_dir, "lidar", f"lidar_{self.frame_counter:06d}.bin")
+                                }
+                                if vehicle_image_path:
+                                    sensor_data['camera'] = vehicle_image_path
+
+                                self.fusion_manager.create_synchronization_file(self.frame_counter, sensor_data)
+                        except Exception as e:
+                            print(f"LiDAR处理失败: {e}")
+
+            lidar_sensor.listen(lidar_callback)
+            self.sensors.append(lidar_sensor)
+
+            print("LiDAR传感器已安装")
+            return 1
+
+        except Exception as e:
+            print(f"LiDAR安装失败: {e}")
+            return 0
     def _create_camera(self, name, config, parent, sensor_type):
-        """创建摄像头"""
         try:
             blueprint = self.world.get_blueprint_library().find('sensor.camera.rgb')
 
-            # 设置摄像头参数
             img_size = self.config['sensors'].get('image_size', [1280, 720])
             blueprint.set_attribute('image_size_x', str(img_size[0]))
             blueprint.set_attribute('image_size_y', str(img_size[1]))
             blueprint.set_attribute('fov', str(config.get('fov', 90)))
 
-            # 质量设置
-            blueprint.set_attribute('motion_blur_intensity', '0')
-            blueprint.set_attribute('enable_postprocess_effects', 'False')
-
-            location = carla.Location(*config['loc'])
-            rotation = carla.Rotation(*config['rot'])
+            location = carla.Location(config['loc'][0], config['loc'][1], config['loc'][2])
+            rotation = carla.Rotation(config['rot'][0], config['rot'][1], config['rot'][2])
             transform = carla.Transform(location, rotation)
 
-            # 生成摄像头
             if parent:
                 camera = self.world.spawn_actor(blueprint, transform, attach_to=parent)
             else:
                 camera = self.world.spawn_actor(blueprint, transform)
 
-            # 创建保存目录
             save_dir = os.path.join(self.data_dir, "raw", sensor_type, name)
             os.makedirs(save_dir, exist_ok=True)
 
-            # 设置回调
-            callback = self._create_image_callback(save_dir, name, sensor_type)
+            callback = self._create_callback(save_dir, name, sensor_type)
             camera.listen(callback)
 
             self.sensors.append(camera)
@@ -517,9 +397,8 @@ class SensorSystem:
             Log.warning(f"创建摄像头 {name} 失败: {e}")
             return False
 
-    def _create_image_callback(self, save_dir, name, sensor_type):
-        """创建图像回调函数"""
-        capture_interval = self.config['sensors'].get('capture_interval', 2.0)
+    def _create_callback(self, save_dir, name, sensor_type):
+        capture_interval = self.config['sensors']['capture_interval']
 
         def callback(image):
             current_time = time.time()
@@ -528,42 +407,43 @@ class SensorSystem:
                 self.frame_counter += 1
                 self.last_capture_time = current_time
 
-                # 保存原始图像
                 filename = os.path.join(save_dir, f"{name}_{self.frame_counter:06d}.png")
                 image.save_to_disk(filename, carla.ColorConverter.Raw)
 
-                # 更新缓冲区
                 with self.buffer_lock:
                     if sensor_type == 'vehicle':
                         self.vehicle_buffer[name] = filename
                         if len(self.vehicle_buffer) >= 4:
-                            self.image_processor.stitch_4_view(
-                                self.vehicle_buffer, self.frame_counter, 'vehicle'
-                            )
+                            self.image_processor.stitch(self.vehicle_buffer, self.frame_counter, 'vehicle')
                             self.vehicle_buffer.clear()
                     else:
                         self.infra_buffer[name] = filename
                         if len(self.infra_buffer) >= 4:
-                            self.image_processor.stitch_4_view(
-                                self.infra_buffer, self.frame_counter, 'infrastructure'
-                            )
+                            self.image_processor.stitch(self.infra_buffer, self.frame_counter, 'infrastructure')
                             self.infra_buffer.clear()
-
-                # 生成标注
-                if self.annotation_generator:
-                    timestamp = datetime.now().isoformat()
-                    self.annotation_generator.detect_objects(
-                        self.world, self.frame_counter, timestamp
-                    )
 
         return callback
 
     def get_frame_count(self):
-        """获取帧数"""
         return self.frame_counter
 
+    def generate_sensor_summary(self):
+        summary = {
+            'total_sensors': len(self.sensors),
+            'frame_count': self.frame_counter,
+            'lidar_data': None,
+            'fusion_data': None
+        }
+
+        if self.lidar_processor:
+            summary['lidar_data'] = self.lidar_processor.generate_lidar_summary()
+
+        if self.fusion_manager:
+            summary['fusion_data'] = self.fusion_manager.generate_fusion_report()
+
+        return summary
+
     def cleanup(self):
-        """清理传感器"""
         Log.info(f"清理 {len(self.sensors)} 个传感器...")
         for sensor in self.sensors:
             try:
@@ -575,8 +455,6 @@ class SensorSystem:
 
 
 class DataCollector:
-    """数据收集器 - 主控制器"""
-
     def __init__(self, config):
         self.config = config
         self.client = None
@@ -587,21 +465,13 @@ class DataCollector:
         self.setup_directories()
 
         self.traffic_manager = None
-        self.sensor_system = None
+        self.sensor_manager = None
 
         self.start_time = None
         self.is_running = False
         self.collected_frames = 0
 
-        # 性能监控
-        self.performance_stats = {
-            'fps_history': [],
-            'memory_usage': [],
-            'start_time': 0
-        }
-
     def setup_directories(self):
-        """设置目录结构"""
         scenario = self.config['scenario']
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -610,15 +480,14 @@ class DataCollector:
             f"{scenario['name']}_{scenario['town']}_{timestamp}"
         )
 
-        # 创建目录结构
         directories = [
             "raw/vehicle",
             "raw/infrastructure",
             "stitched",
-            "annotations",
-            "metadata",
+            "lidar",
+            "fusion",
             "calibration",
-            "logs"
+            "metadata"
         ]
 
         for subdir in directories:
@@ -627,19 +496,16 @@ class DataCollector:
         Log.info(f"数据目录: {self.output_dir}")
 
     def connect(self):
-        """连接到CARLA服务器"""
         for attempt in range(1, 6):
             try:
                 self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(15.0)
+                self.client.set_timeout(10.0)
 
                 town = self.config['scenario']['town']
                 self.world = self.client.load_world(town)
 
-                # 设置世界参数
                 settings = self.world.get_settings()
                 settings.synchronous_mode = False
-                settings.fixed_delta_seconds = 0.05
                 self.world.apply_settings(settings)
 
                 Log.info(f"连接成功: {town}")
@@ -647,145 +513,69 @@ class DataCollector:
 
             except Exception as e:
                 Log.warning(f"连接尝试 {attempt}/5 失败: {str(e)[:50]}")
-                if attempt < 5:
-                    time.sleep(3)
+                time.sleep(2)
 
         return False
 
-    def setup_scene(self, scene_type=None, add_obstacles=False, add_accident=False):
-        """设置场景"""
-        # 设置天气
+    def setup_scene(self):
         weather_cfg = self.config['scenario']
-        weather = WeatherSystem.create_weather(
-            weather_cfg['weather'],
-            weather_cfg['time_of_day']
-        )
+        weather = WeatherSystem.create_weather(weather_cfg['weather'], weather_cfg['time_of_day'])
         self.world.set_weather(weather)
-
         Log.info(f"天气: {weather_cfg['weather']}, 时间: {weather_cfg['time_of_day']}")
 
-        # 获取场景中心
         spawn_points = self.world.get_map().get_spawn_points()
         if spawn_points:
             self.scene_center = spawn_points[len(spawn_points) // 2].location
         else:
             self.scene_center = carla.Location(0, 0, 0)
 
-        # 应用场景配置
-        if scene_type:
-            self.config = SceneManager.setup_scene(
-                self.world, self.config, scene_type
-            )
-            SceneManager.save_scene_description(
-                self.output_dir, scene_type, self.config
-            )
-
-        # 初始化交通管理器
         self.traffic_manager = TrafficManager(self.world, self.config)
 
-        # 生成主车
         self.ego_vehicle = self.traffic_manager.spawn_ego_vehicle()
         if not self.ego_vehicle:
             Log.error("主车生成失败")
             return False
 
-        # 生成交通
-        vehicles = self.config['traffic'].get('background_vehicles', 8)
-        pedestrians = self.config['traffic'].get('pedestrians', 6)
-        self.traffic_manager.spawn_traffic(
-            self.scene_center, vehicles, pedestrians
-        )
+        self.traffic_manager.spawn_traffic(self.scene_center)
 
-        # 添加障碍物
-        if add_obstacles:
-            self.traffic_manager.add_static_obstacles(self.scene_center)
-
-        # 添加事故场景
-        if add_accident:
-            self.traffic_manager.setup_accident_scene(self.scene_center)
-
-        # 等待场景稳定
-        Log.info("等待场景稳定...")
-        time.sleep(5.0)
-
+        time.sleep(3.0)
         return True
 
-    def setup_sensors(self, enable_annotations=True):
-        """设置传感器"""
-        self.sensor_system = SensorSystem(
-            self.world,
-            self.config,
-            self.output_dir
-        )
+    def setup_sensors(self):
+        self.sensor_manager = SensorManager(self.world, self.config, self.output_dir)
 
-        if enable_annotations:
-            self.sensor_system.enable_annotations()
-
-        # 安装摄像头
-        vehicle_cams = self.config['sensors'].get('vehicle_cameras', 4)
-        infra_cams = self.config['sensors'].get('infrastructure_cameras', 4)
-
-        installed = self.sensor_system.setup_cameras(
-            self.ego_vehicle,
-            self.scene_center,
-            vehicle_cams > 0,
-            infra_cams > 0
-        )
-
-        if installed == 0:
+        cameras = self.sensor_manager.setup_cameras(self.ego_vehicle, self.scene_center)
+        if cameras == 0:
             Log.error("没有摄像头安装成功")
             return False
 
-        Log.info(f"传感器系统就绪: {installed}个摄像头")
+        lidars = self.sensor_manager.setup_lidar(self.ego_vehicle)
+        Log.info(f"传感器: {cameras}摄像头 + {lidars}LiDAR")
+
         return True
 
     def collect_data(self):
-        """收集数据"""
         duration = self.config['scenario']['duration']
         Log.info(f"开始数据收集，时长: {duration}秒")
 
         self.start_time = time.time()
         self.is_running = True
-        self.performance_stats['start_time'] = self.start_time
 
         last_update = time.time()
-        last_fps_check = time.time()
-        frame_counter = 0
 
         try:
             while time.time() - self.start_time < duration and self.is_running:
                 current_time = time.time()
                 elapsed = current_time - self.start_time
 
-                # 更新交通
-                if self.traffic_manager:
-                    self.traffic_manager.update_traffic_flow()
-
-                # 性能监控
-                if current_time - last_fps_check >= 1.0:
-                    current_frames = self.sensor_system.get_frame_count()
-                    fps = current_frames - frame_counter
-                    self.performance_stats['fps_history'].append(fps)
-                    frame_counter = current_frames
-                    last_fps_check = current_time
-
-                # 进度更新
                 if current_time - last_update >= 5.0:
-                    frames = self.sensor_system.get_frame_count()
+                    frames = self.sensor_manager.get_frame_count()
                     progress = (elapsed / duration) * 100
-                    remaining = duration - elapsed
 
-                    avg_fps = sum(self.performance_stats['fps_history'][-5:]) / \
-                              min(len(self.performance_stats['fps_history'][-5:]), 5)
-
-                    Log.info(
-                        f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | "
-                        f"帧数: {frames} | FPS: {avg_fps:.1f} | "
-                        f"剩余: {remaining:.0f}秒"
-                    )
+                    Log.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | 帧数: {frames}")
                     last_update = current_time
 
-                time.sleep(0.01)
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
             Log.info("数据收集被用户中断")
@@ -793,34 +583,28 @@ class DataCollector:
             self.is_running = False
             elapsed = time.time() - self.start_time
 
-            self.collected_frames = self.sensor_system.get_frame_count() if self.sensor_system else 0
+            self.collected_frames = self.sensor_manager.get_frame_count()
             Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
 
-            self._save_collection_metadata()
-            self._generate_dataset_report()
+            self._save_metadata()
+            self._print_summary()
 
-    def _save_collection_metadata(self):
-        """保存收集元数据"""
+    def _save_metadata(self):
         metadata = {
             'scenario': self.config['scenario'],
             'traffic': self.config['traffic'],
             'sensors': self.config['sensors'],
             'output': self.config['output'],
             'collection': {
-                'start_time': datetime.fromtimestamp(self.start_time).isoformat(),
-                'duration_seconds': round(time.time() - self.start_time, 2),
+                'duration': round(time.time() - self.start_time, 2),
                 'total_frames': self.collected_frames,
-                'frame_rate': round(self.collected_frames / (time.time() - self.start_time), 2)
-            },
-            'performance': {
-                'average_fps': round(
-                    sum(self.performance_stats['fps_history']) /
-                    max(len(self.performance_stats['fps_history']), 1),
-                    2
-                ),
-                'fps_history': self.performance_stats['fps_history'][:20]  # 只保留前20个
+                'frame_rate': round(self.collected_frames / max(time.time() - self.start_time, 0.1), 2)
             }
         }
+
+        if self.sensor_manager:
+            sensor_summary = self.sensor_manager.generate_sensor_summary()
+            metadata['sensor_summary'] = sensor_summary
 
         meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
         with open(meta_path, 'w', encoding='utf-8') as f:
@@ -828,80 +612,58 @@ class DataCollector:
 
         Log.info(f"元数据保存: {meta_path}")
 
-    def _generate_dataset_report(self):
-        """生成数据集报告"""
+    def _print_summary(self):
         print("\n" + "=" * 60)
-        print("数据集生成报告")
+        print("数据收集摘要")
         print("=" * 60)
 
-        # 基本统计
-        total_size = self._get_directory_size(self.output_dir)
-        print(f"总数据大小: {total_size} MB")
-        print(f"总帧数: {self.collected_frames}")
-
-        # 文件统计
+        # 统计图像
         stitched_dir = os.path.join(self.output_dir, "stitched")
         if os.path.exists(stitched_dir):
             stitched_files = [f for f in os.listdir(stitched_dir) if f.endswith('.jpg')]
             print(f"拼接图像: {len(stitched_files)} 张")
 
-        # 原始图像统计
-        raw_stats = self._count_raw_images()
-        print(f"原始图像: {raw_stats['total']} 张")
-        print(f"  车辆视角: {raw_stats['vehicle']} 张")
-        print(f"  基础设施: {raw_stats['infrastructure']} 张")
+        # 统计LiDAR
+        lidar_dir = os.path.join(self.output_dir, "lidar")
+        if os.path.exists(lidar_dir):
+            bin_files = [f for f in os.listdir(lidar_dir) if f.endswith('.bin')]
+            npy_files = [f for f in os.listdir(lidar_dir) if f.endswith('.npy')]
+            print(f"LiDAR数据: {len(bin_files)} .bin文件, {len(npy_files)} .npy文件")
 
-        # 标注统计
-        annotations_dir = os.path.join(self.output_dir, "annotations")
-        if os.path.exists(annotations_dir):
-            json_files = [f for f in os.listdir(annotations_dir) if f.endswith('.json')]
-            print(f"标注文件: {len(json_files)} 个")
+            if bin_files:
+                total_points = 0
+                for bin_file in bin_files[:3]:
+                    bin_path = os.path.join(lidar_dir, bin_file)
+                    if os.path.exists(bin_path):
+                        file_size = os.path.getsize(bin_path)
+                        points_in_file = file_size // (4 * 4)
+                        total_points += points_in_file
+                print(f"  估计总点数: {total_points:,}")
+
+        # 统计融合数据
+        fusion_dir = os.path.join(self.output_dir, "fusion")
+        if os.path.exists(fusion_dir):
+            sync_files = [f for f in os.listdir(fusion_dir) if f.endswith('.json')]
+            print(f"融合数据: {len(sync_files)} 个同步文件")
 
         print(f"\n输出目录: {self.output_dir}")
         print("=" * 60)
 
-    def _count_raw_images(self):
-        """统计原始图像"""
-        stats = {'total': 0, 'vehicle': 0, 'infrastructure': 0}
-
-        for view_type in ['vehicle', 'infrastructure']:
-            path = os.path.join(self.output_dir, "raw", view_type)
-            if os.path.exists(path):
-                count = 0
-                for root, dirs, files in os.walk(path):
-                    count += len([f for f in files if f.endswith('.png')])
-
-                stats[view_type] = count
-                stats['total'] += count
-
-        return stats
-
-    def _get_directory_size(self, path):
-        """计算目录大小"""
-        total = 0
-        for dirpath, dirnames, filenames in os.walk(path):
-            for f in filenames:
-                fp = os.path.join(dirpath, f)
-                if os.path.exists(fp):
-                    total += os.path.getsize(fp)
-        return round(total / (1024 * 1024), 2)
+    def run_validation(self):
+        if self.config['output'].get('validate_data', True):
+            Log.info("运行数据验证...")
+            DataValidator.validate_dataset(self.output_dir)
 
     def run_analysis(self):
-        """运行数据集分析"""
-        Log.info("运行数据集分析...")
-        DataAnalyzer.analyze_dataset(self.output_dir)
-
-    def run_validation(self):
-        """运行数据验证"""
-        Log.info("运行数据验证...")
-        DataValidator.validate_dataset(self.output_dir)
+        if self.config['output'].get('run_analysis', False):
+            Log.info("运行数据分析...")
+            DataAnalyzer.analyze_dataset(self.output_dir)
 
     def cleanup(self):
-        """清理场景"""
         Log.info("清理场景...")
 
-        if self.sensor_system:
-            self.sensor_system.cleanup()
+        if self.sensor_manager:
+            self.sensor_manager.cleanup()
 
         if self.traffic_manager:
             self.traffic_manager.cleanup()
@@ -916,40 +678,34 @@ class DataCollector:
 
 
 def main():
-    """主函数"""
-    parser = argparse.ArgumentParser(description='CVIPS 高级交通场景数据集生成器')
+    parser = argparse.ArgumentParser(description='CVIPS 多传感器数据收集系统')
 
     # 基础参数
     parser.add_argument('--config', type=str, help='配置文件路径')
-    parser.add_argument('--scenario', type=str, default='urban_scene', help='场景名称')
+    parser.add_argument('--scenario', type=str, default='multi_sensor_scene', help='场景名称')
     parser.add_argument('--town', type=str, default='Town10HD',
                         choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
     parser.add_argument('--weather', type=str, default='clear',
-                        choices=['clear', 'rainy', 'cloudy', 'foggy', 'stormy'], help='天气')
+                        choices=['clear', 'rainy', 'cloudy', 'foggy'], help='天气')
     parser.add_argument('--time-of-day', type=str, default='noon',
-                        choices=['noon', 'sunset', 'night', 'morning', 'dawn'], help='时间')
+                        choices=['noon', 'sunset', 'night'], help='时间')
 
     # 交通参数
     parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
     parser.add_argument('--num-pedestrians', type=int, default=6, help='行人数')
-    parser.add_argument('--ego-vehicle', type=str, help='主车类型')
 
     # 收集参数
     parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
     parser.add_argument('--capture-interval', type=float, default=2.0, help='捕捉间隔(秒)')
     parser.add_argument('--seed', type=int, help='随机种子')
 
-    # 场景参数
-    parser.add_argument('--scene-type', type=str,
-                        choices=['intersection_4way', 'highway', 'urban_street',
-                                 'night_scene', 'rainy_intersection'], help='场景类型')
-    parser.add_argument('--add-obstacles', action='store_true', help='添加障碍物')
-    parser.add_argument('--add-accident', action='store_true', help='添加事故场景')
+    # 传感器参数
+    parser.add_argument('--enable-lidar', action='store_true', help='启用LiDAR传感器')
+    parser.add_argument('--enable-fusion', action='store_true', help='启用多传感器融合')
+    parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
 
     # 功能参数
-    parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
     parser.add_argument('--run-analysis', action='store_true', help='运行数据集分析')
-    parser.add_argument('--run-validation', action='store_true', help='运行数据验证')
     parser.add_argument('--skip-validation', action='store_true', help='跳过数据验证')
 
     args = parser.parse_args(remaining_argv)
@@ -960,7 +716,7 @@ def main():
 
     # 显示配置
     print("\n" + "=" * 60)
-    print("CVIPS 交通场景数据集生成器 v8.0")
+    print("CVIPS 多传感器数据收集系统 v9.0")
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
@@ -969,52 +725,34 @@ def main():
     print(f"时长: {config['scenario']['duration']}秒")
     print(f"交通: {config['traffic']['background_vehicles']}车辆 + {config['traffic']['pedestrians']}行人")
 
-    if args.scene_type:
-        print(f"场景类型: {args.scene_type}")
-    if args.add_obstacles:
-        print(f"障碍物: 启用")
-    if args.add_accident:
-        print(f"事故场景: 启用")
+    print(f"传感器:")
+    print(
+        f"  摄像头: {config['sensors']['vehicle_cameras']}车辆 + {config['sensors']['infrastructure_cameras']}基础设施")
+    print(f"  LiDAR: {'启用' if config['sensors']['lidar_sensors'] > 0 else '禁用'}")
+    print(f"  融合: {'启用' if config['output']['save_fusion'] else '禁用'}")
+    print(f"  标注: {'启用' if config['output']['save_annotations'] else '禁用'}")
 
-    print(f"标注: {'启用' if args.enable_annotations else '禁用'}")
-    print(f"分析: {'启用' if args.run_analysis else '禁用'}")
-    print(f"验证: {'禁用' if args.skip_validation else '启用'}")
-
-    # 创建收集器
     collector = DataCollector(config)
 
     try:
-        # 连接服务器
         if not collector.connect():
             print("连接CARLA服务器失败")
             return
 
-        # 设置场景
-        if not collector.setup_scene(
-                args.scene_type,
-                args.add_obstacles,
-                args.add_accident
-        ):
+        if not collector.setup_scene():
             print("场景设置失败")
             collector.cleanup()
             return
 
-        # 设置传感器
-        if not collector.setup_sensors(args.enable_annotations):
+        if not collector.setup_sensors():
             print("传感器设置失败")
             collector.cleanup()
             return
 
-        # 收集数据
         collector.collect_data()
 
-        # 运行分析
-        if args.run_analysis:
-            collector.run_analysis()
-
-        # 运行验证
-        if not args.skip_validation:
-            collector.run_validation()
+        collector.run_analysis()
+        collector.run_validation()
 
     except KeyboardInterrupt:
         print("\n程序被用户中断")
