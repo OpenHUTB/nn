@@ -18,7 +18,6 @@ pip install numpy opencv-python matplotlib vscode-debugpy
 - `numpy`：数值计算支持
 - `opencv-python`：图像数据处理
 - `matplotlib`：数据可视化工具
-- `vscode-debugpy`：VSCode调试支持
 
 ### 开发环境配置
 1. 下载并安装[Carla 0.9.11官方发行版](https://github.com/carla-simulator/carla/releases/tag/0.9.11)
