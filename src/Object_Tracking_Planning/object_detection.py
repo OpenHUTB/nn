@@ -2,6 +2,14 @@
 
 from __future__ import print_function
 
+import sys
+import os
+# 获取当前脚本所在的目录，并找到agents文件夹的路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+agents_path = os.path.join(current_dir, 'agents')
+# 将该路径添加到模块搜索路径中
+if os.path.exists(agents_path):
+    sys.path.insert(0, agents_path)
 import argparse
 import collections
 import datetime
@@ -23,6 +31,9 @@ try:
     from pygame.locals import KMOD_CTRL
     from pygame.locals import K_ESCAPE
     from pygame.locals import K_q
+    from pygame.locals import K_l
+    from pygame.locals import K_v
+    from pygame.locals import K_c
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
@@ -162,7 +173,6 @@ class World(object):
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
-
     def next_weather(self, reverse=False):
         """Get next weather setting"""
         self._weather_index += -1 if reverse else 1
@@ -205,16 +215,29 @@ class World(object):
 
 
 class KeyboardControl(object):
-    def __init__(self, world):
+    def __init__(self, world, start_locked=True):
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
+        # 可选：启动时自动锁定
+        if start_locked and world.camera_manager is not None:
+            world.camera_manager.set_lock_mode(True)
+            world.camera_manager.hud.notification("Camera Lock: ON", seconds=2.0)
 
-    def parse_events(self):
+    def parse_events(self, world):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+                elif event.key == K_l:  # 按L键切换锁定
+                    if world.camera_manager is not None:
+                        world.camera_manager.toggle_lock()
+                elif event.key == K_v:  # 按V键切换锁定视角
+                    if world.camera_manager is not None and world.camera_manager.lock_mode:
+                        world.camera_manager.next_lock_view()
+                elif event.key == K_c:  # 按C键切换相机（原有功能）
+                    if world.camera_manager is not None:
+                        world.camera_manager.toggle_camera()
 
     @staticmethod
     def _is_quit_shortcut(key):
@@ -417,7 +440,28 @@ class HelpText(object):
 
     def __init__(self, font, width, height):
         """Constructor method"""
-        lines = __doc__.split('\n')
+        lines = [
+            'Welcome to CARLA automatic control client',
+            '',
+            'Camera Control:',
+            '    C          : Change camera position',
+            '    L          : Toggle camera lock on vehicle',
+            '    V          : Change lock view (when locked)',
+            '    PageUp     : Toggle recording',
+            '',
+            'Vehicle Control:',
+            '    W          : Throttle',
+            '    S          : Brake',
+            '    A/D        : Steer left/right',
+            '    Q          : Toggle reverse',
+            '    P          : Toggle autopilot',
+            '',
+            'Miscellaneous:',
+            '    H          : Toggle help',
+            '    ESC        : Quit',
+            '    CTRL + Q   : Quit',
+        ]
+
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
@@ -583,6 +627,24 @@ class CameraManager(object):
             ['sensor.camera.semantic_segmentation', cc.CityScapesPalette,
              'Camera Semantic Segmentation (CityScapes Palette)'],
             ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)']]
+
+        # 添加锁定模式相关属性
+        self.lock_mode = True  # 默认启用锁定模式
+        self.lock_target = parent_actor  # 锁定目标
+        self.lock_transform_index = 0  # 锁定模式的相机位置索引
+
+        # 定义锁定模式的相机变换（可以自定义不同角度）
+        self._lock_transforms = [
+            (carla.Transform(
+                carla.Location(x=-6.0, z=3.5), carla.Rotation(pitch=-10.0)), attachment.SpringArm),
+            (carla.Transform(
+                carla.Location(x=2.0, z=1.5), carla.Rotation(pitch=0.0)), attachment.Rigid),
+            (carla.Transform(
+                carla.Location(x=5.0, y=2.0, z=2.0), carla.Rotation(pitch=-5.0)), attachment.SpringArm),
+            (carla.Transform(
+                carla.Location(x=-10.0, z=5.0), carla.Rotation(pitch=-15.0)), attachment.SpringArm),
+        ]
+
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
         for item in self.sensors:
@@ -611,18 +673,30 @@ class CameraManager(object):
             if self.sensor is not None:
                 self.sensor.destroy()
                 self.surface = None
+
+            # 选择变换和附着类型
+            if self.lock_mode:
+                # 锁定模式使用锁定变换
+                transform, attachment_type = self._lock_transforms[self.lock_transform_index]
+            else:
+                # 非锁定模式使用原有变换
+                transform, attachment_type = self._camera_transforms[self.transform_index]
+
             self.sensor = self._parent.get_world().spawn_actor(
                 self.sensors[index][-1],
-                self._camera_transforms[self.transform_index][0],
+                transform,
                 attach_to=self._parent,
-                attachment_type=self._camera_transforms[self.transform_index][1])
+                attachment_type=attachment_type)
 
             # We need to pass the lambda a weak reference to
             # self to avoid circular reference.
             weak_self = weakref.ref(self)
             self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
         if notify:
-            self.hud.notification(self.sensors[index][2])
+            sensor_name = self.sensors[index][2]
+            if self.lock_mode:
+                sensor_name += " (Locked)"
+            self.hud.notification(sensor_name)
         self.index = index
 
     def next_sensor(self):
@@ -633,6 +707,30 @@ class CameraManager(object):
         """Toggle recording on or off"""
         self.recording = not self.recording
         self.hud.notification('Recording %s' % ('On' if self.recording else 'Off'))
+
+    def toggle_lock(self):
+        """切换锁定模式"""
+        self.lock_mode = not self.lock_mode
+        mode_text = "Camera Lock: ON" if self.lock_mode else "Camera Lock: OFF"
+        self.hud.notification(mode_text, seconds=2.0)
+        # 重新设置传感器以应用锁定模式
+        if self.sensor is not None:
+            self.set_sensor(self.index, notify=False, force_respawn=True)
+        return self.lock_mode
+
+    def set_lock_mode(self, enable=True):
+        """设置锁定模式"""
+        self.lock_mode = enable
+        return self.lock_mode
+
+    def next_lock_view(self):
+        """切换到下一个锁定视角"""
+        if self.lock_mode:
+            self.lock_transform_index = (self.lock_transform_index + 1) % len(self._lock_transforms)
+            self.hud.notification(f'Lock View {self.lock_transform_index + 1}', seconds=1.0)
+            # 重新设置传感器以应用新的锁定视角
+            if self.sensor is not None:
+                self.set_sensor(self.index, notify=False, force_respawn=True)
 
     def render(self, display):
         """Render method"""
@@ -663,7 +761,7 @@ class CameraManager(object):
             array = np.reshape(array, (image.height, image.width, 4))
             array = array[:, :, :3]
             array = array[:, :, ::-1]
-            
+
             #########################################################################################################################################
 ############################################################  yolov3 ####################################################################
         def calculate_iou(box1, box2):
@@ -701,7 +799,7 @@ class CameraManager(object):
 
             return iou
 
-        
+
         test_im = np.array(image.raw_data)
         test_im = test_im.copy()
         test_im = test_im.reshape((image.height, image.width, 4))
@@ -715,7 +813,7 @@ class CameraManager(object):
         frameWidth = 640
         frameHeight = 480
         net = cv2.dnn.readNet(model_weights, model_cfg)
-        
+
         # Define your loss function
         #loss_fn = tf.keras.losses.BinaryCrossentropy()
 
@@ -789,7 +887,7 @@ class CameraManager(object):
         # Ground truth annotations
         ground_truth_labels = ['person', 'bicycle', 'car', 'traffic light', 'fire hydrant', 'pottedplant', 'stop sign', 'bench']
         ground_truth_boxes = [[250, 220, 160, 190], [200, 200, 80, 80], [200, 200, 80, 80], [450, 90, 20, 50], [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80]]  # [x, y, w, h] format
-        
+
         #def normalize_boxes(boxes, image_width, image_height):
             # Convert box coordinates to numpy array
            # boxes = np.array(boxes)
@@ -855,7 +953,7 @@ class CameraManager(object):
 
         #num_classes = len(label_to_id)
     '''
-        
+
 
         # Perform object matching for ground truth and detected objects
         TP = 0  # True positives
@@ -888,7 +986,7 @@ class CameraManager(object):
 
         # Any remaining unmatched detected objects are false positives
         FP = len(detected_labels)
-        
+
         eps = 1e-7  # Small value to avoid division by zero
 
         # Calculate performance metrics
@@ -896,8 +994,8 @@ class CameraManager(object):
         precision = TP / (TP + FP + eps)
         recall = TP / (TP + FN + eps)
         matt_corr_coeff = (TP - (FP * FN)) / math.sqrt((TP + FP + eps) * (TP + FN + eps) * (FP + eps) * (FN + eps))
-        
-        
+
+
         # Calculate the loss
         #ground_truth_targets = preprocess_ground_truth(ground_truth_labels, ground_truth_boxes)  # Preprocess the ground truth targets
 
@@ -1197,7 +1295,7 @@ class LocalPlanner(object):
         self._waypoint_buffer = deque(maxlen=self._buffer_size)
 
         self._init_controller()  # initializing controller
-        
+
     def get_distance_to_nearest_obstacle(self):
         ego_vehicle_transform = self._vehicle.get_transform()
         ego_vehicle_location = ego_vehicle_transform.location
@@ -1554,7 +1652,7 @@ class BehaviorAgent(Agent):
                     self.light_state = "Green"
         # Get distance to the nearest obstacle
         distance_to_nearest_obstacle = self._local_planner.get_distance_to_nearest_obstacle()
-        
+
         # Check if the obstacle is closer than the minimum distance
         if distance_to_nearest_obstacle is not None and distance_to_nearest_obstacle < 3.0:
             # Apply braking if the distance to the nearest obstacle is below the threshold
@@ -1634,7 +1732,7 @@ class BehaviorAgent(Agent):
 
         ego_vehicle_loc = self.vehicle.get_location()
         ego_vehicle_wp = self._map.get_waypoint(ego_vehicle_loc)
-        
+
         if self.is_at_traffic_light and self.light_state != "Green":
             # Stop at red traffic light
             control = carla.VehicleControl()
@@ -1706,7 +1804,7 @@ def game_loop(args):
 
         while True:
             clock.tick_busy_loop(60)
-            if controller.parse_events():
+            if controller.parse_events(world):
                 return
 
             # As soon as the server is ready continue!
@@ -1714,7 +1812,7 @@ def game_loop(args):
                 continue
 
             if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events():
+                if controller.parse_events(world):
                     return
 
                 #agent.update_information(world)
@@ -1733,7 +1831,7 @@ def game_loop(args):
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
-            
+
 
             # Set new destination when target has been reached
             if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
