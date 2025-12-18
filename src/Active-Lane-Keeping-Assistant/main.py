@@ -62,7 +62,7 @@ def run(id:str, path:str, world:World, agent:Agent, steps:int = 100,
         steer, throttle = agent.get_actions(detection_surface_area, error)
         error, detection_surface_area, img, collision_detected = world.step(
             steer=steer, throttle=throttle)
-        agent.show_error()
+        #agent.show_error()
 
         if save:
             recorder.add_image(img=img)
