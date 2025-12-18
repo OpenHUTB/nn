@@ -1,6 +1,6 @@
-mediapipe>=0.8.0
-opencv-python>=4.5.0
-numpy>=1.19.0
-tensorflow==2.10.0
-tflite-runtime>=2.5.0
-pillow>=9.0.0
+opencv-python==4.8.1.78
+mediapipe==0.10.8
+numpy==1.24.3
+Pillow==10.1.0
+tflite-runtime==2.14.0
+airsim==1.8.1
