@@ -1178,7 +1178,7 @@ class PIDLongitudinalController():
         return np.clip((self._k_p * error) + (self._k_d * _de) + (self._k_i * _ie), -1.0, 1.0)
 
 
-class PIDLateralController():
+class PIDLateralController:
     """
     PIDLateralController implements lateral control using a PID.
     """
@@ -1187,64 +1187,98 @@ class PIDLateralController():
         """
         Constructor method.
 
-            :param vehicle: actor to apply to local planner logic onto
-            :param K_P: Proportional term
-            :param K_D: Differential term
-            :param K_I: Integral term
-            :param dt: time differential in seconds
+        Args:
+            vehicle: Actor to apply local planner logic onto
+            K_P: Proportional term coefficient (default: 1.0)
+            K_D: Differential term coefficient (default: 0.0)
+            K_I: Integral term coefficient (default: 0.0)
+            dt: Time differential in seconds (default: 0.03)
         """
         self._vehicle = vehicle
         self._k_p = K_P
         self._k_d = K_D
         self._k_i = K_I
         self._dt = dt
-        self._e_buffer = deque(maxlen=10)
+        self._error_buffer = deque(maxlen=10)
 
     def run_step(self, waypoint):
         """
-        Execute one step of lateral control to steer
-        the vehicle towards a certain waypoin.
+        Execute one step of lateral control to steer the vehicle towards a waypoint.
 
-            :param waypoint: target waypoint
-            :return: steering control in the range [-1, 1] where:
-            -1 maximum steering to left
-            +1 maximum steering to right
+        Args:
+            waypoint: Target waypoint
+
+        Returns:
+            float: Steering control in range [-1, 1] where:
+                   -1 = maximum steering to left
+                   +1 = maximum steering to right
         """
         return self._pid_control(waypoint, self._vehicle.get_transform())
 
     def _pid_control(self, waypoint, vehicle_transform):
         """
-        Estimate the steering angle of the vehicle based on the PID equations
+        Estimate steering angle based on PID equations.
 
-            :param waypoint: target waypoint
-            :param vehicle_transform: current transform of the vehicle
-            :return: steering control in the range [-1, 1]
+        Args:
+            waypoint: Target waypoint
+            vehicle_transform: Current transform of the vehicle
+
+        Returns:
+            float: Steering control in range [-1, 1]
         """
+        # Calculate vehicle direction vector
         v_begin = vehicle_transform.location
-        v_end = v_begin + carla.Location(x=math.cos(math.radians(vehicle_transform.rotation.yaw)),
-                                         y=math.sin(math.radians(vehicle_transform.rotation.yaw)))
+        yaw_rad = math.radians(vehicle_transform.rotation.yaw)
+        v_end = v_begin + carla.Location(
+            x=math.cos(yaw_rad),
+            y=math.sin(yaw_rad)
+        )
 
+        # Calculate vectors
         v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
-        w_vec = np.array([waypoint.transform.location.x -
-                          v_begin.x, waypoint.transform.location.y -
-                          v_begin.y, 0.0])
-        _dot = math.acos(np.clip(np.dot(w_vec, v_vec) /
-                                 (np.linalg.norm(w_vec) * np.linalg.norm(v_vec)), -1.0, 1.0))
+        w_vec = np.array([
+            waypoint.transform.location.x - v_begin.x,
+            waypoint.transform.location.y - v_begin.y,
+            0.0
+        ])
 
-        _cross = np.cross(v_vec, w_vec)
+        # Calculate angle difference
+        v_norm = np.linalg.norm(v_vec)
+        w_norm = np.linalg.norm(w_vec)
+        dot_product = np.dot(w_vec, v_vec) / (v_norm * w_norm)
+        dot_product_clipped = np.clip(dot_product, -1.0, 1.0)
+        angle_diff = math.acos(dot_product_clipped)
 
-        if _cross[2] < 0:
-            _dot *= -1.0
+        # Determine sign based on cross product
+        cross_product = np.cross(v_vec, w_vec)
+        if cross_product[2] < 0:
+            angle_diff *= -1.0
 
-        self._e_buffer.append(_dot)
-        if len(self._e_buffer) >= 2:
-            _de = (self._e_buffer[-1] - self._e_buffer[-2]) / self._dt
-            _ie = sum(self._e_buffer) * self._dt
-        else:
-            _de = 0.0
-            _ie = 0.0
+        # Update error buffer and calculate PID terms
+        self._error_buffer.append(angle_diff)
 
-        return np.clip((self._k_p * _dot) + (self._k_d * _de) + (self._k_i * _ie), -1.0, 1.0)
+        # Calculate derivative and integral terms
+        derivative_error = self._calculate_derivative_error()
+        integral_error = self._calculate_integral_error()
+
+        # PID calculation with clamping
+        pid_output = (
+                self._k_p * angle_diff +
+                self._k_d * derivative_error +
+                self._k_i * integral_error
+        )
+
+        return np.clip(pid_output, -1.0, 1.0)
+
+    def _calculate_derivative_error(self):
+        """Calculate derivative error term."""
+        if len(self._error_buffer) >= 2:
+            return (self._error_buffer[-1] - self._error_buffer[-2]) / self._dt
+        return 0.0
+
+    def _calculate_integral_error(self):
+        """Calculate integral error term."""
+        return sum(self._error_buffer) * self._dt
 
 
 # ==============================================================================
