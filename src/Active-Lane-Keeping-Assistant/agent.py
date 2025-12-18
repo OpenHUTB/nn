@@ -138,24 +138,21 @@ class Agent():
         return steer, self.throttle
 
     @staticmethod
-    def _simple_controller(error:float) -> float:
-        """Hard Coded Controller
-
-        Args:
-            error (float): Difference to the center of the detected lane.
-
-        Returns:
-            float: Steering angle to use.
+    def _simple_controller(error: float) -> float:
+        """Hard Coded Controller - Optimized to use Class Constants
         """
-        limit = 0.75
-        tolerance = 0.1
+        # 使用类中定义的常量，方便统一管理
+        limit = Agent.SIMPLE_STEER_LIMIT
+        tolerance = Agent.SIMPLE_ERROR_TOLERANCE
+
         if (abs(error) < tolerance):
-            steer = 0
-        elif error > 0:
-            steer = -limit
-        else:
-            steer = limit
-        return steer
+            return 0.0
+
+        # 简化逻辑分支
+        if error > 0:
+            return -limit
+
+        return limit
 
     def _p_controller(self, error:float) -> float:
         """Proportional Controller

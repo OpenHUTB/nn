@@ -1,4 +1,4 @@
-# Python»
+# Python»º´æ£¨ºËÐÄ£¬½â¾ö»º´æÎÄ¼þÎÊÌâ£©
 __pycache__/
 *.pyc
 *.pyo
@@ -6,12 +6,12 @@ __pycache__/
 .pytest_cache/
 __pycache__/
 
-#
+# ÏµÍ³/±à¼­Æ÷»º´æ
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 
-# ??????????
+# ÆäËû»º´æ£¨°´Ðè²¹³ä£©
 *.log
 *.tmp

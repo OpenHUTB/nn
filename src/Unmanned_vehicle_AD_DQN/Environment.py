@@ -7,18 +7,10 @@ import time
 import numpy as np
 import cv2
 import math
+from Hyperparameters import *
 
 import carla
 from carla import ColorConverter
-
-# 导入超参数
-try:
-    from Hyperparameters import *
-except ImportError:
-    # 如果在导入Hyperparameters时出错，使用默认值
-    SHOW_PREVIEW = False
-    IM_WIDTH = 640
-    IM_HEIGHT = 480
 
 
 class CarEnv:
@@ -42,11 +34,7 @@ class CarEnv:
         self.current_episode = 1  # 当前episode编号
 
         # 加载世界和蓝图
-        try:
-            self.world = self.client.load_world('Town03')
-        except:
-            # 如果加载失败，使用当前世界
-            self.world = self.client.get_world()
+        self.world = self.client.load_world('Town03')
         
         # 设置观察者视角，让CARLA窗口显示
         self.setup_observer_view()
@@ -108,6 +96,7 @@ class CarEnv:
                         success_count += 1
             except Exception as e:
                 # 如果生成失败，继续尝试
+                print(f"生成行人失败: {e}")
                 continue
         
         print(f"成功生成 {success_count}/{target_number} 个行人 (isCross={isCross})")
@@ -163,6 +152,7 @@ class CarEnv:
                     self.walker_list.append(npc)  # 添加到行人列表
                     return True  # 生成成功
             except Exception as e:
+                print(f"生成右侧行人失败 (尝试 {attempt+1}): {e}")
                 continue
         
         return False  # 生成失败
@@ -217,6 +207,7 @@ class CarEnv:
                     self.walker_list.append(npc)  # 添加到行人列表
                     return True  # 生成成功
             except Exception as e:
+                print(f"生成左侧行人失败 (尝试 {attempt+1}): {e}")
                 continue
         
         return False  # 生成失败
@@ -292,8 +283,7 @@ class CarEnv:
         self.colsensor.listen(lambda event: self.collision_data(event))  # 设置碰撞检测回调
 
         # 等待摄像头初始化完成
-        start_time = time.time()
-        while self.front_camera is None and time.time() - start_time < 5:
+        while self.front_camera is None:
             time.sleep(0.01)
 
         # 设置跟随相机（用于观察）
@@ -308,30 +298,21 @@ class CarEnv:
     def cleanup_actors(self):
         """清理所有actors"""
         # 清理车辆
-        try:
-            vehicles = self.world.get_actors().filter('vehicle.*')
-            for vehicle in vehicles:
-                if vehicle.is_alive:
-                    vehicle.destroy()
-        except:
-            pass
+        vehicles = self.world.get_actors().filter('vehicle.*')
+        for vehicle in vehicles:
+            if vehicle.is_alive:
+                vehicle.destroy()
         
         # 清理行人
-        try:
-            walkers = self.world.get_actors().filter('walker.*')
-            for walker in walkers:
-                if walker.is_alive:
-                    walker.destroy()
-        except:
-            pass
+        walkers = self.world.get_actors().filter('walker.*')
+        for walker in walkers:
+            if walker.is_alive:
+                walker.destroy()
                 
         # 清理传感器
         for actor in self.actor_list:
-            try:
-                if actor.is_alive:
-                    actor.destroy()
-            except:
-                pass
+            if actor.is_alive:
+                actor.destroy()
                 
         self.actor_list = []
         self.walker_list = []  # 清空行人列表
@@ -359,22 +340,19 @@ class CarEnv:
 
     def process_img(self, image):
         """处理摄像头图像"""
-        try:
-            image.convert(carla.ColorConverter.CityScapesPalette)  # 转换为CityScapes调色板
+        image.convert(carla.ColorConverter.CityScapesPalette)  # 转换为CityScapes调色板
 
-            # 处理原始图像数据
-            processed_image = np.array(image.raw_data)
-            processed_image = processed_image.reshape((self.im_height, self.im_width, 4))
-            processed_image = processed_image[:, :, :3]  # 移除alpha通道
+        # 处理原始图像数据
+        processed_image = np.array(image.raw_data)
+        processed_image = processed_image.reshape((self.im_height, self.im_width, 4))
+        processed_image = processed_image[:, :, :3]  # 移除alpha通道
 
-            # 显示预览（如果启用）
-            if self.SHOW_CAM:
-                cv2.imshow("", processed_image)
-                cv2.waitKey(1)
+        # 显示预览（如果启用）
+        if self.SHOW_CAM:
+            cv2.imshow("", processed_image)
+            cv2.waitKey(1)
 
-            self.front_camera = processed_image  # 更新前置摄像头图像
-        except Exception as e:
-            print(f"处理图像时出错: {e}")
+        self.front_camera = processed_image  # 更新前置摄像头图像
 
     def reward(self, speed_kmh, current_steer):
         """增强的奖励函数 - 特别强调行人避障"""
@@ -454,13 +432,13 @@ class CarEnv:
         self.last_ped_distance = min_ped_distance  # 保存当前距离
         
         # 4. 速度奖励（平衡避障和前进）
-        if 20 <= speed_kmh <= 35:  # 理想速度区间
+        if 15 <= speed_kmh <= 35:  # 理想速度区间
             reward += 0.4
-        elif 10 <= speed_kmh < 20:  # 较慢但安全（避障时可能需要减速）
+        elif 5 <= speed_kmh < 15:  # 较慢但安全（避障时可能需要减速）
             reward += 0.2
-        elif 35 < speed_kmh <= 40:  # 稍快
+        elif 35 < speed_kmh <= 45:  # 稍快
             reward += 0.1
-        elif speed_kmh > 40:  # 过快，在行人环境中危险
+        elif speed_kmh > 45:  # 过快，在行人环境中危险
             reward -= 0.5  # 增加惩罚
         else:  # 停车或极慢
             reward -= 0.05  # 轻微惩罚
@@ -471,7 +449,7 @@ class CarEnv:
         
         # 6. 碰撞检测
         if len(self.collision_history) != 0:
-            reward = -10  # 减少碰撞惩罚
+            reward = -15  # 增加碰撞惩罚
             done = True
             print(f"Episode {self.current_episode}: 发生碰撞!")
         
@@ -481,16 +459,13 @@ class CarEnv:
         
         # 8. 边界检查
         if vehicle_location.x > 155:  # 成功到达终点
-            reward += 15  # 减少到达终点的奖励
+            reward += 20  # 增加到达终点的奖励
             done = True
             print(f"Episode {self.current_episode}: 成功到达终点!")
         elif vehicle_location.x < -90 or abs(vehicle_location.y + 195) > 30:  # 偏离道路
             reward -= 3  # 降低偏离惩罚
             done = True
             print(f"Episode {self.current_episode}: 偏离道路!")
-        
-        # 限制奖励范围
-        reward = max(min(reward, 20), -15)
         
         return reward, done
 
@@ -535,7 +510,6 @@ class CarEnv:
             if self.same_steer_counter > 3:  # 连续3次同向转向后强制回正
                 steer *= 0.5  # 减小转向幅度
                 throttle *= 0.8  # 减速
-                brake = 0.1  # 轻微制动
         else:
             self.same_steer_counter = 0
         
