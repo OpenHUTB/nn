@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import sys
 import os
+
 # 获取当前脚本所在的目录，并找到agents文件夹的路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 agents_path = os.path.join(current_dir, 'agents')
@@ -24,7 +25,6 @@ import sys
 import weakref
 from enum import Enum
 from collections import deque
-
 
 try:
     import pygame
@@ -66,7 +66,8 @@ import carla
 from carla import ColorConverter as cc
 from torch.utils.tensorboard import SummaryWriter
 import torch
-#import tensorflow as tf
+
+# import tensorflow as tf
 
 # Create a SummaryWriter object to write the metrics to Tensorboard
 writer = SummaryWriter()
@@ -86,7 +87,9 @@ from agents.tools.misc import get_speed, positive, draw_waypoints, distance_vehi
 def find_weather_presets():
     """Method to find weather presets"""
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
+
     def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
+
     presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
@@ -139,7 +142,7 @@ class World(object):
             random.seed(args.seed)
 
         # KK Get a vehicle blueprint
-        #blueprint = self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017')[0]  # KK
+        # blueprint = self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017')[0]  # KK
         blueprint = self.world.get_blueprint_library().filter('model3')[0]
         blueprint.set_attribute('role_name', 'hero')
         if blueprint.has_attribute('color'):
@@ -162,7 +165,7 @@ class World(object):
                 sys.exit(1)
             spawn_points = self.map.get_spawn_points()
             spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
-            #spawn_point = spawn_points[0] if spawn_points else carla.Transform()  # KK
+            # spawn_point = spawn_points[0] if spawn_points else carla.Transform()  # KK
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
@@ -173,6 +176,7 @@ class World(object):
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
+
     def next_weather(self, reverse=False):
         """Get next weather setting"""
         self._weather_index += -1 if reverse else 1
@@ -244,6 +248,7 @@ class KeyboardControl(object):
         """Shortcut for quitting"""
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
 
+
 # ==============================================================================
 # -- HUD -----------------------------------------------------------------------
 # ==============================================================================
@@ -304,7 +309,7 @@ class HUD(object):
             'Map:     % 20s' % world.map.name,
             'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
             '',
-            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)),
+            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)),
             u'Heading:% 16.0f\N{DEGREE SIGN} % 2s' % (transform.rotation.yaw, heading),
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
@@ -334,8 +339,9 @@ class HUD(object):
             self._info_text += ['Nearby vehicles:']
 
         def dist(l):
-            return math.sqrt((l.x - transform.location.x)**2 + (l.y - transform.location.y)
-                             ** 2 + (l.z - transform.location.z)**2)
+            return math.sqrt((l.x - transform.location.x) ** 2 + (l.y - transform.location.y)
+                             ** 2 + (l.z - transform.location.z) ** 2)
+
         vehicles = [(dist(x.get_location()), x) for x in vehicles if x.id != world.player.id]
 
         for dist, vehicle in sorted(vehicles):
@@ -396,6 +402,7 @@ class HUD(object):
         self._notifications.render(display)
         self.help.render(display)
 
+
 # ==============================================================================
 # -- FadingText ----------------------------------------------------------------
 # ==============================================================================
@@ -429,6 +436,7 @@ class FadingText(object):
     def render(self, display):
         """Render fading text method"""
         display.blit(self.surface, self.pos)
+
 
 # ==============================================================================
 # -- HelpText ------------------------------------------------------------------
@@ -483,6 +491,7 @@ class HelpText(object):
         if self._render:
             display.blit(self.surface, self.pos)
 
+
 # ==============================================================================
 # -- CollisionSensor -----------------------------------------------------------
 # ==============================================================================
@@ -526,6 +535,7 @@ class CollisionSensor(object):
         if len(self.history) > 4000:
             self.history.pop(0)
 
+
 # ==============================================================================
 # -- LaneInvasionSensor --------------------------------------------------------
 # ==============================================================================
@@ -556,6 +566,7 @@ class LaneInvasionSensor(object):
         lane_types = set(x.type for x in event.crossed_lane_markings)
         text = ['%r' % str(x).split()[-1] for x in lane_types]
         self.hud.notification('Crossed line %s' % ' and '.join(text))
+
 
 # ==============================================================================
 # -- GnssSensor --------------------------------------------------------
@@ -588,6 +599,7 @@ class GnssSensor(object):
             return
         self.lat = event.latitude
         self.lon = event.longitude
+
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
@@ -668,7 +680,7 @@ class CameraManager(object):
         """Set a sensor"""
         index = index % len(self.sensors)
         needs_respawn = True if self.index is None else (
-            force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
+                force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
         if needs_respawn:
             if self.sensor is not None:
                 self.sensor.destroy()
@@ -763,7 +775,8 @@ class CameraManager(object):
             array = array[:, :, ::-1]
 
             #########################################################################################################################################
-############################################################  yolov3 ####################################################################
+
+        ############################################################  yolov3 ####################################################################
         def calculate_iou(box1, box2):
             """
             Calculate the Intersection over Union (IoU) between two bounding boxes.
@@ -799,7 +812,6 @@ class CameraManager(object):
 
             return iou
 
-
         test_im = np.array(image.raw_data)
         test_im = test_im.copy()
         test_im = test_im.reshape((image.height, image.width, 4))
@@ -808,21 +820,21 @@ class CameraManager(object):
         # Load YOLO
         model_weights = 'yolov3.cfg'
         model_cfg = 'yolov3.weights'
-        #frameWidth = 1200
-        #frameHeight = 720
+        # frameWidth = 1200
+        # frameHeight = 720
         frameWidth = 640
         frameHeight = 480
         net = cv2.dnn.readNet(model_weights, model_cfg)
 
         # Define your loss function
-        #loss_fn = tf.keras.losses.BinaryCrossentropy()
+        # loss_fn = tf.keras.losses.BinaryCrossentropy()
 
         classes = []
         with open("coco.names", "r") as f:
             classes = [line.strip() for line in f.readlines()]
 
         layers_names = net.getLayerNames()
-        #output_layers = [layers_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+        # output_layers = [layers_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
         output_layers = [layers_names[i - 1] for i in net.getUnconnectedOutLayers()]
         colors = np.random.uniform(0, 255, size=(len(classes), 3))
 
@@ -832,7 +844,7 @@ class CameraManager(object):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # Detect objects
-        blob = cv2.dnn.blobFromImage(img, 1/255, (416, 416), (0, 0, 0), True, crop=False)
+        blob = cv2.dnn.blobFromImage(img, 1 / 255, (416, 416), (0, 0, 0), True, crop=False)
         net.setInput(blob)
         outs = net.forward(output_layers)
 
@@ -885,26 +897,29 @@ class CameraManager(object):
                 predicted_class_probs.append(label)
 
         # Ground truth annotations
-        ground_truth_labels = ['person', 'bicycle', 'car', 'traffic light', 'fire hydrant', 'pottedplant', 'stop sign', 'bench']
-        ground_truth_boxes = [[250, 220, 160, 190], [200, 200, 80, 80], [200, 200, 80, 80], [450, 90, 20, 50], [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80]]  # [x, y, w, h] format
+        ground_truth_labels = ['person', 'bicycle', 'car', 'traffic light', 'fire hydrant', 'pottedplant', 'stop sign',
+                               'bench']
+        ground_truth_boxes = [[250, 220, 160, 190], [200, 200, 80, 80], [200, 200, 80, 80], [450, 90, 20, 50],
+                              [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80],
+                              [200, 200, 80, 80]]  # [x, y, w, h] format
 
-        #def normalize_boxes(boxes, image_width, image_height):
-            # Convert box coordinates to numpy array
-           # boxes = np.array(boxes)
+        # def normalize_boxes(boxes, image_width, image_height):
+        # Convert box coordinates to numpy array
+        # boxes = np.array(boxes)
 
-            # Extract box coordinates
-            #x, y, w, h = np.split(boxes, 4, axis=1)
+        # Extract box coordinates
+        # x, y, w, h = np.split(boxes, 4, axis=1)
 
-            # Normalize box coordinates
-            #normalized_x = x / image_width
-            #normalized_y = y / image_height
-            #normalized_w = w / image_width
-            #normalized_h = h / image_height
+        # Normalize box coordinates
+        # normalized_x = x / image_width
+        # normalized_y = y / image_height
+        # normalized_w = w / image_width
+        # normalized_h = h / image_height
 
-            # Concatenate normalized coordinates
-           # normalized_boxes = np.concatenate((normalized_x, normalized_y, normalized_w, normalized_h), axis=1)
+        # Concatenate normalized coordinates
+        # normalized_boxes = np.concatenate((normalized_x, normalized_y, normalized_w, normalized_h), axis=1)
 
-            #return normalized_boxes
+        # return normalized_boxes
         '''
         def preprocess_ground_truth(ground_truth_labels, ground_truth_boxes):
             # Define a dictionary to map class labels to class IDs
@@ -920,7 +935,7 @@ class CameraManager(object):
             }
         '''
 
-            # Convert class labels to class IDs#
+        # Convert class labels to class IDs#
         '''
             class_ids = [label_to_id[label] for label in ground_truth_labels]
 
@@ -930,7 +945,7 @@ class CameraManager(object):
 
             # Normalize bounding box coordinates
             normalized_boxes = normalize_boxes(ground_truth_boxes, width, height)  # Implement 'normalize_boxes' function to scale box coordinates between 0 and 1
-            
+
             print('Normalized Boxes Shape:', normalized_boxes.shape)
             print('One-Hot Labels Shape:', one_hot_labels.shape)
             print('Normalized Boxes Data Type:', normalized_boxes.dtype)
@@ -953,7 +968,6 @@ class CameraManager(object):
 
         #num_classes = len(label_to_id)
     '''
-
 
         # Perform object matching for ground truth and detected objects
         TP = 0  # True positives
@@ -995,13 +1009,12 @@ class CameraManager(object):
         recall = TP / (TP + FN + eps)
         matt_corr_coeff = (TP - (FP * FN)) / math.sqrt((TP + FP + eps) * (TP + FN + eps) * (FP + eps) * (FN + eps))
 
-
         # Calculate the loss
-        #ground_truth_targets = preprocess_ground_truth(ground_truth_labels, ground_truth_boxes)  # Preprocess the ground truth targets
+        # ground_truth_targets = preprocess_ground_truth(ground_truth_labels, ground_truth_boxes)  # Preprocess the ground truth targets
 
-       # localization_loss = loss_fn(detected_boxes, ground_truth_targets)  # Calculate the localization loss
-       # confidence_loss = loss_fn(predicted_confidences, ground_truth_targets)  # Calculate the confidence loss
-       # class_prob_loss = loss_fn(predicted_class_probs, ground_truth_targets)  # Calculate the class probability loss
+        # localization_loss = loss_fn(detected_boxes, ground_truth_targets)  # Calculate the localization loss
+        # confidence_loss = loss_fn(predicted_confidences, ground_truth_targets)  # Calculate the confidence loss
+        # class_prob_loss = loss_fn(predicted_class_probs, ground_truth_targets)  # Calculate the class probability loss
 
         # Log the metrics to Tensorboard
         log_dir = "./logs3"  # Specify the log directory her
@@ -1010,15 +1023,15 @@ class CameraManager(object):
         writer.add_scalar('Precision', precision, image.frame)
         writer.add_scalar('Recall', recall, image.frame)
         writer.add_scalar('IOU', max_iou, image.frame)
-        #writer.add_scalar('Matthews Correlation Coefficient', matt_corr_coeff)
-        #writer.add_scalar('Localization Loss', localization_loss, image.frame)
-        #writer.add_scalar('Confidence Loss', confidence_loss, image.frame)
-        #writer.add_scalar('Class Probability Loss', class_prob_loss, image.frame)
+        # writer.add_scalar('Matthews Correlation Coefficient', matt_corr_coeff)
+        # writer.add_scalar('Localization Loss', localization_loss, image.frame)
+        # writer.add_scalar('Confidence Loss', confidence_loss, image.frame)
+        # writer.add_scalar('Class Probability Loss', class_prob_loss, image.frame)
 
         # Show the annotated image
-        #cv2.imshow("Annotated Image", img)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
+        # cv2.imshow("Annotated Image", img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
         self.surface = pygame.surfarray.make_surface(img.swapaxes(0, 1))
         if self.recording:
@@ -1035,7 +1048,6 @@ class VehiclePIDController():
     (lateral and longitudinal) to perform the
     low level control a vehicle from client side
     """
-
 
     def __init__(self, vehicle, args_lateral, args_longitudinal, max_throttle=0.75, max_brake=0.3, max_steering=0.8):
         """
@@ -1109,7 +1121,6 @@ class PIDLongitudinalController():
     """
     PIDLongitudinalController implements longitudinal control using a PID.
     """
-
 
     def __init__(self, vehicle, K_P=1.0, K_D=0.0, K_I=0.0, dt=0.03):
         """
@@ -1320,7 +1331,6 @@ class LocalPlanner(object):
                 if distance_to_nearest_obstacle is None or distance_to_obstacle < distance_to_nearest_obstacle:
                     distance_to_nearest_obstacle = distance_to_obstacle
 
-
         return distance_to_nearest_obstacle
 
     def reset_vehicle(self):
@@ -1497,31 +1507,51 @@ class AgentState(Enum):
     BLOCKED_RED_LIGHT = 3
 
 
-class Agent(object):
+class Agent:
     """Base class to define agents in CARLA"""
 
     def __init__(self, vehicle):
         """
         Constructor method.
 
-            :param vehicle: actor to apply to local planner logic onto
+        Args:
+            vehicle: Actor to apply local planner logic onto
         """
         self._vehicle = vehicle
         self._proximity_tlight_threshold = 5.0  # meters
         self._proximity_vehicle_threshold = 10.0  # meters
         self._local_planner = None
         self._world = self._vehicle.get_world()
+        self._last_traffic_light = None
+
+        # 初始化地图，处理可能的错误
+        self._init_map()
+
+    def _init_map(self):
+        """Initialize the map with error handling."""
         try:
             self._map = self._world.get_map()
         except RuntimeError as error:
-            print('RuntimeError: {}'.format(error))
-            print('  The server could not send the OpenDRIVE (.xodr) file:')
-            print('  Make sure it exists, has the same name of your town, and is correct.')
-            sys.exit(1)
-        self._last_traffic_light = None
+            self._handle_map_error(error)
+
+    def _handle_map_error(self, error):
+        """Handle map initialization error."""
+        error_msg = (
+            f'RuntimeError: {error}\n'
+            '  The server could not send the OpenDRIVE (.xodr) file:\n'
+            '  Make sure it exists, has the same name of your town, and is correct.'
+        )
+        print(error_msg)
+        sys.exit(1)
 
     def get_local_planner(self):
         """Get method for protected member local planner"""
+        return self._local_planner
+
+    # 也可以同时提供属性访问方式
+    @property
+    def local_planner(self):
+        """Get the local planner instance (property version)."""
         return self._local_planner
 
     @staticmethod
@@ -1529,12 +1559,16 @@ class Agent(object):
         """
         Execute one step of navigation.
 
-            :param debug: boolean flag for debugging
-            :return: control
+        Args:
+            debug: Boolean flag for debugging
+
+        Returns:
+            control: Vehicle control command
         """
         control = carla.VehicleControl()
 
         if debug:
+            # 设置调试模式下的默认控制参数
             control.steer = 0.0
             control.throttle = 0.0
             control.brake = 0.0
@@ -1546,9 +1580,10 @@ class Agent(object):
     @staticmethod
     def emergency_stop():
         """
-        Send an emergency stop command to the vehicle
+        Send an emergency stop command to the vehicle.
 
-            :return: control for braking
+        Returns:
+            control: Emergency stop control command
         """
         control = carla.VehicleControl()
         control.steer = 0.0
@@ -1659,9 +1694,9 @@ class BehaviorAgent(Agent):
             self._local_planner.brake = 1.0
         else:
             self._local_planner.brake = 0.0
-        #else:
-            # This method also includes stop signs and intersections.
-            #self.light_state = str(self.vehicle.get_traffic_light_state())
+        # else:
+        # This method also includes stop signs and intersections.
+        # self.light_state = str(self.vehicle.get_traffic_light_state())
 
     def set_destination(self, start_location, end_location, clean=False):
         """
@@ -1752,7 +1787,8 @@ class BehaviorAgent(Agent):
             else:
                 # Continue following the planned route
                 control = self._local_planner.run_step(
-                    target_speed=min(self.behavior.max_speed, self.speed_limit - self.behavior.speed_lim_dist), debug=debug)
+                    target_speed=min(self.behavior.max_speed, self.speed_limit - self.behavior.speed_lim_dist),
+                    debug=debug)
         self.vehicle.apply_control(control)
 
         return control
@@ -1762,151 +1798,203 @@ class BehaviorAgent(Agent):
 # -- Game Loop ---------------------------------------------------------
 # ==============================================================================
 
-    def game_loop(args):
-        """Main loop for agent"""
-        pygame.init()
-        pygame.font.init()
-        world = None
-        tot_target_reached = 0
-        num_min_waypoints = 21
 
-        try:
-            client = carla.Client(args.host, args.port)
-            client.set_timeout(70.0)
+def game_loop(args):
+    """ Main loop for agent"""
 
-            display = pygame.display.set_mode(
-                (args.width, args.height),
-                pygame.HWSURFACE | pygame.DOUBLEBUF)
+    pygame.init()
+    pygame.font.init()
+    world = None
+    tot_target_reached = 0
+    num_min_waypoints = 21
 
-            hud = HUD(args.width, args.height)
-            world = World(client.get_world(), hud, args)
-            controller = KeyboardControl(world)
-            agent = BehaviorAgent(world.player, behavior=args.behavior)
+    try:
+        client = carla.Client(args.host, args.port)
+        client.set_timeout(70.0)
 
-            # 设置初始目的地
-            spawn_points = world.map.get_spawn_points()
-            random.shuffle(spawn_points)
+        display = pygame.display.set_mode(
+            (args.width, args.height),
+            pygame.HWSURFACE | pygame.DOUBLEBUF)
 
-            start_index = 0 if spawn_points[0].location != agent.vehicle.get_location() else 1
-            destination = spawn_points[start_index].location
-            agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
+        hud = HUD(args.width, args.height)
 
-            clock = pygame.time.Clock()
+        # selected_world = client.load_world("Town01")  # KK Changes world to Town04
+        selected_world = client.get_world()
 
-            while True:
-                clock.tick_busy_loop(60)
+        world = World(client.get_world(), hud, args)
+        controller = KeyboardControl(world)
 
-                # 处理控制事件
-                if controller.parse_events():
-                    break
+        agent = BehaviorAgent(world.player, behavior=args.behavior)
 
-                # 等待服务器就绪
-                if not world.world.wait_for_tick(10.0):
-                    continue
+        spawn_points = world.map.get_spawn_points()
+        random.shuffle(spawn_points)
 
-                # 更新代理信息
-                if args.agent != "Roaming" and args.agent != "Basic":
-                    agent.update_information(world)
+        if spawn_points[0].location != agent.vehicle.get_location():
+            destination = spawn_points[0].location
+        else:
+            destination = spawn_points[1].location
 
-                # 更新和渲染世界
+        agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
+
+        clock = pygame.time.Clock()
+
+        while True:
+            clock.tick_busy_loop(60)
+            if controller.parse_events(world):
+                return
+
+            # As soon as the server is ready continue!
+            if not world.world.wait_for_tick(10.0):
+                continue
+
+            if args.agent == "Roaming" or args.agent == "Basic":
+                if controller.parse_events(world):
+                    return
+
+                # agent.update_information(world)
+                # as soon as the server is ready continue!
+                world.world.wait_for_tick(10.0)
+
+                world.tick(clock)
+                world.render(display)
+                pygame.display.flip()
+                control = agent.run_step()
+                control.manual_gear_shift = False
+                world.player.apply_control(control)
+            else:
+                agent.update_information(world)
+
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
 
-                # 处理不同代理类型
-                if args.agent == "Roaming" or args.agent == "Basic":
-                    control = agent.run_step()
-                    control.manual_gear_shift = False
-                    world.player.apply_control(control)
-                    continue  # 跳过后续控制逻辑
+            # Set new destination when target has been reached
+            if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
+                agent.reroute(spawn_points)
+                tot_target_reached += 1
+                world.hud.notification("The target has been reached " +
+                                       str(tot_target_reached) + " times.", seconds=4.0)
 
-                # 检查是否需要重新规划路线
-                waypoints_queue = agent.get_local_planner().waypoints_queue
-                if len(waypoints_queue) < num_min_waypoints and args.loop:
-                    agent.reroute(spawn_points)
-                    tot_target_reached += 1
-                    world.hud.notification(
-                        f"The target has been reached {tot_target_reached} times.",
-                        seconds=4.0
-                    )
-                elif len(waypoints_queue) == 0 and not args.loop:
-                    print("Target reached, mission accomplished...")
-                    break
+            elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
+                print("Target reached, mission accomplished...")
+                break
 
-                # 设置速度限制并执行控制
-                speed_limit = world.player.get_speed_limit()
-                agent.get_local_planner().set_speed(speed_limit)
-                control = agent.run_step()
-                world.player.apply_control(control)
+            speed_limit = world.player.get_speed_limit()
+            agent.get_local_planner().set_speed(speed_limit)
 
-        except Exception as e:
-            logging.error(f"Error in game loop: {e}")
-            raise
-        finally:
-            if world is not None:
-                world.destroy()
-            pygame.quit()
+            control = agent.run_step()
+            world.player.apply_control(control)
 
-    def main():
-        """Main method"""
-        argparser = argparse.ArgumentParser(
-            description='CARLA Automatic Control Client'
-        )
+    finally:
+        if world is not None:
+            world.destroy()
 
-        # 参数定义
-        arguments = [
-            ('-v', '--verbose', 'store_true', 'debug', 'Print debug information'),
-            ('', '--host', 'store', 'host', 'IP of the host server (default: 127.0.0.1)', '127.0.0.1'),
-            ('-p', '--port', 'store', 'port', 'TCP port to listen to (default: 2000)', 2000),
-            ('', '--res', 'store', 'res', 'Window resolution (default: 1280x720)', '1280x720'),
-            ('', '--filter', 'store', 'filter', 'Actor filter (default: "vehicle.*")', 'vehicle.*'),
-            ('', '--gamma', 'store', 'gamma', 'Gamma correction of the camera (default: 2.2)', 2.2),
-            ('-l', '--loop', 'store_true', 'loop', 'Sets a new random destination upon reaching the previous one'),
-            ('-b', '--behavior', 'store', 'behavior',
-             'Choose one of the possible agent behaviors (default: normal)', 'normal',
-             ["cautious", "normal", "aggressive"]),
-            ('-a', '--agent', 'store', 'agent', 'select which agent to run', 'Behavior',
-             ["Behavior", "Roaming", "Basic"]),
-            ('-s', '--seed', 'store', 'seed', 'Set seed for repeating executions', None, int)
-        ]
+        pygame.quit()
 
-        for arg in arguments:
-            flags = [f for f in arg[:2] if f]  # 处理可能为空的短标志
-            kwargs = {
-                'dest': arg[3],
-                'help': arg[4],
-                'default': arg[5] if len(arg) > 5 else None
-            }
 
-            if len(arg) > 6 and isinstance(arg[6], list):
-                kwargs['choices'] = arg[6]
-            if len(arg) > 7:
-                kwargs['type'] = arg[7]
-            elif arg[2] == 'store':
-                kwargs['type'] = str
+# ==============================================================================
+# -- main() --------------------------------------------------------------
+# ==============================================================================
 
-            action = 'store_true' if arg[2] == 'store_true' else 'store'
-            argparser.add_argument(*flags, action=action, **kwargs)
 
-        args = argparser.parse_args()
-        args.width, args.height = map(int, args.res.split('x'))
+def main():
+    """Main method"""
 
-        # 设置日志
-        log_level = logging.DEBUG if args.debug else logging.INFO
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
-        logging.info('Listening to server %s:%s', args.host, args.port)
+    # 参数解析器配置
+    argparser = argparse.ArgumentParser(
+        description='CARLA Automatic Control Client'
+    )
 
-        # 设置随机种子
-        if args.seed is not None:
-            random.seed(args.seed)
+    # 参数定义
+    argparser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        dest='debug',
+        help='Print debug information'
+    )
+    argparser.add_argument(
+        '--host',
+        metavar='H',
+        default='127.0.0.1',
+        help='IP of the host server (default: 127.0.0.1)'
+    )
+    argparser.add_argument(
+        '-p', '--port',
+        metavar='P',
+        default=2000,
+        type=int,
+        help='TCP port to listen to (default: 2000)'
+    )
+    argparser.add_argument(
+        '--res',
+        metavar='WIDTHxHEIGHT',
+        default='1280x720',
+        help='Window resolution (default: 1280x720)'
+    )
+    argparser.add_argument(
+        '--filter',
+        metavar='PATTERN',
+        default='vehicle.*',
+        help='Actor filter (default: "vehicle.*")'
+    )
+    argparser.add_argument(
+        '--gamma',
+        default=2.2,
+        type=float,
+        help='Gamma correction of the camera (default: 2.2)'
+    )
+    argparser.add_argument(
+        '-l', '--loop',
+        action='store_true',
+        dest='loop',
+        help='Sets a new random destination upon reaching the previous one (default: False)'
+    )
+    argparser.add_argument(
+        '-b', '--behavior',
+        type=str,
+        choices=['cautious', 'normal', 'aggressive'],
+        help='Choose one of the possible agent behaviors (default: normal)',
+        default='normal'
+    )
+    argparser.add_argument(
+        '-a', '--agent',
+        type=str,
+        choices=['Behavior', 'Roaming', 'Basic'],
+        help='Select which agent to run',
+        default='Behavior'
+    )
+    argparser.add_argument(
+        '-s', '--seed',
+        help='Set seed for repeating executions (default: None)',
+        default=None,
+        type=int
+    )
 
-        try:
-            game_loop(args)
-        except KeyboardInterrupt:
-            print('\nCancelled by user. Bye!')
-        except Exception as e:
-            logging.error(f"Unexpected error: {e}")
-            sys.exit(1)
+    # 解析参数
+    args = argparser.parse_args()
 
-    if __name__ == '__main__':
-        main()
+    # 解析分辨率
+    args.width, args.height = map(int, args.res.split('x'))
+
+    # 配置日志
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=log_level
+    )
+
+    logging.info('Listening to server %s:%s', args.host, args.port)
+
+    # 打印文档字符串（假设有外部文档）
+    if __doc__:
+        print(__doc__)
+
+    # 运行主循环
+    try:
+        game_loop(args)
+    except KeyboardInterrupt:
+        print('\nCancelled by user. Bye!')
+
+
+if __name__ == '__main__':
+    main()
