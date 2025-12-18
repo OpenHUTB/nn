@@ -36,6 +36,7 @@ class ConfigManager:
                     'rotation_frequency': 10
                 }
             },
+
             'v2x': {
                 'enabled': True,
                 'communication_range': 300.0,
@@ -53,6 +54,8 @@ class ConfigManager:
                 'data_fusion_interval': 1.0,
                 'max_shared_objects': 50
             },
+
+
             'output': {
                 'data_dir': 'cvips_dataset',
                 'save_raw': True,
@@ -60,8 +63,11 @@ class ConfigManager:
                 'save_annotations': False,
                 'save_lidar': True,
                 'save_fusion': True,
+
                 'save_cooperative': True,
                 'save_v2x_messages': True,
+
+
                 'validate_data': True,
                 'run_analysis': False
             }
@@ -105,6 +111,7 @@ class ConfigManager:
         if args.num_pedestrians:
             config['traffic']['pedestrians'] = args.num_pedestrians
 
+
         if args.num_coop_vehicles:
             config['cooperative']['num_coop_vehicles'] = args.num_coop_vehicles
 
@@ -114,6 +121,11 @@ class ConfigManager:
         if args.enable_v2x:
             config['v2x']['enabled'] = True
 
+
+        if args.capture_interval:
+            config['sensors']['capture_interval'] = args.capture_interval
+
+
         if args.enable_lidar:
             config['sensors']['lidar_sensors'] = 1
             config['output']['save_lidar'] = True
@@ -121,8 +133,11 @@ class ConfigManager:
         if args.enable_fusion:
             config['output']['save_fusion'] = True
 
+
         if args.enable_cooperative:
             config['output']['save_cooperative'] = True
+
+
 
         if args.enable_annotations:
             config['output']['save_annotations'] = True

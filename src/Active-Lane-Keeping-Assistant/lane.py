@@ -9,7 +9,13 @@ from os.path import join
 class Lane:
     """Detects Lanes in a given Image
     """
-
+    HLS_L_THRESHOLD_MIN = 150
+    HLS_L_THRESHOLD_MAX = 255
+    XM_PER_PIX = 3.7 / 781
+    ROI_BOTTOM = 350
+    ROI_TOP = 260
+    ROI_LEFT = 200
+    ROI_RIGHT = 440
     def __init__(self, height:int, width:int, save:bool=False,
         save_folder:str=join('img', 'examples')) -> None:
         """Constructor
@@ -56,7 +62,7 @@ class Lane:
 
         # Create threshold matrix to differentiate black and white based on the
         # lightness (of HSL).
-        _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+        _, binary = cv2.threshold(hls[:, :, 1], self.HLS_L_THRESHOLD_MIN, self.HLS_L_THRESHOLD_MAX, cv2.THRESH_BINARY)
         binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
 
         if self.save:
@@ -64,8 +70,11 @@ class Lane:
 
         return binary_blured
 
-    def extract_roi(self, img:np.ndarray, bottom:int=350, top:int=260,
-        left:int=200, right:int=440) -> tuple[np.ndarray, np.ndarray]:
+    def extract_roi(self, img: np.ndarray,
+                    bottom: int = ROI_BOTTOM,
+                    top: int = ROI_TOP,
+                    left: int = ROI_LEFT,
+                    right: int = ROI_RIGHT) -> tuple[np.ndarray, np.ndarray]:
         """Extract the Region of Interest
 
         Extracts the region of interest and transforms it to fit the original
@@ -462,7 +471,6 @@ class Lane:
                 [0]: Original image with lane and offset drawn on.
                 [1]: Calculated offset to the center of the detected lane.
         """
-        M_PER_PIX = 3.7 / 781 # Meters per pixel
 
         # Retrieve the position of the car assuming it is the center of the
         # image. 
@@ -476,7 +484,7 @@ class Lane:
     
         center_lane = (bottom_right - bottom_left)/2 + bottom_left
         center_offset = (np.abs(car_location) - np.abs(center_lane)) * \
-            M_PER_PIX * 100
+                        self.XM_PER_PIX * 100
         
         cv2.putText(img, (f'Difference to Center: '
             f'{str(round(center_offset, 5))} cm'), (int((5/600)*self.img_width),

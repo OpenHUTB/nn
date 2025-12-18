@@ -16,8 +16,11 @@ from data_validator import DataValidator
 from scene_manager import SceneManager
 from data_analyzer import DataAnalyzer
 from lidar_processor import LidarProcessor, MultiSensorFusion
+
 from multi_vehicle_manager import MultiVehicleManager
 from v2x_communication import V2XCommunication
+
+
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
@@ -256,14 +259,23 @@ class SensorManager:
         if config['output'].get('save_fusion', False):
             self.fusion_manager = MultiSensorFusion(data_dir)
 
+
     def setup_cameras(self, vehicle, center_location, vehicle_id=0):
         vehicle_cams = self._setup_vehicle_cameras(vehicle, vehicle_id)
+
+    def setup_cameras(self, vehicle, center_location):
+        vehicle_cams = self._setup_vehicle_cameras(vehicle)
+
         infra_cams = self._setup_infrastructure_cameras(center_location)
 
         Log.info(f"摄像头: {vehicle_cams}车辆 + {infra_cams}基础设施")
         return vehicle_cams + infra_cams
 
+
     def _setup_vehicle_cameras(self, vehicle, vehicle_id):
+
+    def _setup_vehicle_cameras(self, vehicle):
+
         if not vehicle:
             return 0
 
@@ -276,7 +288,11 @@ class SensorManager:
 
         installed = 0
         for cam_name, config_data in camera_configs.items():
+
             if self._create_camera(cam_name, config_data, vehicle, 'vehicle', vehicle_id):
+
+            if self._create_camera(cam_name, config_data, vehicle, 'vehicle'):
+
                 installed += 1
 
         return installed
@@ -306,7 +322,11 @@ class SensorManager:
 
         return installed
 
+
     def setup_lidar(self, vehicle, vehicle_id=0):
+
+    def setup_lidar(self, vehicle):
+
         if not vehicle or not self.config['sensors'].get('lidar_sensors', 0) > 0:
             return 0
 
@@ -320,6 +340,10 @@ class SensorManager:
             lidar_bp.set_attribute('range', str(lidar_config.get('range', 100)))
             lidar_bp.set_attribute('points_per_second', str(lidar_config.get('points_per_second', 56000)))
             lidar_bp.set_attribute('rotation_frequency', str(lidar_config.get('rotation_frequency', 10)))
+
+
+
+            # 添加更多LiDAR参数
 
             lidar_bp.set_attribute('upper_fov', '10')
             lidar_bp.set_attribute('lower_fov', '-20')
@@ -338,9 +362,17 @@ class SensorManager:
                         try:
                             metadata = self.lidar_processor.process_lidar_data(lidar_data, self.frame_counter)
                             if metadata and self.fusion_manager:
+
                                 vehicle_image_path = None
                                 with self.buffer_lock:
                                     if self.vehicle_buffer:
+
+                                # 尝试获取最新的车辆图像
+                                vehicle_image_path = None
+                                with self.buffer_lock:
+                                    if self.vehicle_buffer:
+                                        # 取第一个摄像头的图像
+
                                         for cam_name, img_path in self.vehicle_buffer.items():
                                             if os.path.exists(img_path):
                                                 vehicle_image_path = img_path
@@ -366,7 +398,11 @@ class SensorManager:
             print(f"LiDAR安装失败: {e}")
             return 0
 
+
     def _create_camera(self, name, config, parent, sensor_type, vehicle_id=0):
+
+    def _create_camera(self, name, config, parent, sensor_type):
+
         try:
             blueprint = self.world.get_blueprint_library().find('sensor.camera.rgb')
 
@@ -384,6 +420,7 @@ class SensorManager:
             else:
                 camera = self.world.spawn_actor(blueprint, transform)
 
+
             # 为不同车辆创建不同目录
             if sensor_type == 'vehicle' and vehicle_id > 0:
                 save_dir = os.path.join(self.data_dir, "raw", f"vehicle_{vehicle_id}", name)
@@ -393,6 +430,11 @@ class SensorManager:
             os.makedirs(save_dir, exist_ok=True)
 
             callback = self._create_callback(save_dir, name, sensor_type, vehicle_id)
+            save_dir = os.path.join(self.data_dir, "raw", sensor_type, name)
+            os.makedirs(save_dir, exist_ok=True)
+
+            callback = self._create_callback(save_dir, name, sensor_type)
+
             camera.listen(callback)
 
             self.sensors.append(camera)
@@ -402,7 +444,11 @@ class SensorManager:
             Log.warning(f"创建摄像头 {name} 失败: {e}")
             return False
 
+
     def _create_callback(self, save_dir, name, sensor_type, vehicle_id=0):
+
+    def _create_callback(self, save_dir, name, sensor_type):
+
         capture_interval = self.config['sensors']['capture_interval']
 
         def callback(image):
@@ -419,8 +465,12 @@ class SensorManager:
                     if sensor_type == 'vehicle':
                         self.vehicle_buffer[name] = filename
                         if len(self.vehicle_buffer) >= 4:
+
                             self.image_processor.stitch(self.vehicle_buffer, self.frame_counter,
                                                         f'vehicle_{vehicle_id}')
+
+                            self.image_processor.stitch(self.vehicle_buffer, self.frame_counter, 'vehicle')
+
                             self.vehicle_buffer.clear()
                     else:
                         self.infra_buffer[name] = filename
@@ -465,15 +515,23 @@ class DataCollector:
         self.config = config
         self.client = None
         self.world = None
+
         self.ego_vehicles = []  # 多个主车
+
+        self.ego_vehicle = None
+
         self.scene_center = None
 
         self.setup_directories()
 
         self.traffic_manager = None
+
         self.sensor_managers = {}  # 车辆ID -> SensorManager
         self.multi_vehicle_manager = None
         self.v2x_communication = None
+
+        self.sensor_manager = None
+
 
         self.start_time = None
         self.is_running = False
@@ -489,15 +547,21 @@ class DataCollector:
         )
 
         directories = [
+
             "raw/vehicle_1",  # 主车1
             "raw/vehicle_2",  # 主车2（如果有）
+
+            "raw/vehicle",
+
             "raw/infrastructure",
             "stitched",
             "lidar",
             "fusion",
             "calibration",
+
             "cooperative",
             "v2x_messages",
+
             "metadata"
         ]
 
@@ -542,6 +606,7 @@ class DataCollector:
 
         self.traffic_manager = TrafficManager(self.world, self.config)
 
+
         # 生成多个主车
         num_ego_vehicles = min(self.config['cooperative'].get('num_coop_vehicles', 2) + 1, 3)
         for i in range(num_ego_vehicles):
@@ -551,10 +616,15 @@ class DataCollector:
                 Log.info(f"主车 {i + 1} 生成: {ego_vehicle.type_id}")
 
         if not self.ego_vehicles:
+
+        self.ego_vehicle = self.traffic_manager.spawn_ego_vehicle()
+        if not self.ego_vehicle:
+
             Log.error("主车生成失败")
             return False
 
         self.traffic_manager.spawn_traffic(self.scene_center)
+
 
         # 初始化V2X通信
         if self.config['v2x']['enabled']:
@@ -593,10 +663,13 @@ class DataCollector:
                     {'type': 'vehicle', 'capabilities': ['bsm', 'rsm']}
                 )
 
+
+
         time.sleep(3.0)
         return True
 
     def setup_sensors(self):
+
         # 为每个主车设置传感器
         for i, vehicle in enumerate(self.ego_vehicles):
             sensor_manager = SensorManager(self.world, self.config, self.output_dir)
@@ -611,6 +684,17 @@ class DataCollector:
 
             self.sensor_managers[vehicle.id] = sensor_manager
 
+        self.sensor_manager = SensorManager(self.world, self.config, self.output_dir)
+
+        cameras = self.sensor_manager.setup_cameras(self.ego_vehicle, self.scene_center)
+        if cameras == 0:
+            Log.error("没有摄像头安装成功")
+            return False
+
+        lidars = self.sensor_manager.setup_lidar(self.ego_vehicle)
+        Log.info(f"传感器: {cameras}摄像头 + {lidars}LiDAR")
+
+
         return True
 
     def collect_data(self):
@@ -621,6 +705,7 @@ class DataCollector:
         self.is_running = True
 
         last_update = time.time()
+
         last_v2x_update = time.time()
         last_perception_share = time.time()
 
@@ -628,6 +713,7 @@ class DataCollector:
             while time.time() - self.start_time < duration and self.is_running:
                 current_time = time.time()
                 elapsed = current_time - self.start_time
+
 
                 # 更新车辆状态
                 if self.multi_vehicle_manager:
@@ -654,6 +740,13 @@ class DataCollector:
                     progress = (elapsed / duration) * 100
 
                     Log.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | 总帧数: {total_frames}")
+
+                if current_time - last_update >= 5.0:
+                    frames = self.sensor_manager.get_frame_count()
+                    progress = (elapsed / duration) * 100
+
+                    Log.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | 帧数: {frames}")
+
                     last_update = current_time
 
                 time.sleep(0.05)
@@ -664,11 +757,16 @@ class DataCollector:
             self.is_running = False
             elapsed = time.time() - self.start_time
 
+
             self.collected_frames = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
+
+            self.collected_frames = self.sensor_manager.get_frame_count()
+
             Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
 
             self._save_metadata()
             self._print_summary()
+
 
     def _update_v2x_communication(self):
         """更新V2X通信"""
@@ -750,13 +848,17 @@ class DataCollector:
 
         return detected_objects
 
+
     def _save_metadata(self):
         metadata = {
             'scenario': self.config['scenario'],
             'traffic': self.config['traffic'],
             'sensors': self.config['sensors'],
+
             'v2x': self.config['v2x'],
             'cooperative': self.config['cooperative'],
+
+
             'output': self.config['output'],
             'collection': {
                 'duration': round(time.time() - self.start_time, 2),
@@ -764,6 +866,7 @@ class DataCollector:
                 'frame_rate': round(self.collected_frames / max(time.time() - self.start_time, 0.1), 2)
             }
         }
+
 
         # 传感器摘要
         sensor_summaries = {}
@@ -778,6 +881,11 @@ class DataCollector:
         # 协同摘要
         if self.multi_vehicle_manager:
             metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
+
+        if self.sensor_manager:
+            sensor_summary = self.sensor_manager.generate_sensor_summary()
+            metadata['sensor_summary'] = sensor_summary
+
 
         meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
         with open(meta_path, 'w', encoding='utf-8') as f:
@@ -813,6 +921,7 @@ class DataCollector:
                         total_points += points_in_file
                 print(f"  估计总点数: {total_points:,}")
 
+
         # 统计协同数据
         coop_dir = os.path.join(self.output_dir, "cooperative")
         if os.path.exists(coop_dir):
@@ -832,6 +941,13 @@ class DataCollector:
         print(f"车辆总数: {len(self.ego_vehicles)} 主车 + "
               f"{len(self.multi_vehicle_manager.cooperative_vehicles)} 协同车")
 
+        # 统计融合数据
+        fusion_dir = os.path.join(self.output_dir, "fusion")
+        if os.path.exists(fusion_dir):
+            sync_files = [f for f in os.listdir(fusion_dir) if f.endswith('.json')]
+            print(f"融合数据: {len(sync_files)} 个同步文件")
+
+
         print(f"\n输出目录: {self.output_dir}")
         print("=" * 60)
 
@@ -847,6 +963,7 @@ class DataCollector:
 
     def cleanup(self):
         Log.info("清理场景...")
+
 
         # 清理传感器
         for sensor_manager in self.sensor_managers.values():
@@ -872,15 +989,37 @@ class DataCollector:
                 except:
                     pass
 
+
+        if self.sensor_manager:
+            self.sensor_manager.cleanup()
+
+        if self.traffic_manager:
+            self.traffic_manager.cleanup()
+
+        if self.ego_vehicle and self.ego_vehicle.is_alive:
+            try:
+                self.ego_vehicle.destroy()
+            except:
+                pass
+
+
         Log.info("清理完成")
 
 
 def main():
+
     parser = argparse.ArgumentParser(description='CVIPS 多车辆协同数据收集系统 v10.0')
 
     # 基础参数
     parser.add_argument('--config', type=str, help='配置文件路径')
     parser.add_argument('--scenario', type=str, default='multi_vehicle_cooperative', help='场景名称')
+
+    parser = argparse.ArgumentParser(description='CVIPS 多传感器数据收集系统')
+
+    # 基础参数
+    parser.add_argument('--config', type=str, help='配置文件路径')
+    parser.add_argument('--scenario', type=str, default='multi_sensor_scene', help='场景名称')
+
     parser.add_argument('--town', type=str, default='Town10HD',
                         choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
     parser.add_argument('--weather', type=str, default='clear',
@@ -891,7 +1030,10 @@ def main():
     # 交通参数
     parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
     parser.add_argument('--num-pedestrians', type=int, default=6, help='行人数')
+
     parser.add_argument('--num-coop-vehicles', type=int, default=2, help='协同车辆数')
+
+
 
     # 收集参数
     parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
@@ -901,8 +1043,11 @@ def main():
     # 传感器参数
     parser.add_argument('--enable-lidar', action='store_true', help='启用LiDAR传感器')
     parser.add_argument('--enable-fusion', action='store_true', help='启用多传感器融合')
+
     parser.add_argument('--enable-v2x', action='store_true', help='启用V2X通信')
     parser.add_argument('--enable-cooperative', action='store_true', help='启用协同感知')
+
+
     parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
 
     # 功能参数
@@ -917,23 +1062,35 @@ def main():
 
     # 显示配置
     print("\n" + "=" * 60)
+
     print("CVIPS 多车辆协同数据收集系统 v10.0")
+
+    print("CVIPS 多传感器数据收集系统 v9.0")
+
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
     print(f"地图: {config['scenario']['town']}")
     print(f"天气/时间: {config['scenario']['weather']}/{config['scenario']['time_of_day']}")
     print(f"时长: {config['scenario']['duration']}秒")
+
     print(f"交通: {config['traffic']['background_vehicles']}背景车辆 + {config['traffic']['pedestrians']}行人")
     print(f"协同: {config['cooperative']['num_coop_vehicles']} 协同车辆")
+
+    print(f"交通: {config['traffic']['background_vehicles']}车辆 + {config['traffic']['pedestrians']}行人")
+
 
     print(f"传感器:")
     print(
         f"  摄像头: {config['sensors']['vehicle_cameras']}车辆 + {config['sensors']['infrastructure_cameras']}基础设施")
     print(f"  LiDAR: {'启用' if config['sensors']['lidar_sensors'] > 0 else '禁用'}")
     print(f"  融合: {'启用' if config['output']['save_fusion'] else '禁用'}")
+
     print(f"  V2X: {'启用' if config['v2x']['enabled'] else '禁用'}")
     print(f"  协同: {'启用' if config['output']['save_cooperative'] else '禁用'}")
+
+    print(f"  标注: {'启用' if config['output']['save_annotations'] else '禁用'}")
+
 
     collector = DataCollector(config)
 

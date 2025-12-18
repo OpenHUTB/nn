@@ -17,7 +17,10 @@ class DataAnalyzer:
             'file_distribution': DataAnalyzer._analyze_file_distribution(data_dir),
             'object_statistics': DataAnalyzer._analyze_objects(data_dir),
             'temporal_analysis': DataAnalyzer._analyze_temporal(data_dir),
+
             'cooperative_data': DataAnalyzer._analyze_cooperative_data(data_dir),
+
+
             'quality_metrics': DataAnalyzer._calculate_quality_metrics(data_dir)
         }
 
@@ -78,6 +81,7 @@ class DataAnalyzer:
         distribution = {}
 
         # 分析原始图像
+
         raw_dirs = []
         raw_path = os.path.join(data_dir, "raw")
         if os.path.exists(raw_path):
@@ -94,6 +98,20 @@ class DataAnalyzer:
                     camera_stats[camera_dir] = len(images)
             distribution[f'raw_{raw_dir}'] = camera_stats
 
+        raw_dirs = ['vehicle', 'infrastructure']
+        for raw_dir in raw_dirs:
+            path = os.path.join(data_dir, "raw", raw_dir)
+            if os.path.exists(path):
+                camera_stats = {}
+                for camera_dir in os.listdir(path):
+                    camera_path = os.path.join(path, camera_dir)
+                    if os.path.isdir(camera_path):
+                        images = [f for f in os.listdir(camera_path)
+                                  if f.endswith(('.png', '.jpg', '.jpeg'))]
+                        camera_stats[camera_dir] = len(images)
+                distribution[f'raw_{raw_dir}'] = camera_stats
+
+
         # 分析拼接图像
         stitched_dir = os.path.join(data_dir, "stitched")
         if os.path.exists(stitched_dir):
@@ -106,6 +124,7 @@ class DataAnalyzer:
         if os.path.exists(annotations_dir):
             json_files = [f for f in os.listdir(annotations_dir) if f.endswith('.json')]
             distribution['annotations'] = len(json_files)
+
 
         # 分析LiDAR数据
         lidar_dir = os.path.join(data_dir, "lidar")
@@ -120,6 +139,8 @@ class DataAnalyzer:
             json_files = [f for f in os.listdir(fusion_dir) if f.endswith('.json')]
             distribution['fusion'] = len(json_files)
 
+
+
         return distribution
 
     @staticmethod
@@ -128,7 +149,11 @@ class DataAnalyzer:
         annotations_dir = os.path.join(data_dir, "annotations")
 
         if not os.path.exists(annotations_dir):
+
             return {'total_objects': 0, 'by_class': {}, 'by_frame': {}, 'class_distribution': {}}
+
+            return {'total_objects': 0, 'by_class': {}, 'by_frame': {}}
+
 
         object_stats = {
             'total_objects': 0,
@@ -191,6 +216,7 @@ class DataAnalyzer:
         return temporal_stats
 
     @staticmethod
+
     def _analyze_cooperative_data(data_dir):
         """分析协同数据"""
         coop_dir = os.path.join(data_dir, "cooperative")
@@ -263,28 +289,45 @@ class DataAnalyzer:
         return analysis
 
     @staticmethod
+
+
     def _calculate_quality_metrics(data_dir):
         """计算质量指标"""
         quality_metrics = {
             'completeness_score': 0,
             'consistency_score': 0,
             'diversity_score': 0,
+
             'cooperative_score': 0,
+
+
             'issues_found': []
         }
 
         # 检查完整性
+
         required_dirs = ["raw/vehicle", "raw/infrastructure", "stitched", "metadata", "cooperative"]
         missing_dirs = []
 
         for dir_path in required_dirs:
             full_path = os.path.join(data_dir, dir_path)
             if not os.path.exists(full_path):
+
+        required_dirs = ["raw/vehicle", "raw/infrastructure", "stitched", "metadata"]
+        missing_dirs = []
+
+        for dir_path in required_dirs:
+            if not os.path.exists(os.path.join(data_dir, dir_path)):
+
                 missing_dirs.append(dir_path)
 
         if missing_dirs:
             quality_metrics['issues_found'].append(f"缺失目录: {missing_dirs}")
+
             quality_metrics['completeness_score'] = 100 - (len(missing_dirs) * 20)
+
+            quality_metrics['completeness_score'] = 50
+
         else:
             quality_metrics['completeness_score'] = 100
 
@@ -300,7 +343,11 @@ class DataAnalyzer:
                     camera_counts.append(len(images))
 
             if camera_counts:
+
                 max_diff = max(camera_counts) - min(camera_counts) if camera_counts else 0
+
+                max_diff = max(camera_counts) - min(camera_counts)
+
                 if max_diff > 5:
                     quality_metrics['issues_found'].append(f"摄像头图像数量不一致: 差异{max_diff}")
                     quality_metrics['consistency_score'] = 70
@@ -319,6 +366,7 @@ class DataAnalyzer:
             quality_metrics['diversity_score'] = 50
             quality_metrics['issues_found'].append(f"物体类别较少: {num_classes}类")
 
+
         # 协同评分
         cooperative_data = DataAnalyzer._analyze_cooperative_data(data_dir)
         if cooperative_data['v2x_messages'] > 10 and cooperative_data['shared_perception_frames'] > 5:
@@ -329,17 +377,26 @@ class DataAnalyzer:
             quality_metrics['cooperative_score'] = 30
             quality_metrics['issues_found'].append("协同数据较少")
 
+
+
         return quality_metrics
 
     @staticmethod
     def _calculate_overall_score(analysis):
         """计算总体评分"""
         weights = {
+
             'completeness': 0.25,
             'consistency': 0.20,
             'diversity': 0.15,
             'cooperative': 0.20,
             'temporal': 0.20
+
+            'completeness': 0.3,
+            'consistency': 0.25,
+            'diversity': 0.25,
+            'temporal': 0.2
+
         }
 
         quality = analysis['quality_metrics']
@@ -347,8 +404,12 @@ class DataAnalyzer:
         score = (
                 quality['completeness_score'] * weights['completeness'] +
                 quality['consistency_score'] * weights['consistency'] +
+
                 quality['diversity_score'] * weights['diversity'] +
                 quality['cooperative_score'] * weights['cooperative']
+
+                quality['diversity_score'] * weights['diversity']
+
         )
 
         # 时间因素
@@ -360,7 +421,11 @@ class DataAnalyzer:
         else:
             score += 5 * weights['temporal']
 
+
         return round(min(score, 100), 1)
+
+        return round(score, 1)
+
 
     @staticmethod
     def _save_analysis_report(data_dir, analysis):
@@ -395,11 +460,15 @@ class DataAnalyzer:
             if isinstance(value, dict):
                 print(f"  {key}:")
                 for subkey, subvalue in value.items():
+
                     if isinstance(subvalue, dict):
                         for subsubkey, subsubvalue in subvalue.items():
                             print(f"    {subsubkey}: {subsubvalue}")
                     else:
                         print(f"    {subkey}: {subvalue}")
+
+                    print(f"    {subkey}: {subvalue}")
+
             else:
                 print(f"  {key}: {value}")
 
@@ -411,6 +480,7 @@ class DataAnalyzer:
             for obj_class, count in objects['by_class'].items():
                 percentage = objects['class_distribution'].get(obj_class, 0)
                 print(f"    {obj_class}: {count} ({percentage}%)")
+
 
         # 协同数据分析
         cooperative = analysis['cooperative_data']
@@ -428,6 +498,8 @@ class DataAnalyzer:
             for msg_type, count in cooperative['v2x_stats']['message_types'].items():
                 print(f"    {msg_type}: {count}")
 
+
+
         temporal = analysis['temporal_analysis']
         print(f"\n时间分析:")
         print(f"  总时长: {temporal['total_duration']:.1f}秒")
@@ -438,7 +510,10 @@ class DataAnalyzer:
         print(f"  完整性: {quality['completeness_score']}/100")
         print(f"  一致性: {quality['consistency_score']}/100")
         print(f"  多样性: {quality['diversity_score']}/100")
+
         print(f"  协同性: {quality['cooperative_score']}/100")
+
+
 
         if quality['issues_found']:
             print(f"  发现的问题 ({len(quality['issues_found'])}):")
@@ -449,12 +524,20 @@ class DataAnalyzer:
 
         print(f"\n总体评分: {analysis['overall_score']}/100")
 
+
         overall_score = analysis['overall_score']
         if overall_score >= 90:
             print("✓ 数据集质量优秀")
         elif overall_score >= 75:
             print("✓ 数据集质量良好")
         elif overall_score >= 60:
+
+        if analysis['overall_score'] >= 90:
+            print("✓ 数据集质量优秀")
+        elif analysis['overall_score'] >= 75:
+            print("✓ 数据集质量良好")
+        elif analysis['overall_score'] >= 60:
+
             print("⚠ 数据集质量一般")
         else:
             print("✗ 数据集质量需要改进")
