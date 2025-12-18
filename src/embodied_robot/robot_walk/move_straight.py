@@ -601,7 +601,7 @@ class DynamicPatrolController:
                 import traceback
                 traceback.print_exc()
             finally:
-                # Final statistics
+
                 if self.torso_id != -1:
                     elapsed_time = time.time() - self.sim_start_time
                     torso_pos = self.data.xpos[self.torso_id]
