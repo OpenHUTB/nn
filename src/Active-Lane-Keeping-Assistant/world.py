@@ -121,7 +121,7 @@ class World():
         self.collision_sensor.listen(lambda e: {self._set_collision()})
         self.initialized = True
 
-        return self._change_to_left_lane()
+        return 0.0, 0.0, np.zeros((self.image_height, self.image_width, 3)), False
 
     def _set_collision(self) -> None:
         """Helper to set collision_detected to True.
