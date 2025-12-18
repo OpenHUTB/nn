@@ -24,7 +24,7 @@ class CarlaSpeedAlarmSystem:
 
     def judge_speed_status(self, speed):
         """根据速度判断状态"""
-        # 检查速度是否在合法范围外
+        # 检查速度是否合法范围外
         if speed < 0 or speed > 150:
             return "速度异常"
 
