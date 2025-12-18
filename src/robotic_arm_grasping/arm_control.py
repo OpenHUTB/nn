@@ -1,8 +1,3 @@
-"""
-6-DOF 机械臂 + 三指夹爪
-Tkinter 滑杆（硬限位防重置）+ Grab / Release 按钮
-**修正：同时控制 9 个夹爪执行器，equality 同步生效**
-"""
 import threading, queue
 import tkinter as tk
 import glfw, mujoco as mj
