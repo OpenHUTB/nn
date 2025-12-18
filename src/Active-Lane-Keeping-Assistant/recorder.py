@@ -21,7 +21,7 @@ class Recorder():
             folder (str, optional): Storage location. Defaults to 'videos'.
         """
 
-        self.cameraCapture = cv2.VideoCapture(0)
+        #self.cameraCapture = cv2.VideoCapture(0)
         self.height = height
         self.width = width
         self.fps = float(fps)

@@ -1,46 +1,61 @@
+import glob
+import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from custom_env import AirSimMazeEnv
-import os
 
-# 创建日志目录
-log_dir = "./airsim_logs/"
-os.makedirs(log_dir, exist_ok=True)
+# === 路径配置 ===
+MODELS_DIR = r"D:\Others\MyAirsimprojects\models"
+LOG_DIR = r"D:\Others\MyAirsimprojects\airsim_logs"
+
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
+
+
+def get_latest_model_path(path_dir):
+    list_of_files = glob.glob(os.path.join(path_dir, '*.zip'))
+    if not list_of_files:
+        return None
+    return max(list_of_files, key=os.path.getctime)
 
 
 def main():
-    # 实例化环境
     env = AirSimMazeEnv()
+    latest_model_path = get_latest_model_path(MODELS_DIR)
 
-    # 定义模型
-    # MultiInputPolicy 会自动检测 Dict 输入
-    # learning_rate: 学习率，通常 3e-4 是个不错的起点
-    # n_steps: 每次更新收集的步数
-    model = PPO(
-        "MultiInputPolicy",
-        env,
-        verbose=1,
-        tensorboard_log=log_dir,
-        learning_rate=0.0003,
-        batch_size=64,
-        n_steps=2048,
-        gamma=0.99
-    )
+    if latest_model_path:
+        print(f"--- 发现存档: {latest_model_path}，继续训练 ---")
+        model = PPO.load(latest_model_path, env=env, tensorboard_log=LOG_DIR)
+        reset_timesteps = False
+    else:
+        print(f"--- 未发现存档，开始【从头训练】 ---")
+        model = PPO(
+            "MultiInputPolicy",
+            env,
+            verbose=1,
+            tensorboard_log=LOG_DIR,
+            learning_rate=0.0003,
+            batch_size=256,  # 大Batch加速
+            n_steps=2048,
+            gamma=0.99
+        )
+        reset_timesteps = True
 
-    # 保存检查点的回调函数 (每 10000 步保存一次)
     checkpoint_callback = CheckpointCallback(
         save_freq=10000,
-        save_path='./models/',
+        save_path=MODELS_DIR,
         name_prefix='drone_maze'
     )
 
-    print("开始训练...")
-    # 训练步数建议：简单的迷宫可能需要 20万-50万步，复杂的需要更多
-    model.learn(total_timesteps=500000, callback=checkpoint_callback)
+    print("🚀 训练引擎启动...")
+    model.learn(
+        total_timesteps=500000,
+        callback=checkpoint_callback,
+        reset_num_timesteps=reset_timesteps
+    )
 
-    # 保存最终模型
-    model.save("drone_maze_final")
-    print("训练完成，模型已保存。")
+    model.save(os.path.join(MODELS_DIR, "drone_maze_final"))
+    print("训练结束。")
 
 
 if __name__ == "__main__":

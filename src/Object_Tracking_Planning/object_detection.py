@@ -1507,31 +1507,51 @@ class AgentState(Enum):
     BLOCKED_RED_LIGHT = 3
 
 
-class Agent(object):
+class Agent:
     """Base class to define agents in CARLA"""
 
     def __init__(self, vehicle):
         """
         Constructor method.
 
-            :param vehicle: actor to apply to local planner logic onto
+        Args:
+            vehicle: Actor to apply local planner logic onto
         """
         self._vehicle = vehicle
         self._proximity_tlight_threshold = 5.0  # meters
         self._proximity_vehicle_threshold = 10.0  # meters
         self._local_planner = None
         self._world = self._vehicle.get_world()
+        self._last_traffic_light = None
+
+        # 初始化地图，处理可能的错误
+        self._init_map()
+
+    def _init_map(self):
+        """Initialize the map with error handling."""
         try:
             self._map = self._world.get_map()
         except RuntimeError as error:
-            print('RuntimeError: {}'.format(error))
-            print('  The server could not send the OpenDRIVE (.xodr) file:')
-            print('  Make sure it exists, has the same name of your town, and is correct.')
-            sys.exit(1)
-        self._last_traffic_light = None
+            self._handle_map_error(error)
+
+    def _handle_map_error(self, error):
+        """Handle map initialization error."""
+        error_msg = (
+            f'RuntimeError: {error}\n'
+            '  The server could not send the OpenDRIVE (.xodr) file:\n'
+            '  Make sure it exists, has the same name of your town, and is correct.'
+        )
+        print(error_msg)
+        sys.exit(1)
 
     def get_local_planner(self):
         """Get method for protected member local planner"""
+        return self._local_planner
+
+    # 也可以同时提供属性访问方式
+    @property
+    def local_planner(self):
+        """Get the local planner instance (property version)."""
         return self._local_planner
 
     @staticmethod
@@ -1539,12 +1559,16 @@ class Agent(object):
         """
         Execute one step of navigation.
 
-            :param debug: boolean flag for debugging
-            :return: control
+        Args:
+            debug: Boolean flag for debugging
+
+        Returns:
+            control: Vehicle control command
         """
         control = carla.VehicleControl()
 
         if debug:
+            # 设置调试模式下的默认控制参数
             control.steer = 0.0
             control.throttle = 0.0
             control.brake = 0.0
@@ -1556,9 +1580,10 @@ class Agent(object):
     @staticmethod
     def emergency_stop():
         """
-        Send an emergency stop command to the vehicle
+        Send an emergency stop command to the vehicle.
 
-            :return: control for braking
+        Returns:
+            control: Emergency stop control command
         """
         control = carla.VehicleControl()
         control.steer = 0.0
