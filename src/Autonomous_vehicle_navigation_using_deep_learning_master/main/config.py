@@ -29,11 +29,15 @@ def get_current_trajectory():
 
 
 # ==================== 模型配置 ====================
-
-
+# 设置基础路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.dirname(current_dir)  # 上一级目录
+MODELS_DIR = os.path.join(base_dir, 'models')
+braking = os.path.join(MODELS_DIR, 'Braking___282.model')
+driving = os.path.join(MODELS_DIR, 'Driving__6030.model')
 MODEL_PATHS = {
-    'braking': "models/Braking___282.model" ,
-    'driving': "models/Driving__6030.model"
+    'braking': braking ,
+    'driving': driving
 }
 
 # ==================== 动作配置 ====================
