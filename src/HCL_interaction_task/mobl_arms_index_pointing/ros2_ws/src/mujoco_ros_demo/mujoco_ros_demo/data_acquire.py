@@ -75,22 +75,22 @@ class DataAcquisitionNode(Node):
             self.finger_joint_pub.publish(joint_msg)
             
             # 2. 发布目标小球位置
+            target_body_id = self.sim.model.body('target').id  
             ball_msg = PointStamped()
             ball_msg.header.stamp = self.get_clock().now().to_msg()
             ball_msg.header.frame_id = 'sim_world'
-            ball_msg.point.x = self.sim.data.qpos[self.sim.target_joint_ids[0]]
-            ball_msg.point.y = self.sim.data.qpos[self.sim.target_joint_ids[1]]
-            ball_msg.point.z = self.sim.data.qpos[self.sim.target_joint_ids[2]]
+            ball_msg.point.x = self.sim.data.xpos[target_body_id][0]
+            ball_msg.point.y = self.sim.data.xpos[target_body_id][1]
+            ball_msg.point.z = self.sim.data.xpos[target_body_id][2]
             self.target_ball_pub.publish(ball_msg)
             
             # 3. 发布手指末端位置
             tip_msg = PointStamped()
             tip_msg.header.stamp = self.get_clock().now().to_msg()
             tip_msg.header.frame_id = 'sim_world'
-            if self.sim.data.xpos.shape[0] > 1:
-                tip_msg.point.x = self.sim.data.xpos[1][0]
-                tip_msg.point.y = self.sim.data.xpos[1][1]
-                tip_msg.point.z = self.sim.data.xpos[1][2]
+            tip_msg.point.x = self.sim.data.xpos[self.sim.finger_tip_body_id][0]
+            tip_msg.point.y = self.sim.data.xpos[self.sim.finger_tip_body_id][1]
+            tip_msg.point.z = self.sim.data.xpos[self.sim.finger_tip_body_id][2]
             self.finger_tip_pub.publish(tip_msg)
             
             # 4. 发布仿真时间
