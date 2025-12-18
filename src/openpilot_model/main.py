@@ -112,7 +112,7 @@ def main():
     ax.legend()
     # -------------------------------------------------------------------
 
-    # 逐帧推理+轻量化可视化
+    
     print(f"\n开始推理+可视化（共{len(frame_tensors)-1}帧，按Q键退出）...")
     for i in range(len(frame_tensors) - 1):
         try:
@@ -122,7 +122,7 @@ def main():
             parsed = parser(outs)
             state = outs[-1]
 
-            # -------------------------- 仅更新线的数据，不重绘整个窗口 --------------------------
+        
             lll_line.set_data(parsed["lll"][0], range(192))  # 只更新左车道线数据
             rll_line.set_data(parsed["rll"][0], range(192))  # 只更新右车道线数据
             path_line.set_data(parsed["path"][0], range(192))# 只更新路径数据
@@ -144,7 +144,7 @@ def main():
             print(f"⚠️  帧 {i+1} 失败：{str(e)}")
             continue
 
-    # 释放资源（简化版）
+
     print("\n🎉 处理完成！")
     plt.ioff()
     plt.close()
