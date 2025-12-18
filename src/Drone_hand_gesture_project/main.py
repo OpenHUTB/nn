@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-手势控制无人机仿真系统 - 主程序（取消自动起飞版本）
-集成：手势识别 + 无人机控制 + 3D仿真
-"""
 import cv2
 import numpy as np
 import time
@@ -15,7 +10,15 @@ import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
-from gesture_detector import GestureDetector
+try:
+    from gesture_detector_enhanced import EnhancedGestureDetector
+    print("✅ 导入增强版手势检测器 (机器学习)")
+    HAS_ENHANCED_DETECTOR = True
+except ImportError:
+    print("⚠️  未找到增强版检测器，使用原始手势检测器")
+    from gesture_detector import GestureDetector
+    HAS_ENHANCED_DETECTOR = False
+
 from drone_controller import DroneController
 from simulation_3d import Drone3DViewer
 
@@ -42,7 +45,61 @@ class IntegratedDroneSimulation:
 
         # 初始化模块
         print("正在初始化手势检测器...")
-        self.gesture_detector = GestureDetector()
+
+        # 检查可用的模型文件（按优先级排序）
+        model_candidates = [
+            ("dataset/models/gesture_svm.pkl", "SVM模型"),
+            ("dataset/models/gesture_random_forest.pkl", "随机森林模型"),
+            ("dataset/models/gesture_mlp.pkl", "神经网络模型"),
+        ]
+
+        selected_model = None
+        selected_model_name = None
+
+        for model_path, model_name in model_candidates:
+            if os.path.exists(model_path):
+                file_size = os.path.getsize(model_path)
+                print(f"📁 找到 {model_name}: {file_size / 1024:.1f} KB")
+
+                # 检查文件大小是否合理
+                if file_size > 10 * 1024:
+                    selected_model = model_path
+                    selected_model_name = model_name
+                    print(f"✅ 选择: {model_name}")
+                    break
+
+        if selected_model:
+            print(f"🎯 使用模型: {selected_model_name}")
+
+            try:
+                from gesture_detector_enhanced import EnhancedGestureDetector
+                print("✅ 导入增强版手势检测器")
+
+                # 使用实际的模型文件
+                self.gesture_detector = EnhancedGestureDetector(
+                    ml_model_path=selected_model,
+                    use_ml=True
+                )
+
+                # 验证模型是否真正加载成功
+                if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
+                    print(f"✅ 机器学习模型加载成功 ({selected_model_name})")
+                    print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
+                else:
+                    print("⚠️  机器学习模型未加载，回退到规则检测")
+                    self.gesture_detector = EnhancedGestureDetector(use_ml=False)
+
+            except ImportError as e:
+                print(f"⚠️  无法导入增强版检测器: {e}")
+                print("✅ 使用原始手势检测器")
+                from gesture_detector import GestureDetector
+                self.gesture_detector = GestureDetector()
+
+        else:
+            print("⚠️  未找到可用的机器学习模型文件")
+            print("✅ 使用原始手势检测器")
+            from gesture_detector import GestureDetector
+            self.gesture_detector = GestureDetector()
 
         print("正在初始化无人机控制器...")
         self.drone_controller = DroneController(simulation_mode=True)
@@ -79,16 +136,23 @@ class IntegratedDroneSimulation:
         self.command_cooldown = 1.5  # 命令冷却时间（秒），从2.0降低到1.5
 
         # 手势识别阈值（降低以提高灵敏度）
+        # 如果是机器学习模式，阈值可以进一步降低
+        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml') and self.gesture_detector.use_ml:
+            print("✅ 使用机器学习模式，置信度阈值更低")
+            base_threshold = 0.55  # 机器学习可以更低
+        else:
+            base_threshold = 0.6  # 规则检测需要高一点
+
         self.gesture_thresholds = {
-            'open_palm': 0.6,  # 降低到0.6
-            'closed_fist': 0.65,  # 降低到0.65
-            'victory': 0.65,  # 降低到0.65
-            'thumb_up': 0.65,  # 降低到0.65
-            'thumb_down': 0.65,  # 降低到0.65
-            'pointing_up': 0.6,  # 降低到0.6
-            'pointing_down': 0.6,  # 降低到0.6
-            'ok_sign': 0.7,  # 稍微降低
-            'default': 0.6  # 默认阈值
+            'open_palm': base_threshold,
+            'closed_fist': base_threshold + 0.05,
+            'victory': base_threshold + 0.05,
+            'thumb_up': base_threshold + 0.05,
+            'thumb_down': base_threshold + 0.05,
+            'pointing_up': base_threshold,
+            'pointing_down': base_threshold,
+            'ok_sign': base_threshold + 0.1,
+            'default': base_threshold
         }
 
         # 初始化摄像头
@@ -98,10 +162,15 @@ class IntegratedDroneSimulation:
         self.data_log = []
         self.log_file = "flight_log.json"
 
-        # 不再自动起飞 - 完全由手势控制
         print("无人机初始化完成，等待手势指令...")
 
         print("无人机仿真系统初始化完成 ✓")
+
+        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
+            if self.gesture_detector.use_ml:
+                print("📊 当前模式: 机器学习手势识别")
+            else:
+                print("📊 当前模式: 规则手势识别")
 
     def _initialize_camera(self):
         """初始化摄像头"""
@@ -141,6 +210,15 @@ class IntegratedDroneSimulation:
         """手势识别循环"""
         print("手势识别线程启动...")
 
+        # 显示当前检测模式
+        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
+            if self.gesture_detector.use_ml:
+                mode_text = "机器学习模式"
+            else:
+                mode_text = "规则检测模式"
+        else:
+            mode_text = "规则检测模式"
+
         # 显示虚拟模式提示（如果摄像头未连接）
         if self.cap is None:
             print("⚠️ 使用虚拟摄像头模式，请连接摄像头进行真实手势识别")
@@ -160,25 +238,27 @@ class IntegratedDroneSimulation:
                     frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                     cv2.putText(frame, "Camera Error - Virtual Mode", (50, 50),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.putText(frame, "Connect camera for real gesture detection", (50, 100),
+                    cv2.putText(frame, f"Connect camera for real gesture detection", (50, 100),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)
+                    cv2.putText(frame, f"Mode: {mode_text}", (50, 140),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 100, 0), 1)
             else:
                 # 虚拟模式
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                 cv2.putText(frame, "Virtual Camera Mode", (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.putText(frame, "Gesture Commands:", (50, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                cv2.putText(frame, f"Gesture Commands ({mode_text}):", (50, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
                 cv2.putText(frame, "Open Palm - Takeoff", (50, 140),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "Closed Fist - Land", (50, 170),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "Victory - Forward", (50, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "Thumb Up - Backward", (50, 230),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "Press 'q' to quit", (50, 280),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
             # 手势检测
             try:
@@ -195,14 +275,14 @@ class IntegratedDroneSimulation:
                 self._process_gesture_command(gesture, confidence)
 
                 # 显示手势识别窗口
-                cv2.imshow('手势控制 - Gesture Control', processed_frame)
+                cv2.imshow('Gesture Control', processed_frame)
 
             except Exception as e:
                 print(f"手势检测错误: {e}")
                 self.current_frame = frame
                 self.current_gesture = None
 
-            # 检查退出
+                # 检查退出
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
                 print("收到退出指令...")
@@ -213,8 +293,47 @@ class IntegratedDroneSimulation:
                 self._switch_camera()
             elif key == ord('d'):  # 调试模式
                 self._debug_gesture_detection()
+            elif key == ord('m'):  # 切换模式（如果有多个模型）
+                self._switch_detection_mode()
 
         print("手势识别线程结束")
+
+    def _switch_detection_mode(self):
+        """切换检测模式（如果有多个可用模型）"""
+        if not HAS_ENHANCED_DETECTOR:
+            print("当前只有规则检测器可用")
+            return
+
+        # 检查可用的模型
+        model_files = [
+            ("dataset/models/gesture_ensemble.pkl", "集成模型"),
+            ("dataset/models/gesture_svm.pkl", "SVM模型"),
+            ("dataset/models/gesture_random_forest.pkl", "随机森林模型"),
+            ("dataset/models/gesture_mlp.pkl", "神经网络模型"),
+        ]
+
+        available_models = []
+        for path, name in model_files:
+            if os.path.exists(path):
+                available_models.append((path, name))
+
+        if len(available_models) == 0:
+            print("未找到任何机器学习模型")
+            return
+        elif len(available_models) == 1:
+            print(f"只有 {available_models[0][1]} 可用")
+            return
+
+        # 显示可用模型
+        print("\n可用的手势识别模型:")
+        for i, (path, name) in enumerate(available_models, 1):
+            print(f"  {i}. {name}")
+
+        print("按数字键选择模型，或按其他键取消")
+
+        # 这里简化处理，实际需要更复杂的交互
+        # 暂时只记录一下
+        print("注意: 需要重启程序切换模型")
 
     def _switch_camera(self):
         """切换摄像头"""
@@ -464,8 +583,20 @@ class IntegratedDroneSimulation:
     def run(self):
         """运行主程序"""
         print("=" * 60)
-        print("     手势控制无人机仿真系统（完全手势控制版）")
+        print("     手势控制无人机仿真系统（机器学习增强版）")
         print("=" * 60)
+
+        # 显示当前检测模式
+        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
+            if self.gesture_detector.use_ml:
+                mode_info = "机器学习模式 (更高精度)"
+            else:
+                mode_info = "规则检测模式 (基础)"
+        else:
+            mode_info = "规则检测模式"
+
+        print(f"检测模式: {mode_info}")
+
         print("系统功能:")
         print("  1. 实时手势识别 (8种手势)")
         print("  2. 无人机控制仿真")
@@ -561,7 +692,7 @@ def load_config():
 
 
 if __name__ == "__main__":
-    print("手势控制无人机仿真系统 - 启动（完全手势控制版）")
+    print("手势控制无人机仿真系统")
     print("=" * 60)
 
     # 检查必要的模块
