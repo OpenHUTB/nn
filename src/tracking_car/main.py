@@ -49,7 +49,7 @@ WEATHER = {
 }
 VEHICLE_CLS = {2:"Car",5:"Bus",7:"Truck",-1:"Unknown"}
 
-# ======================== 配置类（新增检测框样式配置） ========================
+# ======================== 配置类 ========================
 @dataclass
 class Config:
     host, port, num_npcs = "localhost", 2000, 20
@@ -66,14 +66,6 @@ class Config:
     use_lidar, lidar_channels, lidar_range, lidar_points_per_second, fuse_lidar_vision = True,32,100.0,500000,True
     record_data, record_dir, record_format, record_fps, save_screenshots = True,"track_records","csv",10,False
     use_3d_visualization, pcd_view_size = True,800
-    
-    # 新增：检测框样式配置（匹配截图）
-    det_box_color: tuple = (255, 0, 0)  # 检测框颜色（蓝色）
-    det_box_thickness: int = 2           # 框线宽度
-    det_label_bg_color: tuple = (0, 0, 0)# 标签背景色（黑色）
-    det_label_text_color: tuple = (255, 255, 255)  # 标签文字色（白色）
-    det_label_font_scale: float = 0.5    # 字体大小
-    det_label_padding: int = 5           # 标签内边距
 
     @classmethod
     def from_yaml(cls, p=None):
@@ -438,7 +430,7 @@ class DetThread(threading.Thread):
             except: self.out_q.put((None, np.array([])))
     def stop(self): self.running = False
 
-# ======================== 可视化工具（核心：优化检测框绘制） ========================
+# ======================== 可视化工具（优化版） ========================
 class FrameBuf:
     def __init__(self, sz=(480,640,3)):
         self.df = np.zeros(sz, dtype=np.uint8)
@@ -449,30 +441,6 @@ class FrameBuf:
             with self.lock: self.cf = f.copy()
     def get(self): return self.cf.copy()
 
-# 新增：绘制缓存类，提升性能
-class DrawCache:
-    """绘制缓存类，减少重复计算"""
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.label_cache = {}  # 缓存标签尺寸
-        self.color_cache = {}  # 缓存跟踪ID颜色
-
-    def get_label_size(self, text):
-        """缓存标签文字尺寸"""
-        if text not in self.label_cache:
-            size = cv2.getTextSize(
-                text, cv2.FONT_HERSHEY_SIMPLEX,
-                self.cfg.det_label_font_scale, 1
-            )[0]
-            self.label_cache[text] = size
-        return self.label_cache[text]
-
-    def get_track_color(self, track_id):
-        """缓存跟踪ID颜色"""
-        if track_id not in self.color_cache:
-            self.color_cache[track_id] = ((track_id*59)%256, (track_id*127)%256, (track_id*199)%256)
-        return self.color_cache[track_id]
-
 class FPS:
     def __init__(self, ws=15):
         self.ws = ws; self.times = []; self.fps =0.0
@@ -482,121 +450,73 @@ class FPS:
         if len(self.times)>=2: self.fps = (len(self.times)-1)/(self.times[-1]-self.times[0])
         return self.fps
 
-# 核心修改：自定义检测框绘制（匹配截图样式）
+# ======================== 核心绘制函数（优化版） ========================
 def draw(img, boxes, ids, cls_ids, tracks, fps=0.0, det_cnt=0, cfg=None, w="clear", perf=None):
+    """优化版绘制函数，简洁高效，匹配截图样式"""
     if not valid_img(img): 
         return np.zeros((480,640,3), dtype=np.uint8)
-    cfg = cfg or Config()
+    
     di = img.copy()
-    draw_cache = DrawCache(cfg)  # 初始化绘制缓存
     
-    # 1. 绘制顶部信息栏（性能/天气/计数）
-    ov = di.copy()
-    cv2.rectangle(ov, (10,10), (800,80), (0,0,0), -1)
-    cv2.addWeighted(ov,0.7,di,0.3,0,di)
+    # 1. 绘制顶部信息栏（简洁版）
+    info_height = 60
+    cv2.rectangle(di, (0, 0), (di.shape[1], info_height), (0, 0, 0), -1)
     
-    sc = sum(1 for t in tracks if t.is_stopped) if tracks else 0
-    oc = sum(1 for t in tracks if t.is_overtaking) if tracks else 0
-    lc = sum(1 for t in tracks if t.is_lane_changing) if tracks else 0
-    bc = sum(1 for t in tracks if t.is_braking) if tracks else 0
-    dc = sum(1 for t in tracks if t.is_dangerous) if tracks else 0
+    # FPS和基本信息
+    cv2.putText(di, f"FPS: {fps:.1f} | Weather: {w} | Tracks: {len(boxes)}", 
+                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
     
-    lines = [
-        f"FPS:{fps:.1f} | Weather:{w} | Tracks:{len(boxes)} | Dets:{det_cnt}",
-        f"Stop:{sc} | Overtake:{oc} | LaneChange:{lc} | Brake:{bc} | Danger:{dc}"
-    ]
-    if perf: 
-        lines.append(f"CPU:{perf['cpu']:.1f}% | MEM:{perf['mem']:.1f}% | GPU:{perf['gpu']:.1f}%")
+    # 行为统计
+    if tracks:
+        sc = sum(1 for t in tracks if t.is_stopped)
+        oc = sum(1 for t in tracks if t.is_overtaking)
+        dc = sum(1 for t in tracks if t.is_dangerous)
+        cv2.putText(di, f"Stop: {sc} | Overtake: {oc} | Danger: {dc}", 
+                    (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
     
-    for i, l in enumerate(lines):
-        cv2.putText(di, l, (15,30+i*20), cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,255,0),2,cv2.LINE_AA)
-
-    # 2. 绘制车辆检测框（核心：匹配截图样式）
-    if boxes is not None and ids is not None and cls_ids is not None and tracks is not None:
-        ml = min(len(boxes), len(ids), len(cls_ids), len(tracks))
-        for i in range(ml):
+    # 2. 绘制检测框（简化版，匹配截图）
+    if boxes is not None and ids is not None:
+        for i, (b, tid) in enumerate(zip(boxes, ids)):
             try:
-                b = boxes[i]
-                tid = ids[i]
-                cid = cls_ids[i]
-                t = tracks[i]
+                if len(b) != 4: continue
                 
-                # 过滤无效框
-                if b is None or len(b)!=4 or b[0]>=b[2] or b[1]>=b[3]: 
-                    continue
+                x1, y1, x2, y2 = map(int, b)
                 
-                x1,y1,x2,y2 = map(int, b)
-                cls_name = VEHICLE_CLS.get(cid, "Unknown")
-                conf = t.conf if hasattr(t, 'conf') else 0.0
+                # 检查坐标有效性
+                if x1 >= x2 or y1 >= y2: continue
                 
-                # ========== 核心：自定义检测框（匹配截图） ==========
-                # 1. 绘制蓝色检测框（无透明度，实线）
-                cv2.rectangle(di, (x1, y1), (x2, y2), cfg.det_box_color, cfg.det_box_thickness, cv2.LINE_AA)
+                # 蓝色检测框（截图样式）
+                cv2.rectangle(di, (x1, y1), (x2, y2), (255, 0, 0), 2, cv2.LINE_AA)
                 
-                # 2. 绘制标签（类别+置信度，黑底白字）
-                label = f"{cls_name} {conf:.2f}"
-                # 计算标签尺寸（缓存复用）
-                label_w, label_h = draw_cache.get_label_size(label)
-                # 绘制标签背景（紧贴框体顶部）
-                label_x1 = x1
-                label_y1 = y1 - label_h - 2*cfg.det_label_padding
-                label_x2 = x1 + label_w + 2*cfg.det_label_padding
-                label_y2 = y1
-                cv2.rectangle(
-                    di, (label_x1, label_y1), (label_x2, label_y2),
-                    cfg.det_label_bg_color, -1  # 实心背景
-                )
-                # 绘制标签文字
-                cv2.putText(
-                    di, label, 
-                    (x1 + cfg.det_label_padding, y1 - cfg.det_label_padding),
-                    cv2.FONT_HERSHEY_SIMPLEX, cfg.det_label_font_scale,
-                    cfg.det_label_text_color, 1, cv2.LINE_AA
-                )
-
-                # 3. 绘制跟踪ID（可选，绿色背景）
-                id_label = f"ID:{tid}"
-                id_w, id_h = cv2.getTextSize(id_label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
-                cv2.rectangle(
-                    di, (x1, label_y1 - id_h - 2*cfg.det_label_padding),
-                    (x1 + id_w + 2*cfg.det_label_padding, label_y1),
-                    (0, 255, 0), -1
-                )
-                cv2.putText(
-                    di, id_label,
-                    (x1 + cfg.det_label_padding, label_y1 - cfg.det_label_padding),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0,0,0), 1, cv2.LINE_AA
-                )
-
-                # 4. 行为标签（简化显示，红色背景）
-                behavior_tags = []
-                if t.is_stopped: behavior_tags.append("STOP")
-                if t.is_dangerous: behavior_tags.append("DANGER")
-                if behavior_tags:
-                    behavior_label = " | ".join(behavior_tags)
-                    bh_w, bh_h = cv2.getTextSize(behavior_label, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)[0]
-                    cv2.rectangle(
-                        di, (x2 - bh_w - 2*cfg.det_label_padding, y1 - bh_h - 2*cfg.det_label_padding),
-                        (x2, y1), (0,0,255), -1
-                    )
-                    cv2.putText(
-                        di, behavior_label,
-                        (x2 - bh_w - cfg.det_label_padding, y1 - cfg.det_label_padding),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255), 1, cv2.LINE_AA
-                    )
-
-                # 5. 简化轨迹绘制（只绘制最近5帧，提升性能）
-                if t and len(t.track_hist)>=2:
-                    hist = t.track_hist[-5:]
-                    for j in range(1, len(hist)):
-                        p1 = (int(hist[j-1][0]), int(hist[j-1][1]))
-                        p2 = (int(hist[j][0]), int(hist[j][1]))
-                        cv2.line(di, p1, p2, (0,255,0), 1, cv2.LINE_AA)
-
+                # 在左上角显示ID（白色背景，黑色文字）
+                id_text = f"{tid}"
+                text_size = cv2.getTextSize(id_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
+                
+                # 背景框
+                bg_x2 = x1 + text_size[0] + 6
+                bg_y2 = y1 + text_size[1] + 6
+                cv2.rectangle(di, (x1, y1), (bg_x2, bg_y2), (255, 255, 255), -1)
+                
+                # 文字
+                cv2.putText(di, id_text, (x1+3, y1+text_size[1]+3), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                
             except Exception as e:
-                logger.warning(f"绘制检测框失败: {e}")
                 continue
-
+    
+    # 3. 绘制轨迹线（可选，简化版）
+    if tracks:
+        for track in tracks:
+            if len(track.track_hist) >= 2:
+                # 只绘制最近5帧轨迹
+                for j in range(1, min(5, len(track.track_hist))):
+                    try:
+                        pt1 = (int(track.track_hist[-j-1][0]), int(track.track_hist[-j-1][1]))
+                        pt2 = (int(track.track_hist[-j][0]), int(track.track_hist[-j][1]))
+                        cv2.line(di, pt1, pt2, (0, 255, 0), 1, cv2.LINE_AA)
+                    except:
+                        pass
+    
     return di
 
 # ======================== 工具函数 ========================
