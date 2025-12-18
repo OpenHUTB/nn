@@ -2,7 +2,7 @@
 """
 CARLA全局路径规划节点 - 增强版
 提供从起始点到随机目标点的路径规划服务，并将规划结果通过ROS消息发布和可视化
-
+新增slam算法相关功能
 """
 
 import rclpy
@@ -12,7 +12,7 @@ from geometry_msgs.msg import PoseStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from carla_global_planner.srv import PlanGlobalPath
 from utilities.planner import compute_route_waypoints
-
+from nav_msgs.msg import Odometry
 import carla
 import random
 import time  # 新增：用于性能统计
@@ -104,7 +104,10 @@ class GlobalPlannerNode(Node):
 
             # TF broadcaster for SLAM
             self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
-
+            # SLAM相关发布器
+            self.odom_pub = self.create_publisher(Odometry, '/carla/ego_vehicle/odometry', 10)
+            self.odom_timer = self.create_timer(0.1, self.publish_odom)  # 10Hz发布里程计
+            self.vehicle = None  # 存储车辆actor
             self.carla_connected = True  # 新增：设置连接状态
             self.get_logger().info(
                 f"成功连接到CARLA服务器 {host}:{port} "
@@ -224,6 +227,53 @@ class GlobalPlannerNode(Node):
         t.transform.rotation.w = orientation[3]
         
         self.tf_broadcaster.sendTransform(t)
+    def publish_odom(self):
+        """发布里程计数据用于SLAM"""
+        if not self.vehicle:
+            # 获取ego车辆
+            actors = self.world.get_actors()
+            for actor in actors:
+                if actor.type_id.startswith('vehicle') and 'ego' in actor.attributes.get('role_name', ''):
+                    self.vehicle = actor
+                    break
+        
+        if self.vehicle:
+            transform = self.vehicle.get_transform()
+            velocity = self.vehicle.get_velocity()
+            
+            # 创建odom消息
+            odom = Odometry()
+            odom.header.stamp = self.get_clock().now().to_msg()
+            odom.header.frame_id = 'odom'
+            odom.child_frame_id = 'ego_vehicle'
+            
+            # 位置（转换CARLA坐标系到ROS）
+            odom.pose.pose.position.x = transform.location.x
+            odom.pose.pose.position.y = -transform.location.y
+            odom.pose.pose.position.z = transform.location.z
+            
+            # 方向（转换为四元数）
+            yaw_rad = math.radians(transform.rotation.yaw)
+            q = quaternion_from_euler(0, 0, yaw_rad)
+            odom.pose.pose.orientation.x = q[0]
+            odom.pose.pose.orientation.y = q[1]
+            odom.pose.pose.orientation.z = q[2]
+            odom.pose.pose.orientation.w = q[3]
+            
+            # 速度
+            odom.twist.twist.linear.x = velocity.x
+            odom.twist.twist.linear.y = -velocity.y
+            odom.twist.twist.linear.z = velocity.z
+            
+            self.odom_pub.publish(odom)
+            
+            # 发布TF变换 odom -> ego_vehicle
+            self.publish_tf_transform(
+                [odom.pose.pose.position.x, odom.pose.pose.position.y, odom.pose.pose.position.z],
+                [q[0], q[1], q[2], q[3]],
+                'odom',
+                'ego_vehicle'
+            )
 
     def _update_performance_stats(self, planning_time: float, waypoint_count: int, total_distance: float):
         """更新性能统计"""
@@ -422,6 +472,8 @@ class GlobalPlannerNode(Node):
             self.connection_check_timer.cancel()
         if hasattr(self, 'stats_timer'):
             self.stats_timer.cancel()
+        if hasattr(self, 'odom_timer'):
+            self.odom_timer.cancel()
 
 
 def main(args=None):
