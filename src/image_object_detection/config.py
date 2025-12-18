@@ -18,7 +18,7 @@ class Config:
 
         # 默认测试图像路径：位于项目根目录下的 data/test.jpg
         # 若用户未指定图像路径，系统将尝试加载此文件
-        self.default_image_path = os.path.join(base_dir, "data", "test.jpg")
+        self.default_image_path = r"C:\Users\apple\OneDrive\桌面\test.jpg"
 
         # YOLO 模型权重文件路径
         # 支持：
@@ -38,3 +38,4 @@ class Config:
         # FPS（帧率）输出的时间间隔（单位：秒）
         # 例如设为 1.0 表示每秒打印一次当前处理速度
         self.output_interval = 1.0
+

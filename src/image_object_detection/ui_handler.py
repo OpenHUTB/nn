@@ -5,8 +5,6 @@ import os
 import cv2
 import argparse
 from detection_engine import DetectionEngine
-from image_detector import ImageDetector
-from camera_detector import CameraDetector
 
 
 def parse_args():
@@ -92,7 +90,7 @@ class UIHandler:
         子菜单：让用户选择使用默认测试图像还是输入自定义路径。
         默认路径硬编码为桌面的 test.jpg（适用于快速测试）。
         """
-        default_image_path = r"C:\Users\apple\OneDrive\桌面\test.jpg"
+        default_image_path = self.config.default_image_path  # 使用配置中的默认图片路径
         print("\n--- Static Image Detection ---")
         print(f"a) Use default test image at: {default_image_path}")
         print("b) Enter custom image path")
@@ -111,6 +109,8 @@ class UIHandler:
             # 获取用户输入的路径，并展开 ~ 符号（如 ~/Pictures/img.jpg）
             custom_path = input("Enter full or relative image path: ").strip()
             custom_path = os.path.expanduser(custom_path)
+            # 移除可能的不可见 Unicode 控制字符（特别是从 Windows 复制的路径）
+            custom_path = ''.join(ch for ch in custom_path if ord(ch) != 0x202A)
             if not os.path.exists(custom_path):
                 print(f"❌ Error: File not found at: {custom_path}")
                 return
@@ -120,16 +120,34 @@ class UIHandler:
             print("Invalid choice. Returning to main menu.")
 
     def _run_static_detection(self, image_path):
-        """
-        执行静态图像检测流程。
-
+        """ 
+        执行静态图像检测流程。 
+        
         参数:
             image_path (str): 待检测图像的完整路径
         """
         print(f"🔍 Detecting objects in: {image_path}")
         try:
-            detector = ImageDetector(self.engine)
-            detector.detect_static_image(image_path)
+            # 直接读取图像
+            frame = cv2.imread(image_path)
+            if frame is None:
+                print(f"❌ Failed to load image from: {image_path}")
+                return
+
+            # 使用已有的 self.engine（DetectionEngine）进行检测
+            annotated_frame, results = self.engine.detect(frame)
+
+            # 显示结果
+            cv2.imshow("YOLO Detection Result", annotated_frame)
+            print("Detection completed. Press any key to close the window.")
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+
+            # 可选：保存结果
+            save_path = image_path.replace(".jpg", "_detected.jpg").replace(".png", "_detected.png")
+            cv2.imwrite(save_path, annotated_frame)
+            print(f"Result saved to: {save_path}")
+
         except Exception as e:
             print(f"❌ Detection failed: {e}")
             import traceback
@@ -141,6 +159,7 @@ class UIHandler:
         使用配置中的摄像头索引和输出间隔参数。
         """
         try:
+            from camera_detector import CameraDetector
             detector = CameraDetector(
                 detection_engine=self.engine,
                 output_interval=self.config.output_interval
