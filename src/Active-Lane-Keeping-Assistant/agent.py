@@ -7,7 +7,8 @@ import os
 class Agent():
     """Agent that outputs the desired behaviour given 
     """
-
+    SIMPLE_STEER_LIMIT = 0.75
+    SIMPLE_ERROR_TOLERANCE = 0.1
     def __init__(self, tau_p:float = 0, tau_d:float = 0, tau_i:float = 0,
         surface_lower_threshold:float = 20e6, throttle:float = 0.3,
         suface_upper_threshold=30e6, controller:str = 'simple') -> None:
@@ -137,22 +138,21 @@ class Agent():
         return steer, self.throttle
 
     @staticmethod
-    def _simple_controller(error:float) -> float:
-        """Hard Coded Controller
-
-        Args:
-            error (float): Difference to the center of the detected lane.
-
-        Returns:
-            float: Steering angle to use.
+    def _simple_controller(error: float) -> float:
+        """Hard Coded Controller - Optimized to use Class Constants
         """
-        if (abs(error) < 0.1):
-            steer = 0
-        elif error > 0:
-            steer = -0.75
-        else:
-            steer = 0.75
-        return steer
+        # 使用类中定义的常量，方便统一管理
+        limit = Agent.SIMPLE_STEER_LIMIT
+        tolerance = Agent.SIMPLE_ERROR_TOLERANCE
+
+        if (abs(error) < tolerance):
+            return 0.0
+
+        # 简化逻辑分支
+        if error > 0:
+            return -limit
+
+        return limit
 
     def _p_controller(self, error:float) -> float:
         """Proportional Controller

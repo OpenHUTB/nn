@@ -2,6 +2,15 @@
 
 from __future__ import print_function
 
+import sys
+import os
+
+# 获取当前脚本所在的目录，并找到agents文件夹的路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+agents_path = os.path.join(current_dir, 'agents')
+# 将该路径添加到模块搜索路径中
+if os.path.exists(agents_path):
+    sys.path.insert(0, agents_path)
 import argparse
 import collections
 import datetime
@@ -17,12 +26,14 @@ import weakref
 from enum import Enum
 from collections import deque
 
-
 try:
     import pygame
     from pygame.locals import KMOD_CTRL
     from pygame.locals import K_ESCAPE
     from pygame.locals import K_q
+    from pygame.locals import K_l
+    from pygame.locals import K_v
+    from pygame.locals import K_c
 except ImportError:
     raise RuntimeError('cannot import pygame, make sure pygame package is installed')
 
@@ -55,7 +66,8 @@ import carla
 from carla import ColorConverter as cc
 from torch.utils.tensorboard import SummaryWriter
 import torch
-#import tensorflow as tf
+
+# import tensorflow as tf
 
 # Create a SummaryWriter object to write the metrics to Tensorboard
 writer = SummaryWriter()
@@ -75,7 +87,9 @@ from agents.tools.misc import get_speed, positive, draw_waypoints, distance_vehi
 def find_weather_presets():
     """Method to find weather presets"""
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
+
     def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
+
     presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
@@ -128,7 +142,7 @@ class World(object):
             random.seed(args.seed)
 
         # KK Get a vehicle blueprint
-        #blueprint = self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017')[0]  # KK
+        # blueprint = self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017')[0]  # KK
         blueprint = self.world.get_blueprint_library().filter('model3')[0]
         blueprint.set_attribute('role_name', 'hero')
         if blueprint.has_attribute('color'):
@@ -151,7 +165,7 @@ class World(object):
                 sys.exit(1)
             spawn_points = self.map.get_spawn_points()
             spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
-            #spawn_point = spawn_points[0] if spawn_points else carla.Transform()  # KK
+            # spawn_point = spawn_points[0] if spawn_points else carla.Transform()  # KK
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
         # Set up the sensors.
         self.collision_sensor = CollisionSensor(self.player, self.hud)
@@ -205,21 +219,35 @@ class World(object):
 
 
 class KeyboardControl(object):
-    def __init__(self, world):
+    def __init__(self, world, start_locked=True):
         world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
+        # 可选：启动时自动锁定
+        if start_locked and world.camera_manager is not None:
+            world.camera_manager.set_lock_mode(True)
+            world.camera_manager.hud.notification("Camera Lock: ON", seconds=2.0)
 
-    def parse_events(self):
+    def parse_events(self, world):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
             if event.type == pygame.KEYUP:
                 if self._is_quit_shortcut(event.key):
                     return True
+                elif event.key == K_l:  # 按L键切换锁定
+                    if world.camera_manager is not None:
+                        world.camera_manager.toggle_lock()
+                elif event.key == K_v:  # 按V键切换锁定视角
+                    if world.camera_manager is not None and world.camera_manager.lock_mode:
+                        world.camera_manager.next_lock_view()
+                elif event.key == K_c:  # 按C键切换相机（原有功能）
+                    if world.camera_manager is not None:
+                        world.camera_manager.toggle_camera()
 
     @staticmethod
     def _is_quit_shortcut(key):
         """Shortcut for quitting"""
         return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
+
 
 # ==============================================================================
 # -- HUD -----------------------------------------------------------------------
@@ -281,7 +309,7 @@ class HUD(object):
             'Map:     % 20s' % world.map.name,
             'Simulation time: % 12s' % datetime.timedelta(seconds=int(self.simulation_time)),
             '',
-            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(vel.x**2 + vel.y**2 + vel.z**2)),
+            'Speed:   % 15.0f km/h' % (3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)),
             u'Heading:% 16.0f\N{DEGREE SIGN} % 2s' % (transform.rotation.yaw, heading),
             'Location:% 20s' % ('(% 5.1f, % 5.1f)' % (transform.location.x, transform.location.y)),
             'GNSS:% 24s' % ('(% 2.6f, % 3.6f)' % (world.gnss_sensor.lat, world.gnss_sensor.lon)),
@@ -311,8 +339,9 @@ class HUD(object):
             self._info_text += ['Nearby vehicles:']
 
         def dist(l):
-            return math.sqrt((l.x - transform.location.x)**2 + (l.y - transform.location.y)
-                             ** 2 + (l.z - transform.location.z)**2)
+            return math.sqrt((l.x - transform.location.x) ** 2 + (l.y - transform.location.y)
+                             ** 2 + (l.z - transform.location.z) ** 2)
+
         vehicles = [(dist(x.get_location()), x) for x in vehicles if x.id != world.player.id]
 
         for dist, vehicle in sorted(vehicles):
@@ -373,6 +402,7 @@ class HUD(object):
         self._notifications.render(display)
         self.help.render(display)
 
+
 # ==============================================================================
 # -- FadingText ----------------------------------------------------------------
 # ==============================================================================
@@ -407,6 +437,7 @@ class FadingText(object):
         """Render fading text method"""
         display.blit(self.surface, self.pos)
 
+
 # ==============================================================================
 # -- HelpText ------------------------------------------------------------------
 # ==============================================================================
@@ -417,7 +448,28 @@ class HelpText(object):
 
     def __init__(self, font, width, height):
         """Constructor method"""
-        lines = __doc__.split('\n')
+        lines = [
+            'Welcome to CARLA automatic control client',
+            '',
+            'Camera Control:',
+            '    C          : Change camera position',
+            '    L          : Toggle camera lock on vehicle',
+            '    V          : Change lock view (when locked)',
+            '    PageUp     : Toggle recording',
+            '',
+            'Vehicle Control:',
+            '    W          : Throttle',
+            '    S          : Brake',
+            '    A/D        : Steer left/right',
+            '    Q          : Toggle reverse',
+            '    P          : Toggle autopilot',
+            '',
+            'Miscellaneous:',
+            '    H          : Toggle help',
+            '    ESC        : Quit',
+            '    CTRL + Q   : Quit',
+        ]
+
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
@@ -438,6 +490,7 @@ class HelpText(object):
         """Render help text method"""
         if self._render:
             display.blit(self.surface, self.pos)
+
 
 # ==============================================================================
 # -- CollisionSensor -----------------------------------------------------------
@@ -482,6 +535,7 @@ class CollisionSensor(object):
         if len(self.history) > 4000:
             self.history.pop(0)
 
+
 # ==============================================================================
 # -- LaneInvasionSensor --------------------------------------------------------
 # ==============================================================================
@@ -512,6 +566,7 @@ class LaneInvasionSensor(object):
         lane_types = set(x.type for x in event.crossed_lane_markings)
         text = ['%r' % str(x).split()[-1] for x in lane_types]
         self.hud.notification('Crossed line %s' % ' and '.join(text))
+
 
 # ==============================================================================
 # -- GnssSensor --------------------------------------------------------
@@ -544,6 +599,7 @@ class GnssSensor(object):
             return
         self.lat = event.latitude
         self.lon = event.longitude
+
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
@@ -583,6 +639,24 @@ class CameraManager(object):
             ['sensor.camera.semantic_segmentation', cc.CityScapesPalette,
              'Camera Semantic Segmentation (CityScapes Palette)'],
             ['sensor.lidar.ray_cast', None, 'Lidar (Ray-Cast)']]
+
+        # 添加锁定模式相关属性
+        self.lock_mode = True  # 默认启用锁定模式
+        self.lock_target = parent_actor  # 锁定目标
+        self.lock_transform_index = 0  # 锁定模式的相机位置索引
+
+        # 定义锁定模式的相机变换（可以自定义不同角度）
+        self._lock_transforms = [
+            (carla.Transform(
+                carla.Location(x=-6.0, z=3.5), carla.Rotation(pitch=-10.0)), attachment.SpringArm),
+            (carla.Transform(
+                carla.Location(x=2.0, z=1.5), carla.Rotation(pitch=0.0)), attachment.Rigid),
+            (carla.Transform(
+                carla.Location(x=5.0, y=2.0, z=2.0), carla.Rotation(pitch=-5.0)), attachment.SpringArm),
+            (carla.Transform(
+                carla.Location(x=-10.0, z=5.0), carla.Rotation(pitch=-15.0)), attachment.SpringArm),
+        ]
+
         world = self._parent.get_world()
         bp_library = world.get_blueprint_library()
         for item in self.sensors:
@@ -606,23 +680,35 @@ class CameraManager(object):
         """Set a sensor"""
         index = index % len(self.sensors)
         needs_respawn = True if self.index is None else (
-            force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
+                force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
         if needs_respawn:
             if self.sensor is not None:
                 self.sensor.destroy()
                 self.surface = None
+
+            # 选择变换和附着类型
+            if self.lock_mode:
+                # 锁定模式使用锁定变换
+                transform, attachment_type = self._lock_transforms[self.lock_transform_index]
+            else:
+                # 非锁定模式使用原有变换
+                transform, attachment_type = self._camera_transforms[self.transform_index]
+
             self.sensor = self._parent.get_world().spawn_actor(
                 self.sensors[index][-1],
-                self._camera_transforms[self.transform_index][0],
+                transform,
                 attach_to=self._parent,
-                attachment_type=self._camera_transforms[self.transform_index][1])
+                attachment_type=attachment_type)
 
             # We need to pass the lambda a weak reference to
             # self to avoid circular reference.
             weak_self = weakref.ref(self)
             self.sensor.listen(lambda image: CameraManager._parse_image(weak_self, image))
         if notify:
-            self.hud.notification(self.sensors[index][2])
+            sensor_name = self.sensors[index][2]
+            if self.lock_mode:
+                sensor_name += " (Locked)"
+            self.hud.notification(sensor_name)
         self.index = index
 
     def next_sensor(self):
@@ -633,6 +719,30 @@ class CameraManager(object):
         """Toggle recording on or off"""
         self.recording = not self.recording
         self.hud.notification('Recording %s' % ('On' if self.recording else 'Off'))
+
+    def toggle_lock(self):
+        """切换锁定模式"""
+        self.lock_mode = not self.lock_mode
+        mode_text = "Camera Lock: ON" if self.lock_mode else "Camera Lock: OFF"
+        self.hud.notification(mode_text, seconds=2.0)
+        # 重新设置传感器以应用锁定模式
+        if self.sensor is not None:
+            self.set_sensor(self.index, notify=False, force_respawn=True)
+        return self.lock_mode
+
+    def set_lock_mode(self, enable=True):
+        """设置锁定模式"""
+        self.lock_mode = enable
+        return self.lock_mode
+
+    def next_lock_view(self):
+        """切换到下一个锁定视角"""
+        if self.lock_mode:
+            self.lock_transform_index = (self.lock_transform_index + 1) % len(self._lock_transforms)
+            self.hud.notification(f'Lock View {self.lock_transform_index + 1}', seconds=1.0)
+            # 重新设置传感器以应用新的锁定视角
+            if self.sensor is not None:
+                self.set_sensor(self.index, notify=False, force_respawn=True)
 
     def render(self, display):
         """Render method"""
@@ -663,9 +773,10 @@ class CameraManager(object):
             array = np.reshape(array, (image.height, image.width, 4))
             array = array[:, :, :3]
             array = array[:, :, ::-1]
-            
+
             #########################################################################################################################################
-############################################################  yolov3 ####################################################################
+
+        ############################################################  yolov3 ####################################################################
         def calculate_iou(box1, box2):
             """
             Calculate the Intersection over Union (IoU) between two bounding boxes.
@@ -701,7 +812,6 @@ class CameraManager(object):
 
             return iou
 
-        
         test_im = np.array(image.raw_data)
         test_im = test_im.copy()
         test_im = test_im.reshape((image.height, image.width, 4))
@@ -710,21 +820,21 @@ class CameraManager(object):
         # Load YOLO
         model_weights = 'yolov3.cfg'
         model_cfg = 'yolov3.weights'
-        #frameWidth = 1200
-        #frameHeight = 720
+        # frameWidth = 1200
+        # frameHeight = 720
         frameWidth = 640
         frameHeight = 480
         net = cv2.dnn.readNet(model_weights, model_cfg)
-        
+
         # Define your loss function
-        #loss_fn = tf.keras.losses.BinaryCrossentropy()
+        # loss_fn = tf.keras.losses.BinaryCrossentropy()
 
         classes = []
         with open("coco.names", "r") as f:
             classes = [line.strip() for line in f.readlines()]
 
         layers_names = net.getLayerNames()
-        #output_layers = [layers_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
+        # output_layers = [layers_names[i[0] - 1] for i in net.getUnconnectedOutLayers()]
         output_layers = [layers_names[i - 1] for i in net.getUnconnectedOutLayers()]
         colors = np.random.uniform(0, 255, size=(len(classes), 3))
 
@@ -734,7 +844,7 @@ class CameraManager(object):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
         # Detect objects
-        blob = cv2.dnn.blobFromImage(img, 1/255, (416, 416), (0, 0, 0), True, crop=False)
+        blob = cv2.dnn.blobFromImage(img, 1 / 255, (416, 416), (0, 0, 0), True, crop=False)
         net.setInput(blob)
         outs = net.forward(output_layers)
 
@@ -787,26 +897,29 @@ class CameraManager(object):
                 predicted_class_probs.append(label)
 
         # Ground truth annotations
-        ground_truth_labels = ['person', 'bicycle', 'car', 'traffic light', 'fire hydrant', 'pottedplant', 'stop sign', 'bench']
-        ground_truth_boxes = [[250, 220, 160, 190], [200, 200, 80, 80], [200, 200, 80, 80], [450, 90, 20, 50], [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80]]  # [x, y, w, h] format
-        
-        #def normalize_boxes(boxes, image_width, image_height):
-            # Convert box coordinates to numpy array
-           # boxes = np.array(boxes)
+        ground_truth_labels = ['person', 'bicycle', 'car', 'traffic light', 'fire hydrant', 'pottedplant', 'stop sign',
+                               'bench']
+        ground_truth_boxes = [[250, 220, 160, 190], [200, 200, 80, 80], [200, 200, 80, 80], [450, 90, 20, 50],
+                              [200, 200, 80, 80], [200, 200, 80, 80], [200, 200, 80, 80],
+                              [200, 200, 80, 80]]  # [x, y, w, h] format
 
-            # Extract box coordinates
-            #x, y, w, h = np.split(boxes, 4, axis=1)
+        # def normalize_boxes(boxes, image_width, image_height):
+        # Convert box coordinates to numpy array
+        # boxes = np.array(boxes)
 
-            # Normalize box coordinates
-            #normalized_x = x / image_width
-            #normalized_y = y / image_height
-            #normalized_w = w / image_width
-            #normalized_h = h / image_height
+        # Extract box coordinates
+        # x, y, w, h = np.split(boxes, 4, axis=1)
 
-            # Concatenate normalized coordinates
-           # normalized_boxes = np.concatenate((normalized_x, normalized_y, normalized_w, normalized_h), axis=1)
+        # Normalize box coordinates
+        # normalized_x = x / image_width
+        # normalized_y = y / image_height
+        # normalized_w = w / image_width
+        # normalized_h = h / image_height
 
-            #return normalized_boxes
+        # Concatenate normalized coordinates
+        # normalized_boxes = np.concatenate((normalized_x, normalized_y, normalized_w, normalized_h), axis=1)
+
+        # return normalized_boxes
         '''
         def preprocess_ground_truth(ground_truth_labels, ground_truth_boxes):
             # Define a dictionary to map class labels to class IDs
@@ -822,7 +935,7 @@ class CameraManager(object):
             }
         '''
 
-            # Convert class labels to class IDs#
+        # Convert class labels to class IDs#
         '''
             class_ids = [label_to_id[label] for label in ground_truth_labels]
 
@@ -832,7 +945,7 @@ class CameraManager(object):
 
             # Normalize bounding box coordinates
             normalized_boxes = normalize_boxes(ground_truth_boxes, width, height)  # Implement 'normalize_boxes' function to scale box coordinates between 0 and 1
-            
+
             print('Normalized Boxes Shape:', normalized_boxes.shape)
             print('One-Hot Labels Shape:', one_hot_labels.shape)
             print('Normalized Boxes Data Type:', normalized_boxes.dtype)
@@ -855,7 +968,6 @@ class CameraManager(object):
 
         #num_classes = len(label_to_id)
     '''
-        
 
         # Perform object matching for ground truth and detected objects
         TP = 0  # True positives
@@ -888,7 +1000,7 @@ class CameraManager(object):
 
         # Any remaining unmatched detected objects are false positives
         FP = len(detected_labels)
-        
+
         eps = 1e-7  # Small value to avoid division by zero
 
         # Calculate performance metrics
@@ -896,14 +1008,13 @@ class CameraManager(object):
         precision = TP / (TP + FP + eps)
         recall = TP / (TP + FN + eps)
         matt_corr_coeff = (TP - (FP * FN)) / math.sqrt((TP + FP + eps) * (TP + FN + eps) * (FP + eps) * (FN + eps))
-        
-        
-        # Calculate the loss
-        #ground_truth_targets = preprocess_ground_truth(ground_truth_labels, ground_truth_boxes)  # Preprocess the ground truth targets
 
-       # localization_loss = loss_fn(detected_boxes, ground_truth_targets)  # Calculate the localization loss
-       # confidence_loss = loss_fn(predicted_confidences, ground_truth_targets)  # Calculate the confidence loss
-       # class_prob_loss = loss_fn(predicted_class_probs, ground_truth_targets)  # Calculate the class probability loss
+        # Calculate the loss
+        # ground_truth_targets = preprocess_ground_truth(ground_truth_labels, ground_truth_boxes)  # Preprocess the ground truth targets
+
+        # localization_loss = loss_fn(detected_boxes, ground_truth_targets)  # Calculate the localization loss
+        # confidence_loss = loss_fn(predicted_confidences, ground_truth_targets)  # Calculate the confidence loss
+        # class_prob_loss = loss_fn(predicted_class_probs, ground_truth_targets)  # Calculate the class probability loss
 
         # Log the metrics to Tensorboard
         log_dir = "./logs3"  # Specify the log directory her
@@ -912,15 +1023,15 @@ class CameraManager(object):
         writer.add_scalar('Precision', precision, image.frame)
         writer.add_scalar('Recall', recall, image.frame)
         writer.add_scalar('IOU', max_iou, image.frame)
-        #writer.add_scalar('Matthews Correlation Coefficient', matt_corr_coeff)
-        #writer.add_scalar('Localization Loss', localization_loss, image.frame)
-        #writer.add_scalar('Confidence Loss', confidence_loss, image.frame)
-        #writer.add_scalar('Class Probability Loss', class_prob_loss, image.frame)
+        # writer.add_scalar('Matthews Correlation Coefficient', matt_corr_coeff)
+        # writer.add_scalar('Localization Loss', localization_loss, image.frame)
+        # writer.add_scalar('Confidence Loss', confidence_loss, image.frame)
+        # writer.add_scalar('Class Probability Loss', class_prob_loss, image.frame)
 
         # Show the annotated image
-        #cv2.imshow("Annotated Image", img)
-        #cv2.waitKey(0)
-        #cv2.destroyAllWindows()
+        # cv2.imshow("Annotated Image", img)
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
         self.surface = pygame.surfarray.make_surface(img.swapaxes(0, 1))
         if self.recording:
@@ -937,7 +1048,6 @@ class VehiclePIDController():
     (lateral and longitudinal) to perform the
     low level control a vehicle from client side
     """
-
 
     def __init__(self, vehicle, args_lateral, args_longitudinal, max_throttle=0.75, max_brake=0.3, max_steering=0.8):
         """
@@ -1012,7 +1122,6 @@ class PIDLongitudinalController():
     PIDLongitudinalController implements longitudinal control using a PID.
     """
 
-
     def __init__(self, vehicle, K_P=1.0, K_D=0.0, K_I=0.0, dt=0.03):
         """
         Constructor method.
@@ -1069,7 +1178,7 @@ class PIDLongitudinalController():
         return np.clip((self._k_p * error) + (self._k_d * _de) + (self._k_i * _ie), -1.0, 1.0)
 
 
-class PIDLateralController():
+class PIDLateralController:
     """
     PIDLateralController implements lateral control using a PID.
     """
@@ -1078,64 +1187,98 @@ class PIDLateralController():
         """
         Constructor method.
 
-            :param vehicle: actor to apply to local planner logic onto
-            :param K_P: Proportional term
-            :param K_D: Differential term
-            :param K_I: Integral term
-            :param dt: time differential in seconds
+        Args:
+            vehicle: Actor to apply local planner logic onto
+            K_P: Proportional term coefficient (default: 1.0)
+            K_D: Differential term coefficient (default: 0.0)
+            K_I: Integral term coefficient (default: 0.0)
+            dt: Time differential in seconds (default: 0.03)
         """
         self._vehicle = vehicle
         self._k_p = K_P
         self._k_d = K_D
         self._k_i = K_I
         self._dt = dt
-        self._e_buffer = deque(maxlen=10)
+        self._error_buffer = deque(maxlen=10)
 
     def run_step(self, waypoint):
         """
-        Execute one step of lateral control to steer
-        the vehicle towards a certain waypoin.
+        Execute one step of lateral control to steer the vehicle towards a waypoint.
 
-            :param waypoint: target waypoint
-            :return: steering control in the range [-1, 1] where:
-            -1 maximum steering to left
-            +1 maximum steering to right
+        Args:
+            waypoint: Target waypoint
+
+        Returns:
+            float: Steering control in range [-1, 1] where:
+                   -1 = maximum steering to left
+                   +1 = maximum steering to right
         """
         return self._pid_control(waypoint, self._vehicle.get_transform())
 
     def _pid_control(self, waypoint, vehicle_transform):
         """
-        Estimate the steering angle of the vehicle based on the PID equations
+        Estimate steering angle based on PID equations.
 
-            :param waypoint: target waypoint
-            :param vehicle_transform: current transform of the vehicle
-            :return: steering control in the range [-1, 1]
+        Args:
+            waypoint: Target waypoint
+            vehicle_transform: Current transform of the vehicle
+
+        Returns:
+            float: Steering control in range [-1, 1]
         """
+        # Calculate vehicle direction vector
         v_begin = vehicle_transform.location
-        v_end = v_begin + carla.Location(x=math.cos(math.radians(vehicle_transform.rotation.yaw)),
-                                         y=math.sin(math.radians(vehicle_transform.rotation.yaw)))
+        yaw_rad = math.radians(vehicle_transform.rotation.yaw)
+        v_end = v_begin + carla.Location(
+            x=math.cos(yaw_rad),
+            y=math.sin(yaw_rad)
+        )
 
+        # Calculate vectors
         v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
-        w_vec = np.array([waypoint.transform.location.x -
-                          v_begin.x, waypoint.transform.location.y -
-                          v_begin.y, 0.0])
-        _dot = math.acos(np.clip(np.dot(w_vec, v_vec) /
-                                 (np.linalg.norm(w_vec) * np.linalg.norm(v_vec)), -1.0, 1.0))
+        w_vec = np.array([
+            waypoint.transform.location.x - v_begin.x,
+            waypoint.transform.location.y - v_begin.y,
+            0.0
+        ])
 
-        _cross = np.cross(v_vec, w_vec)
+        # Calculate angle difference
+        v_norm = np.linalg.norm(v_vec)
+        w_norm = np.linalg.norm(w_vec)
+        dot_product = np.dot(w_vec, v_vec) / (v_norm * w_norm)
+        dot_product_clipped = np.clip(dot_product, -1.0, 1.0)
+        angle_diff = math.acos(dot_product_clipped)
 
-        if _cross[2] < 0:
-            _dot *= -1.0
+        # Determine sign based on cross product
+        cross_product = np.cross(v_vec, w_vec)
+        if cross_product[2] < 0:
+            angle_diff *= -1.0
 
-        self._e_buffer.append(_dot)
-        if len(self._e_buffer) >= 2:
-            _de = (self._e_buffer[-1] - self._e_buffer[-2]) / self._dt
-            _ie = sum(self._e_buffer) * self._dt
-        else:
-            _de = 0.0
-            _ie = 0.0
+        # Update error buffer and calculate PID terms
+        self._error_buffer.append(angle_diff)
 
-        return np.clip((self._k_p * _dot) + (self._k_d * _de) + (self._k_i * _ie), -1.0, 1.0)
+        # Calculate derivative and integral terms
+        derivative_error = self._calculate_derivative_error()
+        integral_error = self._calculate_integral_error()
+
+        # PID calculation with clamping
+        pid_output = (
+                self._k_p * angle_diff +
+                self._k_d * derivative_error +
+                self._k_i * integral_error
+        )
+
+        return np.clip(pid_output, -1.0, 1.0)
+
+    def _calculate_derivative_error(self):
+        """Calculate derivative error term."""
+        if len(self._error_buffer) >= 2:
+            return (self._error_buffer[-1] - self._error_buffer[-2]) / self._dt
+        return 0.0
+
+    def _calculate_integral_error(self):
+        """Calculate integral error term."""
+        return sum(self._error_buffer) * self._dt
 
 
 # ==============================================================================
@@ -1197,7 +1340,7 @@ class LocalPlanner(object):
         self._waypoint_buffer = deque(maxlen=self._buffer_size)
 
         self._init_controller()  # initializing controller
-        
+
     def get_distance_to_nearest_obstacle(self):
         ego_vehicle_transform = self._vehicle.get_transform()
         ego_vehicle_location = ego_vehicle_transform.location
@@ -1221,7 +1364,6 @@ class LocalPlanner(object):
 
                 if distance_to_nearest_obstacle is None or distance_to_obstacle < distance_to_nearest_obstacle:
                     distance_to_nearest_obstacle = distance_to_obstacle
-
 
         return distance_to_nearest_obstacle
 
@@ -1399,31 +1541,51 @@ class AgentState(Enum):
     BLOCKED_RED_LIGHT = 3
 
 
-class Agent(object):
+class Agent:
     """Base class to define agents in CARLA"""
 
     def __init__(self, vehicle):
         """
         Constructor method.
 
-            :param vehicle: actor to apply to local planner logic onto
+        Args:
+            vehicle: Actor to apply local planner logic onto
         """
         self._vehicle = vehicle
         self._proximity_tlight_threshold = 5.0  # meters
         self._proximity_vehicle_threshold = 10.0  # meters
         self._local_planner = None
         self._world = self._vehicle.get_world()
+        self._last_traffic_light = None
+
+        # 初始化地图，处理可能的错误
+        self._init_map()
+
+    def _init_map(self):
+        """Initialize the map with error handling."""
         try:
             self._map = self._world.get_map()
         except RuntimeError as error:
-            print('RuntimeError: {}'.format(error))
-            print('  The server could not send the OpenDRIVE (.xodr) file:')
-            print('  Make sure it exists, has the same name of your town, and is correct.')
-            sys.exit(1)
-        self._last_traffic_light = None
+            self._handle_map_error(error)
+
+    def _handle_map_error(self, error):
+        """Handle map initialization error."""
+        error_msg = (
+            f'RuntimeError: {error}\n'
+            '  The server could not send the OpenDRIVE (.xodr) file:\n'
+            '  Make sure it exists, has the same name of your town, and is correct.'
+        )
+        print(error_msg)
+        sys.exit(1)
 
     def get_local_planner(self):
         """Get method for protected member local planner"""
+        return self._local_planner
+
+    # 也可以同时提供属性访问方式
+    @property
+    def local_planner(self):
+        """Get the local planner instance (property version)."""
         return self._local_planner
 
     @staticmethod
@@ -1431,12 +1593,16 @@ class Agent(object):
         """
         Execute one step of navigation.
 
-            :param debug: boolean flag for debugging
-            :return: control
+        Args:
+            debug: Boolean flag for debugging
+
+        Returns:
+            control: Vehicle control command
         """
         control = carla.VehicleControl()
 
         if debug:
+            # 设置调试模式下的默认控制参数
             control.steer = 0.0
             control.throttle = 0.0
             control.brake = 0.0
@@ -1448,9 +1614,10 @@ class Agent(object):
     @staticmethod
     def emergency_stop():
         """
-        Send an emergency stop command to the vehicle
+        Send an emergency stop command to the vehicle.
 
-            :return: control for braking
+        Returns:
+            control: Emergency stop control command
         """
         control = carla.VehicleControl()
         control.steer = 0.0
@@ -1554,16 +1721,16 @@ class BehaviorAgent(Agent):
                     self.light_state = "Green"
         # Get distance to the nearest obstacle
         distance_to_nearest_obstacle = self._local_planner.get_distance_to_nearest_obstacle()
-        
+
         # Check if the obstacle is closer than the minimum distance
         if distance_to_nearest_obstacle is not None and distance_to_nearest_obstacle < 3.0:
             # Apply braking if the distance to the nearest obstacle is below the threshold
             self._local_planner.brake = 1.0
         else:
             self._local_planner.brake = 0.0
-        #else:
-            # This method also includes stop signs and intersections.
-            #self.light_state = str(self.vehicle.get_traffic_light_state())
+        # else:
+        # This method also includes stop signs and intersections.
+        # self.light_state = str(self.vehicle.get_traffic_light_state())
 
     def set_destination(self, start_location, end_location, clean=False):
         """
@@ -1634,7 +1801,7 @@ class BehaviorAgent(Agent):
 
         ego_vehicle_loc = self.vehicle.get_location()
         ego_vehicle_wp = self._map.get_waypoint(ego_vehicle_loc)
-        
+
         if self.is_at_traffic_light and self.light_state != "Green":
             # Stop at red traffic light
             control = carla.VehicleControl()
@@ -1654,7 +1821,8 @@ class BehaviorAgent(Agent):
             else:
                 # Continue following the planned route
                 control = self._local_planner.run_step(
-                    target_speed=min(self.behavior.max_speed, self.speed_limit - self.behavior.speed_lim_dist), debug=debug)
+                    target_speed=min(self.behavior.max_speed, self.speed_limit - self.behavior.speed_lim_dist),
+                    debug=debug)
         self.vehicle.apply_control(control)
 
         return control
@@ -1684,7 +1852,7 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
 
-        #selected_world = client.load_world("Town01")  # KK Changes world to Town04
+        # selected_world = client.load_world("Town01")  # KK Changes world to Town04
         selected_world = client.get_world()
 
         world = World(client.get_world(), hud, args)
@@ -1706,7 +1874,7 @@ def game_loop(args):
 
         while True:
             clock.tick_busy_loop(60)
-            if controller.parse_events():
+            if controller.parse_events(world):
                 return
 
             # As soon as the server is ready continue!
@@ -1714,10 +1882,10 @@ def game_loop(args):
                 continue
 
             if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events():
+                if controller.parse_events(world):
                     return
 
-                #agent.update_information(world)
+                # agent.update_information(world)
                 # as soon as the server is ready continue!
                 world.world.wait_for_tick(10.0)
 
@@ -1733,7 +1901,6 @@ def game_loop(args):
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
-            
 
             # Set new destination when target has been reached
             if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
@@ -1767,73 +1934,98 @@ def game_loop(args):
 def main():
     """Main method"""
 
+    # 参数解析器配置
     argparser = argparse.ArgumentParser(
-        description='CARLA Automatic Control Client')
+        description='CARLA Automatic Control Client'
+    )
+
+    # 参数定义
     argparser.add_argument(
         '-v', '--verbose',
         action='store_true',
         dest='debug',
-        help='Print debug information')
+        help='Print debug information'
+    )
     argparser.add_argument(
         '--host',
         metavar='H',
         default='127.0.0.1',
-        help='IP of the host server (default: 127.0.0.1)')
+        help='IP of the host server (default: 127.0.0.1)'
+    )
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
         default=2000,
         type=int,
-        help='TCP port to listen to (default: 2000)')
+        help='TCP port to listen to (default: 2000)'
+    )
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
         default='1280x720',
-        help='Window resolution (default: 1280x720)')
+        help='Window resolution (default: 1280x720)'
+    )
     argparser.add_argument(
         '--filter',
         metavar='PATTERN',
         default='vehicle.*',
-        help='Actor filter (default: "vehicle.*")')
+        help='Actor filter (default: "vehicle.*")'
+    )
     argparser.add_argument(
         '--gamma',
         default=2.2,
         type=float,
-        help='Gamma correction of the camera (default: 2.2)')
+        help='Gamma correction of the camera (default: 2.2)'
+    )
     argparser.add_argument(
         '-l', '--loop',
         action='store_true',
         dest='loop',
-        help='Sets a new random destination upon reaching the previous one (default: False)')
+        help='Sets a new random destination upon reaching the previous one (default: False)'
+    )
     argparser.add_argument(
-        '-b', '--behavior', type=str,
-        choices=["cautious", "normal", "aggressive"],
-        help='Choose one of the possible agent behaviors (default: normal) ',
-        default='normal')
-    argparser.add_argument("-a", "--agent", type=str,
-                           choices=["Behavior", "Roaming", "Basic"],
-                           help="select which agent to run",
-                           default="Behavior")
+        '-b', '--behavior',
+        type=str,
+        choices=['cautious', 'normal', 'aggressive'],
+        help='Choose one of the possible agent behaviors (default: normal)',
+        default='normal'
+    )
+    argparser.add_argument(
+        '-a', '--agent',
+        type=str,
+        choices=['Behavior', 'Roaming', 'Basic'],
+        help='Select which agent to run',
+        default='Behavior'
+    )
     argparser.add_argument(
         '-s', '--seed',
         help='Set seed for repeating executions (default: None)',
         default=None,
-        type=int)
+        type=int
+    )
 
+    # 解析参数
     args = argparser.parse_args()
 
-    args.width, args.height = [int(x) for x in args.res.split('x')]
+    # 解析分辨率
+    args.width, args.height = map(int, args.res.split('x'))
 
+    # 配置日志
     log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=log_level
+    )
 
-    logging.info('listening to server %s:%s', args.host, args.port)
+    logging.info('Listening to server %s:%s', args.host, args.port)
 
-    print(__doc__)
+    # 打印文档字符串（假设有外部文档）
+    if __doc__:
+        print(__doc__)
 
+    # 运行主循环
     try:
         game_loop(args)
-
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
 

@@ -47,7 +47,11 @@ class DetectionEngine:
 
         try:
             # 加载模型（若为官方模型且未下载，会自动联网下载）
+            print(f"尝试加载模型: {self.model_path}")  # 打印调试信息
             model = YOLO(self.model_path)
+        except Exception as e:
+            print(f"加载模型失败: {e}")  # 打印异常信息
+            raise e  # 重新抛出异常以便进一步处理    
         finally:
             # 确保无论是否出错，都恢复原始输出流
             sys.stdout = old_stdout
@@ -91,3 +95,4 @@ class DetectionEngine:
         annotated_frame = results[0].plot()  # results 总是包含至少一个元素
 
         return annotated_frame, results
+

@@ -7,12 +7,12 @@ import os
 import json
 from gymnasium import Env, spaces
 
-# 用于记录上一次车辆ID的临时文件（与脚本同目录）
 VEHICLE_ID_FILE = ".last_vehicle_id.json"
+TRAJECTORY_LOG_FILE = "trajectory.csv"
 
 
 class CarlaEnvMultiObs(Env):
-    def __init__(self, keep_alive_after_exit=True):
+    def __init__(self, keep_alive_after_exit=True, log_trajectory=True):
         super(CarlaEnvMultiObs, self).__init__()
         self.client = None
         self.world = None
@@ -20,9 +20,11 @@ class CarlaEnvMultiObs(Env):
         self._current_vehicle_id = None
         self.frame_count = 0
         self.max_frames = 1000
-        self.prev_x = 0.0
         self.spectator = None
         self.keep_alive = keep_alive_after_exit
+        self.log_trajectory = log_trajectory
+        self.trajectory_data = []
+
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32
         )
@@ -32,166 +34,146 @@ class CarlaEnvMultiObs(Env):
             dtype=np.float32
         )
 
+    def _connect_carla(self, max_retries=3):
+        """自动重试连接 CARLA"""
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 尝试连接 CARLA 服务器 (第 {attempt + 1} 次)...")
+                self.client = carla.Client('localhost', 2000)
+                self.client.set_timeout(10.0)
+                self.world = self.client.get_world()
+                if self.world is not None:
+                    print(f"✅ 成功连接到 CARLA！地图: {self.world.get_map().name}")
+                    return True
+            except Exception as e:
+                print(f"⚠️ 连接失败: {e}")
+                time.sleep(2)
+        raise RuntimeError("❌ 无法连接到 CARLA 服务器，请确保 CARLA 已启动！")
+
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
-        try:
-            if self.client is None:
-                print("🔄 尝试连接 CARLA 服务器...")
-                self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(20.0)
-                self.world = self.client.get_world()
-                if self.world is None:
-                    raise RuntimeError("❌ 无法获取 CARLA 世界！")
-                print(f"✅ 成功连接到 CARLA！地图: {self.world.get_map().name}")
 
-            # 🔥 关键修复：安全清理上一次车辆
-            self._destroy_last_run_vehicle()
+        self._connect_carla()
+        self._destroy_last_run_vehicle()
+        self.spawn_vehicle()
 
-            self.spawn_vehicle()
-            for _ in range(5):
-                self.world.tick()
-                time.sleep(0.05)
+        for _ in range(5):
+            self.world.tick()
+            time.sleep(0.05)
 
-            self.spectator = self.world.get_spectator()
-            self._update_spectator_view()
-            print("🎥 第三人称视角已激活（完整车身 + 前方道路可见）")
+        self.spectator = self.world.get_spectator()
+        self._update_spectator_view()
 
-            self.frame_count = 0
-            obs = self.get_observation()
-            self.prev_x = obs[0]
-            return obs, {}
-        except Exception as e:
-            print(f"❌ 初始化失败: {e}")
-            raise
+        self.trajectory_data = []
+        self.frame_count = 0
+        obs = self.get_observation()
+        return obs, {}
 
     def _destroy_last_run_vehicle(self):
-        """
-        安全销毁上一次运行留下的车辆。
-        即使 .last_vehicle_id.json 损坏、为空或不存在，也能优雅处理。
-        """
         if not os.path.exists(VEHICLE_ID_FILE):
-            print("ℹ️ 无历史车辆记录，跳过清理")
             return
-
-        last_id = None
         try:
-            # 安全读取：捕获所有 JSON 解析错误
             with open(VEHICLE_ID_FILE, 'r') as f:
-                content = f.read().strip()
-                if not content:
-                    print("⚠️ 车辆ID文件为空")
-                    return
-                data = json.loads(content)
+                data = json.load(f)
                 last_id = data.get("vehicle_id")
-                if last_id is None:
-                    print("⚠️ 车辆ID字段缺失")
-                    return
-        except (json.JSONDecodeError, OSError, ValueError) as e:
-            print(f"⚠️ 读取车辆ID文件失败（文件可能损坏）: {e}")
-            # 即使读取失败，也尝试删除该文件，避免下次再错
-            try:
-                os.remove(VEHICLE_ID_FILE)
-            except OSError:
-                pass
-            return
-
-        if not isinstance(last_id, int):
-            print(f"⚠️ 车辆ID类型无效: {type(last_id)}")
-            return
-
-        print(f"🧹 正在销毁上一次运行的车辆 (ID: {last_id})...")
-        batch = [carla.command.DestroyActor(last_id)]
-        responses = self.client.apply_batch_sync(batch, do_tick=True)
-        if responses[0].error:
-            print(f" - 销毁失败: {responses[0].error}")
-        else:
-            print("✅ 上次车辆已成功清理")
-
-        # 清理后删除文件（使用 try-except 避免权限错误）
+            if isinstance(last_id, int):
+                self.client.apply_batch_sync([carla.command.DestroyActor(last_id)], do_tick=True)
+        except Exception:
+            pass
         try:
             os.remove(VEHICLE_ID_FILE)
-        except OSError as e:
-            print(f"⚠️ 删除车辆ID文件失败: {e}")
+        except OSError:
+            pass
 
     def spawn_vehicle(self):
         blueprint_library = self.world.get_blueprint_library()
+        # 优先使用特斯拉，否则随机选一个
         vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-        if not vehicle_bp:
+        if not vehicle_bp or not vehicle_bp.has_attribute('number_of_wheels'):
             vehicle_bp = random.choice(blueprint_library.filter('vehicle.*'))
 
+        # 设置颜色（可选）
+        if vehicle_bp.has_attribute('color'):
+            color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+            vehicle_bp.set_attribute('color', color)
+
         map_name = self.world.get_map().name.lower()
-        if 'town01' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=-60.0, y=20.0, z=0.3),
-                carla.Rotation(yaw=90.0)
-            )
-        elif 'town03' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=70.0, y=-10.0, z=0.3),
-                carla.Rotation(yaw=180.0)
-            )
-        elif 'town05' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=-75.0, y=16.0, z=0.3),
-                carla.Rotation(yaw=90.0)
-            )
-        elif 'town10' in map_name:
+        spawn_transform = None
+
+        # 针对 Town10HD_Opt 使用已知安全点
+        if 'town10' in map_name:
             spawn_transform = carla.Transform(
                 carla.Location(x=100.0, y=130.0, z=0.3),
                 carla.Rotation(yaw=180.0)
             )
         else:
+            # 通用 fallback：使用第一个 spawn point
             spawn_points = self.world.get_map().get_spawn_points()
-            if not spawn_points:
-                raise RuntimeError("❌ 地图中没有可用的 spawn points！")
-            # 选择 z 最低的点（更安全）
-            spawn_transform = min(spawn_points, key=lambda t: t.location.z)
+            if spawn_points:
+                spawn_transform = spawn_points[0]
+            else:
+                # 极端 fallback：原点上方
+                spawn_transform = carla.Transform(carla.Location(x=0, y=0, z=1.0), carla.Rotation())
 
+        # 尝试主位置
         self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_transform)
+
+        # 如果失败，遍历所有 spawn points
         if self.vehicle is None:
-            spawn_points = self.world.get_map().get_spawn_points()
-            for transform in spawn_points:
-                safe_z = max(transform.location.z, 0.0) + 0.3
-                safe_transform = carla.Transform(
-                    carla.Location(x=transform.location.x, y=transform.location.y, z=safe_z),
-                    transform.rotation
+            print("⚠️ 主 spawn 点失败，尝试遍历所有可用点...")
+            all_spawn_points = self.world.get_map().get_spawn_points()
+            random.shuffle(all_spawn_points)  # 随机顺序避免总用同一个
+            for sp in all_spawn_points:
+                # 抬高一点防止穿地
+                safe_z = max(sp.location.z, 0.0) + 0.3
+                safe_sp = carla.Transform(
+                    carla.Location(x=sp.location.x, y=sp.location.y, z=safe_z),
+                    sp.rotation
                 )
-                self.vehicle = self.world.try_spawn_actor(vehicle_bp, safe_transform)
+                self.vehicle = self.world.try_spawn_actor(vehicle_bp, safe_sp)
                 if self.vehicle is not None:
+                    print(f"✅ 在备用点成功生成车辆: ({safe_sp.location.x:.1f}, {safe_sp.location.y:.1f})")
                     break
 
         if self.vehicle is None:
-            raise RuntimeError("❌ 无法生成车辆！")
+            raise RuntimeError("❌ 所有 spawn 点均无法生成车辆！请检查地图或 CARLA 状态。")
 
         self._current_vehicle_id = self.vehicle.id
         loc = self.vehicle.get_location()
-        print(f"✅ 车辆生成成功: {self.vehicle.type_id} | ID={self._current_vehicle_id} | 位置: ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})")
+        print(
+            f"✅ 车辆生成成功: {self.vehicle.type_id} | ID={self._current_vehicle_id} | 位置: ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})")
 
-        # ✅✅✅ 关键修复：原子写入车辆ID文件
-        temp_file = VEHICLE_ID_FILE + ".tmp"
         try:
-            with open(temp_file, 'w') as f:
+            with open(VEHICLE_ID_FILE, 'w') as f:
                 json.dump({"vehicle_id": self._current_vehicle_id}, f)
-            # 原子替换（在大多数系统上是原子的）
-            os.replace(temp_file, VEHICLE_ID_FILE)
         except Exception as e:
-            print(f"⚠️ 保存车辆ID失败（不影响运行）: {e}")
+            print(f"⚠️ 保存车辆ID失败: {e}")
 
     def _update_spectator_view(self):
+        """修复视角：温和第三人称，确保看到整车"""
         if not (self.vehicle and self.spectator):
             return
-        v_transform = self.vehicle.get_transform()
-        offset = carla.Location(x=-8.0, y=0.0, z=4.0)
-        spectator_loc = v_transform.transform(offset)
-        spectator_rot = carla.Rotation(
-            pitch=-20.0,
-            yaw=v_transform.rotation.yaw,
-            roll=0.0
-        )
-        self.spectator.set_transform(carla.Transform(spectator_loc, spectator_rot))
+        try:
+            v_transform = self.vehicle.get_transform()
+            # 相机：后方5米，右侧1米，上方2.2米（更低更稳）
+            offset = carla.Location(x=-5.0, y=1.0, z=2.2)
+            camera_loc = v_transform.transform(offset)
+            # 俯角 -10°（不要太陡），yaw 跟随车辆
+            spectator_rot = carla.Rotation(
+                pitch=-10.0,
+                yaw=v_transform.rotation.yaw,
+                roll=0.0
+            )
+            self.spectator.set_transform(carla.Transform(camera_loc, spectator_rot))
+        except Exception:
+            pass  # 容错
+
+    def _log_trajectory(self, x, y, speed):
+        if self.log_trajectory:
+            self.trajectory_data.append((x, y, speed))
 
     def get_observation(self):
         if not self.vehicle or not self.vehicle.is_alive:
@@ -218,13 +200,31 @@ class CarlaEnvMultiObs(Env):
         obs = self.get_observation()
         x, y, vx, vy = obs
         speed = np.linalg.norm([vx, vy])
-        reward = 0.1 * (x - self.prev_x) + 0.5 * speed
-        self.prev_x = x
+
+        vehicle_transform = self.vehicle.get_transform()
+        forward_vector = vehicle_transform.get_forward_vector()
+        forward_speed = vx * forward_vector.x + vy * forward_vector.y
+        reward = 1.0 * max(forward_speed, 0.0)
+        if speed < 0.1:
+            reward -= 0.5
+
+        self._log_trajectory(x, y, speed)
+
         terminated = False
         truncated = self.frame_count >= self.max_frames
         return obs, reward, terminated, truncated, {}
 
     def close(self):
+        if self.log_trajectory and self.trajectory_data:
+            try:
+                with open(TRAJECTORY_LOG_FILE, 'w') as f:
+                    f.write("x,y,speed\n")
+                    for x, y, speed in self.trajectory_data:
+                        f.write(f"{x:.3f},{y:.3f},{speed:.3f}\n")
+                print(f"📊 轨迹已保存至: {TRAJECTORY_LOG_FILE}")
+            except Exception as e:
+                print(f"⚠️ 轨迹保存失败: {e}")
+
         if self.keep_alive:
             print("ℹ️ 车辆已保留（ID已记录，下次运行时将自动清理）")
             if self.vehicle:
