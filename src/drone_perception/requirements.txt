@@ -1,0 +1,12 @@
+# 项目核心依赖
+# Python 版本要求：>= 3.7
+
+# AirSim 仿真器客户端库 (核心)
+airsim
+
+# 计算机视觉与图像处理
+opencv-python>=4.5.0
+numpy>=1.19.0
+
+# 网络通信支持 (airsim 的依赖，建议明确指定)
+msgpack-rpc-python
