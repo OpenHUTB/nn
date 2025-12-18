@@ -7,7 +7,8 @@ import os
 class Agent():
     """Agent that outputs the desired behaviour given 
     """
-
+    SIMPLE_STEER_LIMIT = 0.75
+    SIMPLE_ERROR_TOLERANCE = 0.1
     def __init__(self, tau_p:float = 0, tau_d:float = 0, tau_i:float = 0,
         surface_lower_threshold:float = 20e6, throttle:float = 0.3,
         suface_upper_threshold=30e6, controller:str = 'simple') -> None:
@@ -146,12 +147,14 @@ class Agent():
         Returns:
             float: Steering angle to use.
         """
-        if (abs(error) < 0.1):
+        limit = 0.75
+        tolerance = 0.1
+        if (abs(error) < tolerance):
             steer = 0
         elif error > 0:
-            steer = -0.75
+            steer = -limit
         else:
-            steer = 0.75
+            steer = limit
         return steer
 
     def _p_controller(self, error:float) -> float:
