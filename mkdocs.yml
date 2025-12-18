@@ -1,0 +1,47 @@
+site_name: 神经网络
+# 参考链接：https://blog.csdn.net/m0_63203517/article/details/129765689
+
+#repo_url: https://github.com/carla-simulator/carla
+#docs_dir: Docs
+#edit_uri: 'edit/master/Docs/'
+
+
+# 设置编译页面的链接的前缀
+repo_url: https://github.com/OpenHUTB/nn
+
+# 页面右上角添加直接编辑页面的按钮
+edit_uri: edit/master/docs/
+
+theme:
+  name: readthedocs
+  sticky_navigation: True
+  navigation_depth: 3
+  features:
+    - search.suggest # 在目录栏中的搜索框中输入一些字母时推荐补全整个单词
+extra_css: [extra.css]
+
+
+
+# mathjax用于单独公式展示
+extra_javascript:
+  - extra.js
+  - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
+
+plugins:
+#  - mkdocs-video
+  - search:
+      lang: ja
+      separator: '[\s\-\.]+'
+      min_search_length: 3
+
+extra:
+  generator: false
+
+nav:
+- 首页: 'index.md'
+
+
+# - mdx_math 用于行内公式显示
+markdown_extensions:
+  - admonition
+  - mdx_math
