@@ -621,6 +621,6 @@ if __name__ == "__main__":
         print(f"❌ Model file not found: {model_file}")
         sys.exit(1)
 
-    # Initialize and run controller
+
     controller = DynamicPatrolController(model_file)
     controller.run_simulation()
