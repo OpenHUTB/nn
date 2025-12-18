@@ -1,52 +1,56 @@
+import glob
+import os
+import time
 from stable_baselines3 import PPO
 from custom_env import AirSimMazeEnv
-import time
-import os
 
-MODEL_PATH = "models/drone_maze_final"  # 或者具体 checkpoint zip
-# 如果你有多个 final 文件，用绝对路径或最近的模型路径替换上面
+# === 配置路径 ===
+MODELS_DIR = r"D:\Others\MyAirsimprojects\models"
+
+
+def get_latest_model_path(path_dir):
+    list_of_files = glob.glob(os.path.join(path_dir, '*.zip'))
+    if not list_of_files:
+        return None
+    latest_file = max(list_of_files, key=os.path.getctime)
+    return latest_file
+
 
 def main():
+    # 实例化环境
     env = AirSimMazeEnv()
-    model = None
-    try:
-        # 尝试加载模型
-        if os.path.exists(MODEL_PATH + ".zip"):
-            model = PPO.load(MODEL_PATH, env=env)
-            print("成功加载模型:", MODEL_PATH)
-        else:
-            # 尝试寻找目录下最新 zip
-            import glob
-            zl = glob.glob("models/*.zip")
-            if zl:
-                model = PPO.load(sorted(zl, key=os.path.getctime)[-1], env=env)
-                print("加载最新模型:", sorted(zl, key=os.path.getctime)[-1])
-            else:
-                print("未找到模型，请先训练并保存模型。")
-                return
-    except Exception as e:
-        print("加载模型失败:", e)
+
+    # 寻找最新的模型
+    model_path = get_latest_model_path(MODELS_DIR)
+
+    if not model_path:
+        print("错误：没有找到任何训练好的模型！请先运行 train.py。")
         return
 
-    obs, _ = env.reset()
-    print("开始推理测试（按 Ctrl+C 停止）")
+    print(f"正在加载模型进行测试: {model_path}")
+    model = PPO.load(model_path)
 
+    # 开始测试循环
+    obs, _ = env.reset()
+
+    print("开始推理 (按 Ctrl+C 停止)...")
     try:
         while True:
+            # 预测动作 (deterministic=True 表示不使用随机探索，只用这一刻认为最好的动作)
             action, _states = model.predict(obs, deterministic=True)
+
+            # 执行动作
             obs, reward, done, truncated, info = env.step(action)
-            # 简单日志
-            print(f"step reward={reward:.3f}, done={done}")
+
+            # 如果结束了 (撞墙或到达)，自动重置
             if done:
-                print("回合结束，reset...")
-                time.sleep(0.5)
+                print("--- 回合结束，重置环境 ---")
                 obs, _ = env.reset()
-            # 小延迟以便观察（可移除）
-            time.sleep(0.02)
+
     except KeyboardInterrupt:
-        print("推理停止")
-    finally:
+        print("停止测试")
         env.close()
+
 
 if __name__ == "__main__":
     main()
