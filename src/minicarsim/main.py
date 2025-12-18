@@ -17,15 +17,17 @@ OUTPUT_DIR = "output/simulation_results"
 # LiDAR参数
 LIDAR_PARAMS = {
     "pos": [0, 0, 0.8],  # LiDAR在车辆上的安装位置
-    "range": 30.0,        # 探测范围（m）
-    "azimuth_res": 1.0,   # 方位角分辨率（°）
-    "elevation_res": 2.0, # 俯仰角分辨率（°）
-    "elevation_min": -15, # 最小俯仰角（°）
+    "range": 30.0,  # 探测范围（m）
+    "azimuth_res": 1.0,  # 方位角分辨率（°）
+    "elevation_res": 2.0,  # 俯仰角分辨率（°）
+    "elevation_min": -15,  # 最小俯仰角（°）
     "elevation_max": 15,  # 最大俯仰角（°）
-    "lines": 16,          # 线束数
+    "lines": 16,  # 线束数
 }
 # 仿真帧数
 SIMULATION_FRAMES = 1000
+
+
 # -------------------------------------------------------------
 
 class MojocoDataSim:
@@ -67,11 +69,11 @@ class MojocoDataSim:
             vehicle_pos, vehicle_quat = self.get_world_pose("vehicle")
         except ValueError:
             vehicle_pos = np.array([0, 0, 0.5])
-            
+
         # LiDAR相对位置
         lidar_offset = np.array(LIDAR_PARAMS["pos"])
         lidar_pos = vehicle_pos + lidar_offset
-        
+
         # 生成角度范围
         azimuth_angles = np.arange(0, 360, LIDAR_PARAMS["azimuth_res"])  # 方位角：0~360°
         elevation_angles = np.arange(
@@ -81,7 +83,7 @@ class MojocoDataSim:
         )  # 俯仰角
 
         point_cloud = []
-        
+
         # 遍历所有角度，生成激光束
         for az in azimuth_angles:
             for el in elevation_angles:
@@ -95,23 +97,23 @@ class MojocoDataSim:
                     np.cos(el_rad) * np.sin(az_rad),
                     np.sin(el_rad)
                 ])
-                
+
                 # 归一化方向向量
                 dir_local = dir_local / np.linalg.norm(dir_local)
-                
+
                 # 创建参数
                 geom_group = np.array([1, 1, 1, 1, 1, 1], dtype=np.uint8)
                 geom_id = np.zeros(1, dtype=np.int32)
-                
+
                 # 调用射线检测
                 distance = mujoco.mj_ray(
                     self.model, self.data,
-                    lidar_pos,      # 射线起点
-                    dir_local,      # 射线方向
-                    geom_group,     # 几何体组
-                    1,              # flg_static: 检测静态几何体
-                    -1,             # bodyexclude: 不排除任何body
-                    geom_id         # 返回碰撞的几何体ID
+                    lidar_pos,  # 射线起点
+                    dir_local,  # 射线方向
+                    geom_group,  # 几何体组
+                    1,  # flg_static: 检测静态几何体
+                    -1,  # bodyexclude: 不排除任何body
+                    geom_id  # 返回碰撞的几何体ID
                 )
 
                 # 记录点云数据
@@ -126,29 +128,29 @@ class MojocoDataSim:
         else:
             # 如果没有检测到点，返回空数组
             point_cloud = np.empty((0, 3))
-            
+
         return point_cloud
 
     def detect_objects(self):
         """检测环境中的物体"""
         detected_objects = []
-        
+
         # 遍历所有物体
         for i in range(self.model.nbody):
             body_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, i)
             if body_name and body_name.startswith("obstacle"):
                 # 获取物体位置
                 pos = self.data.xpos[i].copy()
-                
+
                 # 简单的距离检测（10米内认为可检测到）
                 try:
                     vehicle_pos, _ = self.get_world_pose("vehicle")
                     distance = np.linalg.norm(pos - vehicle_pos)
-                    
+
                     if distance <= 10.0:
                         # 获取物体类型（根据名称）
                         obj_type = "box"
-                        
+
                         detected_objects.append({
                             "id": i,
                             "name": body_name,
@@ -172,7 +174,7 @@ class MojocoDataSim:
         """生成物体检测标注数据"""
         # 检测到的物体
         detected_objects = self.detect_objects()
-        
+
         annotations = {
             "frame": self.frame_count,
             "timestamp": time.time(),
@@ -192,37 +194,156 @@ class MojocoDataSim:
 
         self.frame_count += 1
 
-    def run_simulation(self):
-        """运行MuJoCo仿真并生成数据"""
+    def key_callback(self, keycode):
+        """处理键盘事件的回调函数"""
+        # 将按键码存储在实例变量中，供仿真循环使用
+        self.pressed_key = keycode
+
+    def run_simulation(self, auto_drive=True):
+        """运行MuJoCo仿真并生成数据
+
+        Args:
+            auto_drive (bool): 是否启用自动驾驶模式，默认为True
+        """
         print("开始仿真...")
         self.frame_count = 0
-        
-        # 设置简单的控制输入
+
+        # 初始化按键状态
+        self.pressed_key = None
+
+        # 重新创建带有按键回调的viewer
+        self.viewer.close()
+        self.viewer = viewer.launch_passive(self.model, self.data, key_callback=self.key_callback)
+
         # 查找车辆的驱动关节
         rear_left_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "rear_left_wheel_motor")
         rear_right_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "rear_right_wheel_motor")
-        
+        front_left_steer_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_left_steering")
+        front_right_steer_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_right_steering")
+
         if rear_left_idx >= 0 and rear_right_idx >= 0:
             print("找到了车辆驱动关节")
-        
+        if front_left_steer_idx >= 0 and front_right_steer_idx >= 0:
+            print("找到了车辆转向关节")
+
         prev_detected_count = 0
-            
-        for i in range(SIMULATION_FRAMES):
-            # 设置控制输入（使车辆向前移动并轻微转向）
+
+        # 添加控制变量
+        forward_speed = 0.0
+        steering_angle = 0.0
+
+        # 自动驾驶参数
+        auto_speed = 6.0  # 进一步提高速度值
+
+        if auto_drive:
+            print("自动驾驶模式已启用，小车将以较快的速度前进")
+            print("按 W/S 加速/减速，按 A/D 左转/右转，按空格键切换自动驾驶，按 Q 退出")
+        else:
+            print("手动驾驶模式，按 W/S 前进/后退，按 A/D 左转/右转，按空格键切换自动驾驶，按 Q 退出")
+
+        # 用于限制数据保存频率的计数器
+        step_count = 0
+        auto_mode = auto_drive  # 当前是否为自动驾驶模式
+
+        # 确保初始状态下车辆前进
+        forward_speed = auto_speed if auto_drive else 0.0
+
+        while self.viewer.is_running():
+            # 处理键盘输入
+            if self.pressed_key is not None:
+                key = self.pressed_key
+                # 重置按键状态
+                self.pressed_key = None
+
+                # 切换自动驾驶模式
+                if key == ord(' '):  # 空格键
+                    auto_mode = not auto_mode
+                    if auto_mode:
+                        print("切换到自动驾驶模式")
+                    else:
+                        print("切换到手动驾驶模式")
+                elif key in [ord('w'), ord('W'), 265]:  # W键或上箭头键
+                    if auto_mode:
+                        auto_speed = min(auto_speed + 2.0, 10.0)  # 进一步增加自动驾驶速度，提高最大速度
+                        print(f"自动驾驶速度: {auto_speed}")
+                    else:
+                        forward_speed = 6.0  # 进一步提高手动控制前进速度
+                elif key in [ord('s'), ord('S'), 264]:  # S键或下箭头键
+                    if auto_mode:
+                        auto_speed = max(auto_speed - 2.0, 1.0)  # 减少自动驾驶速度
+                        print(f"自动驾驶速度: {auto_speed}")
+                    else:
+                        forward_speed = -4.0  # 进一步提高手动控制后退速度
+                elif key in [ord('a'), ord('A'), 263]:  # A键或左箭头键
+                    steering_angle = 0.8
+                elif key in [ord('d'), ord('D'), 262]:  # D键或右箭头键
+                    steering_angle = -0.8
+                elif key == ord('q') or key == ord('Q'):
+                    print("用户请求退出")
+                    break
+                else:
+                    # 没有按键时逐渐减速
+                    if not auto_mode:
+                        forward_speed *= 0.9
+                        if abs(forward_speed) < 0.1:
+                            forward_speed = 0.0
+
+                    steering_angle *= 0.8
+                    if abs(steering_angle) < 0.05:
+                        steering_angle = 0.0
+            else:
+                # 没有按键时逐渐减速
+                if not auto_mode:
+                    forward_speed *= 0.9
+                    if abs(forward_speed) < 0.1:
+                        forward_speed = 0.0
+                else:
+                    # 自动驾驶模式下保持设定速度
+                    forward_speed = auto_speed
+
+                steering_angle *= 0.8
+                if abs(steering_angle) < 0.05:
+                    steering_angle = 0.0
+
+            # 根据模式设置控制输入
+            if auto_mode:
+                # 自动驾驶模式: 保持恒定速度前进
+                current_speed = auto_speed
+            else:
+                # 手动模式: 使用手动控制的速度
+                current_speed = forward_speed
+
+            # 如果是自动驾驶模式，确保车辆始终前进
+            if auto_mode and current_speed > 0:
+                # 确保即使没有按键也保持前进
+                pass
+
+            # 设置控制输入（使车辆前进和转向）
             if rear_left_idx >= 0:
-                self.data.ctrl[rear_left_idx] = 5.0  # 左后轮速度
+                self.data.ctrl[rear_left_idx] = current_speed
             if rear_right_idx >= 0:
-                self.data.ctrl[rear_right_idx] = 5.0  # 右后轮速度
-                
+                self.data.ctrl[rear_right_idx] = current_speed
+            if front_left_steer_idx >= 0:
+                self.data.ctrl[front_left_steer_idx] = steering_angle
+            if front_right_steer_idx >= 0:
+                self.data.ctrl[front_right_steer_idx] = steering_angle
+
             # 执行仿真步长
             mujoco.mj_step(self.model, self.data)
-            
-            # 每20帧生成和保存一次数据
-            if i % 20 == 0:
+
+            # 更新可视化窗口
+            self.viewer.sync()
+
+            # 确保窗口保持在前台
+            if hasattr(self.viewer, 'render'):
+                self.viewer.render()
+
+            # 每20步生成和保存一次数据
+            if step_count % 20 == 0:
                 # 生成传感器数据和标注
                 lidar_data = self.generate_realistic_lidar_data()
                 annotations = self.generate_annotations()
-                
+
                 # 显示检测到的物体数量
                 detected_count = len(annotations["objects"])
                 if detected_count != prev_detected_count:
@@ -236,23 +357,28 @@ class MojocoDataSim:
 
                 # 保存数据
                 self.save_data(lidar_data, annotations)
-                
-                print(f"已仿真 {i}/{SIMULATION_FRAMES} 帧")
-                
+
+                print(f"已仿真 {step_count} 帧")
+
+            step_count += 1
+
             # 控制仿真速度以便观察
             time.sleep(0.02)
 
-        print(f"仿真完成！数据已保存到：{self.output_dir}")
+        print(f"仿真完成! 数据已保存到: {self.output_dir}")
+
 
 if __name__ == "__main__":
     print("正在初始化仿真器...")
     try:
         sim = MojocoDataSim(XML_PATH, OUTPUT_DIR)
-        sim.run_simulation()
+        # 默认启用自动驾驶模式
+        sim.run_simulation(auto_drive=True)
     except FileNotFoundError as e:
         print(f"找不到模型文件: {e}")
         print("请确认XML文件路径是否正确")
     except Exception as e:
         print(f"仿真过程中出现错误: {e}")
         import traceback
+
         traceback.print_exc()
