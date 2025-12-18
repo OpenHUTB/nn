@@ -77,59 +77,42 @@ for _ in range(5):
 if not vehicle:
     raise Exception("主角车辆生成失败，请重启CARLA服务器")
 
-# 4. 初始化摄像头通用函数（复用代码，修复shutter_speed属性问题）
-def init_camera(vehicle, camera_type, transform, width=1024, height=720, fov=90):
-    """
-    初始化摄像头（RGB/语义分割）
-    :param vehicle: 挂载的车辆
-    :param camera_type: 摄像头类型（'rgb'/'semantic'）
-    :param transform: 摄像头位姿
-    :param width/height: 图像分辨率
-    :param fov: 视场角
-    :return: 摄像头actor + 数据队列
-    """
-    if camera_type == 'rgb':
-        camera_bp = bp_lib.find('sensor.camera.rgb')
-    elif camera_type == 'semantic':
-        camera_bp = bp_lib.find('sensor.camera.semantic_segmentation')
-    else:
-        raise ValueError("camera_type must be 'rgb' or 'semantic'")
-    
-    # 通用属性（所有摄像头都支持）
-    camera_bp.set_attribute('image_size_x', str(width))
-    camera_bp.set_attribute('image_size_y', str(height))
-    camera_bp.set_attribute('fov', str(fov))
-    
-    # 仅RGB摄像头设置shutter_speed（语义分割摄像头不支持）
-    if camera_type == 'rgb':
-        camera_bp.set_attribute('shutter_speed', '100')
-    
-    camera = world.spawn_actor(camera_bp, transform, attach_to=vehicle)
+# 4. 初始化RGB摄像头
+def init_rgb_camera(vehicle):
+    camera_bp = bp_lib.find('sensor.camera.rgb')
+    camera_bp.set_attribute('image_size_x', '1024')
+    camera_bp.set_attribute('image_size_y', '720')
+    camera_bp.set_attribute('fov', '90')
+    camera_bp.set_attribute('shutter_speed', '100')
+    camera_transform = carla.Transform(
+        carla.Location(x=2.0, z=1.5),
+        carla.Rotation(pitch=-5)
+    )
+    camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
     image_queue = queue.Queue()
     camera.listen(image_queue.put)
-    print(f"{camera_type.upper()}摄像头初始化完成（{transform.location}）")
+    print("RGB摄像头初始化完成")
     return camera, image_queue
 
-# 4.1 初始化前视RGB摄像头（原有）
-front_rgb_transform = carla.Transform(
-    carla.Location(x=2.0, z=1.5),
-    carla.Rotation(pitch=-5)
-)
-front_rgb_camera, front_rgb_queue = init_camera(vehicle, 'rgb', front_rgb_transform)
+# 5. 初始化语义分割摄像头
+def init_semantic_camera(vehicle):
+    sem_bp = bp_lib.find('sensor.camera.semantic_segmentation')
+    sem_bp.set_attribute('image_size_x', '1024')
+    sem_bp.set_attribute('image_size_y', '720')
+    sem_bp.set_attribute('fov', '90')
+    sem_transform = carla.Transform(
+        carla.Location(x=2.0, z=1.5),
+        carla.Rotation(pitch=-5)
+    )
+    sem_camera = world.spawn_actor(sem_bp, sem_transform, attach_to=vehicle)
+    sem_queue = queue.Queue()
+    sem_camera.listen(sem_queue.put)
+    print("语义分割摄像头初始化完成")
+    return sem_camera, sem_queue
 
-# 4.2 初始化前视语义分割摄像头（修复shutter_speed问题）
-front_sem_transform = carla.Transform(
-    carla.Location(x=2.0, z=1.5),
-    carla.Rotation(pitch=-5)
-)
-front_sem_camera, front_sem_queue = init_camera(vehicle, 'semantic', front_sem_transform)
-
-# 4.3 新增：初始化俯视RGB摄像头（鸟瞰视角）
-top_rgb_transform = carla.Transform(
-    carla.Location(x=0.0, z=8.0),  # 车辆正上方8米
-    carla.Rotation(pitch=-90)      # 垂直向下俯视
-)
-top_rgb_camera, top_rgb_queue = init_camera(vehicle, 'rgb', top_rgb_transform, fov=120)  # 广角120°覆盖更多区域
+# 初始化摄像头
+rgb_camera, rgb_queue = init_rgb_camera(vehicle)
+sem_camera, sem_queue = init_semantic_camera(vehicle)
 
 # 6. 生成NPC车辆
 npc_count = 100
@@ -251,13 +234,13 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：多视角可视化 + 性能监控）
+# 9. 主循环（核心：RGB与语义分割图像拼接显示 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：前视+俯视双视角可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
+print(f"功能：RGB与语义分割图像拼接显示 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 平滑视角 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
-# ==================== 性能监控初始化 ====================
+# ==================== 新增：性能监控初始化 ====================
 start_time = time.time()
 frame_counter = 0
 current_fps = 0.0
@@ -271,8 +254,9 @@ try:
         world.tick()
         last_spectator_tf = set_spectator_smooth(last_spectator_tf)
         
-        # ==================== 实时FPS计算 ====================
+        # ==================== 新增：实时FPS计算 ====================
         frame_counter += 1
+        # 每30帧更新一次FPS（避免频繁计算）
         if frame_counter % 30 == 0:
             elapsed_time = time.time() - start_time
             current_fps = 30.0 / elapsed_time if elapsed_time > 0 else 0.0
@@ -280,74 +264,61 @@ try:
             frame_counter = 0
         # =================================================================
         
-        # 同时获取三个摄像头数据（帧同步：前视RGB + 前视语义 + 俯视RGB）
-        if not front_rgb_queue.empty() and not front_sem_queue.empty() and not top_rgb_queue.empty():
-            # 1. 处理前视RGB图像
-            front_rgb_image = front_rgb_queue.get()
-            front_rgb_img = np.reshape(np.copy(front_rgb_image.raw_data), 
-                                     (720, 1024, 4))[:, :, :3]
+        # 同时获取RGB和语义分割图像（确保帧同步）
+        if not rgb_queue.empty() and not sem_queue.empty():
+            # 处理RGB图像（移除alpha通道，保留RGB）
+            rgb_image = rgb_queue.get()
+            rgb_img = np.reshape(np.copy(rgb_image.raw_data), 
+                                (rgb_image.height, rgb_image.width, 4))[:, :, :3]  # 取前3通道（RGB）
             
-            # 2. 处理前视语义分割图像
-            front_sem_image = front_sem_queue.get()
-            front_sem_data = np.reshape(np.copy(front_sem_image.raw_data), 
-                                      (720, 1024, 4))[:, :, 2].astype(np.int32)
-            front_sem_rgb = np.zeros((720, 1024, 3), dtype=np.uint8)
+            # 处理语义分割图像（转换为彩色可视化）
+            sem_image = sem_queue.get()
+            sem_data = np.reshape(np.copy(sem_image.raw_data), 
+                                (sem_image.height, sem_image.width, 4))[:, :, 2].astype(np.int32)
+            sem_rgb = np.zeros((sem_image.height, sem_image.width, 3), dtype=np.uint8)
             for i in range(len(CITYSCAPES_PALETTE)):
-                front_sem_rgb[front_sem_data == i] = CITYSCAPES_PALETTE[i]
+                sem_rgb[sem_data == i] = CITYSCAPES_PALETTE[i]
             
-            # 3. 处理俯视RGB图像（调整分辨率匹配前视图）
-            top_rgb_image = top_rgb_queue.get()
-            top_rgb_img = np.reshape(np.copy(top_rgb_image.raw_data), 
-                                    (720, 1024, 4))[:, :, :3]
+            # 横向拼接两张图像（宽度合并，高度不变）
+            combined_img = cv2.hconcat([rgb_img, sem_rgb])
             
-            # 4. 多视角图像拼接：
-            #    上半部分：前视RGB + 前视语义分割
-            #    下半部分：俯视RGB（居中显示，左右补黑边匹配宽度）
-            upper_part = cv2.hconcat([front_rgb_img, front_sem_rgb])  # 宽度2048，高度720
-            # 补全俯视图像宽度到2048（和上半部分一致）
-            top_rgb_padded = np.zeros((720, 2048, 3), dtype=np.uint8)
-            top_rgb_padded[:, (2048-1024)//2 : (2048+1024)//2] = top_rgb_img  # 居中
-            # 上下拼接最终图像
-            combined_img = cv2.vconcat([upper_part, top_rgb_padded])  # 宽度2048，高度1440
-            
-            # 5. 添加视角标题
-            # 前视RGB标题
-            cv2.putText(combined_img, "Front View (RGB)", 
+            # ==================== 修复：调整标题位置，为性能监控腾出空间 ====================
+            cv2.putText(combined_img, 
+                       f"RGB Image | Semantic Segmentation (Vehicles:{actual_npc_count} Pedestrians:{actual_walker_count})", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 前视语义标题
-            cv2.putText(combined_img, "Front View (Semantic)", 
-                       (1024 + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 俯视标题
-            cv2.putText(combined_img, "Top View (RGB / Bird's Eye)", 
-                       (10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # =================================================================
             
-            # 6. 绘制性能监控（左上角，标题下方）
+            # ==================== 修复：性能监控移到左上角标题下方，避免被裁剪 ====================
+            # 性能信息列表
             perf_info = [
                 f"FPS: {current_fps:.1f}",
-                f"RGB Queue: {front_rgb_queue.qsize()}",
-                f"Sem Queue: {front_sem_queue.qsize()}",
+                f"RGB Queue: {rgb_queue.qsize()}",
+                f"Sem Queue: {sem_queue.qsize()}",
                 f"Sync Frame: {world.get_snapshot().frame}",
-                f"Vehicles: {actual_npc_count} | Pedestrians: {actual_walker_count}"
+                f"Fixed Delta: {settings.fixed_delta_seconds:.3f}s"
             ]
+            
+            # 绘制位置：左上角，标题下方（y从60开始）
             perf_x = 10
-            perf_y = 60
+            perf_y = 60  # 标题在30位置，这里从60开始
             perf_line_height = 25
-            perf_color = (0, 255, 255)  # 黄色
+            perf_color = (0, 255, 255)  # 黄色字体
+            
             for idx, info in enumerate(perf_info):
                 y_pos = perf_y + idx * perf_line_height
-                # 半透明背景
+                # 绘制半透明黑色背景（提升可读性）
                 cv2.rectangle(combined_img, 
                               (perf_x - 5, y_pos - 15), 
-                              (perf_x + 300, y_pos + 5), 
+                              (perf_x + 220, y_pos + 5), 
                               (0, 0, 0), -1)
-                cv2.putText(combined_img, info, (perf_x, y_pos), 
+                # 绘制性能文本
+                cv2.putText(combined_img, info, 
+                           (perf_x, y_pos), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, perf_color, 2)
+            # =================================================================
             
-            # 7. 显示最终图像（自动调整窗口大小）
-            cv2.namedWindow('CARLA Multi-View (Front + Top) + Semantic Segmentation', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('CARLA Multi-View (Front + Top) + Semantic Segmentation', 1920, 1080)
-            cv2.imshow('CARLA Multi-View (Front + Top) + Semantic Segmentation', combined_img)
-            
+            # 显示拼接后的图像
+            cv2.imshow('CARLA RGB + Semantic Segmentation (with Pedestrians & Performance)', combined_img)
             if cv2.waitKey(1) == ord('q'):
                 break
         
@@ -356,28 +327,24 @@ try:
 except KeyboardInterrupt:
     print("\n用户中断，清理资源...")
 finally:
-    # ==================== 清理所有摄像头资源 ====================
-    # 前视RGB
-    front_rgb_camera.stop()
-    front_rgb_camera.destroy()
-    # 前视语义
-    front_sem_camera.stop()
-    front_sem_camera.destroy()
-    # 俯视RGB
-    top_rgb_camera.stop()
-    top_rgb_camera.destroy()
-    # =================================================================
-    
     # ==================== 清理行人资源 ====================
+    # 停止并销毁行人控制器
     for controller in walker_controllers:
         if controller.is_alive:
             controller.stop()
             controller.destroy()
+    # 销毁行人
     for walker in walkers:
         if walker.is_alive:
             walker.destroy()
     print(f"已销毁{len(walker_controllers)}个行人控制器 + {len(walkers)}个行人")
     # =================================================================
+    
+    # 清理传感器
+    rgb_camera.stop()
+    rgb_camera.destroy()
+    sem_camera.stop()
+    sem_camera.destroy()
     
     # 恢复CARLA设置
     settings.synchronous_mode = False
