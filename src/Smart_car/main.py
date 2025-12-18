@@ -1,143 +1,288 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+简单的无人车速度预测系统
+使用移动平均和线性回归方法进行速度预测
+"""
+
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
+import pandas as pd
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
+import warnings
 
 
-# 1. 生成模拟驾驶数据
-def generate_driving_data(n_samples=10000):
-    time = np.linspace(0, 100, n_samples)
-    speed = np.zeros(n_samples)
-    acceleration = np.zeros(n_samples)
-    steering_angle = np.zeros(n_samples)
-
-    # 模拟驾驶场景：起步→加速→匀速→减速→转弯→加速→停车
-    segment1 = slice(0, 1500)
-    segment2 = slice(1500, 4000)
-    segment3 = slice(4000, 5000)
-    segment4 = slice(5000, 6500)
-    segment5 = slice(6500, 8500)
-    segment6 = slice(8500, 10000)
-
-    # 计算各段长度
-    len1 = segment1.stop - segment1.start
-    len2 = segment2.stop - segment2.start
-    len3 = segment3.stop - segment3.start
-    len4 = segment4.stop - segment4.start
-    len5 = segment5.stop - segment5.start
-    len6 = segment6.stop - segment6.start
-
-    # 填充速度数据
-    speed[segment1] = np.linspace(0, 15, len1) + np.random.normal(0, 0.3, len1)
-    speed[segment2] = 15 + np.random.normal(0, 0.2, len2)
-    speed[segment3] = np.linspace(15, 5, len3) + np.random.normal(0, 0.3, len3)
-    speed[segment4] = 5 + np.random.normal(0, 0.2, len4)
-    speed[segment5] = np.linspace(5, 12, len5) + np.random.normal(0, 0.3, len5)
-    speed[segment6] = np.linspace(12, 0, len6) + np.random.normal(0, 0.3, len6)
-
-    # 填充加速度数据
-    acceleration[segment1] = 0.5 + np.random.normal(0, 0.1, len1)
-    acceleration[segment2] = 0 + np.random.normal(0, 0.05, len2)
-    acceleration[segment3] = -0.3 + np.random.normal(0, 0.1, len3)
-    acceleration[segment4] = 0 + np.random.normal(0, 0.05, len4)
-    acceleration[segment5] = 0.2 + np.random.normal(0, 0.1, len5)
-    acceleration[segment6] = -0.4 + np.random.normal(0, 0.1, len6)
-
-    # 填充转向角数据
-    steering_angle[segment1] = 0 + np.random.normal(0, 0.5, len1)
-    steering_angle[segment2] = 0 + np.random.normal(0, 0.5, len2)
-    steering_angle[segment3] = 0 + np.random.normal(0, 0.5, len3)
-    steering_angle[segment4] = np.linspace(0, 15, len4) + np.random.normal(0, 1, len4)
-    steering_angle[segment5] = 0 + np.random.normal(0, 0.5, len5)
-    steering_angle[segment6] = 0 + np.random.normal(0, 0.5, len6)
-
-    # 组合成DataFrame
-    data = pd.DataFrame({
-        'time': time,
-        'speed': speed,
-        'acceleration': acceleration,
-        'steering_angle': steering_angle
-    })
-    return data
+def setup_matplotlib_for_plotting():
+    """
+    设置matplotlib和seaborn以确保正确的图表渲染
+    在创建任何图表之前调用此函数
+    """
+    warnings.filterwarnings('default')
+    plt.switch_backend("Agg")
+    plt.style.use("seaborn-v0_8")
+    plt.rcParams["font.sans-serif"] = ["Noto Sans CJK SC", "WenQuanYi Zen Hei", "PingFang SC", "Arial Unicode MS",
+                                       "Hiragino Sans GB"]
+    plt.rcParams["axes.unicode_minus"] = False
 
 
-# 2. 数据预处理：构建时间序列
-def create_sequences(data, seq_length=50):
-    X, y = [], []
-    for i in range(len(data) - seq_length):
-        X.append(data[i:i + seq_length])
-        y.append(data[i + seq_length, 0])  # 预测speed（第0列）
-    return np.array(X), np.array(y)
+class SimpleSpeedPredictor:
+    """简单的无人车速度预测器"""
+
+    def __init__(self):
+        self.method = "moving_average"
+        self.window_size = 5
+
+    def set_method(self, method, **kwargs):
+        """设置预测方法"""
+        self.method = method
+        if method == "moving_average":
+            self.window_size = kwargs.get('window_size', 5)
+        elif method == "linear_regression":
+            self.history_size = kwargs.get('history_size', 10)
+
+    def moving_average_predict(self, speeds, window_size=5):
+        """移动平均预测"""
+        predictions = []
+        for i in range(len(speeds)):
+            if i < window_size:
+                # 初期使用可用数据的平均值
+                predictions.append(np.mean(speeds[:i + 1]))
+            else:
+                # 使用滑动窗口的平均值
+                predictions.append(np.mean(speeds[i - window_size:i]))
+        return np.array(predictions)
+
+    def linear_regression_predict(self, speeds, history_size=10):
+        """线性回归预测"""
+        predictions = []
+
+        for i in range(len(speeds)):
+            if i < history_size:
+                # 初期使用可用数据的平均值
+                predictions.append(np.mean(speeds[:i + 1]))
+            else:
+                # 使用历史数据进行线性回归预测
+                X = np.arange(i - history_size, i).reshape(-1, 1)
+                y = speeds[i - history_size:i]
+
+                # 拟合线性回归模型
+                model = LinearRegression()
+                model.fit(X, y)
+
+                # 预测下一个值
+                next_x = np.array([[i]])
+                pred = model.predict(next_x)[0]
+                predictions.append(pred)
+
+        return np.array(predictions)
+
+    def predict(self, speeds):
+        """执行预测"""
+        if self.method == "moving_average":
+            return self.moving_average_predict(speeds, self.window_size)
+        elif self.method == "linear_regression":
+            return self.linear_regression_predict(speeds, self.history_size)
+        else:
+            raise ValueError(f"Unknown method: {self.method}")
 
 
-# 主流程
+def generate_vehicle_data(num_points=50, base_speed=30, noise_level=2):
+    """生成模拟的无人车速度数据"""
+    np.random.seed(42)  # 确保结果可重现
+
+    # 生成时间点
+    time_points = np.arange(num_points)
+
+    # 生成基础速度趋势（模拟加速、减速、匀速阶段）
+    base_trend = np.zeros(num_points)
+
+    # 0-10: 加速阶段
+    base_trend[0:10] = base_speed + (time_points[0:10] * 2)
+    # 10-30: 匀速阶段
+    base_trend[10:30] = base_speed + 20 + np.random.normal(0, 1, 20)
+    # 30-40: 减速阶段
+    base_trend[30:40] = base_speed + 20 - (time_points[30:40] - 30) * 1.5
+    # 40-50: 重新加速
+    base_trend[40:50] = base_speed + 5 + (time_points[40:50] - 40) * 0.8
+
+    # 添加噪声
+    noise = np.random.normal(0, noise_level, num_points)
+    speeds = base_trend + noise
+
+    # 确保速度为正数且在合理范围内
+    speeds = np.clip(speeds, 5, 80)
+
+    return time_points, speeds
+
+
+def evaluate_prediction(actual_speeds, predicted_speeds):
+    """评估预测性能"""
+    mse = mean_squared_error(actual_speeds, predicted_speeds)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(actual_speeds, predicted_speeds)
+    mae = np.mean(np.abs(actual_speeds - predicted_speeds))
+
+    return {
+        'MSE': mse,
+        'RMSE': rmse,
+        'MAE': mae,
+        'R²': r2
+    }
+
+
+def main():
+    """主函数：运行速度预测示例"""
+    setup_matplotlib_for_plotting()
+
+    # 生成模拟数据
+    print("正在生成无人车速度数据...")
+    time_points, actual_speeds = generate_vehicle_data(num_points=50, base_speed=25, noise_level=1.5)
+
+    # 创建预测器
+    predictor = SimpleSpeedPredictor()
+
+    # 方法1：移动平均预测
+    print("\n使用移动平均方法进行预测...")
+    predictor.set_method("moving_average", window_size=5)
+    ma_predictions = predictor.predict(actual_speeds)
+    ma_metrics = evaluate_prediction(actual_speeds, ma_predictions)
+
+    # 方法2：线性回归预测
+    print("使用线性回归方法进行预测...")
+    predictor.set_method("linear_regression", history_size=8)
+    lr_predictions = predictor.predict(actual_speeds)
+    lr_metrics = evaluate_prediction(actual_speeds, lr_predictions)
+
+    # 创建可视化图表
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+
+    # 图1：移动平均预测结果
+    ax1.plot(time_points, actual_speeds, 'b-', label='实际速度', linewidth=2, alpha=0.7)
+    ax1.plot(time_points, ma_predictions, 'r--', label='移动平均预测', linewidth=2)
+    ax1.set_title('移动平均预测方法', fontsize=14, fontweight='bold')
+    ax1.set_xlabel('时间点')
+    ax1.set_ylabel('速度 (km/h)')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    ax1.set_ylim(0, 60)
+
+    # 添加性能指标文本
+    text1 = f'RMSE: {ma_metrics["RMSE"]:.2f}\nR²: {ma_metrics["R²"]:.3f}\nMAE: {ma_metrics["MAE"]:.2f}'
+    ax1.text(0.02, 0.98, text1, transform=ax1.transAxes, fontsize=10,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    # 图2：线性回归预测结果
+    ax2.plot(time_points, actual_speeds, 'b-', label='实际速度', linewidth=2, alpha=0.7)
+    ax2.plot(time_points, lr_predictions, 'g--', label='线性回归预测', linewidth=2)
+    ax2.set_title('线性回归预测方法', fontsize=14, fontweight='bold')
+    ax2.set_xlabel('时间点')
+    ax2.set_ylabel('速度 (km/h)')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    ax2.set_ylim(0, 60)
+
+    # 添加性能指标文本
+    text2 = f'RMSE: {lr_metrics["RMSE"]:.2f}\nR²: {lr_metrics["R²"]:.3f}\nMAE: {lr_metrics["MAE"]:.2f}'
+    ax2.text(0.02, 0.98, text2, transform=ax2.transAxes, fontsize=10,
+             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.5))
+
+    # 图3：预测误差对比
+    ma_errors = actual_speeds - ma_predictions
+    lr_errors = actual_speeds - lr_predictions
+
+    ax3.plot(time_points, ma_errors, 'r-', label='移动平均误差', alpha=0.7)
+    ax3.plot(time_points, lr_errors, 'g-', label='线性回归误差', alpha=0.7)
+    ax3.axhline(y=0, color='k', linestyle='-', alpha=0.3)
+    ax3.set_title('预测误差对比', fontsize=14, fontweight='bold')
+    ax3.set_xlabel('时间点')
+    ax3.set_ylabel('误差 (km/h)')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+
+    # 图4：两种方法性能对比
+    methods = ['移动平均', '线性回归']
+    rmse_values = [ma_metrics['RMSE'], lr_metrics['RMSE']]
+    mae_values = [ma_metrics['MAE'], lr_metrics['MAE']]
+
+    x = np.arange(len(methods))
+    width = 0.35
+
+    ax4.bar(x - width / 2, rmse_values, width, label='RMSE', alpha=0.8)
+    ax4.bar(x + width / 2, mae_values, width, label='MAE', alpha=0.8)
+
+    ax4.set_title('预测性能对比', fontsize=14, fontweight='bold')
+    ax4.set_xlabel('预测方法')
+    ax4.set_ylabel('误差指标')
+    ax4.set_xticks(x)
+    ax4.set_xticklabels(methods)
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig('/workspace/autonomous_vehicle_speed_prediction_results.png', dpi=300, bbox_inches='tight')
+    print(f"\n预测结果图表已保存到: autonomous_vehicle_speed_prediction_results.png")
+
+    # 创建详细的时间序列对比图
+    fig2, ax = plt.subplots(1, 1, figsize=(14, 8))
+
+    ax.plot(time_points, actual_speeds, 'b-', label='实际速度', linewidth=3, alpha=0.8)
+    ax.plot(time_points, ma_predictions, 'r--', label='移动平均预测', linewidth=2, marker='o', markersize=4)
+    ax.plot(time_points, lr_predictions, 'g--', label='线性回归预测', linewidth=2, marker='s', markersize=4)
+
+    ax.set_title('无人车速度预测完整对比图', fontsize=16, fontweight='bold')
+    ax.set_xlabel('时间点', fontsize=12)
+    ax.set_ylabel('速度 (km/h)', fontsize=12)
+    ax.legend(fontsize=12)
+    ax.grid(True, alpha=0.3)
+    ax.set_ylim(0, 60)
+
+    # 添加统计信息
+    info_text = f"""数据统计:
+实际速度范围: {actual_speeds.min():.1f} - {actual_speeds.max():.1f} km/h
+实际速度均值: {actual_speeds.mean():.1f} km/h
+
+移动平均预测:
+RMSE: {ma_metrics['RMSE']:.2f}, R²: {ma_metrics['R²']:.3f}
+
+线性回归预测:
+RMSE: {lr_metrics['RMSE']:.2f}, R²: {lr_metrics['R²']:.3f}"""
+
+    ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=11,
+            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+
+    plt.tight_layout()
+    plt.savefig('/workspace/autonomous_vehicle_detailed_comparison.png', dpi=300, bbox_inches='tight')
+    print(f"详细对比图已保存到: autonomous_vehicle_detailed_comparison.png")
+
+    # 打印评估结果
+    print("\n" + "=" * 50)
+    print("预测性能评估结果")
+    print("=" * 50)
+
+    print(f"\n移动平均方法:")
+    for metric, value in ma_metrics.items():
+        print(f"  {metric}: {value:.3f}")
+
+    print(f"\n线性回归方法:")
+    for metric, value in lr_metrics.items():
+        print(f"  {metric}: {value:.3f}")
+
+    # 找出更好的方法
+    if ma_metrics['RMSE'] < lr_metrics['RMSE']:
+        print(f"\n结论: 移动平均方法在此数据集上表现更好 (RMSE更低)")
+    else:
+        print(f"\n结论: 线性回归方法在此数据集上表现更好 (RMSE更低)")
+
+    return {
+        'actual_speeds': actual_speeds,
+        'ma_predictions': ma_predictions,
+        'lr_predictions': lr_predictions,
+        'time_points': time_points,
+        'ma_metrics': ma_metrics,
+        'lr_metrics': lr_metrics
+    }
+
+
 if __name__ == "__main__":
-    # 生成数据
-    df = generate_driving_data()
-    features = df[['speed', 'acceleration', 'steering_angle']].values
-
-    # 归一化
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_features = scaler.fit_transform(features)
-
-    # 构建时间序列
-    seq_length = 50
-    X, y = create_sequences(scaled_features, seq_length)
-
-    # 划分训练集和测试集
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
-
-    # 3. 构建LSTM模型
-    model = Sequential()
-    model.add(LSTM(64, return_sequences=True, input_shape=(X_train.shape[1], X_train.shape[2])))
-    model.add(Dropout(0.2))
-    model.add(LSTM(32, return_sequences=False))
-    model.add(Dropout(0.2))
-    model.add(Dense(16, activation='relu'))
-    model.add(Dense(1))
-
-    model.compile(optimizer='adam', loss='mean_squared_error')
-
-    # 早停机制
-    early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-
-    # 训练模型
-    history = model.fit(
-        X_train, y_train,
-        batch_size=32,
-        epochs=50,
-        validation_split=0.1,
-        callbacks=[early_stopping]
-    )
-
-    # 4. 模型评估
-    y_pred = model.predict(X_test)
-
-    # 反归一化（仅针对speed）
-    # 构造反归一化的临时数组
-    y_test_inv = scaler.inverse_transform(np.hstack((y_test.reshape(-1, 1), np.zeros((len(y_test), 2)))))[:, 0]
-    y_pred_inv = scaler.inverse_transform(np.hstack((y_pred, np.zeros((len(y_pred), 2)))))[:, 0]
-
-    # 计算指标
-    mse = mean_squared_error(y_test_inv, y_pred_inv)
-    mae = mean_absolute_error(y_test_inv, y_pred_inv)
-    r2 = r2_score(y_test_inv, y_pred_inv)
-
-    print(f"测试集MSE: {mse:.4f}")
-    print(f"测试集MAE: {mae:.4f}")
-    print(f"测试集R2: {r2:.4f}")
-
-    # 5. 结果可视化
-    plt.figure(figsize=(12, 6))
-    plt.plot(y_test_inv, label='真实速度')
-    plt.plot(y_pred_inv, label='预测速度')
-    plt.title('无人车速度预测结果')
-    plt.xlabel('时间步')
-    plt.ylabel('速度 (m/s)')
-    plt.legend()
-    plt.show()#预测
+    results = main()
