@@ -9,125 +9,175 @@ import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
 
 
+# 静态障碍物检测器
+class StaticObstacleDetector:
+    def __init__(self):
+        self.static_obstacle_history = deque(maxlen=50)
+        self.collision_patterns = []
+        
+    def detect_pattern(self, location, heading, action, reward):
+        """检测静态障碍物碰撞模式"""
+        if reward < -20:
+            pattern = {
+                'location': location,
+                'heading': heading,
+                'action': action,
+                'timestamp': datetime.now()
+            }
+            self.static_obstacle_history.append(pattern)
+            
+            if len(self.static_obstacle_history) >= 10:
+                self.analyze_collision_patterns()
+                
+    def analyze_collision_patterns(self):
+        """分析碰撞模式"""
+        if len(self.static_obstacle_history) == 0:
+            return
+            
+        print(f"静态障碍物碰撞分析: 总次数={len(self.static_obstacle_history)}")
+        
+    def get_safe_action_suggestion(self, current_location, current_heading):
+        """获取安全动作建议"""
+        suggestions = []
+        
+        if len(self.static_obstacle_history) > 0:
+            for pattern in list(self.static_obstacle_history)[-5:]:
+                loc = pattern['location']
+                distance = math.sqrt(
+                    (current_location[0] - loc[0])**2 + 
+                    (current_location[1] - loc[1])**2
+                )
+                
+                if distance < 10.0:
+                    dangerous_action = pattern['action']
+                    suggestions.append({
+                        'avoid_action': dangerous_action,
+                        'suggested_actions': [0, 1, 2] if dangerous_action in [3, 4] else [3, 4],
+                        'reason': '历史碰撞区域'
+                    })
+        
+        return suggestions
+
+
 # 课程学习管理器
 class CurriculumManager:
     def __init__(self, env):
         self.env = env
         self.current_stage = 0
-        self.stage_thresholds = [0.3, 0.5, 0.7, 0.85]  # 成功率阈值
+        self.stage_thresholds = [0.3, 0.5, 0.7, 0.85, 0.9]
+        
         self.stage_configs = [
-            # 阶段0: 入门 - 更早引入行人，但数量少速度慢
+            # 阶段0: 入门
             {
-                'pedestrian_cross': 3,      # 增加一点难度
-                'pedestrian_normal': 2,     
-                'pedestrian_speed_min': 0.3,  # 降低行人速度
-                'pedestrian_speed_max': 0.8,  
-                'max_episode_steps': 900,    # 减少最大步数，加速训练
+                'pedestrian_cross': 2,
+                'pedestrian_normal': 1,
+                'static_obstacle_penalty': 0.5,
+                'max_episode_steps': 800,
                 'success_threshold': 0.3,
+                'difficulty_name': '入门'
+            },
+            # 阶段1: 简单
+            {
+                'pedestrian_cross': 4,
+                'pedestrian_normal': 2,
+                'static_obstacle_penalty': 1.0,
+                'max_episode_steps': 1000,
+                'success_threshold': 0.4,
                 'difficulty_name': '简单'
             },
-            # 阶段1: 初级
+            # 阶段2: 中等
             {
-                'pedestrian_cross': 5,      
+                'pedestrian_cross': 6,
                 'pedestrian_normal': 3,
-                'pedestrian_speed_min': 0.5,
-                'pedestrian_speed_max': 1.0,
-                'max_episode_steps': 1200,   
+                'static_obstacle_penalty': 2.0,
+                'max_episode_steps': 1200,
                 'success_threshold': 0.5,
-                'difficulty_name': '初级'
+                'difficulty_name': '中等'
             },
-            # 阶段2: 中级 - 增加反应时间训练
+            # 阶段3: 困难
             {
-                'pedestrian_cross': 7,
+                'pedestrian_cross': 8,
                 'pedestrian_normal': 4,
-                'pedestrian_speed_min': 0.7,
-                'pedestrian_speed_max': 1.3,
-                'max_episode_steps': 1500,   
-                'success_threshold': 0.6,  # 提高阈值
-                'difficulty_name': '中级'
+                'static_obstacle_penalty': 3.0,
+                'max_episode_steps': 1500,
+                'success_threshold': 0.6,
+                'difficulty_name': '困难'
             },
-            # 阶段3: 高级
+            # 阶段4: 专家
             {
-                'pedestrian_cross': 9,
-                'pedestrian_normal': 5,
-                'pedestrian_speed_min': 0.9,
-                'pedestrian_speed_max': 1.6,
-                'max_episode_steps': 1800,   
-                'success_threshold': 0.7,
-                'difficulty_name': '高级'
-            },
-            # 阶段4: 专家 (正常难度)
-            {
-                'pedestrian_cross': 10,     
+                'pedestrian_cross': 10,
                 'pedestrian_normal': 6,
-                'pedestrian_speed_min': 1.0,
-                'pedestrian_speed_max': 2.0,
-                'max_episode_steps': 2400,
-                'success_threshold': 0.8,
+                'static_obstacle_penalty': 4.0,
+                'max_episode_steps': 1800,
+                'success_threshold': 0.7,
                 'difficulty_name': '专家'
             },
-            # 阶段5: 大师 (挑战)
+            # 阶段5: 大师
             {
-                'pedestrian_cross': 12,     
+                'pedestrian_cross': 12,
                 'pedestrian_normal': 8,
-                'pedestrian_speed_min': 1.2,
-                'pedestrian_speed_max': 2.5,
-                'max_episode_steps': 3000,
-                'success_threshold': 0.85,
+                'static_obstacle_penalty': 5.0,
+                'max_episode_steps': 2400,
+                'success_threshold': 0.8,
                 'difficulty_name': '大师'
             }
         ]
         
         # 训练历史
-        self.success_history = deque(maxlen=20)  # 记录最近20轮的成功情况
-        self.reward_history = deque(maxlen=50)   # 记录最近50轮的奖励
-        self.reaction_time_history = deque(maxlen=50)  # 记录反应时间
+        self.success_history = deque(maxlen=20)
+        self.reward_history = deque(maxlen=50)
+        self.reaction_time_history = deque(maxlen=50)
+        self.static_collision_history = deque(maxlen=20)
         
-    def update_stage(self, success, reward, reaction_time=None):
+        # 静态障碍物检测器
+        self.static_detector = StaticObstacleDetector()
+        
+    def update_stage(self, success, reward, reaction_time=None, static_collision=False):
         """更新训练阶段"""
-        # 记录历史
         self.success_history.append(1 if success else 0)
         self.reward_history.append(reward)
         if reaction_time is not None:
             self.reaction_time_history.append(reaction_time)
+        if static_collision:
+            self.static_collision_history.append(1)
+        else:
+            self.static_collision_history.append(0)
         
-        # 计算最近成功率
         if len(self.success_history) >= 10:
             success_rate = sum(self.success_history) / len(self.success_history)
             avg_reward = np.mean(self.reward_history) if self.reward_history else 0
             
-            # 每20轮打印一次
+            static_collision_rate = sum(self.static_collision_history) / len(self.static_collision_history) if self.static_collision_history else 0
+            
             if len(self.success_history) % 20 == 0:
                 stage_info = self.get_current_config()
-                print(f"课程学习 - 阶段: {self.current_stage}({stage_info['difficulty_name']}), "
-                      f"成功率: {success_rate:.2f}, 平均奖励: {avg_reward:.2f}")
+                print(f"课程学习 - 阶段: {self.current_stage}({stage_info['difficulty_name']})")
+                print(f"  成功率: {success_rate:.2f}, 平均奖励: {avg_reward:.2f}")
+                print(f"  静态碰撞率: {static_collision_rate:.2f}")
                 if self.reaction_time_history:
                     avg_rt = np.mean(self.reaction_time_history)
                     print(f"  平均反应时间: {avg_rt:.2f}秒")
             
-            # 检查是否可以进入下一阶段
             if self.current_stage < len(self.stage_configs) - 1:
                 next_stage_threshold = self.stage_configs[self.current_stage]['success_threshold']
                 
-                # 不仅要看成功率，还要看反应时间（如果可用）
-                can_advance = success_rate >= next_stage_threshold and avg_reward > 5
-                if can_advance and self.reaction_time_history:
-                    avg_rt = np.mean(self.reaction_time_history)
-                    # 要求反应时间小于1秒
-                    if avg_rt < 1.0:
-                        self.current_stage += 1
-                        print(f"🎉 课程学习: 进阶到阶段 {self.current_stage}!")
-                        print(f"   新配置: {self.stage_configs[self.current_stage]['difficulty_name']}")
-                        return True
-                elif can_advance:
+                can_advance = (
+                    success_rate >= next_stage_threshold and 
+                    avg_reward > 3 and
+                    static_collision_rate < 0.2
+                )
+                
+                if can_advance:
                     self.current_stage += 1
                     print(f"🎉 课程学习: 进阶到阶段 {self.current_stage}!")
                     print(f"   新配置: {self.stage_configs[self.current_stage]['difficulty_name']}")
                     return True
                     
-            # 如果表现太差或反应时间太长，退回上一阶段
-            if self.current_stage > 0 and (success_rate < 0.2 or 
-                (self.reaction_time_history and np.mean(self.reaction_time_history) > 2.0)):
+            if self.current_stage > 0 and (
+                success_rate < 0.2 or 
+                static_collision_rate > 0.4 or
+                (self.reaction_time_history and np.mean(self.reaction_time_history) > 2.0)
+            ):
                 self.current_stage -= 1
                 print(f"⚠️ 课程学习: 退回阶段 {self.current_stage}")
                 return True
@@ -147,20 +197,19 @@ class CurriculumManager:
 # 多目标优化器
 class MultiObjectiveOptimizer:
     def __init__(self):
-        # 定义优化目标及其权重（可动态调整）
         self.objectives = {
             'reaction_time': {
-                'weight': 0.25,  # 新增：反应时间权重
+                'weight': 0.20,
                 'description': '快速反应避障',
                 'metrics': ['reaction_time', 'proactive_actions']
             },
             'safety': {
-                'weight': 0.30,  
+                'weight': 0.35,
                 'description': '安全避障和避免碰撞',
-                'metrics': ['collision_avoidance', 'pedestrian_distance']
+                'metrics': ['collision_avoidance', 'pedestrian_distance', 'static_obstacle_distance']
             },
             'efficiency': {
-                'weight': 0.25,  
+                'weight': 0.20,
                 'description': '快速到达目的地',
                 'metrics': ['progress_speed', 'total_time']
             },
@@ -169,20 +218,19 @@ class MultiObjectiveOptimizer:
                 'description': '平稳驾驶体验',
                 'metrics': ['smoothness', 'steering_changes']
             },
-            'rule_following': {
-                'weight': 0.05,
-                'description': '遵守交通规则',
-                'metrics': ['lane_keeping', 'speed_limit']
+            'static_avoidance': {
+                'weight': 0.10,
+                'description': '避免静态障碍物',
+                'metrics': ['static_collision', 'static_distance']
             }
         }
         
-        # 指标跟踪
         self.metrics_history = {
             'reaction_time': [],
             'safety': [],
             'efficiency': [],
             'comfort': [],
-            'rule_following': []
+            'static_avoidance': []
         }
         
     def compute_composite_reward(self, metrics):
@@ -191,53 +239,52 @@ class MultiObjectiveOptimizer:
         
         for obj_name, obj_info in self.objectives.items():
             if obj_name in metrics:
-                # 归一化处理每个目标的贡献
                 normalized_value = self._normalize_metric(metrics[obj_name], obj_name)
                 composite += normalized_value * obj_info['weight']
                 
-                # 记录指标历史
                 self.metrics_history[obj_name].append(normalized_value)
         
         # 特殊奖励/惩罚项
         if metrics.get('collision', False):
-            composite -= 10  # 增加碰撞惩罚
+            composite -= 12
+        if metrics.get('static_collision', False):
+            composite -= 15
         if metrics.get('off_road', False):
-            composite -= 5   # 增加偏离道路惩罚
-        if metrics.get('dangerous_action', False):
-            composite -= 3   # 增加危险动作惩罚
+            composite -= 8
             
-        # 新增：反应时间相关奖励/惩罚
         if 'reaction_time' in metrics:
             rt = metrics['reaction_time']
-            if rt < 0.5:  # 快速反应
-                composite += 2
-            elif rt > 1.5:  # 反应太慢
-                composite -= 3
+            if rt < 0.3:
+                composite += 3
+            elif rt > 1.2:
+                composite -= 4
         
-        # 新增：主动避障奖励
         if metrics.get('proactive_action', False):
-            composite += 1.5
+            composite += 2.0
+            
+        if metrics.get('static_distance', 100) > 15:
+            composite += 1.0
+        elif metrics.get('static_distance', 100) < 5:
+            composite -= 3.0
             
         return composite
     
     def _normalize_metric(self, value, metric_name):
         """归一化指标值到[0, 1]范围"""
-        # 不同指标的归一化方式不同
         normalization_rules = {
-            'reaction_time': lambda x: max(0, 1 - x/3),  # 反应时间越短越好
+            'reaction_time': lambda x: max(0, 1 - x/3),
             'safety': lambda x: min(max(x / 10, 0), 1),
             'efficiency': lambda x: min(max(x / 100, 0), 1),
             'comfort': lambda x: min(max((x + 5) / 10, 0), 1),
-            'rule_following': lambda x: min(max(x, 0), 1)
+            'static_avoidance': lambda x: min(max(1 - x/5, 0), 1)
         }
         
         if metric_name in normalization_rules:
             return normalization_rules[metric_name](value)
-        return min(max(value, 0), 1)  # 默认截断到[0, 1]
+        return min(max(value, 0), 1)
     
     def adjust_weights(self, performance_feedback):
         """根据性能反馈动态调整权重"""
-        # 如果某个目标表现持续较差，增加其权重
         recent_performance = {}
         for obj in self.objectives:
             if len(self.metrics_history[obj]) >= 10:
@@ -245,17 +292,14 @@ class MultiObjectiveOptimizer:
                 recent_performance[obj] = recent_avg
         
         if recent_performance:
-            # 找到表现最差的目标
             worst_obj = min(recent_performance, key=recent_performance.get)
             best_obj = max(recent_performance, key=recent_performance.get)
             
-            # 如果最差目标表现低于阈值，增加其权重
             if recent_performance[worst_obj] < 0.3:
-                adjustment = 0.03  # 调整幅度
+                adjustment = 0.04
                 self.objectives[worst_obj]['weight'] += adjustment
                 self.objectives[best_obj]['weight'] -= adjustment
                 
-                # 确保权重总和为1
                 total = sum(obj['weight'] for obj in self.objectives.values())
                 for obj in self.objectives:
                     self.objectives[obj]['weight'] /= total
@@ -278,7 +322,7 @@ class MultiObjectiveOptimizer:
         return report
 
 
-# 模仿学习管理器（保持不变，略作修改）
+# 模仿学习管理器
 class ImitationLearningManager:
     def __init__(self, expert_data_path=None):
         self.expert_data_path = expert_data_path
@@ -301,16 +345,15 @@ class ImitationLearningManager:
             return False
 
 
-# 优先经验回放缓冲区（增加对危险经验的优先级）
+# 优先经验回放缓冲区
 class PrioritizedReplayBuffer:
-    def __init__(self, max_size=15000, alpha=0.7, beta_start=0.5, beta_frames=50000):
+    def __init__(self, max_size=20000, alpha=0.7, beta_start=0.5, beta_frames=50000):
         self.max_size = max_size
-        self.alpha = alpha  # 优先级程度 (0 = 均匀采样, 1 = 完全优先级)
-        self.beta_start = beta_start  # 重要性采样权重起始值
-        self.beta_frames = beta_frames  # beta线性增长的帧数
+        self.alpha = alpha
+        self.beta_start = beta_start
+        self.beta_frames = beta_frames
         self.frame = 1
         
-        # 使用循环缓冲区
         self.buffer = deque(maxlen=max_size)
         self.priorities = deque(maxlen=max_size)
         
@@ -328,9 +371,13 @@ class PrioritizedReplayBuffer:
         else:
             priority = (abs(error) + 1e-5) ** self.alpha
             
-        # 如果是危险经验（负奖励较大），增加优先级
-        reward = experience[2]
-        if reward < -2:  # 危险经验
+        state, action, reward, next_state, done = experience
+        
+        # 静态碰撞检测
+        if reward < -20:
+            priority *= 2.0
+            
+        elif reward < -5:
             priority *= 1.5
             
         self.buffer.append(experience)
@@ -341,23 +388,18 @@ class PrioritizedReplayBuffer:
         if len(self.buffer) == 0:
             return [], [], []
             
-        # 计算采样概率
         priorities = np.array(self.priorities, dtype=np.float32)
         probs = priorities ** self.alpha
         probs /= probs.sum()
         
-        # 采样索引
         indices = np.random.choice(len(self.buffer), min(batch_size, len(self.buffer)), p=probs, replace=False)
         
-        # 获取样本
         samples = [self.buffer[i] for i in indices]
         
-        # 计算重要性采样权重
         total = len(self.buffer)
         weights = (total * probs[indices]) ** (-self.beta())
-        weights /= weights.max()  # 归一化
+        weights /= weights.max()
         
-        # 更新帧计数器
         self.frame += 1
         
         return indices, samples, weights
