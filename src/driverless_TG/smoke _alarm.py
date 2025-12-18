@@ -332,7 +332,7 @@ def main():
         level_count[level] += 1
     print(f"无报警样本数：{level_count[0]} | 低风险样本数：{level_count[1]} | 高风险样本数：{level_count[2]}")
 
-    # 7. 可视化监测结果
+    # 7. 可视化监测结果  222
     print("\n===== 7. 可视化烟雾监测结果 =====")
     visualize_smoke_alarm(time_steps, smoke_conc, abnormal_label, alarm_level)
 
