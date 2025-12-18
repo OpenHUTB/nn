@@ -8,14 +8,17 @@ CARLA全局路径规划节点 - 增强版
 - 改进的错误处理
 - 性能统计
 - 配置参数化
+- SLAM功能集成
 """
 
 import rclpy
 from rclpy.node import Node
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, OccupancyGrid
 from geometry_msgs.msg import PoseStamped, Point
 from visualization_msgs.msg import Marker, MarkerArray
 from carla_global_planner.srv import PlanGlobalPath
+from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import String
 from utilities.planner import compute_route_waypoints
 
 import carla
@@ -44,9 +47,17 @@ class GlobalPlannerNode(Node):
                 ('path_line_width', 0.6),  # 路径可视化线宽
                 ('enable_performance_stats', True),  # 是否启用性能统计
                 ('publish_goal_marker', True),  # 是否发布目标点标记
+                ('use_slam', False),  # 是否启用SLAM功能
+                ('slam_topic', '/slam/map'),  # SLAM地图话题
+                ('pointcloud_topic', '/velodyne_points'),  # 点云话题
             ]
         )
 
+        # 新增：SLAM相关属性
+        self.use_slam = self.get_parameter('use_slam').value
+        self.slam_map = None
+        self.pointcloud_data = None
+        
         # 新增：性能统计变量
         self.planning_count = 0
         self.total_planning_time = 0.0
@@ -67,6 +78,25 @@ class GlobalPlannerNode(Node):
         self.marker_array_pub = self.create_publisher(
             MarkerArray, 'visualization_marker_array', 10)
 
+        # 新增：SLAM地图订阅
+        if self.use_slam:
+            self.slam_sub = self.create_subscription(
+                OccupancyGrid,
+                self.get_parameter('slam_topic').value,
+                self.slam_callback,
+                10)
+            
+            # 新增：点云数据订阅
+            self.pointcloud_sub = self.create_subscription(
+                PointCloud2,
+                self.get_parameter('pointcloud_topic').value,
+                self.pointcloud_callback,
+                10)
+            
+            # 新增：SLAM状态发布
+            self.slam_status_pub = self.create_publisher(
+                String, 'slam_status', 10)
+
         self.srv = self.create_service(
             PlanGlobalPath, 'plan_to_random_goal', self.plan_path_cb)
 
@@ -80,6 +110,25 @@ class GlobalPlannerNode(Node):
                 30.0, self._publish_performance_stats)
 
         self.get_logger().info("CARLA全局路径规划服务已启动 [增强版]")
+        if self.use_slam:
+            self.get_logger().info("SLAM功能已启用")
+
+    def slam_callback(self, msg):
+        """SLAM地图回调函数"""
+        self.slam_map = msg
+        self.get_logger().debug(f"接收到SLAM地图数据: {msg.info.width}x{msg.info.height}")
+
+    def pointcloud_callback(self, msg):
+        """点云数据回调函数"""
+        self.pointcloud_data = msg
+        self.get_logger().debug(f"接收到点云数据: {msg.height}x{msg.width}")
+
+    def publish_slam_status(self, status):
+        """发布SLAM状态信息"""
+        if self.use_slam:
+            status_msg = String()
+            status_msg.data = status
+            self.slam_status_pub.publish(status_msg)
 
     def _initialize_carla_client(self):
         """初始化CARLA客户端连接 - 增强版错误处理"""
@@ -146,6 +195,15 @@ class GlobalPlannerNode(Node):
             response.success = False  # 假设服务定义中有success字段
             return response
 
+        # 新增：检查SLAM状态
+        if self.use_slam:
+            if self.slam_map is None:
+                self.get_logger().warning("SLAM地图尚未准备好")
+                self.publish_slam_status("waiting_for_map")
+            else:
+                self.publish_slam_status("map_ready")
+                self.get_logger().info("使用SLAM地图进行路径规划")
+
         try:
             # 将ROS坐标转换为CARLA坐标
             start_location = self._ros_to_carla_location(request.start)
@@ -185,10 +243,17 @@ class GlobalPlannerNode(Node):
                 f"总距离: {total_distance:.2f}m, "
                 f"用时: {planning_time:.3f}s"
             )
+            
+            # 新增：SLAM状态更新
+            if self.use_slam:
+                self.publish_slam_status("path_planned")
+                
             return response
 
         except Exception as e:
             self.get_logger().error(f"路径规划过程中发生错误: {str(e)}")
+            if self.use_slam:
+                self.publish_slam_status("planning_error")
             return response
 
     def _ros_to_carla_location(self, odom_msg):
