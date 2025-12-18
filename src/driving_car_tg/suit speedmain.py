@@ -45,7 +45,7 @@ def generate_speed_data() -> tuple:
 def calculate_speed_metrics(time_seq: np.ndarray, speed_seq: np.ndarray) -> dict:
     """
     计算速度测试关键指标
-    返回：指标字典
+    返回：指标字典发
     """
     # 基础统计指标
     avg_speed = np.mean(speed_seq)
