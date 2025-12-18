@@ -399,7 +399,7 @@ def main():
     predictor.plot_real_time_demo(X_test, y_test, y_pred)
 
     # 模拟驾驶场景
-    print("\n🚙 第五步: 模拟驾驶场景.")
+    print("\n🚙 第五步: 模拟驾驶场景")
     scenario_data = predictor.simulate_driving_scenario()
 
     # 性能总结
