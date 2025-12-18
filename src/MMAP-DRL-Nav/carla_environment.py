@@ -95,103 +95,147 @@ class CarlaEnvironment(gym.Env):
         self.collision_pedestrian_penalty = -100.0 # 碰撞行人惩罚
         self.collision_static_penalty = -15.0    # 碰撞静态物体惩罚
 
-        # ========== 天气系统：新增中文名称映射 + 移除冗余日志 ==========
+        # ========== 天气系统：仅保留白天/夜晚切换 ==========
         self.weather_mode = "dynamic"
-        # 核心修改：天气枚举值 → 中文名称映射
+        # 简化：只保留白天（ClearNoon）和夜晚（ClearNight）两种天气
         self.weather_name_map = {
-            carla.WeatherParameters.ClearNoon: "晴天",
-            carla.WeatherParameters.CloudyNoon: "多云",
-            carla.WeatherParameters.WetNoon: "小雨",
-            carla.WeatherParameters.WetCloudyNoon: "多云转小雨",
-            carla.WeatherParameters.MidRainyNoon: "中雨",
-            carla.WeatherParameters.HardRainNoon: "大雨",
-            carla.WeatherParameters.SoftRainNoon: "细雨"
+            "Day": "晴天（白天）",
+            "Night": "晴天（夜晚）"
         }
-        self.preset_weathers = list(self.weather_name_map.keys())  # 从映射中获取枚举值
-        self.current_weather = random.choice(self.preset_weathers)
-        self.world.set_weather(self.current_weather)
-        # 可选：打印初始天气名称（仅易读名称，无冗余日志）
-        print(f"初始天气：{self.weather_name_map[self.current_weather]}")
+        # 预设天气列表：仅白天/夜晚
+        self.all_weather_ids = ["Day", "Night"]
+        # 随机选择初始天气
+        self.current_weather_id = random.choice(self.all_weather_ids)
+        self._set_weather_by_id(self.current_weather_id)
+        print(f"初始天气：{self.weather_name_map[self.current_weather_id]}")
 
-        # ========== 新增：导航系统配置 ==========
-        self.target_location = None          # 导航目标点
-        self.target_radius = 5.0             # 到达终点的判定半径（米）
-        self.nav_reward_per_meter = 0.02     # 每靠近目标点1米的奖励
-        self.goal_completion_reward = 100.0  # 到达终点的高额奖励
-        self.last_dist_to_target = 0.0       # 上一步与目标点的距离
+        # ========== 仅保留大灯核心功能：夜晚开灯加分 ==========
+        self.headlight_required_weathers = ["Night"]  # 仅夜晚需要开大灯
+        self.headlight_on_reward = 1.0               # 夜晚开灯加分（提高奖励值）
+        self.headlight_check_cooldown = 2.0          # 检测间隔缩短为2秒
+        self.last_headlight_check_time = 0
+        self.vehicle_headlights_on = False
 
-        # ========== 新增：步数限制配置 ==========
-        self.max_steps = 800                 # 单回合最大步数（调整为800）
-        self.current_step = 0                # 当前回合已执行步数
+        # ========== 其他配置完全保留 ==========
+        self.target_location = None          
+        self.target_radius = 5.0             
+        self.nav_reward_per_meter = 0.02     
+        self.goal_completion_reward = 100.0  
+        self.last_dist_to_target = 0.0       
 
-        # ========== 新增：档位检测核心配置 ==========
+        self.max_steps = 800                 
+        self.current_step = 0                
+
         self.gear_config = {
-            # 车速区间(km/h) : 推荐档位
-            0: 1,    # 0-10km/h → 1挡
-            10: 2,   # 10-20km/h → 2挡
-            20: 3,   # 20-30km/h → 3挡
-            30: 4,   # 30-40km/h → 4挡
-            40: 5    # ≥40km/h → 5挡
+            0: 1,
+            10: 2,
+            20: 3,
+            30: 4,
+            40: 5
         }
-        self.gear_correct_reward = 0.1       # 档位正确加分
-        self.last_speed_range = 0            # 记录上一次的车速区间（用于判断是否跨档位）
-        self.last_gear = 1                   # 记录上一步档位
-        self.is_initial_gear_logged = False  # 标记初始档位日志是否已输出
+        self.gear_correct_reward = 0.1
+        self.last_speed_range = 0
+        self.last_gear = 1
+        self.is_initial_gear_logged = False
 
-        # 基础配置（完全保留）
         self.spawn_retry_times = 20
         self.spawn_safe_radius = 2.0
 
-        # 动作/观测空间（完全保留）
         self.action_space = gym.spaces.Discrete(4)
         self.observation_space = gym.spaces.Box(
             low=0, high=255, shape=(128, 128, 3), dtype=np.uint8
         )
 
-        # 核心对象（完全保留）
         self.vehicle = None
         self.camera = None
         self.collision_sensor = None
         self.image_data = None
         self.has_collision = False
 
-        # 视角参数（完全保留）
         self.view_height = 6.0
         self.view_pitch = -15.0
         self.view_distance = 8.0
         self.z_offset = 0.5
 
-    # ========== 新增：档位奖励计算（初始输出一次 + 跨区间输出） ==========
+    # ========== 简化：仅实现白天/夜晚天气切换 ==========
+    def _set_weather_by_id(self, weather_id):
+        """仅设置白天/夜晚两种天气"""
+        weather = carla.WeatherParameters()
+        if weather_id == "Day":
+            # 白天：标准晴天
+            weather.sun_altitude_angle = 90.0
+            weather.sun_azimuth_angle = 0.0
+            weather.cloudiness = 0.0
+            weather.precipitation = 0.0
+            weather.brightness = 1.0
+            weather.directionald_light_intensity = 1.0
+        elif weather_id == "Night":
+            # 夜晚：极低光照+月光
+            weather.sun_altitude_angle = -90.0  # 太阳在地平线下
+            weather.moon_altitude_angle = 30.0
+            weather.moon_intensity = 1.0
+            weather.brightness = 0.1
+            weather.directionald_light_intensity = 0.01
+            weather.ambient_occlusion_intensity = 0.2
+        self.world.set_weather(weather)
+
+    # ========== 简化：仅保留夜晚开灯加分功能 ==========
+    def _check_headlight_status(self):
+        current_time = time.time()
+        if current_time - self.last_headlight_check_time < self.headlight_check_cooldown:
+            return 0.0
+        
+        self.last_headlight_check_time = current_time
+
+        if not self.vehicle or not self.vehicle.is_alive:
+            return 0.0
+        
+        # 仅夜晚检测大灯
+        need_headlight = self.current_weather_id == "Night"
+        if not need_headlight:
+            return 0.0
+        
+        # 获取大灯状态
+        try:
+            vehicle_light_state = self.vehicle.get_light_state()
+            self.vehicle_headlights_on = vehicle_light_state == carla.VehicleLightState.HeadlightOn
+        except:
+            self.vehicle_headlights_on = False
+        
+        reward = 0.0
+        if need_headlight and self.vehicle_headlights_on:
+            # 夜晚开灯就加分
+            reward = self.headlight_on_reward
+            print(f"[夜晚] 大灯已开启，加分{self.headlight_on_reward}")
+        
+        return reward
+
+    # ========== 以下所有方法完全保留原有逻辑，未做修改 ==========
     def _calculate_gear_reward(self):
         if not self.vehicle or not self.vehicle.is_alive:
             return 0.0
         
-        # 1. 计算当前车速（m/s → km/h）
         velocity = self.vehicle.get_velocity()
         speed_m_s = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         speed_kmh = round(speed_m_s * 3.6, 1)
         
-        # 2. 判断当前车速区间
         current_speed_range = 0
-        if speed_kmh < 0:  # 倒车
+        if speed_kmh < 0:
             current_speed_range = -1
             recommended_gear = 'R'
         else:
-            # 匹配前进车速区间
             for range_val in sorted(self.gear_config.keys(), reverse=True):
                 if speed_kmh >= range_val:
                     current_speed_range = range_val
                     recommended_gear = self.gear_config[range_val]
                     break
         
-        # 3. 获取当前档位
         control = self.vehicle.get_control()
         current_gear = control.gear
-        if control.reverse or speed_kmh < 0:  # 倒车挡
+        if control.reverse or speed_kmh < 0:
             current_gear = 'R'
 
         gear_reward = 0.0
-        # 4. 初始启动时输出一次（仅首次）
         if not self.is_initial_gear_logged:
             is_correct = (current_gear == recommended_gear)
             if is_correct:
@@ -200,35 +244,26 @@ class CarlaEnvironment(gym.Env):
                     print(f"初始倒车档位正确加分：{self.gear_correct_reward}（车速{speed_kmh}km/h，当前R挡）")
                 else:
                     print(f"初始档位正确加分：{self.gear_correct_reward}（车速{speed_kmh}km/h，当前{current_gear}挡，对应{current_speed_range}-{current_speed_range+10}km/h区间）")
-            self.is_initial_gear_logged = True  # 标记初始日志已输出
-        # 5. 跨档位区间时输出（初始之后）
+            self.is_initial_gear_logged = True
         elif current_speed_range != self.last_speed_range:
-            # 档位正确判断
             is_correct = (current_gear == recommended_gear)
             if is_correct:
                 gear_reward = self.gear_correct_reward
-                # 仅档位正确时输出日志
                 if speed_kmh < 0:
                     print(f"倒车档位正确加分：{self.gear_correct_reward}（车速{speed_kmh}km/h，当前R挡）")
                 else:
                     print(f"车速进入{current_speed_range}-{current_speed_range+10}km/h区间，档位{current_gear}正确加分：{self.gear_correct_reward}")
-            # 更新上次车速区间
             self.last_speed_range = current_speed_range
         
         return gear_reward
 
-    # ========== 天气切换：输出中文名称 ==========
     def switch_weather(self):
-        available_weathers = [w for w in self.preset_weathers if w != self.current_weather]
-        new_weather = random.choice(available_weathers)
-        self.world.set_weather(new_weather)
-        self.current_weather = new_weather
-        # 输出易读的天气名称（替代原有枚举值日志）
-        print(f"天气已切换为：{self.weather_name_map[self.current_weather]}")
+        available_weathers = [w for w in self.all_weather_ids if w != self.current_weather_id]
+        self.current_weather_id = random.choice(available_weathers)
+        self._set_weather_by_id(self.current_weather_id)
+        print(f"天气已切换为：{self.weather_name_map[self.current_weather_id]}")
 
-    # ========== 新增：生成导航目标点 ==========
     def _generate_random_target(self):
-        """随机生成导航目标点（基于地图合法出生点）"""
         spawn_points = self.world.get_map().get_spawn_points()
         if not spawn_points:
             hero_loc = self.vehicle.get_transform().location if self.vehicle else carla.Location(x=0, y=0, z=0.5)
@@ -242,7 +277,6 @@ class CarlaEnvironment(gym.Env):
             self.last_dist_to_target = self.vehicle.get_transform().location.distance(self.target_location)
         print(f"生成导航目标点：({self.target_location.x:.2f}, {self.target_location.y:.2f})，初始距离：{self.last_dist_to_target:.2f}米")
 
-    # ========== 红绿灯判定（完全保留原始代码） ==========
     def _check_traffic_light(self):
         current_time = time.time()
         if current_time - self.last_traffic_light_time < self.traffic_light_cooldown:
@@ -293,7 +327,6 @@ class CarlaEnvironment(gym.Env):
 
         return reward
 
-    # ========== 超速检测（完全保留原始代码） ==========
     def _check_over_speed(self):
         current_time = time.time()
         if current_time - self.last_over_speed_time < self.over_speed_cooldown:
@@ -317,7 +350,6 @@ class CarlaEnvironment(gym.Env):
 
         return reward
 
-    # ========== 车道偏离检测（完全保留原始代码） ==========
     def _check_lane_offset(self):
         current_time = time.time()
         if current_time - self.last_lane_check_time < self.lane_check_interval:
@@ -361,7 +393,6 @@ class CarlaEnvironment(gym.Env):
 
         return reward
 
-    # ========== 安全生成车辆（完全保留原始代码） ==========
     def _spawn_vehicle_safely(self, vehicle_bp):
         spawn_points = self.world.get_map().get_spawn_points()
         if not spawn_points:
@@ -385,7 +416,6 @@ class CarlaEnvironment(gym.Env):
 
         raise RuntimeError("所有出生点都有碰撞，无法生成车辆！")
 
-    # ========== 优化NPC生成（完全保留原始代码） ==========
     def _spawn_small_npc(self):
         for v in self.npc_vehicle_list:
             if v.is_alive:
@@ -444,7 +474,6 @@ class CarlaEnvironment(gym.Env):
             except:
                 continue
 
-    # ========== 初始化碰撞传感器（完全保留原始代码） ==========
     def _init_collision_sensor(self):
         collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
         collision_transform = carla.Transform(carla.Location(x=0, y=0, z=0))
@@ -453,7 +482,6 @@ class CarlaEnvironment(gym.Env):
         )
         self.collision_sensor.listen(lambda event: self._collision_callback(event))
 
-    # ========== 碰撞回调（完全保留原始代码） ==========
     def _collision_callback(self, event):
         self.has_collision = True
         other_actor = event.other_actor
@@ -465,7 +493,6 @@ class CarlaEnvironment(gym.Env):
         elif 'static' in other_actor_type or 'building' in other_actor_type or 'guardrail' in other_actor_type:
             self.hit_static = True
 
-    # ========== 初始化相机（完全保留原始代码） ==========
     def _init_camera(self):
         camera_bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
@@ -476,9 +503,7 @@ class CarlaEnvironment(gym.Env):
         self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
         self.camera.listen(lambda img: self._camera_callback(img))
 
-    # ========== 重置环境（新增导航+步数重置 + 移除天气日志） ==========
     def reset(self):
-        # 清理旧资源
         if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
         if self.camera is not None and self.camera.is_alive:
@@ -487,7 +512,6 @@ class CarlaEnvironment(gym.Env):
             self.collision_sensor.destroy()
         self.image_data = None
         
-        # 重置标记
         self.has_collision = False
         self.hit_vehicle = False
         self.hit_pedestrian = False
@@ -500,30 +524,32 @@ class CarlaEnvironment(gym.Env):
         self.last_lane_check_time = 0
         self.last_lane_log_time = 0
 
-        # ========== 新增：重置步数 ==========
         self.current_step = 0
-        
-        # ========== 新增：重置档位相关状态 ==========
         self.last_speed_range = 0
         self.last_gear = 1
-        self.is_initial_gear_logged = False  # 重置初始档位日志标记
+        self.is_initial_gear_logged = False
+        self.last_headlight_check_time = 0
+        self.vehicle_headlights_on = False
 
-        # ========== 切换天气（会自动输出中文名称） ==========
         self.switch_weather()
 
-        # 生成车辆
         vehicle_bp = self.world.get_blueprint_library().filter('vehicle.tesla.model3')[0]
         self.vehicle = self._spawn_vehicle_safely(vehicle_bp)
 
-        # ========== 新增：生成导航目标点 ==========
-        self._generate_random_target()
+        # 夜晚自动开灯
+        if self.current_weather_id == "Night":
+            try:
+                self.vehicle.set_light_state(carla.VehicleLightState.HeadlightOn)
+                self.vehicle_headlights_on = True
+                print(f"当前为夜晚，已自动开启大灯")
+            except:
+                self.vehicle_headlights_on = False
 
-        # 初始化传感器
+        self._generate_random_target()
         self._init_camera()
         self._init_collision_sensor()
         self._spawn_small_npc()
 
-        # 等待传感器就绪
         timeout = 0
         while self.image_data is None and timeout < 30:
             self.world.tick()
@@ -534,7 +560,6 @@ class CarlaEnvironment(gym.Env):
         self.world.tick()
         return self.image_data.copy() if self.image_data is not None else np.zeros((128,128,3), dtype=np.uint8)
 
-    # ========== 视角跟随（完全保留原始代码） ==========
     def follow_vehicle(self):
         spectator = self.world.get_spectator()
         if not spectator or not self.vehicle or not self.vehicle.is_alive:
@@ -553,24 +578,19 @@ class CarlaEnvironment(gym.Env):
             carla.Rotation(pitch=self.view_pitch, yaw=vehicle_tf.rotation.yaw, roll=0.0)
         ))
 
-    # ========== 获取观测（完全保留原始代码） ==========
     def get_observation(self):
         return self.image_data.copy() if self.image_data is not None else np.zeros((128, 128, 3), dtype=np.uint8)
 
-    # ========== 相机回调（完全保留原始代码） ==========
     def _camera_callback(self, image):
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
         self.image_data = array.reshape((image.height, image.width, 4))[:, :, :3]
 
-    # ========== 核心：奖励函数（集成导航+步数限制 + 新增档位奖励） ==========
     def step(self, action):
         if self.vehicle is None or not self.vehicle.is_alive:
             raise RuntimeError("车辆未初始化/已销毁，请先调用reset()")
 
-        # ========== 新增：步数+1 ==========
         self.current_step += 1
 
-        # 车辆控制逻辑
         throttle = 0.0
         steer = 0.0
         if action == 0:
@@ -584,18 +604,14 @@ class CarlaEnvironment(gym.Env):
         elif action == 3:
             throttle = -0.2
 
-        # ========== 优化：根据车速自动匹配合理档位 ==========
-        # 计算当前车速
         velocity = self.vehicle.get_velocity()
         speed_m_s = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         current_speed = speed_m_s * 3.6
         
-        # 匹配档位
         gear = 1
-        if throttle < 0:  # 倒车
+        if throttle < 0:
             gear = -1
         else:
-            # 根据车速匹配前进档位
             if 0 <= current_speed < 10:
                 gear = 1
             elif 10 <= current_speed < 20:
@@ -619,15 +635,13 @@ class CarlaEnvironment(gym.Env):
         self.world.tick()
         self.follow_vehicle()
 
-        # 奖励计算
         base_reward = 0.1 if throttle > 0 else (-0.1 if throttle < 0 else 0.0)
         traffic_light_reward = self._check_traffic_light()
         over_speed_reward = self._check_over_speed()
         lane_reward = self._check_lane_offset()
         collision_reward = 0.0
-        
-        # ========== 新增：计算档位奖励 ==========
         gear_reward = self._calculate_gear_reward()
+        headlight_reward = self._check_headlight_status()
         
         done = False
 
@@ -646,7 +660,6 @@ class CarlaEnvironment(gym.Env):
                 done = False
             self.collision_penalty_applied = True
 
-        # ========== 导航奖励计算 ==========
         nav_reward = 0.0
         dist_to_target = -1.0
         if self.target_location is not None and self.vehicle.is_alive:
@@ -663,13 +676,11 @@ class CarlaEnvironment(gym.Env):
                 nav_reward = max(nav_reward, -0.01)
                 self.last_dist_to_target = dist_to_target
 
-        # ========== 步数超限判定 ==========
         if self.current_step >= self.max_steps and not done:
             print(f"达到最大步数{self.max_steps}，终止训练（当前距离目标点：{dist_to_target:.2f}米）")
             done = True
 
-        # 总奖励（新增档位奖励）
-        total_reward = base_reward + traffic_light_reward + over_speed_reward + lane_reward + collision_reward + nav_reward + gear_reward
+        total_reward = base_reward + traffic_light_reward + over_speed_reward + lane_reward + collision_reward + nav_reward + gear_reward + headlight_reward
         next_state = self.get_observation()
 
         return next_state, total_reward, done, {
@@ -679,15 +690,14 @@ class CarlaEnvironment(gym.Env):
             "lane_reward": lane_reward,
             "collision_reward": collision_reward,
             "nav_reward": nav_reward,
-            "gear_reward": gear_reward,  # 新增：返回档位奖励
+            "gear_reward": gear_reward,
+            "headlight_reward": headlight_reward,
             "total_reward": total_reward,
             "current_step": self.current_step,
             "dist_to_target": dist_to_target,
-            # 可选：在返回的info中添加当前天气名称
-            "current_weather": self.weather_name_map[self.current_weather]
+            "current_weather": self.weather_name_map[self.current_weather_id]
         }
 
-    # ========== 关闭环境（完全保留原始代码） ==========
     def close(self):
         for v in self.npc_vehicle_list:
             if v.is_alive:
