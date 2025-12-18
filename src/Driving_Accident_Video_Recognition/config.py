@@ -1,29 +1,45 @@
 """
-全局配置文件：所有可配置参数集中管理，新手只需修改这里
+配置模块：支持环境变量加载+精细化事故判断配置
 """
-# YOLOv8模型配置
-YOLO_MODEL_PATH = "yolov8n.pt"  # 轻量化模型（自动下载）
-CONFIDENCE_THRESHOLD = 0.5      # 目标检测置信度阈值（0-1）
+import os
+from dotenv import load_dotenv
 
-# 检测源配置
-DETECTION_SOURCE = 0  # 0=电脑摄像头，可改为视频路径如"test_accident.mp4"
+# 加载.env环境文件（优先读取环境变量，无则用默认值）
+load_dotenv()
 
-# 事故识别配置
-ACCIDENT_CLASSES = [0, 2, 7]    # YOLOv8类别：0=人，2=汽车，7=卡车
-MIN_VEHICLE_COUNT = 2           # 至少2辆车判定为事故
-PERSON_VEHICLE_CONTACT = True   # 行人和车辆同时出现判定为事故
+# ====================== YOLO模型配置 ======================
+YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "yolov8n.pt")
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", 0.5))
 
-# 帧处理优化配置（低配电脑推荐）
-RESIZE_WIDTH = 640
-RESIZE_HEIGHT = 480
+# ====================== 检测源配置 ======================
+# 支持环境变量指定：0=摄像头，或视频路径（如"test.mp4"）
+DETECTION_SOURCE = os.getenv("DETECTION_SOURCE", 0)
+# 转换为整数（摄像头）或字符串（视频路径）
+if DETECTION_SOURCE.isdigit():
+    DETECTION_SOURCE = int(DETECTION_SOURCE)
 
-# 依赖包配置
+# ====================== 事故识别配置 ======================
+ACCIDENT_CLASSES = [0, 2, 7]  # 0=人，2=汽车，7=卡车
+MIN_VEHICLE_COUNT = int(os.getenv("MIN_VEHICLE_COUNT", 2))
+PERSON_VEHICLE_CONTACT = os.getenv("PERSON_VEHICLE_CONTACT", "True").lower() == "true"
+# 新增：行人和车辆的距离阈值（像素），小于该值才判定为接触
+PERSON_VEHICLE_DISTANCE_THRESHOLD = int(os.getenv("PERSON_VEHICLE_DISTANCE_THRESHOLD", 50))
+
+# ====================== 帧处理配置 ======================
+RESIZE_WIDTH = int(os.getenv("RESIZE_WIDTH", 640))
+RESIZE_HEIGHT = int(os.getenv("RESIZE_HEIGHT", 480))
+
+# ====================== 依赖配置 ======================
 REQUIRED_PACKAGES = [
     "ultralytics>=8.0.0",
     "opencv-python>=4.8.0",
     "numpy>=1.24.0",
-    "torch>=2.0.0"
+    "torch>=2.0.0",
+    "python-dotenv>=1.0.0"  # 新增：支持.env文件
 ]
-
-# 清华镜像源（加速依赖下载）
 PYPI_MIRROR = "https://pypi.tuna.tsinghua.edu.cn/simple"
+
+# ====================== 输出配置 ======================
+# 新增：是否保存检测结果视频
+SAVE_RESULT_VIDEO = os.getenv("SAVE_RESULT_VIDEO", "False").lower() == "true"
+RESULT_VIDEO_PATH = os.getenv("RESULT_VIDEO_PATH", "detection_result.mp4")
