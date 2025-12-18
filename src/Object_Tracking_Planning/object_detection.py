@@ -1875,73 +1875,98 @@ def game_loop(args):
 def main():
     """Main method"""
 
+    # 参数解析器配置
     argparser = argparse.ArgumentParser(
-        description='CARLA Automatic Control Client')
+        description='CARLA Automatic Control Client'
+    )
+
+    # 参数定义
     argparser.add_argument(
         '-v', '--verbose',
         action='store_true',
         dest='debug',
-        help='Print debug information')
+        help='Print debug information'
+    )
     argparser.add_argument(
         '--host',
         metavar='H',
         default='127.0.0.1',
-        help='IP of the host server (default: 127.0.0.1)')
+        help='IP of the host server (default: 127.0.0.1)'
+    )
     argparser.add_argument(
         '-p', '--port',
         metavar='P',
         default=2000,
         type=int,
-        help='TCP port to listen to (default: 2000)')
+        help='TCP port to listen to (default: 2000)'
+    )
     argparser.add_argument(
         '--res',
         metavar='WIDTHxHEIGHT',
         default='1280x720',
-        help='Window resolution (default: 1280x720)')
+        help='Window resolution (default: 1280x720)'
+    )
     argparser.add_argument(
         '--filter',
         metavar='PATTERN',
         default='vehicle.*',
-        help='Actor filter (default: "vehicle.*")')
+        help='Actor filter (default: "vehicle.*")'
+    )
     argparser.add_argument(
         '--gamma',
         default=2.2,
         type=float,
-        help='Gamma correction of the camera (default: 2.2)')
+        help='Gamma correction of the camera (default: 2.2)'
+    )
     argparser.add_argument(
         '-l', '--loop',
         action='store_true',
         dest='loop',
-        help='Sets a new random destination upon reaching the previous one (default: False)')
+        help='Sets a new random destination upon reaching the previous one (default: False)'
+    )
     argparser.add_argument(
-        '-b', '--behavior', type=str,
-        choices=["cautious", "normal", "aggressive"],
-        help='Choose one of the possible agent behaviors (default: normal) ',
-        default='normal')
-    argparser.add_argument("-a", "--agent", type=str,
-                           choices=["Behavior", "Roaming", "Basic"],
-                           help="select which agent to run",
-                           default="Behavior")
+        '-b', '--behavior',
+        type=str,
+        choices=['cautious', 'normal', 'aggressive'],
+        help='Choose one of the possible agent behaviors (default: normal)',
+        default='normal'
+    )
+    argparser.add_argument(
+        '-a', '--agent',
+        type=str,
+        choices=['Behavior', 'Roaming', 'Basic'],
+        help='Select which agent to run',
+        default='Behavior'
+    )
     argparser.add_argument(
         '-s', '--seed',
         help='Set seed for repeating executions (default: None)',
         default=None,
-        type=int)
+        type=int
+    )
 
+    # 解析参数
     args = argparser.parse_args()
 
-    args.width, args.height = [int(x) for x in args.res.split('x')]
+    # 解析分辨率
+    args.width, args.height = map(int, args.res.split('x'))
 
+    # 配置日志
     log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    logging.basicConfig(
+        format='%(levelname)s: %(message)s',
+        level=log_level
+    )
 
-    logging.info('listening to server %s:%s', args.host, args.port)
+    logging.info('Listening to server %s:%s', args.host, args.port)
 
-    print(__doc__)
+    # 打印文档字符串（假设有外部文档）
+    if __doc__:
+        print(__doc__)
 
+    # 运行主循环
     try:
         game_loop(args)
-
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
 
