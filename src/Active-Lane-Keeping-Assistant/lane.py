@@ -9,7 +9,8 @@ from os.path import join
 class Lane:
     """Detects Lanes in a given Image
     """
-
+    HLS_L_THRESHOLD_MIN = 150
+    HLS_L_THRESHOLD_MAX = 255
     def __init__(self, height:int, width:int, save:bool=False,
         save_folder:str=join('img', 'examples')) -> None:
         """Constructor
@@ -56,7 +57,7 @@ class Lane:
 
         # Create threshold matrix to differentiate black and white based on the
         # lightness (of HSL).
-        _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+        _, binary = cv2.threshold(hls[:, :, 1], self.HLS_L_THRESHOLD_MIN, self.HLS_L_THRESHOLD_MAX, cv2.THRESH_BINARY)
         binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
 
         if self.save:
