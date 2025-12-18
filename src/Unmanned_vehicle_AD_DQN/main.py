@@ -15,15 +15,10 @@ import tensorflow.keras.backend as backend
 from threading import Thread
 
 from tqdm import tqdm
-import pickle
 
-# 导入本地模块
-from Environment import CarEnv
-from Model import DQNAgent
-from TrainingStrategies import CurriculumManager, MultiObjectiveOptimizer, ImitationLearningManager
 import Hyperparameters
-
-# 从Hyperparameters导入所有参数
+from Environment import *
+from Model import *
 from Hyperparameters import *
 
 def extended_reward_calculation(env, action, reward, done, step_info):
@@ -38,8 +33,9 @@ def extended_reward_calculation(env, action, reward, done, step_info):
     # 计算多目标指标
     metrics = {}
     
-    # 1. 安全性指标 - 基于最近行人距离
-    min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
+    # 1. 安全性指标
+    # 最近行人距离
+    min_ped_distance = env.last_ped_distance if hasattr(env, 'last_ped_distance') else float('inf')
     safety_score = 0
     if min_ped_distance < 100:
         if min_ped_distance > 12:
@@ -55,49 +51,38 @@ def extended_reward_calculation(env, action, reward, done, step_info):
     
     metrics['safety'] = safety_score
     
-    # 2. 效率指标 - 基于进度
+    # 2. 效率指标
     progress = (vehicle_location.x + 81) / 236.0  # 从-81到155
     efficiency_score = progress * 100  # 进度百分比
     metrics['efficiency'] = efficiency_score
     
-    # 3. 舒适度指标 - 基于转向平滑性
-    comfort_score = 5  # 默认舒适
-    
+    # 3. 舒适度指标
+    # 转向平滑性
     if hasattr(env, 'last_action') and env.last_action in [3, 4]:
-        if getattr(env, 'same_steer_counter', 0) > 2:  # 连续同向转向
-            comfort_score = 2   # 稍不舒适
-        elif getattr(env, 'same_steer_counter', 0) > 1:
-            comfort_score = 3   # 一般
+        if env.same_steer_counter > 2:  # 连续同向转向
+            comfort_score = -2  # 不舒适
         else:
-            comfort_score = 4   # 舒适
+            comfort_score = 2   # 舒适
     else:
         comfort_score = 5  # 直行，最舒适
     
     metrics['comfort'] = comfort_score
     
-    # 4. 规则遵循指标 - 基于速度
-    rule_score = 0.3  # 默认较低分数
-    
-    if 20 <= speed_kmh <= 35:  # 理想速度范围
+    # 4. 规则遵循指标
+    # 速度是否在合理范围内
+    if 20 <= speed_kmh <= 40:
         rule_score = 1.0
-    elif 15 <= speed_kmh < 20 or 35 < speed_kmh <= 40:
+    elif 15 <= speed_kmh < 20 or 40 < speed_kmh <= 45:
         rule_score = 0.7
-    elif 10 <= speed_kmh < 15 or 40 < speed_kmh <= 45:
-        rule_score = 0.5
-    elif 5 <= speed_kmh < 10:
-        rule_score = 0.4
+    else:
+        rule_score = 0.3
     
     metrics['rule_following'] = rule_score
     
     # 5. 特殊事件
-    metrics['collision'] = len(getattr(env, 'collision_history', [])) > 0
+    metrics['collision'] = len(env.collision_history) > 0
     metrics['off_road'] = vehicle_location.x < -90 or abs(vehicle_location.y + 195) > 30
-    
-    # 6. 危险动作检测
-    if speed_kmh > 40 and action in [3, 4]:  # 高速急转
-        metrics['dangerous_action'] = True
-    else:
-        metrics['dangerous_action'] = False
+    metrics['dangerous_action'] = speed_kmh > 45 and action in [3, 4]  # 高速急转
     
     return metrics
 
@@ -105,7 +90,12 @@ if __name__ == '__main__':
     FPS = 60  # 帧率
     ep_rewards = [-200]  # 存储每轮奖励
 
-    # GPU内存配置
+    # 为了结果可重复性（注释掉）
+    # random.seed(1)
+    # np.random.seed(1)
+    # tf.compat.v1.set_random_seed(1)
+
+    # GPU内存配置，主要用于多智能体训练
     gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=MEMORY_FRACTION)
     tf.compat.v1.keras.backend.set_session(
         tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(gpu_options=gpu_options)))
@@ -118,7 +108,7 @@ if __name__ == '__main__':
     if not os.path.isdir('expert_data'):
         os.makedirs('expert_data')
 
-    # 创建智能体和环境
+    # 创建智能体和环境 - 启用所有高级功能
     agent = DQNAgent(
         use_dueling=True, 
         use_per=True,
@@ -196,9 +186,10 @@ if __name__ == '__main__':
         # 应用课程学习配置
         if agent.curriculum_manager:
             config = agent.curriculum_manager.get_current_config()
-            if episode % 50 == 0:  # 每50轮打印一次
-                print(f"课程学习 - 阶段 {agent.curriculum_manager.current_stage}: "
-                      f"行人(十字路口={config['pedestrian_cross']}, 普通={config['pedestrian_normal']})")
+            # 这里可以根据配置调整环境难度
+            # 例如：调整行人数量、速度等
+            print(f"课程学习 - 阶段 {agent.curriculum_manager.current_stage}: "
+                  f"行人(十字路口={config['pedestrian_cross']}, 普通={config['pedestrian_normal']})")
             curriculum_stages.append(agent.curriculum_manager.current_stage)
         
         # 重置每轮统计
@@ -229,13 +220,14 @@ if __name__ == '__main__':
 
         # 仅在给定秒数内运行
         while not done and step < max_steps_per_episode:
+
             # 选择动作策略
             if np.random.random() > Hyperparameters.EPSILON:
                 # 从Q网络获取动作（利用）
                 qs = agent.get_qs(current_state)
                 action = np.argmax(qs)
-                if episode % 50 == 0 and step % 30 == 0:  # 减少打印频率
-                    print(f'Ep {episode} Step {step}: Q值 [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] 动作: {action}')
+                if episode % 20 == 0:  # 减少打印频率
+                    print(f'动作: [{qs[0]:>5.2f}, {qs[1]:>5.2f}, {qs[2]:>5.2f}, {qs[3]:>5.2f}, {qs[4]:>5.2f}] {action}')
             else:
                 # 随机选择动作（探索）
                 action = np.random.randint(0, 5)
@@ -290,9 +282,9 @@ if __name__ == '__main__':
                 print(f"课程学习阶段已更新: {agent.curriculum_manager.current_stage}")
         
         # 更新多目标优化器权重
-        if agent.multi_objective_optimizer and episode % 20 == 0:
+        if agent.multi_objective_optimizer and episode % 10 == 0:
             agent.multi_objective_optimizer.adjust_weights(avg_metrics)
-            if episode % 100 == 0:
+            if episode % 50 == 0:
                 print(agent.multi_objective_optimizer.get_performance_report())
         
         # 更新成功计数
@@ -349,11 +341,10 @@ if __name__ == '__main__':
         epds.append(episode)
         
         # 打印训练信息
-        if episode % 10 == 0:  # 每10轮打印一次
-            info_str = f'轮次: {episode:3d}, 得分: {score:6.2f}, 成功: {success_count:3d}'
-            if agent.curriculum_manager:
-                info_str += f', 阶段: {agent.curriculum_manager.current_stage}'
-            print(info_str)
+        info_str = f'轮次: {episode:3d}, 得分: {score:6.2f}, 成功: {success_count:3d}'
+        if agent.curriculum_manager:
+            info_str += f', 阶段: {agent.curriculum_manager.current_stage}'
+        print(info_str)
         
         # 衰减探索率
         if Hyperparameters.EPSILON > Hyperparameters.MIN_EPSILON:
