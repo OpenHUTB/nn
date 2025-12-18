@@ -1,0 +1,43 @@
+<!-- arm_model.xml -->
+<mujoco model="仿人机械臂">
+  <option timestep="0.01"/>
+
+  <worldbody>
+    <!-- 世界坐标系中的基础光源 -->
+    <light pos="0 0 2" dir="0 0 -1"/>
+    <geom type="plane" size="1 1 0.1" rgba=".9 .9 .9 1"/>
+
+    <!-- 躯干基座 -->
+    <body name="torso" pos="0 0 0">
+      <geom type="box" size=".1 .1 .1" rgba=".7 .5 .3 1"/>
+      <joint type="free"/> <!-- 基座可以自由移动，方便观察 -->
+
+      <!-- 上臂 -->
+      <body name="upper_arm" pos="0 0 .15">
+        <geom type="capsule" fromto="0 0 0 0 0 .3" size="0.05" rgba="0.2 0.6 0.8 1"/>
+        <joint name="shoulder_pitch" type="hinge" pos="0 0 0" axis="1 0 0" range="-90 90"/>
+        <joint name="shoulder_yaw" type="hinge" pos="0 0 0" axis="0 1 0" range="-45 45"/>
+
+        <!-- 前臂 -->
+        <body name="forearm" pos="0 0 .3">
+          <geom type="capsule" fromto="0 0 0 0 0 .25" size="0.04" rgba="0.8 0.2 0.2 1"/>
+          <joint name="elbow" type="hinge" pos="0 0 0" axis="1 0 0" range="-120 0"/>
+
+          <!-- 简化手掌（作为一个整体） -->
+          <body name="hand" pos="0 0 .25">
+            <geom type="box" size=".04 .08 .02" rgba=".9 .9 .2 1"/>
+            <joint name="wrist" type="hinge" pos="0 0 0" axis="0 1 0" range="-30 30"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <!-- 为每个关节定义位置伺服电机 -->
+    <motor name="motor_shoulder_pitch" joint="shoulder_pitch" gear="50"/>
+    <motor name="motor_shoulder_yaw" joint="shoulder_yaw" gear="30"/>
+    <motor name="motor_elbow" joint="elbow" gear="40"/>
+    <motor name="motor_wrist" joint="wrist" gear="10"/>
+  </actuator>
+</mujoco>
