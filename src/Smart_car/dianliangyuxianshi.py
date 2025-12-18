@@ -73,7 +73,7 @@ class UnmannedVehicleBattery:
 
         # 低电量告警
         if self.battery_percent < 5:
-            print("⚠️  电量过低，立即停止作业并充电！")
+            print("⚠️  电量过低，立即停止作业并充电")
 
 
 def main():
