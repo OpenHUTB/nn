@@ -1,52 +1,20 @@
-自动驾驶汽车车道和路径检测
-=========================================
-## Demo
-<div align="center">
-      <a href="https://www.youtube.com/watch?v=UFQQbTYH9hI-Y">
-     <img 
-      src="https://i.ytimg.com/vi/UFQQbTYH9hI/maxresdefault.jpg" 
-      alt="Demo" 
-      style="width:100%;">
-      </a>
-    </div>
+# 自动驾驶车道检测系统 (Basic Lane Detection)
 
-## 如何安装
+基于 OpenCV 和 Python 实现的基础车道线识别系统。该项目使用经典的计算机视觉技术（Canny 边缘检测、霍夫变换）来识别道路上的车道线，适用于直道和轻微弯道的场景。
 
-为了能够运行它，我建议使用 Python 3.6 或更高版本。
+## 📋 功能特性
+- **边缘检测**：使用 Canny 算子提取图像边缘。
+- **ROI 提取**：自动掩盖天空和无关背景，只关注路面区域。
+- **车道拟合**：利用霍夫变换检测直线，并通过斜率过滤和平均算法计算左右车道。
+- **视觉反馈**：在原视频上实时绘制检测到的车道区域（绿色）和车道线（蓝色）。
 
-1. 安装要求
+## 🛠️ 安装指南
 
-```
-pip3 install -r requirements.txt
-```
-这将安装运行此作所需的所有依赖项。 
+### 1. 环境要求
+建议使用 Python 3.8 或更高版本（测试环境为 Python 3.13）。
 
-2. 下载示例数据
+### 2. 安装依赖
+在项目根目录下运行以下命令安装所需库：
 
-The sample data can be downloaded from [here.](https://drive.google.com/file/d/1hP-v8lLn1g1jEaJUBYJhv1mEb32hkMvG/view?usp=sharing) More data will be added soon. 
-
-3. 运行程序
-
-``` 
-python3 main.py <path-to-sample-data-hevc> 
-```
-
-## 下一步是什么 ？ 
-
-使用 YOLOv3 进行红绿灯、汽车、卡车、自行车、摩托车、行人和停车标志检测。
-实时语义分割，或几乎实时。
-快速大满贯。
-
-## 相关研究
-
-[Learning a driving simulator](https://arxiv.org/abs/1608.01230)
-
-## 学分
-
-[comma.ai for supercombo model](https://github.com/commaai/openpilot/blob/master/models/supercombo.keras)
-
-[Harald Schafer for parts of the code](https://github.com/haraldschafer)
-
-[lanes_image_space.py Code by @Shane](https://github.com/ShaneSmiskol)
-
-
+```bash
+pip install -r requirements.txt
