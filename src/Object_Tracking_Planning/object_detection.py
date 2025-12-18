@@ -1666,8 +1666,7 @@ class BehaviorAgent(Agent):
 
 
 def game_loop(args):
-    """ Main loop for agent"""
-
+    """Main loop for agent"""
     pygame.init()
     pygame.font.init()
     world = None
@@ -1683,159 +1682,135 @@ def game_loop(args):
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
-
-        #selected_world = client.load_world("Town01")  # KK Changes world to Town04
-        selected_world = client.get_world()
-
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
-
         agent = BehaviorAgent(world.player, behavior=args.behavior)
 
+        # 设置初始目的地
         spawn_points = world.map.get_spawn_points()
         random.shuffle(spawn_points)
-
-        if spawn_points[0].location != agent.vehicle.get_location():
-            destination = spawn_points[0].location
-        else:
-            destination = spawn_points[1].location
-
+        
+        start_index = 0 if spawn_points[0].location != agent.vehicle.get_location() else 1
+        destination = spawn_points[start_index].location
         agent.set_destination(agent.vehicle.get_location(), destination, clean=True)
 
         clock = pygame.time.Clock()
 
         while True:
             clock.tick_busy_loop(60)
+            
+            # 处理控制事件
             if controller.parse_events():
-                return
+                break
 
-            # As soon as the server is ready continue!
+            # 等待服务器就绪
             if not world.world.wait_for_tick(10.0):
                 continue
 
+            # 更新代理信息
+            if args.agent != "Roaming" and args.agent != "Basic":
+                agent.update_information(world)
+
+            # 更新和渲染世界
+            world.tick(clock)
+            world.render(display)
+            pygame.display.flip()
+
+            # 处理不同代理类型
             if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events():
-                    return
-
-                #agent.update_information(world)
-                # as soon as the server is ready continue!
-                world.world.wait_for_tick(10.0)
-
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
                 control = agent.run_step()
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
-            else:
-                agent.update_information(world)
+                continue  # 跳过后续控制逻辑
 
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
-            
-
-            # Set new destination when target has been reached
-            if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
+            # 检查是否需要重新规划路线
+            waypoints_queue = agent.get_local_planner().waypoints_queue
+            if len(waypoints_queue) < num_min_waypoints and args.loop:
                 agent.reroute(spawn_points)
                 tot_target_reached += 1
-                world.hud.notification("The target has been reached " +
-                                       str(tot_target_reached) + " times.", seconds=4.0)
-
-            elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
+                world.hud.notification(
+                    f"The target has been reached {tot_target_reached} times.",
+                    seconds=4.0
+                )
+            elif len(waypoints_queue) == 0 and not args.loop:
                 print("Target reached, mission accomplished...")
                 break
 
+            # 设置速度限制并执行控制
             speed_limit = world.player.get_speed_limit()
             agent.get_local_planner().set_speed(speed_limit)
-
             control = agent.run_step()
             world.player.apply_control(control)
 
+    except Exception as e:
+        logging.error(f"Error in game loop: {e}")
+        raise
     finally:
         if world is not None:
             world.destroy()
-
         pygame.quit()
-
-
-# ==============================================================================
-# -- main() --------------------------------------------------------------
-# ==============================================================================
 
 
 def main():
     """Main method"""
-
     argparser = argparse.ArgumentParser(
-        description='CARLA Automatic Control Client')
-    argparser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        dest='debug',
-        help='Print debug information')
-    argparser.add_argument(
-        '--host',
-        metavar='H',
-        default='127.0.0.1',
-        help='IP of the host server (default: 127.0.0.1)')
-    argparser.add_argument(
-        '-p', '--port',
-        metavar='P',
-        default=2000,
-        type=int,
-        help='TCP port to listen to (default: 2000)')
-    argparser.add_argument(
-        '--res',
-        metavar='WIDTHxHEIGHT',
-        default='1280x720',
-        help='Window resolution (default: 1280x720)')
-    argparser.add_argument(
-        '--filter',
-        metavar='PATTERN',
-        default='vehicle.*',
-        help='Actor filter (default: "vehicle.*")')
-    argparser.add_argument(
-        '--gamma',
-        default=2.2,
-        type=float,
-        help='Gamma correction of the camera (default: 2.2)')
-    argparser.add_argument(
-        '-l', '--loop',
-        action='store_true',
-        dest='loop',
-        help='Sets a new random destination upon reaching the previous one (default: False)')
-    argparser.add_argument(
-        '-b', '--behavior', type=str,
-        choices=["cautious", "normal", "aggressive"],
-        help='Choose one of the possible agent behaviors (default: normal) ',
-        default='normal')
-    argparser.add_argument("-a", "--agent", type=str,
-                           choices=["Behavior", "Roaming", "Basic"],
-                           help="select which agent to run",
-                           default="Behavior")
-    argparser.add_argument(
-        '-s', '--seed',
-        help='Set seed for repeating executions (default: None)',
-        default=None,
-        type=int)
+        description='CARLA Automatic Control Client'
+    )
+    
+    # 参数定义
+    arguments = [
+        ('-v', '--verbose', 'store_true', 'debug', 'Print debug information'),
+        ('', '--host', 'store', 'host', 'IP of the host server (default: 127.0.0.1)', '127.0.0.1'),
+        ('-p', '--port', 'store', 'port', 'TCP port to listen to (default: 2000)', 2000),
+        ('', '--res', 'store', 'res', 'Window resolution (default: 1280x720)', '1280x720'),
+        ('', '--filter', 'store', 'filter', 'Actor filter (default: "vehicle.*")', 'vehicle.*'),
+        ('', '--gamma', 'store', 'gamma', 'Gamma correction of the camera (default: 2.2)', 2.2),
+        ('-l', '--loop', 'store_true', 'loop', 'Sets a new random destination upon reaching the previous one'),
+        ('-b', '--behavior', 'store', 'behavior', 
+         'Choose one of the possible agent behaviors (default: normal)', 'normal',
+         ["cautious", "normal", "aggressive"]),
+        ('-a', '--agent', 'store', 'agent', 'select which agent to run', 'Behavior',
+         ["Behavior", "Roaming", "Basic"]),
+        ('-s', '--seed', 'store', 'seed', 'Set seed for repeating executions', None, int)
+    ]
+    
+    for arg in arguments:
+        flags = [f for f in arg[:2] if f]  # 处理可能为空的短标志
+        kwargs = {
+            'dest': arg[3],
+            'help': arg[4],
+            'default': arg[5] if len(arg) > 5 else None
+        }
+        
+        if len(arg) > 6 and isinstance(arg[6], list):
+            kwargs['choices'] = arg[6]
+        if len(arg) > 7:
+            kwargs['type'] = arg[7]
+        elif arg[2] == 'store':
+            kwargs['type'] = str
+        
+        action = 'store_true' if arg[2] == 'store_true' else 'store'
+        argparser.add_argument(*flags, action=action, **kwargs)
 
     args = argparser.parse_args()
+    args.width, args.height = map(int, args.res.split('x'))
 
-    args.width, args.height = [int(x) for x in args.res.split('x')]
-
+    # 设置日志
     log_level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
+    logging.info('Listening to server %s:%s', args.host, args.port)
 
-    logging.info('listening to server %s:%s', args.host, args.port)
-
-    print(__doc__)
+    # 设置随机种子
+    if args.seed is not None:
+        random.seed(args.seed)
 
     try:
         game_loop(args)
-
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        sys.exit(1)
 
 
 if __name__ == '__main__':
