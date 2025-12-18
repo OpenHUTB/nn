@@ -411,7 +411,7 @@ def main():
     print(f"均方误差 (MSE): {mse:.4f}")
     print(f"平均绝对误差 (MAE): {mae:.4f}")
     print(f"预测准确率: {(1 - mae / np.mean(y_test)) * 100:.1f}%")
-    print("\n✅ 所有演示图表已生成完成！")
+    print("\n✅ 所有演示图表已生成完成")
     print("=" * 50)
 
 
