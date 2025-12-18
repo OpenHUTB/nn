@@ -1,110 +1,79 @@
-# Hyperparameters.py
+# Hyperparameters.py - 修复版
 # 深度强化学习超参数配置
 
 DISCOUNT = 0.97
-# 未来奖励的折扣因子 - 提高未来奖励的重要性
 
 FPS = 60
-# 模拟环境的帧率
 
 MEMORY_FRACTION = 0.35
-# GPU内存分配比例
 
 REWARD_OFFSET = -100
-# 停止模拟的奖励阈值
 
-MIN_REPLAY_MEMORY_SIZE = 3_000
-# 开始训练前经验回放缓冲区的最小大小 - 增加以获得更稳定训练
+MIN_REPLAY_MEMORY_SIZE = 1_000
 
-REPLAY_MEMORY_SIZE = 10_000
-# 经验回放缓冲区的最大容量
+REPLAY_MEMORY_SIZE = 20_000
 
-MINIBATCH_SIZE = 64
-# 每次训练从经验回放中采样的经验数量 - 增加批次大小
+MINIBATCH_SIZE = 64  # 减小批次大小以提高稳定性
 
 PREDICTION_BATCH_SIZE = 1
-# 预测阶段使用的批次大小
 
 TRAINING_BATCH_SIZE = MINIBATCH_SIZE // 4
-# 训练阶段使用的批次大小
 
-EPISODES = 800  # 从1000减少到800，因为减少了无行人阶段
-# 智能体训练的总轮次数
+EPISODES = 300  # 减少训练轮次以快速测试
 
 SECONDS_PER_EPISODE = 60
-# 每轮训练的秒数
 
-MIN_EPSILON = 0.01
-# 最小探索率
+MIN_EPSILON = 0.05
 
 EPSILON = 1.0
-# 初始探索率
 
-EPSILON_DECAY = 0.998
-# 探索率的衰减率 - 减缓衰减速度
+EPSILON_DECAY = 0.995
 
-MODEL_NAME = "YY_Optimized"
-# 训练模型的名称标识
+MODEL_NAME = "YY_Optimized_v3"
 
-MIN_REWARD = 5
-# 被认为是"良好"或"积极"经验的最小奖励值
+MIN_REWARD = -100
 
-UPDATE_TARGET_EVERY = 20
-# 目标网络更新的频率 - 增加以获得更稳定训练
+UPDATE_TARGET_EVERY = 15
 
-AGGREGATE_STATS_EVERY = 10
-# 计算和聚合统计信息（如平均得分、奖励）的频率
+AGGREGATE_STATS_EVERY = 5
 
 SHOW_PREVIEW = False
-# 是否显示预览窗口 - 测试时设为False以显示CARLA主窗口
 
-IM_WIDTH = 640
-# 预览或模拟中捕获图像的宽度
+IM_WIDTH = 160
 
-IM_HEIGHT = 480
-# 预览或模拟中捕获图像的高度
+IM_HEIGHT = 120
 
 SLOW_COUNTER = 330
-# 慢速计数器阈值
 
 LOW_REWARD_THRESHOLD = -2
-# 低奖励阈值
 
 SUCCESSFUL_THRESHOLD = 3
-# 成功阈值
 
-LEARNING_RATE = 0.00005
-# 优化器的学习率 - 降低以获得更稳定训练
+LEARNING_RATE = 0.0001
 
-# PER (优先经验回放) 参数
-PER_ALPHA = 0.6
-# 优先级程度 (0 = 均匀采样, 1 = 完全优先级)
-
-PER_BETA_START = 0.4
-# 重要性采样权重起始值
-
-PER_BETA_FRAMES = 100000
-# beta线性增长的帧数
+# PER参数
+PER_ALPHA = 0.7
+PER_BETA_START = 0.5
+PER_BETA_FRAMES = 50000
 
 # 训练策略参数
 USE_CURRICULUM_LEARNING = True
-# 是否使用课程学习
-
 USE_MULTI_OBJECTIVE = True
-# 是否使用多目标优化
-
 USE_IMITATION_LEARNING = False
-# 是否使用模仿学习（预训练）
-
-# 多目标优化权重（这些权重会自动调整）
-SAFETY_WEIGHT = 0.40
-EFFICIENCY_WEIGHT = 0.25
-COMFORT_WEIGHT = 0.20
-RULE_FOLLOWING_WEIGHT = 0.15
 
 # 课程学习参数
-CURRICULUM_STAGES = 5
-# 课程学习阶段数量
+CURRICULUM_STAGES = 6
+CURRICULUM_SUCCESS_THRESHOLDS = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 
-CURRICULUM_SUCCESS_THRESHOLDS = [0.3, 0.5, 0.7, 0.85, 0.9]
-# 每个阶段进入下一阶段所需的成功率阈值
+# 静态障碍物参数
+STATIC_OBSTACLE_PENALTY_MULTIPLIER = 1.5
+STATIC_SAFE_DISTANCE = 5.0
+ROAD_BOUNDARY_PENALTY = 10.0
+
+# 交叉路口参数
+INTERSECTION_SAFE_SPEED = 25.0
+INTERSECTION_STEER_REDUCTION = 0.6
+
+# 反应时间参数
+REACTION_TIME_PENALTY = 0.1
+PROACTIVE_REWARD = 0.5

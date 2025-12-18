@@ -65,10 +65,10 @@ def select_best_model(model_files, preferred_keywords=None, excluded_keywords=No
         return None
     
     if preferred_keywords is None:
-        preferred_keywords = ["best", "advanced", "dueling_per"]
+        preferred_keywords = ["best", "advanced", "dueling_per", "v3", "final"]
     
     if excluded_keywords is None:
-        excluded_keywords = ["min", "avg", "final"]  # 排除统计文件
+        excluded_keywords = ["min", "avg", "stage"]  # 排除统计文件和中间阶段文件
     
     # 评分系统：根据关键词和文件属性给模型打分
     scored_models = []
@@ -85,7 +85,7 @@ def select_best_model(model_files, preferred_keywords=None, excluded_keywords=No
         # 排除包含特定关键词的文件
         exclude = False
         for keyword in excluded_keywords:
-            if keyword.lower() in filename.lower() and not filename.lower().endswith(".model"):
+            if keyword.lower() in filename.lower() and "stage" not in filename.lower():
                 exclude = True
                 break
         
@@ -95,7 +95,7 @@ def select_best_model(model_files, preferred_keywords=None, excluded_keywords=No
         # 基于文件大小和修改时间打分
         try:
             file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
-            if file_size > 100:  # 大于100MB的模型可能更复杂
+            if file_size > 50:  # 大于50MB的模型可能更复杂
                 score += 5
             
             # 文件修改时间（越新越好）
@@ -129,10 +129,42 @@ def select_best_model(model_files, preferred_keywords=None, excluded_keywords=No
 def get_safe_action_advanced(model, state, env, previous_action, uncertainty_threshold=1.0):
     """
     高级安全动作选择，结合模型预测、安全规则、不确定性估计和多目标优化
+    支持多模态输入（图像+向量）
     """
-    # 模型预测
-    state_normalized = np.array(state).reshape(-1, *state.shape) / 255
-    qs = model.predict(state_normalized, verbose=0)[0]
+    # 提取状态信息
+    if isinstance(state, dict):
+        # 多模态输入
+        image_state = state['image']
+        
+        # 获取车辆状态信息
+        vehicle_location = env.vehicle.get_location()
+        velocity = env.vehicle.get_velocity()
+        speed_kmh = 3.6 * np.linalg.norm([velocity.x, velocity.y, velocity.z])
+        vehicle_transform = env.vehicle.get_transform()
+        heading = vehicle_transform.rotation.yaw
+        
+        # 构建向量状态（10维）
+        vector_state = np.array([
+            vehicle_location.x / 200.0,  # 归一化
+            vehicle_location.y / 200.0,
+            speed_kmh / 100.0,           # 归一化速度
+            heading / 180.0,             # 归一化方向
+            0, 0, 0, 0, 0, 0             # 动作历史占位符
+        ])
+        
+        # 设置上一个动作
+        vector_state[4 + previous_action] = 1.0 if previous_action < 5 else 0
+        
+        # 模型预测
+        image_input = np.array(image_state).reshape(-1, *image_state.shape) / 255
+        vector_input = vector_state.reshape(1, -1)
+        
+        qs = model.predict([image_input, vector_input], verbose=0)[0]
+    else:
+        # 单图像输入（向后兼容）
+        state_normalized = np.array(state).reshape(-1, *state.shape) / 255
+        dummy_vector = np.zeros((1, 10))
+        qs = model.predict([state_normalized, dummy_vector], verbose=0)[0]
     
     # 获取车辆速度
     velocity = env.vehicle.get_velocity()
@@ -152,14 +184,20 @@ def get_safe_action_advanced(model, state, env, previous_action, uncertainty_thr
     
     # 2. 行人避障优先级
     if hasattr(env, 'suggested_action') and env.suggested_action is not None:
-        qs[env.suggested_action] += 3.0  # 大幅提高建议动作的Q值
-        print(f"🚨 安全避让: 执行动作 {env.suggested_action}")
+        # 根据距离调整优先级
+        min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
+        if min_ped_distance < 8.0:  # 危险距离
+            qs[env.suggested_action] += 5.0  # 大幅提高建议动作的Q值
+            print(f"🚨 紧急避让: 执行动作 {env.suggested_action}, 距离: {min_ped_distance:.1f}m")
+        elif min_ped_distance < 12.0:  # 预警距离
+            qs[env.suggested_action] += 2.0
+            print(f"⚠️ 安全避让: 执行动作 {env.suggested_action}, 距离: {min_ped_distance:.1f}m")
         env.suggested_action = None
     
     # 3. 防止过度转向
     if hasattr(env, 'same_steer_counter') and env.same_steer_counter > 2:
         if previous_action in [3, 4]:
-            qs[previous_action] -= 1.5  # 降低连续同向转向的倾向
+            qs[previous_action] -= 2.0  # 降低连续同向转向的倾向
     
     # 4. 动作平滑性
     if previous_action in [3, 4]:  # 转向动作
@@ -176,18 +214,24 @@ def get_safe_action_advanced(model, state, env, previous_action, uncertainty_thr
         elif abs(vehicle_rotation) > 30:  # 方向偏差大
             # 鼓励向相反方向转向以回正
             if vehicle_rotation > 0:  # 偏左，鼓励右转
-                qs[4] += 1.0
+                qs[4] += 1.5
             else:  # 偏右，鼓励左转
-                qs[3] += 1.0
+                qs[3] += 1.5
     
     # 6. 紧急情况处理
     min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
     if min_ped_distance < 5.0:  # 紧急避让距离
         # 大幅调整Q值以确保安全
-        qs[0] += 2.0  # 紧急制动
+        qs[0] += 3.0  # 紧急制动
         if min_ped_distance < 3.0:  # 极危险
             qs[2] = -float('inf')  # 禁止加速
-            print("⚠️ 紧急制动!")
+            qs[1] = -float('inf')  # 禁止保持
+            print("⚠️ 紧急制动! 危险距离!")
+    
+    # 7. 考虑运动检测结果
+    if hasattr(env, 'motion_detected') and env.motion_detected:
+        # 如果检测到运动，提高警惕
+        qs[0] += 0.5  # 鼓励减速观察
     
     # 选择动作
     action = np.argmax(qs)
@@ -208,7 +252,7 @@ def get_safe_action_advanced(model, state, env, previous_action, uncertainty_thr
 
 
 def run_test_episode(model, env, episode_num, use_advanced_safety=True):
-    """运行单个测试episode"""
+    """运行单个测试episode - 支持多模态输入"""
     print(f"\n{'='*50}")
     print(f"测试 Episode {episode_num}")
     print(f"{'='*50}")
@@ -224,6 +268,9 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
     previous_action = 1
     fps_counter = deque(maxlen=30)
     
+    # 反应时间统计
+    reaction_times = []
+    
     # 运行episode
     max_steps = SECONDS_PER_EPISODE * 60
     
@@ -234,12 +281,44 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
         if use_advanced_safety:
             action, qs = get_safe_action_advanced(model, current_state, env, previous_action)
         else:
-            # 基础动作选择
-            state_normalized = np.array(current_state).reshape(-1, *current_state.shape) / 255
-            qs = model.predict(state_normalized, verbose=0)[0]
+            # 基础动作选择 - 需要处理多模态输入
+            if isinstance(current_state, dict):
+                # 多模态输入
+                image_input = np.array(current_state['image']).reshape(-1, *current_state['image'].shape) / 255
+                
+                # 构建向量输入
+                vehicle_location = env.vehicle.get_location()
+                velocity = env.vehicle.get_velocity()
+                speed_kmh = 3.6 * np.linalg.norm([velocity.x, velocity.y, velocity.z])
+                vehicle_transform = env.vehicle.get_transform()
+                heading = vehicle_transform.rotation.yaw
+                
+                vector_state = np.array([
+                    vehicle_location.x / 200.0,
+                    vehicle_location.y / 200.0,
+                    speed_kmh / 100.0,
+                    heading / 180.0,
+                    0, 0, 0, 0, 0, 0
+                ])
+                vector_state[4 + previous_action] = 1.0 if previous_action < 5 else 0
+                
+                vector_input = vector_state.reshape(1, -1)
+                qs = model.predict([image_input, vector_input], verbose=0)[0]
+            else:
+                # 单图像输入
+                state_normalized = np.array(current_state).reshape(-1, *current_state.shape) / 255
+                dummy_vector = np.zeros((1, 10))
+                qs = model.predict([state_normalized, dummy_vector], verbose=0)[0]
+            
             action = np.argmax(qs)
         
         previous_action = action
+        
+        # 记录反应开始时间（如果有障碍物）
+        if hasattr(env, 'obstacle_detected_time') and env.obstacle_detected_time is not None:
+            if hasattr(env, 'reaction_start_time') and env.reaction_start_time is not None:
+                reaction_time = time.time() - env.reaction_start_time
+                reaction_times.append(reaction_time)
         
         # 执行动作
         new_state, reward, done, _ = env.step(action)
@@ -259,10 +338,14 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
             velocity = env.vehicle.get_velocity()
             speed_kmh = 3.6 * np.linalg.norm([velocity.x, velocity.y, velocity.z])
             
+            # 获取最近行人距离
+            min_ped_distance = getattr(env, 'last_ped_distance', float('inf'))
+            
             status = "✅" if reward > 0 else "⚠️" if reward < -1 else "➡️"
             
             print(f"{status} 步数: {step_count:4d} | FPS: {fps:4.1f} | "
-                  f"速度: {speed_kmh:5.1f} km/h | 奖励: {reward:6.2f} | 累计: {total_reward:7.2f}")
+                  f"速度: {speed_kmh:5.1f} km/h | 行人距离: {min_ped_distance:5.1f}m | "
+                  f"奖励: {reward:6.2f} | 累计: {total_reward:7.2f}")
         
         if done:
             break
@@ -274,14 +357,18 @@ def run_test_episode(model, env, episode_num, use_advanced_safety=True):
     success = total_reward > 5
     result = "成功" if success else "失败"
     
+    # 计算平均反应时间
+    avg_reaction_time = np.mean(reaction_times) if reaction_times else 0
+    
     print(f"\nEpisode {episode_num} 结果: {result}")
     print(f"总步数: {step_count}, 总奖励: {total_reward:.2f}")
+    print(f"平均反应时间: {avg_reaction_time:.2f}秒")
     
-    return success, total_reward, step_count
+    return success, total_reward, step_count, avg_reaction_time
 
 
 def load_model_with_fallback(model_path):
-    """加载模型，支持多种格式和回退机制"""
+    """加载模型，支持多种格式和回退机制 - 支持多模态输入模型"""
     print(f"尝试加载模型: {model_path}")
     
     # 如果是相对路径，尝试转换为绝对路径（相对于脚本目录）
@@ -312,20 +399,33 @@ def load_model_with_fallback(model_path):
         'Add': tf.keras.layers.Add, 
         'Subtract': tf.keras.layers.Subtract,
         'Lambda': tf.keras.layers.Lambda,
-        'Multiply': tf.keras.layers.Multiply
+        'Multiply': tf.keras.layers.Multiply,
+        'Concatenate': tf.keras.layers.Concatenate,
+        'SeparableConv2D': tf.keras.layers.SeparableConv2D,
+        'SpatialDropout2D': tf.keras.layers.SpatialDropout2D
     }
     
     try:
         # 尝试加载完整模型
-        model = load_model(model_path, custom_objects=custom_objects)
+        model = load_model(model_path, custom_objects=custom_objects, compile=False)
         print(f"✅ 模型加载成功 (使用自定义层)")
+        
+        # 编译模型
+        model.compile(loss="huber", 
+                     optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0), 
+                     metrics=["mae"])
         return model
     except Exception as e1:
         print(f"使用自定义层加载失败: {e1}")
         try:
             # 尝试不加载自定义层
-            model = load_model(model_path)
+            model = load_model(model_path, compile=False)
             print(f"✅ 模型加载成功 (基础加载)")
+            
+            # 编译模型
+            model.compile(loss="huber", 
+                         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0), 
+                         metrics=["mae"])
             return model
         except Exception as e2:
             print(f"基础加载失败: {e2}")
@@ -338,14 +438,19 @@ def load_model_with_fallback(model_path):
                     custom_objects=custom_objects
                 )
                 print(f"✅ 模型加载成功 (不编译)")
+                
+                # 编译模型
+                model.compile(loss="huber", 
+                             optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0), 
+                             metrics=["mae"])
                 return model
             except Exception as e3:
                 print(f"所有加载尝试失败: {e3}")
                 raise ValueError(f"无法加载模型: {model_path}")
 
 
-def comprehensive_model_evaluation(model_path, num_episodes=5):
-    """综合模型评估"""
+def comprehensive_model_evaluation(model_path, num_episodes=3):
+    """综合模型评估 - 支持多模态输入"""
     print(f"\n{'='*60}")
     print(f"开始综合模型评估")
     print(f"模型路径: {model_path}")
@@ -360,30 +465,57 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
     # 加载模型
     model = load_model_with_fallback(model_path)
     
+    # 检查模型输入
+    print(f"模型输入数量: {len(model.inputs)}")
+    for i, inp in enumerate(model.inputs):
+        print(f"  输入{i}: {inp.shape}")
+    
     # 创建环境
     env = CarEnv()
     env.SHOW_CAM = False
     
     # 预热模型
     print("预热模型...")
-    model.predict(np.ones((1, env.im_height, env.im_width, 3)), verbose=0)
+    # 创建测试输入
+    dummy_image = np.ones((1, env.im_height, env.im_width, 3)) / 255
+    dummy_vector = np.zeros((1, 10))
+    
+    try:
+        # 根据模型输入数量进行预测
+        if len(model.inputs) == 2:
+            qs = model.predict([dummy_image, dummy_vector], verbose=0)
+            print(f"✅ 多模态模型预热成功，输出形状: {qs.shape}")
+        else:
+            qs = model.predict(dummy_image, verbose=0)
+            print(f"✅ 单输入模型预热成功，输出形状: {qs.shape}")
+    except Exception as e:
+        print(f"⚠️ 模型预热失败: {e}")
+        print("尝试使用单输入进行预热...")
+        try:
+            qs = model.predict(dummy_image, verbose=0)
+            print(f"✅ 单输入预热成功")
+        except Exception as e2:
+            print(f"❌ 预热失败: {e2}")
+            print("模型可能不兼容，尝试继续...")
     
     # 运行测试
     results = {
         'successes': 0,
         'total_rewards': [],
         'episode_lengths': [],
+        'reaction_times': [],
         'start_time': time.time()
     }
     
     try:
         for episode in range(1, num_episodes + 1):
-            success, reward, length = run_test_episode(model, env, episode, use_advanced_safety=True)
+            success, reward, length, avg_rt = run_test_episode(model, env, episode, use_advanced_safety=True)
             
             if success:
                 results['successes'] += 1
             results['total_rewards'].append(reward)
             results['episode_lengths'].append(length)
+            results['reaction_times'].append(avg_rt)
             
             # 短暂暂停
             time.sleep(1)
@@ -392,6 +524,8 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
         print("\n测试被用户中断")
     except Exception as e:
         print(f"测试过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         # 清理环境
         env.cleanup_actors()
@@ -406,6 +540,7 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
             results['avg_length'] = np.mean(results['episode_lengths'])
             results['max_reward'] = max(results['total_rewards'])
             results['min_reward'] = min(results['total_rewards'])
+            results['avg_reaction_time'] = np.mean(results['reaction_times']) if results['reaction_times'] else 0
         
         # 显示评估报告
         print(f"\n{'='*60}")
@@ -416,6 +551,7 @@ def comprehensive_model_evaluation(model_path, num_episodes=5):
         print(f"成功率: {results.get('success_rate', 0):.1f}%")
         print(f"平均奖励: {results.get('avg_reward', 0):.2f}")
         print(f"平均步数: {results.get('avg_length', 0):.1f}")
+        print(f"平均反应时间: {results.get('avg_reaction_time', 0):.2f}秒")
         print(f"最佳表现: {results.get('max_reward', 0):.2f}")
         print(f"最差表现: {results.get('min_reward', 0):.2f}")
         print(f"总测试时间: {results.get('total_time', 0):.1f}秒")
@@ -499,7 +635,7 @@ def interactive_model_selection(model_files):
 def main():
     """主函数 - 自动查找和测试模型"""
     print(f"\n{'='*60}")
-    print("自动驾驶模型测试系统")
+    print("自动驾驶模型测试系统 - 多模态输入版")
     print(f"{'='*60}")
     
     # 显示当前脚本所在目录
@@ -536,7 +672,7 @@ def main():
         return
     
     # 开始测试
-    comprehensive_model_evaluation(selected_model, num_episodes=3)
+    comprehensive_model_evaluation(selected_model, num_episodes=2)
 
 
 def quick_test():
@@ -569,6 +705,42 @@ def quick_test():
     comprehensive_model_evaluation(selected_model, num_episodes=1)
 
 
+def simple_test_model(model_path):
+    """简单测试模型 - 用于调试"""
+    print(f"\n简单测试模型: {model_path}")
+    
+    # 加载模型
+    try:
+        model = load_model_with_fallback(model_path)
+        print(f"✅ 模型加载成功")
+        print(f"模型输入: {len(model.inputs)} 个")
+        
+        # 测试模型预测
+        env = CarEnv()
+        
+        # 创建测试输入
+        dummy_image = np.ones((1, env.im_height, env.im_width, 3)) / 255
+        dummy_vector = np.zeros((1, 10))
+        
+        if len(model.inputs) == 2:
+            print("测试多模态输入...")
+            predictions = model.predict([dummy_image, dummy_vector], verbose=0)
+            print(f"预测成功! 输出形状: {predictions.shape}")
+        else:
+            print("测试单输入...")
+            predictions = model.predict(dummy_image, verbose=0)
+            print(f"预测成功! 输出形状: {predictions.shape}")
+        
+        env.cleanup_actors()
+        return True
+        
+    except Exception as e:
+        print(f"❌ 测试失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 if __name__ == '__main__':
     import argparse
     
@@ -576,10 +748,14 @@ if __name__ == '__main__':
     parser.add_argument('--quick', action='store_true', help='快速测试模式')
     parser.add_argument('--model', type=str, help='指定模型文件路径')
     parser.add_argument('--episodes', type=int, default=3, help='测试轮次数量')
+    parser.add_argument('--test', type=str, help='简单测试模型文件')
     
     args = parser.parse_args()
     
-    if args.model:
+    if args.test:
+        # 简单测试模式
+        simple_test_model(args.test)
+    elif args.model:
         # 使用指定的模型文件
         script_dir = get_script_directory()
         

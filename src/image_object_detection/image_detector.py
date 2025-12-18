@@ -1,112 +1,116 @@
 # image_detector.py
+# 功能：对单张静态图像执行目标检测，并可视化结果
+
 import cv2
 import numpy as np
 import traceback
+import os
+
 
 class ImageDetector:
+    """
+    静态图像检测器类。
+    接收一个检测引擎（如 YOLO 模型封装），加载指定路径的图像，
+    执行目标检测，并在窗口中显示带标注的结果，同时打印检测信息到控制台。
+    """
+
     def __init__(self, detection_engine):
+        """
+        初始化图像检测器。
+
+        参数:
+            detection_engine: 实现 detect(frame) 方法的对象（如 DetectionEngine 实例）
+        """
         self.engine = detection_engine
-    
+
     def detect_static_image(self, image_path):
-        """检测静态图像"""
-        print(f"正在加载图像: {image_path}")
-        
-        if not self._check_image_exists(image_path):
-            return
-        
-        frame = self._load_image(image_path)
-        if frame is None or frame.size == 0:
-            print("错误: 无法读取图像文件或图像为空")
-            return
-        
-        print("正在检测图像...")
-        results, annotated_frame = self._perform_detection(frame)
-        
-        if annotated_frame is None:
-            print("错误: 检测未返回有效图像")
-            return
-        
-        # 显示检测结果文本
-        self._display_results(results)
-        
-        # 显示图像窗口（带固定初始大小）
-        self._show_image(annotated_frame, 'YOLO 检测结果 - 静态图像')
-    
-    def _check_image_exists(self, image_path):
-        import os
+        """
+        对指定路径的静态图像执行目标检测。
+
+        参数:
+            image_path (str): 待检测图像的文件路径
+        """
+        print(f"Loading image: {image_path}")
+
+        # 检查图像文件是否存在
         if not os.path.exists(image_path):
-            print(f"错误: 图像文件不存在 - {image_path}")
-            return False
-        return True
-    
-    def _load_image(self, image_path):
-        try:
-            with open(image_path, "rb") as f:
-                bytes_data = bytearray(f.read())
-            nparr = np.frombuffer(bytes_data, np.uint8)
-            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            return frame
-        except Exception as e:
-            print(f"加载图像时出错: {e}")
-            return None
-    
-    def _perform_detection(self, frame):
-        try:
-            annotated_frame, results = self.engine.detect(frame)
-            return results, annotated_frame
-        except Exception as e:
-            print(f"检测过程中发生错误: {e}")
-            traceback.print_exc()
-            return [], None
-    
-    def _display_results(self, results):
-        if not results:
-            print("未检测到任何对象（results 为空）")
+            print(f"Error: Image file not found - {image_path}")
             return
-        
-        result = results[0]
+
+        # 使用 OpenCV 读取图像（BGR 格式）
+        frame = cv2.imread(image_path)
+        if frame is None or frame.size == 0:
+            print("Error: Failed to load image")
+            return
+
+        print("Running detection...")
+
+        # 调用检测引擎进行推理，获取可视化图像和原始结果
+        annotated_frame, results = self.engine.detect(frame)
+
+        # 安全检查：确保返回的图像有效
+        if annotated_frame is None or annotated_frame.size == 0:
+            print("Error: Invalid annotated frame")
+            return
+
+        # 打印检测到的目标信息（类别、置信度）
+        self._display_results(results)
+
+        # 在独立窗口中显示带检测框的图像
+        self._show_image(annotated_frame, "YOLO_Static_Detection")
+
+    def _display_results(self, results):
+        """
+        私有方法：解析并打印检测结果到控制台。
+
+        参数:
+            results (List[Results]): YOLO 返回的检测结果列表（通常长度为1）
+        """
+        # 若结果为空或无检测框，提示用户
+        if not results:
+            print("No objects detected.")
+            return
+
+        result = results[0]  # YOLO 总是返回至少一个 Results 对象
         boxes = result.boxes
         if len(boxes) == 0:
-            print("未检测到任何对象")
+            print("No objects detected.")
             return
-        
-        print("检测完成，正在显示结果...")
-        print(f"检测到 {len(boxes)} 个对象:")
-        
-        names_list = self.engine.model.names
-        
+
+        print(f"Detected {len(boxes)} object(s):")
+        names_list = self.engine.model.names  # 获取模型的类别名称列表
+
+        # 遍历每个检测框，提取类别索引、置信度和类别名
         for i, box in enumerate(boxes):
             try:
-                cls_index = int(box.cls.item())
-                confidence = box.conf.item()
-                
-                if 0 <= cls_index < len(names_list):
-                    cls_name = names_list[cls_index]
-                else:
-                    cls_name = f"unknown_class_{cls_index}"
-                    print(f"  ⚠️ 警告：类别索引 {cls_index} 超出范围（共 {len(names_list)} 类）")
-                
-                print(f"  {i+1}. {cls_name} (置信度: {confidence:.2f})")
+                cls_index = int(box.cls.item())  # 类别索引（tensor → int）
+                confidence = box.conf.item()     # 置信度（tensor → float）
+                # 安全获取类别名称，防止索引越界
+                cls_name = names_list[cls_index] if 0 <= cls_index < len(names_list) else f"unknown_{cls_index}"
+                print(f" {i+1}. {cls_name} (confidence: {confidence:.2f})")
             except Exception as e:
-                print(f"  ⚠️ 解析第 {i+1} 个检测框时出错: {e}")
-    
-    def _show_image(self, annotated_frame, window_name):
-        """显示图像，并设置窗口为可调整的小尺寸"""
-        if annotated_frame is None or annotated_frame.size == 0:
-            print("错误: 标注帧无效，无法显示")
-            return
-        
-        print("\n图像已显示。按任意键关闭窗口...")
+                print(f" Warning: Failed to parse box {i+1}: {e}")
+
+    def _show_image(self, annotated_frame, window_name="YOLO_Static_Detection"):
+        """
+        私有方法：使用 OpenCV 显示带标注的图像。
+
+        参数:
+            annotated_frame (np.ndarray): 带检测框的图像（HWC, BGR）
+            window_name (str): 显示窗口的标题
+        """
         try:
-            # 创建可调整大小的窗口
-            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-            # 设置初始窗口大小为 800x600（你可以按需修改）
-            cv2.resizeWindow(window_name, 800, 600)
-            # 显示图像（OpenCV 会自动适应窗口）
-            cv2.imshow(window_name, annotated_frame)
-            cv2.waitKey(0)
+            # 关闭可能已存在的同名窗口，避免残留
             cv2.destroyAllWindows()
-            print("窗口已关闭。")
+
+            # 创建可调整大小的窗口（便于查看大图）
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(window_name, 800, 600)  # 初始窗口大小
+
+            # 显示图像，并等待任意按键关闭
+            cv2.imshow(window_name, annotated_frame)
+            cv2.waitKey(0)  # 0 表示无限等待，直到按键
+            cv2.destroyAllWindows()
         except Exception as e:
-            print(f"显示图像时发生错误: {e}")
-            traceback.print_exc()
+            print(f"Failed to display image: {e}")
+            traceback.print_exc()  # 打印完整错误栈，便于调试
