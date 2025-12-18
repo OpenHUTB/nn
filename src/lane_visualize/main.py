@@ -1,173 +1,156 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 import sys
-import os
+from collections import deque
+
+# ==========================================
+# 👇 请在这里填入你在 Tuner 中调出的“最好”的数值
+# ==========================================
+CANNY_LOW = 50        # 你的 Canny Low
+CANNY_HIGH = 150      # 你的 Canny High
+
+ROI_TOP_WIDTH = 0.40  # 你的 ROI Top W (例如滑动条是40，这里写 0.40)
+ROI_HEIGHT_POS = 0.60 # 你的 ROI Height (例如滑动条是60，这里写 0.60)
+
+HOUGH_THRESH = 20     # 你的 Hough Thresh
+MIN_LINE_LEN = 20     # 你的 Min Length
+MAX_LINE_GAP = 100    # 你的 Max Gap
+# ==========================================
 
 class LaneDetector:
     def __init__(self):
-        # 霍夫变换参数
-        self.rho = 1
-        self.theta = np.pi / 180
-        self.threshold = 15
-        self.min_line_length = 40
-        self.max_line_gap = 20
+        # 历史缓存 (用于平滑防抖)
+        self.left_lines_buffer = deque(maxlen=10)
+        self.right_lines_buffer = deque(maxlen=10)
         self.vertices = None
 
     def region_of_interest(self, img):
-        """定义感兴趣区域（ROI）"""
         mask = np.zeros_like(img)
         if self.vertices is None:
             height, width = img.shape
-            # 调整梯形区域以适应大多数行车记录仪视角
-            self.vertices = np.array([[
-                (width * 0.1, height),            # 左下
-                (width * 0.45, height * 0.6),     # 左上
-                (width * 0.55, height * 0.6),     # 右上
-                (width * 0.9, height)             # 右下
-            ]], dtype=np.int32)
+            
+            # 使用填入的参数计算梯形
+            top_w = width * ROI_TOP_WIDTH
+            top_x_center = width * 0.5
+            
+            # 梯形四个顶点
+            bl = (0, height)                                  # 左下
+            tl = (int(top_x_center - top_w/2), int(height * ROI_HEIGHT_POS)) # 左上
+            tr = (int(top_x_center + top_w/2), int(height * ROI_HEIGHT_POS)) # 右上
+            br = (width, height)                              # 右下
+            
+            self.vertices = np.array([[bl, tl, tr, br]], dtype=np.int32)
+
         cv2.fillPoly(mask, self.vertices, 255)
-        masked_img = cv2.bitwise_and(img, mask)
-        return masked_img
+        return cv2.bitwise_and(img, mask)
 
-    def detect_edges(self, img):
-        """Canny边缘检测"""
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    def process_frame(self, frame):
+        if frame is None: return None
+
+        # 1. 图像预处理
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blur, 50, 150)
-        return edges
+        
+        # 2. 边缘检测 (使用你的参数)
+        edges = cv2.Canny(blur, CANNY_LOW, CANNY_HIGH)
+        
+        # 3. ROI 裁剪
+        roi = self.region_of_interest(edges)
+        
+        # 4. 霍夫变换 (使用你的参数)
+        lines = cv2.HoughLinesP(roi, 1, np.pi/180, HOUGH_THRESH, 
+                                minLineLength=MIN_LINE_LEN, 
+                                maxLineGap=MAX_LINE_GAP)
+        
+        # 5. 计算平均线
+        left_raw, right_raw = self.average_slope_intercept(lines)
+        
+        # 6. 平滑处理
+        left_avg, right_avg = self.smooth_lines(left_raw, right_raw)
 
-    def detect_lines(self, edges):
-        """霍夫变换检测直线"""
-        lines = cv2.HoughLinesP(edges, self.rho, self.theta, self.threshold,
-                                np.array([]), minLineLength=self.min_line_length,
-                                maxLineGap=self.max_line_gap)
-        return lines
+        # 7. 绘制
+        height = frame.shape[0]
+        y_min = int(height * ROI_HEIGHT_POS) + 50 # 稍微画低一点，不要画到消失点
+        y_max = height
+        
+        left_pts = self.make_line_points(left_avg, y_min, y_max)
+        right_pts = self.make_line_points(right_avg, y_min, y_max)
+
+        return self.draw_lane(frame, left_pts, right_pts)
 
     def average_slope_intercept(self, lines):
-        """计算左右车道线的平均斜率和截距"""
         left_lines = []
         right_lines = []
+        if lines is None: return None, None
 
-        if lines is not None:
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                if x2 - x1 == 0: continue
-                slope = (y2 - y1) / (x2 - x1)
-                
-                # 过滤不合理的斜率 (太水平或太垂直)
-                if abs(slope) < 0.5 or abs(slope) > 2:
-                    continue
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            if x2 == x1: continue
+            
+            slope = (y2 - y1) / (x2 - x1)
+            intercept = y1 - slope * x1
 
-                intercept = y1 - slope * x1
-                # 图像坐标系中，y轴向下，所以斜率为负是左车道，正为右车道
-                if slope < 0:
-                    left_lines.append((slope, intercept))
-                else:
-                    right_lines.append((slope, intercept))
+            # 斜率过滤：排除水平线和垂直线
+            if abs(slope) < 0.3 or abs(slope) > 10:
+                continue
+
+            if slope < 0: left_lines.append((slope, intercept))
+            else: right_lines.append((slope, intercept))
 
         left_avg = np.average(left_lines, axis=0) if left_lines else None
         right_avg = np.average(right_lines, axis=0) if right_lines else None
         return left_avg, right_avg
 
-    def make_line_points(self, avg_line, y_min, y_max):
-        """生成绘制用的坐标点"""
-        if avg_line is None:
-            return None
-        slope, intercept = avg_line
-        # 防止除以0
-        if slope == 0: 
-            return None
-            
+    def smooth_lines(self, left_current, right_current):
+        if left_current is not None: self.left_lines_buffer.append(left_current)
+        if right_current is not None: self.right_lines_buffer.append(right_current)
+        
+        left_smooth = np.average(self.left_lines_buffer, axis=0) if self.left_lines_buffer else None
+        right_smooth = np.average(self.right_lines_buffer, axis=0) if self.right_lines_buffer else None
+        return left_smooth, right_smooth
+
+    def make_line_points(self, line, y_min, y_max):
+        if line is None: return None
+        slope, intercept = line
+        if abs(slope) < 1e-3: return None
         try:
             x_min = int((y_min - intercept) / slope)
             x_max = int((y_max - intercept) / slope)
-            return [(x_min, y_min), (x_max, y_max)]
-        except OverflowError:
-            return None
+            return ((x_min, y_min), (x_max, y_max))
+        except: return None
 
-    def draw_lane(self, img, left_line, right_line):
-        """绘制半透明车道区域"""
+    def draw_lane(self, img, left_pts, right_pts):
         lane_img = np.zeros_like(img)
+        if left_pts is not None and right_pts is not None:
+            pts = np.array([left_pts[0], left_pts[1], right_pts[1], right_pts[0]], dtype=np.int32)
+            cv2.fillPoly(lane_img, [pts], (0, 255, 0))
         
-        # 确保两条线都检测到了才画多边形
-        if left_line is not None and right_line is not None:
-            left_pts = np.array([left_line[0], left_line[1]], dtype=np.int32)
-            right_pts = np.array([right_line[0], right_line[1]], dtype=np.int32)
-            
-            # 创建多边形顶点
-            pts = np.vstack([left_pts, np.flipud(right_pts)])
-            cv2.fillPoly(lane_img, [pts], (0, 255, 0)) # 绿色填充
-            
-        # 无论是否形成区域，都尝试画线
-        if left_line is not None:
-            cv2.line(lane_img, left_line[0], left_line[1], (255, 0, 0), 10) # 蓝色线
-        if right_line is not None:
-            cv2.line(lane_img, right_line[0], right_line[1], (255, 0, 0), 10) # 蓝色线
-
-        result = cv2.addWeighted(img, 0.8, lane_img, 0.4, 0)
-        return result
-
-    def process_frame(self, frame):
-        if frame is None: return None
-        edges = self.detect_edges(frame)
-        roi_edges = self.region_of_interest(edges)
-        lines = self.detect_lines(roi_edges)
-        
-        height, width = frame.shape[:2]
-        left_avg, right_avg = self.average_slope_intercept(lines)
-        
-        y_min = int(height * 0.65) # 稍作调整，不要画太远
-        y_max = height
-
-        left_line = self.make_line_points(left_avg, y_min, y_max)
-        right_line = self.make_line_points(right_avg, y_min, y_max)
-        
-        result = self.draw_lane(frame, left_line, right_line)
-        return result
+        if left_pts: cv2.line(lane_img, left_pts[0], left_pts[1], (255, 0, 0), 10)
+        if right_pts: cv2.line(lane_img, right_pts[0], right_pts[1], (0, 0, 255), 10)
+        return cv2.addWeighted(img, 1, lane_img, 0.3, 0)
 
 def main():
-    detector = LaneDetector()
-    
-    # 逻辑：如果有命令行参数，读取视频；否则读取摄像头
-    input_source = 0 # 默认摄像头
-    
-    if len(sys.argv) > 1:
-        input_path = sys.argv[1]
-        if os.path.exists(input_path):
-            input_source = input_path
-            print(f"正在打开视频文件: {input_path}")
-        else:
-            print(f"错误: 找不到文件 {input_path}")
-            return
-    else:
-        print("未提供视频路径，正在打开默认摄像头...")
-
+    # 自动读取 sample.hevc 或摄像头
+    input_source = sys.argv[1] if len(sys.argv) > 1 else "sample.hevc"
     cap = cv2.VideoCapture(input_source)
-
     if not cap.isOpened():
-        print("错误: 无法打开视频源")
+        print("无法打开视频，请检查路径。")
         return
 
-    print("按 'q' 键退出程序")
+    detector = LaneDetector()
+    print("正在运行... 按 'q' 退出")
 
     while True:
         ret, frame = cap.read()
-        if not ret:
-            print("视频播放结束或无法读取帧")
-            break
+        if not ret: 
+            # 循环播放
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            continue
 
-        # 处理帧
-        processed_frame = detector.process_frame(frame)
+        result = detector.process_frame(frame)
+        cv2.imshow('Final Lane Detection', result)
 
-        # 显示结果
-        if processed_frame is not None:
-            cv2.imshow('Lane Detection System', processed_frame)
-        else:
-            cv2.imshow('Lane Detection System', frame)
-
-        # 按 'q' 退出，设置 25ms 延时（约 40fps）
-        if cv2.waitKey(25) & 0xFF == ord('q'):
+        if cv2.waitKey(20) & 0xFF == ord('q'):
             break
 
     cap.release()

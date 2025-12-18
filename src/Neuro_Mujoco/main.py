@@ -307,7 +307,7 @@ def visualize_model(model_path: str, use_ros_mode: bool = False, policy_model_pa
             obs_tensor = torch.zeros(1, obs_dimension, dtype=torch.float32) if policy_net else None
             
             while viewer_instance.is_running() and (not use_ros_mode or not rospy.is_shutdown()):
-                # 控制指令优先级：ROS指令 > 策略推理 > 无控制
+                # 【核心优先级规则】控制指令优先级：ROS外部指令 > 策略网络推理 > 无控制输入
                 if use_ros_mode and ros_ctrl_cmd is not None:
                     data.ctrl[:] = ros_ctrl_cmd
                 elif policy_net is not None:
@@ -323,7 +323,7 @@ def visualize_model(model_path: str, use_ros_mode: bool = False, policy_model_pa
                     # 策略推理得到归一化动作（[-1,1]）
                     normalized_action = policy_net(obs_tensor).squeeze().numpy()
                     
-                    # 映射到执行器实际控制范围 + 裁剪（核心优化：删除重复映射）
+                    # 【关键安全机制】线性映射归一化动作到执行器物理极限，并强制裁剪防止超限损坏模拟
                     if control_range is not None:
                         # 线性映射：[-1,1] → [ctrl_min, ctrl_max]
                         normalized_action = control_range[:, 0] + (control_range[:, 1] - control_range[:, 0]) * (normalized_action + 1) / 2
