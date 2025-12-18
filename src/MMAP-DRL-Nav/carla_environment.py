@@ -95,24 +95,47 @@ class CarlaEnvironment(gym.Env):
         self.collision_pedestrian_penalty = -100.0 # 碰撞行人惩罚
         self.collision_static_penalty = -15.0    # 碰撞静态物体惩罚
 
-        # ========== 天气系统：仅保留白天/夜晚切换 ==========
+        # ========== 天气系统：恢复所有原始天气 + 昼夜切换 ==========
         self.weather_mode = "dynamic"
-        # 简化：只保留白天（ClearNoon）和夜晚（ClearNight）两种天气
+        # 恢复所有原始天气类型 + 自定义昼夜天气
         self.weather_name_map = {
-            "Day": "晴天（白天）",
-            "Night": "晴天（夜晚）"
+            # 白天天气（原有）
+            carla.WeatherParameters.ClearNoon: "晴天（中午）",
+            carla.WeatherParameters.CloudyNoon: "多云（中午）",
+            carla.WeatherParameters.WetNoon: "小雨（中午）",
+            carla.WeatherParameters.WetCloudyNoon: "多云转小雨（中午）",
+            carla.WeatherParameters.MidRainyNoon: "中雨（中午）",
+            carla.WeatherParameters.HardRainNoon: "大雨（中午）",
+            carla.WeatherParameters.SoftRainNoon: "细雨（中午）",
+            # 自定义夜晚天气（补充）
+            "ClearNight": "晴天（夜晚）",
+            "CloudyNight": "多云（夜晚）",
+            "WetNight": "小雨（夜晚）"
         }
-        # 预设天气列表：仅白天/夜晚
-        self.all_weather_ids = ["Day", "Night"]
+        
+        # 预设天气列表：恢复所有原有 + 自定义夜晚
+        self.builtin_weathers = [
+            carla.WeatherParameters.ClearNoon,
+            carla.WeatherParameters.CloudyNoon,
+            carla.WeatherParameters.WetNoon,
+            carla.WeatherParameters.WetCloudyNoon,
+            carla.WeatherParameters.MidRainyNoon,
+            carla.WeatherParameters.HardRainNoon,
+            carla.WeatherParameters.SoftRainNoon
+        ]
+        self.custom_night_weathers = ["ClearNight", "CloudyNight", "WetNight"]
+        self.all_weather_ids = self.builtin_weathers + self.custom_night_weathers
+        
         # 随机选择初始天气
         self.current_weather_id = random.choice(self.all_weather_ids)
         self._set_weather_by_id(self.current_weather_id)
         print(f"初始天气：{self.weather_name_map[self.current_weather_id]}")
 
-        # ========== 仅保留大灯核心功能：夜晚开灯加分 ==========
-        self.headlight_required_weathers = ["Night"]  # 仅夜晚需要开大灯
-        self.headlight_on_reward = 1.0               # 夜晚开灯加分（提高奖励值）
-        self.headlight_check_cooldown = 2.0          # 检测间隔缩短为2秒
+        # ========== 大灯奖惩配置：夜晚开灯奖励 + 未开灯轻微惩罚 ==========
+        self.headlight_required_weathers = ["ClearNight", "CloudyNight", "WetNight"]  # 所有夜晚天气需要开灯
+        self.headlight_on_reward = 0.5               # 夜晚开灯奖励（适中）
+        self.headlight_off_penalty = -0.2            # 夜晚未开灯轻微惩罚（和轻微车道偏离一致）
+        self.headlight_check_cooldown = 2.0          # 检测间隔2秒
         self.last_headlight_check_time = 0
         self.vehicle_headlights_on = False
 
@@ -157,31 +180,52 @@ class CarlaEnvironment(gym.Env):
         self.view_distance = 8.0
         self.z_offset = 0.5
 
-    # ========== 简化：仅实现白天/夜晚天气切换 ==========
+    # ========== 恢复原始天气设置 + 完善夜晚天气参数 ==========
     def _set_weather_by_id(self, weather_id):
-        """仅设置白天/夜晚两种天气"""
-        weather = carla.WeatherParameters()
-        if weather_id == "Day":
-            # 白天：标准晴天
-            weather.sun_altitude_angle = 90.0
-            weather.sun_azimuth_angle = 0.0
-            weather.cloudiness = 0.0
-            weather.precipitation = 0.0
-            weather.brightness = 1.0
-            weather.directionald_light_intensity = 1.0
-        elif weather_id == "Night":
-            # 夜晚：极低光照+月光
-            weather.sun_altitude_angle = -90.0  # 太阳在地平线下
-            weather.moon_altitude_angle = 30.0
-            weather.moon_intensity = 1.0
-            weather.brightness = 0.1
-            weather.directionald_light_intensity = 0.01
-            weather.ambient_occlusion_intensity = 0.2
-        self.world.set_weather(weather)
+        """兼容内置天气枚举和自定义夜晚天气"""
+        if isinstance(weather_id, carla.WeatherParameters):
+            # 原有白天天气：直接使用CARLA内置枚举
+            self.world.set_weather(weather_id)
+        else:
+            # 自定义夜晚天气：基于对应白天天气调整光照
+            weather = carla.WeatherParameters()
+            if weather_id == "ClearNight":
+                # 晴天夜晚：极低光照+月光
+                weather.sun_altitude_angle = -90.0
+                weather.moon_altitude_angle = 30.0
+                weather.moon_intensity = 1.0
+                weather.cloudiness = 0.0
+                weather.precipitation = 0.0
+                weather.brightness = 0.1
+                weather.directionald_light_intensity = 0.01
+                weather.ambient_occlusion_intensity = 0.2
+            elif weather_id == "CloudyNight":
+                # 多云夜晚
+                weather.sun_altitude_angle = -90.0
+                weather.moon_altitude_angle = 25.0
+                weather.moon_intensity = 0.7
+                weather.cloudiness = 80.0
+                weather.precipitation = 0.0
+                weather.brightness = 0.08
+                weather.directionald_light_intensity = 0.008
+                weather.ambient_occlusion_intensity = 0.25
+            elif weather_id == "WetNight":
+                # 小雨夜晚
+                weather.sun_altitude_angle = -90.0
+                weather.moon_altitude_angle = 20.0
+                weather.moon_intensity = 0.5
+                weather.cloudiness = 90.0
+                weather.precipitation = 20.0
+                weather.precipitation_deposits = 10.0
+                weather.brightness = 0.07
+                weather.directionald_light_intensity = 0.005
+                weather.ambient_occlusion_intensity = 0.3
+            self.world.set_weather(weather)
 
-    # ========== 简化：仅保留夜晚开灯加分功能 ==========
+    # ========== 大灯奖惩：夜晚开灯奖励 + 未开灯轻微惩罚 ==========
     def _check_headlight_status(self):
         current_time = time.time()
+        # 冷却时间内不检测
         if current_time - self.last_headlight_check_time < self.headlight_check_cooldown:
             return 0.0
         
@@ -190,8 +234,8 @@ class CarlaEnvironment(gym.Env):
         if not self.vehicle or not self.vehicle.is_alive:
             return 0.0
         
-        # 仅夜晚检测大灯
-        need_headlight = self.current_weather_id == "Night"
+        # 仅夜晚天气检测大灯
+        need_headlight = self.current_weather_id in self.headlight_required_weathers
         if not need_headlight:
             return 0.0
         
@@ -199,18 +243,24 @@ class CarlaEnvironment(gym.Env):
         try:
             vehicle_light_state = self.vehicle.get_light_state()
             self.vehicle_headlights_on = vehicle_light_state == carla.VehicleLightState.HeadlightOn
-        except:
+        except Exception as e:
             self.vehicle_headlights_on = False
+            print(f"检测大灯状态失败：{e}")
         
         reward = 0.0
-        if need_headlight and self.vehicle_headlights_on:
-            # 夜晚开灯就加分
-            reward = self.headlight_on_reward
-            print(f"[夜晚] 大灯已开启，加分{self.headlight_on_reward}")
+        if need_headlight:
+            if self.vehicle_headlights_on:
+                # 夜晚开灯：奖励
+                reward = self.headlight_on_reward
+                print(f"[{self.weather_name_map[self.current_weather_id]}] 大灯已开启，加分{self.headlight_on_reward}")
+            else:
+                # 夜晚未开灯：轻微惩罚
+                reward = self.headlight_off_penalty
+                print(f"[{self.weather_name_map[self.current_weather_id]}] 大灯未开启，扣分{abs(self.headlight_off_penalty)}")
         
         return reward
 
-    # ========== 以下所有方法完全保留原有逻辑，未做修改 ==========
+    # ========== 以下所有方法完全保留原始代码，未做任何修改 ==========
     def _calculate_gear_reward(self):
         if not self.vehicle or not self.vehicle.is_alive:
             return 0.0
@@ -504,6 +554,7 @@ class CarlaEnvironment(gym.Env):
         self.camera.listen(lambda img: self._camera_callback(img))
 
     def reset(self):
+        # 清理资源
         if self.vehicle is not None and self.vehicle.is_alive:
             self.vehicle.destroy()
         if self.camera is not None and self.camera.is_alive:
@@ -512,6 +563,7 @@ class CarlaEnvironment(gym.Env):
             self.collision_sensor.destroy()
         self.image_data = None
         
+        # 重置状态
         self.has_collision = False
         self.hit_vehicle = False
         self.hit_pedestrian = False
@@ -531,33 +583,40 @@ class CarlaEnvironment(gym.Env):
         self.last_headlight_check_time = 0
         self.vehicle_headlights_on = False
 
+        # 切换天气
         self.switch_weather()
 
+        # 生成车辆
         vehicle_bp = self.world.get_blueprint_library().filter('vehicle.tesla.model3')[0]
         self.vehicle = self._spawn_vehicle_safely(vehicle_bp)
 
         # 夜晚自动开灯
-        if self.current_weather_id == "Night":
+        if self.current_weather_id in self.headlight_required_weathers:
             try:
                 self.vehicle.set_light_state(carla.VehicleLightState.HeadlightOn)
                 self.vehicle_headlights_on = True
-                print(f"当前为夜晚，已自动开启大灯")
-            except:
+                print(f"当前为{self.weather_name_map[self.current_weather_id]}，已自动开启大灯")
+            except Exception as e:
                 self.vehicle_headlights_on = False
+                print(f"自动开启大灯失败：{e}")
 
+        # 生成目标点 + 初始化传感器 + 生成NPC
         self._generate_random_target()
         self._init_camera()
         self._init_collision_sensor()
         self._spawn_small_npc()
 
+        # 等待相机数据
         timeout = 0
         while self.image_data is None and timeout < 30:
             self.world.tick()
             time.sleep(0.001)
             timeout += 1
 
+        # 跟随车辆
         self.follow_vehicle()
         self.world.tick()
+        
         return self.image_data.copy() if self.image_data is not None else np.zeros((128,128,3), dtype=np.uint8)
 
     def follow_vehicle(self):
@@ -591,6 +650,7 @@ class CarlaEnvironment(gym.Env):
 
         self.current_step += 1
 
+        # 解析动作
         throttle = 0.0
         steer = 0.0
         if action == 0:
@@ -604,6 +664,7 @@ class CarlaEnvironment(gym.Env):
         elif action == 3:
             throttle = -0.2
 
+        # 计算车速和档位
         velocity = self.vehicle.get_velocity()
         speed_m_s = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
         current_speed = speed_m_s * 3.6
@@ -623,6 +684,7 @@ class CarlaEnvironment(gym.Env):
             else:
                 gear = 5
 
+        # 控制车辆
         self.vehicle.apply_control(carla.VehicleControl(
             throttle=throttle,
             steer=steer,
@@ -635,6 +697,7 @@ class CarlaEnvironment(gym.Env):
         self.world.tick()
         self.follow_vehicle()
 
+        # 计算各项奖励
         base_reward = 0.1 if throttle > 0 else (-0.1 if throttle < 0 else 0.0)
         traffic_light_reward = self._check_traffic_light()
         over_speed_reward = self._check_over_speed()
@@ -645,6 +708,7 @@ class CarlaEnvironment(gym.Env):
         
         done = False
 
+        # 碰撞惩罚
         if self.has_collision and not self.collision_penalty_applied:
             if self.hit_pedestrian:
                 collision_reward = self.collision_pedestrian_penalty
@@ -660,6 +724,7 @@ class CarlaEnvironment(gym.Env):
                 done = False
             self.collision_penalty_applied = True
 
+        # 导航奖励
         nav_reward = 0.0
         dist_to_target = -1.0
         if self.target_location is not None and self.vehicle.is_alive:
@@ -676,10 +741,12 @@ class CarlaEnvironment(gym.Env):
                 nav_reward = max(nav_reward, -0.01)
                 self.last_dist_to_target = dist_to_target
 
+        # 步数超限
         if self.current_step >= self.max_steps and not done:
             print(f"达到最大步数{self.max_steps}，终止训练（当前距离目标点：{dist_to_target:.2f}米）")
             done = True
 
+        # 总奖励
         total_reward = base_reward + traffic_light_reward + over_speed_reward + lane_reward + collision_reward + nav_reward + gear_reward + headlight_reward
         next_state = self.get_observation()
 
@@ -699,6 +766,7 @@ class CarlaEnvironment(gym.Env):
         }
 
     def close(self):
+        # 清理NPC
         for v in self.npc_vehicle_list:
             if v.is_alive:
                 v.destroy()
@@ -709,12 +777,14 @@ class CarlaEnvironment(gym.Env):
         self.npc_pedestrian_list.clear()
         self.traffic_manager.set_synchronous_mode(False)
 
+        # 恢复同步模式
         try:
             self.sync_settings.synchronous_mode = False
             self.world.apply_settings(self.sync_settings)
         except Exception as e:
             print(f"恢复异步模式时警告：{e}")
 
+        # 销毁车辆和传感器
         try:
             if self.vehicle is not None and self.vehicle.is_alive:
                 self.vehicle.destroy()
