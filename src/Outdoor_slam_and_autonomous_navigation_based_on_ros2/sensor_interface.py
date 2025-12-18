@@ -6,8 +6,55 @@ from queue import Queue
 import json
 from dataclasses import dataclass
 from typing import Optional, Tuple
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import random
 
 
+# ====================== 传感器模拟器部分（原缺失的依赖） ======================
+class LidarSimulator:
+    def generate_pointcloud(self):
+        """模拟生成(1000, 3)的点云数据（x,y,z）"""
+        n_points = 1000
+        x = np.random.uniform(-50, 50, n_points)
+        y = np.random.uniform(-50, 50, n_points)
+        z = np.random.uniform(-5, 5, n_points)
+        return np.column_stack((x, y, z))
+
+
+class IMUSimulator:
+    def get_acceleration(self):
+        """模拟加速度（含重力+微小噪声）"""
+        return np.array([0, 0, 9.81 + random.uniform(-0.1, 0.1)])
+
+    def get_gyro(self):
+        """模拟陀螺仪数据（微小噪声）"""
+        return np.array([random.uniform(-0.01, 0.01) for _ in range(3)])
+
+
+class GNSSTrueSimulator:
+    def __init__(self):
+        self.lat = 39.9042  # 基准纬度（如北京天安门）
+        self.lon = 116.4074  # 基准经度
+        self.alt = 50.0  # 基准海拔
+
+    def get_latitude(self):
+        """模拟纬度缓慢变化"""
+        self.lat += random.uniform(-1e-6, 1e-6)
+        return self.lat
+
+    def get_longitude(self):
+        """模拟经度缓慢变化"""
+        self.lon += random.uniform(-1e-6, 1e-6)
+        return self.lon
+
+    def get_altitude(self):
+        """模拟海拔缓慢变化"""
+        self.alt += random.uniform(-0.01, 0.01)
+        return self.alt
+
+
+# ====================== 原代码核心部分（无任何修改） ======================
 @dataclass
 class PointCloud:
     points: np.ndarray  # (N, 3) or (N, 4) for intensity
@@ -91,8 +138,7 @@ class SensorInterface:
 
     def _lidar_capture(self):
         """模拟激光雷达数据采集"""
-        from sensor_simulators import LidarSimulator
-
+        # 直接使用上方定义的模拟器（不再需要外部导入）
         sim = LidarSimulator()
         while self.running:
             points = sim.generate_pointcloud()
@@ -106,8 +152,7 @@ class SensorInterface:
 
     def _imu_capture(self):
         """模拟IMU数据采集"""
-        from sensor_simulators import IMUSimulator
-
+        # 直接使用上方定义的模拟器
         sim = IMUSimulator()
         while self.running:
             imu_data = IMUData(
@@ -121,8 +166,7 @@ class SensorInterface:
 
     def _gnss_capture(self):
         """模拟GNSS数据采集"""
-        from sensor_simulators import GNSSTrueSimulator
-
+        # 直接使用上方定义的模拟器
         sim = GNSSTrueSimulator()
         while self.running:
             gnss_data = GNSSData(
@@ -182,3 +226,106 @@ class SensorInterface:
         except Exception as e:
             print(f"数据同步失败: {e}")
             return None, None, None
+
+
+# ====================== 可视化与运行逻辑（外部扩展整合进来） ======================
+def visualize_synchronized_data(pc, imu, gnss, fig, axes):
+    """可视化同步数据"""
+    ax_pc, ax_imu_accel, ax_imu_gyro, ax_gnss = axes
+    # 清空画布
+    ax_pc.clear()
+    ax_imu_accel.clear()
+    ax_imu_gyro.clear()
+    ax_gnss.clear()
+
+    # 1. 绘制点云
+    if pc is not None:
+        points = pc.points
+        ax_pc.scatter(points[:, 0], points[:, 1], points[:, 2], s=1, c='b')
+        ax_pc.set_xlabel('X (m)')
+        ax_pc.set_ylabel('Y (m)')
+        ax_pc.set_zlabel('Z (m)')
+        ax_pc.set_title(f'Point Cloud (time: {pc.timestamp:.2f})')
+    else:
+        ax_pc.set_title('Point Cloud: No Data')
+
+    # 2. 绘制IMU数据
+    if imu is not None:
+        # 加速度
+        ax_imu_accel.bar(['X', 'Y', 'Z'], imu.accel, color=['r', 'g', 'b'])
+        ax_imu_accel.set_ylim(9.7, 9.9)
+        ax_imu_accel.set_title(f'IMU Accel (time: {imu.timestamp:.2f})')
+        ax_imu_accel.set_ylabel('Accel (m/s²)')
+        # 陀螺仪
+        ax_imu_gyro.bar(['X', 'Y', 'Z'], imu.gyro, color=['r', 'g', 'b'])
+        ax_imu_gyro.set_ylim(-0.01, 0.01)
+        ax_imu_gyro.set_title('IMU Gyro (rad/s)')
+        ax_imu_gyro.set_ylabel('Gyro (rad/s)')
+    else:
+        ax_imu_accel.set_title('IMU Accel: No Data')
+        ax_imu_gyro.set_title('IMU Gyro: No Data')
+
+    # 3. 绘制GNSS数据
+    if gnss is not None:
+        ax_gnss.text(0.1, 0.8, f'Lat: {gnss.lat:.6f}', transform=ax_gnss.transAxes)
+        ax_gnss.text(0.1, 0.6, f'Lon: {gnss.lon:.6f}', transform=ax_gnss.transAxes)
+        ax_gnss.text(0.1, 0.4, f'Alt: {gnss.alt:.2f} m', transform=ax_gnss.transAxes)
+        ax_gnss.text(0.1, 0.2, f'Time: {gnss.timestamp:.2f}', transform=ax_gnss.transAxes)
+        ax_gnss.set_xlim(0, 1)
+        ax_gnss.set_ylim(0, 1)
+        ax_gnss.axis('off')
+    else:
+        ax_gnss.set_title('GNSS: No Data')
+        ax_gnss.axis('off')
+
+    # 实时更新
+    plt.draw()
+    plt.pause(0.001)
+
+
+def main():
+    """主运行函数"""
+    # 1. 实例化传感器接口
+    sensor_if = SensorInterface()
+
+    # 2. 初始化可视化画布
+    fig = plt.figure(figsize=(12, 8))
+    ax_pc = fig.add_subplot(221, projection='3d')
+    ax_imu_accel = fig.add_subplot(222)
+    ax_imu_gyro = fig.add_subplot(223)
+    ax_gnss = fig.add_subplot(224)
+    axes = (ax_pc, ax_imu_accel, ax_imu_gyro, ax_gnss)
+    plt.ion()  # 交互模式
+
+    try:
+        # 3. 启动传感器采集
+        sensor_if.start_capture()
+
+        # 4. 循环获取同步数据并展示
+        while True:
+            pc_data, imu_data, gnss_data = sensor_if.get_synchronized_data()
+
+            # 文本输出
+            print("\n=== 同步数据摘要 ===")
+            print(f"点云: {'有数据' if pc_data else '无数据'} (数量: {pc_data.points.shape[0] if pc_data else 0})")
+            print(f"IMU: {'有数据' if imu_data else '无数据'} (加速度: {imu_data.accel if imu_data else 'None'})")
+            print(
+                f"GNSS: {'有数据' if gnss_data else '无数据'} (经纬度: {f'{gnss_data.lat:.6f}, {gnss_data.lon:.6f}' if gnss_data else 'None'})")
+
+            # 可视化输出
+            visualize_synchronized_data(pc_data, imu_data, gnss_data, fig, axes)
+
+            time.sleep(0.1)  # 与点云频率同步
+
+    except KeyboardInterrupt:
+        # 停止采集
+        print("\n停止传感器采集...")
+        sensor_if.stop_capture()
+        plt.ioff()
+        plt.show()
+        print("采集已停止")
+
+
+# 程序入口
+if __name__ == "__main__":
+    main()
