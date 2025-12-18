@@ -13,6 +13,12 @@ try:
 except IndexError:
     pass
 
+# 获取当前文件的目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 获取父目录
+parent_dir = os.path.dirname(current_dir)
+# 将父目录添加到系统路径
+sys.path.append(parent_dir)
 from agents.navigation.global_route_planner import GlobalRoutePlanner
 
 import carla
@@ -420,7 +426,7 @@ class CarEnv:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0, brake=1.0))
             print("执行动作: 刹车")
         elif action == 1:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.5, steer=   0*self.STEER_AMT))
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=   0*self.STEER_AMT))
             print("执行动作: 直行")
         elif action == 2:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=-0.3*self.STEER_AMT))

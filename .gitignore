@@ -1,18 +1,18 @@
-# Python���棨���ģ���������ļ����⣩
+# 虚拟环境
+venv/
+# 视频文件
+*.mp4
+*.avi
+*.mov
+# 结果目录
+lane_detection_results/
+# Python缓存
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.pytest_cache/
-__pycache__/
-
-# ϵͳ/�༭������
-.DS_Store
-Thumbs.db
+# 日志文件
+lane_detection.log
+# 构建目录
+src/openpilot_model/build/
+src/openpilot_model/log/
+# VS Code配置
 .vscode/
-.idea/
-
-# �������棨���貹�䣩
-*.log
-*.tmp
-.txt
