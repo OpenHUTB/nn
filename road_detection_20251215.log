@@ -1,0 +1,11 @@
+2025-12-15 10:49:00,947 - RoadDetection - ERROR - 应用程序启动失败: name 'AdvancedRoadDetector' is not defined
+Traceback (most recent call last):
+  File "C:\Users\li\source\repos\nn\src\lane_identification\lane_identificantion.py", line 2032, in main
+    app = AdvancedLaneDetectionApp(root)
+  File "C:\Users\li\source\repos\nn\src\lane_identification\lane_identificantion.py", line 1699, in __init__
+    self._init_components()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\li\source\repos\nn\src\lane_identification\lane_identificantion.py", line 1715, in _init_components
+    self.road_detector = AdvancedRoadDetector(self.config_manager)
+                         ^^^^^^^^^^^^^^^^^^^^
+NameError: name 'AdvancedRoadDetector' is not defined
