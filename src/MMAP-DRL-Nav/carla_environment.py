@@ -40,6 +40,7 @@ class CarlaEnvironment(gym.Env):
         else:
             raise RuntimeError("CARLA连接超时（3次重试失败），请检查模拟器是否启动")
 
+        # ========== 修复核心错误：从World获取蓝图库（而非Map） ==========
         self.blueprint_library = self.world.get_blueprint_library()
 
         # ========== 同步模式配置 ==========
@@ -123,6 +124,20 @@ class CarlaEnvironment(gym.Env):
         self.max_steps = 800                 # 单回合最大步数（调整为800）
         self.current_step = 0                # 当前回合已执行步数
 
+        # ========== 新增：档位检测核心配置 ==========
+        self.gear_config = {
+            # 车速区间(km/h) : 推荐档位
+            0: 1,    # 0-10km/h → 1挡
+            10: 2,   # 10-20km/h → 2挡
+            20: 3,   # 20-30km/h → 3挡
+            30: 4,   # 30-40km/h → 4挡
+            40: 5    # ≥40km/h → 5挡
+        }
+        self.gear_correct_reward = 0.1       # 档位正确加分
+        self.last_speed_range = 0            # 记录上一次的车速区间（用于判断是否跨档位）
+        self.last_gear = 1                   # 记录上一步档位
+        self.is_initial_gear_logged = False  # 标记初始档位日志是否已输出
+
         # 基础配置（完全保留）
         self.spawn_retry_times = 20
         self.spawn_safe_radius = 2.0
@@ -145,6 +160,62 @@ class CarlaEnvironment(gym.Env):
         self.view_pitch = -15.0
         self.view_distance = 8.0
         self.z_offset = 0.5
+
+    # ========== 新增：档位奖励计算（初始输出一次 + 跨区间输出） ==========
+    def _calculate_gear_reward(self):
+        if not self.vehicle or not self.vehicle.is_alive:
+            return 0.0
+        
+        # 1. 计算当前车速（m/s → km/h）
+        velocity = self.vehicle.get_velocity()
+        speed_m_s = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        speed_kmh = round(speed_m_s * 3.6, 1)
+        
+        # 2. 判断当前车速区间
+        current_speed_range = 0
+        if speed_kmh < 0:  # 倒车
+            current_speed_range = -1
+            recommended_gear = 'R'
+        else:
+            # 匹配前进车速区间
+            for range_val in sorted(self.gear_config.keys(), reverse=True):
+                if speed_kmh >= range_val:
+                    current_speed_range = range_val
+                    recommended_gear = self.gear_config[range_val]
+                    break
+        
+        # 3. 获取当前档位
+        control = self.vehicle.get_control()
+        current_gear = control.gear
+        if control.reverse or speed_kmh < 0:  # 倒车挡
+            current_gear = 'R'
+
+        gear_reward = 0.0
+        # 4. 初始启动时输出一次（仅首次）
+        if not self.is_initial_gear_logged:
+            is_correct = (current_gear == recommended_gear)
+            if is_correct:
+                gear_reward = self.gear_correct_reward
+                if speed_kmh < 0:
+                    print(f"初始倒车档位正确加分：{self.gear_correct_reward}（车速{speed_kmh}km/h，当前R挡）")
+                else:
+                    print(f"初始档位正确加分：{self.gear_correct_reward}（车速{speed_kmh}km/h，当前{current_gear}挡，对应{current_speed_range}-{current_speed_range+10}km/h区间）")
+            self.is_initial_gear_logged = True  # 标记初始日志已输出
+        # 5. 跨档位区间时输出（初始之后）
+        elif current_speed_range != self.last_speed_range:
+            # 档位正确判断
+            is_correct = (current_gear == recommended_gear)
+            if is_correct:
+                gear_reward = self.gear_correct_reward
+                # 仅档位正确时输出日志
+                if speed_kmh < 0:
+                    print(f"倒车档位正确加分：{self.gear_correct_reward}（车速{speed_kmh}km/h，当前R挡）")
+                else:
+                    print(f"车速进入{current_speed_range}-{current_speed_range+10}km/h区间，档位{current_gear}正确加分：{self.gear_correct_reward}")
+            # 更新上次车速区间
+            self.last_speed_range = current_speed_range
+        
+        return gear_reward
 
     # ========== 天气切换：输出中文名称 ==========
     def switch_weather(self):
@@ -325,7 +396,7 @@ class CarlaEnvironment(gym.Env):
                 p.destroy()
         self.npc_pedestrian_list.clear()
 
-        vehicle_bps = self.blueprint_library.filter('vehicle.*')
+        vehicle_bps = self.world.get_blueprint_library().filter('vehicle.*')
         spawn_points = self.world.get_map().get_spawn_points()
         
         if len(spawn_points) < 50:
@@ -355,7 +426,7 @@ class CarlaEnvironment(gym.Env):
             except:
                 continue
 
-        pedestrian_bps = self.blueprint_library.filter('walker.pedestrian.*')
+        pedestrian_bps = self.world.get_blueprint_library().filter('walker.pedestrian.*')
         for _ in range(5):
             if self.vehicle is not None:
                 hero_loc = self.vehicle.get_transform().location
@@ -375,7 +446,7 @@ class CarlaEnvironment(gym.Env):
 
     # ========== 初始化碰撞传感器（完全保留原始代码） ==========
     def _init_collision_sensor(self):
-        collision_bp = self.blueprint_library.find('sensor.other.collision')
+        collision_bp = self.world.get_blueprint_library().find('sensor.other.collision')
         collision_transform = carla.Transform(carla.Location(x=0, y=0, z=0))
         self.collision_sensor = self.world.spawn_actor(
             collision_bp, collision_transform, attach_to=self.vehicle
@@ -396,7 +467,7 @@ class CarlaEnvironment(gym.Env):
 
     # ========== 初始化相机（完全保留原始代码） ==========
     def _init_camera(self):
-        camera_bp = self.blueprint_library.find('sensor.camera.rgb')
+        camera_bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
         camera_bp.set_attribute('image_size_y', '128')
         camera_bp.set_attribute('fov', '90')
@@ -431,12 +502,17 @@ class CarlaEnvironment(gym.Env):
 
         # ========== 新增：重置步数 ==========
         self.current_step = 0
+        
+        # ========== 新增：重置档位相关状态 ==========
+        self.last_speed_range = 0
+        self.last_gear = 1
+        self.is_initial_gear_logged = False  # 重置初始档位日志标记
 
         # ========== 切换天气（会自动输出中文名称） ==========
         self.switch_weather()
 
         # 生成车辆
-        vehicle_bp = self.blueprint_library.filter('vehicle.tesla.model3')[0]
+        vehicle_bp = self.world.get_blueprint_library().filter('vehicle.tesla.model3')[0]
         self.vehicle = self._spawn_vehicle_safely(vehicle_bp)
 
         # ========== 新增：生成导航目标点 ==========
@@ -486,7 +562,7 @@ class CarlaEnvironment(gym.Env):
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
         self.image_data = array.reshape((image.height, image.width, 4))[:, :, :3]
 
-    # ========== 核心：奖励函数（集成导航+步数限制） ==========
+    # ========== 核心：奖励函数（集成导航+步数限制 + 新增档位奖励） ==========
     def step(self, action):
         if self.vehicle is None or not self.vehicle.is_alive:
             raise RuntimeError("车辆未初始化/已销毁，请先调用reset()")
@@ -508,12 +584,35 @@ class CarlaEnvironment(gym.Env):
         elif action == 3:
             throttle = -0.2
 
+        # ========== 优化：根据车速自动匹配合理档位 ==========
+        # 计算当前车速
+        velocity = self.vehicle.get_velocity()
+        speed_m_s = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        current_speed = speed_m_s * 3.6
+        
+        # 匹配档位
+        gear = 1
+        if throttle < 0:  # 倒车
+            gear = -1
+        else:
+            # 根据车速匹配前进档位
+            if 0 <= current_speed < 10:
+                gear = 1
+            elif 10 <= current_speed < 20:
+                gear = 2
+            elif 20 <= current_speed < 30:
+                gear = 3
+            elif 30 <= current_speed < 40:
+                gear = 4
+            else:
+                gear = 5
+
         self.vehicle.apply_control(carla.VehicleControl(
             throttle=throttle,
             steer=steer,
             hand_brake=False,
             reverse=(throttle < 0),
-            gear=1,
+            gear=gear,
             manual_gear_shift=True
         ))
         
@@ -526,6 +625,10 @@ class CarlaEnvironment(gym.Env):
         over_speed_reward = self._check_over_speed()
         lane_reward = self._check_lane_offset()
         collision_reward = 0.0
+        
+        # ========== 新增：计算档位奖励 ==========
+        gear_reward = self._calculate_gear_reward()
+        
         done = False
 
         if self.has_collision and not self.collision_penalty_applied:
@@ -565,8 +668,8 @@ class CarlaEnvironment(gym.Env):
             print(f"达到最大步数{self.max_steps}，终止训练（当前距离目标点：{dist_to_target:.2f}米）")
             done = True
 
-        # 总奖励
-        total_reward = base_reward + traffic_light_reward + over_speed_reward + lane_reward + collision_reward + nav_reward
+        # 总奖励（新增档位奖励）
+        total_reward = base_reward + traffic_light_reward + over_speed_reward + lane_reward + collision_reward + nav_reward + gear_reward
         next_state = self.get_observation()
 
         return next_state, total_reward, done, {
@@ -576,6 +679,7 @@ class CarlaEnvironment(gym.Env):
             "lane_reward": lane_reward,
             "collision_reward": collision_reward,
             "nav_reward": nav_reward,
+            "gear_reward": gear_reward,  # 新增：返回档位奖励
             "total_reward": total_reward,
             "current_step": self.current_step,
             "dist_to_target": dist_to_target,
