@@ -1,4 +1,3 @@
-# cvips_infrastructure_collaborative.py
 import sys
 import os
 import time
@@ -6,694 +5,603 @@ import random
 import argparse
 import traceback
 import math
+import threading
+import json
 from datetime import datetime
-
-print("=" * 80)
-print("CVIPS v4.0 - 基础设施摄像头与多车协同数据生成器")
-print("=" * 80)
+from collections import deque
 
 from carla_utils import setup_carla_path, import_carla_module
+from config_manager import ConfigManager
+from annotation_generator import AnnotationGenerator
+from data_validator import DataValidator
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
 
 
-class InfrastructureCollaborativeGenerator:
-    def __init__(self, args):
-        self.args = args
-        self.client = None
-        self.world = None
-        self.actors = []
-        self.sensors = []
-        self.infrastructure_cameras = []
-        self.cooperative_vehicles = []
-        self.frame_count = 0
-        self.last_save_time = time.time()
-        self.intersection_location = None
-        self.setup_output_directory()
+class Logger:
+    @staticmethod
+    def info(msg):
+        print(f"[INFO] {msg}")
 
-    def setup_output_directory(self):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        scenario_name = f"{self.args.scenario}_v4_{timestamp}"
-        self.output_dir = os.path.join("cvips_v4_data", scenario_name)
-        os.makedirs(self.output_dir, exist_ok=True)
+    @staticmethod
+    def warning(msg):
+        print(f"[WARNING] {msg}")
 
-        self.camera_dirs = {}
+    @staticmethod
+    def error(msg):
+        print(f"[ERROR] {msg}")
 
-        for view in ['front_wide', 'front_narrow', 'right_side', 'left_side']:
-            dir_path = os.path.join(self.output_dir, "ego_vehicle", view)
-            os.makedirs(dir_path, exist_ok=True)
-            self.camera_dirs[f"ego_{view}"] = dir_path
+    @staticmethod
+    def debug(msg):
+        print(f"[DEBUG] {msg}")
 
-        for i in range(self.args.num_infra_cameras):
-            for angle in ['overview', 'left_view', 'right_view', 'closeup']:
-                dir_path = os.path.join(self.output_dir, "infrastructure", f"camera_{i + 1}", angle)
-                os.makedirs(dir_path, exist_ok=True)
-                self.camera_dirs[f"infra_{i + 1}_{angle}"] = dir_path
 
-        for v in range(self.args.num_coop_vehicles):
-            for view in ['front', 'rear', 'left', 'right']:
-                dir_path = os.path.join(self.output_dir, "cooperative", f"vehicle_{v + 1}", view)
-                os.makedirs(dir_path, exist_ok=True)
-                self.camera_dirs[f"coop{v + 1}_{view}"] = dir_path
+class Config:
+    VEHICLE_TYPES = [
+        'vehicle.tesla.model3',
+        'vehicle.audi.tt',
+        'vehicle.mini.cooperst',
+        'vehicle.nissan.micra'
+    ]
 
-        print(f"输出目录: {self.output_dir}")
-        print(f"目录结构: 主车({self.args.num_coop_vehicles + 1}辆) + 基础设施({self.args.num_infra_cameras}个)")
 
-    def connect_to_server(self):
-        print("\n[3/6] 连接到CARLA服务器...")
-
-        for attempt in range(1, 6):
-            try:
-                print(f"  尝试 {attempt}/5...")
-                self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(15.0)
-
-                if self.args.town:
-                    self.world = self.client.load_world(self.args.town)
-                else:
-                    self.world = self.client.get_world()
-
-                print(f"✓ 连接成功! 地图: {self.world.get_map().name}")
-
-                settings = self.world.get_settings()
-                settings.synchronous_mode = False
-                self.world.apply_settings(settings)
-                return True
-
-            except Exception as e:
-                error_msg = str(e)
-                print(f"  尝试 {attempt} 失败: {error_msg[:80]}...")
-                if attempt < 5:
-                    print("  等待3秒后重试...")
-                    time.sleep(3)
-
-        print("✗ 连接失败")
-        return False
-
-    def setup_collaborative_scene(self):
-        print("\n[4/6] 设置协同感知场景...")
-
-        try:
-            self.set_high_quality_settings()
-            self.set_environment()
-            time.sleep(2.0)
-
-            self.intersection_location = self.find_main_intersection()
-            if self.intersection_location:
-                print(f"✓ 找到主路口位置: ({self.intersection_location.x:.1f}, {self.intersection_location.y:.1f})")
-
-            ego_vehicle = self.spawn_ego_vehicle_near_intersection()
-            if not ego_vehicle:
-                print("⚠ 无法生成主车辆")
-                return None
-
-            self.cooperative_vehicles = self.spawn_cooperative_vehicles()
-            self.setup_infrastructure_cameras()
-            self.spawn_traffic_and_pedestrians()
-
-            print("等待协同场景稳定...")
-            time.sleep(8.0)
-            return ego_vehicle
-
-        except Exception as e:
-            print(f"设置场景失败: {e}")
-            traceback.print_exc()
-            return None
-
-    def set_high_quality_settings(self):
-        try:
-            quality_settings = {
-                'r.MotionBlurQuality': 0,
-                'r.DepthOfFieldQuality': 0,
-                'r.BloomQuality': 0,
-                'r.LensFlareQuality': 0,
-                'r.TonemapperQuality': 0,
-                'r.AmbientOcclusionLevels': 0,
-                'r.ShadowQuality': 3,
-                'r.TextureStreaming': True,
-                'r.PostProcessAAQuality': 6,
-            }
-
-            for key, value in quality_settings.items():
-                self.world.get_settings().set(str(key), str(value))
-
-            print("✓ 高质量渲染设置已应用")
-        except Exception as e:
-            print(f"设置渲染质量失败: {e}")
-
-    def set_environment(self):
+class WeatherManager:
+    @staticmethod
+    def create_weather(weather_type, time_of_day):
         weather = carla.WeatherParameters()
 
-        if self.args.weather == 'clear':
-            weather.sun_altitude_angle = 75
-            weather.cloudiness = 5.0
-            weather.precipitation = 0.0
-            weather.fog_density = 0.0
-        elif self.args.weather == 'rainy':
-            weather.sun_altitude_angle = 40
+        if weather_type == 'clear':
+            weather.cloudiness = 10.0
+        elif weather_type == 'rainy':
             weather.cloudiness = 90.0
-            weather.precipitation = 60.0
-            weather.fog_density = 15.0
-        elif self.args.weather == 'cloudy':
-            weather.sun_altitude_angle = 60
+            weather.precipitation = 80.0
+        elif weather_type == 'cloudy':
             weather.cloudiness = 70.0
-            weather.precipitation = 0.0
-            weather.fog_density = 5.0
 
-        if self.args.time_of_day == 'night':
-            weather.sun_altitude_angle = -10
-            weather.fog_density = 5.0
-        elif self.args.time_of_day == 'sunset':
-            weather.sun_altitude_angle = 5
-            weather.cloudiness = 50.0
+        if time_of_day == 'noon':
+            weather.sun_altitude_angle = 75
+        elif time_of_day == 'sunset':
+            weather.sun_altitude_angle = 15
+        elif time_of_day == 'night':
+            weather.sun_altitude_angle = -20
 
-        self.world.set_weather(weather)
-        print(f"✓ 环境设置: {self.args.weather}, {self.args.time_of_day}")
+        return weather
 
-    def find_main_intersection(self):
-        spawn_points = self.world.get_map().get_spawn_points()
-        if not spawn_points:
-            return None
 
-        if len(spawn_points) > 10:
-            center_point = None
-            min_distance = float('inf')
+class ImageStitcher:
+    def __init__(self, output_dir):
+        self.output_dir = output_dir
+        self.stitched_dir = os.path.join(output_dir, "stitched")
+        os.makedirs(self.stitched_dir, exist_ok=True)
 
-            for point in spawn_points:
-                distance = math.sqrt(point.location.x ** 2 + point.location.y ** 2)
-                if distance < min_distance:
-                    min_distance = distance
-                    center_point = point.location
-            return center_point
+    def stitch(self, image_paths, frame_num, view_type="vehicle"):
+        try:
+            from PIL import Image, ImageDraw
+        except ImportError:
+            Logger.warning("PIL未安装，跳过图像拼接")
+            return False
 
-        return spawn_points[0].location
+        positions = [(10, 10), (660, 10), (10, 390), (660, 390)]
 
-    def spawn_ego_vehicle_near_intersection(self):
+        canvas = Image.new('RGB', (640 * 2 + 20, 360 * 2 + 20), (40, 40, 40))
+        draw = ImageDraw.Draw(canvas)
+
+        for idx, (cam_name, img_path) in enumerate(list(image_paths.items())[:4]):
+            if img_path and os.path.exists(img_path):
+                try:
+                    img = Image.open(img_path).resize((640, 360))
+                except:
+                    img = Image.new('RGB', (640, 360), (80, 80, 80))
+            else:
+                img = Image.new('RGB', (640, 360), (80, 80, 80))
+
+            canvas.paste(img, positions[idx])
+            draw.text((positions[idx][0] + 5, positions[idx][1] + 5),
+                      cam_name, fill=(255, 255, 200))
+
+        output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
+        canvas.save(output_path, "JPEG", quality=90)
+        return True
+
+
+class TrafficSystem:
+    def __init__(self, world, config):
+        self.world = world
+        self.config = config
+        self.vehicles = []
+        self.pedestrians = []
+
+        seed = config['scenario'].get('seed', 42)
+        random.seed(seed)
+
+    def spawn_ego_vehicle(self):
         blueprint_lib = self.world.get_blueprint_library()
-        vehicle_types = [
-            'vehicle.tesla.model3',
-            'vehicle.audi.tt',
-            'vehicle.bmw.grandtourer',
-            'vehicle.mercedes.coupe'
-        ]
 
-        vehicle_bp = None
-        for vtype in vehicle_types:
+        for vtype in Config.VEHICLE_TYPES:
             if blueprint_lib.filter(vtype):
                 vehicle_bp = random.choice(blueprint_lib.filter(vtype))
                 break
-
-        if not vehicle_bp:
+        else:
             vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
 
         spawn_points = self.world.get_map().get_spawn_points()
         if not spawn_points:
-            print("⚠ 没有生成点")
             return None
 
-        if self.intersection_location:
-            nearest_point = None
-            min_distance = float('inf')
-
-            for point in spawn_points:
-                distance = point.location.distance(self.intersection_location)
-                if distance < min_distance and distance > 5.0:
-                    min_distance = distance
-                    nearest_point = point
-
-            spawn_point = nearest_point if nearest_point else random.choice(spawn_points)
-        else:
-            spawn_point = random.choice(spawn_points)
-
+        spawn_point = random.choice(spawn_points)
         try:
             vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-            self.actors.append(vehicle)
             vehicle.set_autopilot(True)
-            vehicle.apply_control(carla.VehicleControl(throttle=0.2, steer=0.0))
-
-            print(f"✓ 生成主车辆: {vehicle.type_id}")
-            print(f"  位置: ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
+            vehicle.apply_control(carla.VehicleControl(throttle=0.2))
+            Logger.info(f"主车: {vehicle.type_id}")
             return vehicle
         except Exception as e:
-            print(f"生成主车辆失败: {e}")
+            Logger.warning(f"主车生成失败: {e}")
             return None
 
-    def spawn_cooperative_vehicles(self):
+    def spawn_background_vehicles(self):
         blueprint_lib = self.world.get_blueprint_library()
         spawn_points = self.world.get_map().get_spawn_points()
 
         if not spawn_points:
-            print("⚠ 没有生成点，无法生成协同车辆")
-            return []
+            return 0
 
-        cooperative_vehicles = []
-        num_to_spawn = min(self.args.num_coop_vehicles, len(spawn_points) - 1)
-        print(f"生成 {num_to_spawn} 辆协同车辆...")
+        num_vehicles = min(self.config['traffic']['background_vehicles'], 10)
+        spawned = 0
 
-        for i in range(num_to_spawn):
+        for _ in range(num_vehicles):
             try:
                 vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
-                spawn_index = (i + 5) % len(spawn_points)
-                spawn_point = spawn_points[spawn_index]
-
+                spawn_point = random.choice(spawn_points)
                 vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-                self.actors.append(vehicle)
                 vehicle.set_autopilot(True)
-                speed = 0.2 + (i * 0.05)
-                vehicle.apply_control(carla.VehicleControl(throttle=speed, steer=0.0))
-
-                cooperative_vehicles.append(vehicle)
-                print(f"  协同车辆 {i + 1}: {vehicle.type_id}")
-            except Exception as e:
-                print(f"  生成协同车辆 {i + 1} 失败: {e}")
-                continue
-
-        print(f"✓ 生成 {len(cooperative_vehicles)} 辆协同车辆")
-        return cooperative_vehicles
-
-    def setup_infrastructure_cameras(self):
-        if not self.intersection_location:
-            print("⚠ 无路口位置，跳过基础设施摄像头")
-            return
-
-        blueprint_lib = self.world.get_blueprint_library()
-        print(f"安装 {self.args.num_infra_cameras} 个基础设施摄像头...")
-
-        for cam_idx in range(self.args.num_infra_cameras):
-            try:
-                angle_offset = (cam_idx * 360) / self.args.num_infra_cameras
-                radius = 15.0 + (cam_idx * 5.0)
-                angle_rad = math.radians(angle_offset)
-                cam_x = self.intersection_location.x + radius * math.cos(angle_rad)
-                cam_y = self.intersection_location.y + radius * math.sin(angle_rad)
-                cam_z = 8.0 + (cam_idx * 2.0)
-
-                camera_location = carla.Location(x=cam_x, y=cam_y, z=cam_z)
-                look_at_location = self.intersection_location
-                look_at_location.z = 0
-                direction = look_at_location - camera_location
-                rotation = carla.Rotation(
-                    pitch=-20 - (cam_idx * 5),
-                    yaw=math.degrees(math.atan2(direction.y, direction.x))
-                )
-                transform = carla.Transform(camera_location, rotation)
-
-                camera_angles = ['overview', 'left_view', 'right_view', 'closeup']
-
-                for angle_name in camera_angles:
-                    try:
-                        camera_bp = blueprint_lib.find('sensor.camera.rgb')
-
-                        if angle_name == 'overview':
-                            fov = 90
-                        elif angle_name == 'closeup':
-                            fov = 45
-                        else:
-                            fov = 70
-
-                        camera_bp.set_attribute('image_size_x', '1280')
-                        camera_bp.set_attribute('image_size_y', '720')
-                        camera_bp.set_attribute('fov', str(fov))
-                        camera_bp.set_attribute('motion_blur_intensity', '0.0')
-                        camera_bp.set_attribute('enable_postprocess_effects', 'False')
-
-                        camera = self.world.spawn_actor(camera_bp, transform)
-
-                        def make_save_callback(save_dir, cam_id, angle):
-                            def save_image(image):
-                                current_time = time.time()
-                                if current_time - self.last_save_time >= self.args.capture_interval:
-                                    self.frame_count += 1
-                                    self.last_save_time = current_time
-                                    filename = f"{save_dir}/infra_{cam_id}_{angle}_frame_{self.frame_count:04d}.png"
-                                    image.save_to_disk(filename, carla.ColorConverter.Raw)
-                            return save_image
-
-                        save_dir = self.camera_dirs[f"infra_{cam_idx + 1}_{angle_name}"]
-                        camera.listen(make_save_callback(save_dir, cam_idx + 1, angle_name))
-                        self.actors.append(camera)
-                        self.infrastructure_cameras.append(camera)
-                    except Exception as e:
-                        print(f"    安装{angle_name}视角失败: {e}")
-
-                print(f"  基础设施摄像头 {cam_idx + 1} 安装在: ({cam_x:.1f}, {cam_y:.1f}, {cam_z:.1f})")
-            except Exception as e:
-                print(f"  安装基础设施摄像头 {cam_idx + 1} 失败: {e}")
-                continue
-
-        print(f"✓ 安装 {len(self.infrastructure_cameras)} 个基础设施摄像头视角")
-
-    def setup_ego_cameras(self, vehicle):
-        if not vehicle:
-            return
-
-        blueprint_lib = self.world.get_blueprint_library()
-        print("安装主车辆摄像头...")
-
-        camera_configs = [
-            ('front_wide', carla.Location(x=2.0, z=1.8), carla.Rotation(pitch=-3.0), 100),
-            ('front_narrow', carla.Location(x=2.0, z=1.6), carla.Rotation(pitch=0), 60),
-            ('right_side', carla.Location(x=0.5, y=1.0, z=1.5), carla.Rotation(pitch=-2.0, yaw=45), 90),
-            ('left_side', carla.Location(x=0.5, y=-1.0, z=1.5), carla.Rotation(pitch=-2.0, yaw=-45), 90),
-        ]
-
-        for name, location, rotation, fov in camera_configs:
-            try:
-                camera_bp = blueprint_lib.find('sensor.camera.rgb')
-                camera_bp.set_attribute('image_size_x', '1280')
-                camera_bp.set_attribute('image_size_y', '720')
-                camera_bp.set_attribute('fov', str(fov))
-                camera_bp.set_attribute('motion_blur_intensity', '0.0')
-                camera_bp.set_attribute('enable_postprocess_effects', 'False')
-
-                transform = carla.Transform(location, rotation)
-                camera = self.world.spawn_actor(camera_bp, transform, attach_to=vehicle)
-
-                def make_save_callback(save_dir, cam_name):
-                    def save_image(image):
-                        current_time = time.time()
-                        if current_time - self.last_save_time >= self.args.capture_interval:
-                            self.frame_count += 1
-                            self.last_save_time = current_time
-                            filename = f"{save_dir}/ego_{cam_name}_frame_{self.frame_count:04d}.png"
-                            image.save_to_disk(filename, carla.ColorConverter.Raw)
-                    return save_image
-
-                save_dir = self.camera_dirs[f"ego_{name}"]
-                camera.listen(make_save_callback(save_dir, name))
-                self.actors.append(camera)
-                self.sensors.append(camera)
-                print(f"  主车{name}摄像头已安装")
-            except Exception as e:
-                print(f"  安装主车{name}摄像头失败: {e}")
-
-        print("✓ 主车辆摄像头安装完成")
-
-    def setup_cooperative_cameras(self):
-        if not self.cooperative_vehicles:
-            return
-
-        blueprint_lib = self.world.get_blueprint_library()
-        print("安装协同车辆摄像头...")
-
-        for v_idx, vehicle in enumerate(self.cooperative_vehicles):
-            camera_configs = [
-                ('front', carla.Location(x=1.5, z=1.4), carla.Rotation(pitch=0), 90),
-                ('rear', carla.Location(x=-1.5, z=1.4), carla.Rotation(pitch=0, yaw=180), 90),
-                ('left', carla.Location(x=0.0, y=-0.8, z=1.4), carla.Rotation(pitch=0, yaw=-90), 90),
-                ('right', carla.Location(x=0.0, y=0.8, z=1.4), carla.Rotation(pitch=0, yaw=90), 90),
-            ]
-
-            for name, location, rotation, fov in camera_configs:
-                try:
-                    camera_bp = blueprint_lib.find('sensor.camera.rgb')
-                    camera_bp.set_attribute('image_size_x', '1280')
-                    camera_bp.set_attribute('image_size_y', '720')
-                    camera_bp.set_attribute('fov', str(fov))
-                    camera_bp.set_attribute('motion_blur_intensity', '0.0')
-
-                    transform = carla.Transform(location, rotation)
-                    camera = self.world.spawn_actor(camera_bp, transform, attach_to=vehicle)
-
-                    def make_save_callback(save_dir, v_id, cam_name):
-                        def save_image(image):
-                            current_time = time.time()
-                            if current_time - self.last_save_time >= self.args.capture_interval:
-                                self.frame_count += 1
-                                self.last_save_time = current_time
-                                filename = f"{save_dir}/coop{v_id}_{cam_name}_frame_{self.frame_count:04d}.png"
-                                image.save_to_disk(filename, carla.ColorConverter.Raw)
-                        return save_image
-
-                    save_dir = self.camera_dirs[f"coop{v_idx + 1}_{name}"]
-                    camera.listen(make_save_callback(save_dir, v_idx + 1, name))
-                    self.actors.append(camera)
-                    self.sensors.append(camera)
-                except Exception as e:
-                    print(f"  协同车辆{v_idx + 1} {name}摄像头安装失败: {e}")
-
-            print(f"  协同车辆{v_idx + 1}摄像头安装完成")
-
-        print("✓ 所有协同车辆摄像头安装完成")
-
-    def spawn_traffic_and_pedestrians(self):
-        blueprint_lib = self.world.get_blueprint_library()
-
-        vehicles_spawned = 0
-        for i in range(min(8, self.args.num_background_vehicles)):
-            try:
-                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
-                spawn_points = self.world.get_map().get_spawn_points()
-                if spawn_points and len(spawn_points) > i + 15:
-                    spawn_point = spawn_points[i + 15]
-                    vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-                    self.actors.append(vehicle)
-                    vehicle.set_autopilot(True)
-                    vehicles_spawned += 1
+                self.vehicles.append(vehicle)
+                spawned += 1
             except:
                 pass
 
-        pedestrians_spawned = 0
-        if self.intersection_location:
-            for i in range(min(10, self.args.num_pedestrians)):
-                try:
-                    ped_bp = random.choice(blueprint_lib.filter('walker.pedestrian.*'))
-                    angle = random.uniform(0, 2 * math.pi)
-                    radius = random.uniform(5.0, 20.0)
-                    location = carla.Location(
-                        x=self.intersection_location.x + radius * math.cos(angle),
-                        y=self.intersection_location.y + radius * math.sin(angle),
-                        z=self.intersection_location.z + 1.0
-                    )
-                    pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
-                    self.actors.append(pedestrian)
+        Logger.info(f"背景车辆: {spawned} 辆")
+        return spawned
 
-                    controller_bp = blueprint_lib.find('controller.ai.walker')
-                    controller = self.world.spawn_actor(controller_bp, carla.Transform(), attach_to=pedestrian)
-                    controller.start()
+    def spawn_pedestrians(self, center_location):
+        blueprint_lib = self.world.get_blueprint_library()
 
-                    target_angle = angle + random.uniform(-math.pi / 2, math.pi / 2)
-                    target_radius = random.uniform(5.0, 15.0)
-                    target_location = carla.Location(
-                        x=self.intersection_location.x + target_radius * math.cos(target_angle),
-                        y=self.intersection_location.y + target_radius * math.sin(target_angle),
-                        z=location.z
-                    )
-                    controller.go_to_location(target_location)
-                    pedestrians_spawned += 1
-                    self.actors.append(controller)
-                except Exception as e:
+        num_peds = min(self.config['traffic']['pedestrians'], 8)
+        spawned = 0
+
+        for _ in range(num_peds):
+            try:
+                ped_bps = list(blueprint_lib.filter('walker.pedestrian.*'))
+                if not ped_bps:
                     continue
 
-        print(f"✓ 生成 {vehicles_spawned} 辆背景车辆和 {pedestrians_spawned} 个行人")
+                ped_bp = random.choice(ped_bps)
 
-    def collect_collaborative_data(self):
-        print("\n[5/6] 开始收集协同感知数据...")
-        print(f"数据收集模式: 间隔{self.args.capture_interval}秒捕捉")
-        print(f"预计总时长: {self.args.total_duration}秒")
-        print(f"预计总帧数: {self.args.total_duration // self.args.capture_interval}")
-        print("\n协同感知场景运行中...")
-        print("按 Ctrl+C 提前结束\n")
+                angle = random.uniform(0, 2 * math.pi)
+                distance = random.uniform(5.0, 12.0)
 
-        start_time = time.time()
-        self.frame_count = 0
-        self.last_save_time = start_time
+                location = carla.Location(
+                    x=center_location.x + distance * math.cos(angle),
+                    y=center_location.y + distance * math.sin(angle),
+                    z=center_location.z + 0.5
+                )
 
-        total_cameras = 4 + self.args.num_coop_vehicles * 4 + self.args.num_infra_cameras * 4
-        print(f"摄像头总数: {total_cameras}个视角")
-        print(f"每次捕捉保存: {total_cameras}张图像")
+                pedestrian = self.world.spawn_actor(ped_bp, carla.Transform(location))
+                self.pedestrians.append(pedestrian)
+                spawned += 1
+            except Exception as e:
+                Logger.debug(f"行人生成失败: {e}")
+
+        Logger.info(f"行人: {spawned} 个")
+        return spawned
+
+    def cleanup(self):
+        Logger.info("清理交通...")
+
+        for vehicle in self.vehicles:
+            try:
+                if vehicle.is_alive:
+                    vehicle.destroy()
+            except:
+                pass
+
+        for pedestrian in self.pedestrians:
+            try:
+                if pedestrian.is_alive:
+                    pedestrian.destroy()
+            except:
+                pass
+
+        self.vehicles.clear()
+        self.pedestrians.clear()
+
+
+class SensorSystem:
+    def __init__(self, world, config, data_dir):
+        self.world = world
+        self.config = config
+        self.data_dir = data_dir
+        self.sensors = []
+
+        self.frame_counter = 0
+        self.last_capture_time = 0
+
+        self.vehicle_buffer = {}
+        self.infra_buffer = {}
+        self.buffer_lock = threading.Lock()
+
+        self.image_stitcher = ImageStitcher(data_dir)
+
+        self.camera_configs = {
+            'vehicle': {
+                'front_wide': {'loc': (2.0, 0, 1.8), 'rot': (0, -3, 0), 'fov': 100},
+                'front_narrow': {'loc': (2.0, 0, 1.6), 'rot': (0, 0, 0), 'fov': 60},
+                'right_side': {'loc': (0.5, 1.0, 1.5), 'rot': (0, -2, 45), 'fov': 90},
+                'left_side': {'loc': (0.5, -1.0, 1.5), 'rot': (0, -2, -45), 'fov': 90}
+            },
+            'infrastructure': [
+                {'name': 'north', 'offset': (0, -20, 12), 'rotation': (0, -25, 180)},
+                {'name': 'south', 'offset': (0, 20, 12), 'rotation': (0, -25, 0)},
+                {'name': 'east', 'offset': (20, 0, 12), 'rotation': (0, -25, -90)},
+                {'name': 'west', 'offset': (-20, 0, 12), 'rotation': (0, -25, 90)}
+            ]
+        }
+
+    def setup_vehicle_cameras(self, vehicle):
+        if not vehicle:
+            return 0
+
+        installed = 0
+        for cam_name, config_data in self.camera_configs['vehicle'].items():
+            if self._create_camera(cam_name, config_data, vehicle, 'vehicle'):
+                installed += 1
+
+        Logger.info(f"车辆摄像头: {installed}")
+        return installed
+
+    def setup_infrastructure_cameras(self, center_location):
+        installed = 0
+
+        for cam_config in self.camera_configs['infrastructure']:
+            sensor_config = {
+                'loc': (
+                    center_location.x + cam_config['offset'][0],
+                    center_location.y + cam_config['offset'][1],
+                    center_location.z + cam_config['offset'][2]
+                ),
+                'rot': cam_config['rotation'],
+                'fov': 90
+            }
+
+            if self._create_camera(cam_config['name'], sensor_config, None, 'infrastructure'):
+                installed += 1
+
+        Logger.info(f"基础设施摄像头: {installed}")
+        return installed
+
+    def _create_camera(self, name, config, parent, sensor_type):
+        try:
+            blueprint = self.world.get_blueprint_library().find('sensor.camera.rgb')
+            blueprint.set_attribute('image_size_x', '1280')
+            blueprint.set_attribute('image_size_y', '720')
+            blueprint.set_attribute('fov', str(config.get('fov', 90)))
+
+            location = carla.Location(config['loc'][0], config['loc'][1], config['loc'][2])
+            rotation = carla.Rotation(config['rot'][0], config['rot'][1], config['rot'][2])
+            transform = carla.Transform(location, rotation)
+
+            if parent:
+                camera = self.world.spawn_actor(blueprint, transform, attach_to=parent)
+            else:
+                camera = self.world.spawn_actor(blueprint, transform)
+
+            save_dir = os.path.join(self.data_dir, "raw", sensor_type, name)
+            os.makedirs(save_dir, exist_ok=True)
+
+            callback = self._create_callback(save_dir, name, sensor_type)
+            camera.listen(callback)
+
+            self.sensors.append(camera)
+            return True
+
+        except Exception as e:
+            Logger.warning(f"创建摄像头 {name} 失败: {e}")
+            return False
+
+    def _create_callback(self, save_dir, name, sensor_type):
+        capture_interval = self.config['sensors']['capture_interval']
+
+        def callback(image):
+            current_time = time.time()
+
+            if current_time - self.last_capture_time >= capture_interval:
+                self.frame_counter += 1
+                self.last_capture_time = current_time
+
+                filename = os.path.join(save_dir, f"{name}_{self.frame_counter:06d}.png")
+                image.save_to_disk(filename, carla.ColorConverter.Raw)
+
+                with self.buffer_lock:
+                    if sensor_type == 'vehicle':
+                        self.vehicle_buffer[name] = filename
+                        if len(self.vehicle_buffer) >= 4:
+                            self.image_stitcher.stitch(self.vehicle_buffer, self.frame_counter, 'vehicle')
+                            self.vehicle_buffer.clear()
+                    else:
+                        self.infra_buffer[name] = filename
+                        if len(self.infra_buffer) >= 4:
+                            self.image_stitcher.stitch(self.infra_buffer, self.frame_counter, 'infrastructure')
+                            self.infra_buffer.clear()
+
+        return callback
+
+    def get_frame_count(self):
+        return self.frame_counter
+
+    def cleanup(self):
+        Logger.info(f"清理 {len(self.sensors)} 个传感器...")
+        for sensor in self.sensors:
+            try:
+                sensor.stop()
+                sensor.destroy()
+            except:
+                pass
+        self.sensors.clear()
+
+
+class DataCollector:
+    def __init__(self, config):
+        self.config = config
+        self.client = None
+        self.world = None
+        self.ego_vehicle = None
+        self.scene_center = None
+
+        self.setup_directories()
+
+        self.traffic_system = None
+        self.sensor_system = None
+
+        self.start_time = None
+        self.is_running = False
+
+    def setup_directories(self):
+        scenario = self.config['scenario']
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        self.output_dir = os.path.join(
+            self.config['output']['data_dir'],
+            f"{scenario['name']}_{scenario['town']}_{timestamp}"
+        )
+
+        for subdir in ["raw/vehicle", "raw/infrastructure", "stitched", "metadata"]:
+            os.makedirs(os.path.join(self.output_dir, subdir), exist_ok=True)
+
+        Logger.info(f"数据目录: {self.output_dir}")
+
+    def connect(self):
+        for attempt in range(1, 6):
+            try:
+                self.client = carla.Client('localhost', 2000)
+                self.client.set_timeout(10.0)
+
+                town = self.config['scenario']['town']
+                self.world = self.client.load_world(town)
+
+                settings = self.world.get_settings()
+                settings.synchronous_mode = False
+                self.world.apply_settings(settings)
+
+                Logger.info(f"连接成功: {town}")
+                return True
+
+            except Exception as e:
+                Logger.warning(f"连接尝试 {attempt}/5 失败: {str(e)[:50]}")
+                time.sleep(2)
+
+        return False
+
+    def setup_scene(self):
+        weather_cfg = self.config['scenario']
+        weather = WeatherManager.create_weather(weather_cfg['weather'], weather_cfg['time_of_day'])
+        self.world.set_weather(weather)
+        Logger.info(f"天气: {weather_cfg['weather']}, 时间: {weather_cfg['time_of_day']}")
+
+        spawn_points = self.world.get_map().get_spawn_points()
+        if spawn_points:
+            self.scene_center = spawn_points[len(spawn_points) // 2].location
+        else:
+            self.scene_center = carla.Location(0, 0, 0)
+
+        self.traffic_system = TrafficSystem(self.world, self.config)
+
+        self.ego_vehicle = self.traffic_system.spawn_ego_vehicle()
+        if not self.ego_vehicle:
+            Logger.error("主车生成失败")
+            return False
+
+        self.traffic_system.spawn_background_vehicles()
+        self.traffic_system.spawn_pedestrians(self.scene_center)
+
+        time.sleep(2.0)
+        return True
+
+    def setup_sensors(self):
+        self.sensor_system = SensorSystem(self.world, self.config, self.output_dir)
+
+        vehicle_cams = self.sensor_system.setup_vehicle_cameras(self.ego_vehicle)
+        infra_cams = self.sensor_system.setup_infrastructure_cameras(self.scene_center)
+
+        total_cams = vehicle_cams + infra_cams
+        if total_cams == 0:
+            Logger.error("没有摄像头安装成功")
+            return False
+
+        Logger.info(f"摄像头总数: {total_cams}")
+        return True
+
+    def run_collection(self):
+        duration = self.config['scenario']['duration']
+        Logger.info(f"开始数据收集，时长: {duration}秒")
+
+        self.start_time = time.time()
+        self.is_running = True
+
+        last_update = time.time()
 
         try:
-            update_interval = 5.0
+            while time.time() - self.start_time < duration and self.is_running:
+                current_time = time.time()
+                elapsed = current_time - self.start_time
 
-            while time.time() - start_time < self.args.total_duration:
-                elapsed = time.time() - start_time
-                remaining = max(0, self.args.total_duration - elapsed)
+                if current_time - last_update >= 5.0:
+                    frames = self.sensor_system.get_frame_count()
+                    progress = (elapsed / duration) * 100
 
-                if int(elapsed) % update_interval == 0 and elapsed % update_interval < 0.1:
-                    progress_percent = (elapsed / self.args.total_duration) * 100
-                    estimated_total_frames = total_cameras * self.frame_count
+                    Logger.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | 帧数: {frames}")
+                    last_update = current_time
 
-                    print(f"  进度: {elapsed:.0f}/{self.args.total_duration}秒 "
-                          f"({progress_percent:.1f}%) | "
-                          f"已保存批次: {self.frame_count} | "
-                          f"总图像数: {estimated_total_frames} | "
-                          f"剩余: {remaining:.0f}秒")
-
-                time.sleep(0.1)
-
-            elapsed = time.time() - start_time
-            estimated_total_frames = total_cameras * self.frame_count
-
-            print(f"\n✓ 协同感知数据收集完成!")
-            print(f"  总时长: {elapsed:.1f}秒")
-            print(f"  保存批次: {self.frame_count}")
-            print(f"  估计总图像数: {estimated_total_frames}")
-            print(f"  批次间隔: {self.args.capture_interval}秒")
-
-            self.display_collaborative_summary(total_cameras)
+                time.sleep(0.05)
 
         except KeyboardInterrupt:
-            elapsed = time.time() - start_time
-            estimated_total_frames = total_cameras * self.frame_count
-            print(f"\n数据收集中断，已收集 {self.frame_count} 批次")
-            print(f"估计总图像数: {estimated_total_frames}")
+            Logger.info("数据收集被用户中断")
+        finally:
+            self.is_running = False
+            elapsed = time.time() - self.start_time
 
-    def display_collaborative_summary(self, total_cameras):
+            frames = self.sensor_system.get_frame_count() if self.sensor_system else 0
+            Logger.info(f"收集完成: {frames}帧, 用时: {elapsed:.1f}秒")
+
+            self._save_metadata(frames, elapsed)
+            self._print_summary()
+
+    def _save_metadata(self, total_frames, elapsed_time):
+        metadata = {
+            'scenario': self.config['scenario'],
+            'traffic': self.config['traffic'],
+            'sensors': self.config['sensors'],
+            'collection': {
+                'duration': elapsed_time,
+                'total_frames': total_frames,
+                'frame_rate': total_frames / elapsed_time if elapsed_time > 0 else 0
+            }
+        }
+
+        meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
+        with open(meta_path, 'w', encoding='utf-8') as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        Logger.info(f"元数据保存: {meta_path}")
+
+    def _print_summary(self):
         print("\n" + "=" * 60)
-        print("协同感知数据收集摘要:")
+        print("数据收集摘要")
         print("=" * 60)
 
-        print(f"\n摄像头配置:")
-        print(f"  主车辆: 4个视角")
-        print(f"  协同车辆: {self.args.num_coop_vehicles}辆 × 4个视角 = {self.args.num_coop_vehicles * 4}个视角")
-        print(f"  基础设施: {self.args.num_infra_cameras}个 × 4个视角 = {self.args.num_infra_cameras * 4}个视角")
-        print(f"  总计: {total_cameras}个视角")
+        stitched_dir = os.path.join(self.output_dir, "stitched")
+        if os.path.exists(stitched_dir):
+            files = [f for f in os.listdir(stitched_dir) if f.endswith('.jpg')]
+            print(f"拼接图像: {len(files)} 张")
 
-        print(f"\n数据详情:")
+        raw_dirs = ["vehicle", "infrastructure"]
+        for raw_dir in raw_dirs:
+            path = os.path.join(self.output_dir, "raw", raw_dir)
+            if os.path.exists(path):
+                total = 0
+                for root, dirs, files in os.walk(path):
+                    total += len([f for f in files if f.endswith('.png')])
+                print(f"原始图像 ({raw_dir}): {total} 张")
 
-        ego_dir = os.path.join(self.output_dir, "ego_vehicle")
-        if os.path.exists(ego_dir):
-            for view in ['front_wide', 'front_narrow', 'right_side', 'left_side']:
-                view_dir = os.path.join(ego_dir, view)
-                if os.path.exists(view_dir):
-                    count = len([f for f in os.listdir(view_dir) if f.endswith('.png')])
-                    print(f"  主车-{view}: {count}张")
-
-        infra_dir = os.path.join(self.output_dir, "infrastructure")
-        if os.path.exists(infra_dir):
-            for cam_dir in os.listdir(infra_dir):
-                cam_path = os.path.join(infra_dir, cam_dir)
-                if os.path.isdir(cam_path):
-                    for angle in ['overview', 'left_view', 'right_view', 'closeup']:
-                        angle_dir = os.path.join(cam_path, angle)
-                        if os.path.exists(angle_dir):
-                            count = len([f for f in os.listdir(angle_dir) if f.endswith('.png')])
-                            print(f"  基础设施{cam_dir}-{angle}: {count}张")
-
-        print(f"\n数据目录: {self.output_dir}")
+        print(f"\n输出目录: {self.output_dir}")
         print("=" * 60)
 
     def cleanup(self):
-        print("\n清理协同感知场景...")
+        Logger.info("清理场景...")
 
-        for sensor in self.sensors + self.infrastructure_cameras:
+        if self.sensor_system:
+            self.sensor_system.cleanup()
+
+        if self.traffic_system:
+            self.traffic_system.cleanup()
+
+        if self.ego_vehicle and self.ego_vehicle.is_alive:
             try:
-                sensor.stop()
+                self.ego_vehicle.destroy()
             except:
                 pass
 
-        destroyed = 0
-        for actor in self.actors:
-            try:
-                if actor and actor.is_alive:
-                    actor.destroy()
-                    destroyed += 1
-            except:
-                pass
+        Logger.info("清理完成")
 
-        print(f"销毁 {destroyed} 个actor")
-        self.actors.clear()
-        self.sensors.clear()
-        self.infrastructure_cameras.clear()
-        self.cooperative_vehicles.clear()
+        # 运行数据验证
+        if self.config['output'].get('validate_data', True):
+            DataValidator.validate_dataset(self.output_dir)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='CVIPS v4.0 - 基础设施摄像头与多车协同数据生成器',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-协同感知场景示例:
-  # 基础协同场景（1主车 + 1协同车 + 2基础设施摄像头）
-  python cvips_infrastructure_collaborative.py
+    parser = argparse.ArgumentParser(description='CVIPS 数据收集系统')
 
-  # 复杂协同场景
-  python cvips_infrastructure_collaborative.py --num-coop-vehicles 2 --num-infra-cameras 3 --total-duration 120 --capture-interval 3.0
-
-  # 雨天夜晚协同场景
-  python cvips_infrastructure_collaborative.py --weather rainy --time-of-day night --scenario night_rain_collab
-        """
-    )
-
-    parser.add_argument('--scenario', type=str, default='collaborative_test', help='协同感知场景名称')
-    parser.add_argument('--town', type=str, default='Town10HD', choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='CARLA地图')
-    parser.add_argument('--weather', type=str, default='clear', choices=['clear', 'rainy', 'cloudy'], help='天气条件')
-    parser.add_argument('--time-of-day', type=str, default='noon', choices=['noon', 'sunset', 'night'], help='时间')
-    parser.add_argument('--num-coop-vehicles', type=int, default=1, help='协同车辆数量（不包括主车）')
-    parser.add_argument('--num-infra-cameras', type=int, default=2, help='基础设施摄像头数量')
-    parser.add_argument('--num-pedestrians', type=int, default=8, help='行人数（主要集中在路口）')
-    parser.add_argument('--num-background-vehicles', type=int, default=6, help='背景车辆数')
-    parser.add_argument('--total-duration', type=int, default=90, help='总收集时间(秒)')
-    parser.add_argument('--capture-interval', type=float, default=2.5, help='图像捕捉间隔(秒)')
+    parser.add_argument('--config', type=str, help='配置文件路径')
+    parser.add_argument('--scenario', type=str, default='urban_scene', help='场景名称')
+    parser.add_argument('--town', type=str, default='Town10HD',
+                        choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
+    parser.add_argument('--weather', type=str, default='clear',
+                        choices=['clear', 'rainy', 'cloudy'], help='天气')
+    parser.add_argument('--time-of-day', type=str, default='noon',
+                        choices=['noon', 'sunset', 'night'], help='时间')
+    parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
+    parser.add_argument('--num-pedestrians', type=int, default=10, help='行人数')
+    parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
+    parser.add_argument('--capture-interval', type=float, default=2.0, help='捕捉间隔(秒)')
+    parser.add_argument('--seed', type=int, help='随机种子')
+    parser.add_argument('--validate-data', action='store_true', help='启用数据验证')
 
     args = parser.parse_args(remaining_argv)
 
-    if args.num_coop_vehicles > 3:
-        print("⚠ 警告: 协同车辆过多可能导致性能下降")
-        args.num_coop_vehicles = min(args.num_coop_vehicles, 3)
+    config = ConfigManager.load_config(args.config)
+    config = ConfigManager.merge_args(config, args)
 
-    if args.num_infra_cameras > 4:
-        print("⚠ 警告: 基础设施摄像头过多可能导致性能下降")
-        args.num_infra_cameras = min(args.num_infra_cameras, 4)
+    if args.validate_data:
+        config['output']['validate_data'] = True
 
-    if args.capture_interval < 2.0:
-        print("⚠ 建议: 捕捉间隔建议2.0秒以上，以确保场景有明显变化")
-        args.capture_interval = 2.0
+    print("\n" + "=" * 60)
+    print("CVIPS 数据收集系统")
+    print("=" * 60)
 
-    print(f"\n协同感知场景配置:")
-    print(f"  场景名称: {args.scenario}")
-    print(f"  地图: {args.town}")
-    print(f"  天气/时间: {args.weather}/{args.time_of_day}")
-    print(f"  车辆配置: 1主车 + {args.num_coop_vehicles}协同车")
-    print(f"  基础设施: {args.num_infra_cameras}个摄像头")
-    print(f"  行人/背景车: {args.num_pedestrians}/{args.num_background_vehicles}")
-    print(f"  总时长: {args.total_duration}秒")
-    print(f"  捕捉间隔: {args.capture_interval}秒")
+    print(f"场景: {config['scenario']['name']}")
+    print(f"地图: {config['scenario']['town']}")
+    print(f"天气/时间: {config['scenario']['weather']}/{config['scenario']['time_of_day']}")
+    print(f"时长: {config['scenario']['duration']}秒")
+    print(f"交通: {config['traffic']['background_vehicles']}车辆 + {config['traffic']['pedestrians']}行人")
+    print(f"验证: {'启用' if config['output'].get('validate_data', True) else '禁用'}")
 
-    total_cameras = 4 + (args.num_coop_vehicles * 4) + (args.num_infra_cameras * 4)
-    estimated_frames = args.total_duration // args.capture_interval
-    estimated_images = total_cameras * estimated_frames
-
-    print(f"  预计: {estimated_frames}批次 × {total_cameras}视角 = {estimated_images}张图像")
-
-    generator = InfrastructureCollaborativeGenerator(args)
+    collector = DataCollector(config)
 
     try:
-        if not generator.connect_to_server():
-            print("\n连接失败，退出")
+        if not collector.connect():
+            print("连接CARLA服务器失败")
             return
 
-        ego_vehicle = generator.setup_collaborative_scene()
-        if not ego_vehicle:
-            print("\n场景设置失败")
-            generator.cleanup()
+        if not collector.setup_scene():
+            print("场景设置失败")
+            collector.cleanup()
             return
 
-        generator.setup_ego_cameras(ego_vehicle)
-        generator.setup_cooperative_cameras()
-        generator.collect_collaborative_data()
+        if not collector.setup_sensors():
+            print("传感器设置失败")
+            collector.cleanup()
+            return
+
+        collector.run_collection()
 
     except KeyboardInterrupt:
         print("\n程序被用户中断")
     except Exception as e:
-        print(f"\n运行出错: {e}")
+        print(f"\n运行错误: {e}")
         traceback.print_exc()
     finally:
-        generator.cleanup()
-
-        print("\n" + "=" * 80)
-        print("协同感知数据收集完成!")
-        print(f"数据保存到: {generator.output_dir}")
-        print("=" * 80)
-
-        print("\n后续优化建议:")
-        print("1. 检查各视角图像质量")
-        print("2. 验证基础设施摄像头视角是否覆盖路口")
-        print("3. 调整车辆和摄像头位置以获得更好视角")
-        print("4. 可尝试增加/减少协同车辆数量")
-        print("5. 调整捕捉间隔以获得不同时间尺度的数据")
+        collector.cleanup()
+        print(f"\n数据集已保存到: {collector.output_dir}")
 
 
 if __name__ == "__main__":
