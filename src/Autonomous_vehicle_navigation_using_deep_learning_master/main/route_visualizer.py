@@ -183,7 +183,7 @@ class RouteVisualizer:
         for i in range(len(points) - 1):
             self.world.debug.draw_line(
                 points[i], points[i+1],
-                thickness=0.15,
+                thickness=0.01,
                 color=carla.Color(50, 255, 50),  # 亮绿色轮廓
                 life_time=0.5,
                 persistent_lines=False
