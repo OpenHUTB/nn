@@ -193,7 +193,7 @@ def main():
         plt.ioff()
         plt.close(fig)
         cv2.destroyAllWindows()
-        # 强制清除CV2窗口残留
+        
         for _ in range(2):
             cv2.waitKey(1)
         print("🎉 处理完成！")
