@@ -1,678 +1,993 @@
 # --------------------------
 # 1. 初始化CARLA连接和环境
 # --------------------------
-# 导入必要的库
 import carla
 import time
 import numpy as np
 import cv2
 import math
 from collections import deque
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import random
+import os
 
+
+# 修复1: 简化的神经网络架构（增加障碍物检测通道）
+class SimpleDrivingNetwork(nn.Module):
+    """
+    简化的驾驶网络 - 增加障碍物感知
+    """
+
+    def __init__(self):
+        super(SimpleDrivingNetwork, self).__init__()
+
+        # 图像处理分支 (简化)
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(3, 8, kernel_size=5, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(8, 16, kernel_size=5, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((4, 4))
+        )
+
+        # 状态信息维度: 速度 + 转向历史 + 障碍物信息
+        state_dim = 7  # 增加障碍物相关维度
+
+        # 融合层
+        self.fc_layers = nn.Sequential(
+            nn.Linear(32 * 4 * 4 + state_dim, 128),  # 增加网络容量
+            nn.ReLU(),
+            nn.Dropout(0.1),  # 添加dropout防止过拟合
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 3)  # [throttle, brake, steer]
+        )
+
+    def forward(self, image, state):
+        # 处理图像
+        visual_features = self.conv_layers(image)
+        visual_features = visual_features.view(visual_features.size(0), -1)
+
+        # 融合特征
+        combined = torch.cat([visual_features, state], dim=1)
+
+        # 输出控制
+        control = self.fc_layers(combined)
+        throttle_brake = torch.sigmoid(control[:, :2])
+        steer = torch.tanh(control[:, 2:])
+
+        return torch.cat([throttle_brake, steer], dim=1)
+
+
+# 新增：障碍物检测器类
+class ObstacleDetector:
+    def __init__(self, world, vehicle, max_distance=50.0):
+        self.world = world
+        self.vehicle = vehicle
+        self.max_distance = max_distance
+        self.blueprint_library = world.get_blueprint_library()
+        self.last_obstacle_info = {
+            'has_obstacle': False,
+            'distance': float('inf'),
+            'relative_angle': 0.0,
+            'obstacle_type': None
+        }
+
+    def get_obstacle_info(self):
+        """检测前方障碍物信息"""
+        try:
+            vehicle_transform = self.vehicle.get_transform()
+            vehicle_location = vehicle_transform.location
+            vehicle_rotation = vehicle_transform.rotation
+
+            # 获取车辆前方的向量
+            forward_vector = vehicle_transform.get_forward_vector()
+
+            # 获取世界中的所有车辆（排除自身）
+            all_vehicles = self.world.get_actors().filter('vehicle.*')
+
+            min_distance = float('inf')
+            closest_obstacle = None
+            relative_angle = 0.0
+
+            for other_vehicle in all_vehicles:
+                if other_vehicle.id == self.vehicle.id:
+                    continue
+
+                other_location = other_vehicle.get_location()
+
+                # 计算距离
+                distance = vehicle_location.distance(other_location)
+
+                if distance > self.max_distance:
+                    continue
+
+                # 计算相对位置向量
+                relative_vector = carla.Location(
+                    other_location.x - vehicle_location.x,
+                    other_location.y - vehicle_location.y,
+                    0
+                )
+
+                # 计算角度（车辆前方与障碍物方向的夹角）
+                forward_2d = carla.Vector3D(forward_vector.x, forward_vector.y, 0)
+                relative_2d = carla.Vector3D(relative_vector.x, relative_vector.y, 0)
+
+                # 归一化向量
+                forward_2d_norm = math.sqrt(forward_2d.x ** 2 + forward_2d.y ** 2)
+                relative_2d_norm = math.sqrt(relative_2d.x ** 2 + relative_2d.y ** 2)
+
+                if forward_2d_norm > 0 and relative_2d_norm > 0:
+                    dot_product = forward_2d.x * relative_2d.x + forward_2d.y * relative_2d.y
+                    cos_angle = dot_product / (forward_2d_norm * relative_2d_norm)
+                    cos_angle = max(-1.0, min(1.0, cos_angle))  # 限制范围
+                    angle = math.acos(cos_angle)
+
+                    # 转换为角度
+                    angle_deg = math.degrees(angle)
+
+                    # 只考虑前方±60度范围内的障碍物
+                    if angle_deg <= 60 and distance < min_distance:
+                        min_distance = distance
+                        closest_obstacle = other_vehicle
+                        relative_angle = angle_deg if relative_2d.y >= 0 else -angle_deg
+
+            if closest_obstacle is not None and min_distance < self.max_distance:
+                self.last_obstacle_info = {
+                    'has_obstacle': True,
+                    'distance': min_distance,
+                    'relative_angle': relative_angle,
+                    'obstacle_type': closest_obstacle.type_id,
+                    'obstacle_speed': self.get_vehicle_speed(closest_obstacle)
+                }
+            else:
+                self.last_obstacle_info = {
+                    'has_obstacle': False,
+                    'distance': float('inf'),
+                    'relative_angle': 0.0,
+                    'obstacle_type': None,
+                    'obstacle_speed': 0.0
+                }
+
+            return self.last_obstacle_info
+
+        except Exception as e:
+            print(f"障碍物检测错误: {e}")
+            return self.last_obstacle_info
+
+    def get_vehicle_speed(self, vehicle):
+        """获取车辆速度"""
+        velocity = vehicle.get_velocity()
+        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+        return speed * 3.6  # 转换为km/h
+
+    def visualize_obstacles(self, image, vehicle_transform):
+        """在图像上可视化障碍物检测结果"""
+        if not self.last_obstacle_info['has_obstacle']:
+            return image
+
+        height, width = image.shape[:2]
+
+        # 计算障碍物在图像中的位置（简化投影）
+        distance = self.last_obstacle_info['distance']
+        angle = self.last_obstacle_info['relative_angle']
+
+        # 归一化角度到图像坐标
+        x_pos = int(width / 2 + (angle / 60) * (width / 2))
+
+        # 根据距离计算大小和颜色
+        if distance < 10:
+            color = (0, 0, 255)  # 红色，很近
+            radius = 15
+        elif distance < 20:
+            color = (0, 165, 255)  # 橙色
+            radius = 10
+        else:
+            color = (0, 255, 255)  # 黄色
+            radius = 5
+
+        # 绘制障碍物指示器
+        cv2.circle(image, (x_pos, int(height * 0.8)), radius, color, -1)
+        cv2.putText(image, f"{distance:.1f}m", (x_pos - 20, int(height * 0.8) - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+        return image
+
+
+# 修复2: 改进的神经网络控制器（整合障碍物检测）
+class ImprovedNeuralController:
+    def __init__(self, obstacle_detector=None):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print(f"使用设备: {self.device}")
+
+        # 使用简化网络
+        self.model = SimpleDrivingNetwork().to(self.device)
+        self.model.eval()
+
+        # 控制历史，用于平滑
+        self.control_history = deque(maxlen=5)
+
+        # 障碍物检测器
+        self.obstacle_detector = obstacle_detector
+
+        # 修复3: 更保守的初始控制
+        self.last_throttle = 0.3
+        self.last_brake = 0.0
+        self.last_steer = 0.0
+
+        # 避障参数
+        self.emergency_brake_distance = 5.0  # 紧急刹车距离
+        self.safe_following_distance = 8.0  # 安全跟车距离
+        self.obstacle_avoidance_steer = 0.0
+
+    def preprocess_image(self, image):
+        """修复图像预处理"""
+        if image is None:
+            # 返回黑色图像
+            return torch.zeros((1, 3, 120, 160), device=self.device)
+
+        try:
+            # 调整图像尺寸，减少计算量
+            small_img = cv2.resize(image, (160, 120))
+            img_tensor = torch.from_numpy(small_img).float().to(self.device)
+            img_tensor = img_tensor.permute(2, 0, 1).unsqueeze(0) / 255.0
+            return img_tensor
+        except Exception as e:
+            print(f"图像预处理错误: {e}")
+            return torch.zeros((1, 3, 120, 160), device=self.device)
+
+    def preprocess_state(self, speed, steer_history, obstacle_info):
+        """修复状态预处理，加入障碍物信息"""
+        has_obstacle = 1.0 if obstacle_info['has_obstacle'] else 0.0
+        normalized_distance = min(obstacle_info['distance'] / 50.0, 1.0) if obstacle_info['has_obstacle'] else 1.0
+        normalized_angle = obstacle_info['relative_angle'] / 60.0 if obstacle_info['has_obstacle'] else 0.0
+
+        state_data = [
+            speed / 20.0,  # 归一化速度
+            steer_history[-1] if steer_history else 0.0,  # 最近转向
+            steer_history[-2] if len(steer_history) > 1 else 0.0,  # 前一次转向
+            np.mean(steer_history) if steer_history else 0.0,  # 平均转向
+            has_obstacle,  # 是否有障碍物
+            normalized_distance,  # 归一化距离
+            normalized_angle  # 归一化角度
+        ]
+        return torch.tensor(state_data, device=self.device).unsqueeze(0)
+
+    # 在 ImprovedNeuralController 类的 apply_obstacle_avoidance 方法中，修改以下部分：
+    def apply_obstacle_avoidance(self, throttle, brake, steer, obstacle_info, speed):
+        """应用避障逻辑 - 优化版本"""
+
+    def apply_obstacle_avoidance(self, throttle, brake, steer, obstacle_info, speed):
+
+        if not obstacle_info['has_obstacle']:
+            return throttle, brake, steer
+
+        distance = obstacle_info['distance']
+        angle = obstacle_info['relative_angle']
+
+        # 紧急情况：前方有近距离障碍物
+        if distance < self.emergency_brake_distance:
+            print(f"紧急刹车！距离障碍物: {distance:.1f}m")
+
+            return 0.0, 1.0, 0.0  # 紧急情况下保持直行，只刹车
+
+
+            return 0.0, 1.0, 0.0  # 紧急情况下保持直行，只刹车
+
+            return 0.0, 1.0, steer  # 全力刹车
+
+
+
+        # 中距离障碍物：减速并准备转向
+        elif distance < self.safe_following_distance:
+            # 计算安全速度比例
+
+            safe_speed_ratio = (distance - 3.0) / (self.safe_following_distance - 3.0)
+
+
+            safe_speed_ratio = (distance - 3.0) / (self.safe_following_distance - 3.0)
+            safe_speed_ratio = max(0.1, min(1.0, safe_speed_ratio))
+
+            # 如果当前速度过高，减速
+            target_speed = 15.0 * safe_speed_ratio  # 目标速度最大15km/h
+            current_speed_kmh = speed * 3.6
+
+            if current_speed_kmh > target_speed:
+                throttle = 0.0
+                brake = 0.4 * ((current_speed_kmh - target_speed) / current_speed_kmh)
+            else:
+                throttle = 0.3 * safe_speed_ratio
+                brake = 0.0
+
+            # 如果障碍物在正前方，尝试轻微转向避开
+            if abs(angle) < 15:  # 正前方±15度内
+                # 根据障碍物距离决定转向幅度
+                avoid_factor = max(0, 1.0 - distance / self.safe_following_distance)
+                avoid_steer = 0.3 * avoid_factor if angle >= 0 else -0.3 * avoid_factor
+                # 平滑转向 - 保持更多原始转向
+                steer = 0.8 * steer + 0.2 * avoid_steer
+
+        # 远距离障碍物：轻微调整
+        elif distance < 25.0:
+            # 轻微减速
+            if speed > 8.0:
+                throttle *= 0.7
+
+            # 如果障碍物在正前方，轻微转向
+            if abs(angle) < 20:
+                avoid_steer = 0.15 if angle >= 0 else -0.15
+                steer = 0.9 * steer + 0.1 * avoid_steer
+
+            safe_speed_ratio = (distance - 2.0) / (self.safe_following_distance - 2.0)
+
+            safe_speed_ratio = max(0.1, min(1.0, safe_speed_ratio))
+
+            # 如果当前速度过高，减速
+            target_speed = 15.0 * safe_speed_ratio  # 目标速度最大15km/h
+            current_speed_kmh = speed * 3.6
+
+            if current_speed_kmh > target_speed:
+                throttle = 0.0
+                brake = 0.4 * ((current_speed_kmh - target_speed) / current_speed_kmh)
+            else:
+                throttle = 0.3 * safe_speed_ratio
+                brake = 0.0
+
+            # 如果障碍物在正前方，尝试轻微转向避开
+            if abs(angle) < 15:  # 正前方±15度内
+                # 根据障碍物距离决定转向幅度
+                avoid_factor = max(0, 1.0 - distance / self.safe_following_distance)
+                avoid_steer = 0.3 * avoid_factor if angle >= 0 else -0.3 * avoid_factor
+                # 平滑转向 - 保持更多原始转向
+                steer = 0.8 * steer + 0.2 * avoid_steer
+
+        # 远距离障碍物：轻微调整
+        elif distance < 25.0:
+            # 轻微减速
+            if speed > 8.0:
+                throttle *= 0.7
+
+            # 如果障碍物在正前方，轻微转向
+            if abs(angle) < 20:
+                avoid_steer = 0.15 if angle >= 0 else -0.15
+                steer = 0.9 * steer + 0.1 * avoid_steer
+
+        return throttle, brake, steer
+
+    def get_control(self, image, speed, steer_history, obstacle_info):
+        """修复控制生成逻辑，加入避障"""
+        try:
+            with torch.no_grad():
+                # 预处理
+                img_tensor = self.preprocess_image(image)
+                state_tensor = self.preprocess_state(speed, steer_history, obstacle_info)
+
+                # 神经网络推理
+                control_output = self.model(img_tensor, state_tensor)
+
+                # 提取控制指令
+                throttle = control_output[0, 0].item()
+                brake = control_output[0, 1].item()
+                steer = control_output[0, 2].item()
+
+                # 修复4: 添加安全限制
+                throttle = max(0.0, min(0.8, throttle))  # 限制最大油门
+                brake = max(0.0, min(0.5, brake))  # 限制最大刹车
+                steer = max(-0.5, min(0.5, steer))  # 限制转向幅度
+
+                # 应用避障逻辑
+                throttle, brake, steer = self.apply_obstacle_avoidance(
+                    throttle, brake, steer, obstacle_info, speed
+                )
+
+                return throttle, brake, steer
+
+        except Exception as e:
+            print(f"神经网络控制错误: {e}")
+            # 返回安全默认值
+            return 0.3, 0.0, 0.0
+
+
+# 修复5: 传统控制器作为备份（整合障碍物检测）
+class TraditionalController:
+    """可靠的传统控制逻辑"""
+
+    def __init__(self, world, obstacle_detector=None):
+        self.world = world
+        self.map = world.get_map()
+        self.waypoint_distance = 10.0
+        self.last_waypoint = None
+        self.obstacle_detector = obstacle_detector
+        self.emergency_brake_distance = 6.0
+        self.safe_following_distance = 10.0
+
+    # 在 TraditionalController 类的 apply_obstacle_avoidance 方法中，修改以下部分：
+    def apply_obstacle_avoidance(self, throttle, brake, steer, vehicle, obstacle_info):
+        """传统控制器的避障逻辑 - 优化版本"""
+        if not obstacle_info['has_obstacle']:
+            return throttle, brake, steer
+
+        distance = obstacle_info['distance']
+        angle = obstacle_info['relative_angle']
+        vehicle_speed = math.sqrt(vehicle.get_velocity().x ** 2 +
+                                  vehicle.get_velocity().y ** 2 +
+                                  vehicle.get_velocity().z ** 2) * 3.6  # km/h
+
+        # 紧急刹车
+        if distance < self.emergency_brake_distance:
+            print(f"传统控制：紧急刹车！距离: {distance:.1f}m")
+            return 0.0, 1.0, 0.0
+
+        # 减速跟随
+        elif distance < self.safe_following_distance:
+            # 计算所需的安全距离（基于速度）
+            required_distance = max(5.0, vehicle_speed * 0.4)  # 增加到0.4秒车距
+
+            if distance < required_distance:
+                # 距离太近，减速
+                speed_ratio = distance / required_distance
+                if vehicle_speed > 10:
+                    throttle = 0.0
+                    brake = 0.6 * (1.0 - speed_ratio)
+                else:
+                    throttle = 0.2 * speed_ratio
+                    brake = 0.0
+
+                # 如果障碍物在正前方，尝试变道
+                if abs(angle) < 20:  # 放宽角度范围
+                    location = vehicle.get_location()
+                    waypoint = self.map.get_waypoint(location)
+
+                    # 检查相邻车道是否可用
+                    left_lane = waypoint.get_left_lane()
+                    right_lane = waypoint.get_right_lane()
+
+                    # 优先选择转向较小的方向
+                    if left_lane and left_lane.lane_type == carla.LaneType.Driving:
+
+                        steer = -0.25
+                    elif right_lane and right_lane.lane_type == carla.LaneType.Driving:
+                        steer = 0.25
+                    else:
+
+                        steer = 0.15 if angle >= 0 else -0.15
+
+        return throttle, brake, steer
+
+    def get_control(self, vehicle):
+        """基于路点的传统控制，整合避障"""
+        # 获取车辆状态
+        transform = vehicle.get_transform()
+        location = vehicle.get_location()
+        velocity = vehicle.get_velocity()
+        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6  # km/h
+
+        # 获取障碍物信息
+        obstacle_info = None
+        if self.obstacle_detector:
+            obstacle_info = self.obstacle_detector.get_obstacle_info()
+
+        # 获取路点
+        waypoint = self.map.get_waypoint(location, project_to_road=True)
+        next_waypoints = waypoint.next(self.waypoint_distance)
+
+        if not next_waypoints:
+            # 如果没有找到路点，尝试获取当前路点
+            next_waypoints = [waypoint]
+
+        target_waypoint = next_waypoints[0]
+        self.last_waypoint = target_waypoint
+
+        # 计算转向
+        vehicle_yaw = math.radians(transform.rotation.yaw)
+        target_loc = target_waypoint.transform.location
+
+        dx = target_loc.x - location.x
+        dy = target_loc.y - location.y
+
+        local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
+        local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
+
+        if abs(local_x) < 0.1:
+            steer = 0.0
+        else:
+            angle = math.atan2(local_y, local_x)
+            steer = np.clip(angle / math.radians(45), -1.0, 1.0)
+
+        # 速度控制（基于障碍物距离调整）
+        throttle = 0.0
+        brake = 0.0
+
+        if obstacle_info and obstacle_info['has_obstacle']:
+            distance = obstacle_info['distance']
+
+            # 根据障碍物距离调整速度
+            if distance < 15:
+                if speed > 20:
+                    throttle = 0.0
+                    brake = 0.3
+                elif speed > 10:
+                    throttle = 0.1
+                    brake = 0.0
+                else:
+                    throttle = 0.3
+                    brake = 0.0
+            elif distance < 30:
+                if speed > 30:
+                    throttle = 0.0
+                    brake = 0.1
+                else:
+                    throttle = 0.4
+                    brake = 0.0
+            else:
+                # 没有近距离障碍物，正常行驶
+                if speed < 20:
+                    throttle = 0.6
+                    brake = 0.0
+                elif speed < 40:
+                    throttle = 0.4
+                    brake = 0.0
+                else:
+                    throttle = 0.2
+                    brake = 0.1
+        else:
+            # 没有障碍物，正常行驶
+            if speed < 20:
+                throttle = 0.6
+                brake = 0.0
+            elif speed < 40:
+                throttle = 0.4
+                brake = 0.0
+            else:
+                throttle = 0.2
+                brake = 0.1
+
+        # 应用避障逻辑
+        if obstacle_info:
+            throttle, brake, steer = self.apply_obstacle_avoidance(
+                throttle, brake, steer, vehicle, obstacle_info
+            )
+
+        return throttle, brake, steer
+
+
+# CARLA初始化部分...
 # 连接到本地CARLA服务器，端口2000
 client = carla.Client('localhost', 2000)
-# 设置超时时间为15秒
 client.set_timeout(15.0)
-# 加载名为'Town01'的地图
 world = client.load_world('Town01')
 
 # 获取并设置世界的运行参数
 settings = world.get_settings()
-# 启用同步模式，这意味着仿真将等待客户端的每一个tick信号
 settings.synchronous_mode = True
-# 设置固定的时间步长，单位为秒
 settings.fixed_delta_seconds = 0.1
-# 启用子步进，用于更精确的物理模拟
-settings.substepping = True
-# 设置子步进的最大时间步长
-settings.max_substep_delta_time = 0.01
-# 设置最大子步进次数
-settings.max_substeps = 10
-# 应用这些设置
 world.apply_settings(settings)
 
 # 定义天气参数
 weather = carla.WeatherParameters(
-    cloudiness=30.0,      # 云量
-    precipitation=0.0,    # 降雨量
-    sun_altitude_angle=70.0 # 太阳高度角
+    cloudiness=30.0,
+    precipitation=0.0,
+    sun_altitude_angle=70.0
 )
-# 应用天气设置
 world.set_weather(weather)
 
-# 获取地图对象
+# 获取地图和出生点
 map = world.get_map()
-# 获取地图中所有可用的出生点
 spawn_points = map.get_spawn_points()
 if not spawn_points:
-    raise Exception("No spawn points available") # 如果没有找到出生点则抛出异常
+    raise Exception("No spawn points available")
 
-# 选择一个更好的出生点（索引为10的点）
-spawn_point = spawn_points[10]  # 选择更靠前的出生点
+# 选择更合适的出生点
+spawn_point = spawn_points[10]
 
-# --------------------------
-# 2. 生成车辆和障碍物
-# --------------------------
-# 获取蓝图库，包含所有可生成的actor的蓝图
+# 生成车辆
 blueprint_library = world.get_blueprint_library()
-
-# 主车辆（红色特斯拉Model3）
-# 查找特斯拉Model3的车辆蓝图
 vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-# 设置车辆颜色为红色 (RGB)
 vehicle_bp.set_attribute('color', '255,0,0')
-# 在指定的出生点生成主车辆
 vehicle = world.spawn_actor(vehicle_bp, spawn_point)
+
 if not vehicle:
     raise Exception("无法生成主车辆")
-# 禁用车辆的自动驾驶模式
+
 vehicle.set_autopilot(False)
-# 确保车辆的物理模拟是开启的
 vehicle.set_simulate_physics(True)
 
 print(f"车辆生成在位置: {spawn_point.location}")
 
-# 生成障碍物车辆
-obstacle_count = 3 # 计划生成3个障碍物
-for i in range(obstacle_count):
-    if i >= len(spawn_points):
-        break
-    # 过滤出所有车辆类型的蓝图
-    other_vehicles = blueprint_library.filter('vehicle.*')
-    # 随机选择一个车辆蓝图
-    other_vehicle_bp = np.random.choice(other_vehicles)
-    # 选择一个与主车辆不同的出生点
-    spawn_idx = (i + 15) % len(spawn_points)
-    # 尝试在指定位置生成障碍物车辆
-    other_vehicle = world.try_spawn_actor(other_vehicle_bp, spawn_points[spawn_idx])
-    if other_vehicle:
-        # 为障碍物车辆启用自动驾驶
-        other_vehicle.set_autopilot(True)
+# 改进的NPC车辆生成和设置
+print("生成NPC车辆...")
+obstacle_count = 3
+npc_vehicles = []  # 存储NPC车辆以便后续管理
 
-# --------------------------
-# 3. 配置传感器
-# --------------------------
-# 配置第三视角RGB相机
-# 查找RGB相机的传感器蓝图
+# 获取所有可用的车辆蓝图
+vehicle_blueprints = blueprint_library.filter('vehicle.*')
+
+# 选择远离主车辆的出生点（避免直接堵塞）
+valid_spawn_points = []
+main_spawn_location = spawn_point.location
+
+for point in spawn_points:
+    distance = main_spawn_location.distance(point.location)
+    # 选择距离主车辆50米以上的出生点，避免直接碰撞
+    if distance > 50.0:
+        valid_spawn_points.append(point)
+        if len(valid_spawn_points) >= obstacle_count:
+            break
+
+# 如果找不到足够远的点，使用所有点
+if len(valid_spawn_points) < obstacle_count:
+    print("警告：找不到足够远的出生点，使用所有可用点")
+    valid_spawn_points = spawn_points[:obstacle_count]
+
+# 生成NPC车辆
+for i in range(min(obstacle_count, len(valid_spawn_points))):
+    try:
+        # 随机选择车辆类型（排除特斯拉，使场景更丰富）
+        available_blueprints = [bp for bp in vehicle_blueprints if 'tesla' not in bp.id]
+        if not available_blueprints:
+            available_blueprints = vehicle_blueprints
+
+        npc_bp = random.choice(available_blueprints)
+
+        # 设置车辆颜色
+        if npc_bp.has_attribute('color'):
+            colors = npc_bp.get_attribute('color').recommended_values
+            if colors:
+                npc_bp.set_attribute('color', random.choice(colors))
+
+        # 生成车辆
+        npc_vehicle = world.try_spawn_actor(npc_bp, valid_spawn_points[i])
+
+        if npc_vehicle:
+            # 启用自动驾驶模式并设置速度限制
+            npc_vehicle.set_autopilot(True)
+
+            # 设置NPC车辆的速度限制（让它们能正常行驶）
+            traffic_manager = client.get_trafficmanager()
+            traffic_manager.set_global_distance_to_leading_vehicle(2.5)  # 设置跟车距离
+            traffic_manager.set_random_device_seed(12345)  # 设置随机种子确保一致性
+
+            # 为每个NPC车辆设置不同的速度限制（避免所有车速度相同导致堵塞）
+            target_speed = random.uniform(30.0, 50.0)  # 30-50 km/h
+            traffic_manager.vehicle_percentage_speed_difference(npc_vehicle, random.uniform(-10, 10))
+
+            # 设置NPC车辆的驾驶行为（更安全、更智能）
+            traffic_manager.auto_lane_change(npc_vehicle, True)  # 允许自动变道
+            traffic_manager.distance_to_leading_vehicle(npc_vehicle, 3.0)  # 设置跟车距离
+            traffic_manager.collision_detection(npc_vehicle, world, True)  # 启用碰撞检测
+
+            npc_vehicles.append(npc_vehicle)
+            print(f"生成NPC车辆 {i + 1}: {npc_bp.id} 在位置 {valid_spawn_points[i].location}")
+
+            # 短暂暂停，避免生成时的碰撞
+            time.sleep(0.1)
+
+    except Exception as e:
+        print(f"生成NPC车辆 {i + 1} 时出错: {e}")
+
+print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
+
+# 配置传感器（简化配置）
 third_camera_bp = blueprint_library.find('sensor.camera.rgb')
-# 设置相机图像宽度
 third_camera_bp.set_attribute('image_size_x', '640')
-# 设置相机图像高度
 third_camera_bp.set_attribute('image_size_y', '480')
-# 设置相机视场角
 third_camera_bp.set_attribute('fov', '110')
-# 定义相机相对于车辆的变换（位置和旋转）
 third_camera_transform = carla.Transform(
-    carla.Location(x=-5.0, y=0.0, z=3.0), # 在车后5米，高3米处
-    carla.Rotation(pitch=-15.0)           # 向下倾斜15度
+    carla.Location(x=-5.0, y=0.0, z=3.0),
+    carla.Rotation(pitch=-15.0)
 )
-# 生成相机传感器并将其附加到主车辆上
 third_camera = world.spawn_actor(third_camera_bp, third_camera_transform, attach_to=vehicle)
 
-# 配置激光雷达 (LiDAR)
-# 查找激光雷达的传感器蓝图
-lidar_bp = blueprint_library.find('sensor.lidar.ray_cast')
-# 设置激光雷达的通道数（线数）
-lidar_bp.set_attribute('channels', '32')
-# 设置激光雷达的最大探测范围
-lidar_bp.set_attribute('range', '50')
-# 设置激光雷达的每秒点数
-lidar_bp.set_attribute('points_per_second', '100000')
-# 设置激光雷达的旋转频率
-lidar_bp.set_attribute('rotation_frequency', '10')
-# 设置激光雷达的上视场角
-lidar_bp.set_attribute('upper_fov', '15')
-# 设置激光雷达的下视场角
-lidar_bp.set_attribute('lower_fov', '-25')
-# 定义激光雷达相对于车辆的变换
-lidar_transform = carla.Transform(carla.Location(x=0.0, z=2.5)) # 在车顶中心，高2.5米处
-# 生成激光雷达传感器并将其附加到主车辆上
-lidar = world.spawn_actor(lidar_bp, lidar_transform, attach_to=vehicle)
+front_camera_bp = blueprint_library.find('sensor.camera.rgb')
+front_camera_bp.set_attribute('image_size_x', '640')
+front_camera_bp.set_attribute('image_size_y', '480')
+front_camera_bp.set_attribute('fov', '90')
+front_camera_transform = carla.Transform(
+    carla.Location(x=2.0, y=0.0, z=1.5),
+    carla.Rotation(pitch=0.0)
+)
+front_camera = world.spawn_actor(front_camera_bp, front_camera_transform, attach_to=vehicle)
 
-# --------------------------
-# 4. 传感器数据处理
-# --------------------------
-# 全局变量，用于存储来自传感器的最新数据
-third_image = None # 存储相机图像
-lidar_data = None  # 存储激光雷达点云
+# 传感器数据存储
+third_image = None
+front_image = None
 
-# 相机数据回调函数
+
 def third_camera_callback(image):
-    # 使用global关键字修改全局变量
     global third_image
-    # 将原始图像数据（CARLA的Image对象）转换为numpy数组
     array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-    # 重塑数组形状以匹配图像的尺寸 (高度, 宽度, 4通道RGBA)
     array = np.reshape(array, (image.height, image.width, 4))
-    # 提取前3个通道（RGB）并存储
     third_image = array[:, :, :3]
 
-# 激光雷达数据回调函数
-def lidar_callback(point_cloud):
-    # 使用global关键字修改全局变量
-    global lidar_data
-    # 将原始点云数据转换为numpy数组，每个点由4个32位浮点数表示 (x, y, z, intensity)
-    data = np.frombuffer(point_cloud.raw_data, dtype=np.dtype('f4'))
-    # 重塑数组形状，每行代表一个点 (x, y, z, intensity)
-    data = np.reshape(data, (int(data.shape[0] / 4), 4))
-    # 存储处理后的点云数据
-    lidar_data = data
 
-# 开始监听传感器数据，设置回调函数
+def front_camera_callback(image):
+    global front_image
+    array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+    array = np.reshape(array, (image.height, image.width, 4))
+    front_image = array[:, :, :3]
+
+
 third_camera.listen(third_camera_callback)
-lidar.listen(lidar_callback)
+front_camera.listen(front_camera_callback)
 
-# 等待2秒，确保传感器有足够的时间进行初始化并返回第一帧数据
-time.sleep(2.0)  # 增加等待时间确保传感器初始化
+time.sleep(2.0)
 
-# --------------------------
-# 5. 路径规划与导航逻辑
-# --------------------------
-def get_next_waypoint(vehicle_location, distance=8.0):
-    """
-    获取车辆前方指定距离的路点
-    :param vehicle_location: 车辆当前的位置
-    :param distance: 希望获取的下一个路点距离当前车辆的距离
-    :return: 下一个目标路点 (carla.Waypoint)
-    """
-    # 获取车辆当前位置所在的路点，并将位置投影到道路中心线上
-    waypoint = map.get_waypoint(vehicle_location, project_to_road=True)
+# 新增：初始化障碍物检测器
+print("初始化障碍物检测器...")
+obstacle_detector = ObstacleDetector(world, vehicle, max_distance=50.0)
 
-    # 尝试获取当前路点前方distance米处的路点
-    next_waypoints = waypoint.next(distance)
-    if next_waypoints:
-        return next_waypoints[0] # 返回第一个找到的路点
+# 修复6: 初始化控制器（传入障碍物检测器）
+nn_controller = ImprovedNeuralController(obstacle_detector)
+traditional_controller = TraditionalController(world, obstacle_detector)
 
-    # 如果当前路点在路口(junction)，进行特殊处理
-    if waypoint.is_junction:
-        # 尝试在同一条道路上寻找下一个路点
-        for wp in waypoint.next(distance):
-            if wp.road_id == waypoint.road_id:
-                return wp
+# 控制变量
+throttle = 0.3  # 更保守的初始油门
+steer = 0.0
+brake = 0.0
+NEURAL_NETWORK_MODE = False  # 默认使用传统控制，更稳定
 
-        # 如果找不到同一条路的路点，则尝试变道
-        # 检查是否可以向右变道
-        if waypoint.lane_change & carla.LaneChange.Right:
-            right_way = waypoint.get_right_lane()
-            if right_way:
-                return right_way.next(distance)[0]
-        # 检查是否可以向左变道
-        elif waypoint.lane_change & carla.LaneChange.Left:
-            left_way = waypoint.get_left_lane()
-            if left_way:
-                return left_way.next(distance)[0]
+# 转向历史，用于平滑
+steer_history = deque(maxlen=10)
 
-    # 如果以上方法都失败，返回当前路点
-    return waypoint
-
-def calculate_steering_angle(vehicle_transform, target_waypoint):
-    """
-    计算到达目标路点所需的转向角
-    :param vehicle_transform: 车辆当前的变换（位置和旋转）
-    :param target_waypoint: 目标路点
-    :return: 归一化的转向指令 (-1.0 到 1.0 之间)
-    """
-    # 获取车辆当前位置和目标路点位置
-    vehicle_location = vehicle_transform.location
-    target_location = target_waypoint.transform.location
-
-    # 将车辆的偏航角（yaw）从度转换为弧度
-    vehicle_yaw = math.radians(vehicle_transform.rotation.yaw)
-
-    # 计算目标位置相对于车辆位置的向量 (dx, dy)
-    dx = target_location.x - vehicle_location.x
-    dy = target_location.y - vehicle_location.y
-
-    # 将目标位置向量从世界坐标系转换到车辆局部坐标系
-    # 这使得我们可以更容易地判断目标在车辆的左、右还是正前方
-    local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
-    local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
-
-    # 如果目标在车辆正后方（或非常接近），返回0转向角以避免除以零
-    if abs(local_x) < 0.1:
-        return 0.0
-
-    # 计算目标方向与车辆当前朝向的夹角
-    angle = math.atan2(local_y, local_x)
-
-    # 定义最大转向角（例如60度），并将计算出的角度归一化到[-1, 1]范围
-    max_angle = math.radians(60)
-    steering = angle / max_angle
-
-    # 使用np.clip确保转向值在有效范围内
-    return np.clip(steering, -1.0, 1.0)
-
-# --------------------------
-# 6. 优化避障控制逻辑
-# --------------------------
-class ObstacleAvoidance:
-    """
-    障碍物检测与避障决策类
-    封装了使用LiDAR数据进行障碍物检测和生成避障指令的逻辑
-    """
-    def __init__(self):
-        """初始化避障控制器"""
-        # 用于存储障碍物检测历史，防止频繁切换决策
-        self.obstacle_history = deque(maxlen=10)
-        # 紧急制动标志
-        self.emergency_brake = False
-        # 记录上一次的避障方向，用于决策的连续性
-        self.last_avoid_direction = 0 # -1: 左, 0: 无, 1: 右
-
-    def detect_obstacles(self, lidar_data, vehicle_speed):
-        """
-        修复版的障碍物检测算法
-        处理LiDAR点云数据，检测前方障碍物并分析其位置
-        :param lidar_data: 原始的LiDAR点云数据 (numpy array)
-        :param vehicle_speed: 车辆当前速度 (m/s)
-        :return: 包含障碍物检测结果的字典
-        """
-        # 如果没有LiDAR数据，返回默认结果（无障碍物）
-        if lidar_data is None:
-            return self._get_default_detection_result()
-
-        # 如果点云为空，返回默认结果
-        if len(lidar_data) == 0:
-            return self._get_default_detection_result()
-
-        try:
-            # 1. 地面过滤：移除高度低于阈值的点，减少地面点的干扰
-            ground_threshold = -0.5 # 地面阈值，单位为米
-            valid_mask = lidar_data[:, 2] > ground_threshold # z坐标大于阈值的点被认为是有效的
-            valid_points = lidar_data[valid_mask]
-
-            if len(valid_points) == 0:
-                return self._get_default_detection_result()
-
-            # 2. 计算每个有效点相对于车辆的距离和角度
-            # 计算x-y平面上的距离
-            distances = np.sqrt(valid_points[:, 0] ** 2 + valid_points[:, 1] ** 2)
-            # 计算与车辆x轴正方向的夹角（弧度）
-            angles = np.arctan2(valid_points[:, 1], valid_points[:, 0])
-
-            # 3. 定义感兴趣区域（ROI）：只关注车辆正前方的区域
-            front_angle_range = np.radians(75) # 前方75度的范围
-            # 过滤出在角度范围内且距离大于1米（避免过近的噪声点）的点
-            front_mask = (np.abs(angles) <= front_angle_range) & (distances > 1.0)
-
-            front_points = valid_points[front_mask]
-            front_distances = distances[front_mask]
-            front_angles = angles[front_mask]
-
-            if len(front_points) == 0:
-                return self._get_default_detection_result()
-
-            # 4. 分区域检测：将前方区域分为近、中、远三个区域
-            near_zone = front_distances < 8.0    # 近区：0-8米
-            mid_zone = (front_distances >= 8.0) & (front_distances < 20.0) # 中区：8-20米
-            far_zone = (front_distances >= 20.0) & (front_distances < 35.0) # 远区：20-35米
-
-            # 5. 紧急制动检测：检测近区中非常接近的障碍物
-            emergency_points = front_points[near_zone & (front_distances < 4.0)] # 4米内的点
-            self.emergency_brake = len(emergency_points) > 10 # 如果超过10个点，则触发紧急制动
-
-            # 6. 计算最近障碍物的距离和角度
-            min_distance = np.min(front_distances)
-            min_idx = np.argmin(front_distances)
-            obstacle_angle = front_angles[min_idx] if len(front_angles) > min_idx else 0.0
-
-            # 7. 分左右区域分析障碍物分布
-            left_points_distances = front_distances[front_angles > 0] # 车辆左侧的点（角度为正）
-            right_points_distances = front_distances[front_angles < 0] # 车辆右侧的点（角度为负）
-
-            # 计算左右两侧最近障碍物的距离
-            left_min = np.min(left_points_distances) if len(left_points_distances) > 0 else float('inf')
-            right_min = np.min(right_points_distances) if len(right_points_distances) > 0 else float('inf')
-
-            # 8. 计算左右两侧的自由空间（无障碍物的区域大小）
-            safe_threshold = 15.0 # 认为15米外是安全的
-            # 统计左右两侧距离大于安全阈值的点的数量，作为自由空间的度量
-            left_free = np.sum(left_points_distances > safe_threshold) if len(left_points_distances) > 0 else 1000
-            right_free = np.sum(right_points_distances > safe_threshold) if len(right_points_distances) > 0 else 1000
-
-            # 9. 判断是否检测到障碍物的综合条件
-            obstacle_detected = (np.sum(near_zone) > 5 or  # 近区有超过5个点
-                                 np.sum(mid_zone) > 10 or # 中区有超过10个点
-                                 min_distance < 12.0)     # 最近障碍物距离小于12米
-
-            # 返回包含所有检测信息的字典
-            return {
-                'obstacle_detected': obstacle_detected,
-                'min_distance': min_distance,
-                'left_clearance': left_min,
-                'right_clearance': right_min,
-                'left_free_space': left_free,
-                'right_free_space': right_free,
-                'obstacle_angle': obstacle_angle,
-                'emergency_brake': self.emergency_brake
-            }
-
-        except Exception as e:
-            # 如果检测过程中发生错误，打印错误信息并返回默认结果
-            print(f"障碍物检测错误: {e}")
-            return self._get_default_detection_result()
-
-    def _get_default_detection_result(self):
-        """
-        返回默认的检测结果（无障碍物）
-        这是一个辅助函数，用于在没有数据或出错时提供一个安全的默认值
-        :return: 默认的检测结果字典
-        """
-        return {
-            'obstacle_detected': False,
-            'min_distance': 30.0,
-            'left_clearance': float('inf'),
-            'right_clearance': float('inf'),
-            'left_free_space': 1000,
-            'right_free_space': 1000,
-            'obstacle_angle': 0.0,
-            'emergency_brake': False
-        }
-
-    def decide_avoidance_direction(self, detection_result, current_steer, vehicle_speed):
-        """
-        避障决策逻辑
-        根据障碍物检测结果，决定车辆应采取的避障动作（转向和刹车）
-        :param detection_result: 障碍物检测结果字典
-        :param current_steer: 当前的转向值
-        :param vehicle_speed: 当前车辆速度
-        :return: (避障转向值, 避障刹车值, 是否紧急制动)
-        """
-        # 如果没有检测到障碍物，重置状态并返回无动作
-        if not detection_result['obstacle_detected']:
-            self.last_avoid_direction = 0
-            return 0, 0, False
-
-        # 从检测结果中提取关键信息
-        min_dist = detection_result['min_distance']
-        left_clear = detection_result['left_clearance']
-        right_clear = detection_result['right_clearance']
-        left_free = detection_result['left_free_space']
-        right_free = detection_result['right_free_space']
-        obstacle_angle = detection_result['obstacle_angle']
-
-        # 如果需要紧急制动，返回最大刹车力度
-        if detection_result['emergency_brake']:
-            return 0, 1.0, True # (转向, 刹车, 紧急制动标志)
-
-        # 1. 动态安全距离：速度越快，需要的安全距离越大
-        safety_margin = max(3.0, vehicle_speed * 0.5)
-
-        # 2. 计算左右两侧的安全得分，用于决策避障方向
-        # 得分越高，表示该方向越安全
-        left_score = (left_clear - safety_margin) + (left_free * 0.1)
-        right_score = (right_clear - safety_margin) + (right_free * 0.1)
-
-        # 3. 加入历史决策的权重，防止决策频繁跳动（ hysteresis 机制）
-        if self.last_avoid_direction != 0:
-            if self.last_avoid_direction == 1: # 上一次是向右避障
-                right_score += 2.0 # 给右侧加分
-            else: # 上一次是向左避障
-                left_score += 2.0 # 给左侧加分
-
-        # 4. 初始化避障控制量
-        avoid_steer = 0.0 # 避障所需的转向
-        avoid_brake = 0.0 # 避障所需的刹车
-
-        # 5. 根据与障碍物的距离决定是否需要刹车
-        if min_dist < safety_margin + 2.0:
-            avoid_brake = 0.3 + (safety_margin - min_dist) * 0.1 # 距离越近，刹车力度越大
-
-        # 6. 根据安全得分决定避障方向
-        if right_score > left_score + 1.0: # 右侧明显更安全
-            avoid_steer = -0.5 # 向右转向（CARLA中，负转向值为右转）
-            self.last_avoid_direction = 1 # 记录这次是向右避障
-        elif left_score > right_score + 1.0: # 左侧明显更安全
-            avoid_steer = 0.5 # 向左转向（正转向值为左转）
-            self.last_avoid_direction = -1 # 记录这次是向左避障
-        else: # 两侧安全性相近，根据障碍物位置决定
-            if obstacle_angle > 0: # 障碍物在左侧
-                avoid_steer = -0.4 # 向右避让
-                self.last_avoid_direction = 1
-            else: # 障碍物在右侧或正前方
-                avoid_steer = 0.4 # 向左避让
-                self.last_avoid_direction = -1
-
-        # 返回最终的避障决策
-        return avoid_steer, avoid_brake, False
-
-# --------------------------
-# 7. 主控制循环
-# --------------------------
-# 初始化避障控制器实例
-obstacle_avoidance = ObstacleAvoidance()
-
-# 初始化控制状态变量
-throttle = 1.0  # 油门值 (0.0 到 1.0)，初始设为最大
-steer = 0.0     # 转向值 (-1.0 到 1.0)
-brake = 0.0     # 刹车值 (0.0 到 1.0)
-waypoint_distance = 8.0 # 目标路点距离
-
-# 获取车辆初始位置的下一个路点
-vehicle_location = vehicle.get_location()
-waypoint = get_next_waypoint(vehicle_location, waypoint_distance)
-
-# 使用滑动窗口对控制信号进行平滑滤波，减少控制抖动
-steer_filter = deque(maxlen=3) # 存储最近3次的转向值
-throttle_filter = deque(maxlen=2) # 存储最近2次的油门值
+# 障碍物信息历史
+obstacle_history = deque(maxlen=5)
 
 print("初始化车辆状态...")
-# 再次确保车辆物理引擎开启
 vehicle.set_simulate_physics(True)
 
-# 应用一个初始的强力启动控制，让车辆动起来
-print("应用强力启动控制...")
+# 修复7: 更温和的启动控制
+print("应用启动控制...")
 vehicle.apply_control(carla.VehicleControl(
-    throttle=1.0,  # 最大油门
+    throttle=0.5,  # 降低初始油门
     steer=0.0,
     brake=0.0,
     hand_brake=False
 ))
 
+
+# 添加NPC车辆管理函数
+def check_and_reset_stuck_npcs():
+    """检查并重置卡住的NPC车辆"""
+    for npc in npc_vehicles:
+        try:
+            npc_speed = math.sqrt(
+                npc.get_velocity().x ** 2 + npc.get_velocity().y ** 2 + npc.get_velocity().z ** 2) * 3.6
+            # 如果NPC车辆速度过低（小于1km/h）且没有碰撞，可能是卡住了
+            if npc_speed < 1.0:
+                print(f"检测到NPC车辆 {npc.id} 可能卡住，尝试重置...")
+                # 获取当前位置
+                current_transform = npc.get_transform()
+                # 寻找最近的可用出生点
+                closest_point = None
+                min_distance = float('inf')
+                for point in spawn_points:
+                    distance = point.location.distance(current_transform.location)
+                    if distance < min_distance and distance > 10.0:  # 避免重置到太近的位置
+                        min_distance = distance
+                        closest_point = point
+
+                if closest_point:
+                    npc.set_transform(closest_point)
+                    npc.set_autopilot(True)
+                    print(f"重置NPC车辆 {npc.id} 到新位置")
+        except:
+            pass
+
+
 try:
-    print("自动驾驶系统启动（强力油门版本）")
-    print("控制键: q-退出, w-加速, s-减速, a-左转向, d-右转向, r-重置方向, 空格-紧急制动")
+    print("自动驾驶系统启动 - 初始模式: 传统控制")
+    print("控制键: q-退出, m-切换控制模式, r-重置车辆, t-传统模式, n-神经网络模式")
+    print(f"当前有 {len(npc_vehicles)} 辆NPC车辆在运行")
 
-    frame_count = 0 # 帧计数器
-    stuck_count = 0 # 车辆卡住状态计数器
-    last_position = vehicle.get_location() # 记录上一帧的位置，用于检测是否卡住
+    frame_count = 0
+    stuck_count = 0
+    last_position = vehicle.get_location()
+    success_count = 0  # 成功运行计数器
+    collision_count = 0  # 碰撞计数器
+    last_collision_time = 0  # 上次碰撞时间
+    last_npc_check_time = 0  # 上次检查NPC的时间
 
-    # 主循环，持续运行直到用户退出
+    # 主循环
     while True:
-        # 触发仿真世界进行一次步进
         world.tick()
         frame_count += 1
 
-        # 获取车辆当前的状态信息
+        # 定期检查NPC车辆状态（每100帧检查一次）
+        if frame_count - last_npc_check_time > 100:
+            check_and_reset_stuck_npcs()
+            last_npc_check_time = frame_count
+
+        # 获取车辆状态
         vehicle_transform = vehicle.get_transform()
         vehicle_location = vehicle.get_location()
         vehicle_velocity = vehicle.get_velocity()
-        # 计算车辆当前的速度 (m/s)
         vehicle_speed = math.sqrt(vehicle_velocity.x ** 2 + vehicle_velocity.y ** 2 + vehicle_velocity.z ** 2)
 
-        # 每帧打印车辆状态信息
-        print(
-            f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, 位置=({vehicle_location.x:.1f}, {vehicle_location.y:.1f})")
+        # 检测障碍物
+        obstacle_info = obstacle_detector.get_obstacle_info()
+        obstacle_history.append(obstacle_info)
 
-        # 检测车辆是否卡住
+        # 显示障碍物信息
+        if obstacle_info['has_obstacle']:
+            print(f"障碍物检测: 距离={obstacle_info['distance']:.1f}m, "
+                  f"角度={obstacle_info['relative_angle']:.1f}°, "
+                  f"类型={obstacle_info['obstacle_type']}")
+
+        print(f"帧 {frame_count}: 速度={vehicle_speed * 3.6:.1f}km/h, "
+              f"模式={'神经网络' if NEURAL_NETWORK_MODE else '传统'}, "
+              f"障碍物={'有' if obstacle_info['has_obstacle'] else '无'}")
+
+        # 修复8: 改进的卡住检测
         current_position = vehicle_location
-        distance_moved = current_position.distance(last_position) # 计算与上一帧位置的距离
-        if distance_moved < 0.1: # 如果移动距离小于0.1米，认为车辆卡住了
+        distance_moved = current_position.distance(last_position)
+
+        # 更精确的卡住检测
+        is_moving = distance_moved > 0.2 or vehicle_speed > 1.0
+        if not is_moving:
             stuck_count += 1
         else:
-            stuck_count = 0 # 否则重置卡住计数器
+            stuck_count = 0
+            success_count += 1  # 成功运行一帧
 
-        last_position = current_position # 更新上一帧位置
+        last_position = current_position
 
-        # 如果车辆卡住超过10帧，尝试强力脱困
-        if stuck_count > 10:
-            print("车辆卡住，尝试强力脱困...")
-            # 先短暂倒车
+        # 修复9: 更智能的卡住恢复
+        if stuck_count > 15:  # 1.5秒后认为卡住
+            print("检测到车辆卡住，执行恢复程序...")
+
+            # 先完全停止
             vehicle.apply_control(carla.VehicleControl(
-                throttle=0.0,
-                steer=0.0,
-                brake=1.0,
-                hand_brake=False,
-                reverse=True # 启用倒车
+                throttle=0.0, steer=0.0, brake=1.0, hand_brake=True
             ))
-            time.sleep(0.5) # 倒车0.5秒
-            # 然后向前猛冲
-            vehicle.apply_control(carla.VehicleControl(
-                throttle=1.0,
-                steer=0.0,
-                brake=0.0,
-                hand_brake=False,
-                reverse=False # 关闭倒车
-            ))
-            stuck_count = 0 # 重置卡住计数器
+            time.sleep(0.5)
 
-        # 更新目标路点：如果车辆接近当前路点，则获取下一个
-        current_distance = vehicle_location.distance(waypoint.transform.location)
-        if current_distance < 4.0: # 如果距离目标路点小于4米
-            waypoint = get_next_waypoint(vehicle_location, waypoint_distance) # 获取新的目标路点
+            # 检查是否有前方障碍物
+            if obstacle_info['has_obstacle'] and obstacle_info['distance'] < 10:
+                print("前方有障碍物，尝试倒车...")
+                # 倒车
+                vehicle.apply_control(carla.VehicleControl(
+                    throttle=0.0, steer=0.0, brake=0.0, reverse=True
+                ))
+                time.sleep(1.0)
+            else:
+                # 然后尝试不同方向的脱困
+                recovery_steer = random.choice([-0.5, 0.5])  # 随机选择方向
+                vehicle.apply_control(carla.VehicleControl(
+                    throttle=0.8, steer=recovery_steer, brake=0.0, hand_brake=False
+                ))
+                time.sleep(1.0)
 
-        # 计算基础转向角：基于当前路点的导航转向
-        base_steer = calculate_steering_angle(vehicle_transform, waypoint)
+            stuck_count = 0
+            success_count = 0
 
-        # 使用LiDAR数据检测障碍物并生成避障指令
-        detection_result = obstacle_avoidance.detect_obstacles(lidar_data, vehicle_speed)
-        avoid_steer, avoid_brake, emergency_brake = obstacle_avoidance.decide_avoidance_direction(
-            detection_result, steer, vehicle_speed
-        )
+        # 每成功运行100帧显示一次状态
+        if success_count % 100 == 0:
+            print(f"已成功运行 {success_count} 帧")
 
-        # 综合控制输出 - 简化逻辑，专注于让车动起来
-        if emergency_brake:
-            # 紧急制动状态
-            throttle = 0.2
-            brake = 0.1
-            steer = base_steer * 0.1
-            print("!!! 紧急制动 !!!")
-        elif detection_result['obstacle_detected']:
-            # 检测到障碍物，应用避障控制
-            brake = avoid_brake
-            # 动态调整油门：距离越近，油门越小，以获得更好的操控性
-            obstacle_distance_factor = max(0.2, min(1.0, detection_result['min_distance'] / 15.0))
-            throttle = 0.3 * obstacle_distance_factor  # 基础油门0.3，并根据距离动态调整
-            throttle = 0.4  # 避障时也保持较高油门
-            steer = avoid_steer * 0.1 + base_steer * 0.2
-            print("!!! 检测到障碍物，准备避障 !!!")
-        elif detection_result['obstacle_detected']:
-            # （注：此处原代码逻辑有重复，第二个elif条件与第一个相同，可能是笔误。
-            # 它永远不会被执行。保留原样以符合用户"代码不要改变"的要求。）
-            brake = avoid_brake
-            throttle = 0.3  # 避障时也保持高油门
-            steer = avoid_steer * 0.8 + base_steer * 0.2
-            print(f"避障中 - 距离:{detection_result['min_distance']:.1f}m")
+        # 控制逻辑
+        if NEURAL_NETWORK_MODE:
+            # 神经网络控制（传入障碍物信息）
+            nn_throttle, nn_brake, nn_steer = nn_controller.get_control(
+                front_image, vehicle_speed, steer_history, obstacle_info
+            )
+
+            # 修复10: 更激进的控制平滑
+            throttle = 0.3 * throttle + 0.7 * nn_throttle
+            brake = 0.3 * brake + 0.7 * nn_brake
+            steer = 0.2 * steer + 0.8 * nn_steer
+
+            # 记录转向历史
+            steer_history.append(steer)
+
         else:
-            # 正常行驶状态，无障碍物
-            brake = 0.0
-            steer = base_steer * 0.5
+            # 传统控制 - 更稳定
+            throttle, brake, steer = traditional_controller.get_control(vehicle)
+            steer_history.append(steer)
 
-            # 强力油门策略：根据当前速度动态调整油门大小
-            if vehicle_speed < 2.0:  # 低速时，使用较大油门加速
-                throttle = 0.4
-            elif vehicle_speed < 5.0: # 中低速时，适当减小油门
-                throttle = 0.3
-            elif vehicle_speed < 7.0: # 中高速时，进一步减小油门
-                throttle = 0.2
-            else: # 高速时，使用最小油门维持速度
-                throttle = 0.1
-
-            steer = base_steer # 使用基础转向角
-
-        # 应用控制信号平滑滤波
-        steer_filter.append(steer)
-        throttle_filter.append(throttle)
-
-        # 计算滤波后的控制信号
-        smoothed_steer = np.mean(steer_filter)
-        smoothed_throttle = np.mean(throttle_filter)
-
-        # 构造最终的车辆控制命令
+        # 应用控制
         control = carla.VehicleControl(
-            throttle=smoothed_throttle,
-            steer=smoothed_steer,
+            throttle=throttle,
+            steer=steer,
             brake=brake,
             hand_brake=False,
             reverse=False
         )
 
-        # 打印即将应用的控制命令
-        print(f"控制输出: 油门={control.throttle:.2f}, 刹车={control.brake:.2f}, 转向={control.steer:.2f}")
-        # 将控制命令应用到车辆上
         vehicle.apply_control(control)
 
-        # 可视化显示：如果相机图像可用
+        # 显示和输入处理
         if third_image is not None:
-            # 创建图像副本，避免修改原始数据
             display_image = third_image.copy()
-            # 在图像上绘制车辆速度信息
+
+            # 可视化障碍物检测结果
+            display_image = obstacle_detector.visualize_obstacles(display_image, vehicle_transform)
+
+            # 显示信息
             cv2.putText(display_image, f"Speed: {vehicle_speed * 3.6:.1f} km/h", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            # 在图像上绘制油门值
-            cv2.putText(display_image, f"Throttle: {throttle:.2f}", (10, 60),
+            cv2.putText(display_image, f"Mode: {'Neural' if NEURAL_NETWORK_MODE else 'Traditional'}",
+                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(display_image, f"Throttle: {throttle:.2f}", (10, 90),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            # 在图像上绘制转向值
-            cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 90),
+            cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 120),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(display_image, f"Brake: {brake:.2f}", (10, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            # 根据障碍物检测结果，在图像上绘制不同的状态文本
-            if detection_result['obstacle_detected']:
-                status_text = f"OBSTACLE: {detection_result['min_distance']:.1f}m"
-                cv2.putText(display_image, status_text, (10, 120),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2) # 红色文本表示有障碍物
+            # 显示障碍物信息
+            if obstacle_info['has_obstacle']:
+                cv2.putText(display_image, f"Obstacle: {obstacle_info['distance']:.1f}m", (10, 180),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             else:
-                cv2.putText(display_image, "CLEAR", (10, 120),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2) # 绿色文本表示无障碍物
+                cv2.putText(display_image, "Obstacle: None", (10, 180),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-            # 显示图像窗口
-            cv2.imshow('第三视角 - 强力油门系统', display_image)
+            # 卡住警告
+            if stuck_count > 5:
+                cv2.putText(display_image, "STUCK DETECTED!", (10, 210),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-            # 监听键盘输入
+            # 安全区域标记
+            cv2.rectangle(display_image, (240, 360), (400, 480), (0, 255, 0), 2)  # 前方安全区域
+
+            cv2.imshow('自动驾驶系统 - 带障碍物检测', display_image)
+
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
-                break # 按下'q'键退出程序
-            elif key == ord('w'):
-                throttle = min(1.0, throttle + 0.1) # 按下'w'键增加油门
-            elif key == ord('s'):
-                throttle = max(0.0, throttle - 0.1) # 按下's'键减少油门
-            elif key == ord('a'):
-                steer = max(-1.0, steer - 0.1) # 按下'a'键向左转
-            elif key == ord('d'):
-                steer = min(1.0, steer + 0.1) # 按下'd'键向右转
+                break
+            elif key == ord('m'):
+                NEURAL_NETWORK_MODE = not NEURAL_NETWORK_MODE
+                print(f"切换到{'神经网络' if NEURAL_NETWORK_MODE else '传统'}控制模式")
+            elif key == ord('t'):
+                NEURAL_NETWORK_MODE = False
+                print("切换到传统控制模式")
+            elif key == ord('n'):
+                NEURAL_NETWORK_MODE = True
+                print("切换到神经网络控制模式")
             elif key == ord('r'):
-                steer = 0.0 # 按下'r'键重置转向
-            elif key == ord(' '):
-                brake = 1.0 # 按下空格键紧急制动
-                throttle = 0.0
+                # 重置车辆
+                vehicle.set_transform(spawn_point)
+                throttle = 0.3
+                steer = 0.0
+                brake = 1.0
+                stuck_count = 0
+                success_count = 0
+                collision_count = 0
+                steer_history.clear()
+                obstacle_history.clear()
+                print("车辆已重置")
 
-        # 短暂休眠，降低CPU占用率（在同步模式下，这个sleep的影响不大，但仍是个好习惯）
         time.sleep(0.01)
 
 except KeyboardInterrupt:
-    # 如果用户按下Ctrl+C，捕获中断信号并打印信息
     print("系统已停止")
 except Exception as e:
-    # 如果程序运行中发生其他错误，打印错误信息和堆栈跟踪
     print(f"系统错误: {e}")
     import traceback
+
     traceback.print_exc()
 
 finally:
-    # 程序退出前的清理工作
     print("正在清理资源...")
-    # 停止传感器数据监听
     third_camera.stop()
-    lidar.stop()
+    front_camera.stop()
 
-    # 销毁所有生成的车辆和传感器actor
+    # 销毁actor
     for actor in world.get_actors():
         if actor.type_id.startswith('vehicle.') or actor.type_id.startswith('sensor.'):
-            actor.destroy()
+            try:
+                actor.destroy()
+            except:
+                pass
 
-    # 恢复世界设置为异步模式，方便下次运行
+    # 恢复设置
     settings.synchronous_mode = False
     world.apply_settings(settings)
-    # 关闭所有OpenCV创建的窗口
     cv2.destroyAllWindows()
     print("资源清理完成")
