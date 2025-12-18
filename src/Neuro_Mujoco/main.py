@@ -282,7 +282,7 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
             logger.warning("模型无控制输入（nu=0），不订阅控制指令话题")
 
     # ===================== 可视化主循环 =====================
-    logger.info("启动可视化窗口（按ESC键退出 | 鼠标交互：拖拽旋转、滚轮缩放）")  # 修正缩进
+    logger.info("启动可视化窗口（按ESC键退出 | 鼠标交互：拖拽旋转、滚轮缩放）")
     try:
         with viewer.launch_passive(model, data) as v:
             # 预分配推理张量（复用，避免每次创建）
@@ -305,11 +305,12 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
                     # 策略推理
                     action = policy(obs_tensor).squeeze().numpy()
                     
-                    # 映射到实际控制范围 + 优化2：强制裁剪到物理极限（避免超限）
+                    # 映射到实际控制范围 + 优化：移除重复的线性缩放，仅保留一次映射+裁剪
                     if ctrl_range is not None:
-                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2  # 核心映射：[-1,1]→[ctrl_min,ctrl_max] 线性缩放
-                        action = np.clip(action, ctrl_range[:, 0], ctrl_range[:, 1])  # 强制裁剪，保证指令符合执行器物理极限
-                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2  # 核心映射：[-1,1]→[ctrl_min,ctrl_max] 线性缩放，保证指令符合执行器物理极限
+                        # 核心映射：[-1,1] → [ctrl_min, ctrl_max] 线性缩放
+                        action = ctrl_range[:, 0] + (ctrl_range[:, 1] - ctrl_range[:, 0]) * (action + 1) / 2
+                        # 强制裁剪到物理极限（避免超限）
+                        action = np.clip(action, ctrl_range[:, 0], ctrl_range[:, 1])
                     
                     data.ctrl[:] = action
 
@@ -317,7 +318,7 @@ def visualize(model_path: str, use_ros: bool = False, policy_path: Optional[str]
                 mujoco.mj_step(model, data)
                 v.sync()
 
-                # ROS消息发布（修正缩进：从policy分支移出，作为while循环顶层逻辑）
+                # ROS消息发布
                 if use_ros and ros_publishers is not None:
                     joint_state_pub, pose_pub = ros_publishers
 
