@@ -137,8 +137,10 @@ class UIHandler:
             # 使用已有的 self.engine（DetectionEngine）进行检测
             annotated_frame, results = self.engine.detect(frame)
 
-            # 显示结果
-            cv2.imshow("YOLO Detection Result", annotated_frame)
+            # 显示可缩放窗口
+            window_name = "YOLO Detection Result"
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)  # 👈 关键修改：启用可缩放窗口
+            cv2.imshow(window_name, annotated_frame)
             print("Detection completed. Press any key to close the window.")
             cv2.waitKey(0)
             cv2.destroyAllWindows()
