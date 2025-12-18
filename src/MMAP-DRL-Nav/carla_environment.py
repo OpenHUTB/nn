@@ -94,20 +94,23 @@ class CarlaEnvironment(gym.Env):
         self.collision_pedestrian_penalty = -100.0 # 碰撞行人惩罚
         self.collision_static_penalty = -15.0    # 碰撞静态物体惩罚
 
-        # ========== 天气系统：移除日志输出 ==========
+        # ========== 天气系统：新增中文名称映射 + 移除冗余日志 ==========
         self.weather_mode = "dynamic"
-        self.preset_weathers = [
-            carla.WeatherParameters.ClearNoon,
-            carla.WeatherParameters.CloudyNoon,
-            carla.WeatherParameters.WetNoon,
-            carla.WeatherParameters.WetCloudyNoon,
-            carla.WeatherParameters.MidRainyNoon,
-            carla.WeatherParameters.HardRainNoon,
-            carla.WeatherParameters.SoftRainNoon
-        ]
+        # 核心修改：天气枚举值 → 中文名称映射
+        self.weather_name_map = {
+            carla.WeatherParameters.ClearNoon: "晴天",
+            carla.WeatherParameters.CloudyNoon: "多云",
+            carla.WeatherParameters.WetNoon: "小雨",
+            carla.WeatherParameters.WetCloudyNoon: "多云转小雨",
+            carla.WeatherParameters.MidRainyNoon: "中雨",
+            carla.WeatherParameters.HardRainNoon: "大雨",
+            carla.WeatherParameters.SoftRainNoon: "细雨"
+        }
+        self.preset_weathers = list(self.weather_name_map.keys())  # 从映射中获取枚举值
         self.current_weather = random.choice(self.preset_weathers)
         self.world.set_weather(self.current_weather)
-        # 移除天气初始化日志
+        # 可选：打印初始天气名称（仅易读名称，无冗余日志）
+        print(f"初始天气：{self.weather_name_map[self.current_weather]}")
 
         # ========== 新增：导航系统配置 ==========
         self.target_location = None          # 导航目标点
@@ -143,13 +146,14 @@ class CarlaEnvironment(gym.Env):
         self.view_distance = 8.0
         self.z_offset = 0.5
 
-    # ========== 天气切换：移除日志输出 ==========
+    # ========== 天气切换：输出中文名称 ==========
     def switch_weather(self):
         available_weathers = [w for w in self.preset_weathers if w != self.current_weather]
         new_weather = random.choice(available_weathers)
         self.world.set_weather(new_weather)
         self.current_weather = new_weather
-        # 移除天气切换日志
+        # 输出易读的天气名称（替代原有枚举值日志）
+        print(f"天气已切换为：{self.weather_name_map[self.current_weather]}")
 
     # ========== 新增：生成导航目标点 ==========
     def _generate_random_target(self):
@@ -428,7 +432,7 @@ class CarlaEnvironment(gym.Env):
         # ========== 新增：重置步数 ==========
         self.current_step = 0
 
-        # ========== 切换天气：移除日志 ==========
+        # ========== 切换天气（会自动输出中文名称） ==========
         self.switch_weather()
 
         # 生成车辆
@@ -574,7 +578,9 @@ class CarlaEnvironment(gym.Env):
             "nav_reward": nav_reward,
             "total_reward": total_reward,
             "current_step": self.current_step,
-            "dist_to_target": dist_to_target
+            "dist_to_target": dist_to_target,
+            # 可选：在返回的info中添加当前天气名称
+            "current_weather": self.weather_name_map[self.current_weather]
         }
 
     # ========== 关闭环境（完全保留原始代码） ==========
