@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mujoco model="DeepMind Humanoid with Dynamic Obstacles and Patrol Points">
+<mujoco model="DeepMind Humanoid with Dynamic Obstacles and Moving Patrol Points">
   <compiler angle="radian" inertiafromgeom="true"/>
   <option timestep="0.005" integrator="RK4" gravity="0 0 -9.81"/>
 
@@ -13,7 +13,7 @@
     <material name="floor_material" texture="grid" texrepeat="10 10" reflectance="0.1"/>
   </asset>
 
-  <!-- World body: floor + obstacles + patrol points -->
+  <!-- World body: floor + obstacles + DYNAMIC patrol points -->
   <worldbody>
     <!-- Floor -->
     <geom name="floor" type="plane" size="20 20 0.1" material="floor_material" condim="3"/>
@@ -75,36 +75,67 @@
       </body>
     </body>
 
-    <!-- Patrol points configuration -->
-    <!-- Patrol target 1 (Start point) -->
-    <body name="patrol_target_1" pos="0 0 0.2">
+    <!-- DYNAMIC Patrol Points (with slide joints for real-time movement) -->
+    <!-- Patrol target 1 (Dynamic start point) -->
+    <body name="patrol_target_1_base" pos="0 0 0">
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
-      <geom name="patrol_marker_1" type="sphere" size="0.15" material="target_material" condim="3"/>
-      <geom name="patrol_base_1" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
+      <!-- X/Y slide joints for dynamic movement -->
+      <joint name="patrol1_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol1_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <!-- Target marker body -->
+      <body name="patrol_target_1" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_1" type="sphere" size="0.15" material="target_material" condim="3"/>
+        <geom name="patrol_base_1" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
+      </body>
     </body>
-    <!-- Patrol target 2 (First patrol point) -->
-    <body name="patrol_target_2" pos="4 -2 0.2">
+
+    <!-- Patrol target 2 (Dynamic patrol point 1) -->
+    <body name="patrol_target_2_base" pos="4 -2 0">
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
-      <geom name="patrol_marker_2" type="sphere" size="0.15" rgba="0 1 0 1" condim="3"/>
-      <geom name="patrol_base_2" type="cylinder" size="0.18 0.02" rgba="0 0.8 0 1" condim="3"/>
+      <joint name="patrol2_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol2_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_2" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_2" type="sphere" size="0.15" rgba="0 1 0 1" condim="3"/>
+        <geom name="patrol_base_2" type="cylinder" size="0.18 0.02" rgba="0 0.8 0 1" condim="3"/>
+      </body>
     </body>
-    <!-- Patrol target 3 (Second patrol point) -->
-    <body name="patrol_target_3" pos="8 2 0.2">
+
+    <!-- Patrol target 3 (Dynamic patrol point 2) -->
+    <body name="patrol_target_3_base" pos="8 2 0">
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
-      <geom name="patrol_marker_3" type="sphere" size="0.15" rgba="0 0 1 1" condim="3"/>
-      <geom name="patrol_base_3" type="cylinder" size="0.18 0.02" rgba="0 0 0.8 1" condim="3"/>
+      <joint name="patrol3_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol3_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_3" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_3" type="sphere" size="0.15" rgba="0 0 1 1" condim="3"/>
+        <geom name="patrol_base_3" type="cylinder" size="0.18 0.02" rgba="0 0 0.8 1" condim="3"/>
+      </body>
     </body>
-    <!-- Patrol target 4 (Third patrol point) -->
-    <body name="patrol_target_4" pos="10 -1 0.2">
+
+    <!-- Patrol target 4 (Dynamic patrol point 3) -->
+    <body name="patrol_target_4_base" pos="10 -1 0">
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
-      <geom name="patrol_marker_4" type="sphere" size="0.15" rgba="1 1 0 1" condim="3"/>
-      <geom name="patrol_base_4" type="cylinder" size="0.18 0.02" rgba="1 0.8 0 1" condim="3"/>
+      <joint name="patrol4_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol4_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_4" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_4" type="sphere" size="0.15" rgba="1 1 0 1" condim="3"/>
+        <geom name="patrol_base_4" type="cylinder" size="0.18 0.02" rgba="1 0.8 0 1" condim="3"/>
+      </body>
     </body>
-    <!-- Patrol target 5 (Final patrol point) -->
-    <body name="patrol_target_5" pos="12 0 0.2">
+
+    <!-- Patrol target 5 (Dynamic final point) -->
+    <body name="patrol_target_5_base" pos="12 0 0">
       <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
-      <geom name="patrol_marker_5" type="sphere" size="0.15" rgba="1 0 1 1" condim="3"/>
-      <geom name="patrol_base_5" type="cylinder" size="0.18 0.02" rgba="0.8 0 0.8 1" condim="3"/>
+      <joint name="patrol5_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol5_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_5" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_5" type="sphere" size="0.15" rgba="1 0 1 1" condim="3"/>
+        <geom name="patrol_base_5" type="cylinder" size="0.18 0.02" rgba="0.8 0 0.8 1" condim="3"/>
+      </body>
     </body>
 
     <!-- DeepMind Humanoid Robot -->
@@ -191,7 +222,7 @@
     </body>
   </worldbody>
 
-  <!-- Actuators definition (robot + obstacles) -->
+  <!-- Actuators definition (robot + obstacles + DYNAMIC patrol points) -->
   <actuator>
     <!-- Torso actuators -->
     <motor name="abdomen_x" joint="abdomen_x" ctrlrange="-1.0 1.0" gear="150.0"/>
@@ -225,17 +256,24 @@
     <motor name="ankle_y_left" joint="ankle_y_left" ctrlrange="-1.0 1.0" gear="100.0"/>
 
     <!-- Dynamic obstacle actuators -->
-    <!-- Obstacle 2 (wall2) actuators -->
     <motor name="wall2_motor_y" joint="wall2_slide_y" ctrlrange="-5.0 5.0" gear="10.0"/>
     <motor name="wall2_motor_z" joint="wall2_slide_z" ctrlrange="0.0 2.0" gear="8.0"/>
-
-    <!-- Obstacle 3 (wall3) actuators -->
     <motor name="wall3_motor_x" joint="wall3_slide_x" ctrlrange="4.0 8.0" gear="10.0"/>
     <motor name="wall3_motor_y" joint="wall3_slide_y" ctrlrange="-3.0 3.0" gear="10.0"/>
-
-    <!-- Obstacle 4 (wall4) actuators -->
     <motor name="wall4_motor_rot" joint="wall4_rotate" ctrlrange="-10.0 10.0" gear="5.0"/>
     <motor name="wall4_motor_rad" joint="wall4_radial" ctrlrange="0.5 2.0" gear="8.0"/>
+
+    <!-- DYNAMIC Patrol Point Actuators (for real-time movement control) -->
+    <motor name="patrol1_motor_x" joint="patrol1_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol1_motor_y" joint="patrol1_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol2_motor_x" joint="patrol2_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol2_motor_y" joint="patrol2_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol3_motor_x" joint="patrol3_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol3_motor_y" joint="patrol3_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol4_motor_x" joint="patrol4_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol4_motor_y" joint="patrol4_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol5_motor_x" joint="patrol5_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol5_motor_y" joint="patrol5_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
   </actuator>
 
   <!-- Contact settings (explicit pairs, no wildcards) -->
@@ -275,5 +313,12 @@
     <pair geom1="wall2_geom" geom2="wall3_geom" friction="0.5 0.1 0.01"/>
     <pair geom1="wall2_geom" geom2="wall4_geom" friction="0.5 0.1 0.01"/>
     <pair geom1="wall3_geom" geom2="wall4_geom" friction="0.5 0.1 0.01"/>
+
+    <!-- Robot-patrol point contact (prevent collision) -->
+    <pair geom1="torso_geom" geom2="patrol_marker_1" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso_geom" geom2="patrol_marker_2" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso_geom" geom2="patrol_marker_3" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso_geom" geom2="patrol_marker_4" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso_geom" geom2="patrol_marker_5" friction="0.1 0.01 0.001"/>
   </contact>
 </mujoco>

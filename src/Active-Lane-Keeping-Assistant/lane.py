@@ -9,7 +9,9 @@ from os.path import join
 class Lane:
     """Detects Lanes in a given Image
     """
-
+    HLS_L_THRESHOLD_MIN = 150
+    HLS_L_THRESHOLD_MAX = 255
+    XM_PER_PIX = 3.7 / 781
     def __init__(self, height:int, width:int, save:bool=False,
         save_folder:str=join('img', 'examples')) -> None:
         """Constructor
@@ -56,7 +58,7 @@ class Lane:
 
         # Create threshold matrix to differentiate black and white based on the
         # lightness (of HSL).
-        _, binary = cv2.threshold(hls[:, :, 1], 150, 255, cv2.THRESH_BINARY)
+        _, binary = cv2.threshold(hls[:, :, 1], self.HLS_L_THRESHOLD_MIN, self.HLS_L_THRESHOLD_MAX, cv2.THRESH_BINARY)
         binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
 
         if self.save:
@@ -462,7 +464,6 @@ class Lane:
                 [0]: Original image with lane and offset drawn on.
                 [1]: Calculated offset to the center of the detected lane.
         """
-        M_PER_PIX = 3.7 / 781 # Meters per pixel
 
         # Retrieve the position of the car assuming it is the center of the
         # image. 
@@ -476,7 +477,7 @@ class Lane:
     
         center_lane = (bottom_right - bottom_left)/2 + bottom_left
         center_offset = (np.abs(car_location) - np.abs(center_lane)) * \
-            M_PER_PIX * 100
+                        self.XM_PER_PIX * 100
         
         cv2.putText(img, (f'Difference to Center: '
             f'{str(round(center_offset, 5))} cm'), (int((5/600)*self.img_width),
