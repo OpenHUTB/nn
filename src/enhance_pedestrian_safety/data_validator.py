@@ -14,13 +14,9 @@ class DataValidator:
             'stitched_images': DataValidator._validate_stitched_images(data_dir),
             'annotations': DataValidator._validate_annotations(data_dir),
             'metadata': DataValidator._validate_metadata(data_dir),
-
             'lidar_data': DataValidator._validate_lidar_data(data_dir),
             'cooperative_data': DataValidator._validate_cooperative_data(data_dir),
             'fusion_data': DataValidator._validate_fusion_data(data_dir)
-
-            'lidar_data': DataValidator._validate_lidar_data(data_dir)
-
         }
 
         validation_results['overall_score'] = DataValidator._calculate_score(validation_results)
@@ -36,15 +32,11 @@ class DataValidator:
             "raw/vehicle",
             "raw/infrastructure",
             "stitched",
-
             "metadata",
             "cooperative",
             "cooperative/v2x_messages",
             "cooperative/shared_perception",
             "fusion"
-
-            "metadata"
-
         ]
 
         missing_dirs = []
@@ -65,7 +57,6 @@ class DataValidator:
 
     @staticmethod
     def _validate_raw_images(data_dir):
-
         raw_path = os.path.join(data_dir, "raw")
 
         if not os.path.exists(raw_path):
@@ -73,19 +64,10 @@ class DataValidator:
                     'infrastructure': {'status': 'MISSING', 'count': 0, 'errors': []}}
 
         raw_dirs = [d for d in os.listdir(raw_path) if os.path.isdir(os.path.join(raw_path, d))]
-
-        raw_dirs = ["vehicle", "infrastructure"]
-
         results = {}
 
         for raw_dir in raw_dirs:
             path = os.path.join(data_dir, "raw", raw_dir)
-
-
-            if not os.path.exists(path):
-                results[raw_dir] = {'status': 'MISSING', 'count': 0, 'errors': []}
-                continue
-
 
             camera_dirs = []
             if os.path.exists(path):
@@ -171,14 +153,11 @@ class DataValidator:
                 with open(json_path, 'r') as f:
                     data = json.load(f)
 
-
                 # 检查基本结构
                 required_keys = ['frame_id', 'objects']
                 for key in required_keys:
                     if key not in data:
                         errors.append(f"缺失必要键: {key} in {json_file}")
-
-
 
                 valid_files += 1
             except Exception as e:
@@ -238,31 +217,21 @@ class DataValidator:
             return {'status': 'MISSING', 'count': 0, 'errors': []}
 
         bin_files = [f for f in os.listdir(lidar_dir) if f.endswith('.bin')]
-
         npy_files = [f for f in os.listdir(lidar_dir) if f.endswith('.npy')]
         json_files = [f for f in os.listdir(lidar_dir) if f.endswith('.json')]
 
         errors = []
         valid_bin_files = 0
 
-        errors = []
-        valid_files = 0
-
-
         for bin_file in bin_files:
             bin_path = os.path.join(lidar_dir, bin_file)
             try:
                 if os.path.getsize(bin_path) > 0:
-
                     valid_bin_files += 1
-
-                    valid_files += 1
-
                 else:
                     errors.append(f"空文件: {bin_file}")
             except:
                 errors.append(f"文件访问失败: {bin_file}")
-
 
         total_files = len(bin_files) + len(npy_files) + len(json_files)
 
@@ -394,8 +363,6 @@ class DataValidator:
             except Exception as e:
                 errors.append(f"融合文件无效: {json_file} - {str(e)}")
 
-
-
         if len(errors) == 0 and valid_files > 0:
             status = 'PASS'
         elif len(errors) < 3 and valid_files > 0:
@@ -405,18 +372,13 @@ class DataValidator:
 
         return {
             'status': status,
-
             'count': len(json_files),
-
-            'count': valid_files,
-
             'errors': errors
         }
 
     @staticmethod
     def _calculate_score(results):
         weights = {
-
             'directory_structure': 0.10,
             'raw_images': 0.20,
             'stitched_images': 0.10,
@@ -425,14 +387,6 @@ class DataValidator:
             'lidar_data': 0.15,
             'cooperative_data': 0.15,
             'fusion_data': 0.10
-
-            'directory_structure': 0.15,
-            'raw_images': 0.25,
-            'stitched_images': 0.15,
-            'annotations': 0.1,
-            'metadata': 0.15,
-            'lidar_data': 0.2
-
         }
 
         score = 0
@@ -477,18 +431,13 @@ class DataValidator:
             print(f"\n{key.replace('_', ' ').title()}:")
 
             if 'status' in result:
-
                 status_icon = '✓' if result['status'] == 'PASS' else '⚠' if result['status'] == 'WARNING' else '✗'
                 print(f"  状态: {status_icon} {result['status']}")
-
-                print(f"  状态: {result['status']}")
-
             else:
                 print(f"  状态: 未知")
 
             if 'count' in result:
                 print(f"  数量: {result['count']}")
-
 
             # 特定类型数据的额外信息
             if key == 'raw_images' and isinstance(result, dict):
@@ -509,8 +458,6 @@ class DataValidator:
                     print(f"    NPY文件: {result['npy_files']}")
                 if 'json_files' in result:
                     print(f"    JSON文件: {result['json_files']}")
-
-
 
             if 'errors' in result and result['errors']:
                 print(f"  错误 ({len(result['errors'])}):")
