@@ -312,11 +312,12 @@ def spawn_npcs(world, count=10):
 def load_detection_model(model_type):
     """加载YOLOv5检测模型（使用自定义路径）"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    # 允许使用不同精度的模型
+    # 允许使用不同精度的模型，添加yolov5mu.pt路径
     model_paths = {
         'yolov5s': r"D:\yolo\yolov5s.pt",
         'yolov5m': r"D:\yolo\yolov5m.pt",
-        'yolov5x': r"D:\yolo\yolov5x.pt"  # 更高精度的大模型
+        'yolov5x': r"D:\yolo\yolov5x.pt",
+        'yolov5mu': r"D:\yolo\yolov5mu.pt"  # 新增yolov5mu模型路径
     }
 
     if model_type not in model_paths:
@@ -340,7 +341,8 @@ def setup_tracker(tracker_type):
 # -------------------------- 主函数（优化版） --------------------------
 def main():
     parser = argparse.ArgumentParser(description='CARLA 目标检测与跟踪（优化版）')
-    parser.add_argument('--model', type=str, default='yolov5m', choices=['yolov5s', 'yolov5m', 'yolov5x'],
+    # 新增yolov5mu作为可选模型
+    parser.add_argument('--model', type=str, default='yolov5mu', choices=['yolov5s', 'yolov5m', 'yolov5x', 'yolov5mu'],
                         help='检测模型（yolov5x精度最高，yolov5s最轻便）')
     parser.add_argument('--tracker', type=str, default='sort', choices=['sort'], help='跟踪器（仅保留稳定的SORT）')
     parser.add_argument('--host', type=str, default='localhost', help='CARLA服务器地址')
@@ -479,57 +481,35 @@ def main():
                 # 转换为SORT需要的格式：[x1,y1,x2,y2,conf]
                 dets = np.hstack([boxes, probs.reshape(-1, 1)]) if len(probs) > 0 else boxes
                 # 更新跟踪器
-                track_results = tracker.update(dets)
-                # 解析跟踪结果
-                track_boxes = []
-                track_ids = []
-                for track in track_results:
-                    x1, y1, x2, y2, track_id = track
-                    track_boxes.append([x1, y1, x2, y2])
-                    track_ids.append(int(track_id))
-                # 绘制跟踪框
-                if track_boxes:
-                    image = draw_bounding_boxes(
-                        image, track_boxes,
-                        labels=[2] * len(track_boxes),  # 2对应COCO的car类别
-                        class_names=class_names,
-                        track_ids=track_ids,
-                        probs=[0.9] * len(track_boxes)
-                    )
-            elif len(boxes) > 0:
-                # 无跟踪时，仅绘制检测结果
+                tracks = tracker.update(dets)
+                if len(tracks) > 0:
+                    track_boxes = tracks[:, :4]
+                    track_ids = tracks[:, 4].astype(int)
+                    # 绘制跟踪结果
+                    image = draw_bounding_boxes(image, track_boxes, labels[:len(track_boxes)], class_names, track_ids, probs[:len(track_boxes)])
+            else:
+                # 无跟踪时绘制检测结果
                 image = draw_bounding_boxes(image, boxes, labels, class_names, probs=probs)
 
-            # -------------------------- 显示结果 --------------------------
-            cv2.imshow(f'CARLA {args.model} + {args.tracker}', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-            # 按'q'退出
+            # 显示处理后的图像
+            cv2.imshow('CARLA Detection & Tracking', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            # 按q退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
-                print("用户触发退出程序...")
                 break
 
     except Exception as e:
-        print(f"程序运行出错：{str(e)}")
-        print(
-            "报错提示：1. 确保CARLA服务器已启动；2. 确保carla包版本与服务器一致；3. 确保已安装所有依赖；4. 确保YOLO模型路径正确")
+        print(f"程序出错：{str(e)}")
     finally:
-        # 安全清理所有资源
+        # 清理资源
         print("正在清理资源...")
-        if camera:
-            try:
-                camera.destroy()
-            except:
-                pass
+        clear(world, camera)
+        # 关闭同步模式
         if world:
-            # 恢复CARLA异步模式
             settings = world.get_settings()
             settings.synchronous_mode = False
             world.apply_settings(settings)
-            # 清理车辆
-            clear_npc(world)
-            clear_static_vehicle(world)
-        # 关闭图像窗口
         cv2.destroyAllWindows()
-        print("资源清理完成，程序正常退出！")
+        print("程序已退出")
 
 
 if __name__ == "__main__":
