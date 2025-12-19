@@ -1,0 +1,108 @@
+<mujoco model="simple humanoid">
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+
+  <!-- 视觉材质：区分不同身体部位 -->
+  <asset>
+    <material name="torso_mat" rgba=".8 .2 .2 1"/>   <!-- 躯干-红色 -->
+    <material name="arm_mat" rgba=".2 .8 .2 1"/>     <!-- 手臂-绿色 -->
+    <material name="leg_mat" rgba=".2 .2 .8 1"/>      <!-- 腿部-蓝色 -->
+    <material name="head_mat" rgba=".8 .8 .2 1"/>     <!-- 头部-黄色 -->
+  </asset>
+
+  <!-- 世界坐标系：添加地面 -->
+  <worldbody>
+    <light name="light" pos="0 5 10" dir="0 0 -1"/>
+    <geom name="floor" type="plane" size="20 20 0.1" rgba=".5 .5 .5 1"/>
+
+    <!-- 1. 根节点：躯干 -->
+    <body name="torso" pos="0 0 1.2">
+      <inertial pos="0 0 0" mass="20" diaginertia="1 1 1"/>
+      <geom name="torso_geom" type="capsule" size="0.2 0.4" fromto="0 0 -0.4 0 0 0.4" material="torso_mat"/>
+
+      <!-- 2. 头部 -->
+      <body name="head" pos="0 0 0.4">
+        <inertial pos="0 0 0" mass="5" diaginertia="0.5 0.5 0.5"/>
+        <geom name="head_geom" type="sphere" size="0.2" material="head_mat"/>
+      </body>
+
+      <!-- 3. 左臂：肩关节(球关节) → 上臂 → 肘关节(铰链关节) → 前臂 -->
+      <body name="left_shoulder" pos="0 -0.3 0.2">
+        <joint name="left_shoulder_joint" type="ball" damping="0.1"/>
+        <body name="left_upper_arm" pos="0 0 0">
+          <inertial pos="0 0 -0.2" mass="2" diaginertia="0.2 0.2 0.2"/>
+          <geom name="left_upper_arm_geom" type="capsule" size="0.1 0.3" fromto="0 0 0 0 0 -0.6" material="arm_mat"/>
+          <body name="left_elbow" pos="0 0 -0.6">
+            <joint name="left_elbow_joint" type="hinge" axis="1 0 0" damping="0.1" range="-1.57 0"/>
+            <body name="left_lower_arm" pos="0 0 0">
+              <inertial pos="0 0 -0.2" mass="1" diaginertia="0.1 0.1 0.1"/>
+              <geom name="left_lower_arm_geom" type="capsule" size="0.08 0.25" fromto="0 0 0 0 0 -0.5" material="arm_mat"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <!-- 4. 右臂：结构与左臂对称 -->
+      <body name="right_shoulder" pos="0 0.3 0.2">
+        <joint name="right_shoulder_joint" type="ball" damping="0.1"/>
+        <body name="right_upper_arm" pos="0 0 0">
+          <inertial pos="0 0 -0.2" mass="2" diaginertia="0.2 0.2 0.2"/>
+          <geom name="right_upper_arm_geom" type="capsule" size="0.1 0.3" fromto="0 0 0 0 0 -0.6" material="arm_mat"/>
+          <body name="right_elbow" pos="0 0 -0.6">
+            <joint name="right_elbow_joint" type="hinge" axis="1 0 0" damping="0.1" range="-1.57 0"/>
+            <body name="right_lower_arm" pos="0 0 0">
+              <inertial pos="0 0 -0.2" mass="1" diaginertia="0.1 0.1 0.1"/>
+              <geom name="right_lower_arm_geom" type="capsule" size="0.08 0.25" fromto="0 0 0 0 0 -0.5" material="arm_mat"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <!-- 5. 左腿：髋关节(球关节) → 大腿 → 膝关节(铰链关节) → 小腿 -->
+      <body name="left_hip" pos="0 -0.2 -0.4">
+        <joint name="left_hip_joint" type="ball" damping="0.1"/>
+        <body name="left_thigh" pos="0 0 0">
+          <inertial pos="0 0 -0.3" mass="4" diaginertia="0.3 0.3 0.3"/>
+          <geom name="left_thigh_geom" type="capsule" size="0.15 0.4" fromto="0 0 0 0 0 -0.8" material="leg_mat"/>
+          <body name="left_knee" pos="0 0 -0.8">
+            <joint name="left_knee_joint" type="hinge" axis="1 0 0" damping="0.1" range="0 1.57"/>
+            <body name="left_calf" pos="0 0 0">
+              <inertial pos="0 0 -0.25" mass="3" diaginertia="0.25 0.25 0.25"/>
+              <geom name="left_calf_geom" type="capsule" size="0.12 0.35" fromto="0 0 0 0 0 -0.7" material="leg_mat"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <!-- 6. 右腿：结构与左腿对称 -->
+      <body name="right_hip" pos="0 0.2 -0.4">
+        <joint name="right_hip_joint" type="ball" damping="0.1"/>
+        <body name="right_thigh" pos="0 0 0">
+          <inertial pos="0 0 -0.3" mass="4" diaginertia="0.3 0.3 0.3"/>
+          <geom name="right_thigh_geom" type="capsule" size="0.15 0.4" fromto="0 0 0 0 0 -0.8" material="leg_mat"/>
+          <body name="right_knee" pos="0 0 -0.8">
+            <joint name="right_knee_joint" type="hinge" axis="1 0 0" damping="0.1" range="0 1.57"/>
+            <body name="right_calf" pos="0 0 0">
+              <inertial pos="0 0 -0.25" mass="3" diaginertia="0.25 0.25 0.25"/>
+              <geom name="right_calf_geom" type="capsule" size="0.12 0.35" fromto="0 0 0 0 0 -0.7" material="leg_mat"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- 控制器：为关节添加电机(可选，用于控制运动) -->
+  <actuator>
+    <!-- 手臂关节电机 -->
+    <motor name="left_shoulder_motor" joint="left_shoulder_joint" ctrlrange="-1 1" gear="100"/>
+    <motor name="left_elbow_motor" joint="left_elbow_joint" ctrlrange="-1 1" gear="100"/>
+    <motor name="right_shoulder_motor" joint="right_shoulder_joint" ctrlrange="-1 1" gear="100"/>
+    <motor name="right_elbow_motor" joint="right_elbow_joint" ctrlrange="-1 1" gear="100"/>
+    <!-- 腿部关节电机 -->
+    <motor name="left_hip_motor" joint="left_hip_joint" ctrlrange="-1 1" gear="200"/>
+    <motor name="left_knee_motor" joint="left_knee_joint" ctrlrange="-1 1" gear="200"/>
+    <motor name="right_hip_motor" joint="right_hip_joint" ctrlrange="-1 1" gear="200"/>
+    <motor name="right_knee_motor" joint="right_knee_joint" ctrlrange="-1 1" gear="200"/>
+  </actuator>
+</mujoco>
