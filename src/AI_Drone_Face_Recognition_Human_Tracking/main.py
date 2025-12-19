@@ -1,17 +1,12 @@
 import cv2
 import argparse
 import numpy as np
-from drone_control import VirtualDrone  # 导入正确的无人机类
-from detection_module import DroneDetection  # 导入正确的检测类
-
-
-# 注：MapOverlay/FaceDatabase为自定义模块，若未实现先注释，避免运行报错
-# from map_overlay import MapOverlay
-# from face_database import FaceDatabase
+import os  # 新增：用于创建截图目录
+from drone_control import VirtualDrone
+from detection_module import DroneDetection
 
 
 def parse_args():
-    """解析命令行参数"""
     parser = argparse.ArgumentParser(description="AI无人机面部识别与人体追踪（虚拟版）")
     parser.add_argument("--conf-thres", type=float, default=0.5, help="检测置信度阈值")
     parser.add_argument("--track-thres", type=float, default=0.4, help="追踪IOU阈值")
@@ -19,95 +14,132 @@ def parse_args():
     return parser.parse_args()
 
 
+def draw_clean_text(img, text, pos, color=(0, 255, 0), font_size=0.6):
+    """过滤乱码字符，保证文本正常显示"""
+    valid_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 :.-()%")
+    clean_text = ''.join([c for c in text if c in valid_chars])
+    cv2.putText(
+        img, clean_text, pos,
+        cv2.FONT_HERSHEY_SIMPLEX, font_size,
+        color, 1, lineType=cv2.LINE_AA
+    )
+
+
+def init_screenshot_dir():
+    """初始化截图保存目录，避免保存失败"""
+    if not os.path.exists("drone_screenshots"):
+        os.makedirs("drone_screenshots")
+    return "drone_screenshots"
+
+
 def main():
     args = parse_args()
-
-    # ===================== 初始化核心模块（适配虚拟无人机） =====================
-    # 1. 初始化虚拟无人机（替换原TelloDrone）
     drone = VirtualDrone()
-    # 2. 初始化检测模块（关联无人机，替换原DetectionEngine）
     detector = DroneDetection(drone=drone)
-    # 3. 人脸数据库/地图叠加（未实现则注释，后续可补充）
-    # face_db = FaceDatabase(db_path="face_database/")
-    # map_overlay = MapOverlay(map_path=args.map_path, alpha=args.map_alpha)
+    screenshot_dir = init_screenshot_dir()  # 初始化截图目录
 
-    # ===================== 模拟初始化逻辑 =====================
-    # 加载人脸库（注释，待实现FaceDatabase后启用）
-    # face_db.load_all_faces()
-    # print(f"人脸库加载完成，共{len(face_db.get_face_names())}个人脸")
+    # 打印初始化信息（明确截图键为Z）
+    print("=" * 60)
+    print("✅ 虚拟无人机系统初始化完成")
+    print(f"初始状态 | 电量：{drone.get_battery():.1f}% | 状态：{drone.state.value} | 位置：{drone.position}")
+    print("=" * 60)
+    print("🎮 操作说明：")
+    print("  ESC → 退出程序 | T → 起飞 | L → 降落 | Z → 保存截图（保存至drone_screenshots目录）")
+    print("  W/A/S/D → 前/后/左/右 | ↑/↓ → 上升/下降 | Q/E → 左转/右转")
+    print("=" * 60)
 
-    # 虚拟无人机无需真实连接，模拟启动视频流
-    print("✅ 虚拟无人机初始化完成")
-    print(f"初始电量：{drone.get_battery()}% | 初始状态：{drone.state.value}")
+    # 创建可视化窗口
+    cv2.namedWindow("AI Drone Control System", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("AI Drone Control System", 800, 600)
 
-    # ===================== 主循环（适配虚拟无人机逻辑） =====================
+    # 检测项解释映射
+    detection_explain = {
+        "状态检测": "State Detection",
+        "电量检测": "Battery Detection",
+        "位置检测": "Position Detection",
+        "障碍物检测": "Obstacle Detection",
+        "碰撞预警": "Collision Warning"
+    }
+
     try:
-        # 创建虚拟视频窗口（模拟无人机视频流）
-        cv2.namedWindow("AI Drone Face & Human Tracking", cv2.WINDOW_NORMAL)
-
         while True:
-            # 1. 生成虚拟帧（替代真实无人机视频帧）
-            frame = np.zeros((480, 640, 3), dtype=np.uint8)
-            # 在虚拟帧上绘制无人机状态
-            cv2.putText(frame, f"Battery: {drone.get_battery():.1f}%", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, f"Position: {drone.position.round(1)}", (10, 70),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(frame, f"State: {drone.state.value}", (10, 110),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            # 创建黑色背景帧
+            frame = np.zeros((600, 800, 3), dtype=np.uint8)
 
-            # 2. 执行无人机状态检测（替代真实人脸/人体检测）
+            # 绘制无人机基础状态
+            status_y = 30
+            draw_clean_text(frame, f"Battery: {drone.get_battery():.1f}%", (10, status_y), (0, 255, 0))
+            draw_clean_text(frame, f"Position: {drone.position.round(1)}", (10, status_y + 30), (0, 255, 0))
+            draw_clean_text(frame, f"State: {drone.state.value}", (10, status_y + 60), (0, 255, 0))
+            draw_clean_text(frame, f"Yaw Angle: {drone.yaw:.0f}°", (10, status_y + 90), (0, 255, 0))
+
+            # 绘制检测结果（带解释）
+            detection_y = 150
+            draw_clean_text(frame, "=== Detection Results (检测结果解释) ===", (10, detection_y), (255, 255, 0))
+            draw_clean_text(frame, "【State:状态 | Battery:电量 | Position:位置 | Obstacle:障碍物 | Collision:碰撞】",
+                            (10, detection_y + 20), (255, 255, 255), 0.4)
+            detection_y += 40
+
             detection_results = detector.full_detection()
-            # 在帧上绘制检测预警信息
-            y_offset = 150
-            for res in detection_results:
+            for idx, res in enumerate(detection_results):
+                detection_y += 30
                 color = (0, 0, 255) if res.get("warning") or res.get("risk") else (0, 255, 0)
-                cv2.putText(frame, res["message"], (10, y_offset),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                y_offset += 30
+                core_msg = res['message'].split("|")[0].strip()
+                explain = detection_explain.get(res['type'], "Unknown")
+                display_text = f"{explain}: {core_msg}"
+                draw_clean_text(frame, display_text, (10, detection_y), color, 0.5)
 
-            # 3. 地图叠加（注释，待实现MapOverlay后启用）
-            # frame = map_overlay.overlay(frame)
+            # 绘制操作提示（明确截图键）
+            draw_clean_text(
+                frame,
+                "Operation: ESC(Exit) | T(Takeoff) | L(Land) | Z(Save) | Q/E(Rotate) | W/A/S/D(Move)",
+                (10, 550), (255, 255, 255), 0.45
+            )
 
-            # 4. 显示画面
-            cv2.imshow("AI Drone Face & Human Tracking", frame)
+            # 显示画面
+            cv2.imshow("AI Drone Control System", frame)
 
-            # ===================== 按键控制（适配虚拟无人机） =====================
+            # 键盘控制逻辑（核心：截图键为Z，S仅后退）
             key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):  # 退出
+            if key == 27:  # ESC退出
+                print("\n👋 程序退出中...")
                 break
-            elif key == ord('t'):  # 起飞
+            elif key == ord('t'):  # T起飞
                 drone.takeoff()
-            elif key == ord('l'):  # 降落
+            elif key == ord('l'):  # L降落
                 drone.land()
-            elif key == ord('s'):  # 保存画面
-                cv2.imwrite(f"drone_capture_{cv2.getTickCount()}.jpg", frame)
-                print("✅ 画面已保存")
-            # 无人机移动控制
-            elif key == ord('w'):
+            elif key == ord('z'):  # Z截图（独立键，无冲突）
+                # 生成唯一截图文件名（时间戳+状态）
+                screenshot_name = f"drone_{drone.state.value}_{cv2.getTickCount()}.jpg"
+                screenshot_path = os.path.join(screenshot_dir, screenshot_name)
+                # 保存截图
+                cv2.imwrite(screenshot_path, frame)
+                print(f"✅ 截图已保存：{screenshot_path}")
+            elif key == ord('w'):  # W前进
                 drone.move("forward")
-            elif key == ord('s'):
+            elif key == ord('s'):  # S后退（仅后退，无截图）
                 drone.move("back")
-            elif key == ord('a'):
+            elif key == ord('a'):  # A左移
                 drone.move("left")
-            elif key == ord('d'):
+            elif key == ord('d'):  # D右移
                 drone.move("right")
-            elif key == 2490368:  # 上方向键：上升
+            elif key == 2490368:  # 上方向键上升
                 drone.move("up")
-            elif key == 2621440:  # 下方向键：下降
+            elif key == 2621440:  # 下方向键下降
                 drone.move("down")
-            elif key == ord('q'):  # 左转
+            elif key == ord('q'):  # Q左转
                 drone.rotate("left")
-            elif key == ord('e'):  # 右转
+            elif key == ord('e'):  # E右转
                 drone.rotate("right")
 
     except Exception as e:
-        print(f"❌ 程序异常：{str(e)}")
+        print(f"\n❌ 程序异常：{str(e)}")
+        print("💡 请检查依赖：pip install opencv-python numpy")
     finally:
-        # ===================== 资源释放（适配虚拟无人机） =====================
-        print("\n🔄 程序退出，释放资源...")
-        if drone.state.value == "FLYING":
-            drone.land()  # 紧急降落
+        # 退出前收尾
+        if drone.state.value == "Flying":
+            drone.land()
+            print("✅ 无人机已自动降落")
         cv2.destroyAllWindows()
         print("✅ 程序正常退出")
 
