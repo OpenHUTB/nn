@@ -1,6 +1,3 @@
-简易轮式小车 MuJoCo 模型
-README.md
-markdown
 # 简易轮式小车 MuJoCo 仿真模型
 一款轻量化的**2驱动轮+1万向轮**轮式小车 MuJoCo 模型，适用于移动机器人运动控制入门学习。
 
