@@ -3,6 +3,7 @@
 """
 DeepMind Humanoid Robot Simulation
 Dynamic Obstacle Avoidance + Moving Target Tracking
+适配修改后的官方Humanoid模型
 UTF-8 encoded, GitHub compatible
 """
 
@@ -84,16 +85,41 @@ class DynamicPatrolController:
         self.closest_wall_info = {"name": "", "distance": float('inf'), "type": ""}
         self.turn_dir_label = ""
 
-        # Robot control parameters
-        self.gait_period = 2.2
-        self.swing_gain = 0.8
-        self.stance_gain = 0.75
-        self.forward_speed = 0.3
-        self.heading_kp = 90.0
-        self.balance_kp = 110.0
-        self.balance_kd = 18.0
+        # Robot control parameters (适配官方Humanoid参数)
+        self.gait_period = 2.0  # 调整步态周期适配官方模型
+        self.swing_gain = 0.7   # 降低摆动增益
+        self.stance_gain = 0.7  # 降低支撑增益
+        self.forward_speed = 0.25  # 降低前进速度
+        self.heading_kp = 80.0  # 降低航向比例增益
+        self.balance_kp = 100.0 # 降低平衡比例增益
+        self.balance_kd = 15.0  # 降低平衡微分增益
         self.torso_pitch_target = 0.0
         self.torso_roll_target = 0.0
+
+        # 适配官方模型的关节名称映射
+        self.joint_name_mapping = {
+            "abdomen_x": "abdomen_x",
+            "abdomen_y": "abdomen_y",
+            "abdomen_z": "abdomen_z",
+            "hip_x_right": "hip_x_right",
+            "hip_y_right": "hip_y_right",
+            "hip_z_right": "hip_z_right",
+            "knee_right": "knee_right",
+            "ankle_x_right": "ankle_x_right",
+            "ankle_y_right": "ankle_y_right",
+            "hip_x_left": "hip_x_left",
+            "hip_y_left": "hip_y_left",
+            "hip_z_left": "hip_z_left",
+            "knee_left": "knee_left",
+            "ankle_x_left": "ankle_x_left",
+            "ankle_y_left": "ankle_y_left",
+            "shoulder1_right": "shoulder1_right",
+            "shoulder2_right": "shoulder2_right",
+            "elbow_right": "elbow_right",
+            "shoulder1_left": "shoulder1_left",
+            "shoulder2_left": "shoulder2_left",
+            "elbow_left": "elbow_left"
+        }
 
         # Initialize component IDs
         self._init_component_ids()
@@ -102,8 +128,10 @@ class DynamicPatrolController:
 
     def _init_component_ids(self):
         """Initialize all mujoco component IDs (joints, actuators, bodies)"""
-        # Torso ID (core robot body)
+        # Torso ID (core robot body) - 适配官方模型的torso名称
         self.torso_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "torso")
+        if self.torso_id == -1:
+            self.torso_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "waist_lower")
 
         # Dynamic patrol target IDs
         for idx, point in enumerate(self.patrol_points):
@@ -360,8 +388,13 @@ class DynamicPatrolController:
                 print(
                     f"✅ Back to patrol path - tracking target: {self.patrol_points[self.current_target_idx]['label']}")
 
+    def _get_joint_id(self, joint_name):
+        """获取关节ID（适配名称映射）"""
+        mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
+        return mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, mapped_name)
+
     def _control_robot_gait(self, elapsed_time):
-        """Control robot gait and movement"""
+        """Control robot gait and movement (适配官方Humanoid模型)"""
         if self.torso_id == -1 or self.patrol_completed:
             return
 
@@ -397,14 +430,19 @@ class DynamicPatrolController:
 
         # Calculate heading error
         torso_quat = self.data.xquat[self.torso_id]
-        robot_yaw = np.arctan2(2 * (torso_quat[2] * torso_quat[3] - torso_quat[0] * torso_quat[1]),
-                               torso_quat[0] ** 2 - torso_quat[1] ** 2 - torso_quat[2] ** 2 + torso_quat[3] ** 2)
+        # 适配官方模型的四元数计算
+        robot_yaw = np.arctan2(2 * (torso_quat[0] * torso_quat[1] + torso_quat[2] * torso_quat[3]),
+                               1 - 2 * (torso_quat[1]**2 + torso_quat[2]**2))
         target_yaw = np.arctan2(target_vector[1], target_vector[0])
         yaw_error = target_yaw - robot_yaw
         yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
 
-        # Reset control commands
-        self.data.ctrl[:self.model.nu - 6] = 0.0
+        # Reset control commands (保留障碍物和巡逻点的控制)
+        robot_ctrl_size = self.model.nu - len(self.patrol_motor_ids) * 2 - len(self.wall2_motor_ids) - len(self.wall3_motor_ids) - len(self.wall4_motor_ids)
+        if robot_ctrl_size > 0:
+            self.data.ctrl[:robot_ctrl_size] = 0.0
+        else:
+            self.data.ctrl[:] = 0.0
 
         # -------------------------- Movement Control --------------------------
         cycle = elapsed_time % self.gait_period
@@ -416,123 +454,128 @@ class DynamicPatrolController:
             return_speed = 1.5 * np.cos(return_phase * np.pi)
 
             # Heading control
-            abdomen_z_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
-            hip_z_right_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_right")
-            hip_z_left_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_left")
+            abdomen_z_id = self._get_joint_id("abdomen_z")
+            hip_z_right_id = self._get_joint_id("hip_z_right")
+            hip_z_left_id = self._get_joint_id("hip_z_left")
 
-            if 0 <= abdomen_z_id < self.model.nu - 6:
-                self.data.ctrl[abdomen_z_id] = self.heading_kp * yaw_error * return_speed
-            if 0 <= hip_z_right_id < self.model.nu - 6:
-                self.data.ctrl[hip_z_right_id] = -yaw_error * return_speed * 0.8
-            if 0 <= hip_z_left_id < self.model.nu - 6:
-                self.data.ctrl[hip_z_left_id] = yaw_error * return_speed * 0.8
+            if 0 <= abdomen_z_id < self.model.nu:
+                self.data.ctrl[abdomen_z_id] = self.heading_kp * yaw_error * return_speed * 0.08
+            if 0 <= hip_z_right_id < self.model.nu:
+                self.data.ctrl[hip_z_right_id] = -yaw_error * return_speed * 0.6
+            if 0 <= hip_z_left_id < self.model.nu:
+                self.data.ctrl[hip_z_left_id] = yaw_error * return_speed * 0.6
 
-            # Stabilize stance
+            # Stabilize stance (适配官方模型的关节控制)
             for side in ["right", "left"]:
-                hip_y_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_y_{side}")
-                knee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"knee_{side}")
-                ankle_y_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_y_{side}")
+                hip_y_id = self._get_joint_id(f"hip_y_{side}")
+                knee_id = self._get_joint_id(f"knee_{side}")
+                ankle_y_id = self._get_joint_id(f"ankle_y_{side}")
 
-                if 0 <= hip_y_id < self.model.nu - 6:
-                    self.data.ctrl[hip_y_id] = -0.8
-                if 0 <= knee_id < self.model.nu - 6:
-                    self.data.ctrl[knee_id] = 1.1
-                if 0 <= ankle_y_id < self.model.nu - 6:
-                    self.data.ctrl[ankle_y_id] = 0.4
+                if 0 <= hip_y_id < self.model.nu:
+                    self.data.ctrl[hip_y_id] = -0.6  # 降低力度适配官方模型
+                if 0 <= knee_id < self.model.nu:
+                    self.data.ctrl[knee_id] = 0.9   # 降低力度适配官方模型
+                if 0 <= ankle_y_id < self.model.nu:
+                    self.data.ctrl[ankle_y_id] = 0.3 # 降低力度适配官方模型
 
         elif self.avoid_obstacle:
             # Obstacle avoidance mode
             avoid_phase = (elapsed_time - self.obstacle_avoidance_start) / self.obstacle_avoidance_duration
-            turn_speed = 1.6 * np.sin(avoid_phase * np.pi)
+            turn_speed = 1.4 * np.sin(avoid_phase * np.pi)  # 降低转向速度
 
             # Turn control
-            hip_z_right_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_right")
-            hip_z_left_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_left")
-            abdomen_z_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
+            hip_z_right_id = self._get_joint_id("hip_z_right")
+            hip_z_left_id = self._get_joint_id("hip_z_left")
+            abdomen_z_id = self._get_joint_id("abdomen_z")
 
-            if 0 <= hip_z_right_id < self.model.nu - 6:
-                self.data.ctrl[hip_z_right_id] = self.turn_direction * turn_speed * 1.2
-            if 0 <= hip_z_left_id < self.model.nu - 6:
-                self.data.ctrl[hip_z_left_id] = -self.turn_direction * turn_speed * 1.2
-            if 0 <= abdomen_z_id < self.model.nu - 6:
-                self.data.ctrl[abdomen_z_id] = self.turn_direction * turn_speed * 2.0
+            if 0 <= hip_z_right_id < self.model.nu:
+                self.data.ctrl[hip_z_right_id] = self.turn_direction * turn_speed * 1.0  # 降低力度
+            if 0 <= hip_z_left_id < self.model.nu:
+                self.data.ctrl[hip_z_left_id] = -self.turn_direction * turn_speed * 1.0 # 降低力度
+            if 0 <= abdomen_z_id < self.model.nu:
+                self.data.ctrl[abdomen_z_id] = self.turn_direction * turn_speed * 1.5   # 降低力度
 
-            # Enhanced balance
+            # Enhanced balance (适配官方模型)
             for side in ["right", "left"]:
-                hip_y_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_y_{side}")
-                knee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"knee_{side}")
-                ankle_x_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_x_{side}")
+                hip_y_id = self._get_joint_id(f"hip_y_{side}")
+                knee_id = self._get_joint_id(f"knee_{side}")
+                ankle_x_id = self._get_joint_id(f"ankle_x_{side}")
 
-                if 0 <= hip_y_id < self.model.nu - 6:
-                    self.data.ctrl[hip_y_id] = -1.1
-                if 0 <= knee_id < self.model.nu - 6:
-                    self.data.ctrl[knee_id] = 1.3
-                if 0 <= ankle_x_id < self.model.nu - 6:
-                    self.data.ctrl[ankle_x_id] = 0.3
+                if 0 <= hip_y_id < self.model.nu:
+                    self.data.ctrl[hip_y_id] = -0.9  # 降低力度
+                if 0 <= knee_id < self.model.nu:
+                    self.data.ctrl[knee_id] = 1.1    # 降低力度
+                if 0 <= ankle_x_id < self.model.nu:
+                    self.data.ctrl[ankle_x_id] = 0.2 # 降低力度
 
         else:
             # Normal patrol mode
             # Heading control
-            abdomen_z_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
-            if 0 <= abdomen_z_id < self.model.nu - 6:
-                self.data.ctrl[abdomen_z_id] = self.heading_kp * yaw_error * 0.12
+            abdomen_z_id = self._get_joint_id("abdomen_z")
+            if 0 <= abdomen_z_id < self.model.nu:
+                self.data.ctrl[abdomen_z_id] = self.heading_kp * yaw_error * 0.1  # 降低增益
 
-            # Leg gait control
+            # Leg gait control (适配官方模型的步态参数)
             for side, sign in [("right", 1), ("left", -1)]:
                 swing_phase = (phase + 0.5 * sign) % 1.0
 
                 # Joint IDs
-                hip_x_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_x_{side}")
-                hip_z_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_z_{side}")
-                hip_y_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_y_{side}")
-                knee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"knee_{side}")
-                ankle_y_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_y_{side}")
-                ankle_x_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_x_{side}")
+                hip_x_id = self._get_joint_id(f"hip_x_{side}")
+                hip_z_id = self._get_joint_id(f"hip_z_{side}")
+                hip_y_id = self._get_joint_id(f"hip_y_{side}")
+                knee_id = self._get_joint_id(f"knee_{side}")
+                ankle_y_id = self._get_joint_id(f"ankle_y_{side}")
+                ankle_x_id = self._get_joint_id(f"ankle_x_{side}")
 
-                # Gait commands
-                if 0 <= hip_x_id < self.model.nu - 6:
-                    self.data.ctrl[hip_x_id] = self.swing_gain * np.sin(2 * np.pi * swing_phase) * self.forward_speed
-                if 0 <= hip_z_id < self.model.nu - 6:
+                # Gait commands (适配官方模型调整增益)
+                if 0 <= hip_x_id < self.model.nu:
+                    self.data.ctrl[hip_x_id] = self.swing_gain * np.sin(2 * np.pi * swing_phase) * self.forward_speed * 0.8
+                if 0 <= hip_z_id < self.model.nu:
                     self.data.ctrl[hip_z_id] = self.stance_gain * np.cos(
-                        2 * np.pi * swing_phase) * 0.2 + yaw_error * 0.12
-                if 0 <= hip_y_id < self.model.nu - 6:
-                    self.data.ctrl[hip_y_id] = -0.95 * np.sin(2 * np.pi * swing_phase) - 0.45
-                if 0 <= knee_id < self.model.nu - 6:
-                    self.data.ctrl[knee_id] = 1.25 * np.sin(2 * np.pi * swing_phase) + 0.75
-                if 0 <= ankle_y_id < self.model.nu - 6:
-                    self.data.ctrl[ankle_y_id] = 0.35 * np.cos(2 * np.pi * swing_phase)
-                if 0 <= ankle_x_id < self.model.nu - 6:
-                    self.data.ctrl[ankle_x_id] = 0.18 * np.sin(2 * np.pi * swing_phase)
+                        2 * np.pi * swing_phase) * 0.15 + yaw_error * 0.1
+                if 0 <= hip_y_id < self.model.nu:
+                    self.data.ctrl[hip_y_id] = -0.8 * np.sin(2 * np.pi * swing_phase) - 0.4  # 降低力度
+                if 0 <= knee_id < self.model.nu:
+                    self.data.ctrl[knee_id] = 1.1 * np.sin(2 * np.pi * swing_phase) + 0.7   # 降低力度
+                if 0 <= ankle_y_id < self.model.nu:
+                    self.data.ctrl[ankle_y_id] = 0.3 * np.cos(2 * np.pi * swing_phase)      # 降低力度
+                if 0 <= ankle_x_id < self.model.nu:
+                    self.data.ctrl[ankle_x_id] = 0.15 * np.sin(2 * np.pi * swing_phase)     # 降低力度
 
-            # Torso balance control
-            abdomen_x_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_x")
-            abdomen_y_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_y")
+            # Torso balance control (适配官方模型)
+            abdomen_x_id = self._get_joint_id("abdomen_x")
+            abdomen_y_id = self._get_joint_id("abdomen_y")
 
+            # 适配官方模型的姿态计算
             pitch = 2 * (torso_quat[1] * torso_quat[3] - torso_quat[0] * torso_quat[2])
             roll = 2 * (torso_quat[0] * torso_quat[1] + torso_quat[2] * torso_quat[3])
 
-            if 0 <= abdomen_x_id < self.model.nu - 6:
-                self.data.ctrl[abdomen_x_id] = self.balance_kp * (self.torso_roll_target - roll) - self.balance_kd * \
-                                               self.data.qvel[abdomen_x_id]
-            if 0 <= abdomen_y_id < self.model.nu - 6:
-                self.data.ctrl[abdomen_y_id] = self.balance_kp * (self.torso_pitch_target - pitch) - self.balance_kd * \
-                                               self.data.qvel[abdomen_y_id]
+            # 获取关节速度ID
+            abdomen_x_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "abdomen_x")
+            abdomen_y_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "abdomen_y")
 
-            # Arm swing for balance
+            if 0 <= abdomen_x_id < self.model.nu and abdomen_x_joint_id != -1:
+                self.data.ctrl[abdomen_x_id] = self.balance_kp * (self.torso_roll_target - roll) * 0.08 - self.balance_kd * \
+                                               self.data.qvel[abdomen_x_joint_id] * 0.1
+            if 0 <= abdomen_y_id < self.model.nu and abdomen_y_joint_id != -1:
+                self.data.ctrl[abdomen_y_id] = self.balance_kp * (self.torso_pitch_target - pitch) * 0.08 - self.balance_kd * \
+                                               self.data.qvel[abdomen_y_joint_id] * 0.1
+
+            # Arm swing for balance (适配官方模型降低力度)
             for side, sign in [("right", 1), ("left", -1)]:
-                shoulder1_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"shoulder1_{side}")
-                shoulder2_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"shoulder2_{side}")
-                elbow_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"elbow_{side}")
+                shoulder1_id = self._get_joint_id(f"shoulder1_{side}")
+                shoulder2_id = self._get_joint_id(f"shoulder2_{side}")
+                elbow_id = self._get_joint_id(f"elbow_{side}")
 
-                shoulder1_cmd = 0.22 * np.sin(2 * np.pi * (phase + 0.5 * sign))
-                shoulder2_cmd = 0.17 * np.cos(2 * np.pi * (phase + 0.5 * sign))
-                elbow_cmd = -0.42 * np.sin(2 * np.pi * (phase + 0.5 * sign)) - 0.27
+                shoulder1_cmd = 0.18 * np.sin(2 * np.pi * (phase + 0.5 * sign))  # 降低力度
+                shoulder2_cmd = 0.14 * np.cos(2 * np.pi * (phase + 0.5 * sign))  # 降低力度
+                elbow_cmd = -0.35 * np.sin(2 * np.pi * (phase + 0.5 * sign)) - 0.22  # 降低力度
 
-                if 0 <= shoulder1_id < self.model.nu - 6:
+                if 0 <= shoulder1_id < self.model.nu:
                     self.data.ctrl[shoulder1_id] = shoulder1_cmd
-                if 0 <= shoulder2_id < self.model.nu - 6:
+                if 0 <= shoulder2_id < self.model.nu:
                     self.data.ctrl[shoulder2_id] = shoulder2_cmd
-                if 0 <= elbow_id < self.model.nu - 6:
+                if 0 <= elbow_id < self.model.nu:
                     self.data.ctrl[elbow_id] = elbow_cmd
 
     def _print_status(self, elapsed_time):
@@ -571,7 +614,7 @@ class DynamicPatrolController:
 
     def run_simulation(self):
         """Main simulation loop"""
-        print("🤖 DeepMind Humanoid Simulation Started")
+        print("🤖 DeepMind Humanoid Simulation Started (适配官方模型)")
         print("📌 Features: Dynamic Obstacle Avoidance + Moving Target Tracking")
         print("🔍 Press Ctrl+C to stop simulation\n")
 
@@ -584,15 +627,16 @@ class DynamicPatrolController:
 
                     # Core control sequence
                     self._control_dynamic_obstacles(elapsed_time)  # Step 1: Move obstacles
-                    self._update_dynamic_targets(elapsed_time)  # Step 2: Update targets
-                    self._detect_obstacles(elapsed_time)  # Step 3: Detect obstacles
-                    self._control_robot_gait(elapsed_time)  # Step 4: Control robot
-                    self._print_status(elapsed_time)  # Step 5: Print status
+                    self._update_dynamic_targets(elapsed_time)     # Step 2: Update targets
+                    self._detect_obstacles(elapsed_time)           # Step 3: Detect obstacles
+                    self._control_robot_gait(elapsed_time)         # Step 4: Control robot
+                    self._print_status(elapsed_time)               # Step 5: Print status
 
                     # Step simulation
                     mujoco.mj_step(self.model, self.data)
                     viewer_instance.sync()
-                    time.sleep(self.model.opt.timestep * 2)
+                    # 适配官方模型降低仿真步长延迟
+                    time.sleep(self.model.opt.timestep * 1.5)
 
             except KeyboardInterrupt:
                 print("\n\n🛑 Simulation interrupted by user")
@@ -601,7 +645,6 @@ class DynamicPatrolController:
                 import traceback
                 traceback.print_exc()
             finally:
-
                 if self.torso_id != -1:
                     elapsed_time = time.time() - self.sim_start_time
                     torso_pos = self.data.xpos[self.torso_id]
@@ -616,11 +659,22 @@ if __name__ == "__main__":
     # Set default model path (relative path for GitHub compatibility)
     model_file = "Robot_move_straight.xml"
 
+    # Check command line argument for model path
+    if len(sys.argv) > 1:
+        model_file = sys.argv[1]
+
     # Check if model file exists
     if not os.path.exists(model_file):
         print(f"❌ Model file not found: {model_file}")
+        print(f"ℹ️  Current working directory: {os.getcwd()}")
         sys.exit(1)
 
-
-    controller = DynamicPatrolController(model_file)
-    controller.run_simulation()
+    # Initialize and run controller
+    try:
+        controller = DynamicPatrolController(model_file)
+        controller.run_simulation()
+    except Exception as e:
+        print(f"\n❌ Failed to start simulation: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
