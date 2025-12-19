@@ -1,11 +1,12 @@
 """
-车辆跟踪和视角控制模块 - 平滑跟随车辆，获取车辆状态
+车辆跟踪和视角控制模块 - 从后方跟随车辆（独立更新版本）
 """
 
 import carla
 import math
 import time
 import numpy as np
+import threading
 import config as cfg
 
 class VehicleTracker:
@@ -37,73 +38,108 @@ class VehicleTracker:
         self.velocity_history = []
         self.max_velocity_history = 10
         
-        # 视角参数
-        self.target_height = cfg.TOP_DOWN_HEIGHT
-        self.pitch_angle = cfg.TOP_DOWN_PITCH
+        # 后方跟随参数
+        self.follow_distance = 8.0  # 跟随距离（米）
+        self.follow_height = 3.0    # 跟随高度（米）
+        self.follow_pitch = -20.0   # 俯视角（度）
         
-        print(f"📐 车辆跟踪器初始化完成，平滑系数: {self.smooth_factor}")
-    
-    def set_top_down_view(self, vehicle, height=None):
-        """设置俯视视角"""
-        if vehicle is None:
-            return False
+        # 车辆引用
+        self.current_vehicle = None
         
-        try:
-            if height is not None:
-                self.target_height = height
-            
-            transform = vehicle.get_transform()
-            location = transform.location
-            
-            # 设置相机在车辆正上方
-            camera_location = carla.Location(
-                x=location.x,
-                y=location.y,
-                z=location.z + self.target_height
-            )
-            
-            # 设置俯视角度
-            camera_rotation = carla.Rotation(
-                pitch=self.pitch_angle,
-                yaw=transform.rotation.yaw,
-                roll=0.0
-            )
-            
-            camera_transform = carla.Transform(camera_location, camera_rotation)
-            self.spectator.set_transform(camera_transform)
-            self.last_camera_transform = camera_transform
-            self.last_vehicle_transform = transform
-            
-            print(f"📐 设置俯视视角，高度: {self.target_height}m")
-            return True
-            
-        except Exception as e:
-            print(f"❌ 设置俯视视角失败: {e}")
-            return False
+        # 线程控制
+        self.view_update_enabled = cfg.VIEW_UPDATE_ENABLED
+        self.view_update_fps = cfg.VIEW_UPDATE_FPS
+        self.view_update_thread = None
+        self.is_running = False
+        self.last_frame_time = 0
+
+        print(f"📐 车辆跟踪器初始化完成，后方跟随模式")
+        print(f"   跟随距离: {self.follow_distance}m")
+        print(f"   跟随高度: {self.follow_height}m")
+        print(f"   俯视角: {self.follow_pitch}°")
+        print(f"   视角更新FPS: {self.view_update_fps}")
     
-    def smooth_follow_vehicle(self, vehicle, height=None):
-        """平滑跟随车辆（每帧调用）- 改进版本"""
-        if vehicle is None:
-            return False
+    def start_view_update_thread(self, vehicle):
+        """启动独立视角更新线程"""
+        if not self.view_update_enabled:
+            return
+        
+        self.current_vehicle = vehicle
+        
+        if self.view_update_thread and self.is_running:
+            self.stop_view_update_thread()
+        
+        self.is_running = True
+        self.view_update_thread = threading.Thread(
+            target=self._view_update_loop,
+            daemon=True
+        )
+        self.view_update_thread.start()
+        print(f"🔧 启动独立视角更新线程，频率: {self.view_update_fps}Hz")
+    
+    def stop_view_update_thread(self):
+        """停止视角更新线程"""
+        if self.view_update_thread:
+            self.is_running = False
+            self.view_update_thread.join(timeout=1.0)
+            self.view_update_thread = None
+            print("🛑 停止视角更新线程")
+    
+    def _view_update_loop(self):
+        """独立视角更新循环"""
+        target_interval = 1.0 / self.view_update_fps
+        
+        while self.is_running and self.current_vehicle:
+            try:
+                start_time = time.time()
+                
+                # 检查是否有足够的车辆信息
+                if not self.current_vehicle:
+                    time.sleep(target_interval)
+                    continue
+                
+                # 更新视角
+                self._update_camera_view()
+                
+                # 计算实际耗时并补偿
+                elapsed = time.time() - start_time
+                sleep_time = max(0, target_interval - elapsed)
+                
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+                else:
+                    # 如果处理时间超过目标间隔，跳过等待
+                    if cfg.DEBUG_MODE and self.frame_count % 100 == 0:
+                        print(f"[视角] 帧率下降: {elapsed:.3f}s > {target_interval:.3f}s")
+                        
+            except Exception as e:
+                if cfg.DEBUG_MODE:
+                    print(f"⚠️ 视角更新线程异常: {e}")
+                time.sleep(target_interval)
+    
+    def _update_camera_view(self):
+        """更新相机视角（线程安全）"""
+        if not self.current_vehicle:
+            return
         
         try:
             current_time = time.time()
             time_delta = current_time - self.last_update_time
             
-            # 限制最小时间间隔，避免计算过于频繁
+            # 限制最小时间间隔
             if time_delta < 0.001:
-                return True
+                return
             
             self.last_update_time = current_time
             self.frame_count += 1
             
             # 获取车辆当前状态
-            vehicle_transform = vehicle.get_transform()
+            vehicle_transform = self.current_vehicle.get_transform()
             vehicle_location = vehicle_transform.location
             vehicle_rotation = vehicle_transform.rotation
             
             # 获取车辆速度用于预测
-            vehicle_velocity = vehicle.get_velocity()
+            vehicle_velocity = self.current_vehicle.get_velocity()
             speed = math.sqrt(vehicle_velocity.x**2 + vehicle_velocity.y**2 + vehicle_velocity.z**2)
             
             # 更新速度历史
@@ -111,19 +147,22 @@ class VehicleTracker:
             if len(self.velocity_history) > self.max_velocity_history:
                 self.velocity_history.pop(0)
             
-            if height is not None:
-                self.target_height = height
+            # 计算车辆的后方偏移方向
+            yaw_rad = math.radians(vehicle_rotation.yaw)
             
-            # 计算目标相机位置（车辆正上方）
+            # 计算目标相机位置（车辆后方）
+            offset_x = -self.follow_distance * math.cos(yaw_rad)
+            offset_y = -self.follow_distance * math.sin(yaw_rad)
+            
             target_location = carla.Location(
-                x=vehicle_location.x,
-                y=vehicle_location.y,
-                z=vehicle_location.z + self.target_height
+                x=vehicle_location.x + offset_x,
+                y=vehicle_location.y + offset_y,
+                z=vehicle_location.z + self.follow_height
             )
             
-            # 目标相机旋转（保持俯视，yaw跟随车辆）
+            # 目标相机旋转（朝向车辆）
             target_rotation = carla.Rotation(
-                pitch=self.pitch_angle,
+                pitch=self.follow_pitch,
                 yaw=vehicle_rotation.yaw,
                 roll=0.0
             )
@@ -136,7 +175,7 @@ class VehicleTracker:
             # 预测目标位置（如果启用）
             if self.prediction_enabled and len(self.velocity_history) > 1:
                 avg_speed = np.mean(self.velocity_history[-3:]) if len(self.velocity_history) >= 3 else speed
-                target_location = self._predict_target_position(
+                target_location = self._predict_follow_position(
                     target_location, vehicle_rotation, avg_speed, time_delta
                 )
             
@@ -174,19 +213,85 @@ class VehicleTracker:
             self.last_camera_transform = smooth_transform
             self.last_vehicle_transform = vehicle_transform
             
-            # 每100帧输出一次调试信息
-            if cfg.DEBUG_MODE and self.frame_count % 100 == 0:
+            # 调试信息
+            if cfg.DEBUG_MODE and self.frame_count % 200 == 0:
                 print(f"[视角] 帧: {self.frame_count}, "
                       f"平滑系数: {effective_smooth_factor:.3f}, "
-                      f"速度: {speed:.2f}m/s, "
-                      f"时差: {time_delta:.3f}s")
-            
-            return True
+                      f"速度: {speed:.2f}m/s")
             
         except Exception as e:
             if cfg.DEBUG_MODE:
                 print(f"⚠️ 视角更新失败: {e}")
+    
+    def set_follow_view(self, vehicle):
+        """设置后方跟随视角"""
+        if vehicle is None:
             return False
+        
+        try:
+            transform = vehicle.get_transform()
+            location = transform.location
+            rotation = transform.rotation
+            
+            # 计算车辆的后方偏移方向
+            yaw_rad = math.radians(rotation.yaw)
+            
+            # 计算相机位置（车辆后方）
+            offset_x = -self.follow_distance * math.cos(yaw_rad)
+            offset_y = -self.follow_distance * math.sin(yaw_rad)
+            
+            camera_location = carla.Location(
+                x=location.x + offset_x,
+                y=location.y + offset_y,
+                z=location.z + self.follow_height
+            )
+            
+            # 相机朝向车辆
+            camera_rotation = carla.Rotation(
+                pitch=self.follow_pitch,
+                yaw=rotation.yaw,
+                roll=0.0
+            )
+            
+            camera_transform = carla.Transform(camera_location, camera_rotation)
+            self.spectator.set_transform(camera_transform)
+            self.last_camera_transform = camera_transform
+            self.last_vehicle_transform = transform
+            
+            # 设置当前车辆并启动更新线程
+            self.current_vehicle = vehicle
+            if cfg.VIEW_UPDATE_THREADED:
+                self.start_view_update_thread(vehicle)
+            
+            print(f"📐 设置后方跟随视角")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 设置后方跟随视角失败: {e}")
+            return False
+    
+    def _predict_follow_position(self, target_loc, vehicle_rot, speed, time_delta):
+        """预测后方跟随位置"""
+        if speed < 0.1:  # 速度太慢不预测
+            return target_loc
+        
+        # 预测未来0.3秒的位置
+        prediction_time = 0.3
+        angle_rad = math.radians(vehicle_rot.yaw)
+        
+        # 车辆前进方向
+        vehicle_dx = speed * math.cos(angle_rad) * prediction_time
+        vehicle_dy = speed * math.sin(angle_rad) * prediction_time
+        
+        # 相机跟随车辆移动
+        predicted_x = target_loc.x + vehicle_dx
+        predicted_y = target_loc.y + vehicle_dy
+        
+        return carla.Location(
+            x=predicted_x,
+            y=predicted_y,
+            z=target_loc.z
+        )
     
     def _calculate_adaptive_smooth_factor(self, vehicle_loc, target_loc, speed, time_delta):
         """计算自适应平滑系数"""
@@ -225,24 +330,6 @@ class VehicleTracker:
             return max(self.min_smooth_factor, min(self.max_smooth_factor, factor))
         
         return base_factor
-    
-    def _predict_target_position(self, target_loc, vehicle_rot, speed, time_delta):
-        """预测目标位置"""
-        if speed < 0.1:  # 速度太慢不预测
-            return target_loc
-        
-        # 预测未来0.2秒的位置
-        prediction_time = 0.2
-        angle_rad = math.radians(vehicle_rot.yaw)
-        
-        predicted_x = target_loc.x + speed * math.cos(angle_rad) * prediction_time
-        predicted_y = target_loc.y + speed * math.sin(angle_rad) * prediction_time
-        
-        return carla.Location(
-            x=predicted_x,
-            y=predicted_y,
-            z=target_loc.z
-        )
     
     def _multi_step_interpolation(self, current_transform, target_loc, target_rot, smooth_factor):
         """多步插值，实现更平滑的移动"""
@@ -385,6 +472,17 @@ class VehicleTracker:
         
         return f"进度: {progress:.1f}% | 距起点: {dist_to_start:.1f}m | 距终点: {dist_to_end:.1f}m"
     
+    def update_follow_params(self, distance=None, height=None, pitch=None):
+        """更新后方跟随参数"""
+        if distance is not None and distance > 0:
+            self.follow_distance = distance
+        if height is not None:
+            self.follow_height = height
+        if pitch is not None:
+            self.follow_pitch = pitch
+        
+        print(f"🔄 后方跟随参数更新 - 距离: {self.follow_distance}m, 高度: {self.follow_height}m, 俯角: {self.follow_pitch}°")
+    
     def update_smooth_factor(self, factor):
         """更新平滑系数"""
         if 0 < factor <= 1:
@@ -392,6 +490,11 @@ class VehicleTracker:
             print(f"🔄 平滑系数更新为: {factor}")
         else:
             print(f"❌ 无效的平滑系数: {factor}，保持为: {self.smooth_factor}")
+    
+    def cleanup(self):
+        """清理资源"""
+        self.stop_view_update_thread()
+        self.current_vehicle = None
     
     def reset(self):
         """重置跟踪器状态"""
