@@ -1,11 +1,8 @@
-@"
 """
 数据加载器模块
 负责自动驾驶感知任务的数据集加载、数据预处理分发等功能
 支持图像类数据集（如KITTI、COCO自动驾驶子集）的加载
 """
-
-import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -74,4 +71,3 @@ def build_dataloader(dataset: Dataset, batch_size: int, shuffle: bool = True, nu
 if __name__ == "__main__":
     # 测试代码框架（后续可完善）
     pass
-"@ | Out-File -FilePath data_loader.py -Encoding utf8
