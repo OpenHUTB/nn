@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <!-- 功能包名称：必须和lane_path_detection一致 -->
+  <name>lane_path_detection</name>
+  <version>0.0.0</version>
+  <description>ROS2 package for lane path detection</description>
+  <!-- 自定义信息：可改自己的名字/邮箱，也可保留默认 -->
+  <maintainer email="rosli@example.com">rosli</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- ROS2 Python核心依赖（必须） -->
+  <buildtool_depend>ament_python</buildtool_depend>
+  <build_depend>rclpy</build_depend>
+  <exec_depend>rclpy</exec_depend>
+
+  <!-- 车道检测常用依赖（建议保留，适配图像/可视化） -->
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+
+  <!-- 测试依赖（保留默认即可） -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
