@@ -5,6 +5,7 @@
 import carla
 import math
 import time
+import config as cfg
 
 class RouteVisualizer:
     """路线可视化器"""
@@ -13,15 +14,32 @@ class RouteVisualizer:
         self.world = world
         self.vehicle_history = []  # 存储车辆历史位置
         
-        # 颜色定义
-        self.route_color = carla.Color(255, 0, 0)      # 红色 - 规划路线
-        self.path_color = carla.Color(0, 100, 255)     # 蓝色 - 历史路径
-        self.vehicle_color = carla.Color(0, 255, 0)    # 绿色 - 车辆
+        # 使用配置文件中的颜色定义
+        self.route_color = carla.Color(
+            int(cfg.PLANNED_ROUTE_COLOR[0] * cfg.PLANNED_ROUTE_BRIGHTNESS),
+            int(cfg.PLANNED_ROUTE_COLOR[1] * cfg.PLANNED_ROUTE_BRIGHTNESS),
+            int(cfg.PLANNED_ROUTE_COLOR[2] * cfg.PLANNED_ROUTE_BRIGHTNESS)
+        )
+        self.path_color = carla.Color(
+            int(cfg.HISTORY_PATH_COLOR[0] * cfg.HISTORY_PATH_BRIGHTNESS),
+            int(cfg.HISTORY_PATH_COLOR[1] * cfg.HISTORY_PATH_BRIGHTNESS),
+            int(cfg.HISTORY_PATH_COLOR[2] * cfg.HISTORY_PATH_BRIGHTNESS)
+        )
+        self.vehicle_color = carla.Color(
+            int(cfg.VEHICLE_MARKER_COLOR[0] * cfg.VEHICLE_MARKER_BRIGHTNESS),
+            int(cfg.VEHICLE_MARKER_COLOR[1] * cfg.VEHICLE_MARKER_BRIGHTNESS),
+            int(cfg.VEHICLE_MARKER_COLOR[2] * cfg.VEHICLE_MARKER_BRIGHTNESS)
+        )
+        self.arrow_color = carla.Color(
+            int(cfg.ARROW_COLOR[0] * cfg.ARROW_BRIGHTNESS),
+            int(cfg.ARROW_COLOR[1] * cfg.ARROW_BRIGHTNESS),
+            int(cfg.ARROW_COLOR[2] * cfg.ARROW_BRIGHTNESS)
+        )
         
         # 显示高度
-        self.route_height = 0.3    # 路线显示高度
-        self.path_height = 0.2     # 路径显示高度
-        self.vehicle_height = 0.25 # 车辆显示高度
+        self.route_height = cfg.ROUTE_HEIGHT
+        self.path_height = cfg.PATH_HEIGHT
+        self.vehicle_height = cfg.VEHICLE_HEIGHT
         
         # 存储绘制对象
         self.route_lines = []
@@ -30,6 +48,9 @@ class RouteVisualizer:
         
     def draw_planned_route(self, route_points):
         """绘制规划路线（常亮显示）"""
+        if not cfg.SHOW_PLANNED_ROUTE:
+            return False
+            
         # 清除之前的路线
         self.clear_route()
         
@@ -46,7 +67,7 @@ class RouteVisualizer:
             # 绘制线段，使用长生命时间保证常亮
             line = self.world.debug.draw_line(
                 start, end,
-                thickness=0.15,
+                thickness=cfg.PLANNED_ROUTE_THICKNESS,
                 color=self.route_color,
                 life_time=1000.0,
                 persistent_lines=True
@@ -110,15 +131,17 @@ class RouteVisualizer:
         # 保存历史位置
         self.vehicle_history.append((x, y, heading, time.time()))
         
-        # 保持最近500个历史点
-        if len(self.vehicle_history) > 500:
-            self.vehicle_history = self.vehicle_history[-500:]
+        # 保持历史点数量
+        if len(self.vehicle_history) > cfg.HISTORY_PATH_MAX_POINTS:
+            self.vehicle_history = self.vehicle_history[-cfg.HISTORY_PATH_MAX_POINTS:]
         
         # 绘制车辆当前位置和朝向
-        self._draw_vehicle_current(x, y, heading)
+        if cfg.SHOW_VEHICLE_MARKER:
+            self._draw_vehicle_current(x, y, heading)
         
         # 绘制历史路径
-        self._draw_vehicle_history()
+        if cfg.SHOW_HISTORY_PATH:
+            self._draw_vehicle_history()
         
         # 更新信息显示
         self._update_info_display(x, y, heading)
@@ -130,27 +153,28 @@ class RouteVisualizer:
         
         self.world.debug.draw_point(
             vehicle_loc,
-            size=0.4,
+            size=cfg.VEHICLE_MARKER_SIZE,
             color=self.vehicle_color,
             life_time=0.5,  # 稍微延长显示时间
             persistent_lines=False
         )
         
         # 车辆朝向箭头
-        arrow_length = 2.5
-        angle_rad = math.radians(heading)
-        end_x = x + arrow_length * math.cos(angle_rad)
-        end_y = y + arrow_length * math.sin(angle_rad)
-        
-        self.world.debug.draw_arrow(
-            vehicle_loc,
-            self._create_location((end_x, end_y, 0), self.vehicle_height),
-            thickness=0.2,
-            arrow_size=0.6,
-            color=self.vehicle_color,
-            life_time=0.5,
-            persistent_lines=False
-        )
+        if cfg.SHOW_ARROW:
+            arrow_length = cfg.ARROW_LENGTH
+            angle_rad = math.radians(heading)
+            end_x = x + arrow_length * math.cos(angle_rad)
+            end_y = y + arrow_length * math.sin(angle_rad)
+            
+            self.world.debug.draw_arrow(
+                vehicle_loc,
+                self._create_location((end_x, end_y, 0), self.vehicle_height),
+                thickness=cfg.ARROW_THICKNESS,
+                arrow_size=0.6,
+                color=self.arrow_color,
+                life_time=0.5,
+                persistent_lines=False
+            )
         
         # 车辆轮廓（三角形）
         self._draw_vehicle_outline(x, y, heading)
@@ -194,8 +218,11 @@ class RouteVisualizer:
         if len(self.vehicle_history) < 2:
             return
         
-        # 绘制最近100个点的路径
-        start_idx = max(0, len(self.vehicle_history) - 100)
+        # 确定要绘制的点范围
+        if cfg.HISTORY_PATH_MAX_POINTS > 0:
+            start_idx = max(0, len(self.vehicle_history) - cfg.HISTORY_PATH_MAX_POINTS)
+        else:
+            start_idx = 0
         
         for i in range(start_idx, len(self.vehicle_history) - 1):
             x1, y1, _, t1 = self.vehicle_history[i]
@@ -205,21 +232,29 @@ class RouteVisualizer:
             end = self._create_location((x2, y2, 0), self.path_height)
             
             # 根据时间远近调整透明度
-            time_diff = t2 - t1
-            if time_diff > 0:
-                alpha = min(1.0, 1.0 / (1.0 + (len(self.vehicle_history) - i) * 0.1))
+            if cfg.HISTORY_PATH_FADE_OUT:
+                time_diff = t2 - t1
+                if time_diff > 0:
+                    # 计算衰减因子：越新的点越亮
+                    age = len(self.vehicle_history) - i - 1
+                    alpha = max(0.1, 1.0 / (1.0 + age * 0.05))
+                else:
+                    alpha = 0.5
             else:
-                alpha = 0.5
+                alpha = 1.0
                 
+            # 应用亮度配置
+            brightness_factor = cfg.HISTORY_PATH_BRIGHTNESS * alpha
+            
             color = carla.Color(
-                int(self.path_color.r * alpha),
-                int(self.path_color.g * alpha),
-                int(self.path_color.b * alpha)
+                int(self.path_color.r * brightness_factor),
+                int(self.path_color.g * brightness_factor),
+                int(self.path_color.b * brightness_factor)
             )
             
             self.world.debug.draw_line(
                 start, end,
-                thickness=0.1,
+                thickness=cfg.HISTORY_PATH_THICKNESS,
                 color=color,
                 life_time=0.5,
                 persistent_lines=False
@@ -253,12 +288,22 @@ class RouteVisualizer:
         )
         
         # 显示历史点数
-        history_text = f"History Points: {len(self.vehicle_history)}"
+        history_text = f"History Points: {len(self.vehicle_history)}/{cfg.HISTORY_PATH_MAX_POINTS}"
         self.world.debug.draw_string(
             carla.Location(-30, 1, info_height),
             history_text,
             draw_shadow=True,
             color=carla.Color(255, 200, 200),
+            life_time=0.3
+        )
+        
+        # 显示可视化状态
+        viz_status = f"Viz: Arrow={cfg.SHOW_ARROW}, History={cfg.SHOW_HISTORY_PATH}, Route={cfg.SHOW_PLANNED_ROUTE}"
+        self.world.debug.draw_string(
+            carla.Location(-30, 0, info_height),
+            viz_status,
+            draw_shadow=True,
+            color=carla.Color(200, 255, 200),
             life_time=0.3
         )
     
