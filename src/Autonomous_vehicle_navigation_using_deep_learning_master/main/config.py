@@ -58,14 +58,38 @@ TRAFFIC_SYNC_MODE = False             # 交通同步模式
 TRAFFIC_RESPAWN = False               # 是否重生休眠车辆
 
 # ==================== 可视化配置 ====================
-ROUTE_COLOR = (255, 0, 0)            # 路线颜色 (红色)
-PATH_COLOR = (0, 100, 255)           # 路径颜色 (蓝色)
-VEHICLE_COLOR = (0, 0, 0)          # 车辆颜色 (绿色)
+SHOW_ARROW = True                    # 是否显示车辆方向箭头
+SHOW_HISTORY_PATH = True             # 是否显示历史行驶路线
+SHOW_PLANNED_ROUTE = True            # 是否显示规划路线
+SHOW_VEHICLE_MARKER = False           # 是否显示车辆标记
 
+# 箭头设置
+ARROW_LENGTH = 5.0                   # 箭头长度（米）
+ARROW_THICKNESS = 0.2                # 箭头粗细
+ARROW_COLOR = (0, 255, 0)           # 箭头颜色（绿色）
+ARROW_BRIGHTNESS = 1.0              # 箭头亮度 (0.0-1.0)
+
+# 历史路线设置
+HISTORY_PATH_COLOR = (0, 100, 255)  # 历史路线颜色（蓝色）
+HISTORY_PATH_THICKNESS = 0.1         # 历史路线粗细
+HISTORY_PATH_MAX_POINTS = 500        # 历史路线最大点数
+HISTORY_PATH_FADE_OUT = True         # 是否渐隐效果
+HISTORY_PATH_BRIGHTNESS = 0.8        # 历史路线亮度 (0.0-1.0)
+
+# 规划路线设置
+PLANNED_ROUTE_COLOR = (255, 0, 0)   # 规划路线颜色（红色）
+PLANNED_ROUTE_THICKNESS = 0.15       # 规划路线粗细
+PLANNED_ROUTE_BRIGHTNESS = 1.0       # 规划路线亮度 (0.0-1.0)
+
+# 车辆标记设置
+VEHICLE_MARKER_COLOR = (0, 255, 0)  # 车辆标记颜色（绿色）
+VEHICLE_MARKER_SIZE = 0.4            # 车辆标记大小
+VEHICLE_MARKER_BRIGHTNESS = 1.0      # 车辆标记亮度 (0.0-1.0)
+
+# 显示高度（保持不变）
 ROUTE_HEIGHT = 0.3                   # 路线显示高度
 PATH_HEIGHT = 0.2                    # 路径显示高度
 VEHICLE_HEIGHT = 0.25                # 车辆显示高度
-
 # ==================== 视角配置 ====================
 TOP_DOWN_HEIGHT = 5.0                # 俯视视角高度（提高）
 TOP_DOWN_PITCH = -30.0               # 俯视角 (几乎垂直向下，-90是完全垂直)

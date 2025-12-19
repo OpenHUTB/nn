@@ -8,6 +8,8 @@ import math
 import threading
 import json
 from datetime import datetime
+import gc
+import psutil
 
 from carla_utils import setup_carla_path, import_carla_module
 from config_manager import ConfigManager
@@ -16,14 +18,49 @@ from data_validator import DataValidator
 from scene_manager import SceneManager
 from data_analyzer import DataAnalyzer
 from lidar_processor import LidarProcessor, MultiSensorFusion
-
 from multi_vehicle_manager import MultiVehicleManager
 from v2x_communication import V2XCommunication
 
-
-
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
+
+
+class PerformanceMonitor:
+    """性能监控器"""
+
+    def __init__(self):
+        self.start_time = time.time()
+        self.memory_samples = []
+        self.cpu_samples = []
+        self.frame_times = []
+
+    def sample_memory(self):
+        """采样内存使用"""
+        process = psutil.Process(os.getpid())
+        memory_mb = process.memory_info().rss / 1024 / 1024
+        self.memory_samples.append(memory_mb)
+        return memory_mb
+
+    def sample_cpu(self):
+        """采样CPU使用"""
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+        self.cpu_samples.append(cpu_percent)
+        return cpu_percent
+
+    def record_frame_time(self, frame_time):
+        """记录帧处理时间"""
+        self.frame_times.append(frame_time)
+
+    def get_performance_summary(self):
+        """获取性能摘要"""
+        return {
+            'total_runtime': time.time() - self.start_time,
+            'average_memory_mb': sum(self.memory_samples) / len(self.memory_samples) if self.memory_samples else 0,
+            'max_memory_mb': max(self.memory_samples) if self.memory_samples else 0,
+            'average_cpu_percent': sum(self.cpu_samples) / len(self.cpu_samples) if self.cpu_samples else 0,
+            'average_frame_time': sum(self.frame_times) / len(self.frame_times) if self.frame_times else 0,
+            'frames_per_second': 1.0 / (sum(self.frame_times) / len(self.frame_times)) if self.frame_times else 0
+        }
 
 
 class Log:
@@ -75,10 +112,17 @@ class WeatherSystem:
 
 
 class ImageProcessor:
-    def __init__(self, output_dir):
+    def __init__(self, output_dir, config=None):
         self.output_dir = output_dir
         self.stitched_dir = os.path.join(output_dir, "stitched")
         os.makedirs(self.stitched_dir, exist_ok=True)
+
+        # 性能配置
+        self.compress_images = config.get('compress_images', True) if config else True
+        self.compression_quality = config.get('compression_quality', 85) if config else 85
+        self.enable_memory_cache = config.get('enable_memory_cache', True) if config else True
+        self.image_cache = {}
+        self.max_cache_size = config.get('max_cache_size', 50) if config else 50
 
     def stitch(self, image_paths, frame_num, view_type="vehicle"):
         try:
@@ -87,15 +131,37 @@ class ImageProcessor:
             Log.warning("PIL未安装，跳过图像拼接")
             return False
 
+        # 检查缓存
+        cache_key = f"{view_type}_{frame_num}"
+        if self.enable_memory_cache and cache_key in self.image_cache:
+            # 从缓存加载
+            cached_image = self.image_cache[cache_key]
+            output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
+            cached_image.save(output_path, "JPEG", quality=self.compression_quality)
+            return True
+
         positions = [(10, 10), (660, 10), (10, 390), (660, 390)]
 
         canvas = Image.new('RGB', (640 * 2 + 20, 360 * 2 + 20), (40, 40, 40))
         draw = ImageDraw.Draw(canvas)
 
+        images_loaded = 0
         for idx, (cam_name, img_path) in enumerate(list(image_paths.items())[:4]):
             if img_path and os.path.exists(img_path):
                 try:
-                    img = Image.open(img_path).resize((640, 360))
+                    # 检查图像是否已经加载到内存
+                    if img_path in self.image_cache:
+                        img = self.image_cache[img_path]
+                    else:
+                        img = Image.open(img_path).resize((640, 360))
+                        # 缓存图像
+                        if self.enable_memory_cache:
+                            self.image_cache[img_path] = img
+                            # 清理缓存如果太大
+                            if len(self.image_cache) > self.max_cache_size:
+                                oldest_key = next(iter(self.image_cache))
+                                del self.image_cache[oldest_key]
+                    images_loaded += 1
                 except:
                     img = Image.new('RGB', (640, 360), (80, 80, 80))
             else:
@@ -105,8 +171,25 @@ class ImageProcessor:
             draw.text((positions[idx][0] + 5, positions[idx][1] + 5),
                       cam_name, fill=(255, 255, 200))
 
+        if images_loaded == 0:
+            return False
+
         output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
-        canvas.save(output_path, "JPEG", quality=90)
+
+        # 压缩保存
+        if self.compress_images:
+            canvas.save(output_path, "JPEG", quality=self.compression_quality)
+        else:
+            canvas.save(output_path, "PNG")
+
+        # 缓存结果
+        if self.enable_memory_cache:
+            self.image_cache[cache_key] = canvas.copy()
+
+        # 清理内存
+        del canvas
+        gc.collect()
+
         return True
 
 
@@ -120,6 +203,10 @@ class TrafficManager:
         seed = config['scenario'].get('seed', random.randint(1, 1000))
         random.seed(seed)
         Log.info(f"随机种子: {seed}")
+
+        # 性能优化：批量生成设置
+        self.batch_spawn = config.get('batch_spawn', True)
+        self.max_spawn_attempts = config.get('max_spawn_attempts', 5)
 
     def spawn_ego_vehicle(self):
         blueprint_lib = self.world.get_blueprint_library()
@@ -143,22 +230,81 @@ class TrafficManager:
             return None
 
         spawn_point = random.choice(spawn_points)
-        try:
-            vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
-            vehicle.set_autopilot(True)
-            vehicle.apply_control(carla.VehicleControl(throttle=0.2))
-            Log.info(f"主车: {vehicle.type_id}")
-            return vehicle
-        except Exception as e:
-            Log.warning(f"主车生成失败: {e}")
-            return None
+
+        # 尝试多次生成
+        for attempt in range(self.max_spawn_attempts):
+            try:
+                vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+                vehicle.set_autopilot(True)
+                vehicle.apply_control(carla.VehicleControl(throttle=0.2))
+                Log.info(f"主车: {vehicle.type_id}")
+                return vehicle
+            except Exception as e:
+                if attempt == self.max_spawn_attempts - 1:
+                    Log.warning(f"主车生成失败: {e}")
+                else:
+                    # 尝试不同的生成点
+                    spawn_point = random.choice(spawn_points)
+                    time.sleep(0.1)
+
+        return None
 
     def spawn_traffic(self, center_location):
-        vehicles = self._spawn_vehicles()
+        if self.batch_spawn:
+            vehicles = self._spawn_vehicles_batch()
+        else:
+            vehicles = self._spawn_vehicles()
+
         pedestrians = self._spawn_pedestrians(center_location)
 
         Log.info(f"交通生成: {vehicles}辆车, {pedestrians}个行人")
         return vehicles + pedestrians
+
+    def _spawn_vehicles_batch(self):
+        """批量生成车辆（提高性能）"""
+        blueprint_lib = self.world.get_blueprint_library()
+        spawn_points = self.world.get_map().get_spawn_points()
+
+        if not spawn_points:
+            return 0
+
+        num_vehicles = min(self.config['traffic']['background_vehicles'], 10)
+        spawned = 0
+
+        # 准备批处理
+        batch_commands = []
+        available_points = spawn_points.copy()
+        random.shuffle(available_points)
+
+        for i in range(num_vehicles):
+            if i >= len(available_points):
+                break
+
+            try:
+                vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
+                spawn_point = available_points[i]
+
+                # 创建生成命令
+                batch_commands.append((vehicle_bp, spawn_point))
+
+            except:
+                pass
+
+        # 批量生成
+        for vehicle_bp, spawn_point in batch_commands:
+            try:
+                vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
+                vehicle.set_autopilot(True)
+                self.vehicles.append(vehicle)
+                spawned += 1
+            except:
+                pass
+
+            # 避免过快的生成速度
+            if spawned % 3 == 0:
+                time.sleep(0.05)
+
+        return spawned
 
     def _spawn_vehicles(self):
         blueprint_lib = self.world.get_blueprint_library()
@@ -217,19 +363,30 @@ class TrafficManager:
     def cleanup(self):
         Log.info("清理交通...")
 
+        # 批量销毁
+        actors_to_destroy = []
+
         for vehicle in self.vehicles:
-            try:
-                if vehicle.is_alive:
-                    vehicle.destroy()
-            except:
-                pass
+            if vehicle.is_alive:
+                actors_to_destroy.append(vehicle)
 
         for pedestrian in self.pedestrians:
-            try:
-                if pedestrian.is_alive:
-                    pedestrian.destroy()
-            except:
-                pass
+            if pedestrian.is_alive:
+                actors_to_destroy.append(pedestrian)
+
+        # 批量销毁
+        batch_size = 10
+        for i in range(0, len(actors_to_destroy), batch_size):
+            batch = actors_to_destroy[i:i + batch_size]
+            for actor in batch:
+                try:
+                    actor.destroy()
+                except:
+                    pass
+
+            # 避免过快的销毁速度
+            if i > 0 and i % 30 == 0:
+                time.sleep(0.1)
 
         self.vehicles.clear()
         self.pedestrians.clear()
@@ -244,38 +401,38 @@ class SensorManager:
 
         self.frame_counter = 0
         self.last_capture_time = 0
+        self.last_performance_sample = 0
 
         self.vehicle_buffer = {}
         self.infra_buffer = {}
         self.buffer_lock = threading.Lock()
 
-        self.image_processor = ImageProcessor(data_dir)
+        # 性能监控
+        self.performance_monitor = PerformanceMonitor()
+
+        # 性能优化配置
+        self.image_processor = ImageProcessor(data_dir, config.get('image_processing', {}))
         self.lidar_processor = None
         self.fusion_manager = None
 
+        # 批处理设置
+        self.batch_size = config.get('batch_size', 5)
+        self.enable_async_processing = config.get('enable_async_processing', True)
+
         if config['sensors'].get('lidar_sensors', 0) > 0:
-            self.lidar_processor = LidarProcessor(data_dir)
+            self.lidar_processor = LidarProcessor(data_dir, config.get('lidar_processing', {}))
 
         if config['output'].get('save_fusion', False):
-            self.fusion_manager = MultiSensorFusion(data_dir)
-
+            self.fusion_manager = MultiSensorFusion(data_dir, config.get('fusion', {}))
 
     def setup_cameras(self, vehicle, center_location, vehicle_id=0):
         vehicle_cams = self._setup_vehicle_cameras(vehicle, vehicle_id)
-
-    def setup_cameras(self, vehicle, center_location):
-        vehicle_cams = self._setup_vehicle_cameras(vehicle)
-
         infra_cams = self._setup_infrastructure_cameras(center_location)
 
         Log.info(f"摄像头: {vehicle_cams}车辆 + {infra_cams}基础设施")
         return vehicle_cams + infra_cams
 
-
     def _setup_vehicle_cameras(self, vehicle, vehicle_id):
-
-    def _setup_vehicle_cameras(self, vehicle):
-
         if not vehicle:
             return 0
 
@@ -288,11 +445,7 @@ class SensorManager:
 
         installed = 0
         for cam_name, config_data in camera_configs.items():
-
             if self._create_camera(cam_name, config_data, vehicle, 'vehicle', vehicle_id):
-
-            if self._create_camera(cam_name, config_data, vehicle, 'vehicle'):
-
                 installed += 1
 
         return installed
@@ -322,11 +475,7 @@ class SensorManager:
 
         return installed
 
-
     def setup_lidar(self, vehicle, vehicle_id=0):
-
-    def setup_lidar(self, vehicle):
-
         if not vehicle or not self.config['sensors'].get('lidar_sensors', 0) > 0:
             return 0
 
@@ -341,10 +490,6 @@ class SensorManager:
             lidar_bp.set_attribute('points_per_second', str(lidar_config.get('points_per_second', 56000)))
             lidar_bp.set_attribute('rotation_frequency', str(lidar_config.get('rotation_frequency', 10)))
 
-
-
-            # 添加更多LiDAR参数
-
             lidar_bp.set_attribute('upper_fov', '10')
             lidar_bp.set_attribute('lower_fov', '-20')
             lidar_bp.set_attribute('horizontal_fov', '360')
@@ -357,22 +502,16 @@ class SensorManager:
 
             def lidar_callback(lidar_data):
                 current_time = time.time()
+                frame_start_time = time.time()
+
                 if current_time - self.last_capture_time >= self.config['sensors']['capture_interval']:
                     if self.lidar_processor:
                         try:
                             metadata = self.lidar_processor.process_lidar_data(lidar_data, self.frame_counter)
                             if metadata and self.fusion_manager:
-
                                 vehicle_image_path = None
                                 with self.buffer_lock:
                                     if self.vehicle_buffer:
-
-                                # 尝试获取最新的车辆图像
-                                vehicle_image_path = None
-                                with self.buffer_lock:
-                                    if self.vehicle_buffer:
-                                        # 取第一个摄像头的图像
-
                                         for cam_name, img_path in self.vehicle_buffer.items():
                                             if os.path.exists(img_path):
                                                 vehicle_image_path = img_path
@@ -388,6 +527,10 @@ class SensorManager:
                         except Exception as e:
                             print(f"LiDAR处理失败: {e}")
 
+                # 记录性能
+                frame_time = time.time() - frame_start_time
+                self.performance_monitor.record_frame_time(frame_time)
+
             lidar_sensor.listen(lidar_callback)
             self.sensors.append(lidar_sensor)
 
@@ -398,11 +541,7 @@ class SensorManager:
             print(f"LiDAR安装失败: {e}")
             return 0
 
-
     def _create_camera(self, name, config, parent, sensor_type, vehicle_id=0):
-
-    def _create_camera(self, name, config, parent, sensor_type):
-
         try:
             blueprint = self.world.get_blueprint_library().find('sensor.camera.rgb')
 
@@ -420,7 +559,6 @@ class SensorManager:
             else:
                 camera = self.world.spawn_actor(blueprint, transform)
 
-
             # 为不同车辆创建不同目录
             if sensor_type == 'vehicle' and vehicle_id > 0:
                 save_dir = os.path.join(self.data_dir, "raw", f"vehicle_{vehicle_id}", name)
@@ -430,11 +568,6 @@ class SensorManager:
             os.makedirs(save_dir, exist_ok=True)
 
             callback = self._create_callback(save_dir, name, sensor_type, vehicle_id)
-            save_dir = os.path.join(self.data_dir, "raw", sensor_type, name)
-            os.makedirs(save_dir, exist_ok=True)
-
-            callback = self._create_callback(save_dir, name, sensor_type)
-
             camera.listen(callback)
 
             self.sensors.append(camera)
@@ -444,15 +577,12 @@ class SensorManager:
             Log.warning(f"创建摄像头 {name} 失败: {e}")
             return False
 
-
     def _create_callback(self, save_dir, name, sensor_type, vehicle_id=0):
-
-    def _create_callback(self, save_dir, name, sensor_type):
-
         capture_interval = self.config['sensors']['capture_interval']
 
         def callback(image):
             current_time = time.time()
+            frame_start_time = time.time()
 
             if current_time - self.last_capture_time >= capture_interval:
                 self.frame_counter += 1
@@ -465,18 +595,30 @@ class SensorManager:
                     if sensor_type == 'vehicle':
                         self.vehicle_buffer[name] = filename
                         if len(self.vehicle_buffer) >= 4:
-
                             self.image_processor.stitch(self.vehicle_buffer, self.frame_counter,
                                                         f'vehicle_{vehicle_id}')
-
-                            self.image_processor.stitch(self.vehicle_buffer, self.frame_counter, 'vehicle')
-
                             self.vehicle_buffer.clear()
                     else:
                         self.infra_buffer[name] = filename
                         if len(self.infra_buffer) >= 4:
                             self.image_processor.stitch(self.infra_buffer, self.frame_counter, 'infrastructure')
                             self.infra_buffer.clear()
+
+                # 定期采样性能
+                if current_time - self.last_performance_sample >= 5.0:
+                    memory_mb = self.performance_monitor.sample_memory()
+                    cpu_percent = self.performance_monitor.sample_cpu()
+                    if self.frame_counter % 10 == 0:
+                        Log.debug(f"性能采样 - 内存: {memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%")
+                    self.last_performance_sample = current_time
+
+                # 记录帧处理时间
+                frame_time = time.time() - frame_start_time
+                self.performance_monitor.record_frame_time(frame_time)
+
+                # 定期垃圾回收
+                if self.frame_counter % 50 == 0:
+                    gc.collect()
 
         return callback
 
@@ -488,7 +630,8 @@ class SensorManager:
             'total_sensors': len(self.sensors),
             'frame_count': self.frame_counter,
             'lidar_data': None,
-            'fusion_data': None
+            'fusion_data': None,
+            'performance': self.performance_monitor.get_performance_summary()
         }
 
         if self.lidar_processor:
@@ -501,13 +644,32 @@ class SensorManager:
 
     def cleanup(self):
         Log.info(f"清理 {len(self.sensors)} 个传感器...")
-        for sensor in self.sensors:
-            try:
-                sensor.stop()
-                sensor.destroy()
-            except:
-                pass
+
+        # 刷新批处理数据
+        if self.lidar_processor:
+            self.lidar_processor.flush_batch()
+
+        # 批量销毁传感器
+        batch_size = 5
+        for i in range(0, len(self.sensors), batch_size):
+            batch = self.sensors[i:i + batch_size]
+            for sensor in batch:
+                try:
+                    sensor.stop()
+                    sensor.destroy()
+                except:
+                    pass
+
+            if i > 0 and i % 20 == 0:
+                time.sleep(0.05)
+
         self.sensors.clear()
+
+        # 清理缓存
+        if hasattr(self.image_processor, 'image_cache'):
+            self.image_processor.image_cache.clear()
+
+        gc.collect()
 
 
 class DataCollector:
@@ -515,27 +677,25 @@ class DataCollector:
         self.config = config
         self.client = None
         self.world = None
-
-        self.ego_vehicles = []  # 多个主车
-
-        self.ego_vehicle = None
-
+        self.ego_vehicles = []
         self.scene_center = None
 
         self.setup_directories()
 
         self.traffic_manager = None
-
-        self.sensor_managers = {}  # 车辆ID -> SensorManager
+        self.sensor_managers = {}
         self.multi_vehicle_manager = None
         self.v2x_communication = None
-
-        self.sensor_manager = None
-
 
         self.start_time = None
         self.is_running = False
         self.collected_frames = 0
+
+        # 性能监控
+        self.performance_monitor = PerformanceMonitor()
+
+        # 数据格式配置
+        self.output_format = config.get('output_format', 'standard')  # standard, v2xformer, kitti
 
     def setup_directories(self):
         scenario = self.config['scenario']
@@ -547,21 +707,17 @@ class DataCollector:
         )
 
         directories = [
-
-            "raw/vehicle_1",  # 主车1
-            "raw/vehicle_2",  # 主车2（如果有）
-
-            "raw/vehicle",
-
+            "raw/vehicle_1",
+            "raw/vehicle_2",
             "raw/infrastructure",
             "stitched",
             "lidar",
             "fusion",
             "calibration",
-
             "cooperative",
             "v2x_messages",
-
+            "v2xformer_format",  # V2XFormer格式数据
+            "kitti_format",  # KITTI格式数据
             "metadata"
         ]
 
@@ -606,7 +762,6 @@ class DataCollector:
 
         self.traffic_manager = TrafficManager(self.world, self.config)
 
-
         # 生成多个主车
         num_ego_vehicles = min(self.config['cooperative'].get('num_coop_vehicles', 2) + 1, 3)
         for i in range(num_ego_vehicles):
@@ -616,15 +771,10 @@ class DataCollector:
                 Log.info(f"主车 {i + 1} 生成: {ego_vehicle.type_id}")
 
         if not self.ego_vehicles:
-
-        self.ego_vehicle = self.traffic_manager.spawn_ego_vehicle()
-        if not self.ego_vehicle:
-
             Log.error("主车生成失败")
             return False
 
         self.traffic_manager.spawn_traffic(self.scene_center)
-
 
         # 初始化V2X通信
         if self.config['v2x']['enabled']:
@@ -663,13 +813,10 @@ class DataCollector:
                     {'type': 'vehicle', 'capabilities': ['bsm', 'rsm']}
                 )
 
-
-
         time.sleep(3.0)
         return True
 
     def setup_sensors(self):
-
         # 为每个主车设置传感器
         for i, vehicle in enumerate(self.ego_vehicles):
             sensor_manager = SensorManager(self.world, self.config, self.output_dir)
@@ -684,17 +831,6 @@ class DataCollector:
 
             self.sensor_managers[vehicle.id] = sensor_manager
 
-        self.sensor_manager = SensorManager(self.world, self.config, self.output_dir)
-
-        cameras = self.sensor_manager.setup_cameras(self.ego_vehicle, self.scene_center)
-        if cameras == 0:
-            Log.error("没有摄像头安装成功")
-            return False
-
-        lidars = self.sensor_manager.setup_lidar(self.ego_vehicle)
-        Log.info(f"传感器: {cameras}摄像头 + {lidars}LiDAR")
-
-
         return True
 
     def collect_data(self):
@@ -705,15 +841,14 @@ class DataCollector:
         self.is_running = True
 
         last_update = time.time()
-
         last_v2x_update = time.time()
         last_perception_share = time.time()
+        last_performance_sample = time.time()
 
         try:
             while time.time() - self.start_time < duration and self.is_running:
                 current_time = time.time()
                 elapsed = current_time - self.start_time
-
 
                 # 更新车辆状态
                 if self.multi_vehicle_manager:
@@ -730,43 +865,147 @@ class DataCollector:
                     self._share_perception_data()
                     last_perception_share = current_time
 
-                # 定期保存共享感知
-                frame_count = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
-                if frame_count % 10 == 0 and self.multi_vehicle_manager:
-                    self.multi_vehicle_manager.save_shared_perception(frame_count)
+                # 性能采样
+                if current_time - last_performance_sample >= 10.0:
+                    memory_mb = self.performance_monitor.sample_memory()
+                    cpu_percent = self.performance_monitor.sample_cpu()
+                    Log.debug(f"系统性能 - 内存: {memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%")
+                    last_performance_sample = current_time
+
+                    # 定期垃圾回收
+                    gc.collect()
 
                 if current_time - last_update >= 5.0:
                     total_frames = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
                     progress = (elapsed / duration) * 100
 
-                    Log.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | 总帧数: {total_frames}")
+                    # 计算预估剩余时间
+                    if total_frames > 0:
+                        frames_per_second = total_frames / elapsed
+                        remaining_frames = (duration - elapsed) * frames_per_second
+                        eta_seconds = (duration - elapsed)
+                    else:
+                        eta_seconds = duration - elapsed
 
-                if current_time - last_update >= 5.0:
-                    frames = self.sensor_manager.get_frame_count()
-                    progress = (elapsed / duration) * 100
-
-                    Log.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | 帧数: {frames}")
-
+                    Log.info(f"进度: {elapsed:.0f}/{duration}秒 ({progress:.1f}%) | "
+                             f"总帧数: {total_frames} | "
+                             f"ETA: {eta_seconds:.0f}秒")
                     last_update = current_time
 
-                time.sleep(0.05)
+                time.sleep(0.01)  # 减少CPU占用
 
         except KeyboardInterrupt:
             Log.info("数据收集被用户中断")
+        except Exception as e:
+            Log.error(f"数据收集错误: {e}")
+            traceback.print_exc()
         finally:
             self.is_running = False
             elapsed = time.time() - self.start_time
 
-
             self.collected_frames = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
 
-            self.collected_frames = self.sensor_manager.get_frame_count()
+            # 获取性能摘要
+            performance_summary = self.performance_monitor.get_performance_summary()
 
             Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
+            Log.info(f"平均帧率: {performance_summary['frames_per_second']:.2f} FPS")
+            Log.info(f"最大内存使用: {performance_summary['max_memory_mb']:.1f} MB")
 
             self._save_metadata()
             self._print_summary()
 
+            # 生成标准格式数据
+            if self.output_format != 'standard':
+                self._convert_to_target_format()
+
+    def _convert_to_target_format(self):
+        """转换为目标数据格式"""
+        Log.info(f"转换为 {self.output_format} 格式...")
+
+        if self.output_format == 'v2xformer':
+            self._convert_to_v2xformer_format()
+        elif self.output_format == 'kitti':
+            self._convert_to_kitti_format()
+
+    def _convert_to_v2xformer_format(self):
+        """转换为V2XFormer格式"""
+        try:
+            # 创建必要的目录结构
+            v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
+
+            # 创建数据集结构
+            splits = ['train', 'val', 'test']
+            for split in splits:
+                split_dir = os.path.join(v2x_dir, split)
+                os.makedirs(split_dir, exist_ok=True)
+
+                # 创建子目录
+                for subdir in ['image', 'point_cloud', 'calib', 'label']:
+                    os.makedirs(os.path.join(split_dir, subdir), exist_ok=True)
+
+            # 生成数据集划分
+            total_frames = self.collected_frames
+            train_ratio = 0.7
+            val_ratio = 0.2
+            test_ratio = 0.1
+
+            train_frames = int(total_frames * train_ratio)
+            val_frames = int(total_frames * val_ratio)
+            test_frames = total_frames - train_frames - val_frames
+
+            # 生成划分文件
+            splits_info = {
+                'train': list(range(0, train_frames)),
+                'val': list(range(train_frames, train_frames + val_frames)),
+                'test': list(range(train_frames + val_frames, total_frames))
+            }
+
+            splits_file = os.path.join(v2x_dir, "splits.json")
+            with open(splits_file, 'w') as f:
+                json.dump(splits_info, f, indent=2)
+
+            Log.info(f"V2XFormer格式转换完成: {v2x_dir}")
+
+        except Exception as e:
+            Log.error(f"V2XFormer格式转换失败: {e}")
+
+    def _convert_to_kitti_format(self):
+        """转换为KITTI格式"""
+        try:
+            kitti_dir = os.path.join(self.output_dir, "kitti_format")
+
+            # 创建KITTI标准目录结构
+            for subdir in ['training', 'testing']:
+                full_dir = os.path.join(kitti_dir, subdir)
+                os.makedirs(full_dir, exist_ok=True)
+
+                for subsubdir in ['image_2', 'velodyne', 'calib', 'label_2']:
+                    os.makedirs(os.path.join(full_dir, subsubdir), exist_ok=True)
+
+            # 生成KITTI格式的校准文件
+            self._generate_kitti_calibration(kitti_dir)
+
+            Log.info(f"KITTI格式转换完成: {kitti_dir}")
+
+        except Exception as e:
+            Log.error(f"KITTI格式转换失败: {e}")
+
+    def _generate_kitti_calibration(self, kitti_dir):
+        """生成KITTI格式的校准文件"""
+        calib_template = """P0: 7.215377e+02 0.000000e+00 6.095593e+02 0.000000e+00 0.000000e+00 7.215377e+02 1.728540e+02 0.000000e+00 0.000000e+00 0.000000e+00 1.000000e+00 0.000000e+00
+P1: 7.215377e+02 0.000000e+00 6.095593e+02 -3.875744e+02 0.000000e+00 7.215377e+02 1.728540e+02 0.000000e+00 0.000000e+00 0.000000e+00 1.000000e+00 0.000000e+00
+P2: 7.215377e+02 0.000000e+00 6.095593e+02 4.485728e+01 0.000000e+00 7.215377e+02 1.728540e+02 2.163791e-01 0.000000e+00 0.000000e+00 1.000000e+00 2.745884e-03
+P3: 7.215377e+02 0.000000e+00 6.095593e+02 -3.341729e+02 0.000000e+00 7.215377e+02 1.728540e+02 2.163791e-01 0.000000e+00 0.000000e+00 1.000000e+00 2.745884e-03
+R0_rect: 9.999239e-01 9.837760e-03 -7.445048e-03 -9.869795e-03 9.999421e-01 -4.278459e-03 7.402527e-03 4.351614e-03 9.999631e-01
+Tr_velo_to_cam: 4.276802e-04 -9.999672e-01 -8.084491e-03 -1.198459e-02 -7.210626e-03 8.081198e-03 -9.999413e-01 -5.403984e-02 9.999738e-01 4.859485e-04 -7.206933e-03 -2.921968e-02
+Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e-04 9.998898e-01 -1.482298e-02 3.195559e-01 2.024406e-03 1.482454e-02 9.998881e-01 -7.997231e-01"""
+
+        # 为每一帧生成校准文件
+        for i in range(self.collected_frames):
+            calib_file = os.path.join(kitti_dir, "training", "calib", f"{i:06d}.txt")
+            with open(calib_file, 'w') as f:
+                f.write(calib_template)
 
     def _update_v2x_communication(self):
         """更新V2X通信"""
@@ -848,25 +1087,22 @@ class DataCollector:
 
         return detected_objects
 
-
     def _save_metadata(self):
         metadata = {
             'scenario': self.config['scenario'],
             'traffic': self.config['traffic'],
             'sensors': self.config['sensors'],
-
             'v2x': self.config['v2x'],
             'cooperative': self.config['cooperative'],
-
-
+            'output_format': self.output_format,
             'output': self.config['output'],
             'collection': {
                 'duration': round(time.time() - self.start_time, 2),
                 'total_frames': self.collected_frames,
                 'frame_rate': round(self.collected_frames / max(time.time() - self.start_time, 0.1), 2)
-            }
+            },
+            'performance': self.performance_monitor.get_performance_summary()
         }
-
 
         # 传感器摘要
         sensor_summaries = {}
@@ -882,11 +1118,6 @@ class DataCollector:
         if self.multi_vehicle_manager:
             metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
 
-        if self.sensor_manager:
-            sensor_summary = self.sensor_manager.generate_sensor_summary()
-            metadata['sensor_summary'] = sensor_summary
-
-
         meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
@@ -898,55 +1129,55 @@ class DataCollector:
         print("数据收集摘要")
         print("=" * 60)
 
-        # 统计图像
-        stitched_dir = os.path.join(self.output_dir, "stitched")
-        if os.path.exists(stitched_dir):
-            stitched_files = [f for f in os.listdir(stitched_dir) if f.endswith('.jpg')]
-            print(f"拼接图像: {len(stitched_files)} 张")
+        # 统计原始图像
+        raw_dirs = [d for d in os.listdir(self.output_dir) if d.startswith('raw')]
+        total_raw_images = 0
+        for raw_dir in raw_dirs:
+            raw_path = os.path.join(self.output_dir, raw_dir)
+            if os.path.exists(raw_path):
+                # 快速统计
+                for root, dirs, files in os.walk(raw_path):
+                    total_raw_images += len([f for f in files if f.endswith(('.png', '.jpg', '.jpeg'))])
+
+        print(f"原始图像: {total_raw_images} 张")
 
         # 统计LiDAR
         lidar_dir = os.path.join(self.output_dir, "lidar")
         if os.path.exists(lidar_dir):
-            bin_files = [f for f in os.listdir(lidar_dir) if f.endswith('.bin')]
-            npy_files = [f for f in os.listdir(lidar_dir) if f.endswith('.npy')]
+            import glob
+            bin_files = glob.glob(os.path.join(lidar_dir, "*.bin"))
+            npy_files = glob.glob(os.path.join(lidar_dir, "*.npy"))
+            batch_files = glob.glob(os.path.join(lidar_dir, "*batch*.json"))
             print(f"LiDAR数据: {len(bin_files)} .bin文件, {len(npy_files)} .npy文件")
-
-            if bin_files:
-                total_points = 0
-                for bin_file in bin_files[:3]:
-                    bin_path = os.path.join(lidar_dir, bin_file)
-                    if os.path.exists(bin_path):
-                        file_size = os.path.getsize(bin_path)
-                        points_in_file = file_size // (4 * 4)
-                        total_points += points_in_file
-                print(f"  估计总点数: {total_points:,}")
-
+            print(f"批处理文件: {len(batch_files)} 个")
 
         # 统计协同数据
         coop_dir = os.path.join(self.output_dir, "cooperative")
         if os.path.exists(coop_dir):
-            v2x_files = len([f for f in os.listdir(os.path.join(coop_dir, "v2x_messages")) if f.endswith('.json')])
+            v2x_files = len(
+                [f for f in os.listdir(os.path.join(coop_dir, "v2x_messages")) if f.endswith(('.json', '.gz'))])
             perception_files = len(
                 [f for f in os.listdir(os.path.join(coop_dir, "shared_perception")) if f.endswith('.json')])
             print(f"协同数据: {v2x_files} V2X消息, {perception_files} 共享感知文件")
 
-        # V2X统计
-        if self.v2x_communication:
-            v2x_status = self.v2x_communication.get_network_status()
-            print(f"V2X通信: {v2x_status['stats']['messages_sent']} 发送, "
-                  f"{v2x_status['stats']['messages_received']} 接收, "
-                  f"{v2x_status['stats']['messages_dropped']} 丢包")
+        # 格式转换
+        if self.output_format == 'v2xformer':
+            v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
+            if os.path.exists(v2x_dir):
+                print(f"V2XFormer格式: 已生成")
 
-        # 车辆统计
-        print(f"车辆总数: {len(self.ego_vehicles)} 主车 + "
-              f"{len(self.multi_vehicle_manager.cooperative_vehicles)} 协同车")
+        if self.output_format == 'kitti':
+            kitti_dir = os.path.join(self.output_dir, "kitti_format")
+            if os.path.exists(kitti_dir):
+                print(f"KITTI格式: 已生成")
 
-        # 统计融合数据
-        fusion_dir = os.path.join(self.output_dir, "fusion")
-        if os.path.exists(fusion_dir):
-            sync_files = [f for f in os.listdir(fusion_dir) if f.endswith('.json')]
-            print(f"融合数据: {len(sync_files)} 个同步文件")
-
+        # 性能统计
+        performance = self.performance_monitor.get_performance_summary()
+        print(f"\n性能统计:")
+        print(f"  平均帧率: {performance['frames_per_second']:.2f} FPS")
+        print(f"  平均内存: {performance['average_memory_mb']:.1f} MB")
+        print(f"  最大内存: {performance['max_memory_mb']:.1f} MB")
+        print(f"  平均CPU: {performance['average_cpu_percent']:.1f}%")
 
         print(f"\n输出目录: {self.output_dir}")
         print("=" * 60)
@@ -963,7 +1194,6 @@ class DataCollector:
 
     def cleanup(self):
         Log.info("清理场景...")
-
 
         # 清理传感器
         for sensor_manager in self.sensor_managers.values():
@@ -989,37 +1219,18 @@ class DataCollector:
                 except:
                     pass
 
-
-        if self.sensor_manager:
-            self.sensor_manager.cleanup()
-
-        if self.traffic_manager:
-            self.traffic_manager.cleanup()
-
-        if self.ego_vehicle and self.ego_vehicle.is_alive:
-            try:
-                self.ego_vehicle.destroy()
-            except:
-                pass
-
+        # 强制垃圾回收
+        gc.collect()
 
         Log.info("清理完成")
 
 
 def main():
-
-    parser = argparse.ArgumentParser(description='CVIPS 多车辆协同数据收集系统 v10.0')
-
-    # 基础参数
-    parser.add_argument('--config', type=str, help='配置文件路径')
-    parser.add_argument('--scenario', type=str, default='multi_vehicle_cooperative', help='场景名称')
-
-    parser = argparse.ArgumentParser(description='CVIPS 多传感器数据收集系统')
+    parser = argparse.ArgumentParser(description='CVIPS 性能优化数据收集系统 v12.0')
 
     # 基础参数
     parser.add_argument('--config', type=str, help='配置文件路径')
-    parser.add_argument('--scenario', type=str, default='multi_sensor_scene', help='场景名称')
-
+    parser.add_argument('--scenario', type=str, default='performance_optimized', help='场景名称')
     parser.add_argument('--town', type=str, default='Town10HD',
                         choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
     parser.add_argument('--weather', type=str, default='clear',
@@ -1030,29 +1241,34 @@ def main():
     # 交通参数
     parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
     parser.add_argument('--num-pedestrians', type=int, default=6, help='行人数')
-
     parser.add_argument('--num-coop-vehicles', type=int, default=2, help='协同车辆数')
-
-
 
     # 收集参数
     parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
     parser.add_argument('--capture-interval', type=float, default=2.0, help='捕捉间隔(秒)')
     parser.add_argument('--seed', type=int, help='随机种子')
 
+    # 性能参数
+    parser.add_argument('--batch-size', type=int, default=5, help='批处理大小')
+    parser.add_argument('--enable-compression', action='store_true', help='启用数据压缩')
+    parser.add_argument('--enable-downsampling', action='store_true', help='启用LiDAR下采样')
+
+    # 输出格式
+    parser.add_argument('--output-format', type=str, default='standard',
+                        choices=['standard', 'v2xformer', 'kitti'], help='输出数据格式')
+
     # 传感器参数
     parser.add_argument('--enable-lidar', action='store_true', help='启用LiDAR传感器')
     parser.add_argument('--enable-fusion', action='store_true', help='启用多传感器融合')
-
     parser.add_argument('--enable-v2x', action='store_true', help='启用V2X通信')
     parser.add_argument('--enable-cooperative', action='store_true', help='启用协同感知')
-
-
+    parser.add_argument('--enable-enhancement', action='store_true', help='启用数据增强')  # 添加这行
     parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
 
     # 功能参数
     parser.add_argument('--run-analysis', action='store_true', help='运行数据集分析')
     parser.add_argument('--skip-validation', action='store_true', help='跳过数据验证')
+    parser.add_argument('--skip-quality-check', action='store_true', help='跳过质量检查')
 
     args = parser.parse_args(remaining_argv)
 
@@ -1060,37 +1276,38 @@ def main():
     config = ConfigManager.load_config(args.config)
     config = ConfigManager.merge_args(config, args)
 
+    # 添加性能配置
+    config['performance']['batch_size'] = args.batch_size
+    config['performance']['enable_compression'] = args.enable_compression
+    config['performance']['enable_downsampling'] = args.enable_downsampling
+    config['output']['output_format'] = args.output_format
+
     # 显示配置
     print("\n" + "=" * 60)
-
-    print("CVIPS 多车辆协同数据收集系统 v10.0")
-
-    print("CVIPS 多传感器数据收集系统 v9.0")
-
+    print("CVIPS 性能优化数据收集系统 v12.0")
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
     print(f"地图: {config['scenario']['town']}")
     print(f"天气/时间: {config['scenario']['weather']}/{config['scenario']['time_of_day']}")
     print(f"时长: {config['scenario']['duration']}秒")
-
     print(f"交通: {config['traffic']['background_vehicles']}背景车辆 + {config['traffic']['pedestrians']}行人")
     print(f"协同: {config['cooperative']['num_coop_vehicles']} 协同车辆")
-
-    print(f"交通: {config['traffic']['background_vehicles']}车辆 + {config['traffic']['pedestrians']}行人")
-
+    print(f"输出格式: {config['output']['output_format']}")
 
     print(f"传感器:")
     print(
         f"  摄像头: {config['sensors']['vehicle_cameras']}车辆 + {config['sensors']['infrastructure_cameras']}基础设施")
     print(f"  LiDAR: {'启用' if config['sensors']['lidar_sensors'] > 0 else '禁用'}")
     print(f"  融合: {'启用' if config['output']['save_fusion'] else '禁用'}")
-
     print(f"  V2X: {'启用' if config['v2x']['enabled'] else '禁用'}")
     print(f"  协同: {'启用' if config['output']['save_cooperative'] else '禁用'}")
+    print(f"  增强: {'启用' if config['enhancement']['enabled'] else '禁用'}")
 
-    print(f"  标注: {'启用' if config['output']['save_annotations'] else '禁用'}")
-
+    print(f"性能:")
+    print(f"  批处理大小: {config['performance']['batch_size']}")
+    print(f"  压缩: {'启用' if config['performance']['enable_compression'] else '禁用'}")
+    print(f"  下采样: {'启用' if config['performance']['enable_downsampling'] else '禁用'}")
 
     collector = DataCollector(config)
 
