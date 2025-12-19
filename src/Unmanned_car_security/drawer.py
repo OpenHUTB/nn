@@ -19,10 +19,40 @@ class PyGameDrawer:
         """显示位置信息"""
         if location:
             location_text = self.small_font.render(
-                f'Location: ({location.x:.1f}, {location.y:.1f}, {location.z:.1f})',
+                f'Location: ({location.x:.1f}, {location.y:.1f})',
                 True, (255, 255, 255)
             )
             self.screen.blit(location_text, (20, 70))
+
+    def display_warning(self, warning_message, color, warning_level):
+        """显示障碍物警告信息"""
+        # 显示警告信息在速度下方
+        if warning_message:
+            warning_text = self.small_font.render(warning_message, True, color)
+            self.screen.blit(warning_text, (20, 110))
+
+            # 显示警告级别
+            level_texts = ["安全", "注意", "警告", "危险"]
+            level_text = self.small_font.render(f"警告级别: {level_texts[warning_level]}",
+                                                True, color)
+            self.screen.blit(level_text, (20, 140))
+
+            # 绘制一个简单的状态指示器
+            indicator_width = 300
+            indicator_height = 20
+            indicator_x = 20
+            indicator_y = 170
+
+            # 绘制背景条
+            pygame.draw.rect(self.screen, (60, 60, 60),
+                             (indicator_x, indicator_y, indicator_width, indicator_height),
+                             border_radius=5)
+
+            # 根据警告级别绘制不同长度的彩色条
+            if warning_level > 0:
+                fill_width = int(indicator_width * (warning_level / 3))
+                fill_rect = pygame.Rect(indicator_x, indicator_y, fill_width, indicator_height)
+                pygame.draw.rect(self.screen, color, fill_rect, border_radius=5)
 
     def draw_camera(self, image_array):
         """绘制摄像头图像（如果需要）"""
