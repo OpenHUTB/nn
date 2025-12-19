@@ -9,7 +9,7 @@ import torch
 from collections import deque
 
 
-# -------------------------- 内置 SORT 跟踪器（优化版） --------------------------
+# -------------------------- 内置 SORT 跟踪器（深度优化版） --------------------------
 class KalmanFilter:
     def __init__(self):
         self.dt = 1.0
@@ -57,6 +57,8 @@ class Track:
         # 新增：记录历史位置，用于平滑处理
         self.history = deque(maxlen=5)
         self.history.append(self.center)
+        # 新增：记录目标距离
+        self.distance = None
 
     def predict(self):
         self.age += 1
@@ -70,7 +72,7 @@ class Track:
         self.y2 = self.y1 + self.height
         return [self.x1, self.y1, self.x2, self.y2]
 
-    def update(self, box):
+    def update(self, box, distance=None):
         self.x1, self.y1, self.x2, self.y2 = box
         self.center = np.array([[(self.x1 + self.x2) / 2], [(self.y1 + self.y2) / 2]])
         self.kf.update(self.center)
@@ -79,18 +81,27 @@ class Track:
         self.hits += 1
         self.age = 0
         self.history.append(self.center)
+        # 新增：更新距离信息
+        if distance is not None:
+            self.distance = distance
 
     def get_box(self):
         return [self.x1, self.y1, self.x2, self.y2]
 
 
 class Sort:
-    def __init__(self, max_age=5, min_hits=3, iou_threshold=0.4):  # 提高IOU阈值
+    def __init__(self, max_age=5, min_hits=3, iou_threshold=0.4):
         self.max_age = max_age
         self.min_hits = min_hits
         self.iou_threshold = iou_threshold
         self.tracks = []
         self.next_id = 1
+        # 新增：存储当前检测目标的距离
+        self.depths = []
+
+    def set_depths(self, depths):
+        """设置当前检测目标的距离列表"""
+        self.depths = depths
 
     def update(self, detections):
         if len(detections) == 0:
@@ -100,8 +111,12 @@ class Sort:
             return np.array([[t.x1, t.y1, t.x2, t.y2, t.id] for t in self.tracks if t.hits >= self.min_hits])
 
         if len(self.tracks) == 0:
-            for det in detections:
-                self.tracks.append(Track(det[:4], self.next_id))
+            for i, det in enumerate(detections):
+                track = Track(det[:4], self.next_id)
+                # 关联距离信息
+                if i < len(self.depths):
+                    track.distance = self.depths[i]
+                self.tracks.append(track)
                 self.next_id += 1
             return np.array([[t.x1, t.y1, t.x2, t.y2, t.id] for t in self.tracks])
 
@@ -109,21 +124,31 @@ class Sort:
         iou_matrix = self._iou_batch(track_boxes, detections[:, :4])
         matches, unmatched_tracks, unmatched_dets = self._hungarian_algorithm(iou_matrix)
 
-        # 优化匹配逻辑：只匹配高IOU的结果
+        # 优化匹配逻辑：只匹配高IOU的结果，同时传递距离信息
         for track_idx, det_idx in matches:
             if iou_matrix[track_idx, det_idx] >= self.iou_threshold:
-                self.tracks[track_idx].update(detections[det_idx][:4])
+                distance = self.depths[det_idx] if det_idx < len(self.depths) else None
+                self.tracks[track_idx].update(detections[det_idx][:4], distance)
 
         for track_idx in unmatched_tracks:
             self.tracks[track_idx].age += 1
 
-        # 新增：过滤过小的检测框，减少误检（调整最小尺寸为8）
+        # 基于距离动态调整最小尺寸过滤
         for det_idx in unmatched_dets:
             box = detections[det_idx][:4]
             width = box[2] - box[0]
             height = box[3] - box[1]
-            if width > 8 and height > 8:  # 减小最小尺寸过滤阈值，适配小目标
-                self.tracks.append(Track(box, self.next_id))
+
+            # 根据距离调整过滤阈值
+            min_size = 8
+            if det_idx < len(self.depths) and self.depths[det_idx] > 30:  # 远距离目标放宽限制
+                min_size = 3
+
+            if width > min_size and height > min_size:
+                track = Track(box, self.next_id)
+                if det_idx < len(self.depths):
+                    track.distance = self.depths[det_idx]
+                self.tracks.append(track)
                 self.next_id += 1
 
         self.tracks = [t for t in self.tracks if t.age <= self.max_age]
@@ -139,7 +164,16 @@ class Sort:
         inter_area = np.maximum(0, inter_x2 - inter_x1) * np.maximum(0, inter_y2 - inter_y1)
         b1_area = (b1_x2 - b1_x1) * (b1_y2 - b1_y1)
         b2_area = (b2_x2 - b2_x1) * (b2_y2 - b2_y1)
-        return inter_area / (b1_area[:, None] + b2_area[None, :] - inter_area + 1e-6)
+        base_iou = inter_area / (b1_area[:, None] + b2_area[None, :] - inter_area + 1e-6)
+
+        # 新增：基于距离加权IOU（近距离目标权重更高）
+        if len(self.depths) > 0 and b2.shape[0] == len(self.depths):
+            distance_weights = np.array([
+                1.2 if d < 10 else 0.9 if d < 30 else 0.7
+                for d in self.depths
+            ])
+            return base_iou * distance_weights[None, :]
+        return base_iou
 
     def _hungarian_algorithm(self, cost_matrix):
         from scipy.optimize import linear_sum_assignment
@@ -155,8 +189,8 @@ from ultralytics import YOLO
 
 
 # -------------------------- 核心工具函数（优化版） --------------------------
-def draw_bounding_boxes(image, boxes, labels, class_names, track_ids=None, probs=None):
-    """绘制检测/跟踪框（含类别、置信度、跟踪ID）"""
+def draw_bounding_boxes(image, boxes, labels, class_names, track_ids=None, probs=None, distances=None):
+    """绘制检测/跟踪框（含类别、置信度、跟踪ID和距离）"""
     for i, (box, label) in enumerate(zip(boxes, labels)):
         x1, y1, x2, y2 = map(int, box)
         # 过滤超出图像范围的框
@@ -170,11 +204,13 @@ def draw_bounding_boxes(image, boxes, labels, class_names, track_ids=None, probs
         color = colors.get(label, (0, 255, 0))
         cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
 
-        # 拼接文本信息
+        # 拼接文本信息（新增距离显示）
         conf_text = f"{probs[i]:.2f}" if (probs is not None and i < len(probs)) else ""
         label_text = f"{class_names[label]} {conf_text}".strip()
         if track_ids and i < len(track_ids):
             label_text += f"_ID:{track_ids[i]}"
+        if distances and i < len(distances):
+            label_text += f"_Dist:{distances[i]:.1f}m"
 
         # 绘制文本背景（避免遮挡）
         text_size = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
@@ -211,21 +247,33 @@ def clear_static_vehicle(world):
             pass
 
 
-def clear(world, camera):
-    """清理所有资源"""
+def clear(world, camera, depth_camera=None):
+    """清理所有资源（含深度相机）"""
     if camera:
         try:
             camera.destroy()
+        except:
+            pass
+    if depth_camera:
+        try:
+            depth_camera.destroy()
         except:
             pass
     clear_npc(world)
     clear_static_vehicle(world)
 
 
-# -------------------------- CARLA 相关核心函数 --------------------------
+# -------------------------- CARLA 相关核心函数（新增深度相机） --------------------------
 def camera_callback(image, rgb_image_queue):
     """相机回调函数：将图像存入队列"""
     rgb_image_queue.put(np.reshape(np.copy(image.raw_data), (image.height, image.width, 4)))
+
+
+def depth_camera_callback(image, depth_queue):
+    """深度相机回调：将深度值转换为米"""
+    depth_image = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))[:, :, 0]
+    depth_in_meters = 1000.0 * depth_image  # CARLA深度值转换为米
+    depth_queue.put(depth_in_meters)
 
 
 def setup_carla_client(host='localhost', port=2000):
@@ -270,23 +318,55 @@ def spawn_ego_vehicle(world):
 
 
 def spawn_camera(world, vehicle):
-    """生成相机传感器（挂载在自车）"""
+    """生成RGB相机传感器（挂载在自车）"""
     if not world or not vehicle:
         return None, None, None
     bp_lib = world.get_blueprint_library()
     camera_bp = bp_lib.find('sensor.camera.rgb')
-    # 提高相机分辨率以获取更多细节（略微降低性能）
+    # 相机参数设置
     camera_bp.set_attribute('image_size_x', '640')
     camera_bp.set_attribute('image_size_y', '480')
     camera_bp.set_attribute('fov', '90')
     camera_bp.set_attribute('sensor_tick', '0.05')  # 与世界帧率一致
-    # 相机安装位置优化（更适合检测前方车辆）
+    # 相机安装位置
     camera_init_trans = carla.Transform(carla.Location(x=2.0, z=1.5))
     camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
     # 图像队列（异步获取图像）
     image_queue = queue.Queue()
     camera.listen(lambda image: camera_callback(image, image_queue))
     return camera, image_queue, camera_bp
+
+
+def spawn_depth_camera(world, vehicle):
+    """生成深度相机（与RGB相机同步）"""
+    if not world or not vehicle:
+        return None, None
+    bp_lib = world.get_blueprint_library()
+    depth_bp = bp_lib.find('sensor.camera.depth')
+    # 与RGB相机参数保持一致
+    depth_bp.set_attribute('image_size_x', '640')
+    depth_bp.set_attribute('image_size_y', '480')
+    depth_bp.set_attribute('fov', '90')
+    depth_bp.set_attribute('sensor_tick', '0.05')
+    # 与RGB相机安装位置相同
+    camera_init_trans = carla.Transform(carla.Location(x=2.0, z=1.5))
+    depth_camera = world.spawn_actor(depth_bp, camera_init_trans, attach_to=vehicle)
+    depth_queue = queue.Queue()
+    depth_camera.listen(lambda image: depth_camera_callback(image, depth_queue))
+    return depth_camera, depth_queue
+
+
+def get_target_distance(depth_image, box):
+    """根据边界框获取目标平均距离（过滤异常值）"""
+    x1, y1, x2, y2 = map(int, box)
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(depth_image.shape[1] - 1, x2), min(depth_image.shape[0] - 1, y2)
+    # 提取框内深度值并过滤0（无效值）
+    depth_roi = depth_image[y1:y2, x1:x2]
+    valid_depths = depth_roi[depth_roi > 0]
+    if len(valid_depths) == 0:
+        return 50.0  # 默认远距离
+    return np.mean(valid_depths)
 
 
 def spawn_npcs(world, count=10):
@@ -312,12 +392,11 @@ def spawn_npcs(world, count=10):
 def load_detection_model(model_type):
     """加载YOLOv5检测模型（使用自定义路径）"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    # 允许使用不同精度的模型，添加yolov5mu.pt路径
+    # 允许使用不同精度的模型
     model_paths = {
         'yolov5s': r"D:\yolo\yolov5s.pt",
         'yolov5m': r"D:\yolo\yolov5m.pt",
-        'yolov5x': r"D:\yolo\yolov5x.pt",
-        'yolov5mu': r"D:\yolo\yolov5mu.pt"  # 新增yolov5mu模型路径
+        'yolov5x': r"D:\yolo\yolov5x.pt"  # 更高精度的大模型
     }
 
     if model_type not in model_paths:
@@ -338,25 +417,27 @@ def setup_tracker(tracker_type):
         raise ValueError(f"不支持的跟踪器类型：{tracker_type}")
 
 
-# -------------------------- 主函数（优化版） --------------------------
+# -------------------------- 主函数（深度辅助跟踪版） --------------------------
 def main():
-    parser = argparse.ArgumentParser(description='CARLA 目标检测与跟踪（优化版）')
-    # 新增yolov5mu作为可选模型
-    parser.add_argument('--model', type=str, default='yolov5mu', choices=['yolov5s', 'yolov5m', 'yolov5x', 'yolov5mu'],
+    parser = argparse.ArgumentParser(description='CARLA 目标检测与跟踪（深度辅助版）')
+    parser.add_argument('--model', type=str, default='yolov5m', choices=['yolov5s', 'yolov5m', 'yolov5x'],
                         help='检测模型（yolov5x精度最高，yolov5s最轻便）')
     parser.add_argument('--tracker', type=str, default='sort', choices=['sort'], help='跟踪器（仅保留稳定的SORT）')
     parser.add_argument('--host', type=str, default='localhost', help='CARLA服务器地址')
     parser.add_argument('--port', type=int, default=2000, help='CARLA服务器端口')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='检测置信度阈值（降低至0.25适配小目标）')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IOU阈值')
+    parser.add_argument('--use-depth', action='store_true', help='启用深度相机辅助跟踪')
     args = parser.parse_args()
 
     # 提前初始化所有变量，避免未定义错误
     world = None
     camera = None
+    depth_camera = None
     vehicle = None
     image_queue = None
-    # 新增：记录历史检测结果用于后处理
+    depth_queue = None
+    # 记录历史检测结果用于后处理
     detection_history = deque(maxlen=3)
 
     try:
@@ -381,12 +462,15 @@ def main():
             print("无法生成主车辆，程序退出！")
             return
 
-        # 5. 生成相机传感器
+        # 5. 生成相机传感器（含深度相机）
         camera, image_queue, camera_bp = spawn_camera(world, vehicle)
+        if args.use_depth:
+            depth_camera, depth_queue = spawn_depth_camera(world, vehicle)
+            print("深度相机传感器生成成功！")
         if not camera:
             print("无法生成相机，程序退出！")
             return
-        print("相机传感器生成成功！")
+        print("RGB相机传感器生成成功！")
 
         # 6. 生成NPC车辆
         spawn_npcs(world, count=10)
@@ -417,11 +501,15 @@ def main():
             image = cv2.cvtColor(origin_image, cv2.COLOR_BGRA2RGB)
             height, width, _ = image.shape
 
+            # 获取深度图像（若启用）
+            depth_image = None
+            if args.use_depth and not depth_queue.empty():
+                depth_image = depth_queue.get()
+
             # -------------------------- 目标检测（YOLOv5 优化版） --------------------------
-            # 优化检测参数，使用NMS抑制重复检测
             results = model(image, conf=args.conf_thres, iou=args.iou_thres)
 
-            boxes, labels, probs = [], [], []
+            boxes, labels, probs, depths = [], [], [], []
             for r in results:
                 for box in r.boxes:
                     # 解析边界框（x1,y1,x2,y2）
@@ -429,87 +517,130 @@ def main():
                     # 解析置信度和类别
                     conf = box.conf[0].cpu().numpy()
                     cls = int(box.cls[0].cpu().numpy())
-                    # 只保留车辆相关类别（COCO数据集：car=2, motorcycle=3, bus=5, truck=7）
+                    # 只保留车辆相关类别
                     if cls in [2, 3, 5, 7]:
-                        # 过滤过小目标（减小最小尺寸至8，适配小目标/远处车辆）
                         box_width = x2 - x1
                         box_height = y2 - y1
-                        if box_width > 8 and box_height > 8:  # 关键修改：从15→8
+
+                        # 基于距离动态调整尺寸过滤阈值
+                        min_size = 8
+                        if args.use_depth and depth_image is not None:
+                            rough_distance = get_target_distance(depth_image, [x1, y1, x2, y2])
+                            if rough_distance > 30:  # 远距离目标放宽限制
+                                min_size = 3
+
+                        if box_width > min_size and box_height > min_size:
                             boxes.append([x1, y1, x2, y2])
                             labels.append(cls)
                             probs.append(conf)
+                            # 计算目标距离
+                            if args.use_depth and depth_image is not None:
+                                depths.append(get_target_distance(depth_image, [x1, y1, x2, y2]))
 
             # 转换为numpy数组（避免空列表报错）
             boxes = np.array(boxes) if boxes else np.array([])
             labels = np.array(labels) if labels else np.array([])
             probs = np.array(probs) if probs else np.array([])
 
-            # 新增：多帧投票机制（放宽至1帧即可保留，避免过滤小目标）
+            # 多帧投票机制
             detection_history.append((boxes, labels, probs))
-            if len(detection_history) == 3:  # 累积3帧结果
-                # 简单投票机制：保留至少在1帧中出现的目标（关键修改：从2→1）
+            if len(detection_history) == 3:
                 combined_boxes = []
                 combined_labels = []
                 combined_probs = []
+                combined_depths = []
 
                 for i in range(len(boxes)):
                     current_box = boxes[i]
                     current_label = labels[i]
-                    count = 1  # 当前帧计数
+                    count = 1
 
                     # 检查前两帧是否有相似目标
                     for prev_boxes, prev_labels, _ in list(detection_history)[:-1]:
                         if len(prev_boxes) == 0:
                             continue
-                        # 计算与历史框的IOU
                         ious = Sort()._iou_batch(np.array([current_box]), prev_boxes)[0]
                         if np.max(ious) > 0.5 and prev_labels[np.argmax(ious)] == current_label:
                             count += 1
 
-                    # 关键修改：至少在1帧中出现就保留（适配小目标）
                     if count >= 1:
                         combined_boxes.append(current_box)
                         combined_labels.append(current_label)
                         combined_probs.append(probs[i])
+                        if args.use_depth and i < len(depths):
+                            combined_depths.append(depths[i])
 
                 boxes = np.array(combined_boxes) if combined_boxes else np.array([])
                 labels = np.array(combined_labels) if combined_labels else np.array([])
                 probs = np.array(combined_probs) if combined_probs else np.array([])
+                depths = combined_depths
 
-            # -------------------------- 目标跟踪（SORT 优化版） --------------------------
+            # -------------------------- 目标跟踪（SORT 深度优化版） --------------------------
+            track_distances = []
             if args.tracker == 'sort' and len(boxes) > 0:
-                # 转换为SORT需要的格式：[x1,y1,x2,y2,conf]
                 dets = np.hstack([boxes, probs.reshape(-1, 1)]) if len(probs) > 0 else boxes
+                # 传递距离信息给跟踪器
+                if args.use_depth and len(depths) > 0:
+                    tracker.set_depths(depths)
                 # 更新跟踪器
-                tracks = tracker.update(dets)
-                if len(tracks) > 0:
-                    track_boxes = tracks[:, :4]
-                    track_ids = tracks[:, 4].astype(int)
-                    # 绘制跟踪结果
-                    image = draw_bounding_boxes(image, track_boxes, labels[:len(track_boxes)], class_names, track_ids, probs[:len(track_boxes)])
-            else:
-                # 无跟踪时绘制检测结果
-                image = draw_bounding_boxes(image, boxes, labels, class_names, probs=probs)
+                track_results = tracker.update(dets)
+                # 解析跟踪结果
+                track_boxes = []
+                track_ids = []
+                # 提取跟踪目标的距离
+                for track in track_results:
+                    x1, y1, x2, y2, track_id = track
+                    track_boxes.append([x1, y1, x2, y2])
+                    track_ids.append(int(track_id))
+                    # 查找对应跟踪目标的距离
+                    if args.use_depth:
+                        track_obj = next((t for t in tracker.tracks if t.id == track_id), None)
+                        if track_obj and track_obj.distance:
+                            track_distances.append(track_obj.distance)
+                        else:
+                            track_distances.append(None)
+                # 绘制跟踪框（含距离）
+                if track_boxes:
+                    image = draw_bounding_boxes(
+                        image, track_boxes,
+                        labels=[2] * len(track_boxes),
+                        class_names=class_names,
+                        track_ids=track_ids,
+                        probs=[0.9] * len(track_boxes),
+                        distances=track_distances
+                    )
+            elif len(boxes) > 0:
+                # 无跟踪时，仅绘制检测结果（含距离）
+                image = draw_bounding_boxes(
+                    image, boxes, labels, class_names,
+                    probs=probs,
+                    distances=depths if args.use_depth else None
+                )
 
-            # 显示处理后的图像
-            cv2.imshow('CARLA Detection & Tracking', cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-            # 按q退出
+            # -------------------------- 显示结果 --------------------------
+            cv2.imshow(f'CARLA {args.model} + {args.tracker} (depth: {args.use_depth})',
+                       cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            # 按'q'退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
+                print("用户触发退出程序...")
                 break
 
     except Exception as e:
-        print(f"程序出错：{str(e)}")
+        print(f"程序运行出错：{str(e)}")
+        print(
+            "报错提示：1. 确保CARLA服务器已启动；2. 确保carla包版本与服务器一致；3. 确保已安装所有依赖；4. 确保YOLO模型路径正确")
     finally:
-        # 清理资源
+        # 安全清理所有资源
         print("正在清理资源...")
-        clear(world, camera)
-        # 关闭同步模式
+        clear(world, camera, depth_camera)
         if world:
+            # 恢复CARLA异步模式
             settings = world.get_settings()
             settings.synchronous_mode = False
             world.apply_settings(settings)
+        # 关闭图像窗口
         cv2.destroyAllWindows()
-        print("程序已退出")
+        print("资源清理完成，程序正常退出！")
 
 
 if __name__ == "__main__":
