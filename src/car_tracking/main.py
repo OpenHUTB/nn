@@ -1,8 +1,9 @@
 """
 CARLA 0.9.14 低画质版专用脚本
-- 适配低画质CARLA的API差异（解决各类属性找不到问题）
+- 适配低画质CARLA的API差异（解决各类属性找不到问题，包括雷达数据属性）
 - 解决着色器崩溃/异常类找不到问题
-- 新增：随机地图、车辆基础避让、速度控制输出
+- 新增：随机地图、车辆基础避让+主动识别车辆绕行、速度控制输出
+- 优化：CARLA路径使用环境变量+默认路径，避免绝对路径
 """
 import sys
 import os
@@ -12,10 +13,28 @@ import cv2
 import numpy as np
 import queue
 import traceback
+import math
 
 # ====================== 配置区域（可根据需求修改）======================
-# CARLA根目录
-CARLA_ROOT = 'D:/123/apps/CARLA_0.9.14/WindowsNoEditor'
+# CARLA根目录：优先读取系统环境变量CARLA_ROOT，未配置则使用默认相对路径（可自行调整）
+# 方案1：环境变量（推荐）：在系统中配置CARLA_ROOT为你的CARLA安装路径
+# 方案2：默认路径：改为你项目的相对路径或通用默认路径
+def get_carla_root():
+    """获取CARLA根目录（优先环境变量，次之用默认路径）"""
+    # 从环境变量读取
+    carla_root = os.getenv('CARLA_ROOT')
+    if carla_root and os.path.exists(os.path.join(carla_root, 'CarlaUE4.exe')):
+        return carla_root
+    # 未配置环境变量时，使用默认路径（可改为相对路径，如'./CARLA_0.9.14'）
+    default_carla_root = './CARLA_0.9.14/WindowsNoEditor'  # 相对路径示例
+    # 额外兜底：若相对路径不存在，使用当前工作目录的父目录（可选）
+    if not os.path.exists(os.path.join(default_carla_root, 'CarlaUE4.exe')):
+        # 也可以提示用户配置环境变量，这里暂时返回默认路径
+        print(f"⚠️ 未配置CARLA_ROOT环境变量，且默认路径{default_carla_root}无效，请检查路径！")
+    return default_carla_root
+
+CARLA_ROOT = get_carla_root()
+
 # 服务器连接配置
 CARLA_HOST = '127.0.0.1'
 CARLA_PORT = 2000
@@ -30,6 +49,9 @@ CAMERA_RESOLUTION = (640, 360)  # 降低分辨率
 CAMERA_FOV = 80
 CAMERA_SENSOR_TICK = 0.1  # 10fps减少压力
 CAMERA_POSITION = carla.Transform(carla.Location(x=1.5, z=1.8))  # 摄像头挂载位置
+# 避让配置（改用Actor距离检测，放弃雷达属性依赖）
+SAFE_DISTANCE = 10.0  # 安全距离（小于此距离触发避让）
+AVOIDANCE_ANGLE = 10.0  # 避让时的方向微调角度（度）
 # 窗口配置
 WINDOW_NAME = 'CARLA Low-Quality View'
 WINDOW_SIZE = (640, 360)
@@ -39,6 +61,8 @@ SPEED_PRINT_INTERVAL = 10  # 每10帧打印一次速度（减少刷屏）
 
 # 全局变量
 IMAGE_QUEUE = queue.Queue(maxsize=1)
+# 存储当前车辆的控制对象（用于避让微调）
+vehicle_control = carla.VehicleControl()
 
 def check_carla_running():
     """检查CARLA进程（CarlaUE4.exe）是否运行"""
@@ -115,22 +139,24 @@ def spawn_vehicle(world, blueprint_library, spawn_points):
     return vehicle
 
 def spawn_camera(world, blueprint_library, vehicle):
-    """挂载摄像头（低画质参数配置，适配0.9.14 API）"""
+    """生成摄像头传感器（移除雷达，改用Actor直接检测，适配0.9.14低画质版）"""
+    camera = None
     try:
+        # 生成摄像头
         camera_bp = blueprint_library.find('sensor.camera.rgb')
-        # 设置摄像头低画质参数（确保与0.9.14 API兼容）
+        # 设置摄像头低画质参数
         camera_bp.set_attribute('image_size_x', str(CAMERA_RESOLUTION[0]))
         camera_bp.set_attribute('image_size_y', str(CAMERA_RESOLUTION[1]))
         camera_bp.set_attribute('fov', str(CAMERA_FOV))
         camera_bp.set_attribute('sensor_tick', str(CAMERA_SENSOR_TICK))
-        # 生成摄像头并挂载到车辆
         camera = world.spawn_actor(camera_bp, CAMERA_POSITION, attach_to=vehicle)
-        # 注册回调函数
         camera.listen(image_callback)
         print("✅ 摄像头挂载成功")
         return camera
     except Exception as e:
         print(f"❌ 摄像头挂载失败：{e}")
+        if camera:
+            camera.destroy()
         return None
 
 def get_vehicle_speed(vehicle):
@@ -141,8 +167,85 @@ def get_vehicle_speed(vehicle):
     speed_kmh = speed_ms * 3.6
     return round(speed_kmh, 1)
 
+def detect_nearby_vehicles(world, vehicle):
+    """直接通过Actor检测周围车辆（放弃雷达，适配低画质版API），返回最近车辆的距离、方位和是否有车"""
+    if not vehicle:
+        return None, None, False
+
+    # 获取当前车辆的位置和朝向
+    vehicle_transform = vehicle.get_transform()
+    vehicle_location = vehicle_transform.location
+    vehicle_rotation = vehicle_transform.rotation
+    vehicle_yaw = math.radians(vehicle_rotation.yaw)  # 车辆朝向的偏航角（弧度）
+
+    # 存储最近的车辆信息
+    min_distance = float('inf')
+    target_azimuth = 0.0  # 目标车辆的方位角（-180~180，正前方为0）
+    has_vehicle = False
+
+    # 遍历世界中所有车辆Actor
+    for actor in world.get_actors().filter('vehicle.*'):
+        if actor.id == vehicle.id:
+            continue  # 跳过自己
+
+        # 获取其他车辆的位置
+        actor_location = actor.get_transform().location
+        # 计算两车之间的直线距离
+        distance = vehicle_location.distance(actor_location)
+
+        # 只处理安全距离内的车辆
+        if distance < SAFE_DISTANCE:
+            # 计算目标车辆相对于当前车辆的方位角（前后左右）
+            # 步骤1：计算向量
+            dx = actor_location.x - vehicle_location.x
+            dy = actor_location.y - vehicle_location.y
+            # 步骤2：计算目标角度（弧度）
+            target_angle = math.atan2(dy, dx)
+            # 步骤3：转换为相对于车辆朝向的方位角（度）
+            azimuth = math.degrees(target_angle - vehicle_yaw)
+            # 归一化到-180~180度
+            azimuth = (azimuth + 180) % 360 - 180
+
+            # 只关注前方±60度的车辆（避免检测后方车辆）
+            if abs(azimuth) < 60.0:
+                min_distance = distance
+                target_azimuth = azimuth
+                has_vehicle = True
+
+    if has_vehicle:
+        return min_distance, target_azimuth, True
+    else:
+        return None, None, False
+
+def avoid_vehicle(vehicle, distance, azimuth):
+    """根据检测到的车辆方位，执行避让操作（向宽敞方向微调）"""
+    global vehicle_control
+    # 获取车辆当前的控制状态（保留自动驾驶的油门/刹车，只改转向）
+    vehicle_control = vehicle.get_control()
+
+    # 计算避让方向：根据方位角调整转向（-1~1之间，1为右，-1为左）
+    steer_strength = (AVOIDANCE_ANGLE / 60.0) * 0.2  # 控制转向强度，避免过度打方向
+    if azimuth > 0:  # 车辆在右侧（相对于当前车辆前方）
+        vehicle_control.steer = -steer_strength  # 向左微调
+    elif azimuth < 0:  # 车辆在左侧
+        vehicle_control.steer = steer_strength   # 向右微调
+    else:  # 正前方
+        vehicle_control.steer = steer_strength   # 默认向右微调（宽敞方向）
+
+    # 距离越近，转向强度稍大，同时轻微降速
+    if distance < SAFE_DISTANCE / 2:
+        vehicle_control.steer *= 1.5
+        vehicle_control.throttle = max(0.4, vehicle_control.throttle)
+    else:
+        vehicle_control.throttle = max(0.5, vehicle_control.throttle)
+    vehicle_control.brake = 0.0
+
+    # 应用控制指令（覆盖自动驾驶的转向，保留油门/刹车）
+    vehicle.apply_control(vehicle_control)
+    print(f"\n⚠️ 检测到前方车辆：距离{distance:.1f}m，方位{azimuth:.1f}度，正在向{'右' if azimuth <=0 else '左'}避让...")
+
 def main():
-    """主函数：连接CARLA、随机加载地图、生成车辆、显示画面、输出速度"""
+    """主函数：连接CARLA、随机加载地图、生成车辆、显示画面、检测并避让车辆"""
     # 初始化资源
     client = None
     world = None
@@ -177,20 +280,39 @@ def main():
             print("❌ 无可用生成点，退出")
             return
 
-        # 4. 生成车辆（带基础避让功能）
+        # 4. 生成主车辆（带基础避让功能）
         vehicle = spawn_vehicle(world, blueprint_library, spawn_points)
         if vehicle is None:
             return
 
-        # 5. 挂载摄像头
+        # 5. 生成其他车辆（增加环境中的车辆，用于测试避让）
+        other_vehicle_count = 5  # 生成5辆其他车辆
+        spawned_count = 0
+        for spawn_point in spawn_points:
+            if spawned_count >= other_vehicle_count:
+                break
+            # 随机选择其他车型，跳过主车辆的车型（可选）
+            other_vehicle_bps = [bp for bp in blueprint_library.filter('vehicle.*') if bp.id != PREFERRED_VEHICLE]
+            if not other_vehicle_bps:
+                other_vehicle_bps = blueprint_library.filter('vehicle.*')
+            other_vehicle_bp = random.choice(other_vehicle_bps)
+            try:
+                other_vehicle = world.spawn_actor(other_vehicle_bp, spawn_point)
+                other_vehicle.set_autopilot(True)
+                spawned_count += 1
+            except Exception as e:
+                continue
+        print(f"✅ 生成了{spawned_count}辆其他车辆，用于测试避让功能")
+
+        # 6. 挂载摄像头传感器（移除雷达，避免属性错误）
         camera = spawn_camera(world, blueprint_library, vehicle)
         if camera is None:
             return
 
-        # 6. 显示画面+输出速度
+        # 7. 显示画面+检测车辆+避让逻辑
         print("\n📌 操作说明：")
         print(f"   - 按 'q' 退出程序")
-        print(f"   - 车辆已启用自动驾驶+基础避让功能")
+        print(f"   - 车辆已启用自动驾驶+主动识别车辆避让功能")
         cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(WINDOW_NAME, *WINDOW_SIZE)
 
@@ -200,12 +322,25 @@ def main():
             if not IMAGE_QUEUE.empty():
                 img = IMAGE_QUEUE.get(timeout=0.5)
                 cv2.imshow(WINDOW_NAME, img)
-            # 实时输出车辆速度（间隔打印，避免刷屏）
+
+            # 每隔一定帧数检测车辆（降低性能消耗，适配低画质版）
             frame_count += 1
+            if frame_count % 5 == 0:  # 每5帧检测一次
+                distance, azimuth, has_vehicle = detect_nearby_vehicles(world, vehicle)
+                if has_vehicle:
+                    avoid_vehicle(vehicle, distance, azimuth)
+                else:
+                    # 无车辆时，恢复默认转向（直行）
+                    if vehicle_control.steer != 0.0:
+                        vehicle_control.steer = 0.0
+                        vehicle.apply_control(vehicle_control)
+                frame_count = 0
+
+            # 实时输出车辆速度（间隔打印，避免刷屏）
             if frame_count % SPEED_PRINT_INTERVAL == 0 and vehicle is not None:
                 current_speed = get_vehicle_speed(vehicle)
                 print(f"\r当前车辆速度：{current_speed} km/h", end="")
-                frame_count = 0
+
             # 按q退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 print("\n📌 收到退出指令，正在清理资源...")
@@ -245,6 +380,17 @@ def main():
                 print("✅ 销毁车辆")
             except Exception as e:
                 print(f"⚠️ 销毁车辆失败：{e}")
+        # 销毁其他生成的车辆
+        try:
+            if world:
+                for actor in world.get_actors().filter('vehicle.*'):
+                    try:
+                        actor.destroy()
+                    except Exception:
+                        pass
+                print("✅ 销毁所有其他车辆")
+        except Exception as e:
+            print(f"⚠️ 销毁其他车辆失败：{e}")
         cv2.destroyAllWindows()
         print("✅ 程序结束")
 
