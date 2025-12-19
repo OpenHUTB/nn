@@ -21,7 +21,7 @@ class Recorder():
             folder (str, optional): Storage location. Defaults to 'videos'.
         """
 
-        self.cameraCapture = cv2.VideoCapture(0)
+        #self.cameraCapture = cv2.VideoCapture(0)
         self.height = height
         self.width = width
         self.fps = float(fps)
@@ -61,3 +61,12 @@ class Recorder():
         if self.video is None:
             raise Exception('No video initialized.')
         self.video.release()
+
+        def __enter__(self):
+            """Context manager entry point"""
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            """Context manager exit point - ensures video is closed"""
+            if self.video is not None:
+                self.close_recording()
