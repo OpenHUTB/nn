@@ -5,6 +5,7 @@ import time
 # 加载模型
 model = mujoco.MjModel.from_xml_path("humanoid.xml")
 data = mujoco.MjData(model)
+
 # 启动可视化界面
 with viewer.launch_passive(model, data) as v:
     # 仿真循环
