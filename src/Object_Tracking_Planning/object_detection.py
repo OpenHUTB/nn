@@ -1267,7 +1267,8 @@ class PIDLateralController:
                    -1 = maximum steering to left
                    +1 = maximum steering to right
         """
-        return self._pid_control(waypoint, self._vehicle.get_transform())
+        vehicle_transform = self._vehicle.get_transform()
+        return self._pid_control(waypoint, vehicle_transform)
 
     def _pid_control(self, waypoint, vehicle_transform):
         """
@@ -1280,58 +1281,95 @@ class PIDLateralController:
         Returns:
             float: Steering control in range [-1, 1]
         """
-        # Calculate vehicle direction vector
-        v_begin = vehicle_transform.location
-        yaw_rad = math.radians(vehicle_transform.rotation.yaw)
-        v_end = v_begin + carla.Location(
-            x=math.cos(yaw_rad),
-            y=math.sin(yaw_rad)
-        )
+        # 计算当前角度误差
+        angle_diff = self._calculate_angle_error(waypoint, vehicle_transform)
 
-        # Calculate vectors
-        v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
-        w_vec = np.array([
-            waypoint.transform.location.x - v_begin.x,
-            waypoint.transform.location.y - v_begin.y,
+        # 更新误差缓冲区
+        self._error_buffer.append(angle_diff)
+
+        # 计算PID输出
+        pid_output = self._calculate_pid_value(angle_diff)
+
+        # 限制输出范围
+        return np.clip(pid_output, -1.0, 1.0)
+
+    def _calculate_angle_error(self, waypoint, vehicle_transform):
+        """计算车辆当前方向与目标点方向之间的角度误差"""
+        # 获取车辆位置和方向
+        vehicle_pos = vehicle_transform.location
+        vehicle_yaw = math.radians(vehicle_transform.rotation.yaw)
+
+        # 计算车辆方向向量
+        vehicle_direction = carla.Location(
+            x=math.cos(vehicle_yaw),
+            y=math.sin(vehicle_yaw)
+        )
+        vehicle_vec_end = vehicle_pos + vehicle_direction
+
+        # 计算目标方向向量
+        target_pos = waypoint.transform.location
+
+        # 创建向量
+        vehicle_vec = np.array([
+            vehicle_vec_end.x - vehicle_pos.x,
+            vehicle_vec_end.y - vehicle_pos.y,
             0.0
         ])
 
-        # Calculate angle difference
-        v_norm = np.linalg.norm(v_vec)
-        w_norm = np.linalg.norm(w_vec)
-        dot_product = np.dot(w_vec, v_vec) / (v_norm * w_norm)
+        target_vec = np.array([
+            target_pos.x - vehicle_pos.x,
+            target_pos.y - vehicle_pos.y,
+            0.0
+        ])
+
+        # 计算角度
+        return self._calculate_signed_angle(vehicle_vec, target_vec)
+
+    def _calculate_signed_angle(self, vec1, vec2):
+        """计算两个向量之间的有符号角度"""
+        # 归一化向量
+        vec1_norm = np.linalg.norm(vec1)
+        vec2_norm = np.linalg.norm(vec2)
+
+        # 避免除以零
+        if vec1_norm < 1e-6 or vec2_norm < 1e-6:
+            return 0.0
+
+        # 计算点积和夹角
+        dot_product = np.dot(vec1, vec2) / (vec1_norm * vec2_norm)
         dot_product_clipped = np.clip(dot_product, -1.0, 1.0)
-        angle_diff = math.acos(dot_product_clipped)
+        angle = math.acos(dot_product_clipped)
 
-        # Determine sign based on cross product
-        cross_product = np.cross(v_vec, w_vec)
+        # 根据叉积确定方向（正负）
+        cross_product = np.cross(vec1, vec2)
         if cross_product[2] < 0:
-            angle_diff *= -1.0
+            angle = -angle
 
-        # Update error buffer and calculate PID terms
-        self._error_buffer.append(angle_diff)
+        return angle
 
-        # Calculate derivative and integral terms
-        derivative_error = self._calculate_derivative_error()
-        integral_error = self._calculate_integral_error()
+    def _calculate_pid_value(self, current_error):
+        """计算PID控制器的输出值"""
+        # 比例项
+        proportional = self._k_p * current_error
 
-        # PID calculation with clamping
-        pid_output = (
-                self._k_p * angle_diff +
-                self._k_d * derivative_error +
-                self._k_i * integral_error
-        )
+        # 微分项
+        derivative = self._k_d * self._get_derivative_error()
 
-        return np.clip(pid_output, -1.0, 1.0)
+        # 积分项
+        integral = self._k_i * self._get_integral_error()
 
-    def _calculate_derivative_error(self):
-        """Calculate derivative error term."""
-        if len(self._error_buffer) >= 2:
-            return (self._error_buffer[-1] - self._error_buffer[-2]) / self._dt
-        return 0.0
+        return proportional + derivative + integral
 
-    def _calculate_integral_error(self):
-        """Calculate integral error term."""
+    def _get_derivative_error(self):
+        """获取微分误差项"""
+        if len(self._error_buffer) < 2:
+            return 0.0
+        return (self._error_buffer[-1] - self._error_buffer[-2]) / self._dt
+
+    def _get_integral_error(self):
+        """获取积分误差项"""
+        if not self._error_buffer:
+            return 0.0
         return sum(self._error_buffer) * self._dt
 
 
