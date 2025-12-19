@@ -463,7 +463,13 @@ class HUD(object):
 
 
 class FadingText(object):
-    """ Class for fading text """
+    """Class for fading text"""
+
+    # 常量定义
+    ALPHA_MULTIPLIER = 500.0  # 透明度计算系数
+    TEXT_OFFSET = (10, 11)  # 文本偏移量
+    DEFAULT_COLOR = (255, 255, 255)  # 默认文本颜色
+    DEFAULT_SECONDS = 2.0  # 默认显示时间
 
     def __init__(self, font, dim, pos):
         """Constructor method"""
@@ -471,25 +477,56 @@ class FadingText(object):
         self.dim = dim
         self.pos = pos
         self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        self._init_surface()
 
-    def set_text(self, text, color=(255, 255, 255), seconds=2.0):
+    def _init_surface(self):
+        """初始化Surface"""
+        self.surface = pygame.Surface(self.dim)
+        self._clear_surface()
+
+    def _clear_surface(self):
+        """清空Surface"""
+        self.surface.fill((0, 0, 0, 0))
+
+    def set_text(self, text, color=None, seconds=None):
         """Set fading text"""
+        # 使用默认值
+        if color is None:
+            color = self.DEFAULT_COLOR
+        if seconds is None:
+            seconds = self.DEFAULT_SECONDS
+
+        # 渲染文本
         text_texture = self.font.render(text, True, color)
+
+        # 准备Surface
         self.surface = pygame.Surface(self.dim)
         self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
+        self._clear_surface()
+
+        # 绘制文本
+        self.surface.blit(text_texture, self.TEXT_OFFSET)
 
     def tick(self, _, clock):
         """Fading text method for every tick"""
-        delta_seconds = 1e-3 * clock.get_time()
+        # 计算经过的时间
+        delta_seconds = clock.get_time() / 1000.0  # 转换为秒
+
+        # 更新时间
         self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
+
+        # 更新透明度
+        self._update_alpha()
+
+    def _update_alpha(self):
+        """更新Surface的透明度"""
+        alpha_value = self.seconds_left * self.ALPHA_MULTIPLIER
+        self.surface.set_alpha(alpha_value)
 
     def render(self, display):
         """Render fading text method"""
-        display.blit(self.surface, self.pos)
+        if self.seconds_left > 0:
+            display.blit(self.surface, self.pos)
 
 
 # ==============================================================================
