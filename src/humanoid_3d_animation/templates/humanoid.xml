@@ -2,7 +2,6 @@
   <compiler angle="radian" inertiafromgeom="true"/>
   <option timestep="0.005" gravity="0 0 -9.81"/>
 
-
   <!-- 视觉材质：区分不同身体部位 -->
   <asset>
     <material name="torso_mat" rgba=".8 .2 .2 1"/>   <!-- 躯干-红色 -->
