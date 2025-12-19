@@ -1,22 +1,32 @@
 # ui_handler.py
-# 功能：统一处理用户交互逻辑，支持命令行参数和交互式菜单两种模式
+# 功能：用户交互调度中心（User Interface Handler）
+# 职责：
+#   - 提供命令行接口（CLI）和交互式菜单两种启动方式
+#   - 解析用户输入（图像路径 / 摄像头指令）
+#   - 验证文件路径是否存在、可读、格式有效
+#   - 调度静态图像检测 或 实时摄像头检测
+#   - 处理用户中断（Ctrl+C）并优雅退出
+#   - 保存检测结果图像并反馈保存状态
+#
+# 设计原则：
+#   - 用户友好：错误提示具体到“文件不存在”、“无权限”、“格式不支持”
+#   - 安全兜底：即使用户输错路径，也不崩溃，而是返回主菜单
+#   - 松耦合：依赖 DetectionEngine 和 CameraDetector，但不硬编码其内部逻辑
+#   - 可扩展：支持未来新增模式（如视频文件检测）
 
 import os
 import cv2
 import argparse
-from detection_engine import DetectionEngine
+import traceback
+
+from detection_engine import DetectionEngine, ModelLoadError
+from camera_detector import CameraOpenError
 
 
 def parse_args():
     """
-    解析命令行参数。
-    
-    支持两种运行模式：
-        --image <path>   : 指定静态图像路径进行检测
-        --camera         : 启动实时摄像头检测
-    
-    返回:
-        argparse.Namespace: 解析后的参数对象
+    解析命令行参数，支持 --image <path> 或 --camera 两种模式。
+    返回 argparse.Namespace 对象。
     """
     parser = argparse.ArgumentParser(description="YOLOv8 Detection System")
     parser.add_argument("--image", type=str, help="Path to input image file")
@@ -26,139 +36,157 @@ def parse_args():
 
 class UIHandler:
     """
-    用户界面处理器类。
-    负责协调命令行参数、交互式菜单、图像/摄像头检测流程，
-    是整个应用的调度中心。
+    用户界面控制器。
+    初始化时加载模型，失败则立即退出。
+    支持 CLI 模式和交互式菜单。
     """
 
     def __init__(self, config):
         """
-        初始化 UI 处理器。
-
-        参数:
-            config (Config): 配置对象，包含模型路径、阈值、摄像头索引等参数
+        初始化 UIHandler。
+        若 DetectionEngine 初始化失败（如模型加载错误），打印错误并退出。
         """
         self.config = config
-        # 初始化检测引擎（加载 YOLO 模型）
-        self.engine = DetectionEngine(
-            model_path=config.model_path,
-            conf_threshold=config.confidence_threshold
-        )
+        try:
+            self.engine = DetectionEngine(
+                model_path=config.model_path,
+                conf_threshold=config.confidence_threshold
+            )
+        except ModelLoadError as e:
+            print(f"❌ Fatal: Failed to initialize detection engine: {e}")
+            raise SystemExit(1)
 
     def run(self):
         """
-        主运行入口。
-        优先检查命令行参数；若无，则进入交互式菜单。
+        主流程入口：
+          - 若有 --image 参数 → 静态检测
+          - 若有 --camera 参数 → 摄像头检测
+          - 否则 → 交互式菜单
         """
         args = parse_args()
-
         if args.image is not None:
             print(f"[CLI Mode] Detecting static image: {args.image}")
-            self._run_static_detection(image_path=args.image)
+            self._run_static_detection(args.image)
         elif args.camera:
             print("[CLI Mode] Starting live camera detection...")
             self._run_camera_detection()
         else:
-            # 无命令行参数时，启动交互式菜单
             self._interactive_menu()
 
     def _interactive_menu(self):
         """
-        显示交互式主菜单，供用户选择操作模式。
-        支持选项：
-            1. 静态图像检测（可选默认图或自定义路径）
-            2. 实时摄像头检测
-            3. 退出程序
+        显示交互式文本菜单，处理用户选择。
+        支持 Ctrl+C 中断，无效输入递归重试。
         """
-        print("=== YOLO Detection System ===")
-        print("1. Static Image Detection")
-        print("2. Live Camera Detection")
-        print("3. Exit")
-        choice = input("Please select an option (1-3): ").strip()
+        try:
+            print("\n" + "=" * 40)
+            print("🚀 YOLOv8 Detection System")
+            print("=" * 40)
+            print("1. Static Image Detection")
+            print("2. Live Camera Detection")
+            print("3. Exit")
+            choice = input("Please select an option (1-3): ").strip()
+        except KeyboardInterrupt:
+            print("\nUser cancelled. Exiting...")
+            return
 
         if choice == "1":
             self._choose_image_source()
         elif choice == "2":
             self._run_camera_detection()
         elif choice == "3":
-            print("Exiting program.")
+            print("Goodbye!")
         else:
             print("Invalid option. Please enter 1, 2, or 3.")
+            self._interactive_menu()
 
     def _choose_image_source(self):
         """
-        子菜单：让用户选择使用默认测试图像还是输入自定义路径。
-        默认路径硬编码为桌面的 test.jpg（适用于快速测试）。
+        子菜单：让用户选择默认测试图或自定义路径。
+        对自定义路径进行 ~ 展开和不可见字符清理。
+        分级验证路径有效性（存在性、可读性）。
         """
-        default_image_path = self.config.default_image_path  # 使用配置中的默认图片路径
+        default_path = self.config.default_image_path
         print("\n--- Static Image Detection ---")
-        print(f"a) Use default test image at: {default_image_path}")
+        print(f"a) Use default test image at: {default_path}")
         print("b) Enter custom image path")
-        sub_choice = input("Choose (a/b): ").strip().lower()
+        try:
+            sub_choice = input("Choose (a/b): ").strip().lower()
+        except KeyboardInterrupt:
+            return
 
         if sub_choice == "a":
-            # 检查默认图像是否存在
-            if not os.path.exists(default_image_path):
-                print(f"\n⚠️ Default image not found at:\n {default_image_path}")
-                print("💡 Please place a 'test.jpg' file in the specified location, or choose option (b).")
+            if not os.path.exists(default_path):
+                print(f"⚠️ Default image not found: {default_path}")
+                print("💡 Place 'test.jpg' in the 'data/' folder or choose (b).")
                 return
-            print(f"Using default image: {default_image_path}")
-            self._run_static_detection(image_path=default_image_path)
-
+            self._run_static_detection(default_path)
         elif sub_choice == "b":
-            # 获取用户输入的路径，并展开 ~ 符号（如 ~/Pictures/img.jpg）
-            custom_path = input("Enter full or relative image path: ").strip()
-            custom_path = os.path.expanduser(custom_path)
-            # 移除可能的不可见 Unicode 控制字符（特别是从 Windows 复制的路径）
-            custom_path = ''.join(ch for ch in custom_path if ord(ch) != 0x202A)
-            if not os.path.exists(custom_path):
-                print(f"❌ Error: File not found at: {custom_path}")
+            try:
+                custom_path = input("Enter image path: ").strip()
+                custom_path = os.path.expanduser(custom_path)
+                # 清理从某些系统复制时可能带入的不可见 Unicode 控制字符（如 U+202A）
+                custom_path = ''.join(ch for ch in custom_path if ord(ch) != 0x202A)
+            except KeyboardInterrupt:
                 return
-            self._run_static_detection(image_path=custom_path)
 
+            if not os.path.exists(custom_path):
+                print(f"❌ File not found: {custom_path}")
+                return
+            if not os.access(custom_path, os.R_OK):
+                print(f"❌ Permission denied: {custom_path}")
+                return
+
+            self._run_static_detection(custom_path)
         else:
             print("Invalid choice. Returning to main menu.")
 
     def _run_static_detection(self, image_path):
-        """ 
-        执行静态图像检测流程。 
-        
-        参数:
-            image_path (str): 待检测图像的完整路径
+        """
+        执行单张图像检测：
+          - 使用 cv2.imread 读取
+          - 若失败，分级诊断原因（路径？权限？格式？）
+          - 显示结果窗口，等待按键关闭
+          - 自动保存结果图（原文件名 + "_detected" + 原扩展名）
         """
         print(f"🔍 Detecting objects in: {image_path}")
+        frame = cv2.imread(image_path)
+        if frame is None:
+            # 分级诊断 imread 失败原因
+            if not os.path.exists(image_path):
+                print(f"❌ Path does not exist: {image_path}")
+            elif not os.access(image_path, os.R_OK):
+                print(f"❌ No read permission: {image_path}")
+            else:
+                print(f"❌ Unsupported or corrupted image format: {image_path}")
+            return
+
+        annotated_frame, _ = self.engine.detect(frame)
+
+        window_name = "YOLO Detection Result"
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.imshow(window_name, annotated_frame)
+        print("Press any key to close.")
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+        # 智能保留原扩展名（JPG/PNG）
+        ext = ".jpg" if image_path.lower().endswith(".jpg") else ".png"
+        save_path = image_path.replace(ext, f"_detected{ext}")
         try:
-            # 直接读取图像
-            frame = cv2.imread(image_path)
-            if frame is None:
-                print(f"❌ Failed to load image from: {image_path}")
-                return
-
-            # 使用已有的 self.engine（DetectionEngine）进行检测
-            annotated_frame, results = self.engine.detect(frame)
-
-            # 显示可缩放窗口
-            window_name = "YOLO Detection Result"
-            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)  # 👈 关键修改：启用可缩放窗口
-            cv2.imshow(window_name, annotated_frame)
-            print("Detection completed. Press any key to close the window.")
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
-            # 可选：保存结果
-            save_path = image_path.replace(".jpg", "_detected.jpg").replace(".png", "_detected.png")
-            cv2.imwrite(save_path, annotated_frame)
-            print(f"Result saved to: {save_path}")
-
+            success = cv2.imwrite(save_path, annotated_frame)
+            if success:
+                print(f"✅ Result saved to: {save_path}")
+            else:
+                print("❌ Failed to save result (OpenCV write error)")
         except Exception as e:
-            print(f"❌ Detection failed: {e}")
-            import traceback
-            traceback.print_exc()  # 打印完整错误栈，便于调试
+            print(f"⚠️ Failed to save result: {e}")
 
     def _run_camera_detection(self):
         """
-        执行实时摄像头检测流程。
-        使用配置中的摄像头索引和输出间隔参数。
+        启动实时摄像头检测。
+        动态创建 CameraDetector 实例并运行。
+        捕获摄像头专属异常和其他未预期错误。
         """
         try:
             from camera_detector import CameraDetector
@@ -167,7 +195,8 @@ class UIHandler:
                 output_interval=self.config.output_interval
             )
             detector.start_detection(camera_index=self.config.camera_index)
+        except CameraOpenError as e:
+            print(f"❌ Camera error: {e}")
         except Exception as e:
-            print(f"❌ Camera detection failed: {e}")
-            import traceback
+            print(f"💥 Camera detection failed: {e}")
             traceback.print_exc()
