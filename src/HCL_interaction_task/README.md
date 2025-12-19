@@ -2,105 +2,137 @@
 
 ## 项目概述
 
-本项目融合了基于MuJoCo的人体上肢物理仿真与ROS 2机器人操作系统，实现了兼具高精度食指追踪功能与分布式通信能力的综合仿真系统。项目核心包含两大部分：一是通过MediaPipe手部追踪驱动的食指指向仿真，二是基于ROS 2的关节数据发布与感知处理模块，可实现虚拟模型与外部系统的实时数据交互。
-
-### 演示视频
-
-- **食指指向功能演示**：
+本项目融合了基于MuJoCo的人体上肢物理仿真与ROS 2机器人操作系统，实现了兼具高精度手势交互与分布式通信能力的综合仿真系统。项目核心包含两大功能模块：
+1. **食指指向追踪**（`mobl_arms_index_pointing`）：通过MediaPipe手部追踪驱动食指指向指定目标（如小球）的仿真功能
+- **功能演示**：
 ![ezgif-72b271013158aed5](https://github.com/user-attachments/assets/937c5994-4cfe-42ae-8f77-2eb0ebb1b41a)
+
+2. **面板选择反应**（`mobl_arms_index_choice_reaction`）：新增的多目标面板交互模块，支持食指对虚拟面板进行选择与反应测试
+- **功能演示**：
+![ezgif-283f8d513dd75e78](https://github.com/user-attachments/assets/6edd413e-8566-4b36-a8c0-fd6650ceee10)
+
+
 ## 主要特点
 
+### 通用特点
 - **高精度骨骼模型**：包含上肢完整骨骼结构，细化手部掌骨、指骨（近节/中节/远节）的几何与物理参数
-- **增强型肌肉驱动**：新增食指相关肌肉群（FDPI、EDM等）的肌腱路径定义，提升指向动作真实性
+- **增强型肌肉驱动**：基于FDPI、EDM等食指相关肌肉群的肌腱路径定义，提升动作真实性
 - **实时手势映射**：集成MediaPipe手部追踪，将真实手势实时映射到虚拟模型
-- **目标追踪功能**：支持配置目标坐标，实现食指自动指向指定位置
 - **ROS 2分布式通信**：通过ROS 2节点实现关节数据发布、感知数据处理与外部系统交互
-- **模块化设计**：保持与[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box)原项目的兼容性，同时扩展ROS 2接口
+- **模块化设计**：保持与[User-in-the-Box](https://github.com/User-in-the-Box/user-in-the-box)原项目的兼容性
 
-## 文件说明
+### 食指指向模块（`mobl_arms_index_pointing`）
+- **目标追踪功能**：支持配置单一目标坐标（如小球），实现食指自动指向指定位置
+- **动态轨迹规划**：根据目标位置实时计算手指运动轨迹，确保平滑自然的指向动作
 
-| 文件名 | 描述 |
-|--------|------|
-| **config.yaml** | 仿真参数配置文件，包含仿真步长（dt）、渲染模式、窗口分辨率及目标位置（target_pos）等 |
-| **simulation.xml** | MuJoCo模型定义文件，包含骨骼结构、肌肉肌腱参数、标记点及关节活动范围等核心信息 |
-| **evaluator.py** | 程序入口脚本，通过命令行参数接收配置文件和模型文件路径，初始化并启动仿真 |
-| **simulator.py** | 仿真器核心逻辑，包含MuJoCo环境初始化、Viewer适配、仿真循环控制及手势映射功能 |
-| **assets/** | 模型资源文件夹，存放网格文件（.stl）和纹理文件，定义骨骼与手部的几何形状 |
-| **mujoco_ros_demo/** | ROS 2功能包目录 |
+### 面板选择反应模块（`mobl_arms_index_choice_reaction`）
+- **多目标交互面板**：虚拟面板上可配置多个选择目标，支持自定义布局与样式
+- **反应时间记录**：精确记录从面板目标出现到食指选择的反应时长，用于交互性能分析
+- **选择有效性判定**：自动检测食指与目标区域的接触状态，判断选择有效性
+- **动态目标生成**：支持随机/序列生成面板目标，模拟复杂选择任务
+
+
+## 目录结构
+
+```
+HCL_interaction_task/
+├── mobl_arms_index_pointing/       # 食指指向追踪模块
+│   ├── config.yaml                 # 指向仿真参数配置
+│   ├── simulation.xml              # 指向功能模型定义
+│   ├── evaluator.py                # 指向模块程序入口
+│   ├── simulator.py                # 指向仿真核心逻辑
+│   ├── assets/                     # 指向模块模型资源（网格/纹理）
+│   └── mujoco_ros_demo/            # 指向模块ROS 2功能包
+├── mobl_arms_index_choice_reaction/ # 面板选择反应模块
+│   ├── config.yaml                 # 面板交互参数配置
+│   ├── simulation.xml              # 面板功能模型定义
+│   ├── main.py                     # 面板模块程序入口
+│   ├── simulator.py                # 面板仿真核心逻辑
+│   └── assets/                     # 面板模块模型资源（含面板纹理）
+├── README.md                       # 项目说明文档
+└── requirements.txt                # 项目依赖清单
+```
 
 
 ## 模型结构
 
-仿真模型定义在`simulation.xml`中，核心组件包括：
-- **骨骼结构**：详细的上肢骨骼（锁骨、尺骨、掌骨及指骨等），通过网格文件定义几何形状
-- **标记点（sites）**：用于定位肌肉附着点和关键位置（如手指关节、肌肉路径点）
-- **肌腱与肌肉**：定义主要肌肉的路径（三角肌、肱二头肌等）及物理参数，实现逼真驱动
-- **关节**：定义各关节的活动范围和轴方向（如肘关节弯曲角度限制）
+### 食指指向模型（`mobl_arms_index_pointing/simulation.xml`）
+- 核心组件：上肢骨骼结构、肌肉肌腱系统、目标标记点（小球）
+- 关键定义：手指关节活动范围、肌肉附着点、目标位置约束
+
+### 面板选择模型（`mobl_arms_index_choice_reaction/simulation.xml`）
+- 核心组件：继承基础上肢模型，新增交互面板几何体、多目标区域标记
+- 关键定义：面板碰撞属性、目标区域触发条件、手指接触检测参数
+
 
 ## 系统要求
 
 - Ubuntu 22.04 LTS (ROS 2 Humble)
-- Python 3.8+（3.10.18）
-- MuJoCo 2.3.0+（3.3.7）
-- OpenCV
-- MediaPipe
-- NumPy
-- PyYAML
-- Conda 环境管理器
+- Python 3.8+（推荐3.10.18）
+- MuJoCo 2.3.0+（测试版本3.3.7）
+- 依赖库：OpenCV、MediaPipe、NumPy、PyYAML
+- 环境管理：Conda 环境管理器
 - 额外依赖（C++）：libglfw3-dev、libyaml-cpp-dev、libeigen3-dev
+
 
 ## 安装步骤
 
-### 1. 克隆仓库
+### 1. 克隆仓库（如适用）
 
 ```bash
-# 克隆主项目
-git clone https://github.com/yourusername/mobl-arms-index-pointing.git
-cd mobl-arms-index-pointing
-
-# 克隆依赖项目（如需要）
-git clone https://github.com/User-in-the-Box/user-in-the-box.git
+git clone https://github.com/lbxlb/nn.git
+cd HCL_interaction_task
 ```
 
-### 2. 安装ROS 2 Humble
-
-按照官方指南安装：https://docs.ros.org/en/humble/Installation.html
-
-### 3. 创建并配置环境
+### 2. 环境配置
 
 ```bash
 # 创建并激活conda环境
 conda create -n mjoco_ros python=3.10
 conda activate mjoco_ros
 
-# 安装核心依赖
+# 安装依赖
+pip install -r requirements.txt
+# 或手动安装
 pip install mujoco mediapipe numpy opencv-python pyyaml
 
-# 安装ROS 2相关依赖（如需要）
+# 安装ROS 2相关依赖（如使用ROS功能）
 sudo apt install ros-humble-ros-base
-
-# 安装项目包
-pip install -e .
 ```
 
-### 4. 模型文件准备
+### 3. 模型资源准备
 
-完整模型文件集（精细模型stl文件和图片）可通过以下链接下载：
-[完整模型文件集网盘链接](通过网盘分享的文件：
-链接: https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e 提取码: rq8e)
+1. 下载完整模型文件集（含精细STL模型和纹理）：
+   [完整模型文件集网盘链接](链接: https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e 提取码: rq8e)
 
-下载后解压到 `mujoco_ros_demo/config/assets/` 目录
+2. 解压资源文件到对应模块的assets目录：
+   - 指向模块：`mobl_arms_index_pointing/assets/`
+   - 面板模块：`mobl_arms_index_choice_reaction/assets/`
+
 
 ## 配置说明
 
-### 仿真参数配置（config.yaml）
+### 食指指向模块配置（`mobl_arms_index_pointing/config.yaml`）
 
 ```yaml
-dt: 0.05                # 仿真步长（越小精度越高，性能消耗越大）
-render_mode: "human"    # 渲染模式（"human"显示窗口，"offscreen"无窗口运行）
-resolution: [1280, 960] # 窗口分辨率 [宽度, 高度]
-target_pos: [0.4, 0, 0.7] # 食指追踪目标坐标
+dt: 0.05                # 仿真步长
+render_mode: "human"    # 渲染模式（"human"/"offscreen"）
+resolution: [1280, 960] # 窗口分辨率
+target_pos: [0.4, 0, 0.7] # 目标小球坐标
 ```
+
+### 面板选择模块配置（`mobl_arms_index_choice_reaction/config.yaml`）
+
+```yaml
+dt: 0.05                # 仿真步长
+render_mode: "human"    # 渲染模式
+resolution: [1280, 960] # 窗口分辨率
+panel_pos: [0.5, 0, 0.6] # 面板位置
+target_count: 3         # 面板目标数量
+target_size: 0.05       # 目标区域大小
+reaction_timeout: 5.0   # 反应超时时间（秒）
+```
+
 
 ### ROS 2功能包结构
 
