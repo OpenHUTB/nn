@@ -201,6 +201,8 @@ class MojocoDataSim:
         # 查找车辆的驱动关节
         rear_left_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "rear_left_wheel_motor")
         rear_right_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "rear_right_wheel_motor")
+        front_left_steer_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_left_steering")
+        front_right_steer_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_right_steering")
         
         if rear_left_idx >= 0 and rear_right_idx >= 0:
             print("找到了车辆驱动关节")
@@ -213,6 +215,11 @@ class MojocoDataSim:
                 self.data.ctrl[rear_left_idx] = 5.0  # 左后轮速度
             if rear_right_idx >= 0:
                 self.data.ctrl[rear_right_idx] = 5.0  # 右后轮速度
+            # 设置前轮转向
+            if front_left_steer_idx >= 0:
+                self.data.ctrl[front_left_steer_idx] = np.sin(i * 0.05) * 10  # 正弦变化转向
+            if front_right_steer_idx >= 0:
+                self.data.ctrl[front_right_steer_idx] = np.sin(i * 0.05) * 10  # 正弦变化转向
                 
             # 执行仿真步长
             mujoco.mj_step(self.model, self.data)
