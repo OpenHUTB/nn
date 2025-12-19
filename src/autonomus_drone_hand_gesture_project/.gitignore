@@ -4,3 +4,5 @@ Lib/
 __pycache__/
 *.pyc
 *.dll.a
+# 忽略IDEA配置文件
+.idea/
