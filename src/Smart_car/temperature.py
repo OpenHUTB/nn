@@ -2,148 +2,194 @@ import time
 import random
 from enum import Enum
 
-# 定义温度调节模式枚举
-class TempMode(Enum):
-    AUTO = "自动模式"    # 自动根据目标温度调节
-    COOL = "制冷模式"    # 仅制冷
-    HEAT = "制热模式"    # 仅制热
-    FAN = "仅吹风模式"   # 仅通风，不控温
-    OFF = "关闭模式"     # 系统关闭
+# 定义系统常量
+DEFAULT_TARGET_TEMP = 24  # 默认目标温度(℃)
+TEMP_TOLERANCE = 1  # 温度容差(℃)
+MAX_FAN_SPEED = 5  # 最大风速档
+MIN_FAN_SPEED = 1  # 最小风速档
 
-# 定义温度调节系统类
-class AutoCarTempSystem:
+
+# 空调模式枚举
+class AC_Mode(Enum):
+    COOL = "制冷"
+    HEAT = "制热"
+    VENT = "通风"
+    OFF = "关闭"
+
+
+# 运行模式枚举
+class Run_Mode(Enum):
+    AUTO = "自动"
+    MANUAL = "手动"
+
+
+class TemperatureSensor:
+    """温度传感器类 - 模拟采集车内/车外温度"""
+
     def __init__(self):
-        # 系统基础配置
-        self.target_temp = 25.0          # 目标温度(℃)，默认25℃
-        self.current_temp = 25.0         # 当前温度(℃)，初始默认值
-        self.mode = TempMode.AUTO        # 初始模式：自动
-        self.fan_speed = 2               # 风扇转速(1-5档)，默认2档
-        self.is_running = True           # 系统运行状态
-        self.temp_tolerance = 0.5        # 温度容差(℃)，避免频繁启停
-        self.max_temp = 45.0             # 最高安全温度
-        self.min_temp = 5.0              # 最低安全温度
+        self.interior_temp = 25  # 初始车内温度
+        self.exterior_temp = 30  # 初始车外温度
 
-    def simulate_temp_sensor(self):
-        """模拟温度传感器读取当前温度（含微小波动）"""
-        # 模拟真实环境温度波动 ±0.3℃
-        fluctuation = random.uniform(-0.3, 0.3)
-        self.current_temp += fluctuation
-        # 限制温度在安全范围内
-        self.current_temp = max(self.min_temp, min(self.max_temp, self.current_temp))
-        return round(self.current_temp, 1)
+    def read_temperatures(self):
+        """模拟读取温度（加入微小随机波动）"""
+        self.interior_temp += random.uniform(-0.5, 0.5)
+        self.exterior_temp += random.uniform(-0.8, 0.8)
+        # 温度边界限制
+        self.interior_temp = max(10, min(45, self.interior_temp))
+        self.exterior_temp = max(-20, min(50, self.exterior_temp))
+        return round(self.interior_temp, 1), round(self.exterior_temp, 1)
 
-    def set_target_temp(self, temp):
-        """设置目标温度（含合法性校验）"""
-        if self.min_temp <= temp <= self.max_temp:
-            self.target_temp = temp
-            print(f"✅ 目标温度已设置为：{temp}℃")
-        else:
-            print(f"❌ 温度设置失败！请设置{self.min_temp}~{self.max_temp}℃范围内的温度")
 
-    def set_mode(self, new_mode):
-        """切换温度调节模式"""
-        if isinstance(new_mode, TempMode):
-            self.mode = new_mode
-            print(f"🔄 模式已切换为：{new_mode.value}")
-            # 切换到关闭模式时停止风扇
-            if new_mode == TempMode.OFF:
-                self.fan_speed = 0
-                self.is_running = False
-                print("🔴 温度调节系统已关闭")
-            else:
-                self.is_running = True
-                if self.fan_speed == 0:
-                    self.fan_speed = 2  # 切换回运行模式时默认2档风速
-        else:
-            print("❌ 模式设置失败！请传入合法的TempMode枚举值")
+class SunlightSensor:
+    """阳光强度传感器 - 影响车内温度变化"""
+
+    def read_intensity(self):
+        """返回0-10的阳光强度值"""
+        return round(random.uniform(0, 10), 1)
+
+
+class PassengerDetector:
+    """乘客检测 - 模拟检测车内乘客数量"""
+
+    def get_passenger_count(self):
+        """返回0-5的乘客数"""
+        return random.randint(0, 5)
+
+
+class AirConditioner:
+    """空调执行器类 - 控制空调运行"""
+
+    def __init__(self):
+        self.ac_mode = AC_Mode.OFF
+        self.fan_speed = MIN_FAN_SPEED
+        self.target_temp = DEFAULT_TARGET_TEMP
+        self.run_mode = Run_Mode.AUTO
+
+    def set_mode(self, mode):
+        """设置空调模式"""
+        if isinstance(mode, AC_Mode):
+            self.ac_mode = mode
+            print(f"空调模式已切换为: {self.ac_mode.value}")
 
     def set_fan_speed(self, speed):
-        """设置风扇转速（1-5档）"""
-        if 1 <= speed <= 5:
+        """设置风速（1-5档）"""
+        if MIN_FAN_SPEED <= speed <= MAX_FAN_SPEED:
             self.fan_speed = speed
-            print(f"🌬️  风扇转速已设置为：{speed}档")
-        else:
-            print("❌ 风速设置失败！请设置1~5档范围内的转速")
+            print(f"风速已设置为: {self.fan_speed}档")
 
-    def adjust_temp(self):
-        """核心温度调节逻辑"""
-        if not self.is_running:
-            return
+    def set_target_temp(self, temp):
+        """设置目标温度（16-30℃）"""
+        if 16 <= temp <= 30:
+            self.target_temp = temp
+            print(f"目标温度已设置为: {self.target_temp}℃")
 
-        current_temp = self.simulate_temp_sensor()
-        target_temp = self.target_temp
-        temp_diff = current_temp - target_temp
+    def set_run_mode(self, mode):
+        """设置运行模式（自动/手动）"""
+        if isinstance(mode, Run_Mode):
+            self.run_mode = mode
+            print(f"运行模式已切换为: {self.run_mode.value}")
 
-        # 根据模式执行调节逻辑
-        if self.mode == TempMode.AUTO:
-            # 自动模式：温差超过容差时触发制冷/制热
-            if temp_diff > self.temp_tolerance:
-                self._cooling()
-            elif temp_diff < -self.temp_tolerance:
-                self._heating()
+
+class TemperatureControlSystem:
+    """无人车温度调节核心系统"""
+
+    def __init__(self):
+        # 初始化传感器和执行器
+        self.temp_sensor = TemperatureSensor()
+        self.sun_sensor = SunlightSensor()
+        self.passenger_detector = PassengerDetector()
+        self.aircon = AirConditioner()
+
+    def calculate_adjustment(self):
+        """核心算法：根据环境参数计算空调调节策略"""
+        interior_temp, exterior_temp = self.temp_sensor.read_temperatures()
+        sunlight_intensity = self.sun_sensor.read_intensity()
+        passenger_count = self.passenger_detector.get_passenger_count()
+
+        # 打印当前环境参数
+        print(f"\n=== 环境参数 ===")
+        print(f"车内温度: {interior_temp}℃")
+        print(f"车外温度: {exterior_temp}℃")
+        print(f"阳光强度: {sunlight_intensity}")
+        print(f"乘客数量: {passenger_count}")
+
+        # 目标温度动态调整（乘客越多/阳光越强，目标温度略低）
+        base_target = DEFAULT_TARGET_TEMP
+        dynamic_target = base_target - (passenger_count * 0.5) - (sunlight_intensity * 0.2)
+        dynamic_target = max(18, min(26, dynamic_target))  # 限制在18-26℃
+
+        # 自动模式下的调节逻辑
+        if self.aircon.run_mode == Run_Mode.AUTO:
+            # 温度偏差计算
+            temp_diff = interior_temp - dynamic_target
+
+            # 制冷逻辑
+            if temp_diff > TEMP_TOLERANCE:
+                self.aircon.set_mode(AC_Mode.COOL)
+                # 温差越大，风速越高
+                fan_speed = MIN_FAN_SPEED + min(int(temp_diff), MAX_FAN_SPEED - MIN_FAN_SPEED)
+                self.aircon.set_fan_speed(fan_speed)
+                self.aircon.set_target_temp(dynamic_target)
+
+            # 制热逻辑
+            elif temp_diff < -TEMP_TOLERANCE:
+                self.aircon.set_mode(AC_Mode.HEAT)
+                fan_speed = MIN_FAN_SPEED + min(int(abs(temp_diff)), MAX_FAN_SPEED - MIN_FAN_SPEED)
+                self.aircon.set_fan_speed(fan_speed)
+                self.aircon.set_target_temp(dynamic_target)
+
+            # 温度适宜 - 通风模式
             else:
-                self._fan_only()  # 温度达标仅吹风
+                self.aircon.set_mode(AC_Mode.VENT)
+                self.aircon.set_fan_speed(MIN_FAN_SPEED)
 
-        elif self.mode == TempMode.COOL:
-            self._cooling() if temp_diff > self.temp_tolerance else self._fan_only()
+        # 打印当前空调状态
+        print(f"\n=== 空调状态 ===")
+        print(f"运行模式: {self.aircon.run_mode.value}")
+        print(f"空调模式: {self.aircon.ac_mode.value}")
+        print(f"目标温度: {self.aircon.target_temp}℃")
+        print(f"当前风速: {self.aircon.fan_speed}档")
 
-        elif self.mode == TempMode.HEAT:
-            self._heating() if temp_diff < -self.temp_tolerance else self._fan_only()
+    def manual_control(self, mode, target_temp=None, fan_speed=None):
+        """手动控制接口"""
+        if self.aircon.run_mode != Run_Mode.MANUAL:
+            self.aircon.set_run_mode(Run_Mode.MANUAL)
 
-        elif self.mode == TempMode.FAN:
-            self._fan_only()
-
-        # 打印当前状态
-        self._print_status()
-
-    def _cooling(self):
-        """制冷逻辑：降低当前温度"""
-        # 制冷效率与风扇转速正相关
-        cool_rate = 0.2 * self.fan_speed
-        self.current_temp -= cool_rate
-        self.current_temp = max(self.min_temp, self.current_temp)  # 不低于最低温
-
-    def _heating(self):
-        """制热逻辑：升高当前温度"""
-        heat_rate = 0.15 * self.fan_speed
-        self.current_temp += heat_rate
-        self.current_temp = min(self.max_temp, self.current_temp)  # 不高于最高温
-
-    def _fan_only(self):
-        """仅吹风：温度不变，维持通风"""
-        pass
-
-    def _print_status(self):
-        """打印当前系统状态"""
-        print(f"\n📊 当前系统状态：")
-        print(f"  当前温度：{round(self.current_temp, 1)}℃ | 目标温度：{self.target_temp}℃")
-        print(f"  运行模式：{self.mode.value} | 风扇转速：{self.fan_speed}档")
-        print("-" * 40)
+        self.aircon.set_mode(mode)
+        if target_temp:
+            self.aircon.set_target_temp(target_temp)
+        if fan_speed:
+            self.aircon.set_fan_speed(fan_speed)
 
     def run(self, duration=10):
-        """运行系统（模拟duration秒的调节过程）"""
-        print("🚗 无人车温度调节系统启动...")
+        """系统主运行函数"""
+        print("无人车温度调节系统启动...")
+        print(f"系统将运行 {duration} 秒，自动调节温度")
+
         start_time = time.time()
         while time.time() - start_time < duration:
-            self.adjust_temp()
-            time.sleep(1)  # 每秒调节一次
-        print("⏹️  系统模拟运行结束")
+            self.calculate_adjustment()
+            time.sleep(2)  # 每2秒调节一次
+
+        print("\n系统运行结束")
 
 
-# 测试示例
+# 测试代码
 if __name__ == "__main__":
-    # 初始化温度调节系统
-    temp_system = AutoCarTempSystem()
+    # 初始化系统
+    temp_system = TemperatureControlSystem()
 
-    # 模拟场景1：初始温度25℃，设置目标22℃，自动模式运行5秒
-    temp_system.set_target_temp(22.0)
-    temp_system.run(duration=5)
+    # 示例1：自动模式运行10秒
+    temp_system.run(duration=10)
 
-    # 模拟场景2：切换到制热模式，设置目标28℃，风速4档，运行5秒
-    temp_system.set_mode(TempMode.HEAT)
-    temp_system.set_target_temp(28.0)
-    temp_system.set_fan_speed(4)
-    temp_system.run(duration=5)
+    # 示例2：切换到手动模式，设置制冷22℃，3档风速
+    print("\n--- 切换到手动模式 ---")
+    temp_system.manual_control(
+        mode=AC_Mode.COOL,
+        target_temp=22,
+        fan_speed=3
+    )
 
-    # 模拟场景3：切换到关闭模式
-    temp_system.set_mode(TempMode.OFF)
+    # 手动模式下继续运行5秒
+    time.sleep(5)
+    temp_system.calculate_adjustment()
