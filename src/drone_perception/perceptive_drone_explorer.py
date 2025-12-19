@@ -1,6 +1,7 @@
 """
 AirSimNH 感知驱动自主探索无人机
 核心：视觉感知 → 语义理解 → 智能决策 → 安全执行
+集成前视窗口版本 - 支持实时视觉监控
 """
 
 import airsim
@@ -13,6 +14,9 @@ from dataclasses import dataclass
 from enum import Enum
 import threading
 from typing import Tuple, List, Optional
+
+# ============== 新增：导入队列模块 ==============
+import queue
 
 
 class FlightState(Enum):
@@ -35,6 +39,8 @@ class PerceptionResult:
     open_space_score: float = 0.0  # 开阔度评分 (0-1)
     recommended_height: float = -15.0  # 推荐飞行高度
     safe_directions: List[float] = None  # 安全方向列表
+    # ========== 新增：前视图像字段 ==========
+    front_image: Optional[np.ndarray] = None  # 前视图像
 
     def __post_init__(self):
         if self.safe_directions is None:
@@ -85,6 +91,12 @@ class PerceptiveExplorer:
         self.decision_fps = 0
         self.start_time = time.time()
 
+        # ========== 新增：前视窗口初始化 ==========
+        self.front_display = FrontViewDisplay(
+            window_name=f"无人机前视 - {drone_name or 'AirSimNH'}"
+        )
+        print("🎥 前视窗口已初始化")
+
         print("✅ 系统初始化完成")
         print(f"   开始时间: {time.strftime('%H:%M:%S')}")
         print(f"   预计探索时长: {self.exploration_time}秒")
@@ -94,21 +106,28 @@ class PerceptiveExplorer:
         result = PerceptionResult()
 
         try:
-            # 请求深度图像（使用正确的DepthPlanar类型）
+            # ========== 修改：同时获取深度图像和前视图像 ==========
             responses = self.client.simGetImages([
                 airsim.ImageRequest(
                     "0",
                     airsim.ImageType.DepthPlanar,
                     pixels_as_float=True,
                     compress=False
+                ),
+                # 新增：获取前视RGB图像
+                airsim.ImageRequest(
+                    "0",
+                    airsim.ImageType.Scene,
+                    False,
+                    False
                 )
             ])
 
-            if not responses or not responses[0]:
-                print("⚠ 深度图像获取失败")
+            if not responses or len(responses) < 2:
+                print("⚠ 图像获取失败")
                 return result
 
-            # 转换深度数据为numpy数组
+            # 处理深度图像（原逻辑）
             depth_img = responses[0]
             depth_array = np.array(depth_img.image_data_float, dtype=np.float32)
             depth_array = depth_array.reshape(depth_img.height, depth_img.width)
@@ -167,6 +186,27 @@ class PerceptiveExplorer:
             else:
                 result.recommended_height = -15  # 默认高度
 
+            # ========== 新增：处理前视图像 ==========
+            front_response = responses[1]
+            if front_response and front_response.image_data_uint8:
+                # 转换图像格式
+                img_array = np.frombuffer(front_response.image_data_uint8, dtype=np.uint8)
+                img_rgb = img_array.reshape(front_response.height, front_response.width, 3)
+                img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+                result.front_image = img_bgr
+
+                # 准备显示信息
+                state = self.client.getMultirotorState(vehicle_name=self.drone_name)
+                pos = state.kinematics_estimated.position
+                display_info = {
+                    'state': self.state.value,
+                    'obstacle_distance': result.obstacle_distance,
+                    'position': (pos.x_val, pos.y_val, pos.z_val)
+                }
+
+                # 更新前视窗口
+                self.front_display.update_image(img_bgr, display_info)
+
             # 更新感知FPS
             self.perception_fps = 1 / (time.time() - self.perception_start)
 
@@ -175,6 +215,7 @@ class PerceptiveExplorer:
 
         return result
 
+    # 注意：get_visual_perception 方法现在可能多余，但为了兼容性保留
     def get_visual_perception(self):
         """获取视觉图像用于高级感知（可选）"""
         try:
@@ -381,6 +422,9 @@ class PerceptiveExplorer:
             self.client.armDisarm(False, vehicle_name=self.drone_name)
             self.client.enableApiControl(False, vehicle_name=self.drone_name)
 
+            # ========== 新增：关闭前视窗口 ==========
+            self.front_display.stop()
+
             print("✅ 任务完成，系统安全关闭")
 
         except Exception as e:
@@ -397,6 +441,9 @@ class PerceptiveExplorer:
         self.emergency_flag = True
         self.change_state(FlightState.EMERGENCY)
         self.client.hoverAsync(vehicle_name=self.drone_name).join()
+
+        # ========== 新增：关闭前视窗口 ==========
+        self.front_display.stop()
 
 
 def main():
@@ -432,5 +479,183 @@ def main():
             pass
 
 
+# ============== 新增：前视窗口显示类 ==============
+class FrontViewDisplay:
+    """前视画面显示管理器"""
+
+    def __init__(self, window_name="无人机前视画面", width=640, height=480):
+        self.window_name = window_name
+        self.window_width = width
+        self.window_height = height
+
+        # 图像队列（线程安全）
+        self.image_queue = queue.Queue(maxsize=2)
+        self.display_active = True
+        self.display_thread = None
+
+        # 显示状态
+        self.paused = False
+        self.show_info = True
+        self.enable_sharpening = True  # 启用锐化改善模糊
+
+        # 启动显示线程
+        self.start()
+
+    def start(self):
+        """启动显示线程"""
+        self.display_thread = threading.Thread(
+            target=self._display_loop,
+            daemon=True,
+            name="FrontViewDisplay"
+        )
+        self.display_thread.start()
+
+    def stop(self):
+        """停止显示线程"""
+        self.display_active = False
+        if self.display_thread:
+            self.display_thread.join(timeout=2.0)
+
+    def update_image(self, image_data: np.ndarray, info: dict):
+        """更新要显示的图像"""
+        if not self.display_active or self.paused or image_data is None:
+            return
+
+        try:
+            # 图像增强（锐化处理）
+            if self.enable_sharpening and image_data is not None:
+                kernel = np.array([[0, -1, 0],
+                                   [-1, 5, -1],
+                                   [0, -1, 0]])
+                image_data = cv2.filter2D(image_data, -1, kernel)
+
+            # 如果队列已满，丢弃最旧的一帧
+            if self.image_queue.full():
+                try:
+                    self.image_queue.get_nowait()
+                except queue.Empty:
+                    pass
+
+            display_packet = {
+                'image': image_data.copy(),
+                'info': info.copy() if info else {},
+                'timestamp': time.time()
+            }
+
+            self.image_queue.put_nowait(display_packet)
+
+        except Exception as e:
+            print(f"⚠️ 更新图像时出错: {e}")
+
+    def _display_loop(self):
+        """显示线程主循环"""
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
+
+        print("💡 前视窗口控制:")
+        print("   - 按 'Q': 关闭窗口 | 'S': 保存截图")
+        print("   - 按 'P': 暂停/继续 | 'I': 切换信息显示")
+        print("   - 按 'H': 切换锐化效果")
+
+        while self.display_active:
+            display_image = None
+            info = {}
+
+            try:
+                # 获取最新图像
+                if not self.image_queue.empty():
+                    packet = self.image_queue.get_nowait()
+                    display_image = packet['image']
+                    info = packet['info']
+
+                    # 清空队列中的旧帧
+                    while not self.image_queue.empty():
+                        self.image_queue.get_nowait()
+            except queue.Empty:
+                pass
+
+            # 显示图像
+            if display_image is not None:
+                # 添加信息叠加
+                if self.show_info:
+                    display_image = self._add_info_overlay(display_image, info)
+
+                cv2.imshow(self.window_name, display_image)
+
+            # 键盘事件处理
+            key = cv2.waitKey(30) & 0xFF
+
+            if key == ord('q') or key == ord('Q'):
+                print("🔄 用户关闭显示窗口")
+                self.display_active = False
+                break
+            elif key == ord('s') or key == ord('S'):
+                self._save_screenshot(display_image)
+            elif key == ord('p') or key == ord('P'):
+                self.paused = not self.paused
+                status = "已暂停" if self.paused else "已恢复"
+                print(f"⏸️ 视频流{status}")
+            elif key == ord('i') or key == ord('I'):
+                self.show_info = not self.show_info
+                status = "开启" if self.show_info else "关闭"
+                print(f"📊 信息叠加层{status}")
+            elif key == ord('h') or key == ord('H'):
+                self.enable_sharpening = not self.enable_sharpening
+                status = "开启" if self.enable_sharpening else "关闭"
+                print(f"🔍 图像锐化{status}")
+
+        cv2.destroyWindow(self.window_name)
+
+    def _add_info_overlay(self, image: np.ndarray, info: dict) -> np.ndarray:
+        """在图像上叠加状态信息"""
+        try:
+            height, width = image.shape[:2]
+
+            # 创建半透明信息栏
+            info_height = 80
+            overlay = image.copy()
+            cv2.rectangle(overlay, (0, 0), (width, info_height), (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
+
+            # 飞行状态
+            state = info.get('state', 'UNKNOWN')
+            state_color = (0, 255, 0) if '探索' in state else (0, 255, 255) if '悬停' in state else (0, 0, 255)
+            cv2.putText(image, f"状态: {state}", (10, 25),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, state_color, 2)
+
+            # 位置信息
+            pos = info.get('position', (0, 0, 0))
+            cv2.putText(image, f"位置: ({pos[0]:.1f}, {pos[1]:.1f}, {-pos[2]:.1f}m)", (10, 50),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            # 障碍物信息
+            obs_dist = info.get('obstacle_distance', 0.0)
+            if obs_dist < 100:
+                obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
+                cv2.putText(image, f"障碍: {obs_dist:.1f}m", (width - 120, 30),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, obs_color, 1)
+
+            # 清晰度提示
+            if height < 200:
+                cv2.putText(image, "提示: 修改settings.json可提高分辨率", (10, height-10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+
+            return image
+        except Exception:
+            return image
+
+    def _save_screenshot(self, image: Optional[np.ndarray]):
+        """保存当前画面为截图"""
+        if image is not None and image.size > 0:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = f"drone_snapshot_{timestamp}.png"
+            cv2.imwrite(filename, image)
+            print(f"📸 截图已保存: {filename}")
+
+
 if __name__ == "__main__":
+    print("=" * 70)
+    print("AirSimNH 无人机感知探索系统 - 集成前视窗口版")
+    print("注意: 默认分辨率较低(256x144)，如需高清画面请修改settings.json")
+    print("=" * 70)
     main()
