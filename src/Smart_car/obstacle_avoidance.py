@@ -1,193 +1,191 @@
 import time
-import random
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.patches import Rectangle, Circle
+import math
+from enum import Enum
 
-# 无人车状态常量
-SAFE_DISTANCE = 50  # 安全距离（厘米）
-WARNING_DISTANCE = 30  # 警告距离（厘米）
-DANGER_DISTANCE = 15  # 危险距离（厘米）
-NORMAL_SPEED = 20  # 正常速度（km/h）
-LOW_SPEED = 5  # 低速（km/h）
-STOP_SPEED = 0  # 停车速度
+# ======================== 常量定义 ========================
+# 安全参数（可根据车型调整）
+SAFE_DISTANCE = 5.0          # 安全距离（米），低于此值触发预警
+EMERGENCY_DISTANCE = 2.0     # 紧急制动距离（米）
+MAX_DECELERATION = 8.0       # 最大减速度（m/s²），符合道路安全标准
+TTC_THRESHOLD_LOW = 3.0      # 低风险TTC阈值（秒）
+TTC_THRESHOLD_HIGH = 1.5     # 高风险TTC阈值（秒）
+VEHICLE_MAX_SPEED = 30.0     # 车辆最大速度（m/s）≈108km/h
 
-# 可视化全局变量
-fig, (ax_scene, ax_plot) = plt.subplots(1, 2, figsize=(12, 5))
-distance_history = []  # 前方距离历史
-speed_history = []  # 车速历史
-time_history = []  # 时间轴
-car_pos = [5, 2.5]  # 无人车初始位置（x,y）
-obstacle_pos = [0, 0]  # 障碍物位置
-car_direction = "forward"
+# ======================== 枚举定义 ========================
+class CollisionRiskLevel(Enum):
+    """碰撞风险等级"""
+    NONE = 0        # 无风险
+    LOW = 1         # 低风险（预警）
+    MEDIUM = 2      # 中风险（减速）
+    HIGH = 3        # 高风险（紧急制动）
 
+class ControlCommand(Enum):
+    """车辆控制指令"""
+    NORMAL = 0      # 正常行驶
+    WARNING = 1     # 预警（声光提示）
+    DECELERATE = 2  # 减速
+    EMERGENCY_STOP = 3  # 紧急制动
 
-class UnmannedCar:
+# ======================== 核心类实现 ========================
+class Obstacle:
+    """障碍物类：模拟感知到的障碍物信息"""
+    def __init__(self, distance: float, relative_speed: float, obstacle_type: str):
+        """
+        :param distance: 障碍物距离（米），正值表示前方
+        :param relative_speed: 相对速度（m/s），正值表示靠近
+        :param obstacle_type: 障碍物类型（行人/车辆/障碍物）
+        """
+        self.distance = max(0.0, distance)  # 距离非负
+        self.relative_speed = relative_speed
+        self.obstacle_type = obstacle_type
+        self.update_time = time.time()  # 感知数据更新时间
+
+    def update(self, distance: float, relative_speed: float):
+        """更新障碍物感知数据"""
+        self.distance = max(0.0, distance)
+        self.relative_speed = relative_speed
+        self.update_time = time.time()
+
+class CollisionPreventionSystem:
+    """碰撞预防系统核心类"""
     def __init__(self):
-        self.speed = 0
-        self.direction = "forward"
+        self.current_speed = 0.0  # 车辆当前速度（m/s）
+        self.obstacle = None      # 感知到的前方障碍物
+        self.risk_level = CollisionRiskLevel.NONE
+        self.control_command = ControlCommand.NORMAL
 
-    def simulate_sensor(self, direction):
-        """模拟传感器测距（加入轻微固定偏移，让障碍物位置可预测）"""
-        if direction == "front":
-            # 模拟障碍物距离缓慢变化（更贴近实际）
-            base_dist = random.randint(10, 60) if len(distance_history) < 5 else distance_history[-1] + random.randint(
-                -5, 5)
-            distance = max(0, min(100, base_dist))  # 限制0-100cm
+    def perception_update(self, obstacle_distance: float, obstacle_relative_speed: float, obstacle_type: str):
+        """
+        更新感知模块数据
+        :param obstacle_distance: 障碍物距离（米）
+        :param obstacle_relative_speed: 相对速度（m/s）
+        :param obstacle_type: 障碍物类型
+        """
+        if self.obstacle is None:
+            self.obstacle = Obstacle(obstacle_distance, obstacle_relative_speed, obstacle_type)
         else:
-            distance = random.randint(20, 80)  # 左右侧距离
+            self.obstacle.update(obstacle_distance, obstacle_relative_speed)
 
-        # 更新障碍物位置（用于可视化）
-        global obstacle_pos
-        obstacle_pos = [car_pos[0] + distance / 10, car_pos[1]]  # 缩放适配画布
-        print(f"[{direction}] 传感器检测距离：{distance} cm")
-        return distance
+    def calculate_ttc(self) -> float:
+        """
+        计算碰撞时间（Time To Collision, TTC）
+        :return: TTC值（秒），无穷大表示无碰撞风险
+        """
+        if self.obstacle is None or self.obstacle.relative_speed <= 0:
+            return float('inf')  # 相对速度≤0，无碰撞风险
+        return self.obstacle.distance / self.obstacle.relative_speed
 
-    def adjust_speed(self, new_speed):
-        self.speed = new_speed
-        print(f"车速调整为：{self.speed} km/h")
+    def evaluate_risk(self):
+        """评估碰撞风险等级"""
+        ttc = self.calculate_ttc()
+        distance = self.obstacle.distance if self.obstacle else float('inf')
 
-    def adjust_direction(self, new_dir):
-        global car_direction
-        self.direction = new_dir
-        car_direction = new_dir
-        print(f"行驶方向调整为：{self.direction}")
+        # 风险等级判定逻辑
+        if ttc >= TTC_THRESHOLD_LOW or distance >= SAFE_DISTANCE:
+            self.risk_level = CollisionRiskLevel.NONE
+        elif TTC_THRESHOLD_HIGH <= ttc < TTC_THRESHOLD_LOW or EMERGENCY_DISTANCE <= distance < SAFE_DISTANCE:
+            self.risk_level = CollisionRiskLevel.LOW if ttc >= TTC_THRESHOLD_HIGH else CollisionRiskLevel.MEDIUM
+        else:
+            self.risk_level = CollisionRiskLevel.HIGH
 
-    def collision_avoidance(self):
-        """核心避撞逻辑"""
-        front_dist = self.simulate_sensor("front")
+    def generate_control_command(self) -> ControlCommand:
+        """根据风险等级生成控制指令"""
+        if self.risk_level == CollisionRiskLevel.NONE:
+            self.control_command = ControlCommand.NORMAL
+        elif self.risk_level == CollisionRiskLevel.LOW:
+            self.control_command = ControlCommand.WARNING
+        elif self.risk_level == CollisionRiskLevel.MEDIUM:
+            self.control_command = ControlCommand.DECELERATE
+        else:
+            self.control_command = ControlCommand.EMERGENCY_STOP
+        return self.control_command
 
-        # 记录数据用于绘图
-        distance_history.append(front_dist)
-        speed_history.append(self.speed)
-        time_history.append(len(time_history))
+    def execute_control(self, command: ControlCommand) -> float:
+        """
+        执行车辆控制指令，返回控制后的车速
+        :param command: 控制指令
+        :return: 调整后的车速（m/s）
+        """
+        delta_time = 0.1  # 控制周期（秒），模拟实时控制
 
-        if front_dist > SAFE_DISTANCE:
-            self.adjust_speed(NORMAL_SPEED)
-            self.adjust_direction("forward")
+        if command == ControlCommand.NORMAL:
+            # 正常行驶，维持当前速度（可扩展加速逻辑）
+            pass
+        elif command == ControlCommand.WARNING:
+            # 仅预警，不调整车速（声光提示驾驶员）
+            print("[预警] 检测到前方障碍物，请注意！")
+        elif command == ControlCommand.DECELERATE:
+            # 减速：中等减速度（最大减速度的50%）
+            deceleration = MAX_DECELERATION * 0.5
+            self.current_speed = max(0.0, self.current_speed - deceleration * delta_time)
+            print(f"[减速] 当前车速：{self.current_speed:.2f} m/s（原速度：{self.current_speed + deceleration * delta_time:.2f} m/s）")
+        elif command == ControlCommand.EMERGENCY_STOP:
+            # 紧急制动：最大减速度
+            deceleration = MAX_DECELERATION
+            self.current_speed = max(0.0, self.current_speed - deceleration * delta_time)
+            print(f"[紧急制动] 当前车速：{self.current_speed:.2f} m/s（紧急制动中）")
 
-        elif WARNING_DISTANCE < front_dist <= SAFE_DISTANCE:
-            print("⚠️ 前方接近障碍物，减速！")
-            self.adjust_speed(LOW_SPEED)
-            self.adjust_direction("forward")
+        # 限制车速不超过最大值
+        self.current_speed = min(self.current_speed, VEHICLE_MAX_SPEED)
+        return self.current_speed
 
-        elif front_dist <= DANGER_DISTANCE:
-            print("🚨 前方紧急危险！立即停车！")
-            self.adjust_speed(STOP_SPEED)
-            self.adjust_direction("stop")
+    def run_cycle(self, obstacle_distance: float, obstacle_relative_speed: float, obstacle_type: str, current_speed: float):
+        """
+        碰撞预防系统单次运行周期
+        :param obstacle_distance: 障碍物距离（米）
+        :param obstacle_relative_speed: 相对速度（m/s）
+        :param obstacle_type: 障碍物类型
+        :param current_speed: 车辆当前速度（m/s）
+        """
+        # 1. 更新车辆当前速度
+        self.current_speed = current_speed
 
-            left_dist = self.simulate_sensor("left")
-            right_dist = self.simulate_sensor("right")
+        # 2. 更新感知数据
+        self.perception_update(obstacle_distance, obstacle_relative_speed, obstacle_type)
 
-            if left_dist > SAFE_DISTANCE:
-                print("🔄 左侧有空间，转向左侧避障")
-                self.adjust_direction("left")
-                self.adjust_speed(LOW_SPEED)
-            elif right_dist > SAFE_DISTANCE:
-                print("🔄 右侧有空间，转向右侧避障")
-                self.adjust_direction("right")
-                self.adjust_speed(LOW_SPEED)
-            else:
-                print("❌ 左右侧均有障碍物，无法避障，保持停车！")
+        # 3. 风险评估
+        self.evaluate_risk()
 
+        # 4. 生成控制指令
+        command = self.generate_control_command()
 
-# 初始化可视化场景
-def init_visualization():
-    # 左侧：场景图（无人车+障碍物）
-    ax_scene.set_xlim(0, 15)
-    ax_scene.set_ylim(0, 5)
-    ax_scene.set_title("无人车避障场景模拟")
-    ax_scene.set_xlabel("位置 (cm/10)")
-    ax_scene.set_ylabel("位置 (cm/10)")
-    ax_scene.grid(True)
+        # 5. 执行控制
+        new_speed = self.execute_control(command)
 
-    # 右侧：数据曲线图
-    ax_plot.set_xlim(0, 20)
-    ax_plot.set_ylim(0, max(NORMAL_SPEED + 5, SAFE_DISTANCE + 5))
-    ax_plot.set_title("实时数据监控")
-    ax_plot.set_xlabel("检测次数")
-    ax_plot.set_ylabel("数值")
-    ax_plot.grid(True)
-    ax_plot.legend(["前方距离 (cm)", "车速 (km/h)"], loc="upper right")
-    return ax_scene, ax_plot
+        # 6. 输出状态信息
+        print(f"\n=== 系统状态 ===")
+        print(f"障碍物类型：{obstacle_type}")
+        print(f"障碍物距离：{self.obstacle.distance:.2f} 米")
+        print(f"相对速度：{self.obstacle.relative_speed:.2f} m/s")
+        print(f"碰撞时间（TTC）：{self.calculate_ttc():.2f} 秒")
+        print(f"风险等级：{self.risk_level.name}")
+        print(f"控制指令：{command.name}")
+        print(f"当前车速：{new_speed:.2f} m/s")
 
-
-# 实时更新可视化
-def update_visualization(frame):
-    # 清空场景图
-    ax_scene.clear()
-    ax_scene.set_xlim(0, 15)
-    ax_scene.set_ylim(0, 5)
-    ax_scene.set_title("无人车避障场景模拟")
-    ax_scene.set_xlabel("位置 (cm/10)")
-    ax_scene.set_ylabel("位置 (cm/10)")
-    ax_scene.grid(True)
-
-    # 绘制无人车（矩形）
-    car_color = "green" if car_direction == "forward" else "yellow" if car_direction in ["left", "right"] else "red"
-    car = Rectangle((car_pos[0], car_pos[1] - 0.5), 1, 1, color=car_color, label="无人车")
-    ax_scene.add_patch(car)
-
-    # 绘制障碍物（圆形）
-    obstacle = Circle(obstacle_pos, 0.3, color="black", label="障碍物")
-    ax_scene.add_patch(obstacle)
-
-    # 绘制方向标识
-    if car_direction == "left":
-        ax_scene.arrow(car_pos[0] + 0.5, car_pos[1], -0.3, 0, head_width=0.2, color="blue")
-    elif car_direction == "right":
-        ax_scene.arrow(car_pos[0] + 0.5, car_pos[1], 0.3, 0, head_width=0.2, color="blue")
-    elif car_direction == "forward":
-        ax_scene.arrow(car_pos[0] + 0.5, car_pos[1], 0.3, 0, head_width=0.2, color="blue")
-
-    # 更新曲线图
-    ax_plot.clear()
-    ax_plot.plot(time_history, distance_history, 'b-', label="前方距离 (cm)")
-    ax_plot.plot(time_history, speed_history, 'r-', label="车速 (km/h)")
-    # 绘制安全阈值线
-    ax_plot.axhline(y=SAFE_DISTANCE, color='g', linestyle='--', label="安全距离")
-    ax_plot.axhline(y=WARNING_DISTANCE, color='y', linestyle='--', label="警告距离")
-    ax_plot.axhline(y=DANGER_DISTANCE, color='r', linestyle='--', label="危险距离")
-    ax_plot.set_xlim(max(0, len(time_history) - 20), len(time_history))
-    ax_plot.set_ylim(0, max(NORMAL_SPEED + 5, SAFE_DISTANCE + 5))
-    ax_plot.set_title("实时数据监控")
-    ax_plot.set_xlabel("检测次数")
-    ax_plot.set_ylabel("数值")
-    ax_plot.grid(True)
-    ax_plot.legend(loc="upper right")
-
-    return ax_scene, ax_plot
-
-
-# 主运行逻辑
+# ======================== 测试用例 ========================
 if __name__ == "__main__":
-    car = UnmannedCar()
-    init_visualization()
+    # 初始化碰撞预防系统
+    cps = CollisionPreventionSystem()
 
-    # 启动动画更新（每1秒刷新一次，和传感器检测频率同步）
-    ani = animation.FuncAnimation(fig, update_visualization, interval=1000, blit=False)
+    # 模拟不同场景的运行周期
+    test_scenarios = [
+        # 场景1：无风险（远距离、低相对速度）
+        {"distance": 10.0, "relative_speed": 1.0, "type": "车辆", "speed": 15.0},
+        # 场景2：低风险（预警）
+        {"distance": 6.0, "relative_speed": 3.0, "type": "行人", "speed": 10.0},
+        # 场景3：中风险（减速）
+        {"distance": 3.0, "relative_speed": 4.0, "type": "障碍物", "speed": 8.0},
+        # 场景4：高风险（紧急制动）
+        {"distance": 1.5, "relative_speed": 5.0, "type": "车辆", "speed": 6.0},
+    ]
 
-
-    # 启动无人车避障逻辑（后台运行）
-    def run_car():
-        print("=== 无人车启动 ===")
-        try:
-            while True:
-                car.collision_avoidance()
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n=== 无人车停止 ===")
-            car.adjust_speed(STOP_SPEED)
-            car.adjust_direction("stop")
-
-
-    # 多线程运行（避免阻塞可视化）
-    import threading
-
-    car_thread = threading.Thread(target=run_car)
-    car_thread.daemon = True
-    car_thread.start()
-
-    # 显示可视化窗口
-    plt.tight_layout()
-    plt.show()
+    # 运行测试场景
+    for i, scenario in enumerate(test_scenarios):
+        print(f"\n==================== 测试场景 {i+1} ====================")
+        cps.run_cycle(
+            obstacle_distance=scenario["distance"],
+            obstacle_relative_speed=scenario["relative_speed"],
+            obstacle_type=scenario["type"],
+            current_speed=scenario["speed"]
+        )
+        time.sleep(0.5)  # 模拟时间间隔
