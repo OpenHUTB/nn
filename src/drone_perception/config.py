@@ -34,19 +34,6 @@ PERCEPTION = {
     }
 }
 
-# ==================== 手动控制参数 ====================
-MANUAL = {
-    'CONTROL_SPEED': 3.0,  # 水平移动速度 (米/秒)
-    'ALTITUDE_SPEED': 2.0,  # 垂直移动速度 (米/秒)
-    'YAW_SPEED': 45.0,  # 偏航角速度 (度/秒)
-    'ENABLE_AUTO_HOVER': True,  # 松开按键时自动悬停
-    'DISPLAY_CONTROLS': True,  # 在画面显示控制说明
-    'SAFETY_ENABLED': True,  # 启用安全限制（高度、速度限制）
-    'MAX_MANUAL_SPEED': 5.0,  # 最大手动控制速度
-    'MIN_ALTITUDE_LIMIT': -5.0,  # 最低飞行高度限制
-    'MAX_ALTITUDE_LIMIT': -30.0,  # 最高飞行高度限制
-}
-
 # ==================== 前视窗口参数 ====================
 DISPLAY = {
     'WINDOW_WIDTH': 640,  # 窗口宽度

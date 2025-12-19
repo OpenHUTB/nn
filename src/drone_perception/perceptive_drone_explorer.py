@@ -2,8 +2,7 @@
 AirSimNH 感知驱动自主探索无人机 - 工程优化版
 核心：视觉感知 → 语义理解 → 智能决策 → 安全执行
 集成：配置管理、日志系统、异常恢复、前视窗口显示
-新增：修复按键冲突，改进手动控制
-版本: 2.5 (修复按键冲突改进版)
+版本: 2.0 (工程优化版)
 """
 
 import airsim
@@ -31,12 +30,13 @@ except ImportError as e:
     print(f"❌ 无法加载配置文件 config.py: {e}")
     print("正在使用默认配置...")
     CONFIG_LOADED = False
+    # 临时默认配置
     class DefaultConfig:
-        EXPLORATION = {'TOTAL_TIME': 120, 'PREFERRED_SPEED': 2.5, 'BASE_HEIGHT': -15.0,
-                      'MAX_ALTITUDE': -30.0, 'MIN_ALTITUDE': -5.0, 'TAKEOFF_HEIGHT': -10.0}
+        EXPLORATION = {'TOTAL_TIME': 180, 'PREFERRED_SPEED': 3.0, 'BASE_HEIGHT': -15.0,
+                      'MAX_ALTITUDE': -30.0, 'MIN_ALTITUDE': -8.0, 'TAKEOFF_HEIGHT': -10.0}
         PERCEPTION = {'DEPTH_NEAR_THRESHOLD': 5.0, 'DEPTH_SAFE_THRESHOLD': 10.0,
                      'MIN_GROUND_CLEARANCE': 2.0, 'MAX_PITCH_ANGLE_DEG': 15,
-                     'SCAN_ANGLES': [-60, -45, -30, -15, 0, 15, 30, 45, 60],
+                     'SCAN_ANGLES': [-45, -30, -15, 0, 15, 30, 45],
                      'HEIGHT_STRATEGY': {'STEEP_SLOPE': -20.0, 'OPEN_SPACE': -12.0,
                                          'DEFAULT': -15.0, 'SLOPE_THRESHOLD': 5.0,
                                          'OPENNESS_THRESHOLD': 0.7}}
@@ -44,19 +44,8 @@ except ImportError as e:
                   'SHOW_INFO_OVERLAY': True, 'REFRESH_RATE_MS': 30}
         SYSTEM = {'LOG_LEVEL': 'INFO', 'LOG_TO_FILE': True, 'LOG_FILENAME': 'drone_log.txt',
                  'MAX_RECONNECT_ATTEMPTS': 3, 'RECONNECT_DELAY': 2.0,
-                 'ENABLE_HEALTH_CHECK': True, 'HEALTH_CHECK_INTERVAL': 20}
+                 'ENABLE_HEALTH_CHECK': True, 'HEALTH_CHECK_INTERVAL': 10}
         CAMERA = {'DEFAULT_NAME': "0"}
-        MANUAL = {
-            'CONTROL_SPEED': 3.0,
-            'ALTITUDE_SPEED': 2.0,
-            'YAW_SPEED': 30.0,
-            'ENABLE_AUTO_HOVER': True,
-            'DISPLAY_CONTROLS': True,
-            'SAFETY_ENABLED': True,
-            'MAX_MANUAL_SPEED': 5.0,
-            'MIN_ALTITUDE_LIMIT': -5.0,
-            'MAX_ALTITUDE_LIMIT': -30.0
-        }
     config = DefaultConfig()
 
 
@@ -69,7 +58,6 @@ class FlightState(Enum):
     RETURNING = "返航中"
     LANDING = "降落"
     EMERGENCY = "紧急状态"
-    MANUAL = "手动控制"
 
 
 @dataclass
@@ -77,23 +65,26 @@ class PerceptionResult:
     """感知结果数据结构"""
     has_obstacle: bool = False
     obstacle_distance: float = 100.0
-    obstacle_direction: float = 0.0
-    terrain_slope: float = 0.0
-    open_space_score: float = 0.0
+    obstacle_direction: float = 0.0  # 障碍物相对方向（弧度）
+    terrain_slope: float = 0.0  # 地形坡度
+    open_space_score: float = 0.0  # 开阔度评分 (0-1)
     recommended_height: float = config.PERCEPTION['HEIGHT_STRATEGY']['DEFAULT']
-    safe_directions: List[float] = None
-    front_image: Optional[np.ndarray] = None
+    safe_directions: List[float] = None  # 安全方向列表
+    front_image: Optional[np.ndarray] = None  # 前视图像
 
     def __post_init__(self):
         if self.safe_directions is None:
             self.safe_directions = []
 
 
+# ==================== 前视显示窗口类 ====================
+
 class FrontViewDisplay:
-    """前视画面显示管理器 - 修复按键冲突改进版"""
+    """前视画面显示管理器"""
 
     def __init__(self, window_name="无人机前视画面", width=None, height=None,
                  enable_sharpening=None, show_info=None):
+        # 使用配置参数或传入参数
         self.window_name = window_name
         self.window_width = width if width is not None else config.DISPLAY['WINDOW_WIDTH']
         self.window_height = height if height is not None else config.DISPLAY['WINDOW_HEIGHT']
@@ -102,20 +93,13 @@ class FrontViewDisplay:
         self.show_info = (show_info if show_info is not None
                          else config.DISPLAY['SHOW_INFO_OVERLAY'])
 
-        # 图像队列
+        # 图像队列（线程安全）
         self.image_queue = queue.Queue(maxsize=3)
         self.display_active = True
         self.display_thread = None
+
+        # 显示状态
         self.paused = False
-
-        # 手动控制状态
-        self.manual_mode = False
-        self.key_states = {}  # 当前按下的键
-        self.last_keys = {}   # 上次按下的键（用于检测释放）
-
-        # 控制退出标志
-        self.exit_manual_flag = False
-        self.exit_display_flag = False
 
         # 显示统计
         self.display_stats = {
@@ -143,12 +127,10 @@ class FrontViewDisplay:
     def stop(self):
         """停止显示线程"""
         self.display_active = False
-        self.exit_display_flag = True
         if self.display_thread:
             self.display_thread.join(timeout=2.0)
 
-    def update_image(self, image_data: np.ndarray, info: Optional[Dict] = None,
-                     manual_info: Optional[List[str]] = None):
+    def update_image(self, image_data: np.ndarray, info: Optional[Dict] = None):
         """更新要显示的图像"""
         if not self.display_active or self.paused or image_data is None:
             return
@@ -171,7 +153,6 @@ class FrontViewDisplay:
             display_packet = {
                 'image': image_data.copy(),
                 'info': info.copy() if info else {},
-                'manual_info': manual_info.copy() if manual_info else [],
                 'timestamp': time.time()
             }
 
@@ -180,24 +161,8 @@ class FrontViewDisplay:
         except Exception as e:
             print(f"⚠️ 更新图像时出错: {e}")
 
-    def set_manual_mode(self, manual_mode):
-        """设置手动模式状态"""
-        self.manual_mode = manual_mode
-        self.exit_manual_flag = False
-        self.key_states = {}
-        self.last_keys = {}
-        print(f"🔄 {'进入' if manual_mode else '退出'}手动控制模式")
-
-    def get_control_inputs(self):
-        """获取当前控制输入"""
-        return self.key_states.copy()
-
-    def should_exit_manual(self):
-        """检查是否应该退出手动模式"""
-        return self.exit_manual_flag
-
     def _display_loop(self):
-        """显示线程主循环 - 修复按键冲突"""
+        """显示线程主循环"""
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
 
@@ -206,21 +171,16 @@ class FrontViewDisplay:
         cv2.putText(wait_img, "等待无人机图像...", (50, 150),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         cv2.imshow(self.window_name, wait_img)
-        cv2.waitKey(100)
+        cv2.waitKey(100)  # 关键：给窗口时间初始化
 
         print("💡 前视窗口控制:")
-        print("   - 通用控制: P=暂停/继续, I=信息显示, H=锐化效果")
-        print("   - 非手动模式: Q=关闭窗口, S=保存截图")
-        print("   - 手动模式: ESC=退出手动模式")
-        print("\n🎮 手动控制键位:")
-        print("   - W/S: 前进/后退, A/D: 左移/右移")
-        print("   - Q/E: 上升/下降, Z/X: 左转/右转")
-        print("   - 空格: 悬停, ESC: 退出手动模式")
+        print("   - 按 'Q': 关闭窗口 | 'S': 保存截图")
+        print("   - 按 'P': 暂停/继续 | 'I': 切换信息显示")
+        print("   - 按 'H': 切换锐化效果")
 
-        while self.display_active and not self.exit_display_flag:
+        while self.display_active:
             display_image = None
             info = {}
-            manual_info = []
 
             try:
                 # 获取最新图像
@@ -228,17 +188,13 @@ class FrontViewDisplay:
                     packet = self.image_queue.get_nowait()
                     display_image = packet['image']
                     info = packet['info']
-                    manual_info = packet['manual_info']
 
                     # 更新统计
                     self._update_stats()
 
                     # 清空队列中的旧帧
                     while not self.image_queue.empty():
-                        try:
-                            self.image_queue.get_nowait()
-                        except queue.Empty:
-                            break
+                        self.image_queue.get_nowait()
             except queue.Empty:
                 pass
 
@@ -246,7 +202,7 @@ class FrontViewDisplay:
             if display_image is not None:
                 # 添加信息叠加
                 if self.show_info:
-                    display_image = self._add_info_overlay(display_image, info, manual_info)
+                    display_image = self._add_info_overlay(display_image, info)
 
                 cv2.imshow(self.window_name, display_image)
             elif self.paused:
@@ -256,98 +212,30 @@ class FrontViewDisplay:
                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
                 cv2.imshow(self.window_name, blank)
 
-            # 处理键盘输入（非阻塞）
+            # 键盘事件处理
             key = cv2.waitKey(config.DISPLAY.get('REFRESH_RATE_MS', 30)) & 0xFF
 
-            # 记录当前按键
-            current_keys = {}
-            if key != 255:  # 有按键按下
-                current_keys[key] = True
-
-                # 根据模式处理按键
-                if self.manual_mode:
-                    # 手动控制模式下的按键处理
-                    self._handle_manual_mode_key(key)
-                else:
-                    # 通用模式下的窗口控制按键
-                    self._handle_window_control_key(key, display_image)
-
-            # 更新按键状态（用于检测按键释放）
-            self._update_key_states(current_keys)
-
-            # 检查窗口是否被关闭
-            try:
-                if cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
-                    print("🔄 用户关闭了前视窗口")
-                    self.display_active = False
-                    break
-            except:
-                # 窗口可能已被销毁
+            if key == ord('q') or key == ord('Q'):
+                print("🔄 用户关闭显示窗口")
                 self.display_active = False
                 break
+            elif key == ord('s') or key == ord('S'):
+                self._save_screenshot(display_image)
+            elif key == ord('p') or key == ord('P'):
+                self.paused = not self.paused
+                status = "已暂停" if self.paused else "已恢复"
+                print(f"⏸️ 视频流{status}")
+            elif key == ord('i') or key == ord('I'):
+                self.show_info = not self.show_info
+                status = "开启" if self.show_info else "关闭"
+                print(f"📊 信息叠加层{status}")
+            elif key == ord('h') or key == ord('H'):
+                self.enable_sharpening = not self.enable_sharpening
+                status = "开启" if self.enable_sharpening else "关闭"
+                print(f"🔍 图像锐化{status}")
 
-        # 清理窗口
-        try:
-            cv2.destroyWindow(self.window_name)
-        except:
-            pass
+        cv2.destroyWindow(self.window_name)
         cv2.waitKey(1)
-
-    def _handle_manual_mode_key(self, key):
-        """处理手动控制模式下的按键"""
-        key_char = chr(key).lower() if 0 <= key <= 255 else ''
-
-        # ESC键：退出手动模式
-        if key == 27:  # ESC
-            print("收到退出手动模式指令")
-            self.exit_manual_flag = True
-            return
-
-        # 记录手动控制按键
-        self.key_states[key] = True
-
-        # 特别处理空格键（悬停）
-        if key == 32:  # 空格
-            print("⏸️ 悬停指令")
-
-        # 其他手动控制键已经在key_states中记录，会在主循环中处理
-
-    def _handle_window_control_key(self, key, display_image):
-        """处理通用窗口控制按键"""
-        key_char = chr(key).lower() if 0 <= key <= 255 else ''
-
-        if key_char == 'q':
-            print("🔄 用户关闭显示窗口")
-            self.display_active = False
-        elif key_char == 's' and display_image is not None:
-            self._save_screenshot(display_image)
-        elif key_char == 'p':
-            self.paused = not self.paused
-            status = "已暂停" if self.paused else "已恢复"
-            print(f"⏸️ 视频流{status}")
-        elif key_char == 'i':
-            self.show_info = not self.show_info
-            status = "开启" if self.show_info else "关闭"
-            print(f"📊 信息叠加层{status}")
-        elif key_char == 'h':
-            self.enable_sharpening = not self.enable_sharpening
-            status = "开启" if self.enable_sharpening else "关闭"
-            print(f"🔍 图像锐化{status}")
-
-    def _update_key_states(self, current_keys):
-        """更新按键状态，检测按键释放"""
-        # 找出被释放的键
-        released_keys = []
-        for key in list(self.key_states.keys()):
-            if key not in current_keys:
-                released_keys.append(key)
-
-        # 移除已释放的键
-        for key in released_keys:
-            del self.key_states[key]
-
-        # 保存当前按键状态
-        self.last_keys = current_keys.copy()
 
     def _update_stats(self):
         """更新显示统计信息"""
@@ -359,7 +247,7 @@ class FrontViewDisplay:
             self.display_stats['frame_count'] = 0
             self.display_stats['last_update'] = now
 
-    def _add_info_overlay(self, image: np.ndarray, info: Dict, manual_info: List[str] = None) -> np.ndarray:
+    def _add_info_overlay(self, image: np.ndarray, info: Dict) -> np.ndarray:
         """在图像上叠加状态信息"""
         if image is None or image.size == 0:
             return image
@@ -368,19 +256,14 @@ class FrontViewDisplay:
             overlay = image.copy()
             height, width = image.shape[:2]
 
-            # 判断是否为手动模式
-            is_manual = info.get('state', '') == "手动控制"
-
-            # 信息栏高度（手动模式需要更多空间显示控制说明）
-            info_height = 140 if (is_manual and manual_info) else 100
-
             # 创建半透明信息栏
+            info_height = 100
             cv2.rectangle(overlay, (0, 0), (width, info_height), (0, 0, 0), -1)
             cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
 
             # 飞行状态
             state = info.get('state', 'UNKNOWN')
-            state_color = (0, 255, 0) if '探索' in state else (0, 255, 255) if '悬停' in state else (255, 255, 0) if '手动' in state else (0, 0, 255)
+            state_color = (0, 255, 0) if '探索' in state else (0, 255, 255) if '悬停' in state else (0, 0, 255)
             cv2.putText(image, f"状态: {state}", (10, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, state_color, 2)
 
@@ -389,27 +272,21 @@ class FrontViewDisplay:
             cv2.putText(image, f"位置: ({pos[0]:.1f}, {pos[1]:.1f}, {-pos[2]:.1f}m)", (10, 60),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
-            # 手动控制信息
-            if is_manual and manual_info:
-                for i, line in enumerate(manual_info):
-                    y_pos = 90 + i * 20
-                    cv2.putText(image, line, (10, y_pos),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 255, 200), 1)
-
-                # 显示手动控制提示
-                cv2.putText(image, "手动控制中...", (width - 150, 60),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-            elif not is_manual:
-                # 障碍物信息（如果不是手动模式）
-                obs_dist = info.get('obstacle_distance', 0.0)
-                obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
-                cv2.putText(image, f"障碍: {obs_dist:.1f}m", (10, 90),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, obs_color, 2)
+            # 障碍物信息
+            obs_dist = info.get('obstacle_distance', 0.0)
+            obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
+            cv2.putText(image, f"障碍: {obs_dist:.1f}m", (10, 90),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, obs_color, 2)
 
             # 显示统计信息
             fps_text = f"FPS: {self.display_stats['fps']:.1f}"
             cv2.putText(image, fps_text, (width - 120, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+
+            # 清晰度提示（低分辨率时显示）
+            if height < 200:
+                cv2.putText(image, "提示: 修改config.py可提高分辨率", (10, height-10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
 
             return image
         except Exception as e:
@@ -427,14 +304,16 @@ class FrontViewDisplay:
             print("⚠️ 无法保存截图：无有效图像数据")
 
 
+# ==================== 主探索器类 ====================
+
 class PerceptiveExplorer:
-    """基于感知的自主探索无人机 - 修复按键冲突改进版"""
+    """基于感知的自主探索无人机 - 工程优化版"""
 
     def __init__(self, drone_name=""):
         # 初始化日志系统
         self._setup_logging()
         self.logger.info("=" * 60)
-        self.logger.info("AirSimNH 感知驱动自主探索系统 - 修复按键冲突改进版")
+        self.logger.info("AirSimNH 感知驱动自主探索系统 - 工程优化版 初始化")
         self.logger.info("=" * 60)
 
         # 初始化AirSim连接
@@ -489,16 +368,11 @@ class PerceptiveExplorer:
             'obstacles_detected': 0,
             'state_changes': 0,
             'front_image_updates': 0,
-            'manual_control_time': 0.0,
         }
 
         # 前视窗口
         self.front_display = None
         self._setup_front_display()
-
-        # 手动控制状态
-        self.manual_control_start = 0
-        self.control_keys = {}
 
         self.logger.info("✅ 系统初始化完成")
         self.logger.info(f"   开始时间: {datetime.now().strftime('%H:%M:%S')}")
@@ -684,11 +558,7 @@ class PerceptiveExplorer:
 
                         # 更新前视窗口
                         if self.front_display:
-                            manual_info = None
-                            if self.state == FlightState.MANUAL:
-                                manual_info = self._get_manual_control_info()
-
-                            self.front_display.update_image(img_bgr, display_info, manual_info)
+                            self.front_display.update_image(img_bgr, display_info)
                             self.stats['front_image_updates'] += 1
 
                 except Exception as e:
@@ -730,366 +600,63 @@ class PerceptiveExplorer:
         except:
             return {}
 
-    def _get_manual_control_info(self):
-        """获取手动控制信息"""
-        info_lines = []
+    def _check_connection_health(self):
+        """检查连接健康状态"""
+        try:
+            # 简单的ping测试
+            self.client.ping()
+            self.logger.info("✅ 连接健康检查通过")
+            return True
+        except Exception as e:
+            self.logger.warning(f"⚠️ 连接健康检查失败: {e}")
+            if self.reconnect_attempts < config.SYSTEM['MAX_RECONNECT_ATTEMPTS']:
+                self.logger.info("尝试重新连接...")
+                self._connect_to_airsim()
+                self.reconnect_attempts += 1
+            return False
 
-        # 控制状态
-        if self.control_keys:
-            key_names = []
-            for key in self.control_keys:
-                if key == ord('w'):
-                    key_names.append("前进")
-                elif key == ord('s'):
-                    key_names.append("后退")
-                elif key == ord('a'):
-                    key_names.append("左移")
-                elif key == ord('d'):
-                    key_names.append("右移")
-                elif key == ord('q'):
-                    key_names.append("上升")
-                elif key == ord('e'):
-                    key_names.append("下降")
-                elif key == ord('z'):
-                    key_names.append("左转")
-                elif key == ord('x'):
-                    key_names.append("右转")
-                elif key == 32:  # 空格
-                    key_names.append("悬停")
+    def _handle_airsim_exception(self, exception):
+        """处理AirSim特定异常"""
+        error_msg = str(exception)
+        if "timeout" in error_msg.lower():
+            self.logger.warning("⏰ AirSim响应超时，等待后继续...")
+            time.sleep(1.0)
+        elif "not connected" in error_msg.lower():
+            self.logger.error("🔌 与AirSim连接断开")
+            self._handle_connection_error()
 
-            if key_names:
-                info_lines.append(f"控制: {', '.join(key_names)}")
-        else:
-            info_lines.append("控制: 悬停")
-
-        # 时间信息
-        if self.manual_control_start > 0:
-            elapsed = time.time() - self.manual_control_start
-            info_lines.append(f"手动模式: {elapsed:.1f}秒")
-
-        # 提示信息
-        info_lines.append("ESC: 退出手动模式")
-
-        return info_lines
-
-    def apply_manual_control(self):
-        """应用手动控制指令"""
-        if self.state != FlightState.MANUAL:
+    def _handle_connection_error(self):
+        """处理连接错误"""
+        if self.emergency_flag:
             return
 
-        try:
-            # 获取当前无人机状态
-            state = self.client.getMultirotorState(vehicle_name=self.drone_name)
-            pos = state.kinematics_estimated.position
-            orientation = state.kinematics_estimated.orientation
-
-            # 计算偏航角
-            _, _, yaw = airsim.to_eularian_angles(orientation)
-
-            # 初始化控制向量
-            vx, vy, vz, yaw_rate = 0.0, 0.0, 0.0, 0.0
-
-            # 处理控制键
-            for key in list(self.control_keys.keys()):
-                key_char = chr(key).lower() if 0 <= key <= 255 else ''
-
-                # 前后移动
-                if key_char == 'w':
-                    vx += config.MANUAL['CONTROL_SPEED'] * math.cos(yaw)
-                    vy += config.MANUAL['CONTROL_SPEED'] * math.sin(yaw)
-                elif key_char == 's':
-                    vx -= config.MANUAL['CONTROL_SPEED'] * math.cos(yaw)
-                    vy -= config.MANUAL['CONTROL_SPEED'] * math.sin(yaw)
-
-                # 左右移动
-                if key_char == 'a':
-                    vx += config.MANUAL['CONTROL_SPEED'] * math.cos(yaw + math.pi/2)
-                    vy += config.MANUAL['CONTROL_SPEED'] * math.sin(yaw + math.pi/2)
-                elif key_char == 'd':
-                    vx += config.MANUAL['CONTROL_SPEED'] * math.cos(yaw - math.pi/2)
-                    vy += config.MANUAL['CONTROL_SPEED'] * math.sin(yaw - math.pi/2)
-
-                # 垂直移动
-                if key_char == 'q':
-                    vz = -config.MANUAL['ALTITUDE_SPEED']  # AirSim中Z轴向下为正
-                elif key_char == 'e':
-                    vz = config.MANUAL['ALTITUDE_SPEED']
-
-                # 偏航控制
-                if key_char == 'z':
-                    yaw_rate = -math.radians(config.MANUAL['YAW_SPEED'])
-                elif key_char == 'x':
-                    yaw_rate = math.radians(config.MANUAL['YAW_SPEED'])
-
-                # 悬停
-                if key == 32:  # 空格
-                    self.client.hoverAsync(vehicle_name=self.drone_name)
-                    self.control_keys = {}  # 清空控制键
-                    return
-
-            # 安全限制
-            if config.MANUAL['SAFETY_ENABLED']:
-                # 限制速度
-                speed = math.sqrt(vx**2 + vy**2)
-                if speed > config.MANUAL['MAX_MANUAL_SPEED']:
-                    scale = config.MANUAL['MAX_MANUAL_SPEED'] / speed
-                    vx *= scale
-                    vy *= scale
-
-                # 限制高度
-                target_z = pos.z_val + vz * 0.1
-                if target_z > config.MANUAL['MIN_ALTITUDE_LIMIT']:
-                    vz = max(vz, (config.MANUAL['MIN_ALTITUDE_LIMIT'] - pos.z_val) * 10)
-                if target_z < config.MANUAL['MAX_ALTITUDE_LIMIT']:
-                    vz = min(vz, (config.MANUAL['MAX_ALTITUDE_LIMIT'] - pos.z_val) * 10)
-
-            # 应用控制
-            if vx != 0.0 or vy != 0.0 or vz != 0.0:
-                self.client.moveByVelocityAsync(vx, vy, vz, 0.1, vehicle_name=self.drone_name)
-            elif yaw_rate != 0.0:
-                self.client.rotateByYawRateAsync(yaw_rate, 0.1, vehicle_name=self.drone_name)
-            elif config.MANUAL['ENABLE_AUTO_HOVER'] and not self.control_keys:
-                # 没有按键时自动悬停
-                self.client.hoverAsync(vehicle_name=self.drone_name)
-
-        except Exception as e:
-            self.logger.warning(f"⚠️ 手动控制应用失败: {e}")
-
-    def change_state(self, new_state: FlightState):
-        """状态转换"""
-        if self.state != new_state:
-            self.logger.info(f"🔄 状态转换: {self.state.value} → {new_state.value}")
-            self.state = new_state
-            self.state_history.append((time.time(), new_state))
-            self.stats['state_changes'] += 1
-
-    def run_manual_control(self):
-        """改进的手动控制模式 - 修复按键冲突"""
-        self.logger.info("=" * 60)
-        self.logger.info("启动手动控制模式")
-        self.logger.info("=" * 60)
-
-        if not self.front_display:
-            self.logger.error("❌ 前视窗口未初始化")
-            return
-
-        try:
-            # 切换到手动控制状态
-            self.change_state(FlightState.MANUAL)
-            self.manual_control_start = time.time()
-
-            # 设置前视窗口为手动模式
-            self.front_display.set_manual_mode(True)
-
-            self.logger.info("🕹️ 进入手动控制模式")
-            print("\n" + "="*60)
-            print("🎮 手动控制模式已启动")
-            print("="*60)
-            print("控制键位:")
-            print("  W: 前进 | S: 后退 | A: 左移 | D: 右移")
-            print("  Q: 上升 | E: 下降 | Z: 左转 | X: 右转")
-            print("  空格: 悬停 | ESC: 退出手动模式")
-            print("="*60)
-            print("💡 提示: 按键时控制持续生效，松开自动停止")
-            print("        请在无人机前视窗口操作")
-            print("="*60)
-
-            # 清空控制键
-            self.control_keys = {}
-
-            # 手动控制主循环
-            manual_active = True
-            last_control_time = time.time()
-            last_image_time = time.time()
-
-            while manual_active and not self.emergency_flag:
-                try:
-                    # 检查是否应该退出
-                    if self.front_display.should_exit_manual():
-                        self.logger.info("收到退出手动模式指令")
-                        manual_active = False
-                        break
-
-                    # 获取前视窗口的按键状态
-                    if self.front_display:
-                        window_keys = self.front_display.get_control_inputs()
-                        self.control_keys = window_keys.copy()
-
-                    # 检查前视窗口是否还在运行
-                    if not self.front_display.display_active:
-                        self.logger.info("前视窗口已关闭，退出手动模式")
-                        manual_active = False
-                        break
-
-                    # 应用手动控制（限制频率）
-                    current_time = time.time()
-                    if current_time - last_control_time >= 0.05:  # 20Hz
-                        self.apply_manual_control()
-                        last_control_time = current_time
-
-                    # 定期获取并显示图像（降低频率，避免冲突）
-                    if current_time - last_image_time >= 0.1:  # 10Hz
-                        try:
-                            # 只获取前视图像，避免深度图像获取冲突
-                            camera_name = config.CAMERA['DEFAULT_NAME']
-                            responses = self.client.simGetImages([
-                                airsim.ImageRequest(
-                                    camera_name,
-                                    airsim.ImageType.Scene,
-                                    False,
-                                    False
-                                )
-                            ])
-
-                            if responses and responses[0] and hasattr(responses[0], 'image_data_uint8'):
-                                img_array = np.frombuffer(responses[0].image_data_uint8, dtype=np.uint8)
-                                if len(img_array) > 0:
-                                    img_rgb = img_array.reshape(responses[0].height, responses[0].width, 3)
-                                    img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-
-                                    # 准备显示信息
-                                    try:
-                                        state = self.client.getMultirotorState(vehicle_name=self.drone_name)
-                                        pos = state.kinematics_estimated.position
-                                        display_info = {
-                                            'state': self.state.value,
-                                            'position': (pos.x_val, pos.y_val, pos.z_val),
-                                            'loop_count': self.loop_count,
-                                        }
-                                    except:
-                                        display_info = {}
-
-                                    # 更新前视窗口
-                                    if self.front_display:
-                                        manual_info = self._get_manual_control_info()
-                                        self.front_display.update_image(img_bgr, display_info, manual_info)
-                                        last_image_time = current_time
-                        except Exception as img_error:
-                            # 忽略图像获取错误，继续控制
-                            pass
-
-                    # 短暂休眠
-                    time.sleep(0.01)
-
-                except KeyboardInterrupt:
-                    self.logger.warning("⏹️ 用户中断手动控制")
-                    manual_active = False
-                    break
-                except Exception as e:
-                    self.logger.error(f"❌ 手动控制循环异常: {e}")
-                    time.sleep(0.1)
-
-            # 记录手动控制时间
-            manual_time = time.time() - self.manual_control_start
-            self.stats['manual_control_time'] = manual_time
-
-            # 重置状态
-            self.manual_control_start = 0
-            self.control_keys = {}
-            if self.front_display:
-                self.front_display.set_manual_mode(False)
-
-            # 停止运动，悬停
-            try:
-                self.client.hoverAsync(vehicle_name=self.drone_name).join()
-            except:
-                pass
-
-            self.logger.info(f"⏱️  手动控制结束，持续时间: {manual_time:.1f}秒")
-
-            # 回到悬停状态
-            self.change_state(FlightState.HOVERING)
-
-            # 询问用户下一步操作
-            print("\n" + "="*60)
-            print("手动控制模式已结束")
-            print(f"控制时间: {manual_time:.1f}秒")
-            print("="*60)
-            print("请选择下一步操作:")
-            print("  1. 继续自动探索")
-            print("  2. 再次进入手动模式")
-            print("  3. 降落并结束任务")
-            print("="*60)
-
-            choice = input("请输入选择 (1/2/3): ").strip()
-
-            if choice == '1':
-                self.logger.info("🔄 返回自动探索模式")
-                # 继续自动探索
-                remaining_time = self.exploration_time - (time.time() - self.start_time)
-                if remaining_time > 10:  # 至少还有10秒才继续
-                    self.exploration_time = remaining_time
-                    self.run_perception_loop()
-                else:
-                    self.logger.info("⏰ 剩余探索时间不足，开始返航")
-                    self._finish_mission()
-            elif choice == '2':
-                self.logger.info("🔄 重新进入手动控制模式")
-                self.run_manual_control()
-            else:
-                self.logger.info("🛬 用户选择结束任务")
-                self._finish_mission()
-
-        except Exception as e:
-            self.logger.error(f"❌ 手动控制模式发生异常: {e}")
-            self.logger.debug(f"异常堆栈: {traceback.format_exc()}")
+        self.logger.warning("🔄 尝试恢复连接...")
+        success = self._check_connection_health()
+        if not success and not self.emergency_flag:
+            self.logger.error("❌ 无法恢复连接，启动紧急降落程序")
             self.emergency_stop()
 
-    def run_perception_loop(self):
-        """主感知-决策-控制循环"""
-        self.logger.info("=" * 60)
-        self.logger.info("启动感知-决策-控制主循环")
-        self.logger.info("=" * 60)
-
+    def get_visual_perception(self):
+        """获取视觉图像用于高级感知（可选）"""
         try:
-            # 起飞
-            self.logger.info("🚀 起飞中...")
-            self.client.takeoffAsync(vehicle_name=self.drone_name).join()
-            time.sleep(2)
+            responses = self.client.simGetImages([
+                airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
+            ])
 
-            # 上升到目标高度
-            self.client.moveToZAsync(self.takeoff_height, 3, vehicle_name=self.drone_name).join()
-            self.change_state(FlightState.HOVERING)
-            time.sleep(2)
+            if responses and responses[0]:
+                img_data = responses[0].image_data_uint8
+                img_array = np.frombuffer(img_data, dtype=np.uint8)
+                img = img_array.reshape(responses[0].height, responses[0].width, 3)
 
-            # 主循环
-            exploration_start = time.time()
+                hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+                green_mask = cv2.inRange(hsv, (40, 40, 40), (80, 255, 255))
+                green_ratio = np.sum(green_mask > 0) / green_mask.size
 
-            while (time.time() - exploration_start < self.exploration_time and
-                   not self.emergency_flag):
+                return img, green_ratio
+        except:
+            pass
 
-                self.loop_count += 1
-                loop_start = time.time()
-
-                # 1. 感知阶段
-                perception = self.get_depth_perception()
-
-                # 2. 决策阶段
-                decision = self.make_intelligent_decision(perception)
-
-                # 3. 控制执行阶段
-                self._execute_control_decision(decision)
-
-                # 定期状态报告
-                if self.loop_count % config.SYSTEM.get('HEALTH_CHECK_INTERVAL', 20) == 0:
-                    self._report_status(exploration_start, perception)
-
-                # 循环频率控制
-                loop_time = time.time() - loop_start
-                if loop_time < 0.1:
-                    time.sleep(0.1 - loop_time)
-
-            # 正常结束
-            self.logger.info("⏰ 探索时间到，开始返航")
-            self._finish_mission()
-
-        except KeyboardInterrupt:
-            self.logger.warning("⏹️ 用户中断探索")
-            self.emergency_stop()
-        except Exception as e:
-            self.logger.error(f"❌ 主循环发生异常: {e}")
-            self.logger.debug(f"异常堆栈: {traceback.format_exc()}")
-            self.emergency_stop()
+        return None, 0
 
     def make_intelligent_decision(self, perception: PerceptionResult) -> Tuple[float, float, float, float]:
         """基于感知结果做出智能决策"""
@@ -1166,6 +733,14 @@ class PerceptiveExplorer:
             self.logger.error(f"❌ 决策过程异常: {e}")
             return 0.0, 0.0, self.base_height, 0.0
 
+    def change_state(self, new_state: FlightState):
+        """状态转换"""
+        if self.state != new_state:
+            self.logger.info(f"🔄 状态转换: {self.state.value} → {new_state.value}")
+            self.state = new_state
+            self.state_history.append((time.time(), new_state))
+            self.stats['state_changes'] += 1
+
     def _execute_control_decision(self, decision):
         """执行控制决策，增强异常处理"""
         try:
@@ -1210,10 +785,64 @@ class PerceptiveExplorer:
                             f"| 开阔度={perception.open_space_score:.2f}")
             self.logger.info(f"   系统统计: 异常{self.stats['exceptions_caught']}次 "
                             f"| 状态切换{self.stats['state_changes']}次")
-            if self.stats['manual_control_time'] > 0:
-                self.logger.info(f"   手动控制: {self.stats['manual_control_time']:.1f}秒")
         except:
             self.logger.info("状态报告: 无法获取无人机状态")
+
+    def run_perception_loop(self):
+        """主感知-决策-控制循环"""
+        self.logger.info("=" * 60)
+        self.logger.info("启动感知-决策-控制主循环")
+        self.logger.info("=" * 60)
+
+        try:
+            # 起飞
+            self.logger.info("🚀 起飞中...")
+            self.client.takeoffAsync(vehicle_name=self.drone_name).join()
+            time.sleep(2)
+
+            # 上升到目标高度
+            self.client.moveToZAsync(self.takeoff_height, 3, vehicle_name=self.drone_name).join()
+            self.change_state(FlightState.HOVERING)
+            time.sleep(2)
+
+            # 主循环
+            exploration_start = time.time()
+
+            while (time.time() - exploration_start < self.exploration_time and
+                   not self.emergency_flag):
+
+                self.loop_count += 1
+                loop_start = time.time()
+
+                # 1. 感知阶段
+                perception = self.get_depth_perception()
+
+                # 2. 决策阶段
+                decision = self.make_intelligent_decision(perception)
+
+                # 3. 控制执行阶段
+                self._execute_control_decision(decision)
+
+                # 定期状态报告
+                if self.loop_count % config.SYSTEM.get('HEALTH_CHECK_INTERVAL', 20) == 0:
+                    self._report_status(exploration_start, perception)
+
+                # 循环频率控制
+                loop_time = time.time() - loop_start
+                if loop_time < 0.1:
+                    time.sleep(0.1 - loop_time)
+
+            # 正常结束
+            self.logger.info("⏰ 探索时间到，开始返航")
+            self._finish_mission()
+
+        except KeyboardInterrupt:
+            self.logger.warning("⏹️ 用户中断探索")
+            self.emergency_stop()
+        except Exception as e:
+            self.logger.error(f"❌ 主循环发生异常: {e}")
+            self.logger.debug(f"异常堆栈: {traceback.format_exc()}")
+            self.emergency_stop()
 
     def _finish_mission(self):
         """完成任务并生成总结报告"""
@@ -1276,7 +905,6 @@ class PerceptiveExplorer:
         self.logger.info(f"   状态切换次数: {self.stats['state_changes']}")
         self.logger.info(f"   检测到障碍次数: {self.stats['obstacles_detected']}")
         self.logger.info(f"   前视图像更新次数: {self.stats['front_image_updates']}")
-        self.logger.info(f"   手动控制时间: {self.stats['manual_control_time']:.1f}秒")
         self.logger.info(f"   捕获的异常数: {self.stats['exceptions_caught']}")
         self.logger.info(f"   重连尝试次数: {self.reconnect_attempts}")
 
@@ -1291,7 +919,6 @@ class PerceptiveExplorer:
                 f.write(f"总循环次数: {self.loop_count}\n")
                 f.write(f"探索航点数量: {len(self.visited_positions)}\n")
                 f.write(f"状态切换次数: {self.stats['state_changes']}\n")
-                f.write(f"手动控制时间: {self.stats['manual_control_time']:.1f}秒\n")
                 f.write(f"异常捕获次数: {self.stats['exceptions_caught']}\n")
                 f.write(f"前视图像更新次数: {self.stats['front_image_updates']}\n")
                 f.write("=" * 50 + "\n")
@@ -1311,12 +938,9 @@ class PerceptiveExplorer:
 
         self.logger.error("\n🆘 紧急停止程序启动!")
         self.emergency_flag = True
-
-        # 切换到紧急状态
         self.change_state(FlightState.EMERGENCY)
 
         try:
-            # 停止运动，悬停
             self.client.hoverAsync(vehicle_name=self.drone_name).join()
             time.sleep(1)
             self.client.landAsync(vehicle_name=self.drone_name).join()
@@ -1338,21 +962,18 @@ def main():
     """主程序入口"""
     # 显示启动信息
     print("=" * 70)
-    print("AirSimNH 无人机感知探索系统 - 修复按键冲突改进版")
+    print("AirSimNH 无人机感知探索系统 - 工程优化版")
     print(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"配置状态: {'已加载' if CONFIG_LOADED else '使用默认配置'}")
     print(f"日志级别: {config.SYSTEM['LOG_LEVEL']}")
     print(f"探索时间: {config.EXPLORATION['TOTAL_TIME']}秒")
     print("=" * 70)
 
-    # 用户选择模式
-    print("\n请选择运行模式:")
-    print("  1. 自动探索模式 (AI自主决策)")
-    print("  2. 手动控制模式 (键盘控制)")
-    print("  3. 混合模式 (先自动探索，后可切换)")
-    print("=" * 50)
-
-    mode_choice = input("请输入选择 (1/2/3): ").strip()
+    # 用户确认
+    response = input("按 Enter 键开始运行，或输入 'q' 退出: ")
+    if response.lower() == 'q':
+        print("程序退出")
+        return
 
     explorer = None
     try:
@@ -1368,75 +989,8 @@ def main():
 
         signal.signal(signal.SIGINT, signal_handler)
 
-        # 根据选择运行相应模式
-        if mode_choice == '1':
-            # 自动探索模式
-            print("\n" + "="*50)
-            print("启动自动探索模式")
-            print("="*50)
-            explorer.run_perception_loop()
-
-        elif mode_choice == '2':
-            # 手动控制模式
-            print("\n" + "="*50)
-            print("启动手动控制模式")
-            print("="*50)
-
-            # 先起飞到安全高度
-            print("正在起飞...")
-            explorer.client.takeoffAsync(vehicle_name="").join()
-            time.sleep(2)
-            explorer.client.moveToZAsync(-10, 3, vehicle_name="").join()
-            time.sleep(2)
-            print("起飞完成，可以开始手动控制")
-            print("请切换到无人机前视窗口，使用WSAD键控制")
-
-            # 进入手动控制
-            explorer.run_manual_control()
-
-        elif mode_choice == '3':
-            # 混合模式：先自动探索，后询问是否切换手动
-            print("\n" + "="*50)
-            print("启动混合模式")
-            print("="*50)
-
-            # 先运行一段时间的自动探索
-            explorer.logger.info("🔍 开始自动探索...")
-            original_time = config.EXPLORATION['TOTAL_TIME']
-            # 设置较短的自动探索时间，然后询问
-            explorer.exploration_time = min(60, original_time)  # 最多自动探索60秒
-
-            # 运行自动探索
-            explorer.run_perception_loop()
-
-            # 如果自动探索正常结束（非紧急停止）
-            if not explorer.emergency_flag:
-                print("\n" + "="*50)
-                print("自动探索阶段结束")
-                print("请选择下一步:")
-                print("  1. 进入手动控制模式")
-                print("  2. 继续自动探索")
-                print("  3. 结束任务返航")
-                print("="*50)
-
-                next_choice = input("请输入选择 (1/2/3): ").strip()
-
-                if next_choice == '1':
-                    explorer.run_manual_control()
-                elif next_choice == '2':
-                    explorer.exploration_time = original_time - 60
-                    if explorer.exploration_time > 10:
-                        explorer.run_perception_loop()
-                    else:
-                        explorer.logger.info("⏰ 剩余时间不足，开始返航")
-                        explorer._finish_mission()
-                else:
-                    explorer._finish_mission()
-
-        else:
-            print("❌ 无效的选择，程序退出")
-            if explorer:
-                explorer._cleanup_system()
+        # 运行主循环
+        explorer.run_perception_loop()
 
     except Exception as e:
         print(f"\n❌ 程序启动异常: {e}")
