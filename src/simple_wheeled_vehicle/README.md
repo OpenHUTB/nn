@@ -1,129 +1,139 @@
-# 简易轮式小车智能代理
+MuJoCo 简易轮式小车智能代理
+项目简介
+一个基于PyTorch神经网络与MuJoCo物理引擎的简易轮式小车智能代理，实现了在连续控制环境下的感知、决策与控制一体化解决方案。项目采用模块化设计，便于在仿真环境中进行机器人控制算法研究、强化学习训练和控制系统验证。
 
-## 项目简介
-一个基于PyTorch神经网络与ROS的**简易轮式小车智能代理**，主要面向Carla自动驾驶模拟器。项目实现了从感知到控制的基本自动驾驶流程，模块化设计清晰，便于学习、扩展与二次开发。
+功能特性
+物理仿真：基于MuJoCo的高保真物理模拟，支持关节约束、碰撞检测和接触力计算
 
-## 功能特性
-- **环境感知**：处理相机图像，识别车道线、可行驶区域及动态障碍物。
-- **决策规划**：基于感知结果进行局部路径规划与动态避障决策。
-- **运动控制**：输出转向、油门及刹车指令，控制小车沿规划路径行驶。
-- **训练接口**：提供数据采集与模型训练接口，支持强化学习与模仿学习。
-- **ROS集成**：通过ROS节点进行模块间通信，支持传感器数据发布与控制指令订阅。
+神经网络控制：使用PyTorch实现的深度强化学习或模仿学习策略
 
-## 环境要求
-- **操作系统**：Ubuntu 20.04/22.04（推荐）或 Windows 10/11（WSL2）
-- **Python**：3.7 - 3.12
-- **核心框架**：PyTorch >= 1.9.0（CPU/GPU版本均可）
-- **模拟器**：Carla 0.9.14+
-- **可选依赖**：ROS Noetic 或 ROS2 Foxy（用于ROS通信）
-- **基础包**：numpy, opencv-python, matplotlib
+多模态感知：集成视觉、本体感知和惯性测量单元(IMU)等多种传感器输入
 
-## 项目结构
-```
-src/simple_wheeled_agent/
-├── main.py                      # 模块主入口 (非ROS启动)
-├── main.launch                  # ROS启动配置文件
-├── requirements.txt
-├── config/
-│   └── default.yaml            # 配置文件
-├── docs/                       # 模块文档
-├── models/                     # 预训练模型存放处
-├── scripts/                    # 工具脚本
-├── src/                        # 核心源代码
-│   ├── perception/
-│   │   ├── __init__.py
-│   │   ├── image_processor.py # 图像处理与神经网络推理
-│   │   └── data_collector.py  # 训练数据采集
-│   ├── planning/
-│   │   ├── __init__.py
-│   │   └── local_planner.py   # 局部路径规划器
-│   ├── control/
-│   │   ├── __init__.py
-│   │   └── pid_controller.py  # 运动控制器
-│   └── utils/                  # 通用工具函数
-└── tests/                      # 单元测试
-```
+自适应控制：针对不同地形和任务需求调整控制策略
 
-## 快速开始
-1. **安装依赖**:
-   ```bash
-   cd src/simple_wheeled_agent
-   pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-   ```
+训练框架：提供完整的强化学习训练循环和评估接口
 
-2. **启动Carla服务端** (在另一个终端):
-   ```bash
-   ./CarlaUE4.sh -quality-level=Low # 可根据硬件调整画质
-   ```
+可视化工具：实时显示机器人状态、传感器数据和决策过程
 
-3. **运行代理**:
-   ```bash
-   python main.py --config config/default.yaml
-   ```
-   程序将连接Carla，生成车辆，并开始自主驾驶。
+环境要求
+操作系统：Ubuntu 20.04/22.04（推荐）或 Windows 10/11（需配置WSL2）
 
-4. **(可选) ROS模式**:
-   ```bash
-   roslaunch simple_wheeled_agent main.launch
-   ```
+Python：3.7 - 3.10（MuJoCo官方支持范围）
 
-## 主要类和方法
-- **`PerceptionAgent` (感知模块)**:
-    - `process_image(raw_image)`: 处理原始图像，输出车道与障碍物信息。
-    - `collect_training_data()`: 采集带标签的训练数据。
+MuJoCo版本：2.3.0+（需要获取许可证）
 
-- **`LocalPlanner` (规划模块)**:
-    - `compute_path(perception_result, goal)`: 根据感知结果和全局目标计算局部路径。
-    - `dynamic_obstacle_avoidance()`: 动态避障算法。
+核心框架：PyTorch ≥ 1.9.0，MuJoCo-Py ≥ 2.3.0
 
-- **`VehicleController` (控制模块)**:
-    - `update_control(target_path, current_state)`: 根据目标路径和车辆状态计算控制量。
-    - `get_control()`: 返回当前的控制指令（转向、油门、刹车）。
+渲染支持：OpenGL或EGL（GPU加速推荐）
 
-## 配置参数
-关键参数可在 `config/default.yaml` 中调整:
-```yaml
-carla:
-  host: localhost
-  port: 2000
-  timeout: 10.0
-vehicle:
-  target_speed: 30.0        # 目标速度 (km/h)
-  max_steer_angle: 70.0     # 最大转向角 (度)
-perception:
-  model_path: models/perception_model.pth
-  image_width: 640
-  image_height: 480
-```
+推荐硬件：支持CUDA的NVIDIA显卡（用于神经网络加速）
 
-## 数据输出
-运行过程中会生成以下数据:
-1. **控制台输出**：车辆状态、控制指令、故障信息。
-2. **日志文件** (位于 `logs/`): 运行日志与性能统计。
-3. **数据记录** (训练模式下): 图像与对应控制指令，保存于 `data/train/`。
-4. **可视化窗口**：实时显示处理后的图像与规划路径。
+快速开始
+安装MuJoCo：
 
-## 扩展建议
-- **更换模拟器**：参考现有Carla接口，为AirSim或MuJoCo实现对应的环境包装器。
-- **改进感知模型**：替换 `perception` 模块中的网络结构（如使用ResNet、Transformer）。
-- **尝试新算法**：在 `planning` 模块中实现强化学习（PPO、SAC）或更先进的规划算法。
-- **增加传感器**：集成激光雷达（Lidar）或雷达（Radar）数据进行多传感器融合。
+bash
+# 获取MuJoCo许可证并下载
+pip install mujoco
+# 设置许可证密钥（按官方指引操作）
+安装依赖：
 
-## 常见问题
-1. **Q: 无法连接到Carla服务器**
-   A: 请确认CarlaUE4正在运行，且端口未被占用。检查配置中的 `host` 和 `port`。
+bash
+cd src/mujoco_wheeled_robot
+pip install -r requirements.txt
+测试环境：
 
-2. **Q: 运行时报错 “No module named ‘torch’”**
-   A: 请单独安装与你的Python及CUDA版本匹配的PyTorch。
+bash
+python -c "import mujoco; print('MuJoCo version:', mujoco.__version__)"
+运行示例：
 
-3. **Q: 车辆控制不平稳，抖动严重**
-   A: 尝试调整 `config/default.yaml` 中的PID控制参数，或降低 `target_speed`。
+bash
+# 启动随机策略演示
+python main.py --mode demo
+# 开始训练
+python main.py --mode train --config config/training_config.yaml
+主要类和方法
+WheeledRobotEnv (环境类)：
 
-4. **Q: 如何用自己的数据训练模型？**
-   A: 运行 `python main.py --mode collect` 采集数据，然后使用 `scripts/train_model.py` 进行训练。
+reset(): 重置环境到初始状态
 
-5. **Q: ROS节点无法启动**
-   A: 确保ROS环境已正确配置 (`source /opt/ros/<distro>/setup.bash`)，且所有ROS依赖已安装。
+step(action): 执行动作并返回新状态、奖励和终止标志
 
----
-*更详细的API文档请使用 `mkdocs serve` 在本地构建和查看。*
+render(): 渲染当前环境状态
+
+PolicyNetwork (策略网络)：
+
+forward(observation): 根据观测计算动作分布
+
+sample(observation): 从分布中采样动作
+
+evaluate(observation, action): 计算动作的对数概率和熵
+
+DataLogger (数据记录器)：
+
+log_step(state, action, reward): 记录单步数据
+
+save_episode(episode_id): 保存回合数据
+
+export_trajectory(): 导出轨迹供分析使用
+
+配置参数
+关键配置位于 config/ 目录下：
+
+yaml
+# robot_config.yaml
+robot:
+  mass: 2.5          # 小车质量 (kg)
+  wheel_radius: 0.1  # 轮子半径 (m)
+  max_velocity: 3.0  # 最大速度 (m/s)
+  control_frequency: 50  # 控制频率 (Hz)
+
+# training_config.yaml
+training:
+  algorithm: "sac"   # 使用的算法
+  total_timesteps: 1000000
+  learning_rate: 3e-4
+  gamma: 0.99        # 折扣因子
+  batch_size: 256
+  buffer_size: 1000000
+数据输出
+训练日志：TensorBoard格式，包含奖励曲线、策略熵等指标
+
+模型检查点：定期保存的策略网络参数
+
+轨迹数据：.npz格式，包含状态、动作、奖励序列
+
+评估结果：性能指标统计（平均奖励、成功率等）
+
+视频记录：.mp4格式的演示视频
+
+扩展建议
+添加传感器：在模型文件中增加激光雷达或深度相机
+
+更换任务：修改奖励函数实现不同任务（如避障、路径跟踪）
+
+集成真实数据：使用真实机器人数据微调仿真模型
+
+多机器人协同：扩展环境支持多机器人交互
+
+分布式训练：使用Ray等框架实现并行训练加速
+
+模型预测控制：结合学习的动力学模型实现MPC控制器
+
+常见问题
+Q: MuJoCo许可证如何获取？
+A: 访问MuJoCo官网获取个人或机构许可证，按照官方指引配置环境变量。
+
+Q: 仿真运行速度慢
+A: 检查是否启用了GPU渲染，降低渲染分辨率，或使用 headless 模式进行训练。
+
+Q: 训练不稳定，奖励不收敛
+A: 尝试调整超参数（如学习率、折扣因子），增加网络容量，或检查奖励函数设计。
+
+Q: 如何导入自定义机器人模型？
+A: 将 .xml 模型文件放入 models/ 目录，在环境初始化时指定模型路径。
+
+Q: 在Windows上运行问题
+A: 建议使用WSL2或Linux环境，Windows原生支持有限且可能遇到兼容性问题。
+
+Q: 模型无法学习有效策略
+A: 确保观测空间包含足够信息，检查动作空间是否合理，尝试更简单的任务作为起点。
