@@ -34,7 +34,7 @@ class Camera:
         if not ret:
             raise Exception("无法读取摄像头帧")
         
-        # 水平翻转帧
+        # 水平翻转帧（镜像效果）
         frame = cv2.flip(frame, 1)
         return frame
     
@@ -42,3 +42,33 @@ class Camera:
         """释放摄像头资源"""
         if self.cap:
             self.cap.release()
+            cv2.destroyAllWindows()
+
+
+def main():
+    """主函数：显示摄像头画面"""
+    camera = Camera()
+    
+    try:
+        camera.initialize()
+        print("摄像头初始化成功，按 'q' 键退出")
+        
+        while True:
+            # 读取帧
+            frame = camera.read_frame()
+            
+            # 显示帧
+            cv2.imshow('Camera', frame)
+            
+            # 按 'q' 键退出
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+                
+    except Exception as e:
+        print(f"错误: {e}")
+    finally:
+        camera.release()
+
+
+if __name__ == "__main__":
+    main()
