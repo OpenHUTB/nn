@@ -16,3 +16,5 @@ src/openpilot_model/build/
 src/openpilot_model/log/
 # VS Code閰嶇疆
 .vscode/
+.idea/* 车路协同与边缘智能
+.idea/ 车路协同与边缘智能/
