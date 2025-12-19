@@ -1,0 +1,20 @@
+(cl:defpackage carla_autonomous-srv
+  (:use )
+  (:export
+   "RESET"
+   "<RESET-REQUEST>"
+   "RESET-REQUEST"
+   "<RESET-RESPONSE>"
+   "RESET-RESPONSE"
+   "STARTEPISODE"
+   "<STARTEPISODE-REQUEST>"
+   "STARTEPISODE-REQUEST"
+   "<STARTEPISODE-RESPONSE>"
+   "STARTEPISODE-RESPONSE"
+   "STOP"
+   "<STOP-REQUEST>"
+   "STOP-REQUEST"
+   "<STOP-RESPONSE>"
+   "STOP-RESPONSE"
+  ))
+

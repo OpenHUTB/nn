@@ -1,0 +1,2 @@
+carla_autonomous
+-DCATKIN_DEVEL_PREFIX=/home/yume/carla_ros_ws/devel -DCMAKE_INSTALL_PREFIX=/home/yume/carla_ros_ws/install -G Unix Makefiles
