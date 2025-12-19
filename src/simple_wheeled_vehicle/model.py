@@ -610,7 +610,6 @@ def main():
 
         # 控制帧率
         clock.tick(60)
-
     pygame.quit()
     sys.exit()
 
