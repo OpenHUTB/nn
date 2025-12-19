@@ -315,7 +315,7 @@ if __name__ == "__main__":
         # 转换为模型输入格式
         state_arr = np.array([list(vehicle_state.values())])
         state_scaled = scaler.transform(state_arr)
-        # 预测并限制范围
+        # 预测并限制范围a
         brake_time = model.predict(state_scaled)[0]
         return max(0.1, min(brake_time, 5.0))
 
