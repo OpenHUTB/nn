@@ -245,20 +245,28 @@ class IntegratedDroneSimulation:
             else:
                 # 虚拟模式
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
-                cv2.putText(frame, "Virtual Camera Mode", (50, 50),
+                cv2.putText(frame, "虚拟摄像头模式", (50, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.putText(frame, f"Gesture Commands ({mode_text}):", (50, 100),
+                cv2.putText(frame, f"手势指令 ({mode_text}):", (50, 100),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
-                cv2.putText(frame, "Open Palm - Takeoff", (50, 140),
+                cv2.putText(frame, "张开手掌 - 起飞", (50, 140),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "Closed Fist - Land", (50, 170),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "Victory - Forward", (50, 200),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "Thumb Up - Backward", (50, 230),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "Press 'q' to quit", (50, 280),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                cv2.putText(frame, "握拳 - 降落", (50, 170),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "胜利手势 - 前进", (50, 200),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "大拇指 - 后退", (50, 230),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "食指上指 - 上升", (50, 260),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "食指向下 - 下降", (50, 290),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "OK手势 - 悬停", (50, 320),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "大拇指向下 - 停止", (50, 350),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                cv2.putText(frame, "按 'q' 键退出", (50, 400),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
             # 手势检测
             try:

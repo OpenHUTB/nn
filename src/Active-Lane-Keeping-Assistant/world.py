@@ -101,6 +101,22 @@ class World():
         self.vehicle = self.world.spawn_actor(self.bp, self.spawn_point)
 
         # Spawn camera
+        self._spawn_camera()
+
+        # Spawn collision sensor
+        blueprint = self.world.get_blueprint_library() \
+            .find('sensor.other.collision')
+        self.collision_sensor = self.world.spawn_actor(blueprint,
+                                                       carla.Transform(), attach_to=self.vehicle)
+        self.collision_detected = False
+        # Remove redundant set brackets
+        self.collision_sensor.listen(lambda e: self._set_collision())
+        self.initialized = True
+
+        return 0.0, 0.0, np.zeros((self.image_height, self.image_width, 3)), False
+
+    def _spawn_camera(self) -> None:
+        """Helper method to spawn the camera sensor"""
         blueprint = self.blueprint_library.find('sensor.camera.rgb')
         blueprint.set_attribute('image_size_x', f'{self.image_width}')
         blueprint.set_attribute('image_size_y', f'{self.image_height}')
@@ -111,18 +127,6 @@ class World():
         self.sensor = self.world.spawn_actor(blueprint, spawn_point,
                                              attach_to=self.vehicle)
         self.sensor.listen(self.image_queue.put)
-
-        # Spawn collision sensor
-        blueprint = self.world.get_blueprint_library() \
-            .find('sensor.other.collision')
-        self.collision_sensor = self.world.spawn_actor(blueprint,
-                                                       carla.Transform(), attach_to=self.vehicle)
-        self.collision_detected = False
-        self.collision_sensor.listen(lambda e: {self._set_collision()})
-        self.initialized = True
-
-        return 0.0, 0.0, np.zeros((self.image_height, self.image_width, 3)), False
-
     def _set_collision(self) -> None:
         """Helper to set collision_detected to True.
         """
@@ -200,8 +204,8 @@ class World():
         transformed_image, error, detection_surface_area = self.lane \
             .pipe(img=image)
 
-        if show:
-            World.show_image(image=transformed_image)
+        #if show:
+            #World.show_image(image=transformed_image)
 
         return error, detection_surface_area, transformed_image, \
             self.collision_detected

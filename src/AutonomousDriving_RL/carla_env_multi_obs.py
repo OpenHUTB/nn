@@ -1,4 +1,11 @@
 # carla_env/carla_env_multi_obs.py
+"""
+CARLA 强化学习环境（4D 观测增强版）
+- 观测: [x, y, vx, vy]
+- 动作: [throttle, steer, brake]
+- 新增: 车道保持奖励、合理速度区间、轨迹日志、参数化配置、抗崩溃机制
+"""
+
 import carla
 import numpy as np
 import random
@@ -8,23 +15,56 @@ import json
 from gymnasium import Env, spaces
 
 VEHICLE_ID_FILE = ".last_vehicle_id.json"
-TRAJECTORY_LOG_FILE = "trajectory.csv"
 
 
 class CarlaEnvMultiObs(Env):
-    def __init__(self, keep_alive_after_exit=True, log_trajectory=True):
-        super(CarlaEnvMultiObs, self).__init__()
+    def __init__(
+        self,
+        keep_alive_after_exit=False,
+        log_trajectory=True,
+        trajectory_log_file="trajectory.csv",
+        target_speed=8.0,          # 目标速度 (m/s)
+        max_episode_steps=1000,    # 最大步数
+        map_name=None,             # 指定地图（如 'Town10HD'）
+        spawn_point_index=0,       # spawn 点索引
+        random_spawn=False,        # 是否随机 spawn
+        reward_weights=None        # 奖励权重配置
+    ):
+        super().__init__()
         self.client = None
         self.world = None
         self.vehicle = None
         self._current_vehicle_id = None
         self.frame_count = 0
-        self.max_frames = 1000
+        self.max_episode_steps = max_episode_steps
         self.spectator = None
         self.keep_alive = keep_alive_after_exit
         self.log_trajectory = log_trajectory
+        self.trajectory_log_file = trajectory_log_file
         self.trajectory_data = []
+        self._collision_sensor = None
+        self._collision_hist = []
 
+        # 奖励配置
+        self.target_speed = target_speed
+        self.reward_weights = {
+            'forward': 0.1,
+            'speed_match': 0.5,
+            'lane_center': 1.0,
+            'steer_smooth': 0.05,
+            'brake_penalty': 0.1,
+            'collision': -50.0,
+            'time_bonus': 0.01
+        }
+        if reward_weights:
+            self.reward_weights.update(reward_weights)
+
+        # 地图与 spawn 配置
+        self.map_name = map_name
+        self.spawn_point_index = spawn_point_index
+        self.random_spawn = random_spawn
+
+        # 固定 4D 观测空间
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32
         )
@@ -34,21 +74,22 @@ class CarlaEnvMultiObs(Env):
             dtype=np.float32
         )
 
-    def _connect_carla(self, max_retries=3):
-        """自动重试连接 CARLA"""
+    def _connect_carla(self, max_retries=3, timeout=10.0):
         for attempt in range(max_retries):
             try:
                 print(f"🔄 尝试连接 CARLA 服务器 (第 {attempt + 1} 次)...")
                 self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(10.0)
+                self.client.set_timeout(timeout)
                 self.world = self.client.get_world()
-                if self.world is not None:
-                    print(f"✅ 成功连接到 CARLA！地图: {self.world.get_map().name}")
-                    return True
+                if self.map_name and self.map_name not in self.world.get_map().name:
+                    print(f"🔄 加载指定地图: {self.map_name}")
+                    self.world = self.client.load_world(self.map_name)
+                print(f"✅ 成功连接！地图: {self.world.get_map().name}")
+                return True
             except Exception as e:
                 print(f"⚠️ 连接失败: {e}")
                 time.sleep(2)
-        raise RuntimeError("❌ 无法连接到 CARLA 服务器，请确保 CARLA 已启动！")
+        raise RuntimeError("❌ 无法连接 CARLA，请确保已启动 `CarlaUE4.sh`")
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -60,15 +101,27 @@ class CarlaEnvMultiObs(Env):
         self._destroy_last_run_vehicle()
         self.spawn_vehicle()
 
+        # 初始化传感器
+        self._collision_hist.clear()
+        if self._collision_sensor:
+            self._collision_sensor.destroy()
+        bp = self.world.get_blueprint_library().find('sensor.other.collision')
+        self._collision_sensor = self.world.spawn_actor(bp, carla.Transform(), attach_to=self.vehicle)
+        self._collision_sensor.listen(lambda event: self._collision_hist.append(event))
+
+        # 稳定物理
         for _ in range(5):
             self.world.tick()
             time.sleep(0.05)
 
+        # 设置视角
         self.spectator = self.world.get_spectator()
         self._update_spectator_view()
 
+        # 重置状态
         self.trajectory_data = []
         self.frame_count = 0
+
         obs = self.get_observation()
         return obs, {}
 
@@ -90,61 +143,41 @@ class CarlaEnvMultiObs(Env):
 
     def spawn_vehicle(self):
         blueprint_library = self.world.get_blueprint_library()
-        # 优先使用特斯拉，否则随机选一个
         vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
         if not vehicle_bp or not vehicle_bp.has_attribute('number_of_wheels'):
             vehicle_bp = random.choice(blueprint_library.filter('vehicle.*'))
-
-        # 设置颜色（可选）
         if vehicle_bp.has_attribute('color'):
             color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
             vehicle_bp.set_attribute('color', color)
 
-        map_name = self.world.get_map().name.lower()
-        spawn_transform = None
+        spawn_points = self.world.get_map().get_spawn_points()
+        if not spawn_points:
+            raise RuntimeError("❌ 地图无可用 spawn 点！")
 
-        # 针对 Town10HD_Opt 使用已知安全点
-        if 'town10' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=100.0, y=130.0, z=0.3),
-                carla.Rotation(yaw=180.0)
-            )
+        if self.random_spawn:
+            spawn_transform = random.choice(spawn_points)
+        elif self.spawn_point_index < len(spawn_points):
+            spawn_transform = spawn_points[self.spawn_point_index]
         else:
-            # 通用 fallback：使用第一个 spawn point
-            spawn_points = self.world.get_map().get_spawn_points()
-            if spawn_points:
-                spawn_transform = spawn_points[0]
-            else:
-                # 极端 fallback：原点上方
-                spawn_transform = carla.Transform(carla.Location(x=0, y=0, z=1.0), carla.Rotation())
+            spawn_transform = spawn_points[0]
 
-        # 尝试主位置
+        # 尝试生成
         self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_transform)
-
-        # 如果失败，遍历所有 spawn points
         if self.vehicle is None:
-            print("⚠️ 主 spawn 点失败，尝试遍历所有可用点...")
-            all_spawn_points = self.world.get_map().get_spawn_points()
-            random.shuffle(all_spawn_points)  # 随机顺序避免总用同一个
-            for sp in all_spawn_points:
-                # 抬高一点防止穿地
-                safe_z = max(sp.location.z, 0.0) + 0.3
-                safe_sp = carla.Transform(
-                    carla.Location(x=sp.location.x, y=sp.location.y, z=safe_z),
-                    sp.rotation
-                )
-                self.vehicle = self.world.try_spawn_actor(vehicle_bp, safe_sp)
-                if self.vehicle is not None:
-                    print(f"✅ 在备用点成功生成车辆: ({safe_sp.location.x:.1f}, {safe_sp.location.y:.1f})")
-                    break
+            # 备用：抬高 Z 轴
+            sp = spawn_transform
+            safe_sp = carla.Transform(
+                carla.Location(x=sp.location.x, y=sp.location.y, z=max(sp.location.z, 0.0) + 0.5),
+                sp.rotation
+            )
+            self.vehicle = self.world.try_spawn_actor(vehicle_bp, safe_sp)
 
         if self.vehicle is None:
-            raise RuntimeError("❌ 所有 spawn 点均无法生成车辆！请检查地图或 CARLA 状态。")
+            raise RuntimeError("❌ 所有 spawn 方式均失败！")
 
         self._current_vehicle_id = self.vehicle.id
         loc = self.vehicle.get_location()
-        print(
-            f"✅ 车辆生成成功: {self.vehicle.type_id} | ID={self._current_vehicle_id} | 位置: ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})")
+        print(f"✅ 车辆生成成功 | ID={self._current_vehicle_id} | ({loc.x:.1f}, {loc.y:.1f})")
 
         try:
             with open(VEHICLE_ID_FILE, 'w') as f:
@@ -153,87 +186,127 @@ class CarlaEnvMultiObs(Env):
             print(f"⚠️ 保存车辆ID失败: {e}")
 
     def _update_spectator_view(self):
-        """修复视角：温和第三人称，确保看到整车"""
         if not (self.vehicle and self.spectator):
             return
         try:
             v_transform = self.vehicle.get_transform()
-            # 相机：后方5米，右侧1米，上方2.2米（更低更稳）
-            offset = carla.Location(x=-5.0, y=1.0, z=2.2)
+            offset = carla.Location(x=-6.0, y=0.0, z=2.5)
             camera_loc = v_transform.transform(offset)
-            # 俯角 -10°（不要太陡），yaw 跟随车辆
-            spectator_rot = carla.Rotation(
-                pitch=-10.0,
-                yaw=v_transform.rotation.yaw,
-                roll=0.0
-            )
-            self.spectator.set_transform(carla.Transform(camera_loc, spectator_rot))
+            rot = carla.Rotation(pitch=-15.0, yaw=v_transform.rotation.yaw)
+            self.spectator.set_transform(carla.Transform(camera_loc, rot))
         except Exception:
-            pass  # 容错
-
-    def _log_trajectory(self, x, y, speed):
-        if self.log_trajectory:
-            self.trajectory_data.append((x, y, speed))
+            pass
 
     def get_observation(self):
         if not self.vehicle or not self.vehicle.is_alive:
             return np.zeros(4, dtype=np.float32)
         loc = self.vehicle.get_location()
         vel = self.vehicle.get_velocity()
-        return np.array([loc.x, loc.y, vel.x, vel.y], dtype=np.float32)
+        # 防止 NaN
+        x = float(loc.x) if np.isfinite(loc.x) else 0.0
+        y = float(loc.y) if np.isfinite(loc.y) else 0.0
+        vx = float(vel.x) if np.isfinite(vel.x) else 0.0
+        vy = float(vel.y) if np.isfinite(vel.y) else 0.0
+        return np.array([x, y, vx, vy], dtype=np.float32)
+
+    def _get_lane_offset(self):
+        """计算到最近车道中心的距离（仅用于奖励，不放入 obs）"""
+        try:
+            waypoint = self.world.get_map().get_waypoint(
+                self.vehicle.get_location(), project_to_road=True
+            )
+            return self.vehicle.get_location().distance(waypoint.transform.location)
+        except:
+            return 5.0  # 默认远离车道
+
+    def _compute_reward(self, speed, lane_offset, action):
+        w = self.reward_weights
+        reward = 0.0
+
+        # 前进奖励
+        if speed > 0.1:
+            reward += w['forward'] * speed
+
+        # 速度匹配
+        speed_diff = abs(speed - self.target_speed)
+        if speed_diff < 1.0:
+            reward += w['speed_match']
+        else:
+            reward -= speed_diff * 0.05
+
+        # 车道中心奖励（即使 4D 也鼓励 stay in lane）
+        if lane_offset < 1.0:
+            reward += w['lane_center'] * (1.0 - lane_offset)
+        else:
+            reward -= (lane_offset - 1.0) * 0.5
+
+        # 控制平滑
+        _, steer, brake = action
+        reward -= w['steer_smooth'] * abs(steer)
+        reward -= w['brake_penalty'] * brake
+
+        # 时间奖励（鼓励存活）
+        reward += w['time_bonus']
+
+        return reward
 
     def step(self, action):
-        throttle, steer, brake = action
-        control = carla.VehicleControl(
-            throttle=float(throttle),
-            steer=float(steer),
-            brake=float(brake)
-        )
+        # 安全钳位
+        throttle = np.clip(action[0], 0.0, 1.0)
+        steer = np.clip(action[1], -1.0, 1.0)
+        brake = np.clip(action[2], 0.0, 1.0)
+        control = carla.VehicleControl(throttle=float(throttle), steer=float(steer), brake=float(brake))
         self.vehicle.apply_control(control)
         self.world.tick()
         self.frame_count += 1
         self._update_spectator_view()
 
+        # 车辆死亡
         if not self.vehicle or not self.vehicle.is_alive:
-            return np.zeros(4, dtype=np.float32), -10.0, True, False, {}
+            obs = np.zeros(4, dtype=np.float32)
+            return obs, self.reward_weights['collision'], True, False, {}
+
+        # 状态
+        velocity = self.vehicle.get_velocity()
+        speed = np.sqrt(max(0.0, velocity.x**2 + velocity.y**2))
+        lane_offset = self._get_lane_offset()
+        reward = self._compute_reward(speed, lane_offset, [throttle, steer, brake])
+
+        # 终止条件
+        terminated = len(self._collision_hist) > 0
+        if terminated:
+            reward = self.reward_weights['collision']
+
+        truncated = self.frame_count >= self.max_episode_steps
+
+        # 记录轨迹
+        if self.log_trajectory:
+            loc = self.vehicle.get_location()
+            self.trajectory_data.append((float(loc.x), float(loc.y), float(speed)))
 
         obs = self.get_observation()
-        x, y, vx, vy = obs
-        speed = np.linalg.norm([vx, vy])
-
-        vehicle_transform = self.vehicle.get_transform()
-        forward_vector = vehicle_transform.get_forward_vector()
-        forward_speed = vx * forward_vector.x + vy * forward_vector.y
-        reward = 1.0 * max(forward_speed, 0.0)
-        if speed < 0.1:
-            reward -= 0.5
-
-        self._log_trajectory(x, y, speed)
-
-        terminated = False
-        truncated = self.frame_count >= self.max_frames
-        return obs, reward, terminated, truncated, {}
+        return obs, reward, terminated, truncated, {
+            "speed": speed,
+            "lane_offset": lane_offset,
+            "collision": terminated
+        }
 
     def close(self):
+        # 保存轨迹
         if self.log_trajectory and self.trajectory_data:
             try:
-                with open(TRAJECTORY_LOG_FILE, 'w') as f:
+                with open(self.trajectory_log_file, 'w') as f:
                     f.write("x,y,speed\n")
                     for x, y, speed in self.trajectory_data:
                         f.write(f"{x:.3f},{y:.3f},{speed:.3f}\n")
-                print(f"📊 轨迹已保存至: {TRAJECTORY_LOG_FILE}")
+                print(f"📊 轨迹已保存至: {self.trajectory_log_file}")
             except Exception as e:
                 print(f"⚠️ 轨迹保存失败: {e}")
 
-        if self.keep_alive:
-            print("ℹ️ 车辆已保留（ID已记录，下次运行时将自动清理）")
-            if self.vehicle:
-                self.vehicle.apply_control(carla.VehicleControl())
-                for i in range(30):
-                    self.world.tick()
-                    self._update_spectator_view()
-                    time.sleep(0.1)
-                print("✅ 现在你可以自由操作 CARLA 视角（按 F1~F4）！")
-        else:
-            if self.vehicle and self.vehicle.is_alive:
-                self.vehicle.destroy()
+        # 清理
+        if self._collision_sensor:
+            self._collision_sensor.destroy()
+        if not self.keep_alive and self.vehicle and self.vehicle.is_alive:
+            self.vehicle.destroy()
+        elif self.keep_alive:
+            print("ℹ️ 车辆已保留（下次运行将自动清理）")
