@@ -58,30 +58,59 @@ TRAFFIC_SYNC_MODE = False             # 交通同步模式
 TRAFFIC_RESPAWN = False               # 是否重生休眠车辆
 
 # ==================== 可视化配置 ====================
-ROUTE_COLOR = (255, 0, 0)            # 路线颜色 (红色)
-PATH_COLOR = (0, 100, 255)           # 路径颜色 (蓝色)
-VEHICLE_COLOR = (0, 0, 0)          # 车辆颜色 (绿色)
+SHOW_ARROW = True                    # 是否显示车辆方向箭头
+SHOW_HISTORY_PATH = True             # 是否显示历史行驶路线
+SHOW_PLANNED_ROUTE = True            # 是否显示规划路线
+SHOW_VEHICLE_MARKER = False           # 是否显示车辆标记
 
+# 箭头设置
+ARROW_LENGTH = 5.0                   # 箭头长度（米）
+ARROW_THICKNESS = 0.2                # 箭头粗细
+ARROW_COLOR = (0, 255, 0)           # 箭头颜色（绿色）
+ARROW_BRIGHTNESS = 1.0              # 箭头亮度 (0.0-1.0)
+
+# 历史路线设置
+HISTORY_PATH_COLOR = (0, 100, 255)  # 历史路线颜色（蓝色）
+HISTORY_PATH_THICKNESS = 0.1         # 历史路线粗细
+HISTORY_PATH_MAX_POINTS = 500        # 历史路线最大点数
+HISTORY_PATH_FADE_OUT = True         # 是否渐隐效果
+HISTORY_PATH_BRIGHTNESS = 0.8        # 历史路线亮度 (0.0-1.0)
+
+# 规划路线设置
+PLANNED_ROUTE_COLOR = (255, 0, 0)   # 规划路线颜色（红色）
+PLANNED_ROUTE_THICKNESS = 0.15       # 规划路线粗细
+PLANNED_ROUTE_BRIGHTNESS = 1.0       # 规划路线亮度 (0.0-1.0)
+
+# 车辆标记设置
+VEHICLE_MARKER_COLOR = (0, 255, 0)  # 车辆标记颜色（绿色）
+VEHICLE_MARKER_SIZE = 0.4            # 车辆标记大小
+VEHICLE_MARKER_BRIGHTNESS = 1.0      # 车辆标记亮度 (0.0-1.0)
+
+# 显示高度（保持不变）
 ROUTE_HEIGHT = 0.3                   # 路线显示高度
 PATH_HEIGHT = 0.2                    # 路径显示高度
 VEHICLE_HEIGHT = 0.25                # 车辆显示高度
-
 # ==================== 视角配置 ====================
-TOP_DOWN_HEIGHT = 30.0               # 俯视视角高度（提高）
-TOP_DOWN_PITCH = -85.0               # 俯视角 (几乎垂直向下，-90是完全垂直)
-SMOOTH_FOLLOW_FACTOR = 0.01           # 视角平滑系数 (0-1，越小越平滑)
-MIN_SMOOTH_FACTOR = 0.001             # 最小平滑系数
+TOP_DOWN_HEIGHT = 5.0                # 俯视视角高度（提高）
+TOP_DOWN_PITCH = -30.0               # 俯视角 (几乎垂直向下，-90是完全垂直)
+SMOOTH_FOLLOW_FACTOR = 0.01          # 视角平滑系数 (0-1，越小越平滑)
+MIN_SMOOTH_FACTOR = 0.001            # 最小平滑系数
 MAX_SMOOTH_FACTOR = 0.3              # 最大平滑系数
 SMOOTH_FACTOR_ADAPTIVE = True        # 是否自适应平滑系数
-DISTANCE_THRESHOLD = 5.0             # 距离阈值，超过此值加大平滑系数
-
+DISTANCE_THRESHOLD = 1.0             # 距离阈值，超过此值加大平滑系数
+FOLLOW_DISTANCE= 8.0                 # 跟随距离（米）
+FOLLOW_HEIGHT = 3.0                  # 跟随高度（米）
+FOLLOW_PITCH = -20.0                 # 俯视角（度）
+VIEW_UPDATE_ENABLED = True           # 是否启用视角更新
+VIEW_UPDATE_FPS = 60                 # 视角更新频率 (Hz)
+VIEW_UPDATE_THREADED = True          # 是否使用独立线程更新视角
 # ==================== 性能配置 ====================
 DEBUG_MODE = True                    # 调试模式
-FPS_LIMIT = 120                        # FPS限制 (0为无限制，提高性能)
+FPS_LIMIT = 60                        # FPS限制 (0为无限制，提高性能)
 UPDATE_RATE = 0.5                    # 更新率 (1.0 = 每步更新)
 USE_SMOOTH_INTERPOLATION = True      # 使用平滑插值
 INTERPOLATION_STEPS = 5              # 插值步数
-MAX_FRAME_SKIP = 2                   # 最大跳帧数
+MAX_FRAME_SKIP = 1                   # 最大跳帧数
 
 # ==================== CARLA配置 ====================
 CARLA_HOST = "localhost"
@@ -89,7 +118,7 @@ CARLA_PORT = 2000
 CARLA_TIMEOUT = 20.0
 
 # ==================== 仿真配置 ====================
-FIXED_DELTA_SECONDS = 0.0166          # 固定时间步长 (~30 FPS)
+FIXED_DELTA_SECONDS = 0.0166          # 固定时间步长 (~60 FPS)
 SYNCHRONOUS_MODE = False            # 同步模式（影响性能，暂不启用）
 NO_RENDERING_MODE = False            # 无渲染模式
 
