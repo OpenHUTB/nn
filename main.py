@@ -1,118 +1,145 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Lane Line Detection (精简版)
-核心功能：Canny边缘检测 + 霍夫变换实现车道线检测，单视频处理+结果保存
-适用环境：Ubuntu (Python 3.10 + OpenCV + numpy)
+CARLA 0.9.14 低画质版专用脚本
+- 适配低画质CARLA的API差异
+- 解决着色器崩溃/异常类找不到问题
 """
-
+import sys
+import os
+import carla
 import cv2
 import numpy as np
-import argparse
-import os
-from pathlib import Path
+import queue
 
-# ===================== 核心参数（仅保留必要的） =====================
-# 车道线检测核心参数
-CANNY_LOW_THRESH = 50       # Canny边缘检测低阈值
-CANNY_HIGH_THRESH = 150     # Canny边缘检测高阈值
-HOUGH_RHO = 1               # 霍夫变换rho步长
-HOUGH_THETA = np.pi / 180   # 霍夫变换theta步长
-HOUGH_THRESHOLD = 20        # 霍夫变换阈值
-HOUGH_MIN_LINE_LEN = 40     # 最小线段长度
-HOUGH_MAX_LINE_GAP = 20     # 最大线段间隙
+# 全局变量
+IMAGE_QUEUE = queue.Queue(maxsize=1)
+# 替换为你的低画质CARLA实际路径
+CARLA_ROOT = 'D:/123/apps/CARLA_0.9.14/WindowsNoEditor'
 
-# ===================== 核心函数：车道线检测 =====================
-def detect_lane_lines(frame):
-    """核心：检测并绘制车道线（Canny + 霍夫变换）"""
-    # 1. 灰度化 + 高斯模糊
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # 2. Canny边缘检测
-    edges = cv2.Canny(blur, CANNY_LOW_THRESH, CANNY_HIGH_THRESH)
-    
-    # 3. 区域掩码（仅检测图像下半部分，聚焦车道）
-    h, w = frame.shape[:2]
-    mask = np.zeros_like(edges)
-    polygon = np.array([[(0, h), (w//2, h//2), (w, h)]], np.int32)
-    cv2.fillPoly(mask, polygon, 255)
-    masked_edges = cv2.bitwise_and(edges, mask)
-    
-    # 4. 霍夫变换检测直线
-    lines = cv2.HoughLinesP(
-        masked_edges, HOUGH_RHO, HOUGH_THETA, HOUGH_THRESHOLD,
-        minLineLength=HOUGH_MIN_LINE_LEN, maxLineGap=HOUGH_MAX_LINE_GAP
-    )
-    
-    # 5. 绘制车道线
-    frame_with_lane = frame.copy()
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            cv2.line(frame_with_lane, (x1, y1), (x2, y2), (0, 255, 0), 3)
-    
-    return frame_with_lane
+# 摄像头回调函数（低画质适配：降低分辨率减少压力）
+def image_callback(image):
+    try:
+        img_bgra = np.frombuffer(image.raw_data, dtype=np.uint8)
+        img_bgra = img_bgra.reshape((image.height, image.width, 4))
+        img_bgr = cv2.cvtColor(img_bgra, cv2.COLOR_BGRA2BGR)
 
-# ===================== 核心函数：视频处理 =====================
-def process_video(video_path, max_frames=10):
-    """处理单视频：读取帧→检测车道线→保存结果"""
-    # 校验视频文件
-    if not os.path.exists(video_path):
-        print(f"错误：视频文件不存在 → {video_path}")
+        # 低画质优化：缩小图像尺寸（减少CV窗口渲染压力）
+        img_bgr = cv2.resize(img_bgr, (640, 360))
+
+        if IMAGE_QUEUE.full():
+            IMAGE_QUEUE.get_nowait()
+        IMAGE_QUEUE.put(img_bgr, timeout=0.1)
+    except Exception as e:
+        print(f"⚠️ 图像回调出错：{e}")
+
+def main():
+    camera = None
+    vehicle = None
+
+    # 检查CARLA进程是否运行
+    def check_carla_running():
+        import psutil
+        for proc in psutil.process_iter(['name']):
+            if proc.info['name'] == 'CarlaUE4.exe':
+                return True
+        return False
+
+    # 前置检查
+    print("=" * 60)
+    print("--- [低画质CARLA环境检查] ---")
+    if not check_carla_running():
+        print("❌ 错误：未检测到CarlaUE4.exe进程！")
+        print(f"   请先启动：{os.path.join(CARLA_ROOT, 'CarlaUE4.exe')}")
+        print("   （建议使用低画质快捷方式启动）")
         return
-    
-    # 打开视频流
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print(f"错误：无法打开视频 → {video_path}")
-        return
-    
-    # 获取视频基础信息
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS)) or 25
-    
-    # 初始化结果视频写入器
-    video_name = Path(video_path).stem
-    result_path = f"{video_name}_lane_detected.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(result_path, fourcc, fps, (width, height))
-    
-    # 逐帧处理
-    count = 0
-    print(f"开始处理视频（最大{max_frames}帧）...")
-    while cap.isOpened() and count < max_frames:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        # 核心：检测车道线
-        frame_with_lane = detect_lane_lines(frame)
-        
-        # 写入结果视频
-        writer.write(frame_with_lane)
-        
-        # 实时显示（可选，按Q退出）
-        cv2.imshow("Lane Detection", frame_with_lane)
-        if cv2.waitKey(10) & 0xFF == ord('q'):
-            break
-        
-        count += 1
-    
-    # 释放资源
-    cap.release()
-    writer.release()
-    cv2.destroyAllWindows()
-    print(f"处理完成！结果保存至 → {result_path}")
+    print("✅ 检测到CARLA服务器运行")
+    print("--- [环境检查完成] ---")
+    print("=" * 60)
 
-# ===================== 主函数（精简参数） =====================
-if __name__ == "__main__":
-    # 简化命令行参数：仅保留输入视频、最大帧数
-    parser = argparse.ArgumentParser(description="车道线检测（精简版）")
-    parser.add_argument("video_path", type=str, help="输入视频文件路径")
-    parser.add_argument("--max-frames", type=int, default=10, help="最大处理帧数（默认10）")
-    args = parser.parse_args()
-    
-    # 执行核心逻辑
-    process_video(args.video_path, args.max_frames)
+    try:
+        # 1. 连接CARLA服务器（低画质版超时延长）
+        client = carla.Client('127.0.0.1', 2000)
+        client.set_timeout(60.0)  # 低画质启动慢，延长超时
+        world = client.load_world('Town01')  # 低画质优先用小地图Town01
+        world.wait_for_tick()
+        print(f"✅ 连接成功！当前地图：{world.get_map().name}")
+
+        # 2. 获取蓝图和生成点
+        blueprint_library = world.get_blueprint_library()
+        spawn_points = world.get_map().get_spawn_points()
+        if not spawn_points:
+            print("❌ 无可用生成点，退出")
+            return
+
+        # 3. 生成车辆（低画质选轻量化车型）
+        vehicle_bps = blueprint_library.filter('vehicle.seat.leon')  # 轻量化车型
+        if not vehicle_bps:
+            vehicle_bps = blueprint_library.filter('vehicle.*')[0:1]
+        vehicle_bp = vehicle_bps[0]
+        vehicle_bp.set_attribute('role_name', 'autopilot')
+
+        # 换生成点避免占用（低画质版生成点易冲突）
+        vehicle = world.spawn_actor(vehicle_bp, spawn_points[10])
+        vehicle.set_autopilot(True)
+        print(f"✅ 生成车辆：{vehicle.type_id}")
+
+        # 4. 挂载摄像头（低画质参数）
+        camera_bp = blueprint_library.find('sensor.camera.rgb')
+        camera_bp.set_attribute('image_size_x', '640')   # 降低分辨率
+        camera_bp.set_attribute('image_size_y', '360')
+        camera_bp.set_attribute('fov', '80')
+        camera_bp.set_attribute('sensor_tick', '0.1')    # 10fps减少压力
+        camera_transform = carla.Transform(carla.Location(x=1.5, z=1.8))
+        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
+        camera.listen(image_callback)
+        print("✅ 摄像头挂载成功")
+
+        # 5. 显示画面
+        print("\n📌 按 'q' 退出 | 低画质模式已启用")
+        cv2.namedWindow('CARLA Low-Quality View', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('CARLA Low-Quality View', 640, 360)
+
+        while True:
+            if not IMAGE_QUEUE.empty():
+                img = IMAGE_QUEUE.get(timeout=0.5)
+                cv2.imshow('CARLA Low-Quality View', img)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+    # 修复：低画质版CARLA异常类直接在carla模块下（无exceptions子模块）
+    except carla.CarlaConnectionError:
+        print("\n❌ 连接失败！")
+        print("   解决：1. 确认CarlaUE4.exe已启动 2. 关闭防火墙 3. 检查端口2000")
+    except carla.ActorSpawnException:
+        print("\n❌ 车辆生成失败！")
+        print("   解决：换生成点（如spawn_points[20]）或重启CARLA")
+    except AttributeError as e:
+        print(f"\n❌ API属性错误：{e}")
+        print("   解决：重新安装对应版本的whl包（低画质版CARLA需匹配whl）")
+    except Exception as e:
+        print(f"\n❌ 未知错误：{e}")
+        import traceback
+        traceback.print_exc()
+
+    # 清理资源
+    finally:
+        print("\n--- [清理资源] ---")
+        if camera:
+            camera.stop()
+            camera.destroy()
+            print("✅ 销毁摄像头")
+        if vehicle:
+            vehicle.destroy()
+            print("✅ 销毁车辆")
+        cv2.destroyAllWindows()
+        print("✅ 程序结束")
+
+if __name__ == '__main__':
+    # 低画质版需额外导入psutil检查进程（可选）
+    try:
+        import psutil
+    except ImportError:
+        print("⚠️ 未安装psutil，跳过CARLA进程检查")
+        # 注释掉进程检查相关代码
+        def check_carla_running():
+            return True
+    main()
