@@ -1,24 +1,27 @@
 ﻿"""
-主应用程序模块 - 负责界面和流程控制
+主应用程序模块 - 支持图像、视频和摄像头实时识别
 """
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import threading
 import time
-from typing import Dict, Any 
 from collections import deque
 from PIL import Image, ImageTk
 import cv2
 import numpy as np
 import os
 
+# 类型注解导入
+from typing import Dict, Any, Optional, Tuple, List
+
 # 导入各个模块
-from config import AppConfig
+from config import AppConfig, SceneConfig
 from image_processor import SmartImageProcessor, RoadDetector
 from lane_detector import LaneDetector
 from direction_analyzer import DirectionAnalyzer
 from visualizer import Visualizer
+from video_processor import VideoProcessor
 
 class LaneDetectionApp:
     """道路方向识别系统主应用程序"""
@@ -36,25 +39,34 @@ class LaneDetectionApp:
         self.lane_detector = LaneDetector(self.config)
         self.direction_analyzer = DirectionAnalyzer(self.config)
         self.visualizer = Visualizer(self.config)
+        self.video_processor = VideoProcessor(self.config)
         
         # 状态变量
         self.current_image = None
         self.current_image_path = None
         self.is_processing = False
+        self.is_video_mode = False
         self.processing_history = deque(maxlen=10)
+        
+        # 视频相关变量
+        self.video_file_path = None
+        self.camera_mode = False
         
         # 性能统计
         self.processing_times = []
+        self.frame_counter = 0
+        self.last_fps_update = time.time()
+        self.current_fps = 0
         
         # 创建界面
         self._create_ui()
         
-        print("道路方向识别系统已启动")
+        print("道路方向识别系统已启动（支持视频/摄像头）")
     
     def _setup_window(self):
         """设置窗口"""
-        self.root.title("道路方向识别系统")
-        self.root.geometry("1400x800")
+        self.root.title("道路方向识别系统 - 支持视频/摄像头")
+        self.root.geometry("1400x850")
         self.root.minsize(1200, 700)
         
         # 设置窗口居中
@@ -64,6 +76,9 @@ class LaneDetectionApp:
         x = (self.root.winfo_screenwidth() // 2) - (width // 2)
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f'{width}x{height}+{x}+{y}')
+        
+        # 窗口关闭事件
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
     
     def _create_ui(self):
         """创建用户界面"""
@@ -97,20 +112,20 @@ class LaneDetectionApp:
         # 标题
         title_label = ttk.Label(
             title_frame,
-            text="道路方向识别系统",
+            text="道路方向识别系统（支持视频/摄像头）",
             font=("微软雅黑", 16, "bold"),
             foreground="#2c3e50"
         )
         title_label.pack(side="left")
         
-        # 版本信息
-        version_label = ttk.Label(
+        # 模式指示器
+        self.mode_label = ttk.Label(
             title_frame,
-            text="v2.0",
+            text="[图像模式]",
             font=("微软雅黑", 10),
-            foreground="#7f8c8d"
+            foreground="#3498db"
         )
-        version_label.pack(side="right")
+        self.mode_label.pack(side="right", padx=(0, 10))
     
     def _create_control_panel(self, parent):
         """创建控制面板"""
@@ -121,24 +136,56 @@ class LaneDetectionApp:
             relief="groove"
         )
         control_frame.pack_propagate(False)
-        control_frame.config(width=300)
+        control_frame.config(width=350)
+        
+        # 输入模式选择
+        mode_frame = ttk.LabelFrame(control_frame, text="输入模式", padding="10")
+        mode_frame.pack(fill="x", pady=(0, 15))
+        
+        # 模式选择按钮
+        mode_buttons_frame = ttk.Frame(mode_frame)
+        mode_buttons_frame.pack()
+        
+        self.image_mode_btn = ttk.Button(
+            mode_buttons_frame,
+            text="图像模式",
+            command=self._switch_to_image_mode,
+            width=12
+        )
+        self.image_mode_btn.pack(side="left", padx=(0, 5))
+        
+        self.video_mode_btn = ttk.Button(
+            mode_buttons_frame,
+            text="视频模式",
+            command=self._switch_to_video_mode,
+            width=12
+        )
+        self.video_mode_btn.pack(side="left", padx=(0, 5))
+        
+        self.camera_mode_btn = ttk.Button(
+            mode_buttons_frame,
+            text="摄像头模式",
+            command=self._switch_to_camera_mode,
+            width=12
+        )
+        self.camera_mode_btn.pack(side="left")
         
         # 文件操作区域
-        file_frame = ttk.LabelFrame(control_frame, text="文件操作", padding="10")
-        file_frame.pack(fill="x", pady=(0, 15))
+        self.file_frame = ttk.LabelFrame(control_frame, text="文件操作", padding="10")
+        self.file_frame.pack(fill="x", pady=(0, 15))
         
         # 选择图片按钮
-        select_btn = ttk.Button(
-            file_frame,
+        self.select_image_btn = ttk.Button(
+            self.file_frame,
             text="选择图片",
             command=self._select_image,
             width=20
         )
-        select_btn.pack(pady=(0, 10))
+        self.select_image_btn.pack(pady=(0, 10))
         
         # 重新检测按钮
         self.redetect_btn = ttk.Button(
-            file_frame,
+            self.file_frame,
             text="重新检测",
             command=self._redetect,
             width=20,
@@ -146,11 +193,54 @@ class LaneDetectionApp:
         )
         self.redetect_btn.pack(pady=(0, 10))
         
+        # 视频控制区域（初始隐藏）
+        self.video_frame = ttk.LabelFrame(control_frame, text="视频控制", padding="10")
+        
+        # 选择视频按钮
+        self.select_video_btn = ttk.Button(
+            self.video_frame,
+            text="选择视频文件",
+            command=self._select_video,
+            width=20
+        )
+        self.select_video_btn.pack(pady=(0, 10))
+        
+        # 视频控制按钮
+        self.video_control_frame = ttk.Frame(self.video_frame)
+        self.video_control_frame.pack()
+        
+        self.play_btn = ttk.Button(
+            self.video_control_frame,
+            text="开始",
+            command=self._play_video,
+            width=8,
+            state="disabled"
+        )
+        self.play_btn.pack(side="left", padx=(0, 5))
+        
+        self.pause_btn = ttk.Button(
+            self.video_control_frame,
+            text="暂停",
+            command=self._pause_video,
+            width=8,
+            state="disabled"
+        )
+        self.pause_btn.pack(side="left", padx=(0, 5))
+        
+        self.stop_btn = ttk.Button(
+            self.video_control_frame,
+            text="停止",
+            command=self._stop_video,
+            width=8,
+            state="disabled"
+        )
+        self.stop_btn.pack(side="left")
+        
         # 文件信息显示
         self.file_info_label = ttk.Label(
-            file_frame,
+            self.file_frame,
             text="未选择图片",
-            wraplength=250,
+            wraplength=300,
             foreground="#3498db"
         )
         self.file_info_label.pack()
@@ -169,9 +259,22 @@ class LaneDetectionApp:
             variable=self.sensitivity_var,
             orient="horizontal",
             command=self._on_parameter_change,
-            length=250
+            length=300
         )
         sensitivity_scale.pack(fill="x", pady=(0, 10))
+        
+        # 场景选择
+        ttk.Label(param_frame, text="场景模式:").pack(anchor="w", pady=(0, 5))
+        self.scene_var = tk.StringVar(value="auto")
+        scene_combo = ttk.Combobox(
+            param_frame,
+            textvariable=self.scene_var,
+            values=["自动", "高速公路", "城市道路", "乡村道路"],
+            state="readonly",
+            width=20
+        )
+        scene_combo.pack(fill="x", pady=(0, 10))
+        scene_combo.bind("<<ComboboxSelected>>", self._on_scene_change)
         
         # 结果显示区域
         result_frame = ttk.LabelFrame(control_frame, text="检测结果", padding="10")
@@ -203,7 +306,7 @@ class LaneDetectionApp:
         )
         self.quality_label.pack(anchor="w", pady=(0, 5))
         
-        # 处理时间显示
+        # 处理时间/FPS显示
         self.time_label = ttk.Label(
             result_frame,
             text="",
@@ -240,7 +343,7 @@ class LaneDetectionApp:
         self.original_canvas.pack(fill="both", expand=True)
         self.original_canvas.create_text(
             300, 200,
-            text="请选择道路图片",
+            text="请选择输入源",
             font=("微软雅黑", 12),
             fill="#7f8c8d"
         )
@@ -292,6 +395,81 @@ class LaneDetectionApp:
         )
         status_label.pack(side="right", padx=(0, 10), pady=5)
     
+    def _switch_to_image_mode(self):
+        """切换到图像模式"""
+        if self.is_video_mode:
+            self._stop_video()
+        
+        self.is_video_mode = False
+        self.camera_mode = False
+        self.mode_label.config(text="[图像模式]", foreground="#3498db")
+        
+        # 显示图像控制，隐藏视频控制
+        self.file_frame.pack(fill="x", pady=(0, 15))
+        self.video_frame.pack_forget()
+        
+        # 更新按钮状态
+        self.select_image_btn.config(state="normal")
+        self.redetect_btn.config(state="normal" if self.current_image_path else "disabled")
+        
+        self.status_var.set("已切换到图像模式")
+    
+    def _switch_to_video_mode(self):
+        """切换到视频模式"""
+        if self.is_video_mode and self.camera_mode:
+            self._stop_video()
+        
+        self.is_video_mode = True
+        self.camera_mode = False
+        self.mode_label.config(text="[视频模式]", foreground="#e74c3c")
+        
+        # 隐藏图像控制，显示视频控制
+        self.file_frame.pack_forget()
+        self.video_frame.pack(fill="x", pady=(0, 15))
+        
+        # 更新按钮状态
+        self.select_video_btn.config(state="normal")
+        self.play_btn.config(state="disabled")
+        self.pause_btn.config(state="disabled")
+        self.stop_btn.config(state="disabled")
+        
+        self.status_var.set("已切换到视频模式")
+    
+    def _switch_to_camera_mode(self):
+        """切换到摄像头模式"""
+        if self.is_video_mode:
+            self._stop_video()
+        
+        self.is_video_mode = True
+        self.camera_mode = True
+        self.mode_label.config(text="[摄像头模式]", foreground="#9b59b6")
+        
+        # 隐藏图像控制，显示视频控制
+        self.file_frame.pack_forget()
+        self.video_frame.pack(fill="x", pady=(0, 15))
+        
+        # 更新按钮状态
+        self.select_video_btn.config(state="normal")
+        self.play_btn.config(state="normal")
+        self.pause_btn.config(state="disabled")
+        self.stop_btn.config(state="disabled")
+        
+        # 尝试打开摄像头
+        self._open_camera()
+    
+    def _open_camera(self):
+        """打开摄像头"""
+        try:
+            if self.video_processor.open_camera():
+                self.play_btn.config(state="normal")
+                self.status_var.set("摄像头已打开")
+            else:
+                messagebox.showerror("错误", "无法打开摄像头，请检查摄像头连接")
+                self._switch_to_image_mode()
+        except Exception as e:
+            messagebox.showerror("错误", f"打开摄像头失败: {str(e)}")
+            self._switch_to_image_mode()
+    
     def _select_image(self):
         """选择图片"""
         if self.is_processing:
@@ -311,6 +489,113 @@ class LaneDetectionApp:
         if file_path:
             self.current_image_path = file_path
             self._load_image(file_path)
+    
+    def _select_video(self):
+        """选择视频文件"""
+        if self.is_processing and self.is_video_mode:
+            messagebox.showwarning("提示", "正在处理视频，请先停止当前处理")
+            return
+        
+        file_types = [
+            ("视频文件", "*.mp4 *.avi *.mov *.mkv *.flv"),
+            ("所有文件", "*.*")
+        ]
+        
+        file_path = filedialog.askopenfilename(
+            title="选择道路视频",
+            filetypes=file_types
+        )
+        
+        if file_path:
+            self.video_file_path = file_path
+            self._open_video(file_path)
+    
+    def _open_video(self, file_path: str):
+        """打开视频文件"""
+        if self.video_processor.open_video_file(file_path):
+            self.file_info_label.config(text=os.path.basename(file_path))
+            self.play_btn.config(state="normal")
+            self.pause_btn.config(state="disabled")
+            self.stop_btn.config(state="disabled")
+            self.status_var.set(f"视频已加载: {os.path.basename(file_path)}")
+        else:
+            messagebox.showerror("错误", "无法打开视频文件")
+    
+    def _play_video(self):
+        """播放视频"""
+        if self.is_processing and not self.is_video_mode:
+            return
+        
+        if self.camera_mode and self.video_processor.video_capture is None:
+            self._open_camera()
+        
+        if self.video_processor.start_processing(self._process_video_frame):
+            self.is_processing = True
+            self.play_btn.config(state="disabled")
+            self.pause_btn.config(state="normal")
+            self.stop_btn.config(state="normal")
+            self.status_var.set("视频处理中...")
+        else:
+            messagebox.showerror("错误", "无法开始视频处理")
+    
+    def _pause_video(self):
+        """暂停视频"""
+        if self.is_video_mode and self.video_processor.is_playing:
+            self.video_processor.pause()
+            self.play_btn.config(state="normal")
+            self.pause_btn.config(state="disabled")
+            self.status_var.set("视频已暂停")
+    
+    def _stop_video(self):
+        """停止视频"""
+        if self.is_video_mode:
+            self.video_processor.stop()
+            self.is_processing = False
+            self.play_btn.config(state="normal")
+            self.pause_btn.config(state="disabled")
+            self.stop_btn.config(state="disabled")
+            self.status_var.set("视频已停止")
+            
+            # 清空显示
+            self._clear_canvas_display()
+    
+    def _process_video_frame(self, frame: np.ndarray, frame_info: Dict[str, Any]):
+        """处理视频帧"""
+        try:
+            start_time = time.time()
+            
+            # 预处理帧
+            processed_frame, roi_info = self.image_processor.preprocess_frame(frame)
+            
+            # 道路检测
+            road_info = self.road_detector.detect_road(processed_frame, roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8)))
+            
+            # 车道线检测
+            lane_info = self.lane_detector.detect(processed_frame, roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8)))
+            
+            # 方向分析
+            direction_info = self.direction_analyzer.analyze(road_info, lane_info)
+            
+            # 创建可视化
+            visualization = self.visualizer.create_visualization(
+                processed_frame, road_info, lane_info, direction_info, 
+                is_video=True, frame_info=frame_info
+            )
+            
+            processing_time = time.time() - start_time
+            
+            # 在主线程中更新UI
+            self.root.after(0, self._update_video_results, 
+                          processed_frame, visualization, direction_info, 
+                          lane_info, processing_time, frame_info)
+            
+            # 更新性能统计
+            self.processing_times.append(processing_time)
+            if len(self.processing_times) > 10:
+                self.processing_times.pop(0)
+            
+        except Exception as e:
+            print(f"视频帧处理失败: {e}")
     
     def _load_image(self, file_path: str):
         """加载图像"""
@@ -399,7 +684,7 @@ class LaneDetectionApp:
     
     def _update_results(self, direction_info: Dict[str, Any], lane_info: Dict[str, Any],
                        visualization: np.ndarray, processing_time: float):
-        """更新结果"""
+        """更新结果（图像模式）"""
         try:
             # 显示图像
             self._display_image(self.current_image, self.original_canvas, "原始图像")
@@ -440,6 +725,58 @@ class LaneDetectionApp:
         except Exception as e:
             print(f"更新结果失败: {e}")
             self.status_var.set("更新结果失败")
+    
+    def _update_video_results(self, original_frame: np.ndarray, visualization: np.ndarray,
+                            direction_info: Dict[str, Any], lane_info: Dict[str, Any],
+                            processing_time: float, frame_info: Dict[str, Any]):
+        """更新视频结果"""
+        try:
+            # 显示图像
+            self._display_image(original_frame, self.original_canvas, "原始视频")
+            self._display_image(visualization, self.result_canvas, "实时检测")
+            
+            # 获取信息
+            direction = direction_info['direction']
+            confidence = direction_info['confidence']
+            quality = lane_info.get('detection_quality', 0.0)
+            
+            # 更新方向信息
+            self.direction_label.config(text=f"方向: {direction}")
+            
+            # 设置置信度文本和颜色
+            if confidence > 0.7:
+                color = "#27ae60"
+                confidence_text = f"置信度: {confidence:.1%} (高)"
+            elif confidence > 0.4:
+                color = "#f39c12"
+                confidence_text = f"置信度: {confidence:.1%} (中)"
+            else:
+                color = "#e74c3c"
+                confidence_text = f"置信度: {confidence:.1%} (低)"
+            
+            self.confidence_label.config(text=confidence_text, foreground=color)
+            
+            # 设置检测质量
+            self.quality_label.config(text=f"检测质量: {quality:.1%}")
+            
+            # 计算FPS
+            self.frame_counter += 1
+            current_time = time.time()
+            if current_time - self.last_fps_update >= 1.0:
+                self.current_fps = self.frame_counter / (current_time - self.last_fps_update)
+                self.last_fps_update = current_time
+                self.frame_counter = 0
+            
+            # 设置处理时间和FPS
+            time_text = f"处理时间: {processing_time:.3f}s | FPS: {self.current_fps:.1f}"
+            self.time_label.config(text=time_text)
+            
+            # 更新状态
+            video_type = "摄像头" if self.camera_mode else "视频"
+            self.status_var.set(f"{video_type}处理中 - {direction} | FPS: {self.current_fps:.1f}")
+            
+        except Exception as e:
+            print(f"更新视频结果失败: {e}")
     
     def _display_image(self, image: np.ndarray, canvas: tk.Canvas, title: str):
         """在Canvas上显示图像"""
@@ -483,14 +820,32 @@ class LaneDetectionApp:
             print(f"显示图像失败: {e}")
             canvas.create_text(150, 150, text="图像显示失败", fill="red")
     
+    def _clear_canvas_display(self):
+        """清空画布显示"""
+        self.original_canvas.delete("all")
+        self.result_canvas.delete("all")
+        
+        self.original_canvas.create_text(
+            300, 200,
+            text="请选择输入源",
+            font=("微软雅黑", 12),
+            fill="#7f8c8d"
+        )
+        
+        self.result_canvas.create_text(
+            300, 200,
+            text="检测结果将显示在这里",
+            font=("微软雅黑", 12),
+            fill="#7f8c8d"
+        )
+    
     def _redetect(self):
         """重新检测"""
-        if self.current_image_path and not self.is_processing:
+        if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self._process_image(self.current_image_path)
     
     def _on_parameter_change(self, value):
         """参数变化回调"""
-        # 更新配置
         sensitivity = self.sensitivity_var.get()
         
         # 根据敏感度调整参数
@@ -501,14 +856,53 @@ class LaneDetectionApp:
         print(f"参数更新: 敏感度={sensitivity:.2f}")
         
         # 如果已有图像，自动重新检测
-        if self.current_image_path and not self.is_processing:
+        if self.current_image_path and not self.is_processing and not self.is_video_mode:
+            self._redetect()
+    
+    def _on_scene_change(self, event):
+        """场景选择变化"""
+        scene = self.scene_var.get()
+        
+        if scene == "高速公路":
+            config = SceneConfig.get_scene_config('highway')
+        elif scene == "城市道路":
+            config = SceneConfig.get_scene_config('urban')
+        elif scene == "乡村道路":
+            config = SceneConfig.get_scene_config('rural')
+        else:  # 自动
+            return
+        
+        # 更新配置
+        self.config = config
+        
+        # 重新初始化模块
+        self.image_processor = SmartImageProcessor(self.config)
+        self.road_detector = RoadDetector(self.config)
+        self.lane_detector = LaneDetector(self.config)
+        self.direction_analyzer = DirectionAnalyzer(self.config)
+        self.visualizer = Visualizer(self.config)
+        self.video_processor = VideoProcessor(self.config)
+        
+        print(f"场景切换为: {scene}")
+        self.status_var.set(f"场景已切换为: {scene}")
+        
+        # 重新检测
+        if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self._redetect()
     
     def _show_error(self, error_msg: str):
         """显示错误"""
         messagebox.showerror("错误", f"处理失败: {error_msg}")
         self.status_var.set("处理失败")
-
+    
+    def _on_closing(self):
+        """窗口关闭事件"""
+        if self.is_video_mode:
+            self._stop_video()
+            self.video_processor.release()
+        
+        self.root.destroy()
+        print("应用程序已关闭")
 
 def main():
     """主函数"""
@@ -527,4 +921,6 @@ def main():
         messagebox.showerror("致命错误", f"应用程序启动失败: {str(e)}")
 
 if __name__ == "__main__":
+    # 导入SceneConfig
+    from config import SceneConfig
     main()
