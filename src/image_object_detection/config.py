@@ -3,6 +3,9 @@
 
 import os
 
+class ConfigError(Exception):
+    """配置相关异常的基类"""
+    pass
 
 class Config:
     """
@@ -10,7 +13,6 @@ class Config:
     所有核心参数（如模型路径、默认图像路径、阈值等）集中在此初始化，
     便于维护和部署时调整。
     """
-
     def __init__(self):
         # 获取当前 config.py 文件所在目录的绝对路径
         # 使用 os.path.abspath 确保路径在不同操作系统下一致
@@ -18,10 +20,8 @@ class Config:
 
         # 默认测试图像路径：位于项目根目录下的 data/test.jpg
         # 若用户未指定图像路径，系统将尝试加载此文件
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.default_image_path = os.path.join(base_dir, "data", "test.jpg")  #注意：项目根目录下的data文件!!!
+        self.default_image_path = os.path.join(base_dir, "data", "test.jpg")
 
-        
         # YOLO 模型权重文件路径
         # 支持：
         #   - 内置模型名（如 "yolov8n.pt"，首次运行会自动下载）
@@ -31,7 +31,7 @@ class Config:
         # 目标检测的置信度阈值
         # 只有置信度 ≥ 此值的检测框才会被保留和显示
         # 范围：0.0 ~ 1.0，值越高，结果越严格
-        self.confidence_threshold = 0.35
+        self.confidence_threshold = 0.25
 
         # 摄像头设备索引
         # 通常 0 表示内置摄像头，外接摄像头可能为 1、2 等
@@ -42,3 +42,14 @@ class Config:
         self.output_interval = 1.0
 
 
+        # 验证置信度阈值
+        if not (0.0 <= self.confidence_threshold <= 1.0):
+            raise ConfigError("confidence_threshold must be in range [0.0, 1.0]")
+
+        # 验证摄像头索引
+        if not isinstance(self.camera_index, int) or self.camera_index < 0:
+            raise ConfigError("camera_index must be a non-negative integer")
+
+        # 验证输出间隔
+        if self.output_interval <= 0:
+            raise ConfigError("output_interval must be positive")
