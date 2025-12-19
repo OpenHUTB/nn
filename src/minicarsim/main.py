@@ -38,6 +38,7 @@ class MojocoDataSim:
         os.makedirs(f"{output_dir}/lidar", exist_ok=True)
         os.makedirs(f"{output_dir}/annotations", exist_ok=True)
         os.makedirs(f"{output_dir}/visualization", exist_ok=True)  # 新增可视化目录
+        os.makedirs(f"{output_dir}/distance_analysis", exist_ok=True)  # 新增距离分析目录
 
         # 加载MuJoCo模型和数据
         self.model = mujoco.MjModel.from_xml_path(xml_path)
@@ -145,15 +146,16 @@ class MojocoDataSim:
             
         return point_cloud
 
-    def detect_objects(self):
-        """检测环境中的物体"""
+    def detect_objects_with_direction(self):
+        """检测环境中的物体并计算相对于小车的方向"""
         detected_objects = []
         
-        # 获取车辆位置
+        # 获取车辆位置和朝向
         try:
-            vehicle_pos, _ = self.get_world_pose("vehicle")
+            vehicle_pos, vehicle_quat = self.get_world_pose("vehicle")
         except ValueError:
             vehicle_pos = np.array([0, 0, 0.5])
+            vehicle_quat = np.array([1, 0, 0, 0])  # 默认朝向
         
         # 遍历所有物体
         for i in range(self.model.nbody):
@@ -166,7 +168,16 @@ class MojocoDataSim:
                 distance = np.linalg.norm(pos - vehicle_pos)
                 
                 # 只有在检测范围内才记录
-                if distance <= 15.0:  # 扩大检测范围
+                if distance <= 20.0:  # 扩大检测范围
+                    # 计算相对于车辆的方向（方位角和俯仰角）
+                    relative_pos = pos - vehicle_pos
+                    
+                    # 计算方位角（水平角度）
+                    azimuth = np.arctan2(relative_pos[1], relative_pos[0])
+                    
+                    # 计算俯仰角（垂直角度）
+                    elevation = np.arctan2(relative_pos[2], np.sqrt(relative_pos[0]**2 + relative_pos[1]**2))
+                    
                     # 获取物体类型（根据名称）
                     obj_type = "box"
                     
@@ -183,6 +194,10 @@ class MojocoDataSim:
                         "type": obj_type,
                         "position": pos.tolist(),
                         "distance": float(distance),
+                        "azimuth": float(azimuth),      # 方位角（弧度）
+                        "elevation": float(elevation),  # 俯仰角（弧度）
+                        "azimuth_deg": float(np.degrees(azimuth)),      # 方位角（度）
+                        "elevation_deg": float(np.degrees(elevation)),  # 俯仰角（度）
                         "size": size.tolist()
                     })
 
@@ -225,7 +240,7 @@ class MojocoDataSim:
     def generate_annotations(self):
         """生成物体检测标注数据"""
         # 检测到的物体
-        detected_objects = self.detect_objects()
+        detected_objects = self.detect_objects_with_direction()
         
         annotations = {
             "frame": self.frame_count,
@@ -293,6 +308,54 @@ class MojocoDataSim:
         
         print(f"已生成识别效果图: frame_{self.frame_count:04d}.png")
 
+    def visualize_distance_analysis(self, annotations):
+        """生成距离和方位分析图"""
+        if not annotations['objects']:
+            return
+            
+        # 创建一个新的图形用于距离和方位分析
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+        
+        # 提取物体信息
+        object_names = [obj['name'] for obj in annotations['objects']]
+        distances = [obj['distance'] for obj in annotations['objects']]
+        azimuths = [obj['azimuth_deg'] for obj in annotations['objects']]
+        elevations = [obj['elevation_deg'] for obj in annotations['objects']]
+        
+        # 绘制距离柱状图
+        bars = ax1.bar(range(len(object_names)), distances, color=['red', 'green', 'orange', 'purple', 'brown'])
+        ax1.set_xlabel('物体')
+        ax1.set_ylabel('距离 (m)')
+        ax1.set_title(f'物体距离分析 - 帧 {self.frame_count:04d}')
+        ax1.set_xticks(range(len(object_names)))
+        ax1.set_xticklabels(object_names, rotation=45)
+        
+        # 在柱状图上添加数值标签
+        for i, (bar, dist) in enumerate(zip(bars, distances)):
+            ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
+                    f'{dist:.1f}m', ha='center', va='bottom')
+        
+        # 绘制极坐标图显示方位
+        ax2 = plt.subplot(122, projection='polar')
+        colors = ['red', 'green', 'orange', 'purple', 'brown']
+        for i, (azimuth, distance, name) in enumerate(zip(azimuths, distances, object_names)):
+            # 转换为极坐标（需要弧度）
+            theta = np.radians(azimuth)
+            ax2.plot([0, theta], [0, distance], 'o-', color=colors[i % len(colors)], 
+                    label=f'{name} ({distance:.1f}m)', markersize=8)
+            
+        ax2.set_title(f'物体方位分析 - 帧 {self.frame_count:04d}')
+        ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax2.grid(True)
+        
+        # 保存分析图像
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/distance_analysis/frame_{self.frame_count:04d}.png", 
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"已生成距离和方位分析图: frame_{self.frame_count:04d}.png")
+
     def _generate_bounding_box_corners(self, position, size):
         """生成包围盒的8个顶点"""
         x, y, z = position
@@ -359,7 +422,9 @@ class MojocoDataSim:
                     if detected_count > 0:
                         print(f"检测到 {detected_count} 个物体:")
                         for obj in annotations["objects"]:
-                            print(f"  - {obj['name']} 距离: {obj['distance']:.2f}m")
+                            print(f"  - {obj['name']} 距离: {obj['distance']:.2f}m, "
+                                  f"方位角: {obj['azimuth_deg']:.1f}°, "
+                                  f"俯仰角: {obj['elevation_deg']:.1f}°")
                     else:
                         print("未检测到附近物体")
                     prev_detected_count = detected_count
@@ -369,6 +434,9 @@ class MojocoDataSim:
                 
                 # 生成识别效果图
                 self.visualize_detection(lidar_data, annotations)
+                
+                # 生成距离和方位分析图
+                self.visualize_distance_analysis(annotations)
                 
                 print(f"已仿真 {i}/{SIMULATION_FRAMES} 帧")
             else:
