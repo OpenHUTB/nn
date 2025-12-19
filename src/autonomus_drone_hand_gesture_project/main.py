@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Gesture Controlled AirSim Drone - Optimized Version
-Pure OpenCV implementation with English interface
-Author: xiaoshiyuan888
+手势控制AirSim无人机 - 手势识别优化版
+优化手势识别算法，解决位置敏感问题
+作者: xiaoshiyuan888
 """
 
 import sys
@@ -18,55 +18,55 @@ import numpy as np
 from collections import deque, Counter
 
 print("=" * 60)
-print("Gesture Controlled Drone - Optimized Version")
+print("Gesture Controlled Drone - Gesture Recognition Optimized")
 print("=" * 60)
 
-# ========== Fix import path ==========
+# ========== 修复导入路径 ==========
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 
-# ========== Core module imports ==========
+# ========== 核心模块导入 ==========
 def safe_import():
-    """Safely import all modules"""
+    """安全导入所有模块"""
     modules_status = {}
 
     try:
         from PIL import Image, ImageDraw, ImageFont
         modules_status['PIL'] = True
-        print("[PIL] ✓ Image processing library ready")
+        print("[PIL] ✓ 图像处理库就绪")
     except Exception as e:
         modules_status['PIL'] = False
-        print(f"[PIL] ✗ Import failed: {e}")
+        print(f"[PIL] ✗ 导入失败: {e}")
         return None, modules_status
 
     try:
         import cv2
         import numpy as np
         modules_status['OpenCV'] = True
-        print("[OpenCV] ✓ Computer vision library ready")
+        print("[OpenCV] ✓ 计算机视觉库就绪")
     except Exception as e:
         modules_status['OpenCV'] = False
-        print(f"[OpenCV] ✗ Import failed: {e}")
+        print(f"[OpenCV] ✗ 导入失败: {e}")
         return None, modules_status
 
     airsim_module = None
     try:
         airsim_module = __import__('airsim')
         modules_status['AirSim'] = True
-        print(f"[AirSim] ✓ Successfully imported")
+        print(f"[AirSim] ✓ 成功导入")
     except ImportError:
         print("\n" + "!" * 60)
-        print("⚠ AirSim library NOT FOUND!")
+        print("⚠ AirSim库未找到!")
         print("!" * 60)
-        print("To install AirSim, run:")
-        print("1. First install: pip install msgpack-rpc-python")
-        print("2. Then install: pip install airsim")
-        print("\nOr from source:")
+        print("安装AirSim:")
+        print("1. 首先安装: pip install msgpack-rpc-python")
+        print("2. 然后安装: pip install airsim")
+        print("\n或从源码安装:")
         print("  pip install git+https://github.com/microsoft/AirSim.git")
         print("!" * 60)
 
-        print("\nContinue without AirSim? (y/n)")
+        print("\n无AirSim继续运行? (y/n)")
         choice = input().strip().lower()
         if choice != 'y':
             sys.exit(1)
@@ -79,28 +79,28 @@ def safe_import():
     }, modules_status
 
 
-# Execute imports
+# 执行导入
 libs, status = safe_import()
 if not status.get('OpenCV', False) or not status.get('PIL', False):
-    print("\n❌ Core libraries missing, cannot start.")
-    input("Press Enter to exit...")
+    print("\n❌ 核心库缺失，无法启动。")
+    input("按回车键退出...")
     sys.exit(1)
 
 print("-" * 60)
-print("✅ Environment check passed, initializing...")
+print("✅ 环境检查通过，正在初始化...")
 print("-" * 60)
 
-# Unpack libraries
+# 解包库
 cv2, np = libs['cv2'], libs['np']
 Image, ImageDraw, ImageFont = libs['PIL']['Image'], libs['PIL']['ImageDraw'], libs['PIL']['ImageFont']
 
 
-# ========== Configuration Manager ==========
+# ========== 配置管理器 ==========
 class ConfigManager:
-    """Configuration Manager"""
+    """配置管理器"""
 
     def __init__(self):
-        self.config_file = os.path.join(current_dir, 'gesture_config.json')
+        self.config_file = os.path.join(current_dir, 'gesture_config_v2.json')
         self.default_config = {
             'camera': {
                 'index': 0,
@@ -109,14 +109,22 @@ class ConfigManager:
                 'fps': 30
             },
             'gesture': {
-                'skin_lower': [0, 30, 60],
-                'skin_upper': [25, 255, 255],
-                'min_hand_area': 3000,
+                'skin_lower_h': 0,
+                'skin_upper_h': 25,
+                'skin_lower_s': 30,
+                'skin_upper_s': 255,
+                'skin_lower_v': 60,
+                'skin_upper_v': 255,
+                'min_hand_area': 2000,
+                'max_hand_area': 30000,
                 'history_size': 10,
                 'smooth_frames': 5,
-                'min_confidence': 0.6,
+                'min_confidence': 0.5,
                 'detection_interval': 1,
-                'single_finger_angle_threshold': 60  # 新增：单个手指角度阈值
+                'hand_ratio_threshold': 1.5,  # 手部长宽比阈值
+                'contour_simplify_epsilon': 0.02,
+                'defect_distance_threshold': 20,  # 凸缺陷距离阈值
+                'palm_circle_radius_ratio': 0.3,  # 手掌半径与边界框的比例
             },
             'drone': {
                 'velocity': 2.5,
@@ -130,35 +138,46 @@ class ConfigManager:
                 'show_help': True,
                 'show_contours': True,
                 'show_bbox': True,
-                'show_fingertips': True  # 新增：显示指尖
+                'show_fingertips': True,
+                'show_palm_center': True,
+                'show_hand_direction': True,
+                'show_debug_info': False
             },
             'performance': {
                 'target_fps': 30,
                 'resize_factor': 1.0,
                 'enable_multiprocessing': False
+            },
+            'calibration': {
+                'auto_calibrate_skin': True,
+                'skin_calibration_frames': 30,
+                'hand_size_calibration': True
             }
         }
         self.config = self.load_config()
+        self.skin_calibration_data = []
+        self.hand_size_calibration_done = False
+        self.reference_hand_size = 0
 
     def load_config(self):
-        """Load configuration"""
+        """加载配置"""
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     loaded_config = json.load(f)
                     config = self.default_config.copy()
                     self._merge_config(config, loaded_config)
-                    print("✓ Configuration loaded from file")
+                    print("✓ 从文件加载配置")
                     return config
             except Exception as e:
-                print(f"⚠ Failed to load config: {e}, using defaults")
+                print(f"⚠ 加载配置失败: {e}, 使用默认配置")
                 return self.default_config.copy()
         else:
-            print("✓ Using default configuration")
+            print("✓ 使用默认配置")
             return self.default_config.copy()
 
     def _merge_config(self, base, update):
-        """Recursively merge configurations"""
+        """递归合并配置"""
         for key, value in update.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                 self._merge_config(base[key], value)
@@ -166,16 +185,16 @@ class ConfigManager:
                 base[key] = value
 
     def save_config(self):
-        """Save configuration"""
+        """保存配置"""
         try:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
-            print("✓ Configuration saved")
+            print("✓ 配置已保存")
         except Exception as e:
-            print(f"⚠ Failed to save config: {e}")
+            print(f"⚠ 保存配置失败: {e}")
 
     def get(self, *keys):
-        """Get configuration value"""
+        """获取配置值"""
         value = self.config
         for key in keys:
             if isinstance(value, dict) and key in value:
@@ -185,7 +204,7 @@ class ConfigManager:
         return value
 
     def set(self, *keys, value):
-        """Set configuration value"""
+        """设置配置值"""
         if len(keys) == 0:
             return
 
@@ -198,208 +217,223 @@ class ConfigManager:
         config[keys[-1]] = value
         self.save_config()
 
+    def calibrate_skin_color(self, frame, hand_mask):
+        """自动校准肤色范围"""
+        if not self.get('calibration', 'auto_calibrate_skin'):
+            return
+
+        if len(self.skin_calibration_data) < self.get('calibration', 'skin_calibration_frames'):
+            # 转换到HSV
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+            # 获取肤色区域的HSV值
+            skin_pixels = hsv[hand_mask > 0]
+
+            if len(skin_pixels) > 100:  # 确保有足够的像素
+                self.skin_calibration_data.append(skin_pixels)
+
+        if len(self.skin_calibration_data) == self.get('calibration', 'skin_calibration_frames'):
+            # 计算肤色范围
+            all_skin_pixels = np.vstack(self.skin_calibration_data)
+
+            h_min, h_max = np.percentile(all_skin_pixels[:, 0], [2, 98])
+            s_min, s_max = np.percentile(all_skin_pixels[:, 1], [2, 98])
+            v_min, v_max = np.percentile(all_skin_pixels[:, 2], [2, 98])
+
+            # 更新配置
+            self.set('gesture', 'skin_lower_h', value=int(max(0, h_min - 5)))
+            self.set('gesture', 'skin_upper_h', value=int(min(180, h_max + 5)))
+            self.set('gesture', 'skin_lower_s', value=int(max(0, s_min - 10)))
+            self.set('gesture', 'skin_upper_s', value=int(min(255, s_max + 10)))
+            self.set('gesture', 'skin_lower_v', value=int(max(0, v_min - 10)))
+            self.set('gesture', 'skin_upper_v', value=int(min(255, v_max + 10)))
+
+            print("✓ 肤色校准完成")
+            print(f"  肤色范围: H[{self.get('gesture', 'skin_lower_h')}-{self.get('gesture', 'skin_upper_h')}], "
+                  f"S[{self.get('gesture', 'skin_lower_s')}-{self.get('gesture', 'skin_upper_s')}], "
+                  f"V[{self.get('gesture', 'skin_lower_v')}-{self.get('gesture', 'skin_upper_v')}]")
+
+    def calibrate_hand_size(self, hand_area):
+        """校准手部大小"""
+        if not self.get('calibration', 'hand_size_calibration') or self.hand_size_calibration_done:
+            return
+
+        if hand_area > 0:
+            self.reference_hand_size = hand_area
+            self.hand_size_calibration_done = True
+            print(f"✓ 手部大小校准完成: {self.reference_hand_size:.0f} 像素")
+
 
 config = ConfigManager()
 
 
-# ========== Robust Gesture Recognizer ==========
-class RobustGestureRecognizer:
-    """Robust Gesture Recognizer - Pure OpenCV Implementation"""
+# ========== 改进的手势识别器 ==========
+class ImprovedGestureRecognizer:
+    """改进的手势识别器 - 纯OpenCV实现"""
 
     def __init__(self):
         self.config = config.get('gesture')
 
-        # Gesture history and smoothing
+        # 手势历史和平滑
         self.history_size = self.config['history_size']
         self.gesture_history = deque(maxlen=self.history_size)
         self.confidence_history = deque(maxlen=self.history_size)
         self.current_gesture = "Waiting"
         self.current_confidence = 0.0
 
-        # Hand tracking
+        # 手部跟踪和状态
         self.last_hand_position = None
         self.hand_tracking = False
         self.track_window = None
+        self.hand_states = deque(maxlen=10)  # 手部状态历史
 
-        # Performance statistics
+        # 性能统计
         self.process_times = deque(maxlen=30)
         self.frame_counter = 0
         self.detection_interval = self.config['detection_interval']
 
-        # Gesture color mapping
+        # 手势颜色映射
         self.gesture_colors = {
-            "Stop": (0, 0, 255),  # Red
-            "Forward": (0, 255, 0),  # Green
-            "Up": (255, 255, 0),  # Cyan
-            "Down": (255, 0, 255),  # Purple
-            "Left": (255, 165, 0),  # Orange
-            "Right": (0, 165, 255),  # Light Blue
-            "Waiting": (200, 200, 200),  # Gray
-            "Error": (255, 0, 0)  # Blue
+            "Stop": (0, 0, 255),  # 红色
+            "Forward": (0, 255, 0),  # 绿色
+            "Up": (255, 255, 0),  # 青色
+            "Down": (255, 0, 255),  # 紫色
+            "Left": (255, 165, 0),  # 橙色
+            "Right": (0, 165, 255),  # 浅蓝色
+            "Waiting": (200, 200, 200),  # 灰色
+            "Error": (255, 0, 0),  # 蓝色
+            "Hover": (255, 255, 255)  # 白色
         }
 
-        # Skin detection parameters
-        self.skin_lower = np.array(self.config['skin_lower'], dtype=np.uint8)
-        self.skin_upper = np.array(self.config['skin_upper'], dtype=np.uint8)
-
-        # Background subtractor
+        # 背景减除器
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=100, varThreshold=25, detectShadows=True
         )
 
-        # Morphological operation kernels
+        # 形态学操作核
         self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
-        # Fingertip detection
-        self.prev_fingertips = None
-        self.fingertip_stability_threshold = 3
+        print("✓ 改进的手势识别器已初始化 (纯OpenCV实现)")
 
-        print("✓ Robust gesture recognizer initialized (Pure OpenCV)")
+    def get_skin_mask(self, frame):
+        """获取肤色掩码"""
+        # 从配置获取肤色范围
+        h_low = config.get('gesture', 'skin_lower_h')
+        h_high = config.get('gesture', 'skin_upper_h')
+        s_low = config.get('gesture', 'skin_lower_s')
+        s_high = config.get('gesture', 'skin_upper_s')
+        v_low = config.get('gesture', 'skin_lower_v')
+        v_high = config.get('gesture', 'skin_upper_v')
 
-    def preprocess_frame(self, frame):
-        """Preprocess frame"""
-        # Flip image horizontally for intuitive control
-        frame = cv2.flip(frame, 1)
-
-        # Adjust size for performance
-        resize_factor = config.get('performance', 'resize_factor')
-        if resize_factor != 1.0:
-            new_width = int(frame.shape[1] * resize_factor)
-            new_height = int(frame.shape[0] * resize_factor)
-            frame = cv2.resize(frame, (new_width, new_height))
-
-        return frame
-
-    def detect_skin(self, frame):
-        """Detect skin regions"""
-        # Convert to HSV color space
+        # 转换为HSV颜色空间
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-        # Skin mask
-        skin_mask = cv2.inRange(hsv, self.skin_lower, self.skin_upper)
+        # 定义肤色范围
+        lower_skin = np.array([h_low, s_low, v_low], dtype=np.uint8)
+        upper_skin = np.array([h_high, s_high, v_high], dtype=np.uint8)
 
-        # Apply background subtraction
+        # 创建肤色掩码
+        skin_mask = cv2.inRange(hsv, lower_skin, upper_skin)
+
+        return skin_mask, hsv
+
+    def enhance_skin_detection(self, frame, skin_mask):
+        """增强肤色检测"""
+        # 应用背景减除
         fg_mask = self.bg_subtractor.apply(frame)
 
-        # Combine skin mask and foreground mask
+        # 结合肤色掩码和前景掩码
         combined_mask = cv2.bitwise_and(skin_mask, fg_mask)
 
-        # Morphological operations
+        # 形态学操作
         combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, self.kernel, iterations=2)
         combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, self.kernel, iterations=1)
 
-        # Gaussian blur
+        # 高斯模糊
         combined_mask = cv2.GaussianBlur(combined_mask, (5, 5), 0)
 
         return combined_mask
 
-    def find_hand_contours(self, mask):
-        """Find hand contours"""
-        # Find contours
+    def find_best_hand_contour(self, mask, frame):
+        """找到最佳的手部轮廓"""
+        # 查找轮廓
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if not contours:
-            return None
+            return None, 0.0
 
-        # Find the largest contour (assumed to be hand)
+        # 按面积排序
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
-        for contour in contours:
+        best_contour = None
+        best_score = 0.0
+
+        min_area = config.get('gesture', 'min_hand_area')
+        max_area = config.get('gesture', 'max_hand_area')
+
+        for contour in contours[:3]:  # 只检查前3个最大轮廓
             area = cv2.contourArea(contour)
 
-            # Filter out too small contours
-            if area < self.config['min_hand_area']:
+            # 面积过滤
+            if area < min_area or area > max_area:
                 continue
 
-            # Calculate contour perimeter
-            perimeter = cv2.arcLength(contour, True)
+            # 计算轮廓评分
+            score = self.rate_contour(contour, frame.shape)
 
-            # Filter out too simple contours
-            if perimeter < 100:
-                continue
+            if score > best_score:
+                best_score = score
+                best_contour = contour
 
-            return contour
+        return best_contour, best_score
 
-        return None
+    def rate_contour(self, contour, frame_shape):
+        """评估轮廓作为手部的可能性"""
+        score = 0.0
 
-    def detect_fingertips_advanced(self, contour):
-        """Advanced fingertip detection"""
-        # Simplify contour
-        epsilon = 0.01 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, epsilon, True)
+        # 面积评分
+        area = cv2.contourArea(contour)
+        min_area = config.get('gesture', 'min_hand_area')
+        max_area = config.get('gesture', 'max_hand_area')
 
-        # Find convex hull
-        hull = cv2.convexHull(approx, returnPoints=False)
+        if min_area < area < max_area:
+            # 面积在合理范围内
+            area_ratio = min(area / max_area, 1.0)
+            score += area_ratio * 0.3
 
-        if hull is None or len(hull) < 3:
-            return [], 0
+        # 周长评分
+        perimeter = cv2.arcLength(contour, True)
+        if perimeter > 100:  # 最小周长
+            score += 0.2
 
-        # Find convexity defects
-        defects = cv2.convexityDefects(approx, hull)
+        # 紧凑度评分 (周长^2 / 面积)
+        if area > 0:
+            compactness = perimeter ** 2 / area
+            # 手的紧凑度通常在14-20之间
+            if 12 < compactness < 25:
+                compactness_score = 1.0 - abs(compactness - 18) / 6
+                score += compactness_score * 0.3
 
-        if defects is None:
-            return [], 0
+        # 长宽比评分
+        x, y, w, h = cv2.boundingRect(contour)
+        if h > 0:
+            aspect_ratio = w / h
+            # 手的长宽比通常在0.5-2.0之间
+            if 0.4 < aspect_ratio < 2.5:
+                aspect_score = 1.0 - abs(aspect_ratio - 1.0) / 1.5
+                score += aspect_score * 0.2
 
-        fingertips = []
-        defects_points = []
+        return score
 
-        for i in range(defects.shape[0]):
-            s, e, f, d = defects[i, 0]
-            start = tuple(approx[s][0])
-            end = tuple(approx[e][0])
-            far = tuple(approx[f][0])
-
-            defects_points.append((start, end, far))
-
-            # Calculate triangle sides
-            a = math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
-            b = math.sqrt((far[0] - start[0]) ** 2 + (far[1] - start[1]) ** 2)
-            c = math.sqrt((end[0] - far[0]) ** 2 + (end[1] - far[1]) ** 2)
-
-            # Calculate angle
-            if b * c != 0:
-                angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))
-                angle_degrees = math.degrees(angle)
-
-                # If angle is less than 90 degrees, it might be a finger
-                if angle_degrees < 90:
-                    # Check if this is a deep defect (far from hull)
-                    if d > 1000:  # Adjust this threshold based on your needs
-                        # Both start and end points could be fingertips
-                        for point in [start, end]:
-                            if point not in fingertips:
-                                fingertips.append(point)
-
-        # If we found few fingertips, try alternative method
-        if len(fingertips) <= 2:
-            # Use convex hull points as fingertips
-            hull_points = cv2.convexHull(approx, returnPoints=True)
-
-            # Find extreme points in hull
-            if len(hull_points) > 0:
-                hull_points = hull_points.reshape(-1, 2)
-
-                # Sort by y-coordinate (top to bottom)
-                hull_points = hull_points[hull_points[:, 1].argsort()]
-
-                # Take top points as fingertips
-                num_fingertips = min(5, len(hull_points))
-                for i in range(num_fingertips):
-                    point = tuple(hull_points[i])
-                    if point not in fingertips:
-                        fingertips.append(point)
-
-        return fingertips, len(fingertips)
-
-    def analyze_hand_contour(self, contour, frame_shape):
-        """Analyze hand contour"""
+    def analyze_hand_features(self, contour, frame_shape):
+        """分析手部特征"""
         if contour is None:
             return None, 0.0
 
-        # Calculate contour area
+        # 计算轮廓面积
         area = cv2.contourArea(contour)
 
-        # Calculate contour center
+        # 计算轮廓中心
         M = cv2.moments(contour)
         if M["m00"] == 0:
             return None, 0.0
@@ -407,27 +441,41 @@ class RobustGestureRecognizer:
         cx = int(M["m10"] / M["m00"])
         cy = int(M["m01"] / M["m00"])
 
-        # Calculate bounding box
+        # 计算边界框
         x, y, w, h = cv2.boundingRect(contour)
+        bbox_area = w * h
 
-        # Advanced fingertip detection
-        fingertips, finger_count = self.detect_fingertips_advanced(contour)
+        # 计算手掌中心（假设是轮廓的中心）
+        palm_center = (cx, cy)
 
-        # Calculate hand position (normalized)
+        # 计算手掌半径（假设为边界框宽度的30%）
+        palm_radius = int(w * config.get('gesture', 'palm_circle_radius_ratio'))
+
+        # 分析手指
+        fingers, fingertips, defects = self.analyze_fingers(contour, palm_center, palm_radius)
+
+        # 计算手部方向
+        direction = self.calculate_hand_direction(contour, cx, cy)
+
+        # 计算手部位置（归一化）
         h_img, w_img = frame_shape[:2]
         norm_x = cx / w_img
         norm_y = cy / h_img
 
-        # Calculate gesture confidence
-        confidence = self.calculate_confidence(area, finger_count, len(contour))
+        # 计算手势置信度
+        confidence = self.calculate_confidence(area, len(fingers), len(contour), bbox_area)
 
-        # Return result
+        # 返回结果
         result = {
             'contour': contour,
             'center': (cx, cy),
             'bbox': (x, y, x + w, y + h),
-            'finger_count': finger_count,
-            'fingertips': fingertips,
+            'fingers': fingers,  # 手指列表
+            'fingertips': fingertips,  # 指尖点列表
+            'defects': defects,  # 凸缺陷列表
+            'palm_center': palm_center,
+            'palm_radius': palm_radius,
+            'direction': direction,  # 手部方向（角度）
             'area': area,
             'position': (norm_x, norm_y),
             'confidence': confidence
@@ -435,104 +483,241 @@ class RobustGestureRecognizer:
 
         return result, confidence
 
-    def calculate_confidence(self, area, finger_count, contour_length):
-        """Calculate gesture confidence"""
-        confidence = 0.5  # Base confidence
+    def analyze_fingers(self, contour, palm_center, palm_radius):
+        """分析手指"""
+        # 简化轮廓
+        epsilon = config.get('gesture', 'contour_simplify_epsilon') * cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, epsilon, True)
 
-        # Confidence based on area
-        if area > 5000:
-            confidence += 0.2
-        elif area > 3000:
-            confidence += 0.1
+        # 计算凸包
+        hull = cv2.convexHull(approx, returnPoints=False)
 
-        # Confidence based on finger count
+        if hull is None or len(hull) < 3:
+            return [], [], []
+
+        # 计算凸缺陷
+        defects = cv2.convexityDefects(approx, hull)
+
+        fingers = []
+        fingertips = []
+        defect_points = []
+
+        if defects is not None:
+            for i in range(defects.shape[0]):
+                s, e, f, d = defects[i, 0]
+                start = tuple(approx[s][0])
+                end = tuple(approx[e][0])
+                far = tuple(approx[f][0])
+
+                # 计算距离
+                start_dist = np.linalg.norm(np.array(start) - np.array(palm_center))
+                end_dist = np.linalg.norm(np.array(end) - np.array(palm_center))
+                far_dist = np.linalg.norm(np.array(far) - np.array(palm_center))
+
+                # 检查是否可能是手指
+                if (start_dist > palm_radius * 1.2 and
+                        end_dist > palm_radius * 1.2 and
+                        d > config.get('gesture', 'defect_distance_threshold') * 256):
+
+                    # 检查角度
+                    a = math.sqrt((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2)
+                    b = math.sqrt((far[0] - start[0]) ** 2 + (far[1] - start[1]) ** 2)
+                    c = math.sqrt((end[0] - far[0]) ** 2 + (end[1] - far[1]) ** 2)
+
+                    if b * c != 0:
+                        angle = math.acos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c))
+                        angle_degrees = math.degrees(angle)
+
+                        # 如果角度小于90度，可能是指缝
+                        if angle_degrees < 90:
+                            # 添加手指
+                            finger = {
+                                'start': start,
+                                'end': end,
+                                'far': far,
+                                'depth': d,
+                                'angle': angle_degrees
+                            }
+                            fingers.append(finger)
+
+                            # 添加指尖（开始和结束点都可能是指尖）
+                            for point in [start, end]:
+                                if point not in fingertips:
+                                    # 检查点是否在手掌半径之外
+                                    point_dist = np.linalg.norm(np.array(point) - np.array(palm_center))
+                                    if point_dist > palm_radius * 1.5:
+                                        fingertips.append(point)
+
+                            defect_points.append((start, end, far, d))
+
+        # 如果没有检测到手指，尝试使用凸包点作为指尖
+        if len(fingertips) == 0:
+            hull_points = cv2.convexHull(approx, returnPoints=True)
+            if len(hull_points) > 0:
+                hull_points = hull_points.reshape(-1, 2)
+
+                # 过滤掉离手掌中心太近的点
+                for point in hull_points:
+                    point_tuple = tuple(point)
+                    point_dist = np.linalg.norm(point - np.array(palm_center))
+                    if point_dist > palm_radius * 1.5 and point_tuple not in fingertips:
+                        fingertips.append(point_tuple)
+
+        # 限制指尖数量为5
+        fingertips = fingertips[:5]
+
+        return fingers, fingertips, defect_points
+
+    def calculate_hand_direction(self, contour, cx, cy):
+        """计算手部方向"""
+        # 使用PCA（主成分分析）计算手部方向
+        if len(contour) < 5:
+            return 0.0
+
+        # 将轮廓转换为点集
+        points = contour.reshape(-1, 2).astype(np.float32)
+
+        # 计算PCA
+        mean = np.empty((0))
+        mean, eigenvectors, eigenvalues = cv2.PCACompute2(points, mean)
+
+        # 计算方向角度（度）
+        direction = math.degrees(math.atan2(eigenvectors[0, 1], eigenvectors[0, 0]))
+
+        return direction
+
+    def calculate_confidence(self, area, finger_count, contour_length, bbox_area):
+        """计算手势置信度"""
+        confidence = 0.5  # 基础置信度
+
+        # 基于面积的置信度
+        min_area = config.get('gesture', 'min_hand_area')
+        max_area = config.get('gesture', 'max_hand_area')
+
+        if min_area < area < max_area:
+            # 面积在合理范围内
+            area_norm = (area - min_area) / (max_area - min_area)
+            confidence += area_norm * 0.2
+
+        # 基于手指数量的置信度
         if 0 <= finger_count <= 5:
             confidence += 0.2
 
-        # Confidence based on contour complexity
+        # 基于轮廓复杂度的置信度
         if contour_length > 200:
             confidence += 0.1
 
+        # 基于填充度的置信度（轮廓面积/边界框面积）
+        if bbox_area > 0:
+            fill_ratio = area / bbox_area
+            # 手的填充度通常在0.3-0.7之间
+            if 0.2 < fill_ratio < 0.8:
+                fill_score = 1.0 - abs(fill_ratio - 0.5) / 0.3
+                confidence += fill_score * 0.1
+
         return min(confidence, 1.0)
 
-    def recognize_gesture(self, hand_data):
-        """Recognize gesture based on hand data"""
+    def recognize_gesture_improved(self, hand_data):
+        """改进的手势识别逻辑"""
         if hand_data is None:
             return "Waiting", 0.3
 
-        finger_count = hand_data['finger_count']
-        norm_x, norm_y = hand_data['position']
-        confidence = hand_data['confidence']
+        finger_count = len(hand_data.get('fingers', []))
         fingertips = hand_data.get('fingertips', [])
+        norm_x, norm_y = hand_data['position']
+        direction = hand_data.get('direction', 0.0)
+        confidence = hand_data['confidence']
 
-        # Special case: single finger detection
-        if finger_count == 1:
-            # Additional check for single finger gesture
-            if len(fingertips) == 1:
-                # Check if the fingertip is above the hand center (typical for pointing)
+        # 根据手指数量分类
+        if finger_count == 0:
+            # 握拳或没有手指
+            if len(fingertips) == 0:
+                return "Stop", confidence * 0.9
+            else:
+                # 有指尖但不是手指，可能是部分握拳
+                return "Stop", confidence * 0.7
+
+        elif finger_count == 1:
+            # 单指手势
+            if len(fingertips) >= 1:
+                # 检查指尖方向
                 cx, cy = hand_data['center']
                 fingertip = fingertips[0]
 
-                if fingertip[1] < cy - 20:  # Fingertip is above hand center
-                    return "Forward", confidence * 0.9
-                else:
-                    return "Stop", confidence * 0.7
-            return "Forward", confidence * 0.8
+                # 计算指尖相对于手中心的方向
+                dx = fingertip[0] - cx
+                dy = fingertip[1] - cy
 
-        # No fingers (fist)
-        elif finger_count == 0:
-            return "Stop", confidence * 0.9
-
-        # Two fingers (V sign)
-        elif finger_count == 2:
+                # 判断指尖方向
+                if abs(dx) > abs(dy):  # 主要水平方向
+                    if dx > 0:
+                        return "Right", confidence * 0.8
+                    else:
+                        return "Left", confidence * 0.8
+                else:  # 主要垂直方向
+                    if dy < 0:  # 指尖在手中心上方
+                        return "Up", confidence * 0.8
+                    else:
+                        return "Forward", confidence * 0.8
             return "Forward", confidence * 0.7
 
-        # Three fingers
-        elif finger_count == 3:
-            # Judge direction based on position
-            if norm_y < 0.4:
-                return "Up", confidence * 0.7
-            elif norm_y > 0.6:
-                return "Down", confidence * 0.7
-            else:
-                return "Stop", confidence * 0.6
+        elif finger_count == 2:
+            # 双指手势
+            return "Forward", confidence * 0.7
 
-        # Four or five fingers (open hand)
+        elif finger_count == 3:
+            # 三指手势，根据手部方向判断
+            if -45 <= direction <= 45:  # 大致水平
+                if direction > 0:
+                    return "Right", confidence * 0.7
+                else:
+                    return "Left", confidence * 0.7
+            else:  # 大致垂直
+                if direction > 0:
+                    return "Down", confidence * 0.7
+                else:
+                    return "Up", confidence * 0.7
+
         elif finger_count >= 4:
-            # Judge direction based on hand position
-            if norm_x < 0.3:
+            # 多指手势（手掌张开）
+            # 根据手部位置判断
+            if norm_x < 0.4:  # 左侧
                 return "Left", confidence * 0.8
-            elif norm_x > 0.7:
+            elif norm_x > 0.6:  # 右侧
                 return "Right", confidence * 0.8
-            elif norm_y < 0.4:
+            elif norm_y < 0.4:  # 上方
                 return "Up", confidence * 0.8
-            elif norm_y > 0.6:
+            elif norm_y > 0.6:  # 下方
                 return "Down", confidence * 0.8
-            else:
-                return "Stop", confidence * 0.7
+            else:  # 中间
+                # 根据手部方向判断
+                if -45 <= direction <= 45:  # 大致水平
+                    return "Forward", confidence * 0.7
+                else:  # 大致垂直
+                    return "Stop", confidence * 0.7
 
         return "Waiting", confidence * 0.5
 
     def smooth_gesture(self, new_gesture, new_confidence):
-        """Smooth gesture output"""
-        # Add to history
+        """平滑手势输出"""
+        # 添加到历史
         self.gesture_history.append(new_gesture)
         self.confidence_history.append(new_confidence)
 
-        # If not enough history, return directly
+        # 如果历史记录不足，直接返回
         if len(self.gesture_history) < 3:
             self.current_gesture = new_gesture
             self.current_confidence = new_confidence
             return new_gesture, new_confidence
 
-        # Count most common gesture
+        # 统计最常见的姿势
         gesture_counter = Counter(self.gesture_history)
         most_common_gesture, most_common_count = gesture_counter.most_common(1)[0]
 
-        # Calculate average confidence
+        # 计算平均置信度
         avg_confidence = np.mean(list(self.confidence_history))
 
-        # If the most common gesture appears enough times, use it
+        # 如果最常见的姿势出现次数足够多，使用它
         smooth_frames = self.config['smooth_frames']
         if most_common_count >= smooth_frames:
             self.current_gesture = most_common_gesture
@@ -541,134 +726,175 @@ class RobustGestureRecognizer:
         return self.current_gesture, self.current_confidence
 
     def visualize_detection(self, frame, hand_data, gesture, confidence):
-        """Visualize detection results"""
+        """可视化检测结果"""
         if hand_data is None:
             return frame
 
-        # Get display configuration
+        # 获取显示配置
         show_contours = config.get('display', 'show_contours')
         show_bbox = config.get('display', 'show_bbox')
         show_fingertips = config.get('display', 'show_fingertips')
+        show_palm_center = config.get('display', 'show_palm_center')
+        show_hand_direction = config.get('display', 'show_hand_direction')
+        show_debug_info = config.get('display', 'show_debug_info')
 
-        # Draw contour
+        # 绘制轮廓
         if show_contours and 'contour' in hand_data:
             cv2.drawContours(frame, [hand_data['contour']], -1, (0, 255, 0), 2)
 
-        # Draw bounding box
+        # 绘制边界框
         if show_bbox and 'bbox' in hand_data:
             x1, y1, x2, y2 = hand_data['bbox']
             color = self.gesture_colors.get(gesture, (255, 255, 255))
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-            # Show gesture label
+            # 显示手势标签 - 使用英文避免字体问题
             label = f"{gesture}"
             if config.get('display', 'show_confidence'):
                 label += f" ({confidence:.0%})"
 
-            # Calculate text size
+            # 计算文本大小
             (text_width, text_height), baseline = cv2.getTextSize(
                 label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
             )
 
-            # Draw text background
+            # 绘制文本背景
             cv2.rectangle(frame,
                           (x1, y1 - text_height - 10),
                           (x1 + text_width, y1),
                           color, -1)
 
-            # Draw text
+            # 绘制文本
             cv2.putText(frame, label, (x1, y1 - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # Draw center point
-        if 'center' in hand_data:
-            cx, cy = hand_data['center']
+        # 绘制手掌中心
+        if show_palm_center and 'palm_center' in hand_data:
+            cx, cy = hand_data['palm_center']
+            palm_radius = hand_data.get('palm_radius', 20)
             cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
-            cv2.putText(frame, "Center", (cx + 10, cy),
+            cv2.circle(frame, (cx, cy), palm_radius, (0, 0, 255), 1)
+            cv2.putText(frame, "Palm", (cx + 10, cy),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
-        # Draw fingertips
+        # 绘制指尖
         if show_fingertips and 'fingertips' in hand_data:
             for i, point in enumerate(hand_data['fingertips']):
                 cv2.circle(frame, point, 4, (255, 0, 0), -1)
                 cv2.putText(frame, f"F{i + 1}", (point[0] + 5, point[1]),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
-        # Show finger count
-        if 'finger_count' in hand_data:
-            finger_text = f"Fingers: {hand_data['finger_count']}"
-            cv2.putText(frame, finger_text, (10, frame.shape[0] - 10),
+        # 绘制手部方向
+        if show_hand_direction and 'direction' in hand_data and 'center' in hand_data:
+            cx, cy = hand_data['center']
+            direction = hand_data['direction']
+            length = 50
+
+            # 计算方向向量
+            dx = length * math.cos(math.radians(direction))
+            dy = length * math.sin(math.radians(direction))
+
+            # 绘制方向线
+            end_point = (int(cx + dx), int(cy + dy))
+            cv2.arrowedLine(frame, (cx, cy), end_point, (255, 255, 0), 2)
+
+            # 显示方向角度
+            angle_text = f"Dir: {direction:.0f}°"
+            cv2.putText(frame, angle_text, (cx, cy - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+
+        # 显示调试信息
+        if show_debug_info:
+            # 显示手指数量
+            finger_count = len(hand_data.get('fingers', []))
+            finger_text = f"Fingers: {finger_count}"
+            cv2.putText(frame, finger_text, (10, frame.shape[0] - 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            # 显示手部位置
+            pos_text = f"Pos: ({hand_data['position'][0]:.2f}, {hand_data['position'][1]:.2f})"
+            cv2.putText(frame, pos_text, (10, frame.shape[0] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return frame
 
     def recognize(self, frame):
-        """Recognize gesture"""
+        """识别手势"""
         start_time = time.time()
 
         try:
-            # Preprocess frame
-            processed_frame = self.preprocess_frame(frame)
+            # 预处理帧
+            processed_frame = cv2.flip(frame, 1)
 
-            # Detect every few frames to improve performance
+            # 每隔几帧检测一次以提高性能
             if self.frame_counter % self.detection_interval != 0:
                 self.frame_counter += 1
                 return self.current_gesture, self.current_confidence, processed_frame
 
-            # Detect skin
-            skin_mask = self.detect_skin(processed_frame)
+            # 获取肤色掩码
+            skin_mask, hsv = self.get_skin_mask(processed_frame)
 
-            # Find hand contour
-            hand_contour = self.find_hand_contours(skin_mask)
+            # 增强肤色检测
+            enhanced_mask = self.enhance_skin_detection(processed_frame, skin_mask)
 
-            # Analyze hand contour
-            hand_data, confidence = self.analyze_hand_contour(hand_contour, processed_frame.shape)
+            # 找到最佳的手部轮廓
+            hand_contour, contour_score = self.find_best_hand_contour(enhanced_mask, processed_frame)
 
-            # Recognize gesture
+            # 分析手部特征
+            hand_data, confidence = self.analyze_hand_features(hand_contour, processed_frame.shape)
+
+            # 识别手势
             if hand_data is not None:
-                gesture, raw_confidence = self.recognize_gesture(hand_data)
+                # 校准肤色（如果需要）
+                config.calibrate_skin_color(processed_frame, enhanced_mask)
+
+                # 校准手部大小（如果需要）
+                config.calibrate_hand_size(hand_data['area'])
+
+                # 识别手势
+                gesture, raw_confidence = self.recognize_gesture_improved(hand_data)
                 confidence = max(confidence, raw_confidence)
             else:
                 gesture, confidence = "Waiting", 0.3
 
-            # Smooth gesture
+            # 平滑手势
             final_gesture, final_confidence = self.smooth_gesture(gesture, confidence)
 
-            # Visualize results
+            # 可视化结果
             if hand_data is not None:
                 processed_frame = self.visualize_detection(
                     processed_frame, hand_data, final_gesture, final_confidence
                 )
 
-            # Update counter
+            # 更新计数器
             self.frame_counter += 1
 
-            # Calculate processing time
+            # 计算处理时间
             process_time = (time.time() - start_time) * 1000
             self.process_times.append(process_time)
 
             return final_gesture, final_confidence, processed_frame
 
         except Exception as e:
-            print(f"⚠ Gesture recognition error: {e}")
+            print(f"⚠ 手势识别错误: {e}")
             return "Error", 0.0, frame
 
     def get_performance_stats(self):
-        """Get performance statistics"""
+        """获取性能统计"""
         if len(self.process_times) == 0:
             return 0.0
 
         return np.mean(list(self.process_times))
 
     def set_simulated_gesture(self, gesture):
-        """Set simulated gesture"""
+        """设置模拟的手势"""
         self.current_gesture = gesture
         self.current_confidence = 0.9
 
 
-# ========== Simple Drone Controller ==========
+# ========== 简单的无人机控制器 ==========
 class SimpleDroneController:
-    """Simple Drone Controller"""
+    """简单的无人机控制器"""
 
     def __init__(self, airsim_module):
         self.airsim = airsim_module
@@ -676,118 +902,118 @@ class SimpleDroneController:
         self.connected = False
         self.flying = False
 
-        # Control parameters
+        # 控制参数
         self.velocity = config.get('drone', 'velocity')
         self.duration = config.get('drone', 'duration')
         self.altitude = config.get('drone', 'altitude')
         self.control_interval = config.get('drone', 'control_interval')
 
-        # Control state
+        # 控制状态
         self.last_control_time = 0
         self.last_gesture = None
 
-        print("✓ Simple drone controller initialized")
+        print("✓ 简单的无人机控制器已初始化")
 
     def connect(self):
-        """Connect to AirSim drone"""
+        """连接AirSim无人机"""
         if self.connected:
             return True
 
         if self.airsim is None:
-            print("⚠ AirSim not available, using simulation mode")
+            print("⚠ AirSim不可用，使用模拟模式")
             self.connected = True
             return True
 
-        print("Connecting to AirSim...")
+        print("连接AirSim...")
 
         try:
             self.client = self.airsim.MultirotorClient()
             self.client.confirmConnection()
-            print("✅ Connected to AirSim!")
+            print("✅ 已连接AirSim!")
 
             self.client.enableApiControl(True)
-            print("✅ API control enabled")
+            print("✅ API控制已启用")
 
             self.client.armDisarm(True)
-            print("✅ Drone armed")
+            print("✅ 无人机已武装")
 
             self.connected = True
             return True
 
         except Exception as e:
-            print(f"❌ Connection failed: {e}")
-            print("\nContinue with simulation mode? (y/n)")
+            print(f"❌ 连接失败: {e}")
+            print("\n使用模拟模式继续? (y/n)")
             choice = input().strip().lower()
             if choice == 'y':
                 self.connected = True
-                print("✅ Using simulation mode")
+                print("✅ 使用模拟模式")
                 return True
 
             return False
 
     def takeoff(self):
-        """Take off"""
+        """起飞"""
         if not self.connected:
             return False
 
         try:
             if self.airsim is None or self.client is None:
-                print("✅ Simulated takeoff")
+                print("✅ 模拟起飞")
                 self.flying = True
                 return True
 
-            print("Taking off...")
+            print("起飞中...")
             self.client.takeoffAsync().join()
             time.sleep(1)
 
-            # Ascend to specified altitude
+            # 上升到指定高度
             self.client.moveToZAsync(self.altitude, 3).join()
 
             self.flying = True
-            print("✅ Drone took off successfully")
+            print("✅ 无人机成功起飞")
             return True
         except Exception as e:
-            print(f"❌ Takeoff failed: {e}")
+            print(f"❌ 起飞失败: {e}")
             return False
 
     def land(self):
-        """Land"""
+        """降落"""
         if not self.connected:
             return False
 
         try:
             if self.airsim is None or self.client is None:
-                print("✅ Simulated landing")
+                print("✅ 模拟降落")
                 self.flying = False
                 return True
 
-            print("Landing...")
+            print("降落中...")
             self.client.landAsync().join()
             self.flying = False
-            print("✅ Drone landed")
+            print("✅ 无人机已降落")
             return True
         except Exception as e:
-            print(f"Landing failed: {e}")
+            print(f"降落失败: {e}")
             return False
 
     def move_by_gesture(self, gesture, confidence):
-        """Move based on gesture"""
+        """根据手势移动"""
         if not self.connected or not self.flying:
             return False
 
-        # Check control interval
+        # 检查控制间隔
         current_time = time.time()
         if current_time - self.last_control_time < self.control_interval:
             return False
 
-        # Check confidence threshold
+        # 检查置信度阈值
         min_confidence = config.get('gesture', 'min_confidence')
         if confidence < min_confidence:
             return False
 
         try:
             if self.airsim is None or self.client is None:
-                print(f"Simulated move: {gesture}")
+                print(f"模拟移动: {gesture}")
                 self.last_control_time = current_time
                 self.last_gesture = gesture
                 return True
@@ -812,6 +1038,9 @@ class SimpleDroneController:
             elif gesture == "Stop":
                 self.client.hoverAsync()
                 success = True
+            elif gesture == "Hover":
+                self.client.hoverAsync()
+                success = True
 
             if success:
                 self.last_control_time = current_time
@@ -819,20 +1048,20 @@ class SimpleDroneController:
 
             return success
         except Exception as e:
-            print(f"Control command failed: {e}")
+            print(f"控制命令失败: {e}")
             return False
 
     def emergency_stop(self):
-        """Emergency stop"""
+        """紧急停止"""
         if self.connected:
             try:
                 if self.flying and self.client is not None:
-                    print("Emergency landing...")
+                    print("紧急降落...")
                     self.land()
                 if self.client is not None:
                     self.client.armDisarm(False)
                     self.client.enableApiControl(False)
-                    print("✅ Emergency stop complete")
+                    print("✅ 紧急停止完成")
             except:
                 pass
 
@@ -840,117 +1069,173 @@ class SimpleDroneController:
         self.flying = False
 
 
-# ========== Simple UI Renderer ==========
-class SimpleUIRenderer:
-    """Simple UI Renderer"""
+# ========== 中文UI渲染器 ==========
+class ChineseUIRenderer:
+    """中文UI渲染器"""
 
     def __init__(self):
-        # Color definitions
+        self.fonts = {}
+        self.load_fonts()
+
+        # 颜色定义
         self.colors = {
-            'title': (0, 255, 255),  # Cyan
-            'connected': (0, 255, 0),  # Green
-            'disconnected': (0, 0, 255),  # Red
-            'flying': (0, 255, 0),  # Green
-            'landed': (255, 165, 0),  # Orange
-            'warning': (0, 165, 255),  # Light Blue
-            'info': (255, 255, 255),  # White
-            'help': (255, 200, 100)  # Light Orange
+            'title': (0, 255, 255),  # 青色
+            'connected': (0, 255, 0),  # 绿色
+            'disconnected': (0, 0, 255),  # 红色
+            'flying': (0, 255, 0),  # 绿色
+            'landed': (255, 165, 0),  # 橙色
+            'warning': (0, 165, 255),  # 浅蓝色
+            'info': (255, 255, 255),  # 白色
+            'help': (255, 200, 100)  # 浅橙色
         }
 
-        print("✓ Simple UI renderer initialized")
+        print("✓ 中文UI渲染器已初始化")
+
+    def load_fonts(self):
+        """加载字体"""
+        font_paths = [
+            'simhei.ttf',
+            'C:/Windows/Fonts/simhei.ttf',
+            'C:/Windows/Fonts/msyh.ttc',
+            '/System/Library/Fonts/PingFang.ttc',
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        ]
+
+        for path in font_paths:
+            try:
+                self.fonts[14] = ImageFont.truetype(path, 14)
+                self.fonts[16] = ImageFont.truetype(path, 16)
+                self.fonts[18] = ImageFont.truetype(path, 18)
+                self.fonts[20] = ImageFont.truetype(path, 20)
+                self.fonts[24] = ImageFont.truetype(path, 24)
+                print(f"✓ 字体已加载: {path}")
+                return
+            except:
+                continue
+
+        print("⚠ 未找到字体，使用默认")
+
+    def draw_text(self, frame, text, pos, size=16, color=(255, 255, 255)):
+        """在图像上绘制文本"""
+        try:
+            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(img_rgb)
+            draw = ImageDraw.Draw(pil_img)
+
+            font = self.fonts.get(size, self.fonts.get(16))
+
+            # 绘制阴影
+            shadow_color = (0, 0, 0)
+            shadow_pos = (pos[0] + 1, pos[1] + 1)
+            draw.text(shadow_pos, text, font=font, fill=shadow_color)
+
+            # 绘制文字
+            rgb_color = color[::-1]  # BGR to RGB
+            draw.text(pos, text, font=font, fill=rgb_color)
+
+            return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        except:
+            # 备用方案：使用OpenCV绘制英文
+            cv2.putText(frame, text, pos, cv2.FONT_HERSHEY_SIMPLEX,
+                        size / 25, color, 1)
+            return frame
 
     def draw_status_bar(self, frame, drone_controller, gesture, confidence, fps, process_time):
-        """Draw status bar"""
+        """绘制状态栏"""
         h, w = frame.shape[:2]
 
-        # Draw semi-transparent background
+        # 绘制半透明背景
         overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (w, 100), (0, 0, 0), -1)
+        cv2.rectangle(overlay, (0, 0), (w, 120), (0, 0, 0), -1)
         frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
-        # Title
-        title = "Gesture Controlled Drone"
-        cv2.putText(frame, title, (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.colors['title'], 2)
+        # 标题
+        title = "手势控制无人机系统 - 优化版"
+        frame = self.draw_text(frame, title, (10, 10), size=20, color=self.colors['title'])
 
-        # Connection status
+        # 连接状态
         status_color = self.colors['connected'] if drone_controller.connected else self.colors['disconnected']
-        status_text = f"Drone: {'Connected' if drone_controller.connected else 'Disconnected'}"
-        cv2.putText(frame, status_text, (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 1)
+        status_text = f"无人机: {'已连接' if drone_controller.connected else '未连接'}"
+        frame = self.draw_text(frame, status_text, (10, 40), size=16, color=status_color)
 
-        # Flight status
+        # 飞行状态
         flight_color = self.colors['flying'] if drone_controller.flying else self.colors['landed']
-        flight_text = f"Flight: {'Flying' if drone_controller.flying else 'Landed'}"
-        cv2.putText(frame, flight_text, (10, 85),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, flight_color, 1)
+        flight_text = f"飞行状态: {'飞行中' if drone_controller.flying else '已降落'}"
+        frame = self.draw_text(frame, flight_text, (10, 65), size=16, color=flight_color)
 
-        # Gesture information
+        # 手势信息
         if confidence > 0.7:
-            gesture_color = (0, 255, 0)  # Green
+            gesture_color = (0, 255, 0)  # 绿色
         elif confidence > 0.5:
-            gesture_color = (255, 165, 0)  # Orange
+            gesture_color = (255, 165, 0)  # 橙色
         else:
-            gesture_color = (200, 200, 200)  # Gray
+            gesture_color = (200, 200, 200)  # 灰色
 
-        gesture_text = f"Gesture: {gesture}"
+        gesture_text = f"当前手势: {gesture}"
         if config.get('display', 'show_confidence'):
             gesture_text += f" ({confidence:.0%})"
 
-        cv2.putText(frame, gesture_text, (w // 2, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, gesture_color, 1)
+        frame = self.draw_text(frame, gesture_text, (w // 2, 40), size=16, color=gesture_color)
 
-        # Performance information
+        # 性能信息
         if config.get('display', 'show_fps'):
-            perf_text = f"FPS: {fps:.1f}"
+            perf_text = f"帧率: {fps:.1f}"
             if process_time > 0:
-                perf_text += f" | Delay: {process_time:.1f}ms"
+                perf_text += f" | 延迟: {process_time:.1f}ms"
 
-            cv2.putText(frame, perf_text, (w - 200, 85),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.colors['info'], 1)
+            frame = self.draw_text(frame, perf_text, (w - 200, 65), size=14, color=self.colors['info'])
+
+        # 控制提示
+        control_text = "提示: 确保手部完全进入画面，光线充足"
+        frame = self.draw_text(frame, control_text, (10, 90), size=14, color=self.colors['info'])
 
         return frame
 
     def draw_help_bar(self, frame):
-        """Draw help bar"""
+        """绘制帮助栏"""
         if not config.get('display', 'show_help'):
             return frame
 
         h, w = frame.shape[:2]
 
-        # Draw bottom help bar
-        cv2.rectangle(frame, (0, h - 50), (w, h), (0, 0, 0), -1)
+        # 绘制底部帮助栏
+        cv2.rectangle(frame, (0, h - 60), (w, h), (0, 0, 0), -1)
 
-        # Help text
-        help_text = "C:Connect  Space:Takeoff/Land  ESC:Exit  W/A/S/D/F/X:Keyboard"
-        cv2.putText(frame, help_text, (10, h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.colors['help'], 1)
+        # 帮助文本
+        help_lines = [
+            "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/X:键盘控制",
+            "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息"
+        ]
+
+        for i, line in enumerate(help_lines):
+            y_pos = h - 45 + i * 20
+            frame = self.draw_text(frame, line, (10, y_pos), size=14, color=self.colors['help'])
 
         return frame
 
     def draw_warning(self, frame, message):
-        """Draw warning message"""
+        """绘制警告信息"""
         h, w = frame.shape[:2]
 
-        # Draw warning at top
+        # 在顶部绘制警告
         warning_bg = np.zeros((40, w, 3), dtype=np.uint8)
-        warning_bg[:, :] = (0, 69, 255)  # Orange
+        warning_bg[:, :] = (0, 69, 255)  # 橙色
 
-        frame[100:140, 0:w] = cv2.addWeighted(
-            frame[100:140, 0:w], 0.3,
+        frame[120:160, 0:w] = cv2.addWeighted(
+            frame[120:160, 0:w], 0.3,
             warning_bg, 0.7, 0
         )
 
-        # Draw warning text
-        cv2.putText(frame, message, (10, 125),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, self.colors['warning'], 1)
+        # 绘制警告文本
+        frame = self.draw_text(frame, message, (10, 135),
+                               size=16, color=self.colors['warning'])
 
         return frame
 
 
-# ========== Performance Monitor ==========
+# ========== 性能监控器 ==========
 class PerformanceMonitor:
-    """Performance Monitor"""
+    """性能监控器"""
 
     def __init__(self):
         self.frame_times = deque(maxlen=60)
@@ -959,12 +1244,12 @@ class PerformanceMonitor:
         self.frame_count = 0
 
     def update(self):
-        """Update performance data"""
+        """更新性能数据"""
         current_time = time.time()
         self.frame_times.append(current_time)
         self.frame_count += 1
 
-        # Calculate FPS once per second
+        # 每秒计算一次FPS
         if current_time - self.last_update >= 1.0:
             if len(self.frame_times) > 1:
                 time_diff = self.frame_times[-1] - self.frame_times[0]
@@ -975,25 +1260,25 @@ class PerformanceMonitor:
             self.last_update = current_time
 
     def get_stats(self):
-        """Get performance statistics"""
+        """获取性能统计"""
         return {
             'fps': self.fps,
             'frame_count': self.frame_count
         }
 
 
-# ========== Main Program ==========
+# ========== 主程序 ==========
 def main():
-    """Main function"""
-    # Initialize components
-    print("Initializing components...")
+    """主函数"""
+    # 初始化组件
+    print("初始化组件...")
 
-    gesture_recognizer = RobustGestureRecognizer()
+    gesture_recognizer = ImprovedGestureRecognizer()
     drone_controller = SimpleDroneController(libs['airsim'])
-    ui_renderer = SimpleUIRenderer()
+    ui_renderer = ChineseUIRenderer()
     performance_monitor = PerformanceMonitor()
 
-    # Initialize camera
+    # 初始化摄像头
     cap = None
     try:
         cap = cv2.VideoCapture(0)
@@ -1002,50 +1287,51 @@ def main():
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.get('camera', 'height'))
             cap.set(cv2.CAP_PROP_FPS, config.get('camera', 'fps'))
 
-            # Get actual parameters
+            # 获取实际参数
             actual_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             actual_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             actual_fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-            print(f"✓ Camera initialized")
-            print(f"  Resolution: {actual_width}x{actual_height}")
-            print(f"  FPS: {actual_fps}")
+            print(f"✓ 摄像头已初始化")
+            print(f"  分辨率: {actual_width}x{actual_height}")
+            print(f"  帧率: {actual_fps}")
         else:
-            print("❌ Camera not available, using simulation mode")
+            print("❌ 摄像头不可用，使用模拟模式")
             cap = None
     except Exception as e:
-        print(f"⚠ Camera init failed: {e}")
+        print(f"⚠ 摄像头初始化失败: {e}")
         cap = None
 
-    # Display welcome message
+    # 显示欢迎信息
     print("\n" + "=" * 60)
-    print("Gesture Controlled Drone - Optimized Version")
+    print("手势控制无人机系统 - 手势识别优化版")
     print("=" * 60)
-    print("System Status:")
-    print(f"  Camera: {'Connected' if cap else 'Simulation Mode'}")
-    print(f"  Gesture Recognition: Pure OpenCV")
-    print(f"  AirSim: {'Available' if libs['airsim'] else 'Simulation Mode'}")
+    print("系统状态:")
+    print(f"  摄像头: {'已连接' if cap else '模拟模式'}")
+    print(f"  手势识别: 改进的OpenCV算法")
+    print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
     print("=" * 60)
 
-    # Display operation instructions
-    print("\nOperation Instructions:")
-    print("1. Press [C] to connect drone (AirSim simulator)")
-    print("2. Press [SPACE] to takeoff/land")
-    print("3. Gesture Control:")
-    print("   - Fist (0 fingers): Stop")
-    print("   - Index finger (1 finger): Forward")
-    print("   - Open hand (4-5 fingers): Control direction by hand position")
-    print("   * Gesture confidence > 60% to execute")
-    print("4. Keyboard Control:")
+    # 显示操作说明
+    print("\n操作说明:")
+    print("1. 按 [C] 连接无人机 (AirSim模拟器)")
+    print("2. 按 [空格键] 起飞/降落")
+    print("3. 手势控制改进:")
+    print("   - 握拳或握紧: Stop")
+    print("   - 单指指向: 根据指尖方向判断Up/Down/Left/Right")
+    print("   - 双指: Forward")
+    print("   - 手掌张开: 根据手的位置判断方向")
+    print("   * 手势识别置信度 > 50% 时才会执行")
+    print("4. 键盘控制:")
     print("   [W]Up [S]Down [A]Left [D]Right [F]Forward [X]Stop")
-    print("5. Press [H] to toggle help display")
-    print("6. Press [R] to reset gesture recognition")
-    print("7. Press [ESC] to exit safely")
+    print("5. 调试功能:")
+    print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
+    print("6. 按 [ESC] 安全退出")
     print("=" * 60)
-    print("Program started successfully!")
+    print("程序启动成功!")
     print("-" * 60)
 
-    # Keyboard gesture mapping
+    # 键盘手势映射
     key_to_gesture = {
         ord('w'): "Up", ord('W'): "Up",
         ord('s'): "Down", ord('S'): "Down",
@@ -1055,34 +1341,57 @@ def main():
         ord('x'): "Stop", ord('X'): "Stop",
     }
 
-    # Main loop
-    print("\nEntering main loop, press ESC to exit...")
+    # 显示模式
+    display_modes = ['normal', 'detailed', 'minimal']
+    current_display_mode = 0
+
+    # 主循环
+    print("\n进入主循环，按ESC退出...")
 
     try:
         while True:
-            # Update performance monitor
+            # 更新性能监控
             performance_monitor.update()
 
-            # Read camera frame
+            # 读取摄像头帧
             if cap:
                 ret, frame = cap.read()
                 if not ret:
-                    # Create blank frame
+                    # 创建空白帧
                     frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                    gesture, confidence = "Camera Error", 0.0
+                    gesture, confidence = "摄像头错误", 0.0
                 else:
-                    # Gesture recognition
+                    # 手势识别
                     gesture, confidence, frame = gesture_recognizer.recognize(frame)
             else:
-                # Simulation mode
+                # 模拟模式
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
                 gesture, confidence = gesture_recognizer.current_gesture, gesture_recognizer.current_confidence
 
-            # Get performance statistics
+            # 获取性能统计
             perf_stats = performance_monitor.get_stats()
             process_time = gesture_recognizer.get_performance_stats()
 
-            # Draw UI
+            # 根据显示模式调整显示选项
+            if display_modes[current_display_mode] == 'normal':
+                config.set('display', 'show_contours', value=True)
+                config.set('display', 'show_bbox', value=True)
+                config.set('display', 'show_fingertips', value=True)
+                config.set('display', 'show_debug_info', value=False)
+            elif display_modes[current_display_mode] == 'detailed':
+                config.set('display', 'show_contours', value=True)
+                config.set('display', 'show_bbox', value=True)
+                config.set('display', 'show_fingertips', value=True)
+                config.set('display', 'show_palm_center', value=True)
+                config.set('display', 'show_hand_direction', value=True)
+                config.set('display', 'show_debug_info', value=True)
+            elif display_modes[current_display_mode] == 'minimal':
+                config.set('display', 'show_contours', value=False)
+                config.set('display', 'show_bbox', value=True)
+                config.set('display', 'show_fingertips', value=False)
+                config.set('display', 'show_debug_info', value=False)
+
+            # 绘制UI
             frame = ui_renderer.draw_status_bar(
                 frame, drone_controller, gesture, confidence,
                 perf_stats['fps'], process_time
@@ -1090,27 +1399,26 @@ def main():
 
             frame = ui_renderer.draw_help_bar(frame)
 
-            # Show connection warning
+            # 显示连接提示
             if not drone_controller.connected:
-                warning_msg = "⚠ Press C to connect drone, or use simulation mode"
+                warning_msg = "⚠ 按C键连接无人机，或使用模拟模式"
                 frame = ui_renderer.draw_warning(frame, warning_msg)
 
-            # Show image
-            window_title = "Gesture Controlled Drone - Press ESC to exit"
-            cv2.imshow(window_title, frame)
+            # 显示图像（窗口标题用英文）
+            cv2.imshow('Gesture Controlled Drone - Optimized', frame)
 
-            # ========== Keyboard Control ==========
+            # ========== 键盘控制 ==========
             key = cv2.waitKey(1) & 0xFF
 
-            if key == 27:  # ESC key
-                print("\nExiting program...")
+            if key == 27:  # ESC键
+                print("\n退出程序...")
                 break
 
             elif key == ord('c') or key == ord('C'):
                 if not drone_controller.connected:
                     drone_controller.connect()
 
-            elif key == 32:  # Space key
+            elif key == 32:  # 空格键
                 if drone_controller.connected:
                     if drone_controller.flying:
                         drone_controller.land()
@@ -1119,30 +1427,31 @@ def main():
                     time.sleep(0.5)
 
             elif key == ord('h') or key == ord('H'):
-                # Toggle help display
+                # 切换帮助显示
                 current = config.get('display', 'show_help')
                 config.set('display', 'show_help', value=not current)
-                print(f"Help display: {'ON' if not current else 'OFF'}")
-
-            elif key == ord('f') or key == ord('F'):
-                # Toggle FPS display
-                current = config.get('display', 'show_fps')
-                config.set('display', 'show_fps', value=not current)
-                print(f"FPS display: {'ON' if not current else 'OFF'}")
+                print(f"帮助显示: {'开启' if not current else '关闭'}")
 
             elif key == ord('r') or key == ord('R'):
-                # Reset gesture recognition
-                print("Resetting gesture recognition...")
-                gesture_recognizer = RobustGestureRecognizer()
+                # 重置手势识别
+                print("重置手势识别...")
+                gesture_recognizer = ImprovedGestureRecognizer()
+                print("✓ 手势识别已重置")
 
             elif key == ord('t') or key == ord('T'):
-                # Toggle fingertip display
-                current = config.get('display', 'show_fingertips')
-                config.set('display', 'show_fingertips', value=not current)
-                print(f"Fingertip display: {'ON' if not current else 'OFF'}")
+                # 切换显示模式
+                current_display_mode = (current_display_mode + 1) % len(display_modes)
+                mode_name = display_modes[current_display_mode]
+                print(f"显示模式: {mode_name}")
+
+            elif key == ord('d') or key == ord('D'):
+                # 切换调试信息
+                current = config.get('display', 'show_debug_info')
+                config.set('display', 'show_debug_info', value=not current)
+                print(f"调试信息: {'开启' if not current else '关闭'}")
 
             elif key in key_to_gesture:
-                # Keyboard control
+                # 键盘控制
                 simulated_gesture = key_to_gesture[key]
                 gesture_recognizer.set_simulated_gesture(simulated_gesture)
                 gesture = simulated_gesture
@@ -1150,33 +1459,33 @@ def main():
                 if drone_controller.connected and drone_controller.flying:
                     drone_controller.move_by_gesture(gesture, confidence)
 
-            # Real gesture control
+            # 真实手势控制
             current_time = time.time()
             if (gesture and gesture != "Waiting" and
-                    gesture != "Camera Error" and gesture != "Error" and
+                    gesture != "摄像头错误" and gesture != "Error" and
                     drone_controller.connected and drone_controller.flying):
                 drone_controller.move_by_gesture(gesture, confidence)
 
     except KeyboardInterrupt:
-        print("\nProgram interrupted by user")
+        print("\n程序被用户中断")
     except Exception as e:
-        print(f"\nProgram error: {e}")
+        print(f"\n程序错误: {e}")
         traceback.print_exc()
     finally:
-        # Cleanup resources
-        print("\nCleaning up resources...")
+        # 清理资源
+        print("\n清理资源...")
         if cap:
             cap.release()
         cv2.destroyAllWindows()
         drone_controller.emergency_stop()
         config.save_config()
 
-        print("Program exited safely")
+        print("程序安全退出")
         print("=" * 60)
-        print("\nThank you for using Gesture Controlled Drone System!")
-        input("Press Enter to exit...")
+        print("\n感谢使用手势控制无人机系统!")
+        input("按回车键退出...")
 
 
-# ========== Program Entry Point ==========
+# ========== 程序入口 ==========
 if __name__ == "__main__":
     main()
