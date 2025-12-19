@@ -1,18 +1,17 @@
-# 虚拟环境
-venv/
-# 视频文件
-*.mp4
-*.avi
-*.mov
-# 结果目录
-lane_detection_results/
-# Python缓存
+# Python缓存（核心，解决缓存文件问题）
 __pycache__/
 *.pyc
-# 日志文件
-lane_detection.log
-# 构建目录
-src/openpilot_model/build/
-src/openpilot_model/log/
-# VS Code配置
+*.pyo
+*.pyd
+.pytest_cache/
+__pycache__/
+
+# 系统/编辑器缓存
+.DS_Store
+Thumbs.db
 .vscode/
+.idea/
+
+# 其他缓存（按需补充）
+*.log
+*.tmp
