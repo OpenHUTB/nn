@@ -26,6 +26,13 @@ LIDAR_PARAMS = {
     "elevation_max": 15,  # 最大俯仰角（°）
     "lines": 16,  # 线束数
 }
+# 空调参数
+AC_PARAMS = {
+    "target_temp": 22.0,  # 目标温度（摄氏度）
+    "temp_tolerance": 1.0,  # 温度容差
+    "min_temp": 15.0,  # 最低温度
+    "max_temp": 30.0,  # 最高温度
+}
 # 仿真帧数
 SIMULATION_FRAMES = 1000
 
@@ -47,6 +54,12 @@ class MojocoDataSim:
         self.data = mujoco.MjData(self.model)
         # 创建可视化窗口
         self.viewer = viewer.launch_passive(self.model, self.data)
+
+        # 初始化空调系统参数
+        self.car_temp = 22.0  # 初始车内温度
+        self.outside_temp = 25.0  # 外界温度
+        self.ac_power = 0.0  # 空调功率 (0.0 to 1.0)
+        self.ac_target_temp = AC_PARAMS["target_temp"]
 
         print("可视化窗口已启动")
         print("仿真将在3秒后开始...")
@@ -205,6 +218,65 @@ class MojocoDataSim:
 
         return detected_objects
 
+    def get_car_temperature(self):
+        """获取车内温度"""
+        # 在真实系统中，这将从温度传感器读取数据
+        # 在仿真中，我们模拟温度变化
+        
+        # 模拟温度变化基于以下因素：
+        # 1. 空调功率
+        # 2. 外界温度
+        # 3. 车辆运动（影响通风）
+        # 4. 时间流逝
+        
+        # 简化的温度模型
+        try:
+            # 获取车辆速度
+            vehicle_vel = self.data.qvel[:3]  # 获取车辆线速度
+            speed = np.linalg.norm(vehicle_vel)
+            
+            # 温度变化受以下因素影响：
+            # 1. 空调制冷效果（与空调功率成正比）
+            ac_effect = (self.ac_target_temp - self.car_temp) * self.ac_power * 0.1
+            
+            # 2. 外界温度影响（与温差和车速有关）
+            outside_influence = (self.outside_temp - self.car_temp) * (0.01 + speed * 0.005)
+            
+            # 3. 自然热平衡趋向
+            natural_balance = (20.0 - self.car_temp) * 0.005
+            
+            # 更新车内温度
+            temp_change = ac_effect + outside_influence + natural_balance
+            self.car_temp += temp_change
+            
+            # 限制温度范围
+            self.car_temp = np.clip(self.car_temp, AC_PARAMS["min_temp"], AC_PARAMS["max_temp"])
+            
+        except Exception as e:
+            # 如果出现异常，保持当前温度
+            pass
+            
+        return self.car_temp
+
+    def adjust_ac_system(self):
+        """根据车内温度自动调节空调系统"""
+        current_temp = self.get_car_temperature()
+        
+        # 根据目标温度和当前温度的差异调整空调功率
+        temp_diff = self.ac_target_temp - current_temp
+        
+        if abs(temp_diff) <= AC_PARAMS["temp_tolerance"]:
+            # 温度在舒适范围内，降低空调功率
+            self.ac_power = max(0.0, self.ac_power - 0.05)
+        elif temp_diff > 0:
+            # 车内温度低于目标温度，减少制冷或加热
+            self.ac_power = max(0.0, self.ac_power - 0.02)
+        else:
+            # 车内温度高于目标温度，增加制冷
+            self.ac_power = min(1.0, self.ac_power + 0.05)
+            
+        return current_temp, self.ac_power
+
     def calculate_avoidance_control(self, lidar_data, detected_objects):
         """基于传感器数据计算避障控制指令"""
         # 初始化控制指令
@@ -256,6 +328,11 @@ class MojocoDataSim:
         # 保存LiDAR点云（NPY格式）
         np.save(f"{self.output_dir}/lidar/frame_{self.frame_count:04d}.npy", lidar_data)
         print(f"已保存点云数据: frame_{self.frame_count:04d}.npy (共{len(lidar_data)}个点)")
+
+        # 添加温度信息到标注数据
+        annotations["car_temperature"] = float(self.get_car_temperature())
+        annotations["ac_power"] = float(self.ac_power)
+        annotations["outside_temperature"] = float(self.outside_temp)
 
         # 保存标注数据（JSON格式）
         with open(f"{self.output_dir}/annotations/frame_{self.frame_count:04d}.json", "w") as f:
@@ -413,6 +490,9 @@ class MojocoDataSim:
                 # 生成传感器数据和标注
                 lidar_data = self.generate_realistic_lidar_data()
                 annotations = self.generate_annotations()
+                
+                # 获取并调节空调系统
+                current_temp, ac_power = self.adjust_ac_system()
 
                 # 基于传感器数据计算控制指令
                 left_speed, right_speed, steering_angle = self.calculate_avoidance_control(
@@ -431,6 +511,9 @@ class MojocoDataSim:
                     else:
                         print("未检测到附近物体")
                     prev_detected_count = detected_count
+
+                # 显示温度信息
+                print(f"车内温度: {current_temp:.1f}°C, 空调功率: {ac_power:.2f}")
 
                 # 保存数据
                 self.save_data(lidar_data, annotations)

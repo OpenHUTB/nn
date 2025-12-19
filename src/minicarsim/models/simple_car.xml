@@ -60,6 +60,9 @@
 
       <!-- Camera sensor -->
       <site name="camera_site" pos="1.2 0 0.7" type="sphere" size="0.05"/>
+      
+      <!-- Temperature sensor (inside the car) -->
+      <site name="temperature_sensor" pos="0 0 0.1" type="sphere" size="0.05"/>
     </body>
 
     <!-- More obstacles for object detection -->
@@ -98,5 +101,8 @@
     <!-- Accelerometer and Gyro for IMU data -->
     <accelerometer name="accelerometer" site="lidar_site"/>
     <gyro name="gyro" site="lidar_site"/>
+    
+    <!-- Temperature sensor -->
+    <touch name="temperature_sensor" site="temperature_sensor"/>
   </sensor>
 </mujoco>
