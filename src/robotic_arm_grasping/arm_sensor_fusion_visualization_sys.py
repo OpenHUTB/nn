@@ -1,8 +1,4 @@
 """
-精简版传感器融合与状态估计可视化系统 - 修复版
-Author: AI Assistant
-Date: 2024
-"""
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import signal
