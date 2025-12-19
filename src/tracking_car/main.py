@@ -10,6 +10,8 @@ import argparse
 import cv2
 import numpy as np
 import carla
+import torch
+import queue
 
 # 添加当前目录到路径，确保可以导入模块
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -180,10 +182,10 @@ def set_weather(world, weather_name):
         logger.warning(f"未知天气: {weather_name}, 使用晴天")
 
 
-# ======================== 可视化 ========================
+# ======================== 可视化（增强版） ========================
 
 class Visualizer:
-    """可视化管理器"""
+    """可视化管理器（增强版：彩色ID编码）"""
     
     def __init__(self, config):
         self.config = config
@@ -195,27 +197,135 @@ class Visualizer:
                         config.get('window_width', 1280), 
                         config.get('window_height', 720))
         
-        # 颜色映射
-        self.colors = {
-            'car': (255, 0, 0),      # 蓝色
-            'bus': (0, 255, 0),      # 绿色
-            'truck': (0, 0, 255),    # 红色
-            'default': (255, 255, 0) # 青色
+        # 车辆类别颜色映射
+        self.class_colors = {
+            'car': (255, 0, 0),      # 蓝色 - 小汽车
+            'bus': (0, 255, 0),      # 绿色 - 公交车
+            'truck': (0, 0, 255),    # 红色 - 卡车
+            'default': (255, 255, 0) # 青色 - 默认
         }
         
-        # 行为颜色
+        # 行为状态颜色映射（优先级从高到低）
         self.behavior_colors = {
-            'stopped': (0, 255, 255),    # 黄色
-            'overtaking': (255, 0, 255), # 紫色
-            'dangerous': (0, 0, 255),    # 红色
-            'normal': (0, 255, 0)        # 绿色
+            'dangerous': (0, 0, 255),      # 红色 - 危险（距离过近）
+            'stopped': (0, 255, 255),      # 黄色 - 停车
+            'overtaking': (255, 0, 255),   # 紫色 - 超车
+            'lane_changing': (0, 255, 255), # 青色 - 变道
+            'turning': (0, 255, 255),      # 青色 - 转弯
+            'accelerating': (255, 0, 0),   # 蓝色 - 加速
+            'braking': (0, 165, 255),      # 橙色 - 刹车
+            'normal': (0, 255, 0)          # 绿色 - 正常行驶
         }
         
-        logger.info("✅ 可视化器初始化完成")
+        # 行为状态图标映射
+        self.behavior_icons = {
+            'dangerous': '⚠',    # 警告
+            'stopped': '🛑',     # 停止
+            'overtaking': '💨',  # 超车
+            'lane_changing': '↔', # 变道
+            'turning': '↪',      # 转弯
+            'accelerating': '🚀', # 加速
+            'braking': '🛑',     # 刹车
+            'normal': '→'        # 正常
+        }
+        
+        logger.info("✅ 可视化器初始化完成（彩色ID编码版）")
+    
+    def _get_behavior_color(self, track_info):
+        """
+        根据行为状态返回对应颜色
+        
+        Args:
+            track_info: 跟踪目标信息字典
+            
+        Returns:
+            tuple: BGR颜色值
+        """
+        if not track_info:
+            return self.behavior_colors['normal']
+        
+        # 优先级：危险 > 停车 > 超车 > 变道/转弯 > 加速/刹车 > 正常
+        if track_info.get('is_dangerous', False):
+            return self.behavior_colors['dangerous']
+        elif track_info.get('is_stopped', False):
+            return self.behavior_colors['stopped']
+        elif track_info.get('is_overtaking', False):
+            return self.behavior_colors['overtaking']
+        elif track_info.get('is_lane_changing', False):
+            return self.behavior_colors['lane_changing']
+        elif track_info.get('is_turning', False):
+            return self.behavior_colors['turning']
+        elif track_info.get('is_accelerating', False):
+            return self.behavior_colors['accelerating']
+        elif track_info.get('is_braking', False):
+            return self.behavior_colors['braking']
+        else:
+            return self.behavior_colors['normal']
+    
+    def _get_behavior_icon(self, track_info):
+        """
+        根据行为状态返回对应图标
+        
+        Args:
+            track_info: 跟踪目标信息字典
+            
+        Returns:
+            str: 行为图标
+        """
+        if not track_info:
+            return self.behavior_icons['normal']
+        
+        # 优先级：危险 > 停车 > 超车 > 变道/转弯 > 加速/刹车 > 正常
+        if track_info.get('is_dangerous', False):
+            return self.behavior_icons['dangerous']
+        elif track_info.get('is_stopped', False):
+            return self.behavior_icons['stopped']
+        elif track_info.get('is_overtaking', False):
+            return self.behavior_icons['overtaking']
+        elif track_info.get('is_lane_changing', False):
+            return self.behavior_icons['lane_changing']
+        elif track_info.get('is_turning', False):
+            return self.behavior_icons['turning']
+        elif track_info.get('is_accelerating', False):
+            return self.behavior_icons['accelerating']
+        elif track_info.get('is_braking', False):
+            return self.behavior_icons['braking']
+        else:
+            return self.behavior_icons['normal']
+    
+    def _get_class_name(self, class_id):
+        """
+        根据类别ID获取类别名称
+        
+        Args:
+            class_id: 类别ID
+            
+        Returns:
+            str: 类别名称
+        """
+        class_map = {
+            2: 'car',
+            5: 'bus',
+            7: 'truck',
+        }
+        return class_map.get(int(class_id), 'default')
+    
+    def _adjust_color_brightness(self, color, factor):
+        """
+        调整颜色亮度
+        
+        Args:
+            color: 原始颜色 (B, G, R)
+            factor: 亮度因子 (0.0-1.0)
+            
+        Returns:
+            tuple: 调整后的颜色
+        """
+        return tuple(int(c * factor) for c in color)
     
     def draw_detections(self, image, boxes, ids, classes, tracks_info=None):
         """
-        绘制检测和跟踪结果
+        绘制检测和跟踪结果（彩色ID编码版）
         
         Args:
             image: 原始图像
@@ -244,51 +354,114 @@ class Visualizer:
                 if x1 >= x2 or y1 >= y2:
                     continue
                 
-                # 根据类别选择颜色
-                class_name = self._get_class_name(class_id)
-                color = self.colors.get(class_name, self.colors['default'])
-                
-                # 绘制边界框
-                cv2.rectangle(result, (x1, y1), (x2, y2), color, 2)
-                
-                # 绘制ID标签背景
-                id_text = f"ID:{track_id}"
-                (text_width, text_height), _ = cv2.getTextSize(id_text, 
-                                                              cv2.FONT_HERSHEY_SIMPLEX, 
-                                                              0.5, 1)
-                
-                cv2.rectangle(result, (x1, y1 - text_height - 5),
-                            (x1 + text_width + 5, y1), color, -1)
-                
-                # 绘制ID文本
-                cv2.putText(result, id_text, (x1 + 3, y1 - 5),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                
-                # 如果有详细信息，绘制行为状态
+                # 获取当前目标的详细信息
+                track_info = None
                 if tracks_info and i < len(tracks_info):
                     track_info = tracks_info[i]
-                    behavior = track_info.get('behavior', 'normal')
+                
+                # 根据行为状态选择颜色
+                behavior_color = self._get_behavior_color(track_info)
+                
+                # 根据车辆类别选择基础颜色
+                class_name = self._get_class_name(class_id)
+                class_color = self.class_colors.get(class_name, self.class_colors['default'])
+                
+                # 融合颜色：70%行为颜色 + 30%类别颜色
+                color = tuple(
+                    int(behavior_color[j] * 0.7 + class_color[j] * 0.3)
+                    for j in range(3)
+                )
+                
+                # 绘制渐变色边框（外深内浅）
+                border_width = 3
+                for thickness in range(border_width, 0, -1):
+                    # 计算当前层的颜色亮度
+                    brightness = 0.3 + 0.7 * (thickness / border_width)
+                    layer_color = self._adjust_color_brightness(color, brightness)
+                    
+                    # 绘制边框层
+                    offset = border_width - thickness
+                    cv2.rectangle(result, 
+                                (x1 - offset, y1 - offset), 
+                                (x2 + offset, y2 + offset), 
+                                layer_color, 
+                                1)
+                
+                # 绘制ID标签背景（使用行为颜色）
+                id_text = f"ID:{track_id}"
+                (text_width, text_height), baseline = cv2.getTextSize(
+                    id_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+                )
+                
+                # 标签背景
+                label_bg_top = y1 - text_height - 8
+                label_bg_bottom = y1
+                label_bg_right = x1 + text_width + 8
+                
+                cv2.rectangle(result, 
+                            (x1, label_bg_top),
+                            (label_bg_right, label_bg_bottom), 
+                            behavior_color, -1)
+                
+                # 标签边框
+                cv2.rectangle(result, 
+                            (x1, label_bg_top),
+                            (label_bg_right, label_bg_bottom), 
+                            (255, 255, 255), 1)
+                
+                # 绘制ID文本
+                cv2.putText(result, id_text, 
+                          (x1 + 4, y1 - 4),
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                
+                # 绘制行为图标（如果可用）
+                if track_info:
+                    # 获取行为图标
+                    behavior_icon = self._get_behavior_icon(track_info)
                     
                     # 在右上角绘制行为状态
-                    behavior_text = f"{behavior}"
-                    (bw, bh), _ = cv2.getTextSize(behavior_text, 
-                                                 cv2.FONT_HERSHEY_SIMPLEX, 
-                                                 0.4, 1)
+                    behavior_text = behavior_icon
+                    (icon_width, icon_height), _ = cv2.getTextSize(
+                        behavior_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                    )
                     
-                    # 选择行为颜色
-                    if '停车' in behavior:
-                        bcolor = self.behavior_colors['stopped']
-                    elif '超车' in behavior:
-                        bcolor = self.behavior_colors['overtaking']
-                    elif '危险' in behavior:
-                        bcolor = self.behavior_colors['dangerous']
-                    else:
-                        bcolor = self.behavior_colors['normal']
+                    # 图标位置（右上角）
+                    icon_x = x2 - icon_width - 5
+                    icon_y = y1 + icon_height + 5
                     
-                    cv2.rectangle(result, (x2 - bw - 5, y1),
-                                (x2, y1 + bh + 5), bcolor, -1)
-                    cv2.putText(result, behavior_text, (x2 - bw - 3, y1 + bh),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                    # 绘制图标背景
+                    cv2.rectangle(result,
+                                (icon_x - 3, icon_y - icon_height - 3),
+                                (icon_x + icon_width + 3, icon_y + 3),
+                                behavior_color, -1)
+                    
+                    # 绘制图标
+                    cv2.putText(result, behavior_text,
+                              (icon_x, icon_y),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    
+                    # 绘制速度信息（如果可用）
+                    if 'speed' in track_info:
+                        speed = track_info['speed']
+                        speed_text = f"{speed:.1f}m/s"
+                        (speed_width, speed_height), _ = cv2.getTextSize(
+                            speed_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1
+                        )
+                        
+                        # 速度显示在左下角
+                        speed_x = x1 + 5
+                        speed_y = y2 - 5
+                        
+                        # 速度背景
+                        cv2.rectangle(result,
+                                    (speed_x - 2, speed_y - speed_height - 2),
+                                    (speed_x + speed_width + 2, speed_y + 2),
+                                    (0, 0, 0), -1)
+                        
+                        # 速度文本
+                        cv2.putText(result, speed_text,
+                                  (speed_x, speed_y),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
                 
             except Exception as e:
                 logger.debug(f"绘制边界框时出错: {e}")
@@ -300,37 +473,118 @@ class Visualizer:
         """绘制信息面板"""
         h, w = image.shape[:2]
         
-        # 信息面板背景
-        panel_height = 60
-        cv2.rectangle(image, (0, 0), (w, panel_height), (0, 0, 0), -1)
+        # 信息面板背景（半透明黑色）
+        panel_height = 80
+        overlay = image.copy()
+        cv2.rectangle(overlay, (0, 0), (w, panel_height), (0, 0, 0), -1)
+        image = cv2.addWeighted(overlay, 0.7, image, 0.3, 0)
         
-        # FPS信息（需要从外部传入）
-        fps_text = "FPS: --"
+        # 标题
+        title = "🚗 CARLA 多目标跟踪系统"
+        cv2.putText(image, title, (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
         
-        # 跟踪信息
-        info_lines = [
-            f"CARLA Object Tracking",
-            f"跟踪目标: {track_count} | {fps_text}",
-            f"按 ESC 退出 | 按 W 切换天气"
+        # 状态信息
+        status_lines = [
+            f"跟踪目标: {track_count}",
+            f"按 ESC 退出 | 按 W 切换天气 | 按 S 保存截图",
+            f"按 P 暂停 | 按 M 显示/隐藏颜色说明"
         ]
         
-        # 绘制信息
+        # 绘制状态信息
         font = cv2.FONT_HERSHEY_SIMPLEX
-        for i, line in enumerate(info_lines):
-            y_pos = 25 + i * 20
+        for i, line in enumerate(status_lines):
+            y_pos = 55 + i * 20
             cv2.putText(image, line, (10, y_pos), 
-                       font, 0.6, (0, 255, 0), 1)
+                       font, 0.5, (255, 255, 255), 1)
         
         return image
     
-    def _get_class_name(self, class_id):
-        """根据类别ID获取类别名称"""
-        class_map = {
-            2: 'car',
-            5: 'bus',
-            7: 'truck',
-        }
-        return class_map.get(int(class_id), 'default')
+    def draw_color_legend(self, image):
+        """
+        绘制颜色说明图例
+        
+        Args:
+            image: 原始图像
+            
+        Returns:
+            np.ndarray: 添加了图例的图像
+        """
+        h, w = image.shape[:2]
+        
+        # 图例背景（右侧半透明）
+        legend_width = 200
+        legend_height = 300
+        legend_x = w - legend_width - 20
+        legend_y = 100
+        
+        overlay = image.copy()
+        cv2.rectangle(overlay, 
+                     (legend_x, legend_y),
+                     (legend_x + legend_width, legend_y + legend_height),
+                     (40, 40, 40), -1)
+        image = cv2.addWeighted(overlay, 0.8, image, 0.2, 0)
+        
+        # 图例标题
+        cv2.putText(image, "颜色说明", (legend_x + 10, legend_y + 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        # 行为状态颜色说明
+        behaviors = [
+            ('dangerous', '危险', '⚠'),
+            ('stopped', '停车', '🛑'),
+            ('overtaking', '超车', '💨'),
+            ('lane_changing', '变道', '↔'),
+            ('accelerating', '加速', '🚀'),
+            ('braking', '刹车', '🛑'),
+            ('normal', '正常', '→')
+        ]
+        
+        y_offset = 60
+        for behavior_key, behavior_name, icon in behaviors:
+            # 颜色方块
+            color = self.behavior_colors.get(behavior_key, (255, 255, 255))
+            cv2.rectangle(image,
+                         (legend_x + 10, legend_y + y_offset),
+                         (legend_x + 30, legend_y + y_offset + 15),
+                         color, -1)
+            
+            # 行为名称
+            text = f"{icon} {behavior_name}"
+            cv2.putText(image, text,
+                       (legend_x + 40, legend_y + y_offset + 12),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            y_offset += 25
+        
+        # 车辆类别说明
+        cv2.putText(image, "车辆类别:", (legend_x + 10, legend_y + y_offset + 20),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        classes = [
+            ('car', '小汽车', '🚗'),
+            ('bus', '公交车', '🚌'),
+            ('truck', '卡车', '🚚')
+        ]
+        
+        y_offset += 40
+        for class_key, class_name, icon in classes:
+            # 颜色方块
+            color = self.class_colors.get(class_key, (255, 255, 255))
+            cv2.rectangle(image,
+                         (legend_x + 10, legend_y + y_offset),
+                         (legend_x + 30, legend_y + y_offset + 15),
+                         color, -1)
+            
+            # 类别名称
+            text = f"{icon} {class_name}"
+            cv2.putText(image, text,
+                       (legend_x + 40, legend_y + y_offset + 12),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            y_offset += 25
+        
+        return image
     
     def show(self, image, wait_key=1):
         """
@@ -376,13 +630,14 @@ class CarlaTrackingSystem:
         # 状态变量
         self.current_weather = config.get('weather', 'clear')
         self.frame_count = 0
+        self.show_legend = True  # 是否显示颜色说明
         
         # 检测线程相关
         self.detection_thread = None
         self.image_queue = None
         self.result_queue = None
         
-        logger.info("✅ 跟踪系统初始化完成")
+        logger.info("✅ 跟踪系统初始化完成（彩色ID编码版）")
     
     def initialize(self):
         """初始化系统"""
@@ -391,60 +646,60 @@ class CarlaTrackingSystem:
             self.client, self.world = setup_carla_client(self.config)
             if not self.client or not self.world:
                 return False
-        
+            
             # 等待CARLA世界稳定
             logger.info("等待CARLA世界稳定...")
             for i in range(10):
                 self.world.tick()
                 time.sleep(0.1)
-        
+            
             # 2. 设置天气
             set_weather(self.world, self.current_weather)
-        
+            
             # 3. 清理现有的车辆
             logger.info("清理现有车辆...")
             sensors.clear_all_actors(self.world, [])
             time.sleep(1.0)
-        
+            
             # 4. 创建自车
             self.ego_vehicle = sensors.create_ego_vehicle(self.world, self.config)
             if not self.ego_vehicle:
                 logger.error("❌ 创建自车失败")
                 return False
-        
+            
             # 等待自车稳定
             time.sleep(0.5)
-        
+            
             # 5. 生成NPC车辆
             npc_count = sensors.spawn_npc_vehicles(self.world, self.config)
             logger.info(f"✅ 生成 {npc_count} 个NPC车辆")
-        
+            
             # 等待NPC车辆生成
             time.sleep(0.5)
-        
+            
             # 6. 初始化传感器
             self.sensor_manager = sensors.SensorManager(self.world, self.ego_vehicle, self.config)
             if not self.sensor_manager.setup():
                 logger.error("❌ 传感器初始化失败")
                 return False
-        
+            
             # 7. 初始化检测器
             self.detector = tracker.YOLODetector(self.config)
-        
+            
             # 8. 初始化跟踪器
             self.tracker = tracker.SORTTracker(self.config)
-        
+            
             # 9. 初始化可视化器
             self.visualizer = Visualizer(self.config)
-        
-            # 10. 设置检测线程（如果需要异步检测）
+            
+            # 10. 设置检测线程
             use_async = self.config.get('use_async_detection', True)
             if use_async:
                 self._setup_detection_thread()
-        
+            
             logger.info("🎉 系统初始化完成，准备开始跟踪")
             return True
-        
+            
         except Exception as e:
             logger.error(f"❌ 系统初始化失败: {e}")
             import traceback
@@ -453,8 +708,8 @@ class CarlaTrackingSystem:
     
     def _setup_detection_thread(self):
         """设置检测线程"""
-        import queue
         try:
+            import queue
             self.image_queue = queue.Queue(maxsize=2)
             self.result_queue = queue.Queue(maxsize=2)
             
@@ -474,6 +729,7 @@ class CarlaTrackingSystem:
         """运行主循环"""
         import time
         import queue
+        
         if not self.initialize():
             logger.error("❌ 系统初始化失败，无法运行")
             return
@@ -551,6 +807,10 @@ class CarlaTrackingSystem:
                     tracks_info=tracks_info
                 )
                 
+                # 添加颜色说明图例（如果启用）
+                if self.show_legend:
+                    result_image = self.visualizer.draw_color_legend(result_image)
+                
                 # 在图像上显示FPS
                 if utils.valid_img(result_image):
                     fps_text = f"FPS: {fps:.1f}"
@@ -578,6 +838,8 @@ class CarlaTrackingSystem:
             logger.info("🛑 用户中断程序")
         except Exception as e:
             logger.error(f"❌ 运行错误: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             self.cleanup()
     
@@ -606,10 +868,16 @@ class CarlaTrackingSystem:
             logger.info("⏸️  程序暂停，按任意键继续...")
             cv2.waitKey(0)
             logger.info("▶️  程序继续")
+        
+        # M键切换颜色说明显示
+        elif key == ord('m') or key == ord('M'):
+            self.show_legend = not self.show_legend
+            status = "显示" if self.show_legend else "隐藏"
+            logger.info(f"🎨 颜色说明图例: {status}")
     
     def _control_frame_rate(self, current_fps):
         """控制帧率"""
-        import time  # 确保time模块可用
+        import time
         target_fps = self.config.get('display_fps', 30)
         if target_fps <= 0:
             return
@@ -624,6 +892,7 @@ class CarlaTrackingSystem:
     def _save_screenshot(self):
         """保存截图"""
         try:
+            import time
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             filename = f"screenshot_{timestamp}_{self.frame_count:06d}.png"
             
@@ -641,22 +910,41 @@ class CarlaTrackingSystem:
         tracks_info = self.tracker.get_tracks_info()
         
         # 统计行为类型
-        behaviors = {'stopped': 0, 'overtaking': 0, 'dangerous': 0}
+        behaviors = {
+            'stopped': 0, 
+            'overtaking': 0, 
+            'lane_changing': 0,
+            'turning': 0,
+            'accelerating': 0,
+            'braking': 0,
+            'dangerous': 0,
+            'normal': 0
+        }
+        
         for track in tracks_info:
-            behavior = track.get('behavior', '')
-            if '停车' in behavior:
-                behaviors['stopped'] += 1
-            if '超车' in behavior:
-                behaviors['overtaking'] += 1
-            if '危险' in behavior:
+            if track.get('is_dangerous', False):
                 behaviors['dangerous'] += 1
+            elif track.get('is_stopped', False):
+                behaviors['stopped'] += 1
+            elif track.get('is_overtaking', False):
+                behaviors['overtaking'] += 1
+            elif track.get('is_lane_changing', False):
+                behaviors['lane_changing'] += 1
+            elif track.get('is_turning', False):
+                behaviors['turning'] += 1
+            elif track.get('is_accelerating', False):
+                behaviors['accelerating'] += 1
+            elif track.get('is_braking', False):
+                behaviors['braking'] += 1
+            else:
+                behaviors['normal'] += 1
         
         logger.info(f"📊 状态: 帧数={self.frame_count}, "
                    f"FPS={stats['avg_fps']:.1f}, "
                    f"目标数={len(tracks_info)}, "
+                   f"危险={behaviors['dangerous']}, "
                    f"停车={behaviors['stopped']}, "
-                   f"超车={behaviors['overtaking']}, "
-                   f"危险={behaviors['dangerous']}")
+                   f"超车={behaviors['overtaking']}")
     
     def cleanup(self):
         """清理资源"""
@@ -727,7 +1015,7 @@ def main():
     # 记录开始时间
     start_time = time.time()
     logger.info("=" * 50)
-    logger.info("🚗 CARLA多目标跟踪系统启动")
+    logger.info("🚗 CARLA多目标跟踪系统启动（彩色ID编码版）")
     logger.info("=" * 50)
     
     try:
