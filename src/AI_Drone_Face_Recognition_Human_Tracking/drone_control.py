@@ -1,4 +1,4 @@
-"""无人机控制模块"""
+'''无人机控制模块'''
 import pyvista as pv
 import pygame
 import numpy as np
@@ -28,6 +28,10 @@ class VirtualDrone:
         self.battery = 100.0  # 电量（%）
         self.max_height = 10.0  # 最大飞行高度（m）
         self.min_height = 0.0  # 最小高度（m）
+
+    def get_battery(self):
+        """新增：获取当前电量（适配主程序调用）"""
+        return self.battery
 
     def takeoff(self):
         """起飞（仅落地状态可执行）"""
@@ -116,6 +120,15 @@ class VirtualDrone:
             self.yaw -= 10.0  # 右转10°
         self.yaw %= 360  # 限制在0-360°
         print(f"🔄 旋转 {direction} | 偏航角: {self.yaw:.0f}°")
+
+    # 可选：补充主程序可能用到的扩展方法
+    def get_position(self):
+        """获取当前位置（方便主程序调用）"""
+        return self.position
+
+    def get_state(self):
+        """获取当前状态（返回字符串，适配主程序）"""
+        return self.state.value
 
 
 # ===================== 3D可视化+交互控制 =====================
