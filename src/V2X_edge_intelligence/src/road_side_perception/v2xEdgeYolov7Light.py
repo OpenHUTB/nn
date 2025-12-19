@@ -3,7 +3,7 @@ import torch.nn as nn
 from yolov7.models.yolo import Model
 
 
-
+# 车路协同V2X通信功能升级
 class V2xEdgeYolov7Light(nn.Module):
     def __init__(self):
         super().__init__()
