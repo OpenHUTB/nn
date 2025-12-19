@@ -783,26 +783,23 @@ class StablePatrolController:
 
 
 if __name__ == "__main__":
-    # Set default model path
+
     model_file = "Robot_move_straight.xml"
 
-    # Check command line argument
+
     if len(sys.argv) > 1:
         model_file = sys.argv[1]
 
-    # Check if model file exists
     if not os.path.exists(model_file):
         print(f"❌ Model file not found: {model_file}")
         print(f"ℹ️  Current working directory: {os.getcwd()}")
         sys.exit(1)
 
-    # Initialize and run controller
     try:
         controller = StablePatrolController(model_file)
         controller.run_simulation()
     except Exception as e:
         print(f"\n❌ Failed to start simulation: {e}")
         import traceback
-
         traceback.print_exc()
         sys.exit(1)
