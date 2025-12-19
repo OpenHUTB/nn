@@ -153,17 +153,18 @@ class EnhancedGestureDetector:
         return landmarks
 
     def detect_gestures(self, image, simulation_mode=False):
-        """检测手势"""
+        """检测手势（支持中文显示）"""
+        # 转换为RGB
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.hands.process(image_rgb)
 
-        gesture = "none"  # 默认none
+        gesture = "none"
         confidence = 0.0
         landmarks_data = None
 
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
-                # 绘制手部关键点
+                # 绘制手部关键点（使用OpenCV绘制）
                 self.mp_drawing.draw_landmarks(
                     image,
                     hand_landmarks,
@@ -172,10 +173,10 @@ class EnhancedGestureDetector:
                     self.mp_drawing_styles.get_default_hand_connections_style()
                 )
 
-                # 提取关键点
+                # 提取关键点用于机器学习
                 landmarks = self.extract_landmarks_for_ml(hand_landmarks)
 
-                # 使用机器学习或规则检测
+                # 手势识别逻辑
                 if self.use_ml and self.ml_classifier and len(landmarks) == 63:
                     # 机器学习预测
                     gesture, confidence = self.ml_classifier.predict(landmarks)
@@ -197,26 +198,73 @@ class EnhancedGestureDetector:
                             if matching_confs:
                                 confidence = np.mean(matching_confs)
                 else:
-                    # 如果未使用ML，使用简单的规则检测
+                    # 备用：规则检测
                     gesture, confidence = self._classify_by_rules(hand_landmarks)
 
-                # 显示信息
-                ml_info = " (ML)" if self.use_ml else " (规则)"
-                cv2.putText(image, f"Gesture: {gesture}{ml_info}", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                cv2.putText(image, f"Confidence: {confidence:.2f}", (10, 70),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                # 使用PIL绘制中文文本
+                try:
+                    # 将OpenCV图像转换为PIL图像
+                    image_rgb_for_pil = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                    image_pil = Image.fromarray(image_rgb_for_pil)
+                    draw = ImageDraw.Draw(image_pil)
 
-                command = self.gesture_commands.get(gesture, "none")
-                cv2.putText(image, f"Command: {command}", (10, 110),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    # 设置字体
+                    if self.chinese_font:
+                        font = self.chinese_font
+                    else:
+                        # 如果中文字体不可用，使用默认字体
+                        font = ImageFont.load_default()
+                        print("⚠️ 使用默认字体，中文可能显示为方块")
+
+                    # 绘制手势信息
+                    chinese_gesture = self.chinese_gesture_names.get(gesture, gesture)
+                    ml_info = " (训练模型)" if self.use_ml else " (规则)"
+                    text = f"手势: {chinese_gesture}{ml_info}"
+                    draw.text((10, 30), text, fill=(0, 255, 0), font=font)
+
+                    # 绘制置信度
+                    draw.text((10, 70), f"置信度: {confidence:.2f}", fill=(0, 255, 0), font=font)
+
+                    # 绘制指令
+                    command = self.gesture_commands.get(gesture, "none")
+                    chinese_command = self.chinese_command_names.get(command, command)
+                    draw.text((10, 110), f"指令: {chinese_command}", fill=(255, 0, 0), font=font)
+
+                    # 将PIL图像转换回OpenCV格式
+                    image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+
+                except Exception as e:
+                    print(f"PIL绘制失败，回退到OpenCV英文显示: {e}")
+                    # 回退到英文显示
+                    ml_info = " (ML)" if self.use_ml else " (Rule)"
+                    cv2.putText(image, f"Gesture: {gesture}{ml_info}", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    cv2.putText(image, f"Confidence: {confidence:.2f}", (10, 70),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    cv2.putText(image, f"Command: {command}", (10, 110),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
         else:
-            # 无手部检测
-            cv2.putText(image, "未检测到手部", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-            gesture = "none"
-            confidence = 0.0
+            # 没有检测到手部时也使用PIL绘制
+            try:
+                image_rgb_for_pil = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                image_pil = Image.fromarray(image_rgb_for_pil)
+                draw = ImageDraw.Draw(image_pil)
+
+                if self.chinese_font:
+                    font = self.chinese_font
+                else:
+                    font = ImageFont.load_default()
+
+                draw.text((10, 30), "未检测到手部", fill=(0, 0, 255), font=font)
+
+                # 转换回OpenCV格式
+                image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
+
+            except Exception as e:
+                print(f"PIL绘制失败: {e}")
+                cv2.putText(image, "No Hand Detected", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         return image, gesture, confidence, landmarks_data
 
