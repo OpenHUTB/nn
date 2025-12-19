@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 主程序 - 简化版
@@ -134,8 +133,8 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
         print("未找到车辆")
         return False
     
-    # 设置俯视视角
-    tracker.set_top_down_view(ego_vehicle)
+    # 设置后方跟随视角（启动独立线程）
+    tracker.set_follow_view(ego_vehicle)
     
     # 绘制路线
     if hasattr(env, 'path') and env.path:
@@ -145,7 +144,7 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
             route_points.append((location.x, location.y, location.z))
         visualizer.draw_planned_route(route_points)
     
-    # 运行循环
+    # 运行循环 - 不再在主循环中更新视角
     step_count = 0
     done = False
     fps_counter = deque(maxlen=30)
@@ -154,8 +153,8 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
         step_count += 1
         step_start = time.time()
         
-        # 每步都更新视角
-        tracker.smooth_follow_vehicle(ego_vehicle)
+        # 注意：不再调用 tracker.smooth_follow_vehicle(ego_vehicle)
+        # 视角更新由独立线程处理
         
         # 更新车辆显示
         vehicle_state = tracker.get_vehicle_state(ego_vehicle)
@@ -182,11 +181,15 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
         
         if cfg.DEBUG_MODE and step_count % 50 == 0:
             fps = len(fps_counter) / sum(fps_counter) if fps_counter else 0
-            print(f"步骤 {step_count}, FPS: {fps:.1f}, 动作: {cfg.ACTION_NAMES[action]}")
+            vehicle_speed = vehicle_state.get('speed_2d', 0) if vehicle_state else 0
+            print(f"步骤 {step_count}, FPS: {fps:.1f}, 速度: {vehicle_speed:.1f}m/s, 动作: {cfg.ACTION_NAMES[action]}")
         
         if done:
             print(f"Episode {episode_num} 完成，步数: {step_count}")
             break
+    
+    # 清理跟踪器资源
+    tracker.cleanup()
     
     return True
 
@@ -199,19 +202,22 @@ def main():
     
     env, traffic_mgr, visualizer, tracker, trajectory = result
     
-    # 运行episode
-    for episode in range(cfg.TOTAL_EPISODES):
-        success = run_episode(env, traffic_mgr, visualizer, tracker, episode + 1)
-        
-        if episode < cfg.TOTAL_EPISODES - 1:
-            print(f"等待 {cfg.EPISODE_INTERVAL} 秒...")
-            time.sleep(cfg.EPISODE_INTERVAL)
-    
-    # 清理
-    if traffic_mgr:
-        traffic_mgr.cleanup()
+    try:
+        # 运行episode
+        for episode in range(cfg.TOTAL_EPISODES):
+            success = run_episode(env, traffic_mgr, visualizer, tracker, episode + 1)
+            
+            if episode < cfg.TOTAL_EPISODES - 1:
+                print(f"等待 {cfg.EPISODE_INTERVAL} 秒...")
+                time.sleep(cfg.EPISODE_INTERVAL)
+    finally:
+        # 确保清理
+        if tracker:
+            tracker.cleanup()
+        if traffic_mgr:
+            traffic_mgr.cleanup()
     
     print("\n程序结束")
-
+    
 if __name__ == '__main__':
     main()

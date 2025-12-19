@@ -1,0 +1,45 @@
+{
+  "camera": {
+    "index": 0,
+    "width": 640,
+    "height": 480,
+    "fps": 30
+  },
+  "gesture": {
+    "skin_lower": [
+      0,
+      30,
+      60
+    ],
+    "skin_upper": [
+      25,
+      255,
+      255
+    ],
+    "min_hand_area": 3000,
+    "history_size": 10,
+    "smooth_frames": 5,
+    "min_confidence": 0.6,
+    "detection_interval": 2,
+    "single_finger_angle_threshold": 60
+  },
+  "drone": {
+    "velocity": 2.5,
+    "duration": 0.3,
+    "altitude": -10.0,
+    "control_interval": 0.3
+  },
+  "display": {
+    "show_fps": true,
+    "show_confidence": true,
+    "show_help": true,
+    "show_contours": true,
+    "show_bbox": true,
+    "show_fingertips": true
+  },
+  "performance": {
+    "target_fps": 30,
+    "resize_factor": 1.0,
+    "enable_multiprocessing": false
+  }
+}
