@@ -16,3 +16,5 @@ src/openpilot_model/build/
 src/openpilot_model/log/
 # VS Code配置
 .vscode/
+.idea/
+.idea/
