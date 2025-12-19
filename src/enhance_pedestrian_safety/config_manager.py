@@ -36,7 +36,6 @@ class ConfigManager:
                     'rotation_frequency': 10
                 }
             },
-
             'v2x': {
                 'enabled': True,
                 'communication_range': 300.0,
@@ -54,8 +53,15 @@ class ConfigManager:
                 'data_fusion_interval': 1.0,
                 'max_shared_objects': 50
             },
-
-
+            'enhancement': {
+                'enabled': True,
+                'enable_random': True,
+                'quality_check': True,
+                'save_original': True,
+                'save_enhanced': True,
+                'calibration_generation': True,
+                'enhanced_dir_name': 'enhanced'
+            },
             'output': {
                 'data_dir': 'cvips_dataset',
                 'save_raw': True,
@@ -63,13 +69,12 @@ class ConfigManager:
                 'save_annotations': False,
                 'save_lidar': True,
                 'save_fusion': True,
-
                 'save_cooperative': True,
                 'save_v2x_messages': True,
-
-
+                'save_enhanced': True,
                 'validate_data': True,
-                'run_analysis': False
+                'run_analysis': False,
+                'run_quality_check': True
             }
         }
 
@@ -111,7 +116,6 @@ class ConfigManager:
         if args.num_pedestrians:
             config['traffic']['pedestrians'] = args.num_pedestrians
 
-
         if args.num_coop_vehicles:
             config['cooperative']['num_coop_vehicles'] = args.num_coop_vehicles
 
@@ -121,10 +125,8 @@ class ConfigManager:
         if args.enable_v2x:
             config['v2x']['enabled'] = True
 
-
-        if args.capture_interval:
-            config['sensors']['capture_interval'] = args.capture_interval
-
+        if args.enable_enhancement:
+            config['enhancement']['enabled'] = True
 
         if args.enable_lidar:
             config['sensors']['lidar_sensors'] = 1
@@ -133,17 +135,17 @@ class ConfigManager:
         if args.enable_fusion:
             config['output']['save_fusion'] = True
 
-
         if args.enable_cooperative:
             config['output']['save_cooperative'] = True
-
-
 
         if args.enable_annotations:
             config['output']['save_annotations'] = True
 
         if args.skip_validation:
             config['output']['validate_data'] = False
+
+        if args.skip_quality_check:
+            config['output']['run_quality_check'] = False
 
         if args.run_analysis:
             config['output']['run_analysis'] = True
