@@ -1,0 +1,24 @@
+# Common costmap parameters for both global and local costmaps
+
+# Obstacle marking parameters
+obstacle_range: 50.0
+raytrace_range: 100.0
+
+# Robot footprint (Tesla Model3 approximate dimensions)
+footprint: [[-2.0, -1.0], [-2.0, 1.0], [2.5, 1.0], [2.5, -1.0]]
+inflation_radius: 1.5
+cost_scaling_factor: 10.0
+
+# Observation sources
+observation_sources: laser_scan_sensor
+
+laser_scan_sensor:
+  sensor_frame: ego_vehicle/lidar
+  data_type: LaserScan
+  topic: /carla/ego_vehicle/scan
+  marking: true
+  clearing: true
+  min_obstacle_height: -0.5
+  max_obstacle_height: 2.0
+  obstacle_range: 50.0
+  raytrace_range: 100.0
