@@ -1,48 +1,103 @@
-# 神经网络实现代理
+# AutoPilot System: Lane & Object Detection
 
-利用神经网络/ROS 实现 Carla（车辆、行人的感知、规划、控制）、AirSim、Mujoco 中人和载具的代理。
+这是一个结合了**传统计算机视觉**与**深度学习**的自动驾驶辅助系统原型。它利用 OpenCV 进行高精度的车道线检测，并集成 YOLOv8 模型实现对车辆、行人等障碍物的实时识别。
 
-## 环境配置
+![Status](https://img.shields.io/badge/Status-Active-success)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 
-* 平台：Windows 10/11，Ubuntu 20.04/22.04
-* 软件：Python 3.7-3.12（需支持3.7）、Pytorch（尽量不使用Tensorflow）
-* 相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
+## ✨ 核心功能
 
+### 1. 🛣️ 车道线检测 (Lane Detection)
+* **视觉管线**: 灰度化 -> 高斯模糊 -> Canny 边缘检测 -> 动态 ROI -> 霍夫变换。
+* **算法优化**:
+    * **智能平滑**: 使用 `deque` 历史队列消除车道线抖动。
+    * **斜率过滤**: 自动剔除路面阴影和垂直路标干扰。
+    * **可视化调参**: 提供 `tuner.py` 工具，实时寻找针对当前天气的最佳参数。
 
-## 贡献指南
+### 2. 🚗 目标检测 (Object Detection)
+* **深度学习**: 集成 **YOLOv8 (Nano)** 模型。
+* **识别对象**: 实时框出前方车辆 (Car)、卡车 (Truck)、巴士 (Bus) 和行人 (Person)。
+* **性能**: 针对 CPU 优化，轻量级推理。
 
-准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
-代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
+## 🛠️ 环境准备
 
-### 约定
+### 1. 运行环境
+* Python 3.8+ (推荐 Python 3.13)
+* 建议使用独立显卡 (GPU) 以获得更高帧率，但在 CPU 上也能运行 (FPS 5-10)。
 
-* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
-* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
-* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
-* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
-
-
-### 文档生成
-
-测试生成的文档：
-1. 安装python 3.11，并使用以下命令安装`mkdocs`和相关依赖：
-```shell
-pip install mkdocs -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
+### 2. 安装依赖
+请确保安装了最新版本的依赖库（包含 ultralytics）：
+```bash
 pip install -r requirements.txt
+
 ```
-（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
 
-2. 在命令行中进入`nn`目录下，运行：
-```shell
-mkdocs build
-mkdocs serve
+## 🚀 使用指南
+
+### 第一步：视觉参数调优 (可选但推荐)
+
+如果发现车道线检测不准（乱飞或消失），请先运行调参工具：
+
+```bash
+python tuner.py sample.hevc
+
 ```
-然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
 
-## 参考
+* 按 `空格` 暂停，拖动滑动条调整 Canny 阈值和 ROI 区域。
+* 记下最佳参数，并填入 `main.py` 顶部的配置区。
 
-* [代理模拟器文档](https://openhutb.github.io)
-* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
-* [神经网络原理](https://github.com/OpenHUTB/neuro)
+### 第二步：启动自动驾驶系统
 
+
+直接运行主程序，系统将同时加载车道检测器和 YOLO 模型：
+
+```bash
+python main.py sample.hevc
+
+```
+
+* **首次运行提示**: 程序会自动下载 `yolov8n.pt` 模型权重文件 (约 6MB)，请保持网络连接。
+
+## 📂 项目结构
+
+```text
+Project_Root/
+├── main.py            # [入口] 主程序，协调车道与YOLO检测
+├── yolo_det.py        # [模块] 封装 YOLOv8 目标检测逻辑
+├── tuner.py           # [工具] 视觉参数调试器
+├── requirements.txt   # 依赖清单
+├── README.md          # 项目文档
+└── sample.hevc        # 测试数据
+
+```
+
+## ⚠️ 常见问题
+
+**Q1: 画面非常卡顿 (Low FPS)？**
+
+* **原因**: 深度学习模型在没有 GPU 加速的电脑上运行较慢。
+* **优化**: 可以在 `main.py` 中实现“跳帧机制”（例如每 3 帧跑一次 YOLO，中间帧沿用结果）。
+
+**Q2: 报错 `ModuleNotFoundError: No module named 'ultralytics'`?**
+
+* **解决**: 请运行 `pip install -r requirements.txt` 确保库已安装。
+
+## 🔮 路线图 (Roadmap)
+
+* [x] 基础 OpenCV 车道线检测
+* [x] 可视化参数调试工具 (`tuner.py`)
+* [x] 帧间平滑与防抖算法
+* [x] 集成 YOLOv8 目标检测 (`yolo_det.py`)
+* [ ] 性能优化：加入多线程或跳帧处理
+* [ ] 车辆距离估算 (基于检测框大小)
+* [ ] 偏离预警系统 (LDW)
+
+## 📚 参考资料
+
+* [Ultralytics YOLOv8 Docs](https://docs.ultralytics.com/)
+* [OpenCV Computer Vision](https://opencv.org/)
+
+```
+
+```
 
