@@ -69,9 +69,11 @@ def batch_prepare(nums1, nums2, results, maxlen: int):
     Returns:
         nums1_digits, nums2_digits, results_digits
     """
-    nums1_digits = [pad_digits(list(reversed(num_to_digits(n))), maxlen) for n in nums1]
-    nums2_digits = [pad_digits(list(reversed(num_to_digits(n))), maxlen) for n in nums2]
-    results_digits = [pad_digits(list(reversed(num_to_digits(r))), maxlen) for r in results]
+    def process_num(n):  # 提取转换函数：数字→数位→反转→填充
+        return pad_digits(num_to_digits(n)[::-1], maxlen)
+    nums1_digits = [process_num(n) for n in nums1]
+    nums2_digits = [process_num(n) for n in nums2]
+    results_digits = [process_num(r) for r in results]
     return nums1_digits, nums2_digits, results_digits
 
 
