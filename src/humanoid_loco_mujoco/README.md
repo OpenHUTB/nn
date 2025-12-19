@@ -43,3 +43,17 @@ https://github.com/robfiras/loco-mujoco/tree/master/loco_mujoco/models/unitree_h
 # _数据集百度网盘地址_
 
 链接: https://pan.baidu.com/s/1Viqlg9VYZBuKgj7TiVo-Tw 提取码: 68aa
+下载好的数据集放在当前文件夹下
+
+# _文件说明_
+
+```
+locomujoco
+├── ros2                  #ros2接口
+│   ├── mujoco_ros2_sim   # 使用mujoco进行的强化学习训练    
+│   └── robot_controller  # 控制节点
+├──  main                 # 使用locomujoco的简单示例
+├──  mujoco               #使用mujoco的简单实例
+├── robot_RL              # 强化学习算法
+
+```

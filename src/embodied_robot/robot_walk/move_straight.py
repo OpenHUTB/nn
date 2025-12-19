@@ -1,393 +1,680 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DeepMind Humanoid Robot Simulation
+Dynamic Obstacle Avoidance + Moving Target Tracking
+适配修改后的官方Humanoid模型
+UTF-8 encoded, GitHub compatible
+"""
+
 import mujoco
 from mujoco import viewer
 import time
 import numpy as np
 import random
+from collections import deque
+import os
+import sys
+
+# ====================== Global Configuration ======================
+# Disable all log output (cross-version compatible)
+os.environ['MUJOCO_QUIET'] = '1'
+os.environ['MUJOCO_GL'] = 'egl'
+os.environ['PYTHONIOENCODING'] = 'utf-8'
+
+# Set random seed for reproducibility
+np.random.seed(42)
+random.seed(42)
 
 
-def control_robot(model_path):
-    """
-    控制DeepMind Humanoid模型：目标导航（固定目标点）→ 动态避障 → 到达目标点停止
-    """
-    # 加载模型和数据
-    model = mujoco.MjModel.from_xml_path(model_path)
-    data = mujoco.MjData(model)
+class DynamicPatrolController:
+    def __init__(self, model_path):
+        """Initialize robot controller with dynamic target and obstacle support"""
+        # Load model and data
+        self.model = mujoco.MjModel.from_xml_path(model_path)
+        self.data = mujoco.MjData(self.model)
 
-    # -------------------------- 核心配置：固定导航目标点 --------------------------
-    TARGET_POS = np.array([8.0, 0.0])  # 固定目标点坐标 (x=8, y=0)
-    target_reached_threshold = 0.5  # 到达目标点的距离阈值（米）
-    navigation_target_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "navigation_target")
+        # -------------------------- Core Parameters --------------------------
+        # Simulation settings
+        self.sim_start_time = 0.0
+        self.last_print_time = 0.0
+        self.target_switch_cooldown = 2.0
+        self.last_target_switch_time = 0.0
 
-    # -------------------------- 动态障碍初始化 --------------------------
-    # 获取动态障碍关节和电机ID
-    wall2_joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "wall2_slide_y")
-    wall2_motor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall2_motor")
-    wall2_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "wall2")
+        # Patrol target configuration (dynamic updatable)
+        self.patrol_points = [
+            {"name": "patrol_target_1", "pos": np.array([0.0, 0.0]), "label": "Start Point", "update_interval": 8.0},
+            {"name": "patrol_target_2", "pos": np.array([4.0, -2.0]), "label": "Patrol Point 1 (SW)",
+             "update_interval": 10.0},
+            {"name": "patrol_target_3", "pos": np.array([8.0, 2.0]), "label": "Patrol Point 2 (NE)",
+             "update_interval": 12.0},
+            {"name": "patrol_target_4", "pos": np.array([10.0, -1.0]), "label": "Patrol Point 3 (NW)",
+             "update_interval": 9.0},
+            {"name": "patrol_target_5", "pos": np.array([12.0, 0.0]), "label": "Final Point", "update_interval": 11.0}
+        ]
+        self.current_target_idx = 0
+        self.patrol_cycles = 0
+        self.patrol_completed = False
+        self.target_reached_threshold = 0.8
 
-    # 动态障碍参数
-    wall2_speed = 0.8  # 移动速度
-    wall2_amplitude = 1.8  # 移动幅度（Y轴-1.8~1.8米）
-    wall2_phase = random.uniform(0, 2 * np.pi)  # 随机初始相位
+        # Dynamic target control parameters
+        self.patrol_motor_ids = {}
+        self.patrol_joint_ids = {}
+        self.patrol_body_ids = {}
+        self.last_target_update = {i: 0.0 for i in range(len(self.patrol_points))}
+        self.target_movement_range = {"x": [-2.0, 14.0], "y": [-5.0, 5.0]}
+        self.target_move_speed = 0.5
 
-    # 打印电机数量（调试用）
-    print(f"模型电机数量：{model.nu}，data.ctrl长度：{len(data.ctrl)}")
-    print(f"动态障碍配置：关节ID={wall2_joint_id}，电机ID={wall2_motor_id}，初始相位={wall2_phase:.2f}")
-    print(f"导航目标点：x={TARGET_POS[0]}, y={TARGET_POS[1]} | 到达阈值：{target_reached_threshold}米")
+        # Obstacle detection & avoidance parameters
+        self.valid_wall_names = ["wall1", "wall2", "wall3", "wall4"]
+        self.wall_ids = []
+        self.wall_names = []
+        self.wall_types = {}
+        self.wall_pos_history = {}
+        self.obstacle_distance_threshold = 2.0
+        self.obstacle_avoidance_duration = 5.0
+        self.return_to_path_duration = 4.0
+        self.wall_priority = {"dynamic1": 4, "dynamic2": 3, "dynamic3": 2, "fixed": 1}
 
-    # -------------------------- 兼容低版本MuJoCo的ID查询 --------------------------
-    wall_ids = []
-    wall_names = []
-    for i in range(model.nbody):
-        body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, i)
-        if body_name and body_name.startswith("wall"):
-            wall_ids.append(i)
-            wall_names.append(body_name)
-    torso_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "torso")
+        # Avoidance state variables
+        self.avoid_obstacle = False
+        self.return_to_path = False
+        self.obstacle_avoidance_start = 0.0
+        self.return_to_path_start = 0.0
+        self.turn_direction = 0  # -1 = left, 1 = right
+        self.closest_wall_info = {"name": "", "distance": float('inf'), "type": ""}
+        self.turn_dir_label = ""
 
-    # 打印检测到的障碍物
-    if wall_ids:
-        print(f"检测到障碍物：{wall_names}（ID：{wall_ids}）")
-    else:
-        print("警告：未检测到任何障碍物！")
+        # Robot control parameters (适配官方Humanoid参数)
+        self.gait_period = 2.0  # 调整步态周期适配官方模型
+        self.swing_gain = 0.7   # 降低摆动增益
+        self.stance_gain = 0.7  # 降低支撑增益
+        self.forward_speed = 0.25  # 降低前进速度
+        self.heading_kp = 80.0  # 降低航向比例增益
+        self.balance_kp = 100.0 # 降低平衡比例增益
+        self.balance_kd = 15.0  # 降低平衡微分增益
+        self.torso_pitch_target = 0.0
+        self.torso_roll_target = 0.0
 
-    # -------------------------- 核心参数配置 --------------------------
-    # 避障参数（适配导航+动态障碍）
-    avoid_obstacle = False
-    obstacle_distance_threshold = 1.8  # 触发避障的距离阈值
-    obstacle_avoidance_time = 0
-    obstacle_avoidance_duration = 4.5  # 避障持续时间
-    turn_direction = 0
-    return_to_path = False
-    return_time = 0
-    return_duration = 3.5  # 回归导航路径的持续时间
-    stop_walk = False
-    target_reached = False  # 目标点到达标记
-    closest_wall_id = -1
-    last_closest_wall_pos = np.zeros(2)  # 记录上一帧最近障碍位置
+        # 适配官方模型的关节名称映射
+        self.joint_name_mapping = {
+            "abdomen_x": "abdomen_x",
+            "abdomen_y": "abdomen_y",
+            "abdomen_z": "abdomen_z",
+            "hip_x_right": "hip_x_right",
+            "hip_y_right": "hip_y_right",
+            "hip_z_right": "hip_z_right",
+            "knee_right": "knee_right",
+            "ankle_x_right": "ankle_x_right",
+            "ankle_y_right": "ankle_y_right",
+            "hip_x_left": "hip_x_left",
+            "hip_y_left": "hip_y_left",
+            "hip_z_left": "hip_z_left",
+            "knee_left": "knee_left",
+            "ankle_x_left": "ankle_x_left",
+            "ankle_y_left": "ankle_y_left",
+            "shoulder1_right": "shoulder1_right",
+            "shoulder2_right": "shoulder2_right",
+            "elbow_right": "elbow_right",
+            "shoulder1_left": "shoulder1_left",
+            "shoulder2_left": "shoulder2_left",
+            "elbow_left": "elbow_left"
+        }
 
-    # 步态控制参数（适配导航）
-    gait_period = 2.0
-    swing_gain = 0.85
-    stance_gain = 0.8
-    forward_speed = 0.35  # 前进速度
-    heading_kp = 80.0  # 朝向目标点的比例增益
+        # Initialize component IDs
+        self._init_component_ids()
+        # Initialize obstacle position history
+        self._init_obstacle_history()
 
-    # 姿态稳定参数
-    torso_pitch_target = 0.0
-    torso_roll_target = 0.0
-    balance_kp = 100.0
-    balance_kd = 15.0
+    def _init_component_ids(self):
+        """Initialize all mujoco component IDs (joints, actuators, bodies)"""
+        # Torso ID (core robot body) - 适配官方模型的torso名称
+        self.torso_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "torso")
+        if self.torso_id == -1:
+            self.torso_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "waist_lower")
 
-    # 启动可视化器
-    mujoco.set_mjcb_control(None)
-    with viewer.launch_passive(model, data) as viewer_instance:
-        print("\nDeepMind Humanoid目标导航仿真启动！")
+        # Dynamic patrol target IDs
+        for idx, point in enumerate(self.patrol_points):
+            # Motor (actuator) IDs
+            self.patrol_motor_ids[idx] = {
+                "x": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"patrol{idx + 1}_motor_x"),
+                "y": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"patrol{idx + 1}_motor_y")
+            }
+            # Joint IDs (slide joints for movement)
+            self.patrol_joint_ids[idx] = {
+                "x": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, f"patrol{idx + 1}_slide_x"),
+                "y": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, f"patrol{idx + 1}_slide_y")
+            }
+            # Body IDs (target markers)
+            self.patrol_body_ids[idx] = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, point["name"])
+
+        # Dynamic obstacle IDs
+        # Wall2 (sinusoidal motion)
+        self.wall2_joint_ids = {
+            "y": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "wall2_slide_y"),
+            "z": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "wall2_slide_z")
+        }
+        self.wall2_motor_ids = {
+            "y": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall2_motor_y"),
+            "z": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall2_motor_z")
+        }
+        self.wall2_params = {
+            "y_amp": 2.5, "y_freq": 0.7, "y_phase": random.uniform(0, 2 * np.pi),
+            "z_amp": 0.4, "z_freq": 0.3, "z_phase": random.uniform(0, 2 * np.pi)
+        }
+
+        # Wall3 (random walk)
+        self.wall3_joint_ids = {
+            "x": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "wall3_slide_x"),
+            "y": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "wall3_slide_y")
+        }
+        self.wall3_motor_ids = {
+            "x": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall3_motor_x"),
+            "y": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall3_motor_y")
+        }
+        self.wall3_params = {
+            "x_base": 6.0, "x_range": 1.0, "x_speed": 0.4,
+            "y_base": 0.0, "y_range": 2.0, "y_speed": 0.6,
+            "x_dir": random.choice([-1, 1]), "y_dir": random.choice([-1, 1]),
+            "x_switch": random.uniform(2.0, 4.0), "y_switch": random.uniform(1.5, 3.5)
+        }
+        self.wall3_last_switch = {"x": 0.0, "y": 0.0}
+
+        # Wall4 (circular motion)
+        self.wall4_joint_ids = {
+            "rot": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "wall4_rotate"),
+            "rad": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "wall4_radial")
+        }
+        self.wall4_motor_ids = {
+            "rot": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall4_motor_rot"),
+            "rad": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "wall4_motor_rad")
+        }
+        self.wall4_params = {
+            "rot_speed": 0.5, "rot_dir": random.choice([-1, 1]),
+            "rad_amp": 0.8, "rad_freq": 0.2, "rad_phase": random.uniform(0, 2 * np.pi),
+            "rad_base": 1.2
+        }
+
+        # Wall IDs for obstacle detection
+        for wall_name in self.valid_wall_names:
+            wall_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, wall_name)
+            if wall_id != -1:
+                self.wall_ids.append(wall_id)
+                self.wall_names.append(wall_name)
+                if wall_name == "wall1":
+                    self.wall_types[wall_name] = "fixed"
+                elif wall_name == "wall2":
+                    self.wall_types[wall_name] = "dynamic1"
+                elif wall_name == "wall3":
+                    self.wall_types[wall_name] = "dynamic2"
+                elif wall_name == "wall4":
+                    self.wall_types[wall_name] = "dynamic3"
+
+    def _init_obstacle_history(self):
+        """Initialize obstacle position history for prediction"""
+        for wall_name in self.wall_names:
+            self.wall_pos_history[wall_name] = deque(maxlen=10)
+
+    def _update_dynamic_targets(self, elapsed_time):
+        """Update dynamic patrol target positions in real-time"""
+        current_target = self.patrol_points[self.current_target_idx]
+
+        # 1. Real-time sync with target body positions (from XML)
+        for idx in self.patrol_body_ids:
+            if self.patrol_body_ids[idx] != -1:
+                target_body_pos = self.data.xpos[self.patrol_body_ids[idx]]
+                self.patrol_points[idx]["pos"] = np.array([target_body_pos[0], target_body_pos[1]])
+
+        # 2. Randomly move targets at specified intervals
+        for idx, point in enumerate(self.patrol_points):
+            if (elapsed_time - self.last_target_update[idx] > point["update_interval"] and
+                    not self.avoid_obstacle and not self.return_to_path):
+
+                # Generate new random position (within safe range)
+                new_x = random.uniform(self.target_movement_range["x"][0], self.target_movement_range["x"][1])
+                new_y = random.uniform(self.target_movement_range["y"][0], self.target_movement_range["y"][1])
+
+                # Avoid obstacle areas
+                if self.torso_id != -1:
+                    torso_pos = self.data.xpos[self.torso_id][:2]
+                    while np.linalg.norm(np.array([new_x, new_y]) - torso_pos) < 3.0:
+                        new_x = random.uniform(self.target_movement_range["x"][0], self.target_movement_range["x"][1])
+                        new_y = random.uniform(self.target_movement_range["y"][0], self.target_movement_range["y"][1])
+
+                # Control target movement via actuators
+                if (self.patrol_motor_ids[idx]["x"] != -1 and
+                        self.patrol_motor_ids[idx]["y"] != -1 and
+                        self.patrol_joint_ids[idx]["x"] != -1 and
+                        self.patrol_joint_ids[idx]["y"] != -1):
+                    # Smooth movement control
+                    current_x = self.data.qpos[self.patrol_joint_ids[idx]["x"]]
+                    current_y = self.data.qpos[self.patrol_joint_ids[idx]["y"]]
+
+                    self.data.ctrl[self.patrol_motor_ids[idx]["x"]] = (new_x - current_x) * self.target_move_speed
+                    self.data.ctrl[self.patrol_motor_ids[idx]["y"]] = (new_y - current_y) * self.target_move_speed
+
+                # Update target position and timestamp
+                self.patrol_points[idx]["pos"] = np.array([new_x, new_y])
+                self.last_target_update[idx] = elapsed_time
+
+                if idx == self.current_target_idx:
+                    print(f"\n🔄 Target updated: {point['label']} moved to ({new_x:.2f}, {new_y:.2f})")
+
+    def _control_dynamic_obstacles(self, elapsed_time):
+        """Control dynamic obstacle movements"""
+        # Wall2: Sinusoidal Y+Z motion
+        if all(id != -1 for id in self.wall2_motor_ids.values()):
+            wall2_y_target = self.wall2_params["y_amp"] * np.sin(
+                self.wall2_params["y_freq"] * elapsed_time + self.wall2_params["y_phase"])
+            wall2_z_target = self.wall2_params["z_amp"] * np.sin(
+                self.wall2_params["z_freq"] * elapsed_time + self.wall2_params["z_phase"]) + 0.75
+            self.data.ctrl[self.wall2_motor_ids["y"]] = (wall2_y_target - self.data.qpos[
+                self.wall2_joint_ids["y"]]) * 2.5
+            self.data.ctrl[self.wall2_motor_ids["z"]] = (wall2_z_target - self.data.qpos[
+                self.wall2_joint_ids["z"]]) * 1.8
+
+        # Wall3: Random walk X+Y
+        if all(id != -1 for id in self.wall3_motor_ids.values()):
+            if elapsed_time - self.wall3_last_switch["x"] > self.wall3_params["x_switch"]:
+                self.wall3_params["x_dir"] *= -1
+                self.wall3_params["x_switch"] = random.uniform(2.0, 4.0)
+                self.wall3_last_switch["x"] = elapsed_time
+
+            if elapsed_time - self.wall3_last_switch["y"] > self.wall3_params["y_switch"]:
+                self.wall3_params["y_dir"] *= -1
+                self.wall3_params["y_switch"] = random.uniform(1.5, 3.5)
+                self.wall3_last_switch["y"] = elapsed_time
+
+            wall3_x_target = self.wall3_params["x_base"] + self.wall3_params["x_dir"] * self.wall3_params["x_speed"] * (
+                        elapsed_time % 5)
+            wall3_y_target = self.wall3_params["y_base"] + self.wall3_params["y_dir"] * self.wall3_params["y_speed"] * (
+                        elapsed_time % 4)
+            wall3_x_target = np.clip(wall3_x_target, 5.0, 7.0)
+            wall3_y_target = np.clip(wall3_y_target, -2.5, 2.5)
+
+            self.data.ctrl[self.wall3_motor_ids["x"]] = (wall3_x_target - self.data.qpos[
+                self.wall3_joint_ids["x"]]) * 2.2
+            self.data.ctrl[self.wall3_motor_ids["y"]] = (wall3_y_target - self.data.qpos[
+                self.wall3_joint_ids["y"]]) * 2.0
+
+        # Wall4: Circular motion
+        if all(id != -1 for id in self.wall4_motor_ids.values()):
+            wall4_rot_target = self.wall4_params["rot_dir"] * self.wall4_params["rot_speed"] * elapsed_time
+            wall4_rad_target = self.wall4_params["rad_base"] + self.wall4_params["rad_amp"] * np.sin(
+                self.wall4_params["rad_freq"] * elapsed_time + self.wall4_params["rad_phase"])
+
+            self.data.ctrl[self.wall4_motor_ids["rot"]] = (wall4_rot_target - self.data.qpos[
+                self.wall4_joint_ids["rot"]]) * 1.5
+            self.data.ctrl[self.wall4_motor_ids["rad"]] = (wall4_rad_target - self.data.qpos[
+                self.wall4_joint_ids["rad"]]) * 2.0
+
+    def _detect_obstacles(self, elapsed_time):
+        """Detect obstacles and determine avoidance strategy"""
+        if not self.wall_ids or self.torso_id == -1 or self.patrol_completed:
+            return
+
+        torso_pos = self.data.xpos[self.torso_id][:2]
+        wall_distances = []
+
+        # Calculate obstacle distances (with prediction for dynamic obstacles)
+        for idx, wall_id in enumerate(self.wall_ids):
+            wall_name = self.wall_names[idx]
+            wall_type = self.wall_types.get(wall_name, "fixed")
+
+            wall_pos = self.data.xpos[wall_id][:2]
+            self.wall_pos_history[wall_name].append(wall_pos)
+            current_distance = np.linalg.norm(torso_pos - wall_pos)
+
+            # Predict future position for dynamic obstacles
+            predicted_distance = current_distance
+            if len(self.wall_pos_history[wall_name]) > 5 and wall_type != "fixed":
+                pos_history = np.array(self.wall_pos_history[wall_name])
+                velocity = (pos_history[-1] - pos_history[0]) / len(pos_history) * self.model.opt.timestep * 10
+                future_pos = wall_pos + velocity * 0.8
+                predicted_distance = np.linalg.norm(torso_pos - future_pos)
+
+            # Weight distance by obstacle priority (dynamic > fixed)
+            weighted_distance = predicted_distance / self.wall_priority[wall_type]
+            wall_distances.append({
+                "name": wall_name,
+                "type": wall_type,
+                "id": wall_id,
+                "pos": wall_pos,
+                "current_dist": current_distance,
+                "predicted_dist": predicted_distance,
+                "weighted_dist": weighted_distance
+            })
+
+        # Find closest obstacle (priority-based)
+        if wall_distances:
+            wall_distances.sort(key=lambda x: x["weighted_dist"])
+            closest_wall = wall_distances[0]
+
+            self.closest_wall_info = {
+                "name": closest_wall["name"],
+                "distance": closest_wall["predicted_dist"],
+                "type": closest_wall["type"],
+                "pos": closest_wall["pos"]
+            }
+
+            # Trigger obstacle avoidance
+            if (closest_wall["predicted_dist"] < self.obstacle_distance_threshold and
+                    not self.avoid_obstacle and not self.return_to_path):
+                self.avoid_obstacle = True
+                self.obstacle_avoidance_start = elapsed_time
+
+                # Determine turn direction (away from obstacle)
+                wall_relative = closest_wall["pos"] - torso_pos
+                target_vector = self.patrol_points[self.current_target_idx]["pos"] - torso_pos
+                cross_product = np.cross(np.append(wall_relative, 0), np.append(target_vector, 0))[2]
+
+                self.turn_direction = -1 if cross_product > 0 else 1
+                self.turn_dir_label = "Left" if self.turn_direction == -1 else "Right"
+
+                print(
+                    f"\n⚠️  Obstacle detected: {closest_wall['name']} (distance: {closest_wall['predicted_dist']:.2f}m) - Turning {self.turn_dir_label}")
+
+            # Complete avoidance: return to path
+            if self.avoid_obstacle and (
+                    elapsed_time - self.obstacle_avoidance_start) > self.obstacle_avoidance_duration:
+                self.avoid_obstacle = False
+                self.return_to_path = True
+                self.return_to_path_start = elapsed_time
+                print(f"✅ Obstacle avoidance completed - returning to path")
+
+            # Return to path completed
+            if self.return_to_path and (elapsed_time - self.return_to_path_start) > self.return_to_path_duration:
+                self.return_to_path = False
+                print(
+                    f"✅ Back to patrol path - tracking target: {self.patrol_points[self.current_target_idx]['label']}")
+
+    def _get_joint_id(self, joint_name):
+        """获取关节ID（适配名称映射）"""
+        mapped_name = self.joint_name_mapping.get(joint_name, joint_name)
+        return mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, mapped_name)
+
+    def _control_robot_gait(self, elapsed_time):
+        """Control robot gait and movement (适配官方Humanoid模型)"""
+        if self.torso_id == -1 or self.patrol_completed:
+            return
+
+        current_target = self.patrol_points[self.current_target_idx]
+        torso_pos = self.data.xpos[self.torso_id][:2]
+        target_vector = current_target["pos"] - torso_pos
+        distance_to_target = np.linalg.norm(target_vector)
+
+        # Check if target is reached
+        if (distance_to_target < self.target_reached_threshold and
+                not self.patrol_completed and
+                elapsed_time - self.last_target_switch_time > self.target_switch_cooldown):
+
+            print(f"\n✅ Reached target: {current_target['label']} (x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f})")
+            self.last_target_switch_time = elapsed_time
+
+            # Switch to next target
+            if self.current_target_idx < len(self.patrol_points) - 1:
+                self.current_target_idx += 1
+                print(f"🔄 Now tracking: {self.patrol_points[self.current_target_idx]['label']}")
+            else:
+                # Complete patrol cycle
+                self.patrol_completed = True
+                self.patrol_cycles += 1
+                print(f"\n🏁 Completed patrol cycle {self.patrol_cycles}!")
+
+                # Reset for next cycle
+                time.sleep(self.target_switch_cooldown)
+                self.current_target_idx = 0
+                self.patrol_completed = False
+                self.last_target_switch_time = time.time()
+                print(f"🔄 Restarting patrol - tracking start point")
+
+        # Calculate heading error
+        torso_quat = self.data.xquat[self.torso_id]
+        # 适配官方模型的四元数计算
+        robot_yaw = np.arctan2(2 * (torso_quat[0] * torso_quat[1] + torso_quat[2] * torso_quat[3]),
+                               1 - 2 * (torso_quat[1]**2 + torso_quat[2]**2))
+        target_yaw = np.arctan2(target_vector[1], target_vector[0])
+        yaw_error = target_yaw - robot_yaw
+        yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
+
+        # Reset control commands (保留障碍物和巡逻点的控制)
+        robot_ctrl_size = self.model.nu - len(self.patrol_motor_ids) * 2 - len(self.wall2_motor_ids) - len(self.wall3_motor_ids) - len(self.wall4_motor_ids)
+        if robot_ctrl_size > 0:
+            self.data.ctrl[:robot_ctrl_size] = 0.0
+        else:
+            self.data.ctrl[:] = 0.0
+
+        # -------------------------- Movement Control --------------------------
+        cycle = elapsed_time % self.gait_period
+        phase = cycle / self.gait_period
+
+        if self.return_to_path:
+            # Return to path mode
+            return_phase = (elapsed_time - self.return_to_path_start) / self.return_to_path_duration
+            return_speed = 1.5 * np.cos(return_phase * np.pi)
+
+            # Heading control
+            abdomen_z_id = self._get_joint_id("abdomen_z")
+            hip_z_right_id = self._get_joint_id("hip_z_right")
+            hip_z_left_id = self._get_joint_id("hip_z_left")
+
+            if 0 <= abdomen_z_id < self.model.nu:
+                self.data.ctrl[abdomen_z_id] = self.heading_kp * yaw_error * return_speed * 0.08
+            if 0 <= hip_z_right_id < self.model.nu:
+                self.data.ctrl[hip_z_right_id] = -yaw_error * return_speed * 0.6
+            if 0 <= hip_z_left_id < self.model.nu:
+                self.data.ctrl[hip_z_left_id] = yaw_error * return_speed * 0.6
+
+            # Stabilize stance (适配官方模型的关节控制)
+            for side in ["right", "left"]:
+                hip_y_id = self._get_joint_id(f"hip_y_{side}")
+                knee_id = self._get_joint_id(f"knee_{side}")
+                ankle_y_id = self._get_joint_id(f"ankle_y_{side}")
+
+                if 0 <= hip_y_id < self.model.nu:
+                    self.data.ctrl[hip_y_id] = -0.6  # 降低力度适配官方模型
+                if 0 <= knee_id < self.model.nu:
+                    self.data.ctrl[knee_id] = 0.9   # 降低力度适配官方模型
+                if 0 <= ankle_y_id < self.model.nu:
+                    self.data.ctrl[ankle_y_id] = 0.3 # 降低力度适配官方模型
+
+        elif self.avoid_obstacle:
+            # Obstacle avoidance mode
+            avoid_phase = (elapsed_time - self.obstacle_avoidance_start) / self.obstacle_avoidance_duration
+            turn_speed = 1.4 * np.sin(avoid_phase * np.pi)  # 降低转向速度
+
+            # Turn control
+            hip_z_right_id = self._get_joint_id("hip_z_right")
+            hip_z_left_id = self._get_joint_id("hip_z_left")
+            abdomen_z_id = self._get_joint_id("abdomen_z")
+
+            if 0 <= hip_z_right_id < self.model.nu:
+                self.data.ctrl[hip_z_right_id] = self.turn_direction * turn_speed * 1.0  # 降低力度
+            if 0 <= hip_z_left_id < self.model.nu:
+                self.data.ctrl[hip_z_left_id] = -self.turn_direction * turn_speed * 1.0 # 降低力度
+            if 0 <= abdomen_z_id < self.model.nu:
+                self.data.ctrl[abdomen_z_id] = self.turn_direction * turn_speed * 1.5   # 降低力度
+
+            # Enhanced balance (适配官方模型)
+            for side in ["right", "left"]:
+                hip_y_id = self._get_joint_id(f"hip_y_{side}")
+                knee_id = self._get_joint_id(f"knee_{side}")
+                ankle_x_id = self._get_joint_id(f"ankle_x_{side}")
+
+                if 0 <= hip_y_id < self.model.nu:
+                    self.data.ctrl[hip_y_id] = -0.9  # 降低力度
+                if 0 <= knee_id < self.model.nu:
+                    self.data.ctrl[knee_id] = 1.1    # 降低力度
+                if 0 <= ankle_x_id < self.model.nu:
+                    self.data.ctrl[ankle_x_id] = 0.2 # 降低力度
+
+        else:
+            # Normal patrol mode
+            # Heading control
+            abdomen_z_id = self._get_joint_id("abdomen_z")
+            if 0 <= abdomen_z_id < self.model.nu:
+                self.data.ctrl[abdomen_z_id] = self.heading_kp * yaw_error * 0.1  # 降低增益
+
+            # Leg gait control (适配官方模型的步态参数)
+            for side, sign in [("right", 1), ("left", -1)]:
+                swing_phase = (phase + 0.5 * sign) % 1.0
+
+                # Joint IDs
+                hip_x_id = self._get_joint_id(f"hip_x_{side}")
+                hip_z_id = self._get_joint_id(f"hip_z_{side}")
+                hip_y_id = self._get_joint_id(f"hip_y_{side}")
+                knee_id = self._get_joint_id(f"knee_{side}")
+                ankle_y_id = self._get_joint_id(f"ankle_y_{side}")
+                ankle_x_id = self._get_joint_id(f"ankle_x_{side}")
+
+                # Gait commands (适配官方模型调整增益)
+                if 0 <= hip_x_id < self.model.nu:
+                    self.data.ctrl[hip_x_id] = self.swing_gain * np.sin(2 * np.pi * swing_phase) * self.forward_speed * 0.8
+                if 0 <= hip_z_id < self.model.nu:
+                    self.data.ctrl[hip_z_id] = self.stance_gain * np.cos(
+                        2 * np.pi * swing_phase) * 0.15 + yaw_error * 0.1
+                if 0 <= hip_y_id < self.model.nu:
+                    self.data.ctrl[hip_y_id] = -0.8 * np.sin(2 * np.pi * swing_phase) - 0.4  # 降低力度
+                if 0 <= knee_id < self.model.nu:
+                    self.data.ctrl[knee_id] = 1.1 * np.sin(2 * np.pi * swing_phase) + 0.7   # 降低力度
+                if 0 <= ankle_y_id < self.model.nu:
+                    self.data.ctrl[ankle_y_id] = 0.3 * np.cos(2 * np.pi * swing_phase)      # 降低力度
+                if 0 <= ankle_x_id < self.model.nu:
+                    self.data.ctrl[ankle_x_id] = 0.15 * np.sin(2 * np.pi * swing_phase)     # 降低力度
+
+            # Torso balance control (适配官方模型)
+            abdomen_x_id = self._get_joint_id("abdomen_x")
+            abdomen_y_id = self._get_joint_id("abdomen_y")
+
+            # 适配官方模型的姿态计算
+            pitch = 2 * (torso_quat[1] * torso_quat[3] - torso_quat[0] * torso_quat[2])
+            roll = 2 * (torso_quat[0] * torso_quat[1] + torso_quat[2] * torso_quat[3])
+
+            # 获取关节速度ID
+            abdomen_x_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "abdomen_x")
+            abdomen_y_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "abdomen_y")
+
+            if 0 <= abdomen_x_id < self.model.nu and abdomen_x_joint_id != -1:
+                self.data.ctrl[abdomen_x_id] = self.balance_kp * (self.torso_roll_target - roll) * 0.08 - self.balance_kd * \
+                                               self.data.qvel[abdomen_x_joint_id] * 0.1
+            if 0 <= abdomen_y_id < self.model.nu and abdomen_y_joint_id != -1:
+                self.data.ctrl[abdomen_y_id] = self.balance_kp * (self.torso_pitch_target - pitch) * 0.08 - self.balance_kd * \
+                                               self.data.qvel[abdomen_y_joint_id] * 0.1
+
+            # Arm swing for balance (适配官方模型降低力度)
+            for side, sign in [("right", 1), ("left", -1)]:
+                shoulder1_id = self._get_joint_id(f"shoulder1_{side}")
+                shoulder2_id = self._get_joint_id(f"shoulder2_{side}")
+                elbow_id = self._get_joint_id(f"elbow_{side}")
+
+                shoulder1_cmd = 0.18 * np.sin(2 * np.pi * (phase + 0.5 * sign))  # 降低力度
+                shoulder2_cmd = 0.14 * np.cos(2 * np.pi * (phase + 0.5 * sign))  # 降低力度
+                elbow_cmd = -0.35 * np.sin(2 * np.pi * (phase + 0.5 * sign)) - 0.22  # 降低力度
+
+                if 0 <= shoulder1_id < self.model.nu:
+                    self.data.ctrl[shoulder1_id] = shoulder1_cmd
+                if 0 <= shoulder2_id < self.model.nu:
+                    self.data.ctrl[shoulder2_id] = shoulder2_cmd
+                if 0 <= elbow_id < self.model.nu:
+                    self.data.ctrl[elbow_id] = elbow_cmd
+
+    def _print_status(self, elapsed_time):
+        """Print robot status (reduced frequency to avoid clutter)"""
+        if (elapsed_time - self.last_print_time) < 2.0 or self.torso_id == -1:
+            return
+
+        self.last_print_time = elapsed_time
+        current_target = self.patrol_points[self.current_target_idx]
+        torso_pos = self.data.xpos[self.torso_id]
+        distance_to_target = np.linalg.norm(current_target["pos"] - torso_pos[:2])
+
+        # Status text
+        if self.patrol_completed:
+            status = f"Patrol completed! Cycles: {self.patrol_cycles}"
+            nav_info = "Waiting to restart"
+        elif self.avoid_obstacle:
+            status = f"Avoiding obstacle (Turn {self.turn_dir_label})"
+            nav_info = f"Target: {current_target['label']} (Distance: {distance_to_target:.2f}m)"
+        elif self.return_to_path:
+            status = "Returning to patrol path"
+            nav_info = f"Target: {current_target['label']} (Distance: {distance_to_target:.2f}m)"
+        else:
+            status = f"Tracking {current_target['label']}"
+            nav_info = f"Progress: {self.current_target_idx + 1}/{len(self.patrol_points)} | Distance: {distance_to_target:.2f}m"
+
+        # Obstacle info
+        obstacle_info = f"{self.closest_wall_info['name']}: {self.closest_wall_info['distance']:.2f}m" if \
+        self.closest_wall_info["name"] else "None"
+
+        # Print status line
         print(
-            f"导航逻辑：向目标点({TARGET_POS[0]},{TARGET_POS[1]})移动 → 检测动态障碍 → 避障 → 回归导航路径 → 到达目标点停止")
-        start_time = time.time()
+            f"\r🕒 {elapsed_time:.1f}s | 📍 x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f} | 🗺️ {nav_info} | 🛡️ {obstacle_info} | 📊 {status}",
+            end=""
+        )
 
-        try:
-            while True:
-                if not viewer_instance.is_running():
-                    break
+    def run_simulation(self):
+        """Main simulation loop"""
+        print("🤖 DeepMind Humanoid Simulation Started (适配官方模型)")
+        print("📌 Features: Dynamic Obstacle Avoidance + Moving Target Tracking")
+        print("🔍 Press Ctrl+C to stop simulation\n")
 
-                # -------------------------- 1. 驱动动态障碍移动 --------------------------
-                elapsed_time = time.time() - start_time
-                # 正弦曲线控制动态障碍Y轴往复移动
-                wall2_target_pos = wall2_amplitude * np.sin(wall2_speed * elapsed_time + wall2_phase)
-                # 控制动态障碍关节
-                if 0 <= wall2_motor_id < len(data.ctrl):
-                    data.ctrl[wall2_motor_id] = (wall2_target_pos - data.qpos[wall2_joint_id]) * 2.0  # PD控制
+        with viewer.launch_passive(self.model, self.data) as viewer_instance:
+            self.sim_start_time = time.time()
 
-                # -------------------------- 2. 导航状态计算 --------------------------
-                if torso_id != -1 and not target_reached:
-                    # 获取机器人躯干位置和朝向
-                    torso_pos = data.xpos[torso_id]
-                    robot_xy = torso_pos[:2]
+            try:
+                while viewer_instance.is_running():
+                    elapsed_time = time.time() - self.sim_start_time
 
-                    # 计算到目标点的距离和方向
-                    target_vector = TARGET_POS - robot_xy
-                    distance_to_target = np.linalg.norm(target_vector)
+                    # Core control sequence
+                    self._control_dynamic_obstacles(elapsed_time)  # Step 1: Move obstacles
+                    self._update_dynamic_targets(elapsed_time)     # Step 2: Update targets
+                    self._detect_obstacles(elapsed_time)           # Step 3: Detect obstacles
+                    self._control_robot_gait(elapsed_time)         # Step 4: Control robot
+                    self._print_status(elapsed_time)               # Step 5: Print status
 
-                    # 检查是否到达目标点
-                    if distance_to_target < target_reached_threshold:
-                        target_reached = True
-                        stop_walk = True
-                        print(
-                            f"\n\n✅ 到达目标点！最终位置：x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f} | 目标点：x={TARGET_POS[0]}, y={TARGET_POS[1]}")
-                        continue
+                    # Step simulation
+                    mujoco.mj_step(self.model, self.data)
+                    viewer_instance.sync()
+                    # 适配官方模型降低仿真步长延迟
+                    time.sleep(self.model.opt.timestep * 1.5)
 
-                    # 计算机器人朝向（偏航角）
-                    torso_quat = data.xquat[torso_id]
-                    robot_yaw = np.arctan2(2 * (torso_quat[2] * torso_quat[3] - torso_quat[0] * torso_quat[1]),
-                                           torso_quat[0] ** 2 - torso_quat[1] ** 2 - torso_quat[2] ** 2 + torso_quat[
-                                               3] ** 2)
-                    # 计算目标方向的角度
-                    target_yaw = np.arctan2(target_vector[1], target_vector[0])
-                    # 计算朝向误差（归一化到[-π, π]）
-                    yaw_error = target_yaw - robot_yaw
-                    yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
-
-                # -------------------------- 3. 实时检测动态障碍 --------------------------
-                distance_to_closest_wall = float('inf')
-                closest_wall_name = ""
-                closest_wall_pos = np.zeros(2)
-
-                if wall_ids and torso_id != -1 and not stop_walk and not target_reached:
-                    torso_pos = data.xpos[torso_id]
-                    for idx, wall_id in enumerate(wall_ids):
-                        wall_pos = data.xpos[wall_id]
-                        distance = np.linalg.norm(torso_pos[:2] - wall_pos[:2])
-                        # 动态障碍预判：如果是wall2，额外计算未来0.5秒的位置
-                        if wall_names[idx] == "wall2":
-                            # 预估0.5秒后障碍位置
-                            future_wall2_pos = wall2_amplitude * np.sin(
-                                wall2_speed * (elapsed_time + 0.5) + wall2_phase)
-                            future_distance = np.linalg.norm(np.array([torso_pos[0], torso_pos[1]]) -
-                                                             np.array([wall_pos[0], future_wall2_pos]))
-                            distance = min(distance, future_distance)  # 取当前/未来距离最小值
-
-                        if distance < distance_to_closest_wall:
-                            distance_to_closest_wall = distance
-                            closest_wall_id = wall_id
-                            closest_wall_name = wall_names[idx]
-                            closest_wall_pos = wall_pos[:2]
-
-                # -------------------------- 4. 导航+避障状态切换 --------------------------
-                if closest_wall_id != -1 and torso_id != -1 and not stop_walk and not target_reached:
-                    # 触发避障
-                    if (distance_to_closest_wall < obstacle_distance_threshold and
-                            not avoid_obstacle and not return_to_path):
-                        avoid_obstacle = True
-                        obstacle_avoidance_time = time.time()
-                        # 基于目标方向和障碍位置选择转向方向（更智能的避障）
-                        torso_pos = data.xpos[torso_id]
-                        wall_relative_y = closest_wall_pos[1] - torso_pos[1]
-                        turn_direction = -1 if wall_relative_y > 0 else 1  # 障碍在右侧则左转，左侧则右转
-                        dir_name = "左转" if turn_direction == -1 else "右转"
-                        print(
-                            f"\n⚠️  检测到最近障碍【{closest_wall_name}】！距离：{distance_to_closest_wall:.2f}米，开始{dir_name}避障...")
-
-                    # 避障完成，回归导航路径
-                    if avoid_obstacle and (time.time() - obstacle_avoidance_time) > obstacle_avoidance_duration:
-                        avoid_obstacle = False
-                        return_to_path = True
-                        return_time = time.time()
-                        print(f"✅ 避障完成，开始回归导航路径...")
-
-                    # 回归完成，继续向目标点移动
-                    if return_to_path and (time.time() - return_time) > return_duration:
-                        return_to_path = False
-                        print(f"✅ 已回归导航路径，继续向目标点移动...")
-
-                # -------------------------- 5. 步态周期计算 --------------------------
-                cycle = elapsed_time % gait_period
-                phase = cycle / gait_period
-
-                # -------------------------- 6. 关节控制核心逻辑 --------------------------
-                data.ctrl[:len(data.ctrl) - 1] = 0.0  # 重置机器人控制指令（保留动态障碍电机）
-
-                if stop_walk or target_reached:
-                    # 停止状态：所有关节归零，保持站立
-                    continue
-
-                elif return_to_path:
-                    # 回归导航路径模式：转向回到目标方向
-                    return_phase = (time.time() - return_time) / return_duration
-                    return_speed = 1.3 * np.cos(return_phase * np.pi)
-
-                    # 朝向目标点回正
-                    torso_quat = data.xquat[torso_id]
-                    robot_yaw = np.arctan2(2 * (torso_quat[2] * torso_quat[3] - torso_quat[0] * torso_quat[1]),
-                                           torso_quat[0] ** 2 - torso_quat[1] ** 2 - torso_quat[2] ** 2 + torso_quat[
-                                               3] ** 2)
-                    target_vector = TARGET_POS - data.xpos[torso_id][:2]
-                    target_yaw = np.arctan2(target_vector[1], target_vector[0])
-                    yaw_error = target_yaw - robot_yaw
-                    yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
-
-                    # 转向回正控制
-                    abdomen_z_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
-                    hip_z_right_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_right")
-                    hip_z_left_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_left")
-
-                    if 0 <= abdomen_z_act_id < len(data.ctrl) - 1:
-                        data.ctrl[abdomen_z_act_id] = heading_kp * yaw_error * return_speed
-                    if 0 <= hip_z_right_act_id < len(data.ctrl) - 1:
-                        data.ctrl[hip_z_right_act_id] = -yaw_error * return_speed * 0.7
-                    if 0 <= hip_z_left_act_id < len(data.ctrl) - 1:
-                        data.ctrl[hip_z_left_act_id] = yaw_error * return_speed * 0.7
-
-                    # 保持基本站立姿态
-                    for side in ["right", "left"]:
-                        hip_y_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_y_{side}")
-                        knee_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"knee_{side}")
-                        ankle_y_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_y_{side}")
-                        if 0 <= hip_y_act_id < len(data.ctrl) - 1:
-                            data.ctrl[hip_y_act_id] = -0.7
-                        if 0 <= knee_act_id < len(data.ctrl) - 1:
-                            data.ctrl[knee_act_id] = 1.0
-                        if 0 <= ankle_y_act_id < len(data.ctrl) - 1:
-                            data.ctrl[ankle_y_act_id] = 0.3
-
-                elif avoid_obstacle:
-                    # 避障模式：转向绕开最近障碍
-                    avoid_phase = (time.time() - obstacle_avoidance_time) / obstacle_avoidance_duration
-                    turn_speed = 1.4 * np.sin(avoid_phase * np.pi)  # 转向力度
-
-                    # 转向控制
-                    hip_z_right_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_right")
-                    hip_z_left_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "hip_z_left")
-                    abdomen_z_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
-
-                    if 0 <= hip_z_right_act_id < len(data.ctrl) - 1:
-                        data.ctrl[hip_z_right_act_id] = turn_direction * turn_speed * 1.0
-                    if 0 <= hip_z_left_act_id < len(data.ctrl) - 1:
-                        data.ctrl[hip_z_left_act_id] = -turn_direction * turn_speed * 1.0
-                    if 0 <= abdomen_z_act_id < len(data.ctrl) - 1:
-                        data.ctrl[abdomen_z_act_id] = turn_direction * turn_speed * 1.8
-
-                    # 保持平衡
-                    for side in ["right", "left"]:
-                        hip_y_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_y_{side}")
-                        knee_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"knee_{side}")
-                        ankle_x_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_x_{side}")
-                        if 0 <= hip_y_act_id < len(data.ctrl) - 1:
-                            data.ctrl[hip_y_act_id] = -1.0
-                        if 0 <= knee_act_id < len(data.ctrl) - 1:
-                            data.ctrl[knee_act_id] = 1.2
-                        if 0 <= ankle_x_act_id < len(data.ctrl) - 1:
-                            data.ctrl[ankle_x_act_id] = 0.2
-
-                else:
-                    # 正常导航模式：向目标点移动
-                    torso_quat = data.xquat[torso_id]
-                    robot_yaw = np.arctan2(2 * (torso_quat[2] * torso_quat[3] - torso_quat[0] * torso_quat[1]),
-                                           torso_quat[0] ** 2 - torso_quat[1] ** 2 - torso_quat[2] ** 2 + torso_quat[
-                                               3] ** 2)
-                    target_vector = TARGET_POS - data.xpos[torso_id][:2]
-                    target_yaw = np.arctan2(target_vector[1], target_vector[0])
-                    yaw_error = target_yaw - robot_yaw
-                    yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))
-
-                    # 朝向目标点的转向控制
-                    abdomen_z_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
-                    if 0 <= abdomen_z_act_id < len(data.ctrl) - 1:
-                        data.ctrl[abdomen_z_act_id] = heading_kp * yaw_error * 0.1
-
-                    # 腿部步态控制（向目标点前进）
-                    for side, sign in [("right", 1), ("left", -1)]:
-                        swing_phase = (phase + 0.5 * sign) % 1.0
-
-                        # 查询电机ID
-                        hip_x_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_x_{side}")
-                        hip_z_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_z_{side}")
-                        hip_y_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"hip_y_{side}")
-                        knee_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"knee_{side}")
-                        ankle_y_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_y_{side}")
-                        ankle_x_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"ankle_x_{side}")
-
-                        # 腿部关节控制（适配导航）
-                        if 0 <= hip_x_act_id < len(data.ctrl) - 1:
-                            data.ctrl[hip_x_act_id] = swing_gain * np.sin(2 * np.pi * swing_phase) * forward_speed
-                        if 0 <= hip_z_act_id < len(data.ctrl) - 1:
-                            data.ctrl[hip_z_act_id] = stance_gain * np.cos(
-                                2 * np.pi * swing_phase) * 0.2 + yaw_error * 0.1
-                        if 0 <= hip_y_act_id < len(data.ctrl) - 1:
-                            data.ctrl[hip_y_act_id] = -0.9 * np.sin(2 * np.pi * swing_phase) - 0.4
-                        if 0 <= knee_act_id < len(data.ctrl) - 1:
-                            data.ctrl[knee_act_id] = 1.2 * np.sin(2 * np.pi * swing_phase) + 0.7
-                        if 0 <= ankle_y_act_id < len(data.ctrl) - 1:
-                            data.ctrl[ankle_y_act_id] = 0.3 * np.cos(2 * np.pi * swing_phase)
-                        if 0 <= ankle_x_act_id < len(data.ctrl) - 1:
-                            data.ctrl[ankle_x_act_id] = 0.15 * np.sin(2 * np.pi * swing_phase)
-
-                    # 躯干稳定控制
-                    abdomen_x_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_z")
-                    abdomen_y_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_y")
-                    abdomen_z_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "abdomen_x")
-
-                    pitch = 2 * (torso_quat[1] * torso_quat[3] - torso_quat[0] * torso_quat[2])
-                    roll = 2 * (torso_quat[0] * torso_quat[1] + torso_quat[2] * torso_quat[3])
-
-                    # 平衡补偿
-                    if 0 <= abdomen_x_act_id < len(data.ctrl) - 1:
-                        data.ctrl[abdomen_x_act_id] = balance_kp * (torso_roll_target - roll) - balance_kd * \
-                                                      data.qvel[abdomen_x_act_id]
-                    if 0 <= abdomen_y_act_id < len(data.ctrl) - 1:
-                        data.ctrl[abdomen_y_act_id] = balance_kp * (torso_pitch_target - pitch) - balance_kd * \
-                                                      data.qvel[abdomen_y_act_id]
-
-                    # 手臂自然摆动
-                    for side, sign in [("right", 1), ("left", -1)]:
-                        shoulder1_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"shoulder1_{side}")
-                        shoulder2_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"shoulder2_{side}")
-                        elbow_act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"elbow_{side}")
-
-                        shoulder1_cmd = 0.2 * np.sin(2 * np.pi * (phase + 0.5 * sign))
-                        shoulder2_cmd = 0.15 * np.cos(2 * np.pi * (phase + 0.5 * sign))
-                        elbow_cmd = -0.4 * np.sin(2 * np.pi * (phase + 0.5 * sign)) - 0.25
-
-                        if 0 <= shoulder1_act_id < len(data.ctrl) - 1:
-                            data.ctrl[shoulder1_act_id] = shoulder1_cmd
-                        if 0 <= shoulder2_act_id < len(data.ctrl) - 1:
-                            data.ctrl[shoulder2_act_id] = shoulder2_cmd
-                        if 0 <= elbow_act_id < len(data.ctrl) - 1:
-                            data.ctrl[elbow_act_id] = elbow_cmd
-
-                # -------------------------- 7. 仿真推进 --------------------------
-                mujoco.mj_step(model, data)
-                viewer_instance.sync()
-
-                # 实时状态输出（含导航信息）
-                if torso_id != -1 and int(elapsed_time * 2) % 2 == 0:
-                    if target_reached:
-                        status = "✅ 到达目标点"
-                        nav_info = "—"
-                        dist_info = "—"
-                        wall2_pos_info = "—"
-                    elif stop_walk:
-                        status = "已停止"
-                        nav_info = "—"
-                        dist_info = "—"
-                        wall2_pos_info = "—"
-                    else:
-                        if return_to_path:
-                            status = "回归导航路径中"
-                        elif avoid_obstacle:
-                            status = f"避障中（{dir_name}）"
-                        else:
-                            status = "向目标点移动中"
-
-                        # 导航信息
-                        distance_to_target = np.linalg.norm(TARGET_POS - data.xpos[torso_id][:2])
-                        nav_info = f"剩余{distance_to_target:.2f}m | 朝向误差{np.degrees(yaw_error):.1f}°"
-
-                        # 障碍信息
-                        dist_info = f"{distance_to_closest_wall:.2f}m（{closest_wall_name}）"
-
-                        # 动态障碍位置信息
-                        if wall2_body_id != -1:
-                            wall2_current_pos = data.xpos[wall2_body_id]
-                            wall2_pos_info = f"wall2(Y):{wall2_current_pos[1]:.2f}m"
-                        else:
-                            wall2_pos_info = "wall2:未知"
-
-                    torso_pos = data.xpos[torso_id]
-                    print(
-                        f"\r时间：{elapsed_time:.1f}s | 位置：x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f} | 导航：{nav_info} | 障碍：{dist_info} | 动态障碍：{wall2_pos_info} | 状态：{status}",
-                        end="")
-
-                time.sleep(model.opt.timestep * 2)
-
-        except KeyboardInterrupt:
-            print("\n\n仿真被用户中断")
-        except Exception as e:
-            print(f"\n\n运行错误：{e}")
-            import traceback
-            traceback.print_exc()
+            except KeyboardInterrupt:
+                print("\n\n🛑 Simulation interrupted by user")
+            except Exception as e:
+                print(f"\n\n❌ Simulation error: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                if self.torso_id != -1:
+                    elapsed_time = time.time() - self.sim_start_time
+                    torso_pos = self.data.xpos[self.torso_id]
+                    print(f"\n\n📋 Simulation Summary:")
+                    print(f"   Total runtime: {elapsed_time:.1f} seconds")
+                    print(f"   Patrol cycles completed: {self.patrol_cycles}")
+                    print(f"   Final position: x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f}")
+                    print("🤖 Simulation ended successfully")
 
 
 if __name__ == "__main__":
-    model_file = "Robot_move_straight.xml"  # 你的模型文件名
-    control_robot(model_file)
+    # Set default model path (relative path for GitHub compatibility)
+    model_file = "Robot_move_straight.xml"
+
+    # Check command line argument for model path
+    if len(sys.argv) > 1:
+        model_file = sys.argv[1]
+
+    # Check if model file exists
+    if not os.path.exists(model_file):
+        print(f"❌ Model file not found: {model_file}")
+        print(f"ℹ️  Current working directory: {os.getcwd()}")
+        sys.exit(1)
+
+    # Initialize and run controller
+    try:
+        controller = DynamicPatrolController(model_file)
+        controller.run_simulation()
+    except Exception as e:
+        print(f"\n❌ Failed to start simulation: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
