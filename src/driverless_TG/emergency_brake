@@ -10,7 +10,7 @@ plt.rcParams['figure.figsize'] = (14, 9)      # 图片默认尺寸
 plt.rcParams['savefig.dpi'] = 300             # 保存图片的分辨率
 plt.rcParams['figure.dpi'] = 100              # 显示图片的分辨率
 
-# ===================== 1.1 生成无人车刹车场景数据 111=====================
+# ===================== 1.11 生成无人车刹车场景数据 111=====================
 def generate_vehicle_data(n_samples=8000):
     """生成模拟数据集（纯Python实现，含物理模型+噪声）"""
     random.seed(42)  # 固定随机种子，保证结果可复现
