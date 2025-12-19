@@ -6,7 +6,74 @@ import os
 import sys
 import threading
 
-# 新增：键盘输入监听线程（用于手动控制状态/转向/速度，不阻塞仿真循环）
+# ===================== 新增：ROS话题接收模块（可选兼容，无ROS不报错） =====================
+class ROSCmdVelHandler(threading.Thread):
+    """ROS /cmd_vel话题接收线程，映射linear.x→速度，angular.z→转向"""
+    def __init__(self, stabilizer):
+        super().__init__(daemon=True)
+        self.stabilizer = stabilizer
+        self.running = True
+        self.has_ros = False
+        self.twist_msg = None
+
+        # 尝试导入ROS库，无ROS则跳过
+        try:
+            import rospy
+            from geometry_msgs.msg import Twist
+            self.rospy = rospy
+            self.Twist = Twist
+            self.has_ros = True
+        except ImportError:
+            print("[ROS提示] 未检测到ROS环境，跳过/cmd_vel话题监听（仅保留键盘控制）")
+            return
+
+        # 初始化ROS节点
+        try:
+            if not self.rospy.core.is_initialized():
+                self.rospy.init_node('humanoid_cmd_vel_listener', anonymous=True)
+            # 订阅/cmd_vel话题（队列大小1，避免延迟）
+            self.sub = self.rospy.Subscriber(
+                "/cmd_vel", self.Twist, self._cmd_vel_callback, queue_size=1
+            )
+            print("[ROS提示] 已启动/cmd_vel话题监听：")
+            print("  - linear.x (0.1~1.0) → 行走速度（0.1=最慢，1.0=最快）")
+            print("  - angular.z (-1.0~1.0) → 转向角度（正=左转，负=右转，映射±0.3rad）")
+        except Exception as e:
+            print(f"[ROS提示] ROS节点初始化失败：{e}")
+            self.has_ros = False
+
+    def _cmd_vel_callback(self, msg):
+        """回调函数：解析/cmd_vel并映射到速度/转向"""
+        self.twist_msg = msg
+        # 1. linear.x → 行走速度（限幅0.1~1.0）
+        target_speed = np.clip(msg.linear.x, 0.1, 1.0)
+        # 2. angular.z → 转向角度（-1.0~1.0映射到-0.3~0.3rad）
+        target_turn = np.clip(msg.angular.z, -1.0, 1.0) * 0.3  # 缩放系数0.3
+
+        # 更新到控制器（优先级高于键盘，避免冲突）
+        self.stabilizer.set_walk_speed(target_speed)
+        self.stabilizer.set_turn_angle(target_turn)
+
+        # 自动触发行走（如果接收到速度指令且当前是停止状态）
+        if target_speed > 0.1 and self.stabilizer.state == "STAND":
+            self.stabilizer.set_state("WALK")
+
+        # 调试输出
+        if self.stabilizer.data.time % 0.5 < 0.1:  # 避免刷屏，每0.5秒输出一次
+            print(f"[ROS指令] 速度={target_speed:.2f} | 转向={target_turn:.2f}rad")
+
+    def run(self):
+        """线程主循环（ROS自旋）"""
+        if not self.has_ros:
+            return
+        while self.running and not self.rospy.is_shutdown():
+            self.rospy.spin_once()
+            time.sleep(0.01)
+
+    def stop(self):
+        self.running = False
+
+# ===================== 原始代码：键盘输入监听线程（完全保留） =====================
 class KeyboardInputHandler(threading.Thread):
     def __init__(self, stabilizer):
         super().__init__(daemon=True)
@@ -64,7 +131,7 @@ class KeyboardInputHandler(threading.Thread):
             self.stabilizer.set_walk_speed(self.stabilizer.walk_speed + 0.1)
             print(f"[指令] 加速 | 当前速度: {self.stabilizer.walk_speed:.2f}")
 
-# 新增：CPG中枢模式发生器（替代固定正弦步态，兼容变速/步长联动）
+# ===================== 原始代码：CPG中枢模式发生器（完全保留） =====================
 class CPGOscillator:
     def __init__(self, freq=0.5, amp=0.4, phase=0.0, coupling_strength=0.2):
         self.base_freq = freq  # 基础频率（对应原始步态周期2s）
@@ -99,6 +166,7 @@ class CPGOscillator:
     def base_phase(self):
         return 0.0 if self.phase < np.pi else np.pi
 
+# ===================== 原始代码：人形机器人控制器（完全保留，仅新增ROS线程启动） =====================
 class HumanoidStabilizer:
     """适配humanoid.xml模型的稳定站立与行走控制器（新增转向/变速/状态机）"""
 
@@ -479,9 +547,13 @@ class HumanoidStabilizer:
         self.prev_com = com
         return torques
 
-    # 原始方法：仿真循环（修改：加入键盘监听线程，保留所有原始逻辑）
+    # 原始方法：仿真循环（修改：新增ROS线程启动，保留所有原始逻辑）
     def simulate_stable_standing(self):
-        # 新增：启动键盘监听线程（控制状态/转向/速度）
+        # 新增：启动ROS /cmd_vel监听线程
+        self.ros_handler = ROSCmdVelHandler(self)
+        self.ros_handler.start()
+
+        # 原始：启动键盘监听线程
         keyboard_handler = KeyboardInputHandler(self)
         keyboard_handler.start()
 
@@ -536,6 +608,8 @@ class HumanoidStabilizer:
                     self.set_state("STAND")  # 跌倒后自动恢复站立
                     # break  # 注释掉break，跌倒后可继续控制
 
+        # 停止ROS线程
+        self.ros_handler.stop()
         print("仿真完成！")
 
 
