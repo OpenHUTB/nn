@@ -700,3 +700,69 @@ QGIS内置了多语言支持，切换为中文无需安装额外语言包。
 *   **性能与精度平衡**：面对超大范围的高密度点云，需在数据精度与软件交互流畅性之间取得平衡。实践中，可根据当前建模的细节等级需求，选择使用点云的全分辨率版本，或通过抽稀处理后的轻量化版本作为参考背景，以实现更高效的操作体验。
 
 在 RoadRunner 中引入点云数据，实质上是构建了一条 **“物理感知-数字建模-虚拟仿真”** 的数字化管道。它不仅是提升单点建模效率的工具，更是确保虚拟环境在几何、语义和行为层面与真实世界保持一致的关键技术环节，为高可靠性的自动驾驶系统测试与验证提供了至关重要的环境基础。
+
+# 从何处获取点云数据
+
+Sydney Urban Objects Dataset
+
+链接: [Sydney Urban Objects Dataset](https://www.acfr.usyd.edu.au/papers/data.shtml)
+
+介绍: 由悉尼大学提供的城市道路物体点云数据集，使用Velodyne HDL-64E LIDAR在悉尼中央商务区收集。包含车辆、行人、广告牌等分类信息，适用于自动驾驶技术的研究。
+
+Large-Scale Point Cloud Classification Benchmark (Semantic3D)
+
+链接: [Semantic3D](http://www.semantic3d.net/)
+
+介绍: 包含了大量标记的城市环境3D点云数据集，适合大规模点云分类研究。涵盖了从教堂到铁路轨道等多种场景，数据量大且标注详细。
+
+KITTI Vision Benchmark Suite
+
+链接: [KITTI Vision Benchmark Suite](http://www.cvlibs.net/datasets/kitti/)
+
+介绍: 主要面向自动驾驶领域，提供了丰富的传感器数据，包括点云、图像、GPS和IMU数据。数据来源于真实世界的驾驶场景，是评估自动驾驶系统性能的重要资源。
+
+OpenTopography
+
+链接: [OpenTopography](https://opentopography.org/)
+
+<img width="1920" height="1150" alt="364f1c173de0e829083dc59dbcce0418" src="https://github.com/user-attachments/assets/20e523a0-64b5-4d6c-a15a-dcec014be906" />
+
+介绍: 提供全球范围内的高分辨率地形数据，包括激光雷达（LiDAR）点云数据。适合地理信息系统（GIS）、地貌学和其他地球科学领域的研究人员使用。
+
+USGS National Map 3DEP Program
+
+链接: [](https://apps.nationalmap.gov/downloader/)
+
+<img width="1920" height="1149" alt="image" src="https://github.com/user-attachments/assets/6db55a2f-d0e5-4d9c-8abc-2d72d78bdfcd" />
+
+
+介绍: 美国地质调查局提供的全国3D高程计划（3DEP），包含了美国本土的LiDAR点云数据，可用于洪水建模、水资源管理等多个领域。
+
+# 以美国国家地质调查局（USGS）为例
+
+**1.打开[](https://apps.nationalmap.gov/downloader/)**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/c9395f59-a521-4f34-ae83-4057c636dce6" />
+
+**2.通过鼠标的拖拽和缩放将你需要获取数据的区域大致移到你的屏幕中央**
+
+**3.在左侧的“地图数据”勾选高程源数据选项**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/a580ee02-7a98-48e9-b17e-d53e98888936" />
+
+**4.滚动滚轮，在下方勾选“Lidar Point Cloud (LPC)”和“ LAS,LAZ”项**
+
+<img width="755" height="550" alt="image" src="https://github.com/user-attachments/assets/84d371c4-62fb-4553-8308-dff4b0d26a8b" />
+
+**4.在左上方勾选你用来标定具体区域的方法，此处我以“范围”为例**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/7c67a50a-a4c4-41eb-b5ea-8265b6b1929d" />
+
+**5.搜索产品**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/51bffa50-40ec-4dde-b0fd-e7023d24f74c" />
+
+**6.下载数据**
+
+<img width="580" height="941" alt="image" src="https://github.com/user-attachments/assets/0e52a073-0c79-44c0-b95a-8045f2599fe5" />
+在左侧选中需要的数据后点击Download Link (LAZ)进行下载
