@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import matplotlib.patches as patches
-
 # ==================== PyCharm环境配置 ====================
 plt.switch_backend('TkAgg')  # 显示交互窗口（如需静默保存改'Agg'）
 plt.rcParams['font.sans-serif'] = ['SimHei']  # 解决中文显示
