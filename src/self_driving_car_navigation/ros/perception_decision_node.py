@@ -15,11 +15,14 @@ class PerceptionDecisionNode:
         self.node_name = rospy.get_name()
         rospy.loginfo(f"[{self.node_name}] 节点初始化成功！")
 
-        # 加载参数（带默认值，可通过命令行/launch动态修改）
-        self.image_shape = rospy.get_param('~image_shape', (3, 128, 128))
-        self.feature_dim = rospy.get_param('~feature_dim', 128)
-        self.cmd_dim = rospy.get_param('~cmd_dim', 2)
-        self.timer_freq = rospy.get_param('~timer_freq', 10.0)
+     
+        image_shape_str = rospy.get_param('~image_shape', "[3, 128, 128]")  # 读字符串
+        self.image_shape = tuple(map(int, image_shape_str.strip('[]').replace(' ', '').split(',')))  # 核心转换
+
+        # 2. 处理数值型参数（字符串→int/float）
+        self.feature_dim = int(rospy.get_param('~feature_dim', 128))  # 转整数
+        self.cmd_dim = int(rospy.get_param('~cmd_dim', 2))            # 转整数
+        self.timer_freq = float(rospy.get_param('~timer_freq', 10.0)) # 转浮点数
         
         # 打印加载的参数（日志格式和你预期的一致）
         rospy.loginfo(f"[{self.node_name}] 加载参数完成：")

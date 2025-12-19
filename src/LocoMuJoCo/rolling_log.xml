@@ -1,0 +1,28 @@
+<mujoco model="adjusted_smooth_cylinder">
+  <include file="../common/scene.xml"/>
+  <compiler angle="radian" meshdir="assets" texturedir="assets"/>
+  
+  <!-- 保留PNG纹理关联的材质定义 -->
+  <asset>
+    <texture type="2d" name="wood_base_tex" file="wood_base_texture.png"/>
+    <texture type="2d" name="bark_tex" file="bark_texture.png"/>
+    
+    <material name="wood_base" texture="wood_base_tex" rgba="0.72 0.5 0.3 1" specular="0.1" shininess="0.3"/>
+    <material name="bark" texture="bark_tex" rgba="0.6 0.4 0.22 1" specular="0"/>
+  </asset>
+
+  <worldbody>
+    <body name="log" pos="0 0 0.18"> <!-- 调整高度位置以匹配径向尺寸 -->
+      <freejoint name="log_root"/>
+      <inertial pos="0 0 0" mass="8" diaginertia="0.8 0.8 0.3"/> <!-- 适配新尺寸的惯性参数 -->
+      
+      <!-- 核心圆柱体（更矮更短） -->
+      <!-- fromto控制长度（沿x轴）：-0.5到0.5 → 总长度1.0（原1.4） -->
+      <!-- size控制半径：0.18（原0.22）→ 直径0.36（更矮） -->
+      <geom name="log_core" type="cylinder" fromto="-0.5 0 0 0.5 0 0" size="0.18" material="wood_base"/>
+      
+      <!-- 外层树皮（与核心等长，径向略大） -->
+      <geom name="bark_outer" type="cylinder" fromto="-0.5 0 0 0.5 0 0" size="0.19" material="bark"/>
+    </body>
+  </worldbody>
+</mujoco>

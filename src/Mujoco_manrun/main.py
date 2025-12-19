@@ -5,11 +5,7 @@ import time
 import os
 import sys
 import threading
-import select  # 新增：跨平台输入兼容
-import queue  # 新增：输入队列，避免阻塞
-
-# ===================== 全局输入队列（解决Windows输入阻塞） =====================
-input_queue = queue.Queue()
+from collections import deque
 
 
 # ===================== ROS话题接收模块（原有逻辑完全保留） =====================
@@ -40,8 +36,7 @@ class ROSCmdVelHandler(threading.Thread):
                 self.rospy.init_node('humanoid_cmd_vel_listener', anonymous=True)
             # 订阅/cmd_vel话题（队列大小1，避免延迟）
             self.sub = self.rospy.Subscriber(
-                "/cmd_vel", self.Twist, self._cmd_vel_callback,
-                queue_size=1, tcp_nodelay=True
+                "/cmd_vel", self.Twist, self._cmd_vel_callback, queue_size=1, tcp_nodelay=True
             )
             print("[ROS提示] 已启动/cmd_vel话题监听：")
             print("  - linear.x (0.1~1.0) → 行走速度（0.1=最慢，1.0=最快）")
@@ -64,11 +59,12 @@ class ROSCmdVelHandler(threading.Thread):
 
         # 自动触发行走（如果接收到速度指令且当前是停止状态）
         if target_speed > 0.1 and self.stabilizer.state == "STAND":
-            self.stabilizer.set_state("WALK")
+            self.stabilizer.set_state("WALK")  # 默认切换到正常走
 
         # 调试输出
         if self.stabilizer.data.time % 0.5 < 0.1:  # 避免刷屏，每0.5秒输出一次
-            print(f"[ROS指令] 速度={target_speed:.2f} | 转向={target_turn:.2f}rad")
+            print(
+                f"[ROS指令] 速度={target_speed:.2f} | 转向={target_turn:.2f}rad | 当前步态: {self.stabilizer.gait_mode}")
 
     def run(self):
         """线程主循环（ROS自旋）"""
@@ -76,66 +72,51 @@ class ROSCmdVelHandler(threading.Thread):
             return
         while self.running and not self.rospy.is_shutdown():
             self.rospy.spin_once()
-            time.sleep(0.001)  # 缩短sleep，适配Windows线程
+            time.sleep(0.01)
 
     def stop(self):
         self.running = False
 
 
-# ===================== 键盘输入监听线程（修复Windows兼容） =====================
+# ===================== 键盘输入监听线程（新增步态切换按键） =====================
 class KeyboardInputHandler(threading.Thread):
     def __init__(self, stabilizer):
         super().__init__(daemon=True)
         self.stabilizer = stabilizer
         self.running = True
-        self.is_windows = sys.platform == "win32"
 
     def run(self):
         print("\n===== 控制指令说明 =====")
         print("w: 开始行走 | s: 停止行走 | e: 紧急停止 | r: 恢复站立")
         print("a: 左转 | d: 右转 | 空格: 原地转向 | z: 减速 | x: 加速")
+        print("m: 传感器模拟开关 | p: 打印传感器数据")
+        print("1: 慢走 | 2: 正常走 | 3: 小跑 | 4: 原地踏步")  # 新增步态切换
         print("========================\n")
-
         while self.running:
             try:
-                key = None
-                # 修复：Windows下msvcrt输入逻辑（Python3.13兼容）
-                if self.is_windows:
+                # 非阻塞键盘输入（兼容不同系统）
+                if sys.platform == "win32":
                     import msvcrt
                     if msvcrt.kbhit():
-                        ch = msvcrt.getch()
-                        # 处理Python3.13编码问题：区分字节串和字符
-                        if isinstance(ch, bytes):
-                            try:
-                                key = ch.decode('utf-8', errors='ignore').lower()
-                            except:
-                                key = None
-                        else:
-                            key = ch.lower()
-                        # 处理特殊键（如箭头键，避免乱码）
-                        if key in ['\x00', '\xe0']:
-                            msvcrt.getch()  # 跳过扩展键
-                            key = None
-                # Linux/Mac输入逻辑（保留）
+                        key = msvcrt.getch().decode('utf-8').lower()
+                        self._handle_key(key)
                 else:
+                    import select
                     if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                         key = sys.stdin.read(1).lower()
-
-                if key:
-                    input_queue.put(key)  # 放入队列，避免阻塞
-                    self._handle_key(key)
-                time.sleep(0.001)  # 降低CPU占用，适配Windows
-            except Exception as e:
-                # 容错：避免输入异常导致线程退出
-                print(f"[键盘输入警告] {e}（忽略，继续监听）")
+                        self._handle_key(key)
                 time.sleep(0.01)
+            except:
                 continue
 
     def _handle_key(self, key):
         if key == 'w':
+            # 启动行走时保留当前步态模式
+            current_gait = self.stabilizer.gait_mode
             self.stabilizer.set_state("WALK")
+            self.stabilizer.set_gait_mode(current_gait)
             print(
-                f"[指令] 切换为行走状态 | 当前速度: {self.stabilizer.walk_speed:.2f} | 转向: {self.stabilizer.turn_angle:.2f}")
+                f"[指令] 切换为行走状态 | 当前步态: {current_gait} | 速度: {self.stabilizer.walk_speed:.2f} | 转向: {self.stabilizer.turn_angle:.2f}")
         elif key == 's':
             self.stabilizer.set_state("STOP")
             print("[指令] 切换为停止状态")
@@ -156,13 +137,36 @@ class KeyboardInputHandler(threading.Thread):
             print(f"[指令] 原地转向 | 当前转向角度: {self.stabilizer.turn_angle:.2f}rad")
         elif key == 'z':
             self.stabilizer.set_walk_speed(self.stabilizer.walk_speed - 0.1)
-            print(f"[指令] 减速 | 当前速度: {self.stabilizer.walk_speed:.2f}")
+            print(f"[指令] 减速 | 当前速度: {self.stabilizer.walk_speed:.2f} | 当前步态: {self.stabilizer.gait_mode}")
         elif key == 'x':
             self.stabilizer.set_walk_speed(self.stabilizer.walk_speed + 0.1)
-            print(f"[指令] 加速 | 当前速度: {self.stabilizer.walk_speed:.2f}")
+            print(f"[指令] 加速 | 当前速度: {self.stabilizer.walk_speed:.2f} | 当前步态: {self.stabilizer.gait_mode}")
+        elif key == 'm':
+            # 传感器模拟开关
+            self.stabilizer.enable_sensor_simulation = not self.stabilizer.enable_sensor_simulation
+            print(f"[指令] 传感器模拟{'开启' if self.stabilizer.enable_sensor_simulation else '关闭'}")
+        elif key == 'p':
+            # 打印传感器数据
+            self.stabilizer.print_sensor_data()
+        # 新增：步态模式切换
+        elif key == '1':
+            self.stabilizer.set_gait_mode("SLOW")
+            print(
+                f"[指令] 切换为慢走模式 | CPG频率: {self.stabilizer.gait_config['SLOW']['freq']:.2f}Hz | 振幅: {self.stabilizer.gait_config['SLOW']['amp']:.2f}")
+        elif key == '2':
+            self.stabilizer.set_gait_mode("NORMAL")
+            print(
+                f"[指令] 切换为正常走模式 | CPG频率: {self.stabilizer.gait_config['NORMAL']['freq']:.2f}Hz | 振幅: {self.stabilizer.gait_config['NORMAL']['amp']:.2f}")
+        elif key == '3':
+            self.stabilizer.set_gait_mode("TROT")
+            print(
+                f"[指令] 切换为小跑模式 | CPG频率: {self.stabilizer.gait_config['TROT']['freq']:.2f}Hz | 振幅: {self.stabilizer.gait_config['TROT']['amp']:.2f}")
+        elif key == '4':
+            self.stabilizer.set_gait_mode("STEP_IN_PLACE")
+            print(f"[指令] 切换为原地踏步模式 | 步幅减半，躯干锁定")
 
 
-# ===================== CPG中枢模式发生器（原有逻辑保留） =====================
+# ===================== CPG中枢模式发生器（原有逻辑完全保留） =====================
 class CPGOscillator:
     def __init__(self, freq=0.5, amp=0.4, phase=0.0, coupling_strength=0.2):
         self.base_freq = freq  # 基础频率（对应原始步态周期2s）
@@ -207,9 +211,9 @@ class CPGOscillator:
         return 0.0 if self.phase < np.pi else np.pi
 
 
-# ===================== 人形机器人控制器（修复Windows仿真逻辑） =====================
+# ===================== 人形机器人控制器（新增多步态模式） =====================
 class HumanoidStabilizer:
-    """适配humanoid.xml模型的稳定站立与行走控制器（新增步态鲁棒性优化）"""
+    """适配humanoid.xml模型的稳定站立与行走控制器（新增多步态+传感器模拟+鲁棒性优化）"""
 
     def __init__(self, model_path):
         # 类型检查与模型加载（原有逻辑完全保留）
@@ -222,14 +226,13 @@ class HumanoidStabilizer:
         except Exception as e:
             raise RuntimeError(f"模型加载失败：{e}\n请检查路径和文件完整性")
 
-        # 仿真核心参数（修复：适配Windows时间精度）
+        # 仿真核心参数（原有逻辑保留）
         self.sim_duration = 120.0
         self.dt = self.model.opt.timestep
         self.init_wait_time = 4.0
         self.model.opt.gravity[2] = -9.81
         self.model.opt.iterations = 200
         self.model.opt.tolerance = 1e-8
-        self.sim_sleep_scale = 0.1  # 修复：Windows下缩短sleep时间，提升响应
 
         # 关节名称映射（原有逻辑完全保留）
         self.joint_names = [
@@ -280,26 +283,76 @@ class HumanoidStabilizer:
         self.filter_alpha = 0.1  # 低通滤波系数（新增，0.1=更平滑）
         self.enable_robust_optim = True  # 鲁棒优化开关（新增，默认启用）
 
-        # 运动状态机（原有逻辑完全保留）
+        # ===================== 新增：多步态模式配置 =====================
+        # 步态参数配置（可根据需求调整）
+        self.gait_config = {
+            "SLOW": {  # 慢走：低频、小步幅、高耦合（稳定）
+                "freq": 0.3,  # CPG基础频率
+                "amp": 0.3,  # CPG基础振幅
+                "coupling": 0.3,  # CPG耦合强度
+                "speed_freq_gain": 0.2,  # 速度→频率增益
+                "speed_amp_gain": 0.1,  # 速度→振幅增益
+                "com_z_offset": 0.02  # 重心z轴抬高（更稳定）
+            },
+            "NORMAL": {  # 正常走：原有参数
+                "freq": 0.5,
+                "amp": 0.4,
+                "coupling": 0.2,
+                "speed_freq_gain": 0.4,
+                "speed_amp_gain": 0.2,
+                "com_z_offset": 0.0
+            },
+            "TROT": {  # 小跑：高频、大步幅、中耦合（快速）
+                "freq": 0.8,
+                "amp": 0.5,
+                "coupling": 0.25,
+                "speed_freq_gain": 0.5,
+                "speed_amp_gain": 0.3,
+                "com_z_offset": -0.01  # 重心略降低（提升步幅）
+            },
+            "STEP_IN_PLACE": {  # 原地踏步：步幅减半、躯干锁定
+                "freq": 0.4,
+                "amp": 0.2,  # 步幅减半
+                "coupling": 0.3,
+                "speed_freq_gain": 0.0,  # 速度不影响频率
+                "speed_amp_gain": 0.0,  # 速度不影响振幅
+                "com_z_offset": 0.01,
+                "lock_torso": True  # 锁定躯干偏航/俯仰
+            }
+        }
+        self.gait_mode = "NORMAL"  # 默认步态：正常走
+        self.current_gait_params = self.gait_config[self.gait_mode]
+
+        # 运动状态机（扩展步态相关状态，原有状态保留）
         self.state = "STAND"  # 初始状态：STAND/WALK/STOP/EMERGENCY
         self.state_map = {
             "STAND": self._state_stand,  # 站立（初始稳定）
-            "WALK": self._state_walk,  # 行走（CPG驱动）
+            "WALK": self._state_walk,  # 行走（根据当前步态模式调整）
             "STOP": self._state_stop,  # 停止（关节归零）
             "EMERGENCY": self._state_emergency  # 急停（力矩清零）
         }
 
-        # CPG振荡器（原有逻辑保留，使用优化后的CPG类）
-        self.right_leg_cpg = CPGOscillator(freq=0.5, amp=0.4, phase=0.0)  # 右腿初始相位0
-        self.left_leg_cpg = CPGOscillator(freq=0.5, amp=0.4, phase=np.pi)  # 左腿初始相位π（交替）
+        # CPG振荡器（初始化时加载默认步态参数）
+        self.right_leg_cpg = CPGOscillator(
+            freq=self.current_gait_params["freq"],
+            amp=self.current_gait_params["amp"],
+            phase=0.0,
+            coupling_strength=self.current_gait_params["coupling"]
+        )
+        self.left_leg_cpg = CPGOscillator(
+            freq=self.current_gait_params["freq"],
+            amp=self.current_gait_params["amp"],
+            phase=np.pi,
+            coupling_strength=self.current_gait_params["coupling"]
+        )
         self.gait_phase = 0.0  # 保留原始相位变量，兼容调试输出
 
-        # 转向/变速参数（原有逻辑完全保留）
+        # 转向/变速参数（原有逻辑保留，步态切换时动态更新）
         self.turn_angle = 0.0  # 转向角度（左正右负，范围±0.3rad）
         self.turn_gain = 0.1  # 躯干偏航增益
-        self.walk_speed = 0.5  # 行走速度（0.1~1.0，映射到CPG频率/振幅）
-        self.speed_freq_gain = 0.4  # 速度→频率增益（0.3~0.7Hz）
-        self.speed_amp_gain = 0.2  # 速度→振幅增益（0.3~0.5）
+        self.walk_speed = 0.5  # 行走速度（0.1~1.0）
+        self.speed_freq_gain = self.current_gait_params["speed_freq_gain"]
+        self.speed_amp_gain = self.current_gait_params["speed_amp_gain"]
 
         # 行走功能参数（原有逻辑保留）
         self.gait_cycle = 2.0
@@ -308,8 +361,53 @@ class HumanoidStabilizer:
         self.step_offset_ankle = 0.3
         self.walk_start_time = None
 
+        # ===================== 传感器模拟相关参数（原有新增逻辑保留） =====================
+        self.enable_sensor_simulation = True  # 传感器模拟开关（默认开启）
+        # IMU传感器噪声参数（可调整）
+        self.imu_angle_noise = 0.01  # 欧拉角噪声标准差（rad）
+        self.imu_vel_noise = 0.05  # 角速度噪声标准差（rad/s）
+        self.imu_delay_frames = 2  # IMU延迟帧数（模拟硬件传输延迟）
+        # 足底力传感器噪声参数
+        self.foot_force_noise = 0.3  # 足底力噪声标准差（N）
+        self.foot_force_offset = 0.1  # 足底力偏移误差（模拟零漂）
+        # 传感器数据缓存（用于模拟延迟）
+        self.imu_data_buffer = deque(maxlen=self.imu_delay_frames)
+        self.foot_data_buffer = deque(maxlen=self.imu_delay_frames)
+        # 存储当前传感器数据（用于调试打印）
+        self.current_sensor_data = {}
+
         # 初始化稳定姿态（原有逻辑完全保留）
         self._init_stable_pose()
+
+    # ===================== 新增：步态模式切换接口 =====================
+    def set_gait_mode(self, mode):
+        """切换步态模式"""
+        if mode not in self.gait_config.keys():
+            print(f"[警告] 无效的步态模式：{mode}，默认使用NORMAL")
+            mode = "NORMAL"
+
+        self.gait_mode = mode
+        self.current_gait_params = self.gait_config[mode]
+
+        # 更新CPG基础参数
+        self.right_leg_cpg.base_freq = self.current_gait_params["freq"]
+        self.right_leg_cpg.base_amp = self.current_gait_params["amp"]
+        self.right_leg_cpg.base_coupling = self.current_gait_params["coupling"]
+
+        self.left_leg_cpg.base_freq = self.current_gait_params["freq"]
+        self.left_leg_cpg.base_amp = self.current_gait_params["amp"]
+        self.left_leg_cpg.base_coupling = self.current_gait_params["coupling"]
+
+        # 更新速度增益
+        self.speed_freq_gain = self.current_gait_params["speed_freq_gain"]
+        self.speed_amp_gain = self.current_gait_params["speed_amp_gain"]
+
+        # 更新重心目标（步态适配）
+        self.com_target[2] = 0.78 + self.current_gait_params["com_z_offset"]
+
+        # 重置CPG状态
+        self.right_leg_cpg.reset()
+        self.left_leg_cpg.reset()
 
     def _init_stable_pose(self):
         """初始化稳定姿态（原有逻辑完全保留）"""
@@ -350,7 +448,152 @@ class HumanoidStabilizer:
 
         mujoco.mj_forward(self.model, self.data)
 
-    # 状态机方法（原有逻辑保留，WALK状态新增鲁棒优化）
+    # ===================== 传感器模拟相关方法（原有新增逻辑保留） =====================
+    def _simulate_imu_data(self):
+        """模拟带噪声+延迟的IMU数据（欧拉角+角速度）"""
+        # 获取真实姿态和角速度
+        true_quat = self.data.qpos[3:7].astype(np.float64).copy()
+        true_euler = self._quat_to_euler_xyz(true_quat)
+        true_ang_vel = self.data.qvel[3:6].astype(np.float64).copy()
+
+        # 添加高斯噪声（模拟传感器精度）
+        noisy_euler = true_euler + np.random.normal(0, self.imu_angle_noise, 3)
+        noisy_ang_vel = true_ang_vel + np.random.normal(0, self.imu_vel_noise, 3)
+
+        # 限幅（模拟传感器量程）
+        noisy_euler = np.clip(noisy_euler, -np.pi / 2, np.pi / 2)
+        noisy_ang_vel = np.clip(noisy_ang_vel, -5.0, 5.0)
+
+        # 加入缓存（模拟传输延迟）
+        self.imu_data_buffer.append({
+            "euler": noisy_euler,
+            "ang_vel": noisy_ang_vel,
+            "true_euler": true_euler,
+            "true_ang_vel": true_ang_vel
+        })
+
+        # 获取延迟后的传感器数据（缓存不足时用真实数据）
+        if len(self.imu_data_buffer) < self.imu_delay_frames:
+            return {
+                "euler": true_euler,
+                "ang_vel": true_ang_vel,
+                "true_euler": true_euler,
+                "true_ang_vel": true_ang_vel
+            }
+        else:
+            return self.imu_data_buffer[0]  # 返回最早的缓存数据
+
+    def _simulate_foot_force_data(self):
+        """模拟带噪声+零漂的足底力传感器数据"""
+        # 获取真实接触力（原有逻辑）
+        left_foot_geoms = ["foot1_left", "foot2_left"]
+        right_foot_geoms = ["foot1_right", "foot2_right"]
+
+        true_left_force = 0.0
+        for geom_name in left_foot_geoms:
+            geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            force = np.zeros(6, dtype=np.float64)
+            mujoco.mj_contactForce(self.model, self.data, geom_id, force)
+            true_left_force += np.linalg.norm(force[:3])
+
+        true_right_force = 0.0
+        for geom_name in right_foot_geoms:
+            geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
+            force = np.zeros(6, dtype=np.float64)
+            mujoco.mj_contactForce(self.model, self.data, geom_id, force)
+            true_right_force += np.linalg.norm(force[:3])
+
+        # 添加噪声和零漂（模拟真实传感器）
+        noisy_left_force = true_left_force + np.random.normal(0, self.foot_force_noise) + self.foot_force_offset
+        noisy_right_force = true_right_force + np.random.normal(0, self.foot_force_noise) + self.foot_force_offset
+
+        # 限幅（避免负力）
+        noisy_left_force = max(0.0, noisy_left_force)
+        noisy_right_force = max(0.0, noisy_right_force)
+
+        # 接触判定（基于带噪声的力）
+        left_contact = 1 if noisy_left_force > self.foot_contact_threshold else 0
+        right_contact = 1 if noisy_right_force > self.foot_contact_threshold else 0
+
+        # 加入缓存（模拟延迟）
+        self.foot_data_buffer.append({
+            "left_force": noisy_left_force,
+            "right_force": noisy_right_force,
+            "left_contact": left_contact,
+            "right_contact": right_contact,
+            "true_left_force": true_left_force,
+            "true_right_force": true_right_force
+        })
+
+        # 获取延迟后的传感器数据
+        if len(self.foot_data_buffer) < self.imu_delay_frames:
+            return {
+                "left_force": true_left_force,
+                "right_force": true_right_force,
+                "left_contact": 1 if true_left_force > self.foot_contact_threshold else 0,
+                "right_contact": 1 if true_right_force > self.foot_contact_threshold else 0,
+                "true_left_force": true_left_force,
+                "true_right_force": true_right_force
+            }
+        else:
+            return self.foot_data_buffer[0]
+
+    def _get_sensor_data(self):
+        """获取传感器数据（模拟/真实可切换）"""
+        if not self.enable_sensor_simulation:
+            # 关闭模拟：返回原始数据（兼容原有逻辑）
+            imu_data = {
+                "euler": self._get_root_euler(),
+                "ang_vel": self.data.qvel[3:6].astype(np.float64).copy(),
+                "true_euler": self._get_root_euler(),
+                "true_ang_vel": self.data.qvel[3:6].astype(np.float64).copy()
+            }
+
+            # 原始接触力
+            self._detect_foot_contact()
+            foot_data = {
+                "left_force": self.left_foot_force,
+                "right_force": self.right_foot_force,
+                "left_contact": self.foot_contact[1],
+                "right_contact": self.foot_contact[0],
+                "true_left_force": self.left_foot_force,
+                "true_right_force": self.right_foot_force
+            }
+        else:
+            # 开启模拟：返回带噪声+延迟的传感器数据
+            imu_data = self._simulate_imu_data()
+            foot_data = self._simulate_foot_force_data()
+
+        # 整合传感器数据并存储（用于调试）
+        self.current_sensor_data = {
+            "imu": imu_data,
+            "foot": foot_data,
+            "time": self.data.time,
+            "gait_mode": self.gait_mode  # 新增：记录当前步态
+        }
+
+        return self.current_sensor_data
+
+    def print_sensor_data(self):
+        """打印当前传感器数据（调试用，新增步态信息）"""
+        if not self.current_sensor_data:
+            print("[传感器数据] 暂无数据")
+            return
+
+        imu = self.current_sensor_data["imu"]
+        foot = self.current_sensor_data["foot"]
+        print("\n=== 传感器数据 ===")
+        print(
+            f"仿真时间: {self.current_sensor_data['time']:.2f}s | 模拟状态: {'开启' if self.enable_sensor_simulation else '关闭'} | 当前步态: {self.gait_mode}")
+        print(f"IMU欧拉角(roll/pitch/yaw): {imu['euler'][0]:.3f}/{imu['euler'][1]:.3f}/{imu['euler'][2]:.3f}rad")
+        print(f"IMU真实值: {imu['true_euler'][0]:.3f}/{imu['true_euler'][1]:.3f}/{imu['true_euler'][2]:.3f}rad")
+        print(
+            f"左脚力: {foot['left_force']:.2f}N (真实: {foot['true_left_force']:.2f}N) | 接触: {foot['left_contact']}")
+        print(
+            f"右脚力: {foot['right_force']:.2f}N (真实: {foot['true_right_force']:.2f}N) | 接触: {foot['right_contact']}")
+        print("==================\n")
+
+    # 状态机方法（WALK状态适配多步态模式）
     def _state_stand(self):
         """站立状态：维持初始稳定姿态，CPG重置"""
         self.right_leg_cpg.reset()
@@ -358,34 +601,47 @@ class HumanoidStabilizer:
         self._init_stable_pose()  # 恢复站立姿态
 
     def _state_walk(self):
-        """行走状态：CPG驱动+转向+变速 + 鲁棒性优化"""
+        """行走状态：根据当前步态模式调整CPG参数 + 原有鲁棒优化"""
         if self.walk_start_time is None:
             self.walk_start_time = self.data.time
 
-        # 新增：重心保护 - 重心过低时自动降速
+        # 重心保护 - 重心过低时自动降速（原有逻辑）
         current_com_z = self.data.subtree_com[0][2]
         if current_com_z < self.com_safety_threshold and self.enable_robust_optim:
             current_speed = self.walk_speed * self.speed_reduction_factor
             self.walk_speed = np.clip(current_speed, 0.1, self.walk_speed)
             if self.data.time % 1 < 0.1:
-                print(f"[鲁棒优化] 重心过低({current_com_z:.2f}m)，自动降速到{self.walk_speed:.2f}")
+                print(
+                    f"[鲁棒优化] 重心过低({current_com_z:.2f}m)，自动降速到{self.walk_speed:.2f} | 当前步态: {self.gait_mode}")
 
-        # 1. 变速联动：速度→CPG频率+振幅（原有逻辑保留）
-        self.right_leg_cpg.freq = 0.3 + self.walk_speed * self.speed_freq_gain
-        self.left_leg_cpg.freq = 0.3 + self.walk_speed * self.speed_freq_gain
-        self.right_leg_cpg.amp = 0.3 + self.walk_speed * self.speed_amp_gain
-        self.left_leg_cpg.amp = 0.3 + self.walk_speed * self.speed_amp_gain
+        # ===================== 适配多步态的CPG参数更新 =====================
+        # 1. 加载当前步态的基础参数
+        gait_params = self.current_gait_params
 
-        # 2. 转向联动：躯干偏航 + 左右腿步长差（原有逻辑保留）
-        self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = self.turn_angle * self.turn_gain
-        if self.turn_angle > 0:  # 左转
-            self.right_leg_cpg.amp *= 1.1
-            self.left_leg_cpg.amp *= 0.9
-        elif self.turn_angle < 0:  # 右转
-            self.right_leg_cpg.amp *= 0.9
-            self.left_leg_cpg.amp *= 1.1
+        # 2. 变速联动：根据当前步态的增益调整CPG频率+振幅
+        self.right_leg_cpg.freq = gait_params["freq"] + self.walk_speed * gait_params["speed_freq_gain"]
+        self.left_leg_cpg.freq = gait_params["freq"] + self.walk_speed * gait_params["speed_freq_gain"]
+        self.right_leg_cpg.amp = gait_params["amp"] + self.walk_speed * gait_params["speed_amp_gain"]
+        self.left_leg_cpg.amp = gait_params["amp"] + self.walk_speed * gait_params["speed_amp_gain"]
 
-        # 3. CPG更新（新增：传入速度/转向系数，动态调整耦合）
+        # 3. 原地踏步模式：锁定躯干偏航，步幅固定
+        if self.gait_mode == "STEP_IN_PLACE":
+            self.turn_angle = 0.0  # 强制归零转向
+            self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = 0.0  # 锁定躯干偏航
+            # 步幅固定，不受速度影响
+            self.right_leg_cpg.amp = gait_params["amp"]
+            self.left_leg_cpg.amp = gait_params["amp"]
+        else:
+            # 转向联动：躯干偏航 + 左右腿步长差（原有逻辑）
+            self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = self.turn_angle * self.turn_gain
+            if self.turn_angle > 0:  # 左转
+                self.right_leg_cpg.amp *= 1.1
+                self.left_leg_cpg.amp *= 0.9
+            elif self.turn_angle < 0:  # 右转
+                self.right_leg_cpg.amp *= 0.9
+                self.left_leg_cpg.amp *= 1.1
+
+        # 4. CPG更新（传入速度/转向系数，动态调整耦合）
         speed_factor = self.walk_speed / 1.0  # 速度归一化（0~1）
         turn_factor = self.turn_angle / 0.3  # 转向归一化（-1~1）
         right_hip_offset = self.right_leg_cpg.update(
@@ -397,7 +653,7 @@ class HumanoidStabilizer:
             speed_factor=speed_factor, turn_factor=turn_factor
         )
 
-        # 4. 更新关节目标（原有逻辑保留）
+        # 5. 更新关节目标（原有逻辑保留）
         self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.1 + right_hip_offset
         self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.4 - right_hip_offset * 1.2
         self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0 + right_hip_offset * 0.5
@@ -405,13 +661,13 @@ class HumanoidStabilizer:
         self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.4 - left_hip_offset * 1.2
         self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.0 + left_hip_offset * 0.5
 
-        # 新增：关节目标低通滤波（平滑指令，减少抖动）
+        # 关节目标低通滤波（原有逻辑）
         if self.enable_robust_optim:
             self.joint_targets = (
                                              1 - self.filter_alpha) * self.prev_joint_targets + self.filter_alpha * self.joint_targets
             self.prev_joint_targets = self.joint_targets.copy()
 
-        # 更新原始步态相位（原有逻辑保留）
+        # 更新原始步态相位（原有逻辑）
         self.gait_phase = self.right_leg_cpg.phase / (2 * np.pi) % 1.0
 
     def _state_stop(self):
@@ -435,10 +691,16 @@ class HumanoidStabilizer:
                 self._init_stable_pose()
 
     def set_turn_angle(self, angle):
-        self.turn_angle = np.clip(angle, -0.3, 0.3)
+        # 原地踏步模式下禁止转向
+        if self.gait_mode != "STEP_IN_PLACE":
+            self.turn_angle = np.clip(angle, -0.3, 0.3)
 
     def set_walk_speed(self, speed):
-        self.walk_speed = np.clip(speed, 0.1, 1.0)
+        # 原地踏步模式下速度固定
+        if self.gait_mode != "STEP_IN_PLACE":
+            self.walk_speed = np.clip(speed, 0.1, 1.0)
+        else:
+            self.walk_speed = 0.5  # 原地踏步固定速度
 
     # 四元数转欧拉角（原有逻辑完全保留）
     def _quat_to_euler_xyz(self, quat):
@@ -453,14 +715,14 @@ class HumanoidStabilizer:
         yaw = np.arctan2(siny_cosp, cosy_cosp)
         return np.array([roll, pitch, yaw])
 
-    # 提取躯干欧拉角（原有逻辑完全保留）
+    # 提取躯干欧拉角（原有逻辑，现在仅用于传感器模拟的真实值参考）
     def _get_root_euler(self):
         quat = self.data.qpos[3:7].astype(np.float64).copy()
         euler = self._quat_to_euler_xyz(quat)
         euler = np.mod(euler + np.pi, 2 * np.pi) - np.pi
         return np.clip(euler, -0.3, 0.3)
 
-    # 检测脚部接触（原有逻辑保留，新增接触力强度计算）
+    # 原有接触检测方法（保留，用于关闭传感器模拟时的 fallback）
     def _detect_foot_contact(self):
         try:
             left_foot_geoms = ["foot1_left", "foot2_left"]
@@ -482,8 +744,6 @@ class HumanoidStabilizer:
 
             self.foot_contact[1] = 1 if left_force > self.foot_contact_threshold else 0
             self.foot_contact[0] = 1 if right_force > self.foot_contact_threshold else 0
-
-            # 新增：保存接触力强度（用于动态PD增益）
             self.left_foot_force = left_force
             self.right_foot_force = right_force
 
@@ -493,17 +753,22 @@ class HumanoidStabilizer:
             self.left_foot_force = self.foot_contact_threshold
             self.right_foot_force = self.foot_contact_threshold
 
-    # 计算稳定力矩（核心：新增动态PD增益、接触力自适应）
+    # 计算稳定力矩（核心：基于传感器数据的反馈控制，新增步态信息）
     def _calculate_stabilizing_torques(self):
         # 状态机驱动（原有逻辑保留）
         self.state_map[self.state]()
 
-        # 原始力矩计算逻辑（保留，新增鲁棒优化）
+        # 获取传感器数据（模拟/真实可切换）
+        sensor_data = self._get_sensor_data()
+        imu = sensor_data["imu"]
+        foot = sensor_data["foot"]
+
+        # 原始力矩计算逻辑（替换为传感器数据）
         torques = np.zeros(self.num_joints, dtype=np.float64)
 
-        # 躯干姿态控制（原有逻辑完全保留）
-        root_euler = self._get_root_euler()
-        root_vel = self.data.qvel[3:6].astype(np.float64).copy()
+        # 躯干姿态控制（改用传感器IMU数据）
+        root_euler = imu["euler"]  # 带噪声的欧拉角
+        root_vel = imu["ang_vel"]  # 带噪声的角速度
         root_vel = np.clip(root_vel, -3.0, 3.0)
 
         roll_error = -root_euler[0]
@@ -528,11 +793,15 @@ class HumanoidStabilizer:
         com_error = np.clip(com_error, -0.03, 0.03)
         com_compensation = self.kp_com * com_error
 
-        # 关节控制（原有逻辑保留，新增动态PD增益）
-        self._detect_foot_contact()
+        # 关节控制（改用传感器足底力数据）
         current_joints = self.data.qpos[7:7 + self.num_joints].astype(np.float64)
         current_vel = self.data.qvel[6:6 + self.num_joints].astype(np.float64)
         current_vel = np.clip(current_vel, -8.0, 8.0)
+
+        # 更新接触状态（来自传感器）
+        self.foot_contact = np.array([foot["right_contact"], foot["left_contact"]])
+        self.left_foot_force = foot["left_force"]
+        self.right_foot_force = foot["right_force"]
 
         # 腰部关节控制（原有逻辑完全保留）
         waist_joints = ["abdomen_z", "abdomen_y", "abdomen_x"]
@@ -555,7 +824,7 @@ class HumanoidStabilizer:
             joint_error = self.joint_targets[idx] - current_joints[idx]
             joint_error = np.clip(joint_error, -0.3, 0.3)
 
-            # 新增：动态PD增益 - 接触力越小，增益越低（避免打滑）
+            # 动态PD增益 - 接触力越小，增益越低（避免打滑）
             if self.enable_robust_optim:
                 # 计算接触力归一化系数（0~1）
                 if "right" in joint_name:
@@ -618,20 +887,20 @@ class HumanoidStabilizer:
             idx = self.joint_name_to_idx[joint_name]
             torques[idx] = np.clip(torques[idx], -limit, limit)
 
-        # 调试输出（原有逻辑保留，新增鲁棒优化状态）
+        # 调试输出（新增步态模式信息）
         if self.data.time % 1 < 0.1 and self.data.time > self.init_wait_time:
             print(f"=== 行走调试 ===")
             print(
-                f"状态: {self.state} | 步态相位: {self.gait_phase:.2f} | 速度: {self.walk_speed:.2f} | 转向: {self.turn_angle:.2f}")
+                f"状态: {self.state} | 步态模式: {self.gait_mode} | 步态相位: {self.gait_phase:.2f} | 速度: {self.walk_speed:.2f} | 转向: {self.turn_angle:.2f}")
             print(f"右腿髋目标: {self.joint_targets[self.joint_name_to_idx['hip_y_right']]:.2f}")
             print(f"左腿髋目标: {self.joint_targets[self.joint_name_to_idx['hip_y_left']]:.2f}")
             print(
-                f"右脚接触: {self.foot_contact[0]}, 左脚接触: {self.foot_contact[1]} | 鲁棒优化: {'开启' if self.enable_robust_optim else '关闭'}")
+                f"右脚接触: {self.foot_contact[0]}, 左脚接触: {self.foot_contact[1]} | 鲁棒优化: {'开启' if self.enable_robust_optim else '关闭'} | 传感器模拟: {'开启' if self.enable_sensor_simulation else '关闭'}")
 
         self.prev_com = com
         return torques
 
-    # 仿真循环（修复：Windows线程/时间兼容）
+    # 仿真循环（原有逻辑完全保留，新增步态信息输出）
     def simulate_stable_standing(self):
         # 启动ROS /cmd_vel监听线程
         self.ros_handler = ROSCmdVelHandler(self)
@@ -648,10 +917,11 @@ class HumanoidStabilizer:
             v.cam.elevation = -25
             v.cam.lookat = [0, 0, 0.6]
 
-            print("人形机器人稳定站立+行走仿真启动（已启用步态鲁棒性优化）...")
-            print(f"初始稳定{self.init_wait_time}秒后，按W开始行走 | 支持转向/变速/启停/急停")
+            print("人形机器人稳定站立+行走仿真启动（已启用多步态+传感器模拟+步态鲁棒性优化）...")
+            print(f"初始稳定{self.init_wait_time}秒后，按W开始行走 | 支持多步态切换（1=慢走/2=正常/3=小跑/4=原地踏步）")
+            print(f"默认步态模式：{self.gait_mode}\n")
 
-            # 初始落地阶段（修复：Windows时间精度）
+            # 初始落地阶段（原有逻辑保留）
             start_time = time.time()
             while time.time() - start_time < self.init_wait_time:
                 alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
@@ -660,34 +930,36 @@ class HumanoidStabilizer:
                 mujoco.mj_step(self.model, self.data)
                 self.data.qvel[:] *= 0.97
                 v.sync()
-                time.sleep(self.dt * self.sim_sleep_scale)  # 适配Windows
+                time.sleep(self.dt)
 
-            # 主仿真循环（修复：Windows sleep时间）
+            # 主仿真循环（原有逻辑保留）
             print("=== 初始稳定完成，可输入控制指令 ===")
             while self.data.time < self.sim_duration:
                 torques = self._calculate_stabilizing_torques()
                 self.data.ctrl[:] = torques
                 mujoco.mj_step(self.model, self.data)
 
-                # 状态监测（原有逻辑保留）
+                # 状态监测（新增步态信息）
                 if self.data.time % 2 < 0.1:
                     com = self.data.subtree_com[0]
-                    euler = self._get_root_euler()
+                    euler = self.current_sensor_data["imu"][
+                        "euler"] if self.current_sensor_data else self._get_root_euler()
                     print(
                         f"时间:{self.data.time:.1f}s | 重心(x/z):{com[0]:.3f}/{com[2]:.3f}m | "
-                        f"姿态(roll/pitch):{euler[0]:.3f}/{euler[1]:.3f}rad | 脚接触:{self.foot_contact}"
+                        f"姿态(roll/pitch):{euler[0]:.3f}/{euler[1]:.3f}rad | 脚接触:{self.foot_contact} | "
+                        f"当前步态:{self.gait_mode}"
                     )
 
                 v.sync()
-                time.sleep(self.dt * self.sim_sleep_scale)  # 缩短sleep，提升响应
+                time.sleep(self.dt * 0.5)
 
                 # 跌倒判定（原有逻辑保留）
                 com = self.data.subtree_com[0]
-                euler = self._get_root_euler()
+                euler = self.current_sensor_data["imu"]["euler"] if self.current_sensor_data else self._get_root_euler()
                 if com[2] < 0.4 or abs(euler[0]) > 0.6 or abs(euler[1]) > 0.6:
                     print(
                         f"跌倒！时间:{self.data.time:.1f}s | 重心(z):{com[2]:.3f}m | "
-                        f"最大倾角:{max(abs(euler[0]), abs(euler[1])):.3f}rad"
+                        f"最大倾角:{max(abs(euler[0]), abs(euler[1])):.3f}rad | 当前步态:{self.gait_mode}"
                     )
                     self.set_state("STAND")  # 跌倒后自动恢复站立
 
@@ -697,34 +969,22 @@ class HumanoidStabilizer:
 
 
 if __name__ == "__main__":
-    # 修复：Windows路径兼容（处理中文/空格路径）
     current_directory = os.path.dirname(os.path.abspath(__file__))
     model_file_path = os.path.join(current_directory, "humanoid.xml")
-    model_file_path = os.path.normpath(model_file_path)  # 标准化Windows路径
 
     print(f"模型路径：{model_file_path}")
     if not os.path.exists(model_file_path):
         raise FileNotFoundError(f"模型文件不存在：{model_file_path}")
 
-    # 修复：Python3.13 Mujoco版本强制适配
-    try:
-        import mujoco
-
-        mujoco_version = mujoco.__version__
-        print(f"Mujoco版本：{mujoco_version}（Python3.13兼容）")
-        if mujoco_version < "2.5.0":
-            print("[警告] Mujoco版本过低，建议升级：pip install --upgrade mujoco>=2.5.0")
-    except:
-        raise ImportError("Mujoco未安装，请执行：pip install mujoco>=2.5.0")
-
     try:
         stabilizer = HumanoidStabilizer(model_file_path)
-        # 可选：关闭鲁棒优化（恢复原始逻辑）
+        # 可选配置：关闭传感器模拟/鲁棒优化/修改默认步态
+        # stabilizer.enable_sensor_simulation = False
         # stabilizer.enable_robust_optim = False
+        # stabilizer.set_gait_mode("SLOW")  # 默认改为慢走
         stabilizer.simulate_stable_standing()
     except Exception as e:
         print(f"错误：{e}")
         import traceback
 
         traceback.print_exc()
-        input("按Enter键退出...")  # Windows下避免闪退

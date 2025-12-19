@@ -38,6 +38,36 @@ CITYSCAPES_PALETTE = [
     (145, 170, 100)     # 22: RoadMarking
 ]
 
+# ==================== 新增：语义密度热力图生成函数 ====================
+def generate_density_heatmap(sem_data, target_classes=[4, 10], width=1024, height=720):
+    """
+    生成指定语义类别的密度热力图（行人+车辆为默认目标）
+    :param sem_data: 语义分割原始数据（int32数组，shape=(H,W)）
+    :param target_classes: 目标语义类别列表（4=行人，10=车辆）
+    :param width/height: 图像分辨率
+    :return: 彩色密度热力图（RGB格式）
+    """
+    # 1. 生成目标类别掩码（仅保留行人和车辆）
+    mask = np.zeros((height, width), dtype=np.uint8)
+    for cls in target_classes:
+        mask[sem_data == cls] = 255  # 目标类别像素设为255，背景0
+    
+    # 2. 高斯模糊平滑（模拟密度分布，核越大越平滑）
+    blurred_mask = cv2.GaussianBlur(mask, (21, 21), 0)
+    
+    # 3. 转换为彩色热力图（JET色板：蓝→青→黄→红，代表密度从低到高）
+    heatmap = cv2.applyColorMap(blurred_mask, cv2.COLORMAP_JET)
+    
+    # 4. 优化视觉效果：降低背景透明度，突出目标区域
+    heatmap = cv2.addWeighted(heatmap, 0.9, np.zeros_like(heatmap), 0.1, 0)
+    
+    # 5. 添加热力图标注（右下角说明）
+    cv2.putText(heatmap, "Density: Pedestrian(Red) + Vehicle(Blue)", 
+               (10, height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    
+    return heatmap
+# =================================================================
+
 # 1. 连接CARLA服务器并配置强同步模式
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
@@ -251,9 +281,9 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：多视角可视化 + 性能监控）
+# 9. 主循环（核心：多视角+热力图可视化 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：前视+俯视双视角可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
+print(f"功能：前视+俯视+热力图可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -295,31 +325,35 @@ try:
             for i in range(len(CITYSCAPES_PALETTE)):
                 front_sem_rgb[front_sem_data == i] = CITYSCAPES_PALETTE[i]
             
-            # 3. 处理俯视RGB图像（调整分辨率匹配前视图）
+            # 3. 处理俯视RGB图像
             top_rgb_image = top_rgb_queue.get()
             top_rgb_img = np.reshape(np.copy(top_rgb_image.raw_data), 
                                     (720, 1024, 4))[:, :, :3]
             
-            # 4. 多视角图像拼接：
-            #    上半部分：前视RGB + 前视语义分割
-            #    下半部分：俯视RGB（居中显示，左右补黑边匹配宽度）
+            # ==================== 新增：生成语义密度热力图 ====================
+            density_heatmap = generate_density_heatmap(front_sem_data, target_classes=[4, 10])
+            # =================================================================
+            
+            # 4. 多视角图像拼接（优化布局）：
+            #    上半部分：前视RGB（左） + 前视语义分割（右）
+            #    下半部分：俯视RGB（左） + 行人/车辆密度热力图（右）
             upper_part = cv2.hconcat([front_rgb_img, front_sem_rgb])  # 宽度2048，高度720
-            # 补全俯视图像宽度到2048（和上半部分一致）
-            top_rgb_padded = np.zeros((720, 2048, 3), dtype=np.uint8)
-            top_rgb_padded[:, (2048-1024)//2 : (2048+1024)//2] = top_rgb_img  # 居中
-            # 上下拼接最终图像
-            combined_img = cv2.vconcat([upper_part, top_rgb_padded])  # 宽度2048，高度1440
+            lower_part = cv2.hconcat([top_rgb_img, density_heatmap])  # 宽度2048，高度720
+            combined_img = cv2.vconcat([upper_part, lower_part])       # 最终尺寸：2048×1440
             
             # 5. 添加视角标题
             # 前视RGB标题
             cv2.putText(combined_img, "Front View (RGB)", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             # 前视语义标题
-            cv2.putText(combined_img, "Front View (Semantic)", 
+            cv2.putText(combined_img, "Front View (Semantic Segmentation)", 
                        (1024 + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             # 俯视标题
             cv2.putText(combined_img, "Top View (RGB / Bird's Eye)", 
                        (10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 热力图标题
+            cv2.putText(combined_img, "Density Heatmap (Pedestrian + Vehicle)", 
+                       (1024 + 10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             
             # 6. 绘制性能监控（左上角，标题下方）
             perf_info = [
@@ -344,9 +378,9 @@ try:
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, perf_color, 2)
             
             # 7. 显示最终图像（自动调整窗口大小）
-            cv2.namedWindow('CARLA Multi-View (Front + Top) + Semantic Segmentation', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('CARLA Multi-View (Front + Top) + Semantic Segmentation', 1920, 1080)
-            cv2.imshow('CARLA Multi-View (Front + Top) + Semantic Segmentation', combined_img)
+            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap', 1920, 1080)
+            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap', combined_img)
             
             if cv2.waitKey(1) == ord('q'):
                 break
