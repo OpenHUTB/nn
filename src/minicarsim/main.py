@@ -8,6 +8,8 @@ import numpy as np
 import mujoco
 from mujoco import viewer
 import time
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 # -------------------------- 配置参数 --------------------------
 # 场景文件路径
@@ -35,6 +37,7 @@ class MojocoDataSim:
         os.makedirs(output_dir, exist_ok=True)
         os.makedirs(f"{output_dir}/lidar", exist_ok=True)
         os.makedirs(f"{output_dir}/annotations", exist_ok=True)
+        os.makedirs(f"{output_dir}/visualization", exist_ok=True)  # 新增可视化目录
 
         # 加载MuJoCo模型和数据
         self.model = mujoco.MjModel.from_xml_path(xml_path)
@@ -149,21 +152,36 @@ class MojocoDataSim:
                         # 获取物体类型（根据名称）
                         obj_type = "box"
                         
+                        # 获取物体的几何信息用于更好的可视化
+                        geom_id = self.model.body_geomadr[i]
+                        if geom_id >= 0:
+                            size = self.model.geom_size[geom_id][:3].copy()
+                        else:
+                            size = [0.5, 0.5, 0.5]  # 默认大小
+                        
                         detected_objects.append({
                             "id": i,
                             "name": body_name,
                             "type": obj_type,
                             "position": pos.tolist(),
-                            "distance": distance
+                            "distance": distance,
+                            "size": size.tolist()
                         })
                 except ValueError:
                     # 如果找不到车辆，跳过距离检测
+                    geom_id = self.model.body_geomadr[i]
+                    if geom_id >= 0:
+                        size = self.model.geom_size[geom_id][:3].copy()
+                    else:
+                        size = [0.5, 0.5, 0.5]  # 默认大小
+                        
                     detected_objects.append({
                         "id": i,
                         "name": body_name,
                         "type": "box",
                         "position": pos.tolist(),
-                        "distance": 0
+                        "distance": 0,
+                        "size": size.tolist()
                     })
 
         return detected_objects
@@ -191,6 +209,84 @@ class MojocoDataSim:
             json.dump(annotations, f, indent=4)
 
         self.frame_count += 1
+
+    def visualize_detection(self, lidar_data, annotations):
+        """生成物体识别效果图"""
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # 绘制LiDAR点云数据
+        if len(lidar_data) > 0:
+            ax.scatter(lidar_data[:, 0], lidar_data[:, 1], lidar_data[:, 2], 
+                      c='blue', s=0.5, alpha=0.6, label='LiDAR点云')
+        
+        # 绘制检测到的物体
+        colors = ['red', 'green', 'orange', 'purple', 'brown']
+        for i, obj in enumerate(annotations['objects']):
+            pos = np.array(obj['position'])
+            size = np.array(obj['size'])
+            
+            # 绘制物体中心点
+            ax.scatter(pos[0], pos[1], pos[2], 
+                      c=colors[i % len(colors)], s=100, marker='o',
+                      label=f"{obj['name']}")
+            
+            # 绘制物体边界框
+            corners = self._generate_bounding_box_corners(pos, size)
+            self._plot_bounding_box(ax, corners, colors[i % len(colors)])
+        
+        # 尝试绘制小车
+        try:
+            vehicle_pos, _ = self.get_world_pose("vehicle")
+            ax.scatter(vehicle_pos[0], vehicle_pos[1], vehicle_pos[2], 
+                      c='cyan', s=200, marker='s', label='小车')
+        except ValueError:
+            # 如果无法获取小车位置，则不绘制
+            pass
+        
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+        ax.set_zlabel('Z (m)')
+        ax.set_title(f'物体识别效果图 - 帧 {self.frame_count:04d}')
+        ax.legend()
+        
+        # 保存可视化图像
+        plt.savefig(f"{self.output_dir}/visualization/frame_{self.frame_count:04d}.png", 
+                   dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"已生成识别效果图: frame_{self.frame_count:04d}.png")
+
+    def _generate_bounding_box_corners(self, position, size):
+        """生成包围盒的8个顶点"""
+        x, y, z = position
+        sx, sy, sz = size
+        
+        corners = np.array([
+            [x-sx, y-sy, z-sz], [x+sx, y-sy, z-sz], [x+sx, y+sy, z-sz], [x-sx, y+sy, z-sz],  # 底面
+            [x-sx, y-sy, z+sz], [x+sx, y-sy, z+sz], [x+sx, y+sy, z+sz], [x-sx, y+sy, z+sz]   # 顶面
+        ])
+        return corners
+
+    def _plot_bounding_box(self, ax, corners, color):
+        """绘制包围盒"""
+        # 底面和顶面
+        for i in range(2):
+            # 四条边
+            ax.plot(corners[i*4:(i+1)*4, 0], corners[i*4:(i+1)*4, 1], corners[i*4:(i+1)*4, 2], 
+                   c=color, alpha=0.7)
+            # 连接首尾
+            ax.plot([corners[i*4+3, 0], corners[i*4, 0]], 
+                   [corners[i*4+3, 1], corners[i*4, 1]], 
+                   [corners[i*4+3, 2], corners[i*4, 2]], 
+                   c=color, alpha=0.7)
+        
+        # 连接顶面和底面
+        for i in range(4):
+            ax.plot([corners[i, 0], corners[i+4, 0]], 
+                   [corners[i, 1], corners[i+4, 1]], 
+                   [corners[i, 2], corners[i+4, 2]], 
+                   c=color, alpha=0.7)
 
     def run_simulation(self):
         """运行MuJoCo仿真并生成数据"""
@@ -243,6 +339,9 @@ class MojocoDataSim:
 
                 # 保存数据
                 self.save_data(lidar_data, annotations)
+                
+                # 生成识别效果图
+                self.visualize_detection(lidar_data, annotations)
                 
                 print(f"已仿真 {i}/{SIMULATION_FRAMES} 帧")
                 
