@@ -34,28 +34,7 @@ pip install mujoco numpy
 3. 运行程序
 bash
 python simple_hand_animation.py
-代码说明
-主要功能模块
-模型加载：
 
-python
-model = mujoco.MjModel.from_xml_path('left_hand.xml')
-data = mujoco.MjData(model)
-查看器设置：
-
-python
-viewer = mujoco.viewer.launch_passive(model, data)
-viewer.cam.azimuth = 45
-viewer.cam.elevation = -20
-viewer.cam.distance = 0.8
-姿态定义：
-
-python
-test_poses = [
-    ("张开手", np.zeros(model.nu)),
-    ("握拳", np.array([...])),
-    ("捏取", np.array([...]))
-]
 动画循环：
 
 每3秒切换一个预定义姿态
