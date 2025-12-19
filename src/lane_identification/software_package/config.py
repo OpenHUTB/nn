@@ -31,15 +31,20 @@ class AppConfig:
     # 方向分析参数
     deviation_threshold: float = 0.15
     width_ratio_threshold: float = 0.7
-    confidence_threshold: float = 0.6
+    confidence_threshold: float = 0.5
+    min_confidence_for_direction: float = 0.25
     
     # 路径预测参数
     prediction_steps: int = 10
     prediction_distance: float = 0.75
     min_prediction_points: int = 4
     
+    # 视频处理参数
+    video_frame_skip: int = 1
+    video_fps: int = 10
+    camera_id: int = 0
+    
     # 置信度参数
-    min_confidence_for_direction: float = 0.4
     confidence_smoothing_factor: float = 0.7
     quality_weight_lane: float = 0.5
     quality_weight_road: float = 0.3
@@ -69,7 +74,10 @@ class AppConfig:
             'hough_threshold': self.hough_threshold,
             'confidence_threshold': self.confidence_threshold,
             'prediction_steps': self.prediction_steps,
-            'prediction_distance': self.prediction_distance
+            'prediction_distance': self.prediction_distance,
+            'video_frame_skip': self.video_frame_skip,
+            'video_fps': self.video_fps,
+            'camera_id': self.camera_id
         }
     
     def save(self, filepath: str):
@@ -104,7 +112,8 @@ class SceneConfig:
         canny_threshold2=180,
         hough_threshold=35,
         prediction_distance=0.9,
-        confidence_threshold=0.7
+        confidence_threshold=0.7,
+        video_fps=15
     )
     
     # 城市道路配置
@@ -114,7 +123,8 @@ class SceneConfig:
         canny_threshold2=120,
         hough_threshold=25,
         prediction_distance=0.6,
-        confidence_threshold=0.5
+        confidence_threshold=0.5,
+        video_fps=10
     )
     
     # 乡村道路配置
@@ -126,7 +136,8 @@ class SceneConfig:
         hough_threshold=20,
         min_contour_area=0.002,
         prediction_distance=0.7,
-        confidence_threshold=0.4
+        confidence_threshold=0.4,
+        video_fps=8
     )
     
     @classmethod
