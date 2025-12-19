@@ -1,195 +1,99 @@
-import time
+import tkinter as tk
+from tkinter import ttk
 import random
-from enum import Enum
+import time
 
-# 定义系统常量
-DEFAULT_TARGET_TEMP = 24  # 默认目标温度(℃)
-TEMP_TOLERANCE = 1  # 温度容差(℃)
-MAX_FAN_SPEED = 5  # 最大风速档
-MIN_FAN_SPEED = 1  # 最小风速档
+class UAVTemperatureSystem:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("无人车温度调节系统仿真")
+        self.root.geometry("500x400")
 
+        # 温度参数初始化
+        self.current_temp = 25.0  # 初始温度
+        self.target_temp = 25.0   # 目标温度
+        self.max_temp = 35.0      # 温度上限
+        self.min_temp = 15.0      # 温度下限
 
-# 空调模式枚举
-class AC_Mode(Enum):
-    COOL = "制冷"
-    HEAT = "制热"
-    VENT = "通风"
-    OFF = "关闭"
+        # 创建UI组件
+        self.create_widgets()
 
+        # 启动温度监测循环
+        self.update_temp()
 
-# 运行模式枚举
-class Run_Mode(Enum):
-    AUTO = "自动"
-    MANUAL = "手动"
+    def create_widgets(self):
+        # 标题标签
+        ttk.Label(self.root, text="无人车温度调节系统", font=("Arial", 16, "bold")).pack(pady=10)
 
+        # 当前温度显示
+        self.temp_label = ttk.Label(self.root, text=f"当前温度: {self.current_temp:.1f} °C", font=("Arial", 14))
+        self.temp_label.pack(pady=5)
 
-class TemperatureSensor:
-    """温度传感器类 - 模拟采集车内/车外温度"""
+        # 目标温度设置
+        ttk.Label(self.root, text="设置目标温度:").pack(pady=2)
+        self.target_entry = ttk.Entry(self.root, width=10)
+        self.target_entry.insert(0, "25")
+        self.target_entry.pack(pady=2)
+        ttk.Button(self.root, text="确认设置", command=self.set_target_temp).pack(pady=5)
 
-    def __init__(self):
-        self.interior_temp = 25  # 初始车内温度
-        self.exterior_temp = 30  # 初始车外温度
+        # 系统状态显示
+        self.status_label = ttk.Label(self.root, text="系统状态: 待机", font=("Arial", 12), foreground="blue")
+        self.status_label.pack(pady=10)
 
-    def read_temperatures(self):
-        """模拟读取温度（加入微小随机波动）"""
-        self.interior_temp += random.uniform(-0.5, 0.5)
-        self.exterior_temp += random.uniform(-0.8, 0.8)
-        # 温度边界限制
-        self.interior_temp = max(10, min(45, self.interior_temp))
-        self.exterior_temp = max(-20, min(50, self.exterior_temp))
-        return round(self.interior_temp, 1), round(self.exterior_temp, 1)
+        # 温度曲线画布（简易模拟）
+        self.canvas = tk.Canvas(self.root, width=400, height=150, bg="white")
+        self.canvas.pack(pady=10)
+        self.canvas.create_line(10, 75, 390, 75, fill="black")  # 基准线
+        self.canvas.create_text(200, 10, text="温度变化趋势", font=("Arial", 10))
 
+        self.x_pos = 10  # 曲线绘制横坐标
 
-class SunlightSensor:
-    """阳光强度传感器 - 影响车内温度变化"""
+    def set_target_temp(self):
+        try:
+            self.target_temp = float(self.target_entry.get())
+            self.status_label.config(text=f"目标温度已设为: {self.target_temp:.1f} °C", foreground="green")
+        except ValueError:
+            self.status_label.config(text="输入无效！请输入数字", foreground="red")
 
-    def read_intensity(self):
-        """返回0-10的阳光强度值"""
-        return round(random.uniform(0, 10), 1)
+    def update_temp(self):
+        # 模拟温度波动（无人车运行时的温度变化）
+        self.current_temp += random.uniform(-0.5, 0.8)
+        self.current_temp = round(self.current_temp, 1)
 
+        # 更新温度显示
+        self.temp_label.config(text=f"当前温度: {self.current_temp:.1f} °C")
 
-class PassengerDetector:
-    """乘客检测 - 模拟检测车内乘客数量"""
-
-    def get_passenger_count(self):
-        """返回0-5的乘客数"""
-        return random.randint(0, 5)
-
-
-class AirConditioner:
-    """空调执行器类 - 控制空调运行"""
-
-    def __init__(self):
-        self.ac_mode = AC_Mode.OFF
-        self.fan_speed = MIN_FAN_SPEED
-        self.target_temp = DEFAULT_TARGET_TEMP
-        self.run_mode = Run_Mode.AUTO
-
-    def set_mode(self, mode):
-        """设置空调模式"""
-        if isinstance(mode, AC_Mode):
-            self.ac_mode = mode
-            print(f"空调模式已切换为: {self.ac_mode.value}")
-
-    def set_fan_speed(self, speed):
-        """设置风速（1-5档）"""
-        if MIN_FAN_SPEED <= speed <= MAX_FAN_SPEED:
-            self.fan_speed = speed
-            print(f"风速已设置为: {self.fan_speed}档")
-
-    def set_target_temp(self, temp):
-        """设置目标温度（16-30℃）"""
-        if 16 <= temp <= 30:
-            self.target_temp = temp
-            print(f"目标温度已设置为: {self.target_temp}℃")
-
-    def set_run_mode(self, mode):
-        """设置运行模式（自动/手动）"""
-        if isinstance(mode, Run_Mode):
-            self.run_mode = mode
-            print(f"运行模式已切换为: {self.run_mode.value}")
-
-
-class TemperatureControlSystem:
-    """无人车温度调节核心系统"""
-
-    def __init__(self):
-        # 初始化传感器和执行器
-        self.temp_sensor = TemperatureSensor()
-        self.sun_sensor = SunlightSensor()
-        self.passenger_detector = PassengerDetector()
-        self.aircon = AirConditioner()
-
-    def calculate_adjustment(self):
-        """核心算法：根据环境参数计算空调调节策略"""
-        interior_temp, exterior_temp = self.temp_sensor.read_temperatures()
-        sunlight_intensity = self.sun_sensor.read_intensity()
-        passenger_count = self.passenger_detector.get_passenger_count()
-
-        # 打印当前环境参数
-        print(f"\n=== 环境参数 ===")
-        print(f"车内温度: {interior_temp}℃")
-        print(f"车外温度: {exterior_temp}℃")
-        print(f"阳光强度: {sunlight_intensity}")
-        print(f"乘客数量: {passenger_count}")
-
-        # 目标温度动态调整（乘客越多/阳光越强，目标温度略低）
-        base_target = DEFAULT_TARGET_TEMP
-        dynamic_target = base_target - (passenger_count * 0.5) - (sunlight_intensity * 0.2)
-        dynamic_target = max(18, min(26, dynamic_target))  # 限制在18-26℃
-
-        # 自动模式下的调节逻辑
-        if self.aircon.run_mode == Run_Mode.AUTO:
-            # 温度偏差计算
-            temp_diff = interior_temp - dynamic_target
-
-            # 制冷逻辑
-            if temp_diff > TEMP_TOLERANCE:
-                self.aircon.set_mode(AC_Mode.COOL)
-                # 温差越大，风速越高
-                fan_speed = MIN_FAN_SPEED + min(int(temp_diff), MAX_FAN_SPEED - MIN_FAN_SPEED)
-                self.aircon.set_fan_speed(fan_speed)
-                self.aircon.set_target_temp(dynamic_target)
-
-            # 制热逻辑
-            elif temp_diff < -TEMP_TOLERANCE:
-                self.aircon.set_mode(AC_Mode.HEAT)
-                fan_speed = MIN_FAN_SPEED + min(int(abs(temp_diff)), MAX_FAN_SPEED - MIN_FAN_SPEED)
-                self.aircon.set_fan_speed(fan_speed)
-                self.aircon.set_target_temp(dynamic_target)
-
-            # 温度适宜 - 通风模式
+        # 判断温度状态并执行调节逻辑
+        if self.current_temp > self.max_temp:
+            self.status_label.config(text="状态: 温度过高 → 启动制冷系统", foreground="red")
+            self.current_temp -= 1.2  # 制冷降温
+        elif self.current_temp < self.min_temp:
+            self.status_label.config(text="状态: 温度过低 → 启动加热系统", foreground="orange")
+            self.current_temp += 1.2  # 加热升温
+        elif abs(self.current_temp - self.target_temp) > 1.0:
+            if self.current_temp > self.target_temp:
+                self.status_label.config(text="状态: 高于目标 → 轻度制冷", foreground="blue")
+                self.current_temp -= 0.5
             else:
-                self.aircon.set_mode(AC_Mode.VENT)
-                self.aircon.set_fan_speed(MIN_FAN_SPEED)
+                self.status_label.config(text="状态: 低于目标 → 轻度加热", foreground="blue")
+        else:
+            self.status_label.config(text="状态: 温度正常 → 系统待机", foreground="green")
 
-        # 打印当前空调状态
-        print(f"\n=== 空调状态 ===")
-        print(f"运行模式: {self.aircon.run_mode.value}")
-        print(f"空调模式: {self.aircon.ac_mode.value}")
-        print(f"目标温度: {self.aircon.target_temp}℃")
-        print(f"当前风速: {self.aircon.fan_speed}档")
+        # 绘制温度变化曲线
+        y_pos = 75 - (self.current_temp - 25) * 5  # 映射温度到画布坐标
+        if self.x_pos < 390:
+            self.canvas.create_line(self.x_pos, 75, self.x_pos + 1, y_pos, fill="red", width=2)
+            self.x_pos += 1
+        else:
+            # 曲线满屏后重置
+            self.canvas.delete("all")
+            self.canvas.create_line(10, 75, 390, 75, fill="black")
+            self.x_pos = 10
 
-    def manual_control(self, mode, target_temp=None, fan_speed=None):
-        """手动控制接口"""
-        if self.aircon.run_mode != Run_Mode.MANUAL:
-            self.aircon.set_run_mode(Run_Mode.MANUAL)
+        # 每隔1秒更新一次
+        self.root.after(1000, self.update_temp)
 
-        self.aircon.set_mode(mode)
-        if target_temp:
-            self.aircon.set_target_temp(target_temp)
-        if fan_speed:
-            self.aircon.set_fan_speed(fan_speed)
-
-    def run(self, duration=10):
-        """系统主运行函数"""
-        print("无人车温度调节系统启动...")
-        print(f"系统将运行 {duration} 秒，自动调节温度")
-
-        start_time = time.time()
-        while time.time() - start_time < duration:
-            self.calculate_adjustment()
-            time.sleep(2)  # 每2秒调节一次
-
-        print("\n系统运行结束")
-
-
-# 测试代码
 if __name__ == "__main__":
-    # 初始化系统
-    temp_system = TemperatureControlSystem()
-
-    # 示例1：自动模式运行10秒
-    temp_system.run(duration=10)
-
-    # 示例2：切换到手动模式，设置制冷22℃，3档风速
-    print("\n--- 切换到手动模式 ---")
-    temp_system.manual_control(
-        mode=AC_Mode.COOL,
-        target_temp=22,
-        fan_speed=3
-    )
-
-    # 手动模式下继续运行5秒
-    time.sleep(5)
-    temp_system.calculate_adjustment()
+    root = tk.Tk()
+    app = UAVTemperatureSystem(root)
+    root.mainloop()
