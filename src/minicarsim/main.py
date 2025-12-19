@@ -133,8 +133,15 @@ class MojocoDataSim:
         return point_cloud
 
     def detect_objects(self):
-        """检测环境中的物体"""
+        """检测环境中的物体，包括形状和颜色信息"""
         detected_objects = []
+        
+        # 获取材料名称到RGBA颜色的映射
+        material_colors = {}
+        for i in range(self.model.nmat):
+            mat_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, i)
+            if mat_name:
+                material_colors[mat_name] = self.model.mat_rgba[i].copy()
         
         # 遍历所有物体
         for i in range(self.model.nbody):
@@ -149,20 +156,43 @@ class MojocoDataSim:
                     distance = np.linalg.norm(pos - vehicle_pos)
                     
                     if distance <= 10.0:
-                        # 获取物体类型（根据名称）
-                        obj_type = "box"
-                        
-                        # 获取物体的几何信息用于更好的可视化
+                        # 获取物体几何信息
                         geom_id = self.model.body_geomadr[i]
                         if geom_id >= 0:
+                            # 获取几何体类型
+                            geom_type = self.model.geom_type[geom_id]
+                            geom_types = ["plane", "hfield", "sphere", "capsule", "ellipsoid", "cylinder", "box", "mesh"]
+                            shape = geom_types[geom_type] if geom_type < len(geom_types) else "unknown"
+                            
+                            # 获取尺寸
                             size = self.model.geom_size[geom_id][:3].copy()
+                            
+                            # 获取材质和颜色
+                            mat_id = self.model.geom_matid[geom_id]
+                            color = None
+                            if mat_id >= 0:
+                                mat_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, mat_id)
+                                if mat_name and mat_name in material_colors:
+                                    color = material_colors[mat_name][:3].tolist()  # 只取RGB，忽略alpha
+                            
+                            # 如果没有材质，则尝试直接获取颜色
+                            if color is None:
+                                color = self.model.geom_rgba[geom_id][:3].copy().tolist()
                         else:
+                            shape = "box"
                             size = [0.5, 0.5, 0.5]  # 默认大小
+                            color = [0.5, 0.5, 0.5]  # 默认灰色
+                        
+                        # 根据颜色确定颜色名称
+                        color_name = self._get_color_name(color)
                         
                         detected_objects.append({
                             "id": i,
                             "name": body_name,
-                            "type": obj_type,
+                            "type": "obstacle",
+                            "shape": shape,
+                            "color": color,
+                            "color_name": color_name,
                             "position": pos.tolist(),
                             "distance": distance,
                             "size": size.tolist()
@@ -171,20 +201,69 @@ class MojocoDataSim:
                     # 如果找不到车辆，跳过距离检测
                     geom_id = self.model.body_geomadr[i]
                     if geom_id >= 0:
-                        size = self.model.geom_size[geom_id][:3].copy()
-                    else:
-                        size = [0.5, 0.5, 0.5]  # 默认大小
+                        # 获取几何体类型
+                        geom_type = self.model.geom_type[geom_id]
+                        geom_types = ["plane", "hfield", "sphere", "capsule", "ellipsoid", "cylinder", "box", "mesh"]
+                        shape = geom_types[geom_type] if geom_type < len(geom_types) else "unknown"
                         
+                        # 获取尺寸
+                        size = self.model.geom_size[geom_id][:3].copy()
+                        
+                        # 获取材质和颜色
+                        mat_id = self.model.geom_matid[geom_id]
+                        color = None
+                        if mat_id >= 0:
+                            mat_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, mat_id)
+                            if mat_name and mat_name in material_colors:
+                                color = material_colors[mat_name][:3].tolist()  # 只取RGB，忽略alpha
+                        
+                        # 如果没有材质，则尝试直接获取颜色
+                        if color is None:
+                            color = self.model.geom_rgba[geom_id][:3].copy().tolist()
+                    else:
+                        shape = "box"
+                        size = [0.5, 0.5, 0.5]  # 默认大小
+                        color = [0.5, 0.5, 0.5]  # 默认灰色
+                    
+                    # 根据颜色确定颜色名称
+                    color_name = self._get_color_name(color)
+                    
                     detected_objects.append({
                         "id": i,
                         "name": body_name,
-                        "type": "box",
+                        "type": "obstacle",
+                        "shape": shape,
+                        "color": color,
+                        "color_name": color_name,
                         "position": pos.tolist(),
                         "distance": 0,
                         "size": size.tolist()
                     })
 
         return detected_objects
+
+    def _get_color_name(self, color):
+        """根据RGB颜色值返回颜色名称"""
+        r, g, b = color
+        # 定义基本颜色阈值
+        if r > 0.7 and g < 0.3 and b < 0.3:
+            return "红色"
+        elif r < 0.3 and g > 0.7 and b < 0.3:
+            return "绿色"
+        elif r < 0.3 and g < 0.3 and b > 0.7:
+            return "蓝色"
+        elif r > 0.7 and g > 0.7 and b < 0.3:
+            return "黄色"
+        elif r > 0.7 and g < 0.3 and b > 0.7:
+            return "紫色"
+        elif r < 0.3 and g > 0.7 and b > 0.7:
+            return "青色"
+        elif r > 0.7 and g > 0.7 and b > 0.7:
+            return "白色"
+        elif r < 0.3 and g < 0.3 and b < 0.3:
+            return "黑色"
+        else:
+            return "其他颜色"
 
     def generate_annotations(self):
         """生成物体检测标注数据"""
@@ -211,7 +290,7 @@ class MojocoDataSim:
         self.frame_count += 1
 
     def visualize_detection(self, lidar_data, annotations):
-        """生成物体识别效果图"""
+        """生成物体识别效果图，包含形状和颜色信息"""
         fig = plt.figure(figsize=(12, 10))
         ax = fig.add_subplot(111, projection='3d')
         
@@ -221,19 +300,21 @@ class MojocoDataSim:
                       c='blue', s=0.5, alpha=0.6, label='LiDAR点云')
         
         # 绘制检测到的物体
-        colors = ['red', 'green', 'orange', 'purple', 'brown']
         for i, obj in enumerate(annotations['objects']):
             pos = np.array(obj['position'])
             size = np.array(obj['size'])
+            color = obj['color']
+            shape = obj['shape']
+            color_name = obj['color_name']
             
             # 绘制物体中心点
             ax.scatter(pos[0], pos[1], pos[2], 
-                      c=colors[i % len(colors)], s=100, marker='o',
-                      label=f"{obj['name']}")
+                      c=[color], s=100, marker='o',
+                      label=f"{obj['name']} ({shape}, {color_name})")
             
             # 绘制物体边界框
             corners = self._generate_bounding_box_corners(pos, size)
-            self._plot_bounding_box(ax, corners, colors[i % len(colors)])
+            self._plot_bounding_box(ax, corners, color)
         
         # 尝试绘制小车
         try:
@@ -326,13 +407,13 @@ class MojocoDataSim:
                 lidar_data = self.generate_realistic_lidar_data()
                 annotations = self.generate_annotations()
                 
-                # 显示检测到的物体数量
+                # 显示检测到的物体数量和详细信息
                 detected_count = len(annotations["objects"])
                 if detected_count != prev_detected_count:
                     if detected_count > 0:
                         print(f"检测到 {detected_count} 个物体:")
                         for obj in annotations["objects"]:
-                            print(f"  - {obj['name']} 距离: {obj['distance']:.2f}m")
+                            print(f"  - {obj['name']}: {obj['shape']} ({obj['color_name']}) 距离: {obj['distance']:.2f}m")
                     else:
                         print("未检测到附近物体")
                     prev_detected_count = detected_count
