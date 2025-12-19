@@ -278,7 +278,7 @@ class ImprovedGestureRecognizer:
         self.history_size = self.config['history_size']
         self.gesture_history = deque(maxlen=self.history_size)
         self.confidence_history = deque(maxlen=self.history_size)
-        self.current_gesture = "等待手势"
+        self.current_gesture = "Waiting"
         self.current_confidence = 0.0
 
         # 手部跟踪和状态
@@ -294,15 +294,15 @@ class ImprovedGestureRecognizer:
 
         # 手势颜色映射
         self.gesture_colors = {
-            "停止": (0, 0, 255),  # 红色
-            "向前": (0, 255, 0),  # 绿色
-            "向上": (255, 255, 0),  # 青色
-            "向下": (255, 0, 255),  # 紫色
-            "向左": (255, 165, 0),  # 橙色
-            "向右": (0, 165, 255),  # 浅蓝色
-            "等待手势": (200, 200, 200),  # 灰色
-            "识别异常": (255, 0, 0),  # 蓝色
-            "悬停": (255, 255, 255)  # 白色
+            "Stop": (0, 0, 255),  # 红色
+            "Forward": (0, 255, 0),  # 绿色
+            "Up": (255, 255, 0),  # 青色
+            "Down": (255, 0, 255),  # 紫色
+            "Left": (255, 165, 0),  # 橙色
+            "Right": (0, 165, 255),  # 浅蓝色
+            "Waiting": (200, 200, 200),  # 灰色
+            "Error": (255, 0, 0),  # 蓝色
+            "Hover": (255, 255, 255)  # 白色
         }
 
         # 背景减除器
@@ -620,7 +620,7 @@ class ImprovedGestureRecognizer:
     def recognize_gesture_improved(self, hand_data):
         """改进的手势识别逻辑"""
         if hand_data is None:
-            return "等待手势", 0.3
+            return "Waiting", 0.3
 
         finger_count = len(hand_data.get('fingers', []))
         fingertips = hand_data.get('fingertips', [])
@@ -632,10 +632,10 @@ class ImprovedGestureRecognizer:
         if finger_count == 0:
             # 握拳或没有手指
             if len(fingertips) == 0:
-                return "停止", confidence * 0.9
+                return "Stop", confidence * 0.9
             else:
                 # 有指尖但不是手指，可能是部分握拳
-                return "停止", confidence * 0.7
+                return "Stop", confidence * 0.7
 
         elif finger_count == 1:
             # 单指手势
@@ -651,52 +651,52 @@ class ImprovedGestureRecognizer:
                 # 判断指尖方向
                 if abs(dx) > abs(dy):  # 主要水平方向
                     if dx > 0:
-                        return "向右", confidence * 0.8
+                        return "Right", confidence * 0.8
                     else:
-                        return "向左", confidence * 0.8
+                        return "Left", confidence * 0.8
                 else:  # 主要垂直方向
                     if dy < 0:  # 指尖在手中心上方
-                        return "向上", confidence * 0.8
+                        return "Up", confidence * 0.8
                     else:
-                        return "向前", confidence * 0.8
-            return "向前", confidence * 0.7
+                        return "Forward", confidence * 0.8
+            return "Forward", confidence * 0.7
 
         elif finger_count == 2:
             # 双指手势
-            return "向前", confidence * 0.7
+            return "Forward", confidence * 0.7
 
         elif finger_count == 3:
             # 三指手势，根据手部方向判断
             if -45 <= direction <= 45:  # 大致水平
                 if direction > 0:
-                    return "向右", confidence * 0.7
+                    return "Right", confidence * 0.7
                 else:
-                    return "向左", confidence * 0.7
+                    return "Left", confidence * 0.7
             else:  # 大致垂直
                 if direction > 0:
-                    return "向下", confidence * 0.7
+                    return "Down", confidence * 0.7
                 else:
-                    return "向上", confidence * 0.7
+                    return "Up", confidence * 0.7
 
         elif finger_count >= 4:
             # 多指手势（手掌张开）
             # 根据手部位置判断
             if norm_x < 0.4:  # 左侧
-                return "向左", confidence * 0.8
+                return "Left", confidence * 0.8
             elif norm_x > 0.6:  # 右侧
-                return "向右", confidence * 0.8
+                return "Right", confidence * 0.8
             elif norm_y < 0.4:  # 上方
-                return "向上", confidence * 0.8
+                return "Up", confidence * 0.8
             elif norm_y > 0.6:  # 下方
-                return "向下", confidence * 0.8
+                return "Down", confidence * 0.8
             else:  # 中间
                 # 根据手部方向判断
                 if -45 <= direction <= 45:  # 大致水平
-                    return "向前", confidence * 0.7
+                    return "Forward", confidence * 0.7
                 else:  # 大致垂直
-                    return "停止", confidence * 0.7
+                    return "Stop", confidence * 0.7
 
-        return "等待手势", confidence * 0.5
+        return "Waiting", confidence * 0.5
 
     def smooth_gesture(self, new_gesture, new_confidence):
         """平滑手势输出"""
@@ -748,7 +748,7 @@ class ImprovedGestureRecognizer:
             color = self.gesture_colors.get(gesture, (255, 255, 255))
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
 
-            # 显示手势标签
+            # 显示手势标签 - 使用英文避免字体问题
             label = f"{gesture}"
             if config.get('display', 'show_confidence'):
                 label += f" ({confidence:.0%})"
@@ -855,7 +855,7 @@ class ImprovedGestureRecognizer:
                 gesture, raw_confidence = self.recognize_gesture_improved(hand_data)
                 confidence = max(confidence, raw_confidence)
             else:
-                gesture, confidence = "等待手势", 0.3
+                gesture, confidence = "Waiting", 0.3
 
             # 平滑手势
             final_gesture, final_confidence = self.smooth_gesture(gesture, confidence)
@@ -877,7 +877,7 @@ class ImprovedGestureRecognizer:
 
         except Exception as e:
             print(f"⚠ 手势识别错误: {e}")
-            return "识别异常", 0.0, frame
+            return "Error", 0.0, frame
 
     def get_performance_stats(self):
         """获取性能统计"""
@@ -1020,25 +1020,25 @@ class SimpleDroneController:
 
             success = False
 
-            if gesture == "向上":
+            if gesture == "Up":
                 self.client.moveByVelocityZAsync(0, 0, -self.velocity, self.duration)
                 success = True
-            elif gesture == "向下":
+            elif gesture == "Down":
                 self.client.moveByVelocityZAsync(0, 0, self.velocity, self.duration)
                 success = True
-            elif gesture == "向左":
+            elif gesture == "Left":
                 self.client.moveByVelocityAsync(-self.velocity, 0, 0, self.duration)
                 success = True
-            elif gesture == "向右":
+            elif gesture == "Right":
                 self.client.moveByVelocityAsync(self.velocity, 0, 0, self.duration)
                 success = True
-            elif gesture == "向前":
+            elif gesture == "Forward":
                 self.client.moveByVelocityAsync(0, -self.velocity, 0, self.duration)
                 success = True
-            elif gesture == "停止":
+            elif gesture == "Stop":
                 self.client.hoverAsync()
                 success = True
-            elif gesture == "悬停":
+            elif gesture == "Hover":
                 self.client.hoverAsync()
                 success = True
 
@@ -1317,13 +1317,13 @@ def main():
     print("1. 按 [C] 连接无人机 (AirSim模拟器)")
     print("2. 按 [空格键] 起飞/降落")
     print("3. 手势控制改进:")
-    print("   - 握拳或握紧: 停止")
-    print("   - 单指指向: 根据指尖方向判断上下左右")
-    print("   - 双指: 向前")
+    print("   - 握拳或握紧: Stop")
+    print("   - 单指指向: 根据指尖方向判断Up/Down/Left/Right")
+    print("   - 双指: Forward")
     print("   - 手掌张开: 根据手的位置判断方向")
     print("   * 手势识别置信度 > 50% 时才会执行")
     print("4. 键盘控制:")
-    print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [X]停止")
+    print("   [W]Up [S]Down [A]Left [D]Right [F]Forward [X]Stop")
     print("5. 调试功能:")
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
     print("6. 按 [ESC] 安全退出")
@@ -1333,12 +1333,12 @@ def main():
 
     # 键盘手势映射
     key_to_gesture = {
-        ord('w'): "向上", ord('W'): "向上",
-        ord('s'): "向下", ord('S'): "向下",
-        ord('a'): "向左", ord('A'): "向左",
-        ord('d'): "向右", ord('D'): "向右",
-        ord('f'): "向前", ord('F'): "向前",
-        ord('x'): "停止", ord('X'): "停止",
+        ord('w'): "Up", ord('W'): "Up",
+        ord('s'): "Down", ord('S'): "Down",
+        ord('a'): "Left", ord('A'): "Left",
+        ord('d'): "Right", ord('D'): "Right",
+        ord('f'): "Forward", ord('F'): "Forward",
+        ord('x'): "Stop", ord('X'): "Stop",
     }
 
     # 显示模式
@@ -1461,8 +1461,8 @@ def main():
 
             # 真实手势控制
             current_time = time.time()
-            if (gesture and gesture != "等待手势" and
-                    gesture != "摄像头错误" and gesture != "识别异常" and
+            if (gesture and gesture != "Waiting" and
+                    gesture != "摄像头错误" and gesture != "Error" and
                     drone_controller.connected and drone_controller.flying):
                 drone_controller.move_by_gesture(gesture, confidence)
 
