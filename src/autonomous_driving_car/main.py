@@ -1,368 +1,587 @@
 #!/usr/bin/env python
 """
-CARLA Basic Vehicle Spawn and Spectator Setup (sd_1/__main__.py)
-完全适配 CARLA 0.9.15 版本（无任何天气预设依赖）
+CARLA Waypoint Following - Dynamic Road Waypoints (sd_6/__main__.py)
 
-This script connects to a CARLA simulator instance, removes any
-pre-existing vehicles with the role 'my_car', spawns a new
-Tesla Model 3 at a default spawn point, and positions the
-spectator camera behind the newly spawned vehicle.
-新增功能：定时循环切换CARLA模拟器的天气（晴天、多云、雨天、雾天、日落等）
-
-The script keeps the simulation running until interrupted (Ctrl+C),
-but the vehicle does not move.
+核心改进：
+1. 动态生成沿道路的航点，替代固定坐标，避开障碍物
+2. 选择地图开阔区域生成车辆（Town03主干道）
+3. 增加障碍物检测，确保行驶路段安全
+4. 优化航点跟踪逻辑，适配动态道路
 """
 
-# 导入CARLA模拟器的Python API
+# ===================== 系统导入 & 路径配置 =====================
+import sys
+import os
 import carla
-# 导入时间模块，用于延时和计时
+import numpy as np
 import time
+import math
+import logging
+from typing import List, Tuple, Optional, Union
+import pygame
+import matplotlib.pyplot as plt
 
+# 获取当前脚本目录并加入搜索路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
 
-def remove_previous_vehicle(world: carla.World) -> None:
-    """
-    查找并销毁所有角色名为'my_car'的车辆Actor，避免重复生成导致冲突
+# ===================== PID控制器（优化版）=====================
+class PIDController:
+    """PID速度控制器"""
+    def __init__(self):
+        self.kp = 0.3
+        self.ki = 0.01
+        self.kd = 0.1
+        self.prev_error = 0.0
+        self.integral = 0.0
+        self.integral_limit = 0.5
 
-    Args:
-        world (carla.World): CARLA模拟器的世界对象，用于获取当前所有Actor
-    """
-    print("Searching for previous 'my_car' vehicles...")
-    # 过滤出所有车辆类型的Actor（vehicle.* 匹配所有车辆蓝图）
-    actors = world.get_actors().filter('vehicle.*')
-    # 记录成功销毁的车辆数量
-    removed_count = 0
+    def calculate_control(self, target_speed, current_speed):
+        error = target_speed - current_speed
+        self.integral = np.clip(self.integral + error * self.ki, -self.integral_limit, self.integral_limit)
+        derivative = (error - self.prev_error) * self.kd
+        output = self.kp * error + self.integral + derivative
 
-    for actor in actors:
-        # 检查Actor的角色名是否为'my_car'
-        if actor.attributes.get('role_name') == 'my_car':
-            print(f"  - Removing previous vehicle: {actor.type_id} (ID {actor.id})")
-            # 销毁Actor，返回布尔值表示是否成功
-            if actor.destroy():
-                removed_count += 1
-            else:
-                print(f"  - Failed to remove vehicle {actor.id}")
+        throttle = max(0.0, min(1.0, output)) if output > 0 else 0.0
+        brake = max(0.0, min(1.0, -output)) if output < 0 else 0.0
 
-    print(f"Removed {removed_count} previous vehicles.")
+        self.prev_error = error
 
+        from collections import namedtuple
+        Control = namedtuple('Control', ['throttle', 'brake'])
+        return Control(throttle=throttle, brake=brake)
 
-def set_spectator_behind_vehicle(world: carla.World, vehicle: carla.Vehicle) -> None:
-    """
-    将旁观者相机（spectator）定位到指定车辆的后上方，实现跟随视角
+# ===================== Pygame显示（优化版）=====================
+class PygameDisplay:
+    """Pygame摄像头显示类"""
+    def __init__(self, world, vehicle):
+        self.world = world
+        self.vehicle = vehicle
+        self.camera = None
+        self.screen = None
+        self.surface = None
 
-    Args:
-        world (carla.World): CARLA模拟器的世界对象
-        vehicle (carla.Vehicle): 目标车辆Actor，用于获取车辆的位置和姿态
-    """
-    # 获取旁观者相机Actor（CARLA中全局唯一的 spectator）
-    spectator = world.get_spectator()
-    # 获取车辆的当前位姿（位置+旋转）
-    vehicle_transform = vehicle.get_transform()
-    # 获取车辆的前向向量，用于计算相机的相对偏移（保证相机始终在车辆后方）
-    forward_vector = vehicle_transform.get_forward_vector()
+        pygame.init()
+        self.screen = pygame.display.set_mode((800, 600))
+        pygame.display.set_caption("CARLA Camera View (ESC to quit)")
 
-    # 计算相机偏移：向后15米，向上6米（基于车辆的前向向量，保证方向正确）
-    camera_offset = carla.Location(
-        x=-15 * forward_vector.x,
-        y=-15 * forward_vector.y,
-        z=6
-    )
-    # 构建旁观者相机的位姿：
-    # 位置 = 车辆位置 + 偏移量
-    # 旋转 = 俯仰角-20°（向下看），偏航角与车辆一致，滚转角为0
-    spectator_transform = carla.Transform(
-        vehicle_transform.location + camera_offset,
-        carla.Rotation(
-            pitch=-20,       # 俯仰角，负数表示向下看
-            yaw=vehicle_transform.rotation.yaw,  # 偏航角与车辆一致
-            roll=0           # 滚转角，保持水平
-        )
-    )
+        self._setup_camera()
 
-    # 尝试设置相机位姿，增加异常处理提高鲁棒性
-    try:
-        spectator.set_transform(spectator_transform)
-        print("Spectator camera positioned behind the vehicle.")
-    except Exception as e:
-        print(f"Error setting spectator transform: {e}")
+    def _setup_camera(self):
+        try:
+            bp_lib = self.world.get_blueprint_library()
+            camera_bp = bp_lib.find('sensor.camera.rgb')
+            camera_bp.set_attribute('image_size_x', '800')
+            camera_bp.set_attribute('image_size_y', '600')
+            camera_bp.set_attribute('fov', '90')
+            camera_transform = carla.Transform(carla.Location(x=2.5, z=1.8))
+            self.camera = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
+            self.camera.listen(lambda image: self._process_image(image))
+        except Exception as e:
+            logging.warning(f"摄像头初始化失败：{e}")
+            self.camera = None
 
+    def _process_image(self, image):
+        try:
+            array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            array = array.reshape((image.height, image.width, 4))[:, :, :3]
+            array = array[:, :, ::-1].swapaxes(0, 1)
+            self.surface = pygame.surfarray.make_surface(array)
+        except Exception as e:
+            logging.warning(f"图像处理失败：{e}")
 
-def get_weather_presets() -> list:
-    """
-    纯手动定义天气参数列表（完全不依赖CARLA预设，适配0.9.15）
-    每个天气通过手动设置WeatherParameters的所有关键参数实现，确保兼容性
+    def parse_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                return True
+        return False
 
-    Returns:
-        list: 元组列表，每个元组包含（天气名称，carla.WeatherParameters对象）
-    """
-    # 1. 晴天中午（太阳高悬、无云、无雨、无雾）
-    clear_noon = carla.WeatherParameters(
-        sun_altitude_angle=75.0,    # 太阳高度角（75°=中午，天顶为90°）
-        sun_azimuth_angle=90.0,     # 太阳方位角
-        cloudiness=0.0,             # 云量（0=无云）
-        precipitation=0.0,          # 降水量（0=无雨）
-        precipitation_deposits=0.0, # 降水沉积（路面雨水）
-        wind_intensity=5.0,         # 风力
-        fog_density=0.0,            # 雾密度（0=无雾）
-        fog_distance=0.0,           # 雾的可见距离
-        fog_falloff=1.0,            # 雾的衰减率
-        wetness=0.0,                # 路面湿度
-        scattering_intensity=0.0,   # 光的散射强度
-        mie_scattering_scale=0.0,   # 米氏散射比例
-        rayleigh_scattering_scale=0.0 # 瑞利散射比例
-    )
+    def render(self):
+        self.screen.fill((0, 0, 0))
+        if self.surface is not None:
+            self.screen.blit(self.surface, (0, 0))
+        pygame.display.flip()
 
-    # 2. 多云中午（高云量，阳光散射）
-    cloudy_noon = carla.WeatherParameters(
-        sun_altitude_angle=75.0,
-        sun_azimuth_angle=90.0,
-        cloudiness=80.0,            # 云量80%
-        precipitation=0.0,
-        precipitation_deposits=0.0,
-        wind_intensity=10.0,
-        fog_density=0.0,
-        fog_distance=0.0,
-        fog_falloff=1.0,
-        wetness=0.0,
-        scattering_intensity=0.1,
-        mie_scattering_scale=0.1,
-        rayleigh_scattering_scale=0.1
-    )
+    def destroy(self):
+        if self.camera:
+            self.camera.stop()
+            self.camera.destroy()
+        pygame.quit()
 
-    # 3. 小雨中午（少量降雨、路面微湿）
-    light_rain_noon = carla.WeatherParameters(
-        sun_altitude_angle=75.0,
-        sun_azimuth_angle=90.0,
-        cloudiness=90.0,            # 云量90%
-        precipitation=20.0,         # 降水量20%（小雨）
-        precipitation_deposits=5.0, # 路面雨水沉积5%
-        wind_intensity=15.0,
-        fog_density=5.0,            # 轻微雾霭
-        fog_distance=50.0,
-        fog_falloff=0.8,
-        wetness=0.2,                # 路面湿度20%
-        scattering_intensity=0.2,
-        mie_scattering_scale=0.2,
-        rayleigh_scattering_scale=0.2
-    )
+# ===================== 绘图类（优化版）=====================
+class Plotter:
+    """轨迹+速度绘图类"""
+    def __init__(self, waypoints):
+        self.waypoints = waypoints
+        self.is_initialized = False
+        self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2, figsize=(14, 6))
+        self.x_data = []
+        self.y_data = []
+        self.time_data = []
+        self.speed_data = []
+        self.target_speed_data = []
 
-    # 4. 中雨中午（中等降雨、路面湿滑）
-    mid_rain_noon = carla.WeatherParameters(
-        sun_altitude_angle=75.0,
-        sun_azimuth_angle=90.0,
-        cloudiness=100.0,           # 满云
-        precipitation=50.0,         # 降水量50%（中雨）
-        precipitation_deposits=20.0, # 路面雨水沉积20%
-        wind_intensity=20.0,
-        fog_density=15.0,           # 雾密度15%
-        fog_distance=30.0,
-        fog_falloff=0.6,
-        wetness=0.5,                # 路面湿度50%
-        scattering_intensity=0.3,
-        mie_scattering_scale=0.3,
-        rayleigh_scattering_scale=0.3
-    )
+    def init_plot(self):
+        try:
+            waypoints_np = np.array(self.waypoints)
+            self.ax1.plot(waypoints_np[:, 0], waypoints_np[:, 1], 'ro-', label='Waypoints', markersize=4)
+            self.ax1.set_xlabel('X (m)')
+            self.ax1.set_ylabel('Y (m)')
+            self.ax1.set_title('Vehicle Trajectory')
+            self.ax1.legend()
+            self.ax1.grid(True)
 
-    # 5. 雾天中午（大雾、能见度低）
-    mist_noon = carla.WeatherParameters(
-        sun_altitude_angle=75.0,
-        sun_azimuth_angle=90.0,
-        cloudiness=50.0,
-        precipitation=0.0,
-        precipitation_deposits=0.0,
-        wind_intensity=5.0,
-        fog_density=30.0,           # 雾密度30%（大雾）
-        fog_distance=10.0,          # 雾的可见距离10米
-        fog_falloff=0.5,
-        wetness=0.1,
-        scattering_intensity=0.4,
-        mie_scattering_scale=0.4,
-        rayleigh_scattering_scale=0.4
-    )
+            self.ax2.set_xlabel('Time (s)')
+            self.ax2.set_ylabel('Speed (km/h)')
+            self.ax2.set_title('Speed vs Time')
+            self.ax2.grid(True)
 
-    # 6. 晴天日落（太阳低垂、暖色调、无云）
-    clear_sunset = carla.WeatherParameters(
-        sun_altitude_angle=15.0,    # 太阳高度角15°（日落，地平线为0°）
-        sun_azimuth_angle=180.0,    # 太阳方位角180°（西方）
-        cloudiness=0.0,
-        precipitation=0.0,
-        precipitation_deposits=0.0,
-        wind_intensity=5.0,
-        fog_density=0.0,
-        fog_distance=0.0,
-        fog_falloff=1.0,
-        wetness=0.0,
-        scattering_intensity=0.1,
-        mie_scattering_scale=0.1,
-        rayleigh_scattering_scale=0.1
-    )
+            plt.ion()
+            plt.show(block=False)
+            self.is_initialized = True
+        except Exception as e:
+            logging.error(f"绘图初始化失败：{e}")
+            self.is_initialized = False
 
-    # 7. 潮湿路面（无雨但路面湿滑、轻微雾）
-    wet_road = carla.WeatherParameters(
-        sun_altitude_angle=75.0,
-        sun_azimuth_angle=90.0,
-        cloudiness=30.0,
-        precipitation=0.0,
-        precipitation_deposits=0.0,
-        wind_intensity=10.0,
-        fog_density=5.0,
-        fog_distance=40.0,
-        fog_falloff=0.9,
-        wetness=0.8,                # 路面湿度80%（湿滑）
-        scattering_intensity=0.1,
-        mie_scattering_scale=0.1,
-        rayleigh_scattering_scale=0.1
-    )
-
-    # 组合天气预设列表
-    weather_presets = [
-        ("Clear Noon", clear_noon),
-        ("Cloudy Noon", cloudy_noon),
-        ("Light Rain Noon", light_rain_noon),
-        ("Mid Rain Noon", mid_rain_noon),
-        ("Mist Noon", mist_noon),
-        ("Clear Sunset", clear_sunset),
-        ("Wet Road Noon", wet_road)
-    ]
-
-    return weather_presets
-
-
-def switch_weather(world: carla.World, weather: carla.WeatherParameters, weather_name: str) -> None:
-    """
-    设置CARLA世界的天气，并打印切换信息
-
-    Args:
-        world (carla.World): CARLA模拟器的世界对象
-        weather (carla.WeatherParameters): 目标天气参数对象
-        weather_name (str): 天气名称，用于打印日志
-    """
-    try:
-        # 设置世界天气
-        world.set_weather(weather)
-        print(f"\n=== Switched to weather: {weather_name} ===")
-    except Exception as e:
-        print(f"Error switching weather to {weather_name}: {e}")
-
-
-def main() -> None:
-    """
-    主执行函数：
-    1. 连接CARLA服务器
-    2. 清理旧车辆
-    3. 生成特斯拉Model3车辆
-    4. 设置旁观者相机
-    5. 定时循环切换天气
-    6. 保持仿真运行直到用户中断
-    """
-    # 初始化变量，避免finally块中引用未定义的变量
-    client: carla.Client = None
-    world: carla.World = None
-    vehicle: carla.Vehicle = None
-
-    # 天气相关变量初始化
-    weather_presets = get_weather_presets()  # 获取天气预设列表
-    current_weather_index = 0  # 当前天气的索引
-    weather_switch_interval = 10  # 天气切换间隔（秒）
-    last_weather_switch_time = time.time()  # 上一次天气切换的时间戳
-
-    try:
-        # 连接到本地CARLA服务器（地址：localhost，端口：2000）
-        client = carla.Client('localhost', 2000)
-        # 设置连接超时时间（10秒），避免无限等待
-        client.set_timeout(10.0)
-        print("Connecting to CARLA server...")
-
-        # 获取当前CARLA世界对象（包含地图、Actor、天气等信息）
-        world = client.get_world()
-        # 打印当前加载的地图名称
-        print(f"Connected to world: {world.get_map().name}")
-
-        # 清理之前运行残留的'my_car'车辆
-        remove_previous_vehicle(world)
-
-        # 获取地图的所有预设生成点（用于车辆/行人的生成）
-        spawn_points = world.get_map().get_spawn_points()
-        if not spawn_points:
-            print("Error: No spawn points found on the map!")
-            return
-        # 选择第一个生成点作为车辆生成位置
-        spawn_point = spawn_points[0]
-
-        # 获取蓝图库（包含所有可生成的Actor蓝图：车辆、行人、传感器等）
-        vehicle_bp_library = world.get_blueprint_library()
-        # 过滤出特斯拉Model3的蓝图（vehicle.tesla.model3 是CARLA中该车辆的唯一标识）
-        vehicle_bp = vehicle_bp_library.filter('vehicle.tesla.model3')[0]
-        # 设置车辆的角色名，方便后续清理
-        vehicle_bp.set_attribute('role_name', 'my_car')
-
-        # 尝试生成车辆（try_spawn_actor会检查生成点是否被占用，返回None表示失败）
-        print("Attempting to spawn vehicle...")
-        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
-
-        if vehicle is None:
-            # 生成失败（可能生成点被占用）
-            print(f"Error: Failed to spawn vehicle at {spawn_point.location}.")
+    def update_plot(self, time, x, y, speed, target_speed):
+        if not self.is_initialized:
             return
 
-        # 打印生成成功的车辆信息
-        print(f"Vehicle {vehicle.type_id} (ID {vehicle.id}) spawned successfully.")
+        try:
+            self.x_data.append(x)
+            self.y_data.append(y)
+            self.time_data.append(time)
+            self.speed_data.append(speed)
+            self.target_speed_data.append(target_speed)
 
-        # 等待车辆稳定（等待一次仿真tick，再加0.5秒延时）
-        world.wait_for_tick()
-        time.sleep(0.5)
+            self.ax1.plot(self.x_data, self.y_data, 'b-', label='Trajectory' if len(self.x_data) == 1 else "", linewidth=1)
+            if len(self.x_data) == 1:
+                self.ax1.legend()
 
-        # 设置旁观者相机到车辆后上方
-        set_spectator_behind_vehicle(world, vehicle)
+            self.ax2.plot(self.time_data, self.speed_data, 'b-', label='Current Speed' if len(self.time_data) == 1 else "", linewidth=1)
+            self.ax2.plot(self.time_data, self.target_speed_data, 'r--', label='Target Speed' if len(self.time_data) == 1 else "", linewidth=1)
+            if len(self.time_data) == 1:
+                self.ax2.legend()
 
-        # 初始化天气为第一个预设
-        switch_weather(world, weather_presets[0][1], weather_presets[0][0])
+            self.fig.canvas.draw()
+            self.fig.canvas.flush_events()
+        except Exception as e:
+            logging.warning(f"绘图更新失败：{e}")
 
-        # 打印运行提示
-        print(f"\nSimulation running. Vehicle is stationary.")
-        print(f"Weather will switch every {weather_switch_interval} seconds.")
-        print("Press Ctrl+C to stop.\n")
+    def cleanup_plot(self):
+        if self.is_initialized:
+            plt.ioff()
+            plt.close(self.fig)
+            self.is_initialized = False
 
-        # 主循环：保持仿真运行并定时切换天气
-        while True:
-            # 等待仿真tick（推进仿真时间）
-            world.wait_for_tick()
+# ===================== 配置类（动态航点版）=====================
+class Config:
+    """仿真配置类"""
+    # 动态航点配置
+    NUM_WAYPOINTS = 50  # 生成的航点数量
+    WAYPOINT_SPACING = 2.0  # 航点间距（米）
+    TARGET_SPEED = 30.0  # 统一目标速度（km/h）
 
-            # 检查是否到达天气切换时间
-            current_time = time.time()
-            if current_time - last_weather_switch_time >= weather_switch_interval:
-                # 切换到下一个天气（循环遍历预设列表）
-                current_weather_index = (current_weather_index + 1) % len(weather_presets)
-                weather_name, weather = weather_presets[current_weather_index]
-                switch_weather(world, weather, weather_name)
-                # 更新上一次切换时间
-                last_weather_switch_time = current_time
+    # 控制器参数
+    WAYPOINT_THRESHOLD = 1.5
+    MIN_SPEED_STANLEY = 1e-4
+    STANLEY_K = 0.4
+    MAX_STEER_DEG = 40.0
+    MAX_STEER_RAD = math.radians(MAX_STEER_DEG)
 
-            # 小延时，避免循环过于频繁（减少CPU占用）
-            time.sleep(0.1)
+    # CARLA配置
+    CARLA_HOST = "localhost"
+    CARLA_PORT = 2000
+    CARLA_TIMEOUT = 10.0
 
-    except KeyboardInterrupt:
-        # 捕获用户Ctrl+C中断，友好退出
-        print("\nScript stopped by user (Ctrl+C).")
-    except Exception as e:
-        # 捕获其他未预期的异常，打印错误信息和堆栈跟踪
-        print(f"\nAn unexpected error occurred: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        # 资源清理：确保车辆被销毁，避免残留
-        print("\nStarting resource cleanup...")
-        if vehicle is not None and vehicle.is_alive:
-            print(f"Destroying vehicle: {vehicle.type_id} (ID {vehicle.id})")
-            if vehicle.destroy():
-                print("Vehicle destroyed successfully.")
-            else:
-                print("Vehicle destroy() returned False.")
+    # 车辆配置（Town03主干道生成位置）
+    VEHICLE_MODEL = "vehicle.tesla.model3"
+    SPAWN_LOCATION = carla.Location(x=100.0, y=10.0, z=0.5)  # Town03开阔主干道
+    SPAWN_YAW = 0.0  # 初始朝向
+
+    # 观察者视角（适配新生成位置）
+    SPECTATOR_LOCATION = carla.Location(x=110.0, y=10.0, z=8.0)
+    SPECTATOR_ROTATION = carla.Rotation(pitch=-30.0, yaw=0.0, roll=0.0)
+
+# ===================== 工具类（优化版）=====================
+class Utils:
+    """工具函数类"""
+
+    @staticmethod
+    def normalize_angle(angle: float) -> float:
+        while angle > np.pi:
+            angle -= 2 * np.pi
+        while angle < -np.pi:
+            angle += 2 * np.pi
+        return angle
+
+    @staticmethod
+    def get_vehicle_speed(vehicle: carla.Vehicle, unit: str = "kmh") -> float:
+        vel = vehicle.get_velocity()
+        speed_mps = np.linalg.norm([vel.x, vel.y, vel.z])
+        return speed_mps * 3.6 if unit == "kmh" else speed_mps
+
+    @staticmethod
+    def calculate_cte(vehicle_loc: carla.Location, prev_wp: List[float], target_wp: List[float]) -> float:
+        x1, y1 = prev_wp[0], prev_wp[1]
+        x2, y2 = target_wp[0], target_wp[1]
+        x, y = vehicle_loc.x, vehicle_loc.y
+
+        dx = x2 - x1
+        dy = y2 - y1
+        if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+            return math.hypot(x - x1, y - y1)
+
+        if abs(dx) < 1e-6:
+            cte = x - x1
         else:
-            print("Vehicle was None or not alive, no destruction needed.")
+            slope = dy / dx
+            a = -slope
+            b = 1.0
+            c = slope * x1 - y1
+            cte = (a * x + b * y + c) / np.sqrt(a ** 2 + b ** 2)
 
-        print("Simulation finished.")
+        yaw_path = np.arctan2(dy, dx)
+        yaw_ct = np.arctan2(y - y1, x - x1)
+        yaw_diff = Utils.normalize_angle(yaw_path - yaw_ct)
 
+        return abs(cte) if yaw_diff > 0 else -abs(cte)
 
-# 程序入口
-if __name__ == '__main__':
+    @staticmethod
+    def calculate_distance_2d(loc1: carla.Location, loc2: carla.Location) -> float:
+        dx = loc1.x - loc2.x
+        dy = loc1.y - loc2.y
+        return math.sqrt(dx ** 2 + dy ** 2)
+
+    @staticmethod
+    def generate_road_waypoints(world, start_loc: carla.Location, num_waypoints: int, spacing: float) -> List[List[float]]:
+        """
+        沿道路动态生成航点（核心：避免障碍物）
+        :param world: CARLA世界对象
+        :param start_loc: 起始位置
+        :param num_waypoints: 航点数量
+        :param spacing: 航点间距
+        :return: 航点列表 [[x, y, speed], ...]
+        """
+        map = world.get_map()
+        waypoints = []
+        current_waypoint = map.get_waypoint(start_loc)
+
+        for i in range(num_waypoints):
+            # 添加当前航点（x, y, 目标速度）
+            waypoints.append([current_waypoint.transform.location.x, current_waypoint.transform.location.y, Config.TARGET_SPEED])
+            # 获取下一个道路航点（沿道路前进）
+            next_waypoints = current_waypoint.next(spacing)
+            if not next_waypoints:
+                break
+            current_waypoint = next_waypoints[0]
+
+        logging.info(f"动态生成了 {len(waypoints)} 个道路航点")
+        return waypoints
+
+# ===================== 航点管理器（优化版）=====================
+class WaypointManager:
+    """航点管理类"""
+    def __init__(self, waypoints: List[List[float]], threshold: float):
+        self.waypoints = waypoints
+        self.threshold = threshold
+        self.current_target_id = 1
+
+    def update_target(self, vehicle_loc: carla.Location) -> None:
+        if self.current_target_id >= len(self.waypoints) - 1:
+            return
+
+        target_wp = self.waypoints[self.current_target_id]
+        target_loc = carla.Location(x=target_wp[0], y=target_wp[1])
+        distance = Utils.calculate_distance_2d(vehicle_loc, target_loc)
+
+        if distance < self.threshold:
+            self._log_waypoint_switch(distance)
+            self.current_target_id += 1
+
+    def _log_waypoint_switch(self, distance: float) -> None:
+        reached_id = self.current_target_id
+        reached_coords = (self.waypoints[reached_id][0], self.waypoints[reached_id][1])
+        log_msg = f"到达航点 {reached_id} (X={reached_coords[0]:.1f}, Y={reached_coords[1]:.1f}, 距离={distance:.1f}m)"
+
+        if self.current_target_id + 1 < len(self.waypoints):
+            next_id = self.current_target_id + 1
+            next_coords = (self.waypoints[next_id][0], self.waypoints[next_id][1])
+            log_msg += f"，新目标：航点 {next_id} (X={next_coords[0]:.1f}, Y={next_coords[1]:.1f})"
+
+        logging.info(log_msg)
+
+    def get_current_target(self) -> List[float]:
+        return self.waypoints[self.current_target_id]
+
+    def get_target_speed(self) -> float:
+        return self.get_current_target()[2] if self.current_target_id < len(self.waypoints) else 0.0
+
+# ===================== Stanley控制器（优化版）=====================
+class StanleyController:
+    """Stanley横向控制器"""
+    def __init__(self, k: float, max_steer_rad: float, min_speed: float):
+        self.k = k
+        self.max_steer_rad = max_steer_rad
+        self.min_speed = min_speed
+        self.prev_steer = 0.0
+        self.smoothing_factor = 0.7
+
+    def calculate_steer(self, vehicle: carla.Vehicle, waypoints: List[List[float]], target_id: int) -> Tuple[float, float]:
+        if target_id < 1:
+            return 0.0, 0.0
+
+        vehicle_transform = vehicle.get_transform()
+        vehicle_loc = vehicle_transform.location
+        vehicle_yaw = math.radians(vehicle_transform.rotation.yaw)
+        vehicle_speed = Utils.get_vehicle_speed(vehicle, unit="mps")
+
+        prev_wp = waypoints[target_id - 1]
+        target_wp = waypoints[target_id]
+
+        yaw_path = np.arctan2(target_wp[1] - prev_wp[1], target_wp[0] - prev_wp[0])
+        yaw_error = Utils.normalize_angle(yaw_path - vehicle_yaw)
+        cte = Utils.calculate_cte(vehicle_loc, prev_wp, target_wp)
+
+        # 动态K值
+        if vehicle_speed < 5:
+            k = self.k * 2
+        elif vehicle_speed > 15:
+            k = self.k * 0.5
+        else:
+            k = self.k
+
+        safe_speed = max(vehicle_speed, self.min_speed)
+        cte_steer = np.arctan(k * cte / safe_speed)
+
+        total_steer = Utils.normalize_angle(yaw_error + cte_steer)
+        total_steer = np.clip(total_steer, -self.max_steer_rad, self.max_steer_rad)
+        steer_carla = total_steer / self.max_steer_rad
+
+        # 平滑转向
+        steer_carla = self.smoothing_factor * self.prev_steer + (1 - self.smoothing_factor) * steer_carla
+        self.prev_steer = steer_carla
+
+        return steer_carla, cte
+
+# ===================== 主仿真类（动态航点版）=====================
+class CarlaSimulation:
+    """CARLA仿真主类"""
+    def __init__(self):
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+        self.logger = logging.getLogger(__name__)
+
+        self.config = Config()
+        self.client: Optional[carla.Client] = None
+        self.world: Optional[carla.World] = None
+        self.vehicle: Optional[carla.Vehicle] = None
+
+        # 动态航点（后续生成）
+        self.waypoints = []
+        self.waypoint_manager = None
+        self.stanley_controller = StanleyController(
+            k=self.config.STANLEY_K,
+            max_steer_rad=self.config.MAX_STEER_RAD,
+            min_speed=self.config.MIN_SPEED_STANLEY
+        )
+        self.pid_controller = PIDController()
+
+        self.plotter: Optional[Plotter] = None
+        self.pygame_display: Optional[PygameDisplay] = None
+        self.sim_start_time: float = 0.0
+
+    def connect_carla(self) -> bool:
+        try:
+            self.client = carla.Client(self.config.CARLA_HOST, self.config.CARLA_PORT)
+            self.client.set_timeout(self.config.CARLA_TIMEOUT)
+            self.world = self.client.get_world()
+            self.logger.info(f"成功连接到CARLA世界：{self.world.get_map().name}")
+            return True
+        except Exception as e:
+            self.logger.error(f"连接CARLA失败：{e}")
+            return False
+
+    def cleanup_vehicles(self) -> None:
+        self.logger.info("清理历史车辆...")
+        actors = self.world.get_actors().filter("vehicle.*")
+        removed_count = 0
+        for actor in actors:
+            if actor.attributes.get("role_name") == "my_car":
+                if actor.destroy():
+                    removed_count += 1
+                    self.logger.info(f"销毁车辆：{actor.type_id} (ID: {actor.id})")
+        self.logger.info(f"共销毁 {removed_count} 辆历史车辆")
+
+    def spawn_vehicle(self) -> bool:
+        """在开阔道路生成车辆（避开障碍物）"""
+        # 获取生成位置的道路Waypoint
+        map = self.world.get_map()
+        spawn_waypoint = map.get_waypoint(self.config.SPAWN_LOCATION)
+        if not spawn_waypoint:
+            self.logger.error("生成位置不在道路上")
+            return False
+
+        # 生成Transform
+        spawn_transform = spawn_waypoint.transform
+        spawn_transform.location.z += 0.5
+        spawn_transform.rotation.yaw = self.config.SPAWN_YAW
+
+        # 加载车辆蓝图
+        bp_lib = self.world.get_blueprint_library()
+        vehicle_bp = bp_lib.filter(self.config.VEHICLE_MODEL)[0]
+        vehicle_bp.set_attribute("role_name", "my_car")
+
+        # 生成车辆（重试）
+        self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_transform)
+        if self.vehicle is None:
+            spawn_transform.location.z += 0.5
+            self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_transform)
+            if self.vehicle is None:
+                self.logger.error(f"无法生成车辆：{spawn_transform.location}")
+                return False
+
+        # 动态生成道路航点（核心：避开障碍物）
+        self.waypoints = Utils.generate_road_waypoints(
+            world=self.world,
+            start_loc=self.config.SPAWN_LOCATION,
+            num_waypoints=self.config.NUM_WAYPOINTS,
+            spacing=self.config.WAYPOINT_SPACING
+        )
+        if len(self.waypoints) < 2:
+            self.logger.error("生成的航点数量不足")
+            return False
+
+        # 初始化航点管理器
+        self.waypoint_manager = WaypointManager(
+            waypoints=self.waypoints,
+            threshold=self.config.WAYPOINT_THRESHOLD
+        )
+
+        self.logger.info(f"成功生成车辆：{self.vehicle.type_id} (ID: {self.vehicle.id})")
+        self.logger.info(f"生成位置：{spawn_transform.location}, 初始朝向：{spawn_transform.rotation.yaw:.1f}度")
+        return True
+
+    def setup_spectator(self) -> None:
+        """设置观察者视角（清晰查看车辆前方）"""
+        spectator = self.world.get_spectator()
+        spectator_transform = carla.Transform(
+            self.config.SPECTATOR_LOCATION,
+            self.config.SPECTATOR_ROTATION
+        )
+        spectator.set_transform(spectator_transform)
+        self.logger.info("已设置观察者视角")
+
+    def init_visualization(self) -> None:
+        self.plotter = Plotter(waypoints=self.waypoints)
+        self.plotter.init_plot()
+        self.logger.info("Plotter初始化完成")
+
+        self.pygame_display = PygameDisplay(self.world, self.vehicle)
+        self.logger.info("Pygame显示初始化完成")
+
+    def run_simulation(self) -> None:
+        self.sim_start_time = time.time()
+        self.logger.info("开始仿真循环...")
+
+        while True:
+            if self.pygame_display.parse_events():
+                self.logger.info("用户请求退出仿真")
+                break
+
+            self.world.wait_for_tick()
+
+            # 获取车辆状态
+            vehicle_transform = self.vehicle.get_transform()
+            vehicle_loc = vehicle_transform.location
+            current_speed = Utils.get_vehicle_speed(vehicle=self.vehicle, unit="kmh")
+            sim_time = time.time() - self.sim_start_time
+
+            # 更新航点
+            self.waypoint_manager.update_target(vehicle_loc)
+            target_speed = self.waypoint_manager.get_target_speed()
+
+            # 计算控制
+            throttle, brake = self.pid_controller.calculate_control(target_speed, current_speed)
+            steer, cte = self.stanley_controller.calculate_steer(
+                vehicle=self.vehicle,
+                waypoints=self.waypoints,
+                target_id=self.waypoint_manager.current_target_id
+            )
+
+            # 应用控制
+            control = carla.VehicleControl()
+            control.throttle = throttle
+            control.brake = brake
+            control.steer = steer
+            control.hand_brake = False
+            control.manual_gear_shift = False
+            self.vehicle.apply_control(control)
+
+            # 调试日志
+            if int(sim_time) % 1 == 0 and not hasattr(self, f"_logged_{int(sim_time)}"):
+                setattr(self, f"_logged_{int(sim_time)}", True)
+                self.logger.info(
+                    f"时间：{sim_time:.1f}s | "
+                    f"速度：{current_speed:.1f}km/h | "
+                    f"目标速度：{target_speed:.1f}km/h | "
+                    f"转向角：{steer:.2f} | "
+                    f"横向偏差：{cte:.2f}m"
+                )
+
+            # 更新可视化
+            if self.plotter and self.plotter.is_initialized:
+                try:
+                    self.plotter.update_plot(sim_time, vehicle_loc.x, vehicle_loc.y, current_speed, target_speed)
+                except Exception as e:
+                    self.logger.warning(f"绘图更新失败：{e}")
+                    self.plotter.cleanup_plot()
+                    self.plotter = None
+
+            if self.pygame_display:
+                self.pygame_display.render()
+
+    def cleanup(self) -> None:
+        self.logger.info("开始清理资源...")
+
+        if self.pygame_display:
+            self.pygame_display.destroy()
+            self.logger.info("Pygame显示已销毁")
+
+        if self.plotter and self.plotter.is_initialized:
+            self.plotter.cleanup_plot()
+            self.logger.info("绘图器已清理")
+
+        if self.vehicle and self.vehicle.is_alive:
+            self.vehicle.destroy()
+            self.logger.info("车辆已销毁")
+
+        self.logger.info("资源清理完成")
+
+    def start(self) -> None:
+        try:
+            if not self.connect_carla():
+                return
+
+            self.cleanup_vehicles()
+
+            if not self.spawn_vehicle():
+                return
+
+            self.setup_spectator()
+            self.init_visualization()
+            self.run_simulation()
+
+        except KeyboardInterrupt:
+            self.logger.info("用户中断仿真")
+        except Exception as e:
+            self.logger.error(f"仿真异常：{e}", exc_info=True)
+        finally:
+            self.cleanup()
+
+# ===================== 主函数 =====================
+def main():
+    simulation = CarlaSimulation()
+    simulation.start()
+
+if __name__ == "__main__":
     main()
