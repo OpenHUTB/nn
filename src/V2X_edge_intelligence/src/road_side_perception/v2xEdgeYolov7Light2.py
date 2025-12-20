@@ -1,3 +1,5 @@
+# ==============================================
+# V2X路侧感知系统（动态画面版 + 参数修复）
 # 修复：draw_boxes参数缺失 + 动态画面静止问题
 # ==============================================
 import sys
@@ -6,7 +8,9 @@ import time
 import cv2
 import numpy as np
 
+# --------------------------
 # 1. 强制加载Carla
+# --------------------------
 CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
 if not os.path.exists(CARLA_EGG_PATH):
     print(f"❌ Carla egg文件不存在！路径：{CARLA_EGG_PATH}")
@@ -19,6 +23,7 @@ except Exception as e:
     print(f"❌ Carla导入失败：{e}")
     sys.exit(1)
 
+# --------------------------
 # 2. 核心功能函数（修复参数传递）
 # --------------------------
 def init_carla_camera():
