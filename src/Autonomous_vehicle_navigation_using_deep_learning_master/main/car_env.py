@@ -182,7 +182,7 @@ class CarEnv:
         
         self.transform = Transform(
             Location(x=self.initial_pos[0], y=self.initial_pos[1], z=self.initial_pos[2]), 
-            Rotation(yaw=-correct_yaw)  # 使用路径的朝向
+            Rotation(yaw=correct_yaw)  # 使用路径的朝向
         )
         
         # 生成车辆
@@ -195,7 +195,7 @@ class CarEnv:
                 offset_y = random.uniform(-2.0, 2.0)
                 temp_transform = Transform(
                     Location(x=self.initial_pos[0] + offset_x, y=self.initial_pos[1] + offset_y, z=self.initial_pos[2]),
-                    Rotation(yaw=-correct_yaw)
+                    Rotation(yaw=correct_yaw)
                 )
                 self.vehicle = self.world.try_spawn_actor(self.model_3, temp_transform)
                 if self.vehicle is not None:
