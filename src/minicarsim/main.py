@@ -29,6 +29,13 @@ LIDAR_PARAMS = {
 # 仿真帧数
 SIMULATION_FRAMES = 1000
 
+# 温度监测参数
+TEMPERATURE_PARAMS = {
+    "ambient_temp": 25.0,  # 环境基础温度 (摄氏度)
+    "temp_variation": 5.0,  # 温度变化幅度
+    "heat_sources": ["obstacle1", "obstacle2", "obstacle3", "obstacle4", "obstacle5"]  # 热源物体
+}
+
 
 # -------------------------------------------------------------
 
@@ -390,6 +397,199 @@ class MojocoDataSim:
                     [corners[i, 2], corners[i + 4, 2]],
                     c=color, alpha=0.7)
 
+    def simulate_temperature_data(self):
+        """
+        模拟温度数据采集
+        基于车辆位置和热源位置计算温度
+        """
+        try:
+            # 获取车辆位置
+            vehicle_pos, _ = self.get_world_pose("vehicle")
+            lidar_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "lidar_site")
+            if lidar_site_id >= 0:
+                sensor_pos = self.data.site_xpos[lidar_site_id].copy()
+            else:
+                sensor_pos = vehicle_pos + np.array(LIDAR_PARAMS["pos"])
+        except ValueError:
+            sensor_pos = np.array([0, 0, 0.8])
+
+        # 基础环境温度
+        temperature = TEMPERATURE_PARAMS["ambient_temp"]
+        
+        # 遍历热源物体，计算对温度的影响
+        for heat_source in TEMPERATURE_PARAMS["heat_sources"]:
+            try:
+                # 获取热源位置
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, heat_source)
+                heat_pos = self.data.xpos[body_id].copy()
+                
+                # 计算传感器与热源的距离
+                distance = np.linalg.norm(sensor_pos - heat_pos)
+                
+                # 根据距离计算温度影响（假设热源散发热量遵循平方反比定律）
+                # 距离越近，温度越高
+                temp_increase = TEMPERATURE_PARAMS["temp_variation"] / (distance + 1)  # 避免除零
+                temperature += temp_increase
+                
+            except Exception:
+                # 如果找不到热源，跳过
+                continue
+        
+        # 添加随机噪声模拟真实传感器
+        noise = np.random.normal(0, 0.5)  # 均值为0，标准差为0.5的高斯噪声
+        temperature += noise
+        
+        return temperature
+
+    def visualize_temperature_data(self, temperature, detected_objects):
+        """
+        生成温度分布可视化图
+        """
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+        
+        # 左侧图：温度随时间变化趋势
+        # 由于我们是单帧数据，这里展示当前温度信息
+        ax1.set_xlim(0, 10)
+        ax1.set_ylim(TEMPERATURE_PARAMS["ambient_temp"] - 5, 
+                     TEMPERATURE_PARAMS["ambient_temp"] + TEMPERATURE_PARAMS["temp_variation"] + 5)
+        ax1.axhline(y=TEMPERATURE_PARAMS["ambient_temp"], color='b', linestyle='--', 
+                    label=f'环境温度: {TEMPERATURE_PARAMS["ambient_temp"]:.1f}°C')
+        ax1.bar([5], [temperature], width=2, color='r', alpha=0.7, 
+                label=f'测量温度: {temperature:.1f}°C')
+        ax1.set_xlabel('时间')
+        ax1.set_ylabel('温度 (°C)')
+        ax1.set_title(f'温度监测 - 帧 {self.frame_count:04d}')
+        ax1.legend()
+        ax1.grid(True)
+        
+        # 右侧图：温度与物体距离关系
+        if detected_objects:
+            distances = [obj['distance'] for obj in detected_objects]
+            object_names = [obj['name'] for obj in detected_objects]
+            
+            # 计算每个物体附近的预期温度
+            expected_temps = []
+            try:
+                sensor_pos = self.data.site_xpos[
+                    mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "lidar_site")
+                ].copy()
+                
+                for obj in detected_objects:
+                    obj_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, obj['name'])
+                    obj_pos = self.data.xpos[obj_id].copy()
+                    distance = np.linalg.norm(sensor_pos - obj_pos)
+                    expected_temp = TEMPERATURE_PARAMS["ambient_temp"] + \
+                                   TEMPERATURE_PARAMS["temp_variation"] / (distance + 1)
+                    expected_temps.append(expected_temp)
+            except:
+                # 如果出错，使用简化计算
+                expected_temps = [TEMPERATURE_PARAMS["ambient_temp"] + 
+                                 TEMPERATURE_PARAMS["temp_variation"] / (d + 1) for d in distances]
+            
+            x_pos = range(len(distances))
+            ax2.bar(x_pos, expected_temps, alpha=0.7, color='orange', label='预期温度')
+            ax2.axhline(y=temperature, color='r', linestyle='-', label=f'实测温度: {temperature:.1f}°C')
+            
+            ax2.set_xlabel('物体')
+            ax2.set_ylabel('温度 (°C)')
+            ax2.set_title('物体距离与温度关系')
+            ax2.set_xticks(x_pos)
+            ax2.set_xticklabels([name[-1] for name in object_names])  # 只显示编号
+            ax2.legend()
+            ax2.grid(True)
+        else:
+            ax2.text(0.5, 0.5, '无检测到物体', horizontalalignment='center', 
+                     verticalalignment='center', transform=ax2.transAxes)
+            ax2.set_title('物体距离与温度关系')
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/visualization/temp_frame_{self.frame_count:04d}.png",
+                    dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"已生成温度可视化图: temp_frame_{self.frame_count:04d}.png")
+
+    def generate_thermal_map(self, temperature, detected_objects):
+        """
+        生成热力图（二维温度分布图）
+        """
+        fig, ax = plt.subplots(figsize=(10, 8))
+        
+        # 创建网格点用于绘制热力图
+        grid_size = 50
+        x_range = np.linspace(-10, 15, grid_size)
+        y_range = np.linspace(-8, 8, grid_size)
+        X, Y = np.meshgrid(x_range, y_range)
+        
+        # 计算每个网格点的温度值
+        Z = np.zeros_like(X)
+        sensor_height = 0.8  # 传感器高度
+        
+        for i in range(grid_size):
+            for j in range(grid_size):
+                # 当前网格点位置
+                point_pos = np.array([X[j, i], Y[j, i], sensor_height])
+                
+                # 基础环境温度
+                temp = TEMPERATURE_PARAMS["ambient_temp"]
+                
+                # 遍历热源计算温度贡献
+                for heat_source in TEMPERATURE_PARAMS["heat_sources"]:
+                    try:
+                        body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, heat_source)
+                        heat_pos = self.data.xpos[body_id].copy()
+                        distance = np.linalg.norm(point_pos - heat_pos)
+                        temp_increase = TEMPERATURE_PARAMS["temp_variation"] / (distance + 1)
+                        temp += temp_increase
+                    except:
+                        continue
+                
+                Z[j, i] = temp
+        
+        # 绘制热力图
+        im = ax.contourf(X, Y, Z, levels=50, cmap='hot')
+        plt.colorbar(im, ax=ax, label='温度 (°C)')
+        
+        # 绘制车辆位置
+        try:
+            vehicle_pos, _ = self.get_world_pose("vehicle")
+            ax.plot(vehicle_pos[0], vehicle_pos[1], 'bo', markersize=10, label='车辆')
+        except:
+            pass
+        
+        # 绘制障碍物位置
+        colors = ['red', 'green', 'blue', 'yellow', 'purple']
+        for i, obstacle in enumerate(TEMPERATURE_PARAMS["heat_sources"]):
+            try:
+                body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, obstacle)
+                pos = self.data.xpos[body_id].copy()
+                ax.plot(pos[0], pos[1], 's', color=colors[i % len(colors)], 
+                       markersize=8, label=obstacle)
+            except:
+                continue
+        
+        # 绘制温度传感器测量值
+        try:
+            lidar_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "lidar_site")
+            if lidar_site_id >= 0:
+                sensor_pos = self.data.site_xpos[lidar_site_id].copy()
+                ax.plot(sensor_pos[0], sensor_pos[1], 'wo', markersize=6, 
+                       markeredgecolor='black', label=f'传感器({temperature:.1f}°C)')
+        except:
+            pass
+        
+        ax.set_xlabel('X (m)')
+        ax.set_ylabel('Y (m)')
+        ax.set_title(f'环境温度分布图 - 帧 {self.frame_count:04d}')
+        ax.legend()
+        ax.grid(True)
+        
+        plt.savefig(f"{self.output_dir}/visualization/thermal_map_{self.frame_count:04d}.png",
+                    dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"已生成温度分布热力图: thermal_map_{self.frame_count:04d}.png")
+
     def run_simulation(self):
         """运行MuJoCo仿真并生成数据"""
         print("开始仿真...")
@@ -413,6 +613,9 @@ class MojocoDataSim:
                 # 生成传感器数据和标注
                 lidar_data = self.generate_realistic_lidar_data()
                 annotations = self.generate_annotations()
+                
+                # 新增：模拟温度数据
+                temperature = self.simulate_temperature_data()
 
                 # 基于传感器数据计算控制指令
                 left_speed, right_speed, steering_angle = self.calculate_avoidance_control(
@@ -437,9 +640,21 @@ class MojocoDataSim:
 
                 # 生成识别效果图
                 self.visualize_detection(lidar_data, annotations)
+                
+                # 新增：生成温度可视化图
+                self.visualize_temperature_data(temperature, annotations["objects"])
+                
+                # 新增：生成温度分布热力图
+                self.generate_thermal_map(temperature, annotations["objects"])
 
-                # 生成距离和方位分析图
-                self.visualize_distance_analysis(annotations)
+                # 在保存数据时也保存温度信息
+                temp_data = {
+                    "frame": self.frame_count,
+                    "temperature": temperature,
+                    "unit": "celsius"
+                }
+                with open(f"{self.output_dir}/annotations/temp_frame_{self.frame_count:04d}.json", "w") as f:
+                    json.dump(temp_data, f, indent=4)
 
                 print(f"已仿真 {i}/{SIMULATION_FRAMES} 帧")
             else:
