@@ -12,11 +12,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # 导入自定义模块
 try:
     from gesture_detector_enhanced import EnhancedGestureDetector
+
     print("✅ 导入增强版手势检测器 (机器学习)")
     HAS_ENHANCED_DETECTOR = True
 except ImportError:
     print("⚠️  未找到增强版检测器，使用原始手势检测器")
     from gesture_detector import GestureDetector
+
     HAS_ENHANCED_DETECTOR = False
 
 from drone_controller import DroneController
@@ -246,11 +248,11 @@ class IntegratedDroneSimulation:
                 # 虚拟模式
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                 cv2.putText(frame, "虚拟摄像头模式", (50, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 cv2.putText(frame, f"手势指令 ({mode_text}):", (50, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
                 cv2.putText(frame, "张开手掌 - 起飞", (50, 140),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "握拳 - 降落", (50, 170),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "胜利手势 - 前进", (50, 200),
@@ -428,6 +430,10 @@ class IntegratedDroneSimulation:
         frame_count = 0
         last_status_print = time.time()
 
+        # 帧率控制
+        target_fps = 60
+        frame_delay = 1.0 / target_fps
+
         print("\n🎮 键盘提示：按 'R' 键重置无人机位置到原点")
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
@@ -437,9 +443,15 @@ class IntegratedDroneSimulation:
         self._last_key_press = {}
 
         while self.running:
+            start_time = time.time()
             current_time = time.time()
             dt = current_time - last_time
             last_time = current_time
+
+            if dt <= 0:
+                dt = frame_delay
+            elif dt > 0.1:
+                dt = 0.1
 
             # 每3秒打印一次状态
             if current_time - last_status_print > 3:
@@ -448,11 +460,6 @@ class IntegratedDroneSimulation:
                 if self.current_gesture:
                     print(f"[状态监控] 当前手势: {self.current_gesture} (置信度: {self.gesture_confidence:.2f})")
                 last_status_print = current_time
-
-            if dt <= 0:
-                dt = 0.016
-            elif dt > 0.1:
-                dt = 0.1
 
             if self.paused:
                 if not self.viewer.handle_events():
@@ -526,9 +533,15 @@ class IntegratedDroneSimulation:
 
             self.viewer.render(drone_state_with_gesture, trajectory)
 
+            # 控制帧率，避免CPU占用过高
+            elapsed = time.time() - start_time
+            sleep_time = frame_delay - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
             frame_count += 1
             if frame_count % 120 == 0:
-                fps = 1.0 / dt if dt > 0 else 0
+                fps = 1.0 / (time.time() - start_time) if start_time > 0 else 0
                 print(f"3D仿真帧率: {fps:.1f} FPS")
 
         print("3D仿真线程结束")
