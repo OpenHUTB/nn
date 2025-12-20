@@ -102,7 +102,7 @@ def check_python_environment():
         for pkg in missing_packages:
             print(f"   - {pkg}")
 
-        # 保留原有自动安装逻辑，不修改
+
         try:
             user_input = input("\n📥 Auto-install missing packages? (y/n): ").lower().strip()
             if user_input == 'y':
@@ -130,7 +130,7 @@ def launch_simulation(robot_walk_dir):
     """Launch the robot simulation (恢复原有启动逻辑，删除多余配置)"""
     script_path = robot_walk_dir / "move_straight.py"
 
-    # 保留原有启动提示，不新增额外信息
+
     print("\n🚀 Launching robot simulation...")
     print("=" * 60)
     print("📌 Features:")
@@ -143,7 +143,7 @@ def launch_simulation(robot_walk_dir):
     print("=" * 60 + "\n")
 
     try:
-        # 恢复原有环境变量，删除自定义PYTHONPATH配置
+
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         env['MUJOCO_QUIET'] = '1'
@@ -175,13 +175,13 @@ def main():
     """Main launcher function (完全恢复原有逻辑，不修改)"""
     setup_console_encoding()
 
-    # 保留原有欢迎信息
+
     print("=" * 60)
     print("🤖 DeepMind Humanoid Robot Simulation Launcher")
     print("📅 Version: 2.0 (Dynamic Target + Obstacle Avoidance)")
     print("=" * 60 + "\n")
 
-    # 保留原有三步流程，不修改
+
     print("🔍 Step 1/3: Validating directory structure...")
     valid_structure, project_root, robot_walk_dir = validate_directory_structure()
     if not valid_structure:
