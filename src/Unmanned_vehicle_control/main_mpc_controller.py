@@ -34,6 +34,15 @@ class MpcController:
         }
         self.opti.solver('ipopt', opts)
 
+        # 定义状态和控制变量
+        self.X = self.opti.variable(4, self.horizon + 1)
+        self.U = self.opti.variable(2, self.horizon)
+
+        # 热启动：用上次的解初始化（首次运行可跳过）
+        if hasattr(self, 'prev_X') and hasattr(self, 'prev_U'):
+            self.opti.set_initial(self.X, self.prev_X)  # 状态初始猜测
+            self.opti.set_initial(self.U, self.prev_U)  # 控制量初始猜测
+
         self.X = self.opti.variable(4, self.horizon + 1)  # State: (x, y, theta, v)
         self.U = self.opti.variable(2, self.horizon)  # Control (delta, a)
 
@@ -81,6 +90,9 @@ class MpcController:
         try:
             self.sol = self.opti.solve()
             self.is_success = True
+            # 保存当前解作为下次的初始猜测
+            self.prev_X = self.sol.value(self.X)
+            self.prev_U = self.sol.value(self.U)
             wheel_angle_rad, acceleration_m_s_2 = self.get_controls_value()
             self.control_buffer["acceleration"] = self.control_buffer["acceleration"][1:] + [acceleration_m_s_2]
             self.control_buffer["wheel_angle"] = self.control_buffer["wheel_angle"][1:] + [wheel_angle_rad]

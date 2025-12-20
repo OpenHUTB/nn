@@ -245,6 +245,8 @@ class Main():
                 # 更新绘制器显示
                 self.drawer.display_speed(speed_kmh)
                 self.drawer.display_location(location)
+
+                # 显示障碍物警告信息
                 self.drawer.display_warning(
                     self.obstacle_detector.warning_message,
                     self.obstacle_detector.get_warning_color(),
@@ -256,6 +258,9 @@ class Main():
 
                 # 🆕 显示帧率
                 self.drawer.display_fps(self.fps)
+
+                # 🆕 新增：显示摄像头图像
+                self.drawer.display_camera()
 
                 # 更新观察者视角跟随车辆
                 self.update_spectator()
