@@ -217,6 +217,7 @@ def visualize_model(model_path: str, use_ros_mode: bool = False, policy_model_pa
     obs_dimension = model.nq + model.nv  # 观测维度 = 关节位置数 + 关节速度数
     action_dimension = model.nu
     control_range = None  # 执行器控制范围（min, max）
+    obs_tensor = None  # 观测张量（提前初始化）
 
     if policy_model_path and TORCH_AVAILABLE and action_dimension > 0:
         try:
@@ -234,6 +235,9 @@ def visualize_model(model_path: str, use_ros_mode: bool = False, policy_model_pa
                 else:
                     control_range.append((-1.0, 1.0))
             control_range = np.array(control_range)
+
+            # 【优化点1】提前初始化固定形状的观测张量，避免循环内重复创建
+            obs_tensor = torch.zeros(1, obs_dimension, dtype=torch.float32, device="cpu")
         except Exception as e:
             logger.error(f"策略模型加载失败：{str(e)}", exc_info=True)
             policy_net = None
@@ -302,10 +306,7 @@ def visualize_model(model_path: str, use_ros_mode: bool = False, policy_model_pa
     # ===================== 可视化主循环 =====================
     logger.info("启动MuJoCo可视化窗口 | 退出：ESC键 | 交互：鼠标拖拽（旋转）/滚轮（缩放）")
     try:
-        with viewer.launch_passive(model, data) as viewer_instance:
-            # 预分配观测张量（复用避免重复内存分配）
-            obs_tensor = torch.zeros(1, obs_dimension, dtype=torch.float32) if policy_net else None
-            
+        with viewer.launch_passive(model, data) as viewer_instance:            
             while viewer_instance.is_running() and (not use_ros_mode or not rospy.is_shutdown()):
                 # 【核心优先级规则】控制指令优先级：ROS外部指令 > 策略网络推理 > 无控制输入
                 if use_ros_mode and ros_ctrl_cmd is not None:
@@ -314,16 +315,11 @@ def visualize_model(model_path: str, use_ros_mode: bool = False, policy_model_pa
                     # 提取观测向量：关节位置 + 关节速度
                     observation = np.concatenate([data.qpos, data.qvel])
                     
-                    # 复用张量，避免重复创建
-                    if obs_tensor is None:
-                        obs_tensor = torch.tensor(observation, dtype=torch.float32).unsqueeze(0)
-                    else:
-                        obs_tensor[0] = torch.from_numpy(observation)
+                    obs_tensor[0] = torch.from_numpy(observation).to(obs_tensor.dtype)
                     
                     # 策略推理得到归一化动作（[-1,1]）
                     normalized_action = policy_net(obs_tensor).squeeze().numpy()
                     
-                    # 【关键安全机制】线性映射归一化动作到执行器物理极限，并强制裁剪防止超限损坏模拟
                     if control_range is not None:
                         # 线性映射：[-1,1] → [ctrl_min, ctrl_max]
                         normalized_action = control_range[:, 0] + (control_range[:, 1] - control_range[:, 0]) * (normalized_action + 1) / 2
