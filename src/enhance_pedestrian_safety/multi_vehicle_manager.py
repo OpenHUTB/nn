@@ -40,11 +40,16 @@ class MultiVehicleManager:
         self.config = config
         self.output_dir = output_dir
 
-        # 创建协同数据目录
+        # 创建协同数据目录 - 确保所有子目录都创建
         self.coop_dir = os.path.join(output_dir, "cooperative")
         os.makedirs(self.coop_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.coop_dir, "v2x_messages"), exist_ok=True)
-        os.makedirs(os.path.join(self.coop_dir, "shared_perception"), exist_ok=True)
+
+        # 创建子目录
+        v2x_messages_dir = os.path.join(self.coop_dir, "v2x_messages")
+        os.makedirs(v2x_messages_dir, exist_ok=True)
+
+        shared_perception_dir = os.path.join(self.coop_dir, "shared_perception")
+        os.makedirs(shared_perception_dir, exist_ok=True)
 
         # 车辆管理
         self.ego_vehicles = []  # 主车辆列表
@@ -190,7 +195,7 @@ class MultiVehicleManager:
     def broadcast_message(self, message: V2XMessage):
         """广播消息给范围内的车辆"""
         if message.sender_id not in self.vehicle_states:
-            return
+            return []
 
         sender_state = self.vehicle_states[message.sender_id]
         sender_pos = sender_state.position
@@ -220,65 +225,77 @@ class MultiVehicleManager:
                         'signal_strength': 1.0 - (distance / self.communication_range)
                     })
 
-        self.stats['successful_transmissions'] += len(recipients)
+        if recipients:
+            self.stats['successful_transmissions'] += len(recipients)
 
-        # 保存消息
-        self._save_v2x_message(message, recipients)
+            # 保存消息
+            try:
+                self._save_v2x_message(message, recipients)
+            except Exception as e:
+                print(f"保存V2X消息失败: {e}")
 
         return recipients
 
     def share_perception_data(self, vehicle_id: int, detected_objects: List[Dict]):
         """共享感知数据"""
         if not detected_objects:
-            return
+            return None
 
-        # 创建感知消息
-        perception_data = {
-            'vehicle_id': vehicle_id,
-            'timestamp': time.time(),
-            'objects': detected_objects,
-            'vehicle_state': asdict(
-                self.vehicle_states.get(vehicle_id, VehicleState(0, '', (0, 0, 0), (0, 0, 0), (0, 0, 0), 0, [])))
-        }
+        try:
+            # 创建感知消息
+            perception_data = {
+                'vehicle_id': vehicle_id,
+                'timestamp': time.time(),
+                'objects': detected_objects,
+                'vehicle_state': asdict(
+                    self.vehicle_states.get(vehicle_id, VehicleState(0, '', (0, 0, 0), (0, 0, 0), (0, 0, 0), 0, [])))
+            }
 
-        message = self.create_v2x_message(
-            vehicle_id,
-            'perception',
-            perception_data,
-            priority=2  # 感知数据优先级较高
-        )
+            message = self.create_v2x_message(
+                vehicle_id,
+                'perception',
+                perception_data,
+                priority=2  # 感知数据优先级较高
+            )
 
-        # 广播消息
-        recipients = self.broadcast_message(message)
+            # 广播消息
+            recipients = self.broadcast_message(message)
 
-        # 融合共享的感知数据
-        if recipients:
-            self._fuse_shared_perception(vehicle_id, detected_objects, recipients)
+            # 融合共享的感知数据
+            if recipients:
+                self._fuse_shared_perception(vehicle_id, detected_objects, recipients)
 
-        return message
+            return message
+        except Exception as e:
+            print(f"共享感知数据失败: {e}")
+            return None
 
     def share_traffic_warning(self, vehicle_id: int, warning_type: str,
                               location: Tuple[float, float, float],
                               severity: str = 'medium'):
         """共享交通警告"""
-        warning_data = {
-            'warning_type': warning_type,  # 'accident', 'congestion', 'hazard', 'construction'
-            'location': location,
-            'severity': severity,
-            'timestamp': time.time(),
-            'source_vehicle': vehicle_id
-        }
+        try:
+            warning_data = {
+                'warning_type': warning_type,  # 'accident', 'congestion', 'hazard', 'construction'
+                'location': location,
+                'severity': severity,
+                'timestamp': time.time(),
+                'source_vehicle': vehicle_id
+            }
 
-        message = self.create_v2x_message(
-            vehicle_id,
-            'warning',
-            warning_data,
-            priority=3  # 警告消息优先级最高
-        )
+            message = self.create_v2x_message(
+                vehicle_id,
+                'warning',
+                warning_data,
+                priority=3  # 警告消息优先级最高
+            )
 
-        self.broadcast_message(message)
+            self.broadcast_message(message)
 
-        return message
+            return message
+        except Exception as e:
+            print(f"共享交通警告失败: {e}")
+            return None
 
     def _fuse_shared_perception(self, source_id: int, objects: List[Dict], recipients: List[int]):
         """融合共享的感知数据"""
@@ -376,26 +393,41 @@ class MultiVehicleManager:
             'transmission_time': time.time()
         }
 
-        filename = f"v2x_{int(time.time() * 1000)}_{message.sender_id}_{message.message_type}.json"
-        filepath = os.path.join(self.coop_dir, "v2x_messages", filename)
+        # 确保目录存在
+        v2x_messages_dir = os.path.join(self.coop_dir, "v2x_messages")
+        os.makedirs(v2x_messages_dir, exist_ok=True)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(message_data, f, indent=2, ensure_ascii=False)
+        filename = f"v2x_{int(time.time() * 1000)}_{message.sender_id}_{message.message_type}.json"
+        filepath = os.path.join(v2x_messages_dir, filename)
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(message_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"写入V2X消息文件失败: {e}")
+            raise
 
     def save_shared_perception(self, frame_num: int):
         """保存共享感知数据"""
-        data = {
-            'frame_id': frame_num,
-            'timestamp': time.time(),
-            'shared_objects': self.shared_objects,
-            'active_vehicles': len(self.ego_vehicles + self.cooperative_vehicles),
-            'stats': self.stats
-        }
+        try:
+            data = {
+                'frame_id': frame_num,
+                'timestamp': time.time(),
+                'shared_objects': self.shared_objects,
+                'active_vehicles': len(self.ego_vehicles + self.cooperative_vehicles),
+                'stats': self.stats
+            }
 
-        filepath = os.path.join(self.coop_dir, "shared_perception", f"frame_{frame_num:06d}.json")
+            # 确保目录存在
+            shared_perception_dir = os.path.join(self.coop_dir, "shared_perception")
+            os.makedirs(shared_perception_dir, exist_ok=True)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            filepath = os.path.join(shared_perception_dir, f"frame_{frame_num:06d}.json")
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"保存共享感知数据失败: {e}")
 
     def generate_summary(self):
         """生成协同摘要报告"""
