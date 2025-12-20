@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-手势控制AirSim无人机 - 手势识别优化版
-优化手势识别算法，解决位置敏感问题
+手势控制AirSim无人机 - 手势识别优化版（添加语音反馈）
+优化手势识别算法，解决位置敏感问题，添加语音反馈功能
 作者: xiaoshiyuan888
 """
 
@@ -11,6 +11,8 @@ import time
 import traceback
 import json
 import math
+import threading
+import tempfile
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import cv2
@@ -19,6 +21,7 @@ from collections import deque, Counter
 
 print("=" * 60)
 print("Gesture Controlled Drone - Gesture Recognition Optimized")
+print("现在添加了语音反馈功能!")
 print("=" * 60)
 
 # ========== 修复导入路径 ==========
@@ -71,11 +74,71 @@ def safe_import():
         if choice != 'y':
             sys.exit(1)
 
+    # 尝试导入语音合成库
+    speech_module = None
+    try:
+        # 尝试导入pyttsx3（离线TTS）
+        import pyttsx3
+        speech_module = pyttsx3
+        modules_status['Speech'] = True
+        print("[Speech] ✓ pyttsx3语音库就绪 (离线)")
+    except ImportError:
+        print("\n" + "!" * 60)
+        print("⚠ pyttsx3语音库未找到!")
+        print("!" * 60)
+        print("安装语音库 (使用清华大学镜像源):")
+        print("1. 安装离线语音库: pip install pyttsx3 -i https://pypi.tuna.tsinghua.edu.cn/simple")
+        print("2. 或者安装在线语音库: pip install gtts pygame -i https://pypi.tuna.tsinghua.edu.cn/simple")
+        print("!" * 60)
+
+        # 尝试其他语音库
+        try:
+            # 尝试使用gTTS（需要网络）
+            from gtts import gTTS
+            speech_module = {'gTTS': gTTS, 'type': 'gtts'}
+            modules_status['Speech'] = True
+            print("[Speech] ✓ gTTS语音库就绪 (需要网络连接)")
+
+            # 尝试导入音频播放库
+            try:
+                import pygame
+                pygame.mixer.init()
+                speech_module['pygame'] = pygame
+                print("[Speech] ✓ pygame音频播放库就绪")
+            except ImportError:
+                # 尝试其他播放方式
+                try:
+                    import pydub
+                    from pydub import AudioSegment
+                    from pydub.playback import play
+                    speech_module['pydub'] = pydub
+                    speech_module['AudioSegment'] = AudioSegment
+                    speech_module['play'] = play
+                    print("[Speech] ✓ pydub音频播放库就绪")
+                except ImportError:
+                    # 最后尝试使用系统命令
+                    if os.name == 'nt':  # Windows
+                        speech_module['play_method'] = 'windows'
+                        print("[Speech] ✓ 使用Windows系统命令播放音频")
+                    elif os.name == 'posix':  # Linux/Mac
+                        speech_module['play_method'] = 'posix'
+                        print("[Speech] ✓ 使用系统命令播放音频")
+                    else:
+                        print("[Speech] ✗ 所有音频播放库导入失败，语音功能将不可用")
+                        speech_module = None
+                        modules_status['Speech'] = False
+
+        except ImportError:
+            print("[Speech] ✗ 所有语音库导入失败，语音功能将不可用")
+            speech_module = None
+            modules_status['Speech'] = False
+
     return {
         'cv2': cv2,
         'np': np,
         'PIL': {'Image': Image, 'ImageDraw': ImageDraw, 'ImageFont': ImageFont},
-        'airsim': airsim_module
+        'airsim': airsim_module,
+        'speech': speech_module
     }, modules_status
 
 
@@ -95,12 +158,324 @@ cv2, np = libs['cv2'], libs['np']
 Image, ImageDraw, ImageFont = libs['PIL']['Image'], libs['PIL']['ImageDraw'], libs['PIL']['ImageFont']
 
 
+# ========== 语音反馈管理器 ==========
+class SpeechFeedbackManager:
+    """语音反馈管理器"""
+
+    def __init__(self, speech_lib):
+        self.speech_lib = speech_lib
+        self.enabled = True
+        self.volume = 1.0
+        self.rate = 150
+        self.voice_id = None
+        self.last_speech_time = {}
+        self.min_interval = 2.0  # 相同语音的最小间隔（秒）
+
+        # 语音队列，避免语音重叠
+        self.speech_queue = []
+        self.is_speaking = False
+        self.queue_thread = None
+
+        # 音频播放方法
+        self.audio_method = None
+
+        # 语音消息映射
+        self.messages = {
+            # 连接相关
+            'connecting': "正在连接无人机，请稍候",
+            'connected': "无人机连接成功",
+            'connection_failed': "无人机连接失败，进入模拟模式",
+
+            # 飞行相关
+            'taking_off': "无人机正在起飞",
+            'takeoff_success': "起飞成功",
+            'takeoff_failed': "起飞失败",
+            'landing': "无人机正在降落",
+            'land_success': "降落成功",
+            'emergency_stop': "紧急停止，无人机已降落",
+
+            # 手势相关
+            'gesture_detected': "手势识别就绪",
+            'gesture_stop': "停止",
+            'gesture_up': "向上",
+            'gesture_down': "向下",
+            'gesture_left': "向左",
+            'gesture_right': "向右",
+            'gesture_forward': "向前",
+            'gesture_waiting': "等待手势",
+            'gesture_error': "手势识别错误",
+
+            # 系统相关
+            'program_start': "手势控制无人机系统已启动",
+            'program_exit': "程序退出，感谢使用",
+            'camera_error': "摄像头错误，请检查连接",
+            'low_confidence': "置信度过低，请调整手势",
+
+            # 模式相关
+            'simulation_mode': "进入模拟模式",
+            'debug_mode_on': "调试模式已开启",
+            'debug_mode_off': "调试模式已关闭",
+            'display_mode_changed': "显示模式已切换",
+            'help_toggled': "帮助信息已切换",
+        }
+
+        # 初始化语音引擎
+        self.init_speech_engine()
+
+    def init_speech_engine(self):
+        """初始化语音引擎"""
+        if self.speech_lib is None:
+            print("⚠ 语音库未找到，语音功能禁用")
+            self.enabled = False
+            return
+
+        try:
+            if hasattr(self.speech_lib, 'init'):  # pyttsx3
+                self.engine = self.speech_lib.init()
+                self.audio_method = 'pyttsx3'
+
+                # 设置语音参数
+                voices = self.engine.getProperty('voices')
+
+                # 尝试寻找中文语音
+                for voice in voices:
+                    # 检查语音名称是否包含中文相关标识
+                    if 'chinese' in voice.name.lower() or 'zh' in voice.name.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        self.voice_id = voice.id
+                        print(f"[Speech] 使用中文语音: {voice.name}")
+                        break
+
+                # 如果没找到中文语音，使用第一个可用语音
+                if self.voice_id is None and len(voices) > 0:
+                    self.engine.setProperty('voice', voices[0].id)
+                    print(f"[Speech] 使用默认语音: {voices[0].name}")
+
+                # 设置语速和音量
+                self.engine.setProperty('rate', self.rate)
+                self.engine.setProperty('volume', self.volume)
+
+                print("✅ 语音引擎初始化成功 (pyttsx3)")
+
+            elif isinstance(self.speech_lib, dict) and self.speech_lib.get('type') == 'gtts':
+                print("✅ 语音引擎初始化成功 (gTTS，需要网络连接)")
+                self.audio_method = 'gtts'
+
+                # 确定播放方法
+                if 'pygame' in self.speech_lib:
+                    self.audio_method = 'gtts_pygame'
+                    print("✅ 使用pygame播放音频")
+                elif 'pydub' in self.speech_lib:
+                    self.audio_method = 'gtts_pydub'
+                    print("✅ 使用pydub播放音频")
+                elif 'play_method' in self.speech_lib:
+                    self.audio_method = f"gtts_{self.speech_lib['play_method']}"
+                    print(f"✅ 使用系统命令播放音频")
+                else:
+                    self.audio_method = 'gtts_system'
+                    print("✅ 使用默认系统播放器")
+
+            else:
+                print("⚠ 未知语音库类型，语音功能可能不正常")
+                self.enabled = False
+
+        except Exception as e:
+            print(f"⚠ 语音引擎初始化失败: {e}")
+            self.enabled = False
+
+    def play_audio_file(self, audio_file):
+        """播放音频文件（根据可用库选择方法）"""
+        try:
+            if self.audio_method == 'gtts_pygame' and 'pygame' in self.speech_lib:
+                pygame = self.speech_lib['pygame']
+                pygame.mixer.music.load(audio_file)
+                pygame.mixer.music.play()
+
+                # 等待播放完成
+                while pygame.mixer.music.get_busy():
+                    pygame.time.Clock().tick(10)
+
+            elif self.audio_method == 'gtts_pydub' and 'pydub' in self.speech_lib:
+                AudioSegment = self.speech_lib['AudioSegment']
+                play = self.speech_lib['play']
+
+                audio = AudioSegment.from_mp3(audio_file)
+                play(audio)
+
+            elif self.audio_method == 'gtts_windows':
+                # Windows系统命令
+                os.startfile(audio_file)
+                # 等待播放完成（简单等待）
+                time.sleep(2)
+
+            elif self.audio_method == 'gtts_posix':
+                # Linux/Mac系统命令
+                import subprocess
+                if sys.platform == 'darwin':  # macOS
+                    subprocess.call(['afplay', audio_file])
+                else:  # Linux
+                    subprocess.call(['xdg-open', audio_file])
+
+            else:
+                # 通用方法：使用系统默认播放器
+                import subprocess
+                if sys.platform == 'win32':
+                    os.startfile(audio_file)
+                elif sys.platform == 'darwin':
+                    subprocess.call(['open', audio_file])
+                else:
+                    subprocess.call(['xdg-open', audio_file])
+
+            return True
+
+        except Exception as e:
+            print(f"⚠ 音频播放失败: {e}")
+            return False
+
+    def speak(self, message_key, force=False):
+        """播放语音"""
+        if not self.enabled:
+            return
+
+        # 检查是否在最小间隔内
+        current_time = time.time()
+        if not force and message_key in self.last_speech_time:
+            if current_time - self.last_speech_time[message_key] < self.min_interval:
+                return
+
+        # 获取消息文本
+        if message_key in self.messages:
+            text = self.messages[message_key]
+        else:
+            text = message_key  # 直接使用传入的文本
+
+        # 添加到语音队列
+        self.speech_queue.append(text)
+
+        # 如果没有在播放，启动播放线程
+        if not self.is_speaking and self.queue_thread is None:
+            self.queue_thread = threading.Thread(target=self._process_speech_queue)
+            self.queue_thread.daemon = True
+            self.queue_thread.start()
+
+        # 更新时间戳
+        self.last_speech_time[message_key] = current_time
+
+    def _process_speech_queue(self):
+        """处理语音队列"""
+        while self.speech_queue and self.enabled:
+            self.is_speaking = True
+
+            text = self.speech_queue.pop(0)
+
+            try:
+                if self.audio_method == 'pyttsx3':
+                    # 清除之前的语音
+                    self.engine.stop()
+                    # 播报新语音
+                    self.engine.say(text)
+                    self.engine.runAndWait()
+
+                elif self.audio_method.startswith('gtts'):
+                    # gTTS需要网络连接
+                    tts = self.speech_lib['gTTS'](text=text, lang='zh-cn')
+
+                    # 保存临时文件
+                    with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
+                        temp_file = f.name
+                        tts.save(temp_file)
+
+                    # 播放音频
+                    self.play_audio_file(temp_file)
+
+                    # 删除临时文件
+                    try:
+                        os.unlink(temp_file)
+                    except:
+                        pass  # 忽略删除错误
+
+            except Exception as e:
+                print(f"⚠ 语音播放失败: {e}")
+
+            time.sleep(0.1)  # 避免过快
+
+        self.is_speaking = False
+        self.queue_thread = None
+
+    def speak_direct(self, text):
+        """直接播放文本（不通过消息映射）"""
+        if not self.enabled:
+            return
+
+        # 在新线程中播放
+        thread = threading.Thread(target=self._speak_thread, args=(text,))
+        thread.daemon = True
+        thread.start()
+
+    def _speak_thread(self, text):
+        """语音播放线程"""
+        try:
+            if self.audio_method == 'pyttsx3':
+                self.engine.say(text)
+                self.engine.runAndWait()
+
+            elif self.audio_method.startswith('gtts'):
+                tts = self.speech_lib['gTTS'](text=text, lang='zh-cn')
+
+                with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as f:
+                    temp_file = f.name
+                    tts.save(temp_file)
+
+                self.play_audio_file(temp_file)
+
+                try:
+                    os.unlink(temp_file)
+                except:
+                    pass
+
+        except Exception as e:
+            print(f"⚠ 直接语音播放失败: {e}")
+
+    def stop(self):
+        """停止所有语音"""
+        if hasattr(self, 'engine'):
+            self.engine.stop()
+
+        self.speech_queue.clear()
+        self.is_speaking = False
+
+    def set_enabled(self, enabled):
+        """启用/禁用语音"""
+        self.enabled = enabled
+        if not enabled:
+            self.stop()
+
+    def toggle_enabled(self):
+        """切换语音启用状态"""
+        self.enabled = not self.enabled
+        status = "启用" if self.enabled else "禁用"
+        self.speak_direct(f"语音反馈已{status}")
+        return self.enabled
+
+    def get_status(self):
+        """获取语音状态"""
+        return {
+            'enabled': self.enabled,
+            'engine': 'pyttsx3' if self.audio_method == 'pyttsx3' else
+            'gTTS' if self.audio_method.startswith('gtts') else
+            'None',
+            'queue_size': len(self.speech_queue),
+            'is_speaking': self.is_speaking,
+            'audio_method': self.audio_method
+        }
+
+
 # ========== 配置管理器 ==========
 class ConfigManager:
     """配置管理器"""
 
     def __init__(self):
-        self.config_file = os.path.join(current_dir, 'gesture_config_v2.json')
+        self.config_file = os.path.join(current_dir, 'gesture_config_v3.json')  # 更新版本号
         self.default_config = {
             'camera': {
                 'index': 0,
@@ -141,7 +516,8 @@ class ConfigManager:
                 'show_fingertips': True,
                 'show_palm_center': True,
                 'show_hand_direction': True,
-                'show_debug_info': False
+                'show_debug_info': False,
+                'show_speech_status': True,  # 新增：显示语音状态
             },
             'performance': {
                 'target_fps': 30,
@@ -152,6 +528,15 @@ class ConfigManager:
                 'auto_calibrate_skin': True,
                 'skin_calibration_frames': 30,
                 'hand_size_calibration': True
+            },
+            'speech': {  # 新增：语音配置
+                'enabled': True,
+                'volume': 1.0,
+                'rate': 150,
+                'announce_gestures': True,  # 是否播报手势
+                'announce_connections': True,  # 是否播报连接状态
+                'announce_flight_events': True,  # 是否播报飞行事件
+                'min_gesture_confidence': 0.7,  # 播报手势的最小置信度
             }
         }
         self.config = self.load_config()
@@ -271,8 +656,9 @@ config = ConfigManager()
 class ImprovedGestureRecognizer:
     """改进的手势识别器 - 纯OpenCV实现"""
 
-    def __init__(self):
+    def __init__(self, speech_manager=None):
         self.config = config.get('gesture')
+        self.speech_manager = speech_manager
 
         # 手势历史和平滑
         self.history_size = self.config['history_size']
@@ -280,6 +666,11 @@ class ImprovedGestureRecognizer:
         self.confidence_history = deque(maxlen=self.history_size)
         self.current_gesture = "Waiting"
         self.current_confidence = 0.0
+
+        # 记录上次播报的手势，避免重复播报
+        self.last_announced_gesture = None
+        self.last_announced_time = 0
+        self.gesture_announce_interval = 3.0  # 手势播报最小间隔
 
         # 手部跟踪和状态
         self.last_hand_position = None
@@ -305,6 +696,18 @@ class ImprovedGestureRecognizer:
             "Hover": (255, 255, 255)  # 白色
         }
 
+        # 手势到语音的映射
+        self.gesture_speech_map = {
+            "Stop": "gesture_stop",
+            "Forward": "gesture_forward",
+            "Up": "gesture_up",
+            "Down": "gesture_down",
+            "Left": "gesture_left",
+            "Right": "gesture_right",
+            "Waiting": "gesture_waiting",
+            "Error": "gesture_error",
+        }
+
         # 背景减除器
         self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=100, varThreshold=25, detectShadows=True
@@ -314,6 +717,10 @@ class ImprovedGestureRecognizer:
         self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
         print("✓ 改进的手势识别器已初始化 (纯OpenCV实现)")
+
+        # 语音提示初始化完成
+        if self.speech_manager:
+            self.speech_manager.speak('gesture_detected')
 
     def get_skin_mask(self, frame):
         """获取肤色掩码"""
@@ -860,6 +1267,22 @@ class ImprovedGestureRecognizer:
             # 平滑手势
             final_gesture, final_confidence = self.smooth_gesture(gesture, confidence)
 
+            # 手势语音提示
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_gestures') and
+                    final_confidence >= config.get('speech', 'min_gesture_confidence')):
+
+                current_time = time.time()
+                if (final_gesture != self.last_announced_gesture or
+                        current_time - self.last_announced_time > self.gesture_announce_interval):
+
+                    if final_gesture in self.gesture_speech_map:
+                        self.speech_manager.speak(self.gesture_speech_map[final_gesture])
+
+                    self.last_announced_gesture = final_gesture
+                    self.last_announced_time = current_time
+
             # 可视化结果
             if hand_data is not None:
                 processed_frame = self.visualize_detection(
@@ -891,16 +1314,26 @@ class ImprovedGestureRecognizer:
         self.current_gesture = gesture
         self.current_confidence = 0.9
 
+        # 模拟手势也触发语音提示
+        if (self.speech_manager and
+                config.get('speech', 'enabled') and
+                config.get('speech', 'announce_gestures') and
+                gesture in self.gesture_speech_map):
+            self.speech_manager.speak(self.gesture_speech_map[gesture])
+            self.last_announced_gesture = gesture
+            self.last_announced_time = time.time()
+
 
 # ========== 简单的无人机控制器 ==========
 class SimpleDroneController:
     """简单的无人机控制器"""
 
-    def __init__(self, airsim_module):
+    def __init__(self, airsim_module, speech_manager=None):
         self.airsim = airsim_module
         self.client = None
         self.connected = False
         self.flying = False
+        self.speech_manager = speech_manager
 
         # 控制参数
         self.velocity = config.get('drone', 'velocity')
@@ -912,6 +1345,11 @@ class SimpleDroneController:
         self.last_control_time = 0
         self.last_gesture = None
 
+        # 上次语音提示状态
+        self.last_connection_announced = False
+        self.last_takeoff_announced = False
+        self.last_land_announced = False
+
         print("✓ 简单的无人机控制器已初始化")
 
     def connect(self):
@@ -919,8 +1357,21 @@ class SimpleDroneController:
         if self.connected:
             return True
 
+        # 语音提示：正在连接
+        if (self.speech_manager and
+                config.get('speech', 'enabled') and
+                config.get('speech', 'announce_connections')):
+            self.speech_manager.speak('connecting')
+
         if self.airsim is None:
             print("⚠ AirSim不可用，使用模拟模式")
+
+            # 语音提示：模拟模式
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_connections')):
+                self.speech_manager.speak('simulation_mode')
+
             self.connected = True
             return True
 
@@ -930,6 +1381,12 @@ class SimpleDroneController:
             self.client = self.airsim.MultirotorClient()
             self.client.confirmConnection()
             print("✅ 已连接AirSim!")
+
+            # 语音提示：连接成功
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_connections')):
+                self.speech_manager.speak('connected')
 
             self.client.enableApiControl(True)
             print("✅ API控制已启用")
@@ -942,11 +1399,25 @@ class SimpleDroneController:
 
         except Exception as e:
             print(f"❌ 连接失败: {e}")
+
+            # 语音提示：连接失败
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_connections')):
+                self.speech_manager.speak('connection_failed')
+
             print("\n使用模拟模式继续? (y/n)")
             choice = input().strip().lower()
             if choice == 'y':
                 self.connected = True
                 print("✅ 使用模拟模式")
+
+                # 语音提示：模拟模式
+                if (self.speech_manager and
+                        config.get('speech', 'enabled') and
+                        config.get('speech', 'announce_connections')):
+                    self.speech_manager.speak('simulation_mode')
+
                 return True
 
             return False
@@ -956,10 +1427,26 @@ class SimpleDroneController:
         if not self.connected:
             return False
 
+        # 语音提示：正在起飞
+        if (self.speech_manager and
+                config.get('speech', 'enabled') and
+                config.get('speech', 'announce_flight_events') and
+                not self.last_takeoff_announced):
+            self.speech_manager.speak('taking_off')
+            self.last_takeoff_announced = True
+            self.last_land_announced = False
+
         try:
             if self.airsim is None or self.client is None:
                 print("✅ 模拟起飞")
                 self.flying = True
+
+                # 语音提示：起飞成功
+                if (self.speech_manager and
+                        config.get('speech', 'enabled') and
+                        config.get('speech', 'announce_flight_events')):
+                    self.speech_manager.speak('takeoff_success')
+
                 return True
 
             print("起飞中...")
@@ -971,9 +1458,23 @@ class SimpleDroneController:
 
             self.flying = True
             print("✅ 无人机成功起飞")
+
+            # 语音提示：起飞成功
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_flight_events')):
+                self.speech_manager.speak('takeoff_success')
+
             return True
         except Exception as e:
             print(f"❌ 起飞失败: {e}")
+
+            # 语音提示：起飞失败
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_flight_events')):
+                self.speech_manager.speak('takeoff_failed')
+
             return False
 
     def land(self):
@@ -981,16 +1482,39 @@ class SimpleDroneController:
         if not self.connected:
             return False
 
+        # 语音提示：正在降落
+        if (self.speech_manager and
+                config.get('speech', 'enabled') and
+                config.get('speech', 'announce_flight_events') and
+                not self.last_land_announced):
+            self.speech_manager.speak('landing')
+            self.last_land_announced = True
+            self.last_takeoff_announced = False
+
         try:
             if self.airsim is None or self.client is None:
                 print("✅ 模拟降落")
                 self.flying = False
+
+                # 语音提示：降落成功
+                if (self.speech_manager and
+                        config.get('speech', 'enabled') and
+                        config.get('speech', 'announce_flight_events')):
+                    self.speech_manager.speak('land_success')
+
                 return True
 
             print("降落中...")
             self.client.landAsync().join()
             self.flying = False
             print("✅ 无人机已降落")
+
+            # 语音提示：降落成功
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_flight_events')):
+                self.speech_manager.speak('land_success')
+
             return True
         except Exception as e:
             print(f"降落失败: {e}")
@@ -1009,6 +1533,12 @@ class SimpleDroneController:
         # 检查置信度阈值
         min_confidence = config.get('gesture', 'min_confidence')
         if confidence < min_confidence:
+            # 低置信度语音提示
+            if (self.speech_manager and
+                    config.get('speech', 'enabled') and
+                    config.get('speech', 'announce_gestures') and
+                    confidence < min_confidence * 0.8):  # 如果置信度特别低
+                self.speech_manager.speak('low_confidence')
             return False
 
         try:
@@ -1057,6 +1587,13 @@ class SimpleDroneController:
             try:
                 if self.flying and self.client is not None:
                     print("紧急降落...")
+
+                    # 语音提示：紧急停止
+                    if (self.speech_manager and
+                            config.get('speech', 'enabled') and
+                            config.get('speech', 'announce_flight_events')):
+                        self.speech_manager.speak('emergency_stop')
+
                     self.land()
                 if self.client is not None:
                     self.client.armDisarm(False)
@@ -1073,8 +1610,9 @@ class SimpleDroneController:
 class ChineseUIRenderer:
     """中文UI渲染器"""
 
-    def __init__(self):
+    def __init__(self, speech_manager=None):
         self.fonts = {}
+        self.speech_manager = speech_manager
         self.load_fonts()
 
         # 颜色定义
@@ -1086,7 +1624,9 @@ class ChineseUIRenderer:
             'landed': (255, 165, 0),  # 橙色
             'warning': (0, 165, 255),  # 浅蓝色
             'info': (255, 255, 255),  # 白色
-            'help': (255, 200, 100)  # 浅橙色
+            'help': (255, 200, 100),  # 浅橙色
+            'speech_enabled': (0, 255, 0),  # 绿色
+            'speech_disabled': (255, 0, 0),  # 红色
         }
 
         print("✓ 中文UI渲染器已初始化")
@@ -1150,7 +1690,7 @@ class ChineseUIRenderer:
         frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
         # 标题
-        title = "手势控制无人机系统 - 优化版"
+        title = "手势控制无人机系统 - 优化版 (带语音反馈)"
         frame = self.draw_text(frame, title, (10, 10), size=20, color=self.colors['title'])
 
         # 连接状态
@@ -1177,6 +1717,13 @@ class ChineseUIRenderer:
 
         frame = self.draw_text(frame, gesture_text, (w // 2, 40), size=16, color=gesture_color)
 
+        # 语音状态
+        if config.get('display', 'show_speech_status') and self.speech_manager:
+            speech_status = self.speech_manager.get_status()
+            speech_color = self.colors['speech_enabled'] if speech_status['enabled'] else self.colors['speech_disabled']
+            speech_text = f"语音: {'启用' if speech_status['enabled'] else '禁用'}"
+            frame = self.draw_text(frame, speech_text, (w // 2, 65), size=16, color=speech_color)
+
         # 性能信息
         if config.get('display', 'show_fps'):
             perf_text = f"帧率: {fps:.1f}"
@@ -1199,16 +1746,17 @@ class ChineseUIRenderer:
         h, w = frame.shape[:2]
 
         # 绘制底部帮助栏
-        cv2.rectangle(frame, (0, h - 60), (w, h), (0, 0, 0), -1)
+        cv2.rectangle(frame, (0, h - 80), (w, h), (0, 0, 0), -1)
 
         # 帮助文本
         help_lines = [
             "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/X:键盘控制",
-            "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息"
+            "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息",
+            "V:切换语音反馈  M:测试语音"
         ]
 
         for i, line in enumerate(help_lines):
-            y_pos = h - 45 + i * 20
+            y_pos = h - 65 + i * 20
             frame = self.draw_text(frame, line, (10, y_pos), size=14, color=self.colors['help'])
 
         return frame
@@ -1270,12 +1818,20 @@ class PerformanceMonitor:
 # ========== 主程序 ==========
 def main():
     """主函数"""
+    # 初始化语音管理器
+    print("初始化语音反馈系统...")
+    speech_manager = SpeechFeedbackManager(libs['speech'])
+
+    # 程序启动语音提示
+    if speech_manager.enabled:
+        speech_manager.speak('program_start', force=True)
+
     # 初始化组件
     print("初始化组件...")
 
-    gesture_recognizer = ImprovedGestureRecognizer()
-    drone_controller = SimpleDroneController(libs['airsim'])
-    ui_renderer = ChineseUIRenderer()
+    gesture_recognizer = ImprovedGestureRecognizer(speech_manager)
+    drone_controller = SimpleDroneController(libs['airsim'], speech_manager)
+    ui_renderer = ChineseUIRenderer(speech_manager)
     performance_monitor = PerformanceMonitor()
 
     # 初始化摄像头
@@ -1297,9 +1853,19 @@ def main():
             print(f"  帧率: {actual_fps}")
         else:
             print("❌ 摄像头不可用，使用模拟模式")
+
+            # 摄像头错误语音提示
+            if speech_manager.enabled:
+                speech_manager.speak('camera_error')
+
             cap = None
     except Exception as e:
         print(f"⚠ 摄像头初始化失败: {e}")
+
+        # 摄像头错误语音提示
+        if speech_manager.enabled:
+            speech_manager.speak('camera_error')
+
         cap = None
 
     # 显示欢迎信息
@@ -1309,6 +1875,7 @@ def main():
     print("系统状态:")
     print(f"  摄像头: {'已连接' if cap else '模拟模式'}")
     print(f"  手势识别: 改进的OpenCV算法")
+    print(f"  语音反馈: {'已启用' if speech_manager.enabled else '已禁用'}")
     print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
     print("=" * 60)
 
@@ -1326,7 +1893,9 @@ def main():
     print("   [W]Up [S]Down [A]Left [D]Right [F]Forward [X]Stop")
     print("5. 调试功能:")
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
-    print("6. 按 [ESC] 安全退出")
+    print("6. 语音控制:")
+    print("   [V]切换语音反馈 [M]测试语音")
+    print("7. 按 [ESC] 安全退出")
     print("=" * 60)
     print("程序启动成功!")
     print("-" * 60)
@@ -1405,7 +1974,7 @@ def main():
                 frame = ui_renderer.draw_warning(frame, warning_msg)
 
             # 显示图像（窗口标题用英文）
-            cv2.imshow('Gesture Controlled Drone - Optimized', frame)
+            cv2.imshow('Gesture Controlled Drone - Optimized with Speech', frame)
 
             # ========== 键盘控制 ==========
             key = cv2.waitKey(1) & 0xFF
@@ -1432,11 +2001,19 @@ def main():
                 config.set('display', 'show_help', value=not current)
                 print(f"帮助显示: {'开启' if not current else '关闭'}")
 
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak('help_toggled')
+
             elif key == ord('r') or key == ord('R'):
                 # 重置手势识别
                 print("重置手势识别...")
-                gesture_recognizer = ImprovedGestureRecognizer()
+                gesture_recognizer = ImprovedGestureRecognizer(speech_manager)
                 print("✓ 手势识别已重置")
+
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak_direct("手势识别已重置")
 
             elif key == ord('t') or key == ord('T'):
                 # 切换显示模式
@@ -1444,11 +2021,38 @@ def main():
                 mode_name = display_modes[current_display_mode]
                 print(f"显示模式: {mode_name}")
 
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak('display_mode_changed')
+
             elif key == ord('d') or key == ord('D'):
                 # 切换调试信息
                 current = config.get('display', 'show_debug_info')
                 config.set('display', 'show_debug_info', value=not current)
-                print(f"调试信息: {'开启' if not current else '关闭'}")
+                status = '开启' if not current else '关闭'
+                print(f"调试信息: {status}")
+
+                # 语音提示
+                if speech_manager.enabled:
+                    if not current:
+                        speech_manager.speak('debug_mode_on')
+                    else:
+                        speech_manager.speak('debug_mode_off')
+
+            elif key == ord('v') or key == ord('V'):
+                # 切换语音反馈
+                new_status = speech_manager.toggle_enabled()
+                status = '启用' if new_status else '禁用'
+                print(f"语音反馈: {status}")
+                config.set('speech', 'enabled', value=new_status)
+
+            elif key == ord('m') or key == ord('M'):
+                # 测试语音
+                if speech_manager.enabled:
+                    print("测试语音...")
+                    speech_manager.speak_direct("语音反馈测试，这是一条测试消息")
+                else:
+                    print("语音反馈已禁用，按V键启用")
 
             elif key in key_to_gesture:
                 # 键盘控制
@@ -1477,6 +2081,12 @@ def main():
         if cap:
             cap.release()
         cv2.destroyAllWindows()
+
+        # 程序退出语音提示
+        if speech_manager.enabled:
+            speech_manager.speak('program_exit', force=True)
+            time.sleep(1)  # 确保语音播报完成
+
         drone_controller.emergency_stop()
         config.save_config()
 
