@@ -1,0 +1,55 @@
+<mujoco model="log_cylinder">
+  <!-- 基础配置：弧度制、禁用多余编译选项 -->
+  <compiler angle="radian" discardvisual="false" />  
+
+  <asset>
+    <!-- 方案1：带纹理版本（按你的路径写法） -->
+    <!-- 注意：需在 rolling_log.xml 同级创建 assets 文件夹，放入对应的纹理图片 -->
+    <texture name="wood_tex" file="./assets/wood_base_texture.png" type="2d" width="512" height="512" />
+    <texture name="bark_tex" file="./assets/bark_texture.png" type="2d" width="512" height="512" />
+    
+    <material name="wood_mat" texture="wood_tex" rgba="1 0.8 0.6 1" />  <!-- 原木色底色 -->
+    <material name="bark_mat" texture="bark_tex" rgba="0.8 0.6 0.4 1" /> <!-- 树皮色底色 -->
+
+    <!-- 方案2：无纹理备用材质（注释掉上面，启用下面，避免纹理缺失报错） -->
+    <!-- <material name="wood_mat" rgba="1 0.8 0.6 1" /> -->
+    <!-- <material name="bark_mat" rgba="0.8 0.6 0.4 1" /> -->
+  </asset>
+
+  <worldbody>
+    <!-- 滚木主体：free关节允许自由滚动 -->
+    <body name="log" pos="0 0 0">
+      <joint name="log_root" type="free" damping="0.1" />  <!-- 轻微阻尼，滚动更自然 -->
+      
+      <!-- 内层核心（圆柱体/胶囊体）：直径0.36m，长度1m -->
+      
+        name="log_core" 
+        type="capsule"       
+        fromto="-0.5 0 0 0.5 0 0"  
+        size="0.18 0"        
+        material="wood_mat" 
+        density="800"        
+        friction="0.8 0.1 
+        solref="0.02 1"      <!-- 接触参数，避免穿模 -->
+      
+      
+      <!-- 外层树皮（略大一圈，模拟树皮厚度） --> 
+        name="bark_outer" 
+        type="capsule" 
+        fromto="-0.5 0 0 0.5 0 0" 
+        size="0.19 0"        
+        material="bark_mat" 
+        density="850" 
+        friction="0.85 0.1 0.1"
+        solref="0.02 1"
+      
+    </body>
+  </worldbody>
+
+  <!-- 物理参数优化：让滚动更自然 -->
+  <option>
+    <flag contact="enable" gravity="enable" />
+    <gravity x="0" y="0" z="-9.81" />  <!-- 重力加速度 -->
+    <timestep value="0.002" />         <!-- 仿真步长，更顺滑 -->
+  </option>
+</mujoco>

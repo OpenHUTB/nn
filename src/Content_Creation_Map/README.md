@@ -700,3 +700,115 @@ QGIS内置了多语言支持，切换为中文无需安装额外语言包。
 *   **性能与精度平衡**：面对超大范围的高密度点云，需在数据精度与软件交互流畅性之间取得平衡。实践中，可根据当前建模的细节等级需求，选择使用点云的全分辨率版本，或通过抽稀处理后的轻量化版本作为参考背景，以实现更高效的操作体验。
 
 在 RoadRunner 中引入点云数据，实质上是构建了一条 **“物理感知-数字建模-虚拟仿真”** 的数字化管道。它不仅是提升单点建模效率的工具，更是确保虚拟环境在几何、语义和行为层面与真实世界保持一致的关键技术环节，为高可靠性的自动驾驶系统测试与验证提供了至关重要的环境基础。
+
+# 从何处获取点云数据
+
+Sydney Urban Objects Dataset
+
+链接: [Sydney Urban Objects Dataset](https://www.acfr.usyd.edu.au/papers/data.shtml)
+
+介绍: 由悉尼大学提供的城市道路物体点云数据集，使用Velodyne HDL-64E LIDAR在悉尼中央商务区收集。包含车辆、行人、广告牌等分类信息，适用于自动驾驶技术的研究。
+
+Large-Scale Point Cloud Classification Benchmark (Semantic3D)
+
+链接: [Semantic3D](http://www.semantic3d.net/)
+
+介绍: 包含了大量标记的城市环境3D点云数据集，适合大规模点云分类研究。涵盖了从教堂到铁路轨道等多种场景，数据量大且标注详细。
+
+KITTI Vision Benchmark Suite
+
+链接: [KITTI Vision Benchmark Suite](http://www.cvlibs.net/datasets/kitti/)
+
+介绍: 主要面向自动驾驶领域，提供了丰富的传感器数据，包括点云、图像、GPS和IMU数据。数据来源于真实世界的驾驶场景，是评估自动驾驶系统性能的重要资源。
+
+OpenTopography
+
+链接: [OpenTopography](https://opentopography.org/)
+
+<img width="1920" height="1150" alt="364f1c173de0e829083dc59dbcce0418" src="https://github.com/user-attachments/assets/20e523a0-64b5-4d6c-a15a-dcec014be906" />
+
+介绍: 提供全球范围内的高分辨率地形数据，包括激光雷达（LiDAR）点云数据。适合地理信息系统（GIS）、地貌学和其他地球科学领域的研究人员使用。
+
+USGS National Map 3DEP Program
+
+链接: [](https://apps.nationalmap.gov/downloader/)
+
+<img width="1920" height="1149" alt="image" src="https://github.com/user-attachments/assets/6db55a2f-d0e5-4d9c-8abc-2d72d78bdfcd" />
+
+
+介绍: 美国地质调查局提供的全国3D高程计划（3DEP），包含了美国本土的LiDAR点云数据，可用于洪水建模、水资源管理等多个领域。
+
+# 以美国国家地质调查局（USGS）为例
+
+## 需要说明的是，USGS显然不能提供中国地区的点云数据下载，事实上，USGS只能提供美国的大部分地区的雷达扫描记录的点云数据下载。当然，作为roadrunner练手的素材获取渠道，USGS是完全够用的。
+
+**1.打开[](https://apps.nationalmap.gov/downloader/)**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/c9395f59-a521-4f34-ae83-4057c636dce6" />
+
+**2.通过鼠标的拖拽和缩放将你需要获取数据的区域大致移到你的屏幕中央**
+
+**3.在左侧的“地图数据”勾选高程源数据选项**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/a580ee02-7a98-48e9-b17e-d53e98888936" />
+
+**4.滚动滚轮，在下方勾选“Lidar Point Cloud (LPC)”和“ LAS,LAZ”项**
+
+<img width="755" height="550" alt="image" src="https://github.com/user-attachments/assets/84d371c4-62fb-4553-8308-dff4b0d26a8b" />
+
+**4.在左上方勾选你用来标定具体区域的方法，此处我以“范围”为例**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/7c67a50a-a4c4-41eb-b5ea-8265b6b1929d" />
+
+**5.搜索产品**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/51bffa50-40ec-4dde-b0fd-e7023d24f74c" />
+
+**6.下载数据**
+
+<img width="580" height="941" alt="image" src="https://github.com/user-attachments/assets/0e52a073-0c79-44c0-b95a-8045f2599fe5" />
+
+在左侧选中需要的数据后点击Download Link (LAZ)进行下载
+
+# 将点云文件导入roadrunner的方法
+
+## 第一步：将.laz文件解压为.las文件
+
+### 方法一：使用laszip进行解压
+将.laz文件解压为.las文件需要用到laszip，你可以在GitHub找到LAStools，LAStools 是一组高效、多核批量、可脚本化的工具，用于处理 LAS、压缩 LAZ、Terrasolid BIN、ESRI Shapefile（SHP）、ASCII 等。仓库链接为：[](https://github.com/LAStools/LAStools)
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/13d1c472-8da7-44b5-8d28-300f72dc4a7a" />
+1.**在你的本地创建一个文件夹作为本地仓库并初始化**
+进入文件夹右键空白处，“在终端打开”→“输入git init”→“完成初始化”
+2.**克隆LAStools到本地仓库**
+在打开的终端输入
+git clone https://github.com/LAStools/LAStools.git
+等待克隆完成
+<img width="1700" height="990" alt="image" src="https://github.com/user-attachments/assets/06699df4-bd84-4eb1-b1b9-0afa57f100fe" />
+3.**找到laszip并运行**
+文件路径："你的仓库\LAStools\bin\laszip.exe"
+程序UI：<img width="1275" height="991" alt="image" src="https://github.com/user-attachments/assets/ef2d27ef-48a4-48b1-ae60-1ab206987755" />
+4.**使用laszip将.laz文件解压为.las文件**
+首先你需要把.laz文件移到仓库所在的文件夹下
+然后回到laszip
+<img width="1275" height="989" alt="image" src="https://github.com/user-attachments/assets/cec19d46-7b1c-404a-9a11-304de883b208" />
+<img width="1280" height="959" alt="image" src="https://github.com/user-attachments/assets/ef5edfa2-0d0c-4a65-9b0f-c2b73b6a6382" />
+<img width="1274" height="984" alt="image" src="https://github.com/user-attachments/assets/6101384e-0963-498c-adce-863b24392f38" />
+回到.laz文件所在的那一级文件夹，可以看到生成了一个同名的.las文件，此时你已经成功的将.laz文件转为.las文件
+
+### 方法二：使用QGIS内置的工具进行格式转换
+
+1.**打开QGIS**
+菜单栏->数据处理->工具箱
+<img width="1920" height="1198" alt="image" src="https://github.com/user-attachments/assets/fccc9043-c816-49a8-bbb7-10c7488fe8c9" />
+<img width="1920" height="1198" alt="image" src="https://github.com/user-attachments/assets/7dd0759c-905d-4b6c-a221-413dd76e69d5" />
+2.**选择格式转换**
+点云转换->格式转换，选中格式转换（双击）
+<img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/fe4e07a0-a60f-4e45-9e8f-41a464ffd3f4" />
+3.**进行格式转换**
+<img width="860" height="681" alt="image" src="https://github.com/user-attachments/assets/eedfddae-05ee-4833-89af-7b2438e4c347" />
+4.**转换完成**
+<img width="860" height="654" alt="image" src="https://github.com/user-attachments/assets/5cc6fb83-5bfd-4799-9725-2ef7312b24c0" />
+
+
+
+

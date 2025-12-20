@@ -34,6 +34,8 @@ except Exception as e:
 
 from drawer import PyGameDrawer
 from sync_pygame import SyncPyGame
+# 导入障碍物检测器
+from obstacle_detector import ObstacleDetector
 
 
 class Main():
@@ -65,6 +67,12 @@ class Main():
             print("🚘 生成自动驾驶车辆...")
             self.spawn_vehicle()
 
+            # 添加障碍物检测器
+            self.obstacle_detector = ObstacleDetector()
+
+            # 用于存储最新的激光雷达数据
+            self.latest_lidar_data = None
+
             # 安装传感器
             self.setup_lidar()
             self.setup_camera()
@@ -75,6 +83,7 @@ class Main():
             # 开始游戏循环
             print("▶️ 启动自动驾驶...")
             print("📊 车辆速度和位置将显示在屏幕上")
+            print("🚧 障碍物检测系统已启用")
             print("ℹ️  按ESC键退出程序")
             print("=" * 50)
 
@@ -143,6 +152,7 @@ class Main():
 
             lidar_transform = carla.Transform(carla.Location(x=0.0, z=2.4))
             self.lidar = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=self.ego)
+            # 修改监听函数，存储激光雷达数据
             self.lidar.listen(lambda data: self.process_lidar(data))
             print("✅ 激光雷达已安装")
         except Exception as e:
@@ -164,10 +174,13 @@ class Main():
             print(f"⚠️  安装摄像头失败: {e}")
 
     def process_lidar(self, data):
-        """处理激光雷达数据"""
+        """处理激光雷达数据并存储"""
         try:
             point_cloud = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
             point_cloud = np.reshape(point_cloud, (int(point_cloud.shape[0] / 4), 4))
+
+            # 存储最新的激光雷达数据用于障碍物检测
+            self.latest_lidar_data = point_cloud
 
             # 减少控制台输出频率，避免过于频繁
             if random.random() < 0.01:  # 1%的概率输出
@@ -182,10 +195,18 @@ class Main():
             # 将CARLA图像转换为numpy数组
             array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
             array = np.reshape(array, (image.height, image.width, 4))
-            array = array[:, :, :3]
+
+            # 转换格式：BGRA → RGB，并且调整方向
+            # CARLA默认是BGRA，Pygame需要RGB
+            array = array[:, :, :3]  # 去掉Alpha通道
+            array = array[:, :, ::-1]  # BGR → RGB
+
+            # 将图像数据传递给绘制器
+            if hasattr(self, 'drawer'):
+                self.drawer.camera_image = array
 
         except Exception as e:
-            pass
+            print(f"❌ 处理摄像头数据失败: {e}")
 
     def on_tick(self):
         """每一帧调用的主函数"""
@@ -199,9 +220,28 @@ class Main():
                 speed_m_s = np.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
                 speed_kmh = speed_m_s * 3.6
 
+                # 障碍物检测
+                if self.latest_lidar_data is not None:
+                    obstacles = self.obstacle_detector.detect(self.latest_lidar_data)
+
+                    # 定期输出检测结果（避免控制台太拥挤）
+                    if random.random() < 0.05:  # 5%概率输出
+                        if self.obstacle_detector.warning_level > 0:
+                            print(f"🚧 {self.obstacle_detector.warning_message}")
+
                 # 更新绘制器显示
                 self.drawer.display_speed(speed_kmh)
                 self.drawer.display_location(location)
+
+                # 显示障碍物警告信息
+                self.drawer.display_warning(
+                    self.obstacle_detector.warning_message,
+                    self.obstacle_detector.get_warning_color(),
+                    self.obstacle_detector.warning_level
+                )
+
+                # 🆕 新增：显示摄像头图像
+                self.drawer.display_camera()
 
                 # 更新观察者视角跟随车辆
                 self.update_spectator()

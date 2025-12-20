@@ -38,6 +38,62 @@ CITYSCAPES_PALETTE = [
     (145, 170, 100)     # 22: RoadMarking
 ]
 
+# ==================== 新增：语义密度热力图生成函数 ====================
+def generate_density_heatmap(sem_data, target_classes=[4, 10], width=1024, height=720):
+    """
+    生成指定语义类别的密度热力图（行人+车辆为默认目标）
+    :param sem_data: 语义分割原始数据（int32数组，shape=(H,W)）
+    :param target_classes: 目标语义类别列表（4=行人，10=车辆）
+    :param width/height: 图像分辨率
+    :return: 彩色密度热力图（RGB格式）
+    """
+    # 1. 生成目标类别掩码（仅保留行人和车辆）
+    mask = np.zeros((height, width), dtype=np.uint8)
+    for cls in target_classes:
+        mask[sem_data == cls] = 255  # 目标类别像素设为255，背景0
+    
+    # 2. 高斯模糊平滑（模拟密度分布，核越大越平滑）
+    blurred_mask = cv2.GaussianBlur(mask, (21, 21), 0)
+    
+    # 3. 转换为彩色热力图（JET色板：蓝→青→黄→红，代表密度从低到高）
+    heatmap = cv2.applyColorMap(blurred_mask, cv2.COLORMAP_JET)
+    
+    # 4. 优化视觉效果：降低背景透明度，突出目标区域
+    heatmap = cv2.addWeighted(heatmap, 0.9, np.zeros_like(heatmap), 0.1, 0)
+    
+    # 5. 添加热力图标注（右下角说明）
+    cv2.putText(heatmap, "Density: Pedestrian(Red) + Vehicle(Blue)", 
+               (10, height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    
+    return heatmap
+# =================================================================
+
+# ==================== 第11次提交新增：语义类别实时计数函数 ====================
+def semantic_class_count(sem_data, class_mapping):
+    """
+    统计指定语义类别的像素数量，并估算画面内目标数量（按单目标像素阈值）
+    :param sem_data: 语义分割原始数据（H,W），int32类型
+    :param class_mapping: 字典 {类别名: 类别ID}
+    :return: 计数结果字典 {类别名: 近似目标数}
+    """
+    count_dict = {}
+    # 单目标像素阈值（经验值：行人≈200像素，车辆≈500像素，交通灯≈50像素）
+    pixel_thresholds = {
+        "Pedestrian": 200,
+        "Vehicle": 500,
+        "TrafficLight": 50
+    }
+    
+    for cls_name, cls_id in class_mapping.items():
+        # 统计该类别像素总数
+        pixel_count = np.sum(sem_data == cls_id)
+        # 估算近似目标数（避免0除，最少计为0）
+        threshold = pixel_thresholds.get(cls_name, 200)
+        approx_count = pixel_count // threshold if pixel_count >= threshold else 0
+        count_dict[cls_name] = approx_count
+    return count_dict
+# =================================================================
+
 # 1. 连接CARLA服务器并配置强同步模式
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
@@ -77,42 +133,59 @@ for _ in range(5):
 if not vehicle:
     raise Exception("主角车辆生成失败，请重启CARLA服务器")
 
-# 4. 初始化RGB摄像头
-def init_rgb_camera(vehicle):
-    camera_bp = bp_lib.find('sensor.camera.rgb')
-    camera_bp.set_attribute('image_size_x', '1024')
-    camera_bp.set_attribute('image_size_y', '720')
-    camera_bp.set_attribute('fov', '90')
-    camera_bp.set_attribute('shutter_speed', '100')
-    camera_transform = carla.Transform(
-        carla.Location(x=2.0, z=1.5),
-        carla.Rotation(pitch=-5)
-    )
-    camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
+# 4. 初始化摄像头通用函数（复用代码，修复shutter_speed属性问题）
+def init_camera(vehicle, camera_type, transform, width=1024, height=720, fov=90):
+    """
+    初始化摄像头（RGB/语义分割）
+    :param vehicle: 挂载的车辆
+    :param camera_type: 摄像头类型（'rgb'/'semantic'）
+    :param transform: 摄像头位姿
+    :param width/height: 图像分辨率
+    :param fov: 视场角
+    :return: 摄像头actor + 数据队列
+    """
+    if camera_type == 'rgb':
+        camera_bp = bp_lib.find('sensor.camera.rgb')
+    elif camera_type == 'semantic':
+        camera_bp = bp_lib.find('sensor.camera.semantic_segmentation')
+    else:
+        raise ValueError("camera_type must be 'rgb' or 'semantic'")
+    
+    # 通用属性（所有摄像头都支持）
+    camera_bp.set_attribute('image_size_x', str(width))
+    camera_bp.set_attribute('image_size_y', str(height))
+    camera_bp.set_attribute('fov', str(fov))
+    
+    # 仅RGB摄像头设置shutter_speed（语义分割摄像头不支持）
+    if camera_type == 'rgb':
+        camera_bp.set_attribute('shutter_speed', '100')
+    
+    camera = world.spawn_actor(camera_bp, transform, attach_to=vehicle)
     image_queue = queue.Queue()
     camera.listen(image_queue.put)
-    print("RGB摄像头初始化完成")
+    print(f"{camera_type.upper()}摄像头初始化完成（{transform.location}）")
     return camera, image_queue
 
-# 5. 初始化语义分割摄像头
-def init_semantic_camera(vehicle):
-    sem_bp = bp_lib.find('sensor.camera.semantic_segmentation')
-    sem_bp.set_attribute('image_size_x', '1024')
-    sem_bp.set_attribute('image_size_y', '720')
-    sem_bp.set_attribute('fov', '90')
-    sem_transform = carla.Transform(
-        carla.Location(x=2.0, z=1.5),
-        carla.Rotation(pitch=-5)
-    )
-    sem_camera = world.spawn_actor(sem_bp, sem_transform, attach_to=vehicle)
-    sem_queue = queue.Queue()
-    sem_camera.listen(sem_queue.put)
-    print("语义分割摄像头初始化完成")
-    return sem_camera, sem_queue
+# 4.1 初始化前视RGB摄像头（原有）
+front_rgb_transform = carla.Transform(
+    carla.Location(x=2.0, z=1.5),
+    carla.Rotation(pitch=-5)
+)
+front_rgb_camera, front_rgb_queue = init_camera(vehicle, 'rgb', front_rgb_transform)
 
-# 初始化摄像头
-rgb_camera, rgb_queue = init_rgb_camera(vehicle)
-sem_camera, sem_queue = init_semantic_camera(vehicle)
+# 4.2 初始化前视语义分割摄像头（修复shutter_speed问题）
+front_sem_transform = carla.Transform(
+    carla.Location(x=2.0, z=1.5),
+    carla.Rotation(pitch=-5)
+)
+front_sem_camera, front_sem_queue = init_camera(vehicle, 'semantic', front_sem_transform)
+
+# 4.3 新增：初始化俯视RGB摄像头（鸟瞰视角）
+top_rgb_transform = carla.Transform(
+    carla.Location(x=0.0, z=8.0),  # 车辆正上方8米
+    carla.Rotation(pitch=-90)      # 垂直向下俯视
+)
+top_rgb_camera, top_rgb_queue = init_camera(vehicle, 'rgb', top_rgb_transform, fov=120)  # 广角120°覆盖更多区域
 
 # 6. 生成NPC车辆
 npc_count = 100
@@ -234,16 +307,22 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：RGB与语义分割图像拼接显示 + 性能监控）
+# 9. 主循环（核心：多视角+热力图+计数可视化 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：RGB与语义分割图像拼接显示 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 平滑视角 + 性能监控")
+print(f"功能：前视+俯视+热力图+语义计数可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
-# ==================== 新增：性能监控初始化 ====================
+# ==================== 性能监控初始化 ====================
 start_time = time.time()
 frame_counter = 0
 current_fps = 0.0
+# ==================== 第11次提交新增：定义需要计数的语义类别 ====================
+count_class_mapping = {
+    "Pedestrian": 4,    # 行人
+    "Vehicle": 10,      # 车辆
+    "TrafficLight": 12  # 交通灯
+}
 # =================================================================
 
 try:
@@ -254,9 +333,8 @@ try:
         world.tick()
         last_spectator_tf = set_spectator_smooth(last_spectator_tf)
         
-        # ==================== 新增：实时FPS计算 ====================
+        # ==================== 实时FPS计算 ====================
         frame_counter += 1
-        # 每30帧更新一次FPS（避免频繁计算）
         if frame_counter % 30 == 0:
             elapsed_time = time.time() - start_time
             current_fps = 30.0 / elapsed_time if elapsed_time > 0 else 0.0
@@ -264,61 +342,114 @@ try:
             frame_counter = 0
         # =================================================================
         
-        # 同时获取RGB和语义分割图像（确保帧同步）
-        if not rgb_queue.empty() and not sem_queue.empty():
-            # 处理RGB图像（移除alpha通道，保留RGB）
-            rgb_image = rgb_queue.get()
-            rgb_img = np.reshape(np.copy(rgb_image.raw_data), 
-                                (rgb_image.height, rgb_image.width, 4))[:, :, :3]  # 取前3通道（RGB）
+        # 同时获取三个摄像头数据（帧同步：前视RGB + 前视语义 + 俯视RGB）
+        if not front_rgb_queue.empty() and not front_sem_queue.empty() and not top_rgb_queue.empty():
+            # 1. 处理前视RGB图像
+            front_rgb_image = front_rgb_queue.get()
+            front_rgb_img = np.reshape(np.copy(front_rgb_image.raw_data), 
+                                     (720, 1024, 4))[:, :, :3]
             
-            # 处理语义分割图像（转换为彩色可视化）
-            sem_image = sem_queue.get()
-            sem_data = np.reshape(np.copy(sem_image.raw_data), 
-                                (sem_image.height, sem_image.width, 4))[:, :, 2].astype(np.int32)
-            sem_rgb = np.zeros((sem_image.height, sem_image.width, 3), dtype=np.uint8)
+            # 2. 处理前视语义分割图像
+            front_sem_image = front_sem_queue.get()
+            front_sem_data = np.reshape(np.copy(front_sem_image.raw_data), 
+                                      (720, 1024, 4))[:, :, 2].astype(np.int32)
+            front_sem_rgb = np.zeros((720, 1024, 3), dtype=np.uint8)
             for i in range(len(CITYSCAPES_PALETTE)):
-                sem_rgb[sem_data == i] = CITYSCAPES_PALETTE[i]
+                front_sem_rgb[front_sem_data == i] = CITYSCAPES_PALETTE[i]
             
-            # 横向拼接两张图像（宽度合并，高度不变）
-            combined_img = cv2.hconcat([rgb_img, sem_rgb])
+            # 3. 处理俯视RGB图像
+            top_rgb_image = top_rgb_queue.get()
+            top_rgb_img = np.reshape(np.copy(top_rgb_image.raw_data), 
+                                    (720, 1024, 4))[:, :, :3]
             
-            # ==================== 修复：调整标题位置，为性能监控腾出空间 ====================
-            cv2.putText(combined_img, 
-                       f"RGB Image | Semantic Segmentation (Vehicles:{actual_npc_count} Pedestrians:{actual_walker_count})", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # ==================== 新增：生成语义密度热力图 ====================
+            density_heatmap = generate_density_heatmap(front_sem_data, target_classes=[4, 10])
             # =================================================================
             
-            # ==================== 修复：性能监控移到左上角标题下方，避免被裁剪 ====================
-            # 性能信息列表
+            # ==================== 第11次提交新增：计算语义类别计数 ====================
+            class_count_result = semantic_class_count(front_sem_data, count_class_mapping)
+            # =================================================================
+            
+            # 4. 多视角图像拼接（优化布局）：
+            #    上半部分：前视RGB（左） + 前视语义分割（右）
+            #    下半部分：俯视RGB（左） + 行人/车辆密度热力图（右）
+            upper_part = cv2.hconcat([front_rgb_img, front_sem_rgb])  # 宽度2048，高度720
+            lower_part = cv2.hconcat([top_rgb_img, density_heatmap])  # 宽度2048，高度720
+            combined_img = cv2.vconcat([upper_part, lower_part])       # 最终尺寸：2048×1440
+            
+            # 5. 添加视角标题
+            # 前视RGB标题
+            cv2.putText(combined_img, "Front View (RGB)", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 前视语义标题
+            cv2.putText(combined_img, "Front View (Semantic Segmentation)", 
+                       (1024 + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 俯视标题
+            cv2.putText(combined_img, "Top View (RGB / Bird's Eye)", 
+                       (10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 热力图标题
+            cv2.putText(combined_img, "Density Heatmap (Pedestrian + Vehicle)", 
+                       (1024 + 10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            
+            # 6. 绘制性能监控（左上角，标题下方）
             perf_info = [
                 f"FPS: {current_fps:.1f}",
-                f"RGB Queue: {rgb_queue.qsize()}",
-                f"Sem Queue: {sem_queue.qsize()}",
+                f"RGB Queue: {front_rgb_queue.qsize()}",
+                f"Sem Queue: {front_sem_queue.qsize()}",
                 f"Sync Frame: {world.get_snapshot().frame}",
-                f"Fixed Delta: {settings.fixed_delta_seconds:.3f}s"
+                f"Vehicles: {actual_npc_count} | Pedestrians: {actual_walker_count}"
             ]
-            
-            # 绘制位置：左上角，标题下方（y从60开始）
             perf_x = 10
-            perf_y = 60  # 标题在30位置，这里从60开始
+            perf_y = 60
             perf_line_height = 25
-            perf_color = (0, 255, 255)  # 黄色字体
-            
+            perf_color = (0, 255, 255)  # 黄色
             for idx, info in enumerate(perf_info):
                 y_pos = perf_y + idx * perf_line_height
-                # 绘制半透明黑色背景（提升可读性）
+                # 半透明背景
                 cv2.rectangle(combined_img, 
                               (perf_x - 5, y_pos - 15), 
-                              (perf_x + 220, y_pos + 5), 
+                              (perf_x + 300, y_pos + 5), 
                               (0, 0, 0), -1)
-                # 绘制性能文本
-                cv2.putText(combined_img, info, 
-                           (perf_x, y_pos), 
+                cv2.putText(combined_img, info, (perf_x, y_pos), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, perf_color, 2)
+            
+            # ==================== 第11次提交新增：绘制语义计数面板（右上角） ====================
+            # 计数面板位置（画面右上角，避免与性能监控重叠）
+            count_x = combined_img.shape[1] - 320  # 2048 - 320 = 1728
+            count_y = 30
+            count_color = (255, 255, 0)  # 青色（易识别，与黄色性能监控区分）
+            count_bg_color = (0, 0, 0)   # 黑色背景
+            count_line_height = 28
+            
+            # 绘制计数面板背景（半透明黑色）
+            cv2.rectangle(combined_img, 
+                          (count_x - 10, count_y - 10), 
+                          (combined_img.shape[1] - 10, count_y + 100), 
+                          count_bg_color, -1)  # 实心背景
+            
+            # 绘制计数面板标题
+            cv2.putText(combined_img, "Semantic Count (Frame)", 
+                       (count_x, count_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, count_color, 2)
+            
+            # 绘制各类别计数
+            count_items = [
+                f"Pedestrian: {class_count_result['Pedestrian']}",
+                f"Vehicle: {class_count_result['Vehicle']}",
+                f"TrafficLight: {class_count_result['TrafficLight']}"
+            ]
+            for idx, item in enumerate(count_items):
+                y_pos = count_y + (idx + 1) * count_line_height
+                cv2.putText(combined_img, item, 
+                           (count_x, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.65, count_color, 2)
             # =================================================================
             
-            # 显示拼接后的图像
-            cv2.imshow('CARLA RGB + Semantic Segmentation (with Pedestrians & Performance)', combined_img)
+            # 7. 显示最终图像（自动调整窗口大小）
+            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap + Count', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap + Count', 1920, 1080)
+            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap + Count', combined_img)
+            
             if cv2.waitKey(1) == ord('q'):
                 break
         
@@ -327,24 +458,28 @@ try:
 except KeyboardInterrupt:
     print("\n用户中断，清理资源...")
 finally:
+    # ==================== 清理所有摄像头资源 ====================
+    # 前视RGB
+    front_rgb_camera.stop()
+    front_rgb_camera.destroy()
+    # 前视语义
+    front_sem_camera.stop()
+    front_sem_camera.destroy()
+    # 俯视RGB
+    top_rgb_camera.stop()
+    top_rgb_camera.destroy()
+    # =================================================================
+    
     # ==================== 清理行人资源 ====================
-    # 停止并销毁行人控制器
     for controller in walker_controllers:
         if controller.is_alive:
             controller.stop()
             controller.destroy()
-    # 销毁行人
     for walker in walkers:
         if walker.is_alive:
             walker.destroy()
     print(f"已销毁{len(walker_controllers)}个行人控制器 + {len(walkers)}个行人")
     # =================================================================
-    
-    # 清理传感器
-    rgb_camera.stop()
-    rgb_camera.destroy()
-    sem_camera.stop()
-    sem_camera.destroy()
     
     # 恢复CARLA设置
     settings.synchronous_mode = False
