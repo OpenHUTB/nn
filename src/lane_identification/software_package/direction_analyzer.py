@@ -1,10 +1,10 @@
 ﻿"""
 方向分析模块 - 稳定优化版
+已移除日志文件生成功能
 """
 
 import numpy as np
 from collections import deque, defaultdict
-from typing import Dict, Any, Tuple, List
 import cv2
 
 class DirectionAnalyzer:
@@ -33,10 +33,8 @@ class DirectionAnalyzer:
             'centroid_offset': 0.20,
             'path_curvature': 0.15
         }
-        
-        print("方向分析器已初始化，使用优化配置")
     
-    def analyze(self, road_features: Dict[str, Any], lane_info: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze(self, road_features, lane_info):
         """分析道路方向 - 主方法"""
         try:
             # 提取特征
@@ -79,10 +77,11 @@ class DirectionAnalyzer:
             return result
             
         except Exception as e:
+            # 只打印错误，不生成日志文件
             print(f"方向分析失败: {e}")
             return self._create_default_result()
     
-    def _extract_features(self, road_features: Dict[str, Any], lane_info: Dict[str, Any]) -> Dict[str, float]:
+    def _extract_features(self, road_features, lane_info):
         """提取特征"""
         features = {}
         
@@ -122,7 +121,8 @@ class DirectionAnalyzer:
                 features['lane_balance'] = balance
                 
             except Exception as e:
-                print(f"车道特征提取失败: {e}")
+                # 只打印错误，不生成日志文件
+                pass
         
         # 5. 路径特征
         future_path = lane_info.get('future_path')
@@ -133,7 +133,8 @@ class DirectionAnalyzer:
                     curvature = self._calculate_path_curvature_simple(path_points)
                     features['path_curvature'] = curvature
             except Exception as e:
-                print(f"路径特征提取失败: {e}")
+                # 只打印错误，不生成日志文件
+                pass
         
         # 6. 检测质量
         detection_quality = lane_info.get('detection_quality', 0.0)
@@ -146,7 +147,7 @@ class DirectionAnalyzer:
         
         return features
     
-    def _calculate_lane_convergence_safe(self, left_lane: Dict[str, Any], right_lane: Dict[str, Any]) -> float:
+    def _calculate_lane_convergence_safe(self, left_lane, right_lane):
         """安全计算车道线收敛度"""
         try:
             left_func = left_lane.get('func')
@@ -175,7 +176,7 @@ class DirectionAnalyzer:
         
         return 1.0
     
-    def _calculate_lane_symmetry_safe(self, left_lane: Dict[str, Any], right_lane: Dict[str, Any]) -> float:
+    def _calculate_lane_symmetry_safe(self, left_lane, right_lane):
         """安全计算车道对称性"""
         try:
             left_func = left_lane.get('func')
@@ -203,7 +204,7 @@ class DirectionAnalyzer:
         
         return 0.5
     
-    def _calculate_lane_balance(self, left_lane: Dict[str, Any], right_lane: Dict[str, Any]) -> float:
+    def _calculate_lane_balance(self, left_lane, right_lane):
         """计算车道平衡性"""
         try:
             left_func = left_lane.get('func')
@@ -230,7 +231,7 @@ class DirectionAnalyzer:
         
         return 0.5
     
-    def _calculate_path_curvature_simple(self, path_points: List[Tuple[int, int]]) -> float:
+    def _calculate_path_curvature_simple(self, path_points):
         """简单计算路径曲率"""
         if len(path_points) < 3:
             return 0.0
@@ -257,7 +258,7 @@ class DirectionAnalyzer:
         
         return 0.0
     
-    def _calculate_historical_consistency(self) -> float:
+    def _calculate_historical_consistency(self):
         """计算历史一致性"""
         if len(self.direction_history) < 2:
             return 0.5
@@ -273,7 +274,7 @@ class DirectionAnalyzer:
         
         return consistency
     
-    def _predict_direction_improved(self, features: Dict[str, float]) -> Dict[str, float]:
+    def _predict_direction_improved(self, features):
         """改进的方向预测"""
         probabilities = {'直行': 0.4, '左转': 0.3, '右转': 0.3}
         
@@ -355,9 +356,7 @@ class DirectionAnalyzer:
         
         return probabilities
     
-    def _calculate_confidence_improved(self, features: Dict[str, float],
-                                    probabilities: Dict[str, float],
-                                    lane_info: Dict[str, Any]) -> float:
+    def _calculate_confidence_improved(self, features, probabilities, lane_info):
         """改进的置信度计算"""
         confidence_factors = []
         
@@ -431,8 +430,7 @@ class DirectionAnalyzer:
         else:
             return 0.5
     
-    def _evaluate_feature_consistency(self, features: Dict[str, float],
-                                    probabilities: Dict[str, float]) -> float:
+    def _evaluate_feature_consistency(self, features, probabilities):
         """评估特征一致性"""
         if not features:
             return 0.5
@@ -506,8 +504,7 @@ class DirectionAnalyzer:
         
         return np.mean(consistency_scores) if consistency_scores else 0.5
     
-    def _get_final_direction_improved(self, probabilities: Dict[str, float],
-                                    confidence: float) -> str:
+    def _get_final_direction_improved(self, probabilities, confidence):
         """改进的最终方向决策"""
         sorted_probs = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)
         
@@ -551,7 +548,7 @@ class DirectionAnalyzer:
                         return historical_direction
                 return best_direction
     
-    def _get_historical_direction(self) -> str:
+    def _get_historical_direction(self):
         """获取历史主要方向"""
         if not self.direction_history:
             return '未知'
@@ -569,7 +566,7 @@ class DirectionAnalyzer:
         most_common = max(direction_counts.items(), key=lambda x: x[1])
         return most_common[0]
     
-    def _apply_historical_smoothing(self, direction: str, confidence: float) -> Tuple[str, float]:
+    def _apply_historical_smoothing(self, direction, confidence):
         """应用历史平滑"""
         if len(self.direction_history) < 2:
             return direction, confidence
@@ -609,9 +606,7 @@ class DirectionAnalyzer:
         
         return direction, confidence
     
-    def _generate_detailed_reasoning(self, features: Dict[str, float],
-                                   probabilities: Dict[str, float],
-                                   final_direction: str, confidence: float) -> str:
+    def _generate_detailed_reasoning(self, features, probabilities, final_direction, confidence):
         """生成详细推理说明"""
         reasoning_parts = []
         
@@ -679,8 +674,7 @@ class DirectionAnalyzer:
         
         return " | ".join(reasoning_parts)
     
-    def _fallback_direction_analysis(self, road_features: Dict[str, Any],
-                                   lane_info: Dict[str, Any]) -> Dict[str, Any]:
+    def _fallback_direction_analysis(self, road_features, lane_info):
         """回退策略：当特征不足时使用"""
         direction = '直行'
         confidence = 0.3
@@ -723,7 +717,7 @@ class DirectionAnalyzer:
             'reasoning': '特征不足，使用回退策略'
         }
     
-    def _create_default_result(self) -> Dict[str, Any]:
+    def _create_default_result(self):
         """创建默认结果"""
         return {
             'direction': '直行',
