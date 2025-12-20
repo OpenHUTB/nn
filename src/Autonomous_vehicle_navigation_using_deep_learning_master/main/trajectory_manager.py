@@ -4,7 +4,6 @@
 
 import carla
 import math
-import config as cfg
 
 class TrajectoryManager:
     """轨迹管理器"""
