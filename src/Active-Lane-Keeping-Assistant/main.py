@@ -265,27 +265,29 @@ def make_path(folder:str, id:str) -> str:
     
     return path
 
-if __name__ == '__main__':
+
+def parse_args() -> argparse.Namespace:
+    """Parses command line arguments"""
     parser = argparse.ArgumentParser(prog='Active Lane Keeping System',
-        description='')
-    parser.add_argument('-id', '--identifier', type=str, help=('Unique '
-        'identifier used to identify the run.'), dest='id', required=True)
+                                     description='')
+    parser.add_argument('-id', '--identifier', type=str, required=True,
+                        help='Unique identifier used to identify the run.', dest='id')
     parser.add_argument('-c', '--controller', default='pid', type=str,
-        choices=['simple', 'p', 'pd', 'pid'], help=('The method used to '
-        'control the car.'), dest='controller')
-    parser.add_argument('-s', '--steps', default=100, type=int, help=('The '
-        'number of steps that the agent controls the car. This does not '
-        'include the inital setup driving to the fourth lane.'), dest='steps')
-    parser.add_argument('-a', '--adapt', action='store_true',
-        help=('Whether to adapt the parameters. This only takes effect if not '
-        '\'simple\' is selected as controller.'), dest='adapt')
+                        choices=['simple', 'p', 'pd', 'pid'], dest='controller',
+                        help='The method used to control the car.')
+    parser.add_argument('-s', '--steps', default=100, type=int, dest='steps',
+                        help='The number of steps that the agent controls the car.')
+    parser.add_argument('-a', '--adapt', action='store_true', dest='adapt',
+                        help='Whether to adapt the parameters.')
     parser.add_argument('-t', '--tolerance', default=0.2, type=float,
-        help=('Tolerance range for the adaption of the parameters. This takes '
-        'effect only if adapt is set to true.'), dest='tolerance')
-    parser.add_argument('-d', '--debug', action='store_true',
-        help=('Whether to use debug mode for logging. This takes effect only '
-        'if adapt is set to true.'), dest='debug')
-    args = parser.parse_args()
+                        help='Tolerance range for the adaption.', dest='tolerance')
+    parser.add_argument('-d', '--debug', action='store_true', dest='debug',
+                        help='Whether to use debug mode for logging.')
+
+    return parser.parse_args()
+if __name__ == '__main__':
+
+    args = parse_args()
 
     path = make_path(folder='assets', id=args.id)
 

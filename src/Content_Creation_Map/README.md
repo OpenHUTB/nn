@@ -737,3 +737,32 @@ USGS National Map 3DEP Program
 
 
 介绍: 美国地质调查局提供的全国3D高程计划（3DEP），包含了美国本土的LiDAR点云数据，可用于洪水建模、水资源管理等多个领域。
+
+# 以美国国家地质调查局（USGS）为例
+
+**1.打开[](https://apps.nationalmap.gov/downloader/)**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/c9395f59-a521-4f34-ae83-4057c636dce6" />
+
+**2.通过鼠标的拖拽和缩放将你需要获取数据的区域大致移到你的屏幕中央**
+
+**3.在左侧的“地图数据”勾选高程源数据选项**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/a580ee02-7a98-48e9-b17e-d53e98888936" />
+
+**4.滚动滚轮，在下方勾选“Lidar Point Cloud (LPC)”和“ LAS,LAZ”项**
+
+<img width="755" height="550" alt="image" src="https://github.com/user-attachments/assets/84d371c4-62fb-4553-8308-dff4b0d26a8b" />
+
+**4.在左上方勾选你用来标定具体区域的方法，此处我以“范围”为例**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/7c67a50a-a4c4-41eb-b5ea-8265b6b1929d" />
+
+**5.搜索产品**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/51bffa50-40ec-4dde-b0fd-e7023d24f74c" />
+
+**6.下载数据**
+
+<img width="580" height="941" alt="image" src="https://github.com/user-attachments/assets/0e52a073-0c79-44c0-b95a-8045f2599fe5" />
+在左侧选中需要的数据后点击Download Link (LAZ)进行下载
