@@ -1,6 +1,6 @@
 """
 main.py - CARLA多目标跟踪系统主程序
-增强版：彩色ID编码 + 独立统计窗口
+入口文件，协调各个模块运行
 """
 
 import sys
@@ -12,7 +12,6 @@ import numpy as np
 import carla
 import torch
 import queue
-import psutil
 
 # 添加当前目录到路径，确保可以导入模块
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -183,39 +182,20 @@ def set_weather(world, weather_name):
         logger.warning(f"未知天气: {weather_name}, 使用晴天")
 
 
-# ======================== 可视化（增强版：独立统计窗口） ========================
+# ======================== 可视化（英文版） ========================
 
 class Visualizer:
-    """可视化管理器（增强版：彩色ID编码 + 独立统计窗口）"""
+    """可视化管理器（英文版，解决乱码问题）"""
     
     def __init__(self, config):
         self.config = config
         self.window_name = "CARLA Object Tracking"
-        self.stats_window_name = "📊 实时统计面板"
         
-        # 创建主窗口
+        # 创建窗口
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, 
                         config.get('window_width', 1280), 
                         config.get('window_height', 720))
-        
-        # 创建独立统计窗口
-        cv2.namedWindow(self.stats_window_name, cv2.WINDOW_NORMAL)
-        # 设置统计窗口大小
-        stats_width = 600
-        stats_height = 800
-        cv2.resizeWindow(self.stats_window_name, stats_width, stats_height)
-        
-        # 移动统计窗口位置（避免遮挡主窗口）
-        cv2.moveWindow(self.stats_window_name, 
-                      config.get('window_width', 1280) + 50,  # 放在主窗口右侧
-                      100)                                    # 垂直位置
-        
-        # 统计面板状态
-        self.show_stats_window = True  # 是否显示独立统计窗口
-        self.stats_image = None        # 统计面板图像
-        self.stats_update_interval = 2  # 统计更新间隔（帧数）
-        self.stats_frame_counter = 0   # 帧计数器
         
         # 车辆类别颜色映射
         self.class_colors = {
@@ -227,7 +207,7 @@ class Visualizer:
         
         # 行为状态颜色映射（优先级从高到低）
         self.behavior_colors = {
-            'dangerous': (0, 0, 255),      # 红色 - 危险（距离过近）
+            'dangerous': (0, 0, 255),      # 红色 - 危险
             'stopped': (0, 255, 255),      # 黄色 - 停车
             'overtaking': (255, 0, 255),   # 紫色 - 超车
             'lane_changing': (0, 255, 255), # 青色 - 变道
@@ -237,30 +217,19 @@ class Visualizer:
             'normal': (0, 255, 0)          # 绿色 - 正常行驶
         }
         
-        # 行为状态图标映射
-        self.behavior_icons = {
-            'dangerous': '⚠',    # 警告
-            'stopped': '🛑',     # 停止
-            'overtaking': '💨',  # 超车
-            'lane_changing': '↔', # 变道
-            'turning': '↪',      # 转弯
-            'accelerating': '🚀', # 加速
-            'braking': '🛑',     # 刹车
-            'normal': '→'        # 正常
+        # 行为状态文本映射（使用英文）
+        self.behavior_texts = {
+            'dangerous': 'DANGER',
+            'stopped': 'STOP',
+            'overtaking': 'OVERTAKE',
+            'lane_changing': 'LANE CHANGE',
+            'turning': 'TURNING',
+            'accelerating': 'ACCEL',
+            'braking': 'BRAKE',
+            'normal': 'NORMAL'
         }
         
-        # 性能数据历史
-        self.fps_history = []
-        self.detection_time_history = []
-        self.tracking_time_history = []
-        self.max_history_length = 100  # 增加历史长度用于更详细的图表
-        
-        # 状态历史（用于趋势分析）
-        self.object_count_history = []
-        self.cpu_usage_history = []
-        self.memory_usage_history = []
-        
-        logger.info("✅ 可视化器初始化完成（彩色ID编码 + 独立统计窗口）")
+        logger.info("✅ 可视化器初始化完成（英文版）")
     
     def _get_behavior_color(self, track_info):
         """
@@ -293,36 +262,36 @@ class Visualizer:
         else:
             return self.behavior_colors['normal']
     
-    def _get_behavior_icon(self, track_info):
+    def _get_behavior_text(self, track_info):
         """
-        根据行为状态返回对应图标
+        根据行为状态返回对应文本
         
         Args:
             track_info: 跟踪目标信息字典
             
         Returns:
-            str: 行为图标
+            str: 行为文本
         """
         if not track_info:
-            return self.behavior_icons['normal']
+            return self.behavior_texts['normal']
         
         # 优先级：危险 > 停车 > 超车 > 变道/转弯 > 加速/刹车 > 正常
         if track_info.get('is_dangerous', False):
-            return self.behavior_icons['dangerous']
+            return self.behavior_texts['dangerous']
         elif track_info.get('is_stopped', False):
-            return self.behavior_icons['stopped']
+            return self.behavior_texts['stopped']
         elif track_info.get('is_overtaking', False):
-            return self.behavior_icons['overtaking']
+            return self.behavior_texts['overtaking']
         elif track_info.get('is_lane_changing', False):
-            return self.behavior_icons['lane_changing']
+            return self.behavior_texts['lane_changing']
         elif track_info.get('is_turning', False):
-            return self.behavior_icons['turning']
+            return self.behavior_texts['turning']
         elif track_info.get('is_accelerating', False):
-            return self.behavior_icons['accelerating']
+            return self.behavior_texts['accelerating']
         elif track_info.get('is_braking', False):
-            return self.behavior_icons['braking']
+            return self.behavior_texts['braking']
         else:
-            return self.behavior_icons['normal']
+            return self.behavior_texts['normal']
     
     def _get_class_name(self, class_id):
         """
@@ -353,353 +322,6 @@ class Visualizer:
             tuple: 调整后的颜色
         """
         return tuple(int(c * factor) for c in color)
-    
-    def update_performance_data(self, fps, detection_time, tracking_time, stats_data=None):
-        """
-        更新性能数据（增强版，支持更多数据）
-        
-        Args:
-            fps: 当前帧率
-            detection_time: 检测时间（秒）
-            tracking_time: 跟踪时间（秒）
-            stats_data: 统计数据字典
-        """
-        self.fps_history.append(fps)
-        self.detection_time_history.append(detection_time * 1000)  # 转换为毫秒
-        self.tracking_time_history.append(tracking_time * 1000)    # 转换为毫秒
-        
-        # 如果有统计数据，也更新状态历史
-        if stats_data:
-            self.object_count_history.append(stats_data.get('total_objects', 0))
-            self.cpu_usage_history.append(stats_data.get('cpu_usage', 0))
-            self.memory_usage_history.append(stats_data.get('memory_usage', 0))
-        
-        # 保持历史数据长度
-        for history_list in [
-            self.fps_history,
-            self.detection_time_history,
-            self.tracking_time_history,
-            self.object_count_history,
-            self.cpu_usage_history,
-            self.memory_usage_history
-        ]:
-            if len(history_list) > self.max_history_length:
-                history_list.pop(0)
-    
-    def create_stats_window_image(self, stats_data):
-        """
-        创建独立统计窗口的图像
-        
-        Args:
-            stats_data: 统计数据字典
-            
-        Returns:
-            np.ndarray: 统计面板图像
-        """
-        # 创建统计面板图像（浅灰色背景）
-        stats_width = 600
-        stats_height = 800
-        stats_image = np.ones((stats_height, stats_width, 3), dtype=np.uint8) * 240  # 浅灰色背景
-        
-        # 1. 标题区域
-        title_height = 80
-        cv2.rectangle(stats_image, (0, 0), (stats_width, title_height), (50, 50, 80), -1)
-        
-        title = "🚗 CARLA 实时统计面板"
-        cv2.putText(stats_image, title, 
-                   (stats_width // 2 - 150, title_height // 2 + 10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
-        
-        subtitle = "独立窗口 - 按 T 键切换显示"
-        cv2.putText(stats_image, subtitle,
-                   (stats_width // 2 - 140, title_height // 2 + 40),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
-        
-        y_offset = title_height + 20
-        
-        # 2. 系统状态区块
-        y_offset = self._draw_stats_section(stats_image, "⚙️ 系统状态", y_offset, stats_data, self._draw_system_stats)
-        
-        # 3. 目标统计区块
-        y_offset = self._draw_stats_section(stats_image, "🎯 目标统计", y_offset, stats_data, self._draw_object_stats)
-        
-        # 4. 性能图表区块
-        y_offset = self._draw_stats_section(stats_image, "📈 性能图表", y_offset, stats_data, self._draw_performance_charts)
-        
-        # 5. 历史趋势区块
-        if len(self.fps_history) > 5:
-            y_offset = self._draw_stats_section(stats_image, "📊 历史趋势", y_offset, stats_data, self._draw_trend_charts)
-        
-        # 6. 底部信息
-        bottom_y = stats_height - 30
-        timestamp = time.strftime("%H:%M:%S")
-        cv2.putText(stats_image, f"更新时间: {timestamp}", 
-                   (20, bottom_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
-        
-        frame_info = f"总帧数: {stats_data.get('total_frames', 0)}"
-        cv2.putText(stats_image, frame_info,
-                   (stats_width - 150, bottom_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
-        
-        return stats_image
-    
-    def _draw_stats_section(self, image, title, y_start, stats_data, draw_function):
-        """
-        绘制统计区块的通用模板
-        
-        Returns:
-            int: 下一个区块的起始Y坐标
-        """
-        section_height = 200  # 每个区块默认高度
-        
-        # 区块背景
-        cv2.rectangle(image, (10, y_start), (590, y_start + section_height), (255, 255, 255), -1)
-        cv2.rectangle(image, (10, y_start), (590, y_start + section_height), (220, 220, 220), 2)
-        
-        # 区块标题
-        cv2.putText(image, title, (20, y_start + 25),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (50, 50, 50), 2)
-        
-        # 绘制分割线
-        cv2.line(image, (20, y_start + 35), (580, y_start + 35), (200, 200, 200), 1)
-        
-        # 调用具体的绘制函数
-        content_y = y_start + 50
-        content_y = draw_function(image, content_y, stats_data)
-        
-        # 如果绘制函数返回了新的Y坐标，使用它；否则使用默认高度
-        if content_y > y_start + section_height:
-            section_height = content_y - y_start
-        
-        return y_start + section_height + 20
-    
-    def _draw_system_stats(self, image, y_start, stats_data):
-        """
-        绘制系统状态信息
-        """
-        x_left = 30
-        x_right = 300
-        y = y_start
-        
-        # 定义状态项
-        status_items = [
-            ("FPS", f"{stats_data.get('fps', 0):.1f}", 
-             (0, 255, 0) if stats_data.get('fps', 0) > 20 else (0, 165, 255)),
-            ("运行时间", f"{stats_data.get('run_time', 0):.0f}s", (100, 100, 100)),
-            ("CPU使用率", f"{stats_data.get('cpu_usage', 0):.1f}%",
-             (0, 255, 0) if stats_data.get('cpu_usage', 0) < 70 else (0, 165, 255) if stats_data.get('cpu_usage', 0) < 90 else (0, 0, 255)),
-            ("内存使用率", f"{stats_data.get('memory_usage', 0):.1f}%",
-             (0, 255, 0) if stats_data.get('memory_usage', 0) < 70 else (0, 165, 255) if stats_data.get('memory_usage', 0) < 90 else (0, 0, 255)),
-            ("检测线程", stats_data.get('detection_thread', '未知'),
-             (0, 255, 0) if stats_data.get('detection_thread') == '运行中' else (0, 0, 255)),
-            ("平均帧时间", f"{stats_data.get('avg_frame_time', 0):.1f}ms",
-             (0, 255, 0) if stats_data.get('avg_frame_time', 0) < 33 else (0, 165, 255) if stats_data.get('avg_frame_time', 0) < 50 else (0, 0, 255)),
-        ]
-        
-        # 分两列绘制
-        for i, (label, value, color) in enumerate(status_items):
-            x = x_left if i % 2 == 0 else x_right
-            current_y = y + (i // 2) * 30
-            
-            # 标签
-            cv2.putText(image, f"{label}:", (x, current_y),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 80, 80), 1)
-            
-            # 值
-            cv2.putText(image, value, (x + 120, current_y),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-        
-        return y + (len(status_items) // 2 + 1) * 30
-    
-    def _draw_object_stats(self, image, y_start, stats_data):
-        """
-        绘制目标统计信息
-        """
-        y = y_start
-        
-        # 总目标数
-        total_objects = stats_data.get('total_objects', 0)
-        cv2.putText(image, f"总目标数: {total_objects}", (30, y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (50, 50, 50), 2)
-        y += 30
-        
-        # 车辆类型分布（横向条形图）
-        vehicle_counts = stats_data.get('vehicle_counts', {})
-        if vehicle_counts:
-            cv2.putText(image, "车辆类型分布:", (30, y),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
-            y += 25
-            
-            max_count = max(vehicle_counts.values()) if vehicle_counts.values() else 1
-            bar_width = 200
-            
-            types = ['car', 'bus', 'truck']
-            type_names = {'car': '小汽车 🚗', 'bus': '公交车 🚌', 'truck': '卡车 🚚'}
-            
-            for i, v_type in enumerate(types):
-                count = vehicle_counts.get(v_type, 0)
-                # 条形图
-                bar_length = int((count / max_count) * bar_width) if max_count > 0 else 0
-                color = self.class_colors.get(v_type, (100, 100, 100))
-                
-                cv2.rectangle(image, (150, y - 10), (150 + bar_length, y + 5), color, -1)
-                
-                # 文本
-                cv2.putText(image, type_names[v_type], (30, y),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-                cv2.putText(image, f"{count}", (370, y),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-                
-                y += 25
-            y += 10
-        
-        # 行为分布
-        behavior_counts = stats_data.get('behavior_counts', {})
-        if behavior_counts:
-            cv2.putText(image, "行为分布:", (30, y),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
-            y += 25
-            
-            # 只显示非零行为
-            displayed_behaviors = 0
-            for behavior, count in behavior_counts.items():
-                if count > 0 and behavior in self.behavior_colors:
-                    color = self.behavior_colors[behavior]
-                    icon = self.behavior_icons.get(behavior, '•')
-                    
-                    cv2.putText(image, f"{icon} {behavior}: {count}", (50, y),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-                    y += 20
-                    displayed_behaviors += 1
-            
-            y += 10 if displayed_behaviors > 0 else 0
-        
-        return y
-    
-    def _draw_performance_charts(self, image, y_start, stats_data):
-        """
-        绘制性能图表
-        """
-        chart_x = 30
-        chart_y = y_start
-        chart_width = 540
-        chart_height = 120
-        
-        # 图表背景
-        cv2.rectangle(image, (chart_x, chart_y), 
-                     (chart_x + chart_width, chart_y + chart_height), 
-                     (250, 250, 250), -1)
-        cv2.rectangle(image, (chart_x, chart_y), 
-                     (chart_x + chart_width, chart_y + chart_height), 
-                     (200, 200, 200), 1)
-        
-        if len(self.fps_history) > 1:
-            # 绘制FPS曲线（绿色）
-            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
-                                 self.fps_history, (0, 180, 0), "FPS", 60)
-            
-            # 绘制检测时间曲线（红色）
-            if self.detection_time_history:
-                self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
-                                     self.detection_time_history, (200, 0, 0), "检测(ms)", 100)
-            
-            # 绘制跟踪时间曲线（蓝色）
-            if self.tracking_time_history:
-                self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
-                                     self.tracking_time_history, (0, 0, 200), "跟踪(ms)", 50)
-        
-        # 图表标题
-        cv2.putText(image, "实时性能趋势（最近100帧）", 
-                   (chart_x + 10, chart_y + 15),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
-        
-        return chart_y + chart_height + 20
-    
-    def _draw_trend_charts(self, image, y_start, stats_data):
-        """
-        绘制历史趋势图表
-        """
-        chart_x = 30
-        chart_y = y_start
-        chart_width = 540
-        chart_height = 100
-        
-        # 目标数量趋势
-        if len(self.object_count_history) > 1:
-            cv2.putText(image, "目标数量趋势:", (chart_x, chart_y - 10),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
-            
-            # 图表背景
-            cv2.rectangle(image, (chart_x, chart_y), 
-                         (chart_x + chart_width, chart_y + chart_height), 
-                         (250, 250, 250), -1)
-            cv2.rectangle(image, (chart_x, chart_y), 
-                         (chart_x + chart_width, chart_y + chart_height), 
-                         (200, 200, 200), 1)
-            
-            # 绘制目标数量曲线
-            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
-                                 self.object_count_history, (100, 0, 200), "目标数", 
-                                 max(self.object_count_history) if self.object_count_history else 20)
-            
-            chart_y += chart_height + 30
-        
-        # 系统资源趋势
-        cv2.putText(image, "系统资源趋势:", (chart_x, chart_y - 10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
-        
-        # 图表背景
-        cv2.rectangle(image, (chart_x, chart_y), 
-                     (chart_x + chart_width, chart_y + chart_height), 
-                     (250, 250, 250), -1)
-        cv2.rectangle(image, (chart_x, chart_y), 
-                     (chart_x + chart_width, chart_y + chart_height), 
-                     (200, 200, 200), 1)
-        
-        # 绘制CPU和内存曲线
-        if len(self.cpu_usage_history) > 1:
-            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
-                                 self.cpu_usage_history, (200, 100, 0), "CPU%", 100)
-        
-        if len(self.memory_usage_history) > 1:
-            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
-                                 self.memory_usage_history, (0, 100, 200), "内存%", 100)
-        
-        return chart_y + chart_height + 20
-    
-    def _draw_chart_curve(self, image, x, y, width, height, data, color, label, max_value):
-        """
-        绘制图表曲线（增强版，带标签）
-        """
-        if len(data) < 2:
-            return
-        
-        points = []
-        data_len = len(data)
-        
-        for i, value in enumerate(data):
-            # 归一化到0-1范围
-            normalized = min(1.0, value / max_value) if max_value > 0 else 0
-            
-            # 计算坐标
-            point_x = int(x + (i / (data_len - 1)) * width) if data_len > 1 else x
-            point_y = int(y + height - normalized * height)
-            
-            points.append((point_x, point_y))
-        
-        # 绘制曲线
-        for i in range(1, len(points)):
-            cv2.line(image, points[i-1], points[i], color, 2)
-        
-        # 绘制标签
-        label_x = x + width - 80
-        label_y = y + 15
-        
-        # 颜色标记
-        cv2.circle(image, (label_x - 10, label_y), 4, color, -1)
-        cv2.putText(image, label, (label_x, label_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 50), 1)
     
     def draw_detections(self, image, boxes, ids, classes, tracks_info=None):
         """
@@ -792,31 +414,30 @@ class Visualizer:
                           (x1 + 4, y1 - 4),
                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                 
-                # 绘制行为图标（如果可用）
+                # 绘制行为状态（如果可用）
                 if track_info:
-                    # 获取行为图标
-                    behavior_icon = self._get_behavior_icon(track_info)
+                    # 获取行为文本
+                    behavior_text = self._get_behavior_text(track_info)
                     
                     # 在右上角绘制行为状态
-                    behavior_text = behavior_icon
-                    (icon_width, icon_height), _ = cv2.getTextSize(
-                        behavior_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                    (text_width, text_height), _ = cv2.getTextSize(
+                        behavior_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
                     )
                     
-                    # 图标位置（右上角）
-                    icon_x = x2 - icon_width - 5
-                    icon_y = y1 + icon_height + 5
+                    # 文本位置（右上角）
+                    text_x = x2 - text_width - 5
+                    text_y = y1 + text_height + 5
                     
-                    # 绘制图标背景
+                    # 绘制文本背景
                     cv2.rectangle(result,
-                                (icon_x - 3, icon_y - icon_height - 3),
-                                (icon_x + icon_width + 3, icon_y + 3),
+                                (text_x - 3, text_y - text_height - 3),
+                                (text_x + text_width + 3, text_y + 3),
                                 behavior_color, -1)
                     
-                    # 绘制图标
+                    # 绘制文本
                     cv2.putText(result, behavior_text,
-                              (icon_x, icon_y),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                              (text_x, text_y),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
                     
                     # 绘制速度信息（如果可用）
                     if 'speed' in track_info:
@@ -848,7 +469,7 @@ class Visualizer:
         return result
     
     def _draw_info_panel(self, image, track_count):
-        """绘制信息面板"""
+        """绘制信息面板（英文）"""
         h, w = image.shape[:2]
         
         # 信息面板背景（半透明黑色）
@@ -857,16 +478,16 @@ class Visualizer:
         cv2.rectangle(overlay, (0, 0), (w, panel_height), (0, 0, 0), -1)
         image = cv2.addWeighted(overlay, 0.7, image, 0.3, 0)
         
-        # 标题
-        title = "🚗 CARLA 多目标跟踪系统"
+        # 标题（英文）
+        title = "CARLA Multi-Object Tracking System"
         cv2.putText(image, title, (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
         
-        # 状态信息
+        # 状态信息（英文）
         status_lines = [
-            f"跟踪目标: {track_count}",
-            f"按 ESC 退出 | 按 W 切换天气 | 按 S 保存截图",
-            f"按 P 暂停 | 按 T 显示/隐藏统计窗口 | 按 M 显示/隐藏颜色说明"
+            f"Tracking: {track_count} objects",
+            f"ESC: Exit | W: Weather | S: Screenshot",
+            f"P: Pause | M: Show/Hide Legend"
         ]
         
         # 绘制状态信息
@@ -880,7 +501,7 @@ class Visualizer:
     
     def draw_color_legend(self, image):
         """
-        绘制颜色说明图例
+        绘制颜色说明图例（英文）
         
         Args:
             image: 原始图像
@@ -903,23 +524,23 @@ class Visualizer:
                      (40, 40, 40), -1)
         image = cv2.addWeighted(overlay, 0.8, image, 0.2, 0)
         
-        # 图例标题
-        cv2.putText(image, "颜色说明", (legend_x + 10, legend_y + 30),
+        # 图例标题（英文）
+        cv2.putText(image, "Color Legend", (legend_x + 10, legend_y + 30),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         
-        # 行为状态颜色说明
+        # 行为状态颜色说明（英文）
         behaviors = [
-            ('dangerous', '危险', '⚠'),
-            ('stopped', '停车', '🛑'),
-            ('overtaking', '超车', '💨'),
-            ('lane_changing', '变道', '↔'),
-            ('accelerating', '加速', '🚀'),
-            ('braking', '刹车', '🛑'),
-            ('normal', '正常', '→')
+            ('dangerous', 'Dangerous'),
+            ('stopped', 'Stopped'),
+            ('overtaking', 'Overtaking'),
+            ('lane_changing', 'Lane Change'),
+            ('accelerating', 'Accelerating'),
+            ('braking', 'Braking'),
+            ('normal', 'Normal')
         ]
         
         y_offset = 60
-        for behavior_key, behavior_name, icon in behaviors:
+        for behavior_key, behavior_name in behaviors:
             # 颜色方块
             color = self.behavior_colors.get(behavior_key, (255, 255, 255))
             cv2.rectangle(image,
@@ -928,25 +549,25 @@ class Visualizer:
                          color, -1)
             
             # 行为名称
-            text = f"{icon} {behavior_name}"
+            text = behavior_name
             cv2.putText(image, text,
                        (legend_x + 40, legend_y + y_offset + 12),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             
             y_offset += 25
         
-        # 车辆类别说明
-        cv2.putText(image, "车辆类别:", (legend_x + 10, legend_y + y_offset + 20),
+        # 车辆类别说明（英文）
+        cv2.putText(image, "Vehicle Types:", (legend_x + 10, legend_y + y_offset + 20),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         
         classes = [
-            ('car', '小汽车', '🚗'),
-            ('bus', '公交车', '🚌'),
-            ('truck', '卡车', '🚚')
+            ('car', 'Car'),
+            ('bus', 'Bus'),
+            ('truck', 'Truck')
         ]
         
         y_offset += 40
-        for class_key, class_name, icon in classes:
+        for class_key, class_name in classes:
             # 颜色方块
             color = self.class_colors.get(class_key, (255, 255, 255))
             cv2.rectangle(image,
@@ -955,7 +576,7 @@ class Visualizer:
                          color, -1)
             
             # 类别名称
-            text = f"{icon} {class_name}"
+            text = class_name
             cv2.putText(image, text,
                        (legend_x + 40, legend_y + y_offset + 12),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
@@ -964,38 +585,23 @@ class Visualizer:
         
         return image
     
-    def show(self, image, stats_data=None):
+    def show(self, image, wait_key=1):
         """
-        显示图像和统计窗口
+        显示图像
         
         Args:
-            image: 主窗口图像
-            stats_data: 统计数据（用于更新统计窗口）
-            
-        Returns:
-            int: 按键值
+            image: 要显示的图像
+            wait_key: 等待时间（毫秒）
         """
-        # 显示主窗口
         if utils.valid_img(image):
             cv2.imshow(self.window_name, image)
-        
-        # 更新统计窗口（每几帧更新一次，避免过频更新影响性能）
-        if self.show_stats_window and stats_data is not None:
-            self.stats_frame_counter += 1
-            
-            if self.stats_frame_counter >= self.stats_update_interval:
-                self.stats_image = self.create_stats_window_image(stats_data)
-                if self.stats_image is not None:
-                    cv2.imshow(self.stats_window_name, self.stats_image)
-                self.stats_frame_counter = 0
-        
-        # 等待按键（短暂等待，保持响应性）
-        return cv2.waitKey(1)
+            return cv2.waitKey(wait_key)
+        return -1
     
     def destroy(self):
-        """销毁所有窗口"""
+        """销毁窗口"""
         cv2.destroyAllWindows()
-        logger.info("✅ 所有可视化窗口已关闭")
+        logger.info("✅ 可视化窗口已关闭")
 
 
 # ======================== 主程序 ========================
@@ -1024,14 +630,13 @@ class CarlaTrackingSystem:
         self.current_weather = config.get('weather', 'clear')
         self.frame_count = 0
         self.show_legend = True  # 是否显示颜色说明
-        self.start_time = time.time()  # 程序开始时间
         
         # 检测线程相关
         self.detection_thread = None
         self.image_queue = None
         self.result_queue = None
         
-        logger.info("✅ 跟踪系统初始化完成（彩色ID编码 + 独立统计窗口）")
+        logger.info("✅ 跟踪系统初始化完成（英文版）")
     
     def initialize(self):
         """初始化系统"""
@@ -1119,95 +724,6 @@ class CarlaTrackingSystem:
             logger.warning(f"检测线程设置失败，使用同步模式: {e}")
             self.detection_thread = None
     
-    def _collect_statistics_data(self, fps, detection_time, tracking_time, tracks_info):
-        """
-        收集统计数据
-        
-        Args:
-            fps: 当前帧率
-            detection_time: 检测时间
-            tracking_time: 跟踪时间
-            tracks_info: 跟踪信息列表
-            
-        Returns:
-            dict: 统计数据
-        """
-        # 获取系统性能数据
-        cpu_usage = psutil.cpu_percent()
-        memory_usage = psutil.virtual_memory().percent
-        
-        # 获取GPU使用率（如果可用）
-        try:
-            if torch.cuda.is_available():
-                gpu_usage = torch.cuda.utilization()
-            else:
-                gpu_usage = 0
-        except:
-            gpu_usage = 0
-        
-        # 统计车辆类型
-        vehicle_counts = {'car': 0, 'bus': 0, 'truck': 0}
-        for track in tracks_info:
-            class_name = track.get('class_name', '').lower()
-            if class_name in vehicle_counts:
-                vehicle_counts[class_name] += 1
-        
-        # 统计行为类型
-        behavior_counts = {
-            'dangerous': 0, 'stopped': 0, 'overtaking': 0,
-            'lane_changing': 0, 'turning': 0, 'accelerating': 0,
-            'braking': 0, 'normal': 0
-        }
-        
-        for track in tracks_info:
-            if track.get('is_dangerous', False):
-                behavior_counts['dangerous'] += 1
-            elif track.get('is_stopped', False):
-                behavior_counts['stopped'] += 1
-            elif track.get('is_overtaking', False):
-                behavior_counts['overtaking'] += 1
-            elif track.get('is_lane_changing', False):
-                behavior_counts['lane_changing'] += 1
-            elif track.get('is_turning', False):
-                behavior_counts['turning'] += 1
-            elif track.get('is_accelerating', False):
-                behavior_counts['accelerating'] += 1
-            elif track.get('is_braking', False):
-                behavior_counts['braking'] += 1
-            else:
-                behavior_counts['normal'] += 1
-        
-        # 获取性能监控数据
-        perf_stats = self.perf_monitor.get_stats()
-        
-        # 检测线程状态
-        detection_thread_status = '运行中' if self.detection_thread and self.detection_thread.is_alive() else '未运行'
-        
-        return {
-            # 系统状态
-            'fps': fps,
-            'total_frames': self.frame_count,
-            'run_time': time.time() - self.start_time,
-            'cpu_usage': cpu_usage,
-            'memory_usage': memory_usage,
-            'gpu_usage': gpu_usage,
-            'detection_thread': detection_thread_status,
-            
-            # 目标统计
-            'total_objects': len(tracks_info),
-            'vehicle_counts': vehicle_counts,
-            'behavior_counts': {k: v for k, v in behavior_counts.items() if v > 0},
-            
-            # 性能指标
-            'avg_detection_time': detection_time * 1000,  # 转换为毫秒
-            'avg_tracking_time': tracking_time * 1000,    # 转换为毫秒
-            'avg_frame_time': perf_stats.get('avg_frame_time', 0),
-            
-            # 原始数据（用于图表）
-            'detection_time': detection_time,
-            'tracking_time': tracking_time,
-        }
-    
     def run(self):
         """运行主循环"""
         import time
@@ -1281,13 +797,7 @@ class CarlaTrackingSystem:
                 # 6. 更新FPS
                 fps = self.fps_counter.update()
                 
-                # 7. 收集统计数据
-                stats_data = self._collect_statistics_data(fps, detection_time, tracking_time, tracks_info)
-                
-                # 8. 更新可视化器的性能数据
-                self.visualizer.update_performance_data(fps, detection_time, tracking_time, stats_data)
-                
-                # 9. 可视化
+                # 7. 可视化
                 result_image = self.visualizer.draw_detections(
                     image=image,
                     boxes=boxes,
@@ -1300,28 +810,28 @@ class CarlaTrackingSystem:
                 if self.show_legend:
                     result_image = self.visualizer.draw_color_legend(result_image)
                 
-                # 在图像上显示FPS（顶部）
+                # 在图像上显示FPS
                 if utils.valid_img(result_image):
                     fps_text = f"FPS: {fps:.1f}"
                     cv2.putText(result_image, fps_text, (self.config['img_width'] - 100, 25),
                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
                 
-                # 10. 显示结果（传入统计数据用于更新统计窗口）
-                key = self.visualizer.show(result_image, stats_data=stats_data)
+                # 8. 显示结果
+                key = self.visualizer.show(result_image, wait_key=1)
                 
-                # 11. 处理键盘输入
+                # 9. 处理键盘输入
                 self._handle_keyboard_input(key)
                 
-                # 12. 帧率控制
+                # 10. 帧率控制
                 self._control_frame_rate(fps)
                 
-                # 13. 更新状态
+                # 11. 更新状态
                 self.frame_count += 1
                 self.perf_monitor.end_frame()
                 
-                # 14. 定期打印状态
+                # 12. 定期打印状态
                 if self.frame_count % 100 == 0:
-                    self._print_status(stats_data)
+                    self._print_status()
                 
         except KeyboardInterrupt:
             logger.info("🛑 用户中断程序")
@@ -1358,19 +868,6 @@ class CarlaTrackingSystem:
             cv2.waitKey(0)
             logger.info("▶️  程序继续")
         
-        # T键切换统计窗口显示
-        elif key == ord('t') or key == ord('T'):
-            self.visualizer.show_stats_window = not self.visualizer.show_stats_window
-            status = "显示" if self.visualizer.show_stats_window else "隐藏"
-            logger.info(f"📊 独立统计窗口: {status}")
-            
-            # 如果隐藏窗口，需要关闭它
-            if not self.visualizer.show_stats_window:
-                try:
-                    cv2.destroyWindow(self.visualizer.stats_window_name)
-                except:
-                    pass  # 窗口可能已经关闭
-        
         # M键切换颜色说明显示
         elif key == ord('m') or key == ord('M'):
             self.show_legend = not self.show_legend
@@ -1406,16 +903,47 @@ class CarlaTrackingSystem:
         except Exception as e:
             logger.warning(f"保存截图失败: {e}")
     
-    def _print_status(self, stats_data):
+    def _print_status(self):
         """打印系统状态"""
-        total_objects = stats_data.get('total_objects', 0)
-        fps = stats_data.get('fps', 0)
-        cpu_usage = stats_data.get('cpu_usage', 0)
+        stats = self.perf_monitor.get_stats()
+        tracks_info = self.tracker.get_tracks_info()
+        
+        # 统计行为类型
+        behaviors = {
+            'stopped': 0, 
+            'overtaking': 0, 
+            'lane_changing': 0,
+            'turning': 0,
+            'accelerating': 0,
+            'braking': 0,
+            'dangerous': 0,
+            'normal': 0
+        }
+        
+        for track in tracks_info:
+            if track.get('is_dangerous', False):
+                behaviors['dangerous'] += 1
+            elif track.get('is_stopped', False):
+                behaviors['stopped'] += 1
+            elif track.get('is_overtaking', False):
+                behaviors['overtaking'] += 1
+            elif track.get('is_lane_changing', False):
+                behaviors['lane_changing'] += 1
+            elif track.get('is_turning', False):
+                behaviors['turning'] += 1
+            elif track.get('is_accelerating', False):
+                behaviors['accelerating'] += 1
+            elif track.get('is_braking', False):
+                behaviors['braking'] += 1
+            else:
+                behaviors['normal'] += 1
         
         logger.info(f"📊 状态: 帧数={self.frame_count}, "
-                   f"FPS={fps:.1f}, "
-                   f"目标数={total_objects}, "
-                   f"CPU={cpu_usage:.1f}%")
+                   f"FPS={stats['avg_fps']:.1f}, "
+                   f"目标数={len(tracks_info)}, "
+                   f"危险={behaviors['dangerous']}, "
+                   f"停车={behaviors['stopped']}, "
+                   f"超车={behaviors['overtaking']}")
     
     def cleanup(self):
         """清理资源"""
@@ -1450,11 +978,6 @@ class CarlaTrackingSystem:
         if self.perf_monitor:
             self.perf_monitor.print_stats()
         
-        # 打印最终运行时间
-        total_time = time.time() - self.start_time
-        logger.info(f"⏱️  总运行时间: {total_time:.1f}秒")
-        logger.info(f"📈 平均FPS: {self.frame_count/total_time:.1f}" if total_time > 0 else "")
-        
         logger.info("✅ 资源清理完成")
 
 
@@ -1479,8 +1002,6 @@ def main():
                        help='检测置信度阈值 (默认: 0.5)')
     parser.add_argument('--no-lidar', action='store_true',
                        help='禁用LiDAR')
-    parser.add_argument('--no-stats', action='store_true',
-                       help='启动时不显示统计窗口')
     
     args = parser.parse_args()
     
@@ -1493,7 +1014,7 @@ def main():
     # 记录开始时间
     start_time = time.time()
     logger.info("=" * 50)
-    logger.info("🚗 CARLA多目标跟踪系统启动（增强版：独立统计窗口）")
+    logger.info("🚗 CARLA多目标跟踪系统启动（英文版）")
     logger.info("=" * 50)
     
     try:
@@ -1516,11 +1037,6 @@ def main():
         
         # 3. 创建并运行跟踪系统
         system = CarlaTrackingSystem(config)
-        
-        # 设置初始显示状态
-        if args.no_stats:
-            system.visualizer.show_stats_window = False
-        
         system.run()
         
     except Exception as e:
@@ -1550,12 +1066,6 @@ if __name__ == "__main__":
     except ImportError:
         print("❌ 未找到CARLA Python API")
         print("请从CARLA安装目录复制PythonAPI/carla到项目目录")
-        sys.exit(1)
-    
-    try:
-        import psutil
-    except ImportError:
-        print("❌ 未找到psutil，请安装: pip install psutil")
         sys.exit(1)
     
     # 运行主程序
