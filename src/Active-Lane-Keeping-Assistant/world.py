@@ -109,7 +109,8 @@ class World():
         self.collision_sensor = self.world.spawn_actor(blueprint,
                                                        carla.Transform(), attach_to=self.vehicle)
         self.collision_detected = False
-        self.collision_sensor.listen(lambda e: {self._set_collision()})
+        # Remove redundant set brackets
+        self.collision_sensor.listen(lambda e: self._set_collision())
         self.initialized = True
 
         return 0.0, 0.0, np.zeros((self.image_height, self.image_width, 3)), False
