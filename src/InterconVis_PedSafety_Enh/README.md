@@ -104,9 +104,43 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
 1. Town01 + 15 辆车 + 80 个行人 + 雨天 + 日落 + 种子 111
    ```shell
    python cvips_generation.py --town Town01 --num_vehicles 15 --num_pedestrians 80 --weather rainy --time_of_day sunset --seed 111
+## 数据集生成
+数据集由cvip_collector.py生成，保存在out_cvips_v9(主文件夹)
+- 📂 ego_rgb/ : 存放主车（Tesla）视角的图片（命名格式为 帧号.png）。
+- 📂 rsu_rgb/ : 存放路侧单元（RSU，安装在高处）视角的图片。
+### 运行命令
+### 基础模式 (默认参数)
+- 在Town01地图，生成25辆车和40个行人，晴朗中午。
+   ```shell
+   python cvips_collector.py
+   ```
+### 更换地图 (例如 Town02, Town10HD)
+使用 --town 参数。
+- 在 Town02 采集
+   ```shell
+   python cvips_collector.py --town Town02
+   ```
+- 在 Town10HD (高清地图) 采集
+   ```shell
+   python cvips_collector.py --town Town10HD
+   ```
+### 调整交通密度 (拥堵/空旷)
+使用 --num_vehicles 和 --num_walkers。
+- 拥堵场景 (50辆车, 80人):
+   ```shell
+   python cvips_collector.py --num_vehicles 50 --num_walkers 80
+   ```
+- 空旷场景 (5辆车, 0人):
+   ```shell
+   python cvips_collector.py --num_vehicles 5 --num_walkers 0
+   ```
 ### 样本可视化 (Sample Visualizations)
-
 我们提供了可视化结果来展示我们数据集中的不同视角:
+- 车辆自动行驶（视角为车后）
+- <img src="https://github.com/user-attachments/assets/2b3c4cf0-9bc8-4708-9602-a8ad31048646" width="100%" />
+- 模拟环境
+- <img src="https://github.com/user-attachments/assets/76e93eea-22a8-4601-9bbd-084c973ebf80" width="100%" />
+
 
 ## 致谢 (Acknowledgement)
 本项目基于以下开源项目: BEVerse, Fiery, open-mmlab, 以及 DeepAccident。
