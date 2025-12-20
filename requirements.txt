@@ -88,7 +88,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 python-json-logger==4.0.0
 pytz==2025.2
-pywinpty==3.0.2
+pywinpty==3.0.2; sys_platform == 'win32'
 PyYAML==6.0.3
 pyzmq==27.1.0
 referencing==0.37.0
