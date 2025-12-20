@@ -7,6 +7,7 @@ import gc
 from datetime import datetime
 import zlib
 import pickle
+import gzip
 
 
 class LidarProcessor:
@@ -216,34 +217,86 @@ class LidarProcessor:
         v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
         os.makedirs(v2x_dir, exist_ok=True)
 
-        # 创建V2XFormer格式的数据结构
-        v2x_data = {
-            'frame_id': frame_num,
-            'timestamp': datetime.now().timestamp(),
-            'point_cloud': {
-                'points': points.tolist(),
-                'num_points': points.shape[0],
-                'range': [np.min(points[:, 0]), np.max(points[:, 0]),
-                          np.min(points[:, 1]), np.max(points[:, 1]),
-                          np.min(points[:, 2]), np.max(points[:, 2])]
-            },
-            'metadata': {
-                'sensor_type': 'lidar',
-                'format_version': '1.0',
-                'coordinate_system': 'carla_world'
+        try:
+            # 创建V2XFormer格式的数据结构
+            v2x_data = {
+                'frame_id': frame_num,
+                'timestamp': datetime.now().timestamp(),
+                'point_cloud': {
+                    'points': points.tolist(),
+                    'num_points': points.shape[0],
+                    'range': [float(points[:, 0].min()), float(points[:, 0].max()),
+                              float(points[:, 1].min()), float(points[:, 1].max()),
+                              float(points[:, 2].min()), float(points[:, 2].max())]
+                },
+                'metadata': {
+                    'sensor_type': 'lidar',
+                    'format_version': '1.0',
+                    'coordinate_system': 'carla_world',
+                    'frame_rate': 10.0
+                }
             }
-        }
 
-        # 保存为压缩的JSON格式
-        filename = f"{frame_num:06d}.pkl.gz"
-        filepath = os.path.join(v2x_dir, filename)
+            # 保存为压缩的JSON格式
+            filename = f"{frame_num:06d}.pkl.gz"
+            filepath = os.path.join(v2x_dir, filename)
 
-        # 使用pickle+gzip压缩保存
-        with gzip.open(filepath, 'wb') as f:
-            pickle.dump(v2x_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+            # 使用pickle+gzip压缩保存
+            with gzip.open(filepath, 'wb') as f:
+                pickle.dump(v2x_data, f, protocol=pickle.HIGHEST_PROTOCOL)
 
-        return filepath
+            file_size = os.path.getsize(filepath) / 1024  # KB
+            print(f"保存V2XFormer格式: {filepath} ({file_size:.2f} KB)")
 
+            return filepath
+
+        except Exception as e:
+            # 如果保存失败，只打印警告，不抛出异常
+            print(f"警告: 保存V2XFormer格式失败: {e}")
+            return None
+
+    def process_lidar_data(self, lidar_data, frame_num):
+        with self.data_lock:
+            try:
+                self.frame_counter = frame_num
+
+                points = self._carla_lidar_to_numpy(lidar_data)
+
+                if points is None or points.shape[0] == 0:
+                    print(f"警告: LiDAR数据为空或无效 (帧 {frame_num})")
+                    return None
+
+                # 下采样以减少内存使用
+                if self.enable_downsampling and points.shape[0] > self.max_points_per_frame:
+                    original_count = points.shape[0]
+                    points = self._downsample_point_cloud(points)
+                    print(f"LiDAR下采样: {original_count} -> {points.shape[0]} 点 (帧 {frame_num})")
+
+                # 添加到批处理
+                self.point_cloud_batch.append((frame_num, points))
+
+                # 如果达到批处理大小，保存批处理数据
+                if len(self.point_cloud_batch) >= self.batch_size:
+                    self._save_batch()
+
+                # 保存单个文件（向后兼容）
+                bin_path = self._save_as_bin(points, frame_num)
+                npy_path = self._save_as_npy(points, frame_num)
+
+                # 生成V2XFormer兼容格式（如果失败则忽略）
+                try:
+                    v2xformer_path = self._save_as_v2xformer_format(points, frame_num)
+                except Exception as e:
+                    v2xformer_path = None
+                    print(f"警告: V2XFormer格式保存失败: {e}")
+
+                metadata = self._generate_metadata(points, bin_path, npy_path, v2xformer_path)
+
+                return metadata
+
+            except Exception as e:
+                print(f"处理LiDAR数据失败: {e}")
+                return None
     def _generate_metadata(self, points, bin_path, npy_path, v2xformer_path):
         metadata = {
             'frame_id': self.frame_counter,
