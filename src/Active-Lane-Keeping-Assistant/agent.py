@@ -115,17 +115,7 @@ class Agent():
 
     def get_actions(self, detection_surface_area:float,
         error:float) -> tuple[float, float]:
-        """Retrieve action based on Observation
 
-        Args:
-            error (float): Difference to the center of the detected lane.
-            detection_surface_area (float): Detected surface area.
-
-        Returns:
-            tuple[float, float]:
-                [0]: Steering angle to use.
-                [1]: Throttle to apply.
-        """
         if (self.check_surface_area(detection_surface_area)):
             steer = 0
             if self.errors:
@@ -179,9 +169,10 @@ class Agent():
             self.prev_error = self.errors[-2]
         else:
             self.prev_error = self.errors[-1]
-        
+
         deviation = error - self.prev_error
-        steer = - self.tau_d * deviation/0.1 + self._p_controller(error)
+        dt = 0.1  # Delta time
+        steer = - self.tau_d * deviation / dt + self._p_controller(error)
         return steer
 
     def _pid_controller(self, error:float) -> float:
