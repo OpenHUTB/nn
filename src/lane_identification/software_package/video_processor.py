@@ -1,18 +1,17 @@
 ﻿"""
 视频处理模块 - 负责视频和摄像头处理
+修复摄像头调用问题，移除日志功能
 """
 
 import cv2
 import numpy as np
 import threading
 import time
-from typing import Optional, Dict, Any
-from config import AppConfig
 
 class VideoProcessor:
     """视频处理器"""
     
-    def __init__(self, config: AppConfig):
+    def __init__(self, config):
         self.config = config
         self.video_capture = None
         self.is_playing = False
@@ -27,9 +26,7 @@ class VideoProcessor:
         self.frame_times = []
         self.processing_times = []
         
-        print("视频处理器已初始化")
-    
-    def open_video_file(self, video_path: str) -> bool:
+    def open_video_file(self, video_path):
         """打开视频文件"""
         try:
             self.video_capture = cv2.VideoCapture(video_path)
@@ -52,35 +49,71 @@ class VideoProcessor:
             print(f"打开视频文件失败: {e}")
             return False
     
-    def open_camera(self, camera_id: Optional[int] = None) -> bool:
-        """打开摄像头"""
+    def open_camera(self, camera_id=None):
+        """打开摄像头（修复版）"""
         try:
-            cam_id = camera_id if camera_id is not None else self.config.camera_id
-            self.video_capture = cv2.VideoCapture(cam_id)
+            # 如果提供了camera_id则使用，否则使用配置中的ID
+            if camera_id is not None:
+                cam_id = camera_id
+            elif hasattr(self.config, 'camera_id'):
+                cam_id = self.config.camera_id
+            else:
+                cam_id = 0  # 默认摄像头索引
             
-            if not self.video_capture.isOpened():
-                print(f"无法打开摄像头 {cam_id}")
-                return False
+            print(f"正在尝试打开摄像头 {cam_id}...")
             
-            # 设置摄像头参数
-            self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.video_capture.set(cv2.CAP_PROP_FPS, self.config.video_fps)
+            # 尝试不同的后端
+            backends_to_try = [
+                (cam_id, cv2.CAP_DSHOW),    # Windows DirectShow
+                (cam_id, cv2.CAP_MSMF),     # Windows Media Foundation
+                (cam_id, cv2.CAP_ANY),      # 自动选择
+                (cam_id, cv2.CAP_V4L2),     # Linux Video4Linux2
+            ]
             
-            self.fps = self.video_capture.get(cv2.CAP_PROP_FPS)
-            if self.fps <= 0:
-                self.fps = self.config.video_fps
+            for backend in backends_to_try:
+                try:
+                    self.video_capture = cv2.VideoCapture(*backend)
+                    if self.video_capture.isOpened():
+                        # 测试读取一帧
+                        ret, test_frame = self.video_capture.read()
+                        if ret:
+                            print(f"摄像头 {cam_id} 已成功打开 (后端: {backend[1]})")
+                            
+                            # 获取摄像头参数
+                            actual_width = int(self.video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            actual_height = int(self.video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                            actual_fps = self.video_capture.get(cv2.CAP_PROP_FPS)
+                            
+                            self.fps = actual_fps if actual_fps > 0 else 30
+                            
+                            print(f"分辨率: {actual_width}x{actual_height}")
+                            print(f"FPS: {self.fps}")
+                            
+                            # 尝试设置合理的参数
+                            try:
+                                self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                                self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                                self.video_capture.set(cv2.CAP_PROP_FPS, 30)
+                                self.video_capture.set(cv2.CAP_PROP_AUTOFOCUS, 1)
+                                self.video_capture.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+                            except:
+                                pass  # 忽略参数设置错误
+                            
+                            return True
+                        else:
+                            self.video_capture.release()
+                except Exception as e:
+                    print(f"尝试后端 {backend[1]} 失败: {e}")
+                    continue
             
-            print(f"摄像头已打开: {cam_id}")
-            print(f"FPS: {self.fps}")
-            
-            return True
+            print(f"无法打开摄像头 {cam_id}，所有后端尝试失败")
+            return False
             
         except Exception as e:
             print(f"打开摄像头失败: {e}")
             return False
     
-    def start_processing(self, callback: callable):
+    def start_processing(self, callback):
         """开始视频处理"""
         if self.video_capture is None:
             print("错误：未打开视频源")
@@ -100,7 +133,7 @@ class VideoProcessor:
         print("视频处理已开始")
         return True
     
-    def _process_frames(self, callback: callable):
+    def _process_frames(self, callback):
         """处理视频帧"""
         frame_number = 0
         skip_counter = 0
@@ -203,7 +236,7 @@ class VideoProcessor:
         
         return None
     
-    def get_video_info(self) -> Dict[str, Any]:
+    def get_video_info(self):
         """获取视频信息"""
         if self.video_capture is None:
             return {}
@@ -217,7 +250,7 @@ class VideoProcessor:
             'is_paused': self.is_paused
         }
     
-    def set_frame_position(self, position: int):
+    def set_frame_position(self, position):
         """设置帧位置"""
         if self.video_capture is not None:
             self.video_capture.set(cv2.CAP_PROP_POS_FRAMES, position)
