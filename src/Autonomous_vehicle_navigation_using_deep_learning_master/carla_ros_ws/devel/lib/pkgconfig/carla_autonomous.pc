@@ -1,8 +1,0 @@
-prefix=/home/yume/carla_ros_ws/devel
-
-Name: carla_autonomous
-Description: Description of carla_autonomous
-Version: 0.1.0
-Cflags: -I/home/yume/carla_ros_ws/devel/include
-Libs: -L${prefix}/lib 
-Requires: rospy std_msgs geometry_msgs sensor_msgs nav_msgs visualization_msgs tf cv_bridge message_runtime
