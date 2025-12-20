@@ -7,7 +7,7 @@ import time
 import cv2
 import numpy as np
 
-# --------------------------
+
 # 1. 强制加载Carla
 # --------------------------
 CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
