@@ -442,49 +442,136 @@ def setup_carla_client(host='localhost', port=2000):
 
 
 def spawn_ego_vehicle(world):
-    """生成主车辆"""
+    """生成主车辆 - 优化版：选择交通密度高的位置"""
     if not world:
         return None
+
     bp_lib = world.get_blueprint_library()
+
+    # 优先使用林肯MKZ，如果没有则选择其他小型车辆
     try:
         vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2020')
     except:
-        vehicle_bp = random.choice(
-            [bp for bp in bp_lib.filter('vehicle') if int(bp.get_attribute('number_of_wheels')) == 4])
+        # 选择小型车辆，更容易看到其他车
+        small_vehicles = [
+            'vehicle.audi.a2',
+            'vehicle.audi.tt',
+            'vehicle.bmw.grandtourer',
+            'vehicle.dodge.charger_police',
+            'vehicle.ford.mustang',
+            'vehicle.mercedes.coupe',
+            'vehicle.mini.cooperst',
+            'vehicle.nissan.micra',
+            'vehicle.nissan.patrol',
+            'vehicle.seat.leon',
+            'vehicle.toyota.prius',
+            'vehicle.volkswagen.t2'
+        ]
 
-    # 选择安全的生成点
+        available_vehicles = []
+        for vehicle_name in small_vehicles:
+            try:
+                bp = bp_lib.find(vehicle_name)
+                if bp:
+                    available_vehicles.append(bp)
+            except:
+                pass
+
+        if available_vehicles:
+            vehicle_bp = random.choice(available_vehicles)
+        else:
+            vehicle_bp = random.choice(
+                [bp for bp in bp_lib.filter('vehicle') if int(bp.get_attribute('number_of_wheels')) == 4])
+
+    # 获取所有生成点
     spawn_points = world.get_map().get_spawn_points()
     if not spawn_points:
         print("警告：没有可用的车辆生成点！")
         return None
 
-    # 检查生成点周围是否有障碍物
-    vehicle = None
+    # 分析道路连接性，选择交通流量大的点
+    best_spawn_points = []
+
+    # 获取地图拓扑
+    topology = world.get_map().get_topology()
+
+    # 分析每个生成点的连接性
     for spawn_point in spawn_points:
-        # 检查生成点周围2米内是否有其他车辆
+        nearby_junctions = 0
+        nearby_spawns = 0
+
+        for other_point in spawn_points:
+            if other_point != spawn_point:
+                dist = math.hypot(
+                    other_point.location.x - spawn_point.location.x,
+                    other_point.location.y - spawn_point.location.y
+                )
+                if dist < 50.0:  # 50米内有其他生成点
+                    nearby_spawns += 1
+
+        # 优先选择附近有其他生成点的位置
+        if nearby_spawns >= 2:
+            best_spawn_points.append(spawn_point)
+
+    # 如果没有找到最佳点，使用所有生成点
+    if not best_spawn_points:
+        best_spawn_points = spawn_points
+
+    # 随机打乱最佳点
+    random.shuffle(best_spawn_points)
+
+    # 尝试生成车辆
+    vehicle = None
+    for spawn_point in best_spawn_points:
+        # 检查生成点周围是否有障碍物
         nearby_actors = world.get_actors().filter('vehicle.*')
         too_close = False
+
         for actor in nearby_actors:
             dist = math.hypot(
                 actor.get_location().x - spawn_point.location.x,
                 actor.get_location().y - spawn_point.location.y
             )
-            if dist < 2.0:
+            if dist < 3.0:  # 减小安全距离到3米
                 too_close = True
                 break
 
         if not too_close:
             vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
             if vehicle:
+                print(f"主车辆生成成功！位置：{spawn_point.location}")
                 break
 
     if vehicle:
         vehicle.set_autopilot(True)
+        # 设置适中的速度
+        try:
+            vehicle.set_velocity(carla.Vector3D(30.0, 0, 0))
+        except:
+            pass
         # 禁用物理碰撞，避免自车被撞停
         vehicle.set_simulate_physics(False)
-        print("主车辆生成成功！")
+        print(f"主车辆生成成功！车型：{vehicle_bp.id}")
     else:
-        print("警告：无法生成主车辆！")
+        # 最后尝试强制生成
+        for spawn_point in random.sample(spawn_points, min(5, len(spawn_points))):
+            vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+            if vehicle:
+                vehicle.set_autopilot(True)
+                vehicle.set_simulate_physics(False)
+                print(f"强制生成主车辆成功！位置：{spawn_point.location}")
+                break
+
+    if not vehicle:
+        print("警告：无法生成主车辆！尝试手动生成...")
+        # 尝试生成在原点
+        spawn_point = random.choice(spawn_points)
+        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+        if vehicle:
+            vehicle.set_autopilot(True)
+            vehicle.set_simulate_physics(False)
+            print(f"在原点生成主车辆成功！")
+
     return vehicle
 
 
@@ -498,12 +585,12 @@ def spawn_camera(world, vehicle):
     # 优化相机参数
     camera_bp.set_attribute('image_size_x', '800')  # 提高分辨率
     camera_bp.set_attribute('image_size_y', '600')
-    camera_bp.set_attribute('fov', '80')  # 适度减小FOV，减少畸变
+    camera_bp.set_attribute('fov', '100')  # 增加FOV，扩大视野范围
     camera_bp.set_attribute('sensor_tick', '0.05')
     camera_bp.set_attribute('gamma', '2.2')  # 伽马校正
 
-    # 优化相机位置：略微向前，减少自车遮挡
-    camera_init_trans = carla.Transform(carla.Location(x=1.8, z=1.6), carla.Rotation(pitch=-5))
+    # 优化相机位置：前向视野更开阔
+    camera_init_trans = carla.Transform(carla.Location(x=1.5, z=1.8), carla.Rotation(pitch=-5, yaw=0))
     camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
 
     image_queue = queue.Queue(maxsize=3)  # 限制队列大小，避免内存泄漏
@@ -522,11 +609,11 @@ def spawn_depth_camera(world, vehicle):
     # 与RGB相机参数完全匹配
     depth_bp.set_attribute('image_size_x', '800')
     depth_bp.set_attribute('image_size_y', '600')
-    depth_bp.set_attribute('fov', '80')
+    depth_bp.set_attribute('fov', '100')
     depth_bp.set_attribute('sensor_tick', '0.05')
 
     # 相同的安装位置和角度
-    camera_init_trans = carla.Transform(carla.Location(x=1.8, z=1.6), carla.Rotation(pitch=-5))
+    camera_init_trans = carla.Transform(carla.Location(x=1.5, z=1.8), carla.Rotation(pitch=-5, yaw=0))
     depth_camera = world.spawn_actor(depth_bp, camera_init_trans, attach_to=vehicle)
 
     depth_queue = queue.Queue(maxsize=3)
@@ -573,64 +660,251 @@ def get_target_distance(depth_image, box, use_median=True):
             return np.mean(valid_depths)
 
 
-def spawn_npcs(world, count=15):
-    """优化的NPC生成：避免拥堵"""
+def spawn_npcs(world, count=25, ego_vehicle=None):
+    """优化的NPC生成：确保主车辆周围有足够车辆"""
     if not world:
         return
-    bp_lib = world.get_blueprint_library()
-    vehicle_bp = bp_lib.filter('vehicle')
-    car_bp = [bp for bp in vehicle_bp if int(bp.get_attribute('number_of_wheels')) == 4]
 
-    spawn_points = world.get_map().get_spawn_points()
-    if not car_bp or not spawn_points:
-        print("警告：无法生成NPC车辆！")
+    print(f"开始生成 {count} 辆NPC车辆...")
+
+    bp_lib = world.get_blueprint_library()
+
+    # 使用多种小型车辆增加多样性
+    small_vehicle_names = [
+        'vehicle.audi.a2',
+        'vehicle.audi.tt',
+        'vehicle.bmw.grandtourer',
+        'vehicle.dodge.charger_police',
+        'vehicle.ford.mustang',
+        'vehicle.mercedes.coupe',
+        'vehicle.mini.cooperst',
+        'vehicle.nissan.micra',
+        'vehicle.nissan.patrol',
+        'vehicle.seat.leon',
+        'vehicle.toyota.prius',
+        'vehicle.volkswagen.t2',
+        'vehicle.carlamotors.carlacola',
+        'vehicle.citroen.c3',
+        'vehicle.harley-davidson.low_rider',
+        'vehicle.jeep.wrangler_rubicon',
+        'vehicle.yamaha.yzf'
+    ]
+
+    # 筛选可用的小型车辆蓝图
+    small_vehicle_bps = []
+    for name in small_vehicle_names:
+        try:
+            bp = bp_lib.find(name)
+            if bp:
+                small_vehicle_bps.append(bp)
+        except:
+            continue
+
+    # 如果没有找到小型车辆，使用所有四轮车辆
+    if not small_vehicle_bps:
+        small_vehicle_bps = [bp for bp in bp_lib.filter('vehicle') if int(bp.get_attribute('number_of_wheels')) == 4]
+
+    if not small_vehicle_bps:
+        print("警告：没有可用的NPC车辆蓝图！")
         return
 
-    # 打乱生成点顺序，避免集中生成
-    random.shuffle(spawn_points)
+    # 获取所有生成点
+    spawn_points = world.get_map().get_spawn_points()
+    if not spawn_points:
+        print("警告：没有可用的生成点！")
+        return
+
+    # 获取主车辆位置
+    ego_location = None
+    if ego_vehicle:
+        ego_location = ego_vehicle.get_location()
+
+    # 排序生成点：如果主车辆存在，优先在主车辆附近生成
+    if ego_location:
+        # 计算每个生成点到主车辆的距离
+        spawn_points_with_dist = []
+        for spawn_point in spawn_points:
+            dist = math.hypot(
+                spawn_point.location.x - ego_location.x,
+                spawn_point.location.y - ego_location.y
+            )
+            spawn_points_with_dist.append((spawn_point, dist))
+
+        # 按距离排序（近的在前）
+        spawn_points_with_dist.sort(key=lambda x: x[1])
+        sorted_spawn_points = [sp[0] for sp in spawn_points_with_dist]
+    else:
+        # 随机打乱生成点
+        random.shuffle(spawn_points)
+        sorted_spawn_points = spawn_points
 
     spawned_count = 0
-    for i, spawn_point in enumerate(spawn_points):
-        if spawned_count >= count:
-            break
+    npc_vehicles = []
 
-        # 检查生成点密度
-        nearby_actors = world.get_actors().filter('vehicle.*')
-        too_close = False
-        for actor in nearby_actors:
-            dist = math.hypot(
-                actor.get_location().x - spawn_point.location.x,
-                actor.get_location().y - spawn_point.location.y
-            )
-            if dist < 5.0:
-                too_close = True
+    # 第一轮：在主车辆附近生成（50米内）
+    if ego_location:
+        for spawn_point in sorted_spawn_points[:30]:  # 检查前30个最近的生成点
+            if spawned_count >= count:
                 break
 
-        if not too_close:
-            npc = world.try_spawn_actor(random.choice(car_bp), spawn_point)
-            if npc:
-                npc.set_autopilot(True)
-                # 设置不同的驾驶行为
-                try:
-                    npc.set_attribute('speed', str(random.uniform(20, 50)))
-                except:
-                    pass
-                spawned_count += 1
+            # 计算到主车辆的距离
+            dist_to_ego = math.hypot(
+                spawn_point.location.x - ego_location.x,
+                spawn_point.location.y - ego_location.y
+            )
+
+            # 在主车辆50米内生成
+            if dist_to_ego < 50.0 and dist_to_ego > 10.0:  # 10-50米范围内
+                # 检查与其他NPC的距离
+                too_close = False
+                for npc in npc_vehicles:
+                    npc_loc = npc.get_location()
+                    dist = math.hypot(
+                        npc_loc.x - spawn_point.location.x,
+                        npc_loc.y - spawn_point.location.y
+                    )
+                    if dist < 8.0:  # 减少最小距离到8米
+                        too_close = True
+                        break
+
+                if not too_close:
+                    try:
+                        # 随机选择车辆类型
+                        vehicle_bp = random.choice(small_vehicle_bps)
+
+                        # 设置随机的车辆颜色
+                        if vehicle_bp.has_attribute('color'):
+                            colors = vehicle_bp.get_attribute('color').recommended_values
+                            if colors:
+                                vehicle_bp.set_attribute('color', random.choice(colors))
+
+                        npc = world.try_spawn_actor(vehicle_bp, spawn_point)
+
+                        if npc:
+                            npc.set_autopilot(True)
+
+                            # 设置不同的速度，增加交通真实感
+                            try:
+                                speed = random.uniform(20.0, 40.0)
+                                # 通过设置目标速度来控制车速
+                                traffic_manager = world.get_trafficmanager()
+                                traffic_manager.distance_to_leading_vehicle(npc, 5.0)
+                                traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-30, 10))
+                            except:
+                                pass
+
+                            npc_vehicles.append(npc)
+                            spawned_count += 1
+                            print(f"生成NPC {spawned_count}/{count} - 距离主车辆: {dist_to_ego:.1f}米")
+                    except Exception as e:
+                        print(f"生成NPC失败: {str(e)}")
+
+    # 第二轮：如果数量不够，在更远的地方生成
+    if spawned_count < count:
+        print(f"第一轮生成 {spawned_count} 辆，开始第二轮生成...")
+
+        for spawn_point in sorted_spawn_points:
+            if spawned_count >= count:
+                break
+
+            # 跳过已经检查过的生成点
+            skip = False
+            for npc in npc_vehicles:
+                npc_loc = npc.get_location()
+                dist = math.hypot(
+                    npc_loc.x - spawn_point.location.x,
+                    npc_loc.y - spawn_point.location.y
+                )
+                if dist < 8.0:
+                    skip = True
+                    break
+
+            if skip:
+                continue
+
+            # 如果太靠近主车辆，跳过
+            if ego_location:
+                dist_to_ego = math.hypot(
+                    spawn_point.location.x - ego_location.x,
+                    spawn_point.location.y - ego_location.y
+                )
+                if dist_to_ego < 10.0:
+                    continue
+
+            try:
+                vehicle_bp = random.choice(small_vehicle_bps)
+
+                if vehicle_bp.has_attribute('color'):
+                    colors = vehicle_bp.get_attribute('color').recommended_values
+                    if colors:
+                        vehicle_bp.set_attribute('color', random.choice(colors))
+
+                npc = world.try_spawn_actor(vehicle_bp, spawn_point)
+
+                if npc:
+                    npc.set_autopilot(True)
+
+                    try:
+                        traffic_manager = world.get_trafficmanager()
+                        traffic_manager.distance_to_leading_vehicle(npc, 5.0)
+                        traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-30, 10))
+                    except:
+                        pass
+
+                    npc_vehicles.append(npc)
+                    spawned_count += 1
+                    print(f"生成NPC {spawned_count}/{count}")
+            except Exception as e:
+                print(f"生成NPC失败: {str(e)}")
 
     print(f"成功生成 {spawned_count} 辆NPC车辆")
+
+    # 启动交通管理器，增加交通密度和交互
+    try:
+        traffic_manager = world.get_trafficmanager()
+        traffic_manager.set_global_distance_to_leading_vehicle(2.5)
+        traffic_manager.global_percentage_speed_difference(0.0)
+        traffic_manager.set_synchronous_mode(True)
+        print("交通管理器配置完成")
+    except:
+        pass
 
 
 def load_detection_model(model_type):
     """加载YOLOv5检测模型"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    # 更新模型路径，添加yolov5mu和yolov5su
     model_paths = {
         'yolov5s': r"D:\yolo\yolov5s.pt",
+        'yolov5su': r"D:\yolo\yolov5su.pt",
         'yolov5m': r"D:\yolo\yolov5m.pt",
+        'yolov5mu': r"D:\yolo\yolov5mu.pt",
         'yolov5x': r"D:\yolo\yolov5x.pt"
     }
 
     if model_type not in model_paths:
-        raise ValueError(f"不支持的模型类型：{model_type}")
+        # 尝试使用默认模型
+        if 'su' in model_type.lower():
+            model_type = 'yolov5su'
+        elif 'mu' in model_type.lower():
+            model_type = 'yolov5mu'
+        else:
+            model_type = 'yolov5m'
+
+    # 检查模型文件是否存在
+    if not os.path.exists(model_paths.get(model_type, '')):
+        print(f"警告：模型文件 {model_paths.get(model_type, '')} 不存在！")
+        # 尝试使用默认模型
+        fallback_models = ['yolov5s', 'yolov5m', 'yolov5x']
+        for fallback in fallback_models:
+            if os.path.exists(model_paths[fallback]):
+                print(f"使用备用模型：{fallback}")
+                model_type = fallback
+                break
+
+    if model_type not in model_paths or not os.path.exists(model_paths[model_type]):
+        raise FileNotFoundError(f"无法找到模型文件：{model_paths.get(model_type, '未知')}")
 
     # 加载模型并优化
     model = YOLO(model_paths[model_type])
@@ -638,9 +912,15 @@ def load_detection_model(model_type):
 
     # 模型优化设置
     if device == 'cuda':
-        model = torch.jit.optimize_for_inference(model)
+        model.half()  # 使用半精度提高速度
 
-    print(f"检测模型加载成功（设备：{device}，路径：{model_paths[model_type]}）")
+    # 预热模型
+    dummy_input = torch.randn(1, 3, 640, 640).to(device)
+    if device == 'cuda':
+        dummy_input = dummy_input.half()
+    _ = model(dummy_input)
+
+    print(f"检测模型加载成功（设备：{device}，模型：{model_type}，路径：{model_paths[model_type]}）")
     return model, model.names
 
 
@@ -656,16 +936,17 @@ def setup_tracker(tracker_type):
 # -------------------------- 主函数（深度增强版） --------------------------
 def main():
     parser = argparse.ArgumentParser(description='CARLA 目标检测与跟踪（深度增强版）')
-    parser.add_argument('--model', type=str, default='yolov5m', choices=['yolov5s', 'yolov5m', 'yolov5x'],
-                        help='检测模型（yolov5x精度最高，yolov5s最轻便）')
+    parser.add_argument('--model', type=str, default='yolov5mu',
+                        choices=['yolov5s', 'yolov5su', 'yolov5m', 'yolov5mu', 'yolov5x'],
+                        help='检测模型（yolov5mu为中型优化版）')
     parser.add_argument('--tracker', type=str, default='sort', choices=['sort'], help='跟踪器（仅保留稳定的SORT）')
     parser.add_argument('--host', type=str, default='localhost', help='CARLA服务器地址')
     parser.add_argument('--port', type=int, default=2000, help='CARLA服务器端口')
-    parser.add_argument('--conf-thres', type=float, default=0.2, help='检测置信度阈值')
+    parser.add_argument('--conf-thres', type=float, default=0.15, help='检测置信度阈值')  # 降低阈值检测更多车辆
     parser.add_argument('--iou-thres', type=float, default=0.4, help='NMS IOU阈值')
     parser.add_argument('--use-depth', action='store_true', default=True, help='启用深度相机辅助跟踪（默认启用）')
     parser.add_argument('--show-depth', action='store_true', help='显示深度图像窗口')
-    parser.add_argument('--npc-count', type=int, default=15, help='NPC车辆数量')
+    parser.add_argument('--npc-count', type=int, default=30, help='NPC车辆数量（增加到30辆）')  # 增加数量
     args = parser.parse_args()
 
     # 初始化变量
@@ -679,30 +960,49 @@ def main():
     frame_count = 0
     fps_history = deque(maxlen=30)
 
+    # 跟踪统计
+    detection_stats = {
+        'total_detections': 0,
+        'total_frames': 0,
+        'max_vehicles_per_frame': 0,
+        'no_detection_streak': 0
+    }
+
     try:
         # 1. 初始化设备
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         print(f"当前使用设备：{device}")
         print(f"CUDA可用: {torch.cuda.is_available()}")
 
+        if device == 'cuda':
+            print(f"GPU名称: {torch.cuda.get_device_name(0)}")
+
         # 2. 连接CARLA服务器
         print(f"正在连接CARLA服务器 {args.host}:{args.port}...")
         world, client = setup_carla_client(args.host, args.port)
         spectator = world.get_spectator()
         print("CARLA服务器连接成功！")
+        print(f"地图: {world.get_map().name}")
 
         # 3. 清理环境
+        print("清理环境...")
         clear_npc(world)
         clear_static_vehicle(world)
         print("环境清理完成！")
 
         # 4. 生成主车辆
+        print("生成主车辆...")
         vehicle = spawn_ego_vehicle(world)
         if not vehicle:
             print("无法生成主车辆，程序退出！")
             return
 
+        # 获取主车辆位置信息
+        ego_location = vehicle.get_location()
+        print(f"主车辆位置: X={ego_location.x:.1f}, Y={ego_location.y:.1f}, Z={ego_location.z:.1f}")
+
         # 5. 生成相机传感器
+        print("生成相机传感器...")
         camera, image_queue, camera_bp = spawn_camera(world, vehicle)
         depth_camera = None
         depth_queue = None
@@ -716,34 +1016,47 @@ def main():
             return
         print("RGB相机传感器生成成功！")
 
-        # 6. 生成NPC车辆
-        spawn_npcs(world, count=args.npc_count)
+        # 6. 生成NPC车辆 - 优化版：在主车辆周围生成
+        print(f"生成 {args.npc_count} 辆NPC车辆...")
+        spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+
+        # 等待NPC车辆稳定
+        print("等待NPC车辆初始化...")
+        for _ in range(5):
+            world.tick()
 
         # 7. 加载检测模型和跟踪器
+        print("加载检测模型和跟踪器...")
         model, class_names = load_detection_model(args.model)
         tracker, _ = setup_tracker(args.tracker)
 
         # 8. 主循环
-        print("开始目标检测与跟踪（按 'q' 键退出程序）")
+        print("\n开始目标检测与跟踪（按 'q' 键退出程序，按 'r' 重新生成NPC）")
+        print("=" * 50)
         import time
+
+        # FPS控制
+        frame_time_target = 1.0 / 20  # 目标20FPS
 
         while True:
             start_time = time.time()
             frame_count += 1
+            detection_stats['total_frames'] += 1
 
             # 同步CARLA世界
             world.tick()
 
-            # 移动视角
+            # 移动视角跟随主车辆
             ego_transform = vehicle.get_transform()
             spectator_transform = carla.Transform(
-                ego_transform.transform(carla.Location(x=-8, z=10)),
-                carla.Rotation(yaw=ego_transform.rotation.yaw - 180, pitch=-35)
+                ego_transform.transform(carla.Location(x=-10, z=12)),  # 更远的视角，看到更多车辆
+                carla.Rotation(yaw=ego_transform.rotation.yaw - 180, pitch=-30)
             )
             spectator.set_transform(spectator_transform)
 
             # 获取图像
             if image_queue.empty():
+                time.sleep(0.001)
                 continue
 
             origin_image = image_queue.get()
@@ -765,8 +1078,13 @@ def main():
                     depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
                     cv2.imshow('Depth Image', depth_vis)
 
-            # 目标检测
-            results = model(image, conf=args.conf_thres, iou=args.iou_thres, device=device)
+            # 目标检测 - 优化推理参数
+            try:
+                results = model(image, conf=args.conf_thres, iou=args.iou_thres,
+                                device=device, imgsz=640, verbose=False)
+            except Exception as e:
+                print(f"检测模型推理出错: {e}")
+                results = []
 
             boxes, labels, probs = [], [], []
 
@@ -776,21 +1094,27 @@ def main():
                     conf = box.conf[0].cpu().numpy()
                     cls = int(box.cls[0].cpu().numpy())
 
-                    # 只保留车辆相关类别
+                    # 只保留车辆相关类别 (2: car, 3: motorcycle, 5: bus, 7: truck)
                     if cls in [2, 3, 5, 7]:
                         box_width = x2 - x1
                         box_height = y2 - y1
 
-                        # 动态尺寸过滤
-                        min_size = 8
+                        # 动态尺寸过滤 - 放宽限制
+                        min_size = 6  # 降低最小尺寸
                         if args.use_depth and depth_image is not None:
                             rough_distance = get_target_distance(depth_image, [x1, y1, x2, y2])
                             if rough_distance > 30:
-                                min_size = 3
+                                min_size = 4
                             elif rough_distance > 50:
                                 min_size = 2
+                            else:
+                                min_size = 8
 
-                        if box_width > min_size and box_height > min_size:
+                        # 宽高比检查
+                        aspect_ratio = box_width / max(box_height, 1)
+
+                        if (box_width > min_size and box_height > min_size and
+                                0.3 < aspect_ratio < 3.0):  # 放宽宽高比限制
                             boxes.append([x1, y1, x2, y2])
                             labels.append(cls)
                             probs.append(conf)
@@ -799,6 +1123,17 @@ def main():
                             if args.use_depth and depth_image is not None:
                                 dist = get_target_distance(depth_image, [x1, y1, x2, y2], use_median=True)
                                 depths.append(dist)
+
+            # 更新检测统计
+            detection_stats['total_detections'] += len(boxes)
+            detection_stats['max_vehicles_per_frame'] = max(
+                detection_stats['max_vehicles_per_frame'], len(boxes)
+            )
+
+            if len(boxes) == 0:
+                detection_stats['no_detection_streak'] += 1
+            else:
+                detection_stats['no_detection_streak'] = 0
 
             # 转换为numpy数组
             boxes = np.array(boxes) if boxes else np.array([])
@@ -825,7 +1160,7 @@ def main():
                             continue
                         ious = Sort()._iou_batch(np.array([current_box]), prev_boxes)[0]
                         max_iou_idx = np.argmax(ious)
-                        if ious[max_iou_idx] > 0.4 and prev_labels[max_iou_idx] == current_label:
+                        if ious[max_iou_idx] > 0.3 and prev_labels[max_iou_idx] == current_label:
                             count += 1
 
                     if count >= 2:  # 至少两帧检测到
@@ -873,13 +1208,17 @@ def main():
                 if track_boxes:
                     image = draw_bounding_boxes(
                         image, track_boxes,
-                        labels=[2] * len(track_boxes),
+                        labels=[2] * len(track_boxes),  # 统一使用car类别
                         class_names=class_names,
                         track_ids=track_ids,
                         probs=[0.9] * len(track_boxes),
                         distances=track_distances,
                         velocities=track_velocities
                     )
+
+                    # 显示检测到的车辆数量
+                    cv2.putText(image, f'Vehicles: {len(track_boxes)}', (width - 200, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             elif len(boxes) > 0:
                 # 无跟踪时绘制检测结果
                 image = draw_bounding_boxes(
@@ -888,36 +1227,105 @@ def main():
                     distances=depths if args.use_depth else None
                 )
 
+                cv2.putText(image, f'Detections: {len(boxes)}', (width - 200, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
             # 计算FPS
             fps = 1.0 / (time.time() - start_time)
             fps_history.append(fps)
-            avg_fps = np.mean(fps_history)
+            avg_fps = np.mean(fps_history) if fps_history else fps
 
-            # 显示FPS
-            cv2.putText(image, f'FPS: {avg_fps:.1f}', (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            # 显示信息
+            info = [
+                f"FPS: {avg_fps:.1f}",
+                f"Frame: {frame_count}",
+                f"Tracks: {len(tracker.tracks)}",
+                f"Detections: {len(boxes)}",
+                f"Model: {args.model}",
+                "Press 'q' to quit"
+            ]
 
-            # 显示跟踪器状态
-            cv2.putText(image, f'Tracks: {len(tracker.tracks)}', (10, 70),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            y_pos = 30
+            for line in info:
+                cv2.putText(image, line, (10, y_pos),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                y_pos += 25
 
             # 显示结果
-            cv2.imshow(f'CARLA {args.model} + {args.tracker} (Depth Enhanced)',
-                       cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            window_name = f'CARLA {args.model} + {args.tracker} (Depth Enhanced)'
+            cv2.imshow(window_name, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            # 每30帧打印一次统计信息
+            if frame_count % 30 == 0:
+                print(
+                    f"[Frame {frame_count}] FPS: {avg_fps:.1f}, Detections: {len(boxes)}, Tracks: {len(tracker.tracks)}")
+
+            # 退出检查
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
                 print("用户触发退出程序...")
                 break
+            elif key == ord('r'):
+                # 重新生成NPC（调试功能）
+                print("重新生成NPC车辆...")
+                clear_npc(world)
+                spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+                detection_stats['no_detection_streak'] = 0
+                print("NPC重新生成完成")
+            elif key == ord('d'):
+                # 切换深度显示
+                args.show_depth = not args.show_depth
+                print(f"深度显示: {'开启' if args.show_depth else '关闭'}")
 
+            # 长时间无检测时自动补充NPC
+            if detection_stats['no_detection_streak'] > 50 and frame_count > 100:
+                print("长时间无检测，自动补充NPC车辆...")
+                # 在主车辆附近补充一些NPC
+                spawn_points = world.get_map().get_spawn_points()
+                if spawn_points:
+                    bp_lib = world.get_blueprint_library()
+                    vehicle_bps = [bp for bp in bp_lib.filter('vehicle') if
+                                   int(bp.get_attribute('number_of_wheels')) == 4]
+
+                    added = 0
+                    for spawn_point in spawn_points[:20]:
+                        if added >= 5:
+                            break
+                        distance = math.hypot(
+                            spawn_point.location.x - ego_location.x,
+                            spawn_point.location.y - ego_location.y
+                        )
+                        if 20.0 < distance < 80.0:
+                            try:
+                                npc = world.try_spawn_actor(random.choice(vehicle_bps), spawn_point)
+                                if npc:
+                                    npc.set_autopilot(True)
+                                    added += 1
+                                    print(f"补充生成NPC车辆 {added}/5")
+                            except:
+                                pass
+                detection_stats['no_detection_streak'] = 0
+
+            # FPS限制
+            elapsed = time.time() - start_time
+            if elapsed < frame_time_target:
+                time.sleep(frame_time_target - elapsed)
+
+    except KeyboardInterrupt:
+        print("\n用户中断程序...")
     except Exception as e:
         import traceback
         print(f"程序运行出错：{str(e)}")
         traceback.print_exc()
-        print(
-            "报错提示：1. 确保CARLA服务器已启动；2. 确保carla包版本与服务器一致；3. 确保已安装所有依赖；4. 确保YOLO模型路径正确")
+        print("\n报错提示：")
+        print("1. 确保CARLA服务器已启动")
+        print("2. 确保carla包版本与服务器一致")
+        print("3. 确保已安装所有依赖")
+        print("4. 确保YOLO模型路径正确")
+        print("5. 检查是否有其他程序占用端口")
     finally:
         # 清理资源
-        print("正在清理资源...")
+        print("\n正在清理资源...")
         clear(world, camera, depth_camera)
 
         if world:
@@ -929,7 +1337,16 @@ def main():
 
         # 关闭窗口
         cv2.destroyAllWindows()
-        print(f"总共处理 {frame_count} 帧")
+
+        # 打印最终统计
+        print("\n" + "=" * 50)
+        print("程序运行统计：")
+        print(f"总帧数: {frame_count}")
+        print(f"平均FPS: {np.mean(fps_history) if fps_history else 0:.1f}")
+        print(f"总检测次数: {detection_stats['total_detections']}")
+        print(f"平均每帧检测: {detection_stats['total_detections'] / max(1, detection_stats['total_frames']):.1f}")
+        print(f"最大单帧车辆数: {detection_stats['max_vehicles_per_frame']}")
+        print("=" * 50)
         print("资源清理完成，程序正常退出！")
 
 
