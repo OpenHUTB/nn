@@ -1,160 +1,244 @@
-import cv2
-import argparse
-import numpy as np
+import sys
 import os
-from drone_control import VirtualDrone
-from detection_module import DroneDetection
+import threading
+import time
+from datetime import datetime
+
+# 添加模块路径
+sys.path.append(os.path.join(os.path.dirname(__file__), 'modules'))
+
+from modules.drone_controller import DroneController
+from modules.face_detector import FaceDetector
+from modules.person_detector import PersonDetector
+from modules.face_recognizer import FaceRecognizer
+from modules.ui_controller import UIController
+from modules.voice_synthesizer import VoiceSynthesizer
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description="AI无人机+真实摄像头版")
-    parser.add_argument("--conf-thres", type=float, default=0.5, help="检测置信度阈值")
-    parser.add_argument("--track-thres", type=float, default=0.4, help="追踪IOU阈值")
-    parser.add_argument("--camera-id", type=int, default=0, help="摄像头ID（0为默认摄像头，1为外接）")
-    return parser.parse_args()
+class AIDroneSystem:
+    def __init__(self):
+        """初始化AI无人机系统"""
+        print("🚀 正在初始化AI无人机系统...")
 
+        # 初始化各个模块
+        self.drone = DroneController()
+        self.person_detector = PersonDetector()
+        self.face_detector = FaceDetector()
+        self.face_recognizer = FaceRecognizer()
+        self.voice = VoiceSynthesizer()
+        self.ui = UIController()
 
-def draw_clean_text(img, text, pos, color=(0, 255, 0), font_size=0.6):
-    valid_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 :.-()%")
-    clean_text = ''.join([c for c in text if c in valid_chars])
-    cv2.putText(
-        img, clean_text, pos,
-        cv2.FONT_HERSHEY_SIMPLEX, font_size,
-        color, 1, lineType=cv2.LINE_AA
-    )
+        # 状态变量
+        self.running = False
+        self.target_person = None
+        self.current_target_bbox = None
+        self.recognized_persons = {}
 
+        # 线程锁
+        self.lock = threading.Lock()
 
-def init_screenshot_dir():
-    if not os.path.exists("drone_screenshots"):
-        os.makedirs("drone_screenshots")
-    return "drone_screenshots"
+        print("✅ 系统初始化完成")
+
+    def start(self):
+        """启动系统"""
+        self.running = True
+
+        # 连接无人机
+        if not self.drone.connect():
+            print("❌ 无法连接无人机")
+            return False
+
+        # 启动UI界面
+        ui_thread = threading.Thread(target=self.ui.start, args=(self,))
+        ui_thread.daemon = True
+        ui_thread.start()
+
+        # 主循环
+        self.main_loop()
+
+        return True
+
+    def main_loop(self):
+        """主运行循环"""
+        print("🔄 开始主循环...")
+
+        while self.running:
+            try:
+                # 获取无人机图像
+                frame = self.drone.get_frame()
+                if frame is None:
+                    time.sleep(0.1)
+                    continue
+
+                # 人物检测
+                persons, person_frame = self.person_detector.detect(frame)
+
+                # 如果有选中的目标，进行跟踪
+                if self.target_person:
+                    self.track_target(persons, person_frame)
+
+                # 人脸检测与识别
+                recognized_info = self.detect_and_recognize_faces(frame)
+
+                # 更新UI显示
+                self.ui.update_display({
+                    'original_frame': frame,
+                    'person_frame': person_frame,
+                    'persons': persons,
+                    'recognized_info': recognized_info,
+                    'target': self.target_person
+                })
+
+                # 语音播报识别结果
+                self.announce_recognition(recognized_info)
+
+                time.sleep(0.05)  # 控制帧率
+
+            except Exception as e:
+                print(f"❌ 主循环错误: {e}")
+                time.sleep(1)
+
+    def detect_and_recognize_faces(self, frame):
+        """检测并识别人脸"""
+        # 检测人脸
+        faces = self.face_detector.detect(frame)
+
+        recognized_info = []
+
+        for face in faces:
+            # 提取人脸区域
+            x, y, w, h = face
+            face_img = frame[y:y + h, x:x + w]
+
+            # 识别人脸
+            identity = self.face_recognizer.recognize(face_img)
+
+            if identity != "Unknown":
+                recognized_info.append({
+                    'bbox': (x, y, w, h),
+                    'name': identity,
+                    'confidence': 0.95  # 这里可以添加置信度
+                })
+
+        return recognized_info
+
+    def track_target(self, persons, frame):
+        """跟踪选定目标"""
+        if not persons:
+            return
+
+        # 寻找最接近的目标
+        target_bbox = None
+        min_distance = float('inf')
+
+        for person in persons:
+            # 这里可以根据不同的策略选择目标
+            # 例如：选择最大的、最接近中心的等
+            distance = self.calculate_distance_to_center(person['bbox'], frame.shape)
+
+            if distance < min_distance:
+                min_distance = distance
+                target_bbox = person['bbox']
+
+        if target_bbox:
+            self.current_target_bbox = target_bbox
+
+            # 计算控制指令
+            control_command = self.calculate_control_command(target_bbox, frame.shape)
+
+            # 发送控制指令给无人机
+            self.drone.move_to_target(control_command)
+
+    def calculate_distance_to_center(self, bbox, frame_shape):
+        """计算边界框中心到图像中心的距离"""
+        x1, y1, x2, y2 = bbox
+        bbox_center = ((x1 + x2) // 2, (y1 + y2) // 2)
+        frame_center = (frame_shape[1] // 2, frame_shape[0] // 2)
+
+        return ((bbox_center[0] - frame_center[0]) ** 2 +
+                (bbox_center[1] - frame_center[1]) ** 2) ** 0.5
+
+    def calculate_control_command(self, bbox, frame_shape):
+        """根据目标位置计算无人机控制指令"""
+        x1, y1, x2, y2 = bbox
+        bbox_center = ((x1 + x2) // 2, (y1 + y2) // 2)
+        frame_center = (frame_shape[1] // 2, frame_shape[0] // 2)
+
+        # 计算偏移量（归一化到[-1, 1]）
+        dx = (bbox_center[0] - frame_center[0]) / frame_shape[1]
+        dy = (bbox_center[1] - frame_center[1]) / frame_shape[0]
+
+        # 计算目标大小（用于调整距离）
+        bbox_area = (x2 - x1) * (y2 - y1)
+        frame_area = frame_shape[1] * frame_shape[0]
+        area_ratio = bbox_area / frame_area
+
+        # 生成控制指令
+        command = {
+            'forward': 0.0,
+            'right': 0.0,
+            'up': 0.0,
+            'yaw': 0.0
+        }
+
+        # 调整无人机位置使目标居中
+        if abs(dx) > 0.1:  # 如果水平偏移大于10%
+            command['yaw'] = -dx * 0.5  # 旋转无人机
+
+        if abs(dy) > 0.1:  # 如果垂直偏移大于10%
+            command['up'] = dy * 0.5  # 上下移动
+
+        # 根据目标大小调整距离
+        if area_ratio < 0.2:  # 目标太小，需要靠近
+            command['forward'] = 0.3
+        elif area_ratio > 0.5:  # 目标太大，需要远离
+            command['forward'] = -0.3
+
+        return command
+
+    def announce_recognition(self, recognized_info):
+        """语音播报识别结果"""
+        for info in recognized_info:
+            name = info['name']
+            if name not in self.recognized_persons:
+                self.recognized_persons[name] = datetime.now()
+                self.voice.speak(f"识别到 {name}")
+
+    def select_target(self, bbox):
+        """选择跟踪目标"""
+        self.target_person = {
+            'bbox': bbox,
+            'selected_time': datetime.now()
+        }
+        print(f"🎯 已选择跟踪目标: {bbox}")
+
+    def add_new_face(self, face_img, name):
+        """添加新人脸到数据库"""
+        success = self.face_recognizer.add_face(face_img, name)
+        if success:
+            print(f"✅ 成功添加人脸: {name}")
+            self.voice.speak(f"已添加 {name} 到数据库")
+        return success
+
+    def stop(self):
+        """停止系统"""
+        print("🛑 正在停止系统...")
+        self.running = False
+        self.drone.disconnect()
+        self.ui.stop()
+        print("✅ 系统已停止")
 
 
 def main():
-    args = parse_args()
-    drone = VirtualDrone()
-    detector = DroneDetection(drone=drone)
-    screenshot_dir = init_screenshot_dir()
-
-    # ===================== 新增：初始化摄像头 =====================
-    cap = cv2.VideoCapture(args.camera_id)  # 打开摄像头（0=默认，1=外接）
-    if not cap.isOpened():  # 检查摄像头是否打开成功
-        print("❌ 无法打开摄像头！请检查：")
-        print("  1. 摄像头是否被其他程序占用（如微信、浏览器）")
-        print("  2. Python是否有摄像头访问权限（系统设置→隐私）")
-        print("  3. 摄像头ID是否正确（尝试修改--camera-id 1）")
-        return  # 打开失败则退出程序
-
-    # 打印初始化信息
-    print("=" * 60)
-    print("✅ 虚拟无人机+摄像头系统初始化完成")
-    print(f"初始状态 | 电量：{drone.get_battery():.1f}% | 状态：{drone.state.value}")
-    print(f"摄像头状态 | ID：{args.camera_id} | 已成功打开")
-    print("=" * 60)
-    print("🎮 操作说明：")
-    print("  ESC → 退出 | T → 起飞 | L → 降落 | Z → 保存截图")
-    print("  W/A/S/D → 前后左右 | ↑/↓ → 上升/下降 | Q/E → 左转/右转")
-    print("=" * 60)
-
-    # 创建可视化窗口
-    cv2.namedWindow("AI Drone + Camera System", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("AI Drone + Camera System", 1280, 720)  # 适配摄像头分辨率
-
-    # 检测项解释映射
-    detection_explain = {
-        "状态检测": "State Detection",
-        "电量检测": "Battery Detection",
-        "位置检测": "Position Detection",
-        "障碍物检测": "Obstacle Detection",
-        "碰撞预警": "Collision Warning"
-    }
+    """主函数"""
+    system = AIDroneSystem()
 
     try:
-        while True:
-            # ===================== 读取摄像头画面（核心新增） =====================
-            ret, frame = cap.read()  # 读取摄像头一帧画面
-            if not ret:  # 摄像头读取失败（如断开）
-                print("❌ 摄像头画面读取失败！")
-                break
-            # 调整画面尺寸适配窗口
-            frame = cv2.resize(frame, (1280, 720))
-
-            # ===================== 绘制无人机状态（叠加在摄像头画面上） =====================
-            # 1. 绘制基础状态（顶部左侧）
-            status_y = 30
-            draw_clean_text(frame, f"Battery: {drone.get_battery():.1f}%", (10, status_y), (0, 255, 0), 0.7)
-            draw_clean_text(frame, f"Position: {drone.position.round(1)}", (10, status_y + 40), (0, 255, 0), 0.7)
-            draw_clean_text(frame, f"State: {drone.state.value}", (10, status_y + 80), (0, 255, 0), 0.7)
-            draw_clean_text(frame, f"Yaw Angle: {drone.yaw:.0f}°", (10, status_y + 120), (0, 255, 0), 0.7)
-
-            # 2. 绘制检测结果（顶部右侧，避免遮挡摄像头画面）
-            detection_y = 30
-            draw_clean_text(frame, "=== Detection Results ===", (800, detection_y), (255, 255, 0), 0.7)
-            draw_clean_text(frame, "【State:状态 | Battery:电量 | Position:位置】", (800, detection_y + 40),
-                            (255, 255, 255), 0.5)
-            detection_y += 80
-
-            detection_results = detector.full_detection()
-            for idx, res in enumerate(detection_results):
-                detection_y += 40
-                color = (0, 0, 255) if res.get("warning") else (0, 255, 0)
-                core_msg = res['message'].split("|")[0].strip()
-                explain = detection_explain.get(res['type'], "Unknown")
-                display_text = f"{explain}: {core_msg}"
-                draw_clean_text(frame, display_text, (800, detection_y), color, 0.6)
-
-            # 3. 绘制操作提示（底部）
-            draw_clean_text(
-                frame,
-                "Operation: ESC(Exit) | T(Takeoff) | L(Land) | Z(Save) | Q/E(Rotate) | W/A/S/D(Move)",
-                (10, 680), (255, 255, 255), 0.6
-            )
-
-            # 显示摄像头+无人机状态叠加画面
-            cv2.imshow("AI Drone + Camera System", frame)
-
-            # ===================== 键盘控制逻辑 =====================
-            key = cv2.waitKey(1) & 0xFF
-            if key == 27:  # ESC退出
-                print("\n👋 程序退出中...")
-                break
-            elif key == ord('t'):
-                drone.takeoff()
-            elif key == ord('l'):
-                drone.land()
-            elif key == ord('z'):  # Z保存截图（摄像头画面+无人机状态）
-                screenshot_name = f"drone_camera_{drone.state.value}_{cv2.getTickCount()}.jpg"
-                screenshot_path = os.path.join(screenshot_dir, screenshot_name)
-                cv2.imwrite(screenshot_path, frame)
-                print(f"✅ 摄像头截图已保存：{screenshot_path}")
-            elif key == ord('w'):
-                drone.move("forward")
-            elif key == ord('s'):
-                drone.move("back")
-            elif key == ord('a'):
-                drone.move("left")
-            elif key == ord('d'):
-                drone.move("right")
-            elif key == 2490368:
-                drone.move("up")
-            elif key == 2621440:
-                drone.move("down")
-            elif key == ord('q'):
-                drone.rotate("left")
-            elif key == ord('e'):
-                drone.rotate("right")
-
-    except Exception as e:
-        print(f"\n❌ 程序异常：{str(e)}")
-        print("💡 建议检查：摄像头是否可用 | OpenCV版本（pip install opencv-python --upgrade）")
+        system.start()
+    except KeyboardInterrupt:
+        print("\n👋 用户中断")
     finally:
-        # ===================== 资源释放（核心：关闭摄像头） =====================
-        cap.release()  # 关闭摄像头
-        if drone.state.value == "Flying":
-            drone.land()
-            print("✅ 无人机已自动降落")
-        cv2.destroyAllWindows()
-        print("✅ 摄像头已关闭，程序正常退出")
+        system.stop()
 
 
 if __name__ == "__main__":

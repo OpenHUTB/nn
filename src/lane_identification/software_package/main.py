@@ -1,5 +1,6 @@
 ﻿"""
 主应用程序模块 - 支持图像、视频和摄像头实时识别
+修复摄像头调用问题，移除日志功能
 """
 
 import tkinter as tk
@@ -11,9 +12,6 @@ from PIL import Image, ImageTk
 import cv2
 import numpy as np
 import os
-
-# 类型注解导入
-from typing import Dict, Any, Optional, Tuple, List
 
 # 导入各个模块
 from config import AppConfig, SceneConfig
@@ -51,6 +49,7 @@ class LaneDetectionApp:
         # 视频相关变量
         self.video_file_path = None
         self.camera_mode = False
+        self.camera_index = 0
         
         # 性能统计
         self.processing_times = []
@@ -193,6 +192,15 @@ class LaneDetectionApp:
         )
         self.redetect_btn.pack(pady=(0, 10))
         
+        # 文件信息显示
+        self.file_info_label = ttk.Label(
+            self.file_frame,
+            text="未选择图片",
+            wraplength=300,
+            foreground="#3498db"
+        )
+        self.file_info_label.pack()
+        
         # 视频控制区域（初始隐藏）
         self.video_frame = ttk.LabelFrame(control_frame, text="视频控制", padding="10")
         
@@ -204,6 +212,30 @@ class LaneDetectionApp:
             width=20
         )
         self.select_video_btn.pack(pady=(0, 10))
+        
+        # 摄像头索引选择
+        camera_frame = ttk.Frame(self.video_frame)
+        camera_frame.pack(fill="x", pady=(0, 10))
+        
+        ttk.Label(camera_frame, text="摄像头索引:").pack(side="left")
+        self.camera_index_var = tk.StringVar(value="0")
+        self.camera_index_combo = ttk.Combobox(
+            camera_frame,
+            textvariable=self.camera_index_var,
+            values=["0", "1", "2", "3"],
+            state="readonly",
+            width=8
+        )
+        self.camera_index_combo.pack(side="left", padx=(5, 0))
+        
+        # 摄像头测试按钮
+        self.camera_test_btn = ttk.Button(
+            self.video_frame,
+            text="测试摄像头",
+            command=self._test_camera,
+            width=20
+        )
+        self.camera_test_btn.pack(pady=(0, 10))
         
         # 视频控制按钮
         self.video_control_frame = ttk.Frame(self.video_frame)
@@ -235,15 +267,6 @@ class LaneDetectionApp:
             state="disabled"
         )
         self.stop_btn.pack(side="left")
-        
-        # 文件信息显示
-        self.file_info_label = ttk.Label(
-            self.file_frame,
-            text="未选择图片",
-            wraplength=300,
-            foreground="#3498db"
-        )
-        self.file_info_label.pack()
         
         # 参数调节区域
         param_frame = ttk.LabelFrame(control_frame, text="参数调节", padding="10")
@@ -432,43 +455,142 @@ class LaneDetectionApp:
         self.play_btn.config(state="disabled")
         self.pause_btn.config(state="disabled")
         self.stop_btn.config(state="disabled")
+        self.camera_test_btn.config(state="normal")
         
         self.status_var.set("已切换到视频模式")
     
     def _switch_to_camera_mode(self):
         """切换到摄像头模式"""
-        if self.is_video_mode:
-            self._stop_video()
-        
-        self.is_video_mode = True
-        self.camera_mode = True
-        self.mode_label.config(text="[摄像头模式]", foreground="#9b59b6")
-        
-        # 隐藏图像控制，显示视频控制
-        self.file_frame.pack_forget()
-        self.video_frame.pack(fill="x", pady=(0, 15))
-        
-        # 更新按钮状态
-        self.select_video_btn.config(state="normal")
-        self.play_btn.config(state="normal")
-        self.pause_btn.config(state="disabled")
-        self.stop_btn.config(state="disabled")
-        
-        # 尝试打开摄像头
-        self._open_camera()
-    
-    def _open_camera(self):
-        """打开摄像头"""
         try:
-            if self.video_processor.open_camera():
-                self.play_btn.config(state="normal")
-                self.status_var.set("摄像头已打开")
-            else:
-                messagebox.showerror("错误", "无法打开摄像头，请检查摄像头连接")
-                self._switch_to_image_mode()
+            if self.is_video_mode:
+                self._stop_video()
+            
+            self.is_video_mode = True
+            self.camera_mode = True
+            self.mode_label.config(text="[摄像头模式]", foreground="#9b59b6")
+            
+            # 隐藏图像控制，显示视频控制
+            self.file_frame.pack_forget()
+            self.video_frame.pack(fill="x", pady=(0, 15))
+            
+            # 更新按钮状态
+            self.select_video_btn.config(state="normal")
+            self.play_btn.config(state="disabled")
+            self.pause_btn.config(state="disabled")
+            self.stop_btn.config(state="disabled")
+            self.camera_test_btn.config(state="normal")
+            
+            # 显示摄像头预览
+            self._show_camera_preview()
+            
+            self.status_var.set("已切换到摄像头模式")
+            
         except Exception as e:
-            messagebox.showerror("错误", f"打开摄像头失败: {str(e)}")
-            self._switch_to_image_mode()
+            print(f"切换摄像头模式失败: {e}")
+            self.status_var.set("切换摄像头模式失败")
+    
+    def _show_camera_preview(self):
+        """显示摄像头预览"""
+        try:
+            # 获取摄像头索引
+            try:
+                self.camera_index = int(self.camera_index_var.get())
+            except:
+                self.camera_index = 0
+            
+            # 尝试打开摄像头
+            self.status_var.set(f"正在打开摄像头 {self.camera_index}...")
+            self.root.update()
+            
+            if self.video_processor.open_camera(self.camera_index):
+                # 获取预览帧
+                ret, frame = self.video_processor.get_frame()
+                if ret:
+                    self._display_image(frame, self.original_canvas, "摄像头预览")
+                    
+                    # 在结果区域显示提示
+                    self.result_canvas.delete("all")
+                    self.result_canvas.create_text(
+                        300, 200,
+                        text="摄像头已就绪，点击'开始'按钮进行实时检测",
+                        font=("微软雅黑", 12),
+                        fill="#3498db"
+                    )
+                    
+                    self.play_btn.config(state="normal")
+                    self.status_var.set(f"摄像头 {self.camera_index} 已就绪")
+                else:
+                    self.status_var.set("无法获取摄像头画面")
+            else:
+                self.status_var.set("无法打开摄像头")
+                
+        except Exception as e:
+            print(f"显示摄像头预览失败: {e}")
+            self.status_var.set("摄像头预览失败")
+    
+    def _test_camera(self):
+        """测试摄像头功能"""
+        try:
+            # 创建测试窗口
+            test_window = tk.Toplevel(self.root)
+            test_window.title("摄像头测试")
+            test_window.geometry("500x400")
+            test_window.transient(self.root)
+            
+            # 创建标签
+            label = ttk.Label(test_window, text="正在测试摄像头...", font=("微软雅黑", 10))
+            label.pack(pady=20)
+            
+            # 创建文本显示区域
+            result_text = tk.Text(test_window, height=15, width=50, font=("微软雅黑", 9))
+            result_text.pack(pady=10, padx=20)
+            
+            # 开始测试按钮
+            def start_test():
+                result_text.delete(1.0, tk.END)
+                result_text.insert(tk.END, "=== 摄像头测试结果 ===\n\n")
+                
+                # 测试不同的摄像头索引
+                for i in range(4):  # 测试0-3号摄像头
+                    result_text.insert(tk.END, f"测试摄像头 {i}:\n")
+                    
+                    try:
+                        # 尝试打开摄像头
+                        cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+                        
+                        if cap.isOpened():
+                            ret, frame = cap.read()
+                            if ret:
+                                # 获取摄像头信息
+                                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                                fps = cap.get(cv2.CAP_PROP_FPS)
+                                
+                                result_text.insert(tk.END, f"  ✓ 正常\n")
+                                result_text.insert(tk.END, f"     分辨率: {width}x{height}\n")
+                                result_text.insert(tk.END, f"     FPS: {fps:.1f}\n")
+                            else:
+                                result_text.insert(tk.END, "  ✗ 打开但无法读取帧\n")
+                            cap.release()
+                        else:
+                            result_text.insert(tk.END, "  ✗ 无法打开\n")
+                    except Exception as e:
+                        result_text.insert(tk.END, f"  ✗ 错误: {str(e)}\n")
+                    
+                    result_text.insert(tk.END, "\n")
+                
+                result_text.insert(tk.END, "=== 测试完成 ===\n")
+                result_text.see(1.0)  # 滚动到顶部
+            
+            test_btn = ttk.Button(test_window, text="开始测试", command=start_test)
+            test_btn.pack(pady=(0, 10))
+            
+            # 关闭按钮
+            close_btn = ttk.Button(test_window, text="关闭", command=test_window.destroy)
+            close_btn.pack(pady=(0, 10))
+            
+        except Exception as e:
+            messagebox.showerror("测试错误", f"摄像头测试失败: {str(e)}")
     
     def _select_image(self):
         """选择图片"""
@@ -510,7 +632,7 @@ class LaneDetectionApp:
             self.video_file_path = file_path
             self._open_video(file_path)
     
-    def _open_video(self, file_path: str):
+    def _open_video(self, file_path):
         """打开视频文件"""
         if self.video_processor.open_video_file(file_path):
             self.file_info_label.config(text=os.path.basename(file_path))
@@ -518,25 +640,53 @@ class LaneDetectionApp:
             self.pause_btn.config(state="disabled")
             self.stop_btn.config(state="disabled")
             self.status_var.set(f"视频已加载: {os.path.basename(file_path)}")
+            
+            # 显示第一帧作为预览
+            ret, frame = self.video_processor.get_frame()
+            if ret:
+                self._display_image(frame, self.original_canvas, "视频预览")
+                
+                # 在结果区域显示提示
+                self.result_canvas.delete("all")
+                self.result_canvas.create_text(
+                    300, 200,
+                    text="视频已加载，点击'开始'按钮进行检测",
+                    font=("微软雅黑", 12),
+                    fill="#3498db"
+                )
         else:
             messagebox.showerror("错误", "无法打开视频文件")
     
     def _play_video(self):
-        """播放视频"""
+        """播放视频/摄像头"""
         if self.is_processing and not self.is_video_mode:
             return
         
-        if self.camera_mode and self.video_processor.video_capture is None:
-            self._open_camera()
+        # 如果是摄像头模式但未打开，先尝试打开
+        if self.camera_mode and (self.video_processor.video_capture is None or not self.video_processor.video_capture.isOpened()):
+            self._show_camera_preview()
+            if self.video_processor.video_capture is None or not self.video_processor.video_capture.isOpened():
+                messagebox.showwarning("警告", "请先打开摄像头")
+                return
         
+        # 更新界面状态
+        self.status_var.set("正在启动处理...")
+        self.root.update()
+        
+        # 启动处理
         if self.video_processor.start_processing(self._process_video_frame):
             self.is_processing = True
             self.play_btn.config(state="disabled")
             self.pause_btn.config(state="normal")
             self.stop_btn.config(state="normal")
-            self.status_var.set("视频处理中...")
+            
+            if self.camera_mode:
+                self.status_var.set("摄像头实时检测中...")
+            else:
+                self.status_var.set("视频处理中...")
         else:
-            messagebox.showerror("错误", "无法开始视频处理")
+            messagebox.showerror("错误", "无法开始处理")
+            self.status_var.set("启动失败")
     
     def _pause_video(self):
         """暂停视频"""
@@ -544,7 +694,7 @@ class LaneDetectionApp:
             self.video_processor.pause()
             self.play_btn.config(state="normal")
             self.pause_btn.config(state="disabled")
-            self.status_var.set("视频已暂停")
+            self.status_var.set("已暂停")
     
     def _stop_video(self):
         """停止视频"""
@@ -554,12 +704,12 @@ class LaneDetectionApp:
             self.play_btn.config(state="normal")
             self.pause_btn.config(state="disabled")
             self.stop_btn.config(state="disabled")
-            self.status_var.set("视频已停止")
+            self.status_var.set("已停止")
             
             # 清空显示
             self._clear_canvas_display()
     
-    def _process_video_frame(self, frame: np.ndarray, frame_info: Dict[str, Any]):
+    def _process_video_frame(self, frame, frame_info):
         """处理视频帧"""
         try:
             start_time = time.time()
@@ -579,7 +729,7 @@ class LaneDetectionApp:
             # 创建可视化
             visualization = self.visualizer.create_visualization(
                 processed_frame, road_info, lane_info, direction_info, 
-                is_video=True, frame_info=frame_info
+                True, frame_info
             )
             
             processing_time = time.time() - start_time
@@ -597,7 +747,7 @@ class LaneDetectionApp:
         except Exception as e:
             print(f"视频帧处理失败: {e}")
     
-    def _load_image(self, file_path: str):
+    def _load_image(self, file_path):
         """加载图像"""
         try:
             # 更新界面状态
@@ -614,7 +764,7 @@ class LaneDetectionApp:
             messagebox.showerror("错误", f"加载图片失败: {str(e)}")
             self.status_var.set("加载失败")
     
-    def _process_image(self, file_path: str):
+    def _process_image(self, file_path):
         """处理图像"""
         start_time = time.time()
         
@@ -671,7 +821,7 @@ class LaneDetectionApp:
             self.is_processing = False
             self.root.after(0, self._update_processing_state, False)
     
-    def _update_processing_state(self, is_processing: bool):
+    def _update_processing_state(self, is_processing):
         """更新处理状态"""
         if is_processing:
             self.progress_bar.start()
@@ -682,8 +832,7 @@ class LaneDetectionApp:
             self.status_var.set("分析完成")
             self.redetect_btn.config(state="normal")
     
-    def _update_results(self, direction_info: Dict[str, Any], lane_info: Dict[str, Any],
-                       visualization: np.ndarray, processing_time: float):
+    def _update_results(self, direction_info, lane_info, visualization, processing_time):
         """更新结果（图像模式）"""
         try:
             # 显示图像
@@ -726,9 +875,7 @@ class LaneDetectionApp:
             print(f"更新结果失败: {e}")
             self.status_var.set("更新结果失败")
     
-    def _update_video_results(self, original_frame: np.ndarray, visualization: np.ndarray,
-                            direction_info: Dict[str, Any], lane_info: Dict[str, Any],
-                            processing_time: float, frame_info: Dict[str, Any]):
+    def _update_video_results(self, original_frame, visualization, direction_info, lane_info, processing_time, frame_info):
         """更新视频结果"""
         try:
             # 显示图像
@@ -778,7 +925,7 @@ class LaneDetectionApp:
         except Exception as e:
             print(f"更新视频结果失败: {e}")
     
-    def _display_image(self, image: np.ndarray, canvas: tk.Canvas, title: str):
+    def _display_image(self, image, canvas, title):
         """在Canvas上显示图像"""
         try:
             canvas.delete("all")
@@ -890,19 +1037,30 @@ class LaneDetectionApp:
         if self.current_image_path and not self.is_processing and not self.is_video_mode:
             self._redetect()
     
-    def _show_error(self, error_msg: str):
+    def _show_error(self, error_msg):
         """显示错误"""
         messagebox.showerror("错误", f"处理失败: {error_msg}")
         self.status_var.set("处理失败")
     
     def _on_closing(self):
         """窗口关闭事件"""
-        if self.is_video_mode:
-            self._stop_video()
-            self.video_processor.release()
-        
-        self.root.destroy()
-        print("应用程序已关闭")
+        try:
+            # 停止视频处理
+            if self.is_video_mode:
+                self._stop_video()
+            
+            # 释放摄像头资源
+            if hasattr(self, 'video_processor') and self.video_processor:
+                print("正在释放摄像头资源...")
+                self.video_processor.release()
+            
+            # 关闭窗口
+            self.root.destroy()
+            print("应用程序已关闭")
+            
+        except Exception as e:
+            print(f"关闭应用程序时出错: {e}")
+            self.root.destroy()
 
 def main():
     """主函数"""
@@ -921,6 +1079,4 @@ def main():
         messagebox.showerror("致命错误", f"应用程序启动失败: {str(e)}")
 
 if __name__ == "__main__":
-    # 导入SceneConfig
-    from config import SceneConfig
     main()
