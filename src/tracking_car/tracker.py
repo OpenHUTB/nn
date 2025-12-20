@@ -3,15 +3,14 @@ tracker.py - 目标检测与跟踪核心算法
 包含：YOLO检测器、卡尔曼滤波、SORT跟踪器、行为分析
 """
 
+import queue
 import numpy as np
 import cv2
 import torch
-import queue
 import threading
 import time
 import sys
 import os
-import queue
 
 # 配置日志
 try:
