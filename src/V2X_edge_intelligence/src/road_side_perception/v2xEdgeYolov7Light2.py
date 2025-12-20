@@ -22,7 +22,7 @@ except Exception as e:
     print(f"❌ Carla导入失败：{e}")
     sys.exit(1)
 
-# --------------------------
+
 # 2. 核心功能函数（修复参数传递）
 # --------------------------
 def init_carla_camera():
