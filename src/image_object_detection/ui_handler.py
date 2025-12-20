@@ -2,16 +2,16 @@
 # 功能：用户交互调度中心（User Interface Handler）
 # 职责：
 #   - 提供命令行接口（CLI）和交互式菜单两种启动方式
-#   - 解析用户输入（图像路径 / 摄像头指令）
+#   - 解析用户输入（图像路径 / 摄像头指令 / 批量目录）
 #   - 验证文件路径是否存在、可读、格式有效
-#   - 调度静态图像检测 或 实时摄像头检测
+#   - 调度静态图像检测、实时摄像头检测 或 批量图像检测
 #   - 处理用户中断（Ctrl+C）并优雅退出
 #   - 保存检测结果图像并反馈保存状态
 #
 # 设计原则：
 #   - 用户友好：错误提示具体到“文件不存在”、“无权限”、“格式不支持”
 #   - 安全兜底：即使用户输错路径，也不崩溃，而是返回主菜单
-#   - 松耦合：依赖 DetectionEngine 和 CameraDetector，但不硬编码其内部逻辑
+#   - 松耦合：依赖 DetectionEngine、CameraDetector 和 BatchDetector，但不硬编码其内部逻辑
 #   - 可扩展：支持未来新增模式（如视频文件检测）
 
 import os
@@ -25,12 +25,13 @@ from camera_detector import CameraOpenError
 
 def parse_args():
     """
-    解析命令行参数，支持 --image <path> 或 --camera 两种模式。
+    解析命令行参数，支持 --image <path>、--camera 或 --batch <dir> 三种模式。
     返回 argparse.Namespace 对象。
     """
     parser = argparse.ArgumentParser(description="YOLOv8 Detection System")
     parser.add_argument("--image", type=str, help="Path to input image file")
     parser.add_argument("--camera", action="store_true", help="Start live camera detection")
+    parser.add_argument("--batch", type=str, help="Path to input directory for batch detection")
     return parser.parse_args()
 
 
@@ -61,6 +62,7 @@ class UIHandler:
         主流程入口：
           - 若有 --image 参数 → 静态检测
           - 若有 --camera 参数 → 摄像头检测
+          - 若有 --batch 参数 → 批量检测
           - 否则 → 交互式菜单
         """
         args = parse_args()
@@ -70,6 +72,9 @@ class UIHandler:
         elif args.camera:
             print("[CLI Mode] Starting live camera detection...")
             self._run_camera_detection()
+        elif args.batch is not None:
+            print(f"[CLI Mode] Running batch detection on directory: {args.batch}")
+            self._run_batch_detection(args.batch)
         else:
             self._interactive_menu()
 
@@ -84,8 +89,9 @@ class UIHandler:
             print("=" * 40)
             print("1. Static Image Detection")
             print("2. Live Camera Detection")
-            print("3. Exit")
-            choice = input("Please select an option (1-3): ").strip()
+            print("3. Batch Image Detection")
+            print("4. Exit")
+            choice = input("Please select an option (1-4): ").strip()
         except KeyboardInterrupt:
             print("\nUser cancelled. Exiting...")
             return
@@ -95,9 +101,11 @@ class UIHandler:
         elif choice == "2":
             self._run_camera_detection()
         elif choice == "3":
+            self._run_batch_detection_interactive()
+        elif choice == "4":
             print("Goodbye!")
         else:
-            print("Invalid option. Please enter 1, 2, or 3.")
+            print("Invalid option. Please enter 1, 2, 3, or 4.")
             self._interactive_menu()
 
     def _choose_image_source(self):
@@ -199,4 +207,46 @@ class UIHandler:
             print(f"❌ Camera error: {e}")
         except Exception as e:
             print(f"💥 Camera detection failed: {e}")
+            traceback.print_exc()
+
+    def _run_batch_detection_interactive(self):
+        """
+        交互式批量检测：用户输入输入目录，自动将结果保存到同级 test_picture/ 目录。
+        """
+        try:
+            input_dir = input("Enter input directory path (e.g., ../data): ").strip()
+            input_dir = os.path.expanduser(input_dir)
+            # 清理不可见字符（如从 Windows 资源管理器复制的路径）
+            input_dir = ''.join(ch for ch in input_dir if ord(ch) != 0x202A)
+        except KeyboardInterrupt:
+            return
+
+        if not os.path.isdir(input_dir):
+            print(f"❌ Directory not found: {input_dir}")
+            return
+
+        # 默认输出目录：与输入目录同级的 test_picture/
+        output_dir = os.path.join(input_dir, "test_picture")
+        self._run_batch_detection(input_dir, output_dir)
+
+    def _run_batch_detection(self, input_dir, output_dir=None):
+        """
+        执行批量图像检测。
+        参数:
+            input_dir (str): 输入图像目录
+            output_dir (str, optional): 输出目录，默认为 input_dir/test_picture
+        """
+        if output_dir is None:
+            output_dir = os.path.join(input_dir, "test_picture")
+
+        try:
+            from batch_detector import BatchDetector
+            detector = BatchDetector(
+                detection_engine=self.engine,
+                input_dir=input_dir,
+                output_dir=output_dir
+            )
+            detector.run()
+        except Exception as e:
+            print(f"💥 Batch detection failed: {e}")
             traceback.print_exc()
