@@ -1,0 +1,32 @@
+<launch>
+  <!-- =====================================================================
+       地图保存工具
+       功能：将SLAM建立的地图保存到maps文件夹
+       
+       使用方法：
+       1. 先运行SLAM建图launch文件（gmapping或hector_slam）
+       2. 手动控制车辆完成建图
+       3. 在新终端运行此launch文件保存地图
+       
+       roslaunch carla_spawn_objects save_map.launch map_name:=carla_town01_map
+       ===================================================================== -->
+
+  <!-- 地图文件名（不包含扩展名） -->
+  <arg name="map_name" default="carla_map"/>
+  
+  <!-- 地图保存路径 -->
+  <arg name="map_path" default="$(find carla_spawn_objects)/maps"/>
+
+  <!-- ====================== 地图保存节点 ====================== -->
+  <!-- 订阅/map话题，保存为.pgm和.yaml文件 -->
+  <node 
+    pkg="map_server" 
+    type="map_saver" 
+    name="map_saver" 
+    output="screen"
+    args="-f $(arg map_path)/$(arg map_name)"
+  >
+    <remap from="map" to="/map"/>
+  </node>
+
+</launch>
