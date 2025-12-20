@@ -98,5 +98,7 @@
     <!-- Accelerometer and Gyro for IMU data -->
     <accelerometer name="accelerometer" site="lidar_site"/>
     <gyro name="gyro" site="lidar_site"/>
+    <!-- Temperature sensor -->
+    <framepos name="temperature_sensor" objtype="site" objname="lidar_site"/>
   </sensor>
 </mujoco>
