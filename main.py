@@ -1,118 +1,174 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Lane Line Detection (精简版)
-核心功能：Canny边缘检测 + 霍夫变换实现车道线检测，单视频处理+结果保存
-适用环境：Ubuntu (Python 3.10 + OpenCV + numpy)
-"""
-
 import cv2
 import numpy as np
-import argparse
-import os
-from pathlib import Path
+import sys
+from collections import deque
+import time
+from yolo_det import ObjectDetector
 
-# ===================== 核心参数（仅保留必要的） =====================
-# 车道线检测核心参数
-CANNY_LOW_THRESH = 50       # Canny边缘检测低阈值
-CANNY_HIGH_THRESH = 150     # Canny边缘检测高阈值
-HOUGH_RHO = 1               # 霍夫变换rho步长
-HOUGH_THETA = np.pi / 180   # 霍夫变换theta步长
-HOUGH_THRESHOLD = 20        # 霍夫变换阈值
-HOUGH_MIN_LINE_LEN = 40     # 最小线段长度
-HOUGH_MAX_LINE_GAP = 20     # 最大线段间隙
+# ==========================================
+# 👇 参数配置区 (保持你的 Tuner 参数)
+# ==========================================
+CANNY_LOW = 50
+CANNY_HIGH = 150
+ROI_TOP_WIDTH = 0.40
+ROI_HEIGHT_POS = 0.60
+HOUGH_THRESH = 20
+MIN_LINE_LEN = 20
+MAX_LINE_GAP = 100
 
-# ===================== 核心函数：车道线检测 =====================
-def detect_lane_lines(frame):
-    """核心：检测并绘制车道线（Canny + 霍夫变换）"""
-    # 1. 灰度化 + 高斯模糊
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # 2. Canny边缘检测
-    edges = cv2.Canny(blur, CANNY_LOW_THRESH, CANNY_HIGH_THRESH)
-    
-    # 3. 区域掩码（仅检测图像下半部分，聚焦车道）
-    h, w = frame.shape[:2]
-    mask = np.zeros_like(edges)
-    polygon = np.array([[(0, h), (w//2, h//2), (w, h)]], np.int32)
-    cv2.fillPoly(mask, polygon, 255)
-    masked_edges = cv2.bitwise_and(edges, mask)
-    
-    # 4. 霍夫变换检测直线
-    lines = cv2.HoughLinesP(
-        masked_edges, HOUGH_RHO, HOUGH_THETA, HOUGH_THRESHOLD,
-        minLineLength=HOUGH_MIN_LINE_LEN, maxLineGap=HOUGH_MAX_LINE_GAP
-    )
-    
-    # 5. 绘制车道线
-    frame_with_lane = frame.copy()
-    if lines is not None:
+# 👇 新增优化参数
+SKIP_FRAMES = 3  # 每 4 帧跑一次 YOLO (极大提升 FPS)
+WARNING_RATIO = 0.20  # 当车宽占画面 20% 时，变红预警
+
+
+# ==========================================
+
+class LaneDetector:
+    def __init__(self):
+        self.left_lines_buffer = deque(maxlen=10)
+        self.right_lines_buffer = deque(maxlen=10)
+        self.vertices = None
+
+    def region_of_interest(self, img):
+        mask = np.zeros_like(img)
+        if self.vertices is None:
+            height, width = img.shape
+            top_w = width * ROI_TOP_WIDTH
+            top_x = width * 0.5
+            self.vertices = np.array([[
+                (0, height),
+                (int(top_x - top_w / 2), int(height * ROI_HEIGHT_POS)),
+                (int(top_x + top_w / 2), int(height * ROI_HEIGHT_POS)),
+                (width, height)
+            ]], dtype=np.int32)
+        cv2.fillPoly(mask, self.vertices, 255)
+        return cv2.bitwise_and(img, mask)
+
+    def process_lane(self, frame):
+        if frame is None: return None
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blur, CANNY_LOW, CANNY_HIGH)
+        roi = self.region_of_interest(edges)
+        lines = cv2.HoughLinesP(roi, 1, np.pi / 180, HOUGH_THRESH,
+                                minLineLength=MIN_LINE_LEN, maxLineGap=MAX_LINE_GAP)
+
+        left_raw, right_raw = self.average_slope_intercept(lines)
+        left_avg, right_avg = self.smooth_lines(left_raw, right_raw)
+
+        h = frame.shape[0]
+        y_min, y_max = int(h * ROI_HEIGHT_POS) + 50, h
+        left_pts = self.make_points(left_avg, y_min, y_max)
+        right_pts = self.make_points(right_avg, y_min, y_max)
+
+        return self.draw_lane(frame, left_pts, right_pts)
+
+    def average_slope_intercept(self, lines):
+        lefts, rights = [], []
+        if lines is None: return None, None
         for line in lines:
             x1, y1, x2, y2 = line[0]
-            cv2.line(frame_with_lane, (x1, y1), (x2, y2), (0, 255, 0), 3)
-    
-    return frame_with_lane
+            if x2 == x1: continue
+            slope = (y2 - y1) / (x2 - x1)
+            intercept = y1 - slope * x1
+            if abs(slope) < 0.3 or abs(slope) > 10: continue
+            if slope < 0:
+                lefts.append((slope, intercept))
+            else:
+                rights.append((slope, intercept))
+        return (np.average(lefts, axis=0) if lefts else None,
+                np.average(rights, axis=0) if rights else None)
 
-# ===================== 核心函数：视频处理 =====================
-def process_video(video_path, max_frames=10):
-    """处理单视频：读取帧→检测车道线→保存结果"""
-    # 校验视频文件
-    if not os.path.exists(video_path):
-        print(f"错误：视频文件不存在 → {video_path}")
-        return
-    
-    # 打开视频流
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print(f"错误：无法打开视频 → {video_path}")
-        return
-    
-    # 获取视频基础信息
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = int(cap.get(cv2.CAP_PROP_FPS)) or 25
-    
-    # 初始化结果视频写入器
-    video_name = Path(video_path).stem
-    result_path = f"{video_name}_lane_detected.mp4"
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(result_path, fourcc, fps, (width, height))
-    
-    # 逐帧处理
-    count = 0
-    print(f"开始处理视频（最大{max_frames}帧）...")
-    while cap.isOpened() and count < max_frames:
+    def smooth_lines(self, l, r):
+        if l is not None: self.left_lines_buffer.append(l)
+        if r is not None: self.right_lines_buffer.append(r)
+        return (np.average(self.left_lines_buffer, axis=0) if self.left_lines_buffer else None,
+                np.average(self.right_lines_buffer, axis=0) if self.right_lines_buffer else None)
+
+    def make_points(self, line, y1, y2):
+        if line is None: return None
+        s, i = line
+        if abs(s) < 1e-3: return None
+        try:
+            return ((int((y1 - i) / s), y1), (int((y2 - i) / s), y2))
+        except:
+            return None
+
+    def draw_lane(self, img, l, r):
+        overlay = np.zeros_like(img)
+        if l and r:
+            pts = np.array([l[0], l[1], r[1], r[0]], dtype=np.int32)
+            cv2.fillPoly(overlay, [pts], (0, 255, 0))
+        if l: cv2.line(overlay, l[0], l[1], (255, 0, 0), 10)
+        if r: cv2.line(overlay, r[0], r[1], (0, 0, 255), 10)
+        return overlay
+
+
+def main():
+    source = sys.argv[1] if len(sys.argv) > 1 else "sample.hevc"
+    cap = cv2.VideoCapture(source)
+    if not cap.isOpened(): return
+
+    lane_det = LaneDetector()
+    yolo_det = ObjectDetector()
+    print("🚀 系统优化版启动 - 跳帧检测 & 碰撞预警")
+
+    frame_count = 0
+    current_detections = []  # 缓存当前的检测结果
+
+    while True:
+        t_start = time.time()
         ret, frame = cap.read()
         if not ret:
-            break
-        
-        # 核心：检测车道线
-        frame_with_lane = detect_lane_lines(frame)
-        
-        # 写入结果视频
-        writer.write(frame_with_lane)
-        
-        # 实时显示（可选，按Q退出）
-        cv2.imshow("Lane Detection", frame_with_lane)
-        if cv2.waitKey(10) & 0xFF == ord('q'):
-            break
-        
-        count += 1
-    
-    # 释放资源
-    cap.release()
-    writer.release()
-    cv2.destroyAllWindows()
-    print(f"处理完成！结果保存至 → {result_path}")
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            continue
 
-# ===================== 主函数（精简参数） =====================
+        display = frame.copy()
+        h, w = frame.shape[:2]
+
+        # --- 1. 跳帧检测逻辑 ---
+        # 只有当 帧数 能被 (SKIP_FRAMES + 1) 整除时才跑 YOLO
+        if frame_count % (SKIP_FRAMES + 1) == 0:
+            _, current_detections = yolo_det.detect(frame)
+
+        # --- 2. 绘制检测结果 (每一帧都画，利用缓存) ---
+        for det in current_detections:
+            x1, y1, x2, y2 = det['box']
+            width_ratio = det['width'] / w
+
+            # 智能预警逻辑
+            color = (0, 255, 0)  # 默认绿色
+            msg = ""
+
+            if width_ratio > WARNING_RATIO:
+                color = (0, 0, 255)  # 危险红色
+                msg = " WARNING!"
+                cv2.putText(display, "BRAKE!", (x1, y1 - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
+
+            cv2.rectangle(display, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(display, f"{det['class']}{msg}", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # --- 3. 车道线叠加 ---
+        lane_layer = lane_det.process_lane(frame)
+        if lane_layer is not None:
+            display = cv2.addWeighted(display, 1, lane_layer, 0.4, 0)
+
+        # --- 4. 仪表盘 ---
+        fps = 1.0 / (time.time() - t_start)
+        # 显示当前是在检测(Detect)还是在追踪(Track/Skip)
+        status = "Detecting" if frame_count % (SKIP_FRAMES + 1) == 0 else "Skipping"
+
+        cv2.putText(display, f"FPS: {fps:.1f}", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+        cv2.putText(display, f"Mode: {status}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+
+        cv2.imshow('AutoPilot V2.5', display)
+
+        frame_count += 1
+        if cv2.waitKey(1) & 0xFF == ord('q'): break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
-    # 简化命令行参数：仅保留输入视频、最大帧数
-    parser = argparse.ArgumentParser(description="车道线检测（精简版）")
-    parser.add_argument("video_path", type=str, help="输入视频文件路径")
-    parser.add_argument("--max-frames", type=int, default=10, help="最大处理帧数（默认10）")
-    args = parser.parse_args()
-    
-    # 执行核心逻辑
-    process_video(args.video_path, args.max_frames)
+    main()
