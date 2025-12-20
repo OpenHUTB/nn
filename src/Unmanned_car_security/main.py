@@ -211,6 +211,19 @@ class Main():
     def on_tick(self):
         """每一帧调用的主函数"""
         try:
+            # 🆕 帧率计算
+            if not hasattr(self, 'frame_count'):
+                self.frame_count = 0
+                self.last_time = time.time()
+                self.fps = 0
+
+            self.frame_count += 1
+            current_time = time.time()
+            if current_time - self.last_time >= 1.0:  # 每秒钟更新一次
+                self.fps = self.frame_count / (current_time - self.last_time)
+                self.frame_count = 0
+                self.last_time = current_time
+
             # 获取车辆状态
             if hasattr(self, 'ego') and self.ego:
                 location = self.ego.get_location()
@@ -232,16 +245,17 @@ class Main():
                 # 更新绘制器显示
                 self.drawer.display_speed(speed_kmh)
                 self.drawer.display_location(location)
-
-                # 显示障碍物警告信息
                 self.drawer.display_warning(
                     self.obstacle_detector.warning_message,
                     self.obstacle_detector.get_warning_color(),
                     self.obstacle_detector.warning_level
                 )
 
-                # 🆕 新增：显示摄像头图像
+                # 🆕 显示摄像头图像
                 self.drawer.display_camera()
+
+                # 🆕 显示帧率
+                self.drawer.display_fps(self.fps)
 
                 # 更新观察者视角跟随车辆
                 self.update_spectator()
