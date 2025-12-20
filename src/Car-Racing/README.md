@@ -35,5 +35,5 @@ mac版
     rows = list(reader)
 
 7.文件目录创建教程
-日志生成在Log里，模型权重放在saved_mode里，这些东西全都在training目录里，录视频的videos里是dqn和ddqn
+日志生成在Log里，模型权重放在saved_mode里，这些东西全都在training目录里，录视频的videos里是dqn和ddq
 
