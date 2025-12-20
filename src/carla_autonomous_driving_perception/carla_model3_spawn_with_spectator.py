@@ -68,6 +68,32 @@ def generate_density_heatmap(sem_data, target_classes=[4, 10], width=1024, heigh
     return heatmap
 # =================================================================
 
+# ==================== 第11次提交新增：语义类别实时计数函数 ====================
+def semantic_class_count(sem_data, class_mapping):
+    """
+    统计指定语义类别的像素数量，并估算画面内目标数量（按单目标像素阈值）
+    :param sem_data: 语义分割原始数据（H,W），int32类型
+    :param class_mapping: 字典 {类别名: 类别ID}
+    :return: 计数结果字典 {类别名: 近似目标数}
+    """
+    count_dict = {}
+    # 单目标像素阈值（经验值：行人≈200像素，车辆≈500像素，交通灯≈50像素）
+    pixel_thresholds = {
+        "Pedestrian": 200,
+        "Vehicle": 500,
+        "TrafficLight": 50
+    }
+    
+    for cls_name, cls_id in class_mapping.items():
+        # 统计该类别像素总数
+        pixel_count = np.sum(sem_data == cls_id)
+        # 估算近似目标数（避免0除，最少计为0）
+        threshold = pixel_thresholds.get(cls_name, 200)
+        approx_count = pixel_count // threshold if pixel_count >= threshold else 0
+        count_dict[cls_name] = approx_count
+    return count_dict
+# =================================================================
+
 # 1. 连接CARLA服务器并配置强同步模式
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
@@ -281,9 +307,9 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：多视角+热力图可视化 + 性能监控）
+# 9. 主循环（核心：多视角+热力图+计数可视化 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：前视+俯视+热力图可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
+print(f"功能：前视+俯视+热力图+语义计数可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -291,6 +317,12 @@ clock = pygame.time.Clock()
 start_time = time.time()
 frame_counter = 0
 current_fps = 0.0
+# ==================== 第11次提交新增：定义需要计数的语义类别 ====================
+count_class_mapping = {
+    "Pedestrian": 4,    # 行人
+    "Vehicle": 10,      # 车辆
+    "TrafficLight": 12  # 交通灯
+}
 # =================================================================
 
 try:
@@ -332,6 +364,10 @@ try:
             
             # ==================== 新增：生成语义密度热力图 ====================
             density_heatmap = generate_density_heatmap(front_sem_data, target_classes=[4, 10])
+            # =================================================================
+            
+            # ==================== 第11次提交新增：计算语义类别计数 ====================
+            class_count_result = semantic_class_count(front_sem_data, count_class_mapping)
             # =================================================================
             
             # 4. 多视角图像拼接（优化布局）：
@@ -377,10 +413,42 @@ try:
                 cv2.putText(combined_img, info, (perf_x, y_pos), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, perf_color, 2)
             
+            # ==================== 第11次提交新增：绘制语义计数面板（右上角） ====================
+            # 计数面板位置（画面右上角，避免与性能监控重叠）
+            count_x = combined_img.shape[1] - 320  # 2048 - 320 = 1728
+            count_y = 30
+            count_color = (255, 255, 0)  # 青色（易识别，与黄色性能监控区分）
+            count_bg_color = (0, 0, 0)   # 黑色背景
+            count_line_height = 28
+            
+            # 绘制计数面板背景（半透明黑色）
+            cv2.rectangle(combined_img, 
+                          (count_x - 10, count_y - 10), 
+                          (combined_img.shape[1] - 10, count_y + 100), 
+                          count_bg_color, -1)  # 实心背景
+            
+            # 绘制计数面板标题
+            cv2.putText(combined_img, "Semantic Count (Frame)", 
+                       (count_x, count_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, count_color, 2)
+            
+            # 绘制各类别计数
+            count_items = [
+                f"Pedestrian: {class_count_result['Pedestrian']}",
+                f"Vehicle: {class_count_result['Vehicle']}",
+                f"TrafficLight: {class_count_result['TrafficLight']}"
+            ]
+            for idx, item in enumerate(count_items):
+                y_pos = count_y + (idx + 1) * count_line_height
+                cv2.putText(combined_img, item, 
+                           (count_x, y_pos), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.65, count_color, 2)
+            # =================================================================
+            
             # 7. 显示最终图像（自动调整窗口大小）
-            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap', 1920, 1080)
-            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap', combined_img)
+            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap + Count', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap + Count', 1920, 1080)
+            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap + Count', combined_img)
             
             if cv2.waitKey(1) == ord('q'):
                 break
