@@ -23,3 +23,6 @@ Robot Arm Grasping Simulation (MuJoCo)
 1. 配置 MuJoCo 环境变量，加载机械臂模型文件（robot.xml）
 2. 运行抓取演示脚本：`python grasp_demo.py`
 3. 查看仿真结果日志及可视化视频，验证抓取效果
+ 机械臂抓取仿真项目（MuJoCo）README
+Robot Arm Grasping Simulation (MuJoCo)
+

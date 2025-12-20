@@ -419,9 +419,8 @@ def gen_sentence(model: myRNNModel, word2id: dict, id2word: dict, max_len: int =
     Returns:
         str: 生成的诗歌字符串（不包含开始和结束标记）
     """
-    # 初始化RNN隐藏状态（通常为两个状态变量，如LSTM的cell state和hidden state）
-    state = [tf.random.normal(shape=(1, 128), stddev=0.5),
-             tf.random.normal(shape=(1, 128), stddev=0.5)]
+    # 初始化RNN隐藏状态 - SimpleRNNCell只需要一个状态
+    state = tf.random.normal(shape=(1, 128), stddev=0.5)
 
     # 初始化当前token为开始标记
     cur_token = tf.constant([word2id[start_token]], dtype=tf.int32)

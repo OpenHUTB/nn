@@ -1,0 +1,53 @@
+{
+  "camera": {
+    "index": 0,
+    "width": 640,
+    "height": 480,
+    "fps": 30
+  },
+  "gesture": {
+    "detection_confidence": 0.7,
+    "tracking_confidence": 0.5,
+    "history_size": 10,
+    "smooth_frames": 5,
+    "min_confidence": 0.6
+  },
+  "drone": {
+    "velocity": 3.0,
+    "duration": 0.2,
+    "altitude": -10.0,
+    "control_interval": 0.2
+  },
+  "display": {
+    "show_fps": true,
+    "show_confidence": true,
+    "show_landmarks": true,
+    "show_help": true
+  },
+  "performance": {
+    "target_fps": 30,
+    "resize_factor": 0.5,
+    "enable_threading": true
+  },
+  "camera_width": 640,
+  "camera_height": 480,
+  "camera_fps": 30,
+  "camera_index": 0,
+  "mirror_camera": false,
+  "min_detection_confidence": 0.6,
+  "min_tracking_confidence": 0.5,
+  "gesture_smoothness": 5,
+  "gesture_stability_threshold": 3,
+  "control_velocity": 3.0,
+  "control_duration": 0.25,
+  "control_deadzone": 0.1,
+  "max_altitude": -20.0,
+  "min_altitude": -5.0,
+  "target_fps": 30,
+  "frame_timeout": 2.0,
+  "log_level": "INFO",
+  "ui_theme": "dark",
+  "show_fps": true,
+  "show_landmarks": true,
+  "show_confidence": true
+}

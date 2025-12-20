@@ -1,0 +1,5 @@
+carla==0.9.14
+pygame==2.1.0
+numpy==1.21.5
+Pillow==9.2.0
+icecream==2.1.3
