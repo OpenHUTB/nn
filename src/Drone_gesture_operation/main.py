@@ -1,109 +1,266 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import copy
+import argparse
+import itertools
+from collections import Counter
+from collections import deque
+import time
+
+import cv2 as cv
 import numpy as np
-import tensorflow as tf
-import os
-import warnings
-import pathlib
-
-# 关闭oneDNN提示
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
-# 关闭TF Lite警告
-warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow.lite.python.interpreter')
 
 
-class PointHistoryClassifier(object):
-    def __init__(
-            self,
-            model_path='model/point_history_classifier/point_history_classifier.tflite',
-            score_th=0.5,
-            invalid_value=0,
-            num_threads=1,
-    ):
-        if not os.path.isfile(model_path):
-            raise FileNotFoundError(f"模型文件不存在：{model_path}")
-        if not model_path.endswith('.tflite'):
-            raise ValueError(f"路径不是.tflite文件：{model_path}")
+# ========== FPS计算 ==========
+class CvFpsCalc:
+    def __init__(self, buffer_len=10):
+        self.buffer_len = buffer_len
+        self.times = deque(maxlen=buffer_len)
 
-        with open(model_path, 'rb') as f:
-            model_data = f.read()
-        self.interpreter = tf.lite.Interpreter(model_content=model_data, num_threads=num_threads)
-        self.interpreter.allocate_tensors()
-        self.input_details = self.interpreter.get_input_details()
-        self.output_details = self.interpreter.get_output_details()
+    def get(self):
+        self.times.append(time.perf_counter())
+        if len(self.times) < 2:
+            return 0
+        return int(len(self.times) / (self.times[-1] - self.times[0]))
 
-        self.score_th = score_th
-        self.invalid_value = invalid_value
-        print(f"✅ 模型加载成功！")
-        print(f"输入张量形状：{self.input_details[0]['shape']}")
-        print(f"输出张量形状：{self.output_details[0]['shape']}")
 
+# ========== 手势分类器（简化版） ==========
+class KeyPointClassifier:
+    def __call__(self, landmark_list):
+        return 7  # 模拟点手势
+
+
+class PointHistoryClassifier:
     def __call__(self, point_history):
-        if not isinstance(point_history, (list, np.ndarray)):
-            raise TypeError("输入必须是列表或numpy数组")
-
-        input_data = np.array([point_history], dtype=np.float32)
-        if input_data.shape != tuple(self.input_details[0]['shape']):
-            raise ValueError(
-                f"输入形状不匹配！模型要求：{self.input_details[0]['shape']}，实际：{input_data.shape}"
-            )
-
-        self.interpreter.set_tensor(self.input_details[0]['index'], input_data)
-        self.interpreter.invoke()
-
-        result = self.interpreter.get_tensor(self.output_details[0]['index'])
-        result_squeezed = np.squeeze(result)
-        result_index = np.argmax(result_squeezed)
-
-        print(f"\n原始预测得分：{result_squeezed}")
-        print(f"最高得分索引：{result_index}，得分值：{result_squeezed[result_index]}")
-
-        if result_squeezed[result_index] < self.score_th:
-            result_index = self.invalid_value
-            print(f"⚠️ 得分低于阈值({self.score_th})，返回无效值：{self.invalid_value}")
-
-        return result_index
+        return 0
 
 
-def preprocess_point_history(point_history):
-    """归一化关键点数据到0~1"""
-    point_history = np.array(point_history, dtype=np.float32)
-    min_val = np.min(point_history)
-    max_val = np.max(point_history)
-    # 避免除零
-    point_history = (point_history - min_val) / (max_val - min_val + 1e-6)
-    return point_history
+# ========== 参数解析 ==========
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--device", type=int, default=0)
+    parser.add_argument("--width", type=int, default=960)
+    parser.add_argument("--height", type=int, default=540)
+    return parser.parse_args()
 
 
-if __name__ == "__main__":
-    # 配置
-    MODEL_PATH = pathlib.Path(
-        r"E:\无人机\dronehandgesture2023P1\model\point_history_classifier\point_history_classifier.tflite").resolve()
-    SCORE_THRESHOLD = 0.5
-    # 手势映射（根据实际训练标签调整）
-    gesture_mapping = {0: "无手势/降落", 1: "起飞/前进"}
+# ========== 辅助函数 ==========
+def select_mode(key, mode):
+    number = -1
+    if 48 <= key <= 57:
+        number = key - 48
+    if key == ord('n'):
+        mode = 0
+    if key == ord('k'):
+        mode = 1
+    if key == ord('h'):
+        mode = 2
+    return number, mode
 
-    print(f"当前模型路径：{MODEL_PATH}")
-    try:
-        # 实例化分类器
-        classifier = PointHistoryClassifier(
-            model_path=str(MODEL_PATH),
-            score_th=SCORE_THRESHOLD,
-            num_threads=4
+
+def calc_bounding_rect(image):
+    """模拟手部边界框（屏幕中心）"""
+    h, w = image.shape[:2]
+    cx, cy = w // 2, h // 2
+    bw, bh = 200, 200  # 边界框大小
+    return [cx - bw // 2, cy - bh // 2, cx + bw // 2, cy + bh // 2]
+
+
+def calc_landmark_list(image):
+    """模拟21个手部关键点（适配原代码逻辑）"""
+    h, w = image.shape[:2]
+    cx, cy = w // 2, h // 2
+    landmark_list = []
+
+    # 手掌中心（0号点）
+    landmark_list.append([cx, cy])
+
+    # 拇指（1-4号点）
+    landmark_list.append([cx - 50, cy - 30])
+    landmark_list.append([cx - 80, cy - 60])
+    landmark_list.append([cx - 100, cy - 90])
+    landmark_list.append([cx - 110, cy - 110])
+
+    # 食指（5-8号点）
+    landmark_list.append([cx + 50, cy - 30])
+    landmark_list.append([cx + 80, cy - 60])
+    landmark_list.append([cx + 100, cy - 90])
+    landmark_list.append([cx + 110, cy - 110])  # 8号点（点手势关键）
+
+    # 中指（9-12号点）
+    landmark_list.append([cx + 30, cy - 10])
+    landmark_list.append([cx + 50, cy - 40])
+    landmark_list.append([cx + 70, cy - 70])
+    landmark_list.append([cx + 80, cy - 90])
+
+    # 无名指（13-16号点）
+    landmark_list.append([cx + 10, cy + 10])
+    landmark_list.append([cx + 20, cy - 20])
+    landmark_list.append([cx + 30, cy - 50])
+    landmark_list.append([cx + 40, cy - 70])
+
+    # 小指（17-20号点）
+    landmark_list.append([cx - 10, cy + 10])
+    landmark_list.append([cx - 20, cy - 20])
+    landmark_list.append([cx - 30, cy - 50])
+    landmark_list.append([cx - 40, cy - 70])
+
+    return landmark_list
+
+
+def pre_process_landmark(landmark_list):
+    temp = copy.deepcopy(landmark_list)
+    if not temp:
+        return []
+    base_x, base_y = temp[0][0], temp[0][1]
+    for i in range(len(temp)):
+        temp[i][0] -= base_x
+        temp[i][1] -= base_y
+    temp = list(itertools.chain.from_iterable(temp))
+    max_val = max(map(abs, temp)) if temp else 1
+    return [x / max_val for x in temp]
+
+
+def pre_process_point_history(image, point_history):
+    temp = copy.deepcopy(point_history)
+    if not temp:
+        return []
+    base_x, base_y = temp[0][0], temp[0][1]
+    image_w, image_h = image.shape[1], image.shape[0]
+    for i in range(len(temp)):
+        temp[i][0] = (temp[i][0] - base_x) / image_w
+        temp[i][1] = (temp[i][1] - base_y) / image_h
+    return list(itertools.chain.from_iterable(temp))
+
+
+def draw_landmarks(image, landmark_list):
+    """绘制模拟关键点"""
+    if len(landmark_list) == 0:
+        return image
+    # 绘制手指连线
+    links = [(2, 3), (3, 4), (5, 6), (6, 7), (7, 8), (9, 10), (10, 11), (11, 12),
+             (13, 14), (14, 15), (15, 16), (17, 18), (18, 19), (19, 20),
+             (0, 1), (1, 2), (2, 5), (5, 9), (9, 13), (13, 17), (17, 0)]
+    for (p1, p2) in links:
+        if p1 < len(landmark_list) and p2 < len(landmark_list):
+            cv.line(image, tuple(landmark_list[p1]), tuple(landmark_list[p2]), (0, 0, 0), 6)
+            cv.line(image, tuple(landmark_list[p1]), tuple(landmark_list[p2]), (255, 255, 255), 2)
+    # 绘制关键点
+    for i, (x, y) in enumerate(landmark_list):
+        size = 8 if i in [4, 8, 12, 16, 20] else 5
+        cv.circle(image, (x, y), size, (255, 255, 255), -1)
+        cv.circle(image, (x, y), size, (0, 0, 0), 1)
+    return image
+
+
+def draw_bounding_rect(image, brect):
+    cv.rectangle(image, (brect[0], brect[1]), (brect[2], brect[3]), (0, 255, 0), 2)
+    return image
+
+
+def draw_info_text(image, brect, hand_sign_text, finger_gesture_text):
+    cv.rectangle(image, (brect[0], brect[1] - 30), (brect[2], brect[1]), (0, 255, 0), -1)
+    info = f"Hand: {hand_sign_text}"
+    cv.putText(image, info, (brect[0] + 5, brect[1] - 5), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    if finger_gesture_text:
+        cv.putText(image, f"Gesture: {finger_gesture_text}", (10, 60),
+                   cv.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
+    return image
+
+
+def draw_point_history(image, point_history):
+    for i, (x, y) in enumerate(point_history):
+        if x != 0 and y != 0:
+            cv.circle(image, (x, y), 2 + i // 2, (0, 255, 0), -1)
+    return image
+
+
+def draw_info(image, fps, mode, number):
+    cv.putText(image, f"FPS: {fps}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
+    mode_text = ["Idle", "Log Keypoint", "Log Point History"][mode] if 0 <= mode <= 2 else "Idle"
+    cv.putText(image, f"Mode: {mode_text}", (10, 90), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    if 0 <= number <= 9:
+        cv.putText(image, f"Num: {number}", (10, 120), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    return image
+
+
+# ========== 主函数 ==========
+def main():
+    args = get_args()
+    # 初始化摄像头
+    cap = cv.VideoCapture(args.device)
+    cap.set(cv.CAP_PROP_FRAME_WIDTH, args.width)
+    cap.set(cv.CAP_PROP_FRAME_HEIGHT, args.height)
+
+    # 初始化工具类
+    cvFpsCalc = CvFpsCalc(buffer_len=10)
+    keypoint_classifier = KeyPointClassifier()
+    point_history_classifier = PointHistoryClassifier()
+
+    # 标签和历史数据
+    keypoint_labels = ["None", "Point", "Fist", "OK", "Peace", "ThumbUp", "ThumbDown", "PointGesture"]
+    point_history_labels = ["None", "MoveUp", "MoveDown", "MoveLeft", "MoveRight"]
+    history_length = 16
+    point_history = deque(maxlen=history_length)
+    finger_gesture_history = deque(maxlen=history_length)
+    mode = 0
+
+    while True:
+        # FPS计算
+        fps = cvFpsCalc.get()
+
+        # 按键处理
+        key = cv.waitKey(1) & 0xFF
+        if key == 27:  # ESC退出
+            break
+        number, mode = select_mode(key, mode)
+
+        # 读取摄像头帧
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame = cv.flip(frame, 1)  # 镜像显示
+        debug_frame = copy.deepcopy(frame)
+
+        # 【核心修改】跳过真实检测，直接模拟手部数据
+        brect = calc_bounding_rect(debug_frame)
+        landmark_list = calc_landmark_list(debug_frame)
+
+        # 预处理
+        pre_landmark = pre_process_landmark(landmark_list)
+        pre_point_history = pre_process_point_history(debug_frame, point_history)
+
+        # 手势分类
+        hand_sign_id = keypoint_classifier(pre_landmark)
+        point_history.append(landmark_list[8] if hand_sign_id == 7 else [0, 0])
+
+        # 手指手势分类
+        finger_gesture_id = 0
+        if len(pre_point_history) == history_length * 2:
+            finger_gesture_id = point_history_classifier(pre_point_history)
+        finger_gesture_history.append(finger_gesture_id)
+        most_common = Counter(finger_gesture_history).most_common(1)
+
+        # 绘制UI
+        debug_frame = draw_bounding_rect(debug_frame, brect)
+        debug_frame = draw_landmarks(debug_frame, landmark_list)
+        debug_frame = draw_info_text(
+            debug_frame, brect,
+            keypoint_labels[hand_sign_id] if hand_sign_id < len(keypoint_labels) else "Unknown",
+            point_history_labels[most_common[0][0]] if most_common else "Unknown"
         )
 
-        # 1. 测试数据（随机生成32维，匹配模型输入）
-        test_point_history = np.random.rand(32).astype(np.float32)
-        # 2. 预处理（替换为真实数据时注释掉随机数，启用下面两行）
-        # real_point_history = [0.1,0.2,...,0.3]  # 32个真实关键点数值
-        # test_point_history = preprocess_point_history(real_point_history)
+        # 绘制辅助信息
+        debug_frame = draw_point_history(debug_frame, point_history)
+        debug_frame = draw_info(debug_frame, fps, mode, number)
 
-        # 分类推理
-        result = classifier(test_point_history)
-        print(f"\n🎯 最终分类结果：{result} → {gesture_mapping.get(result, '未知手势')}")
+        # 显示窗口
+        cv.imshow('Hand Gesture Recognition (ESC to exit)', debug_frame)
 
-    except Exception as e:
-        print(f"\n❌ 错误：{e}")
-        import traceback
+    # 释放资源
+    cap.release()
+    cv.destroyAllWindows()
 
-        traceback.print_exc()
+
+if __name__ == '__main__':
+    main()
