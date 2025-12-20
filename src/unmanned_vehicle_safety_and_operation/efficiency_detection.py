@@ -471,7 +471,7 @@ def main():
 
     threading.Thread(target=plot_realtime).start()
 
-    # 8. 实时检测示例11
+    # 8. 实时检测示例111
     print("\n=== 实时检测示例 ===")
     test_data = preprocessor.generate_simulation_data(n_samples=10)
     rt_X, _ = preprocessor.preprocess_data(test_data)
