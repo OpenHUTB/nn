@@ -1,7 +1,6 @@
 MuJoCo 简易轮式小车智能代理
 项目简介
 一个基于PyTorch神经网络与MuJoCo物理引擎的简易轮式小车智能代理，实现了在连续控制环境下的感知、决策与控制一体化解决方案。项目采用模块化设计，便于在仿真环境中进行机器人控制算法研究、强化学习训练和控制系统验证。
-
 功能特性
 物理仿真：基于MuJoCo的高保真物理模拟，支持关节约束、碰撞检测和接触力计算
 
@@ -28,6 +27,43 @@ MuJoCo版本：2.3.0+（需要获取许可证）
 
 推荐硬件：支持CUDA的NVIDIA显卡（用于神经网络加速）
 
+项目结构
+text
+src/mujoco_wheeled_robot/
+├── main.py                      # 模块主入口（训练与推理）
+├── requirements.txt
+├── config/
+│   ├── robot_config.yaml       # 机器人物理参数
+│   └── training_config.yaml    # 训练超参数
+├── models/
+│   ├── robot.xml               # MuJoCo模型文件
+│   ├── trained_policy.pth      # 预训练策略
+│   └── dynamics_model.pth      # 动力学模型（可选）
+├── src/
+│   ├── environment/
+│   │   ├── __init__.py
+│   │   ├── wheeled_robot_env.py # 自定义Gym环境
+│   │   └── env_wrapper.py       # 环境包装器
+│   ├── agent/
+│   │   ├── __init__.py
+│   │   ├── policy_network.py    # 策略网络
+│   │   ├── value_network.py     # 价值网络（强化学习）
+│   │   └── mpc_controller.py    # 模型预测控制器
+│   ├── utils/
+│   │   ├── data_logger.py       # 数据记录器
+│   │   ├── visualization.py     # 可视化工具
+│   │   └── mujoco_utils.py      # MuJoCo辅助函数
+│   └── algorithms/              # 算法实现
+│       ├── sac.py               # Soft Actor-Critic
+│       ├── td3.py               # Twin Delayed DDPG
+│       └── bc.py                # 行为克隆
+├── scripts/
+│   ├── train.py                 # 训练脚本
+│   ├── evaluate.py              # 评估脚本
+│   └── render_trajectory.py     # 轨迹渲染
+└── tests/
+    ├── test_env.py
+    └── test_agent.py
 快速开始
 安装MuJoCo：
 
