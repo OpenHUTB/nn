@@ -5,19 +5,19 @@ import os
 # ==================== 轨迹配置 ====================
 TRAJECTORIES = {
     "custom_trajectory": {
-        "start": [-8.77956485748291, 140.2951202392578, 2.0014660358428955, 0], 
-        "end": [74.17852020263672, -56.52183151245117, 0.18172569572925568],
+        "start": [108.91605377197266,101.3561782836914,0.6136533617973328, 0], 
+        "end": [74.64781951904297,-56.014076232910156,0.40768954157829285],
         "description": "自定义轨迹 - 城镇道路"
     },
     "test_trajectory": {
-        "start": [0.0, 0.0, 2.0, 0],
-        "end": [100.0, 0.0, 2.0],
+        "start": [98.25761413574219,99.15800476074219,0.4944169223308563, 0],
+        "end": [74.64781951904297,-56.014076232910156,0.40768954157829285],
         "description": "测试轨迹 - 直线道路"
     }
 }
 
 # 当前使用的轨迹
-CURRENT_TRAJECTORY = "custom_trajectory"
+CURRENT_TRAJECTORY = "test_trajectory"
 
 def get_current_trajectory():
     """获取当前轨迹配置"""
@@ -49,7 +49,7 @@ MAX_STEPS_PER_EPISODE = 2000          # 每个episode最大步数
 EPISODE_INTERVAL = 2.0                # episode之间的间隔秒数
 
 # ==================== 交通配置 ====================
-ENABLE_TRAFFIC = True                # 是否启用交通流（暂时关闭，避免干扰）
+ENABLE_TRAFFIC = False               # 是否启用交通流（暂时关闭，避免干扰）
 TRAFFIC_VEHICLES = 30                 # 交通车辆数量
 TRAFFIC_WALKERS = 50                  # 交通行人数量
 TRAFFIC_SAFE_MODE = True              # 交通安全模式
