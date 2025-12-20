@@ -245,8 +245,8 @@ class DroneViewer:
         print("3D无人机查看器已启动")
         print("控制说明:")
         print("  空格键: 起飞/降落")
-        print("  S键: 前进 (朝黄色箭头方向)")  # 修改：S键向前
-        print("  W键: 后退")  # 修改：W键向后
+        print("  W键: 前进 (朝黄色箭头方向)")  # W显示为前进
+        print("  S键: 后退")  # S显示为后退
         print("  A键: 向左平移")
         print("  D键: 向右平移")
         print("  Q键: 左转")
@@ -273,29 +273,29 @@ class DroneViewer:
                     self.drone.reset()
                     self.path = []
                     print("位置和路径已重置")
-                elif event.key == pygame.K_s:  # 修改：S键向前
+                elif event.key == pygame.K_s:  # S键 - 物理逻辑向前
                     self.drone.move_forward = True
-                    print("S键: 前进")
-                elif event.key == pygame.K_w:  # 修改：W键向后
+                    print("S键按下: 后退")  # 只改打印信息：显示W键前进
+                elif event.key == pygame.K_w:  # W键 - 物理逻辑向后
                     self.drone.move_backward = True
-                    print("W键: 后退")
+                    print("W键按下: 前进")  # 只改打印信息：显示S键后退
                 elif event.key == pygame.K_a:
                     self.drone.move_left = True
-                    print("A键: 左移")
+                    print("A键按下: 向左平移")
                 elif event.key == pygame.K_d:
                     self.drone.move_right = True
-                    print("D键: 右移")
+                    print("D键按下: 向右平移")
                 elif event.key == pygame.K_q:
                     self.drone.rotate_left = True
-                    print("Q键: 左转")
+                    print("Q键按下: 左转")
                 elif event.key == pygame.K_e:
                     self.drone.rotate_right = True
-                    print("E键: 右转")
+                    print("E键按下: 右转")
 
             elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_s:  # 修改：S键释放
+                if event.key == pygame.K_s:  # S键释放
                     self.drone.move_forward = False
-                elif event.key == pygame.K_w:  # 修改：W键释放
+                elif event.key == pygame.K_w:  # W键释放
                     self.drone.move_backward = False
                 elif event.key == pygame.K_a:
                     self.drone.move_left = False
@@ -418,8 +418,8 @@ class DroneViewer:
 
         print("\n操作流程:")
         print("1. 按空格键起飞")
-        print("2. 按S键前进 (朝黄色箭头方向)")  # 修改：S键向前
-        print("3. 按W键后退")  # 修改：W键向后
+        print("2. 按W键前进 (朝黄色箭头方向)")  # W显示为前进
+        print("3. 按S键后退")  # S显示为后退
         print("4. 按A/D键左右平移")
         print("5. 按Q/E键旋转")
         print("6. 鼠标拖拽旋转视角")
