@@ -838,5 +838,23 @@ git clone https://github.com/LAStools/LAStools.git
 **成功**
 <img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/afecb182-3bba-4884-9b58-e47abd118553" />
 
+## 常见的错误的解决方案
+
+如果报错为
+
+<img width="615" height="314" alt="image" src="https://github.com/user-attachments/assets/b4b7d71c-0df9-43b2-a22c-6729fadc08fa" />
+有时不是因为路径中出现了中文字符，而是你的.las/.laz文件缺少正确的坐标系信息。
+
+### 解决方案：
+
+
+1.**找到上文提到的对应区域的EPSG编码**
+确保你的点云文件已经存在roadrunner的 Library Browser中
+2**打开Attributes窗口**
+
+2.**选中.las/.laz文件并查看Attributes**
+在Attributes窗口中
+
+# 导出场景到CARLA
 
 
