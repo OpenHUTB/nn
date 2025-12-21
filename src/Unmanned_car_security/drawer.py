@@ -8,6 +8,10 @@ class PyGameDrawer:
         self.screen = main.game.screen
         self.font = pygame.font.SysFont('Arial', 32)
         self.small_font = pygame.font.SysFont('Arial', 20)
+        self.warning_font = pygame.font.SysFont('Arial', 24, bold=True)
+
+        # 摄像头图像存储
+        self.camera_image = None
 
     def display_speed(self, speed):
         """显示速度在屏幕左上角"""
@@ -54,10 +58,56 @@ class PyGameDrawer:
                 fill_rect = pygame.Rect(indicator_x, indicator_y, fill_width, indicator_height)
                 pygame.draw.rect(self.screen, color, fill_rect, border_radius=5)
 
+    def display_camera(self):
+        """显示摄像头图像 - 新增功能"""
+        if self.camera_image is not None:
+            try:
+                # 摄像头图像显示在右上角
+                cam_x = self.screen.get_width() - 420  # 右边距20，宽度400
+                cam_y = 20  # 上边距
+
+                # 确保图像是有效的numpy数组
+                if self.camera_image.shape[0] > 0 and self.camera_image.shape[1] > 0:
+                    # 将numpy数组转换为Pygame表面
+                    # 注意：numpy数组是(height, width, 3)格式，需要转置为(width, height, 3)
+                    image_surface = pygame.surfarray.make_surface(self.camera_image.swapaxes(0, 1))
+
+                    # 调整图像大小以适应显示区域
+                    target_width = 400
+                    target_height = 300
+                    image_surface = pygame.transform.scale(image_surface, (target_width, target_height))
+
+                    # 绘制图像
+                    self.screen.blit(image_surface, (cam_x, cam_y))
+
+                    # 绘制边框和标题
+                    pygame.draw.rect(self.screen, (100, 100, 100),
+                                     (cam_x - 2, cam_y - 2, target_width + 4, target_height + 4),
+                                     2, border_radius=5)
+
+                    # 添加摄像头标签
+                    camera_label = self.small_font.render("摄像头视图", True, (255, 255, 255))
+                    self.screen.blit(camera_label, (cam_x + 150, cam_y + target_height + 10))
+
+            except Exception as e:
+                # 如果绘制失败，静默处理（避免影响主程序）
+                # 可以在调试时取消注释下面的打印
+                # print(f"绘制摄像头图像失败: {e}")
+                pass
+
+    # 🆕 新增：帧率显示功能
+    def display_fps(self, fps):
+        """在屏幕右上角显示实时帧率"""
+        fps_text = self.small_font.render(f'FPS: {fps:.1f}', True, (200, 200, 255))
+        # 显示在右上角，摄像头图像的右侧
+        fps_x = self.screen.get_width() - 120  # 右边距20，宽度100
+        fps_y = 20
+        self.screen.blit(fps_text, (fps_x, fps_y))
+
     def draw_camera(self, image_array):
-        """绘制摄像头图像（如果需要）"""
-        # 这里可以添加摄像头图像的绘制逻辑
-        pass
+        """绘制摄像头图像（兼容旧代码）"""
+        # 将图像存储起来供display_camera使用
+        self.camera_image = image_array
 
     def draw_lidar(self, point_cloud):
         """绘制激光雷达点云（如果需要）"""
