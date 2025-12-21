@@ -36,8 +36,11 @@ class ConfigManager:
                     'range': 100,
                     'points_per_second': 56000,
                     'rotation_frequency': 10,
-                    'max_points_per_frame': 100000,
-                    'downsample_ratio': 0.5
+                    'max_points_per_frame': 50000,  # 优化点6：减少最大点数
+                    'downsample_ratio': 0.3,  # 优化点6：增加下采样比例
+                    'memory_warning_threshold': 350,  # 新增：内存警告阈值(MB)
+                    'max_batch_memory_mb': 50,  # 新增：批次最大内存
+                    'v2x_save_interval': 5  # 新增：V2X格式保存间隔
                 }
             },
             'v2x': {
@@ -47,7 +50,8 @@ class ConfigManager:
                 'latency_mean': 0.05,
                 'latency_std': 0.01,
                 'packet_loss_rate': 0.01,
-                'message_types': ['bsm', 'spat', 'map', 'rsm']
+                'message_types': ['bsm', 'spat', 'map', 'rsm'],
+                'update_interval': 2.0  # 优化点6：V2X更新间隔
             },
             'cooperative': {
                 'num_coop_vehicles': 2,
@@ -81,11 +85,16 @@ class ConfigManager:
                     'batch_size': 10,
                     'enable_compression': True,
                     'enable_downsampling': True,
-                    'max_points_per_frame': 100000
+                    'max_points_per_frame': 50000,  # 与sensors配置保持一致
+                    'memory_warning_threshold': 350,
+                    'max_batch_memory_mb': 50,
+                    'v2x_save_interval': 5
                 },
                 'fusion': {
                     'fusion_cache_size': 100
-                }
+                },
+                'sensor_cleanup_timeout': 0.5,  # 新增：传感器清理超时
+                'frame_rate_limit': 5.0  # 新增：帧率限制
             },
             'output': {
                 'data_dir': 'cvips_dataset',
@@ -150,6 +159,9 @@ class ConfigManager:
 
         if hasattr(args, 'enable_v2x') and args.enable_v2x:
             config['v2x']['enabled'] = True
+            # 如果通过命令行启用V2X，使用更保守的更新间隔
+            if 'update_interval' not in config['v2x']:
+                config['v2x']['update_interval'] = 2.0
 
         if hasattr(args, 'enable_enhancement') and args.enable_enhancement:
             config['enhancement']['enabled'] = True
@@ -157,6 +169,9 @@ class ConfigManager:
         if hasattr(args, 'enable_lidar') and args.enable_lidar:
             config['sensors']['lidar_sensors'] = 1
             config['output']['save_lidar'] = True
+            # 优化：如果启用LiDAR，使用更保守的设置
+            config['sensors']['lidar_config']['max_points_per_frame'] = 50000
+            config['sensors']['lidar_config']['downsample_ratio'] = 0.3
 
         if hasattr(args, 'enable_fusion') and args.enable_fusion:
             config['output']['save_fusion'] = True
@@ -185,6 +200,9 @@ class ConfigManager:
 
         if hasattr(args, 'enable_downsampling') and args.enable_downsampling:
             config['performance']['enable_downsampling'] = True
+            # 如果启用下采样，使用更保守的设置
+            config['sensors']['lidar_config']['downsample_ratio'] = 0.3
+            config['performance']['lidar_processing']['max_points_per_frame'] = 50000
 
         if hasattr(args, 'output_format') and args.output_format:
             config['output']['output_format'] = args.output_format
