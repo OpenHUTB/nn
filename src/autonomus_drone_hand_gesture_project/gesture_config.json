@@ -67,6 +67,9 @@
     "show_speech_status": true,
     "show_gesture_history": true,
     "show_stability_indicator": true,
+    "show_trajectory": true,
+    "show_trajectory_heatmap": false,
+    "trajectory_max_points": 100,
     "show_gesture_info": true,
     "show_control_help": true,
     "show_detection_overlay": true,
@@ -96,9 +99,16 @@
     "announce_gesture_changes": true,
     "announce_hand_status": true,
     "announce_performance": true,
+    "announce_recording": true,
     "min_gesture_confidence": 0.7,
     "gesture_start_threshold": 3,
     "gesture_end_threshold": 10
+  },
+  "recording": {
+    "auto_save": false,
+    "default_filename": "gesture_recording.pkl",
+    "playback_speed": 1.0,
+    "loop_playback": false
   },
   "system": {
     "version": "1.0",
