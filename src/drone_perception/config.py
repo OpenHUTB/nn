@@ -131,3 +131,25 @@ DEBUG = {
     'LOG_VECTOR_FIELD': False,  # 是否记录向量场详细信息
     'PERFORMANCE_PROFILING': False,  # 是否启用性能分析
 }
+
+# ==================== 数据记录参数 ====================
+DATA_RECORDING = {
+    'ENABLED': True,                      # 启用数据记录
+    'RECORD_INTERVAL': 0.2,               # 记录间隔（秒）
+    'SAVE_TO_CSV': True,                  # 保存为CSV格式
+    'SAVE_TO_JSON': True,                 # 保存为JSON格式
+    'CSV_FILENAME': 'flight_data.csv',    # CSV文件名
+    'JSON_FILENAME': 'flight_data.json',  # JSON文件名
+    'PERFORMANCE_MONITORING': True,       # 启用性能监控
+    'SYSTEM_METRICS_INTERVAL': 5.0,       # 系统指标记录间隔（秒）
+}
+
+# ==================== 性能监控参数 ====================
+PERFORMANCE = {
+    'ENABLE_REALTIME_METRICS': True,      # 启用实时性能监控
+    'CPU_WARNING_THRESHOLD': 80.0,        # CPU使用率警告阈值（%）
+    'MEMORY_WARNING_THRESHOLD': 80.0,     # 内存使用率警告阈值（%）
+    'LOOP_TIME_WARNING_THRESHOLD': 0.2,   # 循环时间警告阈值（秒）
+    'SAVE_PERFORMANCE_REPORT': True,      # 保存性能报告
+    'REPORT_INTERVAL': 30.0,              # 性能报告间隔（秒）
+}
