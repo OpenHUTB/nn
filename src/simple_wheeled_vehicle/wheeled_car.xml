@@ -14,34 +14,33 @@
       <geom type="sphere" size="0.04" material="wheel"
             mass="0.25" friction="1.0 0.005 0.005"/>
     </default>
-    <!-- 超软悬挂 -->
     <default class="arm">
       <joint type="hinge" axis="0 1 0" damping="15" stiffness="60"
              range="-0.02 0.04" limited="true"/>
     </default>
-    <!-- 伺服：小齿轮 = 慢速回正，阻尼 = 顺滑 -->
-    <default class="servo">
-      <motor ctrlrange="-0.3 0.3" ctrllimited="true" gear="15" damping="10"/>
+    <default class="steer">
+      <joint type="hinge" axis="0 0 1" damping="5" limited="false"/>
     </default>
-    <!-- 驱动扭矩再减半 -->
+    <!-- 电机：去掉 damping，仅用 ctrlrange 限扭 -->
     <default class="drive">
-      <motor ctrlrange="-0.8 0.8" ctrllimited="true" gear="25"/>
+      <motor ctrlrange="-1.2 1.2" ctrllimited="true" gear="30"/>
+    </default>
+    <default class="servo">
+      <motor ctrlrange="-0.3 0.3" ctrllimited="true" gear="15"/>
     </default>
   </default>
 
   <worldbody>
     <geom name="floor" type="plane" size="10 10 0.1" material="grid"/>
 
-    <!-- 重心低于轮轴 -->
     <body name="chassis" pos="0 0 0.03">
       <freejoint/>
       <geom name="body" type="box" size="0.18 0.22 0.02" pos="0 0 -0.02" rgba="0.9 0.2 0.2 1" mass="3"/>
       <geom type="box" size="0.18 0.22 0.04" rgba="0.9 0.2 0.2 1" contype="0" conaffinity="0"/>
 
-      <!-- 轮距 0.34 -->
       <body name="front_left_hub" pos="0.16 0.17 0">
         <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
-        <joint name="fl_steer" class="servo"/>
+        <joint name="fl_steer" class="steer"/>
         <body name="fl_arm" pos="0 0 0">
           <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
           <joint name="fl_arm_hinge" axis="0 1 0" damping="12" stiffness="60" range="-0.02 0.04" limited="true"/>
@@ -54,7 +53,7 @@
 
       <body name="front_right_hub" pos="0.16 -0.17 0">
         <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
-        <joint name="fr_steer" class="servo"/>
+        <joint name="fr_steer" class="steer"/>
         <body name="fr_arm" pos="0 0 0">
           <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
           <joint name="fr_arm_hinge" axis="0 1 0" damping="12" stiffness="60" range="-0.02 0.04" limited="true"/>
@@ -83,7 +82,6 @@
         </body>
       </body>
 
-      <!-- 相机 -->
       <body name="cam" pos="-0.3 0 0.15" quat="0.819 0.573 0 0">
         <camera name="track" mode="track" pos="0 0 0" xyaxes="1 0 0  0 0 1" fovy="50"/>
       </body>

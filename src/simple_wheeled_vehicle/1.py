@@ -65,7 +65,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             steer_target = -0.4
         else:
             steer_target = 0.0          # 松键即回正（伺服自带阻尼）
-
         # ---- 速度斜坡 ----
         speed = speed_target   # 电机直接吃斜坡值即可（已很柔）
 
