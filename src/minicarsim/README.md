@@ -14,6 +14,8 @@
 6. **温度监控**：模拟车内温度变化并可视化
 7. **智能空调系统**：根据温度自动开启/关闭空调调节温度
 8. **温度调节可视化**：生成多种温度调节相关图表
+9. **故障自检系统**：实时监测传感器和执行器状态
+10. **故障记录与可视化**：自动生成故障报告和趋势图
 
 ## 环境要求
 
@@ -31,12 +33,16 @@ minicarsim/
 │   └── simple_car.xml   # 小车和环境模型
 └── output/              # 输出数据目录
     ├── lidar/           # LiDAR点云数据
-    └── annotations/     # 物体检测标注
-    └── visualization/   # 可视化图表
-        ├── temperature_trend.png       # 温度变化趋势图
-        ├── temperature_summary.png     # 温度调节汇总图
-        ├── ac_control_XXXX.png         # 空调控制状态图
-        └── thermal_map_XXXX.png        # 环境温度分布图
+    ├── annotations/     # 物体检测标注
+    ├── visualization/   # 可视化图表
+    │   ├── temperature_trend.png       # 温度变化趋势图
+    │   ├── temperature_summary.png     # 温度调节汇总图
+    │   ├── ac_control_XXXX.png         # 空调控制状态图
+    │   └── thermal_map_XXXX.png        # 环境温度分布图
+    └── fault_reports/   # 故障监测报告
+        ├── frame_XXXX.json             # 故障详细报告(JSON)
+        ├── fault_status_XXXX.png       # 故障状态图
+        └── health_trend.png            # 系统健康趋势图
 ```
 
 ## 快速开始
@@ -67,6 +73,14 @@ python main.py
   - `visualize_ac_control()`: 生成空调控制状态图
   - `generate_temperature_trend()`: 生成温度变化趋势图
   - `generate_temperature_summary_chart()`: 生成温度调节汇总图
+  - `generate_fault_report()`: 生成故障报告
+  - `visualize_fault_status()`: 生成故障状态图
+  - `generate_health_trend()`: 生成健康趋势图
+
+- `FaultMonitor`: 故障监测类
+  - `check_system_health()`: 检查系统整体健康状态
+  - `_check_sensor_health()`: 检查传感器健康状态
+  - `_check_actuator_health()`: 检查执行器健康状态
 
 ### 配置参数
 
@@ -74,6 +88,7 @@ python main.py
 
 - `LIDAR_PARAMS`: LiDAR传感器参数
 - `TEMPERATURE_PARAMS`: 温度监控参数
+- `FAULT_MONITORING_PARAMS`: 故障监测参数
 - `SIMULATION_FRAMES`: 仿真总帧数
 
 ## 模型说明
@@ -88,7 +103,7 @@ python main.py
 
 ## 数据输出
 
-仿真运行后会产生三类数据：
+仿真运行后会产生四类数据：
 
 1. **LiDAR点云数据**：保存为`.npy`格式的NumPy数组
 2. **物体检测标注**：保存为`.json`格式的标注文件
@@ -97,6 +112,10 @@ python main.py
    - 温度调节汇总图 (`temperature_summary.png`)
    - 空调控制状态图 (`ac_control_XXXX.png`)
    - 环境温度分布图 (`thermal_map_XXXX.png`)
+4. **故障监测报告**：
+   - 故障详细报告 (`frame_XXXX.json`)
+   - 故障状态图 (`fault_status_XXXX.png`)
+   - 系统健康趋势图 (`health_trend.png`)
 
 ## 扩展建议
 
@@ -106,6 +125,7 @@ python main.py
 4. 实现自主导航功能
 5. 添加更多的车辆控制方式
 6. 增强空调控制算法（PID控制等）
+7. 增加更多类型的故障检测（如通信故障、电源故障等）
 
 ## 故障排除
 
@@ -115,6 +135,7 @@ python main.py
 2. **无法显示可视化窗口**：确保已正确安装MuJoCo
 3. **没有检测到物体**：检查小车与物体之间的距离
 4. **温度调节效果不明显**：检查空调功率系数和舒适温度范围设置
+5. **没有生成故障报告**：检查故障检测阈值设置
 
 ### 支持
 
