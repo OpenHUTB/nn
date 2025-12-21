@@ -1,6 +1,21 @@
 # 忽略整个Lib目录（包含所有子文件/子目录）
 Lib/
-# 额外补充：忽略Python编译文件，避免后续其他无关文件干扰
+
+# 忽略Python编译文件，避免无关文件干扰
 __pycache__/
 *.pyc
 *.dll.a
+
+# 忽略IDEA配置文件
+.idea/
+
+# 忽略日志文件夹（临时日志文件，无需提交到仓库）
+logs/
+
+trajectories/
+
+# 忽略手势识别配置文件（保留本地，不提交到仓库）
+gesture_config.json
+gesture_config (1).json
+gesture_config_v2.json
+gesture_config_v3.json
