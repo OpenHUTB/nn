@@ -8,7 +8,7 @@ conf_thres: 0.5
 iou_thres: 0.3
 max_age: 5
 min_hits: 3
-yolo_model: "yolov8n.pt"
+yolo_model: '"D:/harudt/yolov8n.pt"'
 yolo_imgsz_max: 320
 yolo_iou: 0.45
 yolo_quantize: false
