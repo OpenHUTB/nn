@@ -129,6 +129,38 @@ def semantic_target_highlight(rgb_img, sem_data, highlight_classes={4:(0,0,255),
     return highlighted_img
 # =================================================================
 
+# ==================== 第14次提交核心：语义分割与RGB融合叠加函数 ====================
+def semantic_rgb_fusion(rgb_img, sem_data, palette=CITYSCAPES_PALETTE, alpha=0.3):
+    """
+    实现RGB图像与语义分割图像的融合叠加显示
+    :param rgb_img: 原始RGB图像（H,W,3）
+    :param sem_data: 语义分割原始数据（H,W），int32类型
+    :param palette: 语义分割调色板
+    :param alpha: 语义层透明度（0~1，0=仅RGB，1=仅语义）
+    :return: 融合后的图像（H,W,3）
+    """
+    # 1. 生成语义分割彩色图
+    sem_rgb = np.zeros_like(rgb_img)
+    for i in range(len(palette)):
+        sem_rgb[sem_data == i] = palette[i]
+    
+    # 2. 融合RGB与语义分割图（alpha=语义层权重，beta=RGB层权重）
+    fused_img = cv2.addWeighted(sem_rgb, alpha, rgb_img, 1 - alpha, 0)
+    
+    # 3. 添加融合说明文字（左上角）
+    fusion_tips = f"Semantic-RGB Fusion (Alpha={alpha})"
+    cv2.putText(fused_img, fusion_tips, 
+               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    
+    # 4. 添加关键类别颜色说明（右下角）
+    class_tips = "Pedestrian(Red) | Vehicle(Blue) | Road(Purple)"
+    cv2.putText(fused_img, class_tips, 
+               (10, rgb_img.shape[0] - 10), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    
+    return fused_img
+# =================================================================
+
 # 1. 连接CARLA服务器并配置强同步模式
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
@@ -342,9 +374,9 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：多视角+热力图+计数+高亮标注可视化 + 性能监控）
+# 9. 主循环（核心：多视角+热力图+计数+高亮+语义-RGB融合可视化 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：前视+俯视+热力图+语义计数+目标高亮标注 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
+print(f"功能：前视+俯视+热力图+语义计数+目标高亮+语义-RGB融合 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -363,6 +395,8 @@ highlight_class_mapping = {
     4: (0, 0, 255),     # 行人 - 红色轮廓
     10: (255, 0, 0)     # 车辆 - 蓝色轮廓
 }
+# ==================== 第14次提交：融合透明度配置（可调整） ====================
+fusion_alpha = 0.3  # 语义层透明度（0.3为推荐值，兼顾RGB视觉和语义辨识度）
 # =================================================================
 
 try:
@@ -411,25 +445,29 @@ try:
             # =================================================================
             
             # ==================== 第12次提交新增：对前视RGB图像叠加目标高亮轮廓 ====================
-            front_rgb_img = semantic_target_highlight(front_rgb_img, front_sem_data, highlight_class_mapping)
+            front_rgb_img_highlight = semantic_target_highlight(front_rgb_img.copy(), front_sem_data, highlight_class_mapping)
             # =================================================================
             
-            # 4. 多视角图像拼接（优化布局）：
-            #    上半部分：前视RGB（带高亮） + 前视语义分割（右）
-            #    下半部分：俯视RGB（左） + 行人/车辆密度热力图（右）
-            upper_part = cv2.hconcat([front_rgb_img, front_sem_rgb])  # 宽度2048，高度720
-            lower_part = cv2.hconcat([top_rgb_img, density_heatmap])  # 宽度2048，高度720
-            combined_img = cv2.vconcat([upper_part, lower_part])       # 最终尺寸：2048×1440
+            # ==================== 第14次提交核心：生成语义-RGB融合图像 ====================
+            fused_img = semantic_rgb_fusion(front_rgb_img, front_sem_data, alpha=fusion_alpha)
+            # =================================================================
             
-            # 5. 添加视角标题
-            # 前视RGB标题（更新为带高亮说明）
+            # 4. 重构多视角图像拼接（融入融合图）：
+            #    上半部分：前视RGB（带高亮） + 语义-RGB融合图（右）
+            #    下半部分：原始语义分割 + 行人/车辆密度热力图（右）
+            upper_part = cv2.hconcat([front_rgb_img_highlight, fused_img])  # 宽度2048，高度720
+            lower_part = cv2.hconcat([front_sem_rgb, density_heatmap])     # 宽度2048，高度720
+            combined_img = cv2.vconcat([upper_part, lower_part])            # 最终尺寸：2048×1440
+            
+            # 5. 更新视角标题（新增融合图说明）
+            # 前视RGB标题（带高亮）
             cv2.putText(combined_img, "Front View (RGB + Target Highlight)", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 前视语义标题
-            cv2.putText(combined_img, "Front View (Semantic Segmentation)", 
+            # 融合图标题
+            cv2.putText(combined_img, "Front View (Semantic-RGB Fusion)", 
                        (1024 + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 俯视标题
-            cv2.putText(combined_img, "Top View (RGB / Bird's Eye)", 
+            # 原始语义标题
+            cv2.putText(combined_img, "Front View (Raw Semantic Segmentation)", 
                        (10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             # 热力图标题
             cv2.putText(combined_img, "Density Heatmap (Pedestrian + Vehicle)", 
@@ -441,7 +479,8 @@ try:
                 f"RGB Queue: {front_rgb_queue.qsize()}",
                 f"Sem Queue: {front_sem_queue.qsize()}",
                 f"Sync Frame: {world.get_snapshot().frame}",
-                f"Vehicles: {actual_npc_count} | Pedestrians: {actual_walker_count}"
+                f"Vehicles: {actual_npc_count} | Pedestrians: {actual_walker_count}",
+                f"Fusion Alpha: {fusion_alpha}"  # 新增融合透明度显示
             ]
             perf_x = 10
             perf_y = 60
@@ -490,9 +529,9 @@ try:
             # =================================================================
             
             # 7. 显示最终图像（自动调整窗口大小）
-            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap + Count + Highlight', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap + Count + Highlight', 1920, 1080)
-            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap + Count + Highlight', combined_img)
+            cv2.namedWindow('CARLA Multi-View + Semantic-RGB Fusion + Count + Highlight', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('CARLA Multi-View + Semantic-RGB Fusion + Count + Highlight', 1920, 1080)
+            cv2.imshow('CARLA Multi-View + Semantic-RGB Fusion + Count + Highlight', combined_img)
             
             if cv2.waitKey(1) == ord('q'):
                 break
