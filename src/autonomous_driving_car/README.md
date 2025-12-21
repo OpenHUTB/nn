@@ -54,7 +54,7 @@ CARLA 模拟器和自动驾驶基础算法学习
 
 3\. 启动CARLA模拟器（运行`CarlaUE4.exe`/`CarlaUE4.sh`）
 
-4\. 运行主程序：`python main.py`，自动连接CARLA并启动自主导航
+4\. 运行主程序：`python main.py`，自动连接CARLA并自主导航
 
 
 
