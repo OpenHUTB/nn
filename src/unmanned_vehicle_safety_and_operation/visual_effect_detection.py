@@ -286,7 +286,7 @@ if __name__ == "__main__":
         print("\n【4/4】评估模型并生成图片...")
         train_acc, test_acc = evaluate_and_visualize(model, X_train, X_test, y_train, y_test, feature_names)
 
-        # 5. 模拟预测（重度雨雾）1
+        # 5. 模拟预测（重度雨雾）11
         print("\n===== 单张图像预测示例（重度雨雾） =====")
         result = predict_simulated_image('heavy', model)
         for k, v in result.items():
