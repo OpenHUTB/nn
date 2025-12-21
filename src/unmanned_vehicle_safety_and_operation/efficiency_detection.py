@@ -463,7 +463,7 @@ def main():
 
     threading.Thread(target=plot_feat).start()
 
-    # 实时监测图表
+    # 实时监测图表11
     def plot_realtime():
         time_series = list(range(50))
         plotter = NativePlotter("实时效率监测")
