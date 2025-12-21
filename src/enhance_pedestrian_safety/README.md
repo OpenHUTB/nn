@@ -1,4 +1,3 @@
-```markdown
 # CVIPS - Cooperative Vehicle-Infrastructure Perception System
 
 基于CARLA仿真平台的多传感器协同感知数据采集系统，支持V2X通信、多车辆协同、数据增强与验证。
@@ -47,6 +46,11 @@ CVIPS是一个用于自动驾驶研究的多传感器数据采集系统，在CAR
 - 内存：≥ 8GB（建议16GB）
 - 存储：≥ 50GB可用空间
 
+
+## 安装步骤
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/Z-w-7799/nn.git
 
 ## 安装步骤
 1. **克隆仓库**
