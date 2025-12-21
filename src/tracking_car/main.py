@@ -1538,7 +1538,7 @@ def main():
 
 
 if __name__ == "__main__":
-    # Check necessary imports
+    # 检查配置
     try:
         import torch
     except ImportError:
