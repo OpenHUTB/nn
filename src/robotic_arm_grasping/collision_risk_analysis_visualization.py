@@ -1,7 +1,3 @@
-"""
-完整版：机械臂碰撞检测 + MuJoCo可视化界面
-包含碰撞分析和实时仿真
-"""
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
