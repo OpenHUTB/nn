@@ -8,7 +8,6 @@
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.6 0.6 0.6" rgb2="0.8 0.8 0.8"/>
     <material name="grid" texture="grid" texuniform="true" reflectance="0.2"/>
   </asset>
-
   <default>
     <default class="wheel">
       <geom type="sphere" size="0.04" material="wheel"
