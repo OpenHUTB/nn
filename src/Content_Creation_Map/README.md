@@ -831,11 +831,17 @@ git clone https://github.com/LAStools/LAStools.git
 # 将.las/.laz文件导入roadrunner
 
 **1.打开roadrunner新建一个场景**
+
 ## *注意：新建场景的路径不能有中文字符存在，否则会报错*
+
 <img width="615" height="314" alt="image" src="https://github.com/user-attachments/assets/b4b7d71c-0df9-43b2-a22c-6729fadc08fa" />
+
 **2.将.las/.laz文件直接拖入roadrunner的Library Browser**
+
 **3.将.las/.laz文件从Library Browser拖入场景**
+
 **成功**
+
 <img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/afecb182-3bba-4884-9b58-e47abd118553" />
 
 ## 常见的错误的解决方案
@@ -843,17 +849,33 @@ git clone https://github.com/LAStools/LAStools.git
 如果报错为
 
 <img width="615" height="314" alt="image" src="https://github.com/user-attachments/assets/b4b7d71c-0df9-43b2-a22c-6729fadc08fa" />
+
 有时不是因为路径中出现了中文字符，而是你的.las/.laz文件缺少正确的坐标系信息。
 
 ### 解决方案：
 
 
 1.**找到上文提到的对应区域的EPSG编码**
+
 确保你的点云文件已经存在roadrunner的 Library Browser中
+
 2**打开Attributes窗口**
 
+![2c6b2cdf01ada25e05e353659654fe98](https://github.com/user-attachments/assets/5aef7363-91b5-4b90-ab76-712ed3f9471f)
+
 2.**选中.las/.laz文件并查看Attributes**
+
 在Attributes窗口中
+
+![b24259663a09b40d94ef0e92af6126de](https://github.com/user-attachments/assets/f1536f8e-62a4-485c-94ad-825453dd6cd1)
+
+3.**在QGIS中导入.las/.laz文件查看坐标信息**
+
+记下坐标信息之后返回roadrunner，选中world settings tool
+<img width="1920" height="1200" alt="_cgi-bin_mmwebwx-bin_webwxgetmsgimg__ MsgID=697152194148194368 skey=@crypt_38968688_e13c903e415bb13501591a3aeadbfff7 mmweb_appid=wx_webfilehelper" src="https://github.com/user-attachments/assets/4c38ed1f-a446-4a51-861a-bb608a924ce6" />
+
+
+根据坐标信息进行世界原点的设置
 
 # 导出场景到CARLA
 
