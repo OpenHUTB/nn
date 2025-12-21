@@ -1,11 +1,12 @@
 import cv2
 import mediapipe as mp
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont  # 引入Pillow库
+import time
+from PIL import Image, ImageDraw, ImageFont  
 
 class GestureDetector:
-    """基于MediaPipe的手势检测类"""
-    # 手部关键点索引
+    """基于MediaPipe的手势检测类（修复中文显示+帧率显示+摄像头容错）"""
+    # 手部关键点索引常量
     WRIST = 0
     THUMB_TIP = 4
     THUMB_IP = 3
@@ -31,7 +32,7 @@ class GestureDetector:
         self.draw_spec = self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2)
 
     def detect_gestures(self, frame):
-        """检测帧中的手势，返回处理后的帧、手势名称、关键点坐标"""
+        """检测帧中的手势"""
         if frame is None or frame.size == 0:
             return frame, "无效帧", None
         
@@ -46,12 +47,10 @@ class GestureDetector:
         
         if results.multi_hand_landmarks:
             hand_landmarks = results.multi_hand_landmarks[0]
-            # 绘制关键点
             self.mp_drawing.draw_landmarks(
                 frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS,
                 self.draw_spec, self.draw_spec
             )
-            # 转换坐标并识别手势
             landmarks = self._convert_landmarks_to_pixels(hand_landmarks, frame.shape)
             gesture = self._classify_gesture(landmarks)
         
@@ -110,51 +109,104 @@ class GestureDetector:
 
 
 def put_chinese_text(frame, text, position, font_size=32, color=(0, 255, 0)):
-    """修复OpenCV中文显示：用Pillow绘制中文后转OpenCV格式"""
-    # 1. OpenCV(BGR)转PIL(RGB)
+    """修复OpenCV中文显示乱码"""
+    # OpenCV转PIL
     pil_frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(pil_frame)
     
-    # 2. 加载中文字体（Windows默认路径：C:/Windows/Fonts/simhei.ttf）
+    # 加载中文字体
     try:
-        # 优先使用系统黑体，若不存在可替换为项目内字体路径
         font = ImageFont.truetype("simhei.ttf", font_size, encoding="utf-8")
     except:
-        #  fallback到默认字体（可能不支持中文）
+        print("加载中文字体失败，使用默认字体")
         font = ImageFont.load_default()
     
-    # 3. 绘制中文
+    # 绘制中文
     draw.text(position, text, font=font, fill=color)
     
-    # 4. PIL(RGB)转OpenCV(BGR)
+    # PIL转OpenCV
     return cv2.cvtColor(np.array(pil_frame), cv2.COLOR_RGB2BGR)
 
 
-# 测试代码
+def get_available_camera():
+    """自动检测可用摄像头（尝试索引0/1/2）"""
+    for idx in [0, 1, 2]:
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)  # Windows用CAP_DSHOW避免延迟/占用问题
+        if cap.isOpened():
+            print(f"成功打开摄像头，索引：{idx}")
+            return cap
+        cap.release()
+    return None
+
+
+# 主程序入口
 if __name__ == "__main__":
+    # 创建手势检测器
     detector = GestureDetector()
-    cap = cv2.VideoCapture(0)
+    
+    # 自动检测可用摄像头（核心修复点）
+    cap = get_available_camera()
+    if cap is None:
+        print("错误：未检测到可用摄像头！")
+        print("请检查：")
+        print("1. 摄像头是否被其他程序占用（如微信、钉钉、系统相机）")
+        print("2. 摄像头是否已正确连接并安装驱动")
+        print("3. 是否授予程序摄像头权限（Windows设置→隐私和安全性→摄像头）")
+        exit(1)
+    
+    # 配置摄像头参数
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 60)  # 目标帧率60fps
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # 减少缓冲区，降低延迟
+    
+    # 帧率计算变量
+    prev_time = time.time()
+    fps = 0
+    fps_counter = 0
+    fps_show_interval = 0.1
     
     try:
         while cap.isOpened():
             ret, frame = cap.read()
-            if not ret:
-                print("无法读取摄像头画面，退出...")
-                break
+            # 增加帧读取失败的容错处理
+            if not ret or frame is None:
+                print("警告：暂时无法读取摄像头帧，重试中...")
+                time.sleep(0.1)
+                continue
             
-            frame = cv2.flip(frame, 1)  # 镜像翻转
+            # 镜像翻转
+            frame = cv2.flip(frame, 1)
+            
+            # 检测手势
             frame, gesture, _ = detector.detect_gestures(frame)
             
-            # 用修复后的函数显示中文手势（替换原cv2.putText）
-            frame = put_chinese_text(frame, f"当前手势: {gesture}", (20, 50), font_size=32)
+            # 计算帧率
+            fps_counter += 1
+            current_time = time.time()
+            if current_time - prev_time >= fps_show_interval:
+                fps = fps_counter / (current_time - prev_time)
+                fps_counter = 0
+                prev_time = current_time
             
-            cv2.imshow("手势检测（按Q退出）", frame)
+            # 显示手势和帧率
+            frame = put_chinese_text(frame, f"当前手势: {gesture}", (20, 50), font_size=32)
+            cv2.putText(
+                frame, f"FPS: {fps:.1f} ", 
+                (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 
+                1.0, (255, 0, 0), 2
+            )
+            
+            # 显示窗口
+            cv2.imshow("手势检测（按Q退出）- 目标帧率60fps", frame)
+            
+            # 按Q退出
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
     except Exception as e:
-        print(f"运行出错: {e}")
+        print(f"程序运行出错：{e}")
     finally:
+        # 确保资源释放
         cap.release()
         cv2.destroyAllWindows()
+        print("程序已退出，资源已释放")
