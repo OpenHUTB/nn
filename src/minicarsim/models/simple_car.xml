@@ -31,28 +31,30 @@
       <freejoint name="vehicle_joint"/>
 
       <!-- Car chassis -->
-      <geom name="chassis" type="box" size="1 0.5 0.2" material="car_body" mass="10" friction="0.2 0.1 0.1" solref="0.08 1"/>
+      <geom name="chassis" type="box" size="1 0.5 0.2" material="car_body" mass="15" friction="0.2 0.1 0.1" solref="0.08 1"/>
+      <!-- Car cabin -->
+      <geom name="cabin" type="box" size="0.6 0.4 0.3" pos="0.1 0 0.3" material="car_body" mass="5"/>
 
       <!-- Front wheels -->
       <body name="front_left_wheel" pos="0.8 0.6 -0.1">
         <joint name="front_left_wheel_joint" type="hinge" axis="0 1 0" limited="false"/>
-        <geom name="front_left_wheel_geom" type="sphere" size="0.2" material="car_wheels" mass="1.0" friction="2.0 0.1 0.1" solref="0.08 1"/>
+        <geom name="front_left_wheel_geom" type="cylinder" size="0.2 0.05" material="car_wheels" mass="1.5" friction="2.0 0.1 0.1" solref="0.08 1"/>
       </body>
 
       <body name="front_right_wheel" pos="0.8 -0.6 -0.1">
         <joint name="front_right_wheel_joint" type="hinge" axis="0 1 0" limited="false"/>
-        <geom name="front_right_wheel_geom" type="sphere" size="0.2" material="car_wheels" mass="1.0" friction="2.0 0.1 0.1" solref="0.08 1"/>
+        <geom name="front_right_wheel_geom" type="cylinder" size="0.2 0.05" material="car_wheels" mass="1.5" friction="2.0 0.1 0.1" solref="0.08 1"/>
       </body>
 
       <!-- Rear wheels -->
       <body name="rear_left_wheel" pos="-0.8 0.6 -0.1">
         <joint name="rear_left_wheel_joint" type="hinge" axis="0 1 0" limited="false"/>
-        <geom name="rear_left_wheel_geom" type="sphere" size="0.2" material="car_wheels" mass="1.0" friction="2.0 0.1 0.1" solref="0.08 1"/>
+        <geom name="rear_left_wheel_geom" type="cylinder" size="0.2 0.05" material="car_wheels" mass="1.5" friction="2.0 0.1 0.1" solref="0.08 1"/>
       </body>
 
       <body name="rear_right_wheel" pos="-0.8 -0.6 -0.1">
         <joint name="rear_right_wheel_joint" type="hinge" axis="0 1 0" limited="false"/>
-        <geom name="rear_right_wheel_geom" type="sphere" size="0.2" material="car_wheels" mass="1.0" friction="2.0 0.1 0.1" solref="0.08 1"/>
+        <geom name="rear_right_wheel_geom" type="cylinder" size="0.2 0.05" material="car_wheels" mass="1.5" friction="2.0 0.1 0.1" solref="0.08 1"/>
       </body>
 
       <!-- LiDAR sensor -->
@@ -98,5 +100,7 @@
     <!-- Accelerometer and Gyro for IMU data -->
     <accelerometer name="accelerometer" site="lidar_site"/>
     <gyro name="gyro" site="lidar_site"/>
+    <!-- Temperature sensor -->
+    <framepos name="temperature_sensor" objtype="site" objname="lidar_site"/>
   </sensor>
 </mujoco>
