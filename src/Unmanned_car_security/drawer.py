@@ -95,6 +95,15 @@ class PyGameDrawer:
                 # print(f"绘制摄像头图像失败: {e}")
                 pass
 
+    # 🆕 新增：帧率显示功能
+    def display_fps(self, fps):
+        """在屏幕右上角显示实时帧率"""
+        fps_text = self.small_font.render(f'FPS: {fps:.1f}', True, (200, 200, 255))
+        # 显示在右上角，摄像头图像的右侧
+        fps_x = self.screen.get_width() - 120  # 右边距20，宽度100
+        fps_y = 20
+        self.screen.blit(fps_text, (fps_x, fps_y))
+
     def draw_camera(self, image_array):
         """绘制摄像头图像（兼容旧代码）"""
         # 将图像存储起来供display_camera使用
