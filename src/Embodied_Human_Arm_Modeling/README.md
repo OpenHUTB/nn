@@ -46,11 +46,11 @@ python simple_hand_animation.py
 
 手部模型将循环展示三种姿态：
 
-张开手 → 等待3秒 → 握拳 → 等待3秒 → 捏取 → 等待3秒 → 重复
+张开手 → 等待3秒 → 握拳 → 等[hand_animation_controller.py](../../../mujoco_menagerie/shadow_hand/hand_animation_controller.py)待3秒 → 捏取 → 等待3秒 → 重复
 
 按 Ctrl+C 可中断程序并关闭查看器
 
-输出信息
+输出信息[hand_animation_controller.py](../../../mujoco_menagerie/shadow_hand/hand_animation_controller.py)
 程序运行时会输出以下信息：
 
 ✅ 模型加载成功
