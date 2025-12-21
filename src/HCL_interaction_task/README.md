@@ -86,7 +86,7 @@ pip install -e .
 ### 4. 模型文件准备
 
 完整模型文件集（包含40+手部精细模型文件）可通过以下链接下载：
-[完整模型文件集网盘链接](https://pan.baidu.com/s/1SN5SWpyfKR7KYDbE8lzvBw?pwd=9e9u)
+[完整模型文件集网盘链接](https://pan.baidu.com/s/1sA0BgEPRgxXTqe6ZdEm7Sg?pwd=rq8e 提取码: rq8e)
 
 下载后解压到 `mujoco_ros_demo/config/assets/` 目录
 
