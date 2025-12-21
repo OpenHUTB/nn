@@ -11,7 +11,7 @@ def traffic_light_real_time_detection():
     # 1. 初始化摄像头（0为默认内置摄像头，1为外接摄像头，可根据实际调整）
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
-        print("错误：无法打开摄像头，请检查摄像头是否正常连接或被其他程序占用")
+        print("错误：无法打开摄像头，请检查摄像头是否正常连接或被其他程序占用.")
         return "摄像头初始化失败"
 
     # 设置摄像头分辨率（提升识别效率，可根据摄像头性能调整）
