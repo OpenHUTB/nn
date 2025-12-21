@@ -1,0 +1,9 @@
+<launch>
+  <!-- 一键启动CARLA ROS节点 -->
+  <node 
+    name="carla_simulation_node"  <!-- 节点名（随便取，唯一就行） -->
+    pkg="carla_pkg"               <!-- 功能包名（必须和之前的carla_pkg一致） -->
+    type="main.py"      <!-- 你的主入口文件（比如run_simulation.py/main.py） -->
+    output="screen"               <!-- 日志输出到终端，方便调试 -->
+    respawn="false" />            <!-- 崩溃不自动重启 -->
+</launch>
