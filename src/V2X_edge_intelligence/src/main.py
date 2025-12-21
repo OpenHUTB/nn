@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-路侧感知数据集预处理Carla 0.9.10终极适配版
+路侧感知数据集预处理Carla 0.9.10终极适配版.
 运行前：先启动D:\WindowsNoEditor\CarlaUE4.exe
 """
 import sys
