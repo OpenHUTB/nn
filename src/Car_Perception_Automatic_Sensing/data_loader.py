@@ -10,7 +10,6 @@ from torch.utils.data import Dataset, DataLoader
 
 class AutoDriveDataset(Dataset):
     """
-    自动驾驶感知数据集基类
     所有自定义数据集需继承此类并实现抽象方法
     """
     def __init__(self, data_root: str, split: str = "train", transform=None):
