@@ -1,85 +1,101 @@
 # Autonomous Vehicle Navigation Using Deep Learning
-
-本项目基于深度学习实现自动驾驶汽车在CARLA仿真环境中的导航系统，支持自定义轨迹规划和行人动态模拟。
-
-## 快速开始
+基于深度学习的自动驾驶汽车导航系统，支持CARLA仿真环境。
+## 🚀 快速开始
 
 ### 环境要求
-- **操作系统**: Ubuntu 20.04
-- **仿真环境**: CARLA 0.9.13
-- **Python**: 3.7
-- **包管理**: Conda虚拟环境
+- Ubuntu 20.04
+- CARLA 0.9.13
+- Python 3.7
+- ROS Noetic
 
-### 安装步骤
-
-1. **安装依赖包**:
+## 📁 项目结构
 ```bash
-conda create -n carla-env python=3.7
-conda activate carla-env
+text
+├── main/              # 主程序目录
+├── models/            # 预训练模型
+├── test/              # 测试脚本
+└── carla_ros_ws/      # ROS版本（可选）
+```
+
+### 安装依赖
+```bash
+# 创建Python环境
+conda create -n carla-ros python=3.7
+conda activate carla-ros
 pip install -r requirements.txt
 ```
 
-2. **启动CARLA仿真器**:
+## 🏗️ ROS工作空间构建
+
+### 1. 构建ROS包
+```bash
+cd carla_ros_ws
+catkin_make
+source devel/setup.bash
+```
+
+### 2. 安装ROS依赖
+```bash
+cd src/carla_autonomous/utils
+./install.sh
+```
+
+## 🎮 运行方法
+
+### 一键启动
+```bash
+cd carla_ros_ws/src/carla_autonomous/utils
+./run_carla.sh
+```
+
+### 手动启动
+```bash
+# 终端1：启动CARLA
+./CarlaUE4.sh
+
+# 终端2：启动ROS节点
+cd carla_ros_ws
+source devel/setup.bash
+roslaunch carla_autonomous carla_autonomous.launch
+
+# 终端3：控制客户端
+cd carla_ros_ws
+source devel/setup.bash
+python src/carla_autonomous/scripts/carla_control_client.py
+```
+
+## 📖 基础版本（无ROS）
+
+1. 启动CARLA仿真器
+
 ```bash
 ./CarlaUE4.sh
 ```
+2. 配置轨迹点
 
-3. **运行主程序**:
+
+python main/get_location.py  # 获取当前坐标
+
+编辑 main/config.py 中的 TRAJECTORIES 配置
+
 ```bash
-python main.py
+# 运行主程序
+python main/main.py
 ```
 
-## 项目结构
+## ⚡ 快速测试
+```bash
+# 刹车测试
+python test/test_braking.py
 
-```
-├── main.py                    # 主程序入口
-├── config.py                  # 配置文件
-├── get_location.py            # 位置坐标获取工具
-├── test_braking.py            # 刹车模型测试
-├── test_driving.py            # 驾驶模型测试
-├── pedestrians_1.py           # 行人生成器1
-├── pedestrians_2.py           # 行人生成器2
-└── requirements.txt           # 依赖包列表
+# 驾驶测试
+python test/test_driving.py
 ```
 
-## 核心功能
+## ⚠️ 注意事项
+1. 必须先构建ROS工作空间：`catkin_make`
+2. 每次使用前需要source：`source devel/setup.bash`
+3. 确保CARLA版本为0.9.13
 
-### 1. 自定义轨迹规划
-使用 `get_location.py` 获取当前摄像头坐标，配置到 `config.py`:
-
-```python
-TRAJECTORIES = {
-    "custom_trajectory": {
-        "start": [x, y, z, yaw],  # 起点坐标和朝向
-        "end": [x, y, z],         # 终点坐标
-        "description": "自定义轨迹 - 城镇道路"
-    }
-}
-```
-
-### 2. 模型测试
-- **刹车测试**: `test_braking.py` - 验证紧急制动性能
-- **驾驶测试**: `test_driving.py` - 评估导航准确性
-
-### 3. 行人模拟
-- `pedestrians_1.py` - 随机行人生成（模式1）
-- `pedestrians_2.py` - 随机行人生成（模式2）
-## 配置说明
-
-### 关键配置文件
-`config.py` 包含所有可调整参数：
-- 轨迹起点/终点坐标
-- 深度学习模型参数
-- 仿真环境设置
-
-## 参考项目
-本项目参考自: [varunpratap222/Autonomous-Vehicle-Navigation-Using-Deep-Learning](https://github.com/varunpratap222/Autonomous-Vehicle-Navigation-Using-Deep-Learning.git)
-
-## 📝 注意事项
-1. 确保CARLA仿真器已正确启动
-2. 建议在独立的Conda环境中运行
-3. 行人模拟模块需要额外计算资源
-
----
-
-**温馨提示**: 运行前请确认CARLA版本为0.9.13，Python版本为3.7，以避免兼容性问题。
+## 📖 参考
+参考项目：varunpratap222/Autonomous-Vehicle-Navigation-Using-Deep-Learning

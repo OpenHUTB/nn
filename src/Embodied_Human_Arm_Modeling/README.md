@@ -1,4 +1,96 @@
-这是机器人建模项目
+Shadow Hand 手部动画演示
+项目概述
+这是一个基于 MuJoCo 物理引擎的 Shadow Hand 手部模型动画演示程序。该脚本加载 Shadow Hand 的 MJCF 模型文件，并通过简单的控制指令循环展示三种不同的手部姿态。
 
+功能特性
+模型加载：加载 Shadow Hand 的 MJCF 模型文件（left_hand.xml）
 
+姿态控制：预定义了三种手部姿态：
 
+张开手：所有关节设置为零位置
+
+握拳：模拟握拳动作的关节角度
+
+捏取：模拟捏取物体的手部姿态
+
+实时动画：每3秒自动切换一种姿态
+
+可视化界面：使用 MuJoCo 的被动查看器实时显示手部动作
+
+系统要求
+Python 3.8+
+
+MuJoCo 2.3.0+
+
+NumPy
+
+安装与运行
+1. 安装依赖
+bash
+pip install mujoco numpy
+2. 准备模型文件
+确保 left_hand.xml 模型文件与脚本在同一目录下，或修改脚本中的路径指向正确的模型文件。
+
+3. 运行程序
+bash
+python simple_hand_animation.py
+
+动画循环：
+
+每3秒切换一个预定义姿态
+
+实时更新控制指令并同步查看器
+
+使用方法
+运行程序后，MuJoCo 查看器将自动打开
+
+手部模型将循环展示三种姿态：
+
+张开手 → 等待3秒 → 握拳 → 等[hand_animation_controller.py](../../../mujoco_menagerie/shadow_hand/hand_animation_controller.py)待3秒 → 捏取 → 等待3秒 → 重复
+
+按 Ctrl+C 可中断程序并关闭查看器
+
+输出信息[hand_animation_controller.py](../../../mujoco_menagerie/shadow_hand/hand_animation_controller.py)
+程序运行时会输出以下信息：
+
+✅ 模型加载成功
+
+📊 关节数: [关节数量]
+
+📊 执行器数: [执行器数量]
+
+🎭 切换到: [当前姿态名称]
+
+文件结构
+text
+.
+├── simple_hand_animation.py    # 主程序文件
+├── left_hand.xml               # Shadow Hand MJCF 模型文件
+└── README.md                   # 说明文档
+注意事项
+确保 MuJoCo 许可证正确配置
+
+模型文件需与脚本在同一目录或指定正确路径
+
+姿态控制值基于原始模型配置，可能需要根据具体模型调整
+
+扩展设想
+基于当前代码，未来可以：
+
+增加更多预定义手部姿态
+
+添加手动控制模式（键盘或GUI）
+
+实现姿态间的平滑过渡动画
+
+记录和回放手部动作序列
+
+添加物理交互对象（如抓取小球）
+
+致谢
+Shadow Robot Company 提供开源手部模型
+
+DeepMind 开发 MuJoCo 物理引擎
+
+许可证
+遵循原始模型的 Apache 2.0 许可证。
