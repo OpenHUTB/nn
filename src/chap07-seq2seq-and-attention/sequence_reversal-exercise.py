@@ -168,39 +168,20 @@ class mySeq2SeqModel(keras.Model):
         # 返回完整的编码器输出和最终状态
         return enc_out, enc_state
 
+
     def get_next_token(self, x, state):
-       '''
-    根据当前输入和状态生成下一个token
-    参数:
-        x: 当前输入token，shape=[b_sz,]
-        state: 当前RNN状态
-    返回:
-        next_token: 预测的下一个token
-        new_state: 更新后的RNN状态
-    '''
-    # 将输入token通过嵌入层转换为密集向量表示
+        # 将输入token通过嵌入层转换为密集向量表示
         x_embed = self.embed_layer(x)  # (B, E)
-        # 加性注意力计算
-        # 计算注意力分数
-        score = tf.nn.tanh(self.dense_attn(enc_out))  # (B, T1, H)
-        # 计算注意力权重
-        # 将注意力得分转换为概率分布：通过softmax函数确保权重和为1
-        score = tf.reduce_sum(score * tf.expand_dims(state, 1), axis=-1)  # (B, T1)
-        attn_weights = tf.nn.softmax(score, axis=-1)  # (B, T1)
-      
-        # 计算上下文向量
-        # 根据注意力权重加权求和编码器输出，得到上下文向量
-        context = tf.reduce_sum(enc_out * tf.expand_dims(attn_weights, -1), axis=1)  # (B, H)
-      
-        # 将嵌入向量和上下文向量拼接作为RNN输入
-        rnn_input = tf.concat([x_embed, context], axis=-1)  # (B, E+H)
-      
-        # 通过RNN单元计算输出和更新状态
-        output, new_state = self.decoder_cell(rnn_input, [state])  # SimpleRNNCell返回单个状态
-      
+
+        # 通过RNN单元计算输出和更新状态（移除了未实现的注意力机制）
+        output, new_state = self.decoder_cell(x_embed, [state])
+
         # 通过全连接层计算logits
         logits = self.dense(output)  # (B, V)
-        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)，获取 logits 张量中每个元素的最大值所在的索引
+
+        # 获取预测的下一个token
+        next_token = tf.argmax(logits, axis=-1, output_type=tf.int32)  # (B,)
+
         return next_token, new_state[0]  # 返回单个状态向量
 
 
