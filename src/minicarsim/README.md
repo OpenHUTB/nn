@@ -11,6 +11,9 @@
 3. **传感器模拟**：LiDAR传感器点云数据生成
 4. **物体检测**：检测环境中的障碍物
 5. **数据保存**：保存点云数据和检测结果
+6. **温度监控**：模拟车内温度变化并可视化
+7. **智能空调系统**：根据温度自动开启/关闭空调调节温度
+8. **温度调节可视化**：生成多种温度调节相关图表
 
 ## 环境要求
 
@@ -29,6 +32,11 @@ minicarsim/
 └── output/              # 输出数据目录
     ├── lidar/           # LiDAR点云数据
     └── annotations/     # 物体检测标注
+    └── visualization/   # 可视化图表
+        ├── temperature_trend.png       # 温度变化趋势图
+        ├── temperature_summary.png     # 温度调节汇总图
+        ├── ac_control_XXXX.png         # 空调控制状态图
+        └── thermal_map_XXXX.png        # 环境温度分布图
 ```
 
 ## 快速开始
@@ -53,13 +61,19 @@ python main.py
 - `MojocoDataSim`: 主要的仿真类
   - `generate_realistic_lidar_data()`: 生成真实的LiDAR点云数据
   - `detect_objects()`: 检测环境中的物体
+  - `simulate_temperature_data()`: 模拟车内温度变化
+  - `check_and_control_ac()`: 检查并控制空调开关
   - `run_simulation()`: 运行仿真主循环
+  - `visualize_ac_control()`: 生成空调控制状态图
+  - `generate_temperature_trend()`: 生成温度变化趋势图
+  - `generate_temperature_summary_chart()`: 生成温度调节汇总图
 
 ### 配置参数
 
 在`main.py`中可以调整的主要参数：
 
 - `LIDAR_PARAMS`: LiDAR传感器参数
+- `TEMPERATURE_PARAMS`: 温度监控参数
 - `SIMULATION_FRAMES`: 仿真总帧数
 
 ## 模型说明
@@ -74,10 +88,15 @@ python main.py
 
 ## 数据输出
 
-仿真运行后会产生两类数据：
+仿真运行后会产生三类数据：
 
 1. **LiDAR点云数据**：保存为`.npy`格式的NumPy数组
 2. **物体检测标注**：保存为`.json`格式的标注文件
+3. **温度调节可视化图表**：
+   - 温度变化趋势图 (`temperature_trend.png`)
+   - 温度调节汇总图 (`temperature_summary.png`)
+   - 空调控制状态图 (`ac_control_XXXX.png`)
+   - 环境温度分布图 (`thermal_map_XXXX.png`)
 
 ## 扩展建议
 
@@ -86,6 +105,7 @@ python main.py
 3. 添加不同的环境地图
 4. 实现自主导航功能
 5. 添加更多的车辆控制方式
+6. 增强空调控制算法（PID控制等）
 
 ## 故障排除
 
@@ -94,6 +114,7 @@ python main.py
 1. **找不到模型文件**：检查`XML_PATH`是否正确
 2. **无法显示可视化窗口**：确保已正确安装MuJoCo
 3. **没有检测到物体**：检查小车与物体之间的距离
+4. **温度调节效果不明显**：检查空调功率系数和舒适温度范围设置
 
 ### 支持
 
