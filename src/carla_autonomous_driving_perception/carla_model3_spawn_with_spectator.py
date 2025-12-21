@@ -94,6 +94,41 @@ def semantic_class_count(sem_data, class_mapping):
     return count_dict
 # =================================================================
 
+# ==================== 第12次提交新增：关键语义目标高亮标注函数 ====================
+def semantic_target_highlight(rgb_img, sem_data, highlight_classes={4:(0,0,255), 10:(255,0,0)}, contour_thickness=2):
+    """
+    对指定语义类别进行边缘检测并绘制轮廓，高亮关键目标
+    :param rgb_img: 原始RGB图像（H,W,3）
+    :param sem_data: 语义分割原始数据（H,W），int32类型
+    :param highlight_classes: 字典 {类别ID: 轮廓颜色}，默认4=行人(红)、10=车辆(蓝)
+    :param contour_thickness: 轮廓线宽度
+    :return: 叠加高亮轮廓的RGB图像
+    """
+    # 复制原始图像，避免修改原数据
+    highlighted_img = rgb_img.copy()
+    
+    for cls_id, color in highlight_classes.items():
+        # 1. 生成该类别的二值掩码
+        cls_mask = np.uint8(sem_data == cls_id) * 255
+        # 2. Canny边缘检测（调整阈值控制边缘灵敏度）
+        edges = cv2.Canny(cls_mask, 50, 150)
+        # 3. 查找轮廓（仅保留外部轮廓，减少计算量）
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # 4. 绘制轮廓（过滤小轮廓，避免噪声）
+        min_contour_area = 50  # 过滤面积小于50像素的噪声轮廓
+        for cnt in contours:
+            if cv2.contourArea(cnt) > min_contour_area:
+                cv2.drawContours(highlighted_img, [cnt], -1, color, contour_thickness)
+    
+    # 5. 添加高亮说明文字（画面左下角）
+    highlight_tips = "Highlight: Pedestrian(Red) | Vehicle(Blue)"
+    cv2.putText(highlighted_img, highlight_tips, 
+               (10, rgb_img.shape[0] - 10), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    
+    return highlighted_img
+# =================================================================
+
 # 1. 连接CARLA服务器并配置强同步模式
 client = carla.Client('localhost', 2000)
 client.set_timeout(15.0)
@@ -307,9 +342,9 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：多视角+热力图+计数可视化 + 性能监控）
+# 9. 主循环（核心：多视角+热力图+计数+高亮标注可视化 + 性能监控）
 print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：前视+俯视+热力图+语义计数可视化 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
+print(f"功能：前视+俯视+热力图+语义计数+目标高亮标注 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -322,6 +357,11 @@ count_class_mapping = {
     "Pedestrian": 4,    # 行人
     "Vehicle": 10,      # 车辆
     "TrafficLight": 12  # 交通灯
+}
+# ==================== 第12次提交新增：定义需要高亮的语义类别 ====================
+highlight_class_mapping = {
+    4: (0, 0, 255),     # 行人 - 红色轮廓
+    10: (255, 0, 0)     # 车辆 - 蓝色轮廓
 }
 # =================================================================
 
@@ -370,16 +410,20 @@ try:
             class_count_result = semantic_class_count(front_sem_data, count_class_mapping)
             # =================================================================
             
+            # ==================== 第12次提交新增：对前视RGB图像叠加目标高亮轮廓 ====================
+            front_rgb_img = semantic_target_highlight(front_rgb_img, front_sem_data, highlight_class_mapping)
+            # =================================================================
+            
             # 4. 多视角图像拼接（优化布局）：
-            #    上半部分：前视RGB（左） + 前视语义分割（右）
+            #    上半部分：前视RGB（带高亮） + 前视语义分割（右）
             #    下半部分：俯视RGB（左） + 行人/车辆密度热力图（右）
             upper_part = cv2.hconcat([front_rgb_img, front_sem_rgb])  # 宽度2048，高度720
             lower_part = cv2.hconcat([top_rgb_img, density_heatmap])  # 宽度2048，高度720
             combined_img = cv2.vconcat([upper_part, lower_part])       # 最终尺寸：2048×1440
             
             # 5. 添加视角标题
-            # 前视RGB标题
-            cv2.putText(combined_img, "Front View (RGB)", 
+            # 前视RGB标题（更新为带高亮说明）
+            cv2.putText(combined_img, "Front View (RGB + Target Highlight)", 
                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
             # 前视语义标题
             cv2.putText(combined_img, "Front View (Semantic Segmentation)", 
@@ -446,9 +490,9 @@ try:
             # =================================================================
             
             # 7. 显示最终图像（自动调整窗口大小）
-            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap + Count', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap + Count', 1920, 1080)
-            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap + Count', combined_img)
+            cv2.namedWindow('CARLA Multi-View + Semantic Density Heatmap + Count + Highlight', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('CARLA Multi-View + Semantic Density Heatmap + Count + Highlight', 1920, 1080)
+            cv2.imshow('CARLA Multi-View + Semantic Density Heatmap + Count + Highlight', combined_img)
             
             if cv2.waitKey(1) == ord('q'):
                 break

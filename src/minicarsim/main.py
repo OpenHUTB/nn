@@ -33,7 +33,9 @@ SIMULATION_FRAMES = 1000
 TEMPERATURE_PARAMS = {
     "ambient_temp": 25.0,  # 环境基础温度 (摄氏度)
     "temp_variation": 5.0,  # 温度变化幅度
-    "heat_sources": ["obstacle1", "obstacle2", "obstacle3", "obstacle4", "obstacle5"]  # 热源物体
+    "heat_sources": ["obstacle1", "obstacle2", "obstacle3", "obstacle4", "obstacle5"],  # 热源物体
+    "comfort_range": [18.0, 28.0],  # 舒适温度范围 (摄氏度)
+    "ac_power": 1.0  # 空调功率系数
 }
 
 
@@ -58,6 +60,12 @@ class MojocoDataSim:
         print("可视化窗口已启动")
         print("仿真将在3秒后开始...")
         time.sleep(3)
+
+        # 初始化空调系统状态
+        self.ac_status = False  # 空调开关状态
+        self.ac_target_temp = 23.0  # 空调目标温度
+        self.comfort_min_temp = TEMPERATURE_PARAMS["comfort_range"][0]
+        self.comfort_max_temp = TEMPERATURE_PARAMS["comfort_range"][1]
 
     def get_world_pose(self, body_name):
         """
@@ -439,6 +447,13 @@ class MojocoDataSim:
         noise = np.random.normal(0, 0.5)  # 均值为0，标准差为0.5的高斯噪声
         temperature += noise
         
+        # 如果空调开启，调整温度
+        if self.ac_status:
+            # 空调效果：逐渐向目标温度靠近
+            temp_diff = self.ac_target_temp - temperature
+            ac_effect = temp_diff * TEMPERATURE_PARAMS["ac_power"] * 0.05  # 空调效果系数
+            temperature += ac_effect
+            
         return temperature
 
     def visualize_temperature_data(self, temperature, detected_objects):
@@ -590,6 +605,237 @@ class MojocoDataSim:
         
         print(f"已生成温度分布热力图: thermal_map_{self.frame_count:04d}.png")
 
+    def check_and_control_ac(self, temperature):
+        """
+        检查温度并控制空调开关
+        :param temperature: 当前温度
+        :return: 是否开启了空调
+        """
+        # 检查温度是否超出舒适范围
+        if temperature < self.comfort_min_temp or temperature > self.comfort_max_temp:
+            # 如果温度不在舒适范围内，开启空调
+            if not self.ac_status:
+                self.ac_status = True
+                print(f"🌡️ 空调已开启，当前温度: {temperature:.1f}°C，目标温度: {self.ac_target_temp:.1f}°C")
+        else:
+            # 如果温度在舒适范围内，关闭空调
+            if self.ac_status:
+                self.ac_status = False
+                print(f"❄️ 空调已关闭，当前温度: {temperature:.1f}°C，处于舒适范围内")
+                
+        return self.ac_status
+
+    def visualize_ac_control(self, temperature, ac_status):
+        """
+        生成空调控制状态可视化图
+        :param temperature: 当前温度
+        :param ac_status: 空调状态
+        """
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # 绘制温度范围
+        comfort_min = self.comfort_min_temp
+        comfort_max = self.comfort_max_temp
+        ambient_temp = TEMPERATURE_PARAMS["ambient_temp"]
+        
+        # 绘制舒适温度区域
+        ax.axvspan(comfort_min, comfort_max, alpha=0.3, color='green', label='舒适温度区间')
+        
+        # 绘制环境温度线
+        ax.axvline(ambient_temp, color='blue', linestyle='--', linewidth=1, label=f'环境温度 ({ambient_temp}°C)')
+        
+        # 绘制当前温度
+        color = 'red' if ac_status else 'orange'
+        status_label = '空调运行中' if ac_status else '空调关闭'
+        ax.scatter(temperature, 1, s=100, color=color, label=f'当前温度 {temperature:.1f}°C ({status_label})')
+        
+        # 绘制目标温度（如果空调开启）
+        if ac_status:
+            ax.axvline(self.ac_target_temp, color='purple', linestyle='-.', linewidth=1, 
+                      label=f'目标温度 ({self.ac_target_temp}°C)')
+        
+        ax.set_xlim(ambient_temp - 10, ambient_temp + 10)
+        ax.set_ylim(0, 2)
+        ax.set_xlabel('温度 (°C)')
+        ax.set_title(f'空调控制系统状态 - 帧 {self.frame_count:04d}')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # 移除y轴刻度
+        ax.set_yticks([])
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/visualization/ac_control_{self.frame_count:04d}.png",
+                    dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"已生成空调控制状态图: ac_control_{self.frame_count:04d}.png")
+
+    def generate_temperature_trend(self):
+        """
+        生成温度变化趋势图
+        """
+        # 读取之前保存的温度数据
+        temp_files = []
+        for file in os.listdir(f"{self.output_dir}/annotations"):
+            if file.startswith("temp_frame_") and file.endswith(".json"):
+                temp_files.append(file)
+        
+        if not temp_files:
+            return
+            
+        # 按帧排序
+        temp_files.sort()
+        
+        frames = []
+        temperatures = []
+        ac_statuses = []
+        
+        # 读取温度数据
+        for file in temp_files:
+            with open(f"{self.output_dir}/annotations/{file}", "r") as f:
+                temp_data = json.load(f)
+                frames.append(temp_data["frame"])
+                temperatures.append(temp_data["temperature"])
+                ac_statuses.append(temp_data["ac_status"])
+        
+        # 绘制温度变化趋势图
+        fig, ax = plt.subplots(figsize=(12, 6))
+        
+        # 绘制温度曲线
+        ax.plot(frames, temperatures, 'o-', color='red', linewidth=2, markersize=4, label='实测温度')
+        
+        # 绘制舒适温度区间
+        ax.axhspan(self.comfort_min_temp, self.comfort_max_temp, alpha=0.2, color='green', 
+                  label='舒适温度区间')
+        
+        # 绘制环境温度线
+        ax.axhline(TEMPERATURE_PARAMS["ambient_temp"], color='blue', linestyle='--', 
+                  label=f'环境温度 ({TEMPERATURE_PARAMS["ambient_temp"]}°C)')
+        
+        # 标记空调开启的时间点
+        ac_on_frames = [frames[i] for i in range(len(frames)) if ac_statuses[i]]
+        ac_on_temps = [temperatures[i] for i in range(len(temperatures)) if ac_statuses[i]]
+        if ac_on_frames:
+            ax.scatter(ac_on_frames, ac_on_temps, color='purple', s=50, marker='^', 
+                      label='空调运行中', zorder=5)
+        
+        ax.set_xlabel('帧序号')
+        ax.set_ylabel('温度 (°C)')
+        ax.set_title('温度变化趋势与空调控制状态')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/visualization/temperature_trend.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print("已生成温度变化趋势图: temperature_trend.png")
+
+    def generate_temperature_summary_chart(self):
+        """
+        生成温度调节汇总图，综合显示温度变化、空调状态和调节效果
+        """
+        # 读取之前保存的温度数据
+        temp_files = []
+        for file in os.listdir(f"{self.output_dir}/annotations"):
+            if file.startswith("temp_frame_") and file.endswith(".json"):
+                temp_files.append(file)
+        
+        if not temp_files:
+            return
+            
+        # 按帧排序
+        temp_files.sort()
+        
+        frames = []
+        temperatures = []
+        ac_statuses = []
+        target_temps = []
+        
+        # 读取温度数据
+        for file in temp_files:
+            with open(f"{self.output_dir}/annotations/{file}", "r") as f:
+                temp_data = json.load(f)
+                frames.append(temp_data["frame"])
+                temperatures.append(temp_data["temperature"])
+                ac_statuses.append(temp_data["ac_status"])
+                target_temps.append(temp_data.get("ac_target_temp", None))
+        
+        # 创建汇总图
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10))
+        
+        # 第一个子图：温度变化和空调状态
+        ax1.plot(frames, temperatures, 'o-', color='red', linewidth=2, markersize=4, label='实测温度')
+        ax1.axhspan(self.comfort_min_temp, self.comfort_max_temp, alpha=0.2, color='green', 
+                   label='舒适温度区间')
+        ax1.axhline(TEMPERATURE_PARAMS["ambient_temp"], color='blue', linestyle='--', 
+                   label=f'环境温度 ({TEMPERATURE_PARAMS["ambient_temp"]}°C)')
+        
+        # 标记空调开启的时间点
+        ac_on_frames = [frames[i] for i in range(len(frames)) if ac_statuses[i]]
+        ac_on_temps = [temperatures[i] for i in range(len(temperatures)) if ac_statuses[i]]
+        if ac_on_frames:
+            ax1.scatter(ac_on_frames, ac_on_temps, color='purple', s=50, marker='^', 
+                       label='空调运行中', zorder=5)
+        
+        ax1.set_ylabel('温度 (°C)')
+        ax1.set_title('温度变化与空调控制状态')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        
+        # 第二个子图：空调工作时的目标温度和调节效果
+        # 只显示空调开启时的数据点
+        ac_frames = []
+        ac_temps = []
+        ac_targets = []
+        temp_differences = []
+        
+        for i in range(len(frames)):
+            if ac_statuses[i] and target_temps[i] is not None:
+                ac_frames.append(frames[i])
+                ac_temps.append(temperatures[i])
+                ac_targets.append(target_temps[i])
+                temp_differences.append(abs(temperatures[i] - target_temps[i]))
+        
+        if ac_frames:
+            ax2.plot(ac_frames, ac_temps, 'o-', color='red', linewidth=2, markersize=4, label='实测温度')
+            ax2.plot(ac_frames, ac_targets, 's-', color='purple', linewidth=2, markersize=4, label='目标温度')
+            
+            # 添加温度差值的柱状图
+            ax3 = ax2.twinx()
+            bars = ax3.bar(ac_frames, temp_differences, alpha=0.3, color='orange', width=1.0, label='温度差值')
+            ax3.set_ylabel('温度差值 (°C)', color='orange')
+            ax3.tick_params(axis='y', labelcolor='orange')
+            
+            # 添加数值标签
+            for bar, diff in zip(bars, temp_differences):
+                height = bar.get_height()
+                ax3.annotate(f'{diff:.1f}', 
+                            xy=(bar.get_x() + bar.get_width()/2, height),
+                            xytext=(0, 3),  # 3 points vertical offset
+                            textcoords="offset points",
+                            ha='center', va='bottom', fontsize=8, color='orange')
+        
+        ax2.set_xlabel('帧序号')
+        ax2.set_ylabel('温度 (°C)')
+        ax2.set_title('空调调节效果分析')
+        ax2.grid(True, alpha=0.3)
+        
+        # 合并图例
+        if ac_frames:
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            lines3, labels3 = ax3.get_legend_handles_labels()
+            ax2.legend(lines2 + lines3, labels2 + labels3, loc='upper left')
+        else:
+            ax2.legend()
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.output_dir}/visualization/temperature_summary.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print("已生成温度调节汇总图: temperature_summary.png")
+
     def run_simulation(self):
         """运行MuJoCo仿真并生成数据"""
         print("开始仿真...")
@@ -616,6 +862,9 @@ class MojocoDataSim:
                 
                 # 新增：模拟温度数据
                 temperature = self.simulate_temperature_data()
+                
+                # 检查并控制空调
+                ac_status = self.check_and_control_ac(temperature)
 
                 # 基于传感器数据计算控制指令
                 left_speed, right_speed, steering_angle = self.calculate_avoidance_control(
@@ -646,12 +895,17 @@ class MojocoDataSim:
                 
                 # 新增：生成温度分布热力图
                 self.generate_thermal_map(temperature, annotations["objects"])
-
+                
+                # 新增：生成空调控制状态图
+                self.visualize_ac_control(temperature, ac_status)
+                
                 # 在保存数据时也保存温度信息
                 temp_data = {
                     "frame": self.frame_count,
                     "temperature": temperature,
-                    "unit": "celsius"
+                    "unit": "celsius",
+                    "ac_status": ac_status,
+                    "ac_target_temp": self.ac_target_temp if ac_status else None
                 }
                 with open(f"{self.output_dir}/annotations/temp_frame_{self.frame_count:04d}.json", "w") as f:
                     json.dump(temp_data, f, indent=4)
@@ -685,6 +939,12 @@ class MojocoDataSim:
             # 控制仿真速度以便观察
             time.sleep(0.01)
 
+        # 生成最终的温度趋势图
+        self.generate_temperature_trend()
+        
+        # 生成温度调节汇总图
+        self.generate_temperature_summary_chart()
+        
         print(f"仿真完成！数据已保存到：{self.output_dir}")
 
 
