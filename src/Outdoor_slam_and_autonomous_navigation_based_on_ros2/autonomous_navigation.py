@@ -1126,7 +1126,7 @@ class AutonomousNavigation:
             print("程序结束")
 
 
-# ==================== 主程序 ====================
+
 if __name__ == "__main__":
     # 创建导航系统
     nav_system = AutonomousNavigation()
