@@ -30,6 +30,8 @@ class PerformanceMonitor:
         self.memory_samples = []
         self.cpu_samples = []
         self.frame_times = []
+        self.first_frame_time = None
+        self.last_frame_time = None
 
     def sample_memory(self):
         try:
@@ -72,14 +74,17 @@ class PerformanceMonitor:
 
     def record_frame_time(self, frame_time):
         self.frame_times.append(frame_time)
+        if self.first_frame_time is None:
+            self.first_frame_time = time.time()
+        self.last_frame_time = time.time()
 
     def get_performance_summary(self):
-        if not self.frame_times:
+        if not self.frame_times or len(self.frame_times) < 2:
             avg_frame_time = 0
             fps = 0
         else:
             avg_frame_time = np.mean(self.frame_times)
-            fps = 1.0 / avg_frame_time if avg_frame_time > 0 else 0
+            fps = len(self.frame_times) / max(0.1, (self.last_frame_time - self.first_frame_time))
 
         summary = {
             'total_runtime': time.time() - self.start_time,
@@ -90,14 +95,24 @@ class PerformanceMonitor:
             'max_cpu_percent': max(self.cpu_samples) if self.cpu_samples else 0,
             'average_frame_time': avg_frame_time,
             'frames_per_second': fps,
-            'total_frames': len(self.frame_times),
-            'frame_time_stats': {
-                'p50': np.percentile(self.frame_times, 50) if self.frame_times else 0,
-                'p95': np.percentile(self.frame_times, 95) if self.frame_times else 0,
-                'p99': np.percentile(self.frame_times, 99) if self.frame_times else 0,
-                'std': np.std(self.frame_times) if self.frame_times else 0
-            }
+            'total_frames': len(self.frame_times)
         }
+
+        if self.frame_times and len(self.frame_times) >= 2:
+            summary['frame_time_stats'] = {
+                'p50': np.percentile(self.frame_times, 50),
+                'p95': np.percentile(self.frame_times, 95),
+                'p99': np.percentile(self.frame_times, 99) if len(self.frame_times) > 1 else 0,
+                'std': np.std(self.frame_times)
+            }
+        else:
+            summary['frame_time_stats'] = {
+                'p50': 0,
+                'p95': 0,
+                'p99': 0,
+                'std': 0
+            }
+
         return summary
 
 
@@ -119,12 +134,12 @@ class Log:
 
     @staticmethod
     def debug(msg):
-        timestamp = datetime.now().strftime("%Y-%m-d %H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[DEBUG][{timestamp}] {msg}")
 
     @staticmethod
     def performance(msg):
-        timestamp = datetime.now().strftime("%Y-%m-d %H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[PERF][{timestamp}] {msg}")
 
 
@@ -569,8 +584,7 @@ class SensorManager:
             'total_images': 0,
             'total_lidar_frames': 0,
             'image_capture_times': [],
-            'lidar_processing_times': [],
-            'frame_drop_count': 0
+            'lidar_processing_times': []
         }
 
     def setup_cameras(self, vehicle, center_location, vehicle_id=0):
@@ -868,7 +882,6 @@ class SensorManager:
 
         self.is_running = False
 
-        Log.info("停止所有传感器监听...")
         for sensor in self.sensors:
             try:
                 if hasattr(sensor, 'stop'):
@@ -885,7 +898,6 @@ class SensorManager:
             except:
                 pass
 
-        Log.info(f"销毁 {len(self.sensors)} 个传感器...")
         for i, sensor in enumerate(self.sensors):
             try:
                 if hasattr(sensor, 'destroy'):
@@ -1105,17 +1117,15 @@ class DataCollector:
         memory_warning_issued = False
         early_stop_triggered = False
 
-        # 添加内存监控阈值
-        memory_warning_threshold = 350  # MB
-        memory_critical_threshold = 400  # MB
-        early_stop_threshold = 450  # MB
+        memory_warning_threshold = 350
+        memory_critical_threshold = 400
+        early_stop_threshold = 450
 
         try:
             while time.time() - self.start_time < duration and self.is_running:
                 current_time = time.time()
                 elapsed = current_time - self.start_time
 
-                # 内存监控和早期停止机制
                 if current_time - last_memory_check >= 2.0:
                     try:
                         import psutil
@@ -1204,16 +1214,21 @@ class DataCollector:
 
             self.collected_frames = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
 
-            performance_summary = self.performance_monitor.get_performance_summary()
+            if self.collected_frames > 0:
+                total_frames_from_sensors = self.collected_frames
+                performance_summary = self.performance_monitor.get_performance_summary()
 
-            if early_stop_triggered:
-                Log.warning("数据收集因内存过高而提前终止")
+                if early_stop_triggered:
+                    Log.warning("数据收集因内存过高而提前终止")
+                else:
+                    Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
+
+                fps = total_frames_from_sensors / max(elapsed, 0.1)
+                Log.info(f"平均帧率: {fps:.2f} FPS")
+                Log.info(f"最大内存使用: {performance_summary['max_memory_mb']:.1f} MB")
+                Log.info(f"平均CPU使用: {performance_summary['average_cpu_percent']:.1f}%")
             else:
-                Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
-
-            Log.info(f"平均帧率: {performance_summary['frames_per_second']:.2f} FPS")
-            Log.info(f"最大内存使用: {performance_summary['max_memory_mb']:.1f} MB")
-            Log.info(f"平均CPU使用: {performance_summary['average_cpu_percent']:.1f}%")
+                Log.warning("未收集到任何数据帧")
 
             self._save_metadata()
             self._print_summary()
@@ -1478,6 +1493,8 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
         return detected_objects
 
     def _save_metadata(self):
+        total_frames = self.collected_frames
+
         metadata = {
             'scenario': self.config['scenario'],
             'traffic': self.config['traffic'],
@@ -1488,22 +1505,26 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             'output': self.config['output'],
             'collection': {
                 'duration': round(time.time() - self.start_time, 2),
-                'total_frames': self.collected_frames,
-                'frame_rate': round(self.collected_frames / max(time.time() - self.start_time, 0.1), 2)
-            },
-            'performance': self.performance_monitor.get_performance_summary()
+                'total_frames': total_frames,
+                'frame_rate': round(total_frames / max(time.time() - self.start_time, 0.1),
+                                    2) if total_frames > 0 else 0
+            }
         }
 
-        sensor_summaries = {}
-        for vehicle_id, sensor_manager in self.sensor_managers.items():
-            sensor_summaries[vehicle_id] = sensor_manager.generate_sensor_summary()
-        metadata['sensor_summaries'] = sensor_summaries
+        if total_frames > 0:
+            performance_summary = self.performance_monitor.get_performance_summary()
+            metadata['performance'] = performance_summary
 
-        if self.v2x_communication:
-            metadata['v2x_status'] = self.v2x_communication.get_network_status()
+            sensor_summaries = {}
+            for vehicle_id, sensor_manager in self.sensor_managers.items():
+                sensor_summaries[vehicle_id] = sensor_manager.generate_sensor_summary()
+            metadata['sensor_summaries'] = sensor_summaries
 
-        if self.multi_vehicle_manager:
-            metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
+            if self.v2x_communication:
+                metadata['v2x_status'] = self.v2x_communication.get_network_status()
+
+            if self.multi_vehicle_manager:
+                metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
 
         meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
         with open(meta_path, 'w', encoding='utf-8') as f:
@@ -1553,29 +1574,37 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             if os.path.exists(kitti_dir):
                 print(f"KITTI格式: 已生成")
 
-        performance = self.performance_monitor.get_performance_summary()
+        total_frames = self.collected_frames
+        elapsed = time.time() - self.start_time
+
         print(f"\n性能统计:")
-        print(f"  平均帧率: {performance['frames_per_second']:.2f} FPS")
-        print(f"  帧时统计:")
-        print(f"    平均: {performance['average_frame_time']:.3f}秒")
-        print(f"    P50: {performance['frame_time_stats']['p50']:.3f}秒")
-        print(f"    P95: {performance['frame_time_stats']['p95']:.3f}秒")
-        print(f"    P99: {performance['frame_time_stats']['p99']:.3f}秒")
-        print(f"  平均内存: {performance['average_memory_mb']:.1f} MB")
-        print(f"  最大内存: {performance['max_memory_mb']:.1f} MB")
-        print(f"  平均CPU: {performance['average_cpu_percent']:.1f}%")
-        print(f"  总帧数: {performance['total_frames']}")
+        if total_frames > 0:
+            fps = total_frames / max(elapsed, 0.1)
+            print(f"  平均帧率: {fps:.2f} FPS")
+
+            performance = self.performance_monitor.get_performance_summary()
+            print(f"  帧时统计:")
+            print(f"    平均: {performance['average_frame_time']:.3f}秒")
+            print(f"    P50: {performance['frame_time_stats']['p50']:.3f}秒")
+            print(f"    P95: {performance['frame_time_stats']['p95']:.3f}秒")
+            print(f"    P99: {performance['frame_time_stats']['p99']:.3f}秒")
+            print(f"  平均内存: {performance['average_memory_mb']:.1f} MB")
+            print(f"  最大内存: {performance['max_memory_mb']:.1f} MB")
+            print(f"  平均CPU: {performance['average_cpu_percent']:.1f}%")
+            print(f"  总帧数: {total_frames}")
+        else:
+            print("  未收集到有效帧数据")
 
         print(f"\n输出目录: {self.output_dir}")
         print("=" * 60)
 
     def run_validation(self):
-        if self.config['output'].get('validate_data', True):
+        if self.config['output'].get('validate_data', True) and self.collected_frames > 0:
             Log.info("运行数据验证...")
             DataValidator.validate_dataset(self.output_dir)
 
     def run_analysis(self):
-        if self.config['output'].get('run_analysis', False):
+        if self.config['output'].get('run_analysis', False) and self.collected_frames > 0:
             Log.info("运行数据分析...")
             DataAnalyzer.analyze_dataset(self.output_dir)
 
