@@ -14,23 +14,12 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # 指定python版本 (已改为 3.11，很好)
+          python-version: '3.11' # 保持 3.11
           architecture: 'x64'
 
-      # === 👇 关键修改开始 👇 ===
-      
-      # 1. 先单独安装 CPU 版本的 PyTorch
-      # 原因：默认的 PyTorch 包含几个GB的 Nvidia 显卡驱动，会把 GitHub 的硬盘撑爆。
-      # 指定 CPU 版本后，体积非常小，几秒钟就装好了。
-      - name: Install CPU-only PyTorch
-        run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-      # 2. 再安装剩下的 requirements.txt
-      # pip 会检测到 torch 已经安装了，就会跳过那个巨大的 GPU 版本，从而解决空间不足的问题。
+      # === 恢复原来的样子：只有一步简单的安装 ===
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
-        
-      # === 👆 关键修改结束 👆 ===
 
       - name: Python script testing
         run: |
