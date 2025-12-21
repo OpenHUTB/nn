@@ -60,27 +60,11 @@ CARLA 模拟器和自动驾驶基础算法学习
 
 \## 项目结构
 
-```
-
-self-driving-car-carla/
-
-├── carla\_client/    # CARLA连接与场景管理
-
-├── perception/      # 目标检测与传感器数据处理
-
-├── planning/        # 路径规划算法实现
-
-├── control/         # PID控制逻辑
-
-├── visualization/   # 实时可视化
-
-├── utils/           # 工具函数
-
-├── main.py          # 项目入口
-
-└── requirements.txt # 依赖列表
-
-```
+autonomous_driving_car/
+├── FPV/             # 第一视角可视化模块：负责车辆摄像头视角、检测结果的实时显示
+├── MCP/             # 主控制与模块集成：包含感知（检测）、规划（路径）、控制（PID）的核心逻辑
+├── main.py          # 项目入口：启动CARLA连接、调用MCP与FPV模块
+└── README.md        # 项目说明文档
 
 
 
