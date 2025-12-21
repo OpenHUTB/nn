@@ -463,7 +463,13 @@ class HUD(object):
 
 
 class FadingText(object):
-    """ Class for fading text """
+    """Class for fading text"""
+
+    # 常量定义
+    ALPHA_MULTIPLIER = 500.0  # 透明度计算系数
+    TEXT_OFFSET = (10, 11)  # 文本偏移量
+    DEFAULT_COLOR = (255, 255, 255)  # 默认文本颜色
+    DEFAULT_SECONDS = 2.0  # 默认显示时间
 
     def __init__(self, font, dim, pos):
         """Constructor method"""
@@ -471,25 +477,56 @@ class FadingText(object):
         self.dim = dim
         self.pos = pos
         self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        self._init_surface()
 
-    def set_text(self, text, color=(255, 255, 255), seconds=2.0):
+    def _init_surface(self):
+        """初始化Surface"""
+        self.surface = pygame.Surface(self.dim)
+        self._clear_surface()
+
+    def _clear_surface(self):
+        """清空Surface"""
+        self.surface.fill((0, 0, 0, 0))
+
+    def set_text(self, text, color=None, seconds=None):
         """Set fading text"""
+        # 使用默认值
+        if color is None:
+            color = self.DEFAULT_COLOR
+        if seconds is None:
+            seconds = self.DEFAULT_SECONDS
+
+        # 渲染文本
         text_texture = self.font.render(text, True, color)
+
+        # 准备Surface
         self.surface = pygame.Surface(self.dim)
         self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
+        self._clear_surface()
+
+        # 绘制文本
+        self.surface.blit(text_texture, self.TEXT_OFFSET)
 
     def tick(self, _, clock):
         """Fading text method for every tick"""
-        delta_seconds = 1e-3 * clock.get_time()
+        # 计算经过的时间
+        delta_seconds = clock.get_time() / 1000.0  # 转换为秒
+
+        # 更新时间
         self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
+
+        # 更新透明度
+        self._update_alpha()
+
+    def _update_alpha(self):
+        """更新Surface的透明度"""
+        alpha_value = self.seconds_left * self.ALPHA_MULTIPLIER
+        self.surface.set_alpha(alpha_value)
 
     def render(self, display):
         """Render fading text method"""
-        display.blit(self.surface, self.pos)
+        if self.seconds_left > 0:
+            display.blit(self.surface, self.pos)
 
 
 # ==============================================================================
@@ -1890,6 +1927,7 @@ class BehaviorAgent(Agent):
 def game_loop(args):
     """ Main loop for agent"""
 
+    # 初始化部分保持不变
     pygame.init()
     pygame.font.init()
     world = None
@@ -1905,13 +1943,9 @@ def game_loop(args):
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
-
-        # selected_world = client.load_world("Town01")  # KK Changes world to Town04
         selected_world = client.get_world()
-
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
-
         agent = BehaviorAgent(world.player, behavior=args.behavior)
 
         spawn_points = world.map.get_spawn_points()
@@ -1926,57 +1960,56 @@ def game_loop(args):
 
         clock = pygame.time.Clock()
 
+        # 主循环开始
         while True:
             clock.tick_busy_loop(60)
+
+            # 统一处理事件
             if controller.parse_events(world):
                 return
 
-            # As soon as the server is ready continue!
+            # 等待世界更新
             if not world.world.wait_for_tick(10.0):
                 continue
 
-            if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events(world):
-                    return
-
-                # agent.update_information(world)
-                # as soon as the server is ready continue!
-                world.world.wait_for_tick(10.0)
-
+            # 根据代理类型执行不同的逻辑
+            if args.agent in ["Roaming", "Basic"]:
+                world.world.wait_for_tick(10.0)  # 等待服务器
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
+
+                # 为Roaming/Basic代理生成控制
                 control = agent.run_step()
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
-            else:
-                agent.update_information(world)
+                continue  # 跳过后续的控制应用
 
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
+            # 其他代理类型的逻辑
+            agent.update_information(world)
+            world.tick(clock)
+            world.render(display)
+            pygame.display.flip()
 
-            # Set new destination when target has been reached
+            # 检查是否到达目的地
             if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
                 agent.reroute(spawn_points)
                 tot_target_reached += 1
                 world.hud.notification("The target has been reached " +
                                        str(tot_target_reached) + " times.", seconds=4.0)
-
             elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
                 print("Target reached, mission accomplished...")
                 break
 
+            # 设置速度限制并应用控制
             speed_limit = world.player.get_speed_limit()
             agent.get_local_planner().set_speed(speed_limit)
-
             control = agent.run_step()
             world.player.apply_control(control)
 
     finally:
         if world is not None:
             world.destroy()
-
         pygame.quit()
 
 
