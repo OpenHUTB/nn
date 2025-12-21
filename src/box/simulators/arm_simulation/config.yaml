@@ -1,4 +1,0 @@
-# 最小化配置示例（具体字段需根据 simulator.py 中的要求调整）
-simulation:
-  model_path: "arm_model.mjcf"  # 模型文件名（若有）
-  render: true
