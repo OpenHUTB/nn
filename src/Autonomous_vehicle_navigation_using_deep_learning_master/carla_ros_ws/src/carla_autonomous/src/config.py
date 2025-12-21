@@ -17,7 +17,7 @@ TRAJECTORIES = {
 }
 
 # 当前使用的轨迹
-CURRENT_TRAJECTORY = "test_trajectory"
+CURRENT_TRAJECTORY = "custom_trajectory"
 
 def get_current_trajectory():
     """获取当前轨迹配置"""

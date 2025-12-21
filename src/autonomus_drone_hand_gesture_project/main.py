@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-手势控制AirSim无人机 - 手势轨迹记录与回放优化版
-修复手势语音播报问题，确保所有手势语音正常
+手势控制AirSim无人机 - 详细性能统计优化版
+新增完整的性能监控、统计和报告功能
 作者: xiaoshiyuan888
 """
 
@@ -13,16 +13,18 @@ import json
 import math
 import threading
 import tempfile
-import pickle  # 新增：用于数据序列化
+import pickle
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import cv2
 import numpy as np
 from collections import deque, Counter
+import psutil  # 新增：用于系统资源监控
+import csv  # 新增：用于性能日志导出
 
 print("=" * 60)
-print("Gesture Controlled Drone - Enhanced with Trajectory Recording")
-print("手势轨迹记录与回放优化版!")
+print("Gesture Controlled Drone - Performance Statistics Enhanced")
+print("详细性能统计优化版!")
 print("=" * 60)
 
 # ========== 修复导入路径 ==========
@@ -53,6 +55,15 @@ def safe_import():
         modules_status['OpenCV'] = False
         print(f"[OpenCV] ✗ 导入失败: {e}")
         return None, modules_status
+
+    try:
+        import psutil
+        modules_status['psutil'] = True
+        print("[psutil] ✓ 系统资源监控库就绪")
+    except Exception as e:
+        modules_status['psutil'] = False
+        print(f"[psutil] ✗ 导入失败: {e}")
+        # 继续运行，psutil不是必需的
 
     airsim_module = None
     try:
@@ -139,7 +150,8 @@ def safe_import():
         'np': np,
         'PIL': {'Image': Image, 'ImageDraw': ImageDraw, 'ImageFont': ImageFont},
         'airsim': airsim_module,
-        'speech': speech_module
+        'speech': speech_module,
+        'psutil': psutil if 'psutil' in modules_status and modules_status['psutil'] else None
     }, modules_status
 
 
@@ -157,6 +169,497 @@ print("-" * 60)
 # 解包库
 cv2, np = libs['cv2'], libs['np']
 Image, ImageDraw, ImageFont = libs['PIL']['Image'], libs['PIL']['ImageDraw'], libs['PIL']['ImageFont']
+
+
+# ========== 性能分析器类 ==========
+class PerformanceAnalyzer:
+    """性能分析器 - 监控和报告系统性能"""
+
+    def __init__(self, speech_manager=None):
+        self.speech_manager = speech_manager
+        self.start_time = time.time()
+        self.session_start_time = time.time()
+
+        # 帧率统计
+        self.frame_times = deque(maxlen=300)  # 保留最近300帧的时间戳
+        self.frame_count = 0
+        self.fps_history = deque(maxlen=100)  # FPS历史记录
+
+        # 手势识别性能
+        self.gesture_recognition_times = deque(maxlen=100)
+        self.avg_recognition_time = 0
+        self.max_recognition_time = 0
+
+        # 系统资源监控
+        self.cpu_usage_history = deque(maxlen=100)
+        self.memory_usage_history = deque(maxlen=100)
+
+        # 性能事件记录
+        self.performance_events = []
+        self.performance_snapshots = []
+
+        # 手势统计
+        self.gesture_counts = {}
+        self.gesture_confidence_sum = {}
+        self.gesture_confidence_count = {}
+
+        # 错误统计
+        self.error_count = 0
+        self.warning_count = 0
+
+        # 无人机控制统计
+        self.drone_commands = 0
+        self.successful_commands = 0
+        self.failed_commands = 0
+
+        # 轨迹记录统计
+        self.recording_sessions = 0
+        self.total_trajectory_points = 0
+
+        # 性能日志
+        self.performance_log = []
+        self.log_file = os.path.join(current_dir, 'performance_log.csv')
+
+        # 性能阈值
+        self.performance_thresholds = {
+            'fps_warning': 15,
+            'fps_critical': 5,
+            'cpu_warning': 80,
+            'cpu_critical': 90,
+            'memory_warning': 85,
+            'memory_critical': 95,
+            'recognition_warning': 50,  # ms
+            'recognition_critical': 100  # ms
+        }
+
+        # 性能状态
+        self.performance_status = "良好"
+        self.last_performance_report = 0
+        self.auto_report_interval = 60  # 自动报告间隔（秒）
+
+        print("✓ 性能分析器已初始化")
+
+    def update_frame(self):
+        """更新帧统计"""
+        current_time = time.time()
+        self.frame_times.append(current_time)
+        self.frame_count += 1
+
+        # 计算当前FPS
+        if len(self.frame_times) > 1:
+            time_span = self.frame_times[-1] - self.frame_times[0]
+            if time_span > 0:
+                current_fps = (len(self.frame_times) - 1) / time_span
+                self.fps_history.append(current_fps)
+
+    def update_gesture_recognition_time(self, recognition_time_ms):
+        """更新手势识别时间"""
+        self.gesture_recognition_times.append(recognition_time_ms)
+
+        # 更新平均识别时间
+        if len(self.gesture_recognition_times) > 0:
+            self.avg_recognition_time = np.mean(list(self.gesture_recognition_times))
+            self.max_recognition_time = max(self.max_recognition_time, recognition_time_ms)
+
+    def update_system_resources(self):
+        """更新系统资源使用情况"""
+        try:
+            if libs['psutil']:
+                cpu_percent = libs['psutil'].cpu_percent(interval=0.1)
+                memory_percent = libs['psutil'].virtual_memory().percent
+
+                self.cpu_usage_history.append(cpu_percent)
+                self.memory_usage_history.append(memory_percent)
+
+                # 检查性能问题
+                self.check_performance_issues(cpu_percent, memory_percent)
+        except:
+            pass  # psutil不可用时跳过
+
+    def check_performance_issues(self, cpu_percent, memory_percent):
+        """检查性能问题"""
+        issues = []
+
+        # 检查FPS
+        if len(self.fps_history) > 0:
+            avg_fps = np.mean(list(self.fps_history[-10:])) if len(self.fps_history) >= 10 else self.fps_history[-1]
+
+            if avg_fps < self.performance_thresholds['fps_critical']:
+                issues.append(("严重", f"帧率过低: {avg_fps:.1f} FPS"))
+                self.performance_status = "严重"
+            elif avg_fps < self.performance_thresholds['fps_warning']:
+                issues.append(("警告", f"帧率较低: {avg_fps:.1f} FPS"))
+                if self.performance_status == "良好":
+                    self.performance_status = "警告"
+
+        # 检查CPU使用率
+        if cpu_percent > self.performance_thresholds['cpu_critical']:
+            issues.append(("严重", f"CPU使用率过高: {cpu_percent:.1f}%"))
+            self.performance_status = "严重"
+        elif cpu_percent > self.performance_thresholds['cpu_warning']:
+            issues.append(("警告", f"CPU使用率较高: {cpu_percent:.1f}%"))
+            if self.performance_status == "良好":
+                self.performance_status = "警告"
+
+        # 检查内存使用率
+        if memory_percent > self.performance_thresholds['memory_critical']:
+            issues.append(("严重", f"内存使用率过高: {memory_percent:.1f}%"))
+            self.performance_status = "严重"
+        elif memory_percent > self.performance_thresholds['memory_warning']:
+            issues.append(("警告", f"内存使用率较高: {memory_percent:.1f}%"))
+            if self.performance_status == "良好":
+                self.performance_status = "警告"
+
+        # 检查手势识别时间
+        if self.avg_recognition_time > self.performance_thresholds['recognition_critical']:
+            issues.append(("严重", f"手势识别时间过长: {self.avg_recognition_time:.1f}ms"))
+            self.performance_status = "严重"
+        elif self.avg_recognition_time > self.performance_thresholds['recognition_warning']:
+            issues.append(("警告", f"手势识别时间较长: {self.avg_recognition_time:.1f}ms"))
+            if self.performance_status == "良好":
+                self.performance_status = "警告"
+
+        # 记录性能事件
+        if issues:
+            for level, message in issues:
+                self.add_performance_event(level, message)
+
+                # 语音提示（仅在状态变化时）
+                if (self.speech_manager and
+                        self.speech_manager.enabled and
+                        level == "严重"):
+                    current_time = time.time()
+                    if current_time - self.last_performance_report > 10:  # 避免频繁提示
+                        self.speech_manager.speak_direct(f"性能{level}: {message}")
+                        self.last_performance_report = current_time
+
+    def add_performance_event(self, level, message):
+        """添加性能事件"""
+        event = {
+            'timestamp': time.time(),
+            'level': level,
+            'message': message,
+            'session_time': time.time() - self.session_start_time
+        }
+        self.performance_events.append(event)
+
+        # 记录到日志
+        self.log_performance_event(event)
+
+        if level == "警告":
+            self.warning_count += 1
+        elif level == "严重":
+            self.error_count += 1
+
+    def log_performance_event(self, event):
+        """记录性能事件到日志"""
+        log_entry = {
+            'timestamp': datetime.fromtimestamp(event['timestamp']).strftime('%Y-%m-%d %H:%M:%S'),
+            'session_time': f"{event['session_time']:.1f}",
+            'level': event['level'],
+            'message': event['message']
+        }
+        self.performance_log.append(log_entry)
+
+    def record_gesture(self, gesture, confidence):
+        """记录手势统计"""
+        if gesture not in self.gesture_counts:
+            self.gesture_counts[gesture] = 0
+            self.gesture_confidence_sum[gesture] = 0
+            self.gesture_confidence_count[gesture] = 0
+
+        self.gesture_counts[gesture] += 1
+        self.gesture_confidence_sum[gesture] += confidence
+        self.gesture_confidence_count[gesture] += 1
+
+    def record_drone_command(self, success=True):
+        """记录无人机命令"""
+        self.drone_commands += 1
+        if success:
+            self.successful_commands += 1
+        else:
+            self.failed_commands += 1
+
+    def record_recording_session(self, points_count=0):
+        """记录录制会话"""
+        self.recording_sessions += 1
+        self.total_trajectory_points += points_count
+
+    def take_snapshot(self, label=""):
+        """拍摄性能快照"""
+        snapshot = {
+            'timestamp': time.time(),
+            'label': label,
+            'fps': self.get_current_fps(),
+            'avg_fps': self.get_average_fps(),
+            'avg_recognition_time': self.avg_recognition_time,
+            'max_recognition_time': self.max_recognition_time,
+            'cpu_usage': self.get_current_cpu_usage(),
+            'memory_usage': self.get_current_memory_usage(),
+            'gesture_counts': dict(self.gesture_counts),
+            'performance_status': self.performance_status,
+            'frame_count': self.frame_count,
+            'session_duration': time.time() - self.session_start_time
+        }
+        self.performance_snapshots.append(snapshot)
+
+        print(f"📸 性能快照已保存: {label}")
+        return snapshot
+
+    def get_current_fps(self):
+        """获取当前FPS"""
+        if len(self.fps_history) > 0:
+            return self.fps_history[-1]
+        return 0
+
+    def get_average_fps(self):
+        """获取平均FPS"""
+        if len(self.fps_history) > 0:
+            return np.mean(list(self.fps_history))
+        return 0
+
+    def get_current_cpu_usage(self):
+        """获取当前CPU使用率"""
+        if len(self.cpu_usage_history) > 0:
+            return self.cpu_usage_history[-1]
+        return 0
+
+    def get_current_memory_usage(self):
+        """获取当前内存使用率"""
+        if len(self.memory_usage_history) > 0:
+            return self.memory_usage_history[-1]
+        return 0
+
+    def generate_report(self, detailed=True):
+        """生成性能报告"""
+        report_time = time.time()
+        session_duration = report_time - self.session_start_time
+
+        # 基础报告
+        report = {
+            '生成时间': datetime.fromtimestamp(report_time).strftime('%Y-%m-%d %H:%M:%S'),
+            '会话时长': f"{session_duration:.1f}秒",
+            '总帧数': self.frame_count,
+            '平均FPS': f"{self.get_average_fps():.1f}",
+            '当前FPS': f"{self.get_current_fps():.1f}",
+            '平均手势识别时间': f"{self.avg_recognition_time:.1f}ms",
+            '最大手势识别时间': f"{self.max_recognition_time:.1f}ms",
+            '当前CPU使用率': f"{self.get_current_cpu_usage():.1f}%",
+            '当前内存使用率': f"{self.get_current_memory_usage():.1f}%",
+            '性能状态': self.performance_status,
+            '警告数量': self.warning_count,
+            '错误数量': self.error_count,
+            '无人机命令': {
+                '总数': self.drone_commands,
+                '成功': self.successful_commands,
+                '失败': self.failed_commands,
+                '成功率': f"{(self.successful_commands / self.drone_commands * 100 if self.drone_commands > 0 else 0):.1f}%"
+            },
+            '录制统计': {
+                '会话数': self.recording_sessions,
+                '总轨迹点数': self.total_trajectory_points
+            }
+        }
+
+        # 详细报告
+        if detailed:
+            # 手势统计
+            gesture_stats = {}
+            for gesture in self.gesture_counts:
+                count = self.gesture_counts[gesture]
+                if gesture in self.gesture_confidence_count and self.gesture_confidence_count[gesture] > 0:
+                    avg_confidence = self.gesture_confidence_sum[gesture] / self.gesture_confidence_count[gesture]
+                else:
+                    avg_confidence = 0
+
+                gesture_stats[gesture] = {
+                    '次数': count,
+                    '占比': f"{(count / self.frame_count * 100 if self.frame_count > 0 else 0):.1f}%",
+                    '平均置信度': f"{avg_confidence:.1%}"
+                }
+
+            report['手势统计'] = gesture_stats
+
+            # 性能事件
+            if self.performance_events:
+                recent_events = list(self.performance_events)[-10:]  # 最近10个事件
+                report['最近性能事件'] = [
+                    {
+                        '时间': datetime.fromtimestamp(e['timestamp']).strftime('%H:%M:%S'),
+                        '级别': e['level'],
+                        '消息': e['message']
+                    }
+                    for e in recent_events
+                ]
+
+            # 性能快照
+            if self.performance_snapshots:
+                report['性能快照数'] = len(self.performance_snapshots)
+
+            # 系统建议
+            suggestions = self.generate_suggestions()
+            if suggestions:
+                report['优化建议'] = suggestions
+
+        return report
+
+    def generate_suggestions(self):
+        """生成优化建议"""
+        suggestions = []
+
+        # 检查FPS
+        avg_fps = self.get_average_fps()
+        if avg_fps < self.performance_thresholds['fps_warning']:
+            suggestions.append(f"帧率较低({avg_fps:.1f}FPS)，建议切换到'最快'性能模式")
+
+        # 检查CPU
+        cpu_usage = self.get_current_cpu_usage()
+        if cpu_usage > self.performance_thresholds['cpu_warning']:
+            suggestions.append(f"CPU使用率较高({cpu_usage:.1f}%)，请关闭其他占用CPU的程序")
+
+        # 检查内存
+        memory_usage = self.get_current_memory_usage()
+        if memory_usage > self.performance_thresholds['memory_warning']:
+            suggestions.append(f"内存使用率较高({memory_usage:.1f}%)，请关闭不必要的程序")
+
+        # 检查识别时间
+        if self.avg_recognition_time > self.performance_thresholds['recognition_warning']:
+            suggestions.append(f"手势识别时间较长({self.avg_recognition_time:.1f}ms)，建议调整摄像头位置或光线")
+
+        return suggestions
+
+    def print_report(self, detailed=True):
+        """打印性能报告"""
+        report = self.generate_report(detailed)
+
+        print("\n" + "=" * 80)
+        print("📊 性能分析报告")
+        print("=" * 80)
+
+        # 基础信息
+        print(f"生成时间: {report['生成时间']}")
+        print(f"会话时长: {report['会话时长']}")
+        print(f"总帧数: {report['总帧数']}")
+        print(f"平均FPS: {report['平均FPS']}")
+        print(f"当前FPS: {report['当前FPS']}")
+        print(f"平均手势识别时间: {report['平均手势识别时间']}")
+        print(f"最大手势识别时间: {report['最大手势识别时间']}")
+        print(f"当前CPU使用率: {report['当前CPU使用率']}")
+        print(f"当前内存使用率: {report['当前内存使用率']}")
+        print(f"性能状态: {report['性能状态']}")
+
+        # 无人机命令统计
+        cmd_stats = report['无人机命令']
+        print(f"\n无人机命令统计:")
+        print(f"  总数: {cmd_stats['总数']}")
+        print(f"  成功: {cmd_stats['成功']}")
+        print(f"  失败: {cmd_stats['失败']}")
+        print(f"  成功率: {cmd_stats['成功率']}")
+
+        # 录制统计
+        rec_stats = report['录制统计']
+        print(f"\n录制统计:")
+        print(f"  会话数: {rec_stats['会话数']}")
+        print(f"  总轨迹点数: {rec_stats['总轨迹点数']}")
+
+        # 详细报告
+        if detailed and '手势统计' in report:
+            print(f"\n手势统计:")
+            for gesture, stats in report['手势统计'].items():
+                print(f"  {gesture}: {stats['次数']}次 ({stats['占比']}), 平均置信度: {stats['平均置信度']}")
+
+        # 性能事件
+        if detailed and '最近性能事件' in report and report['最近性能事件']:
+            print(f"\n最近性能事件:")
+            for event in report['最近性能事件']:
+                print(f"  [{event['时间']}] {event['级别']}: {event['消息']}")
+
+        # 优化建议
+        if detailed and '优化建议' in report and report['优化建议']:
+            print(f"\n优化建议:")
+            for i, suggestion in enumerate(report['优化建议'], 1):
+                print(f"  {i}. {suggestion}")
+
+        print("=" * 80)
+
+        # 语音播报摘要
+        if self.speech_manager and self.speech_manager.enabled:
+            summary = (f"性能报告: 平均帧率{report['平均FPS']}，识别时间{report['平均手势识别时间']}，"
+                       f"性能状态{report['性能状态']}，无人机命令成功率{cmd_stats['成功率']}")
+            self.speech_manager.speak_direct(summary)
+
+    def export_log(self, filename=None):
+        """导出性能日志"""
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(current_dir, f'performance_log_{timestamp}.csv')
+
+        try:
+            with open(filename, 'w', newline='', encoding='utf-8') as f:
+                if self.performance_log:
+                    fieldnames = self.performance_log[0].keys()
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(self.performance_log)
+
+            print(f"📤 性能日志已导出到: {filename}")
+            return True
+        except Exception as e:
+            print(f"❌ 导出性能日志失败: {e}")
+            return False
+
+    def auto_report(self):
+        """自动性能报告（定期执行）"""
+        current_time = time.time()
+        if current_time - self.last_performance_report > self.auto_report_interval:
+            # 生成简要报告
+            report = self.generate_report(detailed=False)
+
+            # 检查是否需要报告
+            if (self.performance_status == "严重" or
+                    self.warning_count > 5 or
+                    self.error_count > 0):
+
+                print(f"⚠ 自动性能检查: {report['性能状态']}, FPS: {report['当前FPS']}, "
+                      f"CPU: {report['当前CPU使用率']}, 内存: {report['当前内存使用率']}")
+
+                # 语音提示
+                if (self.speech_manager and
+                        self.speech_manager.enabled and
+                        self.performance_status == "严重"):
+                    self.speech_manager.speak_direct(f"系统性能{self.performance_status}，建议检查")
+
+            self.last_performance_report = current_time
+
+    def reset_session(self):
+        """重置会话统计"""
+        self.session_start_time = time.time()
+        self.performance_events = []
+        self.performance_snapshots = []
+        self.gesture_counts = {}
+        self.gesture_confidence_sum = {}
+        self.gesture_confidence_count = {}
+        self.error_count = 0
+        self.warning_count = 0
+        self.drone_commands = 0
+        self.successful_commands = 0
+        self.failed_commands = 0
+        self.performance_status = "良好"
+
+        print("✓ 性能统计会话已重置")
+
+    def get_stats_summary(self):
+        """获取统计摘要"""
+        return {
+            'fps': self.get_current_fps(),
+            'avg_fps': self.get_average_fps(),
+            'recognition_time': self.avg_recognition_time,
+            'cpu_usage': self.get_current_cpu_usage(),
+            'memory_usage': self.get_current_memory_usage(),
+            'performance_status': self.performance_status,
+            'gesture_count': sum(self.gesture_counts.values()),
+            'unique_gestures': len(self.gesture_counts)
+        }
 
 
 # ========== 增强语音反馈管理器 ==========
@@ -210,14 +713,14 @@ class EnhancedSpeechFeedbackManager:
             'gesture_left': "向左",
             'gesture_right': "向右",
             'gesture_forward': "向前",
-            'gesture_backward': "向后",  # 新增：向后手势
+            'gesture_backward': "向后",
             'gesture_waiting': "等待手势",
             'gesture_error': "手势识别错误",
             'gesture_stable': "手势稳定",
             'gesture_change': "手势变化",
             'gesture_low_confidence': "手势识别置信度低",
             'gesture_good_confidence': "手势识别置信度高",
-            'gesture_hover': "悬停",  # 新增：悬停手势
+            'gesture_hover': "悬停",
 
             # 系统相关
             'program_start': "手势控制无人机系统已启动",
@@ -232,10 +735,17 @@ class EnhancedSpeechFeedbackManager:
             'debug_mode_off': "调试模式已关闭",
             'display_mode_changed': "显示模式已切换",
             'help_toggled': "帮助信息已切换",
+            'performance_mode_fast': "切换到最快性能模式",
+            'performance_mode_balanced': "切换到平衡性能模式",
+            'performance_mode_accurate': "切换到最准确性能模式",
 
             # 新增：性能相关
             'performance_good': "系统运行流畅",
             'performance_warning': "系统性能警告",
+            'performance_critical': "系统性能严重警告",
+            'performance_report': "性能报告生成完成",
+            'performance_snapshot': "性能快照已保存",
+            'performance_log_exported': "性能日志已导出",
 
             # 新增：手势指导
             'move_closer': "请将手靠近摄像头",
@@ -854,6 +1364,53 @@ class ConfigManager:
 
     def __init__(self):
         self.config_file = os.path.join(current_dir, 'gesture_config.json')
+
+        # 性能模式配置
+        self.performance_modes = {
+            'fast': {
+                'name': '最快',
+                'description': '性能优先，降低识别精度换取更高帧率',
+                'detection_interval': 2,  # 每2帧检测一次
+                'smooth_frames': 3,  # 平滑帧数
+                'min_confidence': 0.5,  # 最小置信度阈值
+                'resize_factor': 0.5,  # 图像缩放因子
+                'skin_detection_enabled': True,
+                'background_subtraction_enabled': False,
+                'contour_simplify_epsilon': 0.03,
+                'history_size': 10,
+                'gesture_stability_threshold': 3,
+                'color': (0, 255, 0),  # 绿色
+            },
+            'balanced': {
+                'name': '平衡',
+                'description': '平衡性能与精度，适用于大多数场景',
+                'detection_interval': 1,  # 每帧检测
+                'smooth_frames': 5,  # 平滑帧数
+                'min_confidence': 0.6,  # 最小置信度阈值
+                'resize_factor': 0.75,  # 图像缩放因子
+                'skin_detection_enabled': True,
+                'background_subtraction_enabled': True,
+                'contour_simplify_epsilon': 0.02,
+                'history_size': 15,
+                'gesture_stability_threshold': 5,
+                'color': (255, 165, 0),  # 橙色
+            },
+            'accurate': {
+                'name': '最准',
+                'description': '精度优先，提供最准确的手势识别',
+                'detection_interval': 1,  # 每帧检测
+                'smooth_frames': 7,  # 平滑帧数
+                'min_confidence': 0.7,  # 最小置信度阈值
+                'resize_factor': 1.0,  # 不缩放
+                'skin_detection_enabled': True,
+                'background_subtraction_enabled': True,
+                'contour_simplify_epsilon': 0.01,
+                'history_size': 20,
+                'gesture_stability_threshold': 7,
+                'color': (255, 0, 0),  # 红色
+            }
+        }
+
         self.default_config = {
             'camera': {
                 'index': 0,
@@ -870,18 +1427,12 @@ class ConfigManager:
                 'skin_upper_v': 255,
                 'min_hand_area': 2000,
                 'max_hand_area': 30000,
-                'history_size': 15,  # 增加历史记录大小
-                'smooth_frames': 7,  # 增加平滑帧数
-                'min_confidence': 0.6,  # 提高最小置信度阈值
-                'detection_interval': 1,
                 'hand_ratio_threshold': 1.5,
-                'contour_simplify_epsilon': 0.02,
                 'defect_distance_threshold': 20,
                 'palm_circle_radius_ratio': 0.3,
-                'gesture_stability_threshold': 5,  # 新增：手势稳定性阈值
-                'transition_threshold': 0.3,  # 新增：手势转换阈值
-                'position_stability_weight': 0.4,  # 新增：位置稳定性权重
-                'gesture_cooldown': 0.5,  # 新增：手势冷却时间
+                'transition_threshold': 0.3,
+                'position_stability_weight': 0.4,
+                'gesture_cooldown': 0.5,
             },
             'drone': {
                 'velocity': 2.5,
@@ -900,15 +1451,23 @@ class ConfigManager:
                 'show_hand_direction': True,
                 'show_debug_info': False,
                 'show_speech_status': True,
-                'show_gesture_history': True,  # 新增：显示手势历史
-                'show_stability_indicator': True,  # 新增：显示稳定性指示器
-                'show_trajectory': True,  # 新增：显示轨迹
-                'show_recording_status': True,  # 新增：显示录制状态
+                'show_gesture_history': True,
+                'show_stability_indicator': True,
+                'show_trajectory': True,
+                'show_recording_status': True,
+                'show_performance_mode': True,  # 新增：显示性能模式
+                'show_performance_stats': True,  # 新增：显示性能统计
+                'show_system_resources': True,  # 新增：显示系统资源
             },
             'performance': {
                 'target_fps': 30,
                 'resize_factor': 1.0,
-                'enable_multiprocessing': False
+                'enable_multiprocessing': False,
+                'mode': 'balanced',  # 新增：性能模式选择
+                'current_mode_index': 1,  # 当前模式索引
+                'modes': ['fast', 'balanced', 'accurate'],  # 可用模式列表
+                'auto_report_interval': 60,  # 自动报告间隔
+                'enable_performance_monitor': True,  # 启用性能监控
             },
             'calibration': {
                 'auto_calibrate_skin': True,
@@ -922,21 +1481,23 @@ class ConfigManager:
                 'announce_gestures': True,
                 'announce_connections': True,
                 'announce_flight_events': True,
-                'announce_gesture_changes': True,  # 新增：播报手势变化
-                'announce_hand_status': True,  # 新增：播报手部状态
-                'announce_performance': True,  # 新增：播报性能状态
-                'announce_recording_events': True,  # 新增：播报录制事件
+                'announce_gesture_changes': True,
+                'announce_hand_status': True,
+                'announce_performance': True,
+                'announce_recording_events': True,
+                'announce_performance_mode': True,  # 新增：播报性能模式切换
+                'announce_performance_events': True,  # 新增：播报性能事件
                 'min_gesture_confidence': 0.7,
-                'gesture_start_threshold': 3,  # 新增：手势开始识别阈值
-                'gesture_end_threshold': 10,  # 新增：手势结束识别阈值
+                'gesture_start_threshold': 3,
+                'gesture_end_threshold': 10,
             },
-            'recording': {  # 新增：录制配置
-                'auto_save_interval': 5,  # 自动保存间隔（秒）
-                'max_trajectory_points': 1000,  # 最大轨迹点数
-                'show_trajectory': True,  # 显示轨迹
-                'trajectory_thickness': 2,  # 轨迹线粗细
-                'trajectory_max_length': 100,  # 显示的最大轨迹长度
-                'default_save_dir': 'trajectories',  # 默认保存目录
+            'recording': {
+                'auto_save_interval': 5,
+                'max_trajectory_points': 1000,
+                'show_trajectory': True,
+                'trajectory_thickness': 2,
+                'trajectory_max_length': 100,
+                'default_save_dir': 'trajectories',
             }
         }
         self.config = self.load_config()
@@ -1002,6 +1563,56 @@ class ConfigManager:
         config[keys[-1]] = value
         self.save_config()
 
+    def get_performance_mode_config(self, mode=None):
+        """获取性能模式配置"""
+        if mode is None:
+            mode = self.get('performance', 'mode')
+
+        if mode in self.performance_modes:
+            return self.performance_modes[mode]
+        else:
+            return self.performance_modes['balanced']
+
+    def get_current_performance_mode(self):
+        """获取当前性能模式"""
+        mode = self.get('performance', 'mode')
+        if mode in self.performance_modes:
+            return mode
+        return 'balanced'
+
+    def set_performance_mode(self, mode):
+        """设置性能模式"""
+        if mode in self.performance_modes:
+            self.set('performance', 'mode', value=mode)
+
+            # 更新当前模式索引
+            modes = self.get('performance', 'modes')
+            if modes and mode in modes:
+                index = modes.index(mode)
+                self.set('performance', 'current_mode_index', value=index)
+
+            print(f"✓ 性能模式设置为: {self.performance_modes[mode]['name']}")
+            return True
+        return False
+
+    def cycle_performance_mode(self):
+        """循环切换性能模式"""
+        modes = self.get('performance', 'modes')
+        if not modes:
+            modes = ['fast', 'balanced', 'accurate']
+
+        current_index = self.get('performance', 'current_mode_index')
+        if current_index is None:
+            current_index = 0
+
+        # 计算下一个模式索引
+        next_index = (current_index + 1) % len(modes)
+        next_mode = modes[next_index]
+
+        # 设置新模式
+        self.set('performance', 'current_mode_index', value=next_index)
+        return self.set_performance_mode(next_mode)
+
     def calibrate_skin_color(self, frame, hand_mask):
         """自动校准肤色范围"""
         if not self.get('calibration', 'auto_calibrate_skin'):
@@ -1052,24 +1663,33 @@ class ConfigManager:
 config = ConfigManager()
 
 
-# ========== 改进的手势识别器（增强平滑处理） ==========
+# ========== 改进的手势识别器（支持性能模式） ==========
 class EnhancedGestureRecognizer:
-    """增强的手势识别器 - 改进平滑处理和稳定性"""
+    """增强的手势识别器 - 支持性能模式选择"""
 
     def __init__(self, speech_manager=None):
-        self.config = config.get('gesture')
         self.speech_manager = speech_manager
 
+        # 加载性能模式配置
+        self.performance_mode = config.get_current_performance_mode()
+        self.mode_config = config.get_performance_mode_config(self.performance_mode)
+
+        # 根据性能模式初始化参数
+        self.history_size = self.mode_config['history_size']
+        self.detection_interval = self.mode_config['detection_interval']
+        self.smooth_frames = self.mode_config['smooth_frames']
+        self.min_confidence = self.mode_config['min_confidence']
+        self.resize_factor = self.mode_config['resize_factor']
+
         # 增强的手势历史和平滑
-        self.history_size = self.config['history_size']
         self.gesture_history = deque(maxlen=self.history_size)
         self.confidence_history = deque(maxlen=self.history_size)
-        self.position_history = deque(maxlen=self.history_size)  # 新增：位置历史
+        self.position_history = deque(maxlen=self.history_size)
         self.current_gesture = "Waiting"
         self.current_confidence = 0.0
 
         # 新增：手势状态追踪
-        self.gesture_state = "none"  # none, starting, active, ending
+        self.gesture_state = "none"
         self.gesture_stability_counter = 0
         self.last_stable_gesture = "Waiting"
         self.gesture_active_frames = 0
@@ -1079,7 +1699,7 @@ class EnhancedGestureRecognizer:
         self.last_announced_gesture = None
         self.last_announced_time = 0
         self.last_hand_status_time = 0
-        self.gesture_announce_interval = 2.0  # 缩短手势播报间隔
+        self.gesture_announce_interval = 2.0
 
         # 手部跟踪和状态
         self.last_hand_position = None
@@ -1092,23 +1712,22 @@ class EnhancedGestureRecognizer:
         # 性能统计
         self.process_times = deque(maxlen=30)
         self.frame_counter = 0
-        self.detection_interval = self.config['detection_interval']
         self.last_performance_report = 0
 
         # 手势颜色映射
         self.gesture_colors = {
-            "Stop": (0, 0, 255),  # 红色
-            "Forward": (0, 255, 0),  # 绿色
-            "Up": (255, 255, 0),  # 青色
-            "Down": (255, 0, 255),  # 紫色
-            "Left": (255, 165, 0),  # 橙色
-            "Right": (0, 165, 255),  # 浅蓝色
-            "Waiting": (200, 200, 200),  # 灰色
-            "Error": (255, 0, 0),  # 蓝色
-            "Hover": (255, 255, 255)  # 白色
+            "Stop": (0, 0, 255),
+            "Forward": (0, 255, 0),
+            "Up": (255, 255, 0),
+            "Down": (255, 0, 255),
+            "Left": (255, 165, 0),
+            "Right": (0, 165, 255),
+            "Waiting": (200, 200, 200),
+            "Error": (255, 0, 0),
+            "Hover": (255, 255, 255)
         }
 
-        # 手势到语音的映射 - 修复：确保所有手势都有对应语音
+        # 手势到语音的映射
         self.gesture_speech_map = {
             "Stop": "gesture_stop",
             "Forward": "gesture_forward",
@@ -1118,34 +1737,71 @@ class EnhancedGestureRecognizer:
             "Right": "gesture_right",
             "Waiting": "gesture_waiting",
             "Error": "gesture_error",
-            "Hover": "gesture_hover",  # 新增悬停手势语音
+            "Hover": "gesture_hover",
         }
 
         # 手势状态颜色
         self.state_colors = {
-            "none": (100, 100, 100),  # 灰色
-            "starting": (255, 165, 0),  # 橙色
-            "active": (0, 255, 0),  # 绿色
-            "ending": (255, 0, 0),  # 红色
+            "none": (100, 100, 100),
+            "starting": (255, 165, 0),
+            "active": (0, 255, 0),
+            "ending": (255, 0, 0),
         }
 
-        # 背景减除器
-        self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
-            history=100, varThreshold=25, detectShadows=True
-        )
+        # 根据性能模式初始化背景减除器
+        self.bg_subtractor = None
+        if self.mode_config['background_subtraction_enabled']:
+            self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+                history=100, varThreshold=25, detectShadows=True
+            )
 
         # 形态学操作核
         self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 
-        # 新增：性能监控
+        # 性能监控
         self.avg_process_time = 0
         self.frame_rate = 0
         self.last_fps_check = time.time()
 
-        # 新增：存储手部数据用于轨迹记录
+        # 存储手部数据用于轨迹记录
         self.last_hand_data = None
 
-        print("✓ 增强的手势识别器已初始化 (改进平滑处理)")
+        # 性能模式信息
+        self.performance_mode_color = self.mode_config['color']
+        self.performance_mode_name = self.mode_config['name']
+
+        print(f"✓ 增强的手势识别器已初始化 - 性能模式: {self.performance_mode_name}")
+
+    def set_performance_mode(self, mode):
+        """设置性能模式"""
+        self.performance_mode = mode
+        self.mode_config = config.get_performance_mode_config(mode)
+
+        # 更新参数
+        self.history_size = self.mode_config['history_size']
+        self.detection_interval = self.mode_config['detection_interval']
+        self.smooth_frames = self.mode_config['smooth_frames']
+        self.min_confidence = self.mode_config['min_confidence']
+        self.resize_factor = self.mode_config['resize_factor']
+
+        # 更新背景减除器
+        if self.mode_config['background_subtraction_enabled'] and self.bg_subtractor is None:
+            self.bg_subtractor = cv2.createBackgroundSubtractorMOG2(
+                history=100, varThreshold=25, detectShadows=True
+            )
+        elif not self.mode_config['background_subtraction_enabled']:
+            self.bg_subtractor = None
+
+        # 更新队列大小
+        self.gesture_history = deque(maxlen=self.history_size)
+        self.confidence_history = deque(maxlen=self.history_size)
+        self.position_history = deque(maxlen=self.history_size)
+
+        # 更新显示信息
+        self.performance_mode_color = self.mode_config['color']
+        self.performance_mode_name = self.mode_config['name']
+
+        print(f"✓ 切换到性能模式: {self.performance_mode_name}")
 
     def get_skin_mask(self, frame):
         """获取肤色掩码"""
@@ -1165,13 +1821,35 @@ class EnhancedGestureRecognizer:
 
     def enhance_skin_detection(self, frame, skin_mask):
         """增强肤色检测"""
-        fg_mask = self.bg_subtractor.apply(frame)
-        combined_mask = cv2.bitwise_and(skin_mask, fg_mask)
-        combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, self.kernel, iterations=2)
-        combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, self.kernel, iterations=1)
-        combined_mask = cv2.GaussianBlur(combined_mask, (5, 5), 0)
+        if not self.mode_config['skin_detection_enabled']:
+            return skin_mask
+
+        if self.bg_subtractor is not None:
+            fg_mask = self.bg_subtractor.apply(frame)
+            combined_mask = cv2.bitwise_and(skin_mask, fg_mask)
+        else:
+            combined_mask = skin_mask
+
+        # 根据性能模式决定形态学操作次数
+        if self.performance_mode == 'accurate':
+            combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, self.kernel, iterations=2)
+            combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, self.kernel, iterations=1)
+            combined_mask = cv2.GaussianBlur(combined_mask, (5, 5), 0)
+        elif self.performance_mode == 'balanced':
+            combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, self.kernel, iterations=1)
+            combined_mask = cv2.GaussianBlur(combined_mask, (3, 3), 0)
+        # fast模式不进行额外的形态学操作
 
         return combined_mask
+
+    def preprocess_frame(self, frame):
+        """预处理帧（根据性能模式调整大小）"""
+        if self.resize_factor != 1.0:
+            new_width = int(frame.shape[1] * self.resize_factor)
+            new_height = int(frame.shape[0] * self.resize_factor)
+            resized_frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+            return resized_frame
+        return frame
 
     def find_best_hand_contour(self, mask, frame):
         """找到最佳的手部轮廓"""
@@ -1183,10 +1861,13 @@ class EnhancedGestureRecognizer:
         contours = sorted(contours, key=cv2.contourArea, reverse=True)
         best_contour = None
         best_score = 0.0
-        min_area = config.get('gesture', 'min_hand_area')
-        max_area = config.get('gesture', 'max_hand_area')
+        min_area = config.get('gesture', 'min_hand_area') * (self.resize_factor ** 2)
+        max_area = config.get('gesture', 'max_hand_area') * (self.resize_factor ** 2)
 
-        for contour in contours[:3]:
+        # 根据性能模式调整检查的轮廓数量
+        max_contours = 3 if self.performance_mode != 'fast' else 1
+
+        for contour in contours[:max_contours]:
             area = cv2.contourArea(contour)
 
             if area < min_area or area > max_area:
@@ -1204,8 +1885,8 @@ class EnhancedGestureRecognizer:
         """评估轮廓作为手部的可能性"""
         score = 0.0
         area = cv2.contourArea(contour)
-        min_area = config.get('gesture', 'min_hand_area')
-        max_area = config.get('gesture', 'max_hand_area')
+        min_area = config.get('gesture', 'min_hand_area') * (self.resize_factor ** 2)
+        max_area = config.get('gesture', 'max_hand_area') * (self.resize_factor ** 2)
 
         if min_area < area < max_area:
             area_ratio = min(area / max_area, 1.0)
@@ -1246,7 +1927,11 @@ class EnhancedGestureRecognizer:
         bbox_area = w * h
         palm_center = (cx, cy)
         palm_radius = int(w * config.get('gesture', 'palm_circle_radius_ratio'))
-        fingers, fingertips, defects = self.analyze_fingers(contour, palm_center, palm_radius)
+
+        # 根据性能模式调整轮廓简化程度
+        epsilon = self.mode_config['contour_simplify_epsilon'] * cv2.arcLength(contour, True)
+        fingers, fingertips, defects = self.analyze_fingers(contour, palm_center, palm_radius, epsilon)
+
         direction = self.calculate_hand_direction(contour, cx, cy)
         h_img, w_img = frame_shape[:2]
         norm_x = cx / w_img
@@ -1271,9 +1956,8 @@ class EnhancedGestureRecognizer:
 
         return result, confidence
 
-    def analyze_fingers(self, contour, palm_center, palm_radius):
+    def analyze_fingers(self, contour, palm_center, palm_radius, epsilon):
         """分析手指"""
-        epsilon = config.get('gesture', 'contour_simplify_epsilon') * cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, epsilon, True)
         hull = cv2.convexHull(approx, returnPoints=False)
 
@@ -1356,8 +2040,8 @@ class EnhancedGestureRecognizer:
     def calculate_confidence(self, area, finger_count, contour_length, bbox_area):
         """计算手势置信度"""
         confidence = 0.5
-        min_area = config.get('gesture', 'min_hand_area')
-        max_area = config.get('gesture', 'max_hand_area')
+        min_area = config.get('gesture', 'min_hand_area') * (self.resize_factor ** 2)
+        max_area = config.get('gesture', 'max_hand_area') * (self.resize_factor ** 2)
 
         if min_area < area < max_area:
             area_norm = (area - min_area) / (max_area - min_area)
@@ -1479,7 +2163,7 @@ class EnhancedGestureRecognizer:
                 position_stability = max(0, 1.0 - position_diff * 5.0)
 
             # 增强的稳定性检查
-            stability_threshold = config.get('gesture', 'gesture_stability_threshold')
+            stability_threshold = self.mode_config['gesture_stability_threshold']
             transition_threshold = config.get('gesture', 'transition_threshold')
             position_weight = config.get('gesture', 'position_stability_weight')
 
@@ -1532,8 +2216,8 @@ class EnhancedGestureRecognizer:
 
         # 检查手部大小和位置
         hand_area = hand_data['area']
-        min_area = config.get('gesture', 'min_hand_area')
-        max_area = config.get('gesture', 'max_hand_area')
+        min_area = config.get('gesture', 'min_hand_area') * (self.resize_factor ** 2)
+        max_area = config.get('gesture', 'max_hand_area') * (self.resize_factor ** 2)
 
         # 提供手部位置反馈
         if (self.speech_manager and
@@ -1686,7 +2370,7 @@ class EnhancedGestureRecognizer:
 
             # 计算稳定性指示条长度
             stability_level = min(1.0,
-                                  self.gesture_stability_counter / config.get('gesture', 'gesture_stability_threshold'))
+                                  self.gesture_stability_counter / self.mode_config['gesture_stability_threshold'])
             bar_length = int(70 * stability_level)
 
             # 根据稳定性级别选择颜色
@@ -1756,10 +2440,15 @@ class EnhancedGestureRecognizer:
             # 预处理帧
             processed_frame = cv2.flip(frame, 1)
 
+            # 根据性能模式调整图像大小
+            original_frame = processed_frame.copy()
+            if self.resize_factor != 1.0:
+                processed_frame = self.preprocess_frame(processed_frame)
+
             # 每隔几帧检测一次以提高性能
             if self.frame_counter % self.detection_interval != 0:
                 self.frame_counter += 1
-                return self.current_gesture, self.current_confidence, processed_frame
+                return self.current_gesture, self.current_confidence, original_frame
 
             # 获取肤色掩码
             skin_mask, hsv = self.get_skin_mask(processed_frame)
@@ -1798,8 +2487,7 @@ class EnhancedGestureRecognizer:
                 self.update_gesture_state(None, gesture, confidence)
                 final_gesture, final_confidence = gesture, confidence
 
-            # ========== 修复手势语音播报 ==========
-            # 确保所有手势都有语音反馈
+            # 手势语音播报
             if (self.speech_manager and
                     config.get('speech', 'enabled') and
                     config.get('speech', 'announce_gestures')):
@@ -1814,19 +2502,17 @@ class EnhancedGestureRecognizer:
                     self.speech_manager.speak('gesture_low_confidence', immediate=True)
                     self.last_hand_status_time = current_time
 
-                # 手势语音播报 - 修复：确保所有手势都能播报
+                # 手势语音播报
                 if (final_gesture != "Waiting" and
                         final_gesture != "Error" and
                         final_gesture != "摄像头错误" and
-                        final_confidence >= config.get('speech', 'min_gesture_confidence') and
+                        final_confidence >= self.min_confidence and
                         current_time - self.last_announced_time > self.gesture_announce_interval):
 
-                    # 检查手势是否在语音映射中
                     if final_gesture in self.gesture_speech_map:
                         speech_key = self.gesture_speech_map[final_gesture]
                         self.speech_manager.speak(speech_key)
                     else:
-                        # 如果手势不在映射中，直接播报手势名称
                         self.speech_manager.speak_direct(f"手势{final_gesture}")
 
                     self.last_announced_gesture = final_gesture
@@ -1834,22 +2520,44 @@ class EnhancedGestureRecognizer:
 
             # 性能报告
             current_time = time.time()
-            if current_time - self.last_performance_report > 30.0:  # 每30秒报告一次
+            if current_time - self.last_performance_report > 30.0:
                 if (self.speech_manager and
                         config.get('speech', 'enabled') and
                         config.get('speech', 'announce_performance')):
 
-                    if self.avg_process_time < 20:  # 处理时间小于20ms
+                    if self.avg_process_time < 20:
                         self.speech_manager.speak('performance_good', immediate=True)
-                    elif self.avg_process_time > 50:  # 处理时间大于50ms
+                    elif self.avg_process_time > 50:
                         self.speech_manager.speak('performance_warning', immediate=True)
 
                     self.last_performance_report = current_time
 
-            # 可视化结果
+            # 可视化结果（在原图上）
             if hand_data is not None:
-                processed_frame = self.visualize_detection(
-                    processed_frame, hand_data, final_gesture, final_confidence
+                # 需要将坐标转换回原始图像大小
+                if self.resize_factor != 1.0:
+                    # 缩放坐标
+                    scale_factor = 1.0 / self.resize_factor
+                    if 'center' in hand_data:
+                        hand_data['center'] = (int(hand_data['center'][0] * scale_factor),
+                                               int(hand_data['center'][1] * scale_factor))
+                    if 'bbox' in hand_data:
+                        x1, y1, x2, y2 = hand_data['bbox']
+                        hand_data['bbox'] = (int(x1 * scale_factor), int(y1 * scale_factor),
+                                             int(x2 * scale_factor), int(y2 * scale_factor))
+                    if 'fingertips' in hand_data:
+                        hand_data['fingertips'] = [(int(x * scale_factor), int(y * scale_factor))
+                                                   for (x, y) in hand_data['fingertips']]
+                    if 'palm_center' in hand_data:
+                        hand_data['palm_center'] = (int(hand_data['palm_center'][0] * scale_factor),
+                                                    int(hand_data['palm_center'][1] * scale_factor))
+
+                original_frame = self.visualize_detection(
+                    original_frame, hand_data, final_gesture, final_confidence
+                )
+            else:
+                original_frame = self.visualize_detection(
+                    original_frame, None, final_gesture, final_confidence
                 )
 
             # 更新计数器
@@ -1870,7 +2578,7 @@ class EnhancedGestureRecognizer:
                 self.frame_counter = 0
                 self.last_fps_check = current_time
 
-            return final_gesture, final_confidence, processed_frame
+            return final_gesture, final_confidence, original_frame
 
         except Exception as e:
             print(f"⚠ 手势识别错误: {e}")
@@ -1883,12 +2591,24 @@ class EnhancedGestureRecognizer:
 
         return np.mean(list(self.process_times)), self.frame_rate
 
+    def get_performance_mode_info(self):
+        """获取性能模式信息"""
+        return {
+            'name': self.performance_mode_name,
+            'mode': self.performance_mode,
+            'color': self.performance_mode_color,
+            'detection_interval': self.detection_interval,
+            'resize_factor': self.resize_factor,
+            'smooth_frames': self.smooth_frames,
+            'min_confidence': self.min_confidence
+        }
+
     def set_simulated_gesture(self, gesture):
         """设置模拟的手势"""
         self.current_gesture = gesture
         self.current_confidence = 0.9
 
-        # 模拟手势也触发语音提示 - 修复：确保所有模拟手势都有语音
+        # 模拟手势也触发语音提示
         if (self.speech_manager and
                 config.get('speech', 'enabled') and
                 config.get('speech', 'announce_gestures')):
@@ -1896,7 +2616,6 @@ class EnhancedGestureRecognizer:
             if gesture in self.gesture_speech_map:
                 self.speech_manager.speak(self.gesture_speech_map[gesture])
             else:
-                # 如果手势不在映射中，直接播报手势名称
                 self.speech_manager.speak_direct(f"手势{gesture}")
 
             self.last_announced_gesture = gesture
@@ -2116,7 +2835,7 @@ class SimpleDroneController:
             if (self.speech_manager and
                     config.get('speech', 'enabled') and
                     config.get('speech', 'announce_gestures') and
-                    confidence < min_confidence * 0.8):  # 如果置信度特别低
+                    confidence < min_confidence * 0.8):
                 self.speech_manager.speak('gesture_low_confidence')
             return False
 
@@ -2194,7 +2913,7 @@ class SimpleDroneController:
         self.flying = False
 
 
-# ========== 中文UI渲染器 ==========
+# ========== 中文UI渲染器（增强版） ==========
 class ChineseUIRenderer:
     """中文UI渲染器"""
 
@@ -2205,22 +2924,31 @@ class ChineseUIRenderer:
 
         # 颜色定义
         self.colors = {
-            'title': (0, 255, 255),  # 青色
-            'connected': (0, 255, 0),  # 绿色
-            'disconnected': (0, 0, 255),  # 红色
-            'flying': (0, 255, 0),  # 绿色
-            'landed': (255, 165, 0),  # 橙色
-            'warning': (0, 165, 255),  # 浅蓝色
-            'info': (255, 255, 255),  # 白色
-            'help': (255, 200, 100),  # 浅橙色
-            'speech_enabled': (0, 255, 0),  # 绿色
-            'speech_disabled': (255, 0, 0),  # 红色
-            'performance_good': (0, 255, 0),  # 绿色
-            'performance_warning': (255, 165, 0),  # 橙色
-            'performance_bad': (255, 0, 0),  # 红色
-            'recording': (255, 50, 50),  # 亮红色
-            'playback': (50, 50, 255),  # 亮蓝色
-            'paused': (255, 255, 0),  # 黄色
+            'title': (0, 255, 255),
+            'connected': (0, 255, 0),
+            'disconnected': (0, 0, 255),
+            'flying': (0, 255, 0),
+            'landed': (255, 165, 0),
+            'warning': (0, 165, 255),
+            'info': (255, 255, 255),
+            'help': (255, 200, 100),
+            'speech_enabled': (0, 255, 0),
+            'speech_disabled': (255, 0, 0),
+            'performance_good': (0, 255, 0),
+            'performance_warning': (255, 165, 0),
+            'performance_bad': (255, 0, 0),
+            'recording': (255, 50, 50),
+            'playback': (50, 50, 255),
+            'paused': (255, 255, 0),
+            'performance_fast': (0, 255, 0),  # 绿色
+            'performance_balanced': (255, 165, 0),  # 橙色
+            'performance_accurate': (255, 0, 0),  # 红色
+            'cpu_good': (0, 255, 0),  # CPU使用率颜色
+            'cpu_warning': (255, 165, 0),
+            'cpu_critical': (255, 0, 0),
+            'memory_good': (0, 255, 0),  # 内存使用率颜色
+            'memory_warning': (255, 165, 0),
+            'memory_critical': (255, 0, 0),
         }
 
         print("✓ 中文UI渲染器已初始化")
@@ -2275,17 +3003,17 @@ class ChineseUIRenderer:
             return frame
 
     def draw_status_bar(self, frame, drone_controller, gesture, confidence, fps, process_time,
-                        trajectory_recorder=None):
-        """绘制状态栏"""
+                        trajectory_recorder=None, gesture_recognizer=None, performance_analyzer=None):
+        """绘制状态栏（增强版）"""
         h, w = frame.shape[:2]
 
         # 绘制半透明背景
         overlay = frame.copy()
-        cv2.rectangle(overlay, (0, 0), (w, 120), (0, 0, 0), -1)
+        cv2.rectangle(overlay, (0, 0), (w, 130), (0, 0, 0), -1)
         frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
         # 标题
-        title = "手势控制无人机系统 - 轨迹记录版"
+        title = "手势控制无人机系统 - 性能统计版"
         frame = self.draw_text(frame, title, (10, 10), size=20, color=self.colors['title'])
 
         # 连接状态
@@ -2300,11 +3028,11 @@ class ChineseUIRenderer:
 
         # 手势信息
         if confidence > 0.7:
-            gesture_color = (0, 255, 0)  # 绿色
+            gesture_color = (0, 255, 0)
         elif confidence > 0.5:
-            gesture_color = (255, 165, 0)  # 橙色
+            gesture_color = (255, 165, 0)
         else:
-            gesture_color = (200, 200, 200)  # 灰色
+            gesture_color = (200, 200, 200)
 
         gesture_text = f"当前手势: {gesture}"
         if config.get('display', 'show_confidence'):
@@ -2312,14 +3040,29 @@ class ChineseUIRenderer:
 
         frame = self.draw_text(frame, gesture_text, (w // 2, 40), size=16, color=gesture_color)
 
+        # 性能模式显示
+        if gesture_recognizer and config.get('display', 'show_performance_mode'):
+            mode_info = gesture_recognizer.get_performance_mode_info()
+
+            # 根据模式选择颜色
+            if mode_info['mode'] == 'fast':
+                mode_color = self.colors['performance_fast']
+            elif mode_info['mode'] == 'balanced':
+                mode_color = self.colors['performance_balanced']
+            else:  # accurate
+                mode_color = self.colors['performance_accurate']
+
+            mode_text = f"性能模式: {mode_info['name']}"
+            frame = self.draw_text(frame, mode_text, (w // 2, 65), size=14, color=mode_color)
+
         # 录制/回放状态
-        if trajectory_recorder and config.get('display', 'show_recording_status'):
+        elif trajectory_recorder and config.get('display', 'show_recording_status'):
             recorder_status = trajectory_recorder.get_status()
 
             if recorder_status['is_recording']:
                 status_color = self.colors['recording']
                 status_text = f"录制中: {recorder_status['trajectory_points']}点"
-                frame = self.draw_text(frame, status_text, (w // 2, 65), size=16, color=status_color)
+                frame = self.draw_text(frame, status_text, (w // 2, 65), size=14, color=status_color)
             elif recorder_status['is_playing']:
                 if recorder_status['playback_paused']:
                     status_color = self.colors['paused']
@@ -2327,17 +3070,57 @@ class ChineseUIRenderer:
                 else:
                     status_color = self.colors['playback']
                     status_text = f"回放中: {recorder_status['playback_index']}/{recorder_status['playback_total']}"
-                frame = self.draw_text(frame, status_text, (w // 2, 65), size=16, color=status_color)
+                frame = self.draw_text(frame, status_text, (w // 2, 65), size=14, color=status_color)
             else:
                 status_text = f"轨迹点: {recorder_status['trajectory_points']}"
-                frame = self.draw_text(frame, status_text, (w // 2, 65), size=14, color=self.colors['info'])
+                frame = self.draw_text(frame, status_text, (w // 2, 65), size=12, color=self.colors['info'])
+
+        # 性能统计显示
+        if performance_analyzer and config.get('display', 'show_performance_stats'):
+            perf_stats = performance_analyzer.get_stats_summary()
+
+            # 性能状态颜色
+            if perf_stats['performance_status'] == "良好":
+                perf_color = self.colors['performance_good']
+            elif perf_stats['performance_status'] == "警告":
+                perf_color = self.colors['performance_warning']
+            else:
+                perf_color = self.colors['performance_bad']
+
+            perf_text = f"性能: {perf_stats['performance_status']} ({perf_stats['fps']:.0f}FPS)"
+            frame = self.draw_text(frame, perf_text, (w // 2, 90), size=12, color=perf_color)
+
+        # 系统资源显示
+        if performance_analyzer and config.get('display', 'show_system_resources'):
+            cpu_usage = performance_analyzer.get_current_cpu_usage()
+            memory_usage = performance_analyzer.get_current_memory_usage()
+
+            # CPU颜色
+            if cpu_usage < 70:
+                cpu_color = self.colors['cpu_good']
+            elif cpu_usage < 85:
+                cpu_color = self.colors['cpu_warning']
+            else:
+                cpu_color = self.colors['cpu_critical']
+
+            # 内存颜色
+            if memory_usage < 70:
+                mem_color = self.colors['memory_good']
+            elif memory_usage < 85:
+                mem_color = self.colors['memory_warning']
+            else:
+                mem_color = self.colors['memory_critical']
+
+            # 绘制系统资源信息
+            sys_text = f"CPU:{cpu_usage:.0f}% 内存:{memory_usage:.0f}%"
+            frame = self.draw_text(frame, sys_text, (w // 2, 110), size=11, color=self.colors['info'])
 
         # 语音状态
         if config.get('display', 'show_speech_status') and self.speech_manager:
             speech_status = self.speech_manager.get_status()
             speech_color = self.colors['speech_enabled'] if speech_status['enabled'] else self.colors['speech_disabled']
             speech_text = f"语音: {'启用' if speech_status['enabled'] else '禁用'}"
-            frame = self.draw_text(frame, speech_text, (w // 2, 90), size=14, color=speech_color)
+            frame = self.draw_text(frame, speech_text, (w - 200, 90), size=12, color=speech_color)
 
         # 性能信息
         if config.get('display', 'show_fps'):
@@ -2355,11 +3138,16 @@ class ChineseUIRenderer:
             else:
                 perf_color = self.colors['info']
 
-            frame = self.draw_text(frame, perf_text, (w - 200, 65), size=14, color=perf_color)
+            frame = self.draw_text(frame, perf_text, (w - 200, 65), size=12, color=perf_color)
 
         # 控制提示
         control_text = "提示: 确保手部完全进入画面，保持稳定手势"
-        frame = self.draw_text(frame, control_text, (10, 90), size=14, color=self.colors['info'])
+        frame = self.draw_text(frame, control_text, (10, 90), size=12, color=self.colors['info'])
+
+        # 性能快捷键提示
+        if performance_analyzer:
+            perf_tip = "P:报告 L:快照 K:导出"
+            frame = self.draw_text(frame, perf_tip, (10, 110), size=11, color=self.colors['help'])
 
         return frame
 
@@ -2371,18 +3159,19 @@ class ChineseUIRenderer:
         h, w = frame.shape[:2]
 
         # 绘制底部帮助栏
-        cv2.rectangle(frame, (0, h - 100), (w, h), (0, 0, 0), -1)
+        cv2.rectangle(frame, (0, h - 120), (w, h), (0, 0, 0), -1)
 
-        # 帮助文本
+        # 帮助文本（增强版，包含性能统计快捷键）
         help_lines = [
             "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/X:键盘控制",
             "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息",
-            "V:切换语音反馈  M:测试语音  P:性能报告",
+            "V:切换语音反馈  M:测试语音  P:性能报告  L:性能快照  K:导出日志",
+            "O:切换性能模式  P:详细报告  R:重置统计",
             "1:开始录制 2:停止录制 3:保存轨迹 4:回放轨迹 5:清除轨迹 6:暂停/继续"
         ]
 
         for i, line in enumerate(help_lines):
-            y_pos = h - 85 + i * 20
+            y_pos = h - 105 + i * 20
             frame = self.draw_text(frame, line, (10, y_pos), size=14, color=self.colors['help'])
 
         return frame
@@ -2393,52 +3182,76 @@ class ChineseUIRenderer:
 
         # 在顶部绘制警告
         warning_bg = np.zeros((40, w, 3), dtype=np.uint8)
-        warning_bg[:, :] = (0, 69, 255)  # 橙色
+        warning_bg[:, :] = (0, 69, 255)
 
-        frame[120:160, 0:w] = cv2.addWeighted(
-            frame[120:160, 0:w], 0.3,
+        frame[130:170, 0:w] = cv2.addWeighted(
+            frame[130:170, 0:w], 0.3,
             warning_bg, 0.7, 0
         )
 
         # 绘制警告文本
-        frame = self.draw_text(frame, message, (10, 135),
+        frame = self.draw_text(frame, message, (10, 145),
                                size=16, color=self.colors['warning'])
 
         return frame
 
+    def draw_performance_chart(self, frame, performance_analyzer):
+        """绘制性能图表"""
+        if not performance_analyzer:
+            return frame
 
-# ========== 性能监控器 ==========
-class PerformanceMonitor:
-    """性能监控器"""
+        h, w = frame.shape[:2]
 
-    def __init__(self):
-        self.frame_times = deque(maxlen=60)
-        self.last_update = time.time()
-        self.fps = 0
-        self.frame_count = 0
+        # 绘制图表区域背景
+        chart_x = w - 250
+        chart_y = 130
+        chart_width = 240
+        chart_height = 150
 
-    def update(self):
-        """更新性能数据"""
-        current_time = time.time()
-        self.frame_times.append(current_time)
-        self.frame_count += 1
+        cv2.rectangle(frame, (chart_x, chart_y),
+                      (chart_x + chart_width, chart_y + chart_height),
+                      (30, 30, 30), -1)
+        cv2.rectangle(frame, (chart_x, chart_y),
+                      (chart_x + chart_width, chart_y + chart_height),
+                      (100, 100, 100), 1)
 
-        # 每秒计算一次FPS
-        if current_time - self.last_update >= 1.0:
-            if len(self.frame_times) > 1:
-                time_diff = self.frame_times[-1] - self.frame_times[0]
-                if time_diff > 0:
-                    self.fps = len(self.frame_times) / time_diff
-                else:
-                    self.fps = 0
-            self.last_update = current_time
+        # 绘制标题
+        frame = self.draw_text(frame, "性能监控", (chart_x + 10, chart_y + 20),
+                               size=14, color=self.colors['title'])
 
-    def get_stats(self):
-        """获取性能统计"""
-        return {
-            'fps': self.fps,
-            'frame_count': self.frame_count
-        }
+        # 绘制FPS图表
+        if len(performance_analyzer.fps_history) > 1:
+            fps_values = list(performance_analyzer.fps_history)[-20:]  # 最近20个值
+
+            # 计算最大值和最小值
+            if fps_values:
+                max_fps = max(fps_values)
+                min_fps = min(fps_values)
+                if max_fps == min_fps:
+                    max_fps = min_fps + 1
+
+                # 绘制FPS曲线
+                points = []
+                for i, fps in enumerate(fps_values):
+                    x = chart_x + 10 + i * (chart_width - 20) / len(fps_values)
+                    y = chart_y + chart_height - 30 - (fps - min_fps) * (chart_height - 50) / (max_fps - min_fps)
+                    points.append((int(x), int(y)))
+
+                # 连接点形成曲线
+                for i in range(len(points) - 1):
+                    cv2.line(frame, points[i], points[i + 1], (0, 255, 0), 2)
+
+                # 显示当前FPS值
+                current_fps = fps_values[-1] if fps_values else 0
+                fps_color = self.colors['performance_good'] if current_fps > 20 else \
+                    self.colors['performance_warning'] if current_fps > 10 else \
+                        self.colors['performance_bad']
+
+                frame = self.draw_text(frame, f"FPS: {current_fps:.1f}",
+                                       (chart_x + 120, chart_y + 40),
+                                       size=12, color=fps_color)
+
+        return frame
 
 
 # ========== 主程序 ==========
@@ -2459,9 +3272,12 @@ def main():
     gesture_recognizer = EnhancedGestureRecognizer(speech_manager)
     drone_controller = SimpleDroneController(libs['airsim'], speech_manager)
     ui_renderer = ChineseUIRenderer(speech_manager)
-    performance_monitor = PerformanceMonitor()
 
-    # 新增：手势轨迹记录器
+    # 初始化性能分析器
+    print("初始化性能分析器...")
+    performance_analyzer = PerformanceAnalyzer(speech_manager)
+
+    # 手势轨迹记录器
     print("初始化手势轨迹记录器...")
     trajectory_recorder = GestureTrajectoryRecorder(speech_manager)
 
@@ -2504,42 +3320,48 @@ def main():
         cap = None
 
     # 显示欢迎信息
-    print("\n" + "=" * 60)
-    print("手势控制无人机系统 - 轨迹记录版")
-    print("=" * 60)
+    print("\n" + "=" * 80)
+    print("手势控制无人机系统 - 详细性能统计版")
+    print("=" * 80)
     print("系统状态:")
     print(f"  摄像头: {'已连接' if cap else '模拟模式'}")
     print(f"  手势识别: 增强的平滑处理算法")
     print(f"  语音反馈: {'已启用' if speech_manager.enabled else '已禁用'}")
+    print(f"  性能模式: {gesture_recognizer.performance_mode_name}")
+    print(f"  性能监控: {'已启用' if config.get('performance', 'enable_performance_monitor') else '已禁用'}")
     print(f"  轨迹记录: 支持录制/回放功能")
-    print(f"  手势状态: 支持开始/活跃/结束状态追踪")
     print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
-    print("=" * 60)
+    print("=" * 80)
 
     # 显示操作说明
     print("\n操作说明:")
     print("1. 按 [C] 连接无人机 (AirSim模拟器)")
     print("2. 按 [空格键] 起飞/降落")
-    print("3. 手势控制:")
+    print("3. 性能统计功能:")
+    print("   - 按 [P] 键显示详细性能报告")
+    print("   - 按 [L] 键记录性能快照")
+    print("   - 按 [K] 键导出性能日志")
+    print("   - 按 [R] 键重置性能统计")
+    print("   - 系统自动监控: FPS, CPU, 内存, 识别时间等")
+    print("4. 性能模式选择:")
+    print("   - 按 [O] 键循环切换性能模式: 最快(fast) → 平衡(balanced) → 最准(accurate)")
+    print("5. 手势控制:")
     print("   - 手势识别后会有语音提示: 向上、向下、向左、向右、向前、停止")
     print("   - 手势稳定性越高，识别越准确")
     print("   - 手部距离摄像头适中时效果最佳")
     print("   * 手势识别置信度 > 60% 时才会执行")
-    print("4. 轨迹记录功能:")
+    print("6. 轨迹记录功能:")
     print("   [1]开始录制 [2]停止录制 [3]保存轨迹 [4]回放轨迹 [5]清除轨迹 [6]暂停/继续")
-    print("   - 录制时系统会记录手部位置和手势")
-    print("   - 回放时可以查看录制的轨迹")
-    print("   - 轨迹数据自动保存到 trajectories/ 目录")
-    print("5. 键盘控制:")
+    print("7. 键盘控制:")
     print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [X]停止")
-    print("6. 调试功能:")
+    print("8. 调试功能:")
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
-    print("7. 语音控制:")
-    print("   [V]切换语音反馈 [M]测试语音 [P]性能报告")
-    print("8. 按 [ESC] 安全退出")
-    print("=" * 60)
+    print("9. 语音控制:")
+    print("   [V]切换语音反馈 [M]测试语音")
+    print("10. 按 [ESC] 安全退出")
+    print("=" * 80)
     print("程序启动成功!")
-    print("-" * 60)
+    print("-" * 80)
 
     # 键盘手势映射
     key_to_gesture = {
@@ -2562,7 +3384,9 @@ def main():
     try:
         while True:
             # 更新性能监控
-            performance_monitor.update()
+            performance_analyzer.update_frame()
+            performance_analyzer.update_system_resources()
+            performance_analyzer.auto_report()
 
             # 读取摄像头帧
             if cap:
@@ -2574,14 +3398,20 @@ def main():
                 else:
                     # 手势识别
                     gesture, confidence, frame = gesture_recognizer.recognize(frame)
+
+                    # 记录手势统计
+                    if gesture and gesture != "Waiting" and gesture != "摄像头错误":
+                        performance_analyzer.record_gesture(gesture, confidence)
             else:
                 # 模拟模式
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
                 gesture, confidence = gesture_recognizer.current_gesture, gesture_recognizer.current_confidence
 
             # 获取性能统计
-            perf_stats = performance_monitor.get_stats()
             process_time, frame_rate = gesture_recognizer.get_performance_stats()
+
+            # 更新手势识别时间
+            performance_analyzer.update_gesture_recognition_time(process_time)
 
             # 根据显示模式调整显示选项
             if display_modes[current_display_mode] == 'normal':
@@ -2592,6 +3422,9 @@ def main():
                 config.set('display', 'show_stability_indicator', value=True)
                 config.set('display', 'show_trajectory', value=True)
                 config.set('display', 'show_recording_status', value=True)
+                config.set('display', 'show_performance_mode', value=True)
+                config.set('display', 'show_performance_stats', value=True)
+                config.set('display', 'show_system_resources', value=True)
                 config.set('display', 'show_debug_info', value=False)
             elif display_modes[current_display_mode] == 'detailed':
                 config.set('display', 'show_contours', value=True)
@@ -2603,6 +3436,9 @@ def main():
                 config.set('display', 'show_stability_indicator', value=True)
                 config.set('display', 'show_trajectory', value=True)
                 config.set('display', 'show_recording_status', value=True)
+                config.set('display', 'show_performance_mode', value=True)
+                config.set('display', 'show_performance_stats', value=True)
+                config.set('display', 'show_system_resources', value=True)
                 config.set('display', 'show_debug_info', value=True)
             elif display_modes[current_display_mode] == 'minimal':
                 config.set('display', 'show_contours', value=False)
@@ -2612,6 +3448,9 @@ def main():
                 config.set('display', 'show_stability_indicator', value=False)
                 config.set('display', 'show_trajectory', value=True)
                 config.set('display', 'show_recording_status', value=True)
+                config.set('display', 'show_performance_mode', value=True)
+                config.set('display', 'show_performance_stats', value=True)
+                config.set('display', 'show_system_resources', value=True)
                 config.set('display', 'show_debug_info', value=False)
 
             # 绘制轨迹（如果启用）
@@ -2621,8 +3460,13 @@ def main():
             # 绘制UI
             frame = ui_renderer.draw_status_bar(
                 frame, drone_controller, gesture, confidence,
-                perf_stats['fps'], process_time, trajectory_recorder
+                performance_analyzer.get_current_fps(), process_time,
+                trajectory_recorder, gesture_recognizer, performance_analyzer
             )
+
+            # 绘制性能图表（如果启用详细模式）
+            if display_modes[current_display_mode] == 'detailed':
+                frame = ui_renderer.draw_performance_chart(frame, performance_analyzer)
 
             frame = ui_renderer.draw_help_bar(frame)
 
@@ -2631,8 +3475,13 @@ def main():
                 warning_msg = "⚠ 按C键连接无人机，或使用模拟模式"
                 frame = ui_renderer.draw_warning(frame, warning_msg)
 
+            # 显示性能警告
+            if performance_analyzer.performance_status != "良好":
+                warning_msg = f"⚠ 性能状态: {performance_analyzer.performance_status}"
+                frame = ui_renderer.draw_warning(frame, warning_msg)
+
             # 显示图像（窗口标题用英文）
-            cv2.imshow('Gesture Controlled Drone - Trajectory Recording', frame)
+            cv2.imshow('Gesture Controlled Drone - Performance Statistics', frame)
 
             # ========== 键盘控制 ==========
             key = cv2.waitKey(1) & 0xFF
@@ -2714,20 +3563,76 @@ def main():
 
             elif key == ord('p') or key == ord('P'):
                 # 性能报告
+                if key == ord('p'):  # 小写p - 简要报告
+                    print("生成简要性能报告...")
+                    performance_analyzer.print_report(detailed=False)
+                else:  # 大写P - 详细报告
+                    print("生成详细性能报告...")
+                    performance_analyzer.print_report(detailed=True)
+
+                # 语音提示
                 if speech_manager.enabled:
-                    print("生成性能报告...")
-                    if process_time < 20:
-                        speech_manager.speak_direct("系统性能优秀，运行流畅")
-                    elif process_time < 50:
-                        speech_manager.speak_direct("系统性能良好")
-                    else:
-                        speech_manager.speak_direct("系统性能警告，请检查")
+                    speech_manager.speak('performance_report', immediate=True)
+
+            elif key == ord('l') or key == ord('L'):
+                # 性能快照
+                snapshot_label = f"快照_{datetime.now().strftime('%H:%M:%S')}"
+                snapshot = performance_analyzer.take_snapshot(snapshot_label)
+
+                print(f"📸 性能快照已保存: {snapshot_label}")
+                print(f"  当前FPS: {snapshot['fps']:.1f}")
+                print(f"  平均FPS: {snapshot['avg_fps']:.1f}")
+                print(f"  CPU使用率: {snapshot['cpu_usage']:.1f}%")
+                print(f"  内存使用率: {snapshot['memory_usage']:.1f}%")
+
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak('performance_snapshot', immediate=True)
+
+            elif key == ord('k') or key == ord('K'):
+                # 导出性能日志
+                if performance_analyzer.export_log():
+                    print("✅ 性能日志导出成功")
+
+                    # 语音提示
+                    if speech_manager.enabled:
+                        speech_manager.speak('performance_log_exported', immediate=True)
+                else:
+                    print("❌ 性能日志导出失败")
+
+            elif key == ord('o') or key == ord('O'):
+                # 切换性能模式
+                if config.cycle_performance_mode():
+                    new_mode = config.get_current_performance_mode()
+                    gesture_recognizer.set_performance_mode(new_mode)
+
+                    # 语音提示
+                    if speech_manager.enabled:
+                        if new_mode == 'fast':
+                            speech_manager.speak('performance_mode_fast', immediate=True)
+                        elif new_mode == 'balanced':
+                            speech_manager.speak('performance_mode_balanced', immediate=True)
+                        else:  # accurate
+                            speech_manager.speak('performance_mode_accurate', immediate=True)
+
+                    print(f"✓ 已切换到性能模式: {gesture_recognizer.performance_mode_name}")
+
+            # 新增：重置性能统计
+            elif key == ord('R') and chr(key).isupper():  # 大写R
+                print("重置性能统计...")
+                performance_analyzer.reset_session()
+                print("✓ 性能统计已重置")
+
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak_direct("性能统计已重置")
 
             # 新增：轨迹记录控制
             elif key == ord('1'):
                 # 开始录制轨迹
                 if trajectory_recorder.start_recording():
                     print("✅ 开始录制手势轨迹")
+                    performance_analyzer.record_recording_session()
                 else:
                     print("⚠ 已经在录制中")
 
@@ -2735,6 +3640,7 @@ def main():
                 # 停止录制轨迹
                 if trajectory_recorder.stop_recording():
                     print("✅ 停止录制手势轨迹")
+                    performance_analyzer.record_recording_session(len(trajectory_recorder.trajectory_data))
                 else:
                     print("⚠ 当前没有在录制")
 
@@ -2772,15 +3678,21 @@ def main():
                 gesture_recognizer.set_simulated_gesture(simulated_gesture)
                 gesture = simulated_gesture
                 confidence = 0.9
+
+                # 记录手势统计
+                performance_analyzer.record_gesture(gesture, confidence)
+
                 if drone_controller.connected and drone_controller.flying:
-                    drone_controller.move_by_gesture(gesture, confidence)
+                    success = drone_controller.move_by_gesture(gesture, confidence)
+                    performance_analyzer.record_drone_command(success)
 
             # 真实手势控制
             current_time = time.time()
             if (gesture and gesture != "Waiting" and
                     gesture != "摄像头错误" and gesture != "Error" and
                     drone_controller.connected and drone_controller.flying):
-                drone_controller.move_by_gesture(gesture, confidence)
+                success = drone_controller.move_by_gesture(gesture, confidence)
+                performance_analyzer.record_drone_command(success)
 
             # 处理轨迹记录
             if cap and ret:
@@ -2812,10 +3724,21 @@ def main():
             cap.release()
         cv2.destroyAllWindows()
 
+        # 生成最终性能报告
+        print("\n" + "=" * 80)
+        print("📊 最终性能总结")
+        print("=" * 80)
+        performance_analyzer.print_report(detailed=True)
+
+        # 导出最终性能日志
+        performance_analyzer.export_log()
+
+        print("=" * 80)
+
         # 程序退出语音提示
         if speech_manager.enabled:
             speech_manager.speak('program_exit', force=True, immediate=True)
-            time.sleep(1)  # 确保语音播报完成
+            time.sleep(1)
 
         drone_controller.emergency_stop()
 
@@ -2827,7 +3750,7 @@ def main():
         config.save_config()
 
         print("程序安全退出")
-        print("=" * 60)
+        print("=" * 80)
         print("\n感谢使用手势控制无人机系统!")
         input("按回车键退出...")
 
