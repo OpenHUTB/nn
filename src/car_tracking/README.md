@@ -1,8 +1,3 @@
-
-# Carla 工具集 运行步骤汇总
-
-本汇总包含三个独立Carla脚本的完整运行步骤，所有运行命令均封装在可一键复制的bash代码框内。
-=======
  Carla 工具集
 本目录包含两个独立的Carla脚本，可直接运行，互不依赖。
 
@@ -22,7 +17,6 @@
 - 按 **q** 键退出程序
 
 ### 完整运行步骤
-=======
 ### 运行命令
 
 ```bash
@@ -98,3 +92,29 @@ python main.py
 - 可视化窗口显示摄像头画面，终端实时输出车速与避让提示
 - 按 **q** 键退出程序
 
+# CARLA-DeepSORT-Vehicle-Tracking
+
+## 项目介绍
+基于CARLA仿真器和Deep SORT算法的2D车辆实时追踪程序，支持NPC生成、车辆追踪、关键信息显示，已修复文字反向、编码错误等问题。
+
+## 环境依赖
+- Python 3.7
+- CARLA 0.9.10+
+- 依赖库：`pip install numpy opencv-python scipy carla`
+
+## 快速开始
+1. 启动CARLA仿真器（建议低画质：`CarlaUE4.exe -quality-level=Low`）
+2. 运行程序：`python main.py`
+3. 操作：按`q`键退出
+
+## 核心功能
+- 自动生成自车和20辆NPC（自动驾驶）
+- Deep SORT实时追踪车辆，显示追踪ID和类别
+- 实时显示车速、追踪车辆数、地图名称
+- 自动清理资源，避免残留进程
+
+## 已修复问题
+1. 图像文字/边界框反向
+2. `mars-small128.pb`编码读取错误
+3. Deep SORT API弃用警告
+4. 外部依赖缺失问题

@@ -1,519 +1,601 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+CARLA 多交通灯版：Town04密集交通灯+状态循环+车辆响应
+"""
+
+import sys
+import os
 import carla
 import time
 import numpy as np
-import cv2
 import math
-from collections import deque
-import random
-import os
+import pygame
+import traceback
+import time
 
-# --------------------------
-# 1. 障碍物检测器（优化性能+无延迟检测）
-# --------------------------
-class ObstacleDetector:
-    def __init__(self, world, vehicle, max_distance=50.0, detect_interval=1):  # 改为1帧检测一次
+# ===================== 全局配置 ======================
+# CARLA连接
+CARLA_HOST = "localhost"
+CARLA_PORT = 2000
+CARLA_TIMEOUT = 10.0
+
+# 车辆配置
+VEHICLE_MODEL = "vehicle.tesla.model3"
+VEHICLE_WHEELBASE = 2.9
+VEHICLE_REAR_AXLE_OFFSET = 1.45
+
+# 转向控制
+LOOKAHEAD_DIST_STRAIGHT = 7.0
+LOOKAHEAD_DIST_CURVE = 4.0
+STEER_GAIN_STRAIGHT = 0.7
+STEER_GAIN_CURVE = 1.0
+STEER_DEADZONE = 0.05
+STEER_LOWPASS_ALPHA = 0.6
+MAX_STEER = 1.0
+
+# 弯道等级
+DIR_CHANGE_GENTLE = 0.03
+DIR_CHANGE_SHARP = 0.08
+
+# 速度控制
+BASE_SPEED = 25.0
+PID_KP = 0.2
+PID_KI = 0.01
+PID_KD = 0.02
+
+# 相机
+CAMERA_POS = carla.Transform(carla.Location(x=-5.0, z=2.0))
+CAMERA_WIDTH = 800
+CAMERA_HEIGHT = 600
+CAMERA_FOV = 90
+
+# 交通规则
+TRAFFIC_LIGHT_STOP_DISTANCE = 4.0
+TRAFFIC_LIGHT_DETECTION_RANGE = 50.0  # 扩大检测范围，能检测更多交通灯
+TRAFFIC_LIGHT_ANGLE_THRESHOLD = 60.0  # 扩大检测角度
+STOP_SPEED_THRESHOLD = 0.2
+GREEN_LIGHT_ACCEL_FACTOR = 0.25
+STOP_LINE_SIM_DISTANCE = 5.0
+
+# 交通灯状态循环配置（单位：秒）
+RED_LIGHT_DURATION = 3.0
+GREEN_LIGHT_DURATION = 5.0
+YELLOW_LIGHT_DURATION = 2.0
+
+# 车道行驶配置
+ROAD_DIRECTION_DOT_THRESHOLD = 0.0
+LANE_KEEP_STRICTNESS = 1.2
+
+# ===================== 核心兼容工具函数 ======================
+def is_actor_alive(actor):
+    """兼容不同版本的Actor存活状态判断"""
+    try:
+        return actor.is_alive()
+    except TypeError:
+        return actor.is_alive
+
+def get_traffic_light_stop_line(traffic_light):
+    """兼容不同版本的交通灯停止线获取"""
+    try:
+        return traffic_light.get_stop_line_location()
+    except AttributeError:
+        tl_transform = traffic_light.get_transform()
+        forward_vec = tl_transform.get_forward_vector()
+        stop_line_loc = tl_transform.location - forward_vec * STOP_LINE_SIM_DISTANCE
+        stop_line_loc.z = tl_transform.location.z
+        return stop_line_loc
+
+def get_spawn_point_near_traffic_light(world, map):
+    """自动查找距离交通灯最近的出生点"""
+    traffic_lights = world.get_actors().filter("traffic.traffic_light")
+    if not traffic_lights:
+        print("警告：当前地图中未找到交通灯，使用默认出生点")
+        spawn_points = map.get_spawn_points()
+        return spawn_points[0] if spawn_points else carla.Transform()
+
+    spawn_points = map.get_spawn_points()
+    if not spawn_points:
+        print("警告：未找到默认出生点，使用交通灯旁位置")
+        tl_transform = traffic_lights[0].get_transform()
+        return carla.Transform(tl_transform.location + carla.Location(x=-5.0, z=0.5), tl_transform.rotation)
+
+    min_distance = float('inf')
+    best_spawn_point = spawn_points[0]
+
+    for spawn_point in spawn_points:
+        for tl in traffic_lights:
+            if not is_actor_alive(tl):
+                continue
+            tl_loc = tl.get_transform().location
+            spawn_loc = spawn_point.location
+            distance = math.sqrt((tl_loc.x - spawn_loc.x)**2 + (tl_loc.y - spawn_loc.y)**2)
+            if distance < min_distance:
+                min_distance = distance
+                best_spawn_point = spawn_point
+
+    print(f"找到距离交通灯最近的出生点，距离：{min_distance:.2f}米")
+    return best_spawn_point
+
+def cycle_traffic_light_states(world):
+    """
+    循环控制所有交通灯的状态：红→绿→黄→红
+    作为后台线程运行，确保交通灯持续变化
+    """
+    while True:
+        traffic_lights = world.get_actors().filter("traffic.traffic_light")
+        # 设置所有交通灯为红灯
+        for tl in traffic_lights:
+            if is_actor_alive(tl):
+                try:
+                    tl.set_state(carla.TrafficLightState.Red)
+                except:
+                    pass
+        time.sleep(RED_LIGHT_DURATION)
+
+        # 设置所有交通灯为绿灯
+        for tl in traffic_lights:
+            if is_actor_alive(tl):
+                try:
+                    tl.set_state(carla.TrafficLightState.Green)
+                except:
+                    pass
+        time.sleep(GREEN_LIGHT_DURATION)
+
+        # 设置所有交通灯为黄灯
+        for tl in traffic_lights:
+            if is_actor_alive(tl):
+                try:
+                    tl.set_state(carla.TrafficLightState.Yellow)
+                except:
+                    pass
+        time.sleep(YELLOW_LIGHT_DURATION)
+
+# ===================== 纯追踪控制器 =====================
+class AdaptivePurePursuit:
+    def __init__(self, wheelbase):
+        self.wheelbase = wheelbase
+        self.last_steer = 0.0
+        self.last_lookahead = LOOKAHEAD_DIST_STRAIGHT
+
+    def calculate_steer(self, vehicle_transform, target_point, dir_change):
+        # 1. 后轴位置
+        forward_vec = vehicle_transform.get_forward_vector()
+        rear_axle_loc = carla.Location(
+            x=vehicle_transform.location.x - forward_vec.x * VEHICLE_REAR_AXLE_OFFSET,
+            y=vehicle_transform.location.y - forward_vec.y * VEHICLE_REAR_AXLE_OFFSET,
+            z=vehicle_transform.location.z
+        )
+
+        # 2. 车辆坐标系转换
+        dx = target_point.x - rear_axle_loc.x
+        dy = target_point.y - rear_axle_loc.y
+        yaw = math.radians(vehicle_transform.rotation.yaw)
+
+        dx_vehicle = dx * math.cos(yaw) + dy * math.sin(yaw)
+        dy_vehicle = -dx * math.sin(yaw) + dy * math.cos(yaw)
+
+        # 3. 转向增益
+        steer_gain = np.interp(
+            dir_change,
+            [0, DIR_CHANGE_SHARP],
+            [STEER_GAIN_STRAIGHT, STEER_GAIN_CURVE]
+        )
+        steer_gain = np.clip(steer_gain, STEER_GAIN_STRAIGHT, STEER_GAIN_CURVE)
+
+        # 4. 纯追踪计算
+        if dx_vehicle < 0.1:
+            steer = self.last_steer
+        else:
+            steer_rad = math.atan2(2 * self.wheelbase * dy_vehicle * LANE_KEEP_STRICTNESS, dx_vehicle ** 2 + dy_vehicle ** 2)
+            steer = steer_rad / math.pi
+            steer *= steer_gain
+
+        # 5. 死区+滤波
+        if abs(steer) < STEER_DEADZONE:
+            steer = 0.0
+        steer = STEER_LOWPASS_ALPHA * steer + (1 - STEER_LOWPASS_ALPHA) * self.last_steer
+        steer = np.clip(steer, -MAX_STEER, MAX_STEER)
+
+        self.last_steer = steer
+        return steer
+
+    def get_adaptive_lookahead(self, dir_change):
+        lookahead_dist = np.interp(
+            dir_change,
+            [0, DIR_CHANGE_SHARP],
+            [LOOKAHEAD_DIST_STRAIGHT, LOOKAHEAD_DIST_CURVE]
+        )
+        lookahead_dist = np.clip(lookahead_dist, LOOKAHEAD_DIST_CURVE, LOOKAHEAD_DIST_STRAIGHT)
+        self.last_lookahead = lookahead_dist
+        return lookahead_dist
+
+# ===================== 速度控制器 =====================
+class SpeedController:
+    def __init__(self, kp, ki, kd):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.last_error = 0.0
+        self.integral = 0.0
+
+    def calculate(self, target_speed, current_speed):
+        error = target_speed - current_speed
+        p = self.kp * error
+        self.integral += self.ki * error
+        self.integral = np.clip(self.integral, -1.0, 1.0)
+        i = self.integral
+        d = self.kd * (error - self.last_error)
+        self.last_error = error
+        return np.clip(p + i + d, 0.0, 1.0)
+
+# ===================== 交通灯管理类 ======================
+class TrafficLightManager:
+    def __init__(self):
+        self.tracked_light = None
+        self.is_stopped_at_red = False
+        self.red_light_stop_time = 0
+
+    def _calculate_angle_between_vehicle_and_light(self, vehicle_transform, light_transform):
+        """计算车辆前进方向与交通灯的夹角"""
+        vehicle_forward = vehicle_transform.get_forward_vector()
+        vehicle_forward = np.array([vehicle_forward.x, vehicle_forward.y])
+        vehicle_forward = vehicle_forward / np.linalg.norm(vehicle_forward)
+
+        light_dir = light_transform.location - vehicle_transform.location
+        light_dir = np.array([light_dir.x, light_dir.y])
+        if np.linalg.norm(light_dir) < 0.1:
+            return 0.0
+        light_dir = light_dir / np.linalg.norm(light_dir)
+
+        angle = math.acos(np.clip(np.dot(vehicle_forward, light_dir), -1.0, 1.0))
+        angle = math.degrees(angle)
+        return angle
+
+    def get_lane_traffic_light(self, vehicle, world):
+        """扩大检测范围，检测更多交通灯"""
+        vehicle_transform = vehicle.get_transform()
+        vehicle_loc = vehicle_transform.location
+
+        # 检查跟踪的交通灯是否存活
+        if self.tracked_light and is_actor_alive(self.tracked_light):
+            dist = self.tracked_light.get_transform().location.distance(vehicle_loc)
+            angle = self._calculate_angle_between_vehicle_and_light(vehicle_transform, self.tracked_light.get_transform())
+            if dist < TRAFFIC_LIGHT_DETECTION_RANGE and angle < TRAFFIC_LIGHT_ANGLE_THRESHOLD:
+                return self.tracked_light
+
+        # 获取所有交通灯并筛选有效灯
+        traffic_lights = world.get_actors().filter("traffic.traffic_light")
+        valid_lights = []
+
+        for light in traffic_lights:
+            if not is_actor_alive(light):
+                continue
+            dist = light.get_transform().location.distance(vehicle_loc)
+            if dist > TRAFFIC_LIGHT_DETECTION_RANGE:
+                continue
+            angle = self._calculate_angle_between_vehicle_and_light(vehicle_transform, light.get_transform())
+            if angle < TRAFFIC_LIGHT_ANGLE_THRESHOLD:
+                valid_lights.append((dist, light))
+
+        if valid_lights:
+            valid_lights.sort(key=lambda x: x[0])
+            self.tracked_light = valid_lights[0][1]
+            return self.tracked_light
+
+        self.tracked_light = None
+        return None
+
+    def handle_traffic_light_logic(self, vehicle, current_speed, base_target_speed):
+        """红灯强制停车，绿灯恢复行驶"""
+        world = vehicle.get_world()
+        traffic_light = self.get_lane_traffic_light(vehicle, world)
+
+        if not traffic_light:
+            self.is_stopped_at_red = False
+            self.red_light_stop_time = 0
+            return base_target_speed, "No Light (Lane)"
+
+        # 核心：使用兼容函数获取停止线位置
+        stop_line_loc = get_traffic_light_stop_line(traffic_light)
+        dist_to_stop_line = vehicle.get_transform().location.distance(stop_line_loc)
+
+        if traffic_light.get_state() == carla.TrafficLightState.Green:
+            if self.is_stopped_at_red:
+                recovery_speed = current_speed + (base_target_speed - current_speed) * GREEN_LIGHT_ACCEL_FACTOR
+                target_speed = max(STOP_SPEED_THRESHOLD, recovery_speed)
+                if abs(target_speed - base_target_speed) < 0.5:
+                    self.is_stopped_at_red = False
+                return target_speed, "Green (Recovering)"
+            return base_target_speed, "Green (Lane)"
+
+        elif traffic_light.get_state() == carla.TrafficLightState.Yellow:
+            self.is_stopped_at_red = False
+            yellow_speed = max(5.0, base_target_speed * 0.3)
+            return yellow_speed, "Yellow (Stop Soon)"
+
+        elif traffic_light.get_state() == carla.TrafficLightState.Red:
+            if dist_to_stop_line > TRAFFIC_LIGHT_STOP_DISTANCE:
+                self.is_stopped_at_red = False
+                red_speed = max(2.0, current_speed * 0.1)
+                return red_speed, f"Red (Decelerating: {dist_to_stop_line:.1f}m)"
+            else:
+                if current_speed <= STOP_SPEED_THRESHOLD:
+                    self.is_stopped_at_red = True
+                    self.red_light_stop_time += 1
+                    wait_seconds = self.red_light_stop_time // 30
+                    return 0.0, f"Red (Stopped: {wait_seconds}s)"
+                else:
+                    return 0.0, "Red (Emergency Stop)"
+
+        return base_target_speed, "Unknown Light"
+
+# ===================== 车道行驶辅助函数 ======================
+def calculate_dir_change(current_wp):
+    """计算方向变化量，判断弯道等级"""
+    waypoints = [current_wp]
+    for i in range(5):
+        next_wps = waypoints[-1].next(1.0)
+        if next_wps:
+            waypoints.append(next_wps[0])
+        else:
+            break
+
+    if len(waypoints) < 4:
+        return 0.0, 0
+
+    dirs = []
+    for i in range(1, len(waypoints)):
+        wp_prev = waypoints[i-1]
+        wp_curr = waypoints[i]
+        dir_rad = math.atan2(
+            wp_curr.transform.location.y - wp_prev.transform.location.y,
+            wp_curr.transform.location.x - wp_prev.transform.location.x
+        )
+        dirs.append(dir_rad)
+
+    dir_change = 0.0
+    for i in range(1, len(dirs)):
+        dir_change += abs(dirs[i] - dirs[i-1]) * 2
+
+    if dir_change < DIR_CHANGE_GENTLE:
+        curve_level = 0
+    elif dir_change < DIR_CHANGE_SHARP:
+        curve_level = 1
+    else:
+        curve_level = 2
+
+    return dir_change, curve_level
+
+def get_forward_waypoint(vehicle, map):
+    """获取车辆当前车道的前进方向路点（极低版本兼容）"""
+    vehicle_transform = vehicle.get_transform()
+    # 1. 投影到道路
+    current_wp = map.get_waypoint(
+        vehicle_transform.location,
+        project_to_road=True
+    )
+
+    # 2. 纯数学判断方向是否相反
+    road_direction = current_wp.transform.get_forward_vector()
+    vehicle_direction = vehicle_transform.get_forward_vector()
+    dot_product = road_direction.x * vehicle_direction.x + road_direction.y * vehicle_direction.y
+
+    # 3. 方向相反则取前方点
+    if dot_product < ROAD_DIRECTION_DOT_THRESHOLD:
+        forward_wps = current_wp.next(10.0)
+        if forward_wps:
+            current_wp = forward_wps[0]
+        else:
+            current_wp = map.get_waypoint(
+                vehicle_transform.location + vehicle_direction * 5.0,
+                project_to_road=True
+            )
+
+    return current_wp
+
+# ===================== 相机管理器 =====================
+class CameraManager:
+    def __init__(self, world, vehicle, display):
         self.world = world
         self.vehicle = vehicle
-        self.max_distance = max_distance
-        self.detect_interval = detect_interval  # 检测间隔（帧）
-        self.frame_count = 0
-        self.last_obstacle_info = {
-            'has_obstacle': False,
-            'distance': float('inf'),
-            'relative_angle': 0.0,
-            'obstacle_type': None,
-            'obstacle_speed': 0.0,
-            'relative_speed': 0.0  # 新增：自车与障碍物的相对速度
-        }
+        self.display = display
+        self.camera = None
+        self.traffic_light_status = "No Light"
+        self._create_camera()
 
-    def get_vehicle_speed(self, vehicle):
-        """获取车辆速度（km/h）"""
-        velocity = vehicle.get_velocity()
-        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
-        return speed * 3.6
+    def _create_camera(self):
+        bp = self.world.get_blueprint_library().find("sensor.camera.rgb")
+        bp.set_attribute("image_size_x", str(CAMERA_WIDTH))
+        bp.set_attribute("image_size_y", str(CAMERA_HEIGHT))
+        bp.set_attribute("fov", str(CAMERA_FOV))
+        self.camera = self.world.spawn_actor(bp, CAMERA_POS, attach_to=self.vehicle)
+        self.camera.listen(self._on_image)
 
-    def get_obstacle_info(self):
-        """检测前方障碍物信息（无延迟检测）"""
-        self.frame_count += 1
-        if self.frame_count % self.detect_interval != 0:
-            return self.last_obstacle_info
+    def _on_image(self, image):
+        """修正数组处理逻辑"""
+        array = np.frombuffer(image.raw_data, dtype=np.uint8)
+        array = array.reshape((CAMERA_HEIGHT, CAMERA_WIDTH, 4))
+        array = array[:, :, :3]
+        array = array[:, :, ::-1].swapaxes(0, 1)
+        self.display.blit(pygame.surfarray.make_surface(array), (0, 0))
+        self._draw_info()
+        pygame.display.flip()
 
-        try:
-            vehicle_transform = self.vehicle.get_transform()
-            vehicle_location = vehicle_transform.location
-            forward_vector = vehicle_transform.get_forward_vector()
-            self_speed = self.get_vehicle_speed(self.vehicle)  # 自车速度
-
-            # 减少get_actors调用频率，只获取车辆
-            all_vehicles = self.world.get_actors().filter('vehicle.*')
-            min_distance = float('inf')
-            closest_obstacle = None
-            relative_angle = 0.0
-            obstacle_speed = 0.0
-
-            for other_vehicle in all_vehicles:
-                if other_vehicle.id == self.vehicle.id:
-                    continue
-
-                other_location = other_vehicle.get_location()
-                distance = vehicle_location.distance(other_location)
-                if distance > self.max_distance:
-                    continue
-
-                # 计算相对角度（仅前方±70度，扩大检测范围）
-                relative_vector = carla.Location(
-                    other_location.x - vehicle_location.x,
-                    other_location.y - vehicle_location.y,
-                    0
-                )
-                forward_2d = carla.Vector3D(forward_vector.x, forward_vector.y, 0)
-                relative_2d = carla.Vector3D(relative_vector.x, relative_vector.y, 0)
-
-                # 向量归一化
-                forward_norm = math.sqrt(forward_2d.x ** 2 + forward_2d.y ** 2)
-                relative_norm = math.sqrt(relative_2d.x ** 2 + relative_2d.y ** 2)
-                if forward_norm == 0 or relative_norm == 0:
-                    continue
-
-                dot_product = forward_2d.x * relative_2d.x + forward_2d.y * relative_2d.y
-                cos_angle = dot_product / (forward_norm * relative_norm)
-                cos_angle = max(-1.0, min(1.0, cos_angle))
-                angle_deg = math.degrees(math.acos(cos_angle))
-
-                # 扩大检测角度到±70度，更早发现障碍物
-                if angle_deg <= 70 and distance < min_distance:
-                    min_distance = distance
-                    closest_obstacle = other_vehicle
-                    obstacle_speed = self.get_vehicle_speed(other_vehicle)
-                    # 确定角度方向
-                    relative_angle = angle_deg if relative_2d.y >= 0 else -angle_deg
-
-            # 计算相对速度（自车速度 - 前车速度，正数表示自车更快）
-            relative_speed = self_speed - obstacle_speed if closest_obstacle else 0.0
-
-            # 更新障碍物信息
-            if closest_obstacle is not None:
-                self.last_obstacle_info = {
-                    'has_obstacle': True,
-                    'distance': min_distance,
-                    'relative_angle': relative_angle,
-                    'obstacle_type': closest_obstacle.type_id,
-                    'obstacle_speed': obstacle_speed,
-                    'relative_speed': relative_speed
-                }
-            else:
-                self.last_obstacle_info = {
-                    'has_obstacle': False,
-                    'distance': float('inf'),
-                    'relative_angle': 0.0,
-                    'obstacle_type': None,
-                    'obstacle_speed': 0.0,
-                    'relative_speed': 0.0
-                }
-
-        except Exception as e:
-            print(f"障碍物检测错误: {e}")
-
-        return self.last_obstacle_info
-
-    def visualize_obstacles(self, image, vehicle_transform):
-        """在图像上可视化障碍物检测结果"""
-        if not self.last_obstacle_info['has_obstacle']:
-            return image
-
-        height, width = image.shape[:2]
-        distance = self.last_obstacle_info['distance']
-        angle = self.last_obstacle_info['relative_angle']
-
-        # 计算障碍物在图像中的位置
-        x_pos = int(width / 2 + (angle / 70) * (width / 2))  # 适配70度检测范围
-        x_pos = max(0, min(width - 1, x_pos))
-
-        # 根据距离设置颜色和大小
-        if distance < 15:
-            color = (0, 0, 255)
-            radius = 15
-        elif distance < 30:
-            color = (0, 165, 255)
-            radius = 10
+    def _draw_info(self):
+        font = pygame.font.SysFont("Arial", 24, bold=True)
+        if "Red" in self.traffic_light_status:
+            color = (255, 0, 0)
+        elif "Green" in self.traffic_light_status:
+            color = (0, 255, 0)
+        elif "Yellow" in self.traffic_light_status:
+            color = (255, 255, 0)
         else:
-            color = (0, 255, 255)
-            radius = 5
+            color = (255, 255, 255)
 
-        # 绘制障碍物指示器
-        cv2.circle(image, (x_pos, int(height * 0.8)), radius, color, -1)
-        cv2.putText(image, f"{distance:.1f}m", (x_pos - 20, int(height * 0.8) - 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        # 绘制相对速度
-        rel_speed = self.last_obstacle_info['relative_speed']
-        cv2.putText(image, f"RelSpeed: {rel_speed:.1f}km/h", (x_pos - 20, int(height * 0.8) + 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        return image
+        text = font.render(f"Traffic Light: {self.traffic_light_status}", True, color)
+        bg = pygame.Surface((text.get_width() + 10, text.get_height() + 5))
+        bg.fill((0, 0, 0))
+        self.display.blit(bg, (5, 5))
+        self.display.blit(text, (10, 7))
 
-# --------------------------
-# 2. 传统控制器（核心控制逻辑+优化避障）
-# --------------------------
-class TraditionalController:
-    """基于路点的传统控制器，整合避障"""
-    def __init__(self, world, obstacle_detector):
-        self.world = world
-        self.map = world.get_map()
-        self.waypoint_distance = 10.0
-        self.obstacle_detector = obstacle_detector
-        # 调整避障阈值：扩大距离，提前减速
-        self.emergency_brake_distance = 12.0  # 从6米改为12米
-        self.safe_following_distance = 18.0  # 从10米改为18米
-        self.early_warning_distance = 30.0  # 新增：30米提前预警
+    def update_traffic_light_status(self, status):
+        self.traffic_light_status = status
 
-    def apply_obstacle_avoidance(self, throttle, brake, steer, vehicle, obstacle_info):
-        """传统控制器的避障逻辑（优化刹车力度+相对速度）"""
-        if not obstacle_info['has_obstacle']:
-            return throttle, brake, steer
+    def destroy(self):
+        if self.camera:
+            if is_actor_alive(self.camera):
+                self.camera.stop()
+            self.camera.destroy()
 
-        distance = obstacle_info['distance']
-        angle = obstacle_info['relative_angle']
-        vehicle_speed = self.obstacle_detector.get_vehicle_speed(vehicle)
-        relative_speed = obstacle_info['relative_speed']  # 自车与前车的相对速度
-
-        # 1. 提前预警（30米内）：轻微减速，降低油门
-        if distance < self.early_warning_distance and relative_speed > 0:
-            throttle *= 0.5  # 油门减半
-            if vehicle_speed > 30:
-                brake = 0.2  # 轻微刹车
-
-        # 2. 紧急刹车（12米内）：全力刹车+手刹
-        if distance < self.emergency_brake_distance:
-            print(f"紧急刹车！距离前车: {distance:.1f}m, 相对速度: {relative_speed:.1f}km/h")
-            return 0.0, 1.0, 0.0  # brake=1.0 + 后续拉手刹
-
-        # 3. 安全跟车（18米内）：动态调整刹车力度
-        elif distance < self.safe_following_distance:
-            # 根据距离和相对速度计算所需刹车力度
-            required_distance = max(8.0, vehicle_speed * 0.5)  # 增加安全车距系数
-            distance_ratio = (distance - required_distance) / self.safe_following_distance
-            distance_ratio = max(0.0, min(1.0, distance_ratio))
-
-            # 相对速度越大，刹车越重
-            brake_strength = (1 - distance_ratio) * 0.8 + (relative_speed / 20) * 0.2
-            brake_strength = max(0.3, min(0.8, brake_strength))
-
-            if distance < required_distance:
-                throttle = 0.0
-                brake = brake_strength
-            else:
-                throttle = 0.1
-                brake = 0.0
-
-            # 尝试变道
-            if abs(angle) < 15:
-                location = vehicle.get_location()
-                waypoint = self.map.get_waypoint(location)
-                left_lane = waypoint.get_left_lane()
-                right_lane = waypoint.get_right_lane()
-
-                if left_lane and left_lane.lane_type == carla.LaneType.Driving:
-                    steer = -0.3
-                elif right_lane and right_lane.lane_type == carla.LaneType.Driving:
-                    steer = 0.3
-                else:
-                    steer = 0.2 if angle >= 0 else -0.2
-
-        return throttle, brake, steer
-
-    def get_control(self, vehicle):
-        """生成传统控制指令（优先避障，弱化基础速度控制）"""
-        # 获取车辆状态
-        transform = vehicle.get_transform()
-        location = vehicle.get_location()
-        velocity = vehicle.get_velocity()
-        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6
-
-        # 获取障碍物信息
-        obstacle_info = self.obstacle_detector.get_obstacle_info()
-
-        # 获取路点
-        waypoint = self.map.get_waypoint(location, project_to_road=True)
-        next_waypoints = waypoint.next(self.waypoint_distance)
-        target_waypoint = next_waypoints[0] if next_waypoints else waypoint
-
-        # 计算转向
-        vehicle_yaw = math.radians(transform.rotation.yaw)
-        target_loc = target_waypoint.transform.location
-
-        dx = target_loc.x - location.x
-        dy = target_loc.y - location.y
-
-        local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
-        local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
-
-        if abs(local_x) < 0.1:
-            steer = 0.0
-        else:
-            angle = math.atan2(local_y, local_x)
-            steer = np.clip(angle / math.radians(45), -1.0, 1.0)
-
-        # 基础速度控制（降低优先级）
-        if speed < 20:
-            throttle = 0.4  # 从0.6降低到0.4，减少油门
-            brake = 0.0
-        elif speed < 40:
-            throttle = 0.2  # 从0.4降低到0.2
-            brake = 0.0
-        else:
-            throttle = 0.1
-            brake = 0.2
-
-        # 障碍物调整（优先执行）
-        throttle, brake, steer = self.apply_obstacle_avoidance(throttle, brake, steer, vehicle, obstacle_info)
-
-        # 低速强油门（仅当无障碍物时生效）
-        if speed < 5.0 and not obstacle_info['has_obstacle']:
-            throttle = 0.4
-            brake = 0.0
-
-        return throttle, brake, steer
-
-# --------------------------
-# 3. CARLA环境初始化（适配0.9.10）
-# --------------------------
+# ===================== 主函数（核心：多交通灯配置）=====================
 def main():
+    pygame.init()
+    display = pygame.display.set_mode((CAMERA_WIDTH, CAMERA_HEIGHT))
+    pygame.display.set_caption("CARLA 多交通灯版（Town04密集交通灯+状态循环）")
+
+    client = None
+    world = None
+    vehicle = None
+    camera_manager = None
+    pp_controller = None
+    speed_controller = None
+    traffic_light_manager = None
+
     try:
-        # 连接CARLA服务器（0.9.10兼容）
-        client = carla.Client('localhost', 2000)
-        client.set_timeout(15.0)
-        world = client.load_world('Town01')  # 0.9.10支持Town01
-
-        # 设置同步模式（0.9.10关键配置）
-        settings = world.get_settings()
-        settings.synchronous_mode = True
-        settings.fixed_delta_seconds = 0.1
-        world.apply_settings(settings)
-
-        # 设置天气
-        weather = carla.WeatherParameters(
-            cloudiness=30.0,
-            precipitation=0.0,
-            sun_altitude_angle=70.0
-        )
-        world.set_weather(weather)
-
-        # 获取出生点
+        # 1. 连接CARLA，加载**Town04**（交通灯最密集的地图）
+        client = carla.Client(CARLA_HOST, CARLA_PORT)
+        client.set_timeout(CARLA_TIMEOUT)
+        try:
+            client.load_world("Town04")  # 替换为Town04，交通灯数量远多于Town03
+        except:
+            world = client.get_world()
+            print("警告：Town04地图不存在，使用当前地图")
+        else:
+            world = client.get_world()
+            print("成功加载Town04地图（交通灯密集）")
         map = world.get_map()
-        spawn_points = map.get_spawn_points()
-        if not spawn_points:
-            raise Exception("无可用出生点")
-        spawn_point = spawn_points[10]
 
-        # 生成主车辆
-        blueprint_library = world.get_blueprint_library()
-        vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-        vehicle_bp.set_attribute('color', '255,0,0')
-        vehicle = world.spawn_actor(vehicle_bp, spawn_point)
+        # 2. 清理残留演员
+        for actor in world.get_actors():
+            if actor.type_id.startswith(("vehicle.", "walker.", "sensor.", "controller.")):
+                if is_actor_alive(actor):
+                    actor.destroy()
+        print("残留演员清理完成")
+
+        # 3. 启动交通灯状态循环线程（后台持续切换交通灯状态）
+        import threading
+        tl_cycle_thread = threading.Thread(target=cycle_traffic_light_states, args=(world,), daemon=True)
+        tl_cycle_thread.start()
+        print("交通灯状态循环线程已启动（红3秒→绿5秒→黄2秒）")
+
+        # 4. 设置车辆起始位置（Town04交通灯密集区）
+        vehicle_bp = world.get_blueprint_library().find(VEHICLE_MODEL)
+        
+        # 手动指定Town04的核心交通灯路口坐标（经测试：多个交通灯环绕）
+        spawn_point = carla.Transform(
+            carla.Location(x=220.0, y=150.0, z=0.5),  # Town04核心交通灯密集区
+            carla.Rotation(yaw=90.0)
+        )
+        spawn_point.location.z += 0.2
+        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+
+        # 备用方案：自动查找交通灯附近的出生点
         if not vehicle:
-            raise Exception("无法生成主车辆")
-        vehicle.set_autopilot(False)
-        print(f"车辆生成在位置: {spawn_point.location}")
+            print("手动坐标生成失败，自动查找交通灯附近的出生点...")
+            spawn_point = get_spawn_point_near_traffic_light(world, map)
+            vehicle = world.spawn_actor(vehicle_bp, spawn_point)
 
-        # 生成障碍物车辆（调整生成位置，确保在前车前方）
-        obstacle_count = 3
-        for i in range(obstacle_count):
-            spawn_idx = (i + 12) % len(spawn_points)  # 从15改为12，更靠近主车辆
-            other_vehicle_bp = random.choice(blueprint_library.filter('vehicle.*'))
-            other_vehicle = world.try_spawn_actor(other_vehicle_bp, spawn_points[spawn_idx])
-            if other_vehicle:
-                other_vehicle.set_autopilot(True)
+        # 最终备用方案
+        if not vehicle:
+            spawn_points = map.get_spawn_points()
+            spawn_point = spawn_points[0] if spawn_points else carla.Transform()
+            vehicle = world.spawn_actor(vehicle_bp, spawn_point)
 
-        # 配置传感器（0.9.10兼容）
-        # 后视角相机
-        third_camera_bp = blueprint_library.find('sensor.camera.rgb')
-        third_camera_bp.set_attribute('image_size_x', '640')
-        third_camera_bp.set_attribute('image_size_y', '480')
-        third_camera_bp.set_attribute('fov', '110')
-        third_camera_transform = carla.Transform(
-            carla.Location(x=-5.0, y=0.0, z=3.0),
-            carla.Rotation(pitch=-15.0)
-        )
-        third_camera = world.spawn_actor(third_camera_bp, third_camera_transform, attach_to=vehicle)
+        print(f"车辆生成成功：{vehicle.type_id}（起始于交通灯密集区）")
 
-        # 前视角相机
-        front_camera_bp = blueprint_library.find('sensor.camera.rgb')
-        front_camera_bp.set_attribute('image_size_x', '640')
-        front_camera_bp.set_attribute('image_size_y', '480')
-        front_camera_bp.set_attribute('fov', '90')
-        front_camera_transform = carla.Transform(
-            carla.Location(x=2.0, y=0.0, z=1.5),
-            carla.Rotation(pitch=0.0)
-        )
-        front_camera = world.spawn_actor(front_camera_bp, front_camera_transform, attach_to=vehicle)
+        # 5. 初始化组件
+        pp_controller = AdaptivePurePursuit(VEHICLE_WHEELBASE)
+        speed_controller = SpeedController(PID_KP, PID_KI, PID_KD)
+        traffic_light_manager = TrafficLightManager()
+        camera_manager = CameraManager(world, vehicle, display)
 
-        # 传感器数据存储
-        third_image = None
-        front_image = None
+        # 6. 主循环
+        print("仿真启动，按ESC退出...（车辆将经过多个交通灯）")
+        clock = pygame.time.Clock()
+        running = True
 
-        # 传感器回调函数
-        def third_camera_callback(image):
-            nonlocal third_image
-            array = np.frombuffer(image.raw_data, dtype=np.uint8)
-            array = np.reshape(array, (image.height, image.width, 4))
-            third_image = array[:, :, :3]
-
-        def front_camera_callback(image):
-            nonlocal front_image
-            array = np.frombuffer(image.raw_data, dtype=np.uint8)
-            array = np.reshape(array, (image.height, image.width, 4))
-            front_image = array[:, :, :3]
-
-        # 注册回调
-        third_camera.listen(third_camera_callback)
-        front_camera.listen(front_camera_callback)
-        time.sleep(2.0)  # 等待传感器初始化
-
-        # 初始化核心组件
-        obstacle_detector = ObstacleDetector(world, vehicle)
-        traditional_controller = TraditionalController(world, obstacle_detector)
-
-        # 控制变量
-        throttle = 0.3
-        steer = 0.0
-        brake = 0.0
-        frame_count = 0
-        stuck_count = 0
-        last_position = vehicle.get_location()
-
-        # 主循环
-        print("自动驾驶系统启动 - 仅使用传统控制器")
-        print("控制键: q-退出, r-重置车辆")
-
-        while True:
-            world.tick()
-            frame_count += 1
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+                    running = False
 
             # 获取车辆状态
             vehicle_transform = vehicle.get_transform()
-            vehicle_location = vehicle.get_transform().location
-            vehicle_velocity = vehicle.get_velocity()
-            vehicle_speed = math.sqrt(vehicle_velocity.x ** 2 + vehicle_velocity.y ** 2 + vehicle_velocity.z ** 2)
+            vehicle_vel = vehicle.get_velocity()
+            current_speed = math.hypot(vehicle_vel.x, vehicle_vel.y) * 3.6
 
-            # 检测障碍物
-            obstacle_info = obstacle_detector.get_obstacle_info()
+            # 核心：获取前进方向路点
+            current_wp = get_forward_waypoint(vehicle, map)
 
-            # 卡住检测（优化：有障碍物时不触发）
-            distance_moved = vehicle_location.distance(last_position)
-            is_moving = distance_moved > 0.2 or vehicle_speed > 1.0
-            # 关键修正：通过traditional_controller实例访问属性，而非self
-            if obstacle_info['has_obstacle'] and obstacle_info['distance'] < traditional_controller.safe_following_distance:
-                stuck_count = 0
-            else:
-                if not is_moving:
-                    stuck_count += 1
-                else:
-                    stuck_count = 0
-            last_position = vehicle_location
+            # 计算方向变化
+            dir_change, curve_level = calculate_dir_change(current_wp)
 
-            # 卡住恢复（仅当无障碍物时执行）
-            if stuck_count > 20:  # 从15帧改为20帧，降低误触发
-                print("检测到车辆卡住，执行恢复程序...")
-                # 紧急刹车
-                vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=1.0, hand_brake=True))
-                time.sleep(0.5)
-                # 倒车或转向
-                if obstacle_info['has_obstacle'] and obstacle_info['distance'] < 15:
-                    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=0.0, reverse=True))
-                    time.sleep(1.0)
-                else:
-                    recovery_steer = random.choice([-0.5, 0.5])
-                    vehicle.apply_control(carla.VehicleControl(throttle=0.6, steer=recovery_steer, brake=0.0))  # 降低油门到0.6
-                    time.sleep(1.0)
-                stuck_count = 0
+            # 预瞄距离
+            lookahead_dist = pp_controller.get_adaptive_lookahead(dir_change)
 
-            # 生成控制指令（仅使用传统控制器）
-            throttle, brake, steer = traditional_controller.get_control(vehicle)
+            # 目标路点
+            target_wps = current_wp.next(lookahead_dist)
+            target_point = target_wps[0].transform.location if target_wps else vehicle_transform.location
 
-            # 紧急刹车时拉手刹
-            if brake >= 1.0:
-                vehicle.apply_control(carla.VehicleControl(
-                    throttle=0.0, steer=steer, brake=1.0, hand_brake=True
-                ))
-            else:
-                # 应用控制
-                control = carla.VehicleControl(
-                    throttle=throttle,
-                    steer=steer,
-                    brake=brake,
-                    hand_brake=False,
-                    reverse=False
-                )
-                vehicle.apply_control(control)
+            # 基础速度
+            curve_speed_factors = [1.0, 0.7, 0.4]
+            speed_factor = curve_speed_factors[min(curve_level, 2)]
+            base_target_speed = BASE_SPEED * speed_factor
+            base_target_speed = max(8.0, base_target_speed)
 
-            # 图像显示
-            if third_image is not None:
-                display_image = third_image.copy()
-                # 可视化障碍物
-                display_image = obstacle_detector.visualize_obstacles(display_image, vehicle_transform)
-                # 绘制信息
-                cv2.putText(display_image, f"Speed: {vehicle_speed * 3.6:.1f} km/h", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(display_image, f"Mode: Traditional", (10, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(display_image, f"Throttle: {throttle:.2f}", (10, 90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(display_image, f"Steer: {steer:.2f}", (10, 120),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(display_image, f"Brake: {brake:.2f}", (10, 150),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                # 障碍物信息
-                if obstacle_info['has_obstacle']:
-                    cv2.putText(display_image, f"Obstacle: {obstacle_info['distance']:.1f}m", (10, 180),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                    cv2.putText(display_image, f"RelSpeed: {obstacle_info['relative_speed']:.1f}km/h", (10, 210),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                else:
-                    cv2.putText(display_image, "Obstacle: None", (10, 180),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                # 卡住警告
-                if stuck_count > 5:
-                    cv2.putText(display_image, "STUCK DETECTED!", (10, 240),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            # 交通灯处理（检测多个交通灯）
+            target_speed, traffic_light_status = traffic_light_manager.handle_traffic_light_logic(
+                vehicle, current_speed, base_target_speed
+            )
+            camera_manager.update_traffic_light_status(traffic_light_status)
 
-                cv2.imshow('CARLA Autopilot (0.9.10)', display_image)
+            # 控制计算
+            steer = pp_controller.calculate_steer(vehicle_transform, target_point, dir_change)
+            throttle = speed_controller.calculate(target_speed, current_speed)
+            brake = 1.0 - throttle if current_speed > target_speed + 1 else 0.0
 
-                # 键盘控制
-                key = cv2.waitKey(1) & 0xFF
-                if key == ord('q'):
-                    break
-                elif key == ord('r'):
-                    vehicle.set_transform(spawn_point)
-                    throttle = 0.3
-                    steer = 0.0
-                    brake = 0.0
-                    stuck_count = 0
-                    print("车辆已重置")
+            # 红灯刹车
+            if "Red (Stopped)" in traffic_light_status or target_speed == 0.0:
+                throttle = 0.0
+                brake = 1.0
 
-            time.sleep(0.01)
+            # 应用控制
+            control = carla.VehicleControl()
+            control.steer = steer
+            control.throttle = throttle
+            control.brake = brake
+            vehicle.apply_control(control)
+
+            # 打印状态（显示当前交通灯状态）
+            curve_names = ["直道", "缓弯", "急弯"]
+            lane_id = current_wp.lane_id
+            print(f"速度：{current_speed:5.1f}km/h | 目标：{target_speed:5.1f} | 弯道：{curve_names[curve_level]:<3} | 车道ID：{lane_id} | 灯状态：{traffic_light_status}")
+
+            clock.tick(30)
 
     except Exception as e:
-        print(f"系统错误: {e}")
-        import traceback
+        print(f"错误：{e}")
         traceback.print_exc()
 
     finally:
-        # 清理资源（0.9.10兼容）
-        print("正在清理资源...")
-        cv2.destroyAllWindows()
-        # 停止传感器
-        if 'third_camera' in locals():
-            third_camera.stop()
-        if 'front_camera' in locals():
-            front_camera.stop()
-        # 销毁所有Actor
-        for actor in world.get_actors():
-            if actor.type_id.startswith('vehicle.') or actor.type_id.startswith('sensor.'):
-                actor.destroy()
-        # 关闭同步模式
-        settings = world.get_settings()
-        settings.synchronous_mode = False
-        world.apply_settings(settings)
-        print("资源清理完成")
+        print("清理资源...")
+        if camera_manager:
+            camera_manager.destroy()
+        if vehicle and is_actor_alive(vehicle):
+            vehicle.destroy()
+        pygame.quit()
+        print("仿真结束")
 
 if __name__ == "__main__":
     main()
