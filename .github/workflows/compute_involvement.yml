@@ -34,4 +34,4 @@ jobs:
 
       # 4. 执行你的贡献统计脚本
       - name: Display involvement degree (${{ matrix.os }})
-        run: python Contribution_analysis.py -t ${{ secrets.GITHUB_TOKEN }}
+        run: python contribution_analysis.py -t ${{ secrets.GITHUB_TOKEN }}
