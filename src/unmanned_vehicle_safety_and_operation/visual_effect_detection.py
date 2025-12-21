@@ -277,7 +277,7 @@ if __name__ == "__main__":
         y_train, y_test = y[:split_idx], y[split_idx:]
         print(f"训练集：{len(X_train)} 样本，测试集：{len(X_test)} 样本")
 
-        # 3. 训练KNN模型
+        # 3. 训练KNN模型11
         print("\n【3/4】训练雨雾检测模型...")
         model = SimpleKNNClassifier(k=5)
         model.fit(X_train, y_train)
