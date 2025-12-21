@@ -770,6 +770,19 @@ USGS National Map 3DEP Program
 
 在左侧选中需要的数据后点击Download Link (LAZ)进行下载
 
+**7.注意此时你需要想办法获取这块区域的EPSG编码（后面可能会用上）**
+
+你需要找到如图所示的“Info/Metadata”项
+<img width="790" height="866" alt="image" src="https://github.com/user-attachments/assets/b3967b65-3583-453c-9ae5-1f893f4c7fdd" />
+跳转到
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/f5226e1a-8fb2-4eeb-a2c9-5185326db45b" />
+往下翻找到
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/c59896c3-40d9-440d-ab2b-ab69e5c5b810" />
+点击后往下翻重点记录下来这部分
+<img width="1409" height="1090" alt="image" src="https://github.com/user-attachments/assets/77e2e8c2-1a0e-45d1-b794-028c315570ee" />
+然后可以去查对应的EPSG编码
+
+
 # 将点云文件导入roadrunner的方法
 
 ## 第一步：将.laz文件解压为.las文件
@@ -798,17 +811,32 @@ git clone https://github.com/LAStools/LAStools.git
 ### 方法二：使用QGIS内置的工具进行格式转换
 
 1.**打开QGIS**
+
 菜单栏->数据处理->工具箱
 <img width="1920" height="1198" alt="image" src="https://github.com/user-attachments/assets/fccc9043-c816-49a8-bbb7-10c7488fe8c9" />
 <img width="1920" height="1198" alt="image" src="https://github.com/user-attachments/assets/7dd0759c-905d-4b6c-a221-413dd76e69d5" />
 2.**选择格式转换**
+
 点云转换->格式转换，选中格式转换（双击）
 <img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/fe4e07a0-a60f-4e45-9e8f-41a464ffd3f4" />
 3.**进行格式转换**
+
 <img width="860" height="681" alt="image" src="https://github.com/user-attachments/assets/eedfddae-05ee-4833-89af-7b2438e4c347" />
+
 4.**转换完成**
+
 <img width="860" height="654" alt="image" src="https://github.com/user-attachments/assets/5cc6fb83-5bfd-4799-9725-2ef7312b24c0" />
 
+
+# 将.las/.laz文件导入roadrunner
+
+**1.打开roadrunner新建一个场景**
+## *注意：新建场景的路径不能有中文字符存在，否则会报错*
+<img width="615" height="314" alt="image" src="https://github.com/user-attachments/assets/b4b7d71c-0df9-43b2-a22c-6729fadc08fa" />
+**2.将.las/.laz文件直接拖入roadrunner的Library Browser**
+**3.将.las/.laz文件从Library Browser拖入场景**
+**成功**
+<img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/afecb182-3bba-4884-9b58-e47abd118553" />
 
 
 
