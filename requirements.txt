@@ -19,7 +19,7 @@ tensorflow; sys_platform == 'win32'
 # === 4. Windows 专用库 (修复 Linux 报错) ===
 pywinpty==3.0.2; sys_platform == 'win32'
 
-# === 5. 其他通用依赖 (保持不变) ===
+# === 5. 其他通用依赖 ===
 anyio==4.11.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
