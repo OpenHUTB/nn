@@ -1,15 +1,1 @@
-# 无人车安全运维模块 - 环境配置与运行手册
-
-## 一、环境设置
-运行本项目安全运维模块代码前，需确保开发环境满足以下依赖版本要求：
-- Python 3.8 及以上版本（适配运维数据处理与实时监控需求）
-- PyTorch 1.8 及以上版本（支持异常检测模型训练推理）
-- CARLA 模拟器 0.9.13 版本（适配无人车全场景运维仿真）
-- OpenCV 4.5 及以上版本（用于传感器数据可视化与异常识别）
-- 其余 Python 依赖项详见项目根目录下的 'requirements_ops.txt' 文件
-
-## 二、依赖安装步骤
-### 1. 克隆项目仓库
-```bash
-git clone https://github.com/yourusername/unmanned_vehicle_safety_and_operation.git
-cd av_safety_operation
+# 无人车安全运维系统
