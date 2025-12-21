@@ -6,7 +6,7 @@ import os
 TRAJECTORIES = {
     "custom_trajectory": {
         "start": [108.91605377197266,101.3561782836914,0.6136533617973328, 0], 
-        "end": [74.64781951904297,-56.014076232910156,0.40768954157829285],
+        "end": [62.20726013183594,-68.12548065185547,0.7430136203765869],
         "description": "自定义轨迹 - 城镇道路"
     },
     "test_trajectory": {
@@ -32,7 +32,7 @@ def get_current_trajectory():
 # 设置基础路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
 base_dir = os.path.dirname(current_dir)  # 上一级目录
-MODELS_DIR = os.path.join(base_dir, 'models')
+MODELS_DIR = os.path.join(base_dir, 'carla_ros_ws/src/carla_autonomous/models')
 braking = os.path.join(MODELS_DIR, 'Braking___282.model')
 driving = os.path.join(MODELS_DIR, 'Driving__6030.model')
 MODEL_PATHS = {
@@ -126,6 +126,21 @@ NO_RENDERING_MODE = False            # 无渲染模式
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
 CAMERA_FOV = 40
+# ==================== 数据收集配置 ====================
+ENABLE_DATA_COLLECTION = True          # 是否启用数据收集
+DATA_SAVE_DIR = "data_logs"           # 数据保存目录
+ENABLE_PLOTTING = True                # 是否生成图表
+PLOT_DPI = 150                        # 图表DPI
+AUTO_OPEN_PLOTS = False               # 是否自动打开图表（可能不支持无GUI环境）
+
+# 数据采样率（1表示记录每一步，2表示每两步记录一次等）
+DATA_SAMPLING_RATE = 1
+
+
+# ==================== 图表字体配置 ====================
+CHART_FONT_FAMILY = 'SimHei'  # 默认字体
+CHART_FONT_SIZE = 12
+ENABLE_CHINESE_FONT = True
 
 def print_config():
     """打印当前配置"""
@@ -161,4 +176,10 @@ def print_config():
     print(f"  固定时间步长: {FIXED_DELTA_SECONDS}s")
     print(f"  同步模式: {'开启' if SYNCHRONOUS_MODE else '关闭'}")
     
+    print("数据收集配置\n")
+    print(f"数据收集: {'启用' if ENABLE_DATA_COLLECTION else '禁用'}")
+    print(f"图表生成: {'启用' if ENABLE_PLOTTING else '禁用'}")
+    print(f"数据保存目录: {DATA_SAVE_DIR}")
+    print(f"数据采样率: 每{DATA_SAMPLING_RATE}步记录一次")
+
     print("="*60)
