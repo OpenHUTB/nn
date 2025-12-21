@@ -7,7 +7,6 @@ CARLA 多交通灯版：Town04密集交通灯+状态循环+车辆响应
 import sys
 import os
 import carla
-import time
 import numpy as np
 import math
 import pygame
