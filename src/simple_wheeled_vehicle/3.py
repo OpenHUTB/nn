@@ -1,9 +1,3 @@
-"""
-自动巡航小车
-- 恒定速度 0.0005 m/s
-- 转向回正（直走）
-- R 键仍可复位
-"""
 import mujoco
 import mujoco.viewer
 import numpy as np
