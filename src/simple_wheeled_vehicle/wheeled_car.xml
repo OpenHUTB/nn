@@ -87,6 +87,7 @@
       </body>
     </body>
   </worldbody>
+
   <actuator>
     <motor name="steer_fl" joint="fl_steer" class="servo"/>
     <motor name="steer_fr" joint="fr_steer" class="servo"/>
