@@ -1,4 +1,4 @@
-# test_face_detector.py
+# 人脸检测模块
 import cv2
 import sys
 import os
