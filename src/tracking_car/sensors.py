@@ -489,17 +489,22 @@ class SensorManager:
 
 def create_ego_vehicle(world, config, spawn_points=None):
     """
-    创建自车
-    
-    Args:
-        world: CARLA世界对象
-        config: 配置字典
-        spawn_points: 可选的自定义生成点列表
-        
-    Returns:
-        carla.Vehicle or None: 自车对象
+    创建自车 - 强制随机版本
     """
     try:
+        # 强制使用随机种子
+        import random
+        import time
+        import os
+        
+        # 生成强随机种子
+        current_time = time.time()
+        pid = os.getpid()
+        seed = int((current_time * 1000) % 1000000) ^ pid
+        random.seed(seed)
+        
+        logger.debug(f"随机种子: {seed} (时间: {current_time}, PID: {pid})")
+        
         # 获取生成点
         if spawn_points is None:
             spawn_points = world.get_map().get_spawn_points()
@@ -510,88 +515,41 @@ def create_ego_vehicle(world, config, spawn_points=None):
         
         logger.info(f"找到 {len(spawn_points)} 个生成点")
         
-        # 选择车辆蓝图
-        vehicle_bp = None
-        vehicle_filter = config.get('ego_vehicle_filter', 'vehicle.tesla.model3')
+        # 随机打乱所有生成点
+        shuffled_points = spawn_points.copy()
+        random.shuffle(shuffled_points)
         
-        # 尝试首选车辆
-        blueprint_library = world.get_blueprint_library()
-        for bp in blueprint_library.filter(vehicle_filter):
-            if int(bp.get_attribute('number_of_wheels')) == 4:
-                vehicle_bp = bp
-                logger.info(f"找到车辆蓝图: {bp.id}")
-                break
-        
-        # 如果没找到，选择任意四轮车辆
-        if vehicle_bp is None:
-            logger.info("首选车辆未找到，尝试其他四轮车辆...")
-            for bp in blueprint_library.filter('vehicle.*'):
-                if int(bp.get_attribute('number_of_wheels')) == 4:
-                    vehicle_bp = bp
-                    logger.info(f"使用备用车辆蓝图: {bp.id}")
-                    break
-        
-        if vehicle_bp is None:
-            logger.error("❌ 找不到合适的车辆蓝图")
-            return None
-        
-        # 设置车辆颜色
-        color = config.get('ego_vehicle_color', '255,0,0')
-        vehicle_bp.set_attribute('color', color)
-        
-        # 尝试生成车辆 - 改进的碰撞避免策略
-        max_attempts = config.get('spawn_max_attempts', 20)
+        # 尝试前5个打乱后的点
+        max_attempts = min(5, len(shuffled_points))
         
         for attempt in range(max_attempts):
-            # 随机选择生成点
-            if attempt < len(spawn_points):
-                spawn_point = spawn_points[attempt]
-            else:
-                # 随机选择一个生成点
-                import random
-                spawn_point = random.choice(spawn_points)
-                
-                # 随机偏移位置以避免碰撞
-                spawn_point.location.x += random.uniform(-3, 3)
-                spawn_point.location.y += random.uniform(-3, 3)
+            spawn_point = shuffled_points[attempt]
             
-            logger.info(f"尝试生成自车 (尝试 {attempt + 1}/{max_attempts}) "
-                       f"位置: x={spawn_point.location.x:.1f}, y={spawn_point.location.y:.1f}")
+            logger.info(f"🎲 尝试 {attempt + 1}/{max_attempts}: "
+                       f"随机选择的位置 ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
             
-            # 设置生成点的高度为地面以上0.5米
+            # 获取车辆蓝图
+            vehicle_bp = world.get_blueprint_library().filter('vehicle.*')[0]
+            
+            # 设置生成点高度
             spawn_point.location.z += 0.5
             
             ego_vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
             
             if ego_vehicle is not None:
-                logger.info(f"✅ 自车生成成功 (尝试 {attempt + 1}/{max_attempts})")
-                logger.info(f"  位置: ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f}, {spawn_point.location.z:.1f})")
-                
-                # 等待一小段时间让车辆稳定
-                world.tick()
+                logger.info(f"✅ 自车生成成功！")
+                logger.info(f"  位置: ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
                 
                 # 设置自动驾驶
                 try:
-                    ego_vehicle.set_autopilot(True, 8000)
-                    logger.info("✅ 自车自动驾驶已启用")
-                except Exception as e:
-                    logger.warning(f"设置自动驾驶失败: {e}")
-                    try:
-                        ego_vehicle.set_autopilot(True)
-                        logger.info("✅ 自车自动驾驶已启用（备用方法）")
-                    except:
-                        logger.warning("无法设置自动驾驶，车辆将保持静止")
+                    ego_vehicle.set_autopilot(True)
+                    logger.info("✅ 自动驾驶已启用")
+                except:
+                    pass
                 
                 return ego_vehicle
-            else:
-                logger.debug(f"生成失败，尝试下一个位置...")
         
-        logger.error(f"❌ 经过 {max_attempts} 次尝试后仍无法生成自车")
-        logger.info("建议：")
-        logger.info("1. 重新启动CARLA服务器")
-        logger.info("2. 在CARLA中手动清理场景中的车辆")
-        logger.info("3. 尝试不同的生成点")
-        
+        logger.error("❌ 所有随机位置尝试都失败")
         return None
         
     except Exception as e:
