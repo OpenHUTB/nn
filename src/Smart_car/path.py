@@ -9,7 +9,7 @@ pygame.init()
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("无人车键盘控制")
+pygame.display.set_caption("无人车键盘控制.")
 
 # 颜色定义
 WHITE = (255, 255, 255)
