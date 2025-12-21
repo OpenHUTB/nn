@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- CARLA自动驾驶ROS节点 -->
+    <node name="carla_autonomous_node" 
+          pkg="carla_autonomous" 
+          type="carla_autonomous_node.py" 
+          output="screen"
+          required="true">
+        
+        <!-- ROS参数 -->
+        <param name="debug_mode" value="$(optenv DEBUG true)" />
+        <param name="fps_limit" value="$(optenv FPS 30)" />
+        
+        <!-- 轨迹参数 -->
+        <param name="trajectory" value="$(optenv TRAJECTORY test_trajectory)" />
+        <param name="enable_traffic" value="$(optenv TRAFFIC false)" />
+        <param name="traffic_vehicles" value="$(optenv TRAFFIC_VEHICLES 10)" />
+        <param name="traffic_walkers" value="$(optenv TRAFFIC_WALKERS 20)" />
+        
+        <!-- 视角参数 -->
+        <param name="follow_distance" value="$(optenv FOLLOW_DISTANCE 8.0)" />
+        <param name="follow_height" value="$(optenv FOLLOW_HEIGHT 3.0)" />
+        <param name="follow_pitch" value="$(optenv FOLLOW_PITCH -20.0)" />
+        
+        <!-- 性能参数 -->
+        <param name="max_steps" value="$(optenv MAX_STEPS 1000)" />
+        <param name="update_rate" value="$(optenv UPDATE_RATE 0.5)" />
+        
+    </node>
+    
+    <!-- RViz可视化 -->
+    <node name="rviz" 
+          pkg="rviz" 
+          type="rviz" 
+          args="-d $(find carla_autonomous)/config/carla.rviz"
+          if="$(optenv RVIZ true)" />
+    
+    <!-- 控制节点 -->
+    <node name="carla_control_client" 
+          pkg="carla_autonomous" 
+          type="carla_control_client.py"
+          output="screen"
+          if="$(optenv CONTROL_CLIENT false)" />
+    
+</launch>
