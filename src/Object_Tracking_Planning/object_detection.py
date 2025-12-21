@@ -1927,6 +1927,7 @@ class BehaviorAgent(Agent):
 def game_loop(args):
     """ Main loop for agent"""
 
+    # 初始化部分保持不变
     pygame.init()
     pygame.font.init()
     world = None
@@ -1942,13 +1943,9 @@ def game_loop(args):
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
-
-        # selected_world = client.load_world("Town01")  # KK Changes world to Town04
         selected_world = client.get_world()
-
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
-
         agent = BehaviorAgent(world.player, behavior=args.behavior)
 
         spawn_points = world.map.get_spawn_points()
@@ -1963,57 +1960,56 @@ def game_loop(args):
 
         clock = pygame.time.Clock()
 
+        # 主循环开始
         while True:
             clock.tick_busy_loop(60)
+
+            # 统一处理事件
             if controller.parse_events(world):
                 return
 
-            # As soon as the server is ready continue!
+            # 等待世界更新
             if not world.world.wait_for_tick(10.0):
                 continue
 
-            if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events(world):
-                    return
-
-                # agent.update_information(world)
-                # as soon as the server is ready continue!
-                world.world.wait_for_tick(10.0)
-
+            # 根据代理类型执行不同的逻辑
+            if args.agent in ["Roaming", "Basic"]:
+                world.world.wait_for_tick(10.0)  # 等待服务器
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
+
+                # 为Roaming/Basic代理生成控制
                 control = agent.run_step()
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
-            else:
-                agent.update_information(world)
+                continue  # 跳过后续的控制应用
 
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
+            # 其他代理类型的逻辑
+            agent.update_information(world)
+            world.tick(clock)
+            world.render(display)
+            pygame.display.flip()
 
-            # Set new destination when target has been reached
+            # 检查是否到达目的地
             if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
                 agent.reroute(spawn_points)
                 tot_target_reached += 1
                 world.hud.notification("The target has been reached " +
                                        str(tot_target_reached) + " times.", seconds=4.0)
-
             elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
                 print("Target reached, mission accomplished...")
                 break
 
+            # 设置速度限制并应用控制
             speed_limit = world.player.get_speed_limit()
             agent.get_local_planner().set_speed(speed_limit)
-
             control = agent.run_step()
             world.player.apply_control(control)
 
     finally:
         if world is not None:
             world.destroy()
-
         pygame.quit()
 
 
