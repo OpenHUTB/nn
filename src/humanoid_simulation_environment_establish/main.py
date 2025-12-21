@@ -903,6 +903,70 @@ class KeyboardController:
         self._set_action(action, "abdomen_z", abdomen_turn_strength)
         self._set_action(action, "abdomen_x", 0.1 * normalized_turn)
         
+        # 躯干控制 - 更自然的轻微摆动
+        # 轻微前倾以辅助前进（减小前倾幅度，更自然）
+        abdomen_pitch = 0.08 * direction * gait_strength
+        # 添加轻微的上下摆动（配合步态，与腿部动作协调）
+        # 在支撑相时稍微下沉，在摆动相时稍微上升
+        abdomen_pitch += 0.02 * np.sin(phase + np.pi/4) * gait_strength
+        self._set_action(action, "abdomen_y", abdomen_pitch)
+        
+        # 转向时允许侧倾（减小侧倾幅度）
+        self._set_action(action, "abdomen_x", 0.05 * turn_direction * gait_strength)
+        
+        # 转向控制（减小转向幅度，更自然）
+        if turn_direction != 0:
+            self._set_action(action, "abdomen_z", 0.25 * turn_direction * gait_strength)
+        else:
+            self._set_action(action, "abdomen_z", 0.0)
+        
+        return action
+    
+    def _create_turning_only_action(self, turn_direction, dt=0.03):
+        """创建仅转向动作（不产生腿部摆动，只在原地转向，目标转向45度）"""
+        action = np.zeros(self.action_dim)
+        
+        if not self.actuator_indices:
+            return action
+        
+        # 更新目标转向角度（每次按键设置目标为45度）
+        turn_velocity = 0.0
+        if turn_direction != 0:
+            # 计算转向误差
+            turn_error = self.target_turn_angle - self.current_turn_angle
+            
+            # 如果接近目标角度，重置目标（允许连续转向）
+            if abs(turn_error) < 0.1:  # 接近目标时，设置新的目标
+                self.target_turn_angle += turn_direction * self.turn_angle_per_step
+            
+            # 计算转向速度（基于误差）
+            turn_velocity = np.clip(turn_error * 3.0, -self.turn_speed, self.turn_speed)
+            
+            # 更新当前转向角度（模拟）
+            self.current_turn_angle += turn_velocity * dt
+        else:
+            # 没有转向指令时，逐渐减小转向角度
+            self.current_turn_angle *= 0.95
+            self.target_turn_angle = self.current_turn_angle  # 同步目标角度
+        
+        # 根据转向速度计算转向强度（归一化到-1到1）
+        if abs(turn_velocity) > 0.01:
+            normalized_turn = np.clip(turn_velocity / self.turn_speed, -1.0, 1.0)
+        else:
+            # 如果没有转向速度，直接使用方向（简化控制）
+            normalized_turn = turn_direction * 0.8  # 直接使用方向，强度0.8
+        
+        # 原地转向：通过髋关节外展和躯干旋转实现
+        # 增大转向强度，使转向更明显
+        hip_turn_strength = 0.6 * normalized_turn  # 从0.25增大到0.6
+        self._set_action(action, "hip_z_right", hip_turn_strength)
+        self._set_action(action, "hip_z_left", -hip_turn_strength)
+        
+        # 躯干旋转辅助转向（主要转向来源，范围±45度）
+        abdomen_turn_strength = 0.8 * normalized_turn  # 从0.15增大到0.8，充分利用±45度范围
+        self._set_action(action, "abdomen_z", abdomen_turn_strength)
+        self._set_action(action, "abdomen_x", 0.1 * normalized_turn)
+        
         return action
     
     def _create_turning_only_action(self, turn_direction):
@@ -1719,16 +1783,25 @@ def main():
     # 将环境切换为“无重力”模式
     env = GapCorridorEnvironment(corridor_length=100, corridor_width=10, use_gravity=False)
     
-    print("\n环境已初始化")
-    print(f"执行器数量: {env.model.nu}")
-    print(f"关节数量: {env.model.nq}")
-    
     controller = KeyboardController(env.model.nu, env.get_actuator_indices())
     obs = env.reset()
     total_reward = 0.0
     
-    print("\n启动MuJoCo交互式查看器...")
-    print("按 ESC 或关闭窗口退出程序")
+    print("\n" + "="*80)
+    print("🚀 环境初始化完成")
+    print("-"*80)
+    print(f"   执行器数量: {env.model.nu}")
+    print(f"   关节数量: {env.model.nq}")
+    print(f"   观测维度: {len(obs)}")
+    print(f"   重力模式: {'启用' if env.use_gravity else '禁用（无重力模式）'}")
+    print(f"   控制时间步: {env.control_timestep:.3f}s")
+    print(f"   物理时间步: {env.timestep:.3f}s")
+    print(f"   最大Episode步数: {env._max_episode_steps}")
+    print("="*80)
+    
+    print("\n📺 启动MuJoCo交互式查看器...")
+    print("   提示: 在查看器窗口中按键盘进行控制")
+    print("   提示: 按 ESC 或关闭窗口退出程序")
     
     try:
         viewer_handle = mujoco.viewer.launch_passive(
@@ -1739,7 +1812,9 @@ def main():
             show_right_ui=True
         )
         
-        print("\n查看器已启动，开始仿真循环...")
+        print("\n✅ 查看器已启动，开始仿真循环...")
+        print(f"   状态报告将每100步输出一次")
+        print("")
         
         step = 0
         last_move_state = None  # 记录上次移动状态，用于检测状态变化
@@ -1831,59 +1906,151 @@ def main():
             if step % 100 == 0:
                 # 获取各个身体部位的位置
                 torso_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "torso")
-                torso_pos = env.data.xpos[torso_id] if torso_id >= 0 else None
+                torso_pos = env.data.xpos[torso_id].copy() if torso_id >= 0 else None
                 
                 head_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "head")
-                head_pos = env.data.xpos[head_id] if head_id >= 0 else None
+                head_pos = env.data.xpos[head_id].copy() if head_id >= 0 else None
                 
                 # 尝试获取左右脚位置（可能有不同的命名）
                 foot_right_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "foot_right")
                 if foot_right_id < 0:
                     foot_right_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "right_foot")
-                foot_right_pos = env.data.xpos[foot_right_id] if foot_right_id >= 0 else None
+                foot_right_pos = env.data.xpos[foot_right_id].copy() if foot_right_id >= 0 else None
                 
                 foot_left_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "foot_left")
                 if foot_left_id < 0:
                     foot_left_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "left_foot")
-                foot_left_pos = env.data.xpos[foot_left_id] if foot_left_id >= 0 else None
+                foot_left_pos = env.data.xpos[foot_left_id].copy() if foot_left_id >= 0 else None
                 
-                # 尝试获取左右手位置
-                hand_right_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "hand_right")
-                if hand_right_id < 0:
-                    hand_right_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "right_hand")
-                hand_right_pos = env.data.xpos[hand_right_id] if hand_right_id >= 0 else None
+                # 获取速度信息
+                linear_vel = np.zeros(6)
+                angular_vel = np.zeros(6)
+                if torso_id >= 0:
+                    mujoco.mj_objectVelocity(env.model, env.data, mujoco.mjtObj.mjOBJ_BODY, torso_id, linear_vel, 0)
+                    mujoco.mj_objectVelocity(env.model, env.data, mujoco.mjtObj.mjOBJ_BODY, torso_id, angular_vel, 1)
+                vx, vy, vz = linear_vel[0], linear_vel[1], linear_vel[2]
+                angular_vz = angular_vel[5]  # 绕Z轴角速度（转向）
+                speed = np.sqrt(vx**2 + vy**2)
                 
-                hand_left_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "hand_left")
-                if hand_left_id < 0:
-                    hand_left_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "left_hand")
-                hand_left_pos = env.data.xpos[hand_left_id] if hand_left_id >= 0 else None
+                # 获取步态相位信息（如果有深度学习控制器）
+                gait_info = ""
+                if controller.deep_controller is not None:
+                    gait_phase_deg = np.degrees(controller.deep_controller.gait_phase) % 360
+                    gait_info = f"步态相位: {gait_phase_deg:.1f}°, 步频: {controller.deep_controller.gait_frequency:.2f}Hz"
                 
-                # 尝试获取骨盆位置
-                pelvis_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
-                pelvis_pos = env.data.xpos[pelvis_id] if pelvis_id >= 0 else None
+                # 获取动作统计信息
+                action_magnitude = np.max(np.abs(action))
+                action_mean = np.mean(np.abs(action))
+                action_std = np.std(action)
                 
-                # 格式化输出
-                info_parts = []
+                # 获取键盘控制状态
+                control_state = []
+                if controller.move_forward:
+                    control_state.append("前进")
+                if controller.move_backward:
+                    control_state.append("后退")
+                if controller.turn_left:
+                    control_state.append("左转")
+                if controller.turn_right:
+                    control_state.append("右转")
+                if not control_state:
+                    control_state.append("静止")
+                control_str = "+".join(control_state) if control_state else "静止"
+                
+                # 获取步态时间信息
+                step_time_info = f"步态时间: {controller.step_time:.2f}s"
+                
+                # 计算运行时间（模拟）
+                sim_time = step * env.control_timestep
+                
+                # 获取奖励信息（当前步奖励和累计奖励）
+                recent_reward = reward  # 当前步的奖励
+                avg_reward_per_step = total_reward / max(step, 1)
+                
+                # 打印分隔线
+                print("\n" + "="*80)
+                print(f"📊 状态报告 [Step {step} | 模拟时间: {sim_time:.2f}s]")
+                print("-"*80)
+                
+                # 控制状态
+                print(f"🎮 控制状态: {control_str:20s} | {step_time_info}")
+                if gait_info:
+                    print(f"🚶 {gait_info}")
+                
+                # 速度和运动信息
+                print(f"\n⚡ 运动信息:")
+                print(f"   线性速度: X={vx:+.3f} m/s, Y={vy:+.3f} m/s, Z={vz:+.3f} m/s")
+                print(f"   速度大小: {speed:.3f} m/s")
+                print(f"   角速度: Z轴旋转={np.degrees(angular_vz):+.2f} °/s")
+                
+                # 位置信息（关键部位）
+                print(f"\n📍 身体部位位置:")
                 if torso_pos is not None:
-                    info_parts.append(f"躯干={torso_pos}")
+                    print(f"   躯干: X={torso_pos[0]:+.3f}, Y={torso_pos[1]:+.3f}, Z={torso_pos[2]:+.3f} m")
                 if head_pos is not None:
-                    info_parts.append(f"头部={head_pos}")
-                if pelvis_pos is not None:
-                    info_parts.append(f"骨盆={pelvis_pos}")
+                    head_height = head_pos[2] - (torso_pos[2] if torso_pos is not None else 0)
+                    print(f"   头部: X={head_pos[0]:+.3f}, Y={head_pos[1]:+.3f}, Z={head_pos[2]:+.3f} m (相对高度: {head_height:+.3f} m)")
                 if foot_right_pos is not None:
-                    info_parts.append(f"右脚={foot_right_pos}")
+                    print(f"   右脚: X={foot_right_pos[0]:+.3f}, Y={foot_right_pos[1]:+.3f}, Z={foot_right_pos[2]:+.3f} m")
                 if foot_left_pos is not None:
-                    info_parts.append(f"左脚={foot_left_pos}")
-                if hand_right_pos is not None:
-                    info_parts.append(f"右手={hand_right_pos}")
-                if hand_left_pos is not None:
-                    info_parts.append(f"左手={hand_left_pos}")
+                    print(f"   左脚: X={foot_left_pos[0]:+.3f}, Y={foot_left_pos[1]:+.3f}, Z={foot_left_pos[2]:+.3f} m")
+                    # 计算步长（两脚间的X距离）
+                    if foot_right_pos is not None:
+                        step_length = abs(foot_right_pos[0] - foot_left_pos[0])
+                        print(f"   步长: {step_length:.3f} m")
                 
-                info_str = ", ".join(info_parts)
-                print(f"Step {step}: {info_str}, 累计奖励 = {total_reward:.2f}")
+                # 动作信息
+                print(f"\n🎯 动作统计:")
+                print(f"   动作维度: {len(action)}")
+                print(f"   最大幅度: {action_magnitude:.3f}")
+                print(f"   平均幅度: {action_mean:.3f}")
+                print(f"   标准差: {action_std:.3f}")
+                
+                # 奖励信息
+                print(f"\n🏆 奖励信息:")
+                print(f"   当前步奖励: {recent_reward:+.4f}")
+                print(f"   累计奖励: {total_reward:+.4f}")
+                print(f"   平均奖励/步: {avg_reward_per_step:+.4f}")
+                
+                # 深度学习信息（如果启用）
+                if controller.use_deep_learning and controller.deep_controller is not None:
+                    buffer_size = len(controller.deep_controller.replay_buffer)
+                    print(f"\n🧠 深度学习控制器:")
+                    print(f"   经验缓冲区: {buffer_size}/{controller.deep_controller.replay_buffer.maxlen}")
+                    print(f"   训练步数: {controller.deep_controller.step_count}")
+                    print(f"   状态维度: {controller.deep_controller.state_dim}, 动作维度: {controller.deep_controller.action_dim}")
+                
+                print("="*80 + "\n")
             
             if done:
-                print(f"\nEpisode finished. Total reward: {total_reward:.2f}")
+                # 计算Episode统计信息
+                episode_duration = step * env.control_timestep
+                avg_reward_per_step = total_reward / max(step, 1)
+                
+                # 获取最终位置信息
+                final_torso_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "torso")
+                
+                print("\n" + "="*80)
+                print("🎯 Episode 结束")
+                print("-"*80)
+                print(f"   总步数: {step}")
+                print(f"   持续时间: {episode_duration:.2f}s")
+                print(f"   累计奖励: {total_reward:+.4f}")
+                print(f"   平均奖励/步: {avg_reward_per_step:+.4f}")
+                
+                # 获取最终位置信息
+                if final_torso_id >= 0:
+                    final_torso_pos = env.data.xpos[final_torso_id]
+                    print(f"   最终位置: X={final_torso_pos[0]:+.3f}, Y={final_torso_pos[1]:+.3f}, Z={final_torso_pos[2]:+.3f} m")
+                    # 计算前进距离（从初始位置）
+                    initial_pos = env._root_joint_qpos_start
+                    if initial_pos is not None and (initial_pos + 2) < len(env.data.qpos):
+                        initial_x = env.data.qpos[initial_pos]
+                        distance_traveled = final_torso_pos[0] - initial_x
+                        print(f"   前进距离: {distance_traveled:+.3f} m")
+                
+                print("="*80 + "\n")
+                
                 obs = env.reset()
                 total_reward = 0.0
                 step = 0
