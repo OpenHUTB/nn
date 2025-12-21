@@ -1,92 +1,110 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-路侧感知数据集预处理（Carla适配）
-零第三方依赖（仅Python内置库），完全无报错！
-运行方式：python main.py
+路侧感知数据集预处理（Carla 0.9.10终极适配版）
+运行前：先启动D:\WindowsNoEditor\CarlaUE4.exe
 """
-import json
+import sys
 import os
-import random
+import time
+import json
+from typing import Dict, Any
 
+# ========== 加载Carla egg文件 ==========
+CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
+sys.path.append(CARLA_EGG_PATH)
 
-# ===================== 第一步：生成模拟Carla数据（纯文本，不用图片） =====================
-def generate_demo_data():
-    """生成模拟Carla标注数据（纯文本，无需图片/OpenCV，零报错）"""
-    os.makedirs("demo_carla_data", exist_ok=True)
-    # 生成Carla场景标注（纯JSON文本，模拟感知数据）
-    anno_data = {
-        "carla_scenes": [
-            {"scene_id": 1001, "frame_id": 0,
-             "obstacles": [{"type": "car", "bbox": [100, 100, 200, 200], "distance": 8.5}]},
-            {"scene_id": 1002, "frame_id": 1,
-             "obstacles": [{"type": "person", "bbox": [150, 150, 250, 250], "distance": 5.2}]}
-        ]
+# 导入Carla并容错
+try:
+    import carla
+    print(f"✅ 成功加载Carla API（0.9.10适配版）")
+except Exception as e:
+    print(f"❌ 加载Carla API失败：{str(e)}")
+    sys.exit(1)
+
+# ========== 配置项 ==========
+CARLA_HOST = "localhost"
+CARLA_PORT = 2000
+TIMEOUT = 10.0
+SAVE_DIR = "carla_sensor_data"
+
+# ========== 连接模拟器 ==========
+def connect_carla() -> carla.World:
+    """连接Carla 0.9.10模拟器"""
+    try:
+        client = carla.Client(CARLA_HOST, CARLA_PORT)
+        client.set_timeout(TIMEOUT)
+        world = client.get_world()
+        print(f"✅ 成功连接Carla模拟器：{CARLA_HOST}:{CARLA_PORT}")
+        return world
+    except Exception as e:
+        print(f"❌ 连接失败：{str(e)}")
+        sys.exit(1)
+
+# ========== 获取路侧数据（完全适配0.9.10） ==========
+def get_roadside_data(world: carla.World) -> Dict[str, Any]:
+    """获取路侧感知数据（避开所有新版API）"""
+    blueprint_lib = world.get_blueprint_library()
+
+    # 1. 激光雷达配置（仅设置参数，不获取返回值，避免API冲突）
+    lidar_bp = blueprint_lib.find("sensor.lidar.ray_cast")
+    # 0.9.10仅支持基础参数，且无需获取返回值
+    lidar_bp.set_attribute("range", "100")
+    lidar_bp.set_attribute("rotation_frequency", "10")
+
+    # 2. 摄像头配置（同样仅设置，不获取）
+    camera_bp = blueprint_lib.find("sensor.camera.rgb")
+    camera_bp.set_attribute("image_size_x", "1920")
+    camera_bp.set_attribute("image_size_y", "1080")
+
+    # 3. 车辆检测（0.9.10核心API兼容）
+    vehicles = world.get_actors().filter("vehicle.*")
+    vehicle_list = []
+    for v in vehicles:
+        trans = v.get_transform()
+        vehicle_list.append({
+            "id": v.id,
+            "model": v.type_id,
+            "x": float(trans.location.x),
+            "y": float(trans.location.y),
+            "z": float(trans.location.z),
+            "yaw": float(trans.rotation.yaw)
+        })
+
+    # 4. 整合数据（不依赖传感器属性获取，避免API错误）
+    return {
+        "timestamp": time.strftime("%Y%m%d_%H%M%S"),
+        "roadside_id": "RSU_001",
+        "lidar_config": {
+            "range": "100m",
+            "rotation_frequency": "10Hz"
+        },
+        "camera_config": {
+            "resolution": "1920x1080"
+        },
+        "detected_vehicles": vehicle_list,
+        "vehicle_count": len(vehicle_list)
     }
-    with open("demo_carla_data/carla_anno.json", "w", encoding="utf-8") as f:
-        json.dump(anno_data, f, indent=2)
-    print("✅ 模拟Carla标注数据生成完成 → demo_carla_data/carla_anno.json")
 
+# ========== 保存数据 ==========
+def save_data(data: Dict[str, Any]) -> None:
+    """保存数据到JSON文件"""
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    file_name = f"roadside_data_{data['timestamp']}.json"
+    file_path = os.path.join(SAVE_DIR, file_name)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    print(f"✅ 数据已保存：{file_path}")
 
-# ===================== 第二步：数据增强（文本层面模拟，无需图片） =====================
-def simple_augment():
-    """模拟数据增强（文本层面扩充，比如添加噪声、复制数据）"""
-    with open("demo_carla_data/carla_anno.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
+# ========== 主函数 ==========
+def main():
+    print("===== Carla 0.9.10 路侧数据采集 =====\n")
+    world = connect_carla()
+    print("🔍 正在采集路侧感知数据...")
+    sensor_data = get_roadside_data(world)
+    save_data(sensor_data)
+    print(f"\n📊 采集完成！共检测到 {sensor_data['vehicle_count']} 辆车辆")
+    print("\n===== 操作结束 =====\n")
 
-    # 模拟增强：为每个场景添加随机噪声（模拟图像增强）
-    augmented_data = []
-    for scene in data["carla_scenes"]:
-        # 复制场景并添加噪声
-        aug_scene = scene.copy()
-        aug_scene["aug_type"] = "random_brightness"  # 模拟亮度增强
-        # 给障碍物距离加随机噪声
-        for obs in aug_scene["obstacles"]:
-            obs["distance"] = round(obs["distance"] + random.uniform(-0.5, 0.5), 2)
-        augmented_data.append(aug_scene)
-
-    # 保存增强后数据
-    with open("demo_carla_data/carla_anno_augmented.json", "w", encoding="utf-8") as f:
-        json.dump({"carla_scenes_augmented": augmented_data}, f, indent=2)
-    print("✅ 数据增强完成 → demo_carla_data/carla_anno_augmented.json")
-
-
-# ===================== 第三步：数据集划分（纯文本，内置库实现） =====================
-def split_dataset():
-    """划分数据集（8:1:1，纯文本处理）"""
-    with open("demo_carla_data/carla_anno.json", "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    scenes = data["carla_scenes"]
-    random.shuffle(scenes)  # 随机打乱
-    total = len(scenes)
-    train_size = int(total * 0.8)
-    val_size = int((total - train_size) / 2)
-
-    # 划分数据
-    train_data = scenes[:train_size]
-    val_data = scenes[train_size:train_size + val_size]
-    test_data = scenes[train_size + val_size:]
-
-    # 保存划分结果
-    split_result = {
-        "train_scenes": train_data,
-        "val_scenes": val_data,
-        "test_scenes": test_data,
-        "split_ratio": "train:80% | val:10% | test:10%"
-    }
-    with open("demo_carla_data/carla_split_result.json", "w", encoding="utf-8") as f:
-        json.dump(split_result, f, indent=2)
-    print("✅ 数据集划分完成 → demo_carla_data/carla_split_result.json")
-    print(f"   划分结果：训练集{len(train_data)}条 | 验证集{len(val_data)}条 | 测试集{len(test_data)}条")
-
-
-# ===================== 主函数：一键运行 =====================
 if __name__ == "__main__":
-    print("===== 路侧感知数据集预处理（Carla适配） =====\n")
-    generate_demo_data()
-    simple_augment()
-    split_dataset()
-    print("\n🎉 所有步骤运行完成！生成文件列表：")
-    for file in os.listdir("demo_carla_data"):
-        print(f"  - demo_carla_data/{file}")
+    main()
