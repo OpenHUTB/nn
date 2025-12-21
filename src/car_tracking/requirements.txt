@@ -1,7 +1,0 @@
-carla==0.9.14
-tensorflow==2.4.0
-numpy==1.19.5
-opencv-python
-scipy
-psutil
-lapx
