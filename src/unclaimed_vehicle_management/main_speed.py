@@ -9,7 +9,6 @@ from sklearn.preprocessing import StandardScaler  # 数据预处理工具：特�
 import matplotlib.pyplot as plt  # 可视化库：绘制预测结果和损失曲线，直观评估模型
 
 # 设置随机种子（固定所有随机数生成器的初始状态）
-# 目的：保证每次运行代码的实验结果完全一致，便于调试和复现
 torch.manual_seed(42)  # 固定PyTorch的随机数生成（张量初始化、dropout等）
 np.random.seed(42)  # 固定NumPy的随机数生成（数据模拟、索引打乱等）
 
