@@ -385,10 +385,17 @@ class IntegratedDroneSimulation:
         # 检查是否在冷却期内
         in_cooldown = current_time - self.last_command_time <= self.command_cooldown
 
+        # 检查是否是重复手势（避免频繁处理同一个手势）
+        same_gesture = (gesture == self.current_gesture and
+                        hasattr(self, 'last_processed_gesture') and
+                        gesture == self.last_processed_gesture and
+                        current_time - getattr(self, 'last_processed_time', 0) < 2.0)
+
         # 只处理置信度高于阈值的手势且不在冷却期
         if (gesture not in ["no_hand", "hand_detected"] and
                 confidence > threshold and
-                not in_cooldown):
+                not in_cooldown and
+                not same_gesture):
 
             # 获取控制命令
             command = self.gesture_detector.get_command(gesture)
@@ -411,16 +418,21 @@ class IntegratedDroneSimulation:
                 # 记录命令
                 self._log_command(gesture, command, confidence, intensity)
 
-                # 更新最后命令时间
+                # 更新最后命令时间和手势状态
                 self.last_command_time = current_time
+                self.last_processed_gesture = gesture
+                self.last_processed_time = current_time
         elif gesture not in ["no_hand", "hand_detected"] and confidence > 0.3:
-            # 显示检测到但未触发的情况（仅调试用，可注释掉）
-            if in_cooldown:
-                # 冷却期内，不显示信息避免干扰
-                pass
-            elif confidence < threshold:
-                # 置信度不足，显示信息
-                print(f"  [手势检测] {gesture} 置信度不足: {confidence:.2f} < {threshold}")
+            # 只在调试模式下显示检测到但未触发的情况
+            debug_mode = False  # 可以设为True启用详细调试
+            if debug_mode:
+                if in_cooldown:
+                    print(
+                        f"  [冷却中] {gesture} 冷却时间剩余: {self.command_cooldown - (current_time - self.last_command_time):.1f}s")
+                elif same_gesture:
+                    print(f"  [重复手势] {gesture} 已处理过，冷却中")
+                elif confidence < threshold:
+                    print(f"  [置信度不足] {gesture} 置信度: {confidence:.2f} < 阈值: {threshold}")
 
     def _simulation_loop(self):
         """仿真主循环"""
