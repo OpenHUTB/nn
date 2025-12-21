@@ -9,9 +9,15 @@ class Agent():
     """
     SIMPLE_STEER_LIMIT = 0.75
     SIMPLE_ERROR_TOLERANCE = 0.1
-    def __init__(self, tau_p:float = 0, tau_d:float = 0, tau_i:float = 0,
-        surface_lower_threshold:float = 20e6, throttle:float = 0.3,
-        suface_upper_threshold=30e6, controller:str = 'simple') -> None:
+
+    def __init__(self,
+                 tau_p: float = 0,
+                 tau_d: float = 0,
+                 tau_i: float = 0,
+                 surface_lower_threshold: float = 20e6,
+                 throttle: float = 0.3,
+                 surface_upper_threshold: float = 30e6,  # Fixed typo: suface -> surface
+                 controller: str = 'simple') -> None:
         """Constructor
 
         Args:
@@ -43,7 +49,7 @@ class Agent():
         self.tau_d = tau_d
         self.tau_i = tau_i
         self.surface_lower_threshold = surface_lower_threshold
-        self.surface_upper_threshold = suface_upper_threshold
+        self.surface_upper_threshold = surface_upper_threshold  # Fixed assignment
         self.prev_error = None
         self.throttle = throttle
         self.func = None
