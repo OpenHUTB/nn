@@ -250,12 +250,12 @@ class Log:
 
     @staticmethod
     def debug(msg):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-d %H:%M:%S")
         print(f"[DEBUG][{timestamp}] {msg}")
 
     @staticmethod
     def performance(msg):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.now().strftime("%Y-%m-d %H:%M:%S")
         print(f"[PERF][{timestamp}] {msg}")
 
 
@@ -663,43 +663,34 @@ class TrafficManager:
         return spawned
 
     def cleanup(self):
-        Log.info("清理交通...")
+        """安全清理所有资源"""
+        Log.info("开始清理交通管理器...")
 
-        # 批量销毁
-        actors_to_destroy = []
-
-        for vehicle in self.vehicles:
-            if vehicle.is_alive:
-                actors_to_destroy.append(vehicle)
-
-        for pedestrian in self.pedestrians:
-            if pedestrian.is_alive:
-                actors_to_destroy.append(pedestrian)
-
-        # 批量销毁
-        batch_size = 10
-        for i in range(0, len(actors_to_destroy), batch_size):
-            batch = actors_to_destroy[i:i + batch_size]
-            for actor in batch:
+        try:
+            # 清理行人
+            for pedestrian in self.pedestrians:
                 try:
-                    actor.destroy()
+                    if pedestrian and pedestrian.is_alive:
+                        pedestrian.destroy()
                 except:
                     pass
 
-            # 避免过快的销毁速度
-            if i > 0 and i % 30 == 0:
-                time.sleep(0.1)
+            self.pedestrians.clear()
 
-        self.vehicles.clear()
-        self.pedestrians.clear()
+            # 清理背景车辆
+            for vehicle in self.vehicles:
+                try:
+                    if vehicle and vehicle.is_alive:
+                        vehicle.destroy()
+                except:
+                    pass
 
-        # 清理统计
-        self.spawn_stats = {
-            'total_attempts': 0,
-            'successful_spawns': 0,
-            'failed_spawns': 0,
-            'total_spawn_time': 0
-        }
+            self.vehicles.clear()
+
+            Log.info("交通管理器清理完成")
+
+        except Exception as e:
+            Log.error(f"清理交通管理器失败: {e}")
 
 
 class SensorManager:
@@ -712,6 +703,13 @@ class SensorManager:
         self.frame_counter = 0
         self.last_capture_time = 0
         self.last_performance_sample = 0
+
+        # 新增：帧率控制相关变量
+        self.target_fps = config['performance'].get('frame_rate_limit', 5.0)
+        self.min_frame_interval = 1.0 / self.target_fps if self.target_fps > 0 else 0.1
+        self.last_frame_time = 0
+        self.frame_skip_count = 0
+        self.max_frame_skip = 2
 
         self.vehicle_buffer = {}
         self.infra_buffer = {}
@@ -729,14 +727,14 @@ class SensorManager:
         self.fusion_manager = None
 
         # 批处理设置
-        self.batch_size = config.get('batch_size', 5)
+        self.batch_size = config['performance'].get('batch_size', 5)
         self.enable_async_processing = config.get('enable_async_processing', True)
 
         if config['sensors'].get('lidar_sensors', 0) > 0:
-            self.lidar_processor = LidarProcessor(data_dir, config.get('lidar_processing', {}))
+            self.lidar_processor = LidarProcessor(data_dir, config['performance'].get('lidar_processing', {}))
 
         if config['output'].get('save_fusion', False):
-            self.fusion_manager = MultiSensorFusion(data_dir, config.get('fusion', {}))
+            self.fusion_manager = MultiSensorFusion(data_dir, config['performance'].get('fusion', {}))
 
         # 传感器统计
         self.sensor_stats = {
@@ -927,9 +925,24 @@ class SensorManager:
                 current_time = time.time()
                 frame_start_time = time.time()
 
+                # 优化点2：添加帧率控制逻辑
+                # 检查是否达到最小帧间隔
+                time_since_last_frame = current_time - self.last_frame_time
+                if time_since_last_frame < self.min_frame_interval:
+                    # 如果帧间隔太小，跳过此帧
+                    self.frame_skip_count += 1
+                    if self.frame_skip_count > self.max_frame_skip:
+                        # 如果连续跳过多帧，强制处理一帧
+                        self.frame_skip_count = 0
+                    else:
+                        return  # 跳过此帧
+                else:
+                    self.frame_skip_count = 0
+
                 if current_time - self.last_capture_time >= capture_interval:
                     self.frame_counter += 1
                     self.last_capture_time = current_time
+                    self.last_frame_time = current_time  # 记录帧处理时间
 
                     capture_start = time.time()
                     filename = os.path.join(save_dir, f"{name}_{self.frame_counter:06d}.png")
@@ -943,13 +956,34 @@ class SensorManager:
                         if sensor_type == 'vehicle':
                             self.vehicle_buffer[name] = filename
                             if len(self.vehicle_buffer) >= 4:
-                                self.image_processor.stitch(self.vehicle_buffer, self.frame_counter,
-                                                            f'vehicle_{vehicle_id}')
+                                # 使用线程池异步处理图像拼接，避免阻塞
+                                if self.enable_async_processing:
+                                    import concurrent.futures
+                                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                                        future = executor.submit(
+                                            self.image_processor.stitch,
+                                            self.vehicle_buffer.copy(),
+                                            self.frame_counter,
+                                            f'vehicle_{vehicle_id}'
+                                        )
+                                else:
+                                    self.image_processor.stitch(self.vehicle_buffer, self.frame_counter,
+                                                                f'vehicle_{vehicle_id}')
                                 self.vehicle_buffer.clear()
                         else:
                             self.infra_buffer[name] = filename
                             if len(self.infra_buffer) >= 4:
-                                self.image_processor.stitch(self.infra_buffer, self.frame_counter, 'infrastructure')
+                                if self.enable_async_processing:
+                                    import concurrent.futures
+                                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                                        future = executor.submit(
+                                            self.image_processor.stitch,
+                                            self.infra_buffer.copy(),
+                                            self.frame_counter,
+                                            'infrastructure'
+                                        )
+                                else:
+                                    self.image_processor.stitch(self.infra_buffer, self.frame_counter, 'infrastructure')
                                 self.infra_buffer.clear()
 
                     # 定期采样性能
@@ -1023,55 +1057,55 @@ class SensorManager:
         """安全清理传感器"""
         Log.info(f"安全清理 {len(self.sensors)} 个传感器...")
 
-        # 设置运行状态为False，防止回调函数继续执行
+        # 1. 首先设置运行状态为False，防止回调函数继续执行
         self.is_running = False
 
-        # 等待一小段时间让回调函数结束
-        time.sleep(0.1)
+        # 2. 停止所有传感器的监听
+        Log.info("停止所有传感器监听...")
+        for sensor in self.sensors:
+            try:
+                if hasattr(sensor, 'stop'):
+                    sensor.stop()
+                    time.sleep(0.001)  # 短暂延迟
+            except:
+                pass
 
-        # 刷新批处理数据
+        # 3. 等待一小段时间让所有传感器回调结束
+        time.sleep(0.2)
+
+        # 4. 刷新批处理数据
         if self.lidar_processor:
             try:
                 self.lidar_processor.flush_batch()
-            except Exception as e:
-                Log.warning(f"刷新LiDAR批处理数据失败: {e}")
+            except:
+                pass
 
-        # 批量销毁传感器（从后向前销毁，避免依赖问题）
-        if self.sensors:
-            Log.info(f"销毁 {len(self.sensors)} 个传感器...")
-
-            # 首先停止所有传感器的监听
-            for sensor in self.sensors:
-                try:
-                    if sensor and sensor.is_alive:
-                        sensor.stop()
-                except Exception as e:
-                    Log.debug(f"停止传感器失败: {e}")
-
-            # 等待一小段时间让传感器完全停止
-            time.sleep(0.05)
-
-            # 然后销毁传感器
-            for i, sensor in enumerate(reversed(self.sensors)):
-                try:
-                    if sensor and sensor.is_alive:
-                        sensor.destroy()
-                except Exception as e:
-                    Log.debug(f"销毁传感器失败: {e}")
-
-                # 分批销毁，避免一次性销毁太多
-                if i % 5 == 0:
-                    time.sleep(0.01)
+        # 5. 销毁传感器
+        Log.info(f"销毁 {len(self.sensors)} 个传感器...")
+        for i, sensor in enumerate(self.sensors):
+            try:
+                if hasattr(sensor, 'destroy'):
+                    sensor.destroy()
+            except:
+                pass
+            # 分批销毁，避免一次性销毁太多
+            if i % 5 == 0:
+                time.sleep(0.01)
 
         self.sensors.clear()
 
-        # 清理缓存
+        # 6. 清理缓存和内存
         if hasattr(self.image_processor, 'image_cache'):
             try:
                 self.image_processor.image_cache.clear()
             except:
                 pass
 
+        # 7. 清理数据结构
+        self.vehicle_buffer.clear()
+        self.infra_buffer.clear()
+
+        # 8. 强制垃圾回收
         gc.collect()
 
         Log.info("传感器清理完成")
@@ -1251,23 +1285,58 @@ class DataCollector:
         last_perception_share = time.time()
         last_performance_sample = time.time()
         last_detailed_log = time.time()
+        last_memory_check = time.time()
+
+        # 内存监控变量
+        memory_warning_issued = False
+        forced_cleanup_count = 0
 
         try:
             while time.time() - self.start_time < duration and self.is_running:
                 current_time = time.time()
                 elapsed = current_time - self.start_time
 
+                # 内存检查 - 优化点4：定期检查内存使用
+                if current_time - last_memory_check >= 2.0:  # 更频繁的内存检查
+                    try:
+                        import psutil
+                        process = psutil.Process()
+                        memory_mb = process.memory_info().rss / (1024 * 1024)
+
+                        if memory_mb > 350 and not memory_warning_issued:
+                            Log.warning(f"内存使用较高: {memory_mb:.1f}MB，将减少数据处理")
+                            memory_warning_issued = True
+
+                            # 如果内存过高，跳过一些非关键操作
+                            if self.v2x_communication:
+                                Log.debug("内存警告：暂停部分V2X消息处理")
+
+                        elif memory_mb > 400:  # 如果内存超过400MB，提前结束
+                            Log.error(f"内存使用过高: {memory_mb:.1f}MB，提前结束数据收集")
+                            break
+
+                        elif memory_mb < 300:
+                            memory_warning_issued = False
+                            forced_cleanup_count = 0
+
+                    except Exception as e:
+                        Log.debug(f"内存检查失败: {e}")
+
+                    last_memory_check = current_time
+
                 # 更新车辆状态
                 if self.multi_vehicle_manager:
                     self.multi_vehicle_manager.update_vehicle_states()
 
-                # V2X通信更新
-                if self.v2x_communication and current_time - last_v2x_update >= 0.1:
+                # V2X通信更新 - 使用配置中的更新间隔
+                v2x_interval = self.config['v2x'].get('update_interval', 2.0)
+                if self.v2x_communication and current_time - last_v2x_update >= v2x_interval:
                     self._update_v2x_communication()
                     last_v2x_update = current_time
 
-                # 共享感知数据
-                if (self.config['cooperative'].get('enable_shared_perception', True) and
+                # 共享感知数据 - 仅在内存允许时进行
+                if (not memory_warning_issued and
+                        self.config['cooperative'].get('enable_shared_perception', True) and
                         current_time - last_perception_share >= 2.0):
                     self._share_perception_data()
                     last_perception_share = current_time
@@ -1347,6 +1416,133 @@ class DataCollector:
             # 生成标准格式数据
             if self.output_format != 'standard':
                 self._convert_to_target_format()
+
+    def _force_memory_cleanup(self):
+        """强制内存清理"""
+        Log.info("执行强制内存清理...")
+
+        # 清理图像处理器缓存
+        for sensor_manager in self.sensor_managers.values():
+            if hasattr(sensor_manager, 'image_processor'):
+                if hasattr(sensor_manager.image_processor, 'image_cache'):
+                    try:
+                        old_size = len(sensor_manager.image_processor.image_cache)
+                        sensor_manager.image_processor.image_cache.clear()
+                        Log.debug(f"清理图像缓存: 释放了{old_size}个缓存项")
+                    except:
+                        pass
+
+        # 清理LiDAR批处理
+        for sensor_manager in self.sensor_managers.values():
+            if hasattr(sensor_manager, 'lidar_processor'):
+                try:
+                    sensor_manager.lidar_processor.flush_batch()
+                    Log.debug("刷新LiDAR批处理数据")
+                except:
+                    pass
+
+        # 强制垃圾回收
+        gc.collect()
+
+        Log.info("强制内存清理完成")
+
+    def cleanup(self):
+        """安全清理所有资源 - 完全重写的版本"""
+        Log.info("开始安全清理场景...")
+
+        cleanup_start = time.time()
+
+        try:
+            # 1. 设置运行状态为False
+            self.is_running = False
+
+            # 2. 等待一小段时间让循环结束
+            time.sleep(0.2)
+
+            # 3. 停止V2X通信
+            if self.v2x_communication:
+                try:
+                    Log.info("停止V2X通信...")
+                    self.v2x_communication.stop()
+                except:
+                    pass
+
+            # 4. 清理传感器（最重要，必须先于车辆）
+            Log.info(f"清理 {len(self.sensor_managers)} 个传感器管理器...")
+            for vehicle_id, sensor_manager in self.sensor_managers.items():
+                try:
+                    sensor_manager.cleanup()
+                except:
+                    pass
+
+            self.sensor_managers.clear()
+            time.sleep(0.1)  # 等待传感器清理完成
+
+            # 5. 清理多车辆管理器
+            if self.multi_vehicle_manager:
+                try:
+                    Log.info("清理多车辆管理器...")
+                    self.multi_vehicle_manager.cleanup()
+                except:
+                    pass
+
+            # 6. 清理背景交通
+            if self.traffic_manager:
+                try:
+                    Log.info("清理交通管理器...")
+                    self.traffic_manager.cleanup()
+                except:
+                    pass
+
+            # 7. 清理主车（最后清理）
+            Log.info(f"清理 {len(self.ego_vehicles)} 个主车...")
+            for vehicle in self.ego_vehicles:
+                try:
+                    if hasattr(vehicle, 'destroy'):
+                        vehicle.destroy()
+                except:
+                    pass
+                time.sleep(0.01)  # 短暂延迟
+
+            self.ego_vehicles.clear()
+
+            # 8. 重置世界设置
+            try:
+                if self.world:
+                    default_weather = carla.WeatherParameters()
+                    self.world.set_weather(default_weather)
+            except:
+                pass
+
+            # 9. 强制垃圾回收
+            gc.collect()
+
+            # 10. 等待确保清理完成
+            time.sleep(0.3)
+
+            # 11. 释放引用
+            self.traffic_manager = None
+            self.multi_vehicle_manager = None
+            self.v2x_communication = None
+            self.scene_center = None
+
+            # 最后一次强制垃圾回收
+            gc.collect()
+
+            Log.info(f"清理完成，总用时: {time.time() - cleanup_start:.2f}秒")
+
+        except Exception as e:
+            Log.error(f"清理过程中发生错误: {e}")
+            # 紧急清理：强制释放所有引用
+            try:
+                self.sensor_managers.clear()
+                self.ego_vehicles.clear()
+                self.traffic_manager = None
+                self.multi_vehicle_manager = None
+                self.v2x_communication = None
+                gc.collect()
+            except:
+                pass
 
     def _convert_to_target_format(self):
         """转换为目标数据格式"""
@@ -1443,7 +1639,7 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
 
         # 为每辆车发送基本安全消息
         for vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
-            if not vehicle.is_alive:
+            if not hasattr(vehicle, 'is_alive') or not vehicle.is_alive:
                 continue
 
             try:
@@ -1478,7 +1674,7 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
 
         # 模拟车辆感知数据（简化处理，实际应从传感器获取）
         for vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
-            if not vehicle.is_alive:
+            if not hasattr(vehicle, 'is_alive') or not vehicle.is_alive:
                 continue
 
             # 模拟检测到的物体
@@ -1493,7 +1689,7 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
 
         # 获取车辆周围的其他车辆
         for other_vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
-            if other_vehicle.id == vehicle.id or not other_vehicle.is_alive:
+            if other_vehicle.id == vehicle.id or not hasattr(other_vehicle, 'is_alive') or not other_vehicle.is_alive:
                 continue
 
             try:
@@ -1626,91 +1822,6 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
         if self.config['output'].get('run_analysis', False):
             Log.info("运行数据分析...")
             DataAnalyzer.analyze_dataset(self.output_dir)
-
-    def cleanup(self):
-        """安全清理所有资源 - 修复的方法"""
-        Log.info("开始安全清理场景...")
-
-        try:
-            # 1. 先停止数据收集
-            self.is_running = False
-
-            # 2. 等待一小段时间让所有传感器回调结束
-            time.sleep(0.2)
-
-            # 3. 清理传感器（这是最重要的，必须在清理车辆之前）
-            for sensor_manager in self.sensor_managers.values():
-                try:
-                    sensor_manager.cleanup()
-                except Exception as e:
-                    Log.error(f"清理传感器管理器失败: {e}")
-
-            self.sensor_managers.clear()
-
-            # 4. 清理V2X通信
-            if self.v2x_communication:
-                try:
-                    self.v2x_communication.stop()
-                except Exception as e:
-                    Log.error(f"停止V2X通信失败: {e}")
-
-            # 5. 清理协同管理
-            if self.multi_vehicle_manager:
-                try:
-                    self.multi_vehicle_manager.cleanup()
-                except Exception as e:
-                    Log.error(f"清理协同管理器失败: {e}")
-
-            # 6. 清理背景交通（必须在清理主车之前）
-            if self.traffic_manager:
-                try:
-                    self.traffic_manager.cleanup()
-                except Exception as e:
-                    Log.error(f"清理交通管理器失败: {e}")
-
-            # 7. 最后清理主车（在传感器和交通清理完之后）
-            for vehicle in self.ego_vehicles:
-                try:
-                    if vehicle and vehicle.is_alive:
-                        vehicle.destroy()
-                except Exception as e:
-                    Log.debug(f"销毁主车失败: {e}")
-
-            self.ego_vehicles.clear()
-
-            # 8. 强制垃圾回收
-            gc.collect()
-
-            # 9. 重置CARLA世界（可选，但可以帮助清理）
-            try:
-                if self.world:
-                    # 重置天气到默认
-                    default_weather = carla.WeatherParameters()
-                    self.world.set_weather(default_weather)
-            except Exception as e:
-                Log.debug(f"重置世界设置失败: {e}")
-
-            # 10. 等待一段时间确保所有清理完成
-            time.sleep(0.5)
-
-            Log.info("清理完成")
-
-        except Exception as e:
-            Log.error(f"清理过程中发生错误: {e}")
-            import traceback
-            traceback.print_exc()
-
-            # 即使出错也要尝试强制清理
-            try:
-                # 强制删除所有引用，让Python垃圾回收器工作
-                del self.sensor_managers
-                del self.traffic_manager
-                del self.multi_vehicle_manager
-                del self.v2x_communication
-                del self.ego_vehicles
-                gc.collect()
-            except:
-                pass
 
 
 def main():
