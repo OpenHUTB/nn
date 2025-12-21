@@ -16,6 +16,9 @@ class Lane:
     ROI_TOP = 260
     ROI_LEFT = 200
     ROI_RIGHT = 440
+    # === 新增 ===
+    MARGIN_RATIO = 1.0 / 12.0
+    # ===========
     def __init__(self, height:int, width:int, save:bool=False,
         save_folder:str=join('img', 'examples')) -> None:
         """Constructor
@@ -32,7 +35,7 @@ class Lane:
         self.save_folder = save_folder
         self.img_height = height
         self.img_width = width
-        self.margin = int((1/12) * self.img_width)
+        self.margin = int(self.MARGIN_RATIO * self.img_width)
         self.DEGREE = 2
 
         # Variables to store for lines
