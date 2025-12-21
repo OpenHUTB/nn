@@ -6,10 +6,13 @@
 
 1. python版本3.7.16
 2. 确保将carla在运行前配置到系统环境中
+3.environment.yml为conda导出的虚拟环境，可一键导入虚拟环境
+4.ROS封装环境为Ubuntu20.04-Linux（ros版本是1版，不是ros2）
 
 ### carla环境配置
 
-1. .whl文件的API请下载至py环境中
+1.Carla版本尽量选择适配Python3，例如0.9.12版本
+2. .whl文件的API请下载至py环境中
 
 ## 使用步骤
 
@@ -19,12 +22,16 @@
 训练模型请运行：
 
 ```
+
 Main.py
+
 ```
 ### 测试
 测试训练后的模型，请运行：
 ```
+
 Test.py
+
 ```
 ### 文件说明
 各文件说明：
@@ -50,3 +57,24 @@ Log文件夹：文件夹里的文件是TensorBoard的记录文件，主要作用
 models：这些是训练好的神经网络权重，是核心成果，请谨慎删除
 
 ```
+### ROS封装
+ROS文件夹：
+```
+
+launch\train_full.launch  为完整训练启动文件
+scripts\carla_train_full.py  为完整训练节点
+./start_full_training.sh  为一键启动脚本
+CMakeLists.txt  为ROS编译配置
+package.xml  为ROS包描述
+
+```
+### ROS代码启用
+使用一键启动脚本/手动（此处不给出）：
+```
+
+（请确保Carla已启用）
+chmod +x start_full_training.sh
+./start_full_training.sh
+
+```
+
