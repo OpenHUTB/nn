@@ -46,7 +46,7 @@ save_screenshots: false
 use_3d_visualization: true
 pcd_view_size: 800
 
-# 检测框样式配置（匹配截图）
+# 检测框样式配置
 det_box_color: [255, 0, 0]      # 蓝色框
 det_box_thickness: 2
 det_label_bg_color: [0, 0, 0]   # 黑色背景

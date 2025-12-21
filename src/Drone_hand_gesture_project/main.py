@@ -12,11 +12,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 # 导入自定义模块
 try:
     from gesture_detector_enhanced import EnhancedGestureDetector
+
     print("✅ 导入增强版手势检测器 (机器学习)")
     HAS_ENHANCED_DETECTOR = True
 except ImportError:
     print("⚠️  未找到增强版检测器，使用原始手势检测器")
     from gesture_detector import GestureDetector
+
     HAS_ENHANCED_DETECTOR = False
 
 from drone_controller import DroneController
@@ -246,11 +248,11 @@ class IntegratedDroneSimulation:
                 # 虚拟模式
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                 cv2.putText(frame, "虚拟摄像头模式", (50, 50),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 cv2.putText(frame, f"手势指令 ({mode_text}):", (50, 100),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
                 cv2.putText(frame, "张开手掌 - 起飞", (50, 140),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "握拳 - 降落", (50, 170),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
                 cv2.putText(frame, "胜利手势 - 前进", (50, 200),
@@ -383,10 +385,17 @@ class IntegratedDroneSimulation:
         # 检查是否在冷却期内
         in_cooldown = current_time - self.last_command_time <= self.command_cooldown
 
+        # 检查是否是重复手势（避免频繁处理同一个手势）
+        same_gesture = (gesture == self.current_gesture and
+                        hasattr(self, 'last_processed_gesture') and
+                        gesture == self.last_processed_gesture and
+                        current_time - getattr(self, 'last_processed_time', 0) < 2.0)
+
         # 只处理置信度高于阈值的手势且不在冷却期
         if (gesture not in ["no_hand", "hand_detected"] and
                 confidence > threshold and
-                not in_cooldown):
+                not in_cooldown and
+                not same_gesture):
 
             # 获取控制命令
             command = self.gesture_detector.get_command(gesture)
@@ -409,16 +418,21 @@ class IntegratedDroneSimulation:
                 # 记录命令
                 self._log_command(gesture, command, confidence, intensity)
 
-                # 更新最后命令时间
+                # 更新最后命令时间和手势状态
                 self.last_command_time = current_time
+                self.last_processed_gesture = gesture
+                self.last_processed_time = current_time
         elif gesture not in ["no_hand", "hand_detected"] and confidence > 0.3:
-            # 显示检测到但未触发的情况（仅调试用，可注释掉）
-            if in_cooldown:
-                # 冷却期内，不显示信息避免干扰
-                pass
-            elif confidence < threshold:
-                # 置信度不足，显示信息
-                print(f"  [手势检测] {gesture} 置信度不足: {confidence:.2f} < {threshold}")
+            # 只在调试模式下显示检测到但未触发的情况
+            debug_mode = False  # 可以设为True启用详细调试
+            if debug_mode:
+                if in_cooldown:
+                    print(
+                        f"  [冷却中] {gesture} 冷却时间剩余: {self.command_cooldown - (current_time - self.last_command_time):.1f}s")
+                elif same_gesture:
+                    print(f"  [重复手势] {gesture} 已处理过，冷却中")
+                elif confidence < threshold:
+                    print(f"  [置信度不足] {gesture} 置信度: {confidence:.2f} < 阈值: {threshold}")
 
     def _simulation_loop(self):
         """仿真主循环"""
@@ -427,6 +441,10 @@ class IntegratedDroneSimulation:
         last_time = time.time()
         frame_count = 0
         last_status_print = time.time()
+
+        # 帧率控制
+        target_fps = 60
+        frame_delay = 1.0 / target_fps
 
         print("\n🎮 键盘提示：按 'R' 键重置无人机位置到原点")
         print("           按 'T' 键手动起飞")
@@ -437,9 +455,15 @@ class IntegratedDroneSimulation:
         self._last_key_press = {}
 
         while self.running:
+            start_time = time.time()
             current_time = time.time()
             dt = current_time - last_time
             last_time = current_time
+
+            if dt <= 0:
+                dt = frame_delay
+            elif dt > 0.1:
+                dt = 0.1
 
             # 每3秒打印一次状态
             if current_time - last_status_print > 3:
@@ -448,11 +472,6 @@ class IntegratedDroneSimulation:
                 if self.current_gesture:
                     print(f"[状态监控] 当前手势: {self.current_gesture} (置信度: {self.gesture_confidence:.2f})")
                 last_status_print = current_time
-
-            if dt <= 0:
-                dt = 0.016
-            elif dt > 0.1:
-                dt = 0.1
 
             if self.paused:
                 if not self.viewer.handle_events():
@@ -526,9 +545,15 @@ class IntegratedDroneSimulation:
 
             self.viewer.render(drone_state_with_gesture, trajectory)
 
+            # 控制帧率，避免CPU占用过高
+            elapsed = time.time() - start_time
+            sleep_time = frame_delay - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
             frame_count += 1
             if frame_count % 120 == 0:
-                fps = 1.0 / dt if dt > 0 else 0
+                fps = 1.0 / (time.time() - start_time) if start_time > 0 else 0
                 print(f"3D仿真帧率: {fps:.1f} FPS")
 
         print("3D仿真线程结束")
