@@ -1,47 +1,49 @@
-<!-- Copyright 2021 DeepMind Technologies Limited
-     Licensed under the Apache License, Version 2.0 (the "License");
-     you may not use this file except in compliance with the License.
-     You may obtain a copy of the License at
-         http://www.apache.org/licenses/LICENSE-2.0
-     Unless required by applicable law or agreed to in writing, software
-     distributed under the License is distributed on an "AS IS" BASIS,
-     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-     See the License for the specific language governing permissions and
-     limitations under the License.
--->
+<?xml version="1.0" encoding="UTF-8"?>
+<mujoco model="DeepMind Humanoid with Dynamic Obstacles and Moving Patrol Points">
+  <!-- Copyright 2021 DeepMind Technologies Limited
 
-<mujoco model="Humanoid_Complex_Dynamic_Env_Navigation">
-  <option timestep="0.005"/>
+       Licensed under the Apache License, Version 2.0 (the "License");
+       you may not use this file except in compliance with the License.
+       You may obtain a copy of the License at
+
+           http://www.apache.org/licenses/LICENSE-2.0
+
+       Unless required by applicable law or agreed to in writing, software
+       distributed under the License is distributed on an "AS IS" BASIS,
+       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+       See the License for the specific language governing permissions and
+       limitations under the License.
+  -->
+
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.005" integrator="RK4" gravity="0 0 -9.81"/>
 
   <visual>
-    <map force="0.1" zfar="50"/>  <!-- 增大可视距离适配更多障碍 -->
+    <map force="0.1" zfar="30"/>
     <rgba haze="0.15 0.25 0.35 1"/>
     <global offwidth="2560" offheight="1440" elevation="-20" azimuth="120"/>
   </visual>
 
   <statistic center="0 0 0.7"/>
 
+  <!-- Visual materials definition -->
   <asset>
     <texture type="skybox" builtin="gradient" rgb1=".3 .5 .7" rgb2="0 0 0" width="32" height="512"/>
     <texture name="body" type="cube" builtin="flat" mark="cross" width="128" height="128" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" markrgb="1 1 1"/>
-    <material name="body" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
-    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
-    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
-    <!-- 障碍物材质（区分固定/不同动态障碍） -->
-    <material name="wall_gray" rgba="0.6 0.6 0.6 1"/>    <!-- 固定障碍 -->
-    <material name="wall_blue" rgba="0.3 0.5 0.8 1"/>    <!-- 动态障碍1：正弦组合运动 -->
-    <material name="wall_green" rgba="0.3 0.8 0.5 1"/>   <!-- 动态障碍2：随机游走 -->
-    <material name="wall_purple" rgba="0.7 0.4 0.8 1"/>  <!-- 动态障碍3：圆周运动 -->
-    <!-- 目标点材质 -->
-    <material name="target_material" rgba="1 0 0 1"/>     <!-- 红色目标点 -->
-    <material name="target_base_material" rgba="1 0.5 0 1"/> <!-- 橙色基座 -->
+    <material name="humanoid_material" texture="body" texuniform="true" rgba="0.8 0.6 .4 1"/>
+    <material name="obstacle_material" rgba="0.8 0.2 0.2 0.8"/>
+    <material name="target_material" rgba="1 0 0 1"/>
+    <material name="target_base_material" rgba="0.8 0 0 1"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.8 0.8 0.8" rgb2="0.6 0.6 0.6" width="512" height="512"/>
+    <material name="floor_material" texture="grid" texrepeat="10 10" reflectance="0.1"/>
   </asset>
 
   <default>
     <motor ctrlrange="-1 1" ctrllimited="true"/>
     <default class="body">
+
       <!-- geoms -->
-      <geom type="capsule" condim="1" friction=".7" solimp=".9 .99 .003" solref=".015 1" material="body" group="1"/>
+      <geom type="capsule" condim="1" friction=".7" solimp=".9 .99 .003" solref=".015 1" material="humanoid_material" group="1"/>
       <default class="thigh">
         <geom size=".06"/>
       </default>
@@ -102,76 +104,138 @@
       <default class="elbow">
         <joint range="-100 50" stiffness="0"/>
       </default>
-      <!-- 动态障碍关节默认配置（不同阻尼适配不同运动） -->
-      <default class="dynamic_wall_joint_slide">
-        <joint type="slide" damping="8" stiffness="0" limited="true"/>
-      </default>
-      <default class="dynamic_wall_joint_rotate">
-        <joint type="slide" damping="5" stiffness="0" limited="true"/>
-      </default>
     </default>
   </default>
 
+  <!-- World body: floor + obstacles + DYNAMIC patrol points -->
   <worldbody>
-    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3"/>
+    <!-- Floor -->
+    <geom name="floor" type="plane" size="20 20 0.1" material="floor_material" condim="3"/>
 
-    <!-- ====================== 导航目标点（固定位置 x=12, y=0, z=0.2） ====================== -->
-    <body name="navigation_target" pos="12 0 0.2">
-      <geom name="target_marker" type="sphere" size="0.15" material="target_material" condim="3"/>
-      <geom name="target_base" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
-    </body>
-
-    <!-- 障碍1：固定障碍（机器人正前方3米） -->
+    <!-- Fixed obstacle (wall1) -->
     <body name="wall1" pos="3 0 0.5">
-      <geom type="box" size="0.5 1 0.8" material="wall_gray" friction="1.0 0.1 0.1"/>
-      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1"/>
+      <inertial pos="0 0 0" mass="100.0" diaginertia="10.0 10.0 10.0"/>
+      <geom name="wall1_geom" type="box" size="0.3 1.0 1.0" material="obstacle_material" condim="3"/>
     </body>
 
-    <!-- 障碍2：动态障碍1（X=4米，Y/Z组合正弦运动） -->
-    <body name="wall2_base" pos="4.0 0.0 0.5">
-      <!-- Y轴滑动关节 -->
-      <joint name="wall2_slide_y" class="dynamic_wall_joint_slide" axis="0 1 0" range="-3.0 3.0"/>
-      <!-- Z轴滑动关节（增加垂直方向运动） -->
-      <joint name="wall2_slide_z" class="dynamic_wall_joint_slide" axis="0 0 1" range="0.3 1.2"/>
-      <!-- 动态障碍本体 -->
-      <body name="wall2" pos="0 0 0">
-        <geom type="box" size="0.4 0.8 0.7" material="wall_blue" friction="1.0 0.1 0.1"/>
-        <inertial pos="0 0 0" mass="50" diaginertia="1 1 1"/>
+    <!-- Dynamic obstacle 1 (wall2: Sinusoidal Y+Z motion) -->
+    <body name="wall2_base" pos="5 0 0">
+      <inertial pos="0 0 0" mass="100.0" diaginertia="10.0 10.0 10.0"/>
+      <!-- Y-axis slide joint -->
+      <joint name="wall2_slide_y" type="slide" axis="0 1 0" pos="0 0 0"/>
+      <!-- Z-axis slide joint -->
+      <body name="wall2_z_base" pos="0 0 0.5">
+        <inertial pos="0 0 0" mass="50.0" diaginertia="5.0 5.0 5.0"/>
+        <joint name="wall2_slide_z" type="slide" axis="0 0 1" pos="0 0 0"/>
+        <!-- Obstacle body -->
+        <body name="wall2" pos="0 0 0">
+          <inertial pos="0 0 0" mass="50.0" diaginertia="5.0 5.0 5.0"/>
+          <geom name="wall2_geom" type="box" size="0.3 1.0 1.0" material="obstacle_material" condim="3"/>
+        </body>
       </body>
     </body>
 
-    <!-- 障碍3：动态障碍2（X=6米，随机游走运动） -->
-    <body name="wall3_base" pos="6.0 0.0 0.5">
-      <!-- X轴滑动关节（小幅前后移动） -->
-      <joint name="wall3_slide_x" class="dynamic_wall_joint_slide" axis="1 0 0" range="5.0 7.0"/>
-      <!-- Y轴滑动关节（左右移动） -->
-      <joint name="wall3_slide_y" class="dynamic_wall_joint_slide" axis="0 1 0" range="-2.5 2.5"/>
-      <!-- 动态障碍本体 -->
-      <body name="wall3" pos="0 0 0">
-        <geom type="box" size="0.6 0.7 0.8" material="wall_green" friction="1.0 0.1 0.1"/>
-        <inertial pos="0 0 0" mass="60" diaginertia="1 1 1"/>
+    <!-- Dynamic obstacle 2 (wall3: Random walk X+Y) -->
+    <body name="wall3_base" pos="6 0 0">
+      <inertial pos="0 0 0" mass="100.0" diaginertia="10.0 10.0 10.0"/>
+      <!-- X-axis slide joint -->
+      <joint name="wall3_slide_x" type="slide" axis="1 0 0" pos="0 0 0"/>
+      <!-- Y-axis slide joint -->
+      <body name="wall3_y_base" pos="0 0 0.5">
+        <inertial pos="0 0 0" mass="50.0" diaginertia="5.0 5.0 5.0"/>
+        <joint name="wall3_slide_y" type="slide" axis="0 1 0" pos="0 0 0"/>
+        <!-- Obstacle body -->
+        <body name="wall3" pos="0 0 0">
+          <inertial pos="0 0 0" mass="50.0" diaginertia="5.0 5.0 5.0"/>
+          <geom name="wall3_geom" type="box" size="0.3 1.0 1.0" material="obstacle_material" condim="3"/>
+        </body>
       </body>
     </body>
 
-    <!-- 障碍4：动态障碍3（圆周运动，中心X=8,Y=1） -->
-    <body name="wall4_rot_base" pos="8.0 1.0 0.5">
-      <!-- 旋转关节（圆周运动的中心） -->
-      <joint name="wall4_rotate" type="hinge" axis="0 0 1" damping="3" stiffness="0"/>
-      <!-- 径向滑动关节（调整圆周半径） -->
-      <joint name="wall4_radial" class="dynamic_wall_joint_rotate" axis="1 0 0" range="0.5 2.0"/>
-      <!-- 动态障碍本体 -->
-      <body name="wall4" pos="1.0 0 0">
-        <geom type="cylinder" size="0.5 0.7" material="wall_purple" friction="1.0 0.1 0.1"/>
-        <inertial pos="0 0 0" mass="40" diaginertia="1 1 1"/>
+    <!-- Dynamic obstacle 3 (wall4: Circular motion) -->
+    <body name="wall4_rot_base" pos="8 0 0">
+      <inertial pos="0 0 0" mass="100.0" diaginertia="10.0 10.0 10.0"/>
+      <!-- Rotation joint -->
+      <joint name="wall4_rotate" type="hinge" axis="0 0 1" pos="0 0 0"/>
+      <!-- Radial slide joint -->
+      <body name="wall4_rad_base" pos="1.2 0 0.5">
+        <inertial pos="0 0 0" mass="50.0" diaginertia="5.0 5.0 5.0"/>
+        <joint name="wall4_radial" type="slide" axis="1 0 0" pos="0 0 0"/>
+        <!-- Obstacle body -->
+        <body name="wall4" pos="0 0 0">
+          <inertial pos="0 0 0" mass="50.0" diaginertia="5.0 5.0 5.0"/>
+          <geom name="wall4_geom" type="cylinder" size="0.3 1.0" material="obstacle_material" condim="3"/>
+        </body>
       </body>
     </body>
 
-    <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
-    <light name="top" pos="0 0 4" mode="trackcom"/>  <!-- 提高顶光高度 -->
+    <!-- DYNAMIC Patrol Points (with slide joints for real-time movement) -->
+    <!-- Patrol target 1 (Dynamic start point) -->
+    <body name="patrol_target_1_base" pos="0 0 0">
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+      <!-- X/Y slide joints for dynamic movement -->
+      <joint name="patrol1_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol1_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <!-- Target marker body -->
+      <body name="patrol_target_1" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_1" type="sphere" size="0.15" material="target_material" condim="3"/>
+        <geom name="patrol_base_1" type="cylinder" size="0.18 0.02" material="target_base_material" condim="3"/>
+      </body>
+    </body>
+
+    <!-- Patrol target 2 (Dynamic patrol point 1) -->
+    <body name="patrol_target_2_base" pos="4 -2 0">
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+      <joint name="patrol2_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol2_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_2" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_2" type="sphere" size="0.15" rgba="0 1 0 1" condim="3"/>
+        <geom name="patrol_base_2" type="cylinder" size="0.18 0.02" rgba="0 0.8 0 1" condim="3"/>
+      </body>
+    </body>
+
+    <!-- Patrol target 3 (Dynamic patrol point 2) -->
+    <body name="patrol_target_3_base" pos="8 2 0">
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+      <joint name="patrol3_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol3_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_3" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_3" type="sphere" size="0.15" rgba="0 0 1 1" condim="3"/>
+        <geom name="patrol_base_3" type="cylinder" size="0.18 0.02" rgba="0 0 0.8 1" condim="3"/>
+      </body>
+    </body>
+
+    <!-- Patrol target 4 (Dynamic patrol point 3) -->
+    <body name="patrol_target_4_base" pos="10 -1 0">
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+      <joint name="patrol4_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol4_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_4" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_4" type="sphere" size="0.15" rgba="1 1 0 1" condim="3"/>
+        <geom name="patrol_base_4" type="cylinder" size="0.18 0.02" rgba="1 0.8 0 1" condim="3"/>
+      </body>
+    </body>
+
+    <!-- Patrol target 5 (Dynamic final point) -->
+    <body name="patrol_target_5_base" pos="12 0 0">
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+      <joint name="patrol5_slide_x" type="slide" axis="1 0 0" pos="0 0 0" damping="0.5"/>
+      <joint name="patrol5_slide_y" type="slide" axis="0 1 0" pos="0 0 0" damping="0.5"/>
+      <body name="patrol_target_5" pos="0 0 0.2">
+        <inertial pos="0 0 0" mass="0.1" diaginertia="0.01 0.01 0.01"/>
+        <geom name="patrol_marker_5" type="sphere" size="0.15" rgba="1 0 1 1" condim="3"/>
+        <geom name="patrol_base_5" type="cylinder" size="0.18 0.02" rgba="0.8 0 0.8 1" condim="3"/>
+      </body>
+    </body>
+
+    <!-- DeepMind Humanoid Robot -->
     <body name="torso" pos="0 0 1.282" childclass="body">
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
-      <camera name="wide" pos="-5 -5 3" xyaxes="1 1 0 0 0 1" mode="trackcom"/> <!-- 新增广角相机 -->
       <freejoint name="root"/>
       <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
       <geom name="waist_upper" fromto="-.01 -.06 -.12 -.01 .06 -.12" size=".06"/>
@@ -250,10 +314,59 @@
   <contact>
     <exclude body1="waist_lower" body2="thigh_right"/>
     <exclude body1="waist_lower" body2="thigh_left"/>
-    <!-- 排除障碍间的碰撞 -->
-    <exclude body1="wall2" body2="wall3"/>
-    <exclude body1="wall3" body2="wall4"/>
-    <exclude body1="wall2" body2="wall4"/>
+
+    <!-- Robot-floor contact -->
+    <pair geom1="floor" geom2="foot1_right" friction="1.0 0.1 0.01"/>
+    <pair geom1="floor" geom2="foot2_right" friction="1.0 0.1 0.01"/>
+    <pair geom1="floor" geom2="foot1_left" friction="1.0 0.1 0.01"/>
+    <pair geom1="floor" geom2="foot2_left" friction="1.0 0.1 0.01"/>
+    <pair geom1="floor" geom2="torso" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="head" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="upper_arm_right" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="upper_arm_left" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="lower_arm_right" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="lower_arm_left" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="thigh_right" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="thigh_left" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="shin_right" friction="0.5 0.1 0.01"/>
+    <pair geom1="floor" geom2="shin_left" friction="0.5 0.1 0.01"/>
+
+    <!-- Robot-obstacle contact -->
+    <pair geom1="wall1_geom" geom2="torso" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall1_geom" geom2="foot1_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall1_geom" geom2="foot2_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall1_geom" geom2="foot1_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall1_geom" geom2="foot2_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="torso" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="foot1_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="foot2_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="foot1_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="foot2_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall3_geom" geom2="torso" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall3_geom" geom2="foot1_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall3_geom" geom2="foot2_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall3_geom" geom2="foot1_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall3_geom" geom2="foot2_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall4_geom" geom2="torso" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall4_geom" geom2="foot1_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall4_geom" geom2="foot2_right" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall4_geom" geom2="foot1_left" friction="0.8 0.1 0.01"/>
+    <pair geom1="wall4_geom" geom2="foot2_left" friction="0.8 0.1 0.01"/>
+
+    <!-- Obstacle-obstacle contact -->
+    <pair geom1="wall1_geom" geom2="wall2_geom" friction="0.5 0.1 0.01"/>
+    <pair geom1="wall1_geom" geom2="wall3_geom" friction="0.5 0.1 0.01"/>
+    <pair geom1="wall1_geom" geom2="wall4_geom" friction="0.5 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="wall3_geom" friction="0.5 0.1 0.01"/>
+    <pair geom1="wall2_geom" geom2="wall4_geom" friction="0.5 0.1 0.01"/>
+    <pair geom1="wall3_geom" geom2="wall4_geom" friction="0.5 0.1 0.01"/>
+
+    <!-- Robot-patrol point contact (prevent collision) -->
+    <pair geom1="torso" geom2="patrol_marker_1" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso" geom2="patrol_marker_2" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso" geom2="patrol_marker_3" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso" geom2="patrol_marker_4" friction="0.1 0.01 0.001"/>
+    <pair geom1="torso" geom2="patrol_marker_5" friction="0.1 0.01 0.001"/>
   </contact>
 
   <tendon>
@@ -267,7 +380,9 @@
     </fixed>
   </tendon>
 
+  <!-- Actuators definition (robot + obstacles + DYNAMIC patrol points) -->
   <actuator>
+    <!-- Original humanoid actuators -->
     <motor name="abdomen_z"       gear="40"  joint="abdomen_z"/>
     <motor name="abdomen_y"       gear="40"  joint="abdomen_y"/>
     <motor name="abdomen_x"       gear="40"  joint="abdomen_x"/>
@@ -289,16 +404,38 @@
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
-    <!-- 动态障碍驱动电机（新增多个） -->
-    <motor name="wall2_motor_y" gear="50" joint="wall2_slide_y" ctrlrange="-1 1"/>
-    <motor name="wall2_motor_z" gear="30" joint="wall2_slide_z" ctrlrange="-1 1"/>
-    <motor name="wall3_motor_x" gear="40" joint="wall3_slide_x" ctrlrange="-1 1"/>
-    <motor name="wall3_motor_y" gear="45" joint="wall3_slide_y" ctrlrange="-1 1"/>
-    <motor name="wall4_motor_rot" gear="25" joint="wall4_rotate" ctrlrange="-1 1"/>
-    <motor name="wall4_motor_rad" gear="35" joint="wall4_radial" ctrlrange="-1 1"/>
+
+    <!-- Dynamic obstacle actuators -->
+    <motor name="wall2_motor_y" joint="wall2_slide_y" ctrlrange="-5.0 5.0" gear="10.0"/>
+    <motor name="wall2_motor_z" joint="wall2_slide_z" ctrlrange="0.0 2.0" gear="8.0"/>
+    <motor name="wall3_motor_x" joint="wall3_slide_x" ctrlrange="4.0 8.0" gear="10.0"/>
+    <motor name="wall3_motor_y" joint="wall3_slide_y" ctrlrange="-3.0 3.0" gear="10.0"/>
+    <motor name="wall4_motor_rot" joint="wall4_rotate" ctrlrange="-10.0 10.0" gear="5.0"/>
+    <motor name="wall4_motor_rad" joint="wall4_radial" ctrlrange="0.5 2.0" gear="8.0"/>
+
+    <!-- DYNAMIC Patrol Point Actuators (for real-time movement control) -->
+    <motor name="patrol1_motor_x" joint="patrol1_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol1_motor_y" joint="patrol1_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol2_motor_x" joint="patrol2_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol2_motor_y" joint="patrol2_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol3_motor_x" joint="patrol3_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol3_motor_y" joint="patrol3_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol4_motor_x" joint="patrol4_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol4_motor_y" joint="patrol4_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
+    <motor name="patrol5_motor_x" joint="patrol5_slide_x" ctrlrange="-2.0 14.0" gear="5.0"/>
+    <motor name="patrol5_motor_y" joint="patrol5_slide_y" ctrlrange="-5.0 5.0" gear="5.0"/>
   </actuator>
 
   <keyframe>
+    <!--
+    The values below are split into rows for readibility:
+      torso position
+      torso orientation
+      spinal
+      right leg
+      left leg
+      arms
+    -->
     <key name="squat"
          qpos="0 0 0.596
                0.988015 0 0.154359 0
