@@ -1,7 +1,5 @@
 import carla
 import time
-
-
 def main():
     # 初始化变量，用于后续资源清理
     vehicle = None
@@ -13,6 +11,11 @@ def main():
         client.set_timeout(15.0)
         world = client.get_world()
         spectator = world.get_spectator()  # 获取视角控制器
+    try:
+        # 1. 连接Carla模拟器，支持重新加载地图（可选）
+        client = carla.Client("localhost", 2000)
+        client.set_timeout(10.0)
+        world = client.get_world()
         print("✅ 成功连接Carla模拟器！")
         print("📌 当前仿真地图：", world.get_map().name)
 
@@ -51,6 +54,18 @@ def main():
             spectator.set_transform(spectator_transform)
             print("👀 模拟器视角已切换到车辆位置！")
 
+        # 2. 获取车辆蓝图，随机选择车辆颜色
+        vehicle_bp = world.get_blueprint_library().find("vehicle.tesla.model3")
+        if vehicle_bp.has_attribute('color'):
+            vehicle_bp.set_attribute('color', '255,0,0')  # 设置红色车身
+        print("🎨 已设置车辆颜色为红色")
+
+        # 3. 选择合法生成点生成车辆
+        spawn_points = world.get_map().get_spawn_points()
+        if spawn_points:
+            vehicle = world.spawn_actor(vehicle_bp, spawn_points[0])
+            print(f"🚗 成功生成特斯拉车辆，ID：{vehicle.id}")
+
             # 4. 添加RGB摄像头传感器（绑定到车辆）
             camera_bp = world.get_blueprint_library().find('sensor.camera.rgb')
             # 设置摄像头参数
@@ -75,6 +90,8 @@ def main():
             print("\n🚙 开始车辆控制演示...")
             # 阶段1：直行3秒（油门0.7，行驶更明显）
             vehicle.apply_control(carla.VehicleControl(throttle=0.7, steer=0.0, brake=0.0))
+            # 阶段1：直行3秒
+            vehicle.apply_control(carla.VehicleControl(throttle=0.6, steer=0.0, brake=0.0))
             time.sleep(3)
             # 阶段2：右转2秒
             vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=0.5, brake=0.0))
@@ -104,6 +121,9 @@ def main():
     # 7. 资源清理（延迟销毁，确保能看到车辆直到程序结束）
     finally:
         time.sleep(3)  # 程序结束前车辆多显示3秒
+
+    # 7. 资源清理（关键：避免模拟器残留车辆/传感器）
+    finally:
         if camera_sensor:
             camera_sensor.stop()
             camera_sensor.destroy()
