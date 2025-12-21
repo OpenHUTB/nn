@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-手势控制AirSim无人机 - 手势识别优化版（增强语音反馈和手势平滑）
-优化手势识别算法，增强语音反馈，改进手势平滑处理
+手势控制AirSim无人机 - 手势轨迹记录与回放优化版
+修复手势语音播报问题，确保所有手势语音正常
 作者: xiaoshiyuan888
 """
 
@@ -13,6 +13,7 @@ import json
 import math
 import threading
 import tempfile
+import pickle  # 新增：用于数据序列化
 from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import cv2
@@ -20,8 +21,8 @@ import numpy as np
 from collections import deque, Counter
 
 print("=" * 60)
-print("Gesture Controlled Drone - Enhanced Gesture Recognition")
-print("增强语音反馈和手势平滑处理!")
+print("Gesture Controlled Drone - Enhanced with Trajectory Recording")
+print("手势轨迹记录与回放优化版!")
 print("=" * 60)
 
 # ========== 修复导入路径 ==========
@@ -209,12 +210,14 @@ class EnhancedSpeechFeedbackManager:
             'gesture_left': "向左",
             'gesture_right': "向右",
             'gesture_forward': "向前",
+            'gesture_backward': "向后",  # 新增：向后手势
             'gesture_waiting': "等待手势",
             'gesture_error': "手势识别错误",
             'gesture_stable': "手势稳定",
             'gesture_change': "手势变化",
             'gesture_low_confidence': "手势识别置信度低",
             'gesture_good_confidence': "手势识别置信度高",
+            'gesture_hover': "悬停",  # 新增：悬停手势
 
             # 系统相关
             'program_start': "手势控制无人机系统已启动",
@@ -240,6 +243,19 @@ class EnhancedSpeechFeedbackManager:
             'good_position': "手部位置良好",
             'hand_detected': "手部已检测到",
             'hand_lost': "手部丢失，请重新放置",
+
+            # 新增：录制相关
+            'recording_start': "开始录制手势轨迹",
+            'recording_stop': "停止录制",
+            'recording_saved': "轨迹已保存",
+            'recording_loaded': "轨迹已加载",
+            'recording_playback_start': "开始回放手势轨迹",
+            'recording_playback_stop': "回放结束",
+            'recording_cleared': "轨迹已清除",
+            'recording_paused': "回放已暂停",
+            'recording_resumed': "回放继续",
+            'recording_not_found': "未找到轨迹数据",
+            'recording_frame_count': "轨迹帧数",
         }
 
         # 初始化语音引擎
@@ -497,6 +513,341 @@ class EnhancedSpeechFeedbackManager:
         }
 
 
+# ========== 手势轨迹记录器 ==========
+class GestureTrajectoryRecorder:
+    """手势轨迹记录器 - 记录、保存、加载和回放手势轨迹"""
+
+    def __init__(self, speech_manager=None):
+        self.speech_manager = speech_manager
+        self.trajectory_data = []
+        self.is_recording = False
+        self.is_playing = False
+        self.playback_index = 0
+        self.playback_paused = False
+        self.max_trajectory_points = 1000  # 最大轨迹点数
+        self.recording_start_time = 0
+        self.last_save_time = 0
+        self.save_interval = 5  # 自动保存间隔（秒）
+
+        # 轨迹文件路径
+        self.trajectory_dir = os.path.join(current_dir, 'trajectories')
+        if not os.path.exists(self.trajectory_dir):
+            os.makedirs(self.trajectory_dir)
+
+        # 默认轨迹文件名
+        self.default_filename = os.path.join(self.trajectory_dir,
+                                             f'trajectory_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pkl')
+
+        # 轨迹可视化设置
+        self.trajectory_colors = [
+            (255, 0, 0),  # 红色 - 起点
+            (0, 255, 0),  # 绿色 - 正常点
+            (0, 0, 255),  # 蓝色 - 终点
+            (255, 255, 0),  # 青色 - 特殊点
+            (255, 0, 255)  # 紫色 - 特殊点
+        ]
+
+        self.show_trajectory = True
+        self.trajectory_thickness = 2
+        self.trajectory_max_length = 100  # 显示的最大轨迹长度
+
+        print("✓ 手势轨迹记录器已初始化")
+
+    def start_recording(self):
+        """开始录制手势轨迹"""
+        if self.is_recording:
+            return False
+
+        self.trajectory_data = []
+        self.is_recording = True
+        self.recording_start_time = time.time()
+        self.last_save_time = time.time()
+
+        print("🎬 开始录制手势轨迹")
+
+        # 语音提示
+        if self.speech_manager and self.speech_manager.enabled:
+            self.speech_manager.speak('recording_start', immediate=True)
+
+        return True
+
+    def stop_recording(self):
+        """停止录制手势轨迹"""
+        if not self.is_recording:
+            return False
+
+        self.is_recording = False
+        recording_duration = time.time() - self.recording_start_time
+
+        print(f"⏹️ 停止录制手势轨迹")
+        print(f"   录制时长: {recording_duration:.1f}秒")
+        print(f"   轨迹点数: {len(self.trajectory_data)}")
+
+        # 语音提示
+        if self.speech_manager and self.speech_manager.enabled:
+            self.speech_manager.speak('recording_stop', immediate=True)
+            if len(self.trajectory_data) > 0:
+                self.speech_manager.speak_direct(f"录制了{len(self.trajectory_data)}个轨迹点")
+
+        return True
+
+    def add_trajectory_point(self, hand_data, gesture, confidence, frame_shape):
+        """添加轨迹点"""
+        if not self.is_recording or len(self.trajectory_data) >= self.max_trajectory_points:
+            return False
+
+        if hand_data is None:
+            return False
+
+        # 创建轨迹点数据
+        trajectory_point = {
+            'timestamp': time.time(),
+            'hand_position': hand_data['position'] if 'position' in hand_data else (0.5, 0.5),
+            'hand_center': hand_data['center'] if 'center' in hand_data else (0, 0),
+            'gesture': gesture,
+            'confidence': confidence,
+            'fingertips': hand_data.get('fingertips', []),
+            'frame_shape': frame_shape
+        }
+
+        self.trajectory_data.append(trajectory_point)
+
+        # 自动保存检查
+        current_time = time.time()
+        if current_time - self.last_save_time >= self.save_interval and len(self.trajectory_data) > 10:
+            self.auto_save()
+            self.last_save_time = current_time
+
+        return True
+
+    def auto_save(self):
+        """自动保存轨迹（临时文件）"""
+        if len(self.trajectory_data) == 0:
+            return
+
+        temp_file = os.path.join(self.trajectory_dir, 'trajectory_temp.pkl')
+        try:
+            with open(temp_file, 'wb') as f:
+                pickle.dump(self.trajectory_data, f)
+            print(f"💾 自动保存轨迹到临时文件 ({len(self.trajectory_data)}个点)")
+        except Exception as e:
+            print(f"⚠ 自动保存轨迹失败: {e}")
+
+    def save_trajectory(self, filename=None):
+        """保存轨迹到文件"""
+        if len(self.trajectory_data) == 0:
+            print("⚠ 没有轨迹数据可保存")
+            return False
+
+        if filename is None:
+            filename = self.default_filename
+
+        try:
+            with open(filename, 'wb') as f:
+                pickle.dump(self.trajectory_data, f)
+
+            print(f"💾 轨迹已保存到: {filename}")
+            print(f"   轨迹点数: {len(self.trajectory_data)}")
+
+            # 语音提示
+            if self.speech_manager and self.speech_manager.enabled:
+                self.speech_manager.speak('recording_saved', immediate=True)
+                self.speech_manager.speak_direct(f"保存了{len(self.trajectory_data)}个轨迹点")
+
+            return True
+        except Exception as e:
+            print(f"❌ 保存轨迹失败: {e}")
+            return False
+
+    def load_trajectory(self, filename):
+        """从文件加载轨迹"""
+        try:
+            if not os.path.exists(filename):
+                print(f"❌ 轨迹文件不存在: {filename}")
+
+                # 语音提示
+                if self.speech_manager and self.speech_manager.enabled:
+                    self.speech_manager.speak('recording_not_found', immediate=True)
+
+                return False
+
+            with open(filename, 'rb') as f:
+                self.trajectory_data = pickle.load(f)
+
+            print(f"📂 轨迹已从文件加载: {filename}")
+            print(f"   轨迹点数: {len(self.trajectory_data)}")
+
+            # 语音提示
+            if self.speech_manager and self.speech_manager.enabled:
+                self.speech_manager.speak('recording_loaded', immediate=True)
+                self.speech_manager.speak_direct(f"加载了{len(self.trajectory_data)}个轨迹点")
+
+            return True
+        except Exception as e:
+            print(f"❌ 加载轨迹失败: {e}")
+            return False
+
+    def start_playback(self):
+        """开始回放轨迹"""
+        if len(self.trajectory_data) == 0:
+            print("⚠ 没有轨迹数据可回放")
+
+            # 语音提示
+            if self.speech_manager and self.speech_manager.enabled:
+                self.speech_manager.speak('recording_not_found', immediate=True)
+
+            return False
+
+        self.is_playing = True
+        self.playback_index = 0
+        self.playback_paused = False
+
+        print(f"▶️ 开始回放手势轨迹")
+        print(f"   总帧数: {len(self.trajectory_data)}")
+
+        # 语音提示
+        if self.speech_manager and self.speech_manager.enabled:
+            self.speech_manager.speak('recording_playback_start', immediate=True)
+
+        return True
+
+    def stop_playback(self):
+        """停止回放轨迹"""
+        if not self.is_playing:
+            return False
+
+        self.is_playing = False
+        self.playback_paused = False
+
+        print("⏹️ 停止回放手势轨迹")
+
+        # 语音提示
+        if self.speech_manager and self.speech_manager.enabled:
+            self.speech_manager.speak('recording_playback_stop', immediate=True)
+
+        return True
+
+    def pause_playback(self):
+        """暂停/继续回放"""
+        self.playback_paused = not self.playback_paused
+
+        status = "暂停" if self.playback_paused else "继续"
+        print(f"⏸️ 回放已{status}")
+
+        # 语音提示
+        if self.speech_manager and self.speech_manager.enabled:
+            if self.playback_paused:
+                self.speech_manager.speak('recording_paused', immediate=True)
+            else:
+                self.speech_manager.speak('recording_resumed', immediate=True)
+
+        return self.playback_paused
+
+    def get_next_playback_point(self):
+        """获取下一个回放点"""
+        if not self.is_playing or self.playback_paused or len(self.trajectory_data) == 0:
+            return None
+
+        if self.playback_index >= len(self.trajectory_data):
+            self.stop_playback()
+            return None
+
+        point = self.trajectory_data[self.playback_index]
+        self.playback_index += 1
+
+        # 检查是否到达末尾
+        if self.playback_index >= len(self.trajectory_data):
+            self.stop_playback()
+
+        return point
+
+    def clear_trajectory(self):
+        """清除轨迹数据"""
+        self.trajectory_data = []
+        self.is_recording = False
+        self.is_playing = False
+        self.playback_index = 0
+
+        print("🗑️ 轨迹数据已清除")
+
+        # 语音提示
+        if self.speech_manager and self.speech_manager.enabled:
+            self.speech_manager.speak('recording_cleared', immediate=True)
+
+        return True
+
+    def draw_trajectory(self, frame):
+        """在帧上绘制轨迹"""
+        if not self.show_trajectory or len(self.trajectory_data) == 0:
+            return frame
+
+        h, w = frame.shape[:2]
+
+        # 限制显示的轨迹点数
+        display_points = min(len(self.trajectory_data), self.trajectory_max_length)
+        start_idx = max(0, len(self.trajectory_data) - display_points)
+
+        # 绘制轨迹线
+        for i in range(start_idx, len(self.trajectory_data) - 1):
+            point1 = self.trajectory_data[i]
+            point2 = self.trajectory_data[i + 1]
+
+            # 获取手部中心位置（转换为图像坐标）
+            if 'hand_center' in point1 and 'hand_center' in point2:
+                x1, y1 = point1['hand_center']
+                x2, y2 = point2['hand_center']
+
+                # 确保坐标在图像范围内
+                x1 = max(0, min(w - 1, x1))
+                y1 = max(0, min(h - 1, y1))
+                x2 = max(0, min(w - 1, x2))
+                y2 = max(0, min(h - 1, y2))
+
+                # 根据索引计算颜色（渐变色）
+                color_idx = int((i - start_idx) / display_points * (len(self.trajectory_colors) - 1))
+                color = self.trajectory_colors[color_idx]
+
+                # 绘制线条
+                cv2.line(frame, (int(x1), int(y1)), (int(x2), int(y2)),
+                         color, self.trajectory_thickness)
+
+        # 绘制当前点（如果正在录制或回放）
+        if self.is_recording or self.is_playing:
+            current_idx = len(self.trajectory_data) - 1 if self.is_recording else self.playback_index - 1
+            if 0 <= current_idx < len(self.trajectory_data):
+                point = self.trajectory_data[current_idx]
+                if 'hand_center' in point:
+                    x, y = point['hand_center']
+                    x = max(0, min(w - 1, x))
+                    y = max(0, min(h - 1, y))
+
+                    # 绘制当前点
+                    cv2.circle(frame, (int(x), int(y)), 8, (0, 255, 255), -1)
+                    cv2.circle(frame, (int(x), int(y)), 8, (0, 0, 0), 2)
+
+        return frame
+
+    def get_status(self):
+        """获取录制状态"""
+        return {
+            'is_recording': self.is_recording,
+            'is_playing': self.is_playing,
+            'playback_paused': self.playback_paused,
+            'trajectory_points': len(self.trajectory_data),
+            'playback_index': self.playback_index,
+            'playback_total': len(self.trajectory_data),
+            'recording_duration': time.time() - self.recording_start_time if self.is_recording else 0
+        }
+
+    def list_saved_trajectories(self):
+        """列出保存的轨迹文件"""
+        try:
+            files = [f for f in os.listdir(self.trajectory_dir) if f.endswith('.pkl')]
+            return sorted(files, reverse=True)
+        except:
+            return []
+
+
 # ========== 配置管理器 ==========
 class ConfigManager:
     """配置管理器"""
@@ -551,6 +902,8 @@ class ConfigManager:
                 'show_speech_status': True,
                 'show_gesture_history': True,  # 新增：显示手势历史
                 'show_stability_indicator': True,  # 新增：显示稳定性指示器
+                'show_trajectory': True,  # 新增：显示轨迹
+                'show_recording_status': True,  # 新增：显示录制状态
             },
             'performance': {
                 'target_fps': 30,
@@ -572,9 +925,18 @@ class ConfigManager:
                 'announce_gesture_changes': True,  # 新增：播报手势变化
                 'announce_hand_status': True,  # 新增：播报手部状态
                 'announce_performance': True,  # 新增：播报性能状态
+                'announce_recording_events': True,  # 新增：播报录制事件
                 'min_gesture_confidence': 0.7,
                 'gesture_start_threshold': 3,  # 新增：手势开始识别阈值
                 'gesture_end_threshold': 10,  # 新增：手势结束识别阈值
+            },
+            'recording': {  # 新增：录制配置
+                'auto_save_interval': 5,  # 自动保存间隔（秒）
+                'max_trajectory_points': 1000,  # 最大轨迹点数
+                'show_trajectory': True,  # 显示轨迹
+                'trajectory_thickness': 2,  # 轨迹线粗细
+                'trajectory_max_length': 100,  # 显示的最大轨迹长度
+                'default_save_dir': 'trajectories',  # 默认保存目录
             }
         }
         self.config = self.load_config()
@@ -746,7 +1108,7 @@ class EnhancedGestureRecognizer:
             "Hover": (255, 255, 255)  # 白色
         }
 
-        # 手势到语音的映射
+        # 手势到语音的映射 - 修复：确保所有手势都有对应语音
         self.gesture_speech_map = {
             "Stop": "gesture_stop",
             "Forward": "gesture_forward",
@@ -756,6 +1118,7 @@ class EnhancedGestureRecognizer:
             "Right": "gesture_right",
             "Waiting": "gesture_waiting",
             "Error": "gesture_error",
+            "Hover": "gesture_hover",  # 新增悬停手势语音
         }
 
         # 手势状态颜色
@@ -778,6 +1141,9 @@ class EnhancedGestureRecognizer:
         self.avg_process_time = 0
         self.frame_rate = 0
         self.last_fps_check = time.time()
+
+        # 新增：存储手部数据用于轨迹记录
+        self.last_hand_data = None
 
         print("✓ 增强的手势识别器已初始化 (改进平滑处理)")
 
@@ -1407,6 +1773,9 @@ class EnhancedGestureRecognizer:
             # 分析手部特征
             hand_data, confidence = self.analyze_hand_features(hand_contour, processed_frame.shape)
 
+            # 保存手部数据用于轨迹记录
+            self.last_hand_data = hand_data
+
             # 识别手势
             if hand_data is not None:
                 # 校准肤色（如果需要）
@@ -1429,7 +1798,8 @@ class EnhancedGestureRecognizer:
                 self.update_gesture_state(None, gesture, confidence)
                 final_gesture, final_confidence = gesture, confidence
 
-            # 手势语音提示
+            # ========== 修复手势语音播报 ==========
+            # 确保所有手势都有语音反馈
             if (self.speech_manager and
                     config.get('speech', 'enabled') and
                     config.get('speech', 'announce_gestures')):
@@ -1444,14 +1814,20 @@ class EnhancedGestureRecognizer:
                     self.speech_manager.speak('gesture_low_confidence', immediate=True)
                     self.last_hand_status_time = current_time
 
-                # 手势变化播报
-                if (final_gesture != self.last_announced_gesture and
-                        final_gesture not in ["Waiting", "Error"] and
+                # 手势语音播报 - 修复：确保所有手势都能播报
+                if (final_gesture != "Waiting" and
+                        final_gesture != "Error" and
+                        final_gesture != "摄像头错误" and
                         final_confidence >= config.get('speech', 'min_gesture_confidence') and
                         current_time - self.last_announced_time > self.gesture_announce_interval):
 
+                    # 检查手势是否在语音映射中
                     if final_gesture in self.gesture_speech_map:
-                        self.speech_manager.speak(self.gesture_speech_map[final_gesture])
+                        speech_key = self.gesture_speech_map[final_gesture]
+                        self.speech_manager.speak(speech_key)
+                    else:
+                        # 如果手势不在映射中，直接播报手势名称
+                        self.speech_manager.speak_direct(f"手势{final_gesture}")
 
                     self.last_announced_gesture = final_gesture
                     self.last_announced_time = current_time
@@ -1512,12 +1888,17 @@ class EnhancedGestureRecognizer:
         self.current_gesture = gesture
         self.current_confidence = 0.9
 
-        # 模拟手势也触发语音提示
+        # 模拟手势也触发语音提示 - 修复：确保所有模拟手势都有语音
         if (self.speech_manager and
                 config.get('speech', 'enabled') and
-                config.get('speech', 'announce_gestures') and
-                gesture in self.gesture_speech_map):
-            self.speech_manager.speak(self.gesture_speech_map[gesture])
+                config.get('speech', 'announce_gestures')):
+
+            if gesture in self.gesture_speech_map:
+                self.speech_manager.speak(self.gesture_speech_map[gesture])
+            else:
+                # 如果手势不在映射中，直接播报手势名称
+                self.speech_manager.speak_direct(f"手势{gesture}")
+
             self.last_announced_gesture = gesture
             self.last_announced_time = time.time()
 
@@ -1837,6 +2218,9 @@ class ChineseUIRenderer:
             'performance_good': (0, 255, 0),  # 绿色
             'performance_warning': (255, 165, 0),  # 橙色
             'performance_bad': (255, 0, 0),  # 红色
+            'recording': (255, 50, 50),  # 亮红色
+            'playback': (50, 50, 255),  # 亮蓝色
+            'paused': (255, 255, 0),  # 黄色
         }
 
         print("✓ 中文UI渲染器已初始化")
@@ -1890,7 +2274,8 @@ class ChineseUIRenderer:
                         size / 25, color, 1)
             return frame
 
-    def draw_status_bar(self, frame, drone_controller, gesture, confidence, fps, process_time):
+    def draw_status_bar(self, frame, drone_controller, gesture, confidence, fps, process_time,
+                        trajectory_recorder=None):
         """绘制状态栏"""
         h, w = frame.shape[:2]
 
@@ -1900,7 +2285,7 @@ class ChineseUIRenderer:
         frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
         # 标题
-        title = "手势控制无人机系统 - 增强版"
+        title = "手势控制无人机系统 - 轨迹记录版"
         frame = self.draw_text(frame, title, (10, 10), size=20, color=self.colors['title'])
 
         # 连接状态
@@ -1927,12 +2312,32 @@ class ChineseUIRenderer:
 
         frame = self.draw_text(frame, gesture_text, (w // 2, 40), size=16, color=gesture_color)
 
+        # 录制/回放状态
+        if trajectory_recorder and config.get('display', 'show_recording_status'):
+            recorder_status = trajectory_recorder.get_status()
+
+            if recorder_status['is_recording']:
+                status_color = self.colors['recording']
+                status_text = f"录制中: {recorder_status['trajectory_points']}点"
+                frame = self.draw_text(frame, status_text, (w // 2, 65), size=16, color=status_color)
+            elif recorder_status['is_playing']:
+                if recorder_status['playback_paused']:
+                    status_color = self.colors['paused']
+                    status_text = f"回放暂停: {recorder_status['playback_index']}/{recorder_status['playback_total']}"
+                else:
+                    status_color = self.colors['playback']
+                    status_text = f"回放中: {recorder_status['playback_index']}/{recorder_status['playback_total']}"
+                frame = self.draw_text(frame, status_text, (w // 2, 65), size=16, color=status_color)
+            else:
+                status_text = f"轨迹点: {recorder_status['trajectory_points']}"
+                frame = self.draw_text(frame, status_text, (w // 2, 65), size=14, color=self.colors['info'])
+
         # 语音状态
         if config.get('display', 'show_speech_status') and self.speech_manager:
             speech_status = self.speech_manager.get_status()
             speech_color = self.colors['speech_enabled'] if speech_status['enabled'] else self.colors['speech_disabled']
             speech_text = f"语音: {'启用' if speech_status['enabled'] else '禁用'}"
-            frame = self.draw_text(frame, speech_text, (w // 2, 65), size=16, color=speech_color)
+            frame = self.draw_text(frame, speech_text, (w // 2, 90), size=14, color=speech_color)
 
         # 性能信息
         if config.get('display', 'show_fps'):
@@ -1966,17 +2371,18 @@ class ChineseUIRenderer:
         h, w = frame.shape[:2]
 
         # 绘制底部帮助栏
-        cv2.rectangle(frame, (0, h - 80), (w, h), (0, 0, 0), -1)
+        cv2.rectangle(frame, (0, h - 100), (w, h), (0, 0, 0), -1)
 
         # 帮助文本
         help_lines = [
             "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/X:键盘控制",
             "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息",
-            "V:切换语音反馈  M:测试语音  P:性能报告"
+            "V:切换语音反馈  M:测试语音  P:性能报告",
+            "1:开始录制 2:停止录制 3:保存轨迹 4:回放轨迹 5:清除轨迹 6:暂停/继续"
         ]
 
         for i, line in enumerate(help_lines):
-            y_pos = h - 65 + i * 20
+            y_pos = h - 85 + i * 20
             frame = self.draw_text(frame, line, (10, y_pos), size=14, color=self.colors['help'])
 
         return frame
@@ -2055,6 +2461,10 @@ def main():
     ui_renderer = ChineseUIRenderer(speech_manager)
     performance_monitor = PerformanceMonitor()
 
+    # 新增：手势轨迹记录器
+    print("初始化手势轨迹记录器...")
+    trajectory_recorder = GestureTrajectoryRecorder(speech_manager)
+
     # 初始化摄像头
     cap = None
     try:
@@ -2095,12 +2505,13 @@ def main():
 
     # 显示欢迎信息
     print("\n" + "=" * 60)
-    print("手势控制无人机系统 - 增强版")
+    print("手势控制无人机系统 - 轨迹记录版")
     print("=" * 60)
     print("系统状态:")
     print(f"  摄像头: {'已连接' if cap else '模拟模式'}")
     print(f"  手势识别: 增强的平滑处理算法")
     print(f"  语音反馈: {'已启用' if speech_manager.enabled else '已禁用'}")
+    print(f"  轨迹记录: 支持录制/回放功能")
     print(f"  手势状态: 支持开始/活跃/结束状态追踪")
     print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
     print("=" * 60)
@@ -2109,18 +2520,23 @@ def main():
     print("\n操作说明:")
     print("1. 按 [C] 连接无人机 (AirSim模拟器)")
     print("2. 按 [空格键] 起飞/降落")
-    print("3. 手势控制改进:")
-    print("   - 系统会自动检测手势开始、稳定和结束状态")
+    print("3. 手势控制:")
+    print("   - 手势识别后会有语音提示: 向上、向下、向左、向右、向前、停止")
     print("   - 手势稳定性越高，识别越准确")
     print("   - 手部距离摄像头适中时效果最佳")
     print("   * 手势识别置信度 > 60% 时才会执行")
-    print("4. 键盘控制:")
-    print("   [W]Up [S]Down [A]Left [D]Right [F]Forward [X]Stop")
-    print("5. 调试功能:")
+    print("4. 轨迹记录功能:")
+    print("   [1]开始录制 [2]停止录制 [3]保存轨迹 [4]回放轨迹 [5]清除轨迹 [6]暂停/继续")
+    print("   - 录制时系统会记录手部位置和手势")
+    print("   - 回放时可以查看录制的轨迹")
+    print("   - 轨迹数据自动保存到 trajectories/ 目录")
+    print("5. 键盘控制:")
+    print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [X]停止")
+    print("6. 调试功能:")
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
-    print("6. 语音控制:")
+    print("7. 语音控制:")
     print("   [V]切换语音反馈 [M]测试语音 [P]性能报告")
-    print("7. 按 [ESC] 安全退出")
+    print("8. 按 [ESC] 安全退出")
     print("=" * 60)
     print("程序启动成功!")
     print("-" * 60)
@@ -2133,6 +2549,7 @@ def main():
         ord('d'): "Right", ord('D'): "Right",
         ord('f'): "Forward", ord('F'): "Forward",
         ord('x'): "Stop", ord('X'): "Stop",
+        ord('h'): "Hover", ord('H'): "Hover",
     }
 
     # 显示模式
@@ -2173,6 +2590,8 @@ def main():
                 config.set('display', 'show_fingertips', value=True)
                 config.set('display', 'show_gesture_history', value=True)
                 config.set('display', 'show_stability_indicator', value=True)
+                config.set('display', 'show_trajectory', value=True)
+                config.set('display', 'show_recording_status', value=True)
                 config.set('display', 'show_debug_info', value=False)
             elif display_modes[current_display_mode] == 'detailed':
                 config.set('display', 'show_contours', value=True)
@@ -2182,6 +2601,8 @@ def main():
                 config.set('display', 'show_hand_direction', value=True)
                 config.set('display', 'show_gesture_history', value=True)
                 config.set('display', 'show_stability_indicator', value=True)
+                config.set('display', 'show_trajectory', value=True)
+                config.set('display', 'show_recording_status', value=True)
                 config.set('display', 'show_debug_info', value=True)
             elif display_modes[current_display_mode] == 'minimal':
                 config.set('display', 'show_contours', value=False)
@@ -2189,12 +2610,18 @@ def main():
                 config.set('display', 'show_fingertips', value=False)
                 config.set('display', 'show_gesture_history', value=False)
                 config.set('display', 'show_stability_indicator', value=False)
+                config.set('display', 'show_trajectory', value=True)
+                config.set('display', 'show_recording_status', value=True)
                 config.set('display', 'show_debug_info', value=False)
+
+            # 绘制轨迹（如果启用）
+            if config.get('display', 'show_trajectory'):
+                frame = trajectory_recorder.draw_trajectory(frame)
 
             # 绘制UI
             frame = ui_renderer.draw_status_bar(
                 frame, drone_controller, gesture, confidence,
-                perf_stats['fps'], process_time
+                perf_stats['fps'], process_time, trajectory_recorder
             )
 
             frame = ui_renderer.draw_help_bar(frame)
@@ -2205,7 +2632,7 @@ def main():
                 frame = ui_renderer.draw_warning(frame, warning_msg)
 
             # 显示图像（窗口标题用英文）
-            cv2.imshow('Gesture Controlled Drone - Enhanced', frame)
+            cv2.imshow('Gesture Controlled Drone - Trajectory Recording', frame)
 
             # ========== 键盘控制 ==========
             key = cv2.waitKey(1) & 0xFF
@@ -2296,6 +2723,49 @@ def main():
                     else:
                         speech_manager.speak_direct("系统性能警告，请检查")
 
+            # 新增：轨迹记录控制
+            elif key == ord('1'):
+                # 开始录制轨迹
+                if trajectory_recorder.start_recording():
+                    print("✅ 开始录制手势轨迹")
+                else:
+                    print("⚠ 已经在录制中")
+
+            elif key == ord('2'):
+                # 停止录制轨迹
+                if trajectory_recorder.stop_recording():
+                    print("✅ 停止录制手势轨迹")
+                else:
+                    print("⚠ 当前没有在录制")
+
+            elif key == ord('3'):
+                # 保存轨迹
+                if trajectory_recorder.save_trajectory():
+                    print("✅ 轨迹保存成功")
+                else:
+                    print("⚠ 没有轨迹数据可保存")
+
+            elif key == ord('4'):
+                # 回放轨迹
+                if trajectory_recorder.start_playback():
+                    print("✅ 开始回放手势轨迹")
+                else:
+                    print("⚠ 没有轨迹数据可回放")
+
+            elif key == ord('5'):
+                # 清除轨迹
+                if trajectory_recorder.clear_trajectory():
+                    print("✅ 轨迹数据已清除")
+                else:
+                    print("⚠ 清除轨迹失败")
+
+            elif key == ord('6'):
+                # 暂停/继续回放
+                if trajectory_recorder.pause_playback():
+                    print("✅ 切换回放暂停状态")
+                else:
+                    print("⚠ 当前没有在回放")
+
             elif key in key_to_gesture:
                 # 键盘控制
                 simulated_gesture = key_to_gesture[key]
@@ -2311,6 +2781,24 @@ def main():
                     gesture != "摄像头错误" and gesture != "Error" and
                     drone_controller.connected and drone_controller.flying):
                 drone_controller.move_by_gesture(gesture, confidence)
+
+            # 处理轨迹记录
+            if cap and ret:
+                # 如果正在录制，添加轨迹点
+                if trajectory_recorder.is_recording:
+                    # 获取手势识别的手部数据
+                    if hasattr(gesture_recognizer, 'last_hand_data'):
+                        hand_data = gesture_recognizer.last_hand_data
+                        trajectory_recorder.add_trajectory_point(
+                            hand_data, gesture, confidence, frame.shape
+                        )
+
+                # 如果正在回放，获取回放点
+                if trajectory_recorder.is_playing and not trajectory_recorder.playback_paused:
+                    playback_point = trajectory_recorder.get_next_playback_point()
+                    if playback_point:
+                        # 这里可以添加回放点的可视化或处理
+                        pass
 
     except KeyboardInterrupt:
         print("\n程序被用户中断")
@@ -2330,6 +2818,12 @@ def main():
             time.sleep(1)  # 确保语音播报完成
 
         drone_controller.emergency_stop()
+
+        # 自动保存轨迹
+        if trajectory_recorder and len(trajectory_recorder.trajectory_data) > 0:
+            print("自动保存轨迹数据...")
+            trajectory_recorder.save_trajectory()
+
         config.save_config()
 
         print("程序安全退出")
