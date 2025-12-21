@@ -1,4 +1,3 @@
-
 import mujoco
 import glfw
 import numpy as np
@@ -8,7 +7,7 @@ from datetime import datetime
 import imageio
 from typing import List
 
-# -------------------------- 全局配置（已优化避障参数）--------------------------
+# -------------------------- 全局配置 --------------------------
 TIME_STEP = 0.01
 MAX_STEPS = 2000
 NSTEP = 5
@@ -18,20 +17,20 @@ LIDAR_MOUNT_POS = np.array([0.5, 0, 0.2])
 LIDAR_MAX_DISTANCE = 8.0
 LIDAR_NUM_RAYS = 360
 
-# 无人车参数（优化后，避免碰撞）
-MAX_STEER_ANGLE = 0.6  # 增大转向角
-MAX_DRIVE_TORQUE = 15.0  # 增大驱动力矩
-SAFE_SPEED = 1.8  # 提高直行速度
-AVOID_SPEED = 1.0  # 提高避让速度
-OBSTACLE_THRESHOLD = 4.0  # 提前触发避让
-AVOID_STEER_ANGLE = 0.5  # 增大避让转向角
-TORQUE_GAIN = 8.0  # 提高加速响应
+# 无人车参数 (恢复到合理数值)
+MAX_STEER_ANGLE = 0.4     # 合理的转向角度
+MAX_DRIVE_TORQUE = 8.0    # 合理的驱动力矩
+SAFE_SPEED = 1.0          # 合理的直行速度
+AVOID_SPEED = 0.5         # 合理的避让速度
+OBSTACLE_THRESHOLD = 4.0
+AVOID_STEER_ANGLE = 0.3   # 合理的避让转向角度
+TORQUE_GAIN = 4.0         # 合理的加速响应
 
 # 执行器索引
 DRIVE_ACTUATOR_IDS = [0, 1]
 STEER_ACTUATOR_IDS = [2, 3]
 
-# -------------------------- MuJoCo XML（障碍物后移，增加反应时间）--------------------------
+# -------------------------- MuJoCo XML 场景定义 --------------------------
 SCENE_XML = """
 <mujoco model="autonomous_vehicle">
   <compiler angle="degree" coordinate="local" inertiafromgeom="true"/>
@@ -74,7 +73,7 @@ SCENE_XML = """
       </body>
     </body>
 
-    <!-- 障碍物后移2m，给车更多反应时间 -->
+    <!-- 障碍物 -->
     <geom name="obstacle1" type="box" pos="7 0.5 0.3" size="0.4 0.4 0.3" rgba="0.8 0.2 0.2 1" mass="10" contype="1" conaffinity="1"/>
     <geom name="obstacle2" type="cylinder" pos="10 -0.6 0.2" size="0.3 0.2" rgba="0.8 0.4 0.2 1" mass="10" contype="1" conaffinity="1"/>
     <site name="target" pos="15 0 0.5" size="0.1" rgba="0 1 0 1"/>
@@ -83,7 +82,7 @@ SCENE_XML = """
 """
 
 
-# -------------------------- 激光雷达（已匹配mj_ray参数）--------------------------
+# -------------------------- 激光雷达传感器 --------------------------
 class LidarSensor:
     def __init__(self, model: mujoco.MjModel, data: mujoco.MjData):
         self.model = model
@@ -143,7 +142,7 @@ class Visualizer:
         self.data = data
         if not glfw.init():
             raise RuntimeError("Failed to initialize GLFW")
-        self.window = glfw.create_window(1280, 720, "无人车仿真", None, None)
+        self.window = glfw.create_window(1280, 720, "Autonomous Vehicle Simulation", None, None)
         if not self.window:
             glfw.terminate()
             raise RuntimeError("Failed to create GLFW window")
@@ -164,20 +163,23 @@ class Visualizer:
 
     def render(self):
         if glfw.window_should_close(self.window):
-            self.close()
-            return
+            return True  # 返回True表示窗口应关闭
         mujoco.mjv_updateScene(self.model, self.data, self.opt, None, self.cam, mujoco.mjtCatBit.mjCAT_ALL, self.scene)
         viewport = mujoco.MjrRect(0, 0, 1280, 720)
         mujoco.mjr_render(viewport, self.scene, self.context)
         glfw.swap_buffers(self.window)
         glfw.poll_events()
+        return False  # 返回False表示窗口继续运行
 
     def close(self):
         glfw.destroy_window(self.window)
         glfw.terminate()
 
+    def should_close(self):
+        return glfw.window_should_close(self.window)
 
-# -------------------------- 日志类 --------------------------
+
+# -------------------------- 数据记录类 --------------------------
 class DataLogger:
     def __init__(self):
         self.log_dir = "logs"
@@ -194,7 +196,7 @@ class DataLogger:
                  1 if collision else 0])
 
 
-# -------------------------- 决策算法类 --------------------------
+# -------------------------- 控制策略类 --------------------------
 class RulePolicy:
     def __init__(self):
         self.front_rays = slice(350, 360)
@@ -225,7 +227,7 @@ class RulePolicy:
         return steer, torque
 
 
-# -------------------------- 仿真环境类（已整合自动录制功能）--------------------------
+# -------------------------- 仿真环境类 --------------------------
 class VehicleEnv:
     def __init__(self):
         self.model = mujoco.MjModel.from_xml_string(SCENE_XML)
@@ -237,6 +239,8 @@ class VehicleEnv:
 
         # 初始化帧缓存用于GIF录制
         self.frames = []
+        self.frame_count = 0
+        self.max_frames = 1000  # 最大录制帧数，防止内存溢出
 
     def reset(self):
         mujoco.mj_resetData(self.model, self.data)
@@ -261,61 +265,71 @@ class VehicleEnv:
 
     def run(self):
         state = self.reset()
-        print("仿真启动（按ESC关闭），正在自动录制GIF...")
+        print("Starting simulation (Press ESC to close and save GIF)...")
         print("=" * 50)
 
-        for step in range(MAX_STEPS):
-            # 1. 决策：根据激光雷达和速度生成控制指令
-            steer, torque = self.policy.decide(state['lidar'], state['vel'])
-            # 2. 执行动作：更新车辆状态
-            state = self.step(steer, torque)
-            # 3. 记录日志
-            self.logger.log(step, step * TIME_STEP, state['pos'][0], state['pos'][1],
-                            self.policy.get_speed(state['vel']), steer, torque, state['collision'])
-            # 4. 渲染画面
-            self.vis.render()
+        step = 0
+        try:
+            while not self.vis.should_close():  # 持续运行直到ESC被按下
+                # 1. 决策：根据激光雷达和速度生成控制指令
+                steer, torque = self.policy.decide(state['lidar'], state['vel'])
+                # 2. 执行动作：更新车辆状态
+                state = self.step(steer, torque)
+                # 3. 记录日志（每10步记录一次，减少日志文件大小）
+                if step % 10 == 0:
+                    self.logger.log(step, step * TIME_STEP, state['pos'][0], state['pos'][1],
+                                    self.policy.get_speed(state['vel']), steer, torque, state['collision'])
+                # 4. 渲染画面
+                if self.vis.render():
+                    break  # 如果渲染返回True，表示窗口应关闭
 
-            # -------------------------- 录制当前帧 --------------------------
+                # -------------------------- 录制当前帧（控制录制频率） --------------------------
+                self.frame_count += 1
+                if self.frame_count % 5 == 0 and len(self.frames) < self.max_frames:  # 每5步录制一帧
+                    try:
+                        width, height = glfw.get_framebuffer_size(self.vis.window)
+                        if width > 0 and height > 0:
+                            buffer = np.zeros((height, width, 3), dtype=np.uint8)
+                            # 创建正确的 MjrRect 对象
+                            viewport = mujoco.MjrRect(0, 0, width, height)
+                            mujoco.mjr_readPixels(buffer, None, viewport, self.vis.context)
+                            buffer = np.flipud(buffer)
+                            self.frames.append(buffer)
+                    except Exception as e:
+                        print(f"Frame recording error: {e}")
+                # -------------------------------------------------------------------
+
+                # 打印进度（每100步）
+                if step % 100 == 0:
+                    print(
+                        f"Step: {step:4d} | Speed: {self.policy.get_speed(state['vel']):.2f}m/s | Collision: {state['collision']}")
+
+                step += 1
+
+                # 防止无限循环的安全机制
+                if step >= 10000:
+                    print("Reached maximum steps limit (10000), stopping simulation...")
+                    break
+
+        finally:
+            # -------------------------- 结束录制并保存 --------------------------
             try:
-                width, height = glfw.get_framebuffer_size(self.vis.window)
-                if width > 0 and height > 0:
-                    buffer = np.zeros((height, width, 3), dtype=np.uint8)
-                    # 创建正确的 MjrRect 对象
-                    viewport = mujoco.MjrRect(0, 0, width, height)
-                    mujoco.mjr_readPixels(buffer, None, viewport, self.vis.context)
-                    buffer = np.flipud(buffer)
-                    self.frames.append(buffer)
+                if self.frames:
+                    print(f"\nRecording completed. Saving GIF with {len(self.frames)} frames...")
+                    # 使用适中的 duration 值来保证合理的播放速度
+                    imageio.v3.imwrite('autonomous_vehicle_simulation.gif', self.frames, duration=200, loop=0)
+                    print("GIF animation saved to: autonomous_vehicle_simulation.gif")
+                else:
+                    print("No frame data available for GIF")
             except Exception as e:
-                print(f"录制帧时出错: {e}")
+                print(f"GIF saving failed: {e}")
             # -------------------------------------------------------------------
 
-            # 打印进度（每100步）
-            if step % 100 == 0:
-                print(
-                    f"Step: {step:4d} | 速度: {self.policy.get_speed(state['vel']):.2f}m/s | 碰撞: {state['collision']}")
-
-            # 仿真结束条件
-            if state['collision'] or state['pos'][0] >= 15.0 or step >= MAX_STEPS - 1:
-                end_msg = "碰撞" if state['collision'] else "到达目标" if state['pos'][0] >= 15 else "超时"
-                print(f"\n仿真结束：{end_msg}（Step: {step}）")
-                break
-
-        # -------------------------- 结束录制并保存 --------------------------
-        try:
-            if self.frames:
-                # 使用imageio v3 API保存GIF，调整duration参数延长播放时间
-                imageio.v3.imwrite('simulation.gif', self.frames, duration=200, loop=0)
-                print("GIF动图已保存至：simulation.gif（项目根目录）")
-            else:
-                print("没有帧数据可保存为GIF")
-        except Exception as e:
-            print(f"GIF保存失败: {e}")
-        # -------------------------------------------------------------------
-
-        # 关闭可视化窗口
-        self.vis.close()
-        # 打印保存路径
-        print(f"日志已保存至：{self.logger.log_path}")
+            # 关闭可视化窗口
+            self.vis.close()
+            # 打印保存路径
+            print(f"Log saved to: {self.logger.log_path}")
+            print(f"Total simulation steps: {step}")
 
 
 # -------------------------- 主函数 --------------------------
@@ -324,7 +338,7 @@ if __name__ == "__main__":
         env = VehicleEnv()
         env.run()
     except Exception as e:
-        print(f"错误：{str(e)}")
+        print(f"Error: {str(e)}")
         try:
             # 异常时也关闭录制器和窗口，避免文件损坏
             env.vis.close()
