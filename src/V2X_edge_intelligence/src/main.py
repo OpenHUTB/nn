@@ -10,7 +10,7 @@ import time
 import json
 from typing import Dict, Any
 
-# ========== 加载Carla egg文件 ==========
+# ======== 加载Carla egg文件 ========
 CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
 sys.path.append(CARLA_EGG_PATH)
 
