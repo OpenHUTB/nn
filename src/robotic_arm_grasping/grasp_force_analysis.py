@@ -1,6 +1,5 @@
 """
-项目3：三指抓取器力分析可视化 - 修复版
-修复了Matplotlib兼容性和数组维度问题
+项目3：三指抓取器力分析可视化
 """
 import numpy as np
 import matplotlib.pyplot as plt
