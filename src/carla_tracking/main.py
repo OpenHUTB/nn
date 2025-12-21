@@ -408,10 +408,15 @@ def preprocess_depth_image(depth_image):
     if depth_image is None:
         return None
 
-    depth_image = np.clip(depth_image.astype(np.float32), 0.1, 200.0)
+    # 如果深度图像是float16类型，转换为float32进行处理
+    if depth_image.dtype == np.float16:
+        depth_image = depth_image.astype(np.float32)
+
+    depth_image = np.clip(depth_image, 0.1, 200.0)
 
     if depth_image.shape[0] > 3 and depth_image.shape[1] > 3:
-        depth_image = cv2.medianBlur(depth_image, 3)
+        # 使用较小的高斯模糊，减少计算量
+        depth_image = cv2.GaussianBlur(depth_image, (3, 3), 0.5)
 
     max_val = np.max(depth_image)
     if max_val > 0:
@@ -423,6 +428,10 @@ def preprocess_depth_image(depth_image):
 def get_target_distance(depth_image, box, use_median=True):
     if depth_image is None:
         return 50.0
+
+    # 如果深度图像是float16类型，转换为float32进行计算
+    if depth_image.dtype == np.float16:
+        depth_image = depth_image.astype(np.float32)
 
     x1, y1, x2, y2 = map(int, box)
 
@@ -548,7 +557,7 @@ def spawn_ego_vehicle(world):
 def spawn_npcs(world, count=30, ego_vehicle=None):
     """修正的NPC生成函数 - 确保在主车辆周围生成足够车辆"""
     if not world:
-        return
+        return []
 
     print(f"正在生成 {count} 辆NPC车辆...")
 
@@ -584,30 +593,57 @@ def spawn_npcs(world, count=30, ego_vehicle=None):
     spawn_points = world.get_map().get_spawn_points()
     if not spawn_points:
         print("警告：没有可用的生成点！")
-        return
+        return []
 
     ego_location = ego_vehicle.get_location() if ego_vehicle else None
+    ego_transform = ego_vehicle.get_transform() if ego_vehicle else None
 
     spawned_count = 0
     npc_vehicles = []
 
+    # 获取主车辆前方的道路信息
+    if ego_transform:
+        ego_yaw = ego_transform.rotation.yaw
+        print(f"主车辆朝向: {ego_yaw:.1f}度")
+
     # 按距离排序生成点（如果主车辆存在）
     if ego_location:
         spawn_points_with_dist = []
-        for spawn_point in spawn_points:
+        for i, spawn_point in enumerate(spawn_points):
             dist = math.hypot(
                 spawn_point.location.x - ego_location.x,
                 spawn_point.location.y - ego_location.y
             )
-            spawn_points_with_dist.append((spawn_point, dist))
 
-        spawn_points_with_dist.sort(key=lambda x: x[1])
+            # 计算与主车辆方向的角度差
+            if ego_transform:
+                spawn_yaw = spawn_point.rotation.yaw
+                angle_diff = abs((spawn_yaw - ego_yaw + 180) % 360 - 180)
+
+                # 优先选择主车辆前方的点
+                if dist < 100:  # 100米范围内
+                    if angle_diff < 90:  # 方向大致相同
+                        priority = dist * 0.5  # 前方点权重更高
+                    else:
+                        priority = dist * 2.0  # 后方点权重较低
+                else:
+                    priority = dist * 1.5
+            else:
+                priority = dist
+
+            spawn_points_with_dist.append((spawn_point, dist, priority))
+
+        # 按优先级排序（优先选择近的、主车辆前方的点）
+        spawn_points_with_dist.sort(key=lambda x: x[2])
         sorted_spawn_points = [sp[0] for sp in spawn_points_with_dist]
+
+        print(f"找到了 {len(spawn_points)} 个生成点，优先选择 {min(50, len(sorted_spawn_points))} 个最近的")
     else:
         random.shuffle(spawn_points)
         sorted_spawn_points = spawn_points
 
-    # 优先在主车辆50米内生成
+    # 第一阶段：在主车辆20-80米内生成
+    print("第一阶段：在主车辆20-80米内生成...")
     for spawn_point in sorted_spawn_points:
         if spawned_count >= count:
             break
@@ -617,20 +653,34 @@ def spawn_npcs(world, count=30, ego_vehicle=None):
                 spawn_point.location.x - ego_location.x,
                 spawn_point.location.y - ego_location.y
             )
-            if dist_to_ego > 50.0 or dist_to_ego < 10.0:
+
+            # 只在20-80米范围内生成
+            if dist_to_ego < 20.0 or dist_to_ego > 80.0:
                 continue
 
-        # 检查是否太靠近其他车辆
+        # 检查是否太靠近其他车辆（包括主车辆）
         too_close = False
-        for npc in npc_vehicles:
-            npc_loc = npc.get_location()
-            dist = math.hypot(
-                npc_loc.x - spawn_point.location.x,
-                npc_loc.y - spawn_point.location.y
+
+        # 检查与主车辆的距离
+        if ego_location:
+            dist_to_ego = math.hypot(
+                spawn_point.location.x - ego_location.x,
+                spawn_point.location.y - ego_location.y
             )
-            if dist < 8.0:
+            if dist_to_ego < 10.0:  # 不能太靠近主车辆
                 too_close = True
-                break
+
+        # 检查与已生成NPC的距离
+        if not too_close:
+            for npc in npc_vehicles:
+                npc_loc = npc.get_location()
+                dist = math.hypot(
+                    npc_loc.x - spawn_point.location.x,
+                    npc_loc.y - spawn_point.location.y
+                )
+                if dist < 8.0:  # NPC之间保持8米距离
+                    too_close = True
+                    break
 
         if too_close:
             continue
@@ -644,36 +694,35 @@ def spawn_npcs(world, count=30, ego_vehicle=None):
                 if colors:
                     vehicle_bp.set_attribute('color', random.choice(colors))
 
+            # 设置NPC速度限制
+            if vehicle_bp.has_attribute('speed'):
+                max_speed = random.uniform(30.0, 70.0)  # 30-70 km/h
+                vehicle_bp.set_attribute('speed', str(max_speed))
+
             npc = world.try_spawn_actor(vehicle_bp, spawn_point)
 
             if npc:
                 npc.set_autopilot(True)
-
-                # 设置交通管理器参数
-                try:
-                    traffic_manager = world.get_trafficmanager()
-                    traffic_manager.distance_to_leading_vehicle(npc, 5.0)
-                    traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-30, 10))
-                except:
-                    pass
-
                 npc_vehicles.append(npc)
                 spawned_count += 1
+
                 if ego_location:
                     dist_to_ego = math.hypot(
                         spawn_point.location.x - ego_location.x,
                         spawn_point.location.y - ego_location.y
                     )
-                    print(f"生成NPC {spawned_count}/{count} - 距离主车辆: {dist_to_ego:.1f}米")
+                    direction = "前方" if abs(spawn_point.rotation.yaw - ego_yaw) < 90 else "后方"
+                    print(f"生成NPC {spawned_count}/{count} - 距离主车辆: {dist_to_ego:.1f}米 ({direction})")
                 else:
                     print(f"生成NPC {spawned_count}/{count}")
+
         except Exception as e:
             print(f"生成NPC失败: {e}")
             continue
 
-    # 如果数量不够，放宽条件继续生成
+    # 第二阶段：如果数量不够，放宽距离限制
     if spawned_count < count:
-        print(f"第一轮生成 {spawned_count} 辆，开始第二轮生成...")
+        print(f"第一阶段生成 {spawned_count} 辆，开始第二阶段生成 (放宽距离限制)...")
 
         for spawn_point in sorted_spawn_points:
             if spawned_count >= count:
@@ -699,7 +748,8 @@ def spawn_npcs(world, count=30, ego_vehicle=None):
                     spawn_point.location.x - ego_location.x,
                     spawn_point.location.y - ego_location.y
                 )
-                if dist_to_ego < 10.0:
+                # 第二阶段放宽到10-100米
+                if dist_to_ego < 10.0 or dist_to_ego > 100.0:
                     continue
 
             try:
@@ -714,42 +764,67 @@ def spawn_npcs(world, count=30, ego_vehicle=None):
 
                 if npc:
                     npc.set_autopilot(True)
-
-                    try:
-                        traffic_manager = world.get_trafficmanager()
-                        traffic_manager.distance_to_leading_vehicle(npc, 5.0)
-                        traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-30, 10))
-                    except:
-                        pass
-
                     npc_vehicles.append(npc)
                     spawned_count += 1
-                    print(f"生成NPC {spawned_count}/{count}")
+
+                    if ego_location:
+                        dist_to_ego = math.hypot(
+                            spawn_point.location.x - ego_location.x,
+                            spawn_point.location.y - ego_location.y
+                        )
+                        print(f"生成NPC {spawned_count}/{count} - 距离: {dist_to_ego:.1f}米")
+                    else:
+                        print(f"生成NPC {spawned_count}/{count}")
             except Exception as e:
                 print(f"生成NPC失败: {e}")
                 continue
 
     print(f"成功生成 {spawned_count} 辆NPC车辆")
 
-    # 配置交通管理器
-    try:
-        traffic_manager = world.get_trafficmanager()
-        traffic_manager.set_global_distance_to_leading_vehicle(2.5)
-        traffic_manager.global_percentage_speed_difference(0.0)
-        traffic_manager.set_synchronous_mode(True)
-        print("交通管理器配置完成")
-    except:
-        pass
+    # 打印生成统计
+    if ego_location and npc_vehicles:
+        distances = []
+        for npc in npc_vehicles:
+            npc_loc = npc.get_location()
+            dist = math.hypot(
+                npc_loc.x - ego_location.x,
+                npc_loc.y - ego_location.y
+            )
+            distances.append(dist)
+
+        if distances:
+            print(
+                f"NPC距离统计: 最近{min(distances):.1f}米, 最远{max(distances):.1f}米, 平均{np.mean(distances):.1f}米")
+
+    return npc_vehicles
 
 
+# 优化内存占用：使用更高效的回调函数
 def camera_callback(image, rgb_image_queue):
-    rgb_image_queue.put(np.reshape(np.copy(image.raw_data), (image.height, image.width, 4)))
+    """优化内存占用的RGB图像回调函数"""
+    # 使用array接口避免额外复制，只取RGB通道
+    array = np.frombuffer(image.raw_data, dtype=np.uint8)
+    array = array.reshape((image.height, image.width, 4))
+    rgb_image_queue.put(array[..., :3])  # 只存储RGB通道，丢弃Alpha通道
 
 
 def depth_camera_callback(image, depth_queue):
-    depth_data = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
-    depth_channel = (depth_data[:, :, 2] + depth_data[:, :, 1] * 256 + depth_data[:, :, 0] * 256 ** 2)
-    depth_in_meters = depth_channel / (256 ** 3 - 1) * 1000.0
+    """优化内存占用的深度图像回调函数"""
+    # 使用更小的数据类型存储深度图像
+    depth_data = np.frombuffer(image.raw_data, dtype=np.uint8)
+    depth_data = depth_data.reshape((image.height, image.width, 4))
+
+    # 使用uint16存储深度数据，减少内存占用
+    depth_channel = (
+            depth_data[..., 2].astype(np.uint16) +
+            depth_data[..., 1].astype(np.uint16) * 256 +
+            depth_data[..., 0].astype(np.uint16) * 256 ** 2
+    )
+
+    # 转换为米为单位，并使用float16存储（相比float32减少50%内存）
+    depth_in_meters = depth_channel.astype(np.float16) / (256 ** 3 - 1) * 1000.0
+
+    # 预处理深度图像
     depth_in_meters = preprocess_depth_image(depth_in_meters)
     depth_queue.put(depth_in_meters)
 
@@ -772,6 +847,7 @@ def main():
     # 初始化变量
     world = vehicle = camera = depth_camera = None
     image_queue = depth_queue = None
+    client = None
 
     try:
         # 1. 初始化设备
@@ -839,11 +915,46 @@ def main():
 
         # 6. 生成NPC车辆
         print(f"生成 {args.npc_count} 辆NPC车辆...")
-        spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+        npc_vehicles = spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+
+        if len(npc_vehicles) < args.npc_count // 2:
+            print(
+                f"警告：只成功生成了 {len(npc_vehicles)} 辆NPC车辆（目标: {args.npc_count} 辆），可能无法获得足够的检测目标")
+        else:
+            print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
+
+        # 配置交通管理器
+        try:
+            # 获取交通管理器
+            traffic_manager = client.get_trafficmanager()
+
+            # 设置交通管理器端口（通常使用默认端口8000）
+            tm_port = traffic_manager.get_port()
+
+            # 设置同步模式
+            traffic_manager.set_synchronous_mode(True)
+
+            # 设置全局参数
+            traffic_manager.set_global_distance_to_leading_vehicle(2.5)
+            traffic_manager.global_percentage_speed_difference(0.0)
+
+            # 设置所有NPC车辆的交通管理器参数
+            for npc in npc_vehicles:
+                # 重新设置自动驾驶，使用交通管理器
+                npc.set_autopilot(True, tm_port)
+
+                # 设置与前方车辆的距离
+                traffic_manager.distance_to_leading_vehicle(npc, random.uniform(2.0, 5.0))
+                # 设置速度差
+                traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-10.0, 10.0))
+
+            print("交通管理器配置完成")
+        except Exception as e:
+            print(f"交通管理器配置失败: {e}")
 
         # 等待NPC车辆稳定
         print("等待NPC车辆初始化...")
-        for _ in range(5):
+        for _ in range(10):
             world.tick()
 
         # 7. 加载检测模型和跟踪器
@@ -881,7 +992,7 @@ def main():
                 continue
 
             origin_image = image_queue.get()
-            image = cv2.cvtColor(origin_image, cv2.COLOR_BGRA2RGB)
+            image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)  # 注意：已经去掉了Alpha通道
             height, width, _ = image.shape
 
             # 获取深度图像
@@ -890,7 +1001,13 @@ def main():
                 depth_image = depth_queue.get()
 
                 if args.show_depth:
-                    depth_vis = cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)
+                    # 转换为8位用于显示
+                    if depth_image.dtype == np.float16:
+                        depth_vis = depth_image.astype(np.float32)
+                    else:
+                        depth_vis = depth_image.copy()
+
+                    depth_vis = cv2.normalize(depth_vis, None, 0, 255, cv2.NORM_MINMAX)
                     depth_vis = depth_vis.astype(np.uint8)
                     depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
                     cv2.imshow('Depth Image', depth_vis)
@@ -1035,8 +1152,23 @@ def main():
                             actor.destroy()
                         except:
                             pass
-                spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+                npc_vehicles = spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
                 print("NPC重新生成完成")
+
+                # 重新配置交通管理器
+                try:
+                    traffic_manager = client.get_trafficmanager()
+                    tm_port = traffic_manager.get_port()
+                    traffic_manager.set_synchronous_mode(True)
+
+                    for npc in npc_vehicles:
+                        npc.set_autopilot(True, tm_port)
+                        traffic_manager.distance_to_leading_vehicle(npc, random.uniform(2.0, 5.0))
+                        traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-10.0, 10.0))
+
+                    print("交通管理器重新配置完成")
+                except Exception as e:
+                    print(f"交通管理器重新配置失败: {e}")
 
             # FPS控制
             elapsed = time.time() - start_time
@@ -1086,4 +1218,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
