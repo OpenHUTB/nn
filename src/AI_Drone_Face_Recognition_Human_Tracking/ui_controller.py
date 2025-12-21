@@ -1,4 +1,4 @@
-# pycharm_ui_demo_enhanced.py - 增强版
+# 用户界面控制模块
 import os
 import sys
 import pygame
