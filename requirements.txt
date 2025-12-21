@@ -1,3 +1,25 @@
+# === 1. 指定 CPU 版本的下载源 (用于 Linux 环境节省空间) ===
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# === 2. PyTorch 配置 (智能切换) ===
+# Linux (GitHub Actions): 强制下载 CPU 版 (极小)
+torch==2.5.1+cpu; sys_platform == 'linux'
+torchvision==0.20.1+cpu; sys_platform == 'linux'
+
+# Windows (你本地): 下载标准版 (带显卡支持)
+torch==2.5.1; sys_platform == 'win32'
+torchvision==0.20.1; sys_platform == 'win32'
+
+# === 3. TensorFlow 配置 ===
+# Linux: 下载 CPU 版
+tensorflow-cpu; sys_platform == 'linux'
+# Windows: 下载标准版
+tensorflow; sys_platform == 'win32'
+
+# === 4. Windows 专用库 (修复 Linux 报错) ===
+pywinpty==3.0.2; sys_platform == 'win32'
+
+# === 5. 其他通用依赖 (保持不变) ===
 anyio==4.11.0
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
@@ -88,7 +110,6 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
 python-json-logger==4.0.0
 pytz==2025.2
-pywinpty==3.0.2
 PyYAML==6.0.3
 pyzmq==27.1.0
 referencing==0.37.0
@@ -106,8 +127,6 @@ stack-data==0.6.3
 sympy==1.14.0
 terminado==0.18.1
 tinycss2==1.4.0
-torch==2.9.1
-torchvision==0.24.1
 tornado==6.5.2
 tqdm==4.67.1
 traitlets==5.14.3
