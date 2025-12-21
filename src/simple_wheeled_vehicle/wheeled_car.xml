@@ -1,4 +1,4 @@
-<mujoco model="auto_creep_with_obstacles">
+<mujoco model="cam_plus_front_obstacle">
   <option timestep="0.002" integrator="Euler"/>
   <compiler angle="radian" coordinate="local" autolimits="false"/>
 
@@ -7,7 +7,6 @@
     <material name="wheel" texture="wheel" texuniform="true" reflectance="0.2"/>
     <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.6 0.6 0.6" rgb2="0.8 0.8 0.8"/>
     <material name="grid" texture="grid" texuniform="true" reflectance="0.2"/>
-    <!-- 障碍物材质 -->
     <material name="obs" rgba="0.2 0.4 0.8 1"/>
     <material name="wall" rgba="0.5 0.5 0.5 1"/>
   </asset>
@@ -25,7 +24,7 @@
       <joint type="hinge" axis="0 0 1" damping="5" limited="false"/>
     </default>
     <default class="drive">
-      <motor ctrlrange="-0.8 0.8" ctrllimited="true" gear="25"/>
+      <motor ctrlrange="-0.8 0.8" ctrllimited="true" gear="60"/>
     </default>
     <default class="servo">
       <motor ctrlrange="-0.3 0.3" ctrllimited="true" gear="15"/>
@@ -35,8 +34,7 @@
   <worldbody>
     <geom name="floor" type="plane" size="10 10 0.1" material="grid"/>
 
-    <!-- ===== 周边障碍物群（5×5 m 范围） ===== -->
-    <!-- 1. 盒子障碍 -->
+    <!-- ===== 周围原有多障碍（全部保留） ===== -->
     <body name="obs_box1" pos="1.0 0.5 0.05">
       <geom type="box" size="0.15 0.15 0.15" material="obs" mass="1"/>
     </body>
@@ -49,8 +47,6 @@
     <body name="obs_box4" pos="2.0 -1.0 0.05">
       <geom type="box" size="0.10 0.20 0.10" material="obs" mass="0.9"/>
     </body>
-
-    <!-- 2. 球障碍 -->
     <body name="obs_ball1" pos="-1.0 -1.0 0.04">
       <geom type="sphere" size="0.08" material="obs" mass="0.6"/>
     </body>
@@ -60,8 +56,6 @@
     <body name="obs_ball3" pos="-2.0 0.5 0.04">
       <geom type="sphere" size="0.10" material="obs" mass="0.8"/>
     </body>
-
-    <!-- 3. 矮墙障碍（当路障） -->
     <body name="wall1" pos="0 2.5 0.02">
       <geom type="box" size="0.8 0.05 0.04" material="wall" mass="0.5"/>
     </body>
@@ -69,7 +63,11 @@
       <geom type="box" size="0.05 0.8 0.04" material="wall" mass="0.5"/>
     </body>
 
-    <!-- 小车 -->
+    <!-- ===== 前方新增障碍物（保留原有多障碍） =====-->
+    <body name="front_dark_box" pos="3.0 0 0.05">
+    <geom type="box" size="0.15 0.15 0.15" material="obs" mass="1"/>
+    </body>
+    <!-- 小车：保留绿色相机 -->
     <body name="chassis" pos="0 0 0.03">
       <freejoint/>
       <geom name="body" type="box" size="0.18 0.22 0.02" pos="0 0 -0.02" rgba="0.9 0.2 0.2 1" mass="3"/>
