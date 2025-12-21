@@ -1,4 +1,4 @@
-# modules/voice_synthesizer.py
+# 语音合成模块
 import os
 import threading
 import time
