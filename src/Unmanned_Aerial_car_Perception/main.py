@@ -20,7 +20,7 @@ def main():
         # world = client.load_world("Town01")
         # print("🔄 已切换地图为：Town01")
 
-        # 2. 获取车辆蓝图（保留红色车身，易识别）
+        # 2. 获取车辆蓝图，设置红色车身
         vehicle_bp = world.get_blueprint_library().find("vehicle.tesla.model3")
         if vehicle_bp.has_attribute('color'):
             vehicle_bp.set_attribute('color', '255,0,0')  # 红色车身
@@ -51,26 +51,29 @@ def main():
             spectator.set_transform(spectator_transform)
             print("👀 模拟器视角已切换到车辆位置！")
 
-            # 4. 添加RGB摄像头传感器（保留原始回调逻辑）
+            # 4. 添加RGB摄像头传感器（绑定到车辆）
             camera_bp = world.get_blueprint_library().find('sensor.camera.rgb')
+            # 设置摄像头参数
             camera_bp.set_attribute('image_size_x', '800')
             camera_bp.set_attribute('image_size_y', '600')
             camera_bp.set_attribute('fov', '90')
+            # 摄像头安装位置（车辆前上方）
             camera_transform = carla.Transform(carla.Location(x=1.5, z=2.4))
             camera_sensor = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
 
-            # 定义摄像头回调函数（保留原始逻辑，可取消注释保存图片）
+            # 定义摄像头回调函数（保存图片/打印信息）
             def camera_callback(image):
                 # 保存摄像头画面到本地（可选，取消注释即可）
                 # image.save_to_disk(f'./camera_images/frame_{image.frame_number}.png')
                 print(f"📸 摄像头帧号：{image.frame_number} | 时间戳：{image.timestamp}")
 
+            # 绑定回调函数
             camera_sensor.listen(camera_callback)
             print("📹 已挂载RGB摄像头，开始采集画面！")
 
-            # 5. 车辆多阶段控制（保留原始逻辑，行驶更明显）
+            # 5. 车辆多阶段控制（前进→右转→减速）
             print("\n🚙 开始车辆控制演示...")
-            # 阶段1：直行3秒（油门加大到0.7，行驶更明显）
+            # 阶段1：直行3秒（油门0.7，行驶更明显）
             vehicle.apply_control(carla.VehicleControl(throttle=0.7, steer=0.0, brake=0.0))
             time.sleep(3)
             # 阶段2：右转2秒
@@ -81,7 +84,7 @@ def main():
             time.sleep(1)
             print("🛑 车辆已停车")
 
-            # 6. 打印车辆最终状态（保留原始格式）
+            # 6. 打印车辆最终状态
             vehicle_location = vehicle.get_location()
             vehicle_velocity = vehicle.get_velocity()
             print(f"\n📊 车辆最终状态：")
