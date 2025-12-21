@@ -22,9 +22,6 @@ def traffic_light_real_time_detection():
     save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "real_time_detection_results")
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-
-    # 2. 定义红、黄、绿三种颜色的HSV阈值范围（优化后更适配实时场景）
-    # 红色（两个区间，覆盖HSV红色色域）
     red_lower1 = np.array([0, 100, 80])
     red_upper1 = np.array([10, 255, 255])
     red_lower2 = np.array([160, 100, 80])
