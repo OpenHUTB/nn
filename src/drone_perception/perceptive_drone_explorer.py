@@ -3,7 +3,8 @@ AirSimNH 感知驱动自主探索无人机 - 智能决策增强版（修复版�
 核心：视觉感知 → 语义理解 → 智能决策 → 安全执行
 集成：配置管理、日志系统、异常恢复、前视窗口显示
 新增：向量场避障算法、基于网格的信息增益探索、平滑飞行控制
-版本: 3.1 (修复配置和健康检查问题)
+新增：性能监控与数据闭环系统
+版本: 3.2 (完整版)
 """
 
 import airsim
@@ -11,6 +12,8 @@ import time
 import numpy as np
 import cv2
 import math
+import json
+import csv
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
@@ -18,11 +21,13 @@ import threading
 import queue
 import signal
 import sys
-from typing import Tuple, List, Optional, Dict, Set
+from typing import Tuple, List, Optional, Dict, Set, Any
 import traceback
 import logging
 from datetime import datetime
 import random
+import psutil
+import os
 
 # ============ 导入配置文件 ============
 try:
@@ -91,6 +96,26 @@ except ImportError as e:
             'SAVE_PERCEPTION_IMAGES': False,
             'IMAGE_SAVE_INTERVAL': 50,
             'LOG_DECISION_DETAILS': False
+        }
+        # 新增：数据记录参数
+        DATA_RECORDING = {
+            'ENABLED': True,
+            'RECORD_INTERVAL': 0.2,               # 记录间隔（秒）
+            'SAVE_TO_CSV': True,
+            'SAVE_TO_JSON': True,
+            'CSV_FILENAME': 'flight_data.csv',
+            'JSON_FILENAME': 'flight_data.json',
+            'PERFORMANCE_MONITORING': True,       # 性能监控
+            'SYSTEM_METRICS_INTERVAL': 5.0,       # 系统指标记录间隔
+        }
+        # 新增：性能监控参数
+        PERFORMANCE = {
+            'ENABLE_REALTIME_METRICS': True,
+            'CPU_WARNING_THRESHOLD': 80.0,        # CPU使用率警告阈值
+            'MEMORY_WARNING_THRESHOLD': 80.0,     # 内存使用率警告阈值
+            'LOOP_TIME_WARNING_THRESHOLD': 0.2,   # 循环时间警告阈值（秒）
+            'SAVE_PERFORMANCE_REPORT': True,
+            'REPORT_INTERVAL': 30.0,              # 性能报告间隔（秒）
         }
     config = DefaultConfig()
 
@@ -369,6 +394,279 @@ class ExplorationGrid:
         return img
 
 
+class DataLogger:
+    """数据记录器类 - 用于记录飞行数据"""
+
+    def __init__(self, enable_csv=True, enable_json=True, csv_filename=None, json_filename=None):
+        self.enable_csv = enable_csv
+        self.enable_json = enable_json
+
+        # 生成时间戳
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # 设置文件名
+        if csv_filename:
+            self.csv_filename = csv_filename
+        else:
+            self.csv_filename = f"flight_data_{timestamp}.csv"
+
+        if json_filename:
+            self.json_filename = json_filename
+        else:
+            self.json_filename = f"flight_data_{timestamp}.json"
+
+        # 数据缓存
+        self.data_buffer = []
+        self.json_data = {
+            "flight_info": {
+                "start_time": datetime.now().isoformat(),
+                "config_loaded": CONFIG_LOADED,
+                "system": config.SYSTEM,
+                "exploration": config.EXPLORATION,
+                "perception": config.PERCEPTION,
+                "intelligent_decision": config.INTELLIGENT_DECISION,
+                "performance": config.PERFORMANCE
+            },
+            "flight_data": []
+        }
+
+        # 性能指标
+        self.performance_metrics = {
+            "start_time": time.time(),
+            "cpu_usage": [],
+            "memory_usage": [],
+            "loop_times": [],
+            "data_points": 0
+        }
+
+        # 定义CSV列名
+        self.csv_columns = [
+            'timestamp', 'loop_count', 'state', 'pos_x', 'pos_y', 'pos_z',
+            'vel_x', 'vel_y', 'vel_z', 'yaw', 'pitch', 'roll',
+            'obstacle_distance', 'open_space_score', 'terrain_slope',
+            'has_obstacle', 'obstacle_direction', 'recommended_height',
+            'target_x', 'target_y', 'target_z', 'velocity_command_x',
+            'velocity_command_y', 'velocity_command_z', 'yaw_command',
+            'battery_level', 'cpu_usage', 'memory_usage', 'loop_time',
+            'grid_frontiers', 'grid_explored', 'vector_field_magnitude',
+            'adaptive_speed_factor', 'decision_making_time', 'perception_time'
+        ]
+
+        # 初始化CSV文件
+        if self.enable_csv:
+            self._init_csv_file()
+
+        print(f"📊 数据记录器初始化完成")
+        print(f"  CSV文件: {self.csv_filename}")
+        print(f"  JSON文件: {self.json_filename}")
+
+    def _init_csv_file(self):
+        """初始化CSV文件，写入列名"""
+        try:
+            with open(self.csv_filename, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=self.csv_columns)
+                writer.writeheader()
+        except Exception as e:
+            print(f"❌ 无法初始化CSV文件: {e}")
+            self.enable_csv = False
+
+    def record_flight_data(self, data_dict):
+        """记录飞行数据"""
+        if not config.DATA_RECORDING['ENABLED']:
+            return
+
+        try:
+            # 添加时间戳
+            data_dict['timestamp'] = datetime.now().isoformat()
+
+            # 记录到CSV
+            if self.enable_csv:
+                with open(self.csv_filename, 'a', newline='', encoding='utf-8') as f:
+                    writer = csv.DictWriter(f, fieldnames=self.csv_columns)
+
+                    # 确保所有字段都存在
+                    row = {col: data_dict.get(col, '') for col in self.csv_columns}
+                    writer.writerow(row)
+
+            # 记录到JSON缓冲区
+            if self.enable_json:
+                self.json_data['flight_data'].append(data_dict)
+
+            # 更新性能指标
+            self.performance_metrics['data_points'] += 1
+
+            # 收集系统性能数据
+            if self.performance_metrics['data_points'] % 10 == 0:
+                self._collect_system_metrics()
+
+        except Exception as e:
+            print(f"⚠️ 记录飞行数据时出错: {e}")
+
+    def _collect_system_metrics(self):
+        """收集系统性能指标"""
+        try:
+            # CPU使用率
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            self.performance_metrics['cpu_usage'].append(cpu_percent)
+
+            # 内存使用率
+            memory_info = psutil.virtual_memory()
+            memory_percent = memory_info.percent
+            self.performance_metrics['memory_usage'].append(memory_percent)
+
+            # 限制数据长度
+            max_length = 1000
+            if len(self.performance_metrics['cpu_usage']) > max_length:
+                self.performance_metrics['cpu_usage'] = self.performance_metrics['cpu_usage'][-max_length:]
+            if len(self.performance_metrics['memory_usage']) > max_length:
+                self.performance_metrics['memory_usage'] = self.performance_metrics['memory_usage'][-max_length:]
+
+        except Exception as e:
+            print(f"⚠️ 收集系统指标时出错: {e}")
+
+    def record_loop_time(self, loop_time):
+        """记录循环时间"""
+        self.performance_metrics['loop_times'].append(loop_time)
+
+        # 限制数据长度
+        max_length = 1000
+        if len(self.performance_metrics['loop_times']) > max_length:
+            self.performance_metrics['loop_times'] = self.performance_metrics['loop_times'][-max_length:]
+
+    def record_event(self, event_type, event_data):
+        """记录事件（状态改变、异常等）"""
+        try:
+            event_record = {
+                'timestamp': datetime.now().isoformat(),
+                'event_type': event_type,
+                'event_data': event_data
+            }
+
+            if 'events' not in self.json_data:
+                self.json_data['events'] = []
+
+            self.json_data['events'].append(event_record)
+
+        except Exception as e:
+            print(f"⚠️ 记录事件时出错: {e}")
+
+    def save_json_data(self):
+        """保存JSON数据到文件"""
+        if not self.enable_json:
+            return
+
+        try:
+            # 计算性能统计
+            self._calculate_performance_stats()
+
+            # 保存到文件
+            with open(self.json_filename, 'w', encoding='utf-8') as f:
+                json.dump(self.json_data, f, indent=2, ensure_ascii=False)
+
+            print(f"✅ JSON数据已保存: {self.json_filename}")
+
+        except Exception as e:
+            print(f"❌ 保存JSON数据时出错: {e}")
+
+    def _calculate_performance_stats(self):
+        """计算性能统计数据"""
+        if not self.performance_metrics['cpu_usage']:
+            return
+
+        # 计算CPU统计
+        cpu_avg = np.mean(self.performance_metrics['cpu_usage'])
+        cpu_max = np.max(self.performance_metrics['cpu_usage'])
+        cpu_min = np.min(self.performance_metrics['cpu_usage'])
+
+        # 计算内存统计
+        mem_avg = np.mean(self.performance_metrics['memory_usage'])
+        mem_max = np.max(self.performance_metrics['memory_usage'])
+        mem_min = np.min(self.performance_metrics['memory_usage'])
+
+        # 计算循环时间统计
+        if self.performance_metrics['loop_times']:
+            loop_avg = np.mean(self.performance_metrics['loop_times'])
+            loop_max = np.max(self.performance_metrics['loop_times'])
+            loop_min = np.min(self.performance_metrics['loop_times'])
+        else:
+            loop_avg = loop_max = loop_min = 0
+
+        # 添加到JSON数据
+        self.json_data['performance_summary'] = {
+            'total_data_points': self.performance_metrics['data_points'],
+            'total_time_seconds': time.time() - self.performance_metrics['start_time'],
+            'cpu_usage': {
+                'average': float(cpu_avg),
+                'maximum': float(cpu_max),
+                'minimum': float(cpu_min)
+            },
+            'memory_usage': {
+                'average': float(mem_avg),
+                'maximum': float(mem_max),
+                'minimum': float(mem_min)
+            },
+            'loop_times': {
+                'average_seconds': float(loop_avg),
+                'maximum_seconds': float(loop_max),
+                'minimum_seconds': float(loop_min)
+            }
+        }
+
+    def generate_performance_report(self):
+        """生成性能报告"""
+        try:
+            if not self.performance_metrics['cpu_usage']:
+                return "无性能数据可用"
+
+            # 计算统计
+            self._calculate_performance_stats()
+
+            report = "\n" + "="*60 + "\n"
+            report += "📊 系统性能报告\n"
+            report += "="*60 + "\n"
+
+            report += f"总数据点数: {self.performance_metrics['data_points']}\n"
+            report += f"运行时间: {time.time() - self.performance_metrics['start_time']:.1f}秒\n"
+
+            if self.performance_metrics['cpu_usage']:
+                cpu_avg = np.mean(self.performance_metrics['cpu_usage'])
+                cpu_max = np.max(self.performance_metrics['cpu_usage'])
+                report += f"CPU使用率: 平均{cpu_avg:.1f}%, 最大{cpu_max:.1f}%\n"
+
+            if self.performance_metrics['memory_usage']:
+                mem_avg = np.mean(self.performance_metrics['memory_usage'])
+                mem_max = np.max(self.performance_metrics['memory_usage'])
+                report += f"内存使用率: 平均{mem_avg:.1f}%, 最大{mem_max:.1f}%\n"
+
+            if self.performance_metrics['loop_times']:
+                loop_avg = np.mean(self.performance_metrics['loop_times'])
+                loop_max = np.max(self.performance_metrics['loop_times'])
+                report += f"循环时间: 平均{loop_avg*1000:.1f}ms, 最大{loop_max*1000:.1f}ms\n"
+
+            report += "="*60 + "\n"
+
+            # 检查警告
+            warnings = []
+            if cpu_avg > config.PERFORMANCE['CPU_WARNING_THRESHOLD']:
+                warnings.append(f"⚠️ CPU使用率过高: {cpu_avg:.1f}%")
+
+            if mem_avg > config.PERFORMANCE['MEMORY_WARNING_THRESHOLD']:
+                warnings.append(f"⚠️ 内存使用率过高: {mem_avg:.1f}%")
+
+            if loop_avg > config.PERFORMANCE['LOOP_TIME_WARNING_THRESHOLD']:
+                warnings.append(f"⚠️ 循环时间过长: {loop_avg*1000:.1f}ms")
+
+            if warnings:
+                report += "\n⚠️ 性能警告:\n"
+                for warning in warnings:
+                    report += f"  {warning}\n"
+
+            return report
+
+        except Exception as e:
+            return f"生成性能报告时出错: {e}"
+
+
 @dataclass
 class PerceptionResult:
     """感知结果数据结构"""
@@ -541,6 +839,13 @@ class FrontViewDisplay:
             'frame_count': 0
         }
 
+        # 性能监控显示
+        self.performance_info = {
+            'cpu_usage': 0.0,
+            'memory_usage': 0.0,
+            'update_time': time.time()
+        }
+
         # 启动显示线程
         self.start()
 
@@ -598,6 +903,12 @@ class FrontViewDisplay:
 
         except Exception as e:
             print(f"⚠️ 更新图像时出错: {e}")
+
+    def update_performance_info(self, cpu_usage, memory_usage):
+        """更新性能信息"""
+        self.performance_info['cpu_usage'] = cpu_usage
+        self.performance_info['memory_usage'] = memory_usage
+        self.performance_info['update_time'] = time.time()
 
     def set_manual_mode(self, manual_mode):
         """设置手动模式状态"""
@@ -843,6 +1154,19 @@ class FrontViewDisplay:
             cv2.putText(image, fps_text, (width - 120, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
 
+            # 性能信息
+            if self.performance_info['cpu_usage'] > 0:
+                cpu_text = f"CPU: {self.performance_info['cpu_usage']:.1f}%"
+                mem_text = f"MEM: {self.performance_info['memory_usage']:.1f}%"
+
+                cpu_color = (0, 200, 255) if self.performance_info['cpu_usage'] > 80 else (0, 255, 0)
+                mem_color = (0, 200, 255) if self.performance_info['memory_usage'] > 80 else (0, 255, 0)
+
+                cv2.putText(image, cpu_text, (width - 120, 60),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, cpu_color, 1)
+                cv2.putText(image, mem_text, (width - 120, 80),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, mem_color, 1)
+
             # 如果有网格图，显示在右上角
             if grid_img is not None and grid_img.size > 0:
                 grid_size = 150
@@ -956,6 +1280,17 @@ class PerceptiveExplorer:
         self.reconnect_attempts = 0
         self.last_successful_loop = time.time()
 
+        # 数据记录器
+        self.data_logger = None
+        self.last_data_record_time = 0
+        self.data_record_interval = config.DATA_RECORDING.get('RECORD_INTERVAL', 0.2)
+        if config.DATA_RECORDING['ENABLED']:
+            self._setup_data_logger()
+
+        # 性能监控
+        self.last_performance_report = time.time()
+        self.performance_report_interval = config.PERFORMANCE.get('REPORT_INTERVAL', 30.0)
+
         # 运行统计
         self.stats = {
             'perception_cycles': 0,
@@ -967,6 +1302,10 @@ class PerceptiveExplorer:
             'manual_control_time': 0.0,
             'vector_field_updates': 0,
             'grid_updates': 0,
+            'data_points_recorded': 0,
+            'average_loop_time': 0.0,
+            'max_loop_time': 0.0,
+            'min_loop_time': 100.0,
         }
 
         # 前视窗口
@@ -981,6 +1320,8 @@ class PerceptiveExplorer:
         self.logger.info(f"   开始时间: {datetime.now().strftime('%H:%M:%S')}")
         self.logger.info(f"   预计探索时长: {self.exploration_time}秒")
         self.logger.info(f"   智能决策: 向量场避障 + 网格探索")
+        if config.DATA_RECORDING['ENABLED']:
+            self.logger.info(f"   数据记录: CSV + JSON 格式")
 
     def _setup_logging(self):
         """配置日志系统"""
@@ -1007,6 +1348,20 @@ class PerceptiveExplorer:
                 self.logger.info(f"📝 日志将保存至: {config.SYSTEM['LOG_FILENAME']}")
             except Exception as e:
                 print(f"⚠️ 无法创建日志文件: {e}")
+
+    def _setup_data_logger(self):
+        """初始化数据记录器"""
+        try:
+            self.data_logger = DataLogger(
+                enable_csv=config.DATA_RECORDING['SAVE_TO_CSV'],
+                enable_json=config.DATA_RECORDING['SAVE_TO_JSON'],
+                csv_filename=config.DATA_RECORDING.get('CSV_FILENAME'),
+                json_filename=config.DATA_RECORDING.get('JSON_FILENAME')
+            )
+            self.logger.info("📊 数据记录器初始化完成")
+        except Exception as e:
+            self.logger.error(f"❌ 数据记录器初始化失败: {e}")
+            self.data_logger = None
 
     def _connect_to_airsim(self):
         """连接到AirSim，支持重试机制"""
@@ -1181,6 +1536,9 @@ class PerceptiveExplorer:
                         # 更新探索网格
                         self._update_exploration_grid(result)
 
+                        # 记录数据
+                        self._record_flight_data(result)
+
                         # 更新前视窗口
                         if self.front_display:
                             manual_info = None
@@ -1190,6 +1548,12 @@ class PerceptiveExplorer:
                             # 获取网格可视化图像
                             grid_img = self.exploration_grid.visualize_grid(size=150)
                             additional_images = {'grid': grid_img} if grid_img is not None else {}
+
+                            # 更新性能信息
+                            if config.PERFORMANCE['ENABLE_REALTIME_METRICS']:
+                                cpu_usage = psutil.cpu_percent(interval=0)
+                                memory_usage = psutil.virtual_memory().percent
+                                self.front_display.update_performance_info(cpu_usage, memory_usage)
 
                             self.front_display.update_image(img_bgr, display_info, manual_info, additional_images)
                             self.stats['front_image_updates'] += 1
@@ -1208,14 +1572,80 @@ class PerceptiveExplorer:
             if "ClientException" in str(type(e)) or "Connection" in str(e):
                 self.logger.error(f"❌ AirSim客户端异常: {e}")
                 self.stats['exceptions_caught'] += 1
+                # 记录事件
+                if self.data_logger:
+                    self.data_logger.record_event('airsim_exception', {'error': str(e)})
                 # 尝试重新连接
                 self._check_connection_health()
             else:
                 self.logger.error(f"❌ 感知过程中发生未知异常: {e}")
                 self.logger.debug(f"异常详情: {traceback.format_exc()}")
                 self.stats['exceptions_caught'] += 1
+                if self.data_logger:
+                    self.data_logger.record_event('perception_exception', {'error': str(e)})
 
         return result
+
+    def _record_flight_data(self, perception: PerceptionResult):
+        """记录飞行数据"""
+        if not config.DATA_RECORDING['ENABLED'] or not self.data_logger:
+            return
+
+        current_time = time.time()
+        if current_time - self.last_data_record_time < self.data_record_interval:
+            return
+
+        try:
+            # 获取无人机状态
+            state = self.client.getMultirotorState(vehicle_name=self.drone_name)
+            pos = state.kinematics_estimated.position
+            vel = state.kinematics_estimated.linear_velocity
+            orientation = state.kinematics_estimated.orientation
+
+            # 转换为欧拉角
+            roll, pitch, yaw = airsim.to_eularian_angles(orientation)
+
+            # 收集系统性能数据
+            cpu_usage = psutil.cpu_percent(interval=0) if config.PERFORMANCE['ENABLE_REALTIME_METRICS'] else 0.0
+            memory_usage = psutil.virtual_memory().percent if config.PERFORMANCE['ENABLE_REALTIME_METRICS'] else 0.0
+
+            # 构建数据字典
+            data_dict = {
+                'timestamp': datetime.now().isoformat(),
+                'loop_count': self.loop_count,
+                'state': self.state.value,
+                'pos_x': pos.x_val,
+                'pos_y': pos.y_val,
+                'pos_z': pos.z_val,
+                'vel_x': vel.x_val,
+                'vel_y': vel.y_val,
+                'vel_z': vel.z_val,
+                'yaw': yaw,
+                'pitch': pitch,
+                'roll': roll,
+                'obstacle_distance': perception.obstacle_distance,
+                'open_space_score': perception.open_space_score,
+                'terrain_slope': perception.terrain_slope,
+                'has_obstacle': perception.has_obstacle,
+                'obstacle_direction': perception.obstacle_direction,
+                'recommended_height': perception.recommended_height,
+                'target_x': self.exploration_target[0] if self.exploration_target else 0.0,
+                'target_y': self.exploration_target[1] if self.exploration_target else 0.0,
+                'target_z': perception.recommended_height,
+                'cpu_usage': cpu_usage,
+                'memory_usage': memory_usage,
+                'grid_frontiers': len(self.exploration_grid.frontier_cells),
+                'grid_explored': np.sum(self.exploration_grid.grid > 0.7),
+                'adaptive_speed_factor': self._calculate_adaptive_speed(perception, 0) if hasattr(self, '_calculate_adaptive_speed') else 1.0,
+            }
+
+            # 记录数据
+            self.data_logger.record_flight_data(data_dict)
+            self.stats['data_points_recorded'] += 1
+            self.last_data_record_time = current_time
+
+        except Exception as e:
+            self.logger.warning(f"⚠️ 记录飞行数据时出错: {e}")
 
     def _extract_obstacle_positions(self, depth_array, height, width):
         """从深度图像中提取障碍物位置"""
@@ -1300,6 +1730,10 @@ class PerceptiveExplorer:
             # 添加决策信息
             if hasattr(self, 'last_decision_info'):
                 info['decision_info'] = self.last_decision_info
+
+            # 添加数据记录信息
+            if config.DATA_RECORDING['ENABLED']:
+                info['data_points'] = self.stats['data_points_recorded']
 
             return info
         except:
@@ -1433,10 +1867,20 @@ class PerceptiveExplorer:
     def change_state(self, new_state: FlightState):
         """状态转换"""
         if self.state != new_state:
-            self.logger.info(f"🔄 状态转换: {self.state.value} → {new_state.value}")
+            old_state = self.state.value
+            self.logger.info(f"🔄 状态转换: {old_state} → {new_state.value}")
             self.state = new_state
             self.state_history.append((time.time(), new_state))
             self.stats['state_changes'] += 1
+
+            # 记录状态改变事件
+            if self.data_logger:
+                event_data = {
+                    'old_state': old_state,
+                    'new_state': new_state.value,
+                    'loop_count': self.loop_count
+                }
+                self.data_logger.record_event('state_change', event_data)
 
     def run_manual_control(self):
         """手动控制模式"""
@@ -1642,6 +2086,22 @@ class PerceptiveExplorer:
                 # 3. 控制执行阶段
                 self._execute_control_decision(decision)
 
+                # 记录循环时间
+                loop_time = time.time() - loop_start
+                self.stats['average_loop_time'] = (self.stats['average_loop_time'] * (self.loop_count-1) + loop_time) / self.loop_count
+                self.stats['max_loop_time'] = max(self.stats['max_loop_time'], loop_time)
+                self.stats['min_loop_time'] = min(self.stats['min_loop_time'], loop_time)
+
+                # 记录循环时间
+                if self.data_logger:
+                    self.data_logger.record_loop_time(loop_time)
+
+                # 定期性能报告
+                current_time = time.time()
+                if current_time - self.last_performance_report >= self.performance_report_interval:
+                    self._generate_performance_report()
+                    self.last_performance_report = current_time
+
                 # 定期状态报告
                 if self.loop_count % config.SYSTEM.get('HEALTH_CHECK_INTERVAL', 20) == 0:
                     self._report_status(exploration_start, perception)
@@ -1663,9 +2123,53 @@ class PerceptiveExplorer:
             self.logger.debug(f"异常堆栈: {traceback.format_exc()}")
             self.emergency_stop()
 
+    def _generate_performance_report(self):
+        """生成性能报告"""
+        try:
+            if not config.PERFORMANCE['ENABLE_REALTIME_METRICS']:
+                return
+
+            # 获取当前性能数据
+            cpu_usage = psutil.cpu_percent(interval=0)
+            memory_usage = psutil.virtual_memory().percent
+
+            # 检查警告
+            warnings = []
+            if cpu_usage > config.PERFORMANCE['CPU_WARNING_THRESHOLD']:
+                warnings.append(f"⚠️ CPU使用率过高: {cpu_usage:.1f}%")
+
+            if memory_usage > config.PERFORMANCE['MEMORY_WARNING_THRESHOLD']:
+                warnings.append(f"⚠️ 内存使用率过高: {memory_usage:.1f}%")
+
+            avg_loop_time = self.stats.get('average_loop_time', 0)
+            if avg_loop_time > config.PERFORMANCE['LOOP_TIME_WARNING_THRESHOLD']:
+                warnings.append(f"⚠️ 平均循环时间过长: {avg_loop_time*1000:.1f}ms")
+
+            if warnings:
+                self.logger.warning("📊 性能警告:")
+                for warning in warnings:
+                    self.logger.warning(f"  {warning}")
+
+            # 记录性能数据
+            if self.data_logger:
+                performance_data = {
+                    'timestamp': datetime.now().isoformat(),
+                    'cpu_usage': cpu_usage,
+                    'memory_usage': memory_usage,
+                    'average_loop_time': avg_loop_time,
+                    'max_loop_time': self.stats.get('max_loop_time', 0),
+                    'min_loop_time': self.stats.get('min_loop_time', 0),
+                    'warnings': warnings
+                }
+                self.data_logger.record_event('performance_report', performance_data)
+
+        except Exception as e:
+            self.logger.warning(f"⚠️ 生成性能报告时出错: {e}")
+
     def make_intelligent_decision(self, perception: PerceptionResult) -> Tuple[float, float, float, float]:
         """基于感知结果做出智能决策 - 增强版（修复配置键名）"""
         self.stats['decision_cycles'] += 1
+        decision_start = time.time()
 
         try:
             state = self.client.getMultirotorState(vehicle_name=self.drone_name)
@@ -1739,7 +2243,8 @@ class PerceptiveExplorer:
                         'vector_angle': math.atan2(vector.y, vector.x),
                         'vector_magnitude': vector.magnitude(),
                         'grid_score': len(self.exploration_grid.frontier_cells) / 100.0,
-                        'speed_factor': speed_factor
+                        'speed_factor': speed_factor,
+                        'decision_time': time.time() - decision_start
                     }
 
                     # 检查是否到达目标附近
@@ -1794,10 +2299,17 @@ class PerceptiveExplorer:
             # 高度安全限制
             target_z = max(self.max_altitude, min(self.min_altitude, target_z))
 
+            # 记录决策时间
+            decision_time = time.time() - decision_start
+            self.last_decision_info['total_decision_time'] = decision_time
+
             return target_vx, target_vy, target_z, target_yaw
 
         except Exception as e:
             self.logger.error(f"❌ 决策过程异常: {e}")
+            # 记录异常事件
+            if self.data_logger:
+                self.data_logger.record_event('decision_exception', {'error': str(e)})
             return 0.0, 0.0, self.base_height, 0.0
 
     def _calculate_adaptive_speed(self, perception: PerceptionResult, vector_magnitude: float) -> float:
@@ -1854,6 +2366,9 @@ class PerceptiveExplorer:
 
         except Exception as e:
             self.logger.warning(f"⚠️ 控制指令执行失败: {e}")
+            # 记录异常事件
+            if self.data_logger:
+                self.data_logger.record_event('control_exception', {'error': str(e)})
             try:
                 self.client.hoverAsync(vehicle_name=self.drone_name).join()
             except:
@@ -1878,6 +2393,10 @@ class PerceptiveExplorer:
             self.logger.info(f"   探索网格: 前沿{len(self.exploration_grid.frontier_cells)}个")
             self.logger.info(f"   系统统计: 异常{self.stats['exceptions_caught']}次 "
                             f"| 状态切换{self.stats['state_changes']}次")
+            self.logger.info(f"   数据记录: {self.stats['data_points_recorded']}个数据点")
+            self.logger.info(f"   性能统计: 平均循环{self.stats['average_loop_time']*1000:.1f}ms "
+                            f"| 最大{self.stats['max_loop_time']*1000:.1f}ms "
+                            f"| 最小{self.stats['min_loop_time']*1000:.1f}ms")
             if self.stats['manual_control_time'] > 0:
                 self.logger.info(f"   手动控制: {self.stats['manual_control_time']:.1f}秒")
         except:
@@ -1929,6 +2448,23 @@ class PerceptiveExplorer:
             self.front_display.stop()
             self.logger.info("✅ 前视窗口已关闭")
 
+        # 保存数据
+        if self.data_logger:
+            self.logger.info("💾 正在保存飞行数据...")
+            self.data_logger.save_json_data()
+
+            # 生成性能报告
+            if config.PERFORMANCE['SAVE_PERFORMANCE_REPORT']:
+                performance_report = self.data_logger.generate_performance_report()
+                self.logger.info(performance_report)
+
+                # 保存性能报告到文件
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                report_filename = f"performance_report_{timestamp}.txt"
+                with open(report_filename, 'w', encoding='utf-8') as f:
+                    f.write(performance_report)
+                self.logger.info(f"📄 性能报告已保存至: {report_filename}")
+
     def _generate_summary_report(self):
         """生成运行总结报告"""
         total_time = time.time() - self.start_time
@@ -1947,15 +2483,19 @@ class PerceptiveExplorer:
         self.logger.info(f"   网格更新次数: {self.stats['grid_updates']}")
         self.logger.info(f"   探索前沿数量: {len(self.exploration_grid.frontier_cells)}")
         self.logger.info(f"   前视图像更新次数: {self.stats['front_image_updates']}")
+        self.logger.info(f"   数据记录点数: {self.stats['data_points_recorded']}")
         self.logger.info(f"   手动控制时间: {self.stats['manual_control_time']:.1f}秒")
         self.logger.info(f"   捕获的异常数: {self.stats['exceptions_caught']}")
         self.logger.info(f"   重连尝试次数: {self.reconnect_attempts}")
+        self.logger.info(f"   平均循环时间: {self.stats['average_loop_time']*1000:.1f}ms")
+        self.logger.info(f"   最大循环时间: {self.stats['max_loop_time']*1000:.1f}ms")
+        self.logger.info(f"   最小循环时间: {self.stats['min_loop_time']*1000:.1f}ms")
 
         # 保存报告到文件
         try:
             report_filename = f"mission_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             with open(report_filename, 'w', encoding='utf-8') as f:
-                f.write("AirSimNH 无人机任务报告 (智能决策增强版 - 修复版)\n")
+                f.write("AirSimNH 无人机任务报告 (智能决策增强版 - 数据闭环版)\n")
                 f.write("=" * 50 + "\n")
                 f.write(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"总运行时间: {total_time:.1f}秒\n")
@@ -1965,9 +2505,13 @@ class PerceptiveExplorer:
                 f.write(f"向量场计算次数: {self.stats['vector_field_updates']}\n")
                 f.write(f"网格更新次数: {self.stats['grid_updates']}\n")
                 f.write(f"探索前沿数量: {len(self.exploration_grid.frontier_cells)}\n")
+                f.write(f"数据记录点数: {self.stats['data_points_recorded']}\n")
                 f.write(f"手动控制时间: {self.stats['manual_control_time']:.1f}秒\n")
                 f.write(f"异常捕获次数: {self.stats['exceptions_caught']}\n")
                 f.write(f"前视图像更新次数: {self.stats['front_image_updates']}\n")
+                f.write(f"平均循环时间: {self.stats['average_loop_time']*1000:.1f}ms\n")
+                f.write(f"最大循环时间: {self.stats['max_loop_time']*1000:.1f}ms\n")
+                f.write(f"最小循环时间: {self.stats['min_loop_time']*1000:.1f}ms\n")
                 f.write("=" * 50 + "\n")
                 f.write("智能决策配置:\n")
                 for key, value in config.INTELLIGENT_DECISION.items():
@@ -1978,6 +2522,13 @@ class PerceptiveExplorer:
                     f.write(f"  航点{i+1}: ({pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f})\n")
                 if len(self.visited_positions) > 20:
                     f.write(f"  ... 还有{len(self.visited_positions)-20}个航点\n")
+                f.write("=" * 50 + "\n")
+                f.write("数据记录信息:\n")
+                if self.data_logger and config.DATA_RECORDING['ENABLED']:
+                    f.write(f"  CSV文件: {self.data_logger.csv_filename}\n")
+                    f.write(f"  JSON文件: {self.data_logger.json_filename}\n")
+                else:
+                    f.write("  数据记录未启用\n")
             self.logger.info(f"📄 详细报告已保存至: {report_filename}")
         except Exception as e:
             self.logger.warning(f"⚠️ 无法保存报告文件: {e}")
@@ -2016,7 +2567,7 @@ def main():
     """主程序入口"""
     # 显示启动信息
     print("=" * 70)
-    print("AirSimNH 无人机感知探索系统 - 智能决策增强版（修复版）")
+    print("AirSimNH 无人机感知探索系统 - 智能决策增强版（数据闭环版）")
     print(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"配置状态: {'已加载' if CONFIG_LOADED else '使用默认配置'}")
     print(f"日志级别: {config.SYSTEM['LOG_LEVEL']}")
@@ -2027,6 +2578,12 @@ def main():
     print("  • 基于网格的信息增益探索")
     print("  • PID平滑飞行控制")
     print("  • 自适应速度调整")
+    print("  • 性能监控与数据闭环")
+    print("=" * 70)
+    print("数据记录:")
+    print(f"  • CSV格式: {config.DATA_RECORDING.get('SAVE_TO_CSV', False)}")
+    print(f"  • JSON格式: {config.DATA_RECORDING.get('SAVE_TO_JSON', False)}")
+    print(f"  • 性能监控: {config.DATA_RECORDING.get('PERFORMANCE_MONITORING', False)}")
     print("=" * 70)
 
     # 用户选择模式

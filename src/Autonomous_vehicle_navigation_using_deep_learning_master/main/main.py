@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-主程序 - 简化版
+主程序
 """
-
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import time
@@ -17,16 +16,45 @@ try:
         'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
 except IndexError:
     pass
-
 import carla
 import numpy as np
 from collections import deque
-
+from data_collector import DataCollector
 from car_env import CarEnv
 from route_visualizer import RouteVisualizer
 from vehicle_tracker import VehicleTracker
 from traffic_manager import TrafficManager
 import config as cfg
+
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.font_manager as fm
+
+def setup_chinese_font():
+    """尝试设置中文字体"""
+    # 检查常见字体
+    font_paths = [
+        "C:/Windows/Fonts/simhei.ttf",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+    ]
+    
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            try:
+                fm.fontManager.addfont(font_path)
+                font_name = fm.FontProperties(fname=font_path).get_name()
+                matplotlib.rcParams['font.sans-serif'] = [font_name]
+                matplotlib.rcParams['axes.unicode_minus'] = False
+                print(f"✅ 使用中文字体: {font_name}")
+                return True
+            except:
+                continue
+    
+    print("⚠️ 未找到中文字体，图表可能无法显示中文")
+    return False
+
+setup_chinese_font()
 
 def setup_environment():
     """设置环境"""
@@ -113,6 +141,9 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
     """运行一个episode"""
     print(f"\nEpisode {episode_num}")
     
+    data_collector = DataCollector()
+    data_collector.start_episode()
+
     # 加载模型
     braking_model, driving_model = load_models()
     if not braking_model or not driving_model:
@@ -175,6 +206,8 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
             print(f"执行动作失败: {e}")
             done = True
         
+        data_collector.record_step(env, action, current_state, reward, vehicle_state)
+
         # 计算FPS
         frame_time = time.time() - step_start
         fps_counter.append(frame_time)
@@ -186,6 +219,12 @@ def run_episode(env, traffic_mgr, visualizer, tracker, episode_num):
         
         if done:
             print(f"Episode {episode_num} 完成，步数: {step_count}")
+            episode_duration = data_collector.end_episode()
+            data_collector.generate_performance_report(episode_num, episode_duration)
+            # 打印项目完成时长
+            print(f"\n⏱️  Episode {episode_num} 总时长: {episode_duration:.2f}秒")
+            print(f"    平均步速: {step_count/episode_duration:.2f} 步/秒")
+            print(f"    平均帧率: {data_collector.get_summary()['平均帧率']:.1f} FPS")
             break
     
     # 清理跟踪器资源
