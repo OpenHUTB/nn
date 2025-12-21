@@ -282,7 +282,7 @@ if __name__ == "__main__":
         model = SimpleKNNClassifier(k=5)
         model.fit(X_train, y_train)
 
-        # 4. 评估模型并生成可视化图片11
+        # 4. 评估模型并生成可视化图片1112
         print("\n【4/4】评估模型并生成图片...")
         train_acc, test_acc = evaluate_and_visualize(model, X_train, X_test, y_train, y_test, feature_names)
 
