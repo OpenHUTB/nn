@@ -16,49 +16,33 @@ from carla_utils import setup_carla_path, import_carla_module
 from config_manager import ConfigManager
 from annotation_generator import AnnotationGenerator
 from data_validator import DataValidator
-from scene_manager import SceneManager
 from data_analyzer import DataAnalyzer
 from lidar_processor import LidarProcessor, MultiSensorFusion
 from multi_vehicle_manager import MultiVehicleManager
-from v2x_communication import V2XCommunication
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
 
 
 class PerformanceMonitor:
-    """性能监控器"""
-
     def __init__(self):
         self.start_time = time.time()
         self.memory_samples = []
         self.cpu_samples = []
         self.frame_times = []
-        self.gpu_memory_samples = []
-        self.disk_io_samples = []
-        self.network_io_samples = []
-
-        # 初始化第一个样本，避免空列表
-        self.sample_memory()
-        self.sample_cpu()
 
     def sample_memory(self):
-        """采样内存使用"""
         try:
             process = psutil.Process(os.getpid())
             memory_mb = process.memory_info().rss / 1024 / 1024
             self.memory_samples.append(memory_mb)
-
-            # 采样系统内存
-            system_memory = psutil.virtual_memory()
             return {
                 'process_mb': memory_mb,
-                'system_total_mb': system_memory.total / 1024 / 1024,
-                'system_used_percent': system_memory.percent,
-                'system_available_mb': system_memory.available / 1024 / 1024
+                'system_total_mb': psutil.virtual_memory().total / 1024 / 1024,
+                'system_used_percent': psutil.virtual_memory().percent,
+                'system_available_mb': psutil.virtual_memory().available / 1024 / 1024
             }
-        except Exception as e:
-            # 如果采样失败，返回默认值
+        except:
             memory_mb = 0
             self.memory_samples.append(memory_mb)
             return {
@@ -69,20 +53,15 @@ class PerformanceMonitor:
             }
 
     def sample_cpu(self):
-        """采样CPU使用"""
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             self.cpu_samples.append(cpu_percent)
-
-            # 采样每个核心的CPU使用率
-            cpu_per_core = psutil.cpu_percent(interval=0.1, percpu=True)
             return {
                 'total_percent': cpu_percent,
-                'per_core': cpu_per_core,
+                'per_core': psutil.cpu_percent(interval=0.1, percpu=True),
                 'count': psutil.cpu_count()
             }
-        except Exception as e:
-            # 如果采样失败，返回默认值
+        except:
             cpu_percent = 0
             self.cpu_samples.append(cpu_percent)
             return {
@@ -91,81 +70,10 @@ class PerformanceMonitor:
                 'count': 1
             }
 
-    def sample_gpu_memory(self):
-        """采样GPU内存（如果可用）"""
-        try:
-            # 尝试导入PyTorch或TensorFlow来获取GPU信息
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    allocated = torch.cuda.memory_allocated() / 1024 / 1024
-                    cached = torch.cuda.memory_reserved() / 1024 / 1024
-                    self.gpu_memory_samples.append(allocated)
-                    return {
-                        'allocated_mb': allocated,
-                        'cached_mb': cached,
-                        'device_count': torch.cuda.device_count()
-                    }
-            except ImportError:
-                pass
-
-            try:
-                import tensorflow as tf
-                gpus = tf.config.list_physical_devices('GPU')
-                if gpus:
-                    # TensorFlow的GPU内存监控比较复杂，这里简单返回
-                    self.gpu_memory_samples.append(0)
-                    return {
-                        'gpu_count': len(gpus),
-                        'allocated_mb': 0
-                    }
-            except ImportError:
-                pass
-        except Exception as e:
-            pass
-
-        return {'available': False}
-
-    def sample_disk_io(self):
-        """采样磁盘IO"""
-        try:
-            disk_io = psutil.disk_io_counters()
-            read_mb = disk_io.read_bytes / 1024 / 1024 if disk_io else 0
-            self.disk_io_samples.append(read_mb)
-            return {
-                'read_mb': read_mb,
-                'write_mb': disk_io.write_bytes / 1024 / 1024 if disk_io else 0,
-                'read_count': disk_io.read_count if disk_io else 0,
-                'write_count': disk_io.write_count if disk_io else 0
-            }
-        except:
-            read_mb = 0
-            self.disk_io_samples.append(read_mb)
-            return None
-
-    def sample_network_io(self):
-        """采样网络IO"""
-        try:
-            net_io = psutil.net_io_counters()
-            sent_kb = net_io.bytes_sent / 1024 if net_io else 0
-            self.network_io_samples.append(sent_kb)
-            return {
-                'sent_kb': sent_kb,
-                'recv_kb': net_io.bytes_recv / 1024 if net_io else 0,
-                'packets_sent': net_io.packets_sent if net_io else 0,
-                'packets_recv': net_io.packets_recv if net_io else 0
-            }
-        except:
-            sent_kb = 0
-            self.network_io_samples.append(sent_kb)
-            return None
-
     def record_frame_time(self, frame_time):
-        """记录帧处理时间"""
         self.frame_times.append(frame_time)
 
     def get_performance_summary(self):
-        """获取性能摘要"""
         if not self.frame_times:
             avg_frame_time = 0
             fps = 0
@@ -190,46 +98,7 @@ class PerformanceMonitor:
                 'std': np.std(self.frame_times) if self.frame_times else 0
             }
         }
-
-        # 添加GPU信息
-        if self.gpu_memory_samples:
-            summary['gpu_memory'] = {
-                'average_mb': np.mean(self.gpu_memory_samples),
-                'max_mb': max(self.gpu_memory_samples)
-            }
-
-        # 添加磁盘IO信息
-        if self.disk_io_samples:
-            summary['disk_io'] = {
-                'total_read_mb': sum(self.disk_io_samples),
-                'average_read_mb': np.mean(self.disk_io_samples)
-            }
-
-        # 添加网络IO信息
-        if self.network_io_samples:
-            summary['network_io'] = {
-                'total_sent_kb': sum(self.network_io_samples),
-                'average_sent_kb': np.mean(self.network_io_samples)
-            }
-
         return summary
-
-    def get_realtime_metrics(self):
-        """获取实时性能指标"""
-        try:
-            return {
-                'memory_mb': psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024,
-                'cpu_percent': psutil.cpu_percent(interval=0.1),
-                'frame_rate': 1.0 / self.frame_times[-1] if self.frame_times else 0,
-                'active_threads': threading.active_count()
-            }
-        except:
-            return {
-                'memory_mb': 0,
-                'cpu_percent': 0,
-                'frame_rate': 0,
-                'active_threads': 0
-            }
 
 
 class Log:
@@ -295,14 +164,12 @@ class ImageProcessor:
         self.stitched_dir = os.path.join(output_dir, "stitched")
         os.makedirs(self.stitched_dir, exist_ok=True)
 
-        # 性能配置
         self.compress_images = config.get('compress_images', True) if config else True
         self.compression_quality = config.get('compression_quality', 85) if config else 85
         self.enable_memory_cache = config.get('enable_memory_cache', True) if config else True
         self.image_cache = {}
         self.max_cache_size = config.get('max_cache_size', 50) if config else 50
 
-        # 性能统计
         self.stats = {
             'images_processed': 0,
             'cache_hits': 0,
@@ -319,14 +186,11 @@ class ImageProcessor:
 
         start_time = time.time()
 
-        # 检查缓存
         cache_key = f"{view_type}_{frame_num}"
         if self.enable_memory_cache and cache_key in self.image_cache:
-            # 从缓存加载
             cached_image = self.image_cache[cache_key]
             output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
 
-            # 使用更快的保存方式
             try:
                 if self.compress_images:
                     cached_image.save(output_path, "JPEG",
@@ -356,22 +220,16 @@ class ImageProcessor:
         for idx, (cam_name, img_path) in enumerate(list(image_paths.items())[:4]):
             if img_path and os.path.exists(img_path):
                 try:
-                    # 检查图像是否已经加载到内存
                     if img_path in self.image_cache:
                         img = self.image_cache[img_path]
                     else:
-                        # 使用更快的图像加载方式
                         img = Image.open(img_path)
-                        # 预加载图像数据到内存
                         img.load()
                         img = img.resize((640, 360), Image.Resampling.LANCZOS)
 
-                        # 缓存图像
                         if self.enable_memory_cache:
                             self.image_cache[img_path] = img
-                            # 清理缓存如果太大
                             if len(self.image_cache) > self.max_cache_size:
-                                # 使用LRU策略清理缓存
                                 self._cleanup_cache()
                     images_loaded += 1
                 except Exception as e:
@@ -389,27 +247,22 @@ class ImageProcessor:
 
         output_path = os.path.join(self.stitched_dir, f"{view_type}_{frame_num:06d}.jpg")
 
-        # 使用优化的保存参数
         try:
             if self.compress_images:
-                # 使用更快的JPEG保存选项
                 canvas.save(output_path, "JPEG",
                             quality=self.compression_quality,
                             optimize=True,
                             progressive=True,
                             subsampling='4:2:0')
             else:
-                # PNG优化
                 canvas.save(output_path, "PNG", optimize=True)
         except Exception as e:
             Log.error(f"保存图像失败: {e}")
             return False
 
-        # 缓存结果
         if self.enable_memory_cache:
             self.image_cache[cache_key] = canvas.copy()
 
-        # 清理内存
         del canvas
         gc.collect()
 
@@ -417,7 +270,6 @@ class ImageProcessor:
         processing_time = time.time() - start_time
         self.stats['total_processing_time'] += processing_time
 
-        # 记录性能日志（每50帧记录一次）
         if self.stats['images_processed'] % 50 == 0:
             avg_time = self.stats['total_processing_time'] / self.stats['images_processed']
             cache_hit_rate = self.stats['cache_hits'] / max(1, self.stats['cache_hits'] + self.stats['cache_misses'])
@@ -427,16 +279,13 @@ class ImageProcessor:
         return True
 
     def _cleanup_cache(self):
-        """清理图像缓存"""
         if len(self.image_cache) > self.max_cache_size:
-            # 移除最旧的缓存项（简单实现）
             keys_to_remove = list(self.image_cache.keys())[:len(self.image_cache) - self.max_cache_size]
             for key in keys_to_remove:
                 del self.image_cache[key]
             Log.debug(f"清理缓存: 移除了{len(keys_to_remove)}个缓存项")
 
     def get_stats(self):
-        """获取处理统计"""
         total_operations = self.stats['cache_hits'] + self.stats['cache_misses']
         if total_operations > 0:
             cache_hit_rate = self.stats['cache_hits'] / total_operations
@@ -466,11 +315,9 @@ class TrafficManager:
         random.seed(seed)
         Log.info(f"随机种子: {seed}")
 
-        # 性能优化：批量生成设置
         self.batch_spawn = config.get('batch_spawn', True)
         self.max_spawn_attempts = config.get('max_spawn_attempts', 5)
 
-        # 性能统计
         self.spawn_stats = {
             'total_attempts': 0,
             'successful_spawns': 0,
@@ -501,7 +348,6 @@ class TrafficManager:
 
         spawn_point = random.choice(spawn_points)
 
-        # 尝试多次生成
         for attempt in range(self.max_spawn_attempts):
             self.spawn_stats['total_attempts'] += 1
             try:
@@ -521,7 +367,6 @@ class TrafficManager:
                 if attempt == self.max_spawn_attempts - 1:
                     Log.warning(f"主车生成失败: {e}")
                 else:
-                    # 尝试不同的生成点
                     spawn_point = random.choice(spawn_points)
                     time.sleep(0.1)
 
@@ -540,7 +385,6 @@ class TrafficManager:
         total_time = time.time() - start_time
         Log.info(f"交通生成: {vehicles}辆车, {pedestrians}个行人, 用时: {total_time:.2f}秒")
 
-        # 记录性能统计
         success_rate = self.spawn_stats['successful_spawns'] / max(1, self.spawn_stats['total_attempts'])
         avg_spawn_time = self.spawn_stats['total_spawn_time'] / max(1, self.spawn_stats['successful_spawns'])
         Log.performance(f"生成统计: 成功率{success_rate:.1%}, 平均生成时间{avg_spawn_time:.3f}秒")
@@ -548,7 +392,6 @@ class TrafficManager:
         return vehicles + pedestrians
 
     def _spawn_vehicles_batch(self):
-        """批量生成车辆（提高性能）"""
         blueprint_lib = self.world.get_blueprint_library()
         spawn_points = self.world.get_map().get_spawn_points()
 
@@ -558,7 +401,6 @@ class TrafficManager:
         num_vehicles = min(self.config['traffic']['background_vehicles'], 10)
         spawned = 0
 
-        # 准备批处理
         batch_commands = []
         available_points = spawn_points.copy()
         random.shuffle(available_points)
@@ -570,14 +412,10 @@ class TrafficManager:
             try:
                 vehicle_bp = random.choice(blueprint_lib.filter('vehicle.*'))
                 spawn_point = available_points[i]
-
-                # 创建生成命令
                 batch_commands.append((vehicle_bp, spawn_point))
-
             except:
                 pass
 
-        # 批量生成
         for vehicle_bp, spawn_point in batch_commands:
             try:
                 vehicle = self.world.spawn_actor(vehicle_bp, spawn_point)
@@ -592,7 +430,6 @@ class TrafficManager:
                 self.spawn_stats['total_attempts'] += 1
                 pass
 
-            # 避免过快的生成速度
             if spawned % 3 == 0:
                 time.sleep(0.05)
 
@@ -663,11 +500,9 @@ class TrafficManager:
         return spawned
 
     def cleanup(self):
-        """安全清理所有资源"""
         Log.info("开始清理交通管理器...")
 
         try:
-            # 清理行人
             for pedestrian in self.pedestrians:
                 try:
                     if pedestrian and pedestrian.is_alive:
@@ -677,7 +512,6 @@ class TrafficManager:
 
             self.pedestrians.clear()
 
-            # 清理背景车辆
             for vehicle in self.vehicles:
                 try:
                     if vehicle and vehicle.is_alive:
@@ -704,7 +538,6 @@ class SensorManager:
         self.last_capture_time = 0
         self.last_performance_sample = 0
 
-        # 新增：帧率控制相关变量
         self.target_fps = config['performance'].get('frame_rate_limit', 5.0)
         self.min_frame_interval = 1.0 / self.target_fps if self.target_fps > 0 else 0.1
         self.last_frame_time = 0
@@ -715,18 +548,14 @@ class SensorManager:
         self.infra_buffer = {}
         self.buffer_lock = threading.Lock()
 
-        # 添加运行状态标志
         self.is_running = True
 
-        # 性能监控
         self.performance_monitor = PerformanceMonitor()
 
-        # 性能优化配置
         self.image_processor = ImageProcessor(data_dir, config.get('image_processing', {}))
         self.lidar_processor = None
         self.fusion_manager = None
 
-        # 批处理设置
         self.batch_size = config['performance'].get('batch_size', 5)
         self.enable_async_processing = config.get('enable_async_processing', True)
 
@@ -736,7 +565,6 @@ class SensorManager:
         if config['output'].get('save_fusion', False):
             self.fusion_manager = MultiSensorFusion(data_dir, config['performance'].get('fusion', {}))
 
-        # 传感器统计
         self.sensor_stats = {
             'total_images': 0,
             'total_lidar_frames': 0,
@@ -746,7 +574,6 @@ class SensorManager:
         }
 
     def setup_cameras(self, vehicle, center_location, vehicle_id=0):
-        """设置摄像头 - 修复的方法"""
         vehicle_cams = self._setup_vehicle_cameras(vehicle, vehicle_id)
         infra_cams = self._setup_infrastructure_cameras(center_location)
 
@@ -822,7 +649,6 @@ class SensorManager:
             lidar_sensor = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=vehicle)
 
             def lidar_callback(lidar_data):
-                # 检查是否正在关闭
                 if not self.is_running:
                     return
 
@@ -860,7 +686,6 @@ class SensorManager:
                                 if self.is_running:
                                     Log.error(f"LiDAR处理失败: {e}")
 
-                    # 记录性能
                     frame_time = time.time() - frame_start_time
                     self.performance_monitor.record_frame_time(frame_time)
                 except Exception as e:
@@ -895,7 +720,6 @@ class SensorManager:
             else:
                 camera = self.world.spawn_actor(blueprint, transform)
 
-            # 为不同车辆创建不同目录
             if sensor_type == 'vehicle' and vehicle_id > 0:
                 save_dir = os.path.join(self.data_dir, "raw", f"vehicle_{vehicle_id}", name)
             else:
@@ -917,7 +741,6 @@ class SensorManager:
         capture_interval = self.config['sensors']['capture_interval']
 
         def callback(image):
-            # 检查是否正在关闭
             if not self.is_running:
                 return
 
@@ -925,24 +748,20 @@ class SensorManager:
                 current_time = time.time()
                 frame_start_time = time.time()
 
-                # 优化点2：添加帧率控制逻辑
-                # 检查是否达到最小帧间隔
                 time_since_last_frame = current_time - self.last_frame_time
                 if time_since_last_frame < self.min_frame_interval:
-                    # 如果帧间隔太小，跳过此帧
                     self.frame_skip_count += 1
                     if self.frame_skip_count > self.max_frame_skip:
-                        # 如果连续跳过多帧，强制处理一帧
                         self.frame_skip_count = 0
                     else:
-                        return  # 跳过此帧
+                        return
                 else:
                     self.frame_skip_count = 0
 
                 if current_time - self.last_capture_time >= capture_interval:
                     self.frame_counter += 1
                     self.last_capture_time = current_time
-                    self.last_frame_time = current_time  # 记录帧处理时间
+                    self.last_frame_time = current_time
 
                     capture_start = time.time()
                     filename = os.path.join(save_dir, f"{name}_{self.frame_counter:06d}.png")
@@ -956,7 +775,6 @@ class SensorManager:
                         if sensor_type == 'vehicle':
                             self.vehicle_buffer[name] = filename
                             if len(self.vehicle_buffer) >= 4:
-                                # 使用线程池异步处理图像拼接，避免阻塞
                                 if self.enable_async_processing:
                                     import concurrent.futures
                                     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -986,11 +804,9 @@ class SensorManager:
                                     self.image_processor.stitch(self.infra_buffer, self.frame_counter, 'infrastructure')
                                 self.infra_buffer.clear()
 
-                    # 定期采样性能
                     if current_time - self.last_performance_sample >= 5.0:
                         memory_info = self.performance_monitor.sample_memory()
                         cpu_info = self.performance_monitor.sample_cpu()
-                        gpu_info = self.performance_monitor.sample_gpu_memory()
 
                         if self.frame_counter % 10 == 0:
                             Log.performance(f"系统监控 - 内存: {memory_info['process_mb']:.1f}MB, "
@@ -999,22 +815,18 @@ class SensorManager:
 
                         self.last_performance_sample = current_time
 
-                    # 记录帧处理时间
                     frame_time = time.time() - frame_start_time
                     self.performance_monitor.record_frame_time(frame_time)
 
-                    # 定期垃圾回收
                     if self.frame_counter % 50 == 0:
                         gc.collect()
 
-                        # 记录传感器统计
                         if self.sensor_stats['total_images'] > 0:
                             avg_capture_time = np.mean(self.sensor_stats['image_capture_times'][-100:]) if len(
                                 self.sensor_stats['image_capture_times']) > 0 else 0
                             Log.performance(f"传感器统计: 图像{self.sensor_stats['total_images']}张, "
                                             f"平均捕获时间{avg_capture_time:.3f}秒")
             except Exception as e:
-                # 如果在关闭过程中发生错误，忽略它
                 if self.is_running:
                     Log.error(f"传感器回调错误: {e}")
 
@@ -1033,7 +845,6 @@ class SensorManager:
             'sensor_stats': self.sensor_stats
         }
 
-        # 计算统计信息
         if self.sensor_stats['image_capture_times']:
             summary['sensor_stats']['avg_image_capture_time'] = np.mean(self.sensor_stats['image_capture_times'])
             summary['sensor_stats']['max_image_capture_time'] = np.max(self.sensor_stats['image_capture_times'])
@@ -1048,39 +859,32 @@ class SensorManager:
         if self.fusion_manager:
             summary['fusion_data'] = self.fusion_manager.generate_fusion_report()
 
-        # 图像处理器统计
         summary['image_processor_stats'] = self.image_processor.get_stats()
 
         return summary
 
     def cleanup(self):
-        """安全清理传感器"""
         Log.info(f"安全清理 {len(self.sensors)} 个传感器...")
 
-        # 1. 首先设置运行状态为False，防止回调函数继续执行
         self.is_running = False
 
-        # 2. 停止所有传感器的监听
         Log.info("停止所有传感器监听...")
         for sensor in self.sensors:
             try:
                 if hasattr(sensor, 'stop'):
                     sensor.stop()
-                    time.sleep(0.001)  # 短暂延迟
+                    time.sleep(0.001)
             except:
                 pass
 
-        # 3. 等待一小段时间让所有传感器回调结束
         time.sleep(0.2)
 
-        # 4. 刷新批处理数据
         if self.lidar_processor:
             try:
                 self.lidar_processor.flush_batch()
             except:
                 pass
 
-        # 5. 销毁传感器
         Log.info(f"销毁 {len(self.sensors)} 个传感器...")
         for i, sensor in enumerate(self.sensors):
             try:
@@ -1088,27 +892,49 @@ class SensorManager:
                     sensor.destroy()
             except:
                 pass
-            # 分批销毁，避免一次性销毁太多
             if i % 5 == 0:
                 time.sleep(0.01)
 
         self.sensors.clear()
 
-        # 6. 清理缓存和内存
         if hasattr(self.image_processor, 'image_cache'):
             try:
                 self.image_processor.image_cache.clear()
             except:
                 pass
 
-        # 7. 清理数据结构
         self.vehicle_buffer.clear()
         self.infra_buffer.clear()
 
-        # 8. 强制垃圾回收
         gc.collect()
 
         Log.info("传感器清理完成")
+
+
+class V2XCommunication:
+    def __init__(self, config):
+        self.config = config
+        self.nodes = {}
+        self.messages = []
+
+    def register_node(self, node_id, position, capabilities):
+        self.nodes[node_id] = {
+            'position': position,
+            'capabilities': capabilities,
+            'last_update': time.time()
+        }
+
+    def broadcast_basic_safety_message(self, sender_id, vehicle_data):
+        pass
+
+    def get_messages_for_node(self, node_id):
+        return []
+
+    def get_network_status(self):
+        return {'nodes': len(self.nodes), 'messages': len(self.messages)}
+
+    def stop(self):
+        pass
 
 
 class DataCollector:
@@ -1130,11 +956,9 @@ class DataCollector:
         self.is_running = False
         self.collected_frames = 0
 
-        # 性能监控
         self.performance_monitor = PerformanceMonitor()
 
-        # 数据格式配置
-        self.output_format = config.get('output_format', 'standard')  # standard, v2xformer, kitti
+        self.output_format = config.get('output_format', 'standard')
 
     def setup_directories(self):
         scenario = self.config['scenario']
@@ -1155,8 +979,8 @@ class DataCollector:
             "calibration",
             "cooperative",
             "v2x_messages",
-            "v2xformer_format",  # V2XFormer格式数据
-            "kitti_format",  # KITTI格式数据
+            "v2xformer_format",
+            "kitti_format",
             "metadata"
         ]
 
@@ -1201,7 +1025,6 @@ class DataCollector:
 
         self.traffic_manager = TrafficManager(self.world, self.config)
 
-        # 生成多个主车
         num_ego_vehicles = min(self.config['cooperative'].get('num_coop_vehicles', 2) + 1, 3)
         for i in range(num_ego_vehicles):
             ego_vehicle = self.traffic_manager.spawn_ego_vehicle()
@@ -1215,11 +1038,9 @@ class DataCollector:
 
         self.traffic_manager.spawn_traffic(self.scene_center)
 
-        # 初始化V2X通信
         if self.config['v2x']['enabled']:
             self.v2x_communication = V2XCommunication(self.config['v2x'])
 
-            # 注册车辆到V2X网络
             for i, vehicle in enumerate(self.ego_vehicles):
                 location = vehicle.get_location()
                 self.v2x_communication.register_node(
@@ -1228,21 +1049,17 @@ class DataCollector:
                     {'type': 'vehicle', 'capabilities': ['bsm', 'rsm']}
                 )
 
-        # 初始化多车辆管理器
         self.multi_vehicle_manager = MultiVehicleManager(
             self.world,
             self.config,
             self.output_dir
         )
 
-        # 设置主车
         self.multi_vehicle_manager.ego_vehicles = self.ego_vehicles
 
-        # 生成协同车辆
         num_coop_vehicles = self.config['cooperative'].get('num_coop_vehicles', 2)
         coop_vehicles = self.multi_vehicle_manager.spawn_cooperative_vehicles(num_coop_vehicles)
 
-        # 注册协同车辆到V2X网络
         if self.v2x_communication:
             for vehicle in coop_vehicles:
                 location = vehicle.get_location()
@@ -1256,8 +1073,6 @@ class DataCollector:
         return True
 
     def setup_sensors(self):
-        """设置传感器 - 修复的方法"""
-        # 为每个主车设置传感器
         for i, vehicle in enumerate(self.ego_vehicles):
             sensor_manager = SensorManager(self.world, self.config, self.output_dir)
 
@@ -1287,96 +1102,83 @@ class DataCollector:
         last_detailed_log = time.time()
         last_memory_check = time.time()
 
-        # 内存监控变量
         memory_warning_issued = False
-        forced_cleanup_count = 0
+        early_stop_triggered = False
+
+        # 添加内存监控阈值
+        memory_warning_threshold = 350  # MB
+        memory_critical_threshold = 400  # MB
+        early_stop_threshold = 450  # MB
 
         try:
             while time.time() - self.start_time < duration and self.is_running:
                 current_time = time.time()
                 elapsed = current_time - self.start_time
 
-                # 内存检查 - 优化点4：定期检查内存使用
-                if current_time - last_memory_check >= 2.0:  # 更频繁的内存检查
+                # 内存监控和早期停止机制
+                if current_time - last_memory_check >= 2.0:
                     try:
                         import psutil
                         process = psutil.Process()
                         memory_mb = process.memory_info().rss / (1024 * 1024)
 
-                        if memory_mb > 350 and not memory_warning_issued:
-                            Log.warning(f"内存使用较高: {memory_mb:.1f}MB，将减少数据处理")
-                            memory_warning_issued = True
-
-                            # 如果内存过高，跳过一些非关键操作
-                            if self.v2x_communication:
-                                Log.debug("内存警告：暂停部分V2X消息处理")
-
-                        elif memory_mb > 400:  # 如果内存超过400MB，提前结束
-                            Log.error(f"内存使用过高: {memory_mb:.1f}MB，提前结束数据收集")
+                        if memory_mb > early_stop_threshold:
+                            Log.error(
+                                f"内存使用超过临界值({early_stop_threshold}MB): {memory_mb:.1f}MB，提前结束数据收集")
+                            early_stop_triggered = True
                             break
-
-                        elif memory_mb < 300:
+                        elif memory_mb > memory_critical_threshold:
+                            Log.warning(f"内存使用严重过高: {memory_mb:.1f}MB，进行强制清理")
+                            self._force_memory_cleanup()
+                            memory_warning_issued = True
+                        elif memory_mb > memory_warning_threshold and not memory_warning_issued:
+                            Log.warning(f"内存使用较高: {memory_mb:.1f}MB，减少数据处理")
+                            memory_warning_issued = True
+                        elif memory_mb < memory_warning_threshold:
                             memory_warning_issued = False
-                            forced_cleanup_count = 0
 
                     except Exception as e:
                         Log.debug(f"内存检查失败: {e}")
 
                     last_memory_check = current_time
 
-                # 更新车辆状态
                 if self.multi_vehicle_manager:
                     self.multi_vehicle_manager.update_vehicle_states()
 
-                # V2X通信更新 - 使用配置中的更新间隔
                 v2x_interval = self.config['v2x'].get('update_interval', 2.0)
                 if self.v2x_communication and current_time - last_v2x_update >= v2x_interval:
                     self._update_v2x_communication()
                     last_v2x_update = current_time
 
-                # 共享感知数据 - 仅在内存允许时进行
                 if (not memory_warning_issued and
                         self.config['cooperative'].get('enable_shared_perception', True) and
                         current_time - last_perception_share >= 2.0):
                     self._share_perception_data()
                     last_perception_share = current_time
 
-                # 性能采样
                 if current_time - last_performance_sample >= 10.0:
                     memory_info = self.performance_monitor.sample_memory()
                     cpu_info = self.performance_monitor.sample_cpu()
-                    disk_info = self.performance_monitor.sample_disk_io()
-                    network_info = self.performance_monitor.sample_network_io()
 
-                    # 详细性能日志（每分钟一次）
                     if current_time - last_detailed_log >= 60.0:
                         Log.performance(f"详细性能监控:")
                         Log.performance(f"  进程内存: {memory_info['process_mb']:.1f}MB")
                         Log.performance(f"  系统内存: {memory_info['system_used_percent']:.1f}%使用率")
                         Log.performance(f"  CPU: {cpu_info['total_percent']:.1f}% ({cpu_info['count']}核心)")
-                        if disk_info:
-                            Log.performance(
-                                f"  磁盘IO: 读{disk_info['read_mb']:.1f}MB, 写{disk_info['write_mb']:.1f}MB")
-                        if network_info:
-                            Log.performance(
-                                f"  网络IO: 发{network_info['sent_kb']:.1f}KB, 收{network_info['recv_kb']:.1f}KB")
                         last_detailed_log = current_time
                     else:
-                        # 简化性能日志
                         Log.performance(f"系统监控 - 内存: {memory_info['process_mb']:.1f}MB, "
                                         f"CPU: {cpu_info['total_percent']:.1f}%, "
                                         f"活跃线程: {threading.active_count()}")
 
                     last_performance_sample = current_time
 
-                    # 定期垃圾回收
                     gc.collect()
 
                 if current_time - last_update >= 5.0:
                     total_frames = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
                     progress = (elapsed / duration) * 100
 
-                    # 计算预估剩余时间
                     if total_frames > 0:
                         frames_per_second = total_frames / elapsed
                         remaining_frames = (duration - elapsed) * frames_per_second
@@ -1389,7 +1191,7 @@ class DataCollector:
                              f"ETA: {eta_seconds:.0f}秒")
                     last_update = current_time
 
-                time.sleep(0.01)  # 减少CPU占用
+                time.sleep(0.01)
 
         except KeyboardInterrupt:
             Log.info("数据收集被用户中断")
@@ -1402,10 +1204,13 @@ class DataCollector:
 
             self.collected_frames = sum(mgr.get_frame_count() for mgr in self.sensor_managers.values())
 
-            # 获取性能摘要
             performance_summary = self.performance_monitor.get_performance_summary()
 
-            Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
+            if early_stop_triggered:
+                Log.warning("数据收集因内存过高而提前终止")
+            else:
+                Log.info(f"收集完成: {self.collected_frames}帧, 用时: {elapsed:.1f}秒")
+
             Log.info(f"平均帧率: {performance_summary['frames_per_second']:.2f} FPS")
             Log.info(f"最大内存使用: {performance_summary['max_memory_mb']:.1f} MB")
             Log.info(f"平均CPU使用: {performance_summary['average_cpu_percent']:.1f}%")
@@ -1413,15 +1218,12 @@ class DataCollector:
             self._save_metadata()
             self._print_summary()
 
-            # 生成标准格式数据
             if self.output_format != 'standard':
                 self._convert_to_target_format()
 
     def _force_memory_cleanup(self):
-        """强制内存清理"""
         Log.info("执行强制内存清理...")
 
-        # 清理图像处理器缓存
         for sensor_manager in self.sensor_managers.values():
             if hasattr(sensor_manager, 'image_processor'):
                 if hasattr(sensor_manager.image_processor, 'image_cache'):
@@ -1432,7 +1234,6 @@ class DataCollector:
                     except:
                         pass
 
-        # 清理LiDAR批处理
         for sensor_manager in self.sensor_managers.values():
             if hasattr(sensor_manager, 'lidar_processor'):
                 try:
@@ -1441,25 +1242,20 @@ class DataCollector:
                 except:
                     pass
 
-        # 强制垃圾回收
         gc.collect()
 
         Log.info("强制内存清理完成")
 
     def cleanup(self):
-        """安全清理所有资源 - 完全重写的版本"""
         Log.info("开始安全清理场景...")
 
         cleanup_start = time.time()
 
         try:
-            # 1. 设置运行状态为False
             self.is_running = False
 
-            # 2. 等待一小段时间让循环结束
             time.sleep(0.2)
 
-            # 3. 停止V2X通信
             if self.v2x_communication:
                 try:
                     Log.info("停止V2X通信...")
@@ -1467,7 +1263,6 @@ class DataCollector:
                 except:
                     pass
 
-            # 4. 清理传感器（最重要，必须先于车辆）
             Log.info(f"清理 {len(self.sensor_managers)} 个传感器管理器...")
             for vehicle_id, sensor_manager in self.sensor_managers.items():
                 try:
@@ -1476,9 +1271,8 @@ class DataCollector:
                     pass
 
             self.sensor_managers.clear()
-            time.sleep(0.1)  # 等待传感器清理完成
+            time.sleep(0.1)
 
-            # 5. 清理多车辆管理器
             if self.multi_vehicle_manager:
                 try:
                     Log.info("清理多车辆管理器...")
@@ -1486,7 +1280,6 @@ class DataCollector:
                 except:
                     pass
 
-            # 6. 清理背景交通
             if self.traffic_manager:
                 try:
                     Log.info("清理交通管理器...")
@@ -1494,7 +1287,6 @@ class DataCollector:
                 except:
                     pass
 
-            # 7. 清理主车（最后清理）
             Log.info(f"清理 {len(self.ego_vehicles)} 个主车...")
             for vehicle in self.ego_vehicles:
                 try:
@@ -1502,11 +1294,10 @@ class DataCollector:
                         vehicle.destroy()
                 except:
                     pass
-                time.sleep(0.01)  # 短暂延迟
+                time.sleep(0.01)
 
             self.ego_vehicles.clear()
 
-            # 8. 重置世界设置
             try:
                 if self.world:
                     default_weather = carla.WeatherParameters()
@@ -1514,26 +1305,21 @@ class DataCollector:
             except:
                 pass
 
-            # 9. 强制垃圾回收
             gc.collect()
 
-            # 10. 等待确保清理完成
             time.sleep(0.3)
 
-            # 11. 释放引用
             self.traffic_manager = None
             self.multi_vehicle_manager = None
             self.v2x_communication = None
             self.scene_center = None
 
-            # 最后一次强制垃圾回收
             gc.collect()
 
             Log.info(f"清理完成，总用时: {time.time() - cleanup_start:.2f}秒")
 
         except Exception as e:
             Log.error(f"清理过程中发生错误: {e}")
-            # 紧急清理：强制释放所有引用
             try:
                 self.sensor_managers.clear()
                 self.ego_vehicles.clear()
@@ -1545,7 +1331,6 @@ class DataCollector:
                 pass
 
     def _convert_to_target_format(self):
-        """转换为目标数据格式"""
         Log.info(f"转换为 {self.output_format} 格式...")
 
         if self.output_format == 'v2xformer':
@@ -1554,22 +1339,17 @@ class DataCollector:
             self._convert_to_kitti_format()
 
     def _convert_to_v2xformer_format(self):
-        """转换为V2XFormer格式"""
         try:
-            # 创建必要的目录结构
             v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
 
-            # 创建数据集结构
             splits = ['train', 'val', 'test']
             for split in splits:
                 split_dir = os.path.join(v2x_dir, split)
                 os.makedirs(split_dir, exist_ok=True)
 
-                # 创建子目录
                 for subdir in ['image', 'point_cloud', 'calib', 'label']:
                     os.makedirs(os.path.join(split_dir, subdir), exist_ok=True)
 
-            # 生成数据集划分
             total_frames = self.collected_frames
             train_ratio = 0.7
             val_ratio = 0.2
@@ -1579,7 +1359,6 @@ class DataCollector:
             val_frames = int(total_frames * val_ratio)
             test_frames = total_frames - train_frames - val_frames
 
-            # 生成划分文件
             splits_info = {
                 'train': list(range(0, train_frames)),
                 'val': list(range(train_frames, train_frames + val_frames)),
@@ -1596,11 +1375,9 @@ class DataCollector:
             Log.error(f"V2XFormer格式转换失败: {e}")
 
     def _convert_to_kitti_format(self):
-        """转换为KITTI格式"""
         try:
             kitti_dir = os.path.join(self.output_dir, "kitti_format")
 
-            # 创建KITTI标准目录结构
             for subdir in ['training', 'testing']:
                 full_dir = os.path.join(kitti_dir, subdir)
                 os.makedirs(full_dir, exist_ok=True)
@@ -1608,7 +1385,6 @@ class DataCollector:
                 for subsubdir in ['image_2', 'velodyne', 'calib', 'label_2']:
                     os.makedirs(os.path.join(full_dir, subsubdir), exist_ok=True)
 
-            # 生成KITTI格式的校准文件
             self._generate_kitti_calibration(kitti_dir)
 
             Log.info(f"KITTI格式转换完成: {kitti_dir}")
@@ -1617,7 +1393,6 @@ class DataCollector:
             Log.error(f"KITTI格式转换失败: {e}")
 
     def _generate_kitti_calibration(self, kitti_dir):
-        """生成KITTI格式的校准文件"""
         calib_template = """P0: 7.215377e+02 0.000000e+00 6.095593e+02 0.000000e+00 0.000000e+00 7.215377e+02 1.728540e+02 0.000000e+00 0.000000e+00 0.000000e+00 1.000000e+00 0.000000e+00
 P1: 7.215377e+02 0.000000e+00 6.095593e+02 -3.875744e+02 0.000000e+00 7.215377e+02 1.728540e+02 0.000000e+00 0.000000e+00 0.000000e+00 1.000000e+00 0.000000e+00
 P2: 7.215377e+02 0.000000e+00 6.095593e+02 4.485728e+01 0.000000e+00 7.215377e+02 1.728540e+02 2.163791e-01 0.000000e+00 0.000000e+00 1.000000e+00 2.745884e-03
@@ -1626,18 +1401,15 @@ R0_rect: 9.999239e-01 9.837760e-03 -7.445048e-03 -9.869795e-03 9.999421e-01 -4.2
 Tr_velo_to_cam: 4.276802e-04 -9.999672e-01 -8.084491e-03 -1.198459e-02 -7.210626e-03 8.081198e-03 -9.999413e-01 -5.403984e-02 9.999738e-01 4.859485e-04 -7.206933e-03 -2.921968e-02
 Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e-04 9.998898e-01 -1.482298e-02 3.195559e-01 2.024406e-03 1.482454e-02 9.998881e-01 -7.997231e-01"""
 
-        # 为每一帧生成校准文件
         for i in range(self.collected_frames):
             calib_file = os.path.join(kitti_dir, "training", "calib", f"{i:06d}.txt")
             with open(calib_file, 'w') as f:
                 f.write(calib_template)
 
     def _update_v2x_communication(self):
-        """更新V2X通信"""
         if not self.v2x_communication:
             return
 
-        # 为每辆车发送基本安全消息
         for vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
             if not hasattr(vehicle, 'is_alive') or not vehicle.is_alive:
                 continue
@@ -1651,7 +1423,7 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
                     'position': (location.x, location.y, location.z),
                     'speed': speed,
                     'heading': vehicle.get_transform().rotation.yaw,
-                    'acceleration': (0, 0, 0)  # 简化处理
+                    'acceleration': (0, 0, 0)
                 }
 
                 self.v2x_communication.broadcast_basic_safety_message(
@@ -1661,33 +1433,27 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             except:
                 pass
 
-        # 处理接收到的消息
         for vehicle in self.ego_vehicles:
             messages = self.v2x_communication.get_messages_for_node(f'vehicle_{vehicle.id}')
             if messages:
                 Log.debug(f"车辆 {vehicle.id} 收到 {len(messages)} 条V2X消息")
 
     def _share_perception_data(self):
-        """共享感知数据"""
         if not self.multi_vehicle_manager or not self.config['cooperative']['enable_shared_perception']:
             return
 
-        # 模拟车辆感知数据（简化处理，实际应从传感器获取）
         for vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
             if not hasattr(vehicle, 'is_alive') or not vehicle.is_alive:
                 continue
 
-            # 模拟检测到的物体
             detected_objects = self._simulate_object_detection(vehicle)
 
             if detected_objects:
                 self.multi_vehicle_manager.share_perception_data(vehicle.id, detected_objects)
 
     def _simulate_object_detection(self, vehicle):
-        """模拟对象检测（简化）"""
         detected_objects = []
 
-        # 获取车辆周围的其他车辆
         for other_vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
             if other_vehicle.id == vehicle.id or not hasattr(other_vehicle, 'is_alive') or not other_vehicle.is_alive:
                 continue
@@ -1696,7 +1462,6 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
                 location = other_vehicle.get_location()
                 distance = vehicle.get_location().distance(location)
 
-                # 模拟检测范围（50米）
                 if distance < 50.0:
                     obj_data = {
                         'class': 'vehicle',
@@ -1729,17 +1494,14 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             'performance': self.performance_monitor.get_performance_summary()
         }
 
-        # 传感器摘要
         sensor_summaries = {}
         for vehicle_id, sensor_manager in self.sensor_managers.items():
             sensor_summaries[vehicle_id] = sensor_manager.generate_sensor_summary()
         metadata['sensor_summaries'] = sensor_summaries
 
-        # V2X通信状态
         if self.v2x_communication:
             metadata['v2x_status'] = self.v2x_communication.get_network_status()
 
-        # 协同摘要
         if self.multi_vehicle_manager:
             metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
 
@@ -1754,19 +1516,16 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
         print("数据收集摘要")
         print("=" * 60)
 
-        # 统计原始图像
         raw_dirs = [d for d in os.listdir(self.output_dir) if d.startswith('raw')]
         total_raw_images = 0
         for raw_dir in raw_dirs:
             raw_path = os.path.join(self.output_dir, raw_dir)
             if os.path.exists(raw_path):
-                # 快速统计
                 for root, dirs, files in os.walk(raw_path):
                     total_raw_images += len([f for f in files if f.endswith(('.png', '.jpg', '.jpeg'))])
 
         print(f"原始图像: {total_raw_images} 张")
 
-        # 统计LiDAR
         lidar_dir = os.path.join(self.output_dir, "lidar")
         if os.path.exists(lidar_dir):
             import glob
@@ -1776,7 +1535,6 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             print(f"LiDAR数据: {len(bin_files)} .bin文件, {len(npy_files)} .npy文件")
             print(f"批处理文件: {len(batch_files)} 个")
 
-        # 统计协同数据
         coop_dir = os.path.join(self.output_dir, "cooperative")
         if os.path.exists(coop_dir):
             v2x_files = len(
@@ -1785,7 +1543,6 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
                 [f for f in os.listdir(os.path.join(coop_dir, "shared_perception")) if f.endswith('.json')])
             print(f"协同数据: {v2x_files} V2X消息, {perception_files} 共享感知文件")
 
-        # 格式转换
         if self.output_format == 'v2xformer':
             v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
             if os.path.exists(v2x_dir):
@@ -1796,7 +1553,6 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             if os.path.exists(kitti_dir):
                 print(f"KITTI格式: 已生成")
 
-        # 性能统计
         performance = self.performance_monitor.get_performance_summary()
         print(f"\n性能统计:")
         print(f"  平均帧率: {performance['frames_per_second']:.2f} FPS")
@@ -1825,9 +1581,8 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
 
 
 def main():
-    parser = argparse.ArgumentParser(description='CVIPS 性能优化数据收集系统 v12.0')
+    parser = argparse.ArgumentParser(description='CVIPS 性能优化数据收集系统')
 
-    # 基础参数
     parser.add_argument('--config', type=str, help='配置文件路径')
     parser.add_argument('--scenario', type=str, default='performance_optimized', help='场景名称')
     parser.add_argument('--town', type=str, default='Town10HD',
@@ -1837,26 +1592,21 @@ def main():
     parser.add_argument('--time-of-day', type=str, default='noon',
                         choices=['noon', 'sunset', 'night'], help='时间')
 
-    # 交通参数
     parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
     parser.add_argument('--num-pedestrians', type=int, default=6, help='行人数')
     parser.add_argument('--num-coop-vehicles', type=int, default=2, help='协同车辆数')
 
-    # 收集参数
     parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
     parser.add_argument('--capture-interval', type=float, default=2.0, help='捕捉间隔(秒)')
     parser.add_argument('--seed', type=int, help='随机种子')
 
-    # 性能参数
     parser.add_argument('--batch-size', type=int, default=5, help='批处理大小')
     parser.add_argument('--enable-compression', action='store_true', help='启用数据压缩')
     parser.add_argument('--enable-downsampling', action='store_true', help='启用LiDAR下采样')
 
-    # 输出格式
     parser.add_argument('--output-format', type=str, default='standard',
                         choices=['standard', 'v2xformer', 'kitti'], help='输出数据格式')
 
-    # 传感器参数
     parser.add_argument('--enable-lidar', action='store_true', help='启用LiDAR传感器')
     parser.add_argument('--enable-fusion', action='store_true', help='启用多传感器融合')
     parser.add_argument('--enable-v2x', action='store_true', help='启用V2X通信')
@@ -1864,26 +1614,22 @@ def main():
     parser.add_argument('--enable-enhancement', action='store_true', help='启用数据增强')
     parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
 
-    # 功能参数
     parser.add_argument('--run-analysis', action='store_true', help='运行数据集分析')
     parser.add_argument('--skip-validation', action='store_true', help='跳过数据验证')
     parser.add_argument('--skip-quality-check', action='store_true', help='跳过质量检查')
 
     args = parser.parse_args(remaining_argv)
 
-    # 加载配置
     config = ConfigManager.load_config(args.config)
     config = ConfigManager.merge_args(config, args)
 
-    # 添加性能配置
     config['performance']['batch_size'] = args.batch_size
     config['performance']['enable_compression'] = args.enable_compression
     config['performance']['enable_downsampling'] = args.enable_downsampling
     config['output']['output_format'] = args.output_format
 
-    # 显示配置
     print("\n" + "=" * 60)
-    print("CVIPS 性能优化数据收集系统 v12.0")
+    print("CVIPS 性能优化数据收集系统")
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
