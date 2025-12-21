@@ -1,162 +1,158 @@
-import math
-import time
+import mujoco
+import mujoco.viewer
+import numpy as np
+import os
+import tempfile
+import time  # 新增：备用的睡眠函数
+
+# ====================== 1. 定义机械臂 XML 模型 ======================
+# 6自由度机械臂的 MuJoCo XML 描述
+arm_xml = """
+<mujoco model="6dof_arm">
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+
+  <!-- 视觉和物理材质 -->
+  <asset>
+    <material name="gray" rgba="0.7 0.7 0.7 1"/>
+    <material name="blue" rgba="0.2 0.4 0.8 1"/>
+    <material name="red" rgba="0.8 0.2 0.2 1"/>
+  </asset>
+
+  <!-- 世界体 -->
+  <worldbody>
+    <!-- 地面 -->
+    <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 0" material="gray"/>
+
+    <!-- 机械臂基座 -->
+    <body name="base" pos="0 0 0">
+      <geom name="base_geom" type="cylinder" size="0.15 0.1" pos="0 0 0" material="gray"/>
+      <joint name="joint0" type="hinge" axis="0 0 1" pos="0 0 0.1"/>
+
+      <!-- 连杆1 (肩部旋转) -->
+      <body name="link1" pos="0 0 0.1">
+        <geom name="link1_geom" type="capsule" size="0.05" fromto="0 0 0 0 0 0.3" material="blue"/>
+        <joint name="joint1" type="hinge" axis="0 1 0" pos="0 0 0.3"/>
+
+        <!-- 连杆2 (肘部旋转) -->
+        <body name="link2" pos="0 0 0.3">
+          <geom name="link2_geom" type="capsule" size="0.05" fromto="0 0 0 0.4 0 0" material="blue"/>
+          <joint name="joint2" type="hinge" axis="0 1 0" pos="0.4 0 0"/>
+
+          <!-- 连杆3 (前臂) -->
+          <body name="link3" pos="0.4 0 0">
+            <geom name="link3_geom" type="capsule" size="0.04" fromto="0 0 0 0.35 0 0" material="blue"/>
+            <joint name="joint3" type="hinge" axis="1 0 0" pos="0.35 0 0"/>
+
+            <!-- 连杆4 (腕部旋转1) -->
+            <body name="link4" pos="0.35 0 0">
+              <geom name="link4_geom" type="capsule" size="0.04" fromto="0 0 0 0 0 0.25" material="blue"/>
+              <joint name="joint4" type="hinge" axis="0 1 0" pos="0 0 0.25"/>
+
+              <!-- 连杆5 (腕部旋转2) -->
+              <body name="link5" pos="0 0 0.25">
+                <geom name="link5_geom" type="capsule" size="0.03" fromto="0 0 0 0 0 0.2" material="blue"/>
+                <joint name="joint5" type="hinge" axis="1 0 0" pos="0 0 0.2"/>
+
+                <!-- 末端执行器 -->
+                <body name="end_effector" pos="0 0 0.2">
+                  <geom name="ee_geom" type="box" size="0.08 0.08 0.08" pos="0 0 0" material="red"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- 关节控制器 -->
+  <actuator>
+    <motor name="motor0" joint="joint0" ctrlrange="-3.14 3.14" gear="100"/>
+    <motor name="motor1" joint="joint1" ctrlrange="-1.57 1.57" gear="100"/>
+    <motor name="motor2" joint="joint2" ctrlrange="-1.57 1.57" gear="100"/>
+    <motor name="motor3" joint="joint3" ctrlrange="-3.14 3.14" gear="100"/>
+    <motor name="motor4" joint="joint4" ctrlrange="-1.57 1.57" gear="100"/>
+    <motor name="motor5" joint="joint5" ctrlrange="-3.14 3.14" gear="100"/>
+  </actuator>
+</mujoco>
+"""
 
 
-class DroneAutonomousNavigation:
-    def __init__(self):
-        """初始化无人机导航模拟器（无硬件依赖）"""
-        # 模拟无人机当前位置 [纬度, 经度, 高度(m)]
-        self.current_position = [39.908823, 116.397470, 10.0]  # 初始位置（天安门附近）
-        # 目标位置
-        self.target_position = None
-        # 导航状态
-        self.is_navigating = False
+# ====================== 2. 模型加载和仿真控制 ======================
+def create_arm_simulation():
+    """创建并运行机械臂仿真"""
+    # 将XML字符串写入临时文件（MuJoCo需要文件路径加载）
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
+        f.write(arm_xml)
+        xml_path = f.name
 
-    def set_current_position(self, lat, lon, alt):
-        """手动设置当前位置（模拟GPS更新）"""
-        self.current_position = [lat, lon, alt]
-        print(f"✅ 更新当前位置：纬度{lat:.6f}, 经度{lon:.6f}, 高度{alt:.1f}m")
-
-    def calculate_gps_distance(self, pos1, pos2):
-        """
-        纯Python实现GPS两点距离计算（半正矢公式）
-        :param pos1: [lat, lon, alt] 起点
-        :param pos2: [lat, lon, alt] 终点
-        :return: 地面距离（米）
-        """
-        # 地球半径（米）
-        EARTH_RADIUS = 6371000.0
-
-        # 转换为弧度
-        lat1, lon1 = math.radians(pos1[0]), math.radians(pos1[1])
-        lat2, lon2 = math.radians(pos2[0]), math.radians(pos2[1])
-
-        # 计算经纬度差值
-        dlat = lat2 - lat1
-        dlon = lon2 - lon1
-
-        # 半正矢公式核心计算
-        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        distance = EARTH_RADIUS * c
-
-        return round(distance, 2)
-
-    def generate_straight_path(self, start_pos, target_pos, waypoint_count=5):
-        """
-        生成直线插值路径（无避障）
-        :param waypoint_count: 中间航点数量
-        :return: 航点列表 [[lat, lon, alt], ...]
-        """
-        path = []
-        # 计算每个维度的步长
-        lat_step = (target_pos[0] - start_pos[0]) / (waypoint_count + 1)
-        lon_step = (target_pos[1] - start_pos[1]) / (waypoint_count + 1)
-        alt_step = (target_pos[2] - start_pos[2]) / (waypoint_count + 1)
-
-        # 生成中间航点
-        for i in range(1, waypoint_count + 1):
-            lat = start_pos[0] + lat_step * i
-            lon = start_pos[1] + lon_step * i
-            alt = start_pos[2] + alt_step * i
-            path.append([round(lat, 6), round(lon, 6), round(alt, 1)])
-
-        # 添加最终目标点
-        path.append([target_pos[0], target_pos[1], target_pos[2]])
-        return path
-
-    def simulate_fly_to_waypoint(self, waypoint):
-        """
-        模拟飞向单个航点（逐步更新位置）
-        :param waypoint: 目标航点 [lat, lon, alt]
-        """
-        # 每次移动的步长（模拟无人机飞行，每次移动0.00001度经纬度）
-        LAT_STEP = 0.00001
-        LON_STEP = 0.00001
-        ALT_STEP = 0.5  # 高度每次移动0.5米
-
-        # 持续移动直到到达航点（距离<1米）
-        while True:
-            distance = self.calculate_gps_distance(self.current_position, waypoint)
-            if distance < 1.0:
-                print(f"✅ 到达航点：{waypoint} (距离{distance}m)")
-                break
-
-            # 计算移动方向并更新位置
-            current_lat, current_lon, current_alt = self.current_position
-            target_lat, target_lon, target_alt = waypoint
-
-            # 纬度调整
-            if current_lat < target_lat:
-                new_lat = current_lat + LAT_STEP
-            elif current_lat > target_lat:
-                new_lat = current_lat - LAT_STEP
-            else:
-                new_lat = current_lat
-
-            # 经度调整
-            if current_lon < target_lon:
-                new_lon = current_lon + LON_STEP
-            elif current_lon > target_lon:
-                new_lon = current_lon - LON_STEP
-            else:
-                new_lon = current_lon
-
-            # 高度调整
-            if current_alt < target_alt:
-                new_alt = current_alt + ALT_STEP
-            elif current_alt > target_alt:
-                new_alt = current_alt - ALT_STEP
-            else:
-                new_alt = current_alt
-
-            # 更新位置
-            self.set_current_position(new_lat, new_lon, new_alt)
-            # 模拟飞行延迟
-            time.sleep(0.1)
-
-    def navigate_to_target(self, target_lat, target_lon, target_alt):
-        """
-        自主导航主函数（纯算法模拟）
-        """
-        self.target_position = [target_lat, target_lon, target_alt]
-        self.is_navigating = True
-
-        print("\n🚀 开始自主导航任务")
-        print(f"📌 起点：{self.current_position}")
-        print(f"🎯 终点：{self.target_position}")
-
-        # 1. 生成路径
-        path = self.generate_straight_path(self.current_position, self.target_position)
-        print(f"\n🗺️  生成路径完成，共{len(path)}个航点：")
-        for i, wp in enumerate(path):
-            print(f"   航点{i + 1}：{wp}")
-
-        # 2. 依次飞向每个航点
-        print("\n✈️  开始飞向目标...")
-        for i, waypoint in enumerate(path):
-            print(f"\n--- 飞向第{i + 1}个航点 ---")
-            self.simulate_fly_to_waypoint(waypoint)
-
-        # 3. 导航完成
-        self.is_navigating = False
-        print("\n🎉 导航任务完成！已到达目标点")
-
-
-# ------------------- 测试代码 -------------------
-if __name__ == "__main__":
-    # 初始化导航模拟器
-    drone = DroneAutonomousNavigation()
-
-    # 设置目标点（比如：北京奥林匹克公园，高度50米）
-    target_lat = 39.990168
-    target_lon = 116.397204
-    target_alt = 50.0
-
-    # 执行自主导航
     try:
-        drone.navigate_to_target(target_lat, target_lon, target_alt)
-    except KeyboardInterrupt:
-        print("\n🛑 导航任务被手动终止")
+        # 加载模型和数据
+        model = mujoco.MjModel.from_xml_path(xml_path)
+        data = mujoco.MjData(model)
+
+        print("✅ 机械臂模型加载成功！")
+        print(f"🔧 关节数量：{model.njnt}")
+        print(f"🔧 执行器数量：{model.nu}")
+
+        # 设置初始关节角度
+        initial_joint_angles = [0, 0.2, -0.5, 0, 0.3, 0]
+        data.qpos[:6] = initial_joint_angles
+
+        # 启动可视化界面
+        with mujoco.viewer.launch_passive(model, data) as viewer:
+            print("\n🎮 仿真已启动！按 Ctrl+C 退出")
+            print("💡 机械臂会自动缓慢运动，展示关节控制效果")
+
+            # 仿真循环
+            step = 0
+            while viewer.is_running():
+                # 控制频率：每20步更新一次关节目标
+                if step % 20 == 0:
+                    # 生成周期性的关节控制指令（让机械臂缓慢摆动）
+                    t = data.time
+                    target_angles = [
+                        0.2 * np.sin(t * 0.5),  # joint0: 基座旋转
+                        0.3 + 0.2 * np.sin(t),  # joint1: 肩部
+                        -0.6 + 0.2 * np.cos(t),  # joint2: 肘部
+                        0.1 * np.sin(t * 1.2),  # joint3: 前臂
+                        0.2 * np.cos(t * 0.8),  # joint4: 腕部1
+                        0.1 * np.sin(t * 1.5)  # joint5: 腕部2
+                    ]
+                    # 设置控制指令
+                    data.ctrl[:6] = target_angles
+
+                # 运行一步仿真
+                mujoco.mj_step(model, data)
+
+                # 更新可视化
+                viewer.sync()
+
+                # 修复：兼容不同版本的睡眠函数
+                try:
+                    # 尝试调用新版 MuJoCo 的 sleep 函数（归属到 utils）
+                    mujoco.utils.mju_sleep(1 / 60)
+                except AttributeError:
+                    try:
+                        # 尝试调用旧版 MuJoCo 的 sleep 函数（主模块）
+                        mujoco.mju_sleep(1 / 60)
+                    except AttributeError:
+                        # 终极备用：使用 Python 内置的 time.sleep
+                        time.sleep(1 / 60)
+
+                step += 1
+
+    except Exception as e:
+        print(f"❌ 仿真出错：{e}")
     finally:
-        print("\n🛬 无人机已悬停/降落")
+        # 删除临时XML文件
+        os.unlink(xml_path)
+
+
+if __name__ == "__main__":
+    # 检查MuJoCo版本
+    print(f"🔍 MuJoCo 版本：{mujoco.__version__}")
+
+    # 启动仿真
+    create_arm_simulation()
