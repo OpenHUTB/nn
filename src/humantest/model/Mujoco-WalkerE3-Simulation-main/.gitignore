@@ -1,0 +1,4 @@
+# 忽略快速推送脚本
+QUICK_PUSH.sh
+QUICK_PUSH_GITHUB.sh
+
