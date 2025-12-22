@@ -131,7 +131,12 @@ class Agent():
         else:
             self.errors.append(error)
             steer = self.func(error=error)
-        return steer, self.throttle
+            # [Planning] Adaptive Cruise Control (ACC) logic
+            # Decrease throttle when steering angle is high (cornering)
+            # Increase throttle when steering angle is low (straight line)
+            dynamic_throttle = max(0.2, self.throttle - abs(steer) * 0.4)
+
+            return steer, dynamic_throttle
 
     @staticmethod
     def _simple_controller(error: float) -> float:
