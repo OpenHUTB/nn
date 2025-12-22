@@ -368,6 +368,201 @@ class LiDARManager:
                 logger.warning(f"销毁LiDAR失败: {e}")
         self.lidar = None
 
+# ======================== 视角管理器 ========================
+
+class SpectatorManager:
+    """CARLA视角管理器 - 提供卫星视角跟随"""
+    
+    def __init__(self, world, ego_vehicle, config):
+        """
+        初始化视角管理器
+        
+        Args:
+            world: CARLA世界对象
+            ego_vehicle: 自车对象
+            config: 配置字典
+        """
+        self.world = world
+        self.ego_vehicle = ego_vehicle
+        self.config = config
+        self.spectator = None
+        self.view_mode = 'satellite'  # 视角模式: 'satellite', 'behind', 'first_person'
+        self.view_height = 50.0  # 卫星视角高度
+        self.follow_distance = 10.0  # 后方视角距离
+        
+    def setup(self):
+        """设置视角"""
+        try:
+            # 获取世界中的观察者（spectator）
+            self.spectator = self.world.get_spectator()
+            
+            # 设置初始视角
+            self._set_satellite_view()
+            
+            logger.info(f"✅ 视角管理器初始化成功")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ 视角管理器初始化失败: {e}")
+            return False
+    
+    def _set_satellite_view(self):
+        """设置卫星视角"""
+        if not self.ego_vehicle or not self.ego_vehicle.is_alive:
+            return
+        
+        try:
+            # 获取车辆位置和方向
+            vehicle_transform = self.ego_vehicle.get_transform()
+            vehicle_location = vehicle_transform.location
+            vehicle_rotation = vehicle_transform.rotation
+            
+            # 设置卫星视角位置（车辆正上方）
+            spectator_location = carla.Location(
+                x=vehicle_location.x,
+                y=vehicle_location.y,
+                z=vehicle_location.z + self.view_height
+            )
+            
+            # 设置视角朝向（俯瞰车辆）
+            spectator_rotation = carla.Rotation(
+                pitch=-90,  # 向下看
+                yaw=vehicle_rotation.yaw,
+                roll=0
+            )
+            
+            # 应用变换
+            spectator_transform = carla.Transform(
+                spectator_location,
+                spectator_rotation
+            )
+            self.spectator.set_transform(spectator_transform)
+            
+        except Exception as e:
+            logger.warning(f"设置卫星视角失败: {e}")
+    
+    def _set_behind_view(self):
+        """设置后方跟随视角"""
+        if not self.ego_vehicle or not self.ego_vehicle.is_alive:
+            return
+        
+        try:
+            # 获取车辆位置和方向
+            vehicle_transform = self.ego_vehicle.get_transform()
+            vehicle_location = vehicle_transform.location
+            vehicle_rotation = vehicle_transform.rotation
+            
+            # 计算后方偏移位置
+            import math
+            yaw_rad = math.radians(vehicle_rotation.yaw)
+            
+            # 车辆后方偏移
+            behind_x = vehicle_location.x - self.follow_distance * math.cos(yaw_rad)
+            behind_y = vehicle_location.y - self.follow_distance * math.sin(yaw_rad)
+            
+            # 设置摄像机位置（稍高于车辆）
+            spectator_location = carla.Location(
+                x=behind_x,
+                y=behind_y,
+                z=vehicle_location.z + 3.0
+            )
+            
+            # 设置视角朝向（看向车辆）
+            # 计算朝向车辆的旋转
+            dx = vehicle_location.x - spectator_location.x
+            dy = vehicle_location.y - spectator_location.y
+            target_yaw = math.degrees(math.atan2(dy, dx))
+            
+            spectator_rotation = carla.Rotation(
+                pitch=-15,  # 略微向下
+                yaw=target_yaw,
+                roll=0
+            )
+            
+            # 应用变换
+            spectator_transform = carla.Transform(
+                spectator_location,
+                spectator_rotation
+            )
+            self.spectator.set_transform(spectator_transform)
+            
+        except Exception as e:
+            logger.warning(f"设置后方视角失败: {e}")
+    
+    def _set_first_person_view(self):
+        """设置第一人称视角"""
+        if not self.ego_vehicle or not self.ego_vehicle.is_alive:
+            return
+        
+        try:
+            # 获取车辆变换
+            vehicle_transform = self.ego_vehicle.get_transform()
+            
+            # 稍微调整位置（从驾驶员视角）
+            location = carla.Location(
+                x=vehicle_transform.location.x,
+                y=vehicle_transform.location.y,
+                z=vehicle_transform.location.z + 1.6  # 驾驶员眼睛高度
+            )
+            
+            # 使用车辆的方向
+            rotation = carla.Rotation(
+                pitch=vehicle_transform.rotation.pitch,
+                yaw=vehicle_transform.rotation.yaw,
+                roll=vehicle_transform.rotation.roll
+            )
+            
+            # 应用变换
+            spectator_transform = carla.Transform(
+                location,
+                rotation
+            )
+            self.spectator.set_transform(spectator_transform)
+            
+        except Exception as e:
+            logger.warning(f"设置第一人称视角失败: {e}")
+    
+    def set_view_mode(self, mode):
+        """
+        设置视角模式
+        
+        Args:
+            mode: 视角模式 ('satellite', 'behind', 'first_person')
+        """
+        if mode not in ['satellite', 'behind', 'first_person']:
+            logger.warning(f"未知的视角模式: {mode}")
+            return
+        
+        self.view_mode = mode
+    
+    def update(self):
+        """更新视角"""
+        if not self.ego_vehicle or not self.ego_vehicle.is_alive:
+            return
+        
+        try:
+            if self.view_mode == 'satellite':
+                self._set_satellite_view()
+            elif self.view_mode == 'behind':
+                self._set_behind_view()
+            elif self.view_mode == 'first_person':
+                self._set_first_person_view()
+                
+        except Exception as e:
+            logger.debug(f"更新视角失败: {e}")
+    
+    def cycle_view_mode(self):
+        """循环切换视角模式"""
+        modes = ['satellite', 'behind', 'first_person']
+        current_index = modes.index(self.view_mode) if self.view_mode in modes else 0
+        next_index = (current_index + 1) % len(modes)
+        self.view_mode = modes[next_index]
+        logger.info(f"切换到 {self.view_mode} 视角")
+    
+    def destroy(self):
+        """销毁视角管理器"""
+        self.spectator = None
+        logger.info("✅ 视角管理器已销毁")
 
 class SensorManager:
     """传感器管理器（统一管理所有传感器）"""
@@ -387,6 +582,7 @@ class SensorManager:
         
         self.camera_manager = None
         self.lidar_manager = None
+        self.spectator_manager = None  # 新增视角管理器
         self.is_setup = False
         
     def setup(self):
@@ -405,7 +601,11 @@ class SensorManager:
         else:
             logger.info("LiDAR功能已禁用")
         
-        self.is_setup = camera_success and lidar_success
+        # 初始化视角管理器
+        self.spectator_manager = SpectatorManager(self.world, self.ego_vehicle, self.config)
+        spectator_success = self.spectator_manager.setup()
+        
+        self.is_setup = camera_success and lidar_success and spectator_success
         
         if self.is_setup:
             logger.info("✅ 所有传感器初始化完成")
@@ -414,6 +614,7 @@ class SensorManager:
         
         return self.is_setup
     
+    # 在get_sensor_data方法中添加视角更新
     def get_sensor_data(self, timeout=0.05):
         """
         获取所有传感器数据
@@ -446,31 +647,22 @@ class SensorManager:
             if points is not None:
                 data['lidar_objects'] = self.lidar_manager.detect_objects()
         
+        # 更新视角
+        if self.spectator_manager:
+            self.spectator_manager.update()
+        
         return data
     
-    def get_camera_image(self):
-        """获取相机图像"""
-        if self.camera_manager:
-            return self.camera_manager.get_current_image()
-        return None
+    # 添加视角控制方法
+    def set_view_mode(self, mode):
+        """设置视角模式"""
+        if self.spectator_manager:
+            self.spectator_manager.set_view_mode(mode)
     
-    def get_lidar_pointcloud(self):
-        """获取LiDAR点云"""
-        if self.lidar_manager:
-            return self.lidar_manager.current_pointcloud
-        return None
-    
-    def get_lidar_objects(self):
-        """获取LiDAR检测到的物体"""
-        if self.lidar_manager:
-            return self.lidar_manager.detect_objects()
-        return []
-    
-    def get_open3d_pointcloud(self):
-        """获取Open3D格式的点云"""
-        if self.lidar_manager:
-            return self.lidar_manager.get_open3d_pointcloud()
-        return None
+    def cycle_view_mode(self):
+        """循环切换视角模式"""
+        if self.spectator_manager:
+            self.spectator_manager.cycle_view_mode()
     
     def destroy(self):
         """销毁所有传感器"""
@@ -481,6 +673,9 @@ class SensorManager:
         
         if self.lidar_manager:
             self.lidar_manager.destroy()
+        
+        if self.spectator_manager:
+            self.spectator_manager.destroy()
         
         logger.info("✅ 所有传感器已销毁")
 

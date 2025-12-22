@@ -118,16 +118,37 @@ MANUAL = {
     'MAX_ALTITUDE_LIMIT': -30.0,  # 最高飞行高度限制
 }
 
-# ==================== 前视窗口参数 ====================
+# ==================== 窗口显示参数 ====================
 DISPLAY = {
-    'WINDOW_WIDTH': 640,  # 窗口宽度 (像素)
-    'WINDOW_HEIGHT': 480,  # 窗口高度 (像素)
-    'ENABLE_SHARPENING': True,  # 启用图像锐化，改善模糊
-    'SHOW_INFO_OVERLAY': True,  # 显示信息叠加层
-    'REFRESH_RATE_MS': 30,  # 刷新率 (毫秒)，建议30-50
-    'GRID_DISPLAY_SIZE': 150,  # 探索网格显示大小 (像素)
-    'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
-    'SHOW_BLUE_OBJECTS': True,  # 在画面中标记蓝色物体（新增）
+    # 前视窗口参数
+    'FRONT_VIEW_WINDOW': {
+        'NAME': "无人机前视画面",
+        'WIDTH': 640,
+        'HEIGHT': 480,
+        'ENABLE_SHARPENING': True,  # 启用图像锐化，改善模糊
+        'SHOW_INFO_OVERLAY': True,  # 显示信息叠加层
+        'REFRESH_RATE_MS': 30,  # 刷新率 (毫秒)，建议30-50
+        'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
+        'SHOW_BLUE_OBJECTS': True,  # 在画面中标记蓝色物体
+    },
+
+    # 信息显示窗口参数
+    'INFO_WINDOW': {
+        'NAME': "无人机信息面板",
+        'WIDTH': 800,
+        'HEIGHT': 600,
+        'BACKGROUND_COLOR': (20, 20, 30),  # 深蓝灰色背景
+        'TEXT_COLOR': (220, 220, 255),  # 浅蓝色文字
+        'HIGHLIGHT_COLOR': (0, 200, 255),  # 青色高亮
+        'WARNING_COLOR': (0, 100, 255),  # 橙色警告
+        'SUCCESS_COLOR': (0, 255, 150),  # 绿色成功
+        'REFRESH_RATE_MS': 100,  # 信息窗口刷新率
+        'SHOW_GRID': True,  # 显示探索网格
+        'GRID_SIZE': 300,  # 网格显示大小
+        'SHOW_OBJECTS_STATS': True,  # 显示物体统计
+        'SHOW_SYSTEM_STATS': True,  # 显示系统统计
+        'SHOW_PERFORMANCE': True,  # 显示性能信息
+    }
 }
 
 # ==================== 系统与安全参数 ====================

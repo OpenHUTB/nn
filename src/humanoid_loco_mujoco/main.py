@@ -13,10 +13,10 @@ from mujoco.mjx import Model, Data
 import numpy as np
 from loco_mujoco.task_factories import ImitationFactory,  DefaultDatasetConf
 from loco_mujoco.environments import UnitreeG1
-
+from loco_mujoco.core.initial_state_handler import InitialStateHandler
 from loco_mujoco.core.observations import Observation, StatefulObservation
 from loco_mujoco.core.control_functions.pd import PDControl, PDControlState
-
+from loco_mujoco.core.terminal_state_handler import TerminalStateHandler
 
 # ----- CUSTOM ENVIRONMENT -----
 # custom environment class with fixed waist yaw joint
@@ -56,6 +56,35 @@ class CustomControlFunction(PDControl):
         dim = env.info.action_space.shape[0]
         ma = backend.zeros_like(dim)
         return CustomControlFunctionState(moving_average=ma, **asdict(orig_state))
+
+# ----- CUSTOM INITIAL STATE HANDLER -----
+# custom initial state handler to set the initial height of the robot between 2.0 and 2.5
+class CustomInitialStateHandler(InitialStateHandler):
+    def reset(self, env: Any, model: Union[MjModel, Model],
+              data: Union[MjData, Data], carry: Any,
+              backend: ModuleType) -> Tuple[Union[MjData, Data], Any]:
+        if backend == np:
+            data.qpos[2] = np.random.uniform(2.0, 2.5)
+        else:
+            key, subkey = jax.random.split(carry.key)
+            z = jax.random.uniform(subkey, (1,), minval=2.0, maxval=2.5)
+            data = data.replace(qpos=data.qpos.at[2].set(z))
+            carry = carry.replace(key=key)
+        return data, carry
+
+# ----- CUSTOM TERMINAL STATE HANDLER -----
+# custom terminal state handler to terminate the episode with a probability of 0.05
+class CustomTerminalStateHandler(TerminalStateHandler):
+    def reset(self, env, model, data, carry, backend):
+        return data, carry
+
+    def is_absorbing(self, env, obs, info, data, carry):
+        return np.random.uniform() < 0.05, carry
+
+    def mjx_is_absorbing(self, env, obs, info, data, carry):
+        key, subkey = jax.random.split(carry.key)
+        absorbing = jax.random.uniform(subkey) < 0.05
+        return absorbing, carry.replace(key=key)
 
 
 
@@ -115,7 +144,8 @@ CustomUnitreeG1.register()
 CustomControlFunction.register()
 CustomBodyCOMPos.register()
 CustomBodyCOMPosMovingAverage.register()
-
+CustomTerminalStateHandler.register()
+CustomInitialStateHandler.register()
 
 # ----- ENVIRONMENT SETUP -----
 observation_spec = [
@@ -187,9 +217,9 @@ randomization_config = {
 
 
 
-# # example --> you can add as many datasets as you want in the lists!
+# # example --> you can add as many datasets as you want in the lists!"squat",
 env = ImitationFactory.make("UnitreeG1",
-                            default_dataset_conf=DefaultDatasetConf(["squat", "walk"]),
+                            default_dataset_conf=DefaultDatasetConf([ "walk"]),
                             terrain_type="RoughTerrain", 
                             terrain_params=dict(random_min_height=-0.1,random_max_height=0.1,random_downsampled_scale=0.5),
                             domain_randomization_type="DefaultRandomizer",
@@ -197,6 +227,8 @@ env = ImitationFactory.make("UnitreeG1",
                             observation_spec=observation_spec,
                             control_type="CustomControlFunction", 
                             control_params={"p_gain": 100, "d_gain": 1},
+                            terminal_state_type="CustomTerminalStateHandler",
+                            init_state_type="CustomInitialStateHandler",
                             n_substeps=20)
 
 env.play_trajectory(n_episodes=3, n_steps_per_episode=500, render=True)

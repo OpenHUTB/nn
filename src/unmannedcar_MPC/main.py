@@ -52,6 +52,13 @@ class Main():
             'safety': 0.0  # 安全性
         }
 
+        # 航点导航系统
+        self.current_waypoint_index = 0  # 当前航点索引
+        self.waypoint_positions = []  # 航点位置列表
+        self.distance_to_waypoint = 0.0  # 到当前航点的距离
+        self.waypoint_reached_count = 0  # 已到达航点计数
+        self.waypoint_progress = 0.0  # 航点进度（0-1）
+
         # start game loop
         self.game.game_loop(self.world, self.on_tick)
 
@@ -69,6 +76,9 @@ class Main():
                 break
             wp = _wps[0]
             path.append(wp.transform.location)
+
+        # 更新航点信息
+        self.update_waypoint_navigation(path)
 
         # get forward speed
         velocity = self.ego.get_velocity()
@@ -187,6 +197,13 @@ class Main():
         self.drawer.display_frame_info(self.frame_count, dt)
         self.drawer.display_collision_warning(self.collision_warning, self.collision_history)
         self.drawer.display_driving_score(self.driving_score, self.score_factors, self.score_history)
+        self.drawer.display_waypoint_navigation(
+            self.current_waypoint_index,
+            self.waypoint_positions,
+            self.distance_to_waypoint,
+            self.waypoint_reached_count,
+            self.waypoint_progress
+        )
 
     def check_collision_warning(self, path, speed_kmh, steer_angle):
         """检测可能的碰撞风险"""
@@ -288,6 +305,53 @@ class Main():
             print(f"路径跟踪: {path_following:.1f}")
             print(f"安全性: {safety:.1f}")
             print("=" * 40)
+
+    def update_waypoint_navigation(self, path):
+        """更新航点导航信息"""
+        if len(path) == 0:
+            return
+
+        # 保存航点位置
+        self.waypoint_positions = path
+
+        # 计算车辆当前位置
+        vehicle_location = self.ego.get_location()
+
+        # 如果还没有设置当前航点，从第一个开始
+        if self.current_waypoint_index >= len(self.waypoint_positions):
+            self.current_waypoint_index = 0
+
+        # 计算到当前航点的距离
+        current_waypoint = self.waypoint_positions[self.current_waypoint_index]
+        dx = current_waypoint.x - vehicle_location.x
+        dy = current_waypoint.y - vehicle_location.y
+        self.distance_to_waypoint = math.sqrt(dx * dx + dy * dy)
+
+        # 检查是否到达当前航点（距离小于5米）
+        waypoint_threshold = 5.0  # 到达阈值（米）
+        if self.distance_to_waypoint < waypoint_threshold:
+            # 到达当前航点，切换到下一个
+            self.current_waypoint_index += 1
+            self.waypoint_reached_count += 1
+
+            # 如果到达所有航点，重新开始
+            if self.current_waypoint_index >= len(self.waypoint_positions):
+                self.current_waypoint_index = 0
+
+            # 重新计算到新航点的距离
+            if self.current_waypoint_index < len(self.waypoint_positions):
+                new_waypoint = self.waypoint_positions[self.current_waypoint_index]
+                dx = new_waypoint.x - vehicle_location.x
+                dy = new_waypoint.y - vehicle_location.y
+                self.distance_to_waypoint = math.sqrt(dx * dx + dy * dy)
+
+            # 输出到达信息
+            print(
+                f"到达航点 #{self.waypoint_reached_count}，切换到航点 {self.current_waypoint_index + 1}/{len(self.waypoint_positions)}")
+
+        # 计算航点进度（0-1）
+        if len(self.waypoint_positions) > 0:
+            self.waypoint_progress = self.current_waypoint_index / len(self.waypoint_positions)
 
 
 if __name__ == '__main__':

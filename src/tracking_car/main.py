@@ -1026,6 +1026,9 @@ class CarlaTrackingSystem:
         self.show_legend = True  # Whether to show color legend
         self.start_time = time.time()  # Program start time
         
+        # 新增：视角控制
+        self.current_view_mode = 'satellite'  # 默认卫星视角
+
         # Detection thread related
         self.detection_thread = None
         self.image_queue = None
@@ -1376,7 +1379,21 @@ class CarlaTrackingSystem:
             self.show_legend = not self.show_legend
             status = "Show" if self.show_legend else "Hide"
             logger.info(f"[LEGEND] Color legend: {status}")
-    
+        
+        # 新增：V键切换视角模式
+        elif key == ord('v') or key == ord('V'):
+            if self.sensor_manager:
+                self.sensor_manager.cycle_view_mode()
+                # 获取当前视角模式并显示
+                current_mode = self.sensor_manager.spectator_manager.view_mode
+                mode_names = {
+                    'satellite': '卫星视角',
+                    'behind': '后方视角', 
+                    'first_person': '第一人称视角'
+                }
+                mode_name = mode_names.get(current_mode, current_mode)
+                logger.info(f"[VIEW] 切换到 {mode_name}")
+
     def _control_frame_rate(self, current_fps):
         """Control frame rate"""
         import time

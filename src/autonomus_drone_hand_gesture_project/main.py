@@ -165,6 +165,7 @@ def print_welcome_message(cap, speech_manager, libs):
     print(f"  语音反馈: {'已启用' if speech_manager.enabled else '已禁用'}")
     print(f"  性能监控: 已启用")
     print(f"  轨迹记录: 支持录制/回放功能")
+    print(f"  高级飞行模式: 方形轨迹、圆形盘旋、8字形飞行")
     print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
     print("=" * 80)
 
@@ -190,7 +191,9 @@ def print_instructions():
     print("6. 轨迹记录功能:")
     print("   [1]开始录制 [2]停止录制 [3]保存轨迹 [4]回放轨迹 [5]清除轨迹 [6]暂停/继续")
     print("7. 键盘控制:")
-    print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [X]停止 [H]悬停 [G]返航")
+    print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [B]向后 [X]停止 [H]悬停")
+    print("   [G]返航 [Q]自动飞行模式 [E]圆形盘旋 [8]8字形飞行 [9]方形轨迹")
+    print("   [T]增加高度 [Y]降低高度 [U]设定高度")
     print("8. 调试功能:")
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
     print("9. 语音控制:")
@@ -236,6 +239,9 @@ def main():
     drone_controller = SimpleDroneController(libs['airsim'], speech_manager, config)
     ui_renderer = ChineseUIRenderer(speech_manager, config)
 
+    # 设置手势识别器的UI渲染器引用
+    gesture_recognizer.set_ui_renderer(ui_renderer)
+
     # 初始化性能分析器
     print("初始化性能分析器...")
     performance_analyzer = PerformanceAnalyzer(speech_manager, libs.get('psutil'), config)
@@ -268,13 +274,20 @@ def main():
         ord('a'): "Left", ord('A'): "Left",
         ord('d'): "Right", ord('D'): "Right",
         ord('f'): "Forward", ord('F'): "Forward",
+        ord('b'): "Backward", ord('B'): "Backward",
         ord('x'): "Stop", ord('X'): "Stop",
         ord('h'): "Hover", ord('H'): "Hover",
         ord('g'): "ReturnHome", ord('G'): "ReturnHome",
-        ord('b'): "AutoFlight", ord('B'): "AutoFlight",
+        ord('q'): "AutoFlight", ord('Q'): "AutoFlight",
         ord('p'): "TakePhoto", ord('P'): "TakePhoto",
         ord('r'): "RotateCW", ord('R'): "RotateCW",
         ord('l'): "RotateCCW", ord('L'): "RotateCCW",
+        ord('e'): "CircleFlight", ord('E'): "CircleFlight",
+        ord('8'): "EightFlight", ord('*'): "EightFlight",
+        ord('9'): "SquareFlight", ord('('): "SquareFlight",
+        ord('t'): "IncreaseAltitude", ord('T'): "IncreaseAltitude",
+        ord('y'): "DecreaseAltitude", ord('Y'): "DecreaseAltitude",
+        ord('u'): "SetAltitude", ord('U'): "SetAltitude",
     }
 
     # 显示模式
@@ -335,6 +348,7 @@ def main():
                 config.set('display', 'show_performance_stats', value=True)
                 config.set('display', 'show_system_resources', value=True)
                 config.set('display', 'show_advanced_gestures', value=True)
+                config.set('display', 'show_flight_mode', value=True)
                 config.set('display', 'show_debug_info', value=False)
             elif display_modes[current_display_mode] == 'detailed':
                 config.set('display', 'show_contours', value=True)
@@ -350,6 +364,7 @@ def main():
                 config.set('display', 'show_performance_stats', value=True)
                 config.set('display', 'show_system_resources', value=True)
                 config.set('display', 'show_advanced_gestures', value=True)
+                config.set('display', 'show_flight_mode', value=True)
                 config.set('display', 'show_debug_info', value=True)
             elif display_modes[current_display_mode] == 'minimal':
                 config.set('display', 'show_contours', value=False)
@@ -363,6 +378,7 @@ def main():
                 config.set('display', 'show_performance_stats', value=True)
                 config.set('display', 'show_system_resources', value=True)
                 config.set('display', 'show_advanced_gestures', value=False)
+                config.set('display', 'show_flight_mode', value=True)
                 config.set('display', 'show_debug_info', value=False)
 
             # 绘制轨迹（如果启用）
@@ -379,6 +395,10 @@ def main():
                 performance_analyzer.get_current_fps(), process_time,
                 trajectory_recorder, gesture_recognizer, performance_analyzer
             )
+
+            # 绘制飞行模式信息
+            if config.get('display', 'show_flight_mode'):
+                frame = ui_renderer.draw_flight_mode(frame, drone_controller)
 
             # 绘制性能图表（如果启用详细模式）
             if display_modes[current_display_mode] == 'detailed':
@@ -432,6 +452,8 @@ def main():
                 # 重置手势识别
                 print("重置手势识别...")
                 gesture_recognizer = EnhancedGestureRecognizer(speech_manager, config)
+                # 重新设置UI渲染器引用
+                gesture_recognizer.set_ui_renderer(ui_renderer)
                 print("✓ 手势识别已重置")
 
                 # 语音提示

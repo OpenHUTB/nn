@@ -1,20 +1,17 @@
 import time
-import threading
 import numpy as np
 from src.main_carla_simulator import CarlaSimulator
-from src.config import X_INIT_M, Y_INIT_M, N, dt, V_REF, LAPS
-from src.main_help_functions import get_eight_trajectory, get_ref_trajectory, get_circle_trajectory, \
-    get_spiral_trajectory, get_square_trajectory, update_reference_point
+from src.config import N, dt, V_REF, LAPS
+from src.main_help_functions import get_ref_trajectory, update_reference_point
 from src.main_logger import Logger
 from src.main_mpc_controller import MpcController
 
 """
-# 注释掉的轨迹绘制线程
+# 注释掉的"8"字形轨迹场景
 def draw_trajectory_in_thread(carla, x_traj, y_traj, dt):
     while True:
         carla.draw_trajectory(x_traj, y_traj, height=0.2, green=255, life_time=dt * 2)
         time.sleep(dt)
-"""
 
 carla = CarlaSimulator()
 carla.load_world('Town02_Opt')
@@ -27,17 +24,348 @@ x_traj, y_traj, v_ref, theta_traj = get_eight_trajectory(X_INIT_M, Y_INIT_M)  # 
 current_idx = 0
 laps = 0
 
-"""
-# 注释掉的轨迹绘制线程
 trajectory_thread = threading.Thread(target=draw_trajectory_in_thread, args=(carla, x_traj, y_traj, dt))
 trajectory_thread.daemon = True
 trajectory_thread.start()
 """
 
-mpc_controller = MpcController(horizon=N, dt=dt)
+# ================ 新的道路场景 - 使用CARLA Waypoint系统 ================
+
+# 初始化CARLA模拟器
+carla = CarlaSimulator()
+
+# 加载一个有道路的地图
+carla.load_world('Town01')  # 使用Town01地图，它有清晰的道路网络
+
+# 获取地图的生成点
+spawn_points = carla.world.get_map().get_spawn_points()
+if not spawn_points:
+    print("Warning: No spawn points found in the map!")
+    raise RuntimeError("No spawn points available")
+
+# 尝试多个生成点直到成功
+vehicle_spawned = False
+for i, spawn_point in enumerate(spawn_points):
+    try:
+        print(f"Attempting to spawn vehicle at spawn point {i + 1}/{len(spawn_points)}...")
+
+        carla.spawn_ego_vehicle(
+            'vehicle.tesla.model3',
+            x=spawn_point.location.x,
+            y=spawn_point.location.y,
+            z=spawn_point.location.z + 0.1,
+            pitch=spawn_point.rotation.pitch,
+            yaw=spawn_point.rotation.yaw,
+            roll=spawn_point.rotation.roll
+        )
+
+        vehicle_spawned = True
+        print(f"Successfully spawned vehicle at spawn point {i + 1}")
+        break
+    except Exception as e:
+        print(f"Failed to spawn at spawn point {i + 1}: {e}")
+        continue
+
+if not vehicle_spawned:
+    raise RuntimeError("Failed to spawn vehicle at any spawn point")
+
+carla.print_ego_vehicle_characteristics()
+
+# 设置spectator位置
+vehicle_location = carla.ego_vehicle.get_location()
+carla.set_spectator(
+    x=vehicle_location.x - 15,  # 在车辆后方15米
+    y=vehicle_location.y,
+    z=12,  # 高度12米
+    pitch=-25,  # 稍微向下看
+    yaw=0  # 看向车辆前方
+)
+
+logger = Logger()
+
+
+# ================ 添加障碍物生成功能 ================
+
+def spawn_obstacles(carla_simulator, num_obstacles=3):
+    """
+    在道路上生成障碍物车辆
+
+    参数:
+        carla_simulator: CarlaSimulator实例
+        num_obstacles: 障碍物数量
+    """
+    obstacles = []
+    blueprint_library = carla_simulator.world.get_blueprint_library()
+
+    # 获取地图的所有生成点
+    all_spawn_points = carla_simulator.world.get_map().get_spawn_points()
+
+    if not all_spawn_points:
+        print("Warning: No spawn points found for obstacles!")
+        return obstacles
+
+    # 获取主车辆的位置
+    ego_location = carla_simulator.ego_vehicle.get_location()
+
+    # 筛选出距离主车辆一定距离的生成点
+    valid_spawn_points = []
+    for spawn_point in all_spawn_points:
+        distance = np.sqrt(
+            (spawn_point.location.x - ego_location.x) ** 2 +
+            (spawn_point.location.y - ego_location.y) ** 2
+        )
+        # 选择距离主车辆20-50米的生成点
+        if 20 < distance < 50:
+            valid_spawn_points.append(spawn_point)
+
+    # 如果没有合适的生成点，放宽条件
+    if not valid_spawn_points:
+        print("No suitable spawn points found, using all spawn points...")
+        valid_spawn_points = all_spawn_points
+
+    # 随机选择生成点
+    import random
+    random.shuffle(valid_spawn_points)
+
+    # 生成障碍物
+    for i in range(min(num_obstacles, len(valid_spawn_points))):
+        try:
+            # 随机选择障碍物类型
+            obstacle_types = [
+                'vehicle.audi.tt',
+                'vehicle.mercedes.coupe',
+                'vehicle.nissan.micra',
+                'vehicle.dodge.charger_police',
+                'vehicle.bmw.grandtourer',
+                'static.prop.box'  # 静态箱子
+            ]
+
+            obstacle_type = random.choice(obstacle_types)
+
+            if obstacle_type.startswith('vehicle.'):
+                # 生成车辆障碍物
+                obstacle_bp = blueprint_library.filter(obstacle_type)[0]
+                spawn_point = valid_spawn_points[i]
+
+                obstacle = carla_simulator.world.spawn_actor(
+                    obstacle_bp,
+                    spawn_point
+                )
+
+                # 设置车辆为静止状态
+                obstacle.apply_control(carla.VehicleControl(
+                    throttle=0.0,
+                    brake=1.0,
+                    steer=0.0,
+                    hand_brake=True
+                ))
+
+                # 设置车辆颜色
+                if obstacle_type != 'static.prop.box':
+                    obstacle.set_autopilot(False)
+
+                print(
+                    f"Spawned obstacle {i + 1}: {obstacle_type} at ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
+                obstacles.append(obstacle)
+
+            elif obstacle_type == 'static.prop.box':
+                # 生成静态箱子障碍物
+                box_bp = blueprint_library.find('static.prop.box')
+                spawn_point = valid_spawn_points[i]
+
+                # 稍微抬高箱子避免陷入地面
+                box_location = carla.Location(
+                    x=spawn_point.location.x,
+                    y=spawn_point.location.y,
+                    z=spawn_point.location.z + 0.5
+                )
+
+                obstacle = carla_simulator.world.spawn_actor(
+                    box_bp,
+                    carla.Transform(box_location, spawn_point.rotation)
+                )
+
+                print(f"Spawned static box obstacle {i + 1} at ({box_location.x:.1f}, {box_location.y:.1f})")
+                obstacles.append(obstacle)
+
+        except Exception as e:
+            print(f"Failed to spawn obstacle {i + 1}: {e}")
+            continue
+
+    print(f"Successfully spawned {len(obstacles)} obstacles")
+    return obstacles
+
+
+# ================ 使用CARLA Waypoint生成轨迹 ================
+
+def generate_road_trajectory(carla_simulator, distance_ahead=100.0, waypoint_interval=2.0):
+    """
+    使用CARLA的Waypoint系统生成沿着道路的轨迹
+
+    参数:
+        carla_simulator: CarlaSimulator实例
+        distance_ahead: 向前看的距离（米）
+        waypoint_interval: waypoint之间的间隔（米）
+    """
+    if not carla_simulator.ego_vehicle:
+        raise ValueError("Vehicle not spawned yet")
+
+    # 获取当前车辆的waypoint
+    vehicle_location = carla_simulator.ego_vehicle.get_location()
+    carla_map = carla_simulator.world.get_map()
+    current_waypoint = carla_map.get_waypoint(vehicle_location)
+
+    if not current_waypoint:
+        raise ValueError("Cannot get waypoint at vehicle location")
+
+    # 收集前方的waypoints
+    waypoints = [current_waypoint]
+    distance_traveled = 0.0
+
+    while distance_traveled < distance_ahead:
+        # 获取下一个waypoint
+        next_waypoints = current_waypoint.next(waypoint_interval)
+
+        if not next_waypoints:
+            print(f"Warning: No more waypoints after {distance_traveled} meters")
+            break
+
+        # 选择第一个（最直接的道路方向）
+        current_waypoint = next_waypoints[0]
+        waypoints.append(current_waypoint)
+        distance_traveled += waypoint_interval
+
+    print(f"Generated {len(waypoints)} waypoints for trajectory")
+
+    # 提取轨迹点
+    x_traj = []
+    y_traj = []
+    v_ref = []
+    theta_traj = []
+
+    for i, wp in enumerate(waypoints):
+        transform = wp.transform
+        location = transform.location
+
+        x_traj.append(location.x)
+        y_traj.append(location.y)
+        v_ref.append(V_REF)  # 使用参考速度
+
+        # 计算航向角（从yaw角度转换）
+        yaw_deg = transform.rotation.yaw
+        theta_traj.append(np.deg2rad(yaw_deg))
+
+    return np.array(x_traj), np.array(y_traj), v_ref, theta_traj
+
+
+# 生成沿着道路的轨迹
 try:
+    x_traj, y_traj, v_ref, theta_traj = generate_road_trajectory(
+        carla_simulator=carla,
+        distance_ahead=200.0,  # 生成200米长的轨迹
+        waypoint_interval=2.0  # 每2米一个waypoint
+    )
+    print(f"Trajectory generated with {len(x_traj)} points")
+except Exception as e:
+    print(f"Failed to generate road trajectory: {e}")
+    # 如果生成失败，使用简单的直线轨迹作为后备
+    print("Using straight trajectory as fallback...")
+    vehicle_location = carla.ego_vehicle.get_location()
+    # 生成简单的直线轨迹
+    x_traj = np.array([vehicle_location.x + i * 2.0 for i in range(100)])
+    y_traj = np.array([vehicle_location.y for i in range(100)])  # 直线
+    v_ref = [V_REF] * 100
+    theta_traj = [0.0] * 100  # 朝向正东方向
+
+current_idx = 0
+laps = 0
+
+# 生成障碍物
+obstacles = spawn_obstacles(carla, num_obstacles=5)
+
+
+# ================ 添加碰撞检测功能 ================
+
+def check_collision(carla_simulator):
+    """
+    检查车辆是否发生碰撞
+
+    返回:
+        bool: 是否发生碰撞
+        str: 碰撞对象类型（如果发生碰撞）
+    """
+    collision_sensor = None
+
+    try:
+        # 创建碰撞传感器
+        blueprint_library = carla_simulator.world.get_blueprint_library()
+        collision_bp = blueprint_library.find('sensor.other.collision')
+
+        # 将传感器附加到车辆
+        collision_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.0))
+        collision_sensor = carla_simulator.world.spawn_actor(
+            collision_bp,
+            collision_transform,
+            attach_to=carla_simulator.ego_vehicle
+        )
+
+        # 设置碰撞事件处理器
+        collision_detected = [False]
+        collision_actor = [None]
+
+        def on_collision(event):
+            collision_detected[0] = True
+            collision_actor[0] = event.other_actor
+            print(f"Collision detected with {event.other_actor.type_id}")
+
+        collision_sensor.listen(on_collision)
+
+        # 等待一小段时间检查碰撞
+        time.sleep(0.1)
+
+        # 销毁传感器
+        if collision_sensor:
+            collision_sensor.destroy()
+
+        return collision_detected[0], collision_actor[0].type_id if collision_actor[0] else "unknown"
+
+    except Exception as e:
+        print(f"Error in collision detection: {e}")
+        if collision_sensor:
+            collision_sensor.destroy()
+        return False, "error"
+
+
+# ================ MPC控制器初始化 ================
+
+mpc_controller = MpcController(horizon=N, dt=dt)
+
+# 降低速度以减少碰撞风险
+SAFE_V_REF = 3.0  # 降低到3 m/s (约10.8 km/h)
+
+try:
+    consecutive_collisions = 0
+    max_consecutive_collisions = 3
+
     while True:
         start_time = time.time()
+
+        # 检查碰撞
+        collision_detected, collision_type = check_collision(carla)
+        if collision_detected:
+            consecutive_collisions += 1
+            print(f"COLLISION WARNING #{consecutive_collisions}: Collision with {collision_type}")
+
+            if consecutive_collisions >= max_consecutive_collisions:
+                print("Too many consecutive collisions. Stopping simulation.")
+                break
+
+            # 碰撞后短暂停止
+            carla.apply_control(0.0, 0.0, 1.0)  # 刹车
+            time.sleep(0.5)
+            continue
+        else:
+            consecutive_collisions = 0
 
         mpc_controller.reset_solver()
 
@@ -49,41 +377,78 @@ try:
         # 使用感知规划绘制，只显示前方轨迹
         carla.draw_perception_planning(x_ref, y_ref, current_idx=0, look_ahead_points=N)
 
-        # 绘制Frenet参考线（可选）
-        # carla.draw_frenet_frame(x_traj, y_traj, current_idx)
-
-        logger.log_controller_input(x0, y0, v0, theta0, x_ref[0], y_ref[0], V_REF, theta_ref[0])
-        mpc_controller.update_cost_function(x_ref, y_ref, theta_ref, v_ref)
+        logger.log_controller_input(x0, y0, v0, theta0, x_ref[0], y_ref[0], SAFE_V_REF, theta_ref[0])
+        mpc_controller.update_cost_function(x_ref, y_ref, theta_ref, [SAFE_V_REF] * len(x_ref))
 
         mpc_controller.solve()
 
         wheel_angle_rad, acceleration_m_s_2 = mpc_controller.get_controls_value()
 
-        # 增加：限制控制量范围，避免极端值导致错误
+        # 限制控制量范围，避免极端值导致错误
         wheel_angle_rad = max(min(wheel_angle_rad, 0.5), -0.5)
-        acceleration_m_s_2 = max(min(acceleration_m_s_2, 3.0), -3.0)
+        acceleration_m_s_2 = max(min(acceleration_m_s_2, 2.0), -2.0)  # 进一步限制加速度
 
         throttle, brake, steer = CarlaSimulator.process_control_inputs(wheel_angle_rad, acceleration_m_s_2)
         logger.log_controller_output(steer, throttle, brake)
         carla.apply_control(steer, throttle, brake)
 
         prev_current_idx = current_idx
-        current_idx = update_reference_point(x0, y0, current_idx, x_traj, y_traj)
+        current_idx = update_reference_point(x0, y0, current_idx, x_traj, y_traj, min_distance=3.0)  # 减小最小距离
+
+        # 如果到达轨迹终点，重新生成轨迹
+        if current_idx >= len(x_traj) - N:
+            print("Reached end of trajectory. Regenerating...")
+            try:
+                x_traj, y_traj, v_ref, theta_traj = generate_road_trajectory(
+                    carla_simulator=carla,
+                    distance_ahead=200.0,
+                    waypoint_interval=2.0
+                )
+                current_idx = 0
+                print(f"New trajectory generated with {len(x_traj)} points")
+            except Exception as e:
+                print(f"Failed to regenerate trajectory: {e}")
+                break
+
         if prev_current_idx == len(x_traj) - 1 and current_idx == 0:
             laps += 1
 
         end_time = time.time()
         mpc_calculation_time = end_time - start_time
-        print(f"Calculation time of MPC controller: {mpc_calculation_time:.6f} seconds")
+
+        # 显示更多调试信息
+        print(f"MPC calculation: {mpc_calculation_time:.3f}s | "
+              f"Position: ({x0:.1f}, {y0:.1f}) | "
+              f"Speed: {v0:.1f}m/s | "
+              f"Controls: steer={steer:.2f}, throttle={throttle:.2f}, brake={brake:.2f}")
 
         time.sleep(max(dt - mpc_calculation_time, 0))
 
+        # 退出条件
         if laps == LAPS:
+            print(f"Completed {laps} lap(s). Stopping simulation.")
             break
+
+        # 安全停止条件：如果车辆偏离轨迹太远
+        if len(x_traj) > current_idx:
+            distance_to_ref = np.sqrt((x0 - x_traj[current_idx]) ** 2 + (y0 - y_traj[current_idx]) ** 2)
+            if distance_to_ref > 10.0:  # 如果偏离超过10米
+                print(f"Vehicle deviated too far from reference ({distance_to_ref:.1f}m). Stopping.")
+                break
+
 finally:
+    # 清理障碍物
+    for obstacle in obstacles:
+        try:
+            obstacle.destroy()
+        except:
+            pass
+
     carla.clean()
     logger.show_plots()
+
 """
+# 注释掉的其他轨迹选项
 # 圆形轨迹参数：圆心（X_INIT_M, Y_INIT_M），半径20米，200个点
 x_traj, y_traj, v_ref, theta_traj = get_circle_trajectory()  # 一行生成轨迹
 init_x, init_y = x_traj[0], y_traj[0]                       # 2行获取初始位置
