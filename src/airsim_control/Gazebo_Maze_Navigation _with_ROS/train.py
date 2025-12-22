@@ -5,9 +5,13 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 from custom_env import AirSimMazeEnv  # 导入刚才那个文件
 
-# === 路径配置 ===
-MODELS_DIR = os.path.expanduser("~/桌面/models")
-LOG_DIR = os.path.expanduser("~/桌面/logs")
+# === 路径配置 (已改为相对路径) ===
+# 获取当前脚本文件所在的绝对目录
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 拼接路径：在脚本同级目录下生成 models 和 logs
+MODELS_DIR = os.path.join(SCRIPT_DIR, "models")
+LOG_DIR = os.path.join(SCRIPT_DIR, "logs")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -25,6 +29,7 @@ def main():
     )
 
     print("🚀 开始训练 (ROS 2 版)...")
+    print(f"数据保存路径: {SCRIPT_DIR}")
 
     # 初始化 PPO 模型
     model = PPO(
