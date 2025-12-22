@@ -6,153 +6,74 @@ import tempfile
 import time
 from scipy import interpolate
 
-# ====================== 1. 全局配置（物理约束+避障+时间最优参数） ======================
-# 机械臂物理约束（UR5参考参数）
+# ====================== 1. 全局配置（物理约束+避障参数） ======================
 CONSTRAINTS = {
-    "max_vel": [1.0, 0.8, 0.8, 1.2, 0.9, 1.2],  # 各关节最大角速度 (rad/s)
-    "max_acc": [0.5, 0.4, 0.4, 0.6, 0.5, 0.6],  # 各关节最大角加速度 (rad/s²)
-    "max_jerk": [0.3, 0.2, 0.2, 0.4, 0.3, 0.4],  # 最大加加速度 (rad/s³)
-    "ctrl_limit": [-10.0, 10.0]  # 电机控制量限制
+    "max_vel": [1.0, 0.8, 0.8, 1.2, 0.9, 1.2],
+    "max_acc": [0.5, 0.4, 0.4, 0.6, 0.5, 0.6],
+    "max_jerk": [0.3, 0.2, 0.2, 0.4, 0.3, 0.4],
+    "ctrl_limit": [-10.0, 10.0]
 }
 
-# 避障参数
 OBSTACLE_CONFIG = {
-    "k_att": 0.8,  # 引力系数
-    "k_rep": 0.6,  # 斥力系数
-    "rep_radius": 0.3,  # 斥力作用半径
-    "obstacle_list": [  # 障碍物：[x,y,z,半径]
+    "k_att": 0.8,
+    "k_rep": 0.6,
+    "rep_radius": 0.3,
+    "obstacle_list": [
         [0.6, 0.1, 0.5, 0.1],
         [0.4, -0.1, 0.6, 0.08]
     ]
 }
 
-# 笛卡尔轨迹关键点
 CART_WAYPOINTS = [
-    [0.5, 0.0, 0.6],  # 起点
-    [0.7, 0.2, 0.7],  # 中间点（障碍区）
-    [0.8, 0.1, 0.8],  # 终点
-    [0.7, 0.2, 0.7],  # 回中间点
-    [0.5, 0.0, 0.6]  # 回起点
+    [0.5, 0.0, 0.6],
+    [0.7, 0.2, 0.7],
+    [0.8, 0.1, 0.8],
+    [0.7, 0.2, 0.7],
+    [0.5, 0.0, 0.6]
 ]
 
 
-# ====================== 2. 核心：时间最优轨迹生成（梯形速度曲线） ======================
-def time_optimal_trajectory(start, end, joint_idx):
-    """
-    生成单个关节的时间最优轨迹（梯形速度曲线）
-    :param start: 起点角度 (rad)
-    :param end: 终点角度 (rad)
-    :param joint_idx: 关节索引（0-5）
-    :return: 最优运动时间 + 轨迹点数组 [时间, 位置, 速度, 加速度]
-    """
-    max_vel = CONSTRAINTS["max_vel"][joint_idx]
-    max_acc = CONSTRAINTS["max_acc"][joint_idx]
-    delta_pos = end - start  # 位置差
-    sign = np.sign(delta_pos)  # 运动方向
+# ====================== 2. 物理约束轨迹生成 ======================
+def constrained_quintic_polynomial(start, end, total_time, t, joint_idx):
+    s0, v0, a0 = start, 0, 0
+    s1, v1, a1 = end, 0, 0
 
-    # 步骤1：计算达到最大速度所需的加速时间和位移
-    t_acc = max_vel / max_acc  # 加速到最大速度的时间
-    s_acc = 0.5 * max_acc * t_acc ** 2  # 加速阶段位移
+    T = total_time
+    a = s0
+    b = v0
+    c = a0 / 2
+    d = (20 * (s1 - s0) - (8 * v1 + 12 * v0) * T - (3 * a0 - a1) * T ** 2) / (2 * T ** 3)
+    e = (30 * (s0 - s1) + (14 * v1 + 16 * v0) * T + (3 * a0 - 2 * a1) * T ** 2) / (2 * T ** 4)
+    f = (12 * (s1 - s0) - (6 * v1 + 6 * v0) * T - (a0 - a1) * T ** 2) / (2 * T ** 5)
 
-    # 步骤2：判断是否能达到最大速度（决定是梯形/三角形速度曲线）
-    if abs(delta_pos) < 2 * s_acc:
-        # 位移太小，无法匀速（三角形曲线）
-        t_acc = np.sqrt(abs(delta_pos) / max_acc)
-        t_const = 0  # 无匀速阶段
-        total_time = 2 * t_acc
-    else:
-        # 能达到最大速度（梯形曲线）
-        t_const = (abs(delta_pos) - 2 * s_acc) / max_vel  # 匀速时间
-        total_time = 2 * t_acc + t_const
+    pos = a + b * t + c * t ** 2 + d * t ** 3 + e * t ** 4 + f * t ** 5
+    vel = b + 2 * c * t + 3 * d * t ** 2 + 4 * e * t ** 3 + 5 * f * t ** 4
+    acc = 2 * c + 6 * d * t + 12 * e * t ** 2 + 20 * f * t ** 3
 
-    # 步骤3：生成离散轨迹点（1ms步长，保证精度）
-    dt = 0.001
-    time_list = np.arange(0, total_time + dt, dt)
-    pos_list = []
-    vel_list = []
-    acc_list = []
+    vel = np.clip(vel, -CONSTRAINTS["max_vel"][joint_idx], CONSTRAINTS["max_vel"][joint_idx])
+    acc = np.clip(acc, -CONSTRAINTS["max_acc"][joint_idx], CONSTRAINTS["max_acc"][joint_idx])
 
-    for t in time_list:
-        if t < t_acc:
-            # 加速阶段
-            pos = start + sign * 0.5 * max_acc * t ** 2
-            vel = sign * max_acc * t
-            acc = sign * max_acc
-        elif t < t_acc + t_const:
-            # 匀速阶段
-            pos = start + sign * (s_acc + max_vel * (t - t_acc))
-            vel = sign * max_vel
-            acc = 0
-        else:
-            # 减速阶段
-            t_dec = t - (t_acc + t_const)
-            pos = end - sign * 0.5 * max_acc * t_dec ** 2
-            vel = sign * (max_vel - max_acc * t_dec)
-            acc = -sign * max_acc
-
-        pos_list.append(pos)
-        vel_list.append(vel)
-        acc_list.append(acc)
-
-    # 封装轨迹数据
-    traj_data = np.vstack((time_list, pos_list, vel_list, acc_list)).T
-    return total_time, traj_data
+    return pos, vel, acc
 
 
-# ====================== 3. 多关节时间最优轨迹同步 ======================
-def sync_joint_trajectories(joint_waypoints):
-    """
-    同步所有关节的时间最优轨迹（保证同时到达目标点）
-    :param joint_waypoints: 关节轨迹关键点 [[j0,j1,...j5], ...]
-    :return: 全局时间最优轨迹数组 [时间, j0_pos, j1_pos, ..., j5_pos]
-    """
-    num_joints = 6
-    segment_trajs = []  # 存储每段轨迹的各关节数据
+# ====================== 3. 闭环PD控制 ======================
+def closed_loop_constraint_control(data, target_joints, joint_idx):
+    k_p = 8.0
+    k_d = 0.2
 
-    # 遍历每段轨迹（关键点之间的段）
-    for seg_idx in range(len(joint_waypoints) - 1):
-        start_wp = joint_waypoints[seg_idx]
-        end_wp = joint_waypoints[seg_idx + 1]
-        joint_trajs = []
-        seg_max_time = 0
+    current_pos = data.qpos[joint_idx]
+    current_vel = data.qvel[joint_idx]
 
-        # 为每个关节生成时间最优轨迹
-        for j in range(num_joints):
-            seg_time, traj_data = time_optimal_trajectory(start_wp[j], end_wp[j], j)
-            joint_trajs.append(traj_data)
-            if seg_time > seg_max_time:
-                seg_max_time = seg_time  # 取最长时间作为段总时间
+    pos_error = target_joints[joint_idx] - current_pos
+    vel_error = -current_vel
 
-        # 同步所有关节轨迹（拉伸到段总时间）
-        synced_seg_traj = []
-        dt = 0.001
-        seg_time_list = np.arange(0, seg_max_time + dt, dt)
+    ctrl = k_p * pos_error + k_d * vel_error
+    ctrl = np.clip(ctrl, CONSTRAINTS["ctrl_limit"][0], CONSTRAINTS["ctrl_limit"][1])
 
-        for t in seg_time_list:
-            row = [t]
-            for j in range(num_joints):
-                # 找到当前时间对应的关节位置（插值补全）
-                j_traj = joint_trajs[j]
-                if t > j_traj[-1, 0]:
-                    pos = j_traj[-1, 1]  # 已到达目标，保持位置
-                else:
-                    pos = np.interp(t, j_traj[:, 0], j_traj[:, 1])
-                row.append(pos)
-            synced_seg_traj.append(row)
-
-        segment_trajs.append(np.array(synced_seg_traj))
-
-    # 拼接所有段的轨迹
-    global_traj = segment_trajs[0]
-    for seg in segment_trajs[1:]:
-        # 时间偏移（累加前序段的总时间）
-        seg[:, 0] += global_traj[-1, 0]
-        global_traj = np.vstack((global_traj, seg))
-
-    return global_traj
+    return ctrl
 
 
-# ====================== 4. 避障+闭环控制（复用已有逻辑） ======================
+# ====================== 4. 人工势场法避障 ======================
 def artificial_potential_field(ee_pos, target_pos):
     ee_pos = np.array(ee_pos)
     target_pos = np.array(target_pos)
@@ -184,26 +105,45 @@ def artificial_potential_field(ee_pos, target_pos):
     return corrected_target.tolist()
 
 
-def closed_loop_constraint_control(data, target_joints, joint_idx):
-    k_p = 8.0
-    k_d = 0.2
+# ====================== 5. 笛卡尔轨迹平滑 ======================
+def smooth_cartesian_trajectory(waypoints, num_points=200):
+    x = np.array([p[0] for p in waypoints])
+    y = np.array([p[1] for p in waypoints])
+    z = np.array([p[2] for p in waypoints])
 
-    current_pos = data.qpos[joint_idx]
-    current_vel = data.qvel[joint_idx]
+    t = np.linspace(0, 1, len(x))
+    t_new = np.linspace(0, 1, num_points)
 
-    pos_error = target_joints[joint_idx] - current_pos
-    vel_error = -current_vel
+    spline_x = interpolate.CubicSpline(t, x, bc_type='natural')
+    spline_y = interpolate.CubicSpline(t, y, bc_type='natural')
+    spline_z = interpolate.CubicSpline(t, z, bc_type='natural')
 
-    ctrl = k_p * pos_error + k_d * vel_error
-    ctrl = np.clip(ctrl, CONSTRAINTS["ctrl_limit"][0], CONSTRAINTS["ctrl_limit"][1])
-
-    return ctrl
+    return np.vstack((spline_x(t_new), spline_y(t_new), spline_z(t_new))).T
 
 
-# ====================== 5. 机械臂模型（带障碍物） ======================
+# ====================== 6. 替代逆运动学：关节轨迹预生成 ======================
+def precompute_joint_waypoints(model, data, cart_waypoints):
+    """预计算笛卡尔轨迹对应的关节角度（兼容旧版MuJoCo）"""
+    joint_waypoints = []
+    ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
+
+    for cart_pos in cart_waypoints:
+        # 重置数据
+        mujoco.mj_resetData(model, data)
+        # 设置目标位置到data中（旧版mj_inverse的要求）
+        data.site_xpos[ee_site_id] = cart_pos
+        # 调用逆运动学（仅model和data参数）
+        mujoco.mj_inverse(model, data)
+        # 保存关节角度
+        joint_waypoints.append(data.qpos[:6].copy())
+
+    return joint_waypoints
+
+
+# ====================== 7. 机械臂模型（带障碍物） ======================
 def get_arm_xml_with_obstacles():
     arm_xml = """
-<mujoco model="6dof_arm_time_optimal">
+<mujoco model="6dof_arm_with_obstacles">
   <compiler angle="radian" inertiafromgeom="true"/>
   <option timestep="0.005" gravity="0 0 -9.81"/>
   <asset>
@@ -265,22 +205,8 @@ def get_arm_xml_with_obstacles():
     return arm_xml
 
 
-# ====================== 6. 预计算关节关键点（兼容旧版MuJoCo） ======================
-def precompute_joint_waypoints(model, data, cart_waypoints):
-    joint_waypoints = []
-    ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-
-    for cart_pos in cart_waypoints:
-        mujoco.mj_resetData(model, data)
-        data.site_xpos[ee_site_id] = cart_pos
-        mujoco.mj_inverse(model, data)
-        joint_waypoints.append(data.qpos[:6].copy())
-
-    return joint_waypoints
-
-
-# ====================== 7. 主仿真逻辑（时间最优+避障+约束） ======================
-def run_time_optimal_simulation():
+# ====================== 8. 主仿真逻辑（修复逆运动学调用） ======================
+def run_obstacle_avoidance_simulation():
     arm_xml = get_arm_xml_with_obstacles()
     with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
         f.write(arm_xml)
@@ -289,60 +215,60 @@ def run_time_optimal_simulation():
     try:
         model = mujoco.MjModel.from_xml_path(xml_path)
         data = mujoco.MjData(model)
-        print("✅ 时间最优机械臂模型加载成功！")
-        print(f"🔧 物理约束：最大速度={CONSTRAINTS['max_vel'][0]}rad/s，最大加速度={CONSTRAINTS['max_acc'][0]}rad/s²")
-        print(f"🔧 避障参数：斥力半径={OBSTACLE_CONFIG['rep_radius']}m")
+        print("✅ 带避障的机械臂模型加载成功！")
+        print(
+            f"🔧 避障参数：斥力半径={OBSTACLE_CONFIG['rep_radius']}m，障碍物数量={len(OBSTACLE_CONFIG['obstacle_list'])}")
 
-        # 步骤1：预计算笛卡尔对应的关节关键点
+        # 预计算关节轨迹关键点（兼容旧版MuJoCo）
         joint_waypoints = precompute_joint_waypoints(model, data, CART_WAYPOINTS)
+        # 平滑关节轨迹
+        num_joint_points = 200
+        smooth_joint_traj = []
+        for joint_idx in range(6):
+            joint_vals = [wp[joint_idx] for wp in joint_waypoints]
+            t = np.linspace(0, 1, len(joint_vals))
+            t_new = np.linspace(0, 1, num_joint_points)
+            spline = interpolate.CubicSpline(t, joint_vals, bc_type='natural')
+            smooth_joint_traj.append(spline(t_new))
+        # 转置为 [轨迹点, 关节]
+        smooth_joint_traj = np.array(smooth_joint_traj).T
 
-        # 步骤2：生成时间最优同步轨迹
-        global_traj = sync_joint_trajectories(joint_waypoints)
-        total_opt_time = global_traj[-1, 0]
-        print(f"\n⏱️  时间最优轨迹生成完成！总运动时间：{total_opt_time:.2f}s")
-
+        traj_length = len(smooth_joint_traj)
         ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-        traj_length = len(global_traj)
+        segment_time = 5.0
 
         with mujoco.viewer.launch_passive(model, data) as viewer:
-            print("\n🎮 时间最优机械臂仿真启动！")
-            print("💡 核心功能：梯形速度曲线（时间最优）+ 避障 + 物理约束")
-            print("💡 特征：机械臂以最短时间运动，同时避开障碍物、不超物理极限")
+            print("\n🎮 机械臂避障仿真启动！")
+            print("💡 核心功能：人工势场法避障 + 物理约束 + PD闭环控制")
+            print("💡 可视化：红色半透明球体为障碍物，机械臂自动绕开")
             print("💡 按 Ctrl+C 退出")
 
             while viewer.is_running():
-                # 1. 获取当前仿真时间
-                t_sim = data.time
+                # 1. 计算当前轨迹索引
+                t_total = data.time
+                traj_idx = int((t_total / segment_time) * traj_length) % traj_length
 
-                # 2. 超出总时间则循环
-                if t_sim > total_opt_time:
-                    mujoco.mj_resetData(model, data)
-                    continue
-
-                # 3. 查找当前时间对应的目标关节角度（插值）
-                target_joints = []
-                for j in range(6):
-                    pos = np.interp(t_sim, global_traj[:, 0], global_traj[:, j + 1])
-                    target_joints.append(pos)
-
-                # 4. 避障修正（实时调整目标）
+                # 2. 获取末端当前位置
                 ee_pos = data.site_xpos[ee_site_id].tolist()
-                # 正运动学获取当前笛卡尔目标
-                mujoco.mj_forward(model, data)
+
+                # 3. 原始关节目标
+                raw_joint_target = smooth_joint_traj[traj_idx]
+
+                # 4. 笛卡尔空间避障修正（核心）
+                # 先通过正运动学获取原始笛卡尔目标
+                mujoco.mj_forward(model, data)  # 更新正运动学
                 raw_cart_target = data.site_xpos[ee_site_id].copy()
-                # 避障修正
+                # 避障修正笛卡尔目标
                 corrected_cart_target = artificial_potential_field(ee_pos, raw_cart_target)
-                # 修正关节目标
+                # 修正后的笛卡尔目标转关节目标（兼容旧版）
                 data.site_xpos[ee_site_id] = corrected_cart_target
                 mujoco.mj_inverse(model, data)
-                corrected_joint_target = data.qpos[:6].copy()
-                # 融合时间最优和避障目标（加权）
-                target_joints = [0.8 * target_joints[i] + 0.2 * corrected_joint_target[i] for i in range(6)]
+                target_joints = data.qpos[:6].copy()
 
-                # 5. 物理约束+闭环控制
+                # 5. 应用物理约束 + 闭环控制
                 ctrl_signals = []
                 for i in range(6):
-                    # 约束关节角度范围
+                    # 约束关节角度
                     target_joints[i] = np.clip(target_joints[i], model.actuator_ctrlrange[i][0],
                                                model.actuator_ctrlrange[i][1])
                     # 闭环PD控制
@@ -352,22 +278,18 @@ def run_time_optimal_simulation():
                 # 6. 发送控制指令
                 data.ctrl[:6] = ctrl_signals
 
-                # 7. 打印关键状态（每0.5秒）
-                if int(t_sim * 2) % 1 == 0 and t_sim > 0:
-                    # 计算当前关节速度
-                    joint_vel = [data.qvel[i] for i in range(6)]
-                    max_vel = max([abs(v) for v in joint_vel])
-                    # 计算末端与最近障碍距离
+                # 7. 打印状态
+                if int(t_total) % 1 == 0 and int(t_total) != 0:
                     obs_distances = []
                     for obs in OBSTACLE_CONFIG["obstacle_list"]:
                         dist = np.linalg.norm(np.array(ee_pos) - np.array(obs[:3]))
                         obs_distances.append(dist)
                     min_obs_dist = min(obs_distances) if obs_distances else 0
 
-                    print(f"\n⏱️  仿真时间：{t_sim:.2f}s / 最优总时间：{total_opt_time:.2f}s")
-                    print(f"   最大关节速度：{max_vel:.3f}rad/s (上限：{CONSTRAINTS['max_vel'][0]})")
-                    print(f"   末端与最近障碍距离：{min_obs_dist:.3f}m")
-                    print(f"   末端位置：{np.round(ee_pos, 3)}")
+                    print(f"\n⏱️  时间：{t_total:.2f}s")
+                    print(f"   末端当前位置：{np.round(ee_pos, 3)}")
+                    print(f"   修正后目标位置：{np.round(corrected_cart_target, 3)}")
+                    print(f"   与最近障碍距离：{min_obs_dist:.3f}m (斥力半径：{OBSTACLE_CONFIG['rep_radius']}m)")
 
                 # 8. 运行仿真步
                 mujoco.mj_step(model, data)
@@ -388,4 +310,4 @@ def run_time_optimal_simulation():
 
 
 if __name__ == "__main__":
-    run_time_optimal_simulation()
+    run_obstacle_avoidance_simulation()
