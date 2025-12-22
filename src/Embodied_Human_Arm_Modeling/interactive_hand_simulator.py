@@ -1,4 +1,3 @@
-# 保存为 hand_demo_mujoco3.py
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -104,11 +103,10 @@ class HandDemoMujoco3:
             'description': '食指伸直，其他手指握起'
         }
 
-        # 演示序列
+        # 演示序列 (去掉了捏取动作)
         self.demo_sequence = [
             '张开手',
             '握拳',
-            '捏取',
             '圆柱体抓握',
             '剪刀手',
             'OK手势',
@@ -422,7 +420,7 @@ class HandDemoMujoco3:
         print("🤖 手部抓握姿态全自动演示 (MuJoCo 3.x 兼容版)")
         print("=" * 60)
         print(f"🎬 演示序列: {len(self.demo_sequence)} 个姿态")
-        print(f"⏱️  每个姿态保持: 3.0秒")
+        print(f"⏱️  每个姿态保持: 5.0秒")
         print(f"🎥 动画过渡: {self.animation_duration}秒")
         self.print_controls()
         print("=" * 60)
@@ -434,11 +432,9 @@ class HandDemoMujoco3:
         self.data.ctrl[:] = self.poses[initial_pose]['values']
 
         last_change = time.time()
-        hold_duration = 5 # 每个姿态保持3秒
+        hold_duration = 5.0  # 每个姿态保持5秒
 
         # 启动一个线程来处理用户输入
-        import threading
-
         def input_thread():
             """处理用户输入的线程"""
             while not self.should_exit:
