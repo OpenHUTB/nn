@@ -84,6 +84,118 @@ carla.set_spectator(
 logger = Logger()
 
 
+# ================ 添加障碍物生成功能 ================
+
+def spawn_obstacles(carla_simulator, num_obstacles=3):
+    """
+    在道路上生成障碍物车辆
+
+    参数:
+        carla_simulator: CarlaSimulator实例
+        num_obstacles: 障碍物数量
+    """
+    obstacles = []
+    blueprint_library = carla_simulator.world.get_blueprint_library()
+
+    # 获取地图的所有生成点
+    all_spawn_points = carla_simulator.world.get_map().get_spawn_points()
+
+    if not all_spawn_points:
+        print("Warning: No spawn points found for obstacles!")
+        return obstacles
+
+    # 获取主车辆的位置
+    ego_location = carla_simulator.ego_vehicle.get_location()
+
+    # 筛选出距离主车辆一定距离的生成点
+    valid_spawn_points = []
+    for spawn_point in all_spawn_points:
+        distance = np.sqrt(
+            (spawn_point.location.x - ego_location.x) ** 2 +
+            (spawn_point.location.y - ego_location.y) ** 2
+        )
+        # 选择距离主车辆20-50米的生成点
+        if 20 < distance < 50:
+            valid_spawn_points.append(spawn_point)
+
+    # 如果没有合适的生成点，放宽条件
+    if not valid_spawn_points:
+        print("No suitable spawn points found, using all spawn points...")
+        valid_spawn_points = all_spawn_points
+
+    # 随机选择生成点
+    import random
+    random.shuffle(valid_spawn_points)
+
+    # 生成障碍物
+    for i in range(min(num_obstacles, len(valid_spawn_points))):
+        try:
+            # 随机选择障碍物类型
+            obstacle_types = [
+                'vehicle.audi.tt',
+                'vehicle.mercedes.coupe',
+                'vehicle.nissan.micra',
+                'vehicle.dodge.charger_police',
+                'vehicle.bmw.grandtourer',
+                'static.prop.box'  # 静态箱子
+            ]
+
+            obstacle_type = random.choice(obstacle_types)
+
+            if obstacle_type.startswith('vehicle.'):
+                # 生成车辆障碍物
+                obstacle_bp = blueprint_library.filter(obstacle_type)[0]
+                spawn_point = valid_spawn_points[i]
+
+                obstacle = carla_simulator.world.spawn_actor(
+                    obstacle_bp,
+                    spawn_point
+                )
+
+                # 设置车辆为静止状态
+                obstacle.apply_control(carla.VehicleControl(
+                    throttle=0.0,
+                    brake=1.0,
+                    steer=0.0,
+                    hand_brake=True
+                ))
+
+                # 设置车辆颜色
+                if obstacle_type != 'static.prop.box':
+                    obstacle.set_autopilot(False)
+
+                print(
+                    f"Spawned obstacle {i + 1}: {obstacle_type} at ({spawn_point.location.x:.1f}, {spawn_point.location.y:.1f})")
+                obstacles.append(obstacle)
+
+            elif obstacle_type == 'static.prop.box':
+                # 生成静态箱子障碍物
+                box_bp = blueprint_library.find('static.prop.box')
+                spawn_point = valid_spawn_points[i]
+
+                # 稍微抬高箱子避免陷入地面
+                box_location = carla.Location(
+                    x=spawn_point.location.x,
+                    y=spawn_point.location.y,
+                    z=spawn_point.location.z + 0.5
+                )
+
+                obstacle = carla_simulator.world.spawn_actor(
+                    box_bp,
+                    carla.Transform(box_location, spawn_point.rotation)
+                )
+
+                print(f"Spawned static box obstacle {i + 1} at ({box_location.x:.1f}, {box_location.y:.1f})")
+                obstacles.append(obstacle)
+
+        except Exception as e:
+            print(f"Failed to spawn obstacle {i + 1}: {e}")
+            continue
+
+    print(f"Successfully spawned {len(obstacles)} obstacles")
+    return obstacles
+
+
 # ================ 使用CARLA Waypoint生成轨迹 ================
 
 def generate_road_trajectory(carla_simulator, distance_ahead=100.0, waypoint_interval=2.0):
@@ -167,6 +279,9 @@ except Exception as e:
 
 current_idx = 0
 laps = 0
+
+# 生成障碍物
+obstacles = spawn_obstacles(carla, num_obstacles=5)
 
 
 # ================ 添加碰撞检测功能 ================
@@ -322,6 +437,13 @@ try:
                 break
 
 finally:
+    # 清理障碍物
+    for obstacle in obstacles:
+        try:
+            obstacle.destroy()
+        except:
+            pass
+
     carla.clean()
     logger.show_plots()
 
