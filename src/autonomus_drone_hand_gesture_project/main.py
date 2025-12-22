@@ -239,6 +239,9 @@ def main():
     drone_controller = SimpleDroneController(libs['airsim'], speech_manager, config)
     ui_renderer = ChineseUIRenderer(speech_manager, config)
 
+    # 设置手势识别器的UI渲染器引用
+    gesture_recognizer.set_ui_renderer(ui_renderer)
+
     # 初始化性能分析器
     print("初始化性能分析器...")
     performance_analyzer = PerformanceAnalyzer(speech_manager, libs.get('psutil'), config)
@@ -449,6 +452,8 @@ def main():
                 # 重置手势识别
                 print("重置手势识别...")
                 gesture_recognizer = EnhancedGestureRecognizer(speech_manager, config)
+                # 重新设置UI渲染器引用
+                gesture_recognizer.set_ui_renderer(ui_renderer)
                 print("✓ 手势识别已重置")
 
                 # 语音提示
