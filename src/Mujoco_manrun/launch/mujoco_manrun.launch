@@ -1,4 +1,15 @@
 <launch>
   <rosparam command="load" file="$(find mujoco_manrun)/config/gait_params.yaml" />
-  <node name="mujoco_manrun_node" pkg="mujoco_manrun" type="main.py" output="screen" />
+  <node 
+    name="mujoco_manrun_node" 
+    pkg="mujoco_manrun" 
+    type="main.py" 
+    output="screen"
+    respawn="false"
+    required="true"
+    ns="humanoid">
+    <param name="use_viewer" value="true" />
+    <param name="sim_freq" value="100" />
+    <param name="init_wait_time" value="4.0" />
+  </node>
 </launch>
