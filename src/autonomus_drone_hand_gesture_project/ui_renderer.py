@@ -45,6 +45,28 @@ class ChineseUIRenderer:
             'memory_good': (0, 255, 0),
             'memory_warning': (255, 165, 0),
             'memory_critical': (255, 0, 0),
+            # 新增手势颜色
+            'gesture_grab': (255, 0, 255),
+            'gesture_rotate_cw': (0, 255, 255),
+            'gesture_rotate_ccw': (255, 255, 0),
+            'gesture_photo': (255, 165, 0),
+            'gesture_return_home': (0, 128, 128),
+            'gesture_auto_flight': (128, 0, 128),
+            # 飞行模式颜色
+            'flight_mode_manual': (0, 255, 0),
+            'flight_mode_auto': (255, 165, 0),
+            'flight_mode_circle': (0, 255, 255),
+            'flight_mode_eight': (255, 0, 255),
+            'flight_mode_square': (255, 255, 0),
+            'flight_mode_return_home': (0, 128, 128),
+            # 性能图表颜色
+            'chart_fps': (0, 255, 0),
+            'chart_cpu': (255, 165, 0),
+            'chart_memory': (0, 165, 255),
+            'chart_recognition': (255, 0, 255),
+            'chart_background': (30, 30, 30),
+            'chart_grid': (60, 60, 60),
+            'chart_text': (200, 200, 200),
         }
 
         print("✓ 中文UI渲染器已初始化")
@@ -109,7 +131,7 @@ class ChineseUIRenderer:
         frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
         # 标题
-        title = "手势控制无人机系统 - 性能统计版"
+        title = "手势控制无人机系统 - 增强性能监控版"
         frame = self.draw_text(frame, title, (10, 10), size=20, color=self.colors['title'])
 
         # 连接状态
@@ -132,7 +154,8 @@ class ChineseUIRenderer:
 
         gesture_text = f"当前手势: {gesture}"
         if self.config.get('display', 'show_confidence'):
-            gesture_text += f" ({confidence:.0%})"
+            # 显示为小数，避免字体问题
+            gesture_text += f" ({confidence:.2f})"
 
         frame = self.draw_text(frame, gesture_text, (w // 2, 40), size=16, color=gesture_color)
 
@@ -176,14 +199,18 @@ class ChineseUIRenderer:
             perf_stats = performance_analyzer.get_stats_summary()
 
             # 性能状态颜色
-            if perf_stats['performance_status'] == "良好":
-                perf_color = self.colors['performance_good']
+            if perf_stats['performance_status'] == "优秀":
+                perf_color = (0, 255, 0)  # 绿色
+            elif perf_stats['performance_status'] == "良好":
+                perf_color = (100, 255, 100)  # 浅绿色
+            elif perf_stats['performance_status'] == "一般":
+                perf_color = (255, 255, 0)  # 黄色
             elif perf_stats['performance_status'] == "警告":
-                perf_color = self.colors['performance_warning']
+                perf_color = (255, 165, 0)  # 橙色
             else:
-                perf_color = self.colors['performance_bad']
+                perf_color = (255, 0, 0)  # 红色
 
-            perf_text = f"性能: {perf_stats['performance_status']} ({perf_stats['fps']:.0f}FPS)"
+            perf_text = f"性能: {perf_stats['performance_status']}({perf_stats['performance_score']:.0f}分) {perf_stats['fps']:.0f}FPS"
             frame = self.draw_text(frame, perf_text, (w // 2, 90), size=12, color=perf_color)
 
         # 系统资源显示
@@ -208,7 +235,7 @@ class ChineseUIRenderer:
                 mem_color = self.colors['memory_critical']
 
             # 绘制系统资源信息
-            sys_text = f"CPU:{cpu_usage:.0f}% 内存:{memory_usage:.0f}%"
+            sys_text = f"CPU:{cpu_usage:.0f}%({performance_analyzer.get_cpu_trend()}) 内存:{memory_usage:.0f}%({performance_analyzer.get_memory_trend()})"
             frame = self.draw_text(frame, sys_text, (w // 2, 110), size=11, color=self.colors['info'])
 
         # 语音状态
@@ -242,8 +269,50 @@ class ChineseUIRenderer:
 
         # 性能快捷键提示
         if performance_analyzer:
-            perf_tip = "P:报告 L:快照 K:导出"
+            perf_tip = "P:详细报告 L:快照 K:导出"
             frame = self.draw_text(frame, perf_tip, (10, 110), size=11, color=self.colors['help'])
+
+        return frame
+
+    def draw_flight_mode(self, frame, drone_controller):
+        """绘制飞行模式信息"""
+        if not drone_controller.connected:
+            return frame
+
+        h, w = frame.shape[:2]
+
+        # 飞行模式显示
+        flight_mode = drone_controller.get_flight_mode()
+
+        # 根据飞行模式选择颜色和文本
+        mode_texts = {
+            'manual': ('手动模式', self.colors['flight_mode_manual']),
+            'auto': ('自动飞行', self.colors['flight_mode_auto']),
+            'circle': ('圆形盘旋', self.colors['flight_mode_circle']),
+            'eight': ('8字形飞行', self.colors['flight_mode_eight']),
+            'square': ('方形轨迹', self.colors['flight_mode_square']),
+            'return_home': ('返航中', self.colors['flight_mode_return_home'])
+        }
+
+        if flight_mode in mode_texts:
+            text, color = mode_texts[flight_mode]
+            mode_text = f"飞行模式: {text}"
+
+            # 绘制背景
+            text_size = cv2.getTextSize(mode_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            bg_x = w - text_size[0] - 20
+            bg_y = 150
+            bg_w = text_size[0] + 10
+            bg_h = text_size[1] + 10
+
+            # 绘制半透明背景
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (bg_x, bg_y), (bg_x + bg_w, bg_y + bg_h), (0, 0, 0), -1)
+            frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
+
+            # 绘制文本
+            frame = self.draw_text(frame, mode_text, (bg_x + 5, bg_y + 5),
+                                  size=14, color=color)
 
         return frame
 
@@ -255,19 +324,20 @@ class ChineseUIRenderer:
         h, w = frame.shape[:2]
 
         # 绘制底部帮助栏
-        cv2.rectangle(frame, (0, h - 120), (w, h), (0, 0, 0), -1)
+        cv2.rectangle(frame, (0, h - 140), (w, h), (0, 0, 0), -1)
 
         # 帮助文本
         help_lines = [
-            "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/X:键盘控制",
+            "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/B:键盘控制",
             "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息",
             "V:切换语音反馈  M:测试语音  P:性能报告  L:性能快照  K:导出日志",
-            "O:切换性能模式  P:详细报告  R:重置统计",
+            "O:切换性能模式  Q:自动飞行  E:圆形盘旋  8:8字形  9:方形轨迹",
+            "T/Y/U:高度控制  G:返航  X:停止  H:悬停",
             "1:开始录制 2:停止录制 3:保存轨迹 4:回放轨迹 5:清除轨迹 6:暂停/继续"
         ]
 
         for i, line in enumerate(help_lines):
-            y_pos = h - 105 + i * 20
+            y_pos = h - 125 + i * 20
             frame = self.draw_text(frame, line, (10, y_pos), size=14, color=self.colors['help'])
 
         return frame
@@ -306,10 +376,10 @@ class ChineseUIRenderer:
 
         cv2.rectangle(frame, (chart_x, chart_y),
                       (chart_x + chart_width, chart_y + chart_height),
-                      (30, 30, 30), -1)
+                      self.colors['chart_background'], -1)
         cv2.rectangle(frame, (chart_x, chart_y),
                       (chart_x + chart_width, chart_y + chart_height),
-                      (100, 100, 100), 1)
+                      self.colors['chart_grid'], 1)
 
         # 绘制标题
         frame = self.draw_text(frame, "性能监控", (chart_x + 10, chart_y + 20),
@@ -335,7 +405,7 @@ class ChineseUIRenderer:
 
                 # 连接点形成曲线
                 for i in range(len(points) - 1):
-                    cv2.line(frame, points[i], points[i + 1], (0, 255, 0), 2)
+                    cv2.line(frame, points[i], points[i + 1], self.colors['chart_fps'], 2)
 
                 # 显示当前FPS值
                 current_fps = fps_values[-1] if fps_values else 0
@@ -346,5 +416,108 @@ class ChineseUIRenderer:
                 frame = self.draw_text(frame, f"FPS: {current_fps:.1f}",
                                        (chart_x + 120, chart_y + 40),
                                        size=12, color=fps_color)
+
+        return frame
+
+    def draw_detailed_performance_charts(self, frame, performance_analyzer):
+        """绘制详细性能图表"""
+        if not performance_analyzer:
+            return frame
+
+        h, w = frame.shape[:2]
+
+        # 绘制多个图表区域
+        chart_height = 100
+        chart_spacing = 10
+
+        # FPS图表
+        fps_chart_y = 130
+        frame = self.draw_chart(frame, w - 250, fps_chart_y, 240, chart_height,
+                               "FPS监控", performance_analyzer.fps_history,
+                               self.colors['chart_fps'], "FPS")
+
+        # CPU图表
+        cpu_chart_y = fps_chart_y + chart_height + chart_spacing
+        frame = self.draw_chart(frame, w - 250, cpu_chart_y, 240, chart_height,
+                               "CPU使用率", performance_analyzer.cpu_usage_history,
+                               self.colors['chart_cpu'], "%", max_val=100)
+
+        # 内存图表
+        memory_chart_y = cpu_chart_y + chart_height + chart_spacing
+        frame = self.draw_chart(frame, w - 250, memory_chart_y, 240, chart_height,
+                               "内存使用率", performance_analyzer.memory_usage_history,
+                               self.colors['chart_memory'], "%", max_val=100)
+
+        # 识别时间图表
+        if len(performance_analyzer.gesture_recognition_times) > 1:
+            recognition_chart_y = memory_chart_y + chart_height + chart_spacing
+            frame = self.draw_chart(frame, w - 250, recognition_chart_y, 240, chart_height,
+                                   "识别时间", performance_analyzer.gesture_recognition_times,
+                                   self.colors['chart_recognition'], "ms")
+
+        return frame
+
+    def draw_chart(self, frame, x, y, width, height, title, data, color, unit="", max_val=None):
+        """绘制单个图表"""
+        # 绘制图表背景
+        cv2.rectangle(frame, (x, y), (x + width, y + height),
+                     self.colors['chart_background'], -1)
+        cv2.rectangle(frame, (x, y), (x + width, y + height),
+                     self.colors['chart_grid'], 1)
+
+        # 绘制标题
+        frame = self.draw_text(frame, title, (x + 10, y + 15),
+                              size=12, color=self.colors['chart_text'])
+
+        if len(data) < 2:
+            return frame
+
+        # 获取数据
+        values = list(data)[-min(20, len(data)):]  # 最多显示20个点
+        if not values:
+            return frame
+
+        # 计算最大值和最小值
+        data_max = max(values) if max_val is None else max_val
+        data_min = min(values)
+
+        if data_max == data_min:
+            data_max = data_min + 1
+
+        # 绘制网格线
+        grid_color = self.colors['chart_grid']
+        for i in range(1, 4):
+            grid_y = y + height - 20 - i * (height - 40) // 4
+            cv2.line(frame, (x + 10, grid_y), (x + width - 10, grid_y), grid_color, 1)
+
+            # 绘制刻度值
+            tick_value = data_min + (data_max - data_min) * i / 4
+            tick_text = f"{tick_value:.0f}{unit}"
+            frame = self.draw_text(frame, tick_text, (x + width - 35, grid_y - 5),
+                                  size=10, color=self.colors['chart_text'])
+
+        # 绘制数据曲线
+        points = []
+        for i, value in enumerate(values):
+            point_x = x + 10 + i * (width - 20) / (len(values) - 1) if len(values) > 1 else x + 10
+            point_y = y + height - 20 - (value - data_min) * (height - 40) / (data_max - data_min)
+            points.append((int(point_x), int(point_y)))
+
+        # 连接点形成曲线
+        for i in range(len(points) - 1):
+            cv2.line(frame, points[i], points[i + 1], color, 2)
+
+        # 绘制当前值
+        if values:
+            current_value = values[-1]
+            current_text = f"当前: {current_value:.1f}{unit}"
+            frame = self.draw_text(frame, current_text, (x + 10, y + 30),
+                                  size=11, color=color)
+
+            # 绘制平均值
+            avg_value = sum(values) / len(values)
+            avg_text = f"平均: {avg_value:.1f}{unit}"
+            frame = self.draw_text(frame, avg_text, (x + width - 80, y + 30),
+                                  size=11, color=self.colors['chart_text'])
 
         return frame
