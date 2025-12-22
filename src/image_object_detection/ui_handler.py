@@ -7,10 +7,11 @@
 #   - 调度静态图像检测、实时摄像头检测 或 批量图像检测
 #   - 处理用户中断（Ctrl+C）并优雅退出
 #   - 保存检测结果图像并反馈保存状态
+#   - 支持运行时切换检测模型（热切换）
 #
 # 设计原则：
 #   - 用户友好：错误提示具体到“文件不存在”、“无权限”、“格式不支持”
-#   - 安全兜底：即使用户输错路径，也不崩溃，而是返回主菜单
+#   - 安全兜底：即使用户输错路径或模型，也不崩溃，而是返回主菜单
 #   - 松耦合：依赖 DetectionEngine、CameraDetector 和 BatchDetector，但不硬编码其内部逻辑
 #   - 可扩展：支持未来新增模式（如视频文件检测）
 
@@ -21,6 +22,7 @@ import traceback
 
 from detection_engine import DetectionEngine, ModelLoadError
 from camera_detector import CameraOpenError
+from model_manager import ModelManager  # ← 新增导入
 
 
 def parse_args():
@@ -38,23 +40,25 @@ def parse_args():
 class UIHandler:
     """
     用户界面控制器。
-    初始化时加载模型，失败则立即退出。
-    支持 CLI 模式和交互式菜单。
+    初始化时加载初始模型，失败则立即退出。
+    支持 CLI 模式、交互式菜单及模型热切换。
     """
 
     def __init__(self, config):
         """
         初始化 UIHandler。
-        若 DetectionEngine 初始化失败（如模型加载错误），打印错误并退出。
+        若初始模型加载失败，打印错误并退出。
         """
         self.config = config
         try:
-            self.engine = DetectionEngine(
-                model_path=config.model_path,
+            # 使用 ModelManager 管理检测引擎，支持后续热切换
+            self.model_manager = ModelManager(
+                initial_model_path=config.model_path,
                 conf_threshold=config.confidence_threshold
             )
-        except ModelLoadError as e:
-            print(f"❌ Fatal: Failed to initialize detection engine: {e}")
+        except Exception as e:
+            # ModelManager 内部已处理加载异常，但若完全无法初始化，应退出
+            print(f"❌ Fatal: Cannot initialize detection engine with initial model: {e}")
             raise SystemExit(1)
 
     def run(self):
@@ -90,8 +94,9 @@ class UIHandler:
             print("1. Static Image Detection")
             print("2. Live Camera Detection")
             print("3. Batch Image Detection")
-            print("4. Exit")
-            choice = input("Please select an option (1-4): ").strip()
+            print("4. Switch Detection Model")  # ← 新增选项
+            print("5. Exit")
+            choice = input("Please select an option (1-5): ").strip()
         except KeyboardInterrupt:
             print("\nUser cancelled. Exiting...")
             return
@@ -103,9 +108,11 @@ class UIHandler:
         elif choice == "3":
             self._run_batch_detection_interactive()
         elif choice == "4":
+            self._switch_model_interactive()  # ← 新增方法
+        elif choice == "5":
             print("Goodbye!")
         else:
-            print("Invalid option. Please enter 1, 2, 3, or 4.")
+            print("Invalid option. Please enter 1, 2, 3, 4, or 5.")
             self._interactive_menu()
 
     def _choose_image_source(self):
@@ -169,7 +176,8 @@ class UIHandler:
                 print(f"❌ Unsupported or corrupted image format: {image_path}")
             return
 
-        annotated_frame, _ = self.engine.detect(frame)
+        # 使用当前模型进行检测
+        annotated_frame, _ = self.model_manager.get_current_engine().detect(frame)
 
         window_name = "YOLO Detection Result"
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
@@ -199,7 +207,7 @@ class UIHandler:
         try:
             from camera_detector import CameraDetector
             detector = CameraDetector(
-                detection_engine=self.engine,
+                detection_engine=self.model_manager.get_current_engine(),  # ← 使用当前模型
                 output_interval=self.config.output_interval
             )
             detector.start_detection(camera_index=self.config.camera_index)
@@ -242,11 +250,41 @@ class UIHandler:
         try:
             from batch_detector import BatchDetector
             detector = BatchDetector(
-                detection_engine=self.engine,
+                detection_engine=self.model_manager.get_current_engine(),  # ← 使用当前模型
                 input_dir=input_dir,
                 output_dir=output_dir
             )
             detector.run()
+        except ValueError as e:
+            print(f"❌ Batch detection setup error: {e}")
         except Exception as e:
             print(f"💥 Batch detection failed: {e}")
             traceback.print_exc()
+
+    def _switch_model_interactive(self):
+        """
+        交互式切换检测模型。
+        允许用户输入新模型路径（本地文件或官方名称），尝试热加载。
+        成功后，所有后续检测将使用新模型。
+        """
+        print("\n--- Switch Detection Model ---")
+        print("Examples:")
+        print("  • yolov8n.pt   (smallest, fastest)")
+        print("  • yolov8s.pt   (balanced)")
+        print("  • yolov8m.pt   (more accurate)")
+        print("  • ./models/custom.pt  (your own model)")
+        try:
+            new_model = input("Enter new model path or name: ").strip()
+        except KeyboardInterrupt:
+            print("\nModel switch cancelled.")
+            return
+
+        if not new_model:
+            print("Empty input. Model switch cancelled.")
+            return
+
+        success = self.model_manager.switch_model(new_model)
+        if success:
+            print("✅ Model switch completed successfully.")
+        else:
+            print("⚠️ Model switch failed. Current model remains active.")
