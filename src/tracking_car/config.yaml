@@ -8,7 +8,7 @@ conf_thres: 0.5
 iou_thres: 0.3
 max_age: 5
 min_hits: 3
-yolo_model: '"D:/harudt/yolov8n.pt"'
+yolo_model: "yolov8n.pt"
 yolo_imgsz_max: 320
 yolo_iou: 0.45
 yolo_quantize: false
@@ -46,10 +46,16 @@ save_screenshots: false
 use_3d_visualization: true
 pcd_view_size: 800
 
-# 检测框样式配置（匹配截图）
+# 检测框样式配置
 det_box_color: [255, 0, 0]      # 蓝色框
 det_box_thickness: 2
 det_label_bg_color: [0, 0, 0]   # 黑色背景
 det_label_text_color: [255, 255, 255]  # 白色文字
 det_label_font_scale: 0.5
 det_label_padding: 5
+
+view:
+default_mode: "satellite"      # 默认视角模式: satellite, behind, first_person
+satellite_height: 50.0         # 卫星视角高度（米）
+behind_distance: 10.0          # 后方视角距离（米）
+first_person_height: 1.6       # 第一人称视角高度（米）

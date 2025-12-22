@@ -1,9 +1,9 @@
 # eval_agent.py
 """
-评估已训练的 PPO 自动驾驶智能体
-支持两种模式：
-1. 默认：沿车道中心自动前进（使用 get_forward_waypoint）
-2. 指定目标点：导航到 (target_x, target_y)
+增强版 CARLA 智能体评估器
+- 支持单目标 / 多目标导航
+- 路径可视化 + 平滑转向 + 动态调速
+- 无需重新训练模型
 """
 
 import argparse
@@ -11,166 +11,164 @@ import numpy as np
 import carla
 from stable_baselines3 import PPO
 from carla_env.carla_env_multi_obs import CarlaEnvMultiObs
+import time
+
+
+def draw_path(world, points, life_time=60.0):
+    """在 CARLA 中绘制路径（绿色线）"""
+    for i in range(len(points) - 1):
+        world.debug.draw_line(
+            points[i],
+            points[i + 1],
+            thickness=0.1,
+            color=carla.Color(0, 255, 0),
+            life_time=life_time
+        )
+
+
+def parse_targets(target_str):
+    """解析目标点字符串: 'x1,y1;x2,y2;...' → [Location(...), ...]"""
+    if not target_str:
+        return []
+    targets = []
+    for pair in target_str.split(";"):
+        x, y = map(float, pair.split(","))
+        targets.append(carla.Location(x=x, y=y, z=0.0))
+    return targets
 
 
 def main():
-    parser = argparse.ArgumentParser(description="评估 CARLA PPO 自动驾驶智能体")
-    parser.add_argument(
-        "--model_path",
-        type=str,
-        default="./checkpoints/best_model.zip",
-        help="已训练模型路径（.zip 文件）"
-    )
-    parser.add_argument(
-        "--steps",
-        type=int,
-        default=500,
-        help="最大运行步数"
-    )
-    parser.add_argument(
-        "--target_x",
-        type=float,
-        default=None,
-        help="全局目标点 x 坐标（世界坐标系，单位：米）"
-    )
-    parser.add_argument(
-        "--target_y",
-        type=float,
-        default=None,
-        help="全局目标点 y 坐标（世界坐标系，单位：米）"
-    )
-    parser.add_argument(
-        "--waypoint_dist",
-        type=float,
-        default=4.0,
-        help="局部目标点前瞻距离（米），建议 2.0~5.0"
-    )
+    parser = argparse.ArgumentParser(description="增强版 CARLA 导航评估")
+    parser.add_argument("--model_path", type=str, default="./checkpoints/best_model.zip")
+    parser.add_argument("--steps", type=int, default=1000)
+    parser.add_argument("--targets", type=str, default=None,
+                        help='目标点序列，格式: "x1,y1;x2,y2;..."')
+    parser.add_argument("--target_x", type=float, default=None)
+    parser.add_argument("--target_y", type=float, default=None)
+    parser.add_argument("--waypoint_dist", type=float, default=4.0)
+    parser.add_argument("--steer_gain", type=float, default=1.8, help="转向增益")
+    parser.add_argument("--arrival_radius", type=float, default=1.0, help="到达判定半径（米）")
+    parser.add_argument("--visualize_path", action="store_true", help="在CARLA中绘制路径")
     args = parser.parse_args()
 
-    print("🚀 正在启动评估环境...")
-    print("💡 请确保 CARLA 仿真器（CarlaUE4.exe）已在后台运行！\n")
+    # 解析目标点
+    targets = parse_targets(args.targets)
+    if args.target_x is not None and args.target_y is not None:
+        targets.insert(0, carla.Location(x=args.target_x, y=args.target_y, z=0.0))
 
+    print("🚀 启动增强版导航评估器...")
+    print(f"🎯 目标点数量: {len(targets)}")
+    if targets:
+        for i, t in enumerate(targets):
+            print(f"   {i + 1}. ({t.x:.1f}, {t.y:.1f})")
+
+    env = None
     try:
-        # 创建环境（保留车辆以便观察）
         env = CarlaEnvMultiObs(keep_alive_after_exit=True, max_episode_steps=args.steps)
-
-        # 加载模型（仅用于底层控制：油门/刹车）
-        print(f"📂 加载模型: {args.model_path}")
         model = PPO.load(args.model_path)
-
-        # 初始化环境
-        print("🔄 重置环境并生成车辆...")
         obs, _ = env.reset()
         total_reward = 0.0
+        current_target_idx = 0
 
-        # 设置全局目标点（如果提供）
-        global_target = None
-        if args.target_x is not None and args.target_y is not None:
-            global_target = carla.Location(x=args.target_x, y=args.target_y, z=0.0)
-            print(f"🎯 全局目标点: ({args.target_x:.1f}, {args.target_y:.1f})")
-        else:
-            print("🛣️ 未指定目标点，将沿车道自动前进...")
+        # 可视化路径
+        if args.visualize_path and targets:
+            draw_path(env.world, [env.vehicle.get_location()] + targets, life_time=120.0)
 
         print("\n▶️ 开始驾驶演示...\n")
 
         for step in range(args.steps):
-            # ===== 高层导航逻辑：计算局部目标点 =====
-            local_target = None
             vehicle_tf = env.get_vehicle_transform()
-
             if vehicle_tf is None:
-                print("⚠️ 车辆状态异常，终止演示")
-                break
+                print("⚠️ 车辆丢失，尝试重置...")
+                obs, _ = env.reset()
+                continue
 
-            if global_target is not None:
-                # --- 模式1：朝向全局目标点 ---
+            # 获取当前目标
+            current_target = None
+            if targets:
+                if current_target_idx < len(targets):
+                    current_target = targets[current_target_idx]
+                    dist_to_target = vehicle_tf.location.distance(current_target)
+                    if dist_to_target < args.arrival_radius:
+                        print(f"✅ 到达第 {current_target_idx + 1} 个目标点！")
+                        current_target_idx += 1
+                        if current_target_idx >= len(targets):
+                            print("🏁 所有目标点已到达！")
+                            break
+                else:
+                    break  # 所有目标完成
+
+            # 计算局部目标点
+            if current_target:
                 to_target = np.array([
-                    global_target.x - vehicle_tf.location.x,
-                    global_target.y - vehicle_tf.location.y
+                    current_target.x - vehicle_tf.location.x,
+                    current_target.y - vehicle_tf.location.y
                 ])
-                dist_to_target = np.linalg.norm(to_target)
-
-                if dist_to_target < 1.0:
-                    print("🏁 已到达目标点！")
-                    break
-
-                # 计算单位方向向量
-                direction = to_target / (dist_to_target + 1e-6)
+                direction = to_target / (np.linalg.norm(to_target) + 1e-6)
                 local_target = carla.Location(
                     x=vehicle_tf.location.x + direction[0] * args.waypoint_dist,
                     y=vehicle_tf.location.y + direction[1] * args.waypoint_dist,
                     z=vehicle_tf.location.z
                 )
             else:
-                # --- 模式2：沿车道中心前进 ---
                 local_target = env.get_forward_waypoint(distance=args.waypoint_dist)
-                if local_target is None:
-                    print("⚠️ 无法获取前方路点，使用原始策略")
-                    local_target = None
 
-            # ===== 底层控制：结合 PPO 与转向决策 =====
-            if local_target is not None:
-                # 计算期望转向角（基于局部目标）
+            # 计算转向
+            steer = 0.0
+            if local_target and vehicle_tf:
                 forward = vehicle_tf.get_forward_vector()
                 to_waypoint = np.array([
                     local_target.x - vehicle_tf.location.x,
                     local_target.y - vehicle_tf.location.y
                 ])
-
-                # 避免除零
                 norm_fw = np.linalg.norm([forward.x, forward.y])
                 norm_wp = np.linalg.norm(to_waypoint)
-                if norm_fw < 1e-3 or norm_wp < 1e-3:
-                    steer = 0.0
-                else:
-                    # 计算夹角（使用叉积判断左右）
+                if norm_fw > 1e-3 and norm_wp > 1e-3:
                     cos_angle = (forward.x * to_waypoint[0] + forward.y * to_waypoint[1]) / (norm_fw * norm_wp)
-                    cos_angle = np.clip(cos_angle, -1.0, 1.0)
-                    angle = np.arccos(cos_angle)  # [0, π]
-
-                    # 叉积符号决定转向方向
+                    angle = np.arccos(np.clip(cos_angle, -1.0, 1.0))
                     cross = forward.x * to_waypoint[1] - forward.y * to_waypoint[0]
-                    steer = np.clip(angle * np.sign(cross) * 1.5, -1.0, 1.0)  # 比例增益可调
+                    steer = np.clip(angle * np.sign(cross) * args.steer_gain, -1.0, 1.0)
 
-                # 使用 PPO 决定油门和刹车（输入仍为原始 4D 观测）
-                throttle_brake_action, _ = model.predict(obs, deterministic=True)
-                throttle = float(np.clip(throttle_brake_action[0], 0.0, 1.0))
-                brake = float(np.clip(throttle_brake_action[2], 0.0, 1.0))
+            # 动态调速：弯道或接近目标时减速
+            throttle_brake_action, _ = model.predict(obs, deterministic=True)
+            throttle = float(np.clip(throttle_brake_action[0], 0.0, 1.0))
+            brake = float(np.clip(throttle_brake_action[2], 0.0, 1.0))
 
-                action = np.array([throttle, steer, brake])
-            else:
-                # 回退到纯 PPO 策略
-                action, _ = model.predict(obs, deterministic=True)
+            if current_target:
+                dist = vehicle_tf.location.distance(current_target)
+                if dist < 5.0:  # 接近目标
+                    throttle *= (dist / 5.0)  # 线性减速
+            if abs(steer) > 0.6:  # 急转弯
+                throttle *= 0.7
 
-            # 执行动作
+            action = np.array([throttle, steer, brake])
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
 
-            # 定期打印状态
-            if step % 50 == 0 or step == args.steps - 1:
+            # 日志
+            if step % 50 == 0:
                 x, y, vx, vy = obs
                 speed = np.linalg.norm([vx, vy])
-                print(f" Step {step:3d}: 位置=({x:6.1f}, {y:6.1f}), 速度={speed:5.2f} m/s")
+                target_info = f" → 目标{current_target_idx + 1}" if current_target else ""
+                print(f" Step {step:4d}: ({x:6.1f}, {y:6.1f}) @ {speed:4.1f} m/s{target_info}")
 
-            # 终止条件
             if terminated or truncated:
                 reason = "碰撞" if terminated else "超时"
-                print(f"⏹️ 演示结束（原因: {reason}）")
+                print(f"⏹️ 终止: {reason}")
                 break
 
-        print(f"\n✅ 演示完成！总奖励: {total_reward:.2f}")
-        print("ℹ️ 车辆已保留在 CARLA 中，可自由观察。")
-        input("\n🛑 按 Enter 键退出并销毁车辆...")
+        print(f"\n✅ 演示结束 | 总奖励: {total_reward:.2f}")
+        input("\n🛑 按 Enter 退出...")
 
+    except KeyboardInterrupt:
+        print("\n⚠️ 用户中断")
     except Exception as e:
-        print(f"\n❌ 运行出错: {e}")
+        print(f"\n❌ 错误: {e}")
         import traceback
         traceback.print_exc()
     finally:
-        try:
+        if env:
             env.close()
-        except:
-            pass
 
 
 if __name__ == "__main__":
