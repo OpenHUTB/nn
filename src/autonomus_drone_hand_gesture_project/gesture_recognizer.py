@@ -2,6 +2,7 @@
 手势识别器模块
 负责识别和分析手势
 作者: xiaoshiyuan888
+优化版本：改进手势历史记录和平滑算法
 """
 
 import time
@@ -29,10 +30,13 @@ class EnhancedGestureRecognizer:
         self.min_confidence = self.mode_config['min_confidence']
         self.resize_factor = self.mode_config['resize_factor']
 
-        # 增强的手势历史和平滑
+        # 改进的手势历史和平滑 - 增加时间戳和权重
         self.gesture_history = deque(maxlen=self.history_size)
         self.confidence_history = deque(maxlen=self.history_size)
         self.position_history = deque(maxlen=self.history_size)
+        self.timestamp_history = deque(maxlen=self.history_size)  # 新增：时间戳历史
+        self.weight_history = deque(maxlen=self.history_size)     # 新增：权重历史
+
         self.current_gesture = "Waiting"
         self.current_confidence = 0.0
 
@@ -73,13 +77,13 @@ class EnhancedGestureRecognizer:
             "Waiting": (200, 200, 200),
             "Error": (255, 0, 0),
             "Hover": (255, 255, 255),
-            "Grab": (255, 0, 255),  # 新增：紫色
-            "Release": (0, 255, 0),  # 新增：绿色
-            "RotateCW": (0, 255, 255),  # 新增：黄色
-            "RotateCCW": (255, 255, 0),  # 新增：青色
-            "TakePhoto": (255, 165, 0),  # 新增：橙色
-            "ReturnHome": (0, 128, 128),  # 新增：深青色
-            "AutoFlight": (128, 0, 128),  # 新增：紫色
+            "Grab": (255, 0, 255),
+            "Release": (0, 255, 0),
+            "RotateCW": (0, 255, 255),
+            "RotateCCW": (255, 255, 0),
+            "TakePhoto": (255, 165, 0),
+            "ReturnHome": (0, 128, 128),
+            "AutoFlight": (128, 0, 128),
         }
 
         # 手势到语音的映射
@@ -93,13 +97,13 @@ class EnhancedGestureRecognizer:
             "Waiting": "gesture_waiting",
             "Error": "gesture_error",
             "Hover": "gesture_hover",
-            "Grab": "gesture_grab",  # 新增
-            "Release": "gesture_release",  # 新增
-            "RotateCW": "gesture_rotate_cw",  # 新增
-            "RotateCCW": "gesture_rotate_ccw",  # 新增
-            "TakePhoto": "gesture_photo",  # 新增
-            "ReturnHome": "gesture_return_home",  # 新增
-            "AutoFlight": "gesture_auto_flight",  # 新增
+            "Grab": "gesture_grab",
+            "Release": "gesture_release",
+            "RotateCW": "gesture_rotate_cw",
+            "RotateCCW": "gesture_rotate_ccw",
+            "TakePhoto": "gesture_photo",
+            "ReturnHome": "gesture_return_home",
+            "AutoFlight": "gesture_auto_flight",
         }
 
         # 手势状态颜色
@@ -165,6 +169,8 @@ class EnhancedGestureRecognizer:
         self.gesture_history = deque(maxlen=self.history_size)
         self.confidence_history = deque(maxlen=self.history_size)
         self.position_history = deque(maxlen=self.history_size)
+        self.timestamp_history = deque(maxlen=self.history_size)
+        self.weight_history = deque(maxlen=self.history_size)
 
         # 更新显示信息
         self.performance_mode_color = self.mode_config['color']
@@ -501,58 +507,116 @@ class EnhancedGestureRecognizer:
         return "Waiting", confidence * 0.5
 
     def smooth_gesture_enhanced(self, new_gesture, new_confidence, hand_data):
-        """增强的手势平滑处理"""
+        """增强的手势平滑处理 - 使用加权平均"""
         current_time = time.time()
 
         # 检查手势冷却时间
         if current_time - self.last_gesture_change_time < self.config.get('gesture', 'gesture_cooldown'):
             return self.current_gesture, self.current_confidence
 
+        # 计算当前手势的权重（基于置信度和时间）
+        # 权重 = 置信度 * 时间衰减因子
+        if len(self.timestamp_history) > 0:
+            time_since_last = current_time - self.timestamp_history[-1]
+            time_weight = max(0.1, 1.0 - time_since_last / 5.0)  # 时间衰减因子
+        else:
+            time_weight = 1.0
+
+        weight = new_confidence * time_weight
+
         # 添加到历史
         self.gesture_history.append(new_gesture)
         self.confidence_history.append(new_confidence)
+        self.timestamp_history.append(current_time)
+        self.weight_history.append(weight)
 
         if hand_data is not None:
             self.position_history.append(hand_data['position'])
 
-        # 计算手势稳定性
-        if len(self.gesture_history) >= 3:
-            recent_gestures = list(self.gesture_history)[-3:]
-            gesture_counter = Counter(recent_gestures)
-            most_common_gesture, most_common_count = gesture_counter.most_common(1)[0]
+        # 如果历史数据不足，返回当前手势
+        if len(self.gesture_history) < 3:
+            self.current_gesture = new_gesture
+            self.current_confidence = new_confidence
+            return self.current_gesture, self.current_confidence
 
-            # 计算位置稳定性
-            position_stability = 1.0
-            if len(self.position_history) >= 2 and hand_data is not None:
-                current_pos = hand_data['position']
-                prev_pos = self.position_history[-2] if len(self.position_history) >= 2 else current_pos
-                position_diff = math.sqrt((current_pos[0] - prev_pos[0]) ** 2 + (current_pos[1] - prev_pos[1]) ** 2)
-                position_stability = max(0, 1.0 - position_diff * 5.0)
+        # 使用加权投票算法确定最佳手势
+        gesture_scores = {}
+        total_weight = 0
 
-            # 增强的稳定性检查
-            stability_threshold = self.mode_config['gesture_stability_threshold']
-            transition_threshold = self.config.get('gesture', 'transition_threshold')
-            position_weight = self.config.get('gesture', 'position_stability_weight')
+        # 为历史中的每个手势计算加权分数
+        for i in range(len(self.gesture_history)):
+            gesture = self.gesture_history[i]
+            conf = self.confidence_history[i]
+            wgt = self.weight_history[i]
 
-            # 计算综合稳定性得分
-            gesture_stability = most_common_count / 3.0
-            overall_stability = gesture_stability * (1.0 - position_weight) + position_stability * position_weight
+            # 计算时间衰减因子（越近的权重越高）
+            time_factor = 1.0
+            if i < len(self.timestamp_history):
+                time_diff = current_time - self.timestamp_history[i]
+                time_factor = max(0.1, 1.0 - time_diff / 3.0)  # 3秒内衰减到0.1
 
-            # 手势状态转换逻辑
-            if overall_stability >= transition_threshold:
-                if most_common_gesture != self.last_stable_gesture:
-                    self.gesture_stability_counter += 1
-                else:
-                    self.gesture_stability_counter = max(0, self.gesture_stability_counter - 1)
+            # 计算综合权重
+            final_weight = wgt * time_factor * (i / len(self.gesture_history) + 0.5)  # 越近权重越高
 
-                if self.gesture_stability_counter >= stability_threshold:
-                    self.current_gesture = most_common_gesture
-                    self.current_confidence = np.mean(list(self.confidence_history)[-3:])
-                    self.last_stable_gesture = most_common_gesture
-                    self.gesture_stability_counter = 0
-                    self.last_gesture_change_time = current_time
+            if gesture not in gesture_scores:
+                gesture_scores[gesture] = 0
+            gesture_scores[gesture] += final_weight * conf
+            total_weight += final_weight
+
+        if total_weight == 0:
+            self.current_gesture = new_gesture
+            self.current_confidence = new_confidence
+            return self.current_gesture, self.current_confidence
+
+        # 找出得分最高的手势
+        best_gesture = max(gesture_scores.items(), key=lambda x: x[1])[0]
+        best_score = gesture_scores[best_gesture] / total_weight
+
+        # 计算位置稳定性
+        position_stability = 1.0
+        if len(self.position_history) >= 2 and hand_data is not None:
+            current_pos = hand_data['position']
+            prev_pos = self.position_history[-2] if len(self.position_history) >= 2 else current_pos
+            position_diff = math.sqrt((current_pos[0] - prev_pos[0]) ** 2 + (current_pos[1] - prev_pos[1]) ** 2)
+            position_stability = max(0, 1.0 - position_diff * 5.0)
+
+        # 检查手势稳定性阈值
+        stability_threshold = self.mode_config['gesture_stability_threshold']
+        transition_threshold = self.config.get('gesture', 'transition_threshold')
+        position_weight = self.config.get('gesture', 'position_stability_weight')
+
+        # 计算综合稳定性得分
+        gesture_stability = best_score
+        overall_stability = gesture_stability * (1.0 - position_weight) + position_stability * position_weight
+
+        # 手势状态转换逻辑
+        if overall_stability >= transition_threshold:
+            if best_gesture != self.last_stable_gesture:
+                self.gesture_stability_counter += 1
             else:
-                self.gesture_stability_counter = max(0, self.gesture_stability_counter - 2)
+                self.gesture_stability_counter = max(0, self.gesture_stability_counter - 1)
+
+            if self.gesture_stability_counter >= stability_threshold:
+                self.current_gesture = best_gesture
+
+                # 计算加权平均置信度
+                weighted_conf_sum = 0
+                weight_sum = 0
+                for i in range(len(self.gesture_history)):
+                    if self.gesture_history[i] == best_gesture:
+                        weighted_conf_sum += self.confidence_history[i] * self.weight_history[i]
+                        weight_sum += self.weight_history[i]
+
+                if weight_sum > 0:
+                    self.current_confidence = weighted_conf_sum / weight_sum
+                else:
+                    self.current_confidence = best_score
+
+                self.last_stable_gesture = best_gesture
+                self.gesture_stability_counter = 0
+                self.last_gesture_change_time = current_time
+        else:
+            self.gesture_stability_counter = max(0, self.gesture_stability_counter - 2)
 
         return self.current_gesture, self.current_confidence
 
