@@ -1,91 +1,94 @@
-import pygame
-import sys
-import math  # 导入Python内置math库，用于角度弧度转换
+import pybullet as p
+import pybullet_data
+import time
+import numpy as np
 
-# 初始化pygame
-pygame.init()
 
-# 窗口配置
-WINDOW_WIDTH = 400
-WINDOW_HEIGHT = 500
-screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("机械臂关节升降模拟")
+class ArmElevatorControllerPyBullet:
+    def __init__(self):
+        # 连接PyBullet模拟器（GUI模式，显示界面）
+        self.physics_client = p.connect(p.GUI)
+        # 设置模型搜索路径（关键：确保能找到内置模型）
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
+        # 关闭重力（避免机械臂倾倒，专注升降控制；若需要真实物理效果可开启）
+        p.setGravity(0, 0, 0)
 
-# 颜色定义
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-BLUE = (0, 128, 255)
-RED = (255, 50, 50)
+        # 加载地面和KUKA IIWA机械臂（内置模型，必存在，无需额外配置）
+        self.plane_id = p.loadURDF("plane.urdf")  # 加载地面
+        # 机械臂初始位姿：坐标(0,0,0)，姿态（无旋转）
+        self.arm_id = p.loadURDF(
+            "kuka_iiwa/model.urdf",
+            basePosition=[0, 0, 0],
+            baseOrientation=p.getQuaternionFromEuler([0, 0, 0])
+        )
 
-# 机械臂参数
-BASE_X = WINDOW_WIDTH // 2  # 机械臂底座x坐标
-BASE_Y = WINDOW_HEIGHT - 50  # 机械臂底座y坐标
-JOINT_LENGTH = 200  # 关节臂长度（影响升降范围）
-joint_angle = 90    # 关节初始角度（90度为垂直向下，0度为水平向左，180度为水平向右）
-speed = 1           # 角度变化速度（控制升降快慢）
+        # 定义升降关节：选择KUKA IIWA的第1个关节（索引0，可实现垂直方向升降/旋转，适配升降逻辑）
+        self.elevator_joint_index = 0
+        # 获取关节信息（限位、当前位置）
+        joint_info = p.getJointInfo(self.arm_id, self.elevator_joint_index)
+        self.joint_min = joint_info[8]  # 关节运动下限
+        self.joint_max = joint_info[9]  # 关节运动上限
+        self.current_pos = p.getJointState(self.arm_id, self.elevator_joint_index)[0]  # 当前位置
 
-def draw_arm(screen, base_x, base_y, angle, length):
-    """绘制机械臂模型"""
-    # 计算关节末端坐标（通过角度转换，使用math库的radians方法）
-    # 三角函数计算：y轴向下为正，需调整角度映射
-    rad = math.radians(angle)  # 修复：替换为math.radians
-    joint_end_x = base_x + length * math.cos(rad)  # 修复：使用math.cos
-    joint_end_y = base_y - length * math.sin(rad)  # 修复：使用math.sin，减号实现y轴向上为高度增加
+        # 打印关节初始化信息
+        print(f"升降关节初始化完成：")
+        print(f"关节索引：{self.elevator_joint_index}")
+        print(f"当前位置：{self.current_pos:.3f}")
+        print(f"运动范围：[{self.joint_min:.3f}, {self.joint_max:.3f}]")
 
-    # 绘制底座
-    pygame.draw.circle(screen, BLUE, (base_x, base_y), 20)
-    # 绘制关节臂（底座到关节末端）
-    pygame.draw.line(screen, RED, (base_x, base_y), (joint_end_x, joint_end_y), 8)
-    # 绘制关节末端
-    pygame.draw.circle(screen, BLACK, (int(joint_end_x), int(joint_end_y)), 10)
-    # 绘制高度提示文字
-    height = int(BASE_Y - joint_end_y)  # 计算当前高度（像素值，近似对应实际高度）
-    font = pygame.font.SysFont(None, 24)
-    text = font.render(f"关节高度：{height}px", True, BLACK)
-    screen.blit(text, (10, 10))
+    def move_elevator(self, target_pos, speed=0.05):
+        """
+        驱动升降关节运动到目标位置
+        :param target_pos: 目标位置（需在关节限位范围内）
+        :param speed: 运动速度（正数，越小越慢）
+        """
+        # 校验目标位置合法性
+        if target_pos < self.joint_min or target_pos > self.joint_max:
+            raise ValueError(f"目标位置超出关节范围！允许范围：[{self.joint_min:.3f}, {self.joint_max:.3f}]")
 
-# 主循环
-clock = pygame.time.Clock()
-is_running = True
-move_direction = "up"  # 初始运动方向：上升
+        print(f"\n开始升降运动：当前位置 {self.current_pos:.3f} → 目标位置 {target_pos:.3f}")
+        # 循环控制，直到接近目标位置（误差小于0.001）
+        while abs(self.current_pos - target_pos) > 0.001:
+            # 计算运动步长（根据目标位置判断升降方向）
+            step = speed if target_pos > self.current_pos else -speed
+            # 更新当前位置（防止超出限位）
+            self.current_pos = np.clip(self.current_pos + step, self.joint_min, self.joint_max)
+            # 发送位置指令给关节（位置控制模式）
+            p.setJointMotorControl2(
+                bodyUniqueId=self.arm_id,
+                jointIndex=self.elevator_joint_index,
+                controlMode=p.POSITION_CONTROL,
+                targetPosition=self.current_pos
+            )
+            # 步进物理仿真（更新场景状态）
+            p.stepSimulation()
+            # 小幅延时，模拟真实运动节奏
+            time.sleep(0.01)
+            # 获取模拟器中关节的实际位置（反馈同步）
+            self.current_pos = p.getJointState(self.arm_id, self.elevator_joint_index)[0]
+            # 实时刷新显示当前位置
+            print(f"实时位置：{self.current_pos:.3f}", end='\r')
 
-while is_running:
-    # 控制帧率
-    clock.tick(60)
-    # 填充背景色
-    screen.fill(WHITE)
+        print(f"\n升降运动完成！最终位置：{self.current_pos:.3f}")
 
-    # 事件处理（关闭窗口、按键控制）
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            is_running = False
-        # 按键控制：上箭头上升，下箭头下降
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                move_direction = "up"
-            if event.key == pygame.K_DOWN:
-                move_direction = "down"
+    def disconnect(self):
+        """断开与PyBullet模拟器的连接"""
+        p.disconnect(self.physics_client)
+        print("\n已断开与PyBullet模拟器的连接")
 
-    # 更新关节角度（控制升降）
-    if move_direction == "up":
-        # 角度增大：关节上升（最大角度170度，避免超出窗口）
-        if joint_angle < 170:
-            joint_angle += speed
-        else:
-            move_direction = "down"  # 到达上限后自动下降
-    else:
-        # 角度减小：关节下降（最小角度10度，避免超出窗口）
-        if joint_angle > 10:
-            joint_angle -= speed
-        else:
-            move_direction = "up"  # 到达下限后自动上升
 
-    # 绘制机械臂
-    draw_arm(screen, BASE_X, BASE_Y, joint_angle, JOINT_LENGTH)
+# ------------------- 主执行程序 -------------------
+if __name__ == "__main__":
+    # 1. 初始化机械臂升降控制器
+    arm_controller = ArmElevatorControllerPyBullet()
 
-    # 更新窗口显示
-    pygame.display.flip()
-
-# 退出程序
-pygame.quit()
-sys.exit()
+    try:
+        # 2. 执行升降动作序列
+        arm_controller.move_elevator(target_pos=arm_controller.joint_max * 0.6, speed=0.03)  # 上升（接近上限）
+        time.sleep(1)  # 停顿1秒
+        arm_controller.move_elevator(target_pos=arm_controller.joint_min * 0.6, speed=0.02)  # 下降（接近下限）
+        time.sleep(1)  # 停顿1秒
+        arm_controller.move_elevator(target_pos=0)  # 回到初始中间位置
+    finally:
+        # 3. 无论是否出错，最终断开连接
+        arm_controller.disconnect()
