@@ -5,3 +5,7 @@ opencv-python
 scipy
 psutil
 lapx
+pillow
+tqdm
+xmltodict
+ultralytics

@@ -52,6 +52,18 @@ class EnhancedSpeechFeedbackManager:
             'emergency_stop': "紧急停止，无人机已降落",
             'hovering': "无人机悬停中",
 
+            # 高级飞行模式
+            'returning_home': "正在返航",
+            'return_home_success': "返航成功",
+            'auto_flight_start': "开始自动飞行模式",
+            'auto_flight_complete': "自动飞行完成",
+            'circle_flight_start': "开始圆形盘旋",
+            'circle_flight_complete': "圆形盘旋完成",
+            'eight_flight_start': "开始8字形飞行",
+            'eight_flight_complete': "8字形飞行完成",
+            'altitude_increasing': "正在增加高度",
+            'altitude_decreasing': "正在降低高度",
+
             # 手势相关
             'gesture_detected': "手势识别就绪，请开始手势",
             'gesture_start': "开始识别手势",
@@ -70,6 +82,19 @@ class EnhancedSpeechFeedbackManager:
             'gesture_low_confidence': "手势识别置信度低",
             'gesture_good_confidence': "手势识别置信度高",
             'gesture_hover': "悬停",
+            'gesture_grab': "抓取",  # 新增
+            'gesture_release': "释放",  # 新增
+            'gesture_rotate_cw': "顺时针旋转",  # 新增
+            'gesture_rotate_ccw': "逆时针旋转",  # 新增
+            'gesture_photo': "拍照",  # 新增
+            'gesture_auto_flight': "自动飞行模式",  # 新增
+            'gesture_return_home': "返航",  # 新增
+            'gesture_circle_flight': "圆形盘旋",  # 新增
+            'gesture_eight_flight': "8字形飞行",  # 新增
+            'gesture_square_flight': "方形轨迹",  # 新增
+            'gesture_increase_altitude': "增加高度",  # 新增
+            'gesture_decrease_altitude': "降低高度",  # 新增
+            'gesture_set_altitude': "设置高度",  # 新增
 
             # 系统相关
             'program_start': "手势控制无人机系统已启动",
