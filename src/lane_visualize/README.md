@@ -1,125 +1,100 @@
-# AutoLane: OpenCV 车道线检测系统
+# AutoPilot System: Lane & Object Detection
 
-这是一个基于 Python 和 OpenCV 的自动驾驶车道线检测项目。它不依赖深度学习模型，而是通过经典的计算机视觉算法（Canny 边缘检测、霍夫变换、色彩过滤）来实现车道线的实时识别与追踪。
+这是一个结合了**传统计算机视觉**与**深度学习**的自动驾驶辅助系统原型。它利用 OpenCV 进行高精度的车道线检测，并集成 YOLOv8 模型实现对车辆、行人等障碍物的实时识别。
 
-本项目包含一个强大的**实时调参工具 (`tuner.py`)**，允许开发者在视频播放过程中动态调整算法参数，从而快速适配不同的光照和道路环境。
+![Status](https://img.shields.io/badge/Status-Active-success)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 
-## ✨ 功能特性
+## ✨ 核心功能
 
-* **视觉管线**: 灰度化 -> 高斯模糊 -> Canny 边缘检测 -> ROI 掩码 -> 霍夫直线变换。
-* **实时调参器**: 提供可视化滑动条界面，实时寻找最佳的 Canny 阈值和 ROI 区域。
-* **鲁棒性优化**:
-    * **斜率过滤**: 剔除水平线（阴影）和垂直线（路标）。
-    * **历史帧平滑**: 使用 `deque` 队列对最近 10 帧数据取平均，消除抖动。
-    * **动态 ROI**: 可配置梯形区域，仅关注路面。
+### 1. 🛣️ 车道线检测 (Lane Detection)
+* **视觉管线**: 灰度化 -> 高斯模糊 -> Canny 边缘检测 -> 动态 ROI -> 霍夫变换。
+* **算法优化**:
+    * **智能平滑**: 使用 `deque` 历史队列消除车道线抖动。
+    * **斜率过滤**: 自动剔除路面阴影和垂直路标干扰。
+    * **可视化调参**: 提供 `tuner.py` 工具，实时寻找针对当前天气的最佳参数。
+
+### 2. 🚗 目标检测 (Object Detection)
+* **深度学习**: 集成 **YOLOv8 (Nano)** 模型。
+* **识别对象**: 实时框出前方车辆 (Car)、卡车 (Truck)、巴士 (Bus) 和行人 (Person)。
+* **性能**: 针对 CPU 优化，轻量级推理。
 
 ## 🛠️ 环境准备
 
 ### 1. 运行环境
 * Python 3.8+ (推荐 Python 3.13)
-* PyCharm 或 VS Code
+* 建议使用独立显卡 (GPU) 以获得更高帧率，但在 CPU 上也能运行 (FPS 5-10)。
 
 ### 2. 安装依赖
-请在项目根目录下运行：
+请确保安装了最新版本的依赖库（包含 ultralytics）：
 ```bash
 pip install -r requirements.txt
 
 ```
 
-*(如果尚未创建 `requirements.txt`，手动安装: `pip install opencv-python numpy matplotlib`)*
+## 🚀 使用指南
 
-### 3. 准备数据
+### 第一步：视觉参数调优 (可选但推荐)
 
-请确保项目目录下有测试视频文件（例如 `sample.hevc` 或 `.mp4` 文件）。
-
-* 如果你没有视频，可以从 [这里下载 sample.hevc](https://drive.google.com/file/d/1hP-v8lLn1g1jEaJUBYJhv1mEb32hkMvG/view?usp=sharing)。
-
----
-
-## 🚀 使用指南 (完整流程)
-
-### 第一步：使用 Tuner 寻找最佳参数
-
-不同的视频（白天/夜晚/阴天）需要不同的参数。运行调参工具来获得最佳效果：
+如果发现车道线检测不准（乱飞或消失），请先运行调参工具：
 
 ```bash
 python tuner.py sample.hevc
 
 ```
 
-**操作方法：**
+* 按 `空格` 暂停，拖动滑动条调整 Canny 阈值和 ROI 区域。
+* 记下最佳参数，并填入 `main.py` 顶部的配置区。
 
-1. **空格键**: 暂停视频，观察当前帧。
-2. **滑动条**:
-* `Canny Low/High`: 调整边缘检测的灵敏度（左侧黑白窗口）。
-* `ROI Top W / Height`: 调整红色梯形框的大小，确保它只包裹车道线，避开天空和树木。
-* `Hough Thresh`: 调整识别直线的严格程度（右侧绿色线条）。
+### 第二步：启动自动驾驶系统
 
-
-3. **记录参数**: 记下效果最好时的 6 个数值。
-
-### 第二步：更新主程序
-
-打开 `main.py`，找到顶部的 **【参数配置区】**，将你刚刚记下的数值填入：
-
-```python
-# main.py 顶部
-CANNY_LOW = 50        # <--- 填入你的数值
-CANNY_HIGH = 150
-ROI_TOP_WIDTH = 0.40
-...
-
-```
-
-### 第三步：运行车道检测
-
-参数配置完成后，运行主程序查看最终效果：
+直接运行主程序，系统将同时加载车道检测器和 YOLO 模型：
 
 ```bash
 python main.py sample.hevc
 
 ```
 
-* **按 `q` 键**: 退出程序。
-
----
+* **首次运行提示**: 程序会自动下载 `yolov8n.pt` 模型权重文件 (约 6MB)，请保持网络连接。
 
 ## 📂 项目结构
 
 ```text
 Project_Root/
-├── main.py            # [核心] 车道检测主程序 (需填入调优后的参数)
-├── tuner.py           # [工具] 可视化调参工具 (含滑动条)
-├── requirements.txt   # 依赖库列表
+├── main.py            # [入口] 主程序，协调车道与YOLO检测
+├── yolo_det.py        # [模块] 封装 YOLOv8 目标检测逻辑
+├── tuner.py           # [工具] 视觉参数调试器
+├── requirements.txt   # 依赖清单
 ├── README.md          # 项目文档
-└── sample.hevc        # 测试视频文件
+└── sample.hevc        # 测试数据
 
 ```
 
 ## ⚠️ 常见问题
 
-**Q1: 运行 `tuner.py` 或 `main.py` 时报错 `Assertion failed` 或无法打开视频？**
+**Q1: 画面非常卡顿 (Low FPS)？**
 
-* **原因**: OpenCV 可能缺少 HEVC (H.265) 解码器。
-* **解决**: 将 `sample.hevc` 转换为 `.mp4` 格式，或者重新编译安装带 FFmpeg 支持的 OpenCV。
+* **原因**: 深度学习模型在没有 GPU 加速的电脑上运行较慢。
+* **优化**: 可以在 `main.py` 中实现“跳帧机制”（例如每 3 帧跑一次 YOLO，中间帧沿用结果）。
 
-**Q2: 检测框乱跳或消失？**
+**Q2: 报错 `ModuleNotFoundError: No module named 'ultralytics'`?**
 
-* **原因**: 参数不适合当前视频的光照。
-* **解决**: 请务必先运行 `tuner.py`，针对当前视频调整 `Canny` 阈值和 `ROI` 范围。
+* **解决**: 请运行 `pip install -r requirements.txt` 确保库已安装。
 
 ## 🔮 路线图 (Roadmap)
 
 * [x] 基础 OpenCV 车道线检测
-* [x] 增加可视化调参工具
-* [x] 增加帧间平滑 (Smoothing)
-* [ ] 集成 YOLOv8 进行车辆/行人目标检测
-* [ ] 结合深度学习实现端到端控制 (类似 comma.ai)
+* [x] 可视化参数调试工具 (`tuner.py`)
+* [x] 帧间平滑与防抖算法
+* [x] 集成 YOLOv8 目标检测 (`yolo_det.py`)
+* [ ] 性能优化：加入多线程或跳帧处理
+* [ ] 车辆距离估算 (基于检测框大小)
+* [ ] 偏离预警系统 (LDW)
 
 ## 📚 参考资料
 
-* [OpenCV Documentation](https://www.google.com/search?q=https://docs.opencv.org/)
-* [Hough Circle Transform Explained](https://docs.opencv.org/3.4/d4/d70/tutorial_hough_circle.html)
+* [Ultralytics YOLOv8 Docs](https://docs.ultralytics.com/)
+* [OpenCV Computer Vision](https://opencv.org/)
 
 ```
 
