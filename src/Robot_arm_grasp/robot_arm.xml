@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mujoco model="4_dof_robot_arm">
+  <compiler angle="radian" coordinate="local"/>
+  <option timestep="0.005" iterations="100" solver="Newton"/>
+
+  <!-- 视觉与物理参数：移除perspective属性，新版MuJoCo不再支持 -->
+  <visual>
+    <global azimuth="135" elevation="-30"/> <!-- 仅保留azimuth和elevation -->
+  </visual>
+
+  <!-- 资产：材质、纹理（简化版） -->
+  <asset>
+    <material name="arm_material" rgba="0.3 0.3 0.7 1"/>  <!-- 臂杆材质（蓝灰色） -->
+    <material name="base_material" rgba="0.2 0.2 0.2 1"/>  <!-- 基座材质（黑色） -->
+    <material name="gripper_material" rgba="0.8 0.2 0.2 1"/>  <!-- 夹爪材质（红色） -->
+    <material name="target_material" rgba="0.2 0.8 0.2 1"/>  <!-- 目标物体材质（绿色） -->
+  </asset>
+
+  <!-- 世界体：地面 -->
+  <worldbody>
+    <!-- 地面 -->
+    <geom name="floor" type="plane" size="10 10 0.1" pos="0 0 0" rgba="0.8 0.8 0.8 1"/>
+
+    <!-- 机械臂基座（固定在地面） -->
+    <body name="base" pos="0 0 0.1">
+      <geom name="base_geom" type="cylinder" size="0.15 0.05" material="base_material"/>
+      <joint name="joint0" type="hinge" axis="0 0 1" pos="0 0 0"/>  <!-- 绕z轴旋转（水平） -->
+
+      <!-- 第一段臂杆（长度1.0） -->
+      <body name="arm1" pos="0 0 0.05">
+        <geom name="arm1_geom" type="capsule" size="0.03" fromto="0 0 0 0 1.0 0" material="arm_material"/>
+        <joint name="joint1" type="hinge" axis="1 0 0" pos="0 1.0 0"/>  <!-- 绕x轴旋转（垂直） -->
+
+        <!-- 第二段臂杆（长度0.8） -->
+        <body name="arm2" pos="0 1.0 0">
+          <geom name="arm2_geom" type="capsule" size="0.03" fromto="0 0 0 0 0.8 0" material="arm_material"/>
+          <joint name="joint2" type="hinge" axis="1 0 0" pos="0 0.8 0"/>
+
+          <!-- 第三段臂杆（长度0.6） -->
+          <body name="arm3" pos="0 0.8 0">
+            <geom name="arm3_geom" type="capsule" size="0.03" fromto="0 0 0 0 0.6 0" material="arm_material"/>
+            <joint name="joint3" type="hinge" axis="1 0 0" pos="0 0.6 0"/>
+
+            <!-- 第四段臂杆（长度0.4）+ 夹爪 -->
+            <body name="arm4" pos="0 0.6 0">
+              <geom name="arm4_geom" type="capsule" size="0.03" fromto="0 0 0 0 0.4 0" material="arm_material"/>
+
+              <!-- 夹爪（简化为两个几何体） -->
+              <body name="gripper_left" pos="0 0.4 -0.05">
+                <geom name="gripper_left_geom" type="box" size="0.02 0.05 0.05" material="gripper_material"/>
+              </body>
+              <body name="gripper_right" pos="0 0.4 0.05">
+                <geom name="gripper_right_geom" type="box" size="0.02 0.05 0.05" material="gripper_material"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- 目标物体（可被抓取的小球） -->
+    <body name="target_ball" pos="1.0 1.0 0.5">
+      <geom name="target_geom" type="sphere" size="0.08" material="target_material"/>
+      <freejoint name="target_joint"/>  <!-- 自由关节，可被推动 -->
+    </body>
+  </worldbody>
+
+  <!-- 控制器：关节扭矩控制 -->
+  <actuator>
+    <motor name="motor0" joint="joint0" gear="100" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <motor name="motor1" joint="joint1" gear="100" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <motor name="motor2" joint="joint2" gear="100" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <motor name="motor3" joint="joint3" gear="100" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+  </actuator>
+</mujoco>

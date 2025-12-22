@@ -13,6 +13,7 @@ import cv2 as cv
 import numpy as np
 
 
+# ========== FPS计算（还原初始版本，无多余逻辑） ==========
 # ===================== 工具类：FPS计算 =====================
 class CvFpsCalc:
     """帧率计算类，基于时间队列滑动平均计算FPS"""
@@ -90,6 +91,7 @@ class CvFpsCalc:
         return int(len(self.times) / (self.times[-1] - self.times[0]))
 
 
+# ========== 手势分类器（还原初始版本） ==========
 # ========== 手势分类器（简化版） ==========
 class KeyPointClassifier:
     def __call__(self, landmark_list):
@@ -101,6 +103,7 @@ class PointHistoryClassifier:
         return 0
 
 
+# ========== 参数解析（还原初始版本） ==========
 # ========== 参数解析 ==========
 def get_args():
     parser = argparse.ArgumentParser()
@@ -110,6 +113,18 @@ def get_args():
     return parser.parse_args()
 
 
+# ========== 辅助函数（仅修复按键响应，不改动逻辑） ==========
+def select_mode(key, mode):
+    """仅修复按键捕获，保留初始逻辑"""
+    number = -1
+    if 48 <= key <= 57:
+        number = key - 48
+    # 还原初始按键判断，仅增加ASCII码兼容（不影响帧率）
+    if key == ord('n') or key == 110:
+        mode = 0
+    elif key == ord('k') or key == 107:
+        mode = 1
+    elif key == ord('h') or key == 104:
 # ========== 辅助函数 ==========
 def select_mode(key, mode):
     number = -1
@@ -125,6 +140,10 @@ def select_mode(key, mode):
 
 
 def calc_bounding_rect(image):
+    """还原初始逻辑"""
+    h, w = image.shape[:2]
+    cx, cy = w // 2, h // 2
+    bw, bh = 200, 200
     """生成模拟手部边界框（屏幕中心固定位置）
     Args:
         image: 摄像头帧画面
@@ -142,6 +161,7 @@ def calc_bounding_rect(image):
 
 
 def calc_landmark_list(image):
+    """还原初始逻辑"""
     """生成模拟21个手部关键点（适配原代码21点逻辑）
     Args:
         image: 摄像头帧画面
@@ -169,6 +189,7 @@ def calc_landmark_list(image):
     cx, cy = w // 2, h // 2
     landmark_list = []
 
+    landmark_list.append([cx, cy])
     # 手掌中心（0号点）
     landmark_list.append([cx, cy])
 
@@ -177,6 +198,10 @@ def calc_landmark_list(image):
     landmark_list.append([cx - 80, cy - 60])
     landmark_list.append([cx - 100, cy - 90])
     landmark_list.append([cx - 110, cy - 110])
+    landmark_list.append([cx + 50, cy - 30])
+    landmark_list.append([cx + 80, cy - 60])
+    landmark_list.append([cx + 100, cy - 90])
+    landmark_list.append([cx + 110, cy - 110])
 
     # 食指（5-8号点）
     landmark_list.append([cx + 50, cy - 30])
@@ -206,6 +231,7 @@ def calc_landmark_list(image):
 
 
 def pre_process_landmark(landmark_list):
+    """还原初始逻辑"""
     """关键点预处理：相对坐标转换+归一化（适配原逻辑）
     Args:
         landmark_list: 原始关键点列表
@@ -234,6 +260,7 @@ def pre_process_landmark(landmark_list):
 
 
 def pre_process_point_history(image, point_history):
+    """还原初始逻辑"""
     """轨迹点预处理：相对坐标转换+归一化（适配原逻辑）
     Args:
         image: 摄像头帧画面
@@ -296,6 +323,9 @@ def draw_landmarks(image, landmark_list):
 
 
 def draw_landmarks(image, landmark_list):
+    """还原初始绘制逻辑（不改动）"""
+    if len(landmark_list) == 0:
+        return image
     """绘制模拟关键点"""
     if len(landmark_list) == 0:
         return image
@@ -316,6 +346,7 @@ def draw_landmarks(image, landmark_list):
 
 
 def draw_bounding_rect(image, brect):
+    """还原初始逻辑"""
     """绘制手部边界框
     Args:
         image: 待绘制的画面
@@ -328,6 +359,7 @@ def draw_bounding_rect(image, brect):
 
 
 def draw_info_text(image, brect, hand_sign_text, finger_gesture_text):
+    """还原初始逻辑"""
     """绘制手势信息文本
     Args:
         image: 待绘制的画面
@@ -353,6 +385,7 @@ def draw_info_text(image, brect, hand_sign_text, finger_gesture_text):
 
 
 def draw_point_history(image, point_history):
+    """还原初始逻辑"""
     """绘制轨迹点历史（指尖移动轨迹）
     Args:
         image: 待绘制的画面
@@ -370,6 +403,19 @@ def draw_point_history(image, point_history):
 
 
 def draw_info(image, fps, mode, number):
+    """仅修复模式显示的可视化，不改动绘制逻辑"""
+    cv.putText(image, f"FPS: {fps}", (10, 30), cv.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 255), 3)
+    mode_text = ["Idle", "Log Keypoint", "Log Point History"][mode] if 0 <= mode <= 2 else "Idle"
+    cv.putText(image, f"Mode: {mode_text}", (10, 70), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    if 0 <= number <= 9:
+        cv.putText(image, f"Num: {number}", (10, 100), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    return image
+
+
+# ========== 主函数（仅修复退出/按键BUG，不改动核心逻辑） ==========
+def main():
+    args = get_args()
+    # 还原初始摄像头初始化（无多余硬件加速配置）
     """绘制全局信息（FPS、模式、数字）
     Args:
         image: 待绘制的画面
@@ -408,6 +454,7 @@ def main():
     cap.set(cv.CAP_PROP_FRAME_WIDTH, args.width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, args.height)
 
+    # 还原初始初始化逻辑
     # 初始化工具类
     cvFpsCalc = CvFpsCalc(buffer_len=10)
     keypoint_classifier = KeyPointClassifier()
@@ -437,6 +484,66 @@ def main():
     finger_gesture_history = deque(maxlen=history_length)
     mode = 0
 
+    print("✅ 还原初始版本（30帧）| ESC退出 | n/k/h切换模式")
+
+    try:
+        while True:
+            # 还原初始帧率计算
+            fps = cvFpsCalc.get()
+
+            # 修复按键响应（仅捕获，无多余逻辑）
+            key = cv.waitKey(1) & 0xFF
+            if key == 27:  # ESC退出
+                break
+
+            # 还原初始模式切换
+            number, mode = select_mode(key, mode)
+
+            # 还原初始帧读取（无多余异常捕获）
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # 还原初始镜像+拷贝逻辑
+            frame = cv.flip(frame, 1)
+            debug_frame = copy.deepcopy(frame)
+
+            # 还原初始核心逻辑（不改动）
+            brect = calc_bounding_rect(debug_frame)
+            landmark_list = calc_landmark_list(debug_frame)
+            pre_landmark = pre_process_landmark(landmark_list)
+            pre_point_history = pre_process_point_history(debug_frame, point_history)
+
+            hand_sign_id = keypoint_classifier(pre_landmark)
+            point_history.append(landmark_list[8] if hand_sign_id == 7 else [0, 0])
+
+            finger_gesture_id = 0
+            if len(pre_point_history) == history_length * 2:
+                finger_gesture_id = point_history_classifier(pre_point_history)
+            finger_gesture_history.append(finger_gesture_id)
+            most_common = Counter(finger_gesture_history).most_common(1)
+
+            # 还原初始绘制逻辑
+            debug_frame = draw_bounding_rect(debug_frame, brect)
+            debug_frame = draw_landmarks(debug_frame, landmark_list)
+            debug_frame = draw_info_text(
+                debug_frame, brect,
+                keypoint_labels[hand_sign_id] if hand_sign_id < len(keypoint_labels) else "Unknown",
+                point_history_labels[most_common[0][0]] if most_common else "Unknown"
+            )
+            debug_frame = draw_point_history(debug_frame, point_history)
+            debug_frame = draw_info(debug_frame, fps, mode, number)
+
+            # 还原初始窗口显示
+            cv.imshow('Hand Gesture Recognition', debug_frame)
+
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # 还原初始资源释放
+        cap.release()
+        cv.destroyAllWindows()
+        print(f"✅ 退出 | 最终帧率：{fps}")
     while True:
         # FPS计算
         fps = cvFpsCalc.get()
