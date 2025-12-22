@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import os
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 class Agent():
     """Agent that outputs the desired behaviour given 
@@ -128,7 +128,7 @@ class Agent():
         """
         if (self.check_surface_area(detection_surface_area)):
             steer = 0
-            if len(self.errors) > 0:
+            if self.errors:
                 self.errors.append(self.errors[-1])
             else:
                 self.errors.append(0)
