@@ -119,24 +119,36 @@ class Agent():
         file_name = os.path.join(path, f'{id}_error.jpg')
         plt.savefig(file_name)
 
-    def get_actions(self, detection_surface_area:float,
-        error:float) -> tuple[float, float]:
+    def get_actions(self, detection_surface_area: float,
+                    error: float) -> tuple[float, float]:
+
+        # 默认基础油门
+        dynamic_throttle = self.throttle
 
         if (self.check_surface_area(detection_surface_area)):
+            # Case 1: Lane lost (Safety Mode)
             steer = 0
+            # [Planning] Safety: Slow down immediately if lane is not found
+            dynamic_throttle = 0.2
+
             if self.errors:
                 self.errors.append(self.errors[-1])
             else:
                 self.errors.append(0)
         else:
+            # Case 2: Lane detected (Normal Driving)
             self.errors.append(error)
             steer = self.func(error=error)
-            # [Planning] Adaptive Cruise Control (ACC) logic
-            # Decrease throttle when steering angle is high (cornering)
-            # Increase throttle when steering angle is low (straight line)
-            dynamic_throttle = max(0.2, self.throttle - abs(steer) * 0.4)
 
-            return steer, dynamic_throttle
+            # [Planning] Longitudinal Speed Planning based on Curvature
+            # NOT "ACC". This adjusts speed based on steering angle.
+            # Strategy: High steering angle -> Low speed (Cornering)
+            #           Low steering angle  -> High speed (Straight)
+            # Formula: Base - (Steer * Factor)
+            # Optimization: Increased factor from 0.4 to 0.8 for visible effect
+            dynamic_throttle = max(0.2, self.throttle - abs(steer) * 0.8)
+
+        return steer, dynamic_throttle
 
     @staticmethod
     def _simple_controller(error: float) -> float:
