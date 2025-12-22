@@ -1,10 +1,11 @@
 """
-AirSimNH 感知驱动自主探索无人机 - 智能决策增强版（红色物体检测版）
+AirSimNH 感知驱动自主探索无人机 - 智能决策增强版（红色与蓝色物体检测版）
 核心：视觉感知 → 语义理解 → 智能决策 → 安全执行
 集成：配置管理、日志系统、异常恢复、前视窗口显示
 新增：向量场避障算法、基于网格的信息增益探索、平滑飞行控制
-新增：性能监控与数据闭环系统、红色物体检测与记录
-版本: 3.3 (红色物体检测版)
+新增：性能监控与数据闭环系统、红色与蓝色物体检测与记录
+新增：信息显示窗口，分离前视画面与系统信息
+版本: 3.5 (双窗口双色物体检测版)
 """
 
 import airsim
@@ -48,15 +49,28 @@ except ImportError as e:
                                          'OPENNESS_THRESHOLD': 0.7},
                      'RED_OBJECT_DETECTION': {'ENABLED': True, 'MIN_AREA': 50,
                                             'MAX_AREA': 10000, 'UPDATE_INTERVAL': 1.0,
-                                            'MEMORY_TIME': 5.0}}
-        DISPLAY = {'WINDOW_WIDTH': 640, 'WINDOW_HEIGHT': 480, 'ENABLE_SHARPENING': True,
-                  'SHOW_INFO_OVERLAY': True, 'REFRESH_RATE_MS': 30, 'SHOW_RED_OBJECTS': True}
+                                            'MEMORY_TIME': 5.0},
+                     'BLUE_OBJECT_DETECTION': {'ENABLED': True, 'MIN_AREA': 50,
+                                              'MAX_AREA': 10000, 'UPDATE_INTERVAL': 1.0,
+                                              'MEMORY_TIME': 5.0}}
+        DISPLAY = {'FRONT_VIEW_WINDOW': {'NAME': "无人机前视画面", 'WIDTH': 640, 'HEIGHT': 480,
+                                        'ENABLE_SHARPENING': True, 'SHOW_INFO_OVERLAY': True,
+                                        'REFRESH_RATE_MS': 30, 'SHOW_RED_OBJECTS': True,
+                                        'SHOW_BLUE_OBJECTS': True},
+                   'INFO_WINDOW': {'NAME': "无人机信息面板", 'WIDTH': 800, 'HEIGHT': 600,
+                                  'BACKGROUND_COLOR': (20, 20, 30), 'TEXT_COLOR': (220, 220, 255),
+                                  'HIGHLIGHT_COLOR': (0, 200, 255), 'WARNING_COLOR': (0, 100, 255),
+                                  'SUCCESS_COLOR': (0, 255, 150), 'REFRESH_RATE_MS': 100,
+                                  'SHOW_GRID': True, 'GRID_SIZE': 300,
+                                  'SHOW_OBJECTS_STATS': True, 'SHOW_SYSTEM_STATS': True,
+                                  'SHOW_PERFORMANCE': True}}
         SYSTEM = {'LOG_LEVEL': 'INFO', 'LOG_TO_FILE': True, 'LOG_FILENAME': 'drone_log.txt',
                  'MAX_RECONNECT_ATTEMPTS': 3, 'RECONNECT_DELAY': 2.0,
                  'ENABLE_HEALTH_CHECK': True, 'HEALTH_CHECK_INTERVAL': 20}
         CAMERA = {'DEFAULT_NAME': "0",
                  'RED_COLOR_RANGE': {'LOWER1': [0, 120, 70], 'UPPER1': [10, 255, 255],
-                                    'LOWER2': [170, 120, 70], 'UPPER2': [180, 255, 255]}}
+                                    'LOWER2': [170, 120, 70], 'UPPER2': [180, 255, 255]},
+                 'BLUE_COLOR_RANGE': {'LOWER': [100, 150, 50], 'UPPER': [130, 255, 255]}}
         MANUAL = {
             'CONTROL_SPEED': 3.0,
             'ALTITUDE_SPEED': 2.0,
@@ -91,13 +105,16 @@ except ImportError as e:
             'TARGET_LIFETIME': 15.0,
             'TARGET_REACHED_DISTANCE': 3.0,
             'RED_OBJECT_EXPLORATION': {'ATTRACTION_GAIN': 1.5, 'DETECTION_RADIUS': 10.0,
-                                      'MIN_DISTANCE': 2.0, 'EXPLORATION_BONUS': 0.5}
+                                      'MIN_DISTANCE': 2.0, 'EXPLORATION_BONUS': 0.5},
+            'BLUE_OBJECT_EXPLORATION': {'ATTRACTION_GAIN': 1.2, 'DETECTION_RADIUS': 8.0,
+                                       'MIN_DISTANCE': 2.0, 'EXPLORATION_BONUS': 0.3}
         }
         DEBUG = {
             'SAVE_PERCEPTION_IMAGES': False,
             'IMAGE_SAVE_INTERVAL': 50,
             'LOG_DECISION_DETAILS': False,
-            'SAVE_RED_OBJECT_IMAGES': False
+            'SAVE_RED_OBJECT_IMAGES': False,
+            'SAVE_BLUE_OBJECT_IMAGES': False
         }
         DATA_RECORDING = {
             'ENABLED': True,
@@ -108,7 +125,8 @@ except ImportError as e:
             'JSON_FILENAME': 'flight_data.json',
             'PERFORMANCE_MONITORING': True,
             'SYSTEM_METRICS_INTERVAL': 5.0,
-            'RECORD_RED_OBJECTS': True
+            'RECORD_RED_OBJECTS': True,
+            'RECORD_BLUE_OBJECTS': True
         }
         PERFORMANCE = {
             'ENABLE_REALTIME_METRICS': True,
@@ -133,11 +151,25 @@ class FlightState(Enum):
     MANUAL = "手动控制"
     PLANNING = "路径规划"
     RED_OBJECT_INSPECTION = "红色物体检查"
+    BLUE_OBJECT_INSPECTION = "蓝色物体检查"
 
 
 @dataclass
 class RedObject:
     """红色物体数据结构"""
+    id: int
+    position: Tuple[float, float, float]
+    pixel_position: Tuple[int, int]
+    size: float
+    confidence: float
+    timestamp: float
+    last_seen: float
+    visited: bool = False
+
+
+@dataclass
+class BlueObject:
+    """蓝色物体数据结构"""
     id: int
     position: Tuple[float, float, float]
     pixel_position: Tuple[int, int]
@@ -232,6 +264,7 @@ class ExplorationGrid:
         self.obstacle_grid = np.zeros((grid_size, grid_size), dtype=bool)
         self.visit_time = np.zeros((grid_size, grid_size), dtype=np.float32)
         self.red_object_grid = np.zeros((grid_size, grid_size), dtype=bool)
+        self.blue_object_grid = np.zeros((grid_size, grid_size), dtype=bool)
         self.current_idx = (self.half_size, self.half_size)
         self.frontier_cells = set()
 
@@ -317,7 +350,21 @@ class ExplorationGrid:
                     if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
                         self.red_object_grid[nx, ny] = True
 
-    def get_best_exploration_target(self, current_pos, red_objects=None):
+    def update_blue_objects(self, blue_objects):
+        self.blue_object_grid.fill(False)
+
+        for obj in blue_objects:
+            grid_x, grid_y = self.world_to_grid(obj.position[0], obj.position[1])
+
+            radius = 1
+            for dx in range(-radius, radius + 1):
+                for dy in range(-radius, radius + 1):
+                    nx, ny = grid_x + dx, grid_y + dy
+                    if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                        self.blue_object_grid[nx, ny] = True
+
+    def get_best_exploration_target(self, current_pos, red_objects=None, blue_objects=None):
+        # 优先检查红色物体
         if red_objects and len(red_objects) > 0:
             nearest_obj = None
             min_distance = float('inf')
@@ -332,6 +379,23 @@ class ExplorationGrid:
                         nearest_obj = obj
 
             if nearest_obj and min_distance < 15.0:
+                return (nearest_obj.position[0], nearest_obj.position[1])
+
+        # 其次检查蓝色物体
+        if blue_objects and len(blue_objects) > 0:
+            nearest_obj = None
+            min_distance = float('inf')
+            current_x, current_y = current_pos
+
+            for obj in blue_objects:
+                if not obj.visited:
+                    distance = math.sqrt((obj.position[0] - current_x)**2 +
+                                        (obj.position[1] - current_y)**2)
+                    if distance < min_distance:
+                        min_distance = distance
+                        nearest_obj = obj
+
+            if nearest_obj and min_distance < 12.0:
                 return (nearest_obj.position[0], nearest_obj.position[1])
 
         if not self.frontier_cells:
@@ -360,11 +424,15 @@ class ExplorationGrid:
             if self.red_object_grid[fx, fy]:
                 red_bonus = config.INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION']['EXPLORATION_BONUS']
 
+            blue_bonus = 0.0
+            if self.blue_object_grid[fx, fy]:
+                blue_bonus = config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']['EXPLORATION_BONUS']
+
             score = (
                 config.INTELLIGENT_DECISION['CURIOUSITY_WEIGHT'] * info_gain +
                 (1 - config.INTELLIGENT_DECISION['MEMORY_WEIGHT'] * time_factor) -
                 distance_cost * 0.3 +
-                red_bonus
+                red_bonus + blue_bonus
             )
 
             if score > best_score:
@@ -391,7 +459,9 @@ class ExplorationGrid:
                 elif self.obstacle_grid[x, y]:
                     color = (0, 0, 255)
                 elif self.red_object_grid[x, y]:
-                    color = (0, 100, 255)
+                    color = (0, 100, 255)  # 红色物体显示为橙色
+                elif self.blue_object_grid[x, y]:
+                    color = (255, 100, 0)  # 蓝色物体显示为青色
                 elif self.grid[x, y] > 0.7:
                     color = (200, 200, 200)
                 elif self.grid[x, y] > 0.3:
@@ -452,6 +522,7 @@ class DataLogger:
         }
 
         self.red_objects_detected = []
+        self.blue_objects_detected = []
 
         self.csv_columns = [
             'timestamp', 'loop_count', 'state', 'pos_x', 'pos_y', 'pos_z',
@@ -463,7 +534,8 @@ class DataLogger:
             'battery_level', 'cpu_usage', 'memory_usage', 'loop_time',
             'grid_frontiers', 'grid_explored', 'vector_field_magnitude',
             'adaptive_speed_factor', 'decision_making_time', 'perception_time',
-            'red_objects_count', 'red_objects_detected', 'red_objects_visited'
+            'red_objects_count', 'red_objects_detected', 'red_objects_visited',
+            'blue_objects_count', 'blue_objects_detected', 'blue_objects_visited'
         ]
 
         if self.enable_csv:
@@ -528,6 +600,28 @@ class DataLogger:
         except Exception as e:
             print(f"⚠️ 记录红色物体时出错: {e}")
 
+    def record_blue_object(self, blue_object):
+        try:
+            blue_object_data = {
+                'id': blue_object.id,
+                'position': blue_object.position,
+                'pixel_position': blue_object.pixel_position,
+                'size': blue_object.size,
+                'confidence': blue_object.confidence,
+                'timestamp': blue_object.timestamp,
+                'visited': blue_object.visited
+            }
+
+            self.blue_objects_detected.append(blue_object_data)
+
+            if 'blue_objects' not in self.json_data:
+                self.json_data['blue_objects'] = []
+
+            self.json_data['blue_objects'].append(blue_object_data)
+
+        except Exception as e:
+            print(f"⚠️ 记录蓝色物体时出错: {e}")
+
     def _collect_system_metrics(self):
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
@@ -576,6 +670,7 @@ class DataLogger:
         try:
             self._calculate_performance_stats()
 
+            # 红色物体统计
             if 'red_objects' in self.json_data:
                 red_count = len(self.json_data['red_objects'])
                 visited_count = sum(1 for obj in self.json_data['red_objects'] if obj.get('visited', False))
@@ -583,6 +678,16 @@ class DataLogger:
                     'total_detected': red_count,
                     'total_visited': visited_count,
                     'visit_rate': visited_count / red_count if red_count > 0 else 0
+                }
+
+            # 蓝色物体统计
+            if 'blue_objects' in self.json_data:
+                blue_count = len(self.json_data['blue_objects'])
+                visited_count = sum(1 for obj in self.json_data['blue_objects'] if obj.get('visited', False))
+                self.json_data['blue_objects_summary'] = {
+                    'total_detected': blue_count,
+                    'total_visited': visited_count,
+                    'visit_rate': visited_count / blue_count if blue_count > 0 else 0
                 }
 
             with open(self.json_filename, 'w', encoding='utf-8') as f:
@@ -666,6 +771,11 @@ class DataLogger:
                 visited_count = sum(1 for obj in self.json_data['red_objects'] if obj.get('visited', False))
                 report += f"红色物体检测: 总数{red_count}个, 已访问{visited_count}个\n"
 
+            if 'blue_objects' in self.json_data:
+                blue_count = len(self.json_data['blue_objects'])
+                visited_count = sum(1 for obj in self.json_data['blue_objects'] if obj.get('visited', False))
+                report += f"蓝色物体检测: 总数{blue_count}个, 已访问{visited_count}个\n"
+
             report += "="*60 + "\n"
 
             warnings = []
@@ -704,6 +814,9 @@ class PerceptionResult:
     red_objects: List[RedObject] = None
     red_objects_count: int = 0
     red_objects_image: Optional[np.ndarray] = None
+    blue_objects: List[BlueObject] = None
+    blue_objects_count: int = 0
+    blue_objects_image: Optional[np.ndarray] = None
 
     def __post_init__(self):
         if self.safe_directions is None:
@@ -712,6 +825,8 @@ class PerceptionResult:
             self.obstacle_positions = []
         if self.red_objects is None:
             self.red_objects = []
+        if self.blue_objects is None:
+            self.blue_objects = []
 
 
 class VectorFieldPlanner:
@@ -722,6 +837,7 @@ class VectorFieldPlanner:
         self.field_radius = config.INTELLIGENT_DECISION['VECTOR_FIELD_RADIUS']
         self.smoothing_factor = config.INTELLIGENT_DECISION['SMOOTHING_FACTOR']
         self.red_attraction_gain = config.INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION']['ATTRACTION_GAIN']
+        self.blue_attraction_gain = config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']['ATTRACTION_GAIN']
 
         self.min_turn_angle = math.radians(config.INTELLIGENT_DECISION['MIN_TURN_ANGLE_DEG'])
         self.max_turn_angle = math.radians(config.INTELLIGENT_DECISION['MAX_TURN_ANGLE_DEG'])
@@ -729,14 +845,19 @@ class VectorFieldPlanner:
         self.vector_history = deque(maxlen=config.INTELLIGENT_DECISION['SMOOTHING_WINDOW_SIZE'])
         self.current_vector = Vector2D()
 
-    def compute_vector(self, current_pos, goal_pos, obstacles, red_objects=None):
+    def compute_vector(self, current_pos, goal_pos, obstacles, red_objects=None, blue_objects=None):
         attraction_vector = self._compute_attraction(current_pos, goal_pos)
         repulsion_vector = self._compute_repulsion(current_pos, obstacles)
         red_attraction_vector = Vector2D()
+        blue_attraction_vector = Vector2D()
+
         if red_objects:
             red_attraction_vector = self._compute_red_attraction(current_pos, red_objects)
 
-        combined_vector = attraction_vector + repulsion_vector + red_attraction_vector
+        if blue_objects:
+            blue_attraction_vector = self._compute_blue_attraction(current_pos, blue_objects)
+
+        combined_vector = attraction_vector + repulsion_vector + red_attraction_vector + blue_attraction_vector
         smoothed_vector = self._smooth_vector(combined_vector)
         limited_vector = self._limit_turn_angle(smoothed_vector)
 
@@ -788,6 +909,22 @@ class VectorFieldPlanner:
 
         return attraction
 
+    def _compute_blue_attraction(self, current_pos, blue_objects):
+        attraction = Vector2D()
+
+        for obj in blue_objects:
+            if not obj.visited:
+                dx = obj.position[0] - current_pos[0]
+                dy = obj.position[1] - current_pos[1]
+                distance = math.sqrt(dx**2 + dy**2)
+
+                if distance < config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']['DETECTION_RADIUS']:
+                    strength = self.blue_attraction_gain / max(1.0, distance)
+                    direction = Vector2D(dx, dy).normalize()
+                    attraction += direction * strength
+
+        return attraction
+
     def _smooth_vector(self, new_vector):
         self.vector_history.append(new_vector)
 
@@ -828,18 +965,18 @@ class VectorFieldPlanner:
         return Vector2D.from_angle(limited_angle, magnitude)
 
 
-class FrontViewDisplay:
-    """前视画面显示管理器"""
+class FrontViewWindow:
+    """前视窗口 - 显示摄像头画面和手动控制"""
 
-    def __init__(self, window_name="无人机前视画面", width=None, height=None,
+    def __init__(self, window_name=None, width=None, height=None,
                  enable_sharpening=None, show_info=None):
-        self.window_name = window_name
-        self.window_width = width if width is not None else config.DISPLAY['WINDOW_WIDTH']
-        self.window_height = height if height is not None else config.DISPLAY['WINDOW_HEIGHT']
+        self.window_name = window_name if window_name else config.DISPLAY['FRONT_VIEW_WINDOW']['NAME']
+        self.window_width = width if width is not None else config.DISPLAY['FRONT_VIEW_WINDOW']['WIDTH']
+        self.window_height = height if height is not None else config.DISPLAY['FRONT_VIEW_WINDOW']['HEIGHT']
         self.enable_sharpening = (enable_sharpening if enable_sharpening is not None
-                                 else config.DISPLAY['ENABLE_SHARPENING'])
+                                 else config.DISPLAY['FRONT_VIEW_WINDOW']['ENABLE_SHARPENING'])
         self.show_info = (show_info if show_info is not None
-                         else config.DISPLAY['SHOW_INFO_OVERLAY'])
+                         else config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_INFO_OVERLAY'])
 
         self.image_queue = queue.Queue(maxsize=3)
         self.display_active = True
@@ -859,12 +996,6 @@ class FrontViewDisplay:
             'frame_count': 0
         }
 
-        self.performance_info = {
-            'cpu_usage': 0.0,
-            'memory_usage': 0.0,
-            'update_time': time.time()
-        }
-
         self.start()
 
     def start(self):
@@ -875,7 +1006,7 @@ class FrontViewDisplay:
         self.display_thread = threading.Thread(
             target=self._display_loop,
             daemon=True,
-            name="FrontViewDisplay"
+            name="FrontViewWindow"
         )
         self.display_thread.start()
 
@@ -886,8 +1017,7 @@ class FrontViewDisplay:
             self.display_thread.join(timeout=2.0)
 
     def update_image(self, image_data: np.ndarray, info: Optional[Dict] = None,
-                     manual_info: Optional[List[str]] = None,
-                     additional_images: Optional[Dict] = None):
+                     manual_info: Optional[List[str]] = None):
         if not self.display_active or self.paused or image_data is None:
             return
 
@@ -908,7 +1038,6 @@ class FrontViewDisplay:
                 'image': image_data.copy(),
                 'info': info.copy() if info else {},
                 'manual_info': manual_info.copy() if manual_info else [],
-                'additional_images': additional_images.copy() if additional_images else {},
                 'timestamp': time.time()
             }
 
@@ -916,11 +1045,6 @@ class FrontViewDisplay:
 
         except Exception as e:
             print(f"⚠️ 更新图像时出错: {e}")
-
-    def update_performance_info(self, cpu_usage, memory_usage):
-        self.performance_info['cpu_usage'] = cpu_usage
-        self.performance_info['memory_usage'] = memory_usage
-        self.performance_info['update_time'] = time.time()
 
     def set_manual_mode(self, manual_mode):
         self.manual_mode = manual_mode
@@ -958,7 +1082,6 @@ class FrontViewDisplay:
             display_image = None
             info = {}
             manual_info = []
-            additional_images = {}
 
             try:
                 if not self.image_queue.empty():
@@ -966,7 +1089,6 @@ class FrontViewDisplay:
                     display_image = packet['image']
                     info = packet['info']
                     manual_info = packet['manual_info']
-                    additional_images = packet.get('additional_images', {})
 
                     self._update_stats()
 
@@ -980,7 +1102,7 @@ class FrontViewDisplay:
 
             if display_image is not None:
                 if self.show_info:
-                    display_image = self._add_info_overlay(display_image, info, manual_info, additional_images)
+                    display_image = self._add_info_overlay(display_image, info, manual_info)
 
                 cv2.imshow(self.window_name, display_image)
             elif self.paused:
@@ -989,7 +1111,7 @@ class FrontViewDisplay:
                            cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
                 cv2.imshow(self.window_name, blank)
 
-            key = cv2.waitKey(config.DISPLAY.get('REFRESH_RATE_MS', 30)) & 0xFF
+            key = cv2.waitKey(config.DISPLAY['FRONT_VIEW_WINDOW'].get('REFRESH_RATE_MS', 30)) & 0xFF
 
             current_keys = {}
             if key != 255:
@@ -1069,8 +1191,7 @@ class FrontViewDisplay:
             self.display_stats['frame_count'] = 0
             self.display_stats['last_update'] = now
 
-    def _add_info_overlay(self, image: np.ndarray, info: Dict, manual_info: List[str] = None,
-                         additional_images: Dict = None) -> np.ndarray:
+    def _add_info_overlay(self, image: np.ndarray, info: Dict, manual_info: List[str] = None) -> np.ndarray:
         if image is None or image.size == 0:
             return image
 
@@ -1080,8 +1201,7 @@ class FrontViewDisplay:
 
             is_manual = info.get('state', '') == "手动控制"
 
-            grid_img = additional_images.get('grid') if additional_images else None
-            info_height = 180 if (is_manual and manual_info) or grid_img is not None else 100
+            info_height = 180 if is_manual and manual_info else 100
 
             cv2.rectangle(overlay, (0, 0), (width, info_height), (0, 0, 0), -1)
             cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
@@ -1097,26 +1217,19 @@ class FrontViewDisplay:
 
             red_objects_count = info.get('red_objects_count', 0)
             red_objects_visited = info.get('red_objects_visited', 0)
-            if red_objects_count > 0:
+            blue_objects_count = info.get('blue_objects_count', 0)
+            blue_objects_visited = info.get('blue_objects_visited', 0)
+
+            if red_objects_count > 0 or blue_objects_count > 0:
                 red_text = f"红色物体: {red_objects_visited}/{red_objects_count}"
+                blue_text = f"蓝色物体: {blue_objects_visited}/{blue_objects_count}"
                 cv2.putText(image, red_text, (10, 90),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 100, 255), 2)
-
-            decision_info = info.get('decision_info', {})
-            if decision_info:
-                y_pos = 120 if red_objects_count > 0 else 90
-                for key, value in decision_info.items():
-                    if key == 'vector_angle':
-                        cv2.putText(image, f"方向: {math.degrees(value):.0f}°", (10, y_pos),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 255, 200), 1)
-                        y_pos += 20
-                    elif key == 'grid_score':
-                        cv2.putText(image, f"探索得分: {value:.2f}", (10, y_pos),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 255), 1)
-                        y_pos += 20
+                cv2.putText(image, blue_text, (10, 110),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 0), 2)
 
             if is_manual and manual_info:
-                y_start = 130 if red_objects_count > 0 else 100
+                y_start = 150 if (red_objects_count > 0 or blue_objects_count > 0) else 100
                 for i, line in enumerate(manual_info):
                     y_pos = y_start + i * 20
                     cv2.putText(image, line, (10, y_pos),
@@ -1124,7 +1237,7 @@ class FrontViewDisplay:
 
                 cv2.putText(image, "手动控制中...", (width - 150, 60),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-            elif not is_manual and red_objects_count == 0:
+            elif not is_manual and red_objects_count == 0 and blue_objects_count == 0:
                 obs_dist = info.get('obstacle_distance', 0.0)
                 obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
                 cv2.putText(image, f"障碍: {obs_dist:.1f}m", (10, 90),
@@ -1133,35 +1246,6 @@ class FrontViewDisplay:
             fps_text = f"FPS: {self.display_stats['fps']:.1f}"
             cv2.putText(image, fps_text, (width - 120, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-
-            if self.performance_info['cpu_usage'] > 0:
-                cpu_text = f"CPU: {self.performance_info['cpu_usage']:.1f}%"
-                mem_text = f"MEM: {self.performance_info['memory_usage']:.1f}%"
-
-                cpu_color = (0, 200, 255) if self.performance_info['cpu_usage'] > 80 else (0, 255, 0)
-                mem_color = (0, 200, 255) if self.performance_info['memory_usage'] > 80 else (0, 255, 0)
-
-                cv2.putText(image, cpu_text, (width - 120, 60),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, cpu_color, 1)
-                cv2.putText(image, mem_text, (width - 120, 80),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, mem_color, 1)
-
-            if grid_img is not None and grid_img.size > 0:
-                grid_size = 150
-                grid_resized = cv2.resize(grid_img, (grid_size, grid_size))
-
-                x_offset = width - grid_size - 10
-                y_offset = info_height + 10
-
-                if y_offset + grid_size < height:
-                    cv2.rectangle(image, (x_offset-2, y_offset-2),
-                                 (x_offset+grid_size+2, y_offset+grid_size+2),
-                                 (255, 255, 255), 1)
-
-                    image[y_offset:y_offset+grid_size, x_offset:x_offset+grid_size] = grid_resized
-
-                    cv2.putText(image, "探索网格", (x_offset, y_offset-5),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
             return image
         except Exception as e:
@@ -1178,13 +1262,351 @@ class FrontViewDisplay:
             print("⚠️ 无法保存截图：无有效图像数据")
 
 
+class InfoDisplayWindow:
+    """信息显示窗口 - 显示系统状态、探索网格、物体统计等信息"""
+
+    def __init__(self, window_name=None, width=None, height=None):
+        self.window_name = window_name if window_name else config.DISPLAY['INFO_WINDOW']['NAME']
+        self.window_width = width if width is not None else config.DISPLAY['INFO_WINDOW']['WIDTH']
+        self.window_height = height if height is not None else config.DISPLAY['INFO_WINDOW']['HEIGHT']
+
+        self.display_config = config.DISPLAY['INFO_WINDOW']
+        self.info_queue = queue.Queue(maxsize=3)
+        self.display_active = True
+        self.display_thread = None
+        self.last_update = time.time()
+
+        self.start()
+
+    def start(self):
+        if self.display_thread and self.display_thread.is_alive():
+            return
+
+        self.display_active = True
+        self.display_thread = threading.Thread(
+            target=self._display_loop,
+            daemon=True,
+            name="InfoDisplayWindow"
+        )
+        self.display_thread.start()
+        print(f"📊 信息显示窗口已启动: {self.window_name}")
+
+    def stop(self):
+        self.display_active = False
+        if self.display_thread:
+            self.display_thread.join(timeout=2.0)
+
+    def update_info(self, info_data: Dict):
+        if not self.display_active:
+            return
+
+        try:
+            if self.info_queue.full():
+                try:
+                    self.info_queue.get_nowait()
+                except queue.Empty:
+                    pass
+
+            self.info_queue.put_nowait(info_data.copy())
+
+        except Exception as e:
+            print(f"⚠️ 更新信息数据时出错: {e}")
+
+    def _display_loop(self):
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
+
+        wait_img = self._create_waiting_screen()
+        cv2.imshow(self.window_name, wait_img)
+        cv2.waitKey(100)
+
+        print("📊 信息显示窗口已就绪")
+        print("  显示内容: 探索网格、系统状态、物体统计、性能信息")
+
+        last_render_time = time.time()
+        info_data = {}
+
+        while self.display_active:
+            current_time = time.time()
+
+            # 从队列获取最新信息
+            try:
+                while not self.info_queue.empty():
+                    info_data = self.info_queue.get_nowait()
+            except queue.Empty:
+                pass
+
+            # 定期刷新显示
+            if current_time - last_render_time >= self.display_config['REFRESH_RATE_MS'] / 1000.0:
+                display_image = self._render_info_display(info_data)
+                if display_image is not None:
+                    cv2.imshow(self.window_name, display_image)
+                last_render_time = current_time
+
+            # 处理窗口事件
+            key = cv2.waitKey(10) & 0xFF
+            if key == ord('q') or key == 27:  # Q或ESC关闭窗口
+                print("🔄 用户关闭信息窗口")
+                self.display_active = False
+                break
+
+            try:
+                if cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
+                    print("🔄 信息窗口被关闭")
+                    self.display_active = False
+                    break
+            except:
+                self.display_active = False
+                break
+
+        try:
+            cv2.destroyWindow(self.window_name)
+        except:
+            pass
+        cv2.waitKey(1)
+
+    def _create_waiting_screen(self):
+        """创建等待屏幕"""
+        img = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
+        bg_color = self.display_config['BACKGROUND_COLOR']
+        img[:, :] = bg_color
+
+        center_x = self.window_width // 2
+        center_y = self.window_height // 2
+
+        # 标题
+        title = "无人机信息面板"
+        cv2.putText(img, title, (center_x - 150, center_y - 100),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, self.display_config['HIGHLIGHT_COLOR'], 2)
+
+        # 状态信息
+        status = "等待数据..."
+        cv2.putText(img, status, (center_x - 80, center_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, self.display_config['TEXT_COLOR'], 1)
+
+        # 提示
+        tip = "系统正在初始化，请稍候..."
+        cv2.putText(img, tip, (center_x - 120, center_y + 50),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, self.display_config['TEXT_COLOR'], 1)
+
+        return img
+
+    def _render_info_display(self, info_data: Dict) -> np.ndarray:
+        """渲染信息显示"""
+        try:
+            # 创建背景
+            img = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
+            bg_color = self.display_config['BACKGROUND_COLOR']
+            img[:, :] = bg_color
+
+            text_color = self.display_config['TEXT_COLOR']
+            highlight_color = self.display_config['HIGHLIGHT_COLOR']
+            warning_color = self.display_config['WARNING_COLOR']
+            success_color = self.display_config['SUCCESS_COLOR']
+
+            y_offset = 40
+            x_offset = 20
+
+            # 标题栏
+            title = "无人机信息面板"
+            cv2.putText(img, title, (self.window_width // 2 - 100, 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, highlight_color, 2)
+
+            # 分隔线
+            cv2.line(img, (10, 50), (self.window_width - 10, 50), text_color, 1)
+
+            y_offset = 80
+
+            # 1. 飞行状态信息
+            if 'state' in info_data:
+                state = info_data['state']
+                state_color = success_color if '探索' in state else highlight_color if '悬停' in state else warning_color if '紧急' in state else text_color
+                cv2.putText(img, f"飞行状态: {state}", (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, state_color, 2)
+                y_offset += 30
+
+            # 2. 位置信息
+            if 'position' in info_data:
+                pos = info_data['position']
+                pos_text = f"位置: X:{pos[0]:.1f}m Y:{pos[1]:.1f}m 高度:{-pos[2]:.1f}m"
+                cv2.putText(img, pos_text, (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+                y_offset += 25
+
+            # 3. 环境感知信息
+            if 'perception' in info_data:
+                perception = info_data['perception']
+                obs_text = f"障碍距离: {perception.get('obstacle_distance', 0):.1f}m"
+                obs_color = warning_color if perception.get('obstacle_distance', 0) < 5.0 else text_color
+                cv2.putText(img, obs_text, (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, obs_color, 1)
+                y_offset += 25
+
+                open_text = f"开阔度: {perception.get('open_space_score', 0):.2f}"
+                cv2.putText(img, open_text, (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+                y_offset += 25
+
+            # 4. 物体检测统计
+            if 'objects_stats' in info_data:
+                objects_stats = info_data['objects_stats']
+
+                # 红色物体统计
+                red_total = objects_stats.get('red_total', 0)
+                red_visited = objects_stats.get('red_visited', 0)
+                red_text = f"红色物体: {red_visited}/{red_total}"
+                red_color = success_color if red_visited > 0 else text_color
+                cv2.putText(img, red_text, (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, red_color, 1)
+                y_offset += 30
+
+                # 蓝色物体统计
+                blue_total = objects_stats.get('blue_total', 0)
+                blue_visited = objects_stats.get('blue_visited', 0)
+                blue_text = f"蓝色物体: {blue_visited}/{blue_total}"
+                blue_color = success_color if blue_visited > 0 else text_color
+                cv2.putText(img, blue_text, (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, blue_color, 1)
+                y_offset += 30
+
+            # 5. 探索网格信息
+            if 'grid_stats' in info_data:
+                grid_stats = info_data['grid_stats']
+                frontiers = grid_stats.get('frontiers', 0)
+                explored = grid_stats.get('explored', 0)
+                total = grid_stats.get('total', 1)
+
+                grid_text = f"探索网格: {frontiers}前沿 | {explored}/{total}已探索"
+                cv2.putText(img, grid_text, (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+                y_offset += 25
+
+                # 探索进度条
+                progress = explored / total if total > 0 else 0
+                bar_width = 200
+                bar_height = 15
+                bar_x = x_offset
+                bar_y = y_offset
+
+                # 背景条
+                cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (50, 50, 50), -1)
+                # 进度条
+                progress_width = int(bar_width * progress)
+                progress_color = (0, int(255 * progress), int(255 * (1 - progress)))
+                cv2.rectangle(img, (bar_x, bar_y), (bar_x + progress_width, bar_y + bar_height), progress_color, -1)
+                # 边框
+                cv2.rectangle(img, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), text_color, 1)
+                # 进度文本
+                progress_text = f"{progress*100:.1f}%"
+                cv2.putText(img, progress_text, (bar_x + bar_width + 10, bar_y + 12),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                y_offset += 35
+
+            # 6. 系统性能信息
+            if 'performance' in info_data:
+                performance = info_data['performance']
+                cpu_usage = performance.get('cpu_usage', 0)
+                memory_usage = performance.get('memory_usage', 0)
+                loop_time = performance.get('loop_time', 0) * 1000  # 转换为毫秒
+
+                cpu_color = warning_color if cpu_usage > 80 else text_color
+                mem_color = warning_color if memory_usage > 80 else text_color
+                loop_color = warning_color if loop_time > 200 else text_color
+
+                cv2.putText(img, f"CPU使用率: {cpu_usage:.1f}%", (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, cpu_color, 1)
+                y_offset += 25
+
+                cv2.putText(img, f"内存使用率: {memory_usage:.1f}%", (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, mem_color, 1)
+                y_offset += 25
+
+                cv2.putText(img, f"循环时间: {loop_time:.1f}ms", (x_offset, y_offset),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, loop_color, 1)
+                y_offset += 25
+
+            # 7. 探索网格图像（右侧）
+            if self.display_config['SHOW_GRID'] and 'grid_image' in info_data:
+                grid_img = info_data['grid_image']
+                if grid_img is not None and grid_img.size > 0:
+                    grid_size = self.display_config['GRID_SIZE']
+                    grid_resized = cv2.resize(grid_img, (grid_size, grid_size))
+
+                    grid_x = self.window_width - grid_size - 20
+                    grid_y = 80
+
+                    # 添加网格标题
+                    cv2.putText(img, "探索网格", (grid_x, grid_y - 10),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, highlight_color, 1)
+
+                    # 添加图例
+                    legend_y = grid_y + grid_size + 20
+                    cv2.putText(img, "图例:", (grid_x, legend_y),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                    legend_y += 20
+
+                    # 当前位置
+                    cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 255, 0), -1)
+                    cv2.putText(img, "当前位置", (grid_x + 20, legend_y + 12),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    legend_y += 25
+
+                    # 障碍物
+                    cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 0, 255), -1)
+                    cv2.putText(img, "障碍物", (grid_x + 20, legend_y + 12),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    legend_y += 25
+
+                    # 红色物体
+                    cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 100, 255), -1)
+                    cv2.putText(img, "红色物体", (grid_x + 20, legend_y + 12),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    legend_y += 25
+
+                    # 蓝色物体
+                    cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (255, 100, 0), -1)
+                    cv2.putText(img, "蓝色物体", (grid_x + 20, legend_y + 12),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    legend_y += 25
+
+                    # 前沿区域
+                    cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 200, 0), -1)
+                    cv2.putText(img, "探索前沿", (grid_x + 20, legend_y + 12),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+
+                    # 将网格图像放到主图像上
+                    img[grid_y:grid_y+grid_size, grid_x:grid_x+grid_size] = grid_resized
+
+            # 8. 时间戳
+            if 'timestamp' in info_data:
+                timestamp = info_data['timestamp']
+                time_text = f"更新时间: {timestamp}"
+                cv2.putText(img, time_text, (self.window_width - 200, self.window_height - 10),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+            # 9. 底部提示
+            hint_text = "按 Q 或 ESC 关闭窗口"
+            cv2.putText(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+
+            return img
+
+        except Exception as e:
+            print(f"⚠️ 渲染信息显示时出错: {e}")
+            error_img = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
+            error_img[:, :] = self.display_config['BACKGROUND_COLOR']
+            cv2.putText(error_img, "渲染错误", (self.window_width // 2 - 50, self.window_height // 2),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, warning_color, 2)
+            return error_img
+
+
 class PerceptiveExplorer:
-    """基于感知的自主探索无人机 - 智能决策增强版（红色物体检测版）"""
+    """基于感知的自主探索无人机 - 智能决策增强版（双色物体检测版）"""
 
     def __init__(self, drone_name=""):
         self._setup_logging()
         self.logger.info("=" * 60)
-        self.logger.info("AirSimNH 感知驱动自主探索系统 - 红色物体检测版")
+        self.logger.info("AirSimNH 感知驱动自主探索系统 - 双窗口双色物体检测版")
         self.logger.info("=" * 60)
 
         self.client = None
@@ -1240,6 +1662,12 @@ class PerceptiveExplorer:
         self.red_detection_interval = config.PERCEPTION['RED_OBJECT_DETECTION']['UPDATE_INTERVAL']
         self.red_object_memory_time = config.PERCEPTION['RED_OBJECT_DETECTION']['MEMORY_TIME']
 
+        self.blue_objects = []
+        self.blue_object_id_counter = 0
+        self.last_blue_detection_time = 0
+        self.blue_detection_interval = config.PERCEPTION['BLUE_OBJECT_DETECTION']['UPDATE_INTERVAL']
+        self.blue_object_memory_time = config.PERCEPTION['BLUE_OBJECT_DETECTION']['MEMORY_TIME']
+
         self.visited_positions = deque(maxlen=100)
 
         self.loop_count = 0
@@ -1273,10 +1701,14 @@ class PerceptiveExplorer:
             'min_loop_time': 100.0,
             'red_objects_detected': 0,
             'red_objects_visited': 0,
+            'blue_objects_detected': 0,
+            'blue_objects_visited': 0,
         }
 
-        self.front_display = None
-        self._setup_front_display()
+        # 初始化两个窗口
+        self.front_window = None
+        self.info_window = None
+        self._setup_windows()
 
         self.manual_control_start = 0
         self.control_keys = {}
@@ -1284,11 +1716,14 @@ class PerceptiveExplorer:
         self.logger.info("✅ 系统初始化完成")
         self.logger.info(f"   开始时间: {datetime.now().strftime('%H:%M:%S')}")
         self.logger.info(f"   预计探索时长: {self.exploration_time}秒")
-        self.logger.info(f"   智能决策: 向量场避障 + 网格探索 + 红色物体检测")
+        self.logger.info(f"   智能决策: 向量场避障 + 网格探索 + 双色物体检测")
+        self.logger.info(f"   显示系统: 双窗口模式 (前视窗口 + 信息窗口)")
         if config.DATA_RECORDING['ENABLED']:
             self.logger.info(f"   数据记录: CSV + JSON 格式")
         if config.PERCEPTION['RED_OBJECT_DETECTION']['ENABLED']:
             self.logger.info(f"   红色物体检测: 已启用")
+        if config.PERCEPTION['BLUE_OBJECT_DETECTION']['ENABLED']:
+            self.logger.info(f"   蓝色物体检测: 已启用")
 
     def _setup_logging(self):
         self.logger = logging.getLogger('DroneExplorer')
@@ -1361,19 +1796,84 @@ class PerceptiveExplorer:
             except:
                 return False
 
-    def _setup_front_display(self):
+    def _setup_windows(self):
+        """初始化两个显示窗口"""
         try:
-            self.front_display = FrontViewDisplay(
-                window_name=f"无人机前视 - {self.drone_name or 'AirSimNH'}",
-                width=config.DISPLAY['WINDOW_WIDTH'],
-                height=config.DISPLAY['WINDOW_HEIGHT'],
-                enable_sharpening=config.DISPLAY['ENABLE_SHARPENING'],
-                show_info=config.DISPLAY['SHOW_INFO_OVERLAY']
+            # 前视窗口
+            self.front_window = FrontViewWindow(
+                window_name=f"{config.DISPLAY['FRONT_VIEW_WINDOW']['NAME']} - {self.drone_name or 'AirSimNH'}",
+                width=config.DISPLAY['FRONT_VIEW_WINDOW']['WIDTH'],
+                height=config.DISPLAY['FRONT_VIEW_WINDOW']['HEIGHT'],
+                enable_sharpening=config.DISPLAY['FRONT_VIEW_WINDOW']['ENABLE_SHARPENING'],
+                show_info=config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_INFO_OVERLAY']
             )
             self.logger.info("🎥 前视窗口已初始化")
+
+            # 信息显示窗口
+            self.info_window = InfoDisplayWindow(
+                window_name=f"{config.DISPLAY['INFO_WINDOW']['NAME']} - {self.drone_name or 'AirSimNH'}",
+                width=config.DISPLAY['INFO_WINDOW']['WIDTH'],
+                height=config.DISPLAY['INFO_WINDOW']['HEIGHT']
+            )
+            self.logger.info("📊 信息显示窗口已初始化")
+
         except Exception as e:
-            self.logger.error(f"❌ 前视窗口初始化失败: {e}")
-            self.front_display = None
+            self.logger.error(f"❌ 窗口初始化失败: {e}")
+
+    def _update_info_window(self, perception: PerceptionResult):
+        """更新信息显示窗口"""
+        if not self.info_window:
+            return
+
+        try:
+            # 获取无人机状态
+            state = self.client.getMultirotorState(vehicle_name=self.drone_name)
+            pos = state.kinematics_estimated.position
+
+            # 收集性能信息
+            cpu_usage = psutil.cpu_percent(interval=0) if config.PERFORMANCE['ENABLE_REALTIME_METRICS'] else 0.0
+            memory_usage = psutil.virtual_memory().percent if config.PERFORMANCE['ENABLE_REALTIME_METRICS'] else 0.0
+
+            # 准备信息数据
+            info_data = {
+                'timestamp': datetime.now().strftime("%H:%M:%S"),
+                'state': self.state.value,
+                'position': (pos.x_val, pos.y_val, pos.z_val),
+                'perception': {
+                    'obstacle_distance': perception.obstacle_distance,
+                    'open_space_score': perception.open_space_score,
+                    'has_obstacle': perception.has_obstacle
+                },
+                'objects_stats': {
+                    'red_total': len(self.red_objects),
+                    'red_visited': sum(1 for obj in self.red_objects if obj.visited),
+                    'blue_total': len(self.blue_objects),
+                    'blue_visited': sum(1 for obj in self.blue_objects if obj.visited),
+                    'red_in_view': perception.red_objects_count,
+                    'blue_in_view': perception.blue_objects_count
+                },
+                'grid_stats': {
+                    'frontiers': len(self.exploration_grid.frontier_cells),
+                    'explored': np.sum(self.exploration_grid.grid > 0.7),
+                    'total': self.exploration_grid.grid_size * self.exploration_grid.grid_size
+                },
+                'performance': {
+                    'cpu_usage': cpu_usage,
+                    'memory_usage': memory_usage,
+                    'loop_time': self.stats.get('average_loop_time', 0)
+                }
+            }
+
+            # 添加网格图像
+            if config.DISPLAY['INFO_WINDOW']['SHOW_GRID']:
+                grid_img = self.exploration_grid.visualize_grid(size=config.DISPLAY['INFO_WINDOW']['GRID_SIZE'])
+                info_data['grid_image'] = grid_img
+
+            # 更新信息窗口
+            self.info_window.update_info(info_data)
+
+        except Exception as e:
+            self.logger.warning(f"⚠️ 更新信息窗口时出错: {e}")
 
     def _detect_red_objects(self, image: np.ndarray, depth_array: Optional[np.ndarray] = None) -> Tuple[List[RedObject], np.ndarray]:
         red_objects = []
@@ -1489,7 +1989,7 @@ class PerceptiveExplorer:
                         cv2.rectangle(marked_image, (x, y), (x+w, y+h), color, 2)
                         cv2.circle(marked_image, (center_x, center_y), 5, color, -1)
 
-                        label = f"ID:{red_object.id} ({confidence:.2f})"
+                        label = f"R:{red_object.id} ({confidence:.2f})"
                         cv2.putText(marked_image, label, (x, y-10),
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
@@ -1506,7 +2006,150 @@ class PerceptiveExplorer:
 
         return red_objects, marked_image
 
+    def _detect_blue_objects(self, image: np.ndarray, depth_array: Optional[np.ndarray] = None) -> Tuple[List[BlueObject], np.ndarray]:
+        blue_objects = []
+        marked_image = image.copy() if image is not None else None
+
+        if not config.PERCEPTION['BLUE_OBJECT_DETECTION']['ENABLED'] or image is None:
+            return blue_objects, marked_image
+
+        try:
+            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+            lower_blue = np.array(config.CAMERA['BLUE_COLOR_RANGE']['LOWER'])
+            upper_blue = np.array(config.CAMERA['BLUE_COLOR_RANGE']['UPPER'])
+
+            blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
+
+            kernel = np.ones((5, 5), np.uint8)
+            blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_CLOSE, kernel)
+            blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_OPEN, kernel)
+
+            contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            try:
+                state = self.client.getMultirotorState(vehicle_name=self.drone_name)
+                drone_pos = state.kinematics_estimated.position
+                orientation = state.kinematics_estimated.orientation
+                roll, pitch, yaw = airsim.to_eularian_angles(orientation)
+            except:
+                drone_pos = None
+                yaw = 0.0
+
+            for contour in contours:
+                area = cv2.contourArea(contour)
+                min_area = config.PERCEPTION['BLUE_OBJECT_DETECTION']['MIN_AREA']
+                max_area = config.PERCEPTION['BLUE_OBJECT_DETECTION']['MAX_AREA']
+
+                if min_area <= area <= max_area:
+                    x, y, w, h = cv2.boundingRect(contour)
+                    center_x = x + w // 2
+                    center_y = y + h // 2
+
+                    aspect_ratio = w / h if h > 0 else 1.0
+                    confidence = min(1.0, area / 1000.0) * (1.0 / (1.0 + abs(aspect_ratio - 1.0)))
+
+                    world_pos = None
+                    if drone_pos is not None and depth_array is not None:
+                        try:
+                            if 0 <= center_y < depth_array.shape[0] and 0 <= center_x < depth_array.shape[1]:
+                                distance = depth_array[center_y, center_x]
+
+                                if 0.5 < distance < 50.0:
+                                    height, width = depth_array.shape
+                                    fov_h = math.radians(90)
+
+                                    pixel_angle_x = (center_x - width/2) / (width/2) * (fov_h/2)
+                                    pixel_angle_y = (center_y - height/2) / (height/2) * (fov_h/2)
+
+                                    z = distance
+                                    x_rel = z * math.tan(pixel_angle_x)
+                                    y_rel = z * math.tan(pixel_angle_y)
+
+                                    world_x = x_rel * math.cos(yaw) - y_rel * math.sin(yaw) + drone_pos.x_val
+                                    world_y = x_rel * math.sin(yaw) + y_rel * math.cos(yaw) + drone_pos.y_val
+                                    world_z = drone_pos.z_val
+
+                                    world_pos = (world_x, world_y, world_z)
+                        except:
+                            pass
+
+                    blue_object = BlueObject(
+                        id=self.blue_object_id_counter,
+                        position=world_pos if world_pos else (0.0, 0.0, 0.0),
+                        pixel_position=(center_x, center_y),
+                        size=area,
+                        confidence=confidence,
+                        timestamp=time.time(),
+                        last_seen=time.time(),
+                        visited=False
+                    )
+
+                    is_new_object = True
+                    for existing_obj in self.blue_objects:
+                        if self._is_same_object_blue(blue_object, existing_obj):
+                            existing_obj.last_seen = time.time()
+                            existing_obj.pixel_position = blue_object.pixel_position
+                            existing_obj.confidence = max(existing_obj.confidence, confidence)
+                            if world_pos:
+                                existing_obj.position = world_pos
+                            blue_object = existing_obj
+                            is_new_object = False
+                            break
+
+                    if is_new_object:
+                        self.blue_object_id_counter += 1
+                        blue_objects.append(blue_object)
+                        self.stats['blue_objects_detected'] += 1
+                        self.logger.info(f"🔵 检测到蓝色物体 #{blue_object.id} (置信度: {confidence:.2f})")
+
+                        if self.data_logger and config.DATA_RECORDING['RECORD_BLUE_OBJECTS']:
+                            self.data_logger.record_blue_object(blue_object)
+                    else:
+                        blue_objects.append(blue_object)
+
+                    if marked_image is not None:
+                        color = (255, 100, 0)
+                        if blue_object.visited:
+                            color = (0, 200, 0)
+
+                        cv2.rectangle(marked_image, (x, y), (x+w, y+h), color, 2)
+                        cv2.circle(marked_image, (center_x, center_y), 5, color, -1)
+
+                        label = f"B:{blue_object.id} ({confidence:.2f})"
+                        cv2.putText(marked_image, label, (x, y-10),
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+            current_time = time.time()
+            self.blue_objects = [obj for obj in self.blue_objects
+                               if current_time - obj.last_seen < self.blue_object_memory_time]
+
+            visited_count = sum(1 for obj in self.blue_objects if obj.visited)
+            if len(blue_objects) > 0:
+                self.logger.debug(f"🔵 当前蓝色物体: {len(self.blue_objects)}个, 已访问: {visited_count}个")
+
+        except Exception as e:
+            self.logger.warning(f"⚠️ 蓝色物体检测失败: {e}")
+
+        return blue_objects, marked_image
+
     def _is_same_object(self, obj1: RedObject, obj2: RedObject, distance_threshold=2.0) -> bool:
+        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
+            distance = math.sqrt(
+                (obj1.position[0] - obj2.position[0])**2 +
+                (obj1.position[1] - obj2.position[1])**2
+            )
+            return distance < distance_threshold
+
+        pixel_distance = math.sqrt(
+            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
+            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
+        )
+        time_diff = abs(obj1.timestamp - obj2.timestamp)
+
+        return pixel_distance < 50 and time_diff < 5.0
+
+    def _is_same_object_blue(self, obj1: BlueObject, obj2: BlueObject, distance_threshold=2.0) -> bool:
         if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
             distance = math.sqrt(
                 (obj1.position[0] - obj2.position[0])**2 +
@@ -1548,6 +2191,36 @@ class PerceptiveExplorer:
                         self.data_logger.record_event('red_object_visited', event_data)
 
                     self.change_state(FlightState.RED_OBJECT_INSPECTION)
+                    return True
+
+        return False
+
+    def _check_blue_object_proximity(self, current_pos):
+        for obj in self.blue_objects:
+            if not obj.visited:
+                distance = math.sqrt(
+                    (obj.position[0] - current_pos[0])**2 +
+                    (obj.position[1] - current_pos[1])**2
+                )
+
+                min_distance = config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']['MIN_DISTANCE']
+                if distance < min_distance:
+                    obj.visited = True
+                    obj.last_seen = time.time()
+                    self.stats['blue_objects_visited'] += 1
+
+                    self.logger.info(f"✅ 已访问蓝色物体 #{obj.id} (距离: {distance:.1f}m)")
+
+                    if self.data_logger:
+                        event_data = {
+                            'object_id': obj.id,
+                            'position': obj.position,
+                            'distance': distance,
+                            'timestamp': time.time()
+                        }
+                        self.data_logger.record_event('blue_object_visited', event_data)
+
+                    self.change_state(FlightState.BLUE_OBJECT_INSPECTION)
                     return True
 
         return False
@@ -1649,12 +2322,22 @@ class PerceptiveExplorer:
                         img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
 
                         current_time = time.time()
+
+                        # 检测红色物体
                         if current_time - self.last_red_detection_time >= self.red_detection_interval:
                             red_objects, red_marked_image = self._detect_red_objects(img_bgr, depth_array)
                             result.red_objects = red_objects
                             result.red_objects_count = len(red_objects)
                             result.red_objects_image = red_marked_image
                             self.last_red_detection_time = current_time
+
+                        # 检测蓝色物体
+                        if current_time - self.last_blue_detection_time >= self.blue_detection_interval:
+                            blue_objects, blue_marked_image = self._detect_blue_objects(img_bgr, depth_array)
+                            result.blue_objects = blue_objects
+                            result.blue_objects_count = len(blue_objects)
+                            result.blue_objects_image = blue_marked_image
+                            self.last_blue_detection_time = current_time
 
                         result.front_image = img_bgr
 
@@ -1664,22 +2347,25 @@ class PerceptiveExplorer:
 
                         self._record_flight_data(result)
 
-                        if self.front_display:
+                        # 更新信息窗口
+                        self._update_info_window(result)
+
+                        if self.front_window:
                             manual_info = None
                             if self.state == FlightState.MANUAL:
                                 manual_info = self._get_manual_control_info()
 
-                            grid_img = self.exploration_grid.visualize_grid(size=150)
-                            additional_images = {'grid': grid_img} if grid_img is not None else {}
+                            # 合并红色和蓝色物体标记
+                            display_image = img_bgr.copy()
+                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None:
+                                red_mask = cv2.inRange(result.red_objects_image, (0, 100, 0), (0, 255, 255))
+                                display_image[red_mask > 0] = result.red_objects_image[red_mask > 0]
 
-                            display_image = result.red_objects_image if result.red_objects_image is not None else img_bgr
+                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None:
+                                blue_mask = cv2.inRange(result.blue_objects_image, (255, 100, 0), (255, 255, 255))
+                                display_image[blue_mask > 0] = result.blue_objects_image[blue_mask > 0]
 
-                            if config.PERFORMANCE['ENABLE_REALTIME_METRICS']:
-                                cpu_usage = psutil.cpu_percent(interval=0)
-                                memory_usage = psutil.virtual_memory().percent
-                                self.front_display.update_performance_info(cpu_usage, memory_usage)
-
-                            self.front_display.update_image(display_image, display_info, manual_info, additional_images)
+                            self.front_window.update_image(display_image, display_info, manual_info)
                             self.stats['front_image_updates'] += 1
 
                 except Exception as e:
@@ -1689,7 +2375,7 @@ class PerceptiveExplorer:
 
             if self.loop_count % 50 == 0 and config.DEBUG.get('LOG_DECISION_DETAILS', False):
                 self.logger.debug(f"感知结果: 障碍={result.has_obstacle}, 距离={result.obstacle_distance:.1f}m, "
-                                f"开阔度={result.open_space_score:.2f}, 红色物体={result.red_objects_count}个")
+                                f"开阔度={result.open_space_score:.2f}, 红色物体={result.red_objects_count}个, 蓝色物体={result.blue_objects_count}个")
 
         except Exception as e:
             if "ClientException" in str(type(e)) or "Connection" in str(e):
@@ -1729,6 +2415,9 @@ class PerceptiveExplorer:
             red_objects_count = perception.red_objects_count
             red_objects_visited = sum(1 for obj in self.red_objects if obj.visited)
 
+            blue_objects_count = perception.blue_objects_count
+            blue_objects_visited = sum(1 for obj in self.blue_objects if obj.visited)
+
             data_dict = {
                 'timestamp': datetime.now().isoformat(),
                 'loop_count': self.loop_count,
@@ -1759,6 +2448,9 @@ class PerceptiveExplorer:
                 'red_objects_count': red_objects_count,
                 'red_objects_detected': self.stats['red_objects_detected'],
                 'red_objects_visited': red_objects_visited,
+                'blue_objects_count': blue_objects_count,
+                'blue_objects_detected': self.stats['blue_objects_detected'],
+                'blue_objects_visited': blue_objects_visited,
             }
 
             self.data_logger.record_flight_data(data_dict)
@@ -1820,6 +2512,9 @@ class PerceptiveExplorer:
             if perception.red_objects:
                 self.exploration_grid.update_red_objects(perception.red_objects)
 
+            if perception.blue_objects:
+                self.exploration_grid.update_blue_objects(perception.blue_objects)
+
             self.stats['grid_updates'] += 1
 
         except Exception as e:
@@ -1837,6 +2532,8 @@ class PerceptiveExplorer:
                 'loop_count': self.loop_count,
                 'red_objects_count': perception.red_objects_count,
                 'red_objects_visited': sum(1 for obj in self.red_objects if obj.visited),
+                'blue_objects_count': perception.blue_objects_count,
+                'blue_objects_visited': sum(1 for obj in self.blue_objects if obj.visited),
             }
 
             if hasattr(self, 'last_decision_info'):
@@ -1882,6 +2579,10 @@ class PerceptiveExplorer:
         if self.red_objects:
             visited_count = sum(1 for obj in self.red_objects if obj.visited)
             info_lines.append(f"红色物体: {visited_count}/{len(self.red_objects)}")
+
+        if self.blue_objects:
+            visited_count = sum(1 for obj in self.blue_objects if obj.visited)
+            info_lines.append(f"蓝色物体: {visited_count}/{len(self.blue_objects)}")
 
         if self.manual_control_start > 0:
             elapsed = time.time() - self.manual_control_start
@@ -1980,7 +2681,7 @@ class PerceptiveExplorer:
         self.logger.info("启动手动控制模式")
         self.logger.info("=" * 60)
 
-        if not self.front_display:
+        if not self.front_window:
             self.logger.error("❌ 前视窗口未初始化")
             return
 
@@ -1988,7 +2689,7 @@ class PerceptiveExplorer:
             self.change_state(FlightState.MANUAL)
             self.manual_control_start = time.time()
 
-            self.front_display.set_manual_mode(True)
+            self.front_window.set_manual_mode(True)
 
             self.logger.info("🕹️ 进入手动控制模式")
             print("\n" + "="*60)
@@ -2011,16 +2712,16 @@ class PerceptiveExplorer:
 
             while manual_active and not self.emergency_flag:
                 try:
-                    if self.front_display.should_exit_manual():
+                    if self.front_window.should_exit_manual():
                         self.logger.info("收到退出手动模式指令")
                         manual_active = False
                         break
 
-                    if self.front_display:
-                        window_keys = self.front_display.get_control_inputs()
+                    if self.front_window:
+                        window_keys = self.front_window.get_control_inputs()
                         self.control_keys = window_keys.copy()
 
-                    if not self.front_display.display_active:
+                    if not self.front_window.display_active:
                         self.logger.info("前视窗口已关闭，退出手动模式")
                         manual_active = False
                         break
@@ -2059,9 +2760,9 @@ class PerceptiveExplorer:
                                     except:
                                         display_info = {}
 
-                                    if self.front_display:
+                                    if self.front_window:
                                         manual_info = self._get_manual_control_info()
-                                        self.front_display.update_image(img_bgr, display_info, manual_info)
+                                        self.front_window.update_image(img_bgr, display_info, manual_info)
                                         last_image_time = current_time
                         except Exception as img_error:
                             pass
@@ -2071,6 +2772,7 @@ class PerceptiveExplorer:
                         pos = state.kinematics_estimated.position
                         current_pos = (pos.x_val, pos.y_val)
                         self._check_red_object_proximity(current_pos)
+                        self._check_blue_object_proximity(current_pos)
                     except:
                         pass
 
@@ -2089,8 +2791,8 @@ class PerceptiveExplorer:
 
             self.manual_control_start = 0
             self.control_keys = {}
-            if self.front_display:
-                self.front_display.set_manual_mode(False)
+            if self.front_window:
+                self.front_window.set_manual_mode(False)
 
             try:
                 self.client.hoverAsync(vehicle_name=self.drone_name).join()
@@ -2105,6 +2807,7 @@ class PerceptiveExplorer:
             print("手动控制模式已结束")
             print(f"控制时间: {manual_time:.1f}秒")
             print(f"检测到红色物体: {self.stats['red_objects_detected']}个")
+            print(f"检测到蓝色物体: {self.stats['blue_objects_detected']}个")
             print("="*60)
             print("请选择下一步:")
             print("  1. 继续自动探索")
@@ -2164,6 +2867,9 @@ class PerceptiveExplorer:
                     pos = state.kinematics_estimated.position
                     current_pos = (pos.x_val, pos.y_val)
                     if self._check_red_object_proximity(current_pos):
+                        time.sleep(2)
+                        self.change_state(FlightState.EXPLORING)
+                    if self._check_blue_object_proximity(current_pos):
                         time.sleep(2)
                         self.change_state(FlightState.EXPLORING)
                 except:
@@ -2268,7 +2974,8 @@ class PerceptiveExplorer:
 
                     self.exploration_target = self.exploration_grid.get_best_exploration_target(
                         (pos.x_val, pos.y_val),
-                        perception.red_objects
+                        perception.red_objects,
+                        perception.blue_objects
                     )
                     self.target_update_time = current_time
 
@@ -2288,7 +2995,8 @@ class PerceptiveExplorer:
                     if self.exploration_target is None:
                         self.exploration_target = self.exploration_grid.get_best_exploration_target(
                             current_pos,
-                            perception.red_objects
+                            perception.red_objects,
+                            perception.blue_objects
                         )
                         self.target_update_time = time.time()
 
@@ -2296,7 +3004,8 @@ class PerceptiveExplorer:
                         current_pos,
                         self.exploration_target,
                         perception.obstacle_positions,
-                        perception.red_objects
+                        perception.red_objects,
+                        perception.blue_objects
                     )
 
                     speed_factor = self._calculate_adaptive_speed(perception, vector.magnitude())
@@ -2318,6 +3027,7 @@ class PerceptiveExplorer:
                         'grid_score': len(self.exploration_grid.frontier_cells) / 100.0,
                         'speed_factor': speed_factor,
                         'red_objects_in_view': perception.red_objects_count,
+                        'blue_objects_in_view': perception.blue_objects_count,
                         'decision_time': time.time() - decision_start
                     }
 
@@ -2339,7 +3049,8 @@ class PerceptiveExplorer:
                         current_pos,
                         None,
                         perception.obstacle_positions,
-                        perception.red_objects
+                        perception.red_objects,
+                        perception.blue_objects
                     )
 
                     if avoid_vector.magnitude() > 0.1:
@@ -2353,6 +3064,11 @@ class PerceptiveExplorer:
                     time.sleep(1)
 
             elif self.state == FlightState.RED_OBJECT_INSPECTION:
+                target_vx, target_vy = 0.0, 0.0
+                time.sleep(2)
+                self.change_state(FlightState.EXPLORING)
+
+            elif self.state == FlightState.BLUE_OBJECT_INSPECTION:
                 target_vx, target_vy = 0.0, 0.0
                 time.sleep(2)
                 self.change_state(FlightState.EXPLORING)
@@ -2396,8 +3112,10 @@ class PerceptiveExplorer:
         vector_factor = min(1.0, vector_magnitude * 2)
 
         red_factor = 0.8 if perception.red_objects_count > 0 else 1.0
+        blue_factor = 0.8 if perception.blue_objects_count > 0 else 1.0
+        color_factor = min(red_factor, blue_factor)
 
-        speed_factor = open_factor * obs_factor * vector_factor * red_factor * 0.7
+        speed_factor = open_factor * obs_factor * vector_factor * color_factor * 0.7
 
         speed_factor = max(
             config.INTELLIGENT_DECISION['MIN_SPEED_FACTOR'],
@@ -2410,7 +3128,8 @@ class PerceptiveExplorer:
         try:
             target_vx, target_vy, target_z, target_yaw = decision
 
-            if self.state in [FlightState.EXPLORING, FlightState.AVOIDING, FlightState.PLANNING, FlightState.RED_OBJECT_INSPECTION]:
+            if self.state in [FlightState.EXPLORING, FlightState.AVOIDING, FlightState.PLANNING,
+                              FlightState.RED_OBJECT_INSPECTION, FlightState.BLUE_OBJECT_INSPECTION]:
                 self.client.moveByVelocityZAsync(
                     target_vx, target_vy, target_z, 0.5,
                     drivetrain=airsim.DrivetrainType.MaxDegreeOfFreedom,
@@ -2451,6 +3170,8 @@ class PerceptiveExplorer:
                             f"| 开阔度={perception.open_space_score:.2f}")
             self.logger.info(f"   红色物体: 检测到{perception.red_objects_count}个 "
                             f"| 已访问{self.stats['red_objects_visited']}个")
+            self.logger.info(f"   蓝色物体: 检测到{perception.blue_objects_count}个 "
+                            f"| 已访问{self.stats['blue_objects_visited']}个")
             self.logger.info(f"   智能决策: 向量场{self.stats['vector_field_updates']}次 "
                             f"| 网格更新{self.stats['grid_updates']}次")
             self.logger.info(f"   探索网格: 前沿{len(self.exploration_grid.frontier_cells)}个")
@@ -2500,9 +3221,13 @@ class PerceptiveExplorer:
         except:
             self.logger.warning("⚠️ 释放控制时出现异常")
 
-        if self.front_display:
-            self.front_display.stop()
+        if self.front_window:
+            self.front_window.stop()
             self.logger.info("✅ 前视窗口已关闭")
+
+        if self.info_window:
+            self.info_window.stop()
+            self.logger.info("✅ 信息窗口已关闭")
 
         if self.data_logger:
             self.logger.info("💾 正在保存飞行数据...")
@@ -2533,6 +3258,8 @@ class PerceptiveExplorer:
         self.logger.info(f"   检测到障碍次数: {self.stats['obstacles_detected']}")
         self.logger.info(f"   红色物体检测: {self.stats['red_objects_detected']}个")
         self.logger.info(f"   红色物体访问: {self.stats['red_objects_visited']}个")
+        self.logger.info(f"   蓝色物体检测: {self.stats['blue_objects_detected']}个")
+        self.logger.info(f"   蓝色物体访问: {self.stats['blue_objects_visited']}个")
         self.logger.info(f"   向量场计算次数: {self.stats['vector_field_updates']}")
         self.logger.info(f"   网格更新次数: {self.stats['grid_updates']}")
         self.logger.info(f"   探索前沿数量: {len(self.exploration_grid.frontier_cells)}")
@@ -2548,7 +3275,7 @@ class PerceptiveExplorer:
         try:
             report_filename = f"mission_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
             with open(report_filename, 'w', encoding='utf-8') as f:
-                f.write("AirSimNH 无人机任务报告 (智能决策增强版 - 红色物体检测版)\n")
+                f.write("AirSimNH 无人机任务报告 (智能决策增强版 - 双窗口双色物体检测版)\n")
                 f.write("=" * 50 + "\n")
                 f.write(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"总运行时间: {total_time:.1f}秒\n")
@@ -2562,6 +3289,8 @@ class PerceptiveExplorer:
                 f.write(f"手动控制时间: {self.stats['manual_control_time']:.1f}秒\n")
                 f.write(f"红色物体检测总数: {self.stats['red_objects_detected']}个\n")
                 f.write(f"红色物体已访问数: {self.stats['red_objects_visited']}个\n")
+                f.write(f"蓝色物体检测总数: {self.stats['blue_objects_detected']}个\n")
+                f.write(f"蓝色物体已访问数: {self.stats['blue_objects_visited']}个\n")
                 f.write(f"异常捕获次数: {self.stats['exceptions_caught']}\n")
                 f.write(f"前视图像更新次数: {self.stats['front_image_updates']}\n")
                 f.write(f"平均循环时间: {self.stats['average_loop_time']*1000:.1f}ms\n")
@@ -2606,8 +3335,11 @@ class PerceptiveExplorer:
         except Exception as e:
             self.logger.error(f"⚠️ 紧急降落异常: {e}")
 
-        if self.front_display:
-            self.front_display.stop()
+        if self.front_window:
+            self.front_window.stop()
+
+        if self.info_window:
+            self.info_window.stop()
 
         self._cleanup_system()
 
@@ -2616,7 +3348,7 @@ class PerceptiveExplorer:
 
 def main():
     print("=" * 70)
-    print("AirSimNH 无人机感知探索系统 - 智能决策增强版（红色物体检测版）")
+    print("AirSimNH 无人机感知探索系统 - 智能决策增强版（双窗口双色物体检测版）")
     print(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"配置状态: {'已加载' if CONFIG_LOADED else '使用默认配置'}")
     print(f"日志级别: {config.SYSTEM['LOG_LEVEL']}")
@@ -2628,17 +3360,23 @@ def main():
     print("  • PID平滑飞行控制")
     print("  • 自适应速度调整")
     print("  • 性能监控与数据闭环")
-    print("  • 红色物体检测与记录")
+    print("  • 红色与蓝色物体检测与记录")
+    print("=" * 70)
+    print("显示系统:")
+    print("  • 双窗口模式: 前视窗口 + 信息窗口")
+    print("  • 前视窗口: 摄像头画面、手动控制")
+    print("  • 信息窗口: 系统状态、探索网格、物体统计")
     print("=" * 70)
     print("数据记录:")
     print(f"  • CSV格式: {config.DATA_RECORDING.get('SAVE_TO_CSV', False)}")
     print(f"  • JSON格式: {config.DATA_RECORDING.get('SAVE_TO_JSON', False)}")
     print(f"  • 性能监控: {config.DATA_RECORDING.get('PERFORMANCE_MONITORING', False)}")
     print(f"  • 红色物体记录: {config.DATA_RECORDING.get('RECORD_RED_OBJECTS', False)}")
+    print(f"  • 蓝色物体记录: {config.DATA_RECORDING.get('RECORD_BLUE_OBJECTS', False)}")
     print("=" * 70)
 
     print("\n请选择运行模式:")
-    print("  1. 智能探索模式 (AI自主决策，包含红色物体检测)")
+    print("  1. 智能探索模式 (AI自主决策，包含双色物体检测)")
     print("  2. 手动控制模式 (键盘控制)")
     print("  3. 混合模式 (先自动探索，后可切换)")
     print("=" * 50)
@@ -2659,7 +3397,11 @@ def main():
 
         if mode_choice == '1':
             print("\n" + "="*50)
-            print("启动智能探索模式（含红色物体检测）")
+            print("启动智能探索模式（含双色物体检测）")
+            print("="*50)
+            print("注意：将打开两个窗口:")
+            print("  1. 前视窗口 - 显示摄像头画面")
+            print("  2. 信息窗口 - 显示系统状态和探索信息")
             print("="*50)
             explorer.run_perception_loop()
 
@@ -2683,7 +3425,7 @@ def main():
             print("启动混合模式")
             print("="*50)
 
-            explorer.logger.info("🔍 开始智能探索（含红色物体检测）...")
+            explorer.logger.info("🔍 开始智能探索（含双色物体检测）...")
             original_time = config.EXPLORATION['TOTAL_TIME']
             explorer.exploration_time = min(60, original_time)
 
@@ -2693,7 +3435,7 @@ def main():
                 print("\n" + "="*50)
                 print("智能探索阶段结束")
                 print(f"检测到红色物体: {explorer.stats['red_objects_detected']}个")
-                print(f"已访问红色物体: {explorer.stats['red_objects_visited']}个")
+                print(f"检测到蓝色物体: {explorer.stats['blue_objects_detected']}个")
                 print("请选择下一步:")
                 print("  1. 进入手动控制模式")
                 print("  2. 继续智能探索")

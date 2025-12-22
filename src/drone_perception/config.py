@@ -41,6 +41,15 @@ PERCEPTION = {
         'MAX_AREA': 10000,  # 最大检测面积（像素）
         'UPDATE_INTERVAL': 1.0,  # 检测更新间隔（秒）
         'MEMORY_TIME': 5.0,  # 物体记忆时间（秒），避免重复计数
+    },
+
+    # 蓝色物体检测参数（新增）
+    'BLUE_OBJECT_DETECTION': {
+        'ENABLED': True,  # 启用蓝色物体检测
+        'MIN_AREA': 50,  # 最小检测面积（像素）
+        'MAX_AREA': 10000,  # 最大检测面积（像素）
+        'UPDATE_INTERVAL': 1.0,  # 检测更新间隔（秒）
+        'MEMORY_TIME': 5.0,  # 物体记忆时间（秒）
     }
 }
 
@@ -85,6 +94,14 @@ INTELLIGENT_DECISION = {
         'DETECTION_RADIUS': 10.0,  # 检测半径（米）
         'MIN_DISTANCE': 2.0,  # 最小接近距离（米）
         'EXPLORATION_BONUS': 0.5,  # 探索奖励分数
+    },
+
+    # 蓝色物体探索参数（新增）
+    'BLUE_OBJECT_EXPLORATION': {
+        'ATTRACTION_GAIN': 1.2,  # 蓝色物体吸引力增益
+        'DETECTION_RADIUS': 8.0,  # 检测半径（米）
+        'MIN_DISTANCE': 2.0,  # 最小接近距离（米）
+        'EXPLORATION_BONUS': 0.3,  # 探索奖励分数
     }
 }
 
@@ -101,15 +118,37 @@ MANUAL = {
     'MAX_ALTITUDE_LIMIT': -30.0,  # 最高飞行高度限制
 }
 
-# ==================== 前视窗口参数 ====================
+# ==================== 窗口显示参数 ====================
 DISPLAY = {
-    'WINDOW_WIDTH': 640,  # 窗口宽度 (像素)
-    'WINDOW_HEIGHT': 480,  # 窗口高度 (像素)
-    'ENABLE_SHARPENING': True,  # 启用图像锐化，改善模糊
-    'SHOW_INFO_OVERLAY': True,  # 显示信息叠加层
-    'REFRESH_RATE_MS': 30,  # 刷新率 (毫秒)，建议30-50
-    'GRID_DISPLAY_SIZE': 150,  # 探索网格显示大小 (像素)
-    'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
+    # 前视窗口参数
+    'FRONT_VIEW_WINDOW': {
+        'NAME': "无人机前视画面",
+        'WIDTH': 640,
+        'HEIGHT': 480,
+        'ENABLE_SHARPENING': True,  # 启用图像锐化，改善模糊
+        'SHOW_INFO_OVERLAY': True,  # 显示信息叠加层
+        'REFRESH_RATE_MS': 30,  # 刷新率 (毫秒)，建议30-50
+        'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
+        'SHOW_BLUE_OBJECTS': True,  # 在画面中标记蓝色物体
+    },
+
+    # 信息显示窗口参数
+    'INFO_WINDOW': {
+        'NAME': "无人机信息面板",
+        'WIDTH': 800,
+        'HEIGHT': 600,
+        'BACKGROUND_COLOR': (20, 20, 30),  # 深蓝灰色背景
+        'TEXT_COLOR': (220, 220, 255),  # 浅蓝色文字
+        'HIGHLIGHT_COLOR': (0, 200, 255),  # 青色高亮
+        'WARNING_COLOR': (0, 100, 255),  # 橙色警告
+        'SUCCESS_COLOR': (0, 255, 150),  # 绿色成功
+        'REFRESH_RATE_MS': 100,  # 信息窗口刷新率
+        'SHOW_GRID': True,  # 显示探索网格
+        'GRID_SIZE': 300,  # 网格显示大小
+        'SHOW_OBJECTS_STATS': True,  # 显示物体统计
+        'SHOW_SYSTEM_STATS': True,  # 显示系统统计
+        'SHOW_PERFORMANCE': True,  # 显示性能信息
+    }
 }
 
 # ==================== 系统与安全参数 ====================
@@ -142,6 +181,12 @@ CAMERA = {
         'UPPER1': [10, 255, 255],  # 红色上限1
         'LOWER2': [170, 120, 70],  # 红色下限2（170-180度）
         'UPPER2': [180, 255, 255], # 红色上限2
+    },
+
+    # 蓝色物体检测颜色范围（HSV空间）（新增）
+    'BLUE_COLOR_RANGE': {
+        'LOWER': [100, 150, 50],    # 蓝色下限
+        'UPPER': [130, 255, 255],   # 蓝色上限
     }
 }
 
@@ -154,6 +199,7 @@ DEBUG = {
     'LOG_VECTOR_FIELD': False,  # 是否记录向量场详细信息
     'PERFORMANCE_PROFILING': False,  # 是否启用性能分析
     'SAVE_RED_OBJECT_IMAGES': False,  # 是否保存检测到红色物体的图像
+    'SAVE_BLUE_OBJECT_IMAGES': False,  # 是否保存检测到蓝色物体的图像（新增）
 }
 
 # ==================== 数据记录参数 ====================
@@ -167,6 +213,7 @@ DATA_RECORDING = {
     'PERFORMANCE_MONITORING': True,       # 启用性能监控
     'SYSTEM_METRICS_INTERVAL': 5.0,       # 系统指标记录间隔（秒）
     'RECORD_RED_OBJECTS': True,           # 记录红色物体信息
+    'RECORD_BLUE_OBJECTS': True,          # 记录蓝色物体信息（新增）
 }
 
 # ==================== 性能监控参数 ====================

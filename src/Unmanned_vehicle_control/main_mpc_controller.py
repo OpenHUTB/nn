@@ -1,4 +1,5 @@
 import casadi as ca
+import numpy as np
 
 from src.main_help_functions import calculate_lateral_deviation
 from src.config import MAX_CONTROL_WHEEL_ANGLE_RAD, MAX_CONTROL_ACCELERATION_M_S_2, MAX_CONTROL_BRAKING_M_S_2, \
@@ -105,10 +106,19 @@ class MpcController:
         if self.is_success:
             wheel_angle_rad = self.sol.value(self.U[0, 0])
             acceleration_m_s_2 = self.sol.value(self.U[1, 0])
+            # 控制量饱和（与config约束一致）
+            wheel_angle_rad = np.clip(wheel_angle_rad,
+                                      -MAX_CONTROL_WHEEL_ANGLE_RAD,
+                                      MAX_CONTROL_WHEEL_ANGLE_RAD)
+            acceleration_m_s_2 = np.clip(acceleration_m_s_2,
+                                         MAX_CONTROL_BRAKING_M_S_2,
+                                         MAX_CONTROL_ACCELERATION_M_S_2)
         else:
             if self.buffer_index < self.horizon:
-                acceleration_m_s_2 = self.control_buffer["acceleration"][self.buffer_index]
-                wheel_angle_rad = self.control_buffer["wheel_angle"][self.buffer_index]
+                # 求解失败时，控制量渐进衰减（减少突变）
+                decay = 0.9  # 衰减系数
+                acceleration_m_s_2 = self.control_buffer["acceleration"][self.buffer_index] * decay
+                wheel_angle_rad = self.control_buffer["wheel_angle"][self.buffer_index] * decay
                 self.buffer_index += 1
             else:
                 raise Exception("Control buffer is empty.")
