@@ -1,12 +1,3 @@
-"""
-完整版：机械臂碰撞检测 + MuJoCo可视化界面
-包含碰撞分析和实时仿真
-修改说明：
-1. 所有路径改为相对路径
-2. 解决可视化图表中文乱码问题
-3. 优化文件处理和错误处理
-4. 修复临时文件创建问题
-"""
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
