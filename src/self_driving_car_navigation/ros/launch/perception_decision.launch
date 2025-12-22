@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- 全局参数配置 -->
+    <param name="/perception_decision_node/image_shape" value="[3, 128, 128]" />
+    <param name="/perception_decision_node/feature_dim" value="128" />
+    <param name="/perception_decision_node/cmd_dim" value="2" />
+    <param name="/perception_decision_node/timer_freq" value="10" />
+
+    <!-- 启动节点：移除shell属性，指定系统Python + 虚拟环境依赖 -->
+    <node 
+        name="perception_decision_node"
+        pkg="mmap_test"
+        type="perception_decision_node.py"
+        output="screen"
+        respawn="false">
+        
+        <!-- 关键：让Python同时加载系统ROS包 + 虚拟环境的torch等包 -->
+        <env name="PYTHONPATH" value="/home/pan-j-l/my_ros_project/venv_py37/lib/python3.7/site-packages:/opt/ros/noetic/lib/python3/dist-packages:$PYTHONPATH" />
+        <!-- 指定ROS的Python解释器（避免虚拟环境无rospy） -->
+        <env name="ROS_PYTHON_VERSION" value="3" />
+    </node>
+
+</launch>
