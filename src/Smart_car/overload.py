@@ -72,7 +72,6 @@ class UnmannedVehicleOverloadWarningSystem:
         """
         print("无人车超载预警系统已启动...")
         print(f"开始持续监测（共监测{monitor_times}次，每次间隔2秒）\n")
-
         # 循环执行监测流程，达到预设次数或检测到严重超载时终止
         for i in range(monitor_times):
             # 1. 采集当前载重（模拟传感器数据更新）
