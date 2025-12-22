@@ -2,6 +2,8 @@ import mujoco
 import mujoco.viewer as viewer
 import os
 import time
+# 新增：导入数学库，用于生成周期性的正弦/余弦运动信号
+import math
 
 def create_humanoid_xml(file_path):
     """自动创建humanoid.xml文件并写入模型代码"""
@@ -129,6 +131,27 @@ def run_humanoid_simulation():
         step_interval = 0.01
         print("仿真开始，按窗口关闭按钮退出...")
         for _ in range(sim_steps):
+            # ========== 新增：关节主动运动控制核心代码 ==========
+            # 1. 手臂运动：左肩关节和右肩关节做相反的正弦运动（周期性摆动）
+            # data.time：仿真累计时间（秒），驱动周期性运动
+            # math.sin(data.time * 2)：2Hz频率的正弦波，取值[-1,1]
+            # * 1.0：运动幅度（可调整，越大摆动越剧烈）
+            data.ctrl[0] = math.sin(data.time * 2) * 1.0  # 左肩关节（对应actuator索引0）
+            data.ctrl[1] = -math.sin(data.time * 2) * 1.0 # 右肩关节（对应actuator索引1，负号表示反向）
+
+            # 2. 肘部运动：跟随肩部运动，幅度更小
+            data.ctrl[2] = math.sin(data.time * 2) * 0.5  # 左肘部（索引2）
+            data.ctrl[3] = -math.sin(data.time * 2) * 0.5 # 右肘部（索引3）
+
+            # 3. 腿部运动：左髋和右髋做余弦运动（与正弦波相位差90°，运动更协调）
+            data.ctrl[4] = math.cos(data.time * 1) * 0.8  # 左髋（索引4）
+            data.ctrl[5] = -math.cos(data.time * 1) * 0.8 # 右髋（索引5）
+
+            # 4. 膝盖运动：跟随髋部运动，幅度稍小
+            data.ctrl[6] = math.cos(data.time * 1) * 0.6  # 左膝盖（索引6）
+            data.ctrl[7] = -math.cos(data.time * 1) * 0.6 # 右膝盖（索引7）
+            # ================================================
+
             mujoco.mj_step(model, data)
             v.sync()
             time.sleep(step_interval)
