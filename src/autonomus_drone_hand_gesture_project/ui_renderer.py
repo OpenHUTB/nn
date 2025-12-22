@@ -52,6 +52,13 @@ class ChineseUIRenderer:
             'gesture_photo': (255, 165, 0),
             'gesture_return_home': (0, 128, 128),
             'gesture_auto_flight': (128, 0, 128),
+            # 飞行模式颜色
+            'flight_mode_manual': (0, 255, 0),
+            'flight_mode_auto': (255, 165, 0),
+            'flight_mode_circle': (0, 255, 255),
+            'flight_mode_eight': (255, 0, 255),
+            'flight_mode_square': (255, 255, 0),
+            'flight_mode_return_home': (0, 128, 128),
         }
 
         print("✓ 中文UI渲染器已初始化")
@@ -116,7 +123,7 @@ class ChineseUIRenderer:
         frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
 
         # 标题
-        title = "手势控制无人机系统 - 性能统计版"
+        title = "手势控制无人机系统 - 高级飞行模式版"
         frame = self.draw_text(frame, title, (10, 10), size=20, color=self.colors['title'])
 
         # 连接状态
@@ -254,6 +261,48 @@ class ChineseUIRenderer:
 
         return frame
 
+    def draw_flight_mode(self, frame, drone_controller):
+        """绘制飞行模式信息"""
+        if not drone_controller.connected:
+            return frame
+
+        h, w = frame.shape[:2]
+
+        # 飞行模式显示
+        flight_mode = drone_controller.get_flight_mode()
+
+        # 根据飞行模式选择颜色和文本
+        mode_texts = {
+            'manual': ('手动模式', self.colors['flight_mode_manual']),
+            'auto': ('自动飞行', self.colors['flight_mode_auto']),
+            'circle': ('圆形盘旋', self.colors['flight_mode_circle']),
+            'eight': ('8字形飞行', self.colors['flight_mode_eight']),
+            'square': ('方形轨迹', self.colors['flight_mode_square']),
+            'return_home': ('返航中', self.colors['flight_mode_return_home'])
+        }
+
+        if flight_mode in mode_texts:
+            text, color = mode_texts[flight_mode]
+            mode_text = f"飞行模式: {text}"
+
+            # 绘制背景
+            text_size = cv2.getTextSize(mode_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            bg_x = w - text_size[0] - 20
+            bg_y = 150
+            bg_w = text_size[0] + 10
+            bg_h = text_size[1] + 10
+
+            # 绘制半透明背景
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (bg_x, bg_y), (bg_x + bg_w, bg_y + bg_h), (0, 0, 0), -1)
+            frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
+
+            # 绘制文本
+            frame = self.draw_text(frame, mode_text, (bg_x + 5, bg_y + 5),
+                                  size=14, color=color)
+
+        return frame
+
     def draw_help_bar(self, frame):
         """绘制帮助栏"""
         if not self.config.get('display', 'show_help'):
@@ -262,19 +311,20 @@ class ChineseUIRenderer:
         h, w = frame.shape[:2]
 
         # 绘制底部帮助栏
-        cv2.rectangle(frame, (0, h - 120), (w, h), (0, 0, 0), -1)
+        cv2.rectangle(frame, (0, h - 140), (w, h), (0, 0, 0), -1)
 
         # 帮助文本
         help_lines = [
-            "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/X:键盘控制",
+            "C:连接  空格:起飞/降落  ESC:退出  W/A/S/D/F/B:键盘控制",
             "H:切换帮助  R:重置识别  T:切换显示模式  D:调试信息",
             "V:切换语音反馈  M:测试语音  P:性能报告  L:性能快照  K:导出日志",
-            "O:切换性能模式  P:详细报告  R:重置统计",
+            "O:切换性能模式  Q:自动飞行  E:圆形盘旋  8:8字形  9:方形轨迹",
+            "T/Y/U:高度控制  G:返航  X:停止  H:悬停",
             "1:开始录制 2:停止录制 3:保存轨迹 4:回放轨迹 5:清除轨迹 6:暂停/继续"
         ]
 
         for i, line in enumerate(help_lines):
-            y_pos = h - 105 + i * 20
+            y_pos = h - 125 + i * 20
             frame = self.draw_text(frame, line, (10, y_pos), size=14, color=self.colors['help'])
 
         return frame
