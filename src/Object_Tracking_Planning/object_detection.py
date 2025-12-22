@@ -1643,13 +1643,13 @@ class Agent:
             vehicle: Actor to apply local planner logic onto
         """
         self._vehicle = vehicle
-        self._proximity_tlight_threshold = 5.0  # meters
-        self._proximity_vehicle_threshold = 10.0  # meters
+        self._proximity_tlight_threshold = 5.0
+        self._proximity_vehicle_threshold = 10.0
         self._local_planner = None
         self._world = self._vehicle.get_world()
         self._last_traffic_light = None
+        self._map = None
 
-        # 初始化地图，处理可能的错误
         self._init_map()
 
     def _init_map(self):
@@ -1673,7 +1673,6 @@ class Agent:
         """Get method for protected member local planner"""
         return self._local_planner
 
-    # 也可以同时提供属性访问方式
     @property
     def local_planner(self):
         """Get the local planner instance (property version)."""
@@ -1693,7 +1692,6 @@ class Agent:
         control = carla.VehicleControl()
 
         if debug:
-            # 设置调试模式下的默认控制参数
             control.steer = 0.0
             control.throttle = 0.0
             control.brake = 0.0

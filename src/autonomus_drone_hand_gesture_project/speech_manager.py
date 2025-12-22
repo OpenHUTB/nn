@@ -70,6 +70,13 @@ class EnhancedSpeechFeedbackManager:
             'gesture_low_confidence': "手势识别置信度低",
             'gesture_good_confidence': "手势识别置信度高",
             'gesture_hover': "悬停",
+            'gesture_grab': "抓取",  # 新增
+            'gesture_release': "释放",  # 新增
+            'gesture_rotate_cw': "顺时针旋转",  # 新增
+            'gesture_rotate_ccw': "逆时针旋转",  # 新增
+            'gesture_photo': "拍照",  # 新增
+            'gesture_auto_flight': "自动飞行模式",  # 新增
+            'gesture_return_home': "返航",  # 新增
 
             # 系统相关
             'program_start': "手势控制无人机系统已启动",
