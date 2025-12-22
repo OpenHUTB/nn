@@ -1,4 +1,4 @@
-# RoadRunner 使用教程说明
+<img width="861" height="436" alt="exporting_to_carla_03" src="https://github.com/user-attachments/assets/c40b3f09-4ad8-4783-8692-8cd1c7d2af62" /><img width="547" height="306" alt="basemap" src="https://github.com/user-attachments/assets/4cbf5888-2164-4bef-a452-14d5827a32ea" /># RoadRunner 使用教程说明
 
 关于 RoadRunner 的使用教程，教师提供的 RoadRunner R2022b 版本并没有汉化，在网上很难找到系统的 RoadRunner 教学视频。
 
@@ -877,6 +877,192 @@ git clone https://github.com/LAStools/LAStools.git
 
 根据坐标信息进行世界原点的设置
 
-# 导出场景到CARLA
+# 导出至 CARLA
 
+## CARLA 导出概览
+
+RoadRunner 可以将场景导出到 CARLA 模拟器。有两个 CARLA 导出选项可供选择：
+
+*   **CARLA**：导出 **Unreal® Datasmith (`.udatasmith`)** 文件和 **ASAM OpenDRIVE® (`.xodr`)** 文件。
+*   **CARLA Filmbox**：导出一个 **Filmbox (`.fbx`)** 文件、一个包含部分元数据的 **XML** 和一个 **ASAM OpenDRIVE (`.xodr`)** 文件。XML 文件保存场景中材质的数据。
+
+在 CARLA 或 Unreal 端，提供了一个插件来帮助导入从 RoadRunner 导出的场景。
+
+**对于使用CARLA 插件导出的场景**，Unreal 端提供的插件处理以下内容：
+*   **设置材质**
+    *   材质数据从 Datasmith (`.udatasmith`) 文件中读取，并将数据映射到插件中包含的基础材质之一的新实例中。
+    *   透明材质将根据漫反射颜色的透明度在半透明和遮罩混合模式之间进行选择。
+*   **调整导入的静态网格物体中的碰撞器**
+    *   在导入过程中，新创建的静态网格素材的 "Collision Complexity" 选项设置为 "Use Complex Collision As Simple"。
+*   **设置交通信号视觉效果**
+    *   交通信号逻辑连接到模拟器。
+*   **软件要求**
+    *   CARLA 0.9.13
+
+**对于使用CARLA Filmbox 插件导出的场景**，Unreal 端提供的插件利用 XML 文件中存储的信息帮助导入 FBX® 文件。该插件处理以下内容：
+*   **设置材质**
+    *   从 XML 文件中读取材质数据，并将数据映射到插件中包含的基础材质之一的新实例中。
+    *   某些材质将从 CARLA 材质之一中实例化。
+    *   透明材质将根据漫反射颜色的透明度在半透明和遮罩混合模式之间进行选择。
+*   **调整导入的静态网格物体中的碰撞器**
+    *   在导入过程中，新创建的静态网格素材的 "Collision Complexity" 选项设置为 "Use Complex Collision As Simple"。
+*   **设置交通信号视觉效果**
+    *   交通信号逻辑未连接到模拟器。
+*   **软件要求**
+    *   CARLA 0.9.13
+
+---
+
+## 安装插件
+
+按照本节中的说明安装 Unreal 插件：
+
+1.  从源代码构建 CARLA。有关更多信息，请参阅构建 CARLA 说明的 Windows® 构建页面。
+2.  有关下载最新版本插件的说明，请参阅 下载插件。
+3.  解压 RoadRunner 插件 zip 文件并找到 `RoadRunnerImporter`、`RoadRunnerCarlaIntegration`、`RoadRunnerRuntime`、`RoadRunnerDatasmith`、`RoadRunnerCarlaDatasmith` 和 `RoadRunnerMaterials` 文件夹，它们位于 "Unreal/Plugins" 下。
+4.  复制 `RoadRunnerImporter`、`RoadRunnerCarlaIntegration`、`RoadRunnerRuntime`、`RoadRunnerDatasmith`、`RoadRunnerCarlaDatasmith` 和 `RoadRunnerMaterials` 文件夹，放入工程目录 `Plugins` 文件夹下的 `CarlaUE4` 文件夹中，位于 `<carla>/Unreal/CarlaUE4/Plugins`（Carla 文件夹旁边）。
+
+<img width="302" height="185" alt="download-new-plugins" src="https://github.com/user-attachments/assets/8aa371b6-062e-4be3-b6a6-99734277113b" />
+
+5.  重建插件。首先，生成工程文件。
+    *   如果您在 Windows 上，请右键点击 `.uproject` 文件并选择 **Generate Visual Studio project files**。
+    *   如果您使用 Linux®，请在命令行运行以下代码：
+        ```
+        $UE4_ROOT/GenerateProjectFiles.sh -project="<CarlaFolderPath>/Unreal/CarlaUE4/CarlaUE4.uproject" -game -engine
+        ```
+        将 `UE4_ROOT` 设置为 Unreal Engine® 安装目录。
+然后，打开工程并构建插件。如果您使用的是 Windows，请在 VS 2019 的 x64 本机工具命令提示符中运行 "make launch" 来编译插件并启动编辑器。
+6.  插件显示在 **Edit > Plugins** 下。如果它没有出现在该菜单中，请检查 **Enabled** 复选框是否选中。
+
+<img width="571" height="577" alt="new-plugin-list" src="https://github.com/user-attachments/assets/febc75c8-6db5-4b71-867b-36c62947c4a9" />
+
+### 插件内容
+
+*   **RoadRunnerImporter 模块**：
+    *   当元数据文件存在时，覆盖默认的 FBX 导入器
+    *   使用元数据文件用新材质覆盖默认材质的选项
+    *   导入信号数据和时序
+*   **RoadRunner 运行时模块**：
+    *   包含控制交通信号视觉效果的组件
+*   **RoadRunnerCarlaIntegration 模块**：
+    *   创建一个新地图并将 FBX 导入到关卡中
+    *   根据分割类型移动静态网格物体素材
+    *   创建由 CARLA 材质实例化的材质，用于天气效果
+    *   从 ASAM OpenDRIVE 文件生成路线
+*   **RoadRunnerMaterials 插件**：
+    *   用于创建实例的基础材质
+*   **RoadRunnerDatasmith 插件**：
+    *   处理元数据后处理的 Dataprep 素材
+    *   导入信号数据和时序
+*   **RoadRunnerCARLADatasmith 插件**：
+    *   将 RoadRunner 场景导入 CARLA，自动设置交通信号灯。
+
+---
+
+## 从 RoadRunner 导出至 CARLA
+
+### 使用 CARLA 插件导出
+
+**CARLA 插件（.udatasmith + .xodr）是导出到 CARLA 的推荐方法。** 使用 CARLA (`.udatasmith` + `.xodr`) 插件将 RoadRunner 场景导出到 CARLA，您可以将 ASAM OpenDRIVE 数据与 Datasmith 文件一起导出，并将元数据添加到 Datasmith 导出中。元数据存储信号和 ASAM OpenDRIVE ID。CARLA 导出选项减少了将大型场景导入 CARLA 的时间。
+
+按照以下步骤使用 **CARLA（.udatasmith + .xodr）** 将场景从 RoadRunner 导出到 Unreal：
+
+1.  在 RoadRunner 中打开您的场景。
+2.  使用 **CARLA (`.udatasmith` + `.xodr`)** 选项导出场景。从菜单栏中选择 **File > Export > CARLA (.udatasmith, .xodr)**。
+3.  在 "Export CARLA Road" 对话框中，设置网格合并和平铺选项，然后点击 **Export**。
+4.  选择 **Browse** 打开文件对话框，设置导出文件的名称和路径。Datasmith 文件导出到指定文件夹。
+    *   您可以按分割类型划分网格。网格体的名称后附加有 `<segmentation type>Node`。
+    *   如果选择了 **Export To Tiles** 选项，网格将按图块进行分割。道具按它们所在的图块进行分组。
+        *   默认情况下，仅导出一个文件。图块存储在单独的节点中。
+        *   如果启用了 **Export Individual Tiles**，则每个图块都会存储在其自己的 Datasmith 文件中。
+
+### 使用 CARLA Filmbox 导出
+
+如果您想使用较旧的管道进行导出，请使用 **CARLA 插件（.fbx + .rrdata.xml + .xodr）** 选项。按照以下步骤使用 **CARLA Filmbox 插件 (.fbx + .rrdata.xml + .xodr)** 选项将场景从 RoadRunner 导出到 CARLA：
+
+1.  在 RoadRunner 中打开您的场景。
+2.  使用 **CARLA** 选项导出场景。从菜单栏中选择 **File > Export > CARLA Filmbox (.fbx, .xodr, .rrdata.xml)**。
+3.  在导出 CARLA 对话框中，根据需要设置 **FBX** 选项卡上的网格平铺和 **OpenDRIVE** 选项卡上的 ASAM OpenDRIVE 选项。然后，点击 **Export**。
+4.  浏览打开文件对话框以设置导出文件的名称和路径。FBX、纹理、XML 和 ASAM OpenDRIVE 文件导出到同一文件夹。
+    *   网格可以按分割类型进行划分。网格有 `"<segmentation type>Node"` 附加到它们的名字后面。
+    *   如果选择了 **Export To Tiles** 选项，网格会按图块分割，道具会按其所在的图块分组。
+        *   默认情况下，仅导出一个文件。图块存储在单独的节点中。
+        *   如果启用了 **Export Individual Tiles**，则每个图块都会存储在其自己的 FBX 文件中。
+
+> **注意**
+> 该插件不完全支持 **Export Individual Tiles** 选项。
+
+---
+
+## 导入 CARLA
+
+### 导入到 CARLA
+
+如果您使用 **CARLA (`.udatasmith` + `.xodr`)** 选项导出了 RoadRunner 场景，请按照以下步骤将场景导入 CARLA：
+
+1.  复制 **BaseMap** 并将其保存到 `Maps` 文件夹。重命名新地图。
+
+<img width="547" height="306" alt="basemap" src="https://github.com/user-attachments/assets/68a03ab6-43f3-407e-818c-f5fa7cdd2088" />
+
+2.  打开您在上一步中创建的新地图。
+3.  在 Unreal 中的 **Content Browser** 窗口中右键点击。在菜单中，选择 **Show Plugin Content**。
+
+<img width="152" height="300" alt="content-browser" src="https://github.com/user-attachments/assets/0cc1dfb8-4fa6-418e-bc7b-637c1c488c66" />
+
+4.  在 CARLA 中启用 **Datasmith FBX Importer** 和 **Datasmith Importer** 插件。
+5.  点击 **RoadRunner CARLADatasmith Content**。双击 **RRCARLADataprep Asset**。这将打开一个新的编辑器，用于处理使用 Datasmith 的导入以及所有后期处理步骤。
+
+<img width="780" height="227" alt="new-carla-plugin" src="https://github.com/user-attachments/assets/789359ae-6ae1-4c1c-870f-0451f630693f" />
+
+6.  点击 **Import** 按钮将场景导入 Unreal。例如，此图像加载 `FourWaySignal` 场景文件，它是 RoadRunner 工程的 `Scenes` 文件夹中存在的场景之一。
+
+<img width="1968" height="1187" alt="imported-scene-datasmith" src="https://github.com/user-attachments/assets/ec5b11fc-0ee7-40c9-8817-d365f7987fbc" />
+
+7.  点击编辑器工具条中的 **Execute** 即可运行导入场景的后期处理步骤。
+8.  点击编辑器工具条中的 **Commit** 将这些更改提交到场景。
+
+场景现已导入并准备进行模拟。
+
+### 导入至 CARLA (Filmbox)
+
+如果您在导出 RoadRunner 场景时使用了 **CARLA Filmbox** 插件，请按照以下步骤操作。
+
+将文件拖到内容浏览器中。
+    *   使用 "Import" 按钮并选择 FBX 文件。
+    *   该插件检查是否存在与导入的文件相关联的 RoadRunner XML 文件，如果未找到相应的 XML 文件，则正常导入。
+    *   选择 **File > Import Into Level** 不会使用导出的 RoadRunner XML，而是使用 Unreal 导入器。
+**当RoadRunner 导入选项对话框打开时：**
+<img width="400" height="246" alt="import_to_unreal_pop_up" src="https://github.com/user-attachments/assets/8e1000ce-dea0-4202-a9bd-6ca736d253e3" />
+
+    *   **覆盖材质**：覆盖默认材质导入。来自 CARLA 材质的道路和树叶实例。
+        *   如果您想在下一个对话框中将材质设置为 **Use Existing**，则需要取消选中。
+    *   **导入信号视觉效果**：仅当在下一个对话框中选择 **"Create one Blueprint asset"** 选项时才起作用。
+        > **注意**
+        > 导入信号视觉效果选项对交通模拟没有任何影响。
+4.  当 **FBX 场景导入选项**对话框打开时：
+    *   将 **Scene > Hierarchy Type** 设置为 **"Create One Blueprint Asset"**（默认选择）。
+        > **注意**
+        > 只有 **"Create One Blueprint Asset"** 导入选项适用于材质、信号和透明度排序。**"Create one Actor with Components"** 和 **"Create Level Actors"** 选项仅导入材质。
+    *   如果需要，请选择 **Invert Normal Maps**。
+<img width="861" height="436" alt="exporting_to_carla_03" src="https://github.com/user-attachments/assets/7831b3e0-c842-4bb7-a191-f6560c6bc900" />
+
+    *   将 **Static Meshes > Normal Import Method** 设置为 **Import Normals**。
+<img width="829" height="436" alt="exporting_to_carla_04" src="https://github.com/user-attachments/assets/c1d67091-b824-4f3e-b684-899ca1d9d167" />
+
+    *   （可选）取消勾选 **Remove Degenerates**，这可以帮助制作一些较大规模的道具。
+    *   点击 **Import**。
+
+**关于将交通信号导入 Unreal：** 如果在 RoadRunner 中设置了交通信号灯，则它们将作为 `RoadRunnerTrafficJunction` 组件导入到 Unreal 中。这些控制器在导入期间自动创建，并包含在创建的蓝图中。`RoadRunnerTrafficJunction` 组件处理信号状态之间切换的逻辑。UUID 用于匹配场景中的特定游戏对象。
+
+**FBX 详细信息：** 由于以下原因，FBX 文件将通过分割和透明度排序层自动划分网格：
+*   **分割**：CARLA 通过静态网格素材确定分割。
+*   **透明度排序**：Unreal 将 "Translucency Sort Priority" 值存储在静态网格组件上。
+
+### 测试地图
+
+1.  在编辑器中点击 **Play**（第一次点击 Play 需要额外时间来构建地图）。
+<img width="326" height="158" alt="exporting_to_carla_05" src="https://github.com/user-attachments/assets/b60b6a7c-69e9-4a30-9c68-6bc8906c16d5" />
+
+2.  运行示例 Python® 脚本。
+<img width="1149" height="592" alt="test-map" src="https://github.com/user-attachments/assets/4a891fa1-62d6-4421-970c-53a521b2e222" />
 
