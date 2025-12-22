@@ -8,9 +8,13 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from custom_env import AirSimMazeEnv
 from typing import Callable
 
-# === 路径配置 ===
-MODELS_DIR = r"D:\Others\MyAirsimprojects\models"
-LOG_DIR = r"D:\Others\MyAirsimprojects\airsim_logs"
+# 路径配置 (已改为相对路径) 
+# 获取当前脚本文件所在的绝对目录
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 拼接路径：在脚本同级目录下生成 models 和 logs
+MODELS_DIR = os.path.join(SCRIPT_DIR, "models")
+LOG_DIR = os.path.join(SCRIPT_DIR, "airsim_logs")
 
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
@@ -95,6 +99,7 @@ def main():
     )
 
     print("🚀 优化版训练引擎启动...")
+    print(f"模型保存路径: {MODELS_DIR}")
     print("配置: Linear LR, Net=[256,256], Ent=0.01")
 
     model.learn(
