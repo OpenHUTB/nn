@@ -1,15 +1,15 @@
 # CARLA 目标检测与跟踪系统
 
-这是一个基于CARLA仿真环境的目标检测与跟踪系统，使用YOLOv5模型进行目标检测，并结合改进的SORT算法实现多目标跟踪，同时利用深度信息增强跟踪稳定性和距离估算。
-
 ## 功能特点
 
 - 基于CARLA仿真环境的实时目标检测与跟踪
-- 使用YOLOv5系列模型进行高精度目标检测
+- 使用YOLOv5系列模型（yolov5s、yolov5su、yolov5m、yolov5mu、yolov5x）进行目标检测
 - 改进版SORT跟踪算法，结合深度信息优化跟踪效果
-- 动态调整的卡尔曼滤波器，适应不同距离的目标
-- 基于深度信息的距离估算与速度计算
-- 可视化标注，显示目标类别、ID、距离和速度信息
+- 动态调整的卡尔曼滤波器，根据目标距离自适应调整参数
+- 基于深度图像的目标距离估算（支持中位数和加权平均两种计算方式）
+- 实时计算目标速度信息
+- 可视化标注，显示目标边界框、ID、距离和速度信息
+- 支持NPC车辆自动生成与交通管理
 
 ## 依赖环境
 
@@ -22,73 +22,78 @@
   - torch
   - ultralytics
   - scipy
-
-## 安装步骤
-
-1. 安装CARLA模拟器，请参考[官方文档](https://carla.readthedocs.io/en/latest/start_quickstart/)
-
-2. 安装所需Python库：
-```bash
-pip install carla opencv-python numpy torch ultralytics scipy
-```
-
-3. 下载YOLOv5模型文件，并在`load_detection_model`函数中更新模型路径
+  - argparse
+  - queue
 
 ## 主要组件说明
 
-### 1. 优化版SORT跟踪器
+### 1. 目标检测模块
+- `load_detection_model`：加载YOLOv5检测模型，自动选择设备（GPU/CPU），支持半精度计算加速
+- 支持模型自动 fallback 机制，当指定模型不存在时自动选择可用模型
 
-- `KalmanFilter`：卡尔曼滤波器，用于预测目标位置，根据目标距离动态调整过程噪声
-- `Track`：单个目标的跟踪信息，包括边界框、中心点、距离、速度等
-- `Sort`：多目标跟踪器，使用匈牙利算法进行数据关联，结合深度信息优化IOU阈值
+### 2. 跟踪模块
+- `Sort`类：改进版SORT跟踪器，结合深度信息优化跟踪效果
+  - 动态IOU阈值：根据目标距离调整匹配阈值
+  - 距离加权匹配：近距离目标权重更高
+  - 基于距离的跟踪生命周期管理
+- `KalmanFilter`类：卡尔曼滤波器，用于目标运动预测
+  - 根据目标距离动态调整过程噪声协方差Q
+  - 支持位置和速度状态估计
 
-### 2. YOLOv5检测模型
-
-- `load_detection_model`：加载YOLOv5模型，支持多种模型类型，自动选择可用设备（CPU/GPU）
-
-### 3. 工具函数
-
-- `draw_bounding_boxes`：在图像上绘制边界框及相关信息
-- `preprocess_depth_image`：预处理深度图像，提高距离估算精度
-- `get_target_distance`：根据深度图像和边界框计算目标距离
+### 3. 深度信息处理
+- `get_target_distance`：从深度图像中计算目标距离
+  - 支持中位数和加权平均两种距离计算方式
+  - 基于目标区域的有效深度提取
 
 ### 4. CARLA相关函数
+- `setup_carla_client`：设置CARLA客户端和世界环境，配置同步模式
+- `spawn_ego_vehicle`：生成主车辆，优先选择林肯MKZ，失败时自动 fallback 到其他车型
+- `spawn_npcs`：生成NPC车辆，确保在主车辆周围合理范围内生成
+- 交通管理器配置：设置NPC车辆的自动驾驶行为参数
 
-- `setup_carla_client`：设置CARLA客户端和世界环境
-- `spawn_ego_vehicle`：生成主车辆
-- `spawn_npcs`：生成NPC车辆
+## 运行说明
 
-## 使用方法
-
-1. 启动CARLA服务器：
+### 基本命令
 ```bash
-./CarlaUE4.sh  # Linux
-CarlaUE4.exe   # Windows
+python main.py --model yolov5mu --tracker sort --npc-count 30
 ```
 
-2. 运行主程序：
-```bash
-python main.py
-```
+### 主要参数
+- `--model`：选择YOLOv5模型（yolov5s、yolov5su、yolov5m、yolov5mu、yolov5x）
+- `--tracker`：选择跟踪器（当前仅支持sort）
+- `--host`：CARLA服务器地址（默认localhost）
+- `--port`：CARLA服务器端口（默认2000）
+- `--conf-thres`：检测置信度阈值（默认0.15）
+- `--iou-thres`：IOU阈值（默认0.4）
+- `--use-depth`：使用深度信息（默认True）
+- `--show-depth`：显示深度图像（默认False）
+- `--npc-count`：NPC车辆数量（默认30）
+
+### 操作说明
+- 按 'q' 键：退出程序
+- 按 'r' 键：重新生成NPC车辆
 
 ## 自定义配置
 
-- 可以在`load_detection_model`函数中切换不同的YOLOv5模型
+- 在`load_detection_model`函数中修改模型路径或添加新模型
 - 在`Sort`类初始化时调整跟踪参数（max_age, min_hits, iou_threshold）
-- 在`KalmanFilter`中调整滤波器参数
-- 在`draw_bounding_boxes`中修改可视化样式
-
-## 注意事项
-
-- 确保CARLA服务器在运行程序前已启动
-- 首次运行可能需要下载YOLOv5模型权重
-- 调整CARLA的画质设置可能会影响性能和检测效果
-- 深度信息的准确性对跟踪效果有较大影响
+- 在`KalmanFilter`中调整滤波器参数（Q_base, R, dist_thresholds）
+- 在`spawn_npcs`函数中调整NPC生成范围和密度
+- 在主循环中调整性能监控参数和显示信息
 
 ## 性能优化
 
-- 对于GPU用户，程序会自动使用半精度计算加速
-- 深度图像预处理使用了轻量级高斯模糊，平衡精度和速度
-- 跟踪器中使用了`__slots__`减少内存占用
+- 对于GPU用户，自动使用半精度计算加速
+- 深度图像预处理优化，平衡精度和速度
+- 跟踪算法中使用距离信息动态调整参数，提高跟踪效率
+- 性能监控功能，自动识别瓶颈并提供优化建议
+- 通过调整模型类型和参数，可以在检测精度和运行速度之间取得平衡
 
-通过调整模型类型和参数，可以在检测精度和运行速度之间取得平衡，适应不同的硬件配置。
+## 性能监控
+
+程序每50帧会输出一次性能统计，包括：
+- CARLA同步时间
+- 图像和深度获取时间
+- 目标检测和跟踪时间
+- 结果绘制和显示时间
+- 自动识别性能瓶颈并提供优化建议
