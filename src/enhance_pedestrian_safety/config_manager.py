@@ -4,31 +4,24 @@ import argparse
 import copy
 from typing import Dict, Any, Optional, List, Tuple
 
-# 尝试导入yaml，如果不存在则跳过
 try:
     import yaml
-
     YAML_AVAILABLE = True
 except ImportError:
     YAML_AVAILABLE = False
-    print("警告: PyYAML未安装，将使用JSON格式")
 
 
 class ConfigValidator:
-    """配置验证器"""
 
     @staticmethod
     def validate_config(config: Dict[str, Any]) -> Tuple[bool, List[str]]:
-        """验证配置的有效性"""
         errors = []
 
-        # 验证必填字段
         required_sections = ['scenario', 'sensors', 'output']
         for section in required_sections:
             if section not in config:
                 errors.append(f"缺失必要配置节: {section}")
 
-        # 验证场景配置
         if 'scenario' in config:
             scenario = config['scenario']
             if 'duration' in scenario and scenario['duration'] <= 0:
@@ -36,7 +29,6 @@ class ConfigValidator:
             if 'town' not in scenario:
                 errors.append("场景配置中缺失地图名称")
 
-        # 验证传感器配置
         if 'sensors' in config:
             sensors = config['sensors']
             if 'capture_interval' in sensors and sensors['capture_interval'] <= 0:
@@ -47,7 +39,6 @@ class ConfigValidator:
                 elif any(dim <= 0 for dim in sensors['image_size']):
                     errors.append("图像尺寸必须大于0")
 
-        # 验证性能配置
         if 'performance' in config:
             perf = config['performance']
             if 'batch_size' in perf and perf['batch_size'] <= 0:
@@ -57,22 +48,18 @@ class ConfigValidator:
 
     @staticmethod
     def suggest_optimizations(config: Dict[str, Any]) -> List[str]:
-        """根据配置提供优化建议"""
         suggestions = []
 
-        # 内存使用建议
         if config.get('sensors', {}).get('lidar_sensors', 0) > 0:
             lidar_config = config['sensors'].get('lidar_config', {})
             max_points = lidar_config.get('max_points_per_frame', 50000)
             if max_points > 50000:
                 suggestions.append(f"LiDAR最大点数({max_points})较高，建议降低到50000以下以减少内存使用")
 
-        # 性能建议
         capture_interval = config['sensors'].get('capture_interval', 2.0)
         if capture_interval < 1.0:
             suggestions.append(f"采集间隔({capture_interval}s)较短，可能导致高负载，建议增加到1.0s以上")
 
-        # 输出建议
         output = config.get('output', {})
         enabled_outputs = [k for k, v in output.items() if isinstance(v, bool) and v]
         if len(enabled_outputs) > 5:
@@ -82,14 +69,11 @@ class ConfigValidator:
 
 
 class ConfigOptimizer:
-    """配置优化器"""
 
     @staticmethod
     def optimize_for_memory(config: Dict[str, Any]) -> Dict[str, Any]:
-        """为内存使用优化配置"""
         optimized = copy.deepcopy(config)
 
-        # 调整LiDAR设置
         if optimized['sensors'].get('lidar_sensors', 0) > 0:
             lidar_config = optimized['sensors'].setdefault('lidar_config', {})
             lidar_config.update({
@@ -99,7 +83,6 @@ class ConfigOptimizer:
                 'max_batch_memory_mb': 30
             })
 
-        # 调整性能设置
         perf = optimized.setdefault('performance', {})
         perf.update({
             'batch_size': 3,
@@ -110,7 +93,6 @@ class ConfigOptimizer:
             'frame_rate_limit': 3.0
         })
 
-        # 调整图像处理
         perf['image_processing'] = {
             'compress_images': True,
             'compression_quality': 80,
@@ -121,10 +103,8 @@ class ConfigOptimizer:
 
     @staticmethod
     def optimize_for_quality(config: Dict[str, Any]) -> Dict[str, Any]:
-        """为数据质量优化配置"""
         optimized = copy.deepcopy(config)
 
-        # 调整传感器设置
         sensors = optimized['sensors']
         sensors.update({
             'image_size': [1920, 1080],
@@ -139,7 +119,6 @@ class ConfigOptimizer:
             }
         })
 
-        # 调整输出设置
         output = optimized['output']
         output.update({
             'save_annotations': True,
@@ -149,7 +128,6 @@ class ConfigOptimizer:
             'run_quality_check': True
         })
 
-        # 调整增强设置
         enhanced = optimized.setdefault('enhancement', {})
         enhanced.update({
             'enabled': True,
@@ -162,35 +140,31 @@ class ConfigOptimizer:
 
     @staticmethod
     def optimize_for_speed(config: Dict[str, Any]) -> Dict[str, Any]:
-        """为处理速度优化配置"""
         optimized = copy.deepcopy(config)
 
-        # 调整传感器设置
         sensors = optimized['sensors']
         sensors.update({
             'image_size': [640, 480],
             'capture_interval': 3.0,
-            'lidar_sensors': 0,  # 禁用LiDAR
-            'radar_sensors': 0  # 禁用雷达
+            'lidar_sensors': 0,
+            'radar_sensors': 0
         })
 
-        # 调整性能设置
         perf = optimized.setdefault('performance', {})
         perf.update({
             'batch_size': 10,
             'enable_compression': True,
-            'compression_level': 1,  # 快速压缩
+            'compression_level': 1,
             'enable_downsampling': True,
             'enable_async_processing': True,
             'max_cache_size': 20,
             'frame_rate_limit': 10.0
         })
 
-        # 简化输出
         output = optimized['output']
         output.update({
             'save_raw': True,
-            'save_stitched': False,  # 不拼接图像
+            'save_stitched': False,
             'save_annotations': False,
             'save_lidar': False,
             'save_fusion': False,
@@ -201,9 +175,7 @@ class ConfigOptimizer:
 
 
 class ConfigManager:
-    """配置管理器（增强版）"""
 
-    # 预定义配置模板
     PRESET_CONFIGS = {
         'balanced': {
             'description': '平衡配置 - 兼顾性能和质量',
@@ -238,31 +210,17 @@ class ConfigManager:
 
     @staticmethod
     def load_config(config_file: Optional[str] = None, preset: Optional[str] = None) -> Dict[str, Any]:
-        """
-        加载配置
-
-        Args:
-            config_file: 配置文件路径
-            preset: 预设配置名称
-
-        Returns:
-            配置字典
-        """
-        # 基础配置
         config = ConfigManager._get_default_config()
 
-        # 应用预设配置
         if preset:
             config = ConfigManager._apply_preset(config, preset)
 
-        # 加载用户配置文件
         if config_file:
             if os.path.exists(config_file):
                 config = ConfigManager._load_config_file(config_file, config)
             else:
                 print(f"警告: 配置文件不存在: {config_file}")
 
-        # 验证配置
         is_valid, errors = ConfigValidator.validate_config(config)
         if not is_valid:
             print("配置验证错误:")
@@ -270,7 +228,6 @@ class ConfigManager:
                 print(f"  - {error}")
             raise ValueError("配置验证失败")
 
-        # 提供优化建议
         suggestions = ConfigValidator.suggest_optimizations(config)
         if suggestions:
             print("配置优化建议:")
@@ -281,7 +238,6 @@ class ConfigManager:
 
     @staticmethod
     def _get_default_config() -> Dict[str, Any]:
-        """获取默认配置（增强版）"""
         return {
             'scenario': {
                 'name': 'multi_sensor_scene',
@@ -291,8 +247,8 @@ class ConfigManager:
                 'time_of_day': 'noon',
                 'duration': 60,
                 'seed': 42,
-                'timeout': 300,  # 超时时间（秒）
-                'retry_attempts': 3  # 重试次数
+                'timeout': 300,
+                'retry_attempts': 3
             },
             'traffic': {
                 'ego_vehicles': 1,
@@ -336,7 +292,7 @@ class ConfigManager:
                     'memory_warning_threshold': 300,
                     'max_batch_memory_mb': 50,
                     'v2x_save_interval': 5,
-                    'compression_format': 'bin'  # bin, npy, pcd
+                    'compression_format': 'bin'
                 },
                 'camera_config': {
                     'fov': 90.0,
@@ -395,7 +351,7 @@ class ConfigManager:
                     'compression_quality': 85,
                     'resize_images': False,
                     'resize_dimensions': [640, 480],
-                    'format': 'jpg'  # jpg, png
+                    'format': 'jpg'
                 },
                 'lidar_processing': {
                     'batch_size': 10,
@@ -405,7 +361,7 @@ class ConfigManager:
                     'memory_warning_threshold': 350,
                     'max_batch_memory_mb': 50,
                     'v2x_save_interval': 5,
-                    'compression_method': 'zlib'  # zlib, lz4, none
+                    'compression_method': 'zlib'
                 },
                 'fusion': {
                     'fusion_cache_size': 100,
@@ -422,7 +378,7 @@ class ConfigManager:
             },
             'output': {
                 'data_dir': 'cvips_dataset',
-                'output_format': 'standard',  # standard, v2xformer, kitti, coco
+                'output_format': 'standard',
                 'save_raw': True,
                 'save_stitched': True,
                 'save_annotations': False,
@@ -436,12 +392,12 @@ class ConfigManager:
                 'run_quality_check': True,
                 'generate_summary': True,
                 'compression_enabled': True,
-                'file_naming': 'sequential',  # sequential, timestamp
+                'file_naming': 'sequential',
                 'backup_original': False
             },
             'monitoring': {
                 'enable_logging': True,
-                'log_level': 'INFO',  # DEBUG, INFO, WARNING, ERROR
+                'log_level': 'INFO',
                 'log_file': 'cvips.log',
                 'enable_performance_monitor': True,
                 'performance_log_interval': 10.0,
@@ -468,7 +424,6 @@ class ConfigManager:
 
     @staticmethod
     def _apply_preset(config: Dict[str, Any], preset_name: str) -> Dict[str, Any]:
-        """应用预设配置"""
         if preset_name not in ConfigManager.PRESET_CONFIGS:
             print(f"警告: 未知的预设配置: {preset_name}")
             return config
@@ -476,7 +431,6 @@ class ConfigManager:
         preset = ConfigManager.PRESET_CONFIGS[preset_name]
         print(f"应用预设配置: {preset_name} - {preset['description']}")
 
-        # 根据优化类型应用配置
         optimization = preset.get('optimization', 'balanced')
         if optimization == 'memory':
             config = ConfigOptimizer.optimize_for_memory(config)
@@ -491,7 +445,6 @@ class ConfigManager:
 
     @staticmethod
     def _load_config_file(config_file: str, base_config: Dict[str, Any]) -> Dict[str, Any]:
-        """加载配置文件"""
         try:
             with open(config_file, 'r', encoding='utf-8') as f:
                 if (config_file.endswith('.yaml') or config_file.endswith('.yml')) and YAML_AVAILABLE:
@@ -508,7 +461,6 @@ class ConfigManager:
 
     @staticmethod
     def _deep_update(original: Dict[str, Any], update: Dict[str, Any]) -> Dict[str, Any]:
-        """深度更新字典"""
         for key, value in update.items():
             if key in original and isinstance(original[key], dict) and isinstance(value, dict):
                 ConfigManager._deep_update(original[key], value)
@@ -518,8 +470,6 @@ class ConfigManager:
 
     @staticmethod
     def merge_args(config: Dict[str, Any], args: argparse.Namespace) -> Dict[str, Any]:
-        """合并命令行参数到配置"""
-        # 场景参数
         if hasattr(args, 'scenario') and args.scenario:
             config['scenario']['name'] = args.scenario
         if hasattr(args, 'town') and args.town:
@@ -533,58 +483,45 @@ class ConfigManager:
         if hasattr(args, 'seed') and args.seed:
             config['scenario']['seed'] = args.seed
 
-        # 交通参数
         if hasattr(args, 'num_vehicles') and args.num_vehicles:
             config['traffic']['background_vehicles'] = args.num_vehicles
         if hasattr(args, 'num_pedestrians') and args.num_pedestrians:
             config['traffic']['pedestrians'] = args.num_pedestrians
 
-        # 协同参数
         if hasattr(args, 'num_coop_vehicles') and args.num_coop_vehicles:
             config['cooperative']['num_coop_vehicles'] = args.num_coop_vehicles
 
-        # 传感器参数
         if hasattr(args, 'capture_interval') and args.capture_interval:
             config['sensors']['capture_interval'] = args.capture_interval
 
-        # V2X参数
         if hasattr(args, 'enable_v2x'):
             config['v2x']['enabled'] = args.enable_v2x
 
-        # 增强参数
         if hasattr(args, 'enable_enhancement'):
             config['enhancement']['enabled'] = args.enable_enhancement
 
-        # LiDAR参数
         if hasattr(args, 'enable_lidar'):
             config['sensors']['lidar_sensors'] = 1 if args.enable_lidar else 0
             config['output']['save_lidar'] = args.enable_lidar
 
-        # 融合参数
         if hasattr(args, 'enable_fusion'):
             config['output']['save_fusion'] = args.enable_fusion
 
-        # 协同参数
         if hasattr(args, 'enable_cooperative'):
             config['output']['save_cooperative'] = args.enable_cooperative
 
-        # 标注参数
         if hasattr(args, 'enable_annotations'):
             config['output']['save_annotations'] = args.enable_annotations
 
-        # 验证参数
         if hasattr(args, 'skip_validation'):
             config['output']['validate_data'] = not args.skip_validation
 
-        # 质量检查参数
         if hasattr(args, 'skip_quality_check'):
             config['output']['run_quality_check'] = not args.skip_quality_check
 
-        # 分析参数
         if hasattr(args, 'run_analysis'):
             config['output']['run_analysis'] = args.run_analysis
 
-        # 性能参数
         if hasattr(args, 'batch_size') and args.batch_size:
             config['performance']['batch_size'] = args.batch_size
 
@@ -596,7 +533,6 @@ class ConfigManager:
             if args.enable_downsampling:
                 config['sensors']['lidar_config']['downsample_ratio'] = 0.3
 
-        # 输出格式
         if hasattr(args, 'output_format') and args.output_format:
             config['output']['output_format'] = args.output_format
 
@@ -604,7 +540,6 @@ class ConfigManager:
 
     @staticmethod
     def save_config(config: Dict[str, Any], output_path: str, format: str = 'json'):
-        """保存配置到文件"""
         try:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
@@ -623,7 +558,6 @@ class ConfigManager:
 
     @staticmethod
     def generate_config_template(output_path: str, preset: Optional[str] = None):
-        """生成配置模板"""
         config = ConfigManager.load_config(preset=preset)
         config['metadata']['created'] = 'template'
         config['metadata']['description'] = f'配置模板 - {preset if preset else "通用"}'
@@ -632,12 +566,10 @@ class ConfigManager:
 
     @staticmethod
     def print_config_summary(config: Dict[str, Any]):
-        """打印配置摘要"""
         print("\n" + "=" * 60)
         print("配置摘要")
         print("=" * 60)
 
-        # 场景信息
         scenario = config['scenario']
         print(f"\n📋 场景:")
         print(f"  名称: {scenario['name']}")
@@ -646,7 +578,6 @@ class ConfigManager:
         print(f"  时长: {scenario['duration']}秒")
         print(f"  随机种子: {scenario.get('seed', '随机')}")
 
-        # 交通信息
         traffic = config['traffic']
         print(f"\n🚗 交通:")
         print(f"  主车: {traffic['ego_vehicles']}")
@@ -654,7 +585,6 @@ class ConfigManager:
         print(f"  行人: {traffic['pedestrians']}")
         print(f"  交通灯: {'启用' if traffic['traffic_lights'] else '禁用'}")
 
-        # 传感器信息
         sensors = config['sensors']
         print(f"\n📷 传感器:")
         print(f"  车辆摄像头: {sensors['vehicle_cameras']}")
@@ -663,7 +593,6 @@ class ConfigManager:
         print(f"  采集间隔: {sensors['capture_interval']}秒")
         print(f"  图像尺寸: {sensors['image_size'][0]}x{sensors['image_size'][1]}")
 
-        # V2X信息
         v2x = config['v2x']
         print(f"\n📡 V2X通信:")
         print(f"  状态: {'启用' if v2x['enabled'] else '禁用'}")
@@ -671,14 +600,12 @@ class ConfigManager:
             print(f"  通信范围: {v2x['communication_range']}米")
             print(f"  更新间隔: {v2x['update_interval']}秒")
 
-        # 协同信息
         coop = config['cooperative']
         print(f"\n🤝 协同感知:")
         print(f"  协同车辆: {coop['num_coop_vehicles']}")
         print(f"  共享感知: {'启用' if coop['enable_shared_perception'] else '禁用'}")
         print(f"  交通警告: {'启用' if coop['enable_traffic_warnings'] else '禁用'}")
 
-        # 性能信息
         perf = config['performance']
         print(f"\n⚡ 性能:")
         print(f"  批处理大小: {perf['batch_size']}")
@@ -686,7 +613,6 @@ class ConfigManager:
         print(f"  下采样: {'启用' if perf['enable_downsampling'] else '禁用'}")
         print(f"  帧率限制: {perf['frame_rate_limit']} FPS")
 
-        # 输出信息
         output = config['output']
         print(f"\n💾 输出:")
         print(f"  输出目录: {output['data_dir']}")
@@ -699,7 +625,6 @@ class ConfigManager:
 
     @staticmethod
     def list_presets():
-        """列出所有预设配置"""
         print("\n可用预设配置:")
         print("-" * 40)
         for name, preset in ConfigManager.PRESET_CONFIGS.items():
@@ -707,12 +632,9 @@ class ConfigManager:
         print("-" * 40)
 
 
-# 兼容旧版本的接口
 def load_config(config_file=None):
-    """兼容旧版本的加载配置函数"""
     return ConfigManager.load_config(config_file)
 
 
 def merge_args(config, args):
-    """兼容旧版本的合并参数函数"""
     return ConfigManager.merge_args(config, args)
