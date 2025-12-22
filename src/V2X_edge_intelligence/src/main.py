@@ -3,7 +3,7 @@
 """
 Carla 0.9.10 路侧感知采集（可视化版）
 适配0.9.10：移除draw_circle，用draw_line模拟激光雷达范围
-运行前：启动D:\WindowsNoEditor\CarlaUE4.exe，等待1分钟初始化
+运行前：启动CarlaUE4.exe，等待1分钟初始化
 """
 import sys
 import os
@@ -12,20 +12,53 @@ import json
 import math
 from typing import Dict, Any
 
-# ========== 加载Carla egg文件 ==========
-CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
-sys.path.append(CARLA_EGG_PATH)
 
-# 导入Carla并容错
-try:
-    import carla
+# ========== 加载Carla egg文件（移除绝对路径，适配多环境） ==========
+def load_carla_egg():
+    """
+    加载Carla egg文件的容错逻辑：
+    1. 优先从CARLA_EGG_PATH环境变量读取
+    2. 其次从Carla默认安装路径查找
+    3. 最后提示用户手动指定
+    """
+    # 1. 从环境变量获取（推荐，用户可灵活配置）
+    carla_egg_path = os.getenv("CARLA_EGG_PATH")
+    if carla_egg_path and os.path.exists(carla_egg_path):
+        sys.path.append(carla_egg_path)
+        return True
 
-    print(f"✅ 成功加载Carla API（0.9.10适配版）")
-except Exception as e:
-    print(f"❌ 加载Carla API失败：{str(e)}")
+    # 2. 尝试Carla默认安装路径（Windows）
+    default_paths = [
+        # 默认安装路径
+        r"CarlaUE4\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg",
+        # 用户原路径（作为备选，兼容本地运行）
+        r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
+    ]
+    for path in default_paths:
+        if os.path.exists(path):
+            sys.path.append(path)
+            return True
+
+    # 3. 未找到egg文件，提示用户配置
+    print("❌ 未找到Carla egg文件！请按以下方式配置：")
+    print("   1. 设置环境变量：set CARLA_EGG_PATH=你的Carla egg文件路径")
+    print("   2. 或手动修改代码中的default_paths为你的Carla安装路径")
+    return False
+
+
+# 加载Carla并容错
+if load_carla_egg():
+    try:
+        import carla
+
+        print(f"✅ 成功加载Carla API（0.9.10适配版）")
+    except Exception as e:
+        print(f"❌ 加载Carla API失败：{str(e)}")
+        sys.exit(1)
+else:
     sys.exit(1)
 
-# ========== 配置项 ==========
+# ========== 配置项（移除硬编码绝对路径） ==========
 CARLA_HOST = "localhost"
 CARLA_PORT = 2000
 TIMEOUT = 20.0
@@ -112,7 +145,7 @@ def spawn_vehicles_in_view(world, spectator_transform):
 
 # ========== 在CarlaUE4中可视化运行效果（适配0.9.10） ==========
 def visualize_in_carla(world, spectator_transform, spawned_vehicles):
-    """在CarlaUE4窗口中绘制：车辆ID标注、激光雷达范围（用线模拟）、路侧单元位置"""
+    """在CarlaUE4窗口中绘制：车辆ID标注、激光雷达范围（线模拟）、路侧单元位置"""
     debug = world.debug  # Carla 0.9.10调试工具
 
     # 1. 绘制路侧单元（RSU）位置（红色立方体+文字）
@@ -131,25 +164,22 @@ def visualize_in_carla(world, spectator_transform, spawned_vehicles):
         life_time=VISUALIZATION_DURATION
     )
 
-    # 2. 模拟绘制激光雷达范围（替换draw_circle，0.9.10支持）
-    # 用多条线绘制圆形轮廓，模拟100米激光雷达范围
+    # 2. 模拟绘制激光雷达范围（0.9.10支持，线组成圆形）
     center = rsu_location
     num_segments = 36  # 36条线组成圆形，足够平滑
     for i in range(num_segments):
-        # 计算线段起点和终点
         angle1 = math.radians(i * 10)
         angle2 = math.radians((i + 1) * 10)
         start = carla.Location(
             x=center.x + LIDAR_RANGE * math.cos(angle1),
             y=center.y + LIDAR_RANGE * math.sin(angle1),
-            z=center.z + 0.1  # 略高于地面，避免被遮挡
+            z=center.z + 0.1
         )
         end = carla.Location(
             x=center.x + LIDAR_RANGE * math.cos(angle2),
             y=center.y + LIDAR_RANGE * math.sin(angle2),
             z=center.z + 0.1
         )
-        # 绘制蓝色线段
         debug.draw_line(
             start, end,
             thickness=0.5,
@@ -167,7 +197,6 @@ def visualize_in_carla(world, spectator_transform, spawned_vehicles):
     # 3. 为每辆车添加3D标注（绿色立方体+黄色文字）
     for idx, vehicle in enumerate(spawned_vehicles):
         v_loc = vehicle.get_transform().location
-        # 绘制车辆包围盒
         debug.draw_box(
             box=carla.BoundingBox(v_loc, carla.Vector3D(2, 1, 1)),
             rotation=vehicle.get_transform().rotation,
@@ -175,7 +204,6 @@ def visualize_in_carla(world, spectator_transform, spawned_vehicles):
             color=carla.Color(0, 255, 0),  # 绿色
             life_time=VISUALIZATION_DURATION
         )
-        # 绘制车辆ID和坐标
         debug.draw_string(
             v_loc + carla.Location(z=1.5),
             f"车辆{idx + 1}\nID:{vehicle.id}\nx:{v_loc.x:.1f}, y:{v_loc.y:.1f}",
@@ -225,7 +253,8 @@ def get_roadside_data(world, spawned_vehicles, spectator_transform):
 
 # ========== 保存数据 ==========
 def save_data(data):
-    """保存数据到绝对路径"""
+    """保存数据到相对路径（避免绝对路径）"""
+    # 使用相对路径+绝对化，兼容不同运行目录
     save_path = os.path.abspath(SAVE_DIR)
     os.makedirs(save_path, exist_ok=True)
     file_name = f"roadside_data_{data['timestamp']}.json"
@@ -244,7 +273,7 @@ def main():
     # 2. 生成车辆
     spawned_vehicles = spawn_vehicles_in_view(world, spectator_transform)
 
-    # 3. 可视化运行效果（核心：CarlaUE4内直接展示）
+    # 3. 可视化运行效果
     visualize_in_carla(world, spectator_transform, spawned_vehicles)
 
     # 4. 调整视角
@@ -256,7 +285,7 @@ def main():
     )
     spectator.set_transform(carla.Transform(spectator_transform.location, new_rotation))
 
-    # 5. 采集数据（修正：传入spectator_transform）
+    # 5. 采集数据
     print("🔍 正在采集路侧感知数据...")
     sensor_data = get_roadside_data(world, spawned_vehicles, spectator_transform)
 
