@@ -2,6 +2,7 @@
 性能分析器模块
 负责监控和报告系统性能
 作者: xiaoshiyuan888
+优化版本：增加更多性能指标和趋势分析
 """
 
 import time
@@ -11,6 +12,7 @@ import numpy as np
 from datetime import datetime
 from collections import deque, Counter
 import statistics
+
 
 class PerformanceAnalyzer:
     """增强的性能分析器 - 监控和报告系统性能"""
@@ -23,10 +25,14 @@ class PerformanceAnalyzer:
         self.session_start_time = time.time()
 
         # 帧率统计
-        self.frame_times = deque(maxlen=500)  # 增加到500
+        self.frame_times = deque(maxlen=500)
         self.frame_count = 0
-        self.fps_history = deque(maxlen=200)  # 增加到200
-        self.frame_time_history = deque(maxlen=100)  # 新增：帧时间历史
+        self.fps_history = deque(maxlen=200)
+        self.frame_time_history = deque(maxlen=100)
+
+        # 新增：FPS波动性分析
+        self.fps_jitter_history = deque(maxlen=50)  # FPS波动
+        self.fps_stability_score = 100  # FPS稳定性评分
 
         # 手势识别性能
         self.gesture_recognition_times = deque(maxlen=200)
@@ -35,22 +41,40 @@ class PerformanceAnalyzer:
         self.min_recognition_time = float('inf')
         self.recognition_time_std = 0
 
+        # 新增：手势识别延迟分布
+        self.recognition_latency_distribution = {
+            'excellent': 0,  # <20ms
+            'good': 0,       # 20-35ms
+            'fair': 0,       # 35-50ms
+            'poor': 0,       # 50-100ms
+            'bad': 0         # >100ms
+        }
+
         # 系统资源监控
         self.cpu_usage_history = deque(maxlen=200)
         self.memory_usage_history = deque(maxlen=200)
-        self.cpu_trend = deque(maxlen=50)  # CPU使用趋势
-        self.memory_trend = deque(maxlen=50)  # 内存使用趋势
+        self.cpu_trend = deque(maxlen=50)
+        self.memory_trend = deque(maxlen=50)
+
+        # 新增：GPU监控（如果可用）
+        self.gpu_usage_history = deque(maxlen=100)
+        self.gpu_available = False
+        self.gpu_memory_history = deque(maxlen=100)
 
         # 性能事件记录
         self.performance_events = []
         self.performance_snapshots = []
-        self.performance_anomalies = []  # 新增：性能异常记录
+        self.performance_anomalies = []
 
         # 手势统计
         self.gesture_counts = {}
         self.gesture_confidence_sum = {}
         self.gesture_confidence_count = {}
-        self.gesture_recognition_latency = {}  # 新增：手势识别延迟
+        self.gesture_recognition_latency = {}
+
+        # 新增：手势转换统计
+        self.gesture_transitions = {}  # 记录手势切换频率
+        self.last_gesture = None
 
         # 错误统计
         self.error_count = 0
@@ -61,16 +85,20 @@ class PerformanceAnalyzer:
         self.drone_commands = 0
         self.successful_commands = 0
         self.failed_commands = 0
-        self.command_latency_history = deque(maxlen=100)  # 新增：命令延迟
+        self.command_latency_history = deque(maxlen=100)
 
         # 轨迹记录统计
         self.recording_sessions = 0
         self.total_trajectory_points = 0
         self.trajectory_recording_time = 0
 
+        # 新增：系统响应时间统计
+        self.system_response_times = deque(maxlen=50)
+        self.avg_system_response_time = 0
+
         # 性能日志
         self.performance_log = []
-        self.anomaly_log = []  # 新增：异常日志
+        self.anomaly_log = []
         self.log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'performance_log.csv')
         self.anomaly_log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'anomaly_log.csv')
 
@@ -92,14 +120,14 @@ class PerformanceAnalyzer:
             'recognition_good': 35,
             'recognition_warning': 50,
             'recognition_critical': 100,
-            'frame_time_excellent': 33,  # 对应30fps
-            'frame_time_warning': 66,    # 对应15fps
-            'frame_time_critical': 200,  # 对应5fps
+            'frame_time_excellent': 33,
+            'frame_time_warning': 66,
+            'frame_time_critical': 200,
         }
 
         # 性能状态
         self.performance_status = "优秀"
-        self.performance_score = 100  # 新增：性能评分
+        self.performance_score = 100
         self.last_performance_report = 0
         self.auto_report_interval = 60
 
@@ -108,12 +136,46 @@ class PerformanceAnalyzer:
         self.cpu_trend = "稳定"
         self.memory_trend = "稳定"
 
+        # 新增：性能预测
+        self.fps_prediction = 0
+        self.cpu_prediction = 0
+        self.memory_prediction = 0
+
         # 异常检测
         self.anomaly_detection_enabled = True
         self.last_anomaly_check = 0
         self.anomaly_check_interval = 10
 
+        # 初始化GPU监控
+        self.init_gpu_monitoring()
+
         print("✓ 增强的性能分析器已初始化")
+
+    def init_gpu_monitoring(self):
+        """初始化GPU监控"""
+        try:
+            # 尝试导入GPU监控库
+            import GPUtil
+            self.gpu_available = True
+            self.gpu_lib = GPUtil
+            print("[GPU] ✓ GPU监控库就绪")
+        except ImportError:
+            print("[GPU] ⚠ GPU监控库未找到，GPU监控功能受限")
+            self.gpu_available = False
+
+    def update_gpu_stats(self):
+        """更新GPU统计"""
+        if not self.gpu_available:
+            return
+
+        try:
+            gpus = self.gpu_lib.getGPUs()
+            if gpus:
+                gpu = gpus[0]  # 使用第一个GPU
+                self.gpu_usage_history.append(gpu.load * 100)
+                self.gpu_memory_history.append(gpu.memoryUtil * 100)
+        except:
+            pass
 
     def update_frame(self):
         """更新帧统计"""
@@ -133,8 +195,21 @@ class PerformanceAnalyzer:
                     frame_time = (self.frame_times[-1] - self.frame_times[-2]) * 1000
                     self.frame_time_history.append(frame_time)
 
+                    # 计算FPS波动
+                    if len(self.fps_history) >= 2:
+                        fps_jitter = abs(self.fps_history[-1] - self.fps_history[-2])
+                        self.fps_jitter_history.append(fps_jitter)
+
+        # 更新GPU统计
+        if self.frame_count % 30 == 0:  # 每30帧更新一次GPU信息
+            self.update_gpu_stats()
+
         # 更新性能评分
         self.update_performance_score()
+
+        # 更新系统响应时间
+        if len(self.system_response_times) > 0:
+            self.avg_system_response_time = statistics.mean(list(self.system_response_times))
 
     def update_performance_score(self):
         """更新性能评分"""
@@ -153,6 +228,19 @@ class PerformanceAnalyzer:
                 score -= 50
             else:
                 score -= 70
+
+        # 基于FPS稳定性评分
+        if len(self.fps_jitter_history) > 0:
+            avg_jitter = statistics.mean(list(self.fps_jitter_history))
+            if avg_jitter < 2:
+                score -= 0
+            elif avg_jitter < 5:
+                score -= 5
+            elif avg_jitter < 10:
+                score -= 15
+            else:
+                score -= 25
+            self.fps_stability_score = max(0, 100 - avg_jitter * 10)
 
         # 基于CPU评分
         cpu_usage = self.get_current_cpu_usage()
@@ -193,6 +281,18 @@ class PerformanceAnalyzer:
             else:
                 score -= 50
 
+        # 基于GPU评分（如果可用）
+        if self.gpu_available and len(self.gpu_usage_history) > 0:
+            gpu_usage = self.gpu_usage_history[-1] if self.gpu_usage_history else 0
+            if gpu_usage < 60:
+                score -= 0
+            elif gpu_usage < 80:
+                score -= 5
+            elif gpu_usage < 90:
+                score -= 10
+            else:
+                score -= 20
+
         self.performance_score = max(0, min(100, score))
 
         # 更新性能状态
@@ -221,6 +321,18 @@ class PerformanceAnalyzer:
             if len(times_list) >= 2:
                 self.recognition_time_std = np.std(times_list)
 
+        # 更新识别延迟分布
+        if recognition_time_ms < 20:
+            self.recognition_latency_distribution['excellent'] += 1
+        elif recognition_time_ms < 35:
+            self.recognition_latency_distribution['good'] += 1
+        elif recognition_time_ms < 50:
+            self.recognition_latency_distribution['fair'] += 1
+        elif recognition_time_ms < 100:
+            self.recognition_latency_distribution['poor'] += 1
+        else:
+            self.recognition_latency_distribution['bad'] += 1
+
     def update_system_resources(self):
         """更新系统资源使用情况"""
         try:
@@ -240,9 +352,43 @@ class PerformanceAnalyzer:
                     recent_memory = list(self.memory_usage_history)[-10:]
                     self.memory_trend.append(statistics.mean(recent_memory))
 
+                # 性能预测
+                self.predict_performance()
+
                 # 检查性能问题和异常
                 self.check_performance_issues(cpu_percent, memory_percent)
                 self.detect_anomalies()
+        except:
+            pass
+
+    def predict_performance(self):
+        """性能预测"""
+        try:
+            # 简单的线性回归预测
+            if len(self.fps_history) >= 10:
+                recent_fps = list(self.fps_history)[-10:]
+                if len(recent_fps) >= 2:
+                    # 计算趋势
+                    x = np.arange(len(recent_fps))
+                    y = np.array(recent_fps)
+                    z = np.polyfit(x, y, 1)
+                    self.fps_prediction = max(0, z[0] * len(recent_fps) + z[1])
+
+            if len(self.cpu_usage_history) >= 10:
+                recent_cpu = list(self.cpu_usage_history)[-10:]
+                if len(recent_cpu) >= 2:
+                    x = np.arange(len(recent_cpu))
+                    y = np.array(recent_cpu)
+                    z = np.polyfit(x, y, 1)
+                    self.cpu_prediction = min(100, max(0, z[0] * len(recent_cpu) + z[1]))
+
+            if len(self.memory_usage_history) >= 10:
+                recent_memory = list(self.memory_usage_history)[-10:]
+                if len(recent_memory) >= 2:
+                    x = np.arange(len(recent_memory))
+                    y = np.array(recent_memory)
+                    z = np.polyfit(x, y, 1)
+                    self.memory_prediction = min(100, max(0, z[0] * len(recent_memory) + z[1]))
         except:
             pass
 
@@ -273,6 +419,10 @@ class PerformanceAnalyzer:
                     if older_avg > 0 and avg_fps / older_avg < 0.5:
                         anomalies.append(("FPS骤降", f"FPS从{older_avg:.1f}降至{avg_fps:.1f}"))
 
+            # 检测FPS波动过大
+            if std_fps > 10:
+                anomalies.append(("FPS不稳定", f"FPS波动过大: 标准差{std_fps:.1f}"))
+
         # 检测CPU使用率异常
         if len(self.cpu_usage_history) >= 10:
             recent_cpu = list(self.cpu_usage_history)[-10:]
@@ -299,6 +449,13 @@ class PerformanceAnalyzer:
                     if second_avg - first_avg > 10:  # 内存增长超过10%
                         anomalies.append(("内存增长", f"内存从{first_avg:.1f}%增长到{second_avg:.1f}%"))
 
+        # 检测手势识别时间异常
+        if len(self.gesture_recognition_times) >= 10:
+            recent_times = list(self.gesture_recognition_times)[-10:]
+            avg_time = statistics.mean(recent_times)
+            if avg_time > 80:  # 识别时间超过80ms
+                anomalies.append(("识别缓慢", f"手势识别平均时间{avg_time:.1f}ms"))
+
         # 记录异常
         for anomaly_type, message in anomalies:
             anomaly = {
@@ -308,7 +465,8 @@ class PerformanceAnalyzer:
                 'fps': self.get_current_fps(),
                 'cpu': self.get_current_cpu_usage(),
                 'memory': self.get_current_memory_usage(),
-                'recognition_time': self.avg_recognition_time
+                'recognition_time': self.avg_recognition_time,
+                'performance_score': self.performance_score
             }
             self.performance_anomalies.append(anomaly)
             self.log_anomaly(anomaly)
@@ -316,7 +474,7 @@ class PerformanceAnalyzer:
             # 语音提示严重异常
             if (self.speech_manager and
                 self.speech_manager.enabled and
-                "骤降" in anomaly_type or "飙升" in anomaly_type):
+                ("骤降" in anomaly_type or "飙升" in anomaly_type or "缓慢" in anomaly_type)):
                 self.speech_manager.speak_direct(f"检测到性能{anomaly_type}")
 
     def check_performance_issues(self, cpu_percent, memory_percent):
@@ -384,6 +542,19 @@ class PerformanceAnalyzer:
                     self.performance_status = "警告"
                 self.warning_count += 1
 
+        # 检查GPU使用率
+        if self.gpu_available and len(self.gpu_usage_history) > 0:
+            gpu_usage = self.gpu_usage_history[-1] if self.gpu_usage_history else 0
+            if gpu_usage > 95:
+                issues.append(("严重", f"GPU使用率极高: {gpu_usage:.1f}%"))
+                self.performance_status = "严重"
+                self.critical_count += 1
+            elif gpu_usage > 90:
+                issues.append(("警告", f"GPU使用率较高: {gpu_usage:.1f}%"))
+                if self.performance_status == "优秀" or self.performance_status == "良好":
+                    self.performance_status = "警告"
+                self.warning_count += 1
+
         # 记录性能事件
         if issues:
             for level, message in issues:
@@ -408,7 +579,8 @@ class PerformanceAnalyzer:
             'fps': self.get_current_fps(),
             'cpu': self.get_current_cpu_usage(),
             'memory': self.get_current_memory_usage(),
-            'recognition_time': self.avg_recognition_time
+            'recognition_time': self.avg_recognition_time,
+            'performance_score': self.performance_score
         }
         self.performance_events.append(event)
 
@@ -430,7 +602,8 @@ class PerformanceAnalyzer:
             'fps': f"{event['fps']:.1f}",
             'cpu': f"{event['cpu']:.1f}",
             'memory': f"{event['memory']:.1f}",
-            'recognition_time': f"{event['recognition_time']:.1f}"
+            'recognition_time': f"{event['recognition_time']:.1f}",
+            'performance_score': f"{event['performance_score']:.1f}"
         }
         self.performance_log.append(log_entry)
 
@@ -443,7 +616,8 @@ class PerformanceAnalyzer:
             'fps': f"{anomaly['fps']:.1f}",
             'cpu': f"{anomaly['cpu']:.1f}",
             'memory': f"{anomaly['memory']:.1f}",
-            'recognition_time': f"{anomaly['recognition_time']:.1f}"
+            'recognition_time': f"{anomaly['recognition_time']:.1f}",
+            'performance_score': f"{anomaly['performance_score']:.1f}"
         }
         self.anomaly_log.append(log_entry)
 
@@ -458,6 +632,15 @@ class PerformanceAnalyzer:
         self.gesture_counts[gesture] += 1
         self.gesture_confidence_sum[gesture] += confidence
         self.gesture_confidence_count[gesture] += 1
+
+        # 记录手势转换
+        if self.last_gesture is not None and self.last_gesture != gesture:
+            transition_key = f"{self.last_gesture}->{gesture}"
+            if transition_key not in self.gesture_transitions:
+                self.gesture_transitions[transition_key] = 0
+            self.gesture_transitions[transition_key] += 1
+
+        self.last_gesture = gesture
 
         # 记录最近一次识别时间
         if len(self.gesture_recognition_times) > 0:
@@ -485,6 +668,10 @@ class PerformanceAnalyzer:
         if points_count > 0:
             self.trajectory_recording_time = time.time() - self.session_start_time
 
+    def record_system_response_time(self, response_time):
+        """记录系统响应时间"""
+        self.system_response_times.append(response_time)
+
     def take_snapshot(self, label=""):
         """拍摄性能快照"""
         snapshot = {
@@ -508,8 +695,18 @@ class PerformanceAnalyzer:
             'session_duration': time.time() - self.session_start_time,
             'warning_count': self.warning_count,
             'error_count': self.error_count,
-            'critical_count': self.critical_count
+            'critical_count': self.critical_count,
+            'fps_stability_score': self.fps_stability_score,
+            'recognition_latency_distribution': dict(self.recognition_latency_distribution),
+            'gesture_transitions': dict(self.gesture_transitions),
+            'avg_system_response_time': self.avg_system_response_time
         }
+
+        # 添加GPU信息（如果可用）
+        if self.gpu_available and len(self.gpu_usage_history) > 0:
+            snapshot['gpu_usage'] = self.gpu_usage_history[-1] if self.gpu_usage_history else 0
+            snapshot['gpu_memory'] = self.gpu_memory_history[-1] if self.gpu_memory_history else 0
+
         self.performance_snapshots.append(snapshot)
 
         print(f"📸 性能快照已保存: {label}")
@@ -582,6 +779,16 @@ class PerformanceAnalyzer:
                     return "下降"
         return "稳定"
 
+    def get_fps_stability(self):
+        """获取FPS稳定性评分"""
+        return self.fps_stability_score
+
+    def get_gpu_usage(self):
+        """获取GPU使用率"""
+        if self.gpu_available and len(self.gpu_usage_history) > 0:
+            return self.gpu_usage_history[-1]
+        return 0
+
     def generate_report(self, detailed=True):
         """生成性能报告"""
         report_time = time.time()
@@ -596,6 +803,7 @@ class PerformanceAnalyzer:
             '当前FPS': f"{self.get_current_fps():.1f}",
             '最低FPS': f"{min(self.fps_history) if self.fps_history else 0:.1f}",
             'FPS稳定性': f"{self.get_fps_percentile(90) - self.get_fps_percentile(10):.1f}",
+            'FPS稳定性评分': f"{self.fps_stability_score:.0f}",
             '平均手势识别时间': f"{self.avg_recognition_time:.1f}ms",
             '最快识别时间': f"{self.min_recognition_time if self.min_recognition_time != float('inf') else 0:.1f}ms",
             '最慢识别时间': f"{self.max_recognition_time:.1f}ms",
@@ -622,9 +830,17 @@ class PerformanceAnalyzer:
             '趋势分析': {
                 'FPS趋势': self.get_fps_trend(),
                 'CPU趋势': self.get_cpu_trend(),
-                '内存趋势': self.get_memory_trend()
-            }
+                '内存趋势': self.get_memory_trend(),
+                'FPS预测': f"{self.fps_prediction:.1f}",
+                'CPU预测': f"{self.cpu_prediction:.1f}%",
+                '内存预测': f"{self.memory_prediction:.1f}%"
+            },
+            '系统响应时间': f"{self.avg_system_response_time:.1f}ms"
         }
+
+        # 添加GPU信息（如果可用）
+        if self.gpu_available:
+            report['GPU使用率'] = f"{self.get_gpu_usage():.1f}%"
 
         # 详细报告
         if detailed:
@@ -650,6 +866,23 @@ class PerformanceAnalyzer:
                 }
 
             report['手势统计'] = gesture_stats
+
+            # 手势转换统计
+            if self.gesture_transitions:
+                report['手势转换统计'] = dict(sorted(
+                    self.gesture_transitions.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )[:10])  # 只显示前10个最常见转换
+
+            # 识别延迟分布
+            total_latency = sum(self.recognition_latency_distribution.values())
+            if total_latency > 0:
+                latency_dist = {}
+                for category, count in self.recognition_latency_distribution.items():
+                    percentage = (count / total_latency * 100) if total_latency > 0 else 0
+                    latency_dist[category] = f"{count}次({percentage:.1f}%)"
+                report['识别延迟分布'] = latency_dist
 
             # 性能事件
             if self.performance_events:
@@ -712,6 +945,12 @@ class PerformanceAnalyzer:
             if self.performance_score < 50:
                 suggestions.append("考虑升级硬件配置（CPU/GPU）以提升性能")
 
+        # 检查FPS稳定性
+        if len(self.fps_jitter_history) > 0:
+            avg_jitter = statistics.mean(list(self.fps_jitter_history))
+            if avg_jitter > 5:
+                suggestions.append(f"FPS波动较大({avg_jitter:.1f}FPS)，建议关闭其他运行程序，优化系统性能")
+
         # 检查CPU
         cpu_usage = self.get_current_cpu_usage()
         if cpu_usage > self.performance_thresholds['cpu_warning']:
@@ -732,15 +971,22 @@ class PerformanceAnalyzer:
             if self.avg_recognition_time > 80:
                 suggestions.append("考虑使用更简单的手势识别算法或优化当前算法")
 
-        # 检查FPS稳定性
-        if len(self.fps_history) >= 20:
-            fps_std = np.std(list(self.fps_history)[-20:])
-            if fps_std > 10:
-                suggestions.append(f"帧率不稳定(标准差{fps_std:.1f}FPS)，建议检查系统负载和网络连接")
+        # 检查GPU使用率（如果可用）
+        if self.gpu_available and len(self.gpu_usage_history) > 0:
+            gpu_usage = self.get_gpu_usage()
+            if gpu_usage > 90:
+                suggestions.append(f"GPU使用率较高({gpu_usage:.1f}%)，可能影响系统性能")
 
         # 检查性能趋势
         if self.get_fps_trend() == "下降":
             suggestions.append("FPS呈下降趋势，建议重启程序或检查系统资源")
+
+        # 检查手势识别延迟分布
+        total_latency = sum(self.recognition_latency_distribution.values())
+        if total_latency > 0:
+            poor_ratio = (self.recognition_latency_distribution['poor'] + self.recognition_latency_distribution['bad']) / total_latency
+            if poor_ratio > 0.3:  # 超过30%的识别时间较差
+                suggestions.append(f"手势识别延迟较高，{poor_ratio*100:.0f}%的识别时间超过50ms")
 
         return suggestions
 
@@ -760,6 +1006,7 @@ class PerformanceAnalyzer:
         print(f"当前FPS: {report['当前FPS']}")
         print(f"最低FPS: {report['最低FPS']}")
         print(f"FPS稳定性: {report['FPS稳定性']}")
+        print(f"FPS稳定性评分: {report['FPS稳定性评分']}")
         print(f"平均手势识别时间: {report['平均手势识别时间']}")
         print(f"最快识别时间: {report['最快识别时间']}")
         print(f"最慢识别时间: {report['最慢识别时间']}")
@@ -772,12 +1019,23 @@ class PerformanceAnalyzer:
         print(f"错误数量: {report['错误数量']}")
         print(f"严重问题数量: {report['严重问题数量']}")
 
+        # GPU信息
+        if 'GPU使用率' in report:
+            print(f"GPU使用率: {report['GPU使用率']}")
+
         # 趋势分析
         trends = report['趋势分析']
         print(f"\n趋势分析:")
         print(f"  FPS趋势: {trends['FPS趋势']}")
         print(f"  CPU趋势: {trends['CPU趋势']}")
         print(f"  内存趋势: {trends['内存趋势']}")
+        if 'FPS预测' in trends:
+            print(f"  FPS预测: {trends['FPS预测']} FPS")
+            print(f"  CPU预测: {trends['CPU预测']}")
+            print(f"  内存预测: {trends['内存预测']}")
+
+        # 系统响应时间
+        print(f"系统响应时间: {report['系统响应时间']}")
 
         # 无人机命令统计
         cmd_stats = report['无人机命令']
@@ -800,6 +1058,18 @@ class PerformanceAnalyzer:
             print(f"\n手势统计:")
             for gesture, stats in report['手势统计'].items():
                 print(f"  {gesture}: {stats['次数']}次 ({stats['占比']}), 平均置信度: {stats['平均置信度']}, 平均延迟: {stats['平均延迟']}")
+
+        # 手势转换统计
+        if detailed and '手势转换统计' in report and report['手势转换统计']:
+            print(f"\n最常见的手势转换:")
+            for transition, count in report['手势转换统计'].items():
+                print(f"  {transition}: {count}次")
+
+        # 识别延迟分布
+        if detailed and '识别延迟分布' in report and report['识别延迟分布']:
+            print(f"\n识别延迟分布:")
+            for category, dist in report['识别延迟分布'].items():
+                print(f"  {category}: {dist}")
 
         # FPS分布
         if detailed and 'FPS分布' in report:
@@ -913,6 +1183,8 @@ class PerformanceAnalyzer:
         self.gesture_confidence_sum = {}
         self.gesture_confidence_count = {}
         self.gesture_recognition_latency = {}
+        self.gesture_transitions = {}
+        self.last_gesture = None
         self.error_count = 0
         self.warning_count = 0
         self.critical_count = 0
@@ -926,12 +1198,23 @@ class PerformanceAnalyzer:
         self.recording_sessions = 0
         self.total_trajectory_points = 0
         self.trajectory_recording_time = 0
+        self.recognition_latency_distribution = {
+            'excellent': 0,
+            'good': 0,
+            'fair': 0,
+            'poor': 0,
+            'bad': 0
+        }
+        self.fps_jitter_history.clear()
+        self.fps_stability_score = 100
+        self.system_response_times.clear()
+        self.avg_system_response_time = 0
 
         print("✓ 性能统计会话已重置")
 
     def get_stats_summary(self):
         """获取统计摘要"""
-        return {
+        summary = {
             'fps': self.get_current_fps(),
             'avg_fps': self.get_average_fps(),
             'min_fps': min(self.fps_history) if self.fps_history else 0,
@@ -946,8 +1229,16 @@ class PerformanceAnalyzer:
             'cpu_trend': self.get_cpu_trend(),
             'memory_trend': self.get_memory_trend(),
             'warning_count': self.warning_count,
-            'error_count': self.error_count
+            'error_count': self.error_count,
+            'fps_stability': self.fps_stability_score,
+            'system_response_time': self.avg_system_response_time
         }
+
+        # 添加GPU信息（如果可用）
+        if self.gpu_available:
+            summary['gpu_usage'] = self.get_gpu_usage()
+
+        return summary
 
     def get_detailed_stats(self):
         """获取详细统计"""
@@ -971,5 +1262,11 @@ class PerformanceAnalyzer:
                 'memory_max': max(self.memory_usage_history) if self.memory_usage_history else 0
             },
             'anomaly_count': len(self.performance_anomalies),
-            'snapshot_count': len(self.performance_snapshots)
+            'snapshot_count': len(self.performance_snapshots),
+            'fps_stability_stats': {
+                'avg_jitter': statistics.mean(self.fps_jitter_history) if self.fps_jitter_history else 0,
+                'max_jitter': max(self.fps_jitter_history) if self.fps_jitter_history else 0
+            },
+            'recognition_latency_distribution': dict(self.recognition_latency_distribution),
+            'gesture_transition_count': len(self.gesture_transitions)
         }
