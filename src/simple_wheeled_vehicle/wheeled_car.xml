@@ -119,8 +119,10 @@
         </body>
       </body>
 
-      <body name="cam" pos="-0.3 0 0.15" quat="0.819 0.573 0 0">
-        <camera name="track" mode="track" pos="0 0 0" xyaxes="1 0 0  0 0 1" fovy="50"/>
+      <!-- 绿色相机保留 -->
+      <body name="cam" pos="0.15 0 0.08" quat="0.819 0.573 0 0">
+        <camera name="track" mode="fixed" pos="0 0 0" xyaxes="1 0 0  0 0 1" fovy="60"/>
+        <geom type="box" size="0.01 0.02 0.01" rgba="0 1 0 1" contype="0" conaffinity="0"/>
       </body>
     </body>
   </worldbody>
