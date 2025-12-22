@@ -45,6 +45,13 @@ class ChineseUIRenderer:
             'memory_good': (0, 255, 0),
             'memory_warning': (255, 165, 0),
             'memory_critical': (255, 0, 0),
+            # 新增手势颜色
+            'gesture_grab': (255, 0, 255),
+            'gesture_rotate_cw': (0, 255, 255),
+            'gesture_rotate_ccw': (255, 255, 0),
+            'gesture_photo': (255, 165, 0),
+            'gesture_return_home': (0, 128, 128),
+            'gesture_auto_flight': (128, 0, 128),
         }
 
         print("✓ 中文UI渲染器已初始化")

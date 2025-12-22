@@ -248,6 +248,56 @@ class SimpleDroneController:
                 if (self.speech_manager and
                         self.speech_manager.enabled):
                     self.speech_manager.speak('hovering')
+            elif gesture == "Grab":
+                # 抓取动作（模拟）
+                print("执行抓取动作")
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_grab')
+            elif gesture == "Release":
+                # 释放动作（模拟）
+                print("执行释放动作")
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_release')
+            elif gesture == "RotateCW":
+                # 顺时针旋转
+                print("顺时针旋转")
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_rotate_cw')
+            elif gesture == "RotateCCW":
+                # 逆时针旋转
+                print("逆时针旋转")
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_rotate_ccw')
+            elif gesture == "TakePhoto":
+                # 拍照/截图
+                print("执行拍照")
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_photo')
+            elif gesture == "ReturnHome":
+                # 返航
+                print("执行返航")
+                self.client.moveToPositionAsync(0, 0, self.altitude, 5)
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_return_home')
+            elif gesture == "AutoFlight":
+                # 自动飞行模式
+                print("启动自动飞行模式")
+                success = True
+                if (self.speech_manager and
+                        self.speech_manager.enabled):
+                    self.speech_manager.speak('gesture_auto_flight')
 
             if success:
                 self.last_control_time = current_time
