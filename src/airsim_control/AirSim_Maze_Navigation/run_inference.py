@@ -12,8 +12,16 @@ import math
 # ==============================================================================
 # 配置区域
 # ==============================================================================
-MODELS_DIR = r"D:\Others\MyAirsimprojects\models"
-LOG_PATH = r"D:\Others\MyAirsimprojects\inference_logs"  # 轨迹保存路径
+
+# 项目名称缩写：ASMN (AirSim Maze Navigation)
+PROJECT_ABBR = "ASMN"
+
+# 获取当前脚本所在目录作为项目根目录
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 使用相对路径
+MODELS_DIR = os.path.join(BASE_DIR, f"{PROJECT_ABBR}_models")
+LOG_PATH = os.path.join(BASE_DIR, f"{PROJECT_ABBR}_inference_logs")  # 轨迹保存路径
 os.makedirs(LOG_PATH, exist_ok=True)
 
 # 可视化配置
@@ -67,8 +75,6 @@ def draw_dashboard(obs, action, reward, step_count, last_info):
         if "Status" in text and "撞墙" in text:
             color = (0, 0, 255)
 
-        # 这里需要注意: OpenCV putText 不支持 emoji，如果 last_info 包含 emoji 可能会显示乱码或问号
-        # 但不会报错崩溃。崩溃是在写入 CSV 时发生的。
         cv2.putText(canvas, text, (x_start, y_start + i * line_height),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
@@ -100,7 +106,7 @@ def draw_dashboard(obs, action, reward, step_count, last_info):
 
 def main():
     print("==================================================")
-    print("       AirSim 无人机智能导航 - 推理与评估系统       ")
+    print(f"       {PROJECT_ABBR} - AirSim UAV Maze Navigation       ")
     print("==================================================")
 
     # 1. 模型选择
@@ -131,14 +137,14 @@ def main():
 
     # 4. 创建轨迹日志文件
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_filename = os.path.join(LOG_PATH, f"trajectory_{timestamp}.csv")
+    csv_filename = os.path.join(LOG_PATH, f"{PROJECT_ABBR}_trajectory_{timestamp}.csv")
 
-    # 【修复点 1】增加 encoding='utf-8-sig'
+    # 使用 utf-8-sig 编码支持中文
     with open(csv_filename, 'w', newline='', encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow(["Episode", "Step", "X", "Y", "Z", "Reward", "DoneType"])
 
-    print("\n>>> 开始推理 (按 'q' 退出 OpenCV 窗口或 Ctrl+C 停止) <<<\n")
+    print(f"\n>>> 开始推理 (按 'q' 退出 OpenCV 窗口或 Ctrl+C 停止) <<<\n")
 
     try:
         obs, _ = env.reset()
@@ -174,7 +180,7 @@ def main():
                 print(
                     f"Episode {stats['episodes']} 结束 | 原因: {done_reason} | 总分: {episode_reward:.2f} | 步数: {step_count}")
 
-                # 【修复点 2】增加 encoding='utf-8-sig'
+                # 追加数据到 CSV 文件
                 with open(csv_filename, 'a', newline='', encoding='utf-8-sig') as f:
                     writer = csv.writer(f)
                     for row in current_traj:
@@ -191,7 +197,7 @@ def main():
 
             if SHOW_DASHBOARD:
                 dashboard = draw_dashboard(obs, action, reward, step_count, done_reason)
-                cv2.imshow("AirSim AI Dashboard", dashboard)
+                cv2.imshow(f"{PROJECT_ABBR} Dashboard", dashboard)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     print("用户手动停止测试。")
                     break
@@ -200,7 +206,7 @@ def main():
         print("\n检测到键盘中断，停止测试。")
     finally:
         print("\n" + "=" * 50)
-        print("              测试总结报告              ")
+        print(f"              {PROJECT_ABBR} 测试总结报告              ")
         print("=" * 50)
         total = stats['episodes']
         if total > 0:
