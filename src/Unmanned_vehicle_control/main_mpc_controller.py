@@ -1,4 +1,5 @@
 import casadi as ca
+import numpy as np
 
 from src.main_help_functions import calculate_lateral_deviation
 from src.config import MAX_CONTROL_WHEEL_ANGLE_RAD, MAX_CONTROL_ACCELERATION_M_S_2, MAX_CONTROL_BRAKING_M_S_2, \
@@ -33,6 +34,15 @@ class MpcController:
             'ipopt.warm_start_mult_bound_push': 1e-6
         }
         self.opti.solver('ipopt', opts)
+
+        # 定义状态和控制变量
+        self.X = self.opti.variable(4, self.horizon + 1)
+        self.U = self.opti.variable(2, self.horizon)
+
+        # 热启动：用上次的解初始化（首次运行可跳过）
+        if hasattr(self, 'prev_X') and hasattr(self, 'prev_U'):
+            self.opti.set_initial(self.X, self.prev_X)  # 状态初始猜测
+            self.opti.set_initial(self.U, self.prev_U)  # 控制量初始猜测
 
         self.X = self.opti.variable(4, self.horizon + 1)  # State: (x, y, theta, v)
         self.U = self.opti.variable(2, self.horizon)  # Control (delta, a)
@@ -81,6 +91,9 @@ class MpcController:
         try:
             self.sol = self.opti.solve()
             self.is_success = True
+            # 保存当前解作为下次的初始猜测
+            self.prev_X = self.sol.value(self.X)
+            self.prev_U = self.sol.value(self.U)
             wheel_angle_rad, acceleration_m_s_2 = self.get_controls_value()
             self.control_buffer["acceleration"] = self.control_buffer["acceleration"][1:] + [acceleration_m_s_2]
             self.control_buffer["wheel_angle"] = self.control_buffer["wheel_angle"][1:] + [wheel_angle_rad]
@@ -93,10 +106,19 @@ class MpcController:
         if self.is_success:
             wheel_angle_rad = self.sol.value(self.U[0, 0])
             acceleration_m_s_2 = self.sol.value(self.U[1, 0])
+            # 控制量饱和（与config约束一致）
+            wheel_angle_rad = np.clip(wheel_angle_rad,
+                                      -MAX_CONTROL_WHEEL_ANGLE_RAD,
+                                      MAX_CONTROL_WHEEL_ANGLE_RAD)
+            acceleration_m_s_2 = np.clip(acceleration_m_s_2,
+                                         MAX_CONTROL_BRAKING_M_S_2,
+                                         MAX_CONTROL_ACCELERATION_M_S_2)
         else:
             if self.buffer_index < self.horizon:
-                acceleration_m_s_2 = self.control_buffer["acceleration"][self.buffer_index]
-                wheel_angle_rad = self.control_buffer["wheel_angle"][self.buffer_index]
+                # 求解失败时，控制量渐进衰减（减少突变）
+                decay = 0.9  # 衰减系数
+                acceleration_m_s_2 = self.control_buffer["acceleration"][self.buffer_index] * decay
+                wheel_angle_rad = self.control_buffer["wheel_angle"][self.buffer_index] * decay
                 self.buffer_index += 1
             else:
                 raise Exception("Control buffer is empty.")
