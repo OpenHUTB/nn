@@ -239,6 +239,9 @@ class Sort:
         return track.age <= self.max_age
 
     def _iou_batch(self, b1, b2):
+        if b1.shape[0] == 0 or b2.shape[0] == 0:
+            return np.zeros((b1.shape[0], b2.shape[0]), dtype=np.float32)
+
         b1_x1, b1_y1, b1_x2, b1_y2 = b1[:, 0], b1[:, 1], b1[:, 2], b1[:, 3]
         b2_x1, b2_y1, b2_x2, b2_y2 = b2[:, 0], b2[:, 1], b2[:, 2], b2[:, 3]
 
@@ -266,7 +269,6 @@ class Sort:
             distance_weights[distances >= self.depth_thresholds['far']] = 0.7
 
             return base_iou * distance_weights[None, :]
-
         return base_iou
 
     def _hungarian_algorithm(self, cost_matrix):
@@ -338,6 +340,169 @@ def load_detection_model(model_type):
     return model, model.names
 
 
+# -------------------------- 性能监控面板函数 --------------------------
+def draw_performance_panel(image, timings, fps, frame_count):
+    """
+    在图像上绘制性能监控面板
+    """
+    h, w = image.shape[:2]
+
+    # 计算各阶段耗时（最近10帧平均）
+    def get_avg_time(key, default=0.0):
+        if key in timings and timings[key]:
+            recent = timings[key][-10:]  # 取最近10帧
+            return np.mean(recent) if recent else default
+        return default
+
+    # 计算各阶段耗时（毫秒）
+    carla_time = get_avg_time('carla_tick') * 1000
+    image_time = get_avg_time('image_get') * 1000
+    depth_time = get_avg_time('depth_get') * 1000
+    detection_time = get_avg_time('detection') * 1000
+    tracking_time = get_avg_time('tracking') * 1000
+    drawing_time = get_avg_time('drawing') * 1000
+    display_time = get_avg_time('display') * 1000
+    total_time = get_avg_time('total') * 1000
+
+    # 面板位置和尺寸
+    panel_x = 10  # 左上角x坐标
+    panel_y = 10  # 左上角y坐标
+    panel_width = 280  # 面板宽度
+    panel_height = 200  # 面板高度
+
+    # 创建半透明面板背景
+    panel_bg = np.zeros((panel_height, panel_width, 3), dtype=np.uint8)
+    panel_bg[:] = (20, 20, 20)  # 深灰色背景
+
+    # 叠加面板到图像上
+    x1, y1 = panel_x, panel_y
+    x2, y2 = panel_x + panel_width, panel_y + panel_height
+
+    # 确保面板在图像范围内
+    if x2 <= w and y2 <= h:
+        # 半透明叠加
+        alpha = 0.7
+        image[y1:y2, x1:x2] = cv2.addWeighted(
+            image[y1:y2, x1:x2], 1 - alpha, panel_bg, alpha, 0
+        )
+
+        # 绘制标题和分隔线
+        title = "性能监控面板"
+        cv2.putText(image, title, (panel_x + 10, panel_y + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
+
+        cv2.line(image, (panel_x, panel_y + 25),
+                 (panel_x + panel_width, panel_y + 25), (100, 100, 100), 1)
+
+        # 绘制性能指标
+        y_offset = 45
+        line_height = 20
+
+        # FPS和帧数
+        cv2.putText(image, f"FPS: {fps:.1f}", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.putText(image, f"Frame: {frame_count}", (panel_x + 120, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+
+        y_offset += line_height
+
+        # CARLA同步
+        color = (0, 255, 0) if carla_time < 5.0 else (0, 165, 255) if carla_time < 10.0 else (0, 0, 255)
+        cv2.putText(image, f"CARLA: {carla_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # 图像获取
+        color = (0, 255, 0) if image_time < 1.0 else (0, 165, 255) if image_time < 3.0 else (0, 0, 255)
+        cv2.putText(image, f"Image: {image_time:.1f}ms", (panel_x + 120, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 深度获取
+        if depth_time > 0:
+            color = (0, 255, 0) if depth_time < 2.0 else (0, 165, 255) if depth_time < 5.0 else (0, 0, 255)
+            cv2.putText(image, f"Depth: {depth_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 目标检测
+        color = (0, 255, 0) if detection_time < 10.0 else (0, 165, 255) if detection_time < 20.0 else (0, 0, 255)
+        cv2.putText(image, f"Detection: {detection_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 目标跟踪
+        color = (0, 255, 0) if tracking_time < 5.0 else (0, 165, 255) if tracking_time < 10.0 else (0, 0, 255)
+        cv2.putText(image, f"Tracking: {tracking_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # 结果绘制
+        color = (0, 255, 0) if drawing_time < 2.0 else (0, 165, 255) if drawing_time < 5.0 else (0, 0, 255)
+        cv2.putText(image, f"Drawing: {drawing_time:.1f}ms", (panel_x + 120, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 显示输出
+        color = (0, 255, 0) if display_time < 2.0 else (0, 165, 255) if display_time < 5.0 else (0, 0, 255)
+        cv2.putText(image, f"Display: {display_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 总帧时间
+        color = (0, 255, 0) if total_time < 50.0 else (0, 165, 255) if total_time < 100.0 else (0, 0, 255)
+        cv2.putText(image, f"Total: {total_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 绘制简易性能柱状图
+        bar_x = panel_x + 10
+        bar_y = panel_y + y_offset + 5
+        bar_width = 250
+        bar_height = 15
+
+        # 绘制背景
+        cv2.rectangle(image, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (50, 50, 50), -1)
+
+        # 计算各阶段占比
+        stages = [carla_time, image_time, depth_time, detection_time, tracking_time, drawing_time, display_time]
+        stage_names = ['C', 'I', 'D', 'Det', 'T', 'Draw', 'Disp']
+        stage_colors = [
+            (0, 200, 200),  # CARLA - 青色
+            (200, 200, 0),  # Image - 黄色
+            (200, 0, 200),  # Depth - 紫色
+            (255, 100, 0),  # Detection - 橙色
+            (0, 150, 255),  # Tracking - 浅蓝色
+            (100, 255, 100),  # Drawing - 浅绿色
+            (255, 100, 100)  # Display - 浅红色
+        ]
+
+        # 绘制各阶段柱状图
+        if total_time > 0:
+            accumulated = 0
+            for i, (stage_time, color, name) in enumerate(zip(stages, stage_colors, stage_names)):
+                if stage_time > 0:
+                    stage_width = int((stage_time / total_time) * bar_width)
+                    if stage_width > 0:
+                        # 绘制阶段条
+                        stage_x1 = bar_x + accumulated
+                        stage_x2 = stage_x1 + stage_width
+                        cv2.rectangle(image, (stage_x1, bar_y), (stage_x2, bar_y + bar_height), color, -1)
+
+                        # 绘制阶段名称
+                        if stage_width > 15:
+                            cv2.putText(image, name, (stage_x1 + 2, bar_y + 12),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+                        accumulated += stage_width
+
+    return image
+
+
 # -------------------------- 核心工具函数 --------------------------
 def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
     track_ids = kwargs.get('track_ids')
@@ -347,6 +512,9 @@ def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
 
     result = image.copy()
     h, w = image.shape[:2]
+
+    # 颜色缓存
+    color_cache = {}
 
     for i, box in enumerate(boxes):
         x1, y1, x2, y2 = map(int, box)
@@ -359,38 +527,37 @@ def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
         if x1 >= x2 or y1 >= y2:
             continue
 
+        # 颜色计算
         color = (0, 255, 0)
         if distances and i < len(distances) and distances[i]:
             dist = distances[i]
-            if dist < 15:
-                r, g = 255, int(255 * (dist / 15))
-                color = (0, g, r)
-            elif dist < 30:
-                r, g = int(255 * (1 - (dist - 15) / 15)), 255
-                color = (0, g, r)
-            elif dist < 50:
-                b, g = int(255 * ((dist - 30) / 20)), 255
-                color = (b, g, 0)
+            if dist not in color_cache:
+                if dist < 15:
+                    r, g = 255, int(255 * (dist / 15))
+                    color_cache[dist] = (0, g, r)
+                elif dist < 30:
+                    r, g = int(255 * (1 - (dist - 15) / 15)), 255
+                    color_cache[dist] = (0, g, r)
+                elif dist < 50:
+                    b, g = int(255 * ((dist - 30) / 20)), 255
+                    color_cache[dist] = (b, g, 0)
+                else:
+                    color_cache[dist] = (0, 255, 0)
+            color = color_cache[dist]
 
         cv2.rectangle(result, (x1, y1), (x2, y2), color, 2)
 
-        text_parts = []
-        if i < len(labels):
-            text_parts.append(class_names.get(labels[i], f"cls{labels[i]}"))
+        # 构建文本信息
+        text_parts = [
+            class_names.get(labels[i], f"cls{labels[i]}") if i < len(labels) else "",
+            f"{probs[i]:.2f}" if probs and i < len(probs) else "",
+            f"ID:{track_ids[i]}" if track_ids and i < len(track_ids) else "",
+            f"D:{distances[i]:.1f}m" if distances and i < len(distances) and distances[i] else "",
+            f"S:{velocities[i]:.1f}m/s" if velocities and i < len(velocities) and velocities[i] else ""
+        ]
 
-        if probs and i < len(probs):
-            text_parts.append(f"{probs[i]:.2f}")
-
-        if track_ids and i < len(track_ids):
-            text_parts.append(f"ID:{track_ids[i]}")
-
-        if distances and i < len(distances) and distances[i]:
-            text_parts.append(f"D:{distances[i]:.1f}m")
-
-        if velocities and i < len(velocities) and velocities[i]:
-            text_parts.append(f"S:{velocities[i]:.1f}m/s")
-
-        label_text = " ".join(text_parts)
+        # 过滤空字符串并拼接
+        label_text = " ".join(filter(None, text_parts))
 
         text_size = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
         text_bg_y1 = max(0, y1 - text_size[1] - 5)
@@ -408,10 +575,15 @@ def preprocess_depth_image(depth_image):
     if depth_image is None:
         return None
 
-    depth_image = np.clip(depth_image.astype(np.float32), 0.1, 200.0)
+    # 如果深度图像是float16类型，转换为float32进行处理
+    if depth_image.dtype == np.float16:
+        depth_image = depth_image.astype(np.float32)
+
+    depth_image = np.clip(depth_image, 0.1, 200.0)
 
     if depth_image.shape[0] > 3 and depth_image.shape[1] > 3:
-        depth_image = cv2.medianBlur(depth_image, 3)
+        # 使用较小的高斯模糊，减少计算量
+        depth_image = cv2.GaussianBlur(depth_image, (3, 3), 0.5)
 
     max_val = np.max(depth_image)
     if max_val > 0:
@@ -423,6 +595,10 @@ def preprocess_depth_image(depth_image):
 def get_target_distance(depth_image, box, use_median=True):
     if depth_image is None:
         return 50.0
+
+    # 如果深度图像是float16类型，转换为float32进行计算
+    if depth_image.dtype == np.float16:
+        depth_image = depth_image.astype(np.float32)
 
     x1, y1, x2, y2 = map(int, box)
 
@@ -548,210 +724,192 @@ def spawn_ego_vehicle(world):
 def spawn_npcs(world, count=30, ego_vehicle=None):
     """修正的NPC生成函数 - 确保在主车辆周围生成足够车辆"""
     if not world:
-        return
+        return []
 
     print(f"正在生成 {count} 辆NPC车辆...")
 
+    # 先检查当前已有的车辆
+    existing_vehicles = world.get_actors().filter('vehicle.*')
+    print(f"当前已有车辆数量: {len(existing_vehicles)}")
+
     bp_lib = world.get_blueprint_library()
 
-    # 可用的车辆类型
-    vehicle_names = [
-        'vehicle.audi.a2',
-        'vehicle.audi.tt',
-        'vehicle.toyota.prius',
-        'vehicle.volkswagen.t2',
-        'vehicle.nissan.patrol',
-        'vehicle.mercedes.coupe',
-        'vehicle.dodge.charger_police',
-        'vehicle.ford.mustang',
-        'vehicle.mini.cooperst',
-        'vehicle.nissan.micra',
-        'vehicle.seat.leon'
-    ]
+    # 创建一个包含所有车辆蓝图的列表
+    vehicle_blueprints = list(bp_lib.filter('vehicle.*'))
+    if not vehicle_blueprints:
+        print("错误：没有找到任何车辆蓝图！")
+        return []
 
-    vehicle_bps = []
-    for name in vehicle_names:
-        try:
-            bp = bp_lib.find(name)
-            if bp:
-                vehicle_bps.append(bp)
-        except:
-            continue
-
-    if not vehicle_bps:
-        vehicle_bps = [bp for bp in bp_lib.filter('vehicle.*')]
+    print(f"可用的车辆蓝图数量: {len(vehicle_blueprints)}")
 
     spawn_points = world.get_map().get_spawn_points()
     if not spawn_points:
         print("警告：没有可用的生成点！")
-        return
+        return []
+
+    print(f"可用的生成点数量: {len(spawn_points)}")
 
     ego_location = ego_vehicle.get_location() if ego_vehicle else None
+    ego_transform = ego_vehicle.get_transform() if ego_vehicle else None
 
     spawned_count = 0
     npc_vehicles = []
 
-    # 按距离排序生成点（如果主车辆存在）
-    if ego_location:
-        spawn_points_with_dist = []
-        for spawn_point in spawn_points:
-            dist = math.hypot(
-                spawn_point.location.x - ego_location.x,
-                spawn_point.location.y - ego_location.y
-            )
-            spawn_points_with_dist.append((spawn_point, dist))
+    # 只尝试每个生成点一次，避免无限循环
+    random.shuffle(spawn_points)
 
-        spawn_points_with_dist.sort(key=lambda x: x[1])
-        sorted_spawn_points = [sp[0] for sp in spawn_points_with_dist]
-    else:
-        random.shuffle(spawn_points)
-        sorted_spawn_points = spawn_points
-
-    # 优先在主车辆50米内生成
-    for spawn_point in sorted_spawn_points:
+    for i, spawn_point in enumerate(spawn_points):
         if spawned_count >= count:
             break
 
+        if i % 10 == 0:
+            print(f"尝试生成点 {i + 1}/{len(spawn_points)}...")
+
+        # 检查与主车辆的距离
         if ego_location:
             dist_to_ego = math.hypot(
                 spawn_point.location.x - ego_location.x,
                 spawn_point.location.y - ego_location.y
             )
-            if dist_to_ego > 50.0 or dist_to_ego < 10.0:
+
+            # 只生成在合理距离范围内的车辆（30-80米）
+            if dist_to_ego < 30.0 or dist_to_ego > 80.0:
                 continue
 
-        # 检查是否太靠近其他车辆
+        # 检查是否太靠近已生成的NPC
         too_close = False
         for npc in npc_vehicles:
-            npc_loc = npc.get_location()
-            dist = math.hypot(
-                npc_loc.x - spawn_point.location.x,
-                npc_loc.y - spawn_point.location.y
-            )
-            if dist < 8.0:
-                too_close = True
-                break
-
-        if too_close:
-            continue
-
-        try:
-            vehicle_bp = random.choice(vehicle_bps)
-
-            # 随机颜色
-            if vehicle_bp.has_attribute('color'):
-                colors = vehicle_bp.get_attribute('color').recommended_values
-                if colors:
-                    vehicle_bp.set_attribute('color', random.choice(colors))
-
-            npc = world.try_spawn_actor(vehicle_bp, spawn_point)
-
-            if npc:
-                npc.set_autopilot(True)
-
-                # 设置交通管理器参数
-                try:
-                    traffic_manager = world.get_trafficmanager()
-                    traffic_manager.distance_to_leading_vehicle(npc, 5.0)
-                    traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-30, 10))
-                except:
-                    pass
-
-                npc_vehicles.append(npc)
-                spawned_count += 1
-                if ego_location:
-                    dist_to_ego = math.hypot(
-                        spawn_point.location.x - ego_location.x,
-                        spawn_point.location.y - ego_location.y
-                    )
-                    print(f"生成NPC {spawned_count}/{count} - 距离主车辆: {dist_to_ego:.1f}米")
-                else:
-                    print(f"生成NPC {spawned_count}/{count}")
-        except Exception as e:
-            print(f"生成NPC失败: {e}")
-            continue
-
-    # 如果数量不够，放宽条件继续生成
-    if spawned_count < count:
-        print(f"第一轮生成 {spawned_count} 辆，开始第二轮生成...")
-
-        for spawn_point in sorted_spawn_points:
-            if spawned_count >= count:
-                break
-
-            # 跳过已经检查过的生成点
-            skip = False
-            for npc in npc_vehicles:
+            try:
                 npc_loc = npc.get_location()
                 dist = math.hypot(
                     npc_loc.x - spawn_point.location.x,
                     npc_loc.y - spawn_point.location.y
                 )
-                if dist < 8.0:
-                    skip = True
+                if dist < 5.0:  # 5米内不生成
+                    too_close = True
                     break
-
-            if skip:
+            except:
                 continue
 
-            if ego_location:
-                dist_to_ego = math.hypot(
-                    spawn_point.location.x - ego_location.x,
-                    spawn_point.location.y - ego_location.y
-                )
-                if dist_to_ego < 10.0:
-                    continue
+        if too_close:
+            continue
 
+        try:
+            # 随机选择一个车辆蓝图
+            vehicle_bp = random.choice(vehicle_blueprints)
+
+            # 设置随机颜色
+            if vehicle_bp.has_attribute('color'):
+                colors = vehicle_bp.get_attribute('color').recommended_values
+                if colors:
+                    vehicle_bp.set_attribute('color', random.choice(colors))
+
+            # 尝试生成车辆
+            npc = world.try_spawn_actor(vehicle_bp, spawn_point)
+
+            if npc:
+                npc.set_autopilot(True)
+                npc_vehicles.append(npc)
+                spawned_count += 1
+
+                if ego_location:
+                    dist_to_ego = math.hypot(
+                        spawn_point.location.x - ego_location.x,
+                        spawn_point.location.y - ego_location.y
+                    )
+                    print(f"✓ 生成NPC {spawned_count}/{count} - 距离: {dist_to_ego:.1f}米")
+                else:
+                    print(f"✓ 生成NPC {spawned_count}/{count}")
+        except Exception as e:
+            print(f"生成NPC失败: {e}")
+            continue
+
+    print(f"最终生成 {spawned_count} 辆NPC车辆")
+
+    # 验证生成的车辆
+    valid_npcs = []
+    for npc in npc_vehicles:
+        try:
+            loc = npc.get_location()
+            if loc:
+                valid_npcs.append(npc)
+        except:
+            print(f"警告：无法获取NPC位置，可能已销毁")
+
+    print(f"有效NPC车辆: {len(valid_npcs)} 辆")
+
+    # 打印距离统计
+    if ego_location and valid_npcs:
+        distances = []
+        for npc in valid_npcs:
             try:
-                vehicle_bp = random.choice(vehicle_bps)
-
-                if vehicle_bp.has_attribute('color'):
-                    colors = vehicle_bp.get_attribute('color').recommended_values
-                    if colors:
-                        vehicle_bp.set_attribute('color', random.choice(colors))
-
-                npc = world.try_spawn_actor(vehicle_bp, spawn_point)
-
-                if npc:
-                    npc.set_autopilot(True)
-
-                    try:
-                        traffic_manager = world.get_trafficmanager()
-                        traffic_manager.distance_to_leading_vehicle(npc, 5.0)
-                        traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-30, 10))
-                    except:
-                        pass
-
-                    npc_vehicles.append(npc)
-                    spawned_count += 1
-                    print(f"生成NPC {spawned_count}/{count}")
-            except Exception as e:
-                print(f"生成NPC失败: {e}")
+                npc_loc = npc.get_location()
+                dist = math.hypot(
+                    npc_loc.x - ego_location.x,
+                    npc_loc.y - ego_location.y
+                )
+                distances.append(dist)
+            except:
                 continue
 
-    print(f"成功生成 {spawned_count} 辆NPC车辆")
+        if distances:
+            print(
+                f"NPC距离统计: 最近{min(distances):.1f}米, 最远{max(distances):.1f}米, 平均{np.mean(distances):.1f}米")
+        else:
+            print("警告：无法计算NPC距离")
 
-    # 配置交通管理器
-    try:
-        traffic_manager = world.get_trafficmanager()
-        traffic_manager.set_global_distance_to_leading_vehicle(2.5)
-        traffic_manager.global_percentage_speed_difference(0.0)
-        traffic_manager.set_synchronous_mode(True)
-        print("交通管理器配置完成")
-    except:
-        pass
+    return valid_npcs
 
 
+# 优化内存占用：使用更高效的回调函数
 def camera_callback(image, rgb_image_queue):
-    rgb_image_queue.put(np.reshape(np.copy(image.raw_data), (image.height, image.width, 4)))
+    """优化内存占用的RGB图像回调函数"""
+    # 使用array接口避免额外复制，只取RGB通道
+    array = np.frombuffer(image.raw_data, dtype=np.uint8)
+    array = array.reshape((image.height, image.width, 4))
+    rgb = array[..., :3]  # 只存储RGB通道，丢弃Alpha通道
+
+    # 使用put_nowait避免阻塞
+    try:
+        rgb_image_queue.put_nowait(rgb)
+    except queue.Full:
+        # 丢弃最旧的一帧，放入新帧
+        try:
+            rgb_image_queue.get_nowait()
+        except:
+            pass
+        rgb_image_queue.put_nowait(rgb)
 
 
 def depth_camera_callback(image, depth_queue):
-    depth_data = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
-    depth_channel = (depth_data[:, :, 2] + depth_data[:, :, 1] * 256 + depth_data[:, :, 0] * 256 ** 2)
-    depth_in_meters = depth_channel / (256 ** 3 - 1) * 1000.0
+    """优化内存占用的深度图像回调函数"""
+    # 使用更小的数据类型存储深度图像
+    depth_data = np.frombuffer(image.raw_data, dtype=np.uint8)
+    depth_data = depth_data.reshape((image.height, image.width, 4))
+
+    # 使用uint16存储深度数据，减少内存占用
+    depth_channel = (
+            depth_data[..., 2].astype(np.uint16) +
+            depth_data[..., 1].astype(np.uint16) * 256 +
+            depth_data[..., 0].astype(np.uint16) * 256 ** 2
+    )
+
+    # 转换为米为单位，并使用float16存储（相比float32减少50%内存）
+    depth_in_meters = depth_channel.astype(np.float16) / (256 ** 3 - 1) * 1000.0
+
+    # 预处理深度图像
     depth_in_meters = preprocess_depth_image(depth_in_meters)
-    depth_queue.put(depth_in_meters)
+
+    # 使用put_nowait避免阻塞
+    try:
+        depth_queue.put_nowait(depth_in_meters)
+    except queue.Full:
+        # 丢弃最旧的一帧，放入新帧
+        try:
+            depth_queue.get_nowait()
+        except:
+            pass
+        depth_queue.put_nowait(depth_in_meters)
 
 
 # -------------------------- 主函数 --------------------------
@@ -772,6 +930,7 @@ def main():
     # 初始化变量
     world = vehicle = camera = depth_camera = None
     image_queue = depth_queue = None
+    client = None
 
     try:
         # 1. 初始化设备
@@ -839,11 +998,46 @@ def main():
 
         # 6. 生成NPC车辆
         print(f"生成 {args.npc_count} 辆NPC车辆...")
-        spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+        npc_vehicles = spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+
+        if len(npc_vehicles) < args.npc_count // 2:
+            print(
+                f"警告：只成功生成了 {len(npc_vehicles)} 辆NPC车辆（目标: {args.npc_count} 辆），可能无法获得足够的检测目标")
+        else:
+            print(f"成功生成 {len(npc_vehicles)} 辆NPC车辆")
+
+        # 配置交通管理器
+        try:
+            # 获取交通管理器
+            traffic_manager = client.get_trafficmanager()
+
+            # 设置交通管理器端口（通常使用默认端口8000）
+            tm_port = traffic_manager.get_port()
+
+            # 设置同步模式
+            traffic_manager.set_synchronous_mode(True)
+
+            # 设置全局参数
+            traffic_manager.set_global_distance_to_leading_vehicle(2.5)
+            traffic_manager.global_percentage_speed_difference(0.0)
+
+            # 设置所有NPC车辆的交通管理器参数
+            for npc in npc_vehicles:
+                # 重新设置自动驾驶，使用交通管理器
+                npc.set_autopilot(True, tm_port)
+
+                # 设置与前方车辆的距离
+                traffic_manager.distance_to_leading_vehicle(npc, random.uniform(2.0, 5.0))
+                # 设置速度差
+                traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-10.0, 10.0))
+
+            print("交通管理器配置完成")
+        except Exception as e:
+            print(f"交通管理器配置失败: {e}")
 
         # 等待NPC车辆稳定
         print("等待NPC车辆初始化...")
-        for _ in range(5):
+        for _ in range(10):
             world.tick()
 
         # 7. 加载检测模型和跟踪器
@@ -856,16 +1050,29 @@ def main():
         print("=" * 50)
 
         frame_count = 0
-        fps_history = deque(maxlen=30)
         detection_stats = {'total_detections': 0, 'total_frames': 0, 'max_vehicles_per_frame': 0}
 
+        # 性能监控变量
+        timings = {
+            'carla_tick': [],
+            'image_get': [],
+            'depth_get': [],
+            'detection': [],
+            'tracking': [],
+            'drawing': [],
+            'display': [],
+            'total': []
+        }
+
         while True:
-            start_time = time.time()
+            frame_start = time.time()
             frame_count += 1
             detection_stats['total_frames'] += 1
 
             # 同步CARLA世界
+            tick_start = time.time()
             world.tick()
+            timings['carla_tick'].append(time.time() - tick_start)
 
             # 移动视角跟随主车辆
             ego_transform = vehicle.get_transform()
@@ -876,26 +1083,37 @@ def main():
             spectator.set_transform(spectator_transform)
 
             # 获取图像
+            image_start = time.time()
             if image_queue.empty():
                 time.sleep(0.001)
                 continue
 
             origin_image = image_queue.get()
-            image = cv2.cvtColor(origin_image, cv2.COLOR_BGRA2RGB)
+            image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)  # 注意：已经去掉了Alpha通道
             height, width, _ = image.shape
+            timings['image_get'].append(time.time() - image_start)
 
             # 获取深度图像
+            depth_start = time.time()
             depth_image = None
             if args.use_depth and depth_queue and not depth_queue.empty():
                 depth_image = depth_queue.get()
 
                 if args.show_depth:
-                    depth_vis = cv2.normalize(depth_image, None, 0, 255, cv2.NORM_MINMAX)
+                    # 转换为8位用于显示
+                    if depth_image.dtype == np.float16:
+                        depth_vis = depth_image.astype(np.float32)
+                    else:
+                        depth_vis = depth_image.copy()
+
+                    depth_vis = cv2.normalize(depth_vis, None, 0, 255, cv2.NORM_MINMAX)
                     depth_vis = depth_vis.astype(np.uint8)
                     depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
                     cv2.imshow('Depth Image', depth_vis)
+            timings['depth_get'].append(time.time() - depth_start)
 
             # 目标检测
+            detection_start = time.time()
             boxes, labels, probs, depths = [], [], [], []
 
             try:
@@ -939,6 +1157,8 @@ def main():
             except Exception as e:
                 print(f"检测模型推理出错: {e}")
 
+            timings['detection'].append(time.time() - detection_start)
+
             # 更新检测统计
             detection_stats['total_detections'] += len(boxes)
             detection_stats['max_vehicles_per_frame'] = max(
@@ -946,6 +1166,7 @@ def main():
             )
 
             # 目标跟踪
+            tracking_start = time.time()
             if boxes:
                 boxes_np = np.array(boxes, dtype=np.float32)
                 probs_np = np.array(probs, dtype=np.float32).reshape(-1, 1)
@@ -977,6 +1198,7 @@ def main():
                             track_velocities.append(None)
 
                     # 绘制跟踪结果
+                    drawing_start = time.time()
                     if track_boxes:
                         image = draw_bounding_boxes(
                             image, track_boxes,
@@ -990,15 +1212,24 @@ def main():
 
                         cv2.putText(image, f'Vehicles: {len(track_boxes)}', (width - 200, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                    timings['drawing'].append(time.time() - drawing_start)
+            else:
+                timings['tracking'].append(0.0)
+                timings['drawing'].append(0.0)
+
+            timings['tracking'].append(time.time() - tracking_start)
 
             # 计算FPS
-            fps = 1.0 / (time.time() - start_time)
-            fps_history.append(fps)
-            avg_fps = np.mean(fps_history) if fps_history else fps
+            total_time = time.time() - frame_start
+            fps = 1.0 / total_time if total_time > 0 else 0
+            timings['total'].append(total_time)
 
-            # 显示信息
+            # 绘制性能监控面板
+            image = draw_performance_panel(image, timings, fps, frame_count)
+
+            # 显示其他信息
             info = [
-                f"FPS: {avg_fps:.1f}",
+                f"FPS: {fps:.1f}",
                 f"Frame: {frame_count}",
                 f"Tracks: {len(tracker.tracks)}",
                 f"Detections: {len(boxes)}",
@@ -1006,20 +1237,53 @@ def main():
                 "Press 'q' to quit"
             ]
 
-            y_pos = 30
+            # 调整信息位置，避免与性能面板重叠
+            y_pos = 220
             for line in info:
                 cv2.putText(image, line, (10, y_pos),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
                 y_pos += 25
 
             # 显示结果
+            display_start = time.time()
             window_name = f'CARLA {args.model} + {args.tracker}'
             cv2.imshow(window_name, cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            timings['display'].append(time.time() - display_start)
 
-            # 每30帧打印一次统计信息
-            if frame_count % 30 == 0:
-                print(
-                    f"[Frame {frame_count}] FPS: {avg_fps:.1f}, Detections: {len(boxes)}, Tracks: {len(tracker.tracks)}")
+            # 每50帧打印一次性能统计
+            if frame_count % 50 == 0 and frame_count > 0:
+                print("\n" + "=" * 60)
+                print("性能监控统计 (最近50帧平均值):")
+                print("-" * 60)
+                print(f"CARLA同步: {np.mean(timings['carla_tick'][-50:]):.4f}s")
+                print(f"图像获取:   {np.mean(timings['image_get'][-50:]):.4f}s")
+                print(f"深度获取:   {np.mean(timings['depth_get'][-50:]):.4f}s")
+                print(f"目标检测:   {np.mean(timings['detection'][-50:]):.4f}s (瓶颈)")
+                print(f"目标跟踪:   {np.mean(timings['tracking'][-50:]):.4f}s")
+                print(f"结果绘制:   {np.mean(timings['drawing'][-50:]):.4f}s")
+                print(f"显示输出:   {np.mean(timings['display'][-50:]):.4f}s")
+                print(f"总帧时间:   {np.mean(timings['total'][-50:]):.4f}s")
+                print(f"理论FPS:    {1.0 / np.mean(timings['total'][-50:]):.1f}")
+                print("=" * 60)
+
+                # 自动识别瓶颈并提供建议
+                bottleneck_times = {
+                    '检测': np.mean(timings['detection'][-50:]),
+                    '跟踪': np.mean(timings['tracking'][-50:]),
+                    '绘制': np.mean(timings['drawing'][-50:]),
+                    'CARLA': np.mean(timings['carla_tick'][-50:])
+                }
+                bottleneck = max(bottleneck_times, key=bottleneck_times.get)
+                if bottleneck_times[bottleneck] > 0.05:  # 超过50ms
+                    print(f"⚠️  性能瓶颈: {bottleneck} ({bottleneck_times[bottleneck]:.3f}s)")
+                    if bottleneck == '检测':
+                        print("建议: 降低模型分辨率或使用更轻量模型")
+                    elif bottleneck == '跟踪':
+                        print("建议: 减少跟踪目标数量或简化跟踪算法")
+                    elif bottleneck == '绘制':
+                        print("建议: 简化绘制内容或减少信息显示")
+                    elif bottleneck == 'CARLA':
+                        print("建议: 减少NPC数量或降低仿真频率")
 
             # 退出检查
             key = cv2.waitKey(1) & 0xFF
@@ -1035,11 +1299,26 @@ def main():
                             actor.destroy()
                         except:
                             pass
-                spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
+                npc_vehicles = spawn_npcs(world, count=args.npc_count, ego_vehicle=vehicle)
                 print("NPC重新生成完成")
 
+                # 重新配置交通管理器
+                try:
+                    traffic_manager = client.get_trafficmanager()
+                    tm_port = traffic_manager.get_port()
+                    traffic_manager.set_synchronous_mode(True)
+
+                    for npc in npc_vehicles:
+                        npc.set_autopilot(True, tm_port)
+                        traffic_manager.distance_to_leading_vehicle(npc, random.uniform(2.0, 5.0))
+                        traffic_manager.vehicle_percentage_speed_difference(npc, random.uniform(-10.0, 10.0))
+
+                    print("交通管理器重新配置完成")
+                except Exception as e:
+                    print(f"交通管理器重新配置失败: {e}")
+
             # FPS控制
-            elapsed = time.time() - start_time
+            elapsed = time.time() - frame_start
             if elapsed < 0.05:
                 time.sleep(0.05 - elapsed)
 
@@ -1053,17 +1332,28 @@ def main():
         # 清理资源
         print("\n正在清理资源...")
 
+        # 先停止传感器监听
         if camera:
             try:
+                camera.stop()
                 camera.destroy()
             except:
                 pass
 
         if depth_camera:
             try:
+                depth_camera.stop()
                 depth_camera.destroy()
             except:
                 pass
+
+        # 清理队列中的残留数据
+        if image_queue:
+            while not image_queue.empty():
+                try:
+                    image_queue.get_nowait()
+                except:
+                    break
 
         if world:
             settings = world.get_settings()
@@ -1072,11 +1362,27 @@ def main():
 
         cv2.destroyAllWindows()
 
+        # 清理PyTorch缓存
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         # 打印最终统计
         print("\n" + "=" * 50)
         print("程序运行统计：")
         print(f"总帧数: {frame_count}")
-        print(f"平均FPS: {np.mean(fps_history) if fps_history else 0:.1f}")
+
+        # 性能统计总结
+        if timings['total']:
+            print(f"平均FPS: {1.0 / np.mean(timings['total']):.1f}")
+            print("\n性能时间分布：")
+            print(f"CARLA同步: {np.mean(timings['carla_tick']):.4f}s")
+            print(f"图像获取:   {np.mean(timings['image_get']):.4f}s")
+            print(f"深度获取:   {np.mean(timings['depth_get']):.4f}s")
+            print(f"目标检测:   {np.mean(timings['detection']):.4f}s")
+            print(f"目标跟踪:   {np.mean(timings['tracking']):.4f}s")
+            print(f"结果绘制:   {np.mean(timings['drawing']):.4f}s")
+            print(f"显示输出:   {np.mean(timings['display']):.4f}s")
+
         print(f"总检测次数: {detection_stats['total_detections']}")
         print(f"平均每帧检测: {detection_stats['total_detections'] / max(1, detection_stats['total_frames']):.1f}")
         print(f"最大单帧车辆数: {detection_stats['max_vehicles_per_frame']}")
@@ -1086,4 +1392,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

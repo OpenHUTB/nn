@@ -1,0 +1,138 @@
+<mujoco model="auto_creep_with_obstacles">
+  <option timestep="0.002" integrator="Euler"/>
+  <compiler angle="radian" coordinate="local" autolimits="false"/>
+
+  <asset>
+    <texture name="wheel" type="2d" builtin="checker" rgb1="0.1 0.1 0.1" rgb2="0.2 0.2 0.2" width="128" height="128"/>
+    <material name="wheel" texture="wheel" texuniform="true" reflectance="0.2"/>
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.6 0.6 0.6" rgb2="0.8 0.8 0.8"/>
+    <material name="grid" texture="grid" texuniform="true" reflectance="0.2"/>
+    <!-- 障碍物材质 -->
+    <material name="obs" rgba="0.2 0.4 0.8 1"/>
+    <material name="wall" rgba="0.5 0.5 0.5 1"/>
+  </asset>
+
+  <default>
+    <default class="wheel">
+      <geom type="sphere" size="0.04" material="wheel"
+            mass="0.25" friction="1.0 0.005 0.005"/>
+    </default>
+    <default class="arm">
+      <joint type="hinge" axis="0 1 0" damping="12" stiffness="60"
+             range="-0.02 0.04" limited="true"/>
+    </default>
+    <default class="steer">
+      <joint type="hinge" axis="0 0 1" damping="5" limited="false"/>
+    </default>
+    <default class="drive">
+      <motor ctrlrange="-0.8 0.8" ctrllimited="true" gear="25"/>
+    </default>
+    <default class="servo">
+      <motor ctrlrange="-0.3 0.3" ctrllimited="true" gear="15"/>
+    </default>
+  </default>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="10 10 0.1" material="grid"/>
+
+    <!-- ===== 周边障碍物群（5×5 m 范围） ===== -->
+    <!-- 1. 盒子障碍 -->
+    <body name="obs_box1" pos="1.0 0.5 0.05">
+      <geom type="box" size="0.15 0.15 0.15" material="obs" mass="1"/>
+    </body>
+    <body name="obs_box2" pos="-1.2 1.2 0.05">
+      <geom type="box" size="0.12 0.12 0.12" material="obs" mass="0.8"/>
+    </body>
+    <body name="obs_box3" pos="0 -1.8 0.05">
+      <geom type="box" size="0.18 0.18 0.18" material="obs" mass="1.2"/>
+    </body>
+    <body name="obs_box4" pos="2.0 -1.0 0.05">
+      <geom type="box" size="0.10 0.20 0.10" material="obs" mass="0.9"/>
+    </body>
+
+    <!-- 2. 球障碍 -->
+    <body name="obs_ball1" pos="-1.0 -1.0 0.04">
+      <geom type="sphere" size="0.08" material="obs" mass="0.6"/>
+    </body>
+    <body name="obs_ball2" pos="2.2 1.3 0.04">
+      <geom type="sphere" size="0.06" material="obs" mass="0.4"/>
+    </body>
+    <body name="obs_ball3" pos="-2.0 0.5 0.04">
+      <geom type="sphere" size="0.10" material="obs" mass="0.8"/>
+    </body>
+
+    <!-- 3. 矮墙障碍（当路障） -->
+    <body name="wall1" pos="0 2.5 0.02">
+      <geom type="box" size="0.8 0.05 0.04" material="wall" mass="0.5"/>
+    </body>
+    <body name="wall2" pos="-2.5 -0.5 0.02">
+      <geom type="box" size="0.05 0.8 0.04" material="wall" mass="0.5"/>
+    </body>
+
+    <!-- 小车 -->
+    <body name="chassis" pos="0 0 0.03">
+      <freejoint/>
+      <geom name="body" type="box" size="0.18 0.22 0.02" pos="0 0 -0.02" rgba="0.9 0.2 0.2 1" mass="3"/>
+      <geom type="box" size="0.18 0.22 0.04" rgba="0.9 0.2 0.2 1" contype="0" conaffinity="0"/>
+
+      <body name="front_left_hub" pos="0.16 0.17 0">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <joint name="fl_steer" class="servo"/>
+        <body name="fl_arm" pos="0 0 0">
+          <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+          <joint name="fl_arm_hinge" axis="0 1 0" damping="12" stiffness="60" range="-0.02 0.04" limited="true"/>
+          <body name="fl_wheel" pos="0 0 -0.04">
+            <joint name="fl_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+            <geom class="wheel" pos="0 0 0"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="front_right_hub" pos="0.16 -0.17 0">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <joint name="fr_steer" class="servo"/>
+        <body name="fr_arm" pos="0 0 0">
+          <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+          <joint name="fr_arm_hinge" axis="0 1 0" damping="12" stiffness="60" range="-0.02 0.04" limited="true"/>
+          <body name="fr_wheel" pos="0 0 -0.04">
+            <joint name="fr_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+            <geom class="wheel" pos="0 0 0"/>
+          </body>
+        </body>
+      </body>
+
+      <body name="rear_left" pos="-0.16 0.17 0">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <joint name="rl_arm_hinge" axis="0 1 0" damping="12" stiffness="60" range="-0.02 0.04" limited="true"/>
+        <body name="rl_wheel" pos="0 0 -0.04">
+          <joint name="rl_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+          <geom class="wheel" pos="0 0 0"/>
+        </body>
+      </body>
+
+      <body name="rear_right" pos="-0.16 -0.17 0">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <joint name="rr_arm_hinge" axis="0 1 0" damping="12" stiffness="60" range="-0.02 0.04" limited="true"/>
+        <body name="rr_wheel" pos="0 0 -0.04">
+          <joint name="rr_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+          <geom class="wheel" pos="0 0 0"/>
+        </body>
+      </body>
+
+      <!-- 绿色相机保留 -->
+      <body name="cam" pos="0.15 0 0.08" quat="0.819 0.573 0 0">
+        <camera name="track" mode="fixed" pos="0 0 0" xyaxes="1 0 0  0 0 1" fovy="60"/>
+        <geom type="box" size="0.01 0.02 0.01" rgba="0 1 0 1" contype="0" conaffinity="0"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="steer_fl" joint="fl_steer" class="servo"/>
+    <motor name="steer_fr" joint="fr_steer" class="servo"/>
+    <motor name="drive_fl" joint="fl_drive" class="drive"/>
+    <motor name="drive_fr" joint="fr_drive" class="drive"/>
+    <motor name="drive_rl" joint="rl_drive" class="drive"/>
+    <motor name="drive_rr" joint="rr_drive" class="drive"/>
+  </actuator>
+</mujoco>
