@@ -4,6 +4,7 @@ CARLA 强化学习环境（4D 观测增强版）
 - 观测: [x, y, vx, vy]
 - 动作: [throttle, steer, brake]
 - 新增: 车道保持奖励、合理速度区间、轨迹日志、参数化配置、抗崩溃机制
+- 【本次更新】新增 get_forward_waypoint() 用于高层导航
 """
 
 import carla
@@ -290,6 +291,47 @@ class CarlaEnvMultiObs(Env):
             "lane_offset": lane_offset,
             "collision": terminated
         }
+
+    # ================================
+    # 【新增功能】用于高层导航
+    # ================================
+
+    def get_vehicle_transform(self):
+        """安全获取车辆当前位姿（Transform）"""
+        if not self.vehicle or not self.vehicle.is_alive:
+            return None
+        try:
+            return self.vehicle.get_transform()
+        except:
+            return None
+
+    def get_forward_waypoint(self, distance=3.0):
+        """
+        获取车辆前方指定距离的车道中心点（世界坐标）
+        :param distance: 前瞻距离（米），建议 2.0~5.0
+        :return: carla.Location 对象，若失败返回 None
+        """
+        try:
+            vehicle_tf = self.get_vehicle_transform()
+            if vehicle_tf is None:
+                return None
+            # 沿车头方向前进
+            forward = vehicle_tf.get_forward_vector()
+            target_loc = vehicle_tf.location + carla.Location(
+                x=forward.x * distance,
+                y=forward.y * distance,
+                z=0.0
+            )
+            # 投影到最近可行驶车道中心
+            waypoint = self.world.get_map().get_waypoint(
+                target_loc,
+                project_to_road=True,
+                lane_type=carla.LaneType.Driving
+            )
+            return waypoint.transform.location if waypoint else None
+        except Exception as e:
+            print(f"⚠️ get_forward_waypoint 失败: {e}")
+            return None
 
     def close(self):
         # 保存轨迹

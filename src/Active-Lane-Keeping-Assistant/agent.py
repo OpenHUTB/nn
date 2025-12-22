@@ -119,33 +119,32 @@ class Agent():
         file_name = os.path.join(path, f'{id}_error.jpg')
         plt.savefig(file_name)
 
-    def get_actions(self, detection_surface_area: float,
-                    error: float) -> tuple[float, float]:
-
+def get_actions(self, detection_surface_area:float,
+        error:float) -> tuple[float, float]:
+        
         # 默认基础油门
         dynamic_throttle = self.throttle
 
         if (self.check_surface_area(detection_surface_area)):
-            # Case 1: Lane lost (Safety Mode)
+            # Case 1: 没找到车道线 (安全模式)
             steer = 0
-            # [Planning] Safety: Slow down immediately if lane is not found
-            dynamic_throttle = 0.2
-
+            # [Planning] Safety: 丢失视野时，强制降速以策安全
+            dynamic_throttle = 0.2 
+            
             if self.errors:
                 self.errors.append(self.errors[-1])
             else:
                 self.errors.append(0)
         else:
-            # Case 2: Lane detected (Normal Driving)
+            # Case 2: 正常行驶
             self.errors.append(error)
             steer = self.func(error=error)
-
-            # [Planning] Longitudinal Speed Planning based on Curvature
-            # NOT "ACC". This adjusts speed based on steering angle.
-            # Strategy: High steering angle -> Low speed (Cornering)
-            #           Low steering angle  -> High speed (Straight)
-            # Formula: Base - (Steer * Factor)
-            # Optimization: Increased factor from 0.4 to 0.8 for visible effect
+            
+            # [Planning] 核心修改：基于曲率的纵向速度规划 (Longitudinal Speed Planning)
+            # 注意：这不是 ACC (自适应巡航)，而是弯道速度控制。
+            # 策略：方向盘转角越大 -> 弯越急 -> 速度越慢
+            # 公式：基础油门 - (转角绝对值 * 系数)
+            # 优化：系数调整为 0.8，确保弯道减速肉眼可见
             dynamic_throttle = max(0.2, self.throttle - abs(steer) * 0.8)
 
         return steer, dynamic_throttle
