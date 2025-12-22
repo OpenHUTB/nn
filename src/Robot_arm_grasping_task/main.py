@@ -5,6 +5,7 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import time
 import matplotlib as mpl
+import os  # 新增：用于处理路径
 
 # ===================== 修复Matplotlib中文显示问题 =====================
 # 设置支持中文的字体（Windows系统）
@@ -13,7 +14,12 @@ mpl.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
 mpl.rcParams['font.family'] = 'sans-serif'
 
 # ===================== 核心配置（优化参数确保抓取成功）=====================
-MODEL_PATH = "D:/nn/src/Robot _arm_grasping_task/robot.xml"
+# 关键修改：使用相对路径（基于当前脚本所在目录）
+# 获取当前脚本的目录
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 拼接robot.xml的绝对路径（适配Windows系统）
+MODEL_PATH = os.path.join(CURRENT_DIR, "robot.xml")
+
 TARGET_OBJECT_POS = np.array([0.4, 0.0, 0.1])  # 目标物体位置
 GOAL_POS = np.array([-0.2, 0.0, 0.1])  # 降低搬运距离，确保完成
 FORCE_THRESHOLD = 2.0  # 降低力阈值，更容易触发抓取
@@ -76,7 +82,10 @@ def pid_controller(error, error_integral, error_prev):
 
 # ===================== 主仿真函数 =====================
 def grasp_simulation():
-    # 1. 加载模型和数据
+    # 1. 加载模型和数据（新增：路径校验）
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"找不到robot.xml文件！路径：{MODEL_PATH}")
+
     model = mujoco.MjModel.from_xml_path(MODEL_PATH)
     data = mujoco.MjData(model)
     viewer = mujoco_viewer.MujocoViewer(model, data)
@@ -269,8 +278,10 @@ def grasp_simulation():
     ax4.legend(fontsize=8)
     ax4.grid(True, alpha=0.3)
 
+    # 关键修改：保存图片到脚本所在目录（避免路径问题）
+    result_img_path = os.path.join(CURRENT_DIR, "grasp_simulation_result.png")
     plt.tight_layout()
-    plt.savefig('grasp_simulation_result.png', dpi=150, bbox_inches='tight')
+    plt.savefig(result_img_path, dpi=150, bbox_inches='tight')
     plt.show()
 
     # 输出抓取结果
@@ -288,5 +299,12 @@ def grasp_simulation():
 
 # ===================== 运行仿真 =====================
 if __name__ == "__main__":
-    grasp_simulation()
-    print("\n🔚 Simulation End")
+    try:
+        grasp_simulation()
+    except FileNotFoundError as e:
+        print(f"❌ 运行失败：{e}")
+        print("💡 请确认robot.xml文件和main.py在同一目录下！")
+    except Exception as e:
+        print(f"❌ 运行出错：{type(e).__name__}: {e}")
+    finally:
+        print("\n🔚 Simulation End")
