@@ -58,5 +58,5 @@ view:
 default_mode: "satellite"          # 默认视角模式: satellite, behind, first_person
 satellite_height: 50.0             # 卫星视角高度（米）
 behind_distance: 10.0              # 后方视角距离（米）
-first_person_height: 1.6           # 第一人称视角高度（米）
+first_person_height: 1.6           # 第一人称视角高度
 update_frequency: 1.0              # 视角更新频率（Hz），1.0=每秒更新一次
