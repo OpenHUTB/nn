@@ -1049,6 +1049,7 @@ class MojocoDataSim:
 
                 # 新增：模拟温度数据
                 temperature = self.simulate_temperature_data()
+                
 
                 # 检查并控制空调
                 ac_status = self.check_and_control_ac(temperature)
