@@ -6,7 +6,6 @@
 
 import os
 import numpy as np
-import cv2  # 新增：导入opencv用于图像读取
 import torch
 from torch.utils.data import Dataset, DataLoader
 
@@ -16,7 +15,6 @@ class AutoDriveDataset(Dataset):
     自动驾驶感知数据集基类
     所有自定义数据集需继承此类并实现抽象方法
     """
-
     def __init__(self, data_root: str, split: str = "train", transform=None):
         """
         初始化数据集
@@ -37,25 +35,6 @@ class AutoDriveDataset(Dataset):
         加载数据集样本列表（抽象方法，需子类实现）
         """
         raise NotImplementedError("子类必须实现 _load_sample_list 方法")
-
-    def _load_image(self, img_path: str) -> np.ndarray:
-        """
-        封装图像读取函数
-        :param img_path: 图像文件路径
-        :return: 读取后的RGB格式图像（np.ndarray）
-        """
-        # 检查图像路径是否存在
-        if not os.path.exists(img_path):
-            raise FileNotFoundError(f"图像文件不存在：{img_path}")
-
-        # 读取图像（cv2默认读取为BGR格式）
-        img = cv2.imread(img_path)
-        if img is None:
-            raise ValueError(f"无法读取图像文件：{img_path}（可能是文件损坏或格式不支持）")
-
-        # 转换为RGB格式（符合大多数深度学习框架的输入要求）
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        return img_rgb
 
     def __len__(self):
         """
