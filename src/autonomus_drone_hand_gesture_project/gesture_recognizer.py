@@ -132,7 +132,14 @@ class EnhancedGestureRecognizer:
         self.performance_mode_color = self.mode_config['color']
         self.performance_mode_name = self.mode_config['name']
 
+        # UI渲染器引用（稍后设置）
+        self.ui_renderer = None
+
         print(f"✓ 增强的手势识别器已初始化 - 性能模式: {self.performance_mode_name}")
+
+    def set_ui_renderer(self, ui_renderer):
+        """设置UI渲染器"""
+        self.ui_renderer = ui_renderer
 
     def set_performance_mode(self, mode):
         """设置性能模式"""
@@ -656,27 +663,72 @@ class EnhancedGestureRecognizer:
             # 显示手势标签
             label = f"{gesture}"
             if self.config.get('display', 'show_confidence'):
-                label += f" ({confidence:.0%})"
+                # 使用UI渲染器绘制文本，避免字体问题
+                if self.ui_renderer:
+                    # 首先绘制手势名称
+                    gesture_text = f"{gesture}"
+
+                    # 计算文本位置
+                    (text_width, text_height), baseline = cv2.getTextSize(
+                        gesture_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                    )
+
+                    # 绘制文本背景
+                    cv2.rectangle(frame,
+                                  (x1, y1 - text_height - 10),
+                                  (x1 + text_width, y1),
+                                  color, -1)
+
+                    # 使用UI渲染器绘制手势名称
+                    frame = self.ui_renderer.draw_text(frame, gesture_text,
+                                                      (x1, y1 - 5),
+                                                      size=16, color=(255, 255, 255))
+
+                    # 绘制置信度（使用UI渲染器确保正确显示）
+                    confidence_text = f"{confidence:.0%}"
+                    # 计算置信度文本位置
+                    frame = self.ui_renderer.draw_text(frame, confidence_text,
+                                                      (x1 + text_width + 5, y1 - 5),
+                                                      size=16, color=(255, 255, 255))
+                else:
+                    # 备用方案
+                    label += f" ({confidence:.0%})"
+                    (text_width, text_height), baseline = cv2.getTextSize(
+                        label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                    )
+
+                    cv2.rectangle(frame,
+                                  (x1, y1 - text_height - 10),
+                                  (x1 + text_width, y1),
+                                  color, -1)
+                    cv2.putText(frame, label, (x1, y1 - 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            else:
+                # 不使用置信度显示
+                (text_width, text_height), baseline = cv2.getTextSize(
+                    label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                )
+
+                cv2.rectangle(frame,
+                              (x1, y1 - text_height - 10),
+                              (x1 + text_width, y1),
+                              color, -1)
+                cv2.putText(frame, label, (x1, y1 - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
             # 显示手势状态
             if self.gesture_state != "none":
-                state_text = {"starting": "开始", "active": "活跃", "ending": "结束"}
-                label += f" [{state_text.get(self.gesture_state, '')}]"
+                state_text = {"starting": "Starting", "active": "Active", "ending": "Ending"}
+                state_label = f" [{state_text.get(self.gesture_state, '')}]"
 
-            # 计算文本大小
-            (text_width, text_height), baseline = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
-            )
-
-            # 绘制文本背景
-            cv2.rectangle(frame,
-                          (x1, y1 - text_height - 10),
-                          (x1 + text_width, y1),
-                          color, -1)
-
-            # 绘制文本
-            cv2.putText(frame, label, (x1, y1 - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                # 使用UI渲染器绘制状态文本
+                if self.ui_renderer:
+                    frame = self.ui_renderer.draw_text(frame, state_label,
+                                                      (x1, y1 - 30),
+                                                      size=14, color=color)
+                else:
+                    cv2.putText(frame, state_label, (x1, y1 - 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
         # 绘制手掌中心
         if show_palm_center and 'palm_center' in hand_data:
@@ -684,15 +736,27 @@ class EnhancedGestureRecognizer:
             palm_radius = hand_data.get('palm_radius', 20)
             cv2.circle(frame, (cx, cy), 5, (0, 0, 255), -1)
             cv2.circle(frame, (cx, cy), palm_radius, (0, 0, 255), 1)
-            cv2.putText(frame, "Palm", (cx + 10, cy),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+            # 使用UI渲染器绘制"Palm"文本
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, "Palm",
+                                                  (cx + 10, cy),
+                                                  size=14, color=(0, 0, 255))
+            else:
+                cv2.putText(frame, "Palm", (cx + 10, cy),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
         # 绘制指尖
         if show_fingertips and 'fingertips' in hand_data:
             for i, point in enumerate(hand_data['fingertips']):
                 cv2.circle(frame, point, 4, (255, 0, 0), -1)
-                cv2.putText(frame, f"F{i + 1}", (point[0] + 5, point[1]),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+                # 使用UI渲染器绘制指尖编号
+                if self.ui_renderer:
+                    frame = self.ui_renderer.draw_text(frame, f"F{i+1}",
+                                                      (point[0] + 5, point[1]),
+                                                      size=14, color=(255, 0, 0))
+                else:
+                    cv2.putText(frame, f"F{i+1}", (point[0] + 5, point[1]),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
         # 绘制手部方向
         if show_hand_direction and 'direction' in hand_data and 'center' in hand_data:
@@ -707,8 +771,14 @@ class EnhancedGestureRecognizer:
             cv2.arrowedLine(frame, (cx, cy), end_point, (255, 255, 0), 2)
 
             angle_text = f"Dir: {direction:.0f}°"
-            cv2.putText(frame, angle_text, (cx, cy - 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+            # 使用UI渲染器绘制方向文本
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, angle_text,
+                                                  (cx, cy - 20),
+                                                  size=14, color=(255, 255, 0))
+            else:
+                cv2.putText(frame, angle_text, (cx, cy - 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
 
         # 绘制稳定性指示器
         if show_stability_indicator:
@@ -738,8 +808,13 @@ class EnhancedGestureRecognizer:
                           (indicator_x + 5 + bar_length, indicator_y + 10), bar_color, -1)
 
             # 绘制稳定性文本
-            cv2.putText(frame, "稳定度", (indicator_x, indicator_y - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, "稳定度",
+                                                  (indicator_x, indicator_y - 5),
+                                                  size=14, color=(255, 255, 255))
+            else:
+                cv2.putText(frame, "稳定度", (indicator_x, indicator_y - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         # 绘制手势历史
         if show_gesture_history and len(self.gesture_history) > 0:
@@ -748,35 +823,69 @@ class EnhancedGestureRecognizer:
 
             # 绘制历史背景
             cv2.rectangle(frame, (10, history_y - 20), (200, history_y + 10), (0, 0, 0), -1)
-            cv2.putText(frame, "手势历史:", (15, history_y),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+            # 使用UI渲染器绘制历史标题
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, "手势历史:",
+                                                  (15, history_y),
+                                                  size=14, color=(255, 255, 255))
+            else:
+                cv2.putText(frame, "手势历史:", (15, history_y),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
             # 显示最近几个手势
             recent_gestures = list(self.gesture_history)[-5:] if len(self.gesture_history) >= 5 else list(
                 self.gesture_history)
             for i, gest in enumerate(recent_gestures):
                 color = self.gesture_colors.get(gest, (255, 255, 255))
-                cv2.putText(frame, gest[0], (85 + i * 20, history_y),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                # 使用UI渲染器绘制手势历史
+                if self.ui_renderer:
+                    frame = self.ui_renderer.draw_text(frame, gest[0],
+                                                      (85 + i * 20, history_y),
+                                                      size=16, color=color)
+                else:
+                    cv2.putText(frame, gest[0], (85 + i * 20, history_y),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         # 显示调试信息
         if show_debug_info:
             finger_count = len(hand_data.get('fingers', []))
             finger_text = f"Fingers: {finger_count}"
-            cv2.putText(frame, finger_text, (10, frame.shape[0] - 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            # 使用UI渲染器绘制调试信息
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, finger_text,
+                                                  (10, frame.shape[0] - 30),
+                                                  size=14, color=(255, 255, 255))
+            else:
+                cv2.putText(frame, finger_text, (10, frame.shape[0] - 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
             pos_text = f"Pos: ({hand_data['position'][0]:.2f}, {hand_data['position'][1]:.2f})"
-            cv2.putText(frame, pos_text, (10, frame.shape[0] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, pos_text,
+                                                  (10, frame.shape[0] - 10),
+                                                  size=14, color=(255, 255, 255))
+            else:
+                cv2.putText(frame, pos_text, (10, frame.shape[0] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
             state_text = f"State: {self.gesture_state}"
-            cv2.putText(frame, state_text, (150, frame.shape[0] - 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, state_text,
+                                                  (150, frame.shape[0] - 30),
+                                                  size=14, color=(255, 255, 255))
+            else:
+                cv2.putText(frame, state_text, (150, frame.shape[0] - 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
             stability_text = f"Stability: {self.gesture_stability_counter}"
-            cv2.putText(frame, stability_text, (150, frame.shape[0] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            if self.ui_renderer:
+                frame = self.ui_renderer.draw_text(frame, stability_text,
+                                                  (150, frame.shape[0] - 10),
+                                                  size=14, color=(255, 255, 255))
+            else:
+                cv2.putText(frame, stability_text, (150, frame.shape[0] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return frame
 

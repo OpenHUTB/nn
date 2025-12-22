@@ -32,20 +32,20 @@ class IndexSimulator:
             15: {
                 "name": "shoulder_rot (肩关节旋转)",
                 "range": (-1.57, 0.349),
-                "step": 0.02,
-                "current_step_dir": 0.02  # 运动方向
+                "step": 0.05,
+                "current_step_dir": 0.05  # 运动方向
             },
             16: {
                 "name": "elbow_flexion (肘关节弯曲)",
                 "range": (0, 2.26893),
-                "step": 0.03,
-                "current_step_dir": 0.03
+                "step": 0.08,
+                "current_step_dir": 0.08
             },
             17: {
                 "name": "pro_sup (前臂旋前旋后)",
                 "range": (-1.5708, 1.5708),
-                "step": 0.015,
-                "current_step_dir": 0.015
+                "step": 0.04,
+                "current_step_dir": 0.04
             }
         }
 

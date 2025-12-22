@@ -3,7 +3,7 @@
 """
 DeepMind Humanoid Robot Simulation
 Dynamic Obstacle Avoidance + Distance-Priority Multi-Target Tracking
-Stable Version: Fixed robot disappearing issue in MuJoCo viewer
+Final Stable Version: Completely fixed robot disappearing issue in MuJoCo viewer
 GitHub compatible (UTF-8, no log files generated)
 """
 
@@ -44,9 +44,12 @@ class StablePatrolController:
         # -------------------------- Patrol Target Configuration --------------------------
         self.patrol_points = [
             {"name": "patrol_target_1", "pos": np.array([0.0, 0.0]), "label": "Start Point", "update_interval": 10.0},
-            {"name": "patrol_target_2", "pos": np.array([2.0, -1.0]), "label": "Patrol Point 1 (SW)", "update_interval": 12.0},
-            {"name": "patrol_target_3", "pos": np.array([4.0, 1.0]), "label": "Patrol Point 2 (NE)", "update_interval": 14.0},
-            {"name": "patrol_target_4", "pos": np.array([6.0, -0.5]), "label": "Patrol Point 3 (NW)", "update_interval": 11.0},
+            {"name": "patrol_target_2", "pos": np.array([2.0, -1.0]), "label": "Patrol Point 1 (SW)",
+             "update_interval": 12.0},
+            {"name": "patrol_target_3", "pos": np.array([4.0, 1.0]), "label": "Patrol Point 2 (NE)",
+             "update_interval": 14.0},
+            {"name": "patrol_target_4", "pos": np.array([6.0, -0.5]), "label": "Patrol Point 3 (NW)",
+             "update_interval": 11.0},
             {"name": "patrol_target_5", "pos": np.array([8.0, 0.0]), "label": "Final Point", "update_interval": 13.0}
         ]
         self.current_target_idx = 0  # Current tracked target index
@@ -104,7 +107,7 @@ class StablePatrolController:
         # -------------------------- Initialize Components --------------------------
         self._init_component_ids()
         self._init_obstacle_history()
-        self._set_initial_pose()
+        self._set_initial_pose()  # Fixed initial position here
 
     def _init_component_ids(self):
         """Initialize all MuJoCo component IDs (joints, motors, bodies)"""
@@ -217,14 +220,23 @@ class StablePatrolController:
             self.wall_pos_history[wall_name] = deque(maxlen=10)
 
     def _set_initial_pose(self):
-        """Set stable initial standing pose and lock position to prevent disappearing"""
-        # Reset entire simulation data first (core fix for initial drift)
+        """强制固定机器人初始位置到视野中心，彻底解决消失问题（核心最终修复）"""
+        # 1. 重置仿真数据（清空所有异常状态）
         mujoco.mj_resetData(self.model, self.data)
 
-        # Reset all control commands
+        # 2. 重置所有控制指令
         self.data.ctrl[:] = 0.0
 
-        # Initial joint positions (stable standing)
+        # 3. 强制设置机器人根关节初始世界坐标（不依赖关节ID，直接操作qpos前6位）
+        # qpos前3位：x/y/z 位置（固定在视野中心）；后3位：roll/pitch/yaw 姿态（无倾斜旋转）
+        self.data.qpos[0] = 0.0  # x坐标：视野中心
+        self.data.qpos[1] = 0.0  # y坐标：视野中心
+        self.data.qpos[2] = 0.8  # z坐标：站立高度，确保在地面上方
+        self.data.qpos[3] = 0.0  # roll：无左右倾斜
+        self.data.qpos[4] = 0.0  # pitch：无前后倾斜
+        self.data.qpos[5] = 0.0  # yaw：无旋转
+
+        # 4. 强制设置机器人关节初始位置（稳定站立姿态，避免倾倒）
         joint_positions = {
             "abdomen_x": 0.0,
             "abdomen_y": 0.0,
@@ -248,25 +260,14 @@ class StablePatrolController:
             "shoulder2_left": 0.0,
             "elbow_left": -0.1
         }
-
-        # Apply initial joint positions
         for joint_name, target_pos in joint_positions.items():
             joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
             if joint_id != -1:
-                self.data.qpos[joint_id] = target_pos
+                # 关节ID对应的qpos索引：根关节占前6位，关节从第7位开始（索引6）
+                self.data.qpos[joint_id + 6] = target_pos
 
-        # Lock torso initial position to prevent drift (core fix for disappearing)
-        if self.torso_id != -1:
-            # Get torso joint ID to set initial world position
-            body_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "torso_joint")
-            if body_joint_id == -1:
-                body_joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, "waist_lower_joint")
-            if body_joint_id != -1:
-                # Set torso initial position (x=0, y=0, z=0.8) to keep it in view
-                self.data.qpos[body_joint_id * 7: body_joint_id * 7 + 3] = [0.0, 0.0, 0.8]
-            # Also reset torso velocity to zero
-            self.data.qvel[:3] = 0.0  # Linear velocity (x/y/z)
-            self.data.qvel[3:6] = 0.0  # Angular velocity (roll/pitch/yaw)
+        # 5. 强制设置机器人初始速度为0（无移动、无旋转，彻底杜绝初始漂移）
+        self.data.qvel[:] = 0.0
 
     def _clip_control_command(self, cmd):
         """Clip control command to max amplitude to prevent joint over-drive (core fix)"""
@@ -276,9 +277,9 @@ class StablePatrolController:
         """Core decision function: select the closest target based on Euclidean distance"""
         # Skip target selection if conditions are not met
         if (elapsed_time < self.stabilization_phase or
-            self.avoid_obstacle or
-            self.return_to_path or
-            (elapsed_time - self.last_target_switch_time < self.target_switch_cooldown)):
+                self.avoid_obstacle or
+                self.return_to_path or
+                (elapsed_time - self.last_target_switch_time < self.target_switch_cooldown)):
             return self.current_target_idx
 
         # Get robot torso position (XY plane)
@@ -309,7 +310,8 @@ class StablePatrolController:
             prev_label = self.patrol_points[self.current_target_idx]["label"]
             self.current_target_idx = closest_idx
             # Print switch info (console only, no log file)
-            print(f"\n🔀 Target switched (distance priority): {prev_label} → {closest_label} (distance: {closest_dist:.2f}m)")
+            print(
+                f"\n🔀 Target switched (distance priority): {prev_label} → {closest_label} (distance: {closest_dist:.2f}m)")
 
         return self.current_target_idx
 
@@ -340,7 +342,7 @@ class StablePatrolController:
                         new_x = random.uniform(self.target_movement_range["x"][0], self.target_movement_range["x"][1])
                         new_y = random.uniform(self.target_movement_range["y"][0], self.target_movement_range["y"][1])
 
-                # Control target movement (smooth and slow)
+                # Control target movement (smooth and slow) with command clipping
                 if (self.patrol_motor_ids[idx]["x"] != -1 and
                         self.patrol_motor_ids[idx]["y"] != -1 and
                         self.patrol_joint_ids[idx]["x"] != -1 and
@@ -348,7 +350,6 @@ class StablePatrolController:
                     current_x = self.data.qpos[self.patrol_joint_ids[idx]["x"]]
                     current_y = self.data.qpos[self.patrol_joint_ids[idx]["y"]]
 
-                    # Clip control commands for targets to prevent sudden movement
                     x_cmd = (new_x - current_x) * self.target_move_speed * 0.5
                     y_cmd = (new_y - current_y) * self.target_move_speed * 0.5
                     self.data.ctrl[self.patrol_motor_ids[idx]["x"]] = self._clip_control_command(x_cmd)
@@ -389,8 +390,10 @@ class StablePatrolController:
                 self.wall3_params["y_switch"] = random.uniform(2.0, 4.0)
                 self.wall3_last_switch["y"] = elapsed_time
 
-            wall3_x_target = self.wall3_params["x_base"] + self.wall3_params["x_dir"] * self.wall3_params["x_speed"] * (elapsed_time % 8)
-            wall3_y_target = self.wall3_params["y_base"] + self.wall3_params["y_dir"] * self.wall3_params["y_speed"] * (elapsed_time % 6)
+            wall3_x_target = self.wall3_params["x_base"] + self.wall3_params["x_dir"] * self.wall3_params["x_speed"] * (
+                        elapsed_time % 8)
+            wall3_y_target = self.wall3_params["y_base"] + self.wall3_params["y_dir"] * self.wall3_params["y_speed"] * (
+                        elapsed_time % 6)
             wall3_x_target = np.clip(wall3_x_target, 3.5, 4.5)
             wall3_y_target = np.clip(wall3_y_target, -1.0, 1.0)
 
@@ -473,10 +476,12 @@ class StablePatrolController:
                 self.turn_direction = -1 if cross_product > 0 else 1
                 self.turn_dir_label = "Left" if self.turn_direction == -1 else "Right"
 
-                print(f"\n⚠️  Obstacle detected: {closest_wall['name']} (distance: {closest_wall['predicted_dist']:.2f}m) - Turning {self.turn_dir_label}")
+                print(
+                    f"\n⚠️  Obstacle detected: {closest_wall['name']} (distance: {closest_wall['predicted_dist']:.2f}m) - Turning {self.turn_dir_label}")
 
             # Complete obstacle avoidance phase
-            if self.avoid_obstacle and (elapsed_time - self.obstacle_avoidance_start) > self.obstacle_avoidance_duration:
+            if self.avoid_obstacle and (
+                    elapsed_time - self.obstacle_avoidance_start) > self.obstacle_avoidance_duration:
                 self.avoid_obstacle = False
                 self.return_to_path = True
                 self.return_to_path_start = elapsed_time
@@ -485,7 +490,8 @@ class StablePatrolController:
             # Complete return to path phase
             if self.return_to_path and (elapsed_time - self.return_to_path_start) > self.return_to_path_duration:
                 self.return_to_path = False
-                print(f"✅ Back to patrol path - tracking target: {self.patrol_points[self.current_target_idx]['label']}")
+                print(
+                    f"✅ Back to patrol path - tracking target: {self.patrol_points[self.current_target_idx]['label']}")
 
     def _get_joint_id(self, joint_name):
         """Get actuator ID for a given joint name"""
@@ -612,7 +618,6 @@ class StablePatrolController:
         if (distance_to_target < self.target_reached_threshold and
                 not self.patrol_completed and
                 elapsed_time - self.last_target_switch_time > self.target_switch_cooldown):
-
             print(f"\n✅ Reached target: {current_target['label']} (x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f})")
             self.last_target_switch_time = elapsed_time
             print(f"🔍 Scanning for closest next target...")
@@ -626,7 +631,7 @@ class StablePatrolController:
         target_yaw = np.arctan2(target_vector[1], target_vector[0])
         yaw_error = target_yaw - robot_yaw
         yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))  # Normalize to [-pi, pi]
-        yaw_error = np.clip(yaw_error, -np.pi/4, np.pi/4)  # Limit max yaw error to 45 degrees (core fix)
+        yaw_error = np.clip(yaw_error, -np.pi / 4, np.pi / 4)  # Limit max yaw error to 45 degrees (core fix)
 
         # Step 4: Reset control commands
         self.data.ctrl[:self.model.nu] = 0.0
@@ -819,7 +824,7 @@ class StablePatrolController:
         )
 
     def run_simulation(self):
-        """Main simulation loop with camera tracking (fixes disappearing robot in viewer)"""
+        """Main simulation loop with optimized camera tracking (彻底解决机器人消失问题)"""
         print("🤖 DeepMind Humanoid Simulation Started (Distance-Priority Target Tracking)")
         print("📌 Features: Enhanced Balance + Dynamic Obstacle Avoidance + Closest Target Selection")
         print("🔍 Press Ctrl+C to stop simulation\n")
@@ -827,13 +832,13 @@ class StablePatrolController:
         with viewer.launch_passive(self.model, self.data) as viewer_instance:
             self.sim_start_time = time.time()
 
-            # Lock camera to track robot torso (core fix for disappearing view)
+            # 优化相机参数：增大距离+调整视角，确保机器人始终在视野内
             if self.torso_id != -1:
                 viewer_instance.cam.trackbodyid = self.torso_id
-                viewer_instance.cam.distance = 5.0  # Camera distance from robot (keep in view)
-                viewer_instance.cam.elevation = -10  # Camera elevation (slight top-down view)
-                viewer_instance.cam.azimuth = 45  # Camera azimuth (fixed angle)
-                viewer_instance.cam.fixedcamid = -1  # Use tracking camera, not fixed camera
+                viewer_instance.cam.distance = 10.0  # 增大相机距离，避免模型超出视野
+                viewer_instance.cam.elevation = -20  # 增大俯视角，清晰看到机器人
+                viewer_instance.cam.azimuth = 90  # 正前方视角，符合直观观察
+                viewer_instance.cam.fixedcamid = -1  # 使用跟踪相机，不使用固定相机
 
             try:
                 while viewer_instance.is_running():
@@ -850,8 +855,8 @@ class StablePatrolController:
                     mujoco.mj_step(self.model, self.data)
                     viewer_instance.sync()
 
-                    # Increased sleep time to fix rendering sync (core fix for disappearing)
-                    time.sleep(0.01)  # Stable sleep time, no more fast simulation
+                    # 稳定休眠时间，解决渲染不同步
+                    time.sleep(0.01)
 
             except KeyboardInterrupt:
                 print("\n\n🛑 Simulation interrupted by user")
@@ -893,5 +898,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Failed to start simulation: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
