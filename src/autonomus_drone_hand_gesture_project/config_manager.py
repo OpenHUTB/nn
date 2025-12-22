@@ -111,6 +111,7 @@ class ConfigManager:
                 'show_performance_mode': True,
                 'show_performance_stats': True,
                 'show_system_resources': True,
+                'show_advanced_gestures': True,  # 新增：显示高级手势信息
             },
             'performance': {
                 'target_fps': 30,

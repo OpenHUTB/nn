@@ -1,4 +1,3 @@
-# config.py
 """
 AirSimNH 无人机项目配置文件
 所有可调参数集中在此管理
@@ -33,6 +32,15 @@ PERCEPTION = {
         'DEFAULT': -15.0,  # 默认高度
         'SLOPE_THRESHOLD': 5.0,  # 坡度阈值，大于此值认为地形陡峭
         'OPENNESS_THRESHOLD': 0.7,  # 开阔度阈值，大于此值认为开阔
+    },
+
+    # 红色物体检测参数
+    'RED_OBJECT_DETECTION': {
+        'ENABLED': True,  # 启用红色物体检测
+        'MIN_AREA': 50,  # 最小检测面积（像素）
+        'MAX_AREA': 10000,  # 最大检测面积（像素）
+        'UPDATE_INTERVAL': 1.0,  # 检测更新间隔（秒）
+        'MEMORY_TIME': 5.0,  # 物体记忆时间（秒），避免重复计数
     }
 }
 
@@ -70,6 +78,14 @@ INTELLIGENT_DECISION = {
     # 目标管理
     'TARGET_LIFETIME': 15.0,  # 目标有效期 (秒)
     'TARGET_REACHED_DISTANCE': 3.0,  # 目标到达判定距离 (米)
+
+    # 红色物体探索参数
+    'RED_OBJECT_EXPLORATION': {
+        'ATTRACTION_GAIN': 1.5,  # 红色物体吸引力增益
+        'DETECTION_RADIUS': 10.0,  # 检测半径（米）
+        'MIN_DISTANCE': 2.0,  # 最小接近距离（米）
+        'EXPLORATION_BONUS': 0.5,  # 探索奖励分数
+    }
 }
 
 # ==================== 手动控制参数 ====================
@@ -93,6 +109,7 @@ DISPLAY = {
     'SHOW_INFO_OVERLAY': True,  # 显示信息叠加层
     'REFRESH_RATE_MS': 30,  # 刷新率 (毫秒)，建议30-50
     'GRID_DISPLAY_SIZE': 150,  # 探索网格显示大小 (像素)
+    'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
 }
 
 # ==================== 系统与安全参数 ====================
@@ -111,15 +128,21 @@ SYSTEM = {
 }
 
 # ==================== 相机配置 ====================
-# 注意：这里的相机名称需要与AirSim环境中的相机名称匹配
 CAMERA = {
     'DEFAULT_NAME': "0",  # 默认相机名称
-    # 如果"0"无效，可以尝试以下名称:
     'POSSIBLE_NAMES': ["0", "1", "front_center", "front", "CameraActor_0"],
 
     # 深度相机参数
     'DEPTH_FOV_DEG': 90,  # 深度相机视野 (度)
-    'MAX_DEPTH_RANGE': 100.0,  # 最大深度范围 (米)
+    'MAX_DEPTH_RANGE': 100.0,  # 最大深度范围 (米),
+
+    # 红色物体检测颜色范围（HSV空间）
+    'RED_COLOR_RANGE': {
+        'LOWER1': [0, 120, 70],    # 红色下限1（0-10度）
+        'UPPER1': [10, 255, 255],  # 红色上限1
+        'LOWER2': [170, 120, 70],  # 红色下限2（170-180度）
+        'UPPER2': [180, 255, 255], # 红色上限2
+    }
 }
 
 # ==================== 调试参数 ====================
@@ -130,6 +153,7 @@ DEBUG = {
     'SAVE_GRID_VISUALIZATION': True,  # 是否保存网格可视化
     'LOG_VECTOR_FIELD': False,  # 是否记录向量场详细信息
     'PERFORMANCE_PROFILING': False,  # 是否启用性能分析
+    'SAVE_RED_OBJECT_IMAGES': False,  # 是否保存检测到红色物体的图像
 }
 
 # ==================== 数据记录参数 ====================
@@ -142,6 +166,7 @@ DATA_RECORDING = {
     'JSON_FILENAME': 'flight_data.json',  # JSON文件名
     'PERFORMANCE_MONITORING': True,       # 启用性能监控
     'SYSTEM_METRICS_INTERVAL': 5.0,       # 系统指标记录间隔（秒）
+    'RECORD_RED_OBJECTS': True,           # 记录红色物体信息
 }
 
 # ==================== 性能监控参数 ====================
