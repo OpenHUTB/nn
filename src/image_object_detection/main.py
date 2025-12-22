@@ -18,10 +18,22 @@ def main():
     3. 启动交互流程（支持命令行参数或交互式菜单）
     """
     config = Config()                     # 创建配置实例
-    ui_handler = UIHandler(config)        # 传入配置，初始化 UI 处理器
-    ui_handler.run()                      # 启动主运行逻辑
+    handler = UIHandler(config)        # 传入配置，初始化 UI 处理器
+    try:
+        handler.run()
+    except KeyboardInterrupt:
+        # 用户按下 Ctrl+C：安静退出，不显示 traceback
+        print("\nProgram interrupted by user. Exiting gracefully...")
+    except SystemExit:
+        # 由 UIHandler 或 DetectionEngine 主动触发的退出（如模型加载失败）
+        pass
+    except Exception as e:
+        # 捕获未预期的顶层异常（开发阶段保留，生产环境可记录日志）
+        print(f"Unexpected error in main: {e}")
+        raise  # 重新抛出以便调试
 
 
 # 确保脚本直接运行时才执行 main()，便于模块复用和测试
 if __name__ == "__main__":
     main()
+
