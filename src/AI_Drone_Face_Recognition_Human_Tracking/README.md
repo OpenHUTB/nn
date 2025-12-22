@@ -1,25 +1,9 @@
 该项目是一个基于人工智能的无人机控制系统，能够用YOLOv8检测图像中的人物，用OpenCV检测人脸，用DeepFace识别人，并能飞近用户从视频流中选定的目标。
 
-AI-Drone-Face-Tracking/
-│
-├── main.py                 # 主程序入口
-├── requirements.txt        # 依赖包列表
-│
-├── modules/
-│   ├── drone_controller.py    # 无人机控制模块
-│   ├── face_detector.py       # 人脸检测模块
-│   ├── person_detector.py     # 人物检测模块（YOLOv8）
-│   ├── face_recognizer.py     # 人脸识别模块（DeepFace）
-│   ├── ui_controller.py       # 用户界面控制模块
-│   └── voice_synthesizer.py   # 语音合成模块
-│
-├── faces/                  # 人脸数据库文件夹
-│   ├── person1/
-│   │   ├── face1.jpg
-│   │   └── face2.jpg
-│   └── person2/
-│       └── face1.jpg
-│
-├── models/                 # 模型文件夹（可选）
-└── utils/                  # 工具函数
-    └── helpers.py
+C:\Users\20728\nn\
+├── drone_system_complete.py      # 主程序（所有功能集成）
+├── install_deps.py              # 安装依赖脚本
+├── run.bat                      # Windows启动脚本
+├── requirements.txt             # 依赖列表
+└── flight_logs\                 # 自动创建：数据记录目录
+    └── flight_20240101_120000.json  # 数据记录文件
