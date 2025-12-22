@@ -82,7 +82,7 @@ class UnmannedVehicleOverloadWarningSystem:
             self.display_warning(status, color, desc)
             # 4. 严重超载（等级3）时，紧急停止系统运行
             if self.warning_level == 3:
-                print("❗❗❗ 检测到严重超载，系统紧急停止运行！ ❗❗")
+                print("❗❗❗ 检测到严重超载，系统紧急停止运行！❗")
                 break
             # 5. 间隔2秒进行下一次监测，模拟实时周期性检测
             time.sleep(2)
