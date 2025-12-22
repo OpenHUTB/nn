@@ -547,7 +547,7 @@ def create_ego_vehicle(world, config, spawn_points=None):
             if attempt < len(spawn_points):
                 spawn_point = spawn_points[attempt]
             else:
-                # 随机选择一个生成点
+                # 选择随机一个生成点
                 import random
                 spawn_point = random.choice(spawn_points)
                 
@@ -713,7 +713,7 @@ def clear_all_actors(world, exclude_ids=None):
             except:
                 pass
         
-        # 再清理车辆（分批进行）
+        # 再清理车辆
         logger.info(f"清理 {len(vehicle_actors)} 个车辆...")
         batch_size = 10
         for i in range(0, len(vehicle_actors), batch_size):
