@@ -122,34 +122,45 @@ class Agent():
     def get_actions(self, detection_surface_area: float,
                     error: float) -> tuple[float, float]:
 
-        # 默认基础油门
-        dynamic_throttle = self.throttle
+        # [Perception] Sensor Data Analysis
+        # Normalize the detection area to calculate "Sensor Confidence"
+        # Assuming typical good lane area is around 300,000 (30e4) to 30,000,000 (30e6) depending on resolution
+        # Let's use the threshold defined in init or a dynamic ratio
 
-        if (self.check_surface_area(detection_surface_area)):
-            # Case 1: Lane lost (Safety Mode)
+        # 1. Calculate Sensor Confidence (0.0 to 1.0)
+        # More white pixels (Surface Area) = Higher Confidence = Better Visibility
+        ref_area = 30e6  # Reference max area
+        sensor_confidence = min(1.0, detection_surface_area / ref_area)
+
+        # 2. Compute Steering (Lateral Control)
+        # Keep track of error history for Integral/Derivative terms
+        if self.check_surface_area(detection_surface_area):
+            # Safety Fallback: Lost Visual Signal
+            sensor_confidence = 0.0  # Force lowest confidence
             steer = 0
-            # [Planning] Safety: Slow down immediately if lane is not found
-            dynamic_throttle = 0.2
-
             if self.errors:
                 self.errors.append(self.errors[-1])
             else:
                 self.errors.append(0)
         else:
-            # Case 2: Lane detected (Normal Driving)
+            # Normal Operation
             self.errors.append(error)
             steer = self.func(error=error)
 
-            # [Planning] Longitudinal Speed Planning based on Curvature
-            # NOT "ACC". This adjusts speed based on steering angle.
-            # Strategy: High steering angle -> Low speed (Cornering)
-            #           Low steering angle  -> High speed (Straight)
-            # Formula: Base - (Steer * Factor)
-            # Optimization: Increased factor from 0.4 to 0.8 for visible effect
-            dynamic_throttle = max(0.2, self.throttle - abs(steer) * 0.8)
+        # [Control] Sensor-Fusion Longitudinal Control
+        # Strategy: Throttle is determined by Sensor Confidence AND Curvature
+        # If sensor sees less lane (low confidence), slow down.
+        # If steering angle is high (high curvature), slow down.
+
+        base_throttle = self.throttle
+
+        # Formula: Base * Confidence - Curvature_Penalty
+        target_throttle = (base_throttle * (0.5 + 0.5 * sensor_confidence)) - (abs(steer) * 0.6)
+
+        # Clamp output to safe range [0.15, Base]
+        dynamic_throttle = max(0.15, min(base_throttle, target_throttle))
 
         return steer, dynamic_throttle
-
     @staticmethod
     def _simple_controller(error: float) -> float:
         """Hard Coded Controller - Optimized to use Class Constants
