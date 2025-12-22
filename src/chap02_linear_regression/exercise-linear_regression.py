@@ -212,7 +212,7 @@ def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
     phi1 = basis_func(x_train)
     phi = np.concatenate([phi0, phi1], axis=1) # 将偏置项和特征矩阵拼接成完整的特征矩阵
     # 最小二乘法求解权重
-    w_lsq = np.dot(np.linalg.pinv(phi), y_train)
+    w_lsq = least_squares(phi, y_train)
 
     w_gd = None
     if use_gradient_descent:
