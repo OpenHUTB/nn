@@ -1,4 +1,4 @@
-# modules/face_recognizer.py - 修正版
+# 人脸识别模块（DeepFace）
 import os
 import cv2
 import numpy as np
