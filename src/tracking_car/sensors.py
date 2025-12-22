@@ -547,7 +547,7 @@ def create_ego_vehicle(world, config, spawn_points=None):
             if attempt < len(spawn_points):
                 spawn_point = spawn_points[attempt]
             else:
-                # 随机选择一个生成点
+                # 选择随机一个生成点
                 import random
                 spawn_point = random.choice(spawn_points)
                 
