@@ -16,7 +16,6 @@ def on_press(k):
     if k in KEYS: KEYS[k] = True
 def on_release(k):
     if k in KEYS: KEYS[k] = False
-
 keyboard.Listener(on_press=on_press, on_release=on_release).start()
 
 # ---------------- 加载模型 --------------

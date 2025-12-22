@@ -72,7 +72,14 @@ class EnhancedGestureRecognizer:
             "Right": (0, 165, 255),
             "Waiting": (200, 200, 200),
             "Error": (255, 0, 0),
-            "Hover": (255, 255, 255)
+            "Hover": (255, 255, 255),
+            "Grab": (255, 0, 255),  # 新增：紫色
+            "Release": (0, 255, 0),  # 新增：绿色
+            "RotateCW": (0, 255, 255),  # 新增：黄色
+            "RotateCCW": (255, 255, 0),  # 新增：青色
+            "TakePhoto": (255, 165, 0),  # 新增：橙色
+            "ReturnHome": (0, 128, 128),  # 新增：深青色
+            "AutoFlight": (128, 0, 128),  # 新增：紫色
         }
 
         # 手势到语音的映射
@@ -86,6 +93,13 @@ class EnhancedGestureRecognizer:
             "Waiting": "gesture_waiting",
             "Error": "gesture_error",
             "Hover": "gesture_hover",
+            "Grab": "gesture_grab",  # 新增
+            "Release": "gesture_release",  # 新增
+            "RotateCW": "gesture_rotate_cw",  # 新增
+            "RotateCCW": "gesture_rotate_ccw",  # 新增
+            "TakePhoto": "gesture_photo",  # 新增
+            "ReturnHome": "gesture_return_home",  # 新增
+            "AutoFlight": "gesture_auto_flight",  # 新增
         }
 
         # 手势状态颜色
