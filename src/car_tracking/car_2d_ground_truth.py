@@ -4,37 +4,44 @@ import random
 import cv2
 import numpy as np
 
-# ===================== 原始代码依赖的工具函数（完全对齐原始逻辑，仅新增跟踪/数据相关）=====================
-# COCO类别名称（原始代码的版本）
+# ===================== 依赖导入（保留原始依赖）=====================
 from what.models.detection.datasets.coco import COCO_CLASS_NAMES
 from utils.box_utils import draw_bounding_boxes
 from utils.projection import *
 from utils.world import *
 
-# 新增：跟踪相关全局变量（不影响原始逻辑）
-tracked_vehicles = {}  # key:车辆ID, value:{'distance':距离, 'frame':帧数, 'color':颜色}
-frame_counter = 0  # 全局帧数计数器
+# ===================== 配置常量（集中管理，便于修改）=====================
+# 相机配置
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 640
+# 图表配置
+CHART_WIDTH = 400
+CHART_HEIGHT = CAMERA_HEIGHT  # 与相机高度一致
+MAX_HISTORY_FRAMES = 50  # 最近50帧数据
+# 跟踪窗口配置
+TRACK_WINDOW_WIDTH = 300
+TRACK_WINDOW_HEIGHT = 400
+# 绘图配置
+FONT_SCALE_SMALL = 0.4
+FONT_SCALE_MEDIUM = 0.6
+LINE_THICKNESS = 2
+POINT_RADIUS = 2
 
-# 新增：数据缓存（保存最近50帧的历史数据，用于动态图表）
-MAX_HISTORY = 50
-history_frames = []  # 帧数缓存
-history_vehicles = []  # 实时车辆数量缓存
-history_max_dist = []  # 最大距离缓存
 
-
+# ===================== 工具函数（独立封装，提升复用性）=====================
 def get_vehicle_color(vehicle_id):
-    """为车辆生成固定唯一颜色（用于跟踪）"""
+    """为车辆生成固定唯一的RGB颜色（基于ID种子，保证跟踪时颜色不变）"""
     np.random.seed(vehicle_id)
     return tuple(np.random.randint(0, 255, 3).tolist())
 
 
-# 重写draw_bounding_boxes以兼容跟踪（保留原始函数参数，新增跟踪标注）
 def custom_draw_bounding_boxes(image, boxes, labels, class_names, ids=None, track_data=None):
-    """保留原始画框逻辑，新增跟踪颜色和距离标注"""
-    # 调用原始的draw_bounding_boxes函数（保证原始功能）
+    """保留原始边界框绘制逻辑，叠加跟踪数据（距离+颜色外框）"""
+    # 调用原始画框函数，保证核心功能不变
     img = draw_bounding_boxes(image, boxes, labels, class_names, ids)
-    # 新增：叠加跟踪数据标注（不破坏原始画框）
-    if ids is not None and track_data is not None:
+
+    # 叠加跟踪数据标注（不破坏原始框）
+    if ids is not None and track_data is not None and len(boxes) > 0:
         for i, box in enumerate(boxes):
             vid = ids[i]
             if vid in track_data:
@@ -42,321 +49,314 @@ def custom_draw_bounding_boxes(image, boxes, labels, class_names, ids=None, trac
                 color = track_data[vid]['color']
                 dist = track_data[vid]['distance']
                 # 绘制距离文本（在原始标注下方）
-                cv2.putText(img, f"Dist: {dist:.1f}m", (x1, y1 + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
-                # 用跟踪颜色绘制框的外框（不覆盖原始绿色框）
+                cv2.putText(
+                    img, f"Dist: {dist:.1f}m", (x1, y1 + 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, color, 1
+                )
+                # 绘制跟踪颜色外框（不覆盖原始绿色框）
                 cv2.rectangle(img, (x1 - 1, y1 - 1), (x2 + 1, y2 + 1), color, 1)
     return img
 
 
-# 新增：绘制动态统计图表（仅修复除零错误，其他不变）
-def draw_dynamic_chart(width, height, frames, vehicles, max_dist):
-    """
-    绘制实时折线图：x轴=帧数，y轴=车辆数量/距离
-    参数：
-        width, height: 图表尺寸
-        frames: 帧数列表
-        vehicles: 车辆数量列表
-        max_dist: 最大距离列表
-    返回：
-        图表图像
-    """
-    # 初始化黑色背景图表
+def init_chart_background(width, height):
+    """初始化图表背景（绘制固定元素：标题、网格、图例，避免每帧重复绘制）"""
     chart = np.zeros((height, width, 3), dtype=np.uint8)
     # 绘制标题
-    cv2.putText(chart, "Real-Time Statistics (Last 50 Frames)", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-                (255, 255, 255), 2)
+    cv2.putText(
+        chart, "Real-Time Statistics (Last 50 Frames)", (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_MEDIUM, (255, 255, 255), LINE_THICKNESS
+    )
+    # 绘制网格（浅灰色，提升视觉效果）
+    grid_color = (50, 50, 50)
+    # 水平网格线
+    for y in range(50, height - 30, 50):
+        cv2.line(chart, (50, y), (width - 50, y), grid_color, 1)
+    # 垂直网格线
+    for x in range(50, width - 50, 50):
+        cv2.line(chart, (x, 30), (x, height - 30), grid_color, 1)
+    # 绘制图例（固定位置，提升可读性）
+    cv2.putText(
+        chart, "Current Vehicles (green)", (10, height - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, (0, 255, 0), 1
+    )
+    cv2.putText(
+        chart, "Max Distance (red)", (200, height - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, (0, 0, 255), 1
+    )
+    return chart
 
-    # 数据为空时返回空图表
-    if len(frames) == 0:
+
+def draw_dynamic_chart(history_frames, history_vehicles, history_max_dist):
+    """
+    绘制实时动态折线图（仅绘制变化的折线和数据点，复用固定背景）
+    参数：
+        history_frames: 最近50帧的帧数列表
+        history_vehicles: 最近50帧的车辆数量列表
+        history_max_dist: 最近50帧的最大距离列表
+    返回：
+        绘制完成的图表图像
+    """
+    # 初始化图表背景（固定元素）
+    chart = init_chart_background(CHART_WIDTH, CHART_HEIGHT)
+
+    # 数据为空时直接返回背景
+    if len(history_frames) == 0:
         return chart
 
-    # ========== 核心修复：处理除零错误 ==========
-    max_veh = max(vehicles) if vehicles else 1
-    if max_veh == 0:  # 当车辆数量最大值为0时，强制设为1避免除法错误
-        max_veh = 1
-    max_d = max(max_dist) if max_dist else 1
-    if max_d == 0:  # 当距离最大值为0时，强制设为1避免除法错误
-        max_d = 1
-    # ==========================================
+    # ========== 数据归一化（优化计算逻辑，避免除零错误）==========
+    # 车辆数量归一化（映射到图表y轴范围：30 ~ CHART_HEIGHT-30）
+    max_veh = max(history_vehicles) if history_vehicles else 1
+    max_veh = max_veh if max_veh != 0 else 1  # 处理除零
+    norm_veh = [(v / max_veh) * (CHART_HEIGHT - 60) for v in history_vehicles]
+    y_veh = np.array([CHART_HEIGHT - 30 - v for v in norm_veh], dtype=int)
 
-    # 归一化数据到图表坐标（适配y轴范围）
-    # x轴：帧数映射到图表宽度（从50px开始，留空坐标轴）
-    x_coords = np.array(
-        [50 + (x - frames[0]) * (width - 100) / (frames[-1] - frames[0] if frames[-1] != frames[0] else 1) for x in
-         frames], dtype=int)
-    # y轴：车辆数量（绿色）映射到图表高度（从30px到height-30px）
-    y_veh = np.array([height - 30 - (v / max_veh) * (height - 60) for v in vehicles], dtype=int)
-    # y轴：最大距离（红色）映射到图表高度
-    y_dist = np.array([height - 30 - (d / max_d) * (height - 60) for d in max_dist], dtype=int)
+    # 最大距离归一化
+    max_d = max(history_max_dist) if history_max_dist else 1
+    max_d = max_d if max_d != 0 else 1  # 处理除零
+    norm_dist = [(d / max_d) * (CHART_HEIGHT - 60) for d in history_max_dist]
+    y_dist = np.array([CHART_HEIGHT - 30 - d for d in norm_dist], dtype=int)
 
-    # 绘制网格
-    for y in range(0, height, 50):
-        cv2.line(chart, (50, y), (width - 50, y), (50, 50, 50), 1)
-    for x in range(50, width, 50):
-        cv2.line(chart, (x, 30), (x, height - 30), (50, 50, 50), 1)
+    # x轴归一化（动态滚动，仅显示最近50帧的x坐标）
+    x_coords = np.array([
+        50 + (i * (CHART_WIDTH - 100) / (len(history_frames) - 1 if len(history_frames) > 1 else 1))
+        for i in range(len(history_frames))
+    ], dtype=int)
 
-    # 绘制折线：车辆数量（绿色）
+    # ========== 绘制折线和数据点（优化绘制逻辑，提升流畅度）==========
+    # 绘制车辆数量折线（绿色）
     if len(x_coords) > 1:
-        for i in range(1, len(x_coords)):
-            cv2.line(chart, (x_coords[i - 1], y_veh[i - 1]), (x_coords[i], y_veh[i]), (0, 255, 0), 2)
-        # 绘制数据点
-        for x, y in zip(x_coords, y_veh):
-            cv2.circle(chart, (x, y), 2, (0, 255, 0), -1)
+        cv2.polylines(chart, [np.column_stack((x_coords, y_veh))], isClosed=False, color=(0, 255, 0),
+                      thickness=LINE_THICKNESS)
+    # 绘制车辆数量数据点
+    for x, y in zip(x_coords, y_veh):
+        cv2.circle(chart, (x, y), POINT_RADIUS, (0, 255, 0), -1)
 
-    # 绘制折线：最大距离（红色）
+    # 绘制最大距离折线（红色）
     if len(x_coords) > 1:
-        for i in range(1, len(x_coords)):
-            cv2.line(chart, (x_coords[i - 1], y_dist[i - 1]), (x_coords[i], y_dist[i]), (0, 0, 255), 2)
-        # 绘制数据点
-        for x, y in zip(x_coords, y_dist):
-            cv2.circle(chart, (x, y), 2, (0, 0, 255), -1)
+        cv2.polylines(chart, [np.column_stack((x_coords, y_dist))], isClosed=False, color=(0, 0, 255),
+                      thickness=LINE_THICKNESS)
+    # 绘制最大距离数据点
+    for x, y in zip(x_coords, y_dist):
+        cv2.circle(chart, (x, y), POINT_RADIUS, (0, 0, 255), -1)
 
-    # 绘制图例
-    cv2.putText(chart, "Current Vehicles (green)", (10, height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-    cv2.putText(chart, "Max Distance (red)", (200, height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
-
-    # 绘制当前数值标注
-    if len(vehicles) > 0 and len(max_dist) > 0:
-        cv2.putText(chart, f"Now: {vehicles[-1]} cars | {max_dist[-1]:.1f}m", (width - 200, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+    # ========== 绘制当前数值标注（实时更新）==========
+    if len(history_vehicles) > 0 and len(history_max_dist) > 0:
+        current_veh = history_vehicles[-1]
+        current_dist = history_max_dist[-1]
+        cv2.putText(
+            chart, f"Now: {current_veh} cars | {current_dist:.1f}m",
+            (CHART_WIDTH - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL,
+            (255, 255, 255), 1
+        )
 
     return chart
 
 
-# ===================== 相机回调函数（完全保留原始代码）=====================
 def camera_callback(image, rgb_image_queue):
-    rgb_image_queue.put(np.reshape(np.copy(image.raw_data),
-                                   (image.height, image.width, 4)))
+    """相机回调函数（保留原始逻辑，简化代码）"""
+    rgb_image_queue.put(np.reshape(np.copy(image.raw_data), (image.height, image.width, 4)))
 
 
-# ===================== 主程序逻辑封装到main函数中 ======================
+def convert_image_format(image):
+    """将4通道BGRA图像转换为3通道RGB图像（提取前3通道，简化逻辑）"""
+    return image[..., :3] if image.shape[-1] == 4 else image.copy()
+
+
+# ===================== 主程序逻辑（优化结构，提升可读性）=====================
 def main():
-    # 声明使用全局变量（若需要修改全局变量则必须声明）
-    global frame_counter, history_frames, history_vehicles, history_max_dist, tracked_vehicles
-    # 重置全局变量（避免多次运行时数据残留）
-    frame_counter = 0
-    tracked_vehicles = {}
-    history_frames = []
-    history_vehicles = []
-    history_max_dist = []
-
-    # Part 1（完全保留原始代码，窗口尺寸为640*640）
+    # 初始化Carla客户端和世界
     client = carla.Client('localhost', 2000)
     world = client.get_world()
 
-    # Set up the simulator in synchronous mode
+    # 设置同步模式（保留原始逻辑）
     settings = world.get_settings()
-    settings.synchronous_mode = True  # Enables synchronous mode
+    settings.synchronous_mode = True
     settings.fixed_delta_seconds = 0.05
     world.apply_settings(settings)
 
-    # Get the world spectator
+    # 获取观众和生成点（保留原始逻辑）
     spectator = world.get_spectator()
-
-    # Get the map spawn points
     spawn_points = world.get_map().get_spawn_points()
 
-    # Spawn the ego vehicle
+    # 生成主车辆（保留原始逻辑，增加异常处理）
     bp_lib = world.get_blueprint_library()
     vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2020')
     vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
+    if not vehicle:
+        print("警告：主车辆生成失败，程序退出！")
+        return
 
-    # Spawn the camera（原始尺寸 640*640）
+    # 生成相机（使用配置常量，简化代码）
     camera_bp = bp_lib.find('sensor.camera.rgb')
-    camera_bp.set_attribute('image_size_x', '640')
-    camera_bp.set_attribute('image_size_y', '640')
-
+    camera_bp.set_attribute('image_size_x', str(CAMERA_WIDTH))
+    camera_bp.set_attribute('image_size_y', str(CAMERA_HEIGHT))
     camera_init_trans = carla.Transform(carla.Location(x=1, z=2))
     camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
 
-    # Create a queue to store and retrieve the sensor data
+    # 初始化图像队列（保留原始逻辑）
     image_queue = queue.Queue()
     camera.listen(lambda image: camera_callback(image, image_queue))
 
-    # Clear existing NPCs
+    # 清理现有NPC（保留原始逻辑）
     clear_npc(world)
     clear_static_vehicle(world)
 
-    # Part 2（完全保留原始代码）
-    # Remember the edge pairs
+    # 2D框计算相关参数（保留原始逻辑）
     edges = [[0, 1], [1, 3], [3, 2], [2, 0], [0, 4], [4, 5],
              [5, 1], [5, 7], [7, 6], [6, 4], [6, 2], [7, 3]]
-
-    # Get the world to camera matrix
-    world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
-
-    # Get the attributes from the camera
-    image_w = camera_bp.get_attribute("image_size_x").as_int()
-    image_h = camera_bp.get_attribute("image_size_y").as_int()
     fov = camera_bp.get_attribute("fov").as_float()
+    K = build_projection_matrix(CAMERA_WIDTH, CAMERA_HEIGHT, fov)
+    K_b = build_projection_matrix(CAMERA_WIDTH, CAMERA_HEIGHT, fov, is_behind_camera=True)
 
-    # Calculate the camera projection matrix to project from 3D -> 2D
-    K = build_projection_matrix(image_w, image_h, fov)
-    K_b = build_projection_matrix(image_w, image_h, fov, is_behind_camera=True)
+    # 生成NPC车辆（保留原始逻辑，使用配置常量）
+    for _ in range(50):
+        vehicle_bp_list = bp_lib.filter('vehicle')
+        car_bp = [bp for bp in vehicle_bp_list if int(bp.get_attribute('number_of_wheels')) == 4]
+        if car_bp:
+            npc = world.try_spawn_actor(random.choice(car_bp), random.choice(spawn_points))
+            if npc:
+                npc.set_autopilot(True)
+    vehicle.set_autopilot(True)
 
-    # Spawn NPCs（完全保留原始代码）
-    for i in range(50):
-        vehicle_bp = bp_lib.filter('vehicle')
+    # 初始化跟踪和数据缓存变量（改为局部变量，减少全局变量）
+    tracked_vehicles = {}  # key:车辆ID, value:{'color':颜色, 'distance':距离, 'frame':帧数}
+    frame_counter = 0
+    history_frames = []  # 最近50帧的帧数
+    history_vehicles = []  # 最近50帧的车辆数量
+    history_max_dist = []  # 最近50帧的最大距离
 
-        # Exclude bicycle
-        car_bp = [bp for bp in vehicle_bp if int(
-            bp.get_attribute('number_of_wheels')) == 4]
-        npc = world.try_spawn_actor(random.choice(
-            car_bp), random.choice(spawn_points))
-
-        if npc:
-            npc.set_autopilot(True)
-
-    if vehicle:
-        vehicle.set_autopilot(True)
-
-    # 新增：数据统计变量（保留原逻辑）
-    total_vehicles = 0
-    max_distance = 0.0
-    current_vehicles = 0
-
-    # Main Loop（保留原始核心逻辑，仅替换数据面板为动态图表）
-    while True:
-        try:
+    # 主循环（优化逻辑，提升可读性）
+    try:
+        while True:
             world.tick()
             frame_counter += 1
 
-            # Move the spectator to the top of the vehicle（原始代码）
-            if vehicle:
-                transform = carla.Transform(vehicle.get_transform().transform(
-                    carla.Location(x=-4, z=50)), carla.Rotation(yaw=-180, pitch=-90))
-                spectator.set_transform(transform)
+            # 移动观众视角到车辆顶部（保留原始逻辑）
+            transform = carla.Transform(
+                vehicle.get_transform().transform(carla.Location(x=-4, z=50)),
+                carla.Rotation(yaw=-180, pitch=-90)
+            )
+            spectator.set_transform(transform)
 
-            # Retrieve and reshape the image（原始代码）
+            # 获取相机图像（保留原始逻辑）
             image = image_queue.get()
 
-            # Get the camera matrix（原始代码）
+            # 更新相机矩阵（保留原始逻辑）
             world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
 
+            # 初始化当前帧变量
             boxes = []
             ids = []
-            # 新增：跟踪数据存储（当前帧）
             track_data = {}
             current_vehicles = 0
-            max_distance = 0.0  # 重置当前帧最大距离
+            max_distance = 0.0
 
-            # 原始代码的核心循环（完全保留）
+            # 检测车辆并计算2D边界框（保留原始核心逻辑）
             for npc in world.get_actors().filter('*vehicle*'):
-                if vehicle and npc.id != vehicle.id:
-                    bb = npc.bounding_box
+                if npc.id != vehicle.id:
+                    # 计算车辆距离和最大距离
                     dist = npc.get_transform().location.distance(vehicle.get_transform().location)
-                    max_distance = max(max_distance, dist)  # 更新当前帧最大距离
+                    max_distance = max(max_distance, dist)
 
-                    # Filter for the vehicles within 50m（原始代码）
+                    # 过滤50米内、车辆前方的目标
                     if dist < 50:
-                        # Calculate the dot product（原始代码）
                         forward_vec = vehicle.get_transform().get_forward_vector()
                         ray = npc.get_transform().location - vehicle.get_transform().location
-
                         if forward_vec.dot(ray) > 0:
-                            verts = [v for v in bb.get_world_vertices(
-                                npc.get_transform())]
-
+                            # 计算3D顶点的2D投影
+                            verts = [v for v in npc.bounding_box.get_world_vertices(npc.get_transform())]
                             points_2d = []
-
                             for vert in verts:
                                 ray0 = vert - camera.get_transform().location
                                 cam_forward_vec = camera.get_transform().get_forward_vector()
-
-                                if (cam_forward_vec.dot(ray0) > 0):
+                                if cam_forward_vec.dot(ray0) > 0:
                                     p = get_image_point(vert, K, world_2_camera)
                                 else:
                                     p = get_image_point(vert, K_b, world_2_camera)
-
                                 points_2d.append(p)
 
+                            # 计算2D边界框
                             x_min, x_max, y_min, y_max = get_2d_box_from_3d_edges(
-                                points_2d, edges, image_h, image_w)
+                                points_2d, edges, CAMERA_HEIGHT, CAMERA_WIDTH
+                            )
 
-                            # Exclude very small bounding boxes（原始代码）
+                            # 过滤小框和超出画布的框
                             if (y_max - y_min) * (x_max - x_min) > 100 and (x_max - x_min) > 20:
-                                if point_in_canvas((x_min, y_min), image_h, image_w) and point_in_canvas((x_max, y_max),
-                                                                                                         image_h,
-                                                                                                         image_w):
+                                if point_in_canvas((x_min, y_min), CAMERA_HEIGHT, CAMERA_WIDTH) and \
+                                        point_in_canvas((x_max, y_max), CAMERA_HEIGHT, CAMERA_WIDTH):
                                     ids.append(npc.id)
-                                    boxes.append(
-                                        np.array([x_min, y_min, x_max, y_max]))
-                                    # 新增：填充跟踪数据（不影响原始逻辑）
+                                    boxes.append(np.array([x_min, y_min, x_max, y_max]))
+                                    # 更新跟踪数据
                                     if npc.id not in tracked_vehicles:
                                         tracked_vehicles[npc.id] = {'color': get_vehicle_color(npc.id)}
                                     tracked_vehicles[npc.id]['distance'] = dist
                                     tracked_vehicles[npc.id]['frame'] = frame_counter
                                     track_data[npc.id] = tracked_vehicles[npc.id]
                                     current_vehicles += 1
-                                    # 统计数据
-                                    total_vehicles = max(total_vehicles, len(tracked_vehicles))
 
-            # 新增：更新历史数据缓存（只保留最近50帧）
+            # 更新历史数据缓存（仅保留最近50帧，优化逻辑）
             history_frames.append(frame_counter)
             history_vehicles.append(current_vehicles)
             history_max_dist.append(max_distance)
-            # 截断缓存，保持固定长度
-            if len(history_frames) > MAX_HISTORY:
+            # 截断数据，保持固定长度
+            if len(history_frames) > MAX_HISTORY_FRAMES:
                 history_frames.pop(0)
                 history_vehicles.pop(0)
                 history_max_dist.pop(0)
 
-            # 原始代码的框处理（完全保留）
+            # 绘制边界框（保留原始逻辑，使用自定义函数）
             boxes = np.array(boxes)
             labels = np.array([2] * len(boxes))
             probs = np.array([1.0] * len(boxes))
+            output = custom_draw_bounding_boxes(
+                image, boxes, labels, COCO_CLASS_NAMES, ids, track_data
+            ) if len(boxes) > 0 else image
 
-            # 原始代码的画框逻辑（替换为自定义函数，保留原始功能+新增跟踪）
-            if len(boxes) > 0:
-                output = custom_draw_bounding_boxes(
-                    image, boxes, labels, COCO_CLASS_NAMES, ids, track_data)
-            else:
-                output = image
-
-            # 替换：动态统计图表（原始尺寸 400宽度）
-            # 转换图像为RGB（处理4通道）
-            if output.shape[-1] == 4:
-                output_rgb = output[..., :3]
-            else:
-                output_rgb = output.copy()
-            # 生成动态图表（尺寸：宽度400，高度与图像一致）
-            chart_image = draw_dynamic_chart(400, image_h, history_frames, history_vehicles, history_max_dist)
-            # 拼接图像和图表
+            # 转换图像格式并拼接图表（优化逻辑）
+            output_rgb = convert_image_format(output)
+            chart_image = draw_dynamic_chart(history_frames, history_vehicles, history_max_dist)
             combined_image = np.hstack((output_rgb, chart_image))
 
-            # 保留：跟踪监测窗口（原始尺寸 400*300）
-            track_window = np.zeros((400, 300, 3), dtype=np.uint8)
-            cv2.putText(track_window, "Vehicle Tracking Monitor", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6,
-                        (255, 255, 255), 2)
+            # 绘制跟踪监测窗口（保留原始功能，优化代码）
+            track_window = np.zeros((TRACK_WINDOW_HEIGHT, TRACK_WINDOW_WIDTH, 3), dtype=np.uint8)
+            cv2.putText(
+                track_window, "Vehicle Tracking Monitor", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_MEDIUM, (255, 255, 255), LINE_THICKNESS
+            )
             y_offset = 60
             # 显示前10辆跟踪的车辆
             for vid, data in list(tracked_vehicles.items())[:10]:
-                color = data['color']
-                dist = data['distance']
-                cv2.putText(track_window, f"ID: {vid} | Dist: {dist:.1f}m", (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.4, color, 1)
-                y_offset += 30
-                if y_offset > 380:
+                if y_offset > TRACK_WINDOW_HEIGHT - 20:
                     break
+                color = data['color']
+                dist = data.get('distance', 0.0)
+                cv2.putText(
+                    track_window, f"ID: {vid} | Dist: {dist:.1f}m", (10, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, color, 1
+                )
+                y_offset += 30
 
-            # 原始代码的显示逻辑（保留）
+            # 显示窗口（保留原始逻辑）
             cv2.imshow('2D Ground Truth', combined_image)
             cv2.imshow('Vehicle Tracking Monitor', track_window)
 
+            # 按q退出（保留原始逻辑）
             if cv2.waitKey(1) == ord('q'):
                 break
+    except KeyboardInterrupt:
+        print("程序被用户中断！")
+    finally:
+        # 清理资源（优化异常处理，确保资源释放）
+        try:
+            camera.destroy()
+            clear(world, camera)
+        except Exception as e:
+            print(f"清理资源时警告：{e}")
+        cv2.destroyAllWindows()
+        # 恢复Carla世界设置（新增，避免同步模式残留）
+        settings.synchronous_mode = False
+        world.apply_settings(settings)
 
-        except KeyboardInterrupt as e:
-            break
 
-    # 原始代码的清理逻辑（保留，新增异常处理）
-    try:
-        clear(world, camera)
-    except Exception as e:
-        print(f"Cleanup warning: {e}")
-    cv2.destroyAllWindows()
-
-
-# ===================== Python规范的主程序入口 ======================
 if __name__ == '__main__':
     main()
