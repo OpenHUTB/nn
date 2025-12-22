@@ -1,6 +1,14 @@
 """
 基于MuJoCo的自动驾驶仿真数据生成核心代码
-功能：车辆动力学仿真、LiDAR点云生成、摄像头图像生成、自动标注、数据保存
+
+本模块实现了完整的自动驾驶车辆仿真系统，包含以下主要功能：
+1. 车辆动力学仿真 - 利用MuJoCo物理引擎模拟真实车辆运动
+2. LiDAR点云生成 - 模拟激光雷达传感器数据采集
+3. 物体检测与标注 - 自动识别环境中的障碍物并生成标注
+4. 温度监控系统 - 模拟车内温度变化及空调控制
+5. 故障监测系统 - 实时监控传感器和执行器健康状态
+6. 数据可视化 - 生成各类图表和分析报告
+7. 键盘控制 - 支持手动控制车辆运动方向
 """
 import os
 import json
@@ -11,6 +19,14 @@ import time
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from collections import defaultdict, deque
+
+# 用于键盘控制
+try:
+    import pygame
+    PYGAME_AVAILABLE = True
+except ImportError:
+    PYGAME_AVAILABLE = False
+    print("注意: 未安装pygame，键盘控制功能不可用。可以通过 'pip install pygame' 安装。")
 
 # -------------------------- 配置参数 --------------------------
 # 场景文件路径
@@ -49,19 +65,39 @@ FAULT_MONITORING_PARAMS = {
 # -------------------------------------------------------------
 
 class MojocoDataSim:
+    """
+    MuJoCo自动驾驶仿真主类
+    
+    该类负责管理整个仿真过程，包括：
+    - 车辆模型加载与初始化
+    - 传感器数据生成
+    - 物体检测与识别
+    - 温度监控与空调控制
+    - 故障监测
+    - 数据保存与可视化
+    - 键盘控制交互
+    """
+    
     def __init__(self, xml_path, output_dir):
-        # 初始化输出目录
+        """
+        初始化仿真系统
+        
+        :param xml_path: MuJoCo模型文件路径
+        :param output_dir: 输出数据存储目录
+        """
+        # 初始化输出目录结构
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
-        os.makedirs(f"{output_dir}/lidar", exist_ok=True)
-        os.makedirs(f"{output_dir}/annotations", exist_ok=True)
-        os.makedirs(f"{output_dir}/visualization", exist_ok=True)  # 新增可视化目录
-        os.makedirs(f"{output_dir}/distance_analysis", exist_ok=True)  # 新增距离分析目录
-        os.makedirs(f"{output_dir}/fault_reports", exist_ok=True)  # 新增故障报告目录
+        os.makedirs(f"{output_dir}/lidar", exist_ok=True)          # LiDAR点云数据目录
+        os.makedirs(f"{output_dir}/annotations", exist_ok=True)     # 物体检测标注目录
+        os.makedirs(f"{output_dir}/visualization", exist_ok=True)   # 可视化图表目录
+        os.makedirs(f"{output_dir}/distance_analysis", exist_ok=True)  # 距离分析图表目录
+        os.makedirs(f"{output_dir}/fault_reports", exist_ok=True)   # 故障监测报告目录
 
         # 加载MuJoCo模型和数据
-        self.model = mujoco.MjModel.from_xml_path(xml_path)
-        self.data = mujoco.MjData(self.model)
+        self.model = mujoco.MjModel.from_xml_path(xml_path)  # 加载物理模型
+        self.data = mujoco.MjData(self.model)                # 创建仿真数据实例
+        
         # 创建可视化窗口
         self.viewer = viewer.launch_passive(self.model, self.data)
 
@@ -70,32 +106,70 @@ class MojocoDataSim:
         time.sleep(3)
 
         # 初始化空调系统状态
-        self.ac_status = False  # 空调开关状态
-        self.ac_target_temp = 23.0  # 空调目标温度
-        self.comfort_min_temp = TEMPERATURE_PARAMS["comfort_range"][0]
-        self.comfort_max_temp = TEMPERATURE_PARAMS["comfort_range"][1]
+        self.ac_status = False           # 空调开关状态 (False=关闭, True=开启)
+        self.ac_target_temp = 23.0       # 空调目标温度 (摄氏度)
+        self.comfort_min_temp = TEMPERATURE_PARAMS["comfort_range"][0]  # 舒适温度下限
+        self.comfort_max_temp = TEMPERATURE_PARAMS["comfort_range"][1]  # 舒适温度上限
 
         # 初始化故障监测系统
-        self.fault_monitor = FaultMonitor(self.model, self.data)
-        self.fault_history = []  # 存储故障历史记录
-        self.health_scores = []  # 存储健康评分历史
+        self.fault_monitor = FaultMonitor(self.model, self.data)  # 创建故障监测器实例
+        self.fault_history = []          # 存储故障历史记录
+        self.health_scores = []          # 存储系统健康评分历史
+
+        # 键盘控制相关初始化
+        self.keyboard_control = False     # 键盘控制功能是否可用
+        if PYGAME_AVAILABLE:
+            try:
+                pygame.init()
+                pygame.display.set_mode((400, 200))
+                pygame.display.set_caption('小车控制')
+                self.font = pygame.font.Font(None, 36)       # 标题字体
+                self.small_font = pygame.font.Font(None, 24)  # 正文字体
+                self.keyboard_control = True
+                print("已启用键盘控制功能")
+                print("使用方向键控制小车: 上键-前进, 下键-后退, 左键-左转, 右键-右转")
+            except Exception as e:
+                print(f"无法初始化键盘控制界面: {e}")
+        else:
+            print("键盘控制不可用: 未安装pygame")
+
+        # 车辆控制参数
+        self.max_speed = 10.0     # 最大行驶速度
+        self.turn_rate = 0.5      # 转向速率
 
     def get_world_pose(self, body_name):
         """
-        获取指定物体的世界位姿
-        :param body_name: 物体名称
-        :return: 位置和四元数
+        获取指定物体的世界位姿（位置和姿态）
+        
+        :param body_name: 物体名称（如'vehicle', 'obstacle1'等）
+        :return: tuple(位置向量, 四元数)
+            - 位置向量: [x, y, z] 世界坐标系下的位置
+            - 四元数: [w, x, y, z] 表示物体的姿态
         """
+        # 根据物体名称查找物体ID
         body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, body_name)
         if body_id == -1:
             raise ValueError(f"未找到名为 '{body_name}' 的物体")
+        
+        # 获取物体在世界坐标系中的位置
         pos = self.data.xpos[body_id].copy()
+        
+        # 获取物体的姿态（旋转矩阵）并转换为四元数
         quat = np.zeros(4)
         mujoco.mju_mat2Quat(quat, self.data.xmat[body_id])
         return pos, quat
 
     def generate_realistic_lidar_data(self):
-        """基于MuJoCo光线追踪生成真实的LiDAR点云数据"""
+        """
+        基于MuJoCo光线追踪生成真实的LiDAR点云数据
+        
+        该方法模拟真实的LiDAR传感器工作原理：
+        1. 从LiDAR传感器位置发射多个激光束
+        2. 检测每个激光束与环境中物体的碰撞点
+        3. 记录有效碰撞点构成点云数据
+        
+        :return: numpy数组，形状为(N, 3)，N为检测到的点数，每行包含[x, y, z]坐标
+        """
         try:
             # 获取车辆位置和朝向
             vehicle_pos, vehicle_quat = self.get_world_pose("vehicle")
@@ -103,71 +177,78 @@ class MojocoDataSim:
             # 获取LiDAR传感器的位置和朝向
             lidar_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "lidar_site")
             if lidar_site_id >= 0:
+                # 获取LiDAR传感器在世界坐标系中的位置
                 lidar_pos = self.data.site_xpos[lidar_site_id].copy()
-                # 获取LiDAR的旋转矩阵
+                # 获取LiDAR传感器的旋转矩阵（姿态）
                 lidar_mat = self.data.site_xmat[lidar_site_id].reshape(3, 3)
             else:
-                # 如果找不到LiDAR站点，使用默认位置
+                # 如果找不到LiDAR站点，使用默认位置（车辆位置+相对偏移）
                 lidar_offset = np.array(LIDAR_PARAMS["pos"])
                 lidar_pos = vehicle_pos + lidar_offset
                 lidar_mat = np.eye(3)  # 单位矩阵表示无旋转
         except ValueError:
+            # 如果无法获取车辆位姿，使用默认值
             vehicle_pos = np.array([0, 0, 0.5])
             lidar_pos = vehicle_pos + np.array(LIDAR_PARAMS["pos"])
             lidar_mat = np.eye(3)
 
-        # 生成角度范围
-        azimuth_angles = np.arange(0, 360, LIDAR_PARAMS["azimuth_res"])  # 方位角：0~360°
+        # 生成扫描角度范围
+        # 方位角：水平方向的角度，从0°到360°
+        azimuth_angles = np.arange(0, 360, LIDAR_PARAMS["azimuth_res"])
+        # 俯仰角：垂直方向的角度，从最小值到最大值
         elevation_angles = np.arange(
             LIDAR_PARAMS["elevation_min"],
             LIDAR_PARAMS["elevation_max"] + LIDAR_PARAMS["elevation_res"],
             LIDAR_PARAMS["elevation_res"]
-        )  # 俯仰角
+        )
 
+        # 存储点云数据的列表
         point_cloud = []
 
-        # 遍历所有角度，生成激光束
+        # 遍历所有角度组合，生成激光束
         for az in azimuth_angles:
             for el in elevation_angles:
-                # 转换为弧度
+                # 将角度转换为弧度（numpy三角函数使用弧度单位）
                 az_rad = np.deg2rad(az)
                 el_rad = np.deg2rad(el)
 
-                # 计算激光束的方向向量（局部坐标系）
+                # 计算激光束的方向向量（在LiDAR局部坐标系中）
+                # 使用球面坐标转换为直角坐标
                 dir_local = np.array([
-                    np.cos(el_rad) * np.cos(az_rad),
-                    np.cos(el_rad) * np.sin(az_rad),
-                    np.sin(el_rad)
+                    np.cos(el_rad) * np.cos(az_rad),  # X分量
+                    np.cos(el_rad) * np.sin(az_rad),  # Y分量
+                    np.sin(el_rad)                    # Z分量
                 ])
 
-                # 归一化方向向量
+                # 归一化方向向量，确保长度为1
                 dir_local = dir_local / np.linalg.norm(dir_local)
 
-                # 将方向向量从LiDAR坐标系转换到世界坐标系
+                # 将方向向量从LiDAR局部坐标系转换到世界坐标系
+                # 通过旋转矩阵实现坐标变换
                 dir_world = lidar_mat @ dir_local
 
-                # 创建参数
-                geom_group = np.array([1, 1, 1, 1, 1, 1], dtype=np.uint8)
-                geom_id = np.zeros(1, dtype=np.int32)
+                # 创建射线检测参数
+                geom_group = np.array([1, 1, 1, 1, 1, 1], dtype=np.uint8)  # 检测所有几何体组
+                geom_id = np.zeros(1, dtype=np.int32)  # 用于返回碰撞的几何体ID
 
-                # 调用射线检测
+                # 调用MuJoCo的射线检测函数
                 distance = mujoco.mj_ray(
                     self.model, self.data,
-                    lidar_pos,  # 射线起点
-                    dir_world,  # 射线方向（世界坐标系）
-                    geom_group,  # 几何体组
-                    1,  # flg_static: 检测静态几何体
-                    -1,  # bodyexclude: 不排除任何body
-                    geom_id  # 返回碰撞的几何体ID
+                    lidar_pos,    # 射线起点（LiDAR传感器位置）
+                    dir_world,    # 射线方向（世界坐标系）
+                    geom_group,   # 几何体组（检测哪些类型的物体）
+                    1,            # flg_static: 检测静态几何体
+                    -1,           # bodyexclude: 不排除任何body
+                    geom_id       # 返回碰撞的几何体ID
                 )
 
-                # 记录点云数据
-                if distance >= 0 and distance <= LIDAR_PARAMS["range"]:  # 如果检测到碰撞且在范围内
-                    # 计算交点位置
+                # 记录有效的点云数据
+                if distance >= 0 and distance <= LIDAR_PARAMS["range"]:
+                    # 计算碰撞点在世界坐标系中的位置
                     hit_pos = lidar_pos + dir_world * distance
                     point_cloud.append(hit_pos)
 
-        # 转换为numpy数组
+        # 转换为numpy数组并返回
         if len(point_cloud) > 0:
             point_cloud = np.array(point_cloud)
         else:
@@ -929,27 +1010,38 @@ class MojocoDataSim:
         print(f"已生成实时避障图: avoidance_{self.frame_count:04d}.png")
 
     def run_simulation(self):
-        """运行MuJoCo仿真并生成数据"""
+        """
+        运行MuJoCo仿真主循环并生成数据
+        
+        仿真主循环流程：
+        1. 每20帧采集传感器数据并保存
+        2. 实时更新车辆控制指令
+        3. 执行物理仿真步骤
+        4. 监控系统健康状态
+        """
         print("开始仿真...")
         self.frame_count = 0
 
-        # 设置简单的控制输入
-        # 查找车辆的驱动关节
+        # 查找车辆的驱动关节和转向关节索引
+        # 后轮驱动电机
         rear_left_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "rear_left_wheel_motor")
         rear_right_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "rear_right_wheel_motor")
+        # 前轮转向伺服电机
         front_left_steer_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_left_steering")
         front_right_steer_idx = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "front_right_steering")
 
         if rear_left_idx >= 0 and rear_right_idx >= 0:
             print("找到了车辆驱动关节")
 
+        # 上一帧检测到的物体数量（用于比较和输出变化）
         prev_detected_count = 0
 
-        # 初始化控制变量
+        # 初始化控制变量（默认自动巡航状态）
         left_speed, right_speed, steering_angle = 5.0, 5.0, 0.0
 
+        # 仿真主循环
         for i in range(SIMULATION_FRAMES):
-            # 每20帧生成和保存一次数据
+            # 每20帧生成和保存一次数据（降低数据生成频率以提高性能）
             if i % 20 == 0:
                 # 生成传感器数据和标注
                 lidar_data = self.generate_realistic_lidar_data()
@@ -962,7 +1054,7 @@ class MojocoDataSim:
                 # 检查并控制空调
                 ac_status = self.check_and_control_ac(temperature)
 
-                # 基于传感器数据计算控制指令
+                # 基于传感器数据计算控制指令（自动避障）
                 left_speed, right_speed, steering_angle = self.calculate_avoidance_control(
                     lidar_data, annotations["objects"]
                 )

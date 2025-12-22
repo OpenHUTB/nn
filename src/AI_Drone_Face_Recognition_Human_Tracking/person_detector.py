@@ -1,4 +1,4 @@
-# test_person_detector.py - 修正版
+# 人物检测模块（YOLOv8）
 import cv2
 import sys
 import os
