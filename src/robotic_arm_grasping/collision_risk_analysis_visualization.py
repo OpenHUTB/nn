@@ -1,8 +1,25 @@
+"""
+完整版：机械臂碰撞检测 + MuJoCo可视化界面
+包含碰撞分析和实时仿真
+修改说明：
+1. 所有路径改为相对路径
+2. 解决可视化图表中文乱码问题
+3. 优化文件处理和错误处理
+4. 修复临时文件创建问题
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import os
+import sys
+import time
+import tempfile
 import warnings
 warnings.filterwarnings('ignore')
+
+# 设置Matplotlib支持中文显示（解决乱码问题）
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']  # 设置中文字体
+plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
 
 # 尝试导入MuJoCo，如果失败则使用模拟模式
 try:
@@ -79,9 +96,9 @@ def generate_collision_analysis():
     # 添加障碍物标记
     ax1.plot([0.7, 0.7], [-0.8, 0.8], [0, 1], 'k-', linewidth=3, alpha=0.5, label='墙壁')
 
-    ax1.set_xlabel('X (m)', fontsize=12, labelpad=10)
-    ax1.set_ylabel('Y (m)', fontsize=12, labelpad=10)
-    ax1.set_zlabel('Z (m)', fontsize=12, labelpad=10)
+    ax1.set_xlabel('X (米)', fontsize=12, labelpad=10)
+    ax1.set_ylabel('Y (米)', fontsize=12, labelpad=10)
+    ax1.set_zlabel('Z (米)', fontsize=12, labelpad=10)
     ax1.set_title('3D碰撞风险热力图', fontsize=14, fontweight='bold')
     ax1.legend(fontsize=10)
     ax1.view_init(elev=25, azim=45)
@@ -128,7 +145,7 @@ def generate_collision_analysis():
     plt.suptitle('机械臂工作空间碰撞风险分析', fontsize=16, fontweight='bold')
     plt.tight_layout()
 
-    # 保存图表
+    # 保存图表到当前目录
     output_file = 'collision_analysis_result.png'
     plt.savefig(output_file, dpi=150, bbox_inches='tight')
     plt.show()
@@ -157,49 +174,55 @@ def run_mujoco_simulation():
     print("="*60)
 
     try:
-        # 使用现有的模型文件而不是内嵌的简化模型
-        import os
-        import tempfile
-        
-        # 获取模型文件的绝对路径
-        model_file_path = os.path.join(os.path.dirname(__file__), 'arm_with_gripper.xml')
-        
+        # 使用相对路径查找模型文件
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        model_file_path = os.path.join(current_dir, 'arm_with_gripper.xml')
+
         # 检查文件是否存在
         if not os.path.exists(model_file_path):
             print(f"❌ 模型文件不存在: {model_file_path}")
+            print(f"当前目录: {current_dir}")
+            print(f"目录内容: {os.listdir(current_dir)}")
             return False
-            
+
         print(f"正在加载模型文件: {model_file_path}")
-        
+
         # 读取模型文件内容
         with open(model_file_path, 'r', encoding='utf-8') as f:
             model_content = f.read()
-        
+
         # 移除对不存在的资源目录的引用
         model_content = model_content.replace('meshdir="assets/"', '')
         model_content = model_content.replace('texturedir="textures/"', '')
-        
-        # 使用固定的临时目录而不是随机命名的目录
-        temp_dir = r"C:\temp\mujoco_model"
-        os.makedirs(temp_dir, exist_ok=True)
-        temp_model_path = os.path.join(temp_dir, "arm_with_gripper.xml")
-        
-        # 将修改后的内容写入临时文件
-        with open(temp_model_path, 'w', encoding='utf-8') as f:
-            f.write(model_content)
-        
-        print(f"模型已复制到临时目录: {temp_model_path}")
-        
-        # 检查临时文件是否创建成功
+
+        # 使用临时文件，避免中文字符路径问题
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False, encoding='utf-8') as temp_file:
+            temp_model_path = temp_file.name
+            temp_file.write(model_content)
+            print(f"✅ 临时模型文件已创建: {temp_model_path}")
+
+        # 检查文件是否已创建
         if not os.path.exists(temp_model_path):
             print(f"❌ 临时文件创建失败: {temp_model_path}")
             return False
-        
+
+        print(f"✅ 临时文件存在: {os.path.exists(temp_model_path)}")
+        print(f"✅ 临时文件大小: {os.path.getsize(temp_model_path)} 字节")
+
         # 从临时路径加载模型
-        model = mujoco.MjModel.from_xml_path(temp_model_path)
-        data = mujoco.MjData(model)
-        
-        print("✅ 模型加载成功")
+        try:
+            print("正在加载MuJoCo模型...")
+            model = mujoco.MjModel.from_xml_path(temp_model_path)
+            data = mujoco.MjData(model)
+            print("✅ 模型加载成功")
+        except Exception as e:
+            print(f"❌ 模型加载失败: {e}")
+            # 尝试直接从XML字符串加载
+            print("尝试从XML字符串加载模型...")
+            model = mujoco.MjModel.from_xml_string(model_content)
+            data = mujoco.MjData(model)
+            print("✅ 从字符串加载模型成功")
+
         print(f"关节数量: {model.njnt}")
         print(f"执行器数量: {model.nu}")
 
@@ -239,16 +262,19 @@ def run_mujoco_simulation():
                         target_angles = np.random.uniform(-0.5, 0.5, model.nu)
 
                     # 碰撞检测（简单版本）
-                    ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, 'ee_site')
-                    if ee_site_id >= 0:
-                        ee_pos = data.site_xpos[ee_site_id]
+                    try:
+                        ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, 'ee_site')
+                        if ee_site_id >= 0:
+                            ee_pos = data.site_xpos[ee_site_id]
 
-                        # 检查与墙壁的碰撞
-                        if abs(ee_pos[0] - 0.7) < 0.1:
-                            print("⚠️  警告: 末端接近墙壁!")
-                        # 检查与柱子的碰撞
-                        if np.sqrt(ee_pos[0]**2 + ee_pos[1]**2) < 0.2:
-                            print("⚠️  警告: 末端接近中心柱子!")
+                            # 检查与墙壁的碰撞
+                            if abs(ee_pos[0] - 0.7) < 0.1:
+                                print("⚠️  警告: 末端接近墙壁!")
+                            # 检查与柱子的碰撞
+                            if np.sqrt(ee_pos[0]**2 + ee_pos[1]**2) < 0.2:
+                                print("⚠️  警告: 末端接近中心柱子!")
+                    except:
+                        pass  # 如果站点不存在，跳过碰撞检测
 
                     # 执行模拟步骤
                     mujoco.mj_step(model, data)
@@ -274,11 +300,11 @@ def run_mujoco_simulation():
         finally:
             # 清理临时文件
             try:
-                os.remove(temp_model_path)
-                os.rmdir(temp_dir)
-                print(f"临时目录已清理: {temp_dir}")
+                if os.path.exists(temp_model_path):
+                    os.remove(temp_model_path)
+                    print(f"临时文件已删除: {temp_model_path}")
             except Exception as e:
-                print(f"清理临时目录失败: {e}")
+                print(f"清理临时文件失败: {e}")
 
         return True
 
@@ -332,9 +358,6 @@ def run_collision_detection_system():
     print("="*60)
 
     return True
-
-# 导入time模块用于仿真
-import time
 
 if __name__ == "__main__":
     try:
