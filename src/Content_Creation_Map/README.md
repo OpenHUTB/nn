@@ -1,4 +1,3 @@
-<img width="861" height="436" alt="exporting_to_carla_03" src="https://github.com/user-attachments/assets/c40b3f09-4ad8-4783-8692-8cd1c7d2af62" /><img width="547" height="306" alt="basemap" src="https://github.com/user-attachments/assets/4cbf5888-2164-4bef-a452-14d5827a32ea" /># RoadRunner 使用教程说明
 
 关于 RoadRunner 的使用教程，教师提供的 RoadRunner R2022b 版本并没有汉化，在网上很难找到系统的 RoadRunner 教学视频。
 
@@ -931,7 +930,8 @@ RoadRunner 可以将场景导出到 CARLA 模拟器。有两个 CARLA 导出选�
         $UE4_ROOT/GenerateProjectFiles.sh -project="<CarlaFolderPath>/Unreal/CarlaUE4/CarlaUE4.uproject" -game -engine
         ```
         将 `UE4_ROOT` 设置为 Unreal Engine® 安装目录。
-然后，打开工程并构建插件。如果您使用的是 Windows，请在 VS 2019 的 x64 本机工具命令提示符中运行 "make launch" 来编译插件并启动编辑器。
+
+    然后，打开工程并构建插件。如果您使用的是 Windows，请在 VS 2019 的 x64 本机工具命令提示符中运行 "make launch" 来编译插件并启动编辑器。
 6.  插件显示在 **Edit > Plugins** 下。如果它没有出现在该菜单中，请检查 **Enabled** 复选框是否选中。
 
 <img width="571" height="577" alt="new-plugin-list" src="https://github.com/user-attachments/assets/febc75c8-6db5-4b71-867b-36c62947c4a9" />
@@ -1020,8 +1020,7 @@ RoadRunner 可以将场景导出到 CARLA 模拟器。有两个 CARLA 导出选�
 
 7.  点击编辑器工具条中的 **Execute** 即可运行导入场景的后期处理步骤。
 8.  点击编辑器工具条中的 **Commit** 将这些更改提交到场景。
-
-场景现已导入并准备进行模拟。
+9.  场景现已导入并准备进行模拟。
 
 ### 导入至 CARLA (Filmbox)
 
@@ -1034,23 +1033,35 @@ RoadRunner 可以将场景导出到 CARLA 模拟器。有两个 CARLA 导出选�
 **当RoadRunner 导入选项对话框打开时：**
 <img width="400" height="246" alt="import_to_unreal_pop_up" src="https://github.com/user-attachments/assets/8e1000ce-dea0-4202-a9bd-6ca736d253e3" />
 
-    *   **覆盖材质**：覆盖默认材质导入。来自 CARLA 材质的道路和树叶实例。
-        *   如果您想在下一个对话框中将材质设置为 **Use Existing**，则需要取消选中。
-    *   **导入信号视觉效果**：仅当在下一个对话框中选择 **"Create one Blueprint asset"** 选项时才起作用。
-        > **注意**
+* 覆盖材质
+
+    * 覆盖默认材质导入。来自 CARLA 材质的道路和树叶实例。
+
+    * 如果您想在下一个对话框中将材质设置为 Use Existing，则需要取消选中。
+
+* 导入信号视觉效果
+
+    * 仅当在下一个对话框中选择 "Create one Blueprint asset" 选项时才起作用。
         > 导入信号视觉效果选项对交通模拟没有任何影响。
-4.  当 **FBX 场景导入选项**对话框打开时：
-    *   将 **Scene > Hierarchy Type** 设置为 **"Create One Blueprint Asset"**（默认选择）。
-        > **注意**
-        > 只有 **"Create One Blueprint Asset"** 导入选项适用于材质、信号和透明度排序。**"Create one Actor with Components"** 和 **"Create Level Actors"** 选项仅导入材质。
-    *   如果需要，请选择 **Invert Normal Maps**。
+      > 
+**当 FBX 场景导入选项对话框打开时：**
+
+1.将 **Scene > Hierarchy Type** 设置为 **"Create One Blueprint Asset"**（默认选择）。
+        
+**注意**
+        
+> 只有 **"Create One Blueprint Asset"** 导入选项适用于材质、信号和透明度排序。**"Create one Actor with Components"** 和 **"Create Level Actors"** 选项仅导入材质。
+
+2.如果需要，请选择 **Invert Normal Maps**。
+
 <img width="861" height="436" alt="exporting_to_carla_03" src="https://github.com/user-attachments/assets/7831b3e0-c842-4bb7-a191-f6560c6bc900" />
 
-    *   将 **Static Meshes > Normal Import Method** 设置为 **Import Normals**。
+3.将 **Static Meshes > Normal Import Method** 设置为 **Import Normals**。
 <img width="829" height="436" alt="exporting_to_carla_04" src="https://github.com/user-attachments/assets/c1d67091-b824-4f3e-b684-899ca1d9d167" />
 
-    *   （可选）取消勾选 **Remove Degenerates**，这可以帮助制作一些较大规模的道具。
-    *   点击 **Import**。
+4.（可选）取消勾选 **Remove Degenerates**，这可以帮助制作一些较大规模的道具。
+
+5.点击 **Import**。
 
 **关于将交通信号导入 Unreal：** 如果在 RoadRunner 中设置了交通信号灯，则它们将作为 `RoadRunnerTrafficJunction` 组件导入到 Unreal 中。这些控制器在导入期间自动创建，并包含在创建的蓝图中。`RoadRunnerTrafficJunction` 组件处理信号状态之间切换的逻辑。UUID 用于匹配场景中的特定游戏对象。
 
