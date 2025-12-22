@@ -23,16 +23,18 @@ class LidarProcessor:
         self.frame_counter = 0
         self.data_lock = threading.Lock()
 
-        # 性能优化：批量处理设置
         self.batch_size = config.get('batch_size', 10) if config else 10
         self.point_cloud_batch = []
         self.enable_compression = config.get('enable_compression', True) if config else True
         self.compression_level = config.get('compression_level', 3) if config else 3
 
-        # 内存管理
-        self.max_points_per_frame = config.get('max_points_per_frame', 100000) if config else 100000
+        self.max_points_per_frame = config.get('max_points_per_frame', 50000) if config else 50000
         self.enable_downsampling = config.get('enable_downsampling', True) if config else True
-        self.downsample_ratio = config.get('downsample_ratio', 0.5) if config else 0.5
+        self.downsample_ratio = config.get('downsample_ratio', 0.3) if config else 0.3
+
+        self.memory_warning_threshold = config.get('memory_warning_threshold', 300) if config else 300
+        self.max_batch_memory_mb = config.get('max_batch_memory_mb', 50) if config else 50
+        self.v2x_save_interval = config.get('v2x_save_interval', 5) if config else 5
 
         self._init_calibration_files()
 
@@ -70,84 +72,110 @@ class LidarProcessor:
 
     def process_lidar_data(self, lidar_data, frame_num):
         with self.data_lock:
-            self.frame_counter = frame_num
+            try:
+                self.frame_counter = frame_num
 
-            points = self._carla_lidar_to_numpy(lidar_data)
+                points = self._carla_lidar_to_numpy(lidar_data)
 
-            if points is None or points.shape[0] == 0:
+                if points is None or points.shape[0] == 0:
+                    return None
+
+                if self._check_memory_usage():
+                    return None
+
+                original_count = points.shape[0]
+                if self.enable_downsampling and points.shape[0] > self.max_points_per_frame:
+                    points = self._downsample_point_cloud(points)
+
+                batch_memory_mb = self._estimate_batch_memory_mb()
+                if batch_memory_mb > self.max_batch_memory_mb:
+                    self._save_batch()
+
+                self.point_cloud_batch.append((frame_num, points))
+
+                if len(self.point_cloud_batch) >= self.batch_size:
+                    self._save_batch()
+
+                bin_path = self._save_as_bin(points, frame_num)
+                npy_path = self._save_as_npy(points, frame_num)
+
+                v2xformer_path = None
+                if frame_num % self.v2x_save_interval == 0:
+                    try:
+                        v2xformer_path = self._save_as_v2xformer_format(points, frame_num)
+                    except Exception as e:
+                        v2xformer_path = None
+
+                metadata = self._generate_metadata(points, bin_path, npy_path, v2xformer_path)
+
+                if frame_num % 20 == 0:
+                    gc.collect()
+
+                return metadata
+
+            except Exception as e:
+                gc.collect()
                 return None
 
-            # 下采样以减少内存使用
-            if self.enable_downsampling and points.shape[0] > self.max_points_per_frame:
-                points = self._downsample_point_cloud(points)
-
-            # 添加到批处理
-            self.point_cloud_batch.append((frame_num, points))
-
-            # 如果达到批处理大小，保存批处理数据
-            if len(self.point_cloud_batch) >= self.batch_size:
-                self._save_batch()
-
-            # 保存单个文件（向后兼容）
-            bin_path = self._save_as_bin(points, frame_num)
-            npy_path = self._save_as_npy(points, frame_num)
-
-            # 生成V2XFormer兼容格式
-            v2xformer_path = self._save_as_v2xformer_format(points, frame_num)
-
-            metadata = self._generate_metadata(points, bin_path, npy_path, v2xformer_path)
-
-            return metadata
-
     def _carla_lidar_to_numpy(self, lidar_data):
-        """高效转换LiDAR数据"""
         try:
-            # 使用内存视图减少内存分配
             points = np.frombuffer(lidar_data.raw_data, dtype=np.float32)
             points = np.reshape(points, (int(points.shape[0] / 4), 4))
-
-            # 只保留位置信息（x, y, z），忽略强度
             points = points[:, :3]
 
-            # 清理临时数组
             del lidar_data
             gc.collect()
 
             return points
 
         except Exception as e:
-            print(f"LiDAR数据转换失败: {e}")
-
-            # 备选转换方法
             try:
                 points = []
                 for i in range(0, len(lidar_data), 4):
                     point = lidar_data[i:i + 4]
                     points.append([point.x, point.y, point.z])
-
                 return np.array(points, dtype=np.float32)
             except:
                 return None
 
     def _downsample_point_cloud(self, points):
-        """下采样点云以减少内存使用"""
         if points.shape[0] <= self.max_points_per_frame:
             return points
 
-        # 随机下采样
         indices = np.random.choice(points.shape[0],
                                    int(points.shape[0] * self.downsample_ratio),
                                    replace=False)
         downsampled = points[indices]
 
-        # 清理内存
         del points
         gc.collect()
 
         return downsampled
 
+    def _estimate_batch_memory_mb(self):
+        if not self.point_cloud_batch:
+            return 0
+
+        total_points = 0
+        for _, points in self.point_cloud_batch:
+            total_points += points.shape[0]
+
+        memory_bytes = total_points * 12 * 1.2
+        return memory_bytes / (1024 * 1024)
+
+    def _check_memory_usage(self):
+        try:
+            import psutil
+            process = psutil.Process()
+            memory_mb = process.memory_info().rss / (1024 * 1024)
+
+            if memory_mb > self.memory_warning_threshold:
+                return True
+            return False
+        except:
+            return False
+
     def _save_batch(self):
-        """批量保存点云数据（提高效率）"""
         if not self.point_cloud_batch:
             return
 
@@ -159,66 +187,75 @@ class LidarProcessor:
                 'num_points': points.shape[0]
             })
 
-        # 生成批处理文件名
         min_frame = min([item[0] for item in self.point_cloud_batch])
         max_frame = max([item[0] for item in self.point_cloud_batch])
         batch_filename = f"lidar_batch_{min_frame:06d}_{max_frame:06d}.json"
         batch_path = os.path.join(self.lidar_dir, batch_filename)
 
-        # 压缩保存
         if self.enable_compression:
-            compressed_data = zlib.compress(
-                json.dumps(batch_data).encode('utf-8'),
-                level=self.compression_level
-            )
-            with open(batch_path, 'wb') as f:
-                f.write(compressed_data)
+            try:
+                json_str = json.dumps(batch_data)
+                compressed_data = zlib.compress(
+                    json_str.encode('utf-8'),
+                    level=self.compression_level
+                )
+                with open(batch_path, 'wb') as f:
+                    f.write(compressed_data)
+            except Exception as e:
+                try:
+                    with open(batch_path, 'w') as f:
+                        json.dump(batch_data, f)
+                except Exception as e2:
+                    pass
         else:
-            with open(batch_path, 'w') as f:
-                json.dump(batch_data, f)
+            try:
+                with open(batch_path, 'w') as f:
+                    json.dump(batch_data, f)
+            except Exception as e:
+                pass
 
-        # 清理批处理缓存
         self.point_cloud_batch.clear()
         gc.collect()
 
-        print(f"批量保存LiDAR数据: {batch_filename}")
-
     def _save_as_bin(self, points, frame_num):
-        """保存为二进制格式（兼容KITTI）"""
         bin_path = os.path.join(self.lidar_dir, f"lidar_{frame_num:06d}.bin")
 
-        # 添加强度信息（全为1）
         points_with_intensity = np.zeros((points.shape[0], 4), dtype=np.float32)
         points_with_intensity[:, :3] = points
-        points_with_intensity[:, 3] = 1.0  # 强度值
+        points_with_intensity[:, 3] = 1.0
 
-        points_with_intensity.tofile(bin_path)
+        try:
+            points_with_intensity.tofile(bin_path)
+        except Exception as e:
+            return None
 
         return bin_path
 
     def _save_as_npy(self, points, frame_num):
-        """保存为numpy格式"""
         npy_path = os.path.join(self.lidar_dir, f"lidar_{frame_num:06d}.npy")
 
-        # 使用内存映射减少内存使用
-        memmap_array = np.lib.format.open_memmap(
-            npy_path,
-            mode='w+',
-            dtype=np.float32,
-            shape=points.shape
-        )
-        memmap_array[:] = points[:]
-        memmap_array.flush()
+        try:
+            memmap_array = np.lib.format.open_memmap(
+                npy_path,
+                mode='w+',
+                dtype=np.float32,
+                shape=points.shape
+            )
+            memmap_array[:] = points[:]
+            memmap_array.flush()
+        except Exception as e:
+            try:
+                np.save(npy_path, points)
+            except Exception as e2:
+                return None
 
         return npy_path
 
     def _save_as_v2xformer_format(self, points, frame_num):
-        """保存为V2XFormer兼容格式"""
         v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
         os.makedirs(v2x_dir, exist_ok=True)
 
         try:
-            # 创建V2XFormer格式的数据结构
             v2x_data = {
                 'frame_id': frame_num,
                 'timestamp': datetime.now().timestamp(),
@@ -237,75 +274,26 @@ class LidarProcessor:
                 }
             }
 
-            # 保存为压缩的JSON格式
             filename = f"{frame_num:06d}.pkl.gz"
             filepath = os.path.join(v2x_dir, filename)
 
-            # 使用pickle+gzip压缩保存
             with gzip.open(filepath, 'wb') as f:
                 pickle.dump(v2x_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-            file_size = os.path.getsize(filepath) / 1024  # KB
-            print(f"保存V2XFormer格式: {filepath} ({file_size:.2f} KB)")
 
             return filepath
 
         except Exception as e:
-            # 如果保存失败，只打印警告，不抛出异常
-            print(f"警告: 保存V2XFormer格式失败: {e}")
             return None
 
-    def process_lidar_data(self, lidar_data, frame_num):
-        with self.data_lock:
-            try:
-                self.frame_counter = frame_num
-
-                points = self._carla_lidar_to_numpy(lidar_data)
-
-                if points is None or points.shape[0] == 0:
-                    print(f"警告: LiDAR数据为空或无效 (帧 {frame_num})")
-                    return None
-
-                # 下采样以减少内存使用
-                if self.enable_downsampling and points.shape[0] > self.max_points_per_frame:
-                    original_count = points.shape[0]
-                    points = self._downsample_point_cloud(points)
-                    print(f"LiDAR下采样: {original_count} -> {points.shape[0]} 点 (帧 {frame_num})")
-
-                # 添加到批处理
-                self.point_cloud_batch.append((frame_num, points))
-
-                # 如果达到批处理大小，保存批处理数据
-                if len(self.point_cloud_batch) >= self.batch_size:
-                    self._save_batch()
-
-                # 保存单个文件（向后兼容）
-                bin_path = self._save_as_bin(points, frame_num)
-                npy_path = self._save_as_npy(points, frame_num)
-
-                # 生成V2XFormer兼容格式（如果失败则忽略）
-                try:
-                    v2xformer_path = self._save_as_v2xformer_format(points, frame_num)
-                except Exception as e:
-                    v2xformer_path = None
-                    print(f"警告: V2XFormer格式保存失败: {e}")
-
-                metadata = self._generate_metadata(points, bin_path, npy_path, v2xformer_path)
-
-                return metadata
-
-            except Exception as e:
-                print(f"处理LiDAR数据失败: {e}")
-                return None
     def _generate_metadata(self, points, bin_path, npy_path, v2xformer_path):
         metadata = {
             'frame_id': self.frame_counter,
             'timestamp': datetime.now().isoformat(),
             'point_count': int(points.shape[0]),
             'file_paths': {
-                'bin': os.path.basename(bin_path),
-                'npy': os.path.basename(npy_path),
-                'v2xformer': os.path.basename(v2xformer_path)
+                'bin': os.path.basename(bin_path) if bin_path else None,
+                'npy': os.path.basename(npy_path) if npy_path else None,
+                'v2xformer': os.path.basename(v2xformer_path) if v2xformer_path else None
             },
             'statistics': {
                 'x_range': [float(points[:, 0].min()), float(points[:, 0].max())],
@@ -318,27 +306,28 @@ class LidarProcessor:
                 'downsampled': self.enable_downsampling and points.shape[0] > self.max_points_per_frame,
                 'downsample_ratio': self.downsample_ratio if self.enable_downsampling else 1.0,
                 'compression_enabled': self.enable_compression,
-                'compression_level': self.compression_level
+                'compression_level': self.compression_level,
+                'v2x_saved': v2xformer_path is not None
             }
         }
 
         meta_path = os.path.join(self.lidar_dir, f"lidar_meta_{self.frame_counter:06d}.json")
-        with open(meta_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
+        try:
+            with open(meta_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+        except Exception as e:
+            pass
 
         return metadata
 
     def flush_batch(self):
-        """强制刷新批处理数据"""
         if self.point_cloud_batch:
             self._save_batch()
 
     def generate_lidar_summary(self):
-        """生成LiDAR数据摘要（优化版）"""
         if not os.path.exists(self.lidar_dir):
             return None
 
-        # 快速统计文件
         import glob
         bin_files = glob.glob(os.path.join(self.lidar_dir, "*.bin"))
         npy_files = glob.glob(os.path.join(self.lidar_dir, "*.npy"))
@@ -348,19 +337,19 @@ class LidarProcessor:
         total_points = 0
         total_size = 0
 
-        # 采样统计，避免读取所有文件
-        sample_files = bin_files[:10] if len(bin_files) > 10 else bin_files
+        sample_files = bin_files[:5] if len(bin_files) > 5 else bin_files
         for bin_file in sample_files:
             if os.path.exists(bin_file):
-                file_size = os.path.getsize(bin_file)
-                total_size += file_size
-                # 估算点数
-                points_in_file = file_size // (4 * 4)  # 4个float32，每个4字节
-                total_points += points_in_file
+                try:
+                    file_size = os.path.getsize(bin_file)
+                    total_size += file_size
+                    points_in_file = file_size // (4 * 4)
+                    total_points += points_in_file
+                except:
+                    continue
 
-        # 根据采样估算总数
-        if sample_files:
-            avg_points_per_file = total_points / len(sample_files)
+        if sample_files and len(bin_files) > 0:
+            avg_points_per_file = total_points / max(len(sample_files), 1)
             total_points_estimated = avg_points_per_file * len(bin_files)
         else:
             total_points_estimated = 0
@@ -382,14 +371,16 @@ class LidarProcessor:
         }
 
         summary_path = os.path.join(self.output_dir, "metadata", "lidar_summary.json")
-        with open(summary_path, 'w') as f:
-            json.dump(summary, f, indent=2)
+        try:
+            with open(summary_path, 'w') as f:
+                json.dump(summary, f, indent=2)
+        except Exception as e:
+            pass
 
         return summary
 
 
 class MultiSensorFusion:
-    """多传感器融合（优化版）"""
 
     def __init__(self, output_dir, config=None):
         self.output_dir = output_dir
@@ -397,8 +388,8 @@ class MultiSensorFusion:
         os.makedirs(self.fusion_dir, exist_ok=True)
 
         self.calibration_data = {}
-        self.fusion_cache = {}  # 融合缓存
-        self.cache_size = config.get('fusion_cache_size', 100) if config else 100
+        self.fusion_cache = {}
+        self.cache_size = config.get('fusion_cache_size', 50) if config else 50
 
         self._load_calibration()
 
@@ -406,65 +397,41 @@ class MultiSensorFusion:
         calibration_dir = os.path.join(self.output_dir, "calibration")
 
         if os.path.exists(calibration_dir):
-            # 批量读取校准文件
             calibration_files = []
             for root, dirs, files in os.walk(calibration_dir):
                 for file in files:
                     if file.endswith('.json'):
                         calibration_files.append(os.path.join(root, file))
 
-            # 并行读取校准文件
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                future_to_file = {
-                    executor.submit(self._load_calibration_file, file): file
-                    for file in calibration_files
-                }
-
-                for future in concurrent.futures.as_completed(future_to_file):
-                    file = future_to_file[future]
-                    try:
-                        sensor_name, data = future.result()
-                        if sensor_name and data:
-                            self.calibration_data[sensor_name] = data
-                    except Exception as e:
-                        print(f"加载校准文件 {file} 失败: {e}")
-
-    def _load_calibration_file(self, filepath):
-        """加载单个校准文件"""
-        try:
-            with open(filepath, 'r') as f:
-                data = json.load(f)
-            sensor_name = os.path.basename(filepath).replace('.json', '')
-            return sensor_name, data
-        except:
-            return None, None
+            for file in calibration_files[:10]:
+                try:
+                    with open(file, 'r') as f:
+                        data = json.load(f)
+                    sensor_name = os.path.basename(file).replace('.json', '')
+                    self.calibration_data[sensor_name] = data
+                except Exception as e:
+                    pass
 
     def create_synchronization_file(self, frame_num, sensor_data):
-        """创建同步文件（优化版）"""
-        # 检查缓存
         cache_key = f"{frame_num}_{hash(str(sensor_data))}"
         if cache_key in self.fusion_cache:
             return self.fusion_cache[cache_key]
 
         sync_data = {
             'frame_id': frame_num,
-            'timestamp': datetime.now().timestamp(),  # 使用时间戳而不是ISO格式
+            'timestamp': datetime.now().timestamp(),
             'sensors': {},
             'transformations': {}
         }
 
-        # 批量处理传感器数据
         for sensor_type, data_path in sensor_data.items():
             if data_path and os.path.exists(data_path):
-                # 获取文件信息（不加载完整文件）
                 file_info = {
                     'file_path': os.path.basename(data_path),
                     'file_size': os.path.getsize(data_path),
                     'modified_time': os.path.getmtime(data_path)
                 }
 
-                # 如果是图像，获取尺寸信息
                 if data_path.endswith(('.png', '.jpg', '.jpeg')):
                     try:
                         import cv2
@@ -476,7 +443,6 @@ class MultiSensorFusion:
 
                 sync_data['sensors'][sensor_type] = file_info
 
-                # 添加变换信息（如果可用）
                 if sensor_type in self.calibration_data:
                     sync_data['transformations'][sensor_type] = {
                         'matrix': self.calibration_data[sensor_type].get('matrix',
@@ -484,11 +450,9 @@ class MultiSensorFusion:
                                                                           [0, 0, 0, 1]])
                     }
 
-        # 压缩保存
         sync_file = os.path.join(self.fusion_dir, f"sync_{frame_num:06d}.json")
 
-        # 使用压缩的JSON
-        if len(str(sync_data)) > 1000:  # 如果数据较大，压缩保存
+        if len(str(sync_data)) > 1000:
             compressed_data = zlib.compress(
                 json.dumps(sync_data).encode('utf-8'),
                 level=3
@@ -498,11 +462,9 @@ class MultiSensorFusion:
                 f.write(compressed_data)
         else:
             with open(sync_file, 'w') as f:
-                json.dump(sync_data, f, separators=(',', ':'))  # 紧凑格式
+                json.dump(sync_data, f, separators=(',', ':'))
 
-        # 更新缓存
         if len(self.fusion_cache) >= self.cache_size:
-            # 移除最旧的缓存项
             oldest_key = next(iter(self.fusion_cache))
             del self.fusion_cache[oldest_key]
 
@@ -511,19 +473,15 @@ class MultiSensorFusion:
         return sync_file
 
     def generate_fusion_report(self):
-        """生成融合报告（优化版）"""
         if not os.path.exists(self.fusion_dir):
             return None
 
-        # 快速扫描文件
         import glob
         sync_files = glob.glob(os.path.join(self.fusion_dir, "*.json*"))
 
-        # 解析文件名获取帧范围（避免读取所有文件）
         frame_ids = []
-        for sync_file in sync_files:
+        for sync_file in sync_files[:20]:
             try:
-                # 从文件名提取帧号
                 filename = os.path.basename(sync_file)
                 if filename.startswith('sync_'):
                     frame_id = int(filename.split('_')[1].split('.')[0])

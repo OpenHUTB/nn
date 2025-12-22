@@ -1,447 +1,405 @@
-"""
-CARLA 0.9.14 低画质版专用脚本
-- 适配0.9.14 API差异（移除road_type、修正Vector2D.is_zero、修正异常处理）
-- 实现严格的红灯停、绿灯行逻辑
-- 车辆沿道路正常行驶，路口自然拐弯（兼容0.9.14）
-- 支持地图随机生成
-- 新增：3D车辆转2D边界框可视化（含车辆ID、距离筛选）
-"""
-import sys
-import os
 import carla
+import queue
+import random
 import cv2
 import numpy as np
-import queue
 import math
-import random
-import colorsys  # 用于生成边界框颜色
+import os
+import time  # 新增：计算帧率
 
-# 全局变量
-IMAGE_QUEUE = queue.Queue(maxsize=2)  # 增大队列，避免图像丢失
-LATEST_IMAGE = None  # 存储最新图像，防止黑屏
-# 替换为你的低画质CARLA实际路径
-CARLA_ROOT = 'D:/123/apps/CARLA_0.9.14/WindowsNoEditor'
+# 修复Deep SORT的API弃用问题
+import scipy.optimize as opt
+from deep_sort import nn_matching
+from deep_sort.detection import Detection
+from deep_sort.tracker import Tracker
 
-# ===================== 3D转2D可视化核心工具函数（适配0.9.14） =====================
+# COCO类别名称
+COCO_CLASS_NAMES = [
+    'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
+    'train', 'truck', 'boat', 'traffic light', 'fire hydrant',
+    'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog',
+    'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+    'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+    'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat',
+    'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+    'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+    'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot',
+    'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+    'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+    'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven',
+    'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+    'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+]
+
+
+# ===================== Deep SORT修复函数 =====================
+def linear_assignment(cost_matrix):
+    x, y = opt.linear_sum_assignment(cost_matrix)
+    return np.array(list(zip(x, y)))
+
+
+import deep_sort.utils.linear_assignment as la
+
+la.linear_assignment = linear_assignment
+
+
+class SimpleBoxEncoder:
+    def __init__(self):
+        pass
+
+    def __call__(self, image, boxes):
+        features = []
+        for box in boxes:
+            x1, y1, w, h = box
+            aspect_ratio = w / h if h != 0 else 1.0
+            center_x = (x1 + w / 2) / image.shape[1]
+            center_y = (y1 + h / 2) / image.shape[0]
+            area = (w * h) / (image.shape[0] * image.shape[1])
+            feature = np.array([aspect_ratio, center_x, center_y, area] + [0.0] * 124)
+            features.append(feature)
+        return np.array(features)
+
+
+def create_box_encoder(model_filename=None, batch_size=32):
+    return SimpleBoxEncoder()
+
+
+# ===================== 工具函数 =====================
+def get_image_point(vertex, K, world_to_camera):
+    point_3d = np.array([vertex.x, vertex.y, vertex.z, 1.0])
+    point_camera = np.dot(world_to_camera, point_3d)
+    point_img = np.dot(K, point_camera[:3])
+    point_img = point_img / point_img[2]
+    return (point_img[0], point_img[1])
+
+
+def get_2d_box_from_3d_edges(points_2d, edges, image_h, image_w):
+    x_coords = [p[0] for p in points_2d]
+    y_coords = [p[1] for p in points_2d]
+    x_min = max(0, min(x_coords))
+    x_max = min(image_w, max(x_coords))
+    y_min = max(0, min(y_coords))
+    y_max = min(image_h, max(y_coords))
+    return x_min, x_max, y_min, y_max
+
+
+def point_in_canvas(point, image_h, image_w):
+    x, y = point
+    return 0 <= x <= image_w and 0 <= y <= image_h
+
+
 def build_projection_matrix(w, h, fov, is_behind_camera=False):
-    """构建相机投影矩阵（将3D世界坐标投影到2D图像）"""
     focal = w / (2.0 * math.tan(fov * math.pi / 360.0))
     K = np.identity(3)
     K[0, 0] = K[1, 1] = focal
     K[0, 2] = w / 2.0
     K[1, 2] = h / 2.0
     if is_behind_camera:
-        K[2, 2] = -1  # 反转z轴处理相机后方的点
+        K[0, 0] = -K[0, 0]
     return K
 
-def get_image_point(loc, K, w2c):
-    """将Carla的3D位置转换为2D图像坐标（适配0.9.14）"""
-    point = np.array([loc.x, loc.y, loc.z, 1.0])
-    point_camera = np.dot(w2c, point)  # 世界→相机
-    point_img = np.dot(K, point_camera[:3])  # 相机→图像
-    if point_img[2] != 0:  # 避免除零错误（适配低画质版）
-        point_img = point_img / point_img[2]  # 归一化
-    return (point_img[0], point_img[1])
 
-def get_2d_box_from_3d_edges(points_2d, h, w):
-    """从3D点的2D投影生成最小包围框"""
-    x_coords = [p[0] for p in points_2d]
-    y_coords = [p[1] for p in points_2d]
-    x_min = max(0, min(x_coords))
-    x_max = min(w, max(x_coords))
-    y_min = max(0, min(y_coords))
-    y_max = min(h, max(y_coords))
-    return x_min, y_min, x_max, y_max  # 调整返回顺序，匹配cv2.rectangle
+def clear_npc(world):
+    for actor in world.get_actors().filter('*vehicle*'):
+        if actor.attributes.get('role_name') != 'hero':
+            actor.destroy()
 
-def point_in_canvas(point, h, w):
-    """检查2D点是否在图像画布范围内"""
-    x, y = point
-    return 0 <= x < w and 0 <= y < h
 
-def generate_color(class_id, num_classes=1):
-    """为类别生成唯一颜色（这里仅车辆，固定颜色）"""
-    hsv_tuples = [(x / num_classes, 1., 1.) for x in range(num_classes)]
-    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    colors = list(map(lambda x: (int(x[0]*255), int(x[1]*255), int(x[2]*255)), colors))
-    return colors[class_id % num_classes]
+def clear_static_vehicle(world):
+    pass
 
-def draw_bounding_boxes(image, boxes, ids, class_names):
-    """在图像上绘制边界框（含车辆ID）"""
+
+def clear(world, camera):
+    if camera:
+        camera.destroy()
+    for actor in world.get_actors().filter('*vehicle*'):
+        actor.destroy()
+
+
+# ===================== 【完善】可视化函数 =====================
+def draw_bounding_boxes(image, bboxes, labels, class_names, ids):
+    """优化框的颜色，不同ID使用不同颜色"""
+
+    # 生成固定的颜色映射（基于ID的哈希值）
+    def get_color(track_id):
+        np.random.seed(track_id)
+        return tuple(np.random.randint(0, 255, 3).tolist())
+
+    for bbox, label, track_id in zip(bboxes, labels, ids):
+        x1, y1, x2, y2 = bbox.astype(int)
+        color = get_color(track_id)
+        # 绘制框和背景
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
+        class_name = class_names[label] if label < len(class_names) else 'car'
+        text = f"ID:{track_id} | {class_name}"
+        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
+        cv2.rectangle(image, (x1, y1 - text_size[1] - 5), (x1 + text_size[0], y1), color, -1)
+        cv2.putText(image, text, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+    return image
+
+
+def draw_info_text(image, speed_kmh, vehicle_count, map_name, fps):
+    """新增帧率显示，优化信息排版"""
     image_copy = image.copy()
-    color = generate_color(0)  # 车辆类别固定为0，颜色为红色系
-    for i, box in enumerate(boxes):
-        x1, y1, x2, y2 = box.astype(int)
-        # 绘制矩形框
-        cv2.rectangle(image_copy, (x1, y1), (x2, y2), color, 2)
-        # 准备文本（车辆ID）
-        text = f"Car (ID: {ids[i]})" if ids and i < len(ids) else "Car"
-        # 绘制文本背景和文字
-        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-        text_y = y1 - 10 if y1 - 10 > 10 else y1 + text_size[1] + 10
-        cv2.rectangle(image_copy, (x1, text_y - text_size[1] - 2),
-                      (x1 + text_size[0], text_y + 2), color, -1)
-        cv2.putText(image_copy, text, (x1, text_y), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (255, 255, 255), 1)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.6
+    font_thickness = 2
+    text_color = (255, 255, 255)
+    bg_color = (0, 0, 0)
+    padding = 5
+
+    text_list = [
+        f"Map: {map_name}",
+        f"Speed: {speed_kmh:.1f} km/h",
+        f"Tracked Vehicles: {vehicle_count}",
+        f"FPS: {fps:.1f}"  # 新增帧率
+    ]
+
+    y_offset = 30
+    for text in text_list:
+        text_size = cv2.getTextSize(text, font, font_scale, font_thickness)[0]
+        cv2.rectangle(
+            image_copy,
+            (10, y_offset - text_size[1] - padding),
+            (10 + text_size[0] + padding * 2, y_offset + padding),
+            bg_color, -1
+        )
+        cv2.putText(image_copy, text, (10 + padding, y_offset), font, font_scale, text_color, font_thickness)
+        y_offset += text_size[1] + padding * 3
     return image_copy
 
-# ===================== 原脚本核心功能函数 =====================
-# 摄像头回调函数（低画质适配，新增图像存储）
-def image_callback(image):
-    global LATEST_IMAGE
-    try:
-        img_bgra = np.frombuffer(image.raw_data, dtype=np.uint8)
-        img_bgra = img_bgra.reshape((image.height, image.width, 4))
-        img_bgr = cv2.cvtColor(img_bgra, cv2.COLOR_BGRA2BGR)
-        img_bgr = cv2.resize(img_bgr, (640, 360))  # 统一分辨率
 
-        # 存储最新图像，防止黑屏
-        LATEST_IMAGE = img_bgr.copy()
+def camera_callback(image, rgb_image_queue):
+    rgb_image = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
+    rgb_image_queue.put(rgb_image)
 
-        # 处理队列，避免满溢
-        if IMAGE_QUEUE.full():
-            IMAGE_QUEUE.get_nowait()
-        IMAGE_QUEUE.put(img_bgr, timeout=0.1)
-    except Exception as e:
-        print(f"⚠️ 图像回调出错：{e}")
 
-# 计算两个向量的夹角（用于转向控制，平滑转向）
-# 适配0.9.14：移除Vector2D.is_zero()，改用长度判断
-def calculate_angle(current_transform, target_location):
-    # 获取车辆的前进方向向量（仅平面，忽略z轴）
-    forward = current_transform.get_forward_vector()
-    forward_flat = carla.Vector2D(forward.x, forward.y)
-    # 计算车辆到目标点的方向向量
-    target_flat = carla.Vector2D(
-        target_location.x - current_transform.location.x,
-        target_location.y - current_transform.location.y
-    )
-    # 归一化向量（避免长度影响夹角计算）
-    if forward_flat.length() > 0:
-        forward_flat = forward_flat / forward_flat.length()
-    if target_flat.length() > 0:
-        target_flat = target_flat / target_flat.length()
-    # 计算夹角（弧度），范围[-π, π]
-    dot = forward_flat.x * target_flat.x + forward_flat.y * target_flat.y
-    cross = forward_flat.x * target_flat.y - forward_flat.y * target_flat.x
-    angle = math.atan2(cross, dot)
-    return angle
+# ===================== 【新增】窗口工具函数 =====================
+def init_window(window_name, width, height):
+    """初始化窗口：置顶、自适应大小、显示提示"""
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)  # 允许调整大小
+    cv2.resizeWindow(window_name, width, height)
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)  # 窗口置顶
+    # 显示初始提示文字
+    init_img = np.zeros((height, width, 3), dtype=np.uint8)
+    cv2.putText(init_img, "CARLA DeepSORT Tracking", (width // 4, height // 2), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                (255, 255, 255), 2)
+    cv2.imshow(window_name, init_img)
+    cv2.waitKey(1)
 
-# 选择路口的路径点（适配0.9.14：不使用road_type，优先选直走/主方向）
-def choose_main_waypoint(waypoint):
-    # 获取下一组路径点（间距5米，更远的距离能更好识别路口）
-    next_waypoints = waypoint.next(5.0)
-    if not next_waypoints:
-        return waypoint
-    # 优先选择第一个路径点（主方向，避免拐入小巷）
-    main_waypoint = next_waypoints[0]
-    return main_waypoint
 
+def confirm_exit():
+    """退出前弹出确认窗口"""
+    confirm_img = np.zeros((200, 400, 3), dtype=np.uint8)
+    cv2.putText(confirm_img, "Quit? (Y/N)", (100, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    cv2.imshow("Confirm Exit", confirm_img)
+    key = cv2.waitKey(0) & 0xFF
+    cv2.destroyWindow("Confirm Exit")
+    return key == ord('y') or key == ord('Y')
+
+
+# ===================== 主函数 =====================
 def main():
-    camera = None
-    vehicle = None
-    current_waypoint = None  # 动态更新的当前目标路径点
+    # 窗口配置
+    WINDOW_NAME = "CARLA 2D Tracking (Enhanced Window)"
+    CAMERA_WIDTH = 640
+    CAMERA_HEIGHT = 480
 
-    # 检查CARLA进程是否运行
-    def check_carla_running():
-        try:
-            import psutil
-            for proc in psutil.process_iter(['name']):
-                if proc.info['name'] == 'CarlaUE4.exe':
-                    return True
-            return False
-        except ImportError:
-            print("⚠️ 未安装psutil，默认认为CARLA进程已运行")
-            return True
+    # 初始化CARLA
+    client = carla.Client('localhost', 2000)
+    client.set_timeout(10.0)
+    world = client.get_world()
 
-    # 前置检查
-    print("=" * 60)
-    print("--- [低画质CARLA环境检查] ---")
-    if not check_carla_running():
-        print("❌ 错误：未检测到CARLA服务器运行！")
-        print(f"   请先启动：{os.path.join(CARLA_ROOT, 'CarlaUE4.exe')}")
-        print("   （建议使用低画质快捷方式启动）")
+    settings = world.get_settings()
+    settings.synchronous_mode = True
+    settings.fixed_delta_seconds = 0.05
+    world.apply_settings(settings)
+
+    spectator = world.get_spectator()
+    spawn_points = world.get_map().get_spawn_points()
+    if not spawn_points:
+        print("❌ 无可用生成点！")
         return
-    print("✅ 检测到CARLA服务器运行")
-    print("--- [环境检查完成] ---")
-    print("=" * 60)
 
-    try:
-        # 1. 连接CARLA服务器（低画质版超时延长）
-        client = carla.Client('127.0.0.1', 2000)
-        client.set_timeout(60.0)
+    # 生成自车
+    bp_lib = world.get_blueprint_library()
+    vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2020') or bp_lib.filter('vehicle.*')[0]
+    spawn_point = random.choice(spawn_points)
+    vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+    if not vehicle:
+        print("❌ 车辆生成失败！")
+        return
 
-        # 随机选择地图
-        available_maps = ['Town01', 'Town02', 'Town03', 'Town04', 'Town05']
-        random_map = random.choice(available_maps)
-        world = client.load_world(random_map)
-        carla_map = world.get_map()
-        world.wait_for_tick()
-        print(f"✅ 随机加载地图成功！当前地图：{carla_map.name}（随机选择：{random_map}）")
+    # 生成相机
+    camera_bp = bp_lib.find('sensor.camera.rgb')
+    camera_bp.set_attribute('image_size_x', str(CAMERA_WIDTH))
+    camera_bp.set_attribute('image_size_y', str(CAMERA_HEIGHT))
+    camera_bp.set_attribute('fov', '90')
+    camera_init_trans = carla.Transform(carla.Location(x=1.2, z=2.0), carla.Rotation(pitch=-5))
+    camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
 
-        # 2. 获取蓝图和生成点
-        blueprint_library = world.get_blueprint_library()
-        spawn_points = carla_map.get_spawn_points()
-        if not spawn_points:
-            print("❌ 无可用生成点，退出")
-            return
+    # 初始化窗口
+    init_window(WINDOW_NAME, CAMERA_WIDTH, CAMERA_HEIGHT)
 
-        # 3. 生成车辆（低画质选轻量化车型）
-        vehicle_bps = blueprint_library.filter('vehicle.seat.leon')
-        if not vehicle_bps:
-            vehicle_bps = blueprint_library.filter('vehicle.*')[0:1]
-        vehicle_bp = vehicle_bps[0]
-        vehicle_bp.set_attribute('role_name', 'autopilot')
+    image_queue = queue.Queue(maxsize=2)
+    camera.listen(lambda image: camera_callback(image, image_queue))
 
-        # 选择生成点
-        spawn_idx = random.choice([5, 12, 15, 20]) if len(spawn_points) > 20 else random.randint(0, len(spawn_points)-1)
-        spawn_point = spawn_points[spawn_idx]
-        vehicle = world.spawn_actor(vehicle_bp, spawn_point)
-        vehicle.set_autopilot(False)
-        print(f"✅ 生成车辆：{vehicle.type_id} | 生成点：{spawn_point.location}")
+    clear_npc(world)
+    clear_static_vehicle(world)
 
-        # 4. 生成NPC车辆（可选，用于测试边界框可视化）
-        npc_count = 10  # 生成10辆NPC车辆
-        spawned_npcs = 0
-        for spawn_point in spawn_points:
-            if spawned_npcs >= npc_count:
-                break
-            npc_bps = [bp for bp in blueprint_library.filter('vehicle.*') if int(bp.get_attribute('number_of_wheels')) == 4]
-            if not npc_bps:
+    # 追踪参数
+    edges = [[0, 1], [1, 3], [3, 2], [2, 0], [0, 4], [4, 5],
+             [5, 1], [5, 7], [7, 6], [6, 4], [6, 2], [7, 3]]
+    K = build_projection_matrix(CAMERA_WIDTH, CAMERA_HEIGHT, 90)
+    K_b = build_projection_matrix(CAMERA_WIDTH, CAMERA_HEIGHT, 90, is_behind_camera=True)
+
+    # 生成NPC
+    npc_count = 20
+    spawned_npcs = 0
+    for i in range(npc_count):
+        vehicle_bp_list = bp_lib.filter('vehicle')
+        car_bp = [bp for bp in vehicle_bp_list if int(bp.get_attribute('number_of_wheels')) == 4]
+        if not car_bp:
+            continue
+        random_spawn = random.choice(spawn_points)
+        if random_spawn.location.distance(vehicle.get_location()) < 10.0:
+            continue
+        npc = world.try_spawn_actor(random.choice(car_bp), random_spawn)
+        if npc:
+            npc.set_autopilot(True)
+            spawned_npcs += 1
+    print(f"✅ 生成{spawned_npcs}辆NPC车辆")
+
+    vehicle.set_autopilot(True)
+
+    # 初始化追踪器
+    encoder = create_box_encoder()
+    metric = nn_matching.NearestNeighborDistanceMetric("cosine", 0.2, None)
+    tracker = Tracker(metric)
+    map_name = world.get_map().name.split('/')[-1]
+
+    # 帧率计算变量
+    frame_count = 0
+    start_time = time.time()
+    fps = 0.0
+
+    # 主循环
+    while True:
+        try:
+            world.tick()
+            frame_count += 1
+
+            # 计算帧率（每10帧更新一次）
+            if frame_count % 10 == 0:
+                end_time = time.time()
+                fps = 10 / (end_time - start_time)
+                start_time = end_time
+
+            # 旁观者视角
+            transform = carla.Transform(
+                vehicle.get_transform().transform(carla.Location(x=-4, z=50)),
+                carla.Rotation(yaw=-180, pitch=-90)
+            )
+            spectator.set_transform(transform)
+
+            # 获取图像
+            if image_queue.empty():
                 continue
-            npc_bp = random.choice(npc_bps)
-            npc = world.try_spawn_actor(npc_bp, spawn_point)
-            if npc:
-                npc.set_autopilot(True)
-                spawned_npcs += 1
-        print(f"✅ 生成{spawned_npcs}辆NPC车辆")
+            image = image_queue.get()
+            image = cv2.cvtColor(image, cv2.COLOR_BGRA2BGR)
+            image = cv2.flip(image, 1)
 
-        # 5. 初始化第一个路径点
-        current_waypoint = carla_map.get_waypoint(vehicle.get_location(), project_to_road=True)
-        current_waypoint = choose_main_waypoint(current_waypoint)
-        print(f"✅ 初始化路径点完成")
-
-        # 6. 挂载摄像头（低画质参数）
-        camera_bp = blueprint_library.find('sensor.camera.rgb')
-        camera_bp.set_attribute('image_size_x', '640')
-        camera_bp.set_attribute('image_size_y', '360')
-        camera_bp.set_attribute('fov', '80')
-        camera_bp.set_attribute('sensor_tick', '0.1')
-        camera_transform = carla.Transform(carla.Location(x=1.5, z=1.8))
-        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
-        camera.listen(image_callback)
-        print("✅ 摄像头挂载成功")
-
-        # 7. 初始化3D转2D投影参数（适配0.9.14）
-        image_w = 640
-        image_h = 360
-        fov = camera_bp.get_attribute('fov').as_float()
-        K = build_projection_matrix(image_w, image_h, fov)
-        K_b = build_projection_matrix(image_w, image_h, fov, is_behind_camera=True)
-        # 车辆包围盒边缘（简化版，不影响边界框生成）
-        edges = [[0,1],[1,3],[3,2],[2,0],[0,4],[4,5],[5,1],[5,7],[7,6],[6,4],[6,2],[7,3]]
-        # COCO类别名称（仅保留车辆）
-        COCO_CLASS_NAMES = ['car']
-
-        # 8. 核心逻辑：红灯停+绿灯行+沿道路行驶+3D可视化
-        print("\n📌 按 'q' 退出 | 红灯停绿灯行+沿道路行驶+3D车辆边界框可视化")
-        cv2.namedWindow('CARLA Low-Quality View (3D Bounding Box)', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow('CARLA Low-Quality View (3D Bounding Box)', 640, 360)
-
-        # 初始化控制参数
-        vehicle_control = carla.VehicleControl()
-        TARGET_SPEED = 30  # 目标车速（km/h）
-        TARGET_SPEED_MS = TARGET_SPEED / 3.6
-        STANDSTILL_THRESHOLD = 0.1
-        last_traffic_light_state = None
-
-        while True:
-            # ========== 步骤1：获取车辆当前状态 ==========
-            current_location = vehicle.get_location()
-            current_transform = vehicle.get_transform()
-            current_speed = vehicle.get_velocity().length()
-            is_standstill = current_speed < STANDSTILL_THRESHOLD
-            need_brake = False
-            traffic_light_info = "无交通灯"
-
-            # ========== 步骤2：红绿灯识别（原逻辑保留） ==========
-            traffic_light = vehicle.get_traffic_light()
-            if traffic_light is not None:
-                tl_state = traffic_light.state
-                traffic_light_info = f"交通灯状态：{tl_state}"
-                if tl_state in [carla.TrafficLightState.Red, carla.TrafficLightState.Yellow]:
-                    need_brake = True
-                elif tl_state == carla.TrafficLightState.Green:
-                    need_brake = False
-
-            if vehicle.is_at_traffic_light():
-                tl_state_alt = vehicle.get_traffic_light_state()
-                if tl_state_alt in [carla.TrafficLightState.Red, carla.TrafficLightState.Yellow]:
-                    need_brake = True
-                    traffic_light_info = f"备用检测：{tl_state_alt}"
-
-            # ========== 步骤3：车辆控制逻辑（原逻辑保留） ==========
-            if need_brake:
-                if traffic_light_info != last_traffic_light_state:
-                    print(f"🚦 {traffic_light_info} | 速度：{current_speed:.2f}m/s → 刹车停车")
-                    last_traffic_light_state = traffic_light_info
-
-                if not is_standstill:
-                    vehicle_control.brake = 1.0
-                    vehicle_control.throttle = 0.0
-                    vehicle_control.steer = 0.0
-                    vehicle_control.hand_brake = False
-                    vehicle_control.gear = 1
-                else:
-                    vehicle_control.brake = 1.0
-                    vehicle_control.throttle = 0.0
-                    vehicle_control.steer = 0.0
-                    vehicle_control.hand_brake = True
-                    vehicle_control.gear = 0
-            else:
-                if last_traffic_light_state is not None:
-                    print(f"🚦 {traffic_light_info} | 速度：{current_speed:.2f}m/s → 沿道路行驶")
-                    last_traffic_light_state = None
-
-                # 动态更新路径点
-                distance_to_waypoint = math.hypot(
-                    current_location.x - current_waypoint.transform.location.x,
-                    current_location.y - current_waypoint.transform.location.y
-                )
-
-                if distance_to_waypoint < 2.0:
-                    current_waypoint = choose_main_waypoint(current_waypoint)
-                    TARGET_SPEED_MS = (TARGET_SPEED - 5) / 3.6 if current_waypoint.is_junction else TARGET_SPEED / 3.6
-
-                # 转向控制
-                angle = calculate_angle(current_transform, current_waypoint.transform.location)
-                vehicle_control.steer = np.clip(angle * 0.8, -1.0, 1.0)
-
-                # 速度控制
-                vehicle_control.hand_brake = False
-                vehicle_control.brake = 0.0
-                if current_speed < TARGET_SPEED_MS:
-                    vehicle_control.throttle = min(0.7, (TARGET_SPEED_MS - current_speed) / 3 + 0.2)
-                else:
-                    vehicle_control.throttle = 0.1 if current_speed < TARGET_SPEED_MS + 1 else 0.0
-                    vehicle_control.brake = 0.1 if current_speed > TARGET_SPEED_MS + 1 else 0.0
-                vehicle_control.gear = 2
-
-            # 应用控制指令
-            vehicle.apply_control(vehicle_control)
-
-            # ========== 步骤4：3D车辆转2D边界框可视化（新增核心逻辑） ==========
-            # 获取摄像头图像
-            current_img = None
-            if not IMAGE_QUEUE.empty():
-                try:
-                    current_img = IMAGE_QUEUE.get(timeout=0.5)
-                except queue.Empty:
-                    pass
-            # 容错：使用最新图像或黑色占位图
-            if current_img is None and LATEST_IMAGE is not None:
-                current_img = LATEST_IMAGE.copy()
-            if current_img is None:
-                current_img = np.zeros((image_h, image_w, 3), dtype=np.uint8)
-
-            # 获取世界→相机的变换矩阵
+            # 3D转2D检测框
             world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
-
-            # 遍历所有车辆，计算2D边界框
             boxes = []
-            ids = []
             for npc in world.get_actors().filter('*vehicle*'):
-                # 跳过自车
-                if npc.id == vehicle.id:
-                    continue
+                if npc.id != vehicle.id:
+                    bb = npc.bounding_box
+                    dist = npc.get_transform().location.distance(vehicle.get_transform().location)
+                    if dist < 50:
+                        forward_vec = vehicle.get_transform().get_forward_vector()
+                        ray = npc.get_transform().location - vehicle.get_transform().location
+                        if forward_vec.dot(ray) > 0:
+                            verts = [v for v in bb.get_world_vertices(npc.get_transform())]
+                            points_2d = []
+                            for vert in verts:
+                                ray0 = vert - camera.get_transform().location
+                                cam_forward_vec = camera.get_transform().get_forward_vector()
+                                p = get_image_point(vert, K, world_2_camera) if cam_forward_vec.dot(
+                                    ray0) > 0 else get_image_point(vert, K_b, world_2_camera)
+                                p = (CAMERA_WIDTH - p[0], p[1])
+                                points_2d.append(p)
+                            x_min, x_max, y_min, y_max = get_2d_box_from_3d_edges(points_2d, edges, CAMERA_HEIGHT,
+                                                                                  CAMERA_WIDTH)
+                            if (y_max - y_min) * (x_max - x_min) > 100 and (x_max - x_min) > 20:
+                                if point_in_canvas((x_min, y_min), CAMERA_HEIGHT, CAMERA_WIDTH) and point_in_canvas(
+                                        (x_max, y_max), CAMERA_HEIGHT, CAMERA_WIDTH):
+                                    boxes.append(np.array([x_min, y_min, x_max, y_max]))
 
-                # 筛选50米内、自车前方的车辆
-                dist = npc.get_transform().location.distance(vehicle.get_transform().location)
-                forward_vec = vehicle.get_transform().get_forward_vector()
-                ray = npc.get_transform().location - vehicle.get_transform().location
-                if dist < 50 and forward_vec.dot(ray) > 0:
-                    # 获取车辆包围盒的3D顶点（适配0.9.14）
-                    bb_verts = [v for v in npc.bounding_box.get_world_vertices(npc.get_transform())]
-                    points_2d = []
-                    # 将每个3D顶点投影到2D图像
-                    for vert in bb_verts:
-                        ray_cam = vert - camera.get_transform().location
-                        cam_forward = camera.get_transform().get_forward_vector()
-                        if cam_forward.dot(ray_cam) > 0:
-                            p = get_image_point(vert, K, world_2_camera)
-                        else:
-                            p = get_image_point(vert, K_b, world_2_camera)
-                        points_2d.append(p)
-                    # 生成2D边界框
-                    if points_2d:
-                        x1, y1, x2, y2 = get_2d_box_from_3d_edges(points_2d, image_h, image_w)
-                        # 过滤过小的边界框
-                        if (y2 - y1) * (x2 - x1) > 100 and (x2 - x1) > 20:
-                            if point_in_canvas((x1, y1), image_h, image_w) and point_in_canvas((x2, y2), image_h, image_w):
-                                boxes.append(np.array([x1, y1, x2, y2]))
-                                ids.append(npc.id)
+            boxes = np.array(boxes)
+            detections = []
+            if len(boxes) > 0:
+                sort_boxes = boxes.copy()
+                for i, box in enumerate(sort_boxes):
+                    box[2] -= box[0]
+                    box[3] -= box[1]
+                    feature = encoder(image, box.reshape(1, -1).copy())
+                    detections.append(Detection(box, 1.0, feature[0]))
 
-            # 绘制边界框
-            if boxes:
-                boxes = np.array(boxes)
-                output_image = draw_bounding_boxes(current_img, boxes, ids, COCO_CLASS_NAMES)
-            else:
-                output_image = current_img
+            # 更新追踪器
+            tracker.predict()
+            tracker.update(detections)
 
-            # ========== 步骤5：显示图像 ==========
-            cv2.imshow('CARLA Low-Quality View (3D Bounding Box)', output_image)
+            # 绘制结果
+            bboxes, ids = [], []
+            for track in tracker.tracks:
+                if track.is_confirmed() and track.time_since_update <= 1:
+                    bboxes.append(track.to_tlbr())
+                    ids.append(track.track_id)
+            bboxes = np.array(bboxes)
+            tracked_vehicle_count = len(bboxes)
 
-            # 按q退出
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            if len(bboxes) > 0:
+                labels = np.array([2] * len(bboxes))
+                image = draw_bounding_boxes(image, bboxes, labels, COCO_CLASS_NAMES, ids)
+
+            # 绘制信息（含帧率）
+            velocity = vehicle.get_velocity()
+            speed_ms = math.hypot(velocity.x, velocity.y)
+            speed_kmh = speed_ms * 3.6
+            image = draw_info_text(image, speed_kmh, tracked_vehicle_count, map_name, fps)
+
+            # 显示图像
+            cv2.imshow(WINDOW_NAME, image)
+
+            # 按键处理（完善退出逻辑）
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
+                if confirm_exit():  # 确认退出
+                    break
+            elif key == ord('f'):  # F键切换全屏
+                current_flag = cv2.getWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN)
+                new_flag = cv2.WINDOW_FULLSCREEN if current_flag == 0 else cv2.WINDOW_NORMAL
+                cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, new_flag)
+            elif key == ord('s'):  # S键保存当前帧
+                save_path = f"track_frame_{frame_count}.png"
+                cv2.imwrite(save_path, image)
+                print(f"💾 帧已保存至 {save_path}")
+
+        except KeyboardInterrupt:
+            if confirm_exit():
                 break
-
-    # 异常处理
-    except Exception as e:
-        if "Connection" in str(e):
-            print("\n❌ 连接失败！")
-            print("   解决：1. 确认CarlaUE4.exe已启动 2. 关闭防火墙 3. 检查端口2000")
-        elif "Spawn" in str(e):
-            print("\n❌ 车辆生成失败！")
-            print("   解决：换生成点或重启CARLA")
-        elif "AttributeError" in str(e):
-            print(f"\n❌ API属性错误：{e}")
-            print("   解决：确认CARLA版本为0.9.14，重新安装对应版本的whl包")
-        else:
-            print(f"\n❌ 未知错误：{e}")
-            import traceback
-            traceback.print_exc()
+        except Exception as e:
+            print(f"⚠️ 运行错误：{e}")
+            continue
 
     # 清理资源
-    finally:
-        print("\n--- [清理资源] ---")
-        # 销毁所有车辆（包括NPC）
-        if world:
-            for actor in world.get_actors().filter('*vehicle*'):
-                try:
-                    actor.destroy()
-                except:
-                    pass
-        if camera:
-            try:
-                camera.stop()
-                camera.destroy()
-                print("✅ 销毁摄像头")
-            except:
-                print("⚠️ 摄像头销毁失败")
-        if vehicle:
-            try:
-                vehicle.destroy()
-                print("✅ 销毁车辆")
-            except:
-                print("⚠️ 车辆销毁失败")
-        cv2.destroyAllWindows()
-        print("✅ 程序结束")
+    clear(world, camera)
+    settings.synchronous_mode = False
+    world.apply_settings(settings)
+    cv2.destroyAllWindows()
+    print("✅ 程序正常退出")
+
 
 if __name__ == '__main__':
-    # 导入psutil
-    try:
-        import psutil
-    except ImportError:
-        print("⚠️ 未安装psutil，跳过CARLA进程检查")
-        def check_carla_running():
-            return True
     main()
