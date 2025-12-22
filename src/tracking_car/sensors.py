@@ -713,7 +713,7 @@ def clear_all_actors(world, exclude_ids=None):
             except:
                 pass
         
-        # 再清理车辆（分批进行）
+        # 再清理车辆
         logger.info(f"清理 {len(vehicle_actors)} 个车辆...")
         batch_size = 10
         for i in range(0, len(vehicle_actors), batch_size):
