@@ -1,101 +1,38 @@
-# AutoPilot System: Lane & Object Detection
+# AutoPilot System V3.0: Perception, Decision & Control
 
-这是一个结合了**传统计算机视觉**与**深度学习**的自动驾驶辅助系统原型。它利用 OpenCV 进行高精度的车道线检测，并集成 YOLOv8 模型实现对车辆、行人等障碍物的实时识别。
+这是一个模拟 **ADAS (高级驾驶辅助系统)** 的完整原型项目。
+V3.0 版本不仅实现了对车道和车辆的**感知**，还加入了**决策逻辑**（碰撞预警）、**模拟控制**（虚拟方向盘）以及**黑匣子取证**功能。
 
 ![Status](https://img.shields.io/badge/Status-Active-success)
-![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![Version](https://img.shields.io/badge/Version-V3.0-blue)
+![Python](https://img.shields.io/badge/Python-3.8%2B-yellow)
 
-## ✨ 核心功能
+## ✨ V3.0 核心特性
 
-### 1. 🛣️ 车道线检测 (Lane Detection)
-* **视觉管线**: 灰度化 -> 高斯模糊 -> Canny 边缘检测 -> 动态 ROI -> 霍夫变换。
-* **算法优化**:
-    * **智能平滑**: 使用 `deque` 历史队列消除车道线抖动。
-    * **斜率过滤**: 自动剔除路面阴影和垂直路标干扰。
-    * **可视化调参**: 提供 `tuner.py` 工具，实时寻找针对当前天气的最佳参数。
+### 1. 🧠 智能感知 (Perception)
+* **车道保持**: 使用 OpenCV + 霍夫变换 + **EMA 平滑滤波**，稳定追踪车道线。
+* **目标检测**: 集成 **YOLOv8** 模型，实时识别车辆、行人、卡车等障碍物。
+* **跳帧优化**: 采用 "Skip-Frame" 策略，大幅降低 CPU 负载，实现流畅运行。
 
-### 2. 🚗 目标检测 (Object Detection)
-* **深度学习**: 集成 **YOLOv8 (Nano)** 模型。
-* **识别对象**: 实时框出前方车辆 (Car)、卡车 (Truck)、巴士 (Bus) 和行人 (Person)。
-* **性能**: 针对 CPU 优化，轻量级推理。
+### 2. 🛡️ 决策与预警 (Decision Making)
+* **FCW (前向碰撞预警)**: 实时计算前车距离（基于视觉占比），触发 **"BRAKE!"** 红色警报。
+* **LDW (车道偏离预警)**: 监测车辆中心与车道中心的偏差。
+
+### 3. 🧭 模拟控制 (Control Simulation)
+* **虚拟方向盘**: 屏幕下方通过 **Steering Dashboard** 实时显示转向角度。
+* **自动修正**: 根据车道曲率自动计算方向盘应转动的角度。
+
+### 4. 📹 黑匣子取证 (Event Data Recorder)
+* **自动抓拍**: 当系统判定有碰撞风险（出现 "BRAKE!"）时，自动保存当前画面。
+* **证据留存**: 图片自动保存在 `events/` 目录下，文件名包含精确时间戳。
 
 ## 🛠️ 环境准备
 
 ### 1. 运行环境
-* Python 3.8+ (推荐 Python 3.13)
-* 建议使用独立显卡 (GPU) 以获得更高帧率，但在 CPU 上也能运行 (FPS 5-10)。
+* Python 3.8+
+* 推荐配置: 具有独立显卡 (NVIDIA) 可获最佳性能，但在 CPU 环境下也能通过跳帧策略流畅运行。
 
 ### 2. 安装依赖
-请确保安装了最新版本的依赖库（包含 ultralytics）：
+本项目已移除沉重的 TensorFlow 依赖，仅需轻量级库：
 ```bash
 pip install -r requirements.txt
-
-```
-
-## 🚀 使用指南
-
-### 第一步：视觉参数调优 (可选但推荐)
-
-如果发现车道线检测不准（乱飞或消失），请先运行调参工具：
-
-```bash
-python tuner.py sample.hevc
-
-```
-
-* 按 `空格` 暂停，拖动滑动条调整 Canny 阈值和 ROI 区域。
-* 记下最佳参数，并填入 `main.py` 顶部的配置区。
-
-### 第二步：启动自动驾驶系统
-
-直接运行主程序，系统将同时加载车道检测器和 YOLO 模型：
-
-```bash
-python main.py sample.hevc
-
-```
-
-* **首次运行提示**: 程序会自动下载 `yolov8n.pt` 模型权重文件 (约 6MB)，请保持网络连接。
-
-## 📂 项目结构
-
-```text
-Project_Root/
-├── main.py            # [入口] 主程序，协调车道与YOLO检测
-├── yolo_det.py        # [模块] 封装 YOLOv8 目标检测逻辑
-├── tuner.py           # [工具] 视觉参数调试器
-├── requirements.txt   # 依赖清单
-├── README.md          # 项目文档
-└── sample.hevc        # 测试数据
-
-```
-
-## ⚠️ 常见问题
-
-**Q1: 画面非常卡顿 (Low FPS)？**
-
-* **原因**: 深度学习模型在没有 GPU 加速的电脑上运行较慢。
-* **优化**: 可以在 `main.py` 中实现“跳帧机制”（例如每 3 帧跑一次 YOLO，中间帧沿用结果）。
-
-**Q2: 报错 `ModuleNotFoundError: No module named 'ultralytics'`?**
-
-* **解决**: 请运行 `pip install -r requirements.txt` 确保库已安装。
-
-## 🔮 路线图 (Roadmap)
-
-* [x] 基础 OpenCV 车道线检测
-* [x] 可视化参数调试工具 (`tuner.py`)
-* [x] 帧间平滑与防抖算法
-* [x] 集成 YOLOv8 目标检测 (`yolo_det.py`)
-* [ ] 性能优化：加入多线程或跳帧处理
-* [ ] 车辆距离估算 (基于检测框大小)
-* [ ] 偏离预警系统 (LDW)
-
-## 📚 参考资料
-
-* [Ultralytics YOLOv8 Docs](https://docs.ultralytics.com/)
-* [OpenCV Computer Vision](https://opencv.org/)
-
-```
-
-```
