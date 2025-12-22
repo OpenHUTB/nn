@@ -268,7 +268,7 @@ def plot_ml_results(
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
 
     # -------- 子图1：速度预测 + 异常检测可视化 --------
-    # 绘制原始速度曲线
+    # 绘制原始速度曲线11
     ax1.plot(time_steps, velocity, color="#2E86AB", linewidth=2, label="原始速度")
     # 绘制预测速度曲线（虚线）
     ax1.plot(predict_time, predict_vel, color="#F18F01", linestyle="--", linewidth=2, label="预测速度")
