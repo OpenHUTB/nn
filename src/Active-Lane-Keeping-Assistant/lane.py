@@ -16,6 +16,9 @@ class Lane:
     ROI_TOP = 260
     ROI_LEFT = 200
     ROI_RIGHT = 440
+    # === 新增 ===
+    MARGIN_RATIO = 1.0 / 12.0
+    # ===========
     def __init__(self, height:int, width:int, save:bool=False,
         save_folder:str=join('img', 'examples')) -> None:
         """Constructor
@@ -32,7 +35,7 @@ class Lane:
         self.save_folder = save_folder
         self.img_height = height
         self.img_width = width
-        self.margin = int((1/12) * self.img_width)
+        self.margin = int(self.MARGIN_RATIO * self.img_width)
         self.DEGREE = 2
 
         # Variables to store for lines
@@ -63,7 +66,14 @@ class Lane:
         # Create threshold matrix to differentiate black and white based on the
         # lightness (of HSL).
         _, binary = cv2.threshold(hls[:, :, 1], self.HLS_L_THRESHOLD_MIN, self.HLS_L_THRESHOLD_MAX, cv2.THRESH_BINARY)
-        binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
+
+        # [Perception] Apply Morphological Closing to fill gaps in lane lines
+        # and remove small noise dots.
+        kernel = np.ones((5, 5), np.uint8)
+        binary_closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+        # Blur the processed image
+        binary_blured = cv2.GaussianBlur(binary_closed, (3, 3), 0)
 
         if self.save:
             cv2.imwrite(join(self.save_folder, 'lines.jpg'), binary_blured)
