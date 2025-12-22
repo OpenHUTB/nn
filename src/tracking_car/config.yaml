@@ -53,3 +53,9 @@ det_label_bg_color: [0, 0, 0]   # 黑色背景
 det_label_text_color: [255, 255, 255]  # 白色文字
 det_label_font_scale: 0.5
 det_label_padding: 5
+
+view:
+default_mode: "satellite"      # 默认视角模式: satellite, behind, first_person
+satellite_height: 50.0         # 卫星视角高度（米）
+behind_distance: 10.0          # 后方视角距离（米）
+first_person_height: 1.6       # 第一人称视角高度（米）
