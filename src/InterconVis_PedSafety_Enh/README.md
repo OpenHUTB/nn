@@ -209,9 +209,9 @@ cvips_collector_6cam.py 是一个基于 CARLA 自动驾驶仿真环境的多摄�
 ## 样本可视化 (Sample Visualizations)
 我们提供了可视化结果来展示我们数据集中的不同视角:
 - 车辆自动行驶检测（视角为车后）
-- <img src="./image/屏幕录制.gif" alt="Infrastructure View" width="640" height="360">
+- <img src="https://github.com/user-attachments/assets/4b520d73-5f00-4326-b072-d07de0772f04" alt="Infrastructure View" width="640" height="360">
 - 六摄像头自动检测
-- <img src="./image/屏幕录制_预览.gif" alt="Vehicle View" width="640" height="360">
+- <img src="https://github.com/user-attachments/assets/f2182831-3719-44cb-acfa-1369121ca227" alt="Vehicle View" width="640" height="360">
 
 
 ## 致谢 (Acknowledgement)
