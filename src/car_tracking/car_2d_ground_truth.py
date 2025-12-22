@@ -1,362 +1,362 @@
-# 导入所需库
-import carla  # Carla仿真平台的Python API
-import queue  # 队列，用于线程安全地存储相机图像数据
-import random  # 随机数，用于随机选择出生点和车辆蓝图
-import cv2  # OpenCV库，用于图像处理和显示
-import numpy as np  # 数值计算库，处理矩阵和数组
-import math  # 数学库，用于三角函数、矩阵计算等
-import colorsys  # 颜色空间转换库，生成类别的唯一颜色
+import carla
+import queue
+import random
+import cv2
+import numpy as np
 
-# ===================== 核心工具函数（整合原utils的核心功能，无需外部依赖） =====================
-# 1. 绘制边界框（原utils.box_utils.draw_bounding_boxes）
-def draw_bounding_boxes(image, boxes, labels, class_names, ids=None, scores=None):
+# ===================== 依赖导入（保留原始依赖）=====================
+from what.models.detection.datasets.coco import COCO_CLASS_NAMES
+from utils.box_utils import draw_bounding_boxes
+from utils.projection import *
+from utils.world import *
+
+# ===================== 配置常量（集中管理，便于修改）=====================
+# 相机配置
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 640
+# 图表配置
+CHART_WIDTH = 400
+CHART_HEIGHT = CAMERA_HEIGHT  # 与相机高度一致
+MAX_HISTORY_FRAMES = 50  # 最近50帧数据
+# 跟踪窗口配置
+TRACK_WINDOW_WIDTH = 300
+TRACK_WINDOW_HEIGHT = 400
+# 绘图配置
+FONT_SCALE_SMALL = 0.4
+FONT_SCALE_MEDIUM = 0.6
+LINE_THICKNESS = 2
+POINT_RADIUS = 2
+
+
+# ===================== 工具函数（独立封装，提升复用性）=====================
+def get_vehicle_color(vehicle_id):
+    """为车辆生成固定唯一的RGB颜色（基于ID种子，保证跟踪时颜色不变）"""
+    np.random.seed(vehicle_id)
+    return tuple(np.random.randint(0, 255, 3).tolist())
+
+
+def custom_draw_bounding_boxes(image, boxes, labels, class_names, ids=None, track_data=None):
+    """保留原始边界框绘制逻辑，叠加跟踪数据（距离+颜色外框）"""
+    # 调用原始画框函数，保证核心功能不变
+    img = draw_bounding_boxes(image, boxes, labels, class_names, ids)
+
+    # 叠加跟踪数据标注（不破坏原始框）
+    if ids is not None and track_data is not None and len(boxes) > 0:
+        for i, box in enumerate(boxes):
+            vid = ids[i]
+            if vid in track_data:
+                x1, y1, x2, y2 = map(int, box)
+                color = track_data[vid]['color']
+                dist = track_data[vid]['distance']
+                # 绘制距离文本（在原始标注下方）
+                cv2.putText(
+                    img, f"Dist: {dist:.1f}m", (x1, y1 + 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, color, 1
+                )
+                # 绘制跟踪颜色外框（不覆盖原始绿色框）
+                cv2.rectangle(img, (x1 - 1, y1 - 1), (x2 + 1, y2 + 1), color, 1)
+    return img
+
+
+def init_chart_background(width, height):
+    """初始化图表背景（绘制固定元素：标题、网格、图例，避免每帧重复绘制）"""
+    chart = np.zeros((height, width, 3), dtype=np.uint8)
+    # 绘制标题
+    cv2.putText(
+        chart, "Real-Time Statistics (Last 50 Frames)", (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_MEDIUM, (255, 255, 255), LINE_THICKNESS
+    )
+    # 绘制网格（浅灰色，提升视觉效果）
+    grid_color = (50, 50, 50)
+    # 水平网格线
+    for y in range(50, height - 30, 50):
+        cv2.line(chart, (50, y), (width - 50, y), grid_color, 1)
+    # 垂直网格线
+    for x in range(50, width - 50, 50):
+        cv2.line(chart, (x, 30), (x, height - 30), grid_color, 1)
+    # 绘制图例（固定位置，提升可读性）
+    cv2.putText(
+        chart, "Current Vehicles (green)", (10, height - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, (0, 255, 0), 1
+    )
+    cv2.putText(
+        chart, "Max Distance (red)", (200, height - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, (0, 0, 255), 1
+    )
+    return chart
+
+
+def draw_dynamic_chart(history_frames, history_vehicles, history_max_dist):
     """
-    在图像上绘制边界框，包含类别名称、实例ID、置信度（可选）
-    参数说明：
-        image: 输入的原始图像（numpy数组）
-        boxes: 边界框坐标数组，形状为(N,4)，每个元素是[x1,y1,x2,y2]
-        labels: 每个边界框对应的类别标签数组，形状为(N,)
-        class_names: 类别名称列表，标签对应列表的索引
-        ids: 可选，每个边界框对应的实例ID数组（如车辆ID）
-        scores: 可选，每个边界框对应的置信度分数数组
+    绘制实时动态折线图（仅绘制变化的折线和数据点，复用固定背景）
+    参数：
+        history_frames: 最近50帧的帧数列表
+        history_vehicles: 最近50帧的车辆数量列表
+        history_max_dist: 最近50帧的最大距离列表
     返回：
-        image_copy: 绘制了边界框的图像副本
+        绘制完成的图表图像
     """
-    # 获取类别总数，用于生成唯一颜色
-    num_classes = len(class_names)
-    # 为每个类别生成HSV颜色（色调均匀分布，饱和度和亮度为1）
-    hsv_tuples = [(x / num_classes, 1., 1.) for x in range(num_classes)]
-    # 将HSV颜色转换为RGB颜色
-    colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
-    # 将RGB值转换为0-255的整数（符合OpenCV的颜色格式）
-    colors = list(map(lambda x: (int(x[0]*255), int(x[1]*255), int(x[2]*255)), colors))
+    # 初始化图表背景（固定元素）
+    chart = init_chart_background(CHART_WIDTH, CHART_HEIGHT)
 
-    # 复制原始图像，避免直接修改原图像
-    image_copy = image.copy()
-    # 遍历每个边界框
-    for i, box in enumerate(boxes):
-        # 将边界框坐标转换为整数（图像像素坐标为整数）
-        x1, y1, x2, y2 = box.astype(int)
-        # 获取当前边界框的类别标签
-        label = labels[i]
-        # 根据标签获取类别名称，若标签超出范围则为unknown
-        class_name = class_names[label] if label < len(class_names) else 'unknown'
-        # 获取当前类别对应的颜色（取模处理避免标签超出类别数）
-        color = colors[label % num_classes]
+    # 数据为空时直接返回背景
+    if len(history_frames) == 0:
+        return chart
 
-        # 绘制矩形边界框（线条宽度为2）
-        cv2.rectangle(image_copy, (x1, y1), (x2, y2), color, 2)
-        # 准备文本内容：类别名称 + 实例ID（可选）
-        text = f"{class_name} (ID: {ids[i]})" if ids and i < len(ids) else class_name
-        # 若有置信度，添加到文本中（保留2位小数）
-        if scores and i < len(scores):
-            text += f" {scores[i]:.2f}"
+    # ========== 数据归一化（优化计算逻辑，避免除零错误）==========
+    # 车辆数量归一化（映射到图表y轴范围：30 ~ CHART_HEIGHT-30）
+    max_veh = max(history_vehicles) if history_vehicles else 1
+    max_veh = max_veh if max_veh != 0 else 1  # 处理除零
+    norm_veh = [(v / max_veh) * (CHART_HEIGHT - 60) for v in history_vehicles]
+    y_veh = np.array([CHART_HEIGHT - 30 - v for v in norm_veh], dtype=int)
 
-        # 计算文本的尺寸，用于绘制文本背景框
-        text_size = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-        # 确定文本的y坐标（避免文本超出图像顶部，若顶部空间不足则显示在框下方）
-        text_y = y1 - 10 if y1 - 10 > 10 else y1 + text_size[1] + 10
-        # 绘制文本背景框（填充颜色为类别颜色）
-        cv2.rectangle(image_copy, (x1, text_y - text_size[1] - 2),
-                      (x1 + text_size[0], text_y + 2), color, -1)
-        # 绘制文本（白色字体，线条宽度为1）
-        cv2.putText(image_copy, text, (x1, text_y), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5, (255, 255, 255), 1)
+    # 最大距离归一化
+    max_d = max(history_max_dist) if history_max_dist else 1
+    max_d = max_d if max_d != 0 else 1  # 处理除零
+    norm_dist = [(d / max_d) * (CHART_HEIGHT - 60) for d in history_max_dist]
+    y_dist = np.array([CHART_HEIGHT - 30 - d for d in norm_dist], dtype=int)
 
-    return image_copy
+    # x轴归一化（动态滚动，仅显示最近50帧的x坐标）
+    x_coords = np.array([
+        50 + (i * (CHART_WIDTH - 100) / (len(history_frames) - 1 if len(history_frames) > 1 else 1))
+        for i in range(len(history_frames))
+    ], dtype=int)
 
-# 2. 构建相机投影矩阵（原utils.projection.build_projection_matrix）
-def build_projection_matrix(w, h, fov, is_behind_camera=False):
-    """
-    构建相机的内参矩阵K，用于将3D相机坐标投影到2D图像坐标
-    参数说明：
-        w: 图像宽度（像素）
-        h: 图像高度（像素）
-        fov: 相机的视场角（度数）
-        is_behind_camera: 是否处理相机后方的点（反转z轴）
-    返回：
-        K: 3x3的相机内参矩阵
-    """
-    # 计算相机的焦距（根据视场角和图像宽度）
-    focal = w / (2.0 * math.tan(fov * math.pi / 360.0))
-    # 初始化内参矩阵为单位矩阵
-    K = np.identity(3)
-    # 设置x和y方向的焦距
-    K[0, 0] = K[1, 1] = focal
-    # 设置图像的主点（图像中心）
-    K[0, 2] = w / 2.0
-    K[1, 2] = h / 2.0
-    # 若处理相机后方的点，反转z轴（使投影后的坐标有效）
-    if is_behind_camera:
-        K[2, 2] = -1
-    return K
+    # ========== 绘制折线和数据点（优化绘制逻辑，提升流畅度）==========
+    # 绘制车辆数量折线（绿色）
+    if len(x_coords) > 1:
+        cv2.polylines(chart, [np.column_stack((x_coords, y_veh))], isClosed=False, color=(0, 255, 0),
+                      thickness=LINE_THICKNESS)
+    # 绘制车辆数量数据点
+    for x, y in zip(x_coords, y_veh):
+        cv2.circle(chart, (x, y), POINT_RADIUS, (0, 255, 0), -1)
 
-# 3. 3D点转2D图像点（原utils.projection.get_image_point）
-def get_image_point(loc, K, w2c):
-    """
-    将Carla的3D世界坐标转换为2D图像坐标
-    参数说明：
-        loc: Carla的Location对象（3D世界坐标）
-        K: 相机内参矩阵（3x3）
-        w2c: 世界到相机的外参矩阵（4x4，逆矩阵）
-    返回：
-        (x, y): 2D图像坐标（像素）
-    """
-    # 将3D坐标转换为齐次坐标（4维）
-    point = np.array([loc.x, loc.y, loc.z, 1.0])
-    # 世界坐标→相机坐标（乘以外参矩阵）
-    point_camera = np.dot(w2c, point)
-    # 相机坐标→图像坐标（乘以内参矩阵，取前3维）
-    point_img = np.dot(K, point_camera[:3])
-    # 归一化（除以z坐标，得到像素坐标）
-    point_img = point_img / point_img[2]
-    return (point_img[0], point_img[1])
+    # 绘制最大距离折线（红色）
+    if len(x_coords) > 1:
+        cv2.polylines(chart, [np.column_stack((x_coords, y_dist))], isClosed=False, color=(0, 0, 255),
+                      thickness=LINE_THICKNESS)
+    # 绘制最大距离数据点
+    for x, y in zip(x_coords, y_dist):
+        cv2.circle(chart, (x, y), POINT_RADIUS, (0, 0, 255), -1)
 
-# 4. 从3D边缘生成2D边界框（原utils.projection.get_2d_box_from_3d_edges）
-def get_2d_box_from_3d_edges(points_2d, edges, h, w):
-    """
-    从3D点的2D投影坐标生成最小包围矩形框
-    参数说明：
-        points_2d: 2D投影点列表，每个元素是(x,y)
-        edges: 3D物体的边缘列表（此处未使用，保留兼容）
-        h: 图像高度（像素）
-        w: 图像宽度（像素）
-    返回：
-        x_min, x_max, y_min, y_max: 边界框的最小/最大坐标（限制在图像范围内）
-    """
-    # 提取所有点的x和y坐标
-    x_coords = [p[0] for p in points_2d]
-    y_coords = [p[1] for p in points_2d]
-    # 计算x的最小值（不小于0）和最大值（不大于图像宽度）
-    x_min = max(0, min(x_coords))
-    x_max = min(w, max(x_coords))
-    # 计算y的最小值（不小于0）和最大值（不大于图像高度）
-    y_min = max(0, min(y_coords))
-    y_max = min(h, max(y_coords))
-    return x_min, x_max, y_min, y_max
+    # ========== 绘制当前数值标注（实时更新）==========
+    if len(history_vehicles) > 0 and len(history_max_dist) > 0:
+        current_veh = history_vehicles[-1]
+        current_dist = history_max_dist[-1]
+        cv2.putText(
+            chart, f"Now: {current_veh} cars | {current_dist:.1f}m",
+            (CHART_WIDTH - 200, 30), cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL,
+            (255, 255, 255), 1
+        )
 
-# 5. 判断点是否在图像内（原utils.projection.point_in_canvas）
-def point_in_canvas(point, h, w):
-    """
-    检查2D点是否在图像画布的有效范围内
-    参数说明：
-        point: 2D点坐标(x,y)
-        h: 图像高度（像素）
-        w: 图像宽度（像素）
-    返回：
-        bool: 点在图像内返回True，否则返回False
-    """
-    x, y = point
-    return 0 <= x < w and 0 <= y < h
+    return chart
 
-# 6. 清理Carla中的车辆（原utils.world.clear_npc/clear_static_vehicle/clear）
-def clear_actors(world, camera=None):
-    """
-    销毁Carla世界中的所有车辆和相机传感器，释放资源
-    参数说明：
-        world: Carla的World对象
-        camera: 可选，需要销毁的相机传感器对象
-    """
-    # 销毁相机传感器（若存在）
-    if camera:
-        camera.destroy()
-    # 遍历并销毁所有车辆Actor
-    for actor in world.get_actors().filter('*vehicle*'):
-        actor.destroy()
 
-# ===================== COCO类别名称（对应车辆类别） =====================
-# 无需依赖what库，直接定义核心类别（标签对应索引）
-COCO_CLASS_NAMES = [
-    'person',  # 0
-    'bicycle', # 1
-    'car',     # 2（车辆类别，对应本文档的核心检测目标）
-    'motorcycle', # 3
-    'airplane',   # 4
-    'bus',        # 5
-    'train',      # 6
-    'truck',      # 7
-    'boat',       # 8
-    'traffic light' # 9
-]
-
-# ===================== 相机回调函数 =====================
 def camera_callback(image, rgb_image_queue):
-    """
-    相机传感器的回调函数，将原始图像数据转换为numpy数组并存入队列
-    参数说明：
-        image: Carla的Image对象（原始相机数据）
-        rgb_image_queue: 存储图像的队列（线程安全）
-    """
-    # Carla的图像数据是BGRA格式（4通道），转换为(height, width, 4)的numpy数组
-    rgb_image = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
-    # 将图像存入队列
-    rgb_image_queue.put(rgb_image)
+    """相机回调函数（保留原始逻辑，简化代码）"""
+    rgb_image_queue.put(np.reshape(np.copy(image.raw_data), (image.height, image.width, 4)))
 
-# ===================== 主程序 =====================
-if __name__ == '__main__':
-    # 1. 连接Carla客户端（本地主机，端口2000）
+
+def convert_image_format(image):
+    """将4通道BGRA图像转换为3通道RGB图像（提取前3通道，简化逻辑）"""
+    return image[..., :3] if image.shape[-1] == 4 else image.copy()
+
+
+# ===================== 主程序逻辑（优化结构，提升可读性）=====================
+def main():
+    # 初始化Carla客户端和世界
     client = carla.Client('localhost', 2000)
-    # 设置客户端超时时间（20秒），避免连接卡死
-    client.set_timeout(20.0)
-    # 获取Carla的世界对象（核心交互对象）
     world = client.get_world()
 
-    # 2. 设置Carla同步模式（稳定控制仿真帧率，避免图像和物理不同步）
+    # 设置同步模式（保留原始逻辑）
     settings = world.get_settings()
-    # 启用同步模式（需要手动调用world.tick()推进仿真）
     settings.synchronous_mode = True
-    # 设置固定的仿真步长（0.05秒，对应20 FPS）
     settings.fixed_delta_seconds = 0.05
-    # 应用设置
     world.apply_settings(settings)
 
-    # 3. 获取核心资源：蓝图库、出生点、观察者
-    bp_lib = world.get_blueprint_library()  # 蓝图库，存储所有可生成的Actor蓝图（车辆、相机、传感器等）
-    spawn_points = world.get_map().get_spawn_points()  # 地图的预设出生点列表（车辆生成的位置和姿态）
-    spectator = world.get_spectator()  # 观察者（用于调整仿真画面的视角）
+    # 获取观众和生成点（保留原始逻辑）
+    spectator = world.get_spectator()
+    spawn_points = world.get_map().get_spawn_points()
 
-    # 4. 生成自车（林肯MKZ 2020款）
-    # 从蓝图库中查找指定车辆的蓝图
+    # 生成主车辆（保留原始逻辑，增加异常处理）
+    bp_lib = world.get_blueprint_library()
     vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2020')
-    # 随机选择一个出生点生成车辆（try_spawn_actor避免出生点冲突返回None）
     vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
-    # 防止出生点冲突，循环重试生成自车，直到成功
-    while not vehicle:
-        vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
+    if not vehicle:
+        print("警告：主车辆生成失败，程序退出！")
+        return
 
-    # 5. 生成相机传感器（挂载在自车前方，前视视角）
-    # 从蓝图库中查找RGB相机的蓝图
+    # 生成相机（使用配置常量，简化代码）
     camera_bp = bp_lib.find('sensor.camera.rgb')
-    # 设置相机的图像分辨率（640x640像素）
-    camera_bp.set_attribute('image_size_x', '640')
-    camera_bp.set_attribute('image_size_y', '640')
-    # 设置相机的变换（相对于自车的位置：前方1.0米，上方2.0米）
-    camera_transform = carla.Transform(carla.Location(x=1.0, z=2.0))
-    # 生成相机Actor，并挂载到自车上
-    camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
+    camera_bp.set_attribute('image_size_x', str(CAMERA_WIDTH))
+    camera_bp.set_attribute('image_size_y', str(CAMERA_HEIGHT))
+    camera_init_trans = carla.Transform(carla.Location(x=1, z=2))
+    camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
 
-    # 6. 初始化图像队列，监听相机数据
-    # 创建队列，用于存储相机回调函数的图像数据（线程安全）
+    # 初始化图像队列（保留原始逻辑）
     image_queue = queue.Queue()
-    # 注册相机的回调函数，当相机产生图像时自动调用
-    camera.listen(lambda img: camera_callback(img, image_queue))
+    camera.listen(lambda image: camera_callback(image, image_queue))
 
-    # 7. 清理原有车辆，生成50辆NPC车辆（开启自动驾驶）
-    # 销毁世界中已存在的所有车辆（避免场景混乱）
-    clear_actors(world)
-    # 循环生成50辆NPC车辆
-    for i in range(50):
-        # 筛选蓝图库中的4轮车辆（排除自行车、摩托车等2轮车辆）
-        vehicle_bps = [bp for bp in bp_lib.filter('vehicle') if int(bp.get_attribute('number_of_wheels')) == 4]
-        # 随机选择车辆蓝图和出生点生成NPC车辆
-        npc = world.try_spawn_actor(random.choice(vehicle_bps), random.choice(spawn_points))
-        # 若生成成功，开启NPC车辆的自动驾驶模式
-        if npc:
-            npc.set_autopilot(True)
-    # 自车也开启自动驾驶模式
+    # 清理现有NPC（保留原始逻辑）
+    clear_npc(world)
+    clear_static_vehicle(world)
+
+    # 2D框计算相关参数（保留原始逻辑）
+    edges = [[0, 1], [1, 3], [3, 2], [2, 0], [0, 4], [4, 5],
+             [5, 1], [5, 7], [7, 6], [6, 4], [6, 2], [7, 3]]
+    fov = camera_bp.get_attribute("fov").as_float()
+    K = build_projection_matrix(CAMERA_WIDTH, CAMERA_HEIGHT, fov)
+    K_b = build_projection_matrix(CAMERA_WIDTH, CAMERA_HEIGHT, fov, is_behind_camera=True)
+
+    # 生成NPC车辆（保留原始逻辑，使用配置常量）
+    for _ in range(50):
+        vehicle_bp_list = bp_lib.filter('vehicle')
+        car_bp = [bp for bp in vehicle_bp_list if int(bp.get_attribute('number_of_wheels')) == 4]
+        if car_bp:
+            npc = world.try_spawn_actor(random.choice(car_bp), random.choice(spawn_points))
+            if npc:
+                npc.set_autopilot(True)
     vehicle.set_autopilot(True)
 
-    # 8. 初始化3D→2D投影的参数
-    # 车辆包围盒的边缘连接列表（3D物体的12条边缘，此处未使用，保留兼容）
-    edges = [[0,1],[1,3],[3,2],[2,0],[0,4],[4,5],[5,1],[5,7],[7,6],[6,4],[6,2],[7,3]]
-    # 图像的宽度和高度（与相机设置一致）
-    image_w = 640
-    image_h = 640
-    # 获取相机的视场角（从相机蓝图的属性中读取）
-    fov = camera_bp.get_attribute('fov').as_float()
-    # 构建相机内参矩阵（处理相机前方的点）
-    K = build_projection_matrix(image_w, image_h, fov)
-    # 构建相机内参矩阵（处理相机后方的点，反转z轴）
-    K_b = build_projection_matrix(image_w, image_h, fov, is_behind_camera=True)
+    # 初始化跟踪和数据缓存变量（改为局部变量，减少全局变量）
+    tracked_vehicles = {}  # key:车辆ID, value:{'color':颜色, 'distance':距离, 'frame':帧数}
+    frame_counter = 0
+    history_frames = []  # 最近50帧的帧数
+    history_vehicles = []  # 最近50帧的车辆数量
+    history_max_dist = []  # 最近50帧的最大距离
 
-    # ===================== 主循环：实时可视化地面真值 =====================
-    print("程序已启动，按q键退出...")
+    # 主循环（优化逻辑，提升可读性）
     try:
         while True:
-            # 推进Carla仿真一帧（同步模式下必须调用，否则仿真不会运行）
             world.tick()
+            frame_counter += 1
 
-            # 移动观察者到自车上方（俯视视角，方便查看全局场景）
-            # 设置观察者的位置：自车后方4米，上方50米；姿态：偏航角-180度，俯仰角-90度（垂直向下看）
-            spectator_transform = carla.Transform(
+            # 移动观众视角到车辆顶部（保留原始逻辑）
+            transform = carla.Transform(
                 vehicle.get_transform().transform(carla.Location(x=-4, z=50)),
                 carla.Rotation(yaw=-180, pitch=-90)
             )
-            # 应用观察者的变换
-            spectator.set_transform(spectator_transform)
+            spectator.set_transform(transform)
 
-            # 从队列中获取相机图像（阻塞等待，直到有图像）
+            # 获取相机图像（保留原始逻辑）
             image = image_queue.get()
-            # 获取世界到相机的变换矩阵（外参矩阵的逆矩阵，用于坐标转换）
+
+            # 更新相机矩阵（保留原始逻辑）
             world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
 
-            # 初始化边界框和实例ID列表
+            # 初始化当前帧变量
             boxes = []
             ids = []
-            # 遍历世界中所有的车辆Actor
+            track_data = {}
+            current_vehicles = 0
+            max_distance = 0.0
+
+            # 检测车辆并计算2D边界框（保留原始核心逻辑）
             for npc in world.get_actors().filter('*vehicle*'):
-                # 跳过自车（只处理NPC车辆）
-                if npc.id == vehicle.id:
-                    continue
+                if npc.id != vehicle.id:
+                    # 计算车辆距离和最大距离
+                    dist = npc.get_transform().location.distance(vehicle.get_transform().location)
+                    max_distance = max(max_distance, dist)
 
-                # 筛选条件：距离自车50米内，且在自车前方的车辆
-                # 计算NPC车辆与自车的直线距离
-                dist = npc.get_transform().location.distance(vehicle.get_transform().location)
-                # 获取自车的前向向量
-                forward_vec = vehicle.get_transform().get_forward_vector()
-                # 计算自车到NPC车辆的向量
-                ray = npc.get_transform().location - vehicle.get_transform().location
-                # 点积大于0表示NPC车辆在自车前方（前向向量与射线向量同向）
-                if dist < 50 and forward_vec.dot(ray) > 0:
-                    # 获取NPC车辆包围盒的3D顶点（世界坐标）
-                    bb_verts = [v for v in npc.bounding_box.get_world_vertices(npc.get_transform())]
-                    points_2d = []
-                    # 遍历每个3D顶点，投影到2D图像
-                    for vert in bb_verts:
-                        # 计算顶点到相机的向量
-                        ray_cam = vert - camera.get_transform().location
-                        # 获取相机的前向向量
-                        cam_forward = camera.get_transform().get_forward_vector()
-                        # 判断顶点是否在相机前方：使用对应内参矩阵投影
-                        if cam_forward.dot(ray_cam) > 0:
-                            # 相机前方的点：使用普通内参矩阵K
-                            p = get_image_point(vert, K, world_2_camera)
-                        else:
-                            # 相机后方的点：使用反转z轴的内参矩阵K_b
-                            p = get_image_point(vert, K_b, world_2_camera)
-                        # 将2D投影点加入列表
-                        points_2d.append(p)
-                    # 从2D投影点生成最小包围边界框
-                    x_min, x_max, y_min, y_max = get_2d_box_from_3d_edges(points_2d, edges, image_h, image_w)
-                    # 过滤条件：边界框的面积大于100像素，宽度大于20像素（排除过小的无效框）
-                    if (y_max - y_min)*(x_max - x_min) > 100 and (x_max - x_min) > 20:
-                        # 过滤条件：边界框的四个角点都在图像范围内
-                        if point_in_canvas((x_min, y_min), image_h, image_w) and point_in_canvas((x_max, y_max), image_h, image_w):
-                            # 将边界框坐标加入列表（格式：[x1,y1,x2,y2]）
-                            boxes.append(np.array([x_min, y_min, x_max, y_max]))
-                            # 将NPC车辆的ID加入列表
-                            ids.append(npc.id)
+                    # 过滤50米内、车辆前方的目标
+                    if dist < 50:
+                        forward_vec = vehicle.get_transform().get_forward_vector()
+                        ray = npc.get_transform().location - vehicle.get_transform().location
+                        if forward_vec.dot(ray) > 0:
+                            # 计算3D顶点的2D投影
+                            verts = [v for v in npc.bounding_box.get_world_vertices(npc.get_transform())]
+                            points_2d = []
+                            for vert in verts:
+                                ray0 = vert - camera.get_transform().location
+                                cam_forward_vec = camera.get_transform().get_forward_vector()
+                                if cam_forward_vec.dot(ray0) > 0:
+                                    p = get_image_point(vert, K, world_2_camera)
+                                else:
+                                    p = get_image_point(vert, K_b, world_2_camera)
+                                points_2d.append(p)
 
-            # 绘制边界框：转换为numpy数组，设置类别标签为2（对应COCO的car类别）
+                            # 计算2D边界框
+                            x_min, x_max, y_min, y_max = get_2d_box_from_3d_edges(
+                                points_2d, edges, CAMERA_HEIGHT, CAMERA_WIDTH
+                            )
+
+                            # 过滤小框和超出画布的框
+                            if (y_max - y_min) * (x_max - x_min) > 100 and (x_max - x_min) > 20:
+                                if point_in_canvas((x_min, y_min), CAMERA_HEIGHT, CAMERA_WIDTH) and \
+                                        point_in_canvas((x_max, y_max), CAMERA_HEIGHT, CAMERA_WIDTH):
+                                    ids.append(npc.id)
+                                    boxes.append(np.array([x_min, y_min, x_max, y_max]))
+                                    # 更新跟踪数据
+                                    if npc.id not in tracked_vehicles:
+                                        tracked_vehicles[npc.id] = {'color': get_vehicle_color(npc.id)}
+                                    tracked_vehicles[npc.id]['distance'] = dist
+                                    tracked_vehicles[npc.id]['frame'] = frame_counter
+                                    track_data[npc.id] = tracked_vehicles[npc.id]
+                                    current_vehicles += 1
+
+            # 更新历史数据缓存（仅保留最近50帧，优化逻辑）
+            history_frames.append(frame_counter)
+            history_vehicles.append(current_vehicles)
+            history_max_dist.append(max_distance)
+            # 截断数据，保持固定长度
+            if len(history_frames) > MAX_HISTORY_FRAMES:
+                history_frames.pop(0)
+                history_vehicles.pop(0)
+                history_max_dist.pop(0)
+
+            # 绘制边界框（保留原始逻辑，使用自定义函数）
             boxes = np.array(boxes)
-            labels = np.array([2] * len(boxes))  # 2 = car（对应COCO_CLASS_NAMES[2]）
-            # 调用绘制函数，生成带边界框的图像
-            output_image = draw_bounding_boxes(image, boxes, labels, COCO_CLASS_NAMES, ids)
+            labels = np.array([2] * len(boxes))
+            probs = np.array([1.0] * len(boxes))
+            output = custom_draw_bounding_boxes(
+                image, boxes, labels, COCO_CLASS_NAMES, ids, track_data
+            ) if len(boxes) > 0 else image
 
-            # 显示图像（窗口名称：Carla 2D Ground Truth (Vehicles)）
-            cv2.imshow('Carla 2D Ground Truth (Vehicles)', output_image)
-            # 按q键退出循环（等待1ms，处理键盘事件）
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            # 转换图像格式并拼接图表（优化逻辑）
+            output_rgb = convert_image_format(output)
+            chart_image = draw_dynamic_chart(history_frames, history_vehicles, history_max_dist)
+            combined_image = np.hstack((output_rgb, chart_image))
+
+            # 绘制跟踪监测窗口（保留原始功能，优化代码）
+            track_window = np.zeros((TRACK_WINDOW_HEIGHT, TRACK_WINDOW_WIDTH, 3), dtype=np.uint8)
+            cv2.putText(
+                track_window, "Vehicle Tracking Monitor", (10, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_MEDIUM, (255, 255, 255), LINE_THICKNESS
+            )
+            y_offset = 60
+            # 显示前10辆跟踪的车辆
+            for vid, data in list(tracked_vehicles.items())[:10]:
+                if y_offset > TRACK_WINDOW_HEIGHT - 20:
+                    break
+                color = data['color']
+                dist = data.get('distance', 0.0)
+                cv2.putText(
+                    track_window, f"ID: {vid} | Dist: {dist:.1f}m", (10, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, FONT_SCALE_SMALL, color, 1
+                )
+                y_offset += 30
+
+            # 显示窗口（保留原始逻辑）
+            cv2.imshow('2D Ground Truth', combined_image)
+            cv2.imshow('Vehicle Tracking Monitor', track_window)
+
+            # 按q退出（保留原始逻辑）
+            if cv2.waitKey(1) == ord('q'):
                 break
-
-    # 捕获键盘中断（Ctrl+C）
     except KeyboardInterrupt:
-        pass
-    # 最终清理资源（无论是否异常，都会执行）
+        print("程序被用户中断！")
     finally:
-        # 销毁车辆和相机传感器
-        clear_actors(world, camera)
-        # 关闭所有OpenCV窗口
+        # 清理资源（优化异常处理，确保资源释放）
+        try:
+            camera.destroy()
+            clear(world, camera)
+        except Exception as e:
+            print(f"清理资源时警告：{e}")
         cv2.destroyAllWindows()
-        # 打印退出信息
-        print("程序已退出，资源已清理")
+        # 恢复Carla世界设置（新增，避免同步模式残留）
+        settings.synchronous_mode = False
+        world.apply_settings(settings)
+
+
+if __name__ == '__main__':
+    main()
