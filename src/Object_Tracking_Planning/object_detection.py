@@ -105,112 +105,166 @@ def get_actor_display_name(actor, truncate=250):
 # ==============================================================================
 
 class World(object):
-    """ Class representing the surrounding environment """
+    """Class representing the surrounding environment"""
+
+    # 常量提取
+    DEFAULT_VEHICLE_MODEL = 'model3'
+    DEFAULT_VEHICLE_COLOR = '236,102,17'
 
     def __init__(self, carla_world, hud, args):
         """Constructor method"""
         self.world = carla_world
-        try:
-            self.map = self.world.get_map()
-        except RuntimeError as error:
-            print('RuntimeError: {}'.format(error))
-            print('  The server could not send the OpenDRIVE (.xodr) file:')
-            print('  Make sure it exists, has the same name of your town, and is correct.')
-            sys.exit(1)
         self.hud = hud
+        self.args = args
+
+        self._initialize_map()
+        self._weather_presets = find_weather_presets()
+        self._weather_index = 0
+
+        # 初始化所有传感器和玩家为None
         self.player = None
         self.collision_sensor = None
         self.lane_invasion_sensor = None
         self.gnss_sensor = None
         self.camera_manager = None
-        self._weather_presets = find_weather_presets()
-        self._weather_index = 0
-        self._actor_filter = args.filter
-        self._gamma = args.gamma
-        self.restart(args)
-        self.world.on_tick(hud.on_world_tick)
+
         self.recording_enabled = False
         self.recording_start = 0
 
-    def restart(self, args):
+        self.restart()
+        self.world.on_tick(hud.on_world_tick)
+
+    def _initialize_map(self):
+        """初始化地图，处理可能的错误"""
+        try:
+            self.map = self.world.get_map()
+        except RuntimeError as error:
+            print(f'RuntimeError: {error}')
+            print('The server could not send the OpenDRIVE (.xodr) file:')
+            print('Make sure it exists, has the same name of your town, and is correct.')
+            sys.exit(1)
+
+    def restart(self):
         """Restart the world"""
-        # Keep same camera config if the camera manager exists.
-        cam_index = self.camera_manager.index if self.camera_manager is not None else 0
-        cam_pos_id = self.camera_manager.transform_index if self.camera_manager is not None else 0
-        # Set the seed if requested by user
-        if args.seed is not None:
-            random.seed(args.seed)
+        # 保存相机状态
+        cam_index = self.camera_manager.index if self.camera_manager else 0
+        cam_pos_id = self.camera_manager.transform_index if self.camera_manager else 0
 
-        # KK Get a vehicle blueprint
-        # blueprint = self.world.get_blueprint_library().filter('vehicle.lincoln.mkz2017')[0]  # KK
-        blueprint = self.world.get_blueprint_library().filter('model3')[0]
+        # 设置随机种子
+        if self.args.seed is not None:
+            random.seed(self.args.seed)
+
+        # 创建并配置车辆
+        blueprint = self._create_vehicle_blueprint()
+
+        # 生成玩家车辆
+        self._spawn_player(blueprint)
+
+        # 设置传感器
+        self._setup_sensors(cam_index, cam_pos_id)
+
+    def _create_vehicle_blueprint(self):
+        """创建并配置车辆蓝图"""
+        blueprint_lib = self.world.get_blueprint_library()
+        blueprint = blueprint_lib.filter(self.DEFAULT_VEHICLE_MODEL)[0]
         blueprint.set_attribute('role_name', 'hero')
+
         if blueprint.has_attribute('color'):
-            color = '236,102,17'  # KK Packt logo color
-            blueprint.set_attribute('color', color)
-        # Spawn the player.
-        print("Spawning the player")
+            blueprint.set_attribute('color', self.DEFAULT_VEHICLE_COLOR)
+
+        return blueprint
+
+    def _spawn_player(self, blueprint):
+        """生成玩家车辆"""
+        # 如果玩家已存在，在当前位置重新生成
         if self.player is not None:
-            spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
-            spawn_point.rotation.roll = 0.0
-            spawn_point.rotation.pitch = 0.0
-            self.destroy()
+            spawn_point = self._get_respawn_point()
+            self.destroy()  # 销毁现有actor
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
 
-        while self.player is None:
-            if not self.map.get_spawn_points():
-                print('There are no spawn points available in your map/town.')
-                print('Please add some Vehicle Spawn Point to your UE4 scene.')
-                sys.exit(1)
-            spawn_points = self.map.get_spawn_points()
-            spawn_point = random.choice(spawn_points) if spawn_points else carla.Transform()
-            # spawn_point = spawn_points[0] if spawn_points else carla.Transform()  # KK
+        # 首次生成或重新生成失败时
+        if self.player is None:
+            spawn_point = self._get_random_spawn_point()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
-        # Set up the sensors.
+
+    def _get_respawn_point(self):
+        """获取重新生成点（当前位置上方）"""
+        spawn_point = self.player.get_transform()
+        spawn_point.location.z += 2.0
+        spawn_point.rotation.roll = 0.0
+        spawn_point.rotation.pitch = 0.0
+        return spawn_point
+
+    def _get_random_spawn_point(self):
+        """获取随机生成点"""
+        spawn_points = self.map.get_spawn_points()
+
+        if not spawn_points:
+            print('There are no spawn points available in your map/town.')
+            print('Please add some Vehicle Spawn Point to your UE4 scene.')
+            sys.exit(1)
+
+        return random.choice(spawn_points)
+
+    def _setup_sensors(self, cam_index, cam_pos_id):
+        """设置所有传感器"""
         self.collision_sensor = CollisionSensor(self.player, self.hud)
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
-        self.camera_manager = CameraManager(self.player, self.hud, self._gamma)
+
+        self.camera_manager = CameraManager(self.player, self.hud, self.args.gamma)
         self.camera_manager.transform_index = cam_pos_id
         self.camera_manager.set_sensor(cam_index, notify=False)
+
+        # 通知玩家类型
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
 
     def next_weather(self, reverse=False):
-        """Get next weather setting"""
+        """切换到下一个天气预设"""
         self._weather_index += -1 if reverse else 1
         self._weather_index %= len(self._weather_presets)
+
         preset = self._weather_presets[self._weather_index]
-        self.hud.notification('Weather: %s' % preset[1])
-        self.player.get_world().set_weather(preset[0])
+        self.hud.notification(f'Weather: {preset[1]}')
+        self.world.set_weather(preset[0])
 
     def tick(self, clock):
-        """Method for every tick"""
+        """每一帧的更新方法"""
         self.hud.tick(self, clock)
 
     def render(self, display):
-        """Render world"""
+        """渲染世界"""
         self.camera_manager.render(display)
         self.hud.render(display)
 
     def destroy_sensors(self):
-        """Destroy sensors"""
-        self.camera_manager.sensor.destroy()
-        self.camera_manager.sensor = None
-        self.camera_manager.index = None
+        """销毁所有传感器"""
+        if self.camera_manager and self.camera_manager.sensor:
+            self.camera_manager.sensor.destroy()
+            self.camera_manager.sensor = None
+            self.camera_manager.index = None
 
     def destroy(self):
-        """Destroys all actors"""
+        """销毁所有actor"""
         actors = [
-            self.camera_manager.sensor,
-            self.collision_sensor.sensor,
-            self.lane_invasion_sensor.sensor,
-            self.gnss_sensor.sensor,
-            self.player]
+            self.camera_manager.sensor if self.camera_manager else None,
+            self.collision_sensor.sensor if self.collision_sensor else None,
+            self.lane_invasion_sensor.sensor if self.lane_invasion_sensor else None,
+            self.gnss_sensor.sensor if self.gnss_sensor else None,
+            self.player
+        ]
+
         for actor in actors:
             if actor is not None:
                 actor.destroy()
+
+        # 重置引用
+        self.player = None
+        self.collision_sensor = None
+        self.lane_invasion_sensor = None
+        self.gnss_sensor = None
+        self.camera_manager = None
 
 
 # ==============================================================================
@@ -409,7 +463,13 @@ class HUD(object):
 
 
 class FadingText(object):
-    """ Class for fading text """
+    """Class for fading text"""
+
+    # 常量定义
+    ALPHA_MULTIPLIER = 500.0  # 透明度计算系数
+    TEXT_OFFSET = (10, 11)  # 文本偏移量
+    DEFAULT_COLOR = (255, 255, 255)  # 默认文本颜色
+    DEFAULT_SECONDS = 2.0  # 默认显示时间
 
     def __init__(self, font, dim, pos):
         """Constructor method"""
@@ -417,25 +477,56 @@ class FadingText(object):
         self.dim = dim
         self.pos = pos
         self.seconds_left = 0
-        self.surface = pygame.Surface(self.dim)
+        self._init_surface()
 
-    def set_text(self, text, color=(255, 255, 255), seconds=2.0):
+    def _init_surface(self):
+        """初始化Surface"""
+        self.surface = pygame.Surface(self.dim)
+        self._clear_surface()
+
+    def _clear_surface(self):
+        """清空Surface"""
+        self.surface.fill((0, 0, 0, 0))
+
+    def set_text(self, text, color=None, seconds=None):
         """Set fading text"""
+        # 使用默认值
+        if color is None:
+            color = self.DEFAULT_COLOR
+        if seconds is None:
+            seconds = self.DEFAULT_SECONDS
+
+        # 渲染文本
         text_texture = self.font.render(text, True, color)
+
+        # 准备Surface
         self.surface = pygame.Surface(self.dim)
         self.seconds_left = seconds
-        self.surface.fill((0, 0, 0, 0))
-        self.surface.blit(text_texture, (10, 11))
+        self._clear_surface()
+
+        # 绘制文本
+        self.surface.blit(text_texture, self.TEXT_OFFSET)
 
     def tick(self, _, clock):
         """Fading text method for every tick"""
-        delta_seconds = 1e-3 * clock.get_time()
+        # 计算经过的时间
+        delta_seconds = clock.get_time() / 1000.0  # 转换为秒
+
+        # 更新时间
         self.seconds_left = max(0.0, self.seconds_left - delta_seconds)
-        self.surface.set_alpha(500.0 * self.seconds_left)
+
+        # 更新透明度
+        self._update_alpha()
+
+    def _update_alpha(self):
+        """更新Surface的透明度"""
+        alpha_value = self.seconds_left * self.ALPHA_MULTIPLIER
+        self.surface.set_alpha(alpha_value)
 
     def render(self, display):
         """Render fading text method"""
-        display.blit(self.surface, self.pos)
+        if self.seconds_left > 0:
+            display.blit(self.surface, self.pos)
 
 
 # ==============================================================================
@@ -1178,7 +1269,7 @@ class PIDLongitudinalController():
         return np.clip((self._k_p * error) + (self._k_d * _de) + (self._k_i * _ie), -1.0, 1.0)
 
 
-class PIDLateralController():
+class PIDLateralController:
     """
     PIDLateralController implements lateral control using a PID.
     """
@@ -1187,64 +1278,98 @@ class PIDLateralController():
         """
         Constructor method.
 
-            :param vehicle: actor to apply to local planner logic onto
-            :param K_P: Proportional term
-            :param K_D: Differential term
-            :param K_I: Integral term
-            :param dt: time differential in seconds
+        Args:
+            vehicle: Actor to apply local planner logic onto
+            K_P: Proportional term coefficient (default: 1.0)
+            K_D: Differential term coefficient (default: 0.0)
+            K_I: Integral term coefficient (default: 0.0)
+            dt: Time differential in seconds (default: 0.03)
         """
         self._vehicle = vehicle
         self._k_p = K_P
         self._k_d = K_D
         self._k_i = K_I
         self._dt = dt
-        self._e_buffer = deque(maxlen=10)
+        self._error_buffer = deque(maxlen=10)
 
     def run_step(self, waypoint):
         """
-        Execute one step of lateral control to steer
-        the vehicle towards a certain waypoin.
+        Execute one step of lateral control to steer the vehicle towards a waypoint.
 
-            :param waypoint: target waypoint
-            :return: steering control in the range [-1, 1] where:
-            -1 maximum steering to left
-            +1 maximum steering to right
+        Args:
+            waypoint: Target waypoint
+
+        Returns:
+            float: Steering control in range [-1, 1] where:
+                   -1 = maximum steering to left
+                   +1 = maximum steering to right
         """
         return self._pid_control(waypoint, self._vehicle.get_transform())
 
     def _pid_control(self, waypoint, vehicle_transform):
         """
-        Estimate the steering angle of the vehicle based on the PID equations
+        Estimate steering angle based on PID equations.
 
-            :param waypoint: target waypoint
-            :param vehicle_transform: current transform of the vehicle
-            :return: steering control in the range [-1, 1]
+        Args:
+            waypoint: Target waypoint
+            vehicle_transform: Current transform of the vehicle
+
+        Returns:
+            float: Steering control in range [-1, 1]
         """
+        # Calculate vehicle direction vector
         v_begin = vehicle_transform.location
-        v_end = v_begin + carla.Location(x=math.cos(math.radians(vehicle_transform.rotation.yaw)),
-                                         y=math.sin(math.radians(vehicle_transform.rotation.yaw)))
+        yaw_rad = math.radians(vehicle_transform.rotation.yaw)
+        v_end = v_begin + carla.Location(
+            x=math.cos(yaw_rad),
+            y=math.sin(yaw_rad)
+        )
 
+        # Calculate vectors
         v_vec = np.array([v_end.x - v_begin.x, v_end.y - v_begin.y, 0.0])
-        w_vec = np.array([waypoint.transform.location.x -
-                          v_begin.x, waypoint.transform.location.y -
-                          v_begin.y, 0.0])
-        _dot = math.acos(np.clip(np.dot(w_vec, v_vec) /
-                                 (np.linalg.norm(w_vec) * np.linalg.norm(v_vec)), -1.0, 1.0))
+        w_vec = np.array([
+            waypoint.transform.location.x - v_begin.x,
+            waypoint.transform.location.y - v_begin.y,
+            0.0
+        ])
 
-        _cross = np.cross(v_vec, w_vec)
+        # Calculate angle difference
+        v_norm = np.linalg.norm(v_vec)
+        w_norm = np.linalg.norm(w_vec)
+        dot_product = np.dot(w_vec, v_vec) / (v_norm * w_norm)
+        dot_product_clipped = np.clip(dot_product, -1.0, 1.0)
+        angle_diff = math.acos(dot_product_clipped)
 
-        if _cross[2] < 0:
-            _dot *= -1.0
+        # Determine sign based on cross product
+        cross_product = np.cross(v_vec, w_vec)
+        if cross_product[2] < 0:
+            angle_diff *= -1.0
 
-        self._e_buffer.append(_dot)
-        if len(self._e_buffer) >= 2:
-            _de = (self._e_buffer[-1] - self._e_buffer[-2]) / self._dt
-            _ie = sum(self._e_buffer) * self._dt
-        else:
-            _de = 0.0
-            _ie = 0.0
+        # Update error buffer and calculate PID terms
+        self._error_buffer.append(angle_diff)
 
-        return np.clip((self._k_p * _dot) + (self._k_d * _de) + (self._k_i * _ie), -1.0, 1.0)
+        # Calculate derivative and integral terms
+        derivative_error = self._calculate_derivative_error()
+        integral_error = self._calculate_integral_error()
+
+        # PID calculation with clamping
+        pid_output = (
+                self._k_p * angle_diff +
+                self._k_d * derivative_error +
+                self._k_i * integral_error
+        )
+
+        return np.clip(pid_output, -1.0, 1.0)
+
+    def _calculate_derivative_error(self):
+        """Calculate derivative error term."""
+        if len(self._error_buffer) >= 2:
+            return (self._error_buffer[-1] - self._error_buffer[-2]) / self._dt
+        return 0.0
+
+    def _calculate_integral_error(self):
+        """Calculate integral error term."""
+        return sum(self._error_buffer) * self._dt
 
 
 # ==============================================================================
@@ -1518,13 +1643,13 @@ class Agent:
             vehicle: Actor to apply local planner logic onto
         """
         self._vehicle = vehicle
-        self._proximity_tlight_threshold = 5.0  # meters
-        self._proximity_vehicle_threshold = 10.0  # meters
+        self._proximity_tlight_threshold = 5.0
+        self._proximity_vehicle_threshold = 10.0
         self._local_planner = None
         self._world = self._vehicle.get_world()
         self._last_traffic_light = None
+        self._map = None
 
-        # 初始化地图，处理可能的错误
         self._init_map()
 
     def _init_map(self):
@@ -1548,7 +1673,6 @@ class Agent:
         """Get method for protected member local planner"""
         return self._local_planner
 
-    # 也可以同时提供属性访问方式
     @property
     def local_planner(self):
         """Get the local planner instance (property version)."""
@@ -1568,7 +1692,6 @@ class Agent:
         control = carla.VehicleControl()
 
         if debug:
-            # 设置调试模式下的默认控制参数
             control.steer = 0.0
             control.throttle = 0.0
             control.brake = 0.0
@@ -1802,6 +1925,7 @@ class BehaviorAgent(Agent):
 def game_loop(args):
     """ Main loop for agent"""
 
+    # 初始化部分保持不变
     pygame.init()
     pygame.font.init()
     world = None
@@ -1817,13 +1941,9 @@ def game_loop(args):
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
-
-        # selected_world = client.load_world("Town01")  # KK Changes world to Town04
         selected_world = client.get_world()
-
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
-
         agent = BehaviorAgent(world.player, behavior=args.behavior)
 
         spawn_points = world.map.get_spawn_points()
@@ -1838,57 +1958,56 @@ def game_loop(args):
 
         clock = pygame.time.Clock()
 
+        # 主循环开始
         while True:
             clock.tick_busy_loop(60)
+
+            # 统一处理事件
             if controller.parse_events(world):
                 return
 
-            # As soon as the server is ready continue!
+            # 等待世界更新
             if not world.world.wait_for_tick(10.0):
                 continue
 
-            if args.agent == "Roaming" or args.agent == "Basic":
-                if controller.parse_events(world):
-                    return
-
-                # agent.update_information(world)
-                # as soon as the server is ready continue!
-                world.world.wait_for_tick(10.0)
-
+            # 根据代理类型执行不同的逻辑
+            if args.agent in ["Roaming", "Basic"]:
+                world.world.wait_for_tick(10.0)  # 等待服务器
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
+
+                # 为Roaming/Basic代理生成控制
                 control = agent.run_step()
                 control.manual_gear_shift = False
                 world.player.apply_control(control)
-            else:
-                agent.update_information(world)
+                continue  # 跳过后续的控制应用
 
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
+            # 其他代理类型的逻辑
+            agent.update_information(world)
+            world.tick(clock)
+            world.render(display)
+            pygame.display.flip()
 
-            # Set new destination when target has been reached
+            # 检查是否到达目的地
             if len(agent.get_local_planner().waypoints_queue) < num_min_waypoints and args.loop:
                 agent.reroute(spawn_points)
                 tot_target_reached += 1
                 world.hud.notification("The target has been reached " +
                                        str(tot_target_reached) + " times.", seconds=4.0)
-
             elif len(agent.get_local_planner().waypoints_queue) == 0 and not args.loop:
                 print("Target reached, mission accomplished...")
                 break
 
+            # 设置速度限制并应用控制
             speed_limit = world.player.get_speed_limit()
             agent.get_local_planner().set_speed(speed_limit)
-
             control = agent.run_step()
             world.player.apply_control(control)
 
     finally:
         if world is not None:
             world.destroy()
-
         pygame.quit()
 
 

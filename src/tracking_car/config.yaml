@@ -1,0 +1,62 @@
+# config.yaml - 完整配置示例
+host: "localhost"
+port: 2000
+num_npcs: 20
+img_width: 640
+img_height: 480
+conf_thres: 0.5
+iou_thres: 0.3
+max_age: 5
+min_hits: 3
+yolo_model: "yolov8n.pt"
+yolo_imgsz_max: 320
+yolo_iou: 0.45
+yolo_quantize: false
+kf_dt: 0.05
+max_speed: 50.0
+window_width: 1280
+window_height: 720
+smooth_alpha: 0.2
+fps_window_size: 15
+display_fps: 30
+track_history_len: 20
+track_line_width: 2
+track_alpha: 0.6
+stop_speed_thresh: 1.0
+stop_frames_thresh: 5
+overtake_speed_ratio: 1.5
+overtake_dist_thresh: 50.0
+lane_change_thresh: 0.5
+brake_accel_thresh: 2.0
+turn_angle_thresh: 15.0
+danger_dist_thresh: 10.0
+predict_frames: 10
+default_weather: "clear"
+auto_adjust_detection: true
+use_lidar: true
+lidar_channels: 32
+lidar_range: 100.0
+lidar_points_per_second: 500000
+fuse_lidar_vision: true
+record_data: true
+record_dir: "track_records"
+record_format: "csv"
+record_fps: 10
+save_screenshots: false
+use_3d_visualization: true
+pcd_view_size: 800
+
+# 检测框样式配置
+det_box_color: [255, 0, 0]      # 蓝色框
+det_box_thickness: 2
+det_label_bg_color: [0, 0, 0]   # 黑色背景
+det_label_text_color: [255, 255, 255]  # 白色文字
+det_label_font_scale: 0.5
+det_label_padding: 5
+
+view:
+default_mode: "satellite"          # 默认视角模式: satellite, behind, first_person
+satellite_height: 50.0             # 卫星视角高度（米）
+behind_distance: 10.0              # 后方视角距离（米）
+first_person_height: 1.6           # 第一人称视角高度
+update_frequency: 1.0              # 视角更新频率（Hz），1.0=每秒更新一次

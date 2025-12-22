@@ -1,0 +1,35 @@
+<mujoco model="e3 scene">
+  <include file="e3.xml"/>
+
+  <statistic center="1.0 0.7 1.0" extent="0.8"/>
+
+  <visual>
+    <!-- 保留 headlight 配置（可按需微调） -->
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.15 0.15 0.15" specular="0.9 0.9 0.9"/>
+    <!-- 让场景雾/大气更淡（可选） -->
+    <rgba haze="0.0 0.0 0.0 1"/>
+    <!-- 白色天空：把 skybox 的 rgb1/rgb2 设为白 -->
+    <global azimuth="-140" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <!-- white skybox (flat white) -->
+    <texture type="skybox" builtin="flat" rgb1="1 1 1" rgb2="1 1 1" width="512" height="3072"/>
+
+    <!-- ground texture from your photo; place flooring2.png next to scene.xml (or use absolute path) -->
+    <texture name="floor_tex" type="2d" file="flooring2.png"/>
+    <!-- material that uses the texture; texuniform=true 保持纹理颜色不被 RGBA 染色，texrepeat 可调 -->
+    <!-- texrepeat 值越小，纹理越大（重复次数越少）；值越大，纹理越小（重复次数越多） -->
+    <material name="floor_mat" texture="floor_tex" texuniform="true" texrepeat="1 1" reflectance="0.2"/>
+
+    <!-- 保留以前的 groundplane checker 作为备用（可删） -->
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="1 0 3.5" dir="0 0 -1" directional="true"/>
+    <!-- 用 floor_mat 替换原来的 groundplane 材质 -->
+    <geom name="floor" size="0 0 0.05" type="plane" material="floor_mat"/>
+  </worldbody>
+</mujoco>
