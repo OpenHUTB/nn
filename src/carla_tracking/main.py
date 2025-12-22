@@ -269,7 +269,6 @@ class Sort:
             distance_weights[distances >= self.depth_thresholds['far']] = 0.7
 
             return base_iou * distance_weights[None, :]
-
         return base_iou
 
     def _hungarian_algorithm(self, cost_matrix):
@@ -339,6 +338,169 @@ def load_detection_model(model_type):
 
     print(f"模型加载成功：{model_type} (设备：{device})")
     return model, model.names
+
+
+# -------------------------- 性能监控面板函数 --------------------------
+def draw_performance_panel(image, timings, fps, frame_count):
+    """
+    在图像上绘制性能监控面板
+    """
+    h, w = image.shape[:2]
+
+    # 计算各阶段耗时（最近10帧平均）
+    def get_avg_time(key, default=0.0):
+        if key in timings and timings[key]:
+            recent = timings[key][-10:]  # 取最近10帧
+            return np.mean(recent) if recent else default
+        return default
+
+    # 计算各阶段耗时（毫秒）
+    carla_time = get_avg_time('carla_tick') * 1000
+    image_time = get_avg_time('image_get') * 1000
+    depth_time = get_avg_time('depth_get') * 1000
+    detection_time = get_avg_time('detection') * 1000
+    tracking_time = get_avg_time('tracking') * 1000
+    drawing_time = get_avg_time('drawing') * 1000
+    display_time = get_avg_time('display') * 1000
+    total_time = get_avg_time('total') * 1000
+
+    # 面板位置和尺寸
+    panel_x = 10  # 左上角x坐标
+    panel_y = 10  # 左上角y坐标
+    panel_width = 280  # 面板宽度
+    panel_height = 200  # 面板高度
+
+    # 创建半透明面板背景
+    panel_bg = np.zeros((panel_height, panel_width, 3), dtype=np.uint8)
+    panel_bg[:] = (20, 20, 20)  # 深灰色背景
+
+    # 叠加面板到图像上
+    x1, y1 = panel_x, panel_y
+    x2, y2 = panel_x + panel_width, panel_y + panel_height
+
+    # 确保面板在图像范围内
+    if x2 <= w and y2 <= h:
+        # 半透明叠加
+        alpha = 0.7
+        image[y1:y2, x1:x2] = cv2.addWeighted(
+            image[y1:y2, x1:x2], 1 - alpha, panel_bg, alpha, 0
+        )
+
+        # 绘制标题和分隔线
+        title = "性能监控面板"
+        cv2.putText(image, title, (panel_x + 10, panel_y + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 1)
+
+        cv2.line(image, (panel_x, panel_y + 25),
+                 (panel_x + panel_width, panel_y + 25), (100, 100, 100), 1)
+
+        # 绘制性能指标
+        y_offset = 45
+        line_height = 20
+
+        # FPS和帧数
+        cv2.putText(image, f"FPS: {fps:.1f}", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+        cv2.putText(image, f"Frame: {frame_count}", (panel_x + 120, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+
+        y_offset += line_height
+
+        # CARLA同步
+        color = (0, 255, 0) if carla_time < 5.0 else (0, 165, 255) if carla_time < 10.0 else (0, 0, 255)
+        cv2.putText(image, f"CARLA: {carla_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # 图像获取
+        color = (0, 255, 0) if image_time < 1.0 else (0, 165, 255) if image_time < 3.0 else (0, 0, 255)
+        cv2.putText(image, f"Image: {image_time:.1f}ms", (panel_x + 120, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 深度获取
+        if depth_time > 0:
+            color = (0, 255, 0) if depth_time < 2.0 else (0, 165, 255) if depth_time < 5.0 else (0, 0, 255)
+            cv2.putText(image, f"Depth: {depth_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 目标检测
+        color = (0, 255, 0) if detection_time < 10.0 else (0, 165, 255) if detection_time < 20.0 else (0, 0, 255)
+        cv2.putText(image, f"Detection: {detection_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 目标跟踪
+        color = (0, 255, 0) if tracking_time < 5.0 else (0, 165, 255) if tracking_time < 10.0 else (0, 0, 255)
+        cv2.putText(image, f"Tracking: {tracking_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # 结果绘制
+        color = (0, 255, 0) if drawing_time < 2.0 else (0, 165, 255) if drawing_time < 5.0 else (0, 0, 255)
+        cv2.putText(image, f"Drawing: {drawing_time:.1f}ms", (panel_x + 120, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 显示输出
+        color = (0, 255, 0) if display_time < 2.0 else (0, 165, 255) if display_time < 5.0 else (0, 0, 255)
+        cv2.putText(image, f"Display: {display_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 总帧时间
+        color = (0, 255, 0) if total_time < 50.0 else (0, 165, 255) if total_time < 100.0 else (0, 0, 255)
+        cv2.putText(image, f"Total: {total_time:.1f}ms", (panel_x + 10, panel_y + y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        y_offset += line_height
+
+        # 绘制简易性能柱状图
+        bar_x = panel_x + 10
+        bar_y = panel_y + y_offset + 5
+        bar_width = 250
+        bar_height = 15
+
+        # 绘制背景
+        cv2.rectangle(image, (bar_x, bar_y), (bar_x + bar_width, bar_y + bar_height), (50, 50, 50), -1)
+
+        # 计算各阶段占比
+        stages = [carla_time, image_time, depth_time, detection_time, tracking_time, drawing_time, display_time]
+        stage_names = ['C', 'I', 'D', 'Det', 'T', 'Draw', 'Disp']
+        stage_colors = [
+            (0, 200, 200),  # CARLA - 青色
+            (200, 200, 0),  # Image - 黄色
+            (200, 0, 200),  # Depth - 紫色
+            (255, 100, 0),  # Detection - 橙色
+            (0, 150, 255),  # Tracking - 浅蓝色
+            (100, 255, 100),  # Drawing - 浅绿色
+            (255, 100, 100)  # Display - 浅红色
+        ]
+
+        # 绘制各阶段柱状图
+        if total_time > 0:
+            accumulated = 0
+            for i, (stage_time, color, name) in enumerate(zip(stages, stage_colors, stage_names)):
+                if stage_time > 0:
+                    stage_width = int((stage_time / total_time) * bar_width)
+                    if stage_width > 0:
+                        # 绘制阶段条
+                        stage_x1 = bar_x + accumulated
+                        stage_x2 = stage_x1 + stage_width
+                        cv2.rectangle(image, (stage_x1, bar_y), (stage_x2, bar_y + bar_height), color, -1)
+
+                        # 绘制阶段名称
+                        if stage_width > 15:
+                            cv2.putText(image, name, (stage_x1 + 2, bar_y + 12),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+
+                        accumulated += stage_width
+
+    return image
 
 
 # -------------------------- 核心工具函数 --------------------------
@@ -1062,7 +1224,10 @@ def main():
             fps = 1.0 / total_time if total_time > 0 else 0
             timings['total'].append(total_time)
 
-            # 显示信息
+            # 绘制性能监控面板
+            image = draw_performance_panel(image, timings, fps, frame_count)
+
+            # 显示其他信息
             info = [
                 f"FPS: {fps:.1f}",
                 f"Frame: {frame_count}",
@@ -1072,7 +1237,8 @@ def main():
                 "Press 'q' to quit"
             ]
 
-            y_pos = 30
+            # 调整信息位置，避免与性能面板重叠
+            y_pos = 220
             for line in info:
                 cv2.putText(image, line, (10, y_pos),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
