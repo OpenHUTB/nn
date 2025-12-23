@@ -8,7 +8,7 @@ from ultralytics import YOLO
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # 加载 YOLO
-yolo_model = YOLO("yolov8n.pt")
+yolo_model = YOLO("yolov8n.pt")#pip install ultralytics 即可下载YOLOv8n.pt
 
 # 正确加载 MiDaS（无需 pip install midas！）
 print("Loading MiDaS model...")
