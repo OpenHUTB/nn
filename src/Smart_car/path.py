@@ -1,10 +1,3 @@
-import pygame
-import sys
-import math
-
-# 初始化pygame
-pygame.init()
-
 # 窗口配置
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
