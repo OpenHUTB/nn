@@ -66,7 +66,7 @@ def traffic_light_real_time_detection():
         # 3. 读取摄像头帧
         ret, frame = cap.read()
         if not ret:
-            print("警告：无法读取摄像头帧，可能是摄像头断开连接")
+            print("警告：无法读取摄像头帧，可能是摄像头断开连接.")
             break
 
         # 复制帧用于绘制结果
