@@ -29,6 +29,7 @@ from datetime import datetime
 import random
 import psutil
 import os
+import gc
 
 # ============ 导入配置文件 ============
 try:
@@ -584,6 +585,14 @@ class DataLogger:
         self.blue_objects_detected = []
         self.black_objects_detected = []
 
+        # 内存优化：限制缓冲区大小
+        self.max_flight_data = config.DATA_RECORDING.get('MAX_FLIGHT_DATA_BUFFER', 500)
+        self.max_objects_buffer = config.DATA_RECORDING.get('MAX_OBJECTS_BUFFER', 200)
+        self.max_events_buffer = config.DATA_RECORDING.get('MAX_EVENTS_BUFFER', 100)
+        self.auto_save_interval = config.DATA_RECORDING.get('AUTO_SAVE_INTERVAL', 60.0)
+        self.last_auto_save_time = time.time()
+        self.max_metrics_buffer = config.PERFORMANCE.get('MAX_METRICS_BUFFER', 500)
+
         self.csv_columns = [
             'timestamp', 'loop_count', 'state', 'pos_x', 'pos_y', 'pos_z',
             'vel_x', 'vel_y', 'vel_z', 'yaw', 'pitch', 'roll',
@@ -630,8 +639,17 @@ class DataLogger:
 
             if self.enable_json:
                 self.json_data['flight_data'].append(data_dict)
+                # 内存优化：限制flight_data长度，超过限制时保存并清空
+                if len(self.json_data['flight_data']) >= self.max_flight_data:
+                    self._auto_save_and_clear()
 
             self.performance_metrics['data_points'] += 1
+
+            # 内存优化：定期自动保存
+            current_time = time.time()
+            if current_time - self.last_auto_save_time >= self.auto_save_interval:
+                self._auto_save_and_clear()
+                self.last_auto_save_time = current_time
 
             if self.performance_metrics['data_points'] % 10 == 0:
                 self._collect_system_metrics()
@@ -651,11 +669,17 @@ class DataLogger:
                 'visited': red_object.visited
             }
 
+            # 内存优化：限制物体记录列表长度
+            if len(self.red_objects_detected) >= self.max_objects_buffer:
+                self.red_objects_detected = self.red_objects_detected[-self.max_objects_buffer//2:]
             self.red_objects_detected.append(red_object_data)
 
             if 'red_objects' not in self.json_data:
                 self.json_data['red_objects'] = []
 
+            # 内存优化：限制JSON中的物体列表长度
+            if len(self.json_data['red_objects']) >= self.max_objects_buffer:
+                self.json_data['red_objects'] = self.json_data['red_objects'][-self.max_objects_buffer//2:]
             self.json_data['red_objects'].append(red_object_data)
 
         except Exception as e:
@@ -673,11 +697,17 @@ class DataLogger:
                 'visited': blue_object.visited
             }
 
+            # 内存优化：限制物体记录列表长度
+            if len(self.blue_objects_detected) >= self.max_objects_buffer:
+                self.blue_objects_detected = self.blue_objects_detected[-self.max_objects_buffer//2:]
             self.blue_objects_detected.append(blue_object_data)
 
             if 'blue_objects' not in self.json_data:
                 self.json_data['blue_objects'] = []
 
+            # 内存优化：限制JSON中的物体列表长度
+            if len(self.json_data['blue_objects']) >= self.max_objects_buffer:
+                self.json_data['blue_objects'] = self.json_data['blue_objects'][-self.max_objects_buffer//2:]
             self.json_data['blue_objects'].append(blue_object_data)
 
         except Exception as e:
@@ -695,11 +725,17 @@ class DataLogger:
                 'visited': black_object.visited
             }
 
+            # 内存优化：限制物体记录列表长度
+            if len(self.black_objects_detected) >= self.max_objects_buffer:
+                self.black_objects_detected = self.black_objects_detected[-self.max_objects_buffer//2:]
             self.black_objects_detected.append(black_object_data)
 
             if 'black_objects' not in self.json_data:
                 self.json_data['black_objects'] = []
 
+            # 内存优化：限制JSON中的物体列表长度
+            if len(self.json_data['black_objects']) >= self.max_objects_buffer:
+                self.json_data['black_objects'] = self.json_data['black_objects'][-self.max_objects_buffer//2:]
             self.json_data['black_objects'].append(black_object_data)
 
         except Exception as e:
@@ -714,7 +750,8 @@ class DataLogger:
             memory_percent = memory_info.percent
             self.performance_metrics['memory_usage'].append(memory_percent)
 
-            max_length = 1000
+            # 内存优化：使用配置的最大缓冲区大小
+            max_length = self.max_metrics_buffer
             if len(self.performance_metrics['cpu_usage']) > max_length:
                 self.performance_metrics['cpu_usage'] = self.performance_metrics['cpu_usage'][-max_length:]
             if len(self.performance_metrics['memory_usage']) > max_length:
@@ -726,7 +763,8 @@ class DataLogger:
     def record_loop_time(self, loop_time):
         self.performance_metrics['loop_times'].append(loop_time)
 
-        max_length = 1000
+        # 内存优化：使用配置的最大缓冲区大小
+        max_length = self.max_metrics_buffer
         if len(self.performance_metrics['loop_times']) > max_length:
             self.performance_metrics['loop_times'] = self.performance_metrics['loop_times'][-max_length:]
 
@@ -741,10 +779,38 @@ class DataLogger:
             if 'events' not in self.json_data:
                 self.json_data['events'] = []
 
+            # 内存优化：限制events列表长度
+            if len(self.json_data['events']) >= self.max_events_buffer:
+                self.json_data['events'] = self.json_data['events'][-self.max_events_buffer//2:]
             self.json_data['events'].append(event_record)
 
         except Exception as e:
             print(f"⚠️ 记录事件时出错: {e}")
+
+    def _auto_save_and_clear(self):
+        """自动保存数据并清空缓冲区（内存优化）"""
+        if not self.enable_json or len(self.json_data['flight_data']) == 0:
+            return
+
+        try:
+            # 创建临时文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_filename = self.json_filename.replace('.json', f'_temp_{timestamp}.json')
+            
+            # 保存当前数据
+            with open(temp_filename, 'w', encoding='utf-8') as f:
+                json.dump(self.json_data, f, indent=2, ensure_ascii=False)
+            
+            # 清空flight_data，保留其他数据
+            saved_count = len(self.json_data['flight_data'])
+            self.json_data['flight_data'] = []
+            
+            # 强制垃圾回收
+            gc.collect()
+            
+            print(f"💾 自动保存 {saved_count} 条数据到: {temp_filename} (已清空缓冲区)")
+        except Exception as e:
+            print(f"⚠️ 自动保存数据时出错: {e}")
 
     def save_json_data(self):
         if not self.enable_json:
@@ -1102,7 +1168,10 @@ class FrontViewWindow:
         self.show_info = (show_info if show_info is not None
                          else config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_INFO_OVERLAY'])
 
-        self.image_queue = queue.Queue(maxsize=3)
+        # 内存优化：使用配置的队列大小
+        queue_maxsize = config.DISPLAY['FRONT_VIEW_WINDOW'].get('QUEUE_MAXSIZE', 2)
+        self.image_queue = queue.Queue(maxsize=queue_maxsize)
+        self.reduce_image_copy = config.DISPLAY['FRONT_VIEW_WINDOW'].get('REDUCE_IMAGE_COPY', True)
         self.display_active = True
         self.display_thread = None
         self.paused = False
@@ -1158,8 +1227,18 @@ class FrontViewWindow:
                 except queue.Empty:
                     pass
 
+            # 内存优化：仅在必要时复制图像
+            if self.reduce_image_copy and image_data is not None:
+                # 如果队列为空或只有一个元素，直接使用引用（避免复制）
+                if self.image_queue.qsize() == 0:
+                    display_image = image_data
+                else:
+                    display_image = image_data.copy()
+            else:
+                display_image = image_data.copy() if image_data is not None else None
+            
             display_packet = {
-                'image': image_data.copy(),
+                'image': display_image,
                 'info': info.copy() if info else {},
                 'manual_info': manual_info.copy() if manual_info else [],
                 'timestamp': time.time()
@@ -2684,19 +2763,27 @@ class PerceptiveExplorer:
                             if self.state == FlightState.MANUAL:
                                 manual_info = self._get_manual_control_info()
 
-                            # 合并红色和蓝色物体标记
-                            display_image = img_bgr.copy()
-                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None:
-                                red_mask = cv2.inRange(result.red_objects_image, (0, 100, 0), (0, 255, 255))
-                                display_image[red_mask > 0] = result.red_objects_image[red_mask > 0]
+                            # 内存优化：仅在需要标记时才复制图像
+                            has_markers = (config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None) or \
+                                         (config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None) or \
+                                         (config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLACK_OBJECTS'] and result.black_objects_image is not None)
+                            
+                            if has_markers:
+                                display_image = img_bgr.copy()
+                                if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None:
+                                    red_mask = cv2.inRange(result.red_objects_image, (0, 100, 0), (0, 255, 255))
+                                    display_image[red_mask > 0] = result.red_objects_image[red_mask > 0]
 
-                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None:
-                                blue_mask = cv2.inRange(result.blue_objects_image, (255, 100, 0), (255, 255, 255))
-                                display_image[blue_mask > 0] = result.blue_objects_image[blue_mask > 0]
+                                if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None:
+                                    blue_mask = cv2.inRange(result.blue_objects_image, (255, 100, 0), (255, 255, 255))
+                                    display_image[blue_mask > 0] = result.blue_objects_image[blue_mask > 0]
 
-                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLACK_OBJECTS'] and result.black_objects_image is not None:
-                                black_mask = cv2.inRange(result.black_objects_image, (128, 128, 0), (128, 255, 255))
-                                display_image[black_mask > 0] = result.black_objects_image[black_mask > 0]
+                                if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLACK_OBJECTS'] and result.black_objects_image is not None:
+                                    black_mask = cv2.inRange(result.black_objects_image, (128, 128, 0), (128, 255, 255))
+                                    display_image[black_mask > 0] = result.black_objects_image[black_mask > 0]
+                            else:
+                                # 没有标记时直接使用原图像引用
+                                display_image = img_bgr
 
                             self.front_window.update_image(display_image, display_info, manual_info)
                             self.stats['front_image_updates'] += 1
@@ -3247,6 +3334,8 @@ class PerceptiveExplorer:
 
                 if self.loop_count % config.SYSTEM.get('HEALTH_CHECK_INTERVAL', 20) == 0:
                     self._report_status(exploration_start, perception)
+                    # 内存优化：定期垃圾回收
+                    gc.collect()
 
                 loop_time = time.time() - loop_start
                 if loop_time < 0.1:
