@@ -3,6 +3,36 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 import time
+import os
+import glob
+
+# 定义日志文件路径（可根据实际情况修改）
+LOG_FILE_PATHS = [
+    "mujoco.log",
+    "drone_simulation.log",
+    "./logs/*.log"
+]
+
+
+def delete_log_files():
+    """删除指定的日志文件（无控制台输出）"""
+    deleted_count = 0
+    for path in LOG_FILE_PATHS:
+        if "*" in path:
+            for file in glob.glob(path):
+                try:
+                    os.remove(file)
+                    deleted_count += 1
+                except (FileNotFoundError, PermissionError):
+                    continue
+        else:
+            if os.path.exists(path):
+                try:
+                    os.remove(path)
+                    deleted_count += 1
+                except (FileNotFoundError, PermissionError):
+                    continue
+
 
 # 最小化但可见的模型
 MJCF_MODEL = """
@@ -43,18 +73,15 @@ MJCF_MODEL = """
 
 
 def main():
-    print("正在启动无人机仿真...")
-    print("按ESC退出窗口")
-    print("等待3秒...")
+    # 删除日志文件（无输出）
+    delete_log_files()
 
-    # 直接从字符串加载模型
+    # 加载模型和数据
     model = mujoco.MjModel.from_xml_string(MJCF_MODEL)
     data = mujoco.MjData(model)
 
-    # 等待3秒
+    # 等待3秒（无提示）
     time.sleep(3)
-
-    print("开始飞行演示...")
 
     with mujoco.viewer.launch_passive(model, data) as viewer:
         # 设置相机视角
@@ -64,7 +91,7 @@ def main():
         viewer.cam.elevation = -30
 
         t = 0
-        while viewer.is_running() and t < 20:  # 运行20秒
+        while viewer.is_running() and t < 20:
             # 简单的上下浮动
             force_z = 20 * np.sin(t * 2) + 50
 
@@ -79,8 +106,6 @@ def main():
 
             t += 0.01
             time.sleep(0.01)
-
-    print("仿真结束！")
 
 
 if __name__ == "__main__":
