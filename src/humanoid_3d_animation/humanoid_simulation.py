@@ -3,45 +3,82 @@ import mujoco.viewer as viewer
 import os
 import time
 import math
-import threading  # 新增：用于监听控制台输入（实现重置指令）
-import numpy as np
+import threading
+import signal
+import sys
+from dataclasses import dataclass  # 用于配置类
 
-def create_humanoid_xml(file_path):
-    """
-    自动创建humanoid.xml文件并写入模型代码
-    优化点：XML内容格式化，增加注释，提升可读性
-    """
-    xml_content = """<mujoco model="simple_humanoid">
-  <!-- 编译器设置：角度单位为弧度，从几何形状推导惯性 -->
+# ====================== 配置抽离（核心优化点）======================
+@dataclass
+class SimConfig:
+    """仿真配置类：集中管理所有可配置参数"""
+    # 文件路径配置
+    xml_filename: str = "humanoid.xml"
+    # 仿真参数
+    timestep: float = 0.005  # 与XML中的timestep保持一致
+    sim_frequency: float = 2.0  # 关节运动频率（Hz）
+    state_print_interval: float = 1.0  # 状态打印间隔（秒）
+    # 相机参数
+    cam_distance: float = 2.0
+    cam_azimuth: float = 45.0
+    cam_elevation: float = -20.0
+    # 关节运动幅度配置
+    joint_amplitudes = {
+        "left_shoulder": 1.0, "right_shoulder": 1.0,
+        "left_elbow": 0.5, "right_elbow": 0.5,
+        "left_hip": 0.8, "right_hip": 0.8,
+        "left_knee": 0.6, "right_knee": 0.6
+    }
+    # 控制模式：sin（正弦运动）、random（随机运动）、stop（静止）
+    default_mode: str = "sin"
+
+# 全局变量：用于优雅退出
+sim_running = True
+
+def signal_handler(sig, frame):
+    """处理Ctrl+C中断信号，实现优雅退出"""
+    global sim_running
+    sim_running = False
+    print("\n⚠️ 收到中断信号，正在退出仿真...")
+    sys.exit(0)
+
+# 注册信号处理
+signal.signal(signal.SIGINT, signal_handler)
+
+# ====================== 核心功能类 ======================
+class HumanoidSimulator:
+    def __init__(self, config: SimConfig):
+        self.config = config
+        self.model = None
+        self.data = None
+        self.joint_names = list(config.joint_amplitudes.keys())
+        # 预存关节ID和控制ID（避免每次循环重复计算，性能优化）
+        self.joint_ctrl_ids = {}
+        self.joint_qpos_indices = {}
+        # 运动模式和控制信号缓存（用于平滑控制）
+        self.current_mode = config.default_mode
+        self.last_ctrl_signals = {}  # 存储上一帧的控制信号
+
+    def create_xml_file(self, file_path):
+        """创建人形机器人XML文件"""
+        xml_content = f"""<mujoco model="simple_humanoid">
   <compiler angle="radian" inertiafromgeom="true"/>
-  <!-- 仿真参数：时间步长0.005s，重力加速度9.81m/s²（z轴负方向） -->
-  <option timestep="0.005" gravity="0 0 -9.81"/>
-
-  <!-- 可视化全局设置：默认相机视角 -->
+  <option timestep="{self.config.timestep}" gravity="0 0 -9.81"/>
   <visual>
     <global azimuth="135" elevation="-30" perspective="0.01"/>
   </visual>
-
-  <!-- 世界体：包含灯光、地面和人形机器人 -->
   <worldbody>
     <light pos="0 0 5" dir="0 0 -1" diffuse="1 1 1" specular="0.1 0.1 0.1"/>
     <geom name="floor" type="plane" size="10 10 0.1" pos="0 0 0" rgba="0.8 0.8 0.8 1"/>
-
-    <!-- 骨盆（根节点）：包含自由关节，允许六自由度运动 -->
     <body name="pelvis" pos="0 0 1.0">
       <joint name="root" type="free"/>
       <geom name="pelvis_geom" type="capsule" size="0.1" fromto="0 0 0 0 0 0.2" rgba="0.5 0.5 0.9 1"/>
-
-      <!-- 躯干 -->
       <body name="torso" pos="0 0 0.2">
         <geom name="torso_geom" type="capsule" size="0.1" fromto="0 0 0 0 0 0.3" rgba="0.5 0.5 0.9 1"/>
-
-        <!-- 头部 -->
         <body name="head" pos="0 0 0.3">
           <geom name="head_geom" type="sphere" size="0.15" pos="0 0 0" rgba="0.8 0.5 0.5 1"/>
         </body>
-
-        <!-- 左手臂：肩关节+肘关节 -->
+        <!-- 左手臂 -->
         <body name="left_arm" pos="0.15 0 0.15">
           <joint name="left_shoulder" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
           <geom name="left_upper_arm" type="capsule" size="0.05" fromto="0 0 0 0 0 0.2" rgba="0.5 0.9 0.5 1"/>
@@ -50,8 +87,7 @@ def create_humanoid_xml(file_path):
             <geom name="left_forearm_geom" type="capsule" size="0.04" fromto="0 0 0 0 0 0.2" rgba="0.5 0.9 0.5 1"/>
           </body>
         </body>
-
-        <!-- 右手臂：肩关节+肘关节 -->
+        <!-- 右手臂 -->
         <body name="right_arm" pos="-0.15 0 0.15">
           <joint name="right_shoulder" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
           <geom name="right_upper_arm" type="capsule" size="0.05" fromto="0 0 0 0 0 0.2" rgba="0.5 0.9 0.5 1"/>
@@ -60,8 +96,7 @@ def create_humanoid_xml(file_path):
             <geom name="right_forearm_geom" type="capsule" size="0.04" fromto="0 0 0 0 0 0.2" rgba="0.5 0.9 0.5 1"/>
           </body>
         </body>
-
-        <!-- 左腿部：髋关节+膝关节 -->
+        <!-- 左腿部 -->
         <body name="left_leg" pos="0.05 0 -0.2">
           <joint name="left_hip" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
           <geom name="left_thigh" type="capsule" size="0.06" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.5 1"/>
@@ -70,8 +105,7 @@ def create_humanoid_xml(file_path):
             <geom name="left_calf_geom" type="capsule" size="0.05" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.5 1"/>
           </body>
         </body>
-
-        <!-- 右腿部：髋关节+膝关节 -->
+        <!-- 右腿部 -->
         <body name="right_leg" pos="-0.05 0 -0.2">
           <joint name="right_hip" type="hinge" axis="1 0 0" range="-1.57 1.57"/>
           <geom name="right_thigh" type="capsule" size="0.06" fromto="0 0 0 0 0 -0.3" rgba="0.9 0.9 0.5 1"/>
@@ -83,10 +117,8 @@ def create_humanoid_xml(file_path):
       </body>
     </body>
   </worldbody>
-
-  <!-- 执行器：添加阻尼和电机控制（新增电机，原仅阻尼无法主动控制） -->
   <actuator>
-    <!-- 手臂关节：阻尼+电机 -->
+    <!-- 手臂关节 -->
     <motor name="left_shoulder_motor" joint="left_shoulder" ctrlrange="-1.57 1.57" gear="10"/>
     <damping joint="left_shoulder" damping="0.1"/>
     <motor name="right_shoulder_motor" joint="right_shoulder" ctrlrange="-1.57 1.57" gear="10"/>
@@ -95,8 +127,7 @@ def create_humanoid_xml(file_path):
     <damping joint="left_elbow" damping="0.1"/>
     <motor name="right_elbow_motor" joint="right_elbow" ctrlrange="-1.57 0" gear="10"/>
     <damping joint="right_elbow" damping="0.1"/>
-
-    <!-- 腿部关节：阻尼+电机 -->
+    <!-- 腿部关节 -->
     <motor name="left_hip_motor" joint="left_hip" ctrlrange="-1.57 1.57" gear="10"/>
     <damping joint="left_hip" damping="0.1"/>
     <motor name="right_hip_motor" joint="right_hip" ctrlrange="-1.57 1.57" gear="10"/>
@@ -107,196 +138,208 @@ def create_humanoid_xml(file_path):
     <damping joint="right_knee" damping="0.1"/>
   </actuator>
 </mujoco>"""
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(xml_content)
-    print(f"✅ 已自动在 {file_path} 创建humanoid.xml文件！")
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(xml_content)
+        print(f"✅ 已在 {file_path} 创建XML文件！")
 
-def get_joint_ctrl_id(model, joint_name):
-    """
-    根据关节名称获取对应的控制索引（替代硬编码索引，提升鲁棒性）
-    参数：
-        model: MuJoCo的MjModel对象
-        joint_name: 关节名称（如"left_shoulder"）
-    返回：
-        控制索引（int），若不存在返回-1
-    """
-    # 先获取电机执行器的ID（对应actuator中的motor）
-    motor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{joint_name}_motor")
-    if motor_id == -1:
-        # 若没有电机，尝试获取阻尼执行器ID（兼容旧版）
-        motor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
-    return motor_id
+    def load_model(self):
+        """加载MuJoCo模型，预存关节ID和控制ID（性能优化）"""
+        # 获取文件路径
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        self.model_path = os.path.join(desktop_path, self.config.xml_filename)
 
-def print_robot_state(data, joint_names, interval=1.0):
-    """
-    周期性打印机器人关节状态（位置、控制信号）
-    参数：
-        data: MuJoCo的MjData对象
-        joint_names: 需要打印的关节名称列表
-        interval: 打印时间间隔（秒）
-    """
-    current_time = data.time
-    if not hasattr(print_robot_state, "last_print_time"):
-        print_robot_state.last_print_time = 0.0  # 初始化上次打印时间
+        # 检查并创建文件
+        if not os.path.exists(self.model_path):
+            self.create_xml_file(self.model_path)
+        else:
+            print("ℹ️ XML文件已存在，无需重新创建！")
 
-    if current_time - print_robot_state.last_print_time >= interval:
-        print(f"\n===== 机器人状态（时间：{current_time:.2f}s）=====")
-        for name in joint_names:
-            # 获取关节ID和控制索引
-            joint_id = mujoco.mj_name2id(data.model, mujoco.mjtObj.mjOBJ_JOINT, name)
-            ctrl_id = get_joint_ctrl_id(data.model, name)
-            if joint_id != -1 and ctrl_id != -1:
-                # 根关节是自由关节（7个自由度），普通关节的qpos索引偏移7位
-                qpos_index = 7 + joint_id  # 自由关节占前7个qpos
-                if qpos_index < len(data.qpos):
-                    print(f"关节 {name}: 位置 = {data.qpos[qpos_index]:.2f} rad, 控制信号 = {data.ctrl[ctrl_id]:.2f}")
-        print_robot_state.last_print_time = current_time
+        # 读取XML内容并加载模型（解决中文路径问题）
+        try:
+            with open(self.model_path, "r", encoding="utf-8") as f:
+                xml_content = f.read()
+            self.model = mujoco.MjModel.from_xml_string(xml_content)
+            self.data = mujoco.MjData(self.model)
+            print("✅ 模型加载成功！")
+        except Exception as e:
+            print(f"❌ 模型加载失败：{e}")
+            sys.exit(1)
 
-def reset_robot(model, data):
-    """
-    重置机器人到初始状态
-    参数：
-        model: MuJoCo的MjModel对象
-        data: MuJoCo的MjData对象
-    """
-    mujoco.mj_resetData(model, data)  # 重置动力学数据
-    data.qpos[0:7] = [0, 0, 1.0, 1, 0, 0, 0]  # 重置根关节位置（x,y,z,四元数）
-    print("\n🔄 机器人已重置到初始状态！")
+        # 预存关节控制ID和qpos索引（只计算一次，性能优化）
+        for name in self.joint_names:
+            # 获取控制ID
+            ctrl_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"{name}_motor")
+            if ctrl_id == -1:
+                ctrl_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, name)
+            self.joint_ctrl_ids[name] = ctrl_id
 
-def input_listener(reset_flag):
-    """
-    后台线程：监听控制台输入，输入'r'则设置重置标记
-    参数：
-        reset_flag: 共享的布尔列表（用于跨线程传递标记，列表是可变对象）
-    """
-    while True:
-        user_input = input().strip().lower()
-        if user_input == 'r':
-            reset_flag[0] = True
-        elif user_input == 'q':
-            print("📤 收到退出指令，仿真将结束...")
-            break
+            # 获取qpos索引（根关节占前7个自由度）
+            joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, name)
+            if joint_id != -1:
+                self.joint_qpos_indices[name] = 7 + joint_id
+            else:
+                self.joint_qpos_indices[name] = -1
 
-def run_humanoid_simulation():
-    """
-    优化后的仿真主函数：修复API兼容问题，用控制台输入实现重置
-    """
-    # 优化：使用用户目录拼接路径，避免硬编码用户名（更通用）
-    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-    model_path = os.path.join(desktop_path, "humanoid.xml")
+            # 初始化控制信号缓存
+            self.last_ctrl_signals[name] = 0.0
 
-    # 打印路径信息
-    print(f"===== 模型文件路径 =====")
-    print(f"模型文件完整路径：{model_path}")
-    print(f"========================")
+    def get_joint_ctrl_signal(self, name, t):
+        """根据运动模式生成关节控制信号（功能扩展：多模式）"""
+        amplitude = self.config.joint_amplitudes[name]
+        freq = self.config.sim_frequency
 
-    # 检查并创建文件
-    if not os.path.exists(model_path):
-        create_humanoid_xml(model_path)
-    else:
-        print("ℹ️ humanoid.xml文件已存在，无需重新创建！")
+        if self.current_mode == "sin":
+            # 正弦/余弦运动：左右关节反向
+            if "left" in name or "hip" in name or "knee" in name:
+                if "shoulder" in name or "elbow" in name:
+                    signal = math.sin(t * freq) * amplitude
+                else:
+                    signal = math.cos(t * freq) * amplitude
+            else:
+                if "shoulder" in name or "elbow" in name:
+                    signal = -math.sin(t * freq) * amplitude
+                else:
+                    signal = -math.cos(t * freq) * amplitude
+        elif self.current_mode == "random":
+            # 随机运动：在幅度范围内随机变化
+            signal = (math.sin(t * freq * 0.5) * 0.5 + 0.5) * amplitude * 2 - amplitude
+        elif self.current_mode == "stop":
+            # 静止：控制信号为0
+            signal = 0.0
+        else:
+            signal = 0.0
 
-    # 加载模型：直接读取内容，用字符串加载（彻底解决中文路径问题）
-    try:
-        with open(model_path, "r", encoding="utf-8") as f:
-            xml_content = f.read()
-        print("✅ Python内置函数已成功读取文件，权限正常！")
-    except Exception as e:
-        print(f"❌ Python读取文件失败，权限/路径问题：{e}")
-        return
+        # 平滑过渡：避免控制信号突变（用户体验优化）
+        smooth_factor = 0.1  # 平滑系数，越小越平滑
+        self.last_ctrl_signals[name] = (1 - smooth_factor) * self.last_ctrl_signals[name] + smooth_factor * signal
+        return self.last_ctrl_signals[name]
 
-    # 加载MuJoCo模型
-    try:
-        model = mujoco.MjModel.from_xml_string(xml_content)
-        data = mujoco.MjData(model)
-        print("✅ 从字符串加载模型成功！开始启动仿真...")
-    except Exception as e:
-        print(f"❌ 模型加载失败：{e}")
-        return
+    def update_joint_controls(self):
+        """更新关节控制信号（函数拆分：主循环更简洁）"""
+        t = self.data.time
+        for name in self.joint_names:
+            ctrl_id = self.joint_ctrl_ids[name]
+            if ctrl_id == -1:
+                continue
+            # 生成控制信号并设置
+            ctrl_signal = self.get_joint_ctrl_signal(name, t)
+            try:
+                self.data.ctrl[ctrl_id] = ctrl_signal
+            except Exception as e:
+                print(f"⚠️ 关节 {name} 控制失败：{e}")
 
-    # 定义需要控制的关节名称
-    joint_names = [
-        "left_shoulder", "right_shoulder",
-        "left_elbow", "right_elbow",
-        "left_hip", "right_hip",
-        "left_knee", "right_knee"
-    ]
+    def print_robot_state(self):
+        """打印机器人状态（优化：控制打印频率，添加帧率显示）"""
+        current_time = self.data.time
+        if not hasattr(self, "last_print_time"):
+            self.last_print_time = 0.0
+            self.frame_count = 0
+            self.start_time = current_time
 
-    # 新增：共享重置标记（用列表实现跨线程可变对象）
-    reset_flag = [False]
-    # 启动后台线程监听控制台输入
-    input_thread = threading.Thread(target=input_listener, args=(reset_flag,), daemon=True)
-    input_thread.start()
+        # 累计帧数，计算帧率
+        self.frame_count += 1
+        elapsed_time = current_time - self.start_time
+        if elapsed_time > 0:
+            self.fps = self.frame_count / elapsed_time
 
-    # 运行仿真可视化
-    with viewer.launch_passive(model, data) as v:
-        # 相机跟随设置（跟随骨盆位置）
-        pelvis_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
-        if pelvis_body_id != -1:
-            v.cam.trackbodyid = pelvis_body_id  # 跟踪骨盆体
-        v.cam.distance = 2.0  # 相机距离跟随目标的距离
-        v.cam.azimuth = 45    # 相机方位角
-        v.cam.elevation = -20 # 相机仰角
+        # 按间隔打印
+        if current_time - self.last_print_time >= self.config.state_print_interval:
+            print(f"\n===== 机器人状态（时间：{current_time:.2f}s | 帧率：{self.fps:.1f} FPS）=====")
+            for name in self.joint_names:
+                ctrl_id = self.joint_ctrl_ids[name]
+                qpos_idx = self.joint_qpos_indices[name]
+                if ctrl_id != -1 and qpos_idx != -1 and qpos_idx < len(self.data.qpos):
+                    print(f"关节 {name}: 位置 = {self.data.qpos[qpos_idx]:.2f} rad, 控制信号 = {self.data.ctrl[ctrl_id]:.2f}")
+            self.last_print_time = current_time
 
-        print("\n📌 仿真操作提示：")
-        print("  - 在控制台输入 'r' 并回车，重置机器人到初始状态")
-        print("  - 在控制台输入 'q' 并回车，退出仿真")
-        print("  - 关闭可视化窗口也可退出仿真")
+    def reset_robot(self):
+        """重置机器人到初始状态"""
+        mujoco.mj_resetData(self.model, self.data)
+        self.data.qpos[0:7] = [0, 0, 1.0, 1, 0, 0, 0]
+        # 重置控制信号缓存
+        for name in self.joint_names:
+            self.last_ctrl_signals[name] = 0.0
+        print("\n🔄 机器人已重置到初始状态！")
 
-        print("🚀 仿真开始...")
+    def input_listener(self):
+        """后台线程：监听控制台输入，支持多指令（功能扩展）"""
+        global sim_running
+        while sim_running:
+            try:
+                user_input = input().strip().lower()
+                if user_input == 'r':
+                    self.reset_robot()
+                elif user_input in ["sin", "random", "stop"]:
+                    self.current_mode = user_input
+                    print(f"\n🔄 运动模式已切换为：{user_input}")
+                elif user_input == 'q':
+                    sim_running = False
+                    print("\n📤 收到退出指令，仿真将结束...")
+                else:
+                    print(f"\n❓ 未知指令：{user_input}，支持的指令：r（重置）、sin/random/stop（模式）、q（退出）")
+            except EOFError:
+                continue
+            except Exception as e:
+                print(f"\n⚠️ 输入处理失败：{e}")
 
-        while v.is_running():
-            # 检查重置标记：如果为True，执行重置并重置标记
-            if reset_flag[0]:
-                reset_robot(model, data)
-                reset_flag[0] = False  # 重置标记置为False
+    def run_simulation(self):
+        """运行仿真主循环"""
+        # 加载模型
+        self.load_model()
 
-            # ========== 关节主动运动控制（用关节名称获取索引） ==========
-            t = data.time  # 仿真累计时间
-            # 1. 手臂运动：左肩关节和右肩关节做相反的正弦运动（2Hz频率）
-            left_shoulder_id = get_joint_ctrl_id(model, "left_shoulder")
-            right_shoulder_id = get_joint_ctrl_id(model, "right_shoulder")
-            if left_shoulder_id != -1:
-                data.ctrl[left_shoulder_id] = math.sin(t * 2) * 1.0  # 左肩关节
-            if right_shoulder_id != -1:
-                data.ctrl[right_shoulder_id] = -math.sin(t * 2) * 1.0  # 右肩关节（反向）
+        # 启动输入监听线程
+        input_thread = threading.Thread(target=self.input_listener, daemon=True)
+        input_thread.start()
 
-            # 2. 肘部运动：跟随肩部运动，幅度更小
-            left_elbow_id = get_joint_ctrl_id(model, "left_elbow")
-            right_elbow_id = get_joint_ctrl_id(model, "right_elbow")
-            if left_elbow_id != -1:
-                data.ctrl[left_elbow_id] = math.sin(t * 2) * 0.5  # 左肘部
-            if right_elbow_id != -1:
-                data.ctrl[right_elbow_id] = -math.sin(t * 2) * 0.5  # 右肘部（反向）
+        # 启动可视化
+        with viewer.launch_passive(self.model, self.data) as v:
+            # 设置相机参数（配置化）
+            pelvis_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
+            if pelvis_id != -1:
+                v.cam.trackbodyid = pelvis_id
+            v.cam.distance = self.config.cam_distance
+            v.cam.azimuth = self.config.cam_azimuth
+            v.cam.elevation = self.config.cam_elevation
 
-            # 3. 腿部运动：左髋和右髋做余弦运动（2Hz频率，和手臂同步）
-            left_hip_id = get_joint_ctrl_id(model, "left_hip")
-            right_hip_id = get_joint_ctrl_id(model, "right_hip")
-            if left_hip_id != -1:
-                data.ctrl[left_hip_id] = math.cos(t * 2) * 0.8  # 左髋
-            if right_hip_id != -1:
-                data.ctrl[right_hip_id] = -math.cos(t * 2) * 0.8  # 右髋（反向）
+            # 打印操作提示（用户体验优化）
+            print("\n📌 仿真操作提示：")
+            print("  - 输入 'r' 回车：重置机器人")
+            print("  - 输入 'sin'/'random'/'stop' 回车：切换运动模式")
+            print("  - 输入 'q' 回车：退出仿真")
+            print("  - 按 Ctrl+C：强制退出仿真")
+            print("\n🚀 仿真开始...")
 
-            # 4. 膝盖运动：跟随髋部运动，幅度稍小
-            left_knee_id = get_joint_ctrl_id(model, "left_knee")
-            right_knee_id = get_joint_ctrl_id(model, "right_knee")
-            if left_knee_id != -1:
-                data.ctrl[left_knee_id] = math.cos(t * 2) * 0.6  # 左膝盖
-            if right_knee_id != -1:
-                data.ctrl[right_knee_id] = -math.cos(t * 2) * 0.6  # 右膝盖（反向）
-            # ================================================
+            # 仿真主循环（使用perf_counter优化时间控制）
+            global sim_running
+            last_step_time = time.perf_counter()
+            while sim_running and v.is_running():
+                # 控制仿真步长（更精准的时间控制）
+                current_time = time.perf_counter()
+                if current_time - last_step_time >= self.config.timestep:
+                    # 更新关节控制
+                    self.update_joint_controls()
 
-            # 执行仿真步
-            mujoco.mj_step(model, data)
-            # 更新可视化
-            v.sync()
-            # 控制仿真速度（使用模型时间步长，更匹配物理仿真）
-            time.sleep(model.opt.timestep)
+                    # 执行仿真步（异常捕获，健壮性优化）
+                    try:
+                        mujoco.mj_step(self.model, self.data)
+                    except Exception as e:
+                        print(f"\n⚠️ 仿真步执行失败：{e}")
+                        self.reset_robot()
 
-            # 周期性打印机器人状态（每1秒打印一次）
-            print_robot_state(data, joint_names, interval=1.0)
+                    # 更新可视化
+                    v.sync()
+
+                    # 打印状态
+                    self.print_robot_state()
+
+                    last_step_time = current_time
 
         print("\n🏁 仿真结束！")
 
+# ====================== 程序入口 ======================
 if __name__ == "__main__":
-    run_humanoid_simulation()
+    # 初始化配置
+    config = SimConfig()
+    # 创建仿真器并运行
+    simulator = HumanoidSimulator(config)
+    simulator.run_simulation()
