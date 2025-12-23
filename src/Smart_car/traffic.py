@@ -42,7 +42,7 @@ def traffic_light_real_time_detection():
     # 自适应最小面积（基于摄像头分辨率）
     min_area = (640 * 480) / 1000
 
-    print("摄像头已启动，实时交通信号灯检测中...")
+    print("摄像头已启动，实时交通信号灯检测中..")
     print("操作提示：")
     print("  1. 按下 's' 键保存当前检测结果图像")
     print("  2. 按下 'ESC' 键退出程序")
