@@ -735,6 +735,183 @@ class KeyboardController:
             turn_strength = 0.25 * turn_direction * gait_strength
             self._set_action(action, "hip_z_right", turn_strength)
             self._set_action(action, "hip_z_left", -turn_strength)
+            # 添加躯干旋转辅助转向
+            self._set_action(action, "abdomen_z", 0.4 * turn_direction)  # 添加躯干旋转
+        
+        return action
+    
+    def _create_turning_only_action(self, turn_direction, dt=0.03):
+        """创建仅转向动作（不产生腿部摆动，只在原地转向，目标转向45度）"""
+        action = np.zeros(self.action_dim)
+        
+        if not self.actuator_indices:
+            return action
+        
+        # 更新目标转向角度（每次按键设置目标为45度）
+        turn_velocity = 0.0
+        if turn_direction != 0:
+            # 计算转向误差
+            turn_error = self.target_turn_angle - self.current_turn_angle
+            
+            # 如果接近目标角度，重置目标（允许连续转向）
+            if abs(turn_error) < 0.1:  # 接近目标时，设置新的目标
+                self.target_turn_angle += turn_direction * self.turn_angle_per_step
+            
+            # 计算转向速度（基于误差）
+            turn_velocity = np.clip(turn_error * 3.0, -self.turn_speed, self.turn_speed)
+            
+            # 更新当前转向角度（模拟）
+            self.current_turn_angle += turn_velocity * dt
+        else:
+            # 没有转向指令时，逐渐减小转向角度
+            self.current_turn_angle *= 0.95
+            self.target_turn_angle = self.current_turn_angle  # 同步目标角度
+        
+        # 根据转向速度计算转向强度（归一化到-1到1）
+        if abs(turn_velocity) > 0.01:
+            normalized_turn = np.clip(turn_velocity / self.turn_speed, -1.0, 1.0)
+        else:
+            # 如果没有转向速度，直接使用方向（简化控制）
+            normalized_turn = turn_direction * 0.8  # 直接使用方向，强度0.8
+        
+        # 原地转向：通过髋关节外展和躯干旋转实现
+        # 增大转向强度，使转向更明显
+        hip_turn_strength = 0.6 * normalized_turn  # 从0.25增大到0.6
+        self._set_action(action, "hip_z_right", hip_turn_strength)
+        self._set_action(action, "hip_z_left", -hip_turn_strength)
+        
+        # 躯干旋转辅助转向（主要转向来源，范围±45度）
+        abdomen_turn_strength = 0.8 * normalized_turn  # 从0.15增大到0.8，充分利用±45度范围
+        self._set_action(action, "abdomen_z", abdomen_turn_strength)
+        self._set_action(action, "abdomen_x", 0.1 * normalized_turn)
+        
+        # 躯干控制 - 更自然的轻微摆动
+        # 轻微前倾以辅助前进（减小前倾幅度，更自然）
+        abdomen_pitch = 0.08 * direction * gait_strength
+        # 添加轻微的上下摆动（配合步态，与腿部动作协调）
+        # 在支撑相时稍微下沉，在摆动相时稍微上升
+        abdomen_pitch += 0.02 * np.sin(phase + np.pi/4) * gait_strength
+        self._set_action(action, "abdomen_y", abdomen_pitch)
+        
+        # 转向时允许侧倾（减小侧倾幅度）
+        self._set_action(action, "abdomen_x", 0.05 * turn_direction * gait_strength)
+        
+        # 转向控制（减小转向幅度，更自然）
+        if turn_direction != 0:
+            self._set_action(action, "abdomen_z", 0.25 * turn_direction * gait_strength)
+        else:
+            self._set_action(action, "abdomen_z", 0.0)
+        
+        return action
+    
+    def _create_turning_only_action(self, turn_direction, dt=0.03):
+        """创建仅转向动作（不产生腿部摆动，只在原地转向，目标转向45度）"""
+        action = np.zeros(self.action_dim)
+        
+        if not self.actuator_indices:
+            return action
+        
+        # 更新目标转向角度（每次按键设置目标为45度）
+        turn_velocity = 0.0
+        if turn_direction != 0:
+            # 计算转向误差
+            turn_error = self.target_turn_angle - self.current_turn_angle
+            
+            # 如果接近目标角度，重置目标（允许连续转向）
+            if abs(turn_error) < 0.1:  # 接近目标时，设置新的目标
+                self.target_turn_angle += turn_direction * self.turn_angle_per_step
+            
+            # 计算转向速度（基于误差）
+            turn_velocity = np.clip(turn_error * 3.0, -self.turn_speed, self.turn_speed)
+            
+            # 更新当前转向角度（模拟）
+            self.current_turn_angle += turn_velocity * dt
+        else:
+            # 没有转向指令时，逐渐减小转向角度
+            self.current_turn_angle *= 0.95
+            self.target_turn_angle = self.current_turn_angle  # 同步目标角度
+        
+        # 根据转向速度计算转向强度（归一化到-1到1）
+        if abs(turn_velocity) > 0.01:
+            normalized_turn = np.clip(turn_velocity / self.turn_speed, -1.0, 1.0)
+        else:
+            # 如果没有转向速度，直接使用方向（简化控制）
+            normalized_turn = turn_direction * 0.8  # 直接使用方向，强度0.8
+        
+        # 原地转向：通过髋关节外展和躯干旋转实现
+        # 增大转向强度，使转向更明显
+        hip_turn_strength = 0.6 * normalized_turn  # 从0.25增大到0.6
+        self._set_action(action, "hip_z_right", hip_turn_strength)
+        self._set_action(action, "hip_z_left", -hip_turn_strength)
+        
+        # 躯干旋转辅助转向（主要转向来源，范围±45度）
+        abdomen_turn_strength = 0.8 * normalized_turn  # 从0.15增大到0.8，充分利用±45度范围
+        self._set_action(action, "abdomen_z", abdomen_turn_strength)
+        self._set_action(action, "abdomen_x", 0.1 * normalized_turn)
+        
+        # 躯干控制 - 更自然的轻微摆动
+        # 轻微前倾以辅助前进（减小前倾幅度，更自然）
+        abdomen_pitch = 0.08 * direction * gait_strength
+        # 添加轻微的上下摆动（配合步态，与腿部动作协调）
+        # 在支撑相时稍微下沉，在摆动相时稍微上升
+        abdomen_pitch += 0.02 * np.sin(phase + np.pi/4) * gait_strength
+        self._set_action(action, "abdomen_y", abdomen_pitch)
+        
+        # 转向时允许侧倾（减小侧倾幅度）
+        self._set_action(action, "abdomen_x", 0.05 * turn_direction * gait_strength)
+        
+        # 转向控制（减小转向幅度，更自然）
+        if turn_direction != 0:
+            self._set_action(action, "abdomen_z", 0.25 * turn_direction * gait_strength)
+        else:
+            self._set_action(action, "abdomen_z", 0.0)
+        
+        return action
+    
+    def _create_turning_only_action(self, turn_direction, dt=0.03):
+        """创建仅转向动作（不产生腿部摆动，只在原地转向，目标转向45度）"""
+        action = np.zeros(self.action_dim)
+        
+        if not self.actuator_indices:
+            return action
+        
+        # 更新目标转向角度（每次按键设置目标为45度）
+        turn_velocity = 0.0
+        if turn_direction != 0:
+            # 计算转向误差
+            turn_error = self.target_turn_angle - self.current_turn_angle
+            
+            # 如果接近目标角度，重置目标（允许连续转向）
+            if abs(turn_error) < 0.1:  # 接近目标时，设置新的目标
+                self.target_turn_angle += turn_direction * self.turn_angle_per_step
+            
+            # 计算转向速度（基于误差）
+            turn_velocity = np.clip(turn_error * 3.0, -self.turn_speed, self.turn_speed)
+            
+            # 更新当前转向角度（模拟）
+            self.current_turn_angle += turn_velocity * dt
+        else:
+            # 没有转向指令时，逐渐减小转向角度
+            self.current_turn_angle *= 0.95
+            self.target_turn_angle = self.current_turn_angle  # 同步目标角度
+        
+        # 根据转向速度计算转向强度（归一化到-1到1）
+        if abs(turn_velocity) > 0.01:
+            normalized_turn = np.clip(turn_velocity / self.turn_speed, -1.0, 1.0)
+        else:
+            # 如果没有转向速度，直接使用方向（简化控制）
+            normalized_turn = turn_direction * 0.8  # 直接使用方向，强度0.8
+        
+        # 原地转向：通过髋关节外展和躯干旋转实现
+        # 增大转向强度，使转向更明显
+        hip_turn_strength = 0.6 * normalized_turn  # 从0.25增大到0.6
+        self._set_action(action, "hip_z_right", hip_turn_strength)
+        self._set_action(action, "hip_z_left", -hip_turn_strength)
+        
+        # 躯干旋转辅助转向（主要转向来源，范围±45度）
+        abdomen_turn_strength = 0.8 * normalized_turn  # 从0.15增大到0.8，充分利用±45度范围
+        self._set_action(action, "abdomen_z", abdomen_turn_strength)
+        self._set_action(action, "abdomen_x", 0.1 * normalized_turn)
         
         # 躯干控制 - 更自然的轻微摆动
         # 轻微前倾以辅助前进（减小前倾幅度，更自然）

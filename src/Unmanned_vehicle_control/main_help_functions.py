@@ -1,7 +1,7 @@
 import numpy as np
 
 from src.config import N, V_REF, A
-
+from src.config import CIRCLE_CENTER_X, CIRCLE_CENTER_Y, CIRCLE_RADIUS
 def update_reference_point(x0, y0, current_idx, x_traj, y_traj, min_distance=5.0):
     # 校验轨迹数组长度一致性与非空
     if len(x_traj) != len(y_traj) or len(x_traj) == 0:
@@ -41,6 +41,48 @@ def get_eight_trajectory(x_init, y_init, total_points=100):
     theta_ref.append(theta_ref[-1])
 
     return x_traj_rotated, y_traj_rotated, v_ref, theta_ref
+def get_circle_trajectory(
+    x_center=CIRCLE_CENTER_X,  # 从config.py读取默认圆心X
+    y_center=CIRCLE_CENTER_Y,  # 从config.py读取默认圆心Y
+  #  radius=CIRCLE_RADIUS,     # 从config.py读取默认半径
+    radius=20,                 # 手动调节可适用无错误的半径
+    total_points=200
+):
+    """生成圆形轨迹（默认参数从配置文件读取）"""
+    t_values = np.linspace(0, 2 * np.pi, total_points)
+    x_traj = x_center + radius * np.cos(t_values)
+    y_traj = y_center + radius * np.sin(t_values)
+
+    v_ref = [V_REF for _ in range(total_points)]
+    # 计算参考角度（切线方向）
+    theta_ref = []
+    for i in range(total_points - 1):
+        dx = x_traj[i + 1] - x_traj[i]
+        dy = y_traj[i + 1] - y_traj[i]
+        theta = np.arctan2(dy, dx)
+        theta_ref.append(theta)
+    theta_ref.append(theta_ref[-1])  # 最后一个点保持与前一个相同
+
+    return x_traj, y_traj, v_ref, theta_ref
+
+def get_spiral_trajectory(x_init, y_init, total_points=200, turns=2, scale=2):
+    """生成螺旋线轨迹"""
+    t_values = np.linspace(0, 2 * np.pi * turns, total_points)
+    # 极坐标方程：r = scale * t（半径随角度线性增加）
+    r = scale * t_values
+    x_traj = x_init + r * np.cos(t_values)
+    y_traj = y_init + r * np.sin(t_values)
+    v_ref = [V_REF for _ in range(total_points)]
+    # 计算参考角度（切线方向）
+    theta_ref = []
+    for i in range(total_points - 1):
+        dx = x_traj[i + 1] - x_traj[i]
+        dy = y_traj[i + 1] - y_traj[i]
+        theta = np.arctan2(dy, dx)
+        theta_ref.append(theta)
+    theta_ref.append(theta_ref[-1])  # 最后一个点保持与前一个相同
+
+    return x_traj, y_traj, v_ref, theta_ref
 
 def get_ref_trajectory(x_traj, y_traj, theta_traj, current_idx):
     if current_idx + N < len(x_traj):
@@ -68,3 +110,4 @@ def calculate_lateral_deviation(x, y, x_ref1, y_ref1, x_ref2, y_ref2):
         return num / denom
     else:
         return 0
+
