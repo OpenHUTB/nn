@@ -64,7 +64,7 @@
     </body>
 
     <!-- ===== 前方新增障碍物（保留原有多障碍） =====-->
-    <body name="front_dark_box" pos="1.9 0 0.05">
+    <body name="front_dark_box" pos="2.0 0 0.05">
     <geom type="box" size="0.15 0.15 0.15" material="obs" mass="1"/>
     </body>
     <!-- 小车：保留绿色相机 -->
