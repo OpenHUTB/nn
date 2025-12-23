@@ -75,4 +75,4 @@ def detect_monocular_3d(image_path, output_path="output_3d.jpg"):
     print(f"\nResult saved to {output_path}")
 
 if __name__ == "__main__":
-    detect_monocular_3d("data/sample_image.jpg")
+    detect_monocular_3d("data/sample_image.jpg")#https://699pic.com/tupian-501301794.html  图片下载链接
