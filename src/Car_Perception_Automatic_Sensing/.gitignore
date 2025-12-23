@@ -1,0 +1,30 @@
+# Python 相关
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+*.env
+
+# PyCharm 相关
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# 项目无关目录/文件
+../../.idea/
+
+# 数据与模型（后续会用到）
+data/raw/
+data/kitti/
+*.npy
+*.pth
+train/checkpoints/
+infer/results/
+
+# OS 相关
+.DS_Store
+Thumbs.db
