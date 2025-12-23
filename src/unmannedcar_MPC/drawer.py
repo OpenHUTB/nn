@@ -28,6 +28,7 @@ class PyGameDrawer():
 
         # 初始化时间
         self.start_time = time.time()
+        self.frame_count = 0  # 帧计数器
 
     # draw on the camera perspective
 
@@ -64,23 +65,27 @@ class PyGameDrawer():
                 cam_locs[i + 1][0], cam_locs[i + 1][1]], width)
 
     def __draw_camera_line_safe(self, color, pt1, pt2, width=1):
-        if (pt1[0] >= 0 and pt1[0] <= Config.PYGAME_WIDTH and pt1[1] >= 0 and pt1[1] <= Config.PYGAME_HEIGHT and pt2[
-            0] >= 0 and pt2[0] <= Config.PYGAME_WIDTH and pt2[1] >= 0 and pt2[1] <= Config.PYGAME_HEIGHT):
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+        if (pt1[0] >= 0 and pt1[0] <= screen_width and pt1[1] >= 0 and pt1[1] <= screen_height and
+                pt2[0] >= 0 and pt2[0] <= screen_width and pt2[1] >= 0 and pt2[1] <= screen_height):
             self.pygame.draw.line(self.main.surface, color, pt1, pt2, width)
 
     # 绘制点的方法
     def draw_point(self, location, color, radius=3):
         """在相机视角下绘制一个点"""
         cam_loc = self.__w_locs_2_camera_locs([location])[0]
-        if cam_loc[0] >= 0 and cam_loc[0] <= Config.PYGAME_WIDTH and cam_loc[1] >= 0 and cam_loc[
-            1] <= Config.PYGAME_HEIGHT:
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+        if cam_loc[0] >= 0 and cam_loc[0] <= screen_width and cam_loc[1] >= 0 and cam_loc[1] <= screen_height:
             self.pygame.draw.circle(self.main.surface, color, cam_loc, radius)
 
     # 显示速度方法
     def display_speed(self, speed_kmh):
         """在屏幕右上角显示当前速度"""
         # 设置速度显示位置
-        pos_x = Config.PYGAME_WIDTH - 180  # 屏幕右侧
+        screen_width = Config.PYGAME_WIDTH
+        pos_x = screen_width - 180  # 屏幕右侧
         pos_y = 30  # 距离顶部30像素
 
         # 根据速度设置颜色
@@ -123,6 +128,8 @@ class PyGameDrawer():
     # 显示刹车状态方法
     def display_brake_status(self, is_braking, brake_history, target_speed, frame_count):
         """在屏幕左上角显示刹车状态"""
+        self.frame_count = frame_count  # 更新帧计数
+
         # 设置显示位置（屏幕左上角）
         pos_x = 30
         pos_y = 30
@@ -215,8 +222,9 @@ class PyGameDrawer():
             return
 
         # 图表位置和大小
+        screen_height = Config.PYGAME_HEIGHT
         chart_x = 30
-        chart_y = Config.PYGAME_HEIGHT - 150
+        chart_y = screen_height - 150
         chart_width = 300
         chart_height = 120
 
@@ -381,7 +389,8 @@ class PyGameDrawer():
     def display_throttle_info(self, throttle_value, brake_value):
         """在屏幕右侧中部显示油门和刹车信息"""
         # 设置显示位置
-        pos_x = Config.PYGAME_WIDTH - 220
+        screen_width = Config.PYGAME_WIDTH
+        pos_x = screen_width - 220
         pos_y = 250
 
         # 显示标题
@@ -430,7 +439,8 @@ class PyGameDrawer():
     # 显示控制模式
     def display_control_mode(self, control_mode):
         """在屏幕顶部中央显示控制模式"""
-        pos_x = Config.PYGAME_WIDTH // 2 - 100
+        screen_width = Config.PYGAME_WIDTH
+        pos_x = screen_width // 2 - 100
         pos_y = 10
 
         if control_mode == "AUTO":
@@ -453,8 +463,9 @@ class PyGameDrawer():
     # 显示帧信息
     def display_frame_info(self, frame_count, dt):
         """在屏幕左下角显示帧信息"""
+        screen_height = Config.PYGAME_HEIGHT
         pos_x = 30
-        pos_y = Config.PYGAME_HEIGHT - 200
+        pos_y = screen_height - 200
 
         # 计算FPS
         fps = 1.0 / dt if dt > 0 else 0
@@ -479,6 +490,312 @@ class PyGameDrawer():
         # 显示每行信息
         for i, text in enumerate(info_texts):
             self.info_font.render_to(self.main.surface, (pos_x, pos_y + i * 20), text, (200, 200, 200))
+
+    # 显示碰撞警告
+    def display_collision_warning(self, collision_warning, collision_history):
+        """在屏幕中央上方显示碰撞警告"""
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+
+        # 设置显示位置（屏幕中央上方）
+        pos_x = screen_width // 2 - 150
+        pos_y = 150
+
+        # 检查是否需要显示警告（使用历史记录减少闪烁）
+        should_warn = False
+        if len(collision_history) >= 10:
+            # 如果最近10帧中有7帧检测到碰撞风险，则显示警告
+            recent_warnings = collision_history[-10:]
+            if sum(recent_warnings) >= 7:
+                should_warn = True
+
+        if collision_warning or should_warn:
+            # 碰撞警告：红色闪烁
+            warning_text = "COLLISION WARNING!"
+
+            # 闪烁效果
+            intensity = 200 + 55 * ((self.frame_count // 3) % 2)  # 快速闪烁
+
+            # 绘制警告背景
+            bg_rect = self.pygame.Rect(pos_x - 20, pos_y - 10, 340, 60)
+
+            # 绘制红色渐变背景
+            for i in range(bg_rect.height):
+                # 创建渐变红色
+                alpha = int(100 * (1.0 - i / bg_rect.height))
+                color = (intensity, 0, 0, alpha)
+                line_rect = self.pygame.Rect(bg_rect.x, bg_rect.y + i, bg_rect.width, 1)
+                self.pygame.draw.rect(self.main.surface, color, line_rect)
+
+            # 绘制边框（闪烁）
+            border_color = (intensity, intensity // 2, 0)
+            self.pygame.draw.rect(self.main.surface, border_color, bg_rect, 4)
+
+            # 显示警告文字
+            warning_font = self.pygame.freetype.SysFont('Arial', 32)
+            warning_font.render_to(self.main.surface, (pos_x, pos_y), warning_text, (intensity, intensity, 0))
+
+            # 添加警告图标
+            icon_x = pos_x + 280
+            icon_y = pos_y + 20
+            self.pygame.draw.circle(self.main.surface, (intensity, 0, 0), (icon_x, icon_y), 20)
+
+            # 绘制感叹号
+            exclamation_font = self.pygame.freetype.SysFont('Arial', 24)
+            exclamation_font.render_to(self.main.surface, (icon_x - 5, icon_y - 15), "!", (255, 255, 255))
+
+            # 添加副标题
+            subtitle_text = "Reduce Speed and Steer Carefully"
+            subtitle_font = self.pygame.freetype.SysFont('Arial', 16)
+            subtitle_font.render_to(self.main.surface, (pos_x, pos_y + 40), subtitle_text, (255, 200, 0))
+
+            # 绘制警告脉冲效果
+            pulse_radius = 15 + 5 * math.sin(self.frame_count * 0.2)
+            self.pygame.draw.circle(self.main.surface, (intensity, 0, 0, 100), (icon_x, icon_y), int(pulse_radius), 2)
+
+    # 显示驾驶评分
+    def display_driving_score(self, score, score_factors, score_history):
+        """在屏幕左侧中部显示驾驶评分"""
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+
+        # 设置显示位置
+        pos_x = 30
+        pos_y = 180
+
+        # 根据评分设置颜色
+        if score >= 85:
+            color = (0, 255, 0)  # 优秀 - 绿色
+            grade = "A"
+        elif score >= 70:
+            color = (255, 255, 0)  # 良好 - 黄色
+            grade = "B"
+        elif score >= 60:
+            color = (255, 165, 0)  # 及格 - 橙色
+            grade = "C"
+        else:
+            color = (255, 0, 0)  # 差 - 红色
+            grade = "D"
+
+        # 绘制评分背景框
+        bg_rect = self.pygame.Rect(pos_x - 10, pos_y - 10, 300, 200)
+        self.pygame.draw.rect(self.main.surface, (20, 20, 20, 200), bg_rect)
+        self.pygame.draw.rect(self.main.surface, (100, 100, 100), bg_rect, 2)
+
+        # 显示标题
+        title_text = "DRIVING PERFORMANCE"
+        self.steer_font.render_to(self.main.surface, (pos_x, pos_y), title_text, (200, 200, 200))
+
+        # 显示综合评分
+        score_text = f"Score: {score:.1f}/100 ({grade})"
+        self.steer_font.render_to(self.main.surface, (pos_x, pos_y + 35), score_text, color)
+
+        # 显示各项评分因子
+        y_offset = 75
+        factor_colors = {
+            'speed_stability': (100, 200, 255),  # 蓝色
+            'steering_smoothness': (255, 200, 100),  # 橙色
+            'brake_usage': (255, 100, 100),  # 红色
+            'path_following': (100, 255, 150),  # 绿色
+            'safety': (200, 100, 255)  # 紫色
+        }
+
+        factor_labels = {
+            'speed_stability': "Speed Stability",
+            'steering_smoothness': "Steering Smooth",
+            'brake_usage': "Brake Usage",
+            'path_following': "Path Following",
+            'safety': "Safety"
+        }
+
+        for factor, label in factor_labels.items():
+            factor_score = score_factors.get(factor, 0)
+            factor_color = factor_colors.get(factor, (200, 200, 200))
+
+            # 显示因子标签和分数
+            factor_text = f"{label}: {factor_score:.1f}"
+            self.info_font.render_to(self.main.surface, (pos_x, pos_y + y_offset), factor_text, factor_color)
+
+            # 绘制分数条
+            bar_width = 150
+            bar_height = 8
+            bar_x = pos_x + 120
+            bar_y = pos_y + y_offset + 5
+
+            # 绘制背景条
+            bar_bg_rect = self.pygame.Rect(bar_x, bar_y, bar_width, bar_height)
+            self.pygame.draw.rect(self.main.surface, (50, 50, 50), bar_bg_rect)
+
+            # 绘制填充条
+            filled_width = int(bar_width * factor_score / 100)
+            filled_rect = self.pygame.Rect(bar_x, bar_y, filled_width, bar_height)
+            self.pygame.draw.rect(self.main.surface, factor_color, filled_rect)
+
+            # 绘制边框
+            self.pygame.draw.rect(self.main.surface, (150, 150, 150), bar_bg_rect, 1)
+
+            y_offset += 20
+
+        # 绘制评分趋势图
+        if len(score_history) >= 2:
+            chart_x = pos_x
+            chart_y = pos_y + 180
+            chart_width = 280
+            chart_height = 60
+
+            # 绘制图表背景
+            chart_bg = self.pygame.Rect(chart_x, chart_y, chart_width, chart_height)
+            self.pygame.draw.rect(self.main.surface, (15, 15, 15), chart_bg)
+            self.pygame.draw.rect(self.main.surface, (80, 80, 80), chart_bg, 1)
+
+            # 绘制趋势线
+            points = []
+            max_history = min(50, len(score_history))  # 最多显示最近50个点
+
+            for i in range(max_history):
+                idx = len(score_history) - max_history + i
+                if idx >= 0:
+                    x = chart_x + int(i * chart_width / max_history)
+                    # 分数范围0-100映射到图表高度
+                    y = chart_y + chart_height - int(score_history[idx] * chart_height / 100)
+                    points.append((x, y))
+
+            if len(points) > 1:
+                # 绘制趋势线
+                self.pygame.draw.lines(self.main.surface, color, False, points, 2)
+
+                # 绘制当前点
+                if points:
+                    last_point = points[-1]
+                    self.pygame.draw.circle(self.main.surface, color, last_point, 4)
+                    self.pygame.draw.circle(self.main.surface, (255, 255, 255), last_point, 2)
+
+            # 添加图表标签
+            chart_label = "Score Trend"
+            self.info_font.render_to(self.main.surface, (chart_x, chart_y - 15), chart_label, (150, 150, 150))
+
+    # 显示航点导航信息
+    def display_waypoint_navigation(self, current_index, waypoints, distance_to_waypoint, reached_count, progress):
+        """在屏幕中央下方显示航点导航信息"""
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+
+        # 设置显示位置（屏幕中央下方）
+        pos_x = screen_width // 2 - 150
+        pos_y = screen_height - 100
+
+        # 绘制背景框
+        bg_rect = self.pygame.Rect(pos_x - 15, pos_y - 15, 330, 90)
+        self.pygame.draw.rect(self.main.surface, (20, 20, 20, 200), bg_rect)
+        self.pygame.draw.rect(self.main.surface, (80, 80, 200), bg_rect, 2)
+
+        # 显示标题
+        title_text = "WAYPOINT NAVIGATION"
+        title_font = self.pygame.freetype.SysFont('Arial', 20)
+        title_font.render_to(self.main.surface, (pos_x, pos_y), title_text, (100, 200, 255))
+
+        if len(waypoints) == 0:
+            # 没有航点时显示提示
+            no_waypoints_text = "No waypoints available"
+            self.info_font.render_to(self.main.surface, (pos_x, pos_y + 30), no_waypoints_text, (150, 150, 150))
+            return
+
+        # 显示当前航点信息
+        waypoint_info = f"Waypoint: {current_index + 1}/{len(waypoints)}"
+        self.info_font.render_to(self.main.surface, (pos_x, pos_y + 30), waypoint_info, (255, 255, 255))
+
+        # 显示到航点的距离
+        distance_text = f"Distance: {distance_to_waypoint:.1f}m"
+        distance_color = (255, 200, 100) if distance_to_waypoint > 10 else (100, 255, 100)
+        self.info_font.render_to(self.main.surface, (pos_x, pos_y + 50), distance_text, distance_color)
+
+        # 显示已到达航点数量
+        reached_text = f"Reached: {reached_count}"
+        self.info_font.render_to(self.main.surface, (pos_x + 180, pos_y + 30), reached_text, (200, 200, 100))
+
+        # 绘制航点进度条
+        progress_bar_width = 200
+        progress_bar_height = 8
+        progress_bar_x = pos_x
+        progress_bar_y = pos_y + 70
+
+        # 绘制进度条背景
+        progress_bg_rect = self.pygame.Rect(progress_bar_x, progress_bar_y, progress_bar_width, progress_bar_height)
+        self.pygame.draw.rect(self.main.surface, (50, 50, 50), progress_bg_rect)
+
+        # 绘制进度条填充
+        filled_width = int(progress_bar_width * progress)
+        filled_rect = self.pygame.Rect(progress_bar_x, progress_bar_y, filled_width, progress_bar_height)
+
+        # 根据进度设置颜色
+        if progress < 0.33:
+            progress_color = (255, 100, 100)  # 红色 - 起始
+        elif progress < 0.66:
+            progress_color = (255, 200, 100)  # 橙色 - 中间
+        else:
+            progress_color = (100, 255, 100)  # 绿色 - 接近完成
+
+        self.pygame.draw.rect(self.main.surface, progress_color, filled_rect)
+        self.pygame.draw.rect(self.main.surface, (200, 200, 200), progress_bg_rect, 1)
+
+        # 显示进度百分比
+        progress_text = f"{progress * 100:.0f}%"
+        progress_font = self.pygame.freetype.SysFont('Arial', 12)
+        progress_font.render_to(self.main.surface, (progress_bar_x + progress_bar_width + 5, progress_bar_y - 2),
+                                progress_text, (200, 200, 200))
+
+        # 在屏幕上绘制航点指示器（小圆点）
+        self.draw_waypoint_indicators(waypoints, current_index)
+
+    def draw_waypoint_indicators(self, waypoints, current_index):
+        """在屏幕上绘制航点指示器"""
+        if len(waypoints) == 0:
+            return
+
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+
+        # 航点指示器区域（屏幕顶部）
+        indicator_area_y = 80
+        indicator_spacing = screen_width / (len(waypoints) + 1)
+
+        for i, waypoint in enumerate(waypoints):
+            # 计算指示器位置
+            indicator_x = int((i + 1) * indicator_spacing)
+            indicator_y = indicator_area_y
+
+            # 根据航点状态设置颜色
+            if i < current_index:
+                color = (100, 255, 100, 150)  # 已通过 - 绿色半透明
+                radius = 6
+            elif i == current_index:
+                color = (255, 200, 0)  # 当前目标 - 黄色
+                radius = 10
+            else:
+                color = (200, 200, 200, 100)  # 未到达 - 灰色半透明
+                radius = 8
+
+            # 绘制航点指示器
+            self.pygame.draw.circle(self.main.surface, color, (indicator_x, indicator_y), radius)
+
+            # 如果是当前航点，添加脉冲效果
+            if i == current_index:
+                pulse_radius = radius + 3 + 2 * math.sin(self.frame_count * 0.1)
+                self.pygame.draw.circle(self.main.surface, (255, 200, 0, 100), (indicator_x, indicator_y),
+                                        int(pulse_radius), 2)
+
+                # 添加航点编号
+                waypoint_text = f"{i + 1}"
+                waypoint_font = self.pygame.freetype.SysFont('Arial', 12)
+                waypoint_font.render_to(self.main.surface, (indicator_x - 5, indicator_y - 20), waypoint_text,
+                                        (255, 255, 255))
+
+            # 在顶部显示航点导航标题
+            if i == 0:
+                nav_title = "WAYPOINTS"
+                title_font = self.pygame.freetype.SysFont('Arial', 14)
+                title_font.render_to(self.main.surface, (screen_width // 2 - 40, indicator_y - 40), nav_title,
+                                     (150, 200, 255))
 
     @staticmethod
     def get_location_bbox(location, camera):

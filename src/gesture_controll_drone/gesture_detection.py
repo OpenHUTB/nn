@@ -1,137 +1,212 @@
-import cv2          # 导入OpenCV库，用于图像处理和视频捕获
-import mediapipe as mp  # 导入MediaPipe库，用于手部关键点检测
-import numpy as np   # 导入numpy库，用于数值计算
+import cv2
+import mediapipe as mp
+import numpy as np
+import time
+from PIL import Image, ImageDraw, ImageFont  
 
 class GestureDetector:
-    """手势检测类
-    基于MediaPipe实现单只手的关键点检测和基础手势识别
-    支持识别：张开手掌、握拳、食指指向、胜利手势、其他手势
-    """
-    
-    def __init__(self):
-        """初始化函数：创建MediaPipe手部检测实例和绘图工具"""
-        # 初始化MediaPipe手部检测模块
+    """基于MediaPipe的手势检测类（修复中文显示+帧率显示+摄像头容错）"""
+    # 手部关键点索引常量
+    WRIST = 0
+    THUMB_TIP = 4
+    THUMB_IP = 3
+    INDEX_TIP = 8
+    INDEX_PIP = 6
+    MIDDLE_TIP = 12
+    MIDDLE_PIP = 10
+    RING_TIP = 16
+    RING_PIP = 14
+    PINKY_TIP = 20
+    PINKY_PIP = 18
+
+    def __init__(self, max_hands=1, detection_confidence=0.7, tracking_confidence=0.5):
+        # 初始化MediaPipe手部检测
         self.mp_hands = mp.solutions.hands
-        # 创建Hands对象，配置检测参数
         self.hands = self.mp_hands.Hands(
-            static_image_mode=False,       # 动态视频模式（False），非静态图片模式
-            max_num_hands=1,               # 最多检测1只手
-            min_detection_confidence=0.7,  # 检测置信度阈值，低于0.7则认为未检测到
-            min_tracking_confidence=0.5    # 跟踪置信度阈值，低于0.5则重新检测
+            static_image_mode=False,
+            max_num_hands=max_hands,
+            min_detection_confidence=detection_confidence,
+            min_tracking_confidence=tracking_confidence
         )
-        # 初始化MediaPipe绘图工具，用于绘制手部关键点和连接线
         self.mp_drawing = mp.solutions.drawing_utils
-        
+        self.draw_spec = self.mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2)
+
     def detect_gestures(self, frame):
-        """检测帧中的手势
-        Args:
-            frame: OpenCV读取的BGR格式视频帧
-        Returns:
-            frame: 绘制了手部关键点的帧
-            gesture: 识别出的手势名称（字符串）
-            landmarks: 手部关键点像素坐标列表，格式[(x1,y1), (x2,y2), ...]
-        """
-        # 将BGR格式（OpenCV默认）转换为RGB格式（MediaPipe要求）
+        """检测帧中的手势"""
+        if frame is None or frame.size == 0:
+            return frame, "无效帧", None
+        
+        # 颜色转换+性能优化
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # 处理帧，获取手部检测结果
+        rgb_frame.flags.writeable = False
         results = self.hands.process(rgb_frame)
+        rgb_frame.flags.writeable = True
+
+        gesture = "未检测到手势"
+        landmarks = None
         
-        # 初始化返回值
-        gesture = "未检测到手势"  # 默认手势状态
-        landmarks = None          # 关键点坐标初始化为空
-        
-        # 如果检测到至少一只手的关键点
         if results.multi_hand_landmarks:
-            # 遍历检测到的每只手（此处最多1只）
-            for hand_landmarks in results.multi_hand_landmarks:
-                # 在帧上绘制手部关键点和连接线
-                self.mp_drawing.draw_landmarks(
-                    frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
-                
-                # 提取关键点像素坐标
-                landmarks = []
-                h, w, c = frame.shape  # 获取帧的高度、宽度、通道数
-                for lm in hand_landmarks.landmark:
-                    # 将MediaPipe的归一化坐标（0-1）转换为像素坐标
-                    px = int(lm.x * w)
-                    py = int(lm.y * h)
-                    landmarks.append((px, py))
-                
-                # 根据关键点坐标分类手势
-                gesture = self._classify_gesture(landmarks)
+            hand_landmarks = results.multi_hand_landmarks[0]
+            self.mp_drawing.draw_landmarks(
+                frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS,
+                self.draw_spec, self.draw_spec
+            )
+            landmarks = self._convert_landmarks_to_pixels(hand_landmarks, frame.shape)
+            gesture = self._classify_gesture(landmarks)
         
-        # 返回处理后的帧、手势名称、关键点坐标
         return frame, gesture, landmarks
     
+    def _convert_landmarks_to_pixels(self, hand_landmarks, frame_shape):
+        """归一化坐标转像素坐标"""
+        h, w, _ = frame_shape
+        landmarks = []
+        for lm in hand_landmarks.landmark:
+            x = int(np.clip(lm.x * w, 0, w-1))
+            y = int(np.clip(lm.y * h, 0, h-1))
+            landmarks.append((x, y))
+        return landmarks
+    
+    def _is_finger_open(self, landmarks, tip_idx, pip_idx):
+        """判断非拇指是否张开"""
+        return landmarks[tip_idx][1] < landmarks[pip_idx][1]
+    
+    def _is_thumb_open(self, landmarks):
+        """判断拇指是否张开（适配左右手）"""
+        wrist_x = landmarks[self.WRIST][0]
+        thumb_tip_x = landmarks[self.THUMB_TIP][0]
+        thumb_ip_x = landmarks[self.THUMB_IP][0]
+        
+        if thumb_tip_x > wrist_x:  # 右手
+            return thumb_tip_x > thumb_ip_x + 10
+        else:  # 左手
+            return thumb_tip_x < thumb_ip_x - 10
+    
     def _classify_gesture(self, landmarks):
-        """根据关键点坐标分类手势（内部方法）
-        Args:
-            landmarks: 手部关键点像素坐标列表
-        Returns:
-            str: 识别出的手势名称
-        """
-        # 校验关键点数量（正常手部关键点应为21个）
+        """分类手势"""
         if not landmarks or len(landmarks) < 21:
             return "未检测到手势"
         
-        # 提取关键部位的坐标
-        thumb_tip = landmarks[4]    # 拇指指尖
-        index_tip = landmarks[8]    # 食指指尖
-        middle_tip = landmarks[12]  # 中指指尖
-        ring_tip = landmarks[16]    # 无名指指尖
-        pinky_tip = landmarks[20]   # 小指指尖
-        wrist = landmarks[0]        # 手腕
+        # 各手指状态
+        thumb_open = self._is_thumb_open(landmarks)
+        index_open = self._is_finger_open(landmarks, self.INDEX_TIP, self.INDEX_PIP)
+        middle_open = self._is_finger_open(landmarks, self.MIDDLE_TIP, self.MIDDLE_PIP)
+        ring_open = self._is_finger_open(landmarks, self.RING_TIP, self.RING_PIP)
+        pinky_open = self._is_finger_open(landmarks, self.PINKY_TIP, self.PINKY_PIP)
         
-        # 判断每根手指是否张开，存入列表
-        fingers = []
-        # 拇指判断：指尖x坐标 > 拇指近节指关节x坐标 视为张开（仅适配右手）
-        fingers.append(thumb_tip[0] > landmarks[3][0])  
+        finger_states = [thumb_open, index_open, middle_open, ring_open, pinky_open]
         
-        # 其他手指判断：指尖y坐标 < 手腕y坐标 视为张开（逻辑较简单）
-        for tip in [index_tip, middle_tip, ring_tip, pinky_tip]:
-            fingers.append(tip[1] < wrist[1])
-        
-        # 根据手指状态分类手势
-        if all(fingers):            # 所有手指都张开
-            return "张开手掌"
-        elif not any(fingers):      # 所有手指都闭合
+        # 手势判断
+        if not any(finger_states):
             return "握拳"
-        elif fingers[1] and not any(fingers[2:]):  # 仅食指张开
+        elif all(finger_states):
+            return "张开手掌"
+        elif index_open and not middle_open and not ring_open and not pinky_open:
             return "食指指向"
-        elif fingers[1] and fingers[2] and not fingers[3] and not fingers[4]:  # 食指+中指张开
+        elif index_open and middle_open and not ring_open and not pinky_open:
             return "胜利手势"
-        elif all(fingers[1:5]):     # 除拇指外其余四指张开
-            return "张开五指"
-        else:                       # 其他未匹配的手势
+        else:
             return "其他手势"
 
-# ------------------- 测试代码（可直接运行） -------------------
+
+def put_chinese_text(frame, text, position, font_size=32, color=(0, 255, 0)):
+    """修复OpenCV中文显示乱码"""
+    # OpenCV转PIL
+    pil_frame = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_frame)
+    
+    # 加载中文字体
+    try:
+        font = ImageFont.truetype("simhei.ttf", font_size, encoding="utf-8")
+    except:
+        print("加载中文字体失败，使用默认字体")
+        font = ImageFont.load_default()
+    
+    # 绘制中文
+    draw.text(position, text, font=font, fill=color)
+    
+    # PIL转OpenCV
+    return cv2.cvtColor(np.array(pil_frame), cv2.COLOR_RGB2BGR)
+
+
+def get_available_camera():
+    """自动检测可用摄像头（尝试索引0/1/2）"""
+    for idx in [0, 1, 2]:
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW)  # Windows用CAP_DSHOW避免延迟/占用问题
+        if cap.isOpened():
+            print(f"成功打开摄像头，索引：{idx}")
+            return cap
+        cap.release()
+    return None
+
+
+# 主程序入口
 if __name__ == "__main__":
-    # 创建手势检测器实例
+    # 创建手势检测器
     detector = GestureDetector()
-    # 打开摄像头（0为默认摄像头）
-    cap = cv2.VideoCapture(0)
     
-    # 循环读取视频帧
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:  # 读取帧失败则退出
-            break
-        
-        # 检测手势
-        frame, gesture, landmarks = detector.detect_gestures(frame)
-        
-        # 在帧上显示识别结果
-        cv2.putText(frame, f"Gesture: {gesture}", (10, 30), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        # 显示处理后的帧
-        cv2.imshow("Gesture Detection", frame)
-        
-        # 按下q键退出循环
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    # 自动检测可用摄像头（核心修复点）
+    cap = get_available_camera()
+    if cap is None:
+        print("错误：未检测到可用摄像头！")
+        print("请检查：")
+        print("1. 摄像头是否被其他程序占用（如微信、钉钉、系统相机）")
+        print("2. 摄像头是否已正确连接并安装驱动")
+        print("3. 是否授予程序摄像头权限（Windows设置→隐私和安全性→摄像头）")
+        exit(1)
     
-    # 释放资源
-    cap.release()
-    cv2.destroyAllWindows()
+    # 配置摄像头参数
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 60)  # 目标帧率60fps
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # 减少缓冲区，降低延迟
+    
+    # 帧率计算变量
+    prev_time = time.time()
+    fps = 0
+    fps_counter = 0
+    fps_show_interval = 0.1
+    
+    try:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            # 增加帧读取失败的容错处理
+            if not ret or frame is None:
+                print("警告：暂时无法读取摄像头帧，重试中...")
+                time.sleep(0.1)
+                continue
+            
+            # 镜像翻转
+            frame = cv2.flip(frame, 1)
+            
+            # 检测手势
+            frame, gesture, _ = detector.detect_gestures(frame)
+            
+            # 计算帧率
+            fps_counter += 1
+            current_time = time.time()
+            if current_time - prev_time >= fps_show_interval:
+                fps = fps_counter / (current_time - prev_time)
+                fps_counter = 0
+                prev_time = current_time
+            
+            # 显示手势和帧率
+            frame = put_chinese_text(frame, f"当前手势: {gesture}", (20, 50), font_size=32)
+            cv2.putText(
+                frame, f"FPS: {fps:.1f} ", 
+                (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 
+                1.0, (255, 0, 0), 2
+            )
+            
+            # 显示窗口
+            cv2.imshow("手势检测（按Q退出）- 目标帧率60fps", frame)
+            
+            # 按Q退出
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    except Exception as e:
+        print(f"程序运行出错：{e}")
+    finally:
+        # 确保资源释放
+        cap.release()
+        cv2.destroyAllWindows()
+        print("程序已退出，资源已释放")
