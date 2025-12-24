@@ -3,6 +3,7 @@ sensors.py - CARLA传感器管理
 包含：相机、LiDAR传感器封装和管理
 """
 
+import random  # 添加随机模块支持
 import carla
 import cv2
 import numpy as np
@@ -22,7 +23,6 @@ except ImportError:
 
 import open3d as o3d
 from sklearn.cluster import DBSCAN
-
 
 class CameraManager:
     """相机管理器"""
@@ -58,8 +58,8 @@ class CameraManager:
             
             # 设置相机位置（车顶前方）
             camera_transform = carla.Transform(
-                carla.Location(x=2.0, z=1.8),
-                carla.Rotation(pitch=-10)  # 略微向下倾斜
+                carla.Location(x=2.5, z=2.5),
+                carla.Rotation(pitch=-5)  # 略微向下倾斜
             )
             
             # 生成相机
@@ -146,7 +146,6 @@ class CameraManager:
             except Exception as e:
                 logger.warning(f"销毁相机失败: {e}")
         self.camera = None
-
 
 class LiDARManager:
     """LiDAR管理器"""
@@ -368,8 +367,6 @@ class LiDARManager:
                 logger.warning(f"销毁LiDAR失败: {e}")
         self.lidar = None
 
-# ======================== 视角管理器 ========================
-
 class SpectatorManager:
     """CARLA视角管理器 - 提供卫星视角跟随"""
     
@@ -386,9 +383,11 @@ class SpectatorManager:
         self.ego_vehicle = ego_vehicle
         self.config = config
         self.spectator = None
-        self.view_mode = 'satellite'  # 视角模式: 'satellite', 'behind', 'first_person'
-        self.view_height = 50.0  # 卫星视角高度
-        self.follow_distance = 10.0  # 后方视角距离
+        view_config = config.get('view', {})
+        self.view_mode = view_config.get('default_mode', 'satellite')
+        self.view_height = view_config.get('satellite_height', 50.0)
+        self.follow_distance = view_config.get('behind_distance', 10.0)
+        self.first_person_height = view_config.get('first_person_height', 1.6)
         
     def setup(self):
         """设置视角"""
@@ -502,7 +501,7 @@ class SpectatorManager:
             location = carla.Location(
                 x=vehicle_transform.location.x,
                 y=vehicle_transform.location.y,
-                z=vehicle_transform.location.z + 1.6  # 驾驶员眼睛高度
+                z=vehicle_transform.location.z + self.first_person_height  # 改为使用配置
             )
             
             # 使用车辆的方向
@@ -679,9 +678,6 @@ class SensorManager:
         
         logger.info("✅ 所有传感器已销毁")
 
-
-# ======================== 工具函数 ========================
-
 def create_ego_vehicle(world, config, spawn_points=None):
     """
     创建自车
@@ -795,7 +791,6 @@ def create_ego_vehicle(world, config, spawn_points=None):
         traceback.print_exc()
         return None
 
-
 def spawn_npc_vehicles(world, config, count=None):
     """
     生成NPC车辆
@@ -846,7 +841,6 @@ def spawn_npc_vehicles(world, config, count=None):
                 continue
             
             # 随机选择车辆蓝图
-            import random
             vehicle_bp = random.choice(vehicle_bps)
             
             # 尝试生成
@@ -871,7 +865,6 @@ def spawn_npc_vehicles(world, config, count=None):
     except Exception as e:
         logger.error(f"生成NPC车辆失败: {e}")
         return 0
-
 
 def clear_all_actors(world, exclude_ids=None):
     """
@@ -925,9 +918,6 @@ def clear_all_actors(world, exclude_ids=None):
     except Exception as e:
         logger.warning(f"清理演员时出错: {e}")
 
-
-# ======================== 测试函数 ========================
-
 def test_sensor_manager():
     """测试传感器管理器"""
     print("=" * 50)
@@ -950,7 +940,6 @@ def test_sensor_manager():
     print("注：完整测试需要CARLA环境")
     
     return True
-
 
 if __name__ == "__main__":
     test_sensor_manager()

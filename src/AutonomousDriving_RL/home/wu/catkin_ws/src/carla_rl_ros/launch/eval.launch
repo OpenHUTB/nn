@@ -1,0 +1,6 @@
+<launch>
+  <arg name="steps" default="1" />
+  <node name="ros_eval_node" pkg="carla_rl_ros" type="ros_eval_node.py" output="screen">
+    <param name="steps" value="$(arg steps)" />
+  </node>
+</launch>

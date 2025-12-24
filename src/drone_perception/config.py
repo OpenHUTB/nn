@@ -50,6 +50,15 @@ PERCEPTION = {
         'MAX_AREA': 10000,  # 最大检测面积（像素）
         'UPDATE_INTERVAL': 1.0,  # 检测更新间隔（秒）
         'MEMORY_TIME': 5.0,  # 物体记忆时间（秒）
+    },
+
+    # 黑色物体检测参数（新增）
+    'BLACK_OBJECT_DETECTION': {
+        'ENABLED': True,  # 启用黑色物体检测
+        'MIN_AREA': 50,  # 最小检测面积（像素）
+        'MAX_AREA': 10000,  # 最大检测面积（像素）
+        'UPDATE_INTERVAL': 1.0,  # 检测更新间隔（秒）
+        'MEMORY_TIME': 5.0,  # 物体记忆时间（秒）
     }
 }
 
@@ -102,6 +111,14 @@ INTELLIGENT_DECISION = {
         'DETECTION_RADIUS': 8.0,  # 检测半径（米）
         'MIN_DISTANCE': 2.0,  # 最小接近距离（米）
         'EXPLORATION_BONUS': 0.3,  # 探索奖励分数
+    },
+
+    # 黑色物体探索参数（新增）
+    'BLACK_OBJECT_EXPLORATION': {
+        'ATTRACTION_GAIN': 1.0,  # 黑色物体吸引力增益
+        'DETECTION_RADIUS': 8.0,  # 检测半径（米）
+        'MIN_DISTANCE': 2.0,  # 最小接近距离（米）
+        'EXPLORATION_BONUS': 0.2,  # 探索奖励分数
     }
 }
 
@@ -130,6 +147,10 @@ DISPLAY = {
         'REFRESH_RATE_MS': 30,  # 刷新率 (毫秒)，建议30-50
         'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
         'SHOW_BLUE_OBJECTS': True,  # 在画面中标记蓝色物体
+        'SHOW_BLACK_OBJECTS': True,  # 在画面中标记黑色物体（新增）
+        # 内存优化参数
+        'QUEUE_MAXSIZE': 2,  # 图像队列最大大小，减少内存占用（原为3）
+        'REDUCE_IMAGE_COPY': True,  # 减少图像复制，仅在必要时复制
     },
 
     # 信息显示窗口参数
@@ -187,6 +208,12 @@ CAMERA = {
     'BLUE_COLOR_RANGE': {
         'LOWER': [100, 150, 50],    # 蓝色下限
         'UPPER': [130, 255, 255],   # 蓝色上限
+    },
+
+    # 黑色物体检测颜色范围（HSV空间）（新增）
+    'BLACK_COLOR_RANGE': {
+        'LOWER': [0, 0, 0],         # 黑色下限（色相任意，饱和度和亮度都很低）
+        'UPPER': [180, 255, 50],    # 黑色上限（亮度阈值50，避免过暗）
     }
 }
 
@@ -200,6 +227,7 @@ DEBUG = {
     'PERFORMANCE_PROFILING': False,  # 是否启用性能分析
     'SAVE_RED_OBJECT_IMAGES': False,  # 是否保存检测到红色物体的图像
     'SAVE_BLUE_OBJECT_IMAGES': False,  # 是否保存检测到蓝色物体的图像（新增）
+    'SAVE_BLACK_OBJECT_IMAGES': False,  # 是否保存检测到黑色物体的图像（新增）
 }
 
 # ==================== 数据记录参数 ====================
@@ -214,6 +242,12 @@ DATA_RECORDING = {
     'SYSTEM_METRICS_INTERVAL': 5.0,       # 系统指标记录间隔（秒）
     'RECORD_RED_OBJECTS': True,           # 记录红色物体信息
     'RECORD_BLUE_OBJECTS': True,          # 记录蓝色物体信息（新增）
+    'RECORD_BLACK_OBJECTS': True,         # 记录黑色物体信息（新增）
+    # 内存优化参数
+    'MAX_FLIGHT_DATA_BUFFER': 500,        # 最大飞行数据缓冲区大小（条），超过后自动保存并清空
+    'MAX_OBJECTS_BUFFER': 200,            # 最大物体记录缓冲区大小（个）
+    'MAX_EVENTS_BUFFER': 100,             # 最大事件记录缓冲区大小（个）
+    'AUTO_SAVE_INTERVAL': 60.0,           # 自动保存间隔（秒），定期保存数据到文件
 }
 
 # ==================== 性能监控参数 ====================
@@ -224,4 +258,6 @@ PERFORMANCE = {
     'LOOP_TIME_WARNING_THRESHOLD': 0.2,   # 循环时间警告阈值（秒）
     'SAVE_PERFORMANCE_REPORT': True,      # 保存性能报告
     'REPORT_INTERVAL': 30.0,              # 性能报告间隔（秒）
+    # 内存优化参数
+    'MAX_METRICS_BUFFER': 500,            # 最大性能指标缓冲区大小（个），减少内存占用
 }

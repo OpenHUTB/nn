@@ -31,7 +31,6 @@ except ImportError as e:
     print("  - tracker.py")
     sys.exit(1)
 
-
 # ======================== Configuration Management ========================
 
 def load_config(config_path=None):
@@ -115,7 +114,6 @@ def load_config(config_path=None):
     
     return default_config
 
-
 def setup_carla_client(config):
     """
     Setup CARLA client
@@ -157,7 +155,6 @@ def setup_carla_client(config):
         logger.error(f"[ERROR] Failed to connect to CARLA server: {e}")
         return None, None
 
-
 def set_weather(world, weather_name):
     """
     Set weather
@@ -181,7 +178,6 @@ def set_weather(world, weather_name):
         logger.info(f"[WEATHER] Weather set to: {weather_name}")
     else:
         logger.warning(f"Unknown weather: {weather_name}, using clear weather")
-
 
 # ======================== Visualization (Enhanced: Independent stats window) ========================
 
@@ -260,7 +256,118 @@ class Visualizer:
         self.cpu_usage_history = []
         self.memory_usage_history = []
         
-        logger.info("[OK] Visualizer initialized (Color ID encoding + Independent statistics window)")
+        # 3D点云可视化相关属性（新增）
+        self.show_pointcloud = False  # 是否显示点云窗口
+        self.pcd_window_name = "LiDAR Point Cloud"
+        self.pcd_vis = None  # Open3D可视化器对象
+        self.pcd_geometry_added = False
+        self.pcd_update_counter = 0  # 点云更新计数器
+        
+        logger.info("[OK] Visualizer initialized (Color ID encoding + Independent statistics window + PointCloud)")
+    
+    def init_pointcloud_visualizer(self):
+        """初始化点云可视化器"""
+        if not self.config.get('use_lidar', True):
+            return False
+        
+        try:
+            import open3d as o3d
+            self.pcd_vis = o3d.visualization.Visualizer()
+            self.pcd_vis.create_window(
+                window_name=self.pcd_window_name,
+                width=800,
+                height=600,
+                left=100,
+                top=100
+            )
+            
+            # 设置背景颜色
+            opt = self.pcd_vis.get_render_option()
+            opt.background_color = np.array([0.1, 0.1, 0.1])  # 深灰色背景
+            opt.point_size = 1.5
+            
+            self.pcd_geometry_added = False
+            logger.info("[POINTCLOUD] 点云可视化器初始化完成")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"点云可视化器初始化失败: {e}")
+            return False
+    
+    def update_pointcloud(self, pointcloud_data):
+        """
+        更新点云显示
+        
+        Args:
+            pointcloud_data: 点云数据 (numpy array)
+        """
+        if not self.show_pointcloud or not self.pcd_vis or pointcloud_data is None:
+            return
+        
+        try:
+            # 每2帧更新一次，避免性能问题
+            self.pcd_update_counter += 1
+            if self.pcd_update_counter % 2 != 0:
+                return
+                
+            import open3d as o3d
+            
+            # 创建点云对象
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(pointcloud_data)
+            
+            # 根据高度着色
+            if len(pointcloud_data) > 0:
+                z_min = pointcloud_data[:, 2].min()
+                z_max = pointcloud_data[:, 2].max()
+                z_range = max(z_max - z_min, 1e-6)
+                
+                colors = np.zeros((len(pointcloud_data), 3))
+                normalized_z = (pointcloud_data[:, 2] - z_min) / z_range
+                colors[:, 0] = normalized_z  # 红色通道（高处）
+                colors[:, 2] = 1 - normalized_z  # 蓝色通道（低处）
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+            
+            # 更新或添加几何体
+            if not self.pcd_geometry_added:
+                self.pcd_vis.add_geometry(pcd)
+                self.pcd_geometry_added = True
+            else:
+                self.pcd_vis.clear_geometries()
+                self.pcd_vis.add_geometry(pcd)
+            
+            # 更新可视化
+            self.pcd_vis.poll_events()
+            self.pcd_vis.update_renderer()
+            
+        except Exception as e:
+            logger.warning(f"更新点云失败: {e}")
+    
+    def toggle_pointcloud_display(self):
+        """切换点云显示"""
+        if not self.config.get('use_lidar', True):
+            logger.warning("LiDAR功能已禁用，无法显示点云")
+            return
+        
+        self.show_pointcloud = not self.show_pointcloud
+        
+        if self.show_pointcloud:
+            # 初始化点云可视化器
+            if not self.pcd_vis:
+                if not self.init_pointcloud_visualizer():
+                    self.show_pointcloud = False
+                    return
+            logger.info("[POINTCLOUD] 点云显示已开启")
+        else:
+            # 关闭点云窗口
+            if self.pcd_vis:
+                try:
+                    self.pcd_vis.destroy_window()
+                except:
+                    pass
+                self.pcd_vis = None
+                self.pcd_geometry_added = False
+            logger.info("[POINTCLOUD] 点云显示已关闭")
     
     def _get_behavior_color(self, track_info):
         """
@@ -852,7 +959,7 @@ class Visualizer:
         h, w = image.shape[:2]
         
         # Information panel background (semi-transparent black)
-        panel_height = 80
+        panel_height = 100
         overlay = image.copy()
         cv2.rectangle(overlay, (0, 0), (w, panel_height), (0, 0, 0), -1)
         image = cv2.addWeighted(overlay, 0.7, image, 0.3, 0)
@@ -866,7 +973,8 @@ class Visualizer:
         status_lines = [
             f"Tracked Objects: {track_count}",
             f"ESC: Exit | W: Weather | S: Screenshot",
-            f"P: Pause | T: Stats Window | M: Color Legend"
+            f"P: Pause | T: Stats Window | M: Color Legend",
+            f"L: PointCloud | V: View Mode"  # 添加点云提示
         ]
         
         # Draw status information
@@ -994,9 +1102,16 @@ class Visualizer:
     
     def destroy(self):
         """Destroy all windows"""
+        # 销毁点云可视化器
+        if self.pcd_vis:
+            try:
+                self.pcd_vis.destroy_window()
+            except:
+                pass
+        
+        # 销毁其他窗口
         cv2.destroyAllWindows()
         logger.info("[OK] All visualization windows closed")
-
 
 # ======================== Main Program ========================
 
@@ -1186,6 +1301,11 @@ class CarlaTrackingSystem:
         # Detection thread status
         detection_thread_status = 'Running' if self.detection_thread and self.detection_thread.is_alive() else 'Not running'
         
+        # 点云状态（新增）
+        pointcloud_status = 'Enabled' if self.config.get('use_lidar', True) else 'Disabled'
+        if self.visualizer:
+            pointcloud_status += ' | Showing' if self.visualizer.show_pointcloud else ' | Hidden'
+        
         return {
             # System status
             'fps': fps,
@@ -1205,6 +1325,11 @@ class CarlaTrackingSystem:
             'avg_detection_time': detection_time * 1000,  # Convert to milliseconds
             'avg_tracking_time': tracking_time * 1000,    # Convert to milliseconds
             'avg_frame_time': perf_stats.get('avg_frame_time', 0),
+            
+            # 点云状态（新增）
+            'pointcloud_status': pointcloud_status,
+            'pointcloud_enabled': self.config.get('use_lidar', True),
+            'pointcloud_showing': self.visualizer.show_pointcloud if self.visualizer else False,
             
             # Raw data (for charts)
             'detection_time': detection_time,
@@ -1299,6 +1424,10 @@ class CarlaTrackingSystem:
                     tracks_info=tracks_info
                 )
                 
+                # 添加点云显示（新增）
+                if sensor_data.get('pointcloud') is not None:
+                    self.visualizer.update_pointcloud(sensor_data['pointcloud'])
+                
                 # Add color legend (if enabled)
                 if self.show_legend:
                     result_image = self.visualizer.draw_color_legend(result_image)
@@ -1379,6 +1508,11 @@ class CarlaTrackingSystem:
             self.show_legend = not self.show_legend
             status = "Show" if self.show_legend else "Hide"
             logger.info(f"[LEGEND] Color legend: {status}")
+        
+        # L键切换点云显示（新增）
+        elif key == ord('l') or key == ord('L'):
+            if self.visualizer:
+                self.visualizer.toggle_pointcloud_display()
         
         # 新增：V键切换视角模式
         elif key == ord('v') or key == ord('V'):
@@ -1474,7 +1608,6 @@ class CarlaTrackingSystem:
         
         logger.info("[OK] Resource cleanup complete")
 
-
 # ======================== Main Function ========================
 
 def main():
@@ -1552,7 +1685,6 @@ def main():
         logger.info(f"[TIME] Program runtime: {run_time:.1f} seconds")
         logger.info("[END] Program ended")
         logger.info("=" * 50)
-
 
 if __name__ == "__main__":
     # 检查配置

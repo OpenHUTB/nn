@@ -1,4 +1,4 @@
-# 机械臂MuJoCo 3.4.0 原生语法稳定版（100%兼容，无API报错）
+# 机械臂MuJoCo 3.4.0 原生语法稳定版（100%兼容，无冲突标记）
 import mujoco
 import mujoco.viewer
 import time

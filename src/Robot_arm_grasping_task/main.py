@@ -1,310 +1,370 @@
 import mujoco
 import mujoco_viewer
 import numpy as np
-from scipy.optimize import minimize
 import matplotlib.pyplot as plt
-import time
 import matplotlib as mpl
-import os  # 新增：用于处理路径
+import os
+import warnings
+import time
+import glfw  # 直接用glfw检测按键，兼容所有版本
+from contextlib import suppress
 
-# ===================== 修复Matplotlib中文显示问题 =====================
-# 设置支持中文的字体（Windows系统）
-mpl.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']  # 优先使用黑体，兼容英文
-mpl.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
-mpl.rcParams['font.family'] = 'sans-serif'
+# ===================== 基础配置（消除警告） =====================
+warnings.filterwarnings('ignore')
+mpl.use('TkAgg')
+mpl.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
+mpl.rcParams['axes.unicode_minus'] = False
 
-# ===================== 核心配置（优化参数确保抓取成功）=====================
-# 关键修改：使用相对路径（基于当前脚本所在目录）
-# 获取当前脚本的目录
+# 路径配置（适配你的原有robot.xml路径）
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# 拼接robot.xml的绝对路径（适配Windows系统）
 MODEL_PATH = os.path.join(CURRENT_DIR, "robot.xml")
 
-TARGET_OBJECT_POS = np.array([0.4, 0.0, 0.1])  # 目标物体位置
-GOAL_POS = np.array([-0.2, 0.0, 0.1])  # 降低搬运距离，确保完成
-FORCE_THRESHOLD = 2.0  # 降低力阈值，更容易触发抓取
-POS_ERROR_THRESHOLD = 0.02  # 放宽位置误差，更容易判定到达
-SIMULATION_STEPS = 5000  # 增加仿真步数，确保完成所有阶段
-# PID控制参数（优化增益，提升稳定性）
-KP = 50.0
-KI = 0.05
-KD = 10.0
+# ===================== 核心控制参数（微调适配原有模型） =====================
+# 手动控制参数（适配原有模型的关节范围，低速易控）
+MANUAL_SPEED = 0.03  # 比之前略小，适配原有模型的关节灵敏度
+GRASP_FORCE = 3.5  # 微调力度，适配原有夹爪尺寸
+# 自动控制参数（适配原有模型的物体位置）
+AUTO_LIFT_HEIGHT = 0.12  # 适配原有模型的抬升范围
+AUTO_TRANSPORT_X = -0.15  # 适配原有模型的搬运范围
+
+# ===================== 全局控制变量 =====================
+control_cmd = {
+    'forward': 0,  # 前（W）
+    'backward': 0,  # 后（S）
+    'left': 0,  # 左（A）
+    'right': 0,  # 右（D）
+    'up': 0,  # 上（Q）
+    'down': 0,  # 下（E）
+    'grasp': 0,  # 抓取（空格）
+    'release': 0,  # 释放（R）
+    'auto': False,  # 一键自动抓取（Z）
+    'reset': False  # 重置（C）
+}
 
 
-# ===================== 工具函数 =====================
-def compute_jacobian(model, data, ee_site_id):
-    """计算末端执行器雅可比矩阵（适配MuJoCo 2.3+）"""
-    jacp = np.zeros((3, model.nv))  # 位置雅可比
-    jacr = np.zeros((3, model.nv))  # 旋转雅可比
-    mujoco.mj_jacSite(model, data, jacp, jacr, ee_site_id)
-    # 只取前3个关节（适配简化版机械臂）的雅可比
-    jacobian = np.vstack([jacp[:, :3], jacr[:, :3]])
-    return jacobian
+# ===================== 兼容版按键检测函数（核心修复） =====================
+def check_keyboard_input(viewer):
+    """
+    兼容所有版本mujoco-viewer的按键检测
+    替代原有get_key()方法，解决属性不存在问题
+    """
+    # 重置所有指令（避免按键粘连）
+    for key in control_cmd.keys():
+        if key != 'auto' and key != 'reset':
+            control_cmd[key] = 0
+
+    # 方式1：适配新版mujoco-viewer（有window属性）
+    if hasattr(viewer, 'window') and viewer.window is not None:
+        window = viewer.window
+        # W键 - 前
+        if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
+            control_cmd['forward'] = 1
+        # S键 - 后
+        if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
+            control_cmd['backward'] = 1
+        # A键 - 左
+        if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
+            control_cmd['left'] = 1
+        # D键 - 右
+        if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
+            control_cmd['right'] = 1
+        # Q键 - 上
+        if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
+            control_cmd['up'] = 1
+        # E键 - 下
+        if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:
+            control_cmd['down'] = 1
+        # 空格键 - 抓取
+        if glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS:
+            control_cmd['grasp'] = 1
+        # R键 - 释放
+        if glfw.get_key(window, glfw.KEY_R) == glfw.PRESS:
+            control_cmd['release'] = 1
+        # Z键 - 一键自动抓取
+        if glfw.get_key(window, glfw.KEY_Z) == glfw.PRESS:
+            control_cmd['auto'] = True
+        # C键 - 重置
+        if glfw.get_key(window, glfw.KEY_C) == glfw.PRESS:
+            control_cmd['reset'] = True
+        # ESC键 - 关闭窗口
+        if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
+            glfw.set_window_should_close(window, True)
+
+    # 方式2：适配旧版mujoco-viewer（无window属性，备用方案）
+    else:
+        # 旧版无法实时检测按键，提供替代操作方式
+        print("\n⚠️ 检测到旧版mujoco-viewer，按键控制受限！")
+        print("   替代操作：按Z键（一键自动抓取）或C键（重置）继续")
+        # 仅保留核心功能（自动抓取/重置）
+        # 按任意键触发自动抓取（简化适配）
+        control_cmd['auto'] = True
 
 
-def ik_newton_raphson(model, data, target_pos, initial_qpos, max_iter=200, tol=1e-3):
-    """牛顿-拉夫逊法求解逆运动学（增加迭代次数，放宽误差）"""
-    q = np.copy(initial_qpos[:3])
-    ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-
-    for _ in range(max_iter):
-        # 设置关节位置并更新动力学
-        data.qpos[:3] = q
-        mujoco.mj_forward(model, data)
-
-        # 获取当前末端位置
-        current_pos = data.site_xpos[ee_site_id].copy()
-        # 计算位置误差
-        error = target_pos - current_pos
-        if np.linalg.norm(error) < tol:
-            break
-
-        # 计算雅可比矩阵
-        jacobian = compute_jacobian(model, data, ee_site_id)[:3, :3]
-        # 牛顿-拉夫逊更新（增加阻尼，提升稳定性）
-        delta_q = np.linalg.pinv(jacobian + 0.01 * np.eye(3)) @ error
-        q += delta_q
-
-        # 限制关节角度在范围内
-        for i in range(3):
-            q[i] = np.clip(q[i], -np.pi / 2, np.pi / 2)  # 放宽关节范围
-
-    return q
-
-
-def pid_controller(error, error_integral, error_prev):
-    """PID控制器"""
-    proportional = KP * error
-    integral = KI * error_integral
-    derivative = KD * (error - error_prev)
-    return proportional + integral + derivative, error_integral + error, error_prev
-
-
-# ===================== 主仿真函数 =====================
-def grasp_simulation():
-    # 1. 加载模型和数据（新增：路径校验）
+# ===================== 核心控制函数（仅微调适配原有模型） =====================
+def init_model_and_viewer():
+    """初始化模型（完全适配原有robot.xml，不修改模型）"""
     if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(f"找不到robot.xml文件！路径：{MODEL_PATH}")
-
+        raise FileNotFoundError(f"未找到原有robot.xml文件: {MODEL_PATH}")
     model = mujoco.MjModel.from_xml_path(MODEL_PATH)
     data = mujoco.MjData(model)
-    viewer = mujoco_viewer.MujocoViewer(model, data)
+    mujoco.mj_resetData(model, data)
+    mujoco.mj_forward(model, data)
 
-    # 初始化变量
-    ee_site_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-    object_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "target_object")
+    # 初始化Viewer（微调视角，适配原有模型的显示）
+    viewer = mujoco_viewer.MujocoViewer(model, data, hide_menus=True)
+    viewer.cam.distance = 1.8  # 微调视角距离，看清原有模型
+    viewer.cam.elevation = 12  # 微调仰角，适配原有模型的高度
+    viewer.cam.azimuth = 50  # 微调方位角，看清物体位置
+    viewer.cam.lookat = [0.15, 0.0, 0.12]  # 适配原有模型的物体位置
 
-    # 记录数据
-    ee_pos_history = []
-    force_history = []
-    object_pos_history = []
-    grasp_success = False
+    # 兼容原有模型的ID命名（不修改模型，仅适配识别）
+    ee_id = -1
+    obj_id = -1
+    # 尝试所有可能的末端命名（适配原有模型）
+    for name in ["ee_site", "ee", "end_effector"]:
+        ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, name)
+        if ee_id >= 0:
+            break
+    if ee_id < 0:
+        for name in ["ee", "end_effector"]:
+            ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+            if ee_id >= 0:
+                break
+    # 尝试所有可能的物体命名（适配原有模型）
+    for name in ["target_object", "object", "ball"]:
+        obj_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+        if obj_id >= 0:
+            break
+    if obj_id < 0:
+        for name in ["object_geom", "ball_geom"]:
+            obj_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            if obj_id >= 0:
+                break
 
-    # PID控制变量
-    error_integral = np.zeros(3)
-    error_prev = np.zeros(3)
+    print("✅ 适配原有robot.xml完成！")
+    print("🎮 操作指南（适配原有模型）：")
+    print("   W/S：前后移动   A/D：左右移动   Q/E：上下移动（低速易控）")
+    print("   空格：抓取      R：释放        Z：一键自动抓取（适配原有模型）")
+    print("   C：重置        ESC：退出")
 
-    # 仿真阶段
-    phase = 1
-    phase_step = 0
-    print("🚀 机械臂抓取仿真启动...")
-    print(f"📌 目标抓取位置: X={TARGET_OBJECT_POS[0]:.2f} Y={TARGET_OBJECT_POS[1]:.2f} Z={TARGET_OBJECT_POS[2]:.2f}")
-    print(f"🎯 目标放置位置: X={GOAL_POS[0]:.2f} Y={GOAL_POS[1]:.2f} Z={GOAL_POS[2]:.2f}")
+    return model, data, viewer, ee_id, obj_id
 
-    try:
-        for step in range(SIMULATION_STEPS):
-            # ---------------- 阶段1：接近物体 ----------------
-            if phase == 1:
-                target_joint_pos = ik_newton_raphson(model, data, TARGET_OBJECT_POS, data.qpos)
-                joint_error = target_joint_pos - data.qpos[:3]
 
-                # PID控制
-                torque = np.zeros(3)
-                for i in range(3):
-                    torque[i], error_integral[i], error_prev[i] = pid_controller(
-                        joint_error[i], error_integral[i], error_prev[i]
-                    )
-                data.ctrl[:3] = torque
+def manual_control(model, data, ee_id):
+    """手动控制（仅微调参数，适配原有模型的关节响应）"""
+    # 安全获取末端位置（适配原有模型）
+    ee_pos = np.array([0.0, 0.0, 0.1])
+    if ee_id >= 0:
+        try:
+            ee_pos = data.site_xpos[ee_id].copy()
+        except:
+            ee_pos = data.xpos[ee_id].copy()
 
-                # 检查是否到达物体
-                current_ee_pos = data.site_xpos[ee_site_id]
-                if np.linalg.norm(current_ee_pos - TARGET_OBJECT_POS) < POS_ERROR_THRESHOLD:
-                    phase = 2
-                    phase_step = 0
-                    print("🔍 已到达目标物体，进入抓取阶段")
+    # 计算目标位置（微调速度，适配原有模型）
+    target_pos = ee_pos.copy()
+    target_pos[0] += control_cmd['forward'] * MANUAL_SPEED
+    target_pos[0] -= control_cmd['backward'] * MANUAL_SPEED
+    target_pos[1] += control_cmd['left'] * MANUAL_SPEED
+    target_pos[1] -= control_cmd['right'] * MANUAL_SPEED
+    target_pos[2] += control_cmd['up'] * MANUAL_SPEED
+    target_pos[2] -= control_cmd['down'] * MANUAL_SPEED
 
-            # ---------------- 阶段2：抓取物体 ----------------
-            elif phase == 2:
-                # 保持末端位置
-                target_joint_pos = ik_newton_raphson(model, data, TARGET_OBJECT_POS, data.qpos)
-                joint_error = target_joint_pos - data.qpos[:3]
-                torque = np.zeros(3)
-                for i in range(3):
-                    torque[i], error_integral[i], error_prev[i] = pid_controller(
-                        joint_error[i], error_integral[i], error_prev[i]
-                    )
-                data.ctrl[:3] = torque
+    # 微调控制增益（适配原有模型的关节传动比，避免转圈）
+    error = target_pos - ee_pos
+    gain = 4.0  # 微调增益，适配原有模型的关节灵敏度
+    for i in range(min(3, model.njnt)):
+        # 更严格的输出限制，彻底避免转圈
+        data.ctrl[i] = np.clip(error[i] * gain, -1.8, 1.8)
 
-                # 夹爪闭合
-                current_force = np.linalg.norm(data.sensordata[:3])
-                if phase_step < 1000:  # 延长夹爪闭合时间
-                    data.ctrl[3] = 8.0  # 增大夹爪力度
-                    data.ctrl[4] = -8.0
-                else:
-                    data.ctrl[3] = 3.0
-                    data.ctrl[4] = -3.0
+    # 抓取控制（微调力度，适配原有夹爪）
+    if control_cmd['grasp']:
+        # 适配原有模型的夹爪控制维度
+        if model.nu >= 4:
+            data.ctrl[3] = GRASP_FORCE
+        if model.nu >= 5:
+            data.ctrl[4] = -GRASP_FORCE
+    elif control_cmd['release']:
+        if model.nu >= 4:
+            data.ctrl[3] = 0.0
+        if model.nu >= 5:
+            data.ctrl[4] = 0.0
 
-                    # 检查抓取是否成功
-                    object_pos = data.xpos[object_body_id].copy()
-                    pos_diff = np.linalg.norm(object_pos - current_ee_pos)
-                    if pos_diff < 0.03 and phase_step > 500:
-                        phase = 3
-                        phase_step = 0
-                        print("✅ 抓取成功，进入搬运阶段")
 
-                phase_step += 1
+def auto_grasp(model, data, ee_id, obj_id):
+    """一键自动抓取（仅微调轨迹，适配原有模型的物体位置）"""
+    print("🔄 开始适配原有模型的一键自动抓取...")
+    # 安全获取物体位置（适配原有模型）
+    obj_pos = np.array([0.2, 0.0, 0.05])  # 适配原有模型的默认物体位置
+    if obj_id >= 0:
+        try:
+            obj_pos = data.xpos[obj_id].copy()
+        except:
+            pass
 
-            # ---------------- 阶段3：搬运到目标位置 ----------------
-            elif phase == 3:
-                # 先抬升，再移动
-                if phase_step < 500:
-                    lift_pos = TARGET_OBJECT_POS + np.array([0, 0, 0.2])  # 增加抬升高度
-                    target_joint_pos = ik_newton_raphson(model, data, lift_pos, data.qpos)
-                else:
-                    target_joint_pos = ik_newton_raphson(model, data, GOAL_POS, data.qpos)
+    # 阶段1：移动到物体上方（微调距离，适配原有模型）
+    step = 0
+    while step < 600 and viewer.is_alive:  # 增加窗口存活检测
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [0, 0, 0.07]  # 微调高度，适配原有模型
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.5, -1.2, 1.2)
+        mujoco.mj_step(model, data)
+        viewer.render()  # 自动抓取时也渲染，避免窗口卡死
+        step += 1
 
-                # PID控制
-                joint_error = target_joint_pos - data.qpos[:3]
-                torque = np.zeros(3)
-                for i in range(3):
-                    torque[i], error_integral[i], error_prev[i] = pid_controller(
-                        joint_error[i], error_integral[i], error_prev[i]
-                    )
-                data.ctrl[:3] = torque
+    # 阶段2：下降抓取（微调力度，适配原有夹爪）
+    step = 0
+    while step < 400 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 2.8, -1.0, 1.0)
+        # 适配原有模型的夹爪控制
+        if model.nu >= 4:
+            data.ctrl[3] = GRASP_FORCE
+        if model.nu >= 5:
+            data.ctrl[4] = -GRASP_FORCE
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-                # 检查是否到达目标位置
-                current_ee_pos = data.site_xpos[ee_site_id]
-                if np.linalg.norm(current_ee_pos - GOAL_POS) < POS_ERROR_THRESHOLD * 1.5 and phase_step > 1000:
-                    phase = 4
-                    phase_step = 0
-                    print("📦 已到达目标位置，进入放置阶段")
+    # 阶段3：抬升（微调高度，适配原有模型）
+    step = 0
+    while step < 450 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [0, 0, AUTO_LIFT_HEIGHT]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.2, -1.1, 1.1)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-                phase_step += 1
+    # 阶段4：搬运（微调距离，适配原有模型）
+    step = 0
+    while step < 700 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [AUTO_TRANSPORT_X, 0, AUTO_LIFT_HEIGHT]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.5, -1.2, 1.2)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-            # ---------------- 阶段4：放置物体 ----------------
-            elif phase == 4:
-                # 保持位置
-                target_joint_pos = ik_newton_raphson(model, data, GOAL_POS, data.qpos)
-                joint_error = target_joint_pos - data.qpos[:3]
-                torque = np.zeros(3)
-                for i in range(3):
-                    torque[i], error_integral[i], error_prev[i] = pid_controller(
-                        joint_error[i], error_integral[i], error_prev[i]
-                    )
-                data.ctrl[:3] = torque
-
-                # 打开夹爪
+    # 阶段5：下放释放（适配原有模型）
+    step = 0
+    while step < 450 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [AUTO_TRANSPORT_X, 0, 0.04]  # 微调下放高度
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 2.8, -1.0, 1.0)
+        # 延迟释放，适配原有模型
+        if step > 250:
+            if model.nu >= 4:
                 data.ctrl[3] = 0.0
+            if model.nu >= 5:
                 data.ctrl[4] = 0.0
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-                phase_step += 1
-                if phase_step > 500:
-                    grasp_success = True
-                    break
+    # 阶段6：归位（适配原有模型的初始位置）
+    step = 0
+    while step < 600 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = np.array([0.0, 0.0, 0.12])  # 微调归位位置
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.5, -1.2, 1.2)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-            # 运行仿真步
-            mujoco.mj_step(model, data)
-
-            # 记录数据
-            ee_pos_history.append(data.site_xpos[ee_site_id].copy())
-            force_history.append(np.linalg.norm(data.sensordata[:3]))
-            object_pos_history.append(data.xpos[object_body_id].copy())
-
-            # 渲染可视化
-            viewer.render()
-            time.sleep(0.0005)  # 降低仿真速度，更易观察
-
-    except KeyboardInterrupt:
-        print("\n⚠️ 仿真被手动终止")
-    finally:
-        viewer.close()
-
-    # ===================== 结果分析 =====================
-    if not ee_pos_history:
-        print("❌ 无仿真数据，跳过结果分析")
-        return
-
-    # 转换数据
-    ee_pos_history = np.array(ee_pos_history)
-    force_history = np.array(force_history)
-    object_pos_history = np.array(object_pos_history)
-
-    # 绘制结果图（全英文标签，避免字体问题）
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 8))
-
-    # 1. 末端执行器轨迹
-    ax1.plot(ee_pos_history[:, 0], ee_pos_history[:, 1], label='End-effector Trajectory', color='blue', linewidth=1.5)
-    ax1.scatter(TARGET_OBJECT_POS[0], TARGET_OBJECT_POS[1], c='red', label='Grasp Point', s=50)
-    ax1.scatter(GOAL_POS[0], GOAL_POS[1], c='green', label='Place Point', s=50)
-    ax1.set_xlabel('X (m)')
-    ax1.set_ylabel('Y (m)')
-    ax1.set_title('End-effector XY Trajectory', fontsize=10)
-    ax1.legend(fontsize=8)
-    ax1.grid(True, alpha=0.3)
-
-    # 2. 末端Z轴位置
-    ax2.plot(ee_pos_history[:, 2], color='green', linewidth=1.5)
-    ax2.set_xlabel('Simulation Steps')
-    ax2.set_ylabel('Z Position (m)')
-    ax2.set_title('End-effector Z Position', fontsize=10)
-    ax2.grid(True, alpha=0.3)
-
-    # 3. 接触力变化
-    ax3.plot(force_history, color='orange', linewidth=1.5)
-    ax3.axhline(y=FORCE_THRESHOLD, color='red', linestyle='--', label='Force Threshold', linewidth=1)
-    ax3.set_xlabel('Simulation Steps')
-    ax3.set_ylabel('Contact Force (N)')
-    ax3.set_title('End-effector Contact Force', fontsize=10)
-    ax3.legend(fontsize=8)
-    ax3.grid(True, alpha=0.3)
-
-    # 4. 物体位置变化
-    ax4.plot(object_pos_history[:, 0], object_pos_history[:, 1], label='Object Trajectory', color='red', linewidth=1.5)
-    ax4.scatter(TARGET_OBJECT_POS[0], TARGET_OBJECT_POS[1], c='red', label='Initial Position', s=50)
-    ax4.scatter(GOAL_POS[0], GOAL_POS[1], c='green', label='Target Position', s=50)
-    ax4.set_xlabel('X (m)')
-    ax4.set_ylabel('Y (m)')
-    ax4.set_title('Object XY Trajectory', fontsize=10)
-    ax4.legend(fontsize=8)
-    ax4.grid(True, alpha=0.3)
-
-    # 关键修改：保存图片到脚本所在目录（避免路径问题）
-    result_img_path = os.path.join(CURRENT_DIR, "grasp_simulation_result.png")
-    plt.tight_layout()
-    plt.savefig(result_img_path, dpi=150, bbox_inches='tight')
-    plt.show()
-
-    # 输出抓取结果
-    if grasp_success:
-        print("\n===================== Simulation Result =====================")
-        print("✅ Grasp Task Completed Successfully!")
-        print(
-            f"📌 Object Final Position: X={object_pos_history[-1, 0]:.3f} Y={object_pos_history[-1, 1]:.3f} Z={object_pos_history[-1, 2]:.3f}")
-        print(f"🎯 Target Position: X={GOAL_POS[0]:.3f} Y={GOAL_POS[1]:.3f} Z={GOAL_POS[2]:.3f}")
-        print(f"📏 Position Error: {np.linalg.norm(object_pos_history[-1] - GOAL_POS):.3f} m")
-    else:
-        print("\n❌ Grasp Task Failed! Try increasing simulation steps or adjusting parameters.")
-        print(f"🔍 Current Phase: {phase} (1=Approach, 2=Grasp, 3=Transport, 4=Place)")
+    print("🎉 适配原有模型的自动抓取完成！")
 
 
-# ===================== 运行仿真 =====================
-if __name__ == "__main__":
+# ===================== 主程序（修复后版本） =====================
+def main():
+    global viewer  # 声明全局变量，让auto_grasp能访问
+    model, data, viewer, ee_id, obj_id = init_model_and_viewer()
+
     try:
-        grasp_simulation()
-    except FileNotFoundError as e:
-        print(f"❌ 运行失败：{e}")
-        print("💡 请确认robot.xml文件和main.py在同一目录下！")
+        while viewer.is_alive:
+            # 核心修复：用兼容版按键检测替代get_key()
+            check_keyboard_input(viewer)
+
+            # 执行控制（适配原有模型）
+            if control_cmd['reset']:
+                mujoco.mj_resetData(model, data)
+                mujoco.mj_forward(model, data)
+                print("🔄 原有模型已重置到初始状态！")
+                control_cmd['reset'] = False
+            elif control_cmd['auto']:
+                auto_grasp(model, data, ee_id, obj_id)
+                control_cmd['auto'] = False
+            else:
+                manual_control(model, data, ee_id)
+
+            # 仿真步进（微调延迟，适配原有模型的帧率）
+            mujoco.mj_step(model, data)
+            viewer.render()
+            time.sleep(0.004)  # 微调延迟，适配原有模型的流畅度
+
     except Exception as e:
-        print(f"❌ 运行出错：{type(e).__name__}: {e}")
+        print(f"\n❌ 运行出错（适配原有模型时）: {e}")
+        import traceback
+        traceback.print_exc()  # 打印详细错误栈，方便排查
     finally:
-        print("\n🔚 Simulation End")
+        with suppress(Exception):
+            viewer.close()
+        print("\n🔚 程序退出（未修改任何robot.xml内容）")
+
+
+# ===================== 运行入口 =====================
+if __name__ == "__main__":
+    # 检查依赖（新增glfw检查）
+    try:
+        import mujoco
+        import mujoco_viewer
+        import glfw
+    except ImportError as e:
+        missing_lib = str(e).split()[-1]
+        print(f"❌ 缺少依赖 {missing_lib}！执行以下命令安装：")
+        print(f"   pip install mujoco mujoco-viewer glfw numpy matplotlib")
+        exit(1)
+
+    main()
