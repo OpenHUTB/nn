@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+
 import carla
 import config as Config
 import numpy as np
 import math
 import time
+import random
 
 
 class PyGameDrawer():
@@ -25,6 +28,11 @@ class PyGameDrawer():
 
         # 通用信息字体
         self.info_font = self.pygame.freetype.SysFont('Arial', 16)
+
+        # 驾驶辅助线相关字体
+        self.assist_font = self.pygame.freetype.SysFont('Arial', 18)
+        self.assist_font_small = self.pygame.freetype.SysFont('Arial', 14)
+        self.radar_font = self.pygame.freetype.SysFont('Arial', 12)
 
         # 初始化时间
         self.start_time = time.time()
@@ -796,6 +804,416 @@ class PyGameDrawer():
                 title_font = self.pygame.freetype.SysFont('Arial', 14)
                 title_font.render_to(self.main.surface, (screen_width // 2 - 40, indicator_y - 40), nav_title,
                                      (150, 200, 255))
+
+    # 显示驾驶辅助线
+    def display_driving_assist_lines(self, vehicle_location, vehicle_transform, steer_angle, path=None):
+        """在屏幕上显示驾驶辅助线和预期路径"""
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+
+        # 设置显示位置（屏幕中央）
+        center_x = screen_width // 2
+        center_y = screen_height // 2
+
+        # 1. 绘制车辆中心参考线
+        # 绘制垂直中心线
+        self.pygame.draw.line(
+            self.main.surface,
+            (0, 255, 0, 100),  # 半透明绿色
+            (center_x, center_y - 50),
+            (center_x, center_y + 150),
+            1
+        )
+
+        # 绘制水平中心线
+        self.pygame.draw.line(
+            self.main.surface,
+            (0, 255, 0, 100),  # 半透明绿色
+            (center_x - 100, center_y),
+            (center_x + 100, center_y),
+            1
+        )
+
+        # 2. 绘制转向辅助线
+        # 根据转向角度计算辅助线的方向和长度
+        turn_radius = 200  # 基础转弯半径
+        if abs(steer_angle) > 0.01:  # 有转向时
+            # 计算转向曲率
+            curvature = steer_angle * 2.0
+            arc_radius = int(turn_radius / (abs(curvature) + 0.1))
+
+            # 计算弧线的起点、终点和中心
+            if steer_angle > 0:  # 右转
+                center_offset = arc_radius
+                arc_color = (255, 100, 0, 150)  # 橙色
+            else:  # 左转
+                center_offset = -arc_radius
+                arc_color = (255, 200, 0, 150)  # 黄色
+
+            # 绘制转向弧线
+            arc_center_x = center_x + center_offset
+            arc_center_y = center_y + 100
+
+            # 计算弧线角度范围
+            start_angle = 180 if steer_angle > 0 else 0
+            end_angle = 0 if steer_angle > 0 else 180
+
+            # 绘制弧线
+            self.pygame.draw.arc(
+                self.main.surface,
+                arc_color,
+                (arc_center_x - arc_radius, arc_center_y - arc_radius,
+                 arc_radius * 2, arc_radius * 2),
+                math.radians(start_angle),
+                math.radians(end_angle),
+                3
+            )
+
+            # 绘制转向方向指示箭头
+            arrow_length = 30
+            if steer_angle > 0:  # 右转箭头
+                arrow_points = [
+                    (center_x + 150, center_y + 50),
+                    (center_x + 150 - arrow_length, center_y + 50 - arrow_length // 2),
+                    (center_x + 150 - arrow_length, center_y + 50 + arrow_length // 2)
+                ]
+            else:  # 左转箭头
+                arrow_points = [
+                    (center_x - 150, center_y + 50),
+                    (center_x - 150 + arrow_length, center_y + 50 - arrow_length // 2),
+                    (center_x - 150 + arrow_length, center_y + 50 + arrow_length // 2)
+                ]
+
+            self.pygame.draw.polygon(
+                self.main.surface,
+                arc_color,
+                arrow_points
+            )
+
+            # 显示转向半径
+            radius_text = f"R: {arc_radius / 10:.1f}m"
+            radius_font = self.pygame.freetype.SysFont('Arial', 14)
+            radius_font.render_to(
+                self.main.surface,
+                (arc_center_x - 30, arc_center_y - arc_radius - 20),
+                radius_text,
+                arc_color
+            )
+
+        # 3. 绘制安全距离参考线
+        # 基于速度的安全距离（假设1秒反应距离）
+        speed_m_s = 0  # 如果没有速度信息，默认为0
+        if hasattr(self.main, 'ego'):
+            velocity = self.main.ego.get_velocity()
+            speed_m_s = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+
+        safe_distance = speed_m_s * 1.5  # 1.5秒的安全距离
+
+        # 绘制安全距离线（红色）
+        safe_line_y = center_y + 100 - int(safe_distance * 5)  # 缩放因子
+        if safe_line_y > center_y - 100:  # 确保在屏幕内
+            self.pygame.draw.line(
+                self.main.surface,
+                (255, 0, 0, 100),  # 半透明红色
+                (center_x - 80, safe_line_y),
+                (center_x + 80, safe_line_y),
+                2
+            )
+
+            # 标注安全距离
+            safe_text = f"Safe: {safe_distance:.1f}m"
+            safe_font = self.pygame.freetype.SysFont('Arial', 12)
+            safe_font.render_to(
+                self.main.surface,
+                (center_x + 90, safe_line_y - 10),
+                safe_text,
+                (255, 0, 0)
+            )
+
+        # 4. 绘制车道保持辅助线
+        # 绘制车道边界线（蓝色虚线）
+        lane_width = 80  # 车道宽度
+        left_lane_x = center_x - lane_width
+        right_lane_x = center_x + lane_width
+
+        # 绘制左车道线（蓝色虚线）
+        for i in range(0, 200, 10):
+            if i % 20 < 10:  # 创建虚线效果
+                self.pygame.draw.line(
+                    self.main.surface,
+                    (100, 100, 255, 150),  # 半透明蓝色
+                    (left_lane_x, center_y + i),
+                    (left_lane_x, center_y + i + 5),
+                    2
+                )
+
+        # 绘制右车道线（蓝色虚线）
+        for i in range(0, 200, 10):
+            if i % 20 < 10:  # 创建虚线效果
+                self.pygame.draw.line(
+                    self.main.surface,
+                    (100, 100, 255, 150),  # 半透明蓝色
+                    (right_lane_x, center_y + i),
+                    (right_lane_x, center_y + i + 5),
+                    2
+                )
+
+        # 5. 如果提供了路径，绘制预期路径
+        if path and len(path) > 1:
+            # 转换路径点到屏幕坐标
+            path_points = []
+            for i, location in enumerate(path):
+                if i >= 10:  # 只显示前10个路径点
+                    break
+
+                # 将世界坐标转换为屏幕坐标
+                cam_loc = self.__w_locs_2_camera_locs([location])[0]
+
+                # 只添加在屏幕内的点
+                if (0 <= cam_loc[0] <= screen_width and
+                        0 <= cam_loc[1] <= screen_height):
+                    path_points.append(cam_loc)
+
+            # 绘制路径线（绿色虚线）
+            if len(path_points) > 1:
+                for i in range(len(path_points) - 1):
+                    # 创建渐变颜色：近处明亮，远处暗淡
+                    alpha = int(255 * (1.0 - i / len(path_points)))
+                    color = (0, 255, 0, alpha)
+
+                    # 绘制虚线
+                    if i % 2 == 0:
+                        self.pygame.draw.line(
+                            self.main.surface,
+                            color,
+                            path_points[i],
+                            path_points[i + 1],
+                            2
+                        )
+
+                # 在最后一个路径点上绘制标记
+                if path_points:
+                    last_point = path_points[-1]
+                    self.pygame.draw.circle(
+                        self.main.surface,
+                        (255, 255, 0),  # 黄色
+                        last_point,
+                        5
+                    )
+
+        # 6. 绘制车辆当前位置指示器
+        # 在屏幕中心绘制一个车辆图标
+        vehicle_color = (0, 200, 255)  # 青色
+
+        # 绘制车辆主体（矩形）
+        vehicle_rect = self.pygame.Rect(center_x - 15, center_y - 25, 30, 50)
+        self.pygame.draw.rect(
+            self.main.surface,
+            vehicle_color,
+            vehicle_rect,
+            2
+        )
+
+        # 绘制车辆前进方向箭头
+        arrow_length = 40
+        self.pygame.draw.line(
+            self.main.surface,
+            (255, 255, 0),  # 黄色箭头
+            (center_x, center_y),
+            (center_x, center_y - arrow_length),
+            3
+        )
+
+        # 绘制箭头头部
+        arrow_head = [
+            (center_x, center_y - arrow_length),
+            (center_x - 5, center_y - arrow_length + 10),
+            (center_x + 5, center_y - arrow_length + 10)
+        ]
+        self.pygame.draw.polygon(
+            self.main.surface,
+            (255, 255, 0),
+            arrow_head
+        )
+
+        # 7. 显示辅助系统状态
+        assist_font = self.pygame.freetype.SysFont('Arial', 16)
+        assist_text = "DRIVING ASSIST"
+        assist_font.render_to(
+            self.main.surface,
+            (center_x - 50, center_y - 80),
+            assist_text,
+            (200, 200, 255)
+        )
+
+        # 根据转向角度显示转向辅助状态
+        if abs(steer_angle) > 0.1:
+            turn_status = "TURNING"
+            turn_color = (255, 200, 0)
+        else:
+            turn_status = "STRAIGHT"
+            turn_color = (0, 255, 0)
+
+        status_font = self.pygame.freetype.SysFont('Arial', 14)
+        status_font.render_to(
+            self.main.surface,
+            (center_x - 40, center_y - 60),
+            turn_status,
+            turn_color
+        )
+
+    # 显示简单雷达图（检测周围环境）
+    def display_simple_radar(self, vehicle_location, obstacles=None):
+        """在屏幕右下角显示简单的雷达图，显示周围环境"""
+        screen_width = Config.PYGAME_WIDTH
+        screen_height = Config.PYGAME_HEIGHT
+
+        # 雷达图位置和大小
+        radar_x = screen_width - 180
+        radar_y = screen_height - 180
+        radar_radius = 70
+
+        # 绘制雷达图背景（圆形）
+        self.pygame.draw.circle(
+            self.main.surface,
+            (20, 20, 40),  # 深蓝色背景
+            (radar_x, radar_y),
+            radar_radius
+        )
+
+        # 绘制雷达图网格
+        # 同心圆
+        for i in range(1, 4):
+            radius = int(radar_radius * i / 4)
+            self.pygame.draw.circle(
+                self.main.surface,
+                (50, 50, 80),  # 网格颜色
+                (radar_x, radar_y),
+                radius,
+                1
+            )
+
+        # 十字线
+        self.pygame.draw.line(
+            self.main.surface,
+            (50, 50, 80),
+            (radar_x - radar_radius, radar_y),
+            (radar_x + radar_radius, radar_y),
+            1
+        )
+        self.pygame.draw.line(
+            self.main.surface,
+            (50, 50, 80),
+            (radar_x, radar_y - radar_radius),
+            (radar_x, radar_y + radar_radius),
+            1
+        )
+
+        # 绘制方向指示
+        # 前方（上）
+        self.pygame.draw.line(
+            self.main.surface,
+            (100, 100, 200),
+            (radar_x, radar_y - radar_radius + 5),
+            (radar_x, radar_y - radar_radius + 15),
+            2
+        )
+
+        # 绘制车辆位置（中心点）
+        self.pygame.draw.circle(
+            self.main.surface,
+            (0, 255, 0),  # 绿色表示车辆
+            (radar_x, radar_y),
+            4
+        )
+
+        # 如果提供了障碍物信息，绘制障碍物
+        if obstacles:
+            for obstacle in obstacles:
+                # 获取障碍物信息
+                if isinstance(obstacle, dict):
+                    # 从main.py传递的障碍物字典
+                    distance = obstacle.get('distance', 0)
+                    angle = obstacle.get('angle', 0)
+
+                    # 限制距离在雷达范围内
+                    normalized_distance = min(distance / 50.0, 1.0)  # 假设最大检测距离50米
+
+                    # 计算障碍物在雷达图上的位置
+                    obstacle_radius = int(radar_radius * normalized_distance)
+                    obstacle_angle = math.radians(angle)
+
+                    obstacle_x = radar_x + int(obstacle_radius * math.sin(obstacle_angle))
+                    obstacle_y = radar_y - int(obstacle_radius * math.cos(obstacle_angle))
+
+                    # 根据障碍物类型设置颜色
+                    obstacle_type = obstacle.get('type', 'unknown')
+                    if obstacle_type == 'vehicle':
+                        color = (255, 100, 100)  # 红色表示车辆
+                    elif obstacle_type == 'static':
+                        color = (200, 200, 100)  # 黄色表示静态障碍物
+                    else:
+                        color = (150, 150, 150)  # 灰色表示未知障碍物
+
+                    # 绘制障碍物点
+                    self.pygame.draw.circle(
+                        self.main.surface,
+                        color,
+                        (obstacle_x, obstacle_y),
+                        4
+                    )
+
+                    # 如果障碍物很近，添加警告效果
+                    if distance < 10.0:
+                        pulse_radius = 4 + 2 * math.sin(self.frame_count * 0.2)
+                        self.pygame.draw.circle(
+                            self.main.surface,
+                            (255, 0, 0, 100),
+                            (obstacle_x, obstacle_y),
+                            int(pulse_radius),
+                            1
+                        )
+
+        # 绘制雷达扫描线（旋转效果）
+        scan_angle = (self.frame_count * 2) % 360  # 根据帧数旋转
+        scan_end_x = radar_x + int(radar_radius * math.sin(math.radians(scan_angle)))
+        scan_end_y = radar_y - int(radar_radius * math.cos(math.radians(scan_angle)))  # 注意：屏幕y轴向下为正
+
+        # 绘制扫描线
+        self.pygame.draw.line(
+            self.main.surface,
+            (0, 255, 0, 100),  # 半透明绿色
+            (radar_x, radar_y),
+            (scan_end_x, scan_end_y),
+            1
+        )
+
+        # 绘制雷达图标题
+        radar_font = self.pygame.freetype.SysFont('Arial', 14)
+        radar_font.render_to(
+            self.main.surface,
+            (radar_x - 40, radar_y - radar_radius - 20),
+            "RADAR",
+            (100, 200, 255)
+        )
+
+        # 添加图例
+        legend_font = self.pygame.freetype.SysFont('Arial', 10)
+        legend_font.render_to(
+            self.main.surface,
+            (radar_x - radar_radius, radar_y + radar_radius + 10),
+            "● Vehicle   ● Static",
+            (150, 150, 150)
+        )
+
+        # 显示检测范围
+        range_text = "Range: 50m"
+        legend_font.render_to(
+            self.main.surface,
+            (radar_x - radar_radius, radar_y + radar_radius + 25),
+            range_text,
+            (100, 100, 200)
+        )
 
     @staticmethod
     def get_location_bbox(location, camera):
