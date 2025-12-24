@@ -97,6 +97,7 @@ class StableFPSHandRecognizer:
             area = cv.contourArea(cnt)
 
             if area > 1000:
+                # 3. 手势分类（修改Point为仅食指+中指（2根手指））
                 # 3. 手势分类（新增五指识别）
                 hull = cv.convexHull(cnt)
                 solidity = cv.contourArea(cnt) / cv.contourArea(hull)
@@ -104,6 +105,12 @@ class StableFPSHandRecognizer:
                 # 计算手指数量
                 finger_count = self.count_fingers(cnt, frame_small)
 
+                # 手势判断逻辑（核心修改）
+                if solidity > 0.85:
+                    # 密实度高 = 握拳
+                    current_gesture = "Fist"
+                elif finger_count == 2:
+                    # 仅2根手指 = 食指+中指（Point）
                 # 手势判断逻辑
                 if solidity > 0.85:
                     # 密实度高 = 握拳
@@ -114,6 +121,12 @@ class StableFPSHandRecognizer:
                 elif finger_count >= 4:
                     # 4-5根手指 = 手掌张开
                     current_gesture = "Palm"
+                elif finger_count == 1:
+                    # 1根手指 = 单指（归为None或单独分类，这里保持None）
+                    current_gesture = "None"
+                elif finger_count == 3:
+                    # 3根手指 = 归为None
+                    current_gesture = "None"
                 elif 2 <= finger_count <= 3:
                     # 2-3根手指 = 部分张开（归类为Point）
                     current_gesture = "Point"
@@ -246,6 +259,7 @@ def main():
         if len(set(self.gesture_buffer)) == 1:
             self.stable_gesture = self.gesture_buffer[0]
 
+        # 5. 绘制极简UI（仅保留手势和FPS显示）
         # 5. 绘制极简UI（仅保留手势和FPS显示，移除手指数量）
         # 5. 绘制极简UI（控制绘制耗时）
         cv.putText(frame, f"Gesture: {self.stable_gesture}", (10, 40),
@@ -272,6 +286,7 @@ def main():
         capture_thread.start()
 
         print(f"✅ 帧率锁定 {self.target_fps} 帧 | ESC退出")
+        print("💡 把手放在画面中间，握拳=Fist，伸食指+中指=Point，五指张开=Palm")
         print("💡 把手放在画面中间，握拳=Fist，伸食指=Point，五指张开=Palm")
         print("💡 把手放在画面中间，握拳=Fist，伸食指=Point")
 
@@ -310,6 +325,7 @@ def main():
 if __name__ == '__main__':
     # 实例化并运行，锁定30帧（可改20/15帧，更低更稳）
     recognizer = StableFPSHandRecognizer(target_fps=30)
+    recognizer.run()
     recognizer.run()
     recognizer.run()
         # 7. 稳定输出（连续2帧相同）
