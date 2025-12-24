@@ -57,8 +57,11 @@ class PandaAutoGrab:
         self.PD_KD = 100  # 微分增益
         self.TORQUE_LIMIT = 20  # 力矩限制
 
-        # 【优化1】提取雅克比伪逆的阻尼系数为类内常量
+        # 雅克比伪逆参数
         self.JACOBIAN_DAMPING = 0.01  # 雅克比伪逆的阻尼系数
+
+        # 【优化1】提取关节速度限制为类内常量
+        self.JOINT_VEL_LIMIT = 0.5  # 关节速度上限
 
         # 打印模型信息
         print("=" * 50)
@@ -84,7 +87,16 @@ class PandaAutoGrab:
         return self.jacp[:, self.joint_ids]
 
     def _move_step(self, target, tol=0.003, speed=0.3):
-        """单步移动控制（修复维度匹配问题）"""
+        """单步位置控制：基于雅克比伪逆实现末端执行器的位置跟踪
+
+        Args:
+            target (np.ndarray): 末端执行器的目标位置，形状为(3,)的三维坐标[x, y, z]
+            tol (float): 位置误差容忍阈值，当实际位置与目标位置的欧氏距离小于该值时，认为到达目标
+            speed (float): 移动速度系数，控制机械臂的运动速度
+
+        Returns:
+            bool: 若到达目标位置返回True，否则返回False
+        """
         ee_pos = self.get_ee_pos()
         error = target - ee_pos
         error_norm = np.linalg.norm(error)
@@ -97,7 +109,6 @@ class PandaAutoGrab:
 
         # ========== 修正：正确的阻尼伪逆计算 ==========
         # 方法1：使用正则化参数的伪逆（推荐）
-        # 【优化2】使用类内常量替代硬编码的阻尼系数
         jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + self.JACOBIAN_DAMPING * np.eye(3))
 
         # 方法2：若方法1仍报错，可改用numpy伪逆（自动处理维度）
@@ -105,7 +116,8 @@ class PandaAutoGrab:
 
         # 关节速度指令
         joint_vel_cmd = speed * jacobian_pinv @ error
-        joint_vel_cmd = np.clip(joint_vel_cmd, -0.5, 0.5)  # 速度限制
+        # 【优化2】使用类内常量替代硬编码的关节速度限制
+        joint_vel_cmd = np.clip(joint_vel_cmd, -self.JOINT_VEL_LIMIT, self.JOINT_VEL_LIMIT)
 
         # PD力矩计算
         torque = np.zeros(7)
