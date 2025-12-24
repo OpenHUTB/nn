@@ -3,3 +3,4 @@ imageio
 numpy
 matplotlib
 tensorflow
+mujoco>=2.3.0
