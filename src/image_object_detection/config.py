@@ -1,41 +1,73 @@
 # config.py
 # 功能：定义项目全局配置参数，便于统一管理和修改
+# 支持从外部 config.yaml 文件加载配置；若文件不存在，则使用内置默认值。
 
 import os
+import yaml
+from pathlib import Path
 
+class ConfigError(Exception):
+    """配置相关异常的基类"""
+    pass
 
 class Config:
     """
     应用程序的配置类。
     所有核心参数（如模型路径、默认图像路径、阈值等）集中在此初始化，
     便于维护和部署时调整。
+    
+    配置优先级（从高到低）：
+      1. 外部 config.yaml 文件（位于项目根目录）
+      2. 内置默认值（硬编码在本类中）
     """
-
-    def __init__(self):
+    def __init__(self, config_file="config.yaml"):
         # 获取当前 config.py 文件所在目录的绝对路径
         # 使用 os.path.abspath 确保路径在不同操作系统下一致
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        base_dir = Path(os.path.dirname(os.path.abspath(__file__)))
 
-        # 默认测试图像路径：位于项目根目录下的 data/test.jpg
-        # 若用户未指定图像路径，系统将尝试加载此文件
-        self.default_image_path = r"C:\Users\apple\OneDrive\桌面\test.jpg"
+        # 构建配置文件的完整路径（相对于项目根目录）
+        config_path = base_dir / config_file
 
-        # YOLO 模型权重文件路径
-        # 支持：
-        #   - 内置模型名（如 "yolov8n.pt"，首次运行会自动下载）
-        #   - 自定义训练模型的相对或绝对路径（如 "runs/detect/train/weights/best.pt"）
-        self.model_path = "yolov8n.pt"
+        # 内置默认配置（与原逻辑一致）
+        default_config = {
+            "default_image_path": str(base_dir / "data" / "test.jpg"),
+            "model_path": "yolov8n.pt",
+            "confidence_threshold": 0.25,
+            "camera_index": 0,
+            "output_interval": 1.0,
+        }
 
-        # 目标检测的置信度阈值
-        # 只有置信度 ≥ 此值的检测框才会被保留和显示
-        # 范围：0.0 ~ 1.0，值越高，结果越严格
-        self.confidence_threshold = 0.25
+        # 尝试从外部 YAML 文件加载用户配置
+        if config_path.is_file():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    user_config = yaml.safe_load(f) or {}
+                # 合并：用户配置覆盖默认值
+                default_config.update(user_config)
+            except yaml.YAMLError as e:
+                raise ConfigError(f"Invalid YAML syntax in {config_file}: {e}")
+            except Exception as e:
+                raise ConfigError(f"Failed to read {config_file}: {e}")
 
-        # 摄像头设备索引
-        # 通常 0 表示内置摄像头，外接摄像头可能为 1、2 等
-        self.camera_index = 0
+        # 提取配置项（保持与原字段名一致）
+        self.default_image_path = default_config["default_image_path"]
+        self.model_path = default_config["model_path"]
+        self.confidence_threshold = float(default_config["confidence_threshold"])
+        self.camera_index = int(default_config["camera_index"])
+        self.output_interval = float(default_config["output_interval"])
 
-        # FPS（帧率）输出的时间间隔（单位：秒）
-        # 例如设为 1.0 表示每秒打印一次当前处理速度
-        self.output_interval = 1.0
+        # 路径标准化：若 default_image_path 是相对路径，则基于项目根目录解析
+        if not os.path.isabs(self.default_image_path):
+            self.default_image_path = str(base_dir / self.default_image_path)
 
+        # 验证置信度阈值
+        if not (0.0 <= self.confidence_threshold <= 1.0):
+            raise ConfigError("confidence_threshold must be in range [0.0, 1.0]")
+
+        # 验证摄像头索引
+        if self.camera_index < 0:
+            raise ConfigError("camera_index must be a non-negative integer")
+
+        # 验证输出间隔
+        if self.output_interval <= 0:
+            raise ConfigError("output_interval must be positive")
