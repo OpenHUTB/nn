@@ -1,4 +1,3 @@
-# RoadRunner 使用教程说明
 
 关于 RoadRunner 的使用教程，教师提供的 RoadRunner R2022b 版本并没有汉化，在网上很难找到系统的 RoadRunner 教学视频。
 
@@ -700,3 +699,432 @@ QGIS内置了多语言支持，切换为中文无需安装额外语言包。
 *   **性能与精度平衡**：面对超大范围的高密度点云，需在数据精度与软件交互流畅性之间取得平衡。实践中，可根据当前建模的细节等级需求，选择使用点云的全分辨率版本，或通过抽稀处理后的轻量化版本作为参考背景，以实现更高效的操作体验。
 
 在 RoadRunner 中引入点云数据，实质上是构建了一条 **“物理感知-数字建模-虚拟仿真”** 的数字化管道。它不仅是提升单点建模效率的工具，更是确保虚拟环境在几何、语义和行为层面与真实世界保持一致的关键技术环节，为高可靠性的自动驾驶系统测试与验证提供了至关重要的环境基础。
+
+# 从何处获取点云数据
+
+Sydney Urban Objects Dataset
+
+链接: [Sydney Urban Objects Dataset](https://www.acfr.usyd.edu.au/papers/data.shtml)
+
+介绍: 由悉尼大学提供的城市道路物体点云数据集，使用Velodyne HDL-64E LIDAR在悉尼中央商务区收集。包含车辆、行人、广告牌等分类信息，适用于自动驾驶技术的研究。
+
+Large-Scale Point Cloud Classification Benchmark (Semantic3D)
+
+链接: [Semantic3D](http://www.semantic3d.net/)
+
+介绍: 包含了大量标记的城市环境3D点云数据集，适合大规模点云分类研究。涵盖了从教堂到铁路轨道等多种场景，数据量大且标注详细。
+
+KITTI Vision Benchmark Suite
+
+链接: [KITTI Vision Benchmark Suite](http://www.cvlibs.net/datasets/kitti/)
+
+介绍: 主要面向自动驾驶领域，提供了丰富的传感器数据，包括点云、图像、GPS和IMU数据。数据来源于真实世界的驾驶场景，是评估自动驾驶系统性能的重要资源。
+
+OpenTopography
+
+链接: [OpenTopography](https://opentopography.org/)
+
+<img width="1920" height="1150" alt="364f1c173de0e829083dc59dbcce0418" src="https://github.com/user-attachments/assets/20e523a0-64b5-4d6c-a15a-dcec014be906" />
+
+介绍: 提供全球范围内的高分辨率地形数据，包括激光雷达（LiDAR）点云数据。适合地理信息系统（GIS）、地貌学和其他地球科学领域的研究人员使用。
+
+USGS National Map 3DEP Program
+
+链接: [](https://apps.nationalmap.gov/downloader/)
+
+<img width="1920" height="1149" alt="image" src="https://github.com/user-attachments/assets/6db55a2f-d0e5-4d9c-8abc-2d72d78bdfcd" />
+
+
+介绍: 美国地质调查局提供的全国3D高程计划（3DEP），包含了美国本土的LiDAR点云数据，可用于洪水建模、水资源管理等多个领域。
+
+# 以美国国家地质调查局（USGS）为例
+
+## 需要说明的是，USGS显然不能提供中国地区的点云数据下载，事实上，USGS只能提供美国的大部分地区的雷达扫描记录的点云数据下载。当然，作为roadrunner练手的素材获取渠道，USGS是完全够用的。
+
+**1.打开[](https://apps.nationalmap.gov/downloader/)**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/c9395f59-a521-4f34-ae83-4057c636dce6" />
+
+**2.通过鼠标的拖拽和缩放将你需要获取数据的区域大致移到你的屏幕中央**
+
+**3.在左侧的“地图数据”勾选高程源数据选项**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/a580ee02-7a98-48e9-b17e-d53e98888936" />
+
+**4.滚动滚轮，在下方勾选“Lidar Point Cloud (LPC)”和“ LAS,LAZ”项**
+
+<img width="755" height="550" alt="image" src="https://github.com/user-attachments/assets/84d371c4-62fb-4553-8308-dff4b0d26a8b" />
+
+**4.在左上方勾选你用来标定具体区域的方法，此处我以“范围”为例**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/7c67a50a-a4c4-41eb-b5ea-8265b6b1929d" />
+
+**5.搜索产品**
+
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/51bffa50-40ec-4dde-b0fd-e7023d24f74c" />
+
+**6.下载数据**
+
+<img width="580" height="941" alt="image" src="https://github.com/user-attachments/assets/0e52a073-0c79-44c0-b95a-8045f2599fe5" />
+
+在左侧选中需要的数据后点击Download Link (LAZ)进行下载
+
+**7.注意此时你需要想办法获取这块区域的EPSG编码（后面可能会用上）**
+
+你需要找到如图所示的“Info/Metadata”项
+<img width="790" height="866" alt="image" src="https://github.com/user-attachments/assets/b3967b65-3583-453c-9ae5-1f893f4c7fdd" />
+跳转到
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/f5226e1a-8fb2-4eeb-a2c9-5185326db45b" />
+往下翻找到
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/c59896c3-40d9-440d-ab2b-ab69e5c5b810" />
+点击后往下翻重点记录下来这部分
+<img width="1409" height="1090" alt="image" src="https://github.com/user-attachments/assets/77e2e8c2-1a0e-45d1-b794-028c315570ee" />
+然后可以去查对应的EPSG编码
+
+
+# 将点云文件导入roadrunner的方法
+
+## 第一步：将.laz文件解压为.las文件
+
+### 方法一：使用laszip进行解压
+将.laz文件解压为.las文件需要用到laszip，你可以在GitHub找到LAStools，LAStools 是一组高效、多核批量、可脚本化的工具，用于处理 LAS、压缩 LAZ、Terrasolid BIN、ESRI Shapefile（SHP）、ASCII 等。仓库链接为：[](https://github.com/LAStools/LAStools)
+<img width="1910" height="1094" alt="image" src="https://github.com/user-attachments/assets/13d1c472-8da7-44b5-8d28-300f72dc4a7a" />
+1.**在你的本地创建一个文件夹作为本地仓库并初始化**
+进入文件夹右键空白处，“在终端打开”→“输入git init”→“完成初始化”
+2.**克隆LAStools到本地仓库**
+在打开的终端输入
+git clone https://github.com/LAStools/LAStools.git
+等待克隆完成
+<img width="1700" height="990" alt="image" src="https://github.com/user-attachments/assets/06699df4-bd84-4eb1-b1b9-0afa57f100fe" />
+3.**找到laszip并运行**
+文件路径："你的仓库\LAStools\bin\laszip.exe"
+程序UI：<img width="1275" height="991" alt="image" src="https://github.com/user-attachments/assets/ef2d27ef-48a4-48b1-ae60-1ab206987755" />
+4.**使用laszip将.laz文件解压为.las文件**
+首先你需要把.laz文件移到仓库所在的文件夹下
+然后回到laszip
+<img width="1275" height="989" alt="image" src="https://github.com/user-attachments/assets/cec19d46-7b1c-404a-9a11-304de883b208" />
+<img width="1280" height="959" alt="image" src="https://github.com/user-attachments/assets/ef5edfa2-0d0c-4a65-9b0f-c2b73b6a6382" />
+<img width="1274" height="984" alt="image" src="https://github.com/user-attachments/assets/6101384e-0963-498c-adce-863b24392f38" />
+回到.laz文件所在的那一级文件夹，可以看到生成了一个同名的.las文件，此时你已经成功的将.laz文件转为.las文件
+
+### 方法二：使用QGIS内置的工具进行格式转换
+
+1.**打开QGIS**
+
+菜单栏->数据处理->工具箱
+<img width="1920" height="1198" alt="image" src="https://github.com/user-attachments/assets/fccc9043-c816-49a8-bbb7-10c7488fe8c9" />
+<img width="1920" height="1198" alt="image" src="https://github.com/user-attachments/assets/7dd0759c-905d-4b6c-a221-413dd76e69d5" />
+2.**选择格式转换**
+
+点云转换->格式转换，选中格式转换（双击）
+<img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/fe4e07a0-a60f-4e45-9e8f-41a464ffd3f4" />
+3.**进行格式转换**
+
+<img width="860" height="681" alt="image" src="https://github.com/user-attachments/assets/eedfddae-05ee-4833-89af-7b2438e4c347" />
+
+4.**转换完成**
+
+<img width="860" height="654" alt="image" src="https://github.com/user-attachments/assets/5cc6fb83-5bfd-4799-9725-2ef7312b24c0" />
+
+
+# 将.las/.laz文件导入roadrunner
+
+**1.打开roadrunner新建一个场景**
+
+## *注意：新建场景的路径不能有中文字符存在，否则会报错*
+
+<img width="615" height="314" alt="image" src="https://github.com/user-attachments/assets/b4b7d71c-0df9-43b2-a22c-6729fadc08fa" />
+
+**2.将.las/.laz文件直接拖入roadrunner的Library Browser**
+
+**3.将.las/.laz文件从Library Browser拖入场景**
+
+**成功**
+
+<img width="1920" height="1169" alt="image" src="https://github.com/user-attachments/assets/afecb182-3bba-4884-9b58-e47abd118553" />
+
+## 常见的错误的解决方案
+
+如果报错为
+
+<img width="615" height="314" alt="image" src="https://github.com/user-attachments/assets/b4b7d71c-0df9-43b2-a22c-6729fadc08fa" />
+
+有时不是因为路径中出现了中文字符，而是你的.las/.laz文件缺少正确的坐标系信息。
+
+### 解决方案：
+
+
+1.**找到上文提到的对应区域的EPSG编码**
+
+确保你的点云文件已经存在roadrunner的 Library Browser中
+
+2**打开Attributes窗口**
+
+![2c6b2cdf01ada25e05e353659654fe98](https://github.com/user-attachments/assets/5aef7363-91b5-4b90-ab76-712ed3f9471f)
+
+2.**选中.las/.laz文件并查看Attributes**
+
+在Attributes窗口中
+
+![b24259663a09b40d94ef0e92af6126de](https://github.com/user-attachments/assets/f1536f8e-62a4-485c-94ad-825453dd6cd1)
+
+3.**在QGIS中导入.las/.laz文件查看坐标信息**
+
+记下坐标信息之后返回roadrunner，选中world settings tool
+<img width="1920" height="1200" alt="_cgi-bin_mmwebwx-bin_webwxgetmsgimg__ MsgID=697152194148194368 skey=@crypt_38968688_e13c903e415bb13501591a3aeadbfff7 mmweb_appid=wx_webfilehelper" src="https://github.com/user-attachments/assets/4c38ed1f-a446-4a51-861a-bb608a924ce6" />
+
+
+根据坐标信息进行世界原点的设置
+
+# 导出至 CARLA
+
+## CARLA 导出概览
+
+RoadRunner 可以将场景导出到 CARLA 模拟器。有两个 CARLA 导出选项可供选择：
+
+*   **CARLA**：导出 **Unreal® Datasmith (`.udatasmith`)** 文件和 **ASAM OpenDRIVE® (`.xodr`)** 文件。
+*   **CARLA Filmbox**：导出一个 **Filmbox (`.fbx`)** 文件、一个包含部分元数据的 **XML** 和一个 **ASAM OpenDRIVE (`.xodr`)** 文件。XML 文件保存场景中材质的数据。
+
+在 CARLA 或 Unreal 端，提供了一个插件来帮助导入从 RoadRunner 导出的场景。
+
+**对于使用CARLA 插件导出的场景**，Unreal 端提供的插件处理以下内容：
+*   **设置材质**
+    *   材质数据从 Datasmith (`.udatasmith`) 文件中读取，并将数据映射到插件中包含的基础材质之一的新实例中。
+    *   透明材质将根据漫反射颜色的透明度在半透明和遮罩混合模式之间进行选择。
+*   **调整导入的静态网格物体中的碰撞器**
+    *   在导入过程中，新创建的静态网格素材的 "Collision Complexity" 选项设置为 "Use Complex Collision As Simple"。
+*   **设置交通信号视觉效果**
+    *   交通信号逻辑连接到模拟器。
+*   **软件要求**
+    *   CARLA 0.9.13
+
+**对于使用CARLA Filmbox 插件导出的场景**，Unreal 端提供的插件利用 XML 文件中存储的信息帮助导入 FBX® 文件。该插件处理以下内容：
+*   **设置材质**
+    *   从 XML 文件中读取材质数据，并将数据映射到插件中包含的基础材质之一的新实例中。
+    *   某些材质将从 CARLA 材质之一中实例化。
+    *   透明材质将根据漫反射颜色的透明度在半透明和遮罩混合模式之间进行选择。
+*   **调整导入的静态网格物体中的碰撞器**
+    *   在导入过程中，新创建的静态网格素材的 "Collision Complexity" 选项设置为 "Use Complex Collision As Simple"。
+*   **设置交通信号视觉效果**
+    *   交通信号逻辑未连接到模拟器。
+*   **软件要求**
+    *   CARLA 0.9.13
+
+---
+
+## 安装插件
+
+按照本节中的说明安装 Unreal 插件：
+
+1.  从源代码构建 CARLA。有关更多信息，请参阅构建 CARLA 说明的 Windows® 构建页面。
+2.  有关下载最新版本插件的说明，请参阅 下载插件。
+3.  解压 RoadRunner 插件 zip 文件并找到 `RoadRunnerImporter`、`RoadRunnerCarlaIntegration`、`RoadRunnerRuntime`、`RoadRunnerDatasmith`、`RoadRunnerCarlaDatasmith` 和 `RoadRunnerMaterials` 文件夹，它们位于 "Unreal/Plugins" 下。
+4.  复制 `RoadRunnerImporter`、`RoadRunnerCarlaIntegration`、`RoadRunnerRuntime`、`RoadRunnerDatasmith`、`RoadRunnerCarlaDatasmith` 和 `RoadRunnerMaterials` 文件夹，放入工程目录 `Plugins` 文件夹下的 `CarlaUE4` 文件夹中，位于 `<carla>/Unreal/CarlaUE4/Plugins`（Carla 文件夹旁边）。
+
+<img width="302" height="185" alt="download-new-plugins" src="https://github.com/user-attachments/assets/8aa371b6-062e-4be3-b6a6-99734277113b" />
+
+5.  重建插件。首先，生成工程文件。
+    *   如果您在 Windows 上，请右键点击 `.uproject` 文件并选择 **Generate Visual Studio project files**。
+    *   如果您使用 Linux®，请在命令行运行以下代码：
+        ```
+        $UE4_ROOT/GenerateProjectFiles.sh -project="<CarlaFolderPath>/Unreal/CarlaUE4/CarlaUE4.uproject" -game -engine
+        ```
+        将 `UE4_ROOT` 设置为 Unreal Engine® 安装目录。
+
+    然后，打开工程并构建插件。如果您使用的是 Windows，请在 VS 2019 的 x64 本机工具命令提示符中运行 "make launch" 来编译插件并启动编辑器。
+6.  插件显示在 **Edit > Plugins** 下。如果它没有出现在该菜单中，请检查 **Enabled** 复选框是否选中。
+
+<img width="571" height="577" alt="new-plugin-list" src="https://github.com/user-attachments/assets/febc75c8-6db5-4b71-867b-36c62947c4a9" />
+
+### 插件内容
+
+*   **RoadRunnerImporter 模块**：
+    *   当元数据文件存在时，覆盖默认的 FBX 导入器
+    *   使用元数据文件用新材质覆盖默认材质的选项
+    *   导入信号数据和时序
+*   **RoadRunner 运行时模块**：
+    *   包含控制交通信号视觉效果的组件
+*   **RoadRunnerCarlaIntegration 模块**：
+    *   创建一个新地图并将 FBX 导入到关卡中
+    *   根据分割类型移动静态网格物体素材
+    *   创建由 CARLA 材质实例化的材质，用于天气效果
+    *   从 ASAM OpenDRIVE 文件生成路线
+*   **RoadRunnerMaterials 插件**：
+    *   用于创建实例的基础材质
+*   **RoadRunnerDatasmith 插件**：
+    *   处理元数据后处理的 Dataprep 素材
+    *   导入信号数据和时序
+*   **RoadRunnerCARLADatasmith 插件**：
+    *   将 RoadRunner 场景导入 CARLA，自动设置交通信号灯。
+
+---
+
+## 从 RoadRunner 导出至 CARLA
+
+### 使用 CARLA 插件导出
+
+**CARLA 插件（.udatasmith + .xodr）是导出到 CARLA 的推荐方法。** 使用 CARLA (`.udatasmith` + `.xodr`) 插件将 RoadRunner 场景导出到 CARLA，您可以将 ASAM OpenDRIVE 数据与 Datasmith 文件一起导出，并将元数据添加到 Datasmith 导出中。元数据存储信号和 ASAM OpenDRIVE ID。CARLA 导出选项减少了将大型场景导入 CARLA 的时间。
+
+按照以下步骤使用 **CARLA（.udatasmith + .xodr）** 将场景从 RoadRunner 导出到 Unreal：
+
+1.  在 RoadRunner 中打开您的场景。
+2.  使用 **CARLA (`.udatasmith` + `.xodr`)** 选项导出场景。从菜单栏中选择 **File > Export > CARLA (.udatasmith, .xodr)**。
+3.  在 "Export CARLA Road" 对话框中，设置网格合并和平铺选项，然后点击 **Export**。
+4.  选择 **Browse** 打开文件对话框，设置导出文件的名称和路径。Datasmith 文件导出到指定文件夹。
+    *   您可以按分割类型划分网格。网格体的名称后附加有 `<segmentation type>Node`。
+    *   如果选择了 **Export To Tiles** 选项，网格将按图块进行分割。道具按它们所在的图块进行分组。
+        *   默认情况下，仅导出一个文件。图块存储在单独的节点中。
+        *   如果启用了 **Export Individual Tiles**，则每个图块都会存储在其自己的 Datasmith 文件中。
+
+### 使用 CARLA Filmbox 导出
+
+如果您想使用较旧的管道进行导出，请使用 **CARLA 插件（.fbx + .rrdata.xml + .xodr）** 选项。按照以下步骤使用 **CARLA Filmbox 插件 (.fbx + .rrdata.xml + .xodr)** 选项将场景从 RoadRunner 导出到 CARLA：
+
+1.  在 RoadRunner 中打开您的场景。
+2.  使用 **CARLA** 选项导出场景。从菜单栏中选择 **File > Export > CARLA Filmbox (.fbx, .xodr, .rrdata.xml)**。
+3.  在导出 CARLA 对话框中，根据需要设置 **FBX** 选项卡上的网格平铺和 **OpenDRIVE** 选项卡上的 ASAM OpenDRIVE 选项。然后，点击 **Export**。
+4.  浏览打开文件对话框以设置导出文件的名称和路径。FBX、纹理、XML 和 ASAM OpenDRIVE 文件导出到同一文件夹。
+    *   网格可以按分割类型进行划分。网格有 `"<segmentation type>Node"` 附加到它们的名字后面。
+    *   如果选择了 **Export To Tiles** 选项，网格会按图块分割，道具会按其所在的图块分组。
+        *   默认情况下，仅导出一个文件。图块存储在单独的节点中。
+        *   如果启用了 **Export Individual Tiles**，则每个图块都会存储在其自己的 FBX 文件中。
+
+> **注意**
+> 该插件不完全支持 **Export Individual Tiles** 选项。
+
+---
+
+## 导入 CARLA
+
+### 导入到 CARLA
+
+如果您使用 **CARLA (`.udatasmith` + `.xodr`)** 选项导出了 RoadRunner 场景，请按照以下步骤将场景导入 CARLA：
+
+1.  复制 **BaseMap** 并将其保存到 `Maps` 文件夹。重命名新地图。
+
+<img width="547" height="306" alt="basemap" src="https://github.com/user-attachments/assets/68a03ab6-43f3-407e-818c-f5fa7cdd2088" />
+
+2.  打开您在上一步中创建的新地图。
+3.  在 Unreal 中的 **Content Browser** 窗口中右键点击。在菜单中，选择 **Show Plugin Content**。
+
+<img width="152" height="300" alt="content-browser" src="https://github.com/user-attachments/assets/0cc1dfb8-4fa6-418e-bc7b-637c1c488c66" />
+
+4.  在 CARLA 中启用 **Datasmith FBX Importer** 和 **Datasmith Importer** 插件。
+5.  点击 **RoadRunner CARLADatasmith Content**。双击 **RRCARLADataprep Asset**。这将打开一个新的编辑器，用于处理使用 Datasmith 的导入以及所有后期处理步骤。
+
+<img width="780" height="227" alt="new-carla-plugin" src="https://github.com/user-attachments/assets/789359ae-6ae1-4c1c-870f-0451f630693f" />
+
+6.  点击 **Import** 按钮将场景导入 Unreal。例如，此图像加载 `FourWaySignal` 场景文件，它是 RoadRunner 工程的 `Scenes` 文件夹中存在的场景之一。
+
+<img width="1968" height="1187" alt="imported-scene-datasmith" src="https://github.com/user-attachments/assets/ec5b11fc-0ee7-40c9-8817-d365f7987fbc" />
+
+7.  点击编辑器工具条中的 **Execute** 即可运行导入场景的后期处理步骤。
+8.  点击编辑器工具条中的 **Commit** 将这些更改提交到场景。
+9.  场景现已导入并准备进行模拟。
+
+### 导入至 CARLA (Filmbox)
+
+如果您在导出 RoadRunner 场景时使用了 **CARLA Filmbox** 插件，请按照以下步骤操作。
+
+将文件拖到内容浏览器中。
+    *   使用 "Import" 按钮并选择 FBX 文件。
+    *   该插件检查是否存在与导入的文件相关联的 RoadRunner XML 文件，如果未找到相应的 XML 文件，则正常导入。
+    *   选择 **File > Import Into Level** 不会使用导出的 RoadRunner XML，而是使用 Unreal 导入器。
+**当RoadRunner 导入选项对话框打开时：**
+<img width="400" height="246" alt="import_to_unreal_pop_up" src="https://github.com/user-attachments/assets/8e1000ce-dea0-4202-a9bd-6ca736d253e3" />
+
+* 覆盖材质
+
+    * 覆盖默认材质导入。来自 CARLA 材质的道路和树叶实例。
+
+    * 如果您想在下一个对话框中将材质设置为 Use Existing，则需要取消选中。
+
+* 导入信号视觉效果
+
+    * 仅当在下一个对话框中选择 "Create one Blueprint asset" 选项时才起作用。
+        > 导入信号视觉效果选项对交通模拟没有任何影响。
+      > 
+**当 FBX 场景导入选项对话框打开时：**
+
+1.将 **Scene > Hierarchy Type** 设置为 **"Create One Blueprint Asset"**（默认选择）。
+        
+**注意**
+        
+> 只有 **"Create One Blueprint Asset"** 导入选项适用于材质、信号和透明度排序。**"Create one Actor with Components"** 和 **"Create Level Actors"** 选项仅导入材质。
+
+2.如果需要，请选择 **Invert Normal Maps**。
+
+<img width="861" height="436" alt="exporting_to_carla_03" src="https://github.com/user-attachments/assets/7831b3e0-c842-4bb7-a191-f6560c6bc900" />
+
+3.将 **Static Meshes > Normal Import Method** 设置为 **Import Normals**。
+<img width="829" height="436" alt="exporting_to_carla_04" src="https://github.com/user-attachments/assets/c1d67091-b824-4f3e-b684-899ca1d9d167" />
+
+4.（可选）取消勾选 **Remove Degenerates**，这可以帮助制作一些较大规模的道具。
+
+5.点击 **Import**。
+
+**关于将交通信号导入 Unreal：** 如果在 RoadRunner 中设置了交通信号灯，则它们将作为 `RoadRunnerTrafficJunction` 组件导入到 Unreal 中。这些控制器在导入期间自动创建，并包含在创建的蓝图中。`RoadRunnerTrafficJunction` 组件处理信号状态之间切换的逻辑。UUID 用于匹配场景中的特定游戏对象。
+
+**FBX 详细信息：** 由于以下原因，FBX 文件将通过分割和透明度排序层自动划分网格：
+*   **分割**：CARLA 通过静态网格素材确定分割。
+*   **透明度排序**：Unreal 将 "Translucency Sort Priority" 值存储在静态网格组件上。
+
+### 测试地图
+
+1.  在编辑器中点击 **Play**（第一次点击 Play 需要额外时间来构建地图）。
+<img width="326" height="158" alt="exporting_to_carla_05" src="https://github.com/user-attachments/assets/b60b6a7c-69e9-4a30-9c68-6bc8906c16d5" />
+
+2.  运行示例 Python® 脚本。
+<img width="1149" height="592" alt="test-map" src="https://github.com/user-attachments/assets/4a891fa1-62d6-4421-970c-53a521b2e222" />
+
+# 使用ros进行桥接（封装）
+## 第一步：本指南完成ros封装操作的前置条件：
+1.**Ubuntu版本为20.04**
+
+2.**ros版本为ros1**
+
+3.**Carla版本为源码编译的0.9.13**
+
+  注意！预编译包安装的Carla通常完成不了完整导入整个地图（包括建筑和材质）到Carla中的功能，需要采用源码编译的方法为你的操作系统配置上Carla，用源码编译对于内存和磁盘空间的要求较高，通常需要内存大于或等于16G、空闲磁盘空间大约200G。
+  
+## 第二步：参考上面的“将roadrunner生成的的地图文件导入Carla”教程成功在Carla中完美再现你所建造的地图 ##
+
+## 第三步：编译 ROS Bridge ##
+
+首先，请按官方指南从源码编译 carla-ros-bridge。核心步骤包括：
+
+1.**创建工作空间并克隆 ros-bridge 仓库到 src 目录**
+
+2.**使用 rosdep install 命令安装所有依赖包**
+
+3.**使用 catkin_make 或 catkin build 命令编译工作空间**
+
+## 第四步：启动仿真：连接ROS与自定义地图 ##
+
+1.**终端1 - 启动CARLA服务端：** 在CARLA根目录下运行 ./CarlaUE4.sh 或使用 carla_server 可执行文件。确保服务器启动完成。
+
+2.**终端2 - 启动ROS桥接：** 
+
+首先，设置环境变量。最关键的一步是正确设置 PYTHONPATH，使其包含CARLA的PythonAPI路径（特别是.egg文件），桥接才能与CARLA通信。
+
+然后，使用 roslaunch 启动桥接。如需加载自定义地图，你有两种方法：
+
+*方法一（启动时指定）*：在启动命令中通过 town:='<你的地图名>' 参数直接指定。例如：
+
+>bash
+>
+>roslaunch carla_ros_bridge carla_ros_bridge.launch town:='Your_Custom_Map'
+
+*方法二（启动后切换）*：先启动桥接连接默认世界，然后通过调用ROS服务（如 /{service_name}）来动态切换到你的自定义地图。
+
+>特别注意：如果CARLA服务端和ROS桥接运行在不同的机器或容器（如本机Windows CARLA，虚拟机内ROS），必须在启动launch文件时额外指定主机IP参数，例如 host:=<主机IP地址>，而不能使用默认的 localhost。
+
+## 版本匹配与常见问题
+
+1.**版本一致性：** CARLA版本、.egg文件版本、carla-ros-bridge分支及ROS版本（Melodic/Noetic）必须互相兼容。
+
+2.**Python环境：** 编译和运行时，Python环境（尤其是Anaconda虚拟环境）可能导致ROS依赖（如rospkg）或CARLA模块导入失败，需仔细检查并安装缺失包。
+
+3.**地图名称：** 确保在ROS桥接中指定的地图名，与地图成功导入CARLA后，在CARLA内部使用的名称完全一致。
+
+# 至此，全部的用roadrunner来高自由度的自主构建地图并导入Carla运行及用ros桥接的全套指南已经结束，开始着手创建自己的地图吧！！！ #
