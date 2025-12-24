@@ -5,6 +5,11 @@ import time
 import sys
 import os
 
+"""
+Franka Panda 机械臂自动抓取仿真 v1.1
+基于MuJoCo实现的基础抓取控制器
+"""
+
 # ========== 路径适配 ==========
 SCENE_PATH = os.path.join(os.path.dirname(__file__),
                           "mujoco_menagerie-main",
@@ -15,9 +20,11 @@ if not os.path.exists(SCENE_PATH):
     print(f"❌ 场景文件不存在：{SCENE_PATH}")
     sys.exit(1)
 
+
 # ========== 智能抓取控制器 ==========
 class PandaAutoGrab:
     def __init__(self):
+        """初始化Franka Panda机械臂抓取控制器，加载模型和初始化参数"""
         self.model = mujoco.MjModel.from_xml_path(SCENE_PATH)
         self.data = mujoco.MjData(self.model)
         self.viewer = None
@@ -44,11 +51,20 @@ class PandaAutoGrab:
         self.safe_lift_height = 0.15
         self.grab_height = 0.05
 
+        # PD控制参数
+        # 【优化1】提取PD控制参数为类内常量
+        self.PD_KP = 250  # 比例增益
+        self.PD_KD = 100  # 微分增益
+        self.TORQUE_LIMIT = 20  # 力矩限制
+
+        # 【优化1】提取雅克比伪逆的阻尼系数为类内常量
+        self.JACOBIAN_DAMPING = 0.01  # 雅克比伪逆的阻尼系数
+
         # 打印模型信息
-        print("="*50)
+        print("=" * 50)
         print("📌 模型Body列表：", [self.model.body(i).name for i in range(min(self.model.nbody, 10))])
         print("📌 模型Joint列表：", [self.model.joint(i).name for i in range(min(self.model.njnt, 10))])
-        print("="*50)
+        print("=" * 50)
 
     def get_ee_pos(self):
         """获取末端执行器位置"""
@@ -59,7 +75,11 @@ class PandaAutoGrab:
         return self.data.xpos[self.cube_body_id].copy()
 
     def _compute_jacobian(self):
-        """计算雅克比矩阵"""
+        """计算末端执行器的位置雅克比矩阵
+
+        Returns:
+            np.ndarray: 3×7的位置雅克比矩阵（仅包含机械臂7个关节的分量）
+        """
         mujoco.mj_jac(self.model, self.data, self.jacp, self.jacr, self.get_ee_pos(), self.ee_body_id)
         return self.jacp[:, self.joint_ids]
 
@@ -77,8 +97,8 @@ class PandaAutoGrab:
 
         # ========== 修正：正确的阻尼伪逆计算 ==========
         # 方法1：使用正则化参数的伪逆（推荐）
-        lambda_ = 0.01  # 阻尼系数
-        jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + lambda_ * np.eye(3))
+        # 【优化2】使用类内常量替代硬编码的阻尼系数
+        jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + self.JACOBIAN_DAMPING * np.eye(3))
 
         # 方法2：若方法1仍报错，可改用numpy伪逆（自动处理维度）
         # jacobian_pinv = np.linalg.pinv(jacobian, rcond=1e-3)
@@ -91,8 +111,9 @@ class PandaAutoGrab:
         torque = np.zeros(7)
         for i in range(7):
             angle_error = joint_vel_cmd[i] * 0.1
-            torque[i] = 250 * angle_error - 100 * self.data.qvel[self.joint_ids[i]]
-            torque[i] = np.clip(torque[i], -20, 20)
+            # 【优化2】使用类内常量替代硬编码的PD参数
+            torque[i] = self.PD_KP * angle_error - self.PD_KD * self.data.qvel[self.joint_ids[i]]
+            torque[i] = np.clip(torque[i], -self.TORQUE_LIMIT, self.TORQUE_LIMIT)
 
         # 设置关节力矩
         for i in range(7):
@@ -203,9 +224,9 @@ class PandaAutoGrab:
         elif self.current_phase == 12:
             # 阶段12：抓取完成
             if not self.grab_complete:
-                print("\n" + "="*50)
+                print("\n" + "=" * 50)
                 print("✅ 智能抓取任务完成！")
-                print("="*50)
+                print("=" * 50)
                 self.grab_complete = True
 
     def run(self):
@@ -220,23 +241,32 @@ class PandaAutoGrab:
         print("\n🚀 仿真已启动，开始自动抓取...")
         print("💡 关闭Viewer窗口可退出程序")
 
-        # 单线程主循环
-        while self.viewer.is_running():
-            if self.running and not self.grab_complete:
-                self._grab_phase_machine()
-            else:
-                # 抓取完成后归零力矩
-                for i in range(7):
-                    self.data.ctrl[self.joint_ids[i]] = 0
+        # 提取休眠时间为常量，便于后续调整
+        SIMULATION_SLEEP = 1 / 200
+        SIMULATION_SLEEP = 1/200
 
-            mujoco.mj_step(self.model, self.data)
-            self.viewer.sync()
-            time.sleep(1/200)
+        # 单线程主循环
+        # 添加KeyboardInterrupt捕获，支持Ctrl+C优雅退出
+        try:
+            while self.viewer.is_running():
+                if self.running and not self.grab_complete:
+                    self._grab_phase_machine()
+                else:
+                    # 抓取完成后归零力矩
+                    for i in range(7):
+                        self.data.ctrl[self.joint_ids[i]] = 0
+
+                mujoco.mj_step(self.model, self.data)
+                self.viewer.sync()
+                time.sleep(SIMULATION_SLEEP)
+        except KeyboardInterrupt:
+            print("\n⚠️ 检测到Ctrl+C，正在退出仿真...")
 
         # 清理
         self.running = False
         self.viewer.close()
         print("\n👋 仿真结束")
+
 
 # ========== 主函数 ==========
 if __name__ == "__main__":
@@ -246,5 +276,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ 程序错误：{e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
