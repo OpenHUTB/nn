@@ -3,6 +3,7 @@ sensors.py - CARLA传感器管理
 包含：相机、LiDAR传感器封装和管理
 """
 
+import random  # 添加随机模块支持
 import carla
 import cv2
 import numpy as np
