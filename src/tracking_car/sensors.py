@@ -23,7 +23,6 @@ except ImportError:
 import open3d as o3d
 from sklearn.cluster import DBSCAN
 
-
 class CameraManager:
     """相机管理器"""
     
@@ -146,7 +145,6 @@ class CameraManager:
             except Exception as e:
                 logger.warning(f"销毁相机失败: {e}")
         self.camera = None
-
 
 class LiDARManager:
     """LiDAR管理器"""
@@ -367,8 +365,6 @@ class LiDARManager:
             except Exception as e:
                 logger.warning(f"销毁LiDAR失败: {e}")
         self.lidar = None
-
-# ======================== 视角管理器 ========================
 
 class SpectatorManager:
     """CARLA视角管理器 - 提供卫星视角跟随"""
@@ -681,9 +677,6 @@ class SensorManager:
         
         logger.info("✅ 所有传感器已销毁")
 
-
-# ======================== 工具函数 ========================
-
 def create_ego_vehicle(world, config, spawn_points=None):
     """
     创建自车
@@ -797,7 +790,6 @@ def create_ego_vehicle(world, config, spawn_points=None):
         traceback.print_exc()
         return None
 
-
 def spawn_npc_vehicles(world, config, count=None):
     """
     生成NPC车辆
@@ -848,7 +840,6 @@ def spawn_npc_vehicles(world, config, count=None):
                 continue
             
             # 随机选择车辆蓝图
-            import random
             vehicle_bp = random.choice(vehicle_bps)
             
             # 尝试生成
@@ -873,7 +864,6 @@ def spawn_npc_vehicles(world, config, count=None):
     except Exception as e:
         logger.error(f"生成NPC车辆失败: {e}")
         return 0
-
 
 def clear_all_actors(world, exclude_ids=None):
     """
@@ -927,9 +917,6 @@ def clear_all_actors(world, exclude_ids=None):
     except Exception as e:
         logger.warning(f"清理演员时出错: {e}")
 
-
-# ======================== 测试函数 ========================
-
 def test_sensor_manager():
     """测试传感器管理器"""
     print("=" * 50)
@@ -952,7 +939,6 @@ def test_sensor_manager():
     print("注：完整测试需要CARLA环境")
     
     return True
-
 
 if __name__ == "__main__":
     test_sensor_manager()

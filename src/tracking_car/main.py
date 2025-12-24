@@ -31,7 +31,6 @@ except ImportError as e:
     print("  - tracker.py")
     sys.exit(1)
 
-
 # ======================== Configuration Management ========================
 
 def load_config(config_path=None):
@@ -115,7 +114,6 @@ def load_config(config_path=None):
     
     return default_config
 
-
 def setup_carla_client(config):
     """
     Setup CARLA client
@@ -157,7 +155,6 @@ def setup_carla_client(config):
         logger.error(f"[ERROR] Failed to connect to CARLA server: {e}")
         return None, None
 
-
 def set_weather(world, weather_name):
     """
     Set weather
@@ -181,7 +178,6 @@ def set_weather(world, weather_name):
         logger.info(f"[WEATHER] Weather set to: {weather_name}")
     else:
         logger.warning(f"Unknown weather: {weather_name}, using clear weather")
-
 
 # ======================== Visualization (Enhanced: Independent stats window) ========================
 
@@ -997,7 +993,6 @@ class Visualizer:
         cv2.destroyAllWindows()
         logger.info("[OK] All visualization windows closed")
 
-
 # ======================== Main Program ========================
 
 class CarlaTrackingSystem:
@@ -1474,7 +1469,6 @@ class CarlaTrackingSystem:
         
         logger.info("[OK] Resource cleanup complete")
 
-
 # ======================== Main Function ========================
 
 def main():
@@ -1552,7 +1546,6 @@ def main():
         logger.info(f"[TIME] Program runtime: {run_time:.1f} seconds")
         logger.info("[END] Program ended")
         logger.info("=" * 50)
-
 
 if __name__ == "__main__":
     # 检查配置
