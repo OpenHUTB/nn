@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 AirSimNH 感知驱动自主探索无人机 - 智能决策增强版（红色、蓝色与黑色物体检测版）
 核心：视觉感知 → 语义理解 → 智能决策 → 安全执行
@@ -29,6 +30,18 @@ from datetime import datetime
 import random
 import psutil
 import os
+import gc
+
+# 导入PIL用于中文文本绘制
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    print("⚠️ PIL/Pillow未安装，中文显示可能不正常。请运行: pip install Pillow")
+
+# 全局字体缓存
+_chinese_font_cache = {}
 
 # ============ 导入配置文件 ============
 try:
@@ -584,6 +597,14 @@ class DataLogger:
         self.blue_objects_detected = []
         self.black_objects_detected = []
 
+        # 内存优化：限制缓冲区大小
+        self.max_flight_data = config.DATA_RECORDING.get('MAX_FLIGHT_DATA_BUFFER', 500)
+        self.max_objects_buffer = config.DATA_RECORDING.get('MAX_OBJECTS_BUFFER', 200)
+        self.max_events_buffer = config.DATA_RECORDING.get('MAX_EVENTS_BUFFER', 100)
+        self.auto_save_interval = config.DATA_RECORDING.get('AUTO_SAVE_INTERVAL', 60.0)
+        self.last_auto_save_time = time.time()
+        self.max_metrics_buffer = config.PERFORMANCE.get('MAX_METRICS_BUFFER', 500)
+
         self.csv_columns = [
             'timestamp', 'loop_count', 'state', 'pos_x', 'pos_y', 'pos_z',
             'vel_x', 'vel_y', 'vel_z', 'yaw', 'pitch', 'roll',
@@ -630,8 +651,17 @@ class DataLogger:
 
             if self.enable_json:
                 self.json_data['flight_data'].append(data_dict)
+                # 内存优化：限制flight_data长度，超过限制时保存并清空
+                if len(self.json_data['flight_data']) >= self.max_flight_data:
+                    self._auto_save_and_clear()
 
             self.performance_metrics['data_points'] += 1
+
+            # 内存优化：定期自动保存
+            current_time = time.time()
+            if current_time - self.last_auto_save_time >= self.auto_save_interval:
+                self._auto_save_and_clear()
+                self.last_auto_save_time = current_time
 
             if self.performance_metrics['data_points'] % 10 == 0:
                 self._collect_system_metrics()
@@ -651,11 +681,17 @@ class DataLogger:
                 'visited': red_object.visited
             }
 
+            # 内存优化：限制物体记录列表长度
+            if len(self.red_objects_detected) >= self.max_objects_buffer:
+                self.red_objects_detected = self.red_objects_detected[-self.max_objects_buffer//2:]
             self.red_objects_detected.append(red_object_data)
 
             if 'red_objects' not in self.json_data:
                 self.json_data['red_objects'] = []
 
+            # 内存优化：限制JSON中的物体列表长度
+            if len(self.json_data['red_objects']) >= self.max_objects_buffer:
+                self.json_data['red_objects'] = self.json_data['red_objects'][-self.max_objects_buffer//2:]
             self.json_data['red_objects'].append(red_object_data)
 
         except Exception as e:
@@ -673,11 +709,17 @@ class DataLogger:
                 'visited': blue_object.visited
             }
 
+            # 内存优化：限制物体记录列表长度
+            if len(self.blue_objects_detected) >= self.max_objects_buffer:
+                self.blue_objects_detected = self.blue_objects_detected[-self.max_objects_buffer//2:]
             self.blue_objects_detected.append(blue_object_data)
 
             if 'blue_objects' not in self.json_data:
                 self.json_data['blue_objects'] = []
 
+            # 内存优化：限制JSON中的物体列表长度
+            if len(self.json_data['blue_objects']) >= self.max_objects_buffer:
+                self.json_data['blue_objects'] = self.json_data['blue_objects'][-self.max_objects_buffer//2:]
             self.json_data['blue_objects'].append(blue_object_data)
 
         except Exception as e:
@@ -695,11 +737,17 @@ class DataLogger:
                 'visited': black_object.visited
             }
 
+            # 内存优化：限制物体记录列表长度
+            if len(self.black_objects_detected) >= self.max_objects_buffer:
+                self.black_objects_detected = self.black_objects_detected[-self.max_objects_buffer//2:]
             self.black_objects_detected.append(black_object_data)
 
             if 'black_objects' not in self.json_data:
                 self.json_data['black_objects'] = []
 
+            # 内存优化：限制JSON中的物体列表长度
+            if len(self.json_data['black_objects']) >= self.max_objects_buffer:
+                self.json_data['black_objects'] = self.json_data['black_objects'][-self.max_objects_buffer//2:]
             self.json_data['black_objects'].append(black_object_data)
 
         except Exception as e:
@@ -714,7 +762,8 @@ class DataLogger:
             memory_percent = memory_info.percent
             self.performance_metrics['memory_usage'].append(memory_percent)
 
-            max_length = 1000
+            # 内存优化：使用配置的最大缓冲区大小
+            max_length = self.max_metrics_buffer
             if len(self.performance_metrics['cpu_usage']) > max_length:
                 self.performance_metrics['cpu_usage'] = self.performance_metrics['cpu_usage'][-max_length:]
             if len(self.performance_metrics['memory_usage']) > max_length:
@@ -726,7 +775,8 @@ class DataLogger:
     def record_loop_time(self, loop_time):
         self.performance_metrics['loop_times'].append(loop_time)
 
-        max_length = 1000
+        # 内存优化：使用配置的最大缓冲区大小
+        max_length = self.max_metrics_buffer
         if len(self.performance_metrics['loop_times']) > max_length:
             self.performance_metrics['loop_times'] = self.performance_metrics['loop_times'][-max_length:]
 
@@ -741,10 +791,38 @@ class DataLogger:
             if 'events' not in self.json_data:
                 self.json_data['events'] = []
 
+            # 内存优化：限制events列表长度
+            if len(self.json_data['events']) >= self.max_events_buffer:
+                self.json_data['events'] = self.json_data['events'][-self.max_events_buffer//2:]
             self.json_data['events'].append(event_record)
 
         except Exception as e:
             print(f"⚠️ 记录事件时出错: {e}")
+
+    def _auto_save_and_clear(self):
+        """自动保存数据并清空缓冲区（内存优化）"""
+        if not self.enable_json or len(self.json_data['flight_data']) == 0:
+            return
+
+        try:
+            # 创建临时文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            temp_filename = self.json_filename.replace('.json', f'_temp_{timestamp}.json')
+            
+            # 保存当前数据
+            with open(temp_filename, 'w', encoding='utf-8') as f:
+                json.dump(self.json_data, f, indent=2, ensure_ascii=False)
+            
+            # 清空flight_data，保留其他数据
+            saved_count = len(self.json_data['flight_data'])
+            self.json_data['flight_data'] = []
+            
+            # 强制垃圾回收
+            gc.collect()
+            
+            print(f"💾 自动保存 {saved_count} 条数据到: {temp_filename} (已清空缓冲区)")
+        except Exception as e:
+            print(f"⚠️ 自动保存数据时出错: {e}")
 
     def save_json_data(self):
         if not self.enable_json:
@@ -1089,6 +1167,144 @@ class VectorFieldPlanner:
         return Vector2D.from_angle(limited_angle, magnitude)
 
 
+def _load_chinese_font(font_size=20):
+    """加载中文字体，使用缓存避免重复加载"""
+    global _chinese_font_cache
+    
+    # 检查缓存
+    cache_key = font_size
+    if cache_key in _chinese_font_cache:
+        return _chinese_font_cache[cache_key]
+    
+    if not PIL_AVAILABLE:
+        return None
+    
+    font = None
+    font_paths = []
+    
+    # Windows系统字体路径
+    if platform.system() == "Windows":
+        windir = os.environ.get('WINDIR', 'C:\\Windows')
+        font_dir = os.path.join(windir, 'Fonts')
+        
+        # 首先尝试已知的中文字体文件名
+        known_fonts = [
+            "simhei.ttf",      # 黑体
+            "msyh.ttc",        # 微软雅黑
+            "msyhbd.ttc",      # 微软雅黑 Bold
+            "simsun.ttc",      # 宋体
+            "simkai.ttf",      # 楷体
+            "simli.ttf",       # 隶书
+            "STHeiti.ttf",     # 华文黑体
+            "STSong.ttf",      # 华文宋体
+        ]
+        
+        for font_name in known_fonts:
+            font_path = os.path.join(font_dir, font_name)
+            font_paths.append(font_path)
+        
+        # 如果找不到，尝试扫描字体目录
+        if os.path.exists(font_dir):
+            try:
+                for filename in os.listdir(font_dir):
+                    filename_lower = filename.lower()
+                    # 检查文件名是否包含中文字体关键词
+                    if any(keyword in filename_lower for keyword in ['simhei', 'msyh', 'simsun', 'simkai', 'simli', 'stheit', 'stsong', 'chinese', 'cjk']):
+                        font_path = os.path.join(font_dir, filename)
+                        if font_path not in font_paths:
+                            font_paths.append(font_path)
+            except:
+                pass
+    
+    # 也尝试常见的路径格式
+    common_paths = [
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/simsun.ttc",
+        "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/simkai.ttf",
+        "C:/Windows/Fonts/simli.ttf",
+    ]
+    font_paths.extend(common_paths)
+    
+    # 去重
+    font_paths = list(dict.fromkeys(font_paths))
+    
+    # 尝试加载字体
+    loaded_font_path = None
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+                # 如果成功加载，缓存字体
+                loaded_font_path = font_path
+                _chinese_font_cache[cache_key] = font
+                break
+            except Exception as e:
+                continue
+    
+    # 如果找到了字体，打印信息（仅第一次）
+    if loaded_font_path and cache_key == 20:  # 只在第一次加载时打印
+        print(f"✅ 成功加载中文字体: {os.path.basename(loaded_font_path)}")
+    
+    # 如果找不到字体，缓存None并打印警告（仅第一次）
+    if font is None and cache_key == 20:
+        print("⚠️ 未找到中文字体，将使用英文显示")
+        if platform.system() == "Windows":
+            windir = os.environ.get('WINDIR', 'C:\\Windows')
+            font_dir = os.path.join(windir, 'Fonts')
+            print(f"   字体目录: {font_dir}")
+            print(f"   请确保该目录存在中文字体文件（如simhei.ttf, msyh.ttc等）")
+    
+    _chinese_font_cache[cache_key] = font
+    return font
+
+
+def put_chinese_text(img, text, position, font_size=20, color=(255, 255, 255), thickness=1):
+    """
+    在OpenCV图像上绘制中文文本
+    使用PIL/Pillow来支持中文显示
+    """
+    if not PIL_AVAILABLE:
+        # 如果PIL不可用，使用英文替代
+        text_en = text.replace("状态:", "State:").replace("位置:", "Pos:").replace("红色物体:", "Red:").replace("蓝色物体:", "Blue:").replace("黑色物体:", "Black:").replace("障碍:", "Obs:").replace("手动控制中...", "Manual Ctrl").replace("等待无人机图像...", "Waiting...").replace("飞行状态:", "State:").replace("障碍距离:", "Obs:").replace("开阔度:", "Open:").replace("探索网格:", "Grid:").replace("CPU使用率:", "CPU:").replace("内存使用率:", "Mem:").replace("循环时间:", "Loop:").replace("更新时间:", "Time:").replace("按 Q 或 ESC 关闭窗口", "Press Q/ESC to close").replace("渲染错误", "Render Error").replace("探索前沿", "Frontier").replace("当前位置", "Current").replace("障碍物", "Obstacle").replace("图例:", "Legend:").replace("无人机信息面板", "Info Panel").replace("等待数据...", "Waiting...").replace("系统正在初始化，请稍候...", "Initializing...")
+        cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
+        return img
+    
+    try:
+        # 将OpenCV图像转换为PIL图像
+        img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_pil)
+        
+        # 加载中文字体
+        font = _load_chinese_font(font_size)
+        
+        if font is None:
+            # 如果找不到字体，回退到英文显示
+            raise Exception("未找到支持中文的字体")
+        
+        # 绘制文本（PIL使用RGB颜色）
+        color_rgb = (color[2], color[1], color[0])  # BGR转RGB
+        
+        # PIL的text函数位置参数是(x, y)
+        x, y = position
+        draw.text((x, y), text, font=font, fill=color_rgb)
+        
+        # 转换回OpenCV格式
+        img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+        
+    except Exception as e:
+        # 如果出错（包括字体加载失败），回退到英文显示
+        try:
+            # 将中文转换为英文
+            text_en = text.replace("状态:", "State:").replace("位置:", "Pos:").replace("红色物体:", "Red:").replace("蓝色物体:", "Blue:").replace("黑色物体:", "Black:").replace("障碍:", "Obs:").replace("手动控制中...", "Manual Ctrl").replace("等待无人机图像...", "Waiting...").replace("飞行状态:", "State:").replace("障碍距离:", "Obs:").replace("开阔度:", "Open:").replace("探索网格:", "Grid:").replace("CPU使用率:", "CPU:").replace("内存使用率:", "Mem:").replace("循环时间:", "Loop:").replace("更新时间:", "Time:").replace("按 Q 或 ESC 关闭窗口", "Press Q/ESC to close").replace("渲染错误", "Render Error").replace("探索前沿", "Frontier").replace("当前位置", "Current").replace("障碍物", "Obstacle").replace("图例:", "Legend:").replace("无人机信息面板", "Info Panel").replace("等待数据...", "Waiting...").replace("系统正在初始化，请稍候...", "Initializing...")
+            cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
+        except:
+            pass
+    
+    return img
+
+
 class FrontViewWindow:
     """前视窗口 - 显示摄像头画面和手动控制"""
 
@@ -1102,7 +1318,10 @@ class FrontViewWindow:
         self.show_info = (show_info if show_info is not None
                          else config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_INFO_OVERLAY'])
 
-        self.image_queue = queue.Queue(maxsize=3)
+        # 内存优化：使用配置的队列大小
+        queue_maxsize = config.DISPLAY['FRONT_VIEW_WINDOW'].get('QUEUE_MAXSIZE', 2)
+        self.image_queue = queue.Queue(maxsize=queue_maxsize)
+        self.reduce_image_copy = config.DISPLAY['FRONT_VIEW_WINDOW'].get('REDUCE_IMAGE_COPY', True)
         self.display_active = True
         self.display_thread = None
         self.paused = False
@@ -1158,8 +1377,18 @@ class FrontViewWindow:
                 except queue.Empty:
                     pass
 
+            # 内存优化：仅在必要时复制图像
+            if self.reduce_image_copy and image_data is not None:
+                # 如果队列为空或只有一个元素，直接使用引用（避免复制）
+                if self.image_queue.qsize() == 0:
+                    display_image = image_data
+                else:
+                    display_image = image_data.copy()
+            else:
+                display_image = image_data.copy() if image_data is not None else None
+            
             display_packet = {
-                'image': image_data.copy(),
+                'image': display_image,
                 'info': info.copy() if info else {},
                 'manual_info': manual_info.copy() if manual_info else [],
                 'timestamp': time.time()
@@ -1188,8 +1417,7 @@ class FrontViewWindow:
         cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
 
         wait_img = np.zeros((300, 400, 3), dtype=np.uint8)
-        cv2.putText(wait_img, "等待无人机图像...", (50, 150),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        wait_img = put_chinese_text(wait_img, "等待无人机图像...", (50, 150), 24, (255, 255, 255), 2)
         cv2.imshow(self.window_name, wait_img)
         cv2.waitKey(100)
 
@@ -1332,12 +1560,10 @@ class FrontViewWindow:
 
             state = info.get('state', 'UNKNOWN')
             state_color = (0, 255, 0) if '探索' in state else (0, 255, 255) if '悬停' in state else (255, 255, 0) if '手动' in state else (0, 0, 255)
-            cv2.putText(image, f"状态: {state}", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, state_color, 2)
+            image = put_chinese_text(image, f"状态: {state}", (10, 30), 21, state_color, 2)
 
             pos = info.get('position', (0, 0, 0))
-            cv2.putText(image, f"位置: ({pos[0]:.1f}, {pos[1]:.1f}, {-pos[2]:.1f}m)", (10, 60),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            image = put_chinese_text(image, f"位置: ({pos[0]:.1f}, {pos[1]:.1f}, {-pos[2]:.1f}m)", (10, 60), 18, (255, 255, 255), 1)
 
             red_objects_count = info.get('red_objects_count', 0)
             red_objects_visited = info.get('red_objects_visited', 0)
@@ -1350,27 +1576,21 @@ class FrontViewWindow:
                 red_text = f"红色物体: {red_objects_visited}/{red_objects_count}"
                 blue_text = f"蓝色物体: {blue_objects_visited}/{blue_objects_count}"
                 black_text = f"黑色物体: {black_objects_visited}/{black_objects_count}"
-                cv2.putText(image, red_text, (10, 90),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 100, 255), 2)
-                cv2.putText(image, blue_text, (10, 110),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 0), 2)
-                cv2.putText(image, black_text, (10, 130),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (128, 128, 128), 2)
+                image = put_chinese_text(image, red_text, (10, 90), 18, (0, 100, 255), 2)
+                image = put_chinese_text(image, blue_text, (10, 110), 18, (255, 100, 0), 2)
+                image = put_chinese_text(image, black_text, (10, 130), 18, (128, 128, 128), 2)
 
             if is_manual and manual_info:
                 y_start = 170 if (red_objects_count > 0 or blue_objects_count > 0 or black_objects_count > 0) else 100
                 for i, line in enumerate(manual_info):
                     y_pos = y_start + i * 20
-                    cv2.putText(image, line, (10, y_pos),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 255, 200), 1)
+                    image = put_chinese_text(image, line, (10, y_pos), 15, (200, 255, 200), 1)
 
-                cv2.putText(image, "手动控制中...", (width - 150, 60),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+                image = put_chinese_text(image, "手动控制中...", (width - 150, 60), 18, (255, 255, 0), 1)
             elif not is_manual and red_objects_count == 0 and blue_objects_count == 0 and black_objects_count == 0:
                 obs_dist = info.get('obstacle_distance', 0.0)
                 obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
-                cv2.putText(image, f"障碍: {obs_dist:.1f}m", (10, 90),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, obs_color, 2)
+                image = put_chinese_text(image, f"障碍: {obs_dist:.1f}m", (10, 90), 21, obs_color, 2)
 
             fps_text = f"FPS: {self.display_stats['fps']:.1f}"
             cv2.putText(image, fps_text, (width - 120, 30),
@@ -1505,18 +1725,15 @@ class InfoDisplayWindow:
 
         # 标题
         title = "无人机信息面板"
-        cv2.putText(img, title, (center_x - 150, center_y - 100),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, self.display_config['HIGHLIGHT_COLOR'], 2)
+        img = put_chinese_text(img, title, (center_x - 150, center_y - 100), 36, self.display_config['HIGHLIGHT_COLOR'], 2)
 
         # 状态信息
         status = "等待数据..."
-        cv2.putText(img, status, (center_x - 80, center_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, self.display_config['TEXT_COLOR'], 1)
+        img = put_chinese_text(img, status, (center_x - 80, center_y), 24, self.display_config['TEXT_COLOR'], 1)
 
         # 提示
         tip = "系统正在初始化，请稍候..."
-        cv2.putText(img, tip, (center_x - 120, center_y + 50),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, self.display_config['TEXT_COLOR'], 1)
+        img = put_chinese_text(img, tip, (center_x - 120, center_y + 50), 18, self.display_config['TEXT_COLOR'], 1)
 
         return img
 
@@ -1538,8 +1755,7 @@ class InfoDisplayWindow:
 
             # 标题栏
             title = "无人机信息面板"
-            cv2.putText(img, title, (self.window_width // 2 - 100, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, highlight_color, 2)
+            img = put_chinese_text(img, title, (self.window_width // 2 - 100, 30), 30, highlight_color, 2)
 
             # 分隔线
             cv2.line(img, (10, 50), (self.window_width - 10, 50), text_color, 1)
@@ -1550,16 +1766,14 @@ class InfoDisplayWindow:
             if 'state' in info_data:
                 state = info_data['state']
                 state_color = success_color if '探索' in state else highlight_color if '悬停' in state else warning_color if '紧急' in state else text_color
-                cv2.putText(img, f"飞行状态: {state}", (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, state_color, 2)
+                img = put_chinese_text(img, f"飞行状态: {state}", (x_offset, y_offset), 21, state_color, 2)
                 y_offset += 30
 
             # 2. 位置信息
             if 'position' in info_data:
                 pos = info_data['position']
                 pos_text = f"位置: X:{pos[0]:.1f}m Y:{pos[1]:.1f}m 高度:{-pos[2]:.1f}m"
-                cv2.putText(img, pos_text, (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+                img = put_chinese_text(img, pos_text, (x_offset, y_offset), 18, text_color, 1)
                 y_offset += 25
 
             # 3. 环境感知信息
@@ -1567,13 +1781,11 @@ class InfoDisplayWindow:
                 perception = info_data['perception']
                 obs_text = f"障碍距离: {perception.get('obstacle_distance', 0):.1f}m"
                 obs_color = warning_color if perception.get('obstacle_distance', 0) < 5.0 else text_color
-                cv2.putText(img, obs_text, (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, obs_color, 1)
+                img = put_chinese_text(img, obs_text, (x_offset, y_offset), 18, obs_color, 1)
                 y_offset += 25
 
                 open_text = f"开阔度: {perception.get('open_space_score', 0):.2f}"
-                cv2.putText(img, open_text, (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+                img = put_chinese_text(img, open_text, (x_offset, y_offset), 18, text_color, 1)
                 y_offset += 25
 
             # 4. 物体检测统计
@@ -1585,8 +1797,7 @@ class InfoDisplayWindow:
                 red_visited = objects_stats.get('red_visited', 0)
                 red_text = f"红色物体: {red_visited}/{red_total}"
                 red_color = success_color if red_visited > 0 else text_color
-                cv2.putText(img, red_text, (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, red_color, 1)
+                img = put_chinese_text(img, red_text, (x_offset, y_offset), 21, red_color, 1)
                 y_offset += 30
 
                 # 蓝色物体统计
@@ -1594,9 +1805,17 @@ class InfoDisplayWindow:
                 blue_visited = objects_stats.get('blue_visited', 0)
                 blue_text = f"蓝色物体: {blue_visited}/{blue_total}"
                 blue_color = success_color if blue_visited > 0 else text_color
-                cv2.putText(img, blue_text, (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, blue_color, 1)
+                img = put_chinese_text(img, blue_text, (x_offset, y_offset), 21, blue_color, 1)
                 y_offset += 30
+                
+                # 黑色物体统计
+                black_total = objects_stats.get('black_total', 0)
+                black_visited = objects_stats.get('black_visited', 0)
+                if black_total > 0:
+                    black_text = f"黑色物体: {black_visited}/{black_total}"
+                    black_color = success_color if black_visited > 0 else text_color
+                    img = put_chinese_text(img, black_text, (x_offset, y_offset), 21, black_color, 1)
+                    y_offset += 30
 
             # 5. 探索网格信息
             if 'grid_stats' in info_data:
@@ -1606,8 +1825,7 @@ class InfoDisplayWindow:
                 total = grid_stats.get('total', 1)
 
                 grid_text = f"探索网格: {frontiers}前沿 | {explored}/{total}已探索"
-                cv2.putText(img, grid_text, (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, text_color, 1)
+                img = put_chinese_text(img, grid_text, (x_offset, y_offset), 18, text_color, 1)
                 y_offset += 25
 
                 # 探索进度条
@@ -1642,16 +1860,13 @@ class InfoDisplayWindow:
                 mem_color = warning_color if memory_usage > 80 else text_color
                 loop_color = warning_color if loop_time > 200 else text_color
 
-                cv2.putText(img, f"CPU使用率: {cpu_usage:.1f}%", (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, cpu_color, 1)
+                img = put_chinese_text(img, f"CPU使用率: {cpu_usage:.1f}%", (x_offset, y_offset), 18, cpu_color, 1)
                 y_offset += 25
 
-                cv2.putText(img, f"内存使用率: {memory_usage:.1f}%", (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, mem_color, 1)
+                img = put_chinese_text(img, f"内存使用率: {memory_usage:.1f}%", (x_offset, y_offset), 18, mem_color, 1)
                 y_offset += 25
 
-                cv2.putText(img, f"循环时间: {loop_time:.1f}ms", (x_offset, y_offset),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.6, loop_color, 1)
+                img = put_chinese_text(img, f"循环时间: {loop_time:.1f}ms", (x_offset, y_offset), 18, loop_color, 1)
                 y_offset += 25
 
             # 7. 探索网格图像（右侧）
@@ -1665,49 +1880,41 @@ class InfoDisplayWindow:
                     grid_y = 80
 
                     # 添加网格标题
-                    cv2.putText(img, "探索网格", (grid_x, grid_y - 10),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, highlight_color, 1)
+                    img = put_chinese_text(img, "探索网格", (grid_x, grid_y - 10), 18, highlight_color, 1)
 
                     # 添加图例
                     legend_y = grid_y + grid_size + 20
-                    cv2.putText(img, "图例:", (grid_x, legend_y),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                    img = put_chinese_text(img, "图例:", (grid_x, legend_y), 15, text_color, 1)
                     legend_y += 20
 
                     # 当前位置
                     cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 255, 0), -1)
-                    cv2.putText(img, "当前位置", (grid_x + 20, legend_y + 12),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    img = put_chinese_text(img, "当前位置", (grid_x + 20, legend_y + 12), 12, text_color, 1)
                     legend_y += 25
 
                     # 障碍物
                     cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 0, 255), -1)
-                    cv2.putText(img, "障碍物", (grid_x + 20, legend_y + 12),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    img = put_chinese_text(img, "障碍物", (grid_x + 20, legend_y + 12), 12, text_color, 1)
                     legend_y += 25
 
                     # 红色物体
                     cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 100, 255), -1)
-                    cv2.putText(img, "红色物体", (grid_x + 20, legend_y + 12),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    img = put_chinese_text(img, "红色物体", (grid_x + 20, legend_y + 12), 12, text_color, 1)
                     legend_y += 25
 
                     # 蓝色物体
                     cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (255, 100, 0), -1)
-                    cv2.putText(img, "蓝色物体", (grid_x + 20, legend_y + 12),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    img = put_chinese_text(img, "蓝色物体", (grid_x + 20, legend_y + 12), 12, text_color, 1)
                     legend_y += 25
 
                     # 黑色物体
                     cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (128, 128, 128), -1)
-                    cv2.putText(img, "黑色物体", (grid_x + 20, legend_y + 12),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    img = put_chinese_text(img, "黑色物体", (grid_x + 20, legend_y + 12), 12, text_color, 1)
                     legend_y += 25
 
                     # 前沿区域
                     cv2.rectangle(img, (grid_x, legend_y), (grid_x + 15, legend_y + 15), (0, 200, 0), -1)
-                    cv2.putText(img, "探索前沿", (grid_x + 20, legend_y + 12),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                    img = put_chinese_text(img, "探索前沿", (grid_x + 20, legend_y + 12), 12, text_color, 1)
 
                     # 将网格图像放到主图像上
                     img[grid_y:grid_y+grid_size, grid_x:grid_x+grid_size] = grid_resized
@@ -1716,13 +1923,11 @@ class InfoDisplayWindow:
             if 'timestamp' in info_data:
                 timestamp = info_data['timestamp']
                 time_text = f"更新时间: {timestamp}"
-                cv2.putText(img, time_text, (self.window_width - 200, self.window_height - 10),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                img = put_chinese_text(img, time_text, (self.window_width - 200, self.window_height - 10), 15, text_color, 1)
 
             # 9. 底部提示
             hint_text = "按 Q 或 ESC 关闭窗口"
-            cv2.putText(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+            img = put_chinese_text(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30), 15, text_color, 1)
 
             return img
 
@@ -1730,8 +1935,7 @@ class InfoDisplayWindow:
             print(f"⚠️ 渲染信息显示时出错: {e}")
             error_img = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
             error_img[:, :] = self.display_config['BACKGROUND_COLOR']
-            cv2.putText(error_img, "渲染错误", (self.window_width // 2 - 50, self.window_height // 2),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1.0, warning_color, 2)
+            error_img = put_chinese_text(error_img, "渲染错误", (self.window_width // 2 - 50, self.window_height // 2), 30, warning_color, 2)
             return error_img
 
 
@@ -2684,19 +2888,27 @@ class PerceptiveExplorer:
                             if self.state == FlightState.MANUAL:
                                 manual_info = self._get_manual_control_info()
 
-                            # 合并红色和蓝色物体标记
-                            display_image = img_bgr.copy()
-                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None:
-                                red_mask = cv2.inRange(result.red_objects_image, (0, 100, 0), (0, 255, 255))
-                                display_image[red_mask > 0] = result.red_objects_image[red_mask > 0]
+                            # 内存优化：仅在需要标记时才复制图像
+                            has_markers = (config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None) or \
+                                         (config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None) or \
+                                         (config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLACK_OBJECTS'] and result.black_objects_image is not None)
+                            
+                            if has_markers:
+                                display_image = img_bgr.copy()
+                                if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_RED_OBJECTS'] and result.red_objects_image is not None:
+                                    red_mask = cv2.inRange(result.red_objects_image, (0, 100, 0), (0, 255, 255))
+                                    display_image[red_mask > 0] = result.red_objects_image[red_mask > 0]
 
-                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None:
-                                blue_mask = cv2.inRange(result.blue_objects_image, (255, 100, 0), (255, 255, 255))
-                                display_image[blue_mask > 0] = result.blue_objects_image[blue_mask > 0]
+                                if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLUE_OBJECTS'] and result.blue_objects_image is not None:
+                                    blue_mask = cv2.inRange(result.blue_objects_image, (255, 100, 0), (255, 255, 255))
+                                    display_image[blue_mask > 0] = result.blue_objects_image[blue_mask > 0]
 
-                            if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLACK_OBJECTS'] and result.black_objects_image is not None:
-                                black_mask = cv2.inRange(result.black_objects_image, (128, 128, 0), (128, 255, 255))
-                                display_image[black_mask > 0] = result.black_objects_image[black_mask > 0]
+                                if config.DISPLAY['FRONT_VIEW_WINDOW']['SHOW_BLACK_OBJECTS'] and result.black_objects_image is not None:
+                                    black_mask = cv2.inRange(result.black_objects_image, (128, 128, 0), (128, 255, 255))
+                                    display_image[black_mask > 0] = result.black_objects_image[black_mask > 0]
+                            else:
+                                # 没有标记时直接使用原图像引用
+                                display_image = img_bgr
 
                             self.front_window.update_image(display_image, display_info, manual_info)
                             self.stats['front_image_updates'] += 1
@@ -3247,6 +3459,8 @@ class PerceptiveExplorer:
 
                 if self.loop_count % config.SYSTEM.get('HEALTH_CHECK_INTERVAL', 20) == 0:
                     self._report_status(exploration_start, perception)
+                    # 内存优化：定期垃圾回收
+                    gc.collect()
 
                 loop_time = time.time() - loop_start
                 if loop_time < 0.1:
