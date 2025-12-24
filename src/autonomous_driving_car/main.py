@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-CARLA 多车辆协同控制版：修复出生点索引越界问题
+CARLA 多车辆协同控制版：V1.0 增强ACC跟车+紧急避障
 """
 
 import sys
@@ -52,6 +52,12 @@ PID_KP = 0.2
 PID_KI = 0.01
 PID_KD = 0.02
 
+# ACC跟车配置（新增）
+SAFE_TIME_GAP = 1.5  # 安全时距（秒）
+MIN_SAFE_DISTANCE = 5.0  # 最小安全距离（米）
+EMERGENCY_DECEL_RATE = 5.0  # 紧急制动减速度（km/h/帧）
+LEAD_BRAKE_THRESHOLD = -10.0  # 前车急刹加速度阈值（km/h/s）
+
 # 交通规则配置
 TRAFFIC_LIGHT_STOP_DISTANCE = 4.0
 TRAFFIC_LIGHT_DETECTION_RANGE = 50.0
@@ -72,12 +78,13 @@ CAMERA_POS = carla.Transform(carla.Location(x=-6.0, z=2.5), carla.Rotation(pitch
 # 全局变量
 current_view_vehicle_id = 1
 vehicle_agents = []
+COLLISION_FLAG = {}  # 碰撞标志（新增）
 
 # 日志配置
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - 车辆%(vehicle_id)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("multi_vehicle_simulation.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler("multi_vehicle_simulation_v1.log"), logging.StreamHandler()]
 )
 
 # ===================== 核心工具函数 ======================
@@ -326,6 +333,11 @@ class VehicleAgent:
         self.logger = logging.getLogger(__name__)
         self.logger = logging.LoggerAdapter(self.logger, {"vehicle_id": vehicle_id})
 
+        # 新增：ACC跟车相关属性
+        self.last_lead_speed = 0.0  # 前车上次速度
+        self.stuck_count = 0  # 卡死计数
+        COLLISION_FLAG[self.vehicle_id] = False  # 初始化碰撞标志
+
         # 生成车辆
         self.vehicle_bp = self.world.get_blueprint_library().find(vehicle_model)
         if self.vehicle_bp.has_attribute("color"):
@@ -400,17 +412,42 @@ class VehicleAgent:
             base_target_speed = self.base_speed * speed_factor
             base_target_speed = max(8.0, base_target_speed)
 
-            # 跟车控制
-            global vehicle_agents
+            # ========== 新增：精细化ACC跟车+紧急避障逻辑 ==========
             if self.vehicle_id > 1 and len(vehicle_agents) >= self.vehicle_id:
                 try:
-                    lead_vehicle = vehicle_agents[self.vehicle_id - 2].vehicle
+                    lead_agent = vehicle_agents[self.vehicle_id - 2]
+                    lead_vehicle = lead_agent.vehicle
                     lead_vehicle_transform = lead_vehicle.get_transform()
+                    
+                    # 计算前车速度和加速度
+                    lead_vel = lead_vehicle.get_velocity()
+                    lead_speed = math.hypot(lead_vel.x, lead_vel.y) * 3.6
+                    lead_acc = (lead_speed - lead_agent.last_lead_speed) / 0.03  # 30Hz刷新率，计算加速度
+                    lead_agent.last_lead_speed = lead_speed  # 更新前车上次速度
+                    
+                    # 计算安全跟车距离（安全时距+最小安全距）
+                    safe_dist = (current_speed / 3.6) * SAFE_TIME_GAP + MIN_SAFE_DISTANCE
                     dist_to_lead = vehicle_transform.location.distance(lead_vehicle_transform.location)
-                    if dist_to_lead < 15.0:
-                        base_target_speed = max(5.0, base_target_speed * 0.5)
-                except:
-                    pass
+                    
+                    # 动态调整目标速度
+                    if dist_to_lead < safe_dist - 2:
+                        # 过近：减速至前车速度-2（不低于5km/h）
+                        base_target_speed = max(5.0, lead_speed - 2)
+                    elif dist_to_lead > safe_dist + 2:
+                        # 过远：加速至前车速度+2（不超基础速度）
+                        base_target_speed = min(self.base_speed * speed_factor, lead_speed + 2)
+                    else:
+                        # 安全距离：与前车速度同步
+                        base_target_speed = lead_speed
+                    
+                    # 紧急避障：前车急刹（加速度<阈值）
+                    if lead_acc < LEAD_BRAKE_THRESHOLD:
+                        base_target_speed = max(0.0, current_speed - EMERGENCY_DECEL_RATE)
+                        self.logger.warning(f"前车急刹（加速度{lead_acc:.1f}km/h/s）！紧急减速至{base_target_speed:.1f}km/h")
+                        
+                except Exception as e:
+                    self.logger.warning(f"ACC跟车计算异常：{e}")
+            # ========== ACC跟车逻辑结束 ==========
 
             # 交通灯处理
             target_speed, traffic_light_status = self.traffic_light_manager.handle_traffic_light_logic(
@@ -426,6 +463,12 @@ class VehicleAgent:
                 throttle = 0.0
                 brake = 1.0
 
+            # 新增：碰撞后紧急停车
+            if COLLISION_FLAG.get(self.vehicle_id, False):
+                throttle = 0.0
+                brake = 1.0
+                self.logger.error("检测到碰撞，紧急停车！")
+
             # 应用控制
             control = carla.VehicleControl()
             control.steer = steer
@@ -433,10 +476,11 @@ class VehicleAgent:
             control.brake = brake
             self.vehicle.apply_control(control)
 
-            # 日志输出
+            # 日志输出（新增ACC相关信息）
             self.logger.info(
                 f"速度：{current_speed:5.1f}km/h | 目标：{target_speed:5.1f} | "
-                f"弯道：{['直道', '缓弯', '急弯'][curve_level]:<3} | 灯状态：{traffic_light_status}"
+                f"弯道：{['直道', '缓弯', '急弯'][curve_level]:<3} | 灯状态：{traffic_light_status} | "
+                f"ACC：{'激活' if self.vehicle_id>1 else '未激活'}"
             )
 
             return True
@@ -521,10 +565,10 @@ class SpeedController:
         p = self.kp * error
         self.integral += self.ki * error
         self.integral = np.clip(self.integral, -1.0, 1.0)
-        i = self.integral
         d = self.kd * (error - self.last_error)
         self.last_error = error
-        return np.clip(p + i + d, 0.0, 1.0)
+        # 修复：将 i 改为 self.integral
+        return np.clip(p + self.integral + d, 0.0, 1.0)
 
 class TrafficLightManager:
     def __init__(self, vehicle_id):
@@ -681,7 +725,7 @@ def main():
     global current_view_vehicle_id, vehicle_agents
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption(f"CARLA多车辆视角（{VEHICLE_COUNT}辆车）- 按1/2/3切换视角，按S切换分屏，按V切换俯视视角")
+    pygame.display.set_caption(f"CARLA多车辆视角（{VEHICLE_COUNT}辆车）- V1.0 ACC跟车 - 按1/2/3切换视角，按S切换分屏，按V切换俯视视角")
 
     client = None
     world = None
@@ -777,7 +821,7 @@ def main():
         if len(vehicle_agents) == 0:
             raise RuntimeError("无车辆生成成功，仿真终止")
 
-        print(f"\n共生成{len(vehicle_agents)}辆车辆！")
+        print(f"\n共生成{len(vehicle_agents)}辆车辆！V1.0 ACC跟车功能已启用")
 
         # 创建全局俯视相机
         try:
