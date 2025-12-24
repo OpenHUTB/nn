@@ -499,7 +499,6 @@ class HumanoidSimulator:
 
     def run_simulation(self):
         """运行仿真主循环"""
-        # 加载模型
         self.load_model()
 
         # 初始化绘图

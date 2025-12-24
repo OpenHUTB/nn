@@ -20,6 +20,7 @@ if not os.path.exists(SCENE_PATH):
     print(f"❌ 场景文件不存在：{SCENE_PATH}")
     sys.exit(1)
 
+
 # ========== 智能抓取控制器 ==========
 class PandaAutoGrab:
     def __init__(self):
@@ -50,16 +51,23 @@ class PandaAutoGrab:
         self.safe_lift_height = 0.15
         self.grab_height = 0.05
 
+        # PD控制参数
         # 【优化1】提取PD控制参数为类内常量
         self.PD_KP = 250  # 比例增益
         self.PD_KD = 100  # 微分增益
         self.TORQUE_LIMIT = 20  # 力矩限制
 
+        # 雅克比伪逆参数
+        self.JACOBIAN_DAMPING = 0.01  # 雅克比伪逆的阻尼系数
+
+        # 【优化1】提取关节速度限制为类内常量
+        self.JOINT_VEL_LIMIT = 0.5  # 关节速度上限
+
         # 打印模型信息
-        print("="*50)
+        print("=" * 50)
         print("📌 模型Body列表：", [self.model.body(i).name for i in range(min(self.model.nbody, 10))])
         print("📌 模型Joint列表：", [self.model.joint(i).name for i in range(min(self.model.njnt, 10))])
-        print("="*50)
+        print("=" * 50)
 
     def get_ee_pos(self):
         """获取末端执行器位置"""
@@ -70,12 +78,25 @@ class PandaAutoGrab:
         return self.data.xpos[self.cube_body_id].copy()
 
     def _compute_jacobian(self):
-        """计算雅克比矩阵"""
+        """计算末端执行器的位置雅克比矩阵
+
+        Returns:
+            np.ndarray: 3×7的位置雅克比矩阵（仅包含机械臂7个关节的分量）
+        """
         mujoco.mj_jac(self.model, self.data, self.jacp, self.jacr, self.get_ee_pos(), self.ee_body_id)
         return self.jacp[:, self.joint_ids]
 
     def _move_step(self, target, tol=0.003, speed=0.3):
-        """单步移动控制（修复维度匹配问题）"""
+        """单步位置控制：基于雅克比伪逆实现末端执行器的位置跟踪
+
+        Args:
+            target (np.ndarray): 末端执行器的目标位置，形状为(3,)的三维坐标[x, y, z]
+            tol (float): 位置误差容忍阈值，当实际位置与目标位置的欧氏距离小于该值时，认为到达目标
+            speed (float): 移动速度系数，控制机械臂的运动速度
+
+        Returns:
+            bool: 若到达目标位置返回True，否则返回False
+        """
         ee_pos = self.get_ee_pos()
         error = target - ee_pos
         error_norm = np.linalg.norm(error)
@@ -88,15 +109,15 @@ class PandaAutoGrab:
 
         # ========== 修正：正确的阻尼伪逆计算 ==========
         # 方法1：使用正则化参数的伪逆（推荐）
-        lambda_ = 0.01  # 阻尼系数
-        jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + lambda_ * np.eye(3))
+        jacobian_pinv = jacobian.T @ np.linalg.inv(jacobian @ jacobian.T + self.JACOBIAN_DAMPING * np.eye(3))
 
         # 方法2：若方法1仍报错，可改用numpy伪逆（自动处理维度）
         # jacobian_pinv = np.linalg.pinv(jacobian, rcond=1e-3)
 
         # 关节速度指令
         joint_vel_cmd = speed * jacobian_pinv @ error
-        joint_vel_cmd = np.clip(joint_vel_cmd, -0.5, 0.5)  # 速度限制
+        # 【优化2】使用类内常量替代硬编码的关节速度限制
+        joint_vel_cmd = np.clip(joint_vel_cmd, -self.JOINT_VEL_LIMIT, self.JOINT_VEL_LIMIT)
 
         # PD力矩计算
         torque = np.zeros(7)
@@ -215,9 +236,9 @@ class PandaAutoGrab:
         elif self.current_phase == 12:
             # 阶段12：抓取完成
             if not self.grab_complete:
-                print("\n" + "="*50)
+                print("\n" + "=" * 50)
                 print("✅ 智能抓取任务完成！")
-                print("="*50)
+                print("=" * 50)
                 self.grab_complete = True
 
     def run(self):
@@ -233,6 +254,7 @@ class PandaAutoGrab:
         print("💡 关闭Viewer窗口可退出程序")
 
         # 提取休眠时间为常量，便于后续调整
+        SIMULATION_SLEEP = 1 / 200
         SIMULATION_SLEEP = 1/200
 
         # 单线程主循环
@@ -257,6 +279,7 @@ class PandaAutoGrab:
         self.viewer.close()
         print("\n👋 仿真结束")
 
+
 # ========== 主函数 ==========
 if __name__ == "__main__":
     try:
@@ -265,5 +288,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ 程序错误：{e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
