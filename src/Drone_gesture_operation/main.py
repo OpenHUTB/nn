@@ -97,26 +97,29 @@ class StableFPSHandRecognizer:
             area = cv.contourArea(cnt)
 
             if area > 1000:
-                # 3. 手势分类（新增五指识别）
+                # 3. 手势分类（修改Point为仅食指+中指（2根手指））
                 hull = cv.convexHull(cnt)
                 solidity = cv.contourArea(cnt) / cv.contourArea(hull)
 
                 # 计算手指数量
                 finger_count = self.count_fingers(cnt, frame_small)
 
-                # 手势判断逻辑
+                # 手势判断逻辑（核心修改）
                 if solidity > 0.85:
                     # 密实度高 = 握拳
                     current_gesture = "Fist"
-                elif finger_count == 1:
-                    # 1根手指 = 单指
+                elif finger_count == 2:
+                    # 仅2根手指 = 食指+中指（Point）
                     current_gesture = "Point"
                 elif finger_count >= 4:
                     # 4-5根手指 = 手掌张开
                     current_gesture = "Palm"
-                elif 2 <= finger_count <= 3:
-                    # 2-3根手指 = 部分张开（归类为Point）
-                    current_gesture = "Point"
+                elif finger_count == 1:
+                    # 1根手指 = 单指（归为None或单独分类，这里保持None）
+                    current_gesture = "None"
+                elif finger_count == 3:
+                    # 3根手指 = 归为None
+                    current_gesture = "None"
 
         # 4. 稳定手势（仅2帧一致）
         self.gesture_buffer.append(current_gesture)
@@ -125,7 +128,7 @@ class StableFPSHandRecognizer:
         if len(set(self.gesture_buffer)) == 1:
             self.stable_gesture = self.gesture_buffer[0]
 
-        # 5. 绘制极简UI（仅保留手势和FPS显示，移除手指数量）
+        # 5. 绘制极简UI（仅保留手势和FPS显示）
         cv.putText(frame, f"Gesture: {self.stable_gesture}", (10, 40),
                    cv.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
         cv.putText(frame, f"FPS: {self.target_fps}", (10, 80),
@@ -150,7 +153,7 @@ class StableFPSHandRecognizer:
         capture_thread.start()
 
         print(f"✅ 帧率锁定 {self.target_fps} 帧 | ESC退出")
-        print("💡 把手放在画面中间，握拳=Fist，伸食指=Point，五指张开=Palm")
+        print("💡 把手放在画面中间，握拳=Fist，伸食指+中指=Point，五指张开=Palm")
 
         # 3. 主线程处理+显示（严格控时）
         while cap.isOpened():
