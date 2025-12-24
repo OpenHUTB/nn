@@ -12,9 +12,15 @@ from pynput import keyboard
 import math
 import random
 import time
+import json
+from collections import deque
 
 # ------------------- 键盘监听 -------------------
-KEYS = {keyboard.KeyCode.from_char('r'): False}
+KEYS = {
+    keyboard.KeyCode.from_char('r'): False,
+    keyboard.KeyCode.from_char('d'): False,  # 调试模式开关
+    keyboard.KeyCode.from_char('s'): False,  # 保存路径记录
+}
 
 def on_press(k):
     if k in KEYS: KEYS[k] = True
@@ -59,6 +65,135 @@ for obs_name in OBSTACLE_NAMES:
 # 小车底盘body id
 chassis_body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "chassis")
 
+# ------------------- 路径记忆类 -------------------
+class PathMemory:
+    """路径记忆与学习系统"""
+
+    def __init__(self, memory_size=50):
+        self.memory = deque(maxlen=memory_size)
+        self.path_scores = {}  # 路径评分字典
+        self.obstacle_history = {}  # 障碍物历史
+        self.successful_paths = []  # 成功路径记录
+        self.debug_mode = False
+
+    def add_experience(self, position, direction, success, distance_traveled):
+        """添加路径经验"""
+        key = self._create_key(position, direction)
+
+        # 更新路径评分
+        if key in self.path_scores:
+            if success:
+                self.path_scores[key] += PATH_REWARD * LEARNING_RATE
+            else:
+                self.path_scores[key] += PATH_PENALTY * LEARNING_RATE
+        else:
+            if success:
+                self.path_scores[key] = PATH_REWARD
+            else:
+                self.path_scores[key] = PATH_PENALTY
+
+        # 记录经验
+        experience = {
+            'position': tuple(position[:2]),  # 只记录x,y坐标
+            'direction': direction,
+            'success': success,
+            'distance': distance_traveled,
+            'timestamp': time.time()
+        }
+        self.memory.append(experience)
+
+        if self.debug_mode:
+            print(f"路径经验: {direction}, 成功: {success}, 评分: {self.path_scores.get(key, 0):.2f}")
+
+    def get_best_direction(self, position, available_directions):
+        """获取最佳方向（基于历史经验）"""
+        if random.random() < EXPLORATION_RATE:
+            # 探索：随机选择一个方向
+            return random.choice(available_directions)
+
+        # 利用：选择评分最高的方向
+        best_direction = None
+        best_score = -float('inf')
+
+        for direction in available_directions:
+            key = self._create_key(position, direction)
+            base_score = DIRECTION_SCORES.get(direction, 0.5)
+            memory_score = self.path_scores.get(key, 0)
+            total_score = base_score + memory_score
+
+            if total_score > best_score:
+                best_score = total_score
+                best_direction = direction
+
+        return best_direction or random.choice(available_directions)
+
+    def record_obstacle(self, obstacle_name, position):
+        """记录障碍物位置"""
+        key = f"{obstacle_name}_{int(position[0]*10)}_{int(position[1]*10)}"
+        self.obstacle_history[key] = {
+            'name': obstacle_name,
+            'position': tuple(position[:2]),
+            'timestamp': time.time(),
+            'count': self.obstacle_history.get(key, {}).get('count', 0) + 1
+        }
+
+    def is_recent_obstacle(self, position, threshold=0.5):
+        """检查位置附近是否有近期遇到的障碍物"""
+        for key, data in self.obstacle_history.items():
+            obs_pos = data['position']
+            distance = math.sqrt((obs_pos[0] - position[0])**2 + (obs_pos[1] - position[1])**2)
+            if distance < threshold and (time.time() - data['timestamp']) < 10:
+                return True
+        return False
+
+    def record_successful_path(self, start_pos, end_pos, directions):
+        """记录成功路径"""
+        path = {
+            'start': tuple(start_pos[:2]),
+            'end': tuple(end_pos[:2]),
+            'directions': directions[:],
+            'length': len(directions),
+            'timestamp': time.time()
+        }
+        self.successful_paths.append(path)
+
+    def save_to_file(self, filename="path_memory.json"):
+        """保存路径记忆到文件"""
+        data = {
+            'path_scores': self.path_scores,
+            'obstacle_history': self.obstacle_history,
+            'successful_paths': self.successful_paths[-10:],  # 只保存最近10条
+        }
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=2)
+        print(f"路径记忆已保存到 {filename}")
+
+    def load_from_file(self, filename="path_memory.json"):
+        """从文件加载路径记忆"""
+        try:
+            with open(filename, 'r') as f:
+                data = json.load(f)
+            self.path_scores = data.get('path_scores', {})
+            self.obstacle_history = data.get('obstacle_history', {})
+            self.successful_paths = data.get('successful_paths', [])
+            print(f"已从 {filename} 加载路径记忆")
+        except FileNotFoundError:
+            print(f"未找到记忆文件 {filename}，从头开始学习")
+
+    def _create_key(self, position, direction):
+        """创建记忆键"""
+        x, y = int(position[0]*10), int(position[1]*10)
+        return f"{x}_{y}_{direction}"
+
+    def toggle_debug(self):
+        """切换调试模式"""
+        self.debug_mode = not self.debug_mode
+        print(f"调试模式: {'开启' if self.debug_mode else '关闭'}")
+
+# 初始化路径记忆系统
+path_memory = PathMemory(PATH_MEMORY_SIZE)
+path_memory.load_from_file()
+
 # ------------------- 复位函数 -------------------
 def reset_car():
     mujoco.mj_resetData(model, data)
@@ -92,6 +227,7 @@ def check_front_obstacle(direction_angle=0):
     # 扫描所有障碍物
     min_distance = float('inf')
     closest_obstacle = None
+    obstacle_pos = None
 
     for obs_name, obs_id in obstacle_ids.items():
         obs_pos = data.body(obs_id).xpos
@@ -219,8 +355,15 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
     viewer.cam.distance = 2.5
     viewer.cam.elevation = -25
 
+    print("=== 智能绕障小车启动 ===")
+    print("控制说明:")
+    print("  R - 复位小车")
+    print("  D - 切换调试模式")
+    print("  S - 保存路径记忆")
+    print("======================")
+
     while viewer.is_running():
-        # 检查R键复位
+        # 检查键盘输入
         if KEYS.get(keyboard.KeyCode.from_char('r'), False):
             reset_car()
             CAR_STATE = "CRUISING"
@@ -231,6 +374,18 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             turn_attempts = 0
             backup_counter = 0
             KEYS[keyboard.KeyCode.from_char('r')] = False
+
+        if KEYS.get(keyboard.KeyCode.from_char('d'), False):
+            path_memory.toggle_debug()
+            KEYS[keyboard.KeyCode.from_char('d')] = False
+
+        if KEYS.get(keyboard.KeyCode.from_char('s'), False):
+            path_memory.save_to_file()
+            KEYS[keyboard.KeyCode.from_char('s')] = False
+
+        # 获取小车当前位置和速度
+        car_pos = get_car_position()
+        car_vel = get_car_velocity()
 
         # 根据当前状态执行不同操作
         if CAR_STATE == "CRUISING":
@@ -417,6 +572,10 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                     print("恢复巡航成功")
                     CAR_STATE = "CRUISING"
                     turn_counter = 0
+
+                    # 更新路径历史
+                    chosen_direction_name = [k for k, v in DIRECTIONS.items() if abs(v - turn_angle) < 0.01][0]
+                    update_path_history(chosen_direction_name, True)
                 else:
                     print("恢复巡航时检测到障碍物，重新处理")
                     CAR_STATE = "STOPPED"
@@ -431,18 +590,19 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 
         status_info = f"状态: {CAR_STATE}, 速度: {vel:7.5f} m/s"
         if abs(current_steer) > 0.01:
-            status_info += f", 转向: {math.degrees(current_steer):.1f}度"
+            status_info += f", 转向: {math.degrees(current_steer):.1f}°"
 
         status_info += f", 尝试次数: {turn_attempts}"
 
         if CAR_STATE == "CRUISING":
             obstacle_status, obstacle_distance, obstacle_name = check_front_obstacle()
             if obstacle_status > 0 and obstacle_name:
-                status_info += f", 前方障碍: {obstacle_name}({obstacle_distance:.2f}m)"
+                status_info += f", 障碍: {obstacle_name}({obstacle_distance:.2f}m)"
 
         print(f"\r{status_info}", end='', flush=True)
 
         # 同步视图
         viewer.sync()
 
-print("\n程序结束")
+print("\n程序结束，保存路径记忆...")
+path_memory.save_to_file()

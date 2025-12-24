@@ -52,6 +52,7 @@ class PandaAutoGrab:
         self.grab_height = 0.05
 
         # PD控制参数
+        # 【优化1】提取PD控制参数为类内常量
         self.PD_KP = 250  # 比例增益
         self.PD_KD = 100  # 微分增益
         self.TORQUE_LIMIT = 20  # 力矩限制
@@ -122,6 +123,7 @@ class PandaAutoGrab:
         torque = np.zeros(7)
         for i in range(7):
             angle_error = joint_vel_cmd[i] * 0.1
+            # 【优化2】使用类内常量替代硬编码的PD参数
             torque[i] = self.PD_KP * angle_error - self.PD_KD * self.data.qvel[self.joint_ids[i]]
             torque[i] = np.clip(torque[i], -self.TORQUE_LIMIT, self.TORQUE_LIMIT)
 
@@ -253,6 +255,7 @@ class PandaAutoGrab:
 
         # 提取休眠时间为常量，便于后续调整
         SIMULATION_SLEEP = 1 / 200
+        SIMULATION_SLEEP = 1/200
 
         # 单线程主循环
         # 添加KeyboardInterrupt捕获，支持Ctrl+C优雅退出
