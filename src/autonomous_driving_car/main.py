@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-CARLA 多车辆协同控制版：修复出生点索引越界问题
+CARLA 多车辆协同控制版：V2.0 增强感知（LiDAR+碰撞检测+障碍物避障）
 """
 
 import sys
@@ -52,6 +52,22 @@ PID_KP = 0.2
 PID_KI = 0.01
 PID_KD = 0.02
 
+# ACC跟车配置（V1.0保留）
+SAFE_TIME_GAP = 1.5  # 安全时距（秒）
+MIN_SAFE_DISTANCE = 5.0  # 最小安全距离（米）
+EMERGENCY_DECEL_RATE = 5.0  # 紧急制动减速度（km/h/帧）
+LEAD_BRAKE_THRESHOLD = -10.0  # 前车急刹加速度阈值（km/h/s）
+
+# LiDAR与障碍物检测配置（V2.0新增）
+LIDAR_RANGE = 30.0  # LiDAR检测范围（米）
+LIDAR_POINTS_PER_SECOND = 100000  # LiDAR点云密度
+LIDAR_ROTATION_FREQ = 30  # LiDAR刷新率（Hz）
+OBSTACLE_DETECTION_WIDTH = 2.0  # 检测宽度（左右各2米）
+OBSTACLE_MIN_HEIGHT = 0.5  # 障碍物最小高度（过滤地面）
+OBSTACLE_WARNING_DIST = 8.0  # 障碍物预警距离（米）
+OBSTACLE_EMERGENCY_DIST = 5.0  # 障碍物紧急制动距离（米）
+OBSTACLE_DECEL_RATE = 8.0  # 障碍物制动减速度（km/h/帧）
+
 # 交通规则配置
 TRAFFIC_LIGHT_STOP_DISTANCE = 4.0
 TRAFFIC_LIGHT_DETECTION_RANGE = 50.0
@@ -72,12 +88,14 @@ CAMERA_POS = carla.Transform(carla.Location(x=-6.0, z=2.5), carla.Rotation(pitch
 # 全局变量
 current_view_vehicle_id = 1
 vehicle_agents = []
+COLLISION_FLAG = {}  # 碰撞标志（V2.0扩展）
+OBSTACLE_FLAG = {}   # 障碍物标志（V2.0新增）
 
 # 日志配置
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - 车辆%(vehicle_id)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("multi_vehicle_simulation.log"), logging.StreamHandler()]
+    handlers=[logging.FileHandler("multi_vehicle_simulation_v2.log"), logging.StreamHandler()]
 )
 
 # ===================== 核心工具函数 ======================
@@ -275,20 +293,32 @@ def check_spawn_collision(world, spawn_point, radius=3.0):
 
     return True
 
-# ===================== 相机管理类（多车辆）=====================
-class VehicleCamera:
+# ===================== 传感器管理类（V2.0重构：相机+LiDAR+碰撞）=====================
+class VehicleSensors:
     def __init__(self, world, vehicle, vehicle_id):
         self.world = world
         self.vehicle = vehicle
         self.vehicle_id = vehicle_id
-        self.camera = None
-        self.image_surface = None
+        self.logger = logging.getLogger(__name__)
+        self.logger = logging.LoggerAdapter(self.logger, {"vehicle_id": vehicle_id})
 
-        # 创建相机传感器
+        # 传感器实例
+        self.camera = None
+        self.lidar = None
+        self.collision_sensor = None
+
+        # 数据存储
+        self.image_surface = None
+        self.obstacle_distances = []  # 前方障碍物距离列表
+        self.last_obstacle_dist = float('inf')  # 最近障碍物距离
+
+        # 创建所有传感器
         self._create_camera()
+        self._create_lidar()
+        self._create_collision_sensor()
 
     def _create_camera(self):
-        # 加载相机蓝图
+        """创建RGB相机传感器"""
         camera_bp = self.world.get_blueprint_library().find("sensor.camera.rgb")
         camera_bp.set_attribute("image_size_x", str(640))
         camera_bp.set_attribute("image_size_y", str(360))
@@ -296,25 +326,104 @@ class VehicleCamera:
 
         # 生成相机（附加到车辆）
         self.camera = self.world.spawn_actor(camera_bp, CAMERA_POS, attach_to=self.vehicle)
-
         # 注册图像回调函数
         self.camera.listen(self._on_image)
 
+    def _create_lidar(self):
+        """创建LiDAR传感器"""
+        lidar_bp = self.world.get_blueprint_library().find("sensor.lidar.ray_cast")
+        # 设置LiDAR参数
+        lidar_bp.set_attribute("range", str(LIDAR_RANGE))
+        lidar_bp.set_attribute("points_per_second", str(LIDAR_POINTS_PER_SECOND))
+        lidar_bp.set_attribute("rotation_frequency", str(LIDAR_ROTATION_FREQ))
+        lidar_bp.set_attribute("channels", "32")  # 32线LiDAR
+        lidar_bp.set_attribute("upper_fov", "15")
+        lidar_bp.set_attribute("lower_fov", "-25")
+        lidar_bp.set_attribute("points_per_second", str(LIDAR_POINTS_PER_SECOND))
+
+        # LiDAR挂载位置（车顶）
+        lidar_transform = carla.Transform(carla.Location(x=0.0, z=2.0))
+        self.lidar = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=self.vehicle)
+        # 注册LiDAR回调函数
+        self.lidar.listen(self._on_lidar_data)
+
+    def _create_collision_sensor(self):
+        """创建碰撞传感器"""
+        collision_bp = self.world.get_blueprint_library().find("sensor.other.collision")
+        self.collision_sensor = self.world.spawn_actor(collision_bp, carla.Transform(), attach_to=self.vehicle)
+        # 注册碰撞回调函数
+        self.collision_sensor.listen(self._on_collision)
+
     def _on_image(self, image):
-        # 将CARLA图像转换为Pygame Surface
+        """相机图像回调：转换为Pygame Surface"""
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
         array = array.reshape((image.height, image.width, 4))
         array = array[:, :, :3]
         array = array[:, :, ::-1]
         array = np.swapaxes(array, 0, 1)
-
-        # 存储为Pygame Surface
         self.image_surface = pygame.surfarray.make_surface(array)
 
+    def _on_lidar_data(self, data):
+        """LiDAR点云回调：解析并提取前方障碍物"""
+        try:
+            # 将点云数据转换为numpy数组 (x, y, z, intensity)
+            points = np.frombuffer(data.raw_data, dtype=np.float32).reshape(-1, 4)
+            
+            # 过滤条件：
+            # 1. 前方（x>0）
+            # 2. 左右范围内（|y| < 检测宽度）
+            # 3. 非地面（z > 最小高度）
+            front_obstacle_points = points[
+                (points[:, 0] > 0) & 
+                (np.abs(points[:, 1]) < OBSTACLE_DETECTION_WIDTH) & 
+                (points[:, 2] > OBSTACLE_MIN_HEIGHT)
+            ]
+
+            # 计算最近障碍物距离
+            if len(front_obstacle_points) > 0:
+                self.last_obstacle_dist = np.min(front_obstacle_points[:, 0])
+                self.obstacle_distances.append(self.last_obstacle_dist)
+                # 只保留最近10帧数据（平滑滤波）
+                if len(self.obstacle_distances) > 10:
+                    self.obstacle_distances.pop(0)
+            else:
+                self.last_obstacle_dist = float('inf')
+                self.obstacle_distances.clear()
+
+        except Exception as e:
+            self.logger.error(f"LiDAR数据解析失败：{e}")
+
+    def _on_collision(self, event):
+        """碰撞回调：记录碰撞信息并触发紧急停车"""
+        try:
+            collision_actor_type = event.other_actor.type_id
+            collision_location = event.transform.location
+            self.logger.error(
+                f"发生碰撞！碰撞对象：{collision_actor_type} | 碰撞位置：({collision_location.x:.1f}, {collision_location.y:.1f})"
+            )
+            # 设置碰撞标志
+            global COLLISION_FLAG
+            COLLISION_FLAG[self.vehicle_id] = True
+        except Exception as e:
+            self.logger.error(f"碰撞检测回调失败：{e}")
+
+    def get_average_obstacle_distance(self):
+        """获取平滑后的障碍物距离"""
+        if len(self.obstacle_distances) == 0:
+            return float('inf')
+        return np.mean(self.obstacle_distances)
+
     def destroy(self):
-        if self.camera:
-            self.camera.stop()
-            self.camera.destroy()
+        """销毁所有传感器"""
+        sensors = [self.camera, self.lidar, self.collision_sensor]
+        for sensor in sensors:
+            if sensor:
+                try:
+                    sensor.stop()
+                    sensor.destroy()
+                except:
+                    pass
+        self.logger.info("所有传感器已销毁")
 
 # ===================== 车辆控制类 ======================
 class VehicleAgent:
@@ -326,6 +435,15 @@ class VehicleAgent:
         self.logger = logging.getLogger(__name__)
         self.logger = logging.LoggerAdapter(self.logger, {"vehicle_id": vehicle_id})
 
+        # ACC跟车相关属性（V1.0保留）
+        self.last_lead_speed = 0.0  # 前车上次速度
+        self.stuck_count = 0  # 卡死计数
+        
+        # 全局状态初始化（V2.0扩展）
+        global COLLISION_FLAG, OBSTACLE_FLAG
+        COLLISION_FLAG[self.vehicle_id] = False
+        OBSTACLE_FLAG[self.vehicle_id] = False
+
         # 生成车辆
         self.vehicle_bp = self.world.get_blueprint_library().find(vehicle_model)
         if self.vehicle_bp.has_attribute("color"):
@@ -336,8 +454,8 @@ class VehicleAgent:
         if not self.vehicle:
             raise RuntimeError(f"车辆{vehicle_id}生成失败")
 
-        # 创建相机
-        self.camera = VehicleCamera(world, self.vehicle, vehicle_id)
+        # 创建传感器（V2.0替换原相机类）
+        self.sensors = VehicleSensors(world, self.vehicle, vehicle_id)
 
         # 初始化控制器
         self.pp_controller = AdaptivePurePursuit(VEHICLE_WHEELBASE)
@@ -394,23 +512,60 @@ class VehicleAgent:
             target_wps = current_wp.next(lookahead_dist)
             target_point = target_wps[0].transform.location if target_wps else vehicle_transform.location
 
-            # 速度控制
+            # 速度控制（基础弯道速度）
             curve_speed_factors = [1.0, 0.7, 0.4]
             speed_factor = curve_speed_factors[min(curve_level, 2)]
             base_target_speed = self.base_speed * speed_factor
             base_target_speed = max(8.0, base_target_speed)
 
-            # 跟车控制
-            global vehicle_agents
+            # ========== V1.0保留：精细化ACC跟车+紧急避障逻辑 ==========
             if self.vehicle_id > 1 and len(vehicle_agents) >= self.vehicle_id:
                 try:
-                    lead_vehicle = vehicle_agents[self.vehicle_id - 2].vehicle
+                    lead_agent = vehicle_agents[self.vehicle_id - 2]
+                    lead_vehicle = lead_agent.vehicle
                     lead_vehicle_transform = lead_vehicle.get_transform()
+                    
+                    # 计算前车速度和加速度
+                    lead_vel = lead_vehicle.get_velocity()
+                    lead_speed = math.hypot(lead_vel.x, lead_vel.y) * 3.6
+                    lead_acc = (lead_speed - lead_agent.last_lead_speed) / 0.03  # 30Hz刷新率，计算加速度
+                    lead_agent.last_lead_speed = lead_speed  # 更新前车上次速度
+                    
+                    # 计算安全跟车距离（安全时距+最小安全距）
+                    safe_dist = (current_speed / 3.6) * SAFE_TIME_GAP + MIN_SAFE_DISTANCE
                     dist_to_lead = vehicle_transform.location.distance(lead_vehicle_transform.location)
-                    if dist_to_lead < 15.0:
-                        base_target_speed = max(5.0, base_target_speed * 0.5)
-                except:
-                    pass
+                    
+                    # 动态调整目标速度
+                    if dist_to_lead < safe_dist - 2:
+                        # 过近：减速至前车速度-2（不低于5km/h）
+                        base_target_speed = max(5.0, lead_speed - 2)
+                    elif dist_to_lead > safe_dist + 2:
+                        # 过远：加速至前车速度+2（不超基础速度）
+                        base_target_speed = min(self.base_speed * speed_factor, lead_speed + 2)
+                    else:
+                        # 安全距离：与前车速度同步
+                        base_target_speed = lead_speed
+                    
+                    # 紧急避障：前车急刹（加速度<阈值）
+                    if lead_acc < LEAD_BRAKE_THRESHOLD:
+                        base_target_speed = max(0.0, current_speed - EMERGENCY_DECEL_RATE)
+                        self.logger.warning(f"前车急刹（加速度{lead_acc:.1f}km/h/s）！紧急减速至{base_target_speed:.1f}km/h")
+                        
+                except Exception as e:
+                    self.logger.warning(f"ACC跟车计算异常：{e}")
+
+            # ========== V2.0新增：LiDAR障碍物检测与避障 ==========
+            obstacle_dist = self.sensors.get_average_obstacle_distance()
+            OBSTACLE_FLAG[self.vehicle_id] = obstacle_dist < OBSTACLE_WARNING_DIST
+            
+            if obstacle_dist < OBSTACLE_EMERGENCY_DIST:
+                # 紧急制动：直接减速至0
+                base_target_speed = max(0.0, current_speed - OBSTACLE_DECEL_RATE)
+                self.logger.warning(f"前方{obstacle_dist:.1f}米检测到障碍物！紧急制动，目标速度：{base_target_speed:.1f}km/h")
+            elif obstacle_dist < OBSTACLE_WARNING_DIST:
+                # 预警减速：降低至基础速度的50%
+                base_target_speed = max(8.0, base_target_speed * 0.5)
+                self.logger.warning(f"前方{obstacle_dist:.1f}米检测到障碍物！预警减速，目标速度：{base_target_speed:.1f}km/h")
 
             # 交通灯处理
             target_speed, traffic_light_status = self.traffic_light_manager.handle_traffic_light_logic(
@@ -422,7 +577,15 @@ class VehicleAgent:
             throttle = self.speed_controller.calculate(target_speed, current_speed)
             brake = 1.0 - throttle if current_speed > target_speed + 1 else 0.0
 
-            if "Red (Stopped)" in traffic_light_status or target_speed == 0.0:
+            # 状态优先级：碰撞 > 红灯 > 障碍物 > 正常行驶
+            if COLLISION_FLAG.get(self.vehicle_id, False):
+                throttle = 0.0
+                brake = 1.0
+                self.logger.error("检测到碰撞，紧急停车！")
+            elif "Red (Stopped)" in traffic_light_status or target_speed == 0.0:
+                throttle = 0.0
+                brake = 1.0
+            elif obstacle_dist < OBSTACLE_EMERGENCY_DIST:
                 throttle = 0.0
                 brake = 1.0
 
@@ -433,10 +596,12 @@ class VehicleAgent:
             control.brake = brake
             self.vehicle.apply_control(control)
 
-            # 日志输出
+            # 日志输出（新增障碍物信息）
+            obstacle_status = f"障碍物{obstacle_dist:.1f}m" if obstacle_dist < OBSTACLE_WARNING_DIST else "无障碍物"
             self.logger.info(
                 f"速度：{current_speed:5.1f}km/h | 目标：{target_speed:5.1f} | "
-                f"弯道：{['直道', '缓弯', '急弯'][curve_level]:<3} | 灯状态：{traffic_light_status}"
+                f"弯道：{['直道', '缓弯', '急弯'][curve_level]:<3} | 灯状态：{traffic_light_status} | "
+                f"ACC：{'激活' if self.vehicle_id>1 else '未激活'} | {obstacle_status}"
             )
 
             return True
@@ -446,12 +611,12 @@ class VehicleAgent:
             return False
 
     def destroy(self):
-        # 销毁相机
-        self.camera.destroy()
+        # 销毁传感器
+        self.sensors.destroy()
         # 销毁车辆
         if self.vehicle and is_actor_alive(self.vehicle):
             self.vehicle.destroy()
-        self.logger.info("车辆资源已清理")
+        self.logger.info("车辆及传感器资源已清理")
 
 # ===================== 控制器类 ======================
 class AdaptivePurePursuit:
@@ -521,10 +686,9 @@ class SpeedController:
         p = self.kp * error
         self.integral += self.ki * error
         self.integral = np.clip(self.integral, -1.0, 1.0)
-        i = self.integral
         d = self.kd * (error - self.last_error)
         self.last_error = error
-        return np.clip(p + i + d, 0.0, 1.0)
+        return np.clip(p + self.integral + d, 0.0, 1.0)  # 修复原代码i未定义问题
 
 class TrafficLightManager:
     def __init__(self, vehicle_id):
@@ -681,7 +845,7 @@ def main():
     global current_view_vehicle_id, vehicle_agents
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption(f"CARLA多车辆视角（{VEHICLE_COUNT}辆车）- 按1/2/3切换视角，按S切换分屏，按V切换俯视视角")
+    pygame.display.set_caption(f"CARLA多车辆视角（{VEHICLE_COUNT}辆车）- V2.0 LiDAR感知 - 按1/2/3切换视角，按S切换分屏，按V切换俯视视角")
 
     client = None
     world = None
@@ -768,7 +932,7 @@ def main():
                 print(f"\n生成车辆{i+1}（车型：{vehicle_model}）...")
                 agent = VehicleAgent(world, map, i+1, spawn_point, vehicle_model, base_speed)
                 vehicle_agents.append(agent)
-                print(f"车辆{i+1}生成成功！")
+                print(f"车辆{i+1}生成成功！已挂载LiDAR+碰撞传感器")
             except Exception as e:
                 print(f"车辆{i+1}生成失败：{e}")
 
@@ -777,7 +941,7 @@ def main():
         if len(vehicle_agents) == 0:
             raise RuntimeError("无车辆生成成功，仿真终止")
 
-        print(f"\n共生成{len(vehicle_agents)}辆车辆！")
+        print(f"\n共生成{len(vehicle_agents)}辆车辆！V2.0 LiDAR感知+障碍物避障功能已启用")
 
         # 创建全局俯视相机
         try:
@@ -844,35 +1008,35 @@ def main():
             elif show_split_screen:
                 if len(vehicle_agents) == 1:
                     agent = vehicle_agents[0]
-                    if agent.camera.image_surface:
-                        surface = pygame.transform.scale(agent.camera.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                    if agent.sensors.image_surface:
+                        surface = pygame.transform.scale(agent.sensors.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
                         screen.blit(surface, (0, 0))
                 elif len(vehicle_agents) == 2:
                     agent1 = vehicle_agents[0]
                     agent2 = vehicle_agents[1]
 
-                    if agent1.camera.image_surface:
-                        surface1 = pygame.transform.scale(agent1.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT))
+                    if agent1.sensors.image_surface:
+                        surface1 = pygame.transform.scale(agent1.sensors.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT))
                         screen.blit(surface1, (0, 0))
 
-                    if agent2.camera.image_surface:
-                        surface2 = pygame.transform.scale(agent2.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT))
+                    if agent2.sensors.image_surface:
+                        surface2 = pygame.transform.scale(agent2.sensors.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT))
                         screen.blit(surface2, (WINDOW_WIDTH//2, 0))
                 elif len(vehicle_agents) >= 3:
                     agent1 = vehicle_agents[0]
                     agent2 = vehicle_agents[1]
                     agent3 = vehicle_agents[2]
 
-                    if agent1.camera.image_surface:
-                        surface1 = pygame.transform.scale(agent1.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
+                    if agent1.sensors.image_surface:
+                        surface1 = pygame.transform.scale(agent1.sensors.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
                         screen.blit(surface1, (0, 0))
 
-                    if agent2.camera.image_surface:
-                        surface2 = pygame.transform.scale(agent2.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
+                    if agent2.sensors.image_surface:
+                        surface2 = pygame.transform.scale(agent2.sensors.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
                         screen.blit(surface2, (WINDOW_WIDTH//2, 0))
 
-                    if agent3.camera.image_surface:
-                        surface3 = pygame.transform.scale(agent3.camera.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT//2))
+                    if agent3.sensors.image_surface:
+                        surface3 = pygame.transform.scale(agent3.sensors.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT//2))
                         screen.blit(surface3, (0, WINDOW_HEIGHT//2))
             else:
                 target_agent = None
@@ -881,8 +1045,8 @@ def main():
                         target_agent = agent
                         break
 
-                if target_agent and target_agent.camera.image_surface:
-                    surface = pygame.transform.scale(target_agent.camera.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                if target_agent and target_agent.sensors.image_surface:
+                    surface = pygame.transform.scale(target_agent.sensors.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
                     screen.blit(surface, (0, 0))
 
             # 更新车辆状态

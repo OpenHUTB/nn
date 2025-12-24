@@ -557,16 +557,25 @@ class KeyboardController:
         if not self.actuator_indices:
             return action
         
+        # 根据方向调节步频与强度：后退更慢、更谨慎
+        step_freq = self.step_frequency if forward else self.step_frequency * 0.8
+        
         # 计算步行动作相位（保持连续性）
-        phase = 2 * np.pi * self.step_time * self.step_frequency
+        phase = 2 * np.pi * self.step_time * step_freq
         direction = 1 if forward else -1
         
         # 计算步态强度（基于step_time，用于平滑停止）
         # 当step_time衰减时，动作幅度也平滑减小
-        gait_strength = min(1.0, self.step_time * self.step_frequency * 2.0)  # 在第一个周期内从0到1
+        gait_strength = min(1.0, self.step_time * step_freq * 2.0)  # 在第一个周期内从0到1
         # 如果step_time很小，进一步减小强度，实现平滑停止
         if self.step_time < 0.1:
             gait_strength *= self.step_time / 0.1  # 在最后0.1秒内平滑衰减到0
+        
+        # 后退或转向时整体动作幅度更柔和
+        if not forward:
+            gait_strength *= 0.75
+        if turn_direction != 0:
+            gait_strength *= 0.9
         
         # 人类步态特点：
         # 1. 支撑相约占60%，摆动相约占40%
@@ -602,7 +611,8 @@ class KeyboardController:
         # 髋关节前后摆动（主要推进力）- 更自然的协调
         # 使用更平滑的正弦波，在摆动相向前，支撑相向后推
         # 添加轻微的相位偏移，让动作更自然
-        right_hip_swing = 0.45 * direction * np.sin(right_phase + 0.1) * gait_strength
+        base_hip_amp = 0.45 if forward else 0.32
+        right_hip_swing = base_hip_amp * direction * np.sin(right_phase + 0.1) * gait_strength
         self._set_action(action, "hip_x_right", right_hip_swing)
         
         # 髋关节上下（抬腿）- 更自然的抬腿动作
@@ -722,7 +732,7 @@ class KeyboardController:
             self._set_action(action, "hip_z_left", -hip_z_balance)
         else:
             # 转向时，外侧腿稍微外展，内侧腿稍微内收
-            turn_strength = 0.4 * turn_direction
+            turn_strength = 0.25 * turn_direction * gait_strength
             self._set_action(action, "hip_z_right", turn_strength)
             self._set_action(action, "hip_z_left", -turn_strength)
             # 添加躯干旋转辅助转向
@@ -905,25 +915,25 @@ class KeyboardController:
         
         # 躯干控制 - 更自然的轻微摆动
         # 轻微前倾以辅助前进（减小前倾幅度，更自然）
-        abdomen_pitch = 0.08 * direction * gait_strength
+        abdomen_pitch = 0.07 * direction * gait_strength
         # 添加轻微的上下摆动（配合步态，与腿部动作协调）
         # 在支撑相时稍微下沉，在摆动相时稍微上升
         abdomen_pitch += 0.02 * np.sin(phase + np.pi/4) * gait_strength
         self._set_action(action, "abdomen_y", abdomen_pitch)
         
         # 转向时允许侧倾（减小侧倾幅度）
-        self._set_action(action, "abdomen_x", 0.05 * turn_direction * gait_strength)
+        self._set_action(action, "abdomen_x", 0.04 * turn_direction * gait_strength)
         
         # 转向控制（减小转向幅度，更自然）
         if turn_direction != 0:
-            self._set_action(action, "abdomen_z", 0.25 * turn_direction * gait_strength)
+            self._set_action(action, "abdomen_z", 0.22 * turn_direction * gait_strength)
         else:
             self._set_action(action, "abdomen_z", 0.0)
         
         return action
     
     def _create_turning_only_action(self, turn_direction, dt=0.03):
-        """创建仅转向动作（不产生腿部摆动，只在原地转向，目标转向45度）"""
+        """创建仅转向动作：更平滑的原地转身"""
         action = np.zeros(self.action_dim)
         
         if not self.actuator_indices:
@@ -939,8 +949,8 @@ class KeyboardController:
             if abs(turn_error) < 0.1:  # 接近目标时，设置新的目标
                 self.target_turn_angle += turn_direction * self.turn_angle_per_step
             
-            # 计算转向速度（基于误差）
-            turn_velocity = np.clip(turn_error * 3.0, -self.turn_speed, self.turn_speed)
+            # 计算转向速度（基于误差），限制更小避免生硬
+            turn_velocity = np.clip(turn_error * 2.0, -self.turn_speed * 0.7, self.turn_speed * 0.7)
             
             # 更新当前转向角度（模拟）
             self.current_turn_angle += turn_velocity * dt
@@ -957,33 +967,19 @@ class KeyboardController:
             normalized_turn = turn_direction * 0.8  # 直接使用方向，强度0.8
         
         # 原地转向：通过髋关节外展和躯干旋转实现
-        # 增大转向强度，使转向更明显
-        hip_turn_strength = 0.6 * normalized_turn  # 从0.25增大到0.6
+        # 略微减小强度并加入轻微屈膝，让转身更稳
+        hip_turn_strength = 0.45 * normalized_turn
         self._set_action(action, "hip_z_right", hip_turn_strength)
         self._set_action(action, "hip_z_left", -hip_turn_strength)
         
         # 躯干旋转辅助转向（主要转向来源，范围±45度）
-        abdomen_turn_strength = 0.8 * normalized_turn  # 从0.15增大到0.8，充分利用±45度范围
+        abdomen_turn_strength = 0.65 * normalized_turn
         self._set_action(action, "abdomen_z", abdomen_turn_strength)
         self._set_action(action, "abdomen_x", 0.1 * normalized_turn)
         
-        return action
-    
-    def _create_turning_only_action(self, turn_direction):
-        """创建仅转向动作（不产生腿部摆动，只在原地转向）"""
-        action = np.zeros(self.action_dim)
-        
-        if not self.actuator_indices:
-            return action
-        
-        # 只设置转向相关的动作，不产生腿部摆动
-        # 转向控制通过髋关节外展实现
-        turn_strength = 0.3 * turn_direction  # 减小转向强度
-        self._set_action(action, "hip_z_right", turn_strength)
-        self._set_action(action, "hip_z_left", -turn_strength)
-        
-        # 可以添加轻微的躯干倾斜来辅助转向
-        self._set_action(action, "abdomen_x", 0.1 * turn_direction)
+        # 轻微屈膝降低质心
+        self._set_action(action, "knee_right", 0.12 * abs(normalized_turn))
+        self._set_action(action, "knee_left", 0.12 * abs(normalized_turn))
         
         return action
     
@@ -1903,25 +1899,11 @@ def main():
             
             env.render(viewer_handle)
             
-            if step % 100 == 0:
-                # 获取各个身体部位的位置
+            if step % 200 == 0:
+                # 获取身体位置
                 torso_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "torso")
                 torso_pos = env.data.xpos[torso_id].copy() if torso_id >= 0 else None
-                
-                head_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "head")
-                head_pos = env.data.xpos[head_id].copy() if head_id >= 0 else None
-                
-                # 尝试获取左右脚位置（可能有不同的命名）
-                foot_right_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "foot_right")
-                if foot_right_id < 0:
-                    foot_right_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "right_foot")
-                foot_right_pos = env.data.xpos[foot_right_id].copy() if foot_right_id >= 0 else None
-                
-                foot_left_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "foot_left")
-                if foot_left_id < 0:
-                    foot_left_id = mujoco.mj_name2id(env.model, mujoco.mjtObj.mjOBJ_BODY, "left_foot")
-                foot_left_pos = env.data.xpos[foot_left_id].copy() if foot_left_id >= 0 else None
-                
+                                
                 # 获取速度信息
                 linear_vel = np.zeros(6)
                 angular_vel = np.zeros(6)
@@ -1977,48 +1959,24 @@ def main():
                 if gait_info:
                     print(f"🚶 {gait_info}")
                 
-                # 速度和运动信息
-                print(f"\n⚡ 运动信息:")
-                print(f"   线性速度: X={vx:+.3f} m/s, Y={vy:+.3f} m/s, Z={vz:+.3f} m/s")
-                print(f"   速度大小: {speed:.3f} m/s")
-                print(f"   角速度: Z轴旋转={np.degrees(angular_vz):+.2f} °/s")
+                # 速度和运动信息（精简）
+                print(f"\n⚡ 速度: |V|={speed:.3f} m/s, vx={vx:+.3f}, vy={vy:+.3f}, yaw_rate={np.degrees(angular_vz):+.2f} °/s")
                 
-                # 位置信息（关键部位）
-                print(f"\n📍 身体部位位置:")
+                # 关键位置
                 if torso_pos is not None:
-                    print(f"   躯干: X={torso_pos[0]:+.3f}, Y={torso_pos[1]:+.3f}, Z={torso_pos[2]:+.3f} m")
-                if head_pos is not None:
-                    head_height = head_pos[2] - (torso_pos[2] if torso_pos is not None else 0)
-                    print(f"   头部: X={head_pos[0]:+.3f}, Y={head_pos[1]:+.3f}, Z={head_pos[2]:+.3f} m (相对高度: {head_height:+.3f} m)")
-                if foot_right_pos is not None:
-                    print(f"   右脚: X={foot_right_pos[0]:+.3f}, Y={foot_right_pos[1]:+.3f}, Z={foot_right_pos[2]:+.3f} m")
-                if foot_left_pos is not None:
-                    print(f"   左脚: X={foot_left_pos[0]:+.3f}, Y={foot_left_pos[1]:+.3f}, Z={foot_left_pos[2]:+.3f} m")
-                    # 计算步长（两脚间的X距离）
-                    if foot_right_pos is not None:
-                        step_length = abs(foot_right_pos[0] - foot_left_pos[0])
-                        print(f"   步长: {step_length:.3f} m")
+                    print(f"📍 位置: X={torso_pos[0]:+.3f}, Y={torso_pos[1]:+.3f}, Z={torso_pos[2]:+.3f} m")
                 
                 # 动作信息
-                print(f"\n🎯 动作统计:")
-                print(f"   动作维度: {len(action)}")
-                print(f"   最大幅度: {action_magnitude:.3f}")
-                print(f"   平均幅度: {action_mean:.3f}")
-                print(f"   标准差: {action_std:.3f}")
+                print(f"🎯 动作: max={action_magnitude:.3f}, mean={action_mean:.3f}, std={action_std:.3f}")
                 
                 # 奖励信息
-                print(f"\n🏆 奖励信息:")
-                print(f"   当前步奖励: {recent_reward:+.4f}")
-                print(f"   累计奖励: {total_reward:+.4f}")
-                print(f"   平均奖励/步: {avg_reward_per_step:+.4f}")
+                print(f"🏆 奖励: step={recent_reward:+.4f}, total={total_reward:+.4f}, avg/step={avg_reward_per_step:+.4f}")
                 
                 # 深度学习信息（如果启用）
                 if controller.use_deep_learning and controller.deep_controller is not None:
                     buffer_size = len(controller.deep_controller.replay_buffer)
-                    print(f"\n🧠 深度学习控制器:")
-                    print(f"   经验缓冲区: {buffer_size}/{controller.deep_controller.replay_buffer.maxlen}")
-                    print(f"   训练步数: {controller.deep_controller.step_count}")
-                    print(f"   状态维度: {controller.deep_controller.state_dim}, 动作维度: {controller.deep_controller.action_dim}")
+                    max_buffer = controller.deep_controller.replay_buffer.maxlen
+                    print(f"🧠 训练: buffer={buffer_size}/{max_buffer}, steps={controller.deep_controller.step_count}")
                 
                 print("="*80 + "\n")
             
