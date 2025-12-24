@@ -5,7 +5,6 @@ import time
 import sys
 import os
 
-# 【优化1】添加文件头注释，标注项目信息
 """
 Franka Panda 机械臂自动抓取仿真 v1.1
 基于MuJoCo实现的基础抓取控制器
@@ -24,6 +23,7 @@ if not os.path.exists(SCENE_PATH):
 # ========== 智能抓取控制器 ==========
 class PandaAutoGrab:
     def __init__(self):
+        """初始化Franka Panda机械臂抓取控制器，加载模型和初始化参数"""
         self.model = mujoco.MjModel.from_xml_path(SCENE_PATH)
         self.data = mujoco.MjData(self.model)
         self.viewer = None
@@ -49,6 +49,11 @@ class PandaAutoGrab:
         self.gripper_close_pos = 0.005
         self.safe_lift_height = 0.15
         self.grab_height = 0.05
+
+        # 【优化1】提取PD控制参数为类内常量
+        self.PD_KP = 250  # 比例增益
+        self.PD_KD = 100  # 微分增益
+        self.TORQUE_LIMIT = 20  # 力矩限制
 
         # 打印模型信息
         print("="*50)
@@ -97,8 +102,9 @@ class PandaAutoGrab:
         torque = np.zeros(7)
         for i in range(7):
             angle_error = joint_vel_cmd[i] * 0.1
-            torque[i] = 250 * angle_error - 100 * self.data.qvel[self.joint_ids[i]]
-            torque[i] = np.clip(torque[i], -20, 20)
+            # 【优化2】使用类内常量替代硬编码的PD参数
+            torque[i] = self.PD_KP * angle_error - self.PD_KD * self.data.qvel[self.joint_ids[i]]
+            torque[i] = np.clip(torque[i], -self.TORQUE_LIMIT, self.TORQUE_LIMIT)
 
         # 设置关节力矩
         for i in range(7):
@@ -226,11 +232,11 @@ class PandaAutoGrab:
         print("\n🚀 仿真已启动，开始自动抓取...")
         print("💡 关闭Viewer窗口可退出程序")
 
-        # 【优化2】提取休眠时间为常量，便于后续调整
+        # 提取休眠时间为常量，便于后续调整
         SIMULATION_SLEEP = 1/200
 
         # 单线程主循环
-        # 【优化3】添加KeyboardInterrupt捕获，支持Ctrl+C优雅退出
+        # 添加KeyboardInterrupt捕获，支持Ctrl+C优雅退出
         try:
             while self.viewer.is_running():
                 if self.running and not self.grab_complete:
