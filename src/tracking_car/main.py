@@ -1529,33 +1529,35 @@ class CarlaTrackingSystem:
                 logger.info(f"[VIEW] 切换到 {mode_name}")
 
     def _control_frame_rate(self, current_fps):
-        """Control frame rate"""
+        """自适应帧率控制（简单版）"""
         import time
-        target_fps = self.config.get('display_fps', 30)
+        import psutil
+    
+        # 获取当前系统负载
+        cpu_usage = psutil.cpu_percent()
+    
+        # 根据CPU使用率动态调整目标FPS
+        if cpu_usage > 85:  # 非常高负载
+            target_fps = max(10, self.config.get('display_fps', 30) * 0.5)
+        elif cpu_usage > 70:  # 高负载
+            target_fps = max(15, self.config.get('display_fps', 30) * 0.7)
+        elif cpu_usage < 40:  # 低负载，可以尝试更高FPS
+            target_fps = min(60, self.config.get('display_fps', 30) * 1.5)
+        elif cpu_usage < 60:  # 中等负载
+            target_fps = min(45, self.config.get('display_fps', 30) * 1.2)
+        else:  # 正常负载
+            target_fps = self.config.get('display_fps', 30)
+    
         if target_fps <= 0:
             return
-        
+    
         target_interval = 1.0 / target_fps
-        
-        # If frame rate is too high, sleep appropriately
-        if current_fps > target_fps * 1.2:  # Allow 20% fluctuation
+    
+        # 如果帧率过高，适当休眠
+        if current_fps > target_fps * 1.2:  # 允许20%波动
             sleep_time = max(0, target_interval - (1.0 / current_fps))
             time.sleep(sleep_time)
     
-    def _save_screenshot(self):
-        """Save screenshot"""
-        try:
-            import time
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            filename = f"screenshot_{timestamp}_{self.frame_count:06d}.png"
-            
-            # Get currently displayed image
-            screenshot = self.sensor_manager.get_camera_image()
-            if utils.valid_img(screenshot):
-                utils.save_image(screenshot, filename)
-                logger.info(f"[SCREENSHOT] Screenshot saved: {filename}")
-        except Exception as e:
-            logger.warning(f"Screenshot save failed: {e}")
     
     def _print_status(self, stats_data):
         """Print system status"""
