@@ -148,6 +148,9 @@ DISPLAY = {
         'SHOW_RED_OBJECTS': True,  # 在画面中标记红色物体
         'SHOW_BLUE_OBJECTS': True,  # 在画面中标记蓝色物体
         'SHOW_BLACK_OBJECTS': True,  # 在画面中标记黑色物体（新增）
+        # 内存优化参数
+        'QUEUE_MAXSIZE': 2,  # 图像队列最大大小，减少内存占用（原为3）
+        'REDUCE_IMAGE_COPY': True,  # 减少图像复制，仅在必要时复制
     },
 
     # 信息显示窗口参数
@@ -240,6 +243,11 @@ DATA_RECORDING = {
     'RECORD_RED_OBJECTS': True,           # 记录红色物体信息
     'RECORD_BLUE_OBJECTS': True,          # 记录蓝色物体信息（新增）
     'RECORD_BLACK_OBJECTS': True,         # 记录黑色物体信息（新增）
+    # 内存优化参数
+    'MAX_FLIGHT_DATA_BUFFER': 500,        # 最大飞行数据缓冲区大小（条），超过后自动保存并清空
+    'MAX_OBJECTS_BUFFER': 200,            # 最大物体记录缓冲区大小（个）
+    'MAX_EVENTS_BUFFER': 100,             # 最大事件记录缓冲区大小（个）
+    'AUTO_SAVE_INTERVAL': 60.0,           # 自动保存间隔（秒），定期保存数据到文件
 }
 
 # ==================== 性能监控参数 ====================
@@ -250,4 +258,6 @@ PERFORMANCE = {
     'LOOP_TIME_WARNING_THRESHOLD': 0.2,   # 循环时间警告阈值（秒）
     'SAVE_PERFORMANCE_REPORT': True,      # 保存性能报告
     'REPORT_INTERVAL': 30.0,              # 性能报告间隔（秒）
+    # 内存优化参数
+    'MAX_METRICS_BUFFER': 500,            # 最大性能指标缓冲区大小（个），减少内存占用
 }
