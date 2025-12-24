@@ -3,6 +3,7 @@
 手势控制无人机系统 - 主入口模块
 协调所有子模块，实现完整的手势控制无人机系统
 作者: xiaoshiyuan888
+优化版本：集成性能可视化模块
 """
 
 import sys
@@ -25,6 +26,8 @@ from drone_controller import SimpleDroneController
 from ui_renderer import ChineseUIRenderer
 from trajectory_recorder import GestureTrajectoryRecorder
 from advanced_gesture_analyzer import AdvancedGestureAnalyzer
+from gesture_stabilizer import GestureStabilizer  # 新增
+from performance_visualizer import PerformanceVisualizer  # 新增
 
 
 # 安全导入所需库
@@ -157,13 +160,13 @@ def init_camera(config):
 def print_welcome_message(cap, speech_manager, libs):
     """打印欢迎信息"""
     print("\n" + "=" * 80)
-    print("手势控制无人机系统 - 增强手势识别版")
+    print("手势控制无人机系统 - 增强手势识别版 v2.0")
     print("=" * 80)
     print("系统状态:")
     print(f"  摄像头: {'已连接' if cap else '模拟模式'}")
-    print(f"  手势识别: 增强的平滑处理算法 + 新手势支持")
+    print(f"  手势识别: 改进的平滑算法 + 手势稳定性分析")
     print(f"  语音反馈: {'已启用' if speech_manager.enabled else '已禁用'}")
-    print(f"  性能监控: 已启用")
+    print(f"  性能监控: 增强版 - 支持GPU监控和趋势预测")
     print(f"  轨迹记录: 支持录制/回放功能")
     print(f"  高级飞行模式: 方形轨迹、圆形盘旋、8字形飞行")
     print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
@@ -180,7 +183,7 @@ def print_instructions():
     print("   - 按 [L] 键记录性能快照")
     print("   - 按 [K] 键导出性能日志")
     print("   - 按 [R] 键重置性能统计")
-    print("   - 系统自动监控: FPS, CPU, 内存, 识别时间等")
+    print("   - 系统自动监控: FPS, CPU, 内存, GPU, 识别时间等")
     print("4. 性能模式选择:")
     print("   - 按 [O] 键循环切换性能模式: 最快(fast) → 平衡(balanced) → 最准(accurate)")
     print("5. 新手势控制:")
@@ -198,7 +201,9 @@ def print_instructions():
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
     print("9. 语音控制:")
     print("   [V]切换语音反馈 [M]测试语音")
-    print("10. 按 [ESC] 安全退出")
+    print("10. 性能可视化:")
+    print("   [F]切换性能图表显示 [G]切换性能仪表盘显示")
+    print("11. 按 [ESC] 安全退出")
     print("=" * 80)
     print("程序启动成功!")
     print("-" * 80)
@@ -207,7 +212,7 @@ def print_instructions():
 def main():
     """主函数"""
     print("=" * 60)
-    print("手势控制无人机系统 - 增强手势识别版")
+    print("手势控制无人机系统 - 增强手势识别版 v2.0")
     print("=" * 60)
 
     # 导入库
@@ -254,6 +259,14 @@ def main():
     print("初始化高级手势分析器...")
     advanced_gesture_analyzer = AdvancedGestureAnalyzer(speech_manager, config)
 
+    # 新增：手势稳定性分析器
+    print("初始化手势稳定性分析器...")
+    gesture_stabilizer = GestureStabilizer(window_size=15)
+
+    # 新增：性能可视化器
+    print("初始化性能可视化器...")
+    performance_visualizer = PerformanceVisualizer()
+
     # 初始化摄像头
     cap = init_camera(config)
     if cap and speech_manager.enabled:
@@ -294,6 +307,10 @@ def main():
     display_modes = ['normal', 'detailed', 'minimal']
     current_display_mode = 0
 
+    # 新增：性能可视化模式
+    visualization_modes = ['none', 'charts', 'gauges']
+    current_visualization_mode = 0
+
     # 主循环
     print("\n进入主循环，按ESC退出...")
 
@@ -324,6 +341,11 @@ def main():
                     # 记录手势统计
                     if gesture and gesture != "Waiting" and gesture != "摄像头错误":
                         performance_analyzer.record_gesture(gesture, confidence)
+
+                        # 新增：更新手势稳定性分析
+                        if gesture_recognizer.last_hand_data:
+                            position = gesture_recognizer.last_hand_data.get('position')
+                            stability_info = gesture_stabilizer.add_gesture(gesture, confidence, position)
             else:
                 # 模拟模式
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -400,9 +422,11 @@ def main():
             if config.get('display', 'show_flight_mode'):
                 frame = ui_renderer.draw_flight_mode(frame, drone_controller)
 
-            # 绘制性能图表（如果启用详细模式）
-            if display_modes[current_display_mode] == 'detailed':
-                frame = ui_renderer.draw_performance_chart(frame, performance_analyzer)
+            # 绘制性能可视化
+            if visualization_modes[current_visualization_mode] == 'charts':
+                frame = performance_visualizer.draw_comprehensive_charts(frame, performance_analyzer)
+            elif visualization_modes[current_visualization_mode] == 'gauges':
+                frame = performance_visualizer.draw_performance_gauges(frame, performance_analyzer)
 
             frame = ui_renderer.draw_help_bar(frame)
 
@@ -417,7 +441,7 @@ def main():
                 frame = ui_renderer.draw_warning(frame, warning_msg)
 
             # 显示图像
-            cv2.imshow('Gesture Controlled Drone - Enhanced Gestures', frame)
+            cv2.imshow('Gesture Controlled Drone - Enhanced Gestures v2.0', frame)
 
             # ========== 键盘控制 ==========
             key = cv2.waitKey(1) & 0xFF
@@ -455,6 +479,10 @@ def main():
                 # 重新设置UI渲染器引用
                 gesture_recognizer.set_ui_renderer(ui_renderer)
                 print("✓ 手势识别已重置")
+
+                # 重置手势稳定性分析
+                gesture_stabilizer.reset()
+                print("✓ 手势稳定性分析已重置")
 
                 # 语音提示
                 if speech_manager.enabled:
@@ -523,6 +551,11 @@ def main():
                 print(f"  CPU使用率: {snapshot['cpu_usage']:.1f}%")
                 print(f"  内存使用率: {snapshot['memory_usage']:.1f}%")
 
+                # 显示手势稳定性信息
+                stability_stats = gesture_stabilizer.get_stats()
+                print(f"  手势稳定性评分: {stability_stats['stability_score']:.2f}")
+                print(f"  手势稳定性等级: {stability_stats['stability_level']}")
+
                 # 语音提示
                 if speech_manager.enabled:
                     speech_manager.speak('performance_snapshot', immediate=True)
@@ -564,6 +597,16 @@ def main():
                 # 语音提示
                 if speech_manager.enabled:
                     speech_manager.speak_direct("性能统计已重置")
+
+            # 切换性能可视化模式
+            elif key == ord('f') or key == ord('F'):
+                current_visualization_mode = (current_visualization_mode + 1) % len(visualization_modes)
+                mode_name = visualization_modes[current_visualization_mode]
+                print(f"性能可视化模式: {mode_name}")
+
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak_direct(f"性能可视化模式: {mode_name}")
 
             # 轨迹记录控制
             elif key == ord('1'):

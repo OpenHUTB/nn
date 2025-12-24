@@ -58,8 +58,8 @@ class CameraManager:
             
             # 设置相机位置（车顶前方）
             camera_transform = carla.Transform(
-                carla.Location(x=2.0, z=1.8),
-                carla.Rotation(pitch=-10)  # 略微向下倾斜
+                carla.Location(x=2.5, z=2.5),
+                carla.Rotation(pitch=-5)  # 略微向下倾斜
             )
             
             # 生成相机
@@ -386,9 +386,11 @@ class SpectatorManager:
         self.ego_vehicle = ego_vehicle
         self.config = config
         self.spectator = None
-        self.view_mode = 'satellite'  # 视角模式: 'satellite', 'behind', 'first_person'
-        self.view_height = 50.0  # 卫星视角高度
-        self.follow_distance = 10.0  # 后方视角距离
+        view_config = config.get('view', {})
+        self.view_mode = view_config.get('default_mode', 'satellite')
+        self.view_height = view_config.get('satellite_height', 50.0)
+        self.follow_distance = view_config.get('behind_distance', 10.0)
+        self.first_person_height = view_config.get('first_person_height', 1.6)
         
     def setup(self):
         """设置视角"""
@@ -502,7 +504,7 @@ class SpectatorManager:
             location = carla.Location(
                 x=vehicle_transform.location.x,
                 y=vehicle_transform.location.y,
-                z=vehicle_transform.location.z + 1.6  # 驾驶员眼睛高度
+                z=vehicle_transform.location.z + self.first_person_height  # 改为使用配置
             )
             
             # 使用车辆的方向
