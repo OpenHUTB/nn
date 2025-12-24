@@ -58,8 +58,8 @@ class CameraManager:
             
             # 设置相机位置（车顶前方）
             camera_transform = carla.Transform(
-                carla.Location(x=2.0, z=1.8),
-                carla.Rotation(pitch=-10)  # 略微向下倾斜
+                carla.Location(x=2.5, z=2.5),
+                carla.Rotation(pitch=-5)  # 略微向下倾斜
             )
             
             # 生成相机
