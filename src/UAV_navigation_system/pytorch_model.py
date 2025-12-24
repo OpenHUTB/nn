@@ -3,6 +3,32 @@
 """
 PyTorch模型工具类
 用于加载和运行无人机场景分类的PyTorch模型
+"""
+
+# 临时修复：在导入 torch 前尝试处理 typing_extensions 问题
+try:
+    import typing_extensions
+    # 检查 TypeIs 是否可用，如果不可用则模拟一个
+    if not hasattr(typing_extensions, 'TypeIs'):
+        typing_extensions.TypeIs = type(lambda: None)
+except ImportError:
+    pass
+
+# 导入核心依赖库
+import torch  # PyTorch核心库，用于模型构建和推理
+import torch.nn as nn  # 神经网络层模块
+import torchvision.transforms as transforms  # 图像预处理工具
+from PIL import Image  # PIL库，用于图像读取和格式转换
+import numpy as np  # 数值计算库，处理图像数组
+import cv2  # OpenCV库，处理视频/图像数据
+import os  # 文件路径操作库
+
+# ... 其余代码保持不变 ...
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+PyTorch模型工具类
+用于加载和运行无人机场景分类的PyTorch模型
 核心功能：
 1. 支持自定义CNN/ResNet18/MobileNetV2三种模型架构加载
 2. 实现图像预处理、单张/批量图像预测
