@@ -12,7 +12,7 @@ from dataclasses import dataclass  # 用于配置类
 @dataclass
 class SimConfig:
     """仿真配置类：集中管理所有可配置参数"""
-    # 文件路径配置
+    # 文件路径配置（修改：XML文件在当前项目目录下）
     xml_filename: str = "humanoid.xml"
     # 仿真参数
     timestep: float = 0.005  # 与XML中的timestep保持一致
@@ -120,22 +120,22 @@ class HumanoidSimulator:
   <actuator>
     <!-- 手臂关节 -->
     <motor name="left_shoulder_motor" joint="left_shoulder" ctrlrange="-1.57 1.57" gear="10"/>
-    <damping joint="left_shoulder" damping="0.1"/>
+    <<damping joint="left_shoulder" damping="0.1"/>
     <motor name="right_shoulder_motor" joint="right_shoulder" ctrlrange="-1.57 1.57" gear="10"/>
-    <damping joint="right_shoulder" damping="0.1"/>
+    <<damping joint="right_shoulder" damping="0.1"/>
     <motor name="left_elbow_motor" joint="left_elbow" ctrlrange="-1.57 0" gear="10"/>
-    <damping joint="left_elbow" damping="0.1"/>
+    <<damping joint="left_elbow" damping="0.1"/>
     <motor name="right_elbow_motor" joint="right_elbow" ctrlrange="-1.57 0" gear="10"/>
-    <damping joint="right_elbow" damping="0.1"/>
+    <<damping joint="right_elbow" damping="0.1"/>
     <!-- 腿部关节 -->
     <motor name="left_hip_motor" joint="left_hip" ctrlrange="-1.57 1.57" gear="10"/>
-    <damping joint="left_hip" damping="0.1"/>
+    <<damping joint="left_hip" damping="0.1"/>
     <motor name="right_hip_motor" joint="right_hip" ctrlrange="-1.57 1.57" gear="10"/>
-    <damping joint="right_hip" damping="0.1"/>
+    <<damping joint="right_hip" damping="0.1"/>
     <motor name="left_knee_motor" joint="left_knee" ctrlrange="0 1.57" gear="10"/>
-    <damping joint="left_knee" damping="0.1"/>
+    <<damping joint="left_knee" damping="0.1"/>
     <motor name="right_knee_motor" joint="right_knee" ctrlrange="0 1.57" gear="10"/>
-    <damping joint="right_knee" damping="0.1"/>
+    <<damping joint="right_knee" damping="0.1"/>
   </actuator>
 </mujoco>"""
         with open(file_path, "w", encoding="utf-8") as f:
@@ -144,17 +144,17 @@ class HumanoidSimulator:
 
     def load_model(self):
         """加载MuJoCo模型，预存关节ID和控制ID（性能优化）"""
-        # 获取文件路径
-        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-        self.model_path = os.path.join(desktop_path, self.config.xml_filename)
+        # 核心修改：获取当前项目目录（即脚本所在的文件夹路径）
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.model_path = os.path.join(current_dir, self.config.xml_filename)
 
         # 检查并创建文件
         if not os.path.exists(self.model_path):
             self.create_xml_file(self.model_path)
         else:
-            print("ℹ️ XML文件已存在，无需重新创建！")
+            print(f"ℹ️ XML文件已存在（路径：{self.model_path}），无需重新创建！")
 
-        # 读取XML内容并加载模型（解决中文路径问题）
+        # 读取XML内容并加载模型
         try:
             with open(self.model_path, "r", encoding="utf-8") as f:
                 xml_content = f.read()
