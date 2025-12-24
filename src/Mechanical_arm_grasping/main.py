@@ -1,199 +1,116 @@
-import pybullet as p
-import pybullet_data
+# 机械臂MuJoCo 3.4.0 原生语法稳定版（100%兼容，无API报错）
+import mujoco
+import mujoco.viewer
 import time
-import numpy as np
-from typing import Optional, Tuple
-
-# ------------------- 配置常量（便于统一修改） -------------------
-SIMULATION_GRAVITY: Tuple[float, float, float] = (0, 0, 0)  # 仿真重力，(0,0,-9.8)为真实重力
-ARM_MODEL_PATH: str = "kuka_iiwa/model.urdf"  # 机械臂模型路径
-ARM_BASE_POSITION: Tuple[float, float, float] = (0, 0, 0)  # 机械臂初始位置
-ARM_BASE_ORIENTATION: Tuple[float, float, float] = (0, 0, 0)  # 机械臂初始姿态（欧拉角）
-ELEVATOR_JOINT_INDEX: int = 0  # 升降关节索引
-MOVE_SPEED_DEFAULT: float = 0.03  # 默认升降速度
-POSITION_TOLERANCE: float = 0.001  # 位置误差容忍度（到达该误差即认为运动完成）
-DELAY_STEP: float = 0.01  # 仿真步进延时
 
 
-class ArmElevatorController:
-    """机械臂升降关节控制器（面向对象封装，职责单一）"""
+def robot_arm_final_stable_demo():
+    # 1. 内置机械臂XML模型（slide/hinge关节，3.4.0原生兼容）
+    robot_xml = """
+<mujoco model="Simple Robot Arm">
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <visual/>
+  <asset>
+    <material name="red" rgba="0.8 0.2 0.2 1"/>
+    <material name="blue" rgba="0.2 0.2 0.8 1"/>
+    <material name="gray" rgba="0.5 0.5 0.5 1"/>
+  </asset>
+  <worldbody>
+    <camera name="fixed_camera" pos="1.5 1.5 1.0" xyaxes="1 0 0 0 1 0"/>
+    <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 -0.1" material="gray"/>
+    <body name="base" pos="0 0 0">
+      <geom name="base_geom" type="cylinder" size="0.2 0.1" pos="0 0 0" material="blue"/>
+      <joint name="base_joint" type="free"/>
+      <body name="lift_link" pos="0 0 0.1">
+        <geom name="lift_geom" type="cylinder" size="0.15 0.3" pos="0 0 0.3" material="blue"/>
+        <joint name="lift_joint" type="slide" axis="0 0 1" pos="0 0 0" range="0 1.0" damping="0.1"/>
+        <body name="extend_link" pos="0 0 0.6">
+          <geom name="extend_geom" type="cylinder" size="0.1 0.4" pos="0.4 0 0" material="blue"/>
+          <joint name="extend_joint" type="slide" axis="1 0 0" pos="0 0 0" range="0 0.8" damping="0.1"/>
+          <body name="gripper_base" pos="0.8 0 0">
+            <geom name="gripper_base_geom" type="box" size="0.1 0.1 0.1" pos="0 0 0" material="red"/>
+            <body name="left_gripper" pos="0 0.1 0">
+              <geom name="left_gripper_geom" type="box" size="0.1 0.05 0.05" pos="0 0 0" material="red"/>
+              <joint name="left_gripper_joint" type="hinge" axis="0 0 1" pos="0 -0.1 0" range="-0.5 0" damping="0.05"/>
+            </body>
+            <body name="right_gripper" pos="0 -0.1 0">
+              <geom name="right_gripper_geom" type="box" size="0.1 0.05 0.05" pos="0 0 0" material="red"/>
+              <joint name="right_gripper_joint" type="hinge" axis="0 0 1" pos="0 0.1 0" range="0 0.5" damping="0.05"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="lift_actuator" joint="lift_joint" kp="1000" kv="100"/>
+    <position name="extend_actuator" joint="extend_joint" kp="1000" kv="100"/>
+    <position name="left_gripper_actuator" joint="left_gripper_joint" kp="500" kv="50"/>
+    <position name="right_gripper_actuator" joint="right_gripper_joint" kp="500" kv="50"/>
+  </actuator>
+</mujoco>
+    """
 
-    def __init__(self):
-        """初始化模拟器连接、机械臂模型和关节信息"""
-        self.physics_client: Optional[int] = None
-        self.arm_id: Optional[int] = None
-        self.plane_id: Optional[int] = None
-
-        # 关节相关参数
-        self.elevator_joint_index: int = ELEVATOR_JOINT_INDEX
-        self.joint_min: float = 0.0
-        self.joint_max: float = 0.0
-        self.current_pos: float = 0.0
-
-        # 初始化流程
-        self._connect_simulator()
-        self._load_scene()
-        self._init_joint_info()
-        self._print_init_info()
-
-    def _connect_simulator(self) -> None:
-        """私有方法：连接PyBullet模拟器（封装初始化细节）"""
-        try:
-            self.physics_client = p.connect(p.GUI)
-            p.setAdditionalSearchPath(pybullet_data.getDataPath())
-            p.setGravity(*SIMULATION_GRAVITY)
-            print("✅ 成功连接PyBullet模拟器")
-        except Exception as e:
-            raise RuntimeError(f"❌ 连接模拟器失败：{str(e)}")
-
-    def _load_scene(self) -> None:
-        """私有方法：加载地面和机械臂模型（封装场景加载逻辑）"""
-        try:
-            # 加载地面
-            self.plane_id = p.loadURDF("plane.urdf")
-            # 加载机械臂
-            base_orientation = p.getQuaternionFromEuler(ARM_BASE_ORIENTATION)
-            self.arm_id = p.loadURDF(
-                ARM_MODEL_PATH,
-                basePosition=ARM_BASE_POSITION,
-                baseOrientation=base_orientation
-            )
-            print("✅ 成功加载场景（地面+机械臂）")
-        except Exception as e:
-            self.disconnect()  # 加载失败时自动断开连接
-            raise RuntimeError(f"❌ 加载场景失败：{str(e)}")
-
-    def _init_joint_info(self) -> None:
-        """私有方法：初始化升降关节的限位和当前位置"""
-        if self.arm_id is None:
-            raise RuntimeError("❌ 机械臂未加载，无法初始化关节信息")
-
-        # 获取关节基础信息
-        joint_info = p.getJointInfo(self.arm_id, self.elevator_joint_index)
-        self.joint_min = joint_info[8]
-        self.joint_max = joint_info[9]
-        # 获取当前关节位置
-        self.current_pos = p.getJointState(self.arm_id, self.elevator_joint_index)[0]
-
-    def _print_init_info(self) -> None:
-        """打印初始化信息（格式化输出，更易读）"""
-        print("\n=" * 40)
-        print("📌 机械臂升降关节初始化信息")
-        print("=" * 40)
-        print(f"关节索引：{self.elevator_joint_index}")
-        print(f"当前位置：{self.current_pos:.3f}")
-        print(f"运动范围：[{self.joint_min:.3f}, {self.joint_max:.3f}]")
-        print(f"默认速度：{MOVE_SPEED_DEFAULT}")
-        print(f"位置误差容忍度：{POSITION_TOLERANCE}")
-        print("=" * 40 + "\n")
-
-    def _check_target_pos_valid(self, target_pos: float) -> bool:
-        """私有方法：校验目标位置是否合法（返回布尔值，便于后续扩展）"""
-        if self.joint_min <= target_pos <= self.joint_max:
-            return True
-        print(f"❌ 目标位置 {target_pos:.3f} 超出关节范围：[{self.joint_min:.3f}, {self.joint_max:.3f}]")
-        return False
-
-    def move_elevator(self, target_pos: float, speed: Optional[float] = None) -> None:
-        """
-        驱动升降关节运动到目标位置（公开方法，对外提供核心功能）
-        :param target_pos: 目标位置（需在关节限位范围内）
-        :param speed: 运动速度，默认使用MOVE_SPEED_DEFAULT
-        :return: None
-        """
-        # 处理默认速度
-        move_speed = speed if speed is not None else MOVE_SPEED_DEFAULT
-        # 校验目标位置
-        if not self._check_target_pos_valid(target_pos):
-            return
-
-        # 打印运动开始信息
-        print(f"\n🚀 开始升降运动：当前位置 {self.current_pos:.3f} → 目标位置 {target_pos:.3f}（速度：{move_speed}）")
-
-        # 闭环控制关节运动
-        while abs(self.current_pos - target_pos) > POSITION_TOLERANCE:
-            # 计算运动步长（方向+大小）
-            step = move_speed if target_pos > self.current_pos else -move_speed
-            # 更新当前位置（防止超出限位）
-            self.current_pos = np.clip(self.current_pos + step, self.joint_min, self.joint_max)
-            # 发送位置控制指令
-            p.setJointMotorControl2(
-                bodyUniqueId=self.arm_id,
-                jointIndex=self.elevator_joint_index,
-                controlMode=p.POSITION_CONTROL,
-                targetPosition=self.current_pos
-            )
-            # 步进仿真
-            p.stepSimulation()
-            time.sleep(DELAY_STEP)
-            # 同步模拟器中的实际关节位置
-            self.current_pos = p.getJointState(self.arm_id, self.elevator_joint_index)[0]
-            # 实时刷新显示（清除当前行，更整洁）
-            print(f"🔍 实时位置：{self.current_pos:.3f}", end='\r')
-
-        # 运动完成提示
-        print(f"\n✅ 升降运动完成！最终位置：{self.current_pos:.3f}")
-
-    def move_elevator_relative(self, delta_pos: float, speed: Optional[float] = None) -> None:
-        """
-        相对运动：基于当前位置升降指定距离（新增功能，提升易用性）
-        :param delta_pos: 相对位移（正数=上升，负数=下降）
-        :param speed: 运动速度
-        :return: None
-        """
-        target_pos = self.current_pos + delta_pos
-        self.move_elevator(target_pos, speed)
-
-    def disconnect(self) -> None:
-        """断开模拟器连接（容错处理，避免重复断开）"""
-        if self.physics_client is not None:
-            p.disconnect(self.physics_client)
-            self.physics_client = None
-            print("\n🔌 已断开与PyBullet模拟器的连接")
-
-
-# ------------------- 主执行逻辑（解耦，便于测试） -------------------
-def main():
-    """主函数：执行升降动作序列"""
-    arm_controller = None
+    # 2. 加载模型
     try:
-        # 初始化控制器
-        arm_controller = ArmElevatorController()
-
-        # 执行升降动作序列
-        print("\n" + "-" * 50)
-        print("📝 执行升降动作序列1：上升到上限60%")
-        print("-" * 50)
-        arm_controller.move_elevator(target_pos=arm_controller.joint_max * 0.6)
-        time.sleep(1)
-
-        print("\n" + "-" * 50)
-        print("📝 执行升降动作序列2：下降到下限60%")
-        print("-" * 50)
-        arm_controller.move_elevator(target_pos=arm_controller.joint_min * 0.6, speed=0.02)
-        time.sleep(1)
-
-        print("\n" + "-" * 50)
-        print("📝 执行升降动作序列3：相对上升0.5")
-        print("-" * 50)
-        arm_controller.move_elevator_relative(delta_pos=0.5, speed=0.04)
-        time.sleep(1)
-
-        print("\n" + "-" * 50)
-        print("📝 执行升降动作序列4：回到初始位置0")
-        print("-" * 50)
-        arm_controller.move_elevator(target_pos=0)
-
+        model = mujoco.MjModel.from_xml_string(robot_xml)
+        data = mujoco.MjData(model)
+        print("✅ 机械臂模型加载成功，启动仿真...")
     except Exception as e:
-        print(f"\n❌ 程序执行出错：{str(e)}")
-    finally:
-        # 确保无论是否出错，都断开连接
-        if arm_controller is not None:
-            arm_controller.disconnect()
+        print(f"❌ 模型加载失败：{e}")
+        return
+
+    # 3. 获取执行器索引（对应data.ctrl数组的下标，3.4.0原生支持）
+    lift_act_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "lift_actuator")
+    extend_act_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "extend_actuator")
+    left_gripper_act_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "left_gripper_actuator")
+    right_gripper_act_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "right_gripper_actuator")
+
+    # 4. 动作控制逻辑（直接操作data.ctrl，3.4.0原生语法）
+    def control_lift(target):
+        data.ctrl[lift_act_idx] = target  # 直接给执行器对应下标赋值
+
+    def control_extend(target):
+        data.ctrl[extend_act_idx] = target
+
+    def control_gripper(target_left):
+        target_right = -target_left
+        data.ctrl[left_gripper_act_idx] = target_left
+        data.ctrl[right_gripper_act_idx] = target_right
+
+    # 5. 预设动作流程
+    action_list = [
+        ("上升", "lift", 0.8, 2.0),
+        ("伸展", "extend", 0.6, 2.0),
+        ("夹紧", "gripper", -0.4, 1.0),
+        ("保持", "none", None, 1.5),
+        ("放松", "gripper", 0, 1.0),
+        ("收缩", "extend", 0, 2.0),
+        ("下降", "lift", 0, 2.0),
+    ]
+
+    # 6. 启动可视化并执行动作
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        for action_name, action_type, target, dur in action_list:
+            print(f"🔧 正在执行：{action_name}")
+            start_time = time.time()
+            while (time.time() - start_time) < dur and viewer.is_running():
+                # 执行对应动作
+                if action_type == "lift":
+                    control_lift(target)
+                elif action_type == "extend":
+                    control_extend(target)
+                elif action_type == "gripper":
+                    control_gripper(target)
+
+                # 步进仿真+同步可视化
+                mujoco.mj_step(model, data)
+                viewer.sync()
+                time.sleep(0.001)
+
+    print("🎉 机械臂动作执行完毕！")
 
 
 if __name__ == "__main__":
-    # 启动程序
-    print("🚀 启动机械臂升降控制系统...")
-    main()
-    print("\n🎉 程序正常结束")
+    robot_arm_final_stable_demo()
