@@ -240,7 +240,7 @@ class AirSimNHCarSimulator:
             print(f"获取GPS数据失败: {e}")
             return None
 
-    def manual_control_demo(self, duration=10):
+    def manual_control_demo(self, duration=20):  # 增加总时长到20秒
         """
         手动控制演示：前进、转向、停止
 
@@ -252,64 +252,146 @@ class AirSimNHCarSimulator:
             return False
 
         print(f"\n开始手动控制演示 ({duration}秒)...")
-        print("操作序列: 加速 → 左转 → 右转 → 刹车停止")
+        print("操作序列: 直线加速 → 保持直线 → 缓左转 → 直线回正 → 缓右转 → 直线行驶 → 平滑刹车")
 
         start_time = time.time()
         sequence = 0
+
+        # 添加速度监控
+        current_speed = 0
+        max_speed_kmh = 40  # 提高最大速度到40km/h
 
         try:
             while time.time() - start_time < duration:
                 elapsed = time.time() - start_time
 
+                # 获取当前速度
+                state = self.get_vehicle_state()
+                if state:
+                    current_speed = state['speed_kmh']
+                else:
+                    current_speed = 0
+
                 # 根据时间执行不同控制序列
-                if elapsed < duration * 0.25:  # 第一阶段：直线加速
+                if elapsed < duration * 0.25:  # 第一阶段：直线加速（25%时间）
                     controls = airsim.CarControls()
-                    controls.throttle = 0.7
+                    # 初始加速使用较高油门
+                    if elapsed < 3:  # 前3秒全力加速
+                        controls.throttle = 0.8
+                    else:  # 3秒后保持中等油门
+                        controls.throttle = 0.6
                     controls.steering = 0.0
                     self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
                     if sequence < 1:
-                        print("  阶段1: 直线加速")
+                        print(f"  阶段1: 直线加速 (目标速度: {max_speed_kmh} km/h)")
                         sequence = 1
 
-                elif elapsed < duration * 0.5:  # 第二阶段：左转
+                elif elapsed < duration * 0.35:  # 第二阶段：保持直线行驶（10%时间）
                     controls = airsim.CarControls()
-                    controls.throttle = 0.5
-                    controls.steering = 0.3  # 左转
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 2:
-                        print("  阶段2: 左转")
-                        sequence = 2
-
-                elif elapsed < duration * 0.75:  # 第三阶段：右转
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.5
-                    controls.steering = -0.3  # 右转
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 3:
-                        print("  阶段3: 右转")
-                        sequence = 3
-
-                else:  # 第四阶段：减速停止
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.0
-                    controls.brake = 1.0
+                    # 根据速度调整油门，保持稳定速度
+                    if current_speed < max_speed_kmh * 0.7:
+                        controls.throttle = 0.6
+                    elif current_speed < max_speed_kmh:
+                        controls.throttle = 0.5
+                    else:
+                        controls.throttle = 0.4  # 速度过高时减小油门
                     controls.steering = 0.0
                     self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+                    if sequence < 2:
+                        print(f"  阶段2: 保持直线 (当前速度: {current_speed:.1f} km/h)")
+                        sequence = 2
+
+                elif elapsed < duration * 0.45:  # 第三阶段：缓左转（10%时间）
+                    controls = airsim.CarControls()
+                    # 转向时减小油门
+                    controls.throttle = 0.5
+                    # 使用小角度左转
+                    controls.steering = 0.2
+                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+                    if sequence < 3:
+                        print(f"  阶段3: 缓左转 (速度: {current_speed:.1f} km/h)")
+                        sequence = 3
+
+                elif elapsed < duration * 0.55:  # 第四阶段：直线回正（10%时间）
+                    controls = airsim.CarControls()
+                    controls.throttle = 0.5
+                    controls.steering = 0.0  # 回正方向
+                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
                     if sequence < 4:
-                        print("  阶段4: 刹车停止")
+                        print("  阶段4: 直线回正")
                         sequence = 4
 
-                # 实时显示车辆状态
-                state = self.get_vehicle_state()
-                if state:
-                    print(f"\r速度: {state['speed_kmh']:.1f} km/h | "
-                          f"位置: ({state['position']['x']:.1f}, "
-                          f"{state['position']['y']:.1f})", end="")
+                elif elapsed < duration * 0.65:  # 第五阶段：缓右转（10%时间）
+                    controls = airsim.CarControls()
+                    controls.throttle = 0.5
+                    # 使用小角度右转
+                    controls.steering = -0.2
+                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+                    if sequence < 5:
+                        print(f"  阶段5: 缓右转 (速度: {current_speed:.1f} km/h)")
+                        sequence = 5
 
-                # 采集传感器数据
-                self.capture_camera_images(["front"])  # 只采集前摄像头
-                self.get_imu_data()
-                self.get_gps_data()
+                elif elapsed < duration * 0.85:  # 第六阶段：直线行驶并准备减速（20%时间）
+                    controls = airsim.CarControls()
+                    # 逐步减小油门
+                    progress = (elapsed - duration * 0.65) / (duration * 0.2)
+                    controls.throttle = max(0.2, 0.5 * (1.0 - progress))
+                    controls.steering = 0.0
+                    # 速度仍然较高时轻微刹车
+                    if current_speed > 25:
+                        controls.brake = 0.2
+                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+                    if sequence < 6:
+                        print("  阶段6: 直线行驶并准备减速")
+                        sequence = 6
+
+                else:  # 第七阶段：平滑刹车停止（15%时间）
+                    controls = airsim.CarControls()
+                    controls.throttle = 0.0
+                    # 根据当前速度调整刹车力度
+                    if current_speed > 20:
+                        controls.brake = 0.8
+                    elif current_speed > 10:
+                        controls.brake = 0.6
+                    else:
+                        controls.brake = 1.0  # 低速时完全刹车
+                    controls.steering = 0.0
+                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+                    if sequence < 7:
+                        print("  阶段7: 平滑刹车停止")
+                        sequence = 7
+
+                # 实时显示车辆状态
+                if state:
+                    # 显示转向状态
+                    steering_status = ""
+                    if controls.steering > 0.05:
+                        steering_status = f"左转{controls.steering:.2f}"
+                    elif controls.steering < -0.05:
+                        steering_status = f"右转{abs(controls.steering):.2f}"
+                    else:
+                        steering_status = "直行"
+
+                    # 显示油门/刹车状态
+                    control_status = ""
+                    if controls.brake > 0:
+                        control_status = f"刹车:{controls.brake:.1f}"
+                    else:
+                        control_status = f"油门:{controls.throttle:.1f}"
+
+                    # 计算行驶距离（假设从起点开始）
+                    distance = (state['position']['x'] ** 2 + state['position']['y'] ** 2) ** 0.5
+
+                    print(f"\r速度: {current_speed:5.1f} km/h | "
+                          f"转向: {steering_status:8} | "
+                          f"{control_status:8} | "
+                          f"距离: {distance:6.1f} m", end="")
+
+                # 采集传感器数据（每0.3秒采集一次）
+                if elapsed % 0.3 < 0.05:
+                    self.capture_camera_images(["front"])
+                    self.get_imu_data()
+                    self.get_gps_data()
 
                 time.sleep(0.1)  # 控制频率 10Hz
 
@@ -416,7 +498,7 @@ class AirSimNHCarSimulator:
             print(f"✗ 保存数据失败: {e}")
             return False
 
-    def run_full_demo(self, control_duration=15, data_duration=8):
+    def run_full_demo(self, control_duration=25, data_duration=10):
         """运行完整演示"""
         print("=" * 60)
         print("AirSimNH 无人车完整仿真演示")
@@ -486,7 +568,7 @@ def main():
     # 运行完整演示
     try:
         simulator.run_full_demo(
-            control_duration=20,  # 控制演示时长（秒）
+            control_duration=30,  # 增加控制演示时长到30秒
             data_duration=10  # 数据采集时长（秒）
         )
 
