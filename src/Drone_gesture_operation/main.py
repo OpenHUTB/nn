@@ -97,25 +97,25 @@ class StableFPSHandRecognizer:
             area = cv.contourArea(cnt)
 
             if area > 1000:
-                # 3. 手势分类（修改Point为仅食指+中指（2根手指））
+                # 3. 手势分类（修改输出文本映射：Fist→stop, Point→front, Palm→back）
                 hull = cv.convexHull(cnt)
                 solidity = cv.contourArea(cnt) / cv.contourArea(hull)
 
                 # 计算手指数量
                 finger_count = self.count_fingers(cnt, frame_small)
 
-                # 手势判断逻辑（核心修改）
+                # 手势判断逻辑（仅修改输出文本）
                 if solidity > 0.85:
-                    # 密实度高 = 握拳
-                    current_gesture = "Fist"
+                    # 密实度高 = 握拳 → 输出stop
+                    current_gesture = "stop"
                 elif finger_count == 2:
-                    # 仅2根手指 = 食指+中指（Point）
-                    current_gesture = "Point"
+                    # 仅2根手指 = 食指+中指 → 输出front
+                    current_gesture = "front"
                 elif finger_count >= 4:
-                    # 4-5根手指 = 手掌张开
-                    current_gesture = "Palm"
+                    # 4-5根手指 = 手掌张开 → 输出back
+                    current_gesture = "back"
                 elif finger_count == 1:
-                    # 1根手指 = 单指（归为None或单独分类，这里保持None）
+                    # 1根手指 = 单指（归为None）
                     current_gesture = "None"
                 elif finger_count == 3:
                     # 3根手指 = 归为None
@@ -128,7 +128,7 @@ class StableFPSHandRecognizer:
         if len(set(self.gesture_buffer)) == 1:
             self.stable_gesture = self.gesture_buffer[0]
 
-        # 5. 绘制极简UI（仅保留手势和FPS显示）
+        # 5. 绘制极简UI（显示修改后的手势文本）
         cv.putText(frame, f"Gesture: {self.stable_gesture}", (10, 40),
                    cv.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
         cv.putText(frame, f"FPS: {self.target_fps}", (10, 80),
@@ -152,8 +152,9 @@ class StableFPSHandRecognizer:
         capture_thread = threading.Thread(target=self.capture_frames, args=(cap,), daemon=True)
         capture_thread.start()
 
+        # 修改控制台提示文本，匹配新的输出
         print(f"✅ 帧率锁定 {self.target_fps} 帧 | ESC退出")
-        print("💡 把手放在画面中间，握拳=Fist，伸食指+中指=Point，五指张开=Palm")
+        print("💡 把手放在画面中间，握拳=stop，伸食指+中指=front，五指张开=back")
 
         # 3. 主线程处理+显示（严格控时）
         while cap.isOpened():
