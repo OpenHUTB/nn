@@ -6,13 +6,14 @@ import math
 import threading
 import signal
 import sys
+import select  # 新增：用于非阻塞输入监听
 from dataclasses import dataclass  # 用于配置类
 
 # ====================== 配置抽离（核心优化点）======================
 @dataclass
 class SimConfig:
     """仿真配置类：集中管理所有可配置参数"""
-    # 文件路径配置
+    # 文件路径配置（XML文件在当前脚本所在目录）
     xml_filename: str = "humanoid.xml"
     # 仿真参数
     timestep: float = 0.005  # 与XML中的timestep保持一致
@@ -40,7 +41,7 @@ def signal_handler(sig, frame):
     global sim_running
     sim_running = False
     print("\n⚠️ 收到中断信号，正在退出仿真...")
-    sys.exit(0)
+    # 这里不再直接sys.exit，让主循环自然退出
 
 # 注册信号处理
 signal.signal(signal.SIGINT, signal_handler)
@@ -58,6 +59,8 @@ class HumanoidSimulator:
         # 运动模式和控制信号缓存（用于平滑控制）
         self.current_mode = config.default_mode
         self.last_ctrl_signals = {}  # 存储上一帧的控制信号
+        # 新增：线程停止标记（用于优雅停止输入监听线程）
+        self.input_thread_running = False
 
     def create_xml_file(self, file_path):
         """创建人形机器人XML文件"""
@@ -144,17 +147,17 @@ class HumanoidSimulator:
 
     def load_model(self):
         """加载MuJoCo模型，预存关节ID和控制ID（性能优化）"""
-        # 获取文件路径
-        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-        self.model_path = os.path.join(desktop_path, self.config.xml_filename)
+        # 核心修改：获取当前脚本所在的文件夹路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.model_path = os.path.join(current_dir, self.config.xml_filename)
 
         # 检查并创建文件
         if not os.path.exists(self.model_path):
             self.create_xml_file(self.model_path)
         else:
-            print("ℹ️ XML文件已存在，无需重新创建！")
+            print(f"ℹ️ XML文件已存在（路径：{self.model_path}），无需重新创建！")
 
-        # 读取XML内容并加载模型（解决中文路径问题）
+        # 读取XML内容并加载模型
         try:
             with open(self.model_path, "r", encoding="utf-8") as f:
                 xml_content = f.read()
@@ -262,33 +265,45 @@ class HumanoidSimulator:
         print("\n🔄 机器人已重置到初始状态！")
 
     def input_listener(self):
-        """后台线程：监听控制台输入，支持多指令（功能扩展）"""
+        """后台线程：非阻塞监听控制台输入（修复锁冲突问题）"""
         global sim_running
-        while sim_running:
+        # 设置线程运行标记
+        self.input_thread_running = True
+        # 非阻塞读取的超时时间（避免线程空转）
+        timeout = 0.1
+
+        while self.input_thread_running and sim_running:
             try:
-                user_input = input().strip().lower()
-                if user_input == 'r':
-                    self.reset_robot()
-                elif user_input in ["sin", "random", "stop"]:
-                    self.current_mode = user_input
-                    print(f"\n🔄 运动模式已切换为：{user_input}")
-                elif user_input == 'q':
-                    sim_running = False
-                    print("\n📤 收到退出指令，仿真将结束...")
-                else:
-                    print(f"\n❓ 未知指令：{user_input}，支持的指令：r（重置）、sin/random/stop（模式）、q（退出）")
-            except EOFError:
-                continue
+                # 使用select检查是否有输入（非阻塞）
+                ready, _, _ = select.select([sys.stdin], [], [], timeout)
+                if ready:
+                    # 读取输入（此时有数据，不会阻塞）
+                    user_input = sys.stdin.readline().strip().lower()
+                    if user_input == 'r':
+                        self.reset_robot()
+                    elif user_input in ["sin", "random", "stop"]:
+                        self.current_mode = user_input
+                        print(f"\n🔄 运动模式已切换为：{user_input}")
+                    elif user_input == 'q':
+                        sim_running = False
+                        print("\n📤 收到退出指令，仿真将结束...")
+                    elif user_input:  # 非空的未知指令
+                        print(f"\n❓ 未知指令：{user_input}，支持的指令：r（重置）、sin/random/stop（模式）、q（退出）")
             except Exception as e:
+                # 捕获异常，避免线程崩溃
                 print(f"\n⚠️ 输入处理失败：{e}")
+                break
+
+        # 线程退出提示（可选）
+        print("\n🔌 输入监听线程已优雅退出")
 
     def run_simulation(self):
         """运行仿真主循环"""
         # 加载模型
         self.load_model()
 
-        # 启动输入监听线程
-        input_thread = threading.Thread(target=self.input_listener, daemon=True)
+        # 启动输入监听线程（不再设置daemon=True，靠标记控制退出）
+        input_thread = threading.Thread(target=self.input_listener)
         input_thread.start()
 
         # 启动可视化
@@ -334,6 +349,11 @@ class HumanoidSimulator:
 
                     last_step_time = current_time
 
+        # 优雅停止输入监听线程
+        self.input_thread_running = False
+        # 等待线程退出（最多等待1秒，避免卡死）
+        input_thread.join(timeout=1.0)
+
         print("\n🏁 仿真结束！")
 
 # ====================== 程序入口 ======================
@@ -343,3 +363,5 @@ if __name__ == "__main__":
     # 创建仿真器并运行
     simulator = HumanoidSimulator(config)
     simulator.run_simulation()
+    # 程序退出前清理（可选）
+    sys.exit(0)
