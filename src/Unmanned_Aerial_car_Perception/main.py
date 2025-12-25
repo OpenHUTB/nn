@@ -270,10 +270,153 @@ def clean_actors(world: carla.World) -> None:
     for actor_type in ["vehicle.*", "sensor.*"]:
         for actor in world.get_actors().filter(actor_type):
             try:
+
+            self.lidar_sensor.listen(lidar_callback)
+            print("✅ 强化LiDAR初始化成功（64线+降噪）")
+        except Exception as e:
+            print(f"⚠️ LiDAR初始化失败：{e}")
+
+    def _init_camera(self):
+        """强化摄像头：高分辨率+实时可视化"""
+        try:
+            camera_bp = self.bp_lib.find('sensor.camera.rgb')
+            camera_bp.set_attribute('image_size_x', str(CONFIG["CAMERA_RESOLUTION"][0]))
+            camera_bp.set_attribute('image_size_y', str(CONFIG["CAMERA_RESOLUTION"][1]))
+            camera_bp.set_attribute('fov', '100')  # 超广角（覆盖更多视野）
+            camera_bp.set_attribute('sensor_tick', str(1 / CONFIG["PERCEPTION_FREQ"]))
+            camera_bp.set_attribute('gamma', '2.2')  # 优化画面亮度
+
+            # 摄像头挂载位置（前挡风玻璃）
+            camera_transform = carla.Transform(carla.Location(x=1.2, z=1.5))
+            self.camera_sensor = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
+
+            # 摄像头回调：实时可视化
+            def camera_callback(image):
+                # 转换为RGB数组
+                frame = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
+                    (image.height, image.width, 4)
+                )[:, :, :3]
+                self.perception_data["camera_frame"] = frame
+                # 实时可视化
+                if CONFIG["VISUALIZATION_ENABLE"] and frame is not None:
+                    # 在画面上叠加感知信息
+                    cv2.putText(frame, f"Obstacle Dist: {self.perception_data['obstacle_distance']:.2f}m",
+                                (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    cv2.putText(frame, f"Speed: {self._get_vehicle_speed():.1f}km/h",
+                                (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    cv2.imshow("Vehicle Camera", frame)
+                    cv2.waitKey(1)  # 刷新窗口
+
+            self.camera_sensor.listen(camera_callback)
+            print("✅ 强化摄像头初始化成功（超广角+可视化）")
+        except Exception as e:
+            print(f"⚠️ 摄像头初始化失败：{e}")
+
+    def _get_vehicle_speed(self) -> float:
+        """获取车辆当前速度（km/h）"""
+        vel = self.vehicle.get_velocity()
+        return math.hypot(vel.x, vel.y) * 3.6
+
+    def get_obstacle_status(self) -> Tuple[bool, float, float, float]:
+        """获取障碍物状态（是否有效、距离、方向、置信度）"""
+        has_obstacle = (self.perception_data["obstacle_distance"] < CONFIG["OBSTACLE_DISTANCE_THRESHOLD"]) & \
+                       (self.perception_data["perception_valid"])
+        return (has_obstacle,
+                self.perception_data["obstacle_distance"],
+                self.perception_data["obstacle_direction"],
+                self.perception_data["obstacle_confidence"])
+
+    def destroy(self):
+        """销毁传感器+关闭可视化窗口"""
+        if self.lidar_sensor:
+            self.lidar_sensor.stop()
+            self.lidar_sensor.destroy()
+        if self.camera_sensor:
+            self.camera_sensor.stop()
+            self.camera_sensor.destroy()
+        if CONFIG["VISUALIZATION_ENABLE"]:
+            cv2.destroyWindow("Vehicle Camera")
+        print("🗑️ 强化感知传感器已销毁")
+
+
+# 精准匀速控制器
+class PreciseSpeedController:
+    def __init__(self, target_speed_mps: float):
+        self.target_speed = target_speed_mps
+        # PID参数
+        self.kp = CONFIG["PID_KP"]
+        self.ki = CONFIG["PID_KI"]
+        self.kd = CONFIG["PID_KD"]
+        # 状态变量
+        self.last_error = 0.0
+        self.error_integral = 0.0
+        self.speed_history = []  # 滑动平均缓存
+        self.smoothed_speed = 0.0  # 指数平滑后的速度
+
+    def update(self, current_speed_mps: float, dt: float = 1 / CONFIG["SYNC_FPS"]) -> Tuple[float, float]:
+        """
+        更新PID控制，返回油门和刹车值
+        :param current_speed_mps: 当前速度（m/s）
+        :param dt: 时间步长（s）
+        :return: (throttle, brake)
+        """
+        # 1. 双级速度滤波（滑动平均+指数平滑）
+        self.speed_history.append(current_speed_mps)
+        if len(self.speed_history) > CONFIG["SPEED_FILTER_WINDOW"]:
+            self.speed_history.pop(0)
+        avg_speed = np.mean(self.speed_history) if self.speed_history else current_speed_mps
+        # 指数平滑
+        self.smoothed_speed = CONFIG["SPEED_SMOOTH_ALPHA"] * avg_speed + (
+                    1 - CONFIG["SPEED_SMOOTH_ALPHA"]) * self.smoothed_speed
+
+        # 2. PID计算
+        error = self.target_speed - self.smoothed_speed
+        self.error_integral += error * dt
+        # 限制积分饱和
+        self.error_integral = np.clip(self.error_integral, -0.8, 0.8)
+        # 微分项（抑制超调）
+        error_derivative = (error - self.last_error) / dt if dt > 0 else 0.0
+        self.last_error = error
+
+        # 3. 计算油门/刹车（互斥，避免同时触发）
+        throttle = np.clip(self.kp * error + self.ki * self.error_integral + self.kd * error_derivative, 0.0, 1.0)
+        brake = 0.0
+        # 速度超调时仅用刹车，且刹车力度柔和
+        if error < -CONFIG["SPEED_ERROR_THRESHOLD"] / 3.6:  # 转换为m/s的误差
+            throttle = 0.0
+            brake = np.clip(-self.kp * error * 0.4, 0.0, 1.0)
+
+        return throttle, brake
+
+
+# 基础工具函数
+def get_carla_client() -> Optional[Tuple[carla.Client, carla.World]]:
+    for port in CONFIG["CARLA_PORTS"]:
+        try:
+            client = carla.Client("127.0.0.1", port)
+            client.set_timeout(60.0)
+            world = client.get_world()
+            settings = world.get_settings()
+            settings.synchronous_mode = True
+            settings.fixed_delta_seconds = 1.0 / CONFIG["SYNC_FPS"]
+            world.apply_settings(settings)
+            print(f"✅ 成功连接Carla（端口：{port}）")
+            return client, world
+        except Exception as e:
+            print(f"⚠️ 端口{port}连接失败：{str(e)[:50]}")
+    return None, None
+
+
+def clean_actors(world: carla.World) -> None:
+    print("\n🧹 清理残留Actor...")
+    for actor_type in ["vehicle.*", "sensor.*"]:
+        for actor in world.get_actors().filter(actor_type):
+            try:
                 actor.destroy()
             except:
                 continue
     time.sleep(1)
+
 
 
 def get_vehicle_blueprint(world: carla.World) -> carla.ActorBlueprint:
@@ -346,6 +489,141 @@ def main():
         client, world = get_carla_client()
         if not client or not world:
             raise Exception("❌ 未连接到Carla")
+        spectator = world.get_spectator()
+        print("✅ 成功连接Carla模拟器！")
+        print("📌 当前仿真地图：", world.get_map().name)
+
+        # 2. 获取车辆蓝图，设置红色车身
+        # 可选：加载指定地图（比如Town01，按需切换）
+        # world = client.load_world("Town01")
+        # print("🔄 已切换地图为：Town01")
+
+        # 3. 生成车辆（多次重试+存活校验）
+        vehicle_bp = world.get_blueprint_library().find("vehicle.tesla.model3")
+        vehicle_bp.set_attribute("color", "255,0,0")  # 红色车身
+
+def get_vehicle_blueprint(world: carla.World) -> carla.ActorBlueprint:
+    bp_lib = world.get_blueprint_library()
+    for vehicle_name in CONFIG["PREFERRED_VEHICLES"]:
+        try:
+            bp = bp_lib.find(vehicle_name)
+            bp.set_attribute('color', '255,0,0')
+            return bp
+        except:
+            continue
+    bp = bp_lib.filter('vehicle')[0]
+    bp.set_attribute('color', '255,0,0')
+    return bp
+
+
+def spawn_vehicle_safely(world: carla.World, bp: carla.ActorBlueprint) -> Optional[carla.Vehicle]:
+    spawn_points = world.get_map().get_spawn_points()
+    if not spawn_points:
+        raise Exception("❌ 无可用生成点")
+    safe_spawn_point = spawn_points[1] if len(spawn_points) >= 2 else spawn_points[0]
+    max_retry = 3
+    for retry in range(max_retry):
+        try:
+            vehicle = world.spawn_actor(bp, safe_spawn_point)
+            if vehicle and vehicle.is_alive:
+                vehicle.set_simulate_physics(True)
+                vehicle.set_autopilot(False)
+                print(f"✅ 车辆生成成功（ID：{vehicle.id}）")
+                return vehicle
+            elif vehicle:
+                vehicle.destroy()
+        except Exception as e:
+            print(f"⚠️ 第{retry + 1}次生成失败：{str(e)[:50]}")
+            time.sleep(0.5)
+    raise Exception("❌ 车辆生成失败")
+
+
+def init_spectator_follow(world: carla.World, vehicle: carla.Vehicle) -> callable:
+    spectator = world.get_spectator()
+    view_update_counter = 0
+
+    def follow_vehicle():
+        nonlocal view_update_counter
+        if view_update_counter % 3 == 0:
+            trans = vehicle.get_transform()
+            spectator.set_transform(carla.Transform(
+                carla.Location(
+                    x=trans.location.x - math.cos(math.radians(trans.rotation.yaw)) * 10,
+                    y=trans.location.y - math.sin(math.radians(trans.rotation.yaw)) * 10,
+                    z=trans.location.z + 5.0
+                ),
+                carla.Rotation(pitch=-20, yaw=trans.rotation.yaw)
+            ))
+        view_update_counter += 1
+
+    follow_vehicle()
+    return follow_vehicle
+
+
+# 主函数（匀速+强化感知）
+def main():
+    vehicle: Optional[carla.Vehicle] = None
+    perception: Optional[EnhancedVehiclePerception] = None
+    speed_controller: Optional[PreciseSpeedController] = None
+    world: Optional[carla.World] = None
+
+    try:
+        # 1. 初始化Carla
+        client, world = get_carla_client()
+        if not client or not world:
+            raise Exception("❌ 未连接到Carla")
+
+        # 2. 清理残留Actor
+        clean_actors(world)
+
+        # 3. 生成车辆
+        vehicle_bp = get_vehicle_blueprint(world)
+        vehicle = spawn_vehicle_safely(world, vehicle_bp)
+
+        # 4. 初始化精准速度控制器
+        speed_controller = PreciseSpeedController(CONFIG["TARGET_SPEED_MPS"])
+
+        # 5. 初始化强化感知模块
+        perception = EnhancedVehiclePerception(world, vehicle)
+
+        # 6. 视角跟随
+        follow_vehicle = init_spectator_follow(world, vehicle)
+        print("👀 视角已绑定车辆")
+
+        # 7. 核心行驶逻辑（50km/h匀速+感知避障）
+        print(f"\n🚙 开始50km/h精准匀速行驶（强化感知避障）")
+        start_time = time.time()
+        current_steer = 0.0
+        target_steer = 0.0
+
+        while time.time() - start_time < CONFIG["DRIVE_DURATION"]:
+            world.tick()
+            follow_vehicle()
+            dt = 1 / CONFIG["SYNC_FPS"]
+
+            # 7.1 获取车辆当前速度（m/s）
+            current_vel = vehicle.get_velocity()
+            current_speed_mps = math.hypot(current_vel.x, current_vel.y)
+            current_speed_kmh = current_speed_mps * 3.6
+
+            # 7.2 强化感知：获取障碍物状态
+            has_obstacle, obstacle_dist, obstacle_dir, obstacle_conf = perception.get_obstacle_status()
+
+            # 7.3 避障转向（超平滑，不影响匀速）
+            if has_obstacle and obstacle_conf > 0.3:
+                # 距离越近，转向越平缓（避免速度波动）
+                steer_amplitude = CONFIG["AVOID_STEER_MAX"] * (CONFIG["OBSTACLE_DISTANCE_THRESHOLD"] / obstacle_dist)
+                steer_amplitude = np.clip(steer_amplitude, 0.1, CONFIG["AVOID_STEER_MAX"])
+                target_steer = obstacle_dir * steer_amplitude
+            else:
+                target_steer = 0.0
+
+            # 7.4 转向超平滑过渡（避免速度波动）
+            current_steer += (target_steer - current_steer) * CONFIG["STEER_SMOOTH_FACTOR"]
+            current_steer = np.clip(current_steer, -CONFIG["AVOID_STEER_MAX"], CONFIG["AVOID_STEER_MAX"])
+
+            # 7.5 精准PID速度控制（核心匀速逻辑）
+            throttle, brake = speed_controller.update(current_speed_mps, dt)
 
         # 2. 清理残留Actor
         clean_actors(world)
