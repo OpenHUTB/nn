@@ -4,12 +4,11 @@ port: 2000
 timeout: 20.0
 
 # ======================== 传感器配置 ========================
-# 增大分辨率和视野，提升远距离检测能力
-img_width: 1280          # ↑ 从640提升到1280，让远处车辆更清晰
-img_height: 960          # ↑ 从480提升到960
-fov: 110                 # ↑ 从90提升到110，扩大视野范围
+img_width: 1280
+img_height: 960
+fov: 110
 sensor_tick: 0.05
-use_lidar: true          # 保持LiDAR开启，用于距离验证
+use_lidar: true
 
 # ======================== LiDAR配置 ========================
 lidar_channels: 32
@@ -17,14 +16,11 @@ lidar_range: 100.0
 lidar_points_per_second: 500000
 
 # ======================== 检测模型配置 ========================
-# 关键优化：降低阈值，增大输入尺寸
-yolo_model: "yolov8n.pt"          # 可选：换成 yolov8m.pt 效果更好
-conf_thres: 0.25                  # ↓ 从0.5降低到0.25，检测更多远处目标
-iou_thres: 0.3                    # 保持
-device: "cuda" if torch.cuda.is_available() else "cpu"
-yolo_imgsz_max: 640               # ↑ 从320提升到640，提升小目标检测能力
-yolo_iou: 0.45
-yolo_quantize: false
+yolo_model: "yolov8n.pt"
+conf_thres: 0.1
+iou_thres: 0.3
+device: "cpu"  
+yolo_imgsz_max: 640
 
 # ======================== 跟踪算法配置 ========================
 max_age: 5
@@ -39,63 +35,47 @@ display_fps: 30
 
 # ======================== 轨迹历史配置 ========================
 track_history_len: 20
-track_line_width: 2
-track_alpha: 0.6
 
 # ======================== 行为分析配置 ========================
-# 针对远距离检测调整参数
-stop_speed_thresh: 0.8            # ↓ 降低停车速度阈值
+stop_speed_thresh: 0.8
 stop_frames_thresh: 5
 overtake_speed_ratio: 1.5
-overtake_dist_thresh: 60.0        # ↑ 增大超车距离阈值
+overtake_dist_thresh: 60.0
 lane_change_thresh: 0.4
 brake_accel_thresh: 2.0
 turn_angle_thresh: 15.0
-danger_dist_thresh: 15.0          # ↑ 增大危险距离阈值，适应更远检测
+danger_dist_thresh: 15.0
 predict_frames: 10
 
 # ======================== 天气与NPC配置 ========================
-default_weather: "clear"          # 使用清晰天气，有利于远距离检测
+default_weather: "clear"
 num_npcs: 20
-
-# ======================== 性能优化配置 ========================
-auto_adjust_detection: true       # 自动调整检测参数
-smooth_alpha: 0.2
-fps_window_size: 15
-
-# ======================== 传感器融合配置 ========================
-fuse_lidar_vision: true           # 启用传感器融合
-
-# ======================== 数据记录配置 ========================
-record_data: true
-record_dir: "track_records"
-record_format: "csv"
-record_fps: 10
-save_screenshots: false
-
-# ======================== 3D可视化配置 ========================
-use_3d_visualization: true
-pcd_view_size: 800
-
-# ======================== 检测框样式配置 ========================
-det_box_color: [255, 0, 0]        # 蓝色框
-det_box_thickness: 2
-det_label_bg_color: [0, 0, 0]     # 黑色背景
-det_label_text_color: [255, 255, 255]  # 白色文字
-det_label_font_scale: 0.5
-det_label_padding: 5
 
 # ======================== 视角控制配置 ========================
 view:
-  default_mode: "satellite"       # 默认视角模式
-  satellite_height: 50.0          # 卫星视角高度
-  behind_distance: 10.0           # 后方视角距离
-  first_person_height: 1.6        # 第一人称视角高度
+  default_mode: "satellite"
+  satellite_height: 50.0
+  behind_distance: 10.0
+  first_person_height: 1.6
 
-# ======================== 新增：远距离检测专用配置 ========================
-far_detection:
-  enabled: true                   # 启用远距离检测模式
-  min_confidence: 0.2            # 远距离目标最低置信度
-  min_pixel_size: 15             # 最小检测像素尺寸（宽或高）
-  scale_factor: 1.5              # 图像缩放因子用于小目标检测
-  enable_multi_scale: true       # 启用多尺度检测
+# ======================== 热重载配置 ========================
+hot_reload:
+  enabled: true           # 是否启用热重载
+  check_interval: 100     # 每多少帧检查一次配置文件
+  safe_keys_only: true    # 是否只更新安全参数（避免重启连接）
+
+# 可热重载的安全参数列表（这些参数可以安全更新而不需要重启）
+hot_reload_safe_keys:
+  - "conf_thres"          # 检测置信度阈值
+  - "iou_thres"           # IOU阈值
+  - "display_fps"         # 显示帧率
+  - "max_age"             # 跟踪最大丢失帧数
+  - "min_hits"            # 跟踪最小匹配次数
+  - "adaptive_fps"        # 是否启用自适应帧率
+  - "min_fps"             # 最小FPS
+  - "max_fps"             # 最大FPS
+  - "fov"                 # 相机视野
+  - "yolo_imgsz_max"      # YOLO输入尺寸
+  - "stop_speed_thresh"   # 停车速度阈值
+  - "danger_dist_thresh"  # 危险距离阈值
+  - "weather"             # 天气设置
