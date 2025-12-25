@@ -5,6 +5,7 @@
 - 路径记忆与学习功能
 - 绕障决策优化
 - R 键复位
+- 空格键强制截停 / 解除锁定
 """
 import mujoco
 import mujoco.viewer
@@ -21,6 +22,7 @@ KEYS = {
     keyboard.KeyCode.from_char('r'): False,
     keyboard.KeyCode.from_char('d'): False,  # 调试模式开关
     keyboard.KeyCode.from_char('s'): False,  # 保存路径记录
+    keyboard.Key.space: False,               # 强制截停
 }
 
 def on_press(k):
@@ -230,7 +232,7 @@ def reset_car():
     # 重置状态变量
     global CAR_STATE, turn_counter, scan_counter, deceleration_counter
     global current_speed, turn_angle, turn_direction, path_history
-    global last_success_pos, distance_since_last_obstacle
+    global last_success_pos, distance_since_last_obstacle, LOCKED_BY_SPACE
 
     CAR_STATE = "CRUISING"
     turn_counter = 0
@@ -242,6 +244,7 @@ def reset_car():
     path_history = []  # 重置路径历史
     last_success_pos = get_car_position()  # 记录起始位置
     distance_since_last_obstacle = 0.0
+    LOCKED_BY_SPACE = False
 
 # ------------------- 小车位置获取 -------------------
 def get_car_position():
@@ -467,6 +470,7 @@ path_history = []  # 路径历史记录
 last_success_pos = get_car_position()  # 最后成功位置
 distance_since_last_obstacle = 0.0
 last_obstacle_time = 0  # 上次遇到障碍物的时间
+LOCKED_BY_SPACE = False  # 空格触发的强制锁标志
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
     viewer.cam.distance = 2.5
@@ -477,6 +481,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
     print("  R - 复位小车")
     print("  D - 切换调试模式")
     print("  S - 保存路径记忆")
+    print("  空格 - 强制截停 / 解除锁定")
     print("======================")
 
     while viewer.is_running():
@@ -492,6 +497,30 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         if KEYS.get(keyboard.KeyCode.from_char('s'), False):
             path_memory.save_to_file()
             KEYS[keyboard.KeyCode.from_char('s')] = False
+
+        # ===== 强制截停（最高优先级） =====
+        if KEYS.get(keyboard.Key.space, False):
+            KEYS[keyboard.Key.space] = False   # 消抖
+            if CAR_STATE == "LOCK":
+                # 解除锁定
+                CAR_STATE = "CRUISING"
+                LOCKED_BY_SPACE = False
+                print("\n>>> 强制截停解除，恢复巡航 <<<")
+            else:
+                # 进入强制锁
+                CAR_STATE = "LOCK"
+                LOCKED_BY_SPACE = True
+                # 瞬间清零所有电机
+                for i in range(len(data.ctrl)):
+                    data.ctrl[i] = 0.0
+                current_speed = 0.0
+                print("\n>>> 强制截停激活！按空格再次解除 <<<")
+
+        # ===== 如果处于 LOCK 状态，直接跳过整个状态机 =====
+        if CAR_STATE == "LOCK":
+            mujoco.mj_step(model, data)
+            viewer.sync()
+            continue
 
         # 获取小车当前位置和速度
         car_pos = get_car_position()
