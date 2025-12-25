@@ -2,261 +2,319 @@ import carla
 import time
 import math
 import numpy as np
-import cv2  # 摄像头可视化（需安装：pip install opencv-python）
+import cv2
+import threading
+import queue
 from typing import Optional, Tuple, List, Dict
-
-# 全局配置（匀速+感知双优化）
-CONFIG = {
-    # 精准匀速控制参数
-    "TARGET_SPEED_KMH": 50.0,  # 目标匀速50km/h
-    "TARGET_SPEED_MPS": 50.0 / 3.6,  # 转换为m/s（≈13.89）
-    "PID_KP": 0.12,  # 比例项（优化匀速）
-    "PID_KI": 0.005,  # 积分项（减小稳态误差）
-    "PID_KD": 0.03,  # 微分项（抑制速度超调）
-    "SPEED_FILTER_WINDOW": 8,  # 滑动平均窗口（提升速度平滑性）
-    "SPEED_SMOOTH_ALPHA": 0.2,  # 指数平滑系数（进一步滤波）
-    "SPEED_ERROR_THRESHOLD": 0.5,  # 速度误差阈值（±0.5km/h）
-    "STEER_SMOOTH_FACTOR": 0.03,  # 转向超平滑（不影响匀速）
-    "AVOID_STEER_MAX": 0.25,  # 最大避障转向（避免速度波动）
-    # 机器感知强化参数
-    "LIDAR_RANGE": 8.0,  # 感知范围扩展至8米（提前预警）
-    "LIDAR_POINTS_PER_SECOND": 80000,  # 提升点云密度（更精准）
-    "LIDAR_NOISE_FILTER": True,  # LiDAR点云降噪
-    "CAMERA_RESOLUTION": (800, 600),  # 提升摄像头分辨率
-    "OBSTACLE_DISTANCE_THRESHOLD": 2.0,  # 障碍物预警阈值（提前2米避障）
-    "OBSTACLE_ANGLE_THRESHOLD": 30,  # 障碍物角度阈值（前方30°）
-    "PERCEPTION_FREQ": 15,  # 感知频率提升至15Hz（更实时）
-    "VISUALIZATION_ENABLE": True,  # 感知可视化（摄像头+LiDAR）
-    # 基础配置
-    "DRIVE_DURATION": 120,
-    "STALL_SPEED_THRESHOLD": 1.0,
-    "SYNC_FPS": 30,
-    "CARLA_PORTS": [2000, 2001, 2002],
-    "PREFERRED_VEHICLES": ["vehicle.tesla.model3", "vehicle.audi.a2", "vehicle.bmw.grandtourer"]
-}
+from dataclasses import dataclass, field
 
 
-# 强化版机器感知类（降噪+精准定位+可视化）
-class EnhancedVehiclePerception:
+# ======================== 全局配置（核心参数可直接调整）========================
+@dataclass
+class Config:
+    # 核心匀速参数（目标50km/h）
+    TARGET_SPEED_KMH: float = 50.0
+    TARGET_SPEED_MPS: float = 50.0 / 3.6  # 转换为米/秒（≈13.89）
+    SPEED_DEADZONE: float = 0.2  # 速度死区（±0.2km/h，避免频繁调整）
+
+    # PID速度控制器参数（优化50km/h匀速）
+    PID_KP_LOW: float = 0.2  # 低速段比例项（<40km/h）
+    PID_KP_MID: float = 0.15  # 中速段比例项（40-50km/h）
+    PID_KP_HIGH: float = 0.1  # 高速段比例项（>50km/h）
+    PID_KI: float = 0.005  # 积分项（消除稳态误差）
+    PID_KD: float = 0.03  # 微分项（抑制超调）
+    PID_INTEGRAL_LIMIT: float = 0.8  # 积分饱和限制
+    PID_INTEGRAL_RESET_THRESH: float = 1.0  # 误差超1km/h重置积分
+
+    # 障碍物避障参数
+    LIDAR_RANGE: float = 8.0  # LiDAR检测范围（米）
+    OBSTACLE_EMERGENCY_DIST: float = 2.0  # 紧急制动距离（<2米刹车）
+    OBSTACLE_WARNING_DIST: float = 4.0  # 避障预警距离（<4米转向）
+    OBSTACLE_ANGLE_THRESHOLD: float = 45  # 检测角度（前方45°）
+    AVOID_STEER_MAX: float = 0.3  # 最大避障转向角（0-1，1为最大）
+    STEER_SMOOTH_FACTOR: float = 0.1  # 转向平滑因子（越大越灵敏）
+    STEER_RETURN_FACTOR: float = 0.05  # 避障后回正因子
+
+    # 传感器参数（降负载，避免卡顿）
+    LIDAR_POINTS_PER_SECOND: int = 20000  # LiDAR点云数量（降负载）
+    CAMERA_RESOLUTION: Tuple[int, int] = (480, 360)  # 摄像头分辨率
+    PERCEPTION_FREQ: int = 10  # 感知频率（Hz）
+    SYNC_FPS: int = 20  # 同步帧率（降负载）
+    VISUALIZATION_ENABLE: bool = True  # 可视化开关（True=显示窗口）
+
+    # 基础运行参数
+    DRIVE_DURATION: int = 120  # 行驶时长（秒）
+    CARLA_PORTS: List[int] = field(default_factory=lambda: [2000, 2001, 2002])
+    PREFERRED_VEHICLES: List[str] = field(
+        default_factory=lambda: ["vehicle.tesla.model3", "vehicle.audi.a2", "vehicle.bmw.grandtourer"])
+
+
+CONFIG = Config()
+
+
+# ======================== 速度滤波：指数平滑+滑动平均 ========================
+class EnhancedSpeedFilter:
+    def __init__(self, initial_speed: float = 0.0):
+        self.smoothed_speed = initial_speed
+        self.speed_history = []
+        self.window_size = 6  # 滑动窗口大小
+
+    def update(self, measured_speed: float) -> float:
+        # 指数平滑（降低瞬时波动）
+        self.smoothed_speed = 0.3 * measured_speed + 0.7 * self.smoothed_speed
+        # 滑动平均（进一步稳定）
+        self.speed_history.append(self.smoothed_speed)
+        if len(self.speed_history) > self.window_size:
+            self.speed_history.pop(0)
+        return np.mean(self.speed_history) if self.speed_history else measured_speed
+
+
+# ======================== PID速度控制器（精准50km/h）========================
+class DynamicSpeedController:
+    def __init__(self):
+        self.target_speed = CONFIG.TARGET_SPEED_MPS
+        self.last_error = 0.0
+        self.error_integral = 0.0
+        self.speed_filter = EnhancedSpeedFilter()
+
+    def _get_dynamic_kp(self, current_speed_mps: float) -> float:
+        """根据当前速度动态调整KP，避免超调"""
+        current_kmh = current_speed_mps * 3.6
+        if current_kmh < 40:
+            return CONFIG.PID_KP_LOW
+        elif 40 <= current_kmh <= 50:
+            return CONFIG.PID_KP_MID
+        else:
+            return CONFIG.PID_KP_HIGH
+
+    def update(self, current_speed_mps: float, dt: float = 1 / CONFIG.SYNC_FPS) -> Tuple[float, float]:
+        # 速度滤波（稳定输入）
+        filtered_speed = self.speed_filter.update(current_speed_mps)
+        # 计算误差（米/秒）
+        error = self.target_speed - filtered_speed
+        error_kmh = error * 3.6
+
+        # 积分项（消除稳态误差，避免速度飘移）
+        if abs(error_kmh) < CONFIG.PID_INTEGRAL_RESET_THRESH:
+            self.error_integral += error * dt
+        else:
+            self.error_integral = 0.0  # 误差过大重置积分
+        self.error_integral = np.clip(self.error_integral, -CONFIG.PID_INTEGRAL_LIMIT, CONFIG.PID_INTEGRAL_LIMIT)
+
+        # 微分项（抑制超调）
+        error_derivative = (error - self.last_error) / dt if dt > 0 else 0.0
+        self.last_error = error
+
+        # 动态PID计算
+        kp = self._get_dynamic_kp(filtered_speed)
+        throttle = kp * error + CONFIG.PID_KI * self.error_integral + CONFIG.PID_KD * error_derivative
+        throttle = np.clip(throttle, 0.0, 1.0)  # 油门限制0-1
+
+        # 刹车逻辑（仅速度超目标+误差>死区时刹车）
+        brake = 0.0
+        if error < -CONFIG.SPEED_DEADZONE / 3.6:  # 转换为米/秒
+            brake = np.clip(-kp * error * 0.4, 0.0, 1.0)
+            throttle = 0.0  # 刹车时关闭油门
+
+        return throttle, brake
+
+
+# ======================== 避障感知类（自动绕开障碍物）========================
+class ObstacleAvoidancePerception:
     def __init__(self, world: carla.World, vehicle: carla.Vehicle):
         self.world = world
         self.vehicle = vehicle
         self.bp_lib = world.get_blueprint_library()
-        # 感知数据缓存（带校验）
-        self.perception_data: Dict[str, any] = {
-            "lidar_obstacles": np.array([]),  # 降噪后的LiDAR点云
-            "lidar_last_update": 0.0,
-            "camera_frame": None,  # 摄像头RGB帧
-            "obstacle_distance": float("inf"),
-            "obstacle_direction": 0.0,
-            "obstacle_confidence": 0.0,  # 障碍物置信度（0-1）
-            "perception_valid": False  # 感知数据有效性标记
+
+        # 感知数据
+        self.perception_data = {
+            "lidar_points": np.array([]),
+            "camera_frame": None,
+            "has_obstacle": False,
+            "has_emergency": False,
+            "obstacle_dist": float("inf"),
+            "obstacle_dir": 0.0,  # -1=左，1=右，0=正前
+            "multi_obstacle": False
         }
-        # 传感器实例
-        self.lidar_sensor: Optional[carla.Sensor] = None
-        self.camera_sensor: Optional[carla.Sensor] = None
-        # 可视化窗口（摄像头）
-        if CONFIG["VISUALIZATION_ENABLE"]:
-            cv2.namedWindow("Vehicle Camera", cv2.WINDOW_NORMAL)
-            cv2.resizeWindow("Vehicle Camera", CONFIG["CAMERA_RESOLUTION"][0], CONFIG["CAMERA_RESOLUTION"][1])
+
+        # 可视化线程（解决窗口未响应）
+        self.frame_queue = queue.Queue(maxsize=1)
+        self.draw_thread = None
+        self.draw_running = False
+        if CONFIG.VISUALIZATION_ENABLE:
+            self.draw_running = True
+            self.draw_thread = threading.Thread(target=self._draw_loop, daemon=True)
+            self.draw_thread.start()
+
         # 初始化传感器
+        self.lidar_sensor = None
+        self.camera_sensor = None
         self._init_lidar()
         self._init_camera()
 
     def _init_lidar(self):
-        """强化LiDAR：降噪+高密度+精准检测"""
+        """初始化LiDAR，检测前方障碍物位置（左/右/正前）"""
         try:
             lidar_bp = self.bp_lib.find('sensor.lidar.ray_cast')
-            # 强化LiDAR参数
-            lidar_bp.set_attribute('range', str(CONFIG["LIDAR_RANGE"]))
-            lidar_bp.set_attribute('points_per_second', str(CONFIG["LIDAR_POINTS_PER_SECOND"]))
-            lidar_bp.set_attribute('rotation_frequency', str(CONFIG["SYNC_FPS"]))
-            lidar_bp.set_attribute('channels', '64')  # 64线LiDAR（更精准）
-            lidar_bp.set_attribute('upper_fov', '15')
-            lidar_bp.set_attribute('lower_fov', '-35')
-            lidar_bp.set_attribute('noise_stddev', '0.005')  # 降低噪声
-            lidar_bp.set_attribute('dropoff_general_rate', '0.01')  # 减少点云丢失
+            # 逐个设置LiDAR参数（修复set_attributes错误）
+            lidar_bp.set_attribute('range', str(CONFIG.LIDAR_RANGE))
+            lidar_bp.set_attribute('points_per_second', str(CONFIG.LIDAR_POINTS_PER_SECOND))
+            lidar_bp.set_attribute('rotation_frequency', str(CONFIG.SYNC_FPS))
+            lidar_bp.set_attribute('channels', '32')  # 降为32线（减少负载）
+            lidar_bp.set_attribute('upper_fov', '5')
+            lidar_bp.set_attribute('lower_fov', '-20')
+            lidar_bp.set_attribute('noise_stddev', '0.001')
+            lidar_bp.set_attribute('dropoff_general_rate', '0.005')
 
-            # LiDAR挂载位置（更精准）
-            lidar_transform = carla.Transform(carla.Location(x=1.0, z=1.8))
+            # LiDAR安装位置（车辆前保险杠）
+            lidar_transform = carla.Transform(carla.Location(x=1.0, z=1.2))
             self.lidar_sensor = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=self.vehicle)
 
-            # 强化LiDAR回调：降噪+置信度计算
             def lidar_callback(point_cloud):
-                current_time = time.time()
-                if current_time - self.perception_data["lidar_last_update"] < 1 / CONFIG["PERCEPTION_FREQ"]:
-                    return
-                self.perception_data["lidar_last_update"] = current_time
-
-                # 1. 解析点云并降噪
+                # 解析点云
                 points = np.frombuffer(point_cloud.raw_data, dtype=np.float32).reshape(-1, 4)
-                x, y, z, intensity = points[:, 0], points[:, 1], points[:, 2], points[:, 3]
+                x, y, z, _ = points[:, 0], points[:, 1], points[:, 2], points[:, 3]
 
-                # 2. 多层降噪（过滤无效点）
-                # 过滤地面/过近/低强度点
-                mask = (z > -0.6) & (np.hypot(x, y) > 0.2) & (intensity > 0.1)
-                # 过滤非前方点（±30°）
+                # 过滤：只保留前方45°、地面以上的点
                 vehicle_yaw = math.radians(self.vehicle.get_transform().rotation.yaw)
                 point_yaw = np.arctan2(y, x)
                 angle_diff = np.degrees(np.abs(point_yaw - vehicle_yaw))
-                mask = mask & (angle_diff < CONFIG["OBSTACLE_ANGLE_THRESHOLD"])
-                # 统计滤波（去除孤立噪点）
-                if CONFIG["LIDAR_NOISE_FILTER"] and len(points[mask]) > 10:
-                    distances = np.hypot(x[mask], y[mask])
-                    mean_dist = np.mean(distances)
-                    std_dist = np.std(distances)
-                    mask[mask] = (distances > mean_dist - 2 * std_dist) & (distances < mean_dist + 2 * std_dist)
-
+                mask = (
+                        (z > -0.5) & (z < 2.0) &  # 高度过滤
+                        (np.hypot(x, y) > 0.3) &  # 排除车辆自身
+                        (angle_diff < CONFIG.OBSTACLE_ANGLE_THRESHOLD)  # 前方角度
+                )
                 valid_points = points[mask][:, :3]
-                self.perception_data["lidar_obstacles"] = valid_points
-                self.perception_data["perception_valid"] = len(valid_points) > 0
 
-                # 3. 精准计算障碍物（带置信度）
-                if len(valid_points) > 0:
-                    distances = np.hypot(valid_points[:, 0], valid_points[:, 1])
-                    min_idx = np.argmin(distances)
-                    min_dist = distances[min_idx]
-                    min_y = valid_points[min_idx, 1]
+                self.perception_data["lidar_points"] = valid_points
+                if len(valid_points) == 0:
+                    # 无障碍物
+                    self.perception_data.update({
+                        "has_obstacle": False,
+                        "has_emergency": False,
+                        "obstacle_dist": float("inf"),
+                        "obstacle_dir": 0.0,
+                        "multi_obstacle": False
+                    })
+                    return
 
-                    # 计算置信度（点云数量越多，置信度越高）
-                    confidence = min(1.0, len(valid_points) / 100)
-                    self.perception_data["obstacle_distance"] = min_dist
-                    self.perception_data["obstacle_direction"] = 1 if min_y > 0 else -1
-                    self.perception_data["obstacle_confidence"] = confidence
-                    self.perception_data["perception_valid"] = confidence > 0.3  # 置信度>0.3才有效
-                else:
-                    self.perception_data["obstacle_distance"] = float("inf")
-                    self.perception_data["obstacle_direction"] = 0.0
-                    self.perception_data["obstacle_confidence"] = 0.0
+                # 计算障碍物距离和方向
+                distances = np.hypot(valid_points[:, 0], valid_points[:, 1])
+                min_dist_idx = np.argmin(distances)
+                min_dist = distances[min_dist_idx]
+                min_y = valid_points[min_dist_idx, 1]  # y<0=左，y>0=右
+
+                # 更新感知数据
+                self.perception_data["obstacle_dist"] = min_dist
+                self.perception_data["has_obstacle"] = min_dist < CONFIG.OBSTACLE_WARNING_DIST
+                self.perception_data["has_emergency"] = min_dist < CONFIG.OBSTACLE_EMERGENCY_DIST
+                self.perception_data["multi_obstacle"] = len(valid_points) > 50
+                # 障碍物方向：-1（左）/1（右），绝对值=距离越近方向越明显
+                self.perception_data["obstacle_dir"] = np.sign(min_y) * (1 - min_dist / CONFIG.OBSTACLE_WARNING_DIST)
 
             self.lidar_sensor.listen(lidar_callback)
-            print("✅ 强化LiDAR初始化成功（64线+降噪）")
+            print("✅ LiDAR初始化完成（障碍物检测）")
         except Exception as e:
             print(f"⚠️ LiDAR初始化失败：{e}")
 
     def _init_camera(self):
-        """强化摄像头：高分辨率+实时可视化"""
+        """初始化摄像头，独立线程绘图（解决窗口未响应）"""
         try:
             camera_bp = self.bp_lib.find('sensor.camera.rgb')
-            camera_bp.set_attribute('image_size_x', str(CONFIG["CAMERA_RESOLUTION"][0]))
-            camera_bp.set_attribute('image_size_y', str(CONFIG["CAMERA_RESOLUTION"][1]))
-            camera_bp.set_attribute('fov', '100')  # 超广角（覆盖更多视野）
-            camera_bp.set_attribute('sensor_tick', str(1 / CONFIG["PERCEPTION_FREQ"]))
-            camera_bp.set_attribute('gamma', '2.2')  # 优化画面亮度
+            # 逐个设置摄像头参数
+            camera_bp.set_attribute('image_size_x', str(CONFIG.CAMERA_RESOLUTION[0]))
+            camera_bp.set_attribute('image_size_y', str(CONFIG.CAMERA_RESOLUTION[1]))
+            camera_bp.set_attribute('fov', '110')
+            camera_bp.set_attribute('sensor_tick', str(1 / CONFIG.PERCEPTION_FREQ))
+            camera_bp.set_attribute('gamma', '2.2')
 
-            # 摄像头挂载位置（前挡风玻璃）
+            # 摄像头安装位置（车辆前挡风玻璃）
             camera_transform = carla.Transform(carla.Location(x=1.2, z=1.5))
             self.camera_sensor = self.world.spawn_actor(camera_bp, camera_transform, attach_to=self.vehicle)
 
-            # 摄像头回调：实时可视化
             def camera_callback(image):
-                # 转换为RGB数组
+                # 创建可写图像副本（修复OpenCV只读错误）
                 frame = np.frombuffer(image.raw_data, dtype=np.uint8).reshape(
                     (image.height, image.width, 4)
-                )[:, :, :3]
+                )[:, :, :3].copy()
                 self.perception_data["camera_frame"] = frame
-                # 实时可视化
-                if CONFIG["VISUALIZATION_ENABLE"] and frame is not None:
-                    # 在画面上叠加感知信息
-                    cv2.putText(frame, f"Obstacle Dist: {self.perception_data['obstacle_distance']:.2f}m",
-                                (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                    cv2.putText(frame, f"Speed: {self._get_vehicle_speed():.1f}km/h",
-                                (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
-                    cv2.imshow("Vehicle Camera", frame)
-                    cv2.waitKey(1)  # 刷新窗口
+                # 放入队列（绘图线程处理）
+                if not self.frame_queue.empty():
+                    try:
+                        self.frame_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+                self.frame_queue.put(frame, block=False)
 
             self.camera_sensor.listen(camera_callback)
-            print("✅ 强化摄像头初始化成功（超广角+可视化）")
+            print("✅ 摄像头初始化完成（独立绘图线程）")
         except Exception as e:
             print(f"⚠️ 摄像头初始化失败：{e}")
 
-    def _get_vehicle_speed(self) -> float:
-        """获取车辆当前速度（km/h）"""
-        vel = self.vehicle.get_velocity()
-        return math.hypot(vel.x, vel.y) * 3.6
+    def _draw_loop(self):
+        """独立绘图线程：避免阻塞Carla同步逻辑"""
+        cv2.namedWindow("Smart Perception", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Smart Perception", CONFIG.CAMERA_RESOLUTION[0], CONFIG.CAMERA_RESOLUTION[1])
+        while self.draw_running:
+            try:
+                frame = self.frame_queue.get(timeout=0.01)
+                # 叠加关键信息
+                speed_kmh = math.hypot(self.vehicle.get_velocity().x, self.vehicle.get_velocity().y) * 3.6
+                cv2.putText(frame, f"Target Speed: {CONFIG.TARGET_SPEED_KMH:.1f}km/h | Current: {speed_kmh:.1f}km/h",
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                cv2.putText(frame, f"Obstacle Dist: {self.perception_data['obstacle_dist']:.2f}m",
+                            (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                cv2.putText(frame, f"Obstacle Dir: {self.perception_data['obstacle_dir']:.2f} (L/R)",
+                            (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                cv2.putText(frame, f"Emergency: {'YES' if self.perception_data['has_emergency'] else 'NO'}",
+                            (10, 120), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                # 刷新窗口
+                cv2.imshow("Smart Perception", frame)
+                cv2.waitKey(1)
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"⚠️ 绘图线程异常：{e}")
+                break
 
-    def get_obstacle_status(self) -> Tuple[bool, float, float, float]:
-        """获取障碍物状态（是否有效、距离、方向、置信度）"""
-        has_obstacle = (self.perception_data["obstacle_distance"] < CONFIG["OBSTACLE_DISTANCE_THRESHOLD"]) & \
-                       (self.perception_data["perception_valid"])
-        return (has_obstacle,
-                self.perception_data["obstacle_distance"],
-                self.perception_data["obstacle_direction"],
-                self.perception_data["obstacle_confidence"])
+    def get_obstacle_status(self) -> Tuple[bool, bool, float, float, bool]:
+        """返回：是否有障碍、是否紧急、障碍距离、障碍方向、是否多障碍"""
+        return (
+            self.perception_data["has_obstacle"],
+            self.perception_data["has_emergency"],
+            self.perception_data["obstacle_dist"],
+            self.perception_data["obstacle_dir"],
+            self.perception_data["multi_obstacle"]
+        )
 
     def destroy(self):
-        """销毁传感器+关闭可视化窗口"""
+        """销毁传感器和绘图线程"""
+        self.draw_running = False
+        if self.draw_thread:
+            self.draw_thread.join(timeout=1.0)
         if self.lidar_sensor:
             self.lidar_sensor.stop()
             self.lidar_sensor.destroy()
         if self.camera_sensor:
             self.camera_sensor.stop()
             self.camera_sensor.destroy()
-        if CONFIG["VISUALIZATION_ENABLE"]:
-            cv2.destroyWindow("Vehicle Camera")
-        print("🗑️ 强化感知传感器已销毁")
+        if CONFIG.VISUALIZATION_ENABLE:
+            cv2.destroyWindow("Smart Perception")
+        print("🗑️ 感知模块已销毁")
 
 
-# 精准匀速控制器
-class PreciseSpeedController:
-    def __init__(self, target_speed_mps: float):
-        self.target_speed = target_speed_mps
-        # PID参数
-        self.kp = CONFIG["PID_KP"]
-        self.ki = CONFIG["PID_KI"]
-        self.kd = CONFIG["PID_KD"]
-        # 状态变量
-        self.last_error = 0.0
-        self.error_integral = 0.0
-        self.speed_history = []  # 滑动平均缓存
-        self.smoothed_speed = 0.0  # 指数平滑后的速度
-
-    def update(self, current_speed_mps: float, dt: float = 1 / CONFIG["SYNC_FPS"]) -> Tuple[float, float]:
-        """
-        更新PID控制，返回油门和刹车值
-        :param current_speed_mps: 当前速度（m/s）
-        :param dt: 时间步长（s）
-        :return: (throttle, brake)
-        """
-        # 1. 双级速度滤波（滑动平均+指数平滑）
-        self.speed_history.append(current_speed_mps)
-        if len(self.speed_history) > CONFIG["SPEED_FILTER_WINDOW"]:
-            self.speed_history.pop(0)
-        avg_speed = np.mean(self.speed_history) if self.speed_history else current_speed_mps
-        # 指数平滑
-        self.smoothed_speed = CONFIG["SPEED_SMOOTH_ALPHA"] * avg_speed + (
-                    1 - CONFIG["SPEED_SMOOTH_ALPHA"]) * self.smoothed_speed
-
-        # 2. PID计算
-        error = self.target_speed - self.smoothed_speed
-        self.error_integral += error * dt
-        # 限制积分饱和
-        self.error_integral = np.clip(self.error_integral, -0.8, 0.8)
-        # 微分项（抑制超调）
-        error_derivative = (error - self.last_error) / dt if dt > 0 else 0.0
-        self.last_error = error
-
-        # 3. 计算油门/刹车（互斥，避免同时触发）
-        throttle = np.clip(self.kp * error + self.ki * self.error_integral + self.kd * error_derivative, 0.0, 1.0)
-        brake = 0.0
-        # 速度超调时仅用刹车，且刹车力度柔和
-        if error < -CONFIG["SPEED_ERROR_THRESHOLD"] / 3.6:  # 转换为m/s的误差
-            throttle = 0.0
-            brake = np.clip(-self.kp * error * 0.4, 0.0, 1.0)
-
-        return throttle, brake
-
-
-# 基础工具函数
+# ======================== 工具函数 ========================
 def get_carla_client() -> Optional[Tuple[carla.Client, carla.World]]:
-    for port in CONFIG["CARLA_PORTS"]:
+    """连接Carla服务器"""
+    for port in CONFIG.CARLA_PORTS:
         try:
             client = carla.Client("127.0.0.1", port)
             client.set_timeout(60.0)
             world = client.get_world()
+            # 设置同步模式
             settings = world.get_settings()
             settings.synchronous_mode = True
-            settings.fixed_delta_seconds = 1.0 / CONFIG["SYNC_FPS"]
+            settings.fixed_delta_seconds = 1.0 / CONFIG.SYNC_FPS
             world.apply_settings(settings)
             print(f"✅ 成功连接Carla（端口：{port}）")
             return client, world
@@ -266,39 +324,48 @@ def get_carla_client() -> Optional[Tuple[carla.Client, carla.World]]:
 
 
 def clean_actors(world: carla.World) -> None:
+    """清理残留Actor（修复ActorList相加错误）"""
     print("\n🧹 清理残留Actor...")
-    for actor_type in ["vehicle.*", "sensor.*"]:
-        for actor in world.get_actors().filter(actor_type):
-            try:
-                actor.destroy()
-            except:
-                continue
+    # 清理车辆
+    for actor in world.get_actors().filter("vehicle.*"):
+        try:
+            actor.destroy()
+        except Exception as e:
+            print(f"⚠️ 销毁车辆失败：{e}")
+    # 清理传感器
+    for actor in world.get_actors().filter("sensor.*"):
+        try:
+            actor.destroy()
+        except Exception as e:
+            print(f"⚠️ 销毁传感器失败：{e}")
     time.sleep(1)
 
 
-def get_vehicle_blueprint(world: carla.World) -> carla.ActorBlueprint:
+def spawn_vehicle_safely(world: carla.World) -> Optional[carla.Vehicle]:
+    """安全生成车辆"""
     bp_lib = world.get_blueprint_library()
-    for vehicle_name in CONFIG["PREFERRED_VEHICLES"]:
+    # 选择优先车辆
+    vehicle_bp = None
+    for vehicle_name in CONFIG.PREFERRED_VEHICLES:
         try:
-            bp = bp_lib.find(vehicle_name)
-            bp.set_attribute('color', '255,0,0')
-            return bp
+            vehicle_bp = bp_lib.find(vehicle_name)
+            break
         except:
             continue
-    bp = bp_lib.filter('vehicle')[0]
-    bp.set_attribute('color', '255,0,0')
-    return bp
+    if not vehicle_bp:
+        vehicle_bp = bp_lib.filter('vehicle')[0]
+    vehicle_bp.set_attribute('color', '255,0,0')  # 红色车辆
 
-
-def spawn_vehicle_safely(world: carla.World, bp: carla.ActorBlueprint) -> Optional[carla.Vehicle]:
+    # 选择生成点
     spawn_points = world.get_map().get_spawn_points()
     if not spawn_points:
         raise Exception("❌ 无可用生成点")
-    safe_spawn_point = spawn_points[1] if len(spawn_points) >= 2 else spawn_points[0]
-    max_retry = 3
-    for retry in range(max_retry):
+    spawn_point = spawn_points[1] if len(spawn_points) >= 2 else spawn_points[0]
+
+    # 尝试生成车辆（3次重试）
+    for retry in range(3):
         try:
-            vehicle = world.spawn_actor(bp, safe_spawn_point)
+            vehicle = world.spawn_actor(vehicle_bp, spawn_point)
             if vehicle and vehicle.is_alive:
                 vehicle.set_simulate_physics(True)
                 vehicle.set_autopilot(False)
@@ -313,6 +380,7 @@ def spawn_vehicle_safely(world: carla.World, bp: carla.ActorBlueprint) -> Option
 
 
 def init_spectator_follow(world: carla.World, vehicle: carla.Vehicle) -> callable:
+    """ spectator视角跟随车辆 """
     spectator = world.get_spectator()
     view_update_counter = 0
 
@@ -320,12 +388,9 @@ def init_spectator_follow(world: carla.World, vehicle: carla.Vehicle) -> callabl
         nonlocal view_update_counter
         if view_update_counter % 3 == 0:
             trans = vehicle.get_transform()
+            # 视角位置：车辆后上方10米
             spectator.set_transform(carla.Transform(
-                carla.Location(
-                    x=trans.location.x - math.cos(math.radians(trans.rotation.yaw)) * 10,
-                    y=trans.location.y - math.sin(math.radians(trans.rotation.yaw)) * 10,
-                    z=trans.location.z + 5.0
-                ),
+                trans.location + carla.Location(x=-10, z=5),
                 carla.Rotation(pitch=-20, yaw=trans.rotation.yaw)
             ))
         view_update_counter += 1
@@ -334,131 +399,128 @@ def init_spectator_follow(world: carla.World, vehicle: carla.Vehicle) -> callabl
     return follow_vehicle
 
 
-# 主函数（匀速+强化感知）
+# ======================== 主逻辑：匀速+避障 ========================
 def main():
     vehicle: Optional[carla.Vehicle] = None
-    perception: Optional[EnhancedVehiclePerception] = None
-    speed_controller: Optional[PreciseSpeedController] = None
+    perception: Optional[ObstacleAvoidancePerception] = None
+    speed_controller: Optional[DynamicSpeedController] = None
     world: Optional[carla.World] = None
+    follow_vehicle = None
 
     try:
-        # 1. 初始化Carla
+        # 1. 连接Carla并初始化
         client, world = get_carla_client()
         if not client or not world:
-            raise Exception("❌ 未连接到Carla")
-
-        # 2. 清理残留Actor
+            raise Exception("❌ 未连接到Carla服务器")
         clean_actors(world)
-
-        # 3. 生成车辆
-        vehicle_bp = get_vehicle_blueprint(world)
-        vehicle = spawn_vehicle_safely(world, vehicle_bp)
-
-        # 4. 初始化精准速度控制器
-        speed_controller = PreciseSpeedController(CONFIG["TARGET_SPEED_MPS"])
-
-        # 5. 初始化强化感知模块
-        perception = EnhancedVehiclePerception(world, vehicle)
-
-        # 6. 视角跟随
+        vehicle = spawn_vehicle_safely(world)
         follow_vehicle = init_spectator_follow(world, vehicle)
-        print("👀 视角已绑定车辆")
 
-        # 7. 核心行驶逻辑（50km/h匀速+感知避障）
-        print(f"\n🚙 开始50km/h精准匀速行驶（强化感知避障）")
+
+        speed_controller = DynamicSpeedController()
+        perception = ObstacleAvoidancePerception(world, vehicle)
+
+
         start_time = time.time()
-        current_steer = 0.0
-        target_steer = 0.0
+        current_steer = 0.0  # 当前转向角
+        print(f"\n🚙 开始行驶（目标速度：{CONFIG.TARGET_SPEED_KMH}km/h，时长：{CONFIG.DRIVE_DURATION}秒）")
 
-        while time.time() - start_time < CONFIG["DRIVE_DURATION"]:
-            world.tick()
-            follow_vehicle()
-            dt = 1 / CONFIG["SYNC_FPS"]
+        # 4. 主行驶循环
+        while time.time() - start_time < CONFIG.DRIVE_DURATION:
+            world.tick()  # 同步Carla世界
+            follow_vehicle()  # 更新视角
+            dt = 1.0 / CONFIG.SYNC_FPS
 
-            # 7.1 获取车辆当前速度（m/s）
+            # 4.1 获取车辆速度（米/秒）
             current_vel = vehicle.get_velocity()
             current_speed_mps = math.hypot(current_vel.x, current_vel.y)
-            current_speed_kmh = current_speed_mps * 3.6
 
-            # 7.2 强化感知：获取障碍物状态
-            has_obstacle, obstacle_dist, obstacle_dir, obstacle_conf = perception.get_obstacle_status()
+            # 4.2 获取障碍物状态
+            has_obstacle, has_emergency, obs_dist, obs_dir, multi_obs = perception.get_obstacle_status()
 
-            # 7.3 避障转向（超平滑，不影响匀速）
-            if has_obstacle and obstacle_conf > 0.3:
-                # 距离越近，转向越平缓（避免速度波动）
-                steer_amplitude = CONFIG["AVOID_STEER_MAX"] * (CONFIG["OBSTACLE_DISTANCE_THRESHOLD"] / obstacle_dist)
-                steer_amplitude = np.clip(steer_amplitude, 0.1, CONFIG["AVOID_STEER_MAX"])
-                target_steer = obstacle_dir * steer_amplitude
-            else:
-                target_steer = 0.0
 
-            # 7.4 转向超平滑过渡（避免速度波动）
-            current_steer += (target_steer - current_steer) * CONFIG["STEER_SMOOTH_FACTOR"]
-            current_steer = np.clip(current_steer, -CONFIG["AVOID_STEER_MAX"], CONFIG["AVOID_STEER_MAX"])
-
-            # 7.5 精准PID速度控制（核心匀速逻辑）
+            # 4.3 速度控制（PID）
             throttle, brake = speed_controller.update(current_speed_mps, dt)
 
-            # 7.6 卡停处理（仅低速时触发）
-            if current_speed_kmh < CONFIG["STALL_SPEED_THRESHOLD"] * 3.6:
-                trans = vehicle.get_transform()
-                new_loc = trans.location + trans.get_forward_vector() * 1.5
-                vehicle.set_transform(carla.Transform(new_loc, trans.rotation))
-                throttle = 0.6  # 平缓恢复速度
-                brake = 0.0
-                print("\n⚠️ 低速重置位置，平缓恢复匀速...", end='')
+            # 4.4 避障转向控制（临时注释这一段）
+            # if has_emergency:
+            #     # 紧急制动：刹车+回正
+            #     brake = 1.0
+            #     throttle = 0.0
+            #     target_steer = 0.0
+            # elif has_obstacle:
+            #     # 避障转向：根据障碍物方向调整（左/右）
+            #     target_steer = obs_dir * CONFIG.AVOID_STEER_MAX
+            # else:
+            #     # 无障碍物：转向回正
+            #     target_steer = current_steer * (1 - CONFIG.STEER_RETURN_FACTOR)
 
-            # 7.7 下发控制指令（匀速优先）
+            # 临时强制设置：无刹车+固定转向+油门=0.5（测试车辆是否能动）
+            brake = 0.0
+            throttle = 0.5
+            target_steer = 0.0
+            # 4.5 下发控制指令
             vehicle.apply_control(carla.VehicleControl(
                 throttle=float(throttle),
                 steer=float(current_steer),
                 brake=float(brake),
-                hand_brake=False
+                hand_brake=False,
+                reverse=False
             ))
 
-            # 7.8 实时状态打印（匀速+感知）
-            speed_error = CONFIG["TARGET_SPEED_KMH"] - current_speed_kmh
-            print(f"  速度：{current_speed_kmh:.1f}km/h（误差：{speed_error:.1f}）| "
-                  f"转向：{current_steer:.3f} | 障碍物：{obstacle_dist:.2f}m | 置信度：{obstacle_conf:.2f}", end='\r')
+            # 4.6 实时打印状态（每5帧打印一次，降负载）
+            if int((time.time() - start_time) * CONFIG.SYNC_FPS) % 5 == 0:
+                current_speed_kmh = current_speed_mps * 3.6
+                speed_error = CONFIG.TARGET_SPEED_KMH - current_speed_kmh
+                print(
+                    f"速度：{current_speed_kmh:.1f}km/h（误差：{speed_error:.1f}）| 转向：{current_steer:.2f} | 障碍距离：{obs_dist:.2f}m",
+                    end='\r')
 
-        # 8. 平滑停车
-        print("\n🛑 开始平滑停车...")
-        for i in range(15):
-            brake = (i / 15) * 1.0
-            vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=brake))
+        # 5. 平滑停车
+        print("\n🛑 到达行驶时长，开始停车...")
+        for i in range(20):
             world.tick()
+            brake = (i / 20) * 1.0
+            vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=brake))
             time.sleep(0.05)
 
-        # 9. 打印最终状态
-        final_speed = math.hypot(vehicle.get_velocity().x, vehicle.get_velocity().y) * 3.6
-        print(f"\n📊 行驶完成（时长：{CONFIG['DRIVE_DURATION']}s）")
-        print(f"   🎯 目标速度：50.0km/h | 最终速度：{final_speed:.1f}km/h")
-        print(f"   📍 最终位置：X={vehicle.get_location().x:.2f}, Y={vehicle.get_location().y:.2f}")
+        # 6. 打印统计信息
+        final_speed_kmh = math.hypot(vehicle.get_velocity().x, vehicle.get_velocity().y) * 3.6
+        start_loc = vehicle.get_transform().location  # 初始位置
+        end_loc = vehicle.get_transform().location  # 结束位置
+        travel_distance = start_loc.distance(end_loc)
+        avg_speed = (travel_distance / CONFIG.DRIVE_DURATION) * 3.6 if CONFIG.DRIVE_DURATION > 0 else 0.0
+        print(f"\n📊 行驶完成统计：")
+        print(f"   目标速度：{CONFIG.TARGET_SPEED_KMH:.1f}km/h | 最终速度：{final_speed_kmh:.1f}km/h")
+        print(f"   平均速度：{avg_speed:.1f}km/h | 行驶距离：{travel_distance:.2f}米")
 
+    except KeyboardInterrupt:
+        print("\n⚠️ 程序被用户手动中断")
     except Exception as e:
         print(f"\n❌ 程序异常：{e}")
         print("\n========== 排查指南 ==========")
-        print("1. 启动Carla：管理员身份运行 CarlaUE4.exe -windowed -ResX=800 -ResY=600")
-        print("2. 安装依赖：pip install numpy opencv-python carla==你的版本")
-        print("3. 关闭代理/防火墙，确保网络正常")
-
+        print("1. 确保Carla模拟器已启动（管理员权限），地图加载完成")
+        print("2. 确保carla库版本与模拟器一致（如0.9.15对应carla==0.9.15）")
+        print("3. 关闭其他占用2000端口的程序（如其他Carla实例）")
     finally:
-        # 清理资源
+        # 资源清理
         if perception:
             perception.destroy()
-        if world:
-            try:
-                settings = world.get_settings()
-                settings.synchronous_mode = False
-                world.apply_settings(settings)
-            except:
-                pass
         if vehicle:
             try:
                 vehicle.destroy()
                 print("🗑️ 车辆已销毁")
-            except:
-                pass
+            except Exception as e:
+                print(f"⚠️ 销毁车辆失败：{e}")
+        if world:
+            try:
+                # 恢复Carla异步模式
+                settings = world.get_settings()
+                settings.synchronous_mode = False
+                world.apply_settings(settings)
+            except Exception as e:
+                print(f"⚠️ 恢复世界设置失败：{e}")
+        cv2.destroyAllWindows()
         print("✅ 所有资源清理完成！")
 
 
