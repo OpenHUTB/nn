@@ -13,7 +13,7 @@ import os
 from datetime import datetime
 import threading
 from collections import deque
-import math
+
 
 
 class AirSimNHCarSimulator:
@@ -38,10 +38,6 @@ class AirSimNHCarSimulator:
         self.data_log = []
         self.data_file = None
 
-        # 车辆状态跟踪
-        self.initial_position = None
-        self.initial_yaw = None
-        self.path_history = []
 
         # 传感器数据缓存
         self.sensor_data = {
@@ -79,12 +75,6 @@ class AirSimNHCarSimulator:
             self.is_connected = True
             print("✓ 成功连接到AirSim仿真器！")
 
-            # 获取初始位置和方向
-            self.initial_position = self.get_position()
-            self.initial_yaw = self.get_yaw()
-            print(f"初始位置: {self.initial_position}")
-            print(f"初始偏航角: {self.initial_yaw:.2f}°")
-
             return True
 
         except Exception as e:
@@ -95,43 +85,6 @@ class AirSimNHCarSimulator:
             print("3. 网络连接正常")
             return False
 
-    def get_position(self):
-        """获取车辆位置"""
-        try:
-            kinematics = self.client.simGetVehiclePose(vehicle_name=self.vehicle_name)
-            return {
-                "x": kinematics.position.x_val,
-                "y": kinematics.position.y_val,
-                "z": kinematics.position.z_val
-            }
-        except:
-            return {"x": 0, "y": 0, "z": 0}
-
-    def get_yaw(self):
-        """获取车辆偏航角（绕Z轴的旋转角度）"""
-        try:
-            kinematics = self.client.simGetVehiclePose(vehicle_name=self.vehicle_name)
-            orientation = kinematics.orientation
-
-            # 将四元数转换为欧拉角
-            # 使用四元数到欧拉角的转换公式
-            q0, q1, q2, q3 = orientation.w_val, orientation.x_val, orientation.y_val, orientation.z_val
-
-            # 计算偏航角 (yaw)
-            siny_cosp = 2 * (q0 * q3 + q1 * q2)
-            cosy_cosp = 1 - 2 * (q2 * q2 + q3 * q3)
-            yaw = math.atan2(siny_cosp, cosy_cosp)
-
-            # 转换为角度
-            yaw_deg = math.degrees(yaw)
-
-            # 标准化到0-360度
-            if yaw_deg < 0:
-                yaw_deg += 360
-
-            return yaw_deg
-        except:
-            return 0.0
 
     def enable_api_control(self, enable=True):
         """启用/禁用API控制"""
@@ -165,34 +118,12 @@ class AirSimNHCarSimulator:
             # 获取车辆物理信息
             kinematics = self.client.simGetVehiclePose(vehicle_name=self.vehicle_name)
 
-            # 获取偏航角
-            yaw = self.get_yaw()
-
-            # 获取当前位置
-            current_position = {
-                "x": kinematics.position.x_val,
-                "y": kinematics.position.y_val,
-                "z": kinematics.position.z_val
-            }
-
-            # 记录路径历史
-            self.path_history.append({
-                "timestamp": time.time(),
-                "position": current_position.copy(),
-                "yaw": yaw,
-                "speed": state.speed
-            })
-
-            # 只保留最近100个点
-            if len(self.path_history) > 100:
-                self.path_history.pop(0)
 
             state_info = {
                 "timestamp": time.time(),
                 "speed_kmh": state.speed,
                 "speed_ms": state.speed / 3.6,
-                "position": current_position,
-                "yaw": yaw,
+
                 "orientation": {
                     "w": kinematics.orientation.w_val,
                     "x": kinematics.orientation.x_val,
@@ -310,46 +241,7 @@ class AirSimNHCarSimulator:
             print(f"获取GPS数据失败: {e}")
             return None
 
-    def calculate_path_deviation(self):
-        """计算路径偏离程度"""
-        if len(self.path_history) < 10:
-            return 0, 0, 0
 
-        # 计算最近路径点的平均位置和方向
-        recent_points = self.path_history[-10:]
-
-        # 计算位置偏离（与起始点的直线距离）
-        start_pos = self.initial_position
-        current_pos = recent_points[-1]["position"]
-
-        pos_deviation = math.sqrt(
-            (current_pos["x"] - start_pos["x"]) ** 2 +
-            (current_pos["y"] - start_pos["y"]) ** 2
-        )
-
-        # 计算角度偏离（与初始角度的差异）
-        current_yaw = recent_points[-1]["yaw"]
-        yaw_deviation = abs(current_yaw - self.initial_yaw)
-        if yaw_deviation > 180:
-            yaw_deviation = 360 - yaw_deviation
-
-        # 计算直线性（最近路径点的标准差）
-        x_coords = [p["position"]["x"] for p in recent_points]
-        y_coords = [p["position"]["y"] for p in recent_points]
-
-        if len(x_coords) > 1:
-            x_std = np.std(x_coords)
-            y_std = np.std(y_coords)
-            linearity = math.sqrt(x_std ** 2 + y_std ** 2)
-        else:
-            linearity = 0
-
-        return pos_deviation, yaw_deviation, linearity
-
-    def manual_control_demo(self, duration=20):
-        """
-        手动控制演示：前进、转向、停止
-        优化控制逻辑，防止车辆偏移
 
         参数:
             duration: 演示总时长（秒）
@@ -359,206 +251,15 @@ class AirSimNHCarSimulator:
             return False
 
         print(f"\n开始手动控制演示 ({duration}秒)...")
-        print("操作序列: 直线加速 → 保持直线 → 缓左转 → 直线回正 → 缓右转 → 直线行驶 → 平滑刹车")
 
         start_time = time.time()
         sequence = 0
 
-        # 添加初始控制变量
-        controls = airsim.CarControls()
-
-        # 添加速度监控
-        current_speed = 0
-        max_speed_kmh = 30  # 降低最大速度到30km/h以提高稳定性
-
-        # 转向控制参数
-        steering_correction = 0.0
-        last_yaw = self.get_yaw()
-
-        # 偏移检测和修正
-        deviation_history = []
-        last_correction_time = 0
 
         try:
             while time.time() - start_time < duration:
                 elapsed = time.time() - start_time
 
-                # 获取当前速度
-                state = self.get_vehicle_state()
-                if state:
-                    current_speed = state['speed_kmh']
-                    current_yaw = state.get('yaw', 0)
-                else:
-                    current_speed = 0
-                    current_yaw = last_yaw
-
-                # 计算路径偏离
-                pos_dev, yaw_dev, linearity = self.calculate_path_deviation()
-                deviation_history.append({
-                    "time": elapsed,
-                    "pos_dev": pos_dev,
-                    "yaw_dev": yaw_dev,
-                    "linearity": linearity
-                })
-
-                # 根据时间执行不同控制序列
-                if elapsed < duration * 0.25:  # 第一阶段：直线加速（25%时间）
-                    controls = airsim.CarControls()
-                    # 使用温和的加速曲线
-                    if elapsed < 2:  # 前2秒逐渐加速
-                        controls.throttle = 0.5 * (elapsed / 2)
-                    else:  # 2秒后保持中等油门
-                        controls.throttle = 0.5
-                    controls.steering = 0.0
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 1:
-                        print(f"  阶段1: 直线加速 (目标速度: {max_speed_kmh} km/h)")
-                        sequence = 1
-
-                elif elapsed < duration * 0.35:  # 第二阶段：保持直线（10%时间）
-                    controls = airsim.CarControls()
-                    # 根据速度调整油门，保持稳定速度
-                    if current_speed < max_speed_kmh * 0.8:
-                        controls.throttle = 0.5
-                    elif current_speed < max_speed_kmh:
-                        controls.throttle = 0.4
-                    else:
-                        controls.throttle = 0.3
-
-                    # 轻微修正转向，保持直线
-                    if yaw_dev > 2.0:  # 如果偏航角偏差大于2度
-                        steering_correction = -0.05 * (yaw_dev / 10)
-                    else:
-                        steering_correction = 0.0
-
-                    controls.steering = steering_correction
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 2:
-                        print(f"  阶段2: 保持直线 (当前速度: {current_speed:.1f} km/h)")
-                        sequence = 2
-
-                elif elapsed < duration * 0.45:  # 第三阶段：缓左转（10%时间）
-                    controls = airsim.CarControls()
-                    # 转向时减小油门
-                    controls.throttle = 0.4
-                    # 使用非常小的角度左转
-                    controls.steering = 0.1  # 减小转向角度
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 3:
-                        print(f"  阶段3: 缓左转 (速度: {current_speed:.1f} km/h)")
-                        sequence = 3
-
-                elif elapsed < duration * 0.55:  # 第四阶段：直线回正（10%时间）
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.4
-
-                    # 主动回正，使用负向转向修正
-                    if current_yaw > last_yaw + 1.0:
-                        controls.steering = -0.05
-                    elif current_yaw < last_yaw - 1.0:
-                        controls.steering = 0.05
-                    else:
-                        controls.steering = 0.0
-
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 4:
-                        print("  阶段4: 直线回正")
-                        sequence = 4
-
-                    last_yaw = current_yaw
-
-                elif elapsed < duration * 0.65:  # 第五阶段：缓右转（10%时间）
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.4
-                    # 使用非常小的角度右转
-                    controls.steering = -0.1  # 减小转向角度
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 5:
-                        print(f"  阶段5: 缓右转 (速度: {current_speed:.1f} km/h)")
-                        sequence = 5
-
-                elif elapsed < duration * 0.85:  # 第六阶段：直线行驶并准备减速（20%时间）
-                    controls = airsim.CarControls()
-                    # 逐步减小油门
-                    progress = (elapsed - duration * 0.65) / (duration * 0.2)
-                    controls.throttle = max(0.1, 0.4 * (1.0 - progress))
-
-                    # 直线行驶时进行轻微修正
-                    if pos_dev > 5.0:  # 如果位置偏离大于5米
-                        controls.steering = -0.02 * (pos_dev / 10)
-                    else:
-                        controls.steering = 0.0
-
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 6:
-                        print("  阶段6: 直线行驶并准备减速")
-                        sequence = 6
-
-                else:  # 第七阶段：平滑刹车停止（15%时间）
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.0
-                    # 根据当前速度调整刹车力度
-                    if current_speed > 20:
-                        controls.brake = 0.6
-                    elif current_speed > 10:
-                        controls.brake = 0.4
-                    else:
-                        controls.brake = 0.2  # 降低刹车力度，避免突然停车
-                    controls.steering = 0.0
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 7:
-                        print("  阶段7: 平滑刹车停止")
-                        sequence = 7
-
-                # 实时显示车辆状态
-                if state:
-                    # 显示转向状态
-                    steering_status = ""
-                    if controls.steering > 0.02:
-                        steering_status = f"左转{controls.steering:.3f}"
-                    elif controls.steering < -0.02:
-                        steering_status = f"右转{abs(controls.steering):.3f}"
-                    else:
-                        steering_status = "直行"
-
-                    # 显示油门/刹车状态
-                    control_status = ""
-                    if controls.brake > 0:
-                        control_status = f"刹车:{controls.brake:.2f}"
-                    else:
-                        control_status = f"油门:{controls.throttle:.2f}"
-
-                    # 显示偏航角
-                    yaw_status = f"{current_yaw:.1f}°"
-
-                    # 显示偏离信息
-                    deviation_status = f"偏离:{pos_dev:.1f}m"
-
-                    print(f"\r速度: {current_speed:5.1f} km/h | "
-                          f"转向: {steering_status:10} | "
-                          f"{control_status:10} | "
-                          f"偏航: {yaw_status:8} | "
-                          f"{deviation_status:12}", end="")
-
-                # 采集传感器数据（每0.5秒采集一次）
-                if elapsed % 0.5 < 0.05:  # 降低采集频率以减少计算负载
-                    self.capture_camera_images(["front"])
-                    self.get_imu_data()
-                    self.get_gps_data()
-
-                time.sleep(0.1)  # 控制频率 10Hz
-
-                # 更新最后的偏航角
-                last_yaw = current_yaw
-
-            print("\n✓ 手动控制演示完成")
-
-            # 分析路径数据
-            if deviation_history:
-                avg_pos_dev = sum(d["pos_dev"] for d in deviation_history) / len(deviation_history)
-                avg_yaw_dev = sum(d["yaw_dev"] for d in deviation_history) / len(deviation_history)
-                print(f"平均位置偏离: {avg_pos_dev:.2f}米")
-                print(f"平均角度偏离: {avg_yaw_dev:.2f}度")
 
             return True
 
@@ -628,19 +329,13 @@ class AirSimNHCarSimulator:
                 "camera_frames": len(self.sensor_data["camera"]),
                 "imu_samples": len(self.sensor_data["imu"]),
                 "gps_samples": len(self.sensor_data["gps"]),
-                "total_log_entries": len(self.data_log),
-                "path_history_length": len(self.path_history)
+
             }
 
             stats_file = f"{self.data_dir}/simulation_stats.json"
             with open(stats_file, 'w') as f:
                 json.dump(stats, f, indent=2)
 
-            # 保存路径历史数据
-            if self.path_history:
-                path_file = f"{self.data_dir}/path_history.json"
-                with open(path_file, 'w') as f:
-                    json.dump(self.path_history, f, indent=2)
 
             # 生成数据报告
             report_file = f"{self.data_dir}/report.txt"
@@ -653,8 +348,7 @@ class AirSimNHCarSimulator:
                 f.write(f"摄像头帧数: {stats['camera_frames']}\n")
                 f.write(f"IMU采样数: {stats['imu_samples']}\n")
                 f.write(f"GPS采样数: {stats['gps_samples']}\n")
-                f.write(f"日志条目: {stats['total_log_entries']}\n")
-                f.write(f"路径记录: {stats['path_history_length']}\n\n")
+
                 f.write("数据文件:\n")
                 for file in os.listdir(self.data_dir):
                     f.write(f"  - {file}\n")
@@ -664,8 +358,6 @@ class AirSimNHCarSimulator:
             print(f"  统计数据: {stats_file}")
             print(f"  报告文件: {report_file}")
 
-            if self.path_history:
-                print(f"  路径历史: {path_file}")
 
             return True
 
@@ -673,7 +365,7 @@ class AirSimNHCarSimulator:
             print(f"✗ 保存数据失败: {e}")
             return False
 
-    def run_full_demo(self, control_duration=20, data_duration=10):
+
         """运行完整演示"""
         print("=" * 60)
         print("AirSimNH 无人车完整仿真演示")
@@ -688,9 +380,6 @@ class AirSimNHCarSimulator:
             if not self.enable_api_control(True):
                 return False
 
-            # 等待车辆稳定
-            print("等待车辆稳定...")
-            time.sleep(2)
 
             # 步骤3: 手动控制演示
             if not self.manual_control_demo(control_duration):
@@ -719,14 +408,7 @@ class AirSimNHCarSimulator:
         # 停止车辆
         if self.is_api_control_enabled:
             controls = airsim.CarControls()
-            controls.brake = 0.5  # 温和刹车
-            controls.handbrake = False
-            try:
-                self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                time.sleep(1)
-                controls.brake = 1.0
-                controls.handbrake = True
-                self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+
             except:
                 pass
 
@@ -751,7 +433,7 @@ def main():
     # 运行完整演示
     try:
         simulator.run_full_demo(
-            control_duration=20,  # 控制演示时长20秒
+
             data_duration=10  # 数据采集时长（秒）
         )
 
