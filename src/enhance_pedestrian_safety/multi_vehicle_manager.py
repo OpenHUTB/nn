@@ -297,6 +297,34 @@ class MultiVehicleManager:
             print(f"共享交通警告失败: {e}")
             return None
 
+    def share_pedestrian_warning(self, vehicle_id: int, pedestrian_location: Tuple[float, float, float],
+                                 distance: float, speed: float):
+        """共享行人警告"""
+        try:
+            warning_data = {
+                'warning_type': 'pedestrian',
+                'pedestrian_location': pedestrian_location,
+                'distance': distance,
+                'vehicle_speed': speed,
+                'timestamp': time.time(),
+                'source_vehicle': vehicle_id,
+                'severity': 'high' if distance < 10.0 else 'medium' if distance < 20.0 else 'low'
+            }
+
+            message = self.create_v2x_message(
+                vehicle_id,
+                'warning',
+                warning_data,
+                priority=4  # 行人警告优先级最高
+            )
+
+            recipients = self.broadcast_message(message)
+
+            return message, recipients
+        except Exception as e:
+            print(f"共享行人警告失败: {e}")
+            return None, []
+
     def _fuse_shared_perception(self, source_id: int, objects: List[Dict], recipients: List[int]):
         """融合共享的感知数据"""
         fused_objects = []
