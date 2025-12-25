@@ -4,55 +4,67 @@ import random  # 仅用于模拟硬件采集的电池电压数据，实际项目
 
 class UnmannedVehicleBattery:
     """无人车电池电量管理核心类
-    负责电池电压读取、剩余电量计算、状态判断及可视化展示，
-    支持对接实际硬件采集模块，可根据电池规格灵活配置参数。
+    核心职责：
+    1. 电池实时电压数据读取（支持对接实际硬件或模拟采集）
+    2. 基于电压值计算剩余电量百分比
+    3. 根据剩余电量判断电池工作状态
+    4. 格式化、可视化展示电池完整监控信息
+    特性：
+    - 可根据电池型号/规格灵活配置核心参数（满电电压、欠压保护电压等）
+    - 预留硬件采集对接接口，易于实际项目部署迁移
     """
 
     def __init__(self):
         # 电池核心参数配置（可根据实际使用的电池型号/规格调整对应数值）
-        self.max_voltage = 12.6  # 电池满电电压（以12V三元锂电池为例）
+        self.max_voltage = 12.6  # 电池满电电压（示例：12V三元锂电池满电电压）
         self.min_voltage = 10.0  # 电池欠压保护电压，低于此值需立即停止使用并充电
-        self.current_voltage = 0.0  # 电池实时电压（初始值为0，通过硬件采集或模拟更新）
-        self.battery_percent = 0.0  # 电池剩余电量百分比（保留1位小数）
+        self.current_voltage = 0.0  # 电池实时电压（初始值为0，后续通过硬件采集或模拟逻辑更新）
+        self.battery_percent = 0.0  # 电池剩余电量百分比（计算后保留1位小数，保证显示精度）
 
     def read_battery_voltage(self):
         """读取电池实时电压（模拟硬件采集逻辑）
-        实际应用场景中，需替换为对应硬件的数据采集方式：
-        1. 树莓派/单片机：通过ADC模块（如ADS1115）采集电压信号
-        2. 带BMS的电池：通过串口/RS485/I2C通信获取BMS上报的电压数据
-        3. 其他硬件：根据对应通信协议调整数据读取逻辑
+        实际应用场景对接说明：
+        1. 树莓派/单片机平台：通过ADC模块（如ADS1115）采集电压模拟信号
+        2. 带BMS管理系统的电池：通过串口/RS485/I2C通信协议获取BMS上报的电压数据
+        3. 其他硬件平台：根据对应硬件的通信协议调整数据读取逻辑
+        本方法中模拟逻辑仅用于测试演示，实际部署需替换为真实硬件采集代码
         """
-        # 模拟电压小幅波动（范围：欠压保护电压~满电电压，保留2位小数）
+        # 模拟电压小幅波动（范围：欠压保护电压~满电电压，保留2位小数，贴近真实电池电压变化）
         self.current_voltage = round(random.uniform(10.0, 12.6), 2)
 
         # 实际硬件采集示例（以树莓派+ADS1115 ADC模块为例，需安装对应依赖库）
-        # 依赖库安装：pip install adafruit-circuitpython-ads1x15
+        # 依赖库安装命令：pip install adafruit-circuitpython-ads1x15
         # import board
         # import adafruit_ads1x15.ads1115 as ADS
         # from adafruit_ads1x15.analog_in import AnalogIn
         #
-        # # 初始化I2C总线和ADS1115模块
-        # i2c = board.I2C()  # 默认使用SDA/SCL引脚
+        # # 初始化I2C总线和ADS1115模块（使用硬件默认SDA/SCL引脚）
+        # i2c = board.I2C()
         # ads = ADS.ADS1115(i2c)
-        # chan = AnalogIn(ads, ADS.P0)  # 选择A0通道作为电压采集通道
+        # chan = AnalogIn(ads, ADS.P0)  # 选择A0通道作为电池电压采集通道
         #
-        # # 计算实际电池电压（需根据分压电路配置对应的电压分压比）
-        # voltage_divider_ratio = 2.0  # 分压比示例，需根据实际电路调整
+        # # 计算实际电池电压（需根据硬件分压电路配置，调整对应的电压分压比）
+        # voltage_divider_ratio = 2.0  # 分压比示例，需根据实际电路参数修改
         # self.current_voltage = chan.voltage * voltage_divider_ratio
 
     def calculate_battery_percent(self):
         """根据实时电压计算电池剩余电量百分比
-        采用线性计算模型（适用于电压与电量近似线性的电池类型），
-        实际场景中可根据电池放电曲线优化为非线性计算模型，提升精度。
+        计算模型说明：
+        - 采用线性计算模型，适用于电压与电量近似线性关系的电池类型（如三元锂电池）
+        - 实际场景优化建议：可根据电池具体放电曲线，优化为非线性计算模型，提升电量计算精度
+        计算逻辑：
+        1. 电压≥满电电压：判定为100%满电量
+        2. 电压≤欠压保护电压：判定为0%电量（需立即停止使用）
+        3. 电压在两者之间：通过线性插值公式计算剩余电量，保留1位小数
         """
         if self.current_voltage >= self.max_voltage:
-            # 电压达到满电电压，判定为100%电量
+            # 电压达到满电阈值，判定为100%剩余电量
             self.battery_percent = 100.0
         elif self.current_voltage <= self.min_voltage:
-            # 电压低于欠压保护值，判定为0%电量（需立即充电）
+            # 电压低于欠压保护阈值，判定为0%剩余电量（需立即充电）
             self.battery_percent = 0.0
         else:
-            # 线性插值计算剩余电量，保留1位小数，保证显示精度
+            # 线性插值计算剩余电量，保留1位小数，保证显示一致性
             self.battery_percent = round(
                 (self.current_voltage - self.min_voltage) /
                 (self.max_voltage - self.min_voltage) * 100,
@@ -60,10 +72,15 @@ class UnmannedVehicleBattery:
             )
 
     def get_battery_status(self):
-        """根据剩余电量判断电池当前状态
+        """根据剩余电量判断电池当前工作状态
         返回值说明：
-        - 第一个返回值：文字状态描述（满电/正常/低电量/紧急）
-        - 第二个返回值：状态标识符号（对应不同告警级别）
+        - 第一个返回值：文字状态描述（用于直观展示电池状态）
+        - 第二个返回值：状态标识符号（通过颜色/emoji区分告警级别，提升可读性）
+        状态分级标准：
+        1. 满电：电量≥95%，正常工作状态
+        2. 正常：20%≤电量<95%，可正常执行作业
+        3. 低电量：5%≤电量<20%，需准备充电
+        4. 紧急：电量<5%，需立即停止作业并充电
         """
         if self.battery_percent >= 95:
             return "满电", "🟢"
@@ -75,55 +92,70 @@ class UnmannedVehicleBattery:
             return "紧急（请充电）", "🔴"
 
     def display_battery_info(self):
-        """可视化展示电池完整信息
-        包括实时电压、剩余电量进度条、当前状态，
-        低电量时触发额外告警提示，提升使用安全性。
+        """可视化展示电池完整监控信息
+        展示内容：
+        1. 电池实时电压
+        2. 剩余电量百分比及可视化进度条
+        3. 电池当前工作状态（含状态标识）
+        4. 紧急告警提示（电量<5%时触发）
+        优化特性：
+        - 进度条可视化提升信息可读性
+        - 紧急告警强化使用安全性，提醒用户及时处理
+        可选配置：
+        - 可启用控制台清屏功能，实现监控信息实时刷新（已注释，按需启用）
         """
         # 清空控制台屏幕（可选功能，根据实际使用场景选择是否启用）
-        # 兼容Windows和Linux/macOS系统
+        # 兼容Windows（cls命令）和Linux/macOS（clear命令）系统
         # import os
         # os.system('cls' if os.name == 'nt' else 'clear')
 
         # 电量进度条可视化配置
-        bar_length = 20  # 进度条总长度（字符数）
-        filled_length = int(bar_length * self.battery_percent // 100)  # 已填充进度长度
-        battery_bar = "█" * filled_length + "-" * (bar_length - filled_length)  # 拼接进度条
+        bar_length = 20  # 进度条总长度（字符数），可根据显示需求调整
+        filled_length = int(bar_length * self.battery_percent // 100)  # 已填充进度的字符长度
+        battery_bar = "█" * filled_length + "-" * (bar_length - filled_length)  # 拼接进度条字符
 
-        # 获取当前电池状态描述和状态标识
+        # 获取当前电池状态描述和状态标识符号
         status, color = self.get_battery_status()
 
-        # 打印格式化后的电池信息
+        # 打印格式化后的电池监控信息，排版清晰便于查看
         print(f"\n=== 无人车电池状态监控 ===")
         print(f"当前电压: {self.current_voltage}V")
         print(f"剩余电量: |{battery_bar}| {self.battery_percent}%")
         print(f"状态: {color} {status}")
 
-        # 紧急告警：电量低于5%时，提示立即停止作业并充电
+        # 紧急告警：电量低于5%时，提示用户立即停止作业并接入充电器，避免电池过放损坏
         if self.battery_percent < 5:
             print("⚠️  【紧急告警】电量过低，立即停止所有作业并接入充电器！")
 
 
 def main():
     """程序主入口，实现电池状态循环监控
-    初始化电池管理对象，持续执行「电压读取→电量计算→信息展示」流程，
-    支持通过Ctrl+C快捷键正常退出监控程序。
+    核心流程：
+    1. 初始化无人车电池管理实例
+    2. 循环执行「电压读取→电量计算→信息展示」流程
+    3. 每秒刷新一次监控数据，保证实时性
+    退出机制：
+    - 支持通过Ctrl+C快捷键捕获中断信号，实现程序友好退出，避免异常报错
+    运行提示：
+    - 启动后会输出系统启动提示，告知用户退出方式
     """
-    # 初始化无人车电池管理实例
+    # 初始化无人车电池管理实例，加载电池核心配置参数
     battery = UnmannedVehicleBattery()
     print("无人车电量监控系统已启动...（按Ctrl+C可退出监控）")
 
     try:
-        # 无限循环执行监控流程，每秒刷新一次数据
+        # 无限循环执行监控流程，每秒刷新一次数据，实现持续监控
         while True:
-            battery.read_battery_voltage()  # 步骤1：读取电池实时电压
-            battery.calculate_battery_percent()  # 步骤2：计算剩余电量百分比
-            battery.display_battery_info()  # 步骤3：可视化展示电池状态
-            time.sleep(1)
+            battery.read_battery_voltage()  # 步骤1：读取电池实时电压（模拟/硬件采集）
+            battery.calculate_battery_percent()  # 步骤2：根据电压计算剩余电量百分比
+            battery.display_battery_info()  # 步骤3：可视化展示电池完整监控信息
+            time.sleep(1)  # 暂停1秒，控制监控刷新频率
     except KeyboardInterrupt:
-        # 捕获Ctrl+C中断信号，友好退出程序
+        # 捕获Ctrl+C中断信号，打印退出提示，实现程序正常退出
         print("\n监控系统已正常退出")
 
 
 if __name__ == "__main__":
-    # 程序启动时，直接执行主函数
+    # 程序启动入口：当脚本直接运行时，自动执行主函数启动监控系统
+    # 若作为模块导入时，不会自动执行，便于复用类和方法
     main()
