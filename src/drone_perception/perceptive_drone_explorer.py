@@ -31,6 +31,7 @@ import random
 import psutil
 import os
 import gc
+import platform
 
 # 导入PIL用于中文文本绘制
 try:
@@ -42,6 +43,8 @@ except ImportError:
 
 # 全局字体缓存
 _chinese_font_cache = {}
+# 全局标志：是否禁用中文显示（如果字体加载失败）
+_chinese_font_disabled = False
 
 # ============ 导入配置文件 ============
 try:
@@ -1248,59 +1251,139 @@ def _load_chinese_font(font_size=20):
         print(f"✅ 成功加载中文字体: {os.path.basename(loaded_font_path)}")
     
     # 如果找不到字体，缓存None并打印警告（仅第一次）
-    if font is None and cache_key == 20:
-        print("⚠️ 未找到中文字体，将使用英文显示")
-        if platform.system() == "Windows":
-            windir = os.environ.get('WINDIR', 'C:\\Windows')
-            font_dir = os.path.join(windir, 'Fonts')
-            print(f"   字体目录: {font_dir}")
-            print(f"   请确保该目录存在中文字体文件（如simhei.ttf, msyh.ttc等）")
+    global _chinese_font_disabled
+    if font is None:
+        # 立即设置禁用标志，避免后续尝试
+        _chinese_font_disabled = True
+        if cache_key == 20:  # 只在第一次加载时打印
+            print("⚠️ 未找到中文字体，将使用英文显示")
+            if platform.system() == "Windows":
+                windir = os.environ.get('WINDIR', 'C:\\Windows')
+                font_dir = os.path.join(windir, 'Fonts')
+                print(f"   字体目录: {font_dir}")
+                print(f"   请确保该目录存在中文字体文件（如simhei.ttf, msyh.ttc等）")
     
     _chinese_font_cache[cache_key] = font
     return font
 
 
+def _translate_to_english(text):
+    """将中文文本转换为英文"""
+    # 按长度从长到短排序，确保先替换长的短语，避免部分替换问题
+    translations = [
+        ("手动控制中...", "Manual Ctrl"),
+        ("等待无人机图像...", "Waiting..."),
+        ("系统正在初始化，请稍候...", "Initializing..."),
+        ("按 Q 或 ESC 关闭窗口", "Press Q/ESC to close"),
+        ("无人机信息面板", "Info Panel"),
+        ("红色物体检查", "Red Object Inspection"),
+        ("蓝色物体检查", "Blue Object Inspection"),
+        ("黑色物体检查", "Black Object Inspection"),
+        ("飞行状态:", "State:"),
+        ("障碍距离:", "Obs:"),
+        ("CPU使用率:", "CPU:"),
+        ("内存使用率:", "Mem:"),
+        ("循环时间:", "Loop:"),
+        ("更新时间:", "Time:"),
+        ("探索网格:", "Grid:"),
+        ("红色物体:", "Red:"),
+        ("红色物体", "Red Object"),  # 图例标签（无冒号）
+        ("蓝色物体:", "Blue:"),
+        ("蓝色物体", "Blue Object"),  # 图例标签（无冒号）
+        ("黑色物体:", "Black:"),
+        ("黑色物体", "Black Object"),  # 图例标签（无冒号）
+        ("主动探索", "Exploring"),  # 完整状态值（必须在"探索"之前）
+        ("探索前沿", "Frontier"),
+        ("当前位置", "Current"),
+        ("等待数据...", "Waiting..."),
+        ("渲染错误", "Render Error"),
+        ("状态:", "State:"),
+        ("位置:", "Pos:"),
+        ("障碍:", "Obs:"),
+        ("开阔度:", "Open:"),
+        ("高度:", "Height:"),
+        ("图例:", "Legend:"),
+        ("障碍物", "Obstacle"),
+        ("已探索", "Explored"),
+        ("前沿", "Frontier"),
+        ("悬停", "Hovering"),
+        ("手动控制", "Manual"),
+        ("紧急", "Emergency"),
+        ("探索", "Exploring"),  # 放在最后，避免与"主动探索"冲突
+        ("主动", ""),  # 单独处理剩余的"主动"，避免显示问号
+    ]
+    
+    result = text
+    for chinese, english in translations:
+        result = result.replace(chinese, english)
+    
+    return result
+
+
 def put_chinese_text(img, text, position, font_size=20, color=(255, 255, 255), thickness=1):
     """
     在OpenCV图像上绘制中文文本
-    使用PIL/Pillow来支持中文显示
+    使用PIL/Pillow来支持中文显示，如果失败则回退到英文
     """
-    if not PIL_AVAILABLE:
-        # 如果PIL不可用，使用英文替代
-        text_en = text.replace("状态:", "State:").replace("位置:", "Pos:").replace("红色物体:", "Red:").replace("蓝色物体:", "Blue:").replace("黑色物体:", "Black:").replace("障碍:", "Obs:").replace("手动控制中...", "Manual Ctrl").replace("等待无人机图像...", "Waiting...").replace("飞行状态:", "State:").replace("障碍距离:", "Obs:").replace("开阔度:", "Open:").replace("探索网格:", "Grid:").replace("CPU使用率:", "CPU:").replace("内存使用率:", "Mem:").replace("循环时间:", "Loop:").replace("更新时间:", "Time:").replace("按 Q 或 ESC 关闭窗口", "Press Q/ESC to close").replace("渲染错误", "Render Error").replace("探索前沿", "Frontier").replace("当前位置", "Current").replace("障碍物", "Obstacle").replace("图例:", "Legend:").replace("无人机信息面板", "Info Panel").replace("等待数据...", "Waiting...").replace("系统正在初始化，请稍候...", "Initializing...")
+    global _chinese_font_disabled
+    
+    # 如果已禁用中文显示，直接使用英文
+    if _chinese_font_disabled:
+        text_en = _translate_to_english(text)
         cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
         return img
     
+    # 首先检查PIL是否可用
+    if not PIL_AVAILABLE:
+        _chinese_font_disabled = True
+        text_en = _translate_to_english(text)
+        cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
+        return img
+    
+    # 尝试加载中文字体
+    font = _load_chinese_font(font_size)
+    
+    # 如果字体加载失败，立即回退到英文并设置禁用标志
+    if font is None:
+        _chinese_font_disabled = True
+        text_en = _translate_to_english(text)
+        cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
+        return img
+    
+    # 尝试使用PIL绘制中文
     try:
+        # 检查文本是否包含中文字符
+        has_chinese = any('\u4e00' <= char <= '\u9fff' for char in text)
+        
+        if not has_chinese:
+            # 如果没有中文字符，直接使用cv2.putText
+            cv2.putText(img, text, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
+            return img
+        
         # 将OpenCV图像转换为PIL图像
         img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(img_pil)
-        
-        # 加载中文字体
-        font = _load_chinese_font(font_size)
-        
-        if font is None:
-            # 如果找不到字体，回退到英文显示
-            raise Exception("未找到支持中文的字体")
         
         # 绘制文本（PIL使用RGB颜色）
         color_rgb = (color[2], color[1], color[0])  # BGR转RGB
         
         # PIL的text函数位置参数是(x, y)
         x, y = position
-        draw.text((x, y), text, font=font, fill=color_rgb)
         
-        # 转换回OpenCV格式
-        img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+        # 尝试绘制文本，如果失败则回退到英文
+        try:
+            draw.text((x, y), text, font=font, fill=color_rgb)
+            # 转换回OpenCV格式
+            img = cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+        except Exception as draw_error:
+            # 如果绘制失败（可能是字体不支持某些字符），回退到英文
+            raise draw_error
         
     except Exception as e:
-        # 如果出错（包括字体加载失败），回退到英文显示
-        try:
-            # 将中文转换为英文
-            text_en = text.replace("状态:", "State:").replace("位置:", "Pos:").replace("红色物体:", "Red:").replace("蓝色物体:", "Blue:").replace("黑色物体:", "Black:").replace("障碍:", "Obs:").replace("手动控制中...", "Manual Ctrl").replace("等待无人机图像...", "Waiting...").replace("飞行状态:", "State:").replace("障碍距离:", "Obs:").replace("开阔度:", "Open:").replace("探索网格:", "Grid:").replace("CPU使用率:", "CPU:").replace("内存使用率:", "Mem:").replace("循环时间:", "Loop:").replace("更新时间:", "Time:").replace("按 Q 或 ESC 关闭窗口", "Press Q/ESC to close").replace("渲染错误", "Render Error").replace("探索前沿", "Frontier").replace("当前位置", "Current").replace("障碍物", "Obstacle").replace("图例:", "Legend:").replace("无人机信息面板", "Info Panel").replace("等待数据...", "Waiting...").replace("系统正在初始化，请稍候...", "Initializing...")
-            cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
-        except:
-            pass
+        # 如果绘制失败，回退到英文显示并设置禁用标志
+        _chinese_font_disabled = True
+        text_en = _translate_to_english(text)
+        cv2.putText(img, text_en, position, cv2.FONT_HERSHEY_SIMPLEX, font_size / 30.0, color, thickness)
     
     return img
 
@@ -1310,7 +1393,13 @@ class FrontViewWindow:
 
     def __init__(self, window_name=None, width=None, height=None,
                  enable_sharpening=None, show_info=None):
-        self.window_name = window_name if window_name else config.DISPLAY['FRONT_VIEW_WINDOW']['NAME']
+        # 窗口标题使用英文，避免乱码
+        if window_name:
+            # 如果传入的窗口名包含中文，翻译为英文
+            self.window_name = _translate_to_english(window_name) if any('\u4e00' <= char <= '\u9fff' for char in window_name) else window_name
+        else:
+            default_name = _translate_to_english(config.DISPLAY['FRONT_VIEW_WINDOW']['NAME'])
+            self.window_name = default_name
         self.window_width = width if width is not None else config.DISPLAY['FRONT_VIEW_WINDOW']['WIDTH']
         self.window_height = height if height is not None else config.DISPLAY['FRONT_VIEW_WINDOW']['HEIGHT']
         self.enable_sharpening = (enable_sharpening if enable_sharpening is not None
@@ -1416,8 +1505,8 @@ class FrontViewWindow:
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
 
-        wait_img = np.zeros((300, 400, 3), dtype=np.uint8)
-        wait_img = put_chinese_text(wait_img, "等待无人机图像...", (50, 150), 24, (255, 255, 255), 2)
+        # 等待画面：只显示黑色背景，不显示任何文字
+        wait_img = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
         cv2.imshow(self.window_name, wait_img)
         cv2.waitKey(100)
 
@@ -1453,14 +1542,11 @@ class FrontViewWindow:
                 pass
 
             if display_image is not None:
-                if self.show_info:
-                    display_image = self._add_info_overlay(display_image, info, manual_info)
-
+                # 前视窗口只显示纯图像，不添加任何信息叠加
                 cv2.imshow(self.window_name, display_image)
             elif self.paused:
-                blank = np.zeros((300, 400, 3), dtype=np.uint8)
-                cv2.putText(blank, "PAUSED", (120, 150),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+                # 暂停时也显示黑色背景，不显示任何文字
+                blank = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
                 cv2.imshow(self.window_name, blank)
 
             key = cv2.waitKey(config.DISPLAY['FRONT_VIEW_WINDOW'].get('REFRESH_RATE_MS', 30)) & 0xFF
@@ -1544,62 +1630,9 @@ class FrontViewWindow:
             self.display_stats['last_update'] = now
 
     def _add_info_overlay(self, image: np.ndarray, info: Dict, manual_info: List[str] = None) -> np.ndarray:
-        if image is None or image.size == 0:
-            return image
-
-        try:
-            overlay = image.copy()
-            height, width = image.shape[:2]
-
-            is_manual = info.get('state', '') == "手动控制"
-
-            info_height = 180 if is_manual and manual_info else 100
-
-            cv2.rectangle(overlay, (0, 0), (width, info_height), (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
-
-            state = info.get('state', 'UNKNOWN')
-            state_color = (0, 255, 0) if '探索' in state else (0, 255, 255) if '悬停' in state else (255, 255, 0) if '手动' in state else (0, 0, 255)
-            image = put_chinese_text(image, f"状态: {state}", (10, 30), 21, state_color, 2)
-
-            pos = info.get('position', (0, 0, 0))
-            image = put_chinese_text(image, f"位置: ({pos[0]:.1f}, {pos[1]:.1f}, {-pos[2]:.1f}m)", (10, 60), 18, (255, 255, 255), 1)
-
-            red_objects_count = info.get('red_objects_count', 0)
-            red_objects_visited = info.get('red_objects_visited', 0)
-            blue_objects_count = info.get('blue_objects_count', 0)
-            blue_objects_visited = info.get('blue_objects_visited', 0)
-            black_objects_count = info.get('black_objects_count', 0)
-            black_objects_visited = info.get('black_objects_visited', 0)
-
-            if red_objects_count > 0 or blue_objects_count > 0 or black_objects_count > 0:
-                red_text = f"红色物体: {red_objects_visited}/{red_objects_count}"
-                blue_text = f"蓝色物体: {blue_objects_visited}/{blue_objects_count}"
-                black_text = f"黑色物体: {black_objects_visited}/{black_objects_count}"
-                image = put_chinese_text(image, red_text, (10, 90), 18, (0, 100, 255), 2)
-                image = put_chinese_text(image, blue_text, (10, 110), 18, (255, 100, 0), 2)
-                image = put_chinese_text(image, black_text, (10, 130), 18, (128, 128, 128), 2)
-
-            if is_manual and manual_info:
-                y_start = 170 if (red_objects_count > 0 or blue_objects_count > 0 or black_objects_count > 0) else 100
-                for i, line in enumerate(manual_info):
-                    y_pos = y_start + i * 20
-                    image = put_chinese_text(image, line, (10, y_pos), 15, (200, 255, 200), 1)
-
-                image = put_chinese_text(image, "手动控制中...", (width - 150, 60), 18, (255, 255, 0), 1)
-            elif not is_manual and red_objects_count == 0 and blue_objects_count == 0 and black_objects_count == 0:
-                obs_dist = info.get('obstacle_distance', 0.0)
-                obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
-                image = put_chinese_text(image, f"障碍: {obs_dist:.1f}m", (10, 90), 21, obs_color, 2)
-
-            fps_text = f"FPS: {self.display_stats['fps']:.1f}"
-            cv2.putText(image, fps_text, (width - 120, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-
-            return image
-        except Exception as e:
-            print(f"⚠️ 添加信息叠加层出错: {e}")
-            return image
+        """前视窗口不再显示任何信息叠加，只显示纯图像"""
+        # 直接返回原始图像，不添加任何文字或叠加层
+        return image
 
     def _save_screenshot(self, image: Optional[np.ndarray]):
         if image is not None and image.size > 0:
@@ -1615,7 +1648,13 @@ class InfoDisplayWindow:
     """信息显示窗口 - 显示系统状态、探索网格、物体统计等信息"""
 
     def __init__(self, window_name=None, width=None, height=None):
-        self.window_name = window_name if window_name else config.DISPLAY['INFO_WINDOW']['NAME']
+        # 窗口标题使用英文，避免乱码
+        if window_name:
+            # 如果传入的窗口名包含中文，翻译为英文
+            self.window_name = _translate_to_english(window_name) if any('\u4e00' <= char <= '\u9fff' for char in window_name) else window_name
+        else:
+            default_name = _translate_to_english(config.DISPLAY['INFO_WINDOW']['NAME'])
+            self.window_name = default_name
         self.window_width = width if width is not None else config.DISPLAY['INFO_WINDOW']['WIDTH']
         self.window_height = height if height is not None else config.DISPLAY['INFO_WINDOW']['HEIGHT']
 
@@ -1765,7 +1804,8 @@ class InfoDisplayWindow:
             # 1. 飞行状态信息
             if 'state' in info_data:
                 state = info_data['state']
-                state_color = success_color if '探索' in state else highlight_color if '悬停' in state else warning_color if '紧急' in state else text_color
+                # 状态值已经在_update_info_window中翻译过了，这里直接使用
+                state_color = success_color if 'Exploring' in state else highlight_color if 'Hovering' in state else warning_color if 'Emergency' in state else text_color
                 img = put_chinese_text(img, f"飞行状态: {state}", (x_offset, y_offset), 21, state_color, 2)
                 y_offset += 30
 
@@ -1869,7 +1909,18 @@ class InfoDisplayWindow:
                 img = put_chinese_text(img, f"循环时间: {loop_time:.1f}ms", (x_offset, y_offset), 18, loop_color, 1)
                 y_offset += 25
 
-            # 7. 探索网格图像（右侧）
+            # 7. 手动控制信息（如果处于手动控制模式）
+            if 'manual_info' in info_data and info_data['manual_info']:
+                y_offset += 10  # 添加一些间距
+                manual_title = "手动控制信息:"
+                img = put_chinese_text(img, manual_title, (x_offset, y_offset), 18, highlight_color, 2)
+                y_offset += 25
+                
+                for line in info_data['manual_info']:
+                    img = put_chinese_text(img, line, (x_offset + 10, y_offset), 16, text_color, 1)
+                    y_offset += 22
+
+            # 8. 探索网格图像（右侧）
             if self.display_config['SHOW_GRID'] and 'grid_image' in info_data:
                 grid_img = info_data['grid_image']
                 if grid_img is not None and grid_img.size > 0:
@@ -1879,8 +1930,11 @@ class InfoDisplayWindow:
                     grid_x = self.window_width - grid_size - 20
                     grid_y = 80
 
-                    # 添加网格标题
-                    img = put_chinese_text(img, "探索网格", (grid_x, grid_y - 10), 18, highlight_color, 1)
+                    # 添加网格标题（直接使用英文，避免问号问题）
+                    grid_title = "Grid Map"  # 直接使用英文，不再翻译
+                    cv2.putText(img, grid_title, (grid_x, grid_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 18 / 30.0, highlight_color, 1)
+                    
+                    # 不再在网格上方显示状态值，避免问号问题
 
                     # 添加图例
                     legend_y = grid_y + grid_size + 20
@@ -1919,13 +1973,13 @@ class InfoDisplayWindow:
                     # 将网格图像放到主图像上
                     img[grid_y:grid_y+grid_size, grid_x:grid_x+grid_size] = grid_resized
 
-            # 8. 时间戳
+            # 9. 时间戳
             if 'timestamp' in info_data:
                 timestamp = info_data['timestamp']
                 time_text = f"更新时间: {timestamp}"
                 img = put_chinese_text(img, time_text, (self.window_width - 200, self.window_height - 10), 15, text_color, 1)
 
-            # 9. 底部提示
+            # 10. 底部提示
             hint_text = "按 Q 或 ESC 关闭窗口"
             img = put_chinese_text(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30), 15, text_color, 1)
 
@@ -2148,9 +2202,10 @@ class PerceptiveExplorer:
     def _setup_windows(self):
         """初始化两个显示窗口"""
         try:
-            # 前视窗口
+            # 前视窗口（窗口标题使用英文，避免乱码）
+            front_window_name = _translate_to_english(config.DISPLAY['FRONT_VIEW_WINDOW']['NAME'])
             self.front_window = FrontViewWindow(
-                window_name=f"{config.DISPLAY['FRONT_VIEW_WINDOW']['NAME']} - {self.drone_name or 'AirSimNH'}",
+                window_name=f"{front_window_name} - {self.drone_name or 'AirSimNH'}",
                 width=config.DISPLAY['FRONT_VIEW_WINDOW']['WIDTH'],
                 height=config.DISPLAY['FRONT_VIEW_WINDOW']['HEIGHT'],
                 enable_sharpening=config.DISPLAY['FRONT_VIEW_WINDOW']['ENABLE_SHARPENING'],
@@ -2158,9 +2213,10 @@ class PerceptiveExplorer:
             )
             self.logger.info("🎥 前视窗口已初始化")
 
-            # 信息显示窗口
+            # 信息显示窗口（窗口标题使用英文，避免乱码）
+            info_window_name = _translate_to_english(config.DISPLAY['INFO_WINDOW']['NAME'])
             self.info_window = InfoDisplayWindow(
-                window_name=f"{config.DISPLAY['INFO_WINDOW']['NAME']} - {self.drone_name or 'AirSimNH'}",
+                window_name=f"{info_window_name} - {self.drone_name or 'AirSimNH'}",
                 width=config.DISPLAY['INFO_WINDOW']['WIDTH'],
                 height=config.DISPLAY['INFO_WINDOW']['HEIGHT']
             )
@@ -2184,9 +2240,19 @@ class PerceptiveExplorer:
             memory_usage = psutil.virtual_memory().percent if config.PERFORMANCE['ENABLE_REALTIME_METRICS'] else 0.0
 
             # 准备信息数据
+            # 无论字体是否禁用，都提前翻译状态值，避免部分翻译导致问号
+            state_value = self.state.value
+            if any('\u4e00' <= char <= '\u9fff' for char in state_value):
+                state_value = _translate_to_english(state_value)
+            
+            # 获取手动控制信息
+            manual_info = None
+            if self.state == FlightState.MANUAL:
+                manual_info = self._get_manual_control_info()
+            
             info_data = {
                 'timestamp': datetime.now().strftime("%H:%M:%S"),
-                'state': self.state.value,
+                'state': state_value,
                 'position': (pos.x_val, pos.y_val, pos.z_val),
                 'perception': {
                     'obstacle_distance': perception.obstacle_distance,
@@ -2213,7 +2279,8 @@ class PerceptiveExplorer:
                     'cpu_usage': cpu_usage,
                     'memory_usage': memory_usage,
                     'loop_time': self.stats.get('average_loop_time', 0)
-                }
+                },
+                'manual_info': manual_info  # 添加手动控制信息
             }
 
             # 添加网格图像
@@ -3335,6 +3402,18 @@ class PerceptiveExplorer:
                         self._check_red_object_proximity(current_pos)
                         self._check_blue_object_proximity(current_pos)
                         self._check_black_object_proximity(current_pos)
+                        
+                        # 更新信息窗口（手动控制模式下）
+                        if current_time - last_image_time >= 0.1 and self.info_window:
+                            # 创建一个简化的感知结果用于信息窗口更新
+                            simple_perception = PerceptionResult()
+                            simple_perception.obstacle_distance = 100.0
+                            simple_perception.open_space_score = 1.0
+                            simple_perception.has_obstacle = False
+                            simple_perception.red_objects_count = len(self.red_objects)
+                            simple_perception.blue_objects_count = len(self.blue_objects)
+                            simple_perception.black_objects_count = len(self.black_objects)
+                            self._update_info_window(simple_perception)
                     except:
                         pass
 
