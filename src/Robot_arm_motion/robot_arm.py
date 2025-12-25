@@ -52,7 +52,6 @@ class PandaAutoGrab:
         self.grab_height = 0.05
 
         # PD控制参数
-        # 【优化1】提取PD控制参数为类内常量
         self.PD_KP = 250  # 比例增益
         self.PD_KD = 100  # 微分增益
         self.TORQUE_LIMIT = 20  # 力矩限制
@@ -60,8 +59,14 @@ class PandaAutoGrab:
         # 雅克比伪逆参数
         self.JACOBIAN_DAMPING = 0.01  # 雅克比伪逆的阻尼系数
 
-        # 【优化1】提取关节速度限制为类内常量
+        # 关节速度参数
         self.JOINT_VEL_LIMIT = 0.5  # 关节速度上限
+
+        # 位置控制参数
+        self.POS_TOLERANCE = 0.003  # 末端执行器位置误差容忍阈值
+
+        # 【优化1】提取夹爪等待步数为类内常量
+        self.GRIPPER_WAIT_STEPS = 100  # 夹爪动作完成所需的等待步数
 
         # 打印模型信息
         print("=" * 50)
@@ -86,12 +91,11 @@ class PandaAutoGrab:
         mujoco.mj_jac(self.model, self.data, self.jacp, self.jacr, self.get_ee_pos(), self.ee_body_id)
         return self.jacp[:, self.joint_ids]
 
-    def _move_step(self, target, tol=0.003, speed=0.3):
+    def _move_step(self, target, speed=0.3):
         """单步位置控制：基于雅克比伪逆实现末端执行器的位置跟踪
 
         Args:
             target (np.ndarray): 末端执行器的目标位置，形状为(3,)的三维坐标[x, y, z]
-            tol (float): 位置误差容忍阈值，当实际位置与目标位置的欧氏距离小于该值时，认为到达目标
             speed (float): 移动速度系数，控制机械臂的运动速度
 
         Returns:
@@ -101,7 +105,7 @@ class PandaAutoGrab:
         error = target - ee_pos
         error_norm = np.linalg.norm(error)
 
-        if error_norm < tol:
+        if error_norm < self.POS_TOLERANCE:
             return True  # 到达目标
 
         # 计算雅克比矩阵
@@ -116,14 +120,12 @@ class PandaAutoGrab:
 
         # 关节速度指令
         joint_vel_cmd = speed * jacobian_pinv @ error
-        # 【优化2】使用类内常量替代硬编码的关节速度限制
         joint_vel_cmd = np.clip(joint_vel_cmd, -self.JOINT_VEL_LIMIT, self.JOINT_VEL_LIMIT)
 
         # PD力矩计算
         torque = np.zeros(7)
         for i in range(7):
             angle_error = joint_vel_cmd[i] * 0.1
-            # 【优化2】使用类内常量替代硬编码的PD参数
             torque[i] = self.PD_KP * angle_error - self.PD_KD * self.data.qvel[self.joint_ids[i]]
             torque[i] = np.clip(torque[i], -self.TORQUE_LIMIT, self.TORQUE_LIMIT)
 
@@ -134,14 +136,21 @@ class PandaAutoGrab:
         return False
 
     def _gripper_step(self, pos):
-        """单步夹爪控制"""
+        """单步夹爪位置控制，设置夹爪的目标开合位置
+
+        Args:
+            pos (float): 夹爪目标位置，0.04为完全打开，0.005为闭合抓取
+        """
         for j_name in self.gripper_joint_names:
             j_id = self.model.joint(j_name).id
             self.data.ctrl[j_id] = pos
-        return True
 
     def _grab_phase_machine(self):
-        """抓取状态机"""
+        """抓取状态机：按阶段执行机械臂的抓取、移动、放置等一系列动作
+
+        状态机分为12个阶段，从初始位置移动→识别立方体→抓取→放置→返回，
+        每个阶段完成后自动切换到下一个阶段，直到抓取任务完成。
+        """
         if self.current_phase == 0:
             # 阶段0：移动到初始位置
             if self._move_step(np.array([0.4, 0.0, 0.2])):
@@ -167,7 +176,8 @@ class PandaAutoGrab:
             if self.step_counter == 0:
                 self._gripper_step(self.gripper_open_pos)
                 print("\n✋ 打开夹爪")
-            if self.step_counter > 100:  # 等待夹爪动作
+            # 【优化2】使用类内常量替代硬编码的等待步数
+            if self.step_counter > self.GRIPPER_WAIT_STEPS:
                 self.current_phase = 4
                 self.step_counter = 0
             self.step_counter += 1
@@ -184,7 +194,8 @@ class PandaAutoGrab:
             if self.step_counter == 0:
                 self._gripper_step(self.gripper_close_pos)
                 print("\n🤏 闭合夹爪抓取")
-            if self.step_counter > 100:
+            # 【优化2】使用类内常量替代硬编码的等待步数
+            if self.step_counter > self.GRIPPER_WAIT_STEPS:
                 self.current_phase = 6
                 self.step_counter = 0
             self.step_counter += 1
@@ -215,7 +226,8 @@ class PandaAutoGrab:
             if self.step_counter == 0:
                 self._gripper_step(self.gripper_open_pos)
                 print("\n🫳 释放立方体")
-            if self.step_counter > 100:
+            # 【优化2】使用类内常量替代硬编码的等待步数
+            if self.step_counter > self.GRIPPER_WAIT_STEPS:
                 self.current_phase = 10
                 self.step_counter = 0
             self.step_counter += 1
@@ -255,7 +267,6 @@ class PandaAutoGrab:
 
         # 提取休眠时间为常量，便于后续调整
         SIMULATION_SLEEP = 1 / 200
-        SIMULATION_SLEEP = 1/200
 
         # 单线程主循环
         # 添加KeyboardInterrupt捕获，支持Ctrl+C优雅退出
