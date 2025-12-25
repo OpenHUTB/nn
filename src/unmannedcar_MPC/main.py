@@ -59,6 +59,15 @@ class Main():
         self.waypoint_reached_count = 0  # 已到达航点计数
         self.waypoint_progress = 0.0  # 航点进度（0-1）
 
+        # 障碍物检测系统
+        self.obstacles = []  # 障碍物列表
+        self.obstacle_detection_range = 50.0  # 障碍物检测范围（米）
+
+        # 驾驶辅助系统状态
+        self.lane_assist_active = True  # 车道保持辅助状态
+        self.adaptive_cruise_active = True  # 自适应巡航状态
+        self.collision_avoidance_active = True  # 碰撞避免状态
+
         # start game loop
         self.game.game_loop(self.world, self.on_tick)
 
@@ -79,6 +88,9 @@ class Main():
 
         # 更新航点信息
         self.update_waypoint_navigation(path)
+
+        # 检测障碍物
+        self.detect_obstacles()
 
         # get forward speed
         velocity = self.ego.get_velocity()
@@ -127,6 +139,15 @@ class Main():
                 speed_error = current_speed_kmh - adjusted_target
             else:
                 speed_error = current_speed_kmh - self.target_speed_kmh
+
+            # 根据前方障碍物调整速度
+            if self.obstacles:
+                # 如果有障碍物，进一步降低目标速度
+                min_obstacle_distance = min(self.obstacles, key=lambda x: x['distance'])['distance']
+                if min_obstacle_distance < 20.0:  # 20米内有障碍物
+                    safety_factor = min_obstacle_distance / 20.0  # 距离越近，因子越小
+                    self.target_speed_kmh = min(self.target_speed_kmh, 30.0 * safety_factor)
+                    speed_error = current_speed_kmh - self.target_speed_kmh
 
             if speed_error > 5:  # 超过目标速度5km/h时强力刹车
                 control.throttle = 0.0
@@ -205,14 +226,32 @@ class Main():
             self.waypoint_progress
         )
 
+        # 显示驾驶辅助线和雷达图
+        self.drawer.display_driving_assist_lines(
+            self.ego.get_location(),
+            self.ego.get_transform(),
+            self.steer_angle,
+            path  # 传入路径用于绘制预期路径
+        )
+
+        # 显示雷达图（传入检测到的障碍物）
+        self.drawer.display_simple_radar(self.ego.get_location(), self.obstacles)
+
     def check_collision_warning(self, path, speed_kmh, steer_angle):
         """检测可能的碰撞风险"""
         # 基于转向角度和速度的简单碰撞检测
         speed_factor = speed_kmh / 100.0  # 速度越快，风险越高
         steer_factor = abs(steer_angle)  # 转向角度越大，风险越高
 
+        # 考虑障碍物距离
+        obstacle_factor = 0.0
+        if self.obstacles:
+            min_obstacle_distance = min(self.obstacles, key=lambda x: x['distance'])['distance']
+            if min_obstacle_distance < 10.0:
+                obstacle_factor = 1.0 - (min_obstacle_distance / 10.0)
+
         # 计算碰撞风险
-        collision_risk = speed_factor * (1.0 + steer_factor * 3)
+        collision_risk = speed_factor * (1.0 + steer_factor * 3) + obstacle_factor * 0.5
 
         # 检查是否超过阈值
         warning_threshold = 0.5
@@ -228,6 +267,8 @@ class Main():
         if self.collision_warning != was_warning:
             if self.collision_warning:
                 print(f"碰撞警告激活！速度: {speed_kmh:.1f} km/h, 转向: {steer_angle:.3f}, 风险: {collision_risk:.2f}")
+                if self.obstacles:
+                    print(f"  最近障碍物距离: {min(self.obstacles, key=lambda x: x['distance'])['distance']:.1f}米")
             else:
                 print("碰撞警告解除")
 
@@ -265,6 +306,8 @@ class Main():
             safety_penalty += 30  # 碰撞警告扣分
         if brake_force > 0.5:
             safety_penalty += 20  # 紧急刹车扣分
+        if self.obstacles and min(self.obstacles, key=lambda x: x['distance'])['distance'] < 5.0:
+            safety_penalty += 30  # 距离障碍物太近扣分
         safety = max(0, 100 - safety_penalty)
 
         # 保存各项评分因子
@@ -352,6 +395,112 @@ class Main():
         # 计算航点进度（0-1）
         if len(self.waypoint_positions) > 0:
             self.waypoint_progress = self.current_waypoint_index / len(self.waypoint_positions)
+
+    def detect_obstacles(self):
+        """检测车辆周围的障碍物"""
+        # 清空障碍物列表
+        self.obstacles = []
+
+        # 获取车辆位置和朝向
+        vehicle_location = self.ego.get_location()
+        vehicle_transform = self.ego.get_transform()
+        vehicle_rotation = vehicle_transform.rotation
+
+        # 获取车辆前方的航点作为参考方向
+        wp = self.map.get_waypoint(vehicle_location)
+
+        # 检测周围的车辆
+        vehicle_list = self.world.get_actors().filter('vehicle.*')
+
+        for vehicle in vehicle_list:
+            # 排除自车
+            if vehicle.id == self.ego.id:
+                continue
+
+            # 计算车辆距离
+            other_location = vehicle.get_location()
+            distance = vehicle_location.distance(other_location)
+
+            # 只检测一定范围内的车辆
+            if distance < self.obstacle_detection_range:
+                # 计算相对方向
+                dx = other_location.x - vehicle_location.x
+                dy = other_location.y - vehicle_location.y
+
+                # 计算相对于车辆前进方向的角度
+                # 这里简化处理，使用航点方向作为参考
+                forward_vector = vehicle_transform.get_forward_vector()
+                relative_vector = carla.Vector3D(dx, dy, 0)
+
+                # 计算点积和叉积
+                dot_product = forward_vector.x * relative_vector.x + forward_vector.y * relative_vector.y
+                cross_product = forward_vector.x * relative_vector.y - forward_vector.y * relative_vector.x
+
+                # 计算角度（弧度）
+                angle = math.atan2(cross_product, dot_product)
+
+                # 转换为度
+                angle_deg = math.degrees(angle)
+
+                # 只考虑前方±60度范围内的障碍物
+                if abs(angle_deg) < 60:
+                    # 计算相对速度（简化）
+                    other_velocity = vehicle.get_velocity()
+                    relative_speed = math.sqrt(
+                        (other_velocity.x - self.ego.get_velocity().x) ** 2 +
+                        (other_velocity.y - self.ego.get_velocity().y) ** 2
+                    )
+
+                    # 添加到障碍物列表
+                    self.obstacles.append({
+                        'location': other_location,
+                        'distance': distance,
+                        'angle': angle_deg,
+                        'relative_speed': relative_speed,
+                        'type': 'vehicle'
+                    })
+
+        # 检测静态障碍物（简化：使用地图中的建筑）
+        # 这里简化处理，实际上应该使用传感器数据
+        if self.frame_count % 30 == 0:  # 每30帧检测一次静态障碍物
+            # 随机添加一些模拟的静态障碍物用于演示
+            import random
+            for i in range(random.randint(0, 3)):
+                # 在车辆前方随机位置添加模拟障碍物
+                angle = random.uniform(-45, 45)
+                distance = random.uniform(10, 40)
+
+                # 计算障碍物位置
+                angle_rad = math.radians(angle)
+                obstacle_x = vehicle_location.x + distance * math.cos(angle_rad + math.radians(vehicle_rotation.yaw))
+                obstacle_y = vehicle_location.y + distance * math.sin(angle_rad + math.radians(vehicle_rotation.yaw))
+                obstacle_z = vehicle_location.z
+
+                obstacle_location = carla.Location(x=obstacle_x, y=obstacle_y, z=obstacle_z)
+
+                # 添加到障碍物列表
+                self.obstacles.append({
+                    'location': obstacle_location,
+                    'distance': distance,
+                    'angle': angle,
+                    'relative_speed': 0.0,
+                    'type': 'static'
+                })
+
+        # 按距离排序
+        self.obstacles.sort(key=lambda x: x['distance'])
+
+        # 保留最近的5个障碍物
+        if len(self.obstacles) > 5:
+            self.obstacles = self.obstacles[:5]
+
+        # 每100帧输出一次障碍物信息
+        if self.frame_count % 100 == 0 and self.obstacles:
+            print(f"\n=== 障碍物检测报告 (帧 {self.frame_count}) ===")
+            for i, obstacle in enumerate(self.obstacles):
+                print(f"障碍物 {i + 1}: 距离={obstacle['distance']:.1f}米, 角度={obstacle['angle']:.1f}°, "
+                      f"类型={obstacle['type']}, 相对速度={obstacle['relative_speed']:.1f} m/s")
+            print("=" * 40)
 
 
 if __name__ == '__main__':
