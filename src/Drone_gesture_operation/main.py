@@ -13,7 +13,7 @@ class StableFPSHandRecognizer:
         self.frame_interval = 1.0 / target_fps
         self.last_frame_time = time.time()
 
-        # 2. 优化后的肤色检测阈值（适配更多肤色/光线）
+        # 2. 优化后的肤色检测阈值
         self.skin_lower = np.array([0, 20, 70], np.uint8)  # 放宽下界
         self.skin_upper = np.array([20, 255, 255], np.uint8)  # 调整上界
         self.kernel = np.ones((5, 5), np.uint8)  # 更大的核去噪
@@ -31,7 +31,7 @@ class StableFPSHandRecognizer:
 
         # 5. 识别区域参数（仅显示边框）
         self.recognition_area = None
-        self.area_color = (0, 255, 0)  # 边框颜色（绿色）
+        self.area_color = (0, 255, 0)  # 边框颜色
 
     def _init_recognition_area(self, frame_shape):
         """初始化识别区域（调大尺寸，右侧更大范围）"""
@@ -98,11 +98,11 @@ class StableFPSHandRecognizer:
                 c = np.linalg.norm(np.array(end) - np.array(far))
                 angle = np.arccos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c)) * 180 / np.pi
 
-                # 有效缺陷：深度足够 + 角度小于90度（手指间的凹陷）
+                # 有效缺陷：深度足够 + 角度小于90度
                 if depth > self.defect_depth_threshold and angle < 90:
                     finger_count += 1
 
-            # 缺陷数+1=手指数量（最多5根）
+            # 缺陷数+1=手指数量
             return min(finger_count + 1, 5)
         except Exception as e:
             print(f"手指计数错误: {e}")
@@ -130,7 +130,7 @@ class StableFPSHandRecognizer:
 
         if roi.size > 0:  # 确保ROI有效
             # 预处理：缩小+转HSV+肤色掩码
-            roi_small = cv.resize(roi, (320, 240))  # 适度放大ROI，提高检测精度
+            roi_small = cv.resize(roi, (320, 240))  # 适度放大ROI
             hsv = cv.cvtColor(roi_small, cv.COLOR_BGR2HSV)
             mask = cv.inRange(hsv, self.skin_lower, self.skin_upper)
 
@@ -142,12 +142,12 @@ class StableFPSHandRecognizer:
             # 查找轮廓
             contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
             if contours:
-                # 取最大轮廓（手部）
+                # 取最大轮廓
                 cnt = max(contours, key=cv.contourArea)
                 area = cv.contourArea(cnt)
 
                 if area > self.min_contour_area:
-                    # 计算密实度（判断是否握拳）
+                    # 计算密实度
                     hull = cv.convexHull(cnt)
                     hull_area = cv.contourArea(hull)
                     solidity = area / hull_area if hull_area > 0 else 0
@@ -155,19 +155,19 @@ class StableFPSHandRecognizer:
                     # 手指计数
                     finger_count = self.count_fingers(cnt)
 
-                    # 可视化调试（可选：在ROI内绘制轮廓）
+                    # 可视化调试
                     cnt_scaled = cnt * (roi.shape[1] / roi_small.shape[1], roi.shape[0] / roi_small.shape[0])
                     cnt_scaled = cnt_scaled.astype(np.int32)
                     cnt_scaled[:, :, 0] += roi_x
                     cnt_scaled[:, :, 1] += roi_y
                     cv.drawContours(frame, [cnt_scaled], -1, (255, 0, 0), 2)
 
-                    # 手势判断逻辑（优化版）
-                    if solidity > 0.8:  # 握拳（密实度高）
+                    # 手势判断逻辑
+                    if solidity > 0.8:  # 握拳
                         current_gesture = "stop"
                     elif finger_count == 2:  # 食指+中指
                         current_gesture = "front"
-                    elif finger_count >= 4:  # 手掌张开（4-5指）
+                    elif finger_count >= 4:  # 手掌张开
                         current_gesture = "back"
                     # 其他情况（1/3指）归为None
 
@@ -184,13 +184,13 @@ class StableFPSHandRecognizer:
         cv.putText(frame, f"FPS: {self.target_fps}", (10, 80),
                    cv.FONT_HERSHEY_SIMPLEX, 1.0, (255, 0, 0), 2)
 
-        # 拉伸显示
+        # 拉伸
         frame_show = cv.resize(frame, (640, 480))
         return frame_show
 
     def run(self):
         """主运行逻辑"""
-        # 摄像头初始化（优化参数）
+        # 摄像头初始化
         cap = cv.VideoCapture(0)
         cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)  # 提高摄像头分辨率
         cap.set(cv.CAP_PROP_FRAME_HEIGHT, 480)
