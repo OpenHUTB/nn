@@ -11,7 +11,7 @@ from gym import spaces
 from collections import deque
 import math
 
-# ========== 原有CarlaEnvironment类保持不变 ==========
+# ========== 原有CarlaEnvironment类（重点修改视角平滑逻辑） ==========
 class CarlaEnvironment(gym.Env):
     def __init__(self):
         super(CarlaEnvironment, self).__init__()
@@ -34,8 +34,17 @@ class CarlaEnvironment(gym.Env):
         self.image_queue = Queue(maxsize=1)
         self.lidar_queue = Queue(maxsize=1)
         self.imu_queue = Queue(maxsize=1)
-        # 新增：保存原始激光雷达点云数据（用于3D可视化）
+        # 激光雷达3D点云专用队列
         self.raw_lidar_queue = Queue(maxsize=1)
+        # 新增：当前视角模式（默认第三人称）
+        self.current_view_mode = "third_person"  # first_person / third_person / bird_view
+        
+        # ========== 新增：视角平滑相关变量（解决抖动核心） ==========
+        self.smooth_pos = None  # 平滑后的位置缓存
+        self.smooth_rot = None  # 平滑后的旋转缓存
+        self.pos_smooth_factor = 0.05 # 位置平滑系数（0.05~0.2，越小越平滑）
+        self.rot_smooth_factor = 0.08  # 旋转平滑系数（比位置更平滑）
+        self.view_switch_flag = False  # 视角切换标记（切换时跳过平滑）
 
         # 连接CARLA（强化严格同步模式）
         self._connect_carla()
@@ -191,7 +200,7 @@ class CarlaEnvironment(gym.Env):
             print(f"[图像处理错误] {str(e)}")
 
     def process_lidar(self, data):
-        """处理激光雷达数据（新增：保存原始点云用于3D可视化）"""
+        """处理激光雷达数据（保留原始点云用于3D可视化）"""
         try:
             if not hasattr(data, 'raw_data'):
                 print("[激光雷达处理错误] 无效的激光雷达数据")
@@ -254,6 +263,11 @@ class CarlaEnvironment(gym.Env):
             self.vehicle.set_autopilot(True, self.tm_port)
             self._spawn_npcs(60)
             self._clear_all_non_ego_actors()
+            # 重置视角模式和平滑缓存
+            self.current_view_mode = "third_person"
+            self.smooth_pos = None
+            self.smooth_rot = None
+            self.view_switch_flag = False
         
         # 多次同步，物理稳定（延长时间）
         for _ in range(15):
@@ -356,13 +370,16 @@ class CarlaEnvironment(gym.Env):
         for sensor in [self.camera, self.lidar, self.imu]:
             self._safe_destroy_actor(sensor)
 
-        # 摄像头
+        # 摄像头（适配第一人称视角：调整安装位置）
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
         camera_bp.set_attribute('image_size_x', '128')
         camera_bp.set_attribute('image_size_y', '128')
         camera_bp.set_attribute('fov', '100')
+        # 第一人称视角摄像头（驾驶位）
         self.camera = self.world.spawn_actor(
-            camera_bp, carla.Transform(carla.Location(x=2.0, z=1.5)), attach_to=self.vehicle
+            camera_bp, carla.Transform(carla.Location(x=1.0, y=0.0, z=1.2), carla.Rotation(pitch=0, yaw=0, roll=0)), 
+            attach_to=self.vehicle,
+            attachment_type=carla.AttachmentType.Rigid
         )
         self.camera.listen(self.process_image)
 
@@ -464,114 +481,69 @@ class CarlaEnvironment(gym.Env):
                 print(f"[世界设置恢复警告] {str(e)}")
         print("[资源清理] 所有资源已销毁")
 
-    def init_spectator_smoother(self, window_size=15):
-        """初始化镜头平滑器（增大滑动窗口到15帧）"""
-        self.vehicle_pose_buffer = deque(maxlen=window_size)  # 15帧缓存，过滤更多高频抖动
-        self.window_size = window_size
-        # 初始化加权平均权重（近期帧权重更高，兼顾平滑和响应）
-        self.weights = np.linspace(0.1, 1.0, window_size)  # 权重从0.1→1.0递增
-        self.weights /= np.sum(self.weights)  # 归一化
+    # ========== 核心修改：视角切换+平滑跟随（解决抖动） ==========
+    def switch_view_mode(self, mode):
+        """切换视角模式（添加切换标记，跳过初始平滑）"""
+        if mode in ["first_person", "third_person", "bird_view"]:
+            self.current_view_mode = mode
+            self.view_switch_flag = True  # 切换时强制重置平滑缓存
+            print(f"[视角切换] 已切换至：{self.current_view_mode}")
 
-    def update_spectator_ultra_smooth(self, spectator):
-        """
-        终极平滑镜头更新：加权滑动平均+微米级死区+完全锁定旋转
-        """
+    def _smooth_transform(self, target_loc, target_rot):
+        """对位置和旋转进行指数移动平均平滑（核心防抖逻辑）"""
+        # 首次初始化平滑缓存
+        if self.smooth_pos is None or self.view_switch_flag:
+            self.smooth_pos = target_loc
+            self.smooth_rot = target_rot
+            self.view_switch_flag = False  # 重置切换标记
+            return self.smooth_pos, self.smooth_rot
+        
+        # 位置平滑（指数移动平均）
+        self.smooth_pos.x = self.smooth_pos.x * (1 - self.pos_smooth_factor) + target_loc.x * self.pos_smooth_factor
+        self.smooth_pos.y = self.smooth_pos.y * (1 - self.pos_smooth_factor) + target_loc.y * self.pos_smooth_factor
+        self.smooth_pos.z = self.smooth_pos.z * (1 - self.pos_smooth_factor) + target_loc.z * self.pos_smooth_factor
+        
+        # 旋转平滑（指数移动平均，仅yaw角跟随，pitch/roll固定）
+        self.smooth_rot.yaw = self.smooth_rot.yaw * (1 - self.rot_smooth_factor) + target_rot.yaw * self.rot_smooth_factor
+        self.smooth_rot.pitch = target_rot.pitch  # 俯仰角固定，不平滑
+        self.smooth_rot.roll = target_rot.roll    # 滚转角固定，不平滑
+        
+        return self.smooth_pos, self.smooth_rot
+
+    def update_view(self, spectator):
+        """根据当前视角模式更新 spectator 位置（添加平滑防抖）"""
         if not self._is_actor_alive(self.vehicle):
             return
         
-        # 1. 获取同步帧快照的车辆位姿（仅用快照，杜绝异步）
-        snapshot = self.world.get_snapshot()
-        vehicle_snapshot = snapshot.find(self.vehicle.id)
-        if not vehicle_snapshot:
-            return
-        current_pose = vehicle_snapshot.get_transform()
-        
-        # 2. 初始化关键变量
-        avg_yaw = current_pose.rotation.yaw
-        avg_pose = current_pose
-        
-        # 3. 加入滑动缓存并计算「加权平均」位姿（核心优化）
-        self.vehicle_pose_buffer.append(current_pose)
-        if len(self.vehicle_pose_buffer) >= self.window_size:
-            # 提取缓存中的位姿
-            poses = list(self.vehicle_pose_buffer)
-            count = len(poses)
-            
-            # 加权平均位置（近期帧权重更高）
-            avg_loc = carla.Location()
-            for i in range(count):
-                weight = self.weights[i]
-                avg_loc.x += poses[i].location.x * weight
-                avg_loc.y += poses[i].location.y * weight
-                avg_loc.z += poses[i].location.z * weight  # Z轴也加权平均
-            
-            # 加权平均Yaw角（处理360度环绕）
-            yaws = [pose.rotation.yaw for pose in poses]
-            yaw_rads = np.radians(yaws)
-            # 加权正弦和余弦
-            weighted_sin = np.sum(np.sin(yaw_rads) * self.weights[:count])
-            weighted_cos = np.sum(np.cos(yaw_rads) * self.weights[:count])
-            avg_yaw = np.degrees(np.arctan2(weighted_sin, weighted_cos))
-            
-            # 构建平均位姿
-            avg_pose = carla.Transform(avg_loc, carla.Rotation(pitch=0, yaw=avg_yaw, roll=0))
-        
-        # 4. 模拟父级绑定+Z轴强制锁定
-        relative_loc = carla.Location(x=-5.0, y=0.0, z=2.0)
-        target_loc = avg_pose.transform(relative_loc)
-        target_loc.z = avg_pose.location.z + 2.0  # 强制锁定Z轴，不随任何波动
-        
-        # 5. 镜头旋转：完全锁定（仅Yaw跟随平均位姿）
-        target_rot = carla.Rotation(
-            pitch=-10.0,  # 完全固定，不参与任何平滑
-            yaw=avg_yaw,
-            roll=0.0      # 完全固定
-        )
-        
-        # 6. EMA平滑+微米级死区过滤（终极去抖）
-        current_transform = spectator.get_transform()
-        alpha = 0.03  # 极致平滑系数（更小，更稳定）
-        pos_deadzone = 0.005  # 微米级死区（5mm内波动不更新）
-        
-        # 位置平滑（带死区）
-        loc_diff = np.array([
-            target_loc.x - current_transform.location.x,
-            target_loc.y - current_transform.location.y,
-            target_loc.z - current_transform.location.z
-        ])
-        loc_diff_mag = np.linalg.norm(loc_diff)
-        
-        if loc_diff_mag > pos_deadzone:
-            final_loc = carla.Location(
-                x=alpha * target_loc.x + (1 - alpha) * current_transform.location.x,
-                y=alpha * target_loc.y + (1 - alpha) * current_transform.location.y,
-                z=target_loc.z  # Z轴直接锁定
-            )
-        else:
-            # 死区内不更新，保持当前位置
-            final_loc = current_transform.location
-        
-        # 旋转平滑（仅Yaw，带死区）
-        yaw_diff = target_rot.yaw - current_transform.rotation.yaw
-        yaw_diff = (yaw_diff + 180) % 360 - 180  # 归一化
-        rot_deadzone = 0.02  # 0.02度死区
-        
-        if abs(yaw_diff) > rot_deadzone:
-            final_yaw = current_transform.rotation.yaw + alpha * yaw_diff
-            final_yaw = final_yaw % 360
-        else:
-            final_yaw = current_transform.rotation.yaw
-        
-        final_rot = carla.Rotation(
-            pitch=-10.0,  # 完全固定
-            yaw=final_yaw,
-            roll=0.0      # 完全固定
-        )
-        
-        # 7. 更新镜头（仅一次，同步帧内完成）
-        spectator.set_transform(carla.Transform(final_loc, final_rot))
+        vehicle_transform = self.vehicle.get_transform()
+        vehicle_location = vehicle_transform.location
+        vehicle_rotation = vehicle_transform.rotation
 
-# ========== 新增：3D点云可视化核心逻辑 ==========
+        # 计算目标视角位置和旋转
+        if self.current_view_mode == "first_person":
+            # 第一人称视角：驾驶位，向前看
+            target_loc = vehicle_transform.transform(carla.Location(x=0.5, y=0.0, z=1.0))
+            target_rot = vehicle_rotation
+        elif self.current_view_mode == "third_person":
+            # 第三人称视角：车辆后上方，平滑跟随
+            target_loc = vehicle_transform.transform(carla.Location(x=-5.0, y=0.0, z=2.0))
+            target_rot = carla.Rotation(pitch=-10.0, yaw=vehicle_rotation.yaw, roll=0.0)
+        elif self.current_view_mode == "bird_view":
+            # 鸟瞰视角：车辆正上方，全局俯视
+            target_loc = carla.Location(vehicle_location.x, vehicle_location.y, vehicle_location.z + 50.0)
+            target_rot = carla.Rotation(pitch=-90.0, yaw=vehicle_rotation.yaw, roll=0.0)
+        else:
+            # 默认第三人称
+            target_loc = vehicle_transform.transform(carla.Location(x=-5.0, y=0.0, z=2.0))
+            target_rot = carla.Rotation(pitch=-10.0, yaw=vehicle_rotation.yaw, roll=0.0)
+        
+        # 对目标视角进行平滑处理（核心防抖）
+        smooth_loc, smooth_rot = self._smooth_transform(target_loc, target_rot)
+        
+        # 更新 spectator（使用平滑后的位置和旋转）
+        spectator.set_transform(carla.Transform(smooth_loc, smooth_rot))
+
+# ========== 激光雷达3D点云可视化窗口（保留，单独运行） ==========
 class Lidar3DVisualizer:
     def __init__(self, width=600, height=600):
         # 窗口参数
@@ -587,7 +559,7 @@ class Lidar3DVisualizer:
         self.offset_x = width // 2
         self.offset_y = height // 2
         
-        # 交互状态
+        # 交互状态（即使暂未生效，保留逻辑）
         self.mouse_down = False
         self.last_mouse_pos = (0, 0)
         self.point_size = 2            # 点云渲染大小
@@ -600,13 +572,7 @@ class Lidar3DVisualizer:
         }
 
     def project_3d_to_2d(self, point):
-        """
-        透视投影：将3D点(x,y,z)转换为2D屏幕坐标
-        核心算法：
-        1. 绕Y轴旋转（水平视角）
-        2. 绕X轴旋转（垂直视角）
-        3. 透视缩放+屏幕偏移
-        """
+        """透视投影：将3D点(x,y,z)转换为2D屏幕坐标"""
         x, y, z = point
         
         # 绕Y轴旋转（theta）
@@ -664,9 +630,9 @@ class Lidar3DVisualizer:
                 pygame.draw.circle(self.screen, color, (screen_x, screen_y), self.point_size)
         
         # 4. 绘制辅助信息（坐标系、说明文字）
-        font = pygame.font.SysFont('Consolas', 12)
+        font = pygame.font.SysFont('Consolas', 12, bold=True)
         # 坐标系提示
-        axis_text = font.render("X:前 Y:左 Z:上 | 鼠标拖拽旋转 | 滚轮缩放", True, (200, 200, 200))
+        axis_text = font.render("X:前 Y:左 Z:上 | 激光雷达有效范围：0.5-50m", True, (200, 200, 200))
         self.screen.blit(axis_text, (10, 10))
         # 距离说明
         dist_text = font.render("红色:<10m 黄色:10-30m 绿色:>30m", True, (200, 200, 200))
@@ -676,7 +642,7 @@ class Lidar3DVisualizer:
         pygame.display.flip()
 
     def handle_events(self):
-        """处理鼠标交互"""
+        """处理鼠标交互（保留逻辑，即使暂未生效）"""
         for event in pygame.event.get():
             # 鼠标按下
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -701,19 +667,204 @@ class Lidar3DVisualizer:
                 self.phi += dy * 0.01
                 self.last_mouse_pos = current_pos
 
-# ========== 修改后的仿真运行函数 ==========
+# ========== 主可视化界面（3D视角增强+清晰交互） ==========
+class MainVisualizer:
+    def __init__(self, width=800, height=600):
+        # 窗口基础配置
+        self.width = width
+        self.height = height
+        self.screen = pygame.display.set_mode((width, height), pygame.DOUBLEBUF | pygame.HWSURFACE)
+        pygame.display.set_caption("CARLA自动驾驶仿真 - 3D视角控制")
+        
+        # 字体配置（确保显示清晰，抗锯齿）
+        self.font_large = pygame.font.SysFont('Microsoft YaHei', 16, bold=True)
+        self.font_small = pygame.font.SysFont('Microsoft YaHei', 12, bold=True)
+        
+        # 颜色配置（工业风，高对比度，显示清晰）
+        self.colors = {
+            'bg_main': (18, 18, 28),       # 主背景（深蓝灰）
+            'bg_panel': (30, 30, 45),      # 面板背景（深紫灰）
+            'text_normal': (220, 220, 240),# 普通文字（浅灰蓝）
+            'text_highlight': (0, 180, 255),# 高亮文字（天蓝色）
+            'button_normal': (45, 45, 65), # 按钮常态
+            'button_hover': (60, 60, 85),  # 按钮悬停
+            'button_press': (0, 120, 180), # 按钮按下
+            'border': (80, 80, 100)        # 边框颜色
+        }
+        
+        # 交互按钮配置（位置+大小+文本）
+        self.buttons = {
+            'first_person': {
+                'rect': pygame.Rect(20, 500, 120, 40),
+                'text': '第一人称 (1)',
+                'active': False
+            },
+            'third_person': {
+                'rect': pygame.Rect(150, 500, 120, 40),
+                'text': '第三人称 (2)',
+                'active': True  # 默认激活
+            },
+            'bird_view': {
+                'rect': pygame.Rect(280, 500, 120, 40),
+                'text': '鸟瞰视角 (3)',
+                'active': False
+            },
+            'pause': {
+                'rect': pygame.Rect(410, 500, 120, 40),
+                'text': '暂停 (空格)',
+                'active': False
+            }
+        }
+        
+        # 状态变量
+        self.paused = False
+        self.fps = 0
+        self.npc_count = 0
+        self.obstacle_distances = {'front': 0, 'rear': 0, 'left': 0, 'right': 0}
+        self.current_view = "第三人称"
+
+    def draw_buttons(self):
+        """绘制交互按钮（清晰易识别，有状态反馈）"""
+        for btn_name, btn in self.buttons.items():
+            # 确定按钮颜色（根据状态）
+            if btn['active']:
+                bg_color = self.colors['button_press']
+            elif btn['rect'].collidepoint(pygame.mouse.get_pos()):
+                bg_color = self.colors['button_hover']
+            else:
+                bg_color = self.colors['button_normal']
+            
+            # 绘制按钮（带边框，清晰）
+            pygame.draw.rect(self.screen, bg_color, btn['rect'], border_radius=5)
+            pygame.draw.rect(self.screen, self.colors['border'], btn['rect'], width=2, border_radius=5)
+            
+            # 绘制按钮文字（居中，抗锯齿）
+            text_surf = self.font_small.render(btn['text'], True, self.colors['text_normal'])
+            text_rect = text_surf.get_rect(center=btn['rect'].center)
+            self.screen.blit(text_surf, text_rect)
+
+    def draw_status_panel(self):
+        """绘制状态面板（信息清晰，分区显示）"""
+        # 面板背景
+        panel_rect = pygame.Rect(20, 20, 300, 150)
+        pygame.draw.rect(self.screen, self.colors['bg_panel'], panel_rect, border_radius=5)
+        pygame.draw.rect(self.screen, self.colors['border'], panel_rect, width=2, border_radius=5)
+        
+        # 面板标题
+        title_surf = self.font_large.render("仿真状态信息", True, self.colors['text_highlight'])
+        self.screen.blit(title_surf, (30, 30))
+        
+        # 状态文本（分行显示，对齐）
+        status_texts = [
+            f"当前视角：{self.current_view}",
+            f"仿真帧率：{self.fps:.1f} FPS",
+            f"NPC车辆数：{self.npc_count} 辆",
+            f"前方障碍物：{self.obstacle_distances['front']:.1f} m",
+            f"右侧障碍物：{self.obstacle_distances['right']:.1f} m"
+        ]
+        
+        for i, text in enumerate(status_texts):
+            y_pos = 60 + i * 20
+            text_surf = self.font_small.render(text, True, self.colors['text_normal'])
+            self.screen.blit(text_surf, (30, y_pos))
+
+    def draw_help_text(self):
+        """绘制操作提示（清晰易读）"""
+        help_texts = [
+            "快捷键：1-第一人称  2-第三人称  3-鸟瞰视角  空格-暂停/继续  ESC-退出",
+            "视角说明：第一人称（驾驶位）| 第三人称（跟随）| 鸟瞰（全局俯视）"
+        ]
+        for i, text in enumerate(help_texts):
+            y_pos = 450 + i * 20
+            text_surf = self.font_small.render(text, True, self.colors['text_normal'])
+            self.screen.blit(text_surf, (20, y_pos))
+
+    def update_status(self, fps, npc_count, obstacle_distances, current_view):
+        """更新状态信息（用于渲染）"""
+        self.fps = fps
+        self.npc_count = npc_count
+        self.obstacle_distances = obstacle_distances
+        self.current_view = current_view
+        
+        # 更新按钮激活状态
+        for btn_name in self.buttons:
+            self.buttons[btn_name]['active'] = False
+        if current_view == "第一人称":
+            self.buttons['first_person']['active'] = True
+        elif current_view == "第三人称":
+            self.buttons['third_person']['active'] = True
+        elif current_view == "鸟瞰视角":
+            self.buttons['bird_view']['active'] = True
+        self.buttons['pause']['active'] = self.paused
+
+    def handle_events(self, env):
+        """处理交互事件（快捷键+按钮点击）"""
+        for event in pygame.event.get():
+            # 窗口关闭
+            if event.type == pygame.QUIT:
+                raise KeyboardInterrupt
+            # 键盘按键
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    raise KeyboardInterrupt
+                elif event.key == pygame.K_1:
+                    env.switch_view_mode("first_person")
+                    self.current_view = "第一人称"
+                elif event.key == pygame.K_2:
+                    env.switch_view_mode("third_person")
+                    self.current_view = "第三人称"
+                elif event.key == pygame.K_3:
+                    env.switch_view_mode("bird_view")
+                    self.current_view = "鸟瞰视角"
+                elif event.key == pygame.K_SPACE:
+                    self.paused = not self.paused
+            # 鼠标点击按钮
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    if self.buttons['first_person']['rect'].collidepoint(mouse_pos):
+                        env.switch_view_mode("first_person")
+                        self.current_view = "第一人称"
+                    elif self.buttons['third_person']['rect'].collidepoint(mouse_pos):
+                        env.switch_view_mode("third_person")
+                        self.current_view = "第三人称"
+                    elif self.buttons['bird_view']['rect'].collidepoint(mouse_pos):
+                        env.switch_view_mode("bird_view")
+                        self.current_view = "鸟瞰视角"
+                    elif self.buttons['pause']['rect'].collidepoint(mouse_pos):
+                        self.paused = not self.paused
+
+    def render(self):
+        """渲染主界面（所有元素）"""
+        # 清空主背景
+        self.screen.fill(self.colors['bg_main'])
+        
+        # 绘制状态面板
+        self.draw_status_panel()
+        
+        # 绘制操作提示
+        self.draw_help_text()
+        
+        # 绘制交互按钮
+        self.draw_buttons()
+        
+        # 更新显示（双缓冲，无撕裂）
+        pygame.display.flip()
+
+# ========== 仿真运行函数 ==========
 def run_simulation():
     pygame.init()
-    # 初始化字体（避免中文/特殊字符乱码）
+    # 初始化字体（确保中文显示清晰，抗锯齿）
     pygame.font.init()
+    # 禁用pygame默认鼠标缩放，避免干扰
+    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+    
     env = None
     lidar_visualizer = None
+    main_visualizer = None
     try:
         print("\n[CARLA连接] 创建环境...")
         env = CarlaEnvironment()
-        
-        # 初始化镜头平滑器（15帧加权滑动窗口）
-        env.init_spectator_smoother(window_size=15)
         
         print("\n[环境重置] 生成车辆和传感器...")
         env.reset()
@@ -722,57 +873,68 @@ def run_simulation():
             raise RuntimeError("车辆生成失败，请检查CARLA是否正常运行")
         print(f"[车辆状态] 生成成功（ID: {env.vehicle.id}），已启用自动驾驶")
 
-        # 初始化3D点云可视化器
+        # 初始化两个可视化窗口
         lidar_visualizer = Lidar3DVisualizer(width=600, height=600)
+        main_visualizer = MainVisualizer(width=800, height=600)
         
         clock = pygame.time.Clock()
         spectator = env.world.get_spectator()
         
-        # 初始化镜头+填充缓存（延长初始化时间）
-        env.world.tick()
-        for _ in range(env.window_size * 2):  # 填充2倍窗口，确保加权平均生效
-            env.update_spectator_ultra_smooth(spectator)
-            env.world.tick()
+        # 初始化视角（强制一次平滑缓存）
+        env.update_view(spectator)
         
-        print("\n[仿真开始] 车辆将沿车道行驶，按Ctrl+C退出...")
-        print("[点云可视化] 窗口已启动 - 鼠标拖拽旋转视角 | 滚轮缩放 | 颜色编码距离")
+        print("\n[仿真开始] 按ESC退出 | 快捷键1/2/3切换视角 | 空格暂停")
+        print("[窗口说明] 主窗口（视角控制）| 独立窗口（激光雷达3D点云）")
         sys.stdout.flush()
         
         step = 0
         obstacle_distances = {'front': 0, 'rear': 0, 'left': 0, 'right': 0}
         while True:
-            # 1. 处理所有事件（主窗口+点云窗口）
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    raise KeyboardInterrupt
-            # 点云窗口交互
-            if lidar_visualizer:
-                lidar_visualizer.handle_events()
+            # 1. 处理所有交互事件
+            main_visualizer.handle_events(env)
+            lidar_visualizer.handle_events()
             
-            # 2. 严格同步的仿真帧推进
-            env.world.tick()
+            # 2. 暂停逻辑
+            if not main_visualizer.paused:
+                # 严格同步的仿真帧推进
+                env.world.tick()
+                
+                # 更新CARLA spectator视角（带平滑防抖）
+                env.update_view(spectator)
+                
+                # 获取观测数据（低频率，减少消耗）
+                if step % 3 == 0:
+                    observation = env.get_observation()
+                    obstacle_distances = env.get_obstacle_directions(observation['lidar_distances'])
+                    # 渲染激光雷达3D点云
+                    raw_lidar_points = env.get_raw_lidar_points()
+                    lidar_visualizer.render(raw_lidar_points)
+                
+                # 打印日志（极低频率）
+                if step % 120 == 0:
+                    print(f"\n[步骤 {step}] 障碍物距离 - 前{obstacle_distances['front']:.1f}m | 后{obstacle_distances['rear']:.1f}m | "
+                          f"左{obstacle_distances['left']:.1f}m | 右{obstacle_distances['right']:.1f}m")
+                    sys.stdout.flush()
+                
+                step += 1
             
-            # 3. 终极平滑的镜头更新
-            env.update_spectator_ultra_smooth(spectator)
+            # 3. 更新主界面状态并渲染
+            current_fps = clock.get_fps()
+            current_view_name = {
+                "first_person": "第一人称",
+                "third_person": "第三人称",
+                "bird_view": "鸟瞰视角"
+            }.get(env.current_view_mode, "第三人称")
+            main_visualizer.update_status(
+                fps=current_fps,
+                npc_count=len(env.npc_vehicles),
+                obstacle_distances=obstacle_distances,
+                current_view=current_view_name
+            )
+            main_visualizer.render()
             
-            # 4. 渲染3D点云（每帧更新，保证实时性）
-            raw_lidar_points = env.get_raw_lidar_points()
-            lidar_visualizer.render(raw_lidar_points)
-            
-            # 5. 极低频率获取观测（减少性能消耗）
-            if step % 3 == 0:
-                observation = env.get_observation()
-                obstacle_distances = env.get_obstacle_directions(observation['lidar_distances'])
-            
-            # 6. 极低频率打印（每2秒打印一次，减少IO抖动）
-            if step % 120 == 0:
-                print(f"\n[步骤 {step}] 障碍物距离 - 前{obstacle_distances['front']:.1f}m | 后{obstacle_distances['rear']:.1f}m | "
-                      f"左{obstacle_distances['left']:.1f}m | 右{obstacle_distances['right']:.1f}m")
-                sys.stdout.flush()
-            
-            # 7. 锁定渲染帧率（与仿真帧率一致，避免波动）
-            clock.tick_busy_loop(60)  # 更精准的帧率锁定
-            step += 1
+            # 4. 锁定渲染帧率（与仿真帧率一致）
+            clock.tick_busy_loop(60)
 
     except KeyboardInterrupt:
         print("\n[用户终止] 收到退出信号")
@@ -792,6 +954,7 @@ if __name__ == "__main__":
     print("="*60)
     print(f"[启动时间] {time.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"[Python解释器] {sys.executable}")
+    print(f"[运行环境] Win11 + CARLA0.9.11 + Python3.7.5")
     print("="*60)
     sys.stdout.flush()
     run_simulation()
