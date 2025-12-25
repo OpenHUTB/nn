@@ -503,7 +503,7 @@ class AirSimNHCarSimulator:
             print(f"✗ 保存数据失败: {e}")
             return False
 
-    def run_full_demo(self, control_duration=25, data_duration=10):
+    def run_full_demo(self, control_duration=20, data_duration=10):
         """运行完整演示"""
         print("=" * 60)
         print("AirSimNH 无人车完整仿真演示")
@@ -573,7 +573,7 @@ def main():
     # 运行完整演示
     try:
         simulator.run_full_demo(
-            control_duration=30,  # 增加控制演示时长到30秒
+            control_duration=20,  # 使用20秒控制演示时长
             data_duration=10  # 数据采集时长（秒）
         )
 
