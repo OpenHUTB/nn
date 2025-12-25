@@ -2,483 +2,369 @@ import mujoco
 import mujoco_viewer
 import numpy as np
 import matplotlib.pyplot as plt
-import time
 import matplotlib as mpl
 import os
-import traceback
 import warnings
-from enum import Enum
+import time
+import glfw  # 直接用glfw检测按键，兼容所有版本
 from contextlib import suppress
 
-# ===================== 全局配置 & 警告消除 =====================
-# 消除libpng sRGB警告
-warnings.filterwarnings('ignore', category=UserWarning, module='PIL')
-warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
-# 强制Matplotlib使用AGG后端（避免图片渲染警告）
-mpl.use('Agg')
-# 中文显示修复
+# ===================== 基础配置（消除警告） =====================
+warnings.filterwarnings('ignore')
+mpl.use('TkAgg')
 mpl.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
 mpl.rcParams['axes.unicode_minus'] = False
-mpl.rcParams['font.family'] = 'sans-serif'
-# 关闭图片色彩配置警告
-os.environ['MPLCONFIGDIR'] = os.path.join(os.getcwd(), ".mplconfig")
-os.makedirs(os.environ['MPLCONFIGDIR'], exist_ok=True)
 
-# 路径配置
+# 路径配置（适配你的原有robot.xml路径）
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(CURRENT_DIR, "robot.xml")
 
-# 仿真参数（精细化）
-SIMULATION_STEPS = 12000
-FRAME_DELAY = 0.001  # 帧延迟，保证动作流畅
-RENDER_INTERVAL = 2  # 渲染间隔，降低窗口压力
-# PID参数（平衡流畅性和精度）
-KP = 12.0
-KI = 0.02
-KD = 2.0
-# 抓取参数（精细化）
-GRASP_FORCE_START = 0.0  # 夹爪初始力度
-GRASP_FORCE_MAX = 8.0  # 夹爪最大力度
-GRASP_RAMP_STEPS = 800  # 夹爪力度渐变步数
-RELEASE_RAMP_STEPS = 500  # 夹爪释放渐变步数
-COLLISION_THRESHOLD = 0.015  # 碰撞检测阈值
-RETRY_MAX = 2  # 抓取失败重试次数
+# ===================== 核心控制参数（微调适配原有模型） =====================
+# 手动控制参数（适配原有模型的关节范围，低速易控）
+MANUAL_SPEED = 0.03  # 比之前略小，适配原有模型的关节灵敏度
+GRASP_FORCE = 3.5  # 微调力度，适配原有夹爪尺寸
+# 自动控制参数（适配原有模型的物体位置）
+AUTO_LIFT_HEIGHT = 0.12  # 适配原有模型的抬升范围
+AUTO_TRANSPORT_X = -0.15  # 适配原有模型的搬运范围
 
-# 相机配置（多视角，自动切换）
-CAMERA_CONFIGS = {
-    "main": {"distance": 2.0, "elevation": -15, "azimuth": 90, "lookat": [0.0, 0.0, 0.1]},
-    "top": {"distance": 2.5, "elevation": 60, "azimuth": 90, "lookat": [0.0, 0.0, 0.1]},
-    "side": {"distance": 1.8, "elevation": -10, "azimuth": 0, "lookat": [0.0, 0.0, 0.1]}
-}
-# 自动切换视角的步数节点
-CAMERA_SWITCH_STEPS = {
-    3000: "top",  # 搬运阶段切换到俯视图
-    6000: "side",  # 下放阶段切换到侧视图
-    9000: "main"  # 归位阶段切回主视角
+# ===================== 全局控制变量 =====================
+control_cmd = {
+    'forward': 0,  # 前（W）
+    'backward': 0,  # 后（S）
+    'left': 0,  # 左（A）
+    'right': 0,  # 右（D）
+    'up': 0,  # 上（Q）
+    'down': 0,  # 下（E）
+    'grasp': 0,  # 抓取（空格）
+    'release': 0,  # 释放（R）
+    'auto': False,  # 一键自动抓取（Z）
+    'reset': False  # 重置（C）
 }
 
 
-# 动作阶段枚举（清晰划分流程）
-class GraspPhase(Enum):
-    INIT = 1  # 初始化
-    APPROACH = 2  # 接近物体（含预抬升）
-    ALIGN = 3  # 姿态对齐
-    GRASP = 4  # 抓取（力度渐变）
-    LIFT = 5  # 抬升（防碰撞）
-    TRANSPORT = 6  # 搬运（平滑轨迹）
-    LOWER = 7  # 下放（精准定位）
-    RELEASE = 8  # 释放（缓慢打开）
-    RETURN = 9  # 归位
-    SUCCESS = 10  # 成功
-    RETRY = 11  # 重试
+# ===================== 兼容版按键检测函数（核心修复） =====================
+def check_keyboard_input(viewer):
+    """
+    兼容所有版本mujoco-viewer的按键检测
+    替代原有get_key()方法，解决属性不存在问题
+    """
+    # 重置所有指令（避免按键粘连）
+    for key in control_cmd.keys():
+        if key != 'auto' and key != 'reset':
+            control_cmd[key] = 0
+
+    # 方式1：适配新版mujoco-viewer（有window属性）
+    if hasattr(viewer, 'window') and viewer.window is not None:
+        window = viewer.window
+        # W键 - 前
+        if glfw.get_key(window, glfw.KEY_W) == glfw.PRESS:
+            control_cmd['forward'] = 1
+        # S键 - 后
+        if glfw.get_key(window, glfw.KEY_S) == glfw.PRESS:
+            control_cmd['backward'] = 1
+        # A键 - 左
+        if glfw.get_key(window, glfw.KEY_A) == glfw.PRESS:
+            control_cmd['left'] = 1
+        # D键 - 右
+        if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS:
+            control_cmd['right'] = 1
+        # Q键 - 上
+        if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS:
+            control_cmd['up'] = 1
+        # E键 - 下
+        if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS:
+            control_cmd['down'] = 1
+        # 空格键 - 抓取
+        if glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS:
+            control_cmd['grasp'] = 1
+        # R键 - 释放
+        if glfw.get_key(window, glfw.KEY_R) == glfw.PRESS:
+            control_cmd['release'] = 1
+        # Z键 - 一键自动抓取
+        if glfw.get_key(window, glfw.KEY_Z) == glfw.PRESS:
+            control_cmd['auto'] = True
+        # C键 - 重置
+        if glfw.get_key(window, glfw.KEY_C) == glfw.PRESS:
+            control_cmd['reset'] = True
+        # ESC键 - 关闭窗口
+        if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
+            glfw.set_window_should_close(window, True)
+
+    # 方式2：适配旧版mujoco-viewer（无window属性，备用方案）
+    else:
+        # 旧版无法实时检测按键，提供替代操作方式
+        print("\n⚠️ 检测到旧版mujoco-viewer，按键控制受限！")
+        print("   替代操作：按Z键（一键自动抓取）或C键（重置）继续")
+        # 仅保留核心功能（自动抓取/重置）
+        # 按任意键触发自动抓取（简化适配）
+        control_cmd['auto'] = True
 
 
-# ===================== 工具函数 =====================
-def validate_model(model, data):
-    """模型校验+详细日志（兼容所有MuJoCo版本）"""
-    print("\n===== 模型信息 =====")
-    print(f"关节数: {model.njnt} | 控制维度: {model.nu} | 接触数: {data.ncon}")
+# ===================== 核心控制函数（仅微调适配原有模型） =====================
+def init_model_and_viewer():
+    """初始化模型（完全适配原有robot.xml，不修改模型）"""
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"未找到原有robot.xml文件: {MODEL_PATH}")
+    model = mujoco.MjModel.from_xml_path(MODEL_PATH)
+    data = mujoco.MjData(model)
+    mujoco.mj_resetData(model, data)
+    mujoco.mj_forward(model, data)
 
-    # 关键组件ID
-    ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-    obj_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "target_object")
-    print(f"末端位点ID: {ee_id} | 目标物体ID: {obj_id}")
+    # 初始化Viewer（微调视角，适配原有模型的显示）
+    viewer = mujoco_viewer.MujocoViewer(model, data, hide_menus=True)
+    viewer.cam.distance = 1.8  # 微调视角距离，看清原有模型
+    viewer.cam.elevation = 12  # 微调仰角，适配原有模型的高度
+    viewer.cam.azimuth = 50  # 微调方位角，看清物体位置
+    viewer.cam.lookat = [0.15, 0.0, 0.12]  # 适配原有模型的物体位置
 
-    # 关节名称
-    for i in range(min(5, model.njnt)):
-        jname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i)
-        print(f"关节{i}: {jname}")
-    print("====================\n")
-
-    if ee_id < 0 or obj_id < 0:
-        raise ValueError("模型缺少ee_site或target_object，请检查robot.xml")
-    return ee_id, obj_id
-
-
-def smooth_pid_control(error, error_integral, error_prev, max_output=8.0):
-    """平滑PID控制（积分限幅+输出限制）"""
-    p = KP * error
-    i = KI * np.clip(error_integral, -2.0, 2.0)
-    d = KD * (error - error_prev)
-    output = np.clip(p + i + d, -max_output, max_output)
-    return output, error_integral + error, error_prev
-
-
-def check_collision(model, data, ee_id, obj_id):
-    """检测末端与物体的碰撞"""
-    ee_pos = data.site_xpos[ee_id]
-    obj_pos = data.xpos[obj_id]
-    distance = np.linalg.norm(ee_pos - obj_pos)
-    return distance < COLLISION_THRESHOLD
-
-
-def get_smooth_target(current_pos, target_pos, progress):
-    """平滑轨迹插值（避免突变）"""
-    t = np.clip(progress, 0, 1)
-    smooth_t = t * t * (3 - 2 * t)  # 三次缓动
-    return current_pos + (target_pos - current_pos) * smooth_t
-
-
-def switch_camera(viewer, camera_name):
-    """切换相机视角（通用方法）"""
-    if viewer is None or not viewer.is_alive:
-        return
-    cfg = CAMERA_CONFIGS[camera_name]
-    viewer.cam.distance = cfg["distance"]
-    viewer.cam.elevation = cfg["elevation"]
-    viewer.cam.azimuth = cfg["azimuth"]
-    viewer.cam.lookat = np.array(cfg["lookat"])
-    print(f"📷 切换到{camera_name}视角")
-
-
-def safe_render(viewer):
-    """安全渲染（防止GLFW窗口不存在）"""
-    try:
-        if viewer and viewer.is_alive:
-            viewer.render()
-        return True
-    except Exception as e:
-        print(f"⚠️ 渲染警告: {e}")
-        return False
-
-
-# ===================== 核心抓取逻辑（稳定+丰富） =====================
-def grasp_simulation():
-    viewer = None
-    try:
-        # 1. 初始化模型
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"模型文件不存在: {MODEL_PATH}")
-
-        model = mujoco.MjModel.from_xml_path(MODEL_PATH)
-        data = mujoco.MjData(model)
-        mujoco.mj_step(model, data)  # 初始化data
-        ee_id, obj_id = validate_model(model, data)
-
-        # 2. 安全初始化Viewer
-        print("🔄 初始化仿真窗口...")
-        viewer = mujoco_viewer.MujocoViewer(model, data, hide_menus=True)
-        viewer._paused = False
-        switch_camera(viewer, "main")
-
-        # 3. 核心变量初始化
-        phase = GraspPhase.INIT
-        phase_step = 0
-        retry_count = 0
-        grasp_force = GRASP_FORCE_START
-        error_integral = np.zeros(3)
-        error_prev = np.zeros(3)
-        last_ee_pos = np.zeros(3)
-        current_camera = "main"
-        simulation_alive = True
-        target_positions = {
-            "object": np.array([0.35, 0.0, 0.12]),
-            "pre_grasp": np.array([0.35, 0.0, 0.20]),
-            "goal": np.array([-0.25, 0.0, 0.15]),
-            "pre_goal": np.array([-0.25, 0.0, 0.22]),
-            "home": np.array([0.0, 0.0, 0.25])
-        }
-
-        print("🚀 机械臂精细化抓取仿真启动！")
-        print("💡 操作提示：")
-        print("   - 空格：暂停/继续 | ESC：退出")
-        print("   - 视角会自动切换：主视角→俯视图→侧视图→主视角\n")
-
-        # 4. 主仿真循环
-        for step in range(SIMULATION_STEPS):
-            # 检查窗口是否存活
-            if viewer and not viewer.is_alive:
-                print("⚠️ 仿真窗口已关闭，结束仿真")
-                simulation_alive = False
+    # 兼容原有模型的ID命名（不修改模型，仅适配识别）
+    ee_id = -1
+    obj_id = -1
+    # 尝试所有可能的末端命名（适配原有模型）
+    for name in ["ee_site", "ee", "end_effector"]:
+        ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, name)
+        if ee_id >= 0:
+            break
+    if ee_id < 0:
+        for name in ["ee", "end_effector"]:
+            ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+            if ee_id >= 0:
+                break
+    # 尝试所有可能的物体命名（适配原有模型）
+    for name in ["target_object", "object", "ball"]:
+        obj_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
+        if obj_id >= 0:
+            break
+    if obj_id < 0:
+        for name in ["object_geom", "ball_geom"]:
+            obj_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            if obj_id >= 0:
                 break
 
-            # 自动切换视角
-            if step in CAMERA_SWITCH_STEPS and CAMERA_SWITCH_STEPS[step] != current_camera:
-                current_camera = CAMERA_SWITCH_STEPS[step]
-                switch_camera(viewer, current_camera)
+    print("✅ 适配原有robot.xml完成！")
+    print("🎮 操作指南（适配原有模型）：")
+    print("   W/S：前后移动   A/D：左右移动   Q/E：上下移动（低速易控）")
+    print("   空格：抓取      R：释放        Z：一键自动抓取（适配原有模型）")
+    print("   C：重置        ESC：退出")
 
-            # 获取当前状态
-            ee_pos = data.site_xpos[ee_id].copy() if ee_id >= 0 else np.zeros(3)
-            obj_pos = data.xpos[obj_id].copy() if obj_id >= 0 else np.zeros(3)
-            joint_pos = data.qpos[:3].copy() if model.njnt >= 3 else np.zeros(3)
+    return model, data, viewer, ee_id, obj_id
 
-            # ---------------- 阶段逻辑 ----------------
-            if phase == GraspPhase.INIT:
-                target = target_positions["home"]
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
-                data.ctrl[3:5] = [0.0, 0.0]  # 夹爪打开
 
-                if np.linalg.norm(error) < 0.02 and phase_step > 500:
-                    phase = GraspPhase.APPROACH
-                    phase_step = 0
-                    print(f"[{step}] 初始化完成 → 进入接近阶段")
-                phase_step += 1
+def manual_control(model, data, ee_id):
+    """手动控制（仅微调参数，适配原有模型的关节响应）"""
+    # 安全获取末端位置（适配原有模型）
+    ee_pos = np.array([0.0, 0.0, 0.1])
+    if ee_id >= 0:
+        try:
+            ee_pos = data.site_xpos[ee_id].copy()
+        except:
+            ee_pos = data.xpos[ee_id].copy()
 
-            elif phase == GraspPhase.APPROACH:
-                if phase_step < 1000:
-                    target = get_smooth_target(last_ee_pos, target_positions["pre_grasp"], phase_step / 1000)
-                else:
-                    target = get_smooth_target(target_positions["pre_grasp"], target_positions["object"],
-                                               (phase_step - 1000) / 800)
+    # 计算目标位置（微调速度，适配原有模型）
+    target_pos = ee_pos.copy()
+    target_pos[0] += control_cmd['forward'] * MANUAL_SPEED
+    target_pos[0] -= control_cmd['backward'] * MANUAL_SPEED
+    target_pos[1] += control_cmd['left'] * MANUAL_SPEED
+    target_pos[1] -= control_cmd['right'] * MANUAL_SPEED
+    target_pos[2] += control_cmd['up'] * MANUAL_SPEED
+    target_pos[2] -= control_cmd['down'] * MANUAL_SPEED
 
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
+    # 微调控制增益（适配原有模型的关节传动比，避免转圈）
+    error = target_pos - ee_pos
+    gain = 4.0  # 微调增益，适配原有模型的关节灵敏度
+    for i in range(min(3, model.njnt)):
+        # 更严格的输出限制，彻底避免转圈
+        data.ctrl[i] = np.clip(error[i] * gain, -1.8, 1.8)
 
-                if phase_step > 1800 and np.linalg.norm(error) < 0.015:
-                    phase = GraspPhase.ALIGN
-                    phase_step = 0
-                    print(f"[{step}] 接近完成 → 进入姿态对齐阶段")
-                phase_step += 1
-                last_ee_pos = ee_pos.copy()
+    # 抓取控制（微调力度，适配原有夹爪）
+    if control_cmd['grasp']:
+        # 适配原有模型的夹爪控制维度
+        if model.nu >= 4:
+            data.ctrl[3] = GRASP_FORCE
+        if model.nu >= 5:
+            data.ctrl[4] = -GRASP_FORCE
+    elif control_cmd['release']:
+        if model.nu >= 4:
+            data.ctrl[3] = 0.0
+        if model.nu >= 5:
+            data.ctrl[4] = 0.0
 
-            elif phase == GraspPhase.ALIGN:
-                target_joints = np.array([0.45, -0.55, 0.2])
-                joint_error = target_joints - joint_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        joint_error[i], error_integral[i], error_prev[i], max_output=4.0
-                    )
 
-                if check_collision(model, data, ee_id, obj_id) and phase_step > 600:
-                    phase = GraspPhase.GRASP
-                    phase_step = 0
-                    print(f"[{step}] 姿态对齐完成 → 进入抓取阶段")
-                elif phase_step > 1500:
-                    retry_count += 1
-                    if retry_count <= RETRY_MAX:
-                        phase = GraspPhase.RETRY
-                        phase_step = 0
-                        print(f"[{step}] 对齐超时 → 重试（{retry_count}/{RETRY_MAX}）")
-                    else:
-                        print(f"[{step}] 重试次数用尽 → 抓取失败")
-                        simulation_alive = False
-                        break
-                phase_step += 1
+def auto_grasp(model, data, ee_id, obj_id):
+    """一键自动抓取（仅微调轨迹，适配原有模型的物体位置）"""
+    print("🔄 开始适配原有模型的一键自动抓取...")
+    # 安全获取物体位置（适配原有模型）
+    obj_pos = np.array([0.2, 0.0, 0.05])  # 适配原有模型的默认物体位置
+    if obj_id >= 0:
+        try:
+            obj_pos = data.xpos[obj_id].copy()
+        except:
+            pass
 
-            elif phase == GraspPhase.GRASP:
-                target = target_positions["object"]
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
+    # 阶段1：移动到物体上方（微调距离，适配原有模型）
+    step = 0
+    while step < 600 and viewer.is_alive:  # 增加窗口存活检测
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [0, 0, 0.07]  # 微调高度，适配原有模型
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.5, -1.2, 1.2)
+        mujoco.mj_step(model, data)
+        viewer.render()  # 自动抓取时也渲染，避免窗口卡死
+        step += 1
 
-                if phase_step < GRASP_RAMP_STEPS:
-                    grasp_force = GRASP_FORCE_MAX * (phase_step / GRASP_RAMP_STEPS)
-                    data.ctrl[3] = grasp_force
-                    data.ctrl[4] = -grasp_force
-                else:
-                    data.ctrl[3] = GRASP_FORCE_MAX
-                    data.ctrl[4] = -GRASP_FORCE_MAX
-                    if phase_step > GRASP_RAMP_STEPS + 500:
-                        phase = GraspPhase.LIFT
-                        phase_step = 0
-                        print(f"[{step}] 抓取完成 → 进入抬升阶段")
-                phase_step += 1
+    # 阶段2：下降抓取（微调力度，适配原有夹爪）
+    step = 0
+    while step < 400 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 2.8, -1.0, 1.0)
+        # 适配原有模型的夹爪控制
+        if model.nu >= 4:
+            data.ctrl[3] = GRASP_FORCE
+        if model.nu >= 5:
+            data.ctrl[4] = -GRASP_FORCE
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-            elif phase == GraspPhase.LIFT:
-                lift_target = target_positions["object"] + np.array([0, 0, 0.15])
-                target = get_smooth_target(ee_pos, lift_target, phase_step / 800)
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i], max_output=5.0
-                    )
+    # 阶段3：抬升（微调高度，适配原有模型）
+    step = 0
+    while step < 450 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [0, 0, AUTO_LIFT_HEIGHT]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.2, -1.1, 1.1)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-                data.ctrl[3] = GRASP_FORCE_MAX * 0.8
-                data.ctrl[4] = -GRASP_FORCE_MAX * 0.8
+    # 阶段4：搬运（微调距离，适配原有模型）
+    step = 0
+    while step < 700 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [AUTO_TRANSPORT_X, 0, AUTO_LIFT_HEIGHT]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.5, -1.2, 1.2)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-                if phase_step > 800 and np.linalg.norm(ee_pos - lift_target) < 0.01:
-                    phase = GraspPhase.TRANSPORT
-                    phase_step = 0
-                    print(f"[{step}] 抬升完成 → 进入搬运阶段")
-                phase_step += 1
+    # 阶段5：下放释放（适配原有模型）
+    step = 0
+    while step < 450 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = obj_pos + [AUTO_TRANSPORT_X, 0, 0.04]  # 微调下放高度
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 2.8, -1.0, 1.0)
+        # 延迟释放，适配原有模型
+        if step > 250:
+            if model.nu >= 4:
+                data.ctrl[3] = 0.0
+            if model.nu >= 5:
+                data.ctrl[4] = 0.0
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-            elif phase == GraspPhase.TRANSPORT:
-                if phase_step < 1500:
-                    target = get_smooth_target(ee_pos, target_positions["pre_goal"], phase_step / 1500)
-                else:
-                    target = get_smooth_target(target_positions["pre_goal"], target_positions["goal"],
-                                               (phase_step - 1500) / 1000)
+    # 阶段6：归位（适配原有模型的初始位置）
+    step = 0
+    while step < 600 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1])
+        if ee_id >= 0:
+            try:
+                ee_pos = data.site_xpos[ee_id].copy()
+            except:
+                ee_pos = data.xpos[ee_id].copy()
+        target = np.array([0.0, 0.0, 0.12])  # 微调归位位置
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = np.clip(error[i] * 3.5, -1.2, 1.2)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
+    print("🎉 适配原有模型的自动抓取完成！")
 
-                data.ctrl[3] = GRASP_FORCE_MAX * 0.7
-                data.ctrl[4] = -GRASP_FORCE_MAX * 0.7
 
-                if phase_step > 2500 and np.linalg.norm(error) < 0.02:
-                    phase = GraspPhase.LOWER
-                    phase_step = 0
-                    print(f"[{step}] 搬运完成 → 进入下放阶段")
-                phase_step += 1
+# ===================== 主程序（修复后版本） =====================
+def main():
+    global viewer  # 声明全局变量，让auto_grasp能访问
+    model, data, viewer, ee_id, obj_id = init_model_and_viewer()
 
-            elif phase == GraspPhase.LOWER:
-                lower_target = target_positions["goal"] - np.array([0, 0, 0.05])
-                target = get_smooth_target(ee_pos, lower_target, phase_step / 800)
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i], max_output=3.0
-                    )
+    try:
+        while viewer.is_alive:
+            # 核心修复：用兼容版按键检测替代get_key()
+            check_keyboard_input(viewer)
 
-                data.ctrl[3] = GRASP_FORCE_MAX * 0.5
-                data.ctrl[4] = -GRASP_FORCE_MAX * 0.5
+            # 执行控制（适配原有模型）
+            if control_cmd['reset']:
+                mujoco.mj_resetData(model, data)
+                mujoco.mj_forward(model, data)
+                print("🔄 原有模型已重置到初始状态！")
+                control_cmd['reset'] = False
+            elif control_cmd['auto']:
+                auto_grasp(model, data, ee_id, obj_id)
+                control_cmd['auto'] = False
+            else:
+                manual_control(model, data, ee_id)
 
-                if phase_step > 800 and np.linalg.norm(error) < 0.01:
-                    phase = GraspPhase.RELEASE
-                    phase_step = 0
-                    print(f"[{step}] 下放完成 → 进入释放阶段")
-                phase_step += 1
-
-            elif phase == GraspPhase.RELEASE:
-                target = lower_target
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
-
-                if phase_step < RELEASE_RAMP_STEPS:
-                    release_force = GRASP_FORCE_MAX * 0.5 * (1 - phase_step / RELEASE_RAMP_STEPS)
-                    data.ctrl[3] = release_force
-                    data.ctrl[4] = -release_force
-                else:
-                    data.ctrl[3:5] = [0.0, 0.0]
-
-                if phase_step > RELEASE_RAMP_STEPS + 500:
-                    phase = GraspPhase.RETURN
-                    phase_step = 0
-                    print(f"[{step}] 释放完成 → 进入归位阶段")
-                phase_step += 1
-
-            elif phase == GraspPhase.RETURN:
-                if phase_step < 600:
-                    target = lower_target + np.array([0, 0, 0.2])
-                else:
-                    target = get_smooth_target(ee_pos, target_positions["home"], (phase_step - 600) / 1000)
-
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
-
-                if phase_step > 1600 and np.linalg.norm(error) < 0.02:
-                    phase = GraspPhase.SUCCESS
-                    print(f"[{step}] 归位完成 → 抓取成功！")
-                phase_step += 1
-
-            elif phase == GraspPhase.RETRY:
-                target = target_positions["home"]
-                error = target - ee_pos
-                for i in range(min(3, model.njnt)):
-                    data.ctrl[i], error_integral[i], error_prev[i] = smooth_pid_control(
-                        error[i], error_integral[i], error_prev[i]
-                    )
-                data.ctrl[3:5] = [0.0, 0.0]
-
-                if phase_step > 1000 and np.linalg.norm(error) < 0.02:
-                    phase = GraspPhase.APPROACH
-                    phase_step = 0
-                phase_step += 1
-
-            # 终止条件
-            if phase == GraspPhase.SUCCESS or not simulation_alive:
-                break
-
-            # 运行仿真步
+            # 仿真步进（微调延迟，适配原有模型的帧率）
             mujoco.mj_step(model, data)
-
-            # 安全渲染
-            if step % RENDER_INTERVAL == 0:
-                safe_render(viewer)
-            time.sleep(FRAME_DELAY)
+            viewer.render()
+            time.sleep(0.004)  # 微调延迟，适配原有模型的流畅度
 
     except Exception as e:
-        print(f"\n❌ 仿真出错: {type(e).__name__}: {e}")
-        traceback.print_exc()
+        print(f"\n❌ 运行出错（适配原有模型时）: {e}")
+        import traceback
+        traceback.print_exc()  # 打印详细错误栈，方便排查
     finally:
-        # 安全关闭Viewer
         with suppress(Exception):
-            if viewer and viewer.is_alive:
-                viewer.close()
-        print("\n🔚 仿真已安全结束")
-
-    # ===================== 结果可视化（无警告） =====================
-    print("\n🎉 仿真结束！生成抓取分析报告...")
-    # 切换回交互后端显示图片
-    mpl.use('TkAgg')
-    import matplotlib.pyplot as plt  # 重新导入确保后端生效
-
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
-
-    # 1. 末端执行器轨迹
-    ax1.plot([0.35, -0.25], [0.20, 0.22], 'b--', label='搬运轨迹', linewidth=2, alpha=0.7)
-    ax1.scatter(0.35, 0.12, c='red', s=80, label='抓取点', zorder=5)
-    ax1.scatter(-0.25, 0.15, c='green', s=80, label='放置点', zorder=5)
-    ax1.set_xlabel('X 位置 (m)')
-    ax1.set_ylabel('Z 位置 (m)')
-    ax1.set_title('机械臂末端执行器轨迹', fontsize=12)
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-
-    # 2. 夹爪力度变化
-    grasp_steps = np.linspace(0, GRASP_RAMP_STEPS, 100)
-    grasp_forces = GRASP_FORCE_MAX * (grasp_steps / GRASP_RAMP_STEPS)
-    ax2.plot(grasp_steps, grasp_forces, 'orange', label='抓取力度上升', linewidth=2)
-    release_steps = np.linspace(0, RELEASE_RAMP_STEPS, 100)
-    release_forces = GRASP_FORCE_MAX * 0.5 * (1 - release_steps / RELEASE_RAMP_STEPS)
-    ax2.plot(release_steps + GRASP_RAMP_STEPS + 500, release_forces, 'red', label='释放力度下降', linewidth=2)
-    ax2.set_xlabel('仿真步数')
-    ax2.set_ylabel('夹爪力度 (N)')
-    ax2.set_title('夹爪力度变化曲线', fontsize=12)
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-
-    # 3. 阶段耗时统计
-    phases = ['初始化', '接近', '对齐', '抓取', '抬升', '搬运', '下放', '释放', '归位']
-    phase_times = [500, 1800, 600, 1300, 800, 2500, 800, 1000, 1600]
-    ax3.bar(phases, phase_times, color=['lightgray', 'lightblue', 'skyblue', 'orange',
-                                        'lightgreen', 'royalblue', 'lightpink', 'red', 'gray'])
-    ax3.set_xlabel('抓取阶段')
-    ax3.set_ylabel('耗时步数')
-    ax3.set_title('各阶段耗时统计', fontsize=12)
-    ax3.tick_params(axis='x', rotation=45)
-
-    # 4. 抓取成功率
-    success_rate = 90 if phase == GraspPhase.SUCCESS else 0
-    ax4.pie([success_rate, 100 - success_rate], labels=['成功', '失败'], autopct='%1.1f%%',
-            colors=['green', 'red'], startangle=90)
-    ax4.set_title('抓取成功率', fontsize=12)
-
-    plt.tight_layout()
-    # 保存图片时消除sRGB警告
-    plt.savefig(os.path.join(CURRENT_DIR, "grasp_analysis_report.png"),
-                dpi=150, bbox_inches='tight', format='png',
-                pil_kwargs={"optimize": True})
-    plt.show()
+            viewer.close()
+        print("\n🔚 程序退出（未修改任何robot.xml内容）")
 
 
 # ===================== 运行入口 =====================
 if __name__ == "__main__":
-    # 检查依赖
+    # 检查依赖（新增glfw检查）
     try:
         import mujoco
         import mujoco_viewer
-    except ImportError:
-        print("❌ 缺少依赖！执行：pip install mujoco mujoco-viewer numpy matplotlib pillow")
+        import glfw
+    except ImportError as e:
+        missing_lib = str(e).split()[-1]
+        print(f"❌ 缺少依赖 {missing_lib}！执行以下命令安装：")
+        print(f"   pip install mujoco mujoco-viewer glfw numpy matplotlib")
         exit(1)
 
-    # 运行仿真
-    grasp_simulation()
+    main()
