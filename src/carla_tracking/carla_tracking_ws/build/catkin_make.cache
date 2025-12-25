@@ -1,0 +1,2 @@
+carla_tracking
+-DCATKIN_DEVEL_PREFIX=/home/sq/carla_tracking_ws/devel -DCMAKE_INSTALL_PREFIX=/home/sq/carla_tracking_ws/install -G Unix Makefiles

@@ -1,0 +1,44 @@
+{
+    "carla": {
+        "host": "localhost",
+        "port": 2000,
+        "timeout": 10.0,
+        "sync_mode": true,
+        "fixed_delta_seconds": 0.05
+    },
+    "detection": {
+        "conf_thres": 0.15,
+        "iou_thres": 0.4,
+        "model_type": "yolov5m",
+        "device": "cuda"
+    },
+    "tracking": {
+        "max_age": 30,
+        "min_hits": 3,
+        "iou_threshold": 0.3,
+        "use_acceleration": true,
+        "use_adaptive_threshold": true,
+        "depth_aware": true,
+        "min_confidence": 0.1
+    },
+    "vehicle": {
+        "max_speed": 50.0,
+        "target_speed": 30.0,
+        "safety_distance": 15.0,
+        "enable_physics": true
+    },
+    "npc": {
+        "count": 20,
+        "min_distance": 20.0
+    },
+    "camera": {
+        "width": 800,
+        "height": 600,
+        "fov": 90
+    },
+    "performance": {
+        "show_panel": true,
+        "log_interval": 100,
+        "max_fps": 30
+    }
+}
