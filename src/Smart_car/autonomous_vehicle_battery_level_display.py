@@ -118,7 +118,7 @@ def main():
             battery.read_battery_voltage()  # 步骤1：读取电池实时电压
             battery.calculate_battery_percent()  # 步骤2：计算剩余电量百分比
             battery.display_battery_info()  # 步骤3：可视化展示电池状态
-            time.sleep(1)  # 设置刷新间隔为1秒，可根据需求调整
+            time.sleep(1)
     except KeyboardInterrupt:
         # 捕获Ctrl+C中断信号，友好退出程序
         print("\n监控系统已正常退出")
