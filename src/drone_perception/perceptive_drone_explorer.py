@@ -31,6 +31,7 @@ import random
 import psutil
 import os
 import gc
+import platform
 
 # 导入PIL用于中文文本绘制
 try:
@@ -1504,8 +1505,8 @@ class FrontViewWindow:
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, self.window_width, self.window_height)
 
-        wait_img = np.zeros((300, 400, 3), dtype=np.uint8)
-        wait_img = put_chinese_text(wait_img, "等待无人机图像...", (50, 150), 24, (255, 255, 255), 2)
+        # 等待画面：只显示黑色背景，不显示任何文字
+        wait_img = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
         cv2.imshow(self.window_name, wait_img)
         cv2.waitKey(100)
 
@@ -1541,14 +1542,11 @@ class FrontViewWindow:
                 pass
 
             if display_image is not None:
-                if self.show_info:
-                    display_image = self._add_info_overlay(display_image, info, manual_info)
-
+                # 前视窗口只显示纯图像，不添加任何信息叠加
                 cv2.imshow(self.window_name, display_image)
             elif self.paused:
-                blank = np.zeros((300, 400, 3), dtype=np.uint8)
-                cv2.putText(blank, "PAUSED", (120, 150),
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 3)
+                # 暂停时也显示黑色背景，不显示任何文字
+                blank = np.zeros((self.window_height, self.window_width, 3), dtype=np.uint8)
                 cv2.imshow(self.window_name, blank)
 
             key = cv2.waitKey(config.DISPLAY['FRONT_VIEW_WINDOW'].get('REFRESH_RATE_MS', 30)) & 0xFF
@@ -1632,62 +1630,9 @@ class FrontViewWindow:
             self.display_stats['last_update'] = now
 
     def _add_info_overlay(self, image: np.ndarray, info: Dict, manual_info: List[str] = None) -> np.ndarray:
-        if image is None or image.size == 0:
-            return image
-
-        try:
-            overlay = image.copy()
-            height, width = image.shape[:2]
-
-            is_manual = info.get('state', '') == "手动控制"
-
-            info_height = 180 if is_manual and manual_info else 100
-
-            cv2.rectangle(overlay, (0, 0), (width, info_height), (0, 0, 0), -1)
-            cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
-
-            state = info.get('state', 'UNKNOWN')
-            state_color = (0, 255, 0) if '探索' in state else (0, 255, 255) if '悬停' in state else (255, 255, 0) if '手动' in state else (0, 0, 255)
-            image = put_chinese_text(image, f"状态: {state}", (10, 30), 21, state_color, 2)
-
-            pos = info.get('position', (0, 0, 0))
-            image = put_chinese_text(image, f"位置: ({pos[0]:.1f}, {pos[1]:.1f}, {-pos[2]:.1f}m)", (10, 60), 18, (255, 255, 255), 1)
-
-            red_objects_count = info.get('red_objects_count', 0)
-            red_objects_visited = info.get('red_objects_visited', 0)
-            blue_objects_count = info.get('blue_objects_count', 0)
-            blue_objects_visited = info.get('blue_objects_visited', 0)
-            black_objects_count = info.get('black_objects_count', 0)
-            black_objects_visited = info.get('black_objects_visited', 0)
-
-            if red_objects_count > 0 or blue_objects_count > 0 or black_objects_count > 0:
-                red_text = f"红色物体: {red_objects_visited}/{red_objects_count}"
-                blue_text = f"蓝色物体: {blue_objects_visited}/{blue_objects_count}"
-                black_text = f"黑色物体: {black_objects_visited}/{black_objects_count}"
-                image = put_chinese_text(image, red_text, (10, 90), 18, (0, 100, 255), 2)
-                image = put_chinese_text(image, blue_text, (10, 110), 18, (255, 100, 0), 2)
-                image = put_chinese_text(image, black_text, (10, 130), 18, (128, 128, 128), 2)
-
-            if is_manual and manual_info:
-                y_start = 170 if (red_objects_count > 0 or blue_objects_count > 0 or black_objects_count > 0) else 100
-                for i, line in enumerate(manual_info):
-                    y_pos = y_start + i * 20
-                    image = put_chinese_text(image, line, (10, y_pos), 15, (200, 255, 200), 1)
-
-                image = put_chinese_text(image, "手动控制中...", (width - 150, 60), 18, (255, 255, 0), 1)
-            elif not is_manual and red_objects_count == 0 and blue_objects_count == 0 and black_objects_count == 0:
-                obs_dist = info.get('obstacle_distance', 0.0)
-                obs_color = (0, 0, 255) if obs_dist < 5.0 else (0, 165, 255) if obs_dist < 10.0 else (0, 255, 0)
-                image = put_chinese_text(image, f"障碍: {obs_dist:.1f}m", (10, 90), 21, obs_color, 2)
-
-            fps_text = f"FPS: {self.display_stats['fps']:.1f}"
-            cv2.putText(image, fps_text, (width - 120, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-
-            return image
-        except Exception as e:
-            print(f"⚠️ 添加信息叠加层出错: {e}")
-            return image
+        """前视窗口不再显示任何信息叠加，只显示纯图像"""
+        # 直接返回原始图像，不添加任何文字或叠加层
+        return image
 
     def _save_screenshot(self, image: Optional[np.ndarray]):
         if image is not None and image.size > 0:
@@ -1964,7 +1909,18 @@ class InfoDisplayWindow:
                 img = put_chinese_text(img, f"循环时间: {loop_time:.1f}ms", (x_offset, y_offset), 18, loop_color, 1)
                 y_offset += 25
 
-            # 7. 探索网格图像（右侧）
+            # 7. 手动控制信息（如果处于手动控制模式）
+            if 'manual_info' in info_data and info_data['manual_info']:
+                y_offset += 10  # 添加一些间距
+                manual_title = "手动控制信息:"
+                img = put_chinese_text(img, manual_title, (x_offset, y_offset), 18, highlight_color, 2)
+                y_offset += 25
+                
+                for line in info_data['manual_info']:
+                    img = put_chinese_text(img, line, (x_offset + 10, y_offset), 16, text_color, 1)
+                    y_offset += 22
+
+            # 8. 探索网格图像（右侧）
             if self.display_config['SHOW_GRID'] and 'grid_image' in info_data:
                 grid_img = info_data['grid_image']
                 if grid_img is not None and grid_img.size > 0:
@@ -2017,13 +1973,13 @@ class InfoDisplayWindow:
                     # 将网格图像放到主图像上
                     img[grid_y:grid_y+grid_size, grid_x:grid_x+grid_size] = grid_resized
 
-            # 8. 时间戳
+            # 9. 时间戳
             if 'timestamp' in info_data:
                 timestamp = info_data['timestamp']
                 time_text = f"更新时间: {timestamp}"
                 img = put_chinese_text(img, time_text, (self.window_width - 200, self.window_height - 10), 15, text_color, 1)
 
-            # 9. 底部提示
+            # 10. 底部提示
             hint_text = "按 Q 或 ESC 关闭窗口"
             img = put_chinese_text(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30), 15, text_color, 1)
 
@@ -2289,6 +2245,11 @@ class PerceptiveExplorer:
             if any('\u4e00' <= char <= '\u9fff' for char in state_value):
                 state_value = _translate_to_english(state_value)
             
+            # 获取手动控制信息
+            manual_info = None
+            if self.state == FlightState.MANUAL:
+                manual_info = self._get_manual_control_info()
+            
             info_data = {
                 'timestamp': datetime.now().strftime("%H:%M:%S"),
                 'state': state_value,
@@ -2318,7 +2279,8 @@ class PerceptiveExplorer:
                     'cpu_usage': cpu_usage,
                     'memory_usage': memory_usage,
                     'loop_time': self.stats.get('average_loop_time', 0)
-                }
+                },
+                'manual_info': manual_info  # 添加手动控制信息
             }
 
             # 添加网格图像
@@ -3440,6 +3402,18 @@ class PerceptiveExplorer:
                         self._check_red_object_proximity(current_pos)
                         self._check_blue_object_proximity(current_pos)
                         self._check_black_object_proximity(current_pos)
+                        
+                        # 更新信息窗口（手动控制模式下）
+                        if current_time - last_image_time >= 0.1 and self.info_window:
+                            # 创建一个简化的感知结果用于信息窗口更新
+                            simple_perception = PerceptionResult()
+                            simple_perception.obstacle_distance = 100.0
+                            simple_perception.open_space_score = 1.0
+                            simple_perception.has_obstacle = False
+                            simple_perception.red_objects_count = len(self.red_objects)
+                            simple_perception.blue_objects_count = len(self.blue_objects)
+                            simple_perception.black_objects_count = len(self.black_objects)
+                            self._update_info_window(simple_perception)
                     except:
                         pass
 
