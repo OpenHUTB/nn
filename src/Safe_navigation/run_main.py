@@ -240,7 +240,7 @@ class AirSimNHCarSimulator:
             print(f"获取GPS数据失败: {e}")
             return None
 
-    def manual_control_demo(self, duration=20):  # 增加总时长到20秒
+    def manual_control_demo(self, duration=20):
         """
         手动控制演示：前进、转向、停止
 
@@ -256,6 +256,9 @@ class AirSimNHCarSimulator:
 
         start_time = time.time()
         sequence = 0
+
+        # 添加初始控制变量，避免未定义错误
+        controls = airsim.CarControls()
 
         # 添加速度监控
         current_speed = 0
@@ -388,7 +391,9 @@ class AirSimNHCarSimulator:
                           f"距离: {distance:6.1f} m", end="")
 
                 # 采集传感器数据（每0.3秒采集一次）
-                if elapsed % 0.3 < 0.05:
+                # 使用计数器替代浮点数取模，避免浮点精度问题
+                frame_counter = int(elapsed * 10)  # 10Hz循环
+                if frame_counter % 3 == 0:  # 每3帧采集一次 = 0.3秒
                     self.capture_camera_images(["front"])
                     self.get_imu_data()
                     self.get_gps_data()
