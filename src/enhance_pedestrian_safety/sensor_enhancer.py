@@ -778,6 +778,60 @@ class SensorDataEnhancer:
 
         return report
 
+    def _add_pedestrian_detection_markers(self, image: np.ndarray, pedestrians: List[Dict]) -> np.ndarray:
+        """添加行人检测标记"""
+        if not pedestrians:
+            return image
+
+        # 创建副本
+        marked_image = image.copy()
+
+        for pedestrian in pedestrians:
+            # 模拟行人检测框
+            x = random.randint(100, image.shape[1] - 100)
+            y = random.randint(100, image.shape[0] - 100)
+            width = random.randint(30, 80)
+            height = random.randint(80, 180)
+
+            # 绘制检测框
+            color = (0, 255, 0)  # 绿色表示安全
+            thickness = 2
+
+            cv2.rectangle(marked_image, (x, y), (x + width, y + height), color, thickness)
+
+            # 添加标签
+            label = f"Pedestrian {pedestrian.get('distance', 0):.1f}m"
+            cv2.putText(marked_image, label, (x, y - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
+
+        return marked_image
+
+    def _simulate_safety_warnings(self, image: np.ndarray, warnings: List[Dict]) -> np.ndarray:
+        """模拟安全警告"""
+        if not warnings:
+            return image
+
+        warning_image = image.copy()
+
+        for warning in warnings[:2]:  # 最多显示2个警告
+            # 添加警告文本
+            text = f"WARNING: {warning.get('type', 'Pedestrian')} {warning.get('distance', 0):.1f}m"
+            color = (0, 0, 255)  # 红色表示警告
+            thickness = 2
+
+            position = (50, 50 + warnings.index(warning) * 40)
+            cv2.putText(warning_image, text, position,
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, thickness)
+
+            # 添加警告图标
+            icon_size = 30
+            icon_position = (position[0] - icon_size - 10, position[1] - icon_size // 2)
+            cv2.rectangle(warning_image, icon_position,
+                          (icon_position[0] + icon_size, icon_position[1] + icon_size),
+                          color, -1)  # 填充红色矩形
+
+        return warning_image
+
 
 # 保持向后兼容的类
 class SensorCalibrator:
