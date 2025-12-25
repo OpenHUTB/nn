@@ -1,618 +1,143 @@
+"""
+main.py - CARLA Multi-Object Tracking System
+Enhanced version: Color ID encoding + Independent statistics window
+"""
+
+import sys
+import os
+import time
 import argparse
-import carla
-import queue
-import random
 import cv2
 import numpy as np
-import time
-import os
-import sys
-import yaml
-import threading
+import carla
 import torch
-import csv
-import open3d as o3d
+import queue
 import psutil
-from ultralytics import YOLO
-from dataclasses import dataclass
-from scipy.optimize import linear_sum_assignment
-from datetime import datetime
-from numba import njit
-from loguru import logger
-from sklearn.cluster import DBSCAN
 
-# ======================== 通用工具函数 ========================
-def valid_img(img): 
-    return img is not None and len(img.shape)==3 and img.shape[2]==3 and img.size>0
+# Add current directory to path to ensure modules can be imported
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def clip_box(bbox, img_shape):
-    h,w = img_shape
-    return np.array([
-        max(0,min(bbox[0],w-1)),
-        max(0,min(bbox[1],h-1)),
-        max(bbox[0]+1,min(bbox[2],w-1)),
-        max(bbox[1]+1,min(bbox[3],h-1))
-    ], dtype=np.float32)
+# Import custom modules
+try:
+    import utils
+    import sensors
+    import tracker
+    from loguru import logger
+except ImportError as e:
+    print(f"[ERROR] Import module failed: {e}")
+    print("Please ensure the following files are in the same directory:")
+    print("  - utils.py")
+    print("  - sensors.py")
+    print("  - tracker.py")
+    sys.exit(1)
 
-def make_div(x, d=32): 
-    return (x + d -1) // d * d
+# ======================== Configuration Management ========================
 
-# ======================== 常量配置 ========================
-PLATFORM, IS_WIN, IS_LINUX = sys.platform, sys.platform.startswith('win'), sys.platform.startswith('linux')
-WEATHER = {
-    'clear':carla.WeatherParameters(0.0,0.0,0.0,0.0,180.0,75.0,0.0,0.0,1.0,0.0,0.0),
-    'rain':carla.WeatherParameters(80.0,80.0,50.0,30.0,180.0,45.0,20.0,50.0,0.8,80.0,0.5),
-    'fog':carla.WeatherParameters(90.0,0.0,0.0,10.0,180.0,30.0,70.0,20.0,0.5,10.0,0.8),
-    'night':carla.WeatherParameters(20.0,0.0,0.0,0.0,0.0,-90.0,10.0,100.0,0.7,0.0,1.0),
-    'cloudy':carla.WeatherParameters(90.0,0.0,0.0,20.0,180.0,60.0,10.0,100.0,0.9,0.0,0.3),
-    'snow':carla.WeatherParameters(90.0,90.0,80.0,40.0,180.0,20.0,30.0,30.0,0.6,50.0,0.7)
-}
-VEHICLE_CLS = {2:"Car",5:"Bus",7:"Truck",-1:"Unknown"}
-
-# ======================== 配置类 ========================
-@dataclass
-class Config:
-    host, port, num_npcs = "localhost", 2000, 20
-    img_width, img_height = 640, 480
-    conf_thres, iou_thres, max_age, min_hits = 0.5, 0.3, 5, 3
-    yolo_model, yolo_imgsz_max, yolo_iou, yolo_quantize = "yolov8n.pt", 320, 0.45, False
-    kf_dt, max_speed = 0.05, 50.0
-    window_width, window_height, smooth_alpha, fps_window_size, display_fps = 1280,720,0.2,15,30
-    track_history_len, track_line_width, track_alpha = 20,2,0.6
-    stop_speed_thresh, stop_frames_thresh = 1.0,5
-    overtake_speed_ratio, overtake_dist_thresh = 1.5,50.0
-    lane_change_thresh, brake_accel_thresh, turn_angle_thresh, danger_dist_thresh, predict_frames = 0.5,2.0,15.0,10.0,10
-    default_weather, auto_adjust_detection = "clear", True
-    use_lidar, lidar_channels, lidar_range, lidar_points_per_second, fuse_lidar_vision = True,32,100.0,500000,True
-    record_data, record_dir, record_format, record_fps, save_screenshots = True,"track_records","csv",10,False
-    use_3d_visualization, pcd_view_size = True,800
-
-    @classmethod
-    def from_yaml(cls, p=None):
-        try:
-            p = p or os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
-            if not os.path.exists(p): return cls()
-            with open(p, "r", encoding="utf-8") as f: data = yaml.safe_load(f.read().strip().replace("\t","  "))
-            if not isinstance(data, dict): return cls()
-            valid_keys = set(cls.__dataclass_fields__.keys())
-            data = {k:v for k,v in data.items() if k in valid_keys}
-            for k,v in data.items():
-                try: data[k] = cls.__dataclass_fields__[k].type(v)
-                except: del data[k]
-            return cls(**data)
-        except: return cls()
-
-# ======================== 天气图像增强 ========================
-class WeatherEnhancer:
-    def __init__(self, cfg):
-        self.cfg = cfg; self.weather = "clear"
-        self.params = {
-            'clear':{'b':1.0,'c':1.0,'g':1.0},
-            'rain':{'b':1.1,'c':1.2,'g':0.9,'dh':True,'dr':True},
-            'fog':{'b':1.3,'c':1.4,'g':0.8,'dh':True},
-            'night':{'b':1.5,'c':1.3,'g':0.7,'dn':True},
-            'cloudy':{'b':1.2,'c':1.1,'g':1.0},
-            'snow':{'b':1.1,'c':1.3,'g':0.9,'dh':True,'ds':True}
-        }
-    def set_weather(self, w):
-        if w in WEATHER: self.weather = w
-    def enhance(self, img):
-        if not self.cfg.auto_adjust_detection or not valid_img(img): return img
-        p = self.params.get(self.weather, self.params['clear'])
-        enh = cv2.convertScaleAbs(img.copy(), alpha=p['c'], beta=int(p['b']*255-255))
-        g = p['g']; inv_g = 1.0/g
-        g_table = np.array([((i/255.0)**inv_g)*255 for i in range(256)]).astype(np.uint8)
-        enh = cv2.LUT(enh, g_table)
-        if p.get('dh'): enh = self._dehaze(enh)
-        if p.get('dr'): enh = self._derain(enh)
-        if p.get('ds'): enh = self._desnow(enh)
-        if p.get('dn'): enh = cv2.fastNlMeansDenoisingColored(enh, None,10,10,7,21)
-        return enh
-    def _dehaze(self, img):
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        dc = cv2.erode(gray, np.ones((7,7), np.uint8))
-        nz = dc[dc<10]; al = 255.0 if len(nz)==0 else np.max(img[dc<10])
-        t = np.clip(1-0.1*(gray/al),0.1,1.0)
-        deh = np.zeros_like(img, dtype=np.float32)
-        for c in range(3): deh[:,:,c] = (img[:,:,c].astype(np.float32)-al)/t + al
-        return np.clip(deh,0,255).astype(np.uint8)
-    def _derain(self, img):
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        km = cv2.getStructuringElement(cv2.MORPH_RECT, (1,5))
-        rm = cv2.morphologyEx(gray, cv2.MORPH_OPEN, km)
-        return cv2.inpaint(img, (255-rm).astype(np.uint8),3,cv2.INPAINT_TELEA)
-    def _desnow(self, img):
-        blur = cv2.GaussianBlur(img,(5,5),0)
-        gray = cv2.cvtColor(blur, cv2.COLOR_BGR2GRAY)
-        _, sm = cv2.threshold(gray,200,255,cv2.THRESH_BINARY)
-        return cv2.inpaint(img,sm,5,cv2.INPAINT_NS)
-
-# ======================== LiDAR处理 ========================
-class LiDARProc:
-    def __init__(self, cfg):
-        self.cfg = cfg; self.q = queue.Queue(maxsize=2); self.data, self.trans = None, None
-    def cb(self, pc):
-        try:
-            self.data = np.frombuffer(pc.raw_data, dtype=np.float32).reshape(-1,4)[:,:3]
-            self.trans = pc.transform
-            if self.q.full(): self.q.get_nowait()
-            self.q.put((self.data.copy(), self.trans))
-        except: pass
-    def detect(self):
-        if self.data is None or len(self.data)<50: return []
-        gm = self.data[:,2] < -1.0; ng = self.data[~gm]
-        if len(ng)<50: return []
-        cls = DBSCAN(eps=0.8, min_samples=30).fit(ng[:,:2])
-        boxes = []
-        for l in set(cls.labels_):
-            if l == -1: continue
-            cp = ng[cls.labels_==l]
-            if len(cp)<30: continue
-            mn = cp.min(axis=0); mx = cp.max(axis=0)
-            boxes.append({'3d_bbox':[mn[0],mn[1],mn[2],mx[0],mx[1],mx[2]],'center':[(mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2],'size':[mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2]],'num_points':len(cp)})
-        return boxes
-    def get_3d(self):
-        if self.data is None: return None
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(self.data)
-        z_min,z_max = self.data[:,2].min(),self.data[:,2].max()
-        c = (self.data[:,2]-z_min)/(z_max-z_min+1e-6)
-        cm = np.zeros((len(c),3)); cm[:,0]=1-c; cm[:,2]=c
-        pcd.colors = o3d.utility.Vector3dVector(cm)
-        return pcd
-
-# ======================== 数据记录 ========================
-class Recorder:
-    def __init__(self, cfg):
-        self.cfg = cfg; self.dir = os.path.join(cfg.record_dir, datetime.now().strftime("%Y%m%d_%H%M%S"))
-        self.fr = 0; self.fs = {}
-        if cfg.record_data:
-            os.makedirs(self.dir, exist_ok=True)
-            os.makedirs(os.path.join(self.dir,"screenshots"), exist_ok=True)
-            self._init()
-    def _init(self):
-        tp = os.path.join(self.dir, "track_results.csv")
-        self.fs['tracks'] = open(tp, 'w', newline='', encoding='utf-8')
-        self.tw = csv.writer(self.fs['tracks'])
-        self.tw.writerow(['timestamp','frame_id','track_id','x1','y1','x2','y2','cls_id','cls_name','behavior','speed','confidence'])
-        pp = os.path.join(self.dir, "performance.csv")
-        self.fs['performance'] = open(pp, 'w', newline='', encoding='utf-8')
-        self.pw = csv.writer(self.fs['performance'])
-        self.pw.writerow(['timestamp','frame_id','fps','cpu_usage','memory_usage','gpu_usage','detection_count','track_count'])
-        cp = os.path.join(self.dir, "config.yaml")
-        with open(cp, 'w', encoding='utf-8') as f: yaml.dump(self.cfg.__dict__, f, indent=2)
-    def record(self, tracks, dets, fps):
-        if not self.cfg.record_data: return
-        if self.fr % (self.cfg.display_fps//self.cfg.record_fps) !=0:
-            self.fr +=1; return
-        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
-        if tracks and len(tracks)>0:
-            for t in tracks:
-                try:
-                    b = "stopped" if t.is_stopped else "overtaking" if t.is_overtaking else "lane_changing" if t.is_lane_changing else "braking" if t.is_braking else "dangerous" if t.is_dangerous else "normal"
-                    s = t._calc_speed() if hasattr(t,'_calc_speed') else 0.0
-                    self.tw.writerow([ts,self.fr,t.track_id,t.bbox[0],t.bbox[1],t.bbox[2],t.bbox[3],t.cls_id,VEHICLE_CLS.get(t.cls_id,"Unknown"),b,s,t.conf if hasattr(t,'conf') else 0.0])
-                except: pass
-        cpu = psutil.cpu_percent(); mem = psutil.virtual_memory().percent
-        gpu = torch.cuda.utilization() if (torch.cuda.is_available() and hasattr(torch.cuda,'utilization')) else 0.0
-        self.pw.writerow([ts,self.fr,fps,cpu,mem,gpu,len(dets) if dets is not None else 0,len(tracks) if tracks is not None else 0])
-        for f in self.fs.values(): f.flush()
-        self.fr +=1
-    def save_ss(self, img, w):
-        if not self.cfg.save_screenshots or not valid_img(img): return
-        p = os.path.join(self.dir,"screenshots",f"screenshot_{w}_{self.fr:06d}.png")
-        cv2.imwrite(p, img)
-    def close(self):
-        if self.cfg.record_data:
-            for f in self.fs.values():
-                try: f.close()
-                except: pass
-
-# ======================== 卡尔曼滤波 ========================
-class KF:
-    def __init__(self, dt=0.05, ms=50.0):
-        self.dt = dt; self.ms = ms; self.x = np.zeros(8, dtype=np.float32)
-        self.F = np.array([[1,0,0,0,dt,0,0,0],[0,1,0,0,0,dt,0,0],[0,0,1,0,0,0,dt,0],[0,0,0,1,0,0,0,dt],[0,0,0,0,1,0,0,0],[0,0,0,0,0,1,0,0],[0,0,0,0,0,0,1,0],[0,0,0,0,0,0,0,1]], dtype=np.float32)
-        self.H = np.eye(4,8,dtype=np.float32)
-        self.Q = np.diag([1,1,1,1,5,5,5,5]).astype(np.float32)
-        self.R = np.diag([5,5,5,5]).astype(np.float32)
-        self.P = np.eye(8,dtype=np.float32)*50
-    def predict(self):
-        self.x = self.F @ self.x
-        self.P = self.F @ self.P @ self.F.T + self.Q
-        return self.x[:4]
-    def update(self, z):
-        z = z.astype(np.float32)
-        y = z - self.H @ self.x
-        S = self.H @ self.P @ self.H.T + self.R
-        S_inv = np.linalg.pinv(S) if np.linalg.det(S)<1e-6 else np.linalg.inv(S)
-        K = self.P @ self.H.T @ S_inv
-        self.x = self.x + K @ y
-        self.P = (np.eye(8)-K@self.H) @ self.P
-        return self.x[:4]
-    def update_noise(self, s):
-        sf = min(1.0, s/self.ms)
-        self.Q = np.diag([1+sf*4]*4 + [5+sf*20]*4).astype(np.float32)
-
-# ======================== IOU计算 ========================
-@njit
-def iou(box1, box2):
-    ix1 = max(box1[0], box2[0]); iy1 = max(box1[1], box2[1])
-    ix2 = min(box1[2], box2[2]); iy2 = min(box1[3], box2[3])
-    ia = max(0, ix2-ix1)*max(0, iy2-iy1)
-    a1 = (box1[2]-box1[0])*(box1[3]-box1[1])
-    a2 = (box2[2]-box2[0])*(box2[3]-box2[1])
-    ua = a1+a2-ia
-    return ia/ua if ua>0 else 0
-
-# ======================== 跟踪目标 ========================
-class Track:
-    def __init__(self, tid, bbox, img_shape, kf_cfg, cfg):
-        self.track_id = tid; self.kf = KF(dt=kf_cfg["dt"], ms=kf_cfg["max_speed"])
-        self.img_shape = img_shape; self.cfg = cfg; self.bbox = clip_box(bbox.astype(np.float32), img_shape)
-        self.kf.x[:4] = self.bbox; self.track_hist = []; self.speed_hist = []; self.accel_hist = []
-        self.heading_hist = []; self.lat_dis = []; self.pred_traj = []
-        self.is_stopped = self.is_overtaking = self.is_lane_changing = self.is_braking = self.is_accelerating = self.is_turning = self.is_dangerous = False
-        self.stop_fr = self.overtake_fr = self.lane_change_fr = self.brake_fr = self.turn_fr = 0
-        self.hits = 1; self.age = 0; self.tsu = 0; self.cls_id = None; self.conf = 0.0
-        self._update_hist()
-    def _update_hist(self):
-        cx = (self.bbox[0]+self.bbox[2])/2; cy = (self.bbox[1]+self.bbox[3])/2
-        self.track_hist.append((cx, cy))
-        if len(self.track_hist)>1: self.lat_dis.append(abs(cx - self.track_hist[-2][0]))
-        if len(self.track_hist)>self.cfg.track_history_len: self.track_hist.pop(0)
-        if len(self.lat_dis)>10: self.lat_dis.pop(0)
-    def _calc_speed(self):
-        if len(self.track_hist)<2: return 0.0
-        pc = self.track_hist[-2]; cc = self.track_hist[-1]
-        s = np.linalg.norm(np.array(cc)-np.array(pc))/self.kf.dt
-        self.speed_hist.append(s)
-        if len(self.speed_hist)>1: self.accel_hist.append((s-self.speed_hist[-2])/self.kf.dt)
-        if len(self.speed_hist)>5: self.speed_hist.pop(0)
-        if len(self.accel_hist)>5: self.accel_hist.pop(0)
-        return np.mean(self.speed_hist) if self.speed_hist else 0.0
-    def _calc_heading(self):
-        if len(self.track_hist)<3: return 0.0
-        dx = self.track_hist[-1][0]-self.track_hist[-3][0]
-        dy = self.track_hist[-1][1]-self.track_hist[-3][1]
-        h = np.degrees(np.arctan2(dy, dx))
-        self.heading_hist.append(h)
-        if len(self.heading_hist)>5: self.heading_hist.pop(0)
-        return h
-    def _pred_traj(self):
-        self.pred_traj = []
-        if len(self.track_hist)<5: return
-        tkf = KF(dt=self.kf.dt, ms=self.kf.ms)
-        tkf.x = self.kf.x.copy(); tkf.P = self.kf.P.copy()
-        for _ in range(self.cfg.predict_frames):
-            pb = tkf.predict()
-            self.pred_traj.append(((pb[0]+pb[2])/2, (pb[1]+pb[3])/2))
-    def _analyze_behavior(self, ego_center):
-        s = self._calc_speed(); h = self._calc_heading()
-        if s < self.cfg.stop_speed_thresh:
-            self.stop_fr +=1; self.is_stopped = self.stop_fr >= self.cfg.stop_frames_thresh
-        else: self.stop_fr = 0; self.is_stopped = False
-        if ego_center and len(self.track_hist)>=2:
-            d = np.linalg.norm(np.array(self.track_hist[-1])-np.array(ego_center))
-            if d < self.cfg.overtake_dist_thresh:
-                es = getattr(self, 'ego_speed', 0.0)
-                if s > es*self.cfg.overtake_speed_ratio:
-                    self.overtake_fr +=1; self.is_overtaking = self.overtake_fr >=3
-                else: self.overtake_fr =0; self.is_overtaking = False
-            else: self.overtake_fr =0; self.is_overtaking = False
-        if len(self.lat_dis)>=5:
-            al = np.mean(self.lat_dis[-5:])
-            if al>self.cfg.lane_change_thresh:
-                self.lane_change_fr +=1; self.is_lane_changing = self.lane_change_fr >=3
-            else: self.lane_change_fr =0; self.is_lane_changing = False
-        if len(self.accel_hist)>=3:
-            aa = np.mean(self.accel_hist[-3:])
-            if aa < -self.cfg.brake_accel_thresh:
-                self.brake_fr +=1; self.is_braking = self.brake_fr >=2; self.is_accelerating = False
-            elif aa > self.cfg.brake_accel_thresh:
-                self.is_accelerating = True; self.is_braking = False; self.brake_fr =0
-            else: self.is_braking = self.is_accelerating = False; self.brake_fr =0
-        if len(self.heading_hist)>=3:
-            hd = np.abs(self.heading_hist[-1]-self.heading_hist[-3])
-            if hd>self.cfg.turn_angle_thresh:
-                self.turn_fr +=1; self.is_turning = self.turn_fr >=2
-            else: self.turn_fr =0; self.is_turning = False
-        if ego_center:
-            d = np.linalg.norm(np.array(self.track_hist[-1])-np.array(ego_center))
-            self.is_dangerous = d < self.cfg.danger_dist_thresh
-        self._pred_traj()
-    def predict(self):
-        if len(self.track_hist)>=2:
-            pc = np.array([(self.kf.x[0]+self.kf.x[2])/2, (self.kf.x[1]+self.kf.x[3])/2])
-            cc = np.array([(self.bbox[0]+self.bbox[2])/2, (self.bbox[1]+self.bbox[3])/2])
-            ps = np.linalg.norm(cc-pc)/self.kf.dt
-            mps = max(self.img_shape)/self.kf.dt
-            s = min(1.0, ps/mps)*self.kf.ms
-        else: s=0.0
-        self.bbox = self.kf.predict()
-        self.bbox = clip_box(self.bbox, self.img_shape)
-        self._update_hist(); self.age +=1; self.tsu +=1; self.kf.update_noise(s)
-        return self.bbox
-    def update(self, bbox, cls_id, conf=0.0, ego_center=None):
-        self.bbox = self.kf.update(clip_box(bbox, self.img_shape))
-        self._update_hist(); self.hits +=1; self.tsu =0; self.cls_id = cls_id; self.conf = conf
-        self._analyze_behavior(ego_center)
-
-# ======================== SORT跟踪器 ========================
-class SORT:
-    def __init__(self, cfg):
-        self.max_age = cfg.max_age; self.min_hits = cfg.min_hits; self.iou_th = cfg.iou_thres
-        self.img_shape = (cfg.img_height, cfg.img_width); self.kf_cfg = {"dt":cfg.kf_dt, "max_speed":cfg.max_speed}
-        self.cfg = cfg; self.tracks = []; self.next_id =1; self.ego_center = None; self.ego_speed =0.0
-    def update(self, dets, ego_center=None, lidar_dets=None):
-        self.ego_center = ego_center
-        if dets is None or len(dets)==0:
-            if lidar_dets and len(lidar_dets)>0 and self.cfg.fuse_lidar_vision:
-                dets = self._lidar2d(lidar_dets)
-            self.tracks = [t for t in self.tracks if t.tsu <= self.max_age]
-            return np.array([]), np.array([]), np.array([])
-        vd = []
-        for d in dets:
-            if len(d)>=6:
-                x1,y1,x2,y2,conf,cls_id = d[:6]
-                if conf>0 and x2>x1 and y2>y1: vd.append([x1,y1,x2,y2,conf,int(cls_id)])
-        vd = np.array(vd, dtype=np.float32)
-        if len(vd)==0:
-            self.tracks = [t for t in self.tracks if t.tsu <= self.max_age]
-            return np.array([]), np.array([]), np.array([])
-        for t in self.tracks: t.predict()
-        if len(self.tracks)==0:
-            for d in vd:
-                self.tracks.append(Track(self.next_id, d[:4], self.img_shape, self.kf_cfg, self.cfg))
-                self.next_id +=1
-            return np.array([]), np.array([]), np.array([])
-        try:
-            iou_mat = np.array([[iou(t.bbox, d[:4]) for t in self.tracks] for d in vd])
-            cost_mat = 1 - iou_mat
-            t_idx, d_idx = linear_sum_assignment(cost_mat)
-        except: t_idx, d_idx = [], []
-        matches, ud, ut = [], set(), set()
-        for ti, di in zip(t_idx, d_idx):
-            if ti<len(self.tracks) and di<len(vd) and iou(self.tracks[ti].bbox, vd[di][:4])>self.iou_th:
-                matches.append((ti,di)); ud.add(di); ut.add(ti)
-        for ti, di in matches:
-            self.tracks[ti].update(vd[di][:4], int(vd[di][5]), vd[di][4], self.ego_center)
-            self.tracks[ti].ego_speed = self.ego_speed
-        for di in set(range(len(vd)))-ud:
-            self.tracks.append(Track(self.next_id, vd[di][:4], self.img_shape, self.kf_cfg, self.cfg))
-            self.next_id +=1
-        self.tracks = [t for t in self.tracks if t.tsu <= self.max_age]
-        vt = [t for t in self.tracks if t.hits >= self.min_hits]
-        if not vt: return np.array([]), np.array([]), np.array([])
-        boxes = np.array([t.bbox.astype(int) for t in vt])
-        ids = np.array([t.track_id for t in vt])
-        cls = np.array([t.cls_id if t.cls_id is not None else -1 for t in vt])
-        return boxes, ids, cls
-    def _lidar2d(self, lidar_dets):
-        dets = []
-        for d in lidar_dets:
-            c = d['center']; s = d['size']
-            x1 = c[0]*10 + self.img_shape[1]/2; y1 = c[1]*10 + self.img_shape[0]/2
-            x2 = x1 + s[0]*5; y2 = y1 + s[1]*5
-            dets.append([x1,y1,x2,y2,0.8,2])
-        return np.array(dets)
-
-# ======================== 检测线程 ========================
-class DetThread(threading.Thread):
-    def __init__(self, det, cfg, enh, in_q, out_q, dev="cpu"):
-        super().__init__(daemon=True)
-        self.det = det; self.cfg = cfg; self.enh = enh; self.in_q = in_q; self.out_q = out_q
-        self.running = True; self.dev = dev
-    def run(self):
-        while self.running:
-            try:
-                img = self.in_q.get(timeout=1.0)
-                if not valid_img(img):
-                    self.out_q.put((None, np.array([])))
-                    continue
-                img_enh = self.enh.enhance(img)
-                h,w = img.shape[:2]; r = min(self.cfg.yolo_imgsz_max/w, self.cfg.yolo_imgsz_max/h)
-                ws, hs = make_div(int(w*r)), make_div(int(h*r))
-                res = self.det.predict(img_enh, conf=self.cfg.conf_thres, verbose=False, device=self.dev, agnostic_nms=True, imgsz=(hs,ws), iou=self.cfg.yolo_iou)
-                dets = []
-                for r in res:
-                    if hasattr(r, 'boxes') and r.boxes is not None and len(r.boxes)>0:
-                        for b in r.boxes:
-                            if b.cls is not None and b.conf is not None and b.xyxy is not None:
-                                cid = int(b.cls[0])
-                                if cid in {2,5,7}:
-                                    xyxy = b.xyxy[0].cpu().numpy()
-                                    conf = float(b.conf[0])
-                                    if xyxy[2]>xyxy[0] and xyxy[3]>xyxy[1] and conf>0:
-                                        dets.append([*xyxy, conf, cid])
-                self.out_q.put((img, np.array(dets, dtype=np.float32)))
-            except queue.Empty: continue
-            except: self.out_q.put((None, np.array([])))
-    def stop(self): self.running = False
-
-# ======================== 可视化工具（优化版） ========================
-class FrameBuf:
-    def __init__(self, sz=(480,640,3)):
-        self.df = np.zeros(sz, dtype=np.uint8)
-        cv2.putText(self.df, "Initializing...", (100,240), cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),2)
-        self.cf = self.df.copy(); self.lock = threading.Lock()
-    def update(self, f):
-        if valid_img(f):
-            with self.lock: self.cf = f.copy()
-    def get(self): return self.cf.copy()
-
-class FPS:
-    def __init__(self, ws=15):
-        self.ws = ws; self.times = []; self.fps =0.0
-    def update(self):
-        self.times.append(time.time())
-        if len(self.times)>self.ws: self.times.pop(0)
-        if len(self.times)>=2: self.fps = (len(self.times)-1)/(self.times[-1]-self.times[0])
-        return self.fps
-
-# ======================== 核心绘制函数（优化版） ========================
-def draw(img, boxes, ids, cls_ids, tracks, fps=0.0, det_cnt=0, cfg=None, w="clear", perf=None):
-    """优化版绘制函数，简洁高效，匹配截图样式"""
-    if not valid_img(img): 
-        return np.zeros((480,640,3), dtype=np.uint8)
+def load_config(config_path=None):
+    """
+    Load configuration
     
-    di = img.copy()
+    Args:
+        config_path: Path to configuration file
+        
+    Returns:
+        dict: Configuration dictionary
+    """
+    # Default configuration
+    default_config = {
+        # CARLA connection
+        'host': 'localhost',
+        'port': 2000,
+        'timeout': 20.0,
+        
+        # Sensors
+        'img_width': 640,
+        'img_height': 480,
+        'fov': 90,
+        'sensor_tick': 0.05,
+        'use_lidar': True,
+        'lidar_channels': 32,
+        'lidar_range': 100.0,
+        'lidar_points_per_second': 500000,
+        
+        # Detection
+        'yolo_model': 'yolov8n.pt',
+        'conf_thres': 0.5,
+        'iou_thres': 0.3,
+        'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+        'yolo_imgsz_max': 320,
+        
+        # Tracking
+        'max_age': 5,
+        'min_hits': 3,
+        'kf_dt': 0.05,
+        'max_speed': 50.0,
+        
+        # Behavior analysis
+        'stop_speed_thresh': 1.0,
+        'stop_frames_thresh': 5,
+        'overtake_speed_ratio': 1.5,
+        'overtake_dist_thresh': 50.0,
+        'lane_change_thresh': 0.5,
+        'brake_accel_thresh': 2.0,
+        'turn_angle_thresh': 15.0,
+        'danger_dist_thresh': 10.0,
+        'predict_frames': 10,
+        'track_history_len': 20,
+        
+        # Visualization
+        'window_width': 1280,
+        'window_height': 720,
+        'display_fps': 30,
+        
+        # Weather
+        'weather': 'clear',
+        'num_npcs': 20,
+        
+        # Ego vehicle
+        'ego_vehicle_filter': 'vehicle.tesla.model3',
+        'ego_vehicle_color': '255,0,0',
+    }
     
-    # 1. 绘制顶部信息栏（简洁版）
-    info_height = 60
-    cv2.rectangle(di, (0, 0), (di.shape[1], info_height), (0, 0, 0), -1)
+    # If config file is provided, try to load it
+    if config_path and os.path.exists(config_path):
+        loaded_config = utils.load_yaml_config(config_path)
+        if loaded_config:
+            # Merge configurations (loaded config overrides default)
+            for key, value in loaded_config.items():
+                if isinstance(value, dict) and key in default_config and isinstance(default_config[key], dict):
+                    # Recursive dictionary merge
+                    default_config[key].update(value)
+                else:
+                    default_config[key] = value
+            logger.info(f"[OK] Configuration file loaded: {config_path}")
     
-    # FPS和基本信息
-    cv2.putText(di, f"FPS: {fps:.1f} | Weather: {w} | Tracks: {len(boxes)}", 
-                (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
-    
-    # 行为统计
-    if tracks:
-        sc = sum(1 for t in tracks if t.is_stopped)
-        oc = sum(1 for t in tracks if t.is_overtaking)
-        dc = sum(1 for t in tracks if t.is_dangerous)
-        cv2.putText(di, f"Stop: {sc} | Overtake: {oc} | Danger: {dc}", 
-                    (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1, cv2.LINE_AA)
-    
-    # 2. 绘制检测框（简化版，匹配截图）
-    if boxes is not None and ids is not None:
-        for i, (b, tid) in enumerate(zip(boxes, ids)):
-            try:
-                if len(b) != 4: continue
-                
-                x1, y1, x2, y2 = map(int, b)
-                
-                # 检查坐标有效性
-                if x1 >= x2 or y1 >= y2: continue
-                
-                # 蓝色检测框（截图样式）
-                cv2.rectangle(di, (x1, y1), (x2, y2), (255, 0, 0), 2, cv2.LINE_AA)
-                
-                # 在左上角显示ID（白色背景，黑色文字）
-                id_text = f"{tid}"
-                text_size = cv2.getTextSize(id_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-                
-                # 背景框
-                bg_x2 = x1 + text_size[0] + 6
-                bg_y2 = y1 + text_size[1] + 6
-                cv2.rectangle(di, (x1, y1), (bg_x2, bg_y2), (255, 255, 255), -1)
-                
-                # 文字
-                cv2.putText(di, id_text, (x1+3, y1+text_size[1]+3), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                
-            except Exception as e:
-                continue
-    
-    # 3. 绘制轨迹线（可选，简化版）
-    if tracks:
-        for track in tracks:
-            if len(track.track_hist) >= 2:
-                # 只绘制最近5帧轨迹
-                for j in range(1, min(5, len(track.track_hist))):
-                    try:
-                        pt1 = (int(track.track_hist[-j-1][0]), int(track.track_hist[-j-1][1]))
-                        pt2 = (int(track.track_hist[-j][0]), int(track.track_hist[-j][1]))
-                        cv2.line(di, pt1, pt2, (0, 255, 0), 1, cv2.LINE_AA)
-                    except:
-                        pass
-    
-    return di
+    return default_config
 
-# ======================== 工具函数 ========================
-def clear_actors(world, exclude=None):
-    ei = set(exclude) if exclude else set()
-    actors = world.get_actors()
-    actor_id_map = {a.id: a for a in actors if a.is_alive}
-    for at in ['vehicle.', 'sensor.']:
-        al = [a for a_id, a in actor_id_map.items() if a.type_id.startswith(at) and a_id not in ei]
-        for i in range(0, len(al),10):
-            for a in al[i:i+10]:
-                try:
-                    if a.is_alive and a.id in actor_id_map:
-                        a.destroy()
-                        del actor_id_map[a.id]
-                except Exception as e:
-                    logger.warning(f"跳过销毁Actor {a.id}：{str(e)[:30]}")
-
-def cam_cb(img, q):
+def setup_carla_client(config):
+    """
+    Setup CARLA client
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        tuple: (client, world) or (None, None)
+    """
     try:
-        ia = np.frombuffer(img.raw_data, dtype=np.uint8).reshape((img.height, img.width,4))
-        ir = cv2.GaussianBlur(ia[:,:,:3], (3,3),0)
-        if q.full(): q.get_nowait()
-        q.put(ir)
-    except: pass
-
-def spawn_npcs(world, num, sp):
-    bps = [bp for bp in world.get_blueprint_library().filter('vehicle') if int(bp.get_attribute('number_of_wheels'))==4 and not bp.id.endswith(('firetruck','ambulance','police'))]
-    if not bps: return 0
-    cnt, used, max_att = 0, set(), num*3
-    for _ in range(max_att):
-        if cnt>=num or len(used)>=len(sp): break
-        p = random.choice(sp)
-        k = (round(p.location.x,2), round(p.location.y,2), round(p.location.z,2))
-        if k not in used:
-            used.add(k)
-            n = world.try_spawn_actor(random.choice(bps), p)
-            if n:
-                try: n.set_autopilot(True, tm_port=8000)
-                except: n.set_autopilot(True)
-                cnt +=1
-    return cnt
-
-# 安全生成自车函数
-def safe_spawn_ego(world, spawn_points):
-    """安全生成自车，避免碰撞"""
-    ego_bp = random.choice(world.get_blueprint_library().filter('vehicle.tesla.model3'))
-    ego_bp.set_attribute('color', '255,0,0')
-    # 遍历生成点，直到找到无碰撞的位置
-    for spawn_point in spawn_points:
-        ego = world.try_spawn_actor(ego_bp, spawn_point)
-        if ego is not None:
-            print(f"✅ 自车生成成功，位置：{spawn_point.location}")
-            return ego
-    # 若所有生成点都碰撞，随机偏移位置重试
-    print("⚠️ 所有默认生成点有碰撞，尝试偏移位置...")
-    for spawn_point in spawn_points:
-        # 随机偏移x/y坐标（±2米）
-        spawn_point.location.x += random.uniform(-2, 2)
-        spawn_point.location.y += random.uniform(-2, 2)
-        ego = world.try_spawn_actor(ego_bp, spawn_point)
-        if ego is not None:
-            print(f"✅ 自车生成成功（偏移位置）：{spawn_point.location}")
-            return ego
-    print("❌ 无法生成自车，所有位置都有碰撞")
-    return None
-
-# ======================== 主函数 ========================
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", help="配置文件路径")
-    parser.add_argument("--host", help="CARLA主机")
-    parser.add_argument("--port", type=int, help="CARLA端口")
-    parser.add_argument("--conf-thres", type=float, help="检测置信度")
-    parser.add_argument("--weather", help="初始天气")
-    args = parser.parse_args()
-    
-    cfg = Config.from_yaml(args.config)
-    if args.host: cfg.host = args.host
-    if args.port: cfg.port = args.port
-    if args.conf_thres: cfg.conf_thres = args.conf_thres
-    if args.weather and args.weather in WEATHER: cfg.default_weather = args.weather
-
-    # 初始化所有可能用到的变量
-    ego = None
-    cam = None
-    lidar = None
-    lidar_proc = None
-    det_thread = None
-    vis = None
-    recorder = Recorder(cfg)
-
-    try:
-        client = carla.Client(cfg.host, cfg.port)
-        client.set_timeout(20.0)
+        logger.info(f"Connecting to CARLA server {config['host']}:{config['port']}...")
+        client = carla.Client(config['host'], config['port'])
+        client.set_timeout(config['timeout'])
+        
         world = client.get_world()
+        
+        # Set synchronous mode
+        settings = world.get_settings()
+        settings.synchronous_mode = True
+        settings.fixed_delta_seconds = 0.05
+        world.apply_settings(settings)
+        
+        # Setup traffic manager
         try:
             tm = client.get_trafficmanager(8000)
             tm.set_global_distance_to_leading_vehicle(2.0)
@@ -620,232 +145,1569 @@ def main():
             tm.set_hybrid_physics_mode(True)
             tm.set_hybrid_physics_radius(50.0)
             tm.global_percentage_speed_difference(0)
-        except: pass
-        settings = world.get_settings()
-        settings.synchronous_mode = True
-        settings.fixed_delta_seconds = 0.05
-        settings.substepping = True
-        settings.max_substep_delta_time = 0.01
-        settings.max_substeps = 10
-        world.apply_settings(settings)
+        except Exception as e:
+            logger.warning(f"Traffic manager setup failed: {e}")
+        
+        logger.info("[OK] CARLA client connected successfully")
+        return client, world
+        
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to connect to CARLA server: {e}")
+        return None, None
 
-        # 设置初始天气
-        world.set_weather(WEATHER[cfg.default_weather])
-        we = WeatherEnhancer(cfg); we.set_weather(cfg.default_weather); cw = cfg.default_weather
+def set_weather(world, weather_name):
+    """
+    Set weather
+    
+    Args:
+        world: CARLA world object
+        weather_name: Weather name
+    """
+    weather_presets = {
+        'clear': carla.WeatherParameters.ClearNoon,
+        'cloudy': carla.WeatherParameters.CloudyNoon,
+        'rain': carla.WeatherParameters.HardRainNoon,
+        'fog': carla.WeatherParameters.SoftRainNoon,
+        'night': carla.WeatherParameters.ClearNight,
+        'wet': carla.WeatherParameters.WetNoon,
+        'wet_cloudy': carla.WeatherParameters.WetCloudyNoon,
+    }
+    
+    if weather_name in weather_presets:
+        world.set_weather(weather_presets[weather_name])
+        logger.info(f"[WEATHER] Weather set to: {weather_name}")
+    else:
+        logger.warning(f"Unknown weather: {weather_name}, using clear weather")
 
-        # 获取生成点并安全生成自车
-        spawn_points = world.get_map().get_spawn_points()
-        if not spawn_points:
-            print("❌ 无可用生成点")
+# ======================== Visualization (Enhanced: Independent stats window) ========================
+
+class Visualizer:
+    """Visualization manager (Enhanced: Color ID encoding + Independent stats window)"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.window_name = "CARLA Object Tracking"
+        self.stats_window_name = "Statistics Panel"
+        
+        # Create main window
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(self.window_name, 
+                        config.get('window_width', 1280), 
+                        config.get('window_height', 720))
+        
+        # Create independent statistics window
+        cv2.namedWindow(self.stats_window_name, cv2.WINDOW_NORMAL)
+        # Set statistics window size
+        stats_width = 600
+        stats_height = 800
+        cv2.resizeWindow(self.stats_window_name, stats_width, stats_height)
+        
+        # Move statistics window position (avoid overlapping main window)
+        cv2.moveWindow(self.stats_window_name, 
+                      config.get('window_width', 1280) + 50,  # Place to the right of main window
+                      100)                                    # Vertical position
+        
+        # Statistics panel state
+        self.show_stats_window = True  # Whether to show independent stats window
+        self.stats_image = None        # Statistics panel image
+        self.stats_update_interval = 2  # Statistics update interval (frames)
+        self.stats_frame_counter = 0   # Frame counter
+        
+        # Vehicle class color mapping
+        self.class_colors = {
+            'car': (255, 0, 0),      # Blue - Car
+            'bus': (0, 255, 0),      # Green - Bus
+            'truck': (0, 0, 255),    # Red - Truck
+            'default': (255, 255, 0) # Cyan - Default
+        }
+        
+        # Behavior state color mapping (priority from high to low)
+        self.behavior_colors = {
+            'dangerous': (0, 0, 255),      # Red - Dangerous (too close)
+            'stopped': (0, 255, 255),      # Yellow - Stopped
+            'overtaking': (255, 0, 255),   # Purple - Overtaking
+            'lane_changing': (0, 255, 255), # Cyan - Lane changing
+            'turning': (0, 255, 255),      # Cyan - Turning
+            'accelerating': (255, 0, 0),   # Blue - Accelerating
+            'braking': (0, 165, 255),      # Orange - Braking
+            'normal': (0, 255, 0)          # Green - Normal driving
+        }
+        
+        # Behavior state icon mapping (ASCII only)
+        self.behavior_icons = {
+            'dangerous': '[!]',    # Warning
+            'stopped': '[S]',      # Stopped
+            'overtaking': '[F]',   # Fast
+            'lane_changing': '[<>]', # Lane change
+            'turning': '[->]',     # Turn
+            'accelerating': '[A]', # Accelerating
+            'braking': '[B]',      # Braking
+            'normal': '[-]'        # Normal
+        }
+        
+        # Performance data history
+        self.fps_history = []
+        self.detection_time_history = []
+        self.tracking_time_history = []
+        self.max_history_length = 100  # Increased history length for more detailed charts
+        
+        # State history (for trend analysis)
+        self.object_count_history = []
+        self.cpu_usage_history = []
+        self.memory_usage_history = []
+        
+        # 3D点云可视化相关属性（新增）
+        self.show_pointcloud = False  # 是否显示点云窗口
+        self.pcd_window_name = "LiDAR Point Cloud"
+        self.pcd_vis = None  # Open3D可视化器对象
+        self.pcd_geometry_added = False
+        self.pcd_update_counter = 0  # 点云更新计数器
+        
+        logger.info("[OK] Visualizer initialized (Color ID encoding + Independent statistics window + PointCloud)")
+    
+    def init_pointcloud_visualizer(self):
+        """初始化点云可视化器"""
+        if not self.config.get('use_lidar', True):
+            return False
+        
+        try:
+            import open3d as o3d
+            self.pcd_vis = o3d.visualization.Visualizer()
+            self.pcd_vis.create_window(
+                window_name=self.pcd_window_name,
+                width=800,
+                height=600,
+                left=100,
+                top=100
+            )
+            
+            # 设置背景颜色
+            opt = self.pcd_vis.get_render_option()
+            opt.background_color = np.array([0.1, 0.1, 0.1])  # 深灰色背景
+            opt.point_size = 1.5
+            
+            self.pcd_geometry_added = False
+            logger.info("[POINTCLOUD] 点云可视化器初始化完成")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"点云可视化器初始化失败: {e}")
+            return False
+    
+    def update_pointcloud(self, pointcloud_data):
+        """
+        更新点云显示
+        
+        Args:
+            pointcloud_data: 点云数据 (numpy array)
+        """
+        if not self.show_pointcloud or not self.pcd_vis or pointcloud_data is None:
             return
         
-        ego = safe_spawn_ego(world, spawn_points)
-        if ego is None:
+        try:
+            # 每2帧更新一次，避免性能问题
+            self.pcd_update_counter += 1
+            if self.pcd_update_counter % 2 != 0:
+                return
+                
+            import open3d as o3d
+            
+            # 创建点云对象
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(pointcloud_data)
+            
+            # 根据高度着色
+            if len(pointcloud_data) > 0:
+                z_min = pointcloud_data[:, 2].min()
+                z_max = pointcloud_data[:, 2].max()
+                z_range = max(z_max - z_min, 1e-6)
+                
+                colors = np.zeros((len(pointcloud_data), 3))
+                normalized_z = (pointcloud_data[:, 2] - z_min) / z_range
+                colors[:, 0] = normalized_z  # 红色通道（高处）
+                colors[:, 2] = 1 - normalized_z  # 蓝色通道（低处）
+                pcd.colors = o3d.utility.Vector3dVector(colors)
+            
+            # 更新或添加几何体
+            if not self.pcd_geometry_added:
+                self.pcd_vis.add_geometry(pcd)
+                self.pcd_geometry_added = True
+            else:
+                self.pcd_vis.clear_geometries()
+                self.pcd_vis.add_geometry(pcd)
+            
+            # 更新可视化
+            self.pcd_vis.poll_events()
+            self.pcd_vis.update_renderer()
+            
+        except Exception as e:
+            logger.warning(f"更新点云失败: {e}")
+    
+    def toggle_pointcloud_display(self):
+        """切换点云显示"""
+        if not self.config.get('use_lidar', True):
+            logger.warning("LiDAR功能已禁用，无法显示点云")
             return
-        ego.set_autopilot(True, tm_port=8000)
-
-        # 生成NPC
-        npc_count = spawn_npcs(world, cfg.num_npcs, spawn_points)
-        print(f"✅ 生成NPC车辆：{npc_count} 辆")
-
-        # 初始化相机
-        cam_bp = world.get_blueprint_library().find('sensor.camera.rgb')
-        cam_bp.set_attribute('image_size_x', str(cfg.img_width))
-        cam_bp.set_attribute('image_size_y', str(cfg.img_height))
-        cam_bp.set_attribute('fov', '90')
-        cam_bp.set_attribute('sensor_tick', '0.05')
-        cam_t = carla.Transform(carla.Location(x=2.0, z=1.8))
-        cam = world.spawn_actor(cam_bp, cam_t, attach_to=ego)
-        cam_q = queue.Queue(maxsize=1)
-        cam.listen(lambda img: cam_cb(img, cam_q))
-        print(f"✅ 相机传感器启动成功 (ID: {cam.id})")
-
-        # 初始化LiDAR
-        if cfg.use_lidar:
-            lidar_proc = LiDARProc(cfg)
-            lidar_bp = world.get_blueprint_library().find('sensor.lidar.ray_cast')
-            lidar_bp.set_attribute('channels', str(cfg.lidar_channels))
-            lidar_bp.set_attribute('range', str(cfg.lidar_range))
-            lidar_bp.set_attribute('points_per_second', str(cfg.lidar_points_per_second))
-            lidar_bp.set_attribute('rotation_frequency', '20')
-            lidar_bp.set_attribute('sensor_tick', '0.05')
-            lidar_t = carla.Transform(carla.Location(x=0.0, z=2.5))
-            lidar = world.spawn_actor(lidar_bp, lidar_t, attach_to=ego)
-            lidar.listen(lidar_proc.cb)
-            print(f"✅ LiDAR传感器启动成功 (ID: {lidar.id})")
-
-        # 初始化YOLO
-        dev = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"✅ 使用设备: {dev}")
-        model = YOLO(cfg.yolo_model)
-        if cfg.yolo_quantize and dev=="cuda": 
-            model = model.quantize()
-            print("✅ YOLO模型已量化")
-
-        # 启动检测线程
-        in_q = queue.Queue(maxsize=2); out_q = queue.Queue(maxsize=2)
-        det_thread = DetThread(model, cfg, we, in_q, out_q, dev)
-        det_thread.start()
-        print("✅ 推理线程已启动")
-
-        # 初始化跟踪器和可视化
-        tracker = SORT(cfg)
-        fb = FrameBuf((cfg.img_height, cfg.img_width, 3))
-        fps_cnt = FPS(cfg.fps_window_size)
-        cv2.namedWindow("CARLA Object Tracking", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("CARLA Object Tracking", cfg.window_width, cfg.window_height)
-
-        # 初始化3D可视化
-        if cfg.use_3d_visualization and cfg.use_lidar and lidar_proc is not None:
-            vis = o3d.visualization.Visualizer()
-            vis.create_window(window_name="LiDAR Point Cloud", width=cfg.pcd_view_size, height=cfg.pcd_view_size)
-            print("✅ 3D点云可视化窗口已启动")
+        
+        self.show_pointcloud = not self.show_pointcloud
+        
+        if self.show_pointcloud:
+            # 初始化点云可视化器
+            if not self.pcd_vis:
+                if not self.init_pointcloud_visualizer():
+                    self.show_pointcloud = False
+                    return
+            logger.info("[POINTCLOUD] 点云显示已开启")
         else:
-            vis = None
-
-        # 主循环
-        print("🚀 开始跟踪（按ESC退出，按W切换天气）")
-        fr_cnt = 0
-        last_display_time = time.time()
-        while True:
-            world.tick()
-            
-            # 帧率控制
-            current_time = time.time()
-            elapsed = current_time - last_display_time
-            target_interval = 1.0 / cfg.display_fps
-            if elapsed < target_interval:
-                time.sleep(target_interval - elapsed)
-            last_display_time = current_time
-            
-            # 获取相机图像
-            try:
-                img = cam_q.get(timeout=0.1)
-                fb.update(img)
-            except: 
-                img = fb.get()
-            
-            # 提交推理任务
-            if not in_q.full(): 
-                in_q.put(img.copy())
-            
-            # 获取检测结果
-            dets = np.array([])
-            try: 
-                _, dets = out_q.get_nowait()
-            except: 
-                pass
-            
-            # LiDAR检测
-            lidar_dets = lidar_proc.detect() if (cfg.use_lidar and lidar_proc) else []
-            
-            # 更新跟踪器
-            boxes, ids, cls_ids = tracker.update(dets, (cfg.img_width//2, cfg.img_height//2), lidar_dets)
-            
-            # 性能计算
-            fps = fps_cnt.update()
-            cpu = psutil.cpu_percent(); mem = psutil.virtual_memory().percent
-            gpu = torch.cuda.utilization() if (torch.cuda.is_available() and hasattr(torch.cuda,'utilization')) else 0.0
-            perf = {'cpu':cpu, 'mem':mem, 'gpu':gpu, 'fps':fps, 'avg_fps':fps}
-            
-            # 绘制可视化（使用新的检测框样式）
-            di = draw(img, boxes, ids, cls_ids, tracker.tracks, fps=fps, det_cnt=len(dets), cfg=cfg, w=cw, perf=perf)
-            cv2.imshow("CARLA Object Tracking", di)
-            
-            # 3D点云更新
-            if cfg.use_3d_visualization and vis and lidar_proc:
-                pcd = lidar_proc.get_3d()
-                if pcd:
-                    vis.clear_geometries()
-                    vis.add_geometry(pcd)
-                    vis.poll_events()
-                    vis.update_renderer()
-            
-            # 数据记录
-            recorder.record(tracker.tracks, dets, fps)
-            if cfg.save_screenshots and fr_cnt%30==0:
-                recorder.save_ss(di, cw)
-            
-            # 键盘事件处理
-            key = cv2.waitKey(1) & 0xFF
-            if key ==27: 
-                print("🛑 用户按下ESC，退出程序")
-                break
-            elif key == ord('w') or key == ord('W'):
-                wl = list(WEATHER.keys())
-                cwi = wl.index(cw)
-                cw = wl[(cwi+1)%len(wl)]
-                world.set_weather(WEATHER[cw])
-                we.set_weather(cw)
-                print(f"🌤️ 已切换天气到: {cw} (可选：{wl})")
-            fr_cnt +=1
-
-    except KeyboardInterrupt: 
-        print("🛑 用户中断程序")
-    except Exception as e: 
-        print(f"❌ 运行错误: {str(e)}")
-    finally:
-        # 资源清理
-        print("🧹 开始清理资源...")
+            # 关闭点云窗口
+            if self.pcd_vis:
+                try:
+                    self.pcd_vis.destroy_window()
+                except:
+                    pass
+                self.pcd_vis = None
+                self.pcd_geometry_added = False
+            logger.info("[POINTCLOUD] 点云显示已关闭")
+    
+    def _get_behavior_color(self, track_info):
+        """
+        Get color based on behavior state
         
-        # 停止检测线程
-        if det_thread:
-            det_thread.stop()
-            det_thread.join(timeout=2.0)
+        Args:
+            track_info: Tracking target information dictionary
+            
+        Returns:
+            tuple: BGR color value
+        """
+        if not track_info:
+            return self.behavior_colors['normal']
         
-        # 关闭3D可视化窗口
-        if vis is not None:
+        # Priority: dangerous > stopped > overtaking > lane changing/turning > accelerating/braking > normal
+        if track_info.get('is_dangerous', False):
+            return self.behavior_colors['dangerous']
+        elif track_info.get('is_stopped', False):
+            return self.behavior_colors['stopped']
+        elif track_info.get('is_overtaking', False):
+            return self.behavior_colors['overtaking']
+        elif track_info.get('is_lane_changing', False):
+            return self.behavior_colors['lane_changing']
+        elif track_info.get('is_turning', False):
+            return self.behavior_colors['turning']
+        elif track_info.get('is_accelerating', False):
+            return self.behavior_colors['accelerating']
+        elif track_info.get('is_braking', False):
+            return self.behavior_colors['braking']
+        else:
+            return self.behavior_colors['normal']
+    
+    def _get_behavior_icon(self, track_info):
+        """
+        Get icon based on behavior state
+        
+        Args:
+            track_info: Tracking target information dictionary
+            
+        Returns:
+            str: Behavior icon
+        """
+        if not track_info:
+            return self.behavior_icons['normal']
+        
+        # Priority: dangerous > stopped > overtaking > lane changing/turning > accelerating/braking > normal
+        if track_info.get('is_dangerous', False):
+            return self.behavior_icons['dangerous']
+        elif track_info.get('is_stopped', False):
+            return self.behavior_icons['stopped']
+        elif track_info.get('is_overtaking', False):
+            return self.behavior_icons['overtaking']
+        elif track_info.get('is_lane_changing', False):
+            return self.behavior_icons['lane_changing']
+        elif track_info.get('is_turning', False):
+            return self.behavior_icons['turning']
+        elif track_info.get('is_accelerating', False):
+            return self.behavior_icons['accelerating']
+        elif track_info.get('is_braking', False):
+            return self.behavior_icons['braking']
+        else:
+            return self.behavior_icons['normal']
+    
+    def _get_class_name(self, class_id):
+        """
+        Get class name based on class ID
+        
+        Args:
+            class_id: Class ID
+            
+        Returns:
+            str: Class name
+        """
+        class_map = {
+            2: 'car',
+            5: 'bus',
+            7: 'truck',
+        }
+        return class_map.get(int(class_id), 'default')
+    
+    def _adjust_color_brightness(self, color, factor):
+        """
+        Adjust color brightness
+        
+        Args:
+            color: Original color (B, G, R)
+            factor: Brightness factor (0.0-1.0)
+            
+        Returns:
+            tuple: Adjusted color
+        """
+        return tuple(int(c * factor) for c in color)
+    
+    def update_performance_data(self, fps, detection_time, tracking_time, stats_data=None):
+        """
+        Update performance data (enhanced, supports more data)
+        
+        Args:
+            fps: Current frame rate
+            detection_time: Detection time (seconds)
+            tracking_time: Tracking time (seconds)
+            stats_data: Statistics data dictionary
+        """
+        self.fps_history.append(fps)
+        self.detection_time_history.append(detection_time * 1000)  # Convert to milliseconds
+        self.tracking_time_history.append(tracking_time * 1000)    # Convert to milliseconds
+        
+        # If there is statistics data, also update state history
+        if stats_data:
+            self.object_count_history.append(stats_data.get('total_objects', 0))
+            self.cpu_usage_history.append(stats_data.get('cpu_usage', 0))
+            self.memory_usage_history.append(stats_data.get('memory_usage', 0))
+        
+        # Keep history data length
+        for history_list in [
+            self.fps_history,
+            self.detection_time_history,
+            self.tracking_time_history,
+            self.object_count_history,
+            self.cpu_usage_history,
+            self.memory_usage_history
+        ]:
+            if len(history_list) > self.max_history_length:
+                history_list.pop(0)
+    
+    def create_stats_window_image(self, stats_data):
+        """
+        Create image for independent statistics window
+        
+        Args:
+            stats_data: Statistics data dictionary
+            
+        Returns:
+            np.ndarray: Statistics panel image
+        """
+        # Create statistics panel image (light gray background)
+        stats_width = 600
+        stats_height = 800
+        stats_image = np.ones((stats_height, stats_width, 3), dtype=np.uint8) * 240  # Light gray background
+        
+        # 1. Title area
+        title_height = 80
+        cv2.rectangle(stats_image, (0, 0), (stats_width, title_height), (50, 50, 80), -1)
+        
+        title = "CARLA Statistics Panel"
+        cv2.putText(stats_image, title, 
+                   (stats_width // 2 - 150, title_height // 2 + 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        
+        subtitle = "Press T to toggle display"
+        cv2.putText(stats_image, subtitle,
+                   (stats_width // 2 - 140, title_height // 2 + 40),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+        
+        y_offset = title_height + 20
+        
+        # 2. System status section
+        y_offset = self._draw_stats_section(stats_image, "System Status", y_offset, stats_data, self._draw_system_stats)
+        
+        # 3. Object statistics section
+        y_offset = self._draw_stats_section(stats_image, "Object Statistics", y_offset, stats_data, self._draw_object_stats)
+        
+        # 4. Performance charts section
+        y_offset = self._draw_stats_section(stats_image, "Performance Charts", y_offset, stats_data, self._draw_performance_charts)
+        
+        # 5. History trends section
+        if len(self.fps_history) > 5:
+            y_offset = self._draw_stats_section(stats_image, "History Trends", y_offset, stats_data, self._draw_trend_charts)
+        
+        # 6. Bottom information
+        bottom_y = stats_height - 30
+        timestamp = time.strftime("%H:%M:%S")
+        cv2.putText(stats_image, f"Update time: {timestamp}", 
+                   (20, bottom_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+        
+        frame_info = f"Total frames: {stats_data.get('total_frames', 0)}"
+        cv2.putText(stats_image, frame_info,
+                   (stats_width - 150, bottom_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+        
+        return stats_image
+    
+    def _draw_stats_section(self, image, title, y_start, stats_data, draw_function):
+        """
+        General template for drawing statistics section
+        
+        Returns:
+            int: Starting Y coordinate of next section
+        """
+        section_height = 200  # Default height for each section
+        
+        # Section background
+        cv2.rectangle(image, (10, y_start), (590, y_start + section_height), (255, 255, 255), -1)
+        cv2.rectangle(image, (10, y_start), (590, y_start + section_height), (220, 220, 220), 2)
+        
+        # Section title
+        cv2.putText(image, title, (20, y_start + 25),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (50, 50, 50), 2)
+        
+        # Draw dividing line
+        cv2.line(image, (20, y_start + 35), (580, y_start + 35), (200, 200, 200), 1)
+        
+        # Call specific drawing function
+        content_y = y_start + 50
+        content_y = draw_function(image, content_y, stats_data)
+        
+        # If drawing function returned new Y coordinate, use it; otherwise use default height
+        if content_y > y_start + section_height:
+            section_height = content_y - y_start
+        
+        return y_start + section_height + 20
+    
+    def _draw_system_stats(self, image, y_start, stats_data):
+        """
+        Draw system status information
+        """
+        x_left = 30
+        x_right = 300
+        y = y_start
+        
+        # Define status items
+        status_items = [
+            ("FPS", f"{stats_data.get('fps', 0):.1f}", 
+             (0, 255, 0) if stats_data.get('fps', 0) > 20 else (0, 165, 255)),
+            ("Runtime", f"{stats_data.get('run_time', 0):.0f}s", (100, 100, 100)),
+            ("CPU Usage", f"{stats_data.get('cpu_usage', 0):.1f}%",
+             (0, 255, 0) if stats_data.get('cpu_usage', 0) < 70 else (0, 165, 255) if stats_data.get('cpu_usage', 0) < 90 else (0, 0, 255)),
+            ("Memory Usage", f"{stats_data.get('memory_usage', 0):.1f}%",
+             (0, 255, 0) if stats_data.get('memory_usage', 0) < 70 else (0, 165, 255) if stats_data.get('memory_usage', 0) < 90 else (0, 0, 255)),
+            ("Detection Thread", stats_data.get('detection_thread', 'Unknown'),
+             (0, 255, 0) if stats_data.get('detection_thread') == 'Running' else (0, 0, 255)),
+            ("Avg Frame Time", f"{stats_data.get('avg_frame_time', 0):.1f}ms",
+             (0, 255, 0) if stats_data.get('avg_frame_time', 0) < 33 else (0, 165, 255) if stats_data.get('avg_frame_time', 0) < 50 else (0, 0, 255)),
+        ]
+        
+        # Draw in two columns
+        for i, (label, value, color) in enumerate(status_items):
+            x = x_left if i % 2 == 0 else x_right
+            current_y = y + (i // 2) * 30
+            
+            # Label
+            cv2.putText(image, f"{label}:", (x, current_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (80, 80, 80), 1)
+            
+            # Value
+            cv2.putText(image, value, (x + 120, current_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        
+        return y + (len(status_items) // 2 + 1) * 30
+    
+    def _draw_object_stats(self, image, y_start, stats_data):
+        """
+        Draw object statistics information
+        """
+        y = y_start
+        
+        # Total objects
+        total_objects = stats_data.get('total_objects', 0)
+        cv2.putText(image, f"Total Objects: {total_objects}", (30, y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (50, 50, 50), 2)
+        y += 30
+        
+        # Vehicle type distribution (horizontal bar chart)
+        vehicle_counts = stats_data.get('vehicle_counts', {})
+        if vehicle_counts:
+            cv2.putText(image, "Vehicle Type Distribution:", (30, y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+            y += 25
+            
+            max_count = max(vehicle_counts.values()) if vehicle_counts.values() else 1
+            bar_width = 200
+            
+            types = ['car', 'bus', 'truck']
+            type_names = {'car': 'Car', 'bus': 'Bus', 'truck': 'Truck'}
+            
+            for i, v_type in enumerate(types):
+                count = vehicle_counts.get(v_type, 0)
+                # Bar chart
+                bar_length = int((count / max_count) * bar_width) if max_count > 0 else 0
+                color = self.class_colors.get(v_type, (100, 100, 100))
+                
+                cv2.rectangle(image, (150, y - 10), (150 + bar_length, y + 5), color, -1)
+                
+                # Text
+                cv2.putText(image, type_names[v_type], (30, y),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
+                cv2.putText(image, f"{count}", (370, y),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
+                
+                y += 25
+            y += 10
+        
+        # Behavior distribution
+        behavior_counts = stats_data.get('behavior_counts', {})
+        if behavior_counts:
+            cv2.putText(image, "Behavior Distribution:", (30, y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+            y += 25
+            
+            # Only show non-zero behaviors
+            displayed_behaviors = 0
+            for behavior, count in behavior_counts.items():
+                if count > 0 and behavior in self.behavior_colors:
+                    color = self.behavior_colors[behavior]
+                    icon = self.behavior_icons.get(behavior, '•')
+                    
+                    cv2.putText(image, f"{icon} {behavior}: {count}", (50, y),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                    y += 20
+                    displayed_behaviors += 1
+            
+            y += 10 if displayed_behaviors > 0 else 0
+        
+        return y
+    
+    def _draw_performance_charts(self, image, y_start, stats_data):
+        """
+        Draw performance charts
+        """
+        chart_x = 30
+        chart_y = y_start
+        chart_width = 540
+        chart_height = 120
+        
+        # Chart background
+        cv2.rectangle(image, (chart_x, chart_y), 
+                     (chart_x + chart_width, chart_y + chart_height), 
+                     (250, 250, 250), -1)
+        cv2.rectangle(image, (chart_x, chart_y), 
+                     (chart_x + chart_width, chart_y + chart_height), 
+                     (200, 200, 200), 1)
+        
+        if len(self.fps_history) > 1:
+            # Draw FPS curve (green)
+            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
+                                 self.fps_history, (0, 180, 0), "FPS", 60)
+            
+            # Draw detection time curve (red)
+            if self.detection_time_history:
+                self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
+                                     self.detection_time_history, (200, 0, 0), "Detect(ms)", 100)
+            
+            # Draw tracking time curve (blue)
+            if self.tracking_time_history:
+                self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
+                                     self.tracking_time_history, (0, 0, 200), "Track(ms)", 50)
+        
+        # Chart title
+        cv2.putText(image, "Real-time Performance Trend (Last 100 frames)", 
+                   (chart_x + 10, chart_y + 15),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (50, 50, 50), 1)
+        
+        return chart_y + chart_height + 20
+    
+    def _draw_trend_charts(self, image, y_start, stats_data):
+        """
+        Draw history trend charts
+        """
+        chart_x = 30
+        chart_y = y_start
+        chart_width = 540
+        chart_height = 100
+        
+        # Object count trend
+        if len(self.object_count_history) > 1:
+            cv2.putText(image, "Object Count Trend:", (chart_x, chart_y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+            
+            # Chart background
+            cv2.rectangle(image, (chart_x, chart_y), 
+                         (chart_x + chart_width, chart_y + chart_height), 
+                         (250, 250, 250), -1)
+            cv2.rectangle(image, (chart_x, chart_y), 
+                         (chart_x + chart_width, chart_y + chart_height), 
+                         (200, 200, 200), 1)
+            
+            # Draw object count curve
+            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
+                                 self.object_count_history, (100, 0, 200), "Objects", 
+                                 max(self.object_count_history) if self.object_count_history else 20)
+            
+            chart_y += chart_height + 30
+        
+        # System resource trend
+        cv2.putText(image, "System Resource Trend:", (chart_x, chart_y - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+        
+        # Chart background
+        cv2.rectangle(image, (chart_x, chart_y), 
+                     (chart_x + chart_width, chart_y + chart_height), 
+                     (250, 250, 250), -1)
+        cv2.rectangle(image, (chart_x, chart_y), 
+                     (chart_x + chart_width, chart_y + chart_height), 
+                     (200, 200, 200), 1)
+        
+        # Draw CPU and memory curves
+        if len(self.cpu_usage_history) > 1:
+            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
+                                 self.cpu_usage_history, (200, 100, 0), "CPU%", 100)
+        
+        if len(self.memory_usage_history) > 1:
+            self._draw_chart_curve(image, chart_x, chart_y, chart_width, chart_height,
+                                 self.memory_usage_history, (0, 100, 200), "Memory%", 100)
+        
+        return chart_y + chart_height + 20
+    
+    def _draw_chart_curve(self, image, x, y, width, height, data, color, label, max_value):
+        """
+        Draw chart curve (enhanced, with label)
+        """
+        if len(data) < 2:
+            return
+        
+        points = []
+        data_len = len(data)
+        
+        for i, value in enumerate(data):
+            # Normalize to 0-1 range
+            normalized = min(1.0, value / max_value) if max_value > 0 else 0
+            
+            # Calculate coordinates
+            point_x = int(x + (i / (data_len - 1)) * width) if data_len > 1 else x
+            point_y = int(y + height - normalized * height)
+            
+            points.append((point_x, point_y))
+        
+        # Draw curve
+        for i in range(1, len(points)):
+            cv2.line(image, points[i-1], points[i], color, 2)
+        
+        # Draw label
+        label_x = x + width - 80
+        label_y = y + 15
+        
+        # Color marker
+        cv2.circle(image, (label_x - 10, label_y), 4, color, -1)
+        cv2.putText(image, label, (label_x, label_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.4, (50, 50, 50), 1)
+    
+    def draw_detections(self, image, boxes, ids, classes, tracks_info=None):
+        """
+        Draw detection and tracking results
+        
+        Args:
+            image: Original image
+            boxes: Bounding box array
+            ids: Tracking ID array
+            classes: Class array
+            tracks_info: Tracking detailed information
+            
+        Returns:
+            np.ndarray: Drawn image
+        """
+        if not utils.valid_img(image):
+            return image
+        
+        result = image.copy()
+        
+        # Draw top information panel
+        result = self._draw_info_panel(result, len(boxes))
+        
+        # Draw bounding boxes and IDs
+        for i, (bbox, track_id, class_id) in enumerate(zip(boxes, ids, classes)):
             try:
-                vis.destroy_window()
+                x1, y1, x2, y2 = map(int, bbox)
+                
+                # Ensure coordinates are valid
+                if x1 >= x2 or y1 >= y2:
+                    continue
+                
+                # Get current target's detailed information
+                track_info = None
+                if tracks_info and i < len(tracks_info):
+                    track_info = tracks_info[i]
+                
+                # Select color based on behavior state
+                behavior_color = self._get_behavior_color(track_info)
+                
+                # Select base color based on vehicle class
+                class_name = self._get_class_name(class_id)
+                class_color = self.class_colors.get(class_name, self.class_colors['default'])
+                
+                # Blend colors: 70% behavior color + 30% class color
+                color = tuple(
+                    int(behavior_color[j] * 0.7 + class_color[j] * 0.3)
+                    for j in range(3)
+                )
+                
+                # Draw gradient border (dark outside, light inside)
+                border_width = 3
+                for thickness in range(border_width, 0, -1):
+                    # Calculate current layer's color brightness
+                    brightness = 0.3 + 0.7 * (thickness / border_width)
+                    layer_color = self._adjust_color_brightness(color, brightness)
+                    
+                    # Draw border layer
+                    offset = border_width - thickness
+                    cv2.rectangle(result, 
+                                (x1 - offset, y1 - offset), 
+                                (x2 + offset, y2 + offset), 
+                                layer_color, 
+                                1)
+                
+                # Draw ID label background (use behavior color)
+                id_text = f"ID:{track_id}"
+                (text_width, text_height), baseline = cv2.getTextSize(
+                    id_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1
+                )
+                
+                # Label background
+                label_bg_top = y1 - text_height - 8
+                label_bg_bottom = y1
+                label_bg_right = x1 + text_width + 8
+                
+                cv2.rectangle(result, 
+                            (x1, label_bg_top),
+                            (label_bg_right, label_bg_bottom), 
+                            behavior_color, -1)
+                
+                # Label border
+                cv2.rectangle(result, 
+                            (x1, label_bg_top),
+                            (label_bg_right, label_bg_bottom), 
+                            (255, 255, 255), 1)
+                
+                # Draw ID text
+                cv2.putText(result, id_text, 
+                          (x1 + 4, y1 - 4),
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                
+                # Draw behavior icon (if available)
+                if track_info:
+                    # Get behavior icon
+                    behavior_icon = self._get_behavior_icon(track_info)
+                    
+                    # Draw behavior status at top-right corner
+                    behavior_text = behavior_icon
+                    (icon_width, icon_height), _ = cv2.getTextSize(
+                        behavior_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                    )
+                    
+                    # Icon position (top-right corner)
+                    icon_x = x2 - icon_width - 5
+                    icon_y = y1 + icon_height + 5
+                    
+                    # Draw icon background
+                    cv2.rectangle(result,
+                                (icon_x - 3, icon_y - icon_height - 3),
+                                (icon_x + icon_width + 3, icon_y + 3),
+                                behavior_color, -1)
+                    
+                    # Draw icon
+                    cv2.putText(result, behavior_text,
+                              (icon_x, icon_y),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    
+                    # Draw speed information (if available)
+                    if 'speed' in track_info:
+                        speed = track_info['speed']
+                        speed_text = f"{speed:.1f}m/s"
+                        (speed_width, speed_height), _ = cv2.getTextSize(
+                            speed_text, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1
+                        )
+                        
+                        # Speed display at bottom-left corner
+                        speed_x = x1 + 5
+                        speed_y = y2 - 5
+                        
+                        # Speed background
+                        cv2.rectangle(result,
+                                    (speed_x - 2, speed_y - speed_height - 2),
+                                    (speed_x + speed_width + 2, speed_y + 2),
+                                    (0, 0, 0), -1)
+                        
+                        # Speed text
+                        cv2.putText(result, speed_text,
+                                  (speed_x, speed_y),
+                                  cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+                
+            except Exception as e:
+                logger.debug(f"Error drawing bounding box: {e}")
+                continue
+        
+        return result
+    
+    def _draw_info_panel(self, image, track_count):
+        """Draw information panel"""
+        h, w = image.shape[:2]
+        
+        # Information panel background (semi-transparent black)
+        panel_height = 100
+        overlay = image.copy()
+        cv2.rectangle(overlay, (0, 0), (w, panel_height), (0, 0, 0), -1)
+        image = cv2.addWeighted(overlay, 0.7, image, 0.3, 0)
+        
+        # Title
+        title = "CARLA Multi-Object Tracking System"
+        cv2.putText(image, title, (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+        
+        # Status information
+        status_lines = [
+            f"Tracked Objects: {track_count}",
+            f"ESC: Exit | W: Weather | S: Screenshot",
+            f"P: Pause | T: Stats Window | M: Color Legend",
+            f"L: PointCloud | V: View Mode"  # 添加点云提示
+        ]
+        
+        # Draw status information
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        for i, line in enumerate(status_lines):
+            y_pos = 55 + i * 20
+            cv2.putText(image, line, (10, y_pos), 
+                       font, 0.5, (255, 255, 255), 1)
+        
+        return image
+    
+    def draw_color_legend(self, image):
+        """
+        Draw color legend
+        
+        Args:
+            image: Original image
+            
+        Returns:
+            np.ndarray: Image with legend added
+        """
+        h, w = image.shape[:2]
+        
+        # Legend background (right side semi-transparent)
+        legend_width = 200
+        legend_height = 300
+        legend_x = w - legend_width - 20
+        legend_y = 100
+        
+        overlay = image.copy()
+        cv2.rectangle(overlay, 
+                     (legend_x, legend_y),
+                     (legend_x + legend_width, legend_y + legend_height),
+                     (40, 40, 40), -1)
+        image = cv2.addWeighted(overlay, 0.8, image, 0.2, 0)
+        
+        # Legend title
+        cv2.putText(image, "Color Legend", (legend_x + 10, legend_y + 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        # Behavior state color explanation
+        behaviors = [
+            ('dangerous', 'Danger', '[!]'),
+            ('stopped', 'Stopped', '[S]'),
+            ('overtaking', 'Overtaking', '[F]'),
+            ('lane_changing', 'Lane Change', '[<>]'),
+            ('accelerating', 'Accelerating', '[A]'),
+            ('braking', 'Braking', '[B]'),
+            ('normal', 'Normal', '[-]')
+        ]
+        
+        y_offset = 60
+        for behavior_key, behavior_name, icon in behaviors:
+            # Color block
+            color = self.behavior_colors.get(behavior_key, (255, 255, 255))
+            cv2.rectangle(image,
+                         (legend_x + 10, legend_y + y_offset),
+                         (legend_x + 30, legend_y + y_offset + 15),
+                         color, -1)
+            
+            # Behavior name
+            text = f"{icon} {behavior_name}"
+            cv2.putText(image, text,
+                       (legend_x + 40, legend_y + y_offset + 12),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            y_offset += 25
+        
+        # Vehicle class explanation
+        cv2.putText(image, "Vehicle Types:", (legend_x + 10, legend_y + y_offset + 20),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        
+        classes = [
+            ('car', 'Car', ''),
+            ('bus', 'Bus', ''),
+            ('truck', 'Truck', '')
+        ]
+        
+        y_offset += 40
+        for class_key, class_name, icon in classes:
+            # Color block
+            color = self.class_colors.get(class_key, (255, 255, 255))
+            cv2.rectangle(image,
+                         (legend_x + 10, legend_y + y_offset),
+                         (legend_x + 30, legend_y + y_offset + 15),
+                         color, -1)
+            
+            # Class name
+            text = class_name
+            cv2.putText(image, text,
+                       (legend_x + 40, legend_y + y_offset + 12),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            
+            y_offset += 25
+        
+        return image
+    
+    def show(self, image, stats_data=None):
+        """
+        Display image and statistics window
+        
+        Args:
+            image: Main window image
+            stats_data: Statistics data (for updating statistics window)
+            
+        Returns:
+            int: Key value
+        """
+        # Display main window
+        if utils.valid_img(image):
+            cv2.imshow(self.window_name, image)
+        
+        # Update statistics window (update every few frames to avoid performance impact)
+        if self.show_stats_window and stats_data is not None:
+            self.stats_frame_counter += 1
+            
+            if self.stats_frame_counter >= self.stats_update_interval:
+                self.stats_image = self.create_stats_window_image(stats_data)
+                if self.stats_image is not None:
+                    cv2.imshow(self.stats_window_name, self.stats_image)
+                self.stats_frame_counter = 0
+        
+        # Wait for key (brief wait to maintain responsiveness)
+        return cv2.waitKey(1)
+    
+    def destroy(self):
+        """Destroy all windows"""
+        # 销毁点云可视化器
+        if self.pcd_vis:
+            try:
+                self.pcd_vis.destroy_window()
             except:
                 pass
         
-        # 关闭OpenCV窗口
+        # 销毁其他窗口
         cv2.destroyAllWindows()
+        logger.info("[OK] All visualization windows closed")
+
+# ======================== Main Program ========================
+
+class CarlaTrackingSystem:
+    """CARLA tracking system main class"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.running = False
         
-        # 关闭数据记录
-        recorder.close()
+        # Core components
+        self.client = None
+        self.world = None
+        self.ego_vehicle = None
+        self.sensor_manager = None
+        self.detector = None
+        self.tracker = None
+        self.visualizer = None
         
-        # 销毁LiDAR
-        if lidar and lidar.is_alive:
-            try: 
-                lidar.stop()
-                lidar.destroy()
-                print("✅ LiDAR已销毁")
-            except Exception as e:
-                print(f"⚠️ 销毁LiDAR失败: {e}")
+        # Performance monitoring
+        self.fps_counter = utils.FPSCounter(window_size=15)
+        self.perf_monitor = utils.PerformanceMonitor()
         
-        # 销毁相机
-        if cam and cam.is_alive:
-            try: 
-                cam.stop()
-                cam.destroy()
-                print("✅ 相机已销毁")
-            except Exception as e:
-                print(f"⚠️ 销毁相机失败: {e}")
+        # State variables
+        self.current_weather = config.get('weather', 'clear')
+        self.frame_count = 0
+        self.show_legend = True  # Whether to show color legend
+        self.start_time = time.time()  # Program start time
         
-        # 销毁自车
-        if ego and ego.is_alive:
-            try: 
-                ego.destroy()
-                print("✅ 自车已销毁")
-            except Exception as e:
-                print(f"⚠️ 销毁自车失败: {e}")
+        # 新增：视角控制
+        self.current_view_mode = 'satellite'  # 默认卫星视角
+
+        # Detection thread related
+        self.detection_thread = None
+        self.image_queue = None
+        self.result_queue = None
         
-        # 清理所有NPC和传感器
-        clear_actors(world)
+        logger.info("[OK] Tracking system initialized (Color ID encoding + Independent statistics window)")
+    
+    def initialize(self):
+        """Initialize system"""
+        try:
+            # 1. Connect to CARLA
+            self.client, self.world = setup_carla_client(self.config)
+            if not self.client or not self.world:
+                return False
+            
+            # Wait for CARLA world to stabilize
+            logger.info("Waiting for CARLA world to stabilize...")
+            for i in range(10):
+                self.world.tick()
+                time.sleep(0.1)
+            
+            # 2. Set weather
+            set_weather(self.world, self.current_weather)
+            
+            # 3. Clean up existing vehicles
+            logger.info("Clearing existing vehicles...")
+            sensors.clear_all_actors(self.world, [])
+            time.sleep(1.0)
+            
+            # 4. Create ego vehicle
+            self.ego_vehicle = sensors.create_ego_vehicle(self.world, self.config)
+            if not self.ego_vehicle:
+                logger.error("[ERROR] Failed to create ego vehicle")
+                return False
+            
+            # Wait for ego vehicle to stabilize
+            time.sleep(0.5)
+            
+            # 5. Generate NPC vehicles
+            npc_count = sensors.spawn_npc_vehicles(self.world, self.config)
+            logger.info(f"[OK] Spawned {npc_count} NPC vehicles")
+            
+            # Wait for NPC vehicles to spawn
+            time.sleep(0.5)
+            
+            # 6. Initialize sensors
+            self.sensor_manager = sensors.SensorManager(self.world, self.ego_vehicle, self.config)
+            if not self.sensor_manager.setup():
+                logger.error("[ERROR] Sensor initialization failed")
+                return False
+            
+            # 7. Initialize detector
+            self.detector = tracker.YOLODetector(self.config)
+            
+            # 8. Initialize tracker
+            self.tracker = tracker.SORTTracker(self.config)
+            
+            # 9. Initialize visualizer
+            self.visualizer = Visualizer(self.config)
+            
+            # 10. Setup detection thread
+            use_async = self.config.get('use_async_detection', True)
+            if use_async:
+                self._setup_detection_thread()
+            
+            logger.info("[OK] System initialization complete, ready to start tracking")
+            return True
+            
+        except Exception as e:
+            logger.error(f"[ERROR] System initialization failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _setup_detection_thread(self):
+        """Setup detection thread"""
+        try:
+            import queue
+            self.image_queue = queue.Queue(maxsize=2)
+            self.result_queue = queue.Queue(maxsize=2)
+            
+            self.detection_thread = tracker.DetectionThread(
+                detector=self.detector,
+                input_queue=self.image_queue,
+                output_queue=self.result_queue,
+                maxsize=2
+            )
+            self.detection_thread.start()
+            logger.info("[OK] Detection thread started")
+        except Exception as e:
+            logger.warning(f"Detection thread setup failed, using synchronous mode: {e}")
+            self.detection_thread = None
+    
+    def _collect_statistics_data(self, fps, detection_time, tracking_time, tracks_info):
+        """
+        Collect statistics data
         
-        # 恢复CARLA设置
-        settings = world.get_settings()
-        settings.synchronous_mode = False
-        world.apply_settings(settings)
-        print("✅ 所有资源清理完成")
+        Args:
+            fps: Current frame rate
+            detection_time: Detection time
+            tracking_time: Tracking time
+            tracks_info: Tracking information list
+            
+        Returns:
+            dict: Statistics data
+        """
+        # Get system performance data
+        cpu_usage = psutil.cpu_percent()
+        memory_usage = psutil.virtual_memory().percent
+        
+        # Get GPU usage (if available)
+        try:
+            if torch.cuda.is_available():
+                gpu_usage = torch.cuda.utilization()
+            else:
+                gpu_usage = 0
+        except:
+            gpu_usage = 0
+        
+        # Count vehicle types
+        vehicle_counts = {'car': 0, 'bus': 0, 'truck': 0}
+        for track in tracks_info:
+            class_name = track.get('class_name', '').lower()
+            if class_name in vehicle_counts:
+                vehicle_counts[class_name] += 1
+        
+        # Count behavior types
+        behavior_counts = {
+            'dangerous': 0, 'stopped': 0, 'overtaking': 0,
+            'lane_changing': 0, 'turning': 0, 'accelerating': 0,
+            'braking': 0, 'normal': 0
+        }
+        
+        for track in tracks_info:
+            if track.get('is_dangerous', False):
+                behavior_counts['dangerous'] += 1
+            elif track.get('is_stopped', False):
+                behavior_counts['stopped'] += 1
+            elif track.get('is_overtaking', False):
+                behavior_counts['overtaking'] += 1
+            elif track.get('is_lane_changing', False):
+                behavior_counts['lane_changing'] += 1
+            elif track.get('is_turning', False):
+                behavior_counts['turning'] += 1
+            elif track.get('is_accelerating', False):
+                behavior_counts['accelerating'] += 1
+            elif track.get('is_braking', False):
+                behavior_counts['braking'] += 1
+            else:
+                behavior_counts['normal'] += 1
+        
+        # Get performance monitoring data
+        perf_stats = self.perf_monitor.get_stats()
+        
+        # Detection thread status
+        detection_thread_status = 'Running' if self.detection_thread and self.detection_thread.is_alive() else 'Not running'
+        
+        # 点云状态（新增）
+        pointcloud_status = 'Enabled' if self.config.get('use_lidar', True) else 'Disabled'
+        if self.visualizer:
+            pointcloud_status += ' | Showing' if self.visualizer.show_pointcloud else ' | Hidden'
+        
+        return {
+            # System status
+            'fps': fps,
+            'total_frames': self.frame_count,
+            'run_time': time.time() - self.start_time,
+            'cpu_usage': cpu_usage,
+            'memory_usage': memory_usage,
+            'gpu_usage': gpu_usage,
+            'detection_thread': detection_thread_status,
+            
+            # Object statistics
+            'total_objects': len(tracks_info),
+            'vehicle_counts': vehicle_counts,
+            'behavior_counts': {k: v for k, v in behavior_counts.items() if v > 0},
+            
+            # Performance metrics
+            'avg_detection_time': detection_time * 1000,  # Convert to milliseconds
+            'avg_tracking_time': tracking_time * 1000,    # Convert to milliseconds
+            'avg_frame_time': perf_stats.get('avg_frame_time', 0),
+            
+            # 点云状态（新增）
+            'pointcloud_status': pointcloud_status,
+            'pointcloud_enabled': self.config.get('use_lidar', True),
+            'pointcloud_showing': self.visualizer.show_pointcloud if self.visualizer else False,
+            
+            # Raw data (for charts)
+            'detection_time': detection_time,
+            'tracking_time': tracking_time,
+        }
+    
+    def run(self):
+        """Run main loop"""
+        import time
+        import queue
+        
+        if not self.initialize():
+            logger.error("[ERROR] System initialization failed, cannot run")
+            return
+        
+        self.running = True
+        logger.info("[START] Starting tracking...")
+        
+        try:
+            while self.running:
+                # Start frame timing
+                self.perf_monitor.start_frame()
+                
+                # 1. Update CARLA world
+                self.world.tick()
+                
+                # 2. Get sensor data
+                sensor_data = self.sensor_manager.get_sensor_data()
+                image = sensor_data.get('image')
+                
+                if not utils.valid_img(image):
+                    logger.warning("Invalid image received, skipping frame")
+                    time.sleep(0.1)
+                    continue
+                
+                # 3. Execute detection (synchronous or asynchronous)
+                detections = []
+                detection_start = time.time()
+                
+                if self.detection_thread and self.detection_thread.is_alive():
+                    # Asynchronous detection
+                    if not self.image_queue.full():
+                        self.image_queue.put(image.copy())
+                    
+                    try:
+                        processed_image, detections = self.result_queue.get(timeout=0.05)
+                        if processed_image is not None:
+                            image = processed_image
+                    except queue.Empty:
+                        # Queue empty, use previous detection result
+                        pass
+                else:
+                    # Synchronous detection
+                    detections = self.detector.detect(image)
+                
+                detection_time = time.time() - detection_start
+                self.perf_monitor.record_detection_time(detection_time)
+                
+                # 4. Update tracker
+                ego_center = (self.config['img_width'] // 2, self.config['img_height'] // 2)
+                
+                # Get LiDAR detection results (if available)
+                lidar_detections = sensor_data.get('lidar_objects', [])
+                
+                tracking_start = time.time()
+                boxes, ids, classes = self.tracker.update(
+                    detections=detections,
+                    ego_center=ego_center,
+                    lidar_detections=lidar_detections if lidar_detections else None
+                )
+                tracking_time = time.time() - tracking_start
+                self.perf_monitor.record_tracking_time(tracking_time)
+                
+                # 5. Get tracking detailed information
+                tracks_info = self.tracker.get_tracks_info()
+                
+                # 6. Update FPS
+                fps = self.fps_counter.update()
+                
+                # 7. Collect statistics data
+                stats_data = self._collect_statistics_data(fps, detection_time, tracking_time, tracks_info)
+                
+                # 8. Update visualizer's performance data
+                self.visualizer.update_performance_data(fps, detection_time, tracking_time, stats_data)
+                
+                # 9. Visualization
+                result_image = self.visualizer.draw_detections(
+                    image=image,
+                    boxes=boxes,
+                    ids=ids,
+                    classes=classes,
+                    tracks_info=tracks_info
+                )
+                
+                # 添加点云显示（新增）
+                if sensor_data.get('pointcloud') is not None:
+                    self.visualizer.update_pointcloud(sensor_data['pointcloud'])
+                
+                # Add color legend (if enabled)
+                if self.show_legend:
+                    result_image = self.visualizer.draw_color_legend(result_image)
+                
+                # Display FPS on image (top)
+                if utils.valid_img(result_image):
+                    fps_text = f"FPS: {fps:.1f}"
+                    cv2.putText(result_image, fps_text, (self.config['img_width'] - 100, 25),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                
+                # 10. Display results (pass statistics data for updating statistics window)
+                key = self.visualizer.show(result_image, stats_data=stats_data)
+                
+                # 11. Handle keyboard input
+                self._handle_keyboard_input(key)
+                
+                # 12. Frame rate control
+                self._control_frame_rate(fps)
+                
+                # 13. Update state
+                self.frame_count += 1
+                self.perf_monitor.end_frame()
+                
+                # 14. Periodically print status
+                if self.frame_count % 100 == 0:
+                    self._print_status(stats_data)
+                
+        except KeyboardInterrupt:
+            logger.info("[STOP] User interrupted program")
+        except Exception as e:
+            logger.error(f"[ERROR] Runtime error: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            self.cleanup()
+    
+    def _handle_keyboard_input(self, key):
+        """Handle keyboard input"""
+        # ESC key to exit
+        if key == 27:  # ESC
+            logger.info("[STOP] ESC pressed, exiting program")
+            self.running = False
+        
+        # W key to switch weather
+        elif key == ord('w') or key == ord('W'):
+            weather_list = ['clear', 'cloudy', 'rain', 'fog', 'night']
+            current_idx = weather_list.index(self.current_weather) if self.current_weather in weather_list else 0
+            next_idx = (current_idx + 1) % len(weather_list)
+            self.current_weather = weather_list[next_idx]
+            set_weather(self.world, self.current_weather)
+            logger.info(f"[WEATHER] Weather switched to: {self.current_weather}")
+        
+        # S key to save screenshot
+        elif key == ord('s') or key == ord('S'):
+            self._save_screenshot()
+        
+        # P key to pause/resume
+        elif key == ord('p') or key == ord('P'):
+            logger.info("[PAUSE] Program paused, press any key to continue...")
+            cv2.waitKey(0)
+            logger.info("[RESUME] Program resumed")
+        
+        # T key to toggle statistics window display
+        elif key == ord('t') or key == ord('T'):
+            self.visualizer.show_stats_window = not self.visualizer.show_stats_window
+            status = "Show" if self.visualizer.show_stats_window else "Hide"
+            logger.info(f"[STATS] Statistics window: {status}")
+            
+            # If hiding window, need to close it
+            if not self.visualizer.show_stats_window:
+                try:
+                    cv2.destroyWindow(self.visualizer.stats_window_name)
+                except:
+                    pass  # Window may already be closed
+        
+        # M key to toggle color legend display
+        elif key == ord('m') or key == ord('M'):
+            self.show_legend = not self.show_legend
+            status = "Show" if self.show_legend else "Hide"
+            logger.info(f"[LEGEND] Color legend: {status}")
+        
+        # L键切换点云显示（新增）
+        elif key == ord('l') or key == ord('L'):
+            if self.visualizer:
+                self.visualizer.toggle_pointcloud_display()
+        
+        # 新增：V键切换视角模式
+        elif key == ord('v') or key == ord('V'):
+            if self.sensor_manager:
+                self.sensor_manager.cycle_view_mode()
+                # 获取当前视角模式并显示
+                current_mode = self.sensor_manager.spectator_manager.view_mode
+                mode_names = {
+                    'satellite': '卫星视角',
+                    'behind': '后方视角', 
+                    'first_person': '第一人称视角'
+                }
+                mode_name = mode_names.get(current_mode, current_mode)
+                logger.info(f"[VIEW] 切换到 {mode_name}")
+
+    def _control_frame_rate(self, current_fps):
+        """自适应帧率控制（简单版）"""
+        import time
+        import psutil
+    
+        # 获取当前系统负载
+        cpu_usage = psutil.cpu_percent()
+    
+        # 根据CPU使用率动态调整目标FPS
+        if cpu_usage > 85:  # 非常高负载
+            target_fps = max(10, self.config.get('display_fps', 30) * 0.5)
+        elif cpu_usage > 70:  # 高负载
+            target_fps = max(15, self.config.get('display_fps', 30) * 0.7)
+        elif cpu_usage < 40:  # 低负载，可以尝试更高FPS
+            target_fps = min(60, self.config.get('display_fps', 30) * 1.5)
+        elif cpu_usage < 60:  # 中等负载
+            target_fps = min(45, self.config.get('display_fps', 30) * 1.2)
+        else:  # 正常负载
+            target_fps = self.config.get('display_fps', 30)
+    
+        if target_fps <= 0:
+            return
+    
+        target_interval = 1.0 / target_fps
+    
+        # 如果帧率过高，适当休眠
+        if current_fps > target_fps * 1.2:  # 允许20%波动
+            sleep_time = max(0, target_interval - (1.0 / current_fps))
+            time.sleep(sleep_time)
+    
+    
+    def _print_status(self, stats_data):
+        """Print system status"""
+        total_objects = stats_data.get('total_objects', 0)
+        fps = stats_data.get('fps', 0)
+        cpu_usage = stats_data.get('cpu_usage', 0)
+        
+        logger.info(f"[STATUS] Frames={self.frame_count}, "
+                   f"FPS={fps:.1f}, "
+                   f"Objects={total_objects}, "
+                   f"CPU={cpu_usage:.1f}%")
+    
+    def cleanup(self):
+        """Clean up resources"""
+        logger.info("[CLEANUP] Cleaning up resources...")
+        
+        # Stop detection thread
+        if self.detection_thread:
+            self.detection_thread.stop()
+            self.detection_thread.join(timeout=2.0)
+        
+        # Destroy visualizer
+        if self.visualizer:
+            self.visualizer.destroy()
+        
+        # Destroy sensors
+        if self.sensor_manager:
+            self.sensor_manager.destroy()
+        
+        # Clean up CARLA actors
+        if self.world:
+            # Exclude ego vehicle ID (if exists)
+            exclude_ids = [self.ego_vehicle.id] if self.ego_vehicle and self.ego_vehicle.is_alive else []
+            sensors.clear_all_actors(self.world, exclude_ids)
+        
+        # Restore CARLA settings
+        if self.world:
+            settings = self.world.get_settings()
+            settings.synchronous_mode = False
+            self.world.apply_settings(settings)
+        
+        # Print final performance statistics
+        if self.perf_monitor:
+            self.perf_monitor.print_stats()
+        
+        # Print final runtime
+        total_time = time.time() - self.start_time
+        logger.info(f"[TIME] Total runtime: {total_time:.1f} seconds")
+        logger.info(f"[STATS] Average FPS: {self.frame_count/total_time:.1f}" if total_time > 0 else "")
+        
+        logger.info("[OK] Resource cleanup complete")
+
+# ======================== Main Function ========================
+
+def main():
+    """Main function"""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='CARLA Multi-Object Tracking System')
+    parser.add_argument('--config', type=str, default='config.yaml',
+                       help='Configuration file path (default: config.yaml)')
+    parser.add_argument('--host', type=str, default='localhost',
+                       help='CARLA server address (default: localhost)')
+    parser.add_argument('--port', type=int, default=2000,
+                       help='CARLA server port (default: 2000)')
+    parser.add_argument('--weather', type=str, default='clear',
+                       choices=['clear', 'cloudy', 'rain', 'fog', 'night'],
+                       help='Initial weather (default: clear)')
+    parser.add_argument('--model', type=str, default='yolov8n.pt',
+                       help='YOLO model path (default: yolov8n.pt)')
+    parser.add_argument('--conf-thres', type=float, default=0.5,
+                       help='Detection confidence threshold (default: 0.5)')
+    parser.add_argument('--no-lidar', action='store_true',
+                       help='Disable LiDAR')
+    parser.add_argument('--no-stats', action='store_true',
+                       help='Do not show statistics window at startup')
+    
+    args = parser.parse_args()
+    
+    # Configure logging
+    logger.remove()
+    logger.add(sys.stdout, 
+               format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+               level="INFO")
+    
+    # Record start time
+    start_time = time.time()
+    logger.info("=" * 50)
+    logger.info("CARLA Multi-Object Tracking System (Enhanced)")
+    logger.info("=" * 50)
+    
+    try:
+        # 1. Load configuration
+        config = load_config(args.config)
+        
+        # 2. Override configuration with command line arguments
+        if args.host:
+            config['host'] = args.host
+        if args.port:
+            config['port'] = args.port
+        if args.weather:
+            config['weather'] = args.weather
+        if args.model:
+            config['yolo_model'] = args.model
+        if args.conf_thres:
+            config['conf_thres'] = args.conf_thres
+        if args.no_lidar:
+            config['use_lidar'] = False
+        
+        # 3. Create and run tracking system
+        system = CarlaTrackingSystem(config)
+        
+        # Set initial display state
+        if args.no_stats:
+            system.visualizer.show_stats_window = False
+        
+        system.run()
+        
+    except Exception as e:
+        logger.error(f"[ERROR] Program runtime error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    finally:
+        # Calculate runtime
+        run_time = time.time() - start_time
+        logger.info("=" * 50)
+        logger.info(f"[TIME] Program runtime: {run_time:.1f} seconds")
+        logger.info("[END] Program ended")
+        logger.info("=" * 50)
 
 if __name__ == "__main__":
-    # 配置日志
-    logger.remove()
-    logger.add(sys.stdout, format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>", level="INFO")
-    logger.add(f"track_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log", rotation="100 MB", retention="7 days", format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}", level="DEBUG")
+    # 检查配置
+    try:
+        import torch
+    except ImportError:
+        print("[ERROR] PyTorch not found, please install: pip install torch")
+        sys.exit(1)
     
-    # 启动主程序
+    try:
+        import carla
+    except ImportError:
+        print("[ERROR] CARLA Python API not found")
+        print("Please copy PythonAPI/carla from CARLA installation directory to project directory")
+        sys.exit(1)
+    
+    try:
+        import psutil
+    except ImportError:
+        print("[ERROR] psutil not found, please install: pip install psutil")
+        sys.exit(1)
+    
+    # Run main program
     main()
