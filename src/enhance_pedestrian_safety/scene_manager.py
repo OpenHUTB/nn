@@ -45,6 +45,23 @@ class SceneManager:
             'vehicle_density': 0.6,
             'pedestrian_density': 0.5,
             'weather_variations': ['rainy']
+        },
+        'school_zone': {
+            'description': '学校区域场景 - 行人安全重点',
+            'pedestrian_behavior': ['crossing', 'walking', 'playing', 'running'],
+            'vehicle_density': 0.4,
+            'pedestrian_density': 0.9,
+            'weather_variations': ['clear', 'cloudy'],
+            'speed_limit': 20.0,
+            'safety_zone_radius': 30.0
+        },
+        'pedestrian_crossing': {
+            'description': '人行横道场景',
+            'pedestrian_behavior': ['crossing', 'waiting', 'walking'],
+            'vehicle_density': 0.5,
+            'pedestrian_density': 0.8,
+            'weather_variations': ['clear', 'rainy'],
+            'crossing_intensity': 'high'
         }
     }
 
@@ -74,6 +91,10 @@ class SceneManager:
         # 设置行人行为
         config['traffic']['pedestrian_behaviors'] = scene_config['pedestrian_behavior']
 
+        # 如果是学校区域，设置车速限制
+        if scene_type == 'school_zone' and 'speed_limit' in scene_config:
+            config['traffic']['speed_limit'] = scene_config['speed_limit']
+
         # 应用场景特定设置
         SceneManager._apply_scene_specifics(world, scene_type)
 
@@ -102,8 +123,72 @@ class SceneManager:
                         except:
                             pass
 
+            elif scene_type == 'school_zone':
+                # 学校区域：设置车辆限速和行人保护区域
+                for actor in world.get_actors():
+                    if 'vehicle' in actor.type_id:
+                        try:
+                            # 限制车速
+                            actor.enable_constant_velocity(carla.Vector3D(15, 0, 0))
+                            # 开启行人检测警告
+                            actor.set_light_state(carla.VehicleLightState.LowBeam)
+                        except:
+                            pass
+
+            elif scene_type == 'pedestrian_crossing':
+                # 人行横道：增加可见性
+                for actor in world.get_actors():
+                    if 'vehicle' in actor.type_id:
+                        try:
+                            actor.set_light_state(carla.VehicleLightState.LowBeam)
+                        except:
+                            pass
+
         except Exception as e:
             print(f"场景特定设置失败: {e}")
+
+    @staticmethod
+    def spawn_pedestrian_safety_features(world, location, feature_type='crosswalk'):
+        """生成行人安全设施"""
+        blueprint_lib = world.get_blueprint_library()
+        features = []
+
+        try:
+            if feature_type == 'crosswalk':
+                # 生成人行横道标记
+                for i in range(-4, 5):
+                    line_location = carla.Location(
+                        x=location.x + i * 0.8,
+                        y=location.y,
+                        z=location.z + 0.02
+                    )
+                    rotation = carla.Rotation(0, 0, 0)
+
+                    line_bp = blueprint_lib.find('static.prop.linepainting')
+                    if line_bp:
+                        line = world.spawn_actor(line_bp, carla.Transform(line_location, rotation))
+                        features.append(line)
+
+            elif feature_type == 'speed_bump':
+                # 生成减速带
+                bump_location = carla.Location(location.x, location.y, location.z + 0.1)
+                bump_bp = blueprint_lib.find('static.prop.speedbump')
+                if bump_bp:
+                    bump = world.spawn_actor(bump_bp, carla.Transform(bump_location, carla.Rotation(0, 0, 0)))
+                    features.append(bump)
+
+            elif feature_type == 'warning_sign':
+                # 生成警告标志
+                sign_location = carla.Location(location.x, location.y, location.z + 2.0)
+                sign_bp = blueprint_lib.find('static.prop.trafficsign')
+                if sign_bp:
+                    sign = world.spawn_actor(sign_bp, carla.Transform(sign_location, carla.Rotation(0, 90, 0)))
+                    features.append(sign)
+
+        except Exception as e:
+            print(f"生成行人安全设施失败: {e}")
+
+        return features
 
     @staticmethod
     def spawn_traffic_cones(world, center_location, num_cones=10):
