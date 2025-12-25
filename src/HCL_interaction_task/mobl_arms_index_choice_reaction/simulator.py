@@ -1,128 +1,224 @@
 import mujoco
-import mujoco.viewer  # 强制导入viewer（放弃兼容旧版本，优先保证运行）
+import mujoco.viewer  
 import numpy as np
 import yaml
 import time
 import os
 
-# 解决Linux GLX错误：优先用osmesa，若不行则用glfw（备选）
-os.environ['MUJOCO_GL'] = 'osmesa'  
-# 增加环境变量，避免viewer闪退
-os.environ['MJPYTHON_FRAMEWORK'] = 'gtk3'
+# 兼容所有MuJoCo版本+远程环境
+os.environ['MUJOCO_GL'] = 'egl'
+os.environ['MJPYTHON_FRAMEWORK'] = 'none'
+os.environ['MESA_GL_VERSION_OVERRIDE'] = '3.3'
 
 class IndexSimulator:
     def __init__(self, config_path, model_path):
-        # 1. 加载配置
         with open(config_path, 'r') as f:
             self.config = yaml.safe_load(f)
         
-        # 2. 加载MuJoCo模型
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
         
-        # 3. 检查qpos长度（关键！避免索引错误）
-        self.qpos_len = len(self.data.qpos)
-        print(f"✅ 模型加载成功！qpos长度：{self.qpos_len}")
-        self.move_joints = 3 if self.qpos_len >=3 else self.qpos_len
+        # 1. 模型关键信息+关节range（稳定核心）
+        print("\n📌 模型核心信息：")
+        print(f"关节总数：{self.model.njnt} | 执行器数：{self.model.nu} | qpos长度：{len(self.data.qpos)}")
 
-        # 4. 初始化核心变量
+        # 在__init__里新增：打印所有geom
+        print("\n📌 所有geom名称：")
+        for i in range(self.model.ngeom):
+            geom_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, i)
+            print(f"geom{i}：{geom_name}")
+        
+        self.key_joints = {
+            15: {
+                "name": "shoulder_rot (肩关节旋转)",
+                "range": (-1.57, 0.349),
+                "step": 0.05,
+                "current_step_dir": 0.05  # 运动方向
+            },
+            16: {
+                "name": "elbow_flexion (肘关节弯曲)",
+                "range": (0, 2.26893),
+                "step": 0.08,
+                "current_step_dir": 0.08
+            },
+            17: {
+                "name": "pro_sup (前臂旋前旋后)",
+                "range": (-1.5708, 1.5708),
+                "step": 0.04,
+                "current_step_dir": 0.04
+            }
+        }
+
+        # 打印关节初始信息
+        print("\n📌 关键关节（带range限制）：")
+        for jnt_id, info in self.key_joints.items():
+            if jnt_id < len(self.data.qpos):
+                init_val = (info['range'][0] + info['range'][1]) / 2
+                print(f"关节{jnt_id}：{info['name']} | range：{info['range']} | 初始值：{init_val:.2f} rad")
+
+        # 2. 仿真状态（极简，避免段错误）
         self.is_running = True
         self.viewer = None
-        self.button_names = ["button-0", "button-1", "button-2", "button-3"]
-        self.button_touched = {name: False for name in self.button_names}
+        self.print_interval = 50
+        self.current_step = 0
+        self.button_touched = {"button-0":False, "button-1":False, "button-2":False, "button-3":False}
         self.finger_geom_name = "hand_2distph"
 
+        # 新增：找到screen对应的geom ID（控制面板颜色）
+        self.screen_geom_name = "screen"
+        self.screen_geom_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, self.screen_geom_name
+        )
+        if self.screen_geom_id == -1:
+            print(f"⚠️ 未找到面板geom（{self.screen_geom_name}），颜色控制失效")
+        else:
+            print(f"✅ 找到面板geom（ID：{self.screen_geom_id}），已启用颜色切换")
+
+        # 新增：面板要切换的4种颜色（和按钮颜色对应）
+        self.screen_colors = [
+            [0.8, 0.1, 0.1, 1.0],  # 红色（对应button-0）
+            [0.1, 0.8, 0.1, 1.0],  # 绿色（对应button-1）
+            [0.1, 0.1, 0.8, 1.0],  # 蓝色（对应button-2）
+            [0.8, 0.8, 0.1, 1.0]   # 黄色（对应button-3）
+        ]
+        self.color_switch_interval = 100  # 每隔100步切换一次颜色（≈3秒）
+
     def reset(self):
-        """重置仿真：安全赋值qpos"""
+        """重置关节到range中间值"""
         mujoco.mj_resetData(self.model, self.data)
-        # 安全赋值：只给存在的关节赋值
-        if self.qpos_len >= 1:
-            self.data.qpos[0] = 0.0  # X方向
-        if self.qpos_len >= 2:
-            self.data.qpos[1] = 0.0  # Y方向
-        if self.qpos_len >= 3:
-            self.data.qpos[2] = 0.0  # Z方向
-        self.button_touched = {name: False for name in self.button_names}
+        for jnt_id, info in self.key_joints.items():
+            if jnt_id < len(self.data.qpos):
+                init_val = (info['range'][0] + info['range'][1]) / 2
+                self.data.qpos[jnt_id] = init_val
+                self.key_joints[jnt_id]['current_step_dir'] = info['step']  # 重置方向
+        self.current_step = 0
         self.is_running = True
         return self.data.qpos.copy()
 
-    def step(self, action=None):
-        """每一步仿真：安全移动手指"""
-        # 1. 默认动作：向按钮移动（放慢速度，避免瞬移）
-        if action is None:
-            action = np.array([0.001, 0.0, 0.0])  # 把步长从0.01改成0.001，移动更慢更稳
+    def step(self):
+        """单步仿真：稳定+慢速，无错误"""
+        if not self.is_running:
+            return self.data.qpos.copy()
 
-        # 2. 安全更新qpos（只更新存在的关节）
-        for i in range(min(len(action), self.move_joints)):
-            self.data.qpos[i] += action[i]
+        # 新增：每隔N步随机切换面板颜色（兼容所有MuJoCo版本）
+        if self.screen_geom_id != -1 and self.current_step % self.color_switch_interval == 0:
+            # 随机选一种颜色
+            random_color = self.screen_colors[np.random.randint(0, len(self.screen_colors))]
+            # 关键修改：直接赋值model.geom_rgba（替代过时的mj_geom_rgba）
+            self.model.geom_rgba[self.screen_geom_id] = random_color
+            # 打印颜色变化
+            color_map = {
+                tuple(self.screen_colors[0]): "红",
+                tuple(self.screen_colors[1]): "绿",
+                tuple(self.screen_colors[2]): "蓝",
+                tuple(self.screen_colors[3]): "黄"
+            }
+            color_name = color_map[tuple(random_color)]
+            print(f"\n🎨 step{self.current_step} 面板颜色切换为：{color_name}色")
 
-        # 3. 推进仿真
+        # 1. 关节慢速摆动（不超range）
+        for jnt_id, info in self.key_joints.items():
+            if jnt_id >= len(self.data.qpos):
+                continue
+            
+            current_val = self.data.qpos[jnt_id]
+            new_val = current_val + info['current_step_dir']
+            
+            # 到边界反向
+            if new_val > info['range'][1]:
+                self.key_joints[jnt_id]['current_step_dir'] = -info['step']
+                new_val = info['range'][1] - 0.01
+            elif new_val < info['range'][0]:
+                self.key_joints[jnt_id]['current_step_dir'] = info['step']
+                new_val = info['range'][0] + 0.01
+            
+            # 安全赋值
+            self.data.qpos[jnt_id] = np.clip(new_val, info['range'][0], info['range'][1])
+
+        # 2. 推进仿真
         mujoco.mj_step(self.model, self.data)
 
-        # 4. 检测碰撞
-        self._check_button_collision()
+        # 3. 定期打印（减少刷屏）
+        if self.current_step % self.print_interval == 0:
+            print(f"\n📌 step{self.current_step} 关节角度（直观度数）：")
+            for jnt_id, info in self.key_joints.items():
+                if jnt_id < len(self.data.qpos):
+                    rad = self.data.qpos[jnt_id]
+                    deg = rad * 57.3  # 弧度转角度
+                    print(f"   {info['name']}：{rad:.2f} rad ≈ {deg:.0f}°")
 
+        # 4. 渲染（容错处理，避免段错误）
+        if self.viewer:
+            try:
+                self.viewer.sync()
+                time.sleep(0.03)  # 慢速，肉眼看清
+            except Exception as e:
+                print(f"⚠️ 渲染同步警告（不影响仿真）：{e}")
+                pass
+
+        self.current_step += 1
         return self.data.qpos.copy()
 
     def run_simulation(self):
-        """
-        核心修改：主动创建Viewer+强制循环，直到手动关闭
-        """
-        print("✅ 仿真器初始化成功！")
-        print("👉 可视化窗口已弹出，手指正在向按钮移动...（按Ctrl+C终止）")
+        """核心：仅Ctrl+C中断，无窗口检测（解决段错误）"""
+        print("\n✅ 仿真启动成功！")
+        print("👉 手臂会慢速稳定摆动，按【Ctrl+C】终止仿真（关闭窗口需手动Ctrl+C）")
+        print("👉 关节严格限制在安全范围，无NaN/段错误！")
         self.reset()
 
-        # 主动创建Viewer实例（放弃passive模式，改用主动模式）
+        # 启动可视化（最大容错）
         try:
-            with mujoco.viewer.launch(self.model, self.data) as self.viewer:
-                # 调整视角
-                self.viewer.cam.azimuth = 135
-                self.viewer.cam.elevation = -15
-                self.viewer.cam.distance = 1.2
-                self.viewer.cam.lookat = [0.4, 0.0, 0.4]
-
-                # 强制循环：直到手动关闭窗口/按Ctrl+C
-                while self.is_running and self.viewer.is_running():
-                    # 执行仿真步
-                    self.step()
-                    # 控制帧率（每秒50帧，不会卡）
-                    time.sleep(0.02)
-                    # 同步viewer（主动模式必须手动sync）
-                    self.viewer.sync()
-
-        except KeyboardInterrupt:
-            # 按Ctrl+C优雅退出
-            print("\n⚠️ 检测到Ctrl+C，正在退出仿真...")
+            self.viewer = mujoco.viewer.launch_passive(self.model, self.data)
+            # 优化视角
+            self.viewer.cam.azimuth = 135
+            self.viewer.cam.elevation = -15
+            self.viewer.cam.distance = 0.6
+            self.viewer.cam.lookat = [0.45, -0.15, 0.8]
+            print("✅ 可视化窗口启动成功！能看到手臂慢速摆动")
         except Exception as e:
-            print(f"⚠️ 可视化启动失败，改用无窗口模式运行：{e}")
-            # 无窗口模式：循环100秒后退出
-            start_time = time.time()
-            while time.time() - start_time < 100:
+            print(f"⚠️ 可视化启动失败（不影响动作）：{e}")
+            print("📢 无窗口模式：终端打印关节角度，确认动作真实发生！")
+
+        # ========== 终极循环：仅Ctrl+C中断，无窗口检测 ==========
+        try:
+            while self.is_running:
                 self.step()
-                time.sleep(0.02)
+        except KeyboardInterrupt:
+            print("\n\n⚠️ 检测到Ctrl+C，正在优雅退出仿真...")
+            self.is_running = False
 
+        # 清理资源
         self.close()
-
-    def _check_button_collision(self):
-        """检测碰撞（简化版）"""
-        for i in range(self.data.ncon):
-            contact = self.data.contact[i]
-            geom1 = self.model.geom(contact.geom1).name
-            geom2 = self.model.geom(contact.geom2).name
-
-            for btn_name in self.button_names:
-                if (btn_name in [geom1, geom2]) and (self.finger_geom_name in [geom1, geom2]):
-                    if not self.button_touched[btn_name]:
-                        color_map = {"button-0":"红", "button-1":"绿", "button-2":"蓝", "button-3":"黄"}
-                        print(f"🎉 碰到【{color_map[btn_name]}按钮】！（继续运行，不会停止）")
-                        self.button_touched[btn_name] = True
+        print(f"\n✅ 仿真正常结束！共运行{self.current_step}步")
+        print("📊 最终关节角度：")
+        for jnt_id, info in self.key_joints.items():
+            if jnt_id < len(self.data.qpos):
+                rad = self.data.qpos[jnt_id]
+                deg = rad * 57.3
+                print(f"   {info['name']}：{rad:.2f} rad ≈ {deg:.0f}°")
 
     def close(self):
-        """关闭资源"""
+        """安全关闭资源，避免段错误"""
         self.is_running = False
         if self.viewer:
             try:
-                self.viewer.close()
+                # 不同版本MuJoCo的viewer关闭方式兼容
+                if hasattr(self.viewer, 'close'):
+                    self.viewer.close()
+                else:
+                    mujoco.viewer.close(self.viewer)
             except:
                 pass
-        print("\n👋 仿真结束～")
+
+if __name__ == "__main__":
+    # 替换为你的配置和模型路径
+    CONFIG_PATH = "config.yaml"
+    MODEL_PATH = "simulation.xml"
+    
+    # 启动仿真（包裹try-except，避免核心转储）
+    try:
+        sim = IndexSimulator(CONFIG_PATH, MODEL_PATH)
+        sim.run_simulation()
+    except Exception as e:
+        print(f"\n❌ 仿真启动异常：{e}")
+        print("💡 请检查模型文件路径/配置文件是否正确")

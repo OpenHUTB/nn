@@ -1,0 +1,59 @@
+# ======================== CARLA连接配置 ========================
+host: "localhost"
+port: 2000
+timeout: 20.0
+
+# ======================== 传感器配置 ========================
+img_width: 1280
+img_height: 960
+fov: 110
+sensor_tick: 0.05
+use_lidar: true
+
+# ======================== LiDAR配置 ========================
+lidar_channels: 32
+lidar_range: 100.0
+lidar_points_per_second: 500000
+
+# ======================== 检测模型配置 ========================
+yolo_model: "yolov8n.pt"
+conf_thres: 0.25
+iou_thres: 0.3
+device: "cpu"  
+yolo_imgsz_max: 640
+
+# ======================== 跟踪算法配置 ========================
+max_age: 5
+min_hits: 3
+kf_dt: 0.05
+max_speed: 50.0
+
+# ======================== 可视化配置 ========================
+window_width: 1280
+window_height: 720
+display_fps: 30
+
+# ======================== 轨迹历史配置 ========================
+track_history_len: 20
+
+# ======================== 行为分析配置 ========================
+stop_speed_thresh: 0.8
+stop_frames_thresh: 5
+overtake_speed_ratio: 1.5
+overtake_dist_thresh: 60.0
+lane_change_thresh: 0.4
+brake_accel_thresh: 2.0
+turn_angle_thresh: 15.0
+danger_dist_thresh: 15.0
+predict_frames: 10
+
+# ======================== 天气与NPC配置 ========================
+default_weather: "clear"
+num_npcs: 20
+
+# ======================== 视角控制配置 ========================
+view:
+  default_mode: "satellite"
+  satellite_height: 50.0
+  behind_distance: 10.0
+  first_person_height: 1.6
