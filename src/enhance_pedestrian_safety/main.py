@@ -20,6 +20,7 @@ from data_validator import DataValidator
 from data_analyzer import DataAnalyzer
 from lidar_processor import LidarProcessor, MultiSensorFusion
 from multi_vehicle_manager import MultiVehicleManager
+from pedestrian_safety_monitor import PedestrianSafetyMonitor
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
@@ -142,6 +143,11 @@ class Log:
     def performance(msg):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[PERF][{timestamp}] {msg}")
+
+    @staticmethod
+    def safety(msg):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[SAFETY][{timestamp}] {msg}")
 
 
 class WeatherSystem:
@@ -964,6 +970,7 @@ class DataCollector:
         self.sensor_managers = {}
         self.multi_vehicle_manager = None
         self.v2x_communication = None
+        self.safety_monitor = None
 
         self.start_time = None
         self.is_running = False
@@ -994,7 +1001,8 @@ class DataCollector:
             "v2x_messages",
             "v2xformer_format",
             "kitti_format",
-            "metadata"
+            "metadata",
+            "safety_reports"
         ]
 
         for subdir in directories:
@@ -1082,6 +1090,9 @@ class DataCollector:
                     {'type': 'vehicle', 'capabilities': ['bsm', 'rsm']}
                 )
 
+        # 初始化行人安全监控器
+        self.safety_monitor = PedestrianSafetyMonitor(self.world, self.output_dir)
+
         time.sleep(3.0)
         return True
 
@@ -1114,6 +1125,7 @@ class DataCollector:
         last_performance_sample = time.time()
         last_detailed_log = time.time()
         last_memory_check = time.time()
+        last_safety_check = time.time()
 
         memory_warning_issued = False
         early_stop_triggered = False
@@ -1166,6 +1178,13 @@ class DataCollector:
                         current_time - last_perception_share >= 2.0):
                     self._share_perception_data()
                     last_perception_share = current_time
+
+                # 行人安全检查
+                if current_time - last_safety_check >= 1.0 and self.safety_monitor:
+                    safety_report = self.safety_monitor.check_pedestrian_safety()
+                    if safety_report['risk_distribution']['high'] > 0:
+                        Log.safety(f"行人安全警告: {safety_report['high_risk_cases']}个高风险情况")
+                    last_safety_check = current_time
 
                 if current_time - last_performance_sample >= 10.0:
                     memory_info = self.performance_monitor.sample_memory()
@@ -1228,6 +1247,12 @@ class DataCollector:
                 Log.info(f"平均帧率: {fps:.2f} FPS")
                 Log.info(f"最大内存使用: {performance_summary['max_memory_mb']:.1f} MB")
                 Log.info(f"平均CPU使用: {performance_summary['average_cpu_percent']:.1f}%")
+
+                # 生成行人安全报告
+                if self.safety_monitor:
+                    final_report = self.safety_monitor.generate_final_report()
+                    Log.safety(
+                        f"行人安全报告: {final_report['risk_distribution']['high']}高风险, {final_report['risk_distribution']['medium']}中风险")
             else:
                 Log.warning("未收集到任何数据帧")
 
@@ -1276,6 +1301,13 @@ class DataCollector:
                 try:
                     Log.info("停止V2X通信...")
                     self.v2x_communication.stop()
+                except:
+                    pass
+
+            if self.safety_monitor:
+                try:
+                    Log.info("保存行人安全数据...")
+                    self.safety_monitor.save_data()
                 except:
                     pass
 
@@ -1328,6 +1360,7 @@ class DataCollector:
             self.traffic_manager = None
             self.multi_vehicle_manager = None
             self.v2x_communication = None
+            self.safety_monitor = None
             self.scene_center = None
 
             gc.collect()
@@ -1342,6 +1375,7 @@ class DataCollector:
                 self.traffic_manager = None
                 self.multi_vehicle_manager = None
                 self.v2x_communication = None
+                self.safety_monitor = None
                 gc.collect()
             except:
                 pass
@@ -1527,6 +1561,9 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             if self.multi_vehicle_manager:
                 metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
 
+            if self.safety_monitor:
+                metadata['safety_report'] = self.safety_monitor.generate_final_report()
+
         meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
@@ -1564,6 +1601,11 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             perception_files = len(
                 [f for f in os.listdir(os.path.join(coop_dir, "shared_perception")) if f.endswith('.json')])
             print(f"协同数据: {v2x_files} V2X消息, {perception_files} 共享感知文件")
+
+        safety_dir = os.path.join(self.output_dir, "safety_reports")
+        if os.path.exists(safety_dir):
+            safety_files = len([f for f in os.listdir(safety_dir) if f.endswith('.json')])
+            print(f"安全报告: {safety_files} 个")
 
         if self.output_format == 'v2xformer':
             v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
@@ -1643,6 +1685,7 @@ def main():
     parser.add_argument('--enable-cooperative', action='store_true', help='启用协同感知')
     parser.add_argument('--enable-enhancement', action='store_true', help='启用数据增强')
     parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
+    parser.add_argument('--enable-safety-monitor', action='store_true', default=True, help='启用行人安全监控')
 
     parser.add_argument('--run-analysis', action='store_true', help='运行数据集分析')
     parser.add_argument('--skip-validation', action='store_true', help='跳过数据验证')
@@ -1659,7 +1702,7 @@ def main():
     config['output']['output_format'] = args.output_format
 
     print("\n" + "=" * 60)
-    print("CVIPS 性能优化数据收集系统")
+    print("CVIPS 性能优化数据收集系统 - 行人安全增强版")
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
@@ -1678,6 +1721,7 @@ def main():
     print(f"  V2X: {'启用' if config['v2x']['enabled'] else '禁用'}")
     print(f"  协同: {'启用' if config['output']['save_cooperative'] else '禁用'}")
     print(f"  增强: {'启用' if config['enhancement']['enabled'] else '禁用'}")
+    print(f"  安全监控: {'启用' if args.enable_safety_monitor else '禁用'}")
 
     print(f"性能:")
     print(f"  批处理大小: {config['performance']['batch_size']}")
