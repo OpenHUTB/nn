@@ -68,8 +68,11 @@ class PandaAutoGrab:
         # 夹爪控制参数
         self.GRIPPER_WAIT_STEPS = 100  # 夹爪动作完成所需的等待步数
 
-        # 【优化1】提取机械臂初始位置为类内常量
+        # 位置坐标参数
         self.INIT_EE_POS = np.array([0.4, 0.0, 0.2])  # 末端执行器初始目标位置
+
+        # 【优化1】提取抬升高度增量为类内常量
+        self.LIFT_HEIGHT_INCREMENT = 0.05  # 抓取后额外抬升的高度增量
 
         # 打印模型信息
         print("=" * 50)
@@ -93,7 +96,7 @@ class PandaAutoGrab:
         """
         return self.data.xpos[self.cube_body_id].copy()
 
-    def _compute_jacobian(self):
+    def _compute_jacobian(self) -> np.ndarray:
         """计算末端执行器的位置雅克比矩阵
 
         Returns:
@@ -164,7 +167,6 @@ class PandaAutoGrab:
         """
         if self.current_phase == 0:
             # 阶段0：移动到初始位置
-            # 【优化2】使用类内常量替代硬编码的初始位置
             if self._move_step(self.INIT_EE_POS):
                 print("\n✅ 到达初始位置")
                 self.current_phase = 1
@@ -212,7 +214,9 @@ class PandaAutoGrab:
 
         elif self.current_phase == 6:
             # 阶段6：抬升立方体
-            if self._move_step(self.cube_pos + np.array([0, 0, self.safe_lift_height + 0.05]), speed=0.3):
+            # 【优化2】使用类内常量替代硬编码的抬升增量
+            lift_target = self.cube_pos + np.array([0, 0, self.safe_lift_height + self.LIFT_HEIGHT_INCREMENT])
+            if self._move_step(lift_target, speed=0.3):
                 print("\n✅ 抬升立方体")
                 self.current_phase = 7
                 self.step_counter = 0
@@ -250,7 +254,6 @@ class PandaAutoGrab:
 
         elif self.current_phase == 11:
             # 阶段11：返回初始位置
-            # 【优化2】使用类内常量替代硬编码的初始位置
             if self._move_step(self.INIT_EE_POS, speed=0.4):
                 print("\n✅ 返回初始位置")
                 self.current_phase = 12
