@@ -87,7 +87,7 @@ AGGREGATE_STATS_EVERY = 10
 class CarEnv:
 
     SHOW_CAM = SHOW_PREVIEW
-    STEER_AMT = 1.0   # actions that the agent can take [-1, 0, 1] --> [turn left, go straight, turn right]
+    STEER_AMT = 0.88   # actions that the agent can take [-1, 0, 1] --> [turn left, go straight, turn right]
     im_width = IM_WIDTH
     im_height = IM_HEIGHT
     front_camera = None
@@ -171,6 +171,8 @@ class CarEnv:
         for el in traj:
             self.path.append(el[0])
         
+        self.visualize_path(self.path)
+
         # 使用路径上的第一个点来确定正确的朝向
         if len(self.path) > 0:
             first_waypoint = self.path[0]
@@ -277,7 +279,85 @@ class CarEnv:
 
         # 返回初始状态，车辆保持静止
         return [(self.distance-300)/300, -1, 0, 0]
-    # 其余方法保持不变...
+
+    def visualize_path(self, path_points, color=None):
+        """可视化路径"""
+        try:
+            if color is None:
+                color = carla.Color(255, 0, 0)  # 红色
+            
+            # 绘制路径点
+            for i, waypoint in enumerate(path_points):
+                location = waypoint.transform.location
+                
+                # 每10个点画一个标记
+                if i % 10 == 0:
+                    self.world.debug.draw_string(
+                        carla.Location(location.x, location.y, location.z + 0.5),
+                        '→',
+                        draw_shadow=False,
+                        color=carla.Color(0, 255, 0),
+                        life_time=100.0,
+                        persistent_lines=True
+                    )
+                
+                # 画线连接路径点
+                if i < len(path_points) - 1:
+                    next_location = path_points[i + 1].transform.location
+                    self.world.debug.draw_line(
+                        carla.Location(location.x, location.y, location.z + 0.3),
+                        carla.Location(next_location.x, next_location.y, next_location.z + 0.3),
+                        thickness=0.1,
+                        color=color,
+                        life_time=100.0,
+                        persistent_lines=True
+                    )
+            
+            # 绘制起点和终点
+            if path_points:
+                start = path_points[0].transform.location
+                end = path_points[-1].transform.location
+                
+                # 起点标记
+                self.world.debug.draw_point(
+                    carla.Location(start.x, start.y, start.z + 0.5),
+                    size=0.2,
+                    color=carla.Color(0, 255, 0),  # 绿色
+                    life_time=100.0,
+                    persistent_lines=True
+                )
+                
+                # 终点标记
+                self.world.debug.draw_point(
+                    carla.Location(end.x, end.y, end.z + 0.5),
+                    size=0.2,
+                    color=carla.Color(255, 0, 0),  # 红色
+                    life_time=100.0,
+                    persistent_lines=True
+                )
+                
+                # 添加文字标签
+                self.world.debug.draw_string(
+                    carla.Location(start.x, start.y, start.z + 2.0),
+                    'START',
+                    draw_shadow=True,
+                    color=carla.Color(255, 255, 255),
+                    life_time=100.0
+                )
+                
+                self.world.debug.draw_string(
+                    carla.Location(end.x, end.y, end.z + 2.0),
+                    'GOAL',
+                    draw_shadow=True,
+                    color=carla.Color(255, 255, 255),
+                    life_time=100.0
+                )
+                
+            print(f"路径可视化完成，共绘制 {len(path_points)} 个点")
+            
+        except Exception as e:
+            print(f"路径可视化失败: {e}")
+
     def collision_data(self, event):
         self.collision_history.append(event)
 
@@ -421,26 +501,50 @@ class CarEnv:
         '''
         To take 6 actions; brake, go straight, turn left, turn right, turn slightly left, turn slightly right
         '''
-        # 应用动作控制
+        # 根据当前速度和横向偏差动态调整转向灵敏度
+        v = self.vehicle.get_velocity()
+        speed = 3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2)
+        
+        # 动态转向系数：速度越高，转向越小
+        if speed > 30:  # 高速时
+            steer_factor = 0.5
+        elif speed > 15:  # 中速时
+            steer_factor = 0.7
+        else:  # 低速时
+            steer_factor = 1.0
+        
+        # 应用动作控制 - 减小等待时间
         if action == 0:
             self.vehicle.apply_control(carla.VehicleControl(throttle=0, brake=1.0))
             print("执行动作: 刹车")
         elif action == 1:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=   0*self.STEER_AMT))
+            # 直行时稍微增加油门，避免停车
+            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=0))
             print("执行动作: 直行")
         elif action == 2:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer=-0.3*self.STEER_AMT))
+            # 根据速度动态调整转向幅度
+            steer_value = -0.25 * steer_factor
+            throttle_value = 0.3 if speed < 10 else 0.1  # 低速时给更多油门
+            self.vehicle.apply_control(carla.VehicleControl(throttle=throttle_value, steer=steer_value))
             print("执行动作: 左转")
         elif action == 3:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.1, steer= 0.3*self.STEER_AMT))
+            steer_value = 0.25 * steer_factor
+            throttle_value = 0.3 if speed < 10 else 0.1
+            self.vehicle.apply_control(carla.VehicleControl(throttle=throttle_value, steer=steer_value))
             print("执行动作: 右转")
         elif action == 4:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer=-0.1*self.STEER_AMT))
+            steer_value = -0.15 * steer_factor
+            throttle_value = 0.4
+            self.vehicle.apply_control(carla.VehicleControl(throttle=throttle_value, steer=steer_value))
             print("执行动作: 微左")
         elif action == 5:
-            self.vehicle.apply_control(carla.VehicleControl(throttle=0.3, steer= 0.1*self.STEER_AMT))
+            steer_value = 0.15 * steer_factor
+            throttle_value = 0.4
+            self.vehicle.apply_control(carla.VehicleControl(throttle=throttle_value, steer=steer_value))
             print("执行动作: 微右")
             
+        time.sleep(0.01)
+
         # 处理图像
         self.process_images()
         
@@ -467,31 +571,83 @@ class CarEnv:
         # 计算角度差
         waypoint_rot = current_waypoint.transform.rotation
         orientation_diff = waypoint_rot.yaw - rot.yaw
-        phi = orientation_diff % 360 - 360 * (orientation_diff % 360 > 180)
+        phi = ((orientation_diff + 180) % 360) - 180
         
         # 计算横向偏差
         if waypoint_ind < len(self.path) - 1:
             next_waypoint = self.path[waypoint_ind + 1]
             waypoint_loc = current_waypoint.transform.location
             next_waypoint_loc = next_waypoint.transform.location
+            vehicle_loc = pos
             
-            u = [waypoint_loc.x - next_waypoint_loc.x, waypoint_loc.y - next_waypoint_loc.y]
-            v = [pos.x - waypoint_loc.x, pos.y - waypoint_loc.y]
-            
-            if np.linalg.norm(u) > 0.1 and np.linalg.norm(v) > 0.1:
-                signed_dis = np.linalg.norm(v) * np.sin(np.sign(np.cross(u,v)) * np.arccos(np.dot(u,v)/(np.linalg.norm(u)*np.linalg.norm(v))))
+            # 计算路径向量
+            u = np.array([next_waypoint_loc.x - waypoint_loc.x, 
+                         next_waypoint_loc.y - waypoint_loc.y])
+            v = np.array([pos.x - waypoint_loc.x, 
+                         pos.y - waypoint_loc.y])
+                       
+            if np.linalg.norm(u) > 0.1:
+                # 计算投影长度
+                t = np.dot(u, v) / np.dot(u, u)
+                t = max(0, min(1, t))  # 限制在0-1之间
+                
+                # 计算最近点
+                closest_point = np.array([waypoint_loc.x, waypoint_loc.y]) + t * u
+                
+                # 计算横向偏差
+                lateral_vec = v - t * u
+                signed_dis = np.linalg.norm(lateral_vec)
+                
+                # 判断偏差方向
+                cross_product = np.cross(u, v)
+                if cross_product > 0:
+                    signed_dis = -signed_dis  # 车辆在路径左侧
             else:
                 signed_dis = 0
         else:
             signed_dis = 0
         
-        current_state[3] = current_state[3]/15
+        current_state[0] = (self.distance-300)/300
+        current_state[1] = (kmh-30)/30 - (self.distance-300)/300
+        current_state[2] = phi
+        current_state[3] = signed_dis * 15
         
         print(f"角度差: {phi:.2f}°, 横向偏差: {signed_dis:.2f}m")
-        print(f"距离障碍物: {current_state[0]*300+300:.2f}m")
-        print(f"速度: {(current_state[1]+current_state[0])*30+30:.2f}km/h")
+        print(f"距离障碍物: {self.distance:.2f}m")
+        print(f"速度: {kmh:.2f}km/h")
+        print(f"距离终点: {dist_from_goal:.2f}m")
 
-        # [原有的奖励计算代码保持不变...]
+        # 奖励计算 - 更精细的奖励函数
+        base_reward = 0.1  # 基础生存奖励
+        
+        # 速度奖励（鼓励合理速度20-40 km/h）
+        if 20 <= kmh <= 40:
+            speed_reward = 0.2
+        elif kmh < 5:
+            speed_reward = -0.1  # 太慢惩罚
+        else:
+            speed_reward = 0.1 * (kmh / 40.0)
+        
+        # 路径跟随奖励
+        heading_penalty = abs(phi) / 180.0  # 角度偏差惩罚
+        lateral_penalty = min(abs(signed_dis) / 3.0, 1.0)  # 横向偏差惩罚
+        
+        path_follow_reward = 0.3 * (1.0 - heading_penalty) + 0.3 * (1.0 - lateral_penalty)
+        
+        # 进度奖励
+        if not hasattr(self, 'initial_distance_to_goal'):
+            self.initial_distance_to_goal = dist_from_goal
+        
+        if self.initial_distance_to_goal > 0:
+            progress = 1.0 - (dist_from_goal / self.initial_distance_to_goal)
+            progress_reward = 0.2 * max(0, progress)
+        else:
+            progress_reward = 0
+        
+        # 距离障碍物奖励
+        obstacle_reward = 0.2 * max(0, 1.0 - self.distance / 50.0) if self.distance < 50 else 0
+        
+        reward = base_reward + speed_reward + path_follow_reward + progress_reward + obstacle_reward
 
         # 检查是否完成
         if len(self.collision_history) != 0:
@@ -515,15 +671,19 @@ class CarEnv:
             reward = 1000
             print("✅ 成功到达终点!")
 
-        # 超时检查
-        if self.episode_start + 200 < time.time():
-            done = True
-            print("⏰ 超时")
 
         print(f"奖励: {reward}")
+
+        self.world.debug.draw_string(
+            carla.Location(pos.x, pos.y, pos.z + 2.0),
+            f'V: {kmh}km/h',
+            draw_shadow=True,
+            color=carla.Color(255, 255, 0),
+            life_time=0.1
+        )
         
         # 返回新的状态、奖励、完成标志和当前路径点
-        return [(self.distance-300)/300, (kmh-30)/30-(self.distance-300)/300, phi, signed_dis*15], reward, done, current_waypoint
+        return current_state, reward, done, current_waypoint
     def trajectory(self, draw = False):
 
         amap = self.world.get_map()
@@ -576,23 +736,39 @@ class CarEnv:
 
 
     def get_closest_waypoint(self, waypoint_list, vehicle_transform):
-        """获取最近的路径点"""
-        closest_waypoint = 0
-        closest_distance = float('inf')
+        """获取最近的路径点，优化搜索算法"""
+        if not waypoint_list:
+            return 0
         
+        # 使用更高效的距离计算方法
         vehicle_location = vehicle_transform.location
+        closest_waypoint = 0
+        closest_distance_sq = float('inf')
         
-        for i, waypoint in enumerate(waypoint_list):
-            distance = math.sqrt(
-                (waypoint.transform.location.x - vehicle_location.x)**2 +
-                (waypoint.transform.location.y - vehicle_location.y)**2
-            )
-            if distance < closest_distance:
+        # 如果已经保存了上一次的最近点，从它附近开始搜索
+        if hasattr(self, 'last_waypoint_index') and self.last_waypoint_index < len(waypoint_list):
+            start_index = max(0, self.last_waypoint_index - 10)
+            end_index = min(len(waypoint_list), self.last_waypoint_index + 20)
+        else:
+            start_index = 0
+            end_index = min(50, len(waypoint_list))  # 限制搜索范围，提高速度
+        
+        for i in range(start_index, end_index):
+            waypoint_location = waypoint_list[i].transform.location
+            dx = waypoint_location.x - vehicle_location.x
+            dy = waypoint_location.y - vehicle_location.y
+            distance_sq = dx*dx + dy*dy  # 使用平方距离，避免开方运算
+            
+            if distance_sq < closest_distance_sq:
                 closest_waypoint = i
-                closest_distance = distance
+                closest_distance_sq = distance_sq
         
-        # 确保不会返回最后一个点（除非非常接近终点）
-        if closest_waypoint < len(waypoint_list) - 1:
-            return closest_waypoint
+        # 保存最近的路径点索引，供下次使用
+        self.last_waypoint_index = closest_waypoint
+        
+        # 向前看几个点，避免卡在同一个点
+        look_ahead = 5
+        if closest_waypoint < len(waypoint_list) - look_ahead:
+            return closest_waypoint + look_ahead
         else:
             return len(waypoint_list) - 1

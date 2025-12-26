@@ -48,16 +48,12 @@ python main_fg.py
 该项目实现了**无人机图像分类**的深度学习Demo，使用公开数据集模拟无人机采集的图像数据，搭建轻量化卷积神经网络（CNN）完成分类任务。
 
 ### 主要特点
-- 🚀 **无硬件依赖**：使用CIFAR-10公开数据集模拟无人机航拍图像
-- 🧠 **轻量化模型**：搭建适用于无人机端的轻量化CNN，兼顾性能与算力消耗
-- 📊 **可视化界面**：包含数据集样本展示、训练过程实时可视化、预测结果展示
-- 🐞 **兼容性修复**：解决Matplotlib中文字体缺失、PyCharm后端兼容等问题
+- 🚀 **无硬件依赖**：使用CIFAR-10数据集模拟航拍图像
+- 🧠 **轻量化模型**：轻量化CNN设计，兼顾性能与效率
+- 📊 **可视化界面**：数据展示、训练可视化、预测结果展示
+- 🐞 **兼容性强**：已处理中文显示和IDE兼容问题
 
-### 技术栈
-- Python + PyTorch
-- torchvision (数据集处理)
-- matplotlib (可视化)
-- numpy (数值计算)
+**技术栈**：Python + PyTorch, torchvision, matplotlib, numpy
 
 ---
 
@@ -72,45 +68,24 @@ python main_fg.py
 - 实时可视化无人机的移动路径、网格环境和训练奖励变化
 - 优化的可视化界面，支持坐标标注、路径方向箭头、移动平均奖励曲线
 
-### 技术栈
-- **环境搭建**：gymnasium（gym 的维护版）自定义网格环境
-- **强化学习算法**：Q-Learning（ε-贪心策略平衡探索与利用）
-- **可视化**：matplotlib（绘制网格、路径、奖励曲线）
-- **数值计算**：numpy
+**技术栈**：gymnasium, PyTorch, matplotlib, numpy
 
 ---
 
-## 环境配置
-
-### 基础依赖安装
-
-推荐使用国内镜像源加速安装：
+## 快速安装
 
 ```bash
-# 语义分割项目依赖
-pip install torch torchvision matplotlib scikit-image pillow numpy opencv-python
+# 安装所有项目依赖
+pip install torch torchvision matplotlib scikit-image pillow numpy opencv-python gymnasium -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 图像分类项目依赖
-pip install torch torchvision matplotlib numpy -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# 路径规划项目依赖
-pip install torch torchvision matplotlib numpy gymnasium -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# 若需要gymnasium完整版（包含额外环境，如Atari）
+# 如需完整版gymnasium（可选）
 pip install gymnasium[all] -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
 
-### 卸载旧版依赖（可选）
-```bash
-# 卸载旧版 gym（如果存在冲突）
+# 卸载旧版gym（如果存在冲突，可选）
 pip uninstall gym -y
 ```
 
-### 系统要求
-- Python 3.7+
-- 支持CUDA的GPU（可选，用于加速训练）
-- 内存：建议4GB以上
-- 存储空间：至少1GB可用空间
+**系统要求**：Python 3.7+，建议4GB以上内存，支持CUDA的GPU（可选）
 
 ---
 
@@ -164,29 +139,28 @@ pip uninstall gym -y
 
 ---
 
-## 扩展方向
+## 优化建议
 
-### 语义分割项目优化方向
-- **数据增强**：在transform中添加随机裁剪、翻转、亮度调整等操作，提升模型泛化能力
-- **模型优化**：在 U-Net 中加入注意力机制（如 SE 模块）或使用 U-Net++ 模型，提升分割精度
-- **真实数据适配**：替换模拟数据生成部分，加载真实的无人机航拍道路数据集
-- **多类别分割**：修改模型输出通道数，实现建筑、植被、水体等多类地物的语义分割
+### 语义分割项目优化
+- **数据增强**：添加随机裁剪、翻转、亮度调整等操作
+- **模型优化**：加入注意力机制或使用U-Net++模型
+- **多类别分割**：实现建筑、植被、水体等多类地物分割
+- **真实数据适配**：替换模拟数据，加载真实航拍数据集
 
-### 通用优化建议
-- 使用更高分辨率的输入图像提升分割精度
-- 尝试不同的损失函数（如Dice Loss、Focal Loss）
-- 添加数据增强技术提升模型泛化能力
+### 通用优化方向
+- 使用更高分辨率输入图像
+- 尝试不同损失函数（Dice Loss、Focal Loss等）
+- 添加数据增强技术
 - 使用预训练模型进行迁移学习
 
 ---
 
 ## 注意事项
 
-- 项目完全基于代码仿真，无需真实无人机硬件
-- 可在普通PC上运行，建议配置支持CUDA的GPU以加速训练
-- 所有可视化界面均已优化，兼容中文显示
-- 代码已处理常见的兼容性问题，可直接在PyCharm等IDE中运行
-- 语义分割项目会在指定路径自动创建数据集文件夹，请确保有足够存储空间
+- 项目基于代码仿真，无需真实无人机硬件
+- 所有可视化界面已优化，兼容中文显示
+- 代码已处理兼容性问题，可直接在IDE中运行
+- 语义分割项目会自动创建数据集文件夹，请确保存储空间充足
 
 ---
 

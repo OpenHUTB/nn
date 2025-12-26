@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 import sys
 import os
 import time
@@ -17,9 +17,9 @@ from carla_utils import setup_carla_path, import_carla_module
 from config_manager import ConfigManager
 from annotation_generator import AnnotationGenerator
 from data_validator import DataValidator
-from data_analyzer import DataAnalyzer
 from lidar_processor import LidarProcessor, MultiSensorFusion
 from multi_vehicle_manager import MultiVehicleManager
+from pedestrian_safety_monitor import PedestrianSafetyMonitor
 
 carla_egg_path, remaining_argv = setup_carla_path()
 carla = import_carla_module()
@@ -142,6 +142,11 @@ class Log:
     def performance(msg):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"[PERF][{timestamp}] {msg}")
+
+    @staticmethod
+    def safety(msg):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[SAFETY][{timestamp}] {msg}")
 
 
 class WeatherSystem:
@@ -482,7 +487,7 @@ class TrafficManager:
     def _spawn_pedestrians(self, center_location):
         blueprint_lib = self.world.get_blueprint_library()
 
-        num_peds = min(self.config['traffic']['pedestrians'], 8)
+        num_peds = min(self.config['traffic']['pedestrians'], 12)  # 增加行人数量
         spawned = 0
 
         for _ in range(num_peds):
@@ -493,8 +498,13 @@ class TrafficManager:
 
                 ped_bp = random.choice(ped_bps)
 
-                angle = random.uniform(0, 2 * math.pi)
-                distance = random.uniform(5.0, 12.0)
+                # 在学校区域或人行横道场景中，行人更集中
+                if self.config.get('scenario', {}).get('name', '').lower() in ['school_zone', 'pedestrian_crossing']:
+                    angle = random.uniform(0, 2 * math.pi)
+                    distance = random.uniform(3.0, 8.0)  # 更靠近中心
+                else:
+                    angle = random.uniform(0, 2 * math.pi)
+                    distance = random.uniform(5.0, 15.0)
 
                 location = carla.Location(
                     x=center_location.x + distance * math.cos(angle),
@@ -964,6 +974,7 @@ class DataCollector:
         self.sensor_managers = {}
         self.multi_vehicle_manager = None
         self.v2x_communication = None
+        self.safety_monitor = None
 
         self.start_time = None
         self.is_running = False
@@ -994,7 +1005,8 @@ class DataCollector:
             "v2x_messages",
             "v2xformer_format",
             "kitti_format",
-            "metadata"
+            "metadata",
+            "safety_reports"
         ]
 
         for subdir in directories:
@@ -1082,6 +1094,8 @@ class DataCollector:
                     {'type': 'vehicle', 'capabilities': ['bsm', 'rsm']}
                 )
 
+        self.safety_monitor = PedestrianSafetyMonitor(self.world, self.output_dir)
+
         time.sleep(3.0)
         return True
 
@@ -1114,6 +1128,7 @@ class DataCollector:
         last_performance_sample = time.time()
         last_detailed_log = time.time()
         last_memory_check = time.time()
+        last_safety_check = time.time()
 
         memory_warning_issued = False
         early_stop_triggered = False
@@ -1166,6 +1181,15 @@ class DataCollector:
                         current_time - last_perception_share >= 2.0):
                     self._share_perception_data()
                     last_perception_share = current_time
+
+                # 行人安全检查
+                if current_time - last_safety_check >= 1.0 and self.safety_monitor:
+                    safety_report = self.safety_monitor.check_pedestrian_safety()
+                    if safety_report['risk_distribution']['high'] > 0:
+                        Log.safety(f"行人安全警告: {safety_report['risk_distribution']['high']}个高风险情况")
+                        # 广播行人警告
+                        self._broadcast_pedestrian_warnings(safety_report)
+                    last_safety_check = current_time
 
                 if current_time - last_performance_sample >= 10.0:
                     memory_info = self.performance_monitor.sample_memory()
@@ -1228,6 +1252,13 @@ class DataCollector:
                 Log.info(f"平均帧率: {fps:.2f} FPS")
                 Log.info(f"最大内存使用: {performance_summary['max_memory_mb']:.1f} MB")
                 Log.info(f"平均CPU使用: {performance_summary['average_cpu_percent']:.1f}%")
+
+                # 生成行人安全报告
+                if self.safety_monitor:
+                    final_report = self.safety_monitor.generate_final_report()
+                    Log.safety(
+                        f"行人安全报告: {final_report['risk_distribution']['high']}高风险, {final_report['risk_distribution']['medium']}中风险")
+                    Log.safety(f"行人安全评分: {final_report['safety_score']:.1f}/100")
             else:
                 Log.warning("未收集到任何数据帧")
 
@@ -1236,6 +1267,44 @@ class DataCollector:
 
             if self.output_format != 'standard':
                 self._convert_to_target_format()
+
+    def _broadcast_pedestrian_warnings(self, safety_report):
+        """广播行人警告"""
+        if not self.multi_vehicle_manager:
+            return
+
+        # 检查高风险交互
+        if safety_report.get('risk_distribution', {}).get('high', 0) > 0:
+            for vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
+                if not hasattr(vehicle, 'is_alive') or not vehicle.is_alive:
+                    continue
+
+                try:
+                    location = vehicle.get_location()
+                    velocity = vehicle.get_velocity()
+                    speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+
+                    # 模拟行人位置（实际应用中应从感知系统获取）
+                    pedestrian_location = (
+                        location.x + random.uniform(-5, 5),
+                        location.y + random.uniform(-5, 5),
+                        location.z
+                    )
+
+                    distance = math.sqrt(
+                        (location.x - pedestrian_location[0]) ** 2 +
+                        (location.y - pedestrian_location[1]) ** 2
+                    )
+
+                    if distance < 20.0:  # 只广播近距离行人
+                        self.multi_vehicle_manager.share_pedestrian_warning(
+                            vehicle.id,
+                            pedestrian_location,
+                            distance,
+                            speed
+                        )
+                except:
+                    pass
 
     def _force_memory_cleanup(self):
         Log.info("执行强制内存清理...")
@@ -1276,6 +1345,13 @@ class DataCollector:
                 try:
                     Log.info("停止V2X通信...")
                     self.v2x_communication.stop()
+                except:
+                    pass
+
+            if self.safety_monitor:
+                try:
+                    Log.info("保存行人安全数据...")
+                    self.safety_monitor.save_data()
                 except:
                     pass
 
@@ -1328,6 +1404,7 @@ class DataCollector:
             self.traffic_manager = None
             self.multi_vehicle_manager = None
             self.v2x_communication = None
+            self.safety_monitor = None
             self.scene_center = None
 
             gc.collect()
@@ -1342,6 +1419,7 @@ class DataCollector:
                 self.traffic_manager = None
                 self.multi_vehicle_manager = None
                 self.v2x_communication = None
+                self.safety_monitor = None
                 gc.collect()
             except:
                 pass
@@ -1527,6 +1605,9 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             if self.multi_vehicle_manager:
                 metadata['cooperative_summary'] = self.multi_vehicle_manager.generate_summary()
 
+            if self.safety_monitor:
+                metadata['safety_report'] = self.safety_monitor.generate_final_report()
+
         meta_path = os.path.join(self.output_dir, "metadata", "collection_info.json")
         with open(meta_path, 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
@@ -1564,6 +1645,11 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             perception_files = len(
                 [f for f in os.listdir(os.path.join(coop_dir, "shared_perception")) if f.endswith('.json')])
             print(f"协同数据: {v2x_files} V2X消息, {perception_files} 共享感知文件")
+
+        safety_dir = os.path.join(self.output_dir, "safety_reports")
+        if os.path.exists(safety_dir):
+            safety_files = len([f for f in os.listdir(safety_dir) if f.endswith('.json')])
+            print(f"安全报告: {safety_files} 个")
 
         if self.output_format == 'v2xformer':
             v2x_dir = os.path.join(self.output_dir, "v2xformer_format")
@@ -1604,17 +1690,12 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             Log.info("运行数据验证...")
             DataValidator.validate_dataset(self.output_dir)
 
-    def run_analysis(self):
-        if self.config['output'].get('run_analysis', False) and self.collected_frames > 0:
-            Log.info("运行数据分析...")
-            DataAnalyzer.analyze_dataset(self.output_dir)
-
 
 def main():
-    parser = argparse.ArgumentParser(description='CVIPS 性能优化数据收集系统')
+    parser = argparse.ArgumentParser(description='CVIPS 行人安全增强数据收集系统')
 
     parser.add_argument('--config', type=str, help='配置文件路径')
-    parser.add_argument('--scenario', type=str, default='performance_optimized', help='场景名称')
+    parser.add_argument('--scenario', type=str, default='pedestrian_safety', help='场景名称')
     parser.add_argument('--town', type=str, default='Town10HD',
                         choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
     parser.add_argument('--weather', type=str, default='clear',
@@ -1623,7 +1704,7 @@ def main():
                         choices=['noon', 'sunset', 'night'], help='时间')
 
     parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
-    parser.add_argument('--num-pedestrians', type=int, default=6, help='行人数')
+    parser.add_argument('--num-pedestrians', type=int, default=12, help='行人数')
     parser.add_argument('--num-coop-vehicles', type=int, default=2, help='协同车辆数')
 
     parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
@@ -1643,6 +1724,7 @@ def main():
     parser.add_argument('--enable-cooperative', action='store_true', help='启用协同感知')
     parser.add_argument('--enable-enhancement', action='store_true', help='启用数据增强')
     parser.add_argument('--enable-annotations', action='store_true', help='启用自动标注')
+    parser.add_argument('--enable-safety-monitor', action='store_true', default=True, help='启用行人安全监控')
 
     parser.add_argument('--run-analysis', action='store_true', help='运行数据集分析')
     parser.add_argument('--skip-validation', action='store_true', help='跳过数据验证')
@@ -1659,7 +1741,7 @@ def main():
     config['output']['output_format'] = args.output_format
 
     print("\n" + "=" * 60)
-    print("CVIPS 性能优化数据收集系统")
+    print("CVIPS 行人安全增强数据收集系统")
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
@@ -1678,6 +1760,7 @@ def main():
     print(f"  V2X: {'启用' if config['v2x']['enabled'] else '禁用'}")
     print(f"  协同: {'启用' if config['output']['save_cooperative'] else '禁用'}")
     print(f"  增强: {'启用' if config['enhancement']['enabled'] else '禁用'}")
+    print(f"  安全监控: {'启用' if args.enable_safety_monitor else '禁用'}")
 
     print(f"性能:")
     print(f"  批处理大小: {config['performance']['batch_size']}")
@@ -1703,7 +1786,6 @@ def main():
 
         collector.collect_data()
 
-        collector.run_analysis()
         collector.run_validation()
 
     except KeyboardInterrupt:

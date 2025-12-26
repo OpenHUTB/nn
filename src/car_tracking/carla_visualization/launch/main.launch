@@ -1,0 +1,11 @@
+<!-- launch/main.launch -->
+<launch>
+  <!-- 启动Carla数据发布节点 -->
+  <node name="carla_publisher" pkg="carla_visualization" type="publisher.py" output="screen" />
+
+  <!-- 启动数据订阅与可视化节点 -->
+  <node name="carla_subscriber" pkg="carla_visualization" type="subscriber.py" output="screen" />
+
+  <!-- 可选：启动rviz可视化（如果需要） -->
+  <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find carla_visualization)/config/rviz_config.rviz" /> -->
+</launch>

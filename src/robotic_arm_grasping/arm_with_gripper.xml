@@ -1,130 +1,154 @@
-<!-- 6-DOF Robotic Arm with Optimized 3-Finger Gripper for MuJoCo -->
-<mujoco model="robotic_arm_3_finger_gripper">
-  <compiler angle="radian" inertiafromgeom="true"/>
+<!-- 优化的6-DOF机械臂与三指抓取器模型 -->
+<mujoco model="optimized_robotic_arm_3_finger_gripper">
+  <compiler angle="radian" inertiafromgeom="true" meshdir="assets/" texturedir="textures/"/>
 
-  <option timestep="0.002" gravity="0 0 -9.81" iterations="50" solver="Newton"/>
+  <option timestep="0.001" gravity="0 0 -9.81" iterations="100" solver="Newton" cone="elliptic"/>
+
+  <size njmax="500" nconmax="100"/>
+
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <quality shadowsize="2048"/>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
+  </visual>
 
   <default>
-    <joint damping="2.0" armature="0.2"/>
-    <geom friction="1.0 0.5 0.01" rgba="0.7 0.7 0.7 1"/>
-    <motor ctrlrange="-1 1" ctrllimited="true"/>
+    <!-- 机械臂关节默认设置 -->
+    <joint armature="0.1" damping="1.5" limited="true" solimplimit="0 0.99 0.001" solreflimit="0.001 0.5"/>
+
+    <!-- 几何体默认设置 -->
+    <geom condim="6" friction="1.0 0.5 0.001" solmix="1.0" solref="0.02 1" margin="0.001" gap="0"/>
+
+    <!-- 电机默认设置 -->
+    <motor ctrllimited="true" ctrlrange="-2 2" forcelimited="true" forcerange="-100 100"/>
+
+    <!-- 站点默认设置 -->
+    <site size="0.005" rgba="1 0 0 0.8" type="sphere"/>
   </default>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="512"/>
-    <texture name="texplane" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 .2 .3" width="512" height="512" mark="cross" markrgb=".8 .8 .8"/>
-    <texture name="texgeom" type="cube" builtin="flat" mark="cross" width="128" height="128" rgb1="0.4 0.4 0.8" rgb2="0.4 0.4 0.8" markrgb="1 1 1"/>
-    <material name="matplane" reflectance="0.3" texture="texplane" texrepeat="1 1" texuniform="true"/>
-    <material name="matgeom" texture="texgeom" texuniform="true" rgba="0.4 0.4 0.8 1"/>
-    <material name="gripper_mat" rgba="0.3 0.3 0.8 1"/>
-    <material name="finger_mat" rgba="0.2 0.5 0.8 1"/>
+    <!-- 天空盒和纹理 -->
+    <texture type="skybox" builtin="gradient" rgb1="0.4 0.6 0.8" rgb2="0.1 0.2 0.3" width="1024" height="1024"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" width="300" height="300" mark="edge" markrgb="0.8 0.8 0.8"/>
+    <texture name="metal" type="cube" builtin="flat" mark="cross" width="256" height="256" rgb1="0.5 0.5 0.5" rgb2="0.7 0.7 0.7" markrgb="1 1 1"/>
+
+    <!-- 材质 -->
+    <material name="grid_mat" texture="grid" texrepeat="20 20" texuniform="true" reflectance="0.2"/>
+    <material name="metal_mat" texture="metal" texuniform="true" reflectance="0.5" specular="1" shininess="0.5"/>
+    <material name="arm_mat" rgba="0.6 0.6 0.7 1" specular="0.5" shininess="0.3"/>
+    <material name="gripper_mat" rgba="0.3 0.3 0.8 1" specular="0.8" shininess="0.5"/>
+    <material name="finger_mat" rgba="0.2 0.5 0.8 1" specular="0.5" shininess="0.4"/>
+
+    <!-- 测试物体材质 -->
+    <material name="red_mat" rgba="1 0.2 0.2 1"/>
+    <material name="green_mat" rgba="0.2 0.8 0.2 1"/>
+    <material name="blue_mat" rgba="0.2 0.5 1 1"/>
+    <material name="yellow_mat" rgba="1 0.8 0.2 1"/>
+    <material name="purple_mat" rgba="0.7 0.2 1 1"/>
   </asset>
 
   <worldbody>
-    <!-- 场景设置 -->
-    <geom name="floor" pos="0 0 -0.05" size="2 2 0.05" type="plane" material="matplane" condim="3"/>
-    <light directional="true" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 0 3.0" dir="0 0 -1"/>
-    <light directional="false" diffuse=".6 .6 .6" specular="0.2 0.2 0.2" pos="2 2 3" dir="-1 -1 -1"/>
+    <!-- 地面 -->
+    <geom name="ground" type="plane" pos="0 0 0" size="3 3 0.1" material="grid_mat" condim="3"/>
 
-    <!-- 目标物体 - 多种形状用于测试 -->
-    <body name="target_cube" pos="0.2 0.1 0.05">
-      <freejoint name="cube_floating"/>
-      <geom name="cube_geom" type="box" size="0.04 0.04 0.04" rgba="0.2 0.8 0.2 1" mass="0.2"/>
-      <site name="cube_site" pos="0 0 0" size="0.01"/>
-    </body>
-
-    <body name="target_sphere" pos="0.2 -0.1 0.05">
-      <freejoint name="sphere_floating"/>
-      <geom name="sphere_geom" type="sphere" size="0.035" rgba="0.8 0.2 0.2 1" mass="0.15"/>
-      <site name="sphere_site" pos="0 0 0" size="0.01"/>
-    </body>
+    <!-- 环境灯光 -->
+    <light directional="true" diffuse="0.9 0.9 0.9" specular="0.3 0.3 0.3" pos="0 0 4" dir="0 0 -1"/>
+    <light directional="true" diffuse="0.5 0.5 0.6" specular="0.1 0.1 0.1" pos="3 3 2" dir="-1 -1 -1"/>
+    <light directional="true" diffuse="0.4 0.4 0.5" specular="0.05 0.05 0.05" pos="-3 -3 2" dir="1 1 -1"/>
 
     <!-- 机械臂基座 -->
-    <body name="base_link" pos="0 0 0">
-      <geom name="base_geom" type="cylinder" size="0.12 0.06" rgba="0.5 0.5 0.5 1" mass="2.0"/>
+    <body name="base" pos="0 0 0.05">
+      <geom name="base_geom" type="cylinder" size="0.15 0.08" material="metal_mat" mass="5.0"/>
+      <site name="base_site" pos="0 0 0" size="0.01"/>
 
-      <!-- 关节1: 基座旋转 -->
-      <body name="shoulder_link" pos="0 0 0.12">
-        <joint name="joint_1" type="hinge" axis="0 0 1" range="-3.14 3.14" damping="2.0"/>
-        <geom name="shoulder_geom" type="cylinder" size="0.09 0.07" rgba="0.6 0.6 0.6 1" mass="1.5"/>
+      <!-- 关节1 - 基座旋转 -->
+      <body name="shoulder" pos="0 0 0.1">
+        <joint name="joint1" type="hinge" pos="0 0 0" axis="0 0 1" range="-3.1416 3.1416" damping="2.0" armature="0.2"/>
+        <geom name="shoulder_geom" type="cylinder" size="0.1 0.08" material="arm_mat" mass="2.0"/>
+        <site name="shoulder_site" pos="0 0 0" size="0.008"/>
 
-        <!-- 关节2: 肩部 -->
-        <body name="upper_arm_link" pos="0 0 0.14">
-          <joint name="joint_2" type="hinge" axis="0 1 0" range="-1.57 1.57" damping="2.0"/>
-          <geom name="upper_arm_geom" type="capsule" size="0.07" fromto="0 0 0 0 0 0.3" rgba="0.7 0.7 0.7 1" mass="1.0"/>
+        <!-- 关节2 - 肩部俯仰 -->
+        <body name="upper_arm" pos="0 0 0.09">
+          <joint name="joint2" type="hinge" pos="0 0 0" axis="0 1 0" range="-2.0 2.0" damping="1.8" armature="0.15"/>
+          <geom name="upper_arm_geom" type="capsule" fromto="0 0 0 0 0 0.35" size="0.075" material="arm_mat" mass="1.5"/>
+          <site name="upper_arm_site" pos="0 0 0.175" size="0.008"/>
 
-          <!-- 关节3: 肘部 -->
-          <body name="forearm_link" pos="0 0 0.3">
-            <joint name="joint_3" type="hinge" axis="0 1 0" range="-1.57 1.57" damping="1.5"/>
-            <geom name="forearm_geom" type="capsule" size="0.06" fromto="0 0 0 0 0 0.28" rgba="0.7 0.7 0.7 1" mass="0.8"/>
+          <!-- 关节3 - 肘部 -->
+          <body name="forearm" pos="0 0 0.35">
+            <joint name="joint3" type="hinge" pos="0 0 0" axis="0 1 0" range="-2.5 0.5" damping="1.5" armature="0.1"/>
+            <geom name="forearm_geom" type="capsule" fromto="0 0 0 0 0 0.3" size="0.065" material="arm_mat" mass="1.2"/>
+            <site name="forearm_site" pos="0 0 0.15" size="0.008"/>
 
-            <!-- 关节4: 腕部1 -->
-            <body name="wrist_1_link" pos="0 0 0.28">
-              <joint name="joint_4" type="hinge" axis="0 0 1" range="-2.0 2.0" damping="1.0"/>
-              <geom name="wrist_1_geom" type="capsule" size="0.05" fromto="0 0 0 0 0 0.12" rgba="0.8 0.8 0.8 1" mass="0.3"/>
+            <!-- 关节4 - 腕部1 -->
+            <body name="wrist1" pos="0 0 0.3">
+              <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 1" range="-2.0 2.0" damping="1.0" armature="0.05"/>
+              <geom name="wrist1_geom" type="capsule" fromto="0 0 0 0 0 0.15" size="0.055" material="arm_mat" mass="0.5"/>
+              <site name="wrist1_site" pos="0 0 0.075" size="0.008"/>
 
-              <!-- 关节5: 腕部2 -->
-              <body name="wrist_2_link" pos="0 0 0.12">
-                <joint name="joint_5" type="hinge" axis="0 1 0" range="-1.57 1.57" damping="1.0"/>
-                <geom name="wrist_2_geom" type="capsule" size="0.05" fromto="0 0 0 0.1 0 0" rgba="0.8 0.8 0.8 1" mass="0.2"/>
+              <!-- 关节5 - 腕部2 -->
+              <body name="wrist2" pos="0 0 0.15">
+                <joint name="joint5" type="hinge" pos="0 0 0" axis="0 1 0" range="-1.8 1.8" damping="0.8" armature="0.04"/>
+                <geom name="wrist2_geom" type="capsule" fromto="0 0 0 0.12 0 0" size="0.045" material="arm_mat" mass="0.3"/>
+                <site name="wrist2_site" pos="0.06 0 0" size="0.008"/>
 
-                <!-- 关节6: 腕部3 (末端执行器连接) -->
-                <body name="wrist_3_link" pos="0.1 0 0">
-                  <joint name="joint_6" type="hinge" axis="1 0 0" range="-1.57 1.57" damping="0.5"/>
-                  <geom name="wrist_3_geom" type="cylinder" size="0.04 0.02" rgba="0.8 0.8 0.8 1" mass="0.1"/>
+                <!-- 关节6 - 腕部3（末端执行器连接） -->
+                <body name="wrist3" pos="0.12 0 0">
+                  <joint name="joint6" type="hinge" pos="0 0 0" axis="1 0 0" range="-1.8 1.8" damping="0.6" armature="0.03"/>
+                  <geom name="wrist3_geom" type="cylinder" size="0.04 0.03" material="arm_mat" mass="0.2"/>
+                  <site name="ee_site" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
 
-                  <!-- 优化的三指抓取器设计 - 符合机械结构 -->
-                  <body name="gripper_base" pos="0.04 0 0">
-                    <geom name="gripper_base_geom" type="cylinder" size="0.04 0.025" rgba="0.3 0.3 0.3 1" mass="0.1"/>
-                    <site name="grip_center" pos="0 0 0" size="0.005" rgba="1 0 0 1"/>
+                  <!-- 抓取器基座 -->
+                  <body name="gripper_base" pos="0.05 0 0" euler="0 0 0">
+                    <geom name="gripper_base_geom" type="cylinder" size="0.045 0.035" material="gripper_mat" mass="0.15"/>
+                    <site name="grip_center" pos="0 0 0" size="0.008" rgba="0 1 0 1"/>
 
-                    <!-- 手指1 (0度方向) - 改进的机械结构 -->
-                    <body name="finger_1_base" pos="0.03 0 0">
-                      <joint name="finger_1_joint" type="slide" axis="0 0 1" range="0 0.06" damping="0.5"/>
-                      <geom name="finger_1_base_geom" type="box" size="0.015 0.008 0.03" material="finger_mat" mass="0.03"/>
+                    <!-- 手指1 (0°) -->
+                    <body name="finger1_base" pos="0.04 0 0">
+                      <joint name="finger1_slide" type="slide" axis="0 0 1" range="-0.02 0.06" damping="0.4" stiffness="50"/>
+                      <geom name="finger1_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04"/>
 
-                      <body name="finger_1_proximal" pos="0 0 0.03">
-                        <joint name="finger_1_proximal_joint" type="hinge" axis="0 1 0" range="-0.3 1.2" damping="0.3"/>
-                        <geom name="finger_1_proximal_geom" type="box" size="0.012 0.006 0.025" material="finger_mat" mass="0.02"/>
+                      <body name="finger1_proximal" pos="0 0 0.035">
+                        <joint name="finger1_hinge1" type="hinge" axis="0 1 0" range="-0.2 1.5" damping="0.3" stiffness="30" armature="0.01"/>
+                        <geom name="finger1_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025"/>
 
-                        <body name="finger_1_distal" pos="0 0 0.025">
-                          <joint name="finger_1_distal_joint" type="hinge" axis="0 1 0" range="0 1.0" damping="0.2"/>
-                          <geom name="finger_1_distal_geom" type="box" size="0.01 0.005 0.02" material="finger_mat" mass="0.015"/>
-                          <site name="finger_1_contact" pos="0 0 0.02" size="0.005" rgba="1 0 0 0.5"/>
+                        <body name="finger1_distal" pos="0 0 0.028">
+                          <joint name="finger1_hinge2" type="hinge" axis="0 1 0" range="0 1.2" damping="0.2" stiffness="20" armature="0.005"/>
+                          <geom name="finger1_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018"/>
+                          <site name="finger1_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
                         </body>
                       </body>
                     </body>
 
-                    <!-- 手指2 (120度方向) - 改进的机械结构 -->
-                    <body name="finger_2_base" pos="-0.015 0.026 0">
-                      <joint name="finger_2_joint" type="slide" axis="0 0 1" range="0 0.06" damping="0.5"/>
-                      <geom name="finger_2_base_geom" type="box" size="0.015 0.008 0.03" material="finger_mat" mass="0.03"/>
+                    <!-- 手指2 (120°) -->
+                    <body name="finger2_base" pos="-0.02 0.035 0" euler="0 0 2.094">
+                      <joint name="finger2_slide" type="slide" axis="0 0 1" range="-0.02 0.06" damping="0.4" stiffness="50"/>
+                      <geom name="finger2_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04"/>
 
-                      <body name="finger_2_proximal" pos="0 0 0.03">
-                        <joint name="finger_2_proximal_joint" type="hinge" axis="0.866 0.5 0" range="-0.3 1.2" damping="0.3"/>
-                        <geom name="finger_2_proximal_geom" type="box" size="0.012 0.006 0.025" material="finger_mat" mass="0.02"/>
+                      <body name="finger2_proximal" pos="0 0 0.035">
+                        <joint name="finger2_hinge1" type="hinge" axis="0 1 0" range="-0.2 1.5" damping="0.3" stiffness="30" armature="0.01"/>
+                        <geom name="finger2_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025"/>
 
-                        <body name="finger_2_distal" pos="0 0 0.025">
-                          <joint name="finger_2_distal_joint" type="hinge" axis="0.866 0.5 0" range="0 1.0" damping="0.2"/>
-                          <geom name="finger_2_distal_geom" type="box" size="0.01 0.005 0.02" material="finger_mat" mass="0.015"/>
-                          <site name="finger_2_contact" pos="0 0 0.02" size="0.005" rgba="1 0 0 0.5"/>
+                        <body name="finger2_distal" pos="0 0 0.028">
+                          <joint name="finger2_hinge2" type="hinge" axis="0 1 0" range="0 1.2" damping="0.2" stiffness="20" armature="0.005"/>
+                          <geom name="finger2_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018"/>
+                          <site name="finger2_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
                         </body>
                       </body>
                     </body>
 
-                    <!-- 手指3 (240度方向) - 改进的机械结构 -->
-                    <body name="finger_3_base" pos="-0.015 -0.026 0">
-                      <joint name="finger_3_joint" type="slide" axis="0 0 1" range="0 0.06" damping="0.5"/>
-                      <geom name="finger_3_base_geom" type="box" size="0.015 0.008 0.03" material="finger_mat" mass="0.03"/>
+                    <!-- 手指3 (240°) -->
+                    <body name="finger3_base" pos="-0.02 -0.035 0" euler="0 0 -2.094">
+                      <joint name="finger3_slide" type="slide" axis="0 0 1" range="-0.02 0.06" damping="0.4" stiffness="50"/>
+                      <geom name="finger3_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04"/>
 
-                      <body name="finger_3_proximal" pos="0 0 0.03">
-                        <joint name="finger_3_proximal_joint" type="hinge" axis="-0.866 0.5 0" range="-0.3 1.2" damping="0.3"/>
-                        <geom name="finger_3_proximal_geom" type="box" size="0.012 0.006 0.025" material="finger_mat" mass="0.02"/>
+                      <body name="finger3_proximal" pos="0 0 0.035">
+                        <joint name="finger3_hinge1" type="hinge" axis="0 1 0" range="-0.2 1.5" damping="0.3" stiffness="30" armature="0.01"/>
+                        <geom name="finger3_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025"/>
 
-                        <body name="finger_3_distal" pos="0 0 0.025">
-                          <joint name="finger_3_distal_joint" type="hinge" axis="-0.866 0.5 0" range="0 1.0" damping="0.2"/>
-                          <geom name="finger_3_distal_geom" type="box" size="0.01 0.005 0.02" material="finger_mat" mass="0.015"/>
-                          <site name="finger_3_contact" pos="0 0 0.02" size="0.005" rgba="1 0 0 0.5"/>
+                        <body name="finger3_distal" pos="0 0 0.028">
+                          <joint name="finger3_hinge2" type="hinge" axis="0 1 0" range="0 1.2" damping="0.2" stiffness="20" armature="0.005"/>
+                          <geom name="finger3_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018"/>
+                          <site name="finger3_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
                         </body>
                       </body>
                     </body>
@@ -136,77 +160,120 @@
         </body>
       </body>
     </body>
+
+    <!-- 测试物体 -->
+    <body name="test_sphere" pos="0.2 0.1 0.1">
+      <joint type="free" name="sphere_joint"/>
+      <geom name="sphere_geom" type="sphere" size="0.06" material="red_mat" mass="0.25" friction="0.7 0.3 0.01"/>
+      <site name="sphere_site" pos="0 0 0" size="0.008"/>
+    </body>
+
+    <body name="test_box" pos="0.1 -0.1 0.05">
+      <joint type="free" name="box_joint"/>
+      <geom name="box_geom" type="box" size="0.05 0.07 0.04" material="green_mat" mass="0.35" friction="0.8 0.4 0.01"/>
+      <site name="box_site" pos="0 0 0" size="0.008"/>
+    </body>
+
+    <body name="test_cylinder" pos="0.3 0.0 0.1">
+      <joint type="free" name="cylinder_joint"/>
+      <geom name="cylinder_geom" type="cylinder" size="0.04 0.09" material="blue_mat" mass="0.3" friction="0.75 0.35 0.01"/>
+      <site name="cylinder_site" pos="0 0 0" size="0.008"/>
+    </body>
+
+    <body name="test_capsule" pos="-0.1 0.2 0.12">
+      <joint type="free" name="capsule_joint"/>
+      <geom name="capsule_geom" type="capsule" fromto="0 -0.04 0 0 0.04 0" size="0.03" material="yellow_mat" mass="0.2" friction="0.65 0.25 0.01"/>
+      <site name="capsule_site" pos="0 0 0" size="0.008"/>
+    </body>
+
+    <body name="test_ellipsoid" pos="0.0 -0.2 0.18">
+      <joint type="free" name="ellipsoid_joint"/>
+      <geom name="ellipsoid_geom" type="ellipsoid" size="0.05 0.07 0.04" material="purple_mat" mass="0.28" friction="0.6 0.2 0.01"/>
+      <site name="ellipsoid_site" pos="0 0 0" size="0.008"/>
+    </body>
+
+
   </worldbody>
 
   <actuator>
-    <!-- 6个关节电机 -->
-    <motor name="motor_1" joint="joint_1" gear="50"/>
-    <motor name="motor_2" joint="joint_2" gear="50"/>
-    <motor name="motor_3" joint="joint_3" gear="30"/>
-    <motor name="motor_4" joint="joint_4" gear="20"/>
-    <motor name="motor_5" joint="joint_5" gear="20"/>
-    <motor name="motor_6" joint="joint_6" gear="10"/>
+    <!-- 机械臂关节执行器 -->
+    <motor name="motor_joint1" joint="joint1" gear="80" ctrlrange="-2.5 2.5" forcerange="-150 150"/>
+    <motor name="motor_joint2" joint="joint2" gear="70" ctrlrange="-2.5 2.5" forcerange="-120 120"/>
+    <motor name="motor_joint3" joint="joint3" gear="60" ctrlrange="-2.5 2.5" forcerange="-100 100"/>
+    <motor name="motor_joint4" joint="joint4" gear="40" ctrlrange="-2.0 2.0" forcerange="-80 80"/>
+    <motor name="motor_joint5" joint="joint5" gear="40" ctrlrange="-2.0 2.0" forcerange="-60 60"/>
+    <motor name="motor_joint6" joint="joint6" gear="30" ctrlrange="-2.0 2.0" forcerange="-40 40"/>
 
-    <!-- 改进的抓取器电机 - 每个手指3个关节，共9个电机 -->
-    <motor name="finger_1_slide_motor" joint="finger_1_joint" gear="20"/>
-    <motor name="finger_1_proximal_motor" joint="finger_1_proximal_joint" gear="15"/>
-    <motor name="finger_1_distal_motor" joint="finger_1_distal_joint" gear="8"/>
+    <!-- 抓取器执行器 -->
+    <motor name="motor_finger1_slide" joint="finger1_slide" gear="50" ctrlrange="-0.5 0.5" forcerange="-80 80"/>
+    <motor name="motor_finger1_hinge1" joint="finger1_hinge1" gear="35" ctrlrange="-0.5 1.5" forcerange="-60 60"/>
+    <motor name="motor_finger1_hinge2" joint="finger1_hinge2" gear="25" ctrlrange="0 1.2" forcerange="-40 40"/>
 
-    <motor name="finger_2_slide_motor" joint="finger_2_joint" gear="20"/>
-    <motor name="finger_2_proximal_motor" joint="finger_2_proximal_joint" gear="15"/>
-    <motor name="finger_2_distal_motor" joint="finger_2_distal_joint" gear="8"/>
+    <motor name="motor_finger2_slide" joint="finger2_slide" gear="50" ctrlrange="-0.5 0.5" forcerange="-80 80"/>
+    <motor name="motor_finger2_hinge1" joint="finger2_hinge1" gear="35" ctrlrange="-0.5 1.5" forcerange="-60 60"/>
+    <motor name="motor_finger2_hinge2" joint="finger2_hinge2" gear="25" ctrlrange="0 1.2" forcerange="-40 40"/>
 
-    <motor name="finger_3_slide_motor" joint="finger_3_joint" gear="20"/>
-    <motor name="finger_3_proximal_motor" joint="finger_3_proximal_joint" gear="15"/>
-    <motor name="finger_3_distal_motor" joint="finger_3_distal_joint" gear="8"/>
+    <motor name="motor_finger3_slide" joint="finger3_slide" gear="50" ctrlrange="-0.5 0.5" forcerange="-80 80"/>
+    <motor name="motor_finger3_hinge1" joint="finger3_hinge1" gear="35" ctrlrange="-0.5 1.5" forcerange="-60 60"/>
+    <motor name="motor_finger3_hinge2" joint="finger3_hinge2" gear="25" ctrlrange="0 1.2" forcerange="-40 40"/>
   </actuator>
 
-  <equality>
-    <!-- 手指滑动同步 -->
-    <joint name="finger_slide_sync_1" joint1="finger_1_joint" joint2="finger_2_joint" polycoef="0 1 0 0 0"/>
-    <joint name="finger_slide_sync_2" joint1="finger_1_joint" joint2="finger_3_joint" polycoef="0 1 0 0 0"/>
-
-    <!-- 近端关节同步 -->
-    <joint name="finger_proximal_sync_1" joint1="finger_1_proximal_joint" joint2="finger_2_proximal_joint" polycoef="0 1 0 0 0"/>
-    <joint name="finger_proximal_sync_2" joint1="finger_1_proximal_joint" joint2="finger_3_proximal_joint" polycoef="0 1 0 0 0"/>
-
-    <!-- 远端关节同步 -->
-    <joint name="finger_distal_sync_1" joint1="finger_1_distal_joint" joint2="finger_2_distal_joint" polycoef="0 1 0 0 0"/>
-    <joint name="finger_distal_sync_2" joint1="finger_1_distal_joint" joint2="finger_3_distal_joint" polycoef="0 1 0 0 0"/>
-  </equality>
-
   <sensor>
-    <!-- 关节位置传感器 -->
-    <jointpos name="joint_1_pos" joint="joint_1"/>
-    <jointpos name="joint_2_pos" joint="joint_2"/>
-    <jointpos name="joint_3_pos" joint="joint_3"/>
-    <jointpos name="joint_4_pos" joint="joint_4"/>
-    <jointpos name="joint_5_pos" joint="joint_5"/>
-    <jointpos name="joint_6_pos" joint="joint_6"/>
+    <!-- 机械臂关节位置传感器 -->
+    <jointpos name="sensor_joint1" joint="joint1"/>
+    <jointpos name="sensor_joint2" joint="joint2"/>
+    <jointpos name="sensor_joint3" joint="joint3"/>
+    <jointpos name="sensor_joint4" joint="joint4"/>
+    <jointpos name="sensor_joint5" joint="joint5"/>
+    <jointpos name="sensor_joint6" joint="joint6"/>
 
-    <!-- 抓取器关节传感器 -->
-    <jointpos name="finger_1_slide_pos" joint="finger_1_joint"/>
-    <jointpos name="finger_1_proximal_pos" joint="finger_1_proximal_joint"/>
-    <jointpos name="finger_1_distal_pos" joint="finger_1_distal_joint"/>
+    <!-- 抓取器传感器 -->
+    <jointpos name="sensor_finger1_slide" joint="finger1_slide"/>
+    <jointpos name="sensor_finger1_hinge1" joint="finger1_hinge1"/>
+    <jointpos name="sensor_finger1_hinge2" joint="finger1_hinge2"/>
 
-    <jointpos name="finger_2_slide_pos" joint="finger_2_joint"/>
-    <jointpos name="finger_2_proximal_pos" joint="finger_2_proximal_joint"/>
-    <jointpos name="finger_2_distal_pos" joint="finger_2_distal_joint"/>
+    <jointpos name="sensor_finger2_slide" joint="finger2_slide"/>
+    <jointpos name="sensor_finger2_hinge1" joint="finger2_hinge1"/>
+    <jointpos name="sensor_finger2_hinge2" joint="finger2_hinge2"/>
 
-    <jointpos name="finger_3_slide_pos" joint="finger_3_joint"/>
-    <jointpos name="finger_3_proximal_pos" joint="finger_3_proximal_joint"/>
-    <jointpos name="finger_3_distal_pos" joint="finger_3_distal_joint"/>
+    <jointpos name="sensor_finger3_slide" joint="finger3_slide"/>
+    <jointpos name="sensor_finger3_hinge1" joint="finger3_hinge1"/>
+    <jointpos name="sensor_finger3_hinge2" joint="finger3_hinge2"/>
+
+    <!-- 力/力矩传感器 -->
+    <force name="sensor_finger1_force" site="finger1_tip"/>
+    <force name="sensor_finger2_force" site="finger2_tip"/>
+    <force name="sensor_finger3_force" site="finger3_tip"/>
 
     <!-- 触觉传感器 -->
-    <touch name="finger_1_touch" site="finger_1_contact"/>
-    <touch name="finger_2_touch" site="finger_2_contact"/>
-    <touch name="finger_3_touch" site="finger_3_contact"/>
+    <touch name="sensor_finger1_touch" site="finger1_tip"/>
+    <touch name="sensor_finger2_touch" site="finger2_tip"/>
+    <touch name="sensor_finger3_touch" site="finger3_tip"/>
 
-    <!-- 抓取力矩传感器 -->
-    <jointactuatorfrc name="gripper_torque" joint="finger_1_proximal_joint"/>
+    <!-- 位置和姿态传感器 -->
+    <framepos name="sensor_gripper_pos" objtype="site" objname="grip_center"/>
+    <framequat name="sensor_gripper_quat" objtype="site" objname="grip_center"/>
 
-    <!-- 目标接近度传感器 -->
-    <framepos name="grip_center_pos" objtype="site" objname="grip_center"/>
-    <framepos name="target_pos" objtype="site" objname="cube_site"/>
+    <!-- 测试物体传感器 -->
+    <framepos name="sensor_sphere_pos" objtype="body" objname="test_sphere"/>
+    <framepos name="sensor_box_pos" objtype="body" objname="test_box"/>
+    <framepos name="sensor_cylinder_pos" objtype="body" objname="test_cylinder"/>
+    <framepos name="sensor_capsule_pos" objtype="body" objname="test_capsule"/>
+    <framepos name="sensor_ellipsoid_pos" objtype="body" objname="test_ellipsoid"/>
+
+    <!-- 接近度传感器 -->
+    <rangefinder name="sensor_gripper_range" site="grip_center" cutoff="0.5"/>
   </sensor>
+
+  <equality>
+    <!-- 抓取器同步约束（确保手指同步运动） -->
+    <joint name="equal_finger_slide_12" joint1="finger1_slide" joint2="finger2_slide" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_slide_13" joint1="finger1_slide" joint2="finger3_slide" polycoef="0 1 0 0 0"/>
+
+    <joint name="equal_finger_hinge1_12" joint1="finger1_hinge1" joint2="finger2_hinge1" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_hinge1_13" joint1="finger1_hinge1" joint2="finger3_hinge1" polycoef="0 1 0 0 0"/>
+
+    <joint name="equal_finger_hinge2_12" joint1="finger1_hinge2" joint2="finger2_hinge2" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_hinge2_13" joint1="finger1_hinge2" joint2="finger3_hinge2" polycoef="0 1 0 0 0"/>
+  </equality>
 </mujoco>

@@ -1,21 +1,43 @@
-# CARLA-DeepSORT-Vehicle-Tracking
+# Carla 3D可视化与车辆跟踪系统
+这是基于Carla 0.9.14仿真平台的可视化项目，适配Python 3.7.9，实现2D/3D车辆可视化、交通灯显示、天气控制、数据统计及车辆跟踪功能。
 
-## 项目介绍
-基于CARLA仿真器和Deep SORT算法的2D车辆实时追踪程序，支持NPC生成、车辆追踪、关键信息显示，已修复文字反向、编码错误等问题。
+## 功能特点
+- **多维度可视化**：2D车辆检测框（带距离标注）+ 3D车辆边界框（距离衰减效果）
+- **交通灯可视化**：投影红绿灯3D位置，显示绿/黄/红/未知状态及文字
+- **天气控制**：6种天气模式（晴/多云/雨/黄昏/雾/暴雨），支持自动/手动切换
+- **数据统计**：实时绘制最近50帧车辆数量、最大距离折线图
+- **交互控制**：键盘按键开关3D显示、交通灯显示等功能
 
-## 环境依赖
-- Python 3.7
-- CARLA 0.9.10+
-- 依赖库：`pip install numpy opencv-python scipy carla`
+## 环境要求
+- 系统：Windows 10/11 / Linux（Ubuntu 18.04/20.04）
+- Python：3.7.9
+- Carla：0.9.14（服务端与Python库版本一致）
 
-## 快速开始
-1. 启动CARLA仿真器（建议低画质：`CarlaUE4.exe -quality-level=Low`）
-2. 运行程序：`python main.py`
-3. 操作：按`q`键退出
+## 安装依赖
+```bash
+pip install -r requirements.txt
+# 若Carla安装失败，用清华镜像：
+# pip install carla==0.9.14 -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
 
-## 核心功能
-- 自动生成自车和20辆NPC（自动驾驶）
-- Deep SORT实时追踪车辆，显示追踪ID和类别
-- 实时显示车速、追踪车辆数、地图名称
-- 自动清理资源，避免残留进程
+## 运行步骤
+1. 启动Carla 0.9.14服务端：
+   ```bash
+   # Windows
+   CarlaUE4.exe -carla-rpc-port=2000
+   # Linux
+   ./CarlaUE4.sh -carla-rpc-port=2000
+   ```
+2. 运行项目：
+   ```bash
+   python main.py
+   ```
 
+## 键盘交互
+| 按键 | 功能 |
+|------|------|
+| Q | 退出程序（自动清理资源） |
+| 1-6 | 切换对应天气（1=晴，2=多云，3=雨，4=黄昏，5=雾，6=暴雨） |
+| V | 开关车辆3D框显示 |
+| T | 开关交通信号灯显示 |
+| S | 开关红绿灯状态文字显示 |
