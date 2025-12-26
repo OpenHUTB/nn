@@ -16,7 +16,7 @@ import os
 class AutonomousCar:
     def __init__(self, model_path=None):
         """初始化无人小车模拟器"""
-        # 如果没有提供模型文件，使 用内置的XML模型
+        # 如果没有提供模型文件，使 用 内置的XML模型
         if model_path is None:
             self.xml = """
             <mujoco>
