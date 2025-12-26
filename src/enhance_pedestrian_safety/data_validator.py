@@ -1,5 +1,5 @@
-import os
 import json
+import os
 
 
 class DataValidator:
@@ -16,7 +16,8 @@ class DataValidator:
             'metadata': DataValidator._validate_metadata(data_dir),
             'lidar_data': DataValidator._validate_lidar_data(data_dir),
             'cooperative_data': DataValidator._validate_cooperative_data(data_dir),
-            'fusion_data': DataValidator._validate_fusion_data(data_dir)
+            'fusion_data': DataValidator._validate_fusion_data(data_dir),
+            'safety_data': DataValidator._validate_safety_data(data_dir)
         }
 
         validation_results['overall_score'] = DataValidator._calculate_score(validation_results)
@@ -39,18 +40,33 @@ class DataValidator:
             "fusion"
         ]
 
+        optional_dirs = [
+            "lidar",
+            "calibration",
+            "annotations",
+            "safety_reports"
+        ]
+
         missing_dirs = []
         for dir_path in required_dirs:
             full_path = os.path.join(data_dir, dir_path)
             if not os.path.exists(full_path):
                 missing_dirs.append(dir_path)
 
+        missing_optional = []
+        for dir_path in optional_dirs:
+            full_path = os.path.join(data_dir, dir_path)
+            if not os.path.exists(full_path):
+                missing_optional.append(dir_path)
+
         status = 'PASS' if len(missing_dirs) == 0 else 'FAIL'
 
         result = {
             'status': status,
             'missing_directories': missing_dirs,
-            'required_directories': required_dirs
+            'missing_optional_directories': missing_optional,
+            'required_directories': required_dirs,
+            'optional_directories': optional_dirs
         }
 
         return result
@@ -377,16 +393,58 @@ class DataValidator:
         }
 
     @staticmethod
+    def _validate_safety_data(data_dir):
+        """验证安全数据"""
+        safety_dir = os.path.join(data_dir, "safety_reports")
+
+        if not os.path.exists(safety_dir):
+            return {'status': 'MISSING', 'count': 0, 'errors': []}
+
+        json_files = [f for f in os.listdir(safety_dir) if f.endswith('.json')]
+        errors = []
+        valid_files = 0
+
+        for json_file in json_files[:min(5, len(json_files))]:
+            json_path = os.path.join(safety_dir, json_file)
+            try:
+                with open(json_path, 'r') as f:
+                    data = json.load(f)
+
+                # 检查必要字段
+                required_keys = ['timestamp', 'total_interactions']
+                for key in required_keys:
+                    if key not in data:
+                        errors.append(f"安全报告缺失字段 {key}: {json_file}")
+
+                valid_files += 1
+            except Exception as e:
+                errors.append(f"安全报告无效: {json_file} - {str(e)}")
+
+        if len(errors) == 0 and valid_files > 0:
+            status = 'PASS'
+        elif len(errors) < 3 and valid_files > 0:
+            status = 'WARNING'
+        else:
+            status = 'FAIL'
+
+        return {
+            'status': status,
+            'count': len(json_files),
+            'errors': errors
+        }
+
+    @staticmethod
     def _calculate_score(results):
         weights = {
             'directory_structure': 0.10,
-            'raw_images': 0.20,
-            'stitched_images': 0.10,
-            'annotations': 0.10,
-            'metadata': 0.10,
-            'lidar_data': 0.15,
-            'cooperative_data': 0.15,
-            'fusion_data': 0.10
+            'raw_images': 0.15,
+            'stitched_images': 0.05,
+            'annotations': 0.08,
+            'metadata': 0.08,
+            'lidar_data': 0.12,
+            'cooperative_data': 0.12,
+            'fusion_data': 0.10,
+            'safety_data': 0.20
         }
 
         score = 0
@@ -458,6 +516,10 @@ class DataValidator:
                     print(f"    NPY文件: {result['npy_files']}")
                 if 'json_files' in result:
                     print(f"    JSON文件: {result['json_files']}")
+
+            if key == 'safety_data' and isinstance(result, dict):
+                if 'count' in result:
+                    print(f"    安全报告: {result['count']} 个")
 
             if 'errors' in result and result['errors']:
                 print(f"  错误 ({len(result['errors'])}):")

@@ -8,6 +8,7 @@ import warnings
 import time
 import glfw
 from contextlib import suppress
+from enum import Enum  # 新增枚举，简化模式管理
 
 # ===================== 基础配置 =====================
 warnings.filterwarnings('ignore')
@@ -19,31 +20,55 @@ mpl.rcParams['axes.unicode_minus'] = False
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(CURRENT_DIR, "robot.xml")
 
-# ===================== 核心优化参数（流畅性重点） =====================
-# 手动控制：更低速、更平滑
-MANUAL_SPEED = 0.025  # 进一步降低速度，减少抖动
-GRASP_FORCE = 3.8  # 微调抓取力度，保证抓稳且不卡顿
-# 自动抓取：平滑轨迹参数
+
+# ===================== 新增：操作模式枚举（易管理） =====================
+class ControlMode(Enum):
+    MANUAL = 1  # 基础手动控制（原有）
+    PRECISE = 2  # 精准微调模式（新增）
+    AUTO_SIMPLE = 3  # 简易自动抓取（原有）
+    AUTO_COMPLEX = 4  # 复杂任务流程（新增）
+    CIRCLE_TASK = 5  # 画圆任务（新增）
+    BACK_FORTH = 6  # 往复运动（新增）
+
+
+# ===================== 核心参数（保留流畅性+新增功能） =====================
+# 基础控制参数
+MANUAL_SPEED = 0.025
+PRECISE_SPEED = 0.01  # 精准模式速度（新增）
+GRASP_FORCE = 3.8
 AUTO_LIFT_HEIGHT = 0.12
 AUTO_TRANSPORT_X = -0.15
-SMOOTH_GAIN = 3.0  # 降低控制增益，减少超调
-SMOOTH_CLIP = 1.0  # 更严格的输出限制，避免猛冲
-ACCEL_FACTOR = 0.05  # 加速度因子，让动作渐进加速/减速
+SMOOTH_GAIN = 3.0
+SMOOTH_CLIP = 1.0
+ACCEL_FACTOR = 0.05
 
-# ===================== 全局变量 =====================
+# 新增任务参数
+CIRCLE_RADIUS = 0.1  # 画圆半径
+CIRCLE_SPEED = 0.005  # 画圆速度
+BACK_FORTH_DIST = 0.2  # 往复运动距离
+
+# ===================== 全局变量（丰富功能） =====================
 control_cmd = {
     'forward': 0, 'backward': 0, 'left': 0, 'right': 0,
     'up': 0, 'down': 0, 'grasp': 0, 'release': 0,
-    'auto': False, 'reset': False
+    'auto_simple': False,  # Z：简易自动
+    'auto_complex': False,  # X：复杂任务
+    'circle_task': False,  # V：画圆任务
+    'back_forth': False,  # B：往复运动
+    'switch_precise': False,  # P：切换精准模式
+    'reset': False
 }
-# 平滑控制缓存（记录上一步的控制输出，避免突变）
-last_ctrl = np.zeros(10)  # 适配最多10个关节
+last_ctrl = np.zeros(10)
+current_mode = ControlMode.MANUAL  # 当前控制模式
+task_step = 0  # 任务步数计数器
 
 
-# ===================== 兼容版按键检测 =====================
+# ===================== 兼容版按键检测（新增操作按键） =====================
 def check_keyboard_input(viewer):
+    global current_mode
+    # 重置基础指令
     for key in control_cmd.keys():
-        if key != 'auto' and key != 'reset':
+        if key not in ['auto_simple', 'auto_complex', 'circle_task', 'back_forth', 'switch_precise', 'reset']:
             control_cmd[key] = 0
 
     if hasattr(viewer, 'window') and viewer.window is not None:
@@ -55,41 +80,47 @@ def check_keyboard_input(viewer):
         control_cmd['right'] = 1 if glfw.get_key(window, glfw.KEY_D) == glfw.PRESS else 0
         control_cmd['up'] = 1 if glfw.get_key(window, glfw.KEY_Q) == glfw.PRESS else 0
         control_cmd['down'] = 1 if glfw.get_key(window, glfw.KEY_E) == glfw.PRESS else 0
-        # 抓取/释放/自动/重置
+        # 抓取/释放
         control_cmd['grasp'] = 1 if glfw.get_key(window, glfw.KEY_SPACE) == glfw.PRESS else 0
         control_cmd['release'] = 1 if glfw.get_key(window, glfw.KEY_R) == glfw.PRESS else 0
-        control_cmd['auto'] = True if glfw.get_key(window, glfw.KEY_Z) == glfw.PRESS else False
+        # 新增：多模式任务按键
+        control_cmd['auto_simple'] = True if glfw.get_key(window, glfw.KEY_Z) == glfw.PRESS else False
+        control_cmd['auto_complex'] = True if glfw.get_key(window, glfw.KEY_X) == glfw.PRESS else False
+        control_cmd['circle_task'] = True if glfw.get_key(window, glfw.KEY_V) == glfw.PRESS else False
+        control_cmd['back_forth'] = True if glfw.get_key(window, glfw.KEY_B) == glfw.PRESS else False
+        control_cmd['switch_precise'] = True if glfw.get_key(window, glfw.KEY_P) == glfw.PRESS else False
         control_cmd['reset'] = True if glfw.get_key(window, glfw.KEY_C) == glfw.PRESS else False
         # ESC退出
         if glfw.get_key(window, glfw.KEY_ESCAPE) == glfw.PRESS:
             glfw.set_window_should_close(window, True)
+
+        # 切换精准模式（新增）
+        if control_cmd['switch_precise']:
+            current_mode = ControlMode.PRECISE if current_mode != ControlMode.PRECISE else ControlMode.MANUAL
+            mode_name = "精准微调" if current_mode == ControlMode.PRECISE else "基础手动"
+            print(
+                f"\n🔄 切换到【{mode_name}】模式（速度：{PRECISE_SPEED if current_mode == ControlMode.PRECISE else MANUAL_SPEED}）")
+            control_cmd['switch_precise'] = False
     else:
-        print("\n⚠️ 旧版mujoco-viewer，按Z触发自动抓取，C重置")
-        control_cmd['auto'] = True
+        print("\n⚠️ 旧版mujoco-viewer，支持：Z(简易自动)、X(复杂任务)、C(重置)")
+        control_cmd['auto_simple'] = True
 
 
-# ===================== 平滑控制函数（核心优化） =====================
+# ===================== 核心控制函数（保留平滑+新增任务） =====================
 def smooth_control(target_ctrl, last_ctrl, joint_idx):
-    """
-    平滑控制输出，避免关节突变（解决抖动/卡顿）
-    :param target_ctrl: 目标控制值
-    :param last_ctrl: 上一步控制值
-    :param joint_idx: 关节索引
-    :return: 平滑后的控制值
-    """
-    # 渐进逼近目标值，避免猛冲
     delta = target_ctrl - last_ctrl[joint_idx]
     smoothed = last_ctrl[joint_idx] + delta * ACCEL_FACTOR
-    # 限制最大变化量，彻底避免抖动
     smoothed = np.clip(smoothed, -SMOOTH_CLIP, SMOOTH_CLIP)
-    # 更新缓存
     last_ctrl[joint_idx] = smoothed
     return smoothed
 
 
 def manual_control(model, data, ee_id):
-    """手动控制（增加平滑逻辑，动作更丝滑）"""
-    global last_ctrl
+    """手动控制（新增精准模式）"""
+    global last_ctrl, current_mode
+    # 选择速度（基础/精准）
+    speed = PRECISE_SPEED if current_mode == ControlMode.PRECISE else MANUAL_SPEED
+
     # 安全获取末端位置
     ee_pos = np.array([0.0, 0.0, 0.1])
     if ee_id >= 0:
@@ -98,42 +129,37 @@ def manual_control(model, data, ee_id):
         except:
             ee_pos = data.xpos[ee_id].copy()
 
-    # 计算目标位置（低速，易控）
+    # 计算目标位置
     target_pos = ee_pos.copy()
-    target_pos[0] += (control_cmd['forward'] - control_cmd['backward']) * MANUAL_SPEED
-    target_pos[1] += (control_cmd['left'] - control_cmd['right']) * MANUAL_SPEED
-    target_pos[2] += (control_cmd['up'] - control_cmd['down']) * MANUAL_SPEED
+    target_pos[0] += (control_cmd['forward'] - control_cmd['backward']) * speed
+    target_pos[1] += (control_cmd['left'] - control_cmd['right']) * speed
+    target_pos[2] += (control_cmd['up'] - control_cmd['down']) * speed
 
-    # 计算误差并平滑控制（核心优化）
+    # 平滑控制
     error = target_pos - ee_pos
     for i in range(min(3, model.njnt)):
         target_ctrl = error[i] * SMOOTH_GAIN
-        # 平滑输出，避免关节突变
         data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
 
-    # 抓取控制（渐进加力，避免夹爪猛夹）
+    # 渐进抓取/释放
     if control_cmd['grasp']:
-        # 渐进增加抓取力，避免物体被弹飞
         if model.nu >= 4:
             data.ctrl[3] = min(data.ctrl[3] + 0.1, GRASP_FORCE)
         if model.nu >= 5:
             data.ctrl[4] = max(data.ctrl[4] - 0.1, -GRASP_FORCE)
     elif control_cmd['release']:
-        # 渐进释放，避免物体掉落
         if model.nu >= 4:
             data.ctrl[3] = max(data.ctrl[3] - 0.1, 0.0)
         if model.nu >= 5:
             data.ctrl[4] = min(data.ctrl[4] + 0.1, 0.0)
 
 
-def auto_grasp(model, data, ee_id, obj_id):
-    """一键自动抓取（全流程平滑优化，无卡顿）"""
+# ===================== 新增：丰富的自动任务函数 =====================
+def auto_simple_grasp(model, data, ee_id, obj_id):
+    """原有简易自动抓取（保留）"""
     global last_ctrl
-    print("🔄 开始平滑自动抓取...")
-    # 重置平滑缓存
+    print("🔄 开始【简易自动抓取】任务...")
     last_ctrl = np.zeros(10)
-
-    # 安全获取物体位置
     obj_pos = np.array([0.2, 0.0, 0.05])
     if obj_id >= 0:
         try:
@@ -141,157 +167,242 @@ def auto_grasp(model, data, ee_id, obj_id):
         except:
             pass
 
-    # 阶段1：缓慢移动到物体上方（平滑逼近，无猛冲）
+    # 阶段1：移动到物体上方
     step = 0
     while step < 800 and viewer.is_alive:
-        ee_pos = np.array([0.0, 0.0, 0.1])
-        if ee_id >= 0:
-            try:
-                ee_pos = data.site_xpos[ee_id].copy()
-            except:
-                ee_pos = data.xpos[ee_id].copy()
-
-        # 目标位置：物体上方（高度微调，避免碰撞）
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
         target = obj_pos + [0, 0, 0.08]
         error = target - ee_pos
-
-        # 平滑控制关节，无抖动
         for i in range(min(3, model.njnt)):
-            target_ctrl = error[i] * SMOOTH_GAIN * 0.8  # 更慢速度
+            target_ctrl = error[i] * SMOOTH_GAIN * 0.8
             data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
-
         mujoco.mj_step(model, data)
         viewer.render()
         step += 1
 
-    # 阶段2：缓慢下降（渐进接近，避免压碎物体）
+    # 阶段2：下降抓取
     step = 0
     while step < 600 and viewer.is_alive:
-        ee_pos = np.array([0.0, 0.0, 0.1])
-        if ee_id >= 0:
-            try:
-                ee_pos = data.site_xpos[ee_id].copy()
-            except:
-                ee_pos = data.xpos[ee_id].copy()
-
-        # 动态调整目标：根据物体位置实时微调，避免偏差
-        target = obj_pos + [0, 0, 0.01]  # 仅贴近物体，不压下去
-        error = target - ee_pos
-
-        for i in range(min(3, model.njnt)):
-            target_ctrl = error[i] * SMOOTH_GAIN * 0.5  # 极慢速度
-            data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
-
-        # 渐进闭合夹爪（核心优化：避免猛夹导致物体掉落）
-        if model.nu >= 4:
-            data.ctrl[3] = min(data.ctrl[3] + 0.05, GRASP_FORCE)
-        if model.nu >= 5:
-            data.ctrl[4] = max(data.ctrl[4] - 0.05, -GRASP_FORCE)
-
-        mujoco.mj_step(model, data)
-        viewer.render()
-        step += 1
-
-    # 阶段3：缓慢抬升（确认抓稳后再抬升）
-    step = 0
-    grasp_confirmed = False
-    while step < 500 and viewer.is_alive:
-        ee_pos = np.array([0.0, 0.0, 0.1])
-        if ee_id >= 0:
-            try:
-                ee_pos = data.site_xpos[ee_id].copy()
-            except:
-                ee_pos = data.xpos[ee_id].copy()
-
-        # 确认抓稳后再抬升（避免刚夹就抬导致掉落）
-        if step > 100:
-            grasp_confirmed = True
-
-        if grasp_confirmed:
-            target = obj_pos + [0, 0, AUTO_LIFT_HEIGHT]
-        else:
-            target = obj_pos + [0, 0, 0.01]  # 先保持位置
-
-        error = target - ee_pos
-        for i in range(min(3, model.njnt)):
-            target_ctrl = error[i] * SMOOTH_GAIN * 0.7
-            data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
-
-        mujoco.mj_step(model, data)
-        viewer.render()
-        step += 1
-
-    # 阶段4：平稳搬运（匀速移动，无晃动）
-    step = 0
-    while step < 800 and viewer.is_alive:
-        ee_pos = np.array([0.0, 0.0, 0.1])
-        if ee_id >= 0:
-            try:
-                ee_pos = data.site_xpos[ee_id].copy()
-            except:
-                ee_pos = data.xpos[ee_id].copy()
-
-        target = obj_pos + [AUTO_TRANSPORT_X, 0, AUTO_LIFT_HEIGHT]
-        error = target - ee_pos
-        for i in range(min(3, model.njnt)):
-            target_ctrl = error[i] * SMOOTH_GAIN * 0.6  # 更平稳的速度
-            data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
-
-        mujoco.mj_step(model, data)
-        viewer.render()
-        step += 1
-
-    # 阶段5：缓慢下放（精准定位，无掉落）
-    step = 0
-    while step < 600 and viewer.is_alive:
-        ee_pos = np.array([0.0, 0.0, 0.1])
-        if ee_id >= 0:
-            try:
-                ee_pos = data.site_xpos[ee_id].copy()
-            except:
-                ee_pos = data.xpos[ee_id].copy()
-
-        target = obj_pos + [AUTO_TRANSPORT_X, 0, 0.03]  # 更贴近地面
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        target = obj_pos + [0, 0, 0.01]
         error = target - ee_pos
         for i in range(min(3, model.njnt)):
             target_ctrl = error[i] * SMOOTH_GAIN * 0.5
             data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
+        if model.nu >= 4:
+            data.ctrl[3] = min(data.ctrl[3] + 0.05, GRASP_FORCE)
+        if model.nu >= 5:
+            data.ctrl[4] = max(data.ctrl[4] - 0.05, -GRASP_FORCE)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
 
-        # 延迟且渐进释放（核心优化：避免提前释放）
+    # 阶段3-6：抬升→搬运→下放→归位（保留流畅性）
+    step = 0
+    while step < 500 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        target = obj_pos + [0, 0, AUTO_LIFT_HEIGHT] if step > 100 else obj_pos + [0, 0, 0.01]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            target_ctrl = error[i] * SMOOTH_GAIN * 0.7
+            data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
+
+    step = 0
+    while step < 800 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        target = obj_pos + [AUTO_TRANSPORT_X, 0, AUTO_LIFT_HEIGHT]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            target_ctrl = error[i] * SMOOTH_GAIN * 0.6
+            data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
+
+    step = 0
+    while step < 600 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        target = obj_pos + [AUTO_TRANSPORT_X, 0, 0.03]
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            target_ctrl = error[i] * SMOOTH_GAIN * 0.5
+            data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
         if step > 300:
             if model.nu >= 4:
                 data.ctrl[3] = max(data.ctrl[3] - 0.05, 0.0)
             if model.nu >= 5:
                 data.ctrl[4] = min(data.ctrl[4] + 0.05, 0.0)
-
         mujoco.mj_step(model, data)
         viewer.render()
         step += 1
 
-    # 阶段6：平稳归位（缓慢退回，无晃动）
     step = 0
     while step < 700 and viewer.is_alive:
-        ee_pos = np.array([0.0, 0.0, 0.1])
-        if ee_id >= 0:
-            try:
-                ee_pos = data.site_xpos[ee_id].copy()
-            except:
-                ee_pos = data.xpos[ee_id].copy()
-
-        target = np.array([0.0, 0.0, 0.15])  # 更高的归位位置，避免碰撞
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        target = np.array([0.0, 0.0, 0.15])
         error = target - ee_pos
         for i in range(min(3, model.njnt)):
             target_ctrl = error[i] * SMOOTH_GAIN * 0.7
             data.ctrl[i] = smooth_control(target_ctrl, last_ctrl, i)
-
         mujoco.mj_step(model, data)
         viewer.render()
         step += 1
 
-    print("🎉 平滑自动抓取完成！（无卡顿/掉落）")
+    print("🎉 【简易自动抓取】任务完成！")
 
 
-# ===================== 初始化+主程序 =====================
+def auto_complex_task(model, data, ee_id, obj_id):
+    """新增：复杂任务流程（多物体抓取+多位置放置）"""
+    global last_ctrl
+    print("🔄 开始【复杂任务】：抓取→搬运→放置→返回→二次抓取...")
+    last_ctrl = np.zeros(10)
+    # 定义多个目标位置（丰富任务）
+    target_positions = [
+        np.array([0.2, 0.0, 0.05]),  # 初始物体位置
+        np.array([-0.15, 0.1, 0.05]),  # 第一个放置点
+        np.array([-0.15, -0.1, 0.05]),  # 第二个放置点
+        np.array([0.2, 0.0, 0.05])  # 回到初始位置
+    ]
+
+    for idx, target in enumerate(target_positions):
+        if not viewer.is_alive:
+            break
+        print(f"📌 复杂任务阶段 {idx + 1}/{len(target_positions)}：移动到 {target[:2]} 位置")
+
+        # 阶段1：移动到目标上方
+        step = 0
+        while step < 700 and viewer.is_alive:
+            ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+            target_above = target + [0, 0, 0.08]
+            error = target_above - ee_pos
+            for i in range(min(3, model.njnt)):
+                data.ctrl[i] = smooth_control(error[i] * SMOOTH_GAIN * 0.7, last_ctrl, i)
+            mujoco.mj_step(model, data)
+            viewer.render()
+            step += 1
+
+        # 阶段2：下降（仅第一阶段抓取，其他阶段放置）
+        step = 0
+        while step < 500 and viewer.is_alive:
+            ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+            error = target - ee_pos
+            for i in range(min(3, model.njnt)):
+                data.ctrl[i] = smooth_control(error[i] * SMOOTH_GAIN * 0.5, last_ctrl, i)
+
+            # 第一阶段抓取，第二/三阶段释放，第四阶段准备二次抓取
+            if idx == 0:  # 抓取
+                if model.nu >= 4:
+                    data.ctrl[3] = min(data.ctrl[3] + 0.05, GRASP_FORCE)
+                if model.nu >= 5:
+                    data.ctrl[4] = max(data.ctrl[4] - 0.05, -GRASP_FORCE)
+            elif idx in [1, 2]:  # 释放
+                if model.nu >= 4:
+                    data.ctrl[3] = max(data.ctrl[3] - 0.05, 0.0)
+                if model.nu >= 5:
+                    data.ctrl[4] = min(data.ctrl[4] + 0.05, 0.0)
+
+            mujoco.mj_step(model, data)
+            viewer.render()
+            step += 1
+
+        # 阶段3：抬升
+        step = 0
+        while step < 400 and viewer.is_alive:
+            ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+            target_up = target + [0, 0, AUTO_LIFT_HEIGHT]
+            error = target_up - ee_pos
+            for i in range(min(3, model.njnt)):
+                data.ctrl[i] = smooth_control(error[i] * SMOOTH_GAIN * 0.6, last_ctrl, i)
+            mujoco.mj_step(model, data)
+            viewer.render()
+            step += 1
+
+    # 归位
+    step = 0
+    while step < 600 and viewer.is_alive:
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        target = np.array([0.0, 0.0, 0.15])
+        error = target - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = smooth_control(error[i] * SMOOTH_GAIN * 0.7, last_ctrl, i)
+        mujoco.mj_step(model, data)
+        viewer.render()
+        step += 1
+
+    print("🎉 【复杂任务】全流程完成！（多位置抓取+放置）")
+
+
+def circle_task(model, data, ee_id):
+    """新增：画圆任务（机械臂末端画圆，丰富操作）"""
+    global last_ctrl, task_step
+    print("🔄 开始【画圆任务】：末端以原点为中心画圆（按ESC停止）")
+    last_ctrl = np.zeros(10)
+    center = np.array([0.1, 0.0, 0.1])  # 圆心位置
+
+    while viewer.is_alive and task_step < 1500:  # 画2圈左右
+        # 计算圆上的目标点（三角函数生成圆形轨迹）
+        angle = task_step * CIRCLE_SPEED
+        target_x = center[0] + CIRCLE_RADIUS * np.cos(angle)
+        target_y = center[1] + CIRCLE_RADIUS * np.sin(angle)
+        target_z = center[2]
+        target_pos = np.array([target_x, target_y, target_z])
+
+        # 安全获取末端位置
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        error = target_pos - ee_pos
+
+        # 平滑控制画圆
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = smooth_control(error[i] * SMOOTH_GAIN * 0.8, last_ctrl, i)
+
+        # 实时反馈画圆进度
+        if task_step % 100 == 0:
+            print(f"📈 画圆进度：{int(task_step / 1500 * 100)}%（角度：{int(angle * 180 / np.pi)}°）")
+
+        mujoco.mj_step(model, data)
+        viewer.render()
+        task_step += 1
+
+    task_step = 0
+    print("🎉 【画圆任务】完成！机械臂末端画出完整圆形轨迹")
+
+
+def back_forth_task(model, data, ee_id):
+    """新增：往复运动任务（前后/左右往复，丰富操作）"""
+    global last_ctrl, task_step
+    print("🔄 开始【往复运动任务】：前后往复移动（按ESC停止）")
+    last_ctrl = np.zeros(10)
+    start_pos = np.array([0.0, 0.0, 0.1])  # 起始位置
+
+    while viewer.is_alive and task_step < 2000:
+        # 生成往复轨迹（正弦函数实现平滑往复）
+        cycle = np.sin(task_step * 0.01)  # -1~1的周期变化
+        target_x = start_pos[0] + cycle * BACK_FORTH_DIST
+        target_pos = np.array([target_x, start_pos[1], start_pos[2]])
+
+        # 平滑控制往复运动
+        ee_pos = np.array([0.0, 0.0, 0.1]) if ee_id < 0 else data.site_xpos[ee_id].copy()
+        error = target_pos - ee_pos
+        for i in range(min(3, model.njnt)):
+            data.ctrl[i] = smooth_control(error[i] * SMOOTH_GAIN * 0.7, last_ctrl, i)
+
+        # 实时反馈往复进度
+        if task_step % 200 == 0:
+            direction = "前" if cycle > 0 else "后"
+            print(f"📌 往复运动：当前方向【{direction}】（位置X：{target_x:.2f}）")
+
+        mujoco.mj_step(model, data)
+        viewer.render()
+        task_step += 1
+
+    task_step = 0
+    print("🎉 【往复运动任务】完成！机械臂完成多次平滑往复")
+
+
+# ===================== 初始化+主程序（整合所有功能） =====================
 def init_model_and_viewer():
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(f"未找到robot.xml: {MODEL_PATH}")
@@ -323,36 +434,61 @@ def init_model_and_viewer():
             obj_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
             if obj_id >= 0: break
 
-    print("✅ 初始化完成！（平滑控制模式）")
-    print("🎮 操作指南：W/S/A/D/Q/E移动（丝滑无抖），空格抓取（渐进加力）")
-    print("   Z：一键平滑抓取  C：重置  ESC：退出")
+    # 新增：打印丰富的操作指南
+    print("=" * 50)
+    print("✅ 多功能机械臂控制程序初始化完成！")
+    print("🎮 基础操作：")
+    print("   W/S/A/D/Q/E：移动   空格：抓取   R：释放   P：切换精准/基础模式")
+    print("🎯 自动任务（新增）：")
+    print("   Z：简易自动抓取   X：复杂多位置任务")
+    print("   V：画圆任务       B：往复运动任务")
+    print("🔧 其他：C-重置   ESC-退出")
+    print("=" * 50)
     return model, data, viewer, ee_id, obj_id
 
 
 def main():
-    global viewer, last_ctrl
-    last_ctrl = np.zeros(10)  # 初始化平滑缓存
+    global viewer, last_ctrl, task_step, current_mode
+    last_ctrl = np.zeros(10)
+    task_step = 0
+    current_mode = ControlMode.MANUAL
     model, data, viewer, ee_id, obj_id = init_model_and_viewer()
 
     try:
         while viewer.is_alive:
             check_keyboard_input(viewer)
 
+            # 重置功能
             if control_cmd['reset']:
                 mujoco.mj_resetData(model, data)
                 mujoco.mj_forward(model, data)
-                last_ctrl = np.zeros(10)  # 重置平滑缓存
-                print("🔄 模型重置完成（平滑缓存已清空）")
+                last_ctrl = np.zeros(10)
+                task_step = 0
+                current_mode = ControlMode.MANUAL
+                print("\n🔄 模型完全重置：位置、缓存、任务、模式均已恢复初始状态")
                 control_cmd['reset'] = False
-            elif control_cmd['auto']:
-                auto_grasp(model, data, ee_id, obj_id)
-                control_cmd['auto'] = False
+
+            # 执行各类自动任务（新增）
+            elif control_cmd['auto_simple']:
+                auto_simple_grasp(model, data, ee_id, obj_id)
+                control_cmd['auto_simple'] = False
+            elif control_cmd['auto_complex']:
+                auto_complex_task(model, data, ee_id, obj_id)
+                control_cmd['auto_complex'] = False
+            elif control_cmd['circle_task']:
+                circle_task(model, data, ee_id)
+                control_cmd['circle_task'] = False
+            elif control_cmd['back_forth']:
+                back_forth_task(model, data, ee_id)
+                control_cmd['back_forth'] = False
+
+            # 手动控制（基础/精准）
             else:
                 manual_control(model, data, ee_id)
 
             mujoco.mj_step(model, data)
             viewer.render()
-            time.sleep(0.005)  # 更慢的帧率，更丝滑
+            time.sleep(0.005)
 
     except Exception as e:
         print(f"\n❌ 运行出错: {e}")
@@ -361,7 +497,7 @@ def main():
     finally:
         with suppress(Exception):
             viewer.close()
-        print("\n🔚 程序退出（未修改robot.xml）")
+        print("\n🔚 多功能机械臂程序退出（未修改robot.xml）")
 
 
 if __name__ == "__main__":

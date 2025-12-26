@@ -17,7 +17,7 @@ lidar_points_per_second: 500000
 
 # ======================== 检测模型配置 ========================
 yolo_model: "yolov8n.pt"
-conf_thres: 0.25
+conf_thres: 0.1
 iou_thres: 0.3
 device: "cpu"  
 yolo_imgsz_max: 640
@@ -57,3 +57,25 @@ view:
   satellite_height: 50.0
   behind_distance: 10.0
   first_person_height: 1.6
+
+# ======================== 热重载配置 ========================
+hot_reload:
+  enabled: true           # 是否启用热重载
+  check_interval: 100     # 每多少帧检查一次配置文件
+  safe_keys_only: true    # 是否只更新安全参数（避免重启连接）
+
+# 可热重载的安全参数列表（这些参数可以安全更新而不需要重启）
+hot_reload_safe_keys:
+  - "conf_thres"          # 检测置信度阈值
+  - "iou_thres"           # IOU阈值
+  - "display_fps"         # 显示帧率
+  - "max_age"             # 跟踪最大丢失帧数
+  - "min_hits"            # 跟踪最小匹配次数
+  - "adaptive_fps"        # 是否启用自适应帧率
+  - "min_fps"             # 最小FPS
+  - "max_fps"             # 最大FPS
+  - "fov"                 # 相机视野
+  - "yolo_imgsz_max"      # YOLO输入尺寸
+  - "stop_speed_thresh"   # 停车速度阈值
+  - "danger_dist_thresh"  # 危险距离阈值
+  - "weather"             # 天气设置
