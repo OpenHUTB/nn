@@ -11,3 +11,11 @@ __pycache__/
 
 # 忽略日志文件夹（临时日志文件，无需提交到仓库）
 logs/
+
+trajectories/
+
+# 忽略手势识别配置文件（保留本地，不提交到仓库）
+gesture_config.json
+gesture_config (1).json
+gesture_config_v2.json
+gesture_config_v3.json
