@@ -9,6 +9,12 @@ from typing import Optional, Tuple, List, Dict, Any
 import mujoco
 from mujoco import viewer
 
+# ===================== 核心路径配置（相对路径）=====================
+# 获取当前脚本所在目录（所有相对路径的基准）
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 模型文件夹相对路径（相对于当前脚本）
+MODEL_ROOT = os.path.join(SCRIPT_DIR, "mujoco_menagerie")
+
 # ===================== 依赖导入 - ROS 1（保留但禁用）=====================
 ROS_AVAILABLE = False
 try:
@@ -20,12 +26,12 @@ try:
 except ImportError:
     logging.warning("ROS环境未检测到，ROS功能禁用")
 
-# ===================== 多模型配置（修正预设指令）=====================
+# ===================== 多模型配置（修正预设指令 + 相对路径）=====================
 MODEL_CONFIGS = {
     1: {
         "name": "Franka Panda（机械臂）",
         "key": "franka",
-        "path": "/home/lan/桌面/nn/mujoco_menagerie/franka_emika_panda/panda.xml",
+        "path": os.path.join(MODEL_ROOT, "franka_emika_panda/panda.xml"),
         "joint_num": 7,
         "pd_params": {"KP": 800.0, "KD": 60.0},
         "presets": {
@@ -40,7 +46,7 @@ MODEL_CONFIGS = {
     2: {
         "name": "UR5 机械臂",
         "key": "ur5",
-        "path": "/home/lan/桌面/nn/mujoco_menagerie/universal_robots_ur5e/ur5e.xml",
+        "path": os.path.join(MODEL_ROOT, "universal_robots_ur5e/ur5e.xml"),
         "joint_num": 6,
         "pd_params": {"KP": 700.0, "KD": 50.0},
         "presets": {
@@ -54,7 +60,7 @@ MODEL_CONFIGS = {
     3: {
         "name": "Franka Panda（带手爪）",
         "key": "franka_gripper",
-        "path": "/home/lan/桌面/nn/mujoco_menagerie/franka_emika_panda/panda_gripper.xml",
+        "path": os.path.join(MODEL_ROOT, "franka_emika_panda/panda_gripper.xml"),
         "joint_num": 8,
         "pd_params": {"KP": 800.0, "KD": 60.0},
         "presets": {
@@ -68,7 +74,7 @@ MODEL_CONFIGS = {
     4: {
         "name": "Walker2d 机器人",
         "key": "walker2d",
-        "path": "/home/lan/桌面/nn/mujoco_menagerie/walker2d/walker2d.xml",
+        "path": os.path.join(MODEL_ROOT, "walker2d/walker2d.xml"),
         "joint_num": 6,
         "pd_params": {"KP": 1000.0, "KD": 80.0},
         "presets": {
@@ -99,11 +105,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger("mujoco_control_tool")
 
-# ===================== 核心功能函数（精简版）=====================
+# ===================== 核心功能函数（精简版 + 路径调试）=====================
 def load_mujoco_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
-    """加载MuJoCo模型"""
+    """加载MuJoCo模型（增加路径调试信息）"""
+    # 路径合法性检查 + 调试信息
     if not os.path.exists(model_path):
         logger.error(f"模型文件不存在：{model_path}")
+        logger.info(f"💡 调试信息 - 当前脚本目录：{SCRIPT_DIR}")
+        logger.info(f"💡 调试信息 - 模型根目录：{MODEL_ROOT}")
         return None, None
 
     try:
@@ -353,6 +362,10 @@ def main_menu():
 
 # ===================== 命令行入口（精简版）=====================
 def main():
+    # 启动时打印路径信息，方便调试
+    logger.info(f"📌 当前脚本目录：{SCRIPT_DIR}")
+    logger.info(f"📌 模型根目录：{MODEL_ROOT}")
+    
     parser = argparse.ArgumentParser(
         description="MuJoCo模型控制工具（精简版，无数据保存）",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
