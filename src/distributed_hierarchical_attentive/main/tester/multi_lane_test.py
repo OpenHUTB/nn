@@ -116,7 +116,7 @@ class BirdsEyeView:
         # 鸟瞰图的四个角点
         output_points = np.array([
             [0, self.output_size[0]],  # 左下
-            [self.output_size[1], self.output_size[0]],  # 右下
+            [*self.output_size[::-1]],  # 右下 (w, h)
             [self.output_size[1], 0],  # 右上
             [0, 0]  # 左上
         ], dtype=np.float32)
