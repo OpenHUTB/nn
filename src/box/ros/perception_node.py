@@ -4,8 +4,6 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import PointStamped
 import numpy as np
 # 导入仓库中的感知模块
-from my-test-repo.main.BasicWithEndEffectorPosition import BasicWithEndEffectorPosition
-from my-test-repo.mobl_arms_bimanual.sp import MoblArmsSimulator
 
 class PerceptionNode(Node):
     def __init__(self):
