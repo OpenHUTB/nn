@@ -259,9 +259,6 @@ class Main():
                 # 🆕 显示帧率
                 self.drawer.display_fps(self.fps)
 
-                # 🆕 新增：显示摄像头图像
-                self.drawer.display_camera()
-
                 # 更新观察者视角跟随车辆
                 self.update_spectator()
 
