@@ -1,7 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-CARLA 多车辆协同控制版：修复出生点索引越界问题
+CARLA 多车辆协同控制版：V3.0 终极稳定版
+核心特性：
+1. 彻底修复传感器销毁警告
+2. LiDAR点云处理性能优化（降采样+缓存）
+3. 车辆状态实时监控与故障自动恢复
+4. 精准障碍物避障+ACC跟车+交通灯合规
+5. 多视角流畅切换+性能监控
 """
 
 import sys
@@ -16,8 +22,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 import random
+from collections import deque
 
-# ===================== 全局配置 =======================
+# ===================== 全局配置（V3.0优化）=======================
 # CARLA连接
 CARLA_HOST = "localhost"
 CARLA_PORT = 2000
@@ -33,9 +40,9 @@ VEHICLE_MODELS = [
 SPAWN_INTERVAL = 1.0
 SPAWN_RETRY_MAX = 8
 SPAWN_RETRY_DELAY = 0.5
-SPAWN_DISTANCE_LIMIT = 15.0  # 放宽距离限制到15米
+SPAWN_DISTANCE_LIMIT = 15.0
 
-# 车辆控制参数
+# 车辆控制参数（V3.0优化）
 VEHICLE_WHEELBASE = 2.9
 VEHICLE_REAR_AXLE_OFFSET = 1.45
 LOOKAHEAD_DIST_STRAIGHT = 7.0
@@ -49,8 +56,26 @@ DIR_CHANGE_GENTLE = 0.03
 DIR_CHANGE_SHARP = 0.08
 BASE_SPEEDS = [25.0, 22.0, 20.0]
 PID_KP = 0.2
-PID_KI = 0.01
+PID_KI = 0.008  # 降低积分系数，减少饱和
 PID_KD = 0.02
+
+# ACC跟车配置
+SAFE_TIME_GAP = 1.5
+MIN_SAFE_DISTANCE = 5.0
+EMERGENCY_DECEL_RATE = 5.0
+LEAD_BRAKE_THRESHOLD = -10.0
+
+# LiDAR与障碍物检测配置（V3.0性能优化）
+LIDAR_RANGE = 30.0
+LIDAR_POINTS_PER_SECOND = 50000  # 降采样，减少计算量
+LIDAR_ROTATION_FREQ = 20  # 降低刷新率，提升性能
+OBSTACLE_DETECTION_WIDTH = 2.0
+OBSTACLE_MIN_HEIGHT = 0.5
+OBSTACLE_MAX_HEIGHT = 3.0  # 新增最大高度过滤，避免误检高空物体
+OBSTACLE_WARNING_DIST = 8.0
+OBSTACLE_EMERGENCY_DIST = 5.0
+OBSTACLE_DECEL_RATE = 8.0
+OBSTACLE_CACHE_SIZE = 5  # 障碍物距离缓存大小，平滑滤波
 
 # 交通规则配置
 TRAFFIC_LIGHT_STOP_DISTANCE = 4.0
@@ -69,25 +94,74 @@ WINDOW_HEIGHT = 720
 CAMERA_FOV = 120
 CAMERA_POS = carla.Transform(carla.Location(x=-6.0, z=2.5), carla.Rotation(pitch=-5))
 
+# 性能监控配置
+PERF_MONITOR_INTERVAL = 1.0  # 性能监控输出间隔（秒）
+VEHICLE_RESTART_THRESHOLD = 5  # 车辆连续故障次数阈值，超过则重启
+
 # 全局变量
 current_view_vehicle_id = 1
 vehicle_agents = []
+COLLISION_FLAG = {}
+OBSTACLE_FLAG = {}
+last_perf_time = time.time()
+perf_stats = {"frame_count": 0, "avg_fps": 0.0}
 
-# 日志配置
+# 日志配置（V3.0增强）
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - 车辆%(vehicle_id)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("multi_vehicle_simulation.log"), logging.StreamHandler()]
+    handlers=[
+        logging.FileHandler("multi_vehicle_simulation_v3.log", encoding="utf-8"),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 
-# ===================== 核心工具函数 ======================
+# ===================== 核心工具函数（V3.0重构）=====================
 def is_actor_alive(actor):
+    """安全检查actor是否存活（终极版）"""
+    if actor is None:
+        return False
     try:
         return actor.is_alive()
-    except TypeError:
-        return actor.is_alive
+    except (TypeError, AttributeError):
+        try:
+            return actor.is_alive
+        except:
+            return False
+
+def is_sensor_listening(sensor):
+    """检查传感器是否在监听数据"""
+    if sensor is None or not is_actor_alive(sensor):
+        return False
+    try:
+        sensor.listen(lambda data: None)
+        return True
+    except:
+        return False
+
+def safe_sensor_stop(sensor, sensor_name, logger):
+    """安全停止传感器监听"""
+    if sensor is None or not is_actor_alive(sensor):
+        return
+    try:
+        if is_sensor_listening(sensor):
+            sensor.stop()
+            logger.debug(f"{sensor_name}监听已停止")
+    except Exception as e:
+        logger.warning(f"停止{sensor_name}监听忽略异常：{str(e)[:50]}")
+
+def safe_actor_destroy(actor, actor_name, logger):
+    """安全销毁actor"""
+    if actor is None or not is_actor_alive(actor):
+        return
+    try:
+        actor.destroy()
+        logger.debug(f"{actor_name}已销毁")
+    except Exception as e:
+        logger.warning(f"销毁{actor_name}忽略异常：{str(e)[:50]}")
 
 def get_traffic_light_stop_line(traffic_light):
+    """获取交通灯停止线位置（容错版）"""
     try:
         return traffic_light.get_stop_line_location()
     except AttributeError:
@@ -98,6 +172,7 @@ def get_traffic_light_stop_line(traffic_light):
         return stop_line_loc
 
 def calculate_dir_change(current_wp):
+    """计算道路方向变化（优化版）"""
     waypoints = [current_wp]
     for i in range(5):
         next_wps = waypoints[-1].next(1.0)
@@ -123,32 +198,46 @@ def calculate_dir_change(current_wp):
     for i in range(1, len(dirs)):
         dir_change += abs(dirs[i] - dirs[i-1]) * 2
 
-    if dir_change < DIR_CHANGE_GENTLE:
-        curve_level = 0
-    elif dir_change < DIR_CHANGE_SHARP:
+    curve_level = 0
+    if dir_change >= DIR_CHANGE_GENTLE:
         curve_level = 1
-    else:
+    if dir_change >= DIR_CHANGE_SHARP:
         curve_level = 2
 
     return dir_change, curve_level
 
-def get_forward_waypoint(vehicle, map):
+def get_forward_waypoint(vehicle, map, wp_cache=None):
+    """获取前进方向路点（带缓存优化）"""
     vehicle_transform = vehicle.get_transform()
+    cache_key = (round(vehicle_transform.location.x, 1), round(vehicle_transform.location.y, 1))
+    
+    # 缓存命中直接返回
+    if wp_cache and cache_key in wp_cache:
+        return wp_cache[cache_key]
+    
     current_wp = map.get_waypoint(
         vehicle_transform.location,
         project_to_road=True,
         lane_type=carla.LaneType.Driving
     )
 
-    # 所有车辆使用同一车道的路点
+    # 所有车辆使用同一车道
     global vehicle_agents
     if len(vehicle_agents) > 0:
         try:
-            lead_vehicle_wp = map.get_waypoint(vehicle_agents[0].vehicle.get_transform().location, project_to_road=True)
-            current_wp = map.get_waypoint(vehicle_transform.location, project_to_road=True, lane_id=lead_vehicle_wp.lane_id)
+            lead_vehicle_wp = map.get_waypoint(
+                vehicle_agents[0].vehicle.get_transform().location,
+                project_to_road=True
+            )
+            current_wp = map.get_waypoint(
+                vehicle_transform.location,
+                project_to_road=True,
+                lane_id=lead_vehicle_wp.lane_id
+            )
         except:
             pass
 
+    # 方向检查与修正
     road_direction = current_wp.transform.get_forward_vector()
     vehicle_direction = vehicle_transform.get_forward_vector()
     dot_product = road_direction.x * vehicle_direction.x + road_direction.y * vehicle_direction.y
@@ -162,92 +251,52 @@ def get_forward_waypoint(vehicle, map):
                 vehicle_transform.location + vehicle_direction * 5.0,
                 project_to_road=True
             )
-
+    
+    # 更新缓存（有效期短，避免过时）
+    if wp_cache:
+        wp_cache[cache_key] = current_wp
+        # 缓存清理：只保留最近100个
+        if len(wp_cache) > 100:
+            wp_cache.pop(next(iter(wp_cache)))
+    
     return current_wp
 
 def get_valid_spawn_points(map, count, base_location=None, radius=100.0):
-    """
-    获取有效的出生点（增加容错性，避免索引越界）
-    """
-    # 1. 获取地图所有出生点
+    """获取有效出生点（终极容错版）"""
     all_spawn_points = map.get_spawn_points()
     if not all_spawn_points:
         raise RuntimeError("地图中无任何出生点")
 
-    # 2. 初始化候选点列表
     candidate_points = []
-
-    # 3. 如果有基准位置，先筛选附近的点；否则直接使用所有点
     if base_location:
-        filtered_points = []
-        for sp in all_spawn_points:
-            dist = sp.location.distance(base_location)
-            if dist <= radius:
-                filtered_points.append((dist, sp))
-        # 按距离排序
-        filtered_points.sort(key=lambda x: x[0])
-        candidate_points = [sp for _, sp in filtered_points]
-
-    # 4. 如果候选点为空，直接使用所有出生点（容错）
-    if not candidate_points:
+        filtered_points = [(sp.location.distance(base_location), sp) for sp in all_spawn_points]
+        filtered_points = [sp for dist, sp in sorted(filtered_points) if dist <= radius]
+        candidate_points = filtered_points if filtered_points else all_spawn_points
+    else:
         candidate_points = all_spawn_points
-        print(f"警告：基准位置{base_location}附近无出生点，使用全局出生点")
 
-    # 5. 筛选集中的出生点（放宽条件）
+    # 筛选集中的出生点
     valid_points = []
-    # 确保基准点存在（核心修复：避免candidate_points[0]索引越界）
-    if not candidate_points:
-        candidate_points = all_spawn_points
+    if candidate_points:
+        base_sp = candidate_points[0]
+        valid_points.append(base_sp)
 
-    base_sp = candidate_points[0]
-    valid_points.append(base_sp)
-
-    # 6. 筛选其他点，放宽距离限制
-    for sp in candidate_points[1:]:
-        try:
-            # 检查与已选点的距离（放宽到15米）
-            if all(sp.location.distance(vp.location) <= SPAWN_DISTANCE_LIMIT for vp in valid_points):
-                wp = map.get_waypoint(sp.location, project_to_road=True)
-                if wp.lane_type == carla.LaneType.Driving and 0.0 <= sp.location.z <= 2.0:
-                    valid_points.append(sp)
+        for sp in candidate_points[1:]:
             if len(valid_points) >= count:
                 break
-        except:
-            continue
+            try:
+                if all(sp.location.distance(vp.location) <= SPAWN_DISTANCE_LIMIT for vp in valid_points):
+                    wp = map.get_waypoint(sp.location, project_to_road=True)
+                    if wp.lane_type == carla.LaneType.Driving and 0.0 <= sp.location.z <= 2.0:
+                        valid_points.append(sp)
+            except:
+                continue
 
-    # 7. 如果数量不够，进一步放宽条件（距离限制到20米）
-    if len(valid_points) < count:
-        for sp in candidate_points:
-            if sp not in valid_points:
-                try:
-                    if all(sp.location.distance(vp.location) <= SPAWN_DISTANCE_LIMIT * 1.5 for vp in valid_points):
-                        wp = map.get_waypoint(sp.location, project_to_road=True)
-                        if wp.lane_type == carla.LaneType.Driving and 0.0 <= sp.location.z <= 2.0:
-                            valid_points.append(sp)
-                    if len(valid_points) >= count:
-                        break
-                except:
-                    continue
+    # 最终容错
+    while len(valid_points) < count:
+        valid_points.append(valid_points[0] if valid_points else all_spawn_points[0])
 
-    # 8. 如果还是不够，直接取前N个点（最终容错）
-    if len(valid_points) < count:
-        print(f"警告：无法找到{count}个集中的出生点，直接取前{count}个可用点")
-        for sp in candidate_points:
-            if sp not in valid_points:
-                wp = map.get_waypoint(sp.location, project_to_road=True)
-                if wp.lane_type == carla.LaneType.Driving and 0.0 <= sp.location.z <= 2.0:
-                    valid_points.append(sp)
-            if len(valid_points) >= count:
-                break
-
-    # 9. 最终检查：确保数量足够
-    if len(valid_points) < count:
-        # 直接取所有可用点，不足的话重复使用（极端情况）
-        while len(valid_points) < count:
-            valid_points.append(valid_points[0])
-        print(f"警告：出生点数量不足，重复使用已有点")
-
-    # 10. 统一出生点朝向
+    # 统一朝向
     try:
         forward_vec = valid_points[0].transform.get_forward_vector()
         for sp in valid_points:
@@ -258,171 +307,389 @@ def get_valid_spawn_points(map, count, base_location=None, radius=100.0):
     return valid_points[:count]
 
 def check_spawn_collision(world, spawn_point, radius=3.0):
-    # 检查周围车辆和行人
-    vehicles = world.get_actors().filter("vehicle.*")
-    for vehicle in vehicles:
-        if is_actor_alive(vehicle):
-            dist = vehicle.get_transform().location.distance(spawn_point.location)
-            if dist < radius:
-                return False
-
-    walkers = world.get_actors().filter("walker.*")
-    for walker in walkers:
-        if is_actor_alive(walker):
-            dist = walker.get_transform().location.distance(spawn_point.location)
-            if dist < radius:
-                return False
-
+    """检查出生点碰撞"""
+    for vehicle in world.get_actors().filter("vehicle.*"):
+        if is_actor_alive(vehicle) and vehicle.get_transform().location.distance(spawn_point.location) < radius:
+            return False
+    for walker in world.get_actors().filter("walker.*"):
+        if is_actor_alive(walker) and walker.get_transform().location.distance(spawn_point.location) < radius:
+            return False
     return True
 
-# ===================== 相机管理类（多车辆）=====================
-class VehicleCamera:
+def print_performance_stats():
+    """打印性能统计信息"""
+    global perf_stats, last_perf_time
+    current_time = time.time()
+    if current_time - last_perf_time < PERF_MONITOR_INTERVAL:
+        return
+    
+    # 计算FPS
+    elapsed = current_time - last_perf_time
+    fps = perf_stats["frame_count"] / elapsed if elapsed > 0 else 0
+    perf_stats["avg_fps"] = (perf_stats["avg_fps"] * 0.9) + (fps * 0.1)  # 指数平滑
+    
+    # 车辆状态统计
+    alive_vehicles = sum(1 for agent in vehicle_agents if agent.is_alive)
+    collision_count = sum(1 for v_id in COLLISION_FLAG if COLLISION_FLAG[v_id])
+    obstacle_count = sum(1 for v_id in OBSTACLE_FLAG if OBSTACLE_FLAG[v_id])
+    
+    # 控制台输出
+    print(f"\n=== 性能监控 [{time.strftime('%H:%M:%S')}] ===")
+    print(f"平均FPS: {perf_stats['avg_fps']:.1f} | 活跃车辆: {alive_vehicles}/{VEHICLE_COUNT}")
+    print(f"碰撞车辆数: {collision_count} | 障碍物预警数: {obstacle_count}")
+    print("="*50)
+    
+    # 重置统计
+    perf_stats["frame_count"] = 0
+    last_perf_time = current_time
+
+# ===================== 传感器管理类（V3.0终极版）=====================
+class VehicleSensors:
     def __init__(self, world, vehicle, vehicle_id):
         self.world = world
         self.vehicle = vehicle
         self.vehicle_id = vehicle_id
+        self.logger = logging.LoggerAdapter(logging.getLogger(__name__), {"vehicle_id": vehicle_id})
+        
+        # 状态标记
+        self.is_destroyed = False
+        self.init_success = False
+        
+        # 传感器实例
         self.camera = None
+        self.lidar = None
+        self.collision_sensor = None
+        
+        # 数据存储（V3.0优化）
         self.image_surface = None
-
-        # 创建相机传感器
-        self._create_camera()
+        self.obstacle_dist_cache = deque(maxlen=OBSTACLE_CACHE_SIZE)  # 环形缓存
+        self.last_obstacle_dist = float('inf')
+        
+        # 初始化传感器
+        try:
+            self._create_camera()
+            self._create_lidar()
+            self._create_collision_sensor()
+            self.init_success = True
+            self.logger.info("所有传感器初始化成功")
+        except Exception as e:
+            self.logger.error(f"传感器初始化失败：{str(e)[:100]}")
+            self.destroy()
 
     def _create_camera(self):
-        # 加载相机蓝图
+        """创建RGB相机"""
         camera_bp = self.world.get_blueprint_library().find("sensor.camera.rgb")
-        camera_bp.set_attribute("image_size_x", str(640))
-        camera_bp.set_attribute("image_size_y", str(360))
+        camera_bp.set_attribute("image_size_x", "640")
+        camera_bp.set_attribute("image_size_y", "360")
         camera_bp.set_attribute("fov", str(CAMERA_FOV))
-
-        # 生成相机（附加到车辆）
+        camera_bp.set_attribute("sensor_tick", "0.033")  # 30Hz
+        
         self.camera = self.world.spawn_actor(camera_bp, CAMERA_POS, attach_to=self.vehicle)
-
-        # 注册图像回调函数
         self.camera.listen(self._on_image)
 
-    def _on_image(self, image):
-        # 将CARLA图像转换为Pygame Surface
-        array = np.frombuffer(image.raw_data, dtype=np.uint8)
-        array = array.reshape((image.height, image.width, 4))
-        array = array[:, :, :3]
-        array = array[:, :, ::-1]
-        array = np.swapaxes(array, 0, 1)
+    def _create_lidar(self):
+        """创建LiDAR传感器（V3.0性能优化）"""
+        lidar_bp = self.world.get_blueprint_library().find("sensor.lidar.ray_cast")
+        # 性能优化参数
+        lidar_bp.set_attribute("range", str(LIDAR_RANGE))
+        lidar_bp.set_attribute("points_per_second", str(LIDAR_POINTS_PER_SECOND))
+        lidar_bp.set_attribute("rotation_frequency", str(LIDAR_ROTATION_FREQ))
+        lidar_bp.set_attribute("channels", "16")  # 16线代替32线，降低计算量
+        lidar_bp.set_attribute("upper_fov", "10")
+        lidar_bp.set_attribute("lower_fov", "-20")
+        lidar_bp.set_attribute("sensor_tick", str(1.0/LIDAR_ROTATION_FREQ))
+        
+        lidar_transform = carla.Transform(carla.Location(x=0.0, z=2.0))
+        self.lidar = self.world.spawn_actor(lidar_bp, lidar_transform, attach_to=self.vehicle)
+        self.lidar.listen(self._on_lidar_data)
 
-        # 存储为Pygame Surface
-        self.image_surface = pygame.surfarray.make_surface(array)
+    def _create_collision_sensor(self):
+        """创建碰撞传感器"""
+        collision_bp = self.world.get_blueprint_library().find("sensor.other.collision")
+        self.collision_sensor = self.world.spawn_actor(collision_bp, carla.Transform(), attach_to=self.vehicle)
+        self.collision_sensor.listen(self._on_collision)
+
+    def _on_image(self, image):
+        """相机图像回调（非阻塞）"""
+        if self.is_destroyed:
+            return
+        try:
+            array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape((image.height, image.width, 4))
+            array = array[:, :, :3][:, :, ::-1]  # BGR转RGB
+            array = np.swapaxes(array, 0, 1)
+            self.image_surface = pygame.surfarray.make_surface(array)
+        except Exception as e:
+            self.logger.error(f"图像处理失败：{str(e)[:50]}")
+
+    def _on_lidar_data(self, data):
+        """LiDAR点云回调（V3.0优化）"""
+        if self.is_destroyed:
+            return
+        try:
+            # 点云降采样（每N个点取1个）
+            points = np.frombuffer(data.raw_data, dtype=np.float32).reshape(-1, 4)[::2]  # 降采样50%
+            
+            # 精准过滤障碍物
+            front_obstacle_points = points[
+                (points[:, 0] > 0) &                # 前方
+                (np.abs(points[:, 1]) < OBSTACLE_DETECTION_WIDTH) &  # 左右范围
+                (points[:, 2] > OBSTACLE_MIN_HEIGHT) &  # 最小高度
+                (points[:, 2] < OBSTACLE_MAX_HEIGHT)     # 最大高度
+            ]
+
+            # 更新障碍物距离
+            if len(front_obstacle_points) > 0:
+                self.last_obstacle_dist = np.min(front_obstacle_points[:, 0])
+                self.obstacle_dist_cache.append(self.last_obstacle_dist)
+            else:
+                self.last_obstacle_dist = float('inf')
+                if self.obstacle_dist_cache:
+                    self.obstacle_dist_cache.popleft()
+
+        except Exception as e:
+            self.logger.error(f"LiDAR处理失败：{str(e)[:50]}")
+
+    def _on_collision(self, event):
+        """碰撞回调"""
+        if self.is_destroyed:
+            return
+        try:
+            collision_actor = event.other_actor
+            collision_type = collision_actor.type_id if collision_actor else "未知"
+            collision_loc = event.transform.location
+            self.logger.error(
+                f"碰撞发生！对象：{collision_type} | 位置：({collision_loc.x:.1f}, {collision_loc.y:.1f})"
+            )
+            global COLLISION_FLAG
+            COLLISION_FLAG[self.vehicle_id] = True
+        except Exception as e:
+            self.logger.error(f"碰撞检测失败：{str(e)[:50]}")
+
+    def get_smooth_obstacle_distance(self):
+        """获取平滑后的障碍物距离"""
+        if not self.obstacle_dist_cache:
+            return float('inf')
+        return np.mean(self.obstacle_dist_cache)
 
     def destroy(self):
-        if self.camera:
-            self.camera.stop()
-            self.camera.destroy()
+        """安全销毁传感器（终极版）"""
+        if self.is_destroyed:
+            return
+        
+        self.is_destroyed = True
+        self.logger.info("开始销毁传感器")
+        
+        # 停止监听
+        safe_sensor_stop(self.camera, "RGB相机", self.logger)
+        safe_sensor_stop(self.lidar, "LiDAR", self.logger)
+        safe_sensor_stop(self.collision_sensor, "碰撞传感器", self.logger)
+        
+        # 销毁传感器
+        safe_actor_destroy(self.camera, "RGB相机", self.logger)
+        safe_actor_destroy(self.lidar, "LiDAR", self.logger)
+        safe_actor_destroy(self.collision_sensor, "碰撞传感器", self.logger)
+        
+        # 清空引用
+        self.camera = None
+        self.lidar = None
+        self.collision_sensor = None
+        self.image_surface = None
+        
+        self.logger.info("传感器销毁完成")
 
-# ===================== 车辆控制类 ======================
+# ===================== 车辆控制类（V3.0终极版）=====================
 class VehicleAgent:
     def __init__(self, world, map, vehicle_id, spawn_point, vehicle_model, base_speed):
         self.vehicle_id = vehicle_id
         self.world = world
         self.map = map
         self.base_speed = base_speed
-        self.logger = logging.getLogger(__name__)
-        self.logger = logging.LoggerAdapter(self.logger, {"vehicle_id": vehicle_id})
+        self.logger = logging.LoggerAdapter(logging.getLogger(__name__), {"vehicle_id": vehicle_id})
+        
+        # 状态管理
+        self.is_alive = True
+        self.fault_count = 0  # 故障计数
+        self.wp_cache = {}     # 路点缓存
+        self.last_update_success = True
+        
+        # ACC跟车属性
+        self.last_lead_speed = 0.0
+        self.last_lead_acc = 0.0
+        
+        # 全局状态初始化
+        global COLLISION_FLAG, OBSTACLE_FLAG
+        COLLISION_FLAG[self.vehicle_id] = False
+        OBSTACLE_FLAG[self.vehicle_id] = False
 
         # 生成车辆
-        self.vehicle_bp = self.world.get_blueprint_library().find(vehicle_model)
-        if self.vehicle_bp.has_attribute("color"):
-            color = random.choice(self.vehicle_bp.get_attribute("color").recommended_values)
-            self.vehicle_bp.set_attribute("color", color)
+        self.vehicle = None
+        self.sensors = None
+        try:
+            self._spawn_vehicle(spawn_point, vehicle_model)
+            self._init_sensors()
+            self._init_controllers()
+            self.logger.info(f"车辆生成成功 | 车型：{vehicle_model} | 出生点：({spawn_point.location.x:.1f},{spawn_point.location.y:.1f})")
+        except Exception as e:
+            self.logger.error(f"车辆初始化失败：{str(e)[:100]}")
+            self.is_alive = False
 
-        self.vehicle = self._spawn_vehicle_with_retry(spawn_point)
-        if not self.vehicle:
-            raise RuntimeError(f"车辆{vehicle_id}生成失败")
+    def _spawn_vehicle(self, spawn_point, vehicle_model):
+        """生成车辆（带重试）"""
+        vehicle_bp = self.world.get_blueprint_library().find(vehicle_model)
+        if vehicle_bp.has_attribute("color"):
+            color = random.choice(vehicle_bp.get_attribute("color").recommended_values)
+            vehicle_bp.set_attribute("color", color)
 
-        # 创建相机
-        self.camera = VehicleCamera(world, self.vehicle, vehicle_id)
-
-        # 初始化控制器
-        self.pp_controller = AdaptivePurePursuit(VEHICLE_WHEELBASE)
-        self.speed_controller = SpeedController(PID_KP, PID_KI, PID_KD, base_speed)
-        self.traffic_light_manager = TrafficLightManager(vehicle_id)
-
-        self.is_alive = True
-        self.logger.info(f"生成成功，车型：{vehicle_model}，出生点：({spawn_point.location.x:.1f},{spawn_point.location.y:.1f})")
-
-    def _spawn_vehicle_with_retry(self, initial_spawn_point):
-        all_spawn_points = self.map.get_spawn_points()
-        if not all_spawn_points:
-            self.logger.error("地图中无有效出生点")
-            return None
-
-        candidate_points = [initial_spawn_point]
-        candidate_points += random.sample(all_spawn_points, min(10, len(all_spawn_points)))
-
+        candidate_points = [spawn_point] + random.sample(self.map.get_spawn_points(), min(5, len(self.map.get_spawn_points())))
+        
         for retry in range(SPAWN_RETRY_MAX):
-            spawn_point = candidate_points[retry % len(candidate_points)]
-            spawn_point.location.z += 0.3
-            spawn_point.rotation.yaw += random.randint(-5, 5)
-
-            if not check_spawn_collision(self.world, spawn_point):
-                self.logger.warning(f"第{retry+1}次重试：出生点有碰撞风险，跳过")
+            current_sp = candidate_points[retry % len(candidate_points)]
+            current_sp.location.z += 0.3
+            current_sp.rotation.yaw += random.randint(-5, 5)
+            
+            if not check_spawn_collision(self.world, current_sp):
+                self.logger.warning(f"出生点碰撞风险，重试{retry+1}/{SPAWN_RETRY_MAX}")
                 time.sleep(SPAWN_RETRY_DELAY)
                 continue
-
+            
             try:
-                return self.world.spawn_actor(self.vehicle_bp, spawn_point)
+                self.vehicle = self.world.spawn_actor(vehicle_bp, current_sp)
+                self.logger.debug(f"车辆生成重试{retry+1}成功")
+                return
             except Exception as e:
-                self.logger.warning(f"第{retry+1}次重试失败：{e}")
+                self.logger.warning(f"车辆生成重试{retry+1}失败：{str(e)[:50]}")
                 time.sleep(SPAWN_RETRY_DELAY)
+        
+        raise RuntimeError(f"超过{SPAWN_RETRY_MAX}次重试，车辆生成失败")
 
-        self.logger.error(f"超过{SPAWN_RETRY_MAX}次重试，生成失败")
-        return None
+    def _init_sensors(self):
+        """初始化传感器"""
+        self.sensors = VehicleSensors(self.world, self.vehicle, self.vehicle_id)
+        if not self.sensors.init_success:
+            raise RuntimeError("传感器初始化失败")
+
+    def _init_controllers(self):
+        """初始化控制器"""
+        self.pp_controller = AdaptivePurePursuit(VEHICLE_WHEELBASE)
+        self.speed_controller = SpeedController(PID_KP, PID_KI, PID_KD, self.base_speed)
+        self.traffic_light_manager = TrafficLightManager(self.vehicle_id)
+
+    def _restart_vehicle(self):
+        """重启故障车辆"""
+        self.logger.warning(f"车辆故障次数达到阈值，尝试重启")
+        
+        # 销毁旧车辆
+        self.destroy()
+        
+        # 重新生成
+        try:
+            spawn_points = get_valid_spawn_points(self.map, 1, self.vehicle.get_transform().location if self.vehicle else None)
+            self._spawn_vehicle(spawn_points[0], VEHICLE_MODELS[self.vehicle_id % len(VEHICLE_MODELS)])
+            self._init_sensors()
+            self._init_controllers()
+            
+            # 重置状态
+            self.is_alive = True
+            self.fault_count = 0
+            self.last_update_success = True
+            COLLISION_FLAG[self.vehicle_id] = False
+            OBSTACLE_FLAG[self.vehicle_id] = False
+            
+            self.logger.info("车辆重启成功")
+        except Exception as e:
+            self.logger.error(f"车辆重启失败：{str(e)[:100]}")
+            self.is_alive = False
 
     def update(self):
+        """更新车辆状态（V3.0增强）"""
         if not self.is_alive or not is_actor_alive(self.vehicle):
             self.is_alive = False
             self.logger.error("车辆已销毁，停止更新")
             return False
 
         try:
-            # 获取车辆状态
+            # 获取车辆基础状态
             vehicle_transform = self.vehicle.get_transform()
             vehicle_vel = self.vehicle.get_velocity()
             current_speed = math.hypot(vehicle_vel.x, vehicle_vel.y) * 3.6
 
             # 路径跟踪
-            current_wp = get_forward_waypoint(self.vehicle, self.map)
+            current_wp = get_forward_waypoint(self.vehicle, self.map, self.wp_cache)
             dir_change, curve_level = calculate_dir_change(current_wp)
             lookahead_dist = self.pp_controller.get_adaptive_lookahead(dir_change)
+            
             target_wps = current_wp.next(lookahead_dist)
             target_point = target_wps[0].transform.location if target_wps else vehicle_transform.location
 
-            # 速度控制
+            # 基础速度计算（弯道减速）
             curve_speed_factors = [1.0, 0.7, 0.4]
             speed_factor = curve_speed_factors[min(curve_level, 2)]
-            base_target_speed = self.base_speed * speed_factor
-            base_target_speed = max(8.0, base_target_speed)
+            base_target_speed = max(8.0, self.base_speed * speed_factor)
 
-            # 跟车控制
-            global vehicle_agents
+            # ========== ACC跟车逻辑（V3.0优化）==========
             if self.vehicle_id > 1 and len(vehicle_agents) >= self.vehicle_id:
                 try:
-                    lead_vehicle = vehicle_agents[self.vehicle_id - 2].vehicle
-                    lead_vehicle_transform = lead_vehicle.get_transform()
-                    dist_to_lead = vehicle_transform.location.distance(lead_vehicle_transform.location)
-                    if dist_to_lead < 15.0:
-                        base_target_speed = max(5.0, base_target_speed * 0.5)
-                except:
-                    pass
+                    lead_agent = vehicle_agents[self.vehicle_id - 2]
+                    if lead_agent.is_alive and is_actor_alive(lead_agent.vehicle):
+                        lead_vehicle = lead_agent.vehicle
+                        lead_transform = lead_vehicle.get_transform()
+                        lead_vel = lead_vehicle.get_velocity()
+                        lead_speed = math.hypot(lead_vel.x, lead_vel.y) * 3.6
+                        
+                        # 加速度平滑
+                        lead_acc = (lead_speed - lead_agent.last_lead_speed) / (1.0/30)
+                        self.last_lead_acc = 0.8 * self.last_lead_acc + 0.2 * lead_acc
+                        lead_agent.last_lead_speed = lead_speed
+                        
+                        # 安全距离计算
+                        safe_dist = (current_speed / 3.6) * SAFE_TIME_GAP + MIN_SAFE_DISTANCE
+                        dist_to_lead = vehicle_transform.location.distance(lead_transform.location)
+                        
+                        # 动态速度调整
+                        if dist_to_lead < safe_dist - 2:
+                            base_target_speed = max(5.0, lead_speed - 2)
+                        elif dist_to_lead > safe_dist + 2:
+                            base_target_speed = min(self.base_speed * speed_factor, lead_speed + 2)
+                        else:
+                            base_target_speed = lead_speed
+                        
+                        # 前车急刹检测
+                        if self.last_lead_acc < LEAD_BRAKE_THRESHOLD:
+                            base_target_speed = max(0.0, current_speed - EMERGENCY_DECEL_RATE)
+                            self.logger.warning(f"前车急刹！加速度{self.last_lead_acc:.1f}km/h/s，紧急减速")
+                except Exception as e:
+                    self.logger.warning(f"ACC跟车异常：{str(e)[:50]}")
 
-            # 交通灯处理
+            # ========== 障碍物避障逻辑（V3.0优化）==========
+            obstacle_dist = self.sensors.get_smooth_obstacle_distance()
+            OBSTACLE_FLAG[self.vehicle_id] = obstacle_dist < OBSTACLE_WARNING_DIST
+            
+            if obstacle_dist < OBSTACLE_EMERGENCY_DIST:
+                base_target_speed = max(0.0, current_speed - OBSTACLE_DECEL_RATE)
+                self.logger.warning(f"前方{obstacle_dist:.1f}米障碍物！紧急制动")
+            elif obstacle_dist < OBSTACLE_WARNING_DIST:
+                base_target_speed = max(8.0, base_target_speed * 0.5)
+                self.logger.warning(f"前方{obstacle_dist:.1f}米障碍物！预警减速")
+
+            # ========== 交通灯处理 ==========
             target_speed, traffic_light_status = self.traffic_light_manager.handle_traffic_light_logic(
                 self.vehicle, current_speed, base_target_speed
             )
 
-            # 计算控制指令
+            # ========== 控制指令计算 ==========
             steer = self.pp_controller.calculate_steer(vehicle_transform, target_point, dir_change)
             throttle = self.speed_controller.calculate(target_speed, current_speed)
             brake = 1.0 - throttle if current_speed > target_speed + 1 else 0.0
 
-            if "Red (Stopped)" in traffic_light_status or target_speed == 0.0:
+            # 状态优先级：碰撞 > 红灯 > 障碍物 > 正常行驶
+            if COLLISION_FLAG.get(self.vehicle_id, False):
+                throttle = 0.0
+                brake = 1.0
+                self.logger.error("碰撞触发紧急停车")
+            elif "Red (Stopped)" in traffic_light_status or target_speed <= STOP_SPEED_THRESHOLD:
+                throttle = 0.0
+                brake = 1.0
+            elif obstacle_dist < OBSTACLE_EMERGENCY_DIST:
                 throttle = 0.0
                 brake = 1.0
 
@@ -434,33 +701,57 @@ class VehicleAgent:
             self.vehicle.apply_control(control)
 
             # 日志输出
+            obstacle_status = f"障碍物{obstacle_dist:.1f}m" if obstacle_dist < OBSTACLE_WARNING_DIST else "无障碍物"
             self.logger.info(
                 f"速度：{current_speed:5.1f}km/h | 目标：{target_speed:5.1f} | "
-                f"弯道：{['直道', '缓弯', '急弯'][curve_level]:<3} | 灯状态：{traffic_light_status}"
+                f"弯道：{['直道', '缓弯', '急弯'][curve_level]:<3} | 灯状态：{traffic_light_status} | "
+                f"ACC：{'激活' if self.vehicle_id>1 else '未激活'} | {obstacle_status}"
             )
 
+            self.last_update_success = True
+            self.fault_count = 0  # 重置故障计数
             return True
 
         except Exception as e:
-            self.logger.error(f"更新失败：{e}", exc_info=True)
+            self.logger.error(f"更新失败：{str(e)[:100]}", exc_info=False)
+            self.last_update_success = False
+            self.fault_count += 1
+            
+            # 故障重启逻辑
+            if self.fault_count >= VEHICLE_RESTART_THRESHOLD:
+                self._restart_vehicle()
+            
             return False
 
     def destroy(self):
-        # 销毁相机
-        self.camera.destroy()
+        """安全销毁车辆（V3.0终极版）"""
+        self.logger.info("开始销毁车辆资源")
+        
+        # 销毁传感器
+        if self.sensors:
+            self.sensors.destroy()
+        
         # 销毁车辆
-        if self.vehicle and is_actor_alive(self.vehicle):
-            self.vehicle.destroy()
-        self.logger.info("车辆资源已清理")
+        safe_actor_destroy(self.vehicle, f"车辆{self.vehicle_id}", self.logger)
+        
+        # 清空状态
+        self.vehicle = None
+        self.sensors = None
+        self.is_alive = False
+        self.wp_cache.clear()
+        
+        self.logger.info("车辆资源销毁完成")
 
-# ===================== 控制器类 ======================
+# ===================== 控制器类（V3.0优化）=====================
 class AdaptivePurePursuit:
+    """自适应纯追踪控制器"""
     def __init__(self, wheelbase):
         self.wheelbase = wheelbase
         self.last_steer = 0.0
         self.last_lookahead = LOOKAHEAD_DIST_STRAIGHT
 
     def calculate_steer(self, vehicle_transform, target_point, dir_change):
+        """计算转向角（优化滤波）"""
         forward_vec = vehicle_transform.get_forward_vector()
         rear_axle_loc = carla.Location(
             x=vehicle_transform.location.x - forward_vec.x * VEHICLE_REAR_AXLE_OFFSET,
@@ -475,6 +766,7 @@ class AdaptivePurePursuit:
         dx_vehicle = dx * math.cos(yaw) + dy * math.sin(yaw)
         dy_vehicle = -dx * math.sin(yaw) + dy * math.cos(yaw)
 
+        # 转向增益自适应
         steer_gain = np.interp(
             dir_change,
             [0, DIR_CHANGE_SHARP],
@@ -482,6 +774,7 @@ class AdaptivePurePursuit:
         )
         steer_gain = np.clip(steer_gain, STEER_GAIN_STRAIGHT, STEER_GAIN_CURVE)
 
+        # 计算转向角
         if dx_vehicle < 0.1:
             steer = self.last_steer
         else:
@@ -489,6 +782,7 @@ class AdaptivePurePursuit:
             steer = steer_rad / math.pi
             steer *= steer_gain
 
+        # 死区和低通滤波
         if abs(steer) < STEER_DEADZONE:
             steer = 0.0
         steer = STEER_LOWPASS_ALPHA * steer + (1 - STEER_LOWPASS_ALPHA) * self.last_steer
@@ -498,6 +792,7 @@ class AdaptivePurePursuit:
         return steer
 
     def get_adaptive_lookahead(self, dir_change):
+        """自适应前瞻距离"""
         lookahead_dist = np.interp(
             dir_change,
             [0, DIR_CHANGE_SHARP],
@@ -508,6 +803,7 @@ class AdaptivePurePursuit:
         return lookahead_dist
 
 class SpeedController:
+    """PID速度控制器（V3.0优化）"""
     def __init__(self, kp, ki, kd, base_speed):
         self.kp = kp
         self.ki = ki
@@ -515,27 +811,37 @@ class SpeedController:
         self.base_speed = base_speed
         self.last_error = 0.0
         self.integral = 0.0
+        self.integral_limit = 0.5  # 积分限幅
 
     def calculate(self, target_speed, current_speed):
+        """计算油门"""
         error = target_speed - current_speed
+        
+        # PID计算
         p = self.kp * error
         self.integral += self.ki * error
-        self.integral = np.clip(self.integral, -1.0, 1.0)
-        i = self.integral
+        self.integral = np.clip(self.integral, -self.integral_limit, self.integral_limit)  # 积分限幅
         d = self.kd * (error - self.last_error)
+        
+        # 输出限幅
+        output = np.clip(p + self.integral + d, 0.0, 1.0)
+        
         self.last_error = error
-        return np.clip(p + i + d, 0.0, 1.0)
+        return output
 
 class TrafficLightManager:
+    """交通灯管理器（V3.0缓存优化）"""
     def __init__(self, vehicle_id):
         self.vehicle_id = vehicle_id
         self.tracked_light = None
         self.is_stopped_at_red = False
         self.red_light_stop_time = 0
-        self.logger = logging.getLogger(__name__)
-        self.logger = logging.LoggerAdapter(self.logger, {"vehicle_id": vehicle_id})
+        self.tl_state_cache = {}  # 交通灯状态缓存
+        self.tl_cache_time = {}   # 缓存时间
+        self.logger = logging.LoggerAdapter(logging.getLogger(__name__), {"vehicle_id": vehicle_id})
 
     def _calculate_angle_between_vehicle_and_light(self, vehicle_transform, light_transform):
+        """计算车辆与交通灯的夹角"""
         vehicle_forward = vehicle_transform.get_forward_vector()
         vehicle_forward = np.array([vehicle_forward.x, vehicle_forward.y])
         vehicle_forward = vehicle_forward / np.linalg.norm(vehicle_forward)
@@ -547,19 +853,24 @@ class TrafficLightManager:
         light_dir = light_dir / np.linalg.norm(light_dir)
 
         angle = math.acos(np.clip(np.dot(vehicle_forward, light_dir), -1.0, 1.0))
-        angle = math.degrees(angle)
-        return angle
+        return math.degrees(angle)
 
     def get_lane_traffic_light(self, vehicle, world):
+        """获取车道对应的交通灯（带缓存）"""
         vehicle_transform = vehicle.get_transform()
         vehicle_loc = vehicle_transform.location
+        current_time = time.time()
 
+        # 缓存检查
         if self.tracked_light and is_actor_alive(self.tracked_light):
-            dist = self.tracked_light.get_transform().location.distance(vehicle_loc)
-            angle = self._calculate_angle_between_vehicle_and_light(vehicle_transform, self.tracked_light.get_transform())
-            if dist < TRAFFIC_LIGHT_DETECTION_RANGE and angle < TRAFFIC_LIGHT_ANGLE_THRESHOLD:
-                return self.tracked_light
+            tl_id = self.tracked_light.id
+            if tl_id in self.tl_state_cache and current_time - self.tl_cache_time.get(tl_id, 0) < 1.0:
+                dist = self.tracked_light.get_transform().location.distance(vehicle_loc)
+                angle = self._calculate_angle_between_vehicle_and_light(vehicle_transform, self.tracked_light.get_transform())
+                if dist < TRAFFIC_LIGHT_DETECTION_RANGE and angle < TRAFFIC_LIGHT_ANGLE_THRESHOLD:
+                    return self.tracked_light
 
+        # 重新查找交通灯
         traffic_lights = world.get_actors().filter("traffic.traffic_light")
         valid_lights = []
 
@@ -573,15 +884,19 @@ class TrafficLightManager:
             if angle < TRAFFIC_LIGHT_ANGLE_THRESHOLD:
                 valid_lights.append((dist, light))
 
+        # 更新追踪的交通灯
         if valid_lights:
             valid_lights.sort(key=lambda x: x[0])
             self.tracked_light = valid_lights[0][1]
-            return self.tracked_light
+            self.tl_state_cache[self.tracked_light.id] = self.tracked_light.get_state()
+            self.tl_cache_time[self.tracked_light.id] = current_time
+        else:
+            self.tracked_light = None
 
-        self.tracked_light = None
-        return None
+        return self.tracked_light
 
     def handle_traffic_light_logic(self, vehicle, current_speed, base_target_speed):
+        """处理交通灯逻辑"""
         world = vehicle.get_world()
         traffic_light = self.get_lane_traffic_light(vehicle, world)
 
@@ -590,10 +905,13 @@ class TrafficLightManager:
             self.red_light_stop_time = 0
             return base_target_speed, "No Light"
 
+        # 获取停止线和距离
         stop_line_loc = get_traffic_light_stop_line(traffic_light)
         dist_to_stop_line = vehicle.get_transform().location.distance(stop_line_loc)
 
-        if traffic_light.get_state() == carla.TrafficLightState.Green:
+        # 交通灯状态处理
+        tl_state = traffic_light.get_state()
+        if tl_state == carla.TrafficLightState.Green:
             if self.is_stopped_at_red:
                 recovery_speed = current_speed + (base_target_speed - current_speed) * GREEN_LIGHT_ACCEL_FACTOR
                 target_speed = max(STOP_SPEED_THRESHOLD, recovery_speed)
@@ -603,17 +921,17 @@ class TrafficLightManager:
                 return target_speed, "Green"
             return base_target_speed, "Green"
 
-        elif traffic_light.get_state() == carla.TrafficLightState.Yellow:
+        elif tl_state == carla.TrafficLightState.Yellow:
             self.is_stopped_at_red = False
             yellow_speed = max(5.0, base_target_speed * 0.3)
             self.logger.warning(f"黄灯减速，目标速度：{yellow_speed:.1f}km/h")
             return yellow_speed, "Yellow"
 
-        elif traffic_light.get_state() == carla.TrafficLightState.Red:
+        elif tl_state == carla.TrafficLightState.Red:
             if dist_to_stop_line > TRAFFIC_LIGHT_STOP_DISTANCE:
                 self.is_stopped_at_red = False
                 red_speed = max(2.0, current_speed * 0.1)
-                self.logger.warning(f"红灯减速，距离停止线：{dist_to_stop_line:.1f}m，目标速度：{red_speed:.1f}km/h")
+                self.logger.warning(f"红灯减速，距离停止线：{dist_to_stop_line:.1f}m")
                 return red_speed, "Red"
             else:
                 if current_speed <= STOP_SPEED_THRESHOLD:
@@ -630,8 +948,8 @@ class TrafficLightManager:
 
 # ===================== 交通灯控制线程 ======================
 def cycle_traffic_light_states(world, stop_event):
-    logger = logging.getLogger(__name__)
-    logger = logging.LoggerAdapter(logger, {"vehicle_id": "系统"})
+    """交通灯状态循环"""
+    logger = logging.LoggerAdapter(logging.getLogger(__name__), {"vehicle_id": "系统"})
     while not stop_event.is_set():
         traffic_lights = world.get_actors().filter("traffic.traffic_light")
         if not traffic_lights:
@@ -676,13 +994,17 @@ def cycle_traffic_light_states(world, stop_event):
 
     logger.info("交通灯线程停止")
 
-# ===================== 主函数 ======================
+# ===================== 主函数（V3.0终极版）=====================
 def main():
-    global current_view_vehicle_id, vehicle_agents
+    global current_view_vehicle_id, vehicle_agents, perf_stats
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption(f"CARLA多车辆视角（{VEHICLE_COUNT}辆车）- 按1/2/3切换视角，按S切换分屏，按V切换俯视视角")
+    pygame.display.set_caption(
+        f"CARLA多车辆控制 V3.0 | 车辆数：{VEHICLE_COUNT} | "
+        f"按1/2/3切换视角 | S分屏 | V俯视 | ESC退出"
+    )
 
+    # 初始化核心变量
     client = None
     world = None
     map = None
@@ -691,38 +1013,53 @@ def main():
     show_split_screen = True
     show_top_view = False
     top_view_camera = None
+    top_view_surface = None
 
-    # 清理函数
+    # 安全清理函数
     def cleanup():
-        print("\n开始清理资源...")
+        print("\n=== 开始安全清理资源 ===")
         tl_stop_event.set()
+        
+        # 等待交通灯线程结束
         if tl_cycle_thread and tl_cycle_thread.is_alive():
             tl_cycle_thread.join(timeout=2)
 
+        # 销毁俯视相机
         if top_view_camera:
-            top_view_camera.stop()
-            top_view_camera.destroy()
+            safe_sensor_stop(top_view_camera, "俯视相机", logging.getLogger(__name__))
+            safe_actor_destroy(top_view_camera, "俯视相机", logging.getLogger(__name__))
 
+        # 销毁所有车辆
+        global vehicle_agents
         for agent in vehicle_agents:
-            agent.destroy()
+            try:
+                agent.destroy()
+            except Exception as e:
+                print(f"销毁车辆{agent.vehicle_id}忽略异常：{str(e)[:50]}")
 
+        # 清理残留actor
         if world:
             for actor in world.get_actors():
                 if actor.type_id.startswith(("vehicle.", "walker.", "sensor.")):
-                    if is_actor_alive(actor):
-                        actor.destroy()
+                    safe_actor_destroy(actor, actor.type_id, logging.getLogger(__name__))
 
+        # 退出pygame
         pygame.quit()
-        print("资源清理完成")
+        print("=== 资源清理完成 ===")
 
-    # 注册退出回调
+    # 注册退出处理
     import atexit
     import signal
     atexit.register(cleanup)
-    signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(0))
+    
+    def signal_handler(sig, frame):
+        print("\n接收到退出信号，开始清理...")
+        cleanup()
+        sys.exit(0)
+    signal.signal(signal.SIGINT, signal_handler)
 
     try:
-        # 连接CARLA
+        # 连接CARLA服务器
         client = carla.Client(CARLA_HOST, CARLA_PORT)
         client.set_timeout(CARLA_TIMEOUT)
         try:
@@ -730,83 +1067,92 @@ def main():
             print("成功加载Town04地图")
         except Exception as e:
             world = client.get_world()
-            print(f"警告：Town04地图加载失败（{e}），使用当前地图")
+            print(f"警告：Town04加载失败（{e}），使用当前地图")
         map = world.get_map()
 
         # 清理残留演员
         print("清理残留演员...")
         for actor in world.get_actors():
             if actor.type_id.startswith(("vehicle.", "walker.", "sensor.")):
-                if is_actor_alive(actor):
-                    actor.destroy()
-        time.sleep(3.0)
-        print("清理完成")
+                safe_actor_destroy(actor, actor.type_id, logging.getLogger(__name__))
+        time.sleep(2.0)
 
-        # 自动获取地图的第一个出生点作为基准（避免手动坐标无效）
-        base_location = None
-        all_spawn_points = map.get_spawn_points()
-        if all_spawn_points:
-            base_location = all_spawn_points[0].location
-            print(f"使用地图第一个出生点作为基准：({base_location.x:.1f}, {base_location.y:.1f})")
-        else:
-            base_location = carla.Location(x=220.0, y=150.0, z=0.5)
-
-        # 获取有效的出生点
-        print(f"获取{VEHICLE_COUNT}个有效出生点...")
+        # 获取出生点
+        base_location = map.get_spawn_points()[0].location if map.get_spawn_points() else carla.Location(x=220.0, y=150.0)
+        print(f"基准出生点：({base_location.x:.1f}, {base_location.y:.1f})")
+        
         valid_spawn_points = get_valid_spawn_points(map, VEHICLE_COUNT, base_location)
         for i, sp in enumerate(valid_spawn_points):
-            print(f"  出生点{i+1}：({sp.location.x:.1f},{sp.location.y:.1f})")
+            print(f"出生点{i+1}：({sp.location.x:.1f}, {sp.location.y:.1f})")
 
         # 生成车辆
-        print(f"\n分步生成车辆（间隔{SPAWN_INTERVAL}秒）...")
+        print(f"\n分步生成{VEHICLE_COUNT}辆车辆...")
         for i in range(VEHICLE_COUNT):
             vehicle_model = VEHICLE_MODELS[i % len(VEHICLE_MODELS)]
             base_speed = BASE_SPEEDS[i % len(BASE_SPEEDS)]
             spawn_point = valid_spawn_points[i]
 
             try:
-                print(f"\n生成车辆{i+1}（车型：{vehicle_model}）...")
                 agent = VehicleAgent(world, map, i+1, spawn_point, vehicle_model, base_speed)
-                vehicle_agents.append(agent)
-                print(f"车辆{i+1}生成成功！")
+                if agent.is_alive:
+                    vehicle_agents.append(agent)
+                    print(f"车辆{i+1}生成成功")
+                else:
+                    print(f"车辆{i+1}生成失败")
             except Exception as e:
-                print(f"车辆{i+1}生成失败：{e}")
+                print(f"车辆{i+1}生成异常：{str(e)[:100]}")
 
             time.sleep(SPAWN_INTERVAL)
 
         if len(vehicle_agents) == 0:
             raise RuntimeError("无车辆生成成功，仿真终止")
 
-        print(f"\n共生成{len(vehicle_agents)}辆车辆！")
-
-        # 创建全局俯视相机
+        # 创建俯视相机
         try:
             top_view_bp = world.get_blueprint_library().find("sensor.camera.rgb")
             top_view_bp.set_attribute("image_size_x", str(WINDOW_WIDTH))
             top_view_bp.set_attribute("image_size_y", str(WINDOW_HEIGHT))
-            top_view_bp.set_attribute("fov", str(90))
+            top_view_bp.set_attribute("fov", "90")
+            
             top_view_transform = carla.Transform(
                 vehicle_agents[0].vehicle.get_transform().location + carla.Location(z=50),
                 carla.Rotation(pitch=-90)
             )
             top_view_camera = world.spawn_actor(top_view_bp, top_view_transform)
-            top_view_surface = None
-            top_view_camera.listen(lambda image: globals().update({
-                "top_view_surface": pygame.surfarray.make_surface(
-                    np.swapaxes(np.array(image.raw_data).reshape((image.height, image.width, 4))[:, :, :3][:, :, ::-1], 0, 1)
-                )
-            }))
-        except:
-            print("警告：无法创建俯视相机")
+            
+            def top_view_callback(image):
+                nonlocal top_view_surface
+                try:
+                    array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape((image.height, image.width, 4))
+                    array = array[:, :, :3][:, :, ::-1]
+                    array = np.swapaxes(array, 0, 1)
+                    top_view_surface = pygame.surfarray.make_surface(array)
+                except:
+                    pass
+            
+            top_view_camera.listen(top_view_callback)
+            print("俯视相机创建成功")
+        except Exception as e:
+            print(f"俯视相机创建失败：{e}")
+            top_view_camera = None
 
         # 启动交通灯线程
         tl_cycle_thread = threading.Thread(target=cycle_traffic_light_states, args=(world, tl_stop_event), daemon=True)
         tl_cycle_thread.start()
-        print("交通灯线程启动")
+        print("交通灯控制线程启动")
 
         # 主循环
         clock = pygame.time.Clock()
         running = True
+        executor = ThreadPoolExecutor(max_workers=VEHICLE_COUNT)  # 复用线程池，提升性能
+
+        print("\n=== 仿真开始 ===")
+        print("操作说明：")
+        print("  1/2/3 - 切换单车辆视角")
+        print("  S     - 切换分屏视角")
+        print("  V     - 切换俯视视角")
+        print("  ESC   - 退出仿真")
+        print("="*50)
 
         while running:
             # 事件处理
@@ -838,68 +1184,54 @@ def main():
             # 清空屏幕
             screen.fill((0, 0, 0))
 
-            if show_top_view:
-                if top_view_surface:
-                    screen.blit(top_view_surface, (0, 0))
+            # 视角渲染
+            if show_top_view and top_view_surface:
+                screen.blit(top_view_surface, (0, 0))
             elif show_split_screen:
-                if len(vehicle_agents) == 1:
-                    agent = vehicle_agents[0]
-                    if agent.camera.image_surface:
-                        surface = pygame.transform.scale(agent.camera.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
-                        screen.blit(surface, (0, 0))
-                elif len(vehicle_agents) == 2:
-                    agent1 = vehicle_agents[0]
-                    agent2 = vehicle_agents[1]
-
-                    if agent1.camera.image_surface:
-                        surface1 = pygame.transform.scale(agent1.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT))
-                        screen.blit(surface1, (0, 0))
-
-                    if agent2.camera.image_surface:
-                        surface2 = pygame.transform.scale(agent2.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT))
-                        screen.blit(surface2, (WINDOW_WIDTH//2, 0))
-                elif len(vehicle_agents) >= 3:
-                    agent1 = vehicle_agents[0]
-                    agent2 = vehicle_agents[1]
-                    agent3 = vehicle_agents[2]
-
-                    if agent1.camera.image_surface:
-                        surface1 = pygame.transform.scale(agent1.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
-                        screen.blit(surface1, (0, 0))
-
-                    if agent2.camera.image_surface:
-                        surface2 = pygame.transform.scale(agent2.camera.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
-                        screen.blit(surface2, (WINDOW_WIDTH//2, 0))
-
-                    if agent3.camera.image_surface:
-                        surface3 = pygame.transform.scale(agent3.camera.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT//2))
-                        screen.blit(surface3, (0, WINDOW_HEIGHT//2))
+                # 分屏渲染
+                if len(vehicle_agents) >= 1 and vehicle_agents[0].sensors and vehicle_agents[0].sensors.image_surface:
+                    surf1 = pygame.transform.scale(vehicle_agents[0].sensors.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
+                    screen.blit(surf1, (0, 0))
+                
+                if len(vehicle_agents) >= 2 and vehicle_agents[1].sensors and vehicle_agents[1].sensors.image_surface:
+                    surf2 = pygame.transform.scale(vehicle_agents[1].sensors.image_surface, (WINDOW_WIDTH//2, WINDOW_HEIGHT//2))
+                    screen.blit(surf2, (WINDOW_WIDTH//2, 0))
+                
+                if len(vehicle_agents) >= 3 and vehicle_agents[2].sensors and vehicle_agents[2].sensors.image_surface:
+                    surf3 = pygame.transform.scale(vehicle_agents[2].sensors.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT//2))
+                    screen.blit(surf3, (0, WINDOW_HEIGHT//2))
             else:
-                target_agent = None
-                for agent in vehicle_agents:
-                    if agent.vehicle_id == current_view_vehicle_id:
-                        target_agent = agent
-                        break
+                # 单车辆视角
+                target_agent = next((a for a in vehicle_agents if a.vehicle_id == current_view_vehicle_id), None)
+                if target_agent and target_agent.sensors and target_agent.sensors.image_surface:
+                    surf = pygame.transform.scale(target_agent.sensors.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                    screen.blit(surf, (0, 0))
 
-                if target_agent and target_agent.camera.image_surface:
-                    surface = pygame.transform.scale(target_agent.camera.image_surface, (WINDOW_WIDTH, WINDOW_HEIGHT))
-                    screen.blit(surface, (0, 0))
+            # 更新车辆状态（复用线程池）
+            futures = []
+            for agent in vehicle_agents:
+                if agent.is_alive:
+                    futures.append(executor.submit(agent.update))
+            
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"车辆更新异常：{str(e)[:50]}")
 
-            # 更新车辆状态
-            with ThreadPoolExecutor(max_workers=VEHICLE_COUNT) as executor:
-                futures = [executor.submit(agent.update) for agent in vehicle_agents]
-                for future in as_completed(futures):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        print(f"车辆更新异常：{e}")
+            # 性能监控
+            perf_stats["frame_count"] += 1
+            print_performance_stats()
 
             # 刷新屏幕
             pygame.display.flip()
             clock.tick(30)
 
+        # 关闭线程池
+        executor.shutdown(wait=True)
+
     except Exception as e:
-        print(f"仿真异常：{e}")
+        print(f"\n仿真异常：{e}")
         traceback.print_exc()
     finally:
         cleanup()
