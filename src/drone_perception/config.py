@@ -169,6 +169,12 @@ DISPLAY = {
         'SHOW_OBJECTS_STATS': True,  # 显示物体统计
         'SHOW_SYSTEM_STATS': True,  # 显示系统统计
         'SHOW_PERFORMANCE': True,  # 显示性能信息
+        'SHOW_TRAJECTORY': True,  # 显示运动轨迹图
+        'TRAJECTORY_SIZE': 280,  # 轨迹图显示大小（像素）
+        'TRAJECTORY_MAX_POINTS': 1000,  # 轨迹最大记录点数
+        'TRAJECTORY_LINE_COLOR': (0, 255, 255),  # 轨迹线颜色（青色）
+        'TRAJECTORY_CURRENT_COLOR': (0, 255, 0),  # 当前位置颜色（绿色）
+        'TRAJECTORY_START_COLOR': (255, 255, 0),  # 起始位置颜色（黄色）
     }
 }
 
