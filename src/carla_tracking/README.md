@@ -1,145 +1,117 @@
-# CARLA_YOLO_ObjectTrackingTracking
+# Carla 目标跟踪与自动驾驶系统
 
-## 项目概述
-本项目实现了基于YOLOv5算法和CARLA仿真器的自动驾驶目标检测与跟踪功能。通过CARLA仿真环境生成动态交通场景，利用YOLOv5模型实时检测车辆、摩托车、公交车、卡车等交通参与者，结合内置优化版SORT跟踪算法实现目标的连续追踪，并通过OpenCV实时可视化检测与跟踪结果。
+这是一个基于CARLA模拟器的目标跟踪与自动驾驶系统，集成了YOLOv5目标检测和优化的SORT跟踪算法，能够实现车辆检测、跟踪、距离估计和基本的自动驾驶控制功能。
 
-### 核心功能：
-- 基于YOLOv5模型（支持yolov5s、yolov5m、yolov5x）进行实时目标检测，默认置信度阈值0.2
-- 集成优化版SORT跟踪算法（内置实现，无需额外依赖），通过卡尔曼滤波和历史位置平滑处理，实现对检测目标的稳定跟踪，支持多目标ID持续标注
-- 与CARLA仿真器深度集成，自动生成主车辆和NPC交通流，挂载RGB相机和深度相机采集实时图像（RGB相机分辨率800×600）
-- 支持同步模式运行，保证检测帧率与仿真环境一致（默认0.05s/帧，20FPS）
-- 实时可视化检测/跟踪结果，显示目标类别、置信度、跟踪ID、距离及速度信息，不同类别目标使用差异化颜色标注
-- 引入深度信息优化：基于目标距离动态调整跟踪参数，提升不同距离目标的跟踪稳定性
+## 功能特点
 
-## 安装步骤
-### 前置条件：
-- Python 3.7+（推荐3.7，与CARLA兼容性更佳）
-- CARLA仿真器（支持0.9.x系列版本，版本需与Python API匹配）
-- NVIDIA显卡（支持CUDA 11.3+，可选，用于加速模型推理）
+- 实时目标检测（使用YOLOv5模型）
+- 多目标跟踪（优化的SORT算法）
+- 深度感知与距离估计
+- 主车辆自动驾驶控制
+- NPC车辆生成与管理
+- 可配置的系统参数
 
-### 操作步骤：
+## 依赖环境
 
-1. 下载并安装CARLA仿真器：
-```plaintext
-https://github.com/carla-simulator/carla/releases
-```
-选择适合操作系统的版本，解压至任意路径（如D:\CARLA）
+- Python 3.8+
+- CARLA Simulator 0.9.13+
+- 所需Python库：
+  - carla
+  - opencv-python
+  - numpy
+  - torch
+  - ultralytics
+  - scipy
+  - argparse
 
-2. 克隆或下载本项目代码：
+## 安装指南
+
+1. 安装CARLA模拟器，请参考官方文档：[CARLA Installation Guide](https://carla.readthedocs.io/en/latest/start_quickstart/)
+
+2. 安装Python依赖：
 ```bash
-git clone <项目仓库地址>
-cd CARLA_YOLO_ObjectTracking
+pip install carla opencv-python numpy torch ultralytics scipy argparse
 ```
 
-3. 安装Python依赖库：
-```bash
-# 安装PyTorch（支持CUDA加速）
-pip install torch torchvision --extra-index-url https://download.pytorch.org/whl/cu113
+3. 下载YOLOv5模型文件并放置在指定目录（默认为`D:\yolo\`），支持的模型包括：
+   - yolov5s.pt
+   - yolov5su.pt
+   - yolov5m.pt
+   - yolov5mu.pt
+   - yolov5x.pt
 
-# 安装YOLOv5依赖
-pip install ultralytics
+## 配置说明
 
-# 安装其他依赖
-pip install numpy opencv-python scipy carla
+系统使用配置管理器进行参数设置，支持默认配置和自定义配置文件（JSON格式）。主要配置项包括：
 
-# 若使用CPU版本PyTorch
-pip install torch torchvision
-```
+- CARLA连接参数（主机、端口、超时时间等）
+- 检测模型参数（置信度阈值、IOU阈值、模型类型等）
+- 跟踪算法参数（最大年龄、最小命中数、IOU阈值等）
+- 车辆控制参数（最大速度、目标速度、安全距离等）
+- NPC车辆参数（数量、最小距离等）
+- 相机参数（宽度、高度、FOV等）
 
-4. 安装CARLA Python API：
-```bash
-# 进入CARLA安装目录下的PythonAPI路径
-cd D:\CARLA\PythonAPI\carla\dist
-# 安装对应版本的egg文件（需与Python版本匹配）
-easy_install carla-<版本号>-py3.7-<平台>.egg
-```
+可以通过修改配置文件或在代码中调整`ConfigManager`类的默认配置来定制系统行为。
 
-5. 下载YOLOv5预训练模型：
-将模型文件（yolov5s.pt/yolov5m.pt/yolov5x.pt）放置在指定路径（默认路径为`D:\yolo\`，可在代码`load_detection_model`函数中修改）
+## 主要组件说明
+
+### 1. 配置管理器 (`ConfigManager`)
+
+负责加载、更新和保存系统配置，支持递归合并默认配置和用户自定义配置。
+
+### 2. 优化的卡尔曼滤波器 (`OptimizedKalmanFilter`)
+
+用于预测目标的运动状态，支持带加速度模型和不带加速度模型两种模式，提高跟踪稳定性。
+
+### 3. 跟踪目标类 (`OptimizedTrack`)
+
+维护单个跟踪目标的状态信息，包括边界框、中心点、速度、距离等，并提供相似度计算方法。
+
+### 4. 优化的SORT跟踪器 (`OptimizedSORT`)
+
+实现多目标跟踪功能，使用匈牙利算法进行检测与跟踪目标的匹配，支持自适应阈值和深度感知。
+
+### 5. YOLOv5检测模型 (`load_detection_model`)
+
+加载YOLOv5目标检测模型，支持多种模型类型，并进行模型预热以提高推理速度。
+
+### 6. 车辆控制器 (`VehicleController`)
+
+实现主车辆的自动驾驶控制，使用PID控制器调节速度，并根据检测到的障碍物进行制动决策。
+
+### 7. NPC管理器 (`NPCManager`)
+
+负责生成和管理NPC车辆，设置自动驾驶行为，并支持动态调整NPC的行驶参数。
+
+### 8. 工具函数
+
+提供深度图像预处理、目标距离计算、边界框绘制等辅助功能。
 
 ## 使用方法
 
-1. 启动CARLA仿真器：
+1. 启动CARLA模拟器：
 ```bash
-cd D:\CARLA
-# Windows系统
-CarlaUE4.exe
-# Linux系统
-./CarlaUE4.sh
+./CarlaUE4.sh  # Linux
+CarlaUE4.exe   # Windows
 ```
-等待地图加载完成（显示3D城市场景）
 
 2. 运行主程序：
 ```bash
-# 基础运行（默认yolov5m模型+SORT跟踪器，启用深度增强）
-python main.py
-
-# 可选参数配置
-python main.py --model yolov5x --tracker sort --host localhost --port 2000 --conf-thres 0.25 --iou-thres 0.45 --npc-count 20
+python main.py [--config config.json]
 ```
 
-3. 操作指令：
-- 按`q`键：退出程序
-- 程序运行时会自动生成主车辆、NPC车辆及相机，实时显示检测跟踪结果
+其中`--config`参数可选，用于指定自定义配置文件。
 
-## 功能说明
+## 扩展与定制
 
-1. 目标检测：
-- 支持检测类别：汽车（car）、摩托车（motorcycle）、公交车（bus）、卡车（truck）（对应COCO数据集ID：2、3、5、7）
-- 模型选择：yolov5s（轻量快速）、yolov5m（平衡精度与速度）、yolov5x（高精度，适合对精度要求高的场景）
-- 检测优化：
-  - 采用多帧投票机制（保留至少2帧出现的目标），提高小目标检测稳定性
-  - 过滤过小检测框（基于距离动态调整阈值，远距离目标允许更小检测框），减少误检
-  - 支持置信度阈值（--conf-thres）和NMS IOU阈值（--iou-thres）配置
+- 可以通过修改`VehicleController`类来实现更复杂的自动驾驶逻辑
+- 支持更换不同的YOLOv5模型以平衡检测精度和速度
+- 可调整跟踪算法参数以适应不同的场景需求
+- 可扩展支持更多类型的传感器数据处理
 
-2. 目标跟踪：
-- 采用优化版SORT跟踪算法，核心改进包括：
-  - 卡尔曼滤波器参数优化，基于目标距离动态调整过程噪声，适配车辆运动特性
-  - 引入历史位置平滑处理，远距离目标采用更高平滑权重，减少跟踪抖动
-  - 基于目标距离动态调整IOU匹配阈值，增强不同距离目标的跟踪稳定性
-  - 基于距离的尺寸过滤策略，适应透视变换影响
-  - 对远距离目标延长保留时间，减少频繁消失与重现
-- 跟踪核心参数：max_age（最大消失帧数，默认8）、min_hits（最小命中数，默认2）、iou_threshold（基础IOU匹配阈值，默认0.4）
-- 跟踪结果包含持续的目标ID、距离信息和速度估计，支持目标短暂消失后重新出现的ID匹配
+## 注意事项
 
-3. CARLA交互：
-- 自动清理仿真环境中的残留车辆和静态车辆，保证场景纯净
-- 主车辆开启自动驾驶模式，相机优化挂载于主车辆前方（x=1.8m，z=1.6m，俯角-5°），更适合前方车辆检测
-- 自动生成NPC车辆并开启自动驾驶，构建动态交通场景（数量可通过--npc-count配置，默认15辆）
-- spectator视角自动跟随主车辆（后上方8m，z=10m，俯角-35°），方便观察全局场景
-- 同步模式运行，固定帧率0.05s/帧（20FPS），保证检测稳定性
-- 深度相机与RGB相机精确同步，提供目标距离信息用于优化跟踪
-
-## 项目结构
-- main.py：主程序脚本，包含以下核心组件：
-  - KalmanFilter：卡尔曼滤波器实现，用于目标运动状态预测与更新，支持基于距离的参数动态调整
-  - Track：跟踪目标实体类，维护单目标的边界框、ID、生命周期、历史位置、距离及速度等信息
-  - Sort：SORT跟踪器核心实现，处理多目标匹配与跟踪状态管理，集成深度信息优化
-  - 工具函数：包含边界框绘制（支持类别差异化颜色）、相机投影矩阵构建、CARLA环境清理等功能
-  - CARLA交互模块：负责服务器连接、车辆生成、相机配置及同步控制
-  - 检测与跟踪主逻辑：集成YOLOv5检测与SORT跟踪，实现端到端流程
-- YOLOv5预训练模型（yolov5s.pt/yolov5m.pt/yolov5x.pt）：需放置在指定路径
-
-## 常见问题
-### CARLA连接失败：
-- 确保CARLA仿真器已启动，且端口与脚本参数一致（默认2000）
-- 检查CARLA版本与Python API版本是否匹配
-- 关闭防火墙或添加端口例外规则
-
-### 模型加载错误：
-- 确认模型文件已下载并放在正确路径（默认`D:\yolo\`）
-- 检查模型文件名与代码中`model_paths`字典配置一致
-- 网络问题导致模型自动下载失败时，可手动下载并放置到指定路径
-
-### 可视化窗口无响应：
-- 确保OpenCV版本兼容（推荐4.5.x系列）
-- 检查是否存在未处理的异常导致主循环中断
-- 尝试重新启动CARLA仿真器和程序
-
-## 参考文档
-- [CARLA官方文档](https://carla.readthedocs.io/)
-- [YOLOv5官方文档](https://docs.ultralytics.com/yolov5/)
-- [SORT跟踪算法论文](https://arxiv.org/abs/1602.00763)
-
-## 许可协议
-本项目基于MIT许可协议开源，详情参见LICENSE文件。
+- 确保CARLA模拟器与Python API版本匹配
+- 首次运行时需要下载YOLOv5模型文件
+- 使用GPU可以显著提高检测和跟踪性能
+- 调整配置参数时需注意各参数间的兼容性
