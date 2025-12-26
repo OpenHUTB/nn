@@ -148,7 +148,7 @@ def semantic_rgb_fusion(rgb_img, sem_data, palette=CITYSCAPES_PALETTE, alpha=0.3
     fused_img = cv2.addWeighted(sem_rgb, alpha, rgb_img, 1 - alpha, 0)
     
     # 3. 添加融合说明文字（左上角）
-    fusion_tips = f"Semantic-RGB Fusion (Alpha={alpha})"
+    fusion_tips = f"Semantic-RGB Fusion (Alpha={alpha:.1f})"
     cv2.putText(fused_img, fusion_tips, 
                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     
@@ -159,6 +159,28 @@ def semantic_rgb_fusion(rgb_img, sem_data, palette=CITYSCAPES_PALETTE, alpha=0.3
                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     
     return fused_img
+# =================================================================
+
+# ==================== 第15次提交新增：可视化模式提示生成函数 ====================
+def generate_mode_hint(current_mode, fusion_alpha):
+    """
+    生成当前可视化模式的提示文字
+    :param current_mode: 当前模式编号
+    :param fusion_alpha: 融合透明度
+    :return: 提示文字列表
+    """
+    mode_names = {
+        1: "Basic Mode (RGB+Sem / Top+Heatmap)",
+        2: "Fusion Mode (RGB+Fusion / Sem+Heatmap)",
+        3: "Simplified Mode (RGB+Heatmap / Top+Count)",
+        4: "Full Sem Mode (Sem+Fusion / Heatmap+Top)"
+    }
+    control_hints = [
+        "Controls: 1/2/3/4=Switch Mode | ↑↓=Adjust Fusion Alpha | R=Reset | Q=Quit",
+        f"Current Mode: {mode_names.get(current_mode, 'Basic Mode')}",
+        f"Fusion Alpha: {fusion_alpha:.1f} (0=RGB Only, 1=Sem Only)"
+    ]
+    return control_hints
 # =================================================================
 
 # 1. 连接CARLA服务器并配置强同步模式
@@ -374,9 +396,10 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
-# 9. 主循环（核心：多视角+热力图+计数+高亮+语义-RGB融合可视化 + 性能监控）
-print("\n程序运行中，按Ctrl+C或窗口按'q'退出...")
-print(f"功能：前视+俯视+热力图+语义计数+目标高亮+语义-RGB融合 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
+# 9. 主循环（核心：多视角+热力图+计数+高亮+融合+键盘交互可视化模式）
+print("\n程序运行中，按以下按键操作：")
+print("1/2/3/4 = 切换可视化模式 | ↑/↓ = 调整融合透明度 | R = 重置模式 | Q = 退出")
+print(f"功能：多模式切换 + 语义计数 + 目标高亮 + 语义-RGB融合 + {actual_npc_count}辆车辆 + {actual_walker_count}个行人 + 性能监控")
 last_spectator_tf = None
 clock = pygame.time.Clock()
 
@@ -395,8 +418,10 @@ highlight_class_mapping = {
     4: (0, 0, 255),     # 行人 - 红色轮廓
     10: (255, 0, 0)     # 车辆 - 蓝色轮廓
 }
-# ==================== 第14次提交：融合透明度配置（可调整） ====================
-fusion_alpha = 0.3  # 语义层透明度（0.3为推荐值，兼顾RGB视觉和语义辨识度）
+# ==================== 第15次提交：可视化模式配置 ====================
+current_mode = 1  # 默认模式1（基础模式）
+fusion_alpha = 0.3  # 融合透明度（0~1）
+mode_reset_flag = False  # 模式重置标记
 # =================================================================
 
 try:
@@ -436,105 +461,165 @@ try:
             top_rgb_img = np.reshape(np.copy(top_rgb_image.raw_data), 
                                     (720, 1024, 4))[:, :, :3]
             
-            # ==================== 新增：生成语义密度热力图 ====================
+            # ==================== 生成语义密度热力图 ====================
             density_heatmap = generate_density_heatmap(front_sem_data, target_classes=[4, 10])
             # =================================================================
             
-            # ==================== 第11次提交新增：计算语义类别计数 ====================
+            # ==================== 计算语义类别计数 ====================
             class_count_result = semantic_class_count(front_sem_data, count_class_mapping)
             # =================================================================
             
-            # ==================== 第12次提交新增：对前视RGB图像叠加目标高亮轮廓 ====================
+            # ==================== 生成高亮RGB图像 ====================
             front_rgb_img_highlight = semantic_target_highlight(front_rgb_img.copy(), front_sem_data, highlight_class_mapping)
             # =================================================================
             
-            # ==================== 第14次提交核心：生成语义-RGB融合图像 ====================
+            # ==================== 生成语义-RGB融合图像 ====================
             fused_img = semantic_rgb_fusion(front_rgb_img, front_sem_data, alpha=fusion_alpha)
             # =================================================================
             
-            # 4. 重构多视角图像拼接（融入融合图）：
-            #    上半部分：前视RGB（带高亮） + 语义-RGB融合图（右）
-            #    下半部分：原始语义分割 + 行人/车辆密度热力图（右）
-            upper_part = cv2.hconcat([front_rgb_img_highlight, fused_img])  # 宽度2048，高度720
-            lower_part = cv2.hconcat([front_sem_rgb, density_heatmap])     # 宽度2048，高度720
-            combined_img = cv2.vconcat([upper_part, lower_part])            # 最终尺寸：2048×1440
+            # ==================== 第15次提交核心：根据当前模式动态拼接图像 ====================
+            if current_mode == 1:
+                # 模式1：基础模式（原有布局）
+                # 上=RGB高亮 + 语义分割 | 下=俯视RGB + 热力图
+                upper_part = cv2.hconcat([front_rgb_img_highlight, front_sem_rgb])
+                lower_part = cv2.hconcat([top_rgb_img, density_heatmap])
+            elif current_mode == 2:
+                # 模式2：融合模式
+                # 上=RGB高亮 + 语义融合 | 下=语义分割 + 热力图
+                upper_part = cv2.hconcat([front_rgb_img_highlight, fused_img])
+                lower_part = cv2.hconcat([front_sem_rgb, density_heatmap])
+            elif current_mode == 3:
+                # 模式3：精简模式
+                # 上=RGB高亮 + 热力图 | 下=俯视RGB + 计数可视化（生成纯黑背景+计数文字）
+                count_vis = np.zeros((720, 1024, 3), dtype=np.uint8)
+                count_title = "Semantic Count (Frame)"
+                cv2.putText(count_vis, count_title, (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 0), 3)
+                count_items = [
+                    f"Pedestrian: {class_count_result['Pedestrian']}",
+                    f"Vehicle: {class_count_result['Vehicle']}",
+                    f"TrafficLight: {class_count_result['TrafficLight']}"
+                ]
+                for idx, item in enumerate(count_items):
+                    cv2.putText(count_vis, item, (50, 200 + idx * 80), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+                upper_part = cv2.hconcat([front_rgb_img_highlight, density_heatmap])
+                lower_part = cv2.hconcat([top_rgb_img, count_vis])
+            elif current_mode == 4:
+                # 模式4：全语义模式
+                # 上=语义分割 + 融合图 | 下=热力图 + 俯视RGB
+                upper_part = cv2.hconcat([front_sem_rgb, fused_img])
+                lower_part = cv2.hconcat([density_heatmap, top_rgb_img])
+            else:
+                # 默认回退到模式1
+                upper_part = cv2.hconcat([front_rgb_img_highlight, front_sem_rgb])
+                lower_part = cv2.hconcat([top_rgb_img, density_heatmap])
             
-            # 5. 更新视角标题（新增融合图说明）
-            # 前视RGB标题（带高亮）
-            cv2.putText(combined_img, "Front View (RGB + Target Highlight)", 
-                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 融合图标题
-            cv2.putText(combined_img, "Front View (Semantic-RGB Fusion)", 
-                       (1024 + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 原始语义标题
-            cv2.putText(combined_img, "Front View (Raw Semantic Segmentation)", 
-                       (10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
-            # 热力图标题
-            cv2.putText(combined_img, "Density Heatmap (Pedestrian + Vehicle)", 
-                       (1024 + 10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            combined_img = cv2.vconcat([upper_part, lower_part])
+            # =================================================================
             
-            # 6. 绘制性能监控（左上角，标题下方）
+            # 5. 添加视角标题（根据模式动态调整）
+            mode_titles = {
+                1: ["Front View (RGB + Target Highlight)", "Front View (Semantic Segmentation)",
+                    "Top View (RGB / Bird's Eye)", "Density Heatmap (Pedestrian + Vehicle)"],
+                2: ["Front View (RGB + Target Highlight)", "Front View (Semantic-RGB Fusion)",
+                    "Front View (Semantic Segmentation)", "Density Heatmap (Pedestrian + Vehicle)"],
+                3: ["Front View (RGB + Target Highlight)", "Density Heatmap (Pedestrian + Vehicle)",
+                    "Top View (RGB / Bird's Eye)", "Semantic Count Visualization"],
+                4: ["Front View (Semantic Segmentation)", "Front View (Semantic-RGB Fusion)",
+                    "Density Heatmap (Pedestrian + Vehicle)", "Top View (RGB / Bird's Eye)"]
+            }
+            titles = mode_titles.get(current_mode, mode_titles[1])
+            # 上半部分左标题
+            cv2.putText(combined_img, titles[0], (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 上半部分右标题
+            cv2.putText(combined_img, titles[1], (1024 + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 下半部分左标题
+            cv2.putText(combined_img, titles[2], (10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            # 下半部分右标题
+            cv2.putText(combined_img, titles[3], (1024 + 10, 720 + 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+            
+            # 6. 绘制性能监控 + 模式控制提示（左上角）
             perf_info = [
                 f"FPS: {current_fps:.1f}",
-                f"RGB Queue: {front_rgb_queue.qsize()}",
-                f"Sem Queue: {front_sem_queue.qsize()}",
                 f"Sync Frame: {world.get_snapshot().frame}",
-                f"Vehicles: {actual_npc_count} | Pedestrians: {actual_walker_count}",
-                f"Fusion Alpha: {fusion_alpha}"  # 新增融合透明度显示
+                f"Vehicles: {actual_npc_count} | Pedestrians: {actual_walker_count}"
             ]
+            # 生成模式控制提示
+            mode_hints = generate_mode_hint(current_mode, fusion_alpha)
+            all_info = perf_info + mode_hints
+            
             perf_x = 10
             perf_y = 60
             perf_line_height = 25
             perf_color = (0, 255, 255)  # 黄色
-            for idx, info in enumerate(perf_info):
+            for idx, info in enumerate(all_info):
                 y_pos = perf_y + idx * perf_line_height
                 # 半透明背景
                 cv2.rectangle(combined_img, 
                               (perf_x - 5, y_pos - 15), 
-                              (perf_x + 300, y_pos + 5), 
+                              (perf_x + 600, y_pos + 5), 
                               (0, 0, 0), -1)
                 cv2.putText(combined_img, info, (perf_x, y_pos), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, perf_color, 2)
             
-            # ==================== 第11次提交新增：绘制语义计数面板（右上角） ====================
-            # 计数面板位置（画面右上角，避免与性能监控重叠）
-            count_x = combined_img.shape[1] - 320  # 2048 - 320 = 1728
-            count_y = 30
-            count_color = (255, 255, 0)  # 青色（易识别，与黄色性能监控区分）
-            count_bg_color = (0, 0, 0)   # 黑色背景
-            count_line_height = 28
+            # 7. 绘制语义计数面板（仅模式1/2/4显示，模式3已集成到布局）
+            if current_mode in [1, 2, 4]:
+                count_x = combined_img.shape[1] - 320
+                count_y = 30
+                count_color = (255, 255, 0)
+                count_bg_color = (0, 0, 0)
+                # 绘制计数面板背景
+                cv2.rectangle(combined_img, 
+                              (count_x - 10, count_y - 10), 
+                              (combined_img.shape[1] - 10, count_y + 100), 
+                              count_bg_color, -1)
+                # 绘制计数标题和内容
+                cv2.putText(combined_img, "Semantic Count (Frame)", 
+                           (count_x, count_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, count_color, 2)
+                count_items = [
+                    f"Pedestrian: {class_count_result['Pedestrian']}",
+                    f"Vehicle: {class_count_result['Vehicle']}",
+                    f"TrafficLight: {class_count_result['TrafficLight']}"
+                ]
+                for idx, item in enumerate(count_items):
+                    y_pos = count_y + (idx + 1) * 28
+                    cv2.putText(combined_img, item, (count_x, y_pos), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.65, count_color, 2)
             
-            # 绘制计数面板背景（半透明黑色）
-            cv2.rectangle(combined_img, 
-                          (count_x - 10, count_y - 10), 
-                          (combined_img.shape[1] - 10, count_y + 100), 
-                          count_bg_color, -1)  # 实心背景
+            # 8. 显示最终图像
+            cv2.namedWindow('CARLA Multi-Mode Visualization (Keyboard Interactive)', cv2.WINDOW_NORMAL)
+            cv2.resizeWindow('CARLA Multi-Mode Visualization (Keyboard Interactive)', 1920, 1080)
+            cv2.imshow('CARLA Multi-Mode Visualization (Keyboard Interactive)', combined_img)
             
-            # 绘制计数面板标题
-            cv2.putText(combined_img, "Semantic Count (Frame)", 
-                       (count_x, count_y), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, count_color, 2)
-            
-            # 绘制各类别计数
-            count_items = [
-                f"Pedestrian: {class_count_result['Pedestrian']}",
-                f"Vehicle: {class_count_result['Vehicle']}",
-                f"TrafficLight: {class_count_result['TrafficLight']}"
-            ]
-            for idx, item in enumerate(count_items):
-                y_pos = count_y + (idx + 1) * count_line_height
-                cv2.putText(combined_img, item, 
-                           (count_x, y_pos), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.65, count_color, 2)
-            # =================================================================
-            
-            # 7. 显示最终图像（自动调整窗口大小）
-            cv2.namedWindow('CARLA Multi-View + Semantic-RGB Fusion + Count + Highlight', cv2.WINDOW_NORMAL)
-            cv2.resizeWindow('CARLA Multi-View + Semantic-RGB Fusion + Count + Highlight', 1920, 1080)
-            cv2.imshow('CARLA Multi-View + Semantic-RGB Fusion + Count + Highlight', combined_img)
-            
-            if cv2.waitKey(1) == ord('q'):
+            # ==================== 第15次提交核心：键盘事件处理 ====================
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q'):
                 break
+            elif key == ord('1'):
+                current_mode = 1
+                print(f"切换到模式1：基础模式")
+            elif key == ord('2'):
+                current_mode = 2
+                print(f"切换到模式2：融合模式（当前Alpha={fusion_alpha:.1f}）")
+            elif key == ord('3'):
+                current_mode = 3
+                print(f"切换到模式3：精简模式")
+            elif key == ord('4'):
+                current_mode = 4
+                print(f"切换到模式4：全语义模式")
+            elif key == ord('r') or key == ord('R'):
+                # 重置模式和透明度
+                current_mode = 1
+                fusion_alpha = 0.3
+                mode_reset_flag = True
+                print(f"已重置：模式1 + 融合Alpha=0.3")
+            elif key == 2490368:  # 上方向键（增加Alpha）
+                fusion_alpha = min(fusion_alpha + 0.1, 1.0)
+                print(f"融合Alpha调整为：{fusion_alpha:.1f}")
+            elif key == 2621440:  # 下方向键（减少Alpha）
+                fusion_alpha = max(fusion_alpha - 0.1, 0.0)
+                print(f"融合Alpha调整为：{fusion_alpha:.1f}")
+            # =================================================================
         
         clock.tick(30)
 

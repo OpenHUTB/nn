@@ -1,6 +1,6 @@
-import mujoco
-import mujoco.viewer as viewer
-import numpy as np
+import mujoco # 导入MuJoCo核心库，用于加载模型和运行仿真
+import mujoco.viewer as viewer # 导入MuJoCo的可视化器
+import numpy as np # 导入numpy库，用于数值计算（如三角函数、数组操作）
 import time  # 导入time库，用于实现等待功能
 
 def main():
