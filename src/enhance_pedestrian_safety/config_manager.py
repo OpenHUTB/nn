@@ -133,7 +133,13 @@ class ConfigOptimizer:
             'enabled': True,
             'enable_random': True,
             'quality_check': True,
-            'methods': ['normalize', 'contrast', 'sharpness', 'noise']
+            'save_original': True,
+            'save_enhanced': True,
+            'calibration_generation': True,
+            'enhanced_dir_name': 'enhanced',
+            'methods': ['normalize', 'contrast', 'brightness'],
+            'weather_effects': True,
+            'augmentation_level': 'medium'
         })
 
         return optimized
@@ -173,6 +179,94 @@ class ConfigOptimizer:
 
         return optimized
 
+    @staticmethod
+    def optimize_for_safety(config: Dict[str, Any]) -> Dict[str, Any]:
+        """优化配置以增强行人安全"""
+        optimized = copy.deepcopy(config)
+
+        # 增加行人密度
+        traffic = optimized['traffic']
+        traffic.update({
+            'pedestrians': 12,  # 增加行人数量
+            'pedestrian_types': [
+                'walker.pedestrian.0001',
+                'walker.pedestrian.0002',
+                'walker.pedestrian.0003',
+                'walker.pedestrian.0004'
+            ]
+        })
+
+        # 优化传感器配置以更好地检测行人
+        sensors = optimized['sensors']
+        sensors.update({
+            'image_size': [1280, 720],
+            'capture_interval': 1.5,  # 更频繁地捕获
+            'vehicle_cameras': 4,
+            'camera_config': {
+                'fov': 100.0,  # 更宽的视野
+                'post_processing': 'default',
+                'exposure_mode': 'auto',
+                'motion_blur': 0.0
+            }
+        })
+
+        # 启用LiDAR以检测行人
+        sensors['lidar_sensors'] = 1
+        sensors['lidar_config'].update({
+            'channels': 64,  # 更多通道以检测行人
+            'range': 120.0,
+            'points_per_second': 100000,
+            'max_points_per_frame': 80000,
+            'downsample_ratio': 0.2
+        })
+
+        # 启用V2X和协同感知
+        v2x = optimized.setdefault('v2x', {})
+        v2x.update({
+            'enabled': True,
+            'communication_range': 300.0,
+            'update_interval': 1.0  # 更频繁地更新
+        })
+
+        coop = optimized.setdefault('cooperative', {})
+        coop.update({
+            'num_coop_vehicles': 2,
+            'enable_shared_perception': True,
+            'enable_traffic_warnings': True,
+            'enable_maneuver_coordination': False,
+            'data_fusion_interval': 0.5,  # 更频繁地融合
+            'max_shared_objects': 100,
+            'object_matching_threshold': 3.0  # 更严格的对象匹配
+        })
+
+        # 性能优化
+        perf = optimized.setdefault('performance', {})
+        perf.update({
+            'batch_size': 5,
+            'enable_compression': True,
+            'compression_level': 3,
+            'enable_memory_cache': True,
+            'max_cache_size': 40,
+            'frame_rate_limit': 8.0
+        })
+
+        # 输出配置
+        output = optimized['output']
+        output.update({
+            'save_raw': True,
+            'save_stitched': True,
+            'save_annotations': True,
+            'save_lidar': True,
+            'save_fusion': True,
+            'save_cooperative': True,
+            'save_enhanced': True,
+            'validate_data': True,
+            'run_analysis': True,
+            'run_quality_check': True
+        })
+
+        return optimized
+
 
 class ConfigManager:
 
@@ -188,6 +282,10 @@ class ConfigManager:
         'fast_collection': {
             'description': '快速采集配置 - 优先处理速度',
             'optimization': 'speed'
+        },
+        'pedestrian_safety': {
+            'description': '行人安全配置 - 优化行人检测和安全评估',
+            'optimization': 'safety'
         },
         'v2x_focused': {
             'description': 'V2X重点配置 - 优化协同数据采集',
@@ -438,6 +536,8 @@ class ConfigManager:
             config = ConfigOptimizer.optimize_for_quality(config)
         elif optimization == 'speed':
             config = ConfigOptimizer.optimize_for_speed(config)
+        elif optimization == 'safety':
+            config = ConfigOptimizer.optimize_for_safety(config)
         elif optimization == 'custom' and 'settings' in preset:
             config = ConfigManager._deep_update(config, preset['settings'])
 
@@ -535,6 +635,9 @@ class ConfigManager:
 
         if hasattr(args, 'output_format') and args.output_format:
             config['output']['output_format'] = args.output_format
+
+        if hasattr(args, 'enable_safety_monitor'):
+            config['monitoring']['enable_safety_monitor'] = args.enable_safety_monitor
 
         return config
 
