@@ -62,8 +62,17 @@ class PandaAutoGrab:
         # 关节速度参数
         self.JOINT_VEL_LIMIT = 0.5  # 关节速度上限
 
-        # 【优化1】提取位置误差容忍阈值为类内常量
+        # 位置控制参数
         self.POS_TOLERANCE = 0.003  # 末端执行器位置误差容忍阈值
+
+        # 夹爪控制参数
+        self.GRIPPER_WAIT_STEPS = 100  # 夹爪动作完成所需的等待步数
+
+        # 位置坐标参数
+        self.INIT_EE_POS = np.array([0.4, 0.0, 0.2])  # 末端执行器初始目标位置
+
+        # 【优化1】提取抬升高度增量为类内常量
+        self.LIFT_HEIGHT_INCREMENT = 0.05  # 抓取后额外抬升的高度增量
 
         # 打印模型信息
         print("=" * 50)
@@ -71,15 +80,23 @@ class PandaAutoGrab:
         print("📌 模型Joint列表：", [self.model.joint(i).name for i in range(min(self.model.njnt, 10))])
         print("=" * 50)
 
-    def get_ee_pos(self):
-        """获取末端执行器位置"""
+    def get_ee_pos(self) -> np.ndarray:
+        """获取末端执行器位置
+
+        Returns:
+            np.ndarray: 末端执行器的三维位置坐标[x, y, z]
+        """
         return self.data.xpos[self.ee_body_id].copy()
 
-    def get_cube_pos(self):
-        """获取立方体位置"""
+    def get_cube_pos(self) -> np.ndarray:
+        """获取立方体位置
+
+        Returns:
+            np.ndarray: 立方体的三维位置坐标[x, y, z]
+        """
         return self.data.xpos[self.cube_body_id].copy()
 
-    def _compute_jacobian(self):
+    def _compute_jacobian(self) -> np.ndarray:
         """计算末端执行器的位置雅克比矩阵
 
         Returns:
@@ -102,7 +119,6 @@ class PandaAutoGrab:
         error = target - ee_pos
         error_norm = np.linalg.norm(error)
 
-        # 【优化2】使用类内常量替代硬编码的位置误差阈值
         if error_norm < self.POS_TOLERANCE:
             return True  # 到达目标
 
@@ -144,10 +160,14 @@ class PandaAutoGrab:
             self.data.ctrl[j_id] = pos
 
     def _grab_phase_machine(self):
-        """抓取状态机"""
+        """抓取状态机：按阶段执行机械臂的抓取、移动、放置等一系列动作
+
+        状态机分为12个阶段，从初始位置移动→识别立方体→抓取→放置→返回，
+        每个阶段完成后自动切换到下一个阶段，直到抓取任务完成。
+        """
         if self.current_phase == 0:
             # 阶段0：移动到初始位置
-            if self._move_step(np.array([0.4, 0.0, 0.2])):
+            if self._move_step(self.INIT_EE_POS):
                 print("\n✅ 到达初始位置")
                 self.current_phase = 1
                 self.step_counter = 0
@@ -170,7 +190,7 @@ class PandaAutoGrab:
             if self.step_counter == 0:
                 self._gripper_step(self.gripper_open_pos)
                 print("\n✋ 打开夹爪")
-            if self.step_counter > 100:  # 等待夹爪动作
+            if self.step_counter > self.GRIPPER_WAIT_STEPS:
                 self.current_phase = 4
                 self.step_counter = 0
             self.step_counter += 1
@@ -187,14 +207,16 @@ class PandaAutoGrab:
             if self.step_counter == 0:
                 self._gripper_step(self.gripper_close_pos)
                 print("\n🤏 闭合夹爪抓取")
-            if self.step_counter > 100:
+            if self.step_counter > self.GRIPPER_WAIT_STEPS:
                 self.current_phase = 6
                 self.step_counter = 0
             self.step_counter += 1
 
         elif self.current_phase == 6:
             # 阶段6：抬升立方体
-            if self._move_step(self.cube_pos + np.array([0, 0, self.safe_lift_height + 0.05]), speed=0.3):
+            # 【优化2】使用类内常量替代硬编码的抬升增量
+            lift_target = self.cube_pos + np.array([0, 0, self.safe_lift_height + self.LIFT_HEIGHT_INCREMENT])
+            if self._move_step(lift_target, speed=0.3):
                 print("\n✅ 抬升立方体")
                 self.current_phase = 7
                 self.step_counter = 0
@@ -218,7 +240,7 @@ class PandaAutoGrab:
             if self.step_counter == 0:
                 self._gripper_step(self.gripper_open_pos)
                 print("\n🫳 释放立方体")
-            if self.step_counter > 100:
+            if self.step_counter > self.GRIPPER_WAIT_STEPS:
                 self.current_phase = 10
                 self.step_counter = 0
             self.step_counter += 1
@@ -232,7 +254,7 @@ class PandaAutoGrab:
 
         elif self.current_phase == 11:
             # 阶段11：返回初始位置
-            if self._move_step(np.array([0.4, 0.0, 0.2]), speed=0.4):
+            if self._move_step(self.INIT_EE_POS, speed=0.4):
                 print("\n✅ 返回初始位置")
                 self.current_phase = 12
 
