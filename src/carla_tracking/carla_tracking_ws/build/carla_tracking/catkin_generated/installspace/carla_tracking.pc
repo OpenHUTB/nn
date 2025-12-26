@@ -1,8 +1,0 @@
-prefix=/home/sq/carla_tracking_ws/install
-
-Name: carla_tracking
-Description: Description of carla_tracking
-Version: 0.0.0
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: cv_bridge message_runtime rospy sensor_msgs std_msgs
