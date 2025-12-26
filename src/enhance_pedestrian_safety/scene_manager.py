@@ -45,6 +45,23 @@ class SceneManager:
             'vehicle_density': 0.6,
             'pedestrian_density': 0.5,
             'weather_variations': ['rainy']
+        },
+        'school_zone': {
+            'description': '学校区域场景 - 行人安全重点',
+            'pedestrian_behavior': ['crossing', 'walking', 'playing', 'running'],
+            'vehicle_density': 0.4,
+            'pedestrian_density': 0.9,
+            'weather_variations': ['clear', 'cloudy'],
+            'speed_limit': 15.0,  # 降低限速
+            'safety_zone_radius': 50.0  # 扩大安全区域
+        },
+        'pedestrian_crossing': {
+            'description': '人行横道场景',
+            'pedestrian_behavior': ['crossing', 'waiting', 'walking'],
+            'vehicle_density': 0.5,
+            'pedestrian_density': 0.8,
+            'weather_variations': ['clear', 'rainy'],
+            'crossing_intensity': 'high'
         }
     }
 
@@ -74,13 +91,19 @@ class SceneManager:
         # 设置行人行为
         config['traffic']['pedestrian_behaviors'] = scene_config['pedestrian_behavior']
 
+        # 如果是学校区域，设置车速限制
+        if scene_type == 'school_zone' and 'speed_limit' in scene_config:
+            config['traffic']['speed_limit'] = scene_config['speed_limit']
+            # 添加行人安全区域标记
+            SceneManager._add_safety_zone_markers(world, config)
+
         # 应用场景特定设置
-        SceneManager._apply_scene_specifics(world, scene_type)
+        SceneManager._apply_scene_specifics(world, scene_type, config)
 
         return config
 
     @staticmethod
-    def _apply_scene_specifics(world, scene_type):
+    def _apply_scene_specifics(world, scene_type, config):
         """应用场景特定的设置"""
         try:
             if scene_type == 'highway':
@@ -102,8 +125,135 @@ class SceneManager:
                         except:
                             pass
 
+            elif scene_type == 'school_zone':
+                # 学校区域：设置车辆限速和行人保护区域
+                for actor in world.get_actors():
+                    if 'vehicle' in actor.type_id:
+                        try:
+                            # 限制车速
+                            actor.enable_constant_velocity(carla.Vector3D(15, 0, 0))
+                            # 开启行人检测警告
+                            actor.set_light_state(carla.VehicleLightState.LowBeam)
+                        except:
+                            pass
+                # 添加学校区域警告标志
+                SceneManager._add_school_zone_signs(world)
+
+            elif scene_type == 'pedestrian_crossing':
+                # 人行横道：增加可见性
+                for actor in world.get_actors():
+                    if 'vehicle' in actor.type_id:
+                        try:
+                            actor.set_light_state(carla.VehicleLightState.LowBeam)
+                        except:
+                            pass
+                # 添加人行横道标记
+                SceneManager._add_crosswalk_markings(world)
+
         except Exception as e:
             print(f"场景特定设置失败: {e}")
+
+    @staticmethod
+    def _add_safety_zone_markers(world, config):
+        """添加安全区域标记"""
+        try:
+            blueprint_lib = world.get_blueprint_library()
+
+            # 在学校区域周围添加安全锥
+            spawn_points = world.get_map().get_spawn_points()
+            if spawn_points:
+                center_point = spawn_points[len(spawn_points) // 2].location
+                SceneManager.spawn_traffic_cones(world, center_point, num_cones=15)
+
+            # 添加警告标志
+            warning_sign_bp = blueprint_lib.find('static.prop.trafficsign')
+            if warning_sign_bp:
+                sign_location = carla.Location(center_point.x, center_point.y, center_point.z + 2.0)
+                world.spawn_actor(warning_sign_bp, carla.Transform(sign_location, carla.Rotation(0, 90, 0)))
+
+        except Exception as e:
+            print(f"添加安全区域标记失败: {e}")
+
+    @staticmethod
+    def _add_school_zone_signs(world):
+        """添加学校区域标志"""
+        try:
+            blueprint_lib = world.get_blueprint_library()
+
+            # 查找学校区域标志蓝图
+            school_sign_bp = None
+            for bp in blueprint_lib.filter('static.prop.*'):
+                if 'school' in bp.id.lower() or 'warning' in bp.id.lower():
+                    school_sign_bp = bp
+                    break
+
+            if school_sign_bp:
+                # 在学校区域周围放置标志
+                spawn_points = world.get_map().get_spawn_points()
+                if spawn_points:
+                    for i in range(min(4, len(spawn_points))):
+                        location = spawn_points[i].location
+                        sign_location = carla.Location(location.x, location.y, location.z + 2.0)
+                        world.spawn_actor(school_sign_bp,
+                                          carla.Transform(sign_location, carla.Rotation(0, i * 90, 0)))
+
+        except Exception as e:
+            print(f"添加学校区域标志失败: {e}")
+
+    @staticmethod
+    def _add_crosswalk_markings(world):
+        """添加人行横道标记"""
+        try:
+            spawn_points = world.get_map().get_spawn_points()
+            if spawn_points:
+                center_point = spawn_points[len(spawn_points) // 2].location
+                SceneManager.spawn_pedestrian_safety_features(world, center_point, 'crosswalk')
+
+        except Exception as e:
+            print(f"添加人行横道标记失败: {e}")
+
+    @staticmethod
+    def spawn_pedestrian_safety_features(world, location, feature_type='crosswalk'):
+        """生成行人安全设施"""
+        blueprint_lib = world.get_blueprint_library()
+        features = []
+
+        try:
+            if feature_type == 'crosswalk':
+                # 生成人行横道标记
+                for i in range(-4, 5):
+                    line_location = carla.Location(
+                        x=location.x + i * 0.8,
+                        y=location.y,
+                        z=location.z + 0.02
+                    )
+                    rotation = carla.Rotation(0, 0, 0)
+
+                    line_bp = blueprint_lib.find('static.prop.linepainting')
+                    if line_bp:
+                        line = world.spawn_actor(line_bp, carla.Transform(line_location, rotation))
+                        features.append(line)
+
+            elif feature_type == 'speed_bump':
+                # 生成减速带
+                bump_location = carla.Location(location.x, location.y, location.z + 0.1)
+                bump_bp = blueprint_lib.find('static.prop.speedbump')
+                if bump_bp:
+                    bump = world.spawn_actor(bump_bp, carla.Transform(bump_location, carla.Rotation(0, 0, 0)))
+                    features.append(bump)
+
+            elif feature_type == 'warning_sign':
+                # 生成警告标志
+                sign_location = carla.Location(location.x, location.y, location.z + 2.0)
+                sign_bp = blueprint_lib.find('static.prop.trafficsign')
+                if sign_bp:
+                    sign = world.spawn_actor(sign_bp, carla.Transform(sign_location, carla.Rotation(0, 90, 0)))
+                    features.append(sign)
+
+        except Exception as e:
+            print(f"生成行人安全设施失败: {e}")
+
+        return features
 
     @staticmethod
     def spawn_traffic_cones(world, center_location, num_cones=10):
@@ -230,7 +380,12 @@ class SceneManager:
             'description': SceneManager.SCENES.get(scene_type, {}).get('description', '未知场景'),
             'config': config,
             'created': SceneManager._get_timestamp(),
-            'extra_info': extra_info or {}
+            'extra_info': extra_info or {},
+            'safety_features': {
+                'has_crosswalk': scene_type in ['school_zone', 'pedestrian_crossing', 'intersection_4way'],
+                'has_traffic_cones': scene_type in ['school_zone', 'construction_zone'],
+                'has_warning_signs': scene_type in ['school_zone', 'pedestrian_crossing']
+            }
         }
 
         scene_file = os.path.join(output_dir, "metadata", "scene_description.json")
