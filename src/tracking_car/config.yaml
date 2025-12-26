@@ -79,3 +79,12 @@ hot_reload_safe_keys:
   - "stop_speed_thresh"   # 停车速度阈值
   - "danger_dist_thresh"  # 危险距离阈值
   - "weather"             # 天气设置
+
+# ======================== 交通标志检测配置 ========================
+enable_sign_detection: false  # 是否启用交通标志检测
+
+traffic_sign:
+  enabled: true               # 检测器是否启用
+  show_signs: true            # 是否显示检测框
+  enable_actions: false       # 是否触发动作（警告等）
+  conf_threshold: 0.5         # 置信度阈值

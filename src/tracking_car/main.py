@@ -1102,6 +1102,13 @@ class Visualizer:
             f"L: PointCloud | V: View Mode"  # 添加点云提示
         ]
         
+        status_lines = [
+            f"Tracked Objects: {track_count}",
+            f"ESC: Exit | W: Weather | S: Screenshot",
+            f"P: Pause | T: Stats | M: Color Legend",
+            f"L: PointCloud | V: View | O: SignDetect",  # 修改这一行
+        ]
+
         # Draw status information
         font = cv2.FONT_HERSHEY_SIMPLEX
         for i, line in enumerate(status_lines):
@@ -1312,6 +1319,10 @@ class CarlaTrackingSystem:
         self.image_queue = None
         self.result_queue = None
         
+         # 添加交通标志检测器
+        self.traffic_sign_detector = None
+        self.enable_sign_detection = config.get('enable_sign_detection', False)
+
         logger.info("[OK] Tracking system initialized (Color ID encoding + Independent statistics window)")
     
     def initialize(self):
@@ -1380,7 +1391,18 @@ class CarlaTrackingSystem:
             import traceback
             traceback.print_exc()
             return False
-    
+
+        if self.enable_sign_detection:
+            try:
+                from sign_detector import TrafficSignDetector
+                self.traffic_sign_detector = TrafficSignDetector(
+                    config.get('traffic_sign', {})
+                )
+                logger.info("✅ 交通标志检测器已启用")
+            except Exception as e:
+                logger.warning(f"交通标志检测器初始化失败: {e}")
+                self.traffic_sign_detector = None
+
     def _setup_detection_thread(self):
         """Setup detection thread"""
         try:
@@ -1784,6 +1806,23 @@ class CarlaTrackingSystem:
                 if self.frame_count % 100 == 0:
                     self._print_status(stats_data)
                 
+                 # ============ 新增：交通标志检测 ============
+                detected_signs = []
+                if self.traffic_sign_detector and self.enable_sign_detection:
+                    try:
+                        # 检测标志
+                        detected_signs = self.traffic_sign_detector.detect(
+                            image, 
+                            ego_speed=self.ego_vehicle.get_velocity().length() if self.ego_vehicle else 0.0
+                        )
+                    
+                        # 在图像上绘制标志
+                        if self.traffic_sign_detector.config.get('show_signs', True):
+                            image = self.traffic_sign_detector.draw_signs(image, detected_signs)
+                    
+                    except Exception as e:
+                        logger.debug(f"标志检测失败: {e}")
+
         except KeyboardInterrupt:
             logger.info("[STOP] User interrupted program")
         except Exception as e:
@@ -1860,6 +1899,12 @@ class CarlaTrackingSystem:
          # 新增：R键手动重载配置 
         elif key == ord('r') or key == ord('R'):
             self._force_reload_config()
+        
+          # 添加：O键切换标志检测
+        elif key == ord('o') or key == ord('O'):
+            self.enable_sign_detection = not self.enable_sign_detection
+            status = "开启" if self.enable_sign_detection else "关闭"
+            logger.info(f"🚦 交通标志检测: {status}")
 
     def _control_frame_rate(self, current_fps):
         """自适应帧率控制（简单版）"""
