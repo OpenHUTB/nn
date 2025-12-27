@@ -1,0 +1,121 @@
+import mujoco
+import mujoco.viewer as viewer
+import os
+import numpy as np
+
+class QuadrotorSimulator:
+    def __init__(self, model_path):
+        # 加载MuJoCo模型和数据
+        self.model = mujoco.MjModel.from_xml_path(model_path)
+        self.data = mujoco.MjData(self.model)
+
+        # 获取电机控制索引
+        self.motor_ids = {
+            "front_right": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_front_right"),
+            "front_left": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_front_left"),
+            "back_left": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_back_left"),
+            "back_right": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_back_right")
+        }
+
+        # 初始悬停推力
+        self.base_thrust = 500.0
+
+    def set_motor_thrust(self, front_right=None, front_left=None, back_left=None, back_right=None):
+        """设置四个电机的推力"""
+        if front_right is not None:
+            self.data.ctrl[self.motor_ids["front_right"]] = front_right
+        if front_left is not None:
+            self.data.ctrl[self.motor_ids["front_left"]] = front_left
+        if back_left is not None:
+            self.data.ctrl[self.motor_ids["back_left"]] = back_left
+        if back_right is not None:
+            self.data.ctrl[self.motor_ids["back_right"]] = back_right
+
+    def get_sensor_data(self):
+        """读取传感器数据"""
+        sensor_data = {
+            "position": self.data.sensor("quad_position").data.copy(),
+            "orientation": self.data.sensor("quad_orientation").data.copy(),
+            "linear_velocity": self.data.sensor("quad_linear_velocity").data.copy(),
+            "angular_velocity": self.data.sensor("quad_angular_velocity").data.copy(),
+            "linear_acceleration": self.data.sensor("quad_linear_acceleration").data.copy(),
+            "rotor_speeds": [
+                self.data.sensor("rotor_speed_front_right").data[0],
+                self.data.sensor("rotor_speed_front_left").data[0],
+                self.data.sensor("rotor_speed_back_left").data[0],
+                self.data.sensor("rotor_speed_back_right").data[0]
+            ],
+            "touch": self.data.sensor("touch_sensor").data[0]
+        }
+        return sensor_data
+
+    def run_simulation(self):
+        """启动仿真可视化"""
+        # 初始化电机推力
+        self.set_motor_thrust(
+            front_right=self.base_thrust,
+            front_left=self.base_thrust,
+            back_left=self.base_thrust,
+            back_right=self.base_thrust
+        )
+
+        with viewer.launch_passive(self.model, self.data) as v:
+            print("仿真启动成功！")
+            print("操作说明：↑=上升 ↓=下降 ←=左偏航 →=右偏航 q=退出")
+
+            step = 0
+            while v.is_running():
+                step_start = mujoco.mj_time(self.model)
+
+                # 每100步打印传感器数据
+                if step % 100 == 0:
+                    sensor_data = self.get_sensor_data()
+                    print(f"\n步骤 {step} | 位置: {np.round(sensor_data['position'], 3)}")
+
+                # 键盘控制
+                key_events = v.user_input()
+                thrust_delta = 5.0
+                for event in key_events:
+                    if event.key == viewer.KEY.UP and event.down:
+                        self.base_thrust += thrust_delta
+                        self.set_motor_thrust(self.base_thrust, self.base_thrust, self.base_thrust, self.base_thrust)
+                    elif event.key == viewer.KEY.DOWN and event.down:
+                        self.base_thrust = max(0, self.base_thrust - thrust_delta)
+                        self.set_motor_thrust(self.base_thrust, self.base_thrust, self.base_thrust, self.base_thrust)
+                    elif event.key == viewer.KEY.LEFT and event.down:
+                        self.set_motor_thrust(
+                            self.base_thrust+thrust_delta, self.base_thrust-thrust_delta,
+                            self.base_thrust+thrust_delta, self.base_thrust-thrust_delta
+                        )
+                    elif event.key == viewer.KEY.RIGHT and event.down:
+                        self.set_motor_thrust(
+                            self.base_thrust-thrust_delta, self.base_thrust+thrust_delta,
+                            self.base_thrust-thrust_delta, self.base_thrust+thrust_delta
+                        )
+                    elif event.key == viewer.KEY.Q and event.down:
+                        v.close()
+                        break
+
+                # 执行仿真步
+                mujoco.mj_step(self.model, self.data)
+
+                # 控制60FPS帧率
+                while mujoco.mj_time(self.model) - step_start < 1/60:
+                    pass
+
+                v.sync()
+                step += 1
+
+if __name__ == "__main__":
+    # 拼接XML模型文件路径（和当前Python文件同目录）
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(current_dir, "quadrotor.xml")
+
+    # 检查模型文件是否存在
+    if not os.path.exists(model_path):
+        print(f"错误：未找到模型文件 {model_path}")
+        print("请确保 quadrotor.xml 文件和 mainone.py 在同一目录下！")
+    else:
+        # 启动仿真
+        simulator = QuadrotorSimulator(model_path)
+        simulator.run_simulation()

@@ -1,52 +1,38 @@
-自动驾驶汽车车道和路径检测
-=========================================
-## Demo
-<div align="center">
-      <a href="https://www.youtube.com/watch?v=UFQQbTYH9hI-Y">
-     <img 
-      src="https://i.ytimg.com/vi/UFQQbTYH9hI/maxresdefault.jpg" 
-      alt="Demo" 
-      style="width:100%;">
-      </a>
-    </div>
+# AutoPilot System V3.0: Perception, Decision & Control
 
-## 如何安装
+这是一个模拟 **ADAS (高级驾驶辅助系统)** 的完整原型项目。
+V3.0 版本不仅实现了对车道和车辆的**感知**，还加入了**决策逻辑**（碰撞预警）、**模拟控制**（虚拟方向盘）以及**黑匣子取证**功能。
 
-为了能够运行它，我建议使用 Python 3.6 或更高版本。
+![Status](https://img.shields.io/badge/Status-Active-success)
+![Version](https://img.shields.io/badge/Version-V3.0-blue)
+![Python](https://img.shields.io/badge/Python-3.8%2B-yellow)
 
-1. 安装要求
+## ✨ V3.0 核心特性
 
-```
-pip3 install -r requirements.txt
-```
-这将安装运行此作所需的所有依赖项。 
+### 1. 🧠 智能感知 (Perception)
+* **车道保持**: 使用 OpenCV + 霍夫变换 + **EMA 平滑滤波**，稳定追踪车道线。
+* **目标检测**: 集成 **YOLOv8** 模型，实时识别车辆、行人、卡车等障碍物。
+* **跳帧优化**: 采用 "Skip-Frame" 策略，大幅降低 CPU 负载，实现流畅运行。
 
-2. 下载示例数据
+### 2. 🛡️ 决策与预警 (Decision Making)
+* **FCW (前向碰撞预警)**: 实时计算前车距离（基于视觉占比），触发 **"BRAKE!"** 红色警报。
+* **LDW (车道偏离预警)**: 监测车辆中心与车道中心的偏差。
 
-The sample data can be downloaded from [here.](https://drive.google.com/file/d/1hP-v8lLn1g1jEaJUBYJhv1mEb32hkMvG/view?usp=sharing) More data will be added soon. 
+### 3. 🧭 模拟控制 (Control Simulation)
+* **虚拟方向盘**: 屏幕下方通过 **Steering Dashboard** 实时显示转向角度。
+* **自动修正**: 根据车道曲率自动计算方向盘应转动的角度。
 
-3. 运行程序
+### 4. 📹 黑匣子取证 (Event Data Recorder)
+* **自动抓拍**: 当系统判定有碰撞风险（出现 "BRAKE!"）时，自动保存当前画面。
+* **证据留存**: 图片自动保存在 `events/` 目录下，文件名包含精确时间戳。
 
-``` 
-python3 main.py <path-to-sample-data-hevc> 
-```
+## 🛠️ 环境准备
 
-## 下一步是什么 ？ 
+### 1. 运行环境
+* Python 3.8+
+* 推荐配置: 具有独立显卡 (NVIDIA) 可获最佳性能，但在 CPU 环境下也能通过跳帧策略流畅运行。
 
-使用 YOLOv3 进行红绿灯、汽车、卡车、自行车、摩托车、行人和停车标志检测。
-实时语义分割，或几乎实时。
-快速大满贯。
-
-## 相关研究
-
-[Learning a driving simulator](https://arxiv.org/abs/1608.01230)
-
-## 学分
-
-[comma.ai for supercombo model](https://github.com/commaai/openpilot/blob/master/models/supercombo.keras)
-
-[Harald Schafer for parts of the code](https://github.com/haraldschafer)
-
-[lanes_image_space.py Code by @Shane](https://github.com/ShaneSmiskol)
-
-
+### 2. 安装依赖
+本项目已移除沉重的 TensorFlow 依赖，仅需轻量级库：
+```bash
+pip install -r requirements.txt
