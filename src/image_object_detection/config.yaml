@@ -1,0 +1,9 @@
+# config.yaml
+# YOLOv8 检测系统配置文件
+# 所有字段均为可选项；未指定时将使用内置默认值
+
+model_path: "yolov8n.pt"
+confidence_threshold: 0.3
+camera_index: 0
+output_interval: 1.0
+default_image_path: "data/test.jpg"

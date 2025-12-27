@@ -1,339 +1,354 @@
 # carla_env/carla_env_multi_obs.py
-# 本文件定义了一个基于 CARLA 仿真器的自定义 Gymnasium 环境，
-# 用于训练强化学习智能体（如 PPO）控制自动驾驶车辆。
-# 观测空间为 4 维连续状态（位置 + 速度），动作空间为 3 维连续控制（油门、转向、刹车）。
+"""
+CARLA 强化学习环境（4D 观测增强版）
+- 观测: [x, y, vx, vy]
+- 动作: [throttle, steer, brake]
+- 新增: 车道保持奖励、合理速度区间、轨迹日志、参数化配置、抗崩溃机制
+- 【本次更新】新增 get_forward_waypoint() 用于高层导航
+"""
 
-import carla  # CARLA 仿真器 Python API
-import numpy as np  # 数值计算库
-import random  # 随机数生成
-import time  # 时间控制（用于延迟）
-import os  # 操作系统接口（文件操作）
-import json  # JSON 文件读写（用于保存/加载车辆ID）
-from gymnasium import Env, spaces  # Gymnasium 标准环境接口
+import carla
+import numpy as np
+import random
+import time
+import os
+import json
+from gymnasium import Env, spaces
 
-# 定义临时文件路径，用于记录上一次运行生成的车辆ID（与脚本同目录）
 VEHICLE_ID_FILE = ".last_vehicle_id.json"
 
 
 class CarlaEnvMultiObs(Env):
-    """
-    自定义 CARLA 强化学习环境类，继承自 gymnasium.Env。
-    支持自动清理历史车辆、多地图适配、第三人称视角跟随、安全spawn等特性。
-    """
-
-    def __init__(self, keep_alive_after_exit=True):
-        """
-        初始化环境。
-        :param keep_alive_after_exit: 若为 True，close() 时不销毁车辆，便于人工观察或录屏。
-        """
-        super(CarlaEnvMultiObs, self).__init__()
-
-        # CARLA 客户端与世界对象
+    def __init__(
+        self,
+        keep_alive_after_exit=False,
+        log_trajectory=True,
+        trajectory_log_file="trajectory.csv",
+        target_speed=8.0,          # 目标速度 (m/s)
+        max_episode_steps=1000,    # 最大步数
+        map_name=None,             # 指定地图（如 'Town10HD'）
+        spawn_point_index=0,       # spawn 点索引
+        random_spawn=False,        # 是否随机 spawn
+        reward_weights=None        # 奖励权重配置
+    ):
+        super().__init__()
         self.client = None
         self.world = None
-
-        # 车辆相关
-        self.vehicle = None  # 当前控制的车辆 Actor
-        self._current_vehicle_id = None  # 本次生成的车辆 ID（用于下次清理）
-
-        # 训练控制
-        self.frame_count = 0  # 已执行的仿真步数
-        self.max_frames = 1000  # 最大允许步数（用于 truncated 判定）
-        self.prev_x = 0.0  # 上一帧的 x 坐标（用于计算位移奖励）
-
-        # 视角控制
-        self.spectator = None  # CARLA 观察者（摄像头）
-
-        # 行为标志
+        self.vehicle = None
+        self._current_vehicle_id = None
+        self.frame_count = 0
+        self.max_episode_steps = max_episode_steps
+        self.spectator = None
         self.keep_alive = keep_alive_after_exit
+        self.log_trajectory = log_trajectory
+        self.trajectory_log_file = trajectory_log_file
+        self.trajectory_data = []
+        self._collision_sensor = None
+        self._collision_hist = []
 
-        # 定义观测空间：[x, y, vx, vy] —— 位置 (m) + 速度 (m/s)
+        # 奖励配置
+        self.target_speed = target_speed
+        self.reward_weights = {
+            'forward': 0.1,
+            'speed_match': 0.5,
+            'lane_center': 1.0,
+            'steer_smooth': 0.05,
+            'brake_penalty': 0.1,
+            'collision': -50.0,
+            'time_bonus': 0.01
+        }
+        if reward_weights:
+            self.reward_weights.update(reward_weights)
+
+        # 地图与 spawn 配置
+        self.map_name = map_name
+        self.spawn_point_index = spawn_point_index
+        self.random_spawn = random_spawn
+
+        # 固定 4D 观测空间
         self.observation_space = spaces.Box(
-            low=-np.inf,
-            high=np.inf,
-            shape=(4,),
-            dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32
         )
-
-        # 定义动作空间：[throttle, steer, brake]
-        # - throttle: [0.0, 1.0] 油门（0=松开，1=全踩）
-        # - steer: [-1.0, 1.0] 转向（-1=左打满，1=右打满）
-        # - brake: [0.0, 1.0] 刹车（0=松开，1=全刹）
         self.action_space = spaces.Box(
             low=np.array([0.0, -1.0, 0.0]),
             high=np.array([1.0, 1.0, 1.0]),
             dtype=np.float32
         )
 
-    def reset(self, seed=None, options=None):
-        """
-        重置环境到初始状态。
-        :param seed: 随机种子（用于可复现性）
-        :param options: 额外选项（本实现未使用）
-        :return: 初始观测值 (obs), info 字典
-        """
-        super().reset(seed=seed)
+    def _connect_carla(self, max_retries=3, timeout=10.0):
+        for attempt in range(max_retries):
+            try:
+                print(f"🔄 尝试连接 CARLA 服务器 (第 {attempt + 1} 次)...")
+                self.client = carla.Client('localhost', 2000)
+                self.client.set_timeout(timeout)
+                self.world = self.client.get_world()
+                if self.map_name and self.map_name not in self.world.get_map().name:
+                    print(f"🔄 加载指定地图: {self.map_name}")
+                    self.world = self.client.load_world(self.map_name)
+                print(f"✅ 成功连接！地图: {self.world.get_map().name}")
+                return True
+            except Exception as e:
+                print(f"⚠️ 连接失败: {e}")
+                time.sleep(2)
+        raise RuntimeError("❌ 无法连接 CARLA，请确保已启动 `CarlaUE4.sh`")
 
-        # 设置随机种子（确保行为可复现）
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         if seed is not None:
             random.seed(seed)
             np.random.seed(seed)
 
-        try:
-            # 连接 CARLA 服务器（localhost:2000）
-            if self.client is None:
-                print("🔄 尝试连接 CARLA 服务器...")
-                self.client = carla.Client('localhost', 2000)
-                self.client.set_timeout(20.0)  # 超时20秒
-                self.world = self.client.get_world()
-                if self.world is None:
-                    raise RuntimeError("❌ 无法获取 CARLA 世界！")
-                print(f"✅ 成功连接到 CARLA！地图: {self.world.get_map().name}")
+        self._connect_carla()
+        self._destroy_last_run_vehicle()
+        self.spawn_vehicle()
 
-            # 清理上一次运行残留的车辆（通过ID文件）
-            self._destroy_last_run_vehicle()
+        # 初始化传感器
+        self._collision_hist.clear()
+        if self._collision_sensor:
+            self._collision_sensor.destroy()
+        bp = self.world.get_blueprint_library().find('sensor.other.collision')
+        self._collision_sensor = self.world.spawn_actor(bp, carla.Transform(), attach_to=self.vehicle)
+        self._collision_sensor.listen(lambda event: self._collision_hist.append(event))
 
-            # 生成新车
-            self.spawn_vehicle()
+        # 稳定物理
+        for _ in range(5):
+            self.world.tick()
+            time.sleep(0.05)
 
-            # 同步几帧，确保车辆稳定
-            for _ in range(5):
-                self.world.tick()
-                time.sleep(0.05)
+        # 设置视角
+        self.spectator = self.world.get_spectator()
+        self._update_spectator_view()
 
-            # 获取观察者并设置第三人称视角
-            self.spectator = self.world.get_spectator()
-            self._update_spectator_view()
-            print("🎥 第三人称视角已激活（完整车身 + 前方道路可见）")
+        # 重置状态
+        self.trajectory_data = []
+        self.frame_count = 0
 
-            # 重置计数器
-            self.frame_count = 0
-            obs = self.get_observation()
-            self.prev_x = obs[0]  # 记录初始x位置
-            return obs, {}
-
-        except Exception as e:
-            print(f"❌ 初始化失败: {e}")
-            raise
+        obs = self.get_observation()
+        return obs, {}
 
     def _destroy_last_run_vehicle(self):
-        """
-        安全销毁上一次运行留下的车辆。
-        即使 .last_vehicle_id.json 文件损坏、为空或不存在，也能优雅处理，不抛出异常。
-        """
-        # 若无记录文件，直接跳过
         if not os.path.exists(VEHICLE_ID_FILE):
-            print("ℹ️ 无历史车辆记录，跳过清理")
             return
-
-        last_id = None
         try:
-            # 安全读取 JSON 文件
             with open(VEHICLE_ID_FILE, 'r') as f:
-                content = f.read().strip()
-                if not content:
-                    print("⚠️ 车辆ID文件为空")
-                    return
-                data = json.loads(content)
+                data = json.load(f)
                 last_id = data.get("vehicle_id")
-                if last_id is None:
-                    print("⚠️ 车辆ID字段缺失")
-                    return
-        except (json.JSONDecodeError, OSError, ValueError) as e:
-            # 文件损坏时，尝试删除它
-            print(f"⚠️ 读取车辆ID文件失败（文件可能损坏）: {e}")
-            try:
-                os.remove(VEHICLE_ID_FILE)
-            except OSError:
-                pass
-            return
-
-        # 验证ID类型
-        if not isinstance(last_id, int):
-            print(f"⚠️ 车辆ID类型无效: {type(last_id)}")
-            return
-
-        # 发送销毁命令
-        print(f"🧹 正在销毁上一次运行的车辆 (ID: {last_id})...")
-        batch = [carla.command.DestroyActor(last_id)]
-        responses = self.client.apply_batch_sync(batch, do_tick=True)
-
-        if responses[0].error:
-            print(f" - 销毁失败: {responses[0].error}")
-        else:
-            print("✅ 上次车辆已成功清理")
-
-        # 清理后删除ID文件
+            if isinstance(last_id, int):
+                self.client.apply_batch_sync([carla.command.DestroyActor(last_id)], do_tick=True)
+        except Exception:
+            pass
         try:
             os.remove(VEHICLE_ID_FILE)
-        except OSError as e:
-            print(f"⚠️ 删除车辆ID文件失败: {e}")
+        except OSError:
+            pass
 
     def spawn_vehicle(self):
-        """
-        在当前地图的安全位置生成一辆特斯拉 Model 3（若不可用则随机选车）。
-        支持 Town01/03/05/10 的预设 spawn 点，其他地图自动选择最低 z 的点。
-        """
         blueprint_library = self.world.get_blueprint_library()
         vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
-        if not vehicle_bp:
+        if not vehicle_bp or not vehicle_bp.has_attribute('number_of_wheels'):
             vehicle_bp = random.choice(blueprint_library.filter('vehicle.*'))
+        if vehicle_bp.has_attribute('color'):
+            color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+            vehicle_bp.set_attribute('color', color)
 
-        # 根据地图名称选择 spawn 位置
-        map_name = self.world.get_map().name.lower()
-        if 'town01' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=-60.0, y=20.0, z=0.3),
-                carla.Rotation(yaw=90.0)
-            )
-        elif 'town03' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=70.0, y=-10.0, z=0.3),
-                carla.Rotation(yaw=180.0)
-            )
-        elif 'town05' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=-75.0, y=16.0, z=0.3),
-                carla.Rotation(yaw=90.0)
-            )
-        elif 'town10' in map_name:
-            spawn_transform = carla.Transform(
-                carla.Location(x=100.0, y=130.0, z=0.3),
-                carla.Rotation(yaw=180.0)
-            )
+        spawn_points = self.world.get_map().get_spawn_points()
+        if not spawn_points:
+            raise RuntimeError("❌ 地图无可用 spawn 点！")
+
+        if self.random_spawn:
+            spawn_transform = random.choice(spawn_points)
+        elif self.spawn_point_index < len(spawn_points):
+            spawn_transform = spawn_points[self.spawn_point_index]
         else:
-            # 通用 fallback：选择 z 最低的 spawn 点（更平坦安全）
-            spawn_points = self.world.get_map().get_spawn_points()
-            if not spawn_points:
-                raise RuntimeError("❌ 地图中没有可用的 spawn points！")
-            spawn_transform = min(spawn_points, key=lambda t: t.location.z)
+            spawn_transform = spawn_points[0]
 
-        # 尝试生成车辆
+        # 尝试生成
         self.vehicle = self.world.try_spawn_actor(vehicle_bp, spawn_transform)
         if self.vehicle is None:
-            # 若失败，遍历所有 spawn 点，增加 z 安全余量
-            spawn_points = self.world.get_map().get_spawn_points()
-            for transform in spawn_points:
-                safe_z = max(transform.location.z, 0.0) + 0.3
-                safe_transform = carla.Transform(
-                    carla.Location(x=transform.location.x, y=transform.location.y, z=safe_z),
-                    transform.rotation
-                )
-                self.vehicle = self.world.try_spawn_actor(vehicle_bp, safe_transform)
-                if self.vehicle is not None:
-                    break
+            # 备用：抬高 Z 轴
+            sp = spawn_transform
+            safe_sp = carla.Transform(
+                carla.Location(x=sp.location.x, y=sp.location.y, z=max(sp.location.z, 0.0) + 0.5),
+                sp.rotation
+            )
+            self.vehicle = self.world.try_spawn_actor(vehicle_bp, safe_sp)
 
         if self.vehicle is None:
-            raise RuntimeError("❌ 无法生成车辆！")
+            raise RuntimeError("❌ 所有 spawn 方式均失败！")
 
-        # 记录车辆信息
         self._current_vehicle_id = self.vehicle.id
         loc = self.vehicle.get_location()
-        print(
-            f"✅ 车辆生成成功: {self.vehicle.type_id} | ID={self._current_vehicle_id} | 位置: ({loc.x:.1f}, {loc.y:.1f}, {loc.z:.1f})")
+        print(f"✅ 车辆生成成功 | ID={self._current_vehicle_id} | ({loc.x:.1f}, {loc.y:.1f})")
 
-        # 原子写入车辆ID文件（防止并发写入损坏）
-        temp_file = VEHICLE_ID_FILE + ".tmp"
         try:
-            with open(temp_file, 'w') as f:
+            with open(VEHICLE_ID_FILE, 'w') as f:
                 json.dump({"vehicle_id": self._current_vehicle_id}, f)
-            os.replace(temp_file, VEHICLE_ID_FILE)  # 原子操作
         except Exception as e:
-            print(f"⚠️ 保存车辆ID失败（不影响运行）: {e}")
+            print(f"⚠️ 保存车辆ID失败: {e}")
 
     def _update_spectator_view(self):
-        """
-        更新 CARLA 观察者视角，使其跟随车辆（第三人称）。
-        相机位于车辆后上方，俯视前方道路。
-        """
         if not (self.vehicle and self.spectator):
             return
-        v_transform = self.vehicle.get_transform()
-        # 相对偏移：后方8米，上方4米
-        offset = carla.Location(x=-8.0, y=0.0, z=4.0)
-        spectator_loc = v_transform.transform(offset)
-        spectator_rot = carla.Rotation(
-            pitch=-20.0,  # 俯视角
-            yaw=v_transform.rotation.yaw,  # 跟随车辆朝向
-            roll=0.0
-        )
-        self.spectator.set_transform(carla.Transform(spectator_loc, spectator_rot))
+        try:
+            v_transform = self.vehicle.get_transform()
+            offset = carla.Location(x=-6.0, y=0.0, z=2.5)
+            camera_loc = v_transform.transform(offset)
+            rot = carla.Rotation(pitch=-15.0, yaw=v_transform.rotation.yaw)
+            self.spectator.set_transform(carla.Transform(camera_loc, rot))
+        except Exception:
+            pass
 
     def get_observation(self):
-        """
-        获取当前环境观测值。
-        :return: np.array([x, y, vx, vy], dtype=np.float32)
-        """
         if not self.vehicle or not self.vehicle.is_alive:
-            # 车辆不存在时返回零向量（避免崩溃）
             return np.zeros(4, dtype=np.float32)
         loc = self.vehicle.get_location()
         vel = self.vehicle.get_velocity()
-        return np.array([loc.x, loc.y, vel.x, vel.y], dtype=np.float32)
+        # 防止 NaN
+        x = float(loc.x) if np.isfinite(loc.x) else 0.0
+        y = float(loc.y) if np.isfinite(loc.y) else 0.0
+        vx = float(vel.x) if np.isfinite(vel.x) else 0.0
+        vy = float(vel.y) if np.isfinite(vel.y) else 0.0
+        return np.array([x, y, vx, vy], dtype=np.float32)
+
+    def _get_lane_offset(self):
+        """计算到最近车道中心的距离（仅用于奖励，不放入 obs）"""
+        try:
+            waypoint = self.world.get_map().get_waypoint(
+                self.vehicle.get_location(), project_to_road=True
+            )
+            return self.vehicle.get_location().distance(waypoint.transform.location)
+        except:
+            return 5.0  # 默认远离车道
+
+    def _compute_reward(self, speed, lane_offset, action):
+        w = self.reward_weights
+        reward = 0.0
+
+        # 前进奖励
+        if speed > 0.1:
+            reward += w['forward'] * speed
+
+        # 速度匹配
+        speed_diff = abs(speed - self.target_speed)
+        if speed_diff < 1.0:
+            reward += w['speed_match']
+        else:
+            reward -= speed_diff * 0.05
+
+        # 车道中心奖励（即使 4D 也鼓励 stay in lane）
+        if lane_offset < 1.0:
+            reward += w['lane_center'] * (1.0 - lane_offset)
+        else:
+            reward -= (lane_offset - 1.0) * 0.5
+
+        # 控制平滑
+        _, steer, brake = action
+        reward -= w['steer_smooth'] * abs(steer)
+        reward -= w['brake_penalty'] * brake
+
+        # 时间奖励（鼓励存活）
+        reward += w['time_bonus']
+
+        return reward
 
     def step(self, action):
-        """
-        执行一步环境交互。
-        :param action: [throttle, steer, brake]
-        :return: obs, reward, terminated, truncated, info
-        """
-        throttle, steer, brake = action
-        control = carla.VehicleControl(
-            throttle=float(throttle),
-            steer=float(steer),
-            brake=float(brake)
-        )
+        # 安全钳位
+        throttle = np.clip(action[0], 0.0, 1.0)
+        steer = np.clip(action[1], -1.0, 1.0)
+        brake = np.clip(action[2], 0.0, 1.0)
+        control = carla.VehicleControl(throttle=float(throttle), steer=float(steer), brake=float(brake))
         self.vehicle.apply_control(control)
-        self.world.tick()  # 推进仿真
+        self.world.tick()
         self.frame_count += 1
-        self._update_spectator_view()  # 更新视角
+        self._update_spectator_view()
 
-        # 检查车辆是否被销毁
+        # 车辆死亡
         if not self.vehicle or not self.vehicle.is_alive:
-            return np.zeros(4, dtype=np.float32), -10.0, True, False, {}
+            obs = np.zeros(4, dtype=np.float32)
+            return obs, self.reward_weights['collision'], True, False, {}
 
-        # 获取观测
+        # 状态
+        velocity = self.vehicle.get_velocity()
+        speed = np.sqrt(max(0.0, velocity.x**2 + velocity.y**2))
+        lane_offset = self._get_lane_offset()
+        reward = self._compute_reward(speed, lane_offset, [throttle, steer, brake])
+
+        # 终止条件
+        terminated = len(self._collision_hist) > 0
+        if terminated:
+            reward = self.reward_weights['collision']
+
+        truncated = self.frame_count >= self.max_episode_steps
+
+        # 记录轨迹
+        if self.log_trajectory:
+            loc = self.vehicle.get_location()
+            self.trajectory_data.append((float(loc.x), float(loc.y), float(speed)))
+
         obs = self.get_observation()
-        x, y, vx, vy = obs
-        speed = np.linalg.norm([vx, vy])
+        return obs, reward, terminated, truncated, {
+            "speed": speed,
+            "lane_offset": lane_offset,
+            "collision": terminated
+        }
 
-        # ========================
-        # ✅【强力推荐】使用车辆朝向速度作为主奖励
-        # ========================
-        vehicle_transform = self.vehicle.get_transform()
-        forward_vector = vehicle_transform.get_forward_vector()  # 车头方向单位向量
+    # ================================
+    # 【新增功能】用于高层导航
+    # ================================
 
-        # 计算速度在车头方向的投影（鼓励向前行驶）
-        forward_speed = vx * forward_vector.x + vy * forward_vector.y
+    def get_vehicle_transform(self):
+        """安全获取车辆当前位姿（Transform）"""
+        if not self.vehicle or not self.vehicle.is_alive:
+            return None
+        try:
+            return self.vehicle.get_transform()
+        except:
+            return None
 
-        # 主奖励：只奖励正向前进（倒车不奖励）
-        reward = 1.0 * max(forward_speed, 0.0)
-
-        # 额外惩罚：如果几乎静止，施加较大惩罚（促进行动）
-        if speed < 0.1:
-            reward -= 0.5
-
-        self.prev_x = x
-        terminated = False  # 暂无终止条件（如碰撞）
-        truncated = self.frame_count >= self.max_frames  # 超过最大步数则截断
-        return obs, reward, terminated, truncated, {}
+    def get_forward_waypoint(self, distance=3.0):
+        """
+        获取车辆前方指定距离的车道中心点（世界坐标）
+        :param distance: 前瞻距离（米），建议 2.0~5.0
+        :return: carla.Location 对象，若失败返回 None
+        """
+        try:
+            vehicle_tf = self.get_vehicle_transform()
+            if vehicle_tf is None:
+                return None
+            # 沿车头方向前进
+            forward = vehicle_tf.get_forward_vector()
+            target_loc = vehicle_tf.location + carla.Location(
+                x=forward.x * distance,
+                y=forward.y * distance,
+                z=0.0
+            )
+            # 投影到最近可行驶车道中心
+            waypoint = self.world.get_map().get_waypoint(
+                target_loc,
+                project_to_road=True,
+                lane_type=carla.LaneType.Driving
+            )
+            return waypoint.transform.location if waypoint else None
+        except Exception as e:
+            print(f"⚠️ get_forward_waypoint 失败: {e}")
+            return None
 
     def close(self):
-        """
-        关闭环境，释放资源。
-        若 keep_alive=True，则保留车辆供人工观察；否则销毁。
-        """
-        if self.keep_alive:
-            print("ℹ️ 车辆已保留（ID已记录，下次运行时将自动清理）")
-            if self.vehicle:
-                # 松开所有控制，让车自然停下
-                self.vehicle.apply_control(carla.VehicleControl())
-                for i in range(30):  # 同步30帧确保停止
-                    self.world.tick()
-                    self._update_spectator_view()
-                    time.sleep(0.1)
-                print("✅ 现在你可以自由操作 CARLA 视角（按 F1~F4）！")
-        else:
-            # 彻底清理
-            if self.vehicle and self.vehicle.is_alive:
-                self.vehicle.destroy()
+        # 保存轨迹
+        if self.log_trajectory and self.trajectory_data:
+            try:
+                with open(self.trajectory_log_file, 'w') as f:
+                    f.write("x,y,speed\n")
+                    for x, y, speed in self.trajectory_data:
+                        f.write(f"{x:.3f},{y:.3f},{speed:.3f}\n")
+                print(f"📊 轨迹已保存至: {self.trajectory_log_file}")
+            except Exception as e:
+                print(f"⚠️ 轨迹保存失败: {e}")
+
+        # 清理
+        if self._collision_sensor:
+            self._collision_sensor.destroy()
+        if not self.keep_alive and self.vehicle and self.vehicle.is_alive:
+            self.vehicle.destroy()
+        elif self.keep_alive:
+            print("ℹ️ 车辆已保留（下次运行将自动清理）")

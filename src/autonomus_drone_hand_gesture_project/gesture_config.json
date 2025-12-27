@@ -1,0 +1,305 @@
+{
+  "camera": {
+    "index": 0,
+    "width": 640,
+    "height": 480,
+    "fps": 30,
+    "auto_exposure": true,
+    "brightness": 0,
+    "contrast": 1.0,
+    "device_id": 0,
+    "exposure": 0,
+    "flip_horizontal": true,
+    "resolution": {
+      "height": 480,
+      "width": 640
+    },
+    "use_virtual_camera": false
+  },
+  "gesture": {
+    "skin_lower_h": 0,
+    "skin_upper_h": 178,
+    "skin_lower_s": 0,
+    "skin_upper_s": 125,
+    "skin_lower_v": 0,
+    "skin_upper_v": 96,
+    "min_hand_area": 3000,
+    "max_hand_area": 30000,
+    "hand_ratio_threshold": 1.5,
+    "defect_distance_threshold": 20,
+    "palm_circle_radius_ratio": 0.3,
+    "transition_threshold": 0.3,
+    "position_stability_weight": 0.4,
+    "gesture_cooldown": 0.5,
+    "stability_window_size": 15,
+    "enable_gesture_stability_analysis": true,
+    "history_size": 10,
+    "smooth_frames": 5,
+    "min_confidence": 0.6,
+    "detection_interval": 2,
+    "contour_simplify_epsilon": 0.02,
+    "gesture_stability_threshold": 5,
+    "adaptive_learning_rate": 0.1,
+    "enable_background_subtraction": true,
+    "enable_dynamic_threshold": true,
+    "enable_morphological_ops": true,
+    "face_exclusion_area": 8000,
+    "hand_region_threshold": 0.2,
+    "max_fingertips": 5,
+    "min_fingertip_distance": 10,
+    "noise_reduction": 0.5,
+    "palm_aspect_ratio": 1.3,
+    "single_finger_angle_threshold": 60,
+    "skin_lower": [
+      0,
+      30,
+      60
+    ],
+    "skin_upper": [
+      25,
+      255,
+      255
+    ]
+  },
+  "drone": {
+    "velocity": 2.5,
+    "duration": 0.3,
+    "altitude": -10.0,
+    "control_interval": 0.3,
+    "acceleration_limit": 2.0,
+    "auto_takeoff_delay": 2.0,
+    "emergency_land_delay": 3.0,
+    "emergency_land_timeout": 5.0,
+    "smooth_movement": true
+  },
+  "display": {
+    "show_fps": true,
+    "show_confidence": true,
+    "show_help": true,
+    "show_contours": true,
+    "show_bbox": true,
+    "show_fingertips": true,
+    "show_palm_center": true,
+    "show_hand_direction": true,
+    "show_debug_info": false,
+    "show_speech_status": true,
+    "show_gesture_history": true,
+    "show_stability_indicator": true,
+    "show_trajectory": true,
+    "show_recording_status": true,
+    "show_performance_mode": true,
+    "show_performance_stats": true,
+    "show_system_resources": true,
+    "show_advanced_gestures": true,
+    "show_performance_visualization": true,
+    "performance_visualization_mode": "charts",
+    "show_gesture_stability_info": true,
+    "show_custom_gestures": true,
+    "show_hotkey_hints": true,
+    "show_operation_hints": true,
+    "font_size_large": 20,
+    "font_size_medium": 16,
+    "font_size_small": 14,
+    "show_calibration_info": true,
+    "show_control_help": true,
+    "show_control_hints": true,
+    "show_detection_overlay": true,
+    "show_direction": true,
+    "show_gesture_info": true,
+    "show_region_grid": true,
+    "show_trajectory_heatmap": false,
+    "theme": "dark",
+    "trajectory_max_points": 100,
+    "ui_opacity": 0.7,
+    "show_flight_mode": true
+  },
+  "performance": {
+    "target_fps": 30,
+    "resize_factor": 1.0,
+    "enable_multiprocessing": false,
+    "mode": "accurate",
+    "current_mode_index": 2,
+    "modes": [
+      "fast",
+      "balanced",
+      "accurate"
+    ],
+    "auto_report_interval": 60,
+    "enable_performance_monitor": true,
+    "enable_gpu_monitoring": true,
+    "enable_performance_prediction": true,
+    "enable_anomaly_detection": true,
+    "performance_visualization": true,
+    "detailed_performance_charts": false,
+    "enable_gpu_acceleration": false,
+    "enable_hardware_acceleration": true,
+    "enable_multithreading": false,
+    "max_queue_size": 10,
+    "memory_limit_mb": 500,
+    "process_time_critical": 100.0,
+    "process_time_warning": 50.0
+  },
+  "calibration": {
+    "auto_calibrate_skin": true,
+    "skin_calibration_frames": 30,
+    "hand_size_calibration": true,
+    "auto_adjust_parameters": true,
+    "calibration_interval": 300,
+    "calibration_timeout": 10.0,
+    "enable_adaptive_calibration": true,
+    "min_calibration_samples": 50
+  },
+  "speech": {
+    "enabled": false,
+    "volume": 1.0,
+    "rate": 150,
+    "announce_gestures": true,
+    "announce_connections": true,
+    "announce_flight_events": true,
+    "announce_gesture_changes": true,
+    "announce_hand_status": true,
+    "announce_performance": true,
+    "announce_recording_events": true,
+    "announce_performance_mode": true,
+    "announce_performance_events": true,
+    "min_gesture_confidence": 0.7,
+    "gesture_start_threshold": 3,
+    "gesture_end_threshold": 10,
+    "announce_stability_status": true,
+    "announce_visualization_changes": true,
+    "performance_warnings_enabled": true,
+    "announce_gesture_directions": true,
+    "announce_recording": true,
+    "enable_short_feedback": true,
+    "max_queue_size": 5,
+    "speech_cooldown": 1.0,
+    "speech_language": "zh-cn"
+  },
+  "recording": {
+    "auto_save_interval": 5,
+    "max_trajectory_points": 1000,
+    "show_trajectory": true,
+    "trajectory_thickness": 2,
+    "trajectory_max_length": 100,
+    "default_save_dir": "trajectories",
+    "auto_playback_after_recording": false,
+    "save_compressed_trajectories": true,
+    "max_auto_save_files": 10,
+    "auto_save": false,
+    "default_filename": "gesture_recording.pkl",
+    "loop_playback": false,
+    "playback_speed": 1.0
+  },
+  "stability": {
+    "enable_stability_analysis": true,
+    "stability_update_interval": 1.0,
+    "min_stability_score": 0.6,
+    "max_transition_count": 10,
+    "stability_notification_enabled": true,
+    "auto_reset_on_unstable": true
+  },
+  "visualization": {
+    "chart_update_rate": 2,
+    "gauge_update_rate": 5,
+    "chart_history_length": 30,
+    "show_chart_grid": true,
+    "chart_background_opacity": 0.7,
+    "performance_colors": {
+      "excellent": [
+        0,
+        255,
+        0
+      ],
+      "good": [
+        100,
+        255,
+        100
+      ],
+      "fair": [
+        255,
+        255,
+        0
+      ],
+      "poor": [
+        255,
+        165,
+        0
+      ],
+      "critical": [
+        255,
+        0,
+        0
+      ]
+    }
+  },
+  "training": {
+    "samples_needed": 20,
+    "min_sample_confidence": 0.6,
+    "match_threshold": 0.7,
+    "enable_custom_gestures": true,
+    "auto_load_templates": true,
+    "template_dir": "gesture_templates",
+    "auto_save_training": true,
+    "enable_training_mode": false,
+    "samples_per_gesture": 50,
+    "training_gestures": [
+      "Stop",
+      "Forward",
+      "Up",
+      "Down",
+      "Left",
+      "Right"
+    ]
+  },
+  "hotkeys": {
+    "quick_save_enabled": true,
+    "quick_load_enabled": true,
+    "hint_duration": 2.0,
+    "hint_fade_speed": 0.05
+  },
+  "drone_control": {
+    "altitude": -10.0,
+    "base_speed": 2.0,
+    "control_delay": 0.3,
+    "emergency_stop_enabled": true,
+    "takeoff_height": 5.0
+  },
+  "gesture_detection": {
+    "confidence_threshold": 0.5,
+    "detection_interval": 1,
+    "max_hand_area": 30000,
+    "min_hand_area": 2000,
+    "skin_hsv_ranges": {
+      "h_high": 25,
+      "h_low": 0,
+      "s_high": 255,
+      "s_low": 30,
+      "v_high": 255,
+      "v_low": 60
+    },
+    "smoothing_window": 5
+  },
+  "gesture_mapping": {
+    "0": "stop",
+    "1": "forward",
+    "2": "backward",
+    "3": "up",
+    "4": "down",
+    "5": "left",
+    "6": "right",
+    "7": "hover"
+  },
+  "keyboard": {
+    "connect_key": "c",
+    "emergency_key": "q",
+    "enable_keyboard_control": true,
+    "key_repeat_delay": 0.2,
+    "land_key": "l",
+    "takeoff_key": " "
+  },
+  "system": {
+    "debug_mode": false,
+    "last_updated": "2025-12-19 20:51:44",
+    "version": "1.0"
+  }
+}

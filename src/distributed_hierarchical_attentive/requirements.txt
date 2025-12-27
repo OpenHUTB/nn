@@ -1,0 +1,12 @@
+networkx~=2.6.3
+numpy; python_version < '3.0'
+numpy==1.18.4; python_version >= '3.0'
+distro
+Shapely~=1.8.5
+carla==0.9.14
+numpy~=1.21.6
+gym~=0.21.0
+matplotlib~=3.5.3
+psutil~=5.9.0
+scipy~=1.7.3
+tqdm~=4.64.1

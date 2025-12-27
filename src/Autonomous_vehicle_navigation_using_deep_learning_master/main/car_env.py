@@ -4,6 +4,7 @@ import glob
 import os
 import sys
 import random
+import config as cfg
 
 try:
     sys.path.append(glob.glob('../carla/dist/carla-*%d.%d-%s.egg' % (
@@ -13,12 +14,13 @@ try:
 except IndexError:
     pass
 
-# 获取当前文件的目录
+# 获取当前文件目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# 获取父目录
-parent_dir = os.path.dirname(current_dir)
-# 将父目录添加到系统路径
-sys.path.append(parent_dir)
+# 构建可能的路径
+possible_paths = os.path.join(current_dir, '..', 'carla_ros_ws', 'src','carla_autonomous')
+# 找到第一个存在的路径并添加
+abs_path = os.path.abspath(possible_paths)
+sys.path.insert(0, abs_path)
 from agents.navigation.global_route_planner import GlobalRoutePlanner
 
 import carla
@@ -182,7 +184,7 @@ class CarEnv:
         
         self.transform = Transform(
             Location(x=self.initial_pos[0], y=self.initial_pos[1], z=self.initial_pos[2]), 
-            Rotation(yaw=-correct_yaw)  # 使用路径的朝向
+            Rotation(yaw=correct_yaw)  # 使用路径的朝向
         )
         
         # 生成车辆
@@ -195,7 +197,7 @@ class CarEnv:
                 offset_y = random.uniform(-2.0, 2.0)
                 temp_transform = Transform(
                     Location(x=self.initial_pos[0] + offset_x, y=self.initial_pos[1] + offset_y, z=self.initial_pos[2]),
-                    Rotation(yaw=-correct_yaw)
+                    Rotation(yaw=correct_yaw)
                 )
                 self.vehicle = self.world.try_spawn_actor(self.model_3, temp_transform)
                 if self.vehicle is not None:
@@ -413,6 +415,7 @@ class CarEnv:
 
             
         self.distance = min(dis, dis_ped)
+        self.actual_distance = min(dis, dis_ped)  # 保存实际距离
 
         return dis
         
@@ -486,7 +489,16 @@ class CarEnv:
             signed_dis = 0
         
         current_state[3] = current_state[3]/15
-        
+
+        if hasattr(self, 'actual_distance'):
+            actual_obstacle_distance = self.actual_distance
+        else:
+            actual_obstacle_distance = 0
+
+        print(f"Obstacle Distance: {actual_obstacle_distance:.2f}m")
+        print(f"Angle Error: {phi:.2f}°, Lateral Error: {signed_dis:.2f}m")
+        print(f"Speed: {kmh:.2f}km/h, Action: {cfg.ACTION_NAMES[action]}")
+
         print(f"角度差: {phi:.2f}°, 横向偏差: {signed_dis:.2f}m")
         print(f"距离障碍物: {current_state[0]*300+300:.2f}m")
         print(f"速度: {(current_state[1]+current_state[0])*30+30:.2f}km/h")
@@ -515,15 +527,12 @@ class CarEnv:
             reward = 1000
             print("✅ 成功到达终点!")
 
-        # 超时检查
-        if self.episode_start + 200 < time.time():
-            done = True
-            print("⏰ 超时")
-
         print(f"奖励: {reward}")
         
         # 返回新的状态、奖励、完成标志和当前路径点
-        return [(self.distance-300)/300, (kmh-30)/30-(self.distance-300)/300, phi, signed_dis*15], reward, done, current_waypoint
+        norm_distance = (self.actual_distance - 300) / 300 if hasattr(self, 'actual_distance') else 0
+        return [norm_distance, (kmh-30)/30-norm_distance, phi, signed_dis*15], reward, done, current_waypoint
+
     def trajectory(self, draw = False):
 
         amap = self.world.get_map()

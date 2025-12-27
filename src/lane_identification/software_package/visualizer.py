@@ -1,5 +1,6 @@
 ﻿"""
 可视化模块 - 负责结果可视化显示
+支持实时视频显示
 """
 
 import cv2
@@ -39,12 +40,19 @@ class Visualizer:
             # 文本颜色
             'text_primary': (255, 255, 255),
             'text_secondary': (200, 200, 200),
+            
+            # 状态指示器
+            'status_active': (0, 255, 0),
+            'status_paused': (255, 165, 0),
+            'status_stopped': (255, 0, 0)
         }
     
     def create_visualization(self, image: np.ndarray, 
                            road_info: Dict[str, Any],
                            lane_info: Dict[str, Any], 
-                           direction_info: Dict[str, Any]) -> np.ndarray:
+                           direction_info: Dict[str, Any],
+                           is_video: bool = False,
+                           frame_info: Dict[str, Any] = None) -> np.ndarray:
         """创建可视化结果"""
         try:
             # 创建副本
@@ -62,7 +70,7 @@ class Visualizer:
                 visualization = self._draw_future_path(visualization, lane_info['future_path'])
             
             # 4. 绘制信息面板
-            visualization = self._draw_info_panel(visualization, direction_info, lane_info)
+            visualization = self._draw_info_panel(visualization, direction_info, lane_info, is_video, frame_info)
             
             # 5. 绘制方向指示器
             visualization = self._draw_direction_indicator(visualization, direction_info)
@@ -118,7 +126,6 @@ class Visualizer:
                 points = lane['points']
                 color = self.colors[color_key]
                 
-                # 根据置信度调整线条粗细
                 confidence = lane.get('confidence', 0.5)
                 thickness = 2 + int(confidence * 4)
                 
@@ -145,25 +152,22 @@ class Visualizer:
         path_layer = image.copy()
         color = self.colors['future_path']
         
-        # 绘制渐变路径线
         for i in range(len(path_points) - 1):
-            # 计算透明度渐变
             alpha_factor = 0.5 + 0.5 * (i / (len(path_points) - 1))
             line_color = tuple(int(c * alpha_factor) for c in color[:3])
             
-            # 线条粗细渐变
             thickness = 5 - int(i / len(path_points) * 3)
             
             cv2.line(path_layer, path_points[i], path_points[i + 1], 
                     line_color, thickness, cv2.LINE_AA)
         
-        # 混合路径图层
         cv2.addWeighted(path_layer, 0.6, image, 0.4, 0, image)
         
         return image
     
     def _draw_info_panel(self, image: np.ndarray, direction_info: Dict[str, Any],
-                        lane_info: Dict[str, Any]) -> np.ndarray:
+                        lane_info: Dict[str, Any], is_video: bool = False,
+                        frame_info: Dict[str, Any] = None) -> np.ndarray:
         """绘制信息面板"""
         height, width = image.shape[:2]
         
@@ -199,17 +203,26 @@ class Visualizer:
         cv2.putText(image, quality_text, (20, 100), 
                    font, 0.7, self.colors['text_secondary'], 1)
         
-        # 4. 概率分布（右侧）
+        # 4. 视频信息
+        if is_video and frame_info:
+            fps_text = f"FPS: {frame_info.get('fps', 0):.1f}"
+            frame_text = f"帧: {frame_info.get('frame_number', 0)}"
+            
+            cv2.putText(image, fps_text, (width - 200, 35), 
+                       font, 0.7, self.colors['text_primary'], 1)
+            cv2.putText(image, frame_text, (width - 200, 65), 
+                       font, 0.7, self.colors['text_primary'], 1)
+        
+        # 5. 概率分布
         if 'probabilities' in direction_info:
             probabilities = direction_info['probabilities']
             start_x = width - 200
-            start_y = 30
+            start_y = 95 if is_video else 30
             
             for i, (dir_name, prob) in enumerate(probabilities.items()):
                 y = start_y + i * 25
                 prob_text = f"{dir_name}: {prob:.1%}"
                 
-                # 高亮当前方向
                 color = self.colors['text_primary'] if dir_name == direction else self.colors['text_secondary']
                 
                 cv2.putText(image, prob_text, (start_x, y), 
@@ -224,14 +237,13 @@ class Visualizer:
         direction = direction_info.get('direction', '未知')
         confidence = direction_info.get('confidence', 0.0)
         
-        # 指示器位置（底部中央）
+        # 指示器位置
         center_x = width // 2
         indicator_y = height - 150
         
         # 创建指示器图层
         indicator_layer = np.zeros_like(image)
         
-        # 根据方向绘制指示器
         if direction == "左转":
             # 左转箭头
             points = np.array([
@@ -244,7 +256,7 @@ class Visualizer:
                 [center_x - 100, indicator_y + 80],
                 [center_x, indicator_y + 80]
             ], dtype=np.int32)
-            base_color = (0, 165, 255)  # 橙色
+            base_color = (0, 165, 255)
             
         elif direction == "右转":
             # 右转箭头
@@ -258,7 +270,7 @@ class Visualizer:
                 [center_x + 100, indicator_y + 80],
                 [center_x, indicator_y + 80]
             ], dtype=np.int32)
-            base_color = (0, 165, 255)  # 橙色
+            base_color = (0, 165, 255)
             
         else:  # 直行或未知
             # 直行箭头
@@ -271,7 +283,7 @@ class Visualizer:
                 [center_x - 40, indicator_y + 120],
                 [center_x - 40, indicator_y + 40]
             ], dtype=np.int32)
-            base_color = (0, 255, 0)  # 绿色
+            base_color = (0, 255, 0)
         
         # 根据置信度调整颜色亮度
         brightness_factor = 0.5 + confidence * 0.5
@@ -280,7 +292,6 @@ class Visualizer:
         # 绘制指示器
         cv2.fillPoly(indicator_layer, [points], color)
         
-        # 根据置信度调整透明度
         alpha = 0.3 + confidence * 0.5
         cv2.addWeighted(indicator_layer, alpha, image, 1 - alpha, 0, image)
         
@@ -308,7 +319,6 @@ class Visualizer:
                           [-1, -1, -1]])
         sharpened = cv2.filter2D(image, -1, kernel)
         
-        # 混合原始和锐化图像
         cv2.addWeighted(sharpened, 0.3, image, 0.7, 0, image)
         
         return image

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 CARLA全局路径规划节点 - 增强版
 提供从起始点到随机目标点的路径规划服务，并将规划结果通过ROS消息发布和可视化

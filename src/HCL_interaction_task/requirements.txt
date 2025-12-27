@@ -1,0 +1,18 @@
+# 基础依赖
+python >= 3.8
+numpy >= 1.21.0
+pyyaml >= 6.0.0
+
+# 计算机视觉与手势追踪
+opencv-python >= 4.5.5.64
+mediapipe >= 0.8.10
+
+# 物理仿真
+mujoco >= 2.3.0
+
+# ROS 2 Python客户端
+rclpy >= 3.3.0  # 对应ROS 2 Humble版本
+
+# 可选：可视化工具（根据项目实际使用情况添加）
+matplotlib >= 3.5.0
+plotly >= 5.5.0
