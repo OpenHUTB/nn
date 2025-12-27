@@ -13,18 +13,25 @@ class StableFPSHandRecognizer:
         self.frame_interval = 1.0 / target_fps
         self.last_frame_time = time.time()
 
-        # 2. 肤色检测（适配更多光线）
-        self.skin_lower = np.array([0, 10, 50], np.uint8)
-        self.skin_upper = np.array([30, 255, 255], np.uint8)
+        # 2. 肤色检测（适配明亮+暗光环境，核心优化：新增暗光阈值）
+        # 明亮环境阈值（保留原有，适配强光场景）
+        self.skin_lower_bright = np.array([0, 10, 50], np.uint8)
+        self.skin_upper_bright = np.array([30, 255, 255], np.uint8)
+        # 暗光环境阈值（降低S和V下限，放宽H范围，适配弱光场景）
+        self.skin_lower_dark = np.array([0, 5, 15], np.uint8)
+        self.skin_upper_dark = np.array([40, 180, 200], np.uint8)
+        # 默认使用暗光阈值（优先适配弱光，也可通过自适应逻辑切换）
+        self.skin_lower = self.skin_lower_dark
+        self.skin_upper = self.skin_upper_dark
         self.kernel = np.ones((5, 5), np.uint8)
 
-        # 3. 核心参数（精准适配手势特征）
+        # 3. 核心参数（精准适配手势特征，优化暗光下轮廓识别）
         # 握拳参数（稳定识别）
         self.fist_solidity = 0.82  # 降低握拳阈值，提高稳定性
         self.fist_area_ratio = 0.75  # 握拳凸包面积比
         # 手指计数参数
         self.defect_depth_threshold = 8  # 降低深度阈值，提高up识别率
-        self.min_contour_area = 600  # 降低最小面积，适配小手掌
+        self.min_contour_area = 300  # 核心优化：从600降至300，适配暗光下小手部轮廓
         # 大拇指识别参数（宽松但精准）
         self.thumb_aspect_ratio = 0.45  # 放宽宽高比
         self.thumb_solidity_range = (0.55, 0.82)  # 刚好卡在握拳阈值下
@@ -160,20 +167,42 @@ class StableFPSHandRecognizer:
             time.sleep(self.frame_interval * 0.5)
 
     def process_frame(self, frame):
-        """核心处理逻辑"""
+        """核心处理逻辑（暗光增强优化）"""
         frame = cv.flip(frame, 1)
         frame = self._draw_recognition_area(frame)
         roi, (roi_x, roi_y) = self._get_roi(frame)
         current_gesture = "None"
 
         if roi.size > 0:
-            # 预处理（增强手部轮廓）
+            # 预处理（暗光增强：亮度+对比度+去噪+形态学，核心优化）
             roi_small = cv.resize(roi, (400, 300))
-            hsv = cv.cvtColor(roi_small, cv.COLOR_BGR2HSV)
+
+            # 步骤1：亮度和对比度增强（解决暗光下图像偏暗、细节不清晰）
+            alpha = 1.8  # 对比度增益（>1提升对比度，极暗可调整至2.2）
+            beta = 40  # 亮度增益（>0提升亮度，极暗可调整至60）
+            roi_enhanced = cv.convertScaleAbs(roi_small, alpha=alpha, beta=beta)
+
+            # 步骤2：高斯模糊去噪（去除暗光下的椒盐噪声，避免干扰轮廓提取）
+            roi_denoised = cv.GaussianBlur(roi_enhanced, (5, 5), 0)
+
+            # 步骤3：（可选）自适应亮度判断，自动切换明暗阈值（兼顾所有环境）
+            gray_roi = cv.cvtColor(roi_small, cv.COLOR_BGR2GRAY)
+            avg_brightness = np.mean(gray_roi)
+            if avg_brightness < 50:  # 亮度阈值，<50判定为暗光
+                self.skin_lower = self.skin_lower_dark
+                self.skin_upper = self.skin_upper_dark
+            else:  # >50判定为明亮环境
+                self.skin_lower = self.skin_lower_bright
+                self.skin_upper = self.skin_upper_bright
+
+            # 步骤4：转换HSV并提取肤色掩码（使用适配当前环境的阈值）
+            hsv = cv.cvtColor(roi_denoised, cv.COLOR_BGR2HSV)
             mask = cv.inRange(hsv, self.skin_lower, self.skin_upper)
-            # 形态学操作：先开后闭，保留完整轮廓
-            mask = cv.morphologyEx(mask, cv.MORPH_OPEN, self.kernel, iterations=1)
-            mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, self.kernel, iterations=2)
+
+            # 步骤5：优化形态学操作（暗光下增加膨胀迭代，填补手部区域孔洞）
+            mask = cv.morphologyEx(mask, cv.MORPH_OPEN, self.kernel, iterations=1)  # 开运算：去除小噪声
+            mask = cv.morphologyEx(mask, cv.MORPH_DILATE, self.kernel, iterations=2)  # 膨胀：填补手部孔洞，增强轮廓连续性
+            mask = cv.morphologyEx(mask, cv.MORPH_CLOSE, self.kernel, iterations=2)  # 闭运算：平滑轮廓边缘，去除残留小空洞
 
             # 找轮廓
             contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
@@ -182,7 +211,7 @@ class StableFPSHandRecognizer:
                 features = self.analyze_contour(cnt)
 
                 if features and features["area"] > self.min_contour_area:
-                    # 绘制轮廓（调试用）
+                    # 绘制轮廓（调试用，可直观看到手部提取效果）
                     cnt_scaled = cnt * (roi.shape[1] / roi_small.shape[1], roi.shape[0] / roi_small.shape[0])
                     cnt_scaled = cnt_scaled.astype(np.int32)
                     cnt_scaled[:, :, 0] += roi_x
@@ -240,11 +269,12 @@ class StableFPSHandRecognizer:
         # 提示信息
         print("=" * 60)
         print(f"✅ 帧率锁定 {self.target_fps} 帧 | ESC退出")
-        print("💡 优化版手势识别（高稳定性）：")
+        print("💡 暗光优化版手势识别（高稳定性）：")
         print("   ✊ 握拳 → stop（高稳定）")
         print("   👍 竖大拇指 → up（精准识别）")
         print("   🤘 食指+中指 → front")
         print("   🖐️  手掌张开 → back")
+        print("📌 已适配暗光环境，极暗可调整alpha/beta参数")
         print("=" * 60)
 
         # 主循环（修复帧率控制）
@@ -267,7 +297,7 @@ class StableFPSHandRecognizer:
 
             # 处理并显示
             frame_show = self.process_frame(frame)
-            cv.imshow("Hand Gesture Recognition (Optimized)", frame_show)
+            cv.imshow("Hand Gesture Recognition (Dark Mode Optimized)", frame_show)
 
             # 更新时间戳
             self.last_frame_time = time.time()
@@ -282,6 +312,6 @@ class StableFPSHandRecognizer:
 
 
 if __name__ == '__main__':
-    # 20帧兼顾流畅度和识别稳定性
+    # 20帧兼顾流畅度和识别稳定性，暗光下更稳定
     recognizer = StableFPSHandRecognizer(target_fps=20)
     recognizer.run()
