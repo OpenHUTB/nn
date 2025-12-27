@@ -256,7 +256,7 @@ class Main():
                 # 🆕 显示摄像头图像
                 self.drawer.display_camera()
 
-                # 🆕 显示帧率
+                # 🆕 显示帧率 - 确保这个调用在最后，显示在最上层
                 self.drawer.display_fps(self.fps)
 
                 # 更新观察者视角跟随车辆
@@ -264,7 +264,6 @@ class Main():
 
         except Exception as e:
             print(f"⚠️  更新车辆状态失败: {e}")
-
     def update_spectator(self):
         """更新观察者视角"""
         try:
