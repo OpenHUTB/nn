@@ -15,6 +15,7 @@ import threading
 from collections import deque
 
 
+
 class AirSimNHCarSimulator:
     """AirSim无人车仿真主类"""
 
@@ -36,6 +37,7 @@ class AirSimNHCarSimulator:
         self.running = False
         self.data_log = []
         self.data_file = None
+
 
         # 传感器数据缓存
         self.sensor_data = {
@@ -72,6 +74,7 @@ class AirSimNHCarSimulator:
 
             self.is_connected = True
             print("✓ 成功连接到AirSim仿真器！")
+
             return True
 
         except Exception as e:
@@ -81,6 +84,7 @@ class AirSimNHCarSimulator:
             print("2. settings.json配置正确")
             print("3. 网络连接正常")
             return False
+
 
     def enable_api_control(self, enable=True):
         """启用/禁用API控制"""
@@ -114,15 +118,12 @@ class AirSimNHCarSimulator:
             # 获取车辆物理信息
             kinematics = self.client.simGetVehiclePose(vehicle_name=self.vehicle_name)
 
+
             state_info = {
                 "timestamp": time.time(),
                 "speed_kmh": state.speed,
                 "speed_ms": state.speed / 3.6,
-                "position": {
-                    "x": kinematics.position.x_val,
-                    "y": kinematics.position.y_val,
-                    "z": kinematics.position.z_val
-                },
+
                 "orientation": {
                     "w": kinematics.orientation.w_val,
                     "x": kinematics.orientation.x_val,
@@ -240,9 +241,7 @@ class AirSimNHCarSimulator:
             print(f"获取GPS数据失败: {e}")
             return None
 
-    def manual_control_demo(self, duration=10):
-        """
-        手动控制演示：前进、转向、停止
+
 
         参数:
             duration: 演示总时长（秒）
@@ -252,68 +251,16 @@ class AirSimNHCarSimulator:
             return False
 
         print(f"\n开始手动控制演示 ({duration}秒)...")
-        print("操作序列: 加速 → 左转 → 右转 → 刹车停止")
 
         start_time = time.time()
         sequence = 0
+
 
         try:
             while time.time() - start_time < duration:
                 elapsed = time.time() - start_time
 
-                # 根据时间执行不同控制序列
-                if elapsed < duration * 0.25:  # 第一阶段：直线加速
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.7
-                    controls.steering = 0.0
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 1:
-                        print("  阶段1: 直线加速")
-                        sequence = 1
 
-                elif elapsed < duration * 0.5:  # 第二阶段：左转
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.5
-                    controls.steering = 0.3  # 左转
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 2:
-                        print("  阶段2: 左转")
-                        sequence = 2
-
-                elif elapsed < duration * 0.75:  # 第三阶段：右转
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.5
-                    controls.steering = -0.3  # 右转
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 3:
-                        print("  阶段3: 右转")
-                        sequence = 3
-
-                else:  # 第四阶段：减速停止
-                    controls = airsim.CarControls()
-                    controls.throttle = 0.0
-                    controls.brake = 1.0
-                    controls.steering = 0.0
-                    self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
-                    if sequence < 4:
-                        print("  阶段4: 刹车停止")
-                        sequence = 4
-
-                # 实时显示车辆状态
-                state = self.get_vehicle_state()
-                if state:
-                    print(f"\r速度: {state['speed_kmh']:.1f} km/h | "
-                          f"位置: ({state['position']['x']:.1f}, "
-                          f"{state['position']['y']:.1f})", end="")
-
-                # 采集传感器数据
-                self.capture_camera_images(["front"])  # 只采集前摄像头
-                self.get_imu_data()
-                self.get_gps_data()
-
-                time.sleep(0.1)  # 控制频率 10Hz
-
-            print("\n✓ 手动控制演示完成")
             return True
 
         except Exception as e:
@@ -382,12 +329,13 @@ class AirSimNHCarSimulator:
                 "camera_frames": len(self.sensor_data["camera"]),
                 "imu_samples": len(self.sensor_data["imu"]),
                 "gps_samples": len(self.sensor_data["gps"]),
-                "total_log_entries": len(self.data_log)
+
             }
 
             stats_file = f"{self.data_dir}/simulation_stats.json"
             with open(stats_file, 'w') as f:
                 json.dump(stats, f, indent=2)
+
 
             # 生成数据报告
             report_file = f"{self.data_dir}/report.txt"
@@ -400,7 +348,7 @@ class AirSimNHCarSimulator:
                 f.write(f"摄像头帧数: {stats['camera_frames']}\n")
                 f.write(f"IMU采样数: {stats['imu_samples']}\n")
                 f.write(f"GPS采样数: {stats['gps_samples']}\n")
-                f.write(f"日志条目: {stats['total_log_entries']}\n\n")
+
                 f.write("数据文件:\n")
                 for file in os.listdir(self.data_dir):
                     f.write(f"  - {file}\n")
@@ -410,13 +358,14 @@ class AirSimNHCarSimulator:
             print(f"  统计数据: {stats_file}")
             print(f"  报告文件: {report_file}")
 
+
             return True
 
         except Exception as e:
             print(f"✗ 保存数据失败: {e}")
             return False
 
-    def run_full_demo(self, control_duration=15, data_duration=8):
+
         """运行完整演示"""
         print("=" * 60)
         print("AirSimNH 无人车完整仿真演示")
@@ -430,6 +379,7 @@ class AirSimNHCarSimulator:
             # 步骤2: 启用API控制
             if not self.enable_api_control(True):
                 return False
+
 
             # 步骤3: 手动控制演示
             if not self.manual_control_demo(control_duration):
@@ -458,10 +408,7 @@ class AirSimNHCarSimulator:
         # 停止车辆
         if self.is_api_control_enabled:
             controls = airsim.CarControls()
-            controls.brake = 1.0
-            controls.handbrake = True
-            try:
-                self.client.setCarControls(controls, vehicle_name=self.vehicle_name)
+
             except:
                 pass
 
@@ -486,7 +433,7 @@ def main():
     # 运行完整演示
     try:
         simulator.run_full_demo(
-            control_duration=20,  # 控制演示时长（秒）
+
             data_duration=10  # 数据采集时长（秒）
         )
 
