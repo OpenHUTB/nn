@@ -70,9 +70,16 @@ class PandaAutoGrab:
 
         # 位置坐标参数
         self.INIT_EE_POS = np.array([0.4, 0.0, 0.2])  # 末端执行器初始目标位置
-
-        # 【优化1】提取抬升高度增量为类内常量
         self.LIFT_HEIGHT_INCREMENT = 0.05  # 抓取后额外抬升的高度增量
+
+        # 相机视角参数
+        self.CAM_AZIMUTH = 70  # 相机方位角
+        self.CAM_ELEVATION = -25  # 相机仰角
+        self.CAM_DISTANCE = 1.8  # 相机距离
+        self.CAM_LOOKAT = np.array([0.4, 0.0, 0.1])  # 相机注视点
+
+        # 【优化1】将仿真休眠时间提升为类内常量
+        self.SIMULATION_SLEEP = 1 / 200  # 仿真循环的休眠时间
 
         # 打印模型信息
         print("=" * 50)
@@ -105,7 +112,7 @@ class PandaAutoGrab:
         mujoco.mj_jac(self.model, self.data, self.jacp, self.jacr, self.get_ee_pos(), self.ee_body_id)
         return self.jacp[:, self.joint_ids]
 
-    def _move_step(self, target, speed=0.3):
+    def _move_step(self, target: np.ndarray, speed: float = 0.3) -> bool:
         """单步位置控制：基于雅克比伪逆实现末端执行器的位置跟踪
 
         Args:
@@ -149,7 +156,7 @@ class PandaAutoGrab:
 
         return False
 
-    def _gripper_step(self, pos):
+    def _gripper_step(self, pos: float) -> None:
         """单步夹爪位置控制，设置夹爪的目标开合位置
 
         Args:
@@ -214,7 +221,6 @@ class PandaAutoGrab:
 
         elif self.current_phase == 6:
             # 阶段6：抬升立方体
-            # 【优化2】使用类内常量替代硬编码的抬升增量
             lift_target = self.cube_pos + np.array([0, 0, self.safe_lift_height + self.LIFT_HEIGHT_INCREMENT])
             if self._move_step(lift_target, speed=0.3):
                 print("\n✅ 抬升立方体")
@@ -270,16 +276,13 @@ class PandaAutoGrab:
         """单线程仿真主循环"""
         # 初始化Viewer
         self.viewer = viewer.launch_passive(self.model, self.data)
-        self.viewer.cam.azimuth = 70
-        self.viewer.cam.elevation = -25
-        self.viewer.cam.distance = 1.8
-        self.viewer.cam.lookat = np.array([0.4, 0.0, 0.1])
+        self.viewer.cam.azimuth = self.CAM_AZIMUTH
+        self.viewer.cam.elevation = self.CAM_ELEVATION
+        self.viewer.cam.distance = self.CAM_DISTANCE
+        self.viewer.cam.lookat = self.CAM_LOOKAT
 
         print("\n🚀 仿真已启动，开始自动抓取...")
         print("💡 关闭Viewer窗口可退出程序")
-
-        # 提取休眠时间为常量，便于后续调整
-        SIMULATION_SLEEP = 1 / 200
 
         # 单线程主循环
         # 添加KeyboardInterrupt捕获，支持Ctrl+C优雅退出
@@ -294,7 +297,8 @@ class PandaAutoGrab:
 
                 mujoco.mj_step(self.model, self.data)
                 self.viewer.sync()
-                time.sleep(SIMULATION_SLEEP)
+                # 【优化2】使用类内常量替代局部变量
+                time.sleep(self.SIMULATION_SLEEP)
         except KeyboardInterrupt:
             print("\n⚠️ 检测到Ctrl+C，正在退出仿真...")
 
