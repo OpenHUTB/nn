@@ -43,11 +43,21 @@ MODEL_PATHS = {
 # ==================== 动作配置 ====================
 ACTION_NAMES = ["刹车", "直行", "左转", "右转", "微左", "微右"]
 
+# ==================== 控制配置 ====================
+CONTROL_CONFIG = {
+    'max_throttle': 1.0,           # 最大油门
+    'max_steer': 1.0,              # 最大转向
+    'max_brake': 1.0,              # 最大刹车
+    'throttle_increment': 0.2,     # 增加油门增量
+    'steer_increment': 0.1,        # 转向增量
+    'idle_timeout': 1.0,           # 空闲超时（秒）
+}
+
 # ==================== 训练配置 ====================
 TOTAL_EPISODES = 3                    # 总共运行的episode数
 MAX_STEPS_PER_EPISODE = 2000          # 每个episode最大步数
 EPISODE_INTERVAL = 2.0                # episode之间的间隔秒数
-
+UPDATE_RATE = 0.1                     # 降低更新率，让控制更频繁
 # ==================== 交通配置 ====================
 ENABLE_TRAFFIC = False               # 是否启用交通流（暂时关闭，避免干扰）
 TRAFFIC_VEHICLES = 30                 # 交通车辆数量

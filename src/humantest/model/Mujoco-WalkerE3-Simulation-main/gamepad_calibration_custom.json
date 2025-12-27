@@ -1,0 +1,67 @@
+{
+  "joystick_name": "Xbox 360 Controller",
+  "calibration_date": "2025-12-18 20:03:16",
+  "axes": {
+    "0": {
+      "axis_id": 0,
+      "name": "左摇杆X轴 (角速度)",
+      "center": 0.0,
+      "reverse": false,
+      "std": 0.0
+    },
+    "1": {
+      "axis_id": 1,
+      "name": "左摇杆Y轴 (抗扰动模式扰动力)",
+      "center": -3.0517578125e-05,
+      "reverse": false,
+      "std": 0.0
+    },
+    "2": {
+      "axis_id": 2,
+      "name": "右摇杆X轴 (左右速度)",
+      "center": 0.0,
+      "reverse": false,
+      "std": 0.0
+    },
+    "3": {
+      "axis_id": 3,
+      "name": "右摇杆Y轴 (前后速度)",
+      "center": -3.0517578125e-05,
+      "reverse": false,
+      "std": 0.0
+    }
+  },
+  "buttons": {
+    "LB": {
+      "button_id": 4,
+      "name": "LB",
+      "function": "切换模式 (行走/奔跑/抗扰动测试)"
+    },
+    "RB": {
+      "button_id": 5,
+      "name": "RB",
+      "function": "备用按钮（当前未使用）"
+    },
+    "X": {
+      "button_id": 2,
+      "name": "X",
+      "function": "切换显示足底力"
+    },
+    "Y": {
+      "button_id": 3,
+      "name": "Y",
+      "function": "切换是否跟踪pelvis"
+    },
+    "B": {
+      "button_id": 1,
+      "name": "B",
+      "function": "重置机器人状态"
+    },
+    "A": {
+      "button_id": 0,
+      "name": "A",
+      "function": "切换显示足端接触状态"
+    }
+  },
+  "gamepad_type": "custom"
+}

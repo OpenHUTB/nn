@@ -204,8 +204,8 @@ class World():
         transformed_image, error, detection_surface_area = self.lane \
             .pipe(img=image)
 
-        #if show:
-            #World.show_image(image=transformed_image)
+        if show:
+            World.show_image(image=transformed_image)
 
         return error, detection_surface_area, transformed_image, \
             self.collision_detected

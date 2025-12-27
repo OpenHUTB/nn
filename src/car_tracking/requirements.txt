@@ -1,7 +1,6 @@
+# 适配Python3.7.9 + Carla 0.9.14的核心依赖库
 carla==0.9.14
-tensorflow==2.4.0
-numpy==1.19.5
-opencv-python
-scipy
-psutil
-lapx
+opencv-python==4.5.5.62
+numpy==1.21.6
+
+# 备注：queue、random、time为Python3.7.9内置库，无需额外安装

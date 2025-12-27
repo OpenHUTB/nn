@@ -1,113 +1,399 @@
-import carla  # 导入Carla客户端库，用于与Carla模拟器交互
-import numpy as np  # 导入numpy库，用于数值计算
-
-# 从配置文件导入车辆控制相关的常量
+import carla
+import numpy as np
 from src.config import MAX_BRAKING_M_S_2, MAX_WHEEL_ANGLE_RAD, MAX_ACCELERATION_M_S_2
 
 
 class CarlaSimulator:
-    """Carla模拟器交互类，封装了与Carla模拟器的主要交互操作"""
-
     def __init__(self):
-        """初始化Carla模拟器连接及相关参数"""
-        # 连接到本地Carla服务器（默认地址localhost:2000）
         self.client = carla.Client('localhost', 2000)
-        # 设置客户端超时时间（10秒）
         self.client.set_timeout(10.0)
-        # 获取当前世界对象
         self.world = self.client.get_world()
-        # 初始化主车辆（ego vehicle）为None
         self.ego_vehicle = None
-        # 销毁场景中所有现有车辆（初始化环境）
-        for vehicle in self.world.get_actors().filter('*vehicle*'):
-            vehicle.destroy()
+        self.obstacles = []  # 存储障碍物对象
+        self.destroy_all_actors()
+
+        # 障碍物颜色
+        self.obstacle_colors = {
+            'vehicle.audi.tt': (255, 0, 0, 200),  # 红色半透明
+            'vehicle.tesla.model3': (255, 165, 0, 200),  # 橙色半透明
+            'static.prop.trafficcone': (255, 255, 0, 200),  # 黄色半透明
+            'static.prop.streetbarrier': (128, 0, 128, 200),  # 紫色半透明
+        }
+
+    def destroy_all_actors(self):
+        """销毁所有现有actor（车辆、障碍物等）"""
+        for actor in self.world.get_actors():
+            if actor.type_id.startswith('vehicle.') or actor.type_id.startswith('static.prop.'):
+                actor.destroy()
+        self.obstacles = []
 
     def load_world(self, map_name):
-        """
-        加载指定名称的Carla地图
-
-        参数:
-            map_name: 地图名称（如'Town01'）
-        """
         self.client.load_world(map_name)
 
     def spawn_ego_vehicle(self, vehicle_name, x=0, y=0, z=0, pitch=0, yaw=0, roll=0):
+        blueprint_library = self.world.get_blueprint_library()
+        vehicle_bp = blueprint_library.filter(vehicle_name)[0]
+        spawn_location = carla.Location(x, y, z)
+        spawn_rotation = carla.Rotation(pitch, yaw, roll)
+        spawn_transform = carla.Transform(location=spawn_location, rotation=spawn_rotation)
+        self.ego_vehicle = self.world.spawn_actor(vehicle_bp, spawn_transform)
+        return self.ego_vehicle
+
+    def spawn_obstacle(self, obstacle_type='vehicle.tesla.model3', x=0, y=0, z=0,
+                       pitch=0, yaw=0, roll=0, static=True, color=None):
         """
-        在指定位置生成主车辆（ego vehicle）
+        在指定位置生成障碍物
 
         参数:
-            vehicle_name: 车辆蓝图名称（用于筛选车辆模型）
-            x, y, z: 生成位置的坐标（米）
-            pitch, yaw, roll: 生成时的旋转角度（度），分别对应俯仰角、偏航角、横滚角
+            obstacle_type: 障碍物类型 ('vehicle.*', 'static.prop.*', 或 'walker.*')
+            x, y, z: 位置坐标
+            pitch, yaw, roll: 旋转角度
+            static: 是否静态障碍物
+            color: 自定义颜色 (R,G,B,A)
         """
-        # 获取当前世界的蓝图库
-        blueprint_library = self.world.get_blueprint_library()
-        # 根据车辆名称筛选蓝图（取第一个匹配结果）
-        vehicle_bp = blueprint_library.filter(vehicle_name)[0]
-        # 设置生成位置
-        spawn_location = carla.Location(x, y, z)
-        # 设置生成旋转角度
-        spawn_rotation = carla.Rotation(pitch, yaw, roll)
-        # 组合位置和旋转为变换矩阵
-        spawn_transform = carla.Transform(location=spawn_location, rotation=spawn_rotation)
-        # 在指定位置生成车辆并赋值给主车辆
-        self.ego_vehicle = self.world.spawn_actor(vehicle_bp, spawn_transform)
+        try:
+            blueprint_library = self.world.get_blueprint_library()
+
+            # 根据类型获取蓝图
+            if obstacle_type.startswith('vehicle.'):
+                obstacle_bp = blueprint_library.filter(obstacle_type)[0]
+                # 设置车辆为静止
+                if static:
+                    obstacle_bp.set_attribute('role_name', 'static_obstacle')
+            elif obstacle_type.startswith('static.prop.'):
+                obstacle_bp = blueprint_library.filter(obstacle_type)[0]
+            elif obstacle_type.startswith('walker.'):
+                obstacle_bp = blueprint_library.filter(obstacle_type)[0]
+            else:
+                print(f"Unknown obstacle type: {obstacle_type}")
+                return None
+
+            # 设置障碍物颜色（如果提供）
+            if color:
+                if obstacle_bp.has_attribute('color'):
+                    obstacle_bp.set_attribute('color', f'{color[0]},{color[1]},{color[2]}')
+
+            spawn_location = carla.Location(x, y, z)
+            spawn_rotation = carla.Rotation(pitch, yaw, roll)
+            spawn_transform = carla.Transform(location=spawn_location, rotation=spawn_rotation)
+
+            obstacle = self.world.spawn_actor(obstacle_bp, spawn_transform)
+            self.obstacles.append(obstacle)
+
+            print(f"Spawned obstacle at ({x:.1f}, {y:.1f}) of type {obstacle_type}")
+            return obstacle
+
+        except Exception as e:
+            print(f"Failed to spawn obstacle: {e}")
+            return None
+
+    def spawn_spaced_obstacles(self):
+        """
+        生成间距合适的障碍物，避免过于密集
+        在车辆前方不同距离和横向位置生成3个障碍物
+        """
+        if not self.ego_vehicle:
+            print("No ego vehicle, cannot generate obstacles")
+            return []
+
+        vehicle_location = self.ego_vehicle.get_location()
+        vehicle_transform = self.ego_vehicle.get_transform()
+        vehicle_yaw = vehicle_transform.rotation.yaw
+
+        # 获取车辆前方的waypoint
+        map = self.world.get_map()
+        current_waypoint = map.get_waypoint(vehicle_location)
+
+        if not current_waypoint:
+            print("Cannot get current waypoint")
+            return []
+
+        # 定义障碍物配置：位置、类型、横向偏移
+        obstacle_configs = [
+            {'distance': 20.0, 'type': 'vehicle.audi.tt', 'lane_offset': 0.0, 'yaw_offset': 180,
+             'color': (255, 0, 0, 200)},  # 正前方15米，掉头的车辆
+            {'distance': 40.0, 'type': 'static.prop.trafficcone', 'lane_offset': 1.5, 'yaw_offset': 0,
+             'color': (255, 255, 0, 200)},  # 前方30米，右侧交通锥
+            {'distance': 50.0, 'type': 'vehicle.tesla.model3', 'lane_offset': -1.5, 'yaw_offset': 0,
+             'color': (255, 165, 0, 200)},  # 前方45米，左侧车辆
+        ]
+
+        spawned_obstacles = []
+
+        for i, config in enumerate(obstacle_configs):
+            try:
+                distance = config['distance']
+                obstacle_type = config['type']
+                lane_offset = config['lane_offset']  # 正值=右侧，负值=左侧
+                yaw_offset = config['yaw_offset']
+                color = config['color']
+
+                # 获取前方waypoint
+                next_waypoints = current_waypoint.next(distance)
+
+                if not next_waypoints:
+                    print(f"Warning: No waypoint found at distance {distance}m")
+                    continue
+
+                target_waypoint = next_waypoints[0]
+                lane_width = target_waypoint.lane_width
+
+                # 计算障碍物位置
+                location = target_waypoint.transform.location
+
+                # 如果有横向偏移，调整位置
+                if lane_offset != 0:
+                    # 计算横向偏移方向
+                    perpendicular_yaw = vehicle_yaw + 90 if lane_offset > 0 else vehicle_yaw - 90
+                    location.x += np.cos(np.radians(perpendicular_yaw)) * abs(lane_offset)
+                    location.y += np.sin(np.radians(perpendicular_yaw)) * abs(lane_offset)
+
+                # 设置朝向
+                yaw = target_waypoint.transform.rotation.yaw + yaw_offset
+
+                # 生成障碍物
+                obstacle = self.spawn_obstacle(
+                    obstacle_type=obstacle_type,
+                    x=location.x,
+                    y=location.y,
+                    z=location.z + 0.1,
+                    yaw=yaw,
+                    static=True,
+                    color=color
+                )
+
+                if obstacle:
+                    spawned_obstacles.append(obstacle)
+
+                    side = "center"
+                    if lane_offset > 0:
+                        side = "right"
+                    elif lane_offset < 0:
+                        side = "left"
+
+                    print(f"Obstacle {i + 1}: {obstacle_type.split('.')[-1]} "
+                          f"at {distance:.1f}m {side}, Position=({location.x:.1f}, {location.y:.1f})")
+
+            except Exception as e:
+                print(f"Error spawning obstacle {i + 1}: {e}")
+                continue
+
+        return spawned_obstacles
+
+    def get_obstacle_positions(self):
+        """获取所有障碍物的位置和边界框信息"""
+        obstacle_info = []
+
+        for obstacle in self.obstacles:
+            try:
+                transform = obstacle.get_transform()
+                location = transform.location
+
+                # 根据障碍物类型设置不同的安全距离
+                obstacle_type = obstacle.type_id
+                if 'vehicle' in obstacle_type:
+                    safe_distance = 5.0  # 车辆类障碍物需要更大的安全距离
+                    radius = 2.5
+                elif 'streetbarrier' in obstacle_type:
+                    safe_distance = 2.0
+                    radius = 1.0
+                elif 'trafficcone' in obstacle_type:
+                    safe_distance = 1.5
+                    radius = 0.5
+                else:
+                    safe_distance = 2.0
+                    radius = 1.0
+
+                obstacle_info.append({
+                    'id': obstacle.id,
+                    'type': obstacle_type,
+                    'x': location.x,
+                    'y': location.y,
+                    'z': location.z,
+                    'radius': radius,
+                    'safe_distance': safe_distance
+                })
+
+            except Exception as e:
+                print(f"Error getting obstacle info: {e}")
+                continue
+
+        return obstacle_info
+
+    def draw_obstacles_with_info(self, obstacles_info, life_time=0.1):
+        """绘制障碍物及其相关信息"""
+        for obs_info in obstacles_info:
+            try:
+                location = carla.Location(x=obs_info['x'], y=obs_info['y'], z=obs_info['z'] + 0.5)
+                radius = obs_info.get('radius', 2.0)
+                safe_distance = obs_info.get('safe_distance', 3.0)
+
+                # 根据障碍物类型设置颜色
+                if 'vehicle' in obs_info['type']:
+                    color = carla.Color(255, 0, 0)  # 红色
+                elif 'streetbarrier' in obs_info['type']:
+                    color = carla.Color(128, 0, 128)  # 紫色
+                elif 'trafficcone' in obs_info['type']:
+                    color = carla.Color(255, 255, 0)  # 黄色
+                else:
+                    color = carla.Color(255, 165, 0)  # 橙色
+
+                # 绘制障碍物位置（大点）
+                self.world.debug.draw_point(
+                    location,
+                    size=0.3,
+                    color=color,
+                    life_time=life_time
+                )
+
+                # 绘制障碍物半径
+                self.draw_circle(location, radius, color=color, life_time=life_time)
+
+                # 绘制安全距离圆（虚线）
+                self.draw_dashed_circle(location, safe_distance,
+                                        color=carla.Color(255, 255, 255, 100),  # 白色半透明
+                                        dash_length=0.3, gap_length=0.3,
+                                        life_time=life_time)
+
+                # 绘制障碍物类型标签
+                text_location = carla.Location(x=location.x, y=location.y, z=location.z + 1.5)
+                self.world.debug.draw_string(
+                    text_location,
+                    obs_info['type'].split('.')[-1],
+                    draw_shadow=True,
+                    color=carla.Color(255, 255, 255),
+                    life_time=life_time,
+                    persistent_lines=False
+                )
+
+            except Exception as e:
+                print(f"Error drawing obstacle info: {e}")
+                continue
+
+    def draw_circle(self, center, radius, color=carla.Color(255, 0, 0), life_time=0.1):
+        """绘制圆形"""
+        num_segments = 32
+        for i in range(num_segments):
+            angle1 = 2 * np.pi * i / num_segments
+            angle2 = 2 * np.pi * (i + 1) / num_segments
+
+            p1 = carla.Location(
+                center.x + radius * np.cos(angle1),
+                center.y + radius * np.sin(angle1),
+                center.z
+            )
+            p2 = carla.Location(
+                center.x + radius * np.cos(angle2),
+                center.y + radius * np.sin(angle2),
+                center.z
+            )
+
+            self.world.debug.draw_line(
+                p1, p2,
+                thickness=0.05,
+                color=color,
+                life_time=life_time
+            )
+
+    def draw_dashed_circle(self, center, radius, color=carla.Color(255, 255, 255),
+                           dash_length=0.5, gap_length=0.5, life_time=0.1):
+        """绘制虚线圆形"""
+        num_segments = 64
+        dash_pattern = True  # True表示绘制，False表示间隙
+
+        for i in range(num_segments):
+            angle1 = 2 * np.pi * i / num_segments
+            angle2 = 2 * np.pi * (i + 1) / num_segments
+
+            # 计算圆弧长度
+            arc_length = radius * (angle2 - angle1)
+
+            # 如果圆弧长度大于dash_length+gap_length，我们需要进一步细分
+            if arc_length > dash_length + gap_length:
+                sub_segments = int(arc_length / (dash_length + gap_length))
+                for j in range(sub_segments):
+                    sub_angle1 = angle1 + j * (angle2 - angle1) / sub_segments
+                    sub_angle2 = angle1 + (j + 1) * (angle2 - angle1) / sub_segments
+
+                    if dash_pattern:
+                        p1 = carla.Location(
+                            center.x + radius * np.cos(sub_angle1),
+                            center.y + radius * np.sin(sub_angle1),
+                            center.z
+                        )
+                        p2 = carla.Location(
+                            center.x + radius * np.cos(sub_angle2),
+                            center.y + radius * np.sin(sub_angle2),
+                            center.z
+                        )
+
+                        self.world.debug.draw_line(
+                            p1, p2,
+                            thickness=0.02,
+                            color=color,
+                            life_time=life_time
+                        )
+
+                    dash_pattern = not dash_pattern
+            else:
+                if dash_pattern:
+                    p1 = carla.Location(
+                        center.x + radius * np.cos(angle1),
+                        center.y + radius * np.sin(angle1),
+                        center.z
+                    )
+                    p2 = carla.Location(
+                        center.x + radius * np.cos(angle2),
+                        center.y + radius * np.sin(angle2),
+                        center.z
+                    )
+
+                    self.world.debug.draw_line(
+                        p1, p2,
+                        thickness=0.02,
+                        color=color,
+                        life_time=life_time
+                    )
+
+                # 切换绘制模式
+                if arc_length > dash_length:
+                    dash_pattern = not dash_pattern
 
     def set_spectator(self, x=0, y=0, z=0, pitch=0, yaw=0, roll=0):
-        """
-        设置 spectator（ spectator 是Carla中的视角控制者）的位置和角度
-
-        参数:
-            x, y, z: spectator 位置坐标（米）
-            pitch, yaw, roll: spectator 旋转角度（度）
-        """
-        # 获取当前spectator
         spectator = self.world.get_spectator()
-        # 设置位置
         location = carla.Location(x=x, y=y, z=z)
-        # 设置旋转角度
         rotation = carla.Rotation(pitch=pitch, yaw=yaw, roll=roll)
-        # 组合为变换矩阵
         spectator_transform = carla.Transform(location, rotation)
-        # 应用变换到spectator
         spectator.set_transform(spectator_transform)
 
     def clean(self):
-        """清理场景中所有车辆（销毁所有车辆actor）"""
-        for vehicle in self.world.get_actors().filter('*vehicle*'):
-            vehicle.destroy()
+        self.destroy_all_actors()
 
-    def draw_perception_planning(self, x_ref, y_ref, current_idx, look_ahead_points=20):
+    def draw_perception_planning(self, x_ref, y_ref, current_idx, look_ahead_points=20, obstacles_info=None):
         """
-        绘制感知规划信息：只显示车辆前方需要跟踪的轨迹点
-
-        参数:
-            x_ref: 参考轨迹x坐标
-            y_ref: 参考轨迹y坐标
-            current_idx: 当前轨迹点索引
-            look_ahead_points: 向前看的点数
+        绘制感知规划信息，包括障碍物
         """
-        # 清除之前的绘制（通过绘制空列表）
+        # 清除之前的绘制
         self.draw_trajectory([], [], life_time=0.1)
 
-        # 计算要显示的轨迹点范围
+        # 绘制障碍物信息
+        if obstacles_info:
+            self.draw_obstacles_with_info(obstacles_info, life_time=0.1)
+
+        # 绘制前方轨迹
         total_points = len(x_ref)
         if total_points == 0:
             return
 
-        # 获取前方轨迹点
         end_idx = min(current_idx + look_ahead_points, total_points)
 
-        # 提取要显示的轨迹点
         if current_idx < end_idx:
             display_x = x_ref[current_idx:end_idx]
             display_y = y_ref[current_idx:end_idx]
         else:
-            # 处理循环轨迹
             display_x = list(x_ref[current_idx:]) + list(x_ref[:end_idx])
             display_y = list(y_ref[current_idx:]) + list(y_ref[:end_idx])
 
-        # 绘制前方轨迹（绿色）
         if len(display_x) > 1:
             self.draw_trajectory(
                 display_x,
@@ -118,7 +404,6 @@ class CarlaSimulator:
                 life_time=0.1
             )
 
-        # 绘制当前目标点（红色）
         if len(display_x) > 0:
             target_location = carla.Location(
                 x=display_x[0],
@@ -128,33 +413,28 @@ class CarlaSimulator:
             self.world.debug.draw_point(
                 target_location,
                 size=0.3,
-                color=carla.Color(255, 0, 0),
+                color=carla.Color(0, 255, 0),  # 绿色目标点
                 life_time=0.1
             )
 
-            # 绘制从车辆到目标点的连线
-            vehicle_location = self.ego_vehicle.get_transform().location
-            self.world.debug.draw_line(
-                vehicle_location,
-                target_location,
-                thickness=0.1,
-                color=carla.Color(0, 255, 255),
-                life_time=0.1
-            )
+            if self.ego_vehicle:
+                vehicle_location = self.ego_vehicle.get_transform().location
+                self.world.debug.draw_line(
+                    vehicle_location,
+                    target_location,
+                    thickness=0.1,
+                    color=carla.Color(0, 255, 255),
+                    life_time=0.1
+                )
 
     def draw_frenet_frame(self, x_ref, y_ref, current_idx):
-        """
-        绘制Frenet坐标系参考线（用于显示横向偏差）
-        """
         total_points = len(x_ref)
-        if total_idx + 1 >= total_points:
+        if current_idx + 1 >= total_points:
             return
 
-        # 获取当前参考线段
         x1, y1 = x_ref[current_idx], y_ref[current_idx]
         x2, y2 = x_ref[(current_idx + 1) % total_points], y_ref[(current_idx + 1) % total_points]
 
-        # 绘制参考线段（蓝色）
         start_point = carla.Location(x=x1, y=y1, z=0.3)
         end_point = carla.Location(x=x2, y=y2, z=0.3)
 
@@ -165,25 +445,11 @@ class CarlaSimulator:
             color=carla.Color(0, 0, 255),
             life_time=0.1
         )
-    def draw_trajectory(self, x_traj, y_traj, height=0, thickness=0.1, red=0, green=0, blue=0, life_time=0.1):
-        """
-        在世界中绘制轨迹线
 
-        参数:
-            x_traj: 轨迹点的x坐标列表
-            y_traj: 轨迹点的y坐标列表
-            height: 轨迹线的z轴高度（米）
-            thickness: 线的粗细
-            red, green, blue: 线的颜色（0-255）
-            life_time: 线在世界中的存在时间（秒）
-        """
-        # 遍历轨迹点，绘制连续线段
+    def draw_trajectory(self, x_traj, y_traj, height=0, thickness=0.1, red=0, green=0, blue=0, life_time=0.1):
         for i in range(len(x_traj) - 1):
-            # 线段起点
             start_point = carla.Location(x=x_traj[i], y=y_traj[i], z=height)
-            # 线段终点
             end_point = carla.Location(x=x_traj[i + 1], y=y_traj[i + 1], z=height)
-            # 在世界中绘制线段
             self.world.debug.draw_line(
                 start_point,
                 end_point,
@@ -193,109 +459,70 @@ class CarlaSimulator:
             )
 
     def get_main_ego_vehicle_state(self):
-        """
-        获取主车辆的当前状态
+        if not self.ego_vehicle:
+            return 0, 0, 0, 0
 
-        返回:
-            x: 车辆位置x坐标（米）
-            y: 车辆位置y坐标（米）
-            theta: 车辆航向角（弧度，从yaw角度转换而来）
-            v: 车辆瞬时速度（米/秒，x和y方向速度的合速度）
-        """
-        # 获取车辆变换信息（位置和旋转）
         transform = self.ego_vehicle.get_transform()
         x = transform.location.x
         y = transform.location.y
-        # 将yaw角度（度）转换为弧度（航向角）
         theta = np.deg2rad(transform.rotation.yaw)
-        # 计算x和y方向速度的合速度（标量）
         v = np.sqrt(self.ego_vehicle.get_velocity().x ** 2 + self.ego_vehicle.get_velocity().y ** 2)
         return x, y, theta, v
 
     def apply_control(self, steer, throttle, brake):
-        """
-        向主车辆应用控制指令
-
-        参数:
-            steer: 转向指令（-1到1之间，对应左右转向）
-            throttle: 油门指令（0到1之间）
-            brake: 刹车指令（0到1之间）
-        """
-        # 调用Carla的VehicleControl接口应用控制
-        self.ego_vehicle.apply_control(carla.VehicleControl(throttle=throttle, steer=steer, brake=brake))
+        if self.ego_vehicle:
+            self.ego_vehicle.apply_control(carla.VehicleControl(throttle=throttle, steer=steer, brake=brake))
 
     @staticmethod
     def process_control_inputs(wheel_angle_rad, acceleration_m_s_2):
-        """
-        处理原始控制输入（轮角和加速度），转换为Carla需要的标准化控制指令
-
-        参数:
-            wheel_angle_rad: 车轮转角（弧度）
-            acceleration_m_s_2: 加速度指令（米/秒²，正为加速，负为刹车）
-
-        返回:
-            throttle: 标准化油门指令（0到1）
-            brake: 标准化刹车指令（0到1）
-            steer: 标准化转向指令（-1到1）
-        """
         if acceleration_m_s_2 == 0:
-            # 无加速度指令时，油门和刹车均为0
             throttle = 0
             brake = 0
         elif acceleration_m_s_2 < 0:
-            # 负加速度（刹车），标准化到刹车指令（除以最大刹车加速度）
             throttle = 0
-            brake = acceleration_m_s_2 / MAX_BRAKING_M_S_2
+            brake = max(min(acceleration_m_s_2 / MAX_BRAKING_M_S_2, 1.0), 0.0)
         else:
-            # 正加速度（加速），标准化到油门指令（除以最大加速度）
-            throttle = acceleration_m_s_2 / MAX_ACCELERATION_M_S_2
+            throttle = max(min(acceleration_m_s_2 / MAX_ACCELERATION_M_S_2, 1.0), 0.0)
             brake = 0
-        # 车轮转角标准化（除以最大轮角）
-        steer = wheel_angle_rad / MAX_WHEEL_ANGLE_RAD
+        steer = max(min(wheel_angle_rad / MAX_WHEEL_ANGLE_RAD, 1.0), -1.0)
         return throttle, brake, steer
 
     def print_ego_vehicle_characteristics(self):
-        """打印主车辆的物理特性参数（如车轮信息、扭矩曲线、质量等）"""
         if not self.ego_vehicle:
-            print("Vehicle not spawned yet!")  # 车辆未生成时提示
+            print("Vehicle not spawned yet!")
             return None
 
-        # 获取车辆物理控制参数
         physics_control = self.ego_vehicle.get_physics_control()
 
         print("Vehicle Physics Information.\n")
 
-        # 打印车轮信息
         print("Wheel Information:")
         for i, wheel in enumerate(physics_control.wheels):
             print(f" Wheel {i + 1}:")
-            print(f"   Tire Friction: {wheel.tire_friction}")  # 轮胎摩擦系数
-            print(f"   Damping Rate: {wheel.damping_rate}")  # 阻尼率
-            print(f"   Max Steer Angle: {wheel.max_steer_angle}")  # 最大转向角
-            print(f"   Radius: {wheel.radius}")  # 车轮半径
-            print(f"   Max Brake Torque: {wheel.max_brake_torque}")  # 最大刹车扭矩
-            print(f"   Max Handbrake Torque: {wheel.max_handbrake_torque}")  # 最大手刹扭矩
-            print(f"   Position (x, y, z): ({wheel.position.x}, {wheel.position.y}, {wheel.position.z})")  # 车轮位置
+            print(f"   Tire Friction: {wheel.tire_friction}")
+            print(f"   Damping Rate: {wheel.damping_rate}")
+            print(f"   Max Steer Angle: {wheel.max_steer_angle}")
+            print(f"   Radius: {wheel.radius}")
+            print(f"   Max Brake Torque: {wheel.max_brake_torque}")
+            print(f"   Max Handbrake Torque: {wheel.max_handbrake_torque}")
+            print(f"   Position (x, y, z): ({wheel.position.x}, {wheel.position.y}, {wheel.position.z})")
 
-        # 打印扭矩曲线（RPM-扭矩关系）
         print(f" Torque Curve:")
         for point in physics_control.torque_curve:
             print(f"RPM: {point.x}, Torque: {point.y}")
-        print(f" Max RPM: {physics_control.max_rpm}")  # 最大转速
-        print(f" MOI (Moment of Inertia): {physics_control.moi}")  # 转动惯量
-        print(f" Damping Rate Full Throttle: {physics_control.damping_rate_full_throttle}")  # 全油门时的阻尼率
+        print(f" Max RPM: {physics_control.max_rpm}")
+        print(f" MOI (Moment of Inertia): {physics_control.moi}")
+        print(f" Damping Rate Full Throttle: {physics_control.damping_rate_full_throttle}")
         print(
-            f" Damping Rate Zero Throttle Clutch Engaged: {physics_control.damping_rate_zero_throttle_clutch_engaged}")  # 零油门离合器结合时的阻尼率
+            f" Damping Rate Zero Throttle Clutch Engaged: {physics_control.damping_rate_zero_throttle_clutch_engaged}")
         print(
-            f" Damping Rate Zero Throttle Clutch Disengaged: {physics_control.damping_rate_zero_throttle_clutch_disengaged}")  # 零油门离合器分离时的阻尼率
-        print(
-            f" If True, the vehicle will have an automatic transmission: {physics_control.use_gear_autobox}")  # 是否自动变速箱
-        print(f" Gear Switch Time: {physics_control.gear_switch_time}")  # 换挡时间
-        print(f" Clutch Strength: {physics_control.clutch_strength}")  # 离合器强度
-        print(f" Final Ratio: {physics_control.final_ratio}")  # 最终传动比
-        print(f" Mass: {physics_control.mass}")  # 车辆质量
-        print(f" Drag coefficient: {physics_control.drag_coefficient}")  # 空气阻力系数
-        # 打印转向曲线（速度-转向关系）
+            f" Damping Rate Zero Throttle Clutch Disengaged: {physics_control.damping_rate_zero_throttle_clutch_disengaged}")
+        print(f" If True, the vehicle will have an automatic transmission: {physics_control.use_gear_autobox}")
+        print(f" Gear Switch Time: {physics_control.gear_switch_time}")
+        print(f" Clutch Strength: {physics_control.clutch_strength}")
+        print(f" Final Ratio: {physics_control.final_ratio}")
+        print(f" Mass: {physics_control.mass}")
+        print(f" Drag coefficient: {physics_control.drag_coefficient}")
         print(f" Steering Curve:")
         for point in physics_control.steering_curve:
             print(f"Speed: {point.x}, Steering: {point.y}")

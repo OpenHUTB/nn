@@ -84,6 +84,52 @@ def get_spiral_trajectory(x_init, y_init, total_points=200, turns=2, scale=2):
 
     return x_traj, y_traj, v_ref, theta_ref
 
+
+def get_square_trajectory(x_init, y_init, side_length=23, total_points=92):
+    """生成方形轨迹"""
+    # 计算方形四个顶点
+    points = [
+        (x_init, y_init),  # 起点
+        (x_init + side_length, y_init),  # 右顶点
+        (x_init + side_length, y_init + side_length),  # 右上顶点
+        (x_init, y_init + side_length),  # 上顶点
+        (x_init, y_init)  # 回到起点（闭合）
+    ]
+
+    # 计算每条边的点数（平均分配）
+    points_per_side = total_points // 4
+    t_values = np.linspace(0, 1, points_per_side, endpoint=False)
+
+    x_traj = []
+    y_traj = []
+
+    # 生成四条边的轨迹点
+    for i in range(4):
+        x0, y0 = points[i]
+        x1, y1 = points[i + 1]
+        x_segment = x0 + (x1 - x0) * t_values
+        y_segment = y0 + (y1 - y0) * t_values
+        x_traj.extend(x_segment)
+        y_traj.extend(y_segment)
+
+    # 确保总点数正确
+    x_traj = np.array(x_traj[:total_points])
+    y_traj = np.array(y_traj[:total_points])
+
+    # 参考速度
+    v_ref = [V_REF for _ in range(total_points)]
+
+    # 计算参考角度（切线方向）
+    theta_ref = []
+    for i in range(total_points - 1):
+        dx = x_traj[i + 1] - x_traj[i]
+        dy = y_traj[i + 1] - y_traj[i]
+        theta = np.arctan2(dy, dx)
+        theta_ref.append(theta)
+    theta_ref.append(theta_ref[-1])  # 最后一个点保持与前一个相同
+
+    return x_traj, y_traj, v_ref, theta_ref
+
 def get_ref_trajectory(x_traj, y_traj, theta_traj, current_idx):
     if current_idx + N < len(x_traj):
         x_ref = x_traj[current_idx:current_idx + N]
@@ -110,4 +156,3 @@ def calculate_lateral_deviation(x, y, x_ref1, y_ref1, x_ref2, y_ref2):
         return num / denom
     else:
         return 0
-

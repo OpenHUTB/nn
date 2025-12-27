@@ -18,11 +18,11 @@
   },
   "gesture": {
     "skin_lower_h": 0,
-    "skin_upper_h": 170,
+    "skin_upper_h": 178,
     "skin_lower_s": 0,
-    "skin_upper_s": 70,
+    "skin_upper_s": 125,
     "skin_lower_v": 0,
-    "skin_upper_v": 75,
+    "skin_upper_v": 96,
     "min_hand_area": 3000,
     "max_hand_area": 30000,
     "hand_ratio_threshold": 1.5,
@@ -31,6 +31,8 @@
     "transition_threshold": 0.3,
     "position_stability_weight": 0.4,
     "gesture_cooldown": 0.5,
+    "stability_window_size": 15,
+    "enable_gesture_stability_analysis": true,
     "history_size": 10,
     "smooth_frames": 5,
     "min_confidence": 0.6,
@@ -88,6 +90,13 @@
     "show_performance_mode": true,
     "show_performance_stats": true,
     "show_system_resources": true,
+    "show_advanced_gestures": true,
+    "show_performance_visualization": true,
+    "performance_visualization_mode": "charts",
+    "show_gesture_stability_info": true,
+    "show_custom_gestures": true,
+    "show_hotkey_hints": true,
+    "show_operation_hints": true,
     "font_size_large": 20,
     "font_size_medium": 16,
     "font_size_small": 14,
@@ -101,7 +110,8 @@
     "show_trajectory_heatmap": false,
     "theme": "dark",
     "trajectory_max_points": 100,
-    "ui_opacity": 0.7
+    "ui_opacity": 0.7,
+    "show_flight_mode": true
   },
   "performance": {
     "target_fps": 30,
@@ -116,6 +126,11 @@
     ],
     "auto_report_interval": 60,
     "enable_performance_monitor": true,
+    "enable_gpu_monitoring": true,
+    "enable_performance_prediction": true,
+    "enable_anomaly_detection": true,
+    "performance_visualization": true,
+    "detailed_performance_charts": false,
     "enable_gpu_acceleration": false,
     "enable_hardware_acceleration": true,
     "enable_multithreading": false,
@@ -128,13 +143,14 @@
     "auto_calibrate_skin": true,
     "skin_calibration_frames": 30,
     "hand_size_calibration": true,
+    "auto_adjust_parameters": true,
     "calibration_interval": 300,
     "calibration_timeout": 10.0,
     "enable_adaptive_calibration": true,
     "min_calibration_samples": 50
   },
   "speech": {
-    "enabled": true,
+    "enabled": false,
     "volume": 1.0,
     "rate": 150,
     "announce_gestures": true,
@@ -149,6 +165,9 @@
     "min_gesture_confidence": 0.7,
     "gesture_start_threshold": 3,
     "gesture_end_threshold": 10,
+    "announce_stability_status": true,
+    "announce_visualization_changes": true,
+    "performance_warnings_enabled": true,
     "announce_gesture_directions": true,
     "announce_recording": true,
     "enable_short_feedback": true,
@@ -163,10 +182,80 @@
     "trajectory_thickness": 2,
     "trajectory_max_length": 100,
     "default_save_dir": "trajectories",
+    "auto_playback_after_recording": false,
+    "save_compressed_trajectories": true,
+    "max_auto_save_files": 10,
     "auto_save": false,
     "default_filename": "gesture_recording.pkl",
     "loop_playback": false,
     "playback_speed": 1.0
+  },
+  "stability": {
+    "enable_stability_analysis": true,
+    "stability_update_interval": 1.0,
+    "min_stability_score": 0.6,
+    "max_transition_count": 10,
+    "stability_notification_enabled": true,
+    "auto_reset_on_unstable": true
+  },
+  "visualization": {
+    "chart_update_rate": 2,
+    "gauge_update_rate": 5,
+    "chart_history_length": 30,
+    "show_chart_grid": true,
+    "chart_background_opacity": 0.7,
+    "performance_colors": {
+      "excellent": [
+        0,
+        255,
+        0
+      ],
+      "good": [
+        100,
+        255,
+        100
+      ],
+      "fair": [
+        255,
+        255,
+        0
+      ],
+      "poor": [
+        255,
+        165,
+        0
+      ],
+      "critical": [
+        255,
+        0,
+        0
+      ]
+    }
+  },
+  "training": {
+    "samples_needed": 20,
+    "min_sample_confidence": 0.6,
+    "match_threshold": 0.7,
+    "enable_custom_gestures": true,
+    "auto_load_templates": true,
+    "template_dir": "gesture_templates",
+    "auto_save_training": true,
+    "enable_training_mode": false,
+    "samples_per_gesture": 50,
+    "training_gestures": [
+      "Stop",
+      "Forward",
+      "Up",
+      "Down",
+      "Left",
+      "Right"
+    ]
+  },
+  "hotkeys": {
+    "quick_save_enabled": true,
+    "quick_load_enabled": true,
+    "hint_duration": 2.0,
+    "hint_fade_speed": 0.05
   },
   "drone_control": {
     "altitude": -10.0,
@@ -212,18 +301,5 @@
     "debug_mode": false,
     "last_updated": "2025-12-19 20:51:44",
     "version": "1.0"
-  },
-  "training": {
-    "auto_save_training": true,
-    "enable_training_mode": false,
-    "samples_per_gesture": 50,
-    "training_gestures": [
-      "Stop",
-      "Forward",
-      "Up",
-      "Down",
-      "Left",
-      "Right"
-    ]
   }
 }

@@ -1,55 +1,90 @@
-# config.yaml - 完整配置示例
+# ======================== CARLA连接配置 ========================
 host: "localhost"
 port: 2000
-num_npcs: 20
-img_width: 640
-img_height: 480
-conf_thres: 0.5
-iou_thres: 0.3
-max_age: 5
-min_hits: 3
-yolo_model: "yolov8n.pt"
-yolo_imgsz_max: 320
-yolo_iou: 0.45
-yolo_quantize: false
-kf_dt: 0.05
-max_speed: 50.0
-window_width: 1280
-window_height: 720
-smooth_alpha: 0.2
-fps_window_size: 15
-display_fps: 30
-track_history_len: 20
-track_line_width: 2
-track_alpha: 0.6
-stop_speed_thresh: 1.0
-stop_frames_thresh: 5
-overtake_speed_ratio: 1.5
-overtake_dist_thresh: 50.0
-lane_change_thresh: 0.5
-brake_accel_thresh: 2.0
-turn_angle_thresh: 15.0
-danger_dist_thresh: 10.0
-predict_frames: 10
-default_weather: "clear"
-auto_adjust_detection: true
+timeout: 20.0
+
+# ======================== 传感器配置 ========================
+img_width: 1280
+img_height: 960
+fov: 110
+sensor_tick: 0.05
 use_lidar: true
+
+# ======================== LiDAR配置 ========================
 lidar_channels: 32
 lidar_range: 100.0
 lidar_points_per_second: 500000
-fuse_lidar_vision: true
-record_data: true
-record_dir: "track_records"
-record_format: "csv"
-record_fps: 10
-save_screenshots: false
-use_3d_visualization: true
-pcd_view_size: 800
 
-# 检测框样式配置
-det_box_color: [255, 0, 0]      # 蓝色框
-det_box_thickness: 2
-det_label_bg_color: [0, 0, 0]   # 黑色背景
-det_label_text_color: [255, 255, 255]  # 白色文字
-det_label_font_scale: 0.5
-det_label_padding: 5
+# ======================== 检测模型配置 ========================
+yolo_model: "yolov8n.pt"
+conf_thres: 0.1
+iou_thres: 0.3
+device: "cpu"  
+yolo_imgsz_max: 640
+
+# ======================== 跟踪算法配置 ========================
+max_age: 5
+min_hits: 3
+kf_dt: 0.05
+max_speed: 50.0
+
+# ======================== 可视化配置 ========================
+window_width: 1280
+window_height: 720
+display_fps: 30
+
+# ======================== 轨迹历史配置 ========================
+track_history_len: 20
+
+# ======================== 行为分析配置 ========================
+stop_speed_thresh: 0.8
+stop_frames_thresh: 5
+overtake_speed_ratio: 1.5
+overtake_dist_thresh: 60.0
+lane_change_thresh: 0.4
+brake_accel_thresh: 2.0
+turn_angle_thresh: 15.0
+danger_dist_thresh: 15.0
+predict_frames: 10
+
+# ======================== 天气与NPC配置 ========================
+default_weather: "clear"
+num_npcs: 20
+
+# ======================== 视角控制配置 ========================
+view:
+  default_mode: "satellite"
+  satellite_height: 50.0
+  behind_distance: 10.0
+  first_person_height: 1.6
+
+# ======================== 热重载配置 ========================
+hot_reload:
+  enabled: true           # 是否启用热重载
+  check_interval: 100     # 每多少帧检查一次配置文件
+  safe_keys_only: true    # 是否只更新安全参数（避免重启连接）
+
+# 可热重载的安全参数列表（这些参数可以安全更新而不需要重启）
+hot_reload_safe_keys:
+  - "conf_thres"          # 检测置信度阈值
+  - "iou_thres"           # IOU阈值
+  - "display_fps"         # 显示帧率
+  - "max_age"             # 跟踪最大丢失帧数
+  - "min_hits"            # 跟踪最小匹配次数
+  - "adaptive_fps"        # 是否启用自适应帧率
+  - "min_fps"             # 最小FPS
+  - "max_fps"             # 最大FPS
+  - "fov"                 # 相机视野
+  - "yolo_imgsz_max"      # YOLO输入尺寸
+  - "stop_speed_thresh"   # 停车速度阈值
+  - "danger_dist_thresh"  # 危险距离阈值
+  - "weather"             # 天气设置
+
+# ======================== 交通标志检测配置 ========================
+enable_sign_detection: false  # 是否启用交通标志检测
+
+traffic_sign:
+  enabled: true               # 检测器是否启用
+  show_signs: true            # 是否显示检测框
+  enable_actions: false       # 是否触发动作（警告等）
+  conf_threshold: 0.5         # 置信度阈值
