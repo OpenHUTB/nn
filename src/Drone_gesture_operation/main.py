@@ -312,6 +312,5 @@ class StableFPSHandRecognizer:
 
 
 if __name__ == '__main__':
-    # 20帧兼顾流畅度和识别稳定性，暗光下更稳定
     recognizer = StableFPSHandRecognizer(target_fps=20)
     recognizer.run()
