@@ -2535,7 +2535,7 @@ class PerceptiveExplorer:
                 'record_func': 'record_red_object',
                 'record_enabled_config': 'RECORD_RED_OBJECTS',
                 'has_dual_range': True,  # 红色需要两个颜色范围
-                'is_same_func': self._is_same_object,
+                'is_same_func': self._is_same_object_generic,
             },
             'blue': {
                 'detection_config': config.PERCEPTION['BLUE_OBJECT_DETECTION'],
@@ -2552,7 +2552,7 @@ class PerceptiveExplorer:
                 'record_func': 'record_blue_object',
                 'record_enabled_config': 'RECORD_BLUE_OBJECTS',
                 'has_dual_range': False,
-                'is_same_func': self._is_same_object_blue,
+                'is_same_func': self._is_same_object_generic,
             },
             'black': {
                 'detection_config': config.PERCEPTION['BLACK_OBJECT_DETECTION'],
@@ -2569,7 +2569,7 @@ class PerceptiveExplorer:
                 'record_func': 'record_black_object',
                 'record_enabled_config': 'RECORD_BLACK_OBJECTS',
                 'has_dual_range': False,
-                'is_same_func': self._is_same_object_black,
+                'is_same_func': self._is_same_object_generic,
             }
         }
         
@@ -2755,7 +2755,20 @@ class PerceptiveExplorer:
         objects, marked_image = self._detect_color_objects_generic(image, 'black', depth_array)
         return objects, marked_image
 
-    def _is_same_object(self, obj1: RedObject, obj2: RedObject, distance_threshold=2.0) -> bool:
+    def _is_same_object_generic(self, obj1: Any, obj2: Any, distance_threshold=2.0) -> bool:
+        """
+        通用的物体相似度判断函数
+        适用于RedObject、BlueObject、BlackObject等具有相同结构的对象
+        
+        Args:
+            obj1: 第一个物体对象
+            obj2: 第二个物体对象
+            distance_threshold: 距离阈值（米），默认2.0米
+        
+        Returns:
+            bool: 如果两个物体被认为是同一个物体，返回True
+        """
+        # 如果两个物体都有有效的世界坐标位置，使用世界坐标距离判断
         if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
             distance = math.sqrt(
                 (obj1.position[0] - obj2.position[0])**2 +
@@ -2763,135 +2776,124 @@ class PerceptiveExplorer:
             )
             return distance < distance_threshold
 
+        # 如果没有有效的世界坐标，使用像素坐标和时间差判断
         pixel_distance = math.sqrt(
             (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
             (obj1.pixel_position[1] - obj2.pixel_position[1])**2
         )
         time_diff = abs(obj1.timestamp - obj2.timestamp)
 
+        # 像素距离小于50且时间差小于5秒，认为是同一个物体
         return pixel_distance < 50 and time_diff < 5.0
+
+    def _is_same_object(self, obj1: RedObject, obj2: RedObject, distance_threshold=2.0) -> bool:
+        """检测红色物体是否相同 - 使用通用函数"""
+        return self._is_same_object_generic(obj1, obj2, distance_threshold)
 
     def _is_same_object_blue(self, obj1: BlueObject, obj2: BlueObject, distance_threshold=2.0) -> bool:
-        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
-            distance = math.sqrt(
-                (obj1.position[0] - obj2.position[0])**2 +
-                (obj1.position[1] - obj2.position[1])**2
-            )
-            return distance < distance_threshold
-
-        pixel_distance = math.sqrt(
-            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
-            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
-        )
-        time_diff = abs(obj1.timestamp - obj2.timestamp)
-
-        return pixel_distance < 50 and time_diff < 5.0
+        """检测蓝色物体是否相同 - 使用通用函数"""
+        return self._is_same_object_generic(obj1, obj2, distance_threshold)
 
     def _is_same_object_black(self, obj1: BlackObject, obj2: BlackObject, distance_threshold=2.0) -> bool:
-        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
-            distance = math.sqrt(
-                (obj1.position[0] - obj2.position[0])**2 +
-                (obj1.position[1] - obj2.position[1])**2
-            )
-            return distance < distance_threshold
+        """检测黑色物体是否相同 - 使用通用函数"""
+        return self._is_same_object_generic(obj1, obj2, distance_threshold)
 
-        pixel_distance = math.sqrt(
-            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
-            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
-        )
-        time_diff = abs(obj1.timestamp - obj2.timestamp)
-
-        return pixel_distance < 50 and time_diff < 5.0
+    def _check_object_proximity_generic(self, current_pos: Tuple[float, float], color_type: str) -> bool:
+        """
+        通用的物体接近检测函数
+        检查当前位置是否接近指定颜色类型的未访问物体
+        
+        Args:
+            current_pos: 当前位置 (x, y)
+            color_type: 颜色类型 ('red', 'blue', 'black')
+        
+        Returns:
+            bool: 如果检测到接近物体并触发了访问，返回True；否则返回False
+        """
+        # 颜色类型配置映射
+        PROXIMITY_CONFIG = {
+            'red': {
+                'objects_attr': 'red_objects',
+                'exploration_config': config.INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION'],
+                'stats_key': 'red_objects_visited',
+                'log_name': '红色物体',
+                'event_type': 'red_object_visited',
+                'inspection_state': FlightState.RED_OBJECT_INSPECTION,
+            },
+            'blue': {
+                'objects_attr': 'blue_objects',
+                'exploration_config': config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION'],
+                'stats_key': 'blue_objects_visited',
+                'log_name': '蓝色物体',
+                'event_type': 'blue_object_visited',
+                'inspection_state': FlightState.BLUE_OBJECT_INSPECTION,
+            },
+            'black': {
+                'objects_attr': 'black_objects',
+                'exploration_config': config.INTELLIGENT_DECISION['BLACK_OBJECT_EXPLORATION'],
+                'stats_key': 'black_objects_visited',
+                'log_name': '黑色物体',
+                'event_type': 'black_object_visited',
+                'inspection_state': FlightState.BLACK_OBJECT_INSPECTION,
+            }
+        }
+        
+        if color_type not in PROXIMITY_CONFIG:
+            raise ValueError(f"不支持的颜色类型: {color_type}，支持的类型: {list(PROXIMITY_CONFIG.keys())}")
+        
+        cfg = PROXIMITY_CONFIG[color_type]
+        
+        # 获取物体列表
+        objects = getattr(self, cfg['objects_attr'])
+        
+        # 遍历所有未访问的物体
+        for obj in objects:
+            if not obj.visited:
+                # 计算距离
+                distance = math.sqrt(
+                    (obj.position[0] - current_pos[0])**2 +
+                    (obj.position[1] - current_pos[1])**2
+                )
+                
+                # 获取最小接近距离
+                min_distance = cfg['exploration_config']['MIN_DISTANCE']
+                
+                # 如果距离小于最小距离，标记为已访问
+                if distance < min_distance:
+                    obj.visited = True
+                    obj.last_seen = time.time()
+                    self.stats[cfg['stats_key']] += 1
+                    
+                    # 记录日志
+                    self.logger.info(f"✅ 已访问{cfg['log_name']} #{obj.id} (距离: {distance:.1f}m)")
+                    
+                    # 记录事件到数据日志
+                    if self.data_logger:
+                        event_data = {
+                            'object_id': obj.id,
+                            'position': obj.position,
+                            'distance': distance,
+                            'timestamp': time.time()
+                        }
+                        self.data_logger.record_event(cfg['event_type'], event_data)
+                    
+                    # 改变状态为物体检查状态
+                    self.change_state(cfg['inspection_state'])
+                    return True
+        
+        return False
 
     def _check_red_object_proximity(self, current_pos):
-        for obj in self.red_objects:
-            if not obj.visited:
-                distance = math.sqrt(
-                    (obj.position[0] - current_pos[0])**2 +
-                    (obj.position[1] - current_pos[1])**2
-                )
-
-                min_distance = config.INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION']['MIN_DISTANCE']
-                if distance < min_distance:
-                    obj.visited = True
-                    obj.last_seen = time.time()
-                    self.stats['red_objects_visited'] += 1
-
-                    self.logger.info(f"✅ 已访问红色物体 #{obj.id} (距离: {distance:.1f}m)")
-
-                    if self.data_logger:
-                        event_data = {
-                            'object_id': obj.id,
-                            'position': obj.position,
-                            'distance': distance,
-                            'timestamp': time.time()
-                        }
-                        self.data_logger.record_event('red_object_visited', event_data)
-
-                    self.change_state(FlightState.RED_OBJECT_INSPECTION)
-                    return True
-
-        return False
+        """检查红色物体接近 - 使用通用函数"""
+        return self._check_object_proximity_generic(current_pos, 'red')
 
     def _check_blue_object_proximity(self, current_pos):
-        for obj in self.blue_objects:
-            if not obj.visited:
-                distance = math.sqrt(
-                    (obj.position[0] - current_pos[0])**2 +
-                    (obj.position[1] - current_pos[1])**2
-                )
-
-                min_distance = config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']['MIN_DISTANCE']
-                if distance < min_distance:
-                    obj.visited = True
-                    obj.last_seen = time.time()
-                    self.stats['blue_objects_visited'] += 1
-
-                    self.logger.info(f"✅ 已访问蓝色物体 #{obj.id} (距离: {distance:.1f}m)")
-
-                    if self.data_logger:
-                        event_data = {
-                            'object_id': obj.id,
-                            'position': obj.position,
-                            'distance': distance,
-                            'timestamp': time.time()
-                        }
-                        self.data_logger.record_event('blue_object_visited', event_data)
-
-                    self.change_state(FlightState.BLUE_OBJECT_INSPECTION)
-                    return True
-
-        return False
+        """检查蓝色物体接近 - 使用通用函数"""
+        return self._check_object_proximity_generic(current_pos, 'blue')
 
     def _check_black_object_proximity(self, current_pos):
-        for obj in self.black_objects:
-            if not obj.visited:
-                distance = math.sqrt(
-                    (obj.position[0] - current_pos[0])**2 +
-                    (obj.position[1] - current_pos[1])**2
-                )
-
-                min_distance = config.INTELLIGENT_DECISION['BLACK_OBJECT_EXPLORATION']['MIN_DISTANCE']
-                if distance < min_distance:
-                    obj.visited = True
-                    obj.last_seen = time.time()
-                    self.stats['black_objects_visited'] += 1
-
-                    self.logger.info(f"✅ 已访问黑色物体 #{obj.id} (距离: {distance:.1f}m)")
-
-                    if self.data_logger:
-                        event_data = {
-                            'object_id': obj.id,
-                            'position': obj.position,
-                            'distance': distance,
-                            'timestamp': time.time()
-                        }
-                        self.data_logger.record_event('black_object_visited', event_data)
-
-                    self.change_state(FlightState.BLACK_OBJECT_INSPECTION)
-                    return True
-
-        return False
+        """检查黑色物体接近 - 使用通用函数"""
+        return self._check_object_proximity_generic(current_pos, 'black')
 
     def get_depth_perception(self) -> PerceptionResult:
         result = PerceptionResult()
