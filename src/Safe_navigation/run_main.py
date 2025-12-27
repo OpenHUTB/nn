@@ -17,6 +17,7 @@ import random
 import threading
 
 
+
 class AirSimNHCarSimulator:
     """AirSim无人车仿真主类 - V2.0 改进版"""
 
@@ -28,61 +29,6 @@ class AirSimNHCarSimulator:
         self.is_connected = False
         self.is_api_control_enabled = False
 
-        # 车辆状态跟踪
-        self.initial_position = None
-        self.initial_yaw = None
-        self.path_history = []
-        self.velocity_history = deque(maxlen=100)
-
-        # 碰撞计数器
-        self.collision_count = 0
-        self.last_collision_state = False
-        self.last_collision_time = 0
-        self.collision_recovery_mode = False
-        self.recovery_start_time = 0
-
-        # 路口导航参数 - 改进版
-        self.intersection_detected = False
-        self.approaching_intersection = False
-        self.in_intersection = False
-        self.intersection_passed = False
-        self.intersection_decision_made = False
-        self.intersection_turn_direction = None  # 'left', 'right', 'straight'
-        self.intersection_approach_distance = 20.0  # 增加检测距离
-        self.intersection_pass_distance = 12.0  # 增加通过距离
-
-        # 路口检测状态
-        self.intersection_check_counter = 0
-        self.straight_line_counter = 0
-        self.side_obstacle_detected = False
-
-        # 左转避障参数
-        self.left_turn_obstacle_avoidance = False
-        self.left_turn_safe_distance = 3.5  # 安全距离阈值
-        self.left_turn_adjustment_count = 0
-        self.max_left_adjustments = 3
-
-        # 路径记忆和学习
-        self.position_history = deque(maxlen=500)
-        self.yaw_history = deque(maxlen=500)
-        self.successful_paths = []
-        self.failed_paths = []
-
-        # 动态调整参数
-        self.aggressiveness = 0.4  # 降低侵略性，更谨慎
-        self.steering_adjustment_rate = 0.08  # 降低转向调整速率
-        self.last_steering = 0
-        self.target_speed = 18  # km/h，降低目标速度
-
-        # 环境感知参数
-        self.right_obstacle_distance = float('inf')
-        self.left_obstacle_distance = float('inf')
-        self.front_obstacle_distance = float('inf')
-
-        # 改进的偏移控制
-        self.offset_history = deque(maxlen=20)
-        self.target_offset_range = (-0.05, 0.05)  # 目标偏移范围
-        self.offset_adjustment_gain = 0.3  # 偏移调整增益
 
         # 创建数据保存目录
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -134,13 +80,7 @@ class AirSimNHCarSimulator:
                     self.log_message(f"使用车辆: {self.vehicle_name}")
 
             self.is_connected = True
-            self.log_message("✓ 成功连接到AirSim仿真器！")
 
-            self.initial_position = self.get_position()
-            self.initial_yaw = self.get_yaw()
-            self.log_message(
-                f"初始位置: x={self.initial_position['x']:.3f}, y={self.initial_position['y']:.3f}, z={self.initial_position['z']:.3f}")
-            self.log_message(f"初始偏航角: {self.initial_yaw:.2f}°")
 
             return True
 
@@ -149,56 +89,7 @@ class AirSimNHCarSimulator:
             self.log_message("请确保AirSimNH环境正在运行")
             return False
 
-    def get_position(self):
-        """获取车辆位置"""
-        try:
-            kinematics = self.client.simGetVehiclePose(vehicle_name=self.vehicle_name)
-            return {
-                "x": kinematics.position.x_val,
-                "y": kinematics.position.y_val,
-                "z": kinematics.position.z_val
-            }
-        except:
-            return {"x": 0, "y": 0, "z": 0}
 
-    def get_yaw(self):
-        """获取车辆偏航角"""
-        try:
-            kinematics = self.client.simGetVehiclePose(vehicle_name=self.vehicle_name)
-            orientation = kinematics.orientation
-
-            q0, q1, q2, q3 = orientation.w_val, orientation.x_val, orientation.y_val, orientation.z_val
-            siny_cosp = 2 * (q0 * q3 + q1 * q2)
-            cosy_cosp = 1 - 2 * (q2 * q2 + q3 * q3)
-            yaw = math.atan2(siny_cosp, cosy_cosp)
-            yaw_deg = math.degrees(yaw)
-
-            if yaw_deg < 0:
-                yaw_deg += 360
-
-            return yaw_deg
-        except:
-            return 0.0
-
-    def get_velocity(self):
-        """获取车辆速度向量"""
-        try:
-            state = self.client.getCarState(vehicle_name=self.vehicle_name)
-            return {
-                "x": state.kinematics_estimated.linear_velocity.x_val,
-                "y": state.kinematics_estimated.linear_velocity.y_val,
-                "z": state.kinematics_estimated.linear_velocity.z_val
-            }
-        except:
-            return {"x": 0, "y": 0, "z": 0}
-
-    def get_speed_kmh(self):
-        """获取速度(km/h)"""
-        try:
-            state = self.client.getCarState(vehicle_name=self.vehicle_name)
-            return state.speed
-        except:
-            return 0.0
 
     def enable_api_control(self, enable=True):
         """启用/禁用API控制"""
@@ -373,13 +264,12 @@ class AirSimNHCarSimulator:
             if len(self.path_history) > 1000:
                 self.path_history.pop(0)
 
+
             state_info = {
                 "timestamp": current_time,
                 "speed_kmh": state.speed,
                 "speed_ms": state.speed / 3.6,
-                "position": current_position,
-                "yaw": yaw,
-                "velocity": velocity,
+
                 "rpm": state.rpm,
                 "max_rpm": state.maxrpm,
                 "gear": state.gear,
@@ -577,41 +467,7 @@ class AirSimNHCarSimulator:
 
             return None
 
-        return controls
 
-    def smart_offset_correction(self, current_offset):
-        """智能偏移校正"""
-        # 计算平均偏移
-        if len(self.offset_history) >= 5:
-            avg_offset = sum(self.offset_history) / len(self.offset_history)
-        else:
-            avg_offset = current_offset
-
-        # 目标偏移控制
-        target_offset = 0.0  # 目标是在中心
-
-        # 计算偏移误差
-        offset_error = current_offset - target_offset
-
-        # 根据误差大小决定转向
-        if offset_error > 0.15:  # 严重右偏
-            return -0.3
-        elif offset_error > 0.08:  # 中度右偏
-            return -0.18
-        elif offset_error > 0.03:  # 轻微右偏
-            return -0.08
-        elif offset_error < -0.12:  # 严重左偏
-            return 0.2
-        elif offset_error < -0.06:  # 中度左偏
-            return 0.1
-        elif offset_error < -0.02:  # 轻微左偏
-            return 0.05
-        else:  # 良好位置
-            return -0.02  # 轻微左倾预防
-
-    def advanced_safe_control_improved(self, duration=70):
-        """
-        改进的增强安全控制：防碰撞 + 智能路口导航
         参数:
             duration: 演示总时长（秒）
         """
@@ -619,28 +475,11 @@ class AirSimNHCarSimulator:
             self.log_message("错误: 请先连接并启用API控制")
             return False
 
-        self.log_message(f"\n开始改进版增强安全控制演示 ({duration}秒)...")
-        self.log_message("策略: 智能防碰撞 + 改进路口导航 + 动态调整")
+
 
         start_time = time.time()
         controls = airsim.CarControls()
 
-        # 控制参数
-        target_speed_kmh = self.target_speed
-        base_throttle = 0.45  # 降低基础油门
-
-        # 状态跟踪
-        offset_history = deque(maxlen=10)
-        max_right_offset = 0
-        last_good_position = self.initial_position.copy()
-
-        # 路口相关
-        intersection_navigation_started = False
-        intersection_navigation_complete = False
-
-        # 改进的碰撞预防
-        collision_prevention_active = False
-        collision_prevention_timer = 0
 
         try:
             while time.time() - start_time < duration:
@@ -876,21 +715,7 @@ class AirSimNHCarSimulator:
             stats = {
                 "timestamp": datetime.now().isoformat(),
                 "vehicle_name": self.vehicle_name,
-                "collision_count": self.collision_count,
-                "path_history_length": len(self.path_history),
-                "initial_position": self.initial_position,
-                "initial_yaw": self.initial_yaw,
-                "intersection_data": intersection_data,
-                "target_speed": self.target_speed,
-                "aggressiveness": self.aggressiveness
-            }
 
-            stats_file = f"{self.data_dir}/simulation_stats.json"
-            with open(stats_file, 'w', encoding='utf-8') as f:
-                json.dump(stats, f, indent=2, ensure_ascii=False)
-
-            # 生成详细报告
-            self.generate_detailed_report()
 
             return True
 
@@ -898,77 +723,6 @@ class AirSimNHCarSimulator:
             self.log_message(f"✗ 保存数据失败: {e}")
             return False
 
-    def generate_detailed_report(self):
-        """生成详细报告"""
-        report_file = f"{self.data_dir}/detailed_report.txt"
-
-        with open(report_file, 'w', encoding='utf-8') as f:
-            f.write("=" * 70 + "\n")
-            f.write("AirSim无人车智能控制演示详细报告 V2.0\n")
-            f.write("丁字路口通过改进版本\n")
-            f.write("=" * 70 + "\n\n")
-
-            f.write(f"演示时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"车辆名称: {self.vehicle_name}\n")
-            f.write(f"碰撞次数: {self.collision_count}\n")
-            f.write(f"路径点数量: {len(self.path_history)}\n")
-            f.write(f"行驶距离: {self.calculate_distance_traveled():.1f}米\n")
-            f.write(f"目标速度: {self.target_speed} km/h\n")
-            f.write(f"驾驶侵略性: {self.aggressiveness}\n\n")
-
-            f.write("路口导航统计:\n")
-            f.write(f"  路口检测: {'是' if self.intersection_detected else '否'}\n")
-            if self.intersection_detected:
-                f.write(f"  路口通过: {'是' if self.intersection_passed else '否'}\n")
-                f.write(f"  转向决策: {self.intersection_turn_direction}\n")
-                f.write(f"  左转调整次数: {self.left_turn_adjustment_count}\n")
-
-            f.write("\n路径分析:\n")
-            if self.path_history:
-                y_values = [p['position']['y'] for p in self.path_history]
-                x_values = [p['position']['x'] for p in self.path_history]
-
-                min_y = min(y_values)
-                max_y = max(y_values)
-                avg_y = sum(y_values) / len(y_values)
-
-                f.write(f"  Y坐标范围: {min_y:.3f} 到 {max_y:.3f} 米\n")
-                f.write(f"  平均Y坐标: {avg_y:.3f} 米\n")
-                f.write(f"  初始Y坐标: {self.initial_position['y']:.3f} 米\n")
-                f.write(f"  最大右偏移: {max_y - self.initial_position['y']:.3f} 米\n")
-
-                # 分析偏移趋势
-                if len(y_values) > 20:
-                    start_avg = sum(y_values[:10]) / 10
-                    middle_avg = sum(y_values[len(y_values) // 2 - 5:len(y_values) // 2 + 5]) / 10
-                    end_avg = sum(y_values[-10:]) / 10
-
-                    f.write(f"  起始平均Y: {start_avg:.3f} 米\n")
-                    f.write(f"  中间平均Y: {middle_avg:.3f} 米\n")
-                    f.write(f"  结束平均Y: {end_avg:.3f} 米\n")
-
-                    start_to_mid = middle_avg - start_avg
-                    mid_to_end = end_avg - middle_avg
-
-                    f.write(f"  第一阶段偏移: {start_to_mid:+.3f} 米\n")
-                    f.write(f"  第二阶段偏移: {mid_to_end:+.3f} 米\n")
-
-                    if abs(start_to_mid) < 0.5 and abs(mid_to_end) < 0.5:
-                        f.write("  结论: 车辆基本保持稳定\n")
-                    elif start_to_mid > 0.5:
-                        f.write("  结论: 第一阶段有明显右偏\n")
-                    elif mid_to_end < -0.5:
-                        f.write("  结论: 第二阶段有明显左偏\n")
-
-            f.write("\n性能评估:\n")
-            if self.collision_count == 0:
-                f.write("  ✓ 碰撞避免: 优秀\n")
-            elif self.collision_count <= 1:
-                f.write("  ⚠️ 碰撞避免: 良好\n")
-            elif self.collision_count <= 3:
-                f.write("  ⚠️ 碰撞避免: 一般\n")
-            else:
-                f.write("  ✗ 碰撞避免: 需要改进\n")
 
             if self.intersection_passed:
                 f.write("  ✓ 路口通过: 成功\n")
@@ -1012,8 +766,7 @@ class AirSimNHCarSimulator:
             if not self.enable_api_control(True):
                 return False
 
-            self.log_message("\n等待车辆稳定...")
-            time.sleep(3)  # 增加等待时间
+
 
             # 运行改进版增强安全控制演示
             self.log_message("\n" + "=" * 70)
@@ -1042,9 +795,7 @@ class AirSimNHCarSimulator:
 
     def cleanup(self):
         """清理资源"""
-        try:
-            # 先记录清理开始
-            print("\n正在清理资源...")
+
 
             # 停止车辆
             if self.is_api_control_enabled and self.client:
@@ -1091,8 +842,7 @@ def main():
     )
 
     try:
-        # 运行增强演示，时间延长到70秒
-        simulator.run_enhanced_demo(duration=70)
+
 
         print("\n" + "=" * 70)
         print("改进版智能控制演示完成！")

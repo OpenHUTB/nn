@@ -82,7 +82,11 @@ except ImportError as e:
                                   'SUCCESS_COLOR': (0, 255, 150), 'REFRESH_RATE_MS': 100,
                                   'SHOW_GRID': True, 'GRID_SIZE': 300,
                                   'SHOW_OBJECTS_STATS': True, 'SHOW_SYSTEM_STATS': True,
-                                  'SHOW_PERFORMANCE': True}}
+                                  'SHOW_PERFORMANCE': True, 'SHOW_TRAJECTORY': True,
+                                  'TRAJECTORY_SIZE': 280, 'TRAJECTORY_MAX_POINTS': 1000,
+                                  'TRAJECTORY_LINE_COLOR': (0, 255, 255),
+                                  'TRAJECTORY_CURRENT_COLOR': (0, 255, 0),
+                                  'TRAJECTORY_START_COLOR': (255, 255, 0)}}
         SYSTEM = {'LOG_LEVEL': 'INFO', 'LOG_TO_FILE': True, 'LOG_FILENAME': 'drone_log.txt',
                  'MAX_RECONNECT_ATTEMPTS': 3, 'RECONNECT_DELAY': 2.0,
                  'ENABLE_HEALTH_CHECK': True, 'HEALTH_CHECK_INTERVAL': 20}
@@ -1664,6 +1668,10 @@ class InfoDisplayWindow:
         self.display_thread = None
         self.last_update = time.time()
 
+        # 轨迹记录
+        self.trajectory_points = deque(maxlen=config.DISPLAY['INFO_WINDOW'].get('TRAJECTORY_MAX_POINTS', 1000))
+        self.start_position = None
+
         self.start()
 
     def start(self):
@@ -1689,6 +1697,15 @@ class InfoDisplayWindow:
             return
 
         try:
+            # 更新轨迹数据
+            if 'position' in info_data:
+                pos = info_data['position']
+                self.trajectory_points.append((pos[0], pos[1], pos[2]))
+                
+                # 记录起始位置
+                if self.start_position is None:
+                    self.start_position = (pos[0], pos[1], pos[2])
+
             if self.info_queue.full():
                 try:
                     self.info_queue.get_nowait()
@@ -1775,6 +1792,119 @@ class InfoDisplayWindow:
         img = put_chinese_text(img, tip, (center_x - 120, center_y + 50), 18, self.display_config['TEXT_COLOR'], 1)
 
         return img
+
+    def _draw_trajectory(self, trajectory_points, current_pos, start_pos, size):
+        """绘制运动轨迹图"""
+        try:
+            # 创建轨迹图（始终返回有效图像）
+            traj_img = np.zeros((size, size, 3), dtype=np.uint8)
+            traj_img.fill(30)  # 深灰色背景
+
+            # 收集所有点用于计算边界
+            all_points = []
+            if trajectory_points:
+                try:
+                    all_points.extend([(float(p[0]), float(p[1])) for p in trajectory_points if len(p) >= 2])
+                except (IndexError, TypeError, ValueError):
+                    pass
+            if current_pos and len(current_pos) >= 2:
+                try:
+                    all_points.append((float(current_pos[0]), float(current_pos[1])))
+                except (TypeError, ValueError, IndexError):
+                    pass
+            if start_pos and len(start_pos) >= 2:
+                try:
+                    all_points.append((float(start_pos[0]), float(start_pos[1])))
+                except (TypeError, ValueError, IndexError):
+                    pass
+
+            if not all_points:
+                # 没有轨迹点时，返回空白图像
+                return traj_img
+
+            # 计算边界和缩放
+            xs = [p[0] for p in all_points]
+            ys = [p[1] for p in all_points]
+
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+
+            # 添加边距
+            margin = max((max_x - min_x) * 0.1, (max_y - min_y) * 0.1, 5.0)
+            range_x = max_x - min_x + 2 * margin
+            range_y = max_y - min_y + 2 * margin
+
+            if range_x == 0:
+                range_x = 10.0
+            if range_y == 0:
+                range_y = 10.0
+
+            # 坐标转换函数
+            def world_to_pixel(wx, wy):
+                try:
+                    px = int((wx - min_x + margin) / range_x * size)
+                    py = int((wy - min_y + margin) / range_y * size)
+                    px = max(0, min(size - 1, px))
+                    py = max(0, min(size - 1, py))
+                    return px, py
+                except (ZeroDivisionError, ValueError, TypeError):
+                    return size // 2, size // 2
+
+            # 绘制轨迹线
+            if len(trajectory_points) > 1:
+                try:
+                    line_color = self.display_config.get('TRAJECTORY_LINE_COLOR', (0, 255, 255))
+                    for i in range(len(trajectory_points) - 1):
+                        try:
+                            p1 = trajectory_points[i]
+                            p2 = trajectory_points[i + 1]
+                            if len(p1) >= 2 and len(p2) >= 2:
+                                px1, py1 = world_to_pixel(p1[0], p1[1])
+                                px2, py2 = world_to_pixel(p2[0], p2[1])
+                                cv2.line(traj_img, (px1, py1), (px2, py2), line_color, 2)
+                        except (IndexError, TypeError, ValueError):
+                            continue
+                except Exception:
+                    pass
+
+            # 绘制起始点
+            if start_pos and len(start_pos) >= 2:
+                try:
+                    start_color = self.display_config.get('TRAJECTORY_START_COLOR', (255, 255, 0))
+                    sx, sy = world_to_pixel(start_pos[0], start_pos[1])
+                    cv2.circle(traj_img, (sx, sy), 6, start_color, -1)
+                    cv2.circle(traj_img, (sx, sy), 6, (255, 255, 255), 1)
+                except (IndexError, TypeError, ValueError):
+                    pass
+
+            # 绘制当前位置
+            if current_pos and len(current_pos) >= 2:
+                try:
+                    current_color = self.display_config.get('TRAJECTORY_CURRENT_COLOR', (0, 255, 0))
+                    cx, cy = world_to_pixel(current_pos[0], current_pos[1])
+                    cv2.circle(traj_img, (cx, cy), 8, current_color, -1)
+                    cv2.circle(traj_img, (cx, cy), 8, (255, 255, 255), 2)
+                except (IndexError, TypeError, ValueError):
+                    pass
+
+            # 绘制坐标轴
+            try:
+                axis_color = (100, 100, 100)
+                center_x_px, center_y_px = world_to_pixel(0, 0)
+                if 0 <= center_x_px < size:
+                    cv2.line(traj_img, (center_x_px, 0), (center_x_px, size), axis_color, 1)
+                if 0 <= center_y_px < size:
+                    cv2.line(traj_img, (0, center_y_px), (size, center_y_px), axis_color, 1)
+            except Exception:
+                pass
+
+            return traj_img
+        except Exception as e:
+            # 发生任何错误时返回空白图像
+            print(f"⚠️ 绘制轨迹图内部错误: {e}")
+            traj_img = np.zeros((size, size, 3), dtype=np.uint8)
+            traj_img.fill(30)
+            return traj_img
 
     def _render_info_display(self, info_data: Dict) -> np.ndarray:
         """渲染信息显示"""
@@ -1973,13 +2103,90 @@ class InfoDisplayWindow:
                     # 将网格图像放到主图像上
                     img[grid_y:grid_y+grid_size, grid_x:grid_x+grid_size] = grid_resized
 
-            # 9. 时间戳
+            # 9. 运动轨迹图（最左下角）
+            if self.display_config.get('SHOW_TRAJECTORY', True):
+                try:
+                    trajectory_size = self.display_config.get('TRAJECTORY_SIZE', 280)
+                    current_pos = info_data.get('position')
+                    
+                    # 绘制轨迹图
+                    trajectory_img = self._draw_trajectory(
+                        list(self.trajectory_points),
+                        current_pos,
+                        self.start_position,
+                        trajectory_size
+                    )
+                    
+                    if trajectory_img is not None and trajectory_img.size > 0:
+                        # 轨迹图放在最左下角，从底部开始
+                        traj_x = 20  # 左边距
+                        # 从窗口底部向上，留出底部提示文字的空间（约50像素，确保不重叠）
+                        bottom_hint_height = 50
+                        traj_y = self.window_height - trajectory_size - bottom_hint_height
+                        
+                        # 确保轨迹图不会超出窗口范围，且不与上方内容重叠（至少距离顶部80像素）
+                        if traj_y >= 80 and traj_y + trajectory_size <= self.window_height - bottom_hint_height:
+                            # 添加轨迹图标题（在轨迹图上方）
+                            traj_title = "Trajectory"  # 直接使用英文
+                            cv2.putText(img, traj_title, (traj_x, traj_y - 10), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 18 / 30.0, highlight_color, 1)
+                            
+                            # 确保图像尺寸匹配
+                            if (traj_y + trajectory_size <= self.window_height and 
+                                traj_x + trajectory_size <= self.window_width):
+                                # 将轨迹图放到主图像上
+                                img[traj_y:traj_y+trajectory_size, traj_x:traj_x+trajectory_size] = trajectory_img
+                                
+                                # 添加轨迹图图例（在轨迹图右侧，使用英文避免乱码）
+                                legend_x = traj_x + trajectory_size + 15
+                                legend_y = traj_y
+                                
+                                if legend_x + 150 < self.window_width:
+                                    # 使用英文避免乱码
+                                    cv2.putText(img, "Legend:", (legend_x, legend_y), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                                    legend_y += 20
+                                    
+                                    # 起始位置
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 6, 
+                                              self.display_config.get('TRAJECTORY_START_COLOR', (255, 255, 0)), -1)
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 6, (255, 255, 255), 1)
+                                    cv2.putText(img, "Start", (legend_x + 20, legend_y + 12), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                                    legend_y += 25
+                                    
+                                    # 当前位置
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 8, 
+                                              self.display_config.get('TRAJECTORY_CURRENT_COLOR', (0, 255, 0)), -1)
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 8, (255, 255, 255), 2)
+                                    cv2.putText(img, "Current", (legend_x + 20, legend_y + 12), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                                    legend_y += 25
+                                    
+                                    # 轨迹线
+                                    cv2.line(img, (legend_x, legend_y + 7), (legend_x + 20, legend_y + 7), 
+                                            self.display_config.get('TRAJECTORY_LINE_COLOR', (0, 255, 255)), 2)
+                                    cv2.putText(img, "Path", (legend_x + 25, legend_y + 12), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                                    
+                                    # 显示轨迹点数
+                                    point_count = len(self.trajectory_points)
+                                    count_text = f"Points: {point_count}"
+                                    cv2.putText(img, count_text, (legend_x, legend_y + 30), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                except Exception as e:
+                    # 轨迹图绘制失败时不影响其他显示
+                    print(f"⚠️ 绘制轨迹图时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            # 10. 时间戳
             if 'timestamp' in info_data:
                 timestamp = info_data['timestamp']
                 time_text = f"更新时间: {timestamp}"
                 img = put_chinese_text(img, time_text, (self.window_width - 200, self.window_height - 10), 15, text_color, 1)
 
-            # 10. 底部提示
+            # 11. 底部提示
             hint_text = "按 Q 或 ESC 关闭窗口"
             img = put_chinese_text(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30), 15, text_color, 1)
 
@@ -2294,31 +2501,119 @@ class PerceptiveExplorer:
         except Exception as e:
             self.logger.warning(f"⚠️ 更新信息窗口时出错: {e}")
 
-    def _detect_red_objects(self, image: np.ndarray, depth_array: Optional[np.ndarray] = None) -> Tuple[List[RedObject], np.ndarray]:
-        red_objects = []
+    def _detect_color_objects_generic(
+        self, 
+        image: np.ndarray, 
+        color_type: str,
+        depth_array: Optional[np.ndarray] = None
+    ) -> Tuple[List[Any], np.ndarray]:
+        """
+        通用的颜色物体检测函数
+        
+        Args:
+            image: 输入图像
+            color_type: 颜色类型 ('red', 'blue', 'black')
+            depth_array: 深度数组（可选）
+        
+        Returns:
+            (检测到的物体列表, 标记后的图像)
+        """
+        # 颜色类型配置映射
+        COLOR_CONFIG = {
+            'red': {
+                'detection_config': config.PERCEPTION['RED_OBJECT_DETECTION'],
+                'color_range_config': config.CAMERA['RED_COLOR_RANGE'],
+                'object_class': RedObject,
+                'object_list_attr': 'red_objects',
+                'id_counter_attr': 'red_object_id_counter',
+                'memory_time_attr': 'red_object_memory_time',
+                'stats_key': 'red_objects_detected',
+                'log_emoji': '🔴',
+                'log_name': '红色物体',
+                'mark_color': (0, 100, 255),  # BGR格式
+                'label_prefix': 'R:',
+                'record_func': 'record_red_object',
+                'record_enabled_config': 'RECORD_RED_OBJECTS',
+                'has_dual_range': True,  # 红色需要两个颜色范围
+                'is_same_func': self._is_same_object_generic,
+            },
+            'blue': {
+                'detection_config': config.PERCEPTION['BLUE_OBJECT_DETECTION'],
+                'color_range_config': config.CAMERA['BLUE_COLOR_RANGE'],
+                'object_class': BlueObject,
+                'object_list_attr': 'blue_objects',
+                'id_counter_attr': 'blue_object_id_counter',
+                'memory_time_attr': 'blue_object_memory_time',
+                'stats_key': 'blue_objects_detected',
+                'log_emoji': '🔵',
+                'log_name': '蓝色物体',
+                'mark_color': (255, 100, 0),  # BGR格式
+                'label_prefix': 'B:',
+                'record_func': 'record_blue_object',
+                'record_enabled_config': 'RECORD_BLUE_OBJECTS',
+                'has_dual_range': False,
+                'is_same_func': self._is_same_object_generic,
+            },
+            'black': {
+                'detection_config': config.PERCEPTION['BLACK_OBJECT_DETECTION'],
+                'color_range_config': config.CAMERA['BLACK_COLOR_RANGE'],
+                'object_class': BlackObject,
+                'object_list_attr': 'black_objects',
+                'id_counter_attr': 'black_object_id_counter',
+                'memory_time_attr': 'black_object_memory_time',
+                'stats_key': 'black_objects_detected',
+                'log_emoji': '⚫',
+                'log_name': '黑色物体',
+                'mark_color': (128, 128, 128),  # BGR格式
+                'label_prefix': 'K:',
+                'record_func': 'record_black_object',
+                'record_enabled_config': 'RECORD_BLACK_OBJECTS',
+                'has_dual_range': False,
+                'is_same_func': self._is_same_object_generic,
+            }
+        }
+        
+        if color_type not in COLOR_CONFIG:
+            raise ValueError(f"不支持的颜色类型: {color_type}，支持的类型: {list(COLOR_CONFIG.keys())}")
+        
+        cfg = COLOR_CONFIG[color_type]
+        detected_objects = []
         marked_image = image.copy() if image is not None else None
-
-        if not config.PERCEPTION['RED_OBJECT_DETECTION']['ENABLED'] or image is None:
-            return red_objects, marked_image
-
+        
+        # 检查是否启用检测
+        if not cfg['detection_config']['ENABLED'] or image is None:
+            return detected_objects, marked_image
+        
         try:
+            # 转换为HSV颜色空间
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-            lower_red1 = np.array(config.CAMERA['RED_COLOR_RANGE']['LOWER1'])
-            upper_red1 = np.array(config.CAMERA['RED_COLOR_RANGE']['UPPER1'])
-            lower_red2 = np.array(config.CAMERA['RED_COLOR_RANGE']['LOWER2'])
-            upper_red2 = np.array(config.CAMERA['RED_COLOR_RANGE']['UPPER2'])
-
-            mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-            mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-            red_mask = cv2.bitwise_or(mask1, mask2)
-
+            
+            # 创建颜色掩码（红色需要特殊处理，有两个范围）
+            if cfg['has_dual_range']:
+                # 红色：两个颜色范围
+                lower1 = np.array(cfg['color_range_config']['LOWER1'])
+                upper1 = np.array(cfg['color_range_config']['UPPER1'])
+                lower2 = np.array(cfg['color_range_config']['LOWER2'])
+                upper2 = np.array(cfg['color_range_config']['UPPER2'])
+                
+                mask1 = cv2.inRange(hsv, lower1, upper1)
+                mask2 = cv2.inRange(hsv, lower2, upper2)
+                color_mask = cv2.bitwise_or(mask1, mask2)
+            else:
+                # 其他颜色：单个颜色范围
+                lower = np.array(cfg['color_range_config']['LOWER'])
+                upper = np.array(cfg['color_range_config']['UPPER'])
+                color_mask = cv2.inRange(hsv, lower, upper)
+            
+            # 形态学操作
             kernel = np.ones((5, 5), np.uint8)
-            red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel)
-            red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel)
-
-            contours, _ = cv2.findContours(red_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
+            color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, kernel)
+            color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN, kernel)
+            
+            # 查找轮廓
+            contours, _ = cv2.findContours(color_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            # 获取无人机状态
             try:
                 state = self.client.getMultirotorState(vehicle_name=self.drone_name)
                 drone_pos = state.kinematics_estimated.position
@@ -2327,47 +2622,56 @@ class PerceptiveExplorer:
             except:
                 drone_pos = None
                 yaw = 0.0
-
+            
+            # 获取配置参数
+            min_area = cfg['detection_config']['MIN_AREA']
+            max_area = cfg['detection_config']['MAX_AREA']
+            existing_objects = getattr(self, cfg['object_list_attr'])
+            id_counter_attr = cfg['id_counter_attr']
+            
+            # 处理每个轮廓
             for contour in contours:
                 area = cv2.contourArea(contour)
-                min_area = config.PERCEPTION['RED_OBJECT_DETECTION']['MIN_AREA']
-                max_area = config.PERCEPTION['RED_OBJECT_DETECTION']['MAX_AREA']
-
+                
                 if min_area <= area <= max_area:
                     x, y, w, h = cv2.boundingRect(contour)
                     center_x = x + w // 2
                     center_y = y + h // 2
-
+                    
+                    # 计算置信度
                     aspect_ratio = w / h if h > 0 else 1.0
                     confidence = min(1.0, area / 1000.0) * (1.0 / (1.0 + abs(aspect_ratio - 1.0)))
-
+                    
+                    # 计算世界坐标位置
                     world_pos = None
                     if drone_pos is not None and depth_array is not None:
                         try:
                             if 0 <= center_y < depth_array.shape[0] and 0 <= center_x < depth_array.shape[1]:
                                 distance = depth_array[center_y, center_x]
-
+                                
                                 if 0.5 < distance < 50.0:
                                     height, width = depth_array.shape
                                     fov_h = math.radians(90)
-
+                                    
                                     pixel_angle_x = (center_x - width/2) / (width/2) * (fov_h/2)
                                     pixel_angle_y = (center_y - height/2) / (height/2) * (fov_h/2)
-
+                                    
                                     z = distance
                                     x_rel = z * math.tan(pixel_angle_x)
                                     y_rel = z * math.tan(pixel_angle_y)
-
+                                    
                                     world_x = x_rel * math.cos(yaw) - y_rel * math.sin(yaw) + drone_pos.x_val
                                     world_y = x_rel * math.sin(yaw) + y_rel * math.cos(yaw) + drone_pos.y_val
                                     world_z = drone_pos.z_val
-
+                                    
                                     world_pos = (world_x, world_y, world_z)
                         except:
                             pass
-
-                    red_object = RedObject(
-                        id=self.red_object_id_counter,
+                    
+                    # 创建物体对象
+                    current_id = getattr(self, id_counter_attr)
+                    color_object = cfg['object_class'](
+                        id=current_id,
                         position=world_pos if world_pos else (0.0, 0.0, 0.0),
                         pixel_position=(center_x, center_y),
                         size=area,
@@ -2376,446 +2680,220 @@ class PerceptiveExplorer:
                         last_seen=time.time(),
                         visited=False
                     )
-
+                    
+                    # 检查是否是已存在的物体
                     is_new_object = True
-                    for existing_obj in self.red_objects:
-                        if self._is_same_object(red_object, existing_obj):
+                    for existing_obj in existing_objects:
+                        if cfg['is_same_func'](color_object, existing_obj):
                             existing_obj.last_seen = time.time()
-                            existing_obj.pixel_position = red_object.pixel_position
+                            existing_obj.pixel_position = color_object.pixel_position
                             existing_obj.confidence = max(existing_obj.confidence, confidence)
                             if world_pos:
                                 existing_obj.position = world_pos
-                            red_object = existing_obj
+                            color_object = existing_obj
                             is_new_object = False
                             break
-
+                    
+                    # 如果是新物体，增加ID计数器和统计
                     if is_new_object:
-                        self.red_object_id_counter += 1
-                        red_objects.append(red_object)
-                        self.stats['red_objects_detected'] += 1
-                        self.logger.info(f"🔴 检测到红色物体 #{red_object.id} (置信度: {confidence:.2f})")
-
-                        if self.data_logger and config.DATA_RECORDING['RECORD_RED_OBJECTS']:
-                            self.data_logger.record_red_object(red_object)
+                        setattr(self, id_counter_attr, current_id + 1)
+                        detected_objects.append(color_object)
+                        self.stats[cfg['stats_key']] += 1
+                        self.logger.info(f"{cfg['log_emoji']} 检测到{cfg['log_name']} #{color_object.id} (置信度: {confidence:.2f})")
+                        
+                        # 记录到数据日志
+                        if self.data_logger and config.DATA_RECORDING.get(cfg['record_enabled_config'], False):
+                            record_func = getattr(self.data_logger, cfg['record_func'], None)
+                            if record_func:
+                                record_func(color_object)
                     else:
-                        red_objects.append(red_object)
-
+                        detected_objects.append(color_object)
+                    
+                    # 在图像上标记物体
                     if marked_image is not None:
-                        color = (0, 100, 255)
-                        if red_object.visited:
-                            color = (0, 200, 0)
-
-                        cv2.rectangle(marked_image, (x, y), (x+w, y+h), color, 2)
-                        cv2.circle(marked_image, (center_x, center_y), 5, color, -1)
-
-                        label = f"R:{red_object.id} ({confidence:.2f})"
+                        mark_color = cfg['mark_color']
+                        if color_object.visited:
+                            mark_color = (0, 200, 0)  # 已访问的物体显示为绿色
+                        
+                        cv2.rectangle(marked_image, (x, y), (x+w, y+h), mark_color, 2)
+                        cv2.circle(marked_image, (center_x, center_y), 5, mark_color, -1)
+                        
+                        label = f"{cfg['label_prefix']}{color_object.id} ({confidence:.2f})"
                         cv2.putText(marked_image, label, (x, y-10),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, mark_color, 1)
+            
+            # 清理过期的物体记忆
             current_time = time.time()
-            self.red_objects = [obj for obj in self.red_objects
-                              if current_time - obj.last_seen < self.red_object_memory_time]
-
-            visited_count = sum(1 for obj in self.red_objects if obj.visited)
-            if len(red_objects) > 0:
-                self.logger.debug(f"🔴 当前红色物体: {len(self.red_objects)}个, 已访问: {visited_count}个")
-
+            memory_time = getattr(self, cfg['memory_time_attr'])
+            filtered_objects = [obj for obj in existing_objects 
+                              if current_time - obj.last_seen < memory_time]
+            setattr(self, cfg['object_list_attr'], filtered_objects)
+            
+            # 更新统计信息
+            visited_count = sum(1 for obj in filtered_objects if obj.visited)
+            if len(detected_objects) > 0:
+                self.logger.debug(f"{cfg['log_emoji']} 当前{cfg['log_name']}: {len(filtered_objects)}个, 已访问: {visited_count}个")
+        
         except Exception as e:
-            self.logger.warning(f"⚠️ 红色物体检测失败: {e}")
+            cfg = COLOR_CONFIG[color_type]
+            self.logger.warning(f"⚠️ {cfg['log_name']}检测失败: {e}")
+        
+        return detected_objects, marked_image
 
-        return red_objects, marked_image
+    def _detect_red_objects(self, image: np.ndarray, depth_array: Optional[np.ndarray] = None) -> Tuple[List[RedObject], np.ndarray]:
+        """检测红色物体 - 使用通用检测函数"""
+        objects, marked_image = self._detect_color_objects_generic(image, 'red', depth_array)
+        return objects, marked_image
 
     def _detect_blue_objects(self, image: np.ndarray, depth_array: Optional[np.ndarray] = None) -> Tuple[List[BlueObject], np.ndarray]:
-        blue_objects = []
-        marked_image = image.copy() if image is not None else None
-
-        if not config.PERCEPTION['BLUE_OBJECT_DETECTION']['ENABLED'] or image is None:
-            return blue_objects, marked_image
-
-        try:
-            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
-            lower_blue = np.array(config.CAMERA['BLUE_COLOR_RANGE']['LOWER'])
-            upper_blue = np.array(config.CAMERA['BLUE_COLOR_RANGE']['UPPER'])
-
-            blue_mask = cv2.inRange(hsv, lower_blue, upper_blue)
-
-            kernel = np.ones((5, 5), np.uint8)
-            blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_CLOSE, kernel)
-            blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_OPEN, kernel)
-
-            contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            try:
-                state = self.client.getMultirotorState(vehicle_name=self.drone_name)
-                drone_pos = state.kinematics_estimated.position
-                orientation = state.kinematics_estimated.orientation
-                roll, pitch, yaw = airsim.to_eularian_angles(orientation)
-            except:
-                drone_pos = None
-                yaw = 0.0
-
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                min_area = config.PERCEPTION['BLUE_OBJECT_DETECTION']['MIN_AREA']
-                max_area = config.PERCEPTION['BLUE_OBJECT_DETECTION']['MAX_AREA']
-
-                if min_area <= area <= max_area:
-                    x, y, w, h = cv2.boundingRect(contour)
-                    center_x = x + w // 2
-                    center_y = y + h // 2
-
-                    aspect_ratio = w / h if h > 0 else 1.0
-                    confidence = min(1.0, area / 1000.0) * (1.0 / (1.0 + abs(aspect_ratio - 1.0)))
-
-                    world_pos = None
-                    if drone_pos is not None and depth_array is not None:
-                        try:
-                            if 0 <= center_y < depth_array.shape[0] and 0 <= center_x < depth_array.shape[1]:
-                                distance = depth_array[center_y, center_x]
-
-                                if 0.5 < distance < 50.0:
-                                    height, width = depth_array.shape
-                                    fov_h = math.radians(90)
-
-                                    pixel_angle_x = (center_x - width/2) / (width/2) * (fov_h/2)
-                                    pixel_angle_y = (center_y - height/2) / (height/2) * (fov_h/2)
-
-                                    z = distance
-                                    x_rel = z * math.tan(pixel_angle_x)
-                                    y_rel = z * math.tan(pixel_angle_y)
-
-                                    world_x = x_rel * math.cos(yaw) - y_rel * math.sin(yaw) + drone_pos.x_val
-                                    world_y = x_rel * math.sin(yaw) + y_rel * math.cos(yaw) + drone_pos.y_val
-                                    world_z = drone_pos.z_val
-
-                                    world_pos = (world_x, world_y, world_z)
-                        except:
-                            pass
-
-                    blue_object = BlueObject(
-                        id=self.blue_object_id_counter,
-                        position=world_pos if world_pos else (0.0, 0.0, 0.0),
-                        pixel_position=(center_x, center_y),
-                        size=area,
-                        confidence=confidence,
-                        timestamp=time.time(),
-                        last_seen=time.time(),
-                        visited=False
-                    )
-
-                    is_new_object = True
-                    for existing_obj in self.blue_objects:
-                        if self._is_same_object_blue(blue_object, existing_obj):
-                            existing_obj.last_seen = time.time()
-                            existing_obj.pixel_position = blue_object.pixel_position
-                            existing_obj.confidence = max(existing_obj.confidence, confidence)
-                            if world_pos:
-                                existing_obj.position = world_pos
-                            blue_object = existing_obj
-                            is_new_object = False
-                            break
-
-                    if is_new_object:
-                        self.blue_object_id_counter += 1
-                        blue_objects.append(blue_object)
-                        self.stats['blue_objects_detected'] += 1
-                        self.logger.info(f"🔵 检测到蓝色物体 #{blue_object.id} (置信度: {confidence:.2f})")
-
-                        if self.data_logger and config.DATA_RECORDING['RECORD_BLUE_OBJECTS']:
-                            self.data_logger.record_blue_object(blue_object)
-                    else:
-                        blue_objects.append(blue_object)
-
-                    if marked_image is not None:
-                        color = (255, 100, 0)
-                        if blue_object.visited:
-                            color = (0, 200, 0)
-
-                        cv2.rectangle(marked_image, (x, y), (x+w, y+h), color, 2)
-                        cv2.circle(marked_image, (center_x, center_y), 5, color, -1)
-
-                        label = f"B:{blue_object.id} ({confidence:.2f})"
-                        cv2.putText(marked_image, label, (x, y-10),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-            current_time = time.time()
-            self.blue_objects = [obj for obj in self.blue_objects
-                               if current_time - obj.last_seen < self.blue_object_memory_time]
-
-            visited_count = sum(1 for obj in self.blue_objects if obj.visited)
-            if len(blue_objects) > 0:
-                self.logger.debug(f"🔵 当前蓝色物体: {len(self.blue_objects)}个, 已访问: {visited_count}个")
-
-        except Exception as e:
-            self.logger.warning(f"⚠️ 蓝色物体检测失败: {e}")
-
-        return blue_objects, marked_image
+        """检测蓝色物体 - 使用通用检测函数"""
+        objects, marked_image = self._detect_color_objects_generic(image, 'blue', depth_array)
+        return objects, marked_image
 
     def _detect_black_objects(self, image: np.ndarray, depth_array: Optional[np.ndarray] = None) -> Tuple[List[BlackObject], np.ndarray]:
-        black_objects = []
-        marked_image = image.copy() if image is not None else None
+        """检测黑色物体 - 使用通用检测函数"""
+        objects, marked_image = self._detect_color_objects_generic(image, 'black', depth_array)
+        return objects, marked_image
 
-        if not config.PERCEPTION['BLACK_OBJECT_DETECTION']['ENABLED'] or image is None:
-            return black_objects, marked_image
+    def _is_same_object_generic(self, obj1: Any, obj2: Any, distance_threshold=2.0) -> bool:
+        """
+        通用的物体相似度判断函数
+        适用于RedObject、BlueObject、BlackObject等具有相同结构的对象
+        
+        Args:
+            obj1: 第一个物体对象
+            obj2: 第二个物体对象
+            distance_threshold: 距离阈值（米），默认2.0米
+        
+        Returns:
+            bool: 如果两个物体被认为是同一个物体，返回True
+        """
+        # 如果两个物体都有有效的世界坐标位置，使用世界坐标距离判断
+        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
+            distance = math.sqrt(
+                (obj1.position[0] - obj2.position[0])**2 +
+                (obj1.position[1] - obj2.position[1])**2
+            )
+            return distance < distance_threshold
 
-        try:
-            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # 如果没有有效的世界坐标，使用像素坐标和时间差判断
+        pixel_distance = math.sqrt(
+            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
+            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
+        )
+        time_diff = abs(obj1.timestamp - obj2.timestamp)
 
-            lower_black = np.array(config.CAMERA['BLACK_COLOR_RANGE']['LOWER'])
-            upper_black = np.array(config.CAMERA['BLACK_COLOR_RANGE']['UPPER'])
-
-            black_mask = cv2.inRange(hsv, lower_black, upper_black)
-
-            kernel = np.ones((5, 5), np.uint8)
-            black_mask = cv2.morphologyEx(black_mask, cv2.MORPH_CLOSE, kernel)
-            black_mask = cv2.morphologyEx(black_mask, cv2.MORPH_OPEN, kernel)
-
-            contours, _ = cv2.findContours(black_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            try:
-                state = self.client.getMultirotorState(vehicle_name=self.drone_name)
-                drone_pos = state.kinematics_estimated.position
-                orientation = state.kinematics_estimated.orientation
-                roll, pitch, yaw = airsim.to_eularian_angles(orientation)
-            except:
-                drone_pos = None
-                yaw = 0.0
-
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                min_area = config.PERCEPTION['BLACK_OBJECT_DETECTION']['MIN_AREA']
-                max_area = config.PERCEPTION['BLACK_OBJECT_DETECTION']['MAX_AREA']
-
-                if min_area <= area <= max_area:
-                    x, y, w, h = cv2.boundingRect(contour)
-                    center_x = x + w // 2
-                    center_y = y + h // 2
-
-                    aspect_ratio = w / h if h > 0 else 1.0
-                    confidence = min(1.0, area / 1000.0) * (1.0 / (1.0 + abs(aspect_ratio - 1.0)))
-
-                    world_pos = None
-                    if drone_pos is not None and depth_array is not None:
-                        try:
-                            if 0 <= center_y < depth_array.shape[0] and 0 <= center_x < depth_array.shape[1]:
-                                distance = depth_array[center_y, center_x]
-
-                                if 0.5 < distance < 50.0:
-                                    height, width = depth_array.shape
-                                    fov_h = math.radians(90)
-
-                                    pixel_angle_x = (center_x - width/2) / (width/2) * (fov_h/2)
-                                    pixel_angle_y = (center_y - height/2) / (height/2) * (fov_h/2)
-
-                                    z = distance
-                                    x_rel = z * math.tan(pixel_angle_x)
-                                    y_rel = z * math.tan(pixel_angle_y)
-
-                                    world_x = x_rel * math.cos(yaw) - y_rel * math.sin(yaw) + drone_pos.x_val
-                                    world_y = x_rel * math.sin(yaw) + y_rel * math.cos(yaw) + drone_pos.y_val
-                                    world_z = drone_pos.z_val
-
-                                    world_pos = (world_x, world_y, world_z)
-                        except:
-                            pass
-
-                    black_object = BlackObject(
-                        id=self.black_object_id_counter,
-                        position=world_pos if world_pos else (0.0, 0.0, 0.0),
-                        pixel_position=(center_x, center_y),
-                        size=area,
-                        confidence=confidence,
-                        timestamp=time.time(),
-                        last_seen=time.time(),
-                        visited=False
-                    )
-
-                    is_new_object = True
-                    for existing_obj in self.black_objects:
-                        if self._is_same_object_black(black_object, existing_obj):
-                            existing_obj.last_seen = time.time()
-                            existing_obj.pixel_position = black_object.pixel_position
-                            existing_obj.confidence = max(existing_obj.confidence, confidence)
-                            if world_pos:
-                                existing_obj.position = world_pos
-                            black_object = existing_obj
-                            is_new_object = False
-                            break
-
-                    if is_new_object:
-                        self.black_object_id_counter += 1
-                        black_objects.append(black_object)
-                        self.stats['black_objects_detected'] += 1
-                        self.logger.info(f"⚫ 检测到黑色物体 #{black_object.id} (置信度: {confidence:.2f})")
-
-                        if self.data_logger and config.DATA_RECORDING['RECORD_BLACK_OBJECTS']:
-                            self.data_logger.record_black_object(black_object)
-                    else:
-                        black_objects.append(black_object)
-
-                    if marked_image is not None:
-                        color = (128, 128, 128)
-                        if black_object.visited:
-                            color = (0, 200, 0)
-
-                        cv2.rectangle(marked_image, (x, y), (x+w, y+h), color, 2)
-                        cv2.circle(marked_image, (center_x, center_y), 5, color, -1)
-
-                        label = f"K:{black_object.id} ({confidence:.2f})"
-                        cv2.putText(marked_image, label, (x, y-10),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
-
-            current_time = time.time()
-            self.black_objects = [obj for obj in self.black_objects
-                               if current_time - obj.last_seen < self.black_object_memory_time]
-
-            visited_count = sum(1 for obj in self.black_objects if obj.visited)
-            if len(black_objects) > 0:
-                self.logger.debug(f"⚫ 当前黑色物体: {len(self.black_objects)}个, 已访问: {visited_count}个")
-
-        except Exception as e:
-            self.logger.warning(f"⚠️ 黑色物体检测失败: {e}")
-
-        return black_objects, marked_image
+        # 像素距离小于50且时间差小于5秒，认为是同一个物体
+        return pixel_distance < 50 and time_diff < 5.0
 
     def _is_same_object(self, obj1: RedObject, obj2: RedObject, distance_threshold=2.0) -> bool:
-        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
-            distance = math.sqrt(
-                (obj1.position[0] - obj2.position[0])**2 +
-                (obj1.position[1] - obj2.position[1])**2
-            )
-            return distance < distance_threshold
-
-        pixel_distance = math.sqrt(
-            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
-            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
-        )
-        time_diff = abs(obj1.timestamp - obj2.timestamp)
-
-        return pixel_distance < 50 and time_diff < 5.0
+        """检测红色物体是否相同 - 使用通用函数"""
+        return self._is_same_object_generic(obj1, obj2, distance_threshold)
 
     def _is_same_object_blue(self, obj1: BlueObject, obj2: BlueObject, distance_threshold=2.0) -> bool:
-        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
-            distance = math.sqrt(
-                (obj1.position[0] - obj2.position[0])**2 +
-                (obj1.position[1] - obj2.position[1])**2
-            )
-            return distance < distance_threshold
-
-        pixel_distance = math.sqrt(
-            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
-            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
-        )
-        time_diff = abs(obj1.timestamp - obj2.timestamp)
-
-        return pixel_distance < 50 and time_diff < 5.0
+        """检测蓝色物体是否相同 - 使用通用函数"""
+        return self._is_same_object_generic(obj1, obj2, distance_threshold)
 
     def _is_same_object_black(self, obj1: BlackObject, obj2: BlackObject, distance_threshold=2.0) -> bool:
-        if obj1.position != (0.0, 0.0, 0.0) and obj2.position != (0.0, 0.0, 0.0):
-            distance = math.sqrt(
-                (obj1.position[0] - obj2.position[0])**2 +
-                (obj1.position[1] - obj2.position[1])**2
-            )
-            return distance < distance_threshold
+        """检测黑色物体是否相同 - 使用通用函数"""
+        return self._is_same_object_generic(obj1, obj2, distance_threshold)
 
-        pixel_distance = math.sqrt(
-            (obj1.pixel_position[0] - obj2.pixel_position[0])**2 +
-            (obj1.pixel_position[1] - obj2.pixel_position[1])**2
-        )
-        time_diff = abs(obj1.timestamp - obj2.timestamp)
-
-        return pixel_distance < 50 and time_diff < 5.0
+    def _check_object_proximity_generic(self, current_pos: Tuple[float, float], color_type: str) -> bool:
+        """
+        通用的物体接近检测函数
+        检查当前位置是否接近指定颜色类型的未访问物体
+        
+        Args:
+            current_pos: 当前位置 (x, y)
+            color_type: 颜色类型 ('red', 'blue', 'black')
+        
+        Returns:
+            bool: 如果检测到接近物体并触发了访问，返回True；否则返回False
+        """
+        # 颜色类型配置映射
+        PROXIMITY_CONFIG = {
+            'red': {
+                'objects_attr': 'red_objects',
+                'exploration_config': config.INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION'],
+                'stats_key': 'red_objects_visited',
+                'log_name': '红色物体',
+                'event_type': 'red_object_visited',
+                'inspection_state': FlightState.RED_OBJECT_INSPECTION,
+            },
+            'blue': {
+                'objects_attr': 'blue_objects',
+                'exploration_config': config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION'],
+                'stats_key': 'blue_objects_visited',
+                'log_name': '蓝色物体',
+                'event_type': 'blue_object_visited',
+                'inspection_state': FlightState.BLUE_OBJECT_INSPECTION,
+            },
+            'black': {
+                'objects_attr': 'black_objects',
+                'exploration_config': config.INTELLIGENT_DECISION['BLACK_OBJECT_EXPLORATION'],
+                'stats_key': 'black_objects_visited',
+                'log_name': '黑色物体',
+                'event_type': 'black_object_visited',
+                'inspection_state': FlightState.BLACK_OBJECT_INSPECTION,
+            }
+        }
+        
+        if color_type not in PROXIMITY_CONFIG:
+            raise ValueError(f"不支持的颜色类型: {color_type}，支持的类型: {list(PROXIMITY_CONFIG.keys())}")
+        
+        cfg = PROXIMITY_CONFIG[color_type]
+        
+        # 获取物体列表
+        objects = getattr(self, cfg['objects_attr'])
+        
+        # 遍历所有未访问的物体
+        for obj in objects:
+            if not obj.visited:
+                # 计算距离
+                distance = math.sqrt(
+                    (obj.position[0] - current_pos[0])**2 +
+                    (obj.position[1] - current_pos[1])**2
+                )
+                
+                # 获取最小接近距离
+                min_distance = cfg['exploration_config']['MIN_DISTANCE']
+                
+                # 如果距离小于最小距离，标记为已访问
+                if distance < min_distance:
+                    obj.visited = True
+                    obj.last_seen = time.time()
+                    self.stats[cfg['stats_key']] += 1
+                    
+                    # 记录日志
+                    self.logger.info(f"✅ 已访问{cfg['log_name']} #{obj.id} (距离: {distance:.1f}m)")
+                    
+                    # 记录事件到数据日志
+                    if self.data_logger:
+                        event_data = {
+                            'object_id': obj.id,
+                            'position': obj.position,
+                            'distance': distance,
+                            'timestamp': time.time()
+                        }
+                        self.data_logger.record_event(cfg['event_type'], event_data)
+                    
+                    # 改变状态为物体检查状态
+                    self.change_state(cfg['inspection_state'])
+                    return True
+        
+        return False
 
     def _check_red_object_proximity(self, current_pos):
-        for obj in self.red_objects:
-            if not obj.visited:
-                distance = math.sqrt(
-                    (obj.position[0] - current_pos[0])**2 +
-                    (obj.position[1] - current_pos[1])**2
-                )
-
-                min_distance = config.INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION']['MIN_DISTANCE']
-                if distance < min_distance:
-                    obj.visited = True
-                    obj.last_seen = time.time()
-                    self.stats['red_objects_visited'] += 1
-
-                    self.logger.info(f"✅ 已访问红色物体 #{obj.id} (距离: {distance:.1f}m)")
-
-                    if self.data_logger:
-                        event_data = {
-                            'object_id': obj.id,
-                            'position': obj.position,
-                            'distance': distance,
-                            'timestamp': time.time()
-                        }
-                        self.data_logger.record_event('red_object_visited', event_data)
-
-                    self.change_state(FlightState.RED_OBJECT_INSPECTION)
-                    return True
-
-        return False
+        """检查红色物体接近 - 使用通用函数"""
+        return self._check_object_proximity_generic(current_pos, 'red')
 
     def _check_blue_object_proximity(self, current_pos):
-        for obj in self.blue_objects:
-            if not obj.visited:
-                distance = math.sqrt(
-                    (obj.position[0] - current_pos[0])**2 +
-                    (obj.position[1] - current_pos[1])**2
-                )
-
-                min_distance = config.INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']['MIN_DISTANCE']
-                if distance < min_distance:
-                    obj.visited = True
-                    obj.last_seen = time.time()
-                    self.stats['blue_objects_visited'] += 1
-
-                    self.logger.info(f"✅ 已访问蓝色物体 #{obj.id} (距离: {distance:.1f}m)")
-
-                    if self.data_logger:
-                        event_data = {
-                            'object_id': obj.id,
-                            'position': obj.position,
-                            'distance': distance,
-                            'timestamp': time.time()
-                        }
-                        self.data_logger.record_event('blue_object_visited', event_data)
-
-                    self.change_state(FlightState.BLUE_OBJECT_INSPECTION)
-                    return True
-
-        return False
+        """检查蓝色物体接近 - 使用通用函数"""
+        return self._check_object_proximity_generic(current_pos, 'blue')
 
     def _check_black_object_proximity(self, current_pos):
-        for obj in self.black_objects:
-            if not obj.visited:
-                distance = math.sqrt(
-                    (obj.position[0] - current_pos[0])**2 +
-                    (obj.position[1] - current_pos[1])**2
-                )
-
-                min_distance = config.INTELLIGENT_DECISION['BLACK_OBJECT_EXPLORATION']['MIN_DISTANCE']
-                if distance < min_distance:
-                    obj.visited = True
-                    obj.last_seen = time.time()
-                    self.stats['black_objects_visited'] += 1
-
-                    self.logger.info(f"✅ 已访问黑色物体 #{obj.id} (距离: {distance:.1f}m)")
-
-                    if self.data_logger:
-                        event_data = {
-                            'object_id': obj.id,
-                            'position': obj.position,
-                            'distance': distance,
-                            'timestamp': time.time()
-                        }
-                        self.data_logger.record_event('black_object_visited', event_data)
-
-                    self.change_state(FlightState.BLACK_OBJECT_INSPECTION)
-                    return True
-
-        return False
+        """检查黑色物体接近 - 使用通用函数"""
+        return self._check_object_proximity_generic(current_pos, 'black')
 
     def get_depth_perception(self) -> PerceptionResult:
         result = PerceptionResult()
