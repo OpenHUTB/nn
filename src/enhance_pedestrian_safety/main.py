@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 import sys
 import os
 import time
@@ -17,7 +17,6 @@ from carla_utils import setup_carla_path, import_carla_module
 from config_manager import ConfigManager
 from annotation_generator import AnnotationGenerator
 from data_validator import DataValidator
-from data_analyzer import DataAnalyzer
 from lidar_processor import LidarProcessor, MultiSensorFusion
 from multi_vehicle_manager import MultiVehicleManager
 from pedestrian_safety_monitor import PedestrianSafetyMonitor
@@ -488,7 +487,7 @@ class TrafficManager:
     def _spawn_pedestrians(self, center_location):
         blueprint_lib = self.world.get_blueprint_library()
 
-        num_peds = min(self.config['traffic']['pedestrians'], 8)
+        num_peds = min(self.config['traffic']['pedestrians'], 12)  # 增加行人数量
         spawned = 0
 
         for _ in range(num_peds):
@@ -499,8 +498,13 @@ class TrafficManager:
 
                 ped_bp = random.choice(ped_bps)
 
-                angle = random.uniform(0, 2 * math.pi)
-                distance = random.uniform(5.0, 12.0)
+                # 在学校区域或人行横道场景中，行人更集中
+                if self.config.get('scenario', {}).get('name', '').lower() in ['school_zone', 'pedestrian_crossing']:
+                    angle = random.uniform(0, 2 * math.pi)
+                    distance = random.uniform(3.0, 8.0)  # 更靠近中心
+                else:
+                    angle = random.uniform(0, 2 * math.pi)
+                    distance = random.uniform(5.0, 15.0)
 
                 location = carla.Location(
                     x=center_location.x + distance * math.cos(angle),
@@ -1090,7 +1094,6 @@ class DataCollector:
                     {'type': 'vehicle', 'capabilities': ['bsm', 'rsm']}
                 )
 
-        # 初始化行人安全监控器
         self.safety_monitor = PedestrianSafetyMonitor(self.world, self.output_dir)
 
         time.sleep(3.0)
@@ -1183,7 +1186,9 @@ class DataCollector:
                 if current_time - last_safety_check >= 1.0 and self.safety_monitor:
                     safety_report = self.safety_monitor.check_pedestrian_safety()
                     if safety_report['risk_distribution']['high'] > 0:
-                        Log.safety(f"行人安全警告: {safety_report['high_risk_cases']}个高风险情况")
+                        Log.safety(f"行人安全警告: {safety_report['risk_distribution']['high']}个高风险情况")
+                        # 广播行人警告
+                        self._broadcast_pedestrian_warnings(safety_report)
                     last_safety_check = current_time
 
                 if current_time - last_performance_sample >= 10.0:
@@ -1253,6 +1258,7 @@ class DataCollector:
                     final_report = self.safety_monitor.generate_final_report()
                     Log.safety(
                         f"行人安全报告: {final_report['risk_distribution']['high']}高风险, {final_report['risk_distribution']['medium']}中风险")
+                    Log.safety(f"行人安全评分: {final_report['safety_score']:.1f}/100")
             else:
                 Log.warning("未收集到任何数据帧")
 
@@ -1261,6 +1267,44 @@ class DataCollector:
 
             if self.output_format != 'standard':
                 self._convert_to_target_format()
+
+    def _broadcast_pedestrian_warnings(self, safety_report):
+        """广播行人警告"""
+        if not self.multi_vehicle_manager:
+            return
+
+        # 检查高风险交互
+        if safety_report.get('risk_distribution', {}).get('high', 0) > 0:
+            for vehicle in self.ego_vehicles + self.multi_vehicle_manager.cooperative_vehicles:
+                if not hasattr(vehicle, 'is_alive') or not vehicle.is_alive:
+                    continue
+
+                try:
+                    location = vehicle.get_location()
+                    velocity = vehicle.get_velocity()
+                    speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+
+                    # 模拟行人位置（实际应用中应从感知系统获取）
+                    pedestrian_location = (
+                        location.x + random.uniform(-5, 5),
+                        location.y + random.uniform(-5, 5),
+                        location.z
+                    )
+
+                    distance = math.sqrt(
+                        (location.x - pedestrian_location[0]) ** 2 +
+                        (location.y - pedestrian_location[1]) ** 2
+                    )
+
+                    if distance < 20.0:  # 只广播近距离行人
+                        self.multi_vehicle_manager.share_pedestrian_warning(
+                            vehicle.id,
+                            pedestrian_location,
+                            distance,
+                            speed
+                        )
+                except:
+                    pass
 
     def _force_memory_cleanup(self):
         Log.info("执行强制内存清理...")
@@ -1646,17 +1690,12 @@ Tr_imu_to_velo: 9.999976e-01 7.553071e-04 -2.035826e-03 -8.086759e-01 -7.854027e
             Log.info("运行数据验证...")
             DataValidator.validate_dataset(self.output_dir)
 
-    def run_analysis(self):
-        if self.config['output'].get('run_analysis', False) and self.collected_frames > 0:
-            Log.info("运行数据分析...")
-            DataAnalyzer.analyze_dataset(self.output_dir)
-
 
 def main():
-    parser = argparse.ArgumentParser(description='CVIPS 性能优化数据收集系统')
+    parser = argparse.ArgumentParser(description='CVIPS 行人安全增强数据收集系统')
 
     parser.add_argument('--config', type=str, help='配置文件路径')
-    parser.add_argument('--scenario', type=str, default='performance_optimized', help='场景名称')
+    parser.add_argument('--scenario', type=str, default='pedestrian_safety', help='场景名称')
     parser.add_argument('--town', type=str, default='Town10HD',
                         choices=['Town03', 'Town04', 'Town05', 'Town10HD'], help='地图')
     parser.add_argument('--weather', type=str, default='clear',
@@ -1665,7 +1704,7 @@ def main():
                         choices=['noon', 'sunset', 'night'], help='时间')
 
     parser.add_argument('--num-vehicles', type=int, default=8, help='背景车辆数')
-    parser.add_argument('--num-pedestrians', type=int, default=6, help='行人数')
+    parser.add_argument('--num-pedestrians', type=int, default=12, help='行人数')
     parser.add_argument('--num-coop-vehicles', type=int, default=2, help='协同车辆数')
 
     parser.add_argument('--duration', type=int, default=60, help='收集时长(秒)')
@@ -1702,7 +1741,7 @@ def main():
     config['output']['output_format'] = args.output_format
 
     print("\n" + "=" * 60)
-    print("CVIPS 性能优化数据收集系统 - 行人安全增强版")
+    print("CVIPS 行人安全增强数据收集系统")
     print("=" * 60)
 
     print(f"场景: {config['scenario']['name']}")
@@ -1747,7 +1786,6 @@ def main():
 
         collector.collect_data()
 
-        collector.run_analysis()
         collector.run_validation()
 
     except KeyboardInterrupt:
