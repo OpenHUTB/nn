@@ -491,7 +491,7 @@ def main():
     level1, name1 = realtime_smoke_monitor(alarm_model, scaler, 3.0, 2.8, SAMPLE_FREQ)
     print(f"实时样本1：当前浓度3.0ppm → 报警等级：{name1}")
 
-    # 示例2：低风险（10ppm）111
+    # 示例2：低风险（10ppm）11111
     level2, name2 = realtime_smoke_monitor(alarm_model, scaler, 10.0, 8.5, SAMPLE_FREQ)
     print(f"实时样本2：当前浓度10.0ppm → 报警等级：{name2}")
 
