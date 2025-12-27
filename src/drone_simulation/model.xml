@@ -1,164 +1,121 @@
-<?xml version="1.0" ?>
-<mujoco model="quadrotor">
+import mujoco
+import mujoco.viewer as viewer
+import os
+import numpy as np
 
-  <!-- 仿真选项 -->
-  <option timestep="0.005" iterations="50" tolerance="1e-10" cone="elliptic">
-    <flag contact="enable" energy="enable"/>
-  </option>
+class QuadrotorSimulator:
+    def __init__(self, model_path):
+        # 加载MuJoCo模型和数据
+        self.model = mujoco.MjModel.from_xml_path(model_path)
+        self.data = mujoco.MjData(self.model)
 
-  <!-- 物理参数 -->
-  <size nconmax="100" njmax="200"/>
+        # 获取电机控制索引
+        self.motor_ids = {
+            "front_right": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_front_right"),
+            "front_left": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_front_left"),
+            "back_left": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_back_left"),
+            "back_right": mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, "motor_back_right")
+        }
 
-  <!-- 资产定义 -->
-  <asset>
-    <!-- 纹理 -->
-    <texture name="skybox" type="skybox" builtin="gradient" rgb1="0.6 0.8 1.0" rgb2="0.2 0.3 0.6"/>
-    <texture name="ground" type="2d" builtin="checker" rgb1="0.8 0.9 0.8" rgb2="0.6 0.8 0.6" width="512" height="512"/>
-    <texture name="metal" type="2d" builtin="flat" rgb1="0.5 0.5 0.5" rgb2="0.1 0.1 0.1"/>
-    <texture name="propeller" type="2d" builtin="flat" rgb1="0.9 0.2 0.2" rgb2="0.5 0.1 0.1"/>
+        # 初始悬停推力
+        self.base_thrust = 500.0
 
-    <!-- 材质 -->
-    <material name="sky" texture="skybox" texuniform="true"/>
-    <material name="ground_mat" texture="ground" texuniform="true" texrepeat="10 10"/>
-    <material name="metal_mat" texture="metal" shininess="0.5" specular="0.5"/>
-    <material name="propeller_mat" texture="propeller" shininess="0.3" specular="0.2"/>
-    <material name="red" rgba="0.8 0.2 0.2 1"/>
-    <material name="green" rgba="0.2 0.8 0.2 1"/>
-    <material name="blue" rgba="0.2 0.2 0.8 1"/>
-    <material name="black" rgba="0.1 0.1 0.1 1"/>
-    <material name="white" rgba="1 1 1 1"/>
+    def set_motor_thrust(self, front_right=None, front_left=None, back_left=None, back_right=None):
+        """设置四个电机的推力"""
+        if front_right is not None:
+            self.data.ctrl[self.motor_ids["front_right"]] = front_right
+        if front_left is not None:
+            self.data.ctrl[self.motor_ids["front_left"]] = front_left
+        if back_left is not None:
+            self.data.ctrl[self.motor_ids["back_left"]] = back_left
+        if back_right is not None:
+            self.data.ctrl[self.motor_ids["back_right"]] = back_right
 
-    <!-- 网格 -->
-    <mesh name="quad_body" file="quad_body.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="propeller_blade" file="propeller_blade.stl" scale="0.01 0.01 0.01"/>
-  </asset>
+    def get_sensor_data(self):
+        """读取传感器数据"""
+        sensor_data = {
+            "position": self.data.sensor("quad_position").data.copy(),
+            "orientation": self.data.sensor("quad_orientation").data.copy(),
+            "linear_velocity": self.data.sensor("quad_linear_velocity").data.copy(),
+            "angular_velocity": self.data.sensor("quad_angular_velocity").data.copy(),
+            "linear_acceleration": self.data.sensor("quad_linear_acceleration").data.copy(),
+            "rotor_speeds": [
+                self.data.sensor("rotor_speed_front_right").data[0],
+                self.data.sensor("rotor_speed_front_left").data[0],
+                self.data.sensor("rotor_speed_back_left").data[0],
+                self.data.sensor("rotor_speed_back_right").data[0]
+            ],
+            "touch": self.data.sensor("touch_sensor").data[0]
+        }
+        return sensor_data
 
-  <!-- 世界定义 -->
-  <worldbody>
-    <!-- 光源 -->
-    <light name="top_light" pos="0 0 10" dir="0 0 -1" directional="true" diffuse="0.8 0.8 0.8"/>
-    <light name="front_light" pos="5 0 5" dir="-1 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    def run_simulation(self):
+        """启动仿真可视化"""
+        # 初始化电机推力
+        self.set_motor_thrust(
+            front_right=self.base_thrust,
+            front_left=self.base_thrust,
+            back_left=self.base_thrust,
+            back_right=self.base_thrust
+        )
 
-    <!-- 天空和地面 -->
-    <geom name="sky" type="plane" pos="0 0 0" size="0 0 0" material="sky"/>
-    <geom name="ground" type="plane" pos="0 0 0" size="20 20 0.1" material="ground_mat" condim="3" friction="1 0.005 0.0001"/>
+        with viewer.launch_passive(self.model, self.data) as v:
+            print("仿真启动成功！")
+            print("操作说明：↑=上升 ↓=下降 ←=左偏航 →=右偏航 q=退出")
 
-    <!-- 参考坐标系 -->
-    <geom name="origin_x" type="cylinder" fromto="0 0 0.1 1 0 0.1" size="0.01" rgba="1 0 0 1"/>
-    <geom name="origin_y" type="cylinder" fromto="0 0 0.1 0 1 0.1" size="0.01" rgba="0 1 0 1"/>
-    <geom name="origin_z" type="cylinder" fromto="0 0 0.1 0 0 1.1" size="0.01" rgba="0 0 1 1"/>
+            step = 0
+            while v.is_running():
+                step_start = mujoco.mj_time(self.model)
 
-    <!-- 四旋翼无人机主体 -->
-    <body name="quadrotor" pos="0 0 1.5" euler="0 0 0">
-      <!-- 自由关节 (6自由度) -->
-      <freejoint name="quad_free_joint"/>
+                # 每100步打印传感器数据
+                if step % 100 == 0:
+                    sensor_data = self.get_sensor_data()
+                    print(f"\n步骤 {step} | 位置: {np.round(sensor_data['position'], 3)}")
 
-      <!-- 主体框架 -->
-      <geom name="center_body" type="cylinder" size="0.1 0.02" rgba="0.3 0.3 0.3 1" mass="0.3"/>
-      <geom name="arm_front_right" type="capsule" fromto="0 0 0 0.25 0.25 0" size="0.008" rgba="0.1 0.1 0.1 1" mass="0.05"/>
-      <geom name="arm_front_left" type="capsule" fromto="0 0 0 0.25 -0.25 0" size="0.008" rgba="0.1 0.1 0.1 1" mass="0.05"/>
-      <geom name="arm_back_left" type="capsule" fromto="0 0 0 -0.25 -0.25 0" size="0.008" rgba="0.1 0.1 0.1 1" mass="0.05"/>
-      <geom name="arm_back_right" type="capsule" fromto="0 0 0 -0.25 0.25 0" size="0.008" rgba="0.1 0.1 0.1 1" mass="0.05"/>
+                # 键盘控制
+                key_events = v.user_input()
+                thrust_delta = 5.0
+                for event in key_events:
+                    if event.key == viewer.KEY.UP and event.down:
+                        self.base_thrust += thrust_delta
+                        self.set_motor_thrust(self.base_thrust, self.base_thrust, self.base_thrust, self.base_thrust)
+                    elif event.key == viewer.KEY.DOWN and event.down:
+                        self.base_thrust = max(0, self.base_thrust - thrust_delta)
+                        self.set_motor_thrust(self.base_thrust, self.base_thrust, self.base_thrust, self.base_thrust)
+                    elif event.key == viewer.KEY.LEFT and event.down:
+                        self.set_motor_thrust(
+                            self.base_thrust+thrust_delta, self.base_thrust-thrust_delta,
+                            self.base_thrust+thrust_delta, self.base_thrust-thrust_delta
+                        )
+                    elif event.key == viewer.KEY.RIGHT and event.down:
+                        self.set_motor_thrust(
+                            self.base_thrust-thrust_delta, self.base_thrust+thrust_delta,
+                            self.base_thrust-thrust_delta, self.base_thrust+thrust_delta
+                        )
+                    elif event.key == viewer.KEY.Q and event.down:
+                        v.close()
+                        break
 
-      <!-- 电机和旋翼 (前右) -->
-      <body name="motor_front_right" pos="0.25 0.25 0">
-        <geom name="motor_housing_front_right" type="cylinder" size="0.025 0.03" rgba="0.2 0.2 0.2 1" mass="0.05"/>
+                # 执行仿真步
+                mujoco.mj_step(self.model, self.data)
 
-        <body name="rotor_front_right" pos="0 0 0.05">
-          <joint name="rotor_front_right_joint" type="hinge" axis="0 0 1" limited="false"/>
-          <geom name="propeller_front_right" type="cylinder" size="0.12 0.005" rgba="0.8 0.2 0.2 0.8" mass="0.02"/>
-        </body>
-      </body>
+                # 控制60FPS帧率
+                while mujoco.mj_time(self.model) - step_start < 1/60:
+                    pass
 
-      <!-- 电机和旋翼 (前左) -->
-      <body name="motor_front_left" pos="0.25 -0.25 0">
-        <geom name="motor_housing_front_left" type="cylinder" size="0.025 0.03" rgba="0.2 0.2 0.2 1" mass="0.05"/>
+                v.sync()
+                step += 1
 
-        <body name="rotor_front_left" pos="0 0 0.05">
-          <joint name="rotor_front_left_joint" type="hinge" axis="0 0 1" limited="false"/>
-          <geom name="propeller_front_left" type="cylinder" size="0.12 0.005" rgba="0.2 0.8 0.2 0.8" mass="0.02"/>
-        </body>
-      </body>
+if __name__ == "__main__":
+    # 拼接XML模型文件路径（和当前Python文件同目录）
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(current_dir, "quadrotor.xml")
 
-      <!-- 电机和旋翼 (后左) -->
-      <body name="motor_back_left" pos="-0.25 -0.25 0">
-        <geom name="motor_housing_back_left" type="cylinder" size="0.025 0.03" rgba="0.2 0.2 0.2 1" mass="0.05"/>
-
-        <body name="rotor_back_left" pos="0 0 0.05">
-          <joint name="rotor_back_left_joint" type="hinge" axis="0 0 1" limited="false"/>
-          <geom name="propeller_back_left" type="cylinder" size="0.12 0.005" rgba="0.8 0.2 0.2 0.8" mass="0.02"/>
-        </body>
-      </body>
-
-      <!-- 电机和旋翼 (后右) -->
-      <body name="motor_back_right" pos="-0.25 0.25 0">
-        <geom name="motor_housing_back_right" type="cylinder" size="0.025 0.03" rgba="0.2 0.2 0.2 1" mass="0.05"/>
-
-        <body name="rotor_back_right" pos="0 0 0.05">
-          <joint name="rotor_back_right_joint" type="hinge" axis="0 0 1" limited="false"/>
-          <geom name="propeller_back_right" type="cylinder" size="0.12 0.005" rgba="0.2 0.8 0.2 0.8" mass="0.02"/>
-        </body>
-      </body>
-
-      <!-- 起落架 -->
-      <geom name="landing_gear_front" type="cylinder" pos="0.15 0 0" size="0.005 0.05" rgba="0.5 0.5 0.5 1" mass="0.01"/>
-      <geom name="landing_gear_back" type="cylinder" pos="-0.15 0 0" size="0.005 0.05" rgba="0.5 0.5 0.5 1" mass="0.01"/>
-
-      <!-- 视觉标记 (用于方向识别) -->
-      <geom name="front_marker" type="sphere" pos="0.15 0 0.02" size="0.015" rgba="1 1 0 1"/>
-      <geom name="rear_marker" type="sphere" pos="-0.15 0 0.02" size="0.015" rgba="0 1 1 1"/>
-    </body>
-
-    <!-- 障碍物 (可选) -->
-    <body name="obstacle1" pos="2 0 1">
-      <geom name="obs1" type="cylinder" size="0.3 1" rgba="0.7 0.7 0.9 0.7"/>
-    </body>
-
-    <body name="obstacle2" pos="-2 0 1">
-      <geom name="obs2" type="box" size="0.5 0.5 1" rgba="0.9 0.7 0.7 0.7"/>
-    </body>
-
-    <!-- 目标点 -->
-    <body name="target" pos="0 3 2">
-      <geom name="target_sphere" type="sphere" size="0.1" rgba="1 0 0 0.5" contype="0" conaffinity="0"/>
-    </body>
-
-  </worldbody>
-
-  <!-- 执行器定义 -->
-  <actuator>
-    <!-- 电机控制 -->
-    <motor name="motor_front_right" joint="rotor_front_right_joint" gear="50" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_front_left" joint="rotor_front_left_joint" gear="50" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_back_left" joint="rotor_back_left_joint" gear="50" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_back_right" joint="rotor_back_right_joint" gear="50" ctrllimited="true" ctrlrange="0 1000"/>
-  </actuator>
-
-  <!-- 传感器定义 -->
-  <sensor>
-    <!-- 位置传感器 -->
-    <framepos name="quad_position" objtype="body" objname="quadrotor"/>
-
-    <!-- 姿态传感器 (四元数) -->
-    <framequat name="quad_orientation" objtype="body" objname="quadrotor"/>
-
-    <!-- 线速度传感器 -->
-    <framelinvel name="quad_linear_velocity" objtype="body" objname="quadrotor"/>
-
-    <!-- 角速度传感器 -->
-    <frameangvel name="quad_angular_velocity" objtype="body" objname="quadrotor"/>
-
-    <!-- 线加速度传感器 -->
-    <framelinacc name="quad_linear_acceleration" objtype="body" objname="quadrotor"/>
-
-    <!-- 旋翼转速传感器 -->
-    <jointpos name="rotor_speed_front_right" joint="rotor_front_right_joint"/>
-    <jointpos name="rotor_speed_front_left" joint="rotor_front_left_joint"/>
-    <jointpos name="rotor_speed_back_left" joint="rotor_back_left_joint"/>
-    <jointpos name="rotor_speed_back_right" joint="rotor_back_right_joint"/>
-
-    <!-- 接触传感器 -->
-    <touch name="touch_sensor" site="quadrotor_center"/>
-  </sensor>
-
-</mujoco>
+    # 检查模型文件是否存在
+    if not os.path.exists(model_path):
+        print(f"错误：未找到模型文件 {model_path}")
+        print("请确保 quadrotor.xml 文件和 mainone.py 在同一目录下！")
+    else:
+        # 启动仿真
+        simulator = QuadrotorSimulator(model_path)
+        simulator.run_simulation()
