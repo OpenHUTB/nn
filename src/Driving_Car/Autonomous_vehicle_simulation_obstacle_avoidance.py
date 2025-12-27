@@ -142,7 +142,7 @@ def detect_obstacle():
     if len(front_points) == 0:
         return False
 
-    # 计算每个点的水平角度（相对于车辆前进方向，单位：度）
+    # 计算每个点的水平角（相对于车辆前进方向，单位：度）
     # 车辆前进方向为x轴正方向，y轴正方向为左，负方向为右
     angles = np.degrees(np.arctan2(front_points[:, 1], front_points[:, 0]))
     # 过滤角度在[-阈值, +阈值]范围内的点（前方左右各OBSTACLE_ANGLE_THRESHOLD度）
