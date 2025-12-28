@@ -132,7 +132,6 @@ python
    pos_error = 目标关节位置 - 当前关节位置
    vel_error = -当前关节速度
    关节力矩 = KP * pos_error + KD * vel_error
-
    
 ### 核心映射逻辑
 action = ctrl_min + (ctrl_max - ctrl_min) * (action + 1) / 2
