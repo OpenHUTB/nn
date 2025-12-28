@@ -1,3 +1,7 @@
+# main.py
+# CARLA目标检测与跟踪系统 - 优化版
+# 主要功能：在CARLA仿真环境中实现实时目标检测、多目标跟踪和自动驾驶控制
+
 import argparse
 import carla
 import os
@@ -13,181 +17,188 @@ import sys
 import json
 import logging
 from pathlib import Path
-from scipy.optimize import linear_sum_assignment
+from scipy.optimize import linear_sum_assignment  # 匈牙利算法用于目标匹配
 
 
 # -------------------------- 日志配置 --------------------------
 def setup_logging():
-    """设置日志系统"""
+    """设置日志系统 - 同时输出到控制台和文件"""
+    # 创建logger实例
     logger = logging.getLogger("carla_tracking")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.INFO)  # 设置日志级别
 
-    # 创建控制台处理器
+    # 创建控制台处理器 - 输出到终端
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
 
-    # 创建文件处理器
+    # 创建文件处理器 - 输出到文件
     file_handler = logging.FileHandler("carla_tracking.log", mode='w')
-    file_handler.setLevel(logging.DEBUG)
+    file_handler.setLevel(logging.DEBUG)  # 文件日志更详细
 
-    # 设置格式
+    # 设置日志格式
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     console_handler.setFormatter(formatter)
     file_handler.setFormatter(formatter)
 
-    # 添加处理器
+    # 添加处理器到logger
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
     return logger
 
 
-logger = setup_logging()
+logger = setup_logging()  # 初始化全局logger
 
 
 # -------------------------- 配置管理 --------------------------
 class ConfigManager:
-    """配置管理器"""
+    """配置管理器 - 统一管理程序所有配置参数"""
 
+    # 使用单例模式思想，集中管理所有配置参数
     def __init__(self, config_file=None):
-        self.config = self._load_default_config()
+        self.config = self._load_default_config()  # 加载默认配置
 
         if config_file and os.path.exists(config_file):
-            self.load_config(config_file)
+            self.load_config(config_file)  # 从文件加载用户配置
 
     def _load_default_config(self):
-        """加载默认配置"""
+        """加载默认配置 - 程序运行的基准参数"""
         return {
-            'carla': {
+            'carla': {  # CARLA仿真环境配置
                 'host': 'localhost',
                 'port': 2000,
                 'timeout': 10.0,
-                'sync_mode': True,
-                'fixed_delta_seconds': 0.05
+                'sync_mode': True,  # 同步模式确保时间步一致
+                'fixed_delta_seconds': 0.05  # 时间步长（20Hz）
             },
-            'detection': {
-                'conf_thres': 0.15,
-                'iou_thres': 0.4,
-                'model_type': 'yolov5m',
-                'device': 'cuda' if torch.cuda.is_available() else 'cpu'
+            'detection': {  # 目标检测配置
+                'conf_thres': 0.15,  # 置信度阈值
+                'iou_thres': 0.4,  # NMS的IOU阈值
+                'model_type': 'yolov5m',  # YOLO模型类型
+                'device': 'cuda' if torch.cuda.is_available() else 'cpu'  # 自动选择设备
             },
-            'tracking': {
-                'max_age': 30,
-                'min_hits': 3,
-                'iou_threshold': 0.3,
-                'use_acceleration': True,
-                'use_adaptive_threshold': True,
-                'depth_aware': True,
-                'min_confidence': 0.1
+            'tracking': {  # 目标跟踪配置
+                'max_age': 30,  # 最大丢失帧数
+                'min_hits': 3,  # 最小命中次数
+                'iou_threshold': 0.3,  # 匹配阈值
+                'use_acceleration': True,  # 是否使用加速度模型
+                'use_adaptive_threshold': True,  # 自适应阈值
+                'depth_aware': True,  # 使用深度信息
+                'min_confidence': 0.1  # 最小置信度
             },
-            'vehicle': {
-                'max_speed': 50.0,
-                'target_speed': 30.0,
-                'safety_distance': 15.0,
-                'enable_physics': True
+            'vehicle': {  # 主车辆控制配置
+                'max_speed': 50.0,  # 最大速度(km/h)
+                'target_speed': 30.0,  # 目标巡航速度
+                'safety_distance': 15.0,  # 安全距离(m)
+                'enable_physics': True  # 启用物理模拟
             },
-            'npc': {
-                'count': 20,
-                'min_distance': 20.0
+            'npc': {  # NPC车辆配置
+                'count': 20,  # NPC数量
+                'min_distance': 20.0  # 最小生成距离
             },
-            'camera': {
-                'width': 800,
-                'height': 600,
-                'fov': 90
+            'camera': {  # 相机传感器配置
+                'width': 800,  # 图像宽度
+                'height': 600,  # 图像高度
+                'fov': 90  # 视野角度
             },
-            'performance': {
-                'show_panel': True,
-                'log_interval': 100,
-                'max_fps': 30
+            'performance': {  # 性能监控配置
+                'show_panel': True,  # 显示性能面板
+                'log_interval': 100,  # 日志间隔（帧）
+                'max_fps': 30  # 最大FPS限制
             }
         }
 
     def load_config(self, config_file):
-        """从文件加载配置"""
+        """从JSON文件加载配置 - 支持增量更新"""
         try:
             with open(config_file, 'r') as f:
                 user_config = json.load(f)
-                self._update_config(self.config, user_config)
+                self._update_config(self.config, user_config)  # 递归合并配置
                 logger.info(f"加载配置文件: {config_file}")
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}")
 
     def _update_config(self, base, update):
-        """递归更新配置"""
+        """递归更新配置字典 - 深度合并"""
         for key, value in update.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                # 递归更新子字典
                 self._update_config(base[key], value)
             else:
+                # 直接赋值
                 base[key] = value
 
     def save_config(self, config_file):
-        """保存配置到文件"""
+        """保存配置到JSON文件 - 便于下次使用"""
         try:
             with open(config_file, 'w') as f:
-                json.dump(self.config, f, indent=4)
+                json.dump(self.config, f, indent=4)  # 美化输出
             logger.info(f"配置文件已保存: {config_file}")
         except Exception as e:
             logger.error(f"保存配置文件失败: {e}")
 
     def get(self, key, default=None):
-        """获取配置值"""
+        """获取配置值 - 支持点分隔符（如'carla.host'）"""
         keys = key.split('.')
         value = self.config
         for k in keys:
             if isinstance(value, dict) and k in value:
                 value = value[k]
             else:
-                return default
+                return default  # 键不存在时返回默认值
         return value
 
 
 # -------------------------- 优化的卡尔曼滤波器 --------------------------
 class OptimizedKalmanFilter:
-    """优化的卡尔曼滤波器"""
+    """优化的卡尔曼滤波器 - 用于目标状态估计和预测"""
 
+    # 卡尔曼滤波器是多目标跟踪的核心，用于估计目标的位置、速度等状态
     def __init__(self, dt=1.0, use_acceleration=True):
-        self.dt = dt
-        self.use_acceleration = use_acceleration
+        self.dt = dt  # 时间步长
+        self.use_acceleration = use_acceleration  # 是否使用加速度模型
 
         if use_acceleration:
             # 8维状态: [x, y, w, h, vx, vy, vw, vh]
+            # 包含位置、尺寸及其一阶导数（速度）
             self.state_dim = 8
-            self.meas_dim = 4
+            self.meas_dim = 4  # 测量维度（只能直接观测位置和尺寸）
 
-            # 状态转移矩阵
+            # 状态转移矩阵 F - 描述状态如何随时间变化
             self.F = np.eye(self.state_dim, dtype=np.float32)
-            self.F[0, 4] = dt
-            self.F[1, 5] = dt
-            self.F[2, 6] = dt
-            self.F[3, 7] = dt
+            self.F[0, 4] = dt  # x + vx*dt
+            self.F[1, 5] = dt  # y + vy*dt
+            self.F[2, 6] = dt  # w + vw*dt
+            self.F[3, 7] = dt  # h + vh*dt
 
-            # 测量矩阵
+            # 测量矩阵 H - 将状态空间映射到测量空间
             self.H = np.zeros((self.meas_dim, self.state_dim), dtype=np.float32)
-            self.H[0, 0] = 1
-            self.H[1, 1] = 1
-            self.H[2, 2] = 1
-            self.H[3, 3] = 1
+            self.H[0, 0] = 1  # 测量x
+            self.H[1, 1] = 1  # 测量y
+            self.H[2, 2] = 1  # 测量w
+            self.H[3, 3] = 1  # 测量h
 
-            # 初始化状态
+            # 初始化状态向量
             self.x = np.zeros((self.state_dim, 1), dtype=np.float32)
 
-            # 初始化协方差矩阵
-            self.P = np.eye(self.state_dim, dtype=np.float32) * 1000
+            # 初始化协方差矩阵 P - 状态估计的不确定性
+            self.P = np.eye(self.state_dim, dtype=np.float32) * 1000  # 初始高不确定性
 
-            # 过程噪声协方差
+            # 过程噪声协方差 Q - 系统模型的不确定性
             self.Q = np.eye(self.state_dim, dtype=np.float32) * 0.1
-            self.Q[4:, 4:] = np.eye(4) * 0.01
+            self.Q[4:, 4:] = np.eye(4) * 0.01  # 速度噪声更小
 
-            # 测量噪声协方差
+            # 测量噪声协方差 R - 传感器测量的不确定性
             self.R = np.eye(self.meas_dim, dtype=np.float32) * 5
 
         else:
-            # 4维状态: [x, y, w, h]
+            # 简化版：4维状态，仅包含位置和尺寸
             self.state_dim = 4
             self.meas_dim = 4
 
+            # 简化模型
             self.F = np.eye(self.state_dim, dtype=np.float32)
             self.H = np.eye(self.state_dim, dtype=np.float32)
             self.x = np.zeros((self.state_dim, 1), dtype=np.float32)
@@ -195,37 +206,41 @@ class OptimizedKalmanFilter:
             self.Q = np.eye(self.state_dim, dtype=np.float32) * 0.5
             self.R = np.eye(self.state_dim, dtype=np.float32) * 10
 
-        # 预计算转置矩阵
+        # 预计算转置矩阵 - 优化性能
         self.H_T = self.H.T
         self.F_T = self.F.T
 
     def predict(self):
-        """预测下一时刻状态"""
+        """预测下一时刻状态 - 卡尔曼滤波预测步骤"""
+        # 状态预测：x_k = F * x_{k-1}
         self.x = self.F @ self.x
+
+        # 协方差预测：P_k = F * P_{k-1} * F^T + Q
         self.P = self.F @ self.P @ self.F_T + self.Q
 
+        # 返回预测的边界框（位置和尺寸）
         if self.use_acceleration:
-            return self.x[:4].flatten()
+            return self.x[:4].flatten()  # 取前4维（x,y,w,h）
         else:
             return self.x.flatten()
 
     def update(self, measurement):
-        """使用测量值更新状态"""
+        """使用测量值更新状态 - 卡尔曼滤波更新步骤"""
         measurement = np.array(measurement, dtype=np.float32).reshape(-1, 1)
 
-        # 计算残差
+        # 计算残差：y = z - H * x
         y = measurement - self.H @ self.x
 
-        # 计算残差协方差
+        # 计算残差协方差：S = H * P * H^T + R
         S = self.H @ self.P @ self.H_T + self.R
 
-        # 计算卡尔曼增益
+        # 计算卡尔曼增益：K = P * H^T * S^{-1}
         K = self.P @ self.H_T @ np.linalg.inv(S)
 
-        # 更新状态
+        # 状态更新：x = x + K * y
         self.x = self.x + K @ y
 
-        # 更新协方差
+        # 协方差更新：P = (I - K * H) * P
         I = np.eye(self.state_dim, dtype=np.float32)
         self.P = (I - K @ self.H) @ self.P
 
@@ -234,8 +249,8 @@ class OptimizedKalmanFilter:
 
 # -------------------------- 优化的跟踪目标 --------------------------
 class OptimizedTrack:
-    """优化的跟踪目标"""
-
+    """优化的跟踪目标 - 表示一个被跟踪的车辆目标"""
+    # __slots__优化内存使用，固定属性列表
     __slots__ = ('id', 'kf', 'bbox', 'center', 'width', 'height', 'aspect_ratio',
                  'hits', 'age', 'total_visible_count', 'consecutive_invisible_count',
                  'history', 'distance_history', 'velocity_history',
@@ -243,26 +258,28 @@ class OptimizedTrack:
                  'is_confirmed', 'last_seen')
 
     def __init__(self, bbox, track_id, class_id=2, use_acceleration=True):
+        # 目标标识
         self.id = track_id
-        self.class_id = class_id
+        self.class_id = class_id  # 目标类别（2=car, 3=motorcycle等）
 
         # 初始化卡尔曼滤波器
         self.kf = OptimizedKalmanFilter(use_acceleration=use_acceleration)
 
-        # 初始边界框
+        # 初始边界框 [x1, y1, x2, y2]
         self.bbox = np.array(bbox, dtype=np.float32)
 
-        # 初始中心点
+        # 边界框中心点
         self.center = np.array([(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2],
                                dtype=np.float32)
 
         # 尺寸信息
         self.width = bbox[2] - bbox[0]
         self.height = bbox[3] - bbox[1]
-        self.aspect_ratio = self.width / max(self.height, 1e-6)
+        self.aspect_ratio = self.width / max(self.height, 1e-6)  # 宽高比，防止除零
 
         # 初始化滤波器状态
         if use_acceleration:
+            # 设置初始状态：中心点位置和尺寸
             self.kf.x[:4] = np.array([self.center[0], self.center[1],
                                       self.width, self.height],
                                      dtype=np.float32).reshape(-1, 1)
@@ -272,54 +289,54 @@ class OptimizedTrack:
                                  dtype=np.float32).reshape(-1, 1)
 
         # 统计信息
-        self.hits = 1
-        self.age = 0
-        self.total_visible_count = 1
-        self.consecutive_invisible_count = 0
+        self.hits = 1  # 成功匹配次数
+        self.age = 0  # 目标年龄（帧数）
+        self.total_visible_count = 1  # 总可见次数
+        self.consecutive_invisible_count = 0  # 连续不可见次数
 
-        # 历史记录
-        self.history = deque(maxlen=30)
+        # 历史记录（使用deque限制长度）
+        self.history = deque(maxlen=30)  # 轨迹历史
         self.history.append(self.center.copy())
 
-        self.distance_history = deque(maxlen=10)
-        self.velocity_history = deque(maxlen=10)
+        self.distance_history = deque(maxlen=10)  # 距离历史
+        self.velocity_history = deque(maxlen=10)  # 速度历史
 
         # 当前状态
-        self.current_distance = None
-        self.velocity = 0.0
-        self.confidence = 1.0
-        self.is_confirmed = False
-        self.last_seen = 0
+        self.current_distance = None  # 当前距离（米）
+        self.velocity = 0.0  # 当前速度
+        self.confidence = 1.0  # 跟踪置信度
+        self.is_confirmed = False  # 是否确认为有效目标
+        self.last_seen = 0  # 最后被看到的帧编号
 
-        self.mark_seen()
+        self.mark_seen()  # 标记为当前可见
 
     def mark_seen(self):
-        """标记为目标被看到"""
+        """标记为目标被看到 - 重置不可见计数"""
         self.consecutive_invisible_count = 0
         self.last_seen = self.age
 
     def mark_missed(self):
-        """标记为目标丢失"""
+        """标记为目标丢失 - 增加不可见计数"""
         self.consecutive_invisible_count += 1
 
     def predict(self):
-        """预测下一时刻状态"""
-        self.age += 1
+        """预测下一时刻状态 - 使用卡尔曼滤波"""
+        self.age += 1  # 年龄增加
 
         # 使用卡尔曼滤波器预测
         predicted_state = self.kf.predict()
 
-        # 更新边界框
+        # 解析预测状态
         if self.kf.use_acceleration:
             cx, cy, w, h = predicted_state
         else:
             cx, cy, w, h = predicted_state
 
-        # 确保尺寸合理
+        # 确保尺寸合理（最小值限制）
         w = max(w, 1.0)
         h = max(h, 1.0)
 
-        # 更新边界框
+        # 更新边界框 [x1, y1, x2, y2]
         self.bbox = np.array([
             cx - w / 2, cy - h / 2,
             cx + w / 2, cy + h / 2
@@ -337,7 +354,7 @@ class OptimizedTrack:
 
     def update(self, bbox, confidence=1.0, distance=None):
         """使用检测结果更新跟踪目标"""
-        # 转换边界框
+        # 从边界框计算中心点和尺寸
         w = bbox[2] - bbox[0]
         h = bbox[3] - bbox[1]
         cx = (bbox[0] + bbox[2]) / 2
@@ -348,7 +365,7 @@ class OptimizedTrack:
         # 更新卡尔曼滤波器
         updated_state = self.kf.update(measurement)
 
-        # 更新边界框
+        # 解析更新后的状态
         if self.kf.use_acceleration:
             cx, cy, w, h = updated_state
         else:
@@ -358,6 +375,7 @@ class OptimizedTrack:
         w = max(w, 1.0)
         h = max(h, 1.0)
 
+        # 更新边界框
         self.bbox = np.array([
             cx - w / 2, cy - h / 2,
             cx + w / 2, cy + h / 2
@@ -379,13 +397,14 @@ class OptimizedTrack:
         if distance is not None:
             self.distance_history.append(distance)
             if self.distance_history:
+                # 使用中位数减少噪声影响
                 self.current_distance = float(np.median(list(self.distance_history)))
 
-        # 更新置信度
-        alpha = 0.3
+        # 更新置信度（指数加权平均）
+        alpha = 0.3  # 平滑因子
         self.confidence = alpha * confidence + (1 - alpha) * self.confidence
 
-        # 确认目标
+        # 确认目标（经过多次匹配后确认）
         if self.hits >= 3 and not self.is_confirmed:
             self.is_confirmed = True
 
@@ -393,7 +412,7 @@ class OptimizedTrack:
         self.history.append(self.center.copy())
 
     def get_velocity(self):
-        """计算目标速度"""
+        """计算目标速度 - 基于历史轨迹"""
         if len(self.history) < 2:
             return 0.0
 
@@ -404,6 +423,7 @@ class OptimizedTrack:
 
         distances = []
         for i in range(1, len(recent_history)):
+            # 计算相邻帧间的位移
             dx = recent_history[i][0] - recent_history[i - 1][0]
             dy = recent_history[i][1] - recent_history[i - 1][1]
             distance = np.sqrt(dx * dx + dy * dy)
@@ -411,65 +431,70 @@ class OptimizedTrack:
 
         if distances:
             avg_distance = np.mean(distances)
-            # 假设每秒30帧
+            # 假设每秒30帧，将像素位移转换为速度
             self.velocity = avg_distance * 30
             self.velocity_history.append(self.velocity)
 
-            # 使用中值滤波平滑速度
+            # 使用中值滤波平滑速度（抗噪声）
             if len(self.velocity_history) >= 3:
                 self.velocity = float(np.median(list(self.velocity_history)))
 
         return self.velocity
 
     def get_similarity_score(self, bbox):
-        """计算与给定边界框的相似度分数"""
-        # 计算中心点距离
+        """计算与给定边界框的相似度分数 - 用于数据关联"""
+        # 计算新检测框的中心点和尺寸
         other_cx = (bbox[0] + bbox[2]) / 2
         other_cy = (bbox[1] + bbox[3]) / 2
         other_w = bbox[2] - bbox[0]
         other_h = bbox[3] - bbox[1]
 
-        # 位置相似度
+        # 1. 位置相似度（基于距离）
         dx = other_cx - self.center[0]
         dy = other_cy - self.center[1]
         distance = np.sqrt(dx * dx + dy * dy)
 
-        # 自适应距离阈值
+        # 自适应距离阈值：基于目标尺寸
         max_distance = max(self.width, self.height) * 3
 
         if distance > max_distance:
-            return 0.0
+            return 0.0  # 距离太远，完全不相似
 
+        # 距离相似度（指数衰减）
         position_similarity = np.exp(-distance / (max_distance * 0.5))
 
-        # 尺寸相似度
+        # 2. 尺寸相似度
         size_ratio1 = other_w / max(self.width, 1e-6)
         size_ratio2 = other_h / max(self.height, 1e-6)
 
+        # 尺寸变化过大则拒绝
         if size_ratio1 > 2 or size_ratio1 < 0.5 or size_ratio2 > 2 or size_ratio2 < 0.5:
             return 0.0
 
         size_similarity = np.exp(-abs(size_ratio1 - 1) - abs(size_ratio2 - 1))
 
-        # 长宽比相似度
+        # 3. 长宽比相似度
         other_aspect = other_w / max(other_h, 1e-6)
         aspect_similarity = np.exp(-abs(other_aspect - self.aspect_ratio))
 
-        # 综合相似度
+        # 4. 综合相似度（加权平均）
         similarity = 0.5 * position_similarity + 0.3 * size_similarity + 0.2 * aspect_similarity
 
         return similarity
 
     @property
     def is_reliable(self):
-        """判断目标是否可靠"""
+        """判断目标是否可靠 - 用于结果输出筛选"""
+        # 已确认且最近没有丢失太多帧
         return self.is_confirmed and self.consecutive_invisible_count < 5
 
     @property
     def should_delete(self):
-        """判断是否应该删除目标"""
+        """判断是否应该删除目标 - 用于跟踪器清理"""
+        # 未确认目标：快速删除
         if not self.is_confirmed and self.consecutive_invisible_count >= 3:
             return True
+        # 已确认目标：容忍更多丢失帧
         if self.is_confirmed and self.consecutive_invisible_count >= 10:
             return True
         return False
@@ -477,17 +502,19 @@ class OptimizedTrack:
 
 # -------------------------- 优化的SORT跟踪器 --------------------------
 class OptimizedSORT:
-    """优化的SORT跟踪器"""
+    """优化的SORT跟踪器 - Simple Online and Realtime Tracking的改进版"""
+
+    # SORT算法核心：检测-预测-匹配的循环
 
     def __init__(self, config=None):
         # 默认配置
         self.config = {
-            'max_age': 30,
-            'min_hits': 3,
-            'iou_threshold': 0.3,
-            'use_acceleration': True,
-            'use_adaptive_threshold': True,
-            'min_confidence': 0.1
+            'max_age': 30,  # 最大丢失帧数
+            'min_hits': 3,  # 最小命中次数
+            'iou_threshold': 0.3,  # IOU匹配阈值
+            'use_acceleration': True,  # 使用加速度模型
+            'use_adaptive_threshold': True,  # 自适应阈值
+            'min_confidence': 0.1  # 最小置信度
         }
 
         # 更新配置
@@ -496,56 +523,56 @@ class OptimizedSORT:
 
         # 跟踪目标列表
         self.tracks = []
-        self.next_id = 1
+        self.next_id = 1  # 下一个跟踪ID
 
-        # 缓存
-        self._iou_cache = {}
-        self._prediction_cache = {}
+        # 缓存（优化性能）
+        self._iou_cache = {}  # IOU计算结果缓存
+        self._prediction_cache = {}  # 预测结果缓存
 
         logger.info(f"初始化优化SORT跟踪器")
 
     def update(self, detections, depths=None):
-        """更新跟踪器状态"""
-        # 预处理检测结果
+        """更新跟踪器状态 - 主入口函数"""
+        # 1. 预处理检测结果
         detections = self._preprocess_detections(detections)
 
-        # 预测所有现有跟踪目标
+        # 2. 预测所有现有跟踪目标
         self._predict_tracks()
 
-        # 匹配检测和跟踪目标
+        # 3. 匹配检测和跟踪目标（数据关联）
         matched_pairs, unmatched_detections, unmatched_tracks = self._match_detections(detections)
 
-        # 更新匹配的跟踪目标
+        # 4. 更新匹配的跟踪目标
         self._update_matched_tracks(matched_pairs, detections, depths)
 
-        # 为未匹配的检测创建新跟踪目标
+        # 5. 为未匹配的检测创建新跟踪目标
         self._create_new_tracks(unmatched_detections, detections, depths)
 
-        # 标记未匹配的跟踪目标为丢失
+        # 6. 标记未匹配的跟踪目标为丢失
         self._mark_missed_tracks(unmatched_tracks)
 
-        # 清理无效的跟踪目标
+        # 7. 清理无效的跟踪目标
         self._cleanup_tracks()
 
-        # 获取输出结果
+        # 8. 获取输出结果
         output_tracks = self._get_output_tracks()
 
         return output_tracks
 
     def _preprocess_detections(self, detections):
-        """预处理检测结果"""
+        """预处理检测结果 - 过滤低质量检测"""
         if len(detections) == 0:
             return []
 
-        # 转换为numpy数组
+        # 转换为numpy数组便于操作
         detections_np = np.array(detections, dtype=np.float32)
 
         # 过滤低置信度检测
-        if detections_np.shape[1] > 4:
+        if detections_np.shape[1] > 4:  # 包含置信度
             conf_mask = detections_np[:, 4] >= self.config['min_confidence']
             detections_np = detections_np[conf_mask]
 
-        # 过滤无效边界框
+        # 过滤无效边界框（x1<x2, y1<y2）
         valid_mask = (detections_np[:, 2] > detections_np[:, 0]) & \
                      (detections_np[:, 3] > detections_np[:, 1])
 
@@ -555,27 +582,29 @@ class OptimizedSORT:
         """预测所有跟踪目标的下一个状态"""
         for track in self.tracks:
             predicted_bbox = track.predict()
-            self._prediction_cache[track.id] = predicted_bbox
+            self._prediction_cache[track.id] = predicted_bbox  # 缓存预测结果
 
     def _match_detections(self, detections):
-        """匹配检测和跟踪目标"""
+        """匹配检测和跟踪目标 - 匈牙利算法"""
         if len(self.tracks) == 0 or len(detections) == 0:
+            # 无匹配情况
             return [], list(range(len(detections))), list(range(len(self.tracks)))
 
-        # 构建成本矩阵
+        # 构建成本矩阵（代价矩阵）
         cost_matrix = self._build_cost_matrix(detections)
 
         if cost_matrix.size == 0:
             return [], list(range(len(detections))), list(range(len(self.tracks)))
 
-        # 使用匈牙利算法进行匹配
+        # 使用匈牙利算法进行最优匹配
         try:
+            # linear_sum_assignment最小化总成本
             row_indices, col_indices = linear_sum_assignment(cost_matrix)
         except Exception as e:
             logger.error(f"匈牙利算法错误: {e}")
             return [], list(range(len(detections))), list(range(len(self.tracks)))
 
-        # 提取匹配对
+        # 提取匹配对（成本低于阈值）
         matched_pairs = []
         for row, col in zip(row_indices, col_indices):
             if cost_matrix[row, col] < self._get_adaptive_threshold():
@@ -593,11 +622,11 @@ class OptimizedSORT:
         return matched_pairs, unmatched_detections, unmatched_tracks
 
     def _build_cost_matrix(self, detections):
-        """构建成本矩阵"""
+        """构建成本矩阵 - 行：跟踪目标，列：检测结果"""
         n_tracks = len(self.tracks)
         n_detections = len(detections)
 
-        # 初始化成本矩阵
+        # 初始化成本矩阵（默认高成本）
         cost_matrix = np.ones((n_tracks, n_detections), dtype=np.float32) * 1000
 
         # 为每个跟踪目标-检测对计算成本
@@ -608,13 +637,14 @@ class OptimizedSORT:
                 # 提取检测边界框
                 det_bbox = detection[:4]
 
-                # 计算IOU
+                # 计算IOU（交并比）
                 iou = self._calculate_iou(predicted_bbox, det_bbox)
 
-                # 计算相似度
+                # 计算相似度（特征匹配）
                 similarity = track.get_similarity_score(det_bbox)
 
-                # 综合成本
+                # 综合成本 = 1 - 相似度 * IOU
+                # 成本越低，匹配可能性越高
                 cost = 1.0 - similarity * iou
 
                 cost_matrix[i, j] = cost
@@ -622,13 +652,13 @@ class OptimizedSORT:
         return cost_matrix
 
     def _calculate_iou(self, bbox1, bbox2):
-        """计算两个边界框的IOU"""
-        # 使用缓存
+        """计算两个边界框的IOU - 带缓存优化"""
+        # 使用缓存避免重复计算
         key = (tuple(bbox1), tuple(bbox2))
         if key in self._iou_cache:
             return self._iou_cache[key]
 
-        # 计算交集
+        # 计算交集矩形
         x1 = max(bbox1[0], bbox2[0])
         y1 = max(bbox1[1], bbox2[1])
         x2 = min(bbox1[2], bbox2[2])
@@ -639,13 +669,13 @@ class OptimizedSORT:
             self._iou_cache[key] = 0.0
             return 0.0
 
-        # 计算面积
+        # 计算交集面积
         intersection = (x2 - x1) * (y2 - y1)
         area1 = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
         area2 = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
 
-        # 计算IOU
-        iou = intersection / (area1 + area2 - intersection + 1e-6)
+        # 计算IOU：交集/并集
+        iou = intersection / (area1 + area2 - intersection + 1e-6)  # 加小值防止除零
 
         # 缓存结果
         self._iou_cache[key] = iou
@@ -653,8 +683,8 @@ class OptimizedSORT:
         return iou
 
     def _get_adaptive_threshold(self):
-        """获取自适应匹配阈值"""
-        return 1.0 - self.config['iou_threshold']
+        """获取自适应匹配阈值 - 将IOU阈值转换为成本阈值"""
+        return 1.0 - self.config['iou_threshold']  # IOU=0.3 -> 成本=0.7
 
     def _update_matched_tracks(self, matched_pairs, detections, depths):
         """更新匹配的跟踪目标"""
@@ -680,7 +710,7 @@ class OptimizedSORT:
             # 提取检测信息
             bbox = detection[:4]
             confidence = detection[4] if len(detection) > 4 else 1.0
-            class_id = int(detection[5]) if len(detection) > 5 else 2
+            class_id = int(detection[5]) if len(detection) > 5 else 2  # 默认类别2（car）
 
             # 获取深度信息
             depth = depths[det_idx] if depths and det_idx < len(depths) else None
@@ -700,7 +730,7 @@ class OptimizedSORT:
 
             # 添加到跟踪列表
             self.tracks.append(new_track)
-            self.next_id += 1
+            self.next_id += 1  # ID自增
 
     def _mark_missed_tracks(self, unmatched_tracks):
         """标记未匹配的跟踪目标为丢失"""
@@ -708,11 +738,11 @@ class OptimizedSORT:
             self.tracks[track_idx].mark_missed()
 
     def _cleanup_tracks(self):
-        """清理无效的跟踪目标"""
+        """清理无效的跟踪目标 - 删除应删除的目标"""
         self.tracks = [track for track in self.tracks if not track.should_delete]
 
     def _get_output_tracks(self):
-        """获取输出跟踪结果"""
+        """获取输出跟踪结果 - 只返回可靠目标"""
         output = []
 
         for track in self.tracks:
@@ -730,7 +760,7 @@ class OptimizedSORT:
         return output
 
     def get_tracks_info(self):
-        """获取跟踪目标详细信息"""
+        """获取跟踪目标详细信息 - 用于调试和可视化"""
         info = []
         for track in self.tracks:
             if track.is_reliable:
@@ -749,13 +779,14 @@ class OptimizedSORT:
 
 
 # -------------------------- YOLOv5检测模型 --------------------------
-from ultralytics import YOLO
+from ultralytics import YOLO  # YOLOv8的Python接口
 
 
 def load_detection_model(model_type):
-    """加载检测模型"""
+    """加载检测模型 - YOLOv5/v8"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
+    # 模型路径映射
     model_paths = {
         'yolov5s': r"D:\yolo\yolov5s.pt",
         'yolov5su': r"D:\yolo\yolov5su.pt",
@@ -764,16 +795,20 @@ def load_detection_model(model_type):
         'yolov5x': r"D:\yolo\yolov5x.pt"
     }
 
+    # 模型类型回退逻辑
     if model_type not in model_paths:
         if 'su' in model_type.lower():
             model_type = 'yolov5su'
         elif 'mu' in model_type.lower():
             model_type = 'yolov5mu'
         else:
-            model_type = 'yolov5m'
+            model_type = 'yolov5m'  # 默认中等大小模型
 
     model_path = model_paths.get(model_type)
+
+    # 检查模型文件是否存在
     if not model_path or not os.path.exists(model_path):
+        # 尝试其他可用模型
         for key, path in model_paths.items():
             if os.path.exists(path):
                 model_type = key
@@ -784,13 +819,15 @@ def load_detection_model(model_type):
     if not model_path or not os.path.exists(model_path):
         raise FileNotFoundError(f"无法找到模型文件")
 
+    # 加载模型
     model = YOLO(model_path)
     model.to(device)
 
+    # 半精度浮点数加速（CUDA）
     if device == 'cuda':
         model.half()
 
-    # 预热模型
+    # 预热模型（避免首次推理延迟）
     with torch.no_grad():
         dummy_input = torch.randn(1, 3, 640, 640, device=device)
         if device == 'cuda':
@@ -798,21 +835,23 @@ def load_detection_model(model_type):
         _ = model(dummy_input)
 
     logger.info(f"模型加载成功：{model_type} (设备：{device})")
-    return model, model.names
+    return model, model.names  # 返回模型和类别名称
 
 
 # -------------------------- 车辆控制器 --------------------------
 class VehicleController:
-    """车辆运动控制器"""
+    """车辆运动控制器 - PID控制 + 障碍物避让"""
 
     def __init__(self, vehicle, config):
         self.vehicle = vehicle
         self.config = config
 
+        # 控制参数
         self.max_speed = config.get('vehicle.max_speed', 50.0)
         self.target_speed = config.get('vehicle.target_speed', 30.0)
         self.safety_distance = config.get('vehicle.safety_distance', 15.0)
 
+        # 控制状态
         self.control_state = {
             'throttle': 0.0,
             'steer': 0.0,
@@ -822,17 +861,17 @@ class VehicleController:
         }
 
         # PID控制器参数
-        self.Kp = 0.01
-        self.Ki = 0.001
-        self.Kd = 0.005
-        self.last_error = 0.0
-        self.integral = 0.0
+        self.Kp = 0.01  # 比例项
+        self.Ki = 0.001  # 积分项
+        self.Kd = 0.005  # 微分项
+        self.last_error = 0.0  # 上一次误差
+        self.integral = 0.0  # 误差积分
 
     def update_control(self, detected_obstacles):
         """根据检测到的障碍物更新控制"""
         control = carla.VehicleControl()
 
-        # 获取当前速度
+        # 获取当前速度（m/s转km/h）
         try:
             velocity = self.vehicle.get_velocity()
             speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
@@ -845,8 +884,9 @@ class VehicleController:
         self.integral += error
         derivative = error - self.last_error
 
+        # PID计算
         throttle_base = self.Kp * error + self.Ki * self.integral + self.Kd * derivative
-        throttle = np.clip(throttle_base, 0.0, 0.8)
+        throttle = np.clip(throttle_base, 0.0, 0.8)  # 限制油门范围
 
         self.last_error = error
 
@@ -858,6 +898,7 @@ class VehicleController:
             if valid_distances:
                 closest_distance = min(valid_distances)
 
+                # 距离分级处理
                 if closest_distance < self.safety_distance * 0.5:  # 紧急制动
                     throttle = 0.0
                     brake = 1.0
@@ -868,18 +909,20 @@ class VehicleController:
                     throttle = np.clip(throttle * 0.7, 0.0, 0.5)
                     brake = 0.1
 
-        # 随机转向模拟真实驾驶
+        # 随机转向模拟真实驾驶（避免直线行驶）
         if random.random() < 0.05:  # 5%概率微调方向
             steer = random.uniform(-0.1, 0.1)
         else:
             steer = 0.0
 
+        # 设置控制命令
         control.throttle = throttle
         control.steer = steer
         control.brake = brake
         control.hand_brake = False
         control.reverse = False
 
+        # 更新控制状态
         self.control_state = {
             'throttle': throttle,
             'steer': steer,
@@ -903,25 +946,25 @@ class VehicleController:
 
 # -------------------------- NPC管理器 --------------------------
 class NPCManager:
-    """NPC车辆管理器"""
+    """NPC车辆管理器 - 管理非玩家控制车辆"""
 
     def __init__(self, client, config):
         self.client = client
         self.config = config
-        self.traffic_manager = None
-        self.npc_vehicles = []
+        self.traffic_manager = None  # CARLA交通管理器
+        self.npc_vehicles = []  # NPC车辆列表
 
         try:
             self.traffic_manager = self.client.get_trafficmanager()
-            self.traffic_manager.set_synchronous_mode(True)
+            self.traffic_manager.set_synchronous_mode(True)  # 同步模式
             logger.info("交通管理器初始化成功")
         except Exception as e:
             logger.warning(f"交通管理器初始化失败: {e}")
 
     def spawn_npcs(self, world, count=30, ego_vehicle=None):
         """生成NPC车辆"""
-        bp_lib = world.get_blueprint_library()
-        spawn_points = world.get_map().get_spawn_points()
+        bp_lib = world.get_blueprint_library()  # 蓝图库
+        spawn_points = world.get_map().get_spawn_points()  # 生成点
 
         if not spawn_points:
             logger.warning("没有可用的生成点")
@@ -947,7 +990,7 @@ class NPCManager:
                         (spawn_point.location.y - ego_loc.y) ** 2
                     )
                     if dist < min_distance:
-                        continue
+                        continue  # 太靠近，跳过
                 except:
                     pass
 
@@ -972,12 +1015,12 @@ class NPCManager:
                     try:
                         npc.set_autopilot(True, self.traffic_manager.get_port())
 
-                        # 设置个性化参数
+                        # 设置个性化驾驶参数
                         self.traffic_manager.distance_to_leading_vehicle(
-                            npc, random.uniform(2.0, 5.0)
+                            npc, random.uniform(2.0, 5.0)  # 车距
                         )
                         self.traffic_manager.vehicle_percentage_speed_difference(
-                            npc, random.uniform(-30.0, 30.0)
+                            npc, random.uniform(-30.0, 30.0)  # 速度差异
                         )
                     except Exception as e:
                         logger.warning(f"设置NPC自动驾驶失败: {e}")
@@ -991,10 +1034,10 @@ class NPCManager:
         return self.npc_vehicles
 
     def update_npc_behavior(self):
-        """更新NPC行为"""
+        """更新NPC行为 - 随机调整驾驶风格"""
         for npc in self.npc_vehicles:
             try:
-                # 随机更新NPC的速度差异
+                # 随机更新NPC的速度差异（1%概率）
                 if random.random() < 0.01 and self.traffic_manager:
                     self.traffic_manager.vehicle_percentage_speed_difference(
                         npc, random.uniform(-40.0, 40.0)
@@ -1003,7 +1046,7 @@ class NPCManager:
                 pass
 
     def destroy_all_npcs(self):
-        """销毁所有NPC车辆"""
+        """销毁所有NPC车辆 - 资源清理"""
         for npc in self.npc_vehicles:
             try:
                 if npc.is_alive:
@@ -1015,18 +1058,22 @@ class NPCManager:
 
 # -------------------------- 工具函数 --------------------------
 def preprocess_depth_image(depth_image):
-    """预处理深度图像"""
+    """预处理深度图像 - 归一化、滤波、增强"""
     if depth_image is None:
         return None
 
+    # 数据类型转换
     if depth_image.dtype == np.float16:
         depth_image = depth_image.astype(np.float32)
 
+    # 限制深度范围（0.1-200米）
     depth_image = np.clip(depth_image, 0.1, 200.0)
 
+    # 高斯模糊降噪
     if depth_image.shape[0] > 3 and depth_image.shape[1] > 3:
         depth_image = cv2.GaussianBlur(depth_image, (3, 3), 0.5)
 
+    # 非线性增强（伽马校正）
     max_val = np.max(depth_image)
     if max_val > 0:
         depth_image = np.power(depth_image / max_val, 0.7) * max_val
@@ -1035,37 +1082,42 @@ def preprocess_depth_image(depth_image):
 
 
 def get_target_distance(depth_image, box, use_median=True):
-    """获取目标距离"""
+    """获取目标距离 - 基于深度图像"""
     if depth_image is None:
-        return 50.0
+        return 50.0  # 默认距离
 
     if depth_image.dtype == np.float16:
         depth_image = depth_image.astype(np.float32)
 
+    # 边界框坐标
     x1, y1, x2, y2 = map(int, box)
 
     h, w = depth_image.shape
+    # 边界检查
     x1, y1 = max(0, x1), max(0, y1)
     x2, y2 = min(w - 1, x2), min(h - 1, y2)
 
     if x1 >= x2 or y1 >= y2:
         return 50.0
 
+    # 提取目标区域深度
     depth_roi = depth_image[y1:y2, x1:x2]
-    valid_mask = depth_roi > 0.1
+    valid_mask = depth_roi > 0.1  # 过滤无效深度
     valid_depths = depth_roi[valid_mask]
 
     if valid_depths.size == 0:
         return 50.0
 
+    # 使用中位数或均值
     if use_median:
-        return float(np.median(valid_depths))
+        return float(np.median(valid_depths))  # 中位数抗噪声
     else:
         return float(np.mean(valid_depths))
 
 
 def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
-    """绘制边界框"""
+    """绘制边界框 - 带ID、距离、速度等信息"""
+    # 提取可选参数
     track_ids = kwargs.get('track_ids')
     probs = kwargs.get('probs')
     distances = kwargs.get('distances')
@@ -1077,6 +1129,7 @@ def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
     for i, box in enumerate(boxes):
         x1, y1, x2, y2 = map(int, box)
 
+        # 边界检查
         x1 = max(0, min(x1, w - 1))
         y1 = max(0, min(y1, h - 1))
         x2 = max(0, min(x2, w - 1))
@@ -1085,15 +1138,15 @@ def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
         if x1 >= x2 or y1 >= y2:
             continue
 
-        # 根据距离设置颜色
+        # 根据距离设置颜色（红-橙-绿）
         if distances and i < len(distances) and distances[i] is not None:
             dist = distances[i]
             if dist < 15:
-                color = (0, 0, 255)  # 红色，近距离
+                color = (0, 0, 255)  # 红色，近距离（危险）
             elif dist < 30:
-                color = (0, 165, 255)  # 橙色
+                color = (0, 165, 255)  # 橙色（警告）
             else:
-                color = (0, 255, 0)  # 绿色，远距离
+                color = (0, 255, 0)  # 绿色，远距离（安全）
         else:
             color = (0, 255, 0)
 
@@ -1107,26 +1160,29 @@ def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
             text_parts.append(class_names.get(labels[i], f"cls{labels[i]}"))
 
         if probs and i < len(probs):
-            text_parts.append(f"{probs[i]:.2f}")
+            text_parts.append(f"{probs[i]:.2f}")  # 置信度
 
         if track_ids and i < len(track_ids):
-            text_parts.append(f"ID:{track_ids[i]}")
+            text_parts.append(f"ID:{track_ids[i]}")  # 跟踪ID
 
         if distances and i < len(distances) and distances[i] is not None:
-            text_parts.append(f"D:{distances[i]:.1f}m")
+            text_parts.append(f"D:{distances[i]:.1f}m")  # 距离
 
         if velocities and i < len(velocities) and velocities[i] is not None:
-            text_parts.append(f"V:{velocities[i]:.1f}")
+            text_parts.append(f"V:{velocities[i]:.1f}")  # 速度
 
         label_text = " ".join(filter(None, text_parts))
 
         if label_text:
+            # 计算文本大小
             text_size = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
             text_bg_y1 = max(0, y1 - text_size[1] - 5)
             text_bg_y2 = max(0, y1)
 
+            # 绘制文本背景
             cv2.rectangle(result, (x1, text_bg_y1),
                           (x1 + text_size[0] + 5, text_bg_y2), color, -1)
+            # 绘制文本
             cv2.putText(result, label_text, (x1 + 2, y1 - 3),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
@@ -1134,7 +1190,7 @@ def draw_bounding_boxes(image, boxes, labels, class_names, **kwargs):
 
 
 def draw_trajectories(image, tracks_info):
-    """绘制目标轨迹"""
+    """绘制目标轨迹 - 显示运动路径"""
     if not tracks_info:
         return image
 
@@ -1144,7 +1200,7 @@ def draw_trajectories(image, tracks_info):
         if 'history' not in track or len(track['history']) < 2:
             continue
 
-        # 为不同目标使用不同颜色
+        # 为不同目标使用不同颜色（基于ID）
         color_id = track['id'] % 10
         colors = [
             (255, 0, 0), (0, 255, 0), (0, 0, 255),
@@ -1173,13 +1229,14 @@ def draw_trajectories(image, tracks_info):
 
 
 def draw_performance_panel(image, timings, fps, frame_count, config):
-    """绘制性能监控面板"""
+    """绘制性能监控面板 - 显示FPS和各阶段耗时"""
     if not config.get('performance.show_panel', True):
         return image
 
     h, w = image.shape[:2]
 
     def get_avg_time(key, default=0.0):
+        """计算平均耗时"""
         if key in timings and timings[key]:
             # timings[key] 是 deque，需要转换为列表再切片
             timing_list = list(timings[key])
@@ -1208,7 +1265,7 @@ def draw_performance_panel(image, timings, fps, frame_count, config):
         cv2.rectangle(overlay, (panel_x, panel_y),
                       (panel_x + panel_width, panel_y + panel_height),
                       (20, 20, 20), -1)
-        image = cv2.addWeighted(image, 0.3, overlay, 0.7, 0)
+        image = cv2.addWeighted(image, 0.3, overlay, 0.7, 0)  # 透明度混合
 
         # 绘制标题
         cv2.putText(image, "性能监控面板", (panel_x + 10, panel_y + 20),
@@ -1230,9 +1287,9 @@ def draw_performance_panel(image, timings, fps, frame_count, config):
 
         y_offset += line_height
 
-        # 各阶段时间
+        # 各阶段时间（分两列显示）
         metrics = [
-            ('CARLA', carla_time, 5.0, 10.0),
+            ('CARLA', carla_time, 5.0, 10.0),  # 名称, 时间, 良好阈值, 警告阈值
             ('Image', image_time, 1.0, 3.0),
             ('Depth', depth_time, 2.0, 5.0),
             ('Detection', detection_time, 10.0, 20.0),
@@ -1260,7 +1317,7 @@ def draw_performance_panel(image, timings, fps, frame_count, config):
 
 # -------------------------- CARLA相关函数 --------------------------
 def setup_carla_client(config):
-    """连接CARLA服务器"""
+    """连接CARLA服务器 - 初始化仿真环境"""
     host = config.get('carla.host', 'localhost')
     port = config.get('carla.port', 2000)
     timeout = config.get('carla.timeout', 10.0)
@@ -1272,8 +1329,8 @@ def setup_carla_client(config):
 
         # 设置同步模式
         settings = world.get_settings()
-        settings.synchronous_mode = config.get('carla.sync_mode', True)
-        settings.fixed_delta_seconds = config.get('carla.fixed_delta_seconds', 0.05)
+        settings.synchronous_mode = config.get('carla.sync_mode', True)  # 同步模式
+        settings.fixed_delta_seconds = config.get('carla.fixed_delta_seconds', 0.05)  # 时间步长
         world.apply_settings(settings)
 
         logger.info(f"连接到CARLA服务器 {host}:{port}")
@@ -1288,10 +1345,10 @@ def setup_carla_client(config):
 
 
 def spawn_ego_vehicle(world, config):
-    """生成主车辆"""
+    """生成主车辆 - 玩家控制的车辆"""
     bp_lib = world.get_blueprint_library()
 
-    # 优先使用林肯MKZ
+    # 优先使用林肯MKZ（较好的驾驶性能）
     vehicle_bp = None
     try:
         vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2020')
@@ -1299,7 +1356,7 @@ def spawn_ego_vehicle(world, config):
         pass
 
     if not vehicle_bp:
-        # 尝试其他车辆
+        # 尝试其他车辆（备选列表）
         small_vehicles = [
             'vehicle.audi.a2',
             'vehicle.audi.tt',
@@ -1317,6 +1374,7 @@ def spawn_ego_vehicle(world, config):
                 continue
 
     if not vehicle_bp:
+        # 随机选择任意车辆
         try:
             vehicle_bp = random.choice(list(bp_lib.filter('vehicle.*')))
         except:
@@ -1341,7 +1399,7 @@ def spawn_ego_vehicle(world, config):
                     actor_loc.x - spawn_point.location.x,
                     actor_loc.y - spawn_point.location.y
                 )
-                if dist < 10.0:
+                if dist < 10.0:  # 10米以内认为太靠近
                     too_close = True
                     break
             except:
@@ -1379,15 +1437,17 @@ def spawn_ego_vehicle(world, config):
 
 # 回调函数
 def camera_callback(image, rgb_image_queue):
-    """RGB图像回调函数"""
+    """RGB图像回调函数 - 接收相机数据"""
     try:
+        # 转换CARLA图像数据为numpy数组
         array = np.frombuffer(image.raw_data, dtype=np.uint8)
-        array = array.reshape((image.height, image.width, 4))
-        rgb = array[..., :3]
+        array = array.reshape((image.height, image.width, 4))  # RGBA
+        rgb = array[..., :3]  # 取RGB通道
 
+        # 线程安全队列操作
         if rgb_image_queue.full():
             try:
-                rgb_image_queue.get_nowait()
+                rgb_image_queue.get_nowait()  # 丢弃最旧帧
             except:
                 pass
         rgb_image_queue.put(rgb)
@@ -1396,17 +1456,19 @@ def camera_callback(image, rgb_image_queue):
 
 
 def depth_camera_callback(image, depth_queue):
-    """深度图像回调函数"""
+    """深度图像回调函数 - 接收深度数据"""
     try:
         depth_data = np.frombuffer(image.raw_data, dtype=np.uint8)
         depth_data = depth_data.reshape((image.height, image.width, 4))
 
+        # CARLA深度数据编码：R + G*256 + B*256^2
         depth_channel = (
                 depth_data[..., 2].astype(np.uint16) +
                 depth_data[..., 1].astype(np.uint16) * 256 +
                 depth_data[..., 0].astype(np.uint16) * 256 ** 2
         )
 
+        # 转换为米（归一化并乘以1000）
         depth_in_meters = depth_channel.astype(np.float16) / (256 ** 3 - 1) * 1000.0
         depth_in_meters = preprocess_depth_image(depth_in_meters)
 
@@ -1422,7 +1484,8 @@ def depth_camera_callback(image, depth_queue):
 
 # -------------------------- 主函数 --------------------------
 def main():
-    # 初始化
+    """主函数 - 程序入口"""
+    # 初始化命令行参数解析
     parser = argparse.ArgumentParser(description='CARLA目标检测与跟踪 - 优化版')
     parser.add_argument('--config', type=str, default=None, help='配置文件路径')
     parser.add_argument('--model', type=str, default='yolov5m', help='模型类型')
@@ -1438,7 +1501,7 @@ def main():
 
     args = parser.parse_args()
 
-    # 加载配置
+    # 加载配置管理器
     config_manager = ConfigManager(args.config)
 
     # 更新命令行参数到配置
@@ -1470,7 +1533,7 @@ def main():
         logger.info("连接CARLA服务器...")
         world, client = setup_carla_client(config)
 
-        spectator = world.get_spectator()
+        spectator = world.get_spectator()  # 观察者视角
 
         # 2. 清理环境
         logger.info("清理环境...")
@@ -1478,13 +1541,13 @@ def main():
             for actor in world.get_actors().filter('vehicle.*'):
                 try:
                     if actor.is_alive:
-                        actor.destroy()
+                        actor.destroy()  # 清理现有车辆
                 except:
                     pass
         except:
             pass
 
-        time.sleep(1)
+        time.sleep(1)  # 等待清理完成
 
         # 3. 生成主车辆
         logger.info("生成主车辆...")
@@ -1505,13 +1568,13 @@ def main():
         camera_bp.set_attribute('image_size_x', str(config.get('camera.width', 800)))
         camera_bp.set_attribute('image_size_y', str(config.get('camera.height', 600)))
         camera_bp.set_attribute('fov', str(config.get('camera.fov', 90)))
-        camera_bp.set_attribute('sensor_tick', '0.05')
+        camera_bp.set_attribute('sensor_tick', '0.05')  # 20Hz
 
         camera_transform = carla.Transform(carla.Location(x=1.5, z=1.8),
                                            carla.Rotation(pitch=-5, yaw=0))
         try:
             camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
-            image_queue = queue.Queue(maxsize=3)
+            image_queue = queue.Queue(maxsize=3)  # 队列大小限制
             camera.listen(lambda image: camera_callback(image, image_queue))
             logger.info("RGB相机传感器生成成功！")
         except Exception as e:
@@ -1607,19 +1670,19 @@ def main():
 
                 # 同步CARLA世界
                 tick_start = time.time()
-                world.tick()
+                world.tick()  # 同步模式下的关键调用
                 timings['carla_tick'].append(time.time() - tick_start)
 
                 # 更新NPC行为
                 if npc_manager:
                     npc_manager.update_npc_behavior()
 
-                # 移动视角
+                # 移动视角（跟随主车辆）
                 try:
                     ego_transform = vehicle.get_transform()
                     spectator_transform = carla.Transform(
-                        ego_transform.transform(carla.Location(x=-10, z=12)),
-                        carla.Rotation(yaw=ego_transform.rotation.yaw - 180, pitch=-30)
+                        ego_transform.transform(carla.Location(x=-10, z=12)),  # 后方10米，高12米
+                        carla.Rotation(yaw=ego_transform.rotation.yaw - 180, pitch=-30)  # 俯视视角
                     )
                     spectator.set_transform(spectator_transform)
                 except:
@@ -1630,15 +1693,15 @@ def main():
                     key = cv2.waitKey(1) & 0xFF
 
                     # 控制逻辑
-                    if key == ord('w'):
+                    if key == ord('w'):  # 加速
                         manual_controls['throttle'] = min(manual_controls['throttle'] + 0.1, 1.0)
                         manual_controls['brake'] = 0.0
-                    elif key == ord('s'):
+                    elif key == ord('s'):  # 减速/刹车
                         manual_controls['brake'] = min(manual_controls['brake'] + 0.1, 1.0)
                         manual_controls['throttle'] = 0.0
-                    elif key == ord('a'):
+                    elif key == ord('a'):  # 左转
                         manual_controls['steer'] = max(manual_controls['steer'] - 0.1, -1.0)
-                    elif key == ord('d'):
+                    elif key == ord('d'):  # 右转
                         manual_controls['steer'] = min(manual_controls['steer'] + 0.1, 1.0)
                     else:
                         # 逐渐回正
@@ -1668,10 +1731,10 @@ def main():
                 image_start = time.time()
                 if image_queue.empty():
                     time.sleep(0.001)
-                    continue
+                    continue  # 无新图像，跳过
 
                 origin_image = image_queue.get()
-                image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)
+                image = cv2.cvtColor(origin_image, cv2.COLOR_BGR2RGB)  # CARLA是BGR
                 height, width, _ = image.shape
                 timings['image_get'].append(time.time() - image_start)
 
@@ -1689,7 +1752,7 @@ def main():
 
                         depth_vis = cv2.normalize(depth_vis, None, 0, 255, cv2.NORM_MINMAX)
                         depth_vis = depth_vis.astype(np.uint8)
-                        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)
+                        depth_vis = cv2.applyColorMap(depth_vis, cv2.COLORMAP_JET)  # 伪彩色
                         cv2.imshow('Depth Image', depth_vis)
                 timings['depth_get'].append(time.time() - depth_start)
 
@@ -1702,6 +1765,7 @@ def main():
                     iou_thres = config.get('detection.iou_thres', 0.4)
                     device = config.get('detection.device', 'cuda' if torch.cuda.is_available() else 'cpu')
 
+                    # YOLO推理
                     results = model(image, conf=conf_thres, iou=iou_thres,
                                     device=device, imgsz=640, verbose=False)
 
@@ -1711,24 +1775,26 @@ def main():
                             conf = box.conf[0].cpu().numpy()
                             cls = int(box.cls[0].cpu().numpy())
 
-                            # 只保留车辆相关类别
+                            # 只保留车辆相关类别（COCO数据集）
+                            # 2:car, 3:motorcycle, 5:bus, 7:truck
                             if cls in [2, 3, 5, 7]:
                                 box_width = x2 - x1
                                 box_height = y2 - y1
 
-                                # 尺寸过滤
+                                # 尺寸过滤（基于距离自适应）
                                 min_size = 6
                                 if depth_image is not None:
                                     rough_distance = get_target_distance(depth_image, [x1, y1, x2, y2])
                                     if rough_distance > 30:
-                                        min_size = 4
+                                        min_size = 4  # 远处目标可以更小
                                     elif rough_distance > 50:
                                         min_size = 2
                                     else:
-                                        min_size = 8
+                                        min_size = 8  # 近处目标需要更大
 
                                 aspect_ratio = box_width / max(box_height, 1)
 
+                                # 过滤条件：最小尺寸 + 合理宽高比
                                 if (box_width > min_size and box_height > min_size and
                                         0.3 < aspect_ratio < 3.0):
                                     boxes.append([x1, y1, x2, y2])
@@ -1753,7 +1819,7 @@ def main():
                 # 目标跟踪
                 tracking_start = time.time()
                 if boxes:
-                    # 准备检测数据
+                    # 准备检测数据 [x1, y1, x2, y2, conf, class]
                     detections = []
                     for i in range(len(boxes)):
                         det = boxes[i] + [probs[i]] + [labels[i]]
@@ -1882,7 +1948,7 @@ def main():
                         npc_vehicles = npc_manager.spawn_npcs(world, count=npc_count, ego_vehicle=vehicle)
                         logger.info(f"重新生成 {len(npc_vehicles)} 辆NPC车辆完成")
 
-                # FPS控制
+                # FPS控制（避免过高占用）
                 max_fps = config.get('performance.max_fps', 30)
                 elapsed = time.time() - frame_start
                 if elapsed < 1.0 / max_fps:
@@ -1902,7 +1968,7 @@ def main():
         import traceback
         traceback.print_exc()
     finally:
-        # 清理资源
+        # 清理资源（重要：确保程序退出时释放资源）
         logger.info("\n正在清理资源...")
 
         # 停止传感器
@@ -1931,7 +1997,7 @@ def main():
             except:
                 pass
 
-        # 恢复世界设置
+        # 恢复世界设置（关闭同步模式）
         if world:
             try:
                 settings = world.get_settings()
@@ -1940,9 +2006,9 @@ def main():
             except:
                 pass
 
-        cv2.destroyAllWindows()
+        cv2.destroyAllWindows()  # 关闭所有OpenCV窗口
 
-        # 清理PyTorch缓存
+        # 清理PyTorch缓存（GPU内存）
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
