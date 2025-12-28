@@ -1,492 +1,408 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-机械臂仿真完整单文件版本（最终完美修复版）
-核心修复：
-1. 统一关节数为5个（匹配XML模型）
-2. 所有数组维度改为5维
-3. 移除所有硬编码的6关节逻辑
-4. 确保所有运算维度匹配
+机械臂关节精度性能优化控制器（修复geom标签viscous属性错误版）
+核心修复：移除geom标签无效viscous属性，迁移至joint标签damping属性，保证XML Schema合规
 """
 
 import sys
 import os
 import time
-import logging
-import argparse
-from dataclasses import dataclass, field
-from typing import List, Tuple, Optional, Dict, Deque
-from collections import deque
+import signal
+import ctypes
+import threading
+import numpy as np
+import mujoco
+from datetime import datetime
 
-# ====================== 核心配置：统一关节数 ======================
-JOINT_COUNT = 5  # 关键：改为5个关节（匹配XML模型）
-
-# ====================== mujoco 版本兼容处理 ======================
-try:
-    import numpy as np
-    import mujoco
-
+# ====================== 全局配置（精度优化专用） ======================
+# 系统适配（Windows优先，降低系统干扰影响精度）
+if os.name == 'nt':
     try:
-        from mujoco import viewer
-
-        MUJOCO_VIEWER_MODE = "new"
-    except ImportError:
-        if hasattr(mujoco, 'viewer'):
-            viewer = mujoco.viewer
-            MUJOCO_VIEWER_MODE = "old"
-        else:
-            raise ImportError("请安装最新版mujoco：pip install mujoco>=2.3.0")
-
-    from scipy import interpolate
-    from scipy.signal import filtfilt, butter
-    import cvxpy as cp
-except ImportError as e:
-    print(f"❌ 缺少依赖库：{e.name}")
-    print("🔧 请运行：pip install mujoco>=2.3.0 numpy scipy cvxpy ecos osqp")
-    sys.exit(1)
-
-
-# ====================== 1. 配置管理模块（改为5关节） ======================
-@dataclass
-class PhysicsConfig:
-    # 改为5个关节的限制参数
-    max_vel: List[float] = field(default_factory=lambda: [1.0, 0.8, 0.8, 1.2, 0.9])
-    max_acc: List[float] = field(default_factory=lambda: [0.5, 0.4, 0.4, 0.6, 0.5])
-    max_jerk: List[float] = field(default_factory=lambda: [0.3, 0.2, 0.2, 0.4, 0.3])
-    max_torque: List[float] = field(default_factory=lambda: [15.0, 15.0, 10.0, 5.0, 5.0])
-    ctrl_limit: Tuple[float, float] = (-10.0, 10.0)
-
-
-@dataclass
-class ObstacleConfig:
-    base_k_att: float = 0.8
-    base_k_rep: float = 0.6
-    rep_radius: float = 0.3
-    stagnant_threshold: float = 0.01
-    stagnant_time: float = 1.0
-    guide_offset: float = 0.1
-    obstacle_list: List[List[float]] = field(
-        default_factory=lambda: [[0.6, 0.1, 0.5, 0.1], [0.55, 0.05, 0.55, 0.08], [0.4, -0.1, 0.6, 0.08]])
-    safety_margin: float = 0.05
-
-
-@dataclass
-class EfficiencyConfig:
-    time_weight: float = 0.6
-    energy_weight: float = 0.4
-    traj_interp_points: int = 20
-    opt_horizon: float = 1.0
-    smooth_factor: float = 0.2
-    motor_efficiency: float = 0.85
-    # 改为5个关节的摩擦系数
-    joint_friction: List[float] = field(default_factory=lambda: [0.001, 0.002, 0.0015, 0.001, 0.0008])
-
-
-@dataclass
-class TrajectoryConfig:
-    cart_waypoints: List[List[float]] = field(
-        default_factory=lambda: [[0.5, 0.0, 0.6], [0.6, 0.0, 0.58], [0.8, 0.1, 0.8], [0.6, 0.0, 0.58], [0.5, 0.0, 0.6]])
-
-
-@dataclass
-class SimulationConfig:
-    timestep: float = 0.005
-    fps: int = 60
-    log_level: str = "INFO"
-    enable_interaction: bool = False
-
-
-@dataclass
-class RobotConfig:
-    physics: PhysicsConfig = field(default_factory=PhysicsConfig)
-    obstacle: ObstacleConfig = field(default_factory=ObstacleConfig)
-    efficiency: EfficiencyConfig = field(default_factory=EfficiencyConfig)
-    trajectory: TrajectoryConfig = field(default_factory=TrajectoryConfig)
-    simulation: SimulationConfig = field(default_factory=SimulationConfig)
-
-    def validate(self):
-        """校验并自动修复配置参数"""
-        logger = logging.getLogger(__name__)
-        if self.simulation.fps < 1 or self.simulation.fps > 120:
-            logger.warning(f"⚠️ FPS {self.simulation.fps} 超出范围，自动调整为30")
-            self.simulation.fps = 30
-        if self.efficiency.traj_interp_points < 5 or self.efficiency.traj_interp_points > 100:
-            logger.warning(f"⚠️ 插值点数 {self.efficiency.traj_interp_points} 超出范围，自动调整为20")
-            self.efficiency.traj_interp_points = 20
-        weight_sum = self.efficiency.time_weight + self.efficiency.energy_weight
-        if not abs(weight_sum - 1.0) < 1e-6:
-            logger.warning(f"⚠️ 时间+能耗权重和为 {weight_sum}（应为1），自动归一化")
-            self.efficiency.time_weight /= weight_sum
-            self.efficiency.energy_weight /= weight_sum
-
-
-# 全局配置实例
-_global_config: Optional[RobotConfig] = None
-
-
-def get_config() -> RobotConfig:
-    """获取全局配置（单例+参数校验）"""
-    global _global_config
-    if _global_config is None:
-        _global_config = RobotConfig()
-
-        # 应用命令行参数
-        parser = argparse.ArgumentParser(description="机械臂仿真配置", add_help=False)
-        parser.add_argument("--fps", type=int, help="仿真帧率（1-120）")
-        parser.add_argument("--traj-points", type=int, dest="traj_interp_points", help="轨迹插值点数（5-100）")
-        parser.add_argument("--smooth-factor", type=float, help="轨迹平滑系数（0.01-1.0）")
-        parser.add_argument("--time-weight", type=float, help="时间权重（0-1）")
-        parser.add_argument("--energy-weight", type=float, help="能耗权重（0-1）")
-        parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="日志级别")
-        parser.add_argument("-h", "--help", action="store_true", help="显示帮助信息")
-
-        args, _ = parser.parse_known_args()
-
-        # 应用参数到配置
-        if args.fps:
-            _global_config.simulation.fps = args.fps
-        if args.traj_interp_points:
-            _global_config.efficiency.traj_interp_points = args.traj_interp_points
-        if args.smooth_factor:
-            _global_config.efficiency.smooth_factor = args.smooth_factor
-        if args.time_weight:
-            _global_config.efficiency.time_weight = args.time_weight
-        if args.energy_weight:
-            _global_config.efficiency.energy_weight = args.energy_weight
-        if args.log_level:
-            _global_config.simulation.log_level = args.log_level
-
-        # 校验配置
-        _global_config.validate()
-
-        # 显示帮助信息
-        if args.help:
-            print("""
-🤖 机械臂仿真使用帮助：
-命令行参数：
-  --fps N           设置仿真帧率（1-120），默认60
-  --traj-points N   设置轨迹插值点数（5-100），默认20
-  --smooth-factor F 设置轨迹平滑系数（0.01-1.0），默认0.2
-  --time-weight F   设置时间权重（0-1），默认0.6
-  --energy-weight F 设置能耗权重（0-1），默认0.4
-  --log-level LEVEL 设置日志级别（DEBUG/INFO/WARNING/ERROR），默认INFO
-  -h/--help         显示此帮助信息
-            """)
-            sys.exit(0)
-
-    return _global_config
-
-
-# ====================== 2. 性能优化缓存 ======================
-_TRAJ_CACHE = {
-    "butter_coeffs": {},
-    "joint_limits": None
-}
-
-_COLLISION_CACHE = {
-    "link_ids": {},
-    "obstacle_grid": None,
-    "obstacle_array": None,
-    "safety_margin": None
-}
-
-_ENERGY_CACHE = {
-    "friction": None,
-    "motor_eff": None
-}
-
-
-def init_global_caches():
-    """初始化全局缓存（只执行一次）"""
-    config = get_config()
-
-    if _TRAJ_CACHE["joint_limits"] is None:
-        # 改为5个关节的限制参数
-        _TRAJ_CACHE["joint_limits"] = {
-            "max_vel": np.array(config.physics.max_vel, dtype=np.float64),
-            "max_acc": np.array(config.physics.max_acc, dtype=np.float64),
-            "max_torque": np.array(config.physics.max_torque, dtype=np.float64)
-        }
-
-    if not _COLLISION_CACHE["link_ids"]:
-        _COLLISION_CACHE["obstacle_array"] = np.array(config.obstacle.obstacle_list, dtype=np.float64)
-        _COLLISION_CACHE["safety_margin"] = config.obstacle.safety_margin
-        obs_pos = _COLLISION_CACHE["obstacle_array"][:, :3]
-        min_coords = np.min(obs_pos, axis=0) - 0.5
-        max_coords = np.max(obs_pos, axis=0) + 0.5
-        _COLLISION_CACHE["obstacle_grid"] = (min_coords, max_coords)
-
-    if _ENERGY_CACHE["friction"] is None:
-        _ENERGY_CACHE["friction"] = np.array(config.efficiency.joint_friction, dtype=np.float64)
-        _ENERGY_CACHE["motor_eff"] = config.efficiency.motor_efficiency
-
-
-# ====================== 3. 核心算法模块（改为5关节） ======================
-def smooth_cartesian_traj(traj_points: List[List[float]], smooth_factor: float = None) -> List[List[float]]:
-    """笛卡尔轨迹平滑"""
-    config = get_config()
-    smooth_factor = smooth_factor or config.efficiency.smooth_factor
-    traj_array = np.asarray(traj_points, dtype=np.float64)
-
-    if traj_array.size == 0 or len(traj_array) <= 1:
-        return traj_points
-
-    key = round(smooth_factor, 3)
-    if key not in _TRAJ_CACHE["butter_coeffs"]:
-        b, a = butter(1, smooth_factor, btype="low")
-        _TRAJ_CACHE["butter_coeffs"][key] = (b.astype(np.float64), a.astype(np.float64))
-    b, a = _TRAJ_CACHE["butter_coeffs"][key]
-
-    k = min(3, len(traj_array) - 1)
-    t = np.linspace(0, 1, len(traj_array), dtype=np.float64)
-    t_smooth = np.linspace(0, 1, max(10, len(traj_array) * 2), dtype=np.float64)
-
-    try:
-        spline = interpolate.make_interp_spline(t, traj_array, k=k, axis=0)
-        smooth_vals = spline(t_smooth)
-        smooth_vals = filtfilt(b, a, smooth_vals, axis=0)
-
-        smoothed_traj = np.empty_like(traj_array)
-        for dim in range(3):
-            smoothed_traj[:, dim] = np.interp(t, t_smooth, smooth_vals[:, dim])
-        return smoothed_traj.tolist()
-    except Exception:
-        return traj_points
-
-
-def time_optimal_joint_trajectory(
-        start_joint: np.ndarray,
-        end_joint: np.ndarray,
-        seg_time: float
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """时间最优关节轨迹（改为5关节）"""
-    limits = _TRAJ_CACHE["joint_limits"]
-    max_vel = limits["max_vel"]
-    max_acc = limits["max_acc"]
-
-    config = get_config()
-    traj_points = config.efficiency.traj_interp_points
-
-    t_steps = np.linspace(0, seg_time, traj_points, dtype=np.float64)
-    # 改为5列（5个关节）
-    opt_pos = np.empty((traj_points, JOINT_COUNT), dtype=np.float64)
-    opt_vel = np.empty_like(opt_pos)
-    opt_acc = np.empty_like(opt_pos)
-
-    delta = end_joint - start_joint
-    delta_abs = np.abs(delta)
-    sign = np.sign(delta)
-
-    t_acc = max_vel / max_acc
-    s_acc = 0.5 * max_acc * t_acc ** 2
-    t_joint = np.where(
-        delta_abs < 2 * s_acc,
-        2 * np.sqrt(delta_abs / max_acc),
-        2 * t_acc + (delta_abs - 2 * s_acc) / max_vel
-    )
-
-    # 遍历5个关节
-    for i, t in enumerate(t_steps):
-        for j in range(JOINT_COUNT):
-            if delta_abs[j] < 2 * s_acc[j]:
-                if t <= t_joint[j] / 2:
-                    opt_pos[i, j] = start_joint[j] + 0.5 * max_acc[j] * t ** 2 * sign[j]
-                    opt_vel[i, j] = max_acc[j] * t * sign[j]
-                    opt_acc[i, j] = max_acc[j] * sign[j]
-                else:
-                    t_rem = t_joint[j] - t
-                    opt_pos[i, j] = end_joint[j] - 0.5 * max_acc[j] * t_rem ** 2 * sign[j]
-                    opt_vel[i, j] = max_acc[j] * t_rem * sign[j]
-                    opt_acc[i, j] = -max_acc[j] * sign[j]
-            else:
-                if t <= t_acc[j]:
-                    opt_pos[i, j] = start_joint[j] + 0.5 * max_acc[j] * t ** 2 * sign[j]
-                    opt_vel[i, j] = max_acc[j] * t * sign[j]
-                    opt_acc[i, j] = max_acc[j] * sign[j]
-                elif t <= t_acc[j] + (delta_abs[j] - 2 * s_acc[j]) / max_vel[j]:
-                    opt_pos[i, j] = start_joint[j] + (s_acc[j] + max_vel[j] * (t - t_acc[j])) * sign[j]
-                    opt_vel[i, j] = max_vel[j] * sign[j]
-                    opt_acc[i, j] = 0.0
-                else:
-                    t_rem = t_joint[j] - t
-                    opt_pos[i, j] = end_joint[j] - 0.5 * max_acc[j] * t_rem ** 2 * sign[j]
-                    opt_vel[i, j] = max_acc[j] * t_rem * sign[j]
-                    opt_acc[i, j] = -max_acc[j] * sign[j]
-
-        opt_vel[i] = np.clip(opt_vel[i], -max_vel, max_vel)
-        opt_acc[i] = np.clip(opt_acc[i], -max_acc, max_acc)
-
-    return opt_pos, opt_vel, opt_acc
-
-
-def full_arm_collision_check(
-        model,
-        data,
-        return_min_dist: bool = True
-) -> Tuple[bool, float] | bool:
-    """全链路碰撞检测"""
-    if not _COLLISION_CACHE["link_ids"]:
-        # 5个关节对应的连杆
-        link_names = ["link1", "link2", "link3", "link4", "link5", "end_effector"]
-        for name in link_names:
-            _COLLISION_CACHE["link_ids"][name] = mujoco.mj_name2id(
-                model, mujoco.mjtObj.mjOBJ_BODY, name
-            )
-
-    collision = False
-    min_dist = float("inf")
-    obstacle_array = _COLLISION_CACHE["obstacle_array"]
-    safety_margin = _COLLISION_CACHE["safety_margin"]
-    grid_min, grid_max = _COLLISION_CACHE["obstacle_grid"]
-
-    for link_name, link_id in _COLLISION_CACHE["link_ids"].items():
-        try:
-            link_pos = data.xpos[link_id].astype(np.float64)
-
-            if np.any(link_pos < grid_min) or np.any(link_pos > grid_max):
-                continue
-
-            obs_pos = obstacle_array[:, :3]
-            obs_radius = obstacle_array[:, 3]
-            distances = np.linalg.norm(link_pos - obs_pos, axis=1) - (obs_radius + safety_margin)
-
-            if np.any(distances < 0):
-                collision = True
-                if not return_min_dist:
-                    return True
-
-            if return_min_dist:
-                min_dist = min(min_dist, np.min(distances))
-        except Exception:
-            continue
-
-    if return_min_dist:
-        return collision, min_dist
-    return collision
-
-
-def calculate_real_energy_consumption(model, data, dt: float) -> float:
-    """真实能耗计算（改为5关节）"""
-    friction = _ENERGY_CACHE["friction"]
-    motor_eff = _ENERGY_CACHE["motor_eff"]
-
-    # 只取前5个关节的数据
-    torques = data.qfrc_actuator[:JOINT_COUNT].astype(np.float64)
-    velocities = data.qvel[:JOINT_COUNT].astype(np.float64)
-
-    friction_loss = np.sum(friction * np.abs(velocities))
-    mechanical_power = np.sum(np.abs(torques * velocities))
-    total_energy = (mechanical_power + friction_loss) * dt / motor_eff
-
-    return float(total_energy)
-
-
-# ====================== 4. 可视化模块 ======================
-def draw_enhanced_visualization(
-        viewer_inst,
-        model,
-        data,
-        traj_history: Deque[list],
-        collision_warning: bool
-):
-    """增强可视化"""
-    try:
-        scene = viewer_inst.user_scn
-        scene.ngeom = 0
-
-        if len(traj_history) > 1:
-            traj_array = np.array(traj_history, dtype=np.float64)
-
-            for i in range(len(traj_array) - 1):
-                geom = mujoco.MjvGeom()
-                mujoco.mjv_initGeom(
-                    geom,
-                    mujoco.mjtGeom.mjGEOM_LINE,
-                    np.array([0.003, 0, 0], dtype=np.float64),
-                    traj_array[i],
-                    traj_array[i + 1],
-                    np.array([0, 1, 0, 0.6], dtype=np.float64)
-                )
-                mujoco.mjv_addGeom(scene, model, data, geom)
-
-            def draw_sphere(pos, rgba, size):
-                geom = mujoco.MjvGeom()
-                mujoco.mjv_initGeom(
-                    geom,
-                    mujoco.mjtGeom.mjGEOM_SPHERE,
-                    np.array([size, 0, 0], dtype=np.float64),
-                    pos,
-                    np.array([0, 0, 0], dtype=np.float64),
-                    np.array(rgba, dtype=np.float64)
-                )
-                mujoco.mjv_addGeom(scene, model, data, geom)
-
-            draw_sphere(traj_array[0], [0, 0, 1, 0.8], 0.015)
-            draw_sphere(traj_array[-1], [1, 0, 0, 0.8], 0.015)
-
-        if collision_warning:
-            ee_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-            ee_pos = data.site_xpos[ee_id]
-            draw_sphere(ee_pos, [1, 0, 0, 0.3], 0.08)
-
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+        os.system('chcp 65001 >nul 2>&1')
+        kernel32.SetThreadPriority(kernel32.GetCurrentThread(), 1)
     except Exception as e:
-        logging.warning(f"可视化绘制失败：{e}")
+        print(f"⚠️ Windows系统优化失败（不影响核心功能）: {e}")
+    # 强制单线程，避免多线程竞争导致控制延迟，影响精度
+    os.environ['OMP_NUM_THREADS'] = '1'
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['NUMEXPR_NUM_THREADS'] = '1'
+
+# Mujoco Viewer兼容
+MUJOCO_NEW_VIEWER = False
+try:
+    from mujoco import viewer
+
+    MUJOCO_NEW_VIEWER = True
+except ImportError:
+    try:
+        import mujoco.viewer as viewer
+    except ImportError as e:
+        print(f"⚠️ Mujoco Viewer导入失败（无法可视化）: {e}")
+
+# 核心参数配置
+JOINT_COUNT = 5
+JOINT_NAMES = ["joint1", "joint2", "joint3", "joint4", "joint5"]
+JOINT_LIMITS_RAD = np.array([
+    [-np.pi, np.pi],  # joint1（基座）
+    [-np.pi / 2, np.pi / 2],  # joint2（大臂）
+    [-np.pi / 2, np.pi / 2],  # joint3（中臂）
+    [-np.pi / 2, np.pi / 2],  # joint4（小臂）
+    [-np.pi / 2, np.pi / 2],  # joint5（末端）
+], dtype=np.float64)
+JOINT_MAX_VELOCITY_RAD = np.array([1.0, 0.8, 0.8, 0.6, 0.6], dtype=np.float64)
+JOINT_MAX_ACCEL_RAD = np.array([2.0, 1.6, 1.6, 1.2, 1.2], dtype=np.float64)  # 最大加速度（精度优化：限制加减速避免超调）
+JOINT_MAX_TORQUE = np.array([15.0, 12.0, 10.0, 8.0, 5.0], dtype=np.float64)
+
+# 刚度配置（兼容之前的优化，不影响精度）
+STIFFNESS_PARAMS = {
+    'base_stiffness': np.array([200.0, 180.0, 150.0, 120.0, 80.0]),
+    'load_stiffness_gain': 1.8,
+    'error_stiffness_gain': 1.5,
+    'min_stiffness': np.array([100.0, 90.0, 75.0, 60.0, 40.0]),
+    'max_stiffness': np.array([300.0, 270.0, 225.0, 180.0, 120.0]),
+    'stiffness_smoothing': 0.05,
+}
+
+# 阻尼与惯量配置（优化：将粘性摩擦参数整合至joint damping）
+DAMPING_INERTIA_PARAMS = {
+    'base_damping': np.array([8.0, 7.0, 6.0, 5.0, 3.0]),  # 基础阻尼（对应原粘性摩擦需求）
+    'viscous_damping_gain': np.array([1.2, 1.1, 1.1, 1.0, 1.0]),  # 粘性阻尼增益，补充原有viscous效果
+    'damping_stiffness_ratio': 0.04,
+    'armature_inertia': np.array([0.5, 0.4, 0.3, 0.2, 0.1]),
+}
+
+# 仿真配置（精度优化：更小步长+更高控制频率，提升控制分辨率）
+SIMULATION_TIMESTEP = 0.0005  # 微步长，降低离散化误差
+CONTROL_FREQUENCY = 2000  # 高频控制，提升响应精度
+CONTROL_TIMESTEP = 1.0 / CONTROL_FREQUENCY
+FPS = 60
+SLEEP_TIME = 1.0 / FPS
+EPS = 1e-9  # 更小误差阈值，提升精度判断准确性
+RUNNING = True
+SIMULATION_START_TIME = None
+
+# 高精度PD+前馈控制参数（核心精度优化）
+PRECISION_PD_PARAMS = {
+    'kp_base': 120.0,  # 更高比例增益，提升静态定位精度
+    'kd_base': 8.0,  # 优化阻尼增益，抑制振动超调
+    'kp_load_gain': 1.8,  # 负载下增益放大，维持精度
+    'kd_load_gain': 1.5,  # 负载下阻尼优化，防止震荡
+    'ff_gain': 0.7,  # 前馈增益，补偿动态误差
+    'max_vel': JOINT_MAX_VELOCITY_RAD.copy(),
+    'max_accel': JOINT_MAX_ACCEL_RAD.copy()
+}
+
+# 负载配置
+LOAD_PARAMS = {
+    'end_effector_mass': 0.5,
+    'joint_loads': np.zeros(JOINT_COUNT),
+    'max_allowed_load': 2.0,
+    'load_smoothing_factor': 0.05  # 更小平滑系数，提升负载检测精度
+}
+
+# 误差补偿配置（核心精度优化：移除geom的viscous配置，保留摩擦系数用于误差计算）
+ERROR_COMPENSATION_PARAMS = {
+    'backlash_error': np.array([0.001, 0.001, 0.002, 0.002, 0.003]),  # 关节间隙误差（rad）
+    'friction_coeff': np.array([0.1, 0.08, 0.08, 0.06, 0.06]),  # 静摩擦力系数（仅用于误差补偿计算）
+    'gravity_compensation': True,  # 是否启用重力误差补偿
+    'comp_smoothing': 0.02,  # 误差补偿平滑系数，避免突变
+}
+
+# 轨迹规划配置（精度优化：梯形速度规划参数）
+TRAJECTORY_PLANNING_PARAMS = {
+    'traj_type': 'trapezoidal',  # 梯形速度规划，无超调
+    'acceleration_time': 0.2,  # 加速时间
+    'deceleration_time': 0.2,  # 减速时间
+    'position_tol': 1e-5,  # 位置公差（rad），高精度定位判定
+    'velocity_tol': 1e-4  # 速度公差（rad/s），平稳停止判定
+}
+
+# 精度监测配置
+PRECISION_MONITOR_PARAMS = {
+    'log_precision_data': True,
+    'log_path': 'arm_joint_precision_log.txt',
+    'max_allowed_position_error': np.deg2rad(0.1),  # 最大允许定位误差（0.1度）
+    'max_allowed_trajectory_error': np.deg2rad(0.2)  # 最大允许轨迹跟踪误差（0.2度）
+}
+
+# 可靠性配置（兼容之前的优化）
+RELIABILITY_PARAMS = {
+    'stall_detection_threshold': 0.005,  # 更高灵敏度，提升异常检测精度
+    'stall_duration_threshold': 1.0,
+    'overload_duration_threshold': 2.0,
+    'max_angle_error': np.deg2rad(10.0),
+    'auto_reset_on_error': True,
+    'log_reliability_data': True,
+    'reliability_log_path': 'arm_reliability_log.txt'
+}
 
 
-# ====================== 5. 机械臂模型构建（5关节） ======================
-def get_arm_xml_with_obstacles(config: RobotConfig) -> str:
-    """生成机械臂XML模型（5关节）"""
-    obstacles_xml = ""
-    for i, obs in enumerate(config.obstacle.obstacle_list):
-        x, y, z, r = obs
-        obstacles_xml += f"""
-    <body name="obstacle_{i}" pos="{x} {y} {z}">
-        <geom name="obs_geom_{i}" type="sphere" size="{r}" rgba="1 0 0 0.5"/>
-    </body>
-        """
+# ====================== 信号处理（优雅退出，避免精度数据丢失） ======================
+def signal_handler(sig, frame):
+    global RUNNING
+    if not RUNNING:
+        sys.exit(0)
+    print("\n⚠️ 收到退出信号，正在优雅退出（保存精度日志+清理资源）...")
+    RUNNING = False
+
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+
+# ====================== 工具函数（精度优化专用） ======================
+def get_mujoco_id(model, obj_type, name):
+    """兼容所有Mujoco版本的ID查询（容错增强，提升精度稳定性）"""
+    if model is None:
+        return -1
+    type_map = {
+        'joint': mujoco.mjtObj.mjOBJ_JOINT,
+        'actuator': mujoco.mjtObj.mjOBJ_ACTUATOR,
+        'site': mujoco.mjtObj.mjOBJ_SITE,
+        'body': mujoco.mjtObj.mjOBJ_BODY,
+        'geom': mujoco.mjtObj.mjOBJ_GEOM
+    }
+    obj_type_int = type_map.get(obj_type, mujoco.mjtObj.mjOBJ_JOINT)
+    try:
+        obj_id = mujoco.mj_name2id(model, int(obj_type_int), str(name))
+        return obj_id if obj_id >= 0 else -1
+    except Exception as e:
+        print(f"⚠️ 查询{obj_type} {name} ID失败: {e}")
+        return -1
+
+
+def deg2rad(degrees):
+    """角度转弧度（高精度转换，容错增强）"""
+    try:
+        degrees = np.array(degrees, dtype=np.float64)
+        return np.deg2rad(degrees)
+    except Exception as e:
+        print(f"⚠️ 角度转换失败: {e}")
+        return 0.0 if np.isscalar(degrees) else np.zeros(JOINT_COUNT, dtype=np.float64)
+
+
+def rad2deg(radians):
+    """弧度转角度（高精度转换，容错增强）"""
+    try:
+        radians = np.array(radians, dtype=np.float64)
+        return np.rad2deg(radians)
+    except Exception as e:
+        print(f"⚠️ 弧度转换失败: {e}")
+        return 0.0 if np.isscalar(radians) else np.zeros(JOINT_COUNT, dtype=np.float64)
+
+
+def write_precision_log(content, log_path=PRECISION_MONITOR_PARAMS['log_path']):
+    """写入精度日志（记录误差数据，便于精度分析与优化）"""
+    if not PRECISION_MONITOR_PARAMS['log_precision_data']:
+        return
+    try:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]  # 毫秒级时间戳，提升日志精度
+            f.write(f"[{timestamp}] {content}\n")
+    except Exception as e:
+        print(f"⚠️ 写入精度日志失败: {e}")
+
+
+def write_reliability_log(content, log_path=RELIABILITY_PARAMS['reliability_log_path']):
+    """写入可靠性日志（兼容之前的优化）"""
+    if not RELIABILITY_PARAMS['log_reliability_data']:
+        return
+    try:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write(f"[{timestamp}] {content}\n")
+    except Exception as e:
+        print(f"⚠️ 写入可靠性日志失败: {e}")
+
+
+def trapezoidal_velocity_planner(start_pos, target_pos, max_vel, max_accel, dt):
+    """
+    梯形速度规划（精度优化核心：无超调平滑轨迹生成）
+    :param start_pos: 起始位置（rad）
+    :param target_pos: 目标位置（rad）
+    :param max_vel: 最大速度（rad/s）
+    :param max_accel: 最大加速度（rad/s²）
+    :param dt: 时间步长（s）
+    :return: 规划的位置序列、速度序列
+    """
+    pos_error = target_pos - start_pos
+    total_distance = abs(pos_error)
+    if total_distance < TRAJECTORY_PLANNING_PARAMS['position_tol']:
+        return np.array([target_pos]), np.array([0.0])
+
+    # 计算梯形速度规划关键参数
+    accel_phase_vel = max_vel
+    accel_phase_dist = (accel_phase_vel ** 2) / (2 * max_accel)
+    total_accel_decel_dist = 2 * accel_phase_dist
+
+    # 判定运动阶段（是否存在匀速阶段）
+    pos_list = []
+    vel_list = []
+    current_pos = start_pos
+    current_vel = 0.0
+    direction = np.sign(pos_error)
+
+    if total_distance <= total_accel_decel_dist:
+        # 无匀速阶段：加速到最大速度前即开始减速
+        max_reached_vel = np.sqrt(total_distance * max_accel)
+        accel_time = max_reached_vel / max_accel
+        total_time = 2 * accel_time
+
+        t = 0.0
+        while t < total_time + dt:
+            if t <= accel_time:
+                # 加速阶段
+                current_vel = max_accel * t * direction
+                current_pos = start_pos + 0.5 * max_accel * (t ** 2) * direction
+            else:
+                # 减速阶段
+                delta_t = t - accel_time
+                current_vel = (max_reached_vel - max_accel * delta_t) * direction
+                current_pos = start_pos + (max_reached_vel * accel_time - 0.5 * max_accel * (delta_t ** 2)) * direction
+            pos_list.append(current_pos)
+            vel_list.append(current_vel)
+            t += dt
+    else:
+        # 有匀速阶段：加速→匀速→减速
+        accel_time = max_vel / max_accel
+        uniform_dist = total_distance - total_accel_decel_dist
+        uniform_time = uniform_dist / max_vel
+        total_time = 2 * accel_time + uniform_time
+
+        t = 0.0
+        while t < total_time + dt:
+            if t <= accel_time:
+                # 加速阶段
+                current_vel = max_accel * t * direction
+                current_pos = start_pos + 0.5 * max_accel * (t ** 2) * direction
+            elif t <= accel_time + uniform_time:
+                # 匀速阶段
+                current_vel = max_vel * direction
+                delta_t = t - accel_time
+                current_pos = start_pos + (accel_phase_dist + max_vel * delta_t) * direction
+            else:
+                # 减速阶段
+                delta_t = t - (accel_time + uniform_time)
+                current_vel = (max_vel - max_accel * delta_t) * direction
+                delta_pos = accel_phase_dist - 0.5 * max_accel * (delta_t ** 2)
+                current_pos = start_pos + (total_distance - delta_pos) * direction
+            pos_list.append(current_pos)
+            vel_list.append(current_vel)
+            t += dt
+
+    # 最后强制设置为目标位置，消除累积误差
+    pos_list[-1] = target_pos
+    vel_list[-1] = 0.0
+    return np.array(pos_list), np.array(vel_list)
+
+
+# ====================== 机械臂模型生成（修复geom标签viscous属性，高精度配置） ======================
+def create_arm_model_with_precision():
+    """
+    生成高精度机械臂XML模型（彻底修复Schema违规错误，兼容所有Mujoco版本）
+    核心修复：
+    1.  移除所有geom标签的viscous属性（该属性不被geom支持，消除Schema违规）
+    2.  保留geom标签的friction属性（3个值，合法支持静摩擦功能）
+    3.  将粘性摩擦需求迁移至joint标签的damping属性（合法归属），通过粘性阻尼增益补充效果
+    4.  优化joint标签的damping参数，确保与原有粘性摩擦需求一致
+    """
+    end_effector_mass = LOAD_PARAMS['end_effector_mass']
+    link1_geom_mass = 0.8
+    link2_geom_mass = 0.6
+    link3_geom_mass = 0.6
+    link4_geom_mass = 0.4
+    link5_geom_mass = 0.2
+
+    base_stiffness = STIFFNESS_PARAMS['base_stiffness']
+    base_damping = DAMPING_INERTIA_PARAMS['base_damping']
+    viscous_damping_gain = DAMPING_INERTIA_PARAMS['viscous_damping_gain']
+    armature_inertia = DAMPING_INERTIA_PARAMS['armature_inertia']
+    friction_coeffs = ERROR_COMPENSATION_PARAMS['friction_coeff']
+
+    # 计算最终关节阻尼（基础阻尼 + 粘性阻尼增益，等效原有viscous效果）
+    joint_damping = base_damping * viscous_damping_gain
 
     xml = f"""
-<mujoco model="robotic_arm">
-    <compiler angle="radian" inertiafromgeom="true"/>
-    <option timestep="{config.simulation.timestep}" gravity="0 0 -9.81"/>
+<mujoco model="arm_with_precision_optimization">
+    <!-- 修复1：compiler标签仅保留合法属性 -->
+    <compiler angle="radian" inertiafromgeom="true" autolimits="true"/>
+    <!-- tolerance属性合法存放于option标签 -->
+    <option timestep="{SIMULATION_TIMESTEP}" gravity="0 0 -9.81" iterations="100" tolerance="1e-9"/>
+
+    <!-- 高精度默认配置：修复2：移除geom的viscous，保留friction；优化joint的damping -->
+    <default>
+        <!-- joint标签：配置合法属性，damping整合基础阻尼+粘性阻尼效果 -->
+        <joint type="hinge" armature="{armature_inertia[0]}" damping="{joint_damping[0]}" 
+               limited="true" margin="0.001"/> <!-- 更小间隙，提升精度 -->
+        <motor ctrllimited="true" ctrlrange="-1.0 1.0" gear="100"/>
+        <!-- geom标签：仅保留合法属性，移除viscous，保留friction（3个值） -->
+        <geom contype="1" conaffinity="1" rgba="0.2 0.8 0.2 1" solref="0.01 1" solimp="0.9 0.95 0.001"
+              friction="{friction_coeffs[0]} {friction_coeffs[0]} {friction_coeffs[0]}"/> <!-- 高精度接触与静摩擦参数 -->
+    </default>
+
+    <!-- 材质配置 -->
+    <asset>
+        <material name="load_material" rgba="1.0 0.0 0.0 0.8"/>
+        <material name="high_precision_material" rgba="0.0 0.8 0.0 0.8"/>
+        <material name="end_effector_material" rgba="0.8 0.2 0.2 1"/>
+    </asset>
 
     <worldbody>
-        <!-- 地面 -->
-        <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 0" rgba="0.8 0.8 0.8 1"/>
+        <!-- 地面（高精度几何，降低接触误差） -->
+        <geom name="floor" type="plane" size="3 3 0.1" pos="0 0 0" rgba="0.8 0.8 0.8 1" solref="0.01 1"/>
 
-        <!-- 机械臂基座 -->
+        <!-- 机械臂基座（joint1） -->
         <body name="base" pos="0 0 0">
             <geom name="base_geom" type="cylinder" size="0.1 0.1" rgba="0.2 0.2 0.8 1"/>
 
-            <!-- 关节1 -->
+            <!-- 修复3：joint标签配置优化后的damping（整合粘性阻尼效果），无违规属性 -->
+            <joint name="joint1" type="hinge" axis="0 0 1" pos="0 0 0.1" 
+                   range="{JOINT_LIMITS_RAD[0, 0]} {JOINT_LIMITS_RAD[0, 1]}" 
+                   armature="{armature_inertia[0]}" damping="{joint_damping[0]}"/>
             <body name="link1" pos="0 0 0.1">
-                <joint name="joint1" type="hinge" axis="0 0 1" range="-3.14 3.14"/>
-                <geom name="link1_geom" type="cylinder" size="0.05 0.2" rgba="0.2 0.8 0.2 1"/>
+                <!-- 修复4：geom标签移除viscous，仅保留friction（3个值），合法合规 -->
+                <geom name="link1_geom" type="cylinder" size="0.04 0.18" mass="{link1_geom_mass}"
+                      material="high_precision_material"
+                      friction="{friction_coeffs[1]} {friction_coeffs[1]} {friction_coeffs[1]}"/>
 
-                <!-- 关节2 -->
-                <body name="link2" pos="0 0 0.2">
-                    <joint name="joint2" type="hinge" axis="0 1 0" range="-3.14 3.14"/>
-                    <geom name="link2_geom" type="cylinder" size="0.05 0.2" rgba="0.2 0.8 0.2 1"/>
+                <joint name="joint2" type="hinge" axis="0 1 0" pos="0 0 0.18" 
+                       range="{JOINT_LIMITS_RAD[1, 0]} {JOINT_LIMITS_RAD[1, 1]}" 
+                       armature="{armature_inertia[1]}" damping="{joint_damping[1]}"/>
+                <body name="link2" pos="0 0 0.18">
+                    <geom name="link2_geom" type="cylinder" size="0.04 0.18" mass="{link2_geom_mass}"
+                          material="high_precision_material"
+                          friction="{friction_coeffs[2]} {friction_coeffs[2]} {friction_coeffs[2]}"/>
 
-                    <!-- 关节3 -->
-                    <body name="link3" pos="0 0 0.2">
-                        <joint name="joint3" type="hinge" axis="0 1 0" range="-3.14 3.14"/>
-                        <geom name="link3_geom" type="cylinder" size="0.05 0.2" rgba="0.2 0.8 0.2 1"/>
+                    <joint name="joint3" type="hinge" axis="0 1 0" pos="0 0 0.18" 
+                           range="{JOINT_LIMITS_RAD[2, 0]} {JOINT_LIMITS_RAD[2, 1]}" 
+                           armature="{armature_inertia[2]}" damping="{joint_damping[2]}"/>
+                    <body name="link3" pos="0 0 0.18">
+                        <geom name="link3_geom" type="cylinder" size="0.04 0.18" mass="{link3_geom_mass}"
+                              friction="{friction_coeffs[3]} {friction_coeffs[3]} {friction_coeffs[3]}"/>
 
-                        <!-- 关节4 -->
-                        <body name="link4" pos="0 0 0.2">
-                            <joint name="joint4" type="hinge" axis="0 1 0" range="-3.14 3.14"/>
-                            <geom name="link4_geom" type="cylinder" size="0.05 0.2" rgba="0.2 0.8 0.2 1"/>
+                        <joint name="joint4" type="hinge" axis="0 1 0" pos="0 0 0.18" 
+                               range="{JOINT_LIMITS_RAD[3, 0]} {JOINT_LIMITS_RAD[3, 1]}" 
+                               armature="{armature_inertia[3]}" damping="{joint_damping[3]}"/>
+                        <body name="link4" pos="0 0 0.18">
+                            <geom name="link4_geom" type="cylinder" size="0.04 0.18" mass="{link4_geom_mass}"
+                                  friction="{friction_coeffs[3]} {friction_coeffs[3]} {friction_coeffs[3]}"/>
 
-                            <!-- 关节5 -->
-                            <body name="link5" pos="0 0 0.2">
-                                <joint name="joint5" type="hinge" axis="0 1 0" range="-3.14 3.14"/>
-                                <geom name="link5_geom" type="cylinder" size="0.05 0.1" rgba="0.2 0.8 0.2 1"/>
+                            <joint name="joint5" type="hinge" axis="0 1 0" pos="0 0 0.18" 
+                                   range="{JOINT_LIMITS_RAD[4, 0]} {JOINT_LIMITS_RAD[4, 1]}" 
+                                   armature="{armature_inertia[4]}" damping="{joint_damping[4]}"/>
+                            <body name="link5" pos="0 0 0.18">
+                                <geom name="link5_geom" type="cylinder" size="0.03 0.09" mass="{link5_geom_mass}"
+                                      material="end_effector_material"
+                                      friction="{friction_coeffs[4]} {friction_coeffs[4]} {friction_coeffs[4]}"/>
 
-                                <!-- 末端执行器 -->
-                                <body name="end_effector" pos="0 0 0.1">
-                                    <site name="ee_site" pos="0 0 0" size="0.01"/>
-                                    <geom name="ee_geom" type="sphere" size="0.05" rgba="0.8 0.2 0.2 1"/>
+                                <!-- 末端执行器（高精度负载配置） -->
+                                <body name="end_effector" pos="0 0 0.09">
+                                    <site name="ee_site" pos="0 0 0" size="0.005"/> <!-- 更小站点，提升定位精度 -->
+                                    <geom name="load_geom" type="sphere" size="0.04" mass="{end_effector_mass}" 
+                                          rgba="1.0 0.0 0.0 0.8" material="load_material"/>
                                 </body>
                             </body>
                         </body>
@@ -494,12 +410,9 @@ def get_arm_xml_with_obstacles(config: RobotConfig) -> str:
                 </body>
             </body>
         </body>
-
-        <!-- 障碍物 -->
-        {obstacles_xml}
     </worldbody>
 
-    <!-- 控制器（5个电机） -->
+    <!-- 关节电机（无违规属性，兼容所有Mujoco版本） -->
     <actuator>
         <motor name="motor1" joint="joint1" ctrlrange="-1 1" gear="100"/>
         <motor name="motor2" joint="joint2" ctrlrange="-1 1" gear="100"/>
@@ -512,340 +425,741 @@ def get_arm_xml_with_obstacles(config: RobotConfig) -> str:
     return xml
 
 
-# ====================== 6. 仿真器主类（5关节） ======================
-class ArmSimulator:
+# ====================== 核心控制器类（关节精度性能优化） ======================
+class ArmJointPrecisionOptimizationController:
     def __init__(self):
-        self.config = get_config()
-        init_global_caches()
-
-        # 配置日志
-        self._setup_logging()
-
-        # 初始化仿真环境
-        self._init_simulation()
-
-        # 状态管理
-        self.total_motion_time = 0.0
-        self.total_energy_consume = 0.0
-        self.traj_history: Deque[list] = deque(maxlen=50)
-        self.collision_warning = False
-        self.stagnant_start_time: Optional[float] = None
-
-        # 预计算关节起点
-        self.ee_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "ee_site")
-        self.joint_waypoints = self._precompute_joint_waypoints()
-
-        self.logger.info("✅ 机械臂仿真器初始化完成")
-        self.logger.info(f"🔧 使用mujoco viewer模式：{MUJOCO_VIEWER_MODE}")
-        self.logger.info(f"🔧 机械臂关节数：{JOINT_COUNT}")
-
-    def _setup_logging(self):
-        """配置日志系统"""
-        log_level = getattr(logging, self.config.simulation.log_level.upper())
-        logging.basicConfig(
-            level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[logging.StreamHandler()]
-        )
-        self.logger = logging.getLogger("ArmSimulator")
-
-    def _init_simulation(self):
-        """初始化仿真环境"""
-        arm_xml = get_arm_xml_with_obstacles(self.config)
-
-        # 创建临时文件
-        import tempfile
-        self.temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False)
-        self.temp_file.write(arm_xml)
-        self.temp_file.close()
-
-        # 加载模型
-        self.model = mujoco.MjModel.from_xml_path(self.temp_file.name)
-        self.model.opt.timestep = self.config.simulation.timestep
-        self.data = mujoco.MjData(self.model)
-
-    def _precompute_joint_waypoints(self) -> list:
-        """预计算关节起点（5关节）"""
-        joint_waypoints = []
-        for cart_pos in self.config.trajectory.cart_waypoints:
-            mujoco.mj_resetData(self.model, self.data)
-            self.data.site_xpos[self.ee_site_id] = cart_pos
-            mujoco.mj_inverse(self.model, self.data)
-            # 只取前5个关节
-            joint_waypoints.append(self.data.qpos[:JOINT_COUNT].copy())
-        return joint_waypoints
-
-    def _get_ee_cartesian_velocity(self) -> np.ndarray:
-        """获取末端笛卡尔速度"""
-        jacp = np.zeros((3, self.model.nv), dtype=np.float64)
-        jacr = np.zeros((3, self.model.nv), dtype=np.float64)
-
-        mujoco.mj_jacSite(self.model, self.data, jacp, jacr, self.ee_site_id)
-        ee_vel = jacp @ self.data.qvel
-        return ee_vel
-
-    def _check_local_optimum(self, ee_vel: np.ndarray, ee_pos: list, target_pos: list) -> tuple:
-        """检测局部最优"""
-        vel_mag = np.linalg.norm(ee_vel)
-        if vel_mag < self.config.obstacle.stagnant_threshold:
-            if self.stagnant_start_time is None:
-                self.stagnant_start_time = time.time()
-            elif time.time() - self.stagnant_start_time > self.config.obstacle.stagnant_time:
-                self.logger.warning(f"检测到局部最优！末端速度={vel_mag:.4f}m/s")
-                dir_to_target = np.array(target_pos) - np.array(ee_pos, dtype=np.float64)
-                dir_norm = np.linalg.norm(dir_to_target)
-                if dir_norm < 1e-6:
-                    dir_to_target = np.array([0, 0, 0.1], dtype=np.float64)
-                else:
-                    dir_to_target = dir_to_target / dir_norm
-
-                guide_target = np.array(ee_pos, dtype=np.float64) + dir_to_target * self.config.obstacle.guide_offset
-                self.stagnant_start_time = None
-                return True, guide_target.tolist()
-        else:
-            self.stagnant_start_time = None
-        return False, target_pos
-
-    def _robust_artificial_potential_field(self, ee_pos: list, target_pos: list) -> list:
-        """人工势场法避障"""
-        ee_pos = np.array(ee_pos, dtype=np.float64)
-        target_pos = np.array(target_pos, dtype=np.float64)
-
-        ee_vel = self._get_ee_cartesian_velocity()
-        is_local_opt, guide_target = self._check_local_optimum(ee_vel, ee_pos.tolist(), target_pos.tolist())
-        current_target = np.array(guide_target, dtype=np.float64) if is_local_opt else target_pos
-
-        # 自适应参数
-        obs_distances = [np.linalg.norm(ee_pos - np.array(obs[:3], dtype=np.float64))
-                         for obs in self.config.obstacle.obstacle_list]
-        min_dist = min(obs_distances) if obs_distances else 1.0
-        k_rep = self.config.obstacle.base_k_rep if min_dist > 0.2 else self.config.obstacle.base_k_rep * 2.0
-        k_att = self.config.obstacle.base_k_att if len(
-            self.config.obstacle.obstacle_list) <= 2 else self.config.obstacle.base_k_att * 0.5
-
-        # 引力+斥力
-        att_force = k_att * (current_target - ee_pos)
-        rep_force = np.zeros(3, dtype=np.float64)
-
-        for obs in self.config.obstacle.obstacle_list:
-            obs_pos = np.array(obs[:3], dtype=np.float64)
-            obs_radius = obs[3]
-            dist = np.linalg.norm(ee_pos - obs_pos)
-
-            if dist < self.config.obstacle.rep_radius + obs_radius:
-                rep_dir = (ee_pos - obs_pos) / (dist + 1e-6)
-                rep_force += k_rep * (1 / (dist - obs_radius) - 1 / self.config.obstacle.rep_radius) * (
-                            1 / dist ** 2) * rep_dir
-
-        corrected_target = ee_pos + att_force + rep_force
-        corrected_target = np.clip(corrected_target, [0.3, -0.4, 0.2], [0.9, 0.4, 1.0])
-        return corrected_target.tolist()
-
-    def _energy_optimal_trajectory(self, joint_waypoints: np.ndarray, seg_time: float) -> Optional[np.ndarray]:
-        """能耗最优轨迹（5关节）"""
-        n_joints = JOINT_COUNT
-        n_points = len(joint_waypoints)
-        t_step = seg_time / (n_points - 1)
-
-        q = cp.Variable((n_joints, n_points))
-        qd = cp.Variable((n_joints, n_points))
-        qdd = cp.Variable((n_joints, n_points))
-
-        energy_cost = cp.sum_squares(qdd)
-        time_cost = cp.sum(cp.max(cp.abs(qd), axis=1))
-        total_cost = self.config.efficiency.time_weight * time_cost + self.config.efficiency.energy_weight * energy_cost
-
-        constraints = [
-            q[:, 0] == joint_waypoints[0],
-            q[:, -1] == joint_waypoints[-1],
-            qd[:, 0] == 0,
-            qd[:, -1] == 0
-        ]
-
-        max_vel = self.config.physics.max_vel
-        max_acc = self.config.physics.max_acc
-        for j in range(n_joints):
-            constraints.extend([
-                qd[j, :] <= max_vel[j],
-                qd[j, :] >= -max_vel[j],
-                qdd[j, :] <= max_acc[j],
-                qdd[j, :] >= -max_acc[j]
-            ])
-
-        for i in range(n_points - 1):
-            constraints.extend([
-                qd[:, i + 1] == (q[:, i + 1] - q[:, i]) / t_step,
-                qdd[:, i + 1] == (qd[:, i + 1] - qd[:, i]) / t_step
-            ])
-
-        prob = cp.Problem(cp.Minimize(total_cost), constraints)
+        # 模型与数据初始化（高精度配置）
+        self.model = None
+        self.data = None
         try:
-            prob.solve(solver=cp.ECOS, verbose=False, warm_start=True)
-        except:
+            self.model = mujoco.MjModel.from_xml_string(create_arm_model_with_precision())
+            self.data = mujoco.MjData(self.model)
+            write_precision_log("高精度模型初始化成功，geom viscous属性修复完成，精度优化配置加载完毕")
+            write_reliability_log("高精度模型初始化成功，geom viscous属性修复完成，精度优化配置加载完毕")
+        except Exception as e:
+            error_msg = f"高精度模型初始化失败: {e}"
+            print(f"❌ {error_msg}")
+            write_precision_log(error_msg)
+            write_reliability_log(error_msg)
+            global RUNNING
+            RUNNING = False
+            return
+
+        # 获取各类ID（容错增强）
+        self.joint_ids = [get_mujoco_id(self.model, 'joint', name) for name in JOINT_NAMES]
+        self.motor_ids = [get_mujoco_id(self.model, 'actuator', f"motor{i + 1}") for i in range(JOINT_COUNT)]
+        self.ee_site_id = get_mujoco_id(self.model, 'site', "ee_site")
+        self.load_geom_id = get_mujoco_id(self.model, 'geom', "load_geom")
+
+        # 状态变量初始化
+        self.viewer_inst = None
+        self.viewer_ready = False
+        self.last_control_time = time.time()
+        self.last_print_time = time.time()
+        self.fps_counter = 0
+        self.step_count = 0
+        self.total_simulation_time = 0.0
+
+        # 精度相关核心状态
+        self.current_stiffness = STIFFNESS_PARAMS['base_stiffness'].copy()
+        self.current_damping = DAMPING_INERTIA_PARAMS['base_damping'].copy() * DAMPING_INERTIA_PARAMS[
+            'viscous_damping_gain']
+        self.target_angles_rad = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.planned_positions = np.zeros((1, JOINT_COUNT), dtype=np.float64)  # 规划位置序列
+        self.planned_velocities = np.zeros((1, JOINT_COUNT), dtype=np.float64)  # 规划速度序列
+        self.traj_step_idx = 0  # 轨迹步骤索引
+        self.position_error = np.zeros(JOINT_COUNT, dtype=np.float64)  # 当前定位误差
+        self.trajectory_error = np.zeros(JOINT_COUNT, dtype=np.float64)  # 当前轨迹跟踪误差
+        self.max_position_error = np.zeros(JOINT_COUNT, dtype=np.float64)  # 最大定位误差
+        self.max_trajectory_error = np.zeros(JOINT_COUNT, dtype=np.float64)  # 最大轨迹跟踪误差
+
+        # 负载与受力状态
+        self.current_end_load = LOAD_PARAMS['end_effector_mass']
+        self.smoothed_joint_forces = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.angle_error_history = np.zeros(JOINT_COUNT, dtype=np.float64)
+
+        # 可靠性状态（兼容之前的优化）
+        self.overload_warning_flag = False
+        self.stall_detection_flag = np.zeros(JOINT_COUNT, dtype=bool)
+        self.stall_duration = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.overload_duration = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.error_reset_count = 0
+
+        # 误差补偿状态
+        self.compensated_error = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.gravity_compensation_torque = np.zeros(JOINT_COUNT, dtype=np.float64)
+
+        # 初始化关节角度与轨迹
+        try:
+            self.set_joint_angles(np.zeros(JOINT_COUNT), smooth=False, use_deg=False)
+            self.plan_trajectory(np.zeros(JOINT_COUNT), np.zeros(JOINT_COUNT))
+            write_precision_log("关节零位校准完成，初始轨迹规划成功")
+            write_reliability_log("关节零位校准完成，初始轨迹规划成功")
+        except Exception as e:
+            error_msg = f"初始化关节角度或轨迹失败: {e}"
+            print(f"⚠️ {error_msg}")
+            write_precision_log(error_msg)
+            write_reliability_log(error_msg)
+
+        # 全局仿真开始时间
+        global SIMULATION_START_TIME
+        SIMULATION_START_TIME = time.time()
+        write_precision_log(f"高精度仿真启动，控制频率：{CONTROL_FREQUENCY}Hz，步长：{SIMULATION_TIMESTEP}s")
+        write_reliability_log(f"高精度仿真启动，控制频率：{CONTROL_FREQUENCY}Hz，步长：{SIMULATION_TIMESTEP}s")
+
+    def get_current_joint_angles(self, use_deg=True):
+        """获取当前关节角度（高精度采集，容错增强）"""
+        if self.data is None:
+            return np.zeros(JOINT_COUNT, dtype=np.float64)
+        current_rad = np.array([self.data.qpos[jid] if jid >= 0 else 0 for jid in self.joint_ids], dtype=np.float64)
+        if use_deg:
+            return rad2deg(current_rad)
+        return current_rad
+
+    def get_current_joint_velocities(self, use_deg=True):
+        """获取当前关节速度（高精度采集，用于速度闭环控制）"""
+        if self.data is None:
+            return np.zeros(JOINT_COUNT, dtype=np.float64)
+        current_vel_rad = np.array([self.data.qvel[jid] if jid >= 0 else 0 for jid in self.joint_ids], dtype=np.float64)
+        if use_deg:
+            return rad2deg(current_vel_rad)
+        return current_vel_rad
+
+    def get_joint_forces(self):
+        """获取关节实时受力（高精度平滑，避免抖动影响精度）"""
+        if self.data is None:
+            return np.zeros(JOINT_COUNT, dtype=np.float64)
+        joint_forces = np.zeros(JOINT_COUNT, dtype=np.float64)
+        for i, jid in enumerate(self.joint_ids):
+            if jid >= 0:
+                raw_force = abs(self.data.qfrc_actuator[jid])
+                self.smoothed_joint_forces[i] = (1 - LOAD_PARAMS['load_smoothing_factor']) * self.smoothed_joint_forces[
+                    i] + \
+                                                LOAD_PARAMS['load_smoothing_factor'] * raw_force
+                joint_forces[i] = self.smoothed_joint_forces[i]
+        return joint_forces
+
+    def calculate_error_compensation(self):
+        """
+        核心精度优化：多维度误差补偿计算
+        1.  关节间隙误差补偿
+        2.  摩擦力误差补偿（静摩擦，基于friction_coeff）
+        3.  重力误差补偿
+        """
+        current_angles = self.get_current_joint_angles(use_deg=False)
+        current_vels = self.get_current_joint_velocities(use_deg=False)
+        current_forces = self.get_joint_forces()
+
+        # 1. 关节间隙误差补偿（根据运动方向补偿间隙）
+        backlash_comp = np.zeros(JOINT_COUNT, dtype=np.float64)
+        for i in range(JOINT_COUNT):
+            if abs(current_vels[i]) > TRAJECTORY_PLANNING_PARAMS['velocity_tol']:
+                # 运动时，根据速度方向补偿间隙
+                backlash_comp[i] = ERROR_COMPENSATION_PARAMS['backlash_error'][i] * np.sign(current_vels[i])
+            else:
+                # 静止时，补偿当前误差方向的间隙
+                backlash_comp[i] = ERROR_COMPENSATION_PARAMS['backlash_error'][i] * np.sign(self.position_error[i])
+
+        # 2. 摩擦力误差补偿（仅静摩擦，基于合法的friction_coeff）
+        friction_comp = np.zeros(JOINT_COUNT, dtype=np.float64)
+        for i in range(JOINT_COUNT):
+            # 静摩擦力补偿（速度为零时）
+            if abs(current_vels[i]) < TRAJECTORY_PLANNING_PARAMS['velocity_tol']:
+                friction_comp[i] = ERROR_COMPENSATION_PARAMS['friction_coeff'][i] * np.sign(self.position_error[i])
+
+        # 3. 重力误差补偿（简化版，根据关节角度补偿重力扭矩）
+        gravity_comp = np.zeros(JOINT_COUNT, dtype=np.float64)
+        if ERROR_COMPENSATION_PARAMS['gravity_compensation']:
+            for i in range(JOINT_COUNT):
+                gravity_comp[i] = 0.5 * np.sin(current_angles[i]) * self.current_end_load  # 简化重力补偿模型
+
+        # 总误差补偿（平滑处理，避免突变）
+        total_comp = backlash_comp + friction_comp + gravity_comp
+        self.compensated_error = (1 - ERROR_COMPENSATION_PARAMS['comp_smoothing']) * self.compensated_error + \
+                                 ERROR_COMPENSATION_PARAMS['comp_smoothing'] * total_comp
+
+        # 重力补偿扭矩（直接用于控制信号补偿）
+        self.gravity_compensation_torque = gravity_comp * 0.8  # 重力扭矩补偿系数
+
+        return self.compensated_error, self.gravity_compensation_torque
+
+    def plan_trajectory(self, start_angles, target_angles, use_deg=True):
+        """
+        精度优化：规划高精度平滑轨迹（梯形速度规划）
+        :param start_angles: 起始角度
+        :param target_angles: 目标角度
+        :param use_deg: 是否为角度单位
+        """
+        start_angles_rad = self.clamp_joint_angles(start_angles, use_deg=use_deg)
+        target_angles_rad = self.clamp_joint_angles(target_angles, use_deg=use_deg)
+
+        # 为每个关节规划梯形速度轨迹
+        joint_planned_pos = []
+        joint_planned_vel = []
+        max_traj_length = 0
+        for i in range(JOINT_COUNT):
+            pos_traj, vel_traj = trapezoidal_velocity_planner(
+                start_angles_rad[i],
+                target_angles_rad[i],
+                PRECISION_PD_PARAMS['max_vel'][i],
+                PRECISION_PD_PARAMS['max_accel'][i],
+                CONTROL_TIMESTEP
+            )
+            joint_planned_pos.append(pos_traj)
+            joint_planned_vel.append(vel_traj)
+            if len(pos_traj) > max_traj_length:
+                max_traj_length = len(pos_traj)
+
+        # 统一轨迹长度（补零）
+        for i in range(JOINT_COUNT):
+            if len(joint_planned_pos[i]) < max_traj_length:
+                pad_length = max_traj_length - len(joint_planned_pos[i])
+                joint_planned_pos[i] = np.pad(joint_planned_pos[i], (0, pad_length), 'constant',
+                                              constant_values=target_angles_rad[i])
+                joint_planned_vel[i] = np.pad(joint_planned_vel[i], (0, pad_length), 'constant', constant_values=0.0)
+
+        # 转换为二维数组
+        self.planned_positions = np.array(joint_planned_pos).T
+        self.planned_velocities = np.array(joint_planned_vel).T
+        self.traj_step_idx = 0
+        self.target_angles_rad = target_angles_rad.copy()
+
+        info_msg = f"轨迹规划完成：从{np.round(rad2deg(start_angles_rad), 2)}度到{np.round(rad2deg(target_angles_rad), 2)}度，轨迹长度：{max_traj_length}步"
+        print(f"✅ {info_msg}")
+        write_precision_log(info_msg)
+
+    def precision_adaptive_pd_control(self):
+        """
+        核心精度优化：高精度PD+前馈控制（位置-速度双闭环）
+        1.  自适应PD参数，根据负载与误差调整
+        2.  误差前馈补偿，提升动态响应精度
+        3.  重力扭矩补偿，抵消静态误差
+        4.  输出限幅，防止超调与过载
+        """
+        if self.data is None or self.planned_positions.shape[0] == 0:
+            return
+
+        # 1. 获取当前状态与误差补偿
+        current_angles = self.get_current_joint_angles(use_deg=False)
+        current_vels = self.get_current_joint_velocities(use_deg=False)
+        compensated_error, gravity_comp_torque = self.calculate_error_compensation()
+
+        # 2. 获取规划轨迹点（防止索引越界）
+        if self.traj_step_idx < self.planned_positions.shape[0]:
+            target_pos = self.planned_positions[self.traj_step_idx]
+            target_vel = self.planned_velocities[self.traj_step_idx]
+            self.traj_step_idx += 1
+        else:
+            target_pos = self.target_angles_rad
+            target_vel = np.zeros(JOINT_COUNT, dtype=np.float64)
+
+        # 3. 计算定位误差与轨迹跟踪误差
+        self.position_error = target_pos - current_angles
+        self.trajectory_error = target_pos - current_angles + (target_vel - current_vels) * CONTROL_TIMESTEP
+
+        # 更新最大误差
+        self.max_position_error = np.maximum(self.max_position_error, np.abs(self.position_error))
+        self.max_trajectory_error = np.maximum(self.max_trajectory_error, np.abs(self.trajectory_error))
+
+        # 4. 自适应PD参数计算（根据负载调整）
+        normalized_load = min(self.current_end_load / LOAD_PARAMS['max_allowed_load'], 1.0)
+        kp = PRECISION_PD_PARAMS['kp_base'] * (1 + normalized_load * (PRECISION_PD_PARAMS['kp_load_gain'] - 1))
+        kd = PRECISION_PD_PARAMS['kd_base'] * (1 + normalized_load * (PRECISION_PD_PARAMS['kd_load_gain'] - 1))
+
+        # 5. PD控制信号计算（位置-速度双闭环）
+        pd_control = kp * self.position_error + kd * (target_vel - current_vels)
+
+        # 6. 前馈补偿与重力补偿
+        ff_control = PRECISION_PD_PARAMS['ff_gain'] * target_vel  # 速度前馈
+        total_control = pd_control + ff_control + gravity_comp_torque + compensated_error
+
+        # 7. 输出限幅（防止超调与过载）
+        for i in range(JOINT_COUNT):
+            total_control[i] = np.clip(total_control[i], -JOINT_MAX_TORQUE[i], JOINT_MAX_TORQUE[i])
+
+        # 8. 更新关节阻尼（与刚度匹配，提升控制精度）
+        self.calculate_adaptive_stiffness()
+        for i, jid in enumerate(self.joint_ids):
+            if jid >= 0 and self.model is not None:
+                self.model.jnt_damping[jid] = self.current_damping[i]
+
+        # 9. 设置控制信号
+        for i, mid in enumerate(self.motor_ids):
+            if mid >= 0:
+                self.data.ctrl[mid] = total_control[i]
+
+    def calculate_adaptive_stiffness(self):
+        """自适应刚度计算（兼容之前的优化，辅助提升精度）"""
+        normalized_load = min(self.current_end_load / LOAD_PARAMS['max_allowed_load'], 1.0)
+        current_angles = self.get_current_joint_angles(use_deg=False)
+        angle_error_rad = np.abs(self.target_angles_rad - current_angles)
+        normalized_error = np.clip(angle_error_rad / RELIABILITY_PARAMS['max_angle_error'], 0.0, 1.0)
+
+        # 目标刚度计算
+        target_stiffness = STIFFNESS_PARAMS['base_stiffness'] * \
+                           (1 + normalized_load * (STIFFNESS_PARAMS['load_stiffness_gain'] - 1)) * \
+                           (1 + normalized_error * (STIFFNESS_PARAMS['error_stiffness_gain'] - 1))
+        target_stiffness = np.clip(target_stiffness, STIFFNESS_PARAMS['min_stiffness'],
+                                   STIFFNESS_PARAMS['max_stiffness'])
+
+        # 刚度平滑更新
+        self.current_stiffness = (1 - STIFFNESS_PARAMS['stiffness_smoothing']) * self.current_stiffness + \
+                                 STIFFNESS_PARAMS['stiffness_smoothing'] * target_stiffness
+
+        # 阻尼与刚度匹配（整合粘性阻尼增益）
+        target_damping = self.current_stiffness * DAMPING_INERTIA_PARAMS['damping_stiffness_ratio']
+        target_damping = target_damping * DAMPING_INERTIA_PARAMS['viscous_damping_gain']
+        self.current_damping = np.clip(target_damping,
+                                       DAMPING_INERTIA_PARAMS['base_damping'] * 0.5,
+                                       DAMPING_INERTIA_PARAMS['base_damping'] * 2.0)
+
+        return self.current_stiffness, self.current_damping
+
+    def monitor_precision(self):
+        """精度实时监测与评估，量化精度性能"""
+        # 判定是否超出允许误差
+        position_error_over_limit = \
+        np.where(np.abs(self.position_error) > PRECISION_MONITOR_PARAMS['max_allowed_position_error'])[0]
+        trajectory_error_over_limit = \
+        np.where(np.abs(self.trajectory_error) > PRECISION_MONITOR_PARAMS['max_allowed_trajectory_error'])[0]
+
+        # 记录超限信息
+        if len(position_error_over_limit) > 0:
+            joint_names = [JOINT_NAMES[i] for i in position_error_over_limit]
+            error_values = np.round(rad2deg(self.position_error[position_error_over_limit]), 4)
+            warning_msg = f"定位误差超限：关节{joint_names}，误差：{error_values}度（最大允许：{rad2deg(PRECISION_MONITOR_PARAMS['max_allowed_position_error']):.2f}度）"
+            print(f"⚠️ {warning_msg}")
+            write_precision_log(warning_msg)
+
+        if len(trajectory_error_over_limit) > 0:
+            joint_names = [JOINT_NAMES[i] for i in trajectory_error_over_limit]
+            error_values = np.round(rad2deg(self.trajectory_error[trajectory_error_over_limit]), 4)
+            warning_msg = f"轨迹跟踪误差超限：关节{joint_names}，误差：{error_values}度（最大允许：{rad2deg(PRECISION_MONITOR_PARAMS['max_allowed_trajectory_error']):.2f}度）"
+            print(f"⚠️ {warning_msg}")
+            write_precision_log(warning_msg)
+
+        # 记录精度统计信息
+        precision_stats = f"精度统计：当前定位误差（度）：{np.round(rad2deg(np.abs(self.position_error)), 4)}，最大定位误差（度）：{np.round(rad2deg(self.max_position_error), 4)}；当前轨迹误差（度）：{np.round(rad2deg(np.abs(self.trajectory_error)), 4)}，最大轨迹误差（度）：{np.round(rad2deg(self.max_trajectory_error), 4)}"
+        write_precision_log(precision_stats)
+
+    def reliability_detection(self):
+        """可靠性检测（兼容之前的优化，为精度提供保障）"""
+        if self.data is None:
+            return
+
+        current_forces = self.get_joint_forces()
+        current_vels = self.get_current_joint_velocities(use_deg=False)
+        current_angles = self.get_current_joint_angles(use_deg=False)
+        angle_error = np.abs(self.target_angles_rad - current_angles)
+        current_time = time.time()
+
+        # 卡死检测
+        for i in range(JOINT_COUNT):
+            vel_abs = abs(current_vels[i])
+            force_ratio = current_forces[i] / JOINT_MAX_TORQUE[i] if JOINT_MAX_TORQUE[i] > 0 else 0
+
+            if vel_abs < RELIABILITY_PARAMS['stall_detection_threshold'] and force_ratio > 0.9:
+                self.stall_duration[i] += current_time - self.last_control_time
+                if self.stall_duration[i] >= RELIABILITY_PARAMS['stall_duration_threshold']:
+                    self.stall_detection_flag[i] = True
+                    error_msg = f"关节{JOINT_NAMES[i]}卡死检测触发，速度：{vel_abs:.4f}，受力：{current_forces[i]:.2f}N·m"
+                    print(f"⚠️ {error_msg}")
+                    write_reliability_log(error_msg)
+                    write_precision_log(f"卡死异常影响精度：{error_msg}")
+            else:
+                self.stall_duration[i] = 0.0
+                self.stall_detection_flag[i] = False
+
+            # 过载检测
+            if force_ratio > 0.9:
+                self.overload_duration[i] += current_time - self.last_control_time
+                if self.overload_duration[i] >= RELIABILITY_PARAMS['overload_duration_threshold']:
+                    self.overload_warning_flag = True
+                    error_msg = f"关节{JOINT_NAMES[i]}过载持续触发，受力：{current_forces[i]:.2f}N·m，持续时间：{self.overload_duration[i]:.2f}s"
+                    print(f"⚠️ {error_msg}")
+                    write_reliability_log(error_msg)
+                    write_precision_log(f"过载异常影响精度：{error_msg}")
+            else:
+                self.overload_duration[i] = 0.0
+
+        # 大误差检测
+        large_error_joints = np.where(angle_error > RELIABILITY_PARAMS['max_angle_error'])[0]
+        if len(large_error_joints) > 0:
+            joint_names = [JOINT_NAMES[i] for i in large_error_joints]
+            error_msg = f"大角度误差触发，关节：{joint_names}，最大误差：{np.max(angle_error):.2f}rad"
+            print(f"⚠️ {error_msg}")
+            write_reliability_log(error_msg)
+            write_precision_log(f"大误差异常：{error_msg}")
+
+        # 自动复位
+        if RELIABILITY_PARAMS['auto_reset_on_error'] and (
+                np.any(self.stall_detection_flag) or self.overload_warning_flag or len(large_error_joints) > 0):
+            self.auto_reset_joints()
+            self.error_reset_count += 1
+            write_reliability_log(f"异常自动复位触发，复位次数：{self.error_reset_count}")
+            write_precision_log(f"异常复位恢复精度：复位次数{self.error_reset_count}")
+
+    def auto_reset_joints(self):
+        """自动复位异常关节（恢复安全状态，保障后续精度）"""
+        print("\n🔧 执行关节自动复位，恢复零位并降低负载，保障精度...")
+        self.set_end_effector_load(0.1)
+        self.set_joint_angles(np.zeros(JOINT_COUNT), smooth=False, use_deg=False)
+        self.plan_trajectory(np.zeros(JOINT_COUNT), np.zeros(JOINT_COUNT))
+        self.overload_warning_flag = False
+        self.stall_detection_flag = np.zeros(JOINT_COUNT, dtype=bool)
+        self.stall_duration = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.overload_duration = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.current_stiffness = STIFFNESS_PARAMS['base_stiffness'].copy()
+        self.current_damping = DAMPING_INERTIA_PARAMS['base_damping'].copy() * DAMPING_INERTIA_PARAMS[
+            'viscous_damping_gain']
+        # 重置精度相关状态
+        self.position_error = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.trajectory_error = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self.traj_step_idx = 0
+        time.sleep(0.5)
+        print("✅ 关节自动复位完成，恢复高精度安全状态")
+
+    def set_end_effector_load(self, mass):
+        """动态设置末端负载（高精度更新，兼容刚度优化）"""
+        if mass < 0 or mass > LOAD_PARAMS['max_allowed_load']:
+            self.overload_warning_flag = True
+            warning_msg = f"末端负载超出限制（0 ~ {LOAD_PARAMS['max_allowed_load']}kg），当前设置：{mass}kg"
+            print(f"⚠️ {warning_msg}")
+            write_precision_log(warning_msg)
+            write_reliability_log(warning_msg)
+            return
+        self.overload_warning_flag = False
+
+        # 优先直接更新
+        if self.model is not None and self.load_geom_id >= 0:
             try:
-                prob.solve(solver=cp.OSQP, verbose=False, warm_start=True)
-            except:
-                prob.solve(verbose=False)
-
-        if prob.status != cp.OPTIMAL:
-            self.logger.warning("能耗优化求解失败，降级为时间最优轨迹")
-            return None
-
-        return q.value.T
-
-    def _optimize_obstacle_traj_with_efficiency(self, ee_pos: list, target_pos: list) -> tuple:
-        """轨迹优化主逻辑"""
-        # 避障修正
-        corrected_cart_target = self._robust_artificial_potential_field(ee_pos, target_pos)
-
-        # 平滑轨迹
-        corrected_cart_target = smooth_cartesian_traj([ee_pos, corrected_cart_target])[-1]
-
-        # 逆解
-        self.data.site_xpos[self.ee_site_id] = corrected_cart_target
-        mujoco.mj_inverse(self.model, self.data)
-        # 只取前5个关节
-        end_joint = self.data.qpos[:JOINT_COUNT].copy()
-        start_joint = self.data.qpos[:JOINT_COUNT].copy()
-
-        # 时间最优轨迹
-        seg_time = 2.0
-        time_opt_pos, _, _ = time_optimal_joint_trajectory(start_joint, end_joint, seg_time)
-
-        # 能耗最优
-        energy_opt_pos = self._energy_optimal_trajectory(time_opt_pos, seg_time)
-        final_joint_traj = energy_opt_pos if energy_opt_pos is not None else time_opt_pos
-
-        # 能耗计算
-        dt = seg_time / len(final_joint_traj)
-        seg_energy = sum([calculate_real_energy_consumption(self.model, self.data, dt)
-                          for _ in range(1, len(final_joint_traj))])
-
-        # 更新状态
-        self.total_motion_time += seg_time
-        self.total_energy_consume += seg_energy
-        self.traj_history.append(corrected_cart_target)
-
-        return final_joint_traj[0], corrected_cart_target, seg_energy
-
-    def _run_simulation_loop(self, viewer_inst):
-        """通用仿真循环"""
-        self.logger.info("🎮 机械臂仿真启动！")
-
-        config = self.config
-        fps = config.simulation.fps
-        sleep_time = 1.0 / fps
-        print_interval = 2.0
-        waypoints = np.array(config.trajectory.cart_waypoints, dtype=np.float64)
-        n_waypoints = len(waypoints)
-
-        current_waypoint = 0
-        last_print_time = 0.0
-        last_step_time = time.time()
-
-        while viewer_inst.is_running():
-            # 固定步长控制
-            current_time = time.time()
-            if current_time - last_step_time < sleep_time:
-                continue
-            last_step_time = current_time
-
-            # 获取当前状态
-            t_total = self.data.time
-            ee_pos = self.data.site_xpos[self.ee_site_id].tolist()
-
-            # 切换目标点
-            target_cart = waypoints[current_waypoint].tolist()
-            if np.linalg.norm(np.array(ee_pos, dtype=np.float64) - np.array(target_cart, dtype=np.float64)) < 0.01:
-                current_waypoint = (current_waypoint + 1) % n_waypoints
-                self.logger.info(f"🔄 切换到目标点 {current_waypoint}: {np.round(target_cart, 3)}")
-
-            try:
-                # 轨迹优化
-                target_joints, corrected_cart, _ = self._optimize_obstacle_traj_with_efficiency(ee_pos, target_cart)
-                target_joints = np.array(target_joints, dtype=np.float64)
-
-                # 碰撞检测
-                is_collision, min_obs_dist = full_arm_collision_check(self.model, self.data)
-                self.collision_warning = is_collision
-
-                # 紧急避障
-                if is_collision:
-                    self.logger.warning("🆘 检测到碰撞风险，执行紧急避障！")
-                    emergency_rep = np.array(ee_pos, dtype=np.float64) - np.array(config.obstacle.obstacle_list[0][:3],
-                                                                                  dtype=np.float64)
-                    emergency_rep = emergency_rep / np.linalg.norm(emergency_rep) * 0.05
-                    corrected_cart = np.array(corrected_cart, dtype=np.float64) + emergency_rep
-                    self.data.site_xpos[self.ee_site_id] = corrected_cart
-                    mujoco.mj_inverse(self.model, self.data)
-                    target_joints = self.data.qpos[:JOINT_COUNT].copy()
-
-                # PD控制（5关节）
-                max_torque = np.array(config.physics.max_torque, dtype=np.float64) / 100.0
-                pos_error = target_joints - self.data.qpos[:JOINT_COUNT]
-                vel_error = -self.data.qvel[:JOINT_COUNT]
-                ctrl_signals = 8.0 * pos_error + 0.2 * vel_error
-                ctrl_signals = np.clip(ctrl_signals, -max_torque, max_torque)
-                self.data.ctrl[:JOINT_COUNT] = ctrl_signals
-
-                # 打印统计信息
-                if t_total - last_print_time > print_interval and t_total > 0:
-                    ee_vel = self._get_ee_cartesian_velocity()
-                    avg_vel = np.linalg.norm(ee_vel)
-                    avg_energy = self.total_energy_consume / t_total if t_total > 0 else 0.0
-
-                    self.logger.info(
-                        f"\n⏱️ 仿真时间：{t_total:.2f}s | 累计运动时间：{self.total_motion_time:.2f}s\n"
-                        f"   末端位置：{np.round(ee_pos, 3)} | 目标位置：{np.round(corrected_cart, 3)}\n"
-                        f"   末端速度：{avg_vel:.4f}m/s | 最近障碍距离：{min_obs_dist:.3f}m\n"
-                        f"   累计能耗：{self.total_energy_consume:.2f}J | 平均能耗：{avg_energy:.2f}J/s\n"
-                        f"   碰撞风险：{'⚠️ 高' if is_collision else '✅ 低'}"
-                    )
-                    last_print_time = t_total
-
-                # 可视化
-                draw_enhanced_visualization(viewer_inst, self.model, self.data,
-                                            self.traj_history, self.collision_warning)
-
+                self.model.geom_mass[self.load_geom_id] = mass
+                self.current_end_load = mass
+                LOAD_PARAMS['end_effector_mass'] = mass
+                info_msg = f"末端负载更新为 {mass}kg（直接修改geom质量，不影响精度）"
+                print(f"✅ {info_msg}")
+                write_precision_log(info_msg)
+                write_reliability_log(info_msg)
+                return
             except Exception as e:
-                self.logger.error(f"仿真步执行失败：{e}", exc_info=False)
-                continue
+                error_msg = f"直接更新负载失败，将重新初始化模型: {e}"
+                print(f"⚠️ {error_msg}")
+                write_precision_log(error_msg)
+                write_reliability_log(error_msg)
 
-            # 执行仿真步
-            mujoco.mj_step(self.model, self.data)
-            viewer_inst.sync()
+        # 降级方案
+        try:
+            LOAD_PARAMS['end_effector_mass'] = mass
+            self.current_end_load = mass
+            self.model = mujoco.MjModel.from_xml_string(create_arm_model_with_precision())
+            self.data = mujoco.MjData(self.model)
+            self.joint_ids = [get_mujoco_id(self.model, 'joint', name) for name in JOINT_NAMES]
+            self.motor_ids = [get_mujoco_id(self.model, 'actuator', f"motor{i + 1}") for i in range(JOINT_COUNT)]
+            self.ee_site_id = get_mujoco_id(self.model, 'site', "ee_site")
+            self.load_geom_id = get_mujoco_id(self.model, 'geom', "load_geom")
+            current_target = self.target_angles_rad.copy()
+            self.target_angles_rad = current_target
+            self.set_joint_angles(current_target, smooth=False, use_deg=False)
+            self.plan_trajectory(current_target, current_target)
+            info_msg = f"末端负载更新为 {mass}kg（重新初始化模型生效，精度恢复）"
+            print(f"✅ {info_msg}")
+            write_precision_log(info_msg)
+            write_reliability_log(info_msg)
+        except Exception as e:
+            error_msg = f"更新末端负载失败: {e}"
+            print(f"❌ {error_msg}")
+            write_precision_log(error_msg)
+            write_reliability_log(error_msg)
+
+    def set_joint_angles(self, target_angles, smooth=True, use_deg=True):
+        """设置关节目标角度（高精度限位，避免超程影响精度）"""
+        if self.data is None:
+            raise Exception("模型未初始化，无法设置关节角度")
+        if len(target_angles) != JOINT_COUNT:
+            raise ValueError(f"目标角度数量必须为{JOINT_COUNT}，当前为{len(target_angles)}")
+
+        target_angles_rad = self.clamp_joint_angles(target_angles, use_deg=use_deg)
+
+        if not smooth:
+            for i, jid in enumerate(self.joint_ids):
+                if jid >= 0:
+                    self.data.qpos[jid] = target_angles_rad[i]
+                    self.data.qvel[jid] = 0.0
+            try:
+                mujoco.mj_forward(self.model, self.data)
+            except Exception as e:
+                error_msg = f"更新模型状态失败: {e}"
+                print(f"⚠️ {error_msg}")
+                write_precision_log(error_msg)
+                write_reliability_log(error_msg)
+
+        # 若平滑模式，规划轨迹
+        if smooth:
+            start_angles = self.get_current_joint_angles(use_deg=use_deg)
+            self.plan_trajectory(start_angles, target_angles, use_deg=use_deg)
+
+        self.target_angles_rad = target_angles_rad.copy()
+
+    def clamp_joint_angles(self, angles, use_deg=True):
+        """关节高精度限位（更小余量，提升定位精度）"""
+        angles = np.array(angles, dtype=np.float64)
+        if use_deg:
+            angles_rad = deg2rad(angles)
+        else:
+            angles_rad = angles.copy()
+        # 极小安全余量：1%，防止关节撞击限位，保证定位精度
+        limit_margin = 0.01
+        limits_rad_margin = JOINT_LIMITS_RAD.copy()
+        limits_rad_margin[:, 0] += limit_margin
+        limits_rad_margin[:, 1] -= limit_margin
+        clamped_rad = np.clip(angles_rad, limits_rad_margin[:, 0], limits_rad_margin[:, 1])
+        if use_deg:
+            return rad2deg(clamped_rad)
+        return clamped_rad
+
+    def print_precision_status(self):
+        """打印精度与系统状态（实时监控）"""
+        current_time = time.time()
+        if current_time - self.last_print_time < 1.0:
+            return
+
+        fps = self.fps_counter / (current_time - self.last_print_time)
+        joint_angles = self.get_current_joint_angles(use_deg=True)
+        joint_vels = self.get_current_joint_velocities(use_deg=True)
+        joint_forces = self.get_joint_forces()
+        current_stiffness, current_damping = self.calculate_adaptive_stiffness()
+        position_error_deg = rad2deg(self.position_error)
+        trajectory_error_deg = rad2deg(self.trajectory_error)
+        max_position_error_deg = rad2deg(self.max_position_error)
+        max_trajectory_error_deg = rad2deg(self.max_trajectory_error)
+        self.total_simulation_time = current_time - (SIMULATION_START_TIME or current_time)
+
+        # 格式化打印
+        print("-" * 150)
+        print(
+            f"📊 高精度仿真统计 | 耗时: {self.total_simulation_time:.2f}s | 步数: {self.step_count:,} | FPS: {fps:5.1f} | 复位次数: {self.error_reset_count}")
+        print(
+            f"🔧 关节状态 | 角度 (度): {np.round(joint_angles, 2)} | 速度 (度/s): {np.round(joint_vels, 3)} | 受力 (N·m): {np.round(joint_forces, 2)}")
+        print(
+            f"🎯 精度指标 | 当前定位误差 (度): {np.round(np.abs(position_error_deg), 4)} | 最大定位误差 (度): {np.round(max_position_error_deg, 4)}")
+        print(
+            f"🎯 精度指标 | 当前轨迹误差 (度): {np.round(np.abs(trajectory_error_deg), 4)} | 最大轨迹误差 (度): {np.round(max_trajectory_error_deg, 4)}")
+        print(f"🔩 刚度阻尼 | 关节刚度: {np.round(current_stiffness, 1)} | 关节阻尼: {np.round(current_damping, 1)}")
+        print(
+            f"🏋️  负载状态 | 末端负载 (kg): {self.current_end_load:.2f} | 负载限制 (kg): {LOAD_PARAMS['max_allowed_load']}")
+        if self.overload_warning_flag:
+            print("⚠️  警告：关节过载，已启用输出限制，精度可能受影响！")
+        if np.any(self.stall_detection_flag):
+            stall_joints = [JOINT_NAMES[i] for i in range(JOINT_COUNT) if self.stall_detection_flag[i]]
+            print(f"⚠️  警告：关节{stall_joints}卡死风险，即将触发自动复位，精度将临时下降！")
+        print("-" * 150)
+
+        self.last_print_time = current_time
+        self.fps_counter = 0
+
+    def preset_pose(self, pose_name):
+        """预设高精度姿态（平滑切换，无超调）"""
+        pose_map = {
+            'zero': [0, 0, 0, 0, 0],  # 零位（高精度基准姿态）
+            'up': [0, 30, 20, 10, 0],  # 抬起姿态
+            'grasp': [0, 45, 30, 20, 10],  # 抓取姿态
+            'precision_test': [10, 20, 15, 5, 8]  # 精度测试姿态
+        }
+        if pose_name not in pose_map:
+            warning_msg = f"无效姿态名称，支持：{list(pose_map.keys())}"
+            print(f"⚠️ {warning_msg}")
+            write_precision_log(warning_msg)
+            write_reliability_log(warning_msg)
+            return
+        self.set_joint_angles(pose_map[pose_name], smooth=True, use_deg=True)
+        info_msg = f"切换到{pose_name}高精度姿态，轨迹规划与误差补偿已启用"
+        print(f"✅ {info_msg}")
+        write_precision_log(info_msg)
+        write_reliability_log(info_msg)
 
     def run(self):
-        """运行仿真主循环"""
+        """运行高精度仿真主循环"""
+        global RUNNING
+
+        if not self.init_viewer():
+            RUNNING = False
+            return
+
+        # 启动信息
+        print("=" * 150)
+        print("🚀 机械臂关节精度性能优化控制器 - 启动成功（geom viscous属性修复完成）")
+        print(f"✅ 模型信息 | 关节数量: {JOINT_COUNT} | 初始末端负载: {self.current_end_load:.2f}kg")
+        print(
+            f"✅ 精度配置 | 控制频率: {CONTROL_FREQUENCY}Hz | 仿真步长: {SIMULATION_TIMESTEP}s | 定位公差: {rad2deg(TRAJECTORY_PLANNING_PARAMS['position_tol']):.4f}度")
+        print(
+            f"✅ 刚度配置 | 基座最大刚度: {STIFFNESS_PARAMS['max_stiffness'][0]:.1f} | 末端最小刚度: {STIFFNESS_PARAMS['min_stiffness'][-1]:.1f}")
+        print("📝 快捷指令:")
+        print("   - 设置末端负载: controller.set_end_effector_load(1.0)")
+        print("   - 单关节控制: controller.move_joint(0, 90)")
+        print("   - 预设姿态: controller.preset_pose('precision_test')")
+        print("   - 按 Ctrl+C 优雅退出")
+        print("=" * 150)
+
+        # 主循环
+        while RUNNING:
+            try:
+                current_time = time.time()
+                self.fps_counter += 1
+                self.step_count += 1
+
+                # 高频控制更新
+                if current_time - self.last_control_time >= CONTROL_TIMESTEP:
+                    self.precision_adaptive_pd_control()  # 高精度控制
+                    self.monitor_precision()  # 精度监测
+                    self.reliability_detection()  # 可靠性检测
+                    self.last_control_time = current_time
+
+                # 仿真步执行
+                if self.model is not None and self.data is not None:
+                    mujoco.mj_step(self.model, self.data)
+
+                # 可视化同步
+                if self.viewer_ready:
+                    self.viewer_inst.sync()
+
+                # 状态打印
+                self.print_precision_status()
+
+                # 动态睡眠
+                time_diff = current_time - self.last_control_time
+                if time_diff < SLEEP_TIME:
+                    sleep_duration = max(0.00001, SLEEP_TIME - time_diff)
+                    time.sleep(sleep_duration)
+
+            except Exception as e:
+                error_msg = f"仿真步异常（步数：{self.step_count}）: {e}"
+                print(f"⚠️ {error_msg}")
+                write_precision_log(error_msg)
+                write_reliability_log(error_msg)
+                continue
+
+        # 资源清理
+        self.cleanup()
+        # 最终精度统计
+        final_msg = f"高精度仿真结束 | 总耗时: {self.total_simulation_time:.2f}s | 总步数: {self.step_count:,} | 复位次数: {self.error_reset_count} | 最大定位误差: {np.round(rad2deg(np.max(self.max_position_error)), 4)}度 | 最大轨迹误差: {np.round(rad2deg(np.max(self.max_trajectory_error)), 4)}度"
+        print("\n" + "=" * 150)
+        print("✅ 控制器已优雅退出 - 关节精度性能仿真最终统计")
+        print(f"📈 {final_msg}")
+        print("=" * 150)
+        write_precision_log(final_msg)
+        write_reliability_log(final_msg)
+
+    def init_viewer(self):
+        """初始化Viewer（延迟加载，不影响精度）"""
+        if self.model is None or self.data is None:
+            return False
+        if self.viewer_ready:
+            return True
         try:
-            with viewer.launch_passive(self.model, self.data) as viewer_inst:
-                self._run_simulation_loop(viewer_inst)
-
-        except KeyboardInterrupt:
-            self.logger.info("\n🛑 用户终止仿真")
+            if MUJOCO_NEW_VIEWER:
+                self.viewer_inst = viewer.launch_passive(self.model, self.data)
+            else:
+                self.viewer_inst = viewer.Viewer(self.model, self.data)
+            self.viewer_ready = True
+            write_precision_log("Viewer初始化成功，可视化启用（不影响高精度控制）")
+            write_reliability_log("Viewer初始化成功，可视化启用")
+            print("✅ Viewer初始化成功")
+            return True
         except Exception as e:
-            self.logger.error(f"❌ 仿真出错：{e}", exc_info=True)
-        finally:
-            # 清理资源
-            if hasattr(self, 'temp_file'):
-                os.unlink(self.temp_file.name)
-            self.logger.info(f"\n📊 仿真结束 - 最终统计")
-            self.logger.info(f"   总运动时间：{self.total_motion_time:.2f}s")
-            self.logger.info(f"   总能耗：{self.total_energy_consume:.2f}J")
-            self.logger.info(
-                f"   综合得分：{self.total_motion_time * self.config.efficiency.time_weight + self.total_energy_consume * self.config.efficiency.energy_weight:.2f}")
+            error_msg = f"Viewer初始化失败: {e}"
+            print(f"❌ {error_msg}")
+            write_precision_log(error_msg)
+            write_reliability_log(error_msg)
+            return False
+
+    def cleanup(self):
+        """资源清理（完整释放，避免内存泄漏影响后续精度测试）"""
+        if self.viewer_ready and self.viewer_inst:
+            try:
+                self.viewer_inst.close()
+                write_precision_log("Viewer资源清理完成")
+                write_reliability_log("Viewer资源清理完成")
+            except Exception as e:
+                error_msg = f"Viewer关闭失败: {e}"
+                print(f"⚠️ {error_msg}")
+                write_precision_log(error_msg)
+                write_reliability_log(error_msg)
+            self.viewer_inst = None
+            self.viewer_ready = False
+        self.model = None
+        self.data = None
+        global RUNNING, SIMULATION_START_TIME
+        RUNNING = False
+        SIMULATION_START_TIME = None
+        write_precision_log("高精度控制器资源清理完成，仿真正常退出")
+        write_reliability_log("高精度控制器资源清理完成，仿真正常退出")
+
+    def move_joint(self, joint_idx, angle, smooth=True, use_deg=True):
+        """单独控制单个关节（高精度平滑切换）"""
+        if joint_idx < 0 or joint_idx >= JOINT_COUNT:
+            raise ValueError(f"关节索引必须在0-{JOINT_COUNT - 1}之间，当前为{joint_idx}")
+
+        current_angles = self.get_current_joint_angles(use_deg=use_deg)
+        current_angles[joint_idx] = angle
+        self.set_joint_angles(current_angles, smooth=smooth, use_deg=use_deg)
 
 
-# ====================== 7. 主入口 ======================
-def main():
-    """程序主入口"""
-    try:
-        simulator = ArmSimulator()
-        simulator.run()
-    except Exception as e:
-        print(f"❌ 程序运行失败：{e}")
-        sys.exit(1)
+# ====================== 精度优化演示函数 ======================
+def precision_optimization_demo(controller):
+    """演示关节精度优化功能"""
+
+    def demo():
+        time.sleep(2)
+
+        # 演示1：零位姿态（基准精度测试）
+        print("\n🎬 演示1：切换到零位姿态，进行基准精度校准")
+        controller.preset_pose('zero')
+        time.sleep(3)
+
+        # 演示2：精度测试姿态（多关节协同，验证轨迹精度）
+        print("\n🎬 演示2：切换到精度测试姿态，验证多关节轨迹跟踪精度")
+        controller.preset_pose('precision_test')
+        time.sleep(4)
+
+        # 演示3：增加负载（验证抗干扰精度维持）
+        print("\n🎬 演示3：设置末端负载为1.5kg，验证负载下精度稳定性")
+        controller.set_end_effector_load(1.5)
+        time.sleep(4)
+
+        # 演示4：单关节大角度运动（验证定位精度，无超调）
+        print("\n🎬 演示4：关节1旋转45度，验证单关节高精度定位（无超调）")
+        controller.move_joint(0, 45, smooth=True, use_deg=True)
+        time.sleep(4)
+
+        # 演示5：抓取姿态（验证全关节精度匹配）
+        print("\n🎬 演示5：切换到抓取姿态，验证全关节协同精度")
+        controller.preset_pose('grasp')
+        time.sleep(3)
+
+        # 演示6：降低负载（验证精度恢复能力）
+        print("\n🎬 演示6：降低末端负载为0.2kg，验证精度恢复特性")
+        controller.set_end_effector_load(0.2)
+        time.sleep(3)
+
+        # 演示7：复位零位（验证精度复位能力）
+        print("\n🎬 演示7：切换回零位姿态，完成精度优化演示")
+        controller.preset_pose('zero')
+        time.sleep(2)
+
+        # 结束演示
+        global RUNNING
+        RUNNING = False
+
+    demo_thread = threading.Thread(target=demo)
+    demo_thread.daemon = True
+    demo_thread.start()
 
 
+# ====================== 主入口 ======================
 if __name__ == "__main__":
-    main()
+    # 补充完整：设置numpy输出格式，便于查看高精度关节数据
+    np.set_printoptions(precision=4, suppress=True, linewidth=150)
+    # 初始化控制器并运行
+    controller = ArmJointPrecisionOptimizationController()
+    precision_optimization_demo(controller)
+    controller.run()
