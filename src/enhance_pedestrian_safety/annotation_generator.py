@@ -21,7 +21,12 @@ class AnnotationGenerator:
             'frame_id': frame_num,
             'timestamp': timestamp,
             'objects': [],
-            'camera_info': {}
+            'camera_info': {},
+            'safety_info': {
+                'pedestrian_count': 0,
+                'vehicle_count': 0,
+                'high_risk_interactions': 0
+            }
         }
 
         try:
@@ -35,6 +40,16 @@ class AnnotationGenerator:
                     if obj_info:
                         annotations['objects'].append(obj_info)
                         self.object_counter += 1
+
+                        # 更新安全统计
+                        if 'walker' in obj_type:
+                            annotations['safety_info']['pedestrian_count'] += 1
+                        elif 'vehicle' in obj_type:
+                            annotations['safety_info']['vehicle_count'] += 1
+
+            # 检测高风险交互
+            annotations['safety_info']['high_risk_interactions'] = self._detect_high_risk_interactions(
+                annotations['objects'])
 
             self._save_annotations(frame_num, annotations)
             return annotations
@@ -110,6 +125,30 @@ class AnnotationGenerator:
         else:
             return 'unknown'
 
+    def _detect_high_risk_interactions(self, objects):
+        """检测高风险交互"""
+        high_risk_count = 0
+        pedestrians = [obj for obj in objects if obj['class'] == 'pedestrian']
+        vehicles = [obj for obj in objects if obj['class'] in ['car', 'vehicle']]
+
+        for pedestrian in pedestrians:
+            for vehicle in vehicles:
+                # 计算距离
+                p_loc = pedestrian['location']
+                v_loc = vehicle['location']
+
+                distance = np.sqrt(
+                    (p_loc['x'] - v_loc['x']) ** 2 +
+                    (p_loc['y'] - v_loc['y']) ** 2 +
+                    (p_loc['z'] - v_loc['z']) ** 2
+                )
+
+                # 如果距离小于5米，认为是高风险交互
+                if distance < 5.0:
+                    high_risk_count += 1
+
+        return high_risk_count
+
     def _save_annotations(self, frame_num, annotations):
         """保存标注到文件"""
         filename = f"frame_{frame_num:06d}.json"
@@ -130,7 +169,13 @@ class AnnotationGenerator:
             'total_frames': len(self.frame_annotations),
             'total_objects': self.object_counter,
             'frames': list(self.frame_annotations.keys()),
-            'created': datetime.now().isoformat()
+            'created': datetime.now().isoformat(),
+            'safety_summary': {
+                'total_pedestrians': sum(f['safety_info']['pedestrian_count'] for f in self.frame_annotations.values()),
+                'total_vehicles': sum(f['safety_info']['vehicle_count'] for f in self.frame_annotations.values()),
+                'total_high_risk': sum(
+                    f['safety_info']['high_risk_interactions'] for f in self.frame_annotations.values())
+            }
         }
 
         with open(master_file, 'w', encoding='utf-8') as f:
@@ -141,6 +186,7 @@ class AnnotationGenerator:
         vehicle_count = 0
         pedestrian_count = 0
         other_count = 0
+        high_risk_count = 0
 
         for frame_data in self.frame_annotations.values():
             for obj in frame_data.get('objects', []):
@@ -151,14 +197,21 @@ class AnnotationGenerator:
                 else:
                     other_count += 1
 
+            high_risk_count += frame_data['safety_info']['high_risk_interactions']
+
         summary = {
             'total_frames': len(self.frame_annotations),
             'total_objects': self.object_counter,
             'vehicles': vehicle_count,
             'pedestrians': pedestrian_count,
             'other_objects': other_count,
+            'high_risk_interactions': high_risk_count,
             'average_objects_per_frame': self.object_counter / len(
-                self.frame_annotations) if self.frame_annotations else 0
+                self.frame_annotations) if self.frame_annotations else 0,
+            'safety_metrics': {
+                'pedestrian_to_vehicle_ratio': pedestrian_count / max(1, vehicle_count),
+                'high_risk_percentage': high_risk_count / max(1, self.object_counter) * 100
+            }
         }
 
         summary_file = os.path.join(self.annotations_dir, "summary.json")

@@ -82,7 +82,11 @@ except ImportError as e:
                                   'SUCCESS_COLOR': (0, 255, 150), 'REFRESH_RATE_MS': 100,
                                   'SHOW_GRID': True, 'GRID_SIZE': 300,
                                   'SHOW_OBJECTS_STATS': True, 'SHOW_SYSTEM_STATS': True,
-                                  'SHOW_PERFORMANCE': True}}
+                                  'SHOW_PERFORMANCE': True, 'SHOW_TRAJECTORY': True,
+                                  'TRAJECTORY_SIZE': 280, 'TRAJECTORY_MAX_POINTS': 1000,
+                                  'TRAJECTORY_LINE_COLOR': (0, 255, 255),
+                                  'TRAJECTORY_CURRENT_COLOR': (0, 255, 0),
+                                  'TRAJECTORY_START_COLOR': (255, 255, 0)}}
         SYSTEM = {'LOG_LEVEL': 'INFO', 'LOG_TO_FILE': True, 'LOG_FILENAME': 'drone_log.txt',
                  'MAX_RECONNECT_ATTEMPTS': 3, 'RECONNECT_DELAY': 2.0,
                  'ENABLE_HEALTH_CHECK': True, 'HEALTH_CHECK_INTERVAL': 20}
@@ -1664,6 +1668,10 @@ class InfoDisplayWindow:
         self.display_thread = None
         self.last_update = time.time()
 
+        # 轨迹记录
+        self.trajectory_points = deque(maxlen=config.DISPLAY['INFO_WINDOW'].get('TRAJECTORY_MAX_POINTS', 1000))
+        self.start_position = None
+
         self.start()
 
     def start(self):
@@ -1689,6 +1697,15 @@ class InfoDisplayWindow:
             return
 
         try:
+            # 更新轨迹数据
+            if 'position' in info_data:
+                pos = info_data['position']
+                self.trajectory_points.append((pos[0], pos[1], pos[2]))
+                
+                # 记录起始位置
+                if self.start_position is None:
+                    self.start_position = (pos[0], pos[1], pos[2])
+
             if self.info_queue.full():
                 try:
                     self.info_queue.get_nowait()
@@ -1775,6 +1792,119 @@ class InfoDisplayWindow:
         img = put_chinese_text(img, tip, (center_x - 120, center_y + 50), 18, self.display_config['TEXT_COLOR'], 1)
 
         return img
+
+    def _draw_trajectory(self, trajectory_points, current_pos, start_pos, size):
+        """绘制运动轨迹图"""
+        try:
+            # 创建轨迹图（始终返回有效图像）
+            traj_img = np.zeros((size, size, 3), dtype=np.uint8)
+            traj_img.fill(30)  # 深灰色背景
+
+            # 收集所有点用于计算边界
+            all_points = []
+            if trajectory_points:
+                try:
+                    all_points.extend([(float(p[0]), float(p[1])) for p in trajectory_points if len(p) >= 2])
+                except (IndexError, TypeError, ValueError):
+                    pass
+            if current_pos and len(current_pos) >= 2:
+                try:
+                    all_points.append((float(current_pos[0]), float(current_pos[1])))
+                except (TypeError, ValueError, IndexError):
+                    pass
+            if start_pos and len(start_pos) >= 2:
+                try:
+                    all_points.append((float(start_pos[0]), float(start_pos[1])))
+                except (TypeError, ValueError, IndexError):
+                    pass
+
+            if not all_points:
+                # 没有轨迹点时，返回空白图像
+                return traj_img
+
+            # 计算边界和缩放
+            xs = [p[0] for p in all_points]
+            ys = [p[1] for p in all_points]
+
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+
+            # 添加边距
+            margin = max((max_x - min_x) * 0.1, (max_y - min_y) * 0.1, 5.0)
+            range_x = max_x - min_x + 2 * margin
+            range_y = max_y - min_y + 2 * margin
+
+            if range_x == 0:
+                range_x = 10.0
+            if range_y == 0:
+                range_y = 10.0
+
+            # 坐标转换函数
+            def world_to_pixel(wx, wy):
+                try:
+                    px = int((wx - min_x + margin) / range_x * size)
+                    py = int((wy - min_y + margin) / range_y * size)
+                    px = max(0, min(size - 1, px))
+                    py = max(0, min(size - 1, py))
+                    return px, py
+                except (ZeroDivisionError, ValueError, TypeError):
+                    return size // 2, size // 2
+
+            # 绘制轨迹线
+            if len(trajectory_points) > 1:
+                try:
+                    line_color = self.display_config.get('TRAJECTORY_LINE_COLOR', (0, 255, 255))
+                    for i in range(len(trajectory_points) - 1):
+                        try:
+                            p1 = trajectory_points[i]
+                            p2 = trajectory_points[i + 1]
+                            if len(p1) >= 2 and len(p2) >= 2:
+                                px1, py1 = world_to_pixel(p1[0], p1[1])
+                                px2, py2 = world_to_pixel(p2[0], p2[1])
+                                cv2.line(traj_img, (px1, py1), (px2, py2), line_color, 2)
+                        except (IndexError, TypeError, ValueError):
+                            continue
+                except Exception:
+                    pass
+
+            # 绘制起始点
+            if start_pos and len(start_pos) >= 2:
+                try:
+                    start_color = self.display_config.get('TRAJECTORY_START_COLOR', (255, 255, 0))
+                    sx, sy = world_to_pixel(start_pos[0], start_pos[1])
+                    cv2.circle(traj_img, (sx, sy), 6, start_color, -1)
+                    cv2.circle(traj_img, (sx, sy), 6, (255, 255, 255), 1)
+                except (IndexError, TypeError, ValueError):
+                    pass
+
+            # 绘制当前位置
+            if current_pos and len(current_pos) >= 2:
+                try:
+                    current_color = self.display_config.get('TRAJECTORY_CURRENT_COLOR', (0, 255, 0))
+                    cx, cy = world_to_pixel(current_pos[0], current_pos[1])
+                    cv2.circle(traj_img, (cx, cy), 8, current_color, -1)
+                    cv2.circle(traj_img, (cx, cy), 8, (255, 255, 255), 2)
+                except (IndexError, TypeError, ValueError):
+                    pass
+
+            # 绘制坐标轴
+            try:
+                axis_color = (100, 100, 100)
+                center_x_px, center_y_px = world_to_pixel(0, 0)
+                if 0 <= center_x_px < size:
+                    cv2.line(traj_img, (center_x_px, 0), (center_x_px, size), axis_color, 1)
+                if 0 <= center_y_px < size:
+                    cv2.line(traj_img, (0, center_y_px), (size, center_y_px), axis_color, 1)
+            except Exception:
+                pass
+
+            return traj_img
+        except Exception as e:
+            # 发生任何错误时返回空白图像
+            print(f"⚠️ 绘制轨迹图内部错误: {e}")
+            traj_img = np.zeros((size, size, 3), dtype=np.uint8)
+            traj_img.fill(30)
+            return traj_img
 
     def _render_info_display(self, info_data: Dict) -> np.ndarray:
         """渲染信息显示"""
@@ -1973,13 +2103,90 @@ class InfoDisplayWindow:
                     # 将网格图像放到主图像上
                     img[grid_y:grid_y+grid_size, grid_x:grid_x+grid_size] = grid_resized
 
-            # 9. 时间戳
+            # 9. 运动轨迹图（最左下角）
+            if self.display_config.get('SHOW_TRAJECTORY', True):
+                try:
+                    trajectory_size = self.display_config.get('TRAJECTORY_SIZE', 280)
+                    current_pos = info_data.get('position')
+                    
+                    # 绘制轨迹图
+                    trajectory_img = self._draw_trajectory(
+                        list(self.trajectory_points),
+                        current_pos,
+                        self.start_position,
+                        trajectory_size
+                    )
+                    
+                    if trajectory_img is not None and trajectory_img.size > 0:
+                        # 轨迹图放在最左下角，从底部开始
+                        traj_x = 20  # 左边距
+                        # 从窗口底部向上，留出底部提示文字的空间（约50像素，确保不重叠）
+                        bottom_hint_height = 50
+                        traj_y = self.window_height - trajectory_size - bottom_hint_height
+                        
+                        # 确保轨迹图不会超出窗口范围，且不与上方内容重叠（至少距离顶部80像素）
+                        if traj_y >= 80 and traj_y + trajectory_size <= self.window_height - bottom_hint_height:
+                            # 添加轨迹图标题（在轨迹图上方）
+                            traj_title = "Trajectory"  # 直接使用英文
+                            cv2.putText(img, traj_title, (traj_x, traj_y - 10), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 18 / 30.0, highlight_color, 1)
+                            
+                            # 确保图像尺寸匹配
+                            if (traj_y + trajectory_size <= self.window_height and 
+                                traj_x + trajectory_size <= self.window_width):
+                                # 将轨迹图放到主图像上
+                                img[traj_y:traj_y+trajectory_size, traj_x:traj_x+trajectory_size] = trajectory_img
+                                
+                                # 添加轨迹图图例（在轨迹图右侧，使用英文避免乱码）
+                                legend_x = traj_x + trajectory_size + 15
+                                legend_y = traj_y
+                                
+                                if legend_x + 150 < self.window_width:
+                                    # 使用英文避免乱码
+                                    cv2.putText(img, "Legend:", (legend_x, legend_y), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1)
+                                    legend_y += 20
+                                    
+                                    # 起始位置
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 6, 
+                                              self.display_config.get('TRAJECTORY_START_COLOR', (255, 255, 0)), -1)
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 6, (255, 255, 255), 1)
+                                    cv2.putText(img, "Start", (legend_x + 20, legend_y + 12), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                                    legend_y += 25
+                                    
+                                    # 当前位置
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 8, 
+                                              self.display_config.get('TRAJECTORY_CURRENT_COLOR', (0, 255, 0)), -1)
+                                    cv2.circle(img, (legend_x + 7, legend_y + 7), 8, (255, 255, 255), 2)
+                                    cv2.putText(img, "Current", (legend_x + 20, legend_y + 12), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                                    legend_y += 25
+                                    
+                                    # 轨迹线
+                                    cv2.line(img, (legend_x, legend_y + 7), (legend_x + 20, legend_y + 7), 
+                                            self.display_config.get('TRAJECTORY_LINE_COLOR', (0, 255, 255)), 2)
+                                    cv2.putText(img, "Path", (legend_x + 25, legend_y + 12), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                                    
+                                    # 显示轨迹点数
+                                    point_count = len(self.trajectory_points)
+                                    count_text = f"Points: {point_count}"
+                                    cv2.putText(img, count_text, (legend_x, legend_y + 30), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, text_color, 1)
+                except Exception as e:
+                    # 轨迹图绘制失败时不影响其他显示
+                    print(f"⚠️ 绘制轨迹图时出错: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            # 10. 时间戳
             if 'timestamp' in info_data:
                 timestamp = info_data['timestamp']
                 time_text = f"更新时间: {timestamp}"
                 img = put_chinese_text(img, time_text, (self.window_width - 200, self.window_height - 10), 15, text_color, 1)
 
-            # 10. 底部提示
+            # 11. 底部提示
             hint_text = "按 Q 或 ESC 关闭窗口"
             img = put_chinese_text(img, hint_text, (self.window_width // 2 - 80, self.window_height - 30), 15, text_color, 1)
 

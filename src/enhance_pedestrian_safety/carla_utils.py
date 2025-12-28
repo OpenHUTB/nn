@@ -1,7 +1,6 @@
 """
 CARLA 工具模块 - 用于自动查找和配置 CARLA 路径
 """
-# carla_utils.py
 import sys
 import os
 import glob
