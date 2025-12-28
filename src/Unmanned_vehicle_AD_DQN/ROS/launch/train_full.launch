@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- CARLA DQN完整训练节点 -->
+    <node name="carla_dqn_full_trainer" pkg="carla_dqn" type="carla_train_full.py" output="screen">
+        <!-- 使用Hyperparameters.py中的EPISODES作为默认值 -->
+        <param name="episodes" value="100" />
+        <param name="model_name" value="YY_Enhanced_ObstacleAvoidance_ROS" />
+    </node>
+    
+    <!-- 可视化工具 -->
+    <node name="rqt_console" pkg="rqt_console" type="rqt_console" />
+    
+    <!-- 多图监控 -->
+    <node name="rqt_multiplot" pkg="rqt_multiplot" type="rqt_multiplot" />
+    
+    <!-- 图像查看 -->
+    <node name="image_view" pkg="image_view" type="image_view">
+        <remap from="image" to="/carla/full_training/image" />
+    </node>
+</launch>

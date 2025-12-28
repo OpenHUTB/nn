@@ -1,0 +1,93 @@
+<mujoco model="6-DOF Mechanical Arm">
+  <!-- 编译器配置：物理参数、仿真步长 -->
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.001" gravity="0 0 -9.81"/>
+
+  <!-- 视觉配置：背景、光照 -->
+  <visual>
+    <global azimuth="135" elevation="-30" perspective="0.01"/>
+    <light diffuse="0.8 0.8 0.8" ambient="0.2 0.2 0.2" dir="-0.5 -0.5 -1"/>
+  </visual>
+
+  <!-- 资产：材质、纹理（简化版） -->
+  <asset>
+    <material name="arm_mat" rgba="0.2 0.6 0.8 1" specular="0.2"/>
+    <material name="base_mat" rgba="0.1 0.1 0.1 1" specular="0.1"/>
+    <material name="ee_mat" rgba="0.8 0.2 0.2 1" specular="0.3"/>
+  </asset>
+
+  <!-- 世界体：基础坐标系 -->
+  <worldbody>
+    <!-- 地面：方便观察 -->
+    <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 0" rgba="0.8 0.8 0.8 1"/>
+
+    <!-- 机械臂基座 -->
+    <body name="base" pos="0 0 0">
+      <geom name="base_geom" type="cylinder" size="0.15 0.1" pos="0 0 0" material="base_mat"/>
+      <joint name="joint1" type="hinge" axis="0 0 1" pos="0 0 0.1" range="-3.14 3.14" damping="0.1"/>
+
+      <!-- 连杆1（肩部） -->
+      <body name="link1" pos="0 0 0.1">
+        <geom name="link1_geom" type="cylinder" size="0.05 0.3" pos="0 0 0.3" axis="0 1 0" material="arm_mat"/>
+        <joint name="joint2" type="hinge" axis="0 1 0" pos="0 0 0.6" range="-1.57 1.57" damping="0.1"/>
+
+        <!-- 连杆2（肘部） -->
+        <body name="link2" pos="0 0 0.6">
+          <geom name="link2_geom" type="cylinder" size="0.04 0.3" pos="0 0 0.3" axis="0 1 0" material="arm_mat"/>
+          <joint name="joint3" type="hinge" axis="0 1 0" pos="0 0 0.6" range="-1.57 1.57" damping="0.1"/>
+
+          <!-- 连杆3（腕部1） -->
+          <body name="link3" pos="0 0 0.6">
+            <geom name="link3_geom" type="cylinder" size="0.03 0.2" pos="0 0 0.2" axis="0 1 0" material="arm_mat"/>
+            <joint name="joint4" type="hinge" axis="0 0 1" pos="0 0 0.4" range="-3.14 3.14" damping="0.1"/>
+
+            <!-- 连杆4（腕部2） -->
+            <body name="link4" pos="0 0 0.4">
+              <geom name="link4_geom" type="cylinder" size="0.03 0.15" pos="0 0 0.15" axis="0 1 0" material="arm_mat"/>
+              <joint name="joint5" type="hinge" axis="0 1 0" pos="0 0 0.3" range="-1.57 1.57" damping="0.1"/>
+
+              <!-- 连杆5（腕部3） -->
+              <body name="link5" pos="0 0 0.3">
+                <geom name="link5_geom" type="cylinder" size="0.02 0.1" pos="0 0 0.1" axis="0 1 0" material="arm_mat"/>
+                <joint name="joint6" type="hinge" axis="0 0 1" pos="0 0 0.2" range="-3.14 3.14" damping="0.1"/>
+
+                <!-- 末端执行器（夹爪简化版） -->
+                <body name="end_effector" pos="0 0 0.2">
+                  <geom name="ee_geom" type="box" size="0.04 0.04 0.04" pos="0 0 0" material="ee_mat"/>
+                  <!-- 末端执行器位点：方便抓取/坐标计算 -->
+                  <site name="ee_site" pos="0 0 0.04" size="0.01" rgba="1 0 0 1"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- 控制配置：关节力矩控制 -->
+  <actuator>
+    <motor name="motor1" joint="joint1" ctrlrange="-5 5" gear="100"/>
+    <motor name="motor2" joint="joint2" ctrlrange="-5 5" gear="100"/>
+    <motor name="motor3" joint="joint3" ctrlrange="-5 5" gear="100"/>
+    <motor name="motor4" joint="joint4" ctrlrange="-5 5" gear="100"/>
+    <motor name="motor5" joint="joint5" ctrlrange="-5 5" gear="100"/>
+    <motor name="motor6" joint="joint6" ctrlrange="-5 5" gear="100"/>
+  </actuator>
+
+  <!-- 传感器配置：关节角度、末端执行器力/位置 -->
+  <sensor>
+    <!-- 6个关节的角度传感器 -->
+    <jointpos name="joint1_pos" joint="joint1"/>
+    <jointpos name="joint2_pos" joint="joint2"/>
+    <jointpos name="joint3_pos" joint="joint3"/>
+    <jointpos name="joint4_pos" joint="joint4"/>
+    <jointpos name="joint5_pos" joint="joint5"/>
+    <jointpos name="joint6_pos" joint="joint6"/>
+
+    <!-- 末端执行器力传感器 -->
+    <force name="ee_force" site="ee_site"/>
+    <!-- 末端执行器位置传感器 -->
+    <framepos name="ee_pos" site="ee_site"/>
+  </sensor>
+</mujoco>

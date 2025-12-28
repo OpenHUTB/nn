@@ -4,7 +4,12 @@
 from ultralytics import YOLO
 import io
 import sys
+import os
 
+
+class ModelLoadError(Exception):
+    """模型加载失败专用异常"""
+    pass
 
 class DetectionEngine:
     """
@@ -46,18 +51,30 @@ class DetectionEngine:
         sys.stderr = io.StringIO()
 
         try:
-            # 加载模型（若为官方模型且未下载，会自动联网下载）
-            print(f"尝试加载模型: {self.model_path}")  # 打印调试信息
-            model = YOLO(self.model_path)
+            # 判断是本地文件还是官方模型名
+            if os.path.isfile(self.model_path):
+                model = YOLO(self.model_path)
+            else:
+                # 尝试作为 Ultralytics 官方模型加载（会自动下载）
+                model = YOLO(self.model_path)
+            return model
+        except FileNotFoundError as e:
+            raise ModelLoadError(f"Model file not found: {self.model_path}") from e
+        except RuntimeError as e:
+            msg = str(e)
+            if "CUDA out of memory" in msg:
+                raise ModelLoadError(
+                    "GPU memory insufficient. Try using CPU or a smaller model (e.g., yolov8n.pt)."
+                ) from e
+            elif "AssertionError" in msg and ("model" in msg or "state_dict" in msg):
+                raise ModelLoadError(f"Corrupted or incompatible model weights: {self.model_path}") from e
+            else:
+                raise ModelLoadError(f"Runtime error during model loading: {msg}") from e
         except Exception as e:
-            print(f"加载模型失败: {e}")  # 打印异常信息
-            raise e  # 重新抛出异常以便进一步处理    
+            raise ModelLoadError(f"Unexpected error loading YOLO model: {e}") from e
         finally:
-            # 确保无论是否出错，都恢复原始输出流
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-        return model
+            sys.stdout, sys.stderr = old_stdout, old_stderr
+        
 
     def detect(self, frame):
         """
@@ -86,13 +103,15 @@ class DetectionEngine:
         try:
             # 执行推理：传入图像、置信度阈值，并关闭详细日志（verbose=False）
             results = self.model(frame, conf=self.conf_threshold, verbose=False)
+            annotated_frame = results[0].plot()
+            return annotated_frame, results
+        except Exception as e:
+            # 不抛出异常，而是返回原图以维持流程
+            print(f"⚠️ Warning: Detection failed on current frame: {e}")
+            return frame.copy(), []
         finally:
             # 恢复标准输出
             sys.stdout = old_stdout
             sys.stderr = old_stderr
 
-        # 使用 YOLO 内置的 plot() 方法生成带标注的图像（numpy array, HWC）
-        annotated_frame = results[0].plot()  # results 总是包含至少一个元素
-
-        return annotated_frame, results
 

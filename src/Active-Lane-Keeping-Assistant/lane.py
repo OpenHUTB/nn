@@ -12,6 +12,13 @@ class Lane:
     HLS_L_THRESHOLD_MIN = 150
     HLS_L_THRESHOLD_MAX = 255
     XM_PER_PIX = 3.7 / 781
+    ROI_BOTTOM = 350
+    ROI_TOP = 260
+    ROI_LEFT = 200
+    ROI_RIGHT = 440
+    # === 新增 ===
+    MARGIN_RATIO = 1.0 / 12.0
+    # ===========
     def __init__(self, height:int, width:int, save:bool=False,
         save_folder:str=join('img', 'examples')) -> None:
         """Constructor
@@ -28,7 +35,7 @@ class Lane:
         self.save_folder = save_folder
         self.img_height = height
         self.img_width = width
-        self.margin = int((1/12) * self.img_width)
+        self.margin = int(self.MARGIN_RATIO * self.img_width)
         self.DEGREE = 2
 
         # Variables to store for lines
@@ -59,15 +66,25 @@ class Lane:
         # Create threshold matrix to differentiate black and white based on the
         # lightness (of HSL).
         _, binary = cv2.threshold(hls[:, :, 1], self.HLS_L_THRESHOLD_MIN, self.HLS_L_THRESHOLD_MAX, cv2.THRESH_BINARY)
-        binary_blured = cv2.GaussianBlur(binary, (3, 3), 0)
+
+        # [Perception] Apply Morphological Closing to fill gaps in lane lines
+        # and remove small noise dots.
+        kernel = np.ones((5, 5), np.uint8)
+        binary_closed = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+
+        # Blur the processed image
+        binary_blured = cv2.GaussianBlur(binary_closed, (3, 3), 0)
 
         if self.save:
             cv2.imwrite(join(self.save_folder, 'lines.jpg'), binary_blured)
 
         return binary_blured
 
-    def extract_roi(self, img:np.ndarray, bottom:int=350, top:int=260,
-        left:int=200, right:int=440) -> tuple[np.ndarray, np.ndarray]:
+    def extract_roi(self, img: np.ndarray,
+                    bottom: int = ROI_BOTTOM,
+                    top: int = ROI_TOP,
+                    left: int = ROI_LEFT,
+                    right: int = ROI_RIGHT) -> tuple[np.ndarray, np.ndarray]:
         """Extract the Region of Interest
 
         Extracts the region of interest and transforms it to fit the original

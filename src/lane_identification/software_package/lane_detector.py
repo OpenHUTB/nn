@@ -163,8 +163,11 @@ class LaneDetector:
             coeffs = np.polyfit(y_points, x_points, 2)
             model_type = 'quadratic'
         except:
-            coeffs = np.polyfit(y_points, x_points, 1)
-            model_type = 'linear'
+            try:
+                coeffs = np.polyfit(y_points, x_points, 1)
+                model_type = 'linear'
+            except:
+                return None
         
         poly_func = np.poly1d(coeffs)
         
@@ -173,24 +176,27 @@ class LaneDetector:
         y_bottom = height
         y_top = int(height * 0.4)
         
-        x_bottom = int(poly_func(y_bottom))
-        x_top = int(poly_func(y_top))
-        
-        # 限制范围
-        x_bottom = max(0, min(width, x_bottom))
-        x_top = max(0, min(width, x_top))
-        
-        # 计算置信度
-        confidence = min(len(lines) / 10.0, 1.0)
-        
-        return {
-            'func': poly_func,
-            'coeffs': coeffs.tolist(),
-            'points': [(x_bottom, y_bottom), (x_top, y_top)],
-            'model_type': model_type,
-            'confidence': confidence,
-            'num_lines': len(lines)
-        }
+        try:
+            x_bottom = int(poly_func(y_bottom))
+            x_top = int(poly_func(y_top))
+            
+            # 限制范围
+            x_bottom = max(0, min(width, x_bottom))
+            x_top = max(0, min(width, x_top))
+            
+            # 计算置信度
+            confidence = min(len(lines) / 10.0, 1.0)
+            
+            return {
+                'func': poly_func,
+                'coeffs': coeffs.tolist(),
+                'points': [(x_bottom, y_bottom), (x_top, y_top)],
+                'model_type': model_type,
+                'confidence': confidence,
+                'num_lines': len(lines)
+            }
+        except:
+            return None
     
     def _validate_lanes(self, left_lane: Optional[Dict], right_lane: Optional[Dict],
                        image_shape: Tuple[int, ...]) -> Tuple[Optional[Dict], Optional[Dict]]:
@@ -200,35 +206,38 @@ class LaneDetector:
         
         height, width = image_shape[:2]
         
-        # 检查车道宽度
-        left_func = left_lane['func']
-        right_func = right_lane['func']
-        
-        y_points = np.linspace(height * 0.4, height, 5)
-        widths = []
-        
-        for y in y_points:
-            left_x = left_func(y)
-            right_x = right_func(y)
-            if right_x > left_x:
-                widths.append(right_x - left_x)
-        
-        if widths:
-            avg_width = np.mean(widths)
-            std_width = np.std(widths)
+        try:
+            # 检查车道宽度
+            left_func = left_lane['func']
+            right_func = right_lane['func']
             
-            # 宽度合理性检查
-            min_reasonable_width = width * 0.15
-            max_reasonable_width = width * 0.8
+            y_points = np.linspace(height * 0.4, height, 5)
+            widths = []
             
-            if avg_width < min_reasonable_width or avg_width > max_reasonable_width or std_width > width * 0.2:
-                left_lane['confidence'] *= 0.7
-                right_lane['confidence'] *= 0.7
-        
-        # 检查车道线交叉
-        if left_lane['points'][0][0] > right_lane['points'][0][0]:
-            left_lane['confidence'] *= 0.6
-            right_lane['confidence'] *= 0.6
+            for y in y_points:
+                left_x = left_func(y)
+                right_x = right_func(y)
+                if right_x > left_x:
+                    widths.append(right_x - left_x)
+            
+            if widths:
+                avg_width = np.mean(widths)
+                std_width = np.std(widths)
+                
+                # 宽度合理性检查
+                min_reasonable_width = width * 0.15
+                max_reasonable_width = width * 0.8
+                
+                if avg_width < min_reasonable_width or avg_width > max_reasonable_width or std_width > width * 0.2:
+                    left_lane['confidence'] *= 0.7
+                    right_lane['confidence'] *= 0.7
+            
+            # 检查车道线交叉
+            if left_lane['points'][0][0] > right_lane['points'][0][0]:
+                left_lane['confidence'] *= 0.6
+                right_lane['confidence'] *= 0.6
+        except:
+            pass
         
         return left_lane, right_lane
     
@@ -320,14 +329,14 @@ class LaneDetector:
         quality = 0.0
         
         if left_lane is not None:
-            quality += left_lane['confidence'] * 0.5
+            quality += left_lane.get('confidence', 0) * 0.5
         
         if right_lane is not None:
-            quality += right_lane['confidence'] * 0.5
+            quality += right_lane.get('confidence', 0) * 0.5
         
         if left_lane is not None and right_lane is not None:
             quality += 0.1
-            if left_lane['model_type'] == right_lane['model_type']:
+            if left_lane.get('model_type') == right_lane.get('model_type'):
                 quality += 0.1
         
         return min(quality, 1.0)
@@ -341,9 +350,9 @@ class LaneDetector:
         smoothing_factor = 0.6
         
         # 平滑车道线参数
-        if current_result['left_lane']:
+        if current_result['left_lane'] and current_result['left_lane'].get('coeffs'):
             for prev_result in list(self.lane_history)[-2:]:
-                if prev_result['left_lane']:
+                if prev_result['left_lane'] and prev_result['left_lane'].get('coeffs'):
                     prev_coeffs = np.array(prev_result['left_lane']['coeffs'])
                     curr_coeffs = np.array(current_result['left_lane']['coeffs'])
                     
@@ -356,9 +365,9 @@ class LaneDetector:
                         current_result['left_lane']['func'] = np.poly1d(smoothed_coeffs)
         
         # 同样处理右车道线
-        if current_result['right_lane']:
+        if current_result['right_lane'] and current_result['right_lane'].get('coeffs'):
             for prev_result in list(self.lane_history)[-2:]:
-                if prev_result['right_lane']:
+                if prev_result['right_lane'] and prev_result['right_lane'].get('coeffs'):
                     prev_coeffs = np.array(prev_result['right_lane']['coeffs'])
                     curr_coeffs = np.array(current_result['right_lane']['coeffs'])
                     

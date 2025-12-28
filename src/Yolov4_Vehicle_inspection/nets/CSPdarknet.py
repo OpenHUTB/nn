@@ -13,6 +13,7 @@ class Mish(nn.Module):
         super(Mish, self).__init__()
 
     def forward(self, x):
+        # 激活函数计算：x * tanh(ln(1 + e^x))，平滑非单调特性提升梯度流动
         return x * torch.tanh(F.softplus(x))
 
 #---------------------------------------------------#
@@ -23,7 +24,9 @@ class BasicConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1):
         super(BasicConv, self).__init__()
 
+        # 卷积层采用same padding（kernel_size//2），无偏置（BN层替代偏置作用）
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, kernel_size//2, bias=False)
+        # BN层加速训练收敛，降低过拟合风险
         self.bn = nn.BatchNorm2d(out_channels)
         self.activation = Mish()
 
@@ -43,13 +46,14 @@ class Resblock(nn.Module):
 
         if hidden_channels is None:
             hidden_channels = channels
-
+        # 残差块内部：1x1卷积降维 -> 3x3卷积恢复维度，减少计算量同时保留特征
         self.block = nn.Sequential(
             BasicConv(channels, hidden_channels, 1),
             BasicConv(hidden_channels, channels, 3)
         )
 
     def forward(self, x):
+        # 残差连接：原始输入 + 卷积输出，避免梯度消失
         return x + self.block(x)
 
 #--------------------------------------------------------------------#
@@ -76,12 +80,12 @@ class Resblock_body(nn.Module):
             #----------------------------------------------------------------#
             #   主干部分会对num_blocks进行循环，循环内部是残差结构。
             #----------------------------------------------------------------#
-            self.split_conv1 = BasicConv(out_channels, out_channels, 1)  
+            self.split_conv1 = BasicConv(out_channels, out_channels, 1)
             self.blocks_conv = nn.Sequential(
                 Resblock(channels=out_channels, hidden_channels=out_channels//2),
                 BasicConv(out_channels, out_channels, 1)
             )
-
+            # 拼接后通道数翻倍，1x1卷积整合通道维度
             self.concat_conv = BasicConv(out_channels*2, out_channels, 1)
         else:
             #--------------------------------------------------------------------------#
@@ -93,6 +97,7 @@ class Resblock_body(nn.Module):
             #   主干部分会对num_blocks进行循环，循环内部是残差结构。
             #----------------------------------------------------------------#
             self.split_conv1 = BasicConv(out_channels, out_channels//2, 1)
+            # 批量构建num_blocks个残差块，形成主干特征提取路径
             self.blocks_conv = nn.Sequential(
                 *[Resblock(out_channels//2) for _ in range(num_blocks)],
                 BasicConv(out_channels//2, out_channels//2, 1)
@@ -101,16 +106,20 @@ class Resblock_body(nn.Module):
             self.concat_conv = BasicConv(out_channels, out_channels, 1)
 
     def forward(self, x):
+        # 下采样：特征图尺寸减半，通道数翻倍
         x = self.downsample_conv(x)
 
+        # 大残差边路径：直接卷积，不经过残差堆叠
         x0 = self.split_conv0(x)
 
+        # 主干路径：经过残差块堆叠提取特征
         x1 = self.split_conv1(x)
         x1 = self.blocks_conv(x1)
 
         #------------------------------------#
         #   将大残差边再堆叠回来
         #------------------------------------#
+        # dim=1按通道维度拼接，x1(主干) + x0(大残差边)
         x = torch.cat([x1, x0], dim=1)
         #------------------------------------#
         #   最后对通道数进行整合
@@ -130,6 +139,7 @@ class CSPDarkNet(nn.Module):
         self.inplanes = 32
         # 416,416,3 -> 416,416,32
         self.conv1 = BasicConv(3, self.inplanes, kernel_size=3, stride=1)
+        # 各阶段输出通道数，对应5次下采样的通道维度
         self.feature_channels = [64, 128, 256, 512, 1024]
 
         self.stages = nn.ModuleList([
@@ -137,15 +147,16 @@ class CSPDarkNet(nn.Module):
             Resblock_body(self.inplanes, self.feature_channels[0], layers[0], first=True),
             # 208,208,64 -> 104,104,128
             Resblock_body(self.feature_channels[0], self.feature_channels[1], layers[1], first=False),
-            # 104,104,128 -> 52,52,256
+            # 104,104,128 -> 52,52,256 （输出特征层1：检测小目标）
             Resblock_body(self.feature_channels[1], self.feature_channels[2], layers[2], first=False),
-            # 52,52,256 -> 26,26,512
+            # 52,52,256 -> 26,26,512 （输出特征层2：检测中目标）
             Resblock_body(self.feature_channels[2], self.feature_channels[3], layers[3], first=False),
-            # 26,26,512 -> 13,13,1024
+            # 26,26,512 -> 13,13,1024（输出特征层3：检测大目标）
             Resblock_body(self.feature_channels[3], self.feature_channels[4], layers[4], first=False)
         ])
 
         self.num_features = 1
+        # 权重初始化：卷积层使用He正态初始化，BN层默认初始化
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -156,20 +167,28 @@ class CSPDarkNet(nn.Module):
 
 
     def forward(self, x):
+        # 初始卷积层：提取基础特征
         x = self.conv1(x)
 
+        # 前两个阶段：基础特征下采样
         x = self.stages[0](x)
         x = self.stages[1](x)
+        # 第三阶段输出：52x52x256（小目标检测特征层）
         out3 = self.stages[2](x)
+        # 第四阶段输出：26x26x512（中目标检测特征层）
         out4 = self.stages[3](out3)
+        # 第五阶段输出：13x13x1024（大目标检测特征层）
         out5 = self.stages[4](out4)
 
+        # 返回三个不同尺度的特征层，适配YOLO多尺度检测
         return out3, out4, out5
 
 def darknet53(pretrained, **kwargs):
+    # layers=[1,2,8,8,4] 对应CSPDarkNet53的残差块数量配置
     model = CSPDarkNet([1, 2, 8, 8, 4])
     if pretrained:
         if isinstance(pretrained, str):
+            # 加载预训练权重，需保证权重文件与模型结构匹配
             model.load_state_dict(torch.load(pretrained))
         else:
             raise Exception("darknet request a pretrained path. got [{}]".format(pretrained))

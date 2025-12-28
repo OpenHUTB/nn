@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+  <!-- 功能包基本信息 -->
+  <name>mmap_test</name>
+  <version>0.0.1</version>
+  <description>ROS Noetic功能包：集成感知模块与决策模块的测试节点</description>
+  <!-- 修正：使用合法的QQ邮箱 -->
+  <maintainer email="3541417288@qq.com">pan-j-l</maintainer>
+  <license>MIT</license>
+
+  <!-- 编译工具依赖 -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- ROS运行时依赖 -->
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+
+  <!-- 导出编译类型 -->
+  <export>
+    <build_type>catkin</build_type>
+  </export>
+</package>

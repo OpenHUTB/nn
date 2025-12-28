@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+import os
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 class Agent():
     """Agent that outputs the desired behaviour given 
     """
     SIMPLE_STEER_LIMIT = 0.75
     SIMPLE_ERROR_TOLERANCE = 0.1
-    def __init__(self, tau_p:float = 0, tau_d:float = 0, tau_i:float = 0,
-        surface_lower_threshold:float = 20e6, throttle:float = 0.3,
-        suface_upper_threshold=30e6, controller:str = 'simple') -> None:
+
+    def __init__(self,
+                 tau_p: float = 0,
+                 tau_d: float = 0,
+                 tau_i: float = 0,
+                 surface_lower_threshold: float = 20e6,
+                 throttle: float = 0.3,
+                 surface_upper_threshold: float = 30e6,  # Fixed typo: suface -> surface
+                 controller: str = 'simple') -> None:
         """Constructor
 
         Args:
@@ -43,7 +49,7 @@ class Agent():
         self.tau_d = tau_d
         self.tau_i = tau_i
         self.surface_lower_threshold = surface_lower_threshold
-        self.surface_upper_threshold = suface_upper_threshold
+        self.surface_upper_threshold = surface_upper_threshold  # Fixed assignment
         self.prev_error = None
         self.throttle = throttle
         self.func = None
@@ -113,30 +119,48 @@ class Agent():
         file_name = os.path.join(path, f'{id}_error.jpg')
         plt.savefig(file_name)
 
-    def get_actions(self, detection_surface_area:float,
+def get_actions(self, detection_surface_area:float,
         error:float) -> tuple[float, float]:
-        """Retrieve action based on Observation
-
-        Args:
-            error (float): Difference to the center of the detected lane.
-            detection_surface_area (float): Detected surface area.
-
-        Returns:
-            tuple[float, float]:
-                [0]: Steering angle to use.
-                [1]: Throttle to apply.
-        """
-        if (self.check_surface_area(detection_surface_area)):
+        
+        # [Perception] Sensor Data Analysis
+        # Normalize the detection area to calculate "Sensor Confidence"
+        # Assuming typical good lane area is around 300,000 (30e4) to 30,000,000 (30e6) depending on resolution
+        # Let's use the threshold defined in init or a dynamic ratio
+        
+        # 1. Calculate Sensor Confidence (0.0 to 1.0)
+        # More white pixels (Surface Area) = Higher Confidence = Better Visibility
+        ref_area = 30e6 # Reference max area
+        sensor_confidence = min(1.0, detection_surface_area / ref_area)
+        
+        # 2. Compute Steering (Lateral Control)
+        # Keep track of error history for Integral/Derivative terms
+        if self.check_surface_area(detection_surface_area):
+            # Safety Fallback: Lost Visual Signal
+            sensor_confidence = 0.0 # Force lowest confidence
             steer = 0
-            if len(self.errors) > 0:
+            if self.errors:
                 self.errors.append(self.errors[-1])
             else:
                 self.errors.append(0)
         else:
+            # Normal Operation
             self.errors.append(error)
             steer = self.func(error=error)
-        return steer, self.throttle
 
+        # [Control] Sensor-Fusion Longitudinal Control
+        # Strategy: Throttle is determined by Sensor Confidence AND Curvature
+        # If sensor sees less lane (low confidence), slow down.
+        # If steering angle is high (high curvature), slow down.
+        
+        base_throttle = self.throttle
+        
+        # Formula: Base * Confidence - Curvature_Penalty
+        target_throttle = (base_throttle * (0.5 + 0.5 * sensor_confidence)) - (abs(steer) * 0.6)
+        
+        # Clamp output to safe range [0.15, Base]
+        dynamic_throttle = max(0.15, min(base_throttle, target_throttle))
+
+        return steer, dynamic_throttle
     @staticmethod
     def _simple_controller(error: float) -> float:
         """Hard Coded Controller - Optimized to use Class Constants
@@ -179,9 +203,10 @@ class Agent():
             self.prev_error = self.errors[-2]
         else:
             self.prev_error = self.errors[-1]
-        
+
         deviation = error - self.prev_error
-        steer = - self.tau_d * deviation/0.1 + self._p_controller(error)
+        dt = 0.1  # Delta time
+        steer = - self.tau_d * deviation / dt + self._p_controller(error)
         return steer
 
     def _pid_controller(self, error:float) -> float:

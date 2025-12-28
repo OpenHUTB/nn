@@ -8,6 +8,14 @@
 * 软件：Python 3.7-3.12（需支持3.7）、Pytorch（尽量不使用Tensorflow）
 * 相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
 
+## 功能模块表
+| 模块类别                | 模块名 | 链接                                                                            | 其他                                                                  |
+|-------------------|------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| 感知             | 车辆检测以及跟踪 | [Yolov4_Vehicle_inspection](https://github.com/OpenHUTB/nn/tree/main/src/Yolov4_Vehicle_inspection)                                                                          | -                                          |
+| 规划             | 车辆全局路径规划 | [carla_slam_gmapping](https://github.com/OpenHUTB/nn/tree/main/src/carla_slam_gmapping)                                                                          | -                                          |
+| 控制             | 手势控制无人机 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | -                                          |
+| 控制             | 倒车入库 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | [效果](https://github.com/OpenHUTB/nn/pull/4399)                                          |
+
 
 ## 贡献指南
 
@@ -44,6 +52,3 @@ mkdocs serve
 * [代理模拟器文档](https://openhutb.github.io)
 * 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
-
-通过网盘分享的文件：supercombo.h5
-链接: https://pan.baidu.com/s/1yYc4aPBLnXRuWXEb0hyKMA?pwd=1234 提取码: 1234

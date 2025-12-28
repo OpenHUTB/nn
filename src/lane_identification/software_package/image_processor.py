@@ -1,5 +1,6 @@
 ﻿"""
 图像处理模块 - 负责图像加载、预处理和缓存
+支持图像、视频和摄像头输入
 """
 
 import cv2
@@ -50,6 +51,24 @@ class SmartImageProcessor:
         except Exception as e:
             print(f"图像处理失败 {image_path}: {e}")
             return None
+    
+    def preprocess_frame(self, frame: np.ndarray) -> Tuple[np.ndarray, Dict]:
+        """预处理视频帧"""
+        try:
+            # 智能调整尺寸
+            processed = self._smart_resize(frame)
+            
+            # 自适应预处理
+            processed = self._adaptive_preprocessing(processed)
+            
+            # 计算ROI区域
+            roi_info = self._calculate_roi(processed.shape)
+            
+            return processed, roi_info
+            
+        except Exception as e:
+            print(f"帧预处理失败: {e}")
+            return frame, {}
     
     def _smart_resize(self, image: np.ndarray) -> np.ndarray:
         """智能调整图像尺寸"""
