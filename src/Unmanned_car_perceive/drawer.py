@@ -99,11 +99,17 @@ class PyGameDrawer:
     def display_fps(self, fps):
         """在屏幕右上角显示实时帧率"""
         fps_text = self.small_font.render(f'FPS: {fps:.1f}', True, (200, 200, 255))
-        # 显示在右上角，摄像头图像的右侧
-        fps_x = self.screen.get_width() - 120  # 右边距20，宽度100
-        fps_y = 20
-        self.screen.blit(fps_text, (fps_x, fps_y))
 
+        # 确保FPS显示在摄像头图像之上，不会被遮挡
+        fps_x = self.screen.get_width() - 150  # 调整位置，确保不被摄像头图像覆盖
+        fps_y = 10  # 放在最顶部
+
+        # 添加背景框以提高可读性
+        text_rect = fps_text.get_rect()
+        background_rect = pygame.Rect(fps_x - 5, fps_y - 2, text_rect.width + 10, text_rect.height + 4)
+        pygame.draw.rect(self.screen, (0, 0, 0, 180), background_rect, border_radius=3)
+
+        self.screen.blit(fps_text, (fps_x, fps_y))
     def draw_camera(self, image_array):
         """绘制摄像头图像（兼容旧代码）"""
         # 将图像存储起来供display_camera使用
