@@ -116,7 +116,7 @@ class BirdsEyeView:
         # 鸟瞰图的四个角点
         output_points = np.array([
             [0, self.output_size[0]],  # 左下
-            [self.output_size[1], self.output_size[0]],  # 右下
+            [*self.output_size[::-1]],  # 右下 (w, h)
             [self.output_size[1], 0],  # 右上
             [0, 0]  # 左上
         ], dtype=np.float32)
@@ -179,15 +179,10 @@ class VehicleDetector:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         rects, weights = self.hog.detectMultiScale(gray, winStride=(4, 4),
                                                    padding=(8, 8), scale=1.05)
-        
-        bboxes = []
-        scores = []
-        for (x, y, w, h) in rects:
-            # 过滤掉太小的检测
-            if w > 50 and h > 50:
-                bboxes.append([x, y, x+w, y+h])
-                scores.append(1.0)  # HOG不返回置信度分数
-        
+
+        # 使用列表推导式简化过滤和转换
+        bboxes = [[x, y, x + w, y + h] for (x, y, w, h) in rects if w > 50 and h > 50]
+        scores = [1.0] * len(bboxes)  # HOG不返回置信度分数
         return np.array(bboxes), np.array(scores)
     
     def detect_yolo(self, image):

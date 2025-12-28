@@ -1,6 +1,25 @@
 """
 AirSimNH 无人机项目配置文件
 所有可调参数集中在此管理
+
+配置结构说明：
+1. 物体检测配置：PERCEPTION['{COLOR}_OBJECT_DETECTION']
+   - 使用 get_object_detection_config(color_type) 函数获取
+   - 或直接访问 PERCEPTION['RED_OBJECT_DETECTION'] 等
+
+2. 物体探索配置：INTELLIGENT_DECISION['{COLOR}_OBJECT_EXPLORATION']
+   - 使用 get_object_exploration_config(color_type) 函数获取
+   - 或直接访问 INTELLIGENT_DECISION['RED_OBJECT_EXPLORATION'] 等
+
+3. 颜色范围配置：CAMERA['{COLOR}_COLOR_RANGE']
+   - 使用 get_color_range_config(color_type) 函数获取
+   - 或直接访问 CAMERA['RED_COLOR_RANGE'] 等
+
+扩展新颜色类型：
+  1. 在 PERCEPTION 中添加 '{COLOR}_OBJECT_DETECTION' 配置
+  2. 在 INTELLIGENT_DECISION 中添加 '{COLOR}_OBJECT_EXPLORATION' 配置
+  3. 在 CAMERA 中添加 '{COLOR}_COLOR_RANGE' 配置
+  4. 使用提供的辅助函数 create_object_detection_config() 和 create_object_exploration_config()
 """
 
 import math
@@ -34,6 +53,23 @@ PERCEPTION = {
         'OPENNESS_THRESHOLD': 0.7,  # 开阔度阈值，大于此值认为开阔
     },
 
+    # ========== 物体检测配置说明 ==========
+    # 所有颜色类型的物体检测配置使用统一结构，包含以下字段：
+    #   - ENABLED: 是否启用检测 (bool)
+    #   - MIN_AREA: 最小检测面积（像素）(int)
+    #   - MAX_AREA: 最大检测面积（像素）(int)
+    #   - UPDATE_INTERVAL: 检测更新间隔（秒）(float)
+    #   - MEMORY_TIME: 物体记忆时间（秒）(float)
+    #
+    # 扩展新颜色类型时，可以参考以下模板或使用 create_object_detection_config() 函数
+    '_OBJECT_DETECTION_TEMPLATE': {
+        'ENABLED': True,  # 启用物体检测
+        'MIN_AREA': 50,  # 最小检测面积（像素）
+        'MAX_AREA': 10000,  # 最大检测面积（像素）
+        'UPDATE_INTERVAL': 1.0,  # 检测更新间隔（秒）
+        'MEMORY_TIME': 5.0,  # 物体记忆时间（秒），避免重复计数
+    },
+    
     # 红色物体检测参数
     'RED_OBJECT_DETECTION': {
         'ENABLED': True,  # 启用红色物体检测
@@ -43,7 +79,7 @@ PERCEPTION = {
         'MEMORY_TIME': 5.0,  # 物体记忆时间（秒），避免重复计数
     },
 
-    # 蓝色物体检测参数（新增）
+    # 蓝色物体检测参数
     'BLUE_OBJECT_DETECTION': {
         'ENABLED': True,  # 启用蓝色物体检测
         'MIN_AREA': 50,  # 最小检测面积（像素）
@@ -52,7 +88,7 @@ PERCEPTION = {
         'MEMORY_TIME': 5.0,  # 物体记忆时间（秒）
     },
 
-    # 黑色物体检测参数（新增）
+    # 黑色物体检测参数
     'BLACK_OBJECT_DETECTION': {
         'ENABLED': True,  # 启用黑色物体检测
         'MIN_AREA': 50,  # 最小检测面积（像素）
@@ -97,7 +133,22 @@ INTELLIGENT_DECISION = {
     'TARGET_LIFETIME': 15.0,  # 目标有效期 (秒)
     'TARGET_REACHED_DISTANCE': 3.0,  # 目标到达判定距离 (米)
 
-    # 红色物体探索参数
+    # ========== 物体探索配置说明 ==========
+    # 所有颜色类型的物体探索配置使用统一结构，包含以下字段：
+    #   - ATTRACTION_GAIN: 物体吸引力增益 (float)
+    #   - DETECTION_RADIUS: 检测半径（米）(float)
+    #   - MIN_DISTANCE: 最小接近距离（米）(float)
+    #   - EXPLORATION_BONUS: 探索奖励分数 (float)
+    #
+    # 扩展新颜色类型时，可以参考以下模板或使用 create_object_exploration_config() 函数
+    '_OBJECT_EXPLORATION_TEMPLATE': {
+        'ATTRACTION_GAIN': 1.0,  # 物体吸引力增益
+        'DETECTION_RADIUS': 8.0,  # 检测半径（米）
+        'MIN_DISTANCE': 2.0,  # 最小接近距离（米）
+        'EXPLORATION_BONUS': 0.2,  # 探索奖励分数
+    },
+    
+    # 红色物体探索参数（优先级最高）
     'RED_OBJECT_EXPLORATION': {
         'ATTRACTION_GAIN': 1.5,  # 红色物体吸引力增益
         'DETECTION_RADIUS': 10.0,  # 检测半径（米）
@@ -105,7 +156,7 @@ INTELLIGENT_DECISION = {
         'EXPLORATION_BONUS': 0.5,  # 探索奖励分数
     },
 
-    # 蓝色物体探索参数（新增）
+    # 蓝色物体探索参数
     'BLUE_OBJECT_EXPLORATION': {
         'ATTRACTION_GAIN': 1.2,  # 蓝色物体吸引力增益
         'DETECTION_RADIUS': 8.0,  # 检测半径（米）
@@ -113,7 +164,7 @@ INTELLIGENT_DECISION = {
         'EXPLORATION_BONUS': 0.3,  # 探索奖励分数
     },
 
-    # 黑色物体探索参数（新增）
+    # 黑色物体探索参数
     'BLACK_OBJECT_EXPLORATION': {
         'ATTRACTION_GAIN': 1.0,  # 黑色物体吸引力增益
         'DETECTION_RADIUS': 8.0,  # 检测半径（米）
@@ -169,6 +220,12 @@ DISPLAY = {
         'SHOW_OBJECTS_STATS': True,  # 显示物体统计
         'SHOW_SYSTEM_STATS': True,  # 显示系统统计
         'SHOW_PERFORMANCE': True,  # 显示性能信息
+        'SHOW_TRAJECTORY': True,  # 显示运动轨迹图
+        'TRAJECTORY_SIZE': 280,  # 轨迹图显示大小（像素）
+        'TRAJECTORY_MAX_POINTS': 1000,  # 轨迹最大记录点数
+        'TRAJECTORY_LINE_COLOR': (0, 255, 255),  # 轨迹线颜色（青色）
+        'TRAJECTORY_CURRENT_COLOR': (0, 255, 0),  # 当前位置颜色（绿色）
+        'TRAJECTORY_START_COLOR': (255, 255, 0),  # 起始位置颜色（黄色）
     }
 }
 
@@ -261,3 +318,141 @@ PERFORMANCE = {
     # 内存优化参数
     'MAX_METRICS_BUFFER': 500,            # 最大性能指标缓冲区大小（个），减少内存占用
 }
+
+# ==================== 配置辅助函数 ====================
+def get_object_detection_config(color_type: str) -> dict:
+    """
+    获取指定颜色类型的物体检测配置
+    
+    Args:
+        color_type: 颜色类型 ('red', 'blue', 'black')
+    
+    Returns:
+        dict: 物体检测配置字典
+    
+    Example:
+        config = get_object_detection_config('red')
+        # 返回 PERCEPTION['RED_OBJECT_DETECTION']
+    """
+    config_key = f'{color_type.upper()}_OBJECT_DETECTION'
+    if config_key not in PERCEPTION:
+        raise ValueError(f"不支持的颜色类型: {color_type}，支持的类型: ['red', 'blue', 'black']")
+    return PERCEPTION[config_key]
+
+
+def get_object_exploration_config(color_type: str) -> dict:
+    """
+    获取指定颜色类型的物体探索配置
+    
+    Args:
+        color_type: 颜色类型 ('red', 'blue', 'black')
+    
+    Returns:
+        dict: 物体探索配置字典
+    
+    Example:
+        config = get_object_exploration_config('blue')
+        # 返回 INTELLIGENT_DECISION['BLUE_OBJECT_EXPLORATION']
+    """
+    config_key = f'{color_type.upper()}_OBJECT_EXPLORATION'
+    if config_key not in INTELLIGENT_DECISION:
+        raise ValueError(f"不支持的颜色类型: {color_type}，支持的类型: ['red', 'blue', 'black']")
+    return INTELLIGENT_DECISION[config_key]
+
+
+def get_color_range_config(color_type: str) -> dict:
+    """
+    获取指定颜色类型的颜色范围配置
+    
+    Args:
+        color_type: 颜色类型 ('red', 'blue', 'black')
+    
+    Returns:
+        dict: 颜色范围配置字典
+    
+    Example:
+        config = get_color_range_config('red')
+        # 返回 CAMERA['RED_COLOR_RANGE']
+    """
+    config_key = f'{color_type.upper()}_COLOR_RANGE'
+    if config_key not in CAMERA:
+        raise ValueError(f"不支持的颜色类型: {color_type}，支持的类型: ['red', 'blue', 'black']")
+    return CAMERA[config_key]
+
+
+def get_all_color_types() -> list:
+    """
+    获取所有支持的颜色类型列表
+    
+    Returns:
+        list: 支持的颜色类型列表 ['red', 'blue', 'black']
+    """
+    return ['red', 'blue', 'black']
+
+
+def create_object_detection_config(enabled: bool = True, min_area: int = 50, 
+                                   max_area: int = 10000, update_interval: float = 1.0,
+                                   memory_time: float = 5.0) -> dict:
+    """
+    创建新的物体检测配置（用于扩展新颜色类型）
+    
+    Args:
+        enabled: 是否启用检测
+        min_area: 最小检测面积（像素）
+        max_area: 最大检测面积（像素）
+        update_interval: 检测更新间隔（秒）
+        memory_time: 物体记忆时间（秒）
+    
+    Returns:
+        dict: 新的物体检测配置字典
+    
+    Example:
+        # 添加黄色物体检测配置
+        PERCEPTION['YELLOW_OBJECT_DETECTION'] = create_object_detection_config(
+            enabled=True,
+            min_area=50,
+            max_area=10000,
+            update_interval=1.0,
+            memory_time=5.0
+        )
+    """
+    return {
+        'ENABLED': enabled,
+        'MIN_AREA': min_area,
+        'MAX_AREA': max_area,
+        'UPDATE_INTERVAL': update_interval,
+        'MEMORY_TIME': memory_time,
+    }
+
+
+def create_object_exploration_config(attraction_gain: float = 1.0,
+                                     detection_radius: float = 8.0,
+                                     min_distance: float = 2.0,
+                                     exploration_bonus: float = 0.2) -> dict:
+    """
+    创建新的物体探索配置（用于扩展新颜色类型）
+    
+    Args:
+        attraction_gain: 吸引力增益
+        detection_radius: 检测半径（米）
+        min_distance: 最小接近距离（米）
+        exploration_bonus: 探索奖励分数
+    
+    Returns:
+        dict: 新的物体探索配置字典
+    
+    Example:
+        # 添加黄色物体探索配置
+        INTELLIGENT_DECISION['YELLOW_OBJECT_EXPLORATION'] = create_object_exploration_config(
+            attraction_gain=1.3,
+            detection_radius=9.0,
+            min_distance=2.0,
+            exploration_bonus=0.4
+        )
+    """
+    return {
+        'ATTRACTION_GAIN': attraction_gain,
+        'DETECTION_RADIUS': detection_radius,
+        'MIN_DISTANCE': min_distance,
+        'EXPLORATION_BONUS': exploration_bonus,
+    }
