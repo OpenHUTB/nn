@@ -49,8 +49,7 @@ class AirSimNHCarSimulator:
         """初始化日志文件"""
         try:
             self.log_file = open(f"{self.data_dir}/simulation_log.txt", "w")
-            self.log_file.write(f"AirSimNH仿真日志 - 开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            self.log_file.write("=" * 50 + "\n")
+
         except Exception as e:
             print(f"无法创建日志文件: {e}")
             self.log_file = None
@@ -264,8 +263,7 @@ class AirSimNHCarSimulator:
 
             # 限制历史记录长度
             if len(self.path_history) > 1000:
-                # 改为删除前100个元素，提高效率
-                del self.path_history[:100]
+
 
 
             state_info = {
@@ -499,9 +497,6 @@ class AirSimNHCarSimulator:
                 current_yaw = state['yaw']
                 collision_detected = state['collision']
 
-                # 记录偏移历史 - 确保每次循环都记录
-                absolute_offset = self.calculate_lateral_offset(current_position)
-                offset_history.append(absolute_offset)
 
                 # 1. 碰撞恢复处理（最高优先级）
                 if self.collision_recovery_mode:
@@ -530,6 +525,7 @@ class AirSimNHCarSimulator:
                         continue
 
                 # 4. 正常行驶防碰撞控制
+
                 if absolute_offset > max_right_offset:
                     max_right_offset = absolute_offset
 
