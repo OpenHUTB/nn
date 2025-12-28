@@ -7,6 +7,7 @@ import queue
 import random
 
 # ======================== 核心配置（车道硬约束+细障碍物检测+红绿灯）========================
+# ======================== 核心配置（车道硬约束+细障碍物检测）========================
 TARGET_SPEED_KMH = 10.0  # 更低速，确保车道纠偏反应时间
 TARGET_SPEED_MPS = TARGET_SPEED_KMH / 3.6
 SYNC_FPS = 20
@@ -49,6 +50,9 @@ class SimplePID:
 
 
 # ======================== 车道边界+细障碍物+红绿灯检测 =========================
+
+
+# ======================== 车道边界检测+细障碍物识别 =========================
 class LaneBoundaryDetector:
     def __init__(self, world, vehicle):
         self.world = world
@@ -192,6 +196,7 @@ class LaneBoundaryDetector:
             speed = math.hypot(self.vehicle.get_velocity().x, self.vehicle.get_velocity().y) * 3.6
 
             # 原有状态显示
+            # 叠加车道偏离+障碍物检测状态
             cv2.putText(frame, f"Speed: {speed:.1f}km/h", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
             cv2.putText(frame, f"Lane Deviation: {self.lane_deviation:.2f}m", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                         (0, 0, 255) if self.is_near_lane_edge else (0, 255, 0), 2)
@@ -213,6 +218,7 @@ class LaneBoundaryDetector:
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
 
             cv2.imshow("Lane & Obstacle & Traffic Light Detection", frame)
+            cv2.imshow("Lane & Obstacle Detection", frame)
             cv2.waitKey(1)
         except:
             pass
@@ -333,6 +339,9 @@ def spawn_vehicle_safely(world, bp):
 
 
 # ======================== 核心逻辑（红绿灯 > 车道硬约束 > 障碍物避障）========================
+
+
+# ======================== 核心逻辑（车道硬约束+障碍物避障）========================
 def main():
     # 1. 连接Carla
     client = carla.Client('127.0.0.1', 2000)
@@ -370,6 +379,7 @@ def main():
         return
 
     # 5. 第三人称视角（清晰看车道+障碍物+红绿灯）
+    # 5. 第三人称视角（清晰看车道+障碍物）
     spectator = world.get_spectator()
 
     def third_person_view():
@@ -387,6 +397,9 @@ def main():
     # 7. 核心行驶循环（新增红绿灯逻辑）
     print("\n🚗 开始测试：红绿灯规则 > 车道硬约束 > 路边障碍物避障")
     print("核心规则：红灯停，黄灯减速，绿灯行；严格贴车道中心，1米内避开障碍物")
+    # 7. 核心行驶循环
+    print("\n🚗 开始测试：车道硬约束 + 路边障碍物避障")
+    print("核心规则：严格贴车道中心，1米内避开障碍物，零碰撞")
     print("按Ctrl+C停止\n")
     try:
         while True:
@@ -458,11 +471,49 @@ def main():
             current_steer = np.clip(current_steer, -0.7, 0.7)
 
             # 下发车辆控制指令
+            # 1. 检测车道边界（优先级最高）
+            detector.check_lane_boundary()
+
+            # 2. 速度控制
+            current_speed = math.hypot(vehicle.get_velocity().x, vehicle.get_velocity().y)
+            throttle, brake = pid.update(current_speed)
+
+            # 3. 转向逻辑：车道硬约束 > 1米紧急避障 > 预警避障
+            target_steer = 0.0
+            if detector.is_near_lane_edge:
+                # 靠近车道边缘：强制拉回中心
+                print(f"🔴 靠近车道边缘！偏离{detector.lane_deviation:.2f}米 | 强制拉回中心", end='\r')
+                target_steer = detector.lane_steer_correction
+                throttle *= 0.1  # 降速纠偏
+            elif detector.obs_distance < OBSTACLE_EMERGENCY_DIST:
+                # 1米内障碍物：紧急避障+车道约束
+                print(f"⚠️ 紧急避障：距离障碍物{detector.obs_distance:.2f}米 | 贴车道绕开", end='\r')
+                brake = 1.0
+                throttle = 0.0
+                # 避障+车道纠偏：既绕开又不越线
+                target_steer = (-detector.obs_direction * 0.6) + detector.lane_steer_correction
+            elif detector.has_obstacle:
+                # 预警避障：贴车道绕行
+                print(f"🔶 预警避障：距离障碍物{detector.obs_distance:.2f}米 | 顺车道绕开", end='\r')
+                throttle *= 0.2
+                target_steer = (-detector.obs_direction * 0.3) + detector.lane_steer_correction
+            else:
+                # 正常行驶：严格贴车道中心
+                print(f"✅ 正常行驶：车道偏离{detector.lane_deviation:.2f}米 | 速度{current_speed * 3.6:.1f}km/h",
+                      end='\r')
+                target_steer = detector.lane_steer_correction
+
+            # 转向平滑+硬限制
+            current_steer += (target_steer - current_steer) * 0.25
+            current_steer = np.clip(current_steer, -0.7, 0.7)
+
+            # 下发控制
             vehicle.apply_control(carla.VehicleControl(
                 throttle=throttle, steer=current_steer, brake=brake, hand_brake=False
             ))
 
             # 可视化显示（含红绿灯状态）
+            # 可视化
             detector.draw_status()
 
     except KeyboardInterrupt:
