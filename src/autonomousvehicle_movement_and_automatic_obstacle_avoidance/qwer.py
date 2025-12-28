@@ -1,346 +1,582 @@
-import mujoco
-import glfw
-import numpy as np
-import csv
-import os
-from datetime import datetime
-import imageio
-from typing import List
-
-# -------------------------- 全局配置 --------------------------
-TIME_STEP = 0.01
-MAX_STEPS = 2000
-NSTEP = 5
-
-# 激光雷达参数
-LIDAR_MOUNT_POS = np.array([0.5, 0, 0.2])
-LIDAR_MAX_DISTANCE = 8.0
-LIDAR_NUM_RAYS = 360
-
-# 无人车参数 (恢复到合理数值)
-MAX_STEER_ANGLE = 0.4     # 合理的转向角度
-MAX_DRIVE_TORQUE = 8.0    # 合理的驱动力矩
-SAFE_SPEED = 1.0          # 合理的直行速度
-AVOID_SPEED = 0.5         # 合理的避让速度
-OBSTACLE_THRESHOLD = 4.0
-AVOID_STEER_ANGLE = 0.3   # 合理的避让转向角度
-TORQUE_GAIN = 4.0         # 合理的加速响应
-
-# 执行器索引
-DRIVE_ACTUATOR_IDS = [0, 1]
-STEER_ACTUATOR_IDS = [2, 3]
-
-# -------------------------- MuJoCo XML 场景定义 --------------------------
-SCENE_XML = """
-<mujoco model="autonomous_vehicle">
-  <compiler angle="degree" coordinate="local" inertiafromgeom="true"/>
-  <visual>
-    <global offwidth="1280" offheight="720"/>
-  </visual>
-
-  <actuator>
-    <motor name="left_drive" joint="left_drive" gear="50" ctrllimited="true" ctrlrange="-10 10"/>
-    <motor name="right_drive" joint="right_drive" gear="50" ctrllimited="true" ctrlrange="-10 10"/>
-    <motor name="left_steer" joint="left_steer" gear="1" ctrllimited="true" ctrlrange="-28.6 28.6"/>
-    <motor name="right_steer" joint="right_steer" gear="1" ctrllimited="true" ctrlrange="-28.6 28.6"/>
-  </actuator>
-
-  <worldbody>
-    <geom name="ground" type="plane" size="20 20 0.1" rgba="0.8 0.8 0.8 1" friction="0.8"/>
-
-    <body name="vehicle" pos="0 0 0.3">
-      <joint name="vehicle_free" type="free"/>
-      <geom name="body" type="box" size="0.6 0.3 0.2" rgba="0.2 0.6 0.8 1" mass="2.0"/>
-
-      <body name="left_front_wheel" pos="0.4 -0.3 0.1">
-        <joint name="left_steer" type="hinge" axis="0 1 0" damping="0.5"/>
-        <geom name="lf_wheel" type="cylinder" size="0.1 0.1" rgba="0.1 0.1 0.1 1" mass="0.2" friction="0.8"/>
-      </body>
-
-      <body name="right_front_wheel" pos="0.4 0.3 0.1">
-        <joint name="right_steer" type="hinge" axis="0 1 0" damping="0.5"/>
-        <geom name="rf_wheel" type="cylinder" size="0.1 0.1" rgba="0.1 0.1 0.1 1" mass="0.2" friction="0.8"/>
-      </body>
-
-      <body name="left_rear_wheel" pos="-0.4 -0.3 0.1">
-        <joint name="left_drive" type="hinge" axis="0 1 0" damping="0.5"/>
-        <geom name="lr_wheel" type="cylinder" size="0.1 0.1" rgba="0.1 0.1 0.1 1" mass="0.2" friction="0.8"/>
-      </body>
-
-      <body name="right_rear_wheel" pos="-0.4 0.3 0.1">
-        <joint name="right_drive" type="hinge" axis="0 1 0" damping="0.5"/>
-        <geom name="rr_wheel" type="cylinder" size="0.1 0.1" rgba="0.1 0.1 0.1 1" mass="0.2" friction="0.8"/>
-      </body>
-    </body>
-
-    <!-- 障碍物 -->
-    <geom name="obstacle1" type="box" pos="7 0.5 0.3" size="0.4 0.4 0.3" rgba="0.8 0.2 0.2 1" mass="10" contype="1" conaffinity="1"/>
-    <geom name="obstacle2" type="cylinder" pos="10 -0.6 0.2" size="0.3 0.2" rgba="0.8 0.4 0.2 1" mass="10" contype="1" conaffinity="1"/>
-    <site name="target" pos="15 0 0.5" size="0.1" rgba="0 1 0 1"/>
-  </worldbody>
-</mujoco>
+"""
+无人小车自主行驶与避让模拟
+基于MuJoCo和Python实现
+运行环境：PyCharm + MuJoCo
 """
 
-
-# -------------------------- 激光雷达传感器 --------------------------
-class LidarSensor:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData):
-        self.model = model
-        self.data = data
-        self.angles = np.linspace(0, 2 * np.pi, LIDAR_NUM_RAYS, endpoint=False)
-        self.geomgroup = np.zeros(6, dtype=np.uint8)
-        self.geomgroup[0] = 1  # 只检测第0组的geom
-
-    def rotate_vector(self, vec: np.ndarray, quat: np.ndarray) -> np.ndarray:
-        qx, qy, qz, qw = quat
-        rot_mat = np.array([
-            [1 - 2 * qy ** 2 - 2 * qz ** 2, 2 * qx * qy - 2 * qz * qw, 2 * qx * qz + 2 * qy * qw],
-            [2 * qx * qy + 2 * qz * qw, 1 - 2 * qx ** 2 - 2 * qz ** 2, 2 * qy * qz - 2 * qx * qw],
-            [2 * qx * qz - 2 * qy * qw, 2 * qy * qz + 2 * qx * qw, 1 - 2 * qx ** 2 - 2 * qy ** 2]
-        ])
-        return np.dot(rot_mat, vec)
-
-    def get_distance_data(self) -> List[float]:
-        distances = [LIDAR_MAX_DISTANCE] * LIDAR_NUM_RAYS
-        vehicle_pos = self.data.qpos[:3]
-        vehicle_quat = self.data.qpos[3:7]
-
-        for i, angle in enumerate(self.angles):
-            local_dir = np.array([np.cos(angle), np.sin(angle), 0.0], dtype=np.float64)
-            local_dir = local_dir / np.linalg.norm(local_dir)
-            world_dir = self.rotate_vector(local_dir, vehicle_quat)
-            world_dir = world_dir / np.linalg.norm(world_dir)
-
-            ray_start = vehicle_pos + self.rotate_vector(LIDAR_MOUNT_POS, vehicle_quat)
-            ray_start = ray_start.astype(np.float64)
-
-            # 匹配mj_ray参数格式
-            pnt = ray_start.reshape(3, 1)
-            vec = world_dir.reshape(3, 1)
-            geomid = np.zeros(1, dtype=np.int32)
-
-            detected_dist = mujoco.mj_ray(
-                self.model, self.data,
-                pnt=pnt,
-                vec=vec,
-                geomgroup=self.geomgroup,
-                flg_static=1,
-                bodyexclude=0,
-                geomid=geomid
-            )
-
-            if geomid[0] != -1 and detected_dist <= LIDAR_MAX_DISTANCE:
-                distances[i] = detected_dist
-
-        return distances
+import mujoco
+import mujoco.viewer
+import numpy as np
+import glfw
+import time
+import math
+import os
 
 
-# -------------------------- 可视化类 --------------------------
-class Visualizer:
-    def __init__(self, model: mujoco.MjModel, data: mujoco.MjData):
-        self.model = model
-        self.data = data
-        if not glfw.init():
-            raise RuntimeError("Failed to initialize GLFW")
-        self.window = glfw.create_window(1280, 720, "Autonomous Vehicle Simulation", None, None)
-        if not self.window:
-            glfw.terminate()
-            raise RuntimeError("Failed to create GLFW window")
-        glfw.make_context_current(self.window)
-        glfw.swap_interval(1)
+class AutonomousCar:
+    def __init__(self, model_path=None):
+        """初始化无人小车模拟器"""
+        # 如果没有提供模型文件，使 用 内置的XML模型
+        if model_path is None:
+            self.xml = """
+            <mujoco>
+                <option timestep="0.01" gravity="0 0 -9.81"/>
 
-        self.cam = mujoco.MjvCamera()
-        self.opt = mujoco.MjvOption()
-        mujoco.mjv_defaultCamera(self.cam)
-        mujoco.mjv_defaultOption(self.opt)
-        self.scene = mujoco.MjvScene(self.model, maxgeom=10000)
-        self.context = mujoco.MjrContext(self.model, mujoco.mjtFontScale.mjFONTSCALE_150)
+                <asset>
+                    <material name="grid" rgba=".2 .3 .4 1"/>
+                    <material name="car_body" rgba="0.2 0.6 0.8 1"/>
+                    <material name="car_detail" rgba="0.8 0.6 0.2 1"/>
+                    <material name="wheel" rgba="0.1 0.1 0.1 1"/>
+                    <material name="rim" rgba="0.9 0.9 0.9 1"/>
+                    <material name="obstacle" rgba="0.8 0.2 0.2 1"/>
+                    <material name="target" rgba="0.2 0.8 0.2 1"/>
+                    <material name="floor" rgba="0.9 0.9 0.9 1"/>
+                </asset>
 
-        self.cam.distance = 10.0
-        self.cam.azimuth = -45.0
-        self.cam.elevation = -30.0
-        self.cam.lookat = [5.0, 0.0, 0.5]
+                <worldbody>
+                    <!-- 地面 -->
+                    <geom name="floor" type="plane" size="10 10 0.1" material="floor" pos="0 0 -0.1"/>
 
-    def render(self):
-        if glfw.window_should_close(self.window):
-            return True  # 返回True表示窗口应关闭
-        mujoco.mjv_updateScene(self.model, self.data, self.opt, None, self.cam, mujoco.mjtCatBit.mjCAT_ALL, self.scene)
-        viewport = mujoco.MjrRect(0, 0, 1280, 720)
-        mujoco.mjr_render(viewport, self.scene, self.context)
-        glfw.swap_buffers(self.window)
-        glfw.poll_events()
-        return False  # 返回False表示窗口继续运行
+                    <!-- 无人小车 -->
+                    <body name="car" pos="0 0 0.3">
+                        <joint name="car_rot" type="free"/>
+                        <!-- 车身主体 -->
+                        <geom name="car_body_main" type="box" size="0.3 0.6 0.15" material="car_body" pos="0 0 0"/>
+                        <geom name="car_front" type="box" size="0.25 0.15 0.1" pos="0 0.5 0" material="car_detail"/>
+                        <geom name="car_back" type="box" size="0.25 0.15 0.1" pos="0 -0.5 0" material="car_detail"/>
+                        <geom name="car_top" type="box" size="0.28 0.58 0.05" pos="0 0 0.15" material="car_body"/>
 
-    def close(self):
-        glfw.destroy_window(self.window)
-        glfw.terminate()
+                        <!-- 车轮组件 -->
+                        <body name="front_left_wheel" pos="0.25 0.4 0">
+                            <joint name="front_left_steer" type="hinge" axis="0 0 1" range="-30 30"/>
+                            <joint name="front_left_roll" type="hinge" axis="0 1 0"/>
+                            <geom name="wheel_fl_rim" type="cylinder" size="0.09 0.06" material="rim" pos="0 0 -0.01"/>
+                            <geom name="wheel_fl_tire" type="cylinder" size="0.1 0.05" material="wheel" pos="0 0 0.01"/>
+                        </body>
 
-    def should_close(self):
-        return glfw.window_should_close(self.window)
+                        <body name="front_right_wheel" pos="-0.25 0.4 0">
+                            <joint name="front_right_steer" type="hinge" axis="0 0 1" range="-30 30"/>
+                            <joint name="front_right_roll" type="hinge" axis="0 1 0"/>
+                            <geom name="wheel_fr_rim" type="cylinder" size="0.09 0.06" material="rim" pos="0 0 -0.01"/>
+                            <geom name="wheel_fr_tire" type="cylinder" size="0.1 0.05" material="wheel" pos="0 0 0.01"/>
+                        </body>
 
+                        <body name="rear_left_wheel" pos="0.25 -0.4 0">
+                            <joint name="rear_left_roll" type="hinge" axis="0 1 0"/>
+                            <geom name="wheel_rl_rim" type="cylinder" size="0.09 0.06" material="rim" pos="0 0 -0.01"/>
+                            <geom name="wheel_rl_tire" type="cylinder" size="0.1 0.05" material="wheel" pos="0 0 0.01"/>
+                        </body>
 
-# -------------------------- 数据记录类 --------------------------
-class DataLogger:
-    def __init__(self):
-        self.log_dir = "logs"
-        os.makedirs(self.log_dir, exist_ok=True)
-        self.log_path = os.path.join(self.log_dir, f"sim_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-        self.fields = ['step', 'time', 'x', 'y', 'speed', 'steer', 'torque', 'collision']
-        with open(self.log_path, 'w', newline='') as f:
-            csv.writer(f).writerow(self.fields)
+                        <body name="rear_right_wheel" pos="-0.25 -0.4 0">
+                            <joint name="rear_right_roll" type="hinge" axis="0 1 0"/>
+                            <geom name="wheel_rr_rim" type="cylinder" size="0.09 0.06" material="rim" pos="0 0 -0.01"/>
+                            <geom name="wheel_rr_tire" type="cylinder" size="0.1 0.05" material="wheel" pos="0 0 0.01"/>
+                        </body>
 
-    def log(self, step, time, x, y, speed, steer, torque, collision):
-        with open(self.log_path, 'a', newline='') as f:
-            csv.writer(f).writerow(
-                [step, round(time, 3), round(x, 3), round(y, 3), round(speed, 3), round(steer, 3), round(torque, 3),
-                 1 if collision else 0])
+                        <!-- 传感器位置 -->
+                        <site name="front_sensor" pos="0 0.7 0.1" size="0.05"/>
+                        <site name="left_sensor" pos="0.4 0 0.1" size="0.05"/>
+                        <site name="right_sensor" pos="-0.4 0 0.1" size="0.05"/>
+                    </body>
 
+                    <!-- 目标点 -->
+                    <body name="target" pos="8 0 0.5">
+                        <geom name="target_geom" type="sphere" size="0.3" material="target"/>
+                        <site name="target_site" pos="0 0 0" size="0.1"/>
+                    </body>
 
-# -------------------------- 控制策略类 --------------------------
-class RulePolicy:
-    def __init__(self):
-        self.front_rays = slice(350, 360)
-        self.front_ext = slice(0, 10)
-        self.left_rays = slice(270, 350)
-        self.right_rays = slice(10, 90)
+                    <!-- 障碍物 - 更加立体逼真的设计 -->
+                    <body name="obstacle1" pos="3 2 0.5">
+                        <geom name="obs1" type="cylinder" size="0.4 1.0" material="obstacle" euler="0 0 0"/>
+                        <geom name="obs1_top" type="sphere" size="0.4" material="obstacle" pos="0 0 1.0"/>
+                    </body>
 
-    def get_speed(self, vel):
-        return np.linalg.norm(vel[:2])
+                    <body name="obstacle2" pos="5 -1.5 0.5">
+                        <geom name="obs2_base" type="box" size="0.7 0.4 0.8" material="obstacle"/>
+                        <geom name="obs2_top" type="box" size="0.5 0.2 0.3" pos="0 0 0.8" material="obstacle"/>
+                    </body>
 
-    def decide(self, lidar_data, vel):
-        lidar = np.array(lidar_data)
-        current_speed = self.get_speed(vel)
+                    <body name="obstacle3" pos="2 -2 0.5">
+                        <geom name="obs3" type="ellipsoid" size="0.6 0.4 0.5" material="obstacle"/>
+                    </body>
 
-        front_dist = np.min(np.concatenate([lidar[self.front_rays], lidar[self.front_ext]]))
-        left_dist = np.min(lidar[self.left_rays])
-        right_dist = np.min(lidar[self.right_rays])
+                    <body name="obstacle4" pos="6 2 0.5">
+                        <geom name="obs4" type="capsule" size="0.3 1.0" material="obstacle" euler="1.57 0 0"/>
+                    </body>
 
-        if front_dist >= OBSTACLE_THRESHOLD:
-            steer = 0.0
-            target_speed = SAFE_SPEED
+                    <!-- 灯光 -->
+                    <light name="top" pos="0 0 10" dir="0 0 -1" diffuse="1 1 1"/>
+                    <light name="car_light" pos="0 0 2" dir="0 0 -1" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2"/>
+
+                    <!-- 相机视角 -->
+                    <camera name="fixed" pos="12 0 4" xyaxes="1 0 0 0 0.7 0.7"/>
+                    <camera name="follow" mode="targetbody" target="car" pos="0 -8 4"/>
+                </worldbody>
+
+                <actuator>
+                    <!-- 驱动电机 -->
+                    <motor name="front_left_drive" joint="front_left_roll" gear="50"/>
+                    <motor name="front_right_drive" joint="front_right_roll" gear="50"/>
+                    <motor name="rear_left_drive" joint="rear_left_roll" gear="50"/>
+                    <motor name="rear_right_drive" joint="rear_right_roll" gear="50"/>
+
+                    <!-- 转向电机 -->
+                    <position name="front_left_steer" joint="front_left_steer" kp="100"/>
+                    <position name="front_right_steer" joint="front_right_steer" kp="100"/>
+                </actuator>
+
+                <sensor>
+                    <!-- 位置传感器 -->
+                    <framepos objtype="body" objname="car"/>
+                    <framepos objtype="body" objname="target"/>
+                </sensor>
+            </mujoco>
+            """
+
+            # 保存XML到临时文件
+            self.temp_xml_path = "temp_car_model.xml"
+            with open(self.temp_xml_path, 'w') as f:
+                f.write(self.xml)
+
+            try:
+                self.model = mujoco.MjModel.from_xml_path(self.temp_xml_path)
+            except Exception as e:
+                print(f"XML解析错误: {e}")
+                # 尝试简化版本
+                self.create_simple_model()
         else:
-            steer = AVOID_STEER_ANGLE if left_dist > right_dist else -AVOID_STEER_ANGLE
-            target_speed = AVOID_SPEED
+            self.model = mujoco.MjModel.from_xml_path(model_path)
 
-        torque = TORQUE_GAIN * (target_speed - current_speed)
-        torque = np.clip(torque, -MAX_DRIVE_TORQUE, MAX_DRIVE_TORQUE)
-        return steer, torque
-
-
-# -------------------------- 仿真环境类 --------------------------
-class VehicleEnv:
-    def __init__(self):
-        self.model = mujoco.MjModel.from_xml_string(SCENE_XML)
         self.data = mujoco.MjData(self.model)
-        self.lidar = LidarSensor(self.model, self.data)
-        self.vis = Visualizer(self.model, self.data)
-        self.logger = DataLogger()
-        self.policy = RulePolicy()
 
-        # 初始化帧缓存用于GIF录制
-        self.frames = []
-        self.frame_count = 0
-        self.max_frames = 1000  # 最大录制帧数，防止内存溢出
+        # 控制参数
+        self.target_speed = 6.0  # 目标速度
+        self.max_steering_angle = 0.5  # 最大转向角度（弧度）
+        self.avoidance_distance = 2.5  # 避障检测距离
+        self.avoidance_strength = 2.5  # 避障强度
 
-    def reset(self):
-        mujoco.mj_resetData(self.model, self.data)
-        return self.get_state()
+        # 状态变量
+        self.current_speed = 0.0
+        self.steering_angle = 0.0
+        self.obstacle_detected = False
+        self.simulation_time = 0.0
+        self.target_reached = False
+        self.path_history = []  # 路径历史
 
-    def get_state(self):
-        return {
-            'pos': self.data.qpos[:3],
-            'vel': self.data.qvel[:3],
-            'lidar': self.lidar.get_distance_data(),
-            'collision': self.data.ncon > 0
+        # PID控制器参数
+        self.speed_Kp = 4.0
+        self.speed_Ki = 0.1
+        self.speed_Kd = 0.3
+        self.speed_integral = 0.0
+        self.speed_prev_error = 0.0
+
+        self.steering_Kp = 6.0
+        self.steering_Ki = 0.05
+        self.steering_Kd = 0.2
+        self.steering_integral = 0.0
+        self.steering_prev_error = 0.0
+
+    def create_simple_model(self):
+        """创建简化模型（如果完整模型有问题）"""
+        print("使用简化模型...")
+        simple_xml = """
+        <mujoco>
+            <option timestep="0.01" gravity="0 0 -9.81"/>
+
+            <worldbody>
+                <!-- 地面 -->
+                <geom name="floor" type="plane" size="10 10 0.1" pos="0 0 -0.1" rgba="0.9 0.9 0.9 1"/>
+
+                <!-- 无人小车 -->
+                <body name="car" pos="0 0 0.3">
+                    <joint name="car_rot" type="free"/>
+                    <geom name="car_body" type="box" size="0.3 0.5 0.2" rgba="0.2 0.6 0.8 1"/>
+
+                    <!-- 轮子 -->
+                    <geom name="wheel_fl" type="cylinder" size="0.08 0.05" pos="0.25 0.4 0" rgba="0.1 0.1 0.1 1"/>
+                    <geom name="wheel_fr" type="cylinder" size="0.08 0.05" pos="-0.25 0.4 0" rgba="0.1 0.1 0.1 1"/>
+                    <geom name="wheel_rl" type="cylinder" size="0.08 0.05" pos="0.25 -0.4 0" rgba="0.1 0.1 0.1 1"/>
+                    <geom name="wheel_rr" type="cylinder" size="0.08 0.05" pos="-0.25 -0.4 0" rgba="0.1 0.1 0.1 1"/>
+                </body>
+
+                <!-- 目标点 -->
+                <geom name="target" type="sphere" size="0.3" pos="8 0 0.5" rgba="0.2 0.8 0.2 1"/>
+
+                <!-- 障碍物 -->
+                <geom name="obstacle1" type="cylinder" size="0.4 0.8" pos="3 2 0.5" rgba="0.8 0.2 0.2 1"/>
+                <geom name="obstacle2" type="box" size="0.6 0.3 0.8" pos="5 -1.5 0.5" rgba="0.8 0.2 0.2 1"/>
+                <geom name="obstacle3" type="sphere" size="0.5" pos="2 -2 0.5" rgba="0.8 0.2 0.2 1"/>
+            </worldbody>
+
+            <actuator>
+                <motor name="drive" joint="car_rot" ctrlrange="-10 10" gear="100"/>
+            </actuator>
+        </mujoco>
+        """
+
+        with open(self.temp_xml_path, 'w') as f:
+            f.write(simple_xml)
+
+        self.model = mujoco.MjModel.from_xml_path(self.temp_xml_path)
+
+    def __del__(self):
+        """清理临时文件"""
+        if hasattr(self, 'temp_xml_path') and os.path.exists(self.temp_xml_path):
+            try:
+                os.remove(self.temp_xml_path)
+            except:
+                pass
+
+    def get_sensor_readings(self):
+        """获取传感器读数"""
+        readings = {
+            'front_distance': 10.0,
+            'left_distance': 10.0,
+            'right_distance': 10.0,
+            'front_obstacle': False,
+            'left_obstacle': False,
+            'right_obstacle': False
         }
 
-    def step(self, steer, torque):
-        for idx in STEER_ACTUATOR_IDS:
-            self.data.ctrl[idx] = np.clip(steer, -MAX_STEER_ANGLE, MAX_STEER_ANGLE)
-        for idx in DRIVE_ACTUATOR_IDS:
-            self.data.ctrl[idx] = torque
+        # 获取小车位置和方向
+        car_pos = self.data.body('car').xpos
+        car_orientation = self.data.body('car').xmat.reshape(3, 3)
+        car_forward = car_orientation @ np.array([0, 1, 0])  # 小车前进方向
+        car_left = car_orientation @ np.array([1, 0, 0])  # 小车左侧方向
 
-        mujoco.mj_step(self.model, self.data, nstep=NSTEP)
-        return self.get_state()
+        # 检查所有障碍物
+        obstacle_positions = [
+            np.array([3, 2, 0.5]),  # obstacle1
+            np.array([5, -1.5, 0.5]),  # obstacle2
+            np.array([2, -2, 0.5]),  # obstacle3
+            np.array([6, 2, 0.5])  # obstacle4
+        ]
 
-    def run(self):
-        state = self.reset()
-        print("Starting simulation (Press ESC to close and save GIF)...")
-        print("=" * 50)
+        obstacle_sizes = [
+            1.2,  # obstacle1 半径+高度
+            1.4,  # obstacle2 尺寸
+            1.0,  # obstacle3 直径
+            1.3  # obstacle4 半径+高度
+        ]
 
-        step = 0
+        for i, obs_pos in enumerate(obstacle_positions):
+            # 计算障碍物到小车的向量
+            obs_vector = obs_pos - car_pos
+            distance = np.linalg.norm(obs_vector[:2])  # 只考虑平面距离
+
+            if distance < self.avoidance_distance + obstacle_sizes[i]:
+                # 计算障碍物相对于小车的方向
+                obs_direction = obs_vector[:2] / distance if distance > 0 else np.array([0, 0])
+
+                # 计算与前进方向的夹角
+                forward_2d = car_forward[:2]
+                angle = math.atan2(
+                    obs_direction[1] * forward_2d[0] - obs_direction[0] * forward_2d[1],
+                    obs_direction[0] * forward_2d[0] + obs_direction[1] * forward_2d[1]
+                )
+
+                angle_deg = math.degrees(angle)
+
+                # 更新传感器读数
+                if -45 < angle_deg < 45:  # 前方
+                    readings['front_distance'] = min(readings['front_distance'], distance)
+                    if distance < 2.0:
+                        readings['front_obstacle'] = True
+
+                elif 45 <= angle_deg < 135:  # 左侧
+                    readings['left_distance'] = min(readings['left_distance'], distance)
+                    if distance < 1.5:
+                        readings['left_obstacle'] = True
+
+                elif -135 < angle_deg <= -45:  # 右侧
+                    readings['right_distance'] = min(readings['right_distance'], distance)
+                    if distance < 1.5:
+                        readings['right_obstacle'] = True
+
+        return readings
+
+    def autonomous_driving(self, dt):
+        """自主驾驶算法"""
+        if dt <= 0:
+            dt = 0.01
+
+        # 获取传感器数据
+        sensor_data = self.get_sensor_readings()
+
+        # 获取目标位置
+        target_pos = np.array([8, 0, 0.5])
+        car_pos = self.data.body('car').xpos
+
+        # 计算到目标的距离和方向
+        target_vector = target_pos - car_pos
+        target_distance = np.linalg.norm(target_vector[:2])
+
+        # 检查是否到达目标
+        if target_distance < 0.5:
+            self.target_reached = True
+            return np.zeros(self.model.nu)
+
+        # 计算目标方向（归一化）
+        if target_distance > 0:
+            target_direction = target_vector[:2] / target_distance
+        else:
+            target_direction = np.array([0, 1])
+
+        # 获取小车当前方向
+        car_orientation = self.data.body('car').xmat.reshape(3, 3)
+        car_direction = car_orientation @ np.array([0, 1, 0])  # 前进方向
+        car_direction_2d = car_direction[:2]
+
+        if np.linalg.norm(car_direction_2d) > 0:
+            car_direction_2d = car_direction_2d / np.linalg.norm(car_direction_2d)
+
+        # 计算转向误差
+        steering_error = math.atan2(
+            target_direction[1] * car_direction_2d[0] - target_direction[0] * car_direction_2d[1],
+            target_direction[0] * car_direction_2d[0] + target_direction[1] * car_direction_2d[1]
+        )
+
+        # 避障逻辑
+        avoidance_steering = 0.0
+        self.obstacle_detected = False
+
+        if sensor_data['front_obstacle']:
+            self.obstacle_detected = True
+            # 前方有障碍物，根据两侧距离决定转向
+            if sensor_data['left_distance'] > sensor_data['right_distance']:
+                avoidance_steering = 0.5  # 向左转
+            else:
+                avoidance_steering = -0.5  # 向右转
+
+        elif sensor_data['left_obstacle']:
+            avoidance_steering = -0.3  # 向右轻微转向
+
+        elif sensor_data['right_obstacle']:
+            avoidance_steering = 0.3  # 向左轻微转向
+
+        # 合并转向控制
+        total_steering = steering_error + avoidance_steering
+
+        # 限制转向角度
+        total_steering = np.clip(total_steering, -self.max_steering_angle, self.max_steering_angle)
+
+        # 速度控制：根据障碍物距离调整速度
+        min_distance = min(sensor_data['front_distance'],
+                           sensor_data['left_distance'],
+                           sensor_data['right_distance'])
+
+        if min_distance < 1.0:
+            speed_multiplier = 0.3
+        elif min_distance < 2.0:
+            speed_multiplier = 0.6
+        else:
+            speed_multiplier = 1.0
+
+        target_speed_adjusted = self.target_speed * speed_multiplier
+
+        # 简单的速度控制
+        if self.current_speed < target_speed_adjusted:
+            self.current_speed += 0.5 * dt
+        elif self.current_speed > target_speed_adjusted:
+            self.current_speed -= 0.5 * dt
+
+        self.current_speed = np.clip(self.current_speed, 0, self.target_speed)
+
+        # 记录路径
+        self.path_history.append(car_pos.copy())
+        if len(self.path_history) > 1000:
+            self.path_history.pop(0)
+
+        # 生成控制信号
+        control = np.zeros(self.model.nu)
+
+        if hasattr(self.model, 'nu') and self.model.nu >= 6:
+            # 完整模型的控制
+            control[0] = self.current_speed  # 前左驱动
+            control[1] = self.current_speed  # 前右驱动
+            control[2] = self.current_speed  # 后左驱动
+            control[3] = self.current_speed  # 后右驱动
+            control[4] = total_steering  # 前左转向
+            control[5] = total_steering  # 前右转向
+        else:
+            # 简化模型的控制
+            control[0] = self.current_speed
+            if len(control) > 1:
+                control[1] = total_steering
+
+        return control
+
+    def print_status(self):
+        """打印状态信息"""
+        car_pos = self.data.body('car').xpos
+        target_pos = np.array([8, 0, 0.5])
+        distance = np.linalg.norm(target_pos[:2] - car_pos[:2])
+
+        print(f"\r时间: {self.simulation_time:.1f}s | "
+              f"位置: ({car_pos[0]:.1f}, {car_pos[1]:.1f}) | "
+              f"速度: {self.current_speed:.1f}m/s | "
+              f"转向: {math.degrees(self.steering_angle):.0f}° | "
+              f"距目标: {distance:.1f}m | "
+              f"状态: {'避障' if self.obstacle_detected else '导航'} {'到达!' if self.target_reached else ''}",
+              end="")
+
+    def run_simulation(self):
+        """运行模拟主循环"""
+        print("无人小车模拟系统启动中...")
+        print("=" * 80)
+        print("控制说明:")
+        print("  - 按ESC键退出模拟")
+        print("  - 模拟会自动运行直到按下ESC或到达目标")
+        print("  - 绿色球体是目标点")
+        print("  - 红色物体是障碍物")
+        print("  - 小车会自动导航并避开障碍物")
+        print("=" * 80)
+
+        # 设置模拟选项
+        self.model.opt.gravity[2] = -9.81
+
+        # 重置模拟
+        mujoco.mj_resetData(self.model, self.data)
+
+        # 启动查看器
         try:
-            while not self.vis.should_close():  # 持续运行直到ESC被按下
-                # 1. 决策：根据激光雷达和速度生成控制指令
-                steer, torque = self.policy.decide(state['lidar'], state['vel'])
-                # 2. 执行动作：更新车辆状态
-                state = self.step(steer, torque)
-                # 3. 记录日志（每10步记录一次，减少日志文件大小）
-                if step % 10 == 0:
-                    self.logger.log(step, step * TIME_STEP, state['pos'][0], state['pos'][1],
-                                    self.policy.get_speed(state['vel']), steer, torque, state['collision'])
-                # 4. 渲染画面
-                if self.vis.render():
-                    break  # 如果渲染返回True，表示窗口应关闭
+            viewer = mujoco.viewer.launch_passive(self.model, self.data)
+        except Exception as e:
+            print(f"查看器启动失败: {e}")
+            print("将以无界面模式运行模拟...")
+            viewer = None
 
-                # -------------------------- 录制当前帧（控制录制频率） --------------------------
-                self.frame_count += 1
-                if self.frame_count % 5 == 0 and len(self.frames) < self.max_frames:  # 每5步录制一帧
-                    try:
-                        width, height = glfw.get_framebuffer_size(self.vis.window)
-                        if width > 0 and height > 0:
-                            buffer = np.zeros((height, width, 3), dtype=np.uint8)
-                            # 创建正确的 MjrRect 对象
-                            viewport = mujoco.MjrRect(0, 0, width, height)
-                            mujoco.mjr_readPixels(buffer, None, viewport, self.vis.context)
-                            buffer = np.flipud(buffer)
-                            self.frames.append(buffer)
-                    except Exception as e:
-                        print(f"Frame recording error: {e}")
-                # -------------------------------------------------------------------
+        last_time = time.time()
+        frame_count = 0
+        start_time = time.time()
 
-                # 打印进度（每100步）
-                if step % 100 == 0:
-                    print(
-                        f"Step: {step:4d} | Speed: {self.policy.get_speed(state['vel']):.2f}m/s | Collision: {state['collision']}")
-
-                step += 1
-
-                # 防止无限循环的安全机制
-                if step >= 10000:
-                    print("Reached maximum steps limit (10000), stopping simulation...")
+        try:
+            while True:
+                if viewer is not None and not viewer.is_running():
                     break
 
+                # 计算时间步长
+                current_time = time.time()
+                dt = current_time - last_time
+                last_time = current_time
+                self.simulation_time += dt
+
+                # 限制时间步长
+                if dt > 0.1:
+                    dt = 0.01
+
+                # 应用自主驾驶控制
+                control = self.autonomous_driving(dt)
+                self.data.ctrl[:] = control
+
+                # 执行物理模拟
+                mujoco.mj_step(self.model, self.data)
+
+                # 更新查看器
+                if viewer is not None:
+                    viewer.sync()
+
+                # 更新状态显示
+                frame_count += 1
+                if frame_count % 10 == 0:
+                    self.print_status()
+
+                # 检查是否到达目标
+                if self.target_reached:
+                    print(f"\n\n{'=' * 80}")
+                    print("成功到达目标点！")
+                    print(f"总时间: {self.simulation_time:.1f}秒")
+                    print(f"平均速度: {np.mean([v for v in self.path_history if len(v) > 0]):.1f}m/s")
+                    print(f"{'=' * 80}")
+                    time.sleep(2)
+                    break
+
+                # 检查ESC键 - 修复后的代码
+                if viewer is not None:
+                    try:
+                        # MuJoCo新版本使用不同的API来访问窗口句柄
+                        if hasattr(viewer, 'context'):
+                            # 检查查看器是否仍在运行
+                            if not viewer.is_running():
+                                break
+                        else:
+                            # 检查查看器是否仍在运行
+                            if not viewer.is_running():
+                                break
+                    except:
+                        # 如果任何API检查失败，检查查看器是否仍在运行
+                        if viewer is not None and not viewer.is_running():
+                            break
+
+                # 控制帧率
+                time.sleep(0.001)
+
+        except KeyboardInterrupt:
+            print("\n\n用户中断模拟...")
+
         finally:
-            # -------------------------- 结束录制并保存 --------------------------
-            try:
-                if self.frames:
-                    print(f"\nRecording completed. Saving GIF with {len(self.frames)} frames...")
-                    # 使用适中的 duration 值来保证合理的播放速度
-                    imageio.v3.imwrite('autonomous_vehicle_simulation.gif', self.frames, duration=200, loop=0)
-                    print("GIF animation saved to: autonomous_vehicle_simulation.gif")
-                else:
-                    print("No frame data available for GIF")
-            except Exception as e:
-                print(f"GIF saving failed: {e}")
-            # -------------------------------------------------------------------
+            if viewer is not None:
+                viewer.close()
 
-            # 关闭可视化窗口
-            self.vis.close()
-            # 打印保存路径
-            print(f"Log saved to: {self.logger.log_path}")
-            print(f"Total simulation steps: {step}")
+            # 显示模拟统计
+            print(f"\n\n{'=' * 80}")
+            print("模拟统计:")
+            print(f"  总模拟时间: {self.simulation_time:.1f}秒")
+            print(f"  总帧数: {frame_count}")
+            print(f"  平均帧率: {frame_count / (time.time() - start_time):.1f} FPS")
+            print(f"  路径点数: {len(self.path_history)}")
+            print(f"{'=' * 80}")
 
 
-# -------------------------- 主函数 --------------------------
-if __name__ == "__main__":
+def main():
+    """主函数"""
+    print("正在初始化无人小车模拟系统...")
+    print("=" * 80)
+
     try:
-        env = VehicleEnv()
-        env.run()
+        # 检查必要的库
+        import importlib
+        required_libs = ['mujoco', 'numpy', 'glfw']
+        missing_libs = []
+
+        for lib in required_libs:
+            try:
+                importlib.import_module(lib)
+            except ImportError:
+                missing_libs.append(lib)
+
+        if missing_libs:
+            print(f"缺少必要的库: {missing_libs}")
+            print("请使用以下命令安装:")
+            print("pip install mujoco glfw numpy")
+            return
+
+        # 创建无人小车实例
+        print("正在创建无人小车模型...")
+        car_sim = AutonomousCar()
+
+        print("模型创建成功！开始模拟...")
+        time.sleep(1)
+
+        # 运行模拟
+        car_sim.run_simulation()
+
     except Exception as e:
-        print(f"Error: {str(e)}")
-        try:
-            # 异常时也关闭录制器和窗口，避免文件损坏
-            env.vis.close()
-        except:
-            pass
+        print(f"\n模拟过程中发生错误: {e}")
+        import traceback
+        traceback.print_exc()
+
+        # 提供故障排除建议
+        print(f"\n{'=' * 80}")
+        print("故障排除建议:")
+        print("1. 确保已安装正确版本的MuJoCo:")
+        print("   pip install mujoco")
+        print("2. 如果使用简化模型，可能需要安装额外依赖:")
+        print("   pip install glfw")
+        print("3. 确保有足够的权限和磁盘空间")
+        print("4. 尝试重启PyCharm或系统")
+        print(f"{'=' * 80}")
+
+
+if __name__ == "__main__":
+    main()

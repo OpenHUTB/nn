@@ -13,17 +13,17 @@ from config import (
 from utils.dependencies import install_dependencies
 from core.detector import AccidentDetector
 
-# -------------------------- 新增1：日志初始化（替代print，更灵活） --------------------------
+# 在 main.py 的 init_logger 函数中添加一行（关闭日志传播，避免重复输出）
 def init_logger():
     logger = logging.getLogger("AccidentDetection")
     logger.setLevel(logging.INFO)
+    logger.propagate = False  # 新增：避免日志被父logger重复输出
     # 控制台输出格式：时间+日志级别+内容
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
     return logger
-
 # -------------------------- 新增2：优化命令行参数（更灵活的配置） --------------------------
 def parse_args(logger):
     parser = argparse.ArgumentParser(description="驾驶事故视频识别工具（支持动态配置）")

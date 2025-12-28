@@ -1,0 +1,52 @@
+<mujoco model="quadrotor">
+  <compiler angle="radian"/>
+
+  <option timestep="0.005"/>
+
+  <worldbody>
+    <geom name="ground" size="20 20 0.1" type="plane" rgba="0.8 0.9 0.8 1"/>
+    <body name="quadrotor" pos="0 0 1.5">
+      <joint name="quad_free_joint" type="free"/>
+      <geom name="center_body" size="0.1 0.02" type="cylinder" mass="0.3" rgba="0.3 0.3 0.3 1"/>
+      <geom name="arm1" size="0.008 0.176777" pos="0.125 0.125 0" quat="0.707107 0.5 -0.5 0" type="capsule" mass="0.05" rgba="0.1 0.1 0.1 1"/>
+      <geom name="arm2" size="0.008 0.176777" pos="0.125 -0.125 0" quat="0.707107 -0.5 -0.5 0" type="capsule" mass="0.05" rgba="0.1 0.1 0.1 1"/>
+      <geom name="arm3" size="0.008 0.176777" pos="-0.125 -0.125 0" quat="0.707107 -0.5 0.5 0" type="capsule" mass="0.05" rgba="0.1 0.1 0.1 1"/>
+      <geom name="arm4" size="0.008 0.176777" pos="-0.125 0.125 0" quat="0.707107 0.5 0.5 0" type="capsule" mass="0.05" rgba="0.1 0.1 0.1 1"/>
+      <body name="motor1" pos="0.25 0.25 0">
+        <geom name="motor1_geom" size="0.025 0.03" type="cylinder" mass="0.05" rgba="0.2 0.2 0.2 1"/>
+        <body name="rotor1" pos="0 0 0.05">
+          <joint name="rotor1_joint" pos="0 0 0" axis="0 0 1"/>
+          <geom name="propeller1" size="0.12 0.005" type="cylinder" mass="0.02" rgba="0.8 0.2 0.2 0.8"/>
+        </body>
+      </body>
+      <body name="motor2" pos="0.25 -0.25 0">
+        <geom name="motor2_geom" size="0.025 0.03" type="cylinder" mass="0.05" rgba="0.2 0.2 0.2 1"/>
+        <body name="rotor2" pos="0 0 0.05">
+          <joint name="rotor2_joint" pos="0 0 0" axis="0 0 1"/>
+          <geom name="propeller2" size="0.12 0.005" type="cylinder" mass="0.02" rgba="0.2 0.8 0.2 0.8"/>
+        </body>
+      </body>
+      <body name="motor3" pos="-0.25 -0.25 0">
+        <geom name="motor3_geom" size="0.025 0.03" type="cylinder" mass="0.05" rgba="0.2 0.2 0.2 1"/>
+        <body name="rotor3" pos="0 0 0.05">
+          <joint name="rotor3_joint" pos="0 0 0" axis="0 0 1"/>
+          <geom name="propeller3" size="0.12 0.005" type="cylinder" mass="0.02" rgba="0.8 0.2 0.2 0.8"/>
+        </body>
+      </body>
+      <body name="motor4" pos="-0.25 0.25 0">
+        <geom name="motor4_geom" size="0.025 0.03" type="cylinder" mass="0.05" rgba="0.2 0.2 0.2 1"/>
+        <body name="rotor4" pos="0 0 0.05">
+          <joint name="rotor4_joint" pos="0 0 0" axis="0 0 1"/>
+          <geom name="propeller4" size="0.12 0.005" type="cylinder" mass="0.02" rgba="0.2 0.8 0.2 0.8"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <general name="motor1_ctrl" joint="rotor1_joint" gear="50 0 0 0 0 0"/>
+    <general name="motor2_ctrl" joint="rotor2_joint" gear="50 0 0 0 0 0"/>
+    <general name="motor3_ctrl" joint="rotor3_joint" gear="50 0 0 0 0 0"/>
+    <general name="motor4_ctrl" joint="rotor4_joint" gear="50 0 0 0 0 0"/>
+  </actuator>
+</mujoco>

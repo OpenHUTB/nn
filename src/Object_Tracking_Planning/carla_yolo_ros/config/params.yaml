@@ -1,0 +1,3 @@
+carla_host: "127.0.0.1"
+carla_port: 2000
+yolo_confidence_threshold: 0.5

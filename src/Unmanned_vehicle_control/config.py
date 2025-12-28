@@ -1,5 +1,68 @@
 import numpy as np
 
+X_INIT_M = 210
+Y_INIT_M = 362
+A = 25
+LAPS = 1
+
+MAX_ACCELERATION_M_S_2 = 10
+MAX_BRAKING_M_S_2 = -4.1
+MAX_WHEEL_ANGLE_RAD = 70 / 180 * np.pi
+L = 2.875
+
+### MPC settings
+N = 5
+dt = 0.1
+MAX_CONTROL_WHEEL_ANGLE_RAD = 70 / 180 * np.pi
+MAX_CONTROL_ACCELERATION_M_S_2 = 10
+MAX_CONTROL_BRAKING_M_S_2 = -4.1
+PATH_TOLERANCE_M = 0.5
+V_REF = 5
+
+"""
+原始代码被注释掉：
+FINE_X_COEF = 10
+FINE_Y_COEF = 10
+FINE_STEER_COEF = 0
+FINE_ACC_COEF = 0
+FINE_STEER_DOT_COEF = 100
+FINE_ACC_DOT_COEF = 1
+FINE_V_COEF = 20
+FINE_THETA_COEF = 0
+FINE_LATERAL_COEF = 40
+"""
+
+FINE_X_COEF = 10
+FINE_Y_COEF = 10
+FINE_STEER_COEF = 0
+FINE_ACC_COEF = 0
+FINE_STEER_DOT_COEF = 100
+FINE_ACC_DOT_COEF = 1
+FINE_V_COEF = 20
+FINE_THETA_COEF = 0
+FINE_LATERAL_COEF = 40
+
+# 避障相关参数
+OBSTACLE_PENALTY_WEIGHT = 100.0
+OBSTACLE_SAFETY_DISTANCE = 3.0
+OBSTACLE_AVOIDANCE_ENABLED = True
+
+# 圆形轨迹参数
+CIRCLE_CENTER_X = X_INIT_M
+CIRCLE_CENTER_Y = Y_INIT_M
+CIRCLE_RADIUS = 50
+
+VISUALIZATION_CONFIG = {
+    'show_full_trajectory': False,
+    'show_perception_planning': True,
+    'show_frenet_frame': False,
+    'look_ahead_points': N,
+    'target_point_color': (255, 0, 0),
+    'trajectory_color': (0, 255, 0),
+    'obstacle_color': (255, 0, 0),
+    'safety_zone_color': (255, 165, 0),
+}
+"""
 X_INIT_M = 210 # Start X coordinate for vehicle
 Y_INIT_M = 362 # Start Y coordinate for vehicle
 A = 25 # Size of 8-trajectory
@@ -42,3 +105,4 @@ VISUALIZATION_CONFIG = {
     'target_point_color': (255, 0, 0),  # 目标点颜色 (R, G, B)
     'trajectory_color': (0, 255, 0),  # 轨迹线颜色
 }
+"""

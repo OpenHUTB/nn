@@ -1077,3 +1077,54 @@ RoadRunner 可以将场景导出到 CARLA 模拟器。有两个 CARLA 导出选�
 2.  运行示例 Python® 脚本。
 <img width="1149" height="592" alt="test-map" src="https://github.com/user-attachments/assets/4a891fa1-62d6-4421-970c-53a521b2e222" />
 
+# 使用ros进行桥接（封装）
+## 第一步：本指南完成ros封装操作的前置条件：
+1.**Ubuntu版本为20.04**
+
+2.**ros版本为ros1**
+
+3.**Carla版本为源码编译的0.9.13**
+
+  注意！预编译包安装的Carla通常完成不了完整导入整个地图（包括建筑和材质）到Carla中的功能，需要采用源码编译的方法为你的操作系统配置上Carla，用源码编译对于内存和磁盘空间的要求较高，通常需要内存大于或等于16G、空闲磁盘空间大约200G。
+  
+## 第二步：参考上面的“将roadrunner生成的的地图文件导入Carla”教程成功在Carla中完美再现你所建造的地图 ##
+
+## 第三步：编译 ROS Bridge ##
+
+首先，请按官方指南从源码编译 carla-ros-bridge。核心步骤包括：
+
+1.**创建工作空间并克隆 ros-bridge 仓库到 src 目录**
+
+2.**使用 rosdep install 命令安装所有依赖包**
+
+3.**使用 catkin_make 或 catkin build 命令编译工作空间**
+
+## 第四步：启动仿真：连接ROS与自定义地图 ##
+
+1.**终端1 - 启动CARLA服务端：** 在CARLA根目录下运行 ./CarlaUE4.sh 或使用 carla_server 可执行文件。确保服务器启动完成。
+
+2.**终端2 - 启动ROS桥接：** 
+
+首先，设置环境变量。最关键的一步是正确设置 PYTHONPATH，使其包含CARLA的PythonAPI路径（特别是.egg文件），桥接才能与CARLA通信。
+
+然后，使用 roslaunch 启动桥接。如需加载自定义地图，你有两种方法：
+
+*方法一（启动时指定）*：在启动命令中通过 town:='<你的地图名>' 参数直接指定。例如：
+
+>bash
+>
+>roslaunch carla_ros_bridge carla_ros_bridge.launch town:='Your_Custom_Map'
+
+*方法二（启动后切换）*：先启动桥接连接默认世界，然后通过调用ROS服务（如 /{service_name}）来动态切换到你的自定义地图。
+
+>特别注意：如果CARLA服务端和ROS桥接运行在不同的机器或容器（如本机Windows CARLA，虚拟机内ROS），必须在启动launch文件时额外指定主机IP参数，例如 host:=<主机IP地址>，而不能使用默认的 localhost。
+
+## 版本匹配与常见问题
+
+1.**版本一致性：** CARLA版本、.egg文件版本、carla-ros-bridge分支及ROS版本（Melodic/Noetic）必须互相兼容。
+
+2.**Python环境：** 编译和运行时，Python环境（尤其是Anaconda虚拟环境）可能导致ROS依赖（如rospkg）或CARLA模块导入失败，需仔细检查并安装缺失包。
+
+3.**地图名称：** 确保在ROS桥接中指定的地图名，与地图成功导入CARLA后，在CARLA内部使用的名称完全一致。
+
+# 至此，全部的用roadrunner来高自由度的自主构建地图并导入Carla运行及用ros桥接的全套指南已经结束，开始着手创建自己的地图吧！！！ #
