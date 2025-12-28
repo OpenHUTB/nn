@@ -6,7 +6,7 @@ import cv2
 import queue
 import random
 
-# ======================== 核心配置（车道硬约束+细障碍物检测）========================
+# ======================== 核心配置（车道硬约束+细障碍物检测+红绿灯）========================
 TARGET_SPEED_KMH = 10.0  # 更低速，确保车道纠偏反应时间
 TARGET_SPEED_MPS = TARGET_SPEED_KMH / 3.6
 SYNC_FPS = 20
@@ -20,6 +20,10 @@ DETECT_THRESHOLD = 2  # 仅需2个点（细障碍物点少）
 LANE_BOUNDARY_STRICT = 0.8  # 车道边界强制纠偏力度
 LANE_CENTER_BIAS = 0.1  # 轻微偏向车道中心
 MAX_LANE_DEVIATION = 0.5  # 最大允许偏离车道0.5米
+# 红绿灯配置
+TRAFFIC_LIGHT_RANGE = 20.0  # 检测20米内的交通信号灯
+YELLOW_LIGHT_SPEED_KMH = 5.0  # 黄灯时限速5km/h
+YELLOW_LIGHT_SPEED_MPS = YELLOW_LIGHT_SPEED_KMH / 3.6
 VISUALIZATION = True
 
 
@@ -44,7 +48,7 @@ class SimplePID:
         return np.clip(throttle, 0.0, 1.0), brake
 
 
-# ======================== 车道边界检测+细障碍物识别 =========================
+# ======================== 车道边界+细障碍物+红绿灯检测 =========================
 class LaneBoundaryDetector:
     def __init__(self, world, vehicle):
         self.world = world
@@ -59,6 +63,10 @@ class LaneBoundaryDetector:
         self.lane_deviation = 0.0  # 偏离车道中心线距离（米）
         self.lane_steer_correction = 0.0  # 车道纠偏转向
         self.is_near_lane_edge = False  # 是否靠近车道边缘
+        # 红绿灯状态（新增核心）
+        self.traffic_light = None  # 当前车辆需遵守的交通灯
+        self.traffic_light_state = carla.TrafficLightState.Unknown  # 红绿灯状态
+        self.traffic_light_distance = float('inf')  # 到红绿灯的距离
 
         self.frame_queue = queue.Queue(maxsize=1) if VISUALIZATION else None
 
@@ -142,6 +150,30 @@ class LaneBoundaryDetector:
             # 轻微偏离时，柔和纠偏
             self.lane_steer_correction = np.clip(self.lane_deviation / (lane_width / 2), -0.3, 0.3) + LANE_CENTER_BIAS
 
+    def check_traffic_light(self):
+        """新增：检测当前车辆需要遵守的交通信号灯及状态"""
+        # 获取车辆当前需遵守的交通灯（Carla原生API，自动匹配车道对应的信号灯）
+        self.traffic_light = self.vehicle.get_traffic_light()
+
+        if self.traffic_light is not None:
+            # 计算车辆到交通灯的直线距离
+            tl_loc = self.traffic_light.get_transform().location
+            vehicle_loc = self.vehicle.get_transform().location
+            self.traffic_light_distance = math.hypot(
+                tl_loc.x - vehicle_loc.x,
+                tl_loc.y - vehicle_loc.y
+            )
+
+            # 仅处理20米内的有效交通灯
+            if self.traffic_light_distance < TRAFFIC_LIGHT_RANGE:
+                self.traffic_light_state = self.traffic_light.state
+            else:
+                self.traffic_light_state = carla.TrafficLightState.Unknown
+        else:
+            # 无交通灯或不在路口
+            self.traffic_light_state = carla.TrafficLightState.Unknown
+            self.traffic_light_distance = float('inf')
+
     def _cam_callback(self, data):
         frame = np.frombuffer(data.raw_data, np.uint8).reshape(data.height, data.width, 4)[:, :, :3].copy()
         if not self.frame_queue.empty():
@@ -152,18 +184,35 @@ class LaneBoundaryDetector:
         self.frame_queue.put(frame, block=False)
 
     def draw_status(self):
+        """新增：可视化添加红绿灯状态显示"""
         if not VISUALIZATION:
             return
         try:
             frame = self.frame_queue.get(timeout=0.01)
             speed = math.hypot(self.vehicle.get_velocity().x, self.vehicle.get_velocity().y) * 3.6
-            # 叠加车道偏离+障碍物检测状态
+
+            # 原有状态显示
             cv2.putText(frame, f"Speed: {speed:.1f}km/h", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
             cv2.putText(frame, f"Lane Deviation: {self.lane_deviation:.2f}m", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                         (0, 0, 255) if self.is_near_lane_edge else (0, 255, 0), 2)
             cv2.putText(frame, f"Obs Dist: {self.obs_distance:.2f}m", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                         (255, 255, 0), 2)
-            cv2.imshow("Lane & Obstacle Detection", frame)
+
+            # 新增：红绿灯状态显示（不同颜色区分）
+            tl_color = (255, 255, 255)  # 默认白色（未知）
+            if self.traffic_light_state == carla.TrafficLightState.Red:
+                tl_color = (0, 0, 255)
+            elif self.traffic_light_state == carla.TrafficLightState.Yellow:
+                tl_color = (0, 255, 255)
+            elif self.traffic_light_state == carla.TrafficLightState.Green:
+                tl_color = (0, 255, 0)
+
+            cv2.putText(frame, f"Traffic Light: {self.traffic_light_state.name}", (10, 150),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, tl_color, 2)
+            cv2.putText(frame, f"TL Distance: {self.traffic_light_distance:.2f}m", (10, 190),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
+
+            cv2.imshow("Lane & Obstacle & Traffic Light Detection", frame)
             cv2.waitKey(1)
         except:
             pass
@@ -283,7 +332,7 @@ def spawn_vehicle_safely(world, bp):
     raise RuntimeError("❌ 所有生成点都有碰撞，无法生成车辆！")
 
 
-# ======================== 核心逻辑（车道硬约束+障碍物避障）========================
+# ======================== 核心逻辑（红绿灯 > 车道硬约束 > 障碍物避障）========================
 def main():
     # 1. 连接Carla
     client = carla.Client('127.0.0.1', 2000)
@@ -320,7 +369,7 @@ def main():
         vehicle.destroy()
         return
 
-    # 5. 第三人称视角（清晰看车道+障碍物）
+    # 5. 第三人称视角（清晰看车道+障碍物+红绿灯）
     spectator = world.get_spectator()
 
     def third_person_view():
@@ -335,57 +384,85 @@ def main():
     pid = SimplePID()
     current_steer = 0.0
 
-    # 7. 核心行驶循环
-    print("\n🚗 开始测试：车道硬约束 + 路边障碍物避障")
-    print("核心规则：严格贴车道中心，1米内避开障碍物，零碰撞")
+    # 7. 核心行驶循环（新增红绿灯逻辑）
+    print("\n🚗 开始测试：红绿灯规则 > 车道硬约束 > 路边障碍物避障")
+    print("核心规则：红灯停，黄灯减速，绿灯行；严格贴车道中心，1米内避开障碍物")
     print("按Ctrl+C停止\n")
     try:
         while True:
             world.tick()
             third_person_view()
 
-            # 1. 检测车道边界（优先级最高）
+            # 1. 检测车道边界 + 红绿灯（核心新增）
             detector.check_lane_boundary()
+            detector.check_traffic_light()
 
-            # 2. 速度控制
+            # 2. 速度控制（基础PID）
             current_speed = math.hypot(vehicle.get_velocity().x, vehicle.get_velocity().y)
-            throttle, brake = pid.update(current_speed)
+            base_throttle, base_brake = pid.update(current_speed)
 
-            # 3. 转向逻辑：车道硬约束 > 1米紧急避障 > 预警避障
+            # 3. 核心控制逻辑（优先级：红绿灯 > 车道边缘 > 紧急避障 > 预警避障）
             target_steer = 0.0
-            if detector.is_near_lane_edge:
-                # 靠近车道边缘：强制拉回中心
+            throttle = base_throttle
+            brake = base_brake
+
+            # 【最高优先级】红绿灯处理
+            if detector.traffic_light_state == carla.TrafficLightState.Red:
+                # 红灯：强制刹车停稳
+                print(f"🔴 红灯！距离{detector.traffic_light_distance:.2f}米 | 停车等待", end='\r')
+                brake = 1.0
+                throttle = 0.0
+                target_steer = 0.0  # 停车时保持方向
+
+            elif detector.traffic_light_state == carla.TrafficLightState.Yellow:
+                # 黄灯：减速到5km/h，同时遵守车道约束
+                print(f"🟡 黄灯！距离{detector.traffic_light_distance:.2f}米 | 减速慢行", end='\r')
+                yellow_error = YELLOW_LIGHT_SPEED_MPS - current_speed
+                if yellow_error > 0:
+                    throttle = np.clip(yellow_error * 0.5, 0.0, 0.3)
+                    brake = 0.0
+                else:
+                    throttle = 0.0
+                    brake = np.clip(-yellow_error * 0.5, 0.0, 0.3)
+                target_steer = detector.lane_steer_correction
+
+            # 【次优先级】车道边缘约束
+            elif detector.is_near_lane_edge:
                 print(f"🔴 靠近车道边缘！偏离{detector.lane_deviation:.2f}米 | 强制拉回中心", end='\r')
                 target_steer = detector.lane_steer_correction
                 throttle *= 0.1  # 降速纠偏
+
+            # 【次优先级】紧急避障
             elif detector.obs_distance < OBSTACLE_EMERGENCY_DIST:
-                # 1米内障碍物：紧急避障+车道约束
                 print(f"⚠️ 紧急避障：距离障碍物{detector.obs_distance:.2f}米 | 贴车道绕开", end='\r')
                 brake = 1.0
                 throttle = 0.0
-                # 避障+车道纠偏：既绕开又不越线
                 target_steer = (-detector.obs_direction * 0.6) + detector.lane_steer_correction
+
+            # 【次优先级】预警避障
             elif detector.has_obstacle:
-                # 预警避障：贴车道绕行
                 print(f"🔶 预警避障：距离障碍物{detector.obs_distance:.2f}米 | 顺车道绕开", end='\r')
                 throttle *= 0.2
                 target_steer = (-detector.obs_direction * 0.3) + detector.lane_steer_correction
+
+            # 【正常状态】绿灯/无红绿灯，严格贴车道中心
             else:
-                # 正常行驶：严格贴车道中心
-                print(f"✅ 正常行驶：车道偏离{detector.lane_deviation:.2f}米 | 速度{current_speed * 3.6:.1f}km/h",
-                      end='\r')
+                light_status = "🟢 绿灯" if detector.traffic_light_state == carla.TrafficLightState.Green else "🚦 无信号灯"
+                print(
+                    f"✅ 正常行驶：{light_status} | 车道偏离{detector.lane_deviation:.2f}米 | 速度{current_speed * 3.6:.1f}km/h",
+                    end='\r')
                 target_steer = detector.lane_steer_correction
 
-            # 转向平滑+硬限制
+            # 转向平滑+硬限制（防止急转弯）
             current_steer += (target_steer - current_steer) * 0.25
             current_steer = np.clip(current_steer, -0.7, 0.7)
 
-            # 下发控制
+            # 下发车辆控制指令
             vehicle.apply_control(carla.VehicleControl(
                 throttle=throttle, steer=current_steer, brake=brake, hand_brake=False
             ))
 
-            # 可视化
+            # 可视化显示（含红绿灯状态）
             detector.draw_status()
 
     except KeyboardInterrupt:
