@@ -4,14 +4,14 @@ import numpy as np
 import time
 import sys
 import os
-import logging  # 【优化1】引入logging模块
+import logging
 
-# 配置logging，使其输出到控制台并包含时间和日志级别
+# 配置logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 """
-Franka Panda 机械臂自动抓取仿真 v1.1
-基于MuJoCo实现的基础抓取控制器
+Franka Panda 机械臂自动抓取仿真 v1.2
+基于MuJoCo实现的基础抓取控制器，增加了场景随机化以测试鲁棒性
 """
 
 # ========== 路径适配 ==========
@@ -24,7 +24,6 @@ SCENE_PATH = os.path.join(os.path.dirname(__file__),
 # ========== 智能抓取控制器 ==========
 class PandaAutoGrab:
     """
-    【优化3】添加类级文档字符串
     Franka Panda 机械臂智能抓取控制器 (基于MuJoCo)
 
     该类实现了一个完整的、基于视觉的机械臂抓取和放置任务。
@@ -74,11 +73,23 @@ class PandaAutoGrab:
         except FileNotFoundError:
             logging.error(f"场景文件不存在，请检查路径: {SCENE_PATH}")
             sys.exit(1)
-        # 【优化2】增强错误处理，捕获MuJoCo特定的致命错误
         except mujoco.FatalError as e:
             logging.error(f"加载MJCF模型时发生致命错误: {e}")
             logging.error("请检查XML文件的语法和引用的资源（如mesh, texture）是否正确。")
             sys.exit(1)
+
+        # 【优化1】增加场景随机化
+        # 在立方体初始位置上添加一个小范围的随机偏移
+        cube_body_id = self.model.body("cube").id
+        # 注意：在新版 MuJoCo 中，使用 body_jntadr 来获取物体在 qpos 中的起始索引
+        # 由于 "cube" 是一个 free joint，它在 qpos 中有6个值 (x, y, z, qw, qx, qy, qz)
+        # 我们只修改前3个值来改变其位置
+        qpos_start_idx = self.model.body_jntadr[cube_body_id]
+        random_offset = np.array([np.random.uniform(-0.05, 0.05),
+                                  np.random.uniform(-0.05, 0.05),
+                                  0])
+        self.data.qpos[qpos_start_idx: qpos_start_idx + 3] += random_offset
+        logging.info(f"已为立方体添加随机初始位置偏移: {np.round(random_offset, 3)}")
 
         # 机械臂参数
         self.ee_body_id = self.model.body("hand").id
