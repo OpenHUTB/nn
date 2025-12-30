@@ -179,15 +179,10 @@ class VehicleDetector:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         rects, weights = self.hog.detectMultiScale(gray, winStride=(4, 4),
                                                    padding=(8, 8), scale=1.05)
-        
-        bboxes = []
-        scores = []
-        for (x, y, w, h) in rects:
-            # 过滤掉太小的检测
-            if w > 50 and h > 50:
-                bboxes.append([x, y, x+w, y+h])
-                scores.append(1.0)  # HOG不返回置信度分数
-        
+
+        # 使用列表推导式简化过滤和转换
+        bboxes = [[x, y, x + w, y + h] for (x, y, w, h) in rects if w > 50 and h > 50]
+        scores = [1.0] * len(bboxes)  # HOG不返回置信度分数
         return np.array(bboxes), np.array(scores)
     
     def detect_yolo(self, image):
@@ -383,20 +378,14 @@ def compute_vehicle_locations(bboxes, camera):
     """
     if len(bboxes) == 0:
         return np.array([])
-    
-    locations = []
-    for bbox in bboxes:
-        # 计算边界框底边中心点
-        x_center = (bbox[0] + bbox[2]) / 2
-        y_bottom = bbox[3]
-        
-        # 转换到车辆坐标系
-        pixel_coords = np.array([[x_center, y_bottom]])
-        vehicle_point = camera.pixel_to_world(pixel_coords)[0]
-        
-        locations.append(vehicle_point)
-    
-    return np.array(locations)
+
+    if len(bboxes) == 0:
+        return np.array([])
+
+    # 批量计算边界框底边中心点
+    centers = np.column_stack([(bboxes[:, 0] + bboxes[:, 2]) / 2, bboxes[:, 3]])
+    vehicle_points = camera.pixel_to_world(centers)
+    return vehicle_points
 
 def visualize_results(frame, camera, sensor_out, int_out=None):
     """

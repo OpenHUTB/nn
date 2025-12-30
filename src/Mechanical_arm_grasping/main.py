@@ -1,69 +1,74 @@
-# MuJoCo 3.4.0 SCARA型机械臂（末端反馈+目标跟随）演示
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（无传感器，零XML错误）
 import mujoco
 import mujoco.viewer
 import time
 import numpy as np
 
 
-def scara_robot_arm_demo():
-    # 1. 内置SCARA机械臂XML模型（工业常用构型）
-    scara_xml = """
-<mujoco model="SCARA Robot Arm">
+def robot_arm_auto_reset_demo():
+    # 纯MuJoCo 3.4.0原生语法，无任何高版本扩展标签
+    robot_xml = """
+<mujoco model="3-DOF Robot Arm with Auto Reset">
   <compiler angle="radian" inertiafromgeom="true"/>
   <option timestep="0.005" gravity="0 0 -9.81"/>
-  <visual/>
+  <visual>
+    <global azimuth="30" elevation="-25"/>  <!-- 清晰3D视角 -->
+  </visual>
   <asset>
     <material name="red" rgba="0.8 0.2 0.2 1"/>
-    <material name="darkblue" rgba="0.1 0.1 0.6 1"/>
+    <material name="yellow" rgba="0.8 0.7 0.2 1"/>
     <material name="gray" rgba="0.5 0.5 0.5 1"/>
+    <material name="blue" rgba="0.2 0.4 0.8 1"/>
     <material name="green" rgba="0.2 0.8 0.2 1"/>
-    <material name="yellow" rgba="0.8 0.8 0.2 1"/>
-    <material name="cyan" rgba="0.2 0.8 0.8 1"/>
   </asset>
+
+  <!-- 世界体定义 -->
   <worldbody>
-    <camera name="fixed_camera" pos="2.0 2.0 1.5" xyaxes="1 0 0 0 1 0"/>
-    <!-- 地面 -->
-    <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 -0.1" material="gray"/>
-    <!-- 动态目标点（青色小球） -->
-    <body name="moving_target" pos="0.8 0.6 0.3">
-      <geom name="target_geom" type="sphere" size="0.05" pos="0 0 0" material="cyan"/>
+    <!-- 固定监控相机 -->
+    <camera name="monitor_camera" pos="1.8 1.8 1.2" xyaxes="1 0 0 0 1 0"/>
+    <!-- 工作平台 -->
+    <geom name="workbench" type="plane" size="2 2 0.1" pos="0 0 -0.05" material="gray"/>
+    <!-- 待抓取目标：蓝色球体（易抓取，不易滚落） -->
+    <body name="target_ball" pos="0.9 0.6 0.0">
+      <geom name="target_geom" type="sphere" size="0.08" pos="0 0 0" material="blue"/>
       <joint name="target_joint" type="free"/>
     </body>
-    <!-- SCARA机械臂（工业构型：旋转1+旋转2+升降+旋转夹爪） -->
-    <body name="base" pos="0 0 0">
-      <geom name="base_geom" type="cylinder" size="0.25 0.15" pos="0 0 0" material="darkblue"/>
+    <!-- 目标放置区域：绿色圆形标记 -->
+    <geom name="place_area" type="cylinder" size="0.15 0.01" pos="-0.9 0.6 0.0" material="green"/>
+    <!-- 3自由度机械臂 -->
+    <body name="robot_base" pos="0 0 0.0">
+      <geom name="base_geom" type="cylinder" size="0.18 0.1" pos="0 0 0" material="yellow"/>
       <joint name="base_joint" type="free"/>
-      <!-- 关节1：水平旋转（绕Z轴，基座旋转） -->
-      <body name="joint1_link" pos="0 0 0.15">
-        <geom name="joint1_geom" type="cylinder" size="0.15 0.2" pos="0 0 0.1" material="darkblue"/>
-        <joint name="joint1" type="hinge" axis="0 0 1" pos="0 0 0" range="-3.14 3.14" damping="0.08"/>
-        <!-- 关节2：水平旋转（绕Z轴，大臂旋转） -->
-        <body name="joint2_link" pos="0.5 0 0.1">
-          <geom name="joint2_geom" type="cylinder" size="0.12 0.4" pos="0.2 0 0" material="darkblue"/>
-          <joint name="joint2" type="hinge" axis="0 0 1" pos="0 0 0" range="-2.0 2.0" damping="0.08"/>
-          <!-- 关节3：垂直升降（Z轴，小臂升降） -->
-          <body name="joint3_link" pos="0.4 0 0">
-            <geom name="joint3_geom" type="cylinder" size="0.1 0.3" pos="0 0 0.15" material="darkblue"/>
-            <joint name="joint3" type="slide" axis="0 0 1" pos="0 0 0" range="0 0.8" damping="0.08"/>
-            <!-- 关节4：夹爪旋转（绕Z轴，末端旋转） -->
-            <body name="joint4_link" pos="0 0 0.15">
-              <geom name="joint4_geom" type="box" size="0.1 0.1 0.1" pos="0 0 0" material="darkblue"/>
-              <joint name="joint4" type="hinge" axis="0 0 1" pos="0 0 0" range="-3.14 3.14" damping="0.05"/>
-              <!-- 末端夹爪 -->
-              <body name="gripper_base" pos="0 0 0">
-                <geom name="gripper_base_geom" type="box" size="0.1 0.1 0.1" pos="0 0 0" material="red"/>
-                <!-- 左夹爪 -->
-                <body name="left_gripper" pos="0 0.1 0">
-                  <geom name="left_gripper_geom" type="box" size="0.1 0.05 0.05" pos="0 0 0" material="red"/>
-                  <joint name="left_grip_joint" type="hinge" axis="0 0 1" pos="0 -0.1 0" range="-0.5 0" damping="0.05"/>
-                </body>
-                <!-- 右夹爪 -->
-                <body name="right_gripper" pos="0 -0.1 0">
-                  <geom name="right_gripper_geom" type="box" size="0.1 0.05 0.05" pos="0 0 0" material="red"/>
-                  <joint name="right_grip_joint" type="hinge" axis="0 0 1" pos="0 0.1 0" range="0 0.5" damping="0.05"/>
-                </body>
-                <!-- 末端位置标记（绿色小球，用于反馈） -->
-                <geom name="end_effector_marker" type="sphere" size="0.03" pos="0 0 -0.05" material="green"/>
+
+      <!-- 关节1：基座旋转（Z轴） -->
+      <body name="arm_1" pos="0 0 0.1">
+        <geom name="arm1_geom" type="cylinder" size="0.08 0.6" pos="0 0 0.3" material="yellow"/>
+        <joint name="joint1_rotate" type="hinge" axis="0 0 1" pos="0 0 0" range="-3.14 3.14" damping="0.03"/>
+
+        <!-- 关节2：大臂俯仰（Y轴） -->
+        <body name="arm_2" pos="0 0 0.6">
+          <geom name="arm2_geom" type="cylinder" size="0.07 0.5" pos="0 0 0.25" material="yellow"/>
+          <joint name="joint2_pitch" type="hinge" axis="0 1 0" pos="0 0 0" range="-1.5 1.5" damping="0.03"/>
+
+          <!-- 关节3：小臂伸缩（X轴） -->
+          <body name="arm_3" pos="0 0 0.5">
+            <geom name="arm3_geom" type="cylinder" size="0.06 0.4" pos="0.2 0 0" material="yellow"/>
+            <joint name="joint3_telescope" type="slide" axis="1 0 0" pos="0 0 0" range="0 0.4" damping="0.03"/>
+
+            <!-- 平行夹爪 -->
+            <body name="gripper_base" pos="0.4 0 0">
+              <geom name="gripper_base_geom" type="box" size="0.07 0.07 0.07" pos="0 0 0" material="red"/>
+
+              <!-- 左夹爪 -->
+              <body name="gripper_left" pos="0 0.07 0">
+                <geom name="gripper_left_geom" type="box" size="0.05 0.04 0.05" pos="0 0 0" material="red"/>
+                <joint name="gripper_left_joint" type="hinge" axis="0 0 1" pos="0 -0.07 0" range="-0.4 0" damping="0.02"/>
+              </body>
+
+              <!-- 右夹爪 -->
+              <body name="gripper_right" pos="0 -0.07 0">
+                <geom name="gripper_right_geom" type="box" size="0.05 0.04 0.05" pos="0 0 0" material="red"/>
+                <joint name="gripper_right_joint" type="hinge" axis="0 0 1" pos="0 0.07 0" range="0 0.4" damping="0.02"/>
               </body>
             </body>
           </body>
@@ -71,118 +76,172 @@ def scara_robot_arm_demo():
       </body>
     </body>
   </worldbody>
-  <!-- 执行器配置（高精度位置控制） -->
+
+  <!-- 执行器配置（MuJoCo 3.4.0 完全兼容） -->
   <actuator>
-    <position name="joint1_act" joint="joint1" kp="1500" kv="150"/>
-    <position name="joint2_act" joint="joint2" kp="1500" kv="150"/>
-    <position name="joint3_act" joint="joint3" kp="1500" kv="150"/>
-    <position name="joint4_act" joint="joint4" kp="1500" kv="150"/>
-    <position name="left_grip_act" joint="left_grip_joint" kp="800" kv="80"/>
-    <position name="right_grip_act" joint="right_grip_joint" kp="800" kv="80"/>
+    <!-- 关节位置控制（高精度） -->
+    <position name="joint1_act" joint="joint1_rotate" kp="1100" kv="100"/>
+    <position name="joint2_act" joint="joint2_pitch" kp="1100" kv="100"/>
+    <position name="joint3_act" joint="joint3_telescope" kp="1100" kv="100"/>
+
+    <!-- 夹爪速度控制（软接触，防损坏） -->
+    <velocity name="gripper_left_act" joint="gripper_left_joint" kv="40" ctrlrange="-0.3 0"/>
+    <velocity name="gripper_right_act" joint="gripper_right_joint" kv="40" ctrlrange="0 0.3"/>
   </actuator>
 </mujoco>
     """
 
-    # 2. 加载模型
+    # 加载模型（确保零XML错误）
     try:
-        model = mujoco.MjModel.from_xml_string(scara_xml)
+        model = mujoco.MjModel.from_xml_string(robot_xml)
         data = mujoco.MjData(model)
-        print("✅ SCARA机械臂模型加载成功，启动仿真...")
+        print("✅ 3自由度机械臂模型加载成功，启动仿真...")
     except Exception as e:
         print(f"❌ 模型加载失败：{e}")
         return
 
-    # 3. 获取执行器索引
-    joint1_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint1_act")
-    joint2_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint2_act")
-    joint3_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint3_act")
-    joint4_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint4_act")
-    left_grip_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "left_grip_act")
-    right_grip_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "right_grip_act")
+    # 获取执行器索引
+    joint_idxs = {
+        "joint1": mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint1_act"),
+        "joint2": mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint2_act"),
+        "joint3": mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "joint3_act")
+    }
+    left_grip_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "gripper_left_act")
+    right_grip_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, "gripper_right_act")
 
-    # 4. 获取末端执行器（绿色标记）的ID（用于位置反馈）
-    end_effector_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "end_effector_marker")
-    target_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "target_geom")
-
-    # 5. 控制函数（平滑控制+末端反馈）
-    def smooth_set_joint(joint_idx, target_val, duration, viewer):
-        start_val = data.ctrl[joint_idx]
+    # ---------------------- 模块化功能函数 ----------------------
+    def joint_move(joint_name, target_val, duration, viewer, step_desc):
+        """单关节精准移动"""
+        print(f"\n🔧 {step_desc}")
+        idx = joint_idxs[joint_name]
+        start_val = data.ctrl[idx]
         start_time = time.time()
+
         while (time.time() - start_time) < duration and viewer.is_running():
-            t = (time.time() - start_time) / duration
-            current_val = start_val + t * (target_val - start_val)
-            data.ctrl[joint_idx] = current_val
-            # 实时打印末端位置
-            print_end_effector_position(data, end_effector_id, target_id)
-            # 步进仿真
+            progress = (time.time() - start_time) / duration
+            current_val = start_val + progress * (target_val - start_val)
+            data.ctrl[idx] = current_val
+
+            print(f"\r{joint_name} 进度：{progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            mujoco.mj_step(model, data)
+            viewer.sync()
+            time.sleep(0.001)
+        print()  # 换行
+        return True
+
+    def gripper_close(viewer, desc="目标"):
+        """软接触闭合夹爪"""
+        print(f"\n🔧 闭合夹爪抓取{desc}")
+        grip_speed = -0.25
+        close_duration = 1.0
+        start_time = time.time()
+
+        while (time.time() - start_time) < close_duration and viewer.is_running():
+            progress = (time.time() - start_time) / close_duration
+            data.ctrl[left_grip_idx] = grip_speed
+            data.ctrl[right_grip_idx] = -grip_speed
+
+            print(f"\r夹爪闭合进度：{progress * 100:.1f}%", end="")
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
 
-    def smooth_set_gripper(target, duration, viewer):
-        start_left = data.ctrl[left_grip_idx]
-        start_right = data.ctrl[right_grip_idx]
-        target_right = -target
+        data.ctrl[left_grip_idx] = 0
+        data.ctrl[right_grip_idx] = 0
+        print(f"\n✅ {desc} 抓取完成，夹爪锁定")
+        return True
+
+    def gripper_open(viewer, desc="目标"):
+        """张开夹爪放置目标"""
+        print(f"\n🔧 张开夹爪放置{desc}")
+        open_duration = 0.8
         start_time = time.time()
-        while (time.time() - start_time) < duration and viewer.is_running():
-            t = (time.time() - start_time) / duration
-            data.ctrl[left_grip_idx] = start_left + t * (target - start_left)
-            data.ctrl[right_grip_idx] = start_right + t * (target_right - start_right)
-            print_end_effector_position(data, end_effector_id, target_id)
+
+        while (time.time() - start_time) < open_duration and viewer.is_running():
+            data.ctrl[left_grip_idx] = 0.25
+            data.ctrl[right_grip_idx] = -0.25
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
 
-    def print_end_effector_position(data, ee_id, tar_id):
-        # 获取末端和目标的位置
-        ee_pos = data.geom_xpos[ee_id]
-        tar_pos = data.geom_xpos[tar_id]
-        # 计算距离
-        distance = np.linalg.norm(ee_pos - tar_pos)
-        # 实时刷新打印（不换行）
-        print(
-            f"\r末端位置(X:{ee_pos[0]:.2f}, Y:{ee_pos[1]:.2f}, Z:{ee_pos[2]:.2f}) | 目标位置(X:{tar_pos[0]:.2f}, Y:{tar_pos[1]:.2f}, Z:{tar_pos[2]:.2f}) | 距离:{distance:.3f} m",
-            end="")
+        data.ctrl[left_grip_idx] = 0
+        data.ctrl[right_grip_idx] = 0
+        print(f"✅ {desc} 放置完成，夹爪复位")
+        return True
 
-    # 6. SCARA机械臂目标跟随流程
-    scara_steps = [
-        ("关节1旋转对准目标", joint1_idx, 0.785, 2.5),  # 45°旋转
-        ("关节2旋转调整姿态", joint2_idx, -0.523, 2.0),  # -30°旋转
-        ("关节3升降接近目标", joint3_idx, 0.3, 1.8),  # 下降接近目标
-        ("关节4旋转校准方向", joint4_idx, 1.047, 2.0),  # 60°旋转校准
-        ("夹紧夹爪模拟抓取", "gripper", -0.4, 1.2),  # 夹紧夹爪
-        ("关节3升降抬升目标", joint3_idx, 0.6, 1.8),  # 抬升
-        ("关节1反向旋转归位", joint1_idx, 0.0, 2.5),  # 归位旋转
-        ("关节2反向旋转归位", joint2_idx, 0.0, 2.0),  # 归位旋转
-        ("关节3下降放置目标", joint3_idx, 0.3, 1.8),  # 下降放置
-        ("放松夹爪完成操作", "gripper", 0.0, 1.2),  # 放松夹爪
-        ("关节3升降归位", joint3_idx, 0.0, 1.8),  # 最终归位
-        ("关节4旋转归位", joint4_idx, 0.0, 2.0),  # 最终归位
-    ]
+    def robot_auto_reset(viewer):
+        """机械臂自动复位到初始位置"""
+        print("\n\n🔧 开始机械臂自动复位")
+        # 步骤1：抬升大臂
+        joint_move("joint2", 0.0, 1.5, viewer, "复位：抬升大臂")
+        # 步骤2：收缩小臂
+        joint_move("joint3", 0.0, 1.5, viewer, "复位：收缩小臂")
+        # 步骤3：旋转基座回正
+        joint_move("joint1", 0.0, 2.0, viewer, "复位：基座回正")
+        print("✅ 机械臂已完成自动复位，准备下一次抓取")
+        return True
 
-    # 7. 启动仿真
+    def grab_and_place(viewer, retry_max=2):
+        """完整取放流程（含自动重试）"""
+        retry_count = 0
+        success = False
+
+        while retry_count < retry_max and not success:
+            print(f"\n\n===== 开始第 {retry_count + 1} 次抓取尝试 =====")
+            try:
+                # 阶段1：对准目标
+                joint_move("joint1", 0.0, 2.0, viewer, "步骤1：旋转基座对准蓝色目标")
+                joint_move("joint2", -0.7, 2.0, viewer, "步骤2：俯仰大臂接近目标")
+                joint_move("joint3", 0.35, 2.0, viewer, "步骤3：伸缩小臂对准目标")
+
+                # 阶段2：抓取目标
+                gripper_close(viewer, "蓝色球体")
+
+                # 阶段3：抬升并转移目标
+                joint_move("joint2", 0.0, 1.5, viewer, "步骤4：抬升目标脱离平台")
+                joint_move("joint1", 3.14, 2.5, viewer, "步骤5：旋转基座对准绿色放置区域")
+                joint_move("joint2", -0.7, 1.5, viewer, "步骤6：降低目标接近放置区域")
+
+                # 阶段4：放置目标
+                gripper_open(viewer, "蓝色球体")
+
+                # 抓取成功，退出重试循环
+                success = True
+                print("\n\n🎉 第 {retry_count+1} 次抓取尝试成功！")
+            except Exception as e:
+                retry_count += 1
+                print(f"\n❌ 第 {retry_count} 次抓取失败：{e}，准备重试...")
+                robot_auto_reset(viewer)
+
+        if not success:
+            print(f"\n❌ 已达到最大重试次数（{retry_max}次），抓取失败")
+        return success
+
+    # ---------------------- 启动主流程 ----------------------
     with mujoco.viewer.launch_passive(model, data) as viewer:
-        print("\n📌 开始SCARA机械臂目标跟随流程...")
+        print("\n📌 开始带自动复位的机械臂精准取放流程...")
         print("-" * 60)
 
-        for step_name, joint_or_grip, target, duration in scara_steps:
-            print(f"\n\n🔧 {step_name}")
-            if joint_or_grip == "gripper":
-                smooth_set_gripper(target, duration, viewer)
-            else:
-                smooth_set_joint(joint_or_grip, target, duration, viewer)
+        # 执行完整取放流程
+        grab_success = grab_and_place(viewer)
 
-        # 保持5秒查看最终效果
-        print("\n\n\n📌 SCARA机械臂操作完成，保持可视化5秒...")
+        # 无论成功与否，最终执行自动复位
+        if grab_success:
+            robot_auto_reset(viewer)
+        else:
+            print("\n🔧 强制执行机械臂自动复位")
+            robot_auto_reset(viewer)
+
+        # 保持可视化查看结果
+        print("\n\n📌 流程结束，保持可视化5秒...")
         start_hold = time.time()
         while (time.time() - start_hold) < 5 and viewer.is_running():
-            print_end_effector_position(data, end_effector_id, target_id)
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
 
-    print("\n\n🎉 SCARA机械臂末端反馈+目标跟随演示完毕！")
+    print("\n\n🎉 3自由度机械臂自动复位取放演示完毕！")
 
 
 if __name__ == "__main__":
-    scara_robot_arm_demo()
+    robot_arm_auto_reset_demo()
