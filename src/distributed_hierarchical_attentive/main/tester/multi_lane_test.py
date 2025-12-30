@@ -359,12 +359,9 @@ class LaneDetector:
             return boundaries
         
         # 简单的分类：根据y坐标的平均值判断是左车道线还是右车道线
+        # 根据平均y坐标分类车道线
         for boundary in boundaries:
-            mean_y = np.mean(boundary['points'][:, 1])
-            if mean_y > 0:
-                boundary['type'] = 'right'
-            else:
-                boundary['type'] = 'left'
+            boundary['type'] = 'right' if np.mean(boundary['points'][:, 1]) > 0 else 'left'
         
         return boundaries
 
