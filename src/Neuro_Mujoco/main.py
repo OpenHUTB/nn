@@ -9,6 +9,7 @@ from typing import Optional, Tuple, List, Dict, Any
 import mujoco
 from mujoco import viewer
 
+# ===================== 依赖导入 - ROS 1 =====================
 # ===================== 核心路径配置（相对路径）=====================
 # 获取当前脚本所在目录（所有相对路径的基准）
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,11 +27,17 @@ try:
 except ImportError:
     logging.warning("ROS环境未检测到，ROS功能禁用")
 
+# ===================== 动态路径配置 (已修改为相对路径) =====================
+# 获取当前脚本所在的目录
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # ===================== 多模型配置（修正预设指令 + 相对路径）=====================
 MODEL_CONFIGS = {
     1: {
         "name": "Franka Panda（机械臂）",
         "key": "franka",
+        # 使用 os.path.join 拼接相对路径
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/franka_emika_panda/panda.xml"),
         "path": os.path.join(MODEL_ROOT, "franka_emika_panda/panda.xml"),
         "joint_num": 7,
         "pd_params": {"KP": 800.0, "KD": 60.0},
@@ -46,6 +53,7 @@ MODEL_CONFIGS = {
     2: {
         "name": "UR5 机械臂",
         "key": "ur5",
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/universal_robots_ur5e/ur5e.xml"),
         "path": os.path.join(MODEL_ROOT, "universal_robots_ur5e/ur5e.xml"),
         "joint_num": 6,
         "pd_params": {"KP": 700.0, "KD": 50.0},
@@ -60,6 +68,7 @@ MODEL_CONFIGS = {
     3: {
         "name": "Franka Panda（带手爪）",
         "key": "franka_gripper",
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/franka_emika_panda/panda_gripper.xml"),
         "path": os.path.join(MODEL_ROOT, "franka_emika_panda/panda_gripper.xml"),
         "joint_num": 8,
         "pd_params": {"KP": 800.0, "KD": 60.0},
@@ -74,6 +83,7 @@ MODEL_CONFIGS = {
     4: {
         "name": "Walker2d 机器人",
         "key": "walker2d",
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/walker2d/walker2d.xml"),
         "path": os.path.join(MODEL_ROOT, "walker2d/walker2d.xml"),
         "joint_num": 6,
         "pd_params": {"KP": 1000.0, "KD": 80.0},
@@ -87,6 +97,7 @@ MODEL_CONFIGS = {
     }
 }
 
+# ===================== 全局变量 =====================
 # ===================== 全局变量（精简版）=====================
 CURRENT_CONFIG = None
 TARGET_JOINT_POS = None
@@ -96,6 +107,7 @@ SIMULATION_PAUSE = False
 SIMULATION_RUNNING = False
 CMD_LOCK = threading.Lock()
 
+# ===================== 日志配置 =====================
 # ===================== 日志配置（精简输出）=====================
 logging.basicConfig(
     level=logging.INFO,
@@ -105,6 +117,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("mujoco_control_tool")
 
+# ===================== 核心功能函数 =====================
+def load_mujoco_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
+    """加载MuJoCo模型"""
 # ===================== 核心功能函数（精简版 + 路径调试）=====================
 def load_mujoco_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
     """加载MuJoCo模型（增加路径调试信息）"""
@@ -195,6 +210,83 @@ def simulation_worker(model, data, viewer_instance):
         mujoco.mj_step(model, data)
         viewer_instance.sync()
 
+        # 大幅降低打印频率
+        if step_counter % 500 == 0:
+            print_simulation_status(data, step_counter)
+        step_counter += 1
+        
+        # 控制仿真频率
+        loop_duration = time.time() - loop_start
+        if loop_duration < sim_interval:
+            time.sleep(sim_interval - loop_duration)
+
+def cmd_listener_main():
+    """终端指令监听（主线程）"""
+    global TARGET_JOINT_POS, SIMULATION_PAUSE, SIMULATION_RUNNING
+    joint_num = CURRENT_CONFIG["joint_num"]
+    preset_keys = list(CURRENT_CONFIG["presets"].keys())
+    
+    
+    model_path = CURRENT_CONFIG["path"]
+    model, data = load_mujoco_model(model_path)
+    if model and data:
+        mujoco.mj_resetDataKeyframe(model, data, 0)
+        logger.info(f"\n✅ 成功加载模型：{CURRENT_CONFIG['name']}")
+        logger.info(f"📂 模型路径：{model_path}")
+        logger.info(f"🔧 控制关节数：{CURRENT_CONFIG['joint_num']} | PD参数：KP={KP}, KD={KD}")
+    return model, data
+
+def pd_controller(model: mujoco.MjModel, data: mujoco.MjData):
+    """PD控制器"""
+    joint_num = CURRENT_CONFIG["joint_num"]
+    if model.nq < joint_num or model.nu < joint_num:
+        logger.warning(f"⚠️  模型自由度/控制维度不足")
+        return
+    
+    global TARGET_JOINT_POS
+    current_joint_pos = data.qpos[:joint_num].copy()
+    current_joint_vel = data.qvel[:joint_num].copy()
+    
+    # PD控制核心计算
+    pos_error = TARGET_JOINT_POS - current_joint_pos
+    vel_error = -current_joint_vel
+    joint_torque = KP * pos_error + KD * vel_error
+    
+    # 力矩限位
+    if model.actuator_forcerange.size >= joint_num:
+        torque_limit = model.actuator_forcerange[:, 1].copy()[:joint_num]
+        joint_torque = np.clip(joint_torque, -torque_limit, torque_limit)
+    
+    data.ctrl[:joint_num] = joint_torque
+
+def simulation_worker(model, data, viewer_instance):
+    """仿真工作线程"""
+    global SIMULATION_RUNNING, SIMULATION_PAUSE
+    step_counter = 0
+    sim_frequency = 50
+    sim_interval = 1.0 / sim_frequency
+    
+    # 适配相机视角
+    cam_distance = 2.0 if "机械臂" in CURRENT_CONFIG["name"] else 3.0
+    viewer_instance.cam.distance = cam_distance
+    viewer_instance.cam.azimuth = 90
+    viewer_instance.cam.elevation = -20
+    viewer_instance.cam.lookat = [0.0, 0.0, 0.5]
+    
+    while SIMULATION_RUNNING and viewer_instance.is_running():
+        if SIMULATION_PAUSE:
+            time.sleep(0.1)
+            continue
+        
+        loop_start = time.time()
+        
+        # 执行PD控制
+        pd_controller(model, data)
+        
+        # 步进仿真
+        mujoco.mj_step(model, data)
+        viewer_instance.sync()
+
         # 大幅降低打印频率（从200步→500步），减少刷屏
         if step_counter % 500 == 0:
             print_simulation_status(data, step_counter)
@@ -218,10 +310,17 @@ def cmd_listener_main():
     logger.info(f"  2. 自定义关节：set 关节号 角度（示例：set 0 0.5，单位rad）")
     logger.info(f"  3. 暂停/继续仿真：pause / resume")
     logger.info(f"  4. 退出仿真：exit")
+    if ROS_AVAILABLE:
+        logger.info(f"  5. ROS键盘控制：在新终端运行 `python keyboard_control.py <关节数>`")
     logger.info("="*50 + "\n")
     
     while SIMULATION_RUNNING:
         try:
+            cmd = input("\n👉 请输入控制指令：").strip().lower()
+            
+            with CMD_LOCK:
+                pass
+            
             # 输入提示符单独显示，更清晰
             cmd = input("\n👉 请输入控制指令：").strip().lower()
             
@@ -270,6 +369,7 @@ def cmd_listener_main():
             logger.error(f"❌ 指令解析失败：{str(e)}", exc_info=True)
 
 def print_simulation_status(data: mujoco.MjData, step: int):
+    """打印仿真状态"""
     """打印仿真状态（精简输出）"""
     joint_num = CURRENT_CONFIG["joint_num"]
     current_pos = data.qpos[:joint_num].round(4)
@@ -281,6 +381,62 @@ def print_simulation_status(data: mujoco.MjData, step: int):
     logger.info(f"🎯 目标关节位置：{TARGET_JOINT_POS.round(3)}")
     logger.info(f"📝 当前关节位置：{current_pos}")
     logger.info(f"📊 控制精度：平均误差={avg_error:.6f}rad | 最大误差={max_error:.6f}rad")
+
+# ===================== ROS 功能 =====================
+def joint_control_callback(msg):
+    """ROS 关节控制话题回调函数"""
+    global TARGET_JOINT_POS
+    if not SIMULATION_RUNNING or SIMULATION_PAUSE:
+        return
+
+    joint_num = CURRENT_CONFIG["joint_num"]
+    if len(msg.data) != joint_num:
+        logger.warning(f"ROS消息数据长度不匹配！期望 {joint_num}, 收到 {len(msg.data)}")
+        return
+
+    # 将接收到的增量值加到目标关节位置上
+    delta_pos = np.array(msg.data)
+    with CMD_LOCK: # 使用锁确保线程安全
+        TARGET_JOINT_POS += delta_pos
+    
+    logger.info(f"\n🎮 接收到ROS控制指令：目标关节位置更新为 {TARGET_JOINT_POS.round(3)}")
+
+def ros_joint_control_subscriber():
+    """ROS 订阅者节点"""
+    try:
+        rospy.init_node('mujoco_ros_controller', anonymous=True)
+        rospy.Subscriber('joint_position_delta', Float32MultiArray, joint_control_callback)
+        logger.info("✅ ROS节点已启动，正在监听 /joint_position_delta 话题...")
+        rospy.spin() # 保持节点运行，直到被关闭
+    except rospy.ROSInterruptException:
+        logger.info("🛑 ROS节点被中断。")
+    except Exception as e:
+        logger.error(f"❌ ROS节点运行出错: {e}", exc_info=True)
+
+# ===================== 主程序逻辑 =====================
+def run_selected_model():
+    """启动选中模型的可视化与控制"""
+    model, data = load_selected_model()
+    if not model or not data:
+        input("\n按回车键返回模型选择菜单...")
+        return
+    
+    global SIMULATION_PAUSE, SIMULATION_RUNNING
+    SIMULATION_PAUSE = False
+    SIMULATION_RUNNING = True
+    
+    logger.info(f"\n🖥️  正在启动 {CURRENT_CONFIG['name']} 可视化窗口...")
+    logger.info("💡 提示：窗口弹出后，终端会显示输入提示符，可输入指令控制模型！")
+    
+    ros_thread = None
+    if ROS_AVAILABLE:
+        # 启动ROS订阅者线程
+        ros_thread = threading.Thread(target=ros_joint_control_subscriber, daemon=True)
+        ros_thread.start()
+        time.sleep(1.0) # 等待ROS节点初始化
+
+    try:
+        with viewer.launch_passive(model, data) as viewer_instance:
 
 def run_selected_model():
     """启动选中模型的可视化与控制（精简版）"""
@@ -308,6 +464,8 @@ def run_selected_model():
             )
             sim_thread.start()
             
+            cmd_listener_main()
+            
             # 主线程运行指令监听
             cmd_listener_main()
             
@@ -320,6 +478,10 @@ def run_selected_model():
         logger.error(f"\n❌ 可视化出错：{str(e)}", exc_info=True)
         SIMULATION_RUNNING = False
     
+    if ros_thread and ros_thread.is_alive():
+        rospy.signal_shutdown("仿真结束，关闭ROS节点。")
+        ros_thread.join(timeout=2)
+
     input("\n按回车键返回模型选择菜单...")
 
 def show_menu():
@@ -352,6 +514,7 @@ def main_menu():
             sys.exit(0)
         elif choice in MODEL_CONFIGS:
             CURRENT_CONFIG = MODEL_CONFIGS[choice]
+            TARGET_JOINT_POS = CURRENT_CONFIG["presets"][CURRENT_CONFIG["default_preset"]].copy()
             TARGET_JOINT_POS = CURRENT_CONFIG["presets"][CURRENT_CONFIG["default_preset"]]
             KP = CURRENT_CONFIG["pd_params"]["KP"]
             KD = CURRENT_CONFIG["pd_params"]["KD"]
@@ -367,10 +530,12 @@ def main():
     logger.info(f"📌 模型根目录：{MODEL_ROOT}")
     
     parser = argparse.ArgumentParser(
+        description="MuJoCo模型控制工具（支持ROS键盘控制）",
         description="MuJoCo模型控制工具（精简版，无数据保存）",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     subparsers = parser.add_subparsers(dest="subcommand", required=True, help="子命令列表")
+    menu_parser = subparsers.add_parser("menu", help="启动交互式模型选择菜单（PD控制）")
 
     # 只保留menu子命令（核心控制功能）
     menu_parser = subparsers.add_parser("menu", help="启动交互式模型选择菜单（PD控制）")
