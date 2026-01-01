@@ -1,3 +1,4 @@
+
 """
 无人小车自主行驶与避让模拟
 基于MuJoCo和Python实现
@@ -15,43 +16,50 @@ import os
 
 class AutonomousCar:
     def __init__(self, model_path=None):
-        """初始化无人小车模拟器"""
-        # 如果没有提供模型文件，使 用 内置的XML模型
+        """初始化无人小车模拟器
+        
+        Args:
+            model_path (str, optional): MuJoCo模型文件路径. 默认为None，使用内置模型
+        """
+        # 如果没有提供模型文件，使用内置的XML模型
         if model_path is None:
             self.xml = """
             <mujoco>
+                <!-- 仿真参数设置 -->
                 <option timestep="0.01" gravity="0 0 -9.81"/>
 
+                <!-- 材质定义 -->
                 <asset>
-                    <material name="grid" rgba=".2 .3 .4 1"/>
-                    <material name="car_body" rgba="0.2 0.6 0.8 1"/>
-                    <material name="car_detail" rgba="0.8 0.6 0.2 1"/>
-                    <material name="wheel" rgba="0.1 0.1 0.1 1"/>
-                    <material name="rim" rgba="0.9 0.9 0.9 1"/>
-                    <material name="obstacle" rgba="0.8 0.2 0.2 1"/>
-                    <material name="target" rgba="0.2 0.8 0.2 1"/>
-                    <material name="floor" rgba="0.9 0.9 0.9 1"/>
+                    <material name="grid" rgba=".2 .3 .4 1"/>  <!-- 网格材质 -->
+                    <material name="car_body" rgba="0.2 0.6 0.8 1"/>  <!-- 车身材质 -->
+                    <material name="car_detail" rgba="0.8 0.6 0.2 1"/>  <!-- 车辆细节材质 -->
+                    <material name="wheel" rgba="0.1 0.1 0.1 1"/>  <!-- 车轮材质 -->
+                    <material name="rim" rgba="0.9 0.9 0.9 1"/>  <!-- 轮毂材质 -->
+                    <material name="obstacle" rgba="0.8 0.2 0.2 1"/>  <!-- 障碍物材质 -->
+                    <material name="target" rgba="0.2 0.8 0.2 1"/>  <!-- 目标点材质 -->
+                    <material name="floor" rgba="0.9 0.9 0.9 1"/>  <!-- 地面材质 -->
                 </asset>
 
+                <!-- 世界主体定义 -->
                 <worldbody>
                     <!-- 地面 -->
                     <geom name="floor" type="plane" size="10 10 0.1" material="floor" pos="0 0 -0.1"/>
 
                     <!-- 无人小车 -->
-                    <body name="car" pos="0 0 0.3">
-                        <joint name="car_rot" type="free"/>
+                    <body name="car" pos="0 0 0.3">  <!-- 小车起始位置 -->
+                        <joint name="car_rot" type="free"/>  <!-- 自由度关节，允许6自由度运动 -->
                         <!-- 车身主体 -->
-                        <geom name="car_body_main" type="box" size="0.3 0.6 0.15" material="car_body" pos="0 0 0"/>
-                        <geom name="car_front" type="box" size="0.25 0.15 0.1" pos="0 0.5 0" material="car_detail"/>
-                        <geom name="car_back" type="box" size="0.25 0.15 0.1" pos="0 -0.5 0" material="car_detail"/>
-                        <geom name="car_top" type="box" size="0.28 0.58 0.05" pos="0 0 0.15" material="car_body"/>
+                        <geom name="car_body_main" type="box" size="0.3 0.6 0.15" material="car_body" pos="0 0 0"/>  <!-- 主车身体 -->
+                        <geom name="car_front" type="box" size="0.25 0.15 0.1" pos="0 0.5 0" material="car_detail"/>  <!-- 前部装饰 -->
+                        <geom name="car_back" type="box" size="0.25 0.15 0.1" pos="0 -0.5 0" material="car_detail"/>  <!-- 后部装饰 -->
+                        <geom name="car_top" type="box" size="0.28 0.58 0.05" pos="0 0 0.15" material="car_body"/>  <!-- 车顶 -->
 
                         <!-- 车轮组件 -->
-                        <body name="front_left_wheel" pos="0.25 0.4 0">
-                            <joint name="front_left_steer" type="hinge" axis="0 0 1" range="-30 30"/>
-                            <joint name="front_left_roll" type="hinge" axis="0 1 0"/>
-                            <geom name="wheel_fl_rim" type="cylinder" size="0.09 0.06" material="rim" pos="0 0 -0.01"/>
-                            <geom name="wheel_fl_tire" type="cylinder" size="0.1 0.05" material="wheel" pos="0 0 0.01"/>
+                        <body name="front_left_wheel" pos="0.25 0.4 0">  <!-- 前左轮 -->
+                            <joint name="front_left_steer" type="hinge" axis="0 0 1" range="-30 30"/>  <!-- 转向关节 -->
+                            <joint name="front_left_roll" type="hinge" axis="0 1 0"/>  <!-- 滚动关节 -->
+                            <geom name="wheel_fl_rim" type="cylinder" size="0.09 0.06" material="rim" pos="0 0 -0.01"/>  <!-- 轮毂 -->
+                            <geom name="wheel_fl_tire" type="cylinder" size="0.1 0.05" material="wheel" pos="0 0 0.01"/>  <!-- 轮胎 -->
                         </body>
 
                         <body name="front_right_wheel" pos="-0.25 0.4 0">
@@ -74,15 +82,15 @@ class AutonomousCar:
                         </body>
 
                         <!-- 传感器位置 -->
-                        <site name="front_sensor" pos="0 0.7 0.1" size="0.05"/>
-                        <site name="left_sensor" pos="0.4 0 0.1" size="0.05"/>
-                        <site name="right_sensor" pos="-0.4 0 0.1" size="0.05"/>
+                        <site name="front_sensor" pos="0 0.7 0.1" size="0.05"/>  <!-- 前方传感器 -->
+                        <site name="left_sensor" pos="0.4 0 0.1" size="0.05"/>  <!-- 左方传感器 -->
+                        <site name="right_sensor" pos="-0.4 0 0.1" size="0.05"/>  <!-- 右方传感器 -->
                     </body>
 
                     <!-- 目标点 -->
-                    <body name="target" pos="8 0 0.5">
-                        <geom name="target_geom" type="sphere" size="0.3" material="target"/>
-                        <site name="target_site" pos="0 0 0" size="0.1"/>
+                    <body name="target" pos="8 0 0.5">  <!-- 目标位置 (x=8, y=0, z=0.5) -->
+                        <geom name="target_geom" type="sphere" size="0.3" material="target"/>  <!-- 球形目标 -->
+                        <site name="target_site" pos="0 0 0" size="0.1"/>  <!-- 目标位置标记 -->
                     </body>
 
                     <!-- 障碍物 - 更加立体逼真的设计 -->
@@ -150,34 +158,38 @@ class AutonomousCar:
         self.data = mujoco.MjData(self.model)
 
         # 控制参数
-        self.target_speed = 6.0  # 目标速度
+        self.target_speed = 6.0  # 目标速度 (m/s)
         self.max_steering_angle = 0.5  # 最大转向角度（弧度）
-        self.avoidance_distance = 2.5  # 避障检测距离
+        self.avoidance_distance = 2.5  # 避障检测距离 (m)
         self.avoidance_strength = 2.5  # 避障强度
 
         # 状态变量
-        self.current_speed = 0.0
-        self.steering_angle = 0.0
-        self.obstacle_detected = False
-        self.simulation_time = 0.0
-        self.target_reached = False
-        self.path_history = []  # 路径历史
+        self.current_speed = 0.0  # 当前速度 (m/s)
+        self.steering_angle = 0.0  # 当前转向角度 (弧度)
+        self.obstacle_detected = False  # 是否检测到障碍物
+        self.simulation_time = 0.0  # 模拟时间 (s)
+        self.target_reached = False  # 是否到达目标
+        self.path_history = []  # 路径历史，用于轨迹记录
 
-        # PID控制器参数
-        self.speed_Kp = 4.0
-        self.speed_Ki = 0.1
-        self.speed_Kd = 0.3
-        self.speed_integral = 0.0
-        self.speed_prev_error = 0.0
+        # PID控制器参数 (当前未在代码中使用，但为后续扩展预留)
+        self.speed_Kp = 4.0  # 速度控制器比例参数
+        self.speed_Ki = 0.1  # 速度控制器积分参数
+        self.speed_Kd = 0.3  # 速度控制器微分参数
+        self.speed_integral = 0.0  # 速度控制器积分项
+        self.speed_prev_error = 0.0  # 速度控制器前一误差
 
-        self.steering_Kp = 6.0
-        self.steering_Ki = 0.05
-        self.steering_Kd = 0.2
-        self.steering_integral = 0.0
-        self.steering_prev_error = 0.0
+        self.steering_Kp = 6.0  # 转向控制器比例参数
+        self.steering_Ki = 0.05  # 转向控制器积分参数
+        self.steering_Kd = 0.2  # 转向控制器微分参数
+        self.steering_integral = 0.0  # 转向控制器积分项
+        self.steering_prev_error = 0.0  # 转向控制器前一误差
 
     def create_simple_model(self):
-        """创建简化模型（如果完整模型有问题）"""
+        """创建简化模型（如果完整模型有问题）
+        
+        当完整模型因XML格式错误或其他问题无法加载时，
+        使用此方法创建一个简化的模型用于模拟
+        """
         print("使用简化模型...")
         simple_xml = """
         <mujoco>
@@ -220,7 +232,11 @@ class AutonomousCar:
         self.model = mujoco.MjModel.from_xml_path(self.temp_xml_path)
 
     def __del__(self):
-        """清理临时文件"""
+        """清理临时文件
+        
+        析构函数，确保在对象销毁时删除临时创建的XML模型文件
+        避免临时文件残留
+        """
         if hasattr(self, 'temp_xml_path') and os.path.exists(self.temp_xml_path):
             try:
                 os.remove(self.temp_xml_path)
@@ -228,7 +244,20 @@ class AutonomousCar:
                 pass
 
     def get_sensor_readings(self):
-        """获取传感器读数"""
+        """获取传感器读数
+        
+        通过模拟传感器检测周围环境中的障碍物
+        返回包含前后左右距离和障碍物检测状态的字典
+        
+        Returns:
+            dict: 包含传感器读数的字典
+                - front_distance: 前方距离
+                - left_distance: 左方距离
+                - right_distance: 右方距离
+                - front_obstacle: 前方障碍物状态
+                - left_obstacle: 左方障碍物状态
+                - right_obstacle: 右方障碍物状态
+        """
         readings = {
             'front_distance': 10.0,
             'left_distance': 10.0,
@@ -239,20 +268,20 @@ class AutonomousCar:
         }
 
         # 获取小车位置和方向
-        car_pos = self.data.body('car').xpos
-        car_orientation = self.data.body('car').xmat.reshape(3, 3)
-        car_forward = car_orientation @ np.array([0, 1, 0])  # 小车前进方向
-        car_left = car_orientation @ np.array([1, 0, 0])  # 小车左侧方向
+        car_pos = self.data.body('car').xpos  # 小车当前位置 (x, y, z)
+        car_orientation = self.data.body('car').xmat.reshape(3, 3)  # 小车方向矩阵
+        car_forward = car_orientation @ np.array([0, 1, 0])  # 小车前进方向向量
+        car_left = car_orientation @ np.array([1, 0, 0])  # 小车左侧方向向量
 
         # 检查所有障碍物
-        obstacle_positions = [
+        obstacle_positions = [  # 预定义的障碍物位置
             np.array([3, 2, 0.5]),  # obstacle1
             np.array([5, -1.5, 0.5]),  # obstacle2
             np.array([2, -2, 0.5]),  # obstacle3
             np.array([6, 2, 0.5])  # obstacle4
         ]
 
-        obstacle_sizes = [
+        obstacle_sizes = [  # 障碍物尺寸参数，用于碰撞检测
             1.2,  # obstacle1 半径+高度
             1.4,  # obstacle2 尺寸
             1.0,  # obstacle3 直径
@@ -261,8 +290,8 @@ class AutonomousCar:
 
         for i, obs_pos in enumerate(obstacle_positions):
             # 计算障碍物到小车的向量
-            obs_vector = obs_pos - car_pos
-            distance = np.linalg.norm(obs_vector[:2])  # 只考虑平面距离
+            obs_vector = obs_pos - car_pos  # 从小车指向障碍物的向量
+            distance = np.linalg.norm(obs_vector[:2])  # 只考虑平面距离 (x, y方向)
 
             if distance < self.avoidance_distance + obstacle_sizes[i]:
                 # 计算障碍物相对于小车的方向
@@ -296,7 +325,17 @@ class AutonomousCar:
         return readings
 
     def autonomous_driving(self, dt):
-        """自主驾驶算法"""
+        """自主驾驶算法
+        
+        实现无人小车的自主导航和避障功能
+        包括目标导向导航、障碍物检测和避让策略
+        
+        Args:
+            dt (float): 时间步长
+        
+        Returns:
+            numpy.ndarray: 控制信号数组
+        """
         if dt <= 0:
             dt = 0.01
 
@@ -304,8 +343,8 @@ class AutonomousCar:
         sensor_data = self.get_sensor_readings()
 
         # 获取目标位置
-        target_pos = np.array([8, 0, 0.5])
-        car_pos = self.data.body('car').xpos
+        target_pos = np.array([8, 0, 0.5])  # 目标位置 (x, y, z)
+        car_pos = self.data.body('car').xpos  # 小车当前位置
 
         # 计算到目标的距离和方向
         target_vector = target_pos - car_pos
@@ -318,35 +357,35 @@ class AutonomousCar:
 
         # 计算目标方向（归一化）
         if target_distance > 0:
-            target_direction = target_vector[:2] / target_distance
+            target_direction = target_vector[:2] / target_distance  # 归一化目标方向向量
         else:
-            target_direction = np.array([0, 1])
+            target_direction = np.array([0, 1])  # 默认朝y轴正方向
 
         # 获取小车当前方向
-        car_orientation = self.data.body('car').xmat.reshape(3, 3)
-        car_direction = car_orientation @ np.array([0, 1, 0])  # 前进方向
-        car_direction_2d = car_direction[:2]
+        car_orientation = self.data.body('car').xmat.reshape(3, 3)  # 获取小车方向矩阵
+        car_direction = car_orientation @ np.array([0, 1, 0])  # 计算小车实际前进方向
+        car_direction_2d = car_direction[:2]  # 取x,y方向分量
 
         if np.linalg.norm(car_direction_2d) > 0:
-            car_direction_2d = car_direction_2d / np.linalg.norm(car_direction_2d)
+            car_direction_2d = car_direction_2d / np.linalg.norm(car_direction_2d)  # 归一化方向向量
 
-        # 计算转向误差
+        # 计算转向误差 (使用向量叉积和点积计算角度差)
         steering_error = math.atan2(
-            target_direction[1] * car_direction_2d[0] - target_direction[0] * car_direction_2d[1],
-            target_direction[0] * car_direction_2d[0] + target_direction[1] * car_direction_2d[1]
+            target_direction[1] * car_direction_2d[0] - target_direction[0] * car_direction_2d[1],  # 叉积计算转向方向
+            target_direction[0] * car_direction_2d[0] + target_direction[1] * car_direction_2d[1]   # 点积计算转向大小
         )
 
-        # 避障逻辑
-        avoidance_steering = 0.0
-        self.obstacle_detected = False
+        # 避障逻辑 - 根据传感器数据调整转向
+        avoidance_steering = 0.0  # 初始化避障转向量
+        self.obstacle_detected = False  # 重置障碍物检测标志
 
         if sensor_data['front_obstacle']:
             self.obstacle_detected = True
             # 前方有障碍物，根据两侧距离决定转向
             if sensor_data['left_distance'] > sensor_data['right_distance']:
-                avoidance_steering = 0.5  # 向左转
+                avoidance_steering = 0.5  # 向左转 (正值表示左转)
             else:
-                avoidance_steering = -0.5  # 向右转
+                avoidance_steering = -0.5  # 向右转 (负值表示右转)
 
         elif sensor_data['left_obstacle']:
             avoidance_steering = -0.3  # 向右轻微转向
@@ -354,16 +393,16 @@ class AutonomousCar:
         elif sensor_data['right_obstacle']:
             avoidance_steering = 0.3  # 向左轻微转向
 
-        # 合并转向控制
+        # 合并转向控制 - 将目标导向和避障转向相结合
         total_steering = steering_error + avoidance_steering
 
         # 限制转向角度
         total_steering = np.clip(total_steering, -self.max_steering_angle, self.max_steering_angle)
 
-        # 速度控制：根据障碍物距离调整速度
-        min_distance = min(sensor_data['front_distance'],
-                           sensor_data['left_distance'],
-                           sensor_data['right_distance'])
+        # 速度控制：根据障碍物距离调整速度 (距离越近，速度越慢)
+        min_distance = min(sensor_data['front_distance'],      # 前方最近障碍物距离
+                           sensor_data['left_distance'],      # 左方最近障碍物距离
+                           sensor_data['right_distance'])     # 右方最近障碍物距离
 
         if min_distance < 1.0:
             speed_multiplier = 0.3
@@ -382,32 +421,36 @@ class AutonomousCar:
 
         self.current_speed = np.clip(self.current_speed, 0, self.target_speed)
 
-        # 记录路径
-        self.path_history.append(car_pos.copy())
-        if len(self.path_history) > 1000:
-            self.path_history.pop(0)
+        # 记录路径 - 保存小车移动轨迹，用于后续分析或可视化
+        self.path_history.append(car_pos.copy())  # 添加当前位置到路径历史
+        if len(self.path_history) > 1000:  # 限制历史记录数量，避免内存占用过多
+            self.path_history.pop(0)  # 移除最旧的位置记录
 
         # 生成控制信号
         control = np.zeros(self.model.nu)
 
         if hasattr(self.model, 'nu') and self.model.nu >= 6:
-            # 完整模型的控制
-            control[0] = self.current_speed  # 前左驱动
-            control[1] = self.current_speed  # 前右驱动
-            control[2] = self.current_speed  # 后左驱动
-            control[3] = self.current_speed  # 后右驱动
-            control[4] = total_steering  # 前左转向
-            control[5] = total_steering  # 前右转向
+            # 完整模型的控制 (四轮独立驱动+前轮转向)
+            control[0] = self.current_speed  # 前左轮驱动电机
+            control[1] = self.current_speed  # 前右轮驱动电机
+            control[2] = self.current_speed  # 后左轮驱动电机
+            control[3] = self.current_speed  # 后右轮驱动电机
+            control[4] = total_steering  # 前左轮转向电机
+            control[5] = total_steering  # 前右轮转向电机
         else:
-            # 简化模型的控制
-            control[0] = self.current_speed
+            # 简化模型的控制 (单电机驱动+单电机转向)
+            control[0] = self.current_speed  # 驱动电机
             if len(control) > 1:
-                control[1] = total_steering
+                control[1] = total_steering  # 转向电机
 
         return control
 
     def print_status(self):
-        """打印状态信息"""
+        """打印状态信息
+        
+        在控制台打印当前模拟状态，包括位置、速度、方向等信息
+        使用\r覆盖前一行以实现动态更新效果
+        """
         car_pos = self.data.body('car').xpos
         target_pos = np.array([8, 0, 0.5])
         distance = np.linalg.norm(target_pos[:2] - car_pos[:2])
@@ -421,7 +464,11 @@ class AutonomousCar:
               end="")
 
     def run_simulation(self):
-        """运行模拟主循环"""
+        """运行模拟主循环
+        
+        启动MuJoCo可视化界面并运行无人小车模拟
+        包括物理仿真、控制算法执行、状态显示和用户交互
+        """
         print("无人小车模拟系统启动中...")
         print("=" * 80)
         print("控制说明:")
@@ -433,12 +480,12 @@ class AutonomousCar:
         print("=" * 80)
 
         # 设置模拟选项
-        self.model.opt.gravity[2] = -9.81
+        self.model.opt.gravity[2] = -9.81  # 确保重力设置正确
 
-        # 重置模拟
+        # 重置模拟 - 将所有物理量重置为初始状态
         mujoco.mj_resetData(self.model, self.data)
 
-        # 启动查看器
+        # 启动可视化查看器 - 创建3D可视化界面
         try:
             viewer = mujoco.viewer.launch_passive(self.model, self.data)
         except Exception as e:
@@ -455,7 +502,7 @@ class AutonomousCar:
                 if viewer is not None and not viewer.is_running():
                     break
 
-                # 计算时间步长
+                # 计算时间步长 - 确保模拟时间正确更新
                 current_time = time.time()
                 dt = current_time - last_time
                 last_time = current_time
@@ -465,16 +512,16 @@ class AutonomousCar:
                 if dt > 0.1:
                     dt = 0.01
 
-                # 应用自主驾驶控制
-                control = self.autonomous_driving(dt)
-                self.data.ctrl[:] = control
+                # 应用自主驾驶控制 - 计算并应用控制信号
+                control = self.autonomous_driving(dt)  # 获取控制信号
+                self.data.ctrl[:] = control  # 将控制信号应用到模型
 
-                # 执行物理模拟
+                # 执行物理模拟 - 更新物理状态
                 mujoco.mj_step(self.model, self.data)
 
-                # 更新查看器
+                # 更新查看器 - 同步可视化界面与物理模拟状态
                 if viewer is not None:
-                    viewer.sync()
+                    viewer.sync()  # 刷新3D视图
 
                 # 更新状态显示
                 frame_count += 1
@@ -529,21 +576,25 @@ class AutonomousCar:
 
 
 def main():
-    """主函数"""
+    """主函数
+    
+    程序入口点，负责初始化系统、检查依赖、创建模拟实例并启动模拟
+    包含错误处理和故障排除建议
+    """
     print("正在初始化无人小车模拟系统...")
     print("=" * 80)
 
     try:
-        # 检查必要的库
+        # 检查必要的库 - 确保所有必需的库都已安装
         import importlib
-        required_libs = ['mujoco', 'numpy', 'glfw']
-        missing_libs = []
+        required_libs = ['mujoco', 'numpy', 'glfw']  # 必需的库列表
+        missing_libs = []  # 缺失库列表
 
         for lib in required_libs:
             try:
-                importlib.import_module(lib)
+                importlib.import_module(lib)  # 尝试导入库
             except ImportError:
-                missing_libs.append(lib)
+                missing_libs.append(lib)  # 记录缺失的库
 
         if missing_libs:
             print(f"缺少必要的库: {missing_libs}")
