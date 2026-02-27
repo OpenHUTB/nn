@@ -57,6 +57,7 @@ while True:
             car_x -= speed * 2
 
     # 绘制
+
     screen.fill(WHITE)
     pygame.draw.rect(screen, GRAY, (100, 0, 600, 600))  # 道路
     pygame.draw.rect(screen, BLUE, car_rect)             # 车
