@@ -23,21 +23,22 @@ def main():
         car_state = client.getCarState()
         print(f"✓ 车辆状态获取成功 - 速度: {car_state.speed} km/h")
 
-        # 5. 【可选】简单控制演示
-        print("\n>>> 连接成功！开始简单控制演示...")
+        # 5. 持续行驶控制演示
+        print("\n>>> 连接成功！开始持续行驶演示...")
         controls = airsim.CarControls()
         controls.throttle = 0.5
         client.setCarControls(controls)
 
-        # 修改1：延长前进时间，让汽车持续前进
-        time.sleep(10)  # 从2秒改为10秒
+        # 让汽车持续行驶30秒
+        print("汽车正在持续前进中...")
+        time.sleep(30)
 
-        # 修改2：不立即刹车，让汽车继续滑行一段
-        controls.throttle = 0.3  # 改为减速而不是直接刹车
+        # 缓慢减速停止
+        print("准备减速停车...")
+        controls.throttle = 0.2
         client.setCarControls(controls)
         time.sleep(3)
 
-        # 修改3：最后才完全停止
         controls.brake = 1.0
         controls.throttle = 0.0
         client.setCarControls(controls)
