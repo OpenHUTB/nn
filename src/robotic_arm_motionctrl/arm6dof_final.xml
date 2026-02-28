@@ -69,7 +69,7 @@
     <motor name="motor5" joint="joint5" gear="200" ctrllimited="true" ctrlrange="-3.14 3.14"/>
   </actuator>
 
-  <!-- 基础传感器（可选，全版本兼容）  -->
+  <!-- 基础传感器（可选，全版本兼容） -->
   <sensor>
     <jointpos name="j0_pos" joint="joint0"/>
     <jointpos name="j1_pos" joint="joint1"/>

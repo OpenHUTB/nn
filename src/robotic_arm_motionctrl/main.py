@@ -123,7 +123,7 @@ def main():
             # PD控制
             pos_error = pd_controller(model, data, target)
 
-            # 运行仿真步
+            #运行仿真步
             mujoco.mj_step(model, data)
 
             # 更新可视化（适配旧版接口）
