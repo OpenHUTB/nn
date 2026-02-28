@@ -23,27 +23,49 @@ def main():
         car_state = client.getCarState()
         print(f"✓ 车辆状态获取成功 - 速度: {car_state.speed} km/h")
 
-        # 5. 持续行驶控制演示
-        print("\n>>> 连接成功！开始持续行驶演示...")
+        # 5. 路口90度转弯演示
+        print("\n>>> 连接成功！开始路口90度转弯演示...")
         controls = airsim.CarControls()
-        controls.throttle = 0.5
-        client.setCarControls(controls)
 
-        # 让汽车持续行驶30秒
-        print("汽车正在持续前进中...")
-        time.sleep(30)
+        # 直行到路口
+        controls.throttle = 0.5
+        controls.steering = 0.0
+        client.setCarControls(controls)
+        print("直行前往路口...")
+        time.sleep(26)  # 从25秒增加到26秒
+
+        # 到达路口，停车观察
+        controls.throttle = 0.0
+        controls.brake = 1.0
+        client.setCarControls(controls)
+        print("到达路口，停车观察...")
+        time.sleep(2)
+
+        # 起步并90度转弯
+        controls.brake = 0.0
+        controls.throttle = 0.3
+        controls.steering = 1.0  # 最大右转角度
+        client.setCarControls(controls)
+        print("起步并90度右转弯...")
+        time.sleep(6)
+
+        # 回正方向盘，继续直行
+        controls.steering = 0.0
+        client.setCarControls(controls)
+        print("转弯完成，继续直行...")
+        time.sleep(8)
 
         # 缓慢减速停止
-        print("准备减速停车...")
         controls.throttle = 0.2
         client.setCarControls(controls)
-        time.sleep(3)
+        time.sleep(2)
 
         controls.brake = 1.0
         controls.throttle = 0.0
         client.setCarControls(controls)
         time.sleep(1)
         print("演示结束。")
+
         # 6. 释放控制
         client.enableApiControl(False)
         print("控制权已释放。")
