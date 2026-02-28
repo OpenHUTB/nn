@@ -1,0 +1,81 @@
+<mujoco model="6-DOF Robot Arm (Final Compatible)">
+  <compiler angle="radian" inertiafromgeom="true"/>
+
+  <!-- 基础物理参数（全版本兼容） -->
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <!-- 基础材质（仅保留必要定义） -->
+  <asset>
+    <material name="grid" rgba="0.2 0.2 0.2 1"/>
+    <material name="arm" rgba="0.2 0.6 0.8 1"/>
+    <material name="base" rgba="0.1 0.4 0.1 1"/>
+    <material name="ee" rgba="0.8 0.2 0.2 1"/>
+  </asset>
+
+  <!-- 世界体（核心结构，无兼容问题） -->
+  <worldbody>
+    <!-- 地面 -->
+    <geom name="floor" type="plane" size="10 10 0.1" pos="0 0 0" material="grid"/>
+
+    <!-- 机械臂基座 -->
+    <body name="base" pos="0 0 0">
+      <geom name="base_geom" type="box" size="0.2 0.2 0.08" pos="0 0 0" material="base"/>
+      <joint name="joint0" type="hinge" axis="0 0 1" pos="0 0 0.08"/>
+
+      <!-- 连杆1 -->
+      <body name="link1" pos="0 0 0.08">
+        <geom name="link1_geom" type="cylinder" size="0.04 0.2" pos="0 0 0.2" material="arm"/>
+        <joint name="joint1" type="hinge" axis="0 1 0" pos="0 0 0.4"/>
+
+        <!-- 连杆2 -->
+        <body name="link2" pos="0 0 0.4">
+          <geom name="link2_geom" type="cylinder" size="0.04 0.2" pos="0 0 0.2" material="arm"/>
+          <joint name="joint2" type="hinge" axis="0 1 0" pos="0 0 0.4"/>
+
+          <!-- 连杆3 -->
+          <body name="link3" pos="0 0 0.4">
+            <geom name="link3_geom" type="cylinder" size="0.03 0.18" pos="0 0 0.18" material="arm"/>
+            <joint name="joint3" type="hinge" axis="0 0 1" pos="0 0 0.36"/>
+
+            <!-- 连杆4 -->
+            <body name="link4" pos="0 0 0.36">
+              <geom name="link4_geom" type="cylinder" size="0.03 0.18" pos="0 0 0.18" material="arm"/>
+              <joint name="joint4" type="hinge" axis="0 1 0" pos="0 0 0.36"/>
+
+              <!-- 连杆5 -->
+              <body name="link5" pos="0 0 0.36">
+                <geom name="link5_geom" type="cylinder" size="0.025 0.15" pos="0 0 0.15" material="arm"/>
+                <joint name="joint5" type="hinge" axis="0 0 1" pos="0 0 0.3"/>
+
+                <!-- 末端执行器 -->
+                <body name="ee" pos="0 0 0.3">
+                  <geom name="ee_geom" type="sphere" size="0.03" pos="0 0 0" material="ee"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- 控制器（全版本兼容） -->
+  <actuator>
+    <motor name="motor0" joint="joint0" gear="200" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <motor name="motor1" joint="joint1" gear="200" ctrllimited="true" ctrlrange="-1.57 1.57"/>
+    <motor name="motor2" joint="joint2" gear="200" ctrllimited="true" ctrlrange="-1.57 1.57"/>
+    <motor name="motor3" joint="joint3" gear="200" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+    <motor name="motor4" joint="joint4" gear="200" ctrllimited="true" ctrlrange="-1.57 1.57"/>
+    <motor name="motor5" joint="joint5" gear="200" ctrllimited="true" ctrlrange="-3.14 3.14"/>
+  </actuator>
+
+  <!-- 基础传感器（可选，全版本兼容） -->
+  <sensor>
+    <jointpos name="j0_pos" joint="joint0"/>
+    <jointpos name="j1_pos" joint="joint1"/>
+    <jointpos name="j2_pos" joint="joint2"/>
+    <jointpos name="j3_pos" joint="joint3"/>
+    <jointpos name="j4_pos" joint="joint4"/>
+    <jointpos name="j5_pos" joint="joint5"/>
+  </sensor>
+</mujoco>
