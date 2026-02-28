@@ -27,6 +27,7 @@ def main():
         print("\n>>> 连接成功！开始路口90度转弯演示...")
         controls = airsim.CarControls()
 
+<<<<<<< HEAD
         # 直行到路口
         controls.throttle = 0.5
         controls.steering = 0.0
@@ -59,6 +60,8 @@ def main():
         controls.throttle = 0.2
         client.setCarControls(controls)
         time.sleep(2)
+=======
+>>>>>>> 4ee422d9ff0fa5969b4ff9fdba4cb8a6c5b20f83
 
         controls.brake = 1.0
         controls.throttle = 0.0
