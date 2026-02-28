@@ -2,7 +2,7 @@
 name: compute involvement degree
 
 # 触发条件：每次 push 代码时运行
-on: [push]
+on: [repository_dispatch]
 
 jobs:
   compute:

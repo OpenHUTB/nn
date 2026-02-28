@@ -5,10 +5,10 @@ import subprocess
 import sys
 
 # 原始文件路径 - 修改为机器人手臂模型
-original_model_path = r"C:\Users\龙忠梁\Downloads\mujoco-3.3.7-windows-x86_64\model\robotic_arm\arm_with_gripper.xml"
+original_model_path = os.path.join(os.path.dirname(__file__), "arm_with_gripper.xml")
 
 # 尝试复制到临时目录以避免中文路径问题
-temp_dir = r"C:\temp"
+temp_dir = os.path.join(os.path.dirname(__file__), "temp")
 temp_model_path = os.path.join(temp_dir, "arm_with_gripper.xml")
 
 print(f"检查原始文件是否存在: {original_model_path}")
@@ -105,7 +105,7 @@ else:
     print("请检查文件路径是否正确")
     
     # 检查目录结构
-    base_dir = r"C:\Users\龙忠梁\Downloads\mujoco-3.3.7-windows-x86_64\model\robotic_arm"
+    base_dir = os.path.dirname(__file__)
     if os.path.exists(base_dir):
         print("robotic_arm目录下的文件:")
         for file in os.listdir(base_dir):

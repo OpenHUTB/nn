@@ -1,0 +1,9 @@
+# Service definition for global path planning
+# Request: starting position (odometry)
+nav_msgs/Odometry start
+
+---
+# Response: planned path
+nav_msgs/Path path
+bool success
+string message

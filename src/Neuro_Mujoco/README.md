@@ -44,10 +44,29 @@ python mujoco_utils.py visualize /path/to/your/model.xml --ros --policy /path/to
 
 # 目录自动加载（选目录内第一个模型文件）
 python mujoco_utils.py visualize /home/lan/桌面/nn/mujoco_menagerie/anybotics_anymal_b
+
+# 启动交互式模型选择菜单（支持PD控制、预设位置切换）
+python mujoco_utils.py menu
+
 1.2 交互说明
 窗口操作：鼠标拖拽旋转、滚轮缩放，按 ESC 键退出；
 关节状态：仅发布非自由关节（排除 mjJNT_FREE 类型）的位置 / 速度；
 策略映射：输出 [-1,1] 自动线性缩放至执行器 ctrlrange 范围，并强制裁剪至物理极限。
+菜单模式专属指令：
+- 预设位置切换：直接输入预设名称（如home/up/left，根据模型不同有所差异）
+- 自定义关节角度：set <关节号> <角度>（示例：set 0 0.5，单位rad）
+- 仿真控制：pause（暂停）/ resume（继续）/ exit（退出）
+- ROS键盘控制（需ROS环境）：在新终端运行 `python keyboard_control.py <关节数>`
+
+
+## 支持的预设模型
+工具内置4种常用机器人模型，可通过交互式菜单直接选择：
+1. Franka Panda（机械臂）：7关节，支持home/up/left/right预设位置
+2. UR5 机械臂：6关节，支持home/up/forward预设位置
+3. Franka Panda（带手爪）：8关节（含手爪），支持home/open_gripper/up_open预设位置
+4. Walker2d 机器人：6关节，支持stand/walk_left/walk_right预设位置
+
+
 ### 模型格式转换
 2.1 运行命令
 shell
@@ -103,6 +122,17 @@ class PolicyNetwork(nn.Module):
 输出：归一化控制指令（[-1,1]），自动映射至模型 actuator_ctrlrange 范围：
 python
 运行
+
+## PD控制器说明
+适用于模型精确位置控制，核心参数与逻辑：
+1. 控制参数：每个模型预配置KP（比例增益）和KD（微分增益），如Franka Panda默认KP=800.0、KD=60.0
+2. 控制逻辑：
+   ```python
+   # 核心PD计算
+   pos_error = 目标关节位置 - 当前关节位置
+   vel_error = -当前关节速度
+   关节力矩 = KP * pos_error + KD * vel_error
+   
 ### 核心映射逻辑
 action = ctrl_min + (ctrl_max - ctrl_min) * (action + 1) / 2
 action = np.clip(action, ctrl_min, ctrl_max)  # 强制裁剪至物理极限

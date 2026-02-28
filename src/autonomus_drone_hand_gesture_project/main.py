@@ -3,6 +3,7 @@
 手势控制无人机系统 - 主入口模块
 协调所有子模块，实现完整的手势控制无人机系统
 作者: xiaoshiyuan888
+优化版本：集成性能可视化模块
 """
 
 import sys
@@ -24,6 +25,9 @@ from gesture_recognizer import EnhancedGestureRecognizer
 from drone_controller import SimpleDroneController
 from ui_renderer import ChineseUIRenderer
 from trajectory_recorder import GestureTrajectoryRecorder
+from advanced_gesture_analyzer import AdvancedGestureAnalyzer
+from gesture_stabilizer import GestureStabilizer  # 新增
+from performance_visualizer import PerformanceVisualizer  # 新增
 
 
 # 安全导入所需库
@@ -156,14 +160,15 @@ def init_camera(config):
 def print_welcome_message(cap, speech_manager, libs):
     """打印欢迎信息"""
     print("\n" + "=" * 80)
-    print("手势控制无人机系统 - 详细性能统计版")
+    print("手势控制无人机系统 - 增强手势识别版 v2.0")
     print("=" * 80)
     print("系统状态:")
     print(f"  摄像头: {'已连接' if cap else '模拟模式'}")
-    print(f"  手势识别: 增强的平滑处理算法")
+    print(f"  手势识别: 改进的平滑算法 + 手势稳定性分析")
     print(f"  语音反馈: {'已启用' if speech_manager.enabled else '已禁用'}")
-    print(f"  性能监控: 已启用")
+    print(f"  性能监控: 增强版 - 支持GPU监控和趋势预测")
     print(f"  轨迹记录: 支持录制/回放功能")
+    print(f"  高级飞行模式: 方形轨迹、圆形盘旋、8字形飞行")
     print(f"  AirSim: {'可用' if libs['airsim'] else '模拟模式'}")
     print("=" * 80)
 
@@ -178,23 +183,27 @@ def print_instructions():
     print("   - 按 [L] 键记录性能快照")
     print("   - 按 [K] 键导出性能日志")
     print("   - 按 [R] 键重置性能统计")
-    print("   - 系统自动监控: FPS, CPU, 内存, 识别时间等")
+    print("   - 系统自动监控: FPS, CPU, 内存, GPU, 识别时间等")
     print("4. 性能模式选择:")
     print("   - 按 [O] 键循环切换性能模式: 最快(fast) → 平衡(balanced) → 最准(accurate)")
-    print("5. 手势控制:")
-    print("   - 手势识别后会有语音提示: 向上、向下、向左、向右、向前、停止")
-    print("   - 手势稳定性越高，识别越准确")
-    print("   - 手部距离摄像头适中时效果最佳")
-    print("   * 手势识别置信度 > 60% 时才会执行")
+    print("5. 新手势控制:")
+    print("   - 握拳手势: 抓取/释放物体 (模拟)")
+    print("   - 旋转手势: 顺时针旋转 (模拟)")
+    print("   - OK手势: 拍照/截图")
+    print("   - 复杂手势: 返航、自动飞行等")
     print("6. 轨迹记录功能:")
     print("   [1]开始录制 [2]停止录制 [3]保存轨迹 [4]回放轨迹 [5]清除轨迹 [6]暂停/继续")
     print("7. 键盘控制:")
-    print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [X]停止")
+    print("   [W]向上 [S]向下 [A]向左 [D]向右 [F]向前 [B]向后 [X]停止 [H]悬停")
+    print("   [G]返航 [Q]自动飞行模式 [E]圆形盘旋 [8]8字形飞行 [9]方形轨迹")
+    print("   [T]增加高度 [Y]降低高度 [U]设定高度")
     print("8. 调试功能:")
     print("   [H]切换帮助显示 [R]重置手势识别 [T]切换显示模式 [D]调试信息")
     print("9. 语音控制:")
     print("   [V]切换语音反馈 [M]测试语音")
-    print("10. 按 [ESC] 安全退出")
+    print("10. 性能可视化:")
+    print("   [F]切换性能图表显示 [G]切换性能仪表盘显示")
+    print("11. 按 [ESC] 安全退出")
     print("=" * 80)
     print("程序启动成功!")
     print("-" * 80)
@@ -203,8 +212,7 @@ def print_instructions():
 def main():
     """主函数"""
     print("=" * 60)
-    print("手势控制无人机系统 - 详细性能统计优化版")
-    print("详细性能统计优化版!")
+    print("手势控制无人机系统 - 增强手势识别版 v2.0")
     print("=" * 60)
 
     # 导入库
@@ -236,6 +244,9 @@ def main():
     drone_controller = SimpleDroneController(libs['airsim'], speech_manager, config)
     ui_renderer = ChineseUIRenderer(speech_manager, config)
 
+    # 设置手势识别器的UI渲染器引用
+    gesture_recognizer.set_ui_renderer(ui_renderer)
+
     # 初始化性能分析器
     print("初始化性能分析器...")
     performance_analyzer = PerformanceAnalyzer(speech_manager, libs.get('psutil'), config)
@@ -243,6 +254,18 @@ def main():
     # 手势轨迹记录器
     print("初始化手势轨迹记录器...")
     trajectory_recorder = GestureTrajectoryRecorder(speech_manager, config)
+
+    # 高级手势分析器
+    print("初始化高级手势分析器...")
+    advanced_gesture_analyzer = AdvancedGestureAnalyzer(speech_manager, config)
+
+    # 新增：手势稳定性分析器
+    print("初始化手势稳定性分析器...")
+    gesture_stabilizer = GestureStabilizer(window_size=15)
+
+    # 新增：性能可视化器
+    print("初始化性能可视化器...")
+    performance_visualizer = PerformanceVisualizer()
 
     # 初始化摄像头
     cap = init_camera(config)
@@ -264,13 +287,29 @@ def main():
         ord('a'): "Left", ord('A'): "Left",
         ord('d'): "Right", ord('D'): "Right",
         ord('f'): "Forward", ord('F'): "Forward",
+        ord('b'): "Backward", ord('B'): "Backward",
         ord('x'): "Stop", ord('X'): "Stop",
         ord('h'): "Hover", ord('H'): "Hover",
+        ord('g'): "ReturnHome", ord('G'): "ReturnHome",
+        ord('q'): "AutoFlight", ord('Q'): "AutoFlight",
+        ord('p'): "TakePhoto", ord('P'): "TakePhoto",
+        ord('r'): "RotateCW", ord('R'): "RotateCW",
+        ord('l'): "RotateCCW", ord('L'): "RotateCCW",
+        ord('e'): "CircleFlight", ord('E'): "CircleFlight",
+        ord('8'): "EightFlight", ord('*'): "EightFlight",
+        ord('9'): "SquareFlight", ord('('): "SquareFlight",
+        ord('t'): "IncreaseAltitude", ord('T'): "IncreaseAltitude",
+        ord('y'): "DecreaseAltitude", ord('Y'): "DecreaseAltitude",
+        ord('u'): "SetAltitude", ord('U'): "SetAltitude",
     }
 
     # 显示模式
     display_modes = ['normal', 'detailed', 'minimal']
     current_display_mode = 0
+
+    # 新增：性能可视化模式
+    visualization_modes = ['none', 'charts', 'gauges']
+    current_visualization_mode = 0
 
     # 主循环
     print("\n进入主循环，按ESC退出...")
@@ -293,9 +332,20 @@ def main():
                     # 手势识别
                     gesture, confidence, frame = gesture_recognizer.recognize(frame)
 
+                    # 使用高级手势分析器进行补充分析
+                    advanced_result = advanced_gesture_analyzer.analyze(frame, gesture_recognizer.last_hand_data)
+                    if advanced_result and advanced_result.get('confidence', 0) > confidence:
+                        gesture = advanced_result.get('gesture', gesture)
+                        confidence = advanced_result.get('confidence', confidence)
+
                     # 记录手势统计
                     if gesture and gesture != "Waiting" and gesture != "摄像头错误":
                         performance_analyzer.record_gesture(gesture, confidence)
+
+                        # 新增：更新手势稳定性分析
+                        if gesture_recognizer.last_hand_data:
+                            position = gesture_recognizer.last_hand_data.get('position')
+                            stability_info = gesture_stabilizer.add_gesture(gesture, confidence, position)
             else:
                 # 模拟模式
                 frame = np.zeros((480, 640, 3), dtype=np.uint8)
@@ -319,6 +369,8 @@ def main():
                 config.set('display', 'show_performance_mode', value=True)
                 config.set('display', 'show_performance_stats', value=True)
                 config.set('display', 'show_system_resources', value=True)
+                config.set('display', 'show_advanced_gestures', value=True)
+                config.set('display', 'show_flight_mode', value=True)
                 config.set('display', 'show_debug_info', value=False)
             elif display_modes[current_display_mode] == 'detailed':
                 config.set('display', 'show_contours', value=True)
@@ -333,6 +385,8 @@ def main():
                 config.set('display', 'show_performance_mode', value=True)
                 config.set('display', 'show_performance_stats', value=True)
                 config.set('display', 'show_system_resources', value=True)
+                config.set('display', 'show_advanced_gestures', value=True)
+                config.set('display', 'show_flight_mode', value=True)
                 config.set('display', 'show_debug_info', value=True)
             elif display_modes[current_display_mode] == 'minimal':
                 config.set('display', 'show_contours', value=False)
@@ -345,11 +399,17 @@ def main():
                 config.set('display', 'show_performance_mode', value=True)
                 config.set('display', 'show_performance_stats', value=True)
                 config.set('display', 'show_system_resources', value=True)
+                config.set('display', 'show_advanced_gestures', value=False)
+                config.set('display', 'show_flight_mode', value=True)
                 config.set('display', 'show_debug_info', value=False)
 
             # 绘制轨迹（如果启用）
             if config.get('display', 'show_trajectory'):
                 frame = trajectory_recorder.draw_trajectory(frame)
+
+            # 绘制高级手势信息
+            if config.get('display', 'show_advanced_gestures'):
+                frame = advanced_gesture_analyzer.draw_gesture_info(frame)
 
             # 绘制UI
             frame = ui_renderer.draw_status_bar(
@@ -358,9 +418,15 @@ def main():
                 trajectory_recorder, gesture_recognizer, performance_analyzer
             )
 
-            # 绘制性能图表（如果启用详细模式）
-            if display_modes[current_display_mode] == 'detailed':
-                frame = ui_renderer.draw_performance_chart(frame, performance_analyzer)
+            # 绘制飞行模式信息
+            if config.get('display', 'show_flight_mode'):
+                frame = ui_renderer.draw_flight_mode(frame, drone_controller)
+
+            # 绘制性能可视化
+            if visualization_modes[current_visualization_mode] == 'charts':
+                frame = performance_visualizer.draw_comprehensive_charts(frame, performance_analyzer)
+            elif visualization_modes[current_visualization_mode] == 'gauges':
+                frame = performance_visualizer.draw_performance_gauges(frame, performance_analyzer)
 
             frame = ui_renderer.draw_help_bar(frame)
 
@@ -375,7 +441,7 @@ def main():
                 frame = ui_renderer.draw_warning(frame, warning_msg)
 
             # 显示图像
-            cv2.imshow('Gesture Controlled Drone - Performance Statistics', frame)
+            cv2.imshow('Gesture Controlled Drone - Enhanced Gestures v2.0', frame)
 
             # ========== 键盘控制 ==========
             key = cv2.waitKey(1) & 0xFF
@@ -410,7 +476,13 @@ def main():
                 # 重置手势识别
                 print("重置手势识别...")
                 gesture_recognizer = EnhancedGestureRecognizer(speech_manager, config)
+                # 重新设置UI渲染器引用
+                gesture_recognizer.set_ui_renderer(ui_renderer)
                 print("✓ 手势识别已重置")
+
+                # 重置手势稳定性分析
+                gesture_stabilizer.reset()
+                print("✓ 手势稳定性分析已重置")
 
                 # 语音提示
                 if speech_manager.enabled:
@@ -479,6 +551,11 @@ def main():
                 print(f"  CPU使用率: {snapshot['cpu_usage']:.1f}%")
                 print(f"  内存使用率: {snapshot['memory_usage']:.1f}%")
 
+                # 显示手势稳定性信息
+                stability_stats = gesture_stabilizer.get_stats()
+                print(f"  手势稳定性评分: {stability_stats['stability_score']:.2f}")
+                print(f"  手势稳定性等级: {stability_stats['stability_level']}")
+
                 # 语音提示
                 if speech_manager.enabled:
                     speech_manager.speak('performance_snapshot', immediate=True)
@@ -520,6 +597,16 @@ def main():
                 # 语音提示
                 if speech_manager.enabled:
                     speech_manager.speak_direct("性能统计已重置")
+
+            # 切换性能可视化模式
+            elif key == ord('f') or key == ord('F'):
+                current_visualization_mode = (current_visualization_mode + 1) % len(visualization_modes)
+                mode_name = visualization_modes[current_visualization_mode]
+                print(f"性能可视化模式: {mode_name}")
+
+                # 语音提示
+                if speech_manager.enabled:
+                    speech_manager.speak_direct(f"性能可视化模式: {mode_name}")
 
             # 轨迹记录控制
             elif key == ord('1'):
