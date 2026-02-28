@@ -11,7 +11,10 @@
 ## 功能模块表
 | 模块类别                | 模块名 | 链接                                                                            | 其他                                                                  |
 |-------------------|------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| 感知             | 车辆检测以及跟踪 | [Yolov4_Vehicle_inspection](https://github.com/OpenHUTB/nn/tree/main/src/Yolov4_Vehicle_inspection)                                                                          | -                                          |
 | 规划             | 车辆全局路径规划 | [carla_slam_gmapping](https://github.com/OpenHUTB/nn/tree/main/src/carla_slam_gmapping)                                                                          | -                                          |
+| 控制             | 手势控制无人机 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | -                                          |
+| 控制             | 倒车入库 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | [效果](https://github.com/OpenHUTB/nn/pull/4399)                                          |
 
 
 ## 贡献指南

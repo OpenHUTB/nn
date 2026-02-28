@@ -85,7 +85,8 @@ class DataAnalyzer:
             'object_statistics': DataAnalyzer._analyze_objects(data_dir),
             'temporal_analysis': DataAnalyzer._analyze_temporal(data_dir),
             'cooperative_data': DataAnalyzer._analyze_cooperative_data(data_dir),
-            'quality_metrics': DataAnalyzer._calculate_quality_metrics(data_dir)
+            'quality_metrics': DataAnalyzer._calculate_quality_metrics(data_dir),
+            'safety_analysis': DataAnalyzer._analyze_safety_data(data_dir)
         }
 
         # 生成评分
@@ -231,6 +232,10 @@ class DataAnalyzer:
                             fusion_dir = os.path.join(data_dir, "fusion")
                             if os.path.exists(fusion_dir):
                                 distribution['fusion'] = DataAnalyzer._analyze_fusion_data(fusion_dir)
+                        elif dir_name == "safety_reports":
+                            safety_dir = os.path.join(data_dir, "safety_reports")
+                            if os.path.exists(safety_dir):
+                                distribution['safety_reports'] = DataAnalyzer._analyze_safety_reports(safety_dir)
 
         return distribution
 
@@ -334,6 +339,41 @@ class DataAnalyzer:
 
         fusion_stats['total_size_mb'] = round(total_size / (1024 * 1024), 2)
         return fusion_stats
+
+    @staticmethod
+    def _analyze_safety_reports(safety_dir):
+        """分析安全报告数据"""
+        safety_stats = {
+            'reports': 0,
+            'high_risk': 0,
+            'medium_risk': 0,
+            'low_risk': 0,
+            'total_interactions': 0
+        }
+
+        json_files = [f for f in os.listdir(safety_dir) if f.lower().endswith('.json')]
+        safety_stats['reports'] = len(json_files)
+
+        if json_files:
+            # 采样分析几个文件
+            sample_files = json_files[:min(5, len(json_files))]
+            for json_file in sample_files:
+                try:
+                    with open(os.path.join(safety_dir, json_file), 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+
+                    if 'high_risk_cases' in data:
+                        safety_stats['high_risk'] += data['high_risk_cases']
+                    if 'medium_risk_cases' in data:
+                        safety_stats['medium_risk'] += data['medium_risk_cases']
+                    if 'low_risk_cases' in data:
+                        safety_stats['low_risk_cases'] += data['low_risk_cases']
+                    if 'total_interactions' in data:
+                        safety_stats['total_interactions'] += data['total_interactions']
+                except:
+                    pass
+
+        return safety_stats
 
     @staticmethod
     def _analyze_objects(data_dir):
@@ -648,6 +688,70 @@ class DataAnalyzer:
         return analysis
 
     @staticmethod
+    def _analyze_safety_data(data_dir):
+        """分析安全数据"""
+        safety_dir = os.path.join(data_dir, "safety_reports")
+
+        if not os.path.exists(safety_dir):
+            return {
+                'total_reports': 0,
+                'risk_levels': {'high': 0, 'medium': 0, 'low': 0},
+                'safety_score': 0,
+                'pedestrian_interactions': 0,
+                'average_distance': 0
+            }
+
+        json_files = [f for f in os.listdir(safety_dir) if f.lower().endswith('.json')]
+
+        safety_data = {
+            'total_reports': len(json_files),
+            'risk_levels': {'high': 0, 'medium': 0, 'low': 0},
+            'safety_score': 0,
+            'pedestrian_interactions': 0,
+            'average_distance': 0,
+            'near_misses': 0,
+            'safety_warnings': 0
+        }
+
+        if json_files:
+            distances = []
+            for json_file in json_files[:min(10, len(json_files))]:
+                try:
+                    with open(os.path.join(safety_dir, json_file), 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+
+                    if 'high_risk_cases' in data:
+                        safety_data['risk_levels']['high'] += data['high_risk_cases']
+                    if 'medium_risk_cases' in data:
+                        safety_data['risk_levels']['medium'] += data['medium_risk_cases']
+                    if 'low_risk_cases' in data:
+                        safety_data['risk_levels']['low'] += data['low_risk_cases']
+                    if 'total_interactions' in data:
+                        safety_data['pedestrian_interactions'] += data['total_interactions']
+                    if 'average_distance' in data:
+                        distances.append(data['average_distance'])
+                    if 'near_misses' in data:
+                        safety_data['near_misses'] += data['near_misses']
+                    if 'safety_warnings' in data:
+                        safety_data['safety_warnings'] += data['safety_warnings']
+
+                except Exception as e:
+                    print(f"分析安全报告 {json_file} 失败: {e}")
+
+            if distances:
+                safety_data['average_distance'] = round(np.mean(distances), 2)
+
+            # 计算安全评分
+            total_risks = sum(safety_data['risk_levels'].values())
+            if total_risks > 0:
+                high_risk_ratio = safety_data['risk_levels']['high'] / total_risks
+                safety_data['safety_score'] = max(0, 100 - high_risk_ratio * 100)
+            else:
+                safety_data['safety_score'] = 100
+
+        return safety_data
+
+    @staticmethod
     def _calculate_quality_metrics(data_dir):
         """计算质量指标（增强版）"""
         quality_metrics = {
@@ -657,6 +761,7 @@ class DataAnalyzer:
             'cooperative_score': 0,
             'temporal_score': 0,
             'structural_score': 0,
+            'safety_score': 0,
             'issues_found': [],
             'recommendations': []
         }
@@ -674,7 +779,8 @@ class DataAnalyzer:
             "lidar",
             "fusion",
             "annotations",
-            "calibration"
+            "calibration",
+            "safety_reports"
         ]
 
         missing_required = []
@@ -781,9 +887,17 @@ class DataAnalyzer:
             quality_metrics['temporal_score'] *= 0.8  # 时长不足，降低分数
             quality_metrics['recommendations'].append("建议增加数据收集时长以获得更完整的时间序列")
 
+        # 7. 安全评分
+        safety_data = DataAnalyzer._analyze_safety_data(data_dir)
+        quality_metrics['safety_score'] = safety_data.get('safety_score', 0)
+
+        if quality_metrics['safety_score'] < 80:
+            quality_metrics['issues_found'].append(f"安全评分较低: {quality_metrics['safety_score']}")
+            quality_metrics['recommendations'].append("建议增加行人安全相关的场景和数据收集")
+
         # 限制分数在0-100之间
         for key in ['completeness_score', 'consistency_score', 'diversity_score',
-                    'cooperative_score', 'temporal_score', 'structural_score']:
+                    'cooperative_score', 'temporal_score', 'structural_score', 'safety_score']:
             quality_metrics[key] = max(0, min(100, quality_metrics[key]))
 
         return quality_metrics
@@ -792,12 +906,13 @@ class DataAnalyzer:
     def _calculate_overall_score(analysis):
         """计算总体评分（增强版）"""
         weights = {
-            'completeness': 0.20,  # 完整性
-            'consistency': 0.15,  # 一致性
-            'demporal': 0.15,  # 时间性
-            'structural': 0.10,  # 结构性
-            'diversity': 0.15,  # 多样性
-            'cooperative': 0.15,  # 协同性
+            'completeness': 0.15,  # 完整性
+            'consistency': 0.12,  # 一致性
+            'temporal': 0.12,  # 时间性
+            'structural': 0.08,  # 结构性
+            'diversity': 0.12,  # 多样性
+            'cooperative': 0.12,  # 协同性
+            'safety': 0.19,  # 安全性
             'quality_bonus': 0.10  # 质量加成
         }
 
@@ -810,7 +925,8 @@ class DataAnalyzer:
                 quality['temporal_score'] * weights['temporal'] +
                 quality['structural_score'] * weights['structural'] +
                 quality['diversity_score'] * weights['diversity'] +
-                quality['cooperative_score'] * weights['cooperative']
+                quality['cooperative_score'] * weights['cooperative'] +
+                quality['safety_score'] * weights['safety']
         )
 
         # 质量加成（基于问题数量）
@@ -822,7 +938,8 @@ class DataAnalyzer:
         # 额外加成（如果数据集特别优秀）
         if (quality['completeness_score'] >= 95 and
                 quality['consistency_score'] >= 90 and
-                quality['diversity_score'] >= 85):
+                quality['diversity_score'] >= 85 and
+                quality['safety_score'] >= 90):
             total_score += 5
 
         return round(min(total_score, 100), 1)
@@ -852,6 +969,7 @@ class DataAnalyzer:
                 'total_objects': analysis['object_statistics']['total_objects'],
                 'num_classes': len(analysis['object_statistics']['by_class'])
             },
+            'safety_data': analysis.get('safety_analysis', {}),
             'analysis_metadata': analysis.get('metadata', {})
         }
 
@@ -919,6 +1037,20 @@ class DataAnalyzer:
             print(f"  每帧物体数统计:")
             print(f"    最小: {stats['min']}, 最大: {stats['max']}, 平均: {stats['mean']}, 中位数: {stats['median']}")
 
+        # 安全数据分析
+        if 'safety_analysis' in analysis:
+            safety = analysis['safety_analysis']
+            print(f"\n🚸 安全数据分析:")
+            print(f"  安全评分: {safety.get('safety_score', 0)}/100")
+            print(f"  风险等级分布:")
+            print(f"    高风险: {safety.get('risk_levels', {}).get('high', 0)}")
+            print(f"    中风险: {safety.get('risk_levels', {}).get('medium', 0)}")
+            print(f"    低风险: {safety.get('risk_levels', {}).get('low', 0)}")
+            print(f"  行人交互次数: {safety.get('pedestrian_interactions', 0)}")
+            print(f"  平均距离: {safety.get('average_distance', 0):.2f}米")
+            print(f"  近距离事件: {safety.get('near_misses', 0)}")
+            print(f"  安全警告: {safety.get('safety_warnings', 0)}")
+
         # 协同数据分析
         cooperative = analysis['cooperative_data']
         print(f"\n🤝 协同数据分析:")
@@ -958,7 +1090,8 @@ class DataAnalyzer:
             ('结构性', quality['structural_score']),
             ('时间性', quality['temporal_score']),
             ('多样性', quality['diversity_score']),
-            ('协同性', quality['cooperative_score'])
+            ('协同性', quality['cooperative_score']),
+            ('安全性', quality['safety_score'])
         ]
 
         for name, score in metrics:
@@ -1015,7 +1148,8 @@ class DataAnalyzer:
                     'object_statistics': {
                         'total_objects': analysis['object_statistics']['total_objects'],
                         'num_classes': len(analysis['object_statistics']['by_class'])
-                    }
+                    },
+                    'safety_analysis': analysis.get('safety_analysis', {})
                 }
 
         if output_file:

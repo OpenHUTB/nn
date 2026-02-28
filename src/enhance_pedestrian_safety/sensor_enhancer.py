@@ -1,5 +1,5 @@
 """
-传感器数据增强模块 - 提高数据质量和多样性（优化版）
+传感器数据增强模块 - 提高数据质量和多样性（行人安全优化版）
 """
 
 import numpy as np
@@ -7,7 +7,6 @@ import cv2
 import random
 import os
 import json
-from PIL import Image, ImageEnhance, ImageFilter
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional, Union, Callable
 import concurrent.futures
@@ -46,6 +45,8 @@ class EnhancementMethod(Enum):
     COLOR_TEMP = "color_temperature"
     JPEG_COMPRESSION = "jpeg_compression"
     COLOR_JITTER = "color_jitter"
+    PEDESTRIAN_HIGHLIGHT = "pedestrian_highlight"  # 新增：行人高亮
+    SAFETY_WARNING = "safety_warning"  # 新增：安全警告
 
 
 @dataclass
@@ -61,6 +62,7 @@ class EnhancementConfig:
     save_enhanced: bool = True
     output_format: str = "jpg"
     compression_quality: int = 90
+    pedestrian_safety_mode: bool = True  # 新增：行人安全模式
 
     def __post_init__(self):
         if self.enabled_methods is None:
@@ -69,6 +71,12 @@ class EnhancementConfig:
                 EnhancementMethod.CONTRAST,
                 EnhancementMethod.BRIGHTNESS
             ]
+        # 如果启用行人安全模式，添加相关方法
+        if self.pedestrian_safety_mode:
+            if EnhancementMethod.PEDESTRIAN_HIGHLIGHT not in self.enabled_methods:
+                self.enabled_methods.append(EnhancementMethod.PEDESTRIAN_HIGHLIGHT)
+            if EnhancementMethod.SAFETY_WARNING not in self.enabled_methods:
+                self.enabled_methods.append(EnhancementMethod.SAFETY_WARNING)
 
 
 class BatchEnhancer:
@@ -193,7 +201,7 @@ class BatchEnhancer:
 
 
 class SensorDataEnhancer:
-    """传感器数据增强器（优化版）"""
+    """传感器数据增强器（行人安全优化版）"""
 
     def __init__(self, config: Union[EnhancementConfig, Dict]):
         if isinstance(config, dict):
@@ -210,9 +218,13 @@ class SensorDataEnhancer:
             'method_times': {}
         }
 
+        # 行人检测模拟数据
+        self.pedestrian_detections = []
+        self.safety_warnings = []
+
     def _setup_method_registry(self) -> Dict[EnhancementMethod, Callable]:
         """设置方法注册表"""
-        return {
+        registry = {
             EnhancementMethod.NORMALIZE: self._normalize_image,
             EnhancementMethod.BRIGHTNESS: self._adjust_brightness,
             EnhancementMethod.CONTRAST: self._adjust_contrast,
@@ -228,8 +240,11 @@ class SensorDataEnhancer:
             EnhancementMethod.VIGNETTE: self._add_vignette,
             EnhancementMethod.COLOR_TEMP: self._adjust_color_temperature,
             EnhancementMethod.JPEG_COMPRESSION: self._simulate_jpeg_compression,
-            EnhancementMethod.COLOR_JITTER: self._color_jitter
+            EnhancementMethod.COLOR_JITTER: self._color_jitter,
+            EnhancementMethod.PEDESTRIAN_HIGHLIGHT: self._highlight_pedestrians,  # 新增
+            EnhancementMethod.SAFETY_WARNING: self._add_safety_warnings  # 新增
         }
+        return registry
 
     def _setup_weather_methods(self) -> Dict[WeatherType, List[EnhancementMethod]]:
         """设置天气相关方法"""
@@ -262,7 +277,8 @@ class SensorDataEnhancer:
                 EnhancementMethod.BRIGHTNESS,
                 EnhancementMethod.CONTRAST,
                 EnhancementMethod.NOISE,
-                EnhancementMethod.VIGNETTE
+                EnhancementMethod.VIGNETTE,
+                EnhancementMethod.PEDESTRIAN_HIGHLIGHT  # 夜间特别关注行人
             ],
             WeatherType.SUNSET: [
                 EnhancementMethod.NORMALIZE,
@@ -276,7 +292,7 @@ class SensorDataEnhancer:
                      sensor_type: str = 'camera',
                      return_methods: bool = False) -> Union[np.ndarray, Tuple]:
         """
-        增强图像数据（优化版）
+        增强图像数据（行人安全优化版）
 
         Args:
             image_data: 原始图像数据 (H, W, C)
@@ -404,11 +420,10 @@ class SensorDataEnhancer:
             stats['avg_time_per_call'] = stats['total_time'] / stats['calls']
         return stats
 
-    # ========== 增强方法实现（优化版）==========
+    # ========== 增强方法实现（行人安全优化版）==========
 
     def _normalize_image(self, image: np.ndarray) -> np.ndarray:
         """图像归一化（优化版）"""
-        # 使用OpenCV加速
         if image.dtype != np.uint8:
             normalized = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
             return normalized.astype(np.uint8)
@@ -418,9 +433,7 @@ class SensorDataEnhancer:
         """调整亮度（优化版）"""
         factor = random.uniform(*self.config.intensity_range)
 
-        # 使用NumPy向量化操作
         if factor != 1.0:
-            # 转换为浮点数进行计算
             img_float = image.astype(np.float32) * factor
             return np.clip(img_float, 0, 255).astype(np.uint8)
         return image
@@ -430,9 +443,7 @@ class SensorDataEnhancer:
         factor = random.uniform(*self.config.intensity_range)
 
         if factor != 1.0:
-            # 计算平均值
             mean = np.mean(image, axis=(0, 1), keepdims=True)
-            # 应用对比度调整
             contrasted = mean + factor * (image.astype(np.float32) - mean)
             return np.clip(contrasted, 0, 255).astype(np.uint8)
         return image
@@ -442,18 +453,14 @@ class SensorDataEnhancer:
         factor = random.uniform(*self.config.intensity_range)
 
         if factor != 1.0:
-            # 转换为HSV空间
             hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
-            # 调整饱和度通道
             hsv[:, :, 1] = np.clip(hsv[:, :, 1] * factor, 0, 255)
-            # 转换回RGB
             saturated = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
             return saturated
         return image
 
     def _enhance_sharpness(self, image: np.ndarray) -> np.ndarray:
         """增强锐度（优化版）"""
-        # 使用拉普拉斯算子增强边缘
         kernel = np.array([[0, -1, 0],
                           [-1, 5, -1],
                           [0, -1, 0]])
@@ -464,7 +471,6 @@ class SensorDataEnhancer:
         """伽马校正（优化版）"""
         gamma = random.uniform(0.5, 2.0)
 
-        # 使用LUT加速
         table = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)]).astype(np.uint8)
         corrected = cv2.LUT(image, table)
         return corrected
@@ -474,7 +480,6 @@ class SensorDataEnhancer:
         noise_type = random.choice(['gaussian', 'salt_pepper'])
 
         if noise_type == 'gaussian':
-            # 高斯噪声
             mean = 0
             var = random.uniform(0.001, 0.005)
             sigma = var ** 0.5
@@ -483,18 +488,15 @@ class SensorDataEnhancer:
             return np.clip(noisy, 0, 255).astype(np.uint8)
 
         else:  # salt_pepper
-            # 椒盐噪声
             amount = random.uniform(0.001, 0.005)
             s_vs_p = random.uniform(0.3, 0.7)
 
             noisy = image.copy()
 
-            # 盐噪声
             num_salt = np.ceil(amount * image.size * s_vs_p / 3)
             coords = [np.random.randint(0, i, int(num_salt)) for i in image.shape]
             noisy[coords[0], coords[1], :] = 255
 
-            # 椒噪声
             num_pepper = np.ceil(amount * image.size * (1.0 - s_vs_p) / 3)
             coords = [np.random.randint(0, i, int(num_pepper)) for i in image.shape]
             noisy[coords[0], coords[1], :] = 0
@@ -513,7 +515,6 @@ class SensorDataEnhancer:
         kernel_size = random.choice([7, 9, 11])
         direction = random.choice(['horizontal', 'vertical', 'diagonal'])
 
-        # 创建运动模糊核
         kernel = np.zeros((kernel_size, kernel_size))
 
         if direction == 'horizontal':
@@ -526,7 +527,6 @@ class SensorDataEnhancer:
 
         blurred = cv2.filter2D(image, -1, kernel)
 
-        # 混合原图和模糊图
         alpha = random.uniform(0.3, 0.7)
         result = cv2.addWeighted(image, 1 - alpha, blurred, alpha, 0)
         return result.astype(np.uint8)
@@ -535,10 +535,8 @@ class SensorDataEnhancer:
         """添加雨滴效果（优化版）"""
         h, w = image.shape[:2]
 
-        # 创建雨滴层
         rain_layer = np.zeros((h, w), dtype=np.float32)
 
-        # 生成随机雨滴
         num_drops = random.randint(200, 800)
         drop_length = random.randint(8, 15)
 
@@ -547,15 +545,12 @@ class SensorDataEnhancer:
             y = random.randint(0, h - 1)
             brightness = random.uniform(0.3, 0.6)
 
-            # 绘制雨滴线
             for i in range(drop_length):
                 if y + i < h and x + i < w:
                     rain_layer[y + i, x + i] += brightness
 
-        # 模糊雨滴层
         rain_layer = cv2.GaussianBlur(rain_layer, (3, 3), 0)
 
-        # 叠加到原图
         rain_layer_3d = np.stack([rain_layer] * 3, axis=2)
         enhanced = image.astype(np.float32) * 0.9 + rain_layer_3d * 0.1 * 255
         return np.clip(enhanced, 0, 255).astype(np.uint8)
@@ -564,17 +559,14 @@ class SensorDataEnhancer:
         """添加雾效（优化版）"""
         h, w = image.shape[:2]
 
-        # 创建深度图（简化版，假设中心最近）
         center_y, center_x = h // 2, w // 2
         y_coords, x_coords = np.ogrid[:h, :w]
         distance = np.sqrt((x_coords - center_x) ** 2 + (y_coords - center_y) ** 2)
         distance = distance / np.max(distance)
 
-        # 雾效强度
         fog_intensity = random.uniform(0.2, 0.5)
         fog_color = random.choice([200, 210, 220])
 
-        # 应用雾效
         fog_strength = distance * fog_intensity
         fog_strength_3d = np.stack([fog_strength] * 3, axis=2)
         fog_layer = np.ones_like(image) * fog_color
@@ -586,19 +578,15 @@ class SensorDataEnhancer:
 
     def _add_cloud_effect(self, image: np.ndarray) -> np.ndarray:
         """添加云层效果（优化版）"""
-        # 降低饱和度和对比度，模拟多云天气
         hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
 
-        # 调整饱和度
         hsv[:, :, 1] *= random.uniform(0.7, 0.9)
 
-        # 调整亮度和对比度
         brightness_factor = random.uniform(0.9, 1.1)
         contrast_factor = random.uniform(0.8, 0.95)
 
         hsv[:, :, 2] = np.clip(hsv[:, :, 2] * brightness_factor, 0, 255)
 
-        # 应用对比度调整
         mean = np.mean(hsv[:, :, 2])
         hsv[:, :, 2] = mean + contrast_factor * (hsv[:, :, 2] - mean)
         hsv[:, :, 2] = np.clip(hsv[:, :, 2], 0, 255)
@@ -610,21 +598,17 @@ class SensorDataEnhancer:
         """添加暗角效果（优化版）"""
         h, w = image.shape[:2]
 
-        # 创建暗角蒙版
         center_y, center_x = h // 2, w // 2
         y_coords, x_coords = np.ogrid[:h, :w]
 
-        # 计算距离（使用椭圆形状）
         y_dist = (y_coords - center_y) / (h / 2)
         x_dist = (x_coords - center_x) / (w / 2)
         distance = np.sqrt(x_dist ** 2 + y_dist ** 2)
 
-        # 创建暗角
         vignette_intensity = random.uniform(0.2, 0.4)
         vignette = 1 - distance * vignette_intensity
         vignette = np.clip(vignette, 0.6, 1.0)
 
-        # 应用暗角
         vignette_3d = np.stack([vignette] * 3, axis=2)
         enhanced = image.astype(np.float32) * vignette_3d
 
@@ -634,16 +618,13 @@ class SensorDataEnhancer:
         """调整色温（优化版）"""
         temp_type = random.choice(['warm', 'cool'])
 
-        # 转换为浮点数
         img_float = image.astype(np.float32)
 
         if temp_type == 'warm':
-            # 暖色调：增加红色和黄色
             img_float[:, :, 0] *= random.uniform(1.0, 1.15)  # 红色
             img_float[:, :, 1] *= random.uniform(1.0, 1.1)   # 绿色
             img_float[:, :, 2] *= random.uniform(0.9, 1.0)   # 蓝色
         else:
-            # 冷色调：增加蓝色
             img_float[:, :, 0] *= random.uniform(0.9, 1.0)   # 红色
             img_float[:, :, 1] *= random.uniform(0.95, 1.0)  # 绿色
             img_float[:, :, 2] *= random.uniform(1.0, 1.15)  # 蓝色
@@ -653,15 +634,12 @@ class SensorDataEnhancer:
 
     def _simulate_jpeg_compression(self, image: np.ndarray) -> np.ndarray:
         """模拟JPEG压缩（优化版）"""
-        # 使用OpenCV的JPEG编码/解码模拟压缩
         quality = random.randint(70, 95)
 
-        # 编码为JPEG
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), quality]
         result, encoded = cv2.imencode('.jpg', cv2.cvtColor(image, cv2.COLOR_RGB2BGR), encode_param)
 
         if result:
-            # 解码
             decoded = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
             return cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB)
 
@@ -669,57 +647,124 @@ class SensorDataEnhancer:
 
     def _color_jitter(self, image: np.ndarray) -> np.ndarray:
         """颜色抖动（优化版）"""
-        # 随机应用多种颜色变换
         transforms = []
 
-        # 亮度调整
         if random.random() > 0.5:
             brightness = random.uniform(0.8, 1.2)
             transforms.append(lambda img: self._adjust_brightness(img, brightness))
 
-        # 对比度调整
         if random.random() > 0.5:
             contrast = random.uniform(0.8, 1.2)
             transforms.append(lambda img: self._adjust_contrast(img, contrast))
 
-        # 饱和度调整
         if random.random() > 0.5:
             saturation = random.uniform(0.8, 1.2)
             transforms.append(lambda img: self._adjust_saturation(img, saturation))
 
-        # 随机应用变换
         if transforms:
             random.shuffle(transforms)
-            for transform in transforms[:2]:  # 最多应用2个变换
+            for transform in transforms[:2]:
                 image = transform(image)
 
         return image
 
+    def _highlight_pedestrians(self, image: np.ndarray) -> np.ndarray:
+        """高亮行人（新增方法）"""
+        if not self.config.pedestrian_safety_mode:
+            return image
+
+        h, w = image.shape[:2]
+        highlighted = image.copy()
+
+        # 模拟行人检测（随机位置）
+        num_pedestrians = random.randint(1, 3)
+
+        for i in range(num_pedestrians):
+            # 随机位置
+            x = random.randint(50, w - 150)
+            y = random.randint(50, h - 200)
+
+            # 随机大小
+            width = random.randint(30, 70)
+            height = random.randint(80, 180)
+
+            # 根据距离设置颜色（模拟风险评估）
+            distance = random.uniform(5.0, 50.0)
+            if distance < 10.0:
+                color = (0, 0, 255)  # 红色：高风险
+                thickness = 3
+            elif distance < 20.0:
+                color = (0, 165, 255)  # 橙色：中风险
+                thickness = 2
+            else:
+                color = (0, 255, 0)  # 绿色：低风险
+                thickness = 1
+
+            # 绘制边界框
+            cv2.rectangle(highlighted, (x, y), (x + width, y + height), color, thickness)
+
+            # 添加标签
+            label = f"Pedestrian {distance:.1f}m"
+            cv2.putText(highlighted, label, (x, y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, thickness)
+
+            # 记录检测
+            self.pedestrian_detections.append({
+                'position': (x, y, width, height),
+                'distance': distance,
+                'risk_level': 'high' if distance < 10.0 else 'medium' if distance < 20.0 else 'low'
+            })
+
+        return highlighted
+
+    def _add_safety_warnings(self, image: np.ndarray) -> np.ndarray:
+        """添加安全警告（新增方法）"""
+        if not self.config.pedestrian_safety_mode:
+            return image
+
+        warned = image.copy()
+
+        # 检查是否有高风险行人
+        high_risk = [d for d in self.pedestrian_detections if d['risk_level'] == 'high']
+
+        if high_risk:
+            # 在图像顶部添加警告条
+            warning_height = 40
+            warning_bar = np.zeros((warning_height, image.shape[1], 3), dtype=np.uint8)
+            warning_bar[:] = (0, 0, 255)  # 红色背景
+
+            # 添加警告文本
+            warning_text = f"WARNING: {len(high_risk)} high-risk pedestrians detected!"
+            cv2.putText(warning_bar, warning_text, (10, 25),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+            # 将警告条添加到图像顶部
+            warned = np.vstack([warning_bar, warned])
+
+            # 记录警告
+            self.safety_warnings.append({
+                'timestamp': time.time(),
+                'high_risk_count': len(high_risk),
+                'message': warning_text
+            })
+
+        return warned
+
     def _enhance_non_rgb_image(self, image_data: np.ndarray, sensor_type: str) -> np.ndarray:
         """增强非RGB图像（深度、语义分割）"""
         if sensor_type == 'depth':
-            # 深度图增强：归一化和去噪
             if image_data.dtype != np.uint8:
-                # 归一化到0-255
                 normalized = cv2.normalize(image_data, None, 0, 255, cv2.NORM_MINMAX)
             else:
                 normalized = image_data
 
-            # 应用中值滤波去除噪声
             enhanced = cv2.medianBlur(normalized, 3)
             return enhanced.astype(np.uint8)
 
         elif sensor_type == 'semantic':
-            # 语义分割图增强：保持类别不变，只做边界平滑
             kernel = np.ones((3, 3), np.uint8)
-
-            # 形态学操作：先腐蚀再膨胀（闭运算）填充小孔
             enhanced = cv2.morphologyEx(image_data, cv2.MORPH_CLOSE, kernel)
-
-            # 高斯模糊平滑边界
             enhanced = cv2.GaussianBlur(enhanced, (3, 3), 0.5)
-
-            # 恢复类别值
             enhanced = np.round(enhanced).astype(image_data.dtype)
             return enhanced
 
@@ -727,19 +772,15 @@ class SensorDataEnhancer:
 
     def save_enhanced_image(self, image_data: np.ndarray, output_path: str,
                            metadata: Optional[Dict] = None):
-        """保存增强后的图像和元数据（优化版）"""
+        """保存增强后的图像和元数据"""
         try:
-            # 确保目录存在
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-            # 保存图像
             if output_path.lower().endswith(('.png', '.jpg', '.jpeg')):
                 cv2.imwrite(output_path, cv2.cvtColor(image_data, cv2.COLOR_RGB2BGR))
             else:
-                # 默认保存为PNG
                 cv2.imwrite(output_path + '.png', cv2.cvtColor(image_data, cv2.COLOR_RGB2BGR))
 
-            # 保存元数据
             if metadata:
                 meta_path = output_path.rsplit('.', 1)[0] + '_meta.json'
                 with open(meta_path, 'w', encoding='utf-8') as f:
@@ -750,7 +791,7 @@ class SensorDataEnhancer:
             raise
 
     def generate_enhancement_report(self, output_dir: str) -> Dict:
-        """生成增强报告（优化版）"""
+        """生成增强报告"""
         report = {
             'timestamp': datetime.now().isoformat(),
             'config': {
@@ -758,7 +799,8 @@ class SensorDataEnhancer:
                 'time_of_day': self.config.time_of_day,
                 'enabled_methods': [m.value for m in self.config.enabled_methods],
                 'intensity_range': self.config.intensity_range,
-                'probability': self.config.probability
+                'probability': self.config.probability,
+                'pedestrian_safety_mode': self.config.pedestrian_safety_mode
             },
             'performance_stats': self.get_performance_stats(),
             'method_usage': {
@@ -768,98 +810,19 @@ class SensorDataEnhancer:
             'cache_info': {
                 'cache_size': len(self.method_cache),
                 'cache_hits': self.perf_stats.get('cache_hit_calls', 0)
+            },
+            'safety_statistics': {
+                'pedestrian_detections': len(self.pedestrian_detections),
+                'safety_warnings': len(self.safety_warnings),
+                'high_risk_cases': len([d for d in self.pedestrian_detections if d['risk_level'] == 'high'])
             }
         }
 
-        # 保存报告
         report_path = os.path.join(output_dir, 'enhancement_report.json')
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
 
         return report
-
-
-# 保持向后兼容的类
-class SensorCalibrator:
-    """传感器校准模块（优化版）"""
-
-    def __init__(self, config: Dict):
-        self.config = config
-        self.calibration_data = {}
-
-    def generate_calibration_files(self, output_dir: str,
-                                   vehicle_locations: List[Dict],
-                                   camera_positions: List[Dict]):
-        """生成传感器校准文件（优化版）"""
-        calib_dir = os.path.join(output_dir, "calibration")
-        os.makedirs(calib_dir, exist_ok=True)
-
-        # 1. 生成相机内参
-        self._generate_camera_intrinsics(calib_dir)
-
-        # 2. 生成外参（相机到车辆）
-        self._generate_extrinsics(calib_dir, vehicle_locations, camera_positions)
-
-        # 3. 生成传感器间标定
-        self._generate_sensor_calibration(calib_dir)
-
-        # 4. 生成时间同步校准
-        self._generate_temporal_calibration(calib_dir)
-
-        # 5. 生成验证数据
-        self._generate_validation_data(calib_dir)
-
-        print(f"校准文件已生成到: {calib_dir}")
-        return calib_dir
-
-    def _generate_camera_intrinsics(self, calib_dir: str):
-        """生成相机内参（优化版）"""
-        image_size = self.config.get('sensors', {}).get('image_size', [1280, 720])
-        width, height = image_size[0], image_size[1]
-
-        # 为不同相机生成不同的内参
-        camera_types = [
-            ('front_wide', 100.0),   # 前视广角
-            ('front_narrow', 60.0),  # 前视窄角
-            ('side', 90.0),          # 侧视
-            ('rear', 120.0),         # 后视
-            ('infrastructure', 120.0) # 基础设施
-        ]
-
-        for camera_name, fov in camera_types:
-            # 内参矩阵 [fx, 0, cx; 0, fy, cy; 0, 0, 1]
-            fx = width / (2 * np.tan(np.radians(fov / 2)))
-            fy = fx
-            cx = width / 2.0
-            cy = height / 2.0
-
-            intrinsics = {
-                'camera_name': camera_name,
-                'camera_matrix': [
-                    [float(fx), 0.0, float(cx)],
-                    [0.0, float(fy), float(cy)],
-                    [0.0, 0.0, 1.0]
-                ],
-                'distortion_coefficients': [
-                    random.uniform(-0.1, 0.1),  # k1
-                    random.uniform(-0.01, 0.01), # k2
-                    0.0,  # p1
-                    0.0,  # p2
-                    random.uniform(-0.001, 0.001)  # k3
-                ],
-                'image_size': [int(width), int(height)],
-                'fov': float(fov),
-                'pixel_size': [0.003, 0.003],  # 假设像素大小
-                'sensor_type': 'pinhole',
-                'calibration_date': datetime.now().isoformat(),
-                'accuracy': random.uniform(0.5, 1.0)  # 标定精度（像素）
-            }
-
-            file_path = os.path.join(calib_dir, f'{camera_name}_intrinsic.json')
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(intrinsics, f, indent=2, ensure_ascii=False)
-
-    # ... 其他方法保持不变，但可以添加更多优化 ...
 
 
 # 兼容旧版本接口

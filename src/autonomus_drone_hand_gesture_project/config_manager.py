@@ -86,6 +86,9 @@ class ConfigManager:
                 'transition_threshold': 0.3,
                 'position_stability_weight': 0.4,
                 'gesture_cooldown': 0.5,
+                # 新增手势稳定性分析配置
+                'stability_window_size': 15,
+                'enable_gesture_stability_analysis': True,
             },
             'drone': {
                 'velocity': 2.5,
@@ -111,6 +114,11 @@ class ConfigManager:
                 'show_performance_mode': True,
                 'show_performance_stats': True,
                 'show_system_resources': True,
+                'show_advanced_gestures': True,
+                # 新增性能可视化配置
+                'show_performance_visualization': True,
+                'performance_visualization_mode': 'charts',  # 'none', 'charts', 'gauges'
+                'show_gesture_stability_info': True,
             },
             'performance': {
                 'target_fps': 30,
@@ -121,11 +129,20 @@ class ConfigManager:
                 'modes': ['fast', 'balanced', 'accurate'],
                 'auto_report_interval': 60,
                 'enable_performance_monitor': True,
+                # 新增性能监控配置
+                'enable_gpu_monitoring': True,
+                'enable_performance_prediction': True,
+                'enable_anomaly_detection': True,
+                'performance_visualization': True,
+                'detailed_performance_charts': False,
             },
             'calibration': {
                 'auto_calibrate_skin': True,
                 'skin_calibration_frames': 30,
-                'hand_size_calibration': True
+                'hand_size_calibration': True,
+                # 新增自动校准配置
+                'auto_adjust_parameters': True,
+                'calibration_interval': 300,  # 每5分钟校准一次
             },
             'speech': {
                 'enabled': True,
@@ -143,6 +160,10 @@ class ConfigManager:
                 'min_gesture_confidence': 0.7,
                 'gesture_start_threshold': 3,
                 'gesture_end_threshold': 10,
+                # 新增语音配置
+                'announce_stability_status': True,
+                'announce_visualization_changes': True,
+                'performance_warnings_enabled': True,
             },
             'recording': {
                 'auto_save_interval': 5,
@@ -151,12 +172,45 @@ class ConfigManager:
                 'trajectory_thickness': 2,
                 'trajectory_max_length': 100,
                 'default_save_dir': 'trajectories',
+                # 新增录制配置
+                'auto_playback_after_recording': False,
+                'save_compressed_trajectories': True,
+                'max_auto_save_files': 10,
+            },
+            'stability': {
+                # 新增稳定性分析配置
+                'enable_stability_analysis': True,
+                'stability_update_interval': 1.0,
+                'min_stability_score': 0.6,
+                'max_transition_count': 10,
+                'stability_notification_enabled': True,
+                'auto_reset_on_unstable': True,
+            },
+            'visualization': {
+                # 新增可视化配置
+                'chart_update_rate': 2,  # 每2帧更新一次图表
+                'gauge_update_rate': 5,  # 每5帧更新一次仪表盘
+                'chart_history_length': 30,
+                'show_chart_grid': True,
+                'chart_background_opacity': 0.7,
+                'performance_colors': {
+                    'excellent': (0, 255, 0),
+                    'good': (100, 255, 100),
+                    'fair': (255, 255, 0),
+                    'poor': (255, 165, 0),
+                    'critical': (255, 0, 0)
+                }
             }
         }
+
         self.config = self.load_config()
         self.skin_calibration_data = []
         self.hand_size_calibration_done = False
         self.reference_hand_size = 0
+
+        # 新增：可视化状态
+        self.visualization_enabled = self.get('display', 'show_performance_visualization')
+        self.visualization_mode = self.get('display', 'performance_visualization_mode')
 
     def load_config(self):
         """加载配置"""
@@ -215,6 +269,13 @@ class ConfigManager:
 
         config[keys[-1]] = value
         self.save_config()
+
+        # 更新内部状态
+        if len(keys) == 2:
+            if keys[0] == 'display' and keys[1] == 'show_performance_visualization':
+                self.visualization_enabled = value
+            elif keys[0] == 'display' and keys[1] == 'performance_visualization_mode':
+                self.visualization_mode = value
 
     def get_performance_mode_config(self, mode=None):
         """获取性能模式配置"""
@@ -311,3 +372,159 @@ class ConfigManager:
             self.reference_hand_size = hand_area
             self.hand_size_calibration_done = True
             print(f"✓ 手部大小校准完成: {self.reference_hand_size:.0f} 像素")
+
+    def toggle_visualization_mode(self):
+        """切换可视化模式"""
+        modes = ['none', 'charts', 'gauges']
+        current_mode = self.get('display', 'performance_visualization_mode')
+
+        if current_mode not in modes:
+            current_mode = 'none'
+
+        current_index = modes.index(current_mode)
+        next_index = (current_index + 1) % len(modes)
+        next_mode = modes[next_index]
+
+        self.set('display', 'performance_visualization_mode', value=next_mode)
+        self.visualization_mode = next_mode
+
+        print(f"✓ 可视化模式切换为: {next_mode}")
+        return next_mode
+
+    def toggle_visualization(self):
+        """切换可视化显示"""
+        current = self.get('display', 'show_performance_visualization')
+        new_value = not current
+        self.set('display', 'show_performance_visualization', value=new_value)
+        self.visualization_enabled = new_value
+
+        print(f"✓ 性能可视化: {'开启' if new_value else '关闭'}")
+        return new_value
+
+    def get_visualization_status(self):
+        """获取可视化状态"""
+        return {
+            'enabled': self.visualization_enabled,
+            'mode': self.visualization_mode,
+            'show_chart_grid': self.get('visualization', 'show_chart_grid'),
+            'chart_background_opacity': self.get('visualization', 'chart_background_opacity')
+        }
+
+    def get_stability_config(self):
+        """获取稳定性分析配置"""
+        return {
+            'enabled': self.get('stability', 'enable_stability_analysis'),
+            'window_size': self.get('gesture', 'stability_window_size'),
+            'update_interval': self.get('stability', 'stability_update_interval'),
+            'min_score': self.get('stability', 'min_stability_score'),
+            'auto_reset': self.get('stability', 'auto_reset_on_unstable')
+        }
+
+    def get_visualization_config(self):
+        """获取可视化配置"""
+        return {
+            'chart_update_rate': self.get('visualization', 'chart_update_rate'),
+            'gauge_update_rate': self.get('visualization', 'gauge_update_rate'),
+            'chart_history_length': self.get('visualization', 'chart_history_length'),
+            'show_grid': self.get('visualization', 'show_chart_grid'),
+            'background_opacity': self.get('visualization', 'chart_background_opacity'),
+            'colors': self.get('visualization', 'performance_colors')
+        }
+
+    def validate_config(self):
+        """验证配置有效性"""
+        issues = []
+
+        # 检查性能模式
+        current_mode = self.get('performance', 'mode')
+        if current_mode not in self.performance_modes:
+            issues.append(f"无效的性能模式: {current_mode}")
+            self.set('performance', 'mode', value='balanced')
+
+        # 检查可视化模式
+        viz_mode = self.get('display', 'performance_visualization_mode')
+        valid_viz_modes = ['none', 'charts', 'gauges']
+        if viz_mode not in valid_viz_modes:
+            issues.append(f"无效的可视化模式: {viz_mode}")
+            self.set('display', 'performance_visualization_mode', value='charts')
+
+        # 检查手势稳定性窗口大小
+        window_size = self.get('gesture', 'stability_window_size')
+        if not isinstance(window_size, int) or window_size < 5 or window_size > 50:
+            issues.append(f"无效的手势稳定性窗口大小: {window_size}")
+            self.set('gesture', 'stability_window_size', value=15)
+
+        if issues:
+            print("⚠ 配置验证发现问题:")
+            for issue in issues:
+                print(f"  - {issue}")
+            print("✓ 已自动修复配置问题")
+
+        return len(issues) == 0
+
+    def reset_to_defaults(self, section=None):
+        """重置配置为默认值"""
+        if section is None:
+            self.config = self.default_config.copy()
+            print("✓ 所有配置已重置为默认值")
+        elif section in self.default_config:
+            self.config[section] = self.default_config[section].copy()
+            print(f"✓ {section} 配置已重置为默认值")
+        else:
+            print(f"⚠ 无效的配置节: {section}")
+            return False
+
+        self.save_config()
+        return True
+
+    def export_config(self, filename=None):
+        """导出配置到文件"""
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if filename is None:
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(current_dir, f'gesture_config_backup_{timestamp}.json')
+
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+            print(f"📤 配置已导出到: {filename}")
+            return True
+        except Exception as e:
+            print(f"❌ 导出配置失败: {e}")
+            return False
+
+    def import_config(self, filename):
+        """从文件导入配置"""
+        try:
+            if not os.path.exists(filename):
+                print(f"❌ 配置文件不存在: {filename}")
+                return False
+
+            with open(filename, 'r', encoding='utf-8') as f:
+                loaded_config = json.load(f)
+
+            # 合并配置
+            self._merge_config(self.config, loaded_config)
+            self.save_config()
+
+            print(f"📥 配置已从文件导入: {filename}")
+            return True
+        except Exception as e:
+            print(f"❌ 导入配置失败: {e}")
+            return False
+
+# 用于测试配置管理器
+if __name__ == "__main__":
+    import time
+
+    config = ConfigManager()
+
+    print("当前配置状态:")
+    print(f"  性能模式: {config.get('performance', 'mode')}")
+    print(f"  可视化模式: {config.get('display', 'performance_visualization_mode')}")
+    print(f"  手势稳定性分析: {config.get('gesture', 'enable_gesture_stability_analysis')}")
+    print(f"  GPU监控: {config.get('performance', 'enable_gpu_monitoring')}")
+
+    # 验证配置
+    config.validate_config()

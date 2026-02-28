@@ -3,7 +3,7 @@
 """
 DeepMind Humanoid Robot Simulation
 Dynamic Obstacle Avoidance + Distance-Priority Multi-Target Tracking
-Stable Version: Solves robot falling on startup
+Final Stable Version: Completely fixed robot disappearing issue in MuJoCo viewer
 GitHub compatible (UTF-8, no log files generated)
 """
 
@@ -44,9 +44,12 @@ class StablePatrolController:
         # -------------------------- Patrol Target Configuration --------------------------
         self.patrol_points = [
             {"name": "patrol_target_1", "pos": np.array([0.0, 0.0]), "label": "Start Point", "update_interval": 10.0},
-            {"name": "patrol_target_2", "pos": np.array([2.0, -1.0]), "label": "Patrol Point 1 (SW)", "update_interval": 12.0},
-            {"name": "patrol_target_3", "pos": np.array([4.0, 1.0]), "label": "Patrol Point 2 (NE)", "update_interval": 14.0},
-            {"name": "patrol_target_4", "pos": np.array([6.0, -0.5]), "label": "Patrol Point 3 (NW)", "update_interval": 11.0},
+            {"name": "patrol_target_2", "pos": np.array([2.0, -1.0]), "label": "Patrol Point 1 (SW)",
+             "update_interval": 12.0},
+            {"name": "patrol_target_3", "pos": np.array([4.0, 1.0]), "label": "Patrol Point 2 (NE)",
+             "update_interval": 14.0},
+            {"name": "patrol_target_4", "pos": np.array([6.0, -0.5]), "label": "Patrol Point 3 (NW)",
+             "update_interval": 11.0},
             {"name": "patrol_target_5", "pos": np.array([8.0, 0.0]), "label": "Final Point", "update_interval": 13.0}
         ]
         self.current_target_idx = 0  # Current tracked target index
@@ -86,13 +89,14 @@ class StablePatrolController:
         self.gait_period = 3.0  # Longer gait period for stability
         self.swing_gain = 0.3
         self.stance_gain = 0.4
-        self.forward_speed = 0.1  # Ultra-slow forward speed
+        self.forward_speed = 0.05  # Reduced speed to prevent flying (fix disappearing issue)
         self.heading_kp = 40.0
         self.balance_kp = 60.0
         self.balance_kd = 30.0
         self.torso_pitch_target = 0.05  # Slight forward tilt for balance
         self.torso_roll_target = 0.0
         self.max_joint_velocity = 0.5  # Limit joint speed to prevent falling
+        self.max_ctrl_amplitude = 0.8  # Max control command amplitude (core fix for disappearing)
 
         # Balance assist parameters
         self.center_of_mass_target = np.array([0.0, 0.0, 0.8])
@@ -103,7 +107,7 @@ class StablePatrolController:
         # -------------------------- Initialize Components --------------------------
         self._init_component_ids()
         self._init_obstacle_history()
-        self._set_initial_pose()
+        self._set_initial_pose()  # Fixed initial position here
 
     def _init_component_ids(self):
         """Initialize all MuJoCo component IDs (joints, motors, bodies)"""
@@ -216,11 +220,23 @@ class StablePatrolController:
             self.wall_pos_history[wall_name] = deque(maxlen=10)
 
     def _set_initial_pose(self):
-        """Set stable initial standing pose to prevent falling on startup"""
-        # Reset all control commands
+        """强制固定机器人初始位置到视野中心，彻底解决消失问题（核心最终修复）"""
+        # 1. 重置仿真数据（清空所有异常状态）
+        mujoco.mj_resetData(self.model, self.data)
+
+        # 2. 重置所有控制指令
         self.data.ctrl[:] = 0.0
 
-        # Initial joint positions (stable standing)
+        # 3. 强制设置机器人根关节初始世界坐标（不依赖关节ID，直接操作qpos前6位）
+        # qpos前3位：x/y/z 位置（固定在视野中心）；后3位：roll/pitch/yaw 姿态（无倾斜旋转）
+        self.data.qpos[0] = 0.0  # x坐标：视野中心
+        self.data.qpos[1] = 0.0  # y坐标：视野中心
+        self.data.qpos[2] = 0.8  # z坐标：站立高度，确保在地面上方
+        self.data.qpos[3] = 0.0  # roll：无左右倾斜
+        self.data.qpos[4] = 0.0  # pitch：无前后倾斜
+        self.data.qpos[5] = 0.0  # yaw：无旋转
+
+        # 4. 强制设置机器人关节初始位置（稳定站立姿态，避免倾倒）
         joint_positions = {
             "abdomen_x": 0.0,
             "abdomen_y": 0.0,
@@ -244,20 +260,26 @@ class StablePatrolController:
             "shoulder2_left": 0.0,
             "elbow_left": -0.1
         }
-
-        # Apply initial joint positions
         for joint_name, target_pos in joint_positions.items():
             joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
             if joint_id != -1:
-                self.data.qpos[joint_id] = target_pos
+                # 关节ID对应的qpos索引：根关节占前6位，关节从第7位开始（索引6）
+                self.data.qpos[joint_id + 6] = target_pos
+
+        # 5. 强制设置机器人初始速度为0（无移动、无旋转，彻底杜绝初始漂移）
+        self.data.qvel[:] = 0.0
+
+    def _clip_control_command(self, cmd):
+        """Clip control command to max amplitude to prevent joint over-drive (core fix)"""
+        return np.clip(cmd, -self.max_ctrl_amplitude, self.max_ctrl_amplitude)
 
     def _select_closest_target(self, elapsed_time):
         """Core decision function: select the closest target based on Euclidean distance"""
         # Skip target selection if conditions are not met
         if (elapsed_time < self.stabilization_phase or
-            self.avoid_obstacle or
-            self.return_to_path or
-            (elapsed_time - self.last_target_switch_time < self.target_switch_cooldown)):
+                self.avoid_obstacle or
+                self.return_to_path or
+                (elapsed_time - self.last_target_switch_time < self.target_switch_cooldown)):
             return self.current_target_idx
 
         # Get robot torso position (XY plane)
@@ -288,7 +310,8 @@ class StablePatrolController:
             prev_label = self.patrol_points[self.current_target_idx]["label"]
             self.current_target_idx = closest_idx
             # Print switch info (console only, no log file)
-            print(f"\n🔀 Target switched (distance priority): {prev_label} → {closest_label} (distance: {closest_dist:.2f}m)")
+            print(
+                f"\n🔀 Target switched (distance priority): {prev_label} → {closest_label} (distance: {closest_dist:.2f}m)")
 
         return self.current_target_idx
 
@@ -319,7 +342,7 @@ class StablePatrolController:
                         new_x = random.uniform(self.target_movement_range["x"][0], self.target_movement_range["x"][1])
                         new_y = random.uniform(self.target_movement_range["y"][0], self.target_movement_range["y"][1])
 
-                # Control target movement (smooth and slow)
+                # Control target movement (smooth and slow) with command clipping
                 if (self.patrol_motor_ids[idx]["x"] != -1 and
                         self.patrol_motor_ids[idx]["y"] != -1 and
                         self.patrol_joint_ids[idx]["x"] != -1 and
@@ -327,8 +350,10 @@ class StablePatrolController:
                     current_x = self.data.qpos[self.patrol_joint_ids[idx]["x"]]
                     current_y = self.data.qpos[self.patrol_joint_ids[idx]["y"]]
 
-                    self.data.ctrl[self.patrol_motor_ids[idx]["x"]] = (new_x - current_x) * self.target_move_speed * 0.5
-                    self.data.ctrl[self.patrol_motor_ids[idx]["y"]] = (new_y - current_y) * self.target_move_speed * 0.5
+                    x_cmd = (new_x - current_x) * self.target_move_speed * 0.5
+                    y_cmd = (new_y - current_y) * self.target_move_speed * 0.5
+                    self.data.ctrl[self.patrol_motor_ids[idx]["x"]] = self._clip_control_command(x_cmd)
+                    self.data.ctrl[self.patrol_motor_ids[idx]["y"]] = self._clip_control_command(y_cmd)
 
                 # Update target info and timestamp
                 self.patrol_points[idx]["pos"] = np.array([new_x, new_y])
@@ -338,7 +363,7 @@ class StablePatrolController:
                     print(f"\n🔄 Target updated: {point['label']} moved to ({new_x:.2f}, {new_y:.2f})")
 
     def _control_dynamic_obstacles(self, elapsed_time):
-        """Control movement of dynamic obstacles (wall2, wall3, wall4)"""
+        """Control movement of dynamic obstacles (wall2, wall3, wall4) with clipped commands"""
         if elapsed_time < self.stabilization_phase:
             return
 
@@ -348,8 +373,10 @@ class StablePatrolController:
                 self.wall2_params["y_freq"] * elapsed_time + self.wall2_params["y_phase"])
             wall2_z_target = self.wall2_params["z_amp"] * np.sin(
                 self.wall2_params["z_freq"] * elapsed_time + self.wall2_params["z_phase"]) + 0.75
-            self.data.ctrl[self.wall2_motor_ids["y"]] = (wall2_y_target - self.data.qpos[self.wall2_joint_ids["y"]]) * 1.0
-            self.data.ctrl[self.wall2_motor_ids["z"]] = (wall2_z_target - self.data.qpos[self.wall2_joint_ids["z"]]) * 0.8
+            y_cmd = (wall2_y_target - self.data.qpos[self.wall2_joint_ids["y"]]) * 1.0
+            z_cmd = (wall2_z_target - self.data.qpos[self.wall2_joint_ids["z"]]) * 0.8
+            self.data.ctrl[self.wall2_motor_ids["y"]] = self._clip_control_command(y_cmd)
+            self.data.ctrl[self.wall2_motor_ids["z"]] = self._clip_control_command(z_cmd)
 
         # Wall3: Random walk X+Y
         if all(id != -1 for id in self.wall3_motor_ids.values()):
@@ -363,13 +390,17 @@ class StablePatrolController:
                 self.wall3_params["y_switch"] = random.uniform(2.0, 4.0)
                 self.wall3_last_switch["y"] = elapsed_time
 
-            wall3_x_target = self.wall3_params["x_base"] + self.wall3_params["x_dir"] * self.wall3_params["x_speed"] * (elapsed_time % 8)
-            wall3_y_target = self.wall3_params["y_base"] + self.wall3_params["y_dir"] * self.wall3_params["y_speed"] * (elapsed_time % 6)
+            wall3_x_target = self.wall3_params["x_base"] + self.wall3_params["x_dir"] * self.wall3_params["x_speed"] * (
+                        elapsed_time % 8)
+            wall3_y_target = self.wall3_params["y_base"] + self.wall3_params["y_dir"] * self.wall3_params["y_speed"] * (
+                        elapsed_time % 6)
             wall3_x_target = np.clip(wall3_x_target, 3.5, 4.5)
             wall3_y_target = np.clip(wall3_y_target, -1.0, 1.0)
 
-            self.data.ctrl[self.wall3_motor_ids["x"]] = (wall3_x_target - self.data.qpos[self.wall3_joint_ids["x"]]) * 1.0
-            self.data.ctrl[self.wall3_motor_ids["y"]] = (wall3_y_target - self.data.qpos[self.wall3_joint_ids["y"]]) * 0.8
+            x_cmd = (wall3_x_target - self.data.qpos[self.wall3_joint_ids["x"]]) * 1.0
+            y_cmd = (wall3_y_target - self.data.qpos[self.wall3_joint_ids["y"]]) * 0.8
+            self.data.ctrl[self.wall3_motor_ids["x"]] = self._clip_control_command(x_cmd)
+            self.data.ctrl[self.wall3_motor_ids["y"]] = self._clip_control_command(y_cmd)
 
         # Wall4: Circular motion (rotation + radial slide)
         if all(id != -1 for id in self.wall4_motor_ids.values()):
@@ -377,8 +408,10 @@ class StablePatrolController:
             wall4_rad_target = self.wall4_params["rad_base"] + self.wall4_params["rad_amp"] * np.sin(
                 self.wall4_params["rad_freq"] * elapsed_time + self.wall4_params["rad_phase"])
 
-            self.data.ctrl[self.wall4_motor_ids["rot"]] = (wall4_rot_target - self.data.qpos[self.wall4_joint_ids["rot"]]) * 0.8
-            self.data.ctrl[self.wall4_motor_ids["rad"]] = (wall4_rad_target - self.data.qpos[self.wall4_joint_ids["rad"]]) * 0.8
+            rot_cmd = (wall4_rot_target - self.data.qpos[self.wall4_joint_ids["rot"]]) * 0.8
+            rad_cmd = (wall4_rad_target - self.data.qpos[self.wall4_joint_ids["rad"]]) * 0.8
+            self.data.ctrl[self.wall4_motor_ids["rot"]] = self._clip_control_command(rot_cmd)
+            self.data.ctrl[self.wall4_motor_ids["rad"]] = self._clip_control_command(rad_cmd)
 
     def _detect_obstacles(self, elapsed_time):
         """Detect obstacles and trigger avoidance if necessary"""
@@ -443,10 +476,12 @@ class StablePatrolController:
                 self.turn_direction = -1 if cross_product > 0 else 1
                 self.turn_dir_label = "Left" if self.turn_direction == -1 else "Right"
 
-                print(f"\n⚠️  Obstacle detected: {closest_wall['name']} (distance: {closest_wall['predicted_dist']:.2f}m) - Turning {self.turn_dir_label}")
+                print(
+                    f"\n⚠️  Obstacle detected: {closest_wall['name']} (distance: {closest_wall['predicted_dist']:.2f}m) - Turning {self.turn_dir_label}")
 
             # Complete obstacle avoidance phase
-            if self.avoid_obstacle and (elapsed_time - self.obstacle_avoidance_start) > self.obstacle_avoidance_duration:
+            if self.avoid_obstacle and (
+                    elapsed_time - self.obstacle_avoidance_start) > self.obstacle_avoidance_duration:
                 self.avoid_obstacle = False
                 self.return_to_path = True
                 self.return_to_path_start = elapsed_time
@@ -455,7 +490,8 @@ class StablePatrolController:
             # Complete return to path phase
             if self.return_to_path and (elapsed_time - self.return_to_path_start) > self.return_to_path_duration:
                 self.return_to_path = False
-                print(f"✅ Back to patrol path - tracking target: {self.patrol_points[self.current_target_idx]['label']}")
+                print(
+                    f"✅ Back to patrol path - tracking target: {self.patrol_points[self.current_target_idx]['label']}")
 
     def _get_joint_id(self, joint_name):
         """Get actuator ID for a given joint name"""
@@ -500,7 +536,7 @@ class StablePatrolController:
         return com
 
     def _maintain_balance(self, elapsed_time):
-        """Enhanced balance control to prevent falling"""
+        """Enhanced balance control to prevent falling with clipped commands"""
         # Torso attitude control (PD control for roll/pitch)
         abdomen_x_id = self._get_joint_id("abdomen_x")
         abdomen_y_id = self._get_joint_id("abdomen_y")
@@ -514,34 +550,38 @@ class StablePatrolController:
         abdomen_x_vel_id = self._get_joint_vel_id("abdomen_x")
         abdomen_y_vel_id = self._get_joint_vel_id("abdomen_y")
 
-        # PD control for roll (abdomen_x)
+        # PD control for roll (abdomen_x) with clipping
         if 0 <= abdomen_x_id < self.model.nu and abdomen_x_vel_id != -1:
             roll_error = self.torso_roll_target - roll
             roll_vel = self.data.qvel[abdomen_x_vel_id]
             cmd = self.balance_kp * roll_error * 0.05 - self.balance_kd * roll_vel * 0.1
-            self.data.ctrl[abdomen_x_id] = np.clip(cmd, -0.5, 0.5)
+            cmd = self._limit_joint_velocity("abdomen_x", cmd)
+            self.data.ctrl[abdomen_x_id] = self._clip_control_command(cmd)
 
-        # PD control for pitch (abdomen_y)
+        # PD control for pitch (abdomen_y) with clipping
         if 0 <= abdomen_y_id < self.model.nu and abdomen_y_vel_id != -1:
             pitch_error = self.torso_pitch_target - pitch
             pitch_vel = self.data.qvel[abdomen_y_vel_id]
             cmd = self.balance_kp * pitch_error * 0.05 - self.balance_kd * pitch_vel * 0.1
-            self.data.ctrl[abdomen_y_id] = np.clip(cmd, -0.5, 0.5)
+            cmd = self._limit_joint_velocity("abdomen_y", cmd)
+            self.data.ctrl[abdomen_y_id] = self._clip_control_command(cmd)
 
         # Center of mass (COM) control
         com = self._compute_center_of_mass()
         com_error = self.center_of_mass_target - com
 
-        # Adjust torso to correct COM error
+        # Adjust torso to correct COM error with clipping
         if 0 <= abdomen_x_id < self.model.nu:
             current_cmd = self.data.ctrl[abdomen_x_id]
-            self.data.ctrl[abdomen_x_id] = current_cmd + com_error[1] * self.com_kp * 0.01
+            cmd = current_cmd + com_error[1] * self.com_kp * 0.01
+            self.data.ctrl[abdomen_x_id] = self._clip_control_command(cmd)
 
         if 0 <= abdomen_y_id < self.model.nu:
             current_cmd = self.data.ctrl[abdomen_y_id]
-            self.data.ctrl[abdomen_y_id] = current_cmd + com_error[0] * self.com_kp * 0.01
+            cmd = current_cmd + com_error[0] * self.com_kp * 0.01
+            self.data.ctrl[abdomen_y_id] = self._clip_control_command(cmd)
 
-        # Leg stability control (slight joint bending for better support)
+        # Leg stability control (slight joint bending for better support) with clipping
         for side in ["right", "left"]:
             hip_y_id = self._get_joint_id(f"hip_y_{side}")
             knee_id = self._get_joint_id(f"knee_{side}")
@@ -549,18 +589,21 @@ class StablePatrolController:
 
             if 0 <= hip_y_id < self.model.nu:
                 current_cmd = self.data.ctrl[hip_y_id]
-                self.data.ctrl[hip_y_id] = current_cmd - 0.1
+                cmd = current_cmd - 0.1
+                self.data.ctrl[hip_y_id] = self._clip_control_command(cmd)
 
             if 0 <= knee_id < self.model.nu:
                 current_cmd = self.data.ctrl[knee_id]
-                self.data.ctrl[knee_id] = current_cmd + 0.1
+                cmd = current_cmd + 0.1
+                self.data.ctrl[knee_id] = self._clip_control_command(cmd)
 
             if 0 <= ankle_y_id < self.model.nu:
                 current_cmd = self.data.ctrl[ankle_y_id]
-                self.data.ctrl[ankle_y_id] = current_cmd + 0.05
+                cmd = current_cmd + 0.05
+                self.data.ctrl[ankle_y_id] = self._clip_control_command(cmd)
 
     def _control_robot_gait(self, elapsed_time):
-        """Control robot gait with distance-priority target tracking and stability"""
+        """Control robot gait with distance-priority target tracking and stability (fixed disappearing issue)"""
         if self.torso_id == -1 or self.patrol_completed:
             return
 
@@ -575,12 +618,11 @@ class StablePatrolController:
         if (distance_to_target < self.target_reached_threshold and
                 not self.patrol_completed and
                 elapsed_time - self.last_target_switch_time > self.target_switch_cooldown):
-
             print(f"\n✅ Reached target: {current_target['label']} (x={torso_pos[0]:.2f}, y={torso_pos[1]:.2f})")
             self.last_target_switch_time = elapsed_time
             print(f"🔍 Scanning for closest next target...")
 
-        # Step 3: Calculate heading error (yaw)
+        # Step 3: Calculate heading error (yaw) with limit to prevent over-rotation
         torso_quat = self.data.xquat[self.torso_id]
         siny_cosp = 2 * (torso_quat[3] * torso_quat[2] + torso_quat[0] * torso_quat[1])
         cosy_cosp = 1 - 2 * (torso_quat[1] ** 2 + torso_quat[2] ** 2)
@@ -589,6 +631,7 @@ class StablePatrolController:
         target_yaw = np.arctan2(target_vector[1], target_vector[0])
         yaw_error = target_yaw - robot_yaw
         yaw_error = np.arctan2(np.sin(yaw_error), np.cos(yaw_error))  # Normalize to [-pi, pi]
+        yaw_error = np.clip(yaw_error, -np.pi / 4, np.pi / 4)  # Limit max yaw error to 45 degrees (core fix)
 
         # Step 4: Reset control commands
         self.data.ctrl[:self.model.nu] = 0.0
@@ -596,6 +639,9 @@ class StablePatrolController:
         # Step 5: Initial stabilization phase (no movement, only balance)
         if elapsed_time < self.stabilization_phase:
             self._maintain_balance(elapsed_time)
+            # Clip all control commands during stabilization
+            for i in range(self.model.nu):
+                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
             return
 
         # Step 6: Return to path mode
@@ -603,22 +649,28 @@ class StablePatrolController:
             return_phase = (elapsed_time - self.return_to_path_start) / self.return_to_path_duration
             return_speed = 0.8 * np.cos(return_phase * np.pi)
 
-            # Heading control
+            # Heading control with clipping
             abdomen_z_id = self._get_joint_id("abdomen_z")
             hip_z_right_id = self._get_joint_id("hip_z_right")
             hip_z_left_id = self._get_joint_id("hip_z_left")
 
             if 0 <= abdomen_z_id < self.model.nu:
                 cmd = self.heading_kp * yaw_error * return_speed * 0.05
-                self.data.ctrl[abdomen_z_id] = self._limit_joint_velocity("abdomen_z", cmd)
+                cmd = self._limit_joint_velocity("abdomen_z", cmd)
+                self.data.ctrl[abdomen_z_id] = self._clip_control_command(cmd)
             if 0 <= hip_z_right_id < self.model.nu:
                 cmd = -yaw_error * return_speed * 0.3
-                self.data.ctrl[hip_z_right_id] = self._limit_joint_velocity("hip_z_right", cmd)
+                cmd = self._limit_joint_velocity("hip_z_right", cmd)
+                self.data.ctrl[hip_z_right_id] = self._clip_control_command(cmd)
             if 0 <= hip_z_left_id < self.model.nu:
                 cmd = yaw_error * return_speed * 0.3
-                self.data.ctrl[hip_z_left_id] = self._limit_joint_velocity("hip_z_left", cmd)
+                cmd = self._limit_joint_velocity("hip_z_left", cmd)
+                self.data.ctrl[hip_z_left_id] = self._clip_control_command(cmd)
 
             self._maintain_balance(elapsed_time)
+            # Clip all control commands in return mode
+            for i in range(self.model.nu):
+                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
             return
 
         # Step 7: Obstacle avoidance mode
@@ -626,32 +678,39 @@ class StablePatrolController:
             avoid_phase = (elapsed_time - self.obstacle_avoidance_start) / self.obstacle_avoidance_duration
             turn_speed = 0.8 * np.sin(avoid_phase * np.pi)
 
-            # Turn control
+            # Turn control with clipping
             hip_z_right_id = self._get_joint_id("hip_z_right")
             hip_z_left_id = self._get_joint_id("hip_z_left")
             abdomen_z_id = self._get_joint_id("abdomen_z")
 
             if 0 <= hip_z_right_id < self.model.nu:
                 cmd = self.turn_direction * turn_speed * 0.5
-                self.data.ctrl[hip_z_right_id] = self._limit_joint_velocity("hip_z_right", cmd)
+                cmd = self._limit_joint_velocity("hip_z_right", cmd)
+                self.data.ctrl[hip_z_right_id] = self._clip_control_command(cmd)
             if 0 <= hip_z_left_id < self.model.nu:
                 cmd = -self.turn_direction * turn_speed * 0.5
-                self.data.ctrl[hip_z_left_id] = self._limit_joint_velocity("hip_z_left", cmd)
+                cmd = self._limit_joint_velocity("hip_z_left", cmd)
+                self.data.ctrl[hip_z_left_id] = self._clip_control_command(cmd)
             if 0 <= abdomen_z_id < self.model.nu:
                 cmd = self.turn_direction * turn_speed * 0.8
-                self.data.ctrl[abdomen_z_id] = self._limit_joint_velocity("abdomen_z", cmd)
+                cmd = self._limit_joint_velocity("abdomen_z", cmd)
+                self.data.ctrl[abdomen_z_id] = self._clip_control_command(cmd)
 
             self._maintain_balance(elapsed_time)
+            # Clip all control commands in avoidance mode
+            for i in range(self.model.nu):
+                self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
             return
 
         # Step 8: Normal patrol mode (closest target tracking)
-        # Heading control
+        # Heading control with clipping
         abdomen_z_id = self._get_joint_id("abdomen_z")
         if 0 <= abdomen_z_id < self.model.nu:
             cmd = self.heading_kp * yaw_error * 0.05
-            self.data.ctrl[abdomen_z_id] = self._limit_joint_velocity("abdomen_z", cmd)
+            cmd = self._limit_joint_velocity("abdomen_z", cmd)
+            self.data.ctrl[abdomen_z_id] = self._clip_control_command(cmd)
 
-        # Leg gait control
+        # Leg gait control with clipping
         cycle = elapsed_time % self.gait_period
         phase = cycle / self.gait_period
 
@@ -666,32 +725,38 @@ class StablePatrolController:
             ankle_y_id = self._get_joint_id(f"ankle_y_{side}")
             ankle_x_id = self._get_joint_id(f"ankle_x_{side}")
 
-            # Hip X control
+            # Hip X control with clipping
             if 0 <= hip_x_id < self.model.nu:
                 cmd = self.swing_gain * np.sin(2 * np.pi * swing_phase) * self.forward_speed * 0.5
-                self.data.ctrl[hip_x_id] = self._limit_joint_velocity(f"hip_x_{side}", cmd)
-            # Hip Z control
+                cmd = self._limit_joint_velocity(f"hip_x_{side}", cmd)
+                self.data.ctrl[hip_x_id] = self._clip_control_command(cmd)
+            # Hip Z control with clipping
             if 0 <= hip_z_id < self.model.nu:
                 cmd = self.stance_gain * np.cos(2 * np.pi * swing_phase) * 0.08 + yaw_error * 0.05
-                self.data.ctrl[hip_z_id] = self._limit_joint_velocity(f"hip_z_{side}", cmd)
-            # Hip Y control
+                cmd = self._limit_joint_velocity(f"hip_z_{side}", cmd)
+                self.data.ctrl[hip_z_id] = self._clip_control_command(cmd)
+            # Hip Y control with clipping
             if 0 <= hip_y_id < self.model.nu:
                 cmd = -0.4 * np.sin(2 * np.pi * swing_phase) - 0.2
-                self.data.ctrl[hip_y_id] = self._limit_joint_velocity(f"hip_y_{side}", cmd)
-            # Knee control
+                cmd = self._limit_joint_velocity(f"hip_y_{side}", cmd)
+                self.data.ctrl[hip_y_id] = self._clip_control_command(cmd)
+            # Knee control with clipping
             if 0 <= knee_id < self.model.nu:
                 cmd = 0.6 * np.sin(2 * np.pi * swing_phase) + 0.4
-                self.data.ctrl[knee_id] = self._limit_joint_velocity(f"knee_{side}", cmd)
-            # Ankle Y control
+                cmd = self._limit_joint_velocity(f"knee_{side}", cmd)
+                self.data.ctrl[knee_id] = self._clip_control_command(cmd)
+            # Ankle Y control with clipping
             if 0 <= ankle_y_id < self.model.nu:
                 cmd = 0.15 * np.cos(2 * np.pi * swing_phase)
-                self.data.ctrl[ankle_y_id] = self._limit_joint_velocity(f"ankle_y_{side}", cmd)
-            # Ankle X control
+                cmd = self._limit_joint_velocity(f"ankle_y_{side}", cmd)
+                self.data.ctrl[ankle_y_id] = self._clip_control_command(cmd)
+            # Ankle X control with clipping
             if 0 <= ankle_x_id < self.model.nu:
                 cmd = 0.08 * np.sin(2 * np.pi * swing_phase)
-                self.data.ctrl[ankle_x_id] = self._limit_joint_velocity(f"ankle_x_{side}", cmd)
+                cmd = self._limit_joint_velocity(f"ankle_x_{side}", cmd)
+                self.data.ctrl[ankle_x_id] = self._clip_control_command(cmd)
 
-        # Arm swing for balance
+        # Arm swing for balance with clipping
         for side, sign in [("right", 1), ("left", -1)]:
             shoulder1_id = self._get_joint_id(f"shoulder1_{side}")
             shoulder2_id = self._get_joint_id(f"shoulder2_{side}")
@@ -702,14 +767,20 @@ class StablePatrolController:
             elbow_cmd = -0.15 * np.sin(2 * np.pi * (phase + 0.5 * sign)) - 0.1
 
             if 0 <= shoulder1_id < self.model.nu:
-                self.data.ctrl[shoulder1_id] = self._limit_joint_velocity(f"shoulder1_{side}", shoulder1_cmd)
+                cmd = self._limit_joint_velocity(f"shoulder1_{side}", shoulder1_cmd)
+                self.data.ctrl[shoulder1_id] = self._clip_control_command(cmd)
             if 0 <= shoulder2_id < self.model.nu:
-                self.data.ctrl[shoulder2_id] = self._limit_joint_velocity(f"shoulder2_{side}", shoulder2_cmd)
+                cmd = self._limit_joint_velocity(f"shoulder2_{side}", shoulder2_cmd)
+                self.data.ctrl[shoulder2_id] = self._clip_control_command(cmd)
             if 0 <= elbow_id < self.model.nu:
-                self.data.ctrl[elbow_id] = self._limit_joint_velocity(f"elbow_{side}", elbow_cmd)
+                cmd = self._limit_joint_velocity(f"elbow_{side}", elbow_cmd)
+                self.data.ctrl[elbow_id] = self._clip_control_command(cmd)
 
         # Maintain balance
         self._maintain_balance(elapsed_time)
+        # Final clip of all control commands to ensure no over-drive
+        for i in range(self.model.nu):
+            self.data.ctrl[i] = self._clip_control_command(self.data.ctrl[i])
 
     def _print_status(self, elapsed_time):
         """Print real-time robot status (console only, no log file)"""
@@ -753,13 +824,21 @@ class StablePatrolController:
         )
 
     def run_simulation(self):
-        """Main simulation loop"""
+        """Main simulation loop with optimized camera tracking (彻底解决机器人消失问题)"""
         print("🤖 DeepMind Humanoid Simulation Started (Distance-Priority Target Tracking)")
         print("📌 Features: Enhanced Balance + Dynamic Obstacle Avoidance + Closest Target Selection")
         print("🔍 Press Ctrl+C to stop simulation\n")
 
         with viewer.launch_passive(self.model, self.data) as viewer_instance:
             self.sim_start_time = time.time()
+
+            # 优化相机参数：增大距离+调整视角，确保机器人始终在视野内
+            if self.torso_id != -1:
+                viewer_instance.cam.trackbodyid = self.torso_id
+                viewer_instance.cam.distance = 10.0  # 增大相机距离，避免模型超出视野
+                viewer_instance.cam.elevation = -20  # 增大俯视角，清晰看到机器人
+                viewer_instance.cam.azimuth = 90  # 正前方视角，符合直观观察
+                viewer_instance.cam.fixedcamid = -1  # 使用跟踪相机，不使用固定相机
 
             try:
                 while viewer_instance.is_running():
@@ -775,7 +854,9 @@ class StablePatrolController:
                     # Step simulation
                     mujoco.mj_step(self.model, self.data)
                     viewer_instance.sync()
-                    time.sleep(self.model.opt.timestep * 3)
+
+                    # 稳定休眠时间，解决渲染不同步
+                    time.sleep(0.01)
 
             except KeyboardInterrupt:
                 print("\n\n🛑 Simulation interrupted by user")
@@ -817,5 +898,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n❌ Failed to start simulation: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)

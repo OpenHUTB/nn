@@ -105,12 +105,21 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
    ```shell
    python cvips_generation.py --town Town01 --num_vehicles 15 --num_pedestrians 80 --weather rainy --time_of_day sunset --seed 111
 ## 数据集生成
-数据集由cvip_collector.py生成，保存在out_cvips_v9(主文件夹)
+数据集由cvip_collector.py生成，保存在_out_dataset_final(主文件夹)
 - 📂 ego_rgb/ : 存放主车（Tesla）视角的图片（命名格式为 帧号.png）。
 - 📂 rsu_rgb/ : 存放路侧单元（RSU，安装在高处）视角的图片。
+- 📂 label/ : 标注文件，用于作为标签提供目标的 3D 空间属性和类别信息。
+data_check.py：用于验证收集数据的可视化工具。
+cvips_utils.py：用于坐标变换和投影的实用函数,为cvip_collector.py提供计算服务。
 ### 运行命令
 ### 基础模式 (默认参数)
-- 在Town01地图，生成25辆车和40个行人，晴朗中午。
+### 模板指令
+- 可根据需求调整城镇、天气、时间、车辆数、行人数和最大帧数
+   ```shell
+   python cvips_collector.py --town Town03 --weather Rain --time Sunset --num_vehicles 50 --num_walkers 30 --max_frames 1000
+   ```
+-  默认参数运行
+（对应配置：Town01、Clear天气、Day时间、40辆车、20个行人、最多500帧）
    ```shell
    python cvips_collector.py
    ```
@@ -134,12 +143,75 @@ CVIPS (Connected Vision for Increased Pedestrian Safety) 是一个致力于通�
    ```shell
    python cvips_collector.py --num_vehicles 5 --num_walkers 0
    ```
-### 样本可视化 (Sample Visualizations)
+## 使用官方脚本生成目标
+由于在Carla中不使用官方的脚本产生行走的行人和车辆，使用自己的脚本产生需要耗费大量的GPU导致非常的卡顿，所以提供另外一种使用Carla官方自带的脚本文件生成数据集的思路。
+- 进入CARLA安装目录（替换为你实际的路径）
+   ```shell
+   cd F:\carla\CARLA\WindowsNoEditor
+   ```
+- 启动CARLA服务器（窗口模式，默认端口2000）
+   ```shell
+   CarlaUE4.exe
+   ```
+### 生成动态行人和车辆（用 generate_traffic.py）
+- 打开新的终端（CMD/PowerShell），PythonAPI/examples目录（不同版本目录不同，根据实际版本来定），运行官方交通生成脚本：
+- 进入examples目录（替换为你实际的路径）
+   ```shell
+   cd F:\carla\CARLA\WindowsNoEditor\PythonAPI\examples
+   ```
+- 生成动态交通：30辆车 + 15个行人（可自定义数量）
+   ```shell
+   python generate_traffic.py --vehicles 30 --walkers 15
+   ```
+### 运行 cvips_collector.py 采集数据集
+打开第三个终端，进入你的cvips_collector.py脚本所在目录，执行采集指令（关键：设num_vehicles和num_walkers为 0，避免重复生成）：
+- 进入你的cvips_collector.py所在目录（替换为实际路径）
+   ```shell
+   cd F:\你的脚本存放路径
+   ```
+- 运行采集脚本（不额外生成车辆/行人，仅采集已有交通流）
+   ```shell
+   python cvips_collector.py 
+   - --town Town01 
+   - --weather Clear 
+   - --time Day 
+   - --num_vehicles 0 
+   - --num_walkers 0 
+   - --max_frames 500
+   ```
+注意：Windows 终端中换行用^，如果是单行写就不需要加；max_frames 500表示采集 500 帧数据，可按需调整。
+关键补充说明
+脚本功能对应：
+CARLA 旧版本：spawn_npc.py → 生成 NPC（车辆 + 行人）
+CARLA 新版本：generate_traffic.py → 功能完全替代spawn_npc.py，参数更清晰
+避免重复生成：
+必须把cvips_collector.py的--num_vehicles和--num_walkers设为 0，否则脚本会额外生成车辆 / 行人，导致场景中交通流过多、卡顿。
+常见问题解决：
+若运行generate_traffic.py提示 “找不到 carla 模块”：
+先在该终端执行pip install -r requirements.txt（requirements.txt 在你截图的 examples 目录里），安装依赖。
+若采集时帧率低：减少generate_traffic.py的车辆 / 行人数目（比如设--vehicles 20 --walkers 10）。
+### 运行数据检查脚本（data_check.py）
+- 命令格式：
+   ```shell
+   python data_check.py
+   ```
+## 六视角的环境感知可视化系统（可用于自动驾驶场景中的目标检测、多摄像头标定等相关算法的测试与验证）
+cvips_collector_6cam.py 是一个基于 CARLA 自动驾驶仿真环境的多摄像头数据采集与目标可视化程序，主要功能是通过安装在主车上的 6 个摄像头采集周围环境图像，并在图像上实时绘制动态物体（车辆、行人）和静态车辆的 3D 边界框。以下是其主要组成部分和功能说明：
+1. 依赖与配置
+依赖库：使用 carla 库连接仿真环境，numpy 处理矩阵运算，cv2 进行图像处理与显示，以及自定义工具库 cvips_utils。
+核心配置：设置图像分辨率（640x360）、摄像头视场角（FOV=90°）、目标帧率（30 FPS）。
+- 注意：依赖库需在自己所创建的虚拟环境中克隆。
+2. 运行指令
+   ```shell
+   python cvips_collector_6cam.py
+   ```
+- 注意：该脚本的行人和车辆都是运用Carla官方文件生成，详细步骤见 [使用官方脚本生成目标](#使用官方脚本生成目标)
+## 样本可视化 (Sample Visualizations)
 我们提供了可视化结果来展示我们数据集中的不同视角:
-- 车辆自动行驶（视角为车后）
-- <img src="https://github.com/user-attachments/assets/2b3c4cf0-9bc8-4708-9602-a8ad31048646" width="100%" />
-- 模拟环境
-- <img src="https://github.com/user-attachments/assets/76e93eea-22a8-4601-9bbd-084c973ebf80" width="100%" />
+- 车辆自动行驶检测（视角为车后）
+- <img src="https://github.com/user-attachments/assets/4b520d73-5f00-4326-b072-d07de0772f04" alt="Infrastructure View" width="640" height="360">
+- 六摄像头自动检测
+- <img src="https://github.com/user-attachments/assets/f2182831-3719-44cb-acfa-1369121ca227" alt="Vehicle View" width="640" height="360">
 
 
 ## 致谢 (Acknowledgement)

@@ -21,25 +21,31 @@ class IndexSimulator:
         # 1. 模型关键信息+关节range（稳定核心）
         print("\n📌 模型核心信息：")
         print(f"关节总数：{self.model.njnt} | 执行器数：{self.model.nu} | qpos长度：{len(self.data.qpos)}")
+
+        # 在__init__里新增：打印所有geom
+        print("\n📌 所有geom名称：")
+        for i in range(self.model.ngeom):
+            geom_name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_GEOM, i)
+            print(f"geom{i}：{geom_name}")
         
         self.key_joints = {
             15: {
                 "name": "shoulder_rot (肩关节旋转)",
                 "range": (-1.57, 0.349),
-                "step": 0.02,
-                "current_step_dir": 0.02  # 运动方向
+                "step": 0.05,
+                "current_step_dir": 0.05  # 运动方向
             },
             16: {
                 "name": "elbow_flexion (肘关节弯曲)",
                 "range": (0, 2.26893),
-                "step": 0.03,
-                "current_step_dir": 0.03
+                "step": 0.08,
+                "current_step_dir": 0.08
             },
             17: {
                 "name": "pro_sup (前臂旋前旋后)",
                 "range": (-1.5708, 1.5708),
-                "step": 0.015,
-                "current_step_dir": 0.015
+                "step": 0.04,
+                "current_step_dir": 0.04
             }
         }
 
@@ -58,6 +64,25 @@ class IndexSimulator:
         self.button_touched = {"button-0":False, "button-1":False, "button-2":False, "button-3":False}
         self.finger_geom_name = "hand_2distph"
 
+        # 新增：找到screen对应的geom ID（控制面板颜色）
+        self.screen_geom_name = "screen"
+        self.screen_geom_id = mujoco.mj_name2id(
+            self.model, mujoco.mjtObj.mjOBJ_GEOM, self.screen_geom_name
+        )
+        if self.screen_geom_id == -1:
+            print(f"⚠️ 未找到面板geom（{self.screen_geom_name}），颜色控制失效")
+        else:
+            print(f"✅ 找到面板geom（ID：{self.screen_geom_id}），已启用颜色切换")
+
+        # 新增：面板要切换的4种颜色（和按钮颜色对应）
+        self.screen_colors = [
+            [0.8, 0.1, 0.1, 1.0],  # 红色（对应button-0）
+            [0.1, 0.8, 0.1, 1.0],  # 绿色（对应button-1）
+            [0.1, 0.1, 0.8, 1.0],  # 蓝色（对应button-2）
+            [0.8, 0.8, 0.1, 1.0]   # 黄色（对应button-3）
+        ]
+        self.color_switch_interval = 100  # 每隔100步切换一次颜色（≈3秒）
+
     def reset(self):
         """重置关节到range中间值"""
         mujoco.mj_resetData(self.model, self.data)
@@ -74,6 +99,22 @@ class IndexSimulator:
         """单步仿真：稳定+慢速，无错误"""
         if not self.is_running:
             return self.data.qpos.copy()
+
+        # 新增：每隔N步随机切换面板颜色（兼容所有MuJoCo版本）
+        if self.screen_geom_id != -1 and self.current_step % self.color_switch_interval == 0:
+            # 随机选一种颜色
+            random_color = self.screen_colors[np.random.randint(0, len(self.screen_colors))]
+            # 关键修改：直接赋值model.geom_rgba（替代过时的mj_geom_rgba）
+            self.model.geom_rgba[self.screen_geom_id] = random_color
+            # 打印颜色变化
+            color_map = {
+                tuple(self.screen_colors[0]): "红",
+                tuple(self.screen_colors[1]): "绿",
+                tuple(self.screen_colors[2]): "蓝",
+                tuple(self.screen_colors[3]): "黄"
+            }
+            color_name = color_map[tuple(random_color)]
+            print(f"\n🎨 step{self.current_step} 面板颜色切换为：{color_name}色")
 
         # 1. 关节慢速摆动（不超range）
         for jnt_id, info in self.key_joints.items():
