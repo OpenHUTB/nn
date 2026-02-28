@@ -3,7 +3,7 @@
 """
 Carla 0.9.10 路侧感知采集（可视化版）
 适配0.9.10：移除draw_circle，用draw_line模拟激光雷达范围
-运行前：启动CarlaUE4.exe，等待1分钟初始化
+运行前：启动CarlaUE4.exe，等待1分钟初始化.
 """
 import sys
 import os
