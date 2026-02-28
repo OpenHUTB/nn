@@ -29,15 +29,6 @@ def main():
         controls.throttle = 0.5
         client.setCarControls(controls)
 
-        # 让汽车持续行驶30秒
-        print("汽车正在持续前进中...")
-        time.sleep(30)
-
-        # 缓慢减速停止
-        print("准备减速停车...")
-        controls.throttle = 0.2
-        client.setCarControls(controls)
-        time.sleep(3)
 
         controls.brake = 1.0
         controls.throttle = 0.0

@@ -359,12 +359,9 @@ class LaneDetector:
             return boundaries
         
         # 简单的分类：根据y坐标的平均值判断是左车道线还是右车道线
+        # 根据平均y坐标分类车道线
         for boundary in boundaries:
-            mean_y = np.mean(boundary['points'][:, 1])
-            if mean_y > 0:
-                boundary['type'] = 'right'
-            else:
-                boundary['type'] = 'left'
+            boundary['type'] = 'right' if np.mean(boundary['points'][:, 1]) > 0 else 'left'
         
         return boundaries
 
@@ -378,20 +375,14 @@ def compute_vehicle_locations(bboxes, camera):
     """
     if len(bboxes) == 0:
         return np.array([])
-    
-    locations = []
-    for bbox in bboxes:
-        # 计算边界框底边中心点
-        x_center = (bbox[0] + bbox[2]) / 2
-        y_bottom = bbox[3]
-        
-        # 转换到车辆坐标系
-        pixel_coords = np.array([[x_center, y_bottom]])
-        vehicle_point = camera.pixel_to_world(pixel_coords)[0]
-        
-        locations.append(vehicle_point)
-    
-    return np.array(locations)
+
+    if len(bboxes) == 0:
+        return np.array([])
+
+    # 批量计算边界框底边中心点
+    centers = np.column_stack([(bboxes[:, 0] + bboxes[:, 2]) / 2, bboxes[:, 3]])
+    vehicle_points = camera.pixel_to_world(centers)
+    return vehicle_points
 
 def visualize_results(frame, camera, sensor_out, int_out=None):
     """

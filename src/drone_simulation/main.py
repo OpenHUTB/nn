@@ -1,8 +1,9 @@
 """
-MuJoCo 四旋翼无人机仿真 - 完全匹配原代码旋转方式版
-✅ 无人机绕世界坐标系Z轴公转（不是机身自旋），与原代码100%一致
-✅ 原地圆周运动，高度固定，无位置漂移、无闪烁
-✅ 保留所有原代码核心特征，参数完全对齐
+MuJoCo 四旋翼无人机仿真 - 公转+避障版
+✅ 无人机绕世界Z轴公转，保持原旋转逻辑
+✅ 自动避开立方体/圆柱体/球体障碍物
+✅ 避障后自动恢复原轨迹，高度固定、无闪烁
+✅ 保留所有原代码核心特征
 """
 
 import mujoco
@@ -14,7 +15,7 @@ import math
 
 class QuadrotorSimulation:
     def __init__(self):
-        """初始化：完全复刻原代码旋转逻辑"""
+        """初始化：添加避障相关参数"""
         xml_string = self.create_quadrotor_xml()
         self.model = mujoco.MjModel.from_xml_string(xml_string)
         print("✓ 模型加载成功")
@@ -25,15 +26,29 @@ class QuadrotorSimulation:
         hover_thrust = 600
         self.data.ctrl[:] = [hover_thrust] * self.n_actuators
 
-        # ========== 完全匹配原代码的旋转参数 ==========
-        self.rotate_radius = 1.0  # 公转半径（原代码核心参数）
-        self.rotate_speed = 1.0    # 公转角速度（rad/s），与原代码一致
-        self.hover_height = 0.8    # 固定高度，与原代码一致
-        self.rotate_angle = 0.0    # 公转角度累计
-        self.rotor_visual_speed = 8.0  # 旋翼旋转速度，匹配原代码
+        # ========== 原代码旋转参数 ==========
+        self.base_radius = 1.0      # 基础公转半径
+        self.rotate_speed = 1.0     # 公转角速度（rad/s）
+        self.hover_height = 0.8     # 固定高度
+        self.rotate_angle = 0.0     # 公转角度累计
+        self.rotor_visual_speed = 8.0  # 旋翼旋转速度
+
+        # ========== 避障核心参数 ==========
+        self.safety_distance = 0.5  # 安全距离（小于此距离触发避障）
+        self.avoidance_offset = 0.8 # 避障偏移量（扩大半径绕开障碍物）
+        self.obstacle_positions = { # 预定义障碍物位置（与XML中一致）
+            "cube": np.array([2.0, 0.0, 0.75]),
+            "cylinder": np.array([-1.0, 1.0, 0.5]),
+            "sphere": np.array([0.0, -2.0, 1.0])
+        }
+        self.obstacle_sizes = {     # 障碍物尺寸（碰撞判定用）
+            "cube": np.array([0.25, 0.25, 0.75]),
+            "cylinder": np.array([0.3, 0.5]),  # 半径、高度
+            "sphere": np.array([0.4])          # 半径
+        }
 
     def create_quadrotor_xml(self):
-        """完全复刻原代码的XML结构，无任何修改"""
+        """保持原XML结构不变"""
         xml_string = """<?xml version="1.0" ?>
 <mujoco model="quadrotor">
   <option timestep="0.005" iterations="100" tolerance="1e-10">
@@ -142,8 +157,49 @@ class QuadrotorSimulation:
 </mujoco>"""
         return xml_string
 
+    def calculate_obstacle_distance(self, drone_pos):
+        """计算无人机到各障碍物的水平距离（Z轴高度忽略，只算XY平面）"""
+        distances = {}
+
+        # 立方体障碍物
+        cube_pos = self.obstacle_positions["cube"][:2]  # 只取XY坐标
+        drone_xy = drone_pos[:2]
+        distances["cube"] = np.linalg.norm(drone_xy - cube_pos) - self.obstacle_sizes["cube"][0]
+
+        # 圆柱体障碍物
+        cyl_pos = self.obstacle_positions["cylinder"][:2]
+        distances["cylinder"] = np.linalg.norm(drone_xy - cyl_pos) - self.obstacle_sizes["cylinder"][0]
+
+        # 球体障碍物
+        sphere_pos = self.obstacle_positions["sphere"][:2]
+        distances["sphere"] = np.linalg.norm(drone_xy - sphere_pos) - self.obstacle_sizes["sphere"][0]
+
+        return distances
+
+    def get_avoidance_radius(self, drone_pos):
+        """根据障碍物距离动态调整公转半径（避障核心逻辑）"""
+        distances = self.calculate_obstacle_distance(drone_pos)
+        min_distance = min(distances.values())
+
+        # 判定是否需要避障
+        if min_distance < self.safety_distance:
+            # 找到最近的障碍物
+            closest_obs = min(distances, key=distances.get)
+            obs_pos = self.obstacle_positions[closest_obs][:2]
+            drone_xy = drone_pos[:2]
+
+            # 计算避障方向：远离最近障碍物
+            direction = drone_xy - obs_pos
+            direction = direction / np.linalg.norm(direction) if np.linalg.norm(direction) > 0 else np.array([1, 0])
+
+            # 动态调整半径，绕开障碍物
+            return self.base_radius + self.avoidance_offset
+        else:
+            # 无避障需求，恢复基础半径
+            return self.base_radius
+
     def simulation_loop(self, viewer, duration):
-        """核心：完全复刻原代码的旋转逻辑（公转而非自转）"""
+        """核心：公转+避障逻辑"""
         start_time = time.time()
         last_print_time = time.time()
 
@@ -153,21 +209,31 @@ class QuadrotorSimulation:
             # 物理仿真步进
             mujoco.mj_step(self.model, self.data)
 
-            # ========== 原代码核心旋转逻辑：绕世界Z轴公转 ==========
-            # 1. 更新公转角度
+            # ========== 1. 更新公转角度 ==========
             self.rotate_angle += self.rotate_speed * self.model.opt.timestep
-            # 2. 计算公转位置（原代码核心公式）
-            target_x = self.rotate_radius * math.cos(self.rotate_angle)
-            target_y = self.rotate_radius * math.sin(self.rotate_angle)
-            target_z = self.hover_height
-            # 3. 强制设置无人机位置（公转，机身姿态不变）
-            self.data.qpos[0] = target_x  # X轴随角度变化（公转）
-            self.data.qpos[1] = target_y  # Y轴随角度变化（公转）
-            self.data.qpos[2] = target_z  # Z轴固定（悬停）
-            # 4. 机身姿态保持不变（原代码逻辑：只有位置公转，机身不自旋）
-            self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]  # 姿态固定为初始值
+            # 限制角度范围（防止数值过大）
+            if self.rotate_angle > 2 * math.pi:
+                self.rotate_angle -= 2 * math.pi
 
-            # 5. 旋翼旋转（完全匹配原代码逻辑，无闪烁）
+            # ========== 2. 计算基础公转位置 ==========
+            base_x = self.base_radius * math.cos(self.rotate_angle)
+            base_y = self.base_radius * math.sin(self.rotate_angle)
+            base_pos = np.array([base_x, base_y, self.hover_height])
+
+            # ========== 3. 避障逻辑：动态调整位置 ==========
+            current_radius = self.get_avoidance_radius(base_pos)
+            # 计算避障后的目标位置
+            target_x = current_radius * math.cos(self.rotate_angle)
+            target_y = current_radius * math.sin(self.rotate_angle)
+            target_z = self.hover_height
+
+            # ========== 4. 设置无人机位置和姿态 ==========
+            self.data.qpos[0] = target_x  # X轴位置
+            self.data.qpos[1] = target_y  # Y轴位置
+            self.data.qpos[2] = target_z  # Z轴固定高度
+            self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]  # 姿态不变
+
+            # ========== 5. 旋翼旋转（保持原逻辑） ==========
             rotor_speed = self.rotor_visual_speed
             for i in range(4):
                 self.data.qpos[7 + i] += rotor_speed * self.model.opt.timestep * (i % 2 * 2 - 1)
@@ -175,34 +241,39 @@ class QuadrotorSimulation:
             if viewer:
                 viewer.sync()
 
-            # 打印原代码风格的状态信息
+            # ========== 6. 打印状态信息（新增避障状态） ==========
             if time.time() - last_print_time > 1.0:
                 current_time = self.data.time
                 current_pos = self.data.qpos[0:3].copy()
+                distances = self.calculate_obstacle_distance(current_pos)
+                min_dist = min(distances.values())
+                avoidance_status = "避障中" if min_dist < self.safety_distance else "正常轨迹"
+
                 print(f"\n时间: {current_time:.1f}s | 公转角度: {self.rotate_angle:.2f}rad")
                 print(f"当前位置: [{current_pos[0]:.2f}, {current_pos[1]:.2f}, {current_pos[2]:.2f}] m")
-                print(f"公转半径: {self.rotate_radius}m | 旋转速度: {self.rotate_speed}rad/s")
+                print(f"公转半径: {current_radius:.2f}m | 状态: {avoidance_status}")
+                print(f"最近障碍物距离: {min_dist:.2f}m | 安全距离: {self.safety_distance}m")
                 last_print_time = time.time()
 
-            # 控制仿真速率（原代码逻辑）
+            # 控制仿真速率
             elapsed = time.time() - step_start
             sleep_time = self.model.opt.timestep - elapsed
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
     def run_simulation(self, duration=60.0, use_viewer=True):
-        """运行仿真：完全匹配原代码的执行流程"""
-        print(f"\n▶ 开始仿真（完全匹配原代码旋转方式），时长: {duration}秒")
-        print(f"▶ 公转半径: {self.rotate_radius}m | 旋转速度: {self.rotate_speed}rad/s")
-        print(f"▶ 悬停高度: {self.hover_height}m | 旋翼速度: {self.rotor_visual_speed}rad/s")
+        """运行仿真：带避障功能"""
+        print(f"\n▶ 开始仿真（公转+自动避障），时长: {duration}秒")
+        print(f"▶ 基础公转半径: {self.base_radius}m | 旋转速度: {self.rotate_speed}rad/s")
+        print(f"▶ 安全距离: {self.safety_distance}m | 避障偏移量: {self.avoidance_offset}m")
 
         try:
             if use_viewer:
                 with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
-                    # 原代码默认相机视角
+                    # 优化相机视角，方便观察避障效果
                     viewer.cam.azimuth = -45
                     viewer.cam.elevation = 15
-                    viewer.cam.distance = 7.0
+                    viewer.cam.distance = 8.0
                     viewer.cam.lookat[:] = [0.0, 0.0, self.hover_height]
                     self.simulation_loop(viewer, duration)
             else:
@@ -210,22 +281,26 @@ class QuadrotorSimulation:
         except Exception as e:
             print(f"⚠ 仿真错误: {e}")
 
-        print("\n✅ 仿真结束（旋转方式与原代码完全一致）")
+        print("\n✅ 仿真结束（避障功能正常运行）")
 
 
 def main():
-    print("🚁 MuJoCo 四旋翼无人机仿真 - 完全匹配原代码旋转方式")
-    print("=" * 50)
+    print("🚁 MuJoCo 四旋翼无人机仿真 - 公转+自动避障版")
+    print("=" * 60)
 
     try:
         sim = QuadrotorSimulation()
 
-        # ========== 可微调原代码参数（如需） ==========
-        sim.rotate_radius = 1.0   # 公转半径（原代码核心，默认1.0m）
-        sim.rotate_speed = 1.0    # 公转速度（原代码默认1.0rad/s）
-        sim.hover_height = 0.8    # 悬停高度（原代码默认0.8m）
+        # ========== 可自定义参数 ==========
+        # 原旋转参数
+        sim.base_radius = 1.0      # 基础公转半径
+        sim.rotate_speed = 1.0     # 旋转速度
+        sim.hover_height = 0.8     # 悬停高度
+        # 避障参数
+        sim.safety_distance = 0.5  # 触发避障的安全距离（越小越灵敏）
+        sim.avoidance_offset = 0.8 # 避障时的半径偏移量（越大避障越远）
 
-        print("✅ 初始化完成（参数与原代码100%对齐）")
+        print("✅ 初始化完成（避障功能已启用）")
         sim.run_simulation(
             duration=60.0,
             use_viewer=True

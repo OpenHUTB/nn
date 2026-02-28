@@ -13,6 +13,11 @@ class StableFPSHandRecognizer:
         self.frame_interval = 1.0 / target_fps
         self.last_frame_time = time.time()
 
+        # 2. 肤色检测（适配明亮+暗光环境）
+        self.skin_lower_bright = np.array([0, 10, 50], np.uint8)
+        self.skin_upper_bright = np.array([30, 255, 255], np.uint8)
+        self.skin_lower_dark = np.array([0, 5, 15], np.uint8)
+        self.skin_upper_dark = np.array([40, 180, 200], np.uint8)
         # 2. 肤色检测（适配明亮+暗光环境，核心优化：新增暗光阈值）
         # 明亮环境阈值（保留原有，适配强光场景）
         self.skin_lower_bright = np.array([0, 10, 50], np.uint8)
@@ -25,6 +30,21 @@ class StableFPSHandRecognizer:
         self.skin_upper = self.skin_upper_dark
         self.kernel = np.ones((5, 5), np.uint8)
 
+        # 3. 核心参数（细化两者特征差异，解决重叠问题）
+        # 握拳参数（收紧阈值，增加横向/方正特征约束）
+        self.fist_solidity = 0.85  # 从0.82升至0.85，收紧密实度，拉大与大拇指差距
+        self.fist_area_ratio = 0.75
+        # 手指计数参数
+        self.defect_depth_threshold = 4
+        self.min_contour_area = 300
+        # 大拇指识别参数（强化纵向特征，与握拳形成明显差异）
+        self.thumb_aspect_ratio = 0.6
+        self.thumb_solidity_range = (0.4, 0.82)  # 上限设为0.82，与握拳阈值0.85无重叠
+        self.thumb_defect_max = 3
+
+        # 4. 缓存参数
+        self.gesture_buffer = []
+        self.buffer_size = 3
         # 3. 核心参数（精准适配手势特征，优化暗光下轮廓识别）
         # 2. 肤色检测（适配更多光线）
         self.skin_lower = np.array([0, 10, 50], np.uint8)
@@ -161,6 +181,7 @@ class StableFPSHandRecognizer:
                     c = np.linalg.norm(np.array(end) - np.array(far))
                     angle = np.arccos((b ** 2 + c ** 2 - a ** 2) / (2 * b * c)) * 180 / np.pi if (b * c) > 0 else 0
 
+                    if depth > self.defect_depth_threshold and angle < 100:
                     if depth > self.defect_depth_threshold and angle < 90:
                         valid_defects.append((depth, angle, far))
                         defect_count += 1
@@ -185,6 +206,28 @@ class StableFPSHandRecognizer:
             return None
 
     def is_fist(self, features):
+        """优化握拳（stop）判定：增加方正/横向轮廓排除，避免误判大拇指"""
+        if not features:
+            return False
+        # 握拳核心特征：高密实度 + 低缺陷数 + 方正/横向轮廓（h <= w，排除纵向大拇指）
+        return (features["solidity"] > self.fist_solidity and
+                features["defect_count"] <= 1 and
+                abs(features["aspect_ratio"] - 1) < 0.3 and
+                features["h"] <= features["w"])  # 新增：握拳高度不大于宽度，排除纵向大拇指
+
+    def is_thumb_up(self, features):
+        """强化竖大拇指（up）纵向特征，与握拳形成明显差异"""
+        if not features:
+            return False
+        # 大拇指核心特征：窄高轮廓 + 适中密实度 + 少量缺陷 + 强纵向延伸
+        return (features["aspect_ratio"] < self.thumb_aspect_ratio and
+                self.thumb_solidity_range[0] < features["solidity"] < self.thumb_solidity_range[1] and
+                features["defect_count"] <= self.thumb_defect_max and
+                features["hull_aspect"] < 0.7 and
+                features["h"] > features["w"] * 1.2)  # 强化纵向：高度大于宽度1.2倍，与握拳形成差距
+
+    def capture_frames(self, cap):
+        """帧采集线程"""
         """稳定识别握拳（stop）"""
         if not features:
             return False
@@ -311,6 +354,7 @@ class StableFPSHandRecognizer:
             time.sleep(self.frame_interval * 0.5)
 
     def process_frame(self, frame):
+        """核心处理逻辑：调整手势判断优先级，先up后stop"""
         """核心处理逻辑（暗光增强优化）"""
         """核心处理逻辑"""
         frame = cv.flip(frame, 1)
@@ -319,6 +363,28 @@ class StableFPSHandRecognizer:
         current_gesture = "None"
 
         if roi.size > 0:
+            # 预处理（暗光增强+去噪）
+            roi_small = cv.resize(roi, (400, 300))
+            alpha = 1.8
+            beta = 40
+            roi_enhanced = cv.convertScaleAbs(roi_small, alpha=alpha, beta=beta)
+            roi_denoised = cv.GaussianBlur(roi_enhanced, (5, 5), 0)
+
+            # 自适应亮度判断
+            gray_roi = cv.cvtColor(roi_small, cv.COLOR_BGR2GRAY)
+            avg_brightness = np.mean(gray_roi)
+            if avg_brightness < 50:
+                self.skin_lower = self.skin_lower_dark
+                self.skin_upper = self.skin_upper_dark
+            else:
+                self.skin_lower = self.skin_lower_bright
+                self.skin_upper = self.skin_upper_bright
+
+            # 肤色掩码提取+形态学优化
+            hsv = cv.cvtColor(roi_denoised, cv.COLOR_BGR2HSV)
+            mask = cv.inRange(hsv, self.skin_lower, self.skin_upper)
+            mask = cv.morphologyEx(mask, cv.MORPH_OPEN, self.kernel, iterations=1)
+            mask = cv.morphologyEx(mask, cv.MORPH_DILATE, self.kernel, iterations=2)
             # 预处理（暗光增强：亮度+对比度+去噪+形态学，核心优化）
             roi_small = cv.resize(roi, (400, 300))
 
@@ -363,6 +429,39 @@ class StableFPSHandRecognizer:
                 features = self.analyze_contour(cnt)
 
                 if features and features["area"] > self.min_contour_area:
+                    # 手动轮廓坐标缩放+偏移
+                    scale_x = roi.shape[1] / float(roi_small.shape[1])
+                    scale_y = roi.shape[0] / float(roi_small.shape[0])
+                    cnt_scaled = cnt.astype(np.float64)
+                    cnt_scaled[:, :, 0] *= scale_x
+                    cnt_scaled[:, :, 1] *= scale_y
+                    cnt_scaled[:, :, 0] += roi_x
+                    cnt_scaled[:, :, 1] += roi_y
+                    cnt_scaled = cnt_scaled.astype(np.int32)
+                    cnt_scaled[:, :, 0] = np.clip(cnt_scaled[:, :, 0], 0, frame.shape[1]-1)
+                    cnt_scaled[:, :, 1] = np.clip(cnt_scaled[:, :, 1], 0, frame.shape[0]-1)
+
+                    cv.drawContours(frame, [cnt_scaled], -1, (255, 0, 0), 2)
+
+                    # ========== 核心优化：调整手势判断优先级（先up后stop） ==========
+                    # 1. 优先判断竖大拇指（up）- 避免被stop提前拦截
+                    if self.is_thumb_up(features):
+                        current_gesture = "up"
+                    # 2. 再判断握拳（stop）- 此时已排除大拇指，无误判
+                    elif self.is_fist(features):
+                        current_gesture = "stop"
+                    # 3. 其他手势判断
+                    elif features["defect_count"] == 1:
+                        current_gesture = "front"
+                    elif features["defect_count"] >= 3:
+                        current_gesture = "back"
+                    else:
+                        current_gesture = "None"
+
+        # 缓存稳定性增强
+        self.gesture_buffer.append(current_gesture)
+        if len(self.gesture_buffer) > self.buffer_size:
+            self.gesture_buffer.pop(0)
                     # 绘制轮廓（调试用，可直观看到手部提取效果）
                     # 绘制轮廓（调试用）
                 self.frame_queue = [frame]  # 只保留最新帧
@@ -662,6 +761,10 @@ def main():
         return frame_show
 
     def run(self):
+        """主运行逻辑"""
+        # 摄像头初始化
+        cap = cv.VideoCapture(0)
+        cap.set(cv.CAP_PROP_FRAME_WIDTH, 640)
         """主运行逻辑（修复时间计算错误）"""
         # 摄像头初始化
         cap = cv.VideoCapture(0)
@@ -682,6 +785,16 @@ def main():
         # 提示信息
         print("=" * 60)
         print(f"✅ 帧率锁定 {self.target_fps} 帧 | ESC退出")
+        print("💡 修复up误判为stop（优先级+特征优化）：")
+        print("   👍 竖大拇指 → up（优先判断，精准识别）")
+        print("   ✊ 握拳 → stop（排除大拇指，无重叠）")
+        print("   🤘 食指+中指 → front")
+        print("   🖐️  手掌张开 → back")
+        print("📌 已解决up与stop的特征重叠问题")
+        print("=" * 60)
+
+        # 主循环
+        while cap.isOpened():
         print("💡 暗光优化版手势识别（高稳定性）：")
         print("💡 优化版手势识别（高稳定性）：")
         print("   ✊ 握拳 → stop（高稳定）")
@@ -762,6 +875,9 @@ def main():
 
             # 处理并显示
             frame_show = self.process_frame(frame)
+            cv.imshow("Hand Gesture Recognition (Fix UP→Stop Misjudgment)", frame_show)
+
+            # 更新时间戳
             cv.imshow("Hand Gesture Recognition (Dark Mode Optimized)", frame_show)
 
             # 更新时间戳
@@ -787,6 +903,7 @@ def main():
 
 if __name__ == '__main__':
     recognizer = StableFPSHandRecognizer(target_fps=20)
+    recognizer.run()
     recognizer.run()
     # 20帧兼顾流畅度和识别稳定性
     recognizer = StableFPSHandRecognizer(target_fps=20)
