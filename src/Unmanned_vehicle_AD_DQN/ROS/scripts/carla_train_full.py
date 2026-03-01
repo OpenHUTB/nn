@@ -56,7 +56,7 @@ class FullCarlaTrainer:
         """导入所有需要的模块"""
         try:
             # 导入主训练函数
-            import main
+            from drone_simulation import main
             self.main_module = main
             rospy.loginfo("✅ 导入main.py模块")
             
