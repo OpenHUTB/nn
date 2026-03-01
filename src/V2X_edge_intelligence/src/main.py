@@ -2,6 +2,46 @@ import sys
 import os
 import time
 
+# ===================== 全局配置常量（仅使用相对路径） =====================
+# Carla连接配置
+CARLA_HOST = "localhost"
+CARLA_PORT = 2000
+CARLA_TIMEOUT = 20.0
+CARLA_MAP = "Town01"
+
+# 数据采集配置（全部使用相对路径）
+SAVE_DIR = "carla_sensor_data"  # 相对当前运行目录
+VEHICLE_NUM = 3
+TARGET_VEHICLE_MODEL = "vehicle.tesla.model3"
+VEHICLE_COLOR = "0,0,0"  # 黑色
+
+# 可视化配置
+VISUALIZATION_DURATION = 30.0  # 可视化效果持续30秒
+LIDAR_RANGE = 100.0  # 激光雷达范围
+LIDAR_SEGMENTS = 36  # 激光雷达模拟圆的线段数
+RSU_BOX_SIZE = carla.Vector3D(1, 1, 2)  # 路侧单元可视化尺寸
+VEHICLE_BOX_SIZE = carla.Vector3D(2, 1, 1)  # 车辆可视化尺寸
+
+# 颜色配置（RGB）
+COLOR_RED = carla.Color(255, 0, 0)  # 路侧单元
+COLOR_BLUE = carla.Color(0, 0, 255)  # 激光雷达范围
+COLOR_GREEN = carla.Color(0, 255, 0)  # 车辆边框
+COLOR_YELLOW = carla.Color(255, 255, 0)  # 车辆文字
+
+
+# ===================== 路径工具函数（纯相对路径） =====================
+def get_relative_path(*path_parts: str) -> str:
+    """
+    构建并返回相对路径（基于当前工作目录）
+    Args:
+        path_parts: 路径片段，如("data", "sensor", "file.json")
+    Returns:
+        规范化的相对路径字符串
+    """
+    # 拼接路径片段并规范化
+    relative_path = os.path.join(*path_parts)
+    # 返回相对路径（确保不以/开头）
+    return os.path.normpath(relative_path)
 
 # ====================== 1. 灵活加载CARLA egg文件（移除绝对路径） ======================
 def find_carla_egg():
@@ -130,4 +170,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n🛑 用户中断程序执行")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n\n❌ 致命错误: {str(e)}")
+        sys.exit(1)
