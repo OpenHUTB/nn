@@ -16,13 +16,13 @@ Features:
 
 Examples:
   # Still image
-  python initial_human_model_render.py --xml path/to/model.xml --out render.png
+  python initial_human_model_render.py --xml path/to/quadrotor_model.xml --out render.png
 
   # Orbit GIF
-  python initial_human_model_render.py --xml path/to/model.xml --out render.gif --seconds 4 --orbit
+  python initial_human_model_render.py --xml path/to/quadrotor_model.xml --out render.gif --seconds 4 --orbit
 
   # Add muscle volume (legs by default)
-  python initial_human_model_render.py --xml path/to/model.xml --out render.gif --orbit --muscle-volume
+  python initial_human_model_render.py --xml path/to/quadrotor_model.xml --out render.gif --orbit --muscle-volume
 
 Headless:
   export MUJOCO_GL=egl   # (or osmesa)
