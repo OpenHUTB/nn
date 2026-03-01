@@ -359,7 +359,7 @@ def main():
             # 设置控制指令
             data.ctrl[:] = ctrl
 
-            # 运行仿真步
+            #  运行仿真步
             mujoco.mj_step(model, data)
 
             # 控制帧率
