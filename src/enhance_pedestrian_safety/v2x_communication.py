@@ -29,32 +29,29 @@ class V2XCommunication:
         self.config = config
         self.enabled = config.get('enabled', True)
 
-        # 通信参数
-        self.communication_range = config.get('communication_range', 300.0)  # 通信范围（米）
-        self.bandwidth = config.get('bandwidth', 10.0)  # 带宽（Mbps）
-        self.latency_mean = config.get('latency_mean', 0.05)  # 平均延迟（秒）
-        self.latency_std = config.get('latency_std', 0.01)  # 延迟标准差
-        self.packet_loss_rate = config.get('packet_loss_rate', 0.01)  # 丢包率
+        self.communication_range = config.get('communication_range', 300.0)
+        self.bandwidth = config.get('bandwidth', 10.0)
+        self.latency_mean = config.get('latency_mean', 0.05)
+        self.latency_std = config.get('latency_std', 0.01)
+        self.packet_loss_rate = config.get('packet_loss_rate', 0.01)
 
-        # 消息管理
         self.message_queue = queue.PriorityQueue()
         self.received_messages = []
         self.message_counter = 0
 
-        # 网络模拟
-        self.network_nodes = {}  # 节点ID -> 节点信息
-        self.connections = {}  # 连接状态
+        self.network_nodes = {}
+        self.connections = {}
 
-        # 统计信息
         self.stats = {
             'messages_sent': 0,
             'messages_received': 0,
             'messages_dropped': 0,
             'total_latency': 0.0,
-            'bandwidth_used': 0.0
+            'bandwidth_used': 0.0,
+            'pedestrian_warnings': 0,
+            'safety_alerts': 0
         }
 
-        # 启动消息处理线程
         if self.enabled:
             self.running = True
             self.processor_thread = threading.Thread(target=self._message_processor, daemon=True)
@@ -79,17 +76,14 @@ class V2XCommunication:
         if not self.enabled:
             return False
 
-        # 模拟网络延迟和丢包
         if np.random.random() < self.packet_loss_rate:
             self.stats['messages_dropped'] += 1
             return False
 
-        # 添加延迟
         latency = np.random.normal(self.latency_mean, self.latency_std)
         delivery_time = time.time() + max(0, latency)
 
-        # 添加到消息队列（按优先级和发送时间排序）
-        priority = -message.priority  # 负号因为PriorityQueue是小顶堆
+        priority = -message.priority
         self.message_queue.put((priority, delivery_time, message))
 
         self.stats['messages_sent'] += 1
@@ -162,7 +156,7 @@ class V2XCommunication:
             message_type='map',
             data=map_data,
             timestamp=time.time(),
-            ttl=30.0,  # 地图数据TTL较长
+            ttl=30.0,
             priority=1,
             position=map_data.get('reference_point')
         )
@@ -183,13 +177,18 @@ class V2XCommunication:
             data=warning_data,
             timestamp=time.time(),
             ttl=3.0,
-            priority=3,  # 安全消息优先级高
+            priority=3,
             position=warning_data.get('event_position')
         )
 
         self.message_counter += 1
 
         if self.send_message(message):
+            # 更新安全统计
+            if warning_data.get('type') == 'pedestrian':
+                self.stats['pedestrian_warnings'] += 1
+                if warning_data.get('severity') in ['high', 'critical']:
+                    self.stats['safety_alerts'] += 1
             return message
 
         return None
@@ -202,13 +201,11 @@ class V2XCommunication:
             if node_id == sender_id:
                 continue
 
-            # 计算距离
             distance = self._calculate_distance(sender_position, node_info['position'])
 
             if distance <= self.communication_range:
-                # 模拟信号衰减
                 signal_strength = 1.0 - (distance / self.communication_range)
-                if signal_strength > 0.3:  # 最小信号强度阈值
+                if signal_strength > 0.3:
                     reachable.append(node_id)
 
         return reachable
@@ -228,19 +225,16 @@ class V2XCommunication:
         """消息处理线程"""
         while self.running:
             try:
-                # 获取下一个要传递的消息
                 if not self.message_queue.empty():
                     priority, delivery_time, message = self.message_queue.get_nowait()
 
                     current_time = time.time()
 
                     if current_time >= delivery_time:
-                        # 消息已到传递时间
                         self._deliver_message(message)
                     else:
-                        # 重新放回队列
                         self.message_queue.put((priority, delivery_time, message))
-                        time.sleep(0.001)  # 短暂休眠
+                        time.sleep(0.001)
                 else:
                     time.sleep(0.01)
 
@@ -254,18 +248,15 @@ class V2XCommunication:
         if not message.position:
             return
 
-        # 获取可达节点
         reachable_nodes = self.get_reachable_nodes(message.sender_id, message.position)
 
-        # 模拟带宽限制
-        message_size = len(json.dumps(asdict(message)).encode('utf-8')) / 1024 / 1024  # MB
-        bandwidth_required = message_size * 8 * len(reachable_nodes)  # Mbps
+        message_size = len(json.dumps(asdict(message)).encode('utf-8')) / 1024 / 1024
+        bandwidth_required = message_size * 8 * len(reachable_nodes)
 
-        if bandwidth_required > self.bandwidth * 0.8:  # 带宽超过80%时随机丢包
+        if bandwidth_required > self.bandwidth * 0.8:
             drop_probability = min(1.0, bandwidth_required / self.bandwidth - 0.8)
             reachable_nodes = [n for n in reachable_nodes if np.random.random() > drop_probability]
 
-        # 添加到接收消息列表
         for node_id in reachable_nodes:
             received_msg = {
                 'message': asdict(message),
@@ -278,7 +269,6 @@ class V2XCommunication:
             self.received_messages.append(received_msg)
             self.stats['messages_received'] += 1
 
-        # 更新带宽使用统计
         self.stats['bandwidth_used'] += bandwidth_required
 
     def get_messages_for_node(self, node_id: str, message_types: List[str] = None) -> List[Dict]:
@@ -291,7 +281,6 @@ class V2XCommunication:
                 if not message_types or message['message_type'] in message_types:
                     messages.append(msg_record)
 
-        # 清理已处理的消息
         self.received_messages = [
             msg for msg in self.received_messages
             if msg['receiver_id'] != node_id or
@@ -308,7 +297,11 @@ class V2XCommunication:
             'bandwidth_utilization': (self.stats['bandwidth_used'] / (
                         self.bandwidth * time.time())) * 100 if time.time() > 0 else 0,
             'message_delivery_rate': self.stats['messages_received'] / max(1, self.stats['messages_sent']),
-            'average_latency': self.stats['total_latency'] / max(1, self.stats['messages_sent'])
+            'average_latency': self.stats['total_latency'] / max(1, self.stats['messages_sent']),
+            'safety_metrics': {
+                'pedestrian_warnings': self.stats['pedestrian_warnings'],
+                'safety_alerts': self.stats['safety_alerts']
+            }
         }
 
     def reset_stats(self):
@@ -318,7 +311,9 @@ class V2XCommunication:
             'messages_received': 0,
             'messages_dropped': 0,
             'total_latency': 0.0,
-            'bandwidth_used': 0.0
+            'bandwidth_used': 0.0,
+            'pedestrian_warnings': 0,
+            'safety_alerts': 0
         }
 
     def stop(self):

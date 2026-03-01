@@ -40,7 +40,7 @@ class MultiVehicleManager:
         self.config = config
         self.output_dir = output_dir
 
-        # 创建协同数据目录 - 确保所有子目录都创建
+        # 创建协同数据目录
         self.coop_dir = os.path.join(output_dir, "cooperative")
         os.makedirs(self.coop_dir, exist_ok=True)
 
@@ -59,8 +59,8 @@ class MultiVehicleManager:
 
         # V2X通信
         self.v2x_messages = []
-        self.communication_range = config.get('v2x', {}).get('communication_range', 300.0)  # 通信范围
-        self.message_buffer = defaultdict(list)  # 车辆ID -> 接收的消息列表
+        self.communication_range = config.get('v2x', {}).get('communication_range', 300.0)
+        self.message_buffer = defaultdict(list)
 
         # 协同感知
         self.shared_objects = []  # 共享的感知对象
@@ -71,7 +71,9 @@ class MultiVehicleManager:
             'total_messages': 0,
             'successful_transmissions': 0,
             'collaborative_detections': 0,
-            'data_exchange_mb': 0.0
+            'data_exchange_mb': 0.0,
+            'pedestrian_warnings_sent': 0,
+            'safety_alerts': 0
         }
 
     def spawn_cooperative_vehicles(self, num_vehicles: int = 3) -> List[carla.Actor]:
@@ -83,7 +85,6 @@ class MultiVehicleManager:
             print("警告：无生成点")
             return []
 
-        # 车辆类型
         vehicle_types = [
             'vehicle.tesla.model3',
             'vehicle.audi.tt',
@@ -96,17 +97,13 @@ class MultiVehicleManager:
 
         for i in range(min(num_vehicles, len(spawn_points))):
             try:
-                # 选择车辆类型
                 vtype = random.choice(vehicle_types)
                 vehicle_bp = random.choice(blueprint_lib.filter(vtype))
 
-                # 设置车辆属性
                 vehicle_bp.set_attribute('role_name', f'coop_vehicle_{i}')
 
-                # 选择生成点
                 spawn_point = spawn_points[i % len(spawn_points)]
 
-                # 调整位置，使车辆不在同一位置
                 offset_x = random.uniform(-5.0, 5.0)
                 offset_y = random.uniform(-5.0, 5.0)
                 location = carla.Location(
@@ -115,7 +112,6 @@ class MultiVehicleManager:
                     z=spawn_point.location.z
                 )
 
-                # 轻微调整朝向
                 rotation = carla.Rotation(
                     pitch=spawn_point.rotation.pitch,
                     yaw=spawn_point.rotation.yaw + random.uniform(-15, 15),
@@ -124,17 +120,12 @@ class MultiVehicleManager:
 
                 transform = carla.Transform(location, rotation)
 
-                # 生成车辆
                 vehicle = self.world.spawn_actor(vehicle_bp, transform)
-
-                # 设置自动驾驶
                 vehicle.set_autopilot(True)
 
-                # 添加到列表
                 self.cooperative_vehicles.append(vehicle)
                 spawned_vehicles.append(vehicle)
 
-                # 初始化车辆状态
                 self.vehicle_states[vehicle.id] = VehicleState(
                     vehicle_id=vehicle.id,
                     type_id=vehicle.type_id,
@@ -183,7 +174,7 @@ class MultiVehicleManager:
             message_type=message_type,
             data=data,
             timestamp=time.time(),
-            ttl=5.0,  # 5秒生存时间
+            ttl=5.0,
             priority=priority
         )
 
@@ -202,13 +193,11 @@ class MultiVehicleManager:
 
         recipients = []
 
-        # 检查所有车辆是否在通信范围内
         for vehicle in self.ego_vehicles + self.cooperative_vehicles:
             if vehicle.id != message.sender_id and vehicle.id in self.vehicle_states:
                 receiver_state = self.vehicle_states[vehicle.id]
                 receiver_pos = receiver_state.position
 
-                # 计算距离
                 distance = math.sqrt(
                     (sender_pos[0] - receiver_pos[0]) ** 2 +
                     (sender_pos[1] - receiver_pos[1]) ** 2 +
@@ -218,7 +207,6 @@ class MultiVehicleManager:
                 if distance <= self.communication_range:
                     recipients.append(vehicle.id)
 
-                    # 添加到接收者消息缓冲区
                     self.message_buffer[vehicle.id].append({
                         'message': message,
                         'receive_time': time.time(),
@@ -228,7 +216,6 @@ class MultiVehicleManager:
         if recipients:
             self.stats['successful_transmissions'] += len(recipients)
 
-            # 保存消息
             try:
                 self._save_v2x_message(message, recipients)
             except Exception as e:
@@ -242,7 +229,6 @@ class MultiVehicleManager:
             return None
 
         try:
-            # 创建感知消息
             perception_data = {
                 'vehicle_id': vehicle_id,
                 'timestamp': time.time(),
@@ -255,13 +241,11 @@ class MultiVehicleManager:
                 vehicle_id,
                 'perception',
                 perception_data,
-                priority=2  # 感知数据优先级较高
+                priority=2
             )
 
-            # 广播消息
             recipients = self.broadcast_message(message)
 
-            # 融合共享的感知数据
             if recipients:
                 self._fuse_shared_perception(vehicle_id, detected_objects, recipients)
 
@@ -276,7 +260,7 @@ class MultiVehicleManager:
         """共享交通警告"""
         try:
             warning_data = {
-                'warning_type': warning_type,  # 'accident', 'congestion', 'hazard', 'construction'
+                'warning_type': warning_type,
                 'location': location,
                 'severity': severity,
                 'timestamp': time.time(),
@@ -287,7 +271,7 @@ class MultiVehicleManager:
                 vehicle_id,
                 'warning',
                 warning_data,
-                priority=3  # 警告消息优先级最高
+                priority=3
             )
 
             self.broadcast_message(message)
@@ -297,22 +281,74 @@ class MultiVehicleManager:
             print(f"共享交通警告失败: {e}")
             return None
 
+    def share_pedestrian_warning(self, vehicle_id: int, pedestrian_location: Tuple[float, float, float],
+                                 distance: float, speed: float, pedestrian_id: Optional[int] = None):
+        """共享行人警告"""
+        try:
+            # 风险评估
+            if distance < 5.0:
+                severity = 'critical'
+            elif distance < 10.0:
+                severity = 'high'
+            elif distance < 20.0:
+                severity = 'medium'
+            else:
+                severity = 'low'
+
+            warning_data = {
+                'warning_type': 'pedestrian',
+                'pedestrian_location': pedestrian_location,
+                'distance': distance,
+                'vehicle_speed': speed,
+                'timestamp': time.time(),
+                'source_vehicle': vehicle_id,
+                'pedestrian_id': pedestrian_id,
+                'severity': severity,
+                'recommended_action': self._get_recommended_action(distance, speed, severity)
+            }
+
+            message = self.create_v2x_message(
+                vehicle_id,
+                'warning',
+                warning_data,
+                priority=4  # 行人警告优先级最高
+            )
+
+            recipients = self.broadcast_message(message)
+
+            # 更新统计
+            self.stats['pedestrian_warnings_sent'] += 1
+            if severity in ['critical', 'high']:
+                self.stats['safety_alerts'] += 1
+
+            return message, recipients
+        except Exception as e:
+            print(f"共享行人警告失败: {e}")
+            return None, []
+
+    def _get_recommended_action(self, distance: float, speed: float, severity: str) -> str:
+        """获取推荐的安全措施"""
+        if severity == 'critical':
+            return "立即紧急制动，准备避让"
+        elif severity == 'high':
+            return "减速至20km/h以下，准备制动"
+        elif severity == 'medium':
+            return "减速至30km/h，保持警惕"
+        else:
+            return "保持当前速度，注意观察"
+
     def _fuse_shared_perception(self, source_id: int, objects: List[Dict], recipients: List[int]):
         """融合共享的感知数据"""
         fused_objects = []
 
         for obj in objects:
-            # 转换为全局坐标系（简化处理，实际需要坐标变换）
             global_obj = obj.copy()
             global_obj['source_vehicles'] = [source_id]
-            global_obj['confidence'] = obj.get('confidence', 0.8)  # 降低置信度
+            global_obj['confidence'] = obj.get('confidence', 0.8)
 
-            # 检查是否已有类似对象
             matched = False
             for existing_obj in self.shared_objects:
-                # 简单的对象匹配（基于位置）
                 if self._objects_match(global_obj, existing_obj):
-                    # 更新现有对象
                     existing_obj['source_vehicles'].append(source_id)
                     existing_obj['confidence'] = min(1.0, existing_obj.get('confidence', 0) + 0.1)
                     existing_obj['update_time'] = time.time()
@@ -325,11 +361,10 @@ class MultiVehicleManager:
 
         self.shared_objects.extend(fused_objects)
 
-        # 清理旧对象
         current_time = time.time()
         self.shared_objects = [
             obj for obj in self.shared_objects
-            if current_time - obj.get('detection_time', 0) < 10.0  # 保留10秒内的对象
+            if current_time - obj.get('detection_time', 0) < 10.0
         ]
 
         if fused_objects:
@@ -340,7 +375,6 @@ class MultiVehicleManager:
         if obj1.get('class') != obj2.get('class'):
             return False
 
-        # 计算位置距离
         pos1 = obj1.get('position', {'x': 0, 'y': 0, 'z': 0})
         pos2 = obj2.get('position', {'x': 0, 'y': 0, 'z': 0})
 
@@ -357,23 +391,20 @@ class MultiVehicleManager:
         shared_data = []
 
         for obj in self.shared_objects:
-            # 检查对象是否在车辆视野内（简化）
             shared_data.append(obj)
 
         return shared_data
 
     def coordinate_maneuvers(self, maneuvers: List[Dict]):
         """协调多车辆机动"""
-        # 分配优先级和时序
         coordinated = []
 
         for i, maneuver in enumerate(maneuvers):
             coordinated_maneuver = maneuver.copy()
             coordinated_maneuver['sequence'] = i
-            coordinated_maneuver['start_time'] = time.time() + i * 2.0  # 间隔2秒
+            coordinated_maneuver['start_time'] = time.time() + i * 2.0
             coordinated.append(coordinated_maneuver)
 
-            # 发送协调消息
             message = self.create_v2x_message(
                 maneuver.get('vehicle_id', 0),
                 'coordination',
@@ -393,7 +424,6 @@ class MultiVehicleManager:
             'transmission_time': time.time()
         }
 
-        # 确保目录存在
         v2x_messages_dir = os.path.join(self.coop_dir, "v2x_messages")
         os.makedirs(v2x_messages_dir, exist_ok=True)
 
@@ -418,7 +448,6 @@ class MultiVehicleManager:
                 'stats': self.stats
             }
 
-            # 确保目录存在
             shared_perception_dir = os.path.join(self.coop_dir, "shared_perception")
             os.makedirs(shared_perception_dir, exist_ok=True)
 
@@ -439,7 +468,12 @@ class MultiVehicleManager:
             'shared_objects_count': len(self.shared_objects),
             'communication_range': self.communication_range,
             'average_messages_per_vehicle': self.stats['total_messages'] / max(1, len(self.ego_vehicles) + len(
-                self.cooperative_vehicles))
+                self.cooperative_vehicles)),
+            'safety_metrics': {
+                'pedestrian_warnings': self.stats['pedestrian_warnings_sent'],
+                'safety_alerts': self.stats['safety_alerts'],
+                'collaborative_detections': self.stats['collaborative_detections']
+            }
         }
 
         filepath = os.path.join(self.coop_dir, "cooperative_summary.json")
