@@ -1,9 +1,8 @@
 # 参考：https://github.com/Tiryoh/actions-mkdocs
 name: Deploy
 on:
-  push:
-    branches:
-      - main
+  repository_dispatch:
+
 jobs:
   build:
     name: Deploy docs to GitHub Pages
