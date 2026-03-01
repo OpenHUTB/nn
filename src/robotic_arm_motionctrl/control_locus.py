@@ -200,7 +200,7 @@ class RoboticArmController:
 
 
 def main():
-    """主函数 -  机械臂绕圈运动"""
+    """主函数 - 机械臂绕圈运动"""
     model_path = "arm6dof_final.xml"
 
     try:
