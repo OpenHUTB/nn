@@ -1,0 +1,53 @@
+<mujoco model="3DOF Robotic Arm">
+  <compiler angle="radian" inertiafromgeom="true"/>
+
+  <!-- 视觉和物理设置（移除所有不兼容属性） -->
+  <option timestep="0.005" gravity="0 0 -9.81"/>
+  <visual>
+    <global azimuth="135" elevation="-30"/>
+  </visual>
+
+  <!-- 资产定义（颜色、材质） -->
+  <asset>
+    <material name="red" rgba="0.8 0.2 0.2 1"/>
+    <material name="green" rgba="0.2 0.8 0.2 1"/>
+    <material name="blue" rgba="0.2 0.2 0.8 1"/>
+    <material name="gray" rgba="0.5 0.5 0.5 1"/>
+  </asset>
+
+  <!-- 世界体 -->
+  <worldbody>
+    <!-- 地面 -->
+    <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 0" material="gray" condim="3"/>
+
+    <!-- 机械臂基座 -->
+    <body name="base" pos="0 0 0">
+      <geom name="base_geom" type="cylinder" size="0.15 0.05" pos="0 0 0" material="gray"/>
+      <joint name="joint1" type="hinge" axis="0 0 1" pos="0 0 0" range="-3.14 3.14"/>
+
+      <!-- 大臂 -->
+      <body name="upper_arm" pos="0 0 0.05">
+        <geom name="upper_arm_geom" type="capsule" size="0.05" fromto="0 0 0 0 0 0.4" material="red"/>
+        <joint name="joint2" type="hinge" axis="1 0 0" pos="0 0 0.4" range="-1.57 1.57"/>
+
+        <!-- 小臂 -->
+        <body name="lower_arm" pos="0 0 0.4">
+          <geom name="lower_arm_geom" type="capsule" size="0.04" fromto="0 0 0 0 0 0.3" material="green"/>
+          <joint name="joint3" type="hinge" axis="1 0 0" pos="0 0 0.3" range="-1.57 1.57"/>
+
+          <!-- 末端执行器 -->
+          <body name="end_effector" pos="0 0 0.3">
+            <geom name="ee_geom" type="sphere" size="0.03" pos="0 0 0" material="blue"/>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- 控制器（关节位置控制） -->
+  <actuator>
+    <position name="act1" joint="joint1" kp="1000"/>
+    <position name="act2" joint="joint2" kp="1000"/>
+    <position name="act3" joint="joint3" kp="1000"/>
+  </actuator>
+</mujoco>
