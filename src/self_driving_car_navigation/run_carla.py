@@ -9,7 +9,9 @@ import os
 from queue import Queue
 from gym import spaces
 from collections import deque
+import math
 
+# ========== 原有CarlaEnvironment类保持不变 ==========
 class CarlaEnvironment(gym.Env):
     def __init__(self):
         super(CarlaEnvironment, self).__init__()
@@ -32,6 +34,8 @@ class CarlaEnvironment(gym.Env):
         self.image_queue = Queue(maxsize=1)
         self.lidar_queue = Queue(maxsize=1)
         self.imu_queue = Queue(maxsize=1)
+        # 新增：保存原始激光雷达点云数据（用于3D可视化）
+        self.raw_lidar_queue = Queue(maxsize=1)
 
         # 连接CARLA（强化严格同步模式）
         self._connect_carla()
@@ -187,13 +191,20 @@ class CarlaEnvironment(gym.Env):
             print(f"[图像处理错误] {str(e)}")
 
     def process_lidar(self, data):
-        """处理激光雷达数据"""
+        """处理激光雷达数据（新增：保存原始点云用于3D可视化）"""
         try:
             if not hasattr(data, 'raw_data'):
                 print("[激光雷达处理错误] 无效的激光雷达数据")
                 return
                 
-            points = np.frombuffer(data.raw_data, dtype=np.dtype('f4')).reshape(-1, 4)[:, :3]
+            # 原始点云（x,y,z,intensity）- 用于3D可视化
+            raw_points = np.frombuffer(data.raw_data, dtype=np.dtype('f4')).reshape(-1, 4)
+            if self.raw_lidar_queue.full():
+                self.raw_lidar_queue.get()
+            self.raw_lidar_queue.put(raw_points)
+
+            # 原有2D距离计算逻辑
+            points = raw_points[:, :3]
             distances = np.linalg.norm(points, axis=1)
             angles = np.arctan2(points[:, 1], points[:, 0]) * 180 / np.pi
             angles = (angles + 360) % 360
@@ -384,6 +395,12 @@ class CarlaEnvironment(gym.Env):
             'imu': self.imu_queue.get()
         }
 
+    def get_raw_lidar_points(self):
+        """获取原始激光雷达点云（用于3D可视化）"""
+        while self.raw_lidar_queue.empty():
+            time.sleep(0.001)
+        return self.raw_lidar_queue.get()
+
     def get_obstacle_directions(self, lidar_distances):
         """计算四向障碍物距离"""
         front_angles = np.concatenate([np.arange(345, 360), np.arange(0, 16)])
@@ -434,7 +451,7 @@ class CarlaEnvironment(gym.Env):
         self._safe_destroy_actor(self.vehicle)
         self.vehicle = None
         self._clear_all_non_ego_actors()
-        for q in [self.image_queue, self.lidar_queue, self.imu_queue]:
+        for q in [self.image_queue, self.lidar_queue, self.imu_queue, self.raw_lidar_queue]:
             while not q.empty():
                 q.get()
         # 恢复世界设置
@@ -554,10 +571,143 @@ class CarlaEnvironment(gym.Env):
         # 7. 更新镜头（仅一次，同步帧内完成）
         spectator.set_transform(carla.Transform(final_loc, final_rot))
 
+# ========== 新增：3D点云可视化核心逻辑 ==========
+class Lidar3DVisualizer:
+    def __init__(self, width=600, height=600):
+        # 窗口参数
+        self.width = width
+        self.height = height
+        self.screen = pygame.display.set_mode((width, height), pygame.DOUBLEBUF)
+        pygame.display.set_caption("激光雷达3D点云可视化")
+        
+        # 视角参数（默认从车辆后上方俯视）
+        self.theta = math.radians(30)  # 水平旋转角（绕Y轴）
+        self.phi = math.radians(-30)   # 垂直旋转角（绕X轴）
+        self.scale = 10.0              # 缩放系数
+        self.offset_x = width // 2
+        self.offset_y = height // 2
+        
+        # 交互状态
+        self.mouse_down = False
+        self.last_mouse_pos = (0, 0)
+        self.point_size = 2            # 点云渲染大小
+        
+        # 颜色映射（距离→RGB）
+        self.color_map = {
+            'red': (255, 0, 0),    # 0-10m（近距/高风险）
+            'yellow': (255, 255, 0),# 10-30m（中距）
+            'green': (0, 255, 0)    # 30-50m（远距/低风险）
+        }
 
+    def project_3d_to_2d(self, point):
+        """
+        透视投影：将3D点(x,y,z)转换为2D屏幕坐标
+        核心算法：
+        1. 绕Y轴旋转（水平视角）
+        2. 绕X轴旋转（垂直视角）
+        3. 透视缩放+屏幕偏移
+        """
+        x, y, z = point
+        
+        # 绕Y轴旋转（theta）
+        x_rot = x * math.cos(self.theta) - z * math.sin(self.theta)
+        z_rot = x * math.sin(self.theta) + z * math.cos(self.theta)
+        
+        # 绕X轴旋转（phi）
+        y_rot = y * math.cos(self.phi) - z_rot * math.sin(self.phi)
+        z_rot = y * math.sin(self.phi) + z_rot * math.cos(self.phi)
+        
+        # 透视投影 + 屏幕偏移
+        if z_rot == 0:
+            z_rot = 0.001  # 避免除零
+        proj_x = self.offset_x + (x_rot * self.scale) / (z_rot / 5)
+        proj_y = self.offset_y - (y_rot * self.scale) / (z_rot / 5)
+        
+        return int(proj_x), int(proj_y)
+
+    def get_point_color(self, distance):
+        """根据距离获取点云颜色（颜色编码）"""
+        if distance < 10:
+            return self.color_map['red']
+        elif distance < 30:
+            return self.color_map['yellow']
+        else:
+            return self.color_map['green']
+
+    def filter_invalid_points(self, points):
+        """过滤无效点：距离>50m/ <0.5m、z轴异常（地面/天空噪点）"""
+        # 计算每个点的距离
+        distances = np.linalg.norm(points[:, :3], axis=1)
+        # 过滤条件
+        mask = (distances > 0.5) & (distances < 50) & (points[:, 2] > -1) & (points[:, 2] < 5)
+        return points[mask], distances[mask]
+
+    def render(self, raw_points):
+        """渲染3D点云"""
+        # 1. 清空屏幕（深灰背景，高级感）
+        self.screen.fill((20, 20, 20))
+        
+        # 2. 过滤无效点
+        valid_points, distances = self.filter_invalid_points(raw_points)
+        
+        # 3. 逐点投影并渲染
+        for point, dist in zip(valid_points, distances):
+            x, y, z = point[:3]
+            # 转换为车辆局部坐标系（点云以车辆为中心）
+            local_point = (-x, -y, z)  # 反转x/y，让点云朝向正确
+            # 3D→2D投影
+            screen_x, screen_y = self.project_3d_to_2d(local_point)
+            # 边界检查（避免渲染到窗口外）
+            if 0 < screen_x < self.width and 0 < screen_y < self.height:
+                color = self.get_point_color(dist)
+                # 绘制点云（抗锯齿）
+                pygame.draw.circle(self.screen, color, (screen_x, screen_y), self.point_size)
+        
+        # 4. 绘制辅助信息（坐标系、说明文字）
+        font = pygame.font.SysFont('Consolas', 12)
+        # 坐标系提示
+        axis_text = font.render("X:前 Y:左 Z:上 | 鼠标拖拽旋转 | 滚轮缩放", True, (200, 200, 200))
+        self.screen.blit(axis_text, (10, 10))
+        # 距离说明
+        dist_text = font.render("红色:<10m 黄色:10-30m 绿色:>30m", True, (200, 200, 200))
+        self.screen.blit(dist_text, (10, 30))
+        
+        # 5. 更新显示
+        pygame.display.flip()
+
+    def handle_events(self):
+        """处理鼠标交互"""
+        for event in pygame.event.get():
+            # 鼠标按下
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # 左键
+                    self.mouse_down = True
+                    self.last_mouse_pos = pygame.mouse.get_pos()
+                elif event.button == 4:  # 滚轮上滚（放大）
+                    self.scale = min(self.scale + 1, 30)
+                elif event.button == 5:  # 滚轮下滚（缩小）
+                    self.scale = max(self.scale - 1, 5)
+            # 鼠标松开
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:
+                    self.mouse_down = False
+            # 鼠标拖拽（旋转视角）
+            elif event.type == pygame.MOUSEMOTION and self.mouse_down:
+                current_pos = pygame.mouse.get_pos()
+                dx = current_pos[0] - self.last_mouse_pos[0]
+                dy = current_pos[1] - self.last_mouse_pos[1]
+                # 更新旋转角（灵敏度适配）
+                self.theta += dx * 0.01
+                self.phi += dy * 0.01
+                self.last_mouse_pos = current_pos
+
+# ========== 修改后的仿真运行函数 ==========
 def run_simulation():
     pygame.init()
+    # 初始化字体（避免中文/特殊字符乱码）
+    pygame.font.init()
     env = None
+    lidar_visualizer = None
     try:
         print("\n[CARLA连接] 创建环境...")
         env = CarlaEnvironment()
@@ -572,6 +722,9 @@ def run_simulation():
             raise RuntimeError("车辆生成失败，请检查CARLA是否正常运行")
         print(f"[车辆状态] 生成成功（ID: {env.vehicle.id}），已启用自动驾驶")
 
+        # 初始化3D点云可视化器
+        lidar_visualizer = Lidar3DVisualizer(width=600, height=600)
+        
         clock = pygame.time.Clock()
         spectator = env.world.get_spectator()
         
@@ -582,34 +735,42 @@ def run_simulation():
             env.world.tick()
         
         print("\n[仿真开始] 车辆将沿车道行驶，按Ctrl+C退出...")
+        print("[点云可视化] 窗口已启动 - 鼠标拖拽旋转视角 | 滚轮缩放 | 颜色编码距离")
         sys.stdout.flush()
         
         step = 0
         obstacle_distances = {'front': 0, 'rear': 0, 'left': 0, 'right': 0}
         while True:
-            # 处理pygame事件
+            # 1. 处理所有事件（主窗口+点云窗口）
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     raise KeyboardInterrupt
+            # 点云窗口交互
+            if lidar_visualizer:
+                lidar_visualizer.handle_events()
             
-            # 严格同步的仿真帧推进
+            # 2. 严格同步的仿真帧推进
             env.world.tick()
             
-            # 终极平滑的镜头更新
+            # 3. 终极平滑的镜头更新
             env.update_spectator_ultra_smooth(spectator)
             
-            # 极低频率获取观测（减少性能消耗）
+            # 4. 渲染3D点云（每帧更新，保证实时性）
+            raw_lidar_points = env.get_raw_lidar_points()
+            lidar_visualizer.render(raw_lidar_points)
+            
+            # 5. 极低频率获取观测（减少性能消耗）
             if step % 3 == 0:
                 observation = env.get_observation()
                 obstacle_distances = env.get_obstacle_directions(observation['lidar_distances'])
             
-            # 极低频率打印（每2秒打印一次，减少IO抖动）
+            # 6. 极低频率打印（每2秒打印一次，减少IO抖动）
             if step % 120 == 0:
                 print(f"\n[步骤 {step}] 障碍物距离 - 前{obstacle_distances['front']:.1f}m | 后{obstacle_distances['rear']:.1f}m | "
                       f"左{obstacle_distances['left']:.1f}m | 右{obstacle_distances['right']:.1f}m")
                 sys.stdout.flush()
             
-            # 锁定渲染帧率（与仿真帧率一致，避免波动）
+            # 7. 锁定渲染帧率（与仿真帧率一致，避免波动）
             clock.tick_busy_loop(60)  # 更精准的帧率锁定
             step += 1
 

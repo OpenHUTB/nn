@@ -12,20 +12,13 @@ from numba import njit
 from datetime import datetime
 
 # 配置loguru logger
+# 配置日志
 try:
     from loguru import logger
-    # 移除默认配置，避免冲突
-    logger.remove()
-    # 添加控制台输出
-    logger.add(sys.stdout, format="<green>{time:HH:mm:ss}</green> | <level>{level: <8}</level> | <level>{message}</level>", level="INFO")
 except ImportError:
-    # 创建简单的logger回退
-    class SimpleLogger:
-        def debug(self, msg): print(f"DEBUG: {msg}")
-        def info(self, msg): print(f"INFO: {msg}")
-        def warning(self, msg): print(f"WARNING: {msg}")
-        def error(self, msg): print(f"ERROR: {msg}")
-    logger = SimpleLogger()
+    import logging
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
 
 # 尝试导入yaml，如果失败提供友好的错误信息
 try:
@@ -34,8 +27,6 @@ try:
 except ImportError:
     YAML_AVAILABLE = False
     logger.warning("PyYAML未安装，配置文件功能将受限")
-
-# ======================== 图像处理工具 ========================
 
 def valid_img(img):
     """
@@ -48,7 +39,6 @@ def valid_img(img):
         bool: 图像是否有效
     """
     return img is not None and len(img.shape) == 3 and img.shape[2] == 3 and img.size > 0
-
 
 def clip_box(bbox, img_shape):
     """
@@ -69,7 +59,6 @@ def clip_box(bbox, img_shape):
         max(bbox[1] + 1, min(bbox[3], h - 1))
     ], dtype=np.float32)
 
-
 def make_div(x, d=32):
     """
     将数值调整为d的倍数（用于YOLO输入尺寸）
@@ -82,7 +71,6 @@ def make_div(x, d=32):
         int: 调整后的数值
     """
     return (x + d - 1) // d * d
-
 
 def resize_with_padding(image, target_size, color=(114, 114, 114)):
     """
@@ -120,9 +108,6 @@ def resize_with_padding(image, target_size, color=(114, 114, 114)):
     
     return padded, scale, (dx, dy)
 
-
-# ======================== 几何计算工具 ========================
-
 @njit
 def iou_numpy(box1, box2):
     """
@@ -147,7 +132,6 @@ def iou_numpy(box1, box2):
     
     return ia / ua if ua > 0 else 0.0
 
-
 def iou(box1, box2):
     """
     计算两个边界框的IoU（兼容list和numpy数组）
@@ -163,7 +147,6 @@ def iou(box1, box2):
     box1_np = np.array(box1, dtype=np.float32)
     box2_np = np.array(box2, dtype=np.float32)
     return iou_numpy(box1_np, box2_np)
-
 
 @njit
 def iou_batch(boxes1, boxes2):
@@ -187,7 +170,6 @@ def iou_batch(boxes1, boxes2):
     
     return iou_matrix
 
-
 def bbox_center(bbox):
     """
     计算边界框中心点
@@ -200,7 +182,6 @@ def bbox_center(bbox):
     """
     return ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
 
-
 def bbox_area(bbox):
     """
     计算边界框面积
@@ -212,7 +193,6 @@ def bbox_area(bbox):
         float: 边界框面积
     """
     return max(0, bbox[2] - bbox[0]) * max(0, bbox[3] - bbox[1])
-
 
 def bbox_aspect_ratio(bbox):
     """
@@ -227,9 +207,6 @@ def bbox_aspect_ratio(bbox):
     width = max(0.1, bbox[2] - bbox[0])
     height = max(0.1, bbox[3] - bbox[1])
     return width / height
-
-
-# ======================== 性能监控工具 ========================
 
 class FPSCounter:
     """
@@ -276,7 +253,6 @@ class FPSCounter:
         self.fps = 0.0
         self.fps_history = []
         self.avg_fps = 0.0
-
 
 class PerformanceMonitor:
     """
@@ -338,9 +314,6 @@ class PerformanceMonitor:
         logger.info(f"平均检测时间: {stats['avg_detection_time']:.1f}ms")
         logger.info(f"平均跟踪时间: {stats['avg_tracking_time']:.1f}ms")
 
-
-# ======================== 文件操作工具 ========================
-
 def create_output_dir(base_dir="outputs"):
     """
     创建输出目录
@@ -361,7 +334,6 @@ def create_output_dir(base_dir="outputs"):
     
     logger.info(f"创建输出目录: {output_dir}")
     return output_dir
-
 
 def save_image(image, path, create_dir=True):
     """
@@ -391,7 +363,6 @@ def save_image(image, path, create_dir=True):
         logger.error(f"保存图像失败 {path}: {e}")
         return False
 
-
 def load_yaml_config(path):
     """
     加载YAML配置文件
@@ -418,7 +389,6 @@ def load_yaml_config(path):
         logger.error(f"加载配置文件失败 {path}: {e}")
         return {}
 
-
 def save_yaml_config(config, path):
     """
     保存配置到YAML文件
@@ -438,9 +408,6 @@ def save_yaml_config(config, path):
         logger.debug(f"配置已保存: {path}")
     except Exception as e:
         logger.error(f"保存配置失败 {path}: {e}")
-
-
-# ======================== 可视化工具 ========================
 
 def draw_bbox(image, bbox, color=(255, 0, 0), thickness=2, label=None):
     """
@@ -486,7 +453,6 @@ def draw_bbox(image, bbox, color=(255, 0, 0), thickness=2, label=None):
     
     return image
 
-
 def draw_trajectory(image, points, color=(0, 255, 0), thickness=2, max_points=20):
     """
     在图像上绘制轨迹
@@ -518,7 +484,6 @@ def draw_trajectory(image, points, color=(0, 255, 0), thickness=2, max_points=20
             cv2.line(image, pt1, pt2, color, thickness)
     
     return image
-
 
 def draw_info_panel(image, info_dict, position="top_left"):
     """
@@ -567,9 +532,6 @@ def draw_info_panel(image, info_dict, position="top_left"):
                    font, font_scale, (255, 255, 255), thickness)
     
     return image
-
-
-# ======================== 测试函数 ========================
 
 def run_self_tests():
     """运行自测试"""
@@ -714,7 +676,6 @@ def run_self_tests():
         print("⚠️  有测试失败，请检查")
     
     return tests_failed == 0
-
 
 if __name__ == "__main__":
     # 运行自测试
