@@ -1,0 +1,36 @@
+# Logs
+*.log
+logs/
+*.txt
+
+# Mujoco logs
+MUJOCO_LOG.TXT
+
+# Temporary files
+*.tmp
+*.temp
+~*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+.venv/
+venv/
+
+# Documentation
+site/
+*.md
+!README.md
