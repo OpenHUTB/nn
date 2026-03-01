@@ -209,7 +209,7 @@ def main():
         print(f"🔧 绕圈参数：半径={controller.circle_radius}m，中心={controller.circle_center}")
         print("▶️  开始绕圈仿真（运行30秒）...")
 
-        # 运行绕圈仿真（30秒）
+        # 运行绕圈仿真 （30秒）
         controller.simulate_circle_motion(duration=30.0)
 
     except FileNotFoundError as e:
