@@ -1,4 +1,0 @@
-[2026-03-02 17:33:36.472] 高性能机械臂模型初始化成功
-[2026-03-02 17:33:36.473] 控制器运行异常: 'ArmJointPerfOptimizationController' object has no attribute 'set_joint_angles'
-[2026-03-02 17:33:45.523] 高性能机械臂模型初始化成功
-[2026-03-02 17:33:45.525] 控制器运行异常: 'ArmJointPerfOptimizationController' object has no attribute 'set_joint_angles'
