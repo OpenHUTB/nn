@@ -1,0 +1,70 @@
+<mujoco model="6DOF Robotic Arm">
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <!-- 视觉和物理材质 -->
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="800" height="800"/>
+    <material name="metal" rgba="0.7 0.7 0.7 1" specular="0.9" shininess="0.1"/>
+    <material name="red" rgba="0.8 0.2 0.2 1" specular="0.5"/>
+  </asset>
+
+  <!-- 世界体 -->
+  <worldbody>
+    <!-- 地面 -->
+    <geom name="floor" type="plane" size="5 5 0.1" pos="0 0 0" rgba="0.8 0.8 0.8 1"/>
+
+    <!-- 机械臂基座 -->
+    <body name="base" pos="0 0 0">
+      <geom name="base_geom" type="box" size="0.15 0.15 0.05" pos="0 0 0" material="metal"/>
+      <joint name="joint0" type="hinge" axis="0 0 1" pos="0 0 0.05"/>
+
+      <!-- 连杆1 + 关节1（移除axis，圆柱默认沿z轴，无需额外设置） -->
+      <body name="link1" pos="0 0 0.05">
+        <geom name="link1_geom" type="cylinder" size="0.02 0.2" pos="0 0 0.1" material="metal"/>
+        <joint name="joint1" type="hinge" axis="0 1 0" pos="0 0 0.2"/>
+
+        <!-- 连杆2 + 关节2 -->
+        <body name="link2" pos="0 0 0.2">
+          <geom name="link2_geom" type="cylinder" size="0.02 0.2" pos="0 0 0.1" material="metal"/>
+          <joint name="joint2" type="hinge" axis="1 0 0" pos="0 0 0.2"/>
+
+          <!-- 连杆3 + 关节3 -->
+          <body name="link3" pos="0 0 0.2">
+            <geom name="link3_geom" type="cylinder" size="0.02 0.15" pos="0 0 0.075" material="metal"/>
+            <joint name="joint3" type="hinge" axis="0 1 0" pos="0 0 0.15"/>
+
+            <!-- 连杆4 + 关节4 -->
+            <body name="link4" pos="0 0 0.15">
+              <geom name="link4_geom" type="cylinder" size="0.015 0.15" pos="0 0 0.075" material="metal"/>
+              <joint name="joint4" type="hinge" axis="1 0 0" pos="0 0 0.15"/>
+
+              <!-- 连杆5 + 关节5 -->
+              <body name="link5" pos="0 0 0.15">
+                <geom name="link5_geom" type="cylinder" size="0.015 0.1" pos="0 0 0.05" material="metal"/>
+                <joint name="joint5" type="hinge" axis="0 1 0" pos="0 0 0.1"/>
+
+                <!-- 末端执行器 + 关节6 -->
+                <body name="link6" pos="0 0 0.1">
+                  <geom name="link6_geom" type="sphere" size="0.03" pos="0 0 0" material="red"/>
+                  <joint name="joint6" type="hinge" axis="1 0 0" pos="0 0 0"/>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- 控制器：关节位置控制 -->
+  <actuator>
+    <position name="act0" joint="joint0" kp="1000"/>
+    <position name="act1" joint="joint1" kp="1000"/>
+    <position name="act2" joint="joint2" kp="1000"/>
+    <position name="act3" joint="joint3" kp="1000"/>
+    <position name="act4" joint="joint4" kp="1000"/>
+    <position name="act5" joint="joint5" kp="1000"/>
+    <position name="act6" joint="joint6" kp="1000"/>
+  </actuator>
+</mujoco>
