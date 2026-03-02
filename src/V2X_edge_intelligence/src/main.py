@@ -302,6 +302,12 @@ def main():
         world.apply_settings(carla.WorldSettings(synchronous_mode=False))
         print("✅ 程序正常退出")
 
+    # 清理资源
+    if vehicle and vehicle.is_alive:
+        vehicle.destroy()
+        print("✅ 车辆已销毁")
+    world.apply_settings(carla.WorldSettings(synchronous_mode=False))
+    print("✅ 程序正常退出")
 
 # ====================== 程序入口 ======================
 if __name__ == "__main__":
