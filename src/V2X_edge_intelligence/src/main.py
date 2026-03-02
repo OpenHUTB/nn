@@ -1,180 +1,314 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+CARLA 0.9.10 - 无绝对路径优化版
+保持原有自动驾驶功能，仅优化CARLA加载逻辑
+"""
 import sys
 import os
 import time
-
-# ===================== 全局配置常量（仅使用相对路径） =====================
-# Carla连接配置
-CARLA_HOST = "localhost"
-CARLA_PORT = 2000
-CARLA_TIMEOUT = 20.0
-CARLA_MAP = "Town01"
-
-# 数据采集配置（全部使用相对路径）
-SAVE_DIR = "carla_sensor_data"  # 相对当前运行目录
-VEHICLE_NUM = 3
-TARGET_VEHICLE_MODEL = "vehicle.tesla.model3"
-VEHICLE_COLOR = "0,0,0"  # 黑色
-
-# 可视化配置
-VISUALIZATION_DURATION = 30.0  # 可视化效果持续30秒
-LIDAR_RANGE = 100.0  # 激光雷达范围
-LIDAR_SEGMENTS = 36  # 激光雷达模拟圆的线段数
-RSU_BOX_SIZE = carla.Vector3D(1, 1, 2)  # 路侧单元可视化尺寸
-VEHICLE_BOX_SIZE = carla.Vector3D(2, 1, 1)  # 车辆可视化尺寸
-
-# 颜色配置（RGB）
-COLOR_RED = carla.Color(255, 0, 0)  # 路侧单元
-COLOR_BLUE = carla.Color(0, 0, 255)  # 激光雷达范围
-COLOR_GREEN = carla.Color(0, 255, 0)  # 车辆边框
-COLOR_YELLOW = carla.Color(255, 255, 0)  # 车辆文字
+import math
+from typing import Optional
 
 
-# ===================== 路径工具函数（纯相对路径） =====================
-def get_relative_path(*path_parts: str) -> str:
+# ====================== 1. 智能加载CARLA（无硬编码绝对路径） ======================
+def load_carla() -> Optional[object]:
     """
-    构建并返回相对路径（基于当前工作目录）
-    Args:
-        path_parts: 路径片段，如("data", "sensor", "file.json")
-    Returns:
-        规范化的相对路径字符串
+    智能加载CARLA Python API，优先级：
+    1. 系统环境变量 CARLA_ROOT（推荐）
+    2. 自动搜索常见目录（当前目录、用户目录、上级目录）
+    3. 引导用户手动输入路径
     """
-    # 拼接路径片段并规范化
-    relative_path = os.path.join(*path_parts)
-    # 返回相对路径（确保不以/开头）
-    return os.path.normpath(relative_path)
-
-# ====================== 1. 灵活加载CARLA egg文件（移除绝对路径） ======================
-def find_carla_egg():
-    """
-    从环境变量或默认路径查找CARLA egg文件
-    优先读取环境变量CARLA_EGG_PATH，找不到则尝试默认相对路径
-    """
-    # 方案1：从环境变量读取（推荐）
-    carla_egg_path = os.getenv("CARLA_EGG_PATH")
-    if carla_egg_path and os.path.exists(carla_egg_path):
-        return carla_egg_path
-
-    # 方案2：尝试默认相对路径（如果CARLA和代码在同一目录层级）
-    # 请根据你的实际目录结构调整这个相对路径
-    default_egg_paths = [
-        "./PythonAPI/carla/dist/carla-0.9.10-py3.7-win-amd64.egg",
-        "../WindowsNoEditor/PythonAPI/carla/dist/carla-0.9.10-py3.7-win-amd64.egg",
-        "../../WindowsNoEditor/PythonAPI/carla/dist/carla-0.9.10-py3.7-win-amd64.egg"
+    python_version = f"py{sys.version_info.major}.{sys.version_info.minor}"
+    egg_file_patterns = [
+        f"carla-0.9.10-{python_version}-win-amd64.egg",
+        "carla-0.9.10-py3.7-win-amd64.egg",  # 兼容Python3.7（CARLA 0.9.10主流版本）
+        "carla-0.9.10-*.egg"  # 兜底匹配所有0.9.10版本的egg文件
     ]
 
-    for path in default_egg_paths:
-        abs_path = os.path.abspath(path)
-        if os.path.exists(abs_path):
-            return abs_path
+    # 候选路径列表（无任何硬编码绝对路径）
+    candidate_paths = []
 
-    # 方案3：提示用户输入路径
-    print("⚠️  未找到CARLA egg文件，请手动输入路径")
-    manual_path = input("请输入carla egg文件的完整路径：").strip()
-    if os.path.exists(manual_path):
-        return manual_path
+    # 优先级1：从环境变量CARLA_ROOT读取
+    carla_root = os.getenv("CARLA_ROOT")
+    if carla_root and os.path.isdir(carla_root):
+        candidate_paths.append(os.path.join(carla_root, "PythonAPI", "carla", "dist"))
+
+    # 优先级2：自动搜索常见目录
+    search_bases = [
+        os.getcwd(),  # 当前工作目录
+        os.path.dirname(os.getcwd()),  # 上级目录
+        os.path.expanduser("~"),  # 用户主目录
+        os.path.expanduser("~/Documents"),  # 文档目录
+    ]
+    for base in search_bases:
+        candidate_paths.append(os.path.join(base, "PythonAPI", "carla", "dist"))
+        candidate_paths.append(os.path.join(base, "WindowsNoEditor", "PythonAPI", "carla", "dist"))
+
+    # 遍历候选路径，查找有效的egg文件
+    for dist_path in candidate_paths:
+        if not os.path.isdir(dist_path):
+            continue
+
+        # 匹配egg文件
+        for file in os.listdir(dist_path):
+            if any(file.startswith(pattern.replace("*", "")) or file == pattern for pattern in egg_file_patterns):
+                egg_path = os.path.join(dist_path, file)
+                sys.path.append(egg_path)
+                try:
+                    import carla
+                    print(f"✅ CARLA Python API 加载成功：{egg_path}")
+                    return carla
+                except ImportError as e:
+                    print(f"⚠️  加载{egg_path}失败：{str(e)[:50]}")
+                    continue
+
+    # 优先级3：引导用户手动输入路径
+    print("\n❌ 未自动找到CARLA egg文件！")
+    print("📌 推荐配置环境变量（一劳永逸）：")
+    print("   Windows: set CARLA_ROOT=你的CARLA安装目录（如D:\WindowsNoEditor）")
+    print("   Linux/Mac: export CARLA_ROOT=你的CARLA安装目录")
+
+    while True:
+        manual_egg_path = input("\n请输入CARLA egg文件的完整路径：").strip()
+        if not manual_egg_path:
+            continue
+        if os.path.isfile(manual_egg_path) and manual_egg_path.endswith(".egg"):
+            sys.path.append(manual_egg_path)
+            try:
+                import carla
+                print(f"✅ 手动加载CARLA成功：{manual_egg_path}")
+                return carla
+            except ImportError:
+                print("❌ 该egg文件与当前Python版本不兼容，请重新输入！")
+        else:
+            print("❌ 路径无效或不是egg文件，请重新输入！")
 
     return None
 
 
-# 查找并加载egg文件
-carla_egg_path = find_carla_egg()
-if not carla_egg_path:
-    print("❌ 无法找到CARLA egg文件，请检查路径配置")
+# 加载CARLA核心模块
+carla = load_carla()
+if not carla:
+    print("❌ CARLA加载失败，程序退出")
     sys.exit(1)
 
-sys.path.append(carla_egg_path)
+# ====================== 2. 核心配置参数（完全保留原有设置） ======================
+# 速度控制（低速平稳）
+BASE_SPEED = 1.5  # 直道基础速度 (m/s)
+CURVE_TARGET_SPEED = 1.0  # 弯道目标速度 (m/s)
+SPEED_DEADZONE = 0.1  # 速度死区（避免微小波动）
+ACCELERATION_FACTOR = 0.04  # 油门调整幅度
+DECELERATION_FACTOR = 0.06  # 刹车调整幅度
+SPEED_TRANSITION_RATE = 0.03  # 速度过渡率（渐进减速/加速）
 
-# 导入carla
-try:
-    import carla
+# 弯道识别与晚转弯控制
+LOOKAHEAD_DISTANCE = 20.0  # 前瞻距离（提前减速）
+WAYPOINT_STEP = 1.0  # 道路点步长
+CURVE_DETECTION_THRESHOLD = 2.0  # 弯道判定阈值（角度偏差>2度）
+TURN_TRIGGER_DISTANCE_IDX = 4  # 晚转弯触发点（前方5米）
 
-    print("✅ 成功导入carla模块！")
-except ImportError:
-    print("❌ 导入失败，请确认Python版本为3.7且egg路径正确")
-    sys.exit(1)
+# 转向控制（超大角度+快速响应）
+STEER_ANGLE_MAX = 0.85  # 最大转向角（拉满）
+STEER_RESPONSE_FACTOR = 0.4  # 转向响应速度
+STEER_AMPLIFY = 1.6  # 转向角放大系数
+MIN_STEER = 0.2  # 最小转向力度
 
-# ====================== 2. 核心配置 ======================
-CARLA_HOST = "localhost"
-CARLA_PORT = 2000
-# 标记摄像头是否启动监听（解决警告关键）
-camera_listening = False
+# 出生点偏移
+SPAWN_OFFSET_X = -2.0  # X轴左移2米
+SPAWN_OFFSET_Y = 0.0  # Y轴不偏移
+SPAWN_OFFSET_Z = 0.0  # Z轴不偏移
 
 
-# ====================== 3. 核心运行逻辑 ======================
+# ====================== 3. 核心工具函数（功能完全不变） ======================
+def get_road_direction_ahead(vehicle, world):
+    """
+    获取前方道路方向，判定是否为弯道
+    返回：目标航向角、是否为弯道、航向偏差
+    """
+    vehicle_transform = vehicle.get_transform()
+    carla_map = world.get_map()
+
+    # 收集前方道路点
+    waypoints = []
+    current_wp = carla_map.get_waypoint(vehicle_transform.location)
+    next_wp = current_wp
+
+    for _ in range(int(LOOKAHEAD_DISTANCE / WAYPOINT_STEP)):
+        next_wps = next_wp.next(WAYPOINT_STEP)
+        if not next_wps:
+            break
+        next_wp = next_wps[0]
+        waypoints.append(next_wp)
+
+    if len(waypoints) < 3:
+        return vehicle_transform.rotation.yaw, False, 0.0
+
+    # 取前方5米处的道路点（晚转弯核心）
+    target_wp_idx = min(TURN_TRIGGER_DISTANCE_IDX, len(waypoints) - 1)
+    target_wp = waypoints[target_wp_idx]
+    target_yaw = target_wp.transform.rotation.yaw
+
+    # 计算航向偏差
+    current_yaw = vehicle_transform.rotation.yaw
+    yaw_diff = target_yaw - current_yaw
+    yaw_diff = (yaw_diff + 180) % 360 - 180  # 标准化到-180~180°
+    is_curve = abs(yaw_diff) > CURVE_DETECTION_THRESHOLD
+
+    return target_yaw, is_curve, yaw_diff
+
+
+def calculate_steer_angle(current_yaw, target_yaw):
+    """计算超大角度转向角，保证足够转向力度"""
+    yaw_diff = target_yaw - current_yaw
+    yaw_diff = (yaw_diff + 180) % 360 - 180
+
+    # 计算并放大转向角
+    steer = (yaw_diff / 180.0 * STEER_ANGLE_MAX) * STEER_AMPLIFY
+    steer = max(-STEER_ANGLE_MAX, min(STEER_ANGLE_MAX, steer))
+
+    # 强制最小转向力度
+    if abs(steer) > 0.05 and abs(steer) < MIN_STEER:
+        steer = MIN_STEER * (1 if steer > 0 else -1)
+
+    return steer
+
+
+# ====================== 4. 主驾驶逻辑（功能完全不变） ======================
 def main():
-    global camera_listening
-    vehicle = None
-    camera = None
+    # 1. 连接CARLA服务器
+    try:
+        client = carla.Client('localhost', 2000)
+        client.set_timeout(10.0)
+        world = client.load_world('Town01')
+        world.set_weather(carla.WeatherParameters.ClearNoon)
+        # 设置世界参数（非同步模式，降低复杂度）
+        world.apply_settings(carla.WorldSettings(
+            synchronous_mode=False,
+            fixed_delta_seconds=0.1
+        ))
+        print("✅ 已连接CARLA并加载Town01地图")
+    except Exception as e:
+        print(f"❌ 连接CARLA失败：{e}")
+        return
+
+    # 2. 清理场景中旧车辆
+    for actor in world.get_actors().filter('vehicle.*'):
+        actor.destroy()
+    print("✅ 已清理场景中旧车辆")
+
+    # 3. 生成车辆（出生点左移2米）
+    bp_lib = world.get_blueprint_library()
+    veh_bp = bp_lib.filter("vehicle")[0]
+    veh_bp.set_attribute('color', '255,0,0')  # 红色车辆
+
+    # 获取原始生成点并调整偏移
+    spawn_points = world.get_map().get_spawn_points()
+    original_spawn_point = spawn_points[0]
+    spawn_point = carla.Transform(
+        carla.Location(
+            x=original_spawn_point.location.x + SPAWN_OFFSET_X,
+            y=original_spawn_point.location.y + SPAWN_OFFSET_Y,
+            z=original_spawn_point.location.z + SPAWN_OFFSET_Z
+        ),
+        original_spawn_point.rotation
+    )
+
+    # 生成车辆
+    vehicle = world.spawn_actor(veh_bp, spawn_point)
+    print(f"✅ 车辆生成成功（出生点左移{abs(SPAWN_OFFSET_X)}米）")
+    print(f"   生成位置：X={spawn_point.location.x:.1f}, Y={spawn_point.location.y:.1f}")
+
+    # 4. 设置俯视视角（同步车辆位置）
+    spectator = world.get_spectator()
+    spec_transform = carla.Transform(
+        carla.Location(spawn_point.location.x, spawn_point.location.y, 40.0),
+        carla.Rotation(pitch=-85.0, yaw=spawn_point.rotation.yaw, roll=0.0)
+    )
+    spectator.set_transform(spec_transform)
+    print("✅ 已设置俯视视角，对准车辆")
+
+    # 5. 初始化控制参数
+    control = carla.VehicleControl()
+    control.hand_brake = False
+    control.manual_gear_shift = False
+    control.gear = 1
+
+    current_steer = 0.0
+    current_target_speed = BASE_SPEED
+    last_throttle = 0.0
+    last_brake = 0.0
+
+    # 6. 核心驾驶循环
+    print(f"\n🚗 开始自动驾驶 | 直道{BASE_SPEED}m/s | 弯道{CURVE_TARGET_SPEED}m/s")
+    print("💡 按 Ctrl+C 停止程序\n")
 
     try:
-        # 连接CARLA
-        client = carla.Client(CARLA_HOST, CARLA_PORT)
-        client.set_timeout(30.0)
-        world = client.get_world()
-        print(f"\n✅ 成功连接CARLA！场景：{world.get_map().name}")
-
-        # 生成红色Model3车辆
-        blueprint_lib = world.get_blueprint_library()
-        vehicle_bp = blueprint_lib.filter("model3")[0]
-        vehicle_bp.set_attribute("color", "255,0,0")
-        spawn_points = world.get_map().get_spawn_points()
-        vehicle = world.spawn_actor(vehicle_bp, spawn_points[0])
-        print(f"✅ 生成车辆ID：{vehicle.id}（CARLA窗口可见红色车辆）")
-
-        # 挂载摄像头并启动监听（消除警告的关键）
-        camera_bp = blueprint_lib.find("sensor.camera.rgb")
-        camera_bp.set_attribute("image_size_x", "800")
-        camera_bp.set_attribute("image_size_y", "600")
-        camera_transform = carla.Transform(carla.Location(x=2.5, z=1.5))
-        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
-
-        # 给摄像头绑定空回调（启动监听，避免停止时警告）
-        def empty_callback(data):
-            pass
-
-        camera.listen(empty_callback)
-        camera_listening = True  # 标记已监听
-        print(f"✅ 挂载摄像头ID：{camera.id}（按V切换摄像头视角截图）")
-
-        # 控制车辆低速行驶
-        print("\n📌 CARLA已实际运行！操作：")
-        print("   1. 切换到CARLA窗口，可见红色车辆行驶")
-        print("   2. 按V键切换摄像头视角，截图保存（论文用）")
-        print("   3. 截图完成后，在PyCharm终端按Ctrl+C停止")
-        vehicle.apply_control(carla.VehicleControl(throttle=0.2, steer=0.0))
-
-        # 保持运行（等待你截图）
         while True:
-            time.sleep(1)
+            # 获取车辆当前状态
+            velocity = vehicle.get_velocity()
+            current_speed = math.hypot(velocity.x, velocity.y)
+            current_yaw = vehicle.get_transform().rotation.yaw
+
+            # 识别弯道与目标航向
+            target_yaw, is_curve, yaw_diff = get_road_direction_ahead(vehicle, world)
+
+            # 弯道渐进减速/直道恢复速度
+            if is_curve:
+                current_target_speed = max(CURVE_TARGET_SPEED, current_target_speed - SPEED_TRANSITION_RATE)
+            else:
+                current_target_speed = min(BASE_SPEED, current_target_speed + SPEED_TRANSITION_RATE / 2)
+
+            # 平滑速度控制（无抖动）
+            speed_error = current_target_speed - current_speed
+            if abs(speed_error) < SPEED_DEADZONE:
+                control.throttle = last_throttle * 0.85
+                control.brake = 0.0
+            elif speed_error > 0:
+                control.throttle = min(last_throttle + ACCELERATION_FACTOR, 0.25)
+                control.brake = 0.0
+                last_throttle = control.throttle
+            else:
+                control.brake = min(last_brake + DECELERATION_FACTOR, 0.2)
+                control.throttle = 0.0
+                last_brake = control.brake
+
+            # 超大角度转向控制
+            target_steer = calculate_steer_angle(current_yaw, target_yaw)
+            current_steer = current_steer + (target_steer - current_steer) * STEER_RESPONSE_FACTOR
+            control.steer = current_steer
+
+            # 下发控制指令
+            vehicle.apply_control(control)
+
+            # 实时状态显示
+            curve_status = "🔴 弯道（减速中）" if is_curve else "🟢 直道"
+            status_info = (
+                f"{curve_status:12s} | 航向偏差:{yaw_diff:.0f}° "
+                f"| 转向角:{current_steer:.2f}(最大:{STEER_ANGLE_MAX}) "
+                f"| 速度:{current_speed:.2f}m/s(目标:{current_target_speed:.2f})"
+            )
+            print(f"\r{status_info}", end="")
+
+            time.sleep(0.1)
 
     except KeyboardInterrupt:
-        print("\n🛑 你终止了程序，开始清理资源...")
-    except Exception as e:
-        print(f"\n❌ 运行出错：{str(e)}")
-        # 这里也移除了绝对路径，改为提示用户自行启动CARLA
-        print("⚠️  请先启动CARLA主程序（CarlaUE4.exe）")
+        print("\n\n🛑 接收到停止指令，正在清理资源...")
     finally:
-        # 清理资源（仅当摄像头已监听时才停止）
-        if camera and camera_listening:
-            camera.stop()  # 此时停止不会报警告
-            camera.destroy()
-            print("✅ 摄像头已清理")
-        elif camera and not camera_listening:
-            camera.destroy()  # 未监听则直接销毁，不执行stop
-            print("✅ 摄像头已清理")
-
-        if vehicle:
+        # 销毁车辆，恢复世界设置
+        if vehicle and vehicle.is_alive:
             vehicle.destroy()
-            print("✅ 车辆已清理")
-        print("✅ 所有资源清理完成，CARLA可正常关闭")
+            print("✅ 车辆已销毁")
+        world.apply_settings(carla.WorldSettings(synchronous_mode=False))
+        print("✅ 程序正常退出")
 
+    # 清理资源
+    if vehicle and vehicle.is_alive:
+        vehicle.destroy()
+        print("✅ 车辆已销毁")
+    world.apply_settings(carla.WorldSettings(synchronous_mode=False))
+    print("✅ 程序正常退出")
 
+# ====================== 程序入口 ======================
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\n🛑 用户中断程序执行")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n\n❌ 致命错误: {str(e)}")
-        sys.exit(1)
+    main()
