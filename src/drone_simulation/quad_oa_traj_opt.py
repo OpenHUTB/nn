@@ -30,25 +30,25 @@ class QuadrotorSimulation:
         self.data.ctrl[:] = [hover_thrust] * self.n_actuators
 
         # ========== 旋转参数 ==========
-        self.base_radius = 1.0      # 基础公转半径
-        self.rotate_speed = 1.0     # 公转角速度（rad/s）
-        self.hover_height = 0.8     # 固定高度
-        self.rotate_angle = 0.0     # 公转角度累计
+        self.base_radius = 1.0  # 基础公转半径
+        self.rotate_speed = 1.0  # 公转角速度（rad/s）
+        self.hover_height = 0.8  # 固定高度
+        self.rotate_angle = 0.0  # 公转角度累计
         self.rotor_visual_speed = 8.0  # 旋翼旋转速度
 
         # ========== 简洁的避障参数 ==========
-        self.safety_distance = 0.5      # 安全距离
-        self.avoidance_offset = 0.8     # 避障偏移量
+        self.safety_distance = 0.5  # 安全距离
+        self.avoidance_offset = 0.8  # 避障偏移量
 
         # 平滑过渡参数
-        self.smooth_factor = 0.2        # 平滑因子（0-1，越小越平滑）
+        self.smooth_factor = 0.2  # 平滑因子（0-1，越小越平滑）
         self.current_radius = self.base_radius
         self.target_radius = self.base_radius
 
         # 避障状态
         self.in_avoidance = False
         self.avoidance_time = 0
-        self.recovery_time = 1.5        # 恢复时间（秒）
+        self.recovery_time = 1.5  # 恢复时间（秒）
 
         # 障碍物位置和尺寸
         self.obstacle_positions = {
@@ -57,7 +57,7 @@ class QuadrotorSimulation:
             "sphere": np.array([0.0, -2.0, 1.0])
         }
         self.obstacle_sizes = {
-            "cube": 0.5,        # 近似半径
+            "cube": 0.5,  # 近似半径
             "cylinder": 0.4,
             "sphere": 0.4
         }
@@ -203,13 +203,13 @@ def main():
         sim = QuadrotorSimulation(xml_path)
 
         # ========== 可调参数 ==========
-        sim.base_radius = 1.0          # 公转半径
-        sim.rotate_speed = 1.0         # 旋转速度
-        sim.hover_height = 0.8         # 飞行高度
-        sim.safety_distance = 0.5      # 安全距离
-        sim.avoidance_offset = 0.8     # 避障偏移量
-        sim.smooth_factor = 0.2        # 平滑因子（越小越平滑）
-        sim.recovery_time = 1.5        # 恢复时间（秒）
+        sim.base_radius = 1.0  # 公转半径
+        sim.rotate_speed = 1.0  # 旋转速度
+        sim.hover_height = 0.8  # 飞行高度
+        sim.safety_distance = 0.5  # 安全距离
+        sim.avoidance_offset = 0.8  # 避障偏移量
+        sim.smooth_factor = 0.2  # 平滑因子（越小越平滑）
+        sim.recovery_time = 1.5  # 恢复时间（秒）
 
         print("✅ 初始化完成")
         sim.run_simulation(duration=60.0, use_viewer=True)
