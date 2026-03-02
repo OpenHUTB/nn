@@ -198,7 +198,7 @@
       <geom name="building_antenna_base" type="cylinder" size="0.04 0.05" pos="0 0 0.7" material="building_metal" mass="0.05"/>
       <geom name="building_antenna" type="cylinder" size="0.02 0.2" pos="0 0 0.85" material="building_metal" mass="0.05"/>
 
-      <!-- 窗户 - 每层四个面   （用小立方体表示） -->
+      <!-- 窗户 - 每层四个面（用小立方体表示） -->
       <!-- 第一层窗户 -->
       <geom name="building_win1_f" type="box" size="0.05 0.1 0.1" pos="0.18 0 -0.4" material="building_glass" mass="0.05"/>
       <geom name="building_win1_b" type="box" size="0.05 0.1 0.1" pos="-0.18 0 -0.4" material="building_glass" mass="0.05"/>
@@ -315,4 +315,3 @@
     <motor name="motor_back_right" joint="rotor_back_right_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
   </actuator>
 </mujoco>
-
