@@ -161,7 +161,6 @@ uav_vision_navigation/
 - 感谢老师的悉心指导。
 - 本项目使用了以下公开数据集：VisDrone, UAVDT, Stanford Drone Dataset。
 - 参考了 Faster R-CNN、YOLO 等经典目标检测算法。
-- AirSim 团队提供了优秀的仿真平台。
 
 ---
 
