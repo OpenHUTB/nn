@@ -6,6 +6,31 @@ CARLA 0.9.10 车路协同避障
 import sys
 import time
 import math
+from typing import Optional
+
+
+# ====================== 1. 智能加载CARLA（无硬编码绝对路径） ======================
+def load_carla() -> Optional[object]:
+    """
+    智能加载CARLA Python API，优先级：
+    1. 系统环境变量 CARLA_ROOT（推荐）
+    2. 自动搜索常见目录（当前目录、用户目录、上级目录）
+    3. 引导用户手动输入路径
+    """
+    python_version = f"py{sys.version_info.major}.{sys.version_info.minor}"
+    egg_file_patterns = [
+        f"carla-0.9.10-{python_version}-win-amd64.egg",
+        "carla-0.9.10-py3.7-win-amd64.egg",  # 兼容Python3.7（CARLA 0.9.10主流版本）
+        "carla-0.9.10-*.egg"  # 兜底匹配所有0.9.10版本的egg文件
+    ]
+
+    # 候选路径列表（无任何硬编码绝对路径）
+    candidate_paths = []
+
+    # 优先级1：从环境变量CARLA_ROOT读取
+    carla_root = os.getenv("CARLA_ROOT")
+    if carla_root and os.path.isdir(carla_root):
+        candidate_paths.append(os.path.join(carla_root, "PythonAPI", "carla", "dist"))
 
 # ====================== 1. 导入CARLA（无绝对路径，依赖环境配置） ======================
 try:
@@ -41,6 +66,7 @@ def calculate_distance(actor1, actor2):
 
 # ====================== 4. 主程序（远距离停止+渐进减速） ======================
 def main():
+    # 1. 连接CARLA服务器
     try:
         # 1. 连接CARLA+加载地图
         client = carla.Client('localhost', 2000)
