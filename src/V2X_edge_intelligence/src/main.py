@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 CARLA 0.9.10 - 路侧感知可视化
-
+核心修改：移除直接get_velocity，改用速度传感器感知车辆速度
 """
 import sys
 import os
 import time
 import math
 import threading
+from threading import Lock
 
 
 # ====================== 1. 智能加载CARLA（无绝对路径，核心修改） ======================
@@ -74,16 +75,34 @@ def load_carla():
 # 加载CARLA（无绝对路径）
 carla = load_carla()
 
-# ====================== 2. 全局变量 ======================
+# ====================== 2. 全局变量（新增传感器相关） ======================
 RSU_LOC = carla.Location(x=0.0, y=0.0, z=2.0)  # RSU高度降低，更贴合实际
 actors = []
+speed_sensors = {}  # 存储各车辆的速度传感器 {vehicle_id: sensor_actor}
+vehicle_speed_data = {}  # 存储传感器采集的速度数据 {vehicle_id: speed}
+speed_data_lock = Lock()  # 线程安全锁，防止数据竞争
 world = None
 spectator = None
 is_running = True
 vehicle_controls = {}
 
 
-# ====================== 3. 可视化函数（RSU大小适中） ======================
+# ====================== 3. 速度传感器回调函数（核心：感知速度） ======================
+def velocity_sensor_callback(data, vehicle_id):
+    """
+    速度传感器数据回调函数
+    :param data: 传感器原始数据（carla.Vector3D）
+    :param vehicle_id: 车辆ID，用于关联数据
+    """
+    global vehicle_speed_data
+    # 计算车辆速度（m/s）：合速度 = √(x² + y²)（忽略z轴，仅水平速度）
+    speed = math.hypot(data.x, data.y)
+    # 线程安全更新速度数据
+    with speed_data_lock:
+        vehicle_speed_data[vehicle_id] = speed
+
+
+# ====================== 4. 可视化函数（RSU大小适中） ======================
 def draw_elements():
     if not world:
         return
@@ -120,24 +139,30 @@ def draw_elements():
         )
         debug.draw_line(p1, p2, 1.5, carla.Color(0, 0, 255), duration)
 
-    # 3. 绘制车辆信息
+    # 3. 绘制车辆信息（使用传感器感知的速度）
     vehicles = world.get_actors().filter("vehicle.*")
-    for veh in vehicles:
-        loc = veh.get_transform().location
-        vel = veh.get_velocity()
-        speed = math.hypot(vel.x, vel.y)
-        debug.draw_string(
-            carla.Location(loc.x, loc.y, loc.z + 2.0),
-            f"车{veh.id}\n{speed:.1f}m/s",
-            False, carla.Color(255, 255, 0), duration
-        )
+    with speed_data_lock:
+        for veh in vehicles:
+            loc = veh.get_transform().location
+            # 从传感器数据中获取速度，无数据则显示0.0
+            speed = vehicle_speed_data.get(veh.id, 0.0)
+            debug.draw_string(
+                carla.Location(loc.x, loc.y, loc.z + 2.0),
+                f"车{veh.id}\n{speed:.1f}m/s",
+                False, carla.Color(255, 255, 0), duration
+            )
 
 
-# ====================== 4. 生成车辆（纯0.9.10，道路生成） ======================
+# ====================== 5. 生成车辆+挂载速度传感器（核心修改） ======================
 def spawn_vehicles():
-    # 清除旧车辆
+    # 清除旧车辆和传感器
     for veh in world.get_actors().filter("vehicle.*"):
         veh.destroy()
+    for sensor in speed_sensors.values():
+        if sensor.is_alive:
+            sensor.destroy()
+    speed_sensors.clear()
+    vehicle_speed_data.clear()
 
     # 获取官方道路生成点
     map = world.get_map()
@@ -158,9 +183,15 @@ def spawn_vehicles():
     veh_bp = vehicle_bps[0]
     print(f"✅ 使用车辆蓝图：{veh_bp.id}")
 
-    # 生成车辆并初始化控制
+    # 加载速度传感器蓝图（CARLA 0.9.10原生支持）
+    speed_sensor_bp = bp_lib.find("sensor.other.velocity")
+    # 传感器参数配置（更新频率10Hz，符合真实感知）
+    speed_sensor_bp.set_attribute("frequency", "10")
+
+    # 生成车辆并挂载速度传感器
     for i, trans in enumerate(valid_points):
         try:
+            # 生成车辆
             veh = world.spawn_actor(veh_bp, trans)
             if veh:
                 actors.append(veh)
@@ -172,12 +203,27 @@ def spawn_vehicles():
                 control.hand_brake = False
                 vehicle_controls[veh.id] = control
                 print(f"✅ 车辆{i + 1}生成成功（ID={veh.id}）")
+
+                # 挂载速度传感器（传感器位置：车辆中心，不影响可视化）
+                sensor_transform = carla.Transform(carla.Location(x=0.0, y=0.0, z=0.5))
+                speed_sensor = world.spawn_actor(
+                    speed_sensor_bp,
+                    sensor_transform,
+                    attach_to=veh,
+                    attachment_type=carla.AttachmentType.Rigid
+                )
+                if speed_sensor:
+                    # 注册传感器回调函数，关联车辆ID
+                    speed_sensor.listen(lambda data, vid=veh.id: velocity_sensor_callback(data, vid))
+                    speed_sensors[veh.id] = speed_sensor
+                    actors.append(speed_sensor)
+                    print(f"✅ 车辆{veh.id}已挂载速度传感器")
         except Exception as e:
             print(f"⚠️  车辆{i + 1}生成失败：{str(e)[:50]}")
             continue
 
 
-# ====================== 5. 手动驱动车辆线程 ======================
+# ====================== 6. 手动驱动车辆线程 ======================
 def drive_vehicles():
     global is_running
     while is_running:
@@ -191,7 +237,7 @@ def drive_vehicles():
         time.sleep(0.05)
 
 
-# ====================== 6. 主函数（无视角锁定，可自由操作） ======================
+# ====================== 7. 主函数（无视角锁定，可自由操作） ======================
 def main():
     global world, spectator, is_running
     # 1. 连接CARLA
@@ -220,7 +266,7 @@ def main():
     print("✅ 初始视角已设置，可自由转动视角！")
     print("💡 CARLA视角操作：右键按住旋转 | 滚轮缩放 | WASD移动")
 
-    # 4. 生成车辆
+    # 4. 生成车辆（含速度传感器）
     spawn_vehicles()
 
     # 5. 启动驱动线程
@@ -230,22 +276,23 @@ def main():
 
     # 6. 主循环
     print("\n" + "=" * 60)
-    print("📌 CARLA 0.9.10 完美运行！（无绝对路径版）")
+    print("📌 CARLA 0.9.10 完美运行！（传感器感知速度版）")
     print("✅ 无绝对路径 | ✅ 可自由视角 | ✅ RSU大小适中 | ✅ 车辆沿道路行驶")
+    print("✅ 速度传感器感知 | ✅ 无直接调用get_velocity | ✅ 线程安全数据采集")
     print("✅ 无任何报错 | ✅ 无卡死 | ✅ 可视化清晰")
     print("💡 按Ctrl+C停止程序")
     print("=" * 60 + "\n")
     try:
         while is_running:
             draw_elements()
-            # 打印车辆状态
+            # 打印车辆状态（使用传感器速度）
             vehicles = world.get_actors().filter("vehicle.*")
             status = []
-            for veh in vehicles:
-                loc = veh.get_transform().location
-                vel = veh.get_velocity()
-                speed = math.hypot(vel.x, vel.y)
-                status.append(f"车{veh.id}：({loc.x:.0f},{loc.y:.0f}) 速度{speed:.1f}m/s")
+            with speed_data_lock:
+                for veh in vehicles:
+                    loc = veh.get_transform().location
+                    speed = vehicle_speed_data.get(veh.id, 0.0)
+                    status.append(f"车{veh.id}：({loc.x:.0f},{loc.y:.0f}) 速度{speed:.1f}m/s")
             if status:
                 print(f"\r{' | '.join(status)}", end="")
             else:
@@ -255,11 +302,18 @@ def main():
         print("\n\n🛑 接收到停止指令，正在清理资源...")
         is_running = False
 
-    # 7. 清理资源
+    # 7. 清理资源（含传感器）
     for actor in actors:
         try:
             if actor.is_alive:
                 actor.destroy()
+        except:
+            pass
+    # 额外清理传感器
+    for sensor in speed_sensors.values():
+        try:
+            if sensor.is_alive:
+                sensor.destroy()
         except:
             pass
     print("✅ 资源清理完成，程序正常退出")
@@ -275,5 +329,13 @@ if __name__ == "__main__":
         for actor in actors:
             try:
                 actor.destroy()
+            except:
+                pass
+    finally:
+        # 确保传感器全部销毁
+        for sensor in speed_sensors.values():
+            try:
+                if sensor.is_alive:
+                    sensor.destroy()
             except:
                 pass
