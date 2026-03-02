@@ -30,10 +30,11 @@ Yolov3_Autonomous_Vehicle_Object_Detection/
 │   └── config.py        # 全局配置文件
 ├── models/              # 存放 YOLOv3 权重文件与配置文件
 │   ├── __init__.py
-│   └── coco.names       # COCO数据集类别标签
+│   ├── coco.names       # COCO数据集类别标签
+│   └── yolo_detector.py # [新增] YOLO目标检测器封装类
 ├── utils/               # 存放通用的图像处理、坐标转换等工具函数
 │   └── __init__.py
-├── download_weights.py  # [新增] 模型权重自动下载脚本
+├── download_weights.py  # 模型权重自动下载脚本
 ├── main.py              # 项目主程序入口 (待开发)
 ├── requirements.txt     # 项目依赖列表
 └── README.md            # 项目说明文档
@@ -61,10 +62,11 @@ Yolov3_Autonomous_Vehicle_Object_Detection/
 1. [x] **2026-03-01**: 初始化项目结构，建立核心目录。
 2. [x] **2026-03-02**: 编写全局配置模块 `config.py`。
 3. [x] **2026-03-02**: 添加 COCO 类别标签，编写模型权重自动下载脚本。
-4. [ ] 编写 YOLOv3 模型加载与图像前向推理模块。
-5. [ ] 编写 CARLA 客户端连接与传感器数据采集脚本。
-6. [ ] 实现检测框在 CARLA 实时画面中的渲染。
-7. [ ] 完善轨迹规划逻辑并输出测试日志。
+4. [x] **2026-03-02**: 定义 YOLO 检测器类骨架与接口规范。
+5. [ ] 实现 YOLOv3 模型加载与图像前向推理逻辑。
+6. [ ] 编写 CARLA 客户端连接与传感器数据采集脚本。
+7. [ ] 实现检测框在 CARLA 实时画面中的渲染。
+8. [ ] 完善轨迹规划逻辑并输出测试日志。
 
 ---
 *注：本项目仍处于积极开发阶段，后续将持续更新功能模块。*
