@@ -1,84 +1,180 @@
 import numpy as np
 import math
 import yaml
+import logging
+
+# 配置日志
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 
 class RoboticArmKinematics:
+    """机械臂运动学解算类（防关节溢出版）"""
+
     def __init__(self, config_path="config/arm_config.yaml"):
-        # 加载配置（兼容pyyaml>=6.0）
-        with open(config_path, 'r', encoding='utf-8') as f:
-            self.config = yaml.safe_load(f)
-        self.dh_params = self.config['DH_PARAMS']
-        self.joint_limits = self.config['JOINT_LIMITS']
-        self.joint_num = 6  # 固定六轴
+        """初始化：加载D-H参数和关节限位"""
+        self.config_path = config_path
+        self.dh_params = {}
+        self.joint_limits = {}
+        self.joint_num = 6
 
-    def dh_transform(self, a, alpha, d, theta):
-        """单个D-H变换矩阵（单位：mm/度转弧度）"""
-        alpha_rad = math.radians(alpha)
-        theta_rad = math.radians(theta)
-        return np.array([
-            [math.cos(theta_rad), -math.sin(theta_rad)*math.cos(alpha_rad), math.sin(theta_rad)*math.sin(alpha_rad), a*math.cos(theta_rad)],
-            [math.sin(theta_rad), math.cos(theta_rad)*math.cos(alpha_rad), -math.cos(theta_rad)*math.sin(alpha_rad), a*math.sin(theta_rad)],
-            [0, math.sin(alpha_rad), math.cos(alpha_rad), d],
-            [0, 0, 0, 1]
-        ], dtype=np.float64)  # 显式指定类型，兼容numpy>=1.24.0
+        # 加载配置并缓存
+        self._load_config()
+        # 预计算D-H参数的固定部分
+        self._precompute_dh_fixed_params()
 
-    def forward_kinematics(self, joint_angles):
-        """正运动学：关节角→末端位姿"""
-        if len(joint_angles) != 6:
-            raise ValueError("需输入6个关节角")
-        # 关节限位检查
-        for i, limits in enumerate(self.joint_limits.values()):
-            if not (limits[0] <= joint_angles[i] <= limits[1]):
-                raise ValueError(f"关节{i+1}超出限位：{joint_angles[i]}度 (范围：{limits[0]}-{limits[1]}度)")
+    def _load_config(self):
+        """加载配置文件（带异常处理）"""
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            self.dh_params = config['DH_PARAMS']
+            self.joint_limits = config['JOINT_LIMITS']
+            logger.info("成功加载运动学配置文件")
+        except FileNotFoundError:
+            logger.error(f"配置文件不存在：{self.config_path}")
+            raise
+        except KeyError as e:
+            logger.error(f"配置文件缺少关键参数：{e}")
+            raise
+
+    def _precompute_dh_fixed_params(self):
+        """预计算D-H参数的固定部分（alpha转弧度）"""
+        self.dh_fixed = {}
+        for joint, params in self.dh_params.items():
+            self.dh_fixed[joint] = {
+                'a': params['a'] / 1000,  # mm → m
+                'alpha_rad': math.radians(params['alpha']),
+                'd': params['d'] / 1000,
+                'theta_base': params['theta']
+            }
+
+    def _dh_transform(self, theta_joint):
+        """生成D-H变换矩阵"""
+
+        def _single_dh(a, alpha_rad, d, theta_total):
+            theta_rad = math.radians(theta_total)
+            cos_theta = math.cos(theta_rad)
+            sin_theta = math.sin(theta_rad)
+            cos_alpha = math.cos(alpha_rad)
+            sin_alpha = math.sin(alpha_rad)
+
+            return np.array([
+                [cos_theta, -sin_theta * cos_alpha, sin_theta * sin_alpha, a * cos_theta],
+                [sin_theta, cos_theta * cos_alpha, -cos_theta * sin_alpha, a * sin_theta],
+                [0, sin_alpha, cos_alpha, d],
+                [0, 0, 0, 1]
+            ], dtype=np.float64)
 
         T_total = np.eye(4, dtype=np.float64)
-        for i, (_, params) in enumerate(self.dh_params.items()):
-            T_i = self.dh_transform(params['a'], params['alpha'], params['d'], params['theta'] + joint_angles[i])
+        for i, (joint, fixed) in enumerate(self.dh_fixed.items()):
+            theta_total = fixed['theta_base'] + theta_joint[i]
+            T_i = _single_dh(
+                fixed['a'], fixed['alpha_rad'], fixed['d'], theta_total
+            )
             T_total = np.dot(T_total, T_i)
+        return T_total
 
-        # 提取位置（转换为米，适配MuJoCo）和姿态
-        x = round(T_total[0, 3] / 1000, 3)  # mm → m
-        y = round(T_total[1, 3] / 1000, 3)
-        z = round(T_total[2, 3] / 1000, 3)
-        rx = round(math.degrees(math.atan2(T_total[2, 1], T_total[2, 2])), 2)
-        ry = round(math.degrees(math.atan2(-T_total[2, 0], math.sqrt(T_total[2, 1]**2 + T_total[2, 2]**2))), 2)
-        rz = round(math.degrees(math.atan2(T_total[1, 0], T_total[0, 0])), 2)
-        return [x, y, z, rx, ry, rz]
+    def _clip_joint_angles(self, joint_angles):
+        """双重限位裁剪：确保关节角绝对在限位内"""
+        clipped_angles = []
+        for i, (joint, limits) in enumerate(self.joint_limits.items()):
+            angle = joint_angles[i]
+            # 先将角度归一化到 [-360, 360]（处理数值溢出）
+            angle = angle % 360
+            if angle > 180:
+                angle -= 360
+            # 再裁剪到关节限位
+            clipped_angle = np.clip(angle, limits[0], limits[1])
+            # 记录裁剪情况
+            if abs(clipped_angle - angle) > 0.1:
+                logger.warning(f"关节{joint}角度{angle:.2f}度超出限位，已裁剪为{clipped_angle:.2f}度")
+            clipped_angles.append(clipped_angle)
+        return clipped_angles
 
-    def inverse_kinematics(self, target_pose):
-        """简化逆运动学（数值迭代，适配MuJoCo米单位）"""
-        # 转换为mm（内部计算用）
-        target_pose_mm = [p * 1000 for p in target_pose[:3]] + target_pose[3:]
-        initial_joints = [0.0] * 6
-        max_iter = 500
-        tolerance = 1e-3  # mm
-        current_joints = np.array(initial_joints, dtype=np.float64)
-        target_pos = np.array(target_pose_mm[:3])
+    def forward_kinematics(self, joint_angles):
+        """正运动学解算（防溢出版）"""
+        # 参数校验
+        if len(joint_angles) != self.joint_num:
+            raise ValueError(f"需输入{self.joint_num}个关节角，当前输入{len(joint_angles)}个")
 
-        for _ in range(max_iter):
+        # 第一步：强制裁剪关节角（即使超出也先裁剪，避免直接报错）
+        joint_angles = self._clip_joint_angles(joint_angles)
+
+        # 第二步：限位检查（冗余保护）
+        for i, (joint, limits) in enumerate(self.joint_limits.items()):
+            angle = joint_angles[i]
+            if not (limits[0] <= angle <= limits[1]):
+                raise ValueError(f"关节{joint}超出限位：{angle}度（范围：{limits[0]}-{limits[1]}度）")
+
+        # 计算变换矩阵
+        T_total = self._dh_transform(joint_angles)
+
+        # 提取位置和姿态
+        x, y, z = T_total[0, 3], T_total[1, 3], T_total[2, 3]
+        r11, r12, r13 = T_total[0, 0], T_total[0, 1], T_total[0, 2]
+        r21, r22, r23 = T_total[1, 0], T_total[1, 1], T_total[1, 2]
+        r31, r32, r33 = T_total[2, 0], T_total[2, 1], T_total[2, 2]
+
+        rx = math.degrees(math.atan2(r32, r33))
+        ry = math.degrees(math.atan2(-r31, math.hypot(r32, r33)))
+        rz = math.degrees(math.atan2(r21, r11))
+
+        return [round(x, 3), round(y, 3), round(z, 3), round(rx, 2), round(ry, 2), round(rz, 2)]
+
+    def inverse_kinematics(self, target_pose, initial_joints=None, max_iter=200, tolerance=1e-3):
+        """逆运动学解算（低步长+阻尼+强限位）"""
+        # 初始化关节角（默认更安全的初始值）
+        initial_joints = initial_joints if initial_joints else [0.0, 10.0, 0.0, 0.0, 0.0, 0.0]
+        current_joints = np.array(self._clip_joint_angles(initial_joints), dtype=np.float64)
+        target_pos = np.array(target_pose[:3], dtype=np.float64)
+
+        # 降低步长，增加阻尼，避免超调
+        damping_factor = 0.8  # 阻尼系数，降低关节角变化速度
+        base_step_size = 0.005  # 大幅降低步长
+
+        for iter_num in range(max_iter):
+            # 计算当前末端位置
             current_pose = self.forward_kinematics(current_joints)
-            current_pos = np.array([p * 1000 for p in current_pose[:3]])  # m → mm
-            error = target_pos - current_pos
-            if np.linalg.norm(error) < tolerance:
-                break
+            current_pos = np.array(current_pose[:3], dtype=np.float64)
 
-            # 简化雅克比矩阵
-            J = np.zeros((3, 6), dtype=np.float64)
+            # 计算误差
+            error = target_pos - current_pos
+            error_norm = np.linalg.norm(error)
+            if error_norm < tolerance:
+                logger.info(f"逆解收敛：迭代{iter_num}次，误差{error_norm:.4f}米")
+                return self._clip_joint_angles(current_joints)
+
+            # 数值雅克比矩阵（双扰动）
+            J = np.zeros((3, self.joint_num), dtype=np.float64)
             delta = 1e-4
-            for i in range(6):
+            for i in range(self.joint_num):
+                # 正向扰动
                 joints_plus = current_joints.copy()
                 joints_plus[i] += delta
-                pos_plus = np.array([p * 1000 for p in self.forward_kinematics(joints_plus)[:3]])
+                joints_plus = self._clip_joint_angles(joints_plus)
+                pos_plus = np.array(self.forward_kinematics(joints_plus)[:3])
+
+                # 反向扰动
                 joints_minus = current_joints.copy()
                 joints_minus[i] -= delta
-                pos_minus = np.array([p * 1000 for p in self.forward_kinematics(joints_minus)[:3]])
+                joints_minus = self._clip_joint_angles(joints_minus)
+                pos_minus = np.array(self.forward_kinematics(joints_minus)[:3])
+
                 J[:, i] = (pos_plus - pos_minus) / (2 * delta)
 
-            # 更新关节角
-            current_joints += 0.01 * np.dot(np.linalg.pinv(J), error)
-            # 限位裁剪
-            for i, limits in enumerate(self.joint_limits.values()):
-                current_joints[i] = np.clip(current_joints[i], limits[0], limits[1])
-        else:
-            raise ValueError("逆运动学迭代未收敛，误差：{:.2f}mm".format(np.linalg.norm(error)))
-        return [round(j, 2) for j in current_joints]
+            # 伪逆求解（添加正则化）
+            J_pinv = np.linalg.pinv(J, rcond=1e-6)
+
+            # 自适应步长+阻尼
+            step_size = base_step_size * min(1.0, error_norm / 0.01)  # 误差越小步长越小
+            delta_joints = step_size * np.dot(J_pinv, error)
+            delta_joints *= damping_factor  # 应用阻尼
+
+            # 更新关节角并立即裁剪
+            current_joints += delta_joints
+            current_joints = np.array(self._clip_joint_angles(current_joints), dtype=np.float64)
+
+        # 迭代未收敛（返回最近的合法关节角）
+        logger.warning(f"逆解迭代{max_iter}次未收敛，误差{error_norm:.4f}米，返回合法关节角")
+        return self._clip_joint_angles(current_joints)
