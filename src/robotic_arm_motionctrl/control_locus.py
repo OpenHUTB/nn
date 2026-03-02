@@ -45,17 +45,24 @@ class RoboticArmController:
             "joint6": (-1.8, 1.8)
         }
 
+        # 绕圈参数配置
+        self.circle_radius = 0.15  # 绕圈半径（米）
+        self.circle_center = [0.2, 0.0, 0.2]  # 绕圈中心点（x,y,z）
+        self.circle_speed = 1.0  # 绕圈角速度（弧度/秒）
+        self.last_angles = None  # 记录上一帧关节角度，用于平滑
+
     def clamp_joint_angle(self, joint_name: str, angle: float) -> float:
         """将关节角度限制在合法范围内"""
         min_angle, max_angle = self.joint_limits[joint_name]
         return np.clip(angle, min_angle, max_angle)
 
-    def set_joint_angle(self, joint_name: str, target_angle: float, speed: float = 0.5):
+    def smooth_set_joint_angle(self, joint_name: str, target_angle: float, speed: float = 0.8):
         """
-        平滑设置单个关节角度
+        平滑设置单个关节角度（优化版，增加平滑过渡）
         :param joint_name: 关节名称
         :param target_angle: 目标角度（弧度）
         :param speed: 运动速度（弧度/秒）
+        :return: 是否到达目标角度
         """
         if joint_name not in self.arm_joint_ids:
             raise ValueError(f"关节 {joint_name} 不存在")
@@ -63,95 +70,155 @@ class RoboticArmController:
         target_angle = self.clamp_joint_angle(joint_name, target_angle)
         actuator_id = self.actuator_ids[f"motor_{joint_name}"]
 
-        # 获取当前角度
+        # 获取当前角度和速度
         current_angle = self.data.joint(joint_name).qpos[0]
+        current_vel = self.data.joint(joint_name).qvel[0]
 
-        # 计算角度差
+        # 计算角度差（考虑角度周期性）
         angle_diff = target_angle - current_angle
+        angle_diff = np.arctan2(np.sin(angle_diff), np.cos(angle_diff))  # 归一化到[-π, π]
 
-        # 如果角度差很小，直接设置
+        # 如果角度差很小，直接停止
         if abs(angle_diff) < 0.001:
             self.data.ctrl[actuator_id] = 0
             return True
 
-        # PD控制器
-        kp = 50.0
-        kd = 5.0
-        error = angle_diff
-        d_error = -self.data.joint(joint_name).qvel[0]
-        control = kp * error + kd * d_error
+        # 优化的PD控制器（增加阻尼，减少抖动）
+        kp = 60.0
+        kd = 8.0
+        control = kp * angle_diff - kd * current_vel
 
-        # 限制控制信号
-        control = np.clip(control, -speed * 10, speed * 10)
+        # 限制控制信号（根据速度参数）
+        max_control = speed * 15
+        control = np.clip(control, -max_control, max_control)
         self.data.ctrl[actuator_id] = control
 
         return False
 
-    def rotate_joint_continuously(self, joint_name: str, direction: float = 1.0, speed: float = 0.5):
+    def generate_circle_trajectory(self, t: float):
         """
-        让关节持续旋转（核心功能）
+        生成绕圈轨迹的目标关节角度
+        :param t: 时间参数（秒）
+        :return: 各关节目标角度字典
         """
-        if joint_name not in self.arm_joint_ids:
-            raise ValueError(f"关节 {joint_name} 不存在")
+        # 计算绕圈的角度（周期性变化，实现左右绕圈）
+        theta = self.circle_speed * t
+        # 生成环形轨迹的末端位置（x-y平面绕圈，z轴保持恒定）
+        target_x = self.circle_center[0] + self.circle_radius * np.cos(theta)
+        target_y = self.circle_center[1] + self.circle_radius * np.sin(theta)
+        target_z = self.circle_center[2]
 
-        actuator_id = self.actuator_ids[f"motor_{joint_name}"]
-        self.data.ctrl[actuator_id] = direction * speed * 10
+        # 简化版逆运动学（适配6DOF机械臂，核心是关节1-3配合实现末端绕圈）
+        # 关节1：跟随y轴位置变化，实现左右旋转
+        joint1_target = np.arctan2(target_y, target_x - self.circle_center[0])
 
-    def simulate(self, duration: float = None):
-        """运行仿真"""
+        # 关节2：配合高度，保持末端z轴稳定
+        joint2_target = 0.6 + 0.2 * np.cos(theta)
+
+        # 关节3：补偿关节2的运动，保持末端水平
+        joint3_target = -0.8 + 0.2 * np.sin(theta)
+
+        # 关节4-6保持固定姿态（可根据需要调整）
+        joint4_target = 0.0
+        joint5_target = 0.0
+        joint6_target = 0.0
+
+        return {
+            "joint1": joint1_target,
+            "joint2": joint2_target,
+            "joint3": joint3_target,
+            "joint4": joint4_target,
+            "joint5": joint5_target,
+            "joint6": joint6_target
+        }
+
+    def simulate_circle_motion(self, duration: float = None):
+        """运行绕圈运动仿真（核心优化功能）"""
         start_time = time.time()
 
         with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
-            # 调整相机视角，方便观察
-            viewer.cam.distance = 1.5
-            viewer.cam.azimuth = 45
-            viewer.cam.elevation = -20
-            viewer.cam.lookat = [0.1, 0.0, 0.2]
+            # 优化相机视角，清晰观察绕圈运动
+            viewer.cam.distance = 2.0
+            viewer.cam.azimuth = 30
+            viewer.cam.elevation = -15
+            viewer.cam.lookat = self.circle_center  # 相机对准绕圈中心
+
+            print(f"🔄 开始机械臂绕圈运动，绕圈中心：{self.circle_center}，半径：{self.circle_radius}m")
+            print("🛑 关闭窗口停止仿真...")
 
             while viewer.is_running():
                 if duration and (time.time() - start_time) > duration:
+                    print("⏱️  仿真时长结束，停止运动")
                     break
 
                 step_start = time.time()
                 t = time.time() - start_time
 
-                # ========== 核心运动逻辑：关节1持续旋转，其他关节配合摆动 ==========
-                # 关节1：持续顺时针旋转（核心需求）
-                self.rotate_joint_continuously("joint1", direction=1.0, speed=0.3)
+                # 1. 生成绕圈轨迹的目标关节角度
+                target_angles = self.generate_circle_trajectory(t)
 
-                # 关节2：缓慢正弦摆动
-                self.set_joint_angle("joint2", 0.5 * np.sin(t * 0.5))
+                # 2. 逐个关节平滑控制，实现协同绕圈
+                for joint_name in self.arm_joint_names[:6]:  # 控制前6个关节
+                    self.smooth_set_joint_angle(joint_name, target_angles[joint_name])
 
-                # 关节3：缓慢余弦摆动
-                self.set_joint_angle("joint3", -0.5 + 0.3 * np.cos(t * 0.5))
-
-                # 步进仿真
+                # 3. 步进仿真
                 mujoco.mj_step(self.model, self.data)
                 viewer.sync()
 
-                # 控制仿真速率
+                # 4. 控制仿真速率（保持实时性）
                 time_until_next_step = self.model.opt.timestep - (time.time() - step_start)
                 if time_until_next_step > 0:
                     time.sleep(time_until_next_step)
 
+            # 仿真结束，归位到初始姿态
+            print("🔄 正在归位到初始姿态...")
+            self.reset_to_initial_pose(viewer)
+
+    def reset_to_initial_pose(self, viewer):
+        """归位到初始安全姿态"""
+        initial_poses = {
+            "joint1": 0.0,
+            "joint2": 0.3,
+            "joint3": -0.5,
+            "joint4": 0.0,
+            "joint5": 0.0,
+            "joint6": 0.0
+        }
+
+        # 平滑归位
+        for _ in range(500):
+            all_reached = True
+            for joint_name, target in initial_poses.items():
+                if not self.smooth_set_joint_angle(joint_name, target, speed=0.3):
+                    all_reached = False
+            mujoco.mj_step(self.model, self.data)
+            viewer.sync()
+            time.sleep(self.model.opt.timestep)
+            if all_reached:
+                break
+        print("✅ 已归位到初始姿态")
+
 
 def main():
-    """主函数 - 已修正为你的XML文件名"""
-    # 关键修正：使用你的实际模型文件名 arm6dof_final.xml
+    """主函数 机械臂绕圈运动"""
     model_path = "arm6dof_final.xml"
 
     try:
         controller = RoboticArmController(model_path)
         print("✅ 机械臂控制器初始化成功！")
-        print("🔧 关节列表：", controller.arm_joint_names)
-        print("▶️  开始仿真，关节1将持续旋转...")
-        controller.simulate(duration=30.0)  # 运行30秒
+        print(f"🔧 绕圈参数：半径={controller.circle_radius}m，中心={controller.circle_center}")
+        print("▶️  开始绕圈仿真（运行30秒）...")
+
+        # 运行绕圈仿真  （30秒）
+        controller.simulate_circle_motion(duration=30.0)
 
     except FileNotFoundError as e:
         print(f"❌ 错误：{e}")
-        print("💡 请确保 arm6dof_final.xml 和 control_locus.py 在同一个文件夹里")
+        print("💡 请确保 arm6dof_final.xml 文件在当前目录下")
     except Exception as e:
         print(f"❌ 发生错误：{e}")
+        import traceback
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
