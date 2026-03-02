@@ -86,7 +86,7 @@ with mujoco.viewer.launch_passive(model, data) as v:
     # 启动单关节依次运动
     single_joint_sequence_test()
 
-    # 保持窗口打开
+    #  保持窗口打开
     while viewer.is_running():
         mujoco.mj_step(model, data)
         viewer.sync()
