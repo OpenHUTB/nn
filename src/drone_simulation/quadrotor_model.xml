@@ -1,317 +1,243 @@
-<?xml version="1.0" ?>
-<mujoco model="quadrotor_enhanced">
+<?xml version="1.0" encoding="UTF-8"?>
+<mujoco model="quadrotor_city_env">
   <option timestep="0.005" iterations="100" tolerance="1e-10">
     <flag contact="enable" energy="enable"/>
   </option>
   <size nconmax="100" njmax="200"/>
+
   <default>
     <joint damping="0.001" frictionloss="0.001"/>
     <geom solref="0.02 1" solimp="0.9 0.95 0.01" margin="0.001"/>
   </default>
 
   <asset>
-    <!-- 地面材质 -->
-    <material name="ground_mat" rgba="0.6 0.7 0.6 1" specular="0.2" shininess="0.1"/>
+    <!-- 天空盒纹理 -->
+    <texture name="skybox" type="skybox" builtin="gradient" rgb1="0.3 0.5 0.9" rgb2="0.6 0.8 1.0" width="800" height="800"/>
 
-    <!-- 无人机主体材质 -->
-    <material name="body_carbon" rgba="0.15 0.15 0.15 1" specular="0.5" shininess="0.4"/>
-    <material name="arm_carbon" rgba="0.1 0.1 0.1 1" specular="0.6" shininess="0.5"/>
-    <material name="motor_metal" rgba="0.3 0.3 0.35 1" specular="0.8" shininess="0.7"/>
+    <!-- 地面纹理 -->
+    <texture name="grass" type="2d" builtin="checker" rgb1="0.2 0.5 0.2" rgb2="0.3 0.6 0.3" width="512" height="512"/>
+    <material name="grass_mat" texture="grass" texrepeat="20 20"/>
 
-    <!-- 旋翼材质（半透明效果） -->
-    <material name="propeller_red" rgba="0.9 0.2 0.2 0.9" specular="0.4" shininess="0.3"/>
-    <material name="propeller_green" rgba="0.2 0.8 0.2 0.9" specular="0.4" shininess="0.3"/>
-    <material name="propeller_blue" rgba="0.2 0.3 0.9 0.9" specular="0.4" shininess="0.3"/>
-    <material name="propeller_yellow" rgba="0.9 0.8 0.2 0.9" specular="0.4" shininess="0.3"/>
+    <!-- 道路纹理 -->
+    <texture name="asphalt" type="2d" builtin="checker" rgb1="0.15 0.15 0.15" rgb2="0.25 0.25 0.25" width="128" height="128"/>
+    <material name="asphalt_mat" texture="asphalt" texrepeat="10 10"/>
 
-    <!-- LED灯光材质 -->
-    <material name="led_red" rgba="1 0.3 0.3 1" specular="0.8" shininess="0.8"/>
-    <material name="led_green" rgba="0.3 1 0.3 1" specular="0.8" shininess="0.8"/>
-    <material name="led_blue" rgba="0.3 0.3 1 1" specular="0.8" shininess="0.8"/>
+    <!-- 建筑物材质 -->
+    <material name="concrete" rgba="0.5 0.5 0.5 1"/>
+    <material name="brick" rgba="0.7 0.3 0.2 1"/>
+    <material name="glass" rgba="0.6 0.8 1 0.6"/>
+    <material name="metal" rgba="0.3 0.3 0.3 1"/>
+    <material name="wood" rgba="0.6 0.4 0.2 1"/>
 
-    <!-- 真实风格的障碍物材质 -->
-    <!-- 建筑材质 -->
-    <material name="building_concrete" rgba="0.7 0.7 0.7 1" specular="0.2" shininess="0.1"/>
-    <material name="building_brick" rgba="0.7 0.4 0.3 1" specular="0.1" shininess="0.05"/>
-    <material name="building_glass" rgba="0.6 0.8 1 0.7" specular="0.9" shininess="0.8"/>
-    <material name="building_metal" rgba="0.5 0.5 0.55 1" specular="0.7" shininess="0.6"/>
-    <material name="building_roof" rgba="0.3 0.3 0.35 1" specular="0.3" shininess="0.2"/>
-
-    <!-- 油罐材质 -->
-    <material name="tank_metal" rgba="0.6 0.6 0.65 1" specular="0.8" shininess="0.7"/>
-    <material name="tank_rust" rgba="0.7 0.4 0.2 1" specular="0.1" shininess="0.05"/>
-    <material name="tank_label" rgba="0.9 0.2 0.2 1" specular="0.2" shininess="0.1"/>
-    <material name="tank_rim" rgba="0.4 0.4 0.45 1" specular="0.6" shininess="0.5"/>
-
-    <!-- 巨石材质 -->
-    <material name="rock_gray" rgba="0.5 0.5 0.5 1" specular="0.1" shininess="0.05"/>
-    <material name="rock_brown" rgba="0.5 0.3 0.2 1" specular="0.1" shininess="0.05"/>
-    <material name="rock_moss" rgba="0.3 0.5 0.2 1" specular="0.05" shininess="0.02"/>
-
-    <!-- 纹理 -->
-    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1="0.6 0.7 0.6" rgb2="0.4 0.5 0.4"/>
-    <texture name="gradient" type="2d" builtin="gradient" width="256" height="256" rgb1="0.6 0.6 0.6" rgb2="0.4 0.4 0.4"/>
-    <material name="ground_texture" texture="grid" texrepeat="5 5" texuniform="true"/>
+    <!-- 无人机材质 -->
+    <material name="carbon" rgba="0.1 0.1 0.1 1"/>
+    <material name="motor" rgba="0.3 0.3 0.35 1"/>
+    <material name="propeller" rgba="0.05 0.05 0.05 0.9"/>
   </asset>
 
   <worldbody>
-    <!-- 环境光照 - 自然光照 -->
-    <light name="sun" pos="10 10 20" dir="-1 -1 -1" directional="true" castshadow="true" diffuse="1 1 1" ambient="0.4 0.4 0.4"/>
-    <light name="fill_light" pos="-5 5 10" dir="0.5 -0.5 -1" directional="true" castshadow="false" diffuse="0.6 0.6 0.6"/>
+    <!-- 光照 -->
+    <light name="sun" pos="30 30 50" dir="-1 -1 -1" directional="true" castshadow="true" diffuse="1 1 1" ambient="0.4 0.4 0.4"/>
+    <light name="fill1" pos="-20 20 30" dir="0.5 -0.5 -1" directional="true" castshadow="false" diffuse="0.4 0.4 0.4"/>
 
-    <!-- 带纹理的地面 -->
-    <geom name="ground" type="plane" pos="0 0 0" size="20 20 0.1" material="ground_texture"
-          condim="3" friction="0.8 0.005 0.0001"/>
+    <!-- 地面 -->
+    <geom name="ground" type="plane" pos="0 0 -0.1" size="40 40 0.1" material="grass_mat" condim="3"/>
 
-    <!-- 参考坐标系（半透明） -->
-    <geom name="origin_x" type="cylinder" fromto="0 0 0.1 1 0 0.1" size="0.01" rgba="1 0.2 0.2 0.6"/>
-    <geom name="origin_y" type="cylinder" fromto="0 0 0.1 0 1 0.1" size="0.01" rgba="0.2 1 0.2 0.6"/>
-    <geom name="origin_z" type="cylinder" fromto="0 0 0.1 0 0 1.1" size="0.01" rgba="0.2 0.2 1 0.6"/>
+    <!-- 道路 -->
+    <geom name="road_h" type="box" pos="0 0 0" size="30 4 0.05" material="asphalt_mat"/>
+    <geom name="road_v" type="box" pos="0 0 0" size="4 30 0.05" material="asphalt_mat"/>
 
-    <!-- 轨迹辅助点（显示公转路径） -->
-    <body name="path_marker" pos="0 0 0.8">
-      <geom name="path_circle" type="cylinder" size="1.0 0.01" euler="1.57 0 0" rgba="0.5 0.5 0.5 0.15"/>
-    </body>
+    <!-- 道路标线 -->
+    <geom name="line_h" type="box" pos="0 0 0.04" size="30 0.1 0.02" rgba="1 1 0 1"/>
+    <geom name="line_v" type="box" pos="0 0 0.04" size="0.1 30 0.02" rgba="1 1 0 1"/>
 
-    <!-- ========== 优化的无人机模型 ========== -->
-    <body name="quadrotor" pos="0 0 0.8" euler="0 0 0">
-      <joint name="quad_free_joint" type="free" damping="0.001"/>
+    <!-- ========== 无人机 ========== -->
+    <body name="quadrotor" pos="0 0 0.8">
+      <joint name="quad_free_joint" type="free"/>
 
-      <!-- 中心主体 - 碳纤维圆柱体 -->
-      <geom name="center_body_main" type="cylinder" size="0.12 0.035" material="body_carbon" mass="0.3"/>
-      <geom name="center_body_top" type="cylinder" size="0.08 0.01" pos="0 0 0.04" material="body_carbon" mass="0.02"/>
-      <geom name="center_body_bottom" type="cylinder" size="0.08 0.01" pos="0 0 -0.04" material="body_carbon" mass="0.02"/>
+      <!-- 主体 -->
+      <geom name="body_center" type="cylinder" size="0.12 0.04" material="carbon"/>
+      <geom name="body_top" type="cylinder" size="0.08 0.01" pos="0 0 0.05" material="carbon"/>
+      <geom name="body_bottom" type="cylinder" size="0.08 0.01" pos="0 0 -0.05" material="carbon"/>
 
-      <!-- 电子设备装饰 -->
-      <geom name="gps_dome" type="sphere" size="0.025" pos="0.06 0.06 0.06" material="motor_metal" mass="0.005"/>
-      <geom name="flight_controller" type="box" size="0.03 0.03 0.01" pos="0 0 0.02" rgba="0 0.5 1 0.8" mass="0.005"/>
+      <!-- 机臂 -->
+      <geom name="arm_1" type="capsule" fromto="0.1 0.1 0 0.35 0.35 0" size="0.012" material="carbon"/>
+      <geom name="arm_2" type="capsule" fromto="0.1 -0.1 0 0.35 -0.35 0" size="0.012" material="carbon"/>
+      <geom name="arm_3" type="capsule" fromto="-0.1 -0.1 0 -0.35 -0.35 0" size="0.012" material="carbon"/>
+      <geom name="arm_4" type="capsule" fromto="-0.1 0.1 0 -0.35 0.35 0" size="0.012" material="carbon"/>
 
-      <!-- LED状态灯 -->
-      <geom name="led_front" type="sphere" size="0.015" pos="0.1 0 0.02" material="led_red" mass="0.001"/>
-      <geom name="led_rear" type="sphere" size="0.015" pos="-0.1 0 0.02" material="led_blue" mass="0.001"/>
-      <geom name="led_left" type="sphere" size="0.015" pos="0 0.1 0.02" material="led_green" mass="0.001"/>
-      <geom name="led_right" type="sphere" size="0.015" pos="0 -0.1 0.02" material="led_green" mass="0.001"/>
-
-      <!-- 优化的机臂 - X型碳纤维管 -->
-      <geom name="arm_front_right" type="capsule" fromto="0.08 0.08 0 0.3 0.3 0" size="0.015" material="arm_carbon" mass="0.03"/>
-      <geom name="arm_front_left" type="capsule" fromto="0.08 -0.08 0 0.3 -0.3 0" size="0.015" material="arm_carbon" mass="0.03"/>
-      <geom name="arm_back_left" type="capsule" fromto="-0.08 -0.08 0 -0.3 -0.3 0" size="0.015" material="arm_carbon" mass="0.03"/>
-      <geom name="arm_back_right" type="capsule" fromto="-0.08 0.08 0 -0.3 0.3 0" size="0.015" material="arm_carbon" mass="0.03"/>
-
-      <!-- 机臂加固件 -->
-      <geom name="arm_joint_front_right" type="sphere" size="0.025" pos="0.08 0.08 0" material="motor_metal" mass="0.005"/>
-      <geom name="arm_joint_front_left" type="sphere" size="0.025" pos="0.08 -0.08 0" material="motor_metal" mass="0.005"/>
-      <geom name="arm_joint_back_left" type="sphere" size="0.025" pos="-0.08 -0.08 0" material="motor_metal" mass="0.005"/>
-      <geom name="arm_joint_back_right" type="sphere" size="0.025" pos="-0.08 0.08 0" material="motor_metal" mass="0.005"/>
-
-      <!-- 电机和旋翼 -->
-      <!-- 前右电机（红色旋翼） -->
-      <body name="motor_front_right" pos="0.3 0.3 0">
-        <geom name="motor_housing_front_right" type="cylinder" size="0.045 0.025" material="motor_metal" mass="0.04"/>
-        <geom name="motor_top_front_right" type="cylinder" size="0.03 0.01" pos="0 0 0.03" material="motor_metal" mass="0.01"/>
-        <geom name="motor_bottom_front_right" type="cylinder" size="0.03 0.01" pos="0 0 -0.03" material="motor_metal" mass="0.01"/>
-        <body name="rotor_front_right" pos="0 0 0.06">
-          <joint name="rotor_front_right_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_blade1_front_right" type="box" size="0.12 0.02 0.005" pos="0.06 0 0" euler="0 0 0" material="propeller_red" mass="0.005"/>
-          <geom name="propeller_blade2_front_right" type="box" size="0.12 0.02 0.005" pos="-0.06 0 0" euler="0 0 0" material="propeller_red" mass="0.005"/>
-          <geom name="propeller_blade3_front_right" type="box" size="0.02 0.12 0.005" pos="0 0.06 0" euler="0 0 0" material="propeller_red" mass="0.005"/>
-          <geom name="propeller_blade4_front_right" type="box" size="0.02 0.12 0.005" pos="0 -0.06 0" euler="0 0 0" material="propeller_red" mass="0.005"/>
-          <geom name="propeller_center_front_right" type="cylinder" size="0.025 0.01" pos="0 0 0" material="motor_metal" mass="0.002"/>
+      <!-- 电机1 -->
+      <body name="motor_1" pos="0.35 0.35 0">
+        <geom name="motor_housing_1" type="cylinder" size="0.04 0.025" material="motor"/>
+        <body name="rotor_1" pos="0 0 0.05">
+          <joint name="rotor_1_joint" type="hinge" axis="0 0 1"/>
+          <geom name="propeller_1" type="cylinder" size="0.15 0.008" material="propeller"/>
         </body>
       </body>
 
-      <!-- 前左电机（绿色旋翼） -->
-      <body name="motor_front_left" pos="0.3 -0.3 0">
-        <geom name="motor_housing_front_left" type="cylinder" size="0.045 0.025" material="motor_metal" mass="0.04"/>
-        <geom name="motor_top_front_left" type="cylinder" size="0.03 0.01" pos="0 0 0.03" material="motor_metal" mass="0.01"/>
-        <geom name="motor_bottom_front_left" type="cylinder" size="0.03 0.01" pos="0 0 -0.03" material="motor_metal" mass="0.01"/>
-        <body name="rotor_front_left" pos="0 0 0.06">
-          <joint name="rotor_front_left_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_blade1_front_left" type="box" size="0.12 0.02 0.005" pos="0.06 0 0" euler="0 0 0" material="propeller_green" mass="0.005"/>
-          <geom name="propeller_blade2_front_left" type="box" size="0.12 0.02 0.005" pos="-0.06 0 0" euler="0 0 0" material="propeller_green" mass="0.005"/>
-          <geom name="propeller_blade3_front_left" type="box" size="0.02 0.12 0.005" pos="0 0.06 0" euler="0 0 0" material="propeller_green" mass="0.005"/>
-          <geom name="propeller_blade4_front_left" type="box" size="0.02 0.12 0.005" pos="0 -0.06 0" euler="0 0 0" material="propeller_green" mass="0.005"/>
-          <geom name="propeller_center_front_left" type="cylinder" size="0.025 0.01" pos="0 0 0" material="motor_metal" mass="0.002"/>
+      <!-- 电机2 -->
+      <body name="motor_2" pos="0.35 -0.35 0">
+        <geom name="motor_housing_2" type="cylinder" size="0.04 0.025" material="motor"/>
+        <body name="rotor_2" pos="0 0 0.05">
+          <joint name="rotor_2_joint" type="hinge" axis="0 0 1"/>
+          <geom name="propeller_2" type="cylinder" size="0.15 0.008" material="propeller"/>
         </body>
       </body>
 
-      <!-- 后左电机（蓝色旋翼） -->
-      <body name="motor_back_left" pos="-0.3 -0.3 0">
-        <geom name="motor_housing_back_left" type="cylinder" size="0.045 0.025" material="motor_metal" mass="0.04"/>
-        <geom name="motor_top_back_left" type="cylinder" size="0.03 0.01" pos="0 0 0.03" material="motor_metal" mass="0.01"/>
-        <geom name="motor_bottom_back_left" type="cylinder" size="0.03 0.01" pos="0 0 -0.03" material="motor_metal" mass="0.01"/>
-        <body name="rotor_back_left" pos="0 0 0.06">
-          <joint name="rotor_back_left_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_blade1_back_left" type="box" size="0.12 0.02 0.005" pos="0.06 0 0" euler="0 0 0" material="propeller_blue" mass="0.005"/>
-          <geom name="propeller_blade2_back_left" type="box" size="0.12 0.02 0.005" pos="-0.06 0 0" euler="0 0 0" material="propeller_blue" mass="0.005"/>
-          <geom name="propeller_blade3_back_left" type="box" size="0.02 0.12 0.005" pos="0 0.06 0" euler="0 0 0" material="propeller_blue" mass="0.005"/>
-          <geom name="propeller_blade4_back_left" type="box" size="0.02 0.12 0.005" pos="0 -0.06 0" euler="0 0 0" material="propeller_blue" mass="0.005"/>
-          <geom name="propeller_center_back_left" type="cylinder" size="0.025 0.01" pos="0 0 0" material="motor_metal" mass="0.002"/>
+      <!-- 电机3 -->
+      <body name="motor_3" pos="-0.35 -0.35 0">
+        <geom name="motor_housing_3" type="cylinder" size="0.04 0.025" material="motor"/>
+        <body name="rotor_3" pos="0 0 0.05">
+          <joint name="rotor_3_joint" type="hinge" axis="0 0 1"/>
+          <geom name="propeller_3" type="cylinder" size="0.15 0.008" material="propeller"/>
         </body>
       </body>
 
-      <!-- 后右电机（黄色旋翼） -->
-      <body name="motor_back_right" pos="-0.3 0.3 0">
-        <geom name="motor_housing_back_right" type="cylinder" size="0.045 0.025" material="motor_metal" mass="0.04"/>
-        <geom name="motor_top_back_right" type="cylinder" size="0.03 0.01" pos="0 0 0.03" material="motor_metal" mass="0.01"/>
-        <geom name="motor_bottom_back_right" type="cylinder" size="0.03 0.01" pos="0 0 -0.03" material="motor_metal" mass="0.01"/>
-        <body name="rotor_back_right" pos="0 0 0.06">
-          <joint name="rotor_back_right_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_blade1_back_right" type="box" size="0.12 0.02 0.005" pos="0.06 0 0" euler="0 0 0" material="propeller_yellow" mass="0.005"/>
-          <geom name="propeller_blade2_back_right" type="box" size="0.12 0.02 0.005" pos="-0.06 0 0" euler="0 0 0" material="propeller_yellow" mass="0.005"/>
-          <geom name="propeller_blade3_back_right" type="box" size="0.02 0.12 0.005" pos="0 0.06 0" euler="0 0 0" material="propeller_yellow" mass="0.005"/>
-          <geom name="propeller_blade4_back_right" type="box" size="0.02 0.12 0.005" pos="0 -0.06 0" euler="0 0 0" material="propeller_yellow" mass="0.005"/>
-          <geom name="propeller_center_back_right" type="cylinder" size="0.025 0.01" pos="0 0 0" material="motor_metal" mass="0.002"/>
+      <!-- 电机4 -->
+      <body name="motor_4" pos="-0.35 0.35 0">
+        <geom name="motor_housing_4" type="cylinder" size="0.04 0.025" material="motor"/>
+        <body name="rotor_4" pos="0 0 0.05">
+          <joint name="rotor_4_joint" type="hinge" axis="0 0 1"/>
+          <geom name="propeller_4" type="cylinder" size="0.15 0.008" material="propeller"/>
         </body>
       </body>
 
-      <!-- 优化的起落架 -->
-      <geom name="landing_gear_front_left" type="capsule" fromto="0.1 0.05 -0.05 0.1 0.05 -0.15" size="0.008" rgba="0.3 0.3 0.3 1" mass="0.01"/>
-      <geom name="landing_gear_front_right" type="capsule" fromto="0.1 -0.05 -0.05 0.1 -0.05 -0.15" size="0.008" rgba="0.3 0.3 0.3 1" mass="0.01"/>
-      <geom name="landing_gear_back_left" type="capsule" fromto="-0.1 -0.05 -0.05 -0.1 -0.05 -0.15" size="0.008" rgba="0.3 0.3 0.3 1" mass="0.01"/>
-      <geom name="landing_gear_back_right" type="capsule" fromto="-0.1 0.05 -0.05 -0.1 0.05 -0.15" size="0.008" rgba="0.3 0.3 0.3 1" mass="0.01"/>
-
-      <!-- 起落架横杆 -->
-      <geom name="landing_skid_front" type="cylinder" fromto="0.1 0.1 -0.15 0.1 -0.1 -0.15" size="0.008" rgba="0.3 0.3 0.3 1" mass="0.01"/>
-      <geom name="landing_skid_back" type="cylinder" fromto="-0.1 -0.1 -0.15 -0.1 0.1 -0.15" size="0.008" rgba="0.3 0.3 0.3 1" mass="0.01"/>
-
-      <!-- 方向标记（前端） -->
-      <geom name="front_arrow" type="box" size="0.02 0.02 0.005" pos="0.15 0 0.06" rgba="1 1 1 1" mass="0.001"/>
-      <geom name="front_arrow_tip" type="sphere" size="0.015" pos="0.18 0 0.06" rgba="1 1 0 1" mass="0.001"/>
+      <!-- LED灯 -->
+      <geom name="led_front" type="sphere" size="0.015" pos="0.15 0 0.03" rgba="1 0 0 1"/>
+      <geom name="led_back" type="sphere" size="0.015" pos="-0.15 0 0.03" rgba="0 0 1 1"/>
+      <geom name="led_left" type="sphere" size="0.015" pos="0 0.15 0.03" rgba="0 1 0 1"/>
+      <geom name="led_right" type="sphere" size="0.015" pos="0 -0.15 0.03" rgba="0 1 0 1"/>
     </body>
 
-    <!-- ========== 真实风格的障碍物（使用标准几何体） ========== -->
+    <!-- ========== 建筑物 ========== -->
 
-    <!-- 1. 建筑（立方体）- 多层办公楼 -->
-    <body name="building" pos="2 0 0.75">
-      <!-- 地基 -->
-      <geom name="building_base" type="box" size="0.35 0.35 0.1" pos="0 0 -0.65" material="building_concrete" mass="2"/>
-
-      <!-- 主体 - 分层设计 -->
-      <geom name="building_floor1" type="box" size="0.3 0.3 0.2" pos="0 0 -0.4" material="building_concrete" mass="1"/>
-      <geom name="building_floor2" type="box" size="0.28 0.28 0.2" pos="0 0 -0.15" material="building_brick" mass="1"/>
-      <geom name="building_floor3" type="box" size="0.26 0.26 0.2" pos="0 0 0.1" material="building_concrete" mass="1"/>
-      <geom name="building_floor4" type="box" size="0.24 0.24 0.2" pos="0 0 0.35" material="building_brick" mass="1"/>
-
-      <!-- 屋顶 -->
-      <geom name="building_roof" type="box" size="0.22 0.22 0.1" pos="0 0 0.6" material="building_roof" mass="0.5"/>
-      <geom name="building_antenna_base" type="cylinder" size="0.04 0.05" pos="0 0 0.7" material="building_metal" mass="0.05"/>
-      <geom name="building_antenna" type="cylinder" size="0.02 0.2" pos="0 0 0.85" material="building_metal" mass="0.05"/>
-
-      <!-- 窗户 - 每层四个面（用小立方体表示） -->
-      <!-- 第一层窗户 -->
-      <geom name="building_win1_f" type="box" size="0.05 0.1 0.1" pos="0.18 0 -0.4" material="building_glass" mass="0.05"/>
-      <geom name="building_win1_b" type="box" size="0.05 0.1 0.1" pos="-0.18 0 -0.4" material="building_glass" mass="0.05"/>
-      <geom name="building_win1_l" type="box" size="0.1 0.05 0.1" pos="0 0.18 -0.4" material="building_glass" mass="0.05"/>
-      <geom name="building_win1_r" type="box" size="0.1 0.05 0.1" pos="0 -0.18 -0.4" material="building_glass" mass="0.05"/>
-
-      <!-- 第二层窗户 -->
-      <geom name="building_win2_f" type="box" size="0.05 0.1 0.1" pos="0.16 0 -0.15" material="building_glass" mass="0.05"/>
-      <geom name="building_win2_b" type="box" size="0.05 0.1 0.1" pos="-0.16 0 -0.15" material="building_glass" mass="0.05"/>
-      <geom name="building_win2_l" type="box" size="0.1 0.05 0.1" pos="0 0.16 -0.15" material="building_glass" mass="0.05"/>
-      <geom name="building_win2_r" type="box" size="0.1 0.05 0.1" pos="0 -0.16 -0.15" material="building_glass" mass="0.05"/>
-
-      <!-- 第三层窗户 -->
-      <geom name="building_win3_f" type="box" size="0.05 0.1 0.1" pos="0.14 0 0.1" material="building_glass" mass="0.05"/>
-      <geom name="building_win3_b" type="box" size="0.05 0.1 0.1" pos="-0.14 0 0.1" material="building_glass" mass="0.05"/>
-      <geom name="building_win3_l" type="box" size="0.1 0.05 0.1" pos="0 0.14 0.1" material="building_glass" mass="0.05"/>
-      <geom name="building_win3_r" type="box" size="0.1 0.05 0.1" pos="0 -0.14 0.1" material="building_glass" mass="0.05"/>
-
-      <!-- 第四层窗户 -->
-      <geom name="building_win4_f" type="box" size="0.05 0.1 0.1" pos="0.12 0 0.35" material="building_glass" mass="0.05"/>
-      <geom name="building_win4_b" type="box" size="0.05 0.1 0.1" pos="-0.12 0 0.35" material="building_glass" mass="0.05"/>
-      <geom name="building_win4_l" type="box" size="0.1 0.05 0.1" pos="0 0.12 0.35" material="building_glass" mass="0.05"/>
-      <geom name="building_win4_r" type="box" size="0.1 0.05 0.1" pos="0 -0.12 0.35" material="building_glass" mass="0.05"/>
-
-      <!-- 门口 -->
-      <geom name="building_door" type="box" size="0.08 0.05 0.15" pos="0.18 0 -0.55" material="building_metal" mass="0.1"/>
+    <!-- 办公楼 -->
+    <body name="building_office" pos="5 5 0.5">
+      <geom name="office_base" type="box" size="1.2 1.2 0.5" pos="0 0 0.5" material="concrete"/>
+      <geom name="office_mid" type="box" size="1.1 1.1 0.5" pos="0 0 1.2" material="glass"/>
+      <geom name="office_top" type="box" size="1.0 1.0 0.4" pos="0 0 1.9" material="concrete"/>
     </body>
 
-    <!-- 2. 油罐（圆柱体）- 工业储罐（用圆柱体和小球体组合） -->
-    <body name="tank" pos="-1 1 0.5">
-      <!-- 主罐体 -->
-      <geom name="tank_main" type="cylinder" size="0.35 0.5" pos="0 0 0" material="tank_metal" mass="3"/>
-
-      <!-- 罐顶和罐底 -->
-      <geom name="tank_top" type="cylinder" size="0.3 0.05" pos="0 0 0.55" material="tank_rim" mass="0.3"/>
-      <geom name="tank_bottom" type="cylinder" size="0.3 0.05" pos="0 0 -0.55" material="tank_rim" mass="0.3"/>
-      <geom name="tank_dome" type="sphere" size="0.2" pos="0 0 0.7" material="tank_metal" mass="0.2"/>
-
-      <!-- 加强环 - 用薄圆柱体代替 -->
-      <geom name="tank_ring1" type="cylinder" size="0.37 0.03" pos="0 0 -0.3" material="tank_rim" mass="0.1"/>
-      <geom name="tank_ring2" type="cylinder" size="0.37 0.03" pos="0 0 0" material="tank_rim" mass="0.1"/>
-      <geom name="tank_ring3" type="cylinder" size="0.37 0.03" pos="0 0 0.3" material="tank_rim" mass="0.1"/>
-
-      <!-- 垂直加强筋 - 用长方体 -->
-      <geom name="tank_rib1" type="box" size="0.03 0.05 1.1" pos="0.35 0 0" material="tank_rim" mass="0.1"/>
-      <geom name="tank_rib2" type="box" size="0.03 0.05 1.1" pos="-0.35 0 0" material="tank_rim" mass="0.1"/>
-      <geom name="tank_rib3" type="box" size="0.05 0.03 1.1" pos="0 0.35 0" material="tank_rim" mass="0.1"/>
-      <geom name="tank_rib4" type="box" size="0.05 0.03 1.1" pos="0 -0.35 0" material="tank_rim" mass="0.1"/>
-
-      <!-- 锈迹斑点 - 用小球体模拟 -->
-      <geom name="tank_rust1" type="sphere" size="0.08" pos="0.2 0.1 0.2" material="tank_rust" mass="0.02"/>
-      <geom name="tank_rust2" type="sphere" size="0.1" pos="-0.15 -0.2 -0.2" material="tank_rust" mass="0.02"/>
-      <geom name="tank_rust3" type="sphere" size="0.06" pos="0.1 -0.25 0.4" material="tank_rust" mass="0.02"/>
-
-      <!-- 危险品标志 -->
-      <geom name="tank_label1" type="box" size="0.15 0.1 0.02" pos="0.25 0 0.4" material="tank_label" mass="0.02"/>
-      <geom name="tank_label2" type="box" size="0.15 0.1 0.02" pos="-0.25 0 -0.3" material="tank_label" mass="0.02"/>
-
-      <!-- 梯子 - 用圆柱体组成 -->
-      <geom name="tank_ladder1" type="cylinder" fromto="0.35 0.15 -0.4 0.35 0.15 0.4" size="0.01" material="tank_rim" mass="0.05"/>
-      <geom name="tank_ladder2" type="cylinder" fromto="0.35 -0.15 -0.4 0.35 -0.15 0.4" size="0.01" material="tank_rim" mass="0.05"/>
-      <geom name="tank_ladder_rung1" type="cylinder" fromto="0.35 0.15 -0.3 0.35 -0.15 -0.3" size="0.008" material="tank_rim" mass="0.02"/>
-      <geom name="tank_ladder_rung2" type="cylinder" fromto="0.35 0.15 0 0.35 -0.15 0" size="0.008" material="tank_rim" mass="0.02"/>
-      <geom name="tank_ladder_rung3" type="cylinder" fromto="0.35 0.15 0.3 0.35 -0.15 0.3" size="0.008" material="tank_rim" mass="0.02"/>
+    <!-- 塔楼 -->
+    <body name="building_tower" pos="8 4 0.5">
+      <geom name="tower_base" type="cylinder" size="0.8 0.5" pos="0 0 0.5" material="concrete"/>
+      <geom name="tower_mid" type="cylinder" size="0.7 0.6" pos="0 0 1.3" material="glass"/>
+      <geom name="tower_top" type="cylinder" size="0.5 0.4" pos="0 0 2.1" material="concrete"/>
     </body>
 
-    <!-- 3. 巨石群（球体）- 自然岩石 -->
-    <body name="rock_group" pos="0 -2 1.0">
-      <!-- 主巨石 -->
-      <geom name="rock_main" type="sphere" size="0.45" pos="0 0 0" material="rock_gray" mass="4"/>
-
-      <!-- 附着小岩石 -->
-      <geom name="rock_small1" type="sphere" size="0.2" pos="0.35 0.2 0.2" material="rock_brown" mass="0.5"/>
-      <geom name="rock_small2" type="sphere" size="0.18" pos="-0.3 -0.25 -0.1" material="rock_brown" mass="0.4"/>
-      <geom name="rock_small3" type="sphere" size="0.15" pos="0.2 -0.35 0.3" material="rock_gray" mass="0.3"/>
-      <geom name="rock_small4" type="sphere" size="0.22" pos="-0.25 0.3 -0.25" material="rock_brown" mass="0.5"/>
-      <geom name="rock_small5" type="sphere" size="0.12" pos="0.4 -0.1 -0.2" material="rock_gray" mass="0.2"/>
-
-      <!-- 青苔斑块 -->
-      <geom name="rock_moss1" type="sphere" size="0.1" pos="0.3 0.25 0.15" material="rock_moss" mass="0.05"/>
-      <geom name="rock_moss2" type="sphere" size="0.08" pos="-0.2 -0.3 -0.3" material="rock_moss" mass="0.03"/>
-      <geom name="rock_moss3" type="sphere" size="0.12" pos="0.1 0.4 0.1" material="rock_moss" mass="0.04"/>
-
-      <!-- 裂缝/纹理（用细长圆柱表示） -->
-      <geom name="rock_crack1" type="cylinder" fromto="0.1 0.2 0.3 -0.1 -0.1 -0.2" size="0.02" material="rock_brown" mass="0.05"/>
-      <geom name="rock_crack2" type="cylinder" fromto="-0.2 0.3 -0.1 0.3 -0.2 0.2" size="0.015" material="rock_brown" mass="0.03"/>
+    <!-- 公寓楼 -->
+    <body name="building_apartment" pos="3 8 0.5">
+      <geom name="apt_base" type="box" size="1.5 1.5 0.4" pos="0 0 0.4" material="brick"/>
+      <geom name="apt_1" type="box" size="1.4 1.4 0.4" pos="0 0 1.0" material="brick"/>
+      <geom name="apt_2" type="box" size="1.3 1.3 0.4" pos="0 0 1.6" material="brick"/>
     </body>
 
-    <!-- 添加一些小障碍物增加丰富度 -->
-    <!-- 小石块 -->
-    <body name="pebbles1" pos="1.5 0.5 0.1">
-      <geom name="pebble1" type="sphere" size="0.05" pos="0 0 0" material="rock_gray" mass="0.01"/>
-      <geom name="pebble2" type="sphere" size="0.04" pos="0.1 0.05 0" material="rock_brown" mass="0.005"/>
-      <geom name="pebble3" type="sphere" size="0.03" pos="-0.05 0.1 0" material="rock_gray" mass="0.002"/>
+    <!-- 商店 -->
+    <body name="building_shop" pos="-5 5 0.5">
+      <geom name="shop_main" type="box" size="1.5 1.5 0.6" pos="0 0 0.6" material="brick"/>
+      <geom name="shop_roof" type="box" size="1.6 1.6 0.1" pos="0 0 1.2" material="concrete"/>
     </body>
 
-    <body name="pebbles2" pos="-0.5 -1.5 0.1">
-      <geom name="pebble4" type="sphere" size="0.06" pos="0 0 0" material="rock_brown" mass="0.02"/>
-      <geom name="pebble5" type="sphere" size="0.05" pos="0.08 -0.03 0" material="rock_gray" mass="0.01"/>
+    <!-- 咖啡馆 -->
+    <body name="building_cafe" pos="-8 4 0.5">
+      <geom name="cafe_base" type="box" size="1.2 1.2 0.4" pos="0 0 0.4" material="brick"/>
+      <geom name="cafe_walls" type="box" size="1.1 1.1 0.4" pos="0 0 1.0" material="brick"/>
     </body>
 
-    <!-- 小柱子 -->
-    <body name="small_pillar" pos="1.8 -0.8 0.3">
-      <geom name="pillar_base" type="cylinder" size="0.1 0.1" pos="0 0 -0.2" material="building_concrete" mass="0.1"/>
-      <geom name="pillar_body" type="cylinder" size="0.08 0.3" pos="0 0 0.1" material="building_concrete" mass="0.2"/>
-      <geom name="pillar_top" type="sphere" size="0.1" pos="0 0 0.3" material="building_metal" mass="0.05"/>
+    <!-- 住宅1 -->
+    <body name="building_house1" pos="-5 -5 0.5">
+      <geom name="house1_base" type="box" size="1.2 1.2 0.3" pos="0 0 0.3" material="brick"/>
+      <geom name="house1_walls" type="box" size="1.1 1.1 0.3" pos="0 0 0.8" material="brick"/>
+    </body>
+
+    <!-- 住宅2 -->
+    <body name="building_house2" pos="-8 -5 0.5">
+      <geom name="house2_base" type="box" size="1.2 1.2 0.3" pos="0 0 0.3" material="brick"/>
+      <geom name="house2_walls" type="box" size="1.1 1.1 0.3" pos="0 0 0.8" material="brick"/>
+    </body>
+
+    <!-- 学校 -->
+    <body name="building_school" pos="5 -5 0.5">
+      <geom name="school_base" type="box" size="1.8 1.8 0.4" pos="0 0 0.4" material="concrete"/>
+      <geom name="school_mid" type="box" size="1.7 1.7 0.4" pos="0 0 1.0" material="brick"/>
+      <geom name="school_top" type="box" size="1.6 1.6 0.4" pos="0 0 1.6" material="concrete"/>
+    </body>
+
+    <!-- 图书馆 -->
+    <body name="building_library" pos="8 -5 0.5">
+      <geom name="library_base" type="box" size="1.4 1.4 0.5" pos="0 0 0.5" material="brick"/>
+    </body>
+
+    <!-- 公园设施 -->
+    <body name="building_park" pos="5 -8 0.5">
+      <geom name="park_bench" type="box" size="0.5 0.2 0.1" pos="0.3 0 0.1" material="wood"/>
+      <geom name="park_table" type="cylinder" size="0.3 0.1" pos="0 0 0.1" material="concrete"/>
+    </body>
+
+    <!-- 路灯 -->
+    <body name="light_1" pos="3 3 0.5">
+      <geom name="pole_1" type="cylinder" size="0.05 1.2" pos="0 0 0.8" material="metal"/>
+      <geom name="head_1" type="sphere" size="0.1" pos="0 0 1.4" rgba="0.9 0.9 0.8 1"/>
+    </body>
+
+    <body name="light_2" pos="-3 3 0.5">
+      <geom name="pole_2" type="cylinder" size="0.05 1.2" pos="0 0 0.8" material="metal"/>
+      <geom name="head_2" type="sphere" size="0.1" pos="0 0 1.4" rgba="0.9 0.9 0.8 1"/>
+    </body>
+
+    <body name="light_3" pos="3 -3 0.5">
+      <geom name="pole_3" type="cylinder" size="0.05 1.2" pos="0 0 0.8" material="metal"/>
+      <geom name="head_3" type="sphere" size="0.1" pos="0 0 1.4" rgba="0.9 0.9 0.8 1"/>
+    </body>
+
+    <body name="light_4" pos="-3 -3 0.5">
+      <geom name="pole_4" type="cylinder" size="0.05 1.2" pos="0 0 0.8" material="metal"/>
+      <geom name="head_4" type="sphere" size="0.1" pos="0 0 1.4" rgba="0.9 0.9 0.8 1"/>
+    </body>
+
+    <!-- 树木 -->
+    <body name="tree_1" pos="2 2 0.5">
+      <geom name="trunk_1" type="cylinder" size="0.1 0.8" pos="0 0 0.6" rgba="0.5 0.3 0.1 1"/>
+      <geom name="leaves_1" type="sphere" size="0.25" pos="0 0 1.1" rgba="0.2 0.7 0.2 1"/>
+    </body>
+
+    <body name="tree_2" pos="-2 2 0.5">
+      <geom name="trunk_2" type="cylinder" size="0.1 0.8" pos="0 0 0.6" rgba="0.5 0.3 0.1 1"/>
+      <geom name="leaves_2" type="sphere" size="0.25" pos="0 0 1.1" rgba="0.2 0.7 0.2 1"/>
+    </body>
+
+    <body name="tree_3" pos="2 -2 0.5">
+      <geom name="trunk_3" type="cylinder" size="0.1 0.8" pos="0 0 0.6" rgba="0.5 0.3 0.1 1"/>
+      <geom name="leaves_3" type="sphere" size="0.25" pos="0 0 1.1" rgba="0.2 0.7 0.2 1"/>
+    </body>
+
+    <body name="tree_4" pos="-2 -2 0.5">
+      <geom name="trunk_4" type="cylinder" size="0.1 0.8" pos="0 0 0.6" rgba="0.5 0.3 0.1 1"/>
+      <geom name="leaves_4" type="sphere" size="0.25" pos="0 0 1.1" rgba="0.2 0.7 0.2 1"/>
+    </body>
+
+    <!-- 汽车 -->
+    <body name="car_1" pos="2 0 0.15">
+      <geom name="car1_body" type="box" size="0.5 0.2 0.15" pos="0 0 0.15" rgba="0.2 0.3 0.8 1"/>
+      <geom name="car1_wheel1" type="cylinder" size="0.08 0.05" pos="0.25 0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+      <geom name="car1_wheel2" type="cylinder" size="0.08 0.05" pos="0.25 -0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+      <geom name="car1_wheel3" type="cylinder" size="0.08 0.05" pos="-0.25 0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+      <geom name="car1_wheel4" type="cylinder" size="0.08 0.05" pos="-0.25 -0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+    </body>
+
+    <body name="car_2" pos="-2 0 0.15">
+      <geom name="car2_body" type="box" size="0.5 0.2 0.15" pos="0 0 0.15" rgba="0.8 0.2 0.2 1"/>
+      <geom name="car2_wheel1" type="cylinder" size="0.08 0.05" pos="0.25 0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+      <geom name="car2_wheel2" type="cylinder" size="0.08 0.05" pos="0.25 -0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+      <geom name="car2_wheel3" type="cylinder" size="0.08 0.05" pos="-0.25 0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
+      <geom name="car2_wheel4" type="cylinder" size="0.08 0.05" pos="-0.25 -0.15 0.08" euler="1.57 0 0" rgba="0.1 0.1 0.1 1"/>
     </body>
   </worldbody>
 
   <actuator>
-    <motor name="motor_front_right" joint="rotor_front_right_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_front_left" joint="rotor_front_left_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_back_left" joint="rotor_back_left_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_back_right" joint="rotor_back_right_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
+    <motor name="motor_1" joint="rotor_1_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
+    <motor name="motor_2" joint="rotor_2_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
+    <motor name="motor_3" joint="rotor_3_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
+    <motor name="motor_4" joint="rotor_4_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
   </actuator>
 </mujoco>
