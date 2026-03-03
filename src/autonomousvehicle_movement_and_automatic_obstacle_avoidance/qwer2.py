@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-
+规律行驶的无人小车仿真 - 高速版 (目标速度30m/s)
+- 移除不合法的 inertia 属性，适配标准 MuJoCo
+- 通过物理参数（质量、大阻尼）近似实现平面运动
+- 相机跟踪小车，全程可见
+- 增强避障算法
+- 目标速度调整为 30 m/s，油门范围扩大，PID参数优化
 """
 
 import mujoco
@@ -23,13 +28,13 @@ class RegularCarSimulation:
             print(f"从文件加载模型: {model_path}")
             self.model = mujoco.MjModel.from_xml_path(model_path)
         else:
-            print("使用最终兼容版内置模型")
+            print("使用高速版内置模型")
             self.model = mujoco.MjModel.from_xml_string(self.get_regular_model_xml())
 
         self.data = mujoco.MjData(self.model)
 
-        # 稳定的控制参数
-        self.target_velocity = 0.6
+        # 控制参数
+        self.target_velocity = 30.0  # 目标速度提高到 30 m/s
         self.steering_gain = 0.08
         self.obstacle_threshold = 2.5
         self.side_threshold = 1.5
@@ -75,8 +80,9 @@ class RegularCarSimulation:
         self.path_following_mode = True
         self.path_points = []
 
-        self.velocity_pid = PIDController(kp=0.6, ki=0.02, kd=0.15)
-        self.steering_pid = PIDController(kp=0.3, ki=0.005, kd=0.1)
+        # 调整PID参数以适应更高速度
+        self.velocity_pid = PIDController(kp=0.8, ki=0.02, kd=0.2)   # 原 kp=0.6, kd=0.15
+        self.steering_pid = PIDController(kp=0.3, ki=0.005, kd=0.1)  # 转向PID保持不变
 
         self.is_moving_straight = True
         self.last_turn_time = 0
@@ -133,8 +139,8 @@ class RegularCarSimulation:
       <!-- 前左轮 -->
       <body name="front_left_wheel" pos="0.3 0.2 -0.1">
         <joint name="fl_steer" type="hinge" axis="0 0 1" limited="true" range="-0.3 0.3"
-               damping="1.5" armature="0.1" stiffness="2.0"/>
-        <joint name="fl_spin" type="hinge" axis="0 1 0" damping="0.5" armature="0.1"/>
+               damping="0.8" armature="0.1" stiffness="2.0"/>
+        <joint name="fl_spin" type="hinge" axis="0 1 0" damping="0.3" armature="0.1"/>
         <geom name="fl_geom" type="cylinder" size="0.12 0.06" euler="1.57 0 0"
               material="tire" friction="3.0 1.5 0.4" mass="1.0"/>
       </body>
@@ -142,8 +148,8 @@ class RegularCarSimulation:
       <!-- 前右轮 -->
       <body name="front_right_wheel" pos="0.3 -0.2 -0.1">
         <joint name="fr_steer" type="hinge" axis="0 0 1" limited="true" range="-0.3 0.3"
-               damping="1.5" armature="0.1" stiffness="2.0"/>
-        <joint name="fr_spin" type="hinge" axis="0 1 0" damping="0.5" armature="0.1"/>
+               damping="0.8" armature="0.1" stiffness="2.0"/>
+        <joint name="fr_spin" type="hinge" axis="0 1 0" damping="0.3" armature="0.1"/>
         <geom name="fr_geom" type="cylinder" size="0.12 0.06" euler="1.57 0 0"
               material="tire" friction="3.0 1.5 0.4" mass="1.0"/>
       </body>
@@ -392,14 +398,14 @@ class RegularCarSimulation:
             else:
                 target *= 0.6
         self.velocity_pid.setpoint = target
-        throttle = self.velocity_pid.update(current_vel)
+        throttle = self.velocity_pid.update(current_vel, dt=self.model.opt.timestep)
         if len(self.velocity_history) > 0:
             last = self.velocity_history[-1]
-            max_accel = 0.5
+            max_accel = 2.0
             accel = (target - last) / self.model.opt.timestep
             if abs(accel) > max_accel:
-                throttle = np.clip(throttle, -max_accel*3, max_accel*3)
-        throttle = np.clip(throttle, -5.0, 10.0)
+                throttle = np.clip(throttle, -max_accel*8, max_accel*8)
+        throttle = np.clip(throttle, -8.0, 25.0)
         self.velocity_history.append(current_vel)
         return throttle
 
@@ -446,14 +452,13 @@ class RegularCarSimulation:
 
     def apply_regular_controls(self, throttle, steering):
         if 'throttle_left' in self.actuator_ids:
-            cur = self.data.ctrl[self.actuator_ids['throttle_left']]
-            self.data.ctrl[self.actuator_ids['throttle_left']] = 0.7*throttle + 0.3*cur
+            self.data.ctrl[self.actuator_ids['throttle_left']] = throttle
         if 'throttle_right' in self.actuator_ids:
-            self.data.ctrl[self.actuator_ids['throttle_right']] = self.data.ctrl[self.actuator_ids['throttle_left']]
+            self.data.ctrl[self.actuator_ids['throttle_right']] = throttle
         if 'steer_left' in self.actuator_ids:
             self.steering_pid.setpoint = steering
             cur = self.data.ctrl[self.actuator_ids['steer_left']]
-            self.data.ctrl[self.actuator_ids['steer_left']] = self.steering_pid.update(cur)
+            self.data.ctrl[self.actuator_ids['steer_left']] = self.steering_pid.update(cur, dt=self.model.opt.timestep)
         if 'steer_right' in self.actuator_ids:
             self.data.ctrl[self.actuator_ids['steer_right']] = self.data.ctrl[self.actuator_ids['steer_left']]
 
@@ -502,7 +507,7 @@ class RegularCarSimulation:
             print(f"倾斜 {math.degrees(self.tilt_angle):.1f}°，减速")
             self.target_velocity = 0.3
         else:
-            self.target_velocity = 0.6
+            self.target_velocity = 30.0  # 正常状态目标速度 30 m/s
         steer = self.regular_obstacle_avoidance(sensor)
         throttle = self.regular_velocity_control(vel, steer)
         self.apply_regular_controls(throttle, steer)
@@ -534,7 +539,7 @@ class RegularCarSimulation:
 
     def run_regular(self, max_simulation_time=240.0, realtime_factor=1.0):
         print("="*80)
-        print("最终兼容版 - 小车仿真 (相机跟踪，移除非法 inertia)")
+        print("高速版 - 小车仿真 (目标速度30m/s)")
         print("="*80)
         try:
             with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
@@ -607,33 +612,27 @@ class PIDController:
         self.setpoint = setpoint
         self.prev_error = 0.0
         self.integral = 0.0
-        self.last_time = time.time()
         self.integral_limit = 5.0
 
-    def update(self, current):
-        now = time.time()
-        dt = now - self.last_time
-        if dt <= 0:
-            return 0.0
+    def update(self, current, dt=None):
+        if dt is None:
+            dt = 0.002
         error = self.setpoint - current
         self.integral += error * dt
         self.integral = np.clip(self.integral, -self.integral_limit, self.integral_limit)
-        deriv = (error - self.prev_error) / dt
+        deriv = (error - self.prev_error) / dt if dt > 0 else 0.0
         out = self.kp*error + self.ki*self.integral + self.kd*deriv
         self.prev_error = error
-        self.last_time = now
         return out
 
     def reset(self):
         self.prev_error = 0.0
         self.integral = 0.0
-        self.last_time = time.time()
 
 
 def main():
     sim = RegularCarSimulation()
     sim.run_regular()
-
 
 
 if __name__ == "__main__":
