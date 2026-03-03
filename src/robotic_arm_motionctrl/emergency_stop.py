@@ -38,7 +38,7 @@ class ArmEmergencyStop:
         print("[RESET] 系统已复位，恢复正常运行。")
 
     def run(self):
-        """主仿真循环"""
+        """主仿真循环 """
         with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
             print("=" * 60)
             print(" 6-DOF Robotic Arm Emergency Stop System")
