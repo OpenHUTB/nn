@@ -182,6 +182,7 @@ def get_valid_spawn_point(world):
 def main():
     # 1. 连接CARLA
     try:
+        # 1. 连接CARLA+加载地图
         client = carla.Client('localhost', 2000)
         client.set_timeout(20.0)
         world = client.get_world()
