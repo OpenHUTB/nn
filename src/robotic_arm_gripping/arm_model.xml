@@ -60,11 +60,10 @@
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <light name="top" pos="0 0 2" mode="trackcom"/>
 
-    <!-- 简化的躯干（作为机械臂的基座） -->
-    <body name="torso" pos="0 0 1.282" childclass="body">
+    <!-- 核心修改：躯干z轴高度从1.282改为0.5，离地面更近 -->
+    <body name="torso" pos="0 0 0.5" childclass="body">
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
-      <freejoint name="root"/>
       <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
 
       <!-- 右臂 -->
