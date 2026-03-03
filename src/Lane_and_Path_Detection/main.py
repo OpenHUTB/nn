@@ -34,8 +34,17 @@ def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
     right_slope = []  
     right_intercept = [] 
     
+    # ===================== 新增部分开始 =====================
+    # 新增：收集车道线坐标点，用于多项式拟合计算曲率
+    left_x, left_y = [], []
+    right_x, right_y = [], []
+    # ===================== 新增部分结束 =====================
+    
     if lines is None:
-        return img
+        # ===================== 新增部分开始 =====================
+        # 新增：无车道线时返回None（用于曲率计算判断）
+        return img, None, None
+        # ===================== 新增部分结束 =====================
     
     for line in lines:
         for x1, y1, x2, y2 in line:
@@ -46,9 +55,19 @@ def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
             if -0.8 < slope < -0.3:
                 left_slope.append(slope)
                 left_intercept.append(intercept)
+                # ===================== 新增部分开始 =====================
+                # 新增：收集左车道线坐标点
+                left_x.extend([x1, x2])
+                left_y.extend([y1, y2])
+                # ===================== 新增部分结束 =====================
             elif 0.3 < slope < 0.8:
                 right_slope.append(slope)
                 right_intercept.append(intercept)
+                # ===================== 新增部分开始 =====================
+                # 新增：收集右车道线坐标点
+                right_x.extend([x1, x2])
+                right_y.extend([y1, y2])
+                # ===================== 新增部分结束 =====================
     
     # 计算平均斜率和截距
     left_avg_slope = np.mean(left_slope) if left_slope else 0
@@ -61,19 +80,79 @@ def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
     y_bottom = height
     y_top = int(height * 0.6)
     
+    # ===================== 新增部分开始 =====================
+    # 新增：初始化车道线拟合参数（用于曲率计算）
+    left_fit = None
+    right_fit = None
+    # ===================== 新增部分结束 =====================
+    
     # 绘制左车道线
     if left_avg_slope != 0:
         x1_left = int((y_bottom - left_avg_intercept) / left_avg_slope)
         x2_left = int((y_top - left_avg_intercept) / left_avg_slope)
         cv2.line(img, (x1_left, y_bottom), (x2_left, y_top), color, thickness)
+        # ===================== 新增部分开始 =====================
+        # 新增：对左车道线做2次多项式拟合（曲率计算核心）
+        if len(left_x) >= 2:
+            left_fit = np.polyfit(left_y, left_x, 2)
+        # ===================== 新增部分结束 =====================
     
     # 绘制右车道线
     if right_avg_slope != 0:
         x1_right = int((y_bottom - right_avg_intercept) / right_avg_slope)
         x2_right = int((y_top - right_avg_intercept) / right_avg_slope)
         cv2.line(img, (x1_right, y_bottom), (x2_right, y_top), color, thickness)
+        # ===================== 新增部分开始 =====================
+        # 新增：对右车道线做2次多项式拟合（曲率计算核心）
+        if len(right_x) >= 2:
+            right_fit = np.polyfit(right_y, right_x, 2)
+        # ===================== 新增部分结束 =====================
     
-    return img
+    # ===================== 新增部分开始 =====================
+    # 新增：返回拟合参数（用于后续曲率计算）
+    return img, left_fit, right_fit
+    # ===================== 新增部分结束 =====================
+
+# ===================== 新增部分开始 =====================
+def calculate_lane_curvature(left_fit, right_fit, img_shape):
+    """
+    新增：计算车道曲率半径（单位：米）
+    真实世界映射关系：
+    - ym_per_pix: 纵向像素转米（720像素 ≈ 30米）
+    - xm_per_pix: 横向像素转米（700像素 ≈ 3.7米，标准车道宽度）
+    """
+    # 无有效拟合参数时返回N/A
+    if left_fit is None or right_fit is None:
+        return "N/A"
+    
+    height = img_shape[0]
+    # 取图像底部的点计算曲率（贴近车辆实际视角）
+    y_eval = np.max([height - 1, 0])
+    # 像素与真实世界的转换系数
+    ym_per_pix = 30 / 720
+    xm_per_pix = 3.7 / 700
+    
+    # 转换左车道线拟合参数到真实世界坐标系
+    left_fit_cr = np.polyfit(
+        np.array([y_eval]) * ym_per_pix,
+        np.array([left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]]) * xm_per_pix,
+        2
+    )
+    # 转换右车道线拟合参数到真实世界坐标系
+    right_fit_cr = np.polyfit(
+        np.array([y_eval]) * ym_per_pix,
+        np.array([right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]]) * xm_per_pix,
+        2
+    )
+    
+    # 曲率计算公式：R = (1 + (2Ay + B)^2)^1.5 / |2A|
+    left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
+    
+    # 取左右车道线曲率的平均值
+    avg_curvature = (left_curverad + right_curverad) / 2
+    return f"{int(avg_curvature)} m"
+# ===================== 新增部分结束 =====================
 
 def lane_detection_pipeline(img):
     """完整的车道检测流水线"""
@@ -104,15 +183,34 @@ def lane_detection_pipeline(img):
     
     # 绘制车道线并合并结果
     line_img = np.zeros_like(img)
-    line_img = draw_lines(line_img, lines)
+    # ===================== 新增部分开始 =====================
+    # 新增：接收draw_lines返回的拟合参数
+    line_img, left_fit, right_fit = draw_lines(line_img, lines)
+    # ===================== 新增部分结束 =====================
     result = cv2.addWeighted(img, 0.8, line_img, 1, 0)
+    
+    # ===================== 新增部分开始 =====================
+    # 新增：计算曲率并绘制到图像左上角
+    curvature = calculate_lane_curvature(left_fit, right_fit, img.shape)
+    cv2.putText(
+        result, 
+        f"Lane Curvature: {curvature}",  # 曲率文字内容
+        (20, 50),                       # 文字位置（左上角）
+        cv2.FONT_HERSHEY_SIMPLEX,       # 字体
+        1,                              # 字体大小
+        (255, 255, 255),                # 文字颜色（白色）
+        2                               # 文字粗细
+    )
+    # ===================== 新增部分结束 =====================
     
     return result
 
 def main():
     """主函数：手动输入路径的车道检测"""
     print("="*50)
-    print("      车道检测程序 - 手动输入图片路径版")
+    # ===================== 新增部分开始 =====================
+    print("      车道检测程序 - 手动输入图片路径版（含曲率计算）")
+    # ===================== 新增部分结束 =====================
     print("="*50)
     
     # 1. 手动输入图片路径（支持复制粘贴）
@@ -150,7 +248,9 @@ def main():
     
     # 6. 显示检测结果
     cv2.imshow("📷 原始图片", img)
-    cv2.imshow("🚗 车道检测结果", result)
+    # ===================== 新增部分开始 =====================
+    cv2.imshow("🚗 车道检测结果（含曲率）", result)
+    # ===================== 新增部分结束 =====================
     
     # 7. 自动保存检测结果（和原图同目录，后缀加 _result）
     save_path = os.path.splitext(CUSTOM_IMAGE_PATH)[0] + "_result.jpg"
