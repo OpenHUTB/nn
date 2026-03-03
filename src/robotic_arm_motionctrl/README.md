@@ -15,5 +15,5 @@
 - 键盘实时控制机械臂
 - 机械臂爪的开合
 ## 环境依赖
-```bash
+``` bash
 pip install mujoco numpy pynput glfw opencv-python
