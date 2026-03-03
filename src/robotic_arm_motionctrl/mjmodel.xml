@@ -1,0 +1,206 @@
+<mujoco model="optimized_robotic_arm_3_finger_gripper">
+  <compiler angle="radian" meshdir="assets/" texturedir="textures/"/>
+
+  <option timestep="0.001" cone="elliptic">
+    <flag equality="disable"/>
+  </option>
+
+  <size njmax="500" nconmax="100"/>
+
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <quality shadowsize="2048"/>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
+  </visual>
+
+  <default>
+    <joint solreflimit="0.001 0.5" solimplimit="0 0.99" limited="true" armature="0.1" damping="1.5"/>
+    <geom condim="6" friction="1 0.5 0.001" margin="0.001"/>
+    <site rgba="1 0 0 0.8"/>
+    <general ctrllimited="true" ctrlrange="-2 2" forcelimited="true" forcerange="-100 100"/>
+  </default>
+
+  <asset>
+    <texture type="skybox" colorspace="auto" builtin="gradient" rgb1="0.4 0.6 0.8" rgb2="0.1 0.2 0.3" width="1024" height="6144"/>
+    <texture type="2d" colorspace="auto" name="grid" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.15 0.2" markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <texture type="cube" colorspace="auto" name="metal" builtin="flat" mark="cross" rgb1="0.5 0.5 0.5" rgb2="0.7 0.7 0.7" markrgb="1 1 1" width="256" height="1536"/>
+    <material name="grid_mat" texture="grid" texuniform="true" texrepeat="20 20" reflectance="0.2"/>
+    <material name="metal_mat" texture="metal" texuniform="true" specular="1" reflectance="0.5"/>
+    <material name="arm_mat" shininess="0.3" rgba="0.6 0.6 0.7 1"/>
+    <material name="gripper_mat" specular="0.8" rgba="0.3 0.3 0.8 1"/>
+    <material name="finger_mat" shininess="0.4" rgba="0.2 0.5 0.8 1"/>
+    <material name="red_mat" rgba="1 0.2 0.2 1"/>
+    <material name="green_mat" rgba="0.2 0.8 0.2 1"/>
+    <material name="blue_mat" rgba="0.2 0.5 1 1"/>
+    <material name="yellow_mat" rgba="1 0.8 0.2 1"/>
+    <material name="purple_mat" rgba="0.7 0.2 1 1"/>
+  </asset>
+
+  <worldbody>
+    <geom name="ground" size="3 3 0.1" type="plane" condim="3" material="grid_mat"/>
+    <light pos="0 0 4" dir="0 0 -1" type="directional" diffuse="0.9 0.9 0.9"/>
+    <light pos="3 3 2" dir="-0.57735 -0.57735 -0.57735" type="directional" diffuse="0.5 0.5 0.6" specular="0.1 0.1 0.1"/>
+    <light pos="-3 -3 2" dir="0.57735 0.57735 -0.57735" type="directional" diffuse="0.4 0.4 0.5" specular="0.05 0.05 0.05"/>
+    <body name="base" pos="0 0 0.05">
+      <geom name="base_geom" size="0.15 0.08" type="cylinder" mass="5" material="metal_mat"/>
+      <site name="base_site" pos="0 0 0" size="0.01"/>
+      <body name="shoulder" pos="0 0 0.1">
+        <joint name="joint1" pos="0 0 0" axis="0 0 1" range="-3.1416 3.1416" armature="0.2" damping="2"/>
+        <geom name="shoulder_geom" size="0.1 0.08" type="cylinder" mass="2" material="arm_mat"/>
+        <site name="shoulder_site" pos="0 0 0" size="0.008"/>
+        <body name="upper_arm" pos="0 0 0.09">
+          <joint name="joint2" pos="0 0 0" axis="0 1 0" range="-2 2" armature="0.15" damping="1.8"/>
+          <geom name="upper_arm_geom" size="0.075 0.175" pos="0 0 0.175" quat="0 1 0 0" type="capsule" mass="1.5" material="arm_mat"/>
+          <site name="upper_arm_site" pos="0 0 0.175" size="0.008"/>
+          <body name="forearm" pos="0 0 0.35">
+            <joint name="joint3" pos="0 0 0" axis="0 1 0" range="-2.5 0.5"/>
+            <geom name="forearm_geom" size="0.065 0.15" pos="0 0 0.15" quat="0 1 0 0" type="capsule" mass="1.2" material="arm_mat"/>
+            <site name="forearm_site" pos="0 0 0.15" size="0.008"/>
+            <body name="wrist1" pos="0 0 0.3">
+              <joint name="joint4" pos="0 0 0" axis="0 0 1" range="-2 2" armature="0.05" damping="1"/>
+              <geom name="wrist1_geom" size="0.055 0.075" pos="0 0 0.075" quat="0 1 0 0" type="capsule" mass="0.5" material="arm_mat"/>
+              <site name="wrist1_site" pos="0 0 0.075" size="0.008"/>
+              <body name="wrist2" pos="0 0 0.15">
+                <joint name="joint5" pos="0 0 0" axis="0 1 0" range="-1.8 1.8" armature="0.04" damping="0.8"/>
+                <geom name="wrist2_geom" size="0.045 0.06" pos="0.06 0 0" quat="0.707107 0 -0.707107 0" type="capsule" mass="0.3" material="arm_mat"/>
+                <site name="wrist2_site" pos="0.06 0 0" size="0.008"/>
+                <body name="wrist3" pos="0.12 0 0">
+                  <joint name="joint6" pos="0 0 0" axis="1 0 0" range="-1.8 1.8" armature="0.03" damping="0.6"/>
+                  <geom name="wrist3_geom" size="0.04 0.03" type="cylinder" mass="0.2" material="arm_mat"/>
+                  <site name="ee_site" pos="0 0 0" size="0.01" rgba="1 0 0 1"/>
+                  <body name="gripper_base" pos="0.05 0 0">
+                    <geom name="gripper_base_geom" size="0.045 0.035" type="cylinder" mass="0.15" material="gripper_mat"/>
+                    <site name="grip_center" pos="0 0 0" size="0.008" rgba="0 1 0 1"/>
+                    <body name="finger1_base" pos="0.04 0 0">
+                      <joint name="finger1_slide" pos="0 0 0" axis="0 0 1" type="slide" stiffness="50" range="-0.02 0.06" damping="0.4"/>
+                      <geom name="finger1_base_geom" size="0.018 0.01 0.035" type="box" mass="0.04" material="finger_mat"/>
+                      <body name="finger1_proximal" pos="0 0 0.035">
+                        <joint name="finger1_hinge1" pos="0 0 0" axis="0 1 0" stiffness="30" range="-0.2 1.5" armature="0.01" damping="0.3"/>
+                        <geom name="finger1_proximal_geom" size="0.015 0.008 0.028" type="box" mass="0.025" material="finger_mat"/>
+                        <body name="finger1_distal" pos="0 0 0.028">
+                          <joint name="finger1_hinge2" pos="0 0 0" axis="0 1 0" stiffness="20" range="0 1.2" armature="0.005" damping="0.2"/>
+                          <geom name="finger1_distal_geom" size="0.012 0.006 0.022" type="box" mass="0.018" material="finger_mat"/>
+                          <site name="finger1_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
+                        </body>
+                      </body>
+                    </body>
+                    <body name="finger2_base" pos="-0.02 0.035 0" quat="0.500171 0 0 0.865927">
+                      <joint name="finger2_slide" pos="0 0 0" axis="0 0 1" type="slide" stiffness="50" range="-0.02 0.06" damping="0.4"/>
+                      <geom name="finger2_base_geom" size="0.018 0.01 0.035" type="box" mass="0.04" material="finger_mat"/>
+                      <body name="finger2_proximal" pos="0 0 0.035">
+                        <joint name="finger2_hinge1" pos="0 0 0" axis="0 1 0" stiffness="30" range="-0.2 1.5" armature="0.01" damping="0.3"/>
+                        <geom name="finger2_proximal_geom" size="0.015 0.008 0.028" type="box" mass="0.025" material="finger_mat"/>
+                        <body name="finger2_distal" pos="0 0 0.028">
+                          <joint name="finger2_hinge2" pos="0 0 0" axis="0 1 0" stiffness="20" range="0 1.2" armature="0.005" damping="0.2"/>
+                          <geom name="finger2_distal_geom" size="0.012 0.006 0.022" type="box" mass="0.018" material="finger_mat"/>
+                          <site name="finger2_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
+                        </body>
+                      </body>
+                    </body>
+                    <body name="finger3_base" pos="-0.02 -0.035 0" quat="0.500171 0 0 -0.865927">
+                      <joint name="finger3_slide" pos="0 0 0" axis="0 0 1" type="slide" stiffness="50" range="-0.02 0.06" damping="0.4"/>
+                      <geom name="finger3_base_geom" size="0.018 0.01 0.035" type="box" mass="0.04" material="finger_mat"/>
+                      <body name="finger3_proximal" pos="0 0 0.035">
+                        <joint name="finger3_hinge1" pos="0 0 0" axis="0 1 0" stiffness="30" range="-0.2 1.5" armature="0.01" damping="0.3"/>
+                        <geom name="finger3_proximal_geom" size="0.015 0.008 0.028" type="box" mass="0.025" material="finger_mat"/>
+                        <body name="finger3_distal" pos="0 0 0.028">
+                          <joint name="finger3_hinge2" pos="0 0 0" axis="0 1 0" stiffness="20" range="0 1.2" armature="0.005" damping="0.2"/>
+                          <geom name="finger3_distal_geom" size="0.012 0.006 0.022" type="box" mass="0.018" material="finger_mat"/>
+                          <site name="finger3_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
+                        </body>
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+    <body name="test_sphere" pos="0.2 0.1 0.1">
+      <joint name="sphere_joint" type="free"/>
+      <geom name="sphere_geom" size="0.06" friction="0.7 0.3 0.01" mass="0.25" material="red_mat"/>
+      <site name="sphere_site" pos="0 0 0" size="0.008"/>
+    </body>
+    <body name="test_box" pos="0.1 -0.1 0.05">
+      <joint name="box_joint" type="free"/>
+      <geom name="box_geom" size="0.05 0.07 0.04" type="box" friction="0.8 0.4 0.01" mass="0.35" material="green_mat"/>
+      <site name="box_site" pos="0 0 0" size="0.008"/>
+    </body>
+    <body name="test_cylinder" pos="0.3 0 0.1">
+      <joint name="cylinder_joint" type="free"/>
+      <geom name="cylinder_geom" size="0.04 0.09" type="cylinder" friction="0.75 0.35 0.01" mass="0.3" material="blue_mat"/>
+      <site name="cylinder_site" pos="0 0 0" size="0.008"/>
+    </body>
+    <body name="test_capsule" pos="-0.1 0.2 0.12">
+      <joint name="capsule_joint" type="free"/>
+      <geom name="capsule_geom" size="0.03 0.04" quat="0.707107 0.707107 0 0" type="capsule" friction="0.65 0.25 0.01" mass="0.2" material="yellow_mat"/>
+      <site name="capsule_site" pos="0 0 0" size="0.008"/>
+    </body>
+    <body name="test_ellipsoid" pos="0 -0.2 0.18">
+      <joint name="ellipsoid_joint" type="free"/>
+      <geom name="ellipsoid_geom" size="0.05 0.07 0.04" type="ellipsoid" friction="0.6 0.2 0.01" mass="0.28" material="purple_mat"/>
+      <site name="ellipsoid_site" pos="0 0 0" size="0.008"/>
+    </body>
+  </worldbody>
+
+  <equality>
+    <joint name="equal_finger_slide_12" joint1="finger1_slide" joint2="finger2_slide" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_slide_13" joint1="finger1_slide" joint2="finger3_slide" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_hinge1_12" joint1="finger1_hinge1" joint2="finger2_hinge1" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_hinge1_13" joint1="finger1_hinge1" joint2="finger3_hinge1" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_hinge2_12" joint1="finger1_hinge2" joint2="finger2_hinge2" polycoef="0 1 0 0 0"/>
+    <joint name="equal_finger_hinge2_13" joint1="finger1_hinge2" joint2="finger3_hinge2" polycoef="0 1 0 0 0"/>
+  </equality>
+
+  <actuator>
+    <general name="motor_joint1" joint="joint1" ctrlrange="-2.5 2.5" forcerange="-150 150" gear="80 0 0 0 0 0"/>
+    <general name="motor_joint2" joint="joint2" ctrlrange="-2.5 2.5" forcerange="-120 120" gear="70 0 0 0 0 0"/>
+    <general name="motor_joint3" joint="joint3" ctrlrange="-2.5 2.5" gear="60 0 0 0 0 0"/>
+    <general name="motor_joint4" joint="joint4" forcerange="-80 80" gear="40 0 0 0 0 0"/>
+    <general name="motor_joint5" joint="joint5" forcerange="-60 60" gear="40 0 0 0 0 0"/>
+    <general name="motor_joint6" joint="joint6" forcerange="-40 40" gear="30 0 0 0 0 0"/>
+    <general name="motor_finger1_slide" joint="finger1_slide" ctrlrange="-0.5 0.5" forcerange="-80 80" gear="50 0 0 0 0 0"/>
+    <general name="motor_finger1_hinge1" joint="finger1_hinge1" ctrlrange="-0.5 1.5" forcerange="-60 60" gear="35 0 0 0 0 0"/>
+    <general name="motor_finger1_hinge2" joint="finger1_hinge2" ctrlrange="0 1.2" forcerange="-40 40" gear="25 0 0 0 0 0"/>
+    <general name="motor_finger2_slide" joint="finger2_slide" ctrlrange="-0.5 0.5" forcerange="-80 80" gear="50 0 0 0 0 0"/>
+    <general name="motor_finger2_hinge1" joint="finger2_hinge1" ctrlrange="-0.5 1.5" forcerange="-60 60" gear="35 0 0 0 0 0"/>
+    <general name="motor_finger2_hinge2" joint="finger2_hinge2" ctrlrange="0 1.2" forcerange="-40 40" gear="25 0 0 0 0 0"/>
+    <general name="motor_finger3_slide" joint="finger3_slide" ctrlrange="-0.5 0.5" forcerange="-80 80" gear="50 0 0 0 0 0"/>
+    <general name="motor_finger3_hinge1" joint="finger3_hinge1" ctrlrange="-0.5 1.5" forcerange="-60 60" gear="35 0 0 0 0 0"/>
+    <general name="motor_finger3_hinge2" joint="finger3_hinge2" ctrlrange="0 1.2" forcerange="-40 40" gear="25 0 0 0 0 0"/>
+  </actuator>
+
+  <sensor>
+    <jointpos joint="joint1" name="sensor_joint1"/>
+    <jointpos joint="joint2" name="sensor_joint2"/>
+    <jointpos joint="joint3" name="sensor_joint3"/>
+    <jointpos joint="joint4" name="sensor_joint4"/>
+    <jointpos joint="joint5" name="sensor_joint5"/>
+    <jointpos joint="joint6" name="sensor_joint6"/>
+    <jointpos joint="finger1_slide" name="sensor_finger1_slide"/>
+    <jointpos joint="finger1_hinge1" name="sensor_finger1_hinge1"/>
+    <jointpos joint="finger1_hinge2" name="sensor_finger1_hinge2"/>
+    <jointpos joint="finger2_slide" name="sensor_finger2_slide"/>
+    <jointpos joint="finger2_hinge1" name="sensor_finger2_hinge1"/>
+    <jointpos joint="finger2_hinge2" name="sensor_finger2_hinge2"/>
+    <jointpos joint="finger3_slide" name="sensor_finger3_slide"/>
+    <jointpos joint="finger3_hinge1" name="sensor_finger3_hinge1"/>
+    <jointpos joint="finger3_hinge2" name="sensor_finger3_hinge2"/>
+    <force site="finger1_tip" name="sensor_finger1_force"/>
+    <force site="finger2_tip" name="sensor_finger2_force"/>
+    <force site="finger3_tip" name="sensor_finger3_force"/>
+    <touch site="finger1_tip" name="sensor_finger1_touch"/>
+    <touch site="finger2_tip" name="sensor_finger2_touch"/>
+    <touch site="finger3_tip" name="sensor_finger3_touch"/>
+    <framepos objtype="site" objname="grip_center" name="sensor_gripper_pos"/>
+    <framequat objtype="site" objname="grip_center" name="sensor_gripper_quat"/>
+    <framepos objtype="body" objname="test_sphere" name="sensor_sphere_pos"/>
+    <framepos objtype="body" objname="test_box" name="sensor_box_pos"/>
+    <framepos objtype="body" objname="test_cylinder" name="sensor_cylinder_pos"/>
+    <framepos objtype="body" objname="test_capsule" name="sensor_capsule_pos"/>
+    <framepos objtype="body" objname="test_ellipsoid" name="sensor_ellipsoid_pos"/>
+    <rangefinder site="grip_center" name="sensor_gripper_range" cutoff="0.5"/>
+  </sensor>
+</mujoco>
