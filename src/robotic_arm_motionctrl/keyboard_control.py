@@ -228,7 +228,7 @@ class KeyboardControlledArm:
 
 
 def main():
-    """主函数（加异常捕获）"""
+    """主函数（加异常捕获） """
     model_path = "arm6dof_final.xml"
     try:
         arm = KeyboardControlledArm(model_path)
