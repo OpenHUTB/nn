@@ -17,6 +17,31 @@ import mujoco
 from datetime import datetime
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Optional, Union
+from contextlib import contextmanager
+import multiprocessing as mp
+
+
+# 设置线程安全的全局变量管理
+class GlobalState:
+    """线程安全的全局状态管理"""
+
+    def __init__(self):
+        self._running = mp.Value('b', True)
+        self._lock = threading.Lock()
+
+    @property
+    def running(self):
+        with self._lock:
+            return self._running.value
+
+    @running.setter
+    def running(self, value):
+        with self._lock:
+            self._running.value = value
+
+
+# 初始化全局状态（线程安全）
+GLOBAL_STATE = GlobalState()
 
 
 # ====================== 配置类（结构化管理，提升可读性） ======================
@@ -126,7 +151,6 @@ def init_mujoco_viewer() -> Tuple[bool, Optional[any]]:
 # 全局状态
 optimize_system_performance()
 MUJOCO_NEW_VIEWER, MUJOCO_VIEWER_MODULE = init_mujoco_viewer()
-RUNNING = True
 JOINT_CONFIG = JointLimits()
 STIFF_DAMP_CONFIG = StiffnessDampingConfig()
 CONTROL_CONFIG = ControlConfig()
@@ -135,11 +159,10 @@ CONTROL_CONFIG = ControlConfig()
 # ====================== 信号处理（优雅退出） ======================
 def signal_handler(sig, frame):
     """信号处理：优雅退出并清理资源"""
-    global RUNNING
-    if not RUNNING:
+    if not GLOBAL_STATE.running:
         sys.exit(0)
     print("\n⚠️  收到退出信号，正在优雅退出（保存日志+清理资源）...")
-    RUNNING = False
+    GLOBAL_STATE.running = False
 
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -187,97 +210,129 @@ def rad2deg(radians: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
         return 0.0 if np.isscalar(radians) else np.zeros(JOINT_CONFIG.count, dtype=np.float64)
 
 
+@contextmanager
+def thread_safe_file_writer(file_path, mode='a', encoding='utf-8'):
+    """线程安全的文件写入上下文管理器"""
+    lock = threading.Lock()
+    with lock:
+        with open(file_path, mode, encoding=encoding) as f:
+            yield f
+
+
 def log_perf(content: str, log_path: str = "arm_joint_perf.log") -> None:
     """高性能日志写入（线程安全）"""
     try:
-        with open(log_path, 'a', encoding='utf-8') as f:
+        with thread_safe_file_writer(log_path, 'a', 'utf-8') as f:
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             f.write(f"[{timestamp}] {content}\n")
     except Exception as e:
         print(f"⚠️  写入性能日志失败: {e}")
 
 
-def trapezoidal_velocity_planner(
-        start_pos: float,
-        target_pos: float,
-        max_vel: float,
-        max_accel: float,
+def trapezoidal_velocity_planner_vectorized(
+        start_pos: np.ndarray,
+        target_pos: np.ndarray,
+        max_vel: np.ndarray,
+        max_accel: np.ndarray,
         dt: float
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    梯形速度轨迹规划（核心平滑运动优化，无超调）
-    优化点：向量化计算，减少循环开销
+    向量化梯形速度轨迹规划（核心平滑运动优化，无超调）
+    输入：均为形状 (n_joints,) 的数组
+    输出：(positions, velocities)，形状为 (max_steps, n_joints)
     """
+    n_joints = len(start_pos)
     pos_error = target_pos - start_pos
-    total_distance = abs(pos_error)
-
-    if total_distance < CONTROL_CONFIG.position_tol:
-        return np.array([target_pos]), np.array([0.0])
-
-    # 计算关键参数
-    accel_phase_vel = max_vel
-    accel_phase_dist = (accel_phase_vel ** 2) / (2 * max_accel)
-    total_accel_decel_dist = 2 * accel_phase_dist
+    total_distance = np.abs(pos_error)
     direction = np.sign(pos_error)
 
-    # 无匀速阶段
-    if total_distance <= total_accel_decel_dist:
-        max_reached_vel = np.sqrt(total_distance * max_accel)
-        accel_time = max_reached_vel / max_accel
-        total_time = 2 * accel_time
+    # 初始化结果数组
+    all_pos_traj = []
+    all_vel_traj = []
+    max_length = 1
 
-        # 向量化时间序列
-        t = np.arange(0, total_time + dt, dt)
-        accel_mask = t <= accel_time
+    # 为每个关节计算轨迹
+    for i in range(n_joints):
+        if total_distance[i] < CONTROL_CONFIG.position_tol:
+            pos_traj = np.array([target_pos[i]])
+            vel_traj = np.array([0.0])
+        else:
+            # 计算关键参数
+            accel_phase_vel = max_vel[i]
+            accel_phase_dist = (accel_phase_vel ** 2) / (2 * max_accel[i])
+            total_accel_decel_dist = 2 * accel_phase_dist
 
-        vel = np.zeros_like(t)
-        pos = np.zeros_like(t)
+            # 无匀速阶段
+            if total_distance[i] <= total_accel_decel_dist:
+                max_reached_vel = np.sqrt(total_distance[i] * max_accel[i])
+                accel_time = max_reached_vel / max_accel[i]
+                total_time = 2 * accel_time
 
-        # 加速阶段
-        vel[accel_mask] = max_accel * t[accel_mask] * direction
-        pos[accel_mask] = start_pos + 0.5 * max_accel * (t[accel_mask] ** 2) * direction
+                # 向量化时间序列
+                t = np.arange(0, total_time + dt, dt)
+                accel_mask = t <= accel_time
 
-        # 减速阶段
-        delta_t = t[~accel_mask] - accel_time
-        vel[~accel_mask] = (max_reached_vel - max_accel * delta_t) * direction
-        pos[~accel_mask] = start_pos + (max_reached_vel * accel_time - 0.5 * max_accel * (delta_t ** 2)) * direction
+                vel = np.zeros_like(t)
+                pos = np.zeros_like(t)
 
-    # 有匀速阶段
-    else:
-        accel_time = max_vel / max_accel
-        uniform_dist = total_distance - total_accel_decel_dist
-        uniform_time = uniform_dist / max_vel
-        total_time = 2 * accel_time + uniform_time
+                # 加速阶段
+                vel[accel_mask] = max_accel[i] * t[accel_mask] * direction[i]
+                pos[accel_mask] = start_pos[i] + 0.5 * max_accel[i] * (t[accel_mask] ** 2) * direction[i]
 
-        # 向量化时间序列
-        t = np.arange(0, total_time + dt, dt)
-        accel_mask = t <= accel_time
-        uniform_mask = (t > accel_time) & (t <= accel_time + uniform_time)
-        decel_mask = t > accel_time + uniform_time
+                # 减速阶段
+                delta_t = t[~accel_mask] - accel_time
+                vel[~accel_mask] = (max_reached_vel - max_accel[i] * delta_t) * direction[i]
+                pos[~accel_mask] = start_pos[i] + (max_reached_vel * accel_time - 0.5 * max_accel[i] * (delta_t ** 2)) * \
+                                   direction[i]
 
-        vel = np.zeros_like(t)
-        pos = np.zeros_like(t)
+            # 有匀速阶段
+            else:
+                accel_time = max_vel[i] / max_accel[i]
+                uniform_dist = total_distance[i] - total_accel_decel_dist
+                uniform_time = uniform_dist / max_vel[i]
+                total_time = 2 * accel_time + uniform_time
 
-        # 加速阶段
-        vel[accel_mask] = max_accel * t[accel_mask] * direction
-        pos[accel_mask] = start_pos + 0.5 * max_accel * (t[accel_mask] ** 2) * direction
+                # 向量化时间序列
+                t = np.arange(0, total_time + dt, dt)
+                accel_mask = t <= accel_time
+                uniform_mask = (t > accel_time) & (t <= accel_time + uniform_time)
+                decel_mask = t > accel_time + uniform_time
 
-        # 匀速阶段
-        delta_t_uniform = t[uniform_mask] - accel_time
-        vel[uniform_mask] = max_vel * direction
-        pos[uniform_mask] = start_pos + (accel_phase_dist + max_vel * delta_t_uniform) * direction
+                vel = np.zeros_like(t)
+                pos = np.zeros_like(t)
 
-        # 减速阶段
-        delta_t_decel = t[decel_mask] - (accel_time + uniform_time)
-        vel[decel_mask] = (max_vel - max_accel * delta_t_decel) * direction
-        pos[decel_mask] = start_pos + (
-                    total_distance - (accel_phase_dist - 0.5 * max_accel * (delta_t_decel ** 2))) * direction
+                # 加速阶段
+                vel[accel_mask] = max_accel[i] * t[accel_mask] * direction[i]
+                pos[accel_mask] = start_pos[i] + 0.5 * max_accel[i] * (t[accel_mask] ** 2) * direction[i]
 
-    # 强制收尾
-    pos[-1] = target_pos
-    vel[-1] = 0.0
+                # 匀速阶段
+                delta_t_uniform = t[uniform_mask] - accel_time
+                vel[uniform_mask] = max_vel[i] * direction[i]
+                pos[uniform_mask] = start_pos[i] + (accel_phase_dist + max_vel[i] * delta_t_uniform) * direction[i]
 
-    return pos, vel
+                # 减速阶段
+                delta_t_decel = t[decel_mask] - (accel_time + uniform_time)
+                vel[decel_mask] = (max_vel[i] - max_accel[i] * delta_t_decel) * direction[i]
+                pos[decel_mask] = start_pos[i] + (
+                        total_distance[i] - (accel_phase_dist - 0.5 * max_accel[i] * (delta_t_decel ** 2))) * direction[
+                                      i]
+
+            # 强制收尾
+            pos[-1] = target_pos[i]
+            vel[-1] = 0.0
+
+            all_pos_traj.append(pos)
+            all_vel_traj.append(vel)
+            max_length = max(max_length, len(pos))
+
+    # 统一轨迹长度
+    for i in range(n_joints):
+        if len(all_pos_traj[i]) < max_length:
+            pad_len = max_length - len(all_pos_traj[i])
+            all_pos_traj[i] = np.pad(all_pos_traj[i], (0, pad_len), 'constant', constant_values=target_pos[i])
+            all_vel_traj[i] = np.pad(all_vel_traj[i], (0, pad_len), 'constant', constant_values=0.0)
+
+    return np.array(all_pos_traj).T, np.array(all_vel_traj).T
 
 
 # ====================== 机械臂模型生成（优化+合规） ======================
@@ -373,6 +428,9 @@ def create_arm_model() -> str:
 # ====================== 机械臂控制器核心类（全面优化） ======================
 class ArmJointPerfOptimizationController:
     def __init__(self):
+        # 线程锁初始化
+        self._lock = threading.Lock()
+
         # 模型与数据初始化
         self.model: Optional[mujoco.MjModel] = None
         self.data: Optional[mujoco.MjData] = None
@@ -392,6 +450,7 @@ class ArmJointPerfOptimizationController:
         self.last_print_time: float = time.time()
         self.step_count: int = 0
         self.fps_counter: int = 0
+        self.sim_start_time: float = time.time()
         self.total_sim_time: float = 0.0
 
         # 性能优化核心状态
@@ -426,46 +485,48 @@ class ArmJointPerfOptimizationController:
             error_msg = f"模型初始化失败: {e}"
             print(f"❌ {error_msg}")
             log_perf(error_msg)
-            global RUNNING
-            RUNNING = False
+            GLOBAL_STATE.running = False
 
     def get_current_joint_angles(self, use_deg: bool = True) -> np.ndarray:
         """获取当前关节角度（优化空值处理）"""
-        if self.data is None:
-            return np.zeros(JOINT_CONFIG.count, dtype=np.float64)
+        with self._lock:
+            if self.data is None:
+                return np.zeros(JOINT_CONFIG.count, dtype=np.float64)
 
-        current_rad = np.array([
-            self.data.qpos[jid] if jid >= 0 else 0.0
-            for jid in self.joint_ids
-        ], dtype=np.float64)
+            current_rad = np.array([
+                self.data.qpos[jid] if jid >= 0 else 0.0
+                for jid in self.joint_ids
+            ], dtype=np.float64)
 
-        return rad2deg(current_rad) if use_deg else current_rad
+            return rad2deg(current_rad) if use_deg else current_rad
 
     def get_current_joint_velocities(self, use_deg: bool = True) -> np.ndarray:
         """获取当前关节速度（优化空值处理）"""
-        if self.data is None:
-            return np.zeros(JOINT_CONFIG.count, dtype=np.float64)
+        with self._lock:
+            if self.data is None:
+                return np.zeros(JOINT_CONFIG.count, dtype=np.float64)
 
-        current_vel_rad = np.array([
-            self.data.qvel[jid] if jid >= 0 else 0.0
-            for jid in self.joint_ids
-        ], dtype=np.float64)
+            current_vel_rad = np.array([
+                self.data.qvel[jid] if jid >= 0 else 0.0
+                for jid in self.joint_ids
+            ], dtype=np.float64)
 
-        return rad2deg(current_vel_rad) if use_deg else current_vel_rad
+            return rad2deg(current_vel_rad) if use_deg else current_vel_rad
 
     def get_joint_forces(self) -> np.ndarray:
         """获取平滑后的关节受力（优化滤波）"""
-        if self.data is None:
-            return np.zeros(JOINT_CONFIG.count, dtype=np.float64)
+        with self._lock:
+            if self.data is None:
+                return np.zeros(JOINT_CONFIG.count, dtype=np.float64)
 
-        raw_forces = np.array([
-            abs(self.data.qfrc_actuator[jid]) if jid >= 0 else 0.0
-            for jid in self.joint_ids
-        ], dtype=np.float64)
+            raw_forces = np.array([
+                abs(self.data.qfrc_actuator[jid]) if jid >= 0 else 0.0
+                for jid in self.joint_ids
+            ], dtype=np.float64)
 
-        # 一阶低通滤波（优化平滑效果）
-        self.smoothed_joint_forces = 0.95 * self.smoothed_joint_forces + 0.05 * raw_forces
-        return self.smoothed_joint_forces
+            # 一阶低通滤波（优化平滑效果）
+            self.smoothed_joint_forces = 0.95 * self.smoothed_joint_forces + 0.05 * raw_forces
+            return self.smoothed_joint_forces
 
     def calculate_error_compensation(self) -> Tuple[np.ndarray, np.ndarray]:
         """多维度误差补偿（向量化优化）"""
@@ -474,9 +535,8 @@ class ArmJointPerfOptimizationController:
 
         # 1. 关节间隙补偿（向量化）
         vel_sign = np.sign(current_vels)
-        vel_sign[np.abs(current_vels) < CONTROL_CONFIG.velocity_tol] = np.sign(self.position_error)[
-            np.abs(current_vels) < CONTROL_CONFIG.velocity_tol
-            ]
+        vel_zero_mask = np.abs(current_vels) < CONTROL_CONFIG.velocity_tol
+        vel_sign[vel_zero_mask] = np.sign(self.position_error)[vel_zero_mask]
         backlash_comp = CONTROL_CONFIG.backlash_error * vel_sign
 
         # 2. 静摩擦补偿（向量化）
@@ -512,7 +572,7 @@ class ArmJointPerfOptimizationController:
         # 自适应刚度（向量化计算）
         target_stiffness = STIFF_DAMP_CONFIG.base_stiffness * \
                            (1 + normalized_load * (STIFF_DAMP_CONFIG.load_stiffness_gain - 1)) * \
-                           (1 + normalized_error[:, np.newaxis] * (STIFF_DAMP_CONFIG.error_stiffness_gain - 1))
+                           (1 + normalized_error * (STIFF_DAMP_CONFIG.error_stiffness_gain - 1))
 
         target_stiffness = np.clip(
             target_stiffness,
@@ -534,56 +594,59 @@ class ArmJointPerfOptimizationController:
         )
 
         # 批量更新模型阻尼（减少循环开销）
-        valid_jids = [jid for jid in self.joint_ids if jid >= 0]
-        valid_damping = self.current_damping[:len(valid_jids)]
-        for jid, damping in zip(valid_jids, valid_damping):
-            self.model.jnt_damping[jid] = damping
+        with self._lock:
+            if self.model is not None:
+                valid_jids = [jid for jid in self.joint_ids if jid >= 0]
+                valid_damping = self.current_damping[:len(valid_jids)]
+                for jid, damping in zip(valid_jids, valid_damping):
+                    self.model.jnt_damping[jid] = damping
 
         return self.current_stiffness, self.current_damping
 
     def precision_pd_feedforward_control(self) -> None:
         """PD+前馈控制（核心优化：向量化+性能提升）"""
-        if self.data is None or self.planned_positions.size == 0:
-            return
+        with self._lock:
+            if self.data is None or self.planned_positions.size == 0:
+                return
 
-        # 批量获取状态
-        current_angles = self.get_current_joint_angles(use_deg=False)
-        current_vels = self.get_current_joint_velocities(use_deg=False)
-        compensated_error, gravity_comp_torque = self.calculate_error_compensation()
-        self.calculate_adaptive_stiffness_damping()
+            # 批量获取状态
+            current_angles = self.get_current_joint_angles(use_deg=False)
+            current_vels = self.get_current_joint_velocities(use_deg=False)
+            compensated_error, gravity_comp_torque = self.calculate_error_compensation()
+            self.calculate_adaptive_stiffness_damping()
 
-        # 获取规划轨迹点（边界检查优化）
-        if self.traj_step_idx < self.planned_positions.shape[0]:
-            target_pos = self.planned_positions[self.traj_step_idx]
-            target_vel = self.planned_velocities[self.traj_step_idx]
-            self.traj_step_idx += 1
-        else:
-            target_pos = self.target_angles_rad
-            target_vel = np.zeros(JOINT_CONFIG.count, dtype=np.float64)
+            # 获取规划轨迹点（边界检查优化）
+            if self.traj_step_idx < self.planned_positions.shape[0]:
+                target_pos = self.planned_positions[self.traj_step_idx]
+                target_vel = self.planned_velocities[self.traj_step_idx]
+                self.traj_step_idx += 1
+            else:
+                target_pos = self.target_angles_rad
+                target_vel = np.zeros(JOINT_CONFIG.count, dtype=np.float64)
 
-        # 误差计算（向量化）
-        self.position_error = target_pos - current_angles
-        self.trajectory_error = self.position_error + (target_vel - current_vels) * CONTROL_CONFIG.control_timestep
-        self.max_position_error = np.maximum(self.max_position_error, np.abs(self.position_error))
+            # 误差计算（向量化）
+            self.position_error = target_pos - current_angles
+            self.trajectory_error = self.position_error + (target_vel - current_vels) * CONTROL_CONFIG.control_timestep
+            self.max_position_error = np.maximum(self.max_position_error, np.abs(self.position_error))
 
-        # 自适应PD参数（向量化）
-        normalized_load = np.clip(self.current_end_load / 2.0, 0.0, 1.0)
-        kp = CONTROL_CONFIG.kp_base * (1 + normalized_load * (CONTROL_CONFIG.kp_load_gain - 1))
-        kd = CONTROL_CONFIG.kd_base * (1 + normalized_load * (CONTROL_CONFIG.kd_load_gain - 1))
+            # 自适应PD参数（向量化）
+            normalized_load = np.clip(self.current_end_load / 2.0, 0.0, 1.0)
+            kp = CONTROL_CONFIG.kp_base * (1 + normalized_load * (CONTROL_CONFIG.kp_load_gain - 1))
+            kd = CONTROL_CONFIG.kd_base * (1 + normalized_load * (CONTROL_CONFIG.kd_load_gain - 1))
 
-        # 控制计算（全向量化，消除循环）
-        pd_control = kp * self.position_error + kd * (target_vel - current_vels)
-        ff_control = CONTROL_CONFIG.ff_vel_gain * target_vel + \
-                     CONTROL_CONFIG.ff_accel_gain * (target_vel - current_vels) / CONTROL_CONFIG.control_timestep
-        total_control = pd_control + ff_control + gravity_comp_torque + compensated_error
+            # 控制计算（全向量化，消除循环）
+            pd_control = kp * self.position_error + kd * (target_vel - current_vels)
+            ff_control = CONTROL_CONFIG.ff_vel_gain * target_vel + \
+                         CONTROL_CONFIG.ff_accel_gain * (target_vel - current_vels) / CONTROL_CONFIG.control_timestep
+            total_control = pd_control + ff_control + gravity_comp_torque + compensated_error
 
-        # 输出限幅（向量化）
-        total_control = np.clip(total_control, -JOINT_CONFIG.max_torque, JOINT_CONFIG.max_torque)
+            # 输出限幅（向量化）
+            total_control = np.clip(total_control, -JOINT_CONFIG.max_torque, JOINT_CONFIG.max_torque)
 
-        # 批量设置控制信号（减少循环）
-        valid_mids = [(i, mid) for i, mid in enumerate(self.motor_ids) if mid >= 0]
-        for i, mid in valid_mids:
-            self.data.ctrl[mid] = total_control[i]
+            # 批量设置控制信号（减少循环）
+            valid_mids = [(i, mid) for i, mid in enumerate(self.motor_ids) if mid >= 0]
+            for i, mid in valid_mids:
+                self.data.ctrl[mid] = total_control[i]
 
     def plan_trajectory(
             self,
@@ -591,57 +654,31 @@ class ArmJointPerfOptimizationController:
             target_angles: Union[List[float], np.ndarray],
             use_deg: bool = True
     ) -> None:
-        """规划梯形速度轨迹（向量化优化，消除逐关节循环）"""
-        # 角度转换与限位
-        start_angles_rad = self.clamp_joint_angles(start_angles, use_deg=use_deg)
-        target_angles_rad = self.clamp_joint_angles(target_angles, use_deg=use_deg)
+        """规划梯形速度轨迹（完全向量化优化）"""
+        with self._lock:
+            # 角度转换与限位
+            start_angles_rad = self.clamp_joint_angles(start_angles, use_deg=use_deg)
+            target_angles_rad = self.clamp_joint_angles(target_angles, use_deg=use_deg)
 
-        # 批量规划轨迹
-        joint_trajectories = []
-        joint_velocities = []
-        max_length = 0
-
-        for i in range(JOINT_CONFIG.count):
-            pos_traj, vel_traj = trapezoidal_velocity_planner(
-                start_angles_rad[i],
-                target_angles_rad[i],
-                JOINT_CONFIG.max_velocity_rad[i],
-                JOINT_CONFIG.max_accel_rad[i],
+            # 完全向量化轨迹规划
+            self.planned_positions, self.planned_velocities = trapezoidal_velocity_planner_vectorized(
+                start_angles_rad,
+                target_angles_rad,
+                JOINT_CONFIG.max_velocity_rad,
+                JOINT_CONFIG.max_accel_rad,
                 CONTROL_CONFIG.control_timestep
             )
-            joint_trajectories.append(pos_traj)
-            joint_velocities.append(vel_traj)
-            max_length = max(max_length, len(pos_traj))
 
-        # 统一轨迹长度（向量化填充）
-        for i in range(JOINT_CONFIG.count):
-            if len(joint_trajectories[i]) < max_length:
-                pad_len = max_length - len(joint_trajectories[i])
-                joint_trajectories[i] = np.pad(
-                    joint_trajectories[i],
-                    (0, pad_len),
-                    'constant',
-                    constant_values=target_angles_rad[i]
-                )
-                joint_velocities[i] = np.pad(
-                    joint_velocities[i],
-                    (0, pad_len),
-                    'constant',
-                    constant_values=0.0
-                )
+            self.traj_step_idx = 0
+            self.target_angles_rad = target_angles_rad.copy()
 
-        self.planned_positions = np.array(joint_trajectories).T
-        self.planned_velocities = np.array(joint_velocities).T
-        self.traj_step_idx = 0
-        self.target_angles_rad = target_angles_rad.copy()
-
-        # 日志输出（格式化优化）
-        info_msg = (
-            f"轨迹规划完成：从{np.round(rad2deg(start_angles_rad), 2)}° "
-            f"到{np.round(rad2deg(target_angles_rad), 2)}°，长度{max_length}步"
-        )
-        print(f"✅ {info_msg}")
-        log_perf(info_msg)
+            # 日志输出（格式化优化）
+            info_msg = (
+                f"轨迹规划完成：从{np.round(rad2deg(start_angles_rad), 2)}° "
+                f"到{np.round(rad2deg(target_angles_rad), 2)}°，长度{self.planned_positions.shape[0]}步"
+            )
+            print(f"✅ {info_msg}")
+            log_perf(info_msg)
 
     def clamp_joint_angles(self, angles: Union[List[float], np.ndarray], use_deg: bool = True) -> np.ndarray:
         """关节角度限位（向量化优化）"""
@@ -658,20 +695,34 @@ class ArmJointPerfOptimizationController:
         clamped_rad = np.clip(angles_rad, limits[:, 0], limits[:, 1])
         return rad2deg(clamped_rad) if use_deg else clamped_rad
 
+    def set_joint_angles(self, angles: Union[List[float], np.ndarray], smooth: bool = True, use_deg: bool = True):
+        """设置关节角度（线程安全）"""
+        with self._lock:
+            current_angles = self.get_current_joint_angles(use_deg=use_deg)
+            if smooth:
+                self.plan_trajectory(current_angles, angles, use_deg=use_deg)
+            else:
+                target_rad = self.clamp_joint_angles(angles, use_deg=use_deg)
+                self.target_angles_rad = target_rad
+                self.planned_positions = np.array([target_rad])
+                self.planned_velocities = np.zeros_like(self.planned_positions)
+                self.traj_step_idx = 0
+
     def set_end_load(self, mass: float) -> None:
-        """动态设置末端负载（异常处理强化）"""
-        if not 0.0 <= mass <= 2.0:
-            print(f"⚠️  负载超出限制（0-2.0kg），当前设置{mass}kg")
-            return
+        """动态设置末端负载（线程安全+异常处理强化）"""
+        with self._lock:
+            if not 0.0 <= mass <= 2.0:
+                print(f"⚠️  负载超出限制（0-2.0kg），当前设置{mass}kg")
+                return
 
-        self.current_end_load = mass
+            self.current_end_load = mass
 
-        # 更新末端质量（空值检查）
-        if self.ee_geom_id >= 0 and self.model is not None:
-            self.model.geom_mass[self.ee_geom_id] = mass
+            # 更新末端质量（空值检查）
+            if self.ee_geom_id >= 0 and self.model is not None:
+                self.model.geom_mass[self.ee_geom_id] = mass
 
-        log_perf(f"末端负载更新为{mass}kg")
-        print(f"✅ 末端负载更新为{mass}kg")
+            log_perf(f"末端负载更新为{mass}kg")
+            print(f"✅ 末端负载更新为{mass}kg")
 
     def print_perf_status(self) -> None:
         """打印运动性能状态（优化频率控制）"""
@@ -681,11 +732,14 @@ class ArmJointPerfOptimizationController:
 
         # 性能计算（优化浮点精度）
         fps = self.fps_counter / max(1e-6, current_time - self.last_print_time)
-        joint_angles = self.get_current_joint_angles(use_deg=True)
-        joint_vels = self.get_current_joint_velocities(use_deg=True)
-        pos_error_deg = rad2deg(self.position_error)
-        max_pos_error_deg = rad2deg(self.max_position_error)
-        stiffness, damping = self.calculate_adaptive_stiffness_damping()
+        self.total_sim_time = current_time - self.sim_start_time
+
+        with self._lock:
+            joint_angles = self.get_current_joint_angles(use_deg=True)
+            joint_vels = self.get_current_joint_velocities(use_deg=True)
+            pos_error_deg = rad2deg(self.position_error)
+            max_pos_error_deg = rad2deg(self.max_position_error)
+            stiffness, damping = self.calculate_adaptive_stiffness_damping()
 
         # 格式化输出（优化可读性）
         print("-" * 120)
@@ -700,31 +754,33 @@ class ArmJointPerfOptimizationController:
         # 状态重置
         self.last_print_time = current_time
         self.fps_counter = 0
-        self.total_sim_time += current_time - self.last_print_time
 
     def init_viewer(self) -> bool:
         """初始化可视化窗口（兼容性优化）"""
-        if self.model is None or self.data is None:
-            return False
+        with self._lock:
+            if self.model is None or self.data is None:
+                return False
 
-        try:
-            if MUJOCO_NEW_VIEWER:
-                self.viewer_inst = MUJOCO_VIEWER_MODULE.launch_passive(self.model, self.data)
-            else:
-                self.viewer_inst = MUJOCO_VIEWER_MODULE.Viewer(self.model, self.data)
+            try:
+                if MUJOCO_NEW_VIEWER:
+                    self.viewer_inst = MUJOCO_VIEWER_MODULE.launch_passive(self.model, self.data)
+                    # 新API不需要显式启动，自动在后台运行
+                else:
+                    self.viewer_inst = MUJOCO_VIEWER_MODULE.Viewer(self.model, self.data)
+                    # 旧API需要启动
+                    self.viewer_inst.run()
 
-            self.viewer_ready = True
-            print("✅ 可视化窗口初始化成功")
-            return True
-        except Exception as e:
-            print(f"❌ 可视化窗口初始化失败: {e}")
-            return False
+                self.viewer_ready = True
+                print("✅ 可视化窗口初始化成功")
+                return True
+            except Exception as e:
+                print(f"❌ 可视化窗口初始化失败: {e}")
+                return False
 
     def run(self) -> None:
         """运行运动性能优化主循环（性能优化核心）"""
-        global RUNNING
         if not self.init_viewer():
-            RUNNING = False
+            GLOBAL_STATE.running = False
             return
 
         # 启动信息（优化可读性）
@@ -736,7 +792,7 @@ class ArmJointPerfOptimizationController:
         print("=" * 120)
 
         # 主循环（优化时间控制）
-        while RUNNING:
+        while GLOBAL_STATE.running:
             try:
                 current_time = time.time()
                 self.fps_counter += 1
@@ -748,12 +804,19 @@ class ArmJointPerfOptimizationController:
                     self.last_control_time = current_time
 
                 # 仿真步进（空值检查强化）
-                if self.model is not None and self.data is not None:
-                    mujoco.mj_step(self.model, self.data)
+                with self._lock:
+                    if self.model is not None and self.data is not None:
+                        mujoco.mj_step(self.model, self.data)
 
                 # 可视化同步（状态检查强化）
                 if self.viewer_ready and self.viewer_inst:
-                    self.viewer_inst.sync()
+                    try:
+                        if MUJOCO_NEW_VIEWER:
+                            self.viewer_inst.sync()
+                        else:
+                            self.viewer_inst.render()
+                    except:
+                        pass
 
                 # 状态打印
                 self.print_perf_status()
@@ -779,18 +842,22 @@ class ArmJointPerfOptimizationController:
         log_perf(final_msg)
 
     def cleanup(self) -> None:
-        """清理资源（异常处理强化）"""
-        if self.viewer_ready and self.viewer_inst:
-            try:
-                self.viewer_inst.close()
-            except Exception as e:
-                print(f"⚠️  可视化窗口关闭失败: {e}")
+        """清理资源（异常处理强化+线程安全）"""
+        with self._lock:
+            # 关闭Viewer
+            if self.viewer_ready and self.viewer_inst:
+                try:
+                    if MUJOCO_NEW_VIEWER:
+                        self.viewer_inst.close()
+                    else:
+                        self.viewer_inst.close()
+                except Exception as e:
+                    print(f"⚠️  可视化窗口关闭失败: {e}")
 
-        # 资源释放
-        self.model = None
-        self.data = None
-        global RUNNING
-        RUNNING = False
+            # 资源释放
+            self.model = None
+            self.data = None
+            GLOBAL_STATE.running = False
 
     def preset_pose(self, pose_name: str) -> None:
         """预设运动姿态（配置化管理）"""
@@ -828,8 +895,7 @@ def perf_optimization_demo(controller: ArmJointPerfOptimizationController) -> No
             time.sleep(3)
             controller.preset_pose('zero')
             time.sleep(2)
-            global RUNNING
-            RUNNING = False
+            GLOBAL_STATE.running = False
         except Exception as e:
             print(f"⚠️  演示任务异常: {e}")
             log_perf(f"演示任务异常: {e}")
@@ -852,4 +918,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ 控制器运行异常: {e}")
         log_perf(f"控制器运行异常: {e}")
+        GLOBAL_STATE.running = False
         sys.exit(1)
