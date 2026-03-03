@@ -7,6 +7,7 @@ CARLA 0.9.10 车路协同避障
 import sys
 import os
 import time
+import json
 import math
 import threading
 from typing import Optional
@@ -36,63 +37,56 @@ def load_carla() -> Optional[object]:
     if carla_root and os.path.isdir(carla_root):
         candidate_paths.append(os.path.join(carla_root, "PythonAPI", "carla", "dist"))
 
-    # 优先级2：自动搜索常见目录
-    search_bases = [
-        os.getcwd(),  # 当前工作目录
-        os.path.dirname(os.getcwd()),  # 上级目录
-        os.path.expanduser("~"),  # 用户主目录
-        os.path.expanduser("~/Documents"),  # 文档目录
+# ===================== 1. 自动适配CARLA路径（无绝对路径） =====================
+def setup_carla_path():
+    """自动配置CARLA路径（优先级：环境变量 > 相对路径 > 提示用户）"""
+    # 优先级1：读取环境变量 CARLA_PYTHON_API_PATH
+    carla_api_path = os.environ.get("CARLA_PYTHON_API_PATH")
+    if carla_api_path and os.path.exists(carla_api_path):
+        egg_files = [f for f in os.listdir(carla_api_path) if f.endswith(".egg")]
+        if egg_files:
+            carla_egg_path = os.path.join(carla_api_path, egg_files[0])
+            print(f"🔍 从环境变量加载CARLA egg：{carla_egg_path}")
+            sys.path.insert(0, carla_egg_path)
+            return True
+
+    # 优先级2：自动查找常见的相对路径
+    common_paths = [
+        "./PythonAPI/carla/dist",
+        "../WindowsNoEditor/PythonAPI/carla/dist",
+        "./WindowsNoEditor/PythonAPI/carla/dist"
     ]
-    for base in search_bases:
-        candidate_paths.append(os.path.join(base, "PythonAPI", "carla", "dist"))
-        candidate_paths.append(os.path.join(base, "WindowsNoEditor", "PythonAPI", "carla", "dist"))
+    for path in common_paths:
+        if os.path.exists(path):
+            egg_files = [f for f in os.listdir(path) if f.endswith(".egg")]
+            if egg_files:
+                carla_egg_path = os.path.join(path, egg_files[0])
+                print(f"🔍 自动找到CARLA egg：{carla_egg_path}")
+                sys.path.insert(0, carla_egg_path)
+                return True
 
-    # 遍历候选路径，查找有效的egg文件
-    for dist_path in candidate_paths:
-        if not os.path.isdir(dist_path):
-            continue
+    # 优先级3：提示用户手动输入路径
+    print("\n⚠️  未自动找到CARLA PythonAPI路径！")
+    print("📌 请先设置环境变量 CARLA_PYTHON_API_PATH，例如：")
+    print("   Windows: set CARLA_PYTHON_API_PATH=D:\\WindowsNoEditor\\PythonAPI\\carla\\dist")
+    print("   Linux/Mac: export CARLA_PYTHON_API_PATH=/path/to/Carla/PythonAPI/carla/dist")
+    manual_path = input("\n请输入CARLA egg文件所在目录（留空退出）：").strip()
+    if manual_path and os.path.exists(manual_path):
+        egg_files = [f for f in os.listdir(manual_path) if f.endswith(".egg")]
+        if egg_files:
+            carla_egg_path = os.path.join(manual_path, egg_files[0])
+            sys.path.insert(0, carla_egg_path)
+            print(f"✅ 手动加载CARLA egg：{carla_egg_path}")
+            return True
 
-        # 匹配egg文件
-        for file in os.listdir(dist_path):
-            if any(file.startswith(pattern.replace("*", "")) or file == pattern for pattern in egg_file_patterns):
-                egg_path = os.path.join(dist_path, file)
-                sys.path.append(egg_path)
-                try:
-                    import carla
-                    print(f"✅ CARLA Python API 加载成功：{egg_path}")
-                    return carla
-                except ImportError as e:
-                    print(f"⚠️  加载{egg_path}失败：{str(e)[:50]}")
-                    continue
+    return False
 
-    # 优先级3：引导用户手动输入路径
-    print("\n❌ 未自动找到CARLA egg文件！")
-    print("📌 推荐配置环境变量（一劳永逸）：")
-    print("   Windows: set CARLA_ROOT=你的CARLA安装目录（如D:\WindowsNoEditor）")
-    print("   Linux/Mac: export CARLA_ROOT=你的CARLA安装目录")
+# 初始化CARLA路径
+print(f"🔍 当前Python解释器路径：{sys.executable}")
+print(f"🔍 当前Python版本：{sys.version.split()[0]}")
 
-    while True:
-        manual_egg_path = input("\n请输入CARLA egg文件的完整路径：").strip()
-        if not manual_egg_path:
-            continue
-        if os.path.isfile(manual_egg_path) and manual_egg_path.endswith(".egg"):
-            sys.path.append(manual_egg_path)
-            try:
-                import carla
-                print(f"✅ 手动加载CARLA成功：{manual_egg_path}")
-                return carla
-            except ImportError:
-                print("❌ 该egg文件与当前Python版本不兼容，请重新输入！")
-        else:
-            print("❌ 路径无效或不是egg文件，请重新输入！")
-
-    return None
-
-
-# 加载CARLA核心模块
-carla = load_carla()
-if not carla:
-    print("❌ CARLA加载失败，程序退出")
+if not setup_carla_path():
+    print("\n❌ 无法找到CARLA egg文件，请检查路径配置！")
     sys.exit(1)
 
 # ====================== 2. 核心参数（远距离停止+渐进减速+激光雷达感知） ======================
@@ -315,6 +309,6 @@ def main():
         print("✅ 资源清理完成，程序退出！")
 
 
-# ====================== 程序入口 ======================
+# 唯一入口
 if __name__ == "__main__":
     main()
