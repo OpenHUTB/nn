@@ -15,7 +15,7 @@ import os
 
 
 class QuadrotorSimulation:
-    def __init__(self, xml_path="quadrotor_model.xml"):
+    def __init__(self, xml_path="quadrotor_detailed_city.xml"):
         """初始化：从XML文件加载模型"""
         if not os.path.exists(xml_path):
             raise FileNotFoundError(f"找不到XML文件: {xml_path}")
@@ -319,7 +319,7 @@ def main():
 
     try:
         # XML文件路径
-        xml_path = "quadrotor_model.xml"
+        xml_path = "quadrotor_detailed_city.xml"
         sim = QuadrotorSimulation(xml_path)
 
         # ========== 飞行参数 ==========
@@ -348,7 +348,7 @@ def main():
 
     except FileNotFoundError as e:
         print(f"\n❌ 文件错误: {e}")
-        print("请确保 quadrotor_model.xml 文件在同一目录下")
+        print("请确保 quadrotor_detailed_city.xml 文件在同一目录下")
     except KeyboardInterrupt:
         print("\n\n⏹ 仿真被用户中断")
     except Exception as e:
