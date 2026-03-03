@@ -62,11 +62,30 @@ class CarlaClient:
 
 
 if __name__ == "__main__":
-    # 简单的冒烟测试模块
+    from sensor_manager import SensorManager  # 导入新模块
+    import cv2
+
     connector = CarlaClient()
+    sensors = None
     try:
         connector.connect()
         vehicle = connector.spawn_ego_vehicle()
-        time.sleep(3)  # 保持 3 秒便于观察
+
+        # 挂载传感器
+        sensors = SensorManager(connector.world, vehicle)
+        sensors.attach_camera()
+
+        # 简单的实时画面预览循环
+        print("预览画面中，按下 'q' 键退出...")
+        while True:
+            frame = sensors.get_current_frame()
+            if frame is not None:
+                cv2.imshow("CARLA Camera View", frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
     finally:
+        if sensors:
+            sensors.cleanup()
         connector.cleanup()
+        cv2.destroyAllWindows()
