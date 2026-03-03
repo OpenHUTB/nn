@@ -1,9 +1,0 @@
-Tue Mar  3 13:17:58 2026
-WARNING: Nan, Inf or huge value in CTRL at ACTUATOR 3. The simulation is unstable. Time = 0.0000.
-
-Tue Mar  3 13:39:07 2026
-ERROR: mj_copyDataVisual: attempting to copy mjData while stack is in use
-
-Tue Mar  3 13:55:59 2026
-ERROR: could not initialize GLFW
-

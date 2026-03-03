@@ -48,7 +48,7 @@ class ArmEmergencyStop:
             while viewer.is_running():
                 now = time.time()
 
-                # ========== 急停按键 ==========
+                # ========== 急停按键  ==========
                 if keyboard.is_pressed('q'):
                     if now - self.last_estop_time > self.debounce_interval:
                         self.emergency_stop()
