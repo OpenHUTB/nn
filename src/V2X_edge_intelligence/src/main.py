@@ -1,180 +1,228 @@
+# main.py（CARLA V2X低速区专属测试 - 唯一入口+无绝对路径）
 import sys
 import os
 import time
-
-# ===================== 全局配置常量（仅使用相对路径） =====================
-# Carla连接配置
-CARLA_HOST = "localhost"
-CARLA_PORT = 2000
-CARLA_TIMEOUT = 20.0
-CARLA_MAP = "Town01"
-
-# 数据采集配置（全部使用相对路径）
-SAVE_DIR = "carla_sensor_data"  # 相对当前运行目录
-VEHICLE_NUM = 3
-TARGET_VEHICLE_MODEL = "vehicle.tesla.model3"
-VEHICLE_COLOR = "0,0,0"  # 黑色
-
-# 可视化配置
-VISUALIZATION_DURATION = 30.0  # 可视化效果持续30秒
-LIDAR_RANGE = 100.0  # 激光雷达范围
-LIDAR_SEGMENTS = 36  # 激光雷达模拟圆的线段数
-RSU_BOX_SIZE = carla.Vector3D(1, 1, 2)  # 路侧单元可视化尺寸
-VEHICLE_BOX_SIZE = carla.Vector3D(2, 1, 1)  # 车辆可视化尺寸
-
-# 颜色配置（RGB）
-COLOR_RED = carla.Color(255, 0, 0)  # 路侧单元
-COLOR_BLUE = carla.Color(0, 0, 255)  # 激光雷达范围
-COLOR_GREEN = carla.Color(0, 255, 0)  # 车辆边框
-COLOR_YELLOW = carla.Color(255, 255, 0)  # 车辆文字
+import json
+import math
+from typing import Optional
 
 
-# ===================== 路径工具函数（纯相对路径） =====================
-def get_relative_path(*path_parts: str) -> str:
+# ====================== 1. 智能加载CARLA（无硬编码绝对路径） ======================
+def load_carla() -> Optional[object]:
     """
-    构建并返回相对路径（基于当前工作目录）
-    Args:
-        path_parts: 路径片段，如("data", "sensor", "file.json")
-    Returns:
-        规范化的相对路径字符串
+    智能加载CARLA Python API，优先级：
+    1. 系统环境变量 CARLA_ROOT（推荐）
+    2. 自动搜索常见目录（当前目录、用户目录、上级目录）
+    3. 引导用户手动输入路径
     """
-    # 拼接路径片段并规范化
-    relative_path = os.path.join(*path_parts)
-    # 返回相对路径（确保不以/开头）
-    return os.path.normpath(relative_path)
-
-# ====================== 1. 灵活加载CARLA egg文件（移除绝对路径） ======================
-def find_carla_egg():
-    """
-    从环境变量或默认路径查找CARLA egg文件
-    优先读取环境变量CARLA_EGG_PATH，找不到则尝试默认相对路径
-    """
-    # 方案1：从环境变量读取（推荐）
-    carla_egg_path = os.getenv("CARLA_EGG_PATH")
-    if carla_egg_path and os.path.exists(carla_egg_path):
-        return carla_egg_path
-
-    # 方案2：尝试默认相对路径（如果CARLA和代码在同一目录层级）
-    # 请根据你的实际目录结构调整这个相对路径
-    default_egg_paths = [
-        "./PythonAPI/carla/dist/carla-0.9.10-py3.7-win-amd64.egg",
-        "../WindowsNoEditor/PythonAPI/carla/dist/carla-0.9.10-py3.7-win-amd64.egg",
-        "../../WindowsNoEditor/PythonAPI/carla/dist/carla-0.9.10-py3.7-win-amd64.egg"
+    python_version = f"py{sys.version_info.major}.{sys.version_info.minor}"
+    egg_file_patterns = [
+        f"carla-0.9.10-{python_version}-win-amd64.egg",
+        "carla-0.9.10-py3.7-win-amd64.egg",  # 兼容Python3.7（CARLA 0.9.10主流版本）
+        "carla-0.9.10-*.egg"  # 兜底匹配所有0.9.10版本的egg文件
     ]
 
-    for path in default_egg_paths:
-        abs_path = os.path.abspath(path)
-        if os.path.exists(abs_path):
-            return abs_path
+    # 候选路径列表（无任何硬编码绝对路径）
+    candidate_paths = []
 
-    # 方案3：提示用户输入路径
-    print("⚠️  未找到CARLA egg文件，请手动输入路径")
-    manual_path = input("请输入carla egg文件的完整路径：").strip()
-    if os.path.exists(manual_path):
-        return manual_path
+    # 优先级1：从环境变量CARLA_ROOT读取
+    carla_root = os.getenv("CARLA_ROOT")
+    if carla_root and os.path.isdir(carla_root):
+        candidate_paths.append(os.path.join(carla_root, "PythonAPI", "carla", "dist"))
 
-    return None
+# ===================== 1. 自动适配CARLA路径（无绝对路径） =====================
+def setup_carla_path():
+    """自动配置CARLA路径（优先级：环境变量 > 相对路径 > 提示用户）"""
+    # 优先级1：读取环境变量 CARLA_PYTHON_API_PATH
+    carla_api_path = os.environ.get("CARLA_PYTHON_API_PATH")
+    if carla_api_path and os.path.exists(carla_api_path):
+        egg_files = [f for f in os.listdir(carla_api_path) if f.endswith(".egg")]
+        if egg_files:
+            carla_egg_path = os.path.join(carla_api_path, egg_files[0])
+            print(f"🔍 从环境变量加载CARLA egg：{carla_egg_path}")
+            sys.path.insert(0, carla_egg_path)
+            return True
 
+    # 优先级2：自动查找常见的相对路径
+    common_paths = [
+        "./PythonAPI/carla/dist",
+        "../WindowsNoEditor/PythonAPI/carla/dist",
+        "./WindowsNoEditor/PythonAPI/carla/dist"
+    ]
+    for path in common_paths:
+        if os.path.exists(path):
+            egg_files = [f for f in os.listdir(path) if f.endswith(".egg")]
+            if egg_files:
+                carla_egg_path = os.path.join(path, egg_files[0])
+                print(f"🔍 自动找到CARLA egg：{carla_egg_path}")
+                sys.path.insert(0, carla_egg_path)
+                return True
 
-# 查找并加载egg文件
-carla_egg_path = find_carla_egg()
-if not carla_egg_path:
-    print("❌ 无法找到CARLA egg文件，请检查路径配置")
+    # 优先级3：提示用户手动输入路径
+    print("\n⚠️  未自动找到CARLA PythonAPI路径！")
+    print("📌 请先设置环境变量 CARLA_PYTHON_API_PATH，例如：")
+    print("   Windows: set CARLA_PYTHON_API_PATH=D:\\WindowsNoEditor\\PythonAPI\\carla\\dist")
+    print("   Linux/Mac: export CARLA_PYTHON_API_PATH=/path/to/Carla/PythonAPI/carla/dist")
+    manual_path = input("\n请输入CARLA egg文件所在目录（留空退出）：").strip()
+    if manual_path and os.path.exists(manual_path):
+        egg_files = [f for f in os.listdir(manual_path) if f.endswith(".egg")]
+        if egg_files:
+            carla_egg_path = os.path.join(manual_path, egg_files[0])
+            sys.path.insert(0, carla_egg_path)
+            print(f"✅ 手动加载CARLA egg：{carla_egg_path}")
+            return True
+
+    return False
+
+# 初始化CARLA路径
+print(f"🔍 当前Python解释器路径：{sys.executable}")
+print(f"🔍 当前Python版本：{sys.version.split()[0]}")
+
+if not setup_carla_path():
+    print("\n❌ 无法找到CARLA egg文件，请检查路径配置！")
     sys.exit(1)
 
-sys.path.append(carla_egg_path)
-
-# 导入carla
+# 导入CARLA
 try:
     import carla
-
-    print("✅ 成功导入carla模块！")
-except ImportError:
-    print("❌ 导入失败，请确认Python版本为3.7且egg路径正确")
+    print("✅ CARLA模块导入成功！")
+except Exception as e:
+    print(f"\n❌ CARLA导入失败：{str(e)}")
     sys.exit(1)
 
-# ====================== 2. 核心配置 ======================
-CARLA_HOST = "localhost"
-CARLA_PORT = 2000
-# 标记摄像头是否启动监听（解决警告关键）
-camera_listening = False
+# ===================== 2. 核心逻辑：仅保留低速区（10km/h） =====================
+class RoadSideUnit:
+    def __init__(self, carla_world, vehicle):
+        self.world = carla_world
+        self.vehicle = vehicle
+        # 仅保留低速区：基于车辆生成位置设置低速区坐标
+        spawn_loc = vehicle.get_location()
+        self.low_speed_zone = carla.Location(spawn_loc.x, spawn_loc.y + 15, spawn_loc.z)
+        self.zone_radius = 50  # 扩大低速区范围，确保全程在低速区
+        self.speed_map = {"low": 10}  # 仅保留低速
 
+    def get_speed_limit(self):
+        """仅返回低速区的速度和类型（全程低速）"""
+        return self.speed_map["low"], "低速区(10km/h)"
 
-# ====================== 3. 核心运行逻辑 ======================
+    def send_speed_command(self, vehicle_id, speed_limit, zone_type):
+        command = {
+            "vehicle_id": vehicle_id,
+            "speed_limit_kmh": speed_limit,
+            "zone_type": zone_type,
+            "timestamp": time.time()
+        }
+        print(f"\n📡 路侧V2X指令：{json.dumps(command, indent=2, ensure_ascii=False)}")
+        return command
+
+class VehicleUnit:
+    def __init__(self, vehicle):
+        self.vehicle = vehicle
+        self.vehicle.set_autopilot(False)
+        self.control = carla.VehicleControl()
+        self.control.steer = 0.0  # 强制直行
+        self.control.hand_brake = False
+        print("✅ 车辆已设置为手动直行（低速区精准控速）")
+
+    def get_actual_speed(self):
+        """获取实际车速（km/h）"""
+        velocity = self.vehicle.get_velocity()
+        speed_kmh = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6
+        return round(speed_kmh, 1)
+
+    def force_stable_low_speed(self):
+        """仅保留低速区控速逻辑：精准控制在8-12km/h"""
+        target_speed = 10
+        actual_speed = self.get_actual_speed()
+
+        # 低速区精准控速逻辑
+        if actual_speed > 12:
+            self.control.throttle = 0.0
+            self.control.brake = 0.5  # 适度刹车降速
+        elif actual_speed < 8:
+            self.control.throttle = 0.3  # 足够的油门确保到10km/h
+            self.control.brake = 0.0
+        else:
+            self.control.throttle = 0.1  # 小油门维持速度
+            self.control.brake = 0.1
+
+        self.vehicle.apply_control(self.control)
+        return actual_speed, target_speed
+
+    def receive_speed_command(self, command):
+        actual_speed, target_speed = self.force_stable_low_speed()
+        print(
+            f"🚗 车载执行：目标{target_speed}km/h → 实际{actual_speed}km/h | 油门={round(self.control.throttle, 1)} 刹车={round(self.control.brake, 1)}")
+
+# ===================== 3. 近距离视角配置 =====================
+def set_near_observation_view(world, vehicle):
+    """设置车辆后方近距离观察视角"""
+    spectator = world.get_spectator()
+    vehicle_transform = vehicle.get_transform()
+    forward_vector = vehicle_transform.rotation.get_forward_vector()
+    right_vector = vehicle_transform.rotation.get_right_vector()
+    view_location = vehicle_transform.location - forward_vector * 8 + right_vector * 2 + carla.Location(z=2)
+    view_rotation = carla.Rotation(pitch=-15, yaw=vehicle_transform.rotation.yaw, roll=0)
+    spectator.set_transform(carla.Transform(view_location, view_rotation))
+    print("✅ 初始视角已设置：车辆后方近距离")
+    print("📌 视角操作：鼠标拖拽=旋转 | 滚轮=缩放 | WASD=移动")
+
+def get_valid_spawn_point(world):
+    """获取道路有效生成点"""
+    spawn_points = world.get_map().get_spawn_points()
+    valid_spawn = spawn_points[10] if len(spawn_points) >= 10 else spawn_points[5]
+    print(f"✅ 车辆生成位置：(x={valid_spawn.location.x:.1f}, y={valid_spawn.location.y:.1f})")
+    return valid_spawn
+
+# ===================== 4. 主入口逻辑（仅低速区测试） =====================
 def main():
-    global camera_listening
-    vehicle = None
-    camera = None
-
+    # 1. 连接CARLA服务器
     try:
-        # 连接CARLA
-        client = carla.Client(CARLA_HOST, CARLA_PORT)
-        client.set_timeout(30.0)
+        client = carla.Client('localhost', 2000)
+        client.set_timeout(20.0)
         world = client.get_world()
-        print(f"\n✅ 成功连接CARLA！场景：{world.get_map().name}")
-
-        # 生成红色Model3车辆
-        blueprint_lib = world.get_blueprint_library()
-        vehicle_bp = blueprint_lib.filter("model3")[0]
-        vehicle_bp.set_attribute("color", "255,0,0")
-        spawn_points = world.get_map().get_spawn_points()
-        vehicle = world.spawn_actor(vehicle_bp, spawn_points[0])
-        print(f"✅ 生成车辆ID：{vehicle.id}（CARLA窗口可见红色车辆）")
-
-        # 挂载摄像头并启动监听（消除警告的关键）
-        camera_bp = blueprint_lib.find("sensor.camera.rgb")
-        camera_bp.set_attribute("image_size_x", "800")
-        camera_bp.set_attribute("image_size_y", "600")
-        camera_transform = carla.Transform(carla.Location(x=2.5, z=1.5))
-        camera = world.spawn_actor(camera_bp, camera_transform, attach_to=vehicle)
-
-        # 给摄像头绑定空回调（启动监听，避免停止时警告）
-        def empty_callback(data):
-            pass
-
-        camera.listen(empty_callback)
-        camera_listening = True  # 标记已监听
-        print(f"✅ 挂载摄像头ID：{camera.id}（按V切换摄像头视角截图）")
-
-        # 控制车辆低速行驶
-        print("\n📌 CARLA已实际运行！操作：")
-        print("   1. 切换到CARLA窗口，可见红色车辆行驶")
-        print("   2. 按V键切换摄像头视角，截图保存（论文用）")
-        print("   3. 截图完成后，在PyCharm终端按Ctrl+C停止")
-        vehicle.apply_control(carla.VehicleControl(throttle=0.2, steer=0.0))
-
-        # 保持运行（等待你截图）
-        while True:
-            time.sleep(1)
-
-    except KeyboardInterrupt:
-        print("\n🛑 你终止了程序，开始清理资源...")
+        print(f"\n✅ 连接CARLA成功！服务器版本：{client.get_server_version()}")
     except Exception as e:
-        print(f"\n❌ 运行出错：{str(e)}")
-        # 这里也移除了绝对路径，改为提示用户自行启动CARLA
-        print("⚠️  请先启动CARLA主程序（CarlaUE4.exe）")
-    finally:
-        # 清理资源（仅当摄像头已监听时才停止）
-        if camera and camera_listening:
-            camera.stop()  # 此时停止不会报警告
-            camera.destroy()
-            print("✅ 摄像头已清理")
-        elif camera and not camera_listening:
-            camera.destroy()  # 未监听则直接销毁，不执行stop
-            print("✅ 摄像头已清理")
-
-        if vehicle:
-            vehicle.destroy()
-            print("✅ 车辆已清理")
-        print("✅ 所有资源清理完成，CARLA可正常关闭")
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\n🛑 用户中断程序执行")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n\n❌ 致命错误: {str(e)}")
+        print(f"\n❌ CARLA服务器连接失败：{str(e)}")
+        print("📌 请先启动CARLA服务器（CarlaUE4.exe / CarlaUE4.sh）")
         sys.exit(1)
+
+    # 2. 生成测试车辆
+    try:
+        bp_lib = world.get_blueprint_library()
+        vehicle_bp = bp_lib.filter('vehicle.tesla.model3')[0]
+        vehicle_bp.set_attribute('color', '255,0,0')  # 红色车身
+        valid_spawn = get_valid_spawn_point(world)
+        vehicle = world.spawn_actor(vehicle_bp, valid_spawn)
+        print(f"✅ 车辆生成成功，ID：{vehicle.id}（红色车身）")
+    except Exception as e:
+        print(f"\n❌ 车辆生成失败：{str(e)}")
+        sys.exit(1)
+
+    # 3. 初始化V2X组件+设置视角
+    rsu = RoadSideUnit(world, vehicle)
+    vu = VehicleUnit(vehicle)
+    set_near_observation_view(world, vehicle)
+
+    # 4. 启动低速区专属测试
+    print("\n✅ 开始V2X低速区稳定测试（30秒）...")
+    print("📌 速度严格控制在10km/h左右，全程低速运行！")
+    start_time = time.time()
+    try:
+        while time.time() - start_time < 30:
+            speed_limit, zone_type = rsu.get_speed_limit()
+            command = rsu.send_speed_command(vehicle.id, speed_limit, zone_type)
+            vu.receive_speed_command(command)
+            time.sleep(1.5)
+    except KeyboardInterrupt:
+        print("\n⚠️  用户手动中断测试")
+    finally:
+        # 安全销毁车辆
+        vehicle.apply_control(carla.VehicleControl(brake=1.0, throttle=0.0, steer=0.0))
+        time.sleep(2)
+        vehicle.destroy()
+        print("\n✅ 测试结束，车辆已销毁")
+
+# 唯一入口
+if __name__ == "__main__":
+    main()
