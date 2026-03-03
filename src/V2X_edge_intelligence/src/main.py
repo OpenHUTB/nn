@@ -1,314 +1,233 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-CARLA 0.9.10 车路协同避障
-核心修改：移除直接从模拟器获取数据，改为基于路侧激光雷达感知障碍
-"""
+# v2x_balance_zones.py（三区平均分配+低速精准控速）
 import sys
 import os
 import time
 import json
 import math
-import threading
-from typing import Optional
-from threading import Lock
 
+# ===================== 1. 配置CARLA路径 =====================
+CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg"
 
-# ====================== 1. 智能加载CARLA（无硬编码绝对路径，修复重复导入） ======================
-def load_carla() -> Optional[object]:
-    """
-    智能加载CARLA Python API，优先级：
-    1. 系统环境变量 CARLA_ROOT（推荐）
-    2. 自动搜索常见目录（当前目录、用户目录、上级目录）
-    3. 引导用户手动输入路径
-    """
-    python_version = f"py{sys.version_info.major}.{sys.version_info.minor}"
-    egg_file_patterns = [
-        f"carla-0.9.10-{python_version}-win-amd64.egg",
-        "carla-0.9.10-py3.7-win-amd64.egg",  # 兼容Python3.7（CARLA 0.9.10主流版本）
-        "carla-0.9.10-*.egg"  # 兜底匹配所有0.9.10版本的egg文件
-    ]
-
-    # 候选路径列表（无任何硬编码绝对路径）
-    candidate_paths = []
-
-    # 优先级1：从环境变量CARLA_ROOT读取
-    carla_root = os.getenv("CARLA_ROOT")
-    if carla_root and os.path.isdir(carla_root):
-        candidate_paths.append(os.path.join(carla_root, "PythonAPI", "carla", "dist"))
-
-# ===================== 1. 自动适配CARLA路径（无绝对路径） =====================
-def setup_carla_path():
-    """自动配置CARLA路径（优先级：环境变量 > 相对路径 > 提示用户）"""
-    # 优先级1：读取环境变量 CARLA_PYTHON_API_PATH
-    carla_api_path = os.environ.get("CARLA_PYTHON_API_PATH")
-    if carla_api_path and os.path.exists(carla_api_path):
-        egg_files = [f for f in os.listdir(carla_api_path) if f.endswith(".egg")]
-        if egg_files:
-            carla_egg_path = os.path.join(carla_api_path, egg_files[0])
-            print(f"🔍 从环境变量加载CARLA egg：{carla_egg_path}")
-            sys.path.insert(0, carla_egg_path)
-            return True
-
-    # 优先级2：自动查找常见的相对路径
-    common_paths = [
-        "./PythonAPI/carla/dist",
-        "../WindowsNoEditor/PythonAPI/carla/dist",
-        "./WindowsNoEditor/PythonAPI/carla/dist"
-    ]
-    for path in common_paths:
-        if os.path.exists(path):
-            egg_files = [f for f in os.listdir(path) if f.endswith(".egg")]
-            if egg_files:
-                carla_egg_path = os.path.join(path, egg_files[0])
-                print(f"🔍 自动找到CARLA egg：{carla_egg_path}")
-                sys.path.insert(0, carla_egg_path)
-                return True
-
-    # 优先级3：提示用户手动输入路径
-    print("\n⚠️  未自动找到CARLA PythonAPI路径！")
-    print("📌 请先设置环境变量 CARLA_PYTHON_API_PATH，例如：")
-    print("   Windows: set CARLA_PYTHON_API_PATH=D:\\WindowsNoEditor\\PythonAPI\\carla\\dist")
-    print("   Linux/Mac: export CARLA_PYTHON_API_PATH=/path/to/Carla/PythonAPI/carla/dist")
-    manual_path = input("\n请输入CARLA egg文件所在目录（留空退出）：").strip()
-    if manual_path and os.path.exists(manual_path):
-        egg_files = [f for f in os.listdir(manual_path) if f.endswith(".egg")]
-        if egg_files:
-            carla_egg_path = os.path.join(manual_path, egg_files[0])
-            sys.path.insert(0, carla_egg_path)
-            print(f"✅ 手动加载CARLA egg：{carla_egg_path}")
-            return True
-
-    return False
-
-# 初始化CARLA路径
 print(f"🔍 当前Python解释器路径：{sys.executable}")
 print(f"🔍 当前Python版本：{sys.version.split()[0]}")
+print(f"🔍 CARLA egg路径：{CARLA_EGG_PATH}")
 
-if not setup_carla_path():
-    print("\n❌ 无法找到CARLA egg文件，请检查路径配置！")
+if not os.path.exists(CARLA_EGG_PATH):
+    raise FileNotFoundError(f"\n❌ CARLA egg文件不存在：{CARLA_EGG_PATH}")
+if CARLA_EGG_PATH not in sys.path:
+    sys.path.insert(0, CARLA_EGG_PATH)
+
+try:
+    import carla
+
+    print("✅ CARLA模块导入成功！")
+except Exception as e:
+    print(f"\n❌ 导入失败：{str(e)}")
     sys.exit(1)
 
-# ====================== 2. 核心参数（远距离停止+渐进减速+激光雷达感知） ======================
-DECEL_DISTANCE = 20.0  # 距离<20米开始减速（提前缓冲）
-STOP_DISTANCE = 12.0  # 距离<12米完全停止（远离蓝车，不撞）
-NORMAL_THROTTLE = 0.7  # 正常直行油门
-DECEL_THROTTLE = 0.1  # 减速阶段油门（缓慢靠近）
-OBSTACLE_DISTANCE = 25.0  # 蓝车在红车同车道正前方25米（更远初始距离）
-BRAKE_FORCE = 1.0  # 满刹车（停止彻底）
 
-# 激光雷达参数（路侧RSU感知）
-LIDAR_CHANNELS = 32  # 32线激光雷达
-LIDAR_RANGE = 50.0  # 探测范围50米
-LIDAR_ROTATION_FREQ = 10.0  # 旋转频率10Hz
-LIDAR_POINTS_PER_SEC = 100000  # 点云密度
-LIDAR_UPPER_FOV = 10.0  # 上视场角10度
-LIDAR_LOWER_FOV = -30.0  # 下视场角-30度
-LIDAR_HORIZONTAL_FOV = 60.0  # 水平视场角±30度（仅感知前方道路）
+# ===================== 2. 核心：三区平均分配+低速精准控速 =====================
+class RoadSideUnit:
+    def __init__(self, carla_world, vehicle):
+        self.world = carla_world
+        self.vehicle = vehicle
+        # 1. 三区坐标（等距分配，每区长度一致）
+        spawn_loc = vehicle.get_location()
+        # 高速区：生成位置前5-15米（长度10米）
+        self.high_zone_start = carla.Location(spawn_loc.x, spawn_loc.y + 5, spawn_loc.z)
+        self.high_zone_end = carla.Location(spawn_loc.x, spawn_loc.y + 15, spawn_loc.z)
+        # 中速区：生成位置前15-25米（长度10米）
+        self.mid_zone_start = carla.Location(spawn_loc.x, spawn_loc.y + 15, spawn_loc.z)
+        self.mid_zone_end = carla.Location(spawn_loc.x, spawn_loc.y + 25, spawn_loc.z)
+        # 低速区：生成位置前25-35米（长度10米）
+        self.low_zone_start = carla.Location(spawn_loc.x, spawn_loc.y + 25, spawn_loc.z)
+        self.low_zone_end = carla.Location(spawn_loc.x, spawn_loc.y + 35, spawn_loc.z)
 
-# ====================== 3. 全局变量（新增激光雷达感知相关） ======================
-actors = []
-lidar_sensor = None
-perceived_obstacle_distance = float('inf')  # 激光雷达感知到的最近障碍距离
-perception_data_lock = Lock()  # 线程安全锁，防止数据竞争
+        # 2. 三区计时（确保每区停留约10秒）
+        self.current_zone = "high"  # 初始区：高速
+        self.zone_start_time = time.time()
+        self.zone_duration = 10  # 每区停留10秒（30秒测试，三区各10秒）
+        self.speed_map = {"high": 40, "mid": 25, "low": 10}
+
+    def get_balance_speed_limit(self):
+        """核心：计时强制切换+位置双重判断，确保三区平均分配"""
+        current_time = time.time()
+        vehicle_loc = self.vehicle.get_location()
+        vehicle_y = vehicle_loc.y  # 沿行驶方向的核心坐标
+
+        # 1. 计时判断：每区停留10秒强制切换
+        if current_time - self.zone_start_time > self.zone_duration:
+            if self.current_zone == "high":
+                self.current_zone = "mid"
+            elif self.current_zone == "mid":
+                self.current_zone = "low"
+            elif self.current_zone == "low":
+                self.current_zone = "high"  # 循环切换（避免一直停低速）
+            self.zone_start_time = current_time  # 重置计时
+
+        # 2. 位置双重验证：确保区域与位置匹配
+        spawn_y = self.vehicle.get_location().y
+        if spawn_y + 5 <= vehicle_y < spawn_y + 15:
+            self.current_zone = "high"
+        elif spawn_y + 15 <= vehicle_y < spawn_y + 25:
+            self.current_zone = "mid"
+        elif spawn_y + 25 <= vehicle_y < spawn_y + 35:
+            self.current_zone = "low"
+
+        # 返回对应速度和区域名称
+        speed_limit = self.speed_map[self.current_zone]
+        zone_name = {
+            "high": "高速区(40km/h)",
+            "mid": "中速区(25km/h)",
+            "low": "低速区(10km/h)"
+        }[self.current_zone]
+        return speed_limit, zone_name
+
+    def send_speed_command(self, vehicle_id, speed_limit, zone_type):
+        command = {
+            "vehicle_id": vehicle_id,
+            "speed_limit_kmh": speed_limit,
+            "zone_type": zone_type,
+            "timestamp": time.time()
+        }
+        print(f"\n📡 路侧V2X指令：{json.dumps(command, indent=2, ensure_ascii=False)}")
+        return command
 
 
-# ====================== 4. 激光雷达数据回调函数（核心：基于传感器感知障碍） ======================
-def lidar_callback(data):
-    """
-    路侧激光雷达数据回调函数
-    处理点云数据，筛选前方道路内的点，计算最近障碍距离
-    :param data: 激光雷达原始点云数据（carla.LidarMeasurement）
-    """
-    global perceived_obstacle_distance
-    min_distance = float('inf')
+class VehicleUnit:
+    def __init__(self, vehicle):
+        self.vehicle = vehicle
+        self.vehicle.set_autopilot(False)
+        self.control = carla.VehicleControl()
+        self.control.steer = 0.0  # 强制直行
+        self.control.hand_brake = False
+        print("✅ 车辆已设置为手动直行（精准控速）")
 
-    # 遍历所有点云点，筛选有效障碍点
-    for point in data:
-        # 1. 筛选水平视场角内的点（仅感知前方±30度）
-        horizontal_angle = math.degrees(math.atan2(point.y, point.x))
-        if abs(horizontal_angle) > LIDAR_HORIZONTAL_FOV / 2:
-            continue
+    def get_actual_speed(self):
+        velocity = self.vehicle.get_velocity()
+        speed_kmh = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6
+        return round(speed_kmh, 1)
 
-        # 2. 筛选高度范围内的点（过滤地面，仅感知0.5-2.0米高度的障碍）
-        if point.z < 0.5 or point.z > 2.0:
-            continue
+    def precise_speed_control(self, target_speed):
+        """核心修复：低速区加大油门，精准到10km/h"""
+        actual_speed = self.get_actual_speed()
 
-        # 3. 计算点到激光雷达的距离
-        distance = math.sqrt(point.x ** 2 + point.y ** 2 + point.z ** 2)
-        if distance < LIDAR_RANGE and distance < min_distance:
-            min_distance = distance
+        # 1. 高速区：38-42km/h（精准控速）
+        if target_speed == 40:
+            if actual_speed > 42:
+                self.control.throttle = 0.0
+                self.control.brake = 0.4
+            elif actual_speed < 38:
+                self.control.throttle = 0.9
+                self.control.brake = 0.0
+            else:
+                self.control.throttle = 0.2
+                self.control.brake = 0.0
 
-    # 线程安全更新感知到的障碍距离
-    with perception_data_lock:
-        perceived_obstacle_distance = min_distance if min_distance != float('inf') else float('inf')
+        # 2. 中速区：23-27km/h（精准控速）
+        elif target_speed == 25:
+            if actual_speed > 27:
+                self.control.throttle = 0.0
+                self.control.brake = 0.3
+            elif actual_speed < 23:
+                self.control.throttle = 0.6
+                self.control.brake = 0.0
+            else:
+                self.control.throttle = 0.1
+                self.control.brake = 0.0
+
+        # 3. 低速区：9-11km/h（加大油门，确保到10km/h）
+        elif target_speed == 10:
+            if actual_speed > 11:
+                self.control.throttle = 0.0
+                self.control.brake = 0.2
+            elif actual_speed < 9:
+                self.control.throttle = 0.4  # 加大油门（原0.2→0.4）
+                self.control.brake = 0.0
+            else:
+                self.control.throttle = 0.15  # 维持油门
+                self.control.brake = 0.0
+
+        self.vehicle.apply_control(self.control)
+        return actual_speed
+
+    def receive_speed_command(self, command):
+        target_speed = command["speed_limit_kmh"]
+        actual_speed = self.precise_speed_control(target_speed)
+        print(
+            f"🚗 车载执行：目标{target_speed}km/h → 实际{actual_speed}km/h | 油门={round(self.control.throttle, 1)} 刹车={round(self.control.brake, 1)}")
 
 
-# ====================== 5. 主程序（基于激光雷达感知的避障逻辑） ======================
+# ===================== 3. 近距离视角 =====================
+def set_near_observation_view(world, vehicle):
+    spectator = world.get_spectator()
+    vehicle_transform = vehicle.get_transform()
+    forward_vector = vehicle_transform.rotation.get_forward_vector()
+    right_vector = vehicle_transform.rotation.get_right_vector()
+    view_location = vehicle_transform.location - forward_vector * 8 + right_vector * 2 + carla.Location(z=2)
+    view_rotation = carla.Rotation(pitch=-15, yaw=vehicle_transform.rotation.yaw, roll=0)
+    spectator.set_transform(carla.Transform(view_location, view_rotation))
+    print("✅ 初始视角已设置：车辆后方近距离")
+    print("📌 视角操作：鼠标拖拽=旋转 | 滚轮=缩放 | WASD=移动")
+
+
+def get_valid_spawn_point(world):
+    spawn_points = world.get_map().get_spawn_points()
+    valid_spawn = spawn_points[10] if len(spawn_points) >= 10 else spawn_points[5]
+    print(f"✅ 车辆生成位置：(x={valid_spawn.location.x:.1f}, y={valid_spawn.location.y:.1f})")
+    return valid_spawn
+
+
+# ===================== 4. 主逻辑 =====================
 def main():
-    global lidar_sensor, perceived_obstacle_distance
-    # 1. 连接CARLA服务器
+    # 1. 连接CARLA
     try:
         # 1. 连接CARLA+加载地图
         client = carla.Client('localhost', 2000)
-        client.set_timeout(10.0)
-        world = client.load_world('Town01')
-        world.set_weather(carla.WeatherParameters.ClearNoon)
-        print("✅ 连接CARLA成功！加载Town01场景")
-
-        # 2. 清理残留Actor
-        for actor in world.get_actors():
-            if actor.type_id in ['vehicle.*', 'static.prop.*', 'sensor.*']:
-                actor.destroy()
-
-        # 3. 生成红色主车（同车道起点，手动挂前进挡）
-        blueprint_lib = world.get_blueprint_library()
-        main_car_bp = blueprint_lib.filter('vehicle.tesla.model3')[0]
-        main_car_bp.set_attribute('color', '255,0,0')  # 红色
-        spawn_points = world.get_map().get_spawn_points()
-        main_car_spawn = spawn_points[5]  # 开阔直车道生成点（无围栏）
-        main_car = world.spawn_actor(main_car_bp, main_car_spawn)
-        actors.append(main_car)
-
-        # 适配0.9.10：手动挂前进挡+解除手刹
-        init_control = carla.VehicleControl(
-            throttle=NORMAL_THROTTLE,
-            steer=0.0,  # 全程直行，不转向
-            manual_gear_shift=True,  # 开启手动换挡
-            gear=1,  # 前进挡
-            hand_brake=False,
-            reverse=False
-        )
-        main_car.apply_control(init_control)
-        print("✅ 生成红色主车：同车道起点，手动挂前进挡（直行）")
-
-        # 4. 生成蓝色障碍车（红车同车道正前方25米，y坐标一致=同车道）
-        obstacle_car_bp = blueprint_lib.filter('vehicle.tesla.model3')[0]
-        obstacle_car_bp.set_attribute('color', '0,0,255')  # 蓝色
-        obstacle_transform = carla.Transform(
-            carla.Location(
-                x=main_car_spawn.location.x + OBSTACLE_DISTANCE,  # 正前方25米
-                y=main_car_spawn.location.y,  # 同一车道（y坐标一致）
-                z=main_car_spawn.location.z
-            ),
-            main_car_spawn.rotation
-        )
-        obstacle_car = world.spawn_actor(obstacle_car_bp, obstacle_transform)
-        obstacle_car.apply_control(carla.VehicleControl(hand_brake=True))  # 蓝车静止
-        actors.append(obstacle_car)
-        print(f"✅ 生成蓝色障碍车：红车同车道正前方{OBSTACLE_DISTANCE}米")
-
-        # 5. 生成路侧边缘节点+挂载激光雷达（V2X感知设备，核心修改）
-        # 路侧节点位置：红车起点前方15米，右侧3米，高度3米
-        edge_node_transform = carla.Transform(
-            carla.Location(
-                x=main_car_spawn.location.x + 15,
-                y=main_car_spawn.location.y + 3,
-                z=3.0
-            ),
-            main_car_spawn.rotation
-        )
-        # 加载激光雷达蓝图
-        lidar_bp = blueprint_lib.find('sensor.lidar.ray_cast')
-        # 配置激光雷达参数
-        lidar_bp.set_attribute('channels', str(LIDAR_CHANNELS))
-        lidar_bp.set_attribute('range', str(LIDAR_RANGE))
-        lidar_bp.set_attribute('rotation_frequency', str(LIDAR_ROTATION_FREQ))
-        lidar_bp.set_attribute('points_per_second', str(LIDAR_POINTS_PER_SEC))
-        lidar_bp.set_attribute('upper_fov', str(LIDAR_UPPER_FOV))
-        lidar_bp.set_attribute('lower_fov', str(LIDAR_LOWER_FOV))
-        # 生成激光雷达（挂载在路侧节点位置，无实体节点，直接挂载传感器）
-        lidar_sensor = world.spawn_actor(lidar_bp, edge_node_transform)
-        # 注册激光雷达回调函数
-        lidar_sensor.listen(lidar_callback)
-        actors.append(lidar_sensor)
-        print("✅ 生成路侧激光雷达（V2X感知设备）：感知前方道路障碍")
-
-        # 6. 初始近视角（紧贴红车，看清同车道蓝车）
-        spectator = world.get_spectator()
-        spectator_transform = carla.Transform(
-            carla.Location(
-                x=main_car_spawn.location.x + 4,
-                y=main_car_spawn.location.y,
-                z=main_car_spawn.location.z + 6  # 稍高，看清25米外蓝车
-            ),
-            carla.Rotation(pitch=-45, yaw=main_car_spawn.rotation.yaw)  # 直视同车道
-        )
-        spectator.set_transform(spectator_transform)
-        print("✅ 初始视角设置完成：紧贴红车，看清同车道蓝车")
-
-        # 7. 运行提示
-        print("\n======= 车路协同避障仿真（激光雷达感知版） =======")
-        print(f"✅ 红蓝车：同一车道，蓝车在红车正前方{OBSTACLE_DISTANCE}米")
-        print("✅ 感知方式：路侧激光雷达感知障碍（无直接模拟器数据）")
-        print("✅ 红车逻辑：直行→20米处减速→12米处完全停止（远离蓝车不撞）")
-        print("✅ 镜头：自由操作（左键旋转/滚轮缩放/WASD平移）")
-        print("✅ 退出方式：Ctrl+C 停止程序")
-        print("==============================================\n")
-
-        main_car_control = init_control
-        is_stopped = False  # 红车停止标记
-
-        while True:
-            # 从激光雷达感知数据中获取最近障碍距离（线程安全）
-            with perception_data_lock:
-                current_distance = perceived_obstacle_distance
-
-            # 核心逻辑：渐进减速+远距离停止（基于激光雷达感知距离）
-            if not is_stopped:
-                if current_distance == float('inf'):
-                    # 未感知到障碍，正常直行
-                    main_car_control.throttle = NORMAL_THROTTLE
-                    main_car_control.brake = 0.0
-                    current_speed = math.hypot(main_car.get_velocity().x, main_car.get_velocity().y)
-                    print(f"\r【直行中】未感知到障碍 | 当前速度：{current_speed:.2f}m/s", end="")
-                elif current_distance > DECEL_DISTANCE:
-                    # 阶段1：感知距离>20米，正常直行（无减速）
-                    main_car_control.throttle = NORMAL_THROTTLE
-                    main_car_control.brake = 0.0
-                    current_speed = math.hypot(main_car.get_velocity().x, main_car.get_velocity().y)
-                    print(f"\r【直行中】感知障碍距离：{current_distance:.1f}米 | 当前速度：{current_speed:.2f}m/s", end="")
-                elif DECEL_DISTANCE >= current_distance > STOP_DISTANCE:
-                    # 阶段2：20米≥感知距离>12米，渐进减速（缓慢靠近）
-                    main_car_control.throttle = DECEL_THROTTLE
-                    main_car_control.brake = 0.0
-                    current_speed = math.hypot(main_car.get_velocity().x, main_car.get_velocity().y)
-                    print(f"\r【减速中】感知障碍距离：{current_distance:.1f}米 | 当前速度：{current_speed:.2f}m/s", end="")
-                else:
-                    # 阶段3：感知距离≤12米，满刹车完全停止（远离蓝车，不撞）
-                    main_car_control.throttle = 0.0
-                    main_car_control.brake = BRAKE_FORCE
-                    print(f"\r【已停止】感知障碍距离：{current_distance:.1f}米 → 远离蓝车，完全停止", end="")
-                    is_stopped = True
-            else:
-                # 保持停止状态，避免再次移动
-                main_car_control.throttle = 0.0
-                main_car_control.brake = BRAKE_FORCE
-                with perception_data_lock:
-                    current_distance = perceived_obstacle_distance
-                print(f"\r【保持停止】感知障碍距离：{current_distance:.1f}米 | 红车静止不动", end="")
-
-            # 持续发送控制指令，确保状态生效
-            main_car.apply_control(main_car_control)
-            time.sleep(0.02)
-
-    except KeyboardInterrupt:
-        print("\n\n🛑 程序终止，清理资源...")
+        client.set_timeout(20.0)
+        world = client.get_world()
+        print(f"\n✅ 连接CARLA成功！服务器版本：{client.get_server_version()}")
     except Exception as e:
-        print(f"\n⚠️  运行错误：{e} | 请确认CARLA 0.9.10已启动（localhost:2000）")
+        print(f"\n❌ 连接失败：{str(e)}")
+        print("📌 请先启动：D:\WindowsNoEditor\CarlaUE4.exe")
+        sys.exit(1)
+
+    # 2. 生成车辆
+    try:
+        bp_lib = world.get_blueprint_library()
+        vehicle_bp = bp_lib.filter('vehicle.tesla.model3')[0]
+        vehicle_bp.set_attribute('color', '255,0,0')  # 红色车身
+        valid_spawn = get_valid_spawn_point(world)
+        vehicle = world.spawn_actor(vehicle_bp, valid_spawn)
+        print(f"✅ 车辆生成成功，ID：{vehicle.id}（红色车身）")
+    except Exception as e:
+        print(f"\n❌ 生成车辆失败：{str(e)}")
+        sys.exit(1)
+
+    # 3. 初始化V2X+视角
+    rsu = RoadSideUnit(world, vehicle)
+    vu = VehicleUnit(vehicle)
+    set_near_observation_view(world, vehicle)
+
+    # 4. 均衡测试（30秒，三区各10秒）
+    print("\n✅ 开始三区均衡变速测试（30秒）...")
+    print("📌 高速/中速/低速区各停留10秒，低速精准到10km/h！")
+    start_time = time.time()
+    try:
+        while time.time() - start_time < 30:
+            speed_limit, zone_type = rsu.get_balance_speed_limit()
+            command = rsu.send_speed_command(vehicle.id, speed_limit, zone_type)
+            vu.receive_speed_command(command)
+            time.sleep(1)  # 1秒更新，响应更快
+    except KeyboardInterrupt:
+        print("\n⚠️  用户中断测试")
     finally:
-        # 清理所有资源
-        global perceived_obstacle_distance
-        perceived_obstacle_distance = float('inf')
-        for actor in actors:
-            try:
-                if actor.is_alive:
-                    actor.destroy()
-            except:
-                pass
-        print("✅ 资源清理完成，程序退出！")
+        # 紧急停车
+        vehicle.apply_control(carla.VehicleControl(brake=1.0, throttle=0.0, steer=0.0))
+        time.sleep(2)
+        vehicle.destroy()
+        print("\n✅ 测试结束，车辆已销毁")
 
 
-# 唯一入口
 if __name__ == "__main__":
     main()
