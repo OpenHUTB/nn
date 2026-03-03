@@ -28,33 +28,26 @@ class YOLODetector:
         """
         加载 Darknet 网络模型与类别标签
         """
-        # 1. 检查文件是否存在
         if not os.path.exists(self.weights_path) or not os.path.exists(self.cfg_path):
             raise FileNotFoundError(f"[ERROR] 模型文件缺失！请先运行 python download_weights.py")
 
         print(f"[INFO] 正在加载 YOLO 模型...\n配置: {self.cfg_path}\n权重: {self.weights_path}")
 
-        # 2. 使用 OpenCV DNN 模块加载网络
         try:
             self.net = cv2.dnn.readNetFromDarknet(self.cfg_path, self.weights_path)
         except Exception as e:
             raise RuntimeError(f"[ERROR] 模型加载失败: {e}")
 
-        # 3. 设置后端 (默认为 OpenCV + CPU，若有 GPU 可修改为 CUDA)
         self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
 
-        # 4. 获取输出层名称 (兼容不同版本的 OpenCV)
         layer_names = self.net.getLayerNames()
         try:
-            # OpenCV 4.x+ 返回的是 numpy 数组，需要 flatten
             out_layers_indices = self.net.getUnconnectedOutLayers().flatten()
             self.output_layers = [layer_names[i - 1] for i in out_layers_indices]
         except AttributeError:
-            # 旧版本 OpenCV 处理方式
             self.output_layers = [layer_names[i[0] - 1] for i in self.net.getUnconnectedOutLayers()]
 
-        # 5. 加载类别名称
         if os.path.exists(self.names_path):
             with open(self.names_path, "r") as f:
                 self.classes = [line.strip() for line in f.readlines()]
@@ -65,17 +58,42 @@ class YOLODetector:
 
     def detect(self, image):
         """
-        执行目标检测的主流水线 (待实现)
+        执行目标检测的主流水线
+        :param image: 输入图像 (numpy array)
+        :return: 检测结果列表
         """
         if self.net is None:
             print("[ERROR] 模型未加载，请先调用 load_model()")
             return []
 
-        # 下一步实现这里
-        return []
+        # 获取原始图像尺寸
+        (H, W) = image.shape[:2]
+
+        # 1. 预处理：将图像转换为 Blob 格式
+        blob = self._preprocess(image)
+
+        # 2. 将 Blob 设置为网络输入
+        self.net.setInput(blob)
+
+        # 3. 前向推理 (Forward Pass) - 这一步会消耗计算资源
+        # outputs 是一个列表，包含三个尺度的检测结果
+        outputs = self.net.forward(self.output_layers)
+
+        # 4. 后处理 (解析框 & NMS) - 下一次提交实现
+        return self._post_process(outputs, H, W)
 
     def _preprocess(self, image):
-        pass
+        """
+        内部函数：图像预处理
+        将图像 Resize 到 416x416，并进行归一化 (1/255)
+        """
+        # scalefactor=1/255.0, size=(416, 416), mean=(0,0,0), swapRB=True, crop=False
+        blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
+        return blob
 
     def _post_process(self, outputs, height, width):
-        pass
+        """
+        内部函数：解析网络输出，过滤低置信度框，执行 NMS
+        (占位符，下一次提交实现具体逻辑)
+        """
+        return []
