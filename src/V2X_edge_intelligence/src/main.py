@@ -474,6 +474,7 @@ def main():
     speed_controller = None
     traffic_light_manager = None
 
+    # 2. 生成测试车辆
     try:
         # 1. 连接CARLA，加载**Town04**（交通灯最密集的地图）
         client = carla.Client(CARLA_HOST, CARLA_PORT)
