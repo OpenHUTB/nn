@@ -275,6 +275,10 @@ def main():
     print("      车道检测程序 - 单张/批量模式（曲率+偏离计算）")
     print("="*60)
     
+    # 获取脚本所在目录，作为相对路径的基准
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    print(f"\n📂 当前脚本目录：{script_dir}")
+    
     print("\n请选择运行模式：")
     print("1 - 单张图片检测（含曲率+偏离计算）")
     print("2 - 批量图片检测（含曲率+偏离计算）")
@@ -282,19 +286,24 @@ def main():
     
     if mode == "1":
         print("\n📸 单张图片检测模式")
-        print("\n请输入图片的完整路径（可直接复制粘贴）：")
-        print("示例：C:\\Users\\apple\\Desktop\\zy\\test_lane.png")
-        CUSTOM_IMAGE_PATH = input("图片路径：").strip()
+        print("\n请输入图片的相对路径（相对于脚本目录）：")
+        print("示例：images/test_lane.png 或 ../data/test_lane.png")
+        relative_path = input("相对路径：").strip()
         
-        if not CUSTOM_IMAGE_PATH:
+        if not relative_path:
             print("❌ 错误：路径不能为空！")
             return
         
+        # 拼接为绝对路径（内部使用，用户无需关心）
+        CUSTOM_IMAGE_PATH = os.path.join(script_dir, relative_path)
+        
         if not os.path.exists(CUSTOM_IMAGE_PATH):
             print(f"\n❌ 错误：文件不存在！")
-            print(f"当前输入的路径：{CUSTOM_IMAGE_PATH}")
+            print(f"脚本目录：{script_dir}")
+            print(f"你输入的相对路径：{relative_path}")
+            print(f"拼接后的绝对路径：{CUSTOM_IMAGE_PATH}")
             print("请检查：")
-            print("  1. 路径是否正确（建议复制粘贴）")
+            print("  1. 相对路径是否正确（如 images/test_lane.png）")
             print("  2. 文件名和后缀（.jpg/.png）是否正确")
             print("  3. 文件是否真的存在于该目录下")
             return
@@ -323,9 +332,16 @@ def main():
     
     elif mode == "2":
         print("\n📁 批量图片检测模式")
-        print("\n请输入图片文件夹的完整路径（可直接复制粘贴）：")
-        print("示例：C:\\Users\\apple\\Desktop\\zy\\lane_images")
-        folder_path = input("文件夹路径：").strip()
+        print("\n请输入图片文件夹的相对路径（相对于脚本目录）：")
+        print("示例：lane_images 或 ../data/lane_images")
+        relative_folder = input("相对路径：").strip()
+        
+        if not relative_folder:
+            print("❌ 错误：路径不能为空！")
+            return
+        
+        # 拼接为绝对路径（内部使用，用户无需关心）
+        folder_path = os.path.join(script_dir, relative_folder)
         batch_detect_images(folder_path)
     
     else:
