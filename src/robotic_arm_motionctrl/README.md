@@ -13,7 +13,7 @@
 - 末端画圆、、8 字轨迹
 - 6D 位姿控制（位置 + 姿态保持）
 - 键盘控制机械臂
-- 机械臂关节保护
+- 机械臂关节保护等
  ## 环境依赖
 ``` bash
 pip install mujoco numpy pynput glfw opencv-python
