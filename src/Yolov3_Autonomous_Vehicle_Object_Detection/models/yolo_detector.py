@@ -19,7 +19,6 @@ class YOLODetector:
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
 
-        # 核心变量
         self.net = None
         self.output_layers = None
         self.classes = []
@@ -59,41 +58,70 @@ class YOLODetector:
     def detect(self, image):
         """
         执行目标检测的主流水线
-        :param image: 输入图像 (numpy array)
-        :return: 检测结果列表
         """
         if self.net is None:
             print("[ERROR] 模型未加载，请先调用 load_model()")
             return []
 
-        # 获取原始图像尺寸
         (H, W) = image.shape[:2]
 
-        # 1. 预处理：将图像转换为 Blob 格式
+        # 1. 预处理
         blob = self._preprocess(image)
 
-        # 2. 将 Blob 设置为网络输入
+        # 2. 推理
         self.net.setInput(blob)
-
-        # 3. 前向推理 (Forward Pass) - 这一步会消耗计算资源
-        # outputs 是一个列表，包含三个尺度的检测结果
         outputs = self.net.forward(self.output_layers)
 
-        # 4. 后处理 (解析框 & NMS) - 下一次提交实现
+        # 3. 后处理 (解析框 & NMS)
         return self._post_process(outputs, H, W)
 
     def _preprocess(self, image):
         """
         内部函数：图像预处理
-        将图像 Resize 到 416x416，并进行归一化 (1/255)
         """
-        # scalefactor=1/255.0, size=(416, 416), mean=(0,0,0), swapRB=True, crop=False
-        blob = cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
-        return blob
+        return cv2.dnn.blobFromImage(image, 1 / 255.0, (416, 416), swapRB=True, crop=False)
 
     def _post_process(self, outputs, height, width):
         """
         内部函数：解析网络输出，过滤低置信度框，执行 NMS
-        (占位符，下一次提交实现具体逻辑)
         """
-        return []
+        boxes = []
+        confidences = []
+        class_ids = []
+
+        # 遍历三个尺度的输出层
+        for output in outputs:
+            # 遍历每个检测框
+            for detection in output:
+                # detection 格式: [x, y, w, h, objectness, class_scores...]
+                scores = detection[5:]
+                class_id = np.argmax(scores)
+                confidence = scores[class_id]
+
+                # 1. 过滤掉低置信度的框
+                if confidence > self.conf_thres:
+                    # 还原坐标 (center_x, center_y, w, h) -> (x, y, w, h)
+                    box = detection[0:4] * np.array([width, height, width, height])
+                    (centerX, centerY, w, h) = box.astype("int")
+
+                    # 计算左上角坐标
+                    x = int(centerX - (w / 2))
+                    y = int(centerY - (h / 2))
+
+                    boxes.append([x, y, int(w), int(h)])
+                    confidences.append(float(confidence))
+                    class_ids.append(class_id)
+
+        # 2. 执行非极大值抑制 (NMS)
+        # 返回的是保留下来的框的索引
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, self.conf_thres, self.nms_thres)
+
+        results = []
+        if len(indices) > 0:
+            # flatten() 用于兼容不同版本的 OpenCV 返回格式
+            for i in indices.flatten():
+                # 提取最终结果: [x, y, w, h, class_id, confidence]
+                (x, y, w, h) = boxes[i]
+                results.append([x, y, w, h, class_ids[i], confidences[i]])
+
+        return results
