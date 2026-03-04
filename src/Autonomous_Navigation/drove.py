@@ -529,7 +529,7 @@ class EnvironmentClassifier:
 
     def __init__(self):
         self.environments = [
-            "Ruins", "Building", "Forest", "Road",
+            "Ruins", "Building", "forest", "Road",
             "Sky", "Water", "Fire", "Animal", "Vehicle"
         ]
 
