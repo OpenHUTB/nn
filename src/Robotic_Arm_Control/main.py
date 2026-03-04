@@ -202,6 +202,12 @@ def load_traj(name):
         log(f"加载失败: {e}")
         return np.array([]), np.array([])
 
+    @classmethod
+    def clear_cache(cls):
+        """清理缓存（内存管理）"""
+        cls._cache.clear()
+        log("轨迹缓存已清理")
+
 
 # ====================== 核心控制器（极简封装） ======================
 class ArmController:
