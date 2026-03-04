@@ -66,7 +66,7 @@ Yolov3_Autonomous_Vehicle_Object_Detection/
 5. [x] **2026-03-03**: 实现图像预处理与前向推理 (Forward Inference)。
 6. [x] **2026-03-03**: 实现检测结果后处理 (NMS) 与坐标还原。
 7. [x] **2026-03-03**: 编写 CARLA 客户端连接与车辆生成逻辑。
-8. [ ] 实现传感器数据采集 (RGB Camera) 与图像格式转换。
+8. [x] **2026-03-03**: 实现传感器数据采集 (RGB Camera) 与图像格式转换。
 9. [ ] 整合 YOLOv3 与 CARLA，实现实时画面检测。
 ...
 
