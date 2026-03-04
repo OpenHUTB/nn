@@ -6,6 +6,7 @@ import logging
 import os
 import threading
 import sys
+import queue
 
 # 修复循环导入
 try:
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class MuJoCoArmSim:
-    """集成所有功能的MuJoCo机械臂仿真类"""
+    """集成所有功能的MuJoCo机械臂仿真类（修复输入冲突）"""
 
     def __init__(self, model_path="model/six_axis_arm.xml"):
         # 路径校验
@@ -67,9 +68,9 @@ class MuJoCoArmSim:
             "link4_geom", "link5_geom", "end_effector"
         ]
 
-        # 启动手动控制线程（非阻塞读取键盘输入）
-        self.manual_thread = threading.Thread(target=self._manual_control_listener, daemon=True)
-        self.manual_thread.start()
+        # 修复输入冲突：使用队列传递按键，手动线程仅在手动模式启动后运行
+        self.key_queue = queue.Queue()
+        self.manual_thread = None
 
     def _get_ids(self, obj_type, names):
         """批量获取MuJoCo对象ID"""
@@ -132,16 +133,20 @@ class MuJoCoArmSim:
         logger.info("Viewer初始化完成")
 
     def _manual_control_listener(self):
-        """手动控制键盘监听线程（非阻塞）"""
+        """手动控制键盘监听线程（修复输入冲突）"""
         logger.info("===== 手动控制说明 =====")
         logger.info("按键格式：j1+ / j1- / j2+ / j2- ... / j6+ / j6- / stop")
         logger.info("输入示例：j1+ → 关节1增加1度 | stop → 停止手动控制")
+        logger.info("输入 'quit' 退出手动控制")
         logger.info("========================")
 
         while self.running:
             try:
                 key = input("请输入控制按键：").strip()
-                self.manual_control_key = key
+                if key == 'quit':
+                    self.running = False
+                    break
+                self.key_queue.put(key)
             except:
                 continue
 
@@ -154,7 +159,7 @@ class MuJoCoArmSim:
 
     def run_simulation(self, mode="trajectory", duration=30.0):
         """
-        运行仿真（支持多模式）
+        运行仿真（支持多模式，修复输入冲突）
         :param mode: 运行模式 - trajectory:轨迹规划 | manual:手动控制 | follow:目标跟随
         :param duration: 仿真时长（秒）
         """
@@ -170,6 +175,9 @@ class MuJoCoArmSim:
             logger.info(f"启动轨迹规划模式，轨迹点数量：{len(self.arm_functions.trajectory_points)}")
 
         elif mode == "manual":
+            # 手动控制模式：仅此时启动监听线程
+            self.manual_thread = threading.Thread(target=self._manual_control_listener, daemon=True)
+            self.manual_thread.start()
             logger.info("启动手动控制模式（按提示输入按键控制关节）")
 
         elif mode == "follow":
@@ -184,7 +192,7 @@ class MuJoCoArmSim:
             self._init_viewer(viewer)
 
             # 仿真主循环
-            while viewer.is_running() and (time.time() - start_time) < duration:
+            while viewer.is_running() and (time.time() - start_time) < duration and self.running:
                 frame_start = time.time()
 
                 # 1. 根据模式更新关节角
@@ -200,11 +208,14 @@ class MuJoCoArmSim:
                         new_joints = next_point
 
                 elif mode == "manual":
-                    # 手动控制模式
-                    new_joints = self.arm_functions.manual_joint_control(
-                        current_joints, self.manual_control_key, step=1.0
-                    )
-                    self.manual_control_key = 'stop'  # 单次按键生效
+                    # 手动控制模式：从队列读取按键
+                    try:
+                        key = self.key_queue.get_nowait()
+                        new_joints = self.arm_functions.manual_joint_control(
+                            current_joints, key, step=1.0
+                        )
+                    except queue.Empty:
+                        pass  # 无按键时保持当前关节角
 
                 elif mode == "follow":
                     # 目标跟随模式
@@ -249,19 +260,30 @@ class MuJoCoArmSim:
 
 
 def main():
-    """主函数（支持选择运行模式）"""
+    """主函数（修复输入冲突，清晰的模式选择）"""
     try:
         sim = MuJoCoArmSim()
 
-        # 选择运行模式
+        # 清晰的模式选择界面
+        print("\n========================")
+        print("      机械臂仿真系统      ")
+        print("========================")
         print("请选择仿真模式：")
         print("1 - 轨迹规划模式（机械臂沿平滑轨迹运动）")
         print("2 - 手动控制模式（键盘控制单个关节）")
         print("3 - 目标跟随模式（跟随移动的目标点）")
-        mode_choice = input("输入模式编号（1/2/3）：").strip()
+        print("========================")
 
+        # 循环获取有效输入
+        while True:
+            mode_choice = input("输入模式编号（1/2/3）：").strip()
+            if mode_choice in ["1", "2", "3"]:
+                break
+            print("无效输入！请输入 1、2 或 3")
+
+        # 映射模式
         mode_map = {"1": "trajectory", "2": "manual", "3": "follow"}
-        mode = mode_map.get(mode_choice, "trajectory")
+        mode = mode_map[mode_choice]
 
         # 运行仿真
         sim.run_simulation(mode=mode, duration=30.0)
