@@ -1,16 +1,14 @@
+<!-- 优化的6-DOF机械臂与三指抓取器模型 -->
 <mujoco model="optimized_robotic_arm_3_finger_gripper">
-  <compiler angle="radian" inertiafromgeom="true" meshdir="assets/" texturedir="textures/" autolimits="true" strippath="true"/>
+  <compiler angle="radian" inertiafromgeom="true" meshdir="assets/" texturedir="textures/"/>
 
-  <option timestep="0.001" gravity="0 0 -9.81" iterations="100" solver="Newton" cone="elliptic" integrator="RK4"/>
+  <option timestep="0.001" gravity="0 0 -9.81" iterations="100" solver="Newton" cone="elliptic"/>
 
-  <!-- 增加接触参数稳定性 -->
-  <contact solref="0.02 1" solimp="0.9 0.95 0.001" frictionloss="0.001" maxvel="100" margin="0.001"/>
-
-  <size njmax="500" nconmax="100" nstack="1000000"/>
+  <size njmax="500" nconmax="100"/>
 
   <visual>
     <global offwidth="1920" offheight="1080"/>
-    <quality shadowsize="2048" flags="0x00000010"/>
+    <quality shadowsize="2048"/>
     <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8" specular="0.1 0.1 0.1"/>
   </visual>
 
@@ -107,15 +105,15 @@
                     <!-- 手指1 (0°) -->
                     <body name="finger1_base" pos="0.04 0 0">
                       <joint name="finger1_slide" type="slide" axis="0 0 1" range="-0.02 0.06" damping="0.4" stiffness="50"/>
-                      <geom name="finger1_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04" contype="1" conaffinity="1"/>
+                      <geom name="finger1_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04"/>
 
                       <body name="finger1_proximal" pos="0 0 0.035">
                         <joint name="finger1_hinge1" type="hinge" axis="0 1 0" range="-0.2 1.5" damping="0.3" stiffness="30" armature="0.01"/>
-                        <geom name="finger1_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025" contype="1" conaffinity="1"/>
+                        <geom name="finger1_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025"/>
 
                         <body name="finger1_distal" pos="0 0 0.028">
                           <joint name="finger1_hinge2" type="hinge" axis="0 1 0" range="0 1.2" damping="0.2" stiffness="20" armature="0.005"/>
-                          <geom name="finger1_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018" contype="1" conaffinity="1"/>
+                          <geom name="finger1_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018"/>
                           <site name="finger1_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
                         </body>
                       </body>
@@ -124,15 +122,15 @@
                     <!-- 手指2 (120°) -->
                     <body name="finger2_base" pos="-0.02 0.035 0" euler="0 0 2.094">
                       <joint name="finger2_slide" type="slide" axis="0 0 1" range="-0.02 0.06" damping="0.4" stiffness="50"/>
-                      <geom name="finger2_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04" contype="1" conaffinity="1"/>
+                      <geom name="finger2_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04"/>
 
                       <body name="finger2_proximal" pos="0 0 0.035">
                         <joint name="finger2_hinge1" type="hinge" axis="0 1 0" range="-0.2 1.5" damping="0.3" stiffness="30" armature="0.01"/>
-                        <geom name="finger2_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025" contype="1" conaffinity="1"/>
+                        <geom name="finger2_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025"/>
 
                         <body name="finger2_distal" pos="0 0 0.028">
                           <joint name="finger2_hinge2" type="hinge" axis="0 1 0" range="0 1.2" damping="0.2" stiffness="20" armature="0.005"/>
-                          <geom name="finger2_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018" contype="1" conaffinity="1"/>
+                          <geom name="finger2_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018"/>
                           <site name="finger2_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
                         </body>
                       </body>
@@ -141,15 +139,15 @@
                     <!-- 手指3 (240°) -->
                     <body name="finger3_base" pos="-0.02 -0.035 0" euler="0 0 -2.094">
                       <joint name="finger3_slide" type="slide" axis="0 0 1" range="-0.02 0.06" damping="0.4" stiffness="50"/>
-                      <geom name="finger3_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04" contype="1" conaffinity="1"/>
+                      <geom name="finger3_base_geom" type="box" size="0.018 0.01 0.035" material="finger_mat" mass="0.04"/>
 
                       <body name="finger3_proximal" pos="0 0 0.035">
                         <joint name="finger3_hinge1" type="hinge" axis="0 1 0" range="-0.2 1.5" damping="0.3" stiffness="30" armature="0.01"/>
-                        <geom name="finger3_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025" contype="1" conaffinity="1"/>
+                        <geom name="finger3_proximal_geom" type="box" size="0.015 0.008 0.028" material="finger_mat" mass="0.025"/>
 
                         <body name="finger3_distal" pos="0 0 0.028">
                           <joint name="finger3_hinge2" type="hinge" axis="0 1 0" range="0 1.2" damping="0.2" stiffness="20" armature="0.005"/>
-                          <geom name="finger3_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018" contype="1" conaffinity="1"/>
+                          <geom name="finger3_distal_geom" type="box" size="0.012 0.006 0.022" material="finger_mat" mass="0.018"/>
                           <site name="finger3_tip" pos="0 0 0.022" size="0.006" rgba="1 0.5 0 1"/>
                         </body>
                       </body>
@@ -163,36 +161,37 @@
       </body>
     </body>
 
-    <!-- 测试物体（调整位置避免初始碰撞） -->
-    <body name="test_sphere" pos="0.6 0.2 0.3">
+    <!-- 测试物体 -->
+    <body name="test_sphere" pos="0.2 0.1 0.1">
       <joint type="free" name="sphere_joint"/>
-      <geom name="sphere_geom" type="sphere" size="0.06" material="red_mat" mass="0.25" friction="0.7 0.3 0.01" contype="2" conaffinity="2"/>
+      <geom name="sphere_geom" type="sphere" size="0.06" material="red_mat" mass="0.25" friction="0.7 0.3 0.01"/>
       <site name="sphere_site" pos="0 0 0" size="0.008"/>
     </body>
 
-    <body name="test_box" pos="0.5 -0.2 0.25">
+    <body name="test_box" pos="0.1 -0.1 0.05">
       <joint type="free" name="box_joint"/>
-      <geom name="box_geom" type="box" size="0.05 0.07 0.04" material="green_mat" mass="0.35" friction="0.8 0.4 0.01" contype="2" conaffinity="2"/>
+      <geom name="box_geom" type="box" size="0.05 0.07 0.04" material="green_mat" mass="0.35" friction="0.8 0.4 0.01"/>
       <site name="box_site" pos="0 0 0" size="0.008"/>
     </body>
 
-    <body name="test_cylinder" pos="0.7 0.0 0.3">
+    <body name="test_cylinder" pos="0.3 0.0 0.1">
       <joint type="free" name="cylinder_joint"/>
-      <geom name="cylinder_geom" type="cylinder" size="0.04 0.09" material="blue_mat" mass="0.3" friction="0.75 0.35 0.01" contype="2" conaffinity="2"/>
+      <geom name="cylinder_geom" type="cylinder" size="0.04 0.09" material="blue_mat" mass="0.3" friction="0.75 0.35 0.01"/>
       <site name="cylinder_site" pos="0 0 0" size="0.008"/>
     </body>
 
-    <body name="test_capsule" pos="0.4 0.3 0.32">
+    <body name="test_capsule" pos="-0.1 0.2 0.12">
       <joint type="free" name="capsule_joint"/>
-      <geom name="capsule_geom" type="capsule" fromto="0 -0.04 0 0 0.04 0" size="0.03" material="yellow_mat" mass="0.2" friction="0.65 0.25 0.01" contype="2" conaffinity="2"/>
+      <geom name="capsule_geom" type="capsule" fromto="0 -0.04 0 0 0.04 0" size="0.03" material="yellow_mat" mass="0.2" friction="0.65 0.25 0.01"/>
       <site name="capsule_site" pos="0 0 0" size="0.008"/>
     </body>
 
-    <body name="test_ellipsoid" pos="0.5 -0.3 0.38">
+    <body name="test_ellipsoid" pos="0.0 -0.2 0.18">
       <joint type="free" name="ellipsoid_joint"/>
-      <geom name="ellipsoid_geom" type="ellipsoid" size="0.05 0.07 0.04" material="purple_mat" mass="0.28" friction="0.6 0.2 0.01" contype="2" conaffinity="2"/>
+      <geom name="ellipsoid_geom" type="ellipsoid" size="0.05 0.07 0.04" material="purple_mat" mass="0.28" friction="0.6 0.2 0.01"/>
       <site name="ellipsoid_site" pos="0 0 0" size="0.008"/>
     </body>
+
 
   </worldbody>
 
@@ -205,10 +204,18 @@
     <motor name="motor_joint5" joint="joint5" gear="40" ctrlrange="-2.0 2.0" forcerange="-60 60"/>
     <motor name="motor_joint6" joint="joint6" gear="30" ctrlrange="-2.0 2.0" forcerange="-40 40"/>
 
-    <!-- 抓取器执行器（只控制第一个手指，其他通过equality约束同步） -->
+    <!-- 抓取器执行器 -->
     <motor name="motor_finger1_slide" joint="finger1_slide" gear="50" ctrlrange="-0.5 0.5" forcerange="-80 80"/>
     <motor name="motor_finger1_hinge1" joint="finger1_hinge1" gear="35" ctrlrange="-0.5 1.5" forcerange="-60 60"/>
     <motor name="motor_finger1_hinge2" joint="finger1_hinge2" gear="25" ctrlrange="0 1.2" forcerange="-40 40"/>
+
+    <motor name="motor_finger2_slide" joint="finger2_slide" gear="50" ctrlrange="-0.5 0.5" forcerange="-80 80"/>
+    <motor name="motor_finger2_hinge1" joint="finger2_hinge1" gear="35" ctrlrange="-0.5 1.5" forcerange="-60 60"/>
+    <motor name="motor_finger2_hinge2" joint="finger2_hinge2" gear="25" ctrlrange="0 1.2" forcerange="-40 40"/>
+
+    <motor name="motor_finger3_slide" joint="finger3_slide" gear="50" ctrlrange="-0.5 0.5" forcerange="-80 80"/>
+    <motor name="motor_finger3_hinge1" joint="finger3_hinge1" gear="35" ctrlrange="-0.5 1.5" forcerange="-60 60"/>
+    <motor name="motor_finger3_hinge2" joint="finger3_hinge2" gear="25" ctrlrange="0 1.2" forcerange="-40 40"/>
   </actuator>
 
   <sensor>
@@ -269,9 +276,4 @@
     <joint name="equal_finger_hinge2_12" joint1="finger1_hinge2" joint2="finger2_hinge2" polycoef="0 1 0 0 0"/>
     <joint name="equal_finger_hinge2_13" joint1="finger1_hinge2" joint2="finger3_hinge2" polycoef="0 1 0 0 0"/>
   </equality>
-
-  <!-- 添加初始配置，避免奇异位姿 -->
-  <keyframe>
-    <key name="home" qpos="0 0 -0.5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.6 0.2 0.3 1 0 0 0 0.5 -0.2 0.25 1 0 0 0 0.7 0 0.3 1 0 0 0 0.4 0.3 0.32 1 0 0 0 0.5 -0.3 0.38 1 0 0 0"/>
-  </keyframe>
 </mujoco>
