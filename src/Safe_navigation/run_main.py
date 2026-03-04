@@ -23,8 +23,7 @@ def main():
         car_state = client.getCarState()
         print(f"✓ 车辆状态获取成功 - 速度: {car_state.speed} km/h")
 
-        # 5. 精确90度转弯演示
-        print("\n>>> 连接成功！开始精确90度转弯演示...")
+
         controls = airsim.CarControls()
 
         # 直行到路口
@@ -32,34 +31,7 @@ def main():
         controls.steering = 0.0
         client.setCarControls(controls)
         print("直行前往路口...")
-        time.sleep(26)
 
-        # 到达路口，完全停车
-        controls.throttle = 0.0
-        controls.brake = 1.0
-        client.setCarControls(controls)
-        print("到达路口，停车...")
-        time.sleep(1)
-
-        # 缓慢起步并适度转向（避免过度转向）
-        controls.brake = 0.0
-        controls.throttle = 0.25  # 更低的速度，更容易控制
-        controls.steering = 0.7  # 降低转向角度，避免过度转向
-        client.setCarControls(controls)
-        print("缓慢起步转弯...")
-        time.sleep(4)  # 减少转弯时间
-
-        # 稍微回正一点方向盘，继续转弯
-        controls.steering = 0.5
-        client.setCarControls(controls)
-        print("调整转向角度...")
-        time.sleep(2)
-
-        # 完全回正方向盘
-        controls.steering = 0.0
-        client.setCarControls(controls)
-        print("转弯完成，直行...")
-        time.sleep(5)
 
         # 缓慢减速停止
         controls.throttle = 0.2
