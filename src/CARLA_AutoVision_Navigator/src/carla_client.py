@@ -62,7 +62,8 @@ class CarlaClient:
 
 
 if __name__ == "__main__":
-    from sensor_manager import SensorManager  # 导入新模块
+    from sensor_manager import SensorManager
+    from object_detector import YOLOv3Detector  # 导入新模块
     import cv2
 
     connector = CarlaClient()
@@ -71,16 +72,23 @@ if __name__ == "__main__":
         connector.connect()
         vehicle = connector.spawn_ego_vehicle()
 
-        # 挂载传感器
+        # 初始化传感器和检测器
         sensors = SensorManager(connector.world, vehicle)
         sensors.attach_camera()
+        detector = YOLOv3Detector()
 
-        # 简单的实时画面预览循环
-        print("预览画面中，按下 'q' 键退出...")
+        print("系统就绪，开始实时检测。按下 'q' 键退出...")
         while True:
             frame = sensors.get_current_frame()
             if frame is not None:
-                cv2.imshow("CARLA Camera View", frame)
+                # 1. 执行目标检测
+                detections = detector.detect(frame)
+
+                # 2. 绘制检测结果
+                frame = detector.draw_labels(frame, detections)
+
+                # 3. 显示画面
+                cv2.imshow("CARLA AutoVision - YOLOv3 Detection", frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
