@@ -974,38 +974,6 @@ class ArmController:
     def _print_help(self):
         """打印帮助信息"""
         help_text = """
-======= 增强版控制器交互命令 =======
-基础控制：
-  pause          - 暂停轨迹执行
-  resume         - 恢复轨迹执行
-  stop           - 紧急停止（切断所有控制）
-  pose [name]    - 切换预设姿态
-                   支持: zero(零位)、up(抬起)、grasp(抓取)、test(测试)
-
-关节控制：
-  joint [idx] [deg] - 单独控制单个关节
-                   示例: joint 1 30 (控制关节1到30度)
-  load [kg]         - 设置末端负载（0-2kg）
-                   示例: load 1.5
-
-参数调优：
-  param [name] [value] [idx] - 动态调整控制参数
-                   示例1: param kp_base 150 (调整基础KP值)
-                   示例2: param stiffness_base 250 1 (调整关节1刚度)
-                   支持参数: kp_base, kd_base, stiffness_base, damping_ratio等
-
-轨迹管理：
-  save [name]    - 保存当前规划的轨迹
-                   示例: save grasp_pose
-  load_traj [name] - 加载预存轨迹
-                   示例: load_traj grasp_pose
-
-其他：
-  help           - 查看本帮助信息
-===================================
-        """
-        log_info(help_text)
-
     def _cleanup(self):
         """资源清理（自动化，避免泄漏）"""
         if self.viewer:
