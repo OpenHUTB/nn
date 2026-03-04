@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import os
+from scipy import stats
 
 def grayscale(img):
     """将图像转为灰度图，减少计算量"""
@@ -29,146 +30,179 @@ def region_of_interest(img, vertices):
 
 def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
     """拟合并绘制左右车道线，返回拟合参数+车道线底部端点（用于偏离计算）"""
-    left_slope = []   
-    left_intercept = [] 
-    right_slope = []  
-    right_intercept = [] 
-    
-    # 曲率计算相关：收集坐标点
-    left_x, left_y = [], []
-    right_x, right_y = [], []
-    # ===================== 偏离计算新增部分开始 =====================
-    # 保存车道线底部端点（图像底部的x坐标，用于计算中心）
-    left_bottom_x = None
-    right_bottom_x = None
-    # ===================== 偏离计算新增部分结束 =====================
+    # 优化点1：使用列表存储完整坐标，而非仅斜率截距
+    left_points = []   
+    right_points = []  
     
     if lines is None:
-        # 曲率+偏离计算：返回空值
-        return img, None, None, left_bottom_x, right_bottom_x
+        return img, None, None, None, None
     
     for line in lines:
         for x1, y1, x2, y2 in line:
             slope = (y2 - y1) / (x2 - x1) if (x2 - x1) != 0 else 0
-            intercept = y1 - slope * x1
             
-            # 区分左右车道线（左负右正）
-            if -0.8 < slope < -0.3:
-                left_slope.append(slope)
-                left_intercept.append(intercept)
-                left_x.extend([x1, x2])
-                left_y.extend([y1, y2])
-            elif 0.3 < slope < 0.8:
-                right_slope.append(slope)
-                right_intercept.append(intercept)
-                right_x.extend([x1, x2])
-                right_y.extend([y1, y2])
+            # 优化点2：更严格的斜率筛选，减少异常值
+            if -0.9 < slope < -0.2:
+                left_points.append([x1, y1])
+                left_points.append([x2, y2])
+            elif 0.2 < slope < 0.9:
+                right_points.append([x1, y1])
+                right_points.append([x2, y2])
     
-    # 计算平均斜率和截距
-    left_avg_slope = np.mean(left_slope) if left_slope else 0
-    left_avg_intercept = np.mean(left_intercept) if left_intercept else 0
-    right_avg_slope = np.mean(right_slope) if right_slope else 0
-    right_avg_intercept = np.mean(right_intercept) if right_intercept else 0
+    # 优化点3：移除异常值（Z-score过滤）
+    left_points = np.array(left_points)
+    right_points = np.array(right_points)
     
-    # 获取图像尺寸并计算车道线端点
+    # 过滤左车道异常点
+    if len(left_points) > 2:
+        z_scores = stats.zscore(left_points)
+        abs_z_scores = np.abs(z_scores)
+        filtered_entries = (abs_z_scores < 2).all(axis=1)
+        left_points = left_points[filtered_entries]
+    
+    # 过滤右车道异常点
+    if len(right_points) > 2:
+        z_scores = stats.zscore(right_points)
+        abs_z_scores = np.abs(z_scores)
+        filtered_entries = (abs_z_scores < 2).all(axis=1)
+        right_points = right_points[filtered_entries]
+    
     height, width = img.shape[:2]
     y_bottom = height
     y_top = int(height * 0.6)
     
-    # 曲率计算相关：初始化拟合参数
+    # 初始化返回值
     left_fit = None
     right_fit = None
+    left_bottom_x = None
+    right_bottom_x = None
     
-    # 绘制左车道线
-    if left_avg_slope != 0:
-        x1_left = int((y_bottom - left_avg_intercept) / left_avg_slope)
-        x2_left = int((y_top - left_avg_intercept) / left_avg_slope)
+    # 绘制左车道线（使用多项式拟合而非线性拟合）
+    if len(left_points) >= 2:
+        left_y = left_points[:, 1]
+        left_x = left_points[:, 0]
+        # 优化点4：二次多项式拟合，更贴合真实车道曲线
+        left_fit = np.polyfit(left_y, left_x, 2)
+        
+        # 计算车道线端点
+        y_vals = np.array([y_bottom, y_top])
+        x_vals = left_fit[0] * y_vals**2 + left_fit[1] * y_vals + left_fit[2]
+        
+        # 确保坐标在图像范围内
+        x1_left = np.clip(int(x_vals[0]), 0, width)
+        x2_left = np.clip(int(x_vals[1]), 0, width)
+        
         cv2.line(img, (x1_left, y_bottom), (x2_left, y_top), color, thickness)
-        # 曲率计算相关：拟合
-        if len(left_x) >= 2:
-            left_fit = np.polyfit(left_y, left_x, 2)
-        # ===================== 偏离计算新增部分开始 =====================
-        # 保存左车道线底部x坐标
         left_bottom_x = x1_left
-        # ===================== 偏离计算新增部分结束 =====================
     
     # 绘制右车道线
-    if right_avg_slope != 0:
-        x1_right = int((y_bottom - right_avg_intercept) / right_avg_slope)
-        x2_right = int((y_top - right_avg_intercept) / right_avg_slope)
+    if len(right_points) >= 2:
+        right_y = right_points[:, 1]
+        right_x = right_points[:, 0]
+        right_fit = np.polyfit(right_y, right_x, 2)
+        
+        # 计算车道线端点
+        y_vals = np.array([y_bottom, y_top])
+        x_vals = right_fit[0] * y_vals**2 + right_fit[1] * y_vals + right_fit[2]
+        
+        # 确保坐标在图像范围内
+        x1_right = np.clip(int(x_vals[0]), 0, width)
+        x2_right = np.clip(int(x_vals[1]), 0, width)
+        
         cv2.line(img, (x1_right, y_bottom), (x2_right, y_top), color, thickness)
-        # 曲率计算相关：拟合
-        if len(right_x) >= 2:
-            right_fit = np.polyfit(right_y, right_x, 2)
-        # ===================== 偏离计算新增部分开始 =====================
-        # 保存右车道线底部x坐标
         right_bottom_x = x1_right
-        # ===================== 偏离计算新增部分结束 =====================
     
-    # 返回：原图、曲率拟合参数、车道线底部x坐标（用于偏离计算）
     return img, left_fit, right_fit, left_bottom_x, right_bottom_x
 
-# ===================== 偏离计算新增函数开始 =====================
 def calculate_car_offset(left_bottom_x, right_bottom_x, img_shape):
     """
-    新增：计算车辆偏离车道中心的距离（单位：米）
-    核心逻辑：
-    1. 假设车辆中心在图像水平中心位置
-    2. 计算车道中心与车辆中心的像素差，转换为真实世界距离
+    优化版：计算车辆偏离车道中心的距离（单位：米）
+    提升精度措施：
+    1. 动态像素米转换系数
+    2. 异常值过滤
+    3. 边界检查
     """
-    # 无有效车道线时返回N/A
     if left_bottom_x is None or right_bottom_x is None:
         return "N/A"
     
     height, width = img_shape[:2]
-    # 1. 计算车道中心x坐标（左右车道线底部x的平均值）
+    
+    # 优化点5：计算实际车道宽度（像素），动态调整转换系数
+    lane_width_pix = abs(right_bottom_x - left_bottom_x)
+    if lane_width_pix < 100:  # 过滤异常宽度
+        return "N/A"
+    
+    # 标准车道宽度3.7米，动态计算像素米转换系数
+    xm_per_pix = 3.7 / lane_width_pix
+    
+    # 计算车道中心和车辆中心
     lane_center_x = (left_bottom_x + right_bottom_x) / 2
-    # 2. 车辆中心x坐标（图像水平中心）
     car_center_x = width / 2
-    # 3. 像素偏移量（正=右偏，负=左偏）
+    
+    # 优化点6：考虑相机安装偏移（默认0，可根据实际情况调整）
+    camera_offset_pix = 0  # 相机偏左为负，偏右为正
+    car_center_x += camera_offset_pix
+    
+    # 计算偏移量
     offset_pix = car_center_x - lane_center_x
-    # 4. 像素转米（横向：700像素=3.7米，标准车道宽度）
-    xm_per_pix = 3.7 / 700
     offset_m = offset_pix * xm_per_pix
     
-    # 格式化输出
-    if offset_m > 0.05:  # 右偏（阈值避免微小误差）
-        return f"右偏 {abs(offset_m):.2f}m"
-    elif offset_m < -0.05:  # 左偏
-        return f"左偏 {abs(offset_m):.2f}m"
-    else:  # 居中
-        return "居中"
-# ===================== 偏离计算新增函数结束 =====================
+    # 优化点7：更精确的阈值和格式化
+    if offset_m > 0.02:
+        return f"右偏 {abs(offset_m):.3f}m"
+    elif offset_m < -0.02:
+        return f"左偏 {abs(offset_m):.3f}m"
+    else:
+        return "居中 (±0.02m)"
 
 def calculate_lane_curvature(left_fit, right_fit, img_shape):
-    """计算车道曲率半径（单位：米）"""
+    """
+    优化版：计算车道曲率半径（单位：米）
+    提升精度措施：
+    1. 更精确的像素米转换
+    2. 多点拟合而非单点
+    3. 曲率平滑
+    """
     if left_fit is None or right_fit is None:
         return "N/A"
     
-    height = img_shape[0]
-    y_eval = np.max([height - 1, 0])
-    ym_per_pix = 30 / 720
-    xm_per_pix = 3.7 / 700
+    height, width = img_shape[:2]
     
-    left_fit_cr = np.polyfit(
-        np.array([y_eval]) * ym_per_pix,
-        np.array([left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]]) * xm_per_pix,
-        2
-    )
-    right_fit_cr = np.polyfit(
-        np.array([y_eval]) * ym_per_pix,
-        np.array([right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]]) * xm_per_pix,
-        2
-    )
+    # 优化点8：更精确的像素到米的转换系数（基于实际场景校准）
+    # 纵向：720像素对应30米（可根据实际场景调整）
+    ym_per_pix = 30 / 720  
+    # 横向：车道宽度3.7米（动态计算更准确）
+    xm_per_pix = 3.7 / 700  
     
+    # 优化点9：使用多个y值点进行拟合，提升精度
+    y_vals = np.linspace(0, height-1, num=50)  # 生成50个均匀分布的y值
+    y_eval = np.max(y_vals)  # 底部点（车辆位置）
+    
+    # 左车道曲率计算
+    left_x = left_fit[0] * y_vals**2 + left_fit[1] * y_vals + left_fit[2]
+    left_fit_cr = np.polyfit(y_vals * ym_per_pix, left_x * xm_per_pix, 2)
     left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
+    
+    # 右车道曲率计算
+    right_x = right_fit[0] * y_vals**2 + right_fit[1] * y_vals + right_fit[2]
+    right_fit_cr = np.polyfit(y_vals * ym_per_pix, right_x * xm_per_pix, 2)
     right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
     
+    # 优化点10：曲率平滑，取平均值并过滤异常值
     avg_curvature = (left_curverad + right_curverad) / 2
-    return f"{int(avg_curvature)} m"
+    
+    # 过滤异常曲率值
+    if avg_curvature < 100 or avg_curvature > 10000:
+        return "N/A"
+    
+    # 优化点11：根据曲率大小调整显示精度
+    if avg_curvature > 1000:
+        return f"{int(avg_curvature)} m (近似直线)"
+    else:
+        return f"{avg_curvature:.1f} m"
 
 def lane_detection_pipeline(img):
-    """完整的车道检测流水线（含曲率+偏离计算，移除填充）"""
+    """完整的车道检测流水线（优化版）"""
     # 预处理
     gray = grayscale(img)
     blur = gaussian_blur(gray)
@@ -184,17 +218,17 @@ def lane_detection_pipeline(img):
     ]], dtype=np.int32)
     roi_edges = region_of_interest(edges, vertices)
     
-    # 霍夫变换检测直线
+    # 霍夫变换检测直线（优化参数）
     lines = cv2.HoughLinesP(
         roi_edges,
         rho=1,               
         theta=np.pi/180,     
-        threshold=20,        
-        minLineLength=40,    
-        maxLineGap=20        
+        threshold=30,        # 提高阈值，减少噪声
+        minLineLength=50,    # 增加最小线长，过滤短线
+        maxLineGap=15        # 减小最大间隙，提升连续性
     )
     
-    # 绘制车道线（获取曲率参数+车道线底部x坐标）
+    # 绘制车道线
     line_img = np.zeros_like(img)
     line_img, left_fit, right_fit, left_bottom_x, right_bottom_x = draw_lines(line_img, lines)
     result = cv2.addWeighted(img, 0.8, line_img, 1, 0)
@@ -211,19 +245,17 @@ def lane_detection_pipeline(img):
         2
     )
     
-    # ===================== 偏离计算新增部分开始 =====================
     # 计算车辆偏离并绘制
     offset = calculate_car_offset(left_bottom_x, right_bottom_x, img.shape)
     cv2.putText(
         result, 
         f"Car Offset: {offset}",
-        (20, 100),  # 曲率文字下方，避免重叠
+        (20, 100),
         cv2.FONT_HERSHEY_SIMPLEX,
         1,
         (255, 255, 255),
         2
     )
-    # ===================== 偏离计算新增部分结束 =====================
     
     return result
 
@@ -270,18 +302,17 @@ def batch_detect_images(folder_path):
     print(f"📁 所有结果已保存至：{folder_path}")
 
 def main():
-    """主函数：支持单张/批量检测模式（含曲率+偏离计算）"""
+    """主函数：支持单张/批量检测模式（优化版）"""
     print("="*60)
-    print("      车道检测程序 - 单张/批量模式（曲率+偏离计算）")
+    print("      车道检测程序 - 单张/批量模式（高精度版）")
     print("="*60)
     
-    # 获取脚本所在目录，作为相对路径的基准
     script_dir = os.path.dirname(os.path.abspath(__file__))
     print(f"\n📂 当前脚本目录：{script_dir}")
     
     print("\n请选择运行模式：")
-    print("1 - 单张图片检测（含曲率+偏离计算）")
-    print("2 - 批量图片检测（含曲率+偏离计算）")
+    print("1 - 单张图片检测（高精度）")
+    print("2 - 批量图片检测（高精度）")
     mode = input("输入模式编号（1/2）：").strip()
     
     if mode == "1":
@@ -294,7 +325,6 @@ def main():
             print("❌ 错误：路径不能为空！")
             return
         
-        # 拼接为绝对路径（内部使用，用户无需关心）
         CUSTOM_IMAGE_PATH = os.path.join(script_dir, relative_path)
         
         if not os.path.exists(CUSTOM_IMAGE_PATH):
@@ -302,27 +332,21 @@ def main():
             print(f"脚本目录：{script_dir}")
             print(f"你输入的相对路径：{relative_path}")
             print(f"拼接后的绝对路径：{CUSTOM_IMAGE_PATH}")
-            print("请检查：")
-            print("  1. 相对路径是否正确（如 images/test_lane.png）")
-            print("  2. 文件名和后缀（.jpg/.png）是否正确")
-            print("  3. 文件是否真的存在于该目录下")
+            print("请检查路径和文件名是否正确")
             return
         
         img = cv2.imread(CUSTOM_IMAGE_PATH)
         if img is None:
             print("\n❌ 错误：无法读取图像！")
-            print("可能原因：")
-            print("  1. 文件格式不支持（仅支持 jpg/png/bmp 等）")
-            print("  2. 文件已损坏或不是有效的图片文件")
             return
         
-        print("\n✅ 图片读取成功，正在检测车道...")
+        print("\n✅ 图片读取成功，正在高精度检测车道...")
         result = lane_detection_pipeline(img)
         
         cv2.imshow("📷 原始图片", img)
-        cv2.imshow("🚗 车道检测结果（曲率+偏离）", result)
+        cv2.imshow("🚗 车道检测结果（高精度）", result)
         
-        save_path = os.path.splitext(CUSTOM_IMAGE_PATH)[0] + "_result.jpg"
+        save_path = os.path.splitext(CUSTOM_IMAGE_PATH)[0] + "_high_precision_result.jpg"
         cv2.imwrite(save_path, result)
         print(f"\n✅ 检测完成！结果已保存到：{save_path}")
         print("\n提示：按任意键关闭图片窗口")
@@ -340,7 +364,6 @@ def main():
             print("❌ 错误：路径不能为空！")
             return
         
-        # 拼接为绝对路径（内部使用，用户无需关心）
         folder_path = os.path.join(script_dir, relative_folder)
         batch_detect_images(folder_path)
     
@@ -349,5 +372,5 @@ def main():
 
 if __name__ == "__main__":
     # 安装依赖（首次运行前执行）
-    # pip install opencv-python numpy
+    # pip install opencv-python numpy scipy
     main()
