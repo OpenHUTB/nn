@@ -595,6 +595,7 @@ class ArmController:
             self.traj_pos, self.traj_vel = TrajectoryPlanner.plan_joints(start, target)
             self.target = target
             self.traj_idx = 0
+            self.saved_traj_idx = 0
 
             # 保存轨迹
             if save_traj:
@@ -831,6 +832,65 @@ class ArmController:
         max_err = rad2deg(np.max(self.max_err))
         log(f"控制器停止 | 总步数: {self.step} | 最大误差: {np.round(max_err, 3)}°")
 
+    def _start_interactive_thread(self):
+        """新增：启动交互线程，支持运行时命令输入"""
+
+        def interactive_task():
+            log_info("\n======= 交互命令 =======")
+            log_info("help - 查看帮助")
+            log_info("pause - 暂停轨迹")
+            log_info("resume - 恢复轨迹")
+            log_info("stop - 紧急停止")
+            log_info("load [kg] - 设置负载（如load 1.0）")
+            log_info("joint [idx] [deg] - 控制单个关节（如joint 1 30）")
+            log_info("pose [name] - 预设姿态（zero/up/grasp/test）")
+            log_info("param [name] [value] [idx] - 调整参数（如param kp_base 150）")
+            log_info("save [name] - 保存当前轨迹")
+            log_info("load_traj [name] - 加载轨迹")
+            log_info("=======================\n")
+
+            while RUNNING and not EMERGENCY_STOP:
+                try:
+                    cmd = input("> ").strip().lower()
+                    if not cmd:
+                        continue
+
+                    parts = cmd.split()
+                    if parts[0] == 'help':
+                        self._print_help()
+                    elif parts[0] == 'pause':
+                        self.pause_trajectory()
+                    elif parts[0] == 'resume':
+                        self.resume_trajectory()
+                    elif parts[0] == 'stop':
+                        self.emergency_stop()
+                    elif parts[0] == 'load' and len(parts) == 2:
+                        self.set_end_load(float(parts[1]))
+                    elif parts[0] == 'joint' and len(parts) == 3:
+                        self.control_single_joint(int(parts[1]) - 1, float(parts[2]))
+                    elif parts[0] == 'pose' and len(parts) == 2:
+                        self.preset_pose(parts[1])
+                    elif parts[0] == 'param' and len(parts) >= 3:
+                        idx = int(parts[3]) - 1 if len(parts) == 4 else None
+                        self.adjust_control_param(parts[1], float(parts[2]), idx)
+                    elif parts[0] == 'save' and len(parts) == 2:
+                        self.move_to(rad2deg(self.target_rad), save_traj=True, traj_name=parts[1])
+                    elif parts[0] == 'load_traj' and len(parts) == 2:
+                        self.load_trajectory(parts[1])
+                    else:
+                        log_info("未知命令，输入help查看帮助")
+                except KeyboardInterrupt:
+                    continue
+                except Exception as e:
+                    log_info(f"命令执行错误: {e}")
+
+        # 启动交互线程（守护线程）
+        interactive_thread = threading.Thread(target=interactive_task, daemon=True)
+        interactive_thread.start()
+
+    def _print_help(self):
+        """打印帮助信息"""
+        help_text = """
     def _cleanup(self):
         """资源清理（自动化）"""
         if self.viewer:
@@ -875,7 +935,7 @@ def demo(controller: ArmController):
 
         for delay, action, param in steps:
             time.sleep(delay)
-            if not RUNNING:
+            if not RUNNING or EMERGENCY_STOP:
                 break
 
             if action == 'pose':
