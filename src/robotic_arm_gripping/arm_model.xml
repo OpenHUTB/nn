@@ -10,7 +10,7 @@
      limitations under the License.
 -->
 
-<mujoco model="Humanoid-Arm-Grasp">
+<mujoco model="Humanoid-Arm-With-Fingers">
   <option timestep="0.005"/>
 
   <visual>
@@ -29,10 +29,12 @@
     <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
     <!-- 抓取目标物体材质 -->
     <material name="target_obj" rgba="0.9 0.2 0.2 1"/>
+    <!-- 手指材质（略深，区分手臂） -->
+    <material name="finger" texture="body" texuniform="true" rgba="0.7 0.5 .3 1"/>
   </asset>
 
   <default>
-    <motor ctrlrange="-2 2" ctrllimited="true"/>  <!-- 增大控制范围，适配抓取动作 -->
+    <motor ctrlrange="-2 2" ctrllimited="true"/>
     <default class="body">
       <!-- 手臂相关geom默认参数 -->
       <geom type="capsule" condim="1" friction=".9" solimp=".9 .99 .003" solref=".015 1" material="body" group="1"/>
@@ -42,17 +44,22 @@
       <default class="arm_lower">
         <geom size=".031"/>
       </default>
-      <default class="hand">
-        <geom type="sphere" size=".05"/>  <!-- 增大手部尺寸，方便抓取 -->
+      <default class="hand_base">
+        <geom type="sphere" size=".05" material="body"/>
+      </default>
+      <!-- 手指默认参数 -->
+      <default class="finger">
+        <geom type="capsule" size=".018" material="finger" friction=".9"/>
+        <joint type="hinge" damping=".5" stiffness="8" limited="true" range="-1.2 0.2"/>
       </default>
 
-      <!-- 手臂相关joint默认参数 -->
+      <!-- 手臂关节默认参数 -->
       <joint type="hinge" damping=".3" stiffness="5" armature=".01" limited="true" solimplimit="0 .99 .01"/>
       <default class="shoulder">
-        <joint range="-120 90"/>  <!-- 扩大肩膀关节范围，适配向前抓取 -->
+        <joint range="-120 90"/>
       </default>
       <default class="elbow">
-        <joint range="-150 80" stiffness="2"/>  <!-- 扩大手肘范围 -->
+        <joint range="-150 80" stiffness="2"/>
       </default>
     </default>
   </default>
@@ -65,16 +72,16 @@
     <!-- 抓取目标物体（地面上的小球） -->
     <body name="target_ball" pos="0.3 0 0.1">
       <geom name="target_ball_geom" type="sphere" size=".06" material="target_obj" condim="3"/>
-      <freejoint name="target_ball_joint"/>  <!-- 物体可被推动/抓取 -->
+      <freejoint name="target_ball_joint"/>
     </body>
 
-    <!-- 简化的躯干（固定在地面） -->
+    <!-- 躯干（固定在地面） -->
     <body name="torso" pos="0 0 0.5" childclass="body">
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
       <geom name="torso" fromto="0 -.07 0 0 .07 0" size=".07"/>
 
-      <!-- 右臂（主要控制的抓取臂） -->
+      <!-- 右臂（带手指的抓取臂） -->
       <body name="upper_arm_right" pos="0 -.17 .06">
         <joint name="shoulder1_right" axis="2 1 1"  class="shoulder"/>
         <joint name="shoulder2_right" axis="0 -1 1" class="shoulder"/>
@@ -82,10 +89,41 @@
         <body name="lower_arm_right" pos=".18 -.18 -.18">
           <joint name="elbow_right" axis="0 -1 1" class="elbow"/>
           <geom name="lower_arm_right" fromto=".01 .01 .01 .17 .17 .17" class="arm_lower"/>
-          <body name="hand_right" pos=".18 .18 .18">
-            <!-- 手部抓取碰撞体（扩大接触范围） -->
-            <geom name="hand_right_main" zaxis="1 1 1" class="hand"/>
-            <geom name="hand_right_grasp" type="capsule" fromto="0 0 0 0.08 0.08 0" size=".02" material="body"/>
+
+          <!-- 手部基座 -->
+          <body name="hand_right_base" pos=".18 .18 .18">
+            <geom name="hand_right_base_geom" class="hand_base"/>
+
+            <!-- 手指1：拇指（前侧） -->
+            <body name="finger1_base" pos="0.04 0.02 0">
+              <joint name="finger1_joint" axis="1 0 0" class="finger"/>
+              <geom name="finger1_geom" fromto="0 0 0 0.06 0.01 0" class="finger"/>
+              <!-- 手指小节 -->
+              <body name="finger1_tip" pos="0.06 0.01 0">
+                <joint name="finger1_tip_joint" axis="1 0 0" class="finger" range="-0.8 0"/>
+                <geom name="finger1_tip_geom" fromto="0 0 0 0.04 0.005 0" class="finger" size=".015"/>
+              </body>
+            </body>
+
+            <!-- 手指2：食指（右侧） -->
+            <body name="finger2_base" pos="0.02 -0.04 0">
+              <joint name="finger2_joint" axis="0 1 0" class="finger"/>
+              <geom name="finger2_geom" fromto="0 0 0 0.06 -0.01 0" class="finger"/>
+              <body name="finger2_tip" pos="0.06 -0.01 0">
+                <joint name="finger2_tip_joint" axis="0 1 0" class="finger" range="-0.8 0"/>
+                <geom name="finger2_tip_geom" fromto="0 0 0 0.04 -0.005 0" class="finger" size=".015"/>
+              </body>
+            </body>
+
+            <!-- 手指3：中指（左侧） -->
+            <body name="finger3_base" pos="0.02 0 0.04">
+              <joint name="finger3_joint" axis="0 0 1" class="finger"/>
+              <geom name="finger3_geom" fromto="0 0 0 0.06 0 0.01" class="finger"/>
+              <body name="finger3_tip" pos="0.06 0 0.01">
+                <joint name="finger3_tip_joint" axis="0 0 1" class="finger" range="-0.8 0"/>
+                <geom name="finger3_tip_geom" fromto="0 0 0 0.04 0 0.005" class="finger" size=".015"/>
+              </body>
+            </body>
           </body>
         </body>
       </body>
@@ -99,25 +137,36 @@
           <joint name="elbow_left" axis="0 -1 -1" class="elbow"/>
           <geom name="lower_arm_left" fromto=".01 -.01 .01 .17 -.17 .17" class="arm_lower"/>
           <body name="hand_left" pos=".18 -.18 .18">
-            <geom name="hand_left" zaxis="1 -1 1" class="hand"/>
+            <geom name="hand_left" type="sphere" size=".05" material="body"/>
           </body>
         </body>
       </body>
     </body>
   </worldbody>
 
-  <!-- 手臂执行器（新增手部抓取相关的阻尼优化） -->
+  <!-- 执行器：新增手指关节控制 -->
   <actuator>
+    <!-- 右臂基础关节 -->
     <motor name="shoulder1_right" gear="30"  joint="shoulder1_right"/>
     <motor name="shoulder2_right" gear="30"  joint="shoulder2_right"/>
     <motor name="elbow_right"     gear="50"  joint="elbow_right"/>
+    <!-- 手指关节执行器 -->
+    <motor name="finger1_joint" gear="40" joint="finger1_joint"/>
+    <motor name="finger1_tip_joint" gear="35" joint="finger1_tip_joint"/>
+    <motor name="finger2_joint" gear="40" joint="finger2_joint"/>
+    <motor name="finger2_tip_joint" gear="35" joint="finger2_tip_joint"/>
+    <motor name="finger3_joint" gear="40" joint="finger3_joint"/>
+    <motor name="finger3_tip_joint" gear="35" joint="finger3_tip_joint"/>
+    <!-- 左臂关节 -->
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
   </actuator>
 
-  <!-- 抓取约束（接触时自动吸附） -->
+  <!-- 抓取接触约束：手指与目标球的高摩擦接触 -->
   <contact>
-    <pair geom1="hand_right_grasp" geom2="target_ball_geom" solref=".01 1" solimp=".9 .99 .001" friction=".9"/>
+    <pair geom1="finger1_geom" geom2="target_ball_geom" solref=".01 1" solimp=".9 .99 .001" friction=".95"/>
+    <pair geom1="finger2_geom" geom2="target_ball_geom" solref=".01 1" solimp=".9 .99 .001" friction=".95"/>
+    <pair geom1="finger3_geom" geom2="target_ball_geom" solref=".01 1" solimp=".9 .99 .001" friction=".95"/>
   </contact>
 </mujoco>
