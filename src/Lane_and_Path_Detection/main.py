@@ -28,23 +28,24 @@ def region_of_interest(img, vertices):
     return masked_img
 
 def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
-    """拟合并绘制左右车道线"""
+    """拟合并绘制左右车道线，返回拟合参数+车道线底部端点（用于偏离计算）"""
     left_slope = []   
     left_intercept = [] 
     right_slope = []  
     right_intercept = [] 
     
-    # ===================== 新增部分开始 =====================
-    # 新增：收集车道线坐标点，用于多项式拟合计算曲率
+    # 曲率计算相关：收集坐标点
     left_x, left_y = [], []
     right_x, right_y = [], []
-    # ===================== 新增部分结束 =====================
+    # ===================== 偏离计算新增部分开始 =====================
+    # 保存车道线底部端点（图像底部的x坐标，用于计算中心）
+    left_bottom_x = None
+    right_bottom_x = None
+    # ===================== 偏离计算新增部分结束 =====================
     
     if lines is None:
-        # ===================== 新增部分开始 =====================
-        # 新增：无车道线时返回None（用于曲率计算判断）
-        return img, None, None
-        # ===================== 新增部分结束 =====================
+        # 曲率+偏离计算：返回空值
+        return img, None, None, left_bottom_x, right_bottom_x
     
     for line in lines:
         for x1, y1, x2, y2 in line:
@@ -55,19 +56,13 @@ def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
             if -0.8 < slope < -0.3:
                 left_slope.append(slope)
                 left_intercept.append(intercept)
-                # ===================== 新增部分开始 =====================
-                # 新增：收集左车道线坐标点
                 left_x.extend([x1, x2])
                 left_y.extend([y1, y2])
-                # ===================== 新增部分结束 =====================
             elif 0.3 < slope < 0.8:
                 right_slope.append(slope)
                 right_intercept.append(intercept)
-                # ===================== 新增部分开始 =====================
-                # 新增：收集右车道线坐标点
                 right_x.extend([x1, x2])
                 right_y.extend([y1, y2])
-                # ===================== 新增部分结束 =====================
     
     # 计算平均斜率和截距
     left_avg_slope = np.mean(left_slope) if left_slope else 0
@@ -80,82 +75,100 @@ def draw_lines(img, lines, color=(0, 255, 0), thickness=5):
     y_bottom = height
     y_top = int(height * 0.6)
     
-    # ===================== 新增部分开始 =====================
-    # 新增：初始化车道线拟合参数（用于曲率计算）
+    # 曲率计算相关：初始化拟合参数
     left_fit = None
     right_fit = None
-    # ===================== 新增部分结束 =====================
     
     # 绘制左车道线
     if left_avg_slope != 0:
         x1_left = int((y_bottom - left_avg_intercept) / left_avg_slope)
         x2_left = int((y_top - left_avg_intercept) / left_avg_slope)
         cv2.line(img, (x1_left, y_bottom), (x2_left, y_top), color, thickness)
-        # ===================== 新增部分开始 =====================
-        # 新增：对左车道线做2次多项式拟合（曲率计算核心）
+        # 曲率计算相关：拟合
         if len(left_x) >= 2:
             left_fit = np.polyfit(left_y, left_x, 2)
-        # ===================== 新增部分结束 =====================
+        # ===================== 偏离计算新增部分开始 =====================
+        # 保存左车道线底部x坐标
+        left_bottom_x = x1_left
+        # ===================== 偏离计算新增部分结束 =====================
     
     # 绘制右车道线
     if right_avg_slope != 0:
         x1_right = int((y_bottom - right_avg_intercept) / right_avg_slope)
         x2_right = int((y_top - right_avg_intercept) / right_avg_slope)
         cv2.line(img, (x1_right, y_bottom), (x2_right, y_top), color, thickness)
-        # ===================== 新增部分开始 =====================
-        # 新增：对右车道线做2次多项式拟合（曲率计算核心）
+        # 曲率计算相关：拟合
         if len(right_x) >= 2:
             right_fit = np.polyfit(right_y, right_x, 2)
-        # ===================== 新增部分结束 =====================
+        # ===================== 偏离计算新增部分开始 =====================
+        # 保存右车道线底部x坐标
+        right_bottom_x = x1_right
+        # ===================== 偏离计算新增部分结束 =====================
     
-    # ===================== 新增部分开始 =====================
-    # 新增：返回拟合参数（用于后续曲率计算）
-    return img, left_fit, right_fit
-    # ===================== 新增部分结束 =====================
+    # 返回：原图、曲率拟合参数、车道线底部x坐标（用于偏离计算）
+    return img, left_fit, right_fit, left_bottom_x, right_bottom_x
 
-# ===================== 新增部分开始 =====================
+# ===================== 偏离计算新增函数开始 =====================
+def calculate_car_offset(left_bottom_x, right_bottom_x, img_shape):
+    """
+    新增：计算车辆偏离车道中心的距离（单位：米）
+    核心逻辑：
+    1. 假设车辆中心在图像水平中心位置
+    2. 计算车道中心与车辆中心的像素差，转换为真实世界距离
+    """
+    # 无有效车道线时返回N/A
+    if left_bottom_x is None or right_bottom_x is None:
+        return "N/A"
+    
+    height, width = img_shape[:2]
+    # 1. 计算车道中心x坐标（左右车道线底部x的平均值）
+    lane_center_x = (left_bottom_x + right_bottom_x) / 2
+    # 2. 车辆中心x坐标（图像水平中心）
+    car_center_x = width / 2
+    # 3. 像素偏移量（正=右偏，负=左偏）
+    offset_pix = car_center_x - lane_center_x
+    # 4. 像素转米（横向：700像素=3.7米，标准车道宽度）
+    xm_per_pix = 3.7 / 700
+    offset_m = offset_pix * xm_per_pix
+    
+    # 格式化输出
+    if offset_m > 0.05:  # 右偏（阈值避免微小误差）
+        return f"右偏 {abs(offset_m):.2f}m"
+    elif offset_m < -0.05:  # 左偏
+        return f"左偏 {abs(offset_m):.2f}m"
+    else:  # 居中
+        return "居中"
+# ===================== 偏离计算新增函数结束 =====================
+
 def calculate_lane_curvature(left_fit, right_fit, img_shape):
-    """
-    新增：计算车道曲率半径（单位：米）
-    真实世界映射关系：
-    - ym_per_pix: 纵向像素转米（720像素 ≈ 30米）
-    - xm_per_pix: 横向像素转米（700像素 ≈ 3.7米，标准车道宽度）
-    """
-    # 无有效拟合参数时返回N/A
+    """计算车道曲率半径（单位：米）"""
     if left_fit is None or right_fit is None:
         return "N/A"
     
     height = img_shape[0]
-    # 取图像底部的点计算曲率（贴近车辆实际视角）
     y_eval = np.max([height - 1, 0])
-    # 像素与真实世界的转换系数
     ym_per_pix = 30 / 720
     xm_per_pix = 3.7 / 700
     
-    # 转换左车道线拟合参数到真实世界坐标系
     left_fit_cr = np.polyfit(
         np.array([y_eval]) * ym_per_pix,
         np.array([left_fit[0]*y_eval**2 + left_fit[1]*y_eval + left_fit[2]]) * xm_per_pix,
         2
     )
-    # 转换右车道线拟合参数到真实世界坐标系
     right_fit_cr = np.polyfit(
         np.array([y_eval]) * ym_per_pix,
         np.array([right_fit[0]*y_eval**2 + right_fit[1]*y_eval + right_fit[2]]) * xm_per_pix,
         2
     )
     
-    # 曲率计算公式：R = (1 + (2Ay + B)^2)^1.5 / |2A|
     left_curverad = ((1 + (2*left_fit_cr[0]*y_eval*ym_per_pix + left_fit_cr[1])**2)**1.5) / np.absolute(2*left_fit_cr[0])
     right_curverad = ((1 + (2*right_fit_cr[0]*y_eval*ym_per_pix + right_fit_cr[1])**2)**1.5) / np.absolute(2*right_fit_cr[0])
     
-    # 取左右车道线曲率的平均值
     avg_curvature = (left_curverad + right_curverad) / 2
     return f"{int(avg_curvature)} m"
-# ===================== 新增部分结束 =====================
 
 def lane_detection_pipeline(img):
-    """完整的车道检测流水线"""
+    """完整的车道检测流水线（含曲率+偏离计算，移除填充）"""
     # 预处理
     gray = grayscale(img)
     blur = gaussian_blur(gray)
@@ -181,86 +194,158 @@ def lane_detection_pipeline(img):
         maxLineGap=20        
     )
     
-    # 绘制车道线并合并结果
+    # 绘制车道线（获取曲率参数+车道线底部x坐标）
     line_img = np.zeros_like(img)
-    # ===================== 新增部分开始 =====================
-    # 新增：接收draw_lines返回的拟合参数
-    line_img, left_fit, right_fit = draw_lines(line_img, lines)
-    # ===================== 新增部分结束 =====================
+    line_img, left_fit, right_fit, left_bottom_x, right_bottom_x = draw_lines(line_img, lines)
     result = cv2.addWeighted(img, 0.8, line_img, 1, 0)
     
-    # ===================== 新增部分开始 =====================
-    # 新增：计算曲率并绘制到图像左上角
+    # 计算曲率并绘制
     curvature = calculate_lane_curvature(left_fit, right_fit, img.shape)
     cv2.putText(
         result, 
-        f"Lane Curvature: {curvature}",  # 曲率文字内容
-        (20, 50),                       # 文字位置（左上角）
-        cv2.FONT_HERSHEY_SIMPLEX,       # 字体
-        1,                              # 字体大小
-        (255, 255, 255),                # 文字颜色（白色）
-        2                               # 文字粗细
+        f"Lane Curvature: {curvature}",
+        (20, 50),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (255, 255, 255),
+        2
     )
-    # ===================== 新增部分结束 =====================
+    
+    # ===================== 偏离计算新增部分开始 =====================
+    # 计算车辆偏离并绘制
+    offset = calculate_car_offset(left_bottom_x, right_bottom_x, img.shape)
+    cv2.putText(
+        result, 
+        f"Car Offset: {offset}",
+        (20, 100),  # 曲率文字下方，避免重叠
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1,
+        (255, 255, 255),
+        2
+    )
+    # ===================== 偏离计算新增部分结束 =====================
     
     return result
 
+def batch_detect_images(folder_path):
+    """批量检测指定文件夹下的所有图片"""
+    if not os.path.exists(folder_path):
+        print(f"❌ 错误：文件夹不存在 → {folder_path}")
+        return
+    
+    supported_formats = ['.jpg', '.jpeg', '.png', '.bmp']
+    img_files = [
+        f for f in os.listdir(folder_path)
+        if os.path.splitext(f)[1].lower() in supported_formats
+    ]
+    
+    if len(img_files) == 0:
+        print(f"❌ 错误：文件夹内未找到支持的图片文件 → {folder_path}")
+        return
+    
+    print(f"\n📁 开始批量检测，共发现 {len(img_files)} 张图片...")
+    success_count = 0
+    
+    for idx, img_file in enumerate(img_files, 1):
+        img_path = os.path.join(folder_path, img_file)
+        print(f"\n[{idx}/{len(img_files)}] 处理：{img_file}")
+        
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"⚠️  跳过：无法读取图片 {img_file}")
+            continue
+        
+        result = lane_detection_pipeline(img)
+        
+        save_name = os.path.splitext(img_file)[0] + "_batch_result.jpg"
+        save_path = os.path.join(folder_path, save_name)
+        cv2.imwrite(save_path, result)
+        
+        success_count += 1
+        print(f"✅ 完成：结果保存为 {save_name}")
+    
+    print(f"\n🎉 批量检测结束！")
+    print(f"✅ 成功处理：{success_count} 张")
+    print(f"❌ 失败/跳过：{len(img_files) - success_count} 张")
+    print(f"📁 所有结果已保存至：{folder_path}")
+
 def main():
-    """主函数：手动输入路径的车道检测"""
-    print("="*50)
-    # ===================== 新增部分开始 =====================
-    print("      车道检测程序 - 手动输入图片路径版（含曲率计算）")
-    # ===================== 新增部分结束 =====================
-    print("="*50)
+    """主函数：支持单张/批量检测模式（含曲率+偏离计算）"""
+    print("="*60)
+    print("      车道检测程序 - 单张/批量模式（曲率+偏离计算）")
+    print("="*60)
     
-    # 1. 手动输入图片路径（支持复制粘贴）
-    print("\n请输入图片的完整路径（可直接复制粘贴）：")
-    print("示例：C:\\Users\\apple\\Desktop\\zy\\test_lane.png")
-    CUSTOM_IMAGE_PATH = input("图片路径：").strip()
+    # 获取脚本所在目录，作为相对路径的基准
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    print(f"\n📂 当前脚本目录：{script_dir}")
     
-    # 2. 检查路径是否为空
-    if not CUSTOM_IMAGE_PATH:
-        print("❌ 错误：路径不能为空！")
-        return
+    print("\n请选择运行模式：")
+    print("1 - 单张图片检测（含曲率+偏离计算）")
+    print("2 - 批量图片检测（含曲率+偏离计算）")
+    mode = input("输入模式编号（1/2）：").strip()
     
-    # 3. 检查文件是否存在
-    if not os.path.exists(CUSTOM_IMAGE_PATH):
-        print(f"\n❌ 错误：文件不存在！")
-        print(f"当前输入的路径：{CUSTOM_IMAGE_PATH}")
-        print("请检查：")
-        print("  1. 路径是否正确（建议复制粘贴）")
-        print("  2. 文件名和后缀（.jpg/.png）是否正确")
-        print("  3. 文件是否真的存在于该目录下")
-        return
+    if mode == "1":
+        print("\n📸 单张图片检测模式")
+        print("\n请输入图片的相对路径（相对于脚本目录）：")
+        print("示例：images/test_lane.png 或 ../data/test_lane.png")
+        relative_path = input("相对路径：").strip()
+        
+        if not relative_path:
+            print("❌ 错误：路径不能为空！")
+            return
+        
+        # 拼接为绝对路径（内部使用，用户无需关心）
+        CUSTOM_IMAGE_PATH = os.path.join(script_dir, relative_path)
+        
+        if not os.path.exists(CUSTOM_IMAGE_PATH):
+            print(f"\n❌ 错误：文件不存在！")
+            print(f"脚本目录：{script_dir}")
+            print(f"你输入的相对路径：{relative_path}")
+            print(f"拼接后的绝对路径：{CUSTOM_IMAGE_PATH}")
+            print("请检查：")
+            print("  1. 相对路径是否正确（如 images/test_lane.png）")
+            print("  2. 文件名和后缀（.jpg/.png）是否正确")
+            print("  3. 文件是否真的存在于该目录下")
+            return
+        
+        img = cv2.imread(CUSTOM_IMAGE_PATH)
+        if img is None:
+            print("\n❌ 错误：无法读取图像！")
+            print("可能原因：")
+            print("  1. 文件格式不支持（仅支持 jpg/png/bmp 等）")
+            print("  2. 文件已损坏或不是有效的图片文件")
+            return
+        
+        print("\n✅ 图片读取成功，正在检测车道...")
+        result = lane_detection_pipeline(img)
+        
+        cv2.imshow("📷 原始图片", img)
+        cv2.imshow("🚗 车道检测结果（曲率+偏离）", result)
+        
+        save_path = os.path.splitext(CUSTOM_IMAGE_PATH)[0] + "_result.jpg"
+        cv2.imwrite(save_path, result)
+        print(f"\n✅ 检测完成！结果已保存到：{save_path}")
+        print("\n提示：按任意键关闭图片窗口")
+        
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
     
-    # 4. 读取图片
-    img = cv2.imread(CUSTOM_IMAGE_PATH)
-    if img is None:
-        print("\n❌ 错误：无法读取图像！")
-        print("可能原因：")
-        print("  1. 文件格式不支持（仅支持 jpg/png/bmp 等）")
-        print("  2. 文件已损坏或不是有效的图片文件")
-        return
+    elif mode == "2":
+        print("\n📁 批量图片检测模式")
+        print("\n请输入图片文件夹的相对路径（相对于脚本目录）：")
+        print("示例：lane_images 或 ../data/lane_images")
+        relative_folder = input("相对路径：").strip()
+        
+        if not relative_folder:
+            print("❌ 错误：路径不能为空！")
+            return
+        
+        # 拼接为绝对路径（内部使用，用户无需关心）
+        folder_path = os.path.join(script_dir, relative_folder)
+        batch_detect_images(folder_path)
     
-    # 5. 执行车道检测
-    print("\n✅ 图片读取成功，正在检测车道...")
-    result = lane_detection_pipeline(img)
-    
-    # 6. 显示检测结果
-    cv2.imshow("📷 原始图片", img)
-    # ===================== 新增部分开始 =====================
-    cv2.imshow("🚗 车道检测结果（含曲率）", result)
-    # ===================== 新增部分结束 =====================
-    
-    # 7. 自动保存检测结果（和原图同目录，后缀加 _result）
-    save_path = os.path.splitext(CUSTOM_IMAGE_PATH)[0] + "_result.jpg"
-    cv2.imwrite(save_path, result)
-    print(f"\n✅ 检测完成！结果已保存到：{save_path}")
-    print("\n提示：按任意键关闭图片窗口")
-    
-    # 8. 等待按键关闭窗口
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    else:
+        print("❌ 错误：无效的模式编号！请输入 1 或 2")
 
 if __name__ == "__main__":
     # 安装依赖（首次运行前执行）
