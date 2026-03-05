@@ -226,7 +226,6 @@ def main():
                 break
             print("无效输入！请输入 1、2 或 3")
 
-        # 映射模式
         mode_map = {"1": "trajectory", "2": "manual", "3": "follow"}
         sim.run_simulation(mode=mode_map[mode_choice], duration=30.0)
 
