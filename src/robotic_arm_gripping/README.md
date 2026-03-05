@@ -12,9 +12,12 @@
 # 环境要求
 ## 软件依赖
 - 核心依赖
+```bash
 pip install mujoco>=3.1.0 numpy
+```
 
 # 系统兼容
 
 - Windows/Linux/macOS
 - Python 3.8+
+
