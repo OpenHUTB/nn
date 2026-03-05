@@ -99,10 +99,21 @@ class ControlConfig:
                     setattr(cfg, k, v)
         return cfg
 
+            # 写入特殊级别日志
+            if level in log_files and level != "INFO":
+                with open(log_files[level], "a", encoding="utf-8") as f:
+                    f.write(log_msg + "\n")
 
 # 全局配置（单例）
 CFG = ControlConfig()
 
+    @classmethod
+    def deg2rad(cls, x):
+        """角度转弧度（向量化+异常安全）"""
+        try:
+            return np.asarray(x, np.float64) * DEG2RAD
+        except:
+            return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
 # ====================== 工具类（极简+高效） ======================
 class Utils:
@@ -472,12 +483,33 @@ class ArmController:
         # Viewer
         self.viewer = None
 
+        # Viewer
+        self.viewer = None
+
+    def _init_ids(self):
+        """ID初始化（预计算）"""
+        if self.model is None:
+            self.joint_ids = [-1] * JOINT_COUNT
+            self.motor_ids = [-1] * JOINT_COUNT
+            self.ee_id = -1
+            self.link_geom_ids = [-1] * JOINT_COUNT
+            return
+
+        # 批量获取ID
+        self.joint_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, f'joint{i + 1}')
+                          for i in range(JOINT_COUNT)]
+        self.motor_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f'motor{i + 1}')
+                          for i in range(JOINT_COUNT)]
+        self.ee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, 'ee_geom')
+        self.link_geom_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}')
+                              for i in range(JOINT_COUNT)]
+
     def _init_mujoco(self):
         """极简MuJoCo初始化"""
         xml = f"""
 <mujoco model="arm">
     <compiler angle="radian" inertiafromgeom="true"/>
-    <option timestep="{SIM_DT}" gravity="0 0 -9.81" collision="all"/>
+    <option timestep="{sim_dt}" gravity="0 0 -9.81" collision="all"/>
     <default>
         <joint type="hinge" limited="true"/>
         <motor ctrllimited="true" ctrlrange="-1 1" gear="100"/>
@@ -487,19 +519,19 @@ class ArmController:
         <geom name="floor" type="plane" size="3 3 0.1" rgba="0.8 0.8 0.8 1"/>
         <body name="base" pos="0 0 0">
             <geom type="cylinder" size="0.1 0.1" rgba="0.2 0.2 0.8 1"/>
-            <joint name="joint1" axis="0 0 1" pos="0 0 0.1" range="{JOINT_LIMITS[0, 0]} {JOINT_LIMITS[0, 1]}"/>
+            <joint name="joint1" axis="0 0 1" pos="0 0 0.1" range="{j1_min} {j1_max}"/>
             <body name="link1" pos="0 0 0.1">
                 <geom name="link1" type="cylinder" size="0.04 0.18" mass="0.8" rgba="0 0.8 0 0.8"/>
-                <joint name="joint2" axis="0 1 0" pos="0 0 0.18" range="{JOINT_LIMITS[1, 0]} {JOINT_LIMITS[1, 1]}"/>
+                <joint name="joint2" axis="0 1 0" pos="0 0 0.18" range="{j2_min} {j2_max}"/>
                 <body name="link2" pos="0 0 0.18">
                     <geom name="link2" type="cylinder" size="0.04 0.18" mass="0.6" rgba="0 0.8 0 0.8"/>
-                    <joint name="joint3" axis="0 1 0" pos="0 0 0.18" range="{JOINT_LIMITS[2, 0]} {JOINT_LIMITS[2, 1]}"/>
+                    <joint name="joint3" axis="0 1 0" pos="0 0 0.18" range="{j3_min} {j3_max}"/>
                     <body name="link3" pos="0 0 0.18">
                         <geom name="link3" type="cylinder" size="0.04 0.18" mass="0.6" rgba="0 0.8 0 0.8"/>
-                        <joint name="joint4" axis="0 1 0" pos="0 0 0.18" range="{JOINT_LIMITS[3, 0]} {JOINT_LIMITS[3, 1]}"/>
+                        <joint name="joint4" axis="0 1 0" pos="0 0 0.18" range="{j4_min} {j4_max}"/>
                         <body name="link4" pos="0 0 0.18">
                             <geom name="link4" type="cylinder" size="0.04 0.18" mass="0.4" rgba="0 0.8 0 0.8"/>
-                            <joint name="joint5" axis="0 1 0" pos="0 0 0.18" range="{JOINT_LIMITS[4, 0]} {JOINT_LIMITS[4, 1]}"/>
+                            <joint name="joint5" axis="0 1 0" pos="0 0 0.18" range="{j5_min} {j5_max}"/>
                             <body name="ee" pos="0 0 0.18">
                                 <geom name="ee_geom" type="sphere" size="0.04" mass="{self.load}" rgba="0.8 0.2 0.2 1"/>
                             </body>
@@ -520,7 +552,20 @@ class ArmController:
     </actuator>
 </mujoco>
         """
+
+        # 模板参数
+        xml_params = {
+            "sim_dt": SIM_DT,
+            "load": self.load_set,
+            "j1_min": JOINT_LIMITS[0, 0], "j1_max": JOINT_LIMITS[0, 1],
+            "j2_min": JOINT_LIMITS[1, 0], "j2_max": JOINT_LIMITS[1, 1],
+            "j3_min": JOINT_LIMITS[2, 0], "j3_max": JOINT_LIMITS[2, 1],
+            "j4_min": JOINT_LIMITS[3, 0], "j4_max": JOINT_LIMITS[3, 1],
+            "j5_min": JOINT_LIMITS[4, 0], "j5_max": JOINT_LIMITS[4, 1],
+        }
+
         try:
+            xml = xml_template.format(**xml_params)
             model = mujoco.MjModel.from_xml_string(xml)
             data = mujoco.MjData(model)
             return model, data
@@ -549,8 +594,11 @@ class ArmController:
         """获取关节状态"""
         if self.data is None:
             return np.zeros(JOINT_COUNT), np.zeros(JOINT_COUNT)
+
+        # 批量获取状态
         qpos = np.array([self.data.qpos[jid] if jid >= 0 else 0.0 for jid in self.joint_ids])
         qvel = np.array([self.data.qvel[jid] if jid >= 0 else 0.0 for jid in self.joint_ids])
+
         return qpos, qvel
 
     @Utils.perf
@@ -570,7 +618,7 @@ class ArmController:
             self.paused = True
             Utils.log("碰撞触发，已暂停", "COLLISION")
 
-        # 状态获取
+        # 获取状态
         qpos, qvel = self.get_states()
         load_actual = self._calc_load()
 
@@ -597,7 +645,7 @@ class ArmController:
         pd = kp * self.err + kd * (target_vel - qvel)
         ff = CFG.ff_vel * target_vel + CFG.ff_acc * (target_vel - qvel) / CTRL_DT
 
-        # 误差补偿
+        # 误差补偿（向量化）
         vel_sign = np.sign(qvel)
         vel_zero = np.abs(qvel) < 1e-4
         vel_sign[vel_zero] = np.sign(self.err)[vel_zero]
@@ -610,10 +658,10 @@ class ArmController:
         # 控制输出
         ctrl = np.clip(pd + ff + comp, -MAX_TORQUE, MAX_TORQUE)
 
-        # 应用控制
-        for i, mid in enumerate(self.motor_ids):
-            if mid >= 0:
-                self.data.ctrl[mid] = ctrl[i]
+        # 应用控制（批量）
+        valid_motors = [(i, mid) for i, mid in enumerate(self.motor_ids) if mid >= 0]
+        for i, mid in valid_motors:
+            self.data.ctrl[mid] = ctrl[i]
 
         # 自适应刚度阻尼
         load_ratio = np.clip(load_actual / MAX_LOAD, 0.0, 1.0)
@@ -626,9 +674,10 @@ class ArmController:
         self.stiffness = 0.95 * self.stiffness + 0.05 * target_stiff
         self.damping = np.clip(self.stiffness * CFG.damping_ratio, CFG.stiffness_min * 0.02, CFG.stiffness_max * 0.08)
 
-        for i, jid in enumerate(self.joint_ids):
-            if jid >= 0:
-                self.model.jnt_damping[jid] = self.damping[i]
+        # 应用刚度阻尼（批量）
+        valid_joints = [(i, jid) for i, jid in enumerate(self.joint_ids) if jid >= 0]
+        for i, jid in valid_joints:
+            self.model.jnt_damping[jid] = self.damping[i]
 
         # 数据记录
         self.recorder.record(qpos, qvel, self.err, load_actual, self.collision.detected if self.collision else False)
@@ -687,8 +736,9 @@ class ArmController:
             'test': [10, 20, 15, 5, 8],
             'avoid': [15, 25, 10, 5, 0]
         }
-        if pose in poses:
-            self.move_to(poses[pose])
+
+        if pose_name in poses:
+            self.move_to(poses[pose_name])
         else:
             Utils.log(f"未知姿态: {pose}", "ERROR")
 
@@ -739,7 +789,7 @@ class ArmController:
         help_text = """
 命令列表:
   help          - 查看帮助
-  pause/resume  - 暂停/恢复
+  pause/resume  - 暂停/恢复运动
   stop          - 紧急停止
   reset_collision - 重置碰撞
   pose [名称]   - 预设姿态(zero/up/grasp/test/avoid)
@@ -887,13 +937,19 @@ def signal_handler(sig, frame):
 
 
 def main():
+    """主函数"""
+    # 配置numpy
     np.set_printoptions(precision=3, suppress=True)
+
+    # 注册信号处理
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     global controller
     controller = ArmController()
     controller.run()
+
+    sys.exit(0)
 
 
 if __name__ == "__main__":
