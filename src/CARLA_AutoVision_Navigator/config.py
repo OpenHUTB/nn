@@ -26,3 +26,15 @@ NMS_THRESHOLD = 0.4
 
 # 路径设置
 OUTPUT_PATH = "output/"
+
+# --- 新增：车辆控制参数 (PID Controller) ---
+# 纵向控制 (速度)
+TARGET_SPEED = 20.0  # 目标时速 km/h
+K_P_SPEED = 1.0      # 比例系数
+K_I_SPEED = 0.0      # 积分系数
+K_D_SPEED = 0.1      # 微分系数
+
+# 横向控制 (转向 - 预留)
+K_P_STEER = 0.5
+K_I_STEER = 0.0
+K_D_STEER = 0.0
