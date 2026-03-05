@@ -953,5 +953,9 @@ def main():
                 pass
         print("✅ 所有资源清理完成！")
 
+    print(f"📌 即将启动CARLA自动驾驶程序")
+    print(f"🗺️ 选择地图：{selected_map} ({SUPPORTED_MAPS[selected_map]})")
+    print(f"💡 支持的地图：{', '.join(SUPPORTED_MAPS.keys())}")
+    print(f"💡 示例：python {sys.argv[0]} Town02\n")
 
 if __name__ == "__main__":

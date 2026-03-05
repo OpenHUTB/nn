@@ -1,9 +1,9 @@
-```python
 """
 Drone Vision Navigation System
 Optimized for Abandoned Park Environment
 Pure English interface to avoid encoding issues
 Fixed KeyboardInterrupt handling
+Improved image analysis (no extra dependencies)
 """
 
 import airsim
@@ -18,23 +18,18 @@ import random
 
 
 class DroneVisionSystem:
-    """Drone vision navigation system
-       中文注释：无人机视觉导航系统，负责与AirSim通信、图像采集、环境识别和自主导航
-    """
+    """Drone vision navigation system"""
 
     def __init__(self):
-        """Initialize system
-           中文注释：初始化系统，尝试连接模拟器，创建必要目录，加载分类器
-        """
+        """Initialize system"""
         self.clear_screen()
         print("=" * 70)
-        print("DRONE VISION NAVIGATION SYSTEM v2.0")
+        print("DRONE VISION NAVIGATION SYSTEM v2.0 (Enhanced)")
         print("=" * 70)
         print("Optimized for Abandoned Park Environment")
         print("-" * 70)
 
         # Try to connect to simulator
-        # 中文注释：尝试连接AirSim模拟器，如果失败则给出提示
         try:
             print("Connecting to AirSim simulator...")
             self.client = airsim.MultirotorClient()
@@ -57,11 +52,9 @@ class DroneVisionSystem:
         self.emergency = False
 
         # Create directories
-        # 中文注释：创建数据存储目录，如图像、日志、模型等
         self.create_folders()
 
-        # Initialize classifier
-        # 中文注释：初始化环境分类器（用于识别废墟、森林、道路等）
+        # Initialize classifier (enhanced version)
         self.classifier = EnvironmentClassifier()
 
         print("System initialization complete!")
@@ -75,9 +68,7 @@ class DroneVisionSystem:
             os.system('clear')
 
     def create_folders(self):
-        """Create project folders
-           中文注释：确保必要的文件夹存在，用于存放数据
-        """
+        """Create project folders"""
         folders = ['data/images', 'data/logs', 'models', 'debug']
         for folder in folders:
             os.makedirs(folder, exist_ok=True)
@@ -156,9 +147,7 @@ Current Status:
             return False
 
     def capture_image(self):
-        """Capture image from drone camera
-           中文注释：从AirSim请求图像数据，转换为OpenCV格式的BGR图像
-        """
+        """Capture image from drone camera"""
         try:
             responses = self.client.simGetImages([
                 airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
@@ -179,15 +168,11 @@ Current Status:
         return None
 
     def analyze_environment(self, image):
-        """Analyze environment using classifier
-           中文注释：调用分类器对当前图像进行环境识别
-        """
+        """Analyze environment using enhanced classifier"""
         return self.classifier.classify(image)
 
     def update_battery(self):
-        """Update battery status
-           中文注释：根据飞行状态更新电池电量，并在电量低时触发警告和紧急模式
-        """
+        """Update battery status"""
         if self.flying:
             self.battery -= 0.05  # Flying consumption
         else:
@@ -204,9 +189,7 @@ Current Status:
                 self.emergency = True
 
     def save_image_data(self, image, environment, confidence):
-        """Save image data
-           中文注释：保存图像到文件，并将元数据记录到JSON日志中，保留最近1000条记录
-        """
+        """Save image data"""
         if image is None:
             return
 
@@ -252,9 +235,7 @@ Current Status:
             self.log(f"Data save failed: {str(e)}")
 
     def navigate(self, environment, confidence):
-        """Navigate based on environment
-           中文注释：根据识别的环境选择对应的导航行为
-        """
+        """Navigate based on environment"""
         if not self.flying:
             return
 
@@ -276,18 +257,14 @@ Current Status:
         action_func(confidence)
 
     def navigate_ruins(self, confidence):
-        """Navigate in ruins
-           中文注释：废墟环境，低速前进避免碰撞
-        """
+        """Navigate in ruins"""
         self.log("Exploring ruins...")
         # Move slowly to avoid collisions
         self.client.moveByVelocityAsync(2, 0, 0, 2).join()
         time.sleep(1)
 
     def navigate_building(self, confidence):
-        """Navigate around buildings
-           中文注释：建筑物附近，上升并向右绕行
-        """
+        """Navigate around buildings"""
         self.log("Avoiding building...")
         # Rise to avoid collision
         self.client.moveByVelocityAsync(0, 0, -1, 1).join()
@@ -295,33 +272,25 @@ Current Status:
         self.client.moveByVelocityAsync(0, 2, 0, 2).join()
 
     def navigate_forest(self, confidence):
-        """Navigate through forest
-           中文注释：森林中，缓慢上升并前行
-        """
+        """Navigate through forest"""
         self.log("Moving through forest...")
         # Rise slightly and move slowly
         self.client.moveByVelocityAsync(1.5, 0, -0.5, 2).join()
 
     def navigate_road(self, confidence):
-        """Navigate along road
-           中文注释：道路，正常速度沿路飞行
-        """
+        """Navigate along road"""
         self.log("Following road...")
         # Move at normal speed
         self.client.moveByVelocityAsync(3, 0, 0, 3).join()
 
     def navigate_sky(self, confidence):
-        """Navigate in open sky
-           中文注释：开阔天空，可以较快飞行
-        """
+        """Navigate in open sky"""
         self.log("Open sky, normal flight...")
         # Move faster
         self.client.moveByVelocityAsync(4, 0, 0, 3).join()
 
     def navigate_water(self, confidence):
-        """Avoid water
-           中文注释：检测到水域，立即上升并后退
-        """
+        """Avoid water"""
         self.log("Avoiding water area...")
         # Rise immediately
         self.client.moveByVelocityAsync(0, 0, -2, 1).join()
@@ -329,9 +298,7 @@ Current Status:
         self.client.moveByVelocityAsync(-2, 0, 0, 2).join()
 
     def navigate_fire(self, confidence):
-        """Navigate fire emergency
-           中文注释：火灾紧急情况，快速升高并发出警报
-        """
+        """Navigate fire emergency"""
         self.log("Fire detected! Emergency response...")
         self.emergency = True
         # Emergency ascent
@@ -340,9 +307,7 @@ Current Status:
         self.log("Fire alert!")
 
     def navigate_animal(self, confidence):
-        """Navigate around animals
-           中文注释：发现动物，悬停观察然后缓慢后退
-        """
+        """Navigate around animals"""
         self.log("Animal detected, keeping distance...")
         # Hover and observe
         self.client.hoverAsync().join()
@@ -351,25 +316,19 @@ Current Status:
         self.client.moveByVelocityAsync(-1, 0, 0, 2).join()
 
     def navigate_vehicle(self, confidence):
-        """Navigate around vehicles
-           中文注释：检测到车辆，保持距离跟随
-        """
+        """Navigate around vehicles"""
         self.log("Vehicle detected, following...")
         # Follow at distance
         self.client.moveByVelocityAsync(2, 0, 0, 2).join()
 
     def navigate_default(self, confidence):
-        """Default navigation
-           中文注释：未知环境，保守探索，低速前进
-        """
+        """Default navigation"""
         self.log("Unknown environment, conservative exploration...")
         # Move slowly
         self.client.moveByVelocityAsync(1, 0, 0, 2).join()
 
     def display_image(self, image, environment, confidence):
-        """Display image with information
-           中文注释：在图像上叠加环境信息、置信度、电池电量和时间戳，并显示窗口
-        """
+        """Display image with information"""
         if image is None:
             return
 
@@ -382,7 +341,7 @@ Current Status:
         conf_text = f"Conf: {confidence:.1%}"
         bat_text = f"Battery: {self.battery:.1f}%"
 
-        # Set text color based on confidence
+        # Set text color
         color = (0, 255, 0)  # Green
         if confidence < 0.6:
             color = (0, 255, 255)  # Yellow
@@ -406,9 +365,7 @@ Current Status:
         cv2.imshow('Drone Vision System', display_img)
 
     def run_mission(self, mission_time=300):
-        """Run main mission loop
-           中文注释：主任务循环，包含图像采集、环境识别、导航决策、键盘控制等
-        """
+        """Run main mission loop"""
         if not self.client:
             print("Cannot run: Not connected to simulator")
             return
@@ -436,7 +393,6 @@ Current Status:
         last_env = "Unknown"
 
         try:
-            # 中文注释：主循环持续运行直到手动停止或任务时间结束
             while self.running and (time.time() - start_time) < mission_time:
                 frame_count += 1
 
@@ -479,7 +435,7 @@ Current Status:
                     except Exception as e:
                         self.log(f"Navigation error: {str(e)}")
 
-                # Show status (每20帧更新一次，减少屏幕闪烁)
+                # Show status (every 20 frames)
                 if frame_count % 20 == 0:
                     elapsed = int(time.time() - start_time)
                     remaining = mission_time - elapsed
@@ -493,7 +449,6 @@ Current Status:
                     print("CONTROLS: Q-Quit, L-Land, R-Return, S-Save, P-Pause")
 
                 # Check keyboard input
-                # 中文注释：检测键盘输入，实现交互控制
                 key = cv2.waitKey(30) & 0xFF
                 if key == ord('q'):
                     self.log("User quit")
@@ -518,7 +473,7 @@ Current Status:
                     self.log(f"Mission {status}")
 
                 # Small delay to control processing speed
-                time.sleep(0.1)  # 从0.5秒减少到0.1秒，提高响应性
+                time.sleep(0.1)
 
             # Mission complete
             self.log("Mission complete!")
@@ -542,9 +497,7 @@ Current Status:
                 pass
 
     def generate_report(self):
-        """Generate mission report
-           中文注释：生成任务摘要报告，包含电池最终电量、检测到的环境和紧急状态，保存为JSON文件
-        """
+        """Generate mission report"""
         report = {
             "mission": "Drone Vision Navigation",
             "date": datetime.now().strftime("%Y-%m-%d"),
@@ -572,175 +525,187 @@ Current Status:
 
 
 class EnvironmentClassifier:
-    """Environment classifier for abandoned park
-       中文注释：基于颜色和纹理特征的简单规则分类器，用于废弃公园环境识别
-    """
+    """Enhanced environment classifier (no extra dependencies)"""
 
     def __init__(self):
         self.environments = [
-            "Ruins", "Building", "forest", "Road",
+            "Ruins", "Building", "Forest", "Road",
             "Sky", "Water", "Fire", "Animal", "Vehicle"
         ]
-
-        # Feature weights for abandoned park
-        # 中文注释：初始化权重，废墟权重最高（0.35），因为场景是废弃公园，出现概率最大
+        # Base weights for fallback
         self.weights = {
-            "Ruins": 0.35,  # Highest probability for ruins
-            "Building": 0.20,
-            "Forest": 0.15,
-            "Road": 0.10,
-            "Sky": 0.08,
-            "Water": 0.05,  # Lower water weight
-            "Fire": 0.02,
-            "Animal": 0.03,
-            "Vehicle": 0.02
+            "Ruins": 0.35, "Building": 0.20, "Forest": 0.15,
+            "Road": 0.10, "Sky": 0.08, "Water": 0.05,
+            "Fire": 0.02, "Animal": 0.03, "Vehicle": 0.02
         }
 
     def classify(self, image):
-        """Classify image
-           中文注释：主分类函数，先尝试规则分类，若失败则使用加权随机
-        """
+        """Main classification interface"""
         if image is None:
             return "Unknown", 0.0
 
-        # Extract features
-        features = self.extract_features(image)
+        # Extract enhanced features
+        features = self._extract_enhanced_features(image)
 
         # Rule-based classification
-        env, conf = self.rule_based(features)
+        env, conf = self._rule_based_v2(features)
 
-        # If rules unclear, use weighted random
+        # If rules fail, use weighted random
         if env == "Unknown":
-            env, conf = self.weighted_random(features)
+            env, conf = self._weighted_random(features)
 
         return env, conf
 
-    def extract_features(self, image):
-        """Extract image features
-           中文注释：提取颜色比例、边缘密度、亮度方差等特征
-        """
+    def _extract_enhanced_features(self, image):
+        """Extract rich features using only OpenCV and numpy"""
+        h, w = image.shape[:2]
         features = {}
 
-        height, width = image.shape[:2]
+        # ----- LAB color statistics (mean, std) -----
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        l_mean, l_std = cv2.meanStdDev(lab[:, :, 0])
+        a_mean, a_std = cv2.meanStdDev(lab[:, :, 1])
+        b_mean, b_std = cv2.meanStdDev(lab[:, :, 2])
+        features['l_mean'] = l_mean[0][0]
+        features['l_std'] = l_std[0][0]
+        features['a_mean'] = a_mean[0][0]
+        features['a_std'] = a_std[0][0]
+        features['b_mean'] = b_mean[0][0]
+        features['b_std'] = b_std[0][0]
 
-        # Color features
+        # ----- Texture features (gradient magnitude, Laplacian variance) -----
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
+        sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
+        mag = np.sqrt(sobelx**2 + sobely**2)
+        features['grad_mean'] = np.mean(mag)
+        features['grad_std'] = np.std(mag)
+
+        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+        features['lap_var'] = np.var(laplacian)
+
+        # Edge density (Canny)
+        edges = cv2.Canny(gray, 50, 150)
+        features['edge_density'] = np.sum(edges > 0) / (h * w)
+
+        # ----- Global color ratios (HSV) -----
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-        # Blue regions
-        blue_low = np.array([100, 50, 50])
-        blue_high = np.array([130, 255, 255])
-        blue_mask = cv2.inRange(hsv, blue_low, blue_high)
-        features['blue_ratio'] = np.sum(blue_mask > 0) / (height * width)
+        blue_mask = cv2.inRange(hsv, (100, 50, 50), (130, 255, 255))
+        features['blue_ratio'] = np.sum(blue_mask > 0) / (h * w)
 
-        # Green regions
-        green_low = np.array([40, 50, 50])
-        green_high = np.array([80, 255, 255])
-        green_mask = cv2.inRange(hsv, green_low, green_high)
-        features['green_ratio'] = np.sum(green_mask > 0) / (height * width)
+        green_mask = cv2.inRange(hsv, (40, 50, 50), (80, 255, 255))
+        features['green_ratio'] = np.sum(green_mask > 0) / (h * w)
 
-        # Red regions
-        red_low1 = np.array([0, 50, 50])
-        red_high1 = np.array([10, 255, 255])
-        red_low2 = np.array([170, 50, 50])
-        red_high2 = np.array([180, 255, 255])
-        red_mask1 = cv2.inRange(hsv, red_low1, red_high1)
-        red_mask2 = cv2.inRange(hsv, red_low2, red_high2)
+        red_mask1 = cv2.inRange(hsv, (0, 50, 50), (10, 255, 255))
+        red_mask2 = cv2.inRange(hsv, (170, 50, 50), (180, 255, 255))
         red_mask = cv2.bitwise_or(red_mask1, red_mask2)
-        features['red_ratio'] = np.sum(red_mask > 0) / (height * width)
+        features['red_ratio'] = np.sum(red_mask > 0) / (h * w)
 
-        # Texture features
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        edges = cv2.Canny(gray, 50, 150)
-        features['edge_density'] = np.sum(edges > 0) / (height * width)
-        features['gray_variance'] = np.var(gray)
         features['brightness'] = np.mean(gray)
+        features['gray_variance'] = np.var(gray)
 
-        # Sky detection
-        if height > 10:
-            top_blue = np.sum(blue_mask[:height // 3, :] > 0) / (width * height // 3)
-            bottom_blue = np.sum(blue_mask[2 * height // 3:, :] > 0) / (width * height // 3)
-            features['sky_ratio'] = top_blue
-            features['is_sky'] = top_blue > 0.3 and top_blue > bottom_blue * 2
+        # ----- Sky detection (improved) -----
+        if h > 10:
+            top_blue = np.sum(blue_mask[:h//3, :] > 0) / (w * h//3)
+            bottom_blue = np.sum(blue_mask[2*h//3:, :] > 0) / (w * h//3)
+            features['is_sky'] = (top_blue > 0.25) and (top_blue > bottom_blue * 1.8) and (features['l_mean'] > 180)
+        else:
+            features['is_sky'] = False
+
+        # ----- Spatial grid color ratios (3x3) -----
+        grid_h, grid_w = h // 3, w // 3
+        for i in range(3):
+            for j in range(3):
+                roi = image[i*grid_h:(i+1)*grid_h, j*grid_w:(j+1)*grid_w]
+                if roi.size == 0:
+                    continue
+                roi_hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                blue_roi = cv2.inRange(roi_hsv, (100, 50, 50), (130, 255, 255))
+                features[f'blue_grid_{i}_{j}'] = np.sum(blue_roi > 0) / (grid_h * grid_w)
+                green_roi = cv2.inRange(roi_hsv, (40, 50, 50), (80, 255, 255))
+                features[f'green_grid_{i}_{j}'] = np.sum(green_roi > 0) / (grid_h * grid_w)
+                red_roi1 = cv2.inRange(roi_hsv, (0, 50, 50), (10, 255, 255))
+                red_roi2 = cv2.inRange(roi_hsv, (170, 50, 50), (180, 255, 255))
+                red_roi = cv2.bitwise_or(red_roi1, red_roi2)
+                features[f'red_grid_{i}_{j}'] = np.sum(red_roi > 0) / (grid_h * grid_w)
 
         return features
 
-    def rule_based(self, features):
-        """Rule-based classification
-           中文注释：基于经验规则判断环境类型，返回类型和置信度
-        """
-        blue = features.get('blue_ratio', 0)
-        green = features.get('green_ratio', 0)
-        red = features.get('red_ratio', 0)
-        edges = features.get('edge_density', 0)
-        variance = features.get('gray_variance', 0)
-        bright = features.get('brightness', 0)
-        is_sky = features.get('is_sky', False)
+    def _rule_based_v2(self, f):
+        """Improved rule-based classification using enhanced features"""
+        # Extract common features
+        blue = f.get('blue_ratio', 0)
+        green = f.get('green_ratio', 0)
+        red = f.get('red_ratio', 0)
+        edges = f.get('edge_density', 0)
+        grad_mean = f.get('grad_mean', 0)
+        lap_var = f.get('lap_var', 0)
+        bright = f.get('brightness', 0)
+        is_sky = f.get('is_sky', False)
+        l_mean = f.get('l_mean', 128)
 
-        # Rules for abandoned park
-        if edges > 0.06 and variance > 1000:
-            return "Ruins", 0.85
+        # Rule 1: Fire (high red + high brightness + low texture)
+        if red > 0.25 and bright > 200 and grad_mean < 15:
+            return "Fire", 0.75
 
-        if green > 0.25:
+        # Rule 2: Sky (high blue + is_sky + high L)
+        if blue > 0.3 and is_sky and l_mean > 180:
+            return "Sky", 0.85
+
+        # Rule 3: Water (high blue + not sky + low edges)
+        if blue > 0.25 and not is_sky and edges < 0.03:
+            return "Water", 0.70
+
+        # Rule 4: Forest (high green + high texture)
+        if green > 0.3 and grad_mean > 20:
             return "Forest", 0.80
 
-        if blue > 0.3:
-            if is_sky:
-                return "Sky", 0.75
-            else:
-                return "Water", 0.65
+        # Rule 5: Ruins (high edges + high gray variance + low brightness)
+        if edges > 0.07 and f.get('gray_variance', 0) > 1200 and bright < 120:
+            return "Ruins", 0.85
 
-        if edges < 0.03 and 100 < bright < 180:
-            return "Road", 0.70
-
-        if red > 0.15:
-            if bright > 180:
-                return "Fire", 0.60
-            else:
-                return "Ruins", 0.65
-
-        if edges > 0.04 and bright < 120:
+        # Rule 6: Building (medium edges + low brightness + low green)
+        if edges > 0.05 and bright < 100 and green < 0.1:
             return "Building", 0.75
 
+        # Rule 7: Road (low edges + medium brightness + low color saturation)
+        if edges < 0.02 and 100 < bright < 200 and blue < 0.1 and green < 0.1 and red < 0.1:
+            return "Road", 0.70
+
+        # Rule 8: Animal/Vehicle (simple red + edges)
+        if red > 0.15 and edges > 0.04:
+            # Could be improved with spatial patterns, but fallback to vehicle
+            return "Vehicle", 0.60
+
+        # Unknown
         return "Unknown", 0.0
 
-    def weighted_random(self, features):
-        """Weighted random selection
-           中文注释：当规则无法判断时，根据特征调整权重后随机选择
-        """
-        # Adjust weights based on features
+    def _weighted_random(self, features):
+        """Weighted random fallback (similar to original)"""
         adj_weights = self.weights.copy()
-
         blue = features.get('blue_ratio', 0)
         green = features.get('green_ratio', 0)
         edges = features.get('edge_density', 0)
 
-        # Adjust based on features
         if blue > 0.2:
             adj_weights["Sky"] *= 1.5
             if blue > 0.3:
-                adj_weights["Water"] *= 0.5  # Reduce water weight
-
+                adj_weights["Water"] *= 0.5
         if green > 0.15:
             adj_weights["Forest"] *= 2.0
-
         if edges > 0.05:
             adj_weights["Ruins"] *= 1.8
 
-        # Normalize
         total = sum(adj_weights.values())
         if total > 0:
             probs = [adj_weights[env] / total for env in self.environments]
         else:
             probs = [1 / len(self.environments)] * len(self.environments)
 
-        # Random selection
-        env_idx = random.choices(range(len(self.environments)), weights=probs)[0]
-        env = self.environments[env_idx]
+        env = random.choices(self.environments, weights=probs)[0]
 
-        # Calculate confidence
         base_conf = 0.6
-
-        # Increase confidence based on features
         if env == "Ruins" and edges > 0.04:
             base_conf += 0.15
         elif env == "Forest" and green > 0.15:
@@ -748,15 +713,11 @@ class EnvironmentClassifier:
         elif env == "Sky" and blue > 0.2:
             base_conf += 0.1
 
-        conf = min(base_conf, 0.9)
-
-        return env, conf
+        return env, min(base_conf, 0.9)
 
 
 def safe_input(prompt):
-    """Safe input function with KeyboardInterrupt handling
-       中文注释：安全输入函数，捕获 Ctrl+C 避免程序异常退出
-    """
+    """Safe input function with KeyboardInterrupt handling"""
     try:
         return input(prompt).strip()
     except KeyboardInterrupt:
@@ -766,11 +727,9 @@ def safe_input(prompt):
 
 
 def main():
-    """Main function with improved exception handling
-       中文注释：主函数，处理用户配置和异常，启动任务
-    """
+    """Main function with improved exception handling"""
     try:
-        print("DRONE VISION NAVIGATION SYSTEM")
+        print("DRONE VISION NAVIGATION SYSTEM (Enhanced)")
         print("-" * 50)
 
         # Create system
@@ -830,4 +789,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
