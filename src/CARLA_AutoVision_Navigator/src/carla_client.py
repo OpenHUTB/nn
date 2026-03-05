@@ -8,6 +8,7 @@ import os
 # 将根目录加入系统路径，确保能导入 config.py
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import config
+import math
 
 
 class CarlaClient:
@@ -61,9 +62,16 @@ class CarlaClient:
             print("已销毁主车，资源清理完毕。")
 
 
+    def get_speed(vehicle):
+        """计算车辆当前速度 (km/h)"""
+        v = vehicle.get_velocity()
+        return 3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2)
+
+
 if __name__ == "__main__":
     from sensor_manager import SensorManager
-    from object_detector import YOLOv3Detector  # 导入新模块
+    from object_detector import YOLOv3Detector
+    from pid_controller import PIDController  # 导入新模块
     import cv2
 
     connector = CarlaClient()
@@ -72,23 +80,39 @@ if __name__ == "__main__":
         connector.connect()
         vehicle = connector.spawn_ego_vehicle()
 
-        # 初始化传感器和检测器
         sensors = SensorManager(connector.world, vehicle)
         sensors.attach_camera()
         detector = YOLOv3Detector()
 
-        print("系统就绪，开始实时检测。按下 'q' 键退出...")
+        # 初始化 PID 控制器
+        pid = PIDController(config.K_P_SPEED, config.K_I_SPEED, config.K_D_SPEED)
+
+        print(f"系统就绪。目标速度: {config.TARGET_SPEED} km/h. 按下 'q' 键退出...")
         while True:
+            # 1. 获取当前状态
+            current_speed = get_speed(vehicle)
             frame = sensors.get_current_frame()
+
+            # 2. 纵向控制 (速度控制)
+            control_signal = pid.run_step(config.TARGET_SPEED, current_speed)
+            control = vehicle.get_control()
+
+            if control_signal >= 0:
+                control.throttle = control_signal
+                control.brake = 0.0
+            else:
+                control.throttle = 0.0
+                control.brake = abs(control_signal)
+
+            # 这里暂时让车直走，后面会加横向控制
+            control.steer = 0.0
+            vehicle.apply_control(control)
+
+            # 3. 感知处理 (目标检测)
             if frame is not None:
-                # 1. 执行目标检测
                 detections = detector.detect(frame)
-
-                # 2. 绘制检测结果
                 frame = detector.draw_labels(frame, detections)
-
-                # 3. 显示画面
-                cv2.imshow("CARLA AutoVision - YOLOv3 Detection", frame)
+                cv2.imshow("CARLA AutoVision - Control & Detection", frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
