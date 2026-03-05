@@ -101,6 +101,12 @@ class ControlConfig:
                 data[key] = np.array(data[key], dtype=np.float64)
         return cls(**data)
 
+# 全局状态
+RUNNING = True
+PAUSED = False
+EMERGENCY_STOP = False
+COLLISION_DETECTED = False
+LOCK = threading.Lock()
 
 # 全局配置实例（单例）
 CFG = ControlConfig()
@@ -223,6 +229,8 @@ class ParamPersistence:
             Utils.log(f"加载参数失败: {e}", "ERROR")
             return False
 
+# ====================== 轨迹规划增强 ======================
+TRAJ_CACHE = {}
 
 # ====================== 轨迹规划模块（独立解耦） ======================
 class TrajectoryPlanner:
@@ -598,11 +606,38 @@ class DataRecorder:
             Utils.log(f"绘图失败: {e}", "ERROR")
             return False
 
+    # 缓存结果
+    TRAJ_CACHE[cache_key] = (traj_pos, traj_vel)
+    return traj_pos, traj_vel
 
 # ====================== 核心控制器（模块化组合） ======================
 class ArmController:
     """机械臂核心控制器（模块化组合）"""
 
+def save_traj(traj_pos, traj_vel, name):
+    try:
+        header = ['step'] + [f'j{i + 1}_pos' for i in range(JOINT_COUNT)] + [f'j{i + 1}_vel' for i in
+                                                                             range(JOINT_COUNT)]
+        data = np.hstack([np.arange(len(traj_pos))[:, None], traj_pos, traj_vel])
+        np.savetxt(f"trajectories/{name}.csv", data, delimiter=',', header=','.join(header), comments='')
+        log(f"轨迹保存: trajectories/{name}.csv")
+    except Exception as e:
+        log(f"保存轨迹失败: {e}")
+
+
+def load_traj(name):
+    try:
+        data = np.genfromtxt(f"trajectories/{name}.csv", delimiter=',', skip_header=1)
+        if len(data) == 0:
+            return np.array([]), np.array([])
+        return data[:, 1:JOINT_COUNT + 1], data[:, JOINT_COUNT + 1:]
+    except Exception as e:
+        log(f"加载轨迹失败: {e}")
+        return np.array([]), np.array([])
+
+
+# ====================== 核心控制器（增强版） ======================
+class ArmController:
     def __init__(self):
         # 全局状态（原子操作）
         self.running = True
@@ -1020,6 +1055,26 @@ class ArmController:
             self.move_to(poses[pose_name])
         else:
             Utils.log(f"未知姿态: {pose_name} (支持: {list(poses.keys())})", "ERROR")
+
+    def start_recording(self):
+        """开始数据记录（新增）"""
+        with lock():
+            self.record_enabled = True
+            self.data_recorder = {k: [] for k in self.data_recorder.keys()}
+            self.record_count = 0
+            log("开始数据记录")
+
+    def stop_recording(self, save_data=True, plot_data=True):
+        """停止数据记录（新增）"""
+        with lock():
+            self.record_enabled = False
+            log("停止数据记录")
+
+            if save_data:
+                timestamp = time.strftime('%Y%m%d_%H%M%S')
+                self._save_recorded_data(f"run_{timestamp}")
+                if plot_data:
+                    self._plot_data(f"plot_{timestamp}")
 
     def _print_status(self):
         """打印状态（低频更新）"""

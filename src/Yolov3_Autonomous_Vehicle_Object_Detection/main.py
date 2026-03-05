@@ -2,30 +2,18 @@ import cv2
 import time
 import queue
 import numpy as np
+import carla  # [新增] 需要用到 carla.VehicleControl
 
 from config import config
 from utils.carla_client import CarlaClient
 from models.yolo_detector import YOLODetector
-
-
-def draw_results(image, results, classes):
-    """
-    简单绘制检测结果 (临时函数，后续会移动到 utils/visualization.py)
-    """
-    for (x, y, w, h, class_id, conf) in results:
-        label = str(classes[class_id])
-        color = (0, 255, 0)  # 绿色框
-
-        # 画框
-        cv2.rectangle(image, (x, y), (x + w, y + h), color, 2)
-        # 写字
-        text = "{}: {:.4f}".format(label, conf)
-        cv2.putText(image, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-    return image
+from utils.visualization import draw_results
+# [新增] 引入规划器
+from utils.planner import SimplePlanner
 
 
 def main():
-    # 1. 初始化 YOLO 检测器
+    # 1. 初始化 YOLOv3 检测器
     print("[Main] 初始化 YOLOv3 检测器...")
     detector = YOLODetector(
         cfg_path=config.YOLO_CONFIG_PATH,
@@ -36,41 +24,68 @@ def main():
     )
     detector.load_model()
 
-    # 2. 初始化 CARLA 客户端
+    # 2. 初始化规划器 (决策层)
+    print("[Main] 初始化自动驾驶规划器...")
+    planner = SimplePlanner()
+
+    # 3. 初始化 CARLA 客户端
     print("[Main] 初始化 CARLA 客户端...")
     client = CarlaClient()
     if not client.connect():
-        return  # 连接失败直接退出
+        return
 
-    # 3. 生成车辆和传感器
+        # 4. 生成车辆和传感器
     client.spawn_vehicle()
     client.setup_camera()
 
     print("[Main] 开始主循环 (按 'q' 退出)...")
     try:
         while True:
-            # 4. 从队列获取图像 (带超时机制)
             try:
+                # --- 获取数据 ---
                 frame = client.image_queue.get(timeout=2.0)
 
-                # 5. 执行目标检测
+                # --- 感知 (Perception) ---
                 start_time = time.time()
                 results = detector.detect(frame)
-                end_time = time.time()
 
-                # 计算 FPS
-                fps = 1 / (end_time - start_time)
+                # --- 规划与决策 (Planning) ---
+                # 根据感知结果判断是否需要刹车
+                is_brake, warning_msg = planner.plan(results)
 
-                # 6. 绘制结果
+                # --- 控制 (Control) ---
+                if client.vehicle:
+                    if is_brake:
+                        # 紧急情况：关闭自动驾驶，强制刹车
+                        client.vehicle.set_autopilot(False)
+                        control = carla.VehicleControl()
+                        control.throttle = 0.0
+                        control.brake = 1.0
+                        control.hand_brake = False
+                        client.vehicle.apply_control(control)
+                    else:
+                        # 正常情况：恢复自动驾驶
+                        client.vehicle.set_autopilot(True)
+
+                # --- 可视化 (Visualization) ---
+                fps = 1 / (time.time() - start_time)
+
+                # 绘制检测框
                 frame = draw_results(frame, results, detector.classes)
 
-                # 显示 FPS
+                # 绘制 FPS
                 cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                # 7. 显示窗口
+                # 如果触发刹车，绘制巨大的红色警告
+                if is_brake:
+                    cv2.putText(frame, "EMERGENCY BRAKING!", (150, 300),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                    cv2.putText(frame, warning_msg, (180, 350),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+
+                # 显示窗口
                 cv2.imshow("CARLA Autonomous Driving - Object Detection", frame)
 
-                # 按 'q' 键退出
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
@@ -82,7 +97,6 @@ def main():
         print("\n[Main] 用户中断程序")
 
     finally:
-        # 8. 清理资源
         print("[Main] 正在清理资源...")
         client.destroy_actors()
         cv2.destroyAllWindows()
