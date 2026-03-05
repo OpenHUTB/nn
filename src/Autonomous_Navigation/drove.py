@@ -185,7 +185,9 @@ Current Status:
         return self.classifier.classify(image)
 
     def update_battery(self):
-        """Update battery status"""
+        """Update battery status
+           中文注释：根据飞行状态更新电池电量，并在电量低时触发警告和紧急模式
+        """
         if self.flying:
             self.battery -= 0.05  # Flying consumption
         else:
@@ -202,7 +204,9 @@ Current Status:
                 self.emergency = True
 
     def save_image_data(self, image, environment, confidence):
-        """Save image data"""
+        """Save image data
+           中文注释：保存图像到文件，并将元数据记录到JSON日志中，保留最近1000条记录
+        """
         if image is None:
             return
 
@@ -363,7 +367,9 @@ Current Status:
         self.client.moveByVelocityAsync(1, 0, 0, 2).join()
 
     def display_image(self, image, environment, confidence):
-        """Display image with information"""
+        """Display image with information
+           中文注释：在图像上叠加环境信息、置信度、电池电量和时间戳，并显示窗口
+        """
         if image is None:
             return
 
@@ -376,7 +382,7 @@ Current Status:
         conf_text = f"Conf: {confidence:.1%}"
         bat_text = f"Battery: {self.battery:.1f}%"
 
-        # Set text color
+        # Set text color based on confidence
         color = (0, 255, 0)  # Green
         if confidence < 0.6:
             color = (0, 255, 255)  # Yellow
@@ -430,6 +436,7 @@ Current Status:
         last_env = "Unknown"
 
         try:
+            # 中文注释：主循环持续运行直到手动停止或任务时间结束
             while self.running and (time.time() - start_time) < mission_time:
                 frame_count += 1
 
@@ -535,7 +542,9 @@ Current Status:
                 pass
 
     def generate_report(self):
-        """Generate mission report"""
+        """Generate mission report
+           中文注释：生成任务摘要报告，包含电池最终电量、检测到的环境和紧急状态，保存为JSON文件
+        """
         report = {
             "mission": "Drone Vision Navigation",
             "date": datetime.now().strftime("%Y-%m-%d"),
@@ -574,6 +583,7 @@ class EnvironmentClassifier:
         ]
 
         # Feature weights for abandoned park
+        # 中文注释：初始化权重，废墟权重最高（0.35），因为场景是废弃公园，出现概率最大
         self.weights = {
             "Ruins": 0.35,  # Highest probability for ruins
             "Building": 0.20,
@@ -624,7 +634,7 @@ class EnvironmentClassifier:
 
         # Green regions
         green_low = np.array([40, 50, 50])
-        green_high = np.array([80, 255, 255])  # 修复：添加 np.
+        green_high = np.array([80, 255, 255])
         green_mask = cv2.inRange(hsv, green_low, green_high)
         features['green_ratio'] = np.sum(green_mask > 0) / (height * width)
 
