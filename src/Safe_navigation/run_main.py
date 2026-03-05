@@ -1,5 +1,7 @@
 import airsim
 import time
+import numpy as np
+import cv2
 
 
 def main():
@@ -23,7 +25,23 @@ def main():
         car_state = client.getCarState()
         print(f"✓ 车辆状态获取成功 - 速度: {car_state.speed} km/h")
 
-        # 5. 精确90度转弯演示
+        # 5. 获取并显示摄像头图像
+        print("\n>>> 正在获取摄像头图像...")
+        responses = client.simGetImages([
+            airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
+        ])
+        response = responses[0]
+
+        # 将图像数据转换为numpy数组
+        img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
+        img_rgb = img1d.reshape(response.height, response.width, 3)
+
+        # 显示图像
+        cv2.imshow("AirSim Camera View", img_rgb)
+        cv2.waitKey(1)
+        print("✓ 摄像头图像已获取并显示")
+
+        # 6. 精确90度转弯演示
         print("\n>>> 连接成功！开始精确90度转弯演示...")
         controls = airsim.CarControls()
 
@@ -41,15 +59,15 @@ def main():
         print("到达路口，停车...")
         time.sleep(1)
 
-        # 缓慢起步并适度转向（避免过度转向）
+        # 缓慢起步并适度转向
         controls.brake = 0.0
-        controls.throttle = 0.25  # 更低的速度，更容易控制
-        controls.steering = 0.7  # 降低转向角度，避免过度转向
+        controls.throttle = 0.25
+        controls.steering = 0.7
         client.setCarControls(controls)
         print("缓慢起步转弯...")
-        time.sleep(4)  # 减少转弯时间
+        time.sleep(4)
 
-        # 稍微回正一点方向盘，继续转弯
+        # 稍微回正一点方向盘
         controls.steering = 0.5
         client.setCarControls(controls)
         print("调整转向角度...")
@@ -70,9 +88,12 @@ def main():
         controls.throttle = 0.0
         client.setCarControls(controls)
         time.sleep(1)
+
+        # 关闭图像显示窗口
+        cv2.destroyAllWindows()
         print("演示结束。")
 
-        # 6. 释放控制
+        # 7. 释放控制
         client.enableApiControl(False)
         print("控制权已释放。")
 
