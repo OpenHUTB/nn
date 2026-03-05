@@ -19,7 +19,6 @@ from config import config
 class CarlaClient:
     """
     CARLA 模拟器客户端封装类
-    负责连接服务器、加载世界、生成车辆与传感器
     """
 
     def __init__(self):
@@ -32,8 +31,6 @@ class CarlaClient:
         self.vehicle = None
         self.camera = None
         self.blueprint_library = None
-
-        # 用于在不同线程间传递图像数据的队列
         self.image_queue = queue.Queue()
 
     def connect(self):
@@ -68,46 +65,27 @@ class CarlaClient:
             return None
 
     def setup_camera(self):
-        """
-        安装 RGB 摄像头传感器
-        """
         if not self.vehicle:
-            print("[ERROR] 车辆未生成，无法安装传感器！")
             return
-
-        # 1. 查找摄像头蓝图
         camera_bp = self.blueprint_library.find('sensor.camera.rgb')
-
-        # 2. 配置摄像头参数 (从 config 读取)
         camera_bp.set_attribute('image_size_x', str(config.CAMERA_WIDTH))
         camera_bp.set_attribute('image_size_y', str(config.CAMERA_HEIGHT))
         camera_bp.set_attribute('fov', str(config.CAMERA_FOV))
-
-        # 3. 设置摄像头安装位置 (坐标系: x前, y右, z上) -> 安装在引擎盖上方
         spawn_point = carla.Transform(carla.Location(x=1.5, z=2.4))
-
-        # 4. 生成传感器并附着(Attach)到车辆上
         self.camera = self.world.spawn_actor(camera_bp, spawn_point, attach_to=self.vehicle)
-
-        # 5. 注册回调函数 (监听数据)
-        # 这里的 lambda 是为了把 raw_data 传给处理函数
         self.camera.listen(lambda image: self._process_image(image))
         print("[INFO] RGB 摄像头安装成功！")
 
     def _process_image(self, image):
         """
-        [回调函数] 将 CARLA 原始数据转换为 OpenCV 图像格式
+        [修复版] 将 CARLA 原始数据转换为 OpenCV 图像格式
         """
-        # 1. 将原始 buffer 转换为 numpy 数组
         array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-
-        # 2. 重塑形状 (Height, Width, 4通道-BGRA)
         array = np.reshape(array, (image.height, image.width, 4))
 
-        # 3. 取前3个通道 (BGR)，扔掉 Alpha 通道
-        array = array[:, :, :3]
+        # [Fix] 使用 np.ascontiguousarray 解决 OpenCV 内存布局不兼容报错
+        array = np.ascontiguousarray(array[:, :, :3])
 
-        # 4. 存入队列 (供主线程消费)
         self.image_queue.put(array)
 
     def destroy_actors(self):
@@ -118,22 +96,3 @@ class CarlaClient:
             self.vehicle.destroy()
             self.vehicle = None
         print("[INFO] 所有 Actor 已清理。")
-
-
-# 测试代码
-if __name__ == "__main__":
-    client = CarlaClient()
-    if client.connect():
-        vehicle = client.spawn_vehicle()
-        client.setup_camera()
-
-        # 简单测试：尝试从队列取一张图片看看 shape 对不对
-        try:
-            print("等待图像数据...")
-            img = client.image_queue.get(timeout=5)
-            print(f"成功获取图像！尺寸: {img.shape}")
-        except queue.Empty:
-            print("未接收到图像数据！")
-
-        time.sleep(2)
-        client.destroy_actors()
