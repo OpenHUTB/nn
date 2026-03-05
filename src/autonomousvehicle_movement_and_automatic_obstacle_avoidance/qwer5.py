@@ -472,7 +472,7 @@ def multi_car_simulation():
                     last_display = time.time()
 
     except KeyboardInterrupt:
-        print("用户中断")
+        print("中断")
     finally:
         global simulation_running
         simulation_running = False
