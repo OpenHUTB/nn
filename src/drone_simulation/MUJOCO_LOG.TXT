@@ -1,0 +1,57 @@
+Wed Mar  4 10:41:14 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 54.7200.
+
+Wed Mar  4 10:51:24 2026
+WARNING: Too many contacts. Either the arena memory is full, or nconmax is specified and is exceeded. Increase arena memory allocation, or increase/remove nconmax. (ncon = 100) Time = 0.0100.
+
+Wed Mar  4 10:51:25 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0450.
+
+Wed Mar  4 13:24:12 2026
+WARNING: Too many contacts. Either the arena memory is full, or nconmax is specified and is exceeded. Increase arena memory allocation, or increase/remove nconmax. (ncon = 100) Time = 0.0100.
+
+Wed Mar  4 13:24:12 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0450.
+
+Wed Mar  4 14:05:14 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 2. The simulation is unstable. Time = 0.0350.
+
+Wed Mar  4 14:05:31 2026
+WARNING: Too many contacts. Either the arena memory is full, or nconmax is specified and is exceeded. Increase arena memory allocation, or increase/remove nconmax. (ncon = 100) Time = 0.0100.
+
+Wed Mar  4 14:05:31 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 0. The simulation is unstable. Time = 0.0450.
+
+Wed Mar  4 14:09:04 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 14:09:20 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 14:11:55 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 14:12:28 2026
+ERROR: mjv_updateSceneState: m->nu changed
+
+Wed Mar  4 14:31:06 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 17:35:03 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 17:35:18 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 17:37:37 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 17:38:39 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 21:44:10 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
+Wed Mar  4 21:45:13 2026
+WARNING: Nan, Inf or huge value in QACC at DOF 3. The simulation is unstable. Time = 0.0400.
+
