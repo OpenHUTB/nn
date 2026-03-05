@@ -31,16 +31,17 @@ def main():
             airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
         ])
 
-        if responses and responses[0].image_data_uint8:
-            response = responses[0]
-            # 将图像数据转换为numpy数组
-            img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
-            img_rgb = img1d.reshape(response.height, response.width, 3)
+        if len(responses) > 0 and responses[0].image_data_uint8:
+            # 获取图像数据
+            img_data = responses[0].image_data_uint8
+            img_height = responses[0].height
+            img_width = responses[0].width
 
-            # 显示图像
-            cv2.imshow("AirSim Camera View", img_rgb)
+            # 转换为numpy数组并显示
+            img = np.frombuffer(img_data, dtype=np.uint8).reshape(img_height, img_width, 3)
+            cv2.imshow('AirSim Camera', img)
             cv2.waitKey(1)
-            print("✓ 摄像头图像已获取并显示")
+            print(f"✓ 摄像头图像已显示 (分辨率: {img_width}x{img_height})")
         else:
             print("⚠ 无法获取摄像头图像")
 
@@ -54,20 +55,21 @@ def main():
         client.setCarControls(controls)
         print("直行前往路口...")
 
-        # 在直行过程中持续显示摄像头图像
+        # 行驶过程中每隔几秒更新摄像头
         for i in range(26):
             time.sleep(1)
-            if i % 5 == 0:  # 每5秒更新一次摄像头图像
+            if i % 3 == 0:  # 每3秒更新一次
                 responses = client.simGetImages([
                     airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
                 ])
-                if responses and responses[0].image_data_uint8:
-                    response = responses[0]
-                    img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
-                    img_rgb = img1d.reshape(response.height, response.width, 3)
-                    cv2.imshow("AirSim Camera View", img_rgb)
+                if len(responses) > 0 and responses[0].image_data_uint8:
+                    img_data = responses[0].image_data_uint8
+                    img_height = responses[0].height
+                    img_width = responses[0].width
+                    img = np.frombuffer(img_data, dtype=np.uint8).reshape(img_height, img_width, 3)
+                    cv2.imshow('AirSim Camera', img)
                     cv2.waitKey(1)
-                    print(f"  已行驶 {i + 1} 秒，摄像头图像已更新")
+                    print(f"  行驶中 ({i + 1}秒) - 摄像头已更新")
 
         # 到达路口，完全停车
         controls.throttle = 0.0
@@ -108,7 +110,7 @@ def main():
         print("停车...")
         time.sleep(1)
 
-        # 关闭图像显示窗口
+        # 关闭摄像头窗口
         cv2.destroyAllWindows()
         print("演示结束。")
 
@@ -123,12 +125,6 @@ def main():
     except Exception as e:
         print(f"\n✗ 连接过程中出错: {e}")
         print("  其他可能原因：防火墙阻止、端口占用或配置文件错误。")
-    finally:
-        # 确保窗口被关闭
-        try:
-            cv2.destroyAllWindows()
-        except:
-            pass
 
 
 if __name__ == "__main__":
