@@ -14,11 +14,16 @@ CARLA 0.9.10+ 自动驾驶控制程序
 2. 增强功能：多地图切换、实时数据监控、日志记录、智能避障
 3. 保留核心：晚转弯、大转向角度、平稳速度控制
 """
-import mujoco
-import mujoco.viewer
+
+import sys
+import os
+import carla
+import time
 import numpy as np
-from pynput import keyboard
 import math
+import matplotlib.pyplot as plt
+import cv2
+from collections import deque
 import random
 import sys
 import os
@@ -26,7 +31,7 @@ import time
 from typing import Tuple, Optional, Dict
 
 
-# ====================== 全局配置（集中管理，便于调整） ======================
+# ===================== 核心配置 =====================
 class Config:
     # 速度配置
     CRUISE_SPEED = 0.0015  # 巡航速度（原两倍速）
@@ -87,18 +92,124 @@ class KeyManager:
 )
 logger = logging.getLogger(__name__)
 
-    def _on_release(self, k):
-        if k in self.keys:
-            self.keys[k] = False
+        except Exception as e:
+            logger.error(f"障碍物检测错误: {e}")
 
-    def is_pressed(self, key_char: str) -> bool:
-        key = keyboard.KeyCode.from_char(key_char)
-        return self.keys.get(key, False)
+        return self.last_obstacle_info
 
-    def reset_key(self, key_char: str):
-        key = keyboard.KeyCode.from_char(key_char)
-        if key in self.keys:
-            self.keys[key] = False
+    def visualize_obstacles(self, image, vehicle_transform):
+        """在图像上可视化障碍物检测结果"""
+        if not self.last_obstacle_info['has_obstacle']:
+            return image
+
+        height, width = image.shape[:2]
+        distance = self.last_obstacle_info['distance']
+        angle = self.last_obstacle_info['relative_angle']
+
+        # 计算障碍物在图像中的位置
+        x_pos = int(width / 2 + (angle / 70) * (width / 2))  # 适配70度检测范围
+        x_pos = max(0, min(width - 1, x_pos))
+
+        # 根据距离设置颜色和大小
+        if distance < 15:
+            color = (0, 0, 255)
+            radius = 15
+        elif distance < 30:
+            color = (0, 165, 255)
+            radius = 10
+        else:
+            color = (0, 255, 255)
+            radius = 5
+
+        # 绘制障碍物指示器
+        cv2.circle(image, (x_pos, int(height * 0.8)), radius, color, -1)
+        cv2.putText(image, f"{distance:.1f}m", (x_pos - 20, int(height * 0.8) - 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        # 绘制相对速度
+        rel_speed = self.last_obstacle_info['relative_speed']
+        cv2.putText(image, f"RelSpeed: {rel_speed:.1f}km/h", (x_pos - 20, int(height * 0.8) + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        return image
+
+
+# --------------------------
+# 2. 传统控制器（核心控制逻辑+优化避障）
+# --------------------------
+class TraditionalController:
+    """基于路点的传统控制器，整合避障"""
+
+    def __init__(self, world, obstacle_detector):
+        self.world = world
+        self.map = world.get_map()
+        self.waypoint_distance = 10.0
+        self.obstacle_detector = obstacle_detector
+        # 调整避障阈值：扩大距离，提前减速
+        self.emergency_brake_distance = 12.0  # 从6米改为12米
+        self.safe_following_distance = 18.0  # 从10米改为18米
+        self.early_warning_distance = 30.0  # 新增：30米提前预警
+
+    def apply_obstacle_avoidance(self, throttle, brake, steer, vehicle, obstacle_info):
+        """传统控制器的避障逻辑（优化刹车力度+相对速度）"""
+        if not obstacle_info['has_obstacle']:
+            return throttle, brake, steer
+
+        distance = obstacle_info['distance']
+        angle = obstacle_info['relative_angle']
+        vehicle_speed = self.obstacle_detector.get_vehicle_speed(vehicle)
+        relative_speed = obstacle_info['relative_speed']  # 自车与前车的相对速度
+
+        # 1. 提前预警（30米内）：轻微减速，降低油门
+        if distance < self.early_warning_distance and relative_speed > 0:
+            throttle *= 0.5  # 油门减半
+            if vehicle_speed > 30:
+                brake = 0.2  # 轻微刹车
+
+        # 2. 紧急刹车（12米内）：全力刹车+手刹
+        if distance < self.emergency_brake_distance:
+            logger.warning(f"紧急刹车！距离前车: {distance:.1f}m, 相对速度: {relative_speed:.1f}km/h")
+            return 0.0, 1.0, 0.0  # brake=1.0 + 后续拉手刹
+
+        # 3. 安全跟车（18米内）：动态调整刹车力度
+        elif distance < self.safe_following_distance:
+            # 根据距离和相对速度计算所需刹车力度
+            required_distance = max(8.0, vehicle_speed * 0.5)  # 增加安全车距系数
+            distance_ratio = (distance - required_distance) / self.safe_following_distance
+            distance_ratio = max(0.0, min(1.0, distance_ratio))
+
+            # 相对速度越大，刹车越重
+            brake_strength = (1 - distance_ratio) * 0.8 + (relative_speed / 20) * 0.2
+            brake_strength = max(0.3, min(0.8, brake_strength))
+
+            if distance < required_distance:
+                throttle = 0.0
+                brake = brake_strength
+            else:
+                throttle = 0.1
+                brake = 0.0
+
+            # 尝试变道
+            if abs(angle) < 15:
+                location = vehicle.get_location()
+                waypoint = self.map.get_waypoint(location)
+                left_lane = waypoint.get_left_lane()
+                right_lane = waypoint.get_right_lane()
+
+                if left_lane and left_lane.lane_type == carla.LaneType.Driving:
+                    steer = -0.3
+                elif right_lane and right_lane.lane_type == carla.LaneType.Driving:
+                    steer = 0.3
+                else:
+                    steer = 0.2 if angle >= 0 else -0.2
+
+        return throttle, brake, steer
+
+    def get_control(self, vehicle):
+        """生成传统控制指令（优先避障，弱化基础速度控制）"""
+        # 获取车辆状态
+        transform = vehicle.get_transform()
+        location = vehicle.get_location()
+        velocity = vehicle.get_velocity()
+        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6
 
 # ====================== 2. CARLA动态加载（优化版，无绝对路径） ======================
 def load_carla_dynamically():
@@ -437,57 +548,18 @@ class CruiseCarController:
         except Exception as e:
             raise RuntimeError(f"❌ 加载模型失败: {e}")
 
-        # 初始化ID缓存（避免重复计算）
-        self._init_ids()
+        dx = target_loc.x - location.x
+        dy = target_loc.y - location.y
 
-        # 初始化状态
-        self.car_state = CarState.CRUISING
-        self.target_steer_angle = 0.0  # 目标转向角度
-        self.turn_direction = 1  # 转向方向（1=右，-1=左）
-        self.turn_progress = 0.0  # 转向进度（0-1）
+        local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
+        local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
 
         # 复位小车
         self.reset_car()
             logger.warning(f"⚠️ 碰撞传感器挂载失败：{e}")
 
-    def _init_ids(self):
-        """初始化body ID缓存"""
-        # 小车底盘ID
-        self.chassis_id = mujoco.mj_name2id(
-            self.model, mujoco.mjtObj.mjOBJ_BODY, self.config.CHASSIS_NAME
-        )
-        if self.chassis_id == -1:
-            raise RuntimeError(f"❌ 未找到底盘: {self.config.CHASSIS_NAME}")
-
-        # 障碍物ID
-        self.obstacle_ids = {}
-        for name in self.config.OBSTACLE_NAMES:
-            obs_id = mujoco.mj_name2id(
-                self.model, mujoco.mjtObj.mjOBJ_BODY, name
-            )
-            if obs_id != -1:
-                self.obstacle_ids[name] = obs_id
-        print(f"✅ 加载{len(self.obstacle_ids)}个障碍物ID")
-
-    def reset_car(self):
-        """复位小车到初始状态"""
-        mujoco.mj_resetData(self.model, self.data)
-        self.data.qpos[2] = 0.03  # 设置初始高度
-        self.car_state = CarState.CRUISING
-        self.target_steer_angle = 0.0
-        self.turn_progress = 0.0
-        print("\n🔄 小车已复位")
-
-    def detect_obstacle(self) -> Tuple[int, float, Optional[str]]:
-        """
-        检测前方障碍物
-        返回值：(状态码, 最近距离, 障碍物名称)
-        状态码：0=无障碍, 1=检测到障碍, 2=紧急停止
-        """
-        # 获取小车位置
-        chassis_pos = self.data.body(self.chassis_id).xpos
-        min_distance = float('inf')
-        closest_obs = None
+        # 障碍物调整（优先执行）
+        throttle, brake, steer = self.apply_obstacle_avoidance(throttle, brake, steer, vehicle, obstacle_info)
 
         # 遍历所有障碍物
         for obs_name, obs_id in self.obstacle_ids.items():
@@ -658,42 +730,281 @@ class CruiseCarController:
                     print("\n⚠️  转向后仍有障碍，重新停止")
                 self.turn_progress = 0.0
 
-    def get_status_info(self) -> str:
-        """获取状态信息（用于打印）"""
-        # 计算当前速度
-        vel = np.linalg.norm(self.data.qvel[:3])
-        # 当前转向角度（度）
-        current_steer = math.degrees((self.data.ctrl[0] + self.data.ctrl[1]) / 2)
 
-        # 基础状态信息
-        info = f"状态: {self.car_state:<8} | 速度: {vel:.5f} m/s"
-        if abs(current_steer) > 0.1:
-            info += f" | 转向: {current_steer:.1f}°"
-
-        # 巡航状态显示障碍物信息
-        if self.car_state == CarState.CRUISING:
-            obs_status, obs_dist, obs_name = self.detect_obstacle()
-            if obs_status > 0 and obs_name:
-                info += f" | 前方障碍: {obs_name} ({obs_dist:.2f}m)"
-
-        return info
+# ===================== 摄像头回调 =====================
+def camera_callback(image, data_dict):
+    array = np.frombuffer(image.raw_data, dtype=np.uint8).reshape((image.height, image.width, 4))[:, :, :3]
+    data_dict['image'] = array
 
 
-# ====================== 主程序入口 ======================
+# ===================== 控制器 =====================
+class PIDSpeedController:
+    def __init__(self, config):
+        self.kp = config.PID_KP
+        self.ki = config.PID_KI
+        self.kd = config.PID_KD
+        self.prev_err = 0.0
+        self.integral = 0.0
+        self.target_speed = config.TARGET_SPEED
+
+    def calculate(self, current_speed):
+        err = self.target_speed - current_speed
+        self.integral = np.clip(self.integral + err * 0.05, -1.0, 1.0)
+        deriv = (err - self.prev_err) / 0.05 if 0.05 != 0 else 0.0
+        output = self.kp * err + self.ki * self.integral + self.kd * deriv
+        self.prev_err = err
+        return np.clip(output, 0.1, 1.0)
+
+
+class PurePursuitController:
+    def __init__(self, config):
+        self.lookahead_dist = config.LOOKAHEAD_DISTANCE
+        self.max_steer_rad = math.radians(config.MAX_STEER_ANGLE)
+
+    def calculate_steer(self, vehicle_loc, vehicle_yaw, waypoints):
+        """
+        纯追踪算法计算转向角
+        :param vehicle_loc: 车辆位置
+        :param vehicle_yaw: 车辆朝向（弧度）
+        :param waypoints: 道路航点列表
+        :return: 转向角（-1~1）
+        """
+        # 1. 将航点转换为车辆坐标系
+        wp_coords = np.array(waypoints)
+        vehicle_x = vehicle_loc.x
+        vehicle_y = vehicle_loc.y
+
+        # 旋转和平移（车辆坐标系：x向前，y向左）
+        cos_yaw = math.cos(vehicle_yaw)
+        sin_yaw = math.sin(vehicle_yaw)
+        translated_x = wp_coords[:, 0] - vehicle_x
+        translated_y = wp_coords[:, 1] - vehicle_y
+        rotated_x = translated_x * cos_yaw + translated_y * sin_yaw
+        rotated_y = -translated_x * sin_yaw + translated_y * cos_yaw
+
+        # 2. 找到距离车辆>=前瞻距离的第一个航点
+        distances = np.hypot(rotated_x, rotated_y)
+        valid_wp_indices = np.where(distances >= self.lookahead_dist)[0]
+        if len(valid_wp_indices) == 0:
+            return 0.0
+
+        target_idx = valid_wp_indices[0]
+        target_x = rotated_x[target_idx]
+        target_y = rotated_y[target_idx]
+
+        # 3. 计算转向角（纯追踪公式：steer = arctan(2*L*y/(x²+y²))，L为车辆轴距，这里简化为1.0）
+        L = 1.0  # 车辆轴距（米）
+        steer_rad = math.atan2(2 * L * target_y, self.lookahead_dist ** 2)
+
+        # 4. 限制转向角
+        steer_rad = np.clip(steer_rad, -self.max_steer_rad, self.max_steer_rad)
+        steer = steer_rad / self.max_steer_rad
+
+        return steer
+
+
+# ===================== 可视化 =====================
+class Visualizer:
+    def __init__(self, config, spawn_loc, initial_waypoints):
+        self.waypoints = np.array(initial_waypoints)
+        self.trajectory = []
+        self.spawn_loc = (spawn_loc.x, spawn_loc.y)
+
+        plt.rcParams['backend'] = 'TkAgg'
+        plt.ioff()
+        self.fig, self.ax = plt.subplots(figsize=config.PLOT_SIZE)
+
+        # 绘制道路航点（CARLA原生）
+        self.ax.scatter(self.waypoints[:, 0], self.waypoints[:, 1], c='blue', s=50, label='Road Waypoints (CARLA)',
+                        zorder=3)
+        # 绘制生成点
+        self.ax.scatter(self.spawn_loc[0], self.spawn_loc[1], c='orange', marker='s', s=150, label='Spawn Point',
+                        zorder=5)
+        # 轨迹和车辆
+        self.traj_line, = self.ax.plot([], [], c='red', linewidth=4, label='Vehicle Trajectory', zorder=2)
+        self.vehicle_dot, = self.ax.plot([], [], c='green', marker='o', markersize=20, label='Vehicle', zorder=6)
+
+        self.ax.set_xlabel('X (m)', fontsize=14)
+        self.ax.set_ylabel('Y (m)', fontsize=14)
+        self.ax.set_title('CARLA Road Following (Native Waypoints)', fontsize=16)
+        self.ax.legend(fontsize=12)
+        self.ax.grid(True, alpha=0.3)
+        self.ax.axis('equal')
+
+        plt.show(block=False)
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+    def update(self, vehicle_x, vehicle_y, new_waypoints=None):
+        """更新轨迹和航点"""
+        self.trajectory.append([vehicle_x, vehicle_y])
+        if len(self.trajectory) > 1000:
+            self.trajectory = self.trajectory[-1000:]
+
+        # 更新轨迹
+        if self.trajectory:
+            traj = np.array(self.trajectory)
+            self.traj_line.set_data(traj[:, 0], traj[:, 1])
+        self.vehicle_dot.set_data(vehicle_x, vehicle_y)
+
+        # 更新航点（如果有新航点）
+        if new_waypoints is not None:
+            self.waypoints = np.array(new_waypoints)
+            self.ax.scatter(self.waypoints[:, 0], self.waypoints[:, 1], c='blue', s=50, zorder=3)
+
+        self.ax.relim()
+        self.ax.autoscale_view(True, True, True)
+        self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
+
+
+# ===================== 主函数 =====================
 def main():
-    # 初始化配置和控制器
     config = Config()
-    try:
-        controller = CruiseCarController(config)
-    except RuntimeError as e:
-        print(e)
-        return
+    tools = Tools()
 
-    # 启动可视化界面
-    with mujoco.viewer.launch_passive(controller.model, controller.data) as viewer:
-        # 设置相机参数
-        viewer.cam.distance = config.CAM_DISTANCE
-        viewer.cam.elevation = config.CAM_ELEVATION
+    # 初始化变量
+    vehicle = None
+    third_camera = None
+    front_camera = None
+    camera = None
+    visualizer = None
+    third_image = None
+    front_image = None
+
+    # 初始化OpenCV窗口
+    cv2.namedWindow('CARLA Autopilot (0.9.10)', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('CARLA Autopilot (0.9.10)', 640, 480)
+
+    try:
+        # 连接CARLA服务器（0.9.10兼容）
+        client = carla.Client('localhost', 2000)
+        client.set_timeout(30.0)
+        world = client.load_world('Town01')  # 0.9.10支持Town01
+        logger.info("成功连接CARLA并加载Town01地图")
+
+        # 设置同步模式（0.9.10关键配置）
+        settings = world.get_settings()
+        settings.synchronous_mode = True
+        settings.fixed_delta_seconds = 0.1
+        world.apply_settings(settings)
+        logger.info("已设置同步模式，delta=0.1s")
+
+        # 清理Actor
+        tools.clear_all_actors(world)
+
+        # 设置天气
+        weather = carla.WeatherParameters(
+            cloudiness=30.0,
+            precipitation=0.0,
+            sun_altitude_angle=70.0
+        )
+        world.set_weather(weather)
+        logger.info("已设置天气：晴朗，30%云量")
+
+        # 获取出生点
+        map = world.get_map()
+        spawn_points = map.get_spawn_points()
+        if not spawn_points:
+            raise Exception("无可用出生点")
+        spawn_point = spawn_points[10]
+        logger.info(f"使用出生点：{spawn_point.location}")
+
+        # 生成主车辆
+        blueprint_library = world.get_blueprint_library()
+        vehicle_bp = blueprint_library.find(config.VEHICLE_MODEL)
+        vehicle_bp.set_attribute('color', '255,0,0')
+        vehicle = world.spawn_actor(vehicle_bp, spawn_point)
+        if not vehicle:
+            raise Exception("无法生成主车辆")
+        vehicle.set_autopilot(False)
+        logger.info(f"车辆{config.VEHICLE_MODEL}生成成功，位置: {spawn_point.location}")
+
+        # 聚焦车辆
+        tools.focus_vehicle(world, vehicle)
+
+        # 生成障碍物车辆（调整生成位置，确保在前车前方）
+        obstacle_count = 3
+        for i in range(obstacle_count):
+            spawn_idx = (i + 12) % len(spawn_points)  # 从15改为12，更靠近主车辆
+            other_vehicle_bp = random.choice(blueprint_library.filter('vehicle.*'))
+            other_vehicle = world.try_spawn_actor(other_vehicle_bp, spawn_points[spawn_idx])
+            if other_vehicle:
+                other_vehicle.set_autopilot(True)
+                logger.info(f"生成障碍物车辆 {other_vehicle.type_id} 在位置 {spawn_points[spawn_idx].location}")
+
+        # 配置传感器（0.9.10兼容）
+        # 后视角相机
+        third_camera_bp = blueprint_library.find('sensor.camera.rgb')
+        third_camera_bp.set_attribute('image_size_x', '640')
+        third_camera_bp.set_attribute('image_size_y', '480')
+        third_camera_bp.set_attribute('fov', '110')
+        third_camera_transform = carla.Transform(
+            carla.Location(x=-5.0, y=0.0, z=3.0),
+            carla.Rotation(pitch=-15.0)
+        )
+        third_camera = world.spawn_actor(third_camera_bp, third_camera_transform, attach_to=vehicle)
+
+        # 前视角相机
+        front_camera_bp = blueprint_library.find('sensor.camera.rgb')
+        front_camera_bp.set_attribute('image_size_x', '640')
+        front_camera_bp.set_attribute('image_size_y', '480')
+        front_camera_bp.set_attribute('fov', '90')
+        front_camera_transform = carla.Transform(
+            carla.Location(x=2.0, y=0.0, z=1.5),
+            carla.Rotation(pitch=0.0)
+        )
+        front_camera = world.spawn_actor(front_camera_bp, front_camera_transform, attach_to=vehicle)
+
+        # 主摄像头（用于可视化）
+        camera_bp = blueprint_library.find('sensor.camera.rgb')
+        camera_bp.set_attribute('image_size_x', str(config.CAMERA_WIDTH))
+        camera_bp.set_attribute('image_size_y', str(config.CAMERA_HEIGHT))
+        camera_bp.set_attribute('fov', str(config.CAMERA_FOV))
+        camera = world.spawn_actor(camera_bp, carla.Transform(carla.Location(x=2.0, z=1.8)), attach_to=vehicle)
+
+        # 摄像头数据
+        camera_data = {'image': np.zeros((config.CAMERA_HEIGHT, config.CAMERA_WIDTH, 3), dtype=np.uint8)}
+
+        # 传感器回调函数
+        def third_camera_callback(image):
+            nonlocal third_image
+            array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            array = np.reshape(array, (image.height, image.width, 4))
+            third_image = array[:, :, :3]
+
+        def front_camera_callback(image):
+            nonlocal front_image
+            array = np.frombuffer(image.raw_data, dtype=np.uint8)
+            array = np.reshape(array, (image.height, image.width, 4))
+            front_image = array[:, :, :3]
+
+        # 注册回调
+        third_camera.listen(third_camera_callback)
+        front_camera.listen(front_camera_callback)
+        camera.listen(lambda img: camera_callback(img, camera_data))
+        time.sleep(2.0)  # 等待传感器初始化
+        logger.info("传感器初始化完成")
+
+        # 生成初始道路航点
+        initial_waypoints = tools.generate_road_waypoints(world, spawn_point.location, config.WAYPOINT_COUNT)
+
+        # 初始化核心组件
+        obstacle_detector = ObstacleDetector(world, vehicle)
+        traditional_controller = TraditionalController(world, obstacle_detector)
+        speed_controller = PIDSpeedController(config)
+        path_controller = PurePursuitController(config)
+
+        # 初始化可视化
+        visualizer = Visualizer(config, spawn_point.location, initial_waypoints)
+
+        # 控制变量
+        throttle = 0.3
+        steer = 0.0
+        brake = 0.0
+        frame_count = 0
+        stuck_count = 0
+        last_position = vehicle.get_location()
 
         # 主循环
         print("\n🚀 自动巡航小车启动（按R键复位）")
