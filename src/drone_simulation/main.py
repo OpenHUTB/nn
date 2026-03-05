@@ -1,9 +1,8 @@
 """
-MuJoCo 四旋翼无人机仿真 - 公转+避障版
-✅ 无人机绕世界Z轴公转，保持原旋转逻辑
-✅ 自动避开立方体/圆柱体/球体障碍物
-✅ 避障后自动恢复原轨迹，高度固定、无闪烁
-✅ 保留所有原代码核心特征
+MuJoCo 四旋翼无人机仿真 - 探索轨迹版
+✅ 无人机沿8字形轨迹飞行
+✅ 自动避开障碍物
+✅ 更自然的飞行路径
 """
 
 import mujoco
@@ -11,197 +10,202 @@ import mujoco.viewer
 import numpy as np
 import time
 import math
+import os
 
 
 class QuadrotorSimulation:
-    def __init__(self):
-        """初始化：添加避障相关参数"""
-        xml_string = self.create_quadrotor_xml()
-        self.model = mujoco.MjModel.from_xml_string(xml_string)
-        print("✓ 模型加载成功")
+    def __init__(self, xml_path="quadrotor_detailed_city.xml"):
+        """初始化：从XML文件加载模型"""
+        if not os.path.exists(xml_path):
+            raise FileNotFoundError(f"找不到XML文件: {xml_path}")
+
+        self.model = mujoco.MjModel.from_xml_path(xml_path)
+        print(f"✓ 模型加载成功: {xml_path}")
         self.data = mujoco.MjData(self.model)
         self.n_actuators = self.model.nu
 
-        # 原代码悬停推力参数
-        hover_thrust = 600
+        # 悬停推力参数
+        hover_thrust = 650
         self.data.ctrl[:] = [hover_thrust] * self.n_actuators
 
-        # ========== 原代码旋转参数 ==========
-        self.base_radius = 1.0      # 基础公转半径
-        self.rotate_speed = 1.0     # 公转角速度（rad/s）
-        self.hover_height = 0.8     # 固定高度
-        self.rotate_angle = 0.0     # 公转角度累计
-        self.rotor_visual_speed = 8.0  # 旋翼旋转速度
+        # ========== 基础参数（先定义） ==========
+        self.hover_height = 1.0  # 基础高度
+        self.trajectory_speed = 0.5  # 轨迹速度
+        self.rotor_visual_speed = 10.0
 
-        # ========== 避障核心参数 ==========
-        self.safety_distance = 0.5  # 安全距离（小于此距离触发避障）
-        self.avoidance_offset = 0.8 # 避障偏移量（扩大半径绕开障碍物）
-        self.obstacle_positions = { # 预定义障碍物位置（与XML中一致）
-            "cube": np.array([2.0, 0.0, 0.75]),
-            "cylinder": np.array([-1.0, 1.0, 0.5]),
-            "sphere": np.array([0.0, -2.0, 1.0])
+        # ========== 轨迹参数 ==========
+        self.trajectory_type = "figure8"  # "circle", "figure8", "random"
+        self.trajectory_time = 0.0
+
+        # 8字形参数
+        self.figure8_width = 2.0
+        self.figure8_height = 1.5
+        self.figure8_center_x = 0.0
+        self.figure8_center_y = 0.0
+
+        # 随机游走参数
+        self.random_points = []
+        self.current_target_index = 0
+        self.generate_random_path()  # 现在可以安全调用，因为hover_height已定义
+
+        # ========== 避障参数 ==========
+        self.safety_distance = 1.0
+        self.avoidance_strength = 1.5
+        self.influence_radius = 2.0
+
+        # 平滑过渡参数
+        self.smooth_factor = 0.15
+        self.current_pos = np.array([0, 0, self.hover_height])
+        self.target_pos = np.array([0, 0, self.hover_height])
+
+        # 避障状态
+        self.in_avoidance = False
+
+        # 障碍物位置和尺寸
+        self.obstacle_positions = {
+            "big_tree": np.array([2.0, 2.0, 0.8]),
+            "street_lamp": np.array([-2.0, 2.0, 0.6]),
+            "small_shop": np.array([-2.0, -2.0, 0.8]),
+            "office": np.array([3.0, 0.0, 1.2]),
+            "tower": np.array([-3.0, 0.0, 1.5]),
+            "car_red": np.array([1.5, -1.5, 0.3]),
+            "car_blue": np.array([-1.5, 1.5, 0.3])
         }
-        self.obstacle_sizes = {     # 障碍物尺寸（碰撞判定用）
-            "cube": np.array([0.25, 0.25, 0.75]),
-            "cylinder": np.array([0.3, 0.5]),  # 半径、高度
-            "sphere": np.array([0.4])          # 半径
+        self.obstacle_sizes = {
+            "big_tree": 0.6,
+            "street_lamp": 0.3,
+            "small_shop": 0.8,
+            "office": 0.8,
+            "tower": 0.6,
+            "car_red": 0.4,
+            "car_blue": 0.4
         }
 
-    def create_quadrotor_xml(self):
-        """保持原XML结构不变"""
-        xml_string = """<?xml version="1.0" ?>
-<mujoco model="quadrotor">
-  <option timestep="0.005" iterations="100" tolerance="1e-10">
-    <flag contact="enable" energy="enable"/>
-  </option>
-  <size nconmax="100" njmax="200"/>
-  <default>
-    <joint damping="0.001" frictionloss="0.001"/>
-    <geom solref="0.02 1" solimp="0.9 0.95 0.01"/>
-  </default>
-  
-  <asset>
-    <material name="ground_mat" rgba="0.8 0.9 0.8 1"/>
-    <material name="body_mat" rgba="0.3 0.3 0.3 1"/>
-    <material name="arm_mat" rgba="0.1 0.1 0.1 1"/>
-    <material name="motor_mat" rgba="0.2 0.2 0.2 1"/>
-    <material name="propeller_red" rgba="0.8 0.2 0.2 1.0"/>
-    <material name="propeller_green" rgba="0.2 0.8 0.2 1.0"/>
-    <material name="obs_cube_mat" rgba="0.6 0.2 0.8 0.9"/>
-    <material name="obs_cyl_mat" rgba="0.2 0.6 0.8 0.9"/>
-    <material name="obs_sphere_mat" rgba="0.8 0.6 0.2 0.9"/>
-  </asset>
-  
-  <worldbody>
-    <light name="ambient_light" pos="0 0 10" dir="0 0 -1" ambient="0.6 0.6 0.6" diffuse="0.8 0.8 0.8"/>
-    <light name="directional_light" pos="5 5 8" dir="-1 -1 -1" directional="true"/>
+    def generate_random_path(self, num_points=8):
+        """生成随机路径点"""
+        self.random_points = []
+        angles = np.linspace(0, 2*np.pi, num_points, endpoint=False)
+        for i, angle in enumerate(angles):
+            radius = 2.5 + 0.5 * math.sin(angle * 3)
+            x = radius * math.cos(angle)
+            y = radius * math.sin(angle) * 1.2  # 椭圆形状
+            z = self.hover_height + 0.2 * math.sin(angle * 2)
+            self.random_points.append([x, y, z])
+        self.current_target_index = 0
 
-    <!-- 地面 -->
-    <geom name="ground" type="plane" pos="0 0 0" size="20 20 0.1" material="ground_mat" 
-          condim="3" friction="0.8 0.005 0.0001"/>
-    <!-- 参考坐标系 -->
-    <geom name="origin_x" type="cylinder" fromto="0 0 0.1 1 0 0.1" size="0.01" rgba="1 0 0 1"/>
-    <geom name="origin_y" type="cylinder" fromto="0 0 0.1 0 1 0.1" size="0.01" rgba="0 1 0 1"/>
-    <geom name="origin_z" type="cylinder" fromto="0 0 0.1 0 0 1.1" size="0.01" rgba="0 0 1 1"/>
-    
-    <!-- 无人机：原代码初始位置 -->
-    <body name="quadrotor" pos="0 0 0.8" euler="0 0 0">
-      <joint name="quad_free_joint" type="free" damping="0.001"/>
-      
-      <!-- 无人机主体 -->
-      <geom name="center_body" type="cylinder" size="0.1 0.03" material="body_mat" mass="0.4"/>
-      
-      <!-- 机臂 -->
-      <geom name="arm_front_right" type="capsule" fromto="0 0 0 0.25 0.25 0" size="0.01" material="arm_mat" mass="0.04"/>
-      <geom name="arm_front_left" type="capsule" fromto="0 0 0 0.25 -0.25 0" size="0.01" material="arm_mat" mass="0.04"/>
-      <geom name="arm_back_left" type="capsule" fromto="0 0 0 -0.25 -0.25 0" size="0.01" material="arm_mat" mass="0.04"/>
-      <geom name="arm_back_right" type="capsule" fromto="0 0 0 -0.25 0.25 0" size="0.01" material="arm_mat" mass="0.04"/>
-      
-      <!-- 电机和旋翼 -->
-      <body name="motor_front_right" pos="0.25 0.25 0">
-        <geom name="motor_housing_front_right" type="cylinder" size="0.03 0.03" material="motor_mat" mass="0.04"/>
-        <body name="rotor_front_right" pos="0 0 0.05">
-          <joint name="rotor_front_right_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_front_right" type="cylinder" size="0.12 0.008" material="propeller_red" mass="0.01"/>
-        </body>
-      </body>
-      
-      <body name="motor_front_left" pos="0.25 -0.25 0">
-        <geom name="motor_housing_front_left" type="cylinder" size="0.03 0.03" material="motor_mat" mass="0.04"/>
-        <body name="rotor_front_left" pos="0 0 0.05">
-          <joint name="rotor_front_left_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_front_left" type="cylinder" size="0.12 0.008" material="propeller_green" mass="0.01"/>
-        </body>
-      </body>
-      
-      <body name="motor_back_left" pos="-0.25 -0.25 0">
-        <geom name="motor_housing_back_left" type="cylinder" size="0.03 0.03" material="motor_mat" mass="0.04"/>
-        <body name="rotor_back_left" pos="0 0 0.05">
-          <joint name="rotor_back_left_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_back_left" type="cylinder" size="0.12 0.008" material="propeller_red" mass="0.01"/>
-        </body>
-      </body>
-      
-      <body name="motor_back_right" pos="-0.25 0.25 0">
-        <geom name="motor_housing_back_right" type="cylinder" size="0.03 0.03" material="motor_mat" mass="0.04"/>
-        <body name="rotor_back_right" pos="0 0 0.05">
-          <joint name="rotor_back_right_joint" type="hinge" axis="0 0 1" damping="0.001"/>
-          <geom name="propeller_back_right" type="cylinder" size="0.12 0.008" material="propeller_green" mass="0.01"/>
-        </body>
-      </body>
+    def get_trajectory_target(self):
+        """获取当前轨迹目标点"""
+        t = self.trajectory_time * self.trajectory_speed
 
-      <!-- 起落架 -->
-      <geom name="landing_gear_front" type="cylinder" pos="0.15 0 0" size="0.008 0.05" rgba="0.5 0.5 0.5 1" mass="0.01"/>
-      <geom name="landing_gear_back" type="cylinder" pos="-0.15 0 0" size="0.008 0.05" rgba="0.5 0.5 0.5 1" mass="0.01"/>
+        if self.trajectory_type == "circle":
+            # 圆形轨迹
+            radius = 2.5
+            x = radius * math.cos(t)
+            y = radius * math.sin(t)
+            z = self.hover_height
 
-      <!-- 视觉标记 -->
-      <geom name="front_marker" type="sphere" pos="0.15 0 0.02" size="0.02" rgba="1 1 0 1"/>
-      <geom name="rear_marker" type="sphere" pos="-0.15 0 0.02" size="0.02" rgba="0 1 1 1"/>
-    </body>
+        elif self.trajectory_type == "figure8":
+            # 8字形轨迹（李萨如曲线）
+            x = self.figure8_width * math.sin(t)
+            y = self.figure8_height * math.sin(t * 2)
+            z = self.hover_height + 0.2 * math.sin(t * 3)
 
-    <!-- 障碍物 -->
-    <geom name="obstacle_cube" type="box" pos="2 0 0.75" size="0.25 0.25 0.75" material="obs_cube_mat" 
-          friction="0.5 0.01 0.001" mass="5"/>
-    <geom name="obstacle_cylinder" type="cylinder" pos="-1 1 0.5" size="0.3 0.5" material="obs_cyl_mat" 
-          friction="0.5 0.01 0.001" mass="5"/>
-    <geom name="obstacle_sphere" type="sphere" pos="0 -2 1.0" size="0.4" material="obs_sphere_mat" 
-          friction="0.5 0.01 0.001" mass="5"/>
-  </worldbody>
+        elif self.trajectory_type == "random":
+            # 随机点之间的线性插值
+            if len(self.random_points) < 2:
+                return np.array([0, 0, self.hover_height])
 
-  <actuator>
-    <motor name="motor_front_right" joint="rotor_front_right_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_front_left" joint="rotor_front_left_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_back_left" joint="rotor_back_left_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-    <motor name="motor_back_right" joint="rotor_back_right_joint" gear="80" ctrllimited="true" ctrlrange="0 1000"/>
-  </actuator>
-</mujoco>"""
-        return xml_string
+            # 获取当前目标点
+            target = np.array(self.random_points[self.current_target_index])
 
-    def calculate_obstacle_distance(self, drone_pos):
-        """计算无人机到各障碍物的水平距离（Z轴高度忽略，只算XY平面）"""
-        distances = {}
+            # 检查是否到达目标点
+            dist_to_target = np.linalg.norm(self.current_pos[:2] - target[:2])
+            if dist_to_target < 0.3:
+                self.current_target_index = (self.current_target_index + 1) % len(self.random_points)
+                target = np.array(self.random_points[self.current_target_index])
 
-        # 立方体障碍物
-        cube_pos = self.obstacle_positions["cube"][:2]  # 只取XY坐标
-        drone_xy = drone_pos[:2]
-        distances["cube"] = np.linalg.norm(drone_xy - cube_pos) - self.obstacle_sizes["cube"][0]
+            return target
 
-        # 圆柱体障碍物
-        cyl_pos = self.obstacle_positions["cylinder"][:2]
-        distances["cylinder"] = np.linalg.norm(drone_xy - cyl_pos) - self.obstacle_sizes["cylinder"][0]
+        return np.array([x, y, z])
 
-        # 球体障碍物
-        sphere_pos = self.obstacle_positions["sphere"][:2]
-        distances["sphere"] = np.linalg.norm(drone_xy - sphere_pos) - self.obstacle_sizes["sphere"][0]
+    def calculate_avoidance_force(self, drone_pos):
+        """计算避障力"""
+        total_force = np.zeros(3)
+        min_dist = float('inf')
+        closest_obs = None
 
-        return distances
+        for obs_name, obs_pos in self.obstacle_positions.items():
+            # 计算到障碍物的向量和距离
+            to_obs = drone_pos - obs_pos
+            dist = np.linalg.norm(to_obs)
+            obs_size = self.obstacle_sizes.get(obs_name, 0.3)
 
-    def get_avoidance_radius(self, drone_pos):
-        """根据障碍物距离动态调整公转半径（避障核心逻辑）"""
-        distances = self.calculate_obstacle_distance(drone_pos)
-        min_distance = min(distances.values())
+            # 实际距离（减去障碍物尺寸）
+            actual_dist = max(dist - obs_size, 0.1)
 
-        # 判定是否需要避障
-        if min_distance < self.safety_distance:
-            # 找到最近的障碍物
-            closest_obs = min(distances, key=distances.get)
-            obs_pos = self.obstacle_positions[closest_obs][:2]
-            drone_xy = drone_pos[:2]
+            if actual_dist < min_dist:
+                min_dist = actual_dist
+                closest_obs = obs_name
 
-            # 计算避障方向：远离最近障碍物
-            direction = drone_xy - obs_pos
-            direction = direction / np.linalg.norm(direction) if np.linalg.norm(direction) > 0 else np.array([1, 0])
+            # 如果在影响范围内，计算排斥力
+            if actual_dist < self.influence_radius:
+                if dist > 0:
+                    force_dir = to_obs / dist
+                else:
+                    force_dir = np.array([1, 0, 0])
 
-            # 动态调整半径，绕开障碍物
-            return self.base_radius + self.avoidance_offset
+                # 力的强度：距离越近越强
+                strength = self.avoidance_strength * (1.0 - actual_dist / self.influence_radius) ** 2
+
+                # 添加一些随机扰动，避免陷入局部最小
+                if actual_dist < self.safety_distance * 0.5:
+                    # 非常接近时，添加垂直方向的力
+                    force_dir[2] += 0.3 * np.random.randn()
+
+                total_force += force_dir * strength
+
+        return total_force, min_dist, closest_obs
+
+    def calculate_optimized_target(self):
+        """计算优化后的目标点"""
+        # 获取原始轨迹目标
+        raw_target = self.get_trajectory_target()
+
+        # 获取当前位置
+        current_pos = self.data.qpos[0:3].copy()
+
+        # 计算避障力
+        force, min_dist, closest_obs = self.calculate_avoidance_force(current_pos)
+
+        # 根据避障力调整目标点
+        if min_dist < self.safety_distance:
+            # 避障强度
+            intensity = 1.0 - min(min_dist / self.safety_distance, 1.0)
+
+            # 将避障力加到目标点上
+            adjusted_target = raw_target + force * intensity * 0.5
+
+            # 确保高度不会太低
+            adjusted_target[2] = max(adjusted_target[2], 0.5)
+
+            self.in_avoidance = True
         else:
-            # 无避障需求，恢复基础半径
-            return self.base_radius
+            adjusted_target = raw_target
+            self.in_avoidance = False
+
+        # 平滑过渡
+        self.target_pos = adjusted_target
+        self.current_pos += (self.target_pos - self.current_pos) * self.smooth_factor
+
+        return self.current_pos, min_dist, closest_obs
 
     def simulation_loop(self, viewer, duration):
-        """核心：公转+避障逻辑"""
+        """核心：探索轨迹的仿真循环"""
         start_time = time.time()
         last_print_time = time.time()
+
+        # 轨迹记录
+        path_history = []
 
         while (viewer is None or (viewer and viewer.is_running())) and (time.time() - start_time) < duration:
             step_start = time.time()
@@ -209,50 +213,46 @@ class QuadrotorSimulation:
             # 物理仿真步进
             mujoco.mj_step(self.model, self.data)
 
-            # ========== 1. 更新公转角度 ==========
-            self.rotate_angle += self.rotate_speed * self.model.opt.timestep
-            # 限制角度范围（防止数值过大）
-            if self.rotate_angle > 2 * math.pi:
-                self.rotate_angle -= 2 * math.pi
+            # 更新时间
+            self.trajectory_time += self.model.opt.timestep
 
-            # ========== 2. 计算基础公转位置 ==========
-            base_x = self.base_radius * math.cos(self.rotate_angle)
-            base_y = self.base_radius * math.sin(self.rotate_angle)
-            base_pos = np.array([base_x, base_y, self.hover_height])
+            # 获取当前位置
+            current_pos = self.data.qpos[0:3].copy()
 
-            # ========== 3. 避障逻辑：动态调整位置 ==========
-            current_radius = self.get_avoidance_radius(base_pos)
-            # 计算避障后的目标位置
-            target_x = current_radius * math.cos(self.rotate_angle)
-            target_y = current_radius * math.sin(self.rotate_angle)
-            target_z = self.hover_height
+            # 计算优化后的目标位置
+            target_pos, min_dist, closest_obs = self.calculate_optimized_target()
 
-            # ========== 4. 设置无人机位置和姿态 ==========
-            self.data.qpos[0] = target_x  # X轴位置
-            self.data.qpos[1] = target_y  # Y轴位置
-            self.data.qpos[2] = target_z  # Z轴固定高度
-            self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]  # 姿态不变
+            # 设置无人机位置
+            self.data.qpos[0] = target_pos[0]
+            self.data.qpos[1] = target_pos[1]
+            self.data.qpos[2] = target_pos[2]
+            self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]  # 保持水平
 
-            # ========== 5. 旋翼旋转（保持原逻辑） ==========
-            rotor_speed = self.rotor_visual_speed
+            # 旋翼旋转
             for i in range(4):
-                self.data.qpos[7 + i] += rotor_speed * self.model.opt.timestep * (i % 2 * 2 - 1)
+                self.data.qpos[7 + i] += self.rotor_visual_speed * self.model.opt.timestep * (i % 2 * 2 - 1)
+
+            # 记录轨迹
+            path_history.append([target_pos[0], target_pos[1], target_pos[2]])
+            if len(path_history) > 200:
+                path_history.pop(0)
 
             if viewer:
                 viewer.sync()
 
-            # ========== 6. 打印状态信息（新增避障状态） ==========
+            # 打印状态
             if time.time() - last_print_time > 1.0:
-                current_time = self.data.time
-                current_pos = self.data.qpos[0:3].copy()
-                distances = self.calculate_obstacle_distance(current_pos)
-                min_dist = min(distances.values())
-                avoidance_status = "避障中" if min_dist < self.safety_distance else "正常轨迹"
+                status = "🚧 避障中" if self.in_avoidance else "✅ 正常飞行"
 
-                print(f"\n时间: {current_time:.1f}s | 公转角度: {self.rotate_angle:.2f}rad")
-                print(f"当前位置: [{current_pos[0]:.2f}, {current_pos[1]:.2f}, {current_pos[2]:.2f}] m")
-                print(f"公转半径: {current_radius:.2f}m | 状态: {avoidance_status}")
-                print(f"最近障碍物距离: {min_dist:.2f}m | 安全距离: {self.safety_distance}m")
+                print(f"\n{'='*50}")
+                print(f"时间: {self.data.time:.1f}s")
+                print(f"位置: ({target_pos[0]:.2f}, {target_pos[1]:.2f}, {target_pos[2]:.2f})")
+                print(f"状态: {status}")
+                print(f"最近障碍物: {min_dist:.2f}m | 安全距离: {self.safety_distance}m")
+                if closest_obs and self.in_avoidance:
+                    print(f"避障对象: {closest_obs}")
+                print(f"轨迹类型: {self.trajectory_type}")
+                print(f"{'='*50}")
                 last_print_time = time.time()
 
             # 控制仿真速率
@@ -262,50 +262,64 @@ class QuadrotorSimulation:
                 time.sleep(sleep_time)
 
     def run_simulation(self, duration=60.0, use_viewer=True):
-        """运行仿真：带避障功能"""
-        print(f"\n▶ 开始仿真（公转+自动避障），时长: {duration}秒")
-        print(f"▶ 基础公转半径: {self.base_radius}m | 旋转速度: {self.rotate_speed}rad/s")
-        print(f"▶ 安全距离: {self.safety_distance}m | 避障偏移量: {self.avoidance_offset}m")
+        """运行仿真"""
+        print(f"\n{'🚁'*10} 无人机仿真启动 - 探索轨迹 {'🚁'*10}")
+        print(f"▶ 轨迹类型: {self.trajectory_type}")
+        print(f"▶ 轨迹速度: {self.trajectory_speed}")
+        print(f"▶ 安全距离: {self.safety_distance}m")
+        print(f"{'='*50}")
 
         try:
             if use_viewer:
                 with mujoco.viewer.launch_passive(self.model, self.data) as viewer:
-                    # 优化相机视角，方便观察避障效果
+                    # 优化相机视角
                     viewer.cam.azimuth = -45
-                    viewer.cam.elevation = 15
-                    viewer.cam.distance = 8.0
+                    viewer.cam.elevation = 30
+                    viewer.cam.distance = 15.0
                     viewer.cam.lookat[:] = [0.0, 0.0, self.hover_height]
+
+                    print("▶ 仿真运行中... 按 ESC 退出")
                     self.simulation_loop(viewer, duration)
             else:
                 self.simulation_loop(None, duration)
         except Exception as e:
             print(f"⚠ 仿真错误: {e}")
 
-        print("\n✅ 仿真结束（避障功能正常运行）")
+        print(f"\n{'✅'*10} 仿真结束 {'✅'*10}")
 
 
 def main():
-    print("🚁 MuJoCo 四旋翼无人机仿真 - 公转+自动避障版")
-    print("=" * 60)
+    print("🚁 MuJoCo 四旋翼无人机 - 探索轨迹版")
+    print("=" * 50)
 
     try:
-        sim = QuadrotorSimulation()
+        # XML文件路径
+        xml_path = "quadrotor_detailed_city.xml"
+        sim = QuadrotorSimulation(xml_path)
 
-        # ========== 可自定义参数 ==========
-        # 原旋转参数
-        sim.base_radius = 1.0      # 基础公转半径
-        sim.rotate_speed = 1.0     # 旋转速度
-        sim.hover_height = 0.8     # 悬停高度
+        # ========== 轨迹参数选择 ==========
+        # 可选: "circle", "figure8", "random"
+        sim.trajectory_type = "figure8"  # 8字形轨迹，避免单调转圈
+
+        sim.trajectory_speed = 0.6  # 轨迹速度
+        sim.hover_height = 1.2  # 飞行高度
+
+        # 8字形参数
+        sim.figure8_width = 2.5
+        sim.figure8_height = 2.0
+
         # 避障参数
-        sim.safety_distance = 0.5  # 触发避障的安全距离（越小越灵敏）
-        sim.avoidance_offset = 0.8 # 避障时的半径偏移量（越大避障越远）
+        sim.safety_distance = 1.0
+        sim.avoidance_strength = 1.5
+        sim.influence_radius = 2.0
+        sim.smooth_factor = 0.15
 
-        print("✅ 初始化完成（避障功能已启用）")
-        sim.run_simulation(
-            duration=60.0,
-            use_viewer=True
-        )
+        print(f"✅ 初始化完成 - 轨迹类型: {sim.trajectory_type}")
+        sim.run_simulation(duration=60.0, use_viewer=True)
 
+    except FileNotFoundError as e:
+        print(f"\n❌ 文件错误: {e}")
+        print("请确保 quadrotor_detailed_city.xml 文件在同一目录下")
     except KeyboardInterrupt:
         print("\n\n⏹ 仿真被用户中断")
     except Exception as e:
