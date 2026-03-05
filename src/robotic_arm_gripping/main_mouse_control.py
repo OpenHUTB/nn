@@ -33,7 +33,7 @@ def main():
     kp = 1000  # 比例增益（原800，增大以适配更大幅度）
     kd = 80  # 阻尼增益（原60，增大避免抖动）
 
-    # 启动可视化窗口
+    # 可视化窗口加载
     with mujoco.viewer.launch_passive(model, data) as viewer:
         # 设置相机视角（方便观察大幅弯曲）
         viewer.cam.distance = 1.5  # 调远相机，避免机械臂超出视野
