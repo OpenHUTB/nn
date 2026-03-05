@@ -33,7 +33,7 @@ import airsim
 import time
 
 print("=" * 50)
-print("无人机状态检查")
+print("无人机状态视察")
 print("=" * 50)
 
 # 连接到模拟器
