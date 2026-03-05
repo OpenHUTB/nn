@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-多车协同避让仿真 - 改进版
-- 修复让行逻辑复位问题
-- 调优PID参数，避免速度失控
-- 增加调试输出
-- 优化线程退出
+多车协同避让仿真（带障碍物）
+- 两辆独立小车，各自有完整车轮、传感器、执行器
+- 多线程控制，通过共享内存交换位置信息
+- 实现靠右行驶 + 优先级让行规则
+- 增加静态障碍物，测试综合避障能力
+- 使用屏障同步确保控制与仿真的时序
 """
 
 import mujoco
@@ -59,7 +60,7 @@ class CarController:
         self.sensor_ids = sensor_ids
 
         # 控制参数
-        self.target_velocity = 15.0  # 降低目标速度便于观察
+        self.target_velocity = 15.0
         self.steering_gain = 0.08
         self.obstacle_threshold = 2.5
         self.side_threshold = 1.5
@@ -71,9 +72,9 @@ class CarController:
         self.MAX_STEER_CHANGE = 0.05
         self.TILT_THRESHOLD = math.radians(5)
 
-        # PID参数调低，使加速更平缓
-        self.velocity_pid = PIDController(kp=0.4, ki=0.01, kd=0.1)   # 原为0.8/0.02/0.2
-        self.steering_pid = PIDController(kp=0.2, ki=0.002, kd=0.05) # 原为0.3/0.005/0.1
+        # PID
+        self.velocity_pid = PIDController(kp=0.4, ki=0.01, kd=0.1)
+        self.steering_pid = PIDController(kp=0.2, ki=0.002, kd=0.05)
 
         # 历史数据
         self.velocity_history = deque(maxlen=50)
@@ -83,7 +84,7 @@ class CarController:
 
         # 协商状态
         self.yield_flag = False
-        self.near_car = False   # 是否检测到其他车
+        self.near_car = False
 
         # 当前控制输出
         self.last_throttle = 0.0
@@ -124,6 +125,7 @@ class CarController:
             }
 
     def compute_steering(self, my_sensor, other_cars):
+        # ---------- 静态障碍避让（包含对其他车辆的避让） ----------
         front = my_sensor.get('front', 10.0)
         front_left = my_sensor.get('front_left', 10.0)
         front_right = my_sensor.get('front_right', 10.0)
@@ -165,9 +167,8 @@ class CarController:
             dx = other_pos[0] - my_pos[0]
             dy = other_pos[1] - my_pos[1]
             distance = math.hypot(dx, dy)
-            if distance < 6.0:   # 检测范围扩大
+            if distance < 6.0:
                 self.near_car = True
-                # 相对角度
                 angle_to_other = math.atan2(dy, dx)
                 angle_diff = angle_to_other - my_heading
                 while angle_diff > math.pi: angle_diff -= 2*math.pi
@@ -179,13 +180,11 @@ class CarController:
                     else:
                         base_steer += 0.1
 
-                    # 优先级让行：ID大的让行
                     if self.car_id > other_id:
                         self.yield_flag = True
                     else:
                         self.yield_flag = False
 
-        # 如果没有检测到其他车，清除让行标志
         if not self.near_car:
             self.yield_flag = False
 
@@ -194,25 +193,20 @@ class CarController:
 
     def compute_throttle(self, current_vel, steering):
         target = self.target_velocity
-        # 转向减速
         factor = 1.0 - min(abs(steering)*0.5, 0.2)
         target *= factor
-        # 让行减速
         if self.yield_flag:
-            target *= 0.3   # 减速更明显
-        # 防侧翻速度限制
+            target *= 0.3
         if abs(steering) > 1e-6:
             v_safe = math.sqrt(self.MAX_LATERAL_ACC * self.WHEELBASE / abs(math.tan(steering)))
             target = min(target, v_safe)
 
-        # 增加最小速度，避免PID积分过小导致停滞
         if target < 0.5 and self.near_car:
-            target = 0.5   # 即使让行也保持最低速度
+            target = 0.5
 
         self.velocity_pid.setpoint = target
         throttle = self.velocity_pid.update(current_vel, dt=self.model.opt.timestep)
 
-        # 加速度限制
         if len(self.velocity_history) > 0:
             last = self.velocity_history[-1]
             max_accel = 2.0
@@ -239,7 +233,7 @@ class CarController:
         self.last_steer = steer
         self.update_state()
 
-# ==================== XML模型（与之前相同，略）====================
+# ==================== 构建带障碍物的两车模型XML ====================
 def create_multi_car_xml():
     return """
 <mujoco>
@@ -253,6 +247,9 @@ def create_multi_car_xml():
     <material name="car1_mat" rgba="0.1 0.4 0.8 1" specular="0.8"/>
     <material name="car2_mat" rgba="0.8 0.2 0.2 1" specular="0.8"/>
     <material name="tire" rgba="0.1 0.1 0.1 1"/>
+    <material name="obs_red" rgba="1 0 0 1"/>
+    <material name="obs_green" rgba="0 1 0 1"/>
+    <material name="obs_blue" rgba="0 0 1 1"/>
   </asset>
 
   <worldbody>
@@ -322,6 +319,25 @@ def create_multi_car_xml():
       <site name="car2_trail" pos="0 0 0.2" size="0.06" rgba="1 1 0 1" group="2"/>
     </body>
 
+    <!-- ========== 静态障碍物 ========== -->
+    <!-- 中央障碍物，迫使两车绕行 -->
+    <body name="obs_center" pos="0 1 0.8">
+      <geom type="cylinder" size="0.5 0.8" material="obs_red"/>
+    </body>
+    <!-- 左侧障碍物 -->
+    <body name="obs_left" pos="-4 2 0.6">
+      <geom type="box" size="0.8 0.8 0.6" material="obs_green"/>
+    </body>
+    <!-- 右侧障碍物 -->
+    <body name="obs_right" pos="4 -2 0.6">
+      <geom type="box" size="0.8 0.8 0.6" material="obs_green"/>
+    </body>
+    <!-- 远处障碍物 -->
+    <body name="obs_far" pos="8 5 0.7">
+      <geom type="cylinder" size="0.6 0.7" material="obs_blue"/>
+    </body>
+
+    <!-- 边界墙 -->
     <geom name="wall_north" type="box" size="40 0.5 1.5" pos="0 22 1.5" rgba="0.6 0.6 0.6 0.8"/>
     <geom name="wall_south" type="box" size="40 0.5 1.5" pos="0 -22 1.5" rgba="0.6 0.6 0.6 0.8"/>
     <geom name="wall_east" type="box" size="0.5 40 1.5" pos="22 0 1.5" rgba="0.6 0.6 0.6 0.8"/>
@@ -341,6 +357,7 @@ def create_multi_car_xml():
   </actuator>
 
   <sensor>
+    <!-- 小车1传感器 -->
     <rangefinder name="car1_front" site="car1_front"/>
     <rangefinder name="car1_front_left" site="car1_front_left"/>
     <rangefinder name="car1_front_right" site="car1_front_right"/>
@@ -350,6 +367,7 @@ def create_multi_car_xml():
     <framepos name="car1_pos" objtype="site" objname="car1_trail"/>
     <accelerometer name="car1_acc" site="car1_trail"/>
 
+    <!-- 小车2传感器 -->
     <rangefinder name="car2_front" site="car2_front"/>
     <rangefinder name="car2_front_left" site="car2_front_left"/>
     <rangefinder name="car2_front_right" site="car2_front_right"/>
@@ -472,10 +490,10 @@ def multi_car_simulation():
                     last_display = time.time()
 
     except KeyboardInterrupt:
-        print("中断")
+        print("用户中断")
     finally:
         global simulation_running
-
+        simulation_running = False
         step_barrier.abort()
         t1.join()
         t2.join()
