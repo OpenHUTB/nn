@@ -1,4 +1,4 @@
-# drone_vision_system_en_fixed.py
+```python
 """
 Drone Vision Navigation System
 Optimized for Abandoned Park Environment
@@ -18,10 +18,14 @@ import random
 
 
 class DroneVisionSystem:
-    """Drone vision navigation system"""
+    """Drone vision navigation system
+       中文注释：无人机视觉导航系统，负责与AirSim通信、图像采集、环境识别和自主导航
+    """
 
     def __init__(self):
-        """Initialize system"""
+        """Initialize system
+           中文注释：初始化系统，尝试连接模拟器，创建必要目录，加载分类器
+        """
         self.clear_screen()
         print("=" * 70)
         print("DRONE VISION NAVIGATION SYSTEM v2.0")
@@ -30,6 +34,7 @@ class DroneVisionSystem:
         print("-" * 70)
 
         # Try to connect to simulator
+        # 中文注释：尝试连接AirSim模拟器，如果失败则给出提示
         try:
             print("Connecting to AirSim simulator...")
             self.client = airsim.MultirotorClient()
@@ -52,9 +57,11 @@ class DroneVisionSystem:
         self.emergency = False
 
         # Create directories
+        # 中文注释：创建数据存储目录，如图像、日志、模型等
         self.create_folders()
 
         # Initialize classifier
+        # 中文注释：初始化环境分类器（用于识别废墟、森林、道路等）
         self.classifier = EnvironmentClassifier()
 
         print("System initialization complete!")
@@ -68,7 +75,9 @@ class DroneVisionSystem:
             os.system('clear')
 
     def create_folders(self):
-        """Create project folders"""
+        """Create project folders
+           中文注释：确保必要的文件夹存在，用于存放数据
+        """
         folders = ['data/images', 'data/logs', 'models', 'debug']
         for folder in folders:
             os.makedirs(folder, exist_ok=True)
@@ -147,7 +156,9 @@ Current Status:
             return False
 
     def capture_image(self):
-        """Capture image from drone camera"""
+        """Capture image from drone camera
+           中文注释：从AirSim请求图像数据，转换为OpenCV格式的BGR图像
+        """
         try:
             responses = self.client.simGetImages([
                 airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
@@ -168,11 +179,15 @@ Current Status:
         return None
 
     def analyze_environment(self, image):
-        """Analyze environment using classifier"""
+        """Analyze environment using classifier
+           中文注释：调用分类器对当前图像进行环境识别
+        """
         return self.classifier.classify(image)
 
     def update_battery(self):
-        """Update battery status"""
+        """Update battery status
+           中文注释：根据飞行状态更新电池电量，并在电量低时触发警告和紧急模式
+        """
         if self.flying:
             self.battery -= 0.05  # Flying consumption
         else:
@@ -189,7 +204,9 @@ Current Status:
                 self.emergency = True
 
     def save_image_data(self, image, environment, confidence):
-        """Save image data"""
+        """Save image data
+           中文注释：保存图像到文件，并将元数据记录到JSON日志中，保留最近1000条记录
+        """
         if image is None:
             return
 
@@ -235,7 +252,9 @@ Current Status:
             self.log(f"Data save failed: {str(e)}")
 
     def navigate(self, environment, confidence):
-        """Navigate based on environment"""
+        """Navigate based on environment
+           中文注释：根据识别的环境选择对应的导航行为
+        """
         if not self.flying:
             return
 
@@ -257,14 +276,18 @@ Current Status:
         action_func(confidence)
 
     def navigate_ruins(self, confidence):
-        """Navigate in ruins"""
+        """Navigate in ruins
+           中文注释：废墟环境，低速前进避免碰撞
+        """
         self.log("Exploring ruins...")
         # Move slowly to avoid collisions
         self.client.moveByVelocityAsync(2, 0, 0, 2).join()
         time.sleep(1)
 
     def navigate_building(self, confidence):
-        """Navigate around buildings"""
+        """Navigate around buildings
+           中文注释：建筑物附近，上升并向右绕行
+        """
         self.log("Avoiding building...")
         # Rise to avoid collision
         self.client.moveByVelocityAsync(0, 0, -1, 1).join()
@@ -272,25 +295,33 @@ Current Status:
         self.client.moveByVelocityAsync(0, 2, 0, 2).join()
 
     def navigate_forest(self, confidence):
-        """Navigate through forest"""
+        """Navigate through forest
+           中文注释：森林中，缓慢上升并前行
+        """
         self.log("Moving through forest...")
         # Rise slightly and move slowly
         self.client.moveByVelocityAsync(1.5, 0, -0.5, 2).join()
 
     def navigate_road(self, confidence):
-        """Navigate along road"""
+        """Navigate along road
+           中文注释：道路，正常速度沿路飞行
+        """
         self.log("Following road...")
         # Move at normal speed
         self.client.moveByVelocityAsync(3, 0, 0, 3).join()
 
     def navigate_sky(self, confidence):
-        """Navigate in open sky"""
+        """Navigate in open sky
+           中文注释：开阔天空，可以较快飞行
+        """
         self.log("Open sky, normal flight...")
         # Move faster
         self.client.moveByVelocityAsync(4, 0, 0, 3).join()
 
     def navigate_water(self, confidence):
-        """Avoid water"""
+        """Avoid water
+           中文注释：检测到水域，立即上升并后退
+        """
         self.log("Avoiding water area...")
         # Rise immediately
         self.client.moveByVelocityAsync(0, 0, -2, 1).join()
@@ -298,7 +329,9 @@ Current Status:
         self.client.moveByVelocityAsync(-2, 0, 0, 2).join()
 
     def navigate_fire(self, confidence):
-        """Navigate fire emergency"""
+        """Navigate fire emergency
+           中文注释：火灾紧急情况，快速升高并发出警报
+        """
         self.log("Fire detected! Emergency response...")
         self.emergency = True
         # Emergency ascent
@@ -307,7 +340,9 @@ Current Status:
         self.log("Fire alert!")
 
     def navigate_animal(self, confidence):
-        """Navigate around animals"""
+        """Navigate around animals
+           中文注释：发现动物，悬停观察然后缓慢后退
+        """
         self.log("Animal detected, keeping distance...")
         # Hover and observe
         self.client.hoverAsync().join()
@@ -316,19 +351,25 @@ Current Status:
         self.client.moveByVelocityAsync(-1, 0, 0, 2).join()
 
     def navigate_vehicle(self, confidence):
-        """Navigate around vehicles"""
+        """Navigate around vehicles
+           中文注释：检测到车辆，保持距离跟随
+        """
         self.log("Vehicle detected, following...")
         # Follow at distance
         self.client.moveByVelocityAsync(2, 0, 0, 2).join()
 
     def navigate_default(self, confidence):
-        """Default navigation"""
+        """Default navigation
+           中文注释：未知环境，保守探索，低速前进
+        """
         self.log("Unknown environment, conservative exploration...")
         # Move slowly
         self.client.moveByVelocityAsync(1, 0, 0, 2).join()
 
     def display_image(self, image, environment, confidence):
-        """Display image with information"""
+        """Display image with information
+           中文注释：在图像上叠加环境信息、置信度、电池电量和时间戳，并显示窗口
+        """
         if image is None:
             return
 
@@ -341,7 +382,7 @@ Current Status:
         conf_text = f"Conf: {confidence:.1%}"
         bat_text = f"Battery: {self.battery:.1f}%"
 
-        # Set text color
+        # Set text color based on confidence
         color = (0, 255, 0)  # Green
         if confidence < 0.6:
             color = (0, 255, 255)  # Yellow
@@ -365,7 +406,9 @@ Current Status:
         cv2.imshow('Drone Vision System', display_img)
 
     def run_mission(self, mission_time=300):
-        """Run main mission loop"""
+        """Run main mission loop
+           中文注释：主任务循环，包含图像采集、环境识别、导航决策、键盘控制等
+        """
         if not self.client:
             print("Cannot run: Not connected to simulator")
             return
@@ -393,6 +436,7 @@ Current Status:
         last_env = "Unknown"
 
         try:
+            # 中文注释：主循环持续运行直到手动停止或任务时间结束
             while self.running and (time.time() - start_time) < mission_time:
                 frame_count += 1
 
@@ -449,6 +493,7 @@ Current Status:
                     print("CONTROLS: Q-Quit, L-Land, R-Return, S-Save, P-Pause")
 
                 # Check keyboard input
+                # 中文注释：检测键盘输入，实现交互控制
                 key = cv2.waitKey(30) & 0xFF
                 if key == ord('q'):
                     self.log("User quit")
@@ -497,7 +542,9 @@ Current Status:
                 pass
 
     def generate_report(self):
-        """Generate mission report"""
+        """Generate mission report
+           中文注释：生成任务摘要报告，包含电池最终电量、检测到的环境和紧急状态，保存为JSON文件
+        """
         report = {
             "mission": "Drone Vision Navigation",
             "date": datetime.now().strftime("%Y-%m-%d"),
@@ -525,15 +572,18 @@ Current Status:
 
 
 class EnvironmentClassifier:
-    """Environment classifier for abandoned park"""
+    """Environment classifier for abandoned park
+       中文注释：基于颜色和纹理特征的简单规则分类器，用于废弃公园环境识别
+    """
 
     def __init__(self):
         self.environments = [
-            "Ruins", "Building", "Forest", "Road",
+            "Ruins", "Building", "forest", "Road",
             "Sky", "Water", "Fire", "Animal", "Vehicle"
         ]
 
         # Feature weights for abandoned park
+        # 中文注释：初始化权重，废墟权重最高（0.35），因为场景是废弃公园，出现概率最大
         self.weights = {
             "Ruins": 0.35,  # Highest probability for ruins
             "Building": 0.20,
@@ -547,7 +597,9 @@ class EnvironmentClassifier:
         }
 
     def classify(self, image):
-        """Classify image"""
+        """Classify image
+           中文注释：主分类函数，先尝试规则分类，若失败则使用加权随机
+        """
         if image is None:
             return "Unknown", 0.0
 
@@ -564,7 +616,9 @@ class EnvironmentClassifier:
         return env, conf
 
     def extract_features(self, image):
-        """Extract image features"""
+        """Extract image features
+           中文注释：提取颜色比例、边缘密度、亮度方差等特征
+        """
         features = {}
 
         height, width = image.shape[:2]
@@ -580,7 +634,7 @@ class EnvironmentClassifier:
 
         # Green regions
         green_low = np.array([40, 50, 50])
-        green_high = np.array([80, 255, 255])  # 修复：添加 np.
+        green_high = np.array([80, 255, 255])
         green_mask = cv2.inRange(hsv, green_low, green_high)
         features['green_ratio'] = np.sum(green_mask > 0) / (height * width)
 
@@ -611,7 +665,9 @@ class EnvironmentClassifier:
         return features
 
     def rule_based(self, features):
-        """Rule-based classification"""
+        """Rule-based classification
+           中文注释：基于经验规则判断环境类型，返回类型和置信度
+        """
         blue = features.get('blue_ratio', 0)
         green = features.get('green_ratio', 0)
         red = features.get('red_ratio', 0)
@@ -648,7 +704,9 @@ class EnvironmentClassifier:
         return "Unknown", 0.0
 
     def weighted_random(self, features):
-        """Weighted random selection"""
+        """Weighted random selection
+           中文注释：当规则无法判断时，根据特征调整权重后随机选择
+        """
         # Adjust weights based on features
         adj_weights = self.weights.copy()
 
@@ -696,7 +754,9 @@ class EnvironmentClassifier:
 
 
 def safe_input(prompt):
-    """Safe input function with KeyboardInterrupt handling"""
+    """Safe input function with KeyboardInterrupt handling
+       中文注释：安全输入函数，捕获 Ctrl+C 避免程序异常退出
+    """
     try:
         return input(prompt).strip()
     except KeyboardInterrupt:
@@ -706,7 +766,9 @@ def safe_input(prompt):
 
 
 def main():
-    """Main function with improved exception handling"""
+    """Main function with improved exception handling
+       中文注释：主函数，处理用户配置和异常，启动任务
+    """
     try:
         print("DRONE VISION NAVIGATION SYSTEM")
         print("-" * 50)
@@ -768,3 +830,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
