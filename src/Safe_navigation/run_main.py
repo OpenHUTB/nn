@@ -30,16 +30,19 @@ def main():
         responses = client.simGetImages([
             airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
         ])
-        response = responses[0]
 
-        # 将图像数据转换为numpy数组
-        img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
-        img_rgb = img1d.reshape(response.height, response.width, 3)
+        if responses and responses[0].image_data_uint8:
+            response = responses[0]
+            # 将图像数据转换为numpy数组
+            img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
+            img_rgb = img1d.reshape(response.height, response.width, 3)
 
-        # 显示图像
-        cv2.imshow("AirSim Camera View", img_rgb)
-        cv2.waitKey(1)
-        print("✓ 摄像头图像已获取并显示")
+            # 显示图像
+            cv2.imshow("AirSim Camera View", img_rgb)
+            cv2.waitKey(1)
+            print("✓ 摄像头图像已获取并显示")
+        else:
+            print("⚠ 无法获取摄像头图像")
 
         # 6. 精确90度转弯演示
         print("\n>>> 连接成功！开始精确90度转弯演示...")
@@ -50,7 +53,21 @@ def main():
         controls.steering = 0.0
         client.setCarControls(controls)
         print("直行前往路口...")
-        time.sleep(26)
+
+        # 在直行过程中持续显示摄像头图像
+        for i in range(26):
+            time.sleep(1)
+            if i % 5 == 0:  # 每5秒更新一次摄像头图像
+                responses = client.simGetImages([
+                    airsim.ImageRequest("0", airsim.ImageType.Scene, False, False)
+                ])
+                if responses and responses[0].image_data_uint8:
+                    response = responses[0]
+                    img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
+                    img_rgb = img1d.reshape(response.height, response.width, 3)
+                    cv2.imshow("AirSim Camera View", img_rgb)
+                    cv2.waitKey(1)
+                    print(f"  已行驶 {i + 1} 秒，摄像头图像已更新")
 
         # 到达路口，完全停车
         controls.throttle = 0.0
@@ -82,11 +99,13 @@ def main():
         # 缓慢减速停止
         controls.throttle = 0.2
         client.setCarControls(controls)
+        print("减速中...")
         time.sleep(2)
 
         controls.brake = 1.0
         controls.throttle = 0.0
         client.setCarControls(controls)
+        print("停车...")
         time.sleep(1)
 
         # 关闭图像显示窗口
@@ -104,6 +123,12 @@ def main():
     except Exception as e:
         print(f"\n✗ 连接过程中出错: {e}")
         print("  其他可能原因：防火墙阻止、端口占用或配置文件错误。")
+    finally:
+        # 确保窗口被关闭
+        try:
+            cv2.destroyAllWindows()
+        except:
+            pass
 
 
 if __name__ == "__main__":
