@@ -2,17 +2,20 @@ import cv2
 import time
 import queue
 import numpy as np
+import carla
 
 from config import config
 from utils.carla_client import CarlaClient
 from models.yolo_detector import YOLODetector
-# [新增] 引入可视化模块
 from utils.visualization import draw_results
+from utils.planner import SimplePlanner
+# [新增] 引入日志模块
+from utils.logger import PerformanceLogger
 
 
 def main():
-    # 1. 初始化 YOLOv3 检测器
-    print("[Main] 初始化 YOLOv3 检测器...")
+    # 1. 初始化各模块
+    print("[Main] 初始化模块...")
     detector = YOLODetector(
         cfg_path=config.YOLO_CONFIG_PATH,
         weights_path=config.YOLO_WEIGHTS_PATH,
@@ -22,13 +25,15 @@ def main():
     )
     detector.load_model()
 
-    # 2. 初始化 CARLA 客户端
-    print("[Main] 初始化 CARLA 客户端...")
+    planner = SimplePlanner()
+
+    # [新增] 初始化日志记录器
+    logger = PerformanceLogger()
+
     client = CarlaClient()
     if not client.connect():
         return
 
-        # 3. 生成车辆和传感器
     client.spawn_vehicle()
     client.setup_camera()
 
@@ -36,28 +41,50 @@ def main():
     try:
         while True:
             try:
-                # 4. 获取图像
                 frame = client.image_queue.get(timeout=2.0)
 
-                # 5. 目标检测
+                # --- 感知 ---
                 start_time = time.time()
                 results = detector.detect(frame)
+
+                # --- 规划 ---
+                is_brake, warning_msg = planner.plan(results)
+
+                # --- 控制 ---
+                if client.vehicle:
+                    if is_brake:
+                        client.vehicle.set_autopilot(False)
+                        control = carla.VehicleControl()
+                        control.throttle = 0.0
+                        control.brake = 1.0
+                        client.vehicle.apply_control(control)
+                    else:
+                        client.vehicle.set_autopilot(True)
+
+                # --- 数据记录 (Logging) ---
                 fps = 1 / (time.time() - start_time)
 
-                # 6. 绘制结果 (调用新模块)
-                frame = draw_results(frame, results, detector.classes)
+                # 计算平均置信度
+                avg_conf = 0
+                if len(results) > 0:
+                    avg_conf = np.mean([res[5] for res in results])
 
-                # 显示 FPS
+                # 写入 TensorBoard
+                logger.log_step(fps, len(results), avg_conf)
+
+                # --- 可视化 ---
+                frame = draw_results(frame, results, detector.classes)
                 cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                # 7. 显示窗口
-                cv2.imshow("CARLA Autonomous Driving - Object Detection", frame)
+                if is_brake:
+                    cv2.putText(frame, "EMERGENCY BRAKING!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+
+                cv2.imshow("CARLA Object Detection", frame)
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
             except queue.Empty:
-                print("[Warning] 等待传感器数据超时...")
                 continue
 
     except KeyboardInterrupt:
@@ -66,6 +93,8 @@ def main():
     finally:
         print("[Main] 正在清理资源...")
         client.destroy_actors()
+        # [新增] 关闭日志
+        logger.close()
         cv2.destroyAllWindows()
         print("[Main] 程序已退出")
 
