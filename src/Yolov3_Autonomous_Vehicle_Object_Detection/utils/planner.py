@@ -1,4 +1,5 @@
 import numpy as np
+from typing import List, Tuple
 from config import config
 
 
@@ -9,19 +10,20 @@ class SimplePlanner:
     """
 
     def __init__(self):
+        # 从全局配置中加载参数
         self.img_width = config.CAMERA_WIDTH
         self.img_height = config.CAMERA_HEIGHT
 
-        # 定义危险区域参数
-        # 如果物体中心在画面水平中间 40% 的区域内，视为在车道上
-        self.center_zone_ratio = 0.4
+        # 驾驶走廊宽度比例 (0.0 - 1.0)
+        self.center_zone_ratio = config.SAFE_ZONE_RATIO
 
-        # 如果物体面积超过画面的 10%，视为距离过近，需要刹车
-        self.collision_area_threshold = 0.10
+        # 碰撞预警面积阈值 (0.0 - 1.0)
+        self.collision_area_threshold = config.COLLISION_AREA_THRES
 
-    def plan(self, detections):
+    def plan(self, detections: List[list]) -> Tuple[bool, str]:
         """
         根据检测结果规划车辆行为
+
         :param detections: 检测结果列表 [[x, y, w, h, class_id, conf], ...]
         :return: (is_brake, warning_message)
                  is_brake: bool, 是否需要紧急制动
@@ -32,6 +34,8 @@ class SimplePlanner:
 
         img_area = self.img_width * self.img_height
         img_center_x = self.img_width / 2
+
+        # 计算安全区域的半宽 (像素)
         safe_zone_half_width = (self.img_width * self.center_zone_ratio) / 2
 
         for (x, y, w, h, class_id, conf) in detections:
