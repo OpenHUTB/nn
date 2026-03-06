@@ -2,12 +2,15 @@
 # -*- coding: utf-8 -*-
 
 """
-多车协同避让仿真（带障碍物）
-- 两辆独立小车，各自有完整车轮、传感器、执行器
-- 多线程控制，通过共享内存交换位置信息
-- 实现靠右行驶 + 优先级让行规则
-- 增加静态障碍物，测试综合避障能力
-- 使用屏障同步确保控制与仿真的时序
+多车协同避让仿真（道路场景）- 人工势场法平滑避障版
+- 构建一条直行道路（Y方向），两侧有路沿，中间有车道线
+- 两车均在右侧车道相向而行（小车1朝北，小车2朝南）
+- 道路上放置静态障碍物（锥桶），迫使车辆绕行
+- 车辆控制器采用人工势场法：
+    - 引力指向固定目标点（道路远端右侧车道位置）
+    - 斥力来自静态障碍物、对向车辆及道路边界
+    - 实现靠右行驶与平滑避障
+- 目标速度3m/s，多线程控制
 """
 
 import mujoco
@@ -24,7 +27,7 @@ state_lock = threading.Lock()
 simulation_running = True
 step_barrier = None
 
-# ==================== PID控制器 ====================
+# ==================== PID控制器（用于速度） ====================
 class PIDController:
     def __init__(self, kp=1.0, ki=0.0, kd=0.0, setpoint=0.0):
         self.kp = kp
@@ -50,67 +53,77 @@ class PIDController:
         self.prev_error = 0.0
         self.integral = 0.0
 
-# ==================== 小车控制器类 ====================
+# ==================== 小车控制器类（人工势场法） ====================
 class CarController:
-    def __init__(self, car_id, model, data, actuator_ids, sensor_ids):
+    def __init__(self, car_id, model, data, actuator_ids, sensor_ids, goal_pos):
         self.car_id = car_id
         self.model = model
         self.data = data
         self.actuator_ids = actuator_ids
         self.sensor_ids = sensor_ids
+        self.goal_pos = goal_pos  # 固定目标点 (x, y)
 
         # 控制参数
-        self.target_velocity = 15.0
-        self.steering_gain = 0.08
-        self.obstacle_threshold = 2.5
-        self.side_threshold = 1.5
-        self.tight_space_threshold = 1.2
+        self.target_velocity = 3.0
+
+        # 人工势场法参数
+        self.att_gain = 1.0                       # 引力增益
+        self.rep_obs_gain = 4.0                    # 静态障碍物斥力增益
+        self.rep_car_gain = 6.0                     # 动态车辆斥力增益
+        self.rep_wall_gain = 5.0                    # 道路边界斥力增益
+        self.rep_distance_threshold = 5.0           # 斥力作用距离阈值
+        self.safe_distance = 10.0                    # 考虑动态车辆的最大距离
+        self.max_steer = 0.4                         # 最大转向角
+
+        # 传感器方向（相对于车体坐标系，角度rad）
+        self.sensor_angles = {
+            'front': 0.0,
+            'front_left': math.radians(45),
+            'front_right': -math.radians(45),
+            'left': math.radians(90),
+            'right': -math.radians(90)
+        }
+
+        # 道路边界（与XML中的路沿一致）
+        self.road_left = -4.0
+        self.road_right = 4.0
+        self.road_bottom = -20.0
+        self.road_top = 20.0
 
         # 防侧翻参数
         self.MAX_LATERAL_ACC = 5.0
         self.WHEELBASE = 0.6
         self.MAX_STEER_CHANGE = 0.05
-        self.TILT_THRESHOLD = math.radians(5)
 
-        # PID
-        self.velocity_pid = PIDController(kp=0.4, ki=0.01, kd=0.1)
-        self.steering_pid = PIDController(kp=0.2, ki=0.002, kd=0.05)
+        # PID速度控制器
+        self.velocity_pid = PIDController(kp=0.3, ki=0.005, kd=0.08)
 
         # 历史数据
         self.velocity_history = deque(maxlen=50)
         self.steering_history = deque(maxlen=25)
-        self.last_position = None
-        self.last_time = time.time()
 
         # 协商状态
         self.yield_flag = False
         self.near_car = False
+        self.emergency_brake = False
 
         # 当前控制输出
         self.last_throttle = 0.0
         self.last_steer = 0.0
 
     def get_sensor_data(self):
+        """读取传感器数据，返回字典"""
         data = {}
-        if 'front' in self.sensor_ids:
-            data['front'] = self.data.sensordata[self.sensor_ids['front']]
-        if 'front_left' in self.sensor_ids:
-            data['front_left'] = self.data.sensordata[self.sensor_ids['front_left']]
-        if 'front_right' in self.sensor_ids:
-            data['front_right'] = self.data.sensordata[self.sensor_ids['front_right']]
-        if 'left' in self.sensor_ids:
-            data['left'] = self.data.sensordata[self.sensor_ids['left']]
-        if 'right' in self.sensor_ids:
-            data['right'] = self.data.sensordata[self.sensor_ids['right']]
+        for key in ['front', 'front_left', 'front_right', 'left', 'right']:
+            if key in self.sensor_ids:
+                data[key] = self.data.sensordata[self.sensor_ids[key]]
         if 'car_velocity' in self.sensor_ids:
             v = self.data.sensordata[self.sensor_ids['car_velocity']:self.sensor_ids['car_velocity']+3]
             data['velocity'] = np.linalg.norm(v[:2])
-        if 'car_position' in self.sensor_ids:
-            pos = self.data.sensordata[self.sensor_ids['car_position']:self.sensor_ids['car_position']+3]
-            data['position'] = pos[:2]
         return data
 
     def update_state(self):
+        """更新本车状态到共享字典"""
         start = 0 if self.car_id == 1 else 7
         pos_xy = (self.data.qpos[start], self.data.qpos[start+1])
         quat = self.data.qpos[start+3:start+7]
@@ -124,84 +137,123 @@ class CarController:
                 'timestamp': time.time()
             }
 
-    def compute_steering(self, my_sensor, other_cars):
-        # ---------- 静态障碍避让（包含对其他车辆的避让） ----------
-        front = my_sensor.get('front', 10.0)
-        front_left = my_sensor.get('front_left', 10.0)
-        front_right = my_sensor.get('front_right', 10.0)
-        left = my_sensor.get('left', 10.0)
-        right = my_sensor.get('right', 10.0)
+    def compute_apf_steering(self, my_sensor, other_cars):
+        """
+        人工势场法计算期望转向角
+        """
+        my_state = car_states.get(self.car_id, {})
+        my_pos = my_state.get('position', (0,0))
+        my_heading = my_state.get('heading', 0)
 
-        left_space = min(left, front_left)
-        right_space = min(right, front_right)
-        steer_factor = 0.0
+        # ---------- 引力（指向固定目标点） ----------
+        F_att = np.array([self.goal_pos[0] - my_pos[0], self.goal_pos[1] - my_pos[1]])
+        F_att = self.att_gain * F_att
 
-        if front < self.obstacle_threshold:
-            if left_space > self.tight_space_threshold and right_space > self.tight_space_threshold:
-                steer_factor = 0.35 if left_space > right_space else -0.35
-            elif left_space > self.tight_space_threshold:
-                steer_factor = 0.35
-            elif right_space > self.tight_space_threshold:
-                steer_factor = -0.35
-            else:
-                steer_factor = 0.0
-        elif left < self.side_threshold or right < self.side_threshold:
-            if left < self.side_threshold and right >= self.side_threshold:
-                steer_factor = -0.08
-            elif right < self.side_threshold and left >= self.side_threshold:
-                steer_factor = 0.08
-            else:
-                steer_factor = 0.0
+        # ---------- 斥力 ----------
+        F_rep_total = np.array([0.0, 0.0])
 
-        base_steer = steer_factor * self.steering_gain
+        # 静态障碍物斥力（通过测距传感器估算）
+        for sensor_name, angle_rel in self.sensor_angles.items():
+            dist = my_sensor.get(sensor_name, 10.0)
+            if dist < self.rep_distance_threshold and dist > 0.1:
+                world_angle = my_heading + angle_rel
+                obs_x = my_pos[0] + dist * math.cos(world_angle)
+                obs_y = my_pos[1] + dist * math.sin(world_angle)
+                dir_vec = np.array([my_pos[0] - obs_x, my_pos[1] - obs_y])
+                dist_to_obs = max(dist, 0.1)
+                mag = self.rep_obs_gain / (dist_to_obs * dist_to_obs)
+                if np.linalg.norm(dir_vec) > 1e-6:
+                    dir_vec = dir_vec / np.linalg.norm(dir_vec)
+                F_rep_total += mag * dir_vec
 
-        # ---------- 车车协商规则 ----------
-        my_pos = car_states.get(self.car_id, {}).get('position', (0,0))
-        my_heading = car_states.get(self.car_id, {}).get('heading', 0)
-
-        self.near_car = False
+        # 动态车辆斥力
         for other_id, state in other_cars.items():
             if other_id == self.car_id:
                 continue
             other_pos = state.get('position', (0,0))
             dx = other_pos[0] - my_pos[0]
             dy = other_pos[1] - my_pos[1]
-            distance = math.hypot(dx, dy)
-            if distance < 6.0:
-                self.near_car = True
-                angle_to_other = math.atan2(dy, dx)
-                angle_diff = angle_to_other - my_heading
-                while angle_diff > math.pi: angle_diff -= 2*math.pi
-                while angle_diff < -math.pi: angle_diff += 2*math.pi
+            dist = math.hypot(dx, dy)
+            if dist < self.safe_distance and dist > 0.1:
+                dir_vec = np.array([-dx, -dy]) / dist
+                mag = self.rep_car_gain / (dist * dist)
+                F_rep_total += mag * dir_vec
 
-                if abs(angle_diff) < math.radians(60):
-                    if angle_diff > 0:
-                        base_steer -= 0.1   # 右转
-                    else:
-                        base_steer += 0.1
+        # 道路边界斥力
+        # 左边界
+        if my_pos[0] - self.road_left < self.rep_distance_threshold:
+            dist = my_pos[0] - self.road_left
+            if dist > 0:
+                mag = self.rep_wall_gain / (dist * dist)
+                F_rep_total += mag * np.array([1.0, 0.0])
+        # 右边界
+        if self.road_right - my_pos[0] < self.rep_distance_threshold:
+            dist = self.road_right - my_pos[0]
+            if dist > 0:
+                mag = self.rep_wall_gain / (dist * dist)
+                F_rep_total += mag * np.array([-1.0, 0.0])
+        # 下边界（道路尽头，一般不需，但保留）
+        if my_pos[1] - self.road_bottom < self.rep_distance_threshold:
+            dist = my_pos[1] - self.road_bottom
+            if dist > 0:
+                mag = self.rep_wall_gain / (dist * dist)
+                F_rep_total += mag * np.array([0.0, 1.0])
+        # 上边界
+        if self.road_top - my_pos[1] < self.rep_distance_threshold:
+            dist = self.road_top - my_pos[1]
+            if dist > 0:
+                mag = self.rep_wall_gain / (dist * dist)
+                F_rep_total += mag * np.array([0.0, -1.0])
 
-                    if self.car_id > other_id:
-                        self.yield_flag = True
-                    else:
-                        self.yield_flag = False
+        # 合力
+        F_total = F_att + F_rep_total
 
-        if not self.near_car:
-            self.yield_flag = False
+        if np.linalg.norm(F_total) < 1e-6:
+            desired_angle = my_heading
+        else:
+            desired_angle = math.atan2(F_total[1], F_total[0])
 
-        base_steer = np.clip(base_steer, -0.25, 0.25)
-        return base_steer
+        angle_diff = desired_angle - my_heading
+        while angle_diff > math.pi:
+            angle_diff -= 2*math.pi
+        while angle_diff < -math.pi:
+            angle_diff += 2*math.pi
+
+        steer = np.clip(angle_diff * 0.8, -self.max_steer, self.max_steer)
+
+        # 更新协商标志（用于速度调节）
+        self.near_car = any(
+            other_id != self.car_id and
+            math.hypot(other_cars[other_id]['position'][0] - my_pos[0],
+                       other_cars[other_id]['position'][1] - my_pos[1]) < 6.0
+            for other_id in other_cars
+        )
+        # 简单的让行规则：ID大的让行
+        self.yield_flag = self.near_car and (self.car_id > min(other_cars.keys()))
+
+        # 紧急刹车：如果前方距离过小或与车辆太近
+        front_dist = my_sensor.get('front', 10.0)
+        self.emergency_brake = front_dist < 1.5 or any(
+            other_id != self.car_id and
+            math.hypot(other_cars[other_id]['position'][0] - my_pos[0],
+                       other_cars[other_id]['position'][1] - my_pos[1]) < 2.0
+            for other_id in other_cars
+        )
+
+        return steer
 
     def compute_throttle(self, current_vel, steering):
         target = self.target_velocity
-        factor = 1.0 - min(abs(steering)*0.5, 0.2)
+        factor = 1.0 - min(abs(steering)*0.8, 0.4)
         target *= factor
         if self.yield_flag:
-            target *= 0.3
+            target *= 0.2
+        if self.emergency_brake:
+            target = 0.0
         if abs(steering) > 1e-6:
             v_safe = math.sqrt(self.MAX_LATERAL_ACC * self.WHEELBASE / abs(math.tan(steering)))
             target = min(target, v_safe)
-
-        if target < 0.5 and self.near_car:
+        if target < 0.5 and not self.emergency_brake:
             target = 0.5
 
         self.velocity_pid.setpoint = target
@@ -222,19 +274,21 @@ class CarController:
         my_sensor = self.get_sensor_data()
         with state_lock:
             other_cars = car_states.copy()
-        steer = self.compute_steering(my_sensor, other_cars)
+        steer = self.compute_apf_steering(my_sensor, other_cars)
         if len(self.steering_history) > 0:
             prev = self.steering_history[-1]
             steer = np.clip(steer, prev - self.MAX_STEER_CHANGE, prev + self.MAX_STEER_CHANGE)
         self.steering_history.append(steer)
+
         vel = my_sensor.get('velocity', 0)
         throttle = self.compute_throttle(vel, steer)
+
         self.last_throttle = throttle
         self.last_steer = steer
         self.update_state()
 
-# ==================== 构建带障碍物的两车模型XML ====================
-def create_multi_car_xml():
+# ==================== 构建道路场景XML ====================
+def create_road_xml():
     return """
 <mujoco>
   <compiler angle="radian" inertiafromgeom="true" coordinate="local"/>
@@ -242,31 +296,43 @@ def create_multi_car_xml():
 
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.4 0.6 0.8" rgb2="0.2 0.3 0.5" width="512" height="512"/>
-    <texture name="grass" type="2d" builtin="checker" rgb1="0.3 0.6 0.3" rgb2="0.2 0.5 0.2" width="512" height="512"/>
-    <material name="grass_mat" texture="grass" texrepeat="30 30" reflectance="0.1"/>
+    <texture name="road" type="2d" builtin="checker" rgb1="0.2 0.2 0.2" rgb2="0.3 0.3 0.3" width="64" height="64"/>
+    <material name="road_mat" texture="road" texrepeat="1 40" reflectance="0.2"/>
+    <material name="lane_line" rgba="1 1 0 1"/>
     <material name="car1_mat" rgba="0.1 0.4 0.8 1" specular="0.8"/>
     <material name="car2_mat" rgba="0.8 0.2 0.2 1" specular="0.8"/>
     <material name="tire" rgba="0.1 0.1 0.1 1"/>
     <material name="obs_red" rgba="1 0 0 1"/>
-    <material name="obs_green" rgba="0 1 0 1"/>
-    <material name="obs_blue" rgba="0 0 1 1"/>
   </asset>
 
   <worldbody>
-    <geom name="ground" type="plane" size="50 50 0.1" material="grass_mat" friction="2.0"/>
+    <!-- 路面 -->
+    <geom name="road" type="box" size="4 20 0.05" pos="0 0 -0.05" material="road_mat"/>
 
-    <!-- ========== 小车1 ========== -->
-    <body name="car1" pos="-3 0 0.3">
+    <!-- 车道分隔线（中间虚线） -->
+    <geom name="center_line1" type="box" size="0.1 2 0.01" pos="0 -5 0.05" material="lane_line"/>
+    <geom name="center_line2" type="box" size="0.1 2 0.01" pos="0 5 0.05" material="lane_line"/>
+    <geom name="center_line3" type="box" size="0.1 2 0.01" pos="0 15 0.05" material="lane_line"/>
+    <geom name="center_line4" type="box" size="0.1 2 0.01" pos="0 -15 0.05" material="lane_line"/>
+
+    <!-- 路沿（边界墙） -->
+    <geom name="left_curb" type="box" size="0.2 20 0.3" pos="-4 0 0.25" rgba="0.5 0.5 0.5 1"/>
+    <geom name="right_curb" type="box" size="0.2 20 0.3" pos="4 0 0.25" rgba="0.5 0.5 0.5 1"/>
+    <geom name="bottom_curb" type="box" size="4 0.2 0.3" pos="0 -20 0.25" rgba="0.5 0.5 0.5 1"/>
+    <geom name="top_curb" type="box" size="4 0.2 0.3" pos="0 20 0.25" rgba="0.5 0.5 0.5 1"/>
+
+    <!-- ========== 小车1（蓝色，朝北） ========== -->
+    <body name="car1" pos="2.5 -5 0.3">
       <freejoint name="car1_free"/>
       <geom name="car1_body" type="box" size="0.5 0.3 0.1" mass="20.0" material="car1_mat" pos="0 0 -0.1"/>
 
       <body name="car1_fl" pos="0.3 0.3 -0.1">
-        <joint name="car1_fl_steer" type="hinge" axis="0 0 1" limited="true" range="-0.3 0.3" damping="0.8"/>
+        <joint name="car1_fl_steer" type="hinge" axis="0 0 1" limited="true" range="-0.4 0.4" damping="0.8"/>
         <joint name="car1_fl_spin" type="hinge" axis="0 1 0" damping="0.3"/>
         <geom type="cylinder" size="0.12 0.06" euler="1.57 0 0" material="tire" friction="3.0" mass="1.0"/>
       </body>
       <body name="car1_fr" pos="0.3 -0.3 -0.1">
-        <joint name="car1_fr_steer" type="hinge" axis="0 0 1" limited="true" range="-0.3 0.3" damping="0.8"/>
+        <joint name="car1_fr_steer" type="hinge" axis="0 0 1" limited="true" range="-0.4 0.4" damping="0.8"/>
         <joint name="car1_fr_spin" type="hinge" axis="0 1 0" damping="0.3"/>
         <geom type="cylinder" size="0.12 0.06" euler="1.57 0 0" material="tire" friction="3.0" mass="1.0"/>
       </body>
@@ -287,18 +353,18 @@ def create_multi_car_xml():
       <site name="car1_trail" pos="0 0 0.2" size="0.06" rgba="1 1 0 1" group="2"/>
     </body>
 
-    <!-- ========== 小车2 ========== -->
-    <body name="car2" pos="3 0 0.3">
+    <!-- ========== 小车2（红色，朝南）添加 euler 使初始航向为180度 ========== -->
+    <body name="car2" pos="2.5 5 0.3" euler="0 0 3.14159">
       <freejoint name="car2_free"/>
       <geom name="car2_body" type="box" size="0.5 0.3 0.1" mass="20.0" material="car2_mat" pos="0 0 -0.1"/>
 
       <body name="car2_fl" pos="0.3 0.3 -0.1">
-        <joint name="car2_fl_steer" type="hinge" axis="0 0 1" limited="true" range="-0.3 0.3" damping="0.8"/>
+        <joint name="car2_fl_steer" type="hinge" axis="0 0 1" limited="true" range="-0.4 0.4" damping="0.8"/>
         <joint name="car2_fl_spin" type="hinge" axis="0 1 0" damping="0.3"/>
         <geom type="cylinder" size="0.12 0.06" euler="1.57 0 0" material="tire" friction="3.0" mass="1.0"/>
       </body>
       <body name="car2_fr" pos="0.3 -0.3 -0.1">
-        <joint name="car2_fr_steer" type="hinge" axis="0 0 1" limited="true" range="-0.3 0.3" damping="0.8"/>
+        <joint name="car2_fr_steer" type="hinge" axis="0 0 1" limited="true" range="-0.4 0.4" damping="0.8"/>
         <joint name="car2_fr_spin" type="hinge" axis="0 1 0" damping="0.3"/>
         <geom type="cylinder" size="0.12 0.06" euler="1.57 0 0" material="tire" friction="3.0" mass="1.0"/>
       </body>
@@ -319,41 +385,28 @@ def create_multi_car_xml():
       <site name="car2_trail" pos="0 0 0.2" size="0.06" rgba="1 1 0 1" group="2"/>
     </body>
 
-    <!-- ========== 静态障碍物 ========== -->
-    <!-- 中央障碍物，迫使两车绕行 -->
-    <body name="obs_center" pos="0 1 0.8">
-      <geom type="cylinder" size="0.5 0.8" material="obs_red"/>
+    <!-- ========== 静态障碍物（锥桶） ========== -->
+    <body name="obs1" pos="2.0 0 0.4">
+      <geom type="cylinder" size="0.3 0.4" material="obs_red"/>
     </body>
-    <!-- 左侧障碍物 -->
-    <body name="obs_left" pos="-4 2 0.6">
-      <geom type="box" size="0.8 0.8 0.6" material="obs_green"/>
+    <body name="obs2" pos="1.0 2 0.4">
+      <geom type="cylinder" size="0.3 0.4" material="obs_red"/>
     </body>
-    <!-- 右侧障碍物 -->
-    <body name="obs_right" pos="4 -2 0.6">
-      <geom type="box" size="0.8 0.8 0.6" material="obs_green"/>
+    <body name="obs3" pos="3.0 -2 0.4">
+      <geom type="cylinder" size="0.3 0.4" material="obs_red"/>
     </body>
-    <!-- 远处障碍物 -->
-    <body name="obs_far" pos="8 5 0.7">
-      <geom type="cylinder" size="0.6 0.7" material="obs_blue"/>
-    </body>
-
-    <!-- 边界墙 -->
-    <geom name="wall_north" type="box" size="40 0.5 1.5" pos="0 22 1.5" rgba="0.6 0.6 0.6 0.8"/>
-    <geom name="wall_south" type="box" size="40 0.5 1.5" pos="0 -22 1.5" rgba="0.6 0.6 0.6 0.8"/>
-    <geom name="wall_east" type="box" size="0.5 40 1.5" pos="22 0 1.5" rgba="0.6 0.6 0.6 0.8"/>
-    <geom name="wall_west" type="box" size="0.5 40 1.5" pos="-22 0 1.5" rgba="0.6 0.6 0.6 0.8"/>
   </worldbody>
 
   <actuator>
     <motor name="car1_throttle_left" joint="car1_rl_spin" gear="12" ctrllimited="true" ctrlrange="-6 6"/>
     <motor name="car1_throttle_right" joint="car1_rr_spin" gear="12" ctrllimited="true" ctrlrange="-6 6"/>
-    <motor name="car1_steer_left" joint="car1_fl_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.3 0.3"/>
-    <motor name="car1_steer_right" joint="car1_fr_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.3 0.3"/>
+    <motor name="car1_steer_left" joint="car1_fl_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.4 0.4"/>
+    <motor name="car1_steer_right" joint="car1_fr_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.4 0.4"/>
 
     <motor name="car2_throttle_left" joint="car2_rl_spin" gear="12" ctrllimited="true" ctrlrange="-6 6"/>
     <motor name="car2_throttle_right" joint="car2_rr_spin" gear="12" ctrllimited="true" ctrlrange="-6 6"/>
-    <motor name="car2_steer_left" joint="car2_fl_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.3 0.3"/>
-    <motor name="car2_steer_right" joint="car2_fr_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.3 0.3"/>
+    <motor name="car2_steer_left" joint="car2_fl_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.4 0.4"/>
+    <motor name="car2_steer_right" joint="car2_fr_steer" gear="2.5" ctrllimited="true" ctrlrange="-0.4 0.4"/>
   </actuator>
 
   <sensor>
@@ -382,7 +435,7 @@ def create_multi_car_xml():
 
 # ==================== 主仿真函数 ====================
 def multi_car_simulation():
-    xml = create_multi_car_xml()
+    xml = create_road_xml()
     model = mujoco.MjModel.from_xml_string(xml)
     data = mujoco.MjData(model)
     mujoco.mj_forward(model, data)
@@ -415,8 +468,9 @@ def multi_car_simulation():
                     sensor_ids[car][stype] = id
         print(f"Car{car} 找到 {len(sensor_ids[car])} 个传感器")
 
-    car1_ctrl = CarController(1, model, data, actuator_ids[1], sensor_ids[1])
-    car2_ctrl = CarController(2, model, data, actuator_ids[2], sensor_ids[2])
+    # 设置固定目标点：小车1朝北（y+），小车2朝南（y-），均靠右（x=2.5）
+    car1_ctrl = CarController(1, model, data, actuator_ids[1], sensor_ids[1], goal_pos=(2.5, 20))
+    car2_ctrl = CarController(2, model, data, actuator_ids[2], sensor_ids[2], goal_pos=(2.5, -20))
 
     with state_lock:
         car_states[1] = {'position': (data.qpos[0], data.qpos[1]), 'heading': 0, 'velocity': 0}
@@ -446,7 +500,7 @@ def multi_car_simulation():
         with mujoco.viewer.launch_passive(model, data) as viewer:
             viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
             viewer.cam.trackbodyid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "car1")
-            viewer.cam.distance = 8.0
+            viewer.cam.distance = 10.0
             viewer.cam.elevation = -30
             viewer.cam.azimuth = 90
 
@@ -486,7 +540,9 @@ def multi_car_simulation():
                     v2 = car_states[2]['velocity']
                     y1 = car1_ctrl.yield_flag
                     y2 = car2_ctrl.yield_flag
-                    print(f"Step {step}: Car1 vel={v1:.2f} yield={y1}, Car2 vel={v2:.2f} yield={y2}")
+                    e1 = car1_ctrl.emergency_brake
+                    e2 = car2_ctrl.emergency_brake
+                    print(f"Step {step}: Car1 vel={v1:.2f} yield={y1} emerg={e1}, Car2 vel={v2:.2f} yield={y2} emerg={e2}")
                     last_display = time.time()
 
     except KeyboardInterrupt:
