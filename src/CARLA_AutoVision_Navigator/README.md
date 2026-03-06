@@ -1,25 +1,30 @@
 # CARLA AutoVision Navigator
 
 ## 项目简介
-**CARLA AutoVision Navigator** 是一个集成实时目标检测与自动驾驶控制的仿真项目。该项目基于 CARLA 模拟器，利用 YOLOv3 深度学习算法进行环境感知，并通过 PID 控制算法实现车辆的自动化导航。
+本项目是一个集成 YOLOv3 视觉感知、PID 速度控制与 Waypoint 自动寻迹寻航的自动驾驶仿真系统。
 
 目前项目已成功实现了“感知-控制”闭环，车辆能够在识别环境物体的同时自动维持设定时速。
 
 ## 项目目录结构
 ```text
 CARLA_AutoVision_Navigator/
-├── config.py           # 全局配置中心：管理连接、传感器及 PID 控制参数
-├── requirements.txt    # 环境依赖列表
+├── config.py           # 全局配置中心：管理服务器连接、传感器参数及 PID 增益
+├── requirements.txt    # 环境依赖列表：列出项目运行所需的第三方库
 ├── README.md           # 项目说明文档
-├── .gitignore          # Git 忽略配置文件
-├── src/                # 核心源代码
+├── .gitignore          # Git 忽略配置：排除权重文件及临时缓存
+├── src/                # 核心源代码目录
 │   ├── __init__.py     
-│   ├── carla_client.py # 主程序：负责环境管理、控制回路与 UI 渲染
-│   ├── sensor_manager.py # 传感器模块：负责图像采集与预处理
-│   ├── object_detector.py # 检测模块：基于 YOLOv3 的实时物体识别
-│   └── pid_controller.py # 控制模块：基于 PID 算法的纵向速度控制器 (New!)
-├── models/             # 模型资源 (YOLOv3 权重与配置)
-└── utils/              # 工具类 (模型校验、路径管理)
+│   ├── carla_client.py # 系统主入口：负责环境初始化、控制回路调度与 UI 渲染
+│   ├── sensor_manager.py # 传感器管理：负责 RGB 摄像头数据的监听与预处理
+│   ├── object_detector.py # 感知模块：基于 YOLOv3 的实时目标检测逻辑
+│   └── pid_controller.py # 控制模块：通用 PID 控制算法实现
+├── models/             # 模型资源目录
+│   ├── coco.names      # COCO 数据集类别标签
+│   ├── yolov3.cfg      # YOLOv3 网络结构配置文件
+│   └── yolov3.weights  # YOLOv3 模型权重文件 (需外部下载)
+└── utils/              # 辅助工具目录
+    ├── model_loader.py # 模型工具：负责权重文件的完整性校验与下载引导
+    └── geometry.py     # 几何计算：负责车速换算及横向偏差航向角计算 (New!)
 ```
 
 ## 核心模块说明
@@ -51,13 +56,13 @@ python src/carla_client.py
 
 ## 开发计划 (Roadmap)
 - [x] 初始化项目仓库与环境配置。
-- [x] 实现 CARLA 客户端连接与主车管理逻辑。
-- [x] 接入视觉传感器并实现画面实时流显示。
-- [x] 实现并优化 YOLOv3 目标检测模块。
-- [x] **开发并集成纵向 PID 速度控制器 (Control Layer Step 1)。**
-- [ ] 开发横向转向控制模块，实现车道保持辅助。
-- [ ] 探索基于感知结果的简单自动避障逻辑。
-- [ ] 系统综合性能评估与最终代码重构。
+- [x] 实现 CARLA 客户端连接与主车管理。
+- [x] 接入视觉传感器并实现画面实时流。
+- [x] 实现 YOLOv3 实时目标检测逻辑。
+- [x] 开发并调优纵向 PID 速度控制器。
+- [x] **实现基于地图导航点的自动寻迹转向功能 (Lateral Control).**
+- [ ] 开发基础自动避障决策算法。
+- [ ] 系统综合性能调优与代码清理。
 
 ## 声明
 本项目为课程作业/学术研究项目，代码仅供学习与教育参考。
