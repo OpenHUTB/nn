@@ -109,63 +109,73 @@ def calculate_car_offset(left_bottom_x, right_bottom_x, img_shape):
     else:
         return "Centered (±0.02m)", offset_m
 
-# ===================== 高精度偏离百分比计算函数（核心优化） =====================
+# ===================== 高精度偏离百分比计算函数 =====================
 def calculate_offset_percentage(left_fit, right_fit, img_shape, left_bottom_x=None, right_bottom_x=None):
-    """
-    高精度计算车辆偏离车道中心的百分比
-    优化点：
-    1. 基于车道线拟合曲线，多采样点计算平均车道中心，避免单点误差
-    2. 采用加权平均（近景权重更高），贴合实际视觉透视效果
-    3. 保留3位小数，提升精度
-    4. 计算失败时返回8.9
-    """
-    # 基础校验：拟合失败/关键坐标缺失，直接返回8.9
     if left_fit is None or right_fit is None or left_bottom_x is None or right_bottom_x is None:
         return 8.9
     
     height, width = img_shape[:2]
-    # 步骤1：生成从图片底部到中部的采样点（50个点，覆盖主要可视区域）
-    y_samples = np.linspace(height * 0.5, height, 50)  # 从中间到底部，更贴合实际车道区域
+    y_samples = np.linspace(height * 0.5, height, 50)
     lane_center_samples = []
     lane_width_samples = []
 
-    # 步骤2：逐点计算车道中心和宽度，过滤异常值
     for y in y_samples:
-        # 计算当前y坐标下的左右车道线x坐标（基于二次拟合）
         xl = left_fit[0] * y**2 + left_fit[1] * y + left_fit[2]
         xr = right_fit[0] * y**2 + right_fit[1] * y + right_fit[2]
         
-        # 过滤超出图片范围的异常点
         if 0 < xl < width and 0 < xr < width:
             lane_width = abs(xr - xl)
-            # 过滤过窄/过宽的异常宽度（符合实际车道宽度范围）
             if 80 < lane_width < 1200:
                 lane_center = (xl + xr) / 2
                 lane_center_samples.append(lane_center)
                 lane_width_samples.append(lane_width)
 
-    # 步骤3：采样点不足，返回8.9
     if len(lane_center_samples) < 10:
         return 8.9
     
-    # 步骤4：加权平均计算车道中心（近景y值大，权重更高）
-    weights = y_samples[-len(lane_center_samples):] / height  # 权重0.5~1.0
+    weights = y_samples[-len(lane_center_samples):] / height
     avg_lane_center = np.average(lane_center_samples, weights=weights)
     avg_lane_width = np.average(lane_width_samples, weights=weights)
 
-    # 步骤5：计算车辆中心偏移（图片水平中心为车辆中心）
     car_center = width / 2
     offset_pix = car_center - avg_lane_center
 
-    # 步骤6：高精度计算偏离百分比（保留3位小数）
     offset_percent = (offset_pix / avg_lane_width) * 100
     offset_percent_rounded = round(offset_percent, 3)
 
-    # 额外校验：百分比超出合理范围（±50%），返回8.9
     if abs(offset_percent_rounded) > 50:
         return 8.9
     
     return offset_percent_rounded
+
+# ===================== 新增：车道线斜率差计算函数 =====================
+def calculate_lane_slope_diff(left_fit, right_fit, img_shape):
+    """
+    计算左右车道线在图像底部的斜率差（反映车道是否扭曲/倾斜）
+    斜率计算：基于二次拟合曲线的导数（dx/dy），即斜率 = 2*a*y + b
+    斜率差 = 右车道线斜率 - 左车道线斜率
+    计算失败返回 0.00（保留2位小数）
+    """
+    if left_fit is None or right_fit is None:
+        return 0.00
+    
+    height, width = img_shape[:2]
+    y_bottom = height  # 取图像底部的y坐标计算斜率（最接近车辆的位置）
+    
+    # 计算左车道线在底部的斜率（dx/dy）
+    left_slope = 2 * left_fit[0] * y_bottom + left_fit[1]
+    # 计算右车道线在底部的斜率（dx/dy）
+    right_slope = 2 * right_fit[0] * y_bottom + right_fit[1]
+    
+    # 计算斜率差（保留2位小数）
+    slope_diff = right_slope - left_slope
+    slope_diff_rounded = round(slope_diff, 2)
+    
+    # 极端值过滤：斜率差超出±5时返回0.00
+    if abs(slope_diff_rounded) > 5:
+        return 0.00
+    
+    return slope_diff_rounded
 
 def calculate_lane_width_precise(left_fit, right_fit, img_shape):
     if left_fit is None or right_fit is None:
@@ -264,14 +274,17 @@ def lane_detection_pipeline(img):
     line_img, left_fit, right_fit, left_bottom_x, right_bottom_x = draw_lines(line_img, lines)
     result = cv2.addWeighted(img, 0.8, line_img, 1, 0)
 
+    # 1. 车道曲率
     curvature = calculate_lane_curvature(left_fit, right_fit, img.shape)
     cv2.putText(result, f"Lane Curvature: {curvature}",
                 (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
 
+    # 2. 车辆偏移（米）
     offset_str, offset_m = calculate_car_offset(left_bottom_x, right_bottom_x, img.shape)
     cv2.putText(result, f"Car Offset: {offset_str}",
                 (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2)
 
+    # 3. 车道宽度
     lane_width = calculate_lane_width_precise(left_fit, right_fit, img.shape)
     if "m" in lane_width and "Abnormal" not in lane_width:
         wc = (0,255,255)
@@ -282,10 +295,15 @@ def lane_detection_pipeline(img):
     cv2.putText(result, f"Lane Width: {lane_width}",
                 (20, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, wc, 2)
 
-    # ===================== 调用高精度偏离百分比计算 =====================
+    # 4. 高精度偏离百分比
     offset_percent = calculate_offset_percentage(left_fit, right_fit, img.shape, left_bottom_x, right_bottom_x)
     cv2.putText(result, f"Offset Percent: {offset_percent}",
                 (20, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 2)
+
+    # 5. 新增：车道线斜率差（显示在图片上）
+    slope_diff = calculate_lane_slope_diff(left_fit, right_fit, img.shape)
+    cv2.putText(result, f"Slope Diff: {slope_diff}",
+                (20, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,255), 2)  # 紫色字体，区分其他指标
 
     return result
 
@@ -320,7 +338,7 @@ def batch_detect_images(folder_path):
 
 def main():
     print("="*50)
-    print("      Lane Detection + High-Precision Offset Percent")
+    print("      Lane Detection + Slope Diff + High-Precision Offset")
     print("="*50)
     d = os.path.dirname(os.path.abspath(__file__))
 
