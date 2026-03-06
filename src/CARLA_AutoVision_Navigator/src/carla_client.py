@@ -1,31 +1,19 @@
 # -*- coding: utf-8 -*-
 import carla
-import random
-import time
 import sys
 import os
-import math
 import cv2
+import math
+import random
 
 # 将根目录加入系统路径
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import config
-
-
-# --- 辅助工具函数 ---
-def get_speed(vehicle):
-    """
-    计算车辆当前速度 (km/h)
-    """
-    v = vehicle.get_velocity()
-    # 计算三轴合速度并从 m/s 转换为 km/h
-    return 3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2)
+from utils.geometry import get_speed, get_steer_angle
 
 
 class CarlaClient:
-    """
-    负责管理与 CARLA 服务器的通信以及车辆实体的生命周期
-    """
+    """负责管理与 CARLA 服务器的通信以及车辆实体的生命周期"""
 
     def __init__(self):
         self.client = None
@@ -71,42 +59,44 @@ if __name__ == "__main__":
     try:
         connector.connect()
         vehicle = connector.spawn_ego_vehicle()
+        carla_map = connector.world.get_map()
 
-        # 初始化传感器、检测器与控制器
+        # 初始化感知、检测与双控制器
         sensors = SensorManager(connector.world, vehicle)
         sensors.attach_camera()
         detector = YOLOv3Detector()
-        pid = PIDController(config.K_P_SPEED, config.K_I_SPEED, config.K_D_SPEED)
+        speed_pid = PIDController(config.K_P_SPEED, config.K_I_SPEED, config.K_D_SPEED)
+        steer_pid = PIDController(config.K_P_STEER, config.K_I_STEER, config.K_D_STEER)
 
-        print(f"系统就绪。目标速度: {config.TARGET_SPEED} km/h. 按下 'q' 键退出...")
-
+        print("\n全系统启动：感知 + 控速 + 自动转向。按下 'q' 键退出...")
         while True:
-            # 1. 获取当前状态
+            # 1. 获取当前状态与导航点
+            current_loc = vehicle.get_location()
+            waypoint = carla_map.get_waypoint(current_loc).next(8.0)[0]
             current_speed = get_speed(vehicle)
-            frame = sensors.get_current_frame()
+            angle_error = get_steer_angle(vehicle, waypoint)
 
-            # 2. 纵向速度控制逻辑
-            control_signal = pid.run_step(config.TARGET_SPEED, current_speed)
+            # 2. 控制指令计算 (纵向+横向)
+            speed_signal = speed_pid.run_step(config.TARGET_SPEED, current_speed)
+            steer_signal = steer_pid.run_step(0, -angle_error)
+
             control = vehicle.get_control()
-
-            if control_signal >= 0:
-                control.throttle = control_signal
-                control.brake = 0.0
+            if speed_signal >= 0:
+                control.throttle, control.brake = speed_signal, 0.0
             else:
-                control.throttle = 0.0
-                control.brake = abs(control_signal)
+                control.throttle, control.brake = 0.0, abs(speed_signal)
 
-            control.steer = 0.0  # 初始阶段保持直行
+            control.steer = max(-1.0, min(1.0, steer_signal))
             vehicle.apply_control(control)
 
-            # 3. 视觉感知与目标检测
+            # 3. 感知可视化
+            frame = sensors.get_current_frame()
             if frame is not None:
                 detections = detector.detect(frame)
                 frame = detector.draw_labels(frame, detections)
-                # 在画面上额外显示当前车速
-                cv2.putText(frame, f"Speed: {current_speed:.2f} km/h", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                cv2.imshow("CARLA AutoVision - Control & Detection", frame)
+                cv2.putText(frame, f"Speed: {current_speed:.1f} km/h", (10, 30), 1, 1.5, (0, 255, 0), 2)
+                cv2.putText(frame, f"Steer: {control.steer:.2f}", (10, 60), 1, 1.5, (255, 255, 0), 2)
+                cv2.imshow("CARLA AutoVision Integration", frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
