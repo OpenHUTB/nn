@@ -7,11 +7,10 @@ import numpy as np
 import cv2
 import queue
 
-# ================= 路径修复 =================
+# 路径修复
 current_path = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_path)
 sys.path.append(project_root)
-# ===========================================
 
 from config import config
 
@@ -46,12 +45,15 @@ class CarlaClient:
             print(f"[ERROR] 连接失败: {e}")
             return False
 
-    def spawn_vehicle(self, model_name='vehicle.tesla.model3'):
+    def spawn_vehicle(self):
         if not self.world:
             print("[ERROR] 世界未加载，请先连接！")
             return None
 
+        # [Refactor] 使用配置文件中的车型
+        model_name = config.VEHICLE_MODEL
         bp = self.blueprint_library.find(model_name)
+
         spawn_points = self.world.get_map().get_spawn_points()
         spawn_point = random.choice(spawn_points)
 
@@ -71,21 +73,18 @@ class CarlaClient:
         camera_bp.set_attribute('image_size_x', str(config.CAMERA_WIDTH))
         camera_bp.set_attribute('image_size_y', str(config.CAMERA_HEIGHT))
         camera_bp.set_attribute('fov', str(config.CAMERA_FOV))
-        spawn_point = carla.Transform(carla.Location(x=1.5, z=2.4))
+
+        # [Refactor] 使用配置文件中的安装位置
+        spawn_point = carla.Transform(carla.Location(x=config.CAMERA_POS_X, z=config.CAMERA_POS_Z))
+
         self.camera = self.world.spawn_actor(camera_bp, spawn_point, attach_to=self.vehicle)
         self.camera.listen(lambda image: self._process_image(image))
         print("[INFO] RGB 摄像头安装成功！")
 
     def _process_image(self, image):
-        """
-        [修复版] 将 CARLA 原始数据转换为 OpenCV 图像格式
-        """
         array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
         array = np.reshape(array, (image.height, image.width, 4))
-
-        # [Fix] 使用 np.ascontiguousarray 解决 OpenCV 内存布局不兼容报错
         array = np.ascontiguousarray(array[:, :, :3])
-
         self.image_queue.put(array)
 
     def destroy_actors(self):

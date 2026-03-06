@@ -1,9 +1,8 @@
 """
 Drone Vision Navigation System
 Optimized for Abandoned Park Environment
-Pure English interface to avoid encoding issues
-Fixed KeyboardInterrupt handling
-Improved image analysis (no extra dependencies)
+Final version – Python 3.8.9 compatible, no extra dependencies
+Improved image analysis with LAB color, texture, and spatial grid features
 """
 
 import airsim
@@ -18,13 +17,13 @@ import random
 
 
 class DroneVisionSystem:
-    """Drone vision navigation system"""
+    """Drone vision navigation system (core flight control)"""
 
     def __init__(self):
         """Initialize system"""
         self.clear_screen()
         print("=" * 70)
-        print("DRONE VISION NAVIGATION SYSTEM v2.0 (Enhanced)")
+        print("DRONE VISION NAVIGATION SYSTEM v2.0 (Final)")
         print("=" * 70)
         print("Optimized for Abandoned Park Environment")
         print("-" * 70)
@@ -54,7 +53,7 @@ class DroneVisionSystem:
         # Create directories
         self.create_folders()
 
-        # Initialize classifier (enhanced version)
+        # Initialize enhanced classifier
         self.classifier = EnvironmentClassifier()
 
         print("System initialization complete!")
@@ -525,7 +524,7 @@ Current Status:
 
 
 class EnvironmentClassifier:
-    """Enhanced environment classifier (no extra dependencies)"""
+    """Enhanced environment classifier (optimized for Python 3.8.9, no extra deps)"""
 
     def __init__(self):
         self.environments = [
@@ -538,31 +537,54 @@ class EnvironmentClassifier:
             "Road": 0.10, "Sky": 0.08, "Water": 0.05,
             "Fire": 0.02, "Animal": 0.03, "Vehicle": 0.02
         }
+        # Rule thresholds (centralized for easy tuning)
+        self.thresholds = {
+            'fire_red': 0.25,
+            'fire_bright': 200,
+            'fire_grad': 15,
+            'sky_blue': 0.3,
+            'sky_l_mean': 180,
+            'water_blue': 0.25,
+            'water_edges': 0.03,
+            'forest_green': 0.3,
+            'forest_grad': 20,
+            'ruins_edges': 0.07,
+            'ruins_variance': 1200,
+            'ruins_bright': 120,
+            'building_edges': 0.05,
+            'building_bright': 100,
+            'building_green': 0.1,
+            'road_edges': 0.02,
+            'road_bright_low': 100,
+            'road_bright_high': 200,
+            'road_color': 0.1,
+            'animal_red': 0.15,
+            'animal_edges': 0.04
+        }
 
     def classify(self, image):
         """Main classification interface"""
         if image is None:
             return "Unknown", 0.0
 
-        # Extract enhanced features
         features = self._extract_enhanced_features(image)
-
-        # Rule-based classification
         env, conf = self._rule_based_v2(features)
-
-        # If rules fail, use weighted random
         if env == "Unknown":
             env, conf = self._weighted_random(features)
-
         return env, conf
 
     def _extract_enhanced_features(self, image):
-        """Extract rich features using only OpenCV and numpy"""
+        """Extract rich features using only OpenCV and numpy (optimized)"""
         h, w = image.shape[:2]
+
+        # Convert once
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+
         features = {}
 
         # ----- LAB color statistics (mean, std) -----
-        lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l_mean, l_std = cv2.meanStdDev(lab[:, :, 0])
         a_mean, a_std = cv2.meanStdDev(lab[:, :, 1])
         b_mean, b_std = cv2.meanStdDev(lab[:, :, 2])
@@ -573,8 +595,7 @@ class EnvironmentClassifier:
         features['b_mean'] = b_mean[0][0]
         features['b_std'] = b_std[0][0]
 
-        # ----- Texture features (gradient magnitude, Laplacian variance) -----
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # ----- Texture features -----
         sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=3)
         sobely = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
         mag = np.sqrt(sobelx**2 + sobely**2)
@@ -584,13 +605,10 @@ class EnvironmentClassifier:
         laplacian = cv2.Laplacian(gray, cv2.CV_64F)
         features['lap_var'] = np.var(laplacian)
 
-        # Edge density (Canny)
         edges = cv2.Canny(gray, 50, 150)
         features['edge_density'] = np.sum(edges > 0) / (h * w)
 
         # ----- Global color ratios (HSV) -----
-        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-
         blue_mask = cv2.inRange(hsv, (100, 50, 50), (130, 255, 255))
         features['blue_ratio'] = np.sum(blue_mask > 0) / (h * w)
 
@@ -633,52 +651,57 @@ class EnvironmentClassifier:
         return features
 
     def _rule_based_v2(self, f):
-        """Improved rule-based classification using enhanced features"""
-        # Extract common features
-        blue = f.get('blue_ratio', 0)
-        green = f.get('green_ratio', 0)
-        red = f.get('red_ratio', 0)
-        edges = f.get('edge_density', 0)
-        grad_mean = f.get('grad_mean', 0)
-        lap_var = f.get('lap_var', 0)
-        bright = f.get('brightness', 0)
-        is_sky = f.get('is_sky', False)
-        l_mean = f.get('l_mean', 128)
+        """Improved rule-based classification using centralized thresholds"""
+        t = self.thresholds  # local alias for speed
 
-        # Rule 1: Fire (high red + high brightness + low texture)
-        if red > 0.25 and bright > 200 and grad_mean < 15:
+        # Fire
+        if (f.get('red_ratio', 0) > t['fire_red'] and
+            f.get('brightness', 0) > t['fire_bright'] and
+            f.get('grad_mean', 0) < t['fire_grad']):
             return "Fire", 0.75
 
-        # Rule 2: Sky (high blue + is_sky + high L)
-        if blue > 0.3 and is_sky and l_mean > 180:
+        # Sky
+        if (f.get('blue_ratio', 0) > t['sky_blue'] and
+            f.get('is_sky', False) and
+            f.get('l_mean', 0) > t['sky_l_mean']):
             return "Sky", 0.85
 
-        # Rule 3: Water (high blue + not sky + low edges)
-        if blue > 0.25 and not is_sky and edges < 0.03:
+        # Water
+        if (f.get('blue_ratio', 0) > t['water_blue'] and
+            not f.get('is_sky', False) and
+            f.get('edge_density', 0) < t['water_edges']):
             return "Water", 0.70
 
-        # Rule 4: Forest (high green + high texture)
-        if green > 0.3 and grad_mean > 20:
+        # Forest
+        if (f.get('green_ratio', 0) > t['forest_green'] and
+            f.get('grad_mean', 0) > t['forest_grad']):
             return "Forest", 0.80
 
-        # Rule 5: Ruins (high edges + high gray variance + low brightness)
-        if edges > 0.07 and f.get('gray_variance', 0) > 1200 and bright < 120:
+        # Ruins
+        if (f.get('edge_density', 0) > t['ruins_edges'] and
+            f.get('gray_variance', 0) > t['ruins_variance'] and
+            f.get('brightness', 0) < t['ruins_bright']):
             return "Ruins", 0.85
 
-        # Rule 6: Building (medium edges + low brightness + low green)
-        if edges > 0.05 and bright < 100 and green < 0.1:
+        # Building
+        if (f.get('edge_density', 0) > t['building_edges'] and
+            f.get('brightness', 0) < t['building_bright'] and
+            f.get('green_ratio', 0) < t['building_green']):
             return "Building", 0.75
 
-        # Rule 7: Road (low edges + medium brightness + low color saturation)
-        if edges < 0.02 and 100 < bright < 200 and blue < 0.1 and green < 0.1 and red < 0.1:
+        # Road
+        if (f.get('edge_density', 0) < t['road_edges'] and
+            t['road_bright_low'] < f.get('brightness', 0) < t['road_bright_high'] and
+            f.get('blue_ratio', 0) < t['road_color'] and
+            f.get('green_ratio', 0) < t['road_color'] and
+            f.get('red_ratio', 0) < t['road_color']):
             return "Road", 0.70
 
-        # Rule 8: Animal/Vehicle (simple red + edges)
-        if red > 0.15 and edges > 0.04:
-            # Could be improved with spatial patterns, but fallback to vehicle
+        # Animal/Vehicle (simplified)
+        if (f.get('red_ratio', 0) > t['animal_red'] and
+            f.get('edge_density', 0) > t['animal_edges']):
             return "Vehicle", 0.60
 
-        # Unknown
         return "Unknown", 0.0
 
     def _weighted_random(self, features):
@@ -729,7 +752,7 @@ def safe_input(prompt):
 def main():
     """Main function with improved exception handling"""
     try:
-        print("DRONE VISION NAVIGATION SYSTEM (Enhanced)")
+        print("DRONE VISION NAVIGATION SYSTEM (Final Optimized)")
         print("-" * 50)
 
         # Create system
