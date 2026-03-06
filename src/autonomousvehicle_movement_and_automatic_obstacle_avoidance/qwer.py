@@ -7,6 +7,7 @@
 - 安全距离缩小，速度降至1.5m/s
 - 车辆相遇时依靠人工势场法避让（已移除两车之间的斥力）
 - 修正车辆初始朝向，优化速度获取，平滑油门控制
+- 【修复】初始化时正确设置航向角，避免启动时误转向
 """
 
 import mujoco
@@ -66,9 +67,9 @@ class CarController:
 
         # 人工势场法参数 - 优化后的值
         self.att_gain = 1.0
-        self.rep_car_gain = 8.0          # 增加车辆斥力增益
-        self.rep_wall_gain = 5.0
-        self.rep_distance_threshold = 2.0 # 边界斥力作用距离
+        self.rep_car_gain = 8.0          # 增加车辆斥力增益（已移除，保留不变）
+        self.rep_wall_gain = 1.0          # 减小边界斥力强度
+        self.rep_distance_threshold = 0.8 # 缩小作用范围
         self.safe_distance = 3.0          # 车辆间安全距离
         self.max_steer = 0.4
 
@@ -146,8 +147,8 @@ class CarController:
         pos_xy = (self.data.qpos[start], self.data.qpos[start + 1])
         quat = self.data.qpos[start + 3:start + 7]
         # 计算航向角（绕z轴）
-        heading = math.atan2(2.0 * (quat[0] * quat[1] + quat[2] * quat[3]),
-                             1.0 - 2.0 * (quat[1] * quat[1] + quat[2] * quat[2]))
+        heading = math.atan2(2.0 * (quat[0] * quat[3] + quat[1] * quat[2]),
+                             1.0 - 2.0 * (quat[2] * quat[2] + quat[3] * quat[3]))
         with state_lock:
             car_states[self.car_id] = {
                 'position': pos_xy,
@@ -466,9 +467,12 @@ def multi_car_simulation():
     car1_ctrl = CarController(1, model, data, actuator_ids[1], sensor_ids[1], goal_pos=(2.5, 20))
     car2_ctrl = CarController(2, model, data, actuator_ids[2], sensor_ids[2], goal_pos=(2.5, -20))
 
+    # 正确初始化共享状态中的航向角（关键修复）
     with state_lock:
         car_states[1] = {'position': (data.qpos[0], data.qpos[1]), 'heading': 0, 'velocity': 0}
         car_states[2] = {'position': (data.qpos[7], data.qpos[8]), 'heading': 0, 'velocity': 0}
+    car1_ctrl.update_state()
+    car2_ctrl.update_state()
 
     global step_barrier
     step_barrier = threading.Barrier(3)
@@ -525,12 +529,12 @@ def multi_car_simulation():
                 with state_lock:
                     car_states[1]['position'] = (data.qpos[0], data.qpos[1])
                     quat1 = data.qpos[3:7]
-                    car_states[1]['heading'] = math.atan2(2.0 * (quat1[0] * quat1[1] + quat1[2] * quat1[3]),
-                                                          1.0 - 2.0 * (quat1[1] * quat1[1] + quat1[2] * quat1[2]))
+                    car_states[1]['heading'] = math.atan2(2.0 * (quat1[0] * quat1[3] + quat1[1] * quat1[2]),
+                                                          1.0 - 2.0 * (quat1[2] * quat1[2] + quat1[3] * quat1[3]))
                     car_states[2]['position'] = (data.qpos[7], data.qpos[8])
                     quat2 = data.qpos[10:14]
-                    car_states[2]['heading'] = math.atan2(2.0 * (quat2[0] * quat2[1] + quat2[2] * quat2[3]),
-                                                          1.0 - 2.0 * (quat2[1] * quat2[1] + quat2[2] * quat2[2]))
+                    car_states[2]['heading'] = math.atan2(2.0 * (quat2[0] * quat2[3] + quat2[1] * quat2[2]),
+                                                          1.0 - 2.0 * (quat2[2] * quat2[2] + quat2[3] * quat2[3]))
 
                 step_barrier.wait()
                 viewer.sync()
