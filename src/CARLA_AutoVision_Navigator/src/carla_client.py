@@ -48,11 +48,11 @@ class CarlaClient:
             self.ego_vehicle.destroy()
             print("已销毁主车，资源清理完毕。")
 
-
 if __name__ == "__main__":
     from sensor_manager import SensorManager
     from object_detector import YOLOv3Detector
     from pid_controller import PIDController
+    from decision_maker import DecisionMaker  # 引入决策器
 
     connector = CarlaClient()
     sensors = None
@@ -61,42 +61,59 @@ if __name__ == "__main__":
         vehicle = connector.spawn_ego_vehicle()
         carla_map = connector.world.get_map()
 
-        # 初始化感知、检测与双控制器
         sensors = SensorManager(connector.world, vehicle)
         sensors.attach_camera()
         detector = YOLOv3Detector()
+        decision = DecisionMaker()  # 初始化决策器
+
         speed_pid = PIDController(config.K_P_SPEED, config.K_I_SPEED, config.K_D_SPEED)
         steer_pid = PIDController(config.K_P_STEER, config.K_I_STEER, config.K_D_STEER)
 
-        print("\n全系统启动：感知 + 控速 + 自动转向。按下 'q' 键退出...")
+        print("全系统启动：感知+决策+控制。按下 'q' 键退出...")
         while True:
-            # 1. 获取当前状态与导航点
-            current_loc = vehicle.get_location()
-            waypoint = carla_map.get_waypoint(current_loc).next(8.0)[0]
-            current_speed = get_speed(vehicle)
-            angle_error = get_steer_angle(vehicle, waypoint)
-
-            # 2. 控制指令计算 (纵向+横向)
-            speed_signal = speed_pid.run_step(config.TARGET_SPEED, current_speed)
-            steer_signal = steer_pid.run_step(0, -angle_error)
-
-            control = vehicle.get_control()
-            if speed_signal >= 0:
-                control.throttle, control.brake = speed_signal, 0.0
-            else:
-                control.throttle, control.brake = 0.0, abs(speed_signal)
-
-            control.steer = max(-1.0, min(1.0, steer_signal))
-            vehicle.apply_control(control)
-
-            # 3. 感知可视化
             frame = sensors.get_current_frame()
+            current_speed = get_speed(vehicle)
+
+            # 1. 感知与检测
+            detections = []
             if frame is not None:
                 detections = detector.detect(frame)
                 frame = detector.draw_labels(frame, detections)
-                cv2.putText(frame, f"Speed: {current_speed:.1f} km/h", (10, 30), 1, 1.5, (0, 255, 0), 2)
-                cv2.putText(frame, f"Steer: {control.steer:.2f}", (10, 60), 1, 1.5, (255, 255, 0), 2)
-                cv2.imshow("CARLA AutoVision Integration", frame)
+
+            # 2. 决策层分析
+            # 根据检测结果判断是否需要紧急刹车
+            is_emergency = decision.process_detections(detections, config.CAMERA_HEIGHT)
+
+            # 3. 控制信号计算
+            waypoint = carla_map.get_waypoint(vehicle.get_location()).next(8.0)[0]
+            angle_error = get_steer_angle(vehicle, waypoint)
+
+            # 如果是紧急情况，目标速度设为 0
+            target_v = 0.0 if is_emergency else config.TARGET_SPEED
+            speed_signal = speed_pid.run_step(target_v, current_speed)
+            steer_signal = steer_pid.run_step(0, -angle_error)
+
+            # 4. 应用控制
+            control = vehicle.get_control()
+            if is_emergency:
+                control.throttle = 0.0
+                control.brake = 1.0  # 全力刹车
+            elif speed_signal >= 0:
+                control.throttle = speed_signal
+                control.brake = 0.0
+            else:
+                control.throttle = 0.0
+                control.brake = abs(speed_signal)
+
+            control.steer = steer_signal
+            vehicle.apply_control(control)
+
+            # 5. UI 显示
+            if frame is not None:
+                if is_emergency:
+                    cv2.putText(frame, "EMERGENCY BRAKE!", (250, 300),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                cv2.imshow("CARLA Full System Integration", frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
