@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-多车协同避让仿真（道路场景）- 右侧车道行驶版
+多车协同避让仿真（道路场景）- 右侧车道行驶版（优化版）
 - 道路场景不变，两车目标点位于右侧车道 (2.5, ±20)
 - 安全距离缩小，速度降至1.5m/s
 - 车辆相遇时依靠人工势场法避让
-- 添加异常捕获和调试输出，确保运动
-- 修正全局变量声明顺序
+- 修正车辆初始朝向，优化速度获取，平滑油门控制
 """
 
 import mujoco
@@ -65,15 +64,15 @@ class CarController:
         # 控制参数 - 速度减慢
         self.target_velocity = 1.5
 
-        # 人工势场法参数 - 安全距离缩小
+        # 人工势场法参数 - 优化后的值
         self.att_gain = 1.0
-        self.rep_car_gain = 6.0
+        self.rep_car_gain = 8.0          # 增加车辆斥力增益
         self.rep_wall_gain = 5.0
-        self.rep_distance_threshold = 2.5
-        self.safe_distance = 5.0
+        self.rep_distance_threshold = 2.0 # 边界斥力作用距离
+        self.safe_distance = 3.0          # 车辆间安全距离
         self.max_steer = 0.4
 
-        # 传感器方向
+        # 传感器方向（用于调试，未实际使用）
         self.sensor_angles = {
             'front': 0.0,
             'front_left': math.radians(45),
@@ -92,14 +91,14 @@ class CarController:
         self.MAX_LATERAL_ACC = 5.0
         self.WHEELBASE = 0.6
         self.MAX_STEER_CHANGE = 0.05
+        self.MAX_THROTTLE_CHANGE = 0.5   # 油门变化率限制
 
-        # PID 速度控制器 - 调整参数
+        # PID 速度控制器
         self.velocity_pid = PIDController(kp=0.5, ki=0.01, kd=0.1)
 
         # 历史数据
         self.velocity_history = deque(maxlen=50)
         self.steering_history = deque(maxlen=25)
-        self.pos_history = deque(maxlen=5)  # 用于计算微分速度
         self.last_velocity_computed = 0.0
 
         # 协商状态
@@ -111,9 +110,14 @@ class CarController:
         self.last_throttle = 0.0
         self.last_steer = 0.0
 
+        # 速度索引（用于直接从qvel获取全局速度）
+        # freejoint 速度维度：前3为线速度(x,y,z)，后3为角速度
+        self.vel_start = 0 if car_id == 1 else 7  # car1从0开始，car2从7开始
+
     def get_sensor_data(self):
-        """读取传感器数据，返回字典"""
+        """读取传感器数据，返回字典，优先使用全局速度"""
         data = {}
+        # 读取距离传感器
         for key in ['front', 'front_left', 'front_right', 'left', 'right']:
             if key in self.sensor_ids:
                 sensor_val = self.data.sensordata[self.sensor_ids[key]]
@@ -128,17 +132,10 @@ class CarController:
                 else:
                     data[key] = 10.0
 
-        # 通过位置差分计算速度（更可靠）
-        start = 0 if self.car_id == 1 else 7
-        current_pos = (self.data.qpos[start], self.data.qpos[start + 1])
-        self.pos_history.append(current_pos)
-
-        if len(self.pos_history) >= 2:
-            prev_pos = self.pos_history[-2]
-            dt = self.model.opt.timestep
-            dx = current_pos[0] - prev_pos[0]
-            dy = current_pos[1] - prev_pos[1]
-            self.last_velocity_computed = math.sqrt(dx * dx + dy * dy) / dt
+        # 直接从 qvel 获取全局速度（更准确）
+        vx = self.data.qvel[self.vel_start]
+        vy = self.data.qvel[self.vel_start + 1]
+        self.last_velocity_computed = math.hypot(vx, vy)
 
         data['velocity'] = self.last_velocity_computed
         return data
@@ -148,6 +145,7 @@ class CarController:
         start = 0 if self.car_id == 1 else 7
         pos_xy = (self.data.qpos[start], self.data.qpos[start + 1])
         quat = self.data.qpos[start + 3:start + 7]
+        # 计算航向角（绕z轴）
         heading = math.atan2(2.0 * (quat[0] * quat[1] + quat[2] * quat[3]),
                              1.0 - 2.0 * (quat[1] * quat[1] + quat[2] * quat[2]))
         with state_lock:
@@ -228,7 +226,7 @@ class CarController:
 
         steer = np.clip(angle_diff * 0.8, -self.max_steer, self.max_steer)
 
-        # 更新协商标志（用于速度调节）- 缩小近车判断距离
+        # 更新协商标志
         self.near_car = any(
             other_id != self.car_id and
             math.hypot(other_cars[other_id]['position'][0] - my_pos[0],
@@ -240,7 +238,6 @@ class CarController:
 
         # 紧急刹车 - 缩小距离阈值
         front_dist = my_sensor.get('front', 10.0)
-        # 只有当正面距离很近或其他车距离<0.5m 才紧急刹车
         self.emergency_brake = front_dist < 0.5 or any(
             other_id != self.car_id and
             math.hypot(other_cars[other_id]['position'][0] - my_pos[0],
@@ -267,14 +264,12 @@ class CarController:
         self.velocity_pid.setpoint = target
         throttle = self.velocity_pid.update(current_vel, dt=self.model.opt.timestep)
 
-        if len(self.velocity_history) > 0:
-            last = self.velocity_history[-1]
-            max_accel = 2.0
-            accel = (target - last) / self.model.opt.timestep
-            if abs(accel) > max_accel:
-                throttle = np.clip(throttle, -max_accel * 8, max_accel * 8)
-
+        # 限制油门变化率，防止急加速/减速
+        throttle = np.clip(throttle,
+                           self.last_throttle - self.MAX_THROTTLE_CHANGE,
+                           self.last_throttle + self.MAX_THROTTLE_CHANGE)
         throttle = np.clip(throttle, -1.0, 1.0)
+
         self.velocity_history.append(current_vel)
         return throttle
 
@@ -295,14 +290,8 @@ class CarController:
         self.last_steer = steer
         self.update_state()
 
-        # 调试输出：每 100 步打印一次（避免刷屏）
-        if np.random.rand() < 0.01:  # 约 1% 的概率打印
-            front_dist = my_sensor.get('front', 10.0)
-            print(
-                f"Car{self.car_id}: throttle={throttle:.2f}, steer={steer:.2f}, vel={vel:.2f}, front_dist={front_dist:.2f}")
 
-
-# ==================== 构建道路场景XML（无静态障碍物） ====================
+# ==================== 构建道路场景XML（修正车辆朝向） ====================
 def create_road_xml():
     return """
 <mujoco>
@@ -336,7 +325,7 @@ def create_road_xml():
     <geom name="top_curb" type="box" size="4 0.2 0.3" pos="0 20 0.25" rgba="0.5 0.5 0.5 1"/>
 
     <!-- ========== 小车1（蓝色，朝北）右侧车道 ========== -->
-    <body name="car1" pos="2.5 -5 0.3">
+    <body name="car1" pos="2.5 -5 0.3" euler="0 0 1.5708">  <!-- 旋转+90°，使车头朝北 -->
       <freejoint name="car1_free"/>
       <geom name="car1_body" type="box" size="0.5 0.3 0.1" mass="20.0" material="car1_mat" pos="0 0 -0.1"/>
 
@@ -368,7 +357,7 @@ def create_road_xml():
     </body>
 
     <!-- ========== 小车2（红色，朝南）右侧车道 ========== -->
-    <body name="car2" pos="2.5 5 0.3" euler="0 0 3.14159">
+    <body name="car2" pos="2.5 5 0.3" euler="0 0 -1.5708"> <!-- 旋转-90°，使车头朝南 -->
       <freejoint name="car2_free"/>
       <geom name="car2_body" type="box" size="0.5 0.3 0.1" mass="20.0" material="car2_mat" pos="0 0 -0.1"/>
 
@@ -532,6 +521,7 @@ def multi_car_simulation():
 
                 mujoco.mj_step(model, data)
 
+                # 更新共享状态（航向角）
                 with state_lock:
                     car_states[1]['position'] = (data.qpos[0], data.qpos[1])
                     quat1 = data.qpos[3:7]
