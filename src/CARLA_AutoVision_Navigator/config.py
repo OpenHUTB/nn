@@ -38,3 +38,10 @@ K_D_SPEED = 0.1      # 微分系数
 K_P_STEER = 0.5
 K_I_STEER = 0.0
 K_D_STEER = 0.0
+
+# --- 决策层参数 (Decision Layer) ---
+# 触发紧急制动的检测框面积占比阈值 (0.0 到 1.0)
+# 如果目标框占画面高度的 30% 以上，说明距离非常近
+DANGER_THRESHOLD_HEIGHT = 0.35
+# 避障检测的关注类别
+OBSTACLE_CLASSES = ['car', 'truck', 'bus', 'person', 'bicycle', 'motorcycle']
