@@ -407,6 +407,7 @@ def main():
             # 控制循环频率
             time.sleep(0.005)
 
+    # 手动终止处理（Ctrl+C）
     except KeyboardInterrupt:
         logger.info("\n\n👋 用户中断程序")
     except Exception as e:
