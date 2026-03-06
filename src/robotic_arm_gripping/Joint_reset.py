@@ -34,7 +34,7 @@ def main():
         mujoco.mj_resetData(model, data)
         print("✅ 机械臂已复位到初始位置！")
 
-        # 保持可视化，方便观察
+        # 保持可视化
         while viewer.is_running():
             mujoco.mj_step(model, data)
             viewer.sync()
