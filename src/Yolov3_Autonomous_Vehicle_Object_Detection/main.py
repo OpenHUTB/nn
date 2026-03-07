@@ -8,6 +8,10 @@ import argparse  # [新增] 引入命令行参数解析库
 from config import config
 from utils.carla_client import CarlaClient
 from models.yolo_detector import YOLODetector
+<<<<<<< HEAD
+=======
+# [新增] 引入新的绘图函数
+>>>>>>> af1df56e41e216690d1e8e26081896cfd8849632
 from utils.visualization import draw_results, draw_safe_zone
 from utils.planner import SimplePlanner
 from utils.logger import PerformanceLogger
@@ -25,9 +29,13 @@ def parse_arguments():
 
 
 def main():
+<<<<<<< HEAD
     # 1. 解析命令行参数
     args = parse_arguments()
 
+=======
+    # 1. 初始化模块
+>>>>>>> af1df56e41e216690d1e8e26081896cfd8849632
     print("[Main] 初始化模块...")
     # 打印运行模式
     if args.no_render:
@@ -44,9 +52,13 @@ def main():
 
     planner = SimplePlanner()
     logger = PerformanceLogger(log_dir=config.LOG_DIR)
+<<<<<<< HEAD
 
     # [Mod] 使用命令行参数初始化客户端
     client = CarlaClient(host=args.host, port=args.port)
+=======
+    client = CarlaClient()
+>>>>>>> af1df56e41e216690d1e8e26081896cfd8849632
 
     if not client.connect():
         return
@@ -81,6 +93,7 @@ def main():
                 # --- 记录数据 ---
                 fps = 1 / (time.time() - start_time)
                 logger.log_step(fps, len(results))
+<<<<<<< HEAD
 
                 # --- 可视化 (根据 --no-render 参数决定是否显示) ---
                 if not args.no_render:
@@ -96,6 +109,26 @@ def main():
                     cv2.imshow("CARLA Object Detection", frame)
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         break
+=======
+
+                # --- 可视化 ---
+                # 1. 先画安全走廊 (蓝色辅助线)
+                frame = draw_safe_zone(frame)
+
+                # 2. 再画检测框
+                frame = draw_results(frame, results, detector.classes)
+
+                # 3. 画 FPS 和警告
+                cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                if is_brake:
+                    cv2.putText(frame, "EMERGENCY BRAKING!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                    cv2.putText(frame, warning_msg, (180, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+
+                cv2.imshow("CARLA Object Detection", frame)
+
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+>>>>>>> af1df56e41e216690d1e8e26081896cfd8849632
 
             except queue.Empty:
                 continue
