@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Project: CARLA AutoVision Navigator
+Module: Perception - Object Detection
+Version: v1.0.0
+Description: 目标检测模块。基于 YOLOv3 深度学习模型，利用 OpenCV DNN 模块实现交通参与者的实时识别。
+Author: wangadsa
+License: MIT License
+"""
 import cv2
 import numpy as np
 import os

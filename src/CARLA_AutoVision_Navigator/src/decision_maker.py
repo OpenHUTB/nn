@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Project: CARLA AutoVision Navigator
+Module: Decision - Behavioral Logic
+Version: v1.0.0
+Description: 行为决策模块。根据视觉感知层返回的目标信息进行风险评估，实现紧急自动制动（AEB）等避障决策。
+Author: wangadsa
+License: MIT License
+"""
 import sys
 import os
 

@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Project: CARLA AutoVision Navigator
+Module: Utility - Geometric Computation
+Version: v1.0.0
+Description: 几何计算工具库。提供向量空间下的车速换算、航向角偏差计算等自动驾驶核心数学函数。
+Author: wangadsa
+License: MIT License
+"""
 import math
 import numpy as np
 
