@@ -1,0 +1,27 @@
+# 无人机导航系统配置文件
+mission:
+  default_time: 300          # 默认任务时长（秒）
+  takeoff_height: 15          # 起飞高度
+  max_battery: 100.0
+  low_battery_warning: 20
+  critical_battery: 10
+
+navigation:
+  speeds:
+    ruins: 2.0
+    building: 2.0
+    forest: 1.5
+    road: 3.0
+    sky: 4.0
+    water: 2.0
+    fire: 5.0
+    animal: 1.0
+    vehicle: 2.0
+    default: 1.0
+
+classifier:
+  # 可覆盖默认阈值
+  thresholds:
+    fire_red: 0.25
+    fire_bright: 200
+    # ... 其他阈值

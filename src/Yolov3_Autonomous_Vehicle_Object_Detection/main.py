@@ -7,14 +7,14 @@ import carla
 from config import config
 from utils.carla_client import CarlaClient
 from models.yolo_detector import YOLODetector
-from utils.visualization import draw_results
+# [新增] 引入新的绘图函数
+from utils.visualization import draw_results, draw_safe_zone
 from utils.planner import SimplePlanner
-# [新增] 引入日志模块
 from utils.logger import PerformanceLogger
 
 
 def main():
-    # 1. 初始化各模块
+    # 1. 初始化模块
     print("[Main] 初始化模块...")
     detector = YOLODetector(
         cfg_path=config.YOLO_CONFIG_PATH,
@@ -26,11 +26,9 @@ def main():
     detector.load_model()
 
     planner = SimplePlanner()
-
-    # [新增] 初始化日志记录器
-    logger = PerformanceLogger()
-
+    logger = PerformanceLogger(log_dir=config.LOG_DIR)
     client = CarlaClient()
+
     if not client.connect():
         return
 
@@ -61,23 +59,22 @@ def main():
                     else:
                         client.vehicle.set_autopilot(True)
 
-                # --- 数据记录 (Logging) ---
+                # --- 记录数据 ---
                 fps = 1 / (time.time() - start_time)
-
-                # 计算平均置信度
-                avg_conf = 0
-                if len(results) > 0:
-                    avg_conf = np.mean([res[5] for res in results])
-
-                # 写入 TensorBoard
-                logger.log_step(fps, len(results), avg_conf)
+                logger.log_step(fps, len(results))
 
                 # --- 可视化 ---
-                frame = draw_results(frame, results, detector.classes)
-                cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                # 1. 先画安全走廊 (蓝色辅助线)
+                frame = draw_safe_zone(frame)
 
+                # 2. 再画检测框
+                frame = draw_results(frame, results, detector.classes)
+
+                # 3. 画 FPS 和警告
+                cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 if is_brake:
                     cv2.putText(frame, "EMERGENCY BRAKING!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
+                    cv2.putText(frame, warning_msg, (180, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
                 cv2.imshow("CARLA Object Detection", frame)
 
@@ -93,7 +90,6 @@ def main():
     finally:
         print("[Main] 正在清理资源...")
         client.destroy_actors()
-        # [新增] 关闭日志
         logger.close()
         cv2.destroyAllWindows()
         print("[Main] 程序已退出")
