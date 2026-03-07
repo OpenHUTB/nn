@@ -305,6 +305,20 @@ def main():
         print("转弯完成，直行...")
         time.sleep(5)
 
+        # 让汽车往右偏一点点直行
+        print(">>> 现在让汽车往右偏一点点直行...")
+        controls.steering = 0.15  # 向右轻微转向
+        controls.throttle = 0.3
+        client.setCarControls(controls)
+        print("正在向右偏一点点直行...")
+        time.sleep(5)
+
+        # 保持向右偏的状态继续直行
+        controls.steering = 0.1  # 稍微减小一点转向角度
+        client.setCarControls(controls)
+        print("继续向右偏直行...")
+        time.sleep(3)
+
         # 缓慢减速停止
         controls.throttle = 0.2
         client.setCarControls(controls)
@@ -313,6 +327,7 @@ def main():
 
         controls.brake = 1.0
         controls.throttle = 0.0
+        controls.steering = 0.0  # 停车时回正方向盘
         client.setCarControls(controls)
         print("停车...")
         time.sleep(1)
