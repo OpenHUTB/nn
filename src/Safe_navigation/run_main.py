@@ -172,22 +172,7 @@ def main():
         camera_info = client.simGetCameraInfo("0")
         print(f"✓ 摄像头信息: {camera_info}")
 
-        # 尝试获取图像
-        print("正在获取第一帧图像...")
-        img, width, height = get_camera_image(client)
 
-        if img is not None:
-            print(f"✓ 成功获取图像! 分辨率: {width}x{height}")
-
-            # 检测障碍物
-            has_obstacles, obstacles_info = detect_obstacles(img)
-            if has_obstacles:
-                print(f"⚠ 初始检测到 {len(obstacles_info)} 个障碍物")
-
-            # 显示图像
-            cv2.imshow('AirSim Camera - 障碍物检测', img)
-            cv2.waitKey(1)
-            print("✓ 摄像头图像已显示")
         else:
             print("⚠ 无法获取摄像头图像，将使用模拟数据进行演示")
             # 创建一个空白图像用于显示
@@ -207,76 +192,7 @@ def main():
         client.setCarControls(controls)
         print("直行前往路口...")
 
-        # 行驶过程中实时检测障碍物
-        last_obstacle_check = time.time()
-
-        for i in range(26):
-            time.sleep(1)
-
-            # 每次循环都尝试获取图像（不只是每3秒）
-            img, width, height = get_camera_image(client)
-
-            if img is not None:
-                # 检测障碍物
-                has_obstacles, obstacles_info = detect_obstacles(img)
-
-                # 添加时间戳和行驶信息
-                cv2.putText(img, f"Time: {i + 1}s", (10, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-                cv2.putText(img, f"Speed: {car_state.speed:.1f} km/h", (10, 80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-
-                if has_obstacles:
-                    print(f"  ⚠ 行驶中 ({i + 1}秒) - 检测到 {len(obstacles_info)} 个障碍物!")
-
-                    # 根据障碍物信息调整驾驶行为
-                    for obs in obstacles_info:
-                        if obs['position'] == "正前方" and obs['distance'] in ["非常近", "较近"]:
-                            print(f"    前方有障碍物({obs['distance']})，减速避让!")
-                            controls.throttle = 0.2  # 减速
-                            client.setCarControls(controls)
-                            time.sleep(0.5)
-
-                            # 如果障碍物很近，尝试绕行
-                            if obs['distance'] == "非常近":
-                                print("    障碍物非常近，尝试绕行...")
-                                controls.steering = -0.3
-                                controls.throttle = 0.3
-                                client.setCarControls(controls)
-                                time.sleep(1)
-
-                                # 回正
-                                controls.steering = 0.0
-                                controls.throttle = 0.5
-                                client.setCarControls(controls)
-
-                        elif obs['position'] == "左侧" and obs['distance'] == "非常近":
-                            print("    左侧有很近的障碍物，向右微调")
-                            controls.steering = 0.2
-                            client.setCarControls(controls)
-                            time.sleep(0.5)
-                            controls.steering = 0.0
-                            client.setCarControls(controls)
-
-                        elif obs['position'] == "右侧" and obs['distance'] == "非常近":
-                            print("    右侧有很近的障碍物，向左微调")
-                            controls.steering = -0.2
-                            client.setCarControls(controls)
-                            time.sleep(0.5)
-                            controls.steering = 0.0
-                            client.setCarControls(controls)
-
-                # 显示图像
-                cv2.imshow('AirSim Camera - 障碍物检测', img)
-                cv2.waitKey(1)
-
-                if i % 3 == 0:  # 每3秒打印一次状态
-                    print(f"  行驶中 ({i + 1}秒) - 摄像头已更新")
-            else:
-                print(f"  行驶中 ({i + 1}秒) - 等待摄像头图像...")
-
-            # 更新车辆状态
-            car_state = client.getCarState()
+<
 
         # 到达路口，完全停车
         controls.throttle = 0.0
@@ -332,7 +248,7 @@ def main():
         print("停车...")
         time.sleep(1)
 
-        # 关闭摄像头窗口
+
         cv2.destroyAllWindows()
         print("演示结束。")
 
