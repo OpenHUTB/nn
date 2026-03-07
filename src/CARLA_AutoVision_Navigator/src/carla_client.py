@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Main entry point for the CARLA AutoVision Navigator system.
-Integrated Perception, Decision, and Control loops.
+Project: CARLA AutoVision Navigator
+Module: Main Entry & Environment Management
+Version: v1.0.0
+Description: 系统主入口。负责连接 CARLA 服务器、生成主车实体、集成感知与控制循环及 UI 渲染。
+Author: wangadsa
+License: MIT License
 """
 
 import carla
