@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 import os
 from scipy import stats
-from typing import Optional, Tuple, Union  # 新增类型注解，提升可读性
+from typing import Optional, Tuple, Union
+import time  # 新增：用于FPS计算
 
 # ===================== 配置常量（统一管理参数） =====================
 CONFIG = {
@@ -31,11 +32,22 @@ CONFIG = {
         "WARNING": (0, 165, 255),      # 橙色
         "ERROR": (0, 0, 255),          # 红色
         "OFFSET_PERCENT": (0, 255, 255),# 青色
-        "SLOPE_DIFF": (255, 0, 255)    # 紫色
+        "SLOPE_DIFF": (255, 0, 255),    # 紫色
+        "LDW_WARNING": (0, 255, 255),   # 黄色（轻度偏离）
+        "LDW_DANGER": (0, 0, 255),      # 红色（重度偏离）
+        "FPS": (0, 255, 0)              # 绿色（FPS显示）
     },
     "DEFAULT_OFFSET_PERCENT": 8.9,
-    "DEFAULT_SLOPE_DIFF": 0.0
+    "DEFAULT_SLOPE_DIFF": 0.0,
+    # 新增：车道偏离预警阈值
+    "LDW_WARNING_THRESH": 15.0,   # 轻度偏离阈值（百分比）
+    "LDW_DANGER_THRESH": 30.0,    # 重度偏离阈值（百分比）
+    # FPS计算参数
+    "FPS_AVERAGE_FRAMES": 10      # 平均帧数（平滑FPS显示）
 }
+
+# 新增：FPS计算全局变量
+fps_times = []
 
 def grayscale(img: np.ndarray) -> np.ndarray:
     """转换为灰度图"""
@@ -356,8 +368,98 @@ def calculate_lane_curvature(
         return "N/A"
     return f"{int(avg_curvature)} m (Straight)" if avg_curvature > 1000 else f"{avg_curvature:.1f} m"
 
+# 新增：计算并绘制车道偏离预警
+def draw_ldw_warning(
+    img: np.ndarray, 
+    offset_percent: float
+) -> np.ndarray:
+    """
+    绘制车道偏离预警（LDW）
+    :param img: 输入图像
+    :param offset_percent: 偏离百分比
+    :return: 绘制预警后的图像
+    """
+    height, width = img.shape[:2]
+    abs_offset = abs(offset_percent)
+    
+    # 判断偏离等级
+    if abs_offset < CONFIG["LDW_WARNING_THRESH"]:
+        return img  # 无偏离，不绘制预警
+    elif CONFIG["LDW_WARNING_THRESH"] <= abs_offset < CONFIG["LDW_DANGER_THRESH"]:
+        warning_text = "⚠️ LDW WARNING: Lane Departure!"
+        text_color = CONFIG["TEXT_COLORS"]["LDW_WARNING"]
+        bg_color = (0, 165, 255)  # 橙色背景
+    else:
+        warning_text = "🚨 LDW DANGER: Severe Departure!"
+        text_color = CONFIG["TEXT_COLORS"]["LDW_DANGER"]
+        bg_color = (0, 0, 255)    # 红色背景
+    
+    # 计算文字尺寸，绘制半透明背景
+    text_size = cv2.getTextSize(warning_text, CONFIG["FONT"], CONFIG["FONT_SCALE"], CONFIG["FONT_THICKNESS"])[0]
+    text_x = (width - text_size[0]) // 2
+    text_y = int(height * 0.1)
+    bg_rect = [
+        (text_x - 10, text_y - text_size[1] - 10),
+        (text_x + text_size[0] + 10, text_y + 10)
+    ]
+    
+    # 绘制半透明背景
+    overlay = img.copy()
+    cv2.rectangle(overlay, bg_rect[0], bg_rect[1], bg_color, -1)
+    cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+    
+    # 绘制预警文字
+    cv2.putText(
+        img, warning_text,
+        (text_x, text_y), CONFIG["FONT"], CONFIG["FONT_SCALE"],
+        text_color, CONFIG["FONT_THICKNESS"] + 1
+    )
+    
+    return img
+
+# 新增：计算并绘制FPS
+def draw_fps(img: np.ndarray) -> np.ndarray:
+    """
+    计算并绘制实时FPS
+    :param img: 输入图像
+    :return: 绘制FPS后的图像
+    """
+    global fps_times
+    
+    # 记录当前时间
+    current_time = time.time()
+    fps_times.append(current_time)
+    
+    # 只保留最近N帧的时间（平滑FPS）
+    if len(fps_times) > CONFIG["FPS_AVERAGE_FRAMES"]:
+        fps_times = fps_times[-CONFIG["FPS_AVERAGE_FRAMES"]:]
+    
+    # 计算FPS
+    if len(fps_times) >= 2:
+        fps = len(fps_times) / (fps_times[-1] - fps_times[0])
+        fps_text = f"FPS: {fps:.1f}"
+    else:
+        fps_text = "FPS: --"
+    
+    # 绘制FPS（右上角）
+    height, width = img.shape[:2]
+    text_size = cv2.getTextSize(fps_text, CONFIG["FONT"], CONFIG["FONT_SCALE"], CONFIG["FONT_THICKNESS"])[0]
+    text_x = width - text_size[0] - 20
+    text_y = 50
+    
+    cv2.putText(
+        img, fps_text,
+        (text_x, text_y), CONFIG["FONT"], CONFIG["FONT_SCALE"],
+        CONFIG["TEXT_COLORS"]["FPS"], CONFIG["FONT_THICKNESS"]
+    )
+    
+    return img
+
 def lane_detection_pipeline(img: np.ndarray) -> np.ndarray:
-    """车道检测主流程（优化代码结构）"""
+    """车道检测主流程（优化代码结构，新增LDW和FPS功能）"""
+    # 记录开始时间（用于FPS计算）
+    start_time = time.time()
+    
     # 1. 预处理
     gray = grayscale(img)
     blur = gaussian_blur(gray)
@@ -438,6 +540,12 @@ def lane_detection_pipeline(img: np.ndarray) -> np.ndarray:
         CONFIG["TEXT_COLORS"]["SLOPE_DIFF"], CONFIG["FONT_THICKNESS"]
     )
 
+    # ========== 新增功能：车道偏离预警（LDW） ==========
+    result = draw_ldw_warning(result, offset_percent)
+    
+    # ========== 新增功能：绘制FPS ==========
+    result = draw_fps(result)
+
     return result
 
 def batch_detect_images(folder_path: str) -> None:
@@ -475,6 +583,7 @@ def main() -> None:
     """主函数（优化交互体验）"""
     print("="*60)
     print("      Lane Detection System (High-Precision Version)")
+    print("      ✨ Added: LDW (Lane Departure Warning) + FPS ✨")
     print("="*60)
     current_dir = os.path.dirname(os.path.abspath(__file__))
 
