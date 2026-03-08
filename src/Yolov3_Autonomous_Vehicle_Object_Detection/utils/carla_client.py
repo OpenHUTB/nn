@@ -20,9 +20,11 @@ class CarlaClient:
     CARLA 模拟器客户端封装类
     """
 
-    def __init__(self):
-        self.host = config.CARLA_HOST
-        self.port = config.CARLA_PORT
+    # [Mod] 修改 __init__ 方法，允许覆盖 host 和 port
+    def __init__(self, host=None, port=None):
+        # 如果传入了参数就用传入的，否则用 config 里的默认值
+        self.host = host if host else config.CARLA_HOST
+        self.port = port if port else config.CARLA_PORT
         self.timeout = config.CARLA_TIMEOUT
 
         self.client = None
@@ -50,7 +52,6 @@ class CarlaClient:
             print("[ERROR] 世界未加载，请先连接！")
             return None
 
-        # [Refactor] 使用配置文件中的车型
         model_name = config.VEHICLE_MODEL
         bp = self.blueprint_library.find(model_name)
 
@@ -74,7 +75,6 @@ class CarlaClient:
         camera_bp.set_attribute('image_size_y', str(config.CAMERA_HEIGHT))
         camera_bp.set_attribute('fov', str(config.CAMERA_FOV))
 
-        # [Refactor] 使用配置文件中的安装位置
         spawn_point = carla.Transform(carla.Location(x=config.CAMERA_POS_X, z=config.CAMERA_POS_Z))
 
         self.camera = self.world.spawn_actor(camera_bp, spawn_point, attach_to=self.vehicle)
