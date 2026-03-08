@@ -1,0 +1,85 @@
+<mujoco model="ArmWithGripper">
+  <option timestep="0.002"/>
+
+  <visual>
+    <map force="0.1" zfar="30"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+  </visual>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
+    <material name="arm" rgba="0.8 0.7 0.6 1"/>
+    <material name="gripper" rgba="0.6 0.8 1.0 1"/>
+    <material name="target" rgba="0.9 0.2 0.2 1"/>
+  </asset>
+
+  <default>
+    <!-- 仅保留支持的默认参数：joint/geom/motor -->
+    <joint armature="0.01" damping="1.2" limited="true"/>
+    <geom conaffinity="1" condim="3" friction="1.5 0.1 0.1"
+          solimp="0.9 0.95 0.01" solref="0.02 1" mass="0.1"/>
+    <motor ctrllimited="true" ctrlrange="-2 2" gear="60"/>
+  </default>
+
+  <worldbody>
+    <geom name="floor" type="plane" size="1 1 0.05" material="grid"/>
+    <light pos="0 -3 2" dir="0 3 -2" diffuse="1 1 1"/>
+
+    <!-- 抓取小球：使用标准free类型joint，无多余属性 -->
+    <body name="target" pos="0.35 0 0.15">
+      <geom name="target" type="sphere" size="0.06" material="target" mass="0.05"/>
+      <!-- 标准自由关节（无damping，改用接触阻尼实现稳定效果） -->
+      <joint name="target_joint" type="free"/>
+    </body>
+
+    <!-- 机械臂基座 -->
+    <body name="base" pos="0 0 0.4">
+      <geom name="base" type="cylinder" size="0.1 0.08" material="arm" mass="0.5"/>
+
+      <!-- 大臂 -->
+      <body name="upper" pos="0 0 0.08">
+        <joint name="shoulder" type="hinge" axis="0 1 0" range="-1.57 1.57"/>
+        <geom name="upper" type="capsule" fromto="0 0 0 0.22 0 0" size="0.04" material="arm" mass="0.15"/>
+
+        <!-- 小臂 -->
+        <body name="lower" pos="0.22 0 0">
+          <joint name="elbow" type="hinge" axis="0 1 0" range="-2.0 2.0"/>
+          <geom name="lower" type="capsule" fromto="0 0 0 0.20 0 0" size="0.032" material="arm" mass="0.1"/>
+
+          <!-- 夹持器 -->
+          <body name="wrist" pos="0.20 0 0">
+            <geom name="wrist" type="cylinder" size="0.025 0.03" material="gripper" mass="0.05"/>
+
+            <!-- 左手指 -->
+            <body name="left_finger" pos="0 0.035 0">
+              <joint name="left_joint" type="hinge" axis="1 0 0" range="0 0.8"/>
+              <geom name="left_fng" type="capsule" fromto="0 0 0 0.10 0 0" size="0.02" material="gripper" mass="0.02"/>
+            </body>
+
+            <!-- 右手指 -->
+            <body name="right_finger" pos="0 -0.035 0">
+              <joint name="right_joint" type="hinge" axis="1 0 0" range="0 0.8"/>
+              <geom name="right_fng" type="capsule" fromto="0 0 0 0.10 0 0" size="0.02" material="gripper" mass="0.02"/>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <motor name="shoulder" joint="shoulder"/>
+    <motor name="elbow" joint="elbow"/>
+    <motor name="left" joint="left_joint"/>
+    <motor name="right" joint="right_joint"/>
+  </actuator>
+
+  <!-- 接触约束：提升抓取稳定性（替代小球阻尼） -->
+  <contact>
+    <pair geom1="left_fng" geom2="target" solref=".01 1.5" solimp=".9 .99 .001" friction="2.0"/>
+    <pair geom1="right_fng" geom2="target" solref=".01 1.5" solimp=".9 .99 .001" friction="2.0"/>
+    <!-- 小球与地面的接触阻尼，避免滑动过远 -->
+    <pair geom1="target" geom2="floor" solref=".01 2.0" friction="1.0"/>
+  </contact>
+</mujoco>

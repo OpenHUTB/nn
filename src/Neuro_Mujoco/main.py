@@ -1,15 +1,23 @@
-import os
 import sys
+import os
 import time
 import logging
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Tuple, List, Dict
+import threading
 import numpy as np
+from typing import Optional, Tuple, List, Dict, Any
 import mujoco
 from mujoco import viewer
 
-# ===================== ROS 1 相关导入（新增）=====================
+# ===================== 依赖导入 - ROS 1 =====================
+# ===================== 核心路径配置（相对路径）=====================
+# 获取当前脚本所在目录（所有相对路径的基准）
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 模型文件夹相对路径（相对于当前脚本）
+MODEL_ROOT = os.path.join(SCRIPT_DIR, "mujoco_menagerie")
+
+# ===================== 依赖导入 - ROS 1（保留但禁用）=====================
+ROS_AVAILABLE = False
 try:
     import rospy
     from sensor_msgs.msg import JointState
@@ -17,32 +25,109 @@ try:
     from std_msgs.msg import Float32MultiArray
     ROS_AVAILABLE = True
 except ImportError:
-    ROS_AVAILABLE = False
-    logging.warning("未检测到 ROS 环境，ROS 功能已禁用（如需启用，请安装 ROS 1 Noetic 并配置环境）")
+    logging.warning("ROS环境未检测到，ROS功能禁用")
 
+# ===================== 动态路径配置 (已修改为相对路径) =====================
+# 获取当前脚本所在的目录
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 配置日志系统
+# ===================== 多模型配置（修正预设指令 + 相对路径）=====================
+MODEL_CONFIGS = {
+    1: {
+        "name": "Franka Panda（机械臂）",
+        "key": "franka",
+        # 使用 os.path.join 拼接相对路径
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/franka_emika_panda/panda.xml"),
+        "path": os.path.join(MODEL_ROOT, "franka_emika_panda/panda.xml"),
+        "joint_num": 7,
+        "pd_params": {"KP": 800.0, "KD": 60.0},
+        "presets": {
+            "home": np.array([0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0]),
+            "up": np.array([0.2, 0.1, 0.0, -1.57, 0.2, 1.57, 0.0]),
+            "left": np.array([0.0, 0.2, 0.0, -1.2, 0.0, 1.8, 0.0]),
+            "right": np.array([0.0, -0.2, 0.0, -1.8, 0.0, 1.2, 0.0])
+        },
+        "default_preset": "home",
+        "ee_site_name": "end_effector"
+    },
+    2: {
+        "name": "UR5 机械臂",
+        "key": "ur5",
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/universal_robots_ur5e/ur5e.xml"),
+        "path": os.path.join(MODEL_ROOT, "universal_robots_ur5e/ur5e.xml"),
+        "joint_num": 6,
+        "pd_params": {"KP": 700.0, "KD": 50.0},
+        "presets": {
+            "home": np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            "up": np.array([0.0, -0.5, 0.0, 0.0, 0.0, 0.0]),
+            "forward": np.array([0.0, -0.5, 0.5, 0.0, 0.0, 0.0])
+        },
+        "default_preset": "home",
+        "ee_site_name": "ee_link"
+    },
+    3: {
+        "name": "Franka Panda（带手爪）",
+        "key": "franka_gripper",
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/franka_emika_panda/panda_gripper.xml"),
+        "path": os.path.join(MODEL_ROOT, "franka_emika_panda/panda_gripper.xml"),
+        "joint_num": 8,
+        "pd_params": {"KP": 800.0, "KD": 60.0},
+        "presets": {
+            "home": np.array([0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0, 0.0]),
+            "open_gripper": np.array([0.0, 0.0, 0.0, -1.57, 0.0, 1.57, 0.0, 1.0]),
+            "up_open": np.array([0.2, 0.1, 0.0, -1.57, 0.2, 1.57, 0.0, 1.0])
+        },
+        "default_preset": "home",
+        "ee_site_name": "end_effector"
+    },
+    4: {
+        "name": "Walker2d 机器人",
+        "key": "walker2d",
+        "path": os.path.join(SCRIPT_DIR, "mujoco_menagerie/walker2d/walker2d.xml"),
+        "path": os.path.join(MODEL_ROOT, "walker2d/walker2d.xml"),
+        "joint_num": 6,
+        "pd_params": {"KP": 1000.0, "KD": 80.0},
+        "presets": {
+            "stand": np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]),
+            "walk_left": np.array([0.1, -0.1, 0.1, -0.1, 0.1, -0.1]),
+            "walk_right": np.array([-0.1, 0.1, -0.1, 0.1, -0.1, 0.1])
+        },
+        "default_preset": "stand",
+        "ee_site_name": "torso"
+    }
+}
+
+# ===================== 全局变量 =====================
+# ===================== 全局变量（精简版）=====================
+CURRENT_CONFIG = None
+TARGET_JOINT_POS = None
+KP = None
+KD = None
+SIMULATION_PAUSE = False
+SIMULATION_RUNNING = False
+CMD_LOCK = threading.Lock()
+
+# ===================== 日志配置 =====================
+# ===================== 日志配置（精简输出）=====================
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+    format="[%(asctime)s] [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
-logger = logging.getLogger("mujoco_utils")
+logger = logging.getLogger("mujoco_control_tool")
 
-
-def load_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
-    """
-    加载MuJoCo模型（支持XML和MJB格式）
-    
-    参数:
-        model_path: 模型文件路径
-        
-    返回:
-        加载成功返回(model, data)元组，失败返回(None, None)
-    """
+# ===================== 核心功能函数 =====================
+def load_mujoco_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
+    """加载MuJoCo模型"""
+# ===================== 核心功能函数（精简版 + 路径调试）=====================
+def load_mujoco_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
+    """加载MuJoCo模型（增加路径调试信息）"""
+    # 路径合法性检查 + 调试信息
     if not os.path.exists(model_path):
-        logger.error(f"模型文件不存在: {model_path}")
+        logger.error(f"模型文件不存在：{model_path}")
+        logger.info(f"💡 调试信息 - 当前脚本目录：{SCRIPT_DIR}")
+        logger.info(f"💡 调试信息 - 模型根目录：{MODEL_ROOT}")
         return None, None
 
     try:
@@ -50,339 +135,432 @@ def load_model(model_path: str) -> Tuple[Optional[mujoco.MjModel], Optional[mujo
             model = mujoco.MjModel.from_binary_path(model_path)
         else:
             model = mujoco.MjModel.from_xml_path(model_path)
+        
         data = mujoco.MjData(model)
-        logger.info(f"成功加载模型: {model_path}")
-        logger.info(f"模型信息：控制维度(nu)={model.nu} | 关节数(njnt)={model.njnt} | 自由度(nq)={model.nq}")
+        logger.info(f"模型加载成功：{model_path}")
+        logger.info(f"模型参数：控制维度={model.nu} | 关节数={model.njnt} | 自由度={model.nq}")
         return model, data
     except Exception as e:
-        logger.error(f"模型加载失败: {str(e)}", exc_info=True)
+        logger.error(f"模型加载失败：{str(e)}", exc_info=True)
         return None, None
 
-
-def convert_model(input_path: str, output_path: str) -> bool:
-    """
-    转换模型格式（XML↔MJB）
+def load_selected_model() -> Tuple[Optional[mujoco.MjModel], Optional[mujoco.MjData]]:
+    """加载选中的模型"""
+    if not CURRENT_CONFIG:
+        logger.error("❌ 未选择模型！")
+        return None, None
     
-    参数:
-        input_path: 输入模型路径
-        output_path: 输出模型路径（需指定扩展名.xml或.mjb）
+    model_path = CURRENT_CONFIG["path"]
+    model, data = load_mujoco_model(model_path)
+    if model and data:
+        mujoco.mj_resetDataKeyframe(model, data, 0)
+        logger.info(f"\n✅ 成功加载模型：{CURRENT_CONFIG['name']}")
+        logger.info(f"📂 模型路径：{model_path}")
+        logger.info(f"🔧 控制关节数：{CURRENT_CONFIG['joint_num']} | PD参数：KP={KP}, KD={KD}")
+    return model, data
+
+def pd_controller(model: mujoco.MjModel, data: mujoco.MjData):
+    """PD控制器"""
+    joint_num = CURRENT_CONFIG["joint_num"]
+    if model.nq < joint_num or model.nu < joint_num:
+        logger.warning(f"⚠️  模型自由度/控制维度不足")
+        return
+    
+    global TARGET_JOINT_POS
+    current_joint_pos = data.qpos[:joint_num].copy()
+    current_joint_vel = data.qvel[:joint_num].copy()
+    
+    # PD控制核心计算
+    pos_error = TARGET_JOINT_POS - current_joint_pos
+    vel_error = -current_joint_vel
+    joint_torque = KP * pos_error + KD * vel_error
+    
+    # 力矩限位
+    if model.actuator_forcerange.size >= joint_num:
+        torque_limit = model.actuator_forcerange[:, 1].copy()[:joint_num]
+        joint_torque = np.clip(joint_torque, -torque_limit, torque_limit)
+    
+    data.ctrl[:joint_num] = joint_torque
+
+def simulation_worker(model, data, viewer_instance):
+    """仿真工作线程"""
+    global SIMULATION_RUNNING, SIMULATION_PAUSE
+    step_counter = 0
+    sim_frequency = 50
+    sim_interval = 1.0 / sim_frequency
+    
+    # 适配相机视角
+    cam_distance = 2.0 if "机械臂" in CURRENT_CONFIG["name"] else 3.0
+    viewer_instance.cam.distance = cam_distance
+    viewer_instance.cam.azimuth = 90
+    viewer_instance.cam.elevation = -20
+    viewer_instance.cam.lookat = [0.0, 0.0, 0.5]
+    
+    while SIMULATION_RUNNING and viewer_instance.is_running():
+        if SIMULATION_PAUSE:
+            time.sleep(0.1)
+            continue
         
-    返回:
-        转换成功返回True，失败返回False
-    """
-    model, data = load_model(input_path)
+        loop_start = time.time()
+        
+        # 执行PD控制
+        pd_controller(model, data)
+        
+        # 步进仿真
+        mujoco.mj_step(model, data)
+        viewer_instance.sync()
+
+        # 大幅降低打印频率
+        if step_counter % 500 == 0:
+            print_simulation_status(data, step_counter)
+        step_counter += 1
+        
+        # 控制仿真频率
+        loop_duration = time.time() - loop_start
+        if loop_duration < sim_interval:
+            time.sleep(sim_interval - loop_duration)
+
+def cmd_listener_main():
+    """终端指令监听（主线程）"""
+    global TARGET_JOINT_POS, SIMULATION_PAUSE, SIMULATION_RUNNING
+    joint_num = CURRENT_CONFIG["joint_num"]
+    preset_keys = list(CURRENT_CONFIG["presets"].keys())
+    
+    
+    model_path = CURRENT_CONFIG["path"]
+    model, data = load_mujoco_model(model_path)
+    if model and data:
+        mujoco.mj_resetDataKeyframe(model, data, 0)
+        logger.info(f"\n✅ 成功加载模型：{CURRENT_CONFIG['name']}")
+        logger.info(f"📂 模型路径：{model_path}")
+        logger.info(f"🔧 控制关节数：{CURRENT_CONFIG['joint_num']} | PD参数：KP={KP}, KD={KD}")
+    return model, data
+
+def pd_controller(model: mujoco.MjModel, data: mujoco.MjData):
+    """PD控制器"""
+    joint_num = CURRENT_CONFIG["joint_num"]
+    if model.nq < joint_num or model.nu < joint_num:
+        logger.warning(f"⚠️  模型自由度/控制维度不足")
+        return
+    
+    global TARGET_JOINT_POS
+    current_joint_pos = data.qpos[:joint_num].copy()
+    current_joint_vel = data.qvel[:joint_num].copy()
+    
+    # PD控制核心计算
+    pos_error = TARGET_JOINT_POS - current_joint_pos
+    vel_error = -current_joint_vel
+    joint_torque = KP * pos_error + KD * vel_error
+    
+    # 力矩限位
+    if model.actuator_forcerange.size >= joint_num:
+        torque_limit = model.actuator_forcerange[:, 1].copy()[:joint_num]
+        joint_torque = np.clip(joint_torque, -torque_limit, torque_limit)
+    
+    data.ctrl[:joint_num] = joint_torque
+
+def simulation_worker(model, data, viewer_instance):
+    """仿真工作线程"""
+    global SIMULATION_RUNNING, SIMULATION_PAUSE
+    step_counter = 0
+    sim_frequency = 50
+    sim_interval = 1.0 / sim_frequency
+    
+    # 适配相机视角
+    cam_distance = 2.0 if "机械臂" in CURRENT_CONFIG["name"] else 3.0
+    viewer_instance.cam.distance = cam_distance
+    viewer_instance.cam.azimuth = 90
+    viewer_instance.cam.elevation = -20
+    viewer_instance.cam.lookat = [0.0, 0.0, 0.5]
+    
+    while SIMULATION_RUNNING and viewer_instance.is_running():
+        if SIMULATION_PAUSE:
+            time.sleep(0.1)
+            continue
+        
+        loop_start = time.time()
+        
+        # 执行PD控制
+        pd_controller(model, data)
+        
+        # 步进仿真
+        mujoco.mj_step(model, data)
+        viewer_instance.sync()
+
+        # 大幅降低打印频率（从200步→500步），减少刷屏
+        if step_counter % 500 == 0:
+            print_simulation_status(data, step_counter)
+        step_counter += 1
+        
+        # 控制仿真频率
+        loop_duration = time.time() - loop_start
+        if loop_duration < sim_interval:
+            time.sleep(sim_interval - loop_duration)
+
+def cmd_listener_main():
+    """终端指令监听（主线程，移除save指令）"""
+    global TARGET_JOINT_POS, SIMULATION_PAUSE, SIMULATION_RUNNING
+    joint_num = CURRENT_CONFIG["joint_num"]
+    preset_keys = list(CURRENT_CONFIG["presets"].keys())
+    
+    # 修正指令提示，只显示当前模型支持的预设
+    logger.info("\n" + "="*50)
+    logger.info(f"📢 {CURRENT_CONFIG['name']} 控制指令说明")
+    logger.info(f"  1. 预设位置：{' / '.join(preset_keys)}（直接输入即可切换）")
+    logger.info(f"  2. 自定义关节：set 关节号 角度（示例：set 0 0.5，单位rad）")
+    logger.info(f"  3. 暂停/继续仿真：pause / resume")
+    logger.info(f"  4. 退出仿真：exit")
+    if ROS_AVAILABLE:
+        logger.info(f"  5. ROS键盘控制：在新终端运行 `python keyboard_control.py <关节数>`")
+    logger.info("="*50 + "\n")
+    
+    while SIMULATION_RUNNING:
+        try:
+            cmd = input("\n👉 请输入控制指令：").strip().lower()
+            
+            with CMD_LOCK:
+                pass
+            
+            # 输入提示符单独显示，更清晰
+            cmd = input("\n👉 请输入控制指令：").strip().lower()
+            
+            with CMD_LOCK:
+                pass  # 移除指令存储，直接处理
+            
+            # 核心指令逻辑（移除save指令）
+            if cmd == "exit":
+                logger.info("📤 收到退出指令，即将关闭仿真...")
+                SIMULATION_RUNNING = False
+                break
+            elif cmd == "pause":
+                SIMULATION_PAUSE = True
+                logger.info("⏸️  仿真已暂停（输入resume继续）")
+            elif cmd == "resume":
+                SIMULATION_PAUSE = False
+                logger.info("▶️  仿真已继续")
+            elif cmd in preset_keys:
+                TARGET_JOINT_POS = CURRENT_CONFIG["presets"][cmd]
+                logger.info(f"\n🎯 切换到预设位置：{cmd}")
+                logger.info(f"🎯 目标关节位置：{TARGET_JOINT_POS.round(3)}")
+            elif cmd.startswith("set"):
+                parts = cmd.split()
+                if len(parts) != 3:
+                    logger.error("❌ set指令格式错误！正确示例：set 0 0.5")
+                    continue
+                try:
+                    joint_idx = int(parts[1])
+                    joint_angle = float(parts[2])
+                    if 0 <= joint_idx < joint_num:
+                        TARGET_JOINT_POS[joint_idx] = joint_angle
+                        logger.info(f"\n🔧 关节{joint_idx}目标角度设为：{joint_angle} rad")
+                        logger.info(f"🔍 当前完整目标位置：{TARGET_JOINT_POS.round(3)}")
+                    else:
+                        logger.error(f"❌ 关节号无效！必须是0-{joint_num-1}之间的整数")
+                except ValueError:
+                    logger.error("❌ 关节号/角度必须是数字！示例：set 0 0.5")
+            else:
+                logger.error(f"❌ 未知指令！支持的指令：{' / '.join(preset_keys)}、set、pause、resume、exit")
+        
+        except KeyboardInterrupt:
+            logger.info("\n⚠️  检测到键盘中断，即将退出...")
+            SIMULATION_RUNNING = False
+            break
+        except Exception as e:
+            logger.error(f"❌ 指令解析失败：{str(e)}", exc_info=True)
+
+def print_simulation_status(data: mujoco.MjData, step: int):
+    """打印仿真状态"""
+    """打印仿真状态（精简输出）"""
+    joint_num = CURRENT_CONFIG["joint_num"]
+    current_pos = data.qpos[:joint_num].round(4)
+    pos_error = TARGET_JOINT_POS - current_pos
+    avg_error = np.mean(np.abs(pos_error))
+    max_error = np.max(np.abs(pos_error))
+    
+    logger.info(f"\n===== 仿真进度：{data.time:.2f}秒 | 第{step}步 =====")
+    logger.info(f"🎯 目标关节位置：{TARGET_JOINT_POS.round(3)}")
+    logger.info(f"📝 当前关节位置：{current_pos}")
+    logger.info(f"📊 控制精度：平均误差={avg_error:.6f}rad | 最大误差={max_error:.6f}rad")
+
+# ===================== ROS 功能 =====================
+def joint_control_callback(msg):
+    """ROS 关节控制话题回调函数"""
+    global TARGET_JOINT_POS
+    if not SIMULATION_RUNNING or SIMULATION_PAUSE:
+        return
+
+    joint_num = CURRENT_CONFIG["joint_num"]
+    if len(msg.data) != joint_num:
+        logger.warning(f"ROS消息数据长度不匹配！期望 {joint_num}, 收到 {len(msg.data)}")
+        return
+
+    # 将接收到的增量值加到目标关节位置上
+    delta_pos = np.array(msg.data)
+    with CMD_LOCK: # 使用锁确保线程安全
+        TARGET_JOINT_POS += delta_pos
+    
+    logger.info(f"\n🎮 接收到ROS控制指令：目标关节位置更新为 {TARGET_JOINT_POS.round(3)}")
+
+def ros_joint_control_subscriber():
+    """ROS 订阅者节点"""
+    try:
+        rospy.init_node('mujoco_ros_controller', anonymous=True)
+        rospy.Subscriber('joint_position_delta', Float32MultiArray, joint_control_callback)
+        logger.info("✅ ROS节点已启动，正在监听 /joint_position_delta 话题...")
+        rospy.spin() # 保持节点运行，直到被关闭
+    except rospy.ROSInterruptException:
+        logger.info("🛑 ROS节点被中断。")
+    except Exception as e:
+        logger.error(f"❌ ROS节点运行出错: {e}", exc_info=True)
+
+# ===================== 主程序逻辑 =====================
+def run_selected_model():
+    """启动选中模型的可视化与控制"""
+    model, data = load_selected_model()
     if not model or not data:
-        return False
-
-    # 确保输出目录存在
-    output_dir = os.path.dirname(output_path)
-    if output_dir and not os.path.exists(output_dir):
-        try:
-            os.makedirs(output_dir, exist_ok=True)
-            logger.info(f"创建输出目录: {output_dir}")
-        except Exception as e:
-            logger.error(f"无法创建输出目录: {str(e)}")
-            return False
+        input("\n按回车键返回模型选择菜单...")
+        return
+    
+    global SIMULATION_PAUSE, SIMULATION_RUNNING
+    SIMULATION_PAUSE = False
+    SIMULATION_RUNNING = True
+    
+    logger.info(f"\n🖥️  正在启动 {CURRENT_CONFIG['name']} 可视化窗口...")
+    logger.info("💡 提示：窗口弹出后，终端会显示输入提示符，可输入指令控制模型！")
+    
+    ros_thread = None
+    if ROS_AVAILABLE:
+        # 启动ROS订阅者线程
+        ros_thread = threading.Thread(target=ros_joint_control_subscriber, daemon=True)
+        ros_thread.start()
+        time.sleep(1.0) # 等待ROS节点初始化
 
     try:
-        if output_path.endswith('.mjb'):
-            mujoco.save_model(model, output_path)
-            logger.info(f"二进制模型已保存至: {output_path}")
-        else:
-            xml_content = mujoco.mj_saveLastXMLToString(data)
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(xml_content)
-            logger.info(f"XML模型已保存至: {output_path}")
-        return True
-    except Exception as e:
-        logger.error(f"模型转换失败: {str(e)}", exc_info=True)
-        return False
+        with viewer.launch_passive(model, data) as viewer_instance:
 
-
-def test_speed(
-    model_path: str,
-    nstep: int = 10000,
-    nthread: int = 1,
-    ctrlnoise: float = 0.01
-) -> None:
-    """
-    测试模型模拟速度
-    
-    参数:
-        model_path: 模型文件路径
-        nstep: 每线程模拟步数
-        nthread: 测试线程数
-        ctrlnoise: 控制噪声强度
-    """
-    model, _ = load_model(model_path)
-    if not model:
+def run_selected_model():
+    """启动选中模型的可视化与控制（精简版）"""
+    # 加载模型
+    model, data = load_selected_model()
+    if not model or not data:
+        input("\n按回车键返回模型选择菜单...")
         return
-
-    # 参数验证
-    if nstep <= 0:
-        logger.error("步数必须为正数")
-        return
-    if nthread <= 0:
-        logger.error("线程数必须为正数")
-        return
-
-    # 生成控制噪声（处理nu=0的情况）
-    if model.nu == 0:
-        ctrl = None
-        logger.warning("模型无控制输入（nu=0），将跳过控制噪声")
-    else:
-        ctrl = ctrlnoise * np.random.randn(nstep, model.nu)
     
-    logger.info(f"开始速度测试: 线程数={nthread}, 每线程步数={nstep}")
-
-    def simulate_thread(thread_id: int) -> float:
-        """单线程模拟函数"""
-        mj_data = mujoco.MjData(model)
-        start = time.perf_counter()
-        for i in range(nstep):
-            if ctrl is not None:
-                mj_data.ctrl[:] = ctrl[i]
-            mujoco.mj_step(model, mj_data)
-        end = time.perf_counter()
-        duration = end - start
-        logger.debug(f"线程 {thread_id} 完成，耗时: {duration:.2f}秒")
-        return duration
-
-    # 执行多线程测试
-    start_time = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=nthread) as executor:
-        thread_durations: List[float] = list(executor.map(simulate_thread, range(nthread)))
-    total_time = time.perf_counter() - start_time
-
-    # 计算性能指标
-    total_steps = nstep * nthread
-    steps_per_sec = total_steps / total_time
-    realtime_factor = (total_steps * model.opt.timestep) / total_time
-
-    logger.info("\n===== 速度测试结果 =====")
-    logger.info(f"总步数: {total_steps:,}")
-    logger.info(f"总耗时: {total_time:.2f}秒")
-    logger.info(f"每秒步数: {steps_per_sec:.0f}")
-    logger.info(f"实时因子: {realtime_factor:.2f}x")
-    logger.info(f"线程平均耗时: {np.mean(thread_durations):.2f}秒 (±{np.std(thread_durations):.2f})")
-
-
-# ===================== ROS管理器类（新增模块化ROS功能）=====================
-class ROSManager:
-    """ROS管理器类（模块化ROS功能）"""
+    # 初始化全局标志
+    global SIMULATION_PAUSE, SIMULATION_RUNNING
+    SIMULATION_PAUSE = False
+    SIMULATION_RUNNING = True
     
-    def __init__(self, model: mujoco.MjModel):
-        if not ROS_AVAILABLE:
-            raise RuntimeError("ROS环境未就绪，无法启用ROS模式")
-        
-        self.model = model
-        self.ctrl_cmd = None
-        self.joint_msg = None
-        self.njnt = 0
-        self.initialized = False
-        
-        # ROS发布者
-        self.joint_state_pub = None
-        self.pose_pub = None
-        self.ros_rate = None
-        
-    def initialize(self):
-        """初始化ROS节点和发布者/订阅者"""
-        rospy.init_node("mujoco_ros_node", anonymous=True)
-        self.ros_rate = rospy.Rate(100)  # 100Hz发布频率
-        
-        # 创建发布者
-        self.joint_state_pub = rospy.Publisher(
-            "/mujoco/joint_states",
-            JointState,
-            queue_size=10
-        )
-        
-        self.pose_pub = rospy.Publisher(
-            "/mujoco/pose",
-            PoseStamped,
-            queue_size=10
-        )
-        
-        # 初始化关节状态消息
-        self.joint_msg = JointState()
-        joint_names = []
-        
-        for i in range(self.model.njnt):
-            joint_type = self.model.joint(i).type
-            if joint_type != mujoco.mjtJoint.mjJNT_FREE:
-                joint_names.append(self.model.joint(i).name)
-        
-        self.joint_msg.name = joint_names
-        self.njnt = len(joint_names)
-        
-        # 初始化控制命令
-        if self.model.nu > 0:
-            self.ctrl_cmd = np.zeros(self.model.nu)
-            rospy.Subscriber(
-                "/mujoco/ctrl_cmd",
-                Float32MultiArray,
-                self._ctrl_callback,
-                queue_size=5
+    logger.info(f"\n🖥️  正在启动 {CURRENT_CONFIG['name']} 可视化窗口...")
+    logger.info("💡 提示：窗口弹出后，终端会显示输入提示符，可输入指令控制模型！")
+    
+    try:
+        with viewer.launch_passive(model, data) as viewer_instance:
+            # 启动仿真线程
+            sim_thread = threading.Thread(
+                target=simulation_worker,
+                args=(model, data, viewer_instance),
+                daemon=True
             )
+            sim_thread.start()
+            
+            cmd_listener_main()
+            
+            # 主线程运行指令监听
+            cmd_listener_main()
+            
+            # 等待仿真线程结束
+            sim_thread.join(timeout=2)
         
-        self.initialized = True
-        return self
-    
-    def _ctrl_callback(self, msg: Float32MultiArray):
-        """控制指令回调函数"""
-        if self.model.nu == len(msg.data):
-            self.ctrl_cmd = np.array(msg.data)
-            logger.debug(f"收到ROS控制指令，前5个值: {self.ctrl_cmd[:5]}...")
-    
-    def apply_control(self, data: mujoco.MjData):
-        """将ROS控制指令应用到MuJoCo数据"""
-        if self.ctrl_cmd is not None and self.model.nu > 0:
-            data.ctrl[:] = self.ctrl_cmd
-    
-    def publish_states(self, data: mujoco.MjData):
-        """发布关节状态和姿态"""
-        if not self.initialized:
-            return
-        
-        # 发布关节状态
-        self.joint_msg.header.stamp = rospy.Time.now()
-        self.joint_msg.position = data.qpos[:self.njnt].tolist()
-        self.joint_msg.velocity = data.qvel[:self.njnt].tolist()
-        self.joint_state_pub.publish(self.joint_msg)
-        
-        # 发布基座姿态
-        pose_msg = PoseStamped()
-        pose_msg.header.stamp = rospy.Time.now()
-        pose_msg.header.frame_id = "world"
-        
-        if self.model.nq >= 1:
-            pose_msg.pose.position.x = data.qpos[0]
-        if self.model.nq >= 2:
-            pose_msg.pose.position.y = data.qpos[1]
-        if self.model.nq >= 3:
-            pose_msg.pose.position.z = data.qpos[2]
-        
-        if self.model.nq >= 4:
-            pose_msg.pose.orientation.x = data.qpos[3]
-        if self.model.nq >= 5:
-            pose_msg.pose.orientation.y = data.qpos[4]
-        if self.model.nq >= 6:
-            pose_msg.pose.orientation.z = data.qpos[5]
-        if self.model.nq >= 7:
-            pose_msg.pose.orientation.w = data.qpos[6]
-        
-        self.pose_pub.publish(pose_msg)
-        
-        # 控制发布频率
-        self.ros_rate.sleep()
-
-
-# ===================== 可视化函数（使用ROSManager类）=====================
-def visualize(model_path: str, use_ros: bool = False) -> None:
-    """
-    可视化模型并运行模拟（支持ROS 1模式）
-    
-    参数:
-        model_path: 模型文件路径
-        use_ros: 是否启用ROS模式（默认False）
-    """
-    model, data = load_model(model_path)
-    if not model:
-        return
-
-    # ROS管理器初始化
-    ros_manager = None
-    if use_ros:
-        if not ROS_AVAILABLE:
-            logger.error("ROS 环境未就绪，无法启用 ROS 模式（请检查ROS安装和环境配置）")
-            return
-        
-        try:
-            ros_manager = ROSManager(model).initialize()
-            logger.info("="*60)
-            logger.info("ROS 1 模式已启用！")
-            logger.info(f"发布话题：/mujoco/joint_states（{ros_manager.njnt}个非自由关节）")
-            logger.info(f"发布话题：/mujoco/pose（基座姿态）")
-            logger.info(f"订阅话题：/mujoco/ctrl_cmd（控制指令，长度={model.nu}）")
-            logger.info("="*60)
-        except Exception as e:
-            logger.error(f"ROS初始化失败: {str(e)}")
-            return
-
-    # ===================== 可视化主循环 =====================
-    logger.info("启动可视化窗口（按ESC键退出，鼠标可交互：拖拽旋转、滚轮缩放）")
-    try:
-        with viewer.launch_passive(model, data) as v:
-            while v.is_running() and (not use_ros or not rospy.is_shutdown()):
-                # ROS模式：应用控制指令
-                if ros_manager:
-                    ros_manager.apply_control(data)
-                
-                # 执行MuJoCo模拟步
-                mujoco.mj_step(model, data)
-                v.sync()
-                
-                # ROS模式：发布状态
-                if ros_manager:
-                    ros_manager.publish_states(data)
-        
-        logger.info("可视化窗口已关闭")
+        logger.info(f"\n✅ {CURRENT_CONFIG['name']} 仿真已关闭")
+            
     except Exception as e:
-        logger.error(f"可视化过程出错: {str(e)}", exc_info=True)
-    finally:
-        if ros_manager:
-            logger.info("ROS管理器已关闭")
+        logger.error(f"\n❌ 可视化出错：{str(e)}", exc_info=True)
+        SIMULATION_RUNNING = False
+    
+    if ros_thread and ros_thread.is_alive():
+        rospy.signal_shutdown("仿真结束，关闭ROS节点。")
+        ros_thread.join(timeout=2)
 
+    input("\n按回车键返回模型选择菜单...")
 
-# ===================== 主函数（新增--ros选项）=====================
-def main() -> None:
+def show_menu():
+    """显示模型选择菜单"""
+    os.system("clear") if os.name != "nt" else os.system("cls")
+    print("="*60)
+    print("          🚀 MuJoCo 多模型控制平台 🚀          ")
+    print("="*60)
+    print("请选择要运行的模型（输入数字序号）：")
+    for idx, config in MODEL_CONFIGS.items():
+        print(f"  {idx}. {config['name']}")
+    print("  0. 退出程序")
+    print("="*60)
+
+def main_menu():
+    """交互式菜单主函数"""
+    global CURRENT_CONFIG, TARGET_JOINT_POS, KP, KD
+    
+    while True:
+        show_menu()
+        try:
+            choice = int(input("\n👉 请输入选择（0-4）：").strip())
+        except ValueError:
+            logger.error("❌ 输入无效！请输入数字0-4")
+            input("按回车键重新选择...")
+            continue
+        
+        if choice == 0:
+            logger.info("\n👋 感谢使用，程序已退出！")
+            sys.exit(0)
+        elif choice in MODEL_CONFIGS:
+            CURRENT_CONFIG = MODEL_CONFIGS[choice]
+            TARGET_JOINT_POS = CURRENT_CONFIG["presets"][CURRENT_CONFIG["default_preset"]].copy()
+            TARGET_JOINT_POS = CURRENT_CONFIG["presets"][CURRENT_CONFIG["default_preset"]]
+            KP = CURRENT_CONFIG["pd_params"]["KP"]
+            KD = CURRENT_CONFIG["pd_params"]["KD"]
+            run_selected_model()
+        else:
+            logger.error("❌ 选择无效！请输入0-4之间的数字")
+            input("按回车键重新选择...")
+
+# ===================== 命令行入口（精简版）=====================
+def main():
+    # 启动时打印路径信息，方便调试
+    logger.info(f"📌 当前脚本目录：{SCRIPT_DIR}")
+    logger.info(f"📌 模型根目录：{MODEL_ROOT}")
+    
     parser = argparse.ArgumentParser(
-        description="MuJoCo功能整合工具（支持ROS 1消息封装）",
+        description="MuJoCo模型控制工具（支持ROS键盘控制）",
+        description="MuJoCo模型控制工具（精简版，无数据保存）",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="subcommand", required=True, help="子命令列表")
+    menu_parser = subparsers.add_parser("menu", help="启动交互式模型选择菜单（PD控制）")
 
-    # 1. 可视化命令（新增--ros选项）
-    viz_parser = subparsers.add_parser("visualize", help="可视化模型并运行模拟")
-    viz_parser.add_argument("model", help="模型文件路径")
-    viz_parser.add_argument(
-        "--ros",
-        action="store_true",
-        help="启用ROS模式（发布关节状态/基座姿态，订阅控制指令）"
-    )
-
-    # 2. 速度测试命令（原有功能不变）
-    speed_parser = subparsers.add_parser("testspeed", help="测试模型模拟速度")
-    speed_parser.add_argument("model", help="模型文件路径")
-    speed_parser.add_argument("--nstep", type=int, default=10000, help="每线程模拟步数")
-    speed_parser.add_argument("--nthread", type=int, default=1, help="测试线程数量")
-    speed_parser.add_argument("--ctrlnoise", type=float, default=0.01, help="控制噪声强度")
-
-    # 3. 模型转换命令（原有功能不变）
-    convert_parser = subparsers.add_parser("convert", help="转换模型格式（XML↔MJB）")
-    convert_parser.add_argument("input", help="输入模型路径")
-    convert_parser.add_argument("output", help="输出模型路径（需指定.xml或.mjb扩展名）")
+    # 只保留menu子命令（核心控制功能）
+    menu_parser = subparsers.add_parser("menu", help="启动交互式模型选择菜单（PD控制）")
 
     args = parser.parse_args()
 
-    # 命令映射（更新visualize，支持use_ros参数）
-    command_handlers: Dict[str, callable] = {
-        "visualize": lambda: visualize(args.model, use_ros=args.ros),
-        "testspeed": lambda: test_speed(args.model, args.nstep, args.nthread, args.ctrlnoise),
-        "convert": lambda: convert_model(args.input, args.output)
+    subcommand_handlers = {
+        "menu": main_menu
     }
 
-    # 执行命令
     try:
-        command_handlers[args.command]()
+        subcommand_handlers[args.subcommand]()
     except KeyError:
-        logger.error(f"未知命令: {args.command}")
+        logger.error(f"未知子命令：{args.subcommand}")
         sys.exit(1)
     except Exception as e:
-        logger.critical(f"程序执行失败: {str(e)}", exc_info=True)
+        logger.critical(f"程序执行失败：{str(e)}", exc_info=True)
         sys.exit(1)
 
-
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        logger.info("\n\n👋 程序被用户中断，已退出！")
+        sys.exit(0)
+    except Exception as e:
+        logger.critical(f"\n❌ 程序运行出错：{str(e)}", exc_info=True)
+        sys.exit(1)

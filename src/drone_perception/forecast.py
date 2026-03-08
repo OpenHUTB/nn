@@ -79,24 +79,10 @@ def predict_image(model_path, img_path, train_dir, img_size=(128, 128)):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
-    # 检查img_path是文件还是目录
-    if os.path.isdir(img_path):
-        print(f"检测到目录路径: {img_path}")
-        # 如果是目录，找到目录中的第一个图像文件
-        image_files = [f for f in os.listdir(img_path) 
-                      if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
-        if not image_files:
-            print("错误: 目录中没有找到图像文件!")
-            return None
-        # 使用第一个图像文件
-        img_path = os.path.join(img_path, image_files[0])
-        print(f"使用目录中的第一个图像: {image_files[0]}")
-    
     # 加载和预处理图像
     try:
         image = Image.open(img_path).convert('RGB')
         print(f"成功加载图像: {img_path}")
-        print(f"图像尺寸: {image.size}")
     except Exception as e:
         print(f"加载图像失败: {e}")
         return None
@@ -140,47 +126,31 @@ def main():
     train_dir = os.path.join(base_dir, "train")
     
     # 要预测的图像路径 - 可以修改为你的测试图像路径
-    # 可以选择使用目录或具体图像文件
-    test_dir = os.path.join(base_dir, "test", "Fire")  # 目录路径
-    # 或者直接指定具体图像文件：
-    # test_image_path = os.path.join(base_dir, "test", "Fire", "具体的图像文件名.jpg")
+    img_path = os.path.join(base_dir, "test", "Fire", "fi10.jpg")  # 示例路径
     
     # 检查路径是否存在
     print("=" * 50)
     print("路径检查:")
     print(f"模型路径: {model_path}, 存在: {os.path.exists(model_path)}")
     print(f"训练目录: {train_dir}, 存在: {os.path.exists(train_dir)}")
-    print(f"测试目录: {test_dir}, 存在: {os.path.exists(test_dir)}")
-    
-    # 如果指定的是目录，检查其中是否有图像文件
-    if os.path.exists(test_dir) and os.path.isdir(test_dir):
-        image_files = [f for f in os.listdir(test_dir) 
-                      if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
-        print(f"测试目录中的图像文件: {len(image_files)} 个")
-        if image_files:
-            print(f"前几个文件: {image_files[:3]}")  # 显示前3个文件
-    
+    print(f"图像路径: {img_path}, 存在: {os.path.exists(img_path)}")
     print("=" * 50)
     
-    if not all([os.path.exists(model_path), os.path.exists(train_dir)]):
-        print("错误: 模型或训练目录不存在!")
-        return
-    
-    if not os.path.exists(test_dir):
-        print("错误: 测试路径不存在!")
+    if not all([os.path.exists(model_path), os.path.exists(train_dir), os.path.exists(img_path)]):
+        print("错误: 必要的文件或目录不存在!")
         return
     
     # 执行预测
-    result = predict_image(model_path, test_dir, train_dir)
+    result = predict_image(model_path, img_path, train_dir)
     
     if result:
         predicted_class, confidence = result
         print(f"\n🎯 最终预测: {predicted_class} (置信度: {confidence*100:.2f}%)")
 
-# 批量预测单个目录中的所有图像（不要求子目录结构）
-def predict_directory(model_path, directory_path, train_dir, img_size=(128, 128)):
+# 批量预测函数
+def batch_predict(model_path, test_dir, train_dir, img_size=(128, 128)):
     """
-    预测指定目录中的所有图像文件
+    批量预测测试目录中的所有图像
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -204,55 +174,51 @@ def predict_directory(model_path, directory_path, train_dir, img_size=(128, 128)
     
     results = []
     
-    # 获取目录中的所有图像文件
-    image_files = [f for f in os.listdir(directory_path) 
-                  if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+    # 遍历测试目录
+    for class_name in class_labels:
+        class_dir = os.path.join(test_dir, class_name)
+        if not os.path.exists(class_dir):
+            continue
+            
+        for img_name in os.listdir(class_dir):
+            if img_name.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
+                img_path = os.path.join(class_dir, img_name)
+                
+                try:
+                    image = Image.open(img_path).convert('RGB')
+                    input_tensor = transform(image).unsqueeze(0).to(device)
+                    
+                    with torch.no_grad():
+                        outputs = model(input_tensor)
+                        predicted_class_idx = torch.argmax(outputs[0]).item()
+                        confidence = torch.nn.functional.softmax(outputs[0], dim=0)[predicted_class_idx].item()
+                    
+                    predicted_class = class_labels[predicted_class_idx]
+                    is_correct = (predicted_class == class_name)
+                    
+                    results.append({
+                        'image_path': img_path,
+                        'true_class': class_name,
+                        'predicted_class': predicted_class,
+                        'confidence': confidence,
+                        'correct': is_correct
+                    })
+                    
+                    status = "✅" if is_correct else "❌"
+                    print(f"{status} {img_name}: 真实={class_name}, 预测={predicted_class}, 置信度={confidence:.4f}")
+                    
+                except Exception as e:
+                    print(f"处理图像 {img_path} 时出错: {e}")
     
-    if not image_files:
-        print(f"在目录 {directory_path} 中没有找到图像文件!")
-        return results
-    
-    print(f"\n开始批量预测 {len(image_files)} 个图像...")
-    
-    for img_name in image_files:
-        img_path = os.path.join(directory_path, img_name)
-        
-        try:
-            image = Image.open(img_path).convert('RGB')
-            input_tensor = transform(image).unsqueeze(0).to(device)
-            
-            with torch.no_grad():
-                outputs = model(input_tensor)
-                probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
-                predicted_class_idx = torch.argmax(probabilities).item()
-                confidence = probabilities[predicted_class_idx].item()
-            
-            predicted_class = class_labels[predicted_class_idx]
-            
-            results.append({
-                'image_name': img_name,
-                'predicted_class': predicted_class,
-                'confidence': confidence
-            })
-            
-            print(f"📸 {img_name}: {predicted_class} (置信度: {confidence*100:.2f}%)")
-            
-        except Exception as e:
-            print(f"处理图像 {img_path} 时出错: {e}")
-    
-    # 统计预测结果
+    # 计算准确率
     if results:
-        print(f"\n📊 批量预测完成!")
-        class_counts = {}
-        for result in results:
-            cls = result['predicted_class']
-            class_counts[cls] = class_counts.get(cls, 0) + 1
-        
-        print("预测结果统计:")
-        for cls, count in class_counts.items():
-            print(f"  {cls}: {count} 个图像")
+        correct_predictions = sum(1 for r in results if r['correct'])
+        accuracy = correct_predictions / len(results)
+        print(f"\n📊 批量预测准确率: {accuracy:.4f} ({correct_predictions}/{len(results)})")
     
     return results
 
 if __name__ == "__main__":
     main()
+    
+   
