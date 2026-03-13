@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Project: CARLA AutoVision Navigator
+Module: Perception - Sensor Management
+Version: v1.0.0
+Description: 传感器管理模块。实现 RGB 摄像头的挂载、数据监听以及原始图像流向 OpenCV 格式的预处理。
+Author: wangadsa
+License: MIT License
+"""
 import carla
 import numpy as np
 import cv2

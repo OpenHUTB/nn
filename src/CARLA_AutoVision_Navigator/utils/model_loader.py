@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Project: CARLA AutoVision Navigator
+Module: Utility - Model Asset Management
+Version: v1.0.0
+Description: 模型资产管理工具。实现 YOLOv3 权重文件的完整性校验、路径自动锚定以及环境诊断功能。
+Author: wangadsa
+License: MIT License
+"""
 import os
 import requests
 

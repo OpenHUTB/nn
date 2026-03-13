@@ -1,4 +1,12 @@
 # -*- coding: utf-8 -*-
+"""
+Project: CARLA AutoVision Navigator
+Module: Control - PID Algorithm
+Version: v1.0.0
+Description: 车辆运动控制器。实现标准的比例-积分-微分（PID）算法，用于主车的纵向速度补偿与横向转向修正。
+Author: wangadsa
+License: MIT License
+"""
 import collections
 
 

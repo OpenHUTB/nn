@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Global Configuration for CARLA AutoVision Navigator.
+Project: CARLA AutoVision Navigator
+Module: Configuration Management
+Version: v1.0.0
+Description: 全局参数配置文件，统一管理服务器连接、传感器参数、模型配置及 PID 控制增益。
+Author: wangadsa
+License: MIT License
 """
 
 # ==============================================================================
