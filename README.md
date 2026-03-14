@@ -33,10 +33,9 @@
 ### 文档生成
 
 测试生成的文档：
-1. 安装python 3.11，并使用以下命令安装`mkdocs`和相关依赖：
+1. 使用以下命令安装`mkdocs`和相关依赖：
 ```shell
-pip install mkdocs -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 （可选）安装完成后使用`mkdocs --version`查看是否安装成功。
 
