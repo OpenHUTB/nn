@@ -1,0 +1,23 @@
+name: Windows Tests
+
+on: 
+  push:
+  pull_request:
+
+
+jobs:
+  windows-dev:
+    name: Windows CI/CD
+    timeout-minutes: 1440
+    runs-on: self-hosted:windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: setup
+        run: |
+          call setup.bat
+        shell: cmd
