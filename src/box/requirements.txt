@@ -1,0 +1,19 @@
+﻿# Core runtime
+numpy>=1.24
+PyYAML>=6.0
+gymnasium>=0.29
+mujoco>=3.1
+pygame>=2.5
+
+# Utilities used by rendering / analysis scripts
+scipy>=1.10
+matplotlib>=3.7
+imageio>=2.31
+
+# Training stack (used by trainer.py)
+stable-baselines3>=2.2
+wandb>=0.17
+
+# Optional viewers / GUI demos
+PyQt5>=5.15
+pyqtgraph>=0.13
