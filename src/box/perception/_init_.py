@@ -1,5 +1,6 @@
-from .base import Perception
-from .vision import VisionPerception
-from .joint_state import JointStatePerception
+﻿"""Compatibility shim. Prefer importing from package __init__.py."""
 
-__all__ = ["Perception", "VisionPerception", "JointStatePerception"]
+try:
+    from .__init__ import *  # noqa: F401,F403
+except Exception:
+    pass
