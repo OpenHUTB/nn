@@ -8,16 +8,28 @@
 
 ## 运行环境
 
-请确保Python环境安装了以下内容：
+确保你的Python环境安装了以下内容：
 
 ```
-pip install carla pygame numpy torch ultralytics
+pip install pygame numpy torch ultralytics
 ```
 
 ### 附加需求：
 
-1.CARLA 模拟器（版本 ≥ 0.9.13）：从[CARLA GitHub](https://github.com/carla-simulator/carla).下载。
+1. CARLA 模拟器（版本 ≥ 0.9.13）：从[CARLA GitHub](https://github.com/carla-simulator/carla).下载。
 
-2.CUDA（可选）：如果有GPU的话，用YOLOv8推理更快。
+2. CUDA（可选）：如果有GPU的话，用YOLOv8推理更快。
 
-3.Python ≥ 3.7
+3. Python ≥ 3.7
+
+
+
+## 运行方式
+
+1. 启动CARLA模拟器 CarlaUE4.exe
+2. 运行Python脚本 
+
+```
+python Main.py
+```
+
