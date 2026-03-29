@@ -1,11 +1,13 @@
-import numpy as np
-import pickle
 import os
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+import pickle
+import numpy as np
 from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier  # 新增AdaBoost
 from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import KNeighborsClassifier  # 新增KNN
+from sklearn.tree import DecisionTreeClassifier  # 新增决策树
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 import joblib
 
@@ -25,7 +27,7 @@ class GestureClassifier:
             self.load_model(model_path)
 
     def create_model(self):
-        """创建分类模型"""
+        """创建分类模型（作业扩展：新增KNN/决策树/Adaboost）"""
         if self.model_type == 'svm':
             self.model = SVC(
                 kernel='rbf',
@@ -49,6 +51,15 @@ class GestureClassifier:
                 max_iter=1000,
                 random_state=42
             )
+        # 作业新增：KNN算法
+        elif self.model_type == 'knn':
+            self.model = KNeighborsClassifier(n_neighbors=5, n_jobs=-1)
+        # 作业新增：决策树算法
+        elif self.model_type == 'decision_tree':
+            self.model = DecisionTreeClassifier(max_depth=8, random_state=42)
+        # 作业新增：Adaboost算法
+        elif self.model_type == 'ada_boost':
+            self.model = AdaBoostClassifier(n_estimators=50, random_state=42)
         else:
             raise ValueError(f"未知的模型类型: {self.model_type}")
 
