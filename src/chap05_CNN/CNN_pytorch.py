@@ -143,8 +143,8 @@ def test(cnn):
 
 # 训练函数
 def train(cnn):
-    # 使用Adam优化器，学习率为learning_rate
-    optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
+    # 使用Adam优化器，学习率为learning_rate，并添加L2正则化（weight_decay）
+    optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate, weight_decay=1e-4)
     # 使用交叉熵损失函数
     loss_func = nn.CrossEntropyLoss()
 
