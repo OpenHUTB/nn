@@ -1,0 +1,3 @@
+SMATO - Image-based Pedestrian Smartphone Usage Classification
+核心任务：从图像 / 视频中自动识别行人是否在使用手机，并分类具体行为。
+目标：辅助自动驾驶、智能监控系统判断行人分心状态，提升道路安全。
