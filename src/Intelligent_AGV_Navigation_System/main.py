@@ -121,7 +121,7 @@ def update():
     )
     canvas.create_text(20,20,text=text,fill="#00ff00",font=("Consolas",13,"bold"),anchor="w")
 
-    # =============== 【动态标题】 ===============
+    # =============== 【标题】 ===============
     canvas.create_text(550,70,text=" 智能无人小车自动导航系统",fill="#ffffff",font=("黑体",20,"bold"))
 
     root.after(30, update)
