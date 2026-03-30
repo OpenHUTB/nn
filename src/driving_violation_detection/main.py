@@ -13,9 +13,25 @@ import pygame  # Import pygame for keyboard input handling
 pygame.init()
 screen = pygame.display.set_mode((400, 300))
 
+# 当前文件目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 向上回到 Git 目录
+project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
+
+# 拼接 carla 路径
+carla_egg_path = os.path.join(
+    project_root,
+    'Carla',
+    'WindowsNoEditor',
+    'PythonAPI',
+    'carla',
+    'dist',
+    'carla-0.9.11-py3.7-win-amd64.egg'
+)
+
+
 # Define the path to the CARLA Egg file
-carla_egg_path = glob.glob(
-    r'D:\software\Carla\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.11-py3.7-win-amd64.egg')[0]
 sys.path.append(carla_egg_path)
 
 import carla
