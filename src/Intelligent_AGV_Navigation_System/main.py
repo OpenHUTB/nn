@@ -99,7 +99,7 @@ def update():
         s = p["size"]
         canvas.create_oval(x-s,y-s,x+s,y+s,fill="#00ffff")
 
-    # =============== 【绘制：小车（带箭头车头）】 ===============
+    # =============== 【绘制：小车】 ===============
     cx, cy = project(car_x, car_y)
     hx = cx + math.sin(car_angle) * 40
     hy = cy + math.cos(car_angle) * 40
