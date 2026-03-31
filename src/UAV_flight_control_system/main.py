@@ -74,7 +74,7 @@ def on_press(key):
 def on_release(key):
     client.moveByVelocityBodyFrameAsync(0, 0, 0, 0.05)
 
-# ======================= 启动键盘监听 =======================
+# ======================= 键盘监听 =======================
 listener = keyboard.Listener(on_press=on_press, on_release=on_release)
 listener.start()
 
