@@ -5,9 +5,9 @@ sendToGPU = True
 paused = False
 activate_deleter = False # global variable to close cleanly the application
 fixed_delta_seconds = 0.05 # to maintain constant delta time in every client
-imagenet_weights_path = f'{os.getcwd()}/utils/imagenet1000_clsid_to_human.pkl'
-carla_logo = f'{os.getcwd()}/utils/Carla-Simulator-CAM-Logo.png'
-gui_cam_logo = f'{os.getcwd()}/utils/GUI-CAM-Logo.png'
+imagenet_weights_path = './utils/imagenet1000_clsid_to_human.pkl'
+carla_logo = './utils/Carla-Simulator-CAM-Logo.png'
+gui_cam_logo = './utils/GUI-CAM-Logo.png'
 if os.name == 'nt':
     # Configure your Windows environment
     unreal_engine_path = r"C:\Users\pablo\CARLA_0.9.13\Carla\CarlaUE4.exe"

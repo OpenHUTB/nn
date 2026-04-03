@@ -14,7 +14,7 @@ import sys
 import time
 
 print('current path is %s', os.getcwd())
-sys.path.append(f'{os.getcwd()}/visualizer')
+sys.path.append('./visualizer')
 
 import parameters
 

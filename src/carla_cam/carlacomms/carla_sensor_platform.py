@@ -28,7 +28,7 @@ except IndexError:
 # -- Add PythonAPI for release mode --------------------------------------------
 # ==============================================================================
 try:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + '/carla')
+    sys.path.append('../carla')
 except IndexError:
     pass
 
