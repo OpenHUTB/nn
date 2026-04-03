@@ -1,11 +1,60 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
-
+# Dependabot 配置
+# 文档：https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
 version: 2
 updates:
-  - package-ecosystem: "pip" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  # Python 依赖更新
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"        # 每周检查一次
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    # 自动合并的条件
+    automerge:
+      enabled: true
+      # 只自动合并 development 依赖的 patch 版本
+      types:
+        - "version-update:semver-patch"
+        - "version-update:semver-minor"
+    # 允许更新的依赖类型
+    allow:
+      # 保持生产依赖最新
+      - dependency-name: "mkdocs*"
+      - dependency-name: "pymdown-*"
+      - dependency-name: "python-markdown-math"
+      - dependency-name: "mkdocs-material*"
+    # 忽略特定依赖（使用静态版本或手动管理）
+    ignore:
+      - dependency-name: "mkdocs-material"
+        # 跳过 patch 更新，只关注 minor/major
+        update-types:
+          - "version-update:semver-patch"
+
+  # GitHub Actions 依赖更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "ci"
+      - "automated"
+    # 自动合并 Actions 的 patch 更新
+    automerge:
+      enabled: true
+      types:
+        - "version-update:semver-patch"
