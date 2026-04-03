@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- CARLA ROS Bridge节点 -->
+    <node pkg="carla_yolo_ros" type="carla_ros_bridge.py" name="carla_bridge" output="screen">
+        <!-- 仿真模式: ros_only, carla_only, hybrid -->
+        <param name="simulation_mode" value="ros_only" />
+        <param name="publish_rate" value="10.0" />
+        
+        <!-- CARLA连接参数 -->
+        <param name="carla_host" value="127.0.0.1" />
+        <param name="carla_port" value="2000" />
+        <param name="carla_timeout" value="10.0" />
+        <param name="synchronous_mode" value="false" />
+        <param name="fixed_delta_seconds" value="0.05" />
+    </node>
+    
+    <!-- 测试图像发布器 -->
+    <node pkg="carla_yolo_ros" type="test_image_publisher.py" name="test_image_publisher" output="screen">
+        <param name="publish_rate" value="5.0" />
+        <param name="width" value="640" />
+        <param name="height" value="480" />
+    </node>
+    
+    <!-- 键盘遥操作 -->
+    <node pkg="carla_yolo_ros" type="teleop_keyboard.py" name="teleop_keyboard" output="screen" launch-prefix="xterm -e">
+        <param name="linear_speed" value="0.5" />
+        <param name="angular_speed" value="0.5" />
+    </node>
+    
+    <!-- RQT图像查看器 -->
+    <node pkg="rqt_image_view" type="rqt_image_view" name="rqt_image_view" args="/carla/detection_image" />
+    
+    <!-- RQT多功能GUI -->
+    <node pkg="rqt_gui" type="rqt_gui" name="rqt_gui" args="--perspective-file $(find carla_yolo_ros)/config/carla.perspective" />
+</launch>

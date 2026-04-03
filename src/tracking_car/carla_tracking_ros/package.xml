@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>carla_tracking_ros</name>
+  <version>1.0.0</version>
+  <description>CARLA Multi-Object Tracking System - ROS Integration</description>
+
+  <maintainer email="tjl@todo.todo">tjl</maintainer>
+  <license>MIT</license>
+  
+  <url type="website">https://github.com/yourusername/carla_tracking_ros</url>
+  <author email="tjl@todo.todo">tjl</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>cv_bridge</depend>
+  <depend>image_transport</depend>
+  
+  <!-- 消息和服务依赖 -->
+  <depend>message_generation</depend>
+  <depend>message_runtime</depend>
+  
+  <!-- 测试依赖 -->
+  <test_depend>rosunit</test_depend>
+
+  <export>
+    <rosdoc config="rosdoc.yaml" />
+  </export>
+</package>

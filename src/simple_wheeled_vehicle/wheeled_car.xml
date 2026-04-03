@@ -1,0 +1,491 @@
+<?xml version="1.0"?>
+<!--
+  MuJoCo 模型文件：cam_plus_front_obstacle.xml
+  功能：定义一个带摄像头的轮式小车和多样化障碍物环境的仿真场景
+  作者：智能小车仿真系统
+  版本：2.0
+-->
+
+<mujoco model="cam_plus_front_obstacle">
+
+  <!-- ==================== 仿真配置 ==================== -->
+  <option timestep="0.002" integrator="Euler"/>
+  <!--
+    timestep: 仿真步长，单位秒，越小越精确但计算量越大
+    integrator: 积分器类型，Euler为欧拉法，简单快速
+  -->
+
+  <compiler angle="radian" coordinate="local" autolimits="false"/>
+  <!--
+    angle: 角度单位，radian表示使用弧度
+    coordinate: 坐标系类型，local表示本地坐标系
+    autolimits: 是否自动设置关节限制，false表示手动设置
+  -->
+
+  <!-- ==================== 资源定义 ==================== -->
+  <asset>
+    <!-- 纹理定义 -->
+    <texture name="wheel" type="2d" builtin="checker"
+             rgb1="0.1 0.1 0.1" rgb2="0.2 0.2 0.2"
+             width="128" height="128"/>
+    <!--
+      name: 纹理名称，用于后续引用
+      type: 纹理类型，2d表示二维纹理
+      builtin: 内置纹理类型，checker表示棋盘格
+      rgb1/rgb2: 两种颜色值 (红,绿,蓝)
+      width/height: 纹理分辨率
+    -->
+
+    <texture name="grid" type="2d" builtin="checker"
+             width="512" height="512"
+             rgb1="0.6 0.6 0.6" rgb2="0.8 0.8 0.8"/>
+    <!-- 地面网格纹理 -->
+
+    <!-- 材质定义 -->
+    <material name="wheel" texture="wheel" texuniform="true" reflectance="0.2"/>
+    <!--
+      name: 材质名称
+      texture: 使用的纹理名称
+      texuniform: 纹理是否均匀
+      reflectance: 反射率，控制光反射强度
+    -->
+
+    <material name="grid" texture="grid" texuniform="true" reflectance="0.2"/>
+    <!-- 地面网格材质 -->
+
+    <!-- 障碍物颜色材质 -->
+    <material name="obs" rgba="0.2 0.4 0.8 1"/>
+    <!-- rgba: 颜色和透明度 (红,绿,蓝,透明度) -->
+    <material name="obs_red" rgba="0.8 0.2 0.2 1"/>
+    <material name="obs_green" rgba="0.2 0.8 0.2 1"/>
+    <material name="obs_yellow" rgba="0.9 0.9 0.2 1"/>
+    <material name="obs_purple" rgba="0.6 0.2 0.8 1"/>
+
+    <!-- 墙壁材质 -->
+    <material name="wall" rgba="0.5 0.5 0.5 1"/>
+    <material name="wall_dark" rgba="0.3 0.3 0.3 1"/>
+    <material name="wall_light" rgba="0.7 0.7 0.7 1"/>
+  </asset>
+
+  <!-- ==================== 默认参数 ==================== -->
+  <default>
+    <!-- 轮子默认类 -->
+    <default class="wheel">
+      <geom type="sphere" size="0.04" material="wheel"
+            mass="0.25" friction="1.0 0.005 0.005"/>
+      <!--
+        type: 几何体类型，sphere表示球体
+        size: 尺寸，球体半径为0.04米
+        mass: 质量，单位kg
+        friction: 摩擦系数 (滑动摩擦, 滚动摩擦, 扭转摩擦)
+      -->
+    </default>
+
+    <!-- 悬架臂默认类 -->
+    <default class="arm">
+      <joint type="hinge" axis="0 1 0" damping="12" stiffness="60"
+             range="-0.02 0.04" limited="true"/>
+      <!--
+        type: 关节类型，hinge表示铰链关节
+        axis: 旋转轴向量 (x,y,z)
+        damping: 阻尼系数，抑制振荡
+        stiffness: 刚度系数，模拟弹簧
+        range: 运动范围 (最小值, 最大值)
+        limited: 是否限制运动范围
+      -->
+    </default>
+
+    <!-- 转向关节默认类 -->
+    <default class="steer">
+      <joint type="hinge" axis="0 0 1" damping="5" limited="false"/>
+      <!--
+        axis: (0,0,1) 表示绕Z轴旋转，用于转向
+        limited: false表示无角度限制
+      -->
+    </default>
+
+    <!-- 驱动电机默认类 -->
+    <default class="drive">
+      <motor ctrlrange="-0.8 0.8" ctrllimited="true" gear="60"/>
+      <!--
+        ctrlrange: 控制信号范围 (最小值, 最大值)
+        ctrllimited: 是否限制控制信号
+        gear: 齿轮比，电机输出扭矩的放大倍数
+      -->
+    </default>
+
+    <!-- 伺服电机默认类 -->
+    <default class="servo">
+      <motor ctrlrange="-0.3 0.3" ctrllimited="true" gear="15"/>
+      <!--
+        转向电机，扭矩较小，控制范围较小
+      -->
+    </default>
+  </default>
+
+  <!-- ==================== 世界主体 ==================== -->
+  <worldbody>
+    <!-- 地板 -->
+    <geom name="floor" type="plane" size="12 12 0.1" material="grid"/>
+    <!--
+      type: plane表示无限平面
+      size: 平面尺寸 (x半宽, y半宽, z高度)
+    -->
+
+    <!-- 边界墙壁 -->
+    <geom name="border_north" type="box" pos="0 6 0.15" size="12 0.1 0.15" material="wall_dark"/>
+    <!--
+      type: box表示长方体
+      pos: 位置 (x, y, z)
+      size: 半尺寸 (x半宽, y半宽, z半高)
+    -->
+    <geom name="border_south" type="box" pos="0 -6 0.15" size="12 0.1 0.15" material="wall_dark"/>
+    <geom name="border_east" type="box" pos="6 0 0.15" size="0.1 6 0.15" material="wall_dark"/>
+    <geom name="border_west" type="box" pos="-6 0 0.15" size="0.1 6 0.15" material="wall_dark"/>
+
+    <!-- ==================== 迷宫墙结构 ==================== -->
+
+    <!-- 第一区域：Z字形通道 -->
+    <body name="maze_wall1" pos="-2 3 0.1">
+      <!--
+        name: 物体名称
+        pos: 相对父坐标系的位置
+      -->
+      <geom type="box" size="0.05 1.5 0.1" material="wall_light"/>
+    </body>
+
+    <body name="maze_wall2" pos="0 1.5 0.1">
+      <geom type="box" size="1.0 0.05 0.1" material="wall_light"/>
+    </body>
+
+    <body name="maze_wall3" pos="2 -0.5 0.1">
+      <geom type="box" size="0.05 1.0 0.1" material="wall_light"/>
+    </body>
+
+    <!-- 第二区域：交叉路口 -->
+    <body name="cross_wall1" pos="-3 -2 0.1">
+      <geom type="box" size="0.8 0.05 0.1" material="wall"/>
+    </body>
+
+    <body name="cross_wall2" pos="-3.8 -2.8 0.1">
+      <geom type="box" size="0.05 0.8 0.1" material="wall"/>
+    </body>
+
+    <body name="cross_wall3" pos="-2.2 -3.2 0.1">
+      <geom type="box" size="0.05 0.8 0.1" material="wall"/>
+    </body>
+
+    <!-- ==================== 多样化的静态障碍物 ==================== -->
+
+    <!-- 大型障碍物 -->
+    <body name="large_obstacle1" pos="-4 4 0.2">
+      <geom type="box" size="0.25 0.25 0.2" material="obs_red" mass="2.0"/>
+    </body>
+
+    <body name="large_obstacle2" pos="4 -4 0.15">
+      <geom type="box" size="0.3 0.15 0.15" material="obs_yellow" mass="1.8"/>
+    </body>
+
+    <!-- 中型障碍物 -->
+    <body name="medium_obstacle1" pos="1.5 2.5 0.08">
+      <geom type="box" size="0.15 0.15 0.08" material="obs_green" mass="1.0"/>
+    </body>
+
+    <body name="medium_obstacle2" pos="-1.5 -2.5 0.08">
+      <geom type="box" size="0.18 0.12 0.08" material="obs_purple" mass="1.2"/>
+    </body>
+
+    <!-- 小型障碍物（集群） -->
+    <body name="small_obstacle1" pos="3 0.5 0.05">
+      <geom type="box" size="0.08 0.08 0.05" material="obs" mass="0.5"/>
+    </body>
+
+    <body name="small_obstacle2" pos="3.2 0.8 0.05">
+      <geom type="box" size="0.06 0.06 0.05" material="obs_green" mass="0.4"/>
+    </body>
+
+    <body name="small_obstacle3" pos="2.8 0.2 0.05">
+      <geom type="box" size="0.07 0.07 0.05" material="obs_red" mass="0.45"/>
+    </body>
+
+    <!-- 圆形/球形障碍物 -->
+    <body name="sphere_obstacle1" pos="-3.5 1.5 0.07">
+      <geom type="sphere" size="0.1" material="obs_yellow" mass="0.8"/>
+      <!--
+        type: sphere表示球体
+        size: 球体半径
+      -->
+    </body>
+
+    <body name="sphere_obstacle2" pos="2 -3 0.06">
+      <geom type="sphere" size="0.08" material="obs_purple" mass="0.6"/>
+    </body>
+
+    <body name="sphere_obstacle3" pos="0 4 0.07">
+      <geom type="sphere" size="0.09" material="obs_green" mass="0.7"/>
+    </body>
+
+    <!-- 圆柱体障碍物 -->
+    <body name="cylinder_obstacle1" pos="-1 4 0.1">
+      <geom type="cylinder" size="0.07 0.12" material="obs_red" mass="1.0"/>
+      <!--
+        type: cylinder表示圆柱体
+        size: (半径, 半高)
+      -->
+    </body>
+
+    <body name="cylinder_obstacle2" pos="4 2 0.1">
+      <geom type="cylinder" size="0.09 0.15" material="obs" mass="1.3"/>
+    </body>
+
+    <!-- ==================== 通道障碍（需要精确导航） ==================== -->
+    <body name="gate_wall1" pos="0.5 -4 0.1">
+      <geom type="box" size="0.05 0.5 0.1" material="wall_light"/>
+    </body>
+
+    <body name="gate_wall2" pos="-0.5 -4 0.1">
+      <geom type="box" size="0.05 0.5 0.1" material="wall_light"/>
+    </body>
+
+    <body name="gate_center" pos="0 -4.5 0.07">
+      <geom type="box" size="0.5 0.05 0.07" material="wall"/>
+    </body>
+
+    <!-- ==================== 动态障碍物预留位置 ==================== -->
+    <body name="dynamic_area_marker1" pos="5 0 0.02">
+      <!--
+        标记区域，用于未来添加动态障碍物
+        contype="0": 无碰撞检测
+        conaffinity="0": 无碰撞响应
+      -->
+      <geom type="box" size="0.2 1.5 0.02" rgba="0.9 0.9 0.2 0.3"
+            contype="0" conaffinity="0"/>
+    </body>
+
+    <body name="dynamic_area_marker2" pos="-5 0 0.02">
+      <geom type="box" size="0.2 1.5 0.02" rgba="0.9 0.9 0.2 0.3"
+            contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- ==================== 目标区域 ==================== -->
+    <body name="target_zone" pos="5.5 5.5 0.01">
+      <!--
+        目标区域，小车需要到达的位置
+        rgba: 半透明绿色，表示可通过区域
+      -->
+      <geom type="cylinder" size="0.3 0.01" rgba="0.2 0.8 0.2 0.4"
+            contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- ==================== 原有障碍物（保留兼容性） ==================== -->
+    <body name="obs_box1" pos="1.0 0.5 0.05">
+      <geom type="box" size="0.15 0.15 0.15" material="obs" mass="1"/>
+    </body>
+
+    <body name="obs_box2" pos="-1.2 1.2 0.05">
+      <geom type="box" size="0.12 0.12 0.12" material="obs" mass="0.8"/>
+    </body>
+
+    <body name="obs_box3" pos="0 -1.8 0.05">
+      <geom type="box" size="0.18 0.18 0.18" material="obs" mass="1.2"/>
+    </body>
+
+    <body name="obs_box4" pos="2.0 -1.0 0.05">
+      <geom type="box" size="0.10 0.20 0.10" material="obs" mass="0.9"/>
+    </body>
+
+    <!-- 球形障碍物 -->
+    <body name="obs_ball1" pos="-1.0 -1.0 0.04">
+      <geom type="sphere" size="0.08" material="obs" mass="0.6"/>
+    </body>
+
+    <body name="obs_ball2" pos="2.2 1.3 0.04">
+      <geom type="sphere" size="0.06" material="obs" mass="0.4"/>
+    </body>
+
+    <body name="obs_ball3" pos="-2.0 0.5 0.04">
+      <geom type="sphere" size="0.10" material="obs" mass="0.8"/>
+    </body>
+
+    <!-- 墙壁障碍物 -->
+    <body name="wall1" pos="0 2.5 0.02">
+      <geom type="box" size="0.8 0.05 0.04" material="wall" mass="0.5"/>
+    </body>
+
+    <body name="wall2" pos="-2.5 -0.5 0.02">
+      <geom type="box" size="0.05 0.8 0.04" material="wall" mass="0.5"/>
+    </body>
+
+    <!-- ==================== 前方新增障碍物 ==================== -->
+    <body name="front_dark_box" pos="2.1 0 0.05">
+      <geom type="box" size="0.15 0.15 0.15" material="obs" mass="1"/>
+    </body>
+
+    <!-- ==================== 小车模型 ==================== -->
+    <body name="chassis" pos="0 0 0.03">
+      <!-- 小车底盘主体 -->
+      <freejoint/>
+      <!--
+        freejoint: 自由关节，允许6自由度运动 (3平移 + 3旋转)
+        小车在空间中完全自由移动
+      -->
+
+      <!-- 底盘几何体 -->
+      <geom name="body" type="box" size="0.18 0.22 0.02" pos="0 0 -0.02"
+            rgba="0.9 0.2 0.2 1" mass="3"/>
+      <!--
+        主车身，红色不透明
+        pos: 相对于body坐标系的位置偏移
+      -->
+
+      <!-- 视觉边框（无碰撞） -->
+      <geom type="box" size="0.18 0.22 0.04" rgba="0.9 0.2 0.2 1"
+            contype="0" conaffinity="0"/>
+      <!--
+        仅用于视觉显示，增加车身高度感
+        无碰撞属性，不影响物理仿真
+      -->
+
+      <!-- ==================== 前左轮总成 ==================== -->
+      <body name="front_left_hub" pos="0.16 0.17 0">
+        <!--
+          前左轮毂位置
+          pos: 相对于底盘的位置 (右前角)
+        -->
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <!--
+          inertial: 惯性属性
+          diaginertia: 对角惯性矩 (Ixx, Iyy, Izz)
+        -->
+
+        <!-- 转向关节 -->
+        <joint name="fl_steer" class="steer"/>
+        <!--
+          class="steer": 使用steer类定义的默认参数
+          控制前轮转向角度
+        -->
+
+        <!-- 悬架臂 -->
+        <body name="fl_arm" pos="0 0 0">
+          <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+
+          <!-- 悬架关节（上下运动） -->
+          <joint name="fl_arm_hinge" axis="0 1 0" damping="12" stiffness="60"
+                 range="-0.02 0.04" limited="true"/>
+          <!--
+            模拟悬架弹簧阻尼系统
+            range: 允许的垂直运动范围
+          -->
+
+          <!-- 轮子 -->
+          <body name="fl_wheel" pos="0 0 -0.04">
+            <!--
+              轮子位置，相对于悬架臂向下偏移
+            -->
+            <joint name="fl_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+            <!--
+              驱动关节，绕Y轴旋转
+              damping: 较小阻尼，允许自由旋转
+            -->
+            <geom class="wheel" pos="0 0 0"/>
+            <!-- 使用wheel类定义的默认轮子几何体 -->
+          </body>
+        </body>
+      </body>
+
+      <!-- ==================== 前右轮总成 ==================== -->
+      <body name="front_right_hub" pos="0.16 -0.17 0">
+        <!-- 前右轮毂位置 -->
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <joint name="fr_steer" class="steer"/>
+
+        <body name="fr_arm" pos="0 0 0">
+          <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+          <joint name="fr_arm_hinge" axis="0 1 0" damping="12" stiffness="60"
+                 range="-0.02 0.04" limited="true"/>
+
+          <body name="fr_wheel" pos="0 0 -0.04">
+            <joint name="fr_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+            <geom class="wheel" pos="0 0 0"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- ==================== 后左轮总成 ==================== -->
+      <body name="rear_left" pos="-0.16 0.17 0">
+        <!-- 后轮无转向功能，只有悬架和驱动 -->
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+
+        <!-- 后悬架关节 -->
+        <joint name="rl_arm_hinge" axis="0 1 0" damping="12" stiffness="60"
+               range="-0.02 0.04" limited="true"/>
+
+        <!-- 后轮 -->
+        <body name="rl_wheel" pos="0 0 -0.04">
+          <joint name="rl_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+          <geom class="wheel" pos="0 0 0"/>
+        </body>
+      </body>
+
+      <!-- ==================== 后右轮总成 ==================== -->
+      <body name="rear_right" pos="-0.16 -0.17 0">
+        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-4 1e-4 1e-4"/>
+        <joint name="rr_arm_hinge" axis="0 1 0" damping="12" stiffness="60"
+               range="-0.02 0.04" limited="true"/>
+
+        <body name="rr_wheel" pos="0 0 -0.04">
+          <joint name="rr_drive" type="hinge" axis="0 1 0" damping="0.1"/>
+          <geom class="wheel" pos="0 0 0"/>
+        </body>
+      </body>
+
+      <!-- ==================== 摄像头系统 ==================== -->
+      <body name="cam" pos="0.15 0 0.08" quat="0.819 0.573 0 0">
+        <!--
+          pos: 摄像头位置（车身前部上方）
+          quat: 四元数，定义摄像头朝向 (倾斜向下，向前看)
+          四元数格式: (w, x, y, z)
+        -->
+
+        <!-- 摄像头传感器 -->
+        <camera name="track" mode="fixed" pos="0 0 0" xyaxes="1 0 0  0 0 1" fovy="60"/>
+        <!--
+          mode: 摄像头模式，fixed表示固定位置
+          xyaxes: 摄像头坐标系定义
+          fovy: 垂直视野角度，单位度
+        -->
+
+        <!-- 摄像头视觉标记（绿色小方块） -->
+        <geom type="box" size="0.01 0.02 0.01" rgba="0 1 0 1"
+              contype="0" conaffinity="0"/>
+        <!--
+          仅视觉标记，无碰撞属性
+          帮助识别摄像头位置
+        -->
+      </body>
+    </body>
+  </worldbody>
+
+  <!-- ==================== 执行器定义 ==================== -->
+  <actuator>
+    <!-- 转向电机 -->
+    <motor name="steer_fl" joint="fl_steer" class="servo"/>
+    <!--
+      name: 执行器名称
+      joint: 控制的关节名称
+      class: 使用的默认参数类
+    -->
+    <motor name="steer_fr" joint="fr_steer" class="servo"/>
+
+    <!-- 驱动电机 -->
+    <motor name="drive_fl" joint="fl_drive" class="drive"/>
+    <motor name="drive_fr" joint="fr_drive" class="drive"/>
+    <motor name="drive_rl" joint="rl_drive" class="drive"/>
+    <motor name="drive_rr" joint="rr_drive" class="drive"/>
+    <!--
+      四轮驱动系统，每个轮子都有独立的驱动电机
+      实现全轮驱动控制
+    -->
+  </actuator>
+
+</mujoco>
