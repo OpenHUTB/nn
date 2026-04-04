@@ -35,21 +35,9 @@ obs = env.reset()
 
 # 定义一个简单的动作策略
 def get_action(env, obs):
-    """随机选择简单的手动动作或自动驾驶动作。"""
-    p = random.random()
-    if p < 0.5:
-        # 使用自动驾驶（专家模式）
-        env.ego.set_autopilot(True)
-        control = env.ego.get_control()
-        action = [control.throttle, control.steer, control.brake]
-    else:
-        # 使用随机动作（新手模式）
-        env.ego.set_autopilot(False)
-        throttle = random.uniform(0.0, 1.0)
-        steer = random.uniform(-0.6, 0.6)
-        brake = random.uniform(0.0, 0.3)
-        action = [throttle, steer, brake]
-    return action
+    env.ego.set_autopilot(True)
+    control = env.ego.get_control()
+    return [control.throttle, control.steer, control.brake]
 
 # 与环境交互
 for episode in range(5):  # 运行 5 个 episode
