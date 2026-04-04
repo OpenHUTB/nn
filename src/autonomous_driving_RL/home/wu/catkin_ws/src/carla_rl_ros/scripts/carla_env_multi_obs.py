@@ -18,6 +18,19 @@ from gymnasium import Env, spaces
 VEHICLE_ID_FILE = ".last_vehicle_id.json"
 
 
+def _actor_alive(actor):
+    """兼容 CARLA 不同 Python API 中 is_alive 为方法或属性的情况。"""
+    if actor is None:
+        return False
+    alive = getattr(actor, "is_alive", None)
+    if callable(alive):
+        try:
+            return bool(alive())
+        except Exception:
+            return False
+    return bool(alive)
+
+
 class CarlaEnvMultiObs(Env):
     def __init__(
         self,
@@ -29,7 +42,9 @@ class CarlaEnvMultiObs(Env):
         map_name=None,             # 指定地图（如 'Town10HD'）
         spawn_point_index=0,       # spawn 点索引
         random_spawn=False,        # 是否随机 spawn
-        reward_weights=None        # 奖励权重配置
+        reward_weights=None,       # 奖励权重配置
+        carla_host=None,           # None 时使用环境变量 CARLA_HOST，默认 localhost
+        carla_port=None,           # None 时使用环境变量 CARLA_PORT，默认 2000
     ):
         super().__init__()
         self.client = None
@@ -64,6 +79,8 @@ class CarlaEnvMultiObs(Env):
         self.map_name = map_name
         self.spawn_point_index = spawn_point_index
         self.random_spawn = random_spawn
+        self._carla_host = carla_host if carla_host is not None else os.environ.get("CARLA_HOST", "localhost")
+        self._carla_port = int(carla_port) if carla_port is not None else int(os.environ.get("CARLA_PORT", "2000"))
 
         # 固定 4D 观测空间
         self.observation_space = spaces.Box(
@@ -79,7 +96,7 @@ class CarlaEnvMultiObs(Env):
         for attempt in range(max_retries):
             try:
                 print(f"🔄 尝试连接 CARLA 服务器 (第 {attempt + 1} 次)...")
-                self.client = carla.Client('localhost', 2000)
+                self.client = carla.Client(self._carla_host, self._carla_port)
                 self.client.set_timeout(timeout)
                 self.world = self.client.get_world()
                 if self.map_name and self.map_name not in self.world.get_map().name:
@@ -130,7 +147,7 @@ class CarlaEnvMultiObs(Env):
         if not os.path.exists(VEHICLE_ID_FILE):
             return
         try:
-            with open(VEHICLE_ID_FILE, 'r') as f:
+            with open(VEHICLE_ID_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 last_id = data.get("vehicle_id")
             if isinstance(last_id, int):
@@ -181,7 +198,7 @@ class CarlaEnvMultiObs(Env):
         print(f"✅ 车辆生成成功 | ID={self._current_vehicle_id} | ({loc.x:.1f}, {loc.y:.1f})")
 
         try:
-            with open(VEHICLE_ID_FILE, 'w') as f:
+            with open(VEHICLE_ID_FILE, 'w', encoding='utf-8') as f:
                 json.dump({"vehicle_id": self._current_vehicle_id}, f)
         except Exception as e:
             print(f"⚠️ 保存车辆ID失败: {e}")
@@ -199,7 +216,7 @@ class CarlaEnvMultiObs(Env):
             pass
 
     def get_observation(self):
-        if not self.vehicle or not self.vehicle.is_alive:
+        if not _actor_alive(self.vehicle):
             return np.zeros(4, dtype=np.float32)
         loc = self.vehicle.get_location()
         vel = self.vehicle.get_velocity()
@@ -217,7 +234,7 @@ class CarlaEnvMultiObs(Env):
                 self.vehicle.get_location(), project_to_road=True
             )
             return self.vehicle.get_location().distance(waypoint.transform.location)
-        except:
+        except Exception:
             return 5.0  # 默认远离车道
 
     def _compute_reward(self, speed, lane_offset, action):
@@ -263,7 +280,7 @@ class CarlaEnvMultiObs(Env):
         self._update_spectator_view()
 
         # 车辆死亡
-        if not self.vehicle or not self.vehicle.is_alive:
+        if not _actor_alive(self.vehicle):
             obs = np.zeros(4, dtype=np.float32)
             return obs, self.reward_weights['collision'], True, False, {}
 
@@ -298,11 +315,11 @@ class CarlaEnvMultiObs(Env):
 
     def get_vehicle_transform(self):
         """安全获取车辆当前位姿（Transform）"""
-        if not self.vehicle or not self.vehicle.is_alive:
+        if not _actor_alive(self.vehicle):
             return None
         try:
             return self.vehicle.get_transform()
-        except:
+        except Exception:
             return None
 
     def get_forward_waypoint(self, distance=3.0):
@@ -337,7 +354,7 @@ class CarlaEnvMultiObs(Env):
         # 保存轨迹
         if self.log_trajectory and self.trajectory_data:
             try:
-                with open(self.trajectory_log_file, 'w') as f:
+                with open(self.trajectory_log_file, 'w', encoding='utf-8', newline='') as f:
                     f.write("x,y,speed\n")
                     for x, y, speed in self.trajectory_data:
                         f.write(f"{x:.3f},{y:.3f},{speed:.3f}\n")
@@ -348,7 +365,7 @@ class CarlaEnvMultiObs(Env):
         # 清理
         if self._collision_sensor:
             self._collision_sensor.destroy()
-        if not self.keep_alive and self.vehicle and self.vehicle.is_alive:
+        if not self.keep_alive and _actor_alive(self.vehicle):
             self.vehicle.destroy()
         elif self.keep_alive:
             print("ℹ️ 车辆已保留（下次运行将自动清理）")

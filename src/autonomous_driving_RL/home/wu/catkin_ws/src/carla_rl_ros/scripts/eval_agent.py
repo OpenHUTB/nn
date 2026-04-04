@@ -32,7 +32,13 @@ def parse_targets(target_str):
         return []
     targets = []
     for pair in target_str.split(";"):
-        x, y = map(float, pair.split(","))
+        pair = pair.strip()
+        if not pair:
+            continue
+        parts = pair.split(",")
+        if len(parts) != 2:
+            raise ValueError(f"目标点格式错误，应为 x,y：{pair!r}")
+        x, y = map(float, parts)
         targets.append(carla.Location(x=x, y=y, z=0.0))
     return targets
 

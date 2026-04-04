@@ -6,14 +6,13 @@
 import os
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from carla_env.carla_env_multi_obs import CarlaEnvMultiObs
+from carla_env_multi_obs import CarlaEnvMultiObs
 
 if __name__ == "__main__":
     # 创建环境
     env = CarlaEnvMultiObs(
         random_spawn=True,
         max_episode_steps=1000,
-        debug=False
     )
 
     # 日志和模型保存路径

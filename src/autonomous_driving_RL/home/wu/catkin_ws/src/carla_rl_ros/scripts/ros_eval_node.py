@@ -7,7 +7,6 @@ Patches CarlaEnv to support remote CARLA server via ROS params.
 import rospy
 import sys
 import os
-import carla
 # 添加当前目录到 Python 路径
 sys.path.append(os.path.dirname(__file__))
 
@@ -16,25 +15,11 @@ import carla_env_multi_obs
 
 _original_init = carla_env_multi_obs.CarlaEnvMultiObs.__init__
 
-def _patched_init(self):
-    carla_host = rospy.get_param('~carla_host', 'localhost')
-    carla_port = rospy.get_param('~carla_port', 2000)
-    for attempt in range(3):
-        try:
-            rospy.loginfo(f"Connecting to CARLA at {carla_host}:{carla_port}")
-            self.client = carla.Client(carla_host, carla_port)
-            self.client.set_timeout(10.0)
-            self.world = self.client.get_world()
-            break
-        except Exception as e:
-            rospy.logwarn(f"Connection failed: {e}")
-            if attempt == 2:
-                raise Exception("Failed to connect to CARLA after 3 attempts")
+def _patched_init(self, *args, **kwargs):
+    kwargs.setdefault('carla_host', rospy.get_param('~carla_host', 'localhost'))
+    kwargs.setdefault('carla_port', int(rospy.get_param('~carla_port', 2000)))
+    _original_init(self, *args, **kwargs)
 
-    # 调用原始 __init__ 完成其余初始化
-    _original_init(self)
-
-# 替换原方法
 carla_env_multi_obs.CarlaEnvMultiObs.__init__ = _patched_init
 
 if __name__ == '__main__':
