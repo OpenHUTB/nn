@@ -11,14 +11,14 @@ import numpy as np
 
 # 配置环境参数
 params = {
-    'number_of_vehicles': 100,
+    'number_of_vehicles': 20,
     'number_of_walkers': 0,
     'dt': 0.1,  # 两帧之间的时间间隔
     'ego_vehicle_filter': 'vehicle.tesla.model3',  # 用于定义自车的车辆过滤器
     'surrounding_vehicle_spawned_randomly': True, # 周围车辆是否随机生成（True）或手动设置（False）
     'port': 2000,  # 连接端口
     'town': 'Town03',  # 要模拟的城市场景
-    'max_time_episode': 1000,  # 每个 episode 的最大时间步数
+    'max_time_episode': 300,  # 每个 episode 的最大时间步数
     'max_waypoints': 12,  # 最大路点数量
     'visualize_waypoints': True,  # 是否可视化路点（默认：True）
     'desired_speed': 8,  # 期望速度（米/秒）
@@ -31,7 +31,13 @@ params = {
 
 # 创建环境
 env = gym.make('carla-v0', params=params)
-obs = env.reset()
+
+reset_result = env.reset()
+if isinstance(reset_result, tuple):
+    obs, info = reset_result
+else:
+    obs = reset_result
+    info = {}
 
 # 定义一个简单的动作策略
 def get_action(env, obs):
@@ -40,20 +46,47 @@ def get_action(env, obs):
     return [control.throttle, control.steer, control.brake]
 
 # 与环境交互
-for episode in range(5):  # 运行 5 个 episode
-    obs = env.reset()
-    done = False
-    total_reward = 0
+try:
+    for episode in range(5):  # 运行 5 个 episode
+        reset_result = env.reset()
+        if isinstance(reset_result, tuple):
+            obs, info = reset_result
+        else:
+            obs = reset_result
+            info = {}
 
-    while not done:
-        action = get_action(env, obs)
-        next_obs, reward, cost, done, info = env.step(action)
+        done = False
+        total_reward = 0
 
-        print(f"Step: {env.time_step}, Reward: {reward:.2f}, Cost: {cost:.2f}, Done: {done}")
+        while not done:
+            action = get_action(env, obs)
 
-        obs = next_obs
-        total_reward += reward
+            try:
+                step_result = env.step(action)
+            except Exception as e:
+                print(f"[Error] Carla step failed: {e}")
+                break
 
-    print(f"Episode {episode} finished. Total reward: {total_reward:.2f}")
+            if len(step_result) == 5:
+                next_obs, reward, cost, done, info = step_result
+            elif len(step_result) == 6:
+                next_obs, reward, cost, terminated, truncated, info = step_result
+                done = terminated or truncated
+            else:
+                raise ValueError(f"Unexpected step return length: {len(step_result)}")
 
-env.close()
+            if env.time_step % 10 == 0 or done:
+                print(
+                    f"Step: {env.time_step:4d} | "
+                    f"Reward: {reward:7.2f} | "
+                    f"Cost: {cost:6.2f} | "
+                    f"Done: {done}"
+                )
+
+            obs = next_obs
+            total_reward += reward
+
+        print(f"Episode {episode} finished. Total reward: {total_reward:.2f}")
+
+finally:
+    env.close()
