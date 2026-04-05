@@ -5,3 +5,4 @@ hyperparameters:
   # Double DQN specific
   tau: 0.005                    # For soft target updates
   update_target_every: 10000     # Less frequent hard updates
+  
