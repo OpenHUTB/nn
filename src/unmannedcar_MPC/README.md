@@ -1,14 +1,8 @@
-\#!/usr/bin/env python3
+# PyGameDrawer 模块说明
 
-"""
+绘图显示模块说明文档；对应脚本可用于查看 `drawer.py` 中的函数说明。
 
-PyGameDrawer - 绘图显示模块完整说明文档
-
-运行此文件查看drawer.py中所有函数说明
-
-"""
-
-一、模块概述
+## 一、模块概述
 
 PyGameDrawer是基于Pygame的图形绘制模块，用于在Carla仿真环境中显示各种驾驶信息。
 
