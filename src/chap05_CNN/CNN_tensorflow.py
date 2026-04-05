@@ -11,6 +11,7 @@ try:
     # 参数说明：
     # 'MNIST_data' - 数据集存储目录
     # one_hot=True - 将标签转换为one-hot编码格式
+    # 加载MNIST手写数字数据集，one_hot=True表示标签使用one-hot编码
     mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 except Exception as e:
     print(f"数据加载失败: {e}") # 捕获异常并打印错误信息
