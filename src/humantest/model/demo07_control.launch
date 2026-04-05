@@ -6,7 +6,7 @@
     <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher" output="screen" />
     <node pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" name="joint_state_publisher_gui" output="screen" />
     <node pkg="arbotix_python" type="arbotix_driver" name="driver" output="screen" >
-        <rosparam command="load" file="$(find urdf01_rviz)/config/concrol.yaml"/>
+        <rosparam command="load" file="$(find urdf01_rviz)/config/control.yaml"/>
         <param name="sim" value="true" />
     </node>
 </launch>
