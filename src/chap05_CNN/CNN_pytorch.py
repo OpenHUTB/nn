@@ -152,7 +152,7 @@ class CNN(nn.Module):
 # =============================================================================
 # 测试函数：评估模型在测试集上的准确率
 # =============================================================================
-def test(cnn):
+def evaluate(cnn):
     """
     评估模型准确率
     参数：
@@ -219,13 +219,13 @@ def train(cnn):
 
             # 每隔20个batch打印一次测试准确率
             if step != 0 and step % 20 == 0:
-                accuracy = test(cnn)
+                accuracy = evaluate(cnn)
                 print(f"  Epoch {epoch+1} | Step {step:4d} | "
                       f"Loss: {loss.item():.4f} | 测试准确率: {accuracy:.4f} ({accuracy*100:.2f}%)")
 
     print("\n" + "=" * 60)
     print("训练完成！")
-    final_accuracy = test(cnn)
+    final_accuracy = evaluate(cnn)
     print(f"最终测试准确率：{final_accuracy:.4f} ({final_accuracy*100:.2f}%)")
 
 
