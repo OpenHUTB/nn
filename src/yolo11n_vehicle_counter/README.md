@@ -146,13 +146,14 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 - 按 'p' 键可以暂停/继续视频播放
 - 实时显示处理帧率和计数结果
 
-## 改进版本特性
+## 版本特性
 
 ### 版本说明
-项目包含两个版本，可通过 `main.py` 的 `--version` 参数选择：
+项目包含三个版本，可通过 `main.py` 的 `--version` 参数选择：
 
 1. **原始版本** (`original`) - 基础车辆计数功能
 2. **改进版本** (`improved`) - 增强的检测逻辑和可视化效果
+3. **上下行计数版本** (`updown`) - 多车道系统，分别统计上下行方向的车辆
 
 ### 改进版本主要特性
 
@@ -176,6 +177,25 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 - 优化覆盖区域透明度，平衡可视化和视频内容显示
 - 改进检测置信度阈值，提高计数精度
 
+### 上下行计数版本特性
+
+**🚦 多车道车辆计数系统**
+- 在之前版本的基础上增加了多车道车辆计数功能
+- 分别统计上行（up）和下行（down）方向的车辆
+- 为上下行交通流定义了不同的计数线
+
+**📊 实时显示上下行计数**
+- 实时显示总车辆数（COUNTS）
+- 单独显示上行车辆数（UP）
+- 单独显示下行车辆数（DOWN）
+- 支持双向交通流分别监控和统计
+
+**🔧 分区计数逻辑**
+- 使用分区限制（partition_limit）区分上下行区域
+- 左侧区域（0-550px）统计上行车辆
+- 右侧区域（550px-1280px）统计下行车辆
+- 支持复杂道路场景的精确计数
+
 ### 使用示例
 
 ```bash
@@ -185,8 +205,14 @@ python main.py --version original
 # 运行改进版本
 python main.py --version improved
 
+# 运行上下行计数版本
+python main.py --version updown
+
 # 运行改进版本并指定输出到improved目录
 python main.py --version improved --output res/improved/result.mp4
+
+# 运行上下行计数版本
+python main.py --version updown --input dataset/sample_updown.mp4 --output res/improved/sample_updown_res.mp4
 ```
 
 ### 技术改进详解
@@ -195,8 +221,11 @@ python main.py --version improved --output res/improved/result.mp4
 2. **ROI优化**: 多边形ROI能够更精确地定义监控区域，排除无关区域的干扰
 3. **轨迹优化**: 顶部中心轨迹显示更符合车辆运动特性，便于观察车辆行驶路径
 4. **参数调优**: 各项参数经过优化，在保持检测速度的同时提高计数准确率
+5. **多方向计数**: 支持上下行分别计数，满足不同交通监控需求
 
 ---
+
+*项目持续更新中，欢迎提出使用反馈和建议*
 
 *改进版本持续优化中，欢迎提出使用反馈和建议*
 
