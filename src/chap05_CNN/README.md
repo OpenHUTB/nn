@@ -8,7 +8,9 @@
 
 利用卷积神经网络，实现对MNIST 数据集的分类问题。
 
-
+## 运行环境
+- Python 3.7
+- TensorFlow 2.xgit add .
 
 
 ## 数据集: 
