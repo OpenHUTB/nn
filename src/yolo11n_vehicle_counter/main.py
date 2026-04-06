@@ -68,9 +68,9 @@ def main():
 
     parser.add_argument(
         '--version',
-        choices=['original', 'improved', 'updown'],
+        choices=['original', 'improved', 'updown', 'carla'],
         default='original',
-        help='脚本版本: original(原始版本), improved(改进版本) 或 updown(上下行计数) (默认: original)'
+        help='脚本版本: original(原始版本), improved(改进版本), updown(上下行计数) 或 carla(CARLA视频专用) (默认: original)'
     )
 
     args = parser.parse_args()
@@ -111,6 +111,10 @@ def main():
             # 运行上下行计数版本
             from yolo_vehicle_counter_updown import main as run_counter
             print("🚀 正在运行上下行计数版本...")
+        elif args.version == 'carla':
+            # 运行CARLA视频专用版本
+            from yolo_vehicle_counter_carla import main as run_counter
+            print("🚀 正在运行CARLA视频专用版本...")
         else:
             # 运行改进版本
             from yolo_vehicle_counter_improved import main as run_counter
@@ -126,6 +130,8 @@ def main():
             print("确保scripts目录中有yolo_vehicle_counter.py文件")
         elif args.version == 'updown':
             print("确保scripts目录中有yolo_vehicle_counter_updown.py文件")
+        elif args.version == 'carla':
+            print("确保scripts目录中有yolo_vehicle_counter_carla.py文件")
         else:
             print("确保scripts目录中有yolo_vehicle_counter_improved.py文件")
         sys.exit(1)

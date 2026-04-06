@@ -149,11 +149,12 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 ## 版本特性
 
 ### 版本说明
-项目包含三个版本，可通过 `main.py` 的 `--version` 参数选择：
+项目包含四个版本，可通过 `main.py` 的 `--version` 参数选择：
 
 1. **原始版本** (`original`) - 基础车辆计数功能
 2. **改进版本** (`improved`) - 增强的检测逻辑和可视化效果
 3. **上下行计数版本** (`updown`) - 多车道系统，分别统计上下行方向的车辆
+4. **CARLA专用版本** (`carla`) - 专门处理CARLA模拟器录制视频的优化版本
 
 ### 改进版本主要特性
 
@@ -184,6 +185,24 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 - 分别统计上行（up）和下行（down）方向的车辆
 - 为上下行交通流定义了不同的计数线
 
+### CARLA专用版本特性
+
+**🎮 CARLA模拟器视频优化**
+- 专门针对CARLA模拟器录制的视频进行优化
+- 针对模拟环境的特殊视角和车辆行为调整检测参数
+- 优化计数线位置，适配CARLA视频的透视效果
+
+**🔧 技术优化**
+- **红线位置调整**：从y=400降低到y=500，更适合CARLA视频视角
+- **ROI区域优化**：调整感兴趣区域，减少天空干扰，专注道路区域
+- **置信度阈值**：从0.5降低到0.4，适应模拟环境检测
+- **计数区域**：扩大垂直范围，更容易捕捉CARLA车辆
+
+**📊 使用场景**
+- 处理CARLA模拟器录制的交通流视频
+- 测试车辆检测算法在模拟环境中的表现
+- 生成训练数据和验证数据
+
 **📊 实时显示上下行计数**
 - 实时显示总车辆数（COUNTS）
 - 单独显示上行车辆数（UP）
@@ -208,11 +227,17 @@ python main.py --version improved
 # 运行上下行计数版本
 python main.py --version updown
 
+# 运行CARLA专用版本
+python main.py --version carla
+
 # 运行改进版本并指定输出到improved目录
 python main.py --version improved --output res/improved/result.mp4
 
 # 运行上下行计数版本
 python main.py --version updown --input dataset/sample_updown.mp4 --output res/improved/sample_updown_res.mp4
+
+# 运行CARLA专用版本处理CARLA录制视频
+python main.py --version carla --input dataset/carla_recording.mp4 --output res/carla/carla_counted.mp4
 ```
 
 ### 技术改进详解
