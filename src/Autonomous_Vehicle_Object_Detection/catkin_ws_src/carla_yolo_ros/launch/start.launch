@@ -1,0 +1,18 @@
+<launch>
+    <!-- 参数配置 -->
+    <arg name="host" default="192.168.255.53" />
+    <arg name="model_path" default="$(find carla_yolo_ros)/models/yolov8n.pt" />
+
+    <!-- 1. 交通流节点 -->
+    <node pkg="carla_yolo_ros" type="traffic_generator_node.py" name="traffic" output="screen">
+        <param name="host" value="$(arg host)" />
+        <param name="number_of_vehicles" value="30" />
+    </node>
+
+    <!-- 2. 目标检测节点 -->
+    <node pkg="carla_yolo_ros" type="object_detection_node.py" name="detection" output="screen">
+        <param name="host" value="$(arg host)" />
+        <param name="model_path" value="$(arg model_path)" />
+    </node>
+
+</launch>

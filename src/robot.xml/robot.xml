@@ -1,0 +1,104 @@
+<mujoco model="6DOF Robot Arm with Grasping Scene">
+  <compiler angle="radian" inertiafromgeom="true"/>
+  <option timestep="0.001" iterations="100" tolerance="1e-8"/>
+
+  <!-- 视觉渲染配置 -->
+  <visual>
+    <global azimuth="135" elevation="-30" distance="2.5"/>
+  </visual>
+
+  <!-- 材质定义（区分物体/机械臂/易碎品） -->
+  <asset>
+    <material name="robot_mat" rgba="0.2 0.6 0.8 1"/>
+    <material name="object_mat" rgba="0.8 0.2 0.2 1"/>
+    <material name="fragile_mat" rgba="0.8 0.8 0.8 0.9"/>
+    <material name="table_mat" rgba="0.6 0.4 0.2 1"/>
+  </asset>
+
+  <!-- 世界body -->
+  <worldbody>
+    <!-- 桌面 -->
+    <body name="table" pos="0 0 0">
+      <geom name="table_top" type="box" size="0.8 0.8 0.05" pos="0 0 0" material="table_mat"/>
+      <geom name="table_leg1" type="cylinder" size="0.05 0.5" pos="-0.6 -0.6 -0.5" material="table_mat"/>
+      <geom name="table_leg2" type="cylinder" size="0.05 0.5" pos="0.6 -0.6 -0.5" material="table_mat"/>
+      <geom name="table_leg3" type="cylinder" size="0.05 0.5" pos="-0.6 0.6 -0.5" material="table_mat"/>
+      <geom name="table_leg4" type="cylinder" size="0.05 0.5" pos="0.6 0.6 -0.5" material="table_mat"/>
+    </body>
+
+    <!-- 6自由度机械臂 -->
+    <body name="base" pos="0 0 0.05">
+      <geom name="base_geom" type="cylinder" size="0.1 0.05" material="robot_mat"/>
+      <joint name="joint1" type="hinge" axis="0 0 1" pos="0 0 0" range="-3.14 3.14"/>
+
+      <body name="link1" pos="0 0 0.1">
+        <geom name="link1_geom" type="cylinder" size="0.03 0.2" pos="0 0 0.1" material="robot_mat"/>
+        <joint name="joint2" type="hinge" axis="0 1 0" pos="0 0 0.2" range="-1.57 1.57"/>
+
+        <body name="link2" pos="0 0 0.4">
+          <geom name="link2_geom" type="cylinder" size="0.03 0.2" pos="0 0 0.1" material="robot_mat"/>
+          <joint name="joint3" type="hinge" axis="0 1 0" pos="0 0 0.2" range="-1.57 1.57"/>
+
+          <body name="link3" pos="0 0 0.4">
+            <geom name="link3_geom" type="cylinder" size="0.03 0.15" pos="0 0 0.075" material="robot_mat"/>
+            <joint name="joint4" type="hinge" axis="0 1 0" pos="0 0 0.15" range="-1.57 1.57"/>
+
+            <body name="link4" pos="0 0 0.3">
+              <geom name="link4_geom" type="cylinder" size="0.025 0.15" pos="0 0 0.075" material="robot_mat"/>
+              <joint name="joint5" type="hinge" axis="1 0 0" pos="0 0 0.15" range="-1.57 1.57"/>
+
+              <body name="link5" pos="0 0 0.3">
+                <geom name="link5_geom" type="cylinder" size="0.02 0.1" pos="0 0 0.05" material="robot_mat"/>
+                <joint name="joint6" type="hinge" axis="0 1 0" pos="0 0 0.1" range="-3.14 3.14"/>
+
+                <!-- 末端执行器（夹爪） -->
+                <body name="end_effector" pos="0 0 0.1">
+                  <geom name="ee_geom" type="sphere" size="0.02" pos="0 0 0" material="robot_mat"/>
+                  <!-- 力传感器（检测接触力） -->
+                  <sensor name="force_sensor" type="force" site="ee_site"/>
+                  <site name="ee_site" pos="0 0 0" size="0.01"/>
+
+                  <!-- 夹爪左指 -->
+                  <body name="gripper_left" pos="0.02 0 0">
+                    <geom name="gripper_left_geom" type="box" size="0.02 0.01 0.01" material="robot_mat"/>
+                    <joint name="gripper_left_joint" type="slide" axis="1 0 0" pos="0 0 0" range="0 0.04"/>
+                  </body>
+                  <!-- 夹爪右指 -->
+                  <body name="gripper_right" pos="-0.02 0 0">
+                    <geom name="gripper_right_geom" type="box" size="0.02 0.01 0.01" material="robot_mat"/>
+                    <joint name="gripper_right_joint" type="slide" axis="1 0 0" pos="0 0 0" range="-0.04 0"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- 目标物体（立方体） -->
+    <body name="target_object" pos="0.4 0 0.05">
+      <geom name="object_geom" type="box" size="0.05 0.05 0.05" material="object_mat"/>
+      <freejoint name="object_freejoint"/>
+    </body>
+
+    <!-- 目标放置位置 -->
+    <body name="goal_position" pos="-0.4 0 0.1">
+      <geom name="goal_geom" type="box" size="0.05 0.05 0.001" rgba="0 1 0 0.5" material="object_mat"/>
+    </body>
+  </worldbody>
+
+  <!-- 控制器配置 -->
+  <actuator>
+    <!-- 关节力矩控制 -->
+    <motor name="joint1_motor" joint="joint1" ctrlrange="-5 5" gear="100"/>
+    <motor name="joint2_motor" joint="joint2" ctrlrange="-5 5" gear="100"/>
+    <motor name="joint3_motor" joint="joint3" ctrlrange="-5 5" gear="100"/>
+    <motor name="joint4_motor" joint="joint4" ctrlrange="-5 5" gear="100"/>
+    <motor name="joint5_motor" joint="joint5" ctrlrange="-5 5" gear="100"/>
+    <motor name="joint6_motor" joint="joint6" ctrlrange="-5 5" gear="100"/>
+    <!-- 夹爪控制 -->
+    <motor name="gripper_left_motor" joint="gripper_left_joint" ctrlrange="0 10" gear="50"/>
+    <motor name="gripper_right_motor" joint="gripper_right_joint" ctrlrange="-10 0" gear="50"/>
+  </actuator>
+</mujoco>

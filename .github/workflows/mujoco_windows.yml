@@ -1,0 +1,17 @@
+name: Run Mujoco on Windows 
+
+# Controls when the action will run.
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Unity build
+        shell: cmd
+        run: |
+          run_mujoco.bat
