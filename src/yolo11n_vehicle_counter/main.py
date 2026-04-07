@@ -68,9 +68,9 @@ def main():
 
     parser.add_argument(
         '--version',
-        choices=['original', 'improved'],
+        choices=['original', 'improved', 'updown', 'carla'],
         default='original',
-        help='脚本版本: original(原始版本) 或 improved(改进版本) (默认: original)'
+        help='脚本版本: original(原始版本), improved(改进版本), updown(上下行计数) 或 carla(CARLA视频专用) (默认: original)'
     )
 
     args = parser.parse_args()
@@ -78,7 +78,8 @@ def main():
     # 打印运行信息
     print("=" * 60)
     print("YOLO11n Vehicle Counter - 启动")
-    print(f"版本: {args.version} ({'原始版本' if args.version == 'original' else '改进版本'})")
+    version_name = '原始版本' if args.version == 'original' else ('改进版本' if args.version == 'improved' else '上下行计数版本')
+    print(f"版本: {args.version} ({version_name})")
     print("=" * 60)
     print(f"📁 模型路径: {args.model}")
     print(f"🎬 输入视频: {args.input}")
@@ -106,6 +107,14 @@ def main():
             # 运行原始版本
             from yolo_vehicle_counter import main as run_counter
             print("🚀 正在运行原始版本...")
+        elif args.version == 'updown':
+            # 运行上下行计数版本
+            from yolo_vehicle_counter_updown import main as run_counter
+            print("🚀 正在运行上下行计数版本...")
+        elif args.version == 'carla':
+            # 运行CARLA视频专用版本
+            from yolo_vehicle_counter_carla import main as run_counter
+            print("🚀 正在运行CARLA视频专用版本...")
         else:
             # 运行改进版本
             from yolo_vehicle_counter_improved import main as run_counter
@@ -119,6 +128,10 @@ def main():
         print(f"❌ 错误: 无法导入模块 - {e}")
         if args.version == 'original':
             print("确保scripts目录中有yolo_vehicle_counter.py文件")
+        elif args.version == 'updown':
+            print("确保scripts目录中有yolo_vehicle_counter_updown.py文件")
+        elif args.version == 'carla':
+            print("确保scripts目录中有yolo_vehicle_counter_carla.py文件")
         else:
             print("确保scripts目录中有yolo_vehicle_counter_improved.py文件")
         sys.exit(1)
