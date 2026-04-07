@@ -67,6 +67,12 @@ def main():
     )
 
     parser.add_argument(
+        '--ground-truth',
+        default=None,
+        help='ground truth文件路径，用于精度衡量 (可选)'
+    )
+
+    parser.add_argument(
         '--version',
         choices=['original', 'improved', 'updown', 'carla', 'region'],
         default='original',
@@ -125,7 +131,7 @@ def main():
             print("🚀 正在运行改进版本...")
 
         # 传入参数到脚本
-        run_counter(args.model, args.input, args.output)
+        run_counter(args.model, args.input, args.output, args.ground_truth)
         print("✅ 车辆计数完成！")
 
     except ImportError as e:
