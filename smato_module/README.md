@@ -49,6 +49,16 @@ A model using EfficientNet V2M as the feature extractor (has better benchmark pe
 <a id="2">[2]</a>  Frej, D., Jaśkiewicz, M., Poliak, M. and Zwierzewicz, Z., 2022. Smartphone Use in Traffic: A Pilot Study on Pedestrian Behavior. Applied Sciences, 12(24), p.12676.
 
 <a id="3">[3]</a> Y. Deng, P. Luo, C. C. Loy, X. Tang, "Pedestrian attribute recognition at far distance," in Proceedings of ACM Multimedia (ACM MM), 2014
+
+## 网盘资源下载（夸克云盘）
+
+### 1. 模型权重smato_mobilenet_v2m
+链接：https://pan.quark.cn/s/20a4c9ebadb2
+提取码：MhpM
+
+### 2. 训练数据集smato_images
+链接：https://pan.quark.cn/s/e0310dc2237b
+提取码：tVBE
 =======
 # 神经网络实现代理
 
