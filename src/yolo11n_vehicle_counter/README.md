@@ -149,12 +149,13 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 ## 版本特性
 
 ### 版本说明
-项目包含四个版本，可通过 `main.py` 的 `--version` 参数选择：
+项目包含五个版本，可通过 `main.py` 的 `--version` 参数选择：
 
 1. **原始版本** (`original`) - 基础车辆计数功能
 2. **改进版本** (`improved`) - 增强的检测逻辑和可视化效果
 3. **上下行计数版本** (`updown`) - 多车道系统，分别统计上下行方向的车辆
 4. **CARLA专用版本** (`carla`) - 专门处理CARLA模拟器录制视频的优化版本
+5. **区域计数版本** (`region`) - 高级迭代版本，支持多边形区域计数和双向交通流统计
 
 ### 改进版本主要特性
 
@@ -203,6 +204,26 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 - 测试车辆检测算法在模拟环境中的表现
 - 生成训练数据和验证数据
 
+### 区域计数版本特性
+
+**🚀 高级检测优化**
+- 这是对原始版本的进一步优化迭代，提供更平滑的检测体验
+- **检测结果平滑处理**：避免车辆位置突然变化，提供更稳定的追踪效果
+- **双向交通流计数**：同时统计上行和下行方向的车辆流量
+- **多边形区域计数**：支持自定义多边形区域，适应复杂道路布局
+
+**🎨 定制化视觉增强**
+- **半透明覆盖区域**：使用半透明多边形覆盖计数区域，清晰标识监控范围
+- **轨迹注解**：显示车辆运动路径，便于分析交通流模式
+- **分区计数显示**：实时显示总车辆数、上行车辆数和下行车辆数
+- **优化的标注样式**：改进的边界框和标签显示，提升可视化体验
+
+**🔧 技术特性**
+- **多边形ROI支持**：可自定义多边形顶点，精确控制监控区域
+- **动态区域缩放**：根据视频分辨率自动缩放区域坐标
+- **置信度过滤**：0.5置信度阈值，平衡检测精度和召回率
+- **底部中心计数**：基于车辆底部中心点进行区域检测，提高计数准确性
+
 **📊 实时显示上下行计数**
 - 实时显示总车辆数（COUNTS）
 - 单独显示上行车辆数（UP）
@@ -230,6 +251,9 @@ python main.py --version updown
 # 运行CARLA专用版本
 python main.py --version carla
 
+# 运行区域计数版本
+python main.py --version region
+
 # 运行改进版本并指定输出到improved目录
 python main.py --version improved --output res/improved/result.mp4
 
@@ -238,6 +262,9 @@ python main.py --version updown --input dataset/sample_updown.mp4 --output res/i
 
 # 运行CARLA专用版本处理CARLA录制视频
 python main.py --version carla --input dataset/carla_recording.mp4 --output res/carla/carla_counted.mp4
+
+# 运行区域计数版本处理自定义视频
+python main.py --version region --input dataset/highway.mp4 --output res/region/highway_counted.mp4
 ```
 
 ### 技术改进详解
