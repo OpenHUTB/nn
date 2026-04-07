@@ -111,12 +111,17 @@ OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"  # 输出视频文件路径
 - **检测置信度**：默认阈值为 0.5，可根据需要调整
 - **追踪算法**：ByteTrack，支持高帧率视频
 - **计数逻辑**：基于穿越水平线的车辆计数
+- **精度衡量**：支持与ground truth数据对比，计算检测精度
+  - 支持简单数字格式（整个视频的真实车辆总数）
+  - 支持分段验证格式（每行一个数字）
+  - 实时显示精度指标（ACC、F1分数）
+  - 处理结束后输出详细的精度报告
 - **可视化**：
   - 圆角矩形边界框
   - 车辆标签（包含追踪ID和类别）
   - 运动轨迹
   - 半透明覆盖区域
-  - 实时计数显示
+  - 实时计数和精度显示
 
 ## 运行效果
 
@@ -253,6 +258,9 @@ python main.py --version carla
 
 # 运行区域计数版本
 python main.py --version region
+
+# 运行原始版本并指定ground truth文件进行精度衡量
+python main.py --version original --ground-truth dataset/ground_truth/ground_truth.txt
 
 # 运行改进版本并指定输出到improved目录
 python main.py --version improved --output res/improved/result.mp4
