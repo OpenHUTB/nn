@@ -1,0 +1,20 @@
+# YOLOv8核心库（必须）
+ultralytics>=8.0.0  # 推荐8.2.0（稳定版）
+
+# 图像处理（必须）
+opencv-python>=4.8.0  # 推荐4.8.1.78
+
+# 可视化（必须）
+matplotlib>=3.0.0  # 推荐3.7.1
+
+# PyTorch核心（ultralytics依赖，必须）
+torch>=2.0.0  # 推荐2.0.1或2.1.0
+torchvision>=0.15.0  # 与torch版本匹配
+
+# 基础数值计算（间接依赖，建议指定）
+numpy>=1.24.0  # 推荐1.24.3
+
+# 可选（补充依赖，避免隐性报错）
+pillow>=8.0.0  # 推荐9.5.0
+psutil>=5.8.0  # ultralytics监控系统资源用
+pyyaml>=6.0  # 自定义训练时解析yaml配置文件

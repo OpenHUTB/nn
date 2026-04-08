@@ -1,0 +1,20 @@
+hyperparameters:
+  # Network Architecture
+  conv_channels: [16, 32]       # CNN channel progression
+  fc_sizes: [256]               # Fully connected layers
+  
+  # Learning Parameters
+  lr: 0.0001                    # Learning rate
+  gamma: 0.99                   # Discount factor
+  batch_size: 64                # Training batch size
+  buffer_size: 100000           # Replay buffer size
+  
+  # Exploration
+  epsilon_start: 1.0
+  epsilon_decay: 0.9999
+  epsilon_min: 0.01
+  
+  # Training Schedule
+  warmup_steps: 10000           # Random actions before learning
+  target_update: 5000           # Target network update frequency
+  train_freq: 4                 # Learn every N steps

@@ -1,0 +1,59 @@
+name: compute involvement degree
+
+# 修正后的触发器：支持手动输入时间、自动推送到 main、以及远程触发
+on:
+  push:
+    branches:
+      - main
+  repository_dispatch:
+    types: [opened, deleted, custom-event]
+  workflow_dispatch:
+    inputs:
+      since:
+        description: '统计开始时间 (例如: 2026-03-05 12:00)'
+        required: false
+      until:
+        description: '统计结束时间 (例如: 2026-03-07 12:00)'
+        required: false
+
+jobs:
+  compute:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取完整 Git 历史（逻辑不变：SHA 追溯必须获取所有 commit）
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 设置 Python 环境
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # 3. 核心改动：安装 requests 库，因为新脚本需要调用 GitHub API
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      # 4. 执行新的统计脚本
+      # 注意：增加了 -r 参数传递当前仓库名，并匹配了 workflow_dispatch 的输入
+      - name: Execute SHA-based Analysis
+        run: |
+          python contribution_analysis.py \
+            -t ${{ secrets.GITHUB_TOKEN }} \
+            -r ${{ github.repository }} \
+            --ignore "ignore_users.json" \
+            --since "${{ github.event.inputs.since }}" \
+            --until "${{ github.event.inputs.until }}" \
+            --output "contribution_report.csv"
+
+      # 5. 自动上传产物（确保你能在 Actions 页面直接下载 CSV）
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit-stats-report
+          path: contribution_report.csv
