@@ -18,7 +18,7 @@ def banner():
 
     print(colored(banner, 'green'))
 
-def clear(print_banner: 'Whether to print the banner. Defaults to True' = True):
+def clear(print_banner=True):
     command = {
         'nt': 'cls',
         'darwin': 'clear',
@@ -30,7 +30,7 @@ def clear(print_banner: 'Whether to print the banner. Defaults to True' = True):
     if print_banner:
         banner()
 
-def message(text: 'The message text you wanna print', mode='success'):
+def message(text, mode='success'):
     color = {
         'success': 'green',
         'warn': 'yellow',
@@ -38,8 +38,8 @@ def message(text: 'The message text you wanna print', mode='success'):
     }
     print(f'{colored("*", color[mode])} {text}')
 
-def warn(text: 'Warning message'):
+def warn(text):
     message(text, mode='warn')
 
-def error(text: 'Error message'):
+def error(text):
     message(text, mode='error')
