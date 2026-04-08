@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 tensorflow
 carla
 pygame
 numpy
 datetime
 termcolor
+=======
+mkdocs
+python-markdown-math
+>>>>>>> 377e0f2ca50fbcc5b8db8bc7644a76799e99dd1b
