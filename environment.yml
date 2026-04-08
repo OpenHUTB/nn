@@ -1,0 +1,13 @@
+name: pilotnet
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - pip
+  - pip:
+    - tensorflow>=2.4.0
+    - numpy>=1.19.0
+    - opencv-python>=4.5.0
+    - termcolor>=1.1.0
+    - pygame>=2.0.0
