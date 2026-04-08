@@ -4,7 +4,7 @@ import os, json, cv2
 class PilotData(object):
 
     # given the path to an image file as argument, return a PilotData object
-    def __init__(self, path_to: 'Path to the image file', image_file: 'An image file with driving data as filename' = '', isTraining = True):
+    def __init__(self, path_to, image_file='', isTraining=True):
         self.steering, self.throttle, self.brake, self.image = self.parse_train(path_to, image_file) if isTraining == True else self.parse_test(path_to)
 
     # this method overrides str() for PilotData objects
@@ -34,7 +34,7 @@ class PilotData(object):
         return (0, 0, 0, image)
 
 class Data():
-    def __init__(self, isTraining: 'whether to prepare data for training or prediction' = True):
+    def __init__(self, isTraining=True):
         self.data = self.generate_data()
 
     def generate_data(self):
