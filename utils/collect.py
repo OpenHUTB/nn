@@ -14,7 +14,7 @@ class Collector:
         self.vehicle = None
 
         # 不再初始化 pygame 显示
-        self.directory = f'recordings/{datetime.datetime.now().strftime("%Y-%m-%d@%H.%M.%S" if os.name is "nt" else "%Y-%m-%d@%H:%M:%S")}'
+        self.directory = f'recordings/{datetime.datetime.now().strftime("%Y-%m-%d@%H.%M.%S" if os.name == "nt" else "%Y-%m-%d@%H:%M:%S")}'
         self.start(time)
 
     def record(self, image):

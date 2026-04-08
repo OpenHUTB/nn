@@ -6,6 +6,7 @@ import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
 import datetime
+from utils.piloterror import PilotError
 
 class PilotNet():
     def __init__(self, width, height, predict=False):
@@ -57,7 +58,7 @@ class PilotNet():
         model.summary()
         return model
 
-    def train(self, name: 'Filename for saving model', data: 'Training data as an instance of pilotnet.src.Data()', epochs: 'Number of epochs to run' = 30, steps: 'Number of steps per epoch' = 10, steps_val: 'Number of steps to validate' = 10, batch_size: 'Batch size to be used for training' = 64):
+    def train(self, name, data, epochs=30, steps=10, steps_val=10, batch_size=64):
         # x_train & y_train are np.array() objects with data extracted directly from the PilotData object instances
 
         # fit data to model for training
