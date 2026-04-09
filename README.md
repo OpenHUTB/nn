@@ -1,20 +1,12 @@
-# 神经网络实现代理
+# 模拟器的神经网络示例
 
-利用神经网络/ROS 实现 Carla（车辆、行人的感知、规划、控制）、AirSim、Mujoco 中人和载具的代理。
+利用 `神经网络` 实现 Carla（无人机）、AirSim（无人机）、Mujoco（具身人） 的感知、规划、控制等功能。
 
 ## 环境配置
 
 * 平台：Windows 10/11，Ubuntu 20.04/22.04
-* 软件：Python 3.7-3.12（需支持3.7）、Pytorch（尽量不使用Tensorflow）
-* 相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
-
-## 功能模块表
-| 模块类别                | 模块名 | 链接                                                                            | 其他                                                                  |
-|-------------------|------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| 感知             | 车辆检测以及跟踪 | [Yolov4_Vehicle_inspection](https://github.com/OpenHUTB/nn/tree/main/src/Yolov4_Vehicle_inspection)                                                                          | -                                          |
-| 规划             | 车辆全局路径规划 | [carla_slam_gmapping](https://github.com/OpenHUTB/nn/tree/main/src/carla_slam_gmapping)                                                                          | -                                          |
-| 控制             | 手势控制无人机 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | -                                          |
-| 控制             | 倒车入库 | [autonomus_drone_hand_gesture_project](https://github.com/OpenHUTB/nn/tree/main/src/autonomus_drone_hand_gesture_project)                                                                          | [效果](https://github.com/OpenHUTB/nn/pull/4399)                                          |
+* 软件：Python 3.7-3.12（需支持3.8）、Pytorch（尽量不使用Tensorflow）
+* [模拟器下载链接](https://mp.weixin.qq.com/s/3Tzo0AZEMB2PFYAu_s8gOA) 、相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
 
 
 ## 贡献指南
@@ -24,10 +16,12 @@
 
 ### 约定
 
+* 模块的文档位于 `docs/{模块名}`目录下，项目概述位于`docs/{模块名}/README.md`文件中，并能够从 [项目首页](https://openhutb.github.io/nn/) 跳转过去，具体请参考 [carla_CAM 模块文档](https://openhutb.github.io/nn/carla_CAM/)
 * 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
 * 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
 * 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
 * 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
+
 
 
 ### 文档生成
@@ -48,6 +42,6 @@ mkdocs serve
 
 ## 参考
 
-* [代理模拟器文档](https://openhutb.github.io)
+* [模拟器文档](https://openhutb.github.io)
 * 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
 * [神经网络原理](https://github.com/OpenHUTB/neuro)
