@@ -25,8 +25,9 @@ class EnhancedGestureDetector:
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=1,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.7,  # 优化：提高检测阈值
+            min_tracking_confidence=0.7,   # 优化：提高跟踪阈值
+            model_complexity=1  # 优化：平衡性能和精度
         )
 
         # 机器学习模型
