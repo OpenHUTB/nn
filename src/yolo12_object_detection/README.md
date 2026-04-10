@@ -54,41 +54,57 @@ yolo12_object_detection/
 
 ### 1. 数据集准备
 
-从 [Google Drive 数据集链接](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing) 下载整理好的数据集，放置到 `datasets/carla/` 目录下，保持上述目录结构。
+从 [Google Drive 数据集链接](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing) 下载整理好的数据集，放置到 `dataset/` 目录下，保持上述目录结构。
 
 ### 2. 配置数据集
 
-在 `scripts/ultralytics/cfg/datasets/` 下创建 `carla.yaml` 文件，配置数据集路径和类别信息。
+在 `scripts/ultralytics/cfg/datasets/` 下创建 `data.yaml` 文件，配置数据集路径和类别信息。
+
+参考配置：
+```yaml
+path: ../dataset  # 数据集根目录
+train: images/train  # 训练集图像
+val: images/test  # 验证集图像（根据实际数据集调整）
+test: images/test  # 测试集图像
+
+names:
+  0: class0
+  1: class1
+  # 根据实际数据集类别配置
+```
 
 ### 3. 训练模型
 
 ```bash
-cd scripts/ultralytics
-python train.py model=yolo12n.yaml data=carla.yaml epochs=100 imgsz=640
+# 方法1：使用 main.py 入口
+python main.py train
+
+# 方法2：直接进入 scripts 目录运行
+cd scripts
+python train.py
 ```
 
-### 4. 验证和推理
+### 4. 验证模型
 
 ```bash
-# 验证
-python val.py model=runs/train/exp/weights/best.pt data=carla.yaml
+# 方法1：使用 main.py 入口
+python main.py val
 
-# 推理
-python predict.py model=runs/train/exp/weights/best.pt source=test_images/
+# 方法2：直接进入 scripts 目录运行
+cd scripts
+python val.py
 ```
 
-## 模型选择
+### 5. 推理检测
 
-提供多种 YOLO12 模型版本：
-- yolo12n.yaml (Nano - 最快)
-- yolo12s.yaml (Small)
-- yolo12m.yaml (Medium)
-- yolo12l.yaml (Large)
-- yolo12x.yaml (XLarge - 最准)
+```bash
+# 使用 main.py 入口
+# 对图片/视频/摄像头进行推理
+python main.py predict --source "dataset/images/test/image.jpg"
+python main.py predict --source 0  # 使用摄像头
+python main.py predict --source "video.mp4"  # 使用视频
 
-## 待完善
+# 指定自定义模型路径
+python main.py predict --source "test.jpg" --model "runs/train/baseline/weights/best.pt"
+```
 
-- [ ] 训练结果和性能指标
-- [ ] 详细的配置说明
-- [ ] 部署和使用示例
-- [ ] 实验对比分析
