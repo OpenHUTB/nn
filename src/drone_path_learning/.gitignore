@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Training artifacts (Stable-Baselines3 / TensorBoard)
+data/logs/
+data/checkpoints/
+data/best_model/
+data/results/
+**/events.out.tfevents.*
+
+# IDE/editor files
+.vscode/
+.idea/
