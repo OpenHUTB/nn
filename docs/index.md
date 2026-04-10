@@ -38,7 +38,7 @@ title: 主页
 ---
 ## 感知 <span id="perception"></span>
 
-[__检测__](#detection)
+[__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
 
 [__跟踪__](#tracking) 
 
