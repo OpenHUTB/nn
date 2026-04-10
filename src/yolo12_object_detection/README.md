@@ -17,24 +17,37 @@
 
 ```
 yolo12_object_detection/
-├── scripts/ultralytics/      # Ultralytics 框架代码
-│   ├── cfg/                  # 配置文件
-│   ├── data/                 # 数据处理模块
-│   ├── engine/               # 训练推理引擎
-│   └── models/               # 模型定义
-├── datasets/                 # 数据集目录
-│   └── carla/                # CARLA 数据集
-│       ├── images/           # 图像文件
-│       │   ├── train/        # 训练集图像
-│       │   ├── val/          # 验证集图像
-│       │   └── test/         # 测试集图像
-│       └── labels/           # 标签文件
-│           ├── train/        # 训练集标签
-│           ├── val/          # 验证集标签
-│           └── test/         # 测试集标签
-└── runs/                     # 训练结果
-    ├── train/                # 训练过程记录
-    └── detect/               # 推理结果
+├─dataset                     # 数据集目录
+│  ├─annotations              # 标注文件
+│  ├─images                   # 图像文件
+│  │  ├─test                  # 测试集图像
+│  │  └─train                 # 训练集图像
+│  ├─image_sets               # 图像集列表文件
+│  └─labels                   # 标签文件
+│      ├─test                 # 测试集标签
+│      └─train                # 训练集标签
+└─scripts                     # 脚本和框架代码
+    ├─runs                    # 运行结果目录
+    │  ├─train                # 训练结果
+    │  │  └─baseline          # 基线实验
+    │  │      └─weights       # 模型权重
+    │  └─val                  # 验证结果
+    │      └─baseline         # 基线验证
+    └─ultralytics             # Ultralytics 框架
+        ├─assets              # 资源文件
+        ├─cfg                 # 配置文件
+        │  ├─datasets         # 数据集配置
+        │  ├─models           # 模型配置
+        │  ├─solutions        # 解决方案配置
+        │  └─trackers         # 跟踪器配置
+        ├─data                # 数据处理
+        ├─engine              # 训练推理引擎
+        ├─hub                 # Hub 功能
+        ├─models              # 模型定义
+        ├─nn                  # 神经网络模块
+        ├─solutions           # 解决方案
+        ├─trackers            # 跟踪器
+        └─utils               # 工具函数
 ```
 
 ## 使用说明
