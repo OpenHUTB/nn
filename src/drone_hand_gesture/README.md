@@ -28,31 +28,35 @@ drone_hand_gesture/
 └── requirements.txt          # 依赖列表
 ```
 
-### 运行步骤(在ubuntu或是xubuntu下)
-1. 进入项目目录：
+## 快速开始
 
-   ```bash
-   cd /mnt/hgfs/nn/src/Drone_hand_gesture_project
+### 方案 1：本地仿真模式（不需要 AirSim）
 
-2. 激活虚拟环境：
+```bash
+# 进入项目目录
+cd src/drone_hand_gesture
 
-   ```bash
-   source gesture_env/bin/activate
+# 安装依赖
+pip install -r requirements.txt
 
-3. 收集手势图像：
-   
-   ```bash
-   python gesture_data_collector.py
-   
-4. 训练学习模型：
+# 运行主程序
+python main.py
+```
 
-   ```bash
-   python train_gesture_model.py --model_type ensemble
+### 方案 2：AirSim 真实模拟器模式
 
-5. 运行主程序：
+**前提条件**：
+1. 安装 AirSim：`pip install airsim`
+2. 运行 AirSim 模拟器（如 Blocks.exe）
 
-   ```bash
-   python main.py
+```bash
+# 运行 AirSim 版本
+python main_airsim.py
+```
+
+**控制方式**：
+- **手势控制**：张开手掌（悬停）、食指向上（上升）、握拳（降落）等
+- **键盘控制**：空格（起飞/降落）、T（起飞）、L（降落）、H（悬停）、Q/ESC（退出）
    
 ##参考项目
 

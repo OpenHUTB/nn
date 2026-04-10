@@ -16,7 +16,7 @@ from airsim_controller import AirSimController
 from gesture_detector_enhanced import EnhancedGestureDetector
 
 
-def main():
+def main(show_window=True):
     """主函数"""
     print("=" * 70)
     print("手势控制无人机 - AirSim 真实模拟器版")
@@ -25,8 +25,11 @@ def main():
     
     # 1. 连接 AirSim
     print("[1/4] 正在连接 AirSim 模拟器...")
+    print("[DEBUG] 正在创建 AirSimController 实例...")
     controller = AirSimController(ip_address="127.0.0.1", port=41451)
+    print("[DEBUG] AirSimController 实例创建成功")
     
+    print("[DEBUG] 正在连接 AirSim...")
     if not controller.connect():
         print("\n[ERROR] AirSim 连接失败")
         print("\n请检查:")
@@ -35,24 +38,31 @@ def main():
         print("\n按回车键退出...")
         input()
         return
+    print("[DEBUG] AirSim 连接成功")
     
     # 2. 初始化手势检测器
     print("\n[2/4] 正在初始化手势检测器...")
+    print("[DEBUG] 正在创建 EnhancedGestureDetector 实例...")
     detector = EnhancedGestureDetector(use_ml=False)
+    print("[DEBUG] EnhancedGestureDetector 实例创建成功")
     print("[OK] 手势检测器就绪")
     
     # 3. 初始化摄像头
     print("\n[3/4] 正在初始化摄像头...")
+    print("[DEBUG] 正在打开摄像头...")
     cap = cv2.VideoCapture(0)
+    print("[DEBUG] 摄像头打开成功")
     
     if not cap.isOpened():
         print("[ERROR] 摄像头不可用")
         controller.disconnect()
         return
     
+    print("[DEBUG] 正在设置摄像头参数...")
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     cap.set(cv2.CAP_PROP_FPS, 30)
+    print("[DEBUG] 摄像头参数设置成功")
     print("[OK] 摄像头已就绪：640x480 @ 30fps")
     
     # 4. 系统就绪
@@ -150,41 +160,49 @@ def main():
                     last_gesture_time = current_time
             
             # 显示画面
-            cv2.imshow('Gesture Control - AirSim', debug_frame)
-            
-            # 键盘控制
-            key = cv2.waitKey(10) & 0xFF
-            
-            if key == ord('q') or key == ord('Q') or key == 27:
-                print("\n[INFO] 退出程序...")
-                break
-            
-            elif key == ord(' '):
-                if is_flying:
-                    print("[INFO] 降落...")
-                    controller.land()
-                    is_flying = False
-                else:
-                    print("[INFO] 起飞...")
-                    controller.takeoff()
-                    is_flying = True
-                time.sleep(0.5)
-            
-            elif key == ord('t') or key == ord('T'):
-                if not is_flying:
-                    print("[INFO] 手动起飞...")
-                    controller.takeoff()
-                    is_flying = True
-            
-            elif key == ord('l') or key == ord('L'):
-                if is_flying:
-                    print("[INFO] 手动降落...")
-                    controller.land()
-                    is_flying = False
-            
-            elif key == ord('h') or key == ord('H'):
-                print("[INFO] 悬停")
-                controller.hover()
+            if show_window:
+                cv2.imshow('Gesture Control - AirSim', debug_frame)
+                
+                # 键盘控制
+                key = cv2.waitKey(10) & 0xFF
+                
+                if key == ord('q') or key == ord('Q') or key == 27:
+                    print("\n[INFO] 退出程序...")
+                    break
+                
+                elif key == ord(' '):
+                    if is_flying:
+                        print("[INFO] 降落...")
+                        controller.land()
+                        is_flying = False
+                    else:
+                        print("[INFO] 起飞...")
+                        controller.takeoff()
+                        is_flying = True
+                    time.sleep(0.5)
+                
+                elif key == ord('t') or key == ord('T'):
+                    if not is_flying:
+                        print("[INFO] 手动起飞...")
+                        controller.takeoff()
+                        is_flying = True
+                
+                elif key == ord('l') or key == ord('L'):
+                    if is_flying:
+                        print("[INFO] 手动降落...")
+                        controller.land()
+                        is_flying = False
+                
+                elif key == ord('h') or key == ord('H'):
+                    print("[INFO] 悬停")
+                    controller.hover()
+            else:
+                # 没有显示窗口时，使用一个简单的循环来模拟
+                time.sleep(0.1)
+                # 检查是否需要退出
+                if frame_count > 300:  # 运行 5 秒后自动退出
+                    print("\n[INFO] 自动退出程序...")
+                    break
             
             # 显示状态
             if is_flying and frame_count % 30 == 0:
@@ -202,7 +220,8 @@ def main():
             controller.land()
         
         cap.release()
-        cv2.destroyAllWindows()
+        if show_window:
+            cv2.destroyAllWindows()
         controller.disconnect()
         
         print("[OK] 程序安全退出")

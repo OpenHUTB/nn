@@ -86,7 +86,10 @@ class AirSimController:
         
         try:
             print(f"[INFO] 正在起飞到 {altitude} 米高度...")
-            self.client.takeoffAsync(altitude=altitude, vehicle_name=self.vehicle_name).join()
+            self.client.takeoffAsync(vehicle_name=self.vehicle_name).join()
+            # 起飞后上升到指定高度
+            import airsim
+            self.client.moveToZAsync(-altitude, 1.0, vehicle_name=self.vehicle_name).join()
             self.state['flying'] = True
             print("[OK] 起飞完成！")
             return True
@@ -156,15 +159,16 @@ class AirSimController:
         
         try:
             state = self.client.getMultirotorState(vehicle_name=self.vehicle_name)
+            # 修复状态获取 - 使用正确的属性名称
             self.state['position'] = np.array([
-                state.position.x_val,
-                state.position.y_val,
-                -state.position.z_val
+                state.kinematics_estimated.position.x_val,
+                state.kinematics_estimated.position.y_val,
+                -state.kinematics_estimated.position.z_val
             ])
             self.state['velocity'] = np.array([
-                state.velocity.x_val,
-                state.velocity.y_val,
-                -state.velocity.z_val
+                state.kinematics_estimated.linear_velocity.x_val,
+                state.kinematics_estimated.linear_velocity.y_val,
+                -state.kinematics_estimated.linear_velocity.z_val
             ])
             return self.state
         except Exception as e:
