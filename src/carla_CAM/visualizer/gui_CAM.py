@@ -2,7 +2,7 @@
 Visualisation API to produce CAM overlayed images
 
 Offers a GUI through Pygame to facilitate the evaluations
-
+(Fixed version: Resolved model_name unassigned & infinite loop bugs)
 @author: Pablo Roca - github.com/RocaPiedra
 """
 
@@ -38,7 +38,8 @@ class gui_CAM:
             roc_functions.blip_logo(self.display, parameters.gui_cam_logo)
         except Exception as e:
             print(f'Logo blip failed with exception:\n{e}')
-        self.use_cuda = use_cuda
+        #self.use_cuda = use_cuda     默认GPU运行
+        self.use_cuda = use_cuda and torch.cuda.is_available() #如果GPU不可用，则自动切换到CPU
         self.font = pygame.font.SysFont(None, 24)
         self.target_layers = self.select_target_layer()
         self.cam_name = None
@@ -51,7 +52,7 @@ class gui_CAM:
         self.class_list = roc_functions.get_imagenet_dictionary(url=None) 
         self.cam = None
         self.classification_output = ''  
-        self.filtered_cam = True #Determines if the target classes are filtered for the desired ones
+        self.filtered_cam = True 
         if torch.cuda.is_available() and self.use_cuda:
             self.model.to('cuda')
             print("System is cuda ready")
@@ -59,13 +60,16 @@ class gui_CAM:
         self.surface = None
         self.main_location = None
         self.display_width, self.display_height = pygame.display.get_surface().get_size()
-        #location where second cam is plotted in the display
-        
         self.compare_location = [int(2*self.display_width/3), int(self.display_height/2)]
 
         
     def select_cam(self, second_method = False):            
         method_selection = True
+        
+        # [修复说明]：添加了 method_name 的默认值兜底。
+        # 原版中，如果用户没有按 M 键选择过算法，直接按空格，这个变量就是未定义的，导致程序闪退。
+        method_name = self.method_name if self.method_name else 'GradCAM' 
+        
         x = 100
         y = 100
         dx = 0
@@ -81,12 +85,9 @@ class gui_CAM:
             self.GRAD_BUTTON_COLOR = parameters.BUTTON_COLOR
                 
         for pos in range(num_options):
-            
             positions.append([x+pos*dx, y+pos*dy])
         
         draw_text('CAM Technique Menu', self.font, (255, 255, 255), self.display, 20, 20)
-        
-        # To delimit the size of the button, in the future use value related to window res
         
         grad_button = pygame.Rect(positions[0][0], positions[0][1], button_width, button_height)
         score_button = pygame.Rect(positions[4][0], positions[4][1], button_width, button_height)
@@ -114,7 +115,6 @@ class gui_CAM:
         pygame.display.update()
         
         while method_selection:
-            
             mx, my = pygame.mouse.get_pos()
             if grad_button.collidepoint((mx, my)):
                 if self.click and self.model_gradient_compatible:
@@ -126,31 +126,26 @@ class gui_CAM:
                 if self.click:
                     method_selection = False
                     method_name = 'ScoreCAM'
-                    
             if ablation_button.collidepoint((mx, my)):
                 if self.click:
                     method_selection = False
                     method_name = 'AblationCAM'
-                    
             if xgradcam_button.collidepoint((mx, my)):
                 if self.click and self.model_gradient_compatible:
                     method_selection = False
                     method_name = 'XGradCAM'
                 elif self.click and not self.model_gradient_compatible:
                     print(f'The method is gradient based and not compatible with the current model {self.model_name}')
-                    
             if eigen_button.collidepoint((mx, my)):
                 if self.click:
                     method_selection = False
                     method_name = 'EigenCAM'
-                    
             if fullgrad_button.collidepoint((mx, my)):
                 if self.click and self.model_gradient_compatible:
                     method_selection = False
                     method_name = 'FullGrad'
                 elif self.click and not self.model_gradient_compatible:
                     print(f'The method is gradient based and not compatible with the current model {self.model_name}')
-                    
             if gradcampp_button.collidepoint((mx, my)):
                 if self.click and self.model_gradient_compatible:
                     method_selection = False
@@ -176,58 +171,23 @@ class gui_CAM:
     
     
     def load_cam(self, cuda_error = False, method_name=None):
-        
         if not method_name:
             method_name = self.method_name
             
         if method_name == 'ScoreCAM':
-            if not cuda_error:
-                cam_method = ScoreCAM(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = ScoreCAM(model=self.model, target_layers=self.target_layers, use_cuda=False)
-            
-        if method_name == 'AblationCAM':
-            if not cuda_error:
-                cam_method = AblationCAM(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = AblationCAM(model=self.model, target_layers=self.target_layers, use_cuda=False)
-            
-        if method_name == 'XGradCAM':
-            if not cuda_error:
-                cam_method = XGradCAM(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = XGradCAM(model=self.model, target_layers=self.target_layers, use_cuda=False)
-            
-        if method_name == 'EigenCAM':
-            if not cuda_error:
-                cam_method = EigenCAM(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = EigenCAM(model=self.model, target_layers=self.target_layers, use_cuda=False)
-            
-        if method_name == 'FullGrad':
-            if not cuda_error:
-                cam_method = FullGrad(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = FullGrad(model=self.model, target_layers=self.target_layers, use_cuda=False)
-            
-        if method_name == 'GradCAM++':
-            if not cuda_error:
-                cam_method = GradCAMPlusPlus(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = GradCAMPlusPlus(model=self.model, target_layers=self.target_layers, use_cuda=False)
-            
-        if method_name == 'GradCAM':
-            if not cuda_error:
-                cam_method = GradCAM(model=self.model, target_layers=self.target_layers, use_cuda=True)
-            else:
-                print("error thrown, using CPU")
-                cam_method = GradCAM(model=self.model, target_layers=self.target_layers, use_cuda=False)
+            cam_method = ScoreCAM(model=self.model, target_layers=self.target_layers) if not cuda_error else ScoreCAM(model=self.model, target_layers=self.target_layers)
+        elif method_name == 'AblationCAM':
+            cam_method = AblationCAM(model=self.model, target_layers=self.target_layers) if not cuda_error else AblationCAM(model=self.model, target_layers=self.target_layers)
+        elif method_name == 'XGradCAM':
+            cam_method = XGradCAM(model=self.model, target_layers=self.target_layers) if not cuda_error else XGradCAM(model=self.model, target_layers=self.target_layers)
+        elif method_name == 'EigenCAM':
+            cam_method = EigenCAM(model=self.model, target_layers=self.target_layers) if not cuda_error else EigenCAM(model=self.model, target_layers=self.target_layers)
+        elif method_name == 'FullGrad':
+            cam_method = FullGrad(model=self.model, target_layers=self.target_layers) if not cuda_error else FullGrad(model=self.model, target_layers=self.target_layers)
+        elif method_name == 'GradCAM++':
+            cam_method = GradCAMPlusPlus(model=self.model, target_layers=self.target_layers) if not cuda_error else GradCAMPlusPlus(model=self.model, target_layers=self.target_layers)
+        elif method_name == 'GradCAM':
+            cam_method = GradCAM(model=self.model, target_layers=self.target_layers) if not cuda_error else GradCAM(model=self.model, target_layers=self.target_layers)
             
         if cam_method:    
             return cam_method
@@ -236,29 +196,29 @@ class gui_CAM:
     
     
     def select_target_layer(self):
-        # to implement for multiple models
         if self.model.__class__.__name__ == 'ResNet':
             self.target_layers = [self.model.layer4[-1]]
             print(f'Target Layer for {self.model.__class__.__name__} is:')
-            
-        elif self.model.__class__.__name__ == 'Alexnet':
-            self.target_layers = [11]
+        elif self.model.__class__.__name__ in ['AlexNet', 'Alexnet']:
+            # [修复说明]：必须传入真实的 PyTorch 特征层对象，而不是单纯的数字 11
+            self.target_layers = [self.model.features[-1]] 
             print(f'Target Layer for {self.model.__class__.__name__} is:')
-            
         elif self.model.__class__.__name__ == 'VGG':
             self.target_layers = [self.model.features[-1]]
             print(f'Target Layer for {self.model.__class__.__name__} is:')
-            
         elif self.model.__class__.__name__ == 'AutoShape':
             self.target_layers = [self.model.model.model.model[-2]]
             print(f'Target Layer for YOLOv5 is:')
-            
-        # print(self.target_layers)    
         return self.target_layers
     
     
     def select_model(self):
         model_selection = True
+        
+        # [修复说明]：同样添加了 model_name 的默认值兜底。
+        # 防止调用前该变量为空导致的闪退。
+        model_name = self.model_name if self.model_name else 'ResNet' 
+        
         x = 100
         y = 100
         dx = 0
@@ -270,7 +230,6 @@ class gui_CAM:
         
         draw_text('Model Menu', self.font, (255, 255, 255), self.display, 20, 20)
         
-        # To delimit the size of the button, in the future use value related to window res
         w, h = pygame.display.get_surface().get_size()
         button_width = 300
         button_height = 40
@@ -292,7 +251,6 @@ class gui_CAM:
         pygame.display.update()
         
         while model_selection:
-            
             mx, my = pygame.mouse.get_pos()    
             if resnet_button.collidepoint((mx, my)):
                 if self.click:
@@ -302,10 +260,12 @@ class gui_CAM:
                         model_selection = False
                         model_name = 'ResNet'
                         self.model_gradient_compatible = True
-                        
                     else:
                         print(f'Model selected -> {model_name} was already loaded')
-            
+                        # [修复说明]：添加了 model_selection = False，打破死循环。
+                        # 原版代码如果选了当前正在用的模型，它只会打印上面那句话，然后一直卡在这个 while 循环里，导致程序卡死。
+                        model_selection = False 
+
             if alexnet_button.collidepoint((mx, my)):
                 if self.click:
                     if self.model.__class__.__name__ != 'Alexnet':
@@ -314,10 +274,11 @@ class gui_CAM:
                         model_selection = False
                         model_name = 'Alexnet'
                         self.model_gradient_compatible = True
-                        
                     else:
                         print(f'Model selected -> {model_name} was already loaded')
-            
+                        # [修复说明]：打破死循环
+                        model_selection = False 
+
             if third_button.collidepoint((mx, my)):
                 if self.click:
                     if self.model.__class__.__name__ != 'VGG':
@@ -326,22 +287,23 @@ class gui_CAM:
                         model_selection = False
                         model_name = 'VGG'
                         self.model_gradient_compatible = True
-                        
                     else:
                         print(f'Model selected -> {model_name} was already loaded')
+                        # [修复说明]：打破死循环
+                        model_selection = False 
                     
             if fourth_button.collidepoint((mx, my)):
                 if self.click:
-                    # not sure why, yolov5 returns as name AutoShape.
                     if self.model.__class__.__name__ != 'AutoShape':
                         self.clear_memory()
                         self.model =  torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)        
                         model_selection = False
                         model_name = 'YOLOv5'
                         self.model_gradient_compatible = False
-                        
                     else:
                         print(f'Model selected -> {model_name} was already loaded')
+                        # [修复说明]：打破死循环
+                        model_selection = False 
             
             self.click = False
             for event in pygame.event.get():
@@ -384,7 +346,6 @@ class gui_CAM:
 
         return model_name
 
-    # img is a surface 
     def run_model(self, img):
         with torch.no_grad():
             preprocessed_image = pygame.surfarray.pixels3d(img)                
@@ -398,11 +359,9 @@ class gui_CAM:
                 preprocess_pil = Image.fromarray(np.uint8(preprocessed_image))
                 preprocess_pil.show()
                 input("wait for user input to pass preprocessed image")
-            #Image.fromarray is rotating the image
             input_tensor = Image.fromarray(np.uint8(preprocessed_image)).convert('RGB')
-                
             input_tensor = preprocess(input_tensor)
-            input_tensor = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
+            input_tensor = input_tensor.unsqueeze(0) 
 
             if self.use_cuda:
                 input_tensor = input_tensor.to('cuda')
@@ -410,7 +369,6 @@ class gui_CAM:
             output = self.model(input_tensor)
             return output
     
-    #This option obtains the inference results from outside the cam method
     def get_detection(self, img):
         output = self.run_model(img)
         if output.size() == torch.Size([1, 1000]):
@@ -422,13 +380,10 @@ class gui_CAM:
             if parameters.debug:
                 print(f'target class is {target_class}')
                 print(f"SINGLE DETECTION: {class_name} || {class_score*100}% ")
-                
             return class_name, class_score.cpu().detach().numpy(), probabilities
         else:
             print(f'Not ImageNet:{output.size()}')
 
-    
-    
     def get_top_detections(self, input_image = None, probabilities = None, num_detections = 5):
         if probabilities is None:
             if input_image is not None:
@@ -446,17 +401,13 @@ class gui_CAM:
                         print(f"Class detected: {class_name} with score: {class_percentage}%")
                         ordered_score_percentages.append(class_percentage)
                     return ordered_locations, ordered_score_percentages
-                
                 except Exception as e:
-                    print(
-                        f'The ouput type was not expected:\n{e}')
+                    print(f'The ouput type was not expected:\n{e}')
             else:
                 print('inputs missing')
                 return None
     
-    
     def prob_calc_efficient(self, output):
-        # The output has unnormalized scores. To get probabilities, run a softmax on it.
         probabilities = torch.nn.functional.softmax(output[0], dim=0)
         probabilities = probabilities.to('cpu')
         target_class = np.argmax(probabilities.data.numpy())
@@ -464,29 +415,24 @@ class gui_CAM:
         class_score = probabilities[target_class]
         return class_name, class_score.cpu().detach().numpy()
     
-    
     def get_class_and_score(self, probabilities, index):
         class_name = self.class_list[index]
         class_score = probabilities[index]
         return class_name, round(class_score*100,2)
 
-    
     def run_cam_filtered(self, img, cam_method = None, selected_location = None, new_method_name = None):
         if cam_method is None:
             cam_method = self.cam
         else:
-            # try this to free GPU memory and avoid errors (cam must be instanced afterwards again!)
             del self.cam
             
         gc.collect()
         torch.cuda.empty_cache()
         t0 = time.time()
-        # get the top detected classes to select a target later:
         top_detected_classes, top_detected_percentages = self.get_top_detections(img,  probabilities = None, num_detections = 10)
         self.target_class = roc_functions.check_relevant_classes(top_detected_classes, self.class_list)
         index = np.where(top_detected_classes == self.target_class)
         target_score_percent = top_detected_percentages[int(index[0])]
-        # get the cam heat map in a pygame image
         surface, inf_outputs, _ =  roc_functions.surface_to_cam(
             img, cam_method, self.use_cuda, [ClassifierOutputTarget(self.target_class)])
         print('time needed for visualization method creation :', time.time()-t0)
@@ -507,26 +453,21 @@ class gui_CAM:
         if selected_location is None:
             self.surface = surface
             self.render_cam()
-            # self.render_text()
         else:
             score_string = f"Class detected: {self.class_list[self.target_class]} with score: {target_score_percent}%"
             self.render_cam(selected_location, surface, score_string, new_method_name)
-            # self.render_text()
         
         return self.class_list[self.target_class], target_score_percent
-        
         
     def run_cam(self, img, cam_method = None, selected_location = None, new_method_name = None):
         if cam_method is None:
             cam_method = self.cam
         else:
-            # try this to free GPU memory and avoid errors (cam must be instanced afterwards again!)
             del self.cam
             
         gc.collect()
         torch.cuda.empty_cache()
         t0 = time.time()
-        # get the cam heat map in a pygame image
         surface, inf_outputs, cam_targets =  roc_functions.surface_to_cam(img, cam_method, self.use_cuda)
         print('time needed for visualization method creation :', time.time()-t0)
         
@@ -548,7 +489,6 @@ class gui_CAM:
         
         return class_name, class_percentage
         
-    # Compare methods while managing GPU memory usage to avoid errors
     def compare_new_method(self, img):
         new_method_name = self.select_cam(second_method = True)
         old_method_name = self.method_name
@@ -569,14 +509,11 @@ class gui_CAM:
         print(f"compared {old_method_name} to {new_method_name} \
             -> finished with output {class_name}|{class_score}%")
         time.sleep(10)
-        # After execution it is necessary to free memory by deleting the second method
         del new_cam_method
         gc.collect()
         torch.cuda.empty_cache()
-        # Reload initial method, deleted in load cam if to free GPU memory
         self.cam = self.load_cam(False, method_name = old_method_name)
         return class_name, class_score    
-    
     
     def render_cam(self, selected_location = None, surface_to_plot = None, second_classification = None, new_method_name = None):
         if self.surface:
@@ -590,9 +527,7 @@ class gui_CAM:
             if second_classification is not None and new_method_name is not None:
                 self.text_render(second_classification, new_method_name)
 
-
     def text_render(self, second_classification = None, second_method_name = None):
-        
         if second_method_name is not None:
             description = f'Model: {self.model_name} Method: {second_method_name}'
         else:
@@ -613,41 +548,20 @@ class gui_CAM:
         self.display.blit(score_output, score_loc)    
         pygame.display.update()
     
-    
     def clear_memory(self):
-        print('\n\nmemory before Model deletion:')
-        print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-        print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
-        print("torch.cuda.max_memory_reserved: %fGB\n\n"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024))
         del self.model
-        print('memory after Model deletion:')
-        print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-        print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
-        print("torch.cuda.max_memory_reserved: %fGB\n\n"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024))
         if self.cam:
-            print('\n\nmemory after CAM method deletion:')
-            print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-            print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
-            print("torch.cuda.max_memory_reserved: %fGB\n\n"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024)) 
             del self.cam
-            print('memory before CAM method deletion:')
-            print("torch.cuda.memory_allocated: %fGB"%(torch.cuda.memory_allocated(0)/1024/1024/1024))
-            print("torch.cuda.memory_reserved: %fGB"%(torch.cuda.memory_reserved(0)/1024/1024/1024))
-            print("torch.cuda.max_memory_reserved: %fGB\n\n"%(torch.cuda.max_memory_reserved(0)/1024/1024/1024))
-        
         gc.collect()
         torch.cuda.empty_cache()
         self.model = None
         self.cam = None
     
-        
     def run_menu_no_loop(self, event, call_exit, input_image, offset):
         if not self.main_location:
             self.main_location = offset
         if parameters.paused == True:
             last_pause = True
-            if not last_pause:
-                print('PAUSED')
         else:
             last_pause = False
         
@@ -671,11 +585,6 @@ class gui_CAM:
                             self.last_image_evaluated = input_image
                         else:
                             print('[W] No input image')
-                            if self.filtered_cam:
-                                class_name, class_score = self.run_cam_filtered()
-                            else:
-                                class_name, class_score = self.run_cam()
-                        
                         self.classification_output = f"Class detected: {class_name} with score: {class_score}%"
                         print(self.classification_output)
                     else:
@@ -734,39 +643,6 @@ class gui_CAM:
                 self.get_detection(input_image)
                 return False
                     
-                
         if parameters.paused:
             self.render_cam(offset)
-            pygame.display.update()     
-                            
-if __name__ == '__main__':
-    pygame.init()
-    pygame.font.init() #for fonts rendering
-    display = pygame.display.set_mode([1920,1080], pygame.HWSURFACE | pygame.DOUBLEBUF)
-    test_menu = gui_CAM(display)
-    call_exit = False
-    path = '/home/roc/imagenet-sample-images'
-
-    try:
-        image_name = random.choice(os.listdir(path))
-    except Exception as e:
-        print(f'Selected folder path {path} is not correct\n')
-        path = 'utils/test_images/carla_input'
-        image_name = random.choice(os.listdir(path))
-    print(image_name)
-    file_path = os.path.join(path, image_name)    
-
-    sample_image = pygame.image.load(file_path)
-    display.blit(sample_image, [0,0])
-    roc_functions.blip_image_centered(display, sample_image)
-    while not call_exit:
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
-                    image_name = random.choice(os.listdir(path))
-                    file_path = os.path.join(path, image_name)
-                    sample_image = pygame.image.load(file_path)
-                    parameters.paused = False
-                    roc_functions.blip_image_centered(display, sample_image)
-                    
-            call_exit = test_menu.run_menu_no_loop(event, call_exit, sample_image, [0,0])
+            pygame.display.update()

@@ -129,3 +129,5 @@ desktop.ini
 *.tmp
 *.temp
 .mujoco/
+site/
+.claude/

@@ -13,10 +13,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from gesture_detector_enhanced import EnhancedGestureDetector
 
-    print("✅ 导入增强版手势检测器 (机器学习)")
+    print("[OK] 导入增强版手势检测器 (机器学习)")
     HAS_ENHANCED_DETECTOR = True
 except ImportError:
-    print("⚠️  未找到增强版检测器，使用原始手势检测器")
+    print("[WARNING] 未找到增强版检测器，使用原始手势检测器")
     from gesture_detector import GestureDetector
 
     HAS_ENHANCED_DETECTOR = False
@@ -61,21 +61,21 @@ class IntegratedDroneSimulation:
         for model_path, model_name in model_candidates:
             if os.path.exists(model_path):
                 file_size = os.path.getsize(model_path)
-                print(f"📁 找到 {model_name}: {file_size / 1024:.1f} KB")
+                print(f"[INFO] 找到 {model_name}: {file_size / 1024:.1f} KB")
 
                 # 检查文件大小是否合理
                 if file_size > 10 * 1024:
                     selected_model = model_path
                     selected_model_name = model_name
-                    print(f"✅ 选择: {model_name}")
+                    print(f"[OK] 选择: {model_name}")
                     break
 
         if selected_model:
-            print(f"🎯 使用模型: {selected_model_name}")
+            print(f"[INFO] 使用模型: {selected_model_name}")
 
             try:
                 from gesture_detector_enhanced import EnhancedGestureDetector
-                print("✅ 导入增强版手势检测器")
+                print("[OK] 导入增强版手势检测器")
 
                 # 使用实际的模型文件
                 self.gesture_detector = EnhancedGestureDetector(
@@ -85,21 +85,21 @@ class IntegratedDroneSimulation:
 
                 # 验证模型是否真正加载成功
                 if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
-                    print(f"✅ 机器学习模型加载成功 ({selected_model_name})")
+                    print(f"[OK] 机器学习模型加载成功 ({selected_model_name})")
                     print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
                 else:
-                    print("⚠️  机器学习模型未加载，回退到规则检测")
+                    print("[WARNING] 机器学习模型未加载，回退到规则检测")
                     self.gesture_detector = EnhancedGestureDetector(use_ml=False)
 
             except ImportError as e:
-                print(f"⚠️  无法导入增强版检测器: {e}")
-                print("✅ 使用原始手势检测器")
+                print(f"[WARNING] 无法导入增强版检测器: {e}")
+                print("[OK] 使用原始手势检测器")
                 from gesture_detector import GestureDetector
                 self.gesture_detector = GestureDetector()
 
         else:
-            print("⚠️  未找到可用的机器学习模型文件")
-            print("✅ 使用原始手势检测器")
+            print("[WARNING] 未找到可用的机器学习模型文件")
+            print("[OK] 使用原始手势检测器")
             from gesture_detector import GestureDetector
             self.gesture_detector = GestureDetector()
 
@@ -140,7 +140,7 @@ class IntegratedDroneSimulation:
         # 手势识别阈值（降低以提高灵敏度）
         # 如果是机器学习模式，阈值可以进一步降低
         if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml') and self.gesture_detector.use_ml:
-            print("✅ 使用机器学习模式，置信度阈值更低")
+            print("[OK] 使用机器学习模式，置信度阈值更低")
             base_threshold = 0.55  # 机器学习可以更低
         else:
             base_threshold = 0.6  # 规则检测需要高一点
@@ -166,13 +166,13 @@ class IntegratedDroneSimulation:
 
         print("无人机初始化完成，等待手势指令...")
 
-        print("无人机仿真系统初始化完成 ✓")
+        print("无人机仿真系统初始化完成 [OK]")
 
         if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
             if self.gesture_detector.use_ml:
-                print("📊 当前模式: 机器学习手势识别")
+                print("[INFO] 当前模式: 机器学习手势识别")
             else:
-                print("📊 当前模式: 规则手势识别")
+                print("[INFO] 当前模式: 规则手势识别")
 
     def _initialize_camera(self):
         """初始化摄像头"""
@@ -197,7 +197,7 @@ class IntegratedDroneSimulation:
                     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fps = cap.get(cv2.CAP_PROP_FPS)
 
-                    print(f"✅ 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
+                    print(f"[OK] 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
                     return cap
                 else:
                     cap.release()
@@ -205,7 +205,7 @@ class IntegratedDroneSimulation:
             else:
                 print(f"摄像头 {camera_id} 无法打开")
 
-        print("❌ 所有摄像头尝试失败，使用虚拟模式")
+        print("[ERROR] 所有摄像头尝试失败，使用虚拟模式")
         return None
 
     def _gesture_recognition_loop(self):
@@ -223,7 +223,7 @@ class IntegratedDroneSimulation:
 
         # 显示虚拟模式提示（如果摄像头未连接）
         if self.cap is None:
-            print("⚠️ 使用虚拟摄像头模式，请连接摄像头进行真实手势识别")
+            print("[WARNING] 使用虚拟摄像头模式，请连接摄像头进行真实手势识别")
 
         while self.running:
             if self.paused:
@@ -410,7 +410,7 @@ class IntegratedDroneSimulation:
 
                 # 添加调试信息
                 print(
-                    f"🎯 检测到手势: {gesture} (置信度: {confidence:.2f}, 阈值: {threshold}) -> 执行: {command} (强度: {intensity:.2f})")
+                    f"[INFO] 检测到手势: {gesture} (置信度: {confidence:.2f}, 阈值: {threshold}) -> 执行: {command} (强度: {intensity:.2f})")
 
                 # 发送命令到控制器
                 self.drone_controller.send_command(command, intensity)
@@ -446,7 +446,7 @@ class IntegratedDroneSimulation:
         target_fps = 60
         frame_delay = 1.0 / target_fps
 
-        print("\n🎮 键盘提示：按 'R' 键重置无人机位置到原点")
+        print("\n[INFO] 键盘提示：按 'R' 键重置无人机位置到原点")
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
         print("           按 'H' 键悬停")
@@ -485,7 +485,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_r]:
                 if ('r' not in self._last_key_press or
                         current_time - self._last_key_press['r'] > 1.0):
-                    print("🎮 键盘：重置无人机位置")
+                    print("[INFO] 键盘：重置无人机位置")
                     self.drone_controller.reset()
                     print("  无人机已重置到原点位置")
                     self._last_key_press['r'] = current_time
@@ -494,7 +494,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_t]:
                 if ('t' not in self._last_key_press or
                         current_time - self._last_key_press['t'] > 1.0):
-                    print("🎮 键盘：起飞")
+                    print("[INFO] 键盘：起飞")
                     self.drone_controller.send_command("takeoff", 0.8)
                     self._last_key_press['t'] = current_time
 
@@ -502,7 +502,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_l]:
                 if ('l' not in self._last_key_press or
                         current_time - self._last_key_press['l'] > 1.0):
-                    print("🎮 键盘：降落")
+                    print("[INFO] 键盘：降落")
                     self.drone_controller.send_command("land", 0.5)
                     self._last_key_press['l'] = current_time
 
@@ -510,7 +510,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_h]:
                 if ('h' not in self._last_key_press or
                         current_time - self._last_key_press['h'] > 1.0):
-                    print("🎮 键盘：悬停")
+                    print("[INFO] 键盘：悬停")
                     self.drone_controller.send_command("hover")
                     self._last_key_press['h'] = current_time
 
@@ -518,7 +518,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_s]:
                 if ('s' not in self._last_key_press or
                         current_time - self._last_key_press['s'] > 1.0):
-                    print("🎮 键盘：停止")
+                    print("[INFO] 键盘：停止")
                     self.drone_controller.send_command("stop")
                     self._last_key_press['s'] = current_time
 
@@ -707,7 +707,7 @@ class IntegratedDroneSimulation:
             # 保存日志
             self._save_log()
 
-            print("无人机仿真系统已安全关闭 ✓")
+            print("无人机仿真系统已安全关闭 [OK]")
 
 
 def load_config():
@@ -732,18 +732,18 @@ if __name__ == "__main__":
     try:
         import pygame
 
-        print("✅ Pygame 已安装")
+        print("[OK] Pygame 已安装")
     except ImportError:
-        print("❌ 错误: Pygame 未安装!")
+        print("[ERROR] 错误: Pygame 未安装!")
         print("请运行: pip install pygame")
         sys.exit(1)
 
     try:
         import OpenGL
 
-        print("✅ PyOpenGL 已安装")
+        print("[OK] PyOpenGL 已安装")
     except ImportError:
-        print("❌ 错误: PyOpenGL 未安装!")
+        print("[ERROR] 错误: PyOpenGL 未安装!")
         print("请运行: pip install PyOpenGL PyOpenGL-accelerate")
         sys.exit(1)
 
