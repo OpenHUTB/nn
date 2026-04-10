@@ -4,7 +4,7 @@
 
 ## 项目简介
 
-本项目使用 [CARLA Object Detection Dataset](https://github.com/DanielHfnr/Carla-Object-Detection-Dataset) 数据集，结合 YOLO12 模型进行自动驾驶场景下的目标检测任务。
+本项目使用整理好的 [CARLA 数据集](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing)，结合 YOLO12 模型进行自动驾驶场景下的目标检测任务。
 
 ## 环境要求
 
@@ -18,15 +18,30 @@
 ```
 yolo12_object_detection/
 ├── scripts/ultralytics/      # Ultralytics 框架代码
+│   ├── cfg/                  # 配置文件
+│   ├── data/                 # 数据处理模块
+│   ├── engine/               # 训练推理引擎
+│   └── models/               # 模型定义
 ├── datasets/                 # 数据集目录
+│   └── carla/                # CARLA 数据集
+│       ├── images/           # 图像文件
+│       │   ├── train/        # 训练集图像
+│       │   ├── val/          # 验证集图像
+│       │   └── test/         # 测试集图像
+│       └── labels/           # 标签文件
+│           ├── train/        # 训练集标签
+│           ├── val/          # 验证集标签
+│           └── test/         # 测试集标签
 └── runs/                     # 训练结果
+    ├── train/                # 训练过程记录
+    └── detect/               # 推理结果
 ```
 
 ## 使用说明
 
 ### 1. 数据集准备
 
-从 [CARLA Object Detection Dataset](https://github.com/DanielHfnr/Carla-Object-Detection-Dataset) 下载数据集，放置到 `datasets/carla/` 目录下。
+从 [Google Drive 数据集链接](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing) 下载整理好的数据集，放置到 `datasets/carla/` 目录下，保持上述目录结构。
 
 ### 2. 配置数据集
 
