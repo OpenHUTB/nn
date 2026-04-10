@@ -4,7 +4,9 @@ This project implements an intelligent autonomous driving simulation in the CARL
 ***
 
 ## 📁 Project Structure
-- `Code`: Stores the core program files, including the main running script `main.py` and dependency configuration file `requirements.txt`
+- `main.py`: Main running script
+- `requirements.txt`: Dependency configuration file
+- `yolov8n.pt`: YOLOv8 pre-trained model
 - `Images`: Saves the demonstration images, test results and working screenshots generated during the project operation
 - `README.md`: Records the complete description, function introduction and usage specifications of the project
 
@@ -67,7 +69,7 @@ model = YOLO("yolov8n.pt")
    ```
 2. **Run the Main Control Script**:
    ```bash
-   python Main.py
+   python main.py
    ```
 The system will automatically run a complete simulation process for 2 minutes and then exit safely.
 
