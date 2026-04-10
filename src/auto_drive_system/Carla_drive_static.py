@@ -61,7 +61,7 @@ def spawn_obstacles(world, blueprint_library, vehicle, num_obstacles=3, distance
         obstacles.append(obstacle)  # 将障碍物添加到障碍物列表
 
     return obstacles
-
+# 纯追踪算法实现转向控制
 
 def pure_pursuit(tar_location, v_transform):
     L = 2.875  # 汽车轴距
