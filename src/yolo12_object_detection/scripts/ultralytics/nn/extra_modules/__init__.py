@@ -25,7 +25,3 @@ from .LCA import LCA
 from .HFFE import HFFE
 from .moe.moe_module import ESMoE
 from .FAENet import FAENet
-from .CAFM import CAFM_Fusion
-from .LFP import LFP
-from .SFSFusion import SFSFusion
-from .FAAFusion import FAAFusion

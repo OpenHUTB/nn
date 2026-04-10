@@ -16,11 +16,6 @@ from .mona import Mona
 from .transMamba import SpectralEnhancedFFN
 from .EVSSM import EDFFN
 from .srconvnet import MixFFN
-from .DWM_MSA import DWM_MSA
-from .BinaryAttention import BinaryAttention
-from .wca import WCA
-from .LCGA import LCGA
-from .CGTA import CGTA
 from ..modules.transformer import TransformerEncoderLayer, AIFI
 from ..modules.block import C2PSA, PSABlock, ABlock, A2C2f, C3k
 from ..modules.conv import Conv
@@ -28,7 +23,7 @@ from ..modules.conv import Conv
 __all__ = ['AIFI_RepBN', 'C2BRA', 'C2CGA', 'C2DA', 'C2DPB', 'C2Pola', 'C2TSSA', 'C2ASSA', 'C2PSA_DYT', 'C2TSSA_DYT', 'C2Pola_DYT',
            'C2PSA_FMFFN', 'C2PSA_CGLU', 'C2PSA_SEFN', 'C2PSA_Mona', 'C2TSSA_DYT_Mona', 'C2TSSA_DYT_Mona_SEFN', 'C2PSA_SEFFN',
            'C2TSSA_DYT_Mona_SEFFN', 'C2PSA_EDFFN', 'C2TSSA_DYT_Mona_EDFFN', 'C2MSLA', 'C2PSA_EPGO', 'C2PSA_DML', 'C2PSA_LRSA',
-           'C2PSA_MALA', 'C2PSA_EGSA', 'C2PSA_SWSA', 'C2PSA_DWMMSA', 'C2PSA_BinaryAttn', 'C2PSA_WCA', 'C2PSA_LCGA', 'C2PSA_CGTA']
+           'C2PSA_MALA', 'C2PSA_EGSA', 'C2PSA_SWSA']
 
 ln = nn.LayerNorm
 linearnorm = partial(LinearNorm, norm1=ln, norm2=RepBN, step=60000)
@@ -1375,80 +1370,3 @@ class C2PSA_SWSA(C2PSA):
         self.m = nn.Sequential(*(PSABlock_SWSA(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
 
 ######################################## ACMMM2025 Pushing Trade-Off Boundaries: Compact yet Effective RemoteSensing Change Detection end ########################################
-
-######################################## TGRS2025 USTNet start ########################################
-
-class PSABlock_DWMMSA(PSABlock):
-    def __init__(self, c, attn_ratio=0.5, num_heads=4, shortcut=True) -> None:
-        super().__init__(c, attn_ratio, num_heads, shortcut)
-
-        self.attn = DWM_MSA(c)
-
-class C2PSA_DWMMSA(C2PSA):
-    def __init__(self, c1, c2, n=1, e=0.5):
-        super().__init__(c1, c2, n, e)
-
-        self.m = nn.Sequential(*(PSABlock_DWMMSA(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
-
-######################################## TGRS2025 USTNet end ########################################
-
-######################################## CVPR2026 BinaryAttention start ########################################
-
-class PSABlock_BinaryAttn(PSABlock):
-    def __init__(self, c, attn_ratio=0.5, num_heads=4, shortcut=True) -> None:
-        super().__init__(c, attn_ratio, num_heads, shortcut)
-
-        self.attn = BinaryAttention(c)
-
-class C2PSA_BinaryAttn(C2PSA):
-    def __init__(self, c1, c2, n=1, e=0.5):
-        super().__init__(c1, c2, n, e)
-
-        self.m = nn.Sequential(*(PSABlock_BinaryAttn(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
-
-######################################## CVPR2026 BinaryAttention end ########################################
-
-######################################## CVPR2026 WCA start ########################################
-
-class PSABlock_WCA(PSABlock):
-    def __init__(self, c, attn_ratio=0.5, num_heads=4, shortcut=True) -> None:
-        super().__init__(c, attn_ratio, num_heads, shortcut)
-
-        self.attn = WCA(c)
-
-class C2PSA_WCA(C2PSA):
-    def __init__(self, c1, c2, n=1, e=0.5):
-        super().__init__(c1, c2, n, e)
-
-        self.m = nn.Sequential(*(PSABlock_WCA(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
-
-######################################## CVPR2026 WCA end ########################################
-
-######################################## TGRS2026 CGA start ########################################
-
-class PSABlock_LCGA(PSABlock):
-    def __init__(self, c, attn_ratio=0.5, num_heads=4, shortcut=True) -> None:
-        super().__init__(c, attn_ratio, num_heads, shortcut)
-
-        self.attn = LCGA(c)
-
-class C2PSA_LCGA(C2PSA):
-    def __init__(self, c1, c2, n=1, e=0.5):
-        super().__init__(c1, c2, n, e)
-
-        self.m = nn.Sequential(*(PSABlock_LCGA(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
-
-class PSABlock_CGTA(PSABlock):
-    def __init__(self, c, attn_ratio=0.5, num_heads=4, shortcut=True) -> None:
-        super().__init__(c, attn_ratio, num_heads, shortcut)
-
-        self.attn = CGTA(c)
-
-class C2PSA_CGTA(C2PSA):
-    def __init__(self, c1, c2, n=1, e=0.5):
-        super().__init__(c1, c2, n, e)
-
-        self.m = nn.Sequential(*(PSABlock_CGTA(self.c, attn_ratio=0.5, num_heads=self.c // 64) for _ in range(n)))
-
-
-######################################## TGRS2026 CGA end ########################################

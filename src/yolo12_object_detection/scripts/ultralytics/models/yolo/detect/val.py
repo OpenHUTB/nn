@@ -87,22 +87,7 @@ class DetectionValidator(BaseValidator):
 
     def get_desc(self):
         """Return a formatted string summarizing class metrics of YOLO model."""
-        headers = self._display_headers()
-        return ("%22s" + "%11s" * (2 + len(headers))) % ("Class", "Images", "Instances", *headers)
-
-    def _display_headers(self):
-        """Return metric headers used in validation console output."""
-        return "Box(P", "R", "mAP50", "mAP75", "mAP50-95)"
-
-    def _display_mean_results(self):
-        """Return aggregate metric values shown in validation console output."""
-        mp, mr, map50, map50_95 = self.metrics.mean_results()
-        return mp, mr, map50, self.metrics.box.map75, map50_95
-
-    def _display_class_result(self, i):
-        """Return per-class metric values shown in validation console output."""
-        p, r, ap50, ap50_95 = self.metrics.class_result(i)
-        return p, r, ap50, self.metrics.box.all_ap[i, 5], ap50_95
+        return ("%22s" + "%11s" * 6) % ("Class", "Images", "Instances", "Box(P", "R", "mAP50", "mAP50-95)")
 
     def postprocess(self, preds):
         """Apply Non-maximum suppression to prediction outputs."""
@@ -203,15 +188,17 @@ class DetectionValidator(BaseValidator):
 
     def print_results(self):
         """Prints training/validation set metrics per class."""
-        pf = "%22s" + "%11i" * 2 + "%11.3g" * len(self._display_headers())  # print format
-        LOGGER.info(pf % ("all", self.seen, self.nt_per_class.sum(), *self._display_mean_results()))
+        pf = "%22s" + "%11i" * 2 + "%11.3g" * len(self.metrics.keys)  # print format
+        LOGGER.info(pf % ("all", self.seen, self.nt_per_class.sum(), *self.metrics.mean_results()))
         if self.nt_per_class.sum() == 0:
             LOGGER.warning(f"WARNING ⚠️ no labels found in {self.args.task} set, can not compute metrics without labels")
 
         # Print results per class
         if self.args.verbose and not self.training and self.nc > 1 and len(self.stats):
             for i, c in enumerate(self.metrics.ap_class_index):
-                LOGGER.info(pf % (self.names[c], self.nt_per_image[c], self.nt_per_class[c], *self._display_class_result(i)))
+                LOGGER.info(
+                    pf % (self.names[c], self.nt_per_image[c], self.nt_per_class[c], *self.metrics.class_result(i))
+                )
 
         if self.args.plots:
             for normalize in True, False:

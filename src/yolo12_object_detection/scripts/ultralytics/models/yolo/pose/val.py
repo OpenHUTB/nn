@@ -47,54 +47,18 @@ class PoseValidator(DetectionValidator):
 
     def get_desc(self):
         """Returns description of evaluation metrics in string format."""
-        headers = self._display_headers()
-        return ("%22s" + "%11s" * (2 + len(headers))) % ("Class", "Images", "Instances", *headers)
-
-    def _display_headers(self):
-        """Return metric headers used in validation console output."""
-        return (
+        return ("%22s" + "%11s" * 10) % (
+            "Class",
+            "Images",
+            "Instances",
             "Box(P",
             "R",
             "mAP50",
-            "mAP75",
             "mAP50-95)",
             "Pose(P",
             "R",
             "mAP50",
-            "mAP75",
             "mAP50-95)",
-        )
-
-    def _display_mean_results(self):
-        """Return aggregate metric values shown in validation console output."""
-        return (
-            self.metrics.box.mp,
-            self.metrics.box.mr,
-            self.metrics.box.map50,
-            self.metrics.box.map75,
-            self.metrics.box.map,
-            self.metrics.pose.mp,
-            self.metrics.pose.mr,
-            self.metrics.pose.map50,
-            self.metrics.pose.map75,
-            self.metrics.pose.map,
-        )
-
-    def _display_class_result(self, i):
-        """Return per-class metric values shown in validation console output."""
-        box_p, box_r, box_ap50, box_ap50_95 = self.metrics.box.class_result(i)
-        pose_p, pose_r, pose_ap50, pose_ap50_95 = self.metrics.pose.class_result(i)
-        return (
-            box_p,
-            box_r,
-            box_ap50,
-            self.metrics.box.all_ap[i, 5],
-            box_ap50_95,
-            pose_p,
-            pose_r,
-            pose_ap50,
-            self.metrics.pose.all_ap[i, 5],
-            pose_ap50_95,
         )
 
     def postprocess(self, preds):

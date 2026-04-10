@@ -1314,38 +1314,21 @@ def feature_visualization(x, module_type, stage, n=32, save_dir=Path("runs/detec
     for m in {"Detect", "Segment", "Pose", "Classify", "OBB", "RTDETRDecoder"}:  # all model heads
         if m in module_type:
             return
-
-    def to_uint8_map(arr):
-        """Normalize a feature map to [0, 255] uint8 for visualization."""
-        arr_min, arr_max = arr.min(), arr.max()
-        if arr_max > arr_min:
-            arr = (arr - arr_min) / (arr_max - arr_min)
-        else:
-            arr = np.zeros_like(arr, dtype=np.float32)
-        return (arr * 255).astype(np.uint8)
-
     if isinstance(x, torch.Tensor):
-        batch, channels, height, width = x.shape  # batch, channels, height, width
+        _, channels, height, width = x.shape  # batch, channels, height, width
         if height > 1 and width > 1:
-            stage_name = f"stage{stage}_{module_type.split('.')[-1]}"
-            stage_dir = save_dir / stage_name
-            stage_dir.mkdir(parents=True, exist_ok=True)
+            f = save_dir / f"stage{stage}_{module_type.split('.')[-1]}_features.png"  # filename
 
-            # Keep legacy NPY behavior unchanged: one layer-level file using the first image in batch.
-            np.save(str(save_dir / f"{stage_name}_features.npy"), x[0].cpu().numpy())
+            blocks = torch.chunk(x[0].cpu(), channels, dim=0)  # select batch index 0, block by channels
+            n = min(n, channels)  # number of plots
+            _, ax = plt.subplots(math.ceil(n / 8), 8, tight_layout=True)  # 8 rows x n/8 cols
+            ax = ax.ravel()
+            plt.subplots_adjust(wspace=0.05, hspace=0.05)
+            for i in range(n):
+                ax[i].imshow(blocks[i].squeeze())  # cmap='gray'
+                ax[i].axis("off")
 
-            for b in range(batch):
-                image_dir = stage_dir / f"img{b:04d}"
-                image_dir.mkdir(parents=True, exist_ok=True)
-                sample = x[b].cpu().numpy()
-
-                for c in range(channels):
-                    channel_map = to_uint8_map(sample[c])
-                    channel_heatmap = cv2.applyColorMap(channel_map, cv2.COLORMAP_VIRIDIS)
-                    cv2.imwrite(str(image_dir / f"ch{c:04d}.png"), channel_heatmap)
-
-                sum_map = to_uint8_map(sample.sum(axis=0))
-                sum_heatmap = cv2.applyColorMap(sum_map, cv2.COLORMAP_VIRIDIS)
-                cv2.imwrite(str(image_dir / "sum.png"), sum_heatmap)
-
-            LOGGER.info(f"Saving {stage_name} feature maps... ({batch} images, {channels} channels/image)")
+            LOGGER.info(f"Saving {f}... ({n}/{channels})")
+            plt.savefig(f, dpi=300, bbox_inches="tight")
+            plt.close()
+            np.save(str(f.with_suffix(".npy")), x[0].cpu().numpy())  # npy save

@@ -140,12 +140,11 @@ C3K2_CLASS = (C3k2_Faster, C3k2_ODConv, C3k2_Faster_EMA, C3k2_DBB, C3k2_DeepDBB,
               C3k2_TSSA, C3k2_SAVSS, C3k2_MobileMamba, C3k2_MambaOut, C3k2_MambaOut_UniRepLK, C3k2_EfficientVIM, C3k2_EfficientVIM_CGLU, C3k2_FAT, C3k2_LEGM, C3k2_RCB, C3k2_LFEM, C3k2_SBSM, C3k2_LSBlock, C3k2_MambaOut_LSConv, C3k2_TransMamba, C3k2_EVS,
               C3k2_EBlock, C3k2_DBlock, C3k2_FDConv, C3k2_MambaOut_FDConv, C3k2_PFDConv, C3k2_FasterFD, C3k2_DSAN, C3k2_MambaOut_DSA, C3k2_DSA, C3k2_DSAN_EDFFN, C3k2_RMB, C3k2_SFSConv, C3k2_MambaOut_SFSC, C3k2_PSFSConv, C3k2_FasterSFSC, C3k2_GroupMamba,
               C3k2_GroupMambaBlock, C3k2_MambaVision, DSC3k2, C3k2_wConv, C3k2_FourierConv, C3k2_GLVSS, C3k2_ESC, C3k2_MBRConv3, C3k2_MBRConv5, C3k2_VSSD, C3k2_TVIM, C3k2_CSI, C3k2_SHSA_EPGO, C3k2_SHSA_EPGO_CGLU, C3k2_ConvAttn, C3k2_UniConvBlock, C3k2_LGLB,
-              C3k2_ConverseB, C3k2_Converse, C3k2_GCConv, C3k2_CFBlock, C3k2_FMABlock, C3k2_LWGA, C3k2_CSSC, C3k2_CNCM, C3k2_HFRB, C3k2_EVA, C3k2_RMBC, C3k2_RMBC_LA, C3k2_IEL, C3k2_SFMB, C3k2_MFEB, C3k2_PartialNetBlock, C3k2_DRG, C3k2_GLGM, C3k2_MAC, C3k2_SPJFB,
-              C3k2_GLSS2D, C3k2_DEGConv, C3k2_TransMixer, C3k2_PFG, C3k2_MSInit, C3k2_SMB, C3k2_SMS
+              C3k2_ConverseB, C3k2_Converse, C3k2_GCConv, C3k2_CFBlock, C3k2_FMABlock, C3k2_LWGA, C3k2_CSSC, C3k2_CNCM, C3k2_HFRB, C3k2_EVA, C3k2_RMBC, C3k2_RMBC_LA, C3k2_IEL, C3k2_SFMB
               )
 A2C2F_CLASS = (A2C2f, A2C2f_CGLU, A2C2f_KAN, A2C2f_DFFN, A2C2f_FRFN, A2C2f_DYT, A2C2f_CGLU_DYT, A2C2f_DFFN_DYT, A2C2f_FMFFN, A2C2f_FMFFN_DYT, A2C2f_SEFN, A2C2f_Mona, A2C2f_DFFN_DYT_Mona, A2C2f_SEFFN, A2C2f_EDFFN)
 C2PSA_CLASS = (C2PSA, C2BRA, C2CGA, C2DA, C2DPB, C2Pola, C2TSSA, C2ASSA, C2PSA_DYT, C2TSSA_DYT, C2Pola_DYT, C2PSA_FMFFN, C2PSA_CGLU, C2PSA_SEFN, C2PSA_Mona, C2PSA_SEFFN, C2TSSA_DYT_Mona, C2TSSA_DYT_Mona_SEFN, C2TSSA_DYT_Mona_SEFFN, C2PSA_EDFFN,
-               C2TSSA_DYT_Mona_EDFFN, C2MSLA, C2PSA_EPGO, C2PSA_DML, C2PSA_LRSA, C2PSA_MALA, C2PSA_EGSA, C2PSA_SWSA, C2PSA_DWMMSA, C2PSA_BinaryAttn, C2PSA_WCA, C2PSA_LCGA, C2PSA_CGTA)
+               C2TSSA_DYT_Mona_EDFFN, C2MSLA, C2PSA_EPGO, C2PSA_DML, C2PSA_LRSA, C2PSA_MALA, C2PSA_EGSA, C2PSA_SWSA)
 class BaseModel(nn.Module):
     """The BaseModel class serves as a base class for all the models in the Ultralytics YOLO family."""
 
@@ -1112,7 +1111,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             DGCST, RepNCSPELAN4_CAA, SRFD, DRFD, RGCSPELAN, CSP_PTB, SimpleStem, VisionClueMerge, VSSBlock_YOLO, XSSBlock, GLSA, FeaturePyramidSharedConv,
             LDConv, CSP_MSCB, CSP_PMSFA, RFAConv, RFCBAMConv, RFCAConv, CSP_FreqSpatial, MANet, MANet_FasterBlock, MANet_FasterCGLU, 
             MANet_Star, PSConv, RepHMS, CSP_MSCB_SC, LoGStem, GSConvE, DSConv_YOLO13, wConv2d, FourierConv, Converse2D, GCConv, MANet_GCConv,
-            RepStem, ESMoE, FSConv, LFP
+            RepStem, ESMoE, FSConv
         ) + C3K2_CLASS + A2C2F_CLASS + C2PSA_CLASS):
             if args[0] == 'head_channel':
                 args[0] = d[args[0]]
@@ -1144,7 +1143,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             if m in ((C3k2,) + C3K2_CLASS) and scale in "mlx":  # for M/L/X sizes
                 if m in (C3k2_AggregatedAtt, C3k2_MSBlock, C3k2_DAttention, C3k2_FocusedLinearAttention, C3k2_Parc, C3k2_UniRepLKNetBlock, C3k2_SMPCGLU, 
                          C3k2_Heat, C3k2_RandomMixing, C3k2_RandomMixingCGLU, C3k2_PKIModule, C3k2_FCA_CTA, C3k2_GlobalFilter, C3k2_DynamicFilter, C3k2_RMB,
-                         C3k2_wConv, C3k2_FourierConv, C3k2_LWGA, C3k2_PartialNetBlock):
+                         C3k2_wConv, C3k2_FourierConv, C3k2_LWGA):
                     if type(args[-1]) == bool:
                         args[-1] = True
                     else:
@@ -1367,7 +1366,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             c1 = [ch[x] for x in f]
             c2 = c1[0]
             args = [c1]
-        elif m in {HAFB, MFM, CAFM_Fusion}:
+        elif m in {HAFB, MFM}:
             if args[0] == 'head_channel':
                 args[0] = d[args[0]]
             c1 = [ch[x] for x in f]
@@ -1430,7 +1429,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             c1 = [ch[x] for x in f]
             c2 = make_divisible(min(args[0], max_channels) * width, 8)
             args = [c1, c2]
-        elif m in {MFPM, ERM, SFSFusion, FAAFusion}:
+        elif m in {MFPM, ERM}:
             c1 = [ch[x] for x in f]
             c2 = make_divisible(min(args[0], max_channels) * width, 8)
             args = [c1, c2, *args[1:]]

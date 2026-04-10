@@ -54,54 +54,18 @@ class SegmentationValidator(DetectionValidator):
 
     def get_desc(self):
         """Return a formatted description of evaluation metrics."""
-        headers = self._display_headers()
-        return ("%22s" + "%11s" * (2 + len(headers))) % ("Class", "Images", "Instances", *headers)
-
-    def _display_headers(self):
-        """Return metric headers used in validation console output."""
-        return (
+        return ("%22s" + "%11s" * 10) % (
+            "Class",
+            "Images",
+            "Instances",
             "Box(P",
             "R",
             "mAP50",
-            "mAP75",
             "mAP50-95)",
             "Mask(P",
             "R",
             "mAP50",
-            "mAP75",
             "mAP50-95)",
-        )
-
-    def _display_mean_results(self):
-        """Return aggregate metric values shown in validation console output."""
-        return (
-            self.metrics.box.mp,
-            self.metrics.box.mr,
-            self.metrics.box.map50,
-            self.metrics.box.map75,
-            self.metrics.box.map,
-            self.metrics.seg.mp,
-            self.metrics.seg.mr,
-            self.metrics.seg.map50,
-            self.metrics.seg.map75,
-            self.metrics.seg.map,
-        )
-
-    def _display_class_result(self, i):
-        """Return per-class metric values shown in validation console output."""
-        box_p, box_r, box_ap50, box_ap50_95 = self.metrics.box.class_result(i)
-        mask_p, mask_r, mask_ap50, mask_ap50_95 = self.metrics.seg.class_result(i)
-        return (
-            box_p,
-            box_r,
-            box_ap50,
-            self.metrics.box.all_ap[i, 5],
-            box_ap50_95,
-            mask_p,
-            mask_r,
-            mask_ap50,
-            self.metrics.seg.all_ap[i, 5],
-            mask_ap50_95,
         )
 
     def postprocess(self, preds):

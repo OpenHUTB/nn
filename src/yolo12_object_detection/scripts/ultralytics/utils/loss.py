@@ -255,7 +255,7 @@ class BboxLoss(nn.Module):
             loss_iou = self.iou_ratio * loss_iou +  (1 - self.iou_ratio) * nwd_loss
         elif self.gcd_loss:
             gcd = gcd_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask])
-            gcd_l = ((1.0 - gcd) * weight.squeeze()).sum() / target_scores_sum  # 0.0002不需要了，之前的code有尺寸上的问题，现已修复
+            gcd_l = ((1.0 - gcd) * weight).sum() / target_scores_sum * 0.0002
             loss_iou = self.iou_ratio * loss_iou +  (1 - self.iou_ratio) * gcd_l
 
         # DFL loss
