@@ -7,6 +7,6 @@ set SCRIPT_DIR=%~dp0
 cd /d %SCRIPT_DIR%\..\..
 
 :: Run main script
-python src\flight_control\main.py
+python src\flight_control\main.py --gui
 
 pause
