@@ -72,6 +72,9 @@ model = YOLO("yolov8n.pt")
    ```bash
    python main.py
    ```
+3. **替代方法：使用启动脚本**：
+   双击项目目录中的 `start.bat` 文件，自动检查CARLA模拟器状态并启动系统。
+
 系统将自动运行完整的仿真过程2分钟，然后安全退出。
 
 ***
