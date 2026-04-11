@@ -57,6 +57,7 @@ env/
 *.ckpt
 models/
 !src/yolo12_object_detection/scripts/ultralytics/models/
+!src/yolo12_object_detection/scripts/ultralytics/cfg/models/
 
 checkpoints/
 *.tflite
