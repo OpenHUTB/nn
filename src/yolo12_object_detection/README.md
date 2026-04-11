@@ -4,7 +4,9 @@
 
 ## 项目简介
 
-本项目使用整理好的 [CARLA 数据集](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing)，结合 YOLO12 模型进行自动驾驶场景下的目标检测任务。
+本项目使用 [CARLA Object Detection Dataset](https://github.com/DanielHfnr/Carla-Object-Detection-Dataset) 数据集，通过 Google Drive 整理版本进行下载，结合 YOLO12 模型进行自动驾驶场景下的目标检测任务。
+
+数据集来源于：[https://github.com/DanielHfnr/Carla-Object-Detection-Dataset](https://github.com/DanielHfnr/Carla-Object-Detection-Dataset)
 
 ## 环境要求
 
@@ -17,16 +19,19 @@
 
 ```
 yolo12_object_detection/
-├─dataset                     # 数据集目录
-│  ├─annotations              # 标注文件
+├─dataset                     # 数据集目录 (从Google Drive下载)
+│  ├─annotations              # VOC格式标注文件
 │  ├─images                   # 图像文件
 │  │  ├─test                  # 测试集图像
 │  │  └─train                 # 训练集图像
-│  ├─image_sets               # 图像集列表文件
-│  └─labels                   # 标签文件
+│  ├─image_sets               # 图像集列表文件 (train.txt, val.txt, test.txt)
+│  └─labels                   # YOLO格式标签文件
 │      ├─test                 # 测试集标签
 │      └─train                # 训练集标签
+├─main.py                     # 项目统一入口文件
 └─scripts                     # 脚本和框架代码
+    ├─train.py               # 训练脚本
+    ├─val.py                 # 验证脚本
     ├─runs                    # 运行结果目录
     │  ├─train                # 训练结果
     │  │  └─baseline          # 基线实验
@@ -34,44 +39,38 @@ yolo12_object_detection/
     │  └─val                  # 验证结果
     │      └─baseline         # 基线验证
     └─ultralytics             # Ultralytics 框架
-        ├─assets              # 资源文件
         ├─cfg                 # 配置文件
         │  ├─datasets         # 数据集配置
-        │  ├─models           # 模型配置
-        │  ├─solutions        # 解决方案配置
-        │  └─trackers         # 跟踪器配置
-        ├─data                # 数据处理
-        ├─engine              # 训练推理引擎
-        ├─hub                 # Hub 功能
-        ├─models              # 模型定义
-        ├─nn                  # 神经网络模块
-        ├─solutions           # 解决方案
-        ├─trackers            # 跟踪器
-        └─utils               # 工具函数
+        │  └─models           # 模型配置
+        └─...                 # 其他框架文件
 ```
 
 ## 使用说明
 
 ### 1. 数据集准备
 
-从 [Google Drive 数据集链接](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing) 下载整理好的数据集，放置到 `dataset/` 目录下，保持上述目录结构。
+从 [Google Drive 数据集链接](https://drive.google.com/drive/folders/1lApgN0pp_OcZ4L1fXWY4Vabs8F3vTZcM?usp=sharing) 下载整理好的数据集，解压到项目根目录的 `dataset/` 文件夹下。
+
+**注意**：下载后的数据集已经包含了预配置好的 `data.yaml` 文件，无需额外创建。
 
 ### 2. 配置数据集
 
-在 `scripts/ultralytics/cfg/datasets/` 下创建 `data.yaml` 文件，配置数据集路径和类别信息。
+数据集已包含预配置的 `data.yaml` 文件，位于 `dataset/` 目录下。实际配置如下：
 
-参考配置：
 ```yaml
-path: ../dataset  # 数据集根目录
-train: images/train  # 训练集图像
-val: images/test  # 验证集图像（根据实际数据集调整）
-test: images/test  # 测试集图像
+# dataset/data.yaml 实际配置
+train: train_yolo.txt  # 训练集图像列表
+val: val_yolo.txt      # 验证集图像列表
+test: test_yolo.txt    # 测试集图像列表
 
-names:
-  0: class0
-  1: class1
-  # 根据实际数据集类别配置
+# number of classes
+nc: 5
+
+# class names
+names: [ 'vehicle', 'bike', 'motobike', 'traffic_light', 'traffic_sign' ]
 ```
+
+**注意**：数据集的 `image_sets/` 目录下包含了 `train_yolo.txt`、`val_yolo.txt`、`test_yolo.txt` 文件，这些文件列出了对应数据集的图像路径。`labels/` 目录下包含 YOLO 格式的标签文件。
 
 ### 3. 训练模型
 
