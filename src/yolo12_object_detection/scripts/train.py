@@ -8,7 +8,7 @@ if __name__ == '__main__':
     script_dir = os.path.dirname(__file__)
     data_yaml_abs = os.path.abspath(os.path.join(script_dir, '../dataset/data.yaml'))
 
-    model = YOLO('ultralytics/cfg/models/12/yolo12n.yaml')
+    model = YOLO('ultralytics/cfg/models/12/yolo12-A2C2f-CGLU.yaml')
     model.train(data=data_yaml_abs,  # 使用绝对路径
                 amp=False,
                 cache=False,
@@ -19,5 +19,5 @@ if __name__ == '__main__':
                 workers=4,
                 optimizer='SGD',
                 project='runs/train',
-                name='baseline',
+                name='CGLU',
                 )

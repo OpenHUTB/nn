@@ -13,7 +13,7 @@ def get_weight_size(path):
 if __name__ == '__main__':
 
     script_dir = os.path.dirname(__file__)
-    model_abs = os.path.abspath(os.path.join(script_dir, 'runs/train/baseline/weights/best.pt'))
+    model_abs = os.path.abspath(os.path.join(script_dir, 'runs/train/CGLU/weights/best.pt'))
     data_yaml_abs = os.path.abspath(os.path.join(script_dir, '../dataset/data.yaml'))
 
     model_path = model_abs
@@ -26,10 +26,12 @@ if __name__ == '__main__':
                         # rect=False,
                         # save_json=True, # if you need to cal coco metrice
                         project='runs/val',
-                        name='baseline',
+                        name='CGLU',
                         )
     
     if model.task == 'detect':
+
+
         length = result.box.p.size
         model_names = list(result.names.values())
         preprocess_time_per_image = result.speed['preprocess']
