@@ -99,21 +99,8 @@ class ControlConfig:
                     setattr(cfg, k, v)
         return cfg
 
-            # 写入特殊级别日志
-            if level in log_files and level != "INFO":
-                with open(log_files[level], "a", encoding="utf-8") as f:
-                    f.write(log_msg + "\n")
-
 # 全局配置（单例）
 CFG = ControlConfig()
-
-    @classmethod
-    def deg2rad(cls, x):
-        """角度转弧度（向量化+异常安全）"""
-        try:
-            return np.asarray(x, np.float64) * DEG2RAD
-        except:
-            return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
 # ====================== 工具类（极简+高效） ======================
 class Utils:
@@ -506,10 +493,11 @@ class ArmController:
 
     def _init_mujoco(self):
         """极简MuJoCo初始化"""
+        jlim = JOINT_LIMITS
         xml = f"""
 <mujoco model="arm">
     <compiler angle="radian" inertiafromgeom="true"/>
-    <option timestep="{sim_dt}" gravity="0 0 -9.81" collision="all"/>
+    <option timestep="{SIM_DT}" gravity="0 0 -9.81"/>
     <default>
         <joint type="hinge" limited="true"/>
         <motor ctrllimited="true" ctrlrange="-1 1" gear="100"/>
@@ -519,21 +507,21 @@ class ArmController:
         <geom name="floor" type="plane" size="3 3 0.1" rgba="0.8 0.8 0.8 1"/>
         <body name="base" pos="0 0 0">
             <geom type="cylinder" size="0.1 0.1" rgba="0.2 0.2 0.8 1"/>
-            <joint name="joint1" axis="0 0 1" pos="0 0 0.1" range="{j1_min} {j1_max}"/>
+            <joint name="joint1" axis="0 0 1" pos="0 0 0.1" range="{jlim[0,0]} {jlim[0,1]}"/>
             <body name="link1" pos="0 0 0.1">
                 <geom name="link1" type="cylinder" size="0.04 0.18" mass="0.8" rgba="0 0.8 0 0.8"/>
-                <joint name="joint2" axis="0 1 0" pos="0 0 0.18" range="{j2_min} {j2_max}"/>
+                <joint name="joint2" axis="0 1 0" pos="0 0 0.18" range="{jlim[1,0]} {jlim[1,1]}"/>
                 <body name="link2" pos="0 0 0.18">
                     <geom name="link2" type="cylinder" size="0.04 0.18" mass="0.6" rgba="0 0.8 0 0.8"/>
-                    <joint name="joint3" axis="0 1 0" pos="0 0 0.18" range="{j3_min} {j3_max}"/>
+                    <joint name="joint3" axis="0 1 0" pos="0 0 0.18" range="{jlim[2,0]} {jlim[2,1]}"/>
                     <body name="link3" pos="0 0 0.18">
                         <geom name="link3" type="cylinder" size="0.04 0.18" mass="0.6" rgba="0 0.8 0 0.8"/>
-                        <joint name="joint4" axis="0 1 0" pos="0 0 0.18" range="{j4_min} {j4_max}"/>
+                        <joint name="joint4" axis="0 1 0" pos="0 0 0.18" range="{jlim[3,0]} {jlim[3,1]}"/>
                         <body name="link4" pos="0 0 0.18">
                             <geom name="link4" type="cylinder" size="0.04 0.18" mass="0.4" rgba="0 0.8 0 0.8"/>
-                            <joint name="joint5" axis="0 1 0" pos="0 0 0.18" range="{j5_min} {j5_max}"/>
+                            <joint name="joint5" axis="0 1 0" pos="0 0 0.18" range="{jlim[4,0]} {jlim[4,1]}"/>
                             <body name="ee" pos="0 0 0.18">
-                                <geom name="ee_geom" type="sphere" size="0.04" mass="{self.load}" rgba="0.8 0.2 0.2 1"/>
+                                <geom name="ee_geom" type="sphere" size="0.04" mass="0.5" rgba="0.8 0.2 0.2 1"/>
                             </body>
                         </body>
                     </body>
@@ -553,19 +541,8 @@ class ArmController:
 </mujoco>
         """
 
-        # 模板参数
-        xml_params = {
-            "sim_dt": SIM_DT,
-            "load": self.load_set,
-            "j1_min": JOINT_LIMITS[0, 0], "j1_max": JOINT_LIMITS[0, 1],
-            "j2_min": JOINT_LIMITS[1, 0], "j2_max": JOINT_LIMITS[1, 1],
-            "j3_min": JOINT_LIMITS[2, 0], "j3_max": JOINT_LIMITS[2, 1],
-            "j4_min": JOINT_LIMITS[3, 0], "j4_max": JOINT_LIMITS[3, 1],
-            "j5_min": JOINT_LIMITS[4, 0], "j5_max": JOINT_LIMITS[4, 1],
-        }
 
         try:
-            xml = xml_template.format(**xml_params)
             model = mujoco.MjModel.from_xml_string(xml)
             data = mujoco.MjData(model)
             return model, data
@@ -869,12 +846,12 @@ class ArmController:
     def run(self):
         """主运行循环"""
         # 启动Viewer
+        self.viewer = None
         try:
+            import mujoco.viewer
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data) if self.model else None
         except Exception as e:
-            Utils.log(f"Viewer启动失败: {e}", "ERROR")
-            self.running = False
-            return
+            Utils.log(f"Viewer不可用，跳过可视化: {e}", "WARN")
 
         # 启动交互线程
         threading.Thread(target=self._shell, daemon=True).start()
@@ -884,7 +861,7 @@ class ArmController:
 
         # 主循环
         Utils.log("控制器启动成功！输入help查看命令")
-        while self.running and (self.viewer.is_running() if self.viewer else True):
+        while self.running:
             try:
                 self.control_step()
                 if self.data:
