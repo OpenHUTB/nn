@@ -136,6 +136,9 @@ class IntegratedDroneSimulation:
         self.control_intensity = 1.0
         self.last_command_time = time.time()
         self.command_cooldown = 1.5  # 命令冷却时间（秒），从2.0降低到1.5
+        
+        # 帧率计算
+        self.last_frame_time = time.time()
 
         # 手势识别阈值（降低以提高灵敏度）
         # 如果是机器学习模式，阈值可以进一步降低
@@ -270,10 +273,15 @@ class IntegratedDroneSimulation:
                 cv2.putText(frame, "按 'q' 键退出", (50, 400),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
+            # 计算帧率
+            current_time = time.time()
+            fps = 1.0 / (current_time - getattr(self, 'last_frame_time', current_time))
+            self.last_frame_time = current_time
+
             # 手势检测
             try:
                 processed_frame, gesture, confidence, landmarks = \
-                    self.gesture_detector.detect_gestures(frame, simulation_mode=True)
+                    self.gesture_detector.detect_gestures(frame, simulation_mode=True, fps=fps)
 
                 # 更新共享数据
                 self.current_frame = processed_frame
@@ -293,7 +301,7 @@ class IntegratedDroneSimulation:
                 self.current_gesture = None
 
                 # 检查退出
-            key = cv2.waitKey(1) & 0xFF
+            key = cv2.waitKey(10) & 0xFF
             if key == ord('q'):
                 print("收到退出指令...")
                 self.running = False
@@ -305,6 +313,22 @@ class IntegratedDroneSimulation:
                 self._debug_gesture_detection()
             elif key == ord('m'):  # 切换模式（如果有多个模型）
                 self._switch_detection_mode()
+            elif key == ord('r'):  # 重置无人机位置
+                print("[INFO] 键盘：重置无人机位置")
+                self.drone_controller.reset()
+                print("  无人机已重置到原点位置")
+            elif key == ord('t'):  # 手动起飞
+                print("[INFO] 键盘：起飞")
+                self.drone_controller.send_command("takeoff", 0.8)
+            elif key == ord('l'):  # 手动降落
+                print("[INFO] 键盘：降落")
+                self.drone_controller.send_command("land", 0.5)
+            elif key == ord('h'):  # 悬停
+                print("[INFO] 键盘：悬停")
+                self.drone_controller.send_command("hover")
+            elif key == ord('s'):  # 停止
+                print("[INFO] 键盘：停止")
+                self.drone_controller.send_command("stop")
 
         print("手势识别线程结束")
 

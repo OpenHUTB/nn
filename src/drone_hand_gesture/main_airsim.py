@@ -104,17 +104,12 @@ def main(show_window=True):
             
             frame_count += 1
             
-            # 手势识别
-            debug_frame, gesture, confidence, _ = detector.detect_gestures(frame)
-            
-            # 显示帧率
+            # 计算帧率
             elapsed = time.time() - start_time
             fps = frame_count / elapsed if elapsed > 0 else 0
             
-            cv2.putText(debug_frame, f"FPS: {fps:.1f}", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            cv2.putText(debug_frame, f"Gesture: {gesture} ({confidence:.2f})", 
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            # 手势识别
+            debug_frame, gesture, confidence, _ = detector.detect_gestures(frame, fps=fps)
             
             # 处理手势
             if gesture and gesture != "none" and gesture != "no_hand":

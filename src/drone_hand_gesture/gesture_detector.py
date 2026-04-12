@@ -33,13 +33,14 @@ class GestureDetector:
             "ok_sign": "hover"  # OK手势 - 悬停
         }
 
-    def detect_gestures(self, image, simulation_mode=False):
+    def detect_gestures(self, image, simulation_mode=False, fps=0):
         """
         检测图像中的手势
 
         Args:
             image: 输入图像
             simulation_mode: 是否为仿真模式
+            fps: 帧率（可选）
 
         Returns:
             processed_image: 处理后的图像
