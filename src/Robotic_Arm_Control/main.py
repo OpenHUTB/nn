@@ -470,9 +470,6 @@ class ArmController:
         # Viewer
         self.viewer = None
 
-        # Viewer
-        self.viewer = None
-
     def _init_ids(self):
         """ID初始化（预计算）"""
         if self.model is None:
@@ -714,8 +711,8 @@ class ArmController:
             'avoid': [15, 25, 10, 5, 0]
         }
 
-        if pose_name in poses:
-            self.move_to(poses[pose_name])
+        if pose in poses:
+            self.move_to(poses[pose])
         else:
             Utils.log(f"未知姿态: {pose}", "ERROR")
 
