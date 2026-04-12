@@ -1,8 +1,7 @@
 import argparse
 import time
 
-from agents.random_walker import RandomWalker
-from agents.vision_flyer import VisionFlyer
+from agents.keyboard_controller import KeyboardController
 from client.drone_client import DroneClient
 
 
@@ -29,8 +28,7 @@ if __name__ == '__main__':
     else:
         print("录制功能已禁用，减少内存和磁盘使用")
     
-    agent = RandomWalker(client, config.move_type, (-0.5, 0.5))  # 使用较小的速度范围
-    # agent = VisionFlyer(client, config.move_type)
+    agent = KeyboardController(client, config.move_type)
     
     # 运行指定时间
     print(f"开始运行，持续 {config.duration} 秒...")
