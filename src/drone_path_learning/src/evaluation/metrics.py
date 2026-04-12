@@ -1,6 +1,7 @@
 """无人机强化学习评估的性能指标计算"""
 
 import json
+import os
 import numpy as np
 from typing import Dict, List, Tuple
 import logging
@@ -129,21 +130,21 @@ class PerformanceMetrics:
 
         positions = np.array(trajectory)
 
-        # Compute first derivatives (velocity)
+        # 计算一阶差分（速度）
         v1 = np.diff(positions, axis=0)
 
-        # Compute second derivatives (acceleration)
+        # 计算二阶差分（加速度）
         if len(v1) < 2:
             return 0.0
 
         v2 = np.diff(v1, axis=0)
 
-        # Compute magnitudes of accelerations
+        # 计算加速度模长
         accelerations = np.linalg.norm(v2, axis=1)
 
-        # Smoothness is inverse of mean acceleration
+        # 平滑度取平均加速度的反比
         mean_accel = np.mean(accelerations)
-        smoothness = 1.0 / (1.0 + mean_accel)  # Normalized to [0, 1]
+        smoothness = 1.0 / (1.0 + mean_accel)  # 归一化到 [0, 1]
 
         return float(smoothness)
 
@@ -151,7 +152,7 @@ class PerformanceMetrics:
     def average_smoothness(
         trajectories: List[List[Tuple[float, float, float]]],
     ) -> float:
-        """Compute average smoothness across all trajectories"""
+        """计算所有轨迹的平均平滑度"""
         if len(trajectories) == 0:
             return 0.0
 
@@ -163,18 +164,18 @@ class PerformanceMetrics:
     @staticmethod
     def stability(episode_rewards: List[float]) -> float:
         """
-        Compute training stability (lower variance = more stable).
+        计算训练稳定性（方差越小越稳定）。
 
         Args:
-            episode_rewards: List of episode rewards
+            episode_rewards: 回合奖励列表
 
         返回值:
-            Stability score (0-1): 1 = very stable
+            稳定性评分 (0-1): 1 表示非常稳定
         """
         if len(episode_rewards) < 2:
             return 0.0
 
-        # Use coefficient of variation (std / mean)
+        # 使用变异系数（标准差 / 均值）
         mean_reward = np.mean(episode_rewards)
         if mean_reward == 0:
             return 0.0
@@ -182,8 +183,8 @@ class PerformanceMetrics:
         std_reward = np.std(episode_rewards)
         cv = std_reward / abs(mean_reward)
 
-        # Convert to stability score
-        stability = 1.0 / (1.0 + cv)  # Normalized to [0, 1]
+        # 转换为稳定性评分
+        stability = 1.0 / (1.0 + cv)  # 归一化到 [0, 1]
         return float(stability)
 
     @staticmethod
@@ -193,15 +194,15 @@ class PerformanceMetrics:
         episode_rewards: List[float],
     ) -> Dict[str, float]:
         """
-        Compute all metrics at once.
+        一次性计算全部指标。
 
         Args:
-            episodes: List of episode data
-            trajectories: List of position trajectories
-            episode_rewards: List of rewards
+            episodes: 回合数据列表
+            trajectories: 轨迹位置列表
+            episode_rewards: 奖励列表
 
         返回值:
-            Dictionary with all metrics
+            包含所有指标的字典
         """
         metrics = {
             "success_rate": PerformanceMetrics.success_rate(episodes),
@@ -218,16 +219,16 @@ def compute_metrics_from_results(
     results_file: str, trajectories_file: str = None
 ) -> Dict[str, float]:
     """
-    Compute metrics from evaluation results JSON files.
+    从评估结果 JSON 文件计算指标。
 
     Args:
-        results_file: Path to evaluation results JSON
-        trajectories_file: Path to trajectories JSON
+        results_file: 评估结果 JSON 路径
+        trajectories_file: 轨迹 JSON 路径
 
     返回值:
-        Dictionary with computed metrics
+        包含计算结果的字典
     """
-    # Load results
+    # 读取评估结果
     with open(results_file, "r") as f:
         eval_results = json.load(f)
 
@@ -241,21 +242,19 @@ def compute_metrics_from_results(
 
     episode_rewards = eval_results["episode_rewards"]
 
-    # Load trajectories if available
+    # 如有轨迹文件则读取
     trajectories = []
     if trajectories_file and os.path.exists(trajectories_file):
-        import os
-
         with open(trajectories_file, "r") as f:
             traj_data = json.load(f)
         trajectories = [t.get("positions", []) for t in traj_data]
 
-    # Compute metrics
+    # 计算指标
     metrics = PerformanceMetrics.compute_all_metrics(
         episodes, trajectories, episode_rewards
     )
 
-    # Add baseline metrics from eval results
+    # 补充评估结果中的基础指标
     metrics.update(
         {
             "mean_reward": eval_results["mean_reward"],
@@ -268,7 +267,7 @@ def compute_metrics_from_results(
 
 
 def print_metrics(metrics: Dict[str, float]):
-    """Pretty print metrics"""
+    """格式化输出指标"""
     logger.info("\n" + "=" * 50)
     logger.info("PERFORMANCE METRICS")
     logger.info("=" * 50)
@@ -283,17 +282,13 @@ def print_metrics(metrics: Dict[str, float]):
 
 
 def main():
-    """Command-line interface"""
+    """命令行入口"""
     import argparse
     import os
 
-    parser = argparse.ArgumentParser(description="Compute performance metrics")
-    parser.add_argument(
-        "--results", type=str, required=True, help="Path to evaluation results JSON"
-    )
-    parser.add_argument(
-        "--trajectories", type=str, default=None, help="Path to trajectories JSON"
-    )
+    parser = argparse.ArgumentParser(description="计算性能指标")
+    parser.add_argument("--results", type=str, required=True, help="评估结果 JSON 路径")
+    parser.add_argument("--trajectories", type=str, default=None, help="轨迹 JSON 路径")
 
     args = parser.parse_args()
 
@@ -302,11 +297,11 @@ def main():
     metrics = compute_metrics_from_results(args.results, args.trajectories)
     print_metrics(metrics)
 
-    # Save metrics
+    # 保存指标
     output_file = os.path.splitext(args.results)[0] + "_metrics.json"
     with open(output_file, "w") as f:
         json.dump(metrics, f, indent=2)
-    logger.info(f"Metrics saved to {output_file}")
+    logger.info(f"指标已保存到 {output_file}")
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ training:
   algorithm: "PPO" # 算法类型：PPO、DQN、A2C 等
   total_timesteps: 1000000 # 训练总步数
   checkpoint_freq: 10000 # 每 N 步保存一次检查点
-  eval_freq: 5000 # 每 N 步进行一次评估
+  eval_freq: 0 # 每 N 步进行一次评估
   max_steps_per_episode: 500 # 每回合最大步数
 
 # 环境参数
@@ -14,6 +14,7 @@ environment:
   port: 41451
   image_shape: [84, 84] # 输入图像尺寸 (H, W)
   action_duration: 0.5 # 每个动作持续时间（秒）
+  control_step_delay: 0.02 # 每个动作后用于状态刷新的额外等待时间（秒）
   velocity_step: 5.0 # 速度大小（m/s）
   target_points:
     - [0.0, 0.0, -10.0] # 目标航点 1
@@ -22,7 +23,7 @@ environment:
 
 # 观测预处理
 observation:
-  frame_stack: 4 # 堆叠 N 帧以提供时序信息
+  frame_stack: 2 # 堆叠 N 帧以提供时序信息
   normalize: true # 归一化到 [0, 1]
   resize: true
   resize_shape: [84, 84]
@@ -72,9 +73,10 @@ logging:
 
 # 评估参数
 evaluation:
-  eval_episodes: 10 # 评估回合数
+  eval_episodes: 3 # 评估回合数
   deterministic: true # 是否使用确定性策略（不探索）
   render: false # 评估时是否渲染
+  success_distance_threshold: 2.0 # 距离目标小于该阈值视为成功
 
   # 停止条件
   use_reward_threshold: false
@@ -93,9 +95,10 @@ reward:
 hardware:
   n_envs: 1 # 并行环境数量
   vec_env_type: "dummy" # "dummy" 或 "subproc"
-  device: "auto" # "cpu"、"cuda" 或 "auto"
+  device: "cuda" # "cpu"、"cuda" 或 "auto"
 
 # 其他
 misc:
   seed: 42 # 随机种子
   deterministic: false # 是否启用确定性模式
+  validate_env: false # 是否在训练前执行 SB3 check_env（AirSim 下建议关闭）
