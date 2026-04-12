@@ -1,0 +1,55 @@
+{
+  "kp_base": 120.0,
+  "kd_base": 8.0,
+  "kp_load_gain": 1.8,
+  "kd_load_gain": 1.5,
+  "ff_vel": 0.7,
+  "ff_acc": 0.5,
+  "backlash": [
+    0.001,
+    0.001,
+    0.002,
+    0.002,
+    0.003
+  ],
+  "friction": [
+    0.1,
+    0.08,
+    0.08,
+    0.06,
+    0.06
+  ],
+  "gravity_comp": true,
+  "stiffness_base": [
+    200.0,
+    180.0,
+    150.0,
+    120.0,
+    80.0
+  ],
+  "stiffness_load_gain": 1.8,
+  "stiffness_error_gain": 1.5,
+  "stiffness_min": [
+    100.0,
+    90.0,
+    75.0,
+    60.0,
+    40.0
+  ],
+  "stiffness_max": [
+    300.0,
+    270.0,
+    225.0,
+    180.0,
+    120.0
+  ],
+  "damping_ratio": 0.04,
+  "smooth_factor": 0.1,
+  "jerk_limit": [
+    10.0,
+    8.0,
+    8.0,
+    6.0,
+    6.0
+  ]
+}
