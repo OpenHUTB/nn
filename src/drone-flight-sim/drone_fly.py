@@ -7,15 +7,15 @@ client.confirmConnection()
 client.enableApiControl(True)
 client.armDisarm(True)
 
-print("✅ 成功连接 AirSim 无人机！")
+print(" 成功连接 AirSim 无人机！")
 
 # 起飞
 client.takeoffAsync().join()
-print("🚁 无人机已起飞！")
+print(" 无人机已起飞！")
 time.sleep(2)
 
 # 自动巡航
-print("🔁 启动自动巡航...")
+print(" 启动自动巡航...")
 client.moveToPositionAsync(5, 0, -5, 5).join()
 time.sleep(1)
 client.moveToPositionAsync(5, 5, -5, 5).join()
@@ -29,4 +29,4 @@ client.landAsync().join()
 client.armDisarm(False)
 client.enableApiControl(False)
 
-print("🏁 任务完成！无人机已降落！")
+print(" 任务完成！无人机已降落！")
