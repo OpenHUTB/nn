@@ -1,49 +1,70 @@
-# 模拟器的神经网络示例
-
-利用 `神经网络` 实现 Carla（无人车）、AirSim（无人机）、Mujoco（具身人） 的感知、规划、控制等功能。
-
-## 环境配置
-
-* 平台：Windows 10/11，Ubuntu 20.04/22.04
-* 软件：Python 3.7-3.12（需支持3.8）、Pytorch（尽量不使用Tensorflow）
-* [模拟器下载链接](https://mp.weixin.qq.com/s/3Tzo0AZEMB2PFYAu_s8gOA) 、相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
-
-
-## 贡献指南
-
-准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
-代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
-
-### 约定
-
-* 模块的文档位于 `docs/{模块名}`目录下，项目概述位于`docs/{模块名}/README.md`文件中，并能够从 [项目首页](https://openhutb.github.io/nn/) 跳转过去，具体请参考 [carla_CAM 模块文档](https://openhutb.github.io/nn/carla_CAM/)
-* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
-* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
-* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
-* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
-
-其他约定请参考[提交注意事项](https://github.com/OpenHUTB/.github/wiki/submit_notes) 。
+\# 无人机第一次作业 - 自动飞行控制系统
 
 
 
-### 文档生成
+\## 作业内容
 
-测试生成的文档：
-1. 使用以下命令安装`mkdocs`和相关依赖：
-```shell
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
+基于 AirSim 无人机仿真平台，使用 Python 实现无人机自动起飞、定点巡航、自动降落功能。
 
-2. 在命令行中进入`nn`目录下，运行：
-```shell
-mkdocs build
-mkdocs serve
-```
-然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
 
-## 参考
 
-* [模拟器文档](https://openhutb.github.io)
-* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
-* [神经网络原理](https://github.com/OpenHUTB/neuro)
+\## 运行环境
+
+\- 操作系统：Windows 10/11 64位
+
+\- Python 版本：Python 3.10.11
+
+\- 仿真平台：AirSimNH
+
+
+
+\## 依赖库
+
+\- airsim==1.8.1
+
+\- numpy>=1.21
+
+\- pynput>=1.8
+
+\- msgpack-rpc-python>=0.4.1
+
+
+
+\## 功能实现
+
+1\. 自动连接 AirSim 仿真环境
+
+2\. 解锁无人机并启动电机
+
+3\. 自动起飞至目标高度
+
+4\. 按正方形路径自动巡航
+
+5\. 自动降落并上锁
+
+6\. 任务完成自动退出
+
+
+
+\## 运行步骤
+
+1\. 启动 AirSimNH.exe，选择“否(N)”进入四旋翼无人机模式
+
+2\. 等待仿真环境完全加载
+
+3\. 打开终端，执行以下命令运行代码：drone\_fly.py4. 观察无人机自动完成起飞、巡航、降落全过程
+
+
+
+\## 项目效果
+
+\- 无人机成功连接仿真环境
+
+\- 稳定起飞
+
+\- 按预定航线飞行
+
+\- 精准降落
+
+\- 无报错、无异常、可稳定复现
+
