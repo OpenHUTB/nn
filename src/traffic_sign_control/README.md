@@ -1,4 +1,6 @@
 # 🚗 CARLA Environment: Traffic Sign Recognition & Autonomous Vehicle Control System
+
+🌍 [English Version](README.md) | 🇨🇳 [中文](README_CN.md)
 This project implements an intelligent autonomous driving simulation in the CARLA environment, focusing on real-time traffic sign detection and vehicle dynamic control. Powered by the YOLOv8 deep learning model, the system can accurately identify key traffic indicators (stop signs, speed limit signs, traffic lights), and automatically control the vehicle to make compliant driving decisions. The solution also integrates Pygame for real-time rendering of the vehicle-mounted camera view from the driver's perspective.
 
 ***

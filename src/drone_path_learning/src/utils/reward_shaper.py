@@ -92,8 +92,11 @@ class RewardShaper:
         if not self.target_points:
             return 0.0
 
-        distances = [np.linalg.norm(position - pt) for pt in self.target_points]
-        return min(distances)
+        targets = np.asarray(self.target_points, dtype=np.float32)
+        distances = np.linalg.norm(
+            targets - np.asarray(position, dtype=np.float32), axis=1
+        )
+        return float(np.min(distances))
 
     def should_reset_target(self, position: np.ndarray, threshold: float = 2.0) -> bool:
         """检查是否达到当前目标并移动到下一个"""

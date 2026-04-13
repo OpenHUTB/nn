@@ -88,7 +88,7 @@ class TrajectoryVisualizer:
                 linewidth=1,
             )
 
-        # Plot obstacles
+        # 绘制障碍物
         if obstacles:
             for obs in obstacles:
                 pos = obs.get("position", [0, 0, 0])
@@ -102,7 +102,7 @@ class TrajectoryVisualizer:
 
                 ax.plot_surface(x_obs, y_obs, z_obs, alpha=0.3, color="red")
 
-        # Labels and formatting
+        # 坐标与样式设置
         ax.set_xlabel("X (m)")
         ax.set_ylabel("Y (m)")
         ax.set_zlabel("Z (m)")
@@ -110,7 +110,7 @@ class TrajectoryVisualizer:
         ax.legend(loc="upper left")
         ax.grid(True, alpha=0.3)
 
-        # Set equal aspect ratio
+        # 设置等比例坐标轴
         max_range = (
             np.array(
                 [
@@ -149,10 +149,10 @@ class TrajectoryVisualizer:
         在同一图形上绘制多个 3D 轨迹。
 
         Args:
-            trajectories_list: List of (positions, label) tuples
-            target_points: Target waypoints
-            title: Plot title
-            save_path: Path to save figure
+            trajectories_list: (positions, label) 元组列表
+            target_points: 目标航点
+            title: 图标题
+            save_path: 图像保存路径
         """
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D
@@ -173,7 +173,7 @@ class TrajectoryVisualizer:
                 label=label,
             )
 
-        # Plot target points
+        # 绘制目标点
         if target_points is not None and len(target_points) > 0:
             ax.scatter(
                 target_points[:, 0],
@@ -198,7 +198,7 @@ class TrajectoryVisualizer:
 
         if save_path:
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
-            logger.info(f"Saved plot to {save_path}")
+            logger.info(f"图像已保存到 {save_path}")
 
         return fig, ax
 
@@ -210,19 +210,19 @@ class TrajectoryVisualizer:
         save_path: Optional[str] = None,
     ):
         """
-        Plot trajectory metrics over time.
+        绘制轨迹指标随时间变化曲线。
 
         Args:
-            positions: Array of shape (N, 3)
-            rewards: Array of shape (N,) with step rewards
-            collisions: Boolean array indicating collisions
-            save_path: Path to save figure
+            positions: 形状为 (N, 3) 的位置数组
+            rewards: 形状为 (N,) 的每步奖励数组
+            collisions: 表示碰撞情况的布尔数组
+            save_path: 图像保存路径
         """
         import matplotlib.pyplot as plt
 
         fig, axes = plt.subplots(2, 2, figsize=self.figsize)
 
-        # Distance from origin over time
+        # 与原点距离随时间变化
         distances = np.linalg.norm(positions, axis=1)
         axes[0, 0].plot(distances)
         axes[0, 0].set_ylabel("Distance from Origin (m)")
@@ -230,14 +230,14 @@ class TrajectoryVisualizer:
         axes[0, 0].set_title("Distance from Origin")
         axes[0, 0].grid(True, alpha=0.3)
 
-        # Height over time
+        # 高度随时间变化
         axes[0, 1].plot(positions[:, 2])
         axes[0, 1].set_ylabel("Height Z (m)")
         axes[0, 1].set_xlabel("Step")
         axes[0, 1].set_title("Altitude")
         axes[0, 1].grid(True, alpha=0.3)
 
-        # Rewards
+        # 奖励曲线
         if rewards is not None:
             axes[1, 0].plot(rewards)
             axes[1, 0].set_ylabel("Reward")
@@ -245,7 +245,7 @@ class TrajectoryVisualizer:
             axes[1, 0].set_title("Reward over Time")
             axes[1, 0].grid(True, alpha=0.3)
 
-        # Collisions
+        # 碰撞标记
         if collisions is not None:
             axes[1, 1].scatter(
                 np.where(collisions)[0],
@@ -265,13 +265,13 @@ class TrajectoryVisualizer:
 
         if save_path:
             plt.savefig(save_path, dpi=150, bbox_inches="tight")
-            logger.info(f"Saved metrics plot to {save_path}")
+            logger.info(f"指标图已保存到 {save_path}")
 
         return fig, axes
 
 
 def load_trajectories_from_json(json_path: str) -> Dict:
-    """Load trajectories from JSON file"""
+    """从 JSON 文件读取轨迹数据"""
     with open(json_path, "r") as f:
         data = json.load(f)
     return data
@@ -283,12 +283,12 @@ def visualize_evaluation_results(
     viz_dir: Optional[str] = None,
 ):
     """
-    Visualize evaluation results.
+    可视化评估结果。
 
     Args:
-        results_dir: Directory containing evaluation results
-        traj_file: Name of trajectories JSON file
-        viz_dir: Directory to save visualizations
+        results_dir: 包含评估结果的目录
+        traj_file: 轨迹 JSON 文件名
+        viz_dir: 可视化结果保存目录
     """
     import matplotlib.pyplot as plt
 
@@ -296,18 +296,18 @@ def visualize_evaluation_results(
         viz_dir = os.path.join(results_dir, "visualizations")
     os.makedirs(viz_dir, exist_ok=True)
 
-    # Load trajectories
+    # 读取轨迹数据
     traj_path = os.path.join(results_dir, traj_file)
     if not os.path.exists(traj_path):
-        logger.warning(f"Trajectory file not found: {traj_path}")
+        logger.warning(f"未找到轨迹文件: {traj_path}")
         return
 
     trajectories = load_trajectories_from_json(traj_path)
-    logger.info(f"Loaded {len(trajectories)} trajectories")
+    logger.info(f"已加载 {len(trajectories)} 条轨迹")
 
     visualizer = TrajectoryVisualizer()
 
-    # Visualize each episode
+    # 可视化每个回合
     for traj_data in trajectories:
         ep_num = traj_data.get("episode", 0)
         positions = np.array(traj_data.get("positions", []))
@@ -319,40 +319,40 @@ def visualize_evaluation_results(
             )
             plt.close("all")
 
-    # Visualize all trajectories together
+    # 汇总可视化多条轨迹
     if len(trajectories) > 1:
         traj_list = [
             (np.array(t.get("positions", [])), f"Ep. {t.get('episode', 0)}")
-            for t in trajectories[:5]  # Limit to first 5
+            for t in trajectories[:5]  # 最多展示前 5 条
         ]
         save_path = os.path.join(viz_dir, "all_trajectories.png")
         visualizer.plot_multiple_trajectories(
-            traj_list, title="Multiple Episode Trajectories", save_path=save_path
+            traj_list, title="多回合轨迹对比", save_path=save_path
         )
         plt.close("all")
 
-    logger.info(f"Visualizations saved to {viz_dir}")
+    logger.info(f"可视化结果已保存到 {viz_dir}")
 
 
 def main():
-    """Command-line interface"""
+    """命令行入口"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Visualize drone trajectories")
+    parser = argparse.ArgumentParser(description="可视化无人机轨迹")
     parser.add_argument(
         "--results-dir",
         type=str,
         required=True,
-        help="Directory containing evaluation results",
+        help="包含评估结果的目录",
     )
     parser.add_argument(
-        "--output-dir", type=str, default=None, help="Directory to save visualizations"
+        "--output-dir", type=str, default=None, help="可视化结果保存目录"
     )
     parser.add_argument(
         "--traj-file",
         type=str,
         default="trajectories.json",
-        help="Name of trajectories JSON file",
+        help="轨迹 JSON 文件名",
     )
 
     args = parser.parse_args()

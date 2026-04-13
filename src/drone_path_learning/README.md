@@ -13,10 +13,8 @@
 
 ## 项目结构
 
-说明：项目名 `drone_rl_planner` 中的 `rl` 是 `Reinforcement Learning` 的缩写。
-
 ```
-hh/
+drone_path_learning/
 ├── src/
 │   ├── envs/                    # 环境封装
 │   │   ├── base_drone_env.py   # AirSim Gym 环境
@@ -38,9 +36,9 @@ hh/
 │   ├── checkpoints/             # 模型检查点
 │   ├── best_model/              # 最优模型存储
 │   └── results/                 # 评估结果
-├── tests/                       # 单元测试
-├── config.yaml                  # 训练配置
-└── train.py                     # 快速启动脚本
+├── requirements.txt             # pip 依赖
+├── pyproject.toml               # 项目元数据
+└── main.py                     # 快速启动脚本
 ```
 
 ## 安装
@@ -54,13 +52,13 @@ hh/
 
 1. 克隆项目并安装依赖：
 ```bash
-cd drone_rl_planner
+cd drone_path_learning
 pip install -r requirements.txt
 ```
 
 或者使用 pip 可编辑安装：
 ```bash
-pip install -e ".[dev]"
+pip install -e .
 ```
 
 2. 验证安装：
@@ -70,47 +68,44 @@ python -c "import gymnasium; import stable_baselines3; print('✓ Ready')"
 
 ## 快速开始
 
-### 1. 验证环境
+### 1. 验证环境与依赖
 
-```bash
-python -m pytest tests/test_env.py -v
+```powershell
+# 启动快速菜单后选择「1. 验证环境」
+py main.py
 ```
 
 ### 2. 训练模型
 
-```bash
-# 默认训练（读取 config.yaml）
-python -m src.training.train
+```powershell
+# 默认训练（读取 src/training/config.yaml）
+py -m src.training.train
 
 # 自定义训练步数
-python -m src.training.train --timesteps 500000
+py -m src.training.train --timesteps 500000
 
 # 从检查点继续训练
-python -m src.training.train --load ./data/checkpoints/drone_model_100000_steps.zip
+py -m src.training.train --load .\data\checkpoints\drone_model_100000_steps.zip
 ```
 
 ### 3. 评估模型
 
-```bash
+```powershell
 # 评估已训练模型
-python -m src.evaluation.evaluate ./data/best_model/final_model \
-    --episodes 20 \
-    --results-dir ./data/results/
+py -m src.evaluation.evaluate .\data\best_model\final_model.zip --episodes 20 --results-dir .\data\results
 
 # 使用随机策略
-python -m src.evaluation.evaluate ./data/best_model/final_model --stochastic
+py -m src.evaluation.evaluate .\data\best_model\final_model.zip --stochastic
 ```
 
 ### 4. 可视化结果
 
-```bash
+```powershell
 # 生成轨迹图
-python -m src.evaluation.trajectory_vis \
-    --results-dir ./data/results/ \
-    --output-dir ./data/results/visualizations/
+py -m src.evaluation.trajectory_vis --results-dir .\data\results --output-dir .\data\results\visualizations
 
 # 使用 TensorBoard 查看
-tensorboard --logdir ./data/logs/
+py -m tensorboard.main --logdir .\data\logs
 ```
 
 ## 配置
@@ -119,7 +114,8 @@ tensorboard --logdir ./data/logs/
 
 - **算法**：PPO（推荐）或 DQN
 - **学习率**：PPO 为 3e-4，DQN 为 1e-4
-- **N Steps**：2048（轨迹采样长度）
+- **N Steps**：128（轨迹采样长度）
+- **帧堆叠**：默认 2 帧
 - **目标点**：航点坐标
 - **奖励塑形**：距离系数、碰撞惩罚、成功奖励
 
@@ -127,13 +123,14 @@ tensorboard --logdir ./data/logs/
 ```yaml
 ppo:
   learning_rate: 0.0003
-  n_steps: 2048
+  n_steps: 128
   batch_size: 64
   gamma: 0.99
 
 training:
   total_timesteps: 1000000
   checkpoint_freq: 10000
+  eval_freq: 0
 ```
 
 ## 训练
@@ -158,9 +155,11 @@ training:
 ### 监控训练进度
 
 训练期间可使用 TensorBoard：
-```bash
-tensorboard --logdir ./data/logs/
+```powershell
+py -m tensorboard.main --logdir .\data\logs
 ```
+
+若你希望训练阶段显示 `progress_bar`，请确保安装了 `tqdm` 与 `rich`（已包含在当前 `requirements.txt` 中）。
 
 关键指标：
 - `rollout/ep_rew_mean`：平均回合奖励
@@ -169,9 +168,8 @@ tensorboard --logdir ./data/logs/
 
 ### 停止条件
 
-- 达到奖励阈值（可配置）
-- 连续 N 个回合无提升（耐心值）
-- 达到最大训练步数（默认 1M）
+- 默认：达到最大训练步数（`training.total_timesteps`，默认 1M）
+- 可选：如需奖励阈值/耐心值早停，可在训练回调中启用对应逻辑
 
 ## 评估
 
@@ -213,8 +211,8 @@ comparison = compare_models(
 
 ### 轨迹图
 
-```bash
-python -m src.evaluation.trajectory_vis --results-dir ./data/results/
+```powershell
+py -m src.evaluation.trajectory_vis --results-dir .\data\results
 ```
 
 会生成：
@@ -224,8 +222,8 @@ python -m src.evaluation.trajectory_vis --results-dir ./data/results/
 
 ### TensorBoard
 
-```bash
-tensorboard --logdir ./data/logs/
+```powershell
+py -m tensorboard.main --logdir .\data\logs
 ```
 
 可查看：
@@ -252,7 +250,7 @@ tensorboard --logdir ./data/logs/
 
 **解决方案**：
 1. 确认 AirSim 模拟器已启动
-2. 检查 `config.yaml` 中的 IP 地址（默认：127.0.0.1）
+2. 检查 `src/training/config.yaml` 中的 IP 地址（默认：127.0.0.1）
 3. 确认 41451 端口可访问
 
 ### 强化学习训练问题
@@ -274,9 +272,17 @@ tensorboard --logdir ./data/logs/
 **问题**：CUDA/GPU 问题
 
 **解决方案**：
-```bash
-# 强制使用 CPU 训练
-python -m src.training.train --device cpu
+`src.training.train` 当前不支持 `--device` 参数，请在 `src/training/config.yaml` 中设置：
+
+```yaml
+hardware:
+  device: "cpu"
+```
+
+然后运行：
+
+```powershell
+py -m src.training.train
 ```
 
 ## 高级用法
@@ -295,7 +301,7 @@ class CustomRewardShaper(SimpleRewardShaper):
 
 ### 多环境并行训练
 
-在 `config.yaml` 中设置：
+在 `src/training/config.yaml` 中设置：
 ```yaml
 hardware:
   n_envs: 4
@@ -304,9 +310,16 @@ hardware:
 
 ### 使用不同算法
 
-```bash
+```powershell
 # 使用 DQN 训练
-python -m src.training.train --algorithm DQN --timesteps 500000
+py -m src.training.train --timesteps 500000
+```
+
+算法切换请在 `src/training/config.yaml` 中设置：
+
+```yaml
+training:
+  algorithm: "DQN"
 ```
 
 ## 后续改进

@@ -6,6 +6,7 @@ import os
 from typing import List, Dict, Tuple
 import json
 import numpy as np
+import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -35,7 +36,6 @@ def evaluate_model(
     返回值:
         包含评估结果的字典
     """
-    import yaml
     from stable_baselines3 import PPO, DQN
     from ..envs.base_drone_env import AirSimDroneEnv
     from ..envs.wrappers import create_wrapped_env
@@ -53,6 +53,10 @@ def evaluate_model(
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
+    success_distance_threshold = float(
+        config.get("evaluation", {}).get("success_distance_threshold", 2.0)
+    )
+
     logger.info(f"从 {model_path} 加载模型")
 
     # 根据模型路径或配置确定算法
@@ -67,6 +71,8 @@ def evaluate_model(
     # 创建评估环境
     logger.info("正在创建评估环境")
     env_config = config.get("environment", {})
+    obs_config = config.get("observation", {})
+    reward_config = config.get("reward", {})
     target_points = [np.array(pt) for pt in env_config.get("target_points", [])]
 
     env = AirSimDroneEnv(
@@ -74,14 +80,22 @@ def evaluate_model(
         image_shape=tuple(env_config.get("image_shape", [84, 84])),
         max_steps=config.get("training", {}).get("max_steps_per_episode", 500),
         target_points=target_points if target_points else None,
+        action_duration=env_config.get("action_duration", 0.5),
+        control_step_delay=float(env_config.get("control_step_delay", 0.02)),
+        velocity_step=env_config.get("velocity_step", 5.0),
+        target_reached_threshold=reward_config.get("success_distance_threshold", 2.0),
+        reward_config=reward_config,
         verbose=False,
     )
 
-    obs_config = config.get("observation", {})
     env = create_wrapped_env(
         env,
         frame_stack=obs_config.get("frame_stack", 4),
         normalize_obs=obs_config.get("normalize", True),
+        resize_obs=obs_config.get("resize", False),
+        resize_shape=tuple(obs_config.get("resize_shape", [84, 84])),
+        clip_reward=bool(config.get("action", {}).get("clip", False)),
+        action_repeat=config.get("action", {}).get("repeat", 1),
     )
 
     # 运行评估
@@ -121,10 +135,12 @@ def evaluate_model(
         results["episode_lengths"].append(episode_length)
         results["episode_collisions"].append(info.get("collision", False))
 
-        # 检查是否成功（在没有碰撞的情况下达到目标）
-        success = episode_length < config.get("training", {}).get(
-            "max_steps_per_episode", 500
-        ) and not info.get("collision", False)
+        # 仅在真实到达目标阈值且无碰撞时判定成功。
+        success = (
+            not info.get("collision", False)
+            and float(info.get("distance_to_target", np.inf))
+            <= success_distance_threshold
+        )
         results["episode_successes"].append(success)
 
         if save_trajectories:
@@ -203,18 +219,18 @@ def compare_models(
     比较多个已训练的模型。
 
     Args:
-        model_paths: List of model paths
-        config_path: Path to config YAML
-        n_episodes: Episodes per model
-        results_dir: Directory to save results
+        model_paths: 模型路径列表
+        config_path: 配置 YAML 路径
+        n_episodes: 每个模型评估回合数
+        results_dir: 结果保存目录
 
     返回值:
-        Comparison results
+        对比结果
     """
     comparison = {}
 
     for model_path in model_paths:
-        logger.info(f"\nEvaluating {model_path}")
+        logger.info(f"\n正在评估 {model_path}")
         results = evaluate_model(
             model_path,
             config_path=config_path,
@@ -224,36 +240,30 @@ def compare_models(
         model_name = os.path.basename(model_path)
         comparison[model_name] = results
 
-    # Save comparison
+    # 保存对比结果
     comparison_file = os.path.join(results_dir, "model_comparison.json")
     with open(comparison_file, "w") as f:
         json.dump(comparison, f, indent=2)
-    logger.info(f"Comparison saved to {comparison_file}")
+    logger.info(f"对比结果已保存到 {comparison_file}")
 
     return comparison
 
 
 def main():
-    """Command-line interface"""
-    parser = argparse.ArgumentParser(description="Evaluate trained drone RL model")
-    parser.add_argument("model_path", type=str, help="Path to trained model")
+    """命令行入口"""
+    parser = argparse.ArgumentParser(description="评估训练好的无人机强化学习模型")
+    parser.add_argument("model_path", type=str, help="已训练模型路径")
+    parser.add_argument("--config", type=str, default=None, help="配置 YAML 文件路径")
+    parser.add_argument("--episodes", type=int, default=10, help="评估回合数")
     parser.add_argument(
-        "--config", type=str, default=None, help="Path to config YAML file"
+        "--stochastic", action="store_true", help="使用随机策略（探索）"
     )
-    parser.add_argument(
-        "--episodes", type=int, default=10, help="Number of evaluation episodes"
-    )
-    parser.add_argument(
-        "--stochastic", action="store_true", help="Use stochastic policy (exploration)"
-    )
-    parser.add_argument(
-        "--render", action="store_true", help="Render during evaluation"
-    )
+    parser.add_argument("--render", action="store_true", help="评估时渲染")
     parser.add_argument(
         "--results-dir",
         type=str,
         default="./data/results/",
-        help="Directory to save results",
+        help="结果保存目录",
     )
 
     args = parser.parse_args()
