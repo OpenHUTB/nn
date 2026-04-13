@@ -2,6 +2,8 @@ import airsim
 import time
 import os
 import signal
+import atexit
+import sys
 from pynput import keyboard
 
 # ======================= 连接无人机 =======================
@@ -14,6 +16,32 @@ client.armDisarm(True)
 SPEED = 2.0
 HEIGHT = -3.0
 is_flying = True
+
+# ======================= 资源清理 =======================
+def cleanup():
+    """安全退出清理函数"""
+    global is_flying
+    is_flying = False
+    try:
+        if 'client' in globals():
+            client.landAsync().join()
+            client.armDisarm(False)
+            client.enableApiControl(False)
+            print("无人机已安全降落")
+    except Exception as e:
+        print(f"清理过程中出现异常: {e}")
+
+# 注册退出处理
+atexit.register(cleanup)
+
+# 注册信号处理器
+def signal_handler(signum, frame):
+    """处理中断信号"""
+    print(f"\n接收到信号 {signum}，开始清理...")
+    cleanup()
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
 
 # ======================= 起飞 =======================
 print("已连接无人机")
@@ -44,7 +72,11 @@ def orbit_mode():
             client.moveToPositionAsync(x, y, HEIGHT, speed)
             angle += 0.04
             time.sleep(0.05)
-        except:
+        except (airsim.client.ApiError, ConnectionError, OSError) as e:
+            print(f"环绕模式异常: {e}")
+            break
+        except Exception as e:
+            print(f"环绕模式未知异常: {e}")
             break
 
 import math
@@ -57,9 +89,7 @@ def on_press(key):
         # ========== 退出 ==========
         if key == keyboard.Key.esc:
             print("\n安全降落...")
-            client.landAsync().join()
-            client.armDisarm(False)
-            client.enableApiControl(False)
+            cleanup()
             os.kill(os.getpid(), signal.SIGTERM)
             return False
 
@@ -93,13 +123,19 @@ def on_press(key):
         if key.char == 'o':
             start_orbit()
 
-    except:
+    except AttributeError:
         pass
+    except (airsim.client.ApiError, ConnectionError, OSError) as e:
+        print(f"控制指令异常: {e}")
+    except Exception as e:
+        print(f"未知异常: {e}")
 
 def on_release(key):
     try:
         client.moveByVelocityBodyFrameAsync(0, 0, 0, 0.05)
-    except:
+    except (airsim.client.ApiError, ConnectionError, OSError) as e:
+        print(f"释放按键异常: {e}")
+    except Exception as e:
         pass
 
 # ======================= 键盘监听 =======================
