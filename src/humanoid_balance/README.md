@@ -24,4 +24,4 @@ python test.py --load-model trained_models/mujoco_trained
 python test.py --load-model trained_models/mujoco_trained --env-type pybullet
 ```
 ### Simulation Result (MuJoCo)
-![MuJoCo Humanoid Render](./docs/mujoco_humanoid_render.png)
+![Simulation Result](../../docs/humanoid_balance/mujoco_humanoid_render.png)
