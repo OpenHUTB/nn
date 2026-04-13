@@ -3,6 +3,7 @@
 # 导入numpy模块并命名为np
 import numpy as np  # 导入NumPy库用于高效数值计算
 import sys  # 导入系统相关模块，用于获取Python版本、操作路径等
+from tensorflow.keras import datasets  # 导入TensorFlow的数据集模块，用于加载MNIST数据
 
 class RBM:
     """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
@@ -24,49 +25,21 @@ class RBM:
         if not (isinstance(n_observe, int) and n_observe > 0):          # 若条件不满足，后续逻辑可能产生异常或无意义结果
             raise ValueError("可见层单元数量 n_observe 必须为正整数")
         # 初始化模型参数
-        self.n_hidden = n_hidden    # 设置隐藏层的神经元数量
-        self.n_observe = n_observe  # 设置可见层的神经元数量
-        
-        # 权重矩阵 (可见层到隐藏层)
-        # 使用标准正态分布，标准差为0.1，确保权重初始值较小且分布合理
-        self.W = np.random.normal(
-        loc = 0.0,                # 均值
-        scale = 0.1,              # 标准差（常见初始化方法）
-        size = (n_observe, n_hidden))  # 定义了一个元组 size，其中包含两个元素：n_observe 和 n_hidden
-        
-        # 初始化权重矩阵W，使用正态分布随机初始化
-        # 可见层偏置（1 x n_observe）
-        self.Wv = np.zeros((1, n_observe))
-        
-        # 隐藏层偏置（1 x n_hidden）
-        self.Wh = np.zeros((1, n_hidden))
-        
-        # 可选：使用 Xavier/Glorot 初始化替代
-        # self.W = np.random.randn(n_observe, n_hidden) * np.sqrt(1.0 / n_observe)
-        # self.Wv = np.zeros((1, n_observe))
-        # self.Wh = np.zeros((1, n_hidden))
+        self.n_hidden = n_hidden    # 隐藏层神经元个数
+        self.n_observe = n_observe  # 可见层神经元个数
 
-        # 确保隐藏层和可见层的单元数量为正整数
-        # 神经网络模型的一部分，用于初始化隐藏层和可见层的权重和偏置
-        # 参数初始化
-        self.n_hidden = n_hidden     # 隐藏层神经元个数
-        self.n_observe = n_observe   # 可见层神经元个数
-
-        # 初始化权重和偏置
         # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))  # Xavier初始化标准差
+        # 这种初始化方式能有效避免梯度消失/爆炸问题，加快收敛速度
+        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))
 
+        # 初始化权重矩阵（可见层 -> 隐藏层）
         self.W = np.random.normal(
             0, init_std, size = (self.n_observe, self.n_hidden)
-        )  # 初始化权重矩阵（可见层 -> 隐藏层）
+        )
 
-        # 可选替代方案：使用更小的固定标准差进行初始化。
-        # self.W = np.random.normal(0, 0.01, size=(n_observe, n_hidden))
-        # 最终使用的偏置向量（与上方Wv/Wh重复，统一使用b_h和b_v）
-        self.b_h = np.zeros(n_hidden)   # 初始化隐藏层偏置向量
-
-        self.b_v = np.zeros(n_observe)  # 初始化可见层偏置向量
-        # pass
+        # 初始化偏置向量
+        self.b_h = np.zeros(n_hidden)   # 隐藏层偏置向量
+        self.b_v = np.zeros(n_observe)  # 可见层偏置向量
     
     def _sigmoid(self, x):
         """Sigmoid激活函数，用于将输入映射到概率空间
@@ -123,6 +96,9 @@ class RBM:
         epochs = 10  # 训练轮数，整个数据集将被遍历10次
         
         batch_size = 100  # 批处理大小，每次更新参数使用的样本数量
+        
+        # 用于存储每个epoch的平均重构误差
+        epoch_errors = []
 
         # 开始训练轮数
         for epoch in range(epochs):
@@ -130,10 +106,13 @@ class RBM:
             
             np.random.shuffle(data_flat) 
             
+            # 用于统计当前epoch的重构误差
+            batch_errors = []
+            
             # 使用小批量梯度下降法
             for i in range(0, n_samples, batch_size): 
                 # 获取当前批次的数据
-                batch = data_flat[i:i + batch_size]  # 使用切片操作从ata_flat中提取从第i行到第i+batch_size行的子数组
+                batch = data_flat[i:i + batch_size]  # 使用切片操作从data_flat中提取从第i行到第i+batch_size行的子数组
                 
                 # 将批次数据转换为 float64 类型，确保数值计算的精度
                 v0 = batch.astype(np.float64)  # 确保数据类型正确
@@ -158,6 +137,10 @@ class RBM:
                 # 基于重构的可见层状态，再次计算隐藏层激活概率
                 h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       # 计算隐藏单元被激活的概率
 
+                # 计算重构误差（原始数据与重构数据的差异）
+                error = np.mean((v0 - v1_prob) ** 2)  # 均方误差
+                batch_errors.append(error)
+
                 # 计算梯度      
                 # 权重矩阵梯度：数据驱动的正相位与模型生成的负相位之差
                 dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
@@ -177,6 +160,14 @@ class RBM:
                 
                 # 按批次大小归一化梯度，并乘以学习率更新隐藏层偏置
                 self.b_h += learning_rate * db_h / batch_size                        # 更新隐藏层偏置
+            
+            # 计算当前epoch的平均重构误差
+            avg_error = np.mean(batch_errors)
+            epoch_errors.append(avg_error)
+            print(f"Epoch {epoch+1}/{epochs}, 重构误差: {avg_error:.6f}")
+        
+        # 返回训练过程中的误差曲线
+        return epoch_errors
 
     def sample(self):
         """从训练好的模型中采样生成新数据（Gibbs采样）
@@ -212,7 +203,7 @@ if __name__ == '__main__':
         mnist = np.load('mnist_bin.npy')  # 尝试加载文件
     except IOError:
         # 如果文件不存在或加载失败，生成新的二值化MNIST数据
-        (train_images, _), (_, _) = mnist.load_data()  # 加载MNIST数据
+        (train_images, _), (_, _) = datasets.mnist.load_data()  # 加载MNIST数据
         mnist_bin = (train_images >= 128).astype(np.int8)  # 二值化处理
         np.save('mnist_bin.npy', mnist_bin)  # 保存为.npy文件
 
@@ -235,14 +226,19 @@ if __name__ == '__main__':
     # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
     rbm = RBM(2, img_size)
    
-    # 训练RBM
-    errors = rbm.train(mnist, learning_rate = 0.1, epochs = 10, batch_size = 100)
-   
-    # 生成并可视化样本
-    samples = rbm.sample(n_samples = 5, gibbs_steps = 1000)
-   
-    # 使用 MNIST 数据进行训练
-    rbm.train(mnist)
+    # 训练RBM并记录损失
+    print("=" * 50)
+    print("开始训练RBM模型...")
+    print("=" * 50)
+    errors = rbm.train(mnist)
+    
+    # 保存损失值到文件
+    np.save('training_errors.npy', np.array(errors))
+    print("=" * 50)
+    print("训练完成，损失值已保存")
+    print("=" * 50)
 
-    # 从模型中采样一张图像
-    s = rbm.sample()
+    # 从模型中采样多张图像
+    print("生成样本图像...")
+    samples = [rbm.sample() for _ in range(5)]
+    np.save('generated_samples.npy', np.array(samples))
