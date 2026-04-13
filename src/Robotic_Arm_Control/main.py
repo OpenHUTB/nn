@@ -46,7 +46,12 @@ COLLISION_THRESHOLD = 0.01
 COLLISION_FORCE_THRESHOLD = 5.0
 
 # 目录配置（预创建）
-DIRS = {name: Path(name) for name in ["trajectories", "params", "logs", "data"]}
+DIRS = {
+    "trajectories": Path("trajectories"),
+    "params": Path(__file__).parent / "params",
+    "logs": Path("logs"),
+    "data": Path("data")
+}
 for dir_path in DIRS.values():
     dir_path.mkdir(exist_ok=True)
 
