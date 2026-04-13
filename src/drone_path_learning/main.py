@@ -136,7 +136,7 @@ def train_continue():
     model_path = input("Model path [./data/best_model/final_model]: ").strip()
     model_path = model_path or "./data/best_model/final_model"
 
-    timesteps = input("頻次时间步长 [500000]: ").strip()
+    timesteps = input("频次时间步长 [500000]: ").strip()
     timesteps = int(timesteps) if timesteps else 500000
 
     from src.training.train import train
@@ -201,8 +201,8 @@ def tensorboard():
     logger.info("在浏览器中打开 http://localhost:6006")
 
     try:
-        # Newer TensorBoard builds may not expose tensorboard.__main__.
-        # Prefer CLI entrypoint, then fallback to tensorboard.main module.
+        # 较新的 TensorBoard 版本可能不再暴露 tensorboard.__main__。
+        # 优先使用 CLI 入口，失败时回退到 tensorboard.main 模块。
         tensorboard_exe = shutil.which("tensorboard")
         if tensorboard_exe:
             cmd = [tensorboard_exe, f"--logdir={log_dir}", "--port=6006"]
@@ -224,7 +224,7 @@ def main():
     """主入口点"""
     logger.info("启动无人机强化学习路径规划项目\n")
 
-    # Check dependencies
+    # 检查依赖项
     if not check_dependencies():
         sys.exit(1)
 

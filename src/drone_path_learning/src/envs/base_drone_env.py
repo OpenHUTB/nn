@@ -8,7 +8,7 @@ import logging
 import time
 
 from ..utils.airsim_utils import AirSimConnector, process_depth_image
-from ..utils.reward_shaper import SimpleRewardShaper
+from ..utils.reward_shaper import RewardShaper, SimpleRewardShaper
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,9 @@ class AirSimDroneEnv(gym.Env):
         target_points: Optional[list] = None,
         action_duration: float = 0.5,
         velocity_step: float = 5.0,
+        control_step_delay: float = 0.02,
+        target_reached_threshold: float = 2.0,
+        reward_config: Optional[Dict[str, Any]] = None,
         verbose: bool = False,
     ):
         """
@@ -47,6 +50,9 @@ class AirSimDroneEnv(gym.Env):
             target_points: 目标航点列表（3D 数组）
             action_duration: 每个运动的持续时间（秒）
             velocity_step: 运动速度大小（m/s）
+            control_step_delay: 每个动作后等待状态刷新的延时（秒）
+            target_reached_threshold: 判定到达目标的距离阈值（米）
+            reward_config: 奖励参数配置
             verbose: 启用日志记录
         """
         super().__init__()
@@ -56,7 +62,23 @@ class AirSimDroneEnv(gym.Env):
         self.max_steps = max_steps
         self.action_duration = action_duration
         self.velocity_step = velocity_step
+        self.control_step_delay = max(0.0, float(control_step_delay))
+        self.target_reached_threshold = max(0.0, float(target_reached_threshold))
         self.verbose = verbose
+
+        # 7 个离散动作的单位速度方向查找表
+        self._action_directions = np.array(
+            [
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0],
+                [-1.0, 0.0, 0.0],
+                [0.0, -1.0, 0.0],
+                [0.0, 0.0, -1.0],
+                [0.0, 0.0, 0.0],
+            ],
+            dtype=np.float32,
+        )
 
         # AirSim 连接器
         self.airsim = AirSimConnector(ip_address=ip_address)
@@ -68,7 +90,18 @@ class AirSimDroneEnv(gym.Env):
             np.array([50.0, 50.0, -10.0]),
         ]
         self.target_points = target_points or default_targets
-        self.reward_shaper = SimpleRewardShaper(target_points=self.target_points)
+        reward_config = reward_config or {}
+        if reward_config.get("use_simple", False):
+            self.reward_shaper = SimpleRewardShaper(target_points=self.target_points)
+        else:
+            self.reward_shaper = RewardShaper(
+                target_points=self.target_points,
+                distance_reward_scale=float(reward_config.get("distance_scale", 0.1)),
+                collision_penalty=float(reward_config.get("collision_penalty", -100.0)),
+                success_reward=float(reward_config.get("success_reward", 50.0)),
+                step_reward=float(reward_config.get("step_reward", 1.0)),
+                max_distance=float(reward_config.get("max_distance", 100.0)),
+            )
 
         # 定义动作空间：7 个离散动作
         # 0: 向 X+ 运动，1: 向 Y+ 运动，2: 向 Z+ 运动
@@ -86,10 +119,14 @@ class AirSimDroneEnv(gym.Env):
             "position": np.zeros(3, dtype=np.float32),
             "velocity": np.zeros(3, dtype=np.float32),
             "collision": False,
+            "landed": False,
         }
 
         self.step_count = 0
         self.episode_reward = 0.0
+        self._airborne_seen = False
+        self._landed_streak = 0
+        self._collision_streak = 0
 
     def reset(
         self, seed: Optional[int] = None, options: Optional[Dict] = None
@@ -139,7 +176,25 @@ class AirSimDroneEnv(gym.Env):
         # 重置内部状态
         self.step_count = 0
         self.episode_reward = 0.0
+        self._airborne_seen = False
+        self._landed_streak = 0
+        self._collision_streak = 0
         self.reward_shaper.reset_targets()
+
+        # 校验起飞状态，避免“未起飞就训练”导致每步终止、无限刷新。
+        for _ in range(3):
+            state = self.airsim.get_state()
+            if state is not None and not bool(state.get("landed", True)):
+                break
+            logger.warning("检测到无人机仍处于落地状态，重试起飞...")
+            self.airsim.takeoff()
+            time.sleep(0.8)
+
+        state = self.airsim.get_state()
+        if state is None or bool(state.get("landed", True)):
+            raise RuntimeError(
+                "起飞校验失败：无人机未离地，请检查 AirSim 场景与控制权限"
+            )
 
         # 获取初始观测值
         obs = self._get_obs()
@@ -175,7 +230,8 @@ class AirSimDroneEnv(gym.Env):
         if not success:
             logger.warning(f"第 {self.step_count} 步执行动作失败")
 
-        time.sleep(0.05)  # 小延迟以确保状态更新
+        if self.control_step_delay > 0.0:
+            time.sleep(self.control_step_delay)
 
         # 获取新状态
         obs = self._get_obs()
@@ -184,14 +240,46 @@ class AirSimDroneEnv(gym.Env):
         current_pos = self.state["position"]
         current_target = self.reward_shaper.get_current_target()
         dist_to_target = np.linalg.norm(current_pos - current_target)
-        reached_target = dist_to_target < 2.0
+        reached_target = dist_to_target < self.target_reached_threshold
+
+        # 仅当已经飞起后，才把碰撞作为终止条件，避免地面接触抖动导致回合风暴重置。
+        is_landed = bool(self.state.get("landed", False))
+        altitude = float(-current_pos[2])
+        if altitude > 0.8 and not is_landed:
+            self._airborne_seen = True
+
+        collision_raw = bool(self.state.get("collision", False))
+        collision_for_reward = collision_raw and self._airborne_seen and not is_landed
 
         reward, done = self.reward_shaper.compute_reward(
             position=current_pos,
-            collision=self.state["collision"],
+            collision=collision_for_reward,
             reached_target=reached_target,
             info=None,
         )
+
+        # 仅在本回合确认飞起后，才统计“持续落地”状态，避免 reset 初期误判导致频繁重置。
+        if not is_landed:
+            self._landed_streak = 0
+        elif self._airborne_seen and not reached_target:
+            self._landed_streak += 1
+        else:
+            self._landed_streak = 0
+
+        # 碰撞也使用连续计数，减少传感器抖动造成的误终止。
+        if collision_for_reward:
+            self._collision_streak += 1
+        else:
+            self._collision_streak = 0
+
+        if self._collision_streak >= 3:
+            done = True
+
+        # 防止策略学到“提前降落并躺平”：阈值调高，避免刚接地就立刻重置。
+        landed_away_from_target = self._airborne_seen and self._landed_streak >= 40
+        if landed_away_from_target:
+            reward -= 20.0
+            done = True
 
         self.episode_reward += reward
 
@@ -204,7 +292,11 @@ class AirSimDroneEnv(gym.Env):
             {
                 "step": self.step_count,
                 "position": current_pos,
-                "collision": self.state["collision"],
+                "collision": collision_for_reward,
+                "landed": bool(self.state.get("landed", False)),
+                "landed_streak": int(self._landed_streak),
+                "collision_streak": int(self._collision_streak),
+                "airborne_seen": bool(self._airborne_seen),
                 "distance_to_target": dist_to_target,
             }
         )
@@ -227,20 +319,10 @@ class AirSimDroneEnv(gym.Env):
         返回值：
             vel_offset: (vx, vy, vz) 速度分量
         """
-        if action == 0:  # 向 X+ 运动（前进）
-            return (self.velocity_step, 0.0, 0.0)
-        elif action == 1:  # 向 Y+ 运动（右）
-            return (0.0, self.velocity_step, 0.0)
-        elif action == 2:  # 向 Z+ 运动（上升）
-            return (0.0, 0.0, self.velocity_step)
-        elif action == 3:  # 向 X- 运动（后退）
-            return (-self.velocity_step, 0.0, 0.0)
-        elif action == 4:  # 向 Y- 运动（左）
-            return (0.0, -self.velocity_step, 0.0)
-        elif action == 5:  # 向 Z- 运动（下降）
-            return (0.0, 0.0, -self.velocity_step)
-        else:  # 动作 6：悬停
-            return (0.0, 0.0, 0.0)
+        if action < 0 or action >= self.action_space.n:
+            raise ValueError(f"无效动作索引: {action}")
+        vel = self._action_directions[action] * self.velocity_step
+        return float(vel[0]), float(vel[1]), float(vel[2])
 
     def _get_obs(self) -> np.ndarray:
         """
@@ -272,7 +354,11 @@ class AirSimDroneEnv(gym.Env):
         return {
             "episode_reward": self.episode_reward,
             "position": self.state["position"].copy(),
-            "collision": self.state["collision"],
+            "collision": bool(self.state.get("collision", False)),
+            "landed": bool(self.state.get("landed", False)),
+            "landed_streak": int(self._landed_streak),
+            "collision_streak": int(self._collision_streak),
+            "airborne_seen": bool(self._airborne_seen),
         }
 
     def render(self, mode: str = "rgb_array") -> Optional[np.ndarray]:
