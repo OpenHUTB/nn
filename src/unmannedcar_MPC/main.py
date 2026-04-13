@@ -5,7 +5,7 @@ import config as Config
 import math
 import numpy as np
 from drawer import PyGameDrawer
-from sync_pygame import SyncPyGame
+from sync_pygame import np
 from mpc import MPC
 
 
@@ -24,7 +24,7 @@ class Main():
         self.ego = self.world.spawn_actor(bp, ego_spawn_point)
 
         # init game and drawer
-        self.game = SyncPyGame(self)
+        self.game = np(self)
         self.drawer = PyGameDrawer(self)
         self.mpc = MPC(self.drawer, self.ego)
 
