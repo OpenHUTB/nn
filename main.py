@@ -28,8 +28,8 @@ import sys
 import os
 import argparse
 
-# 添加scripts目录到Python路径，以便可以导入其中的模块
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
+# 添加src/yolo11n_vehicle_counter/scripts目录到Python路径，以便可以导入其中的模块
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src', 'yolo11n_vehicle_counter', 'scripts'))
 
 def main():
     """
