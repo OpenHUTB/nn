@@ -152,7 +152,7 @@ class EnhancedGestureDetector:
 
         return landmarks
 
-    def detect_gestures(self, image, simulation_mode=False, fps=0):
+    def detect_gestures(self, image, simulation_mode=False):
         """检测手势（支持中文显示）"""
         # 转换为RGB
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -162,30 +162,15 @@ class EnhancedGestureDetector:
         confidence = 0.0
         landmarks_data = None
 
-        # 创建一个美观的界面
-        # 1. 创建背景
-        height, width = image.shape[:2]
-        display_width = min(width, 800)
-        display_height = min(height, 600)
-        
-        # 调整图像大小
-        image = cv2.resize(image, (display_width, display_height))
-        height, width = image.shape[:2]
-
-        # 2. 添加半透明背景
-        overlay = image.copy()
-        cv2.rectangle(overlay, (0, 0), (width, 150), (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
-
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
-                # 绘制手部关键点（使用更美观的样式）
+                # 绘制手部关键点（使用OpenCV绘制）
                 self.mp_drawing.draw_landmarks(
                     image,
                     hand_landmarks,
                     self.mp_hands.HAND_CONNECTIONS,
-                    mp.solutions.drawing_styles.get_default_hand_landmarks_style(),
-                    mp.solutions.drawing_styles.get_default_hand_connections_style()
+                    self.mp_drawing_styles.get_default_hand_landmarks_style(),
+                    self.mp_drawing_styles.get_default_hand_connections_style()
                 )
 
                 # 提取关键点用于机器学习
@@ -226,33 +211,24 @@ class EnhancedGestureDetector:
                     # 设置字体
                     if self.chinese_font:
                         font = self.chinese_font
-                        font_small = ImageFont.truetype(self.chinese_font.path, 20)
                     else:
                         # 如果中文字体不可用，使用默认字体
                         font = ImageFont.load_default()
-                        font_small = font
                         print("⚠️ 使用默认字体，中文可能显示为方块")
-
-                    # 绘制标题
-                    draw.text((20, 10), "手势控制无人机", fill=(255, 255, 255), font=font)
 
                     # 绘制手势信息
                     chinese_gesture = self.chinese_gesture_names.get(gesture, gesture)
                     ml_info = " (训练模型)" if self.use_ml else " (规则)"
                     text = f"手势: {chinese_gesture}{ml_info}"
-                    draw.text((20, 50), text, fill=(0, 255, 0), font=font_small)
+                    draw.text((10, 30), text, fill=(0, 255, 0), font=font)
 
                     # 绘制置信度
-                    draw.text((20, 80), f"置信度: {confidence:.2f}", fill=(255, 255, 0), font=font_small)
+                    draw.text((10, 70), f"置信度: {confidence:.2f}", fill=(0, 255, 0), font=font)
 
                     # 绘制指令
                     command = self.gesture_commands.get(gesture, "none")
                     chinese_command = self.chinese_command_names.get(command, command)
-                    draw.text((20, 110), f"指令: {chinese_command}", fill=(0, 255, 255), font=font_small)
-
-                    # 绘制FPS
-                    if fps > 0:
-                        draw.text((width - 120, 10), f"FPS: {fps:.1f}", fill=(255, 255, 255), font=font_small)
+                    draw.text((10, 110), f"指令: {chinese_command}", fill=(255, 0, 0), font=font)
 
                     # 将PIL图像转换回OpenCV格式
                     image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
@@ -261,17 +237,12 @@ class EnhancedGestureDetector:
                     print(f"PIL绘制失败，回退到OpenCV英文显示: {e}")
                     # 回退到英文显示
                     ml_info = " (ML)" if self.use_ml else " (Rule)"
-                    cv2.putText(image, "Drone Gesture Control", (20, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                    cv2.putText(image, f"Gesture: {gesture}{ml_info}", (20, 60),
+                    cv2.putText(image, f"Gesture: {gesture}{ml_info}", (10, 30),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                    cv2.putText(image, f"Confidence: {confidence:.2f}", (10, 70),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                    cv2.putText(image, f"Confidence: {confidence:.2f}", (20, 90),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-                    cv2.putText(image, f"Command: {command}", (20, 120),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-                    if fps > 0:
-                        cv2.putText(image, f"FPS: {fps:.1f}", (width - 100, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    cv2.putText(image, f"Command: {command}", (10, 110),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
         else:
             # 没有检测到手部时也使用PIL绘制
@@ -282,38 +253,18 @@ class EnhancedGestureDetector:
 
                 if self.chinese_font:
                     font = self.chinese_font
-                    font_small = ImageFont.truetype(self.chinese_font.path, 20)
                 else:
                     font = ImageFont.load_default()
-                    font_small = font
 
-                # 绘制标题
-                draw.text((20, 10), "手势控制无人机", fill=(255, 255, 255), font=font)
-                # 绘制未检测到手部
-                draw.text((20, 50), "未检测到手部", fill=(0, 0, 255), font=font_small)
-                draw.text((20, 80), "请将手放在摄像头前", fill=(255, 255, 255), font=font_small)
-                
-                # 绘制FPS
-                if fps > 0:
-                    draw.text((width - 120, 10), f"FPS: {fps:.1f}", fill=(255, 255, 255), font=font_small)
+                draw.text((10, 30), "未检测到手部", fill=(0, 0, 255), font=font)
 
                 # 转换回OpenCV格式
                 image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
 
             except Exception as e:
                 print(f"PIL绘制失败: {e}")
-                cv2.putText(image, "Drone Gesture Control", (20, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                cv2.putText(image, "No Hand Detected", (20, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                cv2.putText(image, "Please place your hand in front of the camera", (20, 90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-                if fps > 0:
-                    cv2.putText(image, f"FPS: {fps:.1f}", (width - 100, 30),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-
-        # 添加边框
-        cv2.rectangle(image, (0, 0), (width-1, height-1), (0, 255, 0), 2)
+                cv2.putText(image, "No Hand Detected", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
         return image, gesture, confidence, landmarks_data
 
