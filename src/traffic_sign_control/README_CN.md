@@ -88,6 +88,3 @@ model = YOLO("yolov8n.pt")
 - 请确保代码中使用的交通标志资产存在于当前加载的CARLA地图中。
 - 目标检测功能完全依赖于YOLOv8模型的分类和识别能力。
 
----
-
-🌍 [English Version](README.md) | 🇨🇳 [中文](README_CN.md)
