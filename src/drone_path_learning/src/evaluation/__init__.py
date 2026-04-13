@@ -1,3 +1,3 @@
-"""Evaluation and visualization utilities"""
+"""评估与可视化工具"""
 
 __all__ = []

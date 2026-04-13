@@ -5,6 +5,7 @@ import importlib.util
 import inspect
 import logging
 import os
+import random
 from pathlib import Path
 from typing import Optional
 import yaml
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def _supports_progress_bar() -> bool:
-    """Return True when optional deps needed by SB3 progress bar are installed."""
+    """当已安装 SB3 进度条所需可选依赖时返回 True。"""
     return (
         importlib.util.find_spec("tqdm") is not None
         and importlib.util.find_spec("rich") is not None
@@ -33,6 +34,32 @@ def load_config(config_path: str) -> dict:
     return config
 
 
+def setup_reproducibility(config: dict) -> int:
+    """设置全局随机种子与可选确定性模式。"""
+    misc_config = config.get("misc", {})
+    seed = int(misc_config.get("seed", 42))
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    try:
+        import torch
+
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+
+        if bool(misc_config.get("deterministic", False)):
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            logger.info("已启用 PyTorch 确定性模式")
+    except Exception as exc:
+        logger.warning(f"设置 torch 随机种子失败（可忽略）: {exc}")
+
+    logger.info(f"已设置随机种子: {seed}")
+    return seed
+
+
 def create_environment(config: dict):
     """创建和包装环境"""
     from ..envs.base_drone_env import AirSimDroneEnv
@@ -40,6 +67,7 @@ def create_environment(config: dict):
 
     env_config = config.get("environment", {})
     obs_config = config.get("observation", {})
+    reward_config = config.get("reward", {})
 
     # 创建基础环境
     target_points = [np.array(pt) for pt in env_config.get("target_points", [])]
@@ -50,7 +78,10 @@ def create_environment(config: dict):
         max_steps=config.get("training", {}).get("max_steps_per_episode", 500),
         target_points=target_points if target_points else None,
         action_duration=env_config.get("action_duration", 0.5),
+        control_step_delay=env_config.get("control_step_delay", 0.02),
         velocity_step=env_config.get("velocity_step", 5.0),
+        target_reached_threshold=reward_config.get("success_distance_threshold", 2.0),
+        reward_config=reward_config,
         verbose=config.get("logging", {}).get("verbose", 1) >= 2,
     )
 
@@ -59,7 +90,9 @@ def create_environment(config: dict):
         env,
         frame_stack=obs_config.get("frame_stack", 4),
         normalize_obs=obs_config.get("normalize", True),
-        clip_reward=False,
+        resize_obs=obs_config.get("resize", False),
+        resize_shape=tuple(obs_config.get("resize_shape", [84, 84])),
+        clip_reward=bool(config.get("action", {}).get("clip", False)),
         action_repeat=config.get("action", {}).get("repeat", 1),
     )
 
@@ -104,6 +137,7 @@ def create_model(env, config: dict):
     # 基于算法创建模型
     device = config.get("hardware", {}).get("device", "auto")
     verbose = config.get("logging", {}).get("verbose", 1)
+    seed = int(config.get("misc", {}).get("seed", 42))
 
     if algorithm == "PPO":
         ppo_config = config.get("ppo", {})
@@ -121,6 +155,7 @@ def create_model(env, config: dict):
             vf_coef=float(ppo_config.get("vf_coef", 0.5)),
             max_grad_norm=float(ppo_config.get("max_grad_norm", 0.5)),
             use_sde=ppo_config.get("use_sde", False),
+            seed=seed,
             device=device,
             verbose=verbose,
             tensorboard_log=config.get("logging", {}).get(
@@ -139,6 +174,7 @@ def create_model(env, config: dict):
             batch_size=int(dqn_config.get("batch_size", 32)),
             tau=float(dqn_config.get("tau", 1.0)),
             gamma=float(dqn_config.get("gamma", 0.99)),
+            seed=seed,
             device=device,
             verbose=verbose,
             tensorboard_log=config.get("logging", {}).get(
@@ -153,9 +189,10 @@ def create_model(env, config: dict):
     return model, vec_env
 
 
-def create_callbacks(config: dict):
+def create_callbacks(config: dict, eval_env=None, train_env=None):
     """创建训练回调"""
     from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
+    from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
     from .callbacks import CustomCallback, ProgressCallback
 
     logging_config = config.get("logging", {})
@@ -186,6 +223,29 @@ def create_callbacks(config: dict):
 
     callbacks = [checkpoint_callback, custom_callback, progress_callback]
 
+    eval_freq = int(config.get("training", {}).get("eval_freq", 0))
+    if eval_env is not None and eval_freq > 0:
+        # 让评估环境与训练环境保持相同的 Vec 包装链，避免类型不一致告警。
+        if not hasattr(eval_env, "num_envs"):
+            eval_env = DummyVecEnv([lambda: eval_env])
+
+        if train_env is not None and isinstance(train_env, VecTransposeImage):
+            eval_env = VecTransposeImage(eval_env)
+
+        eval_config = config.get("evaluation", {})
+        eval_callback = EvalCallback(
+            eval_env,
+            best_model_save_path=logging_config.get(
+                "best_model_dir", "./data/best_model/"
+            ),
+            log_path=logging_config.get("log_dir", "./data/logs/"),
+            eval_freq=eval_freq,
+            n_eval_episodes=int(eval_config.get("eval_episodes", 10)),
+            deterministic=bool(eval_config.get("deterministic", True)),
+            render=bool(eval_config.get("render", False)),
+        )
+        callbacks.append(eval_callback)
+
     logger.info(f"已创建 {len(callbacks)} 个回调")
     return callbacks
 
@@ -210,7 +270,10 @@ def train(
     config = load_config(config_path)
     logger.info(f"训练配置: {config}")
 
-    # Create directories
+    # 设置随机种子与确定性选项
+    seed = setup_reproducibility(config)
+
+    # 创建目录
     for key in ["log_dir", "checkpoint_dir", "best_model_dir"]:
         dir_path = config.get("logging", {}).get(key, "")
         if dir_path:
@@ -219,17 +282,22 @@ def train(
     # 创建环境
     logger.info("正在创建环境...")
     env = create_environment(config)
+    env.reset(seed=seed)
 
-    # 验证环境
-    logger.info("正在验证环境...")
-    try:
-        from stable_baselines3.common.env_checker import check_env
+    # 验证环境（AirSim 实时环境中该步骤会触发大量 reset/step，默认关闭）
+    validate_env = bool(config.get("misc", {}).get("validate_env", False))
+    if validate_env:
+        logger.info("正在验证环境...")
+        try:
+            from stable_baselines3.common.env_checker import check_env
 
-        check_env(env.unwrapped)
-        logger.info("✓ 环境验证通过")
-    except Exception as e:
-        logger.error(f"✗ 环境验证失败: {e}")
-        raise
+            check_env(env.unwrapped)
+            logger.info("✓ 环境验证通过")
+        except Exception as e:
+            logger.error(f"✗ 环境验证失败: {e}")
+            raise
+    else:
+        logger.info("已跳过 check_env（misc.validate_env=false）")
 
     # 创建或加载模型
     if load_model_path:
@@ -249,7 +317,17 @@ def train(
 
     # 创建回调
     logger.info("正在创建回调...")
-    callbacks = create_callbacks(config)
+    eval_env = None
+    if int(config.get("training", {}).get("eval_freq", 0)) > 0:
+        logger.info("正在创建评估环境（用于 EvalCallback）...")
+        eval_env = create_environment(config)
+        eval_env.reset(seed=seed + 1000)
+
+    callbacks = create_callbacks(
+        config,
+        eval_env=eval_env,
+        train_env=model.get_env() if model is not None else None,
+    )
 
     # 开始训练
     logger.info("开始训练...")
@@ -289,6 +367,8 @@ def train(
 
         # 清理
         env.close()
+        if eval_env is not None:
+            eval_env.close()
         logger.info("环境已关闭")
 
 
