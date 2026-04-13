@@ -8,7 +8,6 @@
 - `requirements.txt`：依赖配置文件
 - `yolov8n.pt`：YOLOv8预训练模型
 - `Images`：保存项目运行过程中生成的演示图像、测试结果和工作截图
-- `README.md`：记录项目的完整描述、功能介绍和使用规范
 - `README_CN.md`：中文说明文档
 
 ***
