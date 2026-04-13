@@ -73,6 +73,9 @@ model = YOLO("yolov8n.pt")
    ```bash
    python main.py
    ```
+3. **Alternative: Use the Start Script**:
+   Double-click the `start.bat` file in the project directory to automatically check the CARLA simulator status and start the system.
+
 The system will automatically run a complete simulation process for 2 minutes and then exit safely.
 
 ***
