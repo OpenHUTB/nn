@@ -1,3 +1,15 @@
+"""添加了 __setitem__ 方法：支持字典式赋值操作
+改进了 __setattr__ 方法：正确处理 _props 内部属性
+添加了类型注解：使用 Dict[str, Any] 和 Any 类型
+添加了文件存在性检查：使用 os.path.exists() 检查配置文件是否存在
+添加了编码指定：打开文件时指定 utf-8 编码
+添加了 __delitem__ 和 __delattr__ 方法：支持删除操作
+添加了 __len__ 和 __iter__ 方法：支持长度获取和迭代
+添加了 __repr__ 方法：提供友好的字符串表示
+添加了实用方法：get(), update(), to_dict(), save()
+添加了类方法 from_dict：支持从字典创建实例
+改进了异常信息：提供更清晰的错误提示"""
+
 from lib import UndefinedProperty
 from typing import Dict, Any
 import yaml
@@ -107,18 +119,7 @@ class ResearchConfiguration:
         instance._props = config_dict.copy()
         return instance
 
-添加了 __setitem__ 方法：支持字典式赋值操作
-改进了 __setattr__ 方法：正确处理 _props 内部属性
-添加了类型注解：使用 Dict[str, Any] 和 Any 类型
-添加了文件存在性检查：使用 os.path.exists() 检查配置文件是否存在
-添加了编码指定：打开文件时指定 utf-8 编码
-添加了 __delitem__ 和 __delattr__ 方法：支持删除操作
-添加了 __len__ 和 __iter__ 方法：支持长度获取和迭代
-添加了 __repr__ 方法：提供友好的字符串表示
-添加了实用方法：get(), update(), to_dict(), save()
-添加了类方法 from_dict：支持从字典创建实例
-改进了异常信息：提供更清晰的错误提示
-使用示例
+# 使用示例
 # 创建配置实例
 config = ResearchConfiguration("config.yaml")
 
