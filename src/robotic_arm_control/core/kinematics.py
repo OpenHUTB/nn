@@ -18,6 +18,10 @@ class RoboticArmKinematics:
         self.joint_limits = {}
         self.joint_num = 6
 
+        # 缓存配置
+        self._jacobian_cache = {}
+        self._cache_max = 1000
+
         # 加载配置并缓存
         self._load_config()
         # 预计算D-H参数的固定部分
@@ -123,15 +127,15 @@ class RoboticArmKinematics:
         return [round(x, 3), round(y, 3), round(z, 3), round(rx, 2), round(ry, 2), round(rz, 2)]
 
     def inverse_kinematics(self, target_pose, initial_joints=None, max_iter=200, tolerance=1e-3):
-        """逆运动学解算（低步长+阻尼+强限位）"""
+        """逆运动学解算（缓存优化版）"""
         # 初始化关节角（默认更安全的初始值）
         initial_joints = initial_joints if initial_joints else [0.0, 10.0, 0.0, 0.0, 0.0, 0.0]
         current_joints = np.array(self._clip_joint_angles(initial_joints), dtype=np.float64)
         target_pos = np.array(target_pose[:3], dtype=np.float64)
 
         # 降低步长，增加阻尼，避免超调
-        damping_factor = 0.8  # 阻尼系数，降低关节角变化速度
-        base_step_size = 0.005  # 大幅降低步长
+        damping_factor = 0.8  # 阻尼系数
+        base_step_size = 0.005  # 步长
 
         for iter_num in range(max_iter):
             # 计算当前末端位置
@@ -145,36 +149,52 @@ class RoboticArmKinematics:
                 logger.info(f"逆解收敛：迭代{iter_num}次，误差{error_norm:.4f}米")
                 return self._clip_joint_angles(current_joints)
 
-            # 数值雅克比矩阵（双扰动）
-            J = np.zeros((3, self.joint_num), dtype=np.float64)
-            delta = 1e-4
-            for i in range(self.joint_num):
-                # 正向扰动
-                joints_plus = current_joints.copy()
-                joints_plus[i] += delta
-                joints_plus = self._clip_joint_angles(joints_plus)
-                pos_plus = np.array(self.forward_kinematics(joints_plus)[:3])
-
-                # 反向扰动
-                joints_minus = current_joints.copy()
-                joints_minus[i] -= delta
-                joints_minus = self._clip_joint_angles(joints_minus)
-                pos_minus = np.array(self.forward_kinematics(joints_minus)[:3])
-
-                J[:, i] = (pos_plus - pos_minus) / (2 * delta)
+            # 雅克比矩阵计算（带缓存）
+            J = self._compute_jacobian_fast(current_joints)
 
             # 伪逆求解（添加正则化）
             J_pinv = np.linalg.pinv(J, rcond=1e-6)
 
             # 自适应步长+阻尼
-            step_size = base_step_size * min(1.0, error_norm / 0.01)  # 误差越小步长越小
+            step_size = base_step_size * min(1.0, error_norm / 0.01)
             delta_joints = step_size * np.dot(J_pinv, error)
-            delta_joints *= damping_factor  # 应用阻尼
+            delta_joints *= damping_factor
 
             # 更新关节角并立即裁剪
             current_joints += delta_joints
             current_joints = np.array(self._clip_joint_angles(current_joints), dtype=np.float64)
 
-        # 迭代未收敛（返回最近的合法关节角）
+        # 迭代未收敛
         logger.warning(f"逆解迭代{max_iter}次未收敛，误差{error_norm:.4f}米，返回合法关节角")
         return self._clip_joint_angles(current_joints)
+
+    def _compute_jacobian_fast(self, joint_angles):
+        """快速计算雅克比矩阵（缓存优化）"""
+        # 缓存键（圆整减少缓存条目）
+        cache_key = tuple(np.round(joint_angles, 2))
+        if cache_key in self._jacobian_cache:
+            return self._jacobian_cache[cache_key]
+
+        J = np.zeros((3, self.joint_num), dtype=np.float64)
+        delta = 1e-4
+
+        # 批量扰动计算
+        joints_plus = joint_angles.copy()
+        joints_minus = joint_angles.copy()
+        for i in range(self.joint_num):
+            # 正向扰动
+            joints_plus[i] += delta
+            pos_plus = np.array(self.forward_kinematics(self._clip_joint_angles(joints_plus))[:3])
+            joints_plus[i] = joint_angles[i]
+
+            # 反向扰动
+            joints_minus[i] -= delta
+            pos_minus = np.array(self.forward_kinematics(self._clip_joint_angles(joints_minus))[:3])
+            joints_minus[i] = joint_angles[i]
+
+            J[:, i] = (pos_plus - pos_minus) / (2 * delta)
+
+        # 缓存管理
+        if len(self._jacobian_cache) < self._cache_max:
+            self._jacobian_cache[cache_key] = J
+        return J
