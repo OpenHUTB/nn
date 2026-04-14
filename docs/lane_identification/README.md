@@ -12,9 +12,9 @@
 
 在智能驾驶技术栈中，它属于**环境感知层**的基础视觉任务：
 
-- 上游：摄像头图像输入、视频流采集；
-- 本模块：车道线检测、道路区域识别、行驶方向判断、结果标注；
-- 下游：路径规划、车辆控制、决策系统、人机交互展示；
+- 上游：摄像头图像输入、视频流采集
+- 本模块：车道线检测、道路区域识别、行驶方向判断、结果标注
+- 下游：路径规划、车辆控制、决策系统、人机交互展示
 
 可以说，车道识别是车辆 “看懂路” 的第一步，直接决定后续车辆能不能安全、稳定行驶。
 
@@ -72,28 +72,31 @@
 
 ### 2.1 核心技术栈
 
-|      技术 / 工具      |                    用途                    |
-| :-------------------: | :----------------------------------------: |
-|      Python 3.7+      |     核心开发语言，遵循 PEP 8 代码规范      |
-|      OpenCV 4.x       | 图像预处理、边缘检测、霍夫变换、形态学操作 |
-|         NumPy         |       数值计算、多项式拟合、矩阵运算       |
-|        Tkinter        | 图形用户界面（GUI）开发，实现交互与可视化  |
-| 卡尔曼滤波 / 时间平滑 |        帧间结果融合，提升检测稳定性        |
+|   技术 / 工具    |           用途           |
+|:------------:|:----------------------:|
+| Python 3.7+  |  核心开发语言，遵循 PEP 8 代码规范  |
+|  OpenCV 4.x  | 图像预处理、边缘检测、霍夫变换、形态学操作  |
+|    NumPy     |    数值计算、多项式拟合、矩阵运算     |
+|  PIL/Pillow  |       图像处理、字体渲染        |
+|   Tkinter    | 图形用户界面（GUI）开发，实现交互与可视化 |
+| scikit-learn |          聚类算法          |
+| 卡尔曼滤波 / 时间平滑 |     帧间结果融合，提升检测稳定性     |
 
 ### 2.2 核心理论基础
 
 #### 2.2.1 车道线检测核心流程
 
 ```plaintext
-原始图像 → 预处理（灰度化/ROI裁剪/直方图均衡化）→ 边缘检测（Canny）→ 直线检测（霍夫变换）→ 车道线分类/过滤 → 多项式拟合 → 结果验证/平滑 → 方向判断
+原始图像 → 图像指令评估 → 自适应预处理 → ROI区域计算 → 多方法并行道路检测 → 车道线提取 → 多项式拟合 → 路径预测 → 方向分析 → 置信度校准 → 结果可视化
 ```
 
 #### 2.2.2 关键算法原理
 
-- **自适应 Canny 边缘检测**：基于图像中位数动态计算阈值，解决固定阈值在复杂光照下的漏检 / 误检问题；
-- **霍夫变换（HoughLinesP）**：将图像空间的直线转换为参数空间的点，实现直线特征提取，通过阈值过滤短直线 / 噪声；
-- **多项式拟合**：对离散车道线点进行二次 / 一次多项式拟合，生成连续的车道线模型（左 / 右车道线、中心线）；
-- **置信度计算模型**：结合车道线数量、长度、宽度合理性、拟合误差等多维度指标，量化检测结果可信度；
+- **智能图像处理 (SmartImageProcessor)**：综合四维评估图像质量，通过自适应直方图均衡化、分级去噪及智能插值调整尺寸，优化输入图像；
+- **多方法道路检测 (AdvancedRoadDetector)**：采用颜色、纹理、边缘三种并行检测方法，通过加权融合计算置信度，实现精准道路检测；
+- **车道线检测与拟合 (SmartLaneDetector)**：通过自适应边缘检测、DBSCAN聚类分组，经多项式拟合生成车道线模型，完成中心线计算及未来路径预测；
+- **置信度校准系统 (ConfidenceCalibrator)**：通过Sigmoid、特征、上下文、历史四个阶段的校准流程，优化检测结果的置信度准确性；
+- **质量评估系统 (QualityEvaluator)**：基于五个维度加权计算综合评分，划分五个质量等级，全面评估检测系统性能。
 
 ------
 
@@ -126,7 +129,7 @@
 
 ### 问题 1：中文乱码修复
 
-**问题根源：**原代码中文件读取、文本输出环节未指定编码格式，导致中文在不同操作系统/环境下出现编码解析错误。
+**问题根源：**原代码使用PIL渲染中文时未指定中文字体，导致中文无法正确显示。
 
 - 修复了界面与图像标注中的中文乱码问题，现在所有中文提示、标签均可正常显示
 
@@ -137,30 +140,40 @@
   ![img](./images/image2.png)
 
 ```python
-# 读取配置文件（含中文标签）- 新增UTF-8编码指定
-def read_config(config_path):
-    with open(config_path, 'r', encoding='utf-8') as f:
-        config = json.load(f)
-    return config
+def _load_chinese_font(self):
+    """加载系统中文字体"""
+    font_paths = [
+        "C:/Windows/Fonts/msyh.ttc",      # Windows 微软雅黑
+        "C:/Windows/Fonts/simhei.ttf",    # Windows 黑体
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",  # Ubuntu
+        "/System/Library/Fonts/PingFang.ttc"  # macOS
+    ]
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            self.chinese_font = ImageFont.truetype(font_path, 20)
+            return
+    # 兜底：使用默认字体
+    self.chinese_font = ImageFont.load_default()
 
-# 打印检测结果（含中文车道名称）- 新增编码兼容处理
-def print_result(lane_name, confidence):
-    # 确保中文输出不转义
-    lane_name = lane_name.encode('utf-8').decode('utf-8')
-    print(f"检测到车道：{lane_name}，置信度：{confidence}")
-
-# 补充：结果写入文件时的编码指定（新增函数）
-def save_result(result_path, data):
-    with open(result_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+def draw_text_with_background(self, draw, text, position, fill="white", 
+                               bg_color=(0, 0, 0, 180), font=None):
+    """绘制带背景的文字（确保中文清晰可见）"""
+    if font is None:
+        font = self.chinese_font
+    # 绘制半透明背景
+    bbox = draw.textbbox(position, text, font=font)
+    bg_rect = [bbox[0]-5, bbox[1]-5, bbox[2]+5, bbox[3]+5]
+    draw.rectangle(bg_rect, fill=bg_color)
+    # 绘制文字
+    draw.text(position, text, fill=fill, font=font)
 ```
 
 ### 问题 2：置信度优化
 
 #### 图像预处理流程优化
 
-- 对输入图像进行更合理的灰度处理、去噪、增强对比度
-- 强化车道线区域特征，弱化路面阴影、污渍等干扰
+- 对输入图像进行更合理的灰度处理、裁剪、去噪、增强对比度
+- 自适应直方图均衡化，强化车道线区域特征
 - 让后续检测算法在更 “干净” 的图像上工作，显著降低识别失败概率
 
 #### 车道线检测逻辑优化
@@ -178,30 +191,81 @@ def save_result(result_path, data):
 #### （1）增强图像预处理
 
 ```python
-def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray) -> np.ndarray:
-    # 灰度化 + ROI裁剪
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.bitwise_and(gray, gray, mask=roi_mask)
-    
-    # 自适应直方图均衡化（提升对比度）
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    
-    # 高斯模糊去噪
-    blurred = cv2.GaussianBlur(enhanced, (5, 5), 0)
-    return blurred
+def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray) -> np.ndarray: # 转换为灰度图 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+   # 应用ROI裁剪
+   gray = cv2.bitwise_and(gray, gray, mask=roi_mask)
+   
+   # 自适应直方图均衡化（提升对比度）
+   clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+   enhanced = clahe.apply(gray)
+   
+   # 自适应去噪（根据噪声水平动态选择）
+   noise_std = np.std(enhanced)
+   if noise_std > 35:  # 噪声较大时使用双边滤波
+       enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+   
+   # 锐化增强边缘（使用拉普拉斯核）
+   kernel = np.array([[-1, -1, -1],
+                     [-1, 9, -1],
+                     [-1, -1, -1]])
+   sharpened = cv2.filter2D(enhanced, -1, kernel)
+   
+   return sharpened
 ```
 
-#### （2）失败兜底策略
+#### （2）多方法并行检测
 
 ```python
-# 历史结果复用（车道线检测为空时）
-if lines is None or len(lines) == 0:
-    if self.lane_history:  # 复用最近5帧的检测结果
-        return self.lane_history[-1]
-    else:  # 兜底：基于道路先验知识生成默认车道线
-        return self._generate_default_lanes(image_shape)
+def _parallel_lane_detection(self, image: np.ndarray) -> List[Dict[str, Any]]: 
+   # 三种检测方法并行执行 
+   detection_tasks = [ ('canny', self._detect_with_canny), # Canny边缘检测（权重0.35） 
+                       ('sobel', self._detect_with_sobel), # Sobel梯度检测（权重0.30） 
+                       ('gradient', self._detect_with_gradient) # 梯度方向检测（权重0.35） 
+                     ]
+   results = []
+   with ThreadPoolExecutor(max_workers=3) as executor:
+       future_to_method = {
+           executor.submit(method_func, image): method_name
+           for method_name, method_func in detection_tasks
+       }
+       
+       for future in as_completed(future_to_method):
+           method_name = future_to_method[future]
+           try:
+               method_result = future.result(timeout=2.0)
+               if method_result:
+                   method_result['method'] = method_name
+                   results.append(method_result)
+           except Exception as e:
+               print(f"{method_name}车道线检测失败: {e}")
+   
+   return results
 ```
+
+#### （2）自适应Canny阈值检测示例
+
+```python
+def _detect_with_canny(self, image: np.ndarray) -> Optional[Dict[str, Any]]: 
+   # 基于图像中位数自动计算阈值 
+   median = np.median(image) 
+   sigma = 0.33 
+   lower = int(max(20, (1.0 - sigma) * median)) 
+   upper = int(min(180, (1.0 + sigma) * median))
+   edges = cv2.Canny(image, lower, upper)
+   
+   # 霍夫变换检测直线
+   lines = cv2.HoughLinesP(
+       edges, rho=1, theta=np.pi/180,
+       threshold=max(15, self.config.hough_threshold - 10),
+       minLineLength=15, maxLineGap=40
+   )
+   
+   if lines is not None:
+       return {'lines': lines, 'confidence': 0.7}
+   else:
+       return {'lines': [], 'confidence': 0.3}
+```
+
 
 ### 问题 3：识别不准确问题
 
@@ -218,8 +282,6 @@ if lines is None or len(lines) == 0:
 - 抛弃原简单置信度计算方式，采用多维度综合评分
 - 综合考虑：车道线完整性、左右对称性、方向合理性、历史稳定性等
 - 置信度更贴合真实识别质量，输出结果更具参考价值
-
-------
 
 ## 5. 功能扩展与未来规划
 
