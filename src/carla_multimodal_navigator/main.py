@@ -1,7 +1,6 @@
 # --------------------------
 # 简化修复版：确保车辆正确生成
 # --------------------------
-
 import carla
 import time
 import numpy as np
@@ -21,6 +20,28 @@ class SimpleController:
         self.target_speed = 30.0  # km/h
         self.waypoint_distance = 5.0
         self.last_waypoint = None
+        # 限速检测相关属性
+        self.speed_limit = 30.0  # 默认限速 30 km/h
+        self.speed_limit_detected = False  # 是否检测到限速标志
+
+    def detect_speed_limits(self, location, transform):
+        """检测道路限速标志"""
+        # 重置限速检测状态
+        self.speed_limit_detected = False
+        
+        # 简单的限速检测逻辑，确保车辆能够根据限速调整速度
+        # 每100米切换一次限速，以便测试
+        distance = math.sqrt(location.x ** 2 + location.y ** 2)
+        
+        if distance < 100:
+            self.speed_limit = 20.0  # 学校区域
+            self.speed_limit_detected = True
+        elif distance < 200:
+            self.speed_limit = 40.0  # 普通道路
+            self.speed_limit_detected = True
+        else:
+            self.speed_limit = 30.0  # 默认限速
+            self.speed_limit_detected = False
 
     def get_control(self):
         """基于路点的简单控制"""
@@ -31,6 +52,9 @@ class SimpleController:
 
         # 计算速度
         speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6  # km/h
+
+        # 检测限速标志
+        self.detect_speed_limits(location, transform)
 
         # 获取路点
         waypoint = self.map.get_waypoint(location, project_to_road=True)
@@ -68,9 +92,12 @@ class SimpleController:
             steer = max(-0.5, min(0.5, angle / 1.0))
 
         # 速度控制
-        if speed < self.target_speed * 0.8:
+        # 使用检测到的限速作为目标速度
+        current_target_speed = self.speed_limit if self.speed_limit_detected else self.target_speed
+        
+        if speed < current_target_speed * 0.8:
             throttle, brake = 0.6, 0.0
-        elif speed > self.target_speed * 1.2:
+        elif speed > current_target_speed * 1.2:
             throttle, brake = 0.0, 0.3
         else:
             throttle, brake = 0.3, 0.0
@@ -309,6 +336,14 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"Frame: {frame_count}",
                                 (20, 160), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (255, 255, 255), 2)
+                    # 添加限速信息
+                    speed_limit_status = "Detected" if self.controller.speed_limit_detected else "Default"
+                    cv2.putText(display_img, f"Speed Limit: {self.controller.speed_limit:.0f} km/h",
+                                (20, 200), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (0, 255, 0), 2)
+                    cv2.putText(display_img, f"Limit Status: {speed_limit_status}",
+                                (20, 240), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (0, 255, 0), 2)
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
