@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-# main.py
-"""无人机飞行主程序"""
-
 import airsim
 import time
 from drone_controller import DroneController
