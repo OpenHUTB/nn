@@ -102,9 +102,9 @@ class DroneController:
             target_height = self.control_params['takeoff_altitude'] * intensity
             # 设置向上的速度
             self.state['velocity'][1] = 1.0 * intensity  # Y轴向上
-            print(f"✅ 仿真：无人机已解锁并起飞到 {target_height:.1f} 米高度")
+            print(f"[OK] 仿真：无人机已解锁并起飞到 {target_height:.1f} 米高度")
         else:
-            print("⚠️ 无人机已经解锁，无需再次起飞")
+            print("[WARNING] 无人机已经解锁，无需再次起飞")
 
     def _land_simulation(self, intensity):
         """仿真降落"""
@@ -119,7 +119,7 @@ class DroneController:
         print(f"[DEBUG] 当前armed状态: {self.state['armed']}")
 
         if not self.state['armed']:
-            print("❌ 警告：无人机未解锁，无法移动")
+            print("[ERROR] 警告：无人机未解锁，无法移动")
             print("   请先做出'张开手掌'手势进行起飞解锁")
             return
 
@@ -144,7 +144,7 @@ class DroneController:
             self.state['velocity'][0] = speed  # 向右（X轴正方向）
             self.state['mode'] = 'RIGHT'
 
-        print(f"✅ 仿真：无人机{direction}移动，速度{speed:.1f}m/s")
+        print(f"[OK] 仿真：无人机{direction}移动，速度{speed:.1f}m/s")
 
     def _hover_simulation(self):
         """仿真悬停"""

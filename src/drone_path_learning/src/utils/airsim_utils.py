@@ -1,4 +1,4 @@
-"""AirSim 客户端工具和包装器"""
+"""AirSim 客户端工具与封装"""
 
 import numpy as np
 import time
@@ -141,15 +141,24 @@ class AirSimConnector:
             return None
         try:
             state = self.client.getMultirotorState()
+            collision_info = self.client.simGetCollisionInfo()
 
             # 提取运动学数据
             pos = state.kinematics_estimated.position
             vel = state.kinematics_estimated.linear_velocity
 
+            # AirSim 通常使用 Landed=0, Flying=1。
+            # 当枚举值不可用时，采用 landed_state==0 的保守判定。
+            landed_raw = getattr(state, "landed_state", 1)
+            landed_value = getattr(landed_raw, "value", landed_raw)
+            landed_state = int(landed_value)
+            is_landed = landed_state == 0
+
             return {
                 "position": np.array([pos.x_val, pos.y_val, pos.z_val]),
                 "velocity": np.array([vel.x_val, vel.y_val, vel.z_val]),
-                "collision": state.collision.has_collided,
+                "collision": bool(getattr(collision_info, "has_collided", False)),
+                "landed": is_landed,
             }
         except Exception as e:
             logger.error(f"获取无人机状态失败: {e}")
@@ -209,7 +218,7 @@ class AirSimConnector:
             else:
                 req_type = airsim.ImageType.Segmentation
 
-            # 请求图像 from default camera
+            # 从默认相机请求图像
             # 参数: camera_name, image_type, pixels_as_float, compress
             request = airsim.ImageRequest(
                 "0", req_type, pixels_as_float=False, compress=False
