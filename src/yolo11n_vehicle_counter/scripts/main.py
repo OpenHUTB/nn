@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+YOLO11 车辆计数系统 - 主入口
+功能：启动车辆检测与计数，支持多版本切换
+优化：代码规范、结构清晰、注释统一
+"""
+
 """
 YOLO11n Vehicle Counter - 主入口文件
 =====================================
@@ -21,49 +28,52 @@ import sys
 import os
 import argparse
 
-# 添加scripts目录到Python路径，以便可以导入其中的模块
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
+# 由于main.py现在已经在scripts目录内部，不需要再添加路径
 
 def main():
-    """主函数 - 解析参数并运行车辆计数脚本"""
+    """
+    主启动函数
+    解析命令行参数 → 检查文件路径 → 加载对应版本 → 执行车辆计数
+    """
+   
     parser = argparse.ArgumentParser(
         description='YOLO11n Vehicle Counter - 车辆检测与计数系统',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 使用示例:
     # 使用默认路径运行(原始版本)
-    python main.py
+    python scripts/main.py
 
     # 运行改进版本
-    python main.py --version improved
+    python scripts/main.py --version improved
 
     # 指定自定义路径(原始版本)
-    python main.py --model models/custom_model.pt --input videos/test.mp4 --output results/output.mp4
+    python scripts/main.py --model models/custom_model.pt --input videos/test.mp4 --output results/output.mp4
 
     # 指定自定义路径(改进版本)
-    python main.py --version improved --model models/custom_model.pt --input videos/test.mp4 --output res/improved/output.mp4
+    python scripts/main.py --version improved --model models/custom_model.pt --input videos/test.mp4 --output res/improved/output.mp4
 
     # 使用相对路径
-    python main.py --input ../videos/cars.mp4 --output ../results/cars_counted.mp4
+    python scripts/main.py --input ../videos/cars.mp4 --output ../results/cars_counted.mp4
         """
     )
 
     parser.add_argument(
         '--model',
-        default='models/yolo11n.pt',
-        help='YOLO模型文件路径 (默认: models/yolo11n.pt)'
+        default='../models/yolo11n.pt',
+        help='YOLO模型文件路径 (默认: ../models/yolo11n.pt)'
     )
 
     parser.add_argument(
         '--input',
-        default='dataset/sample.mp4',
-        help='输入视频文件路径 (默认: dataset/sample.mp4)'
+        default='../dataset/sample.mp4',
+        help='输入视频文件路径 (默认: ../dataset/sample.mp4)'
     )
 
     parser.add_argument(
         '--output',
-        default='res/sample_res.mp4',
-        help='输出视频文件路径 (默认: res/sample_res.mp4)'
+        default='../res/sample_res.mp4',
+        help='输出视频文件路径 (默认: ../res/sample_res.mp4)'
     )
 
     parser.add_argument(
@@ -123,7 +133,7 @@ def main():
             print("🚀 正在运行CARLA视频专用版本...")
         elif args.version == 'region':
             # 运行区域计数版本
-            from scripts.yolo_vehicle_counter_region import main as run_counter
+            from yolo_vehicle_counter_region import main as run_counter
             print("🚀 正在运行区域计数版本...")
         else:
             # 运行改进版本
