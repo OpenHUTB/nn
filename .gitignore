@@ -56,6 +56,9 @@ env/
 *.pickle
 *.ckpt
 models/
+!src/yolo12_object_detection/scripts/ultralytics/models/
+!src/yolo12_object_detection/scripts/ultralytics/cfg/models/
+
 checkpoints/
 *.tflite
 
@@ -67,6 +70,8 @@ checkpoints/
 *.xls
 !contributions.csv
 data/
+!src/yolo12_object_detection/scripts/ultralytics/data/
+
 dataset/
 datasets/
 
@@ -129,3 +134,5 @@ desktop.ini
 *.tmp
 *.temp
 .mujoco/
+site/
+.claude/
