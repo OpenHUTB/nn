@@ -191,7 +191,9 @@ def draw_text_with_background(self, draw, text, position, fill="white",
 #### （1）增强图像预处理
 
 ```python
-def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray) -> np.ndarray: # 转换为灰度图 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray) -> np.ndarray: 
+   # 转换为灰度图 
+   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
    # 应用ROI裁剪
    gray = cv2.bitwise_and(gray, gray, mask=roi_mask)
    
