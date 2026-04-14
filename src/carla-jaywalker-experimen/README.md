@@ -1,10 +1,42 @@
-# Carla模拟器中的类激活映射可视化研究
+# 自动驾驶系统中的对抗性横穿马路行为建模
 
-本研究项目致力于在Carla模拟器中使用类激活映射技术来测试和分析卷积神经网络在自动驾驶场景中的应用，核心目标是提高深度学习模型在自动驾驶背景下的透明度和可解释性。本项目基于HUTB定制版Carla模拟器开发，通过可视化神经网络在进行决策时所关注的图像区域，帮助研究人员理解模型的行为逻辑和潜在缺陷。
+本研究聚焦于在Carla模拟环境中对自动驾驶汽车进行测试时的真实对抗性行人行为建模。所有方法均在Carla仿真平台中实现。
 
-在使用本应用之前，需要确保HUTB模拟器正在运行，随后通过执行carla_CAM.py脚本启动主程序，所有后台进程将自动运行。应用具备多项便捷功能，如果检测到模拟器尚未启动会自动将其启动，自动部署包含车辆和行人的交通流，并启动基于Pygame的交互式窗口，用户可以在该窗口中可视化所选的传感器并与它们进行交互。应用还会自动管理垃圾回收和进程终止，如果希望在退出应用后保持模拟器继续运行以加快下次启动速度，可以使用--keepsim标志。
+## 核心创新：基于社会力与机器学习的混合行为建模方法
 
-在模拟运行过程中，用户可以通过键盘和鼠标进行丰富的交互操作。键盘控制方面，按下空格键可以暂停模拟并显示当前所选CAM技术生成的显著性热力图，如果尚未选择任何技术则会提示用户进行选择，再次按下空格键则恢复模拟运行；按下M键可以停止模拟并弹出CAM技术选择菜单，即使在模拟暂停显示热力图时也可以再次调出菜单切换不同的CAM技术来比较生成的显著性图；按下N键可以停止模拟并弹出CNN架构选择菜单；按下T键可以对模型进行一次前向传播，返回模型检测到的前五个最可能的类别；按下Q键或ESC键则可以停止应用和模拟器的运行，除非启动时使用了--keepsim标志。鼠标交互方面，在模拟运行时用户可以点击传感器区域来选择要可视化的输入传感器，该传感器的画面将作为模型评估的输入图像；当菜单显示时，用户可以直接点击选择菜单中的某一项。
+本研究的核心创新在于提出了一种**新颖的混合建模方法**用于生成式行人行为建模，该方法能够结合**社会力模型**和**机器学习模型**各自的优势，相互补偿彼此的局限性。社会力模型具有高度交互性和对未见场景的适应性，而机器学习模型则能够捕捉高方差的行为模式。两者结合，可以有效生成丰富且对未见情境具有鲁棒性的生成式行为模型。
 
-本项目支持多种主流的CNN架构，包括ResNet、AlexNet、VGGNet和YOLOv5，同时兼容多种类激活映射技术。基于梯度的方法包括Grad-CAM、Grad-CAM++、XGrad-CAM和FullGrad，非梯度方法则包括Score-CAM、Ablation-CAM和Eigen-CAM。环境配置方面只需运行pip install -r requirements即可完成依赖安装。系统要求方面，本项目仅在Windows 10操作系统下进行了测试，需要使用Python 3.8版本，并且必须基于HUTB定制版Carla模拟器运行，其版本需要与项目提供的whl文件相匹配。特别注意，由于是在HUTB模拟器上进行测试，切勿将原生的Carla Python API与HUTB提供的专用Python API混用，否则会导致程序无法正常运行。
- 
+### 创新动机
+
+我们开展这项工作的动机在于：我们既有可用于训练机器学习模型的可用数据，也有无法直接使用的不可用数据。因此，我们创新性地提出新方法，创建能够从不同类型数据中受益的混合模型，充分利用各类数据资源。
+
+### 技术路线
+
+本研究提出的混合建模方法包含以下关键技术路线：
+
+- **程序生成与深度生成模型结合**：利用程序生成、变分自编码器、生成对抗网络和Transformer等技术原型设计生成式行为模型
+
+- **软轨迹建模**：将基于规划的方法与微观行为模型相结合的生成式行人模型，解决从机器学习模型向分布外场景重新定向计划的问题
+
+- **微观与宏观行为融合**：同时发现高层决策行为和低层微观运动与机动，实现跨层级的行为建模
+
+- **对抗性测试**：利用对抗性技术高效识别自动驾驶系统的失败案例
+
+### 相关论文
+
+```bibtex
+@inproceedings{inproceedings,
+author = {Muktadir, Golam Md and Whitehead, Jim},
+journal={2024 IEEE International Conference on Robotics and Automation (ICRA)},
+year = {2024},
+month = {05},
+title = {Adaptive Pedestrian Agent Modeling for Scenario-based Testing of Autonomous Vehicles through Behavior Retargeting}
+}
+
+@article{Muktadir2022AdversarialJM,
+  title={Adversarial jaywalker modeling for simulation-based testing of Autonomous Vehicle Systems},
+  author={Golam Md Muktadir and E. James Whitehead},
+  journal={2022 IEEE Intelligent Vehicles Symposium (IV)},
+  year={2022},
+  pages={1697-1702},
+}
