@@ -692,10 +692,10 @@ class DirectionAnalyzer:
         right_lane = lane_info.get('right_lane')
         
         if left_lane and not right_lane:
-            direction = '右转'
+            direction = '左转'
             confidence = 0.35
         elif right_lane and not left_lane:
-            direction = '左转'
+            direction = '右转'
             confidence = 0.35
         
         detection_quality = lane_info.get('detection_quality', 0.0)
