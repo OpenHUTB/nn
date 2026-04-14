@@ -40,3 +40,4 @@ title = {Adaptive Pedestrian Agent Modeling for Scenario-based Testing of Autono
   year={2022},
   pages={1697-1702},
 }
+ 
