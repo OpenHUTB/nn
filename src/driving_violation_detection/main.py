@@ -130,9 +130,12 @@ except Exception as e:
     sys.exit(1)
 
 # Disable Autopilot for manual control
-vehicle.set_autopilot(True)
+vehicle.set_autopilot(True, traffic_manager.get_port())
 print("✅ 自动驾驶已启用")
-traffic_manager.ignore_lights_percentage(vehicle, 100.0)  # Ignore all traffic lights
+#设置遵守交通规则
+traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
+#控制自动驾驶速度（加快）
+traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
 
 # Spawn camera
 camera_bp = bp_lib.find('sensor.camera.rgb')
