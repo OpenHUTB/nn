@@ -171,7 +171,16 @@ class Trajectory:
 
     @classmethod
     @Utils.perf
-    def plan(cls, start, target, smooth=True):
+    def plan(cls, start, target, smooth=True, method="trapezoid"):
+        """轨迹规划
+        method: trapezoid(梯形) / scurve(S曲线)
+        """
+        if method == "scurve":
+            return cls.plan_scurve(start, target, smooth)
+        return cls.plan_trapezoid(start, target, smooth)
+
+    @classmethod
+    def plan_trapezoid(cls, start, target, smooth=True):
         """梯形轨迹规划"""
         # 边界裁剪
         start = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
@@ -287,6 +296,121 @@ class Trajectory:
             smooth_vel[2:] = smooth_vel[1:-1] + jerk_clipped * CTRL_DT
 
         return smooth_pos, smooth_vel
+
+    @classmethod
+    def plan_scurve(cls, start, target, smooth=True):
+        """S-curve 轨迹规划（加加速度限制，更平滑）"""
+        # 边界裁剪
+        start = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        target = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+
+        # 缓存检查
+        cache_key = (start.tobytes(), target.tobytes(), smooth, "scurve")
+        if cache_key in cls._cache:
+            return cls._cache[cache_key]
+
+        # S-curve 参数
+        jerk_limit = CFG.jerk_limit  # 加加速度限制
+        max_acc = MAX_ACC  # 最大加速度
+
+        # 预分配
+        max_len = 1
+        traj_pos = np.zeros((0, JOINT_COUNT))
+        traj_vel = np.zeros((0, JOINT_COUNT))
+
+        for i in range(JOINT_COUNT):
+            delta = target[i] - start[i]
+            if abs(delta) < 1e-5:
+                pos, vel = np.array([target[i]]), np.array([0.0])
+            else:
+                dist = abs(delta)
+                dir = np.sign(delta)
+
+                # S-curve 时间计算
+                # jerk_time: 加加速度作用时间
+                jerk_time = max_acc / jerk_limit[i]
+                accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3  # 加加速阶段位移
+
+                # 检查是否达到最大速度
+                peak_vel = np.sqrt(dist * jerk_limit[i])
+                if peak_vel > MAX_VEL[i]:
+                    peak_vel = MAX_VEL[i]
+                    jerk_time = (dist / peak_vel) ** 0.5
+                    accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3
+
+                # 各阶段时间
+                t_jerk = jerk_time
+                t_const_acc = (peak_vel / max_acc[i]) - jerk_time  # 匀加速时间
+                t_const_vel = (dist - 2 * (accel_dist + peak_vel * t_const_acc / 2)) / peak_vel if dist > 2 * (accel_dist + peak_vel * t_const_acc / 2) else 0
+
+                # 总时间
+                total_time = 2 * (2 * t_jerk + t_const_acc) + t_const_vel
+
+                # 时间序列
+                t = np.arange(0, total_time + CTRL_DT, CTRL_DT)
+                pos = np.empty_like(t)
+                vel = np.empty_like(t)
+
+                # 位置计算（S-curve）
+                for k, tk in enumerate(t):
+                    # 加速阶段（0 ~ t_jerk）
+                    if tk <= t_jerk:
+                        a = jerk_limit[i] * tk
+                        v = 0.5 * jerk_limit[i] * tk ** 2
+                        p = start[i] + (1/6) * jerk_limit[i] * tk ** 3
+                    # 匀加速阶段（t_jerk ~ 2*t_jerk）
+                    elif tk <= 2 * t_jerk:
+                        tau = tk - t_jerk
+                        a = max_acc[i] - jerk_limit[i] * tau
+                        v = peak_vel - 0.5 * jerk_limit[i] * tau ** 2
+                        p = start[i] + accel_dist + peak_vel * tau - (1/6) * jerk_limit[i] * tau ** 3
+                    # 匀速阶段
+                    elif tk <= 2 * t_jerk + t_const_acc + t_const_vel:
+                        tau = tk - 2 * t_jerk - t_const_acc
+                        a = 0
+                        v = peak_vel
+                        p = start[i] + 2 * accel_dist + peak_vel * (tau + t_const_acc / 2)
+                    # 匀减速阶段（对称）
+                    elif tk <= 3 * t_jerk + t_const_acc + t_const_vel:
+                        tau = tk - 2 * t_jerk - t_const_acc - t_const_vel
+                        a = -max_acc[i] + jerk_limit[i] * tau
+                        v = peak_vel - 0.5 * jerk_limit[i] * tau ** 2
+                        p = target[i] - 2 * accel_dist - peak_vel * (t_const_acc / 2 + t_const_vel) + peak_vel * tau - (1/6) * jerk_limit[i] * tau ** 3
+                    else:
+                        tau = tk - 3 * t_jerk - t_const_acc - t_const_vel
+                        a = -jerk_limit[i] * (t_jerk - tau)
+                        v = 0.5 * jerk_limit[i] * (t_jerk - tau) ** 2
+                        p = target[i] - (1/6) * jerk_limit[i] * (t_jerk - tau) ** 3
+
+                    pos[k] = p * dir
+                    vel[k] = v * dir
+
+                pos[-1], vel[-1] = target[i], 0.0
+
+            # 扩展数组
+            if len(traj_pos) < len(pos):
+                traj_pos = np.pad(traj_pos, ((0, len(pos) - len(traj_pos)), (0, 0)), 'constant')
+                traj_vel = np.pad(traj_vel, ((0, len(pos) - len(traj_vel)), (0, 0)), 'constant')
+            traj_pos[:len(pos), i] = pos
+            traj_vel[:len(pos), i] = vel
+            max_len = max(max_len, len(pos))
+
+        # 统一长度
+        if len(traj_pos) < max_len:
+            pad = max_len - len(traj_pos)
+            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target)
+            traj_vel = np.pad(traj_vel, ((0, pad), (0, 0)), 'constant')
+
+        # 轨迹平滑
+        if smooth:
+            traj_pos, traj_vel = cls.smooth(traj_pos, traj_vel)
+
+        # 缓存管理
+        if len(cls._cache) >= cls._cache_max:
+            cls._cache.pop(next(iter(cls._cache)))
+        cls._cache[cache_key] = (traj_pos, traj_vel)
+
+        return traj_pos, traj_vel
 
     @classmethod
     def save(cls, traj_pos, traj_vel, name):
