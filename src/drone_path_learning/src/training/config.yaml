@@ -1,0 +1,104 @@
+# 无人机强化学习路径规划训练配置
+
+# 训练参数
+training:
+  algorithm: "PPO" # 算法类型：PPO、DQN、A2C 等
+  total_timesteps: 1000000 # 训练总步数
+  checkpoint_freq: 10000 # 每 N 步保存一次检查点
+  eval_freq: 0 # 每 N 步进行一次评估
+  max_steps_per_episode: 500 # 每回合最大步数
+
+# 环境参数
+environment:
+  ip_address: "127.0.0.1"
+  port: 41451
+  image_shape: [84, 84] # 输入图像尺寸 (H, W)
+  action_duration: 0.5 # 每个动作持续时间（秒）
+  control_step_delay: 0.02 # 每个动作后用于状态刷新的额外等待时间（秒）
+  velocity_step: 5.0 # 速度大小（m/s）
+  target_points:
+    - [0.0, 0.0, -10.0] # 目标航点 1
+    - [50.0, 0.0, -10.0] # 目标航点 2
+    - [50.0, 50.0, -10.0] # 目标航点 3
+
+# 观测预处理
+observation:
+  frame_stack: 2 # 堆叠 N 帧以提供时序信息
+  normalize: true # 归一化到 [0, 1]
+  resize: true
+  resize_shape: [84, 84]
+
+# 动作预处理
+action:
+  repeat: 1 # 每个动作重复 N 步
+  clip: false
+
+# PPO 专用参数
+ppo:
+  learning_rate: 0.0003 # 学习率
+  n_steps: 128 # 每次采样轨迹长度
+  batch_size: 64 # 批大小
+  n_epochs: 10 # 每次更新的训练轮数
+  gamma: 0.99 # 折扣因子
+  gae_lambda: 0.95 # GAE 参数
+  clip_range: 0.2 # PPO 裁剪范围
+  clip_range_vf: null # 价值函数裁剪范围（null 表示与 clip_range 相同）
+  ent_coef: 0.0 # 熵系数
+  vf_coef: 0.5 # 价值函数损失系数
+  max_grad_norm: 0.5 # 最大梯度范数
+  use_sde: false # 是否使用状态相关探索
+
+# DQN 专用参数（使用 DQN 时生效）
+dqn:
+  learning_rate: 0.0001
+  buffer_size: 1000000
+  learning_starts: 50000
+  batch_size: 32
+  tau: 1.0
+  gamma: 0.99
+  train_freq: 4
+  target_update_interval: 10000
+  exploration_fraction: 0.1
+  exploration_initial_eps: 1.0
+  exploration_final_eps: 0.05
+
+# 日志与回调
+logging:
+  log_dir: "./data/logs/"
+  checkpoint_dir: "./data/checkpoints/"
+  best_model_dir: "./data/best_model/"
+  verbose: 1 # 0=静默, 1=信息, 2=调试
+  tensorboard_log: "./data/logs/"
+  save_final_model: true
+
+# 评估参数
+evaluation:
+  eval_episodes: 3 # 评估回合数
+  deterministic: true # 是否使用确定性策略（不探索）
+  render: false # 评估时是否渲染
+  success_distance_threshold: 2.0 # 距离目标小于该阈值视为成功
+
+  # 停止条件
+  use_reward_threshold: false
+  reward_threshold: 100.0 # 平均奖励超过该值时停止
+  patience: 50 # 连续多少回合无提升后提前停止
+
+# 奖励塑形
+reward:
+  distance_scale: 0.1 # 距离惩罚缩放系数
+  collision_penalty: -100.0 # 碰撞惩罚
+  success_reward: 50.0 # 到达目标奖励
+  step_reward: 1.0 # 每步奖励（探索奖励）
+  max_distance: 100.0 # 最大距离阈值
+
+# 硬件设置
+hardware:
+  n_envs: 1 # 并行环境数量
+  vec_env_type: "dummy" # "dummy" 或 "subproc"
+  device: "cuda" # "cpu"、"cuda" 或 "auto"
+
+# 其他
+misc:
+  seed: 42 # 随机种子
+  deterministic: false # 是否启用确定性模式
+  validate_env: false # 是否在训练前执行 SB3 check_env（AirSim 下建议关闭）
