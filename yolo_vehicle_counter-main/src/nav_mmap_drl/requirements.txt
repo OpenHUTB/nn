@@ -1,0 +1,8 @@
+torch==1.7.1
+torchvision==0.8.2
+carla==0.9.11
+numpy==1.19.5
+opencv-python==4.5.1.48
+Pillow==8.1.0
+pygame==2.0.1
+scipy==1.6.0

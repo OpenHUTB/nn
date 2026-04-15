@@ -1,0 +1,15 @@
+<launch>
+	<param name="robot_description" textfile="$(find plumbing_pub_sub)/urdf/mbot_base.urdf" />
+
+	<!-- 设置GUI参数，显示关节控制插件 -->
+	<param name="use_gui" value="true"/>
+	
+	<!-- 运行joint_state_publisher节点，发布机器人的关节状态  -->
+	<node name="joint_state_publisher" pkg="plumbing_pub_sub" type="joint_state_publisher" />
+	
+	<!-- 运行robot_state_publisher节点，发布tf  -->
+	<node name="robot_state_publisher" pkg="plumbing_pub_sub" type="robot_state_publisher" />
+	
+	<!-- 运行rviz可视化界面 -->
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find plumbing_pub_sub)/config/mbot_urdf.rviz" required="true" />
+</launch>

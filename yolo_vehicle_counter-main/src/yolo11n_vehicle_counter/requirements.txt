@@ -1,0 +1,6 @@
+numpy
+opencv-python
+ultralytics
+supervision
+torch
+carla==0.9.14
