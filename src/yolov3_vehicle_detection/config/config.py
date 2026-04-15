@@ -1,40 +1,38 @@
-# -*- coding: utf-8 -*-
-"""
-项目全局配置参数
-"""
-import os
+class Config:
+    # YOLO模型配置
+    yolo_cfg_path = "models/yolov3-tiny.cfg"
+    yolo_weights_path = "models/yolov3-tiny.weights"
+    yolo_names_path = "models/coco.names"
+    conf_thres = 0.5
+    nms_thres = 0.4
 
-# ================= CARLA 模拟器配置 =================
-CARLA_HOST = '127.0.0.1'
-CARLA_PORT = 2000
-CARLA_TIMEOUT = 10.0
+    # CARLA配置
+    carla_host = "127.0.0.1"
+    carla_port = 2000
+    carla_timeout = 10.0
+    CARLA_HOST = carla_host
+    CARLA_PORT = carla_port
+    CARLA_TIMEOUT = carla_timeout
+    VEHICLE_MODEL = "vehicle.tesla.model3"
 
-# 车辆配置
-VEHICLE_MODEL = 'vehicle.tesla.model3'  # 也就是你可以改成 'vehicle.audi.tt' 换个车开
-SPAWN_POINT_INDEX = None  # None表示随机，也可以指定固定点
+    # 摄像头配置
+    camera_width = 800
+    camera_height = 600
+    camera_fov = 110
+    CAMERA_WIDTH = camera_width
+    CAMERA_HEIGHT = camera_height
+    CAMERA_FOV = camera_fov
+    CAMERA_POS_X = 0.3
+    CAMERA_POS_Z = 1.3
 
-# ================= 传感器配置 =================
-CAMERA_WIDTH = 800
-CAMERA_HEIGHT = 600
-CAMERA_FOV = 90
-CAMERA_POS_X = 1.5
-CAMERA_POS_Z = 2.4
+    # 安全区域配置
+    SAFE_ZONE_RATIO = 0.4
+    COLLISION_AREA_THRES = 0.05
 
-# ================= YOLOv3 模型路径 =================
-# 自动获取当前 config.py 的上级目录作为基准
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # 日志配置
+    log_dir = "logs"
+    LOG_DIR = log_dir
 
-YOLO_CONFIG_PATH = os.path.join(BASE_DIR, 'models', 'yolov3.cfg')
-YOLO_WEIGHTS_PATH = os.path.join(BASE_DIR, 'models', 'yolov3.weights')
-YOLO_NAMES_PATH = os.path.join(BASE_DIR, 'models', 'coco.names')
 
-# ================= 检测与规划参数 =================
-CONFIDENCE_THRESHOLD = 0.5
-NMS_THRESHOLD = 0.4
-
-# 规划器参数 (AEB)
-SAFE_ZONE_RATIO = 0.4      # 驾驶走廊宽度比例
-COLLISION_AREA_THRES = 0.10 # 碰撞预警面积阈值
-
-# ================= 日志配置 =================
-LOG_DIR = os.path.join(BASE_DIR, 'runs', 'experiment_1')
+# 创建Config实例供模块导入使用
+config = Config()
