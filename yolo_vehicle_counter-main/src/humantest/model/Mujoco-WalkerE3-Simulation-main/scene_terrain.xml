@@ -1,0 +1,35 @@
+<mujoco model="e3 scene">
+  <include file="e3.xml" />
+
+  <statistic center="1.0 0.7 1.0" extent="0.8" />
+
+  <visual>
+    
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.15 0.15 0.15" specular="0.9 0.9 0.9" />
+    
+    <rgba haze="0.0 0.0 0.0 1" />
+    
+    <global azimuth="-140" elevation="-20" />
+  </visual>
+
+  <asset>
+    
+    <texture type="skybox" builtin="flat" rgb1="1 1 1" rgb2="1 1 1" width="512" height="3072" />
+
+    
+    <texture name="floor_tex" type="2d" file="flooring2.png" />
+    
+    
+    <material name="floor_mat" texture="floor_tex" texuniform="true" texrepeat="1 1" reflectance="0.2" />
+
+    
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300" />
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2" />
+  <texture name="wood_tex" type="2d" file="wood_texture.png" /><material name="wood" texture="wood_tex" texuniform="true" texrepeat="2 2" specular="0.3" shininess="0.1" reflectance="0.1" /></asset>
+
+  <worldbody>
+    <light pos="1 0 3.5" dir="0 0 -1" directional="true" />
+    
+    <geom name="floor" size="0 0 0.05" type="plane" material="floor_mat" />
+  <geom pos="1.33 0.0 0.08" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="1.6600000000000001 0.0 0.24" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="1.99 0.0 0.4" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="2.3200000000000003 0.0 0.56" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="2.6500000000000004 0.0 0.7200000000000001" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="2.9800000000000004 0.0 0.8800000000000001" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="3.31 0.0 1.04" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="3.64 0.0 1.2" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="4.305 0.0 1.2" type="box" size="0.5 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="4.970000000000001 0.0 1.04" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="5.3 0.0 0.8799999999999999" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="5.63 0.0 0.72" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="5.96 0.0 0.5599999999999999" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="6.29 0.0 0.3999999999999999" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="6.62 0.0 0.24" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="6.95 0.0 0.07999999999999985" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="7.28 0.0 -0.08000000000000007" type="box" size="0.165 1.75 0.08" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="9.679243225836387 0.0 0.305" type="box" size="0.8992432258363866 1.75 0.005" quat="0.984807753012208 0.0 -0.17364817766693033 0.0" material="wood" /><geom pos="10.928486451672775 0.0 0.605" type="box" size="0.5 1.75 0.005" quat="1.0 0.0 0.0 0.0" material="wood" /><geom pos="12.252729677509162 0.0 0.305" type="box" size="0.9742432258363867 1.75 0.005" quat="0.984807753012208 0.0 0.17364817766693033 0.0" material="wood" /><geom pos="15.876972903345548 0.0 0.17" type="box" size="0.5 0.75 0.17" quat="1.0 0.0 0.0 0.0" material="wood" /></worldbody>
+</mujoco>

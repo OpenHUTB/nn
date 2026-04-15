@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='utf-8'?>
+<qtgui>
+  <perspective>
+    <mainwindow>
+      <toolbars>
+        <toolbar area="2">
+          <action name="Action 1">
+            <icon>help</icon>
+            <text>Help</text>
+          </action>
+        </toolbar>
+      </toolbars>
+    </mainwindow>
+    <docks>
+      <dock name="Topic Monitor" area="1">
+        <widget class="rqt_topic.topic_plugin.TopicPlugin" package="rqt_topic">
+          <topic>/carla/status</topic>
+        </widget>
+      </dock>
+      <dock name="Image View" area="5">
+        <widget class="rqt_image_view.image_view.ImageView" package="rqt_image_view" />
+      </dock>
+      <dock name="Console" area="4">
+        <widget class="rqt_console.console.Console" package="rqt_console" />
+      </dock>
+    </docks>
+  </perspective>
+</qtgui>

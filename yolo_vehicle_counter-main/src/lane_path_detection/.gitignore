@@ -1,0 +1,21 @@
+# ROS2工作空间临时文件（核心忽略项）
+build/
+install/
+log/
+.colcon*
+.ros/
+
+# Python缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Windows系统文件
+Thumbs.db
+Desktop.ini
+
+# IDE/编辑器配置（可选，根据自己使用的工具加）
+.vscode/
+.idea/
+*.sublime-*
