@@ -12,17 +12,23 @@ class FlightControl:
         self.SPEED = 2.0
         self.HEIGHT = -3.0
         self.is_flying = True
-        self.use_gui = len(sys.argv) > 1 and sys.argv[1] == "--gui"
+        # 更灵活的命令行参数解析
+        self.use_gui = "--gui" in sys.argv
+        self.use_map = "--map" in sys.argv
         self.gui = None
+        self.map_display = None
         self.gui_started = False
+        self.map_started = False
         self.current_velocity = (0, 0, 0)
         
     def setup(self):
         """设置飞行控制系统"""
         self.print_startup_info()
         self.import_gui()
-        self.connect_drone()
-        self.takeoff()
+        self.import_map()
+        connected = self.connect_drone()
+        if connected:
+            self.takeoff()
         self.print_control_instructions()
     
     def print_startup_info(self):
@@ -30,6 +36,12 @@ class FlightControl:
         print("脚本开始运行...")
         print(f"Python 版本: {sys.version}")
         print(f"启用 GUI: {self.use_gui}")
+        print(f"启用地图显示: {self.use_map}")
+        print("使用说明:")
+        print("  python main.py              - 仅使用命令行控制")
+        print("  python main.py --gui        - 启用 GUI 控制")
+        print("  python main.py --map        - 启用地图显示")
+        print("  python main.py --gui --map  - 同时启用 GUI 和地图显示")
     
     def import_gui(self):
         """导入 GUI 模块"""
@@ -41,6 +53,29 @@ class FlightControl:
             except Exception as e:
                 print(f"导入 GUI 模块失败: {e}")
                 self.use_gui = False
+    
+    def import_map(self):
+        """导入地图显示模块"""
+        if self.use_map:
+            try:
+                # 尝试相对导入
+                from .map_display import MapDisplay
+                self.MapDisplay = MapDisplay
+                print("成功导入地图显示模块")
+            except Exception as e:
+                print(f"相对导入失败: {e}")
+                try:
+                    # 尝试直接导入
+                    import sys
+                    import os
+                    # 添加src目录到Python路径
+                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+                    from src.flight_control.map_display import MapDisplay
+                    self.MapDisplay = MapDisplay
+                    print("成功导入地图显示模块")
+                except Exception as e2:
+                    print(f"导入地图显示模块失败: {e2}")
+                    self.use_map = False
     
     def connect_drone(self):
         """连接到无人机"""
@@ -57,10 +92,17 @@ class FlightControl:
         except Exception as e:
             print(f"连接失败: {e}")
             print("请确保 AirSim 模拟器已启动")
-            exit(1)
+            print("如果没有 AirSim 模拟器，程序将以演示模式运行")
+            # 不退出，继续运行以测试GUI功能
+            return False
+        return True
     
     def takeoff(self):
         """起飞并到达指定高度"""
+        if not self.client:
+            print("未连接到无人机，跳过起飞")
+            return
+        
         print("已连接无人机")
         print("起飞中...")
         try:
@@ -175,6 +217,20 @@ class FlightControl:
             print(f"GUI 运行失败: {e}")
             print("回退到命令行控制")
     
+    def run_map(self):
+        """运行地图显示"""
+        try:
+            print("启动地图显示...")
+            self.map_display = self.MapDisplay()
+            if self.map_display.running:
+                self.map_started = True
+                print("地图显示已启动")
+                self.map_display.run()
+            else:
+                print("地图显示启动失败")
+        except Exception as e:
+            print(f"地图显示运行失败: {e}")
+    
     def start_gui(self):
         """启动 GUI 线程"""
         if self.use_gui:
@@ -189,40 +245,97 @@ class FlightControl:
         else:
             print("未启用可视化控制面板，仅使用命令行控制")
     
+    def start_map(self):
+        """启动地图显示线程"""
+        if self.use_map:
+            map_thread = threading.Thread(target=self.run_map)
+            map_thread.daemon = False  # 设置为非守护线程，确保地图显示能够正常运行
+            map_thread.start()
+            
+            # 等待地图显示启动
+            time.sleep(2)
+            if not self.map_started:
+                print("地图显示启动失败")
+        else:
+            print("未启用地图显示")
+    
+    def update_position(self):
+        """更新无人机位置"""
+        # 模拟位置数据，用于测试地图显示
+        x, y = 0, 0
+        direction = 1
+        while True:
+            try:
+                if self.map_display:
+                    if self.client:
+                        # 获取真实无人机状态
+                        state = self.client.getMultirotorState()
+                        pos = state.kinematics_estimated.position
+                        x, y = pos.x_val, pos.y_val
+                    else:
+                        # 模拟位置数据
+                        x += 0.1 * direction
+                        if abs(x) > 10:
+                            direction *= -1
+                    # 更新地图显示
+                    self.map_display.update_position(x, y)
+            except Exception as e:
+                pass
+            time.sleep(0.5)
+    
     def exit_program(self):
         """安全退出程序"""
         print("\n安全降落...")
         try:
-            self.client.landAsync().join()
-            self.client.armDisarm(False)
-            self.client.enableApiControl(False)
-            print("无人机已安全降落")
+            if self.client:
+                self.client.landAsync().join()
+                self.client.armDisarm(False)
+                self.client.enableApiControl(False)
+                print("无人机已安全降落")
         except Exception as e:
             print(f"降落过程中发生错误: {e}")
         finally:
             if self.gui:
                 self.gui.stop()
+            if self.map_display:
+                self.map_display.stop()
             os.kill(os.getpid(), signal.SIGTERM)
     
     def run(self):
         """运行主程序"""
-        # 启动 GUI
-        self.start_gui()
-        
-        # 启动键盘监听
-        listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
-        listener.start()
-        
-        # 保持程序运行
-        print("程序已启动，按 ESC 键退出...")
         try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\n收到中断信号，正在降落...")
+            print("开始运行主程序...")
+            # 启动 GUI
+            self.start_gui()
+            # 启动地图显示
+            self.start_map()
+            
+            # 启动键盘监听
+            print("启动键盘监听...")
+            listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
+            listener.start()
+            
+            # 启动位置更新线程
+            print("启动位置更新线程...")
+            position_thread = threading.Thread(target=self.update_position)
+            position_thread.daemon = True
+            position_thread.start()
+            
+            # 保持程序运行
+            print("程序已启动，按 ESC 键退出...")
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\n收到中断信号，正在降落...")
+                self.exit_program()
+            finally:
+                listener.join()
+        except Exception as e:
+            print(f"主程序运行失败: {e}")
+            import traceback
+            traceback.print_exc()
             self.exit_program()
-        finally:
-            listener.join()
 
 if __name__ == "__main__":
     flight_control = FlightControl()

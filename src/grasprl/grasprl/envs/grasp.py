@@ -46,8 +46,8 @@ class GraspRobot(MujocoPhyEnv):
             eef_site=self.eef_site,
             min_effort=-150.0,
             max_effort=150.0,
-            kp=200,
-            ko=200,
+            kp=50,
+            ko=50,
             kv=50,
             vmax_xyz=1.0,
             vmax_abg=2.0          
@@ -62,11 +62,16 @@ class GraspRobot(MujocoPhyEnv):
         self.reward = 0
         self.get_image_data("eyeinhand",depth=True,show=show)
         
+        qpos = self.physics.data.qpos.copy()
+        qpos = np.nan_to_num(qpos, nan=0.0, posinf=0.0, neginf=0.0)
+        self.physics.data.qpos[:] = qpos
+        
         for i in range(self.frame_skip):
             self.controller.run(eyehand_target)
             self.grp_ctrl.run(signal=0)
+            self.physics.data.ctrl[:] = np.nan_to_num(self.physics.data.ctrl, nan=0.0, posinf=1.0, neginf=-1.0)
             self.step_mujoco_simulation()
-        
+
         rgb_data,depth_data = self.get_image_data("eyeinhand",depth=True,show=show)
         self.observation["rgb"] = rgb_data
         self.observation["depth"] = depth_data
@@ -92,6 +97,8 @@ class GraspRobot(MujocoPhyEnv):
             self.controller.run(
                 target_pose
             )
+            self.physics.data.qpos[:] = np.nan_to_num(self.physics.data.qpos, nan=0.0, posinf=0.0, neginf=0.0)
+            self.physics.data.ctrl[:] = np.nan_to_num(self.physics.data.ctrl, nan=0.0, posinf=1.0, neginf=-1.0)
             self.step_mujoco_simulation()
             ee_pos = self.get_ee_pos()
             detals = np.abs(ee_pos - target_position)
