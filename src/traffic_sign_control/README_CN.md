@@ -1,25 +1,30 @@
 # 🚗 CARLA环境：交通标志识别与自动驾驶控制系统
+
 本项目在CARLA环境中实现了一个智能自动驾驶仿真系统，专注于实时交通标志检测和车辆动态控制。系统基于YOLOv8深度学习模型，能够准确识别关键交通指示（停止标志、限速标志、交通信号灯），并自动控制车辆做出合规的驾驶决策。该解决方案还集成了Pygame用于实时渲染驾驶员视角的车载摄像头视图。
 
 ***
 
 ## 📁 项目结构
+
 - `main.py`：主运行脚本
 - `requirements.txt`：依赖配置文件
 - `yolov8n.pt`：YOLOv8预训练模型
 - `Images`：保存项目运行过程中生成的演示图像、测试结果和工作截图
-- `README.md`：记录项目的完整描述、功能介绍和使用规范
 - `README_CN.md`：中文说明文档
+- `start.bat`：启动脚本，双击即可运行
 
 ***
 
 ## 🛠 系统依赖
+
 请在Python运行环境中配置以下库和工具：
+
 ```bash
 pip install carla pygame numpy torch ultralytics
 ```
 
 ### 额外环境要求
+
 - **CARLA模拟器**（0.9.13及以上版本）：官方下载地址：[CARLA GitHub仓库](https://github.com/carla-simulator/carla)
 - **CUDA工具包**（可选）：GPU加速支持，可以显著提高YOLOv8模型推理速度
 - **Python 3.7及以上**：稳定的Python解释器版本
@@ -27,12 +32,15 @@ pip install carla pygame numpy torch ultralytics
 ***
 
 ## 📦 预训练模型应用
+
 ### 🧠 YOLOv8n轻量级模型
+
 - **模型文件**：`yolov8n.pt`
 - **提供者**：[Ultralytics](https://github.com/ultralytics/ultralytics)官方开源预训练模型
 - **核心功能**：输入车载RGB相机采集的实时图像，完成交通标志和交通信号灯的检测与分类
 
 代码中的模型加载方式：
+
 ```python
 model = YOLO("yolov8n.pt")
 ```
@@ -40,6 +48,7 @@ model = YOLO("yolov8n.pt")
 ***
 
 ## 🎮 系统功能
+
 - 基于路径点导航的自动驾驶车辆自动车道保持
 - 基于车载相机的实时图像获取和目标检测
 - 识别停止标志并执行完全制动控制
@@ -52,6 +61,7 @@ model = YOLO("yolov8n.pt")
 ***
 
 ## 🧪 系统工作原理
+
 1. **CARLA环境初始化**：
    与CARLA服务器建立连接，生成主控制车辆、交通流和交通标志，并加载车载RGB相机传感器。
 2. **YOLOv8实时推理**：
@@ -63,7 +73,16 @@ model = YOLO("yolov8n.pt")
 
 ***
 
-## ▶️ 操作步骤
+## ▶️ 运行步骤
+
+### 方法一：使用启动脚本（推荐）
+1. **首先启动CARLA模拟器**：
+   运行CARLA模拟器（应与项目在同一目录中）
+2. **双击启动脚本**：
+   双击项目目录中的 `start.bat` 文件，自动检查CARLA模拟器状态并启动系统。
+
+### 方法二：手动运行
+
 1. **首先启动CARLA模拟器**：
    ```bash
    ./CarlaUE4.sh
@@ -72,20 +91,22 @@ model = YOLO("yolov8n.pt")
    ```bash
    python main.py
    ```
+
 系统将自动运行完整的仿真过程2分钟，然后安全退出。
 
 ***
 
 ## 🧼 资源释放机制
+
 仿真结束时，系统会统一销毁所有生成的实例（车辆、传感器、标志等），以释放内存资源并避免系统内存泄漏。
 
 ***
 
 ## 📌 重要提醒
+
 - 本项目使用轻量级的`yolov8n.pt`模型来平衡速度和性能。如需更高的检测精度，可以替换为`yolov8s.pt`、`yolov8m.pt`等更大的模型。
 - 请确保代码中使用的交通标志资产存在于当前加载的CARLA地图中。
 - 目标检测功能完全依赖于YOLOv8模型的分类和识别能力。
 
----
+***
 
-🌍 [English Version](README.md) | 🇨🇳 [中文](README_CN.md)

@@ -1,0 +1,6 @@
+# 运行时生成的临时文件（不上传）
+*.npy
+rbm_results.png
+__pycache__/
+*.pyc
+.DS_Store
