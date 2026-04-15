@@ -1,0 +1,15 @@
+{
+  "speed": 2.0,
+  "default_height": -3.0,
+  "controls": {
+    "forward": "w",
+    "backward": "s",
+    "left": "a",
+    "right": "d",
+    "up": "x",
+    "down": "z",
+    "hover": "h",
+    "return": "b",
+    "exit": "esc"
+  }
+}

@@ -25,7 +25,7 @@ class CustomCallback(BaseCallback):
         self.log_dir = log_dir
         os.makedirs(log_dir, exist_ok=True)
 
-        # Statistics tracking
+        # 统计指标跟踪
         self.episode_rewards = []
         self.episode_lengths = []
         self.episode_collisions = []
@@ -182,7 +182,7 @@ class RewardThresholdCallback(BaseCallback):
                 ep_reward = info["episode"].get("r", 0.0)
                 self.episode_rewards.append(ep_reward)
 
-                # Check if threshold reached
+                # 检查是否达到阈值
                 if len(self.episode_rewards) >= 10:
                     mean_reward = np.mean(self.episode_rewards[-10:])
 
@@ -191,7 +191,7 @@ class RewardThresholdCallback(BaseCallback):
                             print(f"Threshold reached! Mean reward: {mean_reward:.2f}")
                         return False
 
-                    # Check patience
+                    # 检查耐心值
                     if mean_reward > self.best_mean_reward:
                         self.best_mean_reward = mean_reward
                         self.patience_counter = 0
@@ -209,7 +209,7 @@ class RewardThresholdCallback(BaseCallback):
 
 
 class EpisodeStatisticsCallback(BaseCallback):
-    """Track detailed episode statistics"""
+    """跟踪详细回合统计信息"""
 
     def __init__(self, log_dir: str = "./data/logs/", verbose: int = 0):
         super().__init__(verbose)
@@ -219,7 +219,7 @@ class EpisodeStatisticsCallback(BaseCallback):
         self.episode_data = []
 
     def _on_step(self) -> bool:
-        """Collect episode data"""
+        """收集回合数据"""
         dones = self.locals.get("dones", [False])
         infos = self.locals.get("infos", [{}])
 
@@ -241,18 +241,18 @@ class EpisodeStatisticsCallback(BaseCallback):
                 }
                 self.episode_data.append(episode_info)
 
-                # Save periodically
+                # 定期保存
                 if len(self.episode_data) % 50 == 0:
                     self._save_data()
 
         return True
 
     def _on_training_end(self) -> None:
-        """Save episode data at training end"""
+        """在训练结束时保存回合数据"""
         self._save_data()
 
     def _save_data(self):
-        """Save episode data to JSON"""
+        """将回合数据保存到 JSON"""
         data_file = os.path.join(self.log_dir, "episode_data.json")
         with open(data_file, "w") as f:
             json.dump(self.episode_data, f, indent=2)
