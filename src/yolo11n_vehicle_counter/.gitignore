@@ -1,4 +1,54 @@
+# Python 虚拟环境（核心！）
+venv/
+venv*/
+*venv/
+env/
+env*/
+*env/
+.venv/
+venv311/
+
+# Python 缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 日志、临时文件
+*.log
+*.tmp
+*.temp
+.cache/
+
+# IDE 配置文件（VS Code、PyCharm等）
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 数据集、模型权重（大文件不要提交）
+*.pt
+*.pth
+*.onnx
+*.weights
+data/
 dataset/
 models/
-res/
-venv311/
+runs/
