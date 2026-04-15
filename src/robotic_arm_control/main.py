@@ -183,11 +183,11 @@ class Trajectory:
     def plan_trapezoid(cls, start, target, smooth=True):
         """梯形轨迹规划"""
         # 边界裁剪
-        start = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
-        target = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        start_clipped = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        target_clipped = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
 
-        # 缓存检查
-        cache_key = (start.tobytes(), target.tobytes(), smooth)
+        # 缓存检查（使用元组键，避免tobytes开销）
+        cache_key = (tuple(start_clipped), tuple(target_clipped), smooth)
         if cache_key in cls._cache:
             return cls._cache[cache_key]
 
@@ -198,7 +198,7 @@ class Trajectory:
 
         # 批量规划
         for i in range(JOINT_COUNT):
-            delta = target[i] - start[i]
+            delta = target_clipped[i] - start_clipped[i]
             if abs(delta) < 1e-5:
                 pos, vel = np.array([target[i]]), np.array([0.0])
             else:
@@ -228,22 +228,22 @@ class Trajectory:
                 mask_dec = ~(mask_acc | mask_uni)
 
                 vel[mask_acc] = MAX_ACC[i] * t[mask_acc] * dir
-                pos[mask_acc] = start[i] + 0.5 * MAX_ACC[i] * t[mask_acc] ** 2 * dir
+                pos[mask_acc] = start_clipped[i] + 0.5 * MAX_ACC[i] * t[mask_acc] ** 2 * dir
 
                 if dist > 2 * accel_dist:
                     t_uni = t[mask_uni] - accel_time
                     vel[mask_uni] = MAX_VEL[i] * dir
-                    pos[mask_uni] = start[i] + (accel_dist + MAX_VEL[i] * t_uni) * dir
+                    pos[mask_uni] = start_clipped[i] + (accel_dist + MAX_VEL[i] * t_uni) * dir
 
                     t_dec = t[mask_dec] - (accel_time + uniform_time)
                     vel[mask_dec] = (MAX_VEL[i] - MAX_ACC[i] * t_dec) * dir
-                    pos[mask_dec] = start[i] + (dist - (accel_dist - 0.5 * MAX_ACC[i] * t_dec ** 2)) * dir
+                    pos[mask_dec] = start_clipped[i] + (dist - (accel_dist - 0.5 * MAX_ACC[i] * t_dec ** 2)) * dir
                 else:
                     t_dec = t[mask_dec] - accel_time
                     vel[mask_dec] = (peak_vel - MAX_ACC[i] * t_dec) * dir
-                    pos[mask_dec] = start[i] + (peak_vel * accel_time - 0.5 * MAX_ACC[i] * t_dec ** 2) * dir
+                    pos[mask_dec] = start_clipped[i] + (peak_vel * accel_time - 0.5 * MAX_ACC[i] * t_dec ** 2) * dir
 
-                pos[-1], vel[-1] = target[i], 0.0
+                pos[-1], vel[-1] = target_clipped[i], 0.0
 
             # 扩展数组
             if len(traj_pos) < len(pos):
@@ -257,7 +257,7 @@ class Trajectory:
         # 统一长度
         if len(traj_pos) < max_len:
             pad = max_len - len(traj_pos)
-            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target)
+            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target_clipped)
             traj_vel = np.pad(traj_vel, ((0, pad), (0, 0)), 'constant')
 
         # 轨迹平滑
@@ -299,93 +299,100 @@ class Trajectory:
 
     @classmethod
     def plan_scurve(cls, start, target, smooth=True):
-        """S-curve 轨迹规划（加加速度限制，更平滑）"""
+        """S-curve 轨迹规划（向量化实现，极致优化）"""
         # 边界裁剪
-        start = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
-        target = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        start_clipped = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        target_clipped = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
 
-        # 缓存检查
-        cache_key = (start.tobytes(), target.tobytes(), smooth, "scurve")
+        # 缓存检查（使用元组键，避免tobytes开销）
+        cache_key = (tuple(start_clipped), tuple(target_clipped), smooth, "scurve")
         if cache_key in cls._cache:
             return cls._cache[cache_key]
-
-        # S-curve 参数
-        jerk_limit = CFG.jerk_limit  # 加加速度限制
-        max_acc = MAX_ACC  # 最大加速度
 
         # 预分配
         max_len = 1
         traj_pos = np.zeros((0, JOINT_COUNT))
         traj_vel = np.zeros((0, JOINT_COUNT))
 
+        jerk_limit = CFG.jerk_limit
+        max_acc = MAX_ACC
+
         for i in range(JOINT_COUNT):
-            delta = target[i] - start[i]
+            delta = target_clipped[i] - start_clipped[i]
             if abs(delta) < 1e-5:
-                pos, vel = np.array([target[i]]), np.array([0.0])
+                pos, vel = np.array([target_clipped[i]]), np.array([0.0])
             else:
                 dist = abs(delta)
-                dir = np.sign(delta)
+                direction = np.sign(delta)
 
-                # S-curve 时间计算
-                # jerk_time: 加加速度作用时间
-                jerk_time = max_acc / jerk_limit[i]
-                accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3  # 加加速阶段位移
+                # S-curve 参数计算
+                jerk_time = max_acc[i] / jerk_limit[i]
+                accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3
 
-                # 检查是否达到最大速度
                 peak_vel = np.sqrt(dist * jerk_limit[i])
                 if peak_vel > MAX_VEL[i]:
                     peak_vel = MAX_VEL[i]
-                    jerk_time = (dist / peak_vel) ** 0.5
+                    jerk_time = np.sqrt(dist / peak_vel)
                     accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3
 
-                # 各阶段时间
                 t_jerk = jerk_time
-                t_const_acc = (peak_vel / max_acc[i]) - jerk_time  # 匀加速时间
-                t_const_vel = (dist - 2 * (accel_dist + peak_vel * t_const_acc / 2)) / peak_vel if dist > 2 * (accel_dist + peak_vel * t_const_acc / 2) else 0
+                t_const_acc = (peak_vel / max_acc[i]) - jerk_time
+                t_const_vel = max(0, (dist - 2 * (accel_dist + peak_vel * t_const_acc / 2)) / peak_vel)
 
-                # 总时间
+                # 关键时间点（向量化分段边界）
+                t1 = t_jerk
+                t2 = 2 * t_jerk
+                t3 = 2 * t_jerk + t_const_acc
+                t4 = 2 * t_jerk + t_const_acc + t_const_vel
                 total_time = 2 * (2 * t_jerk + t_const_acc) + t_const_vel
 
-                # 时间序列
+                # 时间序列（向量化）
                 t = np.arange(0, total_time + CTRL_DT, CTRL_DT)
-                pos = np.empty_like(t)
-                vel = np.empty_like(t)
+                n = len(t)
 
-                # 位置计算（S-curve）
-                for k, tk in enumerate(t):
-                    # 加速阶段（0 ~ t_jerk）
-                    if tk <= t_jerk:
-                        a = jerk_limit[i] * tk
-                        v = 0.5 * jerk_limit[i] * tk ** 2
-                        p = start[i] + (1/6) * jerk_limit[i] * tk ** 3
-                    # 匀加速阶段（t_jerk ~ 2*t_jerk）
-                    elif tk <= 2 * t_jerk:
-                        tau = tk - t_jerk
-                        a = max_acc[i] - jerk_limit[i] * tau
-                        v = peak_vel - 0.5 * jerk_limit[i] * tau ** 2
-                        p = start[i] + accel_dist + peak_vel * tau - (1/6) * jerk_limit[i] * tau ** 3
-                    # 匀速阶段
-                    elif tk <= 2 * t_jerk + t_const_acc + t_const_vel:
-                        tau = tk - 2 * t_jerk - t_const_acc
-                        a = 0
-                        v = peak_vel
-                        p = start[i] + 2 * accel_dist + peak_vel * (tau + t_const_acc / 2)
-                    # 匀减速阶段（对称）
-                    elif tk <= 3 * t_jerk + t_const_acc + t_const_vel:
-                        tau = tk - 2 * t_jerk - t_const_acc - t_const_vel
-                        a = -max_acc[i] + jerk_limit[i] * tau
-                        v = peak_vel - 0.5 * jerk_limit[i] * tau ** 2
-                        p = target[i] - 2 * accel_dist - peak_vel * (t_const_acc / 2 + t_const_vel) + peak_vel * tau - (1/6) * jerk_limit[i] * tau ** 3
-                    else:
-                        tau = tk - 3 * t_jerk - t_const_acc - t_const_vel
-                        a = -jerk_limit[i] * (t_jerk - tau)
-                        v = 0.5 * jerk_limit[i] * (t_jerk - tau) ** 2
-                        p = target[i] - (1/6) * jerk_limit[i] * (t_jerk - tau) ** 3
+                # 向量化位置计算 - 使用掩码分段
+                pos = np.zeros(n)
+                vel = np.zeros(n)
 
-                    pos[k] = p * dir
-                    vel[k] = v * dir
+                # 各阶段掩码（向量化判断）
+                mask1 = t <= t1
+                mask2 = (t > t1) & (t <= t2)
+                mask3 = (t > t2) & (t <= t3)
+                mask4 = (t > t3) & (t <= t4)
+                mask5 = t > t4
 
-                pos[-1], vel[-1] = target[i], 0.0
+                # 阶段1: 加加速（0 ~ t1）
+                t1_arr = t[mask1]
+                pos[mask1] = start_clipped[i] + (1/6) * jerk_limit[i] * t1_arr ** 3
+                vel[mask1] = 0.5 * jerk_limit[i] * t1_arr ** 2
+
+                # 阶段2: 匀减速加速（t1 ~ t2）
+                tau2 = t[mask2] - t1
+                pos[mask2] = start_clipped[i] + accel_dist + peak_vel * tau2 - (1/6) * jerk_limit[i] * tau2 ** 3
+                vel[mask2] = peak_vel - 0.5 * jerk_limit[i] * tau2 ** 2
+
+                # 阶段3: 匀速（t2 ~ t3）
+                tau3 = t[mask3] - t2 - t_const_acc
+                pos[mask3] = start_clipped[i] + 2 * accel_dist + peak_vel * (tau3 + t_const_acc / 2)
+                vel[mask3] = peak_vel
+
+                # 阶段4: 匀减速（t3 ~ t4）
+                tau4 = t[mask4] - t3
+                pos[mask4] = target_clipped[i] - 2 * accel_dist - peak_vel * (t_const_acc / 2 + t_const_vel) + peak_vel * tau4 - (1/6) * jerk_limit[i] * tau4 ** 3
+                vel[mask4] = peak_vel - 0.5 * jerk_limit[i] * tau4 ** 2
+
+                # 阶段5: 减加速（t4 ~ end）
+                tau5 = t[mask5] - t4
+                pos[mask5] = target_clipped[i] - (1/6) * jerk_limit[i] * (t_jerk - tau5) ** 3
+                vel[mask5] = 0.5 * jerk_limit[i] * (t_jerk - tau5) ** 2
+
+                # 应用方向
+                pos = pos * direction
+                vel = vel * direction
+
+                # 确保终点精确
+                pos[-1] = target_clipped[i]
+                vel[-1] = 0.0
 
             # 扩展数组
             if len(traj_pos) < len(pos):
@@ -398,7 +405,7 @@ class Trajectory:
         # 统一长度
         if len(traj_pos) < max_len:
             pad = max_len - len(traj_pos)
-            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target)
+            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target_clipped)
             traj_vel = np.pad(traj_vel, ((0, pad), (0, 0)), 'constant')
 
         # 轨迹平滑
@@ -592,6 +599,10 @@ class ArmController:
         self.err = np.zeros(JOINT_COUNT)
         self.max_err = np.zeros(JOINT_COUNT)
 
+        # 预分配缓冲区（避免循环中重复分配）
+        self._qpos_buf = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self._qvel_buf = np.zeros(JOINT_COUNT, dtype=np.float64)
+
         # 性能统计
         self.step = 0
         self.last_ctrl = time.time()
@@ -606,7 +617,7 @@ class ArmController:
             self.joint_ids = [-1] * JOINT_COUNT
             self.motor_ids = [-1] * JOINT_COUNT
             self.ee_id = -1
-            self.link_geom_ids = [-1] * JOINT_COUNT
+            self.link_ids = [-1] * JOINT_COUNT
             return
 
         # 批量获取ID
@@ -615,8 +626,8 @@ class ArmController:
         self.motor_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f'motor{i + 1}')
                           for i in range(JOINT_COUNT)]
         self.ee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, 'ee_geom')
-        self.link_geom_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}')
-                              for i in range(JOINT_COUNT)]
+        self.link_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}')
+                         for i in range(JOINT_COUNT)]
 
     def _init_mujoco(self):
         """极简MuJoCo初始化"""
@@ -679,31 +690,17 @@ class ArmController:
             self.running = False
             return None, None
 
-    def _init_ids(self):
-        """初始化ID"""
-        if self.model is None:
-            self.joint_ids = self.motor_ids = self.link_ids = [-1] * JOINT_COUNT
-            self.ee_id = -1
-            return
-
-        self.joint_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, f'joint{i + 1}') for i in
-                          range(JOINT_COUNT)]
-        self.motor_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f'motor{i + 1}') for i in
-                          range(JOINT_COUNT)]
-        self.link_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}') for i in
-                         range(JOINT_COUNT)]
-        self.ee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, 'ee_geom')
-
     def get_states(self):
-        """获取关节状态"""
+        """获取关节状态（预分配缓冲区，避免循环内分配）"""
         if self.data is None:
-            return np.zeros(JOINT_COUNT), np.zeros(JOINT_COUNT)
+            return self._qpos_buf.copy(), self._qvel_buf.copy()
 
-        # 批量获取状态
-        qpos = np.array([self.data.qpos[jid] if jid >= 0 else 0.0 for jid in self.joint_ids])
-        qvel = np.array([self.data.qvel[jid] if jid >= 0 else 0.0 for jid in self.joint_ids])
+        # 使用预分配缓冲区，直接写入
+        for i, jid in enumerate(self.joint_ids):
+            self._qpos_buf[i] = self.data.qpos[jid] if jid >= 0 else 0.0
+            self._qvel_buf[i] = self.data.qvel[jid] if jid >= 0 else 0.0
 
-        return qpos, qvel
+        return self._qpos_buf.copy(), self._qvel_buf.copy()
 
     @Utils.perf
     def control_step(self):
