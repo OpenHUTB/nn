@@ -1,0 +1,12 @@
+numpy>=1.24.0
+pillow>=10.0.0
+msgpack-rpc-python>=0.4.1
+pyyaml>=6.0
+torch>=2.0.0
+stable-baselines3>=2.0.0
+gymnasium==0.29.1
+airsim>=1.8.1
+tensorboard>=2.13.0
+matplotlib>=3.7.0
+tqdm>=4.66.0
+rich>=13.7.0

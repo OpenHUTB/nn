@@ -1,0 +1,6 @@
+tensorflow
+carla
+pygame
+numpy
+datetime
+termcolor
