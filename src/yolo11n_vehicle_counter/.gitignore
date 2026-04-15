@@ -51,3 +51,5 @@ data/
 models/
 runs/
 res/
+venv311/
+src/yolo11n_vehicle_counter/venv311/
