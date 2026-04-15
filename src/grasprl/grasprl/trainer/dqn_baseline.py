@@ -22,11 +22,9 @@ from modules.qnet import MULTIDISCRETE_RESNET
 from tqdm import tqdm
 import cv2
 
-MAX_POSSIBLE_SAMPLES = (
-    12  # Number of transitions that fits on GPU memory for one backward-call (12 for RGB-D)
-)
-NUMBER_ACCUMULATIONS_BEFORE_UPDATE = 1  # How often to accumulate gradients before updating
-BATCH_SIZE = MAX_POSSIBLE_SAMPLES * NUMBER_ACCUMULATIONS_BEFORE_UPDATE  # Effective batch size
+MAX_POSSIBLE_SAMPLES = 12
+NUMBER_ACCUMULATIONS_BEFORE_UPDATE = 1
+BATCH_SIZE = MAX_POSSIBLE_SAMPLES * NUMBER_ACCUMULATIONS_BEFORE_UPDATE
 
 class VisualFeatureEnhancer(nn.Module):
     def __init__(self):
@@ -38,6 +36,7 @@ class VisualFeatureEnhancer(nn.Module):
     def forward(self, x):
         x = self.relu(self.conv1(x))
         x = self.conv2(x)
+        x = torch.clamp(x, -1.0, 1.0)
         return x
 
 class DQN_Trainer(object):
@@ -64,9 +63,8 @@ class DQN_Trainer(object):
         self.q_net = MULTIDISCRETE_RESNET(1).to(self.device)
         self.feat_enhance = VisualFeatureEnhancer().to(self.device)
         self.optimizer = optim.Adam(self.q_net.parameters(), lr=learning_rate, weight_decay=0.00002)
-        self.criterion = torch.nn.SmoothL1Loss(reduce=False).to(device=self.device)
+        self.criterion = torch.nn.SmoothL1Loss(reduction="none").to(device=self.device)
 
-        # seeding
         torch.manual_seed(seed)
         torch.cuda.manual_seed(seed)
         np.random.seed(seed)
@@ -89,7 +87,13 @@ class DQN_Trainer(object):
         max_idx = max_idx.item()
         pixel_x = max_idx % self.env.IMAGE_WIDTH
         pixel_y = max_idx // self.env.IMAGE_HEIGHT
-        depth = self.depth_before[pixel_x][pixel_y]
+        pixel_x = max(0, min(pixel_x, self.env.IMAGE_WIDTH - 1))
+        pixel_y = max(0, min(pixel_y, self.env.IMAGE_HEIGHT - 1))
+    
+        if 0 <= pixel_x < self.env.IMAGE_WIDTH and 0 <= pixel_y < self.env.IMAGE_HEIGHT:
+            depth = self.depth_before[pixel_x][pixel_y]
+        else:
+            depth = 0.0
         action = self.env.pixel2world(1, pixel_x, pixel_y, depth)
         return action
 
@@ -98,12 +102,8 @@ class DQN_Trainer(object):
         return list(action)
 
     def select_action_by_eps_random(self, state):
-        self.eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
-            -1.0 * self.steps_done / self.eps_decay
-        )
-        self.steps_done += 1
-        self.writer.add_scalar("Epslion", self.eps_threshold, self.steps_done)
-        if random.random() > self.eps_threshold:
+        eps_threshold = self._get_eps_threshold()
+        if random.random() > eps_threshold:
             self.last_action = "greedy"
             with torch.no_grad():
                 q_max = self.q_net(state).argmax()
@@ -115,12 +115,8 @@ class DQN_Trainer(object):
             return torch.tensor([[action]], dtype=torch.long)
 
     def select_action_by_eps(self, state):
-        self.eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
-            -1.0 * self.steps_done / self.eps_decay
-        )
-        self.steps_done += 1
-        self.writer.add_scalar("Epslion", self.eps_threshold, self.steps_done)
-        if random.random() > self.eps_threshold:
+        eps_threshold = self._get_eps_threshold()
+        if random.random() > eps_threshold:
             self.last_action = "greedy"
             with torch.no_grad():
                 q_max = self.q_net(state).argmax()
@@ -139,14 +135,18 @@ class DQN_Trainer(object):
                 if threshold == 10:
                     break
             return torch.tensor([[action]], dtype=torch.long)
-
-    def select_action_by_instruction(self, state):
-        self.eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
+    
+    def _get_eps_threshold(self):
+        eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
             -1.0 * self.steps_done / self.eps_decay
         )
         self.steps_done += 1
-        self.writer.add_scalar("Epslion", self.eps_threshold, self.steps_done)
-        if random.random() > self.eps_threshold:
+        self.writer.add_scalar("Epslion", eps_threshold, self.steps_done)
+        return eps_threshold
+    
+    def select_action_by_instruction(self, state):
+        eps_threshold = self._get_eps_threshold()
+        if random.random() > eps_threshold:
             self.last_action = "greedy"
             with torch.no_grad():
                 q_max = self.q_net(state).argmax()
@@ -161,32 +161,35 @@ class DQN_Trainer(object):
                     px, py = self.env.world2pixel(cam_id=1, x=wx, y=wy, z=wz)
                     action = py * self.env.IMAGE_WIDTH + px
                     break
-
+            if action is None:
+                action = np.random.randint(low=0, high=(self.env.IMAGE_WIDTH - 1) * (self.env.IMAGE_HEIGHT - 1))
             return torch.tensor([[action]], dtype=torch.long)
 
-    def learn(self):
+    def learn(self,gamma=0.99):
         if len(self.memory) < 2 * BATCH_SIZE:
             print("Filling the replay buffer ...")
             return
         transitions = self.memory.sample(BATCH_SIZE)
         batch = Transition(*zip(*transitions))
+        self.optimizer.zero_grad()
         for i in range(NUMBER_ACCUMULATIONS_BEFORE_UPDATE):
             start_idx = i * MAX_POSSIBLE_SAMPLES
             end_idx = (i + 1) * MAX_POSSIBLE_SAMPLES
             state_batch = torch.cat(batch.state[start_idx:end_idx]).to(self.device)
             action_batch = torch.cat(batch.action[start_idx:end_idx]).to(self.device)
             reward_batch = torch.cat(batch.reward[start_idx:end_idx]).to(self.device)
+            next_state_batch = torch.cat(batch.next_state[start_idx:end_idx]).to(self.device)
 
             q_pred = self.q_net(state_batch).view(MAX_POSSIBLE_SAMPLES, -1).gather(1, action_batch)
-            q_expected = reward_batch.float()
+            with torch.no_grad():
+                q_next = self.q_net(next_state_batch).max(dim=1, keepdim=True)[0]
+                q_expected = reward_batch.float() + gamma * q_next
 
-            loss = F.binary_cross_entropy(q_pred, q_expected) / NUMBER_ACCUMULATIONS_BEFORE_UPDATE
+            loss = self.criterion(q_pred, q_expected).mean() / NUMBER_ACCUMULATIONS_BEFORE_UPDATE
             loss.backward()
 
-            self.optimizer.step()
-            self.optimizer.zero_grad()
-
-            self.writer.add_scalar("losses", loss, self.steps_done)
+        self.optimizer.step()
+        self.writer.add_scalar("losses", loss, self.steps_done)
 
     def predict(self, state, show=False):
         with torch.no_grad():
@@ -208,11 +211,8 @@ class DQN_Trainer(object):
         self.q_net.load_state_dict(torch.load(f=filename + "_qnet", map_location=self.device))
 
     def count(self, greedy, random_num):
-        self.eps_threshold = self.eps_end + (self.eps_start - self.eps_end) * math.exp(
-            -1.0 * self.steps_done / self.eps_decay
-        )
-        self.steps_done += 1
-        if random.random() > self.eps_threshold:
+        eps_threshold = self._get_eps_threshold()
+        if random.random() > eps_threshold:
             greedy += 1
         else:
             self.last_action = "random"
@@ -221,7 +221,7 @@ class DQN_Trainer(object):
 
 
 def main():
-    max_iter = 9999999999
+    max_iter = 9999
     grasp_success = 0
     loop = tqdm(range(1, max_iter + 1))
 
@@ -235,14 +235,16 @@ def main():
         action = trainer.limit_action(action)
         next_state, reward, done, info = trainer.env.step(action)
         import time
-        time.sleep(0.05)
+        if trainer.env.render_mode == "human":
+            time.sleep(0.05)
         loop.set_description(f"iter [{i_iter}]/[{max_iter}]")
         loop.set_postfix(grasp_info=info['grasp'], reward=reward, action=trainer.last_action)
         if info["grasp"] == "Success":
             grasp_success += 1
         if done:
             trainer.env.reset_without_random()
-        trainer.writer.add_scalar("Grasping performance(Success rate)", grasp_success / max_iter, trainer.steps_done)
+        success_rate = grasp_success / i_iter if i_iter > 0 else 0.0
+        trainer.writer.add_scalar("Grasping performance(Success rate)", success_rate, trainer.steps_done)
         reward = torch.tensor([[reward]], dtype=torch.float32)
         next_state = trainer.transform_state(next_state)
         trainer.memory.push(state, max_idx, next_state, reward)
@@ -250,7 +252,6 @@ def main():
         trainer.learn()
 
     trainer.save(path_name="grasprl/trained/resnet/resnet", filename="insne")
-    #trainer.env.close()
     trainer.writer.close()
 
 
