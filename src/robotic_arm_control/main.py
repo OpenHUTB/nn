@@ -130,7 +130,8 @@ class Utils:
             log_file = DIRS["logs"] / f"arm_{level.lower()}.log"
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(log_msg + "\n")
-        except:
+        except (IOError, OSError) as e:
+            # 日志写入失败不影响主程序
             pass
 
     @classmethod
@@ -138,7 +139,7 @@ class Utils:
         """向量化角度转弧度"""
         try:
             return np.asarray(x, np.float64) * DEG2RAD
-        except:
+        except (TypeError, ValueError):
             return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
     @classmethod
@@ -146,7 +147,7 @@ class Utils:
         """向量化弧度转角度"""
         try:
             return np.asarray(x, np.float64) * RAD2DEG
-        except:
+        except (TypeError, ValueError):
             return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
     @classmethod
@@ -819,8 +820,11 @@ class ArmController:
                     self.load_params(parts[1] if len(parts) > 1 else "default")
                 else:
                     Utils.log("未知命令，输入help查看帮助")
-            except:
-                pass
+            except (EOFError, KeyboardInterrupt):
+                # 输入流关闭或用户中断，优雅退出
+                break
+            except Exception as e:
+                Utils.log(f"命令执行错误: {e}", "ERROR")
 
     def _control_joint(self, idx, deg):
         """控制单个关节"""
