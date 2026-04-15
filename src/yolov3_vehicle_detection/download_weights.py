@@ -23,7 +23,24 @@ def download_file(url, save_path):
     print(f"正在开始下载: {save_path}")
     print(f"源地址: {url}")
     try:
-        urllib.request.urlretrieve(url, save_path, reporthook)
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req) as response:
+            total_size = int(response.headers.get('Content-Length', 0))
+            downloaded = 0
+            block_size = 8192
+            with open(save_path, 'wb') as f:
+                while True:
+                    buffer = response.read(block_size)
+                    if not buffer:
+                        break
+                    downloaded += len(buffer)
+                    f.write(buffer)
+                    if total_size > 0:
+                        percent = int(downloaded * 100 / total_size)
+                        speed = int(downloaded / (1024 * (time.time() - start_time))) if time.time() - start_time > 0 else 0
+                        sys.stdout.write(f"\r下载进度: {percent}% | 已下载: {downloaded / (1024 * 1024):.2f} MB | 速度: {speed} KB/s")
+                        sys.stdout.flush()
         print("\n下载完成!")
     except Exception as e:
         print(f"\n下载失败: {e}")
@@ -34,13 +51,19 @@ if __name__ == "__main__":
     if not os.path.exists('models'):
         os.makedirs('models')
 
-    # YOLOv3 权重文件 (约 237MB)
-    weights_url = "https://pjreddie.com/media/files/yolov3.weights"
-    weights_path = "models/yolov3.weights"
+    # 初始化下载计时器
+    start_time = time.time()
 
-    # YOLOv3 配置文件
-    cfg_url = "https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3.cfg"
-    cfg_path = "models/yolov3.cfg"
+    # YOLOv3-tiny 权重文件（24MB）
+    weights_url = "https://pjreddie.com/media/files/yolov3-tiny.weights"
+    weights_path = "models/yolov3-tiny.weights"
+
+    cfg_url = "https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg"
+    cfg_path = "models/yolov3-tiny.cfg"
+
+    # 新增：添加coco.names下载（代码中用到但原脚本未下载）
+    names_url = "https://raw.githubusercontent.com/pjreddie/darknet/master/data/coco.names"
+    names_path = "models/coco.names"
 
     print("=== 开始自动下载模型文件 ===")
 
@@ -55,5 +78,11 @@ if __name__ == "__main__":
         download_file(weights_url, weights_path)
     else:
         print(f"文件已存在，跳过: {weights_path}")
+    
+    # 新增：下载coco.names
+    if not os.path.exists(names_path):
+        download_file(names_url, names_path)
+    else:
+        print(f"文件已存在，跳过: {names_path}")
 
     print("=== 所有文件准备就绪 ===")
