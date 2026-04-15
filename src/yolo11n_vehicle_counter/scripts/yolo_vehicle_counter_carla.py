@@ -13,13 +13,14 @@ OUTPUT_VIDEO_PATH = "../res/sample_carla_res.mp4"
 # ==================================================
 
 
-def main(model_path=None, input_video_path=None, output_video_path=None):
+def main(model_path=None, input_video_path=None, output_video_path=None, ground_truth=None):
     """主函数 - 运行车辆计数，针对CARLA视频优化
 
     Args:
         model_path: 模型文件路径 (如果为None则使用默认值)
         input_video_path: 输入视频路径 (如果为None则使用默认值)
         output_video_path: 输出视频路径 (如果为None则使用默认值)
+        ground_truth: ground truth文件路径 (可选)
     """
     # 使用传入的参数或默认值
     model_path = model_path or MODEL_PATH

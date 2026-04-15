@@ -281,7 +281,7 @@ def main():
 
     try:
         # 连接到CARLA服务器
-        client = carla.Client("localhost", 2000)
+        client = carla.Client("127.0.0.1", 2000)
         client.set_timeout(10.0)  # 设置超时时间
         print(f"✅ 成功连接到CARLA服务器")
 
