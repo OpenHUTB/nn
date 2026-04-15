@@ -3,7 +3,7 @@ import numpy as np
 import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
-from PIL import Image, ImageTk, ImageOps
+from PIL import Image, ImageTk, ImageOps, ImageDraw, ImageFont
 import threading
 import time
 from dataclasses import dataclass, field
@@ -14,6 +14,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 from datetime import datetime
+from sklearn.cluster import DBSCAN
 
 # 忽略警告
 warnings.filterwarnings('ignore')
@@ -61,10 +62,11 @@ class AppConfig:
     ui_refresh_rate: int = 100
     animation_duration: int = 300
 
+
 # ==================== 置信度校准器 ====================
 class ConfidenceCalibrator:
     """置信度校准器 - 提高置信度准确性"""
-    
+
     def __init__(self):
         self.calibration_history = deque(maxlen=100)
         self.performance_stats = {
@@ -883,6 +885,10 @@ class AdvancedRoadDetector:
             print(f"道路检测失败: {e}")
             return self._create_fallback_result()
     
+    def _extract_roi_region(self, image: np.ndarray, roi_mask: np.ndarray) -> np.ndarray:
+        """提取ROI区域"""
+        return cv2.bitwise_and(image, image, mask=roi_mask)
+
     def _parallel_detection(self, roi_region: np.ndarray) -> List[Dict[str, Any]]:
         """并行执行多种检测方法"""
         detection_methods = [
@@ -1357,25 +1363,25 @@ class SmartLaneDetector:
         self.method_configs = {
             'canny': {
                 'weight': 0.35,
-                'min_line_length': 20,
-                'max_line_gap': 30
+                'min_line_length': 15,
+                'max_line_gap': 40
             },
             'sobel': {
                 'weight': 0.30,
-                'gradient_threshold': 50
+                'gradient_threshold': 30
             },
             'gradient': {
                 'weight': 0.35,
-                'angle_tolerance': np.pi / 18  # 10度
+                'angle_tolerance': np.pi / 12  # 10度
             }
         }
         
         # 车道线验证参数
         self.validation_params = {
-            'min_lane_width': 100,  # 像素
-            'max_lane_width': 500,  # 像素
-            'max_width_variation': 0.4,  # 宽度变化率
-            'min_symmetry_score': 0.6
+            'min_lane_width': 50,  # 像素
+            'max_lane_width': 800,  # 像素
+            'max_width_variation': 0.6,  # 宽度变化率
+            'min_symmetry_score': 0.4
         }
     
     def detect(self, image: np.ndarray, roi_mask: np.ndarray) -> Dict[str, Any]:
@@ -1393,7 +1399,12 @@ class SmartLaneDetector:
             left_lines, right_lines = self._classify_and_filter_lanes(
                 detection_results, image.shape[1]
             )
-            
+
+            # 【新增】根据道路轮廓修正车道线分类
+            left_lines, right_lines = self._correct_lane_classification(
+                left_lines, right_lines, roi_mask, image.shape
+            )
+
             # 拟合车道线模型
             left_lane = self._fit_lane_model_robust(left_lines, image.shape, 'left')
             right_lane = self._fit_lane_model_robust(right_lines, image.shape, 'right')
@@ -1495,6 +1506,9 @@ class SmartLaneDetector:
             sigma = 0.33
             lower = int(max(0, (1.0 - sigma) * median))
             upper = int(min(255, (1.0 + sigma) * median))
+
+            lower = max(20, lower)
+            upper = min(180, upper)
             
             edges = cv2.Canny(image, lower, upper)
             
@@ -1503,7 +1517,7 @@ class SmartLaneDetector:
                 edges,
                 rho=1,
                 theta=np.pi/180,
-                threshold=self.config.hough_threshold,
+                threshold=max(15, self.config.hough_threshold - 10),
                 minLineLength=self.method_configs['canny']['min_line_length'],
                 maxLineGap=self.method_configs['canny']['max_line_gap']
             )
@@ -1644,65 +1658,147 @@ class SmartLaneDetector:
         
         if not all_lines:
             return [], []
-        
-        # 根据位置和斜率分类
+
+        # 【核心修复】使用线段底部端点的 x 坐标来分类左右车道
+        # 底部端点更可靠，因为无论道路如何弯曲，左车道底部始终在左侧
         left_candidates = []
         right_candidates = []
-        
+
         for line in all_lines:
-            slope = line['slope']
-            mid_x = line['midpoint'][0]
-            
-            # 分类逻辑
-            if slope < 0:  # 左车道线（负斜率）
-                if mid_x < image_width * 0.65:
-                    left_candidates.append(line)
-            else:  # 右车道线（正斜率）
-                if mid_x > image_width * 0.35:
-                    right_candidates.append(line)
-        
+            (x1, y1), (x2, y2) = line['points']
+            # 找到底部端点（y 值较大的那个）
+            bottom_x = x1 if y1 > y2 else x2
+
+            if bottom_x < image_width / 2:
+                left_candidates.append(line)
+            else:
+                right_candidates.append(line)
+
         # 进一步过滤和聚类
         left_lines = self._filter_and_cluster_lines(left_candidates, 'left')
         right_lines = self._filter_and_cluster_lines(right_candidates, 'right')
-        
+
         return left_lines, right_lines
+
+    def _correct_lane_classification(self, left_lines: List[Dict], right_lines: List[Dict],
+                                     road_mask: np.ndarray, image_shape: Tuple) -> Tuple[List[Dict], List[Dict]]:
+        """根据道路轮廓修正车道线分类"""
+        if not left_lines and not right_lines:
+            return left_lines, right_lines
+
+        # 计算道路中心线
+        road_center_x = self._calculate_road_center_x(road_mask, image_shape)
+        if road_center_x is None:
+            return left_lines, right_lines
+
+        corrected_left = []
+        corrected_right = []
+        all_lines = left_lines + right_lines
+
+        # 【修复】使用底部端点而不是中点来修正分类
+        # 在弯道上，中点可能跑到另一侧，但底部端点始终在正确的一侧
+        for line in all_lines:
+            (x1, y1), (x2, y2) = line['points']
+            # 找到底部端点（y 值较大的那个）
+            bottom_x = x1 if y1 > y2 else x2
+
+            # 根据底部端点相对于道路中心线的位置重新分类
+            if bottom_x < road_center_x:
+                corrected_left.append(line)
+            else:
+                corrected_right.append(line)
+
+        return corrected_left, corrected_right
+
+    def _calculate_road_center_x(self, road_mask: np.ndarray, image_shape: Tuple) -> Optional[float]:
+        """计算道路区域的中心线X坐标"""
+        try:
+            # 找到道路轮廓
+            contours, _ = cv2.findContours(road_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            if not contours:
+                return None
+
+            # 取最大轮廓
+            main_contour = max(contours, key=cv2.contourArea)
+
+            # 计算质心
+            M = cv2.moments(main_contour)
+            if M["m00"] == 0:
+                return None
+
+            cx = M["m10"] / M["m00"]
+            return float(cx)
+        except:
+            return None
+
     
     def _filter_and_cluster_lines(self, candidates: List[Dict], side: str) -> List[Dict]:
         """过滤和聚类线段"""
         if len(candidates) < 2:
             return candidates
-        
-        # 提取特征进行聚类
+
+        try:
+            # 提取特征进行聚类
+            slopes = np.array([c['slope'] for c in candidates])
+            midpoints_x = np.array([c['midpoint'][0] for c in candidates])
+
+            # 简单聚类：基于斜率和位置
+            from sklearn.cluster import DBSCAN
+
+            features = np.column_stack([slopes, midpoints_x])
+
+            # 标准化特征
+            features_norm = (features - np.mean(features, axis=0)) / (np.std(features, axis=0) + 1e-10)
+
+            # DBSCAN聚类
+            clustering = DBSCAN(eps=0.5, min_samples=2).fit(features_norm)
+            labels = clustering.labels_
+
+            # 选择最大的簇
+            unique_labels, counts = np.unique(labels[labels >= 0], return_counts=True)
+            if len(unique_labels) == 0:
+                return candidates  # 没有形成簇，返回所有
+
+            main_cluster_label = unique_labels[np.argmax(counts)]
+
+            # 过滤出主簇的线段
+            filtered = [c for c, l in zip(candidates, labels) if l == main_cluster_label]
+
+            # 进一步统计过滤
+            if len(filtered) >= 3:
+                filtered = self._apply_statistical_filtering(filtered)
+
+            return filtered
+        except ImportError:
+            print("警告：sklearn未安装，使用简化过滤")
+            return self._simple_filter_lines(candidates)
+        except Exception as e:
+            print(f"聚类失败：{e},使用简化过滤")
+            return self._simple_filter_lines(candidates)
+
+    def _simple_filter_lines(self, candidates: List[Dict]) -> List[Dict]:
+        """简化的线段过滤（不依赖sklearn）"""
+        if len(candidates) < 2:
+            return candidates
+
         slopes = np.array([c['slope'] for c in candidates])
         midpoints_x = np.array([c['midpoint'][0] for c in candidates])
-        
-        # 简单聚类：基于斜率和位置
-        from sklearn.cluster import DBSCAN
-        
-        features = np.column_stack([slopes, midpoints_x])
-        
-        # 标准化特征
-        features_norm = (features - np.mean(features, axis=0)) / (np.std(features, axis=0) + 1e-10)
-        
-        # DBSCAN聚类
-        clustering = DBSCAN(eps=0.5, min_samples=2).fit(features_norm)
-        labels = clustering.labels_
-        
-        # 选择最大的簇
-        unique_labels, counts = np.unique(labels[labels >= 0], return_counts=True)
-        if len(unique_labels) == 0:
-            return candidates  # 没有形成簇，返回所有
-        
-        main_cluster_label = unique_labels[np.argmax(counts)]
-        
-        # 过滤出主簇的线段
-        filtered = [c for c, l in zip(candidates, labels) if l == main_cluster_label]
-        
-        # 进一步统计过滤
-        if len(filtered) >= 3:
-            filtered = self._apply_statistical_filtering(filtered)
-        
+
+        slope_mean = np.mean(slopes)
+        slope_std = np.std(slopes)
+        midpoint_mean = np.mean(midpoints_x)
+        midpoint_std = np.std(midpoints_x)
+
+        filtered = []
+        for line in candidates:
+            slope_zscore = abs(line['slope'] - slope_mean) / (slope_std + 1e-10)
+            midpoint_zscore = abs(line['midpoint'][0] - midpoint_mean) / (midpoint_std + 1e-10)
+
+            if slope_zscore < 2.0 and midpoint_zscore < 2.0:
+                filtered.append(line)
+
         return filtered
+
     
     def _apply_statistical_filtering(self, lines: List[Dict]) -> List[Dict]:
         """应用统计过滤"""
@@ -1975,22 +2071,31 @@ class SmartLaneDetector:
         pts = np.array(path_points, dtype=np.float32)
         x = pts[:, 0]
         y = pts[:, 1]
-        
-        # 1. 曲率
+
+        # 1. 带符号的曲率（保留方向信息）
         dx = np.gradient(x)
         dy = np.gradient(y)
         d2x = np.gradient(dx)
         d2y = np.gradient(dy)
-        
-        curvature = np.abs(dx * d2y - d2x * dy) / (dx**2 + dy**2)**1.5
-        curvature = curvature[np.isfinite(curvature)]
-        
-        # 2. 平滑度（通过二阶导数的变化）
+
+        signed_curvature = (dx * d2y - d2x * dy) / (dx ** 2 + dy ** 2) ** 1.5
+        signed_curvature = signed_curvature[np.isfinite(signed_curvature)]
+
+        # 绝对值曲率
+        curvature = np.abs(signed_curvature)
+
+        # 2. 中心线偏移（关键！用于判断左右转）
+        # path_points 从底部(y=height)到顶部(y=target_y)排列
+        # 如果顶部x < 底部x → 左转，如果顶部x > 底部x → 右转
+        center_displacement = x[-1] - x[0]  # 顶部x - 底部x
+        center_displacement_ratio = center_displacement / (x.max() - x.min() + 1e-10)
+
+        # 3. 平滑度
         d2x_std = np.std(d2x) if len(d2x) > 0 else 0
         d2y_std = np.std(d2y) if len(d2y) > 0 else 0
         smoothness = 1.0 / (1.0 + d2x_std + d2y_std)
-        
-        # 3. 直线度（通过线性拟合的R²）
+
+        # 4. 直线度
         if len(x) >= 2:
             coeffs = np.polyfit(y, x, 1)
             poly_func = np.poly1d(coeffs)
@@ -2000,13 +2105,16 @@ class SmartLaneDetector:
             straightness = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
         else:
             straightness = 0
-        
+
         return {
-            'curvature_mean': float(np.mean(curvature)) if len(curvature) > 0 else 0,
+            'curvature_mean': float(np.mean(signed_curvature)) if len(signed_curvature) > 0 else 0,
+            'curvature_abs_mean': float(np.mean(curvature)) if len(curvature) > 0 else 0,
             'curvature_std': float(np.std(curvature)) if len(curvature) > 0 else 0,
             'smoothness': float(smoothness),
             'straightness': float(straightness),
-            'path_length': len(path_points)
+            'path_length': len(path_points),
+            'center_displacement': float(center_displacement),
+            'center_displacement_ratio': float(center_displacement_ratio)
         }
     
     def _calculate_prediction_quality(self, path_points: List[Tuple[int, int]],
@@ -2488,29 +2596,34 @@ class AdvancedDirectionAnalyzer:
     def _extract_path_features(self, future_path: Dict[str, Any]) -> Dict[str, Any]:
         """提取路径特征"""
         features = {}
-        
+
         path_features = future_path.get('features', {})
-        
-        # 曲率特征
-        curvature_mean = path_features.get('curvature_mean', 0)
-        curvature_std = path_features.get('curvature_std', 0)
-        
-        features['path_curvature'] = curvature_mean
-        features['path_curvature_abs'] = abs(curvature_mean)
-        features['path_curvature_std'] = curvature_std
-        
+
+        # 带符号的曲率（关键：保留左右方向信息）
+        signed_curvature = path_features.get('curvature_mean', 0)
+
+        # 中心线偏移（最可靠的左右判断依据）
+        center_displacement = path_features.get('center_displacement', 0)
+        center_displacement_ratio = path_features.get('center_displacement_ratio', 0)
+
+        features['path_curvature'] = signed_curvature
+        features['path_curvature_abs'] = abs(signed_curvature)
+        features['path_curvature_std'] = path_features.get('curvature_std', 0)
+        features['center_displacement'] = center_displacement
+        features['center_displacement_ratio'] = center_displacement_ratio
+
         # 平滑度特征
         smoothness = path_features.get('smoothness', 0.5)
         features['path_smoothness'] = smoothness
-        
+
         # 直线度特征
         straightness = path_features.get('straightness', 0.5)
         features['path_straightness'] = straightness
-        
+
         # 路径质量
         prediction_quality = future_path.get('prediction_quality', 0.5)
         features['path_quality'] = prediction_quality
-        
+
         return features
     
     def _extract_historical_features(self) -> Dict[str, Any]:
@@ -2557,17 +2670,17 @@ class AdvancedDirectionAnalyzer:
         if 'lane_convergence' in features and 'path_curvature' in features:
             convergence = features['lane_convergence']
             curvature = features['path_curvature']
-            
-            # 收敛和曲率应一致
-            if convergence < 0.8 and curvature > 0:  # 收敛且右转
+
+            # 收敛和曲率应一致（注意：图像坐标系中曲率符号与数学定义相反）
+            if convergence < 0.8 and curvature < 0:  # 收敛且右转（负曲率=右转）
                 consistency = 0.8
-            elif convergence < 0.8 and curvature < 0:  # 收敛且左转
+            elif convergence < 0.8 and curvature > 0:  # 收敛且左转（正曲率=左转）
                 consistency = 0.8
             elif convergence > 1.2 and abs(curvature) < 0.001:  # 发散且直行
                 consistency = 0.7
             else:
                 consistency = 0.5
-            
+
             consistency_scores.append(consistency)
         
         # 3. 检测质量一致性
@@ -2638,56 +2751,86 @@ class AdvancedDirectionAnalyzer:
     def _rule_based_prediction(self, features: Dict[str, Any]) -> Dict[str, float]:
         """基于规则的预测"""
         probs = {'直行': 0.3, '左转': 0.35, '右转': 0.35}
-        
-        # 1. 车道线收敛特征
-        if 'lane_convergence' in features:
-            convergence = features['lane_convergence']
-            
-            if convergence < 0.8:  # 明显收敛
-                # 结合对称性判断左右
-                symmetry = features.get('lane_symmetry', 0.5)
-                if symmetry < 0.6:
-                    probs['左转'] += 0.25
-                else:
-                    probs['右转'] += 0.25
-            elif convergence > 1.2:  # 明显发散
-                probs['直行'] += 0.2
-        
-        # 2. 路径曲率特征
+
+        # 1. 中心线偏移判断（最可靠！）
+        if 'center_displacement' in features:
+            displacement = features['center_displacement']
+            displacement_ratio = features.get('center_displacement_ratio', 0)
+
+            # 中心线向左偏移（displacement为负） → 左转，向右偏移（displacement为正） → 右转
+            # 这是因为：在左转道路上，左车道线比右车道线弯曲得更厉害，导致中心线向左偏移
+            if displacement < -20:  # 中心线向左偏移
+                left_strength = min(0.4, abs(displacement_ratio) * 1.5)
+                probs['左转'] += left_strength
+                probs['右转'] -= left_strength * 0.3
+            elif displacement > 20:  # 中心线向右偏移
+                right_strength = min(0.4, abs(displacement_ratio) * 1.5)
+                probs['右转'] += right_strength
+                probs['左转'] -= right_strength * 0.3
+            else:  # 基本居中
+                probs['直行'] += 0.15
+
+        # 2. 带符号的路径曲率（修复：保留正负号）
         if 'path_curvature' in features:
             curvature = features['path_curvature']
-            
+
             if abs(curvature) < 0.0005:
                 probs['直行'] += 0.2
-            elif curvature > 0.0005:
-                probs['右转'] += min(0.3, curvature * 800)
-            else:
-                probs['左转'] += min(0.3, abs(curvature) * 800)
-        
-        # 3. 轮廓质心特征
+            elif curvature < -0.0005:  # 负曲率 → 左转
+                probs['左转'] += min(0.25, abs(curvature) * 600)
+            else:  # 正曲率 → 右转
+                probs['右转'] += min(0.25, curvature * 600)
+
+        # 3. 车道线收敛特征
+        if 'lane_convergence' in features:
+            convergence = features['lane_convergence']
+
+            if convergence < 0.8:  # 明显收敛（弯道）
+                # 结合中心线偏移判断左右
+                displacement = features.get('center_displacement', 0)
+                if displacement < -10:
+                    probs['左转'] += 0.25
+                elif displacement > 10:
+                    probs['右转'] += 0.25
+                else:
+                    # 无法判断方向，只加转弯概率
+                    probs['左转'] += 0.1
+                    probs['右转'] += 0.1
+            elif convergence > 1.2:  # 明显发散
+                probs['直行'] += 0.2
+
+        # 4. 轮廓质心特征
         if 'contour_centroid_x' in features:
             centroid_x = features['contour_centroid_x']
-            deviation = (centroid_x - 400) / 400  # 归一化到[-1, 1]
-            
+            # 注意：这里假设图像宽度约为800，需要根据实际调整
+            # 使用相对位置而非绝对值
+            image_width = features.get('image_width', 800)
+            center_x = image_width / 2
+            deviation = (centroid_x - center_x) / center_x
+
             if abs(deviation) < 0.15:
-                probs['直行'] += 0.25
+                probs['直行'] += 0.15
             elif deviation > 0.15:
-                probs['右转'] += min(0.3, abs(deviation) * 1.5)
+                probs['右转'] += min(0.2, abs(deviation) * 1.0)
             else:
-                probs['左转'] += min(0.3, abs(deviation) * 1.5)
-        
-        # 4. 车道宽度变化
+                probs['左转'] += min(0.2, abs(deviation) * 1.0)
+
+        # 5. 车道宽度变化
         if 'width_variation' in features:
             variation = features['width_variation']
-            if variation > 0.3:  # 宽度变化大，可能转弯
+            if variation > 0.3:
                 probs['直行'] -= 0.1
-        
+
         # 归一化
         total = sum(probs.values())
         if total > 0:
             for direction in probs:
-                probs[direction] /= total
-        
+                probs[direction] = max(0, probs[direction])
+            total = sum(probs.values())
+            if total > 0:
+                for direction in probs:
+                    probs[direction] /= total
+
         return probs
     
     def _statistical_prediction(self, features: Dict[str, Any],
@@ -2743,49 +2886,58 @@ class AdvancedDirectionAnalyzer:
     def _geometric_prediction(self, features: Dict[str, Any]) -> Dict[str, float]:
         """基于几何的预测"""
         probs = {'直行': 0.33, '左转': 0.33, '右转': 0.34}
-        
+
         # 使用多个几何特征进行判断
         indicators = []
-        
+
         # 1. 车道线角度差
         if 'slope_difference' in features:
             diff = features['slope_difference']
             if diff > 0.3:
                 indicators.append('turn')
-        
+
         # 2. 车道宽度变化
         if 'width_variation' in features:
             variation = features['width_variation']
             if variation > 0.25:
                 indicators.append('turn')
-        
+
         # 3. 路径曲率
         if 'path_curvature_abs' in features:
             curvature = features['path_curvature_abs']
             if curvature > 0.0008:
                 indicators.append('turn')
-        
-        # 判断转弯方向
+
+        # 判断转弯方向（优先使用中心线偏移）
         if indicators:
             turn_count = len(indicators)
-            
-            # 使用对称性判断左右
-            symmetry = features.get('lane_symmetry', 0.5)
-            if symmetry < 0.55:
-                probs['左转'] += turn_count * 0.15
-            elif symmetry > 0.65:
-                probs['右转'] += turn_count * 0.15
+
+            # 优先使用中心线偏移判断左右（最可靠）
+            displacement = features.get('center_displacement', 0)
+            if abs(displacement) > 15:
+                if displacement < 0:
+                    probs['左转'] += turn_count * 0.15
+                else:
+                    probs['右转'] += turn_count * 0.15
             else:
-                # 对称性不明显，平均分配
-                probs['左转'] += turn_count * 0.075
-                probs['右转'] += turn_count * 0.075
-        
+                # 降级使用对称性判断
+                symmetry = features.get('lane_symmetry', 0.5)
+                if symmetry < 0.55:
+                    probs['左转'] += turn_count * 0.075
+                    probs['右转'] += turn_count * 0.075
+                elif symmetry > 0.65:
+                    probs['左转'] += turn_count * 0.075
+                    probs['右转'] += turn_count * 0.075
+                else:
+                    probs['左转'] += turn_count * 0.075
+                    probs['右转'] += turn_count * 0.075
+
         # 归一化
         total = sum(probs.values())
         if total > 0:
             for direction in probs:
                 probs[direction] /= total
-        
+
         return probs
     
     def _historical_prediction(self) -> Dict[str, float]:
@@ -2825,19 +2977,21 @@ class AdvancedDirectionAnalyzer:
         """基于上下文的预测"""
         # 根据不同场景调整先验概率
         if context == "highway":
-            # 高速公路更可能直行
             return {'直行': 0.6, '左转': 0.2, '右转': 0.2}
         elif context == "urban_intersection":
-            # 城市交叉口转弯概率增加
             return {'直行': 0.3, '左转': 0.35, '右转': 0.35}
         elif context == "rural_curve":
-            # 乡村弯道
-            # 根据特征判断左右
+            # 乡村弯道 - 使用中心线偏移判断
+            displacement = features.get('center_displacement', 0)
             curvature = features.get('path_curvature', 0)
-            if curvature > 0:
-                return {'直行': 0.2, '左转': 0.3, '右转': 0.5}
-            else:
-                return {'直行': 0.2, '左转': 0.5, '右转': 0.3}
+
+            if abs(displacement) > 15 or abs(curvature) > 0.0005:
+                if displacement < -10 or curvature < -0.0005:
+                    return {'直行': 0.2, '左转': 0.55, '右转': 0.25}
+                elif displacement > 10 or curvature > 0.0005:
+                    return {'直行': 0.2, '左转': 0.25, '右转': 0.55}
+
+            return {'直行': 0.3, '左转': 0.35, '右转': 0.35}
         else:
             return {'直行': 0.33, '左转': 0.33, '右转': 0.34}
     
@@ -3301,7 +3455,7 @@ class SmartVisualizer:
             visualization = self._draw_info_panel(visualization, direction_info, lane_info)
             
             # 5. 绘制方向指示器
-            visualization = self._draw_direction_indicator(visualization, direction_info)
+            # visualization = self._draw_direction_indicator(visualization, direction_info)
             
             # 6. 绘制置信度指示器
             visualization = self._draw_confidence_indicator(visualization, direction_info)
@@ -3414,7 +3568,7 @@ class SmartVisualizer:
         height, width = image.shape[:2]
         
         # 创建半透明背景
-        panel_height = 140
+        panel_height = 130
         overlay = image.copy()
         cv2.rectangle(overlay, (0, 0), (width, panel_height), 
                      self.colors['overlay_bg'][:3], -1)
@@ -3428,24 +3582,59 @@ class SmartVisualizer:
         
         # 设置颜色
         confidence_color = self._get_confidence_color(confidence)
+
+        # 转换为PIL图像以支持中文
+        image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(image_pil)
+
+        # 加载中文字体
+        try:
+            font_large = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 20)
+            font_medium = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 16)
+            font_small = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 12)
+        except:
+            try:
+                font_large = ImageFont.truetype("msyh.ttc", 20)
+                font_medium = ImageFont.truetype("msyh.ttc", 16)
+                font_small = ImageFont.truetype("msyh.ttc", 12)
+            except:
+                font_large = ImageFont.load_default()
+                font_medium = ImageFont.load_default()
+                font_small = ImageFont.load_default()
         
         # 绘制方向信息
-        font = cv2.FONT_HERSHEY_SIMPLEX
+        # font = cv2.FONT_HERSHEY_SIMPLEX
         
         # 1. 方向
         direction_text = f"方向: {direction}"
-        cv2.putText(image, direction_text, (20, 35), 
-                   font, 1.2, confidence_color, 2)
+        direction_color = tuple(int(c) for c in confidence_color)
+
+        # 计算文字尺寸用于背景高亮
+        try:
+            text_bbox = draw.textbbox((20, 15), direction_text, font=font_large)
+            text_width = text_bbox[2] - text_bbox[0] + 16
+            text_height = text_bbox[3] - text_bbox[1] + 8
+
+            # 绘制文字背景高亮
+            bg_color = (30, 30, 30, 180)
+            draw.rectangle(
+                [15, 10, 20 + text_width, 20 + text_height],
+                fill=bg_color
+            )
+        except:
+            pass
+
+        draw.text((20, 15), direction_text, font=font_large, fill=direction_color)
+
         
         # 2. 置信度
         confidence_text = f"置信度: {confidence:.1%}"
-        cv2.putText(image, confidence_text, (20, 70), 
-                   font, 0.9, confidence_color, 2)
+        draw.text((20, 50), confidence_text, font=font_medium, fill=direction_color)
         
         # 3. 检测质量
         quality_text = f"检测质量: {quality:.1%}"
-        cv2.putText(image, quality_text, (20, 100), 
-                   font, 0.7, self.colors['text_secondary'][:3], 1)
+        quality_color = (200, 200, 200)
+        draw.text((20, 80), quality_text, font=font_small, fill=quality_color)
         
         # 4. 推理说明（截断以适应面板）
         if reasoning:
@@ -3453,27 +3642,46 @@ class SmartVisualizer:
             max_chars = 40
             if len(reasoning) > max_chars:
                 reasoning = reasoning[:max_chars-3] + "..."
-            
-            cv2.putText(image, reasoning, (20, 130), 
-                       font, 0.6, self.colors['text_secondary'][:3], 1)
+
+            reasoning_color = (180, 180, 180)
+            draw.text((20, 105), reasoning, font=font_small, fill=reasoning_color)
         
         # 5. 概率分布（右侧）
         if 'probabilities' in direction_info:
             probabilities = direction_info['probabilities']
-            start_x = width - 200
-            start_y = 30
-            
+            start_x = width - 160
+            start_y = 15
+
+            bg_rect_x1 = start_x - 10
+            bg_rect_y1 = start_y - 5
+            bg_rect_x2 = width - 10
+            bg_rect_y2 = start_y + len(probabilities) * 22 + 5
+
+            prob_bg_color = (20, 20, 20, 150)
+            draw.rectangle(
+                [bg_rect_x1, bg_rect_y1, bg_rect_x2, bg_rect_y2],
+                fill=prob_bg_color
+            )
+
+            # 绘制概率分布标题
+            title_text = "概率分布"
+            title_color = (200, 200, 200)
+            draw.text((start_x, start_y), title_text, font=font_small, fill=title_color)
+
             for i, (dir_name, prob) in enumerate(probabilities.items()):
-                y = start_y + i * 25
+                y = start_y + 20 + i * 22
                 prob_text = f"{dir_name}: {prob:.1%}"
                 
                 # 高亮当前方向
-                color = self.colors['text_highlight'][:3] if dir_name == direction \
-                       else self.colors['text_primary'][:3]
-                
-                cv2.putText(image, prob_text, (start_x, y), 
-                           font, 0.7, color, 1)
-        
+                if dir_name == direction:
+                    text_color = (0, 255, 255)
+                else:
+                    text_color = (180, 180, 180)
+
+                draw.text((start_x, y), prob_text, font=font_small, fill=text_color)
+
+        # 转换回OpenCV格式
+        image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
         return image
     
     def _draw_direction_indicator(self, image: np.ndarray, 
@@ -3566,15 +3774,15 @@ class SmartVisualizer:
         height, width = image.shape[:2]
         
         # 在右上角绘制置信度条
-        bar_width = 200
-        bar_height = 20
+        bar_width = 220
+        bar_height = 28
         bar_x = width - bar_width - 20
-        bar_y = 20
+        bar_y = 150
         
         # 绘制背景条
         cv2.rectangle(image, (bar_x, bar_y), 
                      (bar_x + bar_width, bar_y + bar_height),
-                     (100, 100, 100), -1)
+                     (80, 80, 80), -1)
         
         # 绘制前景条（根据置信度）
         fill_width = int(bar_width * confidence)
@@ -3587,16 +3795,29 @@ class SmartVisualizer:
         # 绘制边框
         cv2.rectangle(image, (bar_x, bar_y), 
                      (bar_x + bar_width, bar_y + bar_height),
-                     (255, 255, 255), 1)
+                     (255, 255, 255), 2)
         
         # 添加文本
         conf_text = f"置信度: {confidence:.1%}"
-        text_size = cv2.getTextSize(conf_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)[0]
-        text_x = bar_x + (bar_width - text_size[0]) // 2
-        text_y = bar_y + bar_height // 2 + text_size[1] // 2
-        
-        cv2.putText(image, conf_text, (text_x, text_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        # 转换为PIL绘制中文
+        image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(image_pil)
+
+        try:
+            font = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 15)
+        except:
+            try:
+                font = ImageFont.truetype("msyh.ttc", 15)
+            except:
+                font = ImageFont.load_default()
+
+        text_color = (255, 255, 255)
+        text_x = bar_x + (bar_width - len(conf_text) * 12) // 2
+        text_y = bar_y + 7
+
+        draw.text((text_x, text_y), conf_text, font=font, fill=text_color)
+
+        image = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
         
         return image
     
