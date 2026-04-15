@@ -1,4 +1,4 @@
-# Python 虚拟环境（核心！）
+# ============== 核心：Python 虚拟环境 ==============
 venv/
 venv*/
 *venv/
@@ -7,8 +7,9 @@ env*/
 *env/
 .venv/
 venv311/
+src/yolo11n_vehicle_counter/venv311/
 
-# Python 缓存文件
+# ============== Python 缓存与编译文件 ==============
 __pycache__/
 *.py[cod]
 *$py.class
@@ -30,25 +31,23 @@ wheels/
 .installed.cfg
 *.egg
 
-# 日志、临时文件
+# ============== 日志、临时文件 ==============
 *.log
 *.tmp
 *.temp
 .cache/
-
-# IDE 配置文件（VS Code、PyCharm等）
+*.idea/
 .vscode/
-.idea/
 *.swp
-*.swo
 *~
 
-# 数据集、模型权重（大文件不要提交）
+# ============== 大文件：模型、数据集、输出 ==============
 *.pt
 *.pth
 *.onnx
 *.weights
-data/
 dataset/
+data/
 models/
 runs/
+res/
