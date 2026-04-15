@@ -21,7 +21,7 @@ class FrameStackWrapper(gym.Wrapper):
         super().__init__(env)
         self.num_frames = num_frames
 
-        # Create stacked observation space
+        # 构造堆叠后的观测空间
         assert isinstance(env.observation_space, spaces.Box)
 
         old_shape = env.observation_space.shape
@@ -32,14 +32,14 @@ class FrameStackWrapper(gym.Wrapper):
             dtype=env.observation_space.dtype,
         )
 
-        # Frame buffer
+        # 帧缓存
         self.frames = deque(maxlen=num_frames)
 
     def reset(self, seed=None, options=None) -> Tuple[np.ndarray, Dict]:
         """重置环境和帧缓冲区"""
         obs, info = self.env.reset(seed=seed, options=options)
 
-        # Clear frame buffer and fill with initial observation
+        # 清空帧缓存，并用初始观测填充
         for _ in range(self.num_frames):
             self.frames.append(obs)
 
@@ -94,7 +94,7 @@ class ResizeWrapper(gym.ObservationWrapper):
 
         self.target_shape = target_shape
 
-        # Update observation space
+        # 更新观测空间
         old_obs_shape = env.observation_space.shape
         self.observation_space = spaces.Box(
             low=env.observation_space.low.min(),
@@ -107,18 +107,18 @@ class ResizeWrapper(gym.ObservationWrapper):
         """调整观测值大小"""
         from PIL import Image
 
-        # Extract spatial dimensions
+        # 提取空间维度
         H, W = obs.shape[:2]
         C = obs.shape[-1] if len(obs.shape) == 3 else 1
 
-        # Resize each channel
+        # 逐通道调整尺寸
         if C == 1:
-            # Single channel
+            # 单通道
             img = Image.fromarray(obs.squeeze(), mode="L")
             img_resized = img.resize(self.target_shape[::-1], Image.Resampling.LANCZOS)
             return np.array(img_resized, dtype=obs.dtype).reshape(*self.target_shape, 1)
         else:
-            # Multi-channel
+            # 多通道
             img = Image.fromarray(obs, mode="RGB" if C == 3 else f"{C}")
             img_resized = img.resize(self.target_shape[::-1], Image.Resampling.LANCZOS)
             return np.array(img_resized, dtype=obs.dtype)
@@ -171,6 +171,8 @@ def create_wrapped_env(
     env: gym.Env,
     frame_stack: int = 4,
     normalize_obs: bool = True,
+    resize_obs: bool = False,
+    resize_shape: Tuple[int, int] = (84, 84),
     clip_reward: bool = False,
     action_repeat: int = 1,
 ) -> gym.Env:
@@ -181,6 +183,8 @@ def create_wrapped_env(
         env: 基础环境
         frame_stack: 要堆叠的帧数（0 = 不堆叠）
         normalize_obs: 是否将观测值归一化为 [0, 1]
+        resize_obs: 是否将观测值调整到固定大小
+        resize_shape: 目标观测大小 (H, W)
         clip_reward: 是否将奖励剪裁到 [-1, 1]
         action_repeat: 每个动作重复的次数
 
@@ -188,6 +192,9 @@ def create_wrapped_env(
         包装环境
     """
     # 按顺序应用包装器
+    if resize_obs:
+        env = ResizeWrapper(env, target_shape=resize_shape)
+
     if frame_stack > 1:
         env = FrameStackWrapper(env, num_frames=frame_stack)
 
