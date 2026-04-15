@@ -46,8 +46,8 @@ class GraspRobot(MujocoPhyEnv):
             eef_site=self.eef_site,
             min_effort=-150.0,
             max_effort=150.0,
-            kp=50,
-            ko=50,
+            kp=80,
+            ko=80,
             kv=50,
             vmax_xyz=1.0,
             vmax_abg=2.0          
@@ -69,6 +69,9 @@ class GraspRobot(MujocoPhyEnv):
         for i in range(self.frame_skip):
             self.controller.run(eyehand_target)
             self.grp_ctrl.run(signal=0)
+            # 清一下速度，防止仿真崩
+            self.physics.data.qvel[:] = np.nan_to_num(self.physics.data.qvel, nan=0.0, posinf=0.0, neginf=0.0)
+            self.physics.data.qacc[:] = np.nan_to_num(self.physics.data.qacc, nan=0.0, posinf=0.0, neginf=0.0)
             self.physics.data.ctrl[:] = np.nan_to_num(self.physics.data.ctrl, nan=0.0, posinf=1.0, neginf=-1.0)
             self.step_mujoco_simulation()
 
