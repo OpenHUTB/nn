@@ -24,6 +24,8 @@ class TorcsEnv:
 
         self.initial_run = True  # 初始运行标记
 
+        self.last_steer = 0  # 记录上次转向值用于平滑度计算
+
         ##print("launch torcs")
         # 终止已运行的TORCS进程
         os.system('pkill torcs')
@@ -132,28 +134,52 @@ class TorcsEnv:
         self.observation = self.make_observaton(obs)
 
         # 奖励函数设置 #######################################
-        # 方向相关的正向奖励
-        track = np.array(obs['track'])  # 赛道边界距离
-        trackPos = np.array(obs['trackPos'])  # 赛道位置（偏离中心的距离）
-        sp = np.array(obs['speedX'])  # X方向速度（前进速度）
-        damage = np.array(obs['damage'])  # 车辆损伤值
-        rpm = np.array(obs['rpm'])  # 发动机转速
+        track = np.array(obs['track'])
+        trackPos = np.array(obs['trackPos'])
+        sp = np.array(obs['speedX'])
+        angle = np.array(obs['angle'])
 
-        # 进度计算：综合考虑前进速度、方向和赛道位置
-        progress = sp * np.cos(obs['angle']) - np.abs(sp * np.sin(obs['angle'])) - sp * np.abs(obs['trackPos'])
-        reward = progress  # 基础奖励为进度值
+        # 基础进度奖励
+        progress = sp * np.cos(angle)
 
-        # 碰撞检测（损伤值增加说明发生碰撞）
+        # 赛道位置惩罚（偏离中心）
+        track_pos_penalty = -2.0 * abs(trackPos)
+
+        # 转向平滑度惩罚
+        if hasattr(self, 'last_steer'):
+            steer_change = abs(obs['steer'] - self.last_steer)
+            steering_smoothness_penalty = -5.0 * steer_change
+        else:
+            steering_smoothness_penalty = 0
+        self.last_steer = obs['steer']
+
+        # 速度奖励（鼓励保持适当速度）
+        target_speed = 80.0
+        speed_reward = 0.1 * (1.0 - abs(sp - target_speed) / target_speed)
+
+        # 赛道跟踪奖励（根据赛道传感器）
+        track_center_reward = 0
+        if len(track) > 0:
+            # 检查前方是否有弯道
+            min_track_dist = min(track[5:15])  # 检查前方传感器
+            if min_track_dist < 10:  # 弯道
+                track_center_reward = 5.0 * (1.0 - abs(trackPos))
+
+        # 总奖励
+        reward = (progress * 0.3 +
+                  track_pos_penalty * 0.2 +
+                  steering_smoothness_penalty * 0.2 +
+                  speed_reward * 0.1 +
+                  track_center_reward * 0.2)
+
+        # 碰撞惩罚
         if obs['damage'] - obs_pre['damage'] > 0:
-            reward = -1  # 碰撞惩罚
+            reward = -10.0
 
-        # 终止条件判断 #########################
-        episode_terminate = False
-        # 车辆驶出赛道则终止回合
+        # 驶出赛道
         if (abs(track.any()) > 1 or abs(trackPos) > 1):
-            reward = -200  # 驶出赛道严重惩罚
+            reward = -50.0
             episode_terminate = True
-            client.R.d['meta'] = True  # 设置重置标记
 
         # 长时间无进展则终止回合
         if self.terminal_judge_start < self.time_step:
