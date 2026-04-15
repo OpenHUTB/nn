@@ -388,7 +388,7 @@ if __name__ == "__main__":
     print(f"输出目录: {out_dir.resolve()}")
     print(f"聚类图: {cluster_path.name}")
     print(f"收敛图: {conv_path.name}")
-    print(f"日志: {log_path.name}")
+    print(f"日志: {log_path.name}") 
 
 
 
