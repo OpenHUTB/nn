@@ -108,7 +108,7 @@ class TargetVisualizer:
     def _add_target_geom(self):
         """动态添加目标点几何"""
         # 创建临时几何
-        self.target_geom = mujoco.MjGeom()
+        self.target_geom = mujoco.MjvGeom()
         mujoco.mj_initGeom(
             self.target_geom,
             mujoco.mjtGeom.mjGEOM_SPHERE,
