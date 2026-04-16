@@ -98,3 +98,37 @@ python model_trainer.py --data ./dataset --epochs 50
 - [Keras 深度学习模型构建指南](https://keras.io/guides/)
 - [TensorFlow 模型优化文档](https://www.tensorflow.org/guide/keras/optimizers)
 - [语义分割算法综述](https://arxiv.org/abs/1704.06857)
+
+  ---
+
+## 🔧 本次实验修改说明（语义分割模型替换）
+### 1. 修改目标
+
+在原有系统中，语义分割结果直接使用 CARLA 提供的 Ground Truth（真实标签）。  
+本次修改将其替换为深度学习模型预测结果，使系统更贴近真实自动驾驶感知流程。
+
+---
+
+### 2. 核心修改
+
+将原始代码：
+
+```python
+pred_sem_data = front_sem_data
+```
+替换为：
+```python
+front_sem_data = pred_sem_data
+```
+### 3. 新增模型推理流程
+
+在 RGB 图像基础上引入深度学习模型进行语义分割预测：
+```python
+pred = model(input_tensor)
+pred = torch.argmax(pred, dim=1)
+```
+实现流程：
+
+- RGB 图像输入模型
+- 输出语义类别预测
+- 替代原始语义标签
