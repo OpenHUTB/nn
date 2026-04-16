@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+
+# Copyright (c) 2018 Intel Labs.
+# authors: German Ros (german.ros@intel.com)
+#
+# This work is licensed under the terms of the MIT license.
+# For a copy, see <https://opensource.org/licenses/MIT>.
+
 """Example of automatic vehicle control from client side."""
 
 from __future__ import print_function
@@ -33,7 +41,7 @@ except ImportError:
 # ==============================================================================
 
 # 添加 CARLA Python API 路径（使用你的本地路径）
-carla_base = 'H:/carla0.9.12/WindowsNoEditor/PythonAPI/carla'
+carla_base = 'H:/carla0.9.15/WindowsNoEditor/PythonAPI/carla'
 egg_dir = os.path.join(carla_base, 'dist')
 
 # 添加 egg 文件
