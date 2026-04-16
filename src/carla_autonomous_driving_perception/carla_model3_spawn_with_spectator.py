@@ -1,3 +1,5 @@
+import torch
+import torch.nn as nn
 import carla
 import pygame
 import time
@@ -296,6 +298,7 @@ for _ in range(walker_count * 2):
 for i in range(walker_count):
     if i >= len(walker_spawn_points):
         break
+
     walker_bp = random.choice(walker_bps)
     walker_bp.set_attribute('is_invincible', 'false')
     try:
@@ -356,6 +359,36 @@ def set_spectator_smooth(last_transform=None):
     spectator.set_transform(smooth_tf)
     return smooth_tf
 
+#注意力
+class Attention(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels, in_channels, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        return x * self.sigmoid(self.conv(x))
+
+
+class SimpleSegNet(nn.Module):
+    def __init__(self, num_classes=23):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(3, 16, 3, padding=1),
+            nn.ReLU(),
+            Attention(16),
+
+            nn.Conv2d(16, 32, 3, padding=1),
+            nn.ReLU(),
+            Attention(32),
+
+            nn.Conv2d(32, num_classes, 1)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
 # 9. 主循环（集成量化评估功能）
 print("\n程序运行中，按以下按键操作：")
 print("1-5=切换可视化模式 | ↑/↓=调整融合透明度 | E=开启/关闭量化评估 | R=重置 | Q=退出")
@@ -372,6 +405,9 @@ highlight_class_mapping = {4: (0, 0, 255), 10: (255, 0, 0)}
 current_mode = 1
 fusion_alpha = 0.3
 eval_enabled = True  # 默认开启量化评估
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = SimpleSegNet().to(device)
+model.eval()
 # =================================================================
 
 try:
@@ -396,6 +432,20 @@ try:
             front_rgb_image = front_rgb_queue.get()
             front_rgb_img = np.reshape(np.copy(front_rgb_image.raw_data), (720, 1024, 4))[:, :, :3]
             
+            # resize 输入
+            input_img = cv2.resize(front_rgb_img, (256, 256))
+
+            # 转 tensor
+            input_tensor = torch.from_numpy(input_img).permute(2, 0, 1).float().unsqueeze(0) / 255.0
+            input_tensor = input_tensor.to(device)
+
+            # 推理
+            with torch.no_grad():
+                pred = model(input_tensor)
+                pred = torch.argmax(pred, dim=1).squeeze().cpu().numpy()
+
+            # resize 回原图
+            pred_sem_data = cv2.resize(pred.astype(np.uint8), (1024, 720), interpolation=cv2.INTER_NEAREST) 
             front_sem_image = front_sem_queue.get()
             front_sem_data = np.reshape(np.copy(front_sem_image.raw_data), (720, 1024, 4))[:, :, 2].astype(np.int32)
             front_sem_rgb = np.zeros((720, 1024, 3), dtype=np.uint8)
@@ -413,7 +463,7 @@ try:
             
             # ==================== 第16次提交：量化评估计算与可视化 ====================
             # 模拟预测数据（实际项目中替换为模型输出）
-            pred_sem_data = front_sem_data  # 此处用CARLA语义模拟预测（无噪声）
+            #pred_sem_data = front_sem_data  # 此处用CARLA语义模拟预测（无噪声）
             eval_result = semantic_quantitative_evaluation(pred_sem_data, front_sem_data, EVAL_CLASSES)
             eval_vis = generate_evaluation_visualization(eval_result)
             # =================================================================
