@@ -90,7 +90,8 @@ def spawn_vehicles(num_vehicles, world, spawn_points):
     return spawned_walkers '''
 
 # Define the map you want to load
-world = client.load_world('Town03')
+# 换一个交通标志多的地图
+world = client.load_world('Town05')
 
 
 # Set up the simulator in synchronous mode
@@ -160,9 +161,22 @@ def image_callback(image):
         image_queue.put(image)
 
 camera.listen(image_callback)
+# 使用相对路径保存记录到的数据
+# 当前文件目录
+current_dirc = os.path.dirname(os.path.abspath(__file__))
+
+# 向上回到 Git 目录
+project_root = os.path.abspath(os.path.join(current_dirc, '..', '..', '..'))
+
+# 拼接 carla 路径
+data_path = os.path.join(
+    project_root,
+    'OutPut',
+    'data01'
+)
 
 # Directory to save images and XML files
-output_dir = r'D:\software\workspace\OutPut\data01'
+output_dir = data_path
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -212,7 +226,8 @@ fov = camera_bp.get_attribute("fov").as_float()
 K = build_projection_matrix(image_w, image_h, fov)
 
 # Define the distance threshold for a clearly visible sign
-DISTANCE_THRESHOLD = 5.0  # Example threshold in meters
+# 扩大检测距离到20米
+DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
 
 # Set to track captured traffic sign locations
 captured_sign_locations = set()
@@ -252,7 +267,8 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                     area = (xmax - xmin) * (ymax - ymin)
 
                     # Set a threshold for the minimum area to capture the sign
-                    min_area_threshold = 13000  # Adjust this value as needed
+                    # 降低“面积阈值”过滤
+                    min_area_threshold = 10  # Adjust this value as needed
 
                     # Check if the bounding box is fully within the image frame
                     if xmin >= 0 and ymin >= 0 and xmax < image_w and ymax < image_h:
