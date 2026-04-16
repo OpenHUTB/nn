@@ -18,13 +18,14 @@ theme:
   navigation_depth: 3
   features:
     - search.suggest # 在目录栏中的搜索框中输入一些字母时推荐补全整个单词
-extra_css: [extra.css]
+
+# extra_css: [extra.css]  # 注释掉，文件不存在导致404错误
 
 
 
 # mathjax用于单独公式展示
 extra_javascript:
-  - extra.js
+  # - extra.js  # 注释掉，文件不存在导致404错误
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 
 plugins:
@@ -45,6 +46,26 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- 入门:
+  - issue统计测试: 'issue.md'
+  - 热身: 'warmup.md'
+  - 线性回归: 'linear_regression.md'
+  - softmax回归: 'softmax_regression.md'
+  - 支持向量机: 'svm.md'
+  - 简单神经网络: 'simple_nn.md'
+  - 卷积神经网络: 'CNN.md'
+  - 循环神经网络: 'RNN.md'
+  - 注意力机制: 'attention.md'
+  - 高斯混合: 'gaussian_mixture.md'
+  - 受限玻尔兹曼机: 'RBM.md'
+  - 强化学习: 'RL.md'
+- 感知:
+  - carla_CAM: 'carla_CAM/README.md'
+  - 跟踪: 'tracking.md'
+- 规划:
+  - 导航: 'navigation.md'
+- 控制:
+  - PID: 'pid.md'
 
 
 # - mdx_math 用于行内公式显示

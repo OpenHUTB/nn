@@ -13,6 +13,10 @@ title: 主页
 
 ## 入门 <span id="primary"></span>
 
+[__issue统计测试__](issue.md)
+
+### 基础模型
+
 [__热身__](warmup.md) — 入门热身示例
 
 [__线性回归__](linear_regression.md)
@@ -21,6 +25,8 @@ title: 主页
 
 [__支持向量机__](svm.md)
 
+### 神经网络
+
 [__简单神经网络__](simple_nn.md)
 
 [__卷积神经网络__](CNN.md)
@@ -28,6 +34,8 @@ title: 主页
 [__循环神经网络__](RNN.md)
 
 [__注意力机制__](attention.md)
+
+### 其他模型
 
 [__高斯混合__](gaussian_mixture.md)
 
