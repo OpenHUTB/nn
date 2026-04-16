@@ -1,4 +1,4 @@
-"""Training utilities and callbacks"""
+"""训练工具与回调"""
 
 from .callbacks import CustomCallback
 

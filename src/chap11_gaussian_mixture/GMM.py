@@ -3,7 +3,9 @@ import numpy as np
 # 导入matplotlib.pyplot模块，用于数据可视化和绘图
 import matplotlib.pyplot as plt 
 #添加类型提示支持
-from typing import Tuple, List 
+from typing import Tuple, List
+# 导入adjusted_rand_score用于量化聚类质量（取值范围[-1,1]，1为完美匹配）
+from sklearn.metrics import adjusted_rand_score
 
 # 生成混合高斯分布数据
 def generate_data(n_samples = 1000):
@@ -123,14 +125,15 @@ class GaussianMixtureModel:
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
     """
-    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None):
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'kmeans++'):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
-        self.log_likelihoods = []         #存储每轮迭代的对数似然值
+        self.init = init                  # 初始化方式：'random' 随机初始化, 'kmeans++' K-means++初始化
+        self.log_likelihoods = []         # 存储每轮迭代的对数似然值
 
-        # 初始化随机数生成器
+        # 初始化随机数生成器（random_state参数在此处真正生效，保证结果可复现）
         self.rng = np.random.default_rng(random_state)
 
     def fit(self, X):
@@ -148,8 +151,13 @@ class GaussianMixtureModel:
         # 初始化混合系数（均匀分布）
         self.pi = np.ones(self.n_components) / self.n_components
         
-        # 随机选择样本点作为初始均值
-        self.mu = X[np.random.choice(n_samples, self.n_components, replace = False)]
+        # 根据init参数选择均值初始化方式
+        if self.init == 'kmeans++':
+            # K-means++初始化：让初始中心点尽量分散，减少迭代次数、降低陷入局部最优的概率
+            self.mu = self._kmeans_plus_plus_init(X, n_samples)
+        else:
+            # 随机初始化：使用self.rng保证random_state参数真正生效（修复原代码中rng未被使用的bug）
+            self.mu = X[self.rng.choice(n_samples, self.n_components, replace=False)]
         
         # 初始化协方差矩阵为单位矩阵
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
@@ -224,6 +232,8 @@ class GaussianMixtureModel:
             # new_sigma需保证为正定矩阵，常见实现中会通过Cholesky分解等方法确保数值稳定性
             self.sigma = new_sigma
         
+        # 记录实际迭代次数（log_likelihoods每轮追加一次，其长度即为实际迭代次数）
+        self.n_iter_ = len(self.log_likelihoods)
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
         # 基于软聚类结果确定最终的硬聚类标签
@@ -277,6 +287,40 @@ class GaussianMixtureModel:
             exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
         
+    def _kmeans_plus_plus_init(self, X, n_samples):
+        """使用K-means++算法初始化高斯成分均值
+
+        算法原理（Arthur & Vassilvitskii, 2007）：
+        1. 从数据中随机选择第一个中心点
+        2. 计算每个样本到最近已有中心的距离平方 D(x)^2
+        3. 以 D(x)^2 为权重进行带权采样（距离越远，被选中概率越高）
+        4. 重复步骤2-3，直到选出 n_components 个中心点
+
+        优势：初始中心尽量分散，收敛所需迭代次数更少，不易陷入局部最优
+
+        参数:
+            X: 输入数据，形状 (n_samples, n_features)
+            n_samples: 样本数量
+        返回:
+            centers: 初始化的中心点数组，形状 (n_components, n_features)
+        """
+        # 步骤1：随机选择第一个中心点
+        centers = [X[self.rng.integers(n_samples)]]
+
+        for _ in range(1, self.n_components):
+            # 向量化计算：每个样本到所有已有中心点的最小距离平方
+            center_arr = np.array(centers)                                  # (k, n_features)
+            diff = X[:, np.newaxis, :] - center_arr[np.newaxis, :, :]      # (n, k, n_features)
+            dist_sq = np.sum(diff ** 2, axis=2)                             # (n, k)
+            min_dist_sq = np.min(dist_sq, axis=1)                           # (n,)
+
+            # 以距离平方为概率权重，带权采样下一个中心点
+            probs = min_dist_sq / min_dist_sq.sum()
+            next_idx = self.rng.choice(n_samples, p=probs)
+            centers.append(X[next_idx])
+
+        return np.array(centers)
+
     def plot_convergence(self):
         """可视化对数似然的收敛过程"""
         # 检查是否有对数似然值记录
@@ -319,8 +363,6 @@ if __name__ == "__main__":
     plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)#绘制散点图，x 轴为 X 的第一列（Feature 1），y 轴为 X 的第二列（Feature 2）；点颜色由 y_true 决定（真实聚类标签）
     # 使用 viridis 颜色映射；s=10 设置点的大小为 10
     plt.title("True Clusters")
-    # 注意：此处重复设置标题是为了确保在某些环境中标题能够正确显示
-    plt.title("True Clusters")
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7)
@@ -331,11 +373,35 @@ if __name__ == "__main__":
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
-    plt.show()#显示创建的图形窗口
-    #打印信息
-    print("生成混合高斯分布数据...")
-    print("生成混合高斯分布数据...")
-    print("生成混合高斯分布数据...")
+    plt.show()  # 显示聚类对比图
+
+    # 计算并打印聚类质量指标（调整兰德指数ARI，越接近1效果越好）
+    ari = adjusted_rand_score(y_true, y_pred)
+    print(f"K-means++初始化 — 实际收敛迭代次数: {gmm.n_iter_} 次")
+    print(f"聚类质量 ARI (调整兰德指数): {ari:.4f}  （1.0=完美匹配，0=随机聚类）")
+
+    # 对比实验：随机初始化 vs K-means++ 初始化（各运行20次，量化性能差异）
+    print("\n=== 对比实验：随机初始化 vs K-means++ 初始化（各运行20次）===")
+    n_runs = 20
+    random_iters, kpp_iters = [], []
+    random_aris, kpp_aris = [], []
+
+    for seed in range(n_runs):
+        # 随机初始化
+        gmm_rand = GaussianMixtureModel(n_components=3, random_state=seed, init='random')
+        gmm_rand.fit(X)
+        random_iters.append(gmm_rand.n_iter_)
+        random_aris.append(adjusted_rand_score(y_true, gmm_rand.labels_))
+
+        # K-means++ 初始化
+        gmm_kpp = GaussianMixtureModel(n_components=3, random_state=seed, init='kmeans++')
+        gmm_kpp.fit(X)
+        kpp_iters.append(gmm_kpp.n_iter_)
+        kpp_aris.append(adjusted_rand_score(y_true, gmm_kpp.labels_))
+
+    print(f"平均收敛迭代次数 — 随机初始化: {np.mean(random_iters):.1f} 次，K-means++: {np.mean(kpp_iters):.1f} 次")
+    print(f"平均聚类质量 ARI — 随机初始化: {np.mean(random_aris):.4f}，K-means++: {np.mean(kpp_aris):.4f}")
+    print(f"K-means++相比随机初始化，平均节省: {np.mean(random_iters) - np.mean(kpp_iters):.1f} 次迭代")
 
 
 
