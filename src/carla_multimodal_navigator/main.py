@@ -43,15 +43,11 @@ class SimpleController:
             self.speed_limit = 30.0  # 默认限速
             self.speed_limit_detected = False
 
-    def get_control(self):
+    def get_control(self, speed):
         """基于路点的简单控制"""
         # 获取车辆状态
         location = self.vehicle.get_location()
         transform = self.vehicle.get_transform()
-        velocity = self.vehicle.get_velocity()
-
-        # 计算速度
-        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6  # km/h
 
         # 检测限速标志
         self.detect_speed_limits(location, transform)
@@ -111,8 +107,10 @@ class SimpleDrivingSystem:
         self.world = None
         self.vehicle = None
         self.camera = None
+        self.speed_sensor = None
         self.controller = None
         self.camera_image = None
+        self.vehicle_speed = 0.0  # km/h
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -238,6 +236,63 @@ class SimpleDrivingSystem:
             print(f"设置相机时出错: {e}")
             return False
 
+    def setup_speed_sensor(self):
+        """设置速度传感器"""
+        print("正在设置速度传感器...")
+
+        try:
+            blueprint_library = self.world.get_blueprint_library()
+            # 尝试查找速度传感器蓝图
+            speed_sensors = blueprint_library.filter('sensor.other.speed')
+            
+            if speed_sensors:
+                # 使用专用速度传感器
+                speed_bp = speed_sensors[0]
+                print("使用专用速度传感器")
+            else:
+                # 使用IMU传感器作为速度传感器
+                print("未找到专用速度传感器，使用IMU传感器")
+                imu_sensors = blueprint_library.filter('sensor.other.imu')
+                if not imu_sensors:
+                    print("未找到速度或IMU传感器，将使用备用方法")
+                    return False
+                speed_bp = imu_sensors[0]
+
+            # 设置传感器属性
+            try:
+                speed_bp.set_attribute('sensor_tick', '0.01')  # 100Hz
+            except Exception as e:
+                print(f"设置传感器属性时出错: {e}")
+
+            # 传感器位置（车辆中心）
+            sensor_transform = carla.Transform(
+                carla.Location(x=0.0, y=0.0, z=1.0),  # 车辆中心上方
+                carla.Rotation(pitch=0.0, yaw=0.0, roll=0.0)
+            )
+
+            # 生成传感器
+            try:
+                self.speed_sensor = self.world.spawn_actor(
+                    speed_bp, sensor_transform, attach_to=self.vehicle
+                )
+            except Exception as e:
+                print(f"生成速度传感器时出错: {e}")
+                return False
+
+            # 设置回调函数
+            try:
+                self.speed_sensor.listen(lambda data: self.speed_sensor_callback(data))
+            except Exception as e:
+                print(f"设置速度传感器回调时出错: {e}")
+                # 继续执行，不设置回调
+
+            print("速度传感器设置成功")
+            return True
+
+        except Exception as e:
+            print(f"设置速度传感器时出错: {e}")
+            return False
+
     def camera_callback(self, image):
         """相机数据回调"""
         try:
@@ -247,6 +302,35 @@ class SimpleDrivingSystem:
             self.camera_image = array[:, :, :3]  # RGB通道
         except:
             pass
+
+    def speed_sensor_callback(self, data):
+        """速度传感器数据回调"""
+        try:
+            # 从传感器数据中获取速度
+            # 检查数据类型并相应处理
+            if hasattr(data, 'velocity'):
+                # 专用速度传感器
+                velocity = data.velocity
+                self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+            elif hasattr(data, 'accelerometer'):
+                # IMU传感器，使用车辆速度作为参考
+                if self.vehicle:
+                    velocity = self.vehicle.get_velocity()
+                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+            else:
+                # 其他类型传感器
+                if self.vehicle:
+                    velocity = self.vehicle.get_velocity()
+                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+        except Exception as e:
+            print(f"速度传感器回调错误: {e}")
+            # 回退到直接获取车辆速度
+            if self.vehicle:
+                try:
+                    velocity = self.vehicle.get_velocity()
+                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                except:
+                    pass
 
     def setup_controller(self):
         """设置控制器"""
@@ -271,6 +355,11 @@ class SimpleDrivingSystem:
         if not self.setup_camera():
             # 即使相机失败也继续运行
             print("警告：相机设置失败，继续运行...")
+
+        # 设置速度传感器
+        if not self.setup_speed_sensor():
+            # 即使传感器失败也继续运行，但会使用备用方法
+            print("警告：速度传感器设置失败，将使用备用速度获取方法...")
 
         # 设置控制器
         self.setup_controller()
@@ -302,12 +391,16 @@ class SimpleDrivingSystem:
 
         try:
             while running:
-                # 获取车辆状态
-                velocity = self.vehicle.get_velocity()
-                speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                # 获取速度数据（优先使用传感器数据）
+                if self.vehicle_speed > 0:
+                    speed = self.vehicle_speed
+                else:
+                    # 备用方法：直接从车辆获取速度
+                    velocity = self.vehicle.get_velocity()
+                    speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
 
                 # 获取控制指令
-                throttle, brake, steer = self.controller.get_control()
+                throttle, brake, steer = self.controller.get_control(speed)
 
                 # 应用控制
                 control = carla.VehicleControl(
@@ -344,6 +437,11 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"Limit Status: {speed_limit_status}",
                                 (20, 240), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (0, 255, 0), 2)
+                    # 添加速度传感器状态
+                    speed_sensor_status = "Active" if self.speed_sensor else "Inactive"
+                    cv2.putText(display_img, f"Speed Sensor: {speed_sensor_status}",
+                                (20, 280), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (0, 255, 255), 2)
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
@@ -433,6 +531,13 @@ class SimpleDrivingSystem:
             try:
                 self.camera.stop()
                 self.camera.destroy()
+            except:
+                pass
+
+        if self.speed_sensor:
+            try:
+                self.speed_sensor.stop()
+                self.speed_sensor.destroy()
             except:
                 pass
 
