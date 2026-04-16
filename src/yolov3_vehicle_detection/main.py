@@ -5,20 +5,20 @@ import numpy as np
 import carla
 import argparse  # [新增] 引入命令行参数解析库
 
-from config import config
-from utils.carla_client import CarlaClient
-from models.yolo_detector import YOLODetector
-from utils.visualization import draw_results, draw_safe_zone
-from utils.planner import SimplePlanner
-from utils.logger import PerformanceLogger
+from .config import config
+from .utils.carla_client import CarlaClient
+from .models.yolo_detector import YOLODetector
+from .utils.visualization import draw_results, draw_safe_zone
+from .utils.planner import SimplePlanner
+from .utils.logger import PerformanceLogger
 
 
 # [新增] 参数解析函数
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Autonomous Vehicle Object Detection System")
 
-    parser.add_argument("--host", default=config.CARLA_HOST, help="CARLA Host IP")
-    parser.add_argument("--port", type=int, default=config.CARLA_PORT, help="CARLA Port")
+    parser.add_argument("--host", default=config.carla_host, help="CARLA Host IP")
+    parser.add_argument("--port", type=int, default=config.carla_port, help="CARLA Port")
     parser.add_argument("--no-render", action="store_true", help="Disable OpenCV rendering window (Headless mode)")
 
     return parser.parse_args()
@@ -34,11 +34,11 @@ def main():
         print("[INFO] 运行模式: Headless (无窗口渲染)")
 
     detector = YOLODetector(
-        cfg_path=config.YOLO_CONFIG_PATH,
-        weights_path=config.YOLO_WEIGHTS_PATH,
-        names_path=config.YOLO_NAMES_PATH,
-        conf_thres=config.CONFIDENCE_THRESHOLD,
-        nms_thres=config.NMS_THRESHOLD
+        cfg_path=config.yolo_cfg_path,
+        weights_path=config.yolo_weights_path,
+        names_path=config.yolo_names_path,
+        conf_thres=config.conf_thres,
+        nms_thres=config.nms_thres
     )
     detector.load_model()
 

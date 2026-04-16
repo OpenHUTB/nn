@@ -14,6 +14,60 @@ INPUT_VIDEO_PATH = "../dataset/sample.mp4"
 OUTPUT_VIDEO_PATH = "../res/sample_res.mp4"
 # ==================================================
 
+# 检测区域初始值
+current_region = [400, 300, 1250, 500]  # [left, top, right, bottom]
+region_padding = 50  # 区域扩展的 padding 值
+region_adjust_interval = 10  # 每10帧调整一次区域
+
+
+def auto_adjust_detection_region(frame, detections, current_region, padding=50):
+    """自动调整检测区域大小
+    
+    Args:
+        frame: 当前视频帧
+        detections: 检测结果
+        current_region: 当前区域 [left, top, right, bottom]
+        padding: 区域扩展的像素数
+        
+    Returns:
+        list: 调整后的区域 [left, top, right, bottom]
+    """
+    if len(detections) == 0:
+        return current_region
+    
+    # 获取所有检测到的车辆边界框
+    boxes = detections.xyxy
+    if len(boxes) == 0:
+        return current_region
+    
+    # 计算所有车辆的边界
+    min_x = min(boxes[:, 0])
+    max_x = max(boxes[:, 2])
+    min_y = min(boxes[:, 1])
+    max_y = max(boxes[:, 3])
+    
+    # 扩展区域边界
+    frame_height, frame_width = frame.shape[:2]
+    new_left = max(0, int(min_x - padding))
+    new_top = max(0, int(min_y - padding))
+    new_right = min(frame_width, int(max_x + padding))
+    new_bottom = min(frame_height, int(max_y + padding))
+    
+    # 确保区域不会太小
+    min_region_width = 200
+    min_region_height = 100
+    if new_right - new_left < min_region_width:
+        center_x = (new_left + new_right) // 2
+        new_left = max(0, center_x - min_region_width // 2)
+        new_right = min(frame_width, center_x + min_region_width // 2)
+    
+    if new_bottom - new_top < min_region_height:
+        center_y = (new_top + new_bottom) // 2
+        new_top = max(0, center_y - min_region_height // 2)
+        new_bottom = min(frame_height, center_y + min_region_height // 2)
+    
+    return [new_left, new_top, new_right, new_bottom]
+
 
 def main(model_path=None, input_video_path=None, output_video_path=None, ground_truth_file=None):
     """主函数 - 运行车辆计数
@@ -57,8 +111,22 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     selected_classes = [cls_id for cls_id, class_name in model.names.items() if class_name in vehicle_classes]
 
     # 初始化计数器
-    limits = [400, 400, 1250, 400]  # 计数线位置：起点(x1, y)到终点(x2, y)
-    total_counts, crossed_ids = [], set()  # 总计数和已计数车辆ID集合
+    # 基础计数区域 [left, top, right, bottom]
+    counting_region = [400, 350, 1250, 450]  # 初始计数区域
+    total_counts = []  # 总计数
+    # 车辆状态跟踪：{track_id: {'in_region': bool, 'entry_time': timestamp}}
+    vehicle_states = {}
+    # 区域调整参数
+    region_adjust_interval = 3  # 每3帧调整一次区域（提高响应速度）
+    region_padding = 100  # 区域扩展的padding值（增大扩展范围）
+    smooth_factor = 0.6  # 平滑因子（增大响应速度）
+    
+    # 精度优化参数
+    confidence_threshold = 0.6  # 置信度阈值（平衡精确率和召回率）
+    min_detection_frames = 3  # 最小检测帧数（连续检测4帧才认为有效）
+    iou_threshold = 0.25  # IOU阈值（适中的NMS严格度）
+    min_track_length = 4  # 最小轨迹长度（轨迹至少6个点才计数）
+    max_speed_threshold = 150  # 最大速度阈值（像素/帧），过滤不合理的跳跃
 
     # 精度衡量配置
     ground_truth_file = "../dataset/ground_truth/ground_truth.txt"  # 可以设置为包含真实车辆总数的文件路径
@@ -122,22 +190,182 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         cv.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
 
-    def count_vehicles(track_id, cx, cy, limits, crossed_ids):
-        """统计穿过计数线的车辆
+    def count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
+        """基于区域统计车辆 - 改进版：使用轨迹方向判断 + 稳定性检查
 
         Args:
             track_id: 车辆追踪ID
             cx, cy: 车辆中心点坐标
-            limits: 计数线位置
-            crossed_ids: 已计数车辆ID集合
+            region: 计数区域 [left, top, right, bottom]
+            vehicle_states: 车辆状态字典
+            total_counts: 总计数列表
 
         Returns:
             bool: 是否计数成功
         """
-        if limits[0] < cx < limits[2] and limits[1] - 10 < cy < limits[1] + 10 and track_id not in crossed_ids:
-            crossed_ids.add(track_id)
-            return True
+        left, top, right, bottom = region
+        region_center_y = (top + bottom) / 2
+        is_in_region = left < cx < right and top < cy < bottom
+        
+        # 初始化车辆状态
+        if track_id not in vehicle_states:
+            vehicle_states[track_id] = {
+                'in_region': is_in_region,
+                'entry_time': frame_count,
+                'positions': [(cx, cy)],  # 记录位置历史
+                'counted': False,
+                'detection_count': 1,  # 连续检测计数
+                'last_seen': frame_count  # 上次检测到的帧
+            }
+            return False
+        
+        # 更新检测状态
+        vehicle_states[track_id]['detection_count'] += 1
+        vehicle_states[track_id]['last_seen'] = frame_count
+        
+        # 更新位置历史
+        vehicle_states[track_id]['positions'].append((cx, cy))
+        if len(vehicle_states[track_id]['positions']) > 10:  # 只保留最近10个位置
+            vehicle_states[track_id]['positions'].pop(0)
+        
+        # 如果已经计数过，不再计数
+        if vehicle_states[track_id]['counted']:
+            return False
+        
+        # 稳定性检查：确保车辆被连续检测到足够帧数
+        if vehicle_states[track_id]['detection_count'] < min_detection_frames:
+            return False
+        
+        # 轨迹长度检查：确保轨迹足够长
+        positions = vehicle_states[track_id]['positions']
+        if len(positions) < min_track_length:
+            return False
+        
+        # 速度一致性检查：过滤不合理的跳跃
+        if len(positions) >= 2:
+            speeds = []
+            for i in range(1, len(positions)):
+                dx = positions[i][0] - positions[i-1][0]
+                dy = positions[i][1] - positions[i-1][1]
+                speed = np.sqrt(dx**2 + dy**2)
+                speeds.append(speed)
+            
+            if speeds:
+                avg_speed = np.mean(speeds)
+                max_speed = np.max(speeds)
+                # 如果平均速度或最大速度超过阈值，认为是不合理轨迹
+                if avg_speed > max_speed_threshold or max_speed > max_speed_threshold * 2:
+                    return False
+        
+        # 检测车辆是否穿过区域中心线（从下到上或从上到下）
+        if len(positions) >= 3:
+            # 计算垂直方向移动
+            y_positions = [p[1] for p in positions]
+            
+            # 检测是否穿过区域中心线
+            prev_y = y_positions[-2]
+            curr_y = y_positions[-1]
+            
+            # 从下到上穿过中心线，或从上到下穿过中心线
+            if (prev_y > region_center_y and curr_y <= region_center_y) or \
+               (prev_y < region_center_y and curr_y >= region_center_y):
+                # 确保车辆确实在区域内或附近
+                if is_in_region or vehicle_states[track_id]['in_region']:
+                    total_counts.append(track_id)
+                    vehicle_states[track_id]['counted'] = True
+                    return True
+        
+        # 更新区域状态
+        vehicle_states[track_id]['in_region'] = is_in_region
+        if is_in_region and not vehicle_states[track_id]['in_region']:
+            vehicle_states[track_id]['entry_time'] = frame_count
+        
         return False
+
+    def filter_overlapping_detections(detections, iou_threshold=0.3):
+        """使用NMS过滤重叠的检测框
+        
+        Args:
+            detections: 检测结果
+            iou_threshold: IOU阈值
+            
+        Returns:
+            Detections: 过滤后的检测结果
+        """
+        if len(detections) == 0:
+            return detections
+        
+        # 获取边界框和置信度
+        boxes = detections.xyxy
+        scores = detections.confidence
+        
+        # 使用OpenCV的NMS
+        indices = cv.dnn.NMSBoxes(
+            boxes.tolist(),
+            scores.tolist(),
+            score_threshold=confidence_threshold,
+            nms_threshold=iou_threshold
+        )
+        
+        if len(indices) > 0:
+            indices = indices.flatten()
+            return detections[indices]
+        return detections
+
+    def adjust_counting_region(frame, detections, current_region, padding=50):
+        """动态调整计数区域
+
+        Args:
+            frame: 当前视频帧
+            detections: 检测结果
+            current_region: 当前计数区域 [left, top, right, bottom]
+            padding: 区域扩展的像素数
+
+        Returns:
+            list: 调整后的区域 [left, top, right, bottom]
+        """
+        if len(detections) == 0:
+            return current_region
+        
+        # 获取所有检测到的车辆边界框
+        boxes = detections.xyxy
+        if len(boxes) == 0:
+            return current_region
+        
+        # 计算所有车辆的边界
+        min_x = min(boxes[:, 0])
+        max_x = max(boxes[:, 2])
+        min_y = min(boxes[:, 1])
+        max_y = max(boxes[:, 3])
+        
+        # 扩展区域边界
+        frame_height, frame_width = frame.shape[:2]
+        new_left = max(0, int(min_x - padding))
+        new_top = max(0, int(min_y - padding))
+        new_right = min(frame_width, int(max_x + padding))
+        new_bottom = min(frame_height, int(max_y + padding))
+        
+        # 确保区域不会太小
+        min_region_width = 200
+        min_region_height = 100
+        if new_right - new_left < min_region_width:
+            center_x = (new_left + new_right) // 2
+            new_left = max(0, center_x - min_region_width // 2)
+            new_right = min(frame_width, center_x + min_region_width // 2)
+        
+        if new_bottom - new_top < min_region_height:
+            center_y = (new_top + new_bottom) // 2
+            new_top = max(0, center_y - min_region_height // 2)
+            new_bottom = min(frame_height, center_y + min_region_height // 2)
+        
+        # 平滑过渡到新区域（使用外部定义的平滑因子）
+        left, top, right, bottom = current_region
+        new_left = int(left * (1 - smooth_factor) + new_left * smooth_factor)
+        new_top = int(top * (1 - smooth_factor) + new_top * smooth_factor)
+        new_right = int(right * (1 - smooth_factor) + new_right * smooth_factor)
+        new_bottom = int(bottom * (1 - smooth_factor) + new_bottom * smooth_factor)
+        
+        return [new_left, new_top, new_right, new_bottom]
 
 
     def calculate_accuracy_metrics(ground_truth_total, detected_count):
@@ -158,18 +386,23 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         accuracy = 1.0 - error_rate
         return {'accuracy': accuracy, 'precision': accuracy, 'recall': accuracy, 'f1_score': accuracy}
 
-    def draw_tracks_and_count(frame, detections, total_counts, limits, w=1920):
+    def draw_tracks_and_count(frame, detections, total_counts, region, vehicle_states, w=1920):
         """绘制轨迹并统计车辆
 
         Args:
             frame: 输入帧
             detections: 检测结果
             total_counts: 总计数列表
-            limits: 计数线位置
+            region: 计数区域
+            vehicle_states: 车辆状态字典
             w: 视频宽度
         """
-        # 按车辆类别和检测置信度过滤
-        detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > 0.5)]
+        # 按车辆类别和检测置信度过滤（使用更高的阈值）
+        detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > confidence_threshold)]
+        
+        # 过滤重叠检测（NMS）
+        if len(detections) > 0:
+            detections = filter_overlapping_detections(detections, iou_threshold)
 
         # 为每个检测框生成标签
         labels = [f"#{track_id} {class_names[cls_id]}" for track_id, cls_id in
@@ -190,11 +423,14 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
 
             cv.circle(frame, (cx, cy), 4, (0, 255, 255), cv.FILLED)  # 绘制车辆中心点
 
-            if count_vehicles(track_id, cx, cy, limits, crossed_ids):
-                total_counts.append(track_id)
-                sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
-                             color=sv.Color.ROBOFLOW, thickness=4)
-                draw_overlay(frame, (400, 300), (1250, 500), alpha=0.25, color=(10, 255, 50))
+            if count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
+                # 计数成功时高亮显示计数区域
+                draw_overlay(frame, (region[0], region[1]), (region[2], region[3]), alpha=0.25, color=(10, 255, 50))
+
+        # 绘制计数区域
+        cv.rectangle(frame, (region[0], region[1]), (region[2], region[3]), (0, 255, 0), 2)
+        cv.putText(frame, "Counting Region", (region[0], region[1]-10),
+                   cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
         # 显示车辆计数和精度信息
         sv.draw_text(frame, f"COUNTS: {len(total_counts)}", sv.Point(x=110, y=30), sv.Color.ROBOFLOW, 1.25,
@@ -251,12 +487,13 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             total_detections += len(detections)
             correct_detections += int(len(detections) * avg_confidence)
 
+        # 每N帧自动调整计数区域
+        if frame_count % region_adjust_interval == 0:
+            counting_region = adjust_counting_region(frame, detections, counting_region, region_padding)
+
         if detections.tracker_id is not None:
-            # 绘制计数线并处理车辆轨迹
-            sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
-                         color=sv.Color.RED, thickness=4)
-            draw_overlay(frame, (400, 300), (1250, 500), alpha=0.2)
-            draw_tracks_and_count(frame, detections, total_counts, limits, w)
+            # 处理车辆轨迹和计数
+            draw_tracks_and_count(frame, detections, total_counts, counting_region, vehicle_states, w)
 
         # 写入帧到输出视频
         out.write(frame)
