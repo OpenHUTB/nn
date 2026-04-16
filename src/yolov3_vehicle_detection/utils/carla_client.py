@@ -7,12 +7,7 @@ import numpy as np
 import cv2
 import queue
 
-# 路径修复
-current_path = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_path)
-sys.path.append(project_root)
-
-from config import config
+from ..config import config
 
 
 class CarlaClient:
