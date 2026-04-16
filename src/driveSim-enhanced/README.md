@@ -41,11 +41,22 @@ python3 main.py
 
 =========================================
 
+
 ## 在 CARLA 模拟器上运行自动驾驶
 
 **如果你没有 GTAV，或者希望在更真实的自动驾驶仿真环境中进行开发，可以使用 CARLA 模拟器运行automatic_control.py**
 
 CARLA 是一个开源的自动驾驶仿真器，提供更专业的交通场景、传感器模拟和车辆动力学。
+ 
+## 项目结构 
+
+openhutb/
+├── src/
+│   └── driveSim-enhanced/
+│       └── automatic_control.py    # CARLA 自动驾驶控制模块
+├── main.py                          # GTA V 版本入口
+├── requirements.txt                 # Python 依赖
+└── README.md                        # 项目说明文档
 
 ### CARLA 版本要求
 
@@ -77,32 +88,20 @@ python code/automatic_control.py
 
 🚦 交通信号灯检测
 实时识别交通信号灯状态（红、黄、绿）
-
 根据信号灯状态自动停车/通行
-
 支持多路口复杂场景
-
 🛣️ 车道线检测与保持
 基于 OpenCV 的车道线识别
-
 车道保持辅助（LKA）
-
 弯道自适应速度控制
-
 🚗 自动驾驶行为模式
 谨慎模式 (Cautious)：保持安全距离，提前减速
-
 正常模式 (Normal)：平衡效率与安全
-
 激进模式 (Aggressive)：更快的加速和跟车
-
 📊 实时可视化
 摄像头画面实时显示
-
 车道线检测结果叠加
-
 交通信号灯状态标注
-
 车辆速度、档位、转向角等信息
 
 ## 常见问题
@@ -112,3 +111,6 @@ A: 确保 Python API 版本与 CARLA 模拟器版本一致：
 python -c "import carla; print(carla.__version__)"
 
 # 检查模拟器版本（启动时控制台会显示）
+## 感谢
+
+[Traffic_sign_dectection](https://github.com/RMadhuni/Traffic_sign_dectection)
