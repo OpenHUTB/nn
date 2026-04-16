@@ -193,110 +193,13 @@ class Drone3DViewer:
 
     def _draw_status_overlay(self, state):
         """绘制状态信息覆盖层"""
-        # 切换到2D模式
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
-        gluOrtho2D(0, self.width, 0, self.height)
-
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-
-        # 禁用深度测试和光照
-        glDisable(GL_DEPTH_TEST)
-        glDisable(GL_LIGHTING)
-
-        # 绘制状态文本
-        font = pygame.font.SysFont(None, 24)
-
-        status_info = [
-            f"模式: {state.get('mode', 'TEST')}",
-            f"位置: X={state.get('position', [0, 0, 0])[0]:.2f}m, Y={state.get('position', [0, 0, 0])[1]:.2f}m, Z={state.get('position', [0, 0, 0])[2]:.2f}m",
-            f"电池: {state.get('battery', 100):.1f}%",
-            f"解锁: {'是' if state.get('armed', True) else '否'}",
-            f"俯仰: {np.degrees(state.get('orientation', [0, 0, 0])[1]):.1f}°, 横滚: {np.degrees(state.get('orientation', [0, 0, 0])[0]):.1f}°, 偏航: {np.degrees(state.get('orientation', [0, 0, 0])[2]):.1f}°"
-        ]
-
-        for i, text in enumerate(status_info):
-            text_surface = font.render(text, True, (255, 255, 255))
-            text_data = pygame.image.tostring(text_surface, "RGBA", True)
-
-            glRasterPos2d(10, self.height - 30 - i * 25)
-            glDrawPixels(text_surface.get_width(), text_surface.get_height(),
-                         GL_RGBA, GL_UNSIGNED_BYTE, text_data)
-
-        # 绘制控制提示
-        controls = [
-            "控制提示:",
-            "ESC - 退出仿真",
-            "G - 切换网格显示",
-            "T - 切换轨迹显示",
-            "A - 切换坐标轴显示",
-            "↑↓←→ - 旋转视角",
-            "+/- - 缩放视角",
-            "空格 - 重置视角"
-        ]
-
-        for i, text in enumerate(controls):
-            text_surface = font.render(text, True, (200, 200, 255))
-            text_data = pygame.image.tostring(text_surface, "RGBA", True)
-
-            glRasterPos2d(self.width - 300, self.height - 30 - i * 25)
-            glDrawPixels(text_surface.get_width(), text_surface.get_height(),
-                         GL_RGBA, GL_UNSIGNED_BYTE, text_data)
-
-        # 恢复设置
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
-        glMatrixMode(GL_MODELVIEW)
-        glPopMatrix()
+        # 暂时禁用文本绘制，只保留3D场景渲染
+        pass
 
     def _draw_default_overlay(self):
         """绘制默认覆盖层（无状态数据时）"""
-        # 切换到2D模式
-        glMatrixMode(GL_PROJECTION)
-        glPushMatrix()
-        glLoadIdentity()
-        gluOrtho2D(0, self.width, 0, self.height)
-
-        glMatrixMode(GL_MODELVIEW)
-        glPushMatrix()
-        glLoadIdentity()
-
-        # 禁用深度测试和光照
-        glDisable(GL_DEPTH_TEST)
-        glDisable(GL_LIGHTING)
-
-        # 绘制状态文本
-        font = pygame.font.SysFont(None, 24)
-
-        status_info = [
-            "3D无人机仿真系统",
-            "测试模式运行中",
-            "等待连接主程序...",
-            "按ESC键退出"
-        ]
-
-        for i, text in enumerate(status_info):
-            text_surface = font.render(text, True, (255, 255, 255))
-            text_data = pygame.image.tostring(text_surface, "RGBA", True)
-
-            glRasterPos2d(10, self.height - 30 - i * 25)
-            glDrawPixels(text_surface.get_width(), text_surface.get_height(),
-                         GL_RGBA, GL_UNSIGNED_BYTE, text_data)
-
-        # 恢复设置
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-
-        glMatrixMode(GL_PROJECTION)
-        glPopMatrix()
-        glMatrixMode(GL_MODELVIEW)
-        glPopMatrix()
+        # 暂时禁用文本绘制，只保留3D场景渲染
+        pass
 
     def handle_events(self):
         """处理窗口事件"""
