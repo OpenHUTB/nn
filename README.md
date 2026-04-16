@@ -1,49 +1,74 @@
-# 模拟器的神经网络示例
+# CARLA 语义分割模块修改
 
-利用 `神经网络` 实现 Carla（无人车）、AirSim（无人机）、Mujoco（具身人） 的感知、规划、控制等功能。
+基于 CARLA 自动驾驶仿真平台，对原有语义分割模块进行修改：
 
-## 环境配置
+- 原始：使用 CARLA 语义标签（Ground Truth）
+- 修改：使用神经网络进行预测（CNN）
 
-* 平台：Windows 10/11，Ubuntu 20.04/22.04
-* 软件：Python 3.7-3.12（需支持3.8）、Pytorch（尽量不使用Tensorflow）
-* [模拟器下载链接](https://mp.weixin.qq.com/s/3Tzo0AZEMB2PFYAu_s8gOA) 、相关软件下载 [链接](https://pan.baidu.com/s/1IFhCd8X9lI24oeYQm5-Edw?pwd=hutb)
+实现了从“标签驱动”到“模型驱动”的转换。
 
+---
 
-## 贡献指南
+## 修改记录
 
-准备提交代码之前，请阅读 [贡献指南](https://github.com/OpenHUTB/.github/blob/master/CONTRIBUTING.md) 。
-代码的优化包括：注释、[PEP 8 风格调整](https://peps.pythonlang.cn/pep-0008/) 、将神经网络应用到Carla模拟器中、撰写对应 [文档](https://openhutb.github.io/nn/) 、添加 [源代码对应的自动化测试](https://docs.github.com/zh/actions/use-cases-and-examples/building-and-testing/building-and-testing-python) 等（从Carla场景中获取神经网络所需数据或将神经网络的结果输出到场景中）。
+* 替换语义分割数据来源（GT → 模型预测）
+* 新增 CNN 推理流程
+* 实现 RGB → 模型 → 分割结果
+* 更新 pred_sem_data 来源
+* 新增输入预处理（resize + tensor）
+* 新增输出处理（argmax + resize）
+* 集成模型到 CARLA 主循环
+* 启用真实 mIoU 评估
 
-### 约定
+---
 
-* 模块的文档位于 `docs/{模块名}`目录下，项目概述位于`docs/{模块名}/README.md`文件中，并能够从 [项目首页](https://openhutb.github.io/nn/) 跳转过去，具体请参考 [carla_CAM 模块文档](https://openhutb.github.io/nn/carla_CAM/)
-* 每个模块位于`src/{模块名}`目录下，`模块名`需要用2-3个单词表示，首字母不需要大写，下划线`_`分隔，不能宽泛，越具体越好
-* 每个模块的入口须为`main.`开头，比如：main.py、main.cpp、main.bat、main.sh等，提供的ROS功能以`main.launch`文件作为启动配置文件
-* 每次pull request都需要保证能够通过main脚本直接运行整个模块，在提交信息中提供运行动图或截图；Pull Request的标题不能随意，需要概括具体的修改内容；README.md文档中提供运行环境和运行步骤的说明
-* 仓库尽量保存文本文件，二进制文件需要慎重，如运行需要示例数据，可以保存少量数据，大量数据可以通过提供网盘链接并说明下载链接和运行说明
+##  实验结果
 
-其他约定请参考[提交注意事项](https://github.com/OpenHUTB/.github/wiki/submit_notes) 。
+### 基础模式
 
+![图1](1.png)
 
+### 融合模式
 
-### 文档生成
+![图2](2.png)
 
-测试生成的文档：
-1. 使用以下命令安装`mkdocs`和相关依赖：
-```shell
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-```
-（可选）安装完成后使用`mkdocs --version`查看是否安装成功。
+### 多模态视角
 
-2. 在命令行中进入`nn`目录下，运行：
-```shell
-mkdocs build
-mkdocs serve
-```
-然后使用浏览器打开 [http://127.0.0.1:8000](http://127.0.0.1:8000)，查看文档页面能否正常显示。
+![图3](3.png)
 
-## 参考
+### 评估结果（mIoU / PA）
 
-* [模拟器文档](https://openhutb.github.io)
-* 已有相关 [无人车](https://openhutb.github.io/doc/used_by/) 、[无人机](https://openhutb.github.io/air_doc/third/used_by/) 、[具身人](https://openhutb.github.io/doc/pedestrian/humanoid/) 的实现
-* [神经网络原理](https://github.com/OpenHUTB/neuro)
+![图4](4.png)
+---
+
+## 结果说明
+
+- mIoU = 0.053（较低）
+- 原因：模型未训练，仅进行随机推理
+- 说明：当前结果为真实模型输出，而非Ground Truth
+
+---
+
+## 实验结论
+
+本实验完成：
+
+- 成功替换语义分割模块
+- 实现神经网络推理接入
+- 完成真实预测流程
+- 实现定量评估（mIoU）
+
+验证了模型在 CARLA 仿真中的可行性。
+
+## 核心代码修改
+
+本实验将 CARLA 原始语义标签替换为模型预测结果：
+
+```python
+with torch.no_grad():
+    pred = model(input_tensor)
+    pred = torch.argmax(pred, dim=1).squeeze().cpu().numpy()
+
+pred_sem_data = cv2.resize(pred.astype(np.uint8), (1024, 720), interpolation=cv2.INTER_NEAREST)
+
+front_sem_data = pred_sem_data
