@@ -89,25 +89,8 @@ class FlightControlGUI:
             ttk.Entry(self.params_frame, textvariable=self.height_var, width=10).grid(row=1, column=1, padx=5, pady=2)
             ttk.Label(self.params_frame, text="m").grid(row=1, column=2, sticky=tk.W, padx=5, pady=2)
             print("创建参数设置区域成功")
+            
 
-            # 创建巡航路线设置区域
-            self.cruise_frame = ttk.LabelFrame(self.main_frame, text="巡航路线设置", padding="10")
-            self.cruise_frame.pack(fill=tk.X, pady=5)
-            
-            # 航点输入
-            ttk.Label(self.cruise_frame, text="航点坐标:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
-            
-            ttk.Label(self.cruise_frame, text="X:").grid(row=1, column=0, sticky=tk.W, padx=5, pady=2)
-            self.waypoint_x = tk.DoubleVar(value=0.0)
-            ttk.Entry(self.cruise_frame, textvariable=self.waypoint_x, width=10).grid(row=1, column=1, padx=5, pady=2)
-            
-            ttk.Label(self.cruise_frame, text="Y:").grid(row=1, column=2, sticky=tk.W, padx=5, pady=2)
-            self.waypoint_y = tk.DoubleVar(value=0.0)
-            ttk.Entry(self.cruise_frame, textvariable=self.waypoint_y, width=10).grid(row=1, column=3, padx=5, pady=2)
-            
-            ttk.Label(self.cruise_frame, text="Z:").grid(row=1, column=4, sticky=tk.W, padx=5, pady=2)
-            self.waypoint_z = tk.DoubleVar(value=-3.0)
-            ttk.Entry(self.cruise_frame, textvariable=self.waypoint_z, width=10).grid(row=1, column=5, padx=5, pady=2)
             
             # 航点操作按钮
             ttk.Button(self.cruise_frame, text="添加航点", command=self.add_waypoint).grid(row=1, column=6, padx=5, pady=2)
@@ -136,11 +119,6 @@ class FlightControlGUI:
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             self.log_text.config(yscrollcommand=scrollbar.set)
             print("创建日志区域成功")
-            
-            # 巡航相关变量
-            self.waypoints = []
-            self.is_cruising = False
-            self.cruise_thread = None
             
             # 开始更新数据
             self.running = True
@@ -258,124 +236,10 @@ class FlightControlGUI:
     
 
     
-    def add_waypoint(self):
-        """添加航点"""
-        x = self.waypoint_x.get()
-        y = self.waypoint_y.get()
-        z = self.waypoint_z.get()
-        waypoint = (x, y, z)
-        self.waypoints.append(waypoint)
-        self.waypoint_list.insert(tk.END, f"航点 {len(self.waypoints)}: ({x:.2f}, {y:.2f}, {z:.2f})")
-        self.log(f"添加航点: ({x:.2f}, {y:.2f}, {z:.2f})")
-        # 同步到 FlightControl 实例和地图显示
-        if self.flight_control:
-            self.flight_control.set_waypoints(self.waypoints)
-    
-    def remove_waypoint(self):
-        """删除航点"""
-        selected = self.waypoint_list.curselection()
-        if selected:
-            index = selected[0]
-            self.waypoints.pop(index)
-            self.waypoint_list.delete(index)
-            # 更新列表显示
-            self.waypoint_list.delete(0, tk.END)
-            for i, (x, y, z) in enumerate(self.waypoints):
-                self.waypoint_list.insert(tk.END, f"航点 {i+1}: ({x:.2f}, {y:.2f}, {z:.2f})")
-            self.log(f"删除航点: {index+1}")
-            # 同步到 FlightControl 实例和地图显示
-            if self.flight_control:
-                self.flight_control.set_waypoints(self.waypoints)
-    
-    def clear_waypoints(self):
-        """清空航点"""
-        self.waypoints.clear()
-        self.waypoint_list.delete(0, tk.END)
-        self.log("清空所有航点")
-        # 同步到 FlightControl 实例和地图显示
-        if self.flight_control:
-            self.flight_control.set_waypoints(self.waypoints)
-    
-    def start_cruise(self):
-        """开始巡航"""
-        if not self.client:
-            self.log("未连接到无人机，无法开始巡航")
-            return
-        
-        if len(self.waypoints) < 2:
-            self.log("至少需要设置2个航点才能开始巡航")
-            return
-        
-        if self.is_cruising:
-            self.log("巡航已经开始")
-            return
-        
-        # 使用 FlightControl 实例的巡航方法
-        if self.flight_control:
-            self.is_cruising = True
-            self.log("开始巡航")
-            
-            def _cruise():
-                try:
-                    self.flight_control.start_cruise()
-                    # 等待巡航完成
-                    while self.flight_control.is_cruising:
-                        time.sleep(1)
-                    self.log("巡航完成")
-                except Exception as e:
-                    self.log(f"巡航过程中发生错误: {e}")
-                finally:
-                    self.is_cruising = False
-            
-            self.cruise_thread = threading.Thread(target=_cruise)
-            self.cruise_thread.daemon = True
-            self.cruise_thread.start()
-        else:
-            #  fallback 到本地巡航实现
-            def _cruise():
-                self.is_cruising = True
-                self.log("开始巡航")
-                try:
-                    speed = self.speed_var.get()
-                    for i, (x, y, z) in enumerate(self.waypoints):
-                        self.log(f"前往航点 {i+1}: ({x:.2f}, {y:.2f}, {z:.2f})")
-                        self.client.moveToPositionAsync(x, y, z, speed).join()
-                        # 到达航点后短暂停留
-                        time.sleep(1)
-                    self.log("巡航完成")
-                except Exception as e:
-                    self.log(f"巡航过程中发生错误: {e}")
-                finally:
-                    self.is_cruising = False
-            
-            self.cruise_thread = threading.Thread(target=_cruise)
-            self.cruise_thread.daemon = True
-            self.cruise_thread.start()
-    
-    def stop_cruise(self):
-        """停止巡航"""
-        if not self.is_cruising:
-            self.log("巡航未开始")
-            return
-        
-        self.log("停止巡航")
-        try:
-            if self.flight_control:
-                self.flight_control.stop_cruise()
-            else:
-                self.client.hoverAsync().join()
-        except Exception as e:
-            self.log(f"停止巡航时发生错误: {e}")
-        finally:
-            self.is_cruising = False
-    
     def stop(self):
         """停止 GUI"""
         if self.root:
             self.running = False
-            # 停止巡航
-            if self.is_cruising:
-                self.stop_cruise()
             self.root.quit()
             print("GUI 已停止")
     

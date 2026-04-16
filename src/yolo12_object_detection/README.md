@@ -6,6 +6,11 @@
 
 本项目使用 [CARLA Object Detection Dataset](https://github.com/DanielHfnr/Carla-Object-Detection-Dataset) 数据集，通过 Google Drive 整理版本进行下载，结合 YOLO12 模型进行自动驾驶场景下的目标检测任务。
 
+**新增自定义模型**：项目中包含多个改进的 YOLO12 模型：
+- `yolo12-A2C2f-CGLU.yaml`：在标准 YOLO12 基础上使用 A2C2f_CGLU 模块替换 A2C2f 模块
+- `yolo12-A2C2f-DFFN.yaml`：在标准 YOLO12 基础上使用 A2C2f_DFFN 模块替换 A2C2f 模块
+以上模型均预设类别数为 5，适配 CARLA 数据集（vehicle, bike, motobike, traffic_light, traffic_sign）。
+
 数据集来源于：[https://github.com/DanielHfnr/Carla-Object-Detection-Dataset](https://github.com/DanielHfnr/Carla-Object-Detection-Dataset)
 
 ## 环境要求

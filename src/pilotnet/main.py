@@ -57,14 +57,22 @@ class Menu():
         except:
             try:
                 warn('There seems to be a problem with your CARLA server. Retrying with WSL address...')
-                client = carla.Client('172.17.128.1', 2000) # the host IP can be found with $(hostname).local from WSL
+                client = carla.Client('172.17.128.1', 2000)
                 world = client.get_world()
                 message('Connected to CARLA server')
             except:
                 raise PilotError('Connection to CARLA simulator failed. Check your CARLA installation, confirm simulator is running on port 2000.\nIf in WSL, refer to the troubleshooting guide for tips.')
+        
         time = int(input('Enter the time you need the generator to run for (in minutes) >> '))
+        
+        message('Do you want to enable CARLA visualization?')
+        message('1. Yes - Show vehicle trajectory, control values, and statistics')
+        message('2. No - Just record data without visualization')
+        viz_choice = input('Enter your choice (1-2, default 1) >> ') or '1'
+        enable_visualization = viz_choice == '1'
+        
         clear()
-        collector = Collector(world, time)
+        collector = Collector(world, time, enable_visualization=enable_visualization)
 
     @staticmethod
     def run_3():

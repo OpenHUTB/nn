@@ -31,12 +31,9 @@ class FlightControl:
         self.print_startup_info()
         self.import_gui()
         self.import_map()
-        # 尝试连接无人机，但即使连接失败也继续运行
         connected = self.connect_drone()
         if connected:
             self.takeoff()
-        else:
-            print("未连接到 AirSim 模拟器，系统将以演示模式运行")
         self.print_control_instructions()
     
     def load_config(self):
@@ -129,6 +126,29 @@ class FlightControl:
                     print(f"导入地图显示模块失败: {e2}")
                     import traceback
                     traceback.print_exc()
+                    self.use_map = False
+    
+    def import_map(self):
+        """导入地图显示模块"""
+        if self.use_map:
+            try:
+                # 尝试相对导入
+                from .map_display import MapDisplay
+                self.MapDisplay = MapDisplay
+                print("成功导入地图显示模块")
+            except Exception as e:
+                print(f"相对导入失败: {e}")
+                try:
+                    # 尝试直接导入
+                    import sys
+                    import os
+                    # 添加src目录到Python路径
+                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+                    from src.flight_control.map_display import MapDisplay
+                    self.MapDisplay = MapDisplay
+                    print("成功导入地图显示模块")
+                except Exception as e2:
+                    print(f"导入地图显示模块失败: {e2}")
                     self.use_map = False
     
     def connect_drone(self):
@@ -337,63 +357,6 @@ class FlightControl:
                 pass
             time.sleep(0.5)
     
-    def set_waypoints(self, waypoints):
-        """设置巡航路线航点"""
-        self.waypoints = waypoints
-        # 更新地图显示
-        if self.map_display:
-            self.map_display.set_waypoints(waypoints)
-        print(f"设置巡航路线，共 {len(waypoints)} 个航点")
-    
-    def start_cruise(self):
-        """开始自动巡航"""
-        if not self.client:
-            print("未连接到无人机，无法开始巡航")
-            return
-        
-        if len(self.waypoints) < 2:
-            print("至少需要设置2个航点才能开始巡航")
-            return
-        
-        if self.is_cruising:
-            print("巡航已经开始")
-            return
-        
-        def _cruise():
-            self.is_cruising = True
-            print("开始自动巡航")
-            try:
-                for i, (x, y, z) in enumerate(self.waypoints):
-                    print(f"前往航点 {i+1}: ({x:.2f}, {y:.2f}, {z:.2f})")
-                    self.client.moveToPositionAsync(x, y, z, self.SPEED).join()
-                    # 到达航点后短暂停留
-                    time.sleep(1)
-                print("巡航完成")
-            except Exception as e:
-                print(f"巡航过程中发生错误: {e}")
-            finally:
-                self.is_cruising = False
-        
-        cruise_thread = threading.Thread(target=_cruise)
-        cruise_thread.daemon = True
-        cruise_thread.start()
-    
-    def stop_cruise(self):
-        """停止自动巡航"""
-        if not self.is_cruising:
-            print("巡航未开始")
-            return
-        
-        print("停止巡航")
-        # 发送悬停命令停止当前飞行
-        try:
-            if self.client:
-                self.client.hoverAsync().join()
-        except Exception as e:
-            print(f"停止巡航时发生错误: {e}")
-        finally:
-            self.is_cruising = False
-    
     def exit_program(self):
         """安全退出程序"""
         print("\n安全降落...")
@@ -421,11 +384,6 @@ class FlightControl:
             # 启动地图显示
             self.start_map()
             
-            # 同步默认航点到地图显示
-            if self.map_display and self.waypoints:
-                self.map_display.set_waypoints(self.waypoints)
-                print(f"已将 {len(self.waypoints)} 个默认航点同步到地图显示")
-            
             # 启动键盘监听
             print("启动键盘监听...")
             listener = keyboard.Listener(on_press=self.on_press, on_release=self.on_release)
@@ -439,13 +397,11 @@ class FlightControl:
             
             # 保持程序运行
             print("程序已启动，按 ESC 键退出...")
-            print("注意: 未检测到 AirSim 模拟器，系统以演示模式运行")
-            print("您可以在 GUI 中设置巡航路线并查看地图显示")
             try:
                 while True:
                     time.sleep(1)
             except KeyboardInterrupt:
-                print("\n收到中断信号，正在退出...")
+                print("\n收到中断信号，正在降落...")
                 self.exit_program()
             finally:
                 listener.join()
