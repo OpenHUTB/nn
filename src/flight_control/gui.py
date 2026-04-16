@@ -10,14 +10,17 @@ class FlightControlGUI:
         self.running = False
         
         try:
+            print("开始初始化 GUI...")
             # 尝试创建 tkinter 窗口
             self.root = tk.Tk()
+            print("创建窗口成功")
             self.root.title("无人机控制系统")
             self.root.geometry("800x600")
             
             # 创建主框架
             self.main_frame = ttk.Frame(self.root, padding="10")
             self.main_frame.pack(fill=tk.BOTH, expand=True)
+            print("创建主框架成功")
             
             # 创建状态显示区域
             self.status_frame = ttk.LabelFrame(self.main_frame, text="无人机状态", padding="10")
@@ -35,6 +38,7 @@ class FlightControlGUI:
             for i, (label, var) in enumerate(self.status_labels.items()):
                 ttk.Label(self.status_frame, text=label + ":").grid(row=i, column=0, sticky=tk.W, padx=5, pady=2)
                 ttk.Label(self.status_frame, textvariable=var).grid(row=i, column=1, sticky=tk.W, padx=5, pady=2)
+            print("创建状态显示区域成功")
             
             # 创建传感器数据区域
             self.sensor_frame = ttk.LabelFrame(self.main_frame, text="传感器数据", padding="10")
@@ -50,6 +54,7 @@ class FlightControlGUI:
             for i, (label, var) in enumerate(self.sensor_labels.items()):
                 ttk.Label(self.sensor_frame, text=label + ":").grid(row=i, column=0, sticky=tk.W, padx=5, pady=2)
                 ttk.Label(self.sensor_frame, textvariable=var).grid(row=i, column=1, sticky=tk.W, padx=5, pady=2)
+            print("创建传感器数据区域成功")
             
             # 创建控制按钮区域
             self.control_frame = ttk.LabelFrame(self.main_frame, text="控制", padding="10")
@@ -65,6 +70,7 @@ class FlightControlGUI:
             
             for i, (text, command) in enumerate(control_buttons):
                 ttk.Button(self.control_frame, text=text, command=command).grid(row=0, column=i, padx=5, pady=5)
+            print("创建控制按钮区域成功")
             
             # 创建参数设置区域
             self.params_frame = ttk.LabelFrame(self.main_frame, text="参数设置", padding="10")
@@ -81,6 +87,9 @@ class FlightControlGUI:
             self.height_var = tk.DoubleVar(value=-3.0)
             ttk.Entry(self.params_frame, textvariable=self.height_var, width=10).grid(row=1, column=1, padx=5, pady=2)
             ttk.Label(self.params_frame, text="m").grid(row=1, column=2, sticky=tk.W, padx=5, pady=2)
+            print("创建参数设置区域成功")
+            
+
             
             # 创建日志区域
             self.log_frame = ttk.LabelFrame(self.main_frame, text="日志", padding="10")
@@ -93,6 +102,7 @@ class FlightControlGUI:
             scrollbar = ttk.Scrollbar(self.log_text, command=self.log_text.yview)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             self.log_text.config(yscrollcommand=scrollbar.set)
+            print("创建日志区域成功")
             
             # 开始更新数据
             self.running = True
@@ -103,6 +113,8 @@ class FlightControlGUI:
             print("GUI 初始化成功")
         except Exception as e:
             print(f"GUI 初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
             self.running = False
         
     def takeoff(self):
@@ -157,6 +169,16 @@ class FlightControlGUI:
         def _update_data():
             while self.running:
                 try:
+                    # 检查客户端是否连接
+                    if not self.client:
+                        self.status_labels["连接状态"].set("未连接")
+                        self.status_labels["位置"].set("(0, 0, 0)")
+                        self.status_labels["速度"].set("(0, 0, 0)")
+                        self.status_labels["高度"].set("0.0 m")
+                        self.status_labels["飞行状态"].set("未起飞")
+                        time.sleep(0.5)
+                        continue
+                    
                     # 更新状态信息
                     state = self.client.getMultirotorState()
                     
@@ -195,6 +217,15 @@ class FlightControlGUI:
                 time.sleep(0.5)
         
         threading.Thread(target=_update_data).start()
+    
+
+    
+    def stop(self):
+        """停止 GUI"""
+        if self.root:
+            self.running = False
+            self.root.quit()
+            print("GUI 已停止")
     
     def run(self):
         if self.root is None:
