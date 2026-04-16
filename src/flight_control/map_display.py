@@ -8,6 +8,7 @@ class MapDisplay:
         self.running = False
         self.canvas = None
         self.trail_points = []
+        self.waypoints = []
         
         # 地图中心坐标
         self.map_center_x = 400
@@ -67,6 +68,13 @@ class MapDisplay:
         self.canvas.create_text(self.map_center_x+10, self.map_center_y-10, 
                               text="原点", font=("Arial", 10))
     
+    def set_waypoints(self, waypoints):
+        """设置巡航路线航点"""
+        self.waypoints = waypoints
+        # 触发地图重绘
+        if self.canvas and self.running:
+            self.root.after(0, self.draw_map_grid)
+    
     def _update_position(self, x, y):
         """在主线程中更新无人机位置"""
         if not self.canvas or not self.running:
@@ -84,6 +92,27 @@ class MapDisplay:
         
         # 重绘地图
         self.draw_map_grid()
+        
+        # 绘制巡航路线
+        if len(self.waypoints) > 1:
+            for i in range(1, len(self.waypoints)):
+                # 将航点坐标转换为地图坐标
+                wp1_x, wp1_y, _ = self.waypoints[i-1]
+                wp2_x, wp2_y, _ = self.waypoints[i]
+                map_wp1_x = self.map_center_x + wp1_x * self.map_scale
+                map_wp1_y = self.map_center_y - wp1_y * self.map_scale
+                map_wp2_x = self.map_center_x + wp2_x * self.map_scale
+                map_wp2_y = self.map_center_y - wp2_y * self.map_scale
+                # 绘制巡航路线
+                self.canvas.create_line(map_wp1_x, map_wp1_y, map_wp2_x, map_wp2_y, fill="red", width=2, dash=(5, 2))
+        
+        # 绘制航点
+        for i, (wp_x, wp_y, _) in enumerate(self.waypoints):
+            map_wp_x = self.map_center_x + wp_x * self.map_scale
+            map_wp_y = self.map_center_y - wp_y * self.map_scale
+            # 绘制航点标记
+            self.canvas.create_oval(map_wp_x-6, map_wp_y-6, map_wp_x+6, map_wp_y+6, fill="yellow")
+            self.canvas.create_text(map_wp_x+10, map_wp_y-10, text=f"{i+1}", font=("Arial", 10))
         
         # 绘制航迹
         if len(self.trail_points) > 1:
