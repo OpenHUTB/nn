@@ -3,17 +3,19 @@
 
 from utils.screen import clear, message, warn
 from utils.piloterror import PilotError
+from utils.visualizer import CarlaVisualizer
 import datetime
 import os
 import carla
 
 class Collector:
-    def __init__(self, world, time):
+    def __init__(self, world, time, enable_visualization=True):
         self.start_time = datetime.datetime.now()
         self.world = world
         self.vehicle = None
+        self.enable_visualization = enable_visualization
+        self.visualizer = None
 
-        # 不再初始化 pygame 显示
         self.directory = f'recordings/{datetime.datetime.now().strftime("%Y-%m-%d@%H.%M.%S" if os.name == "nt" else "%Y-%m-%d@%H:%M:%S")}'
         self.start(time)
 
@@ -28,10 +30,14 @@ class Collector:
             message('Spawning vehicle')
             vehicle_blueprints = self.world.get_blueprint_library().filter('*vehicle*')
             spawn_points = self.world.get_map().get_spawn_points()
-            self.vehicle = self.world.spawn_actor(vehicle_blueprints[0], spawn_points[0])  # 使用第一个可用点，避免随机失败
+            self.vehicle = self.world.spawn_actor(vehicle_blueprints[0], spawn_points[0])
             message('OK')
         except Exception as e:
             raise PilotError(f'Failed to spawn vehicle: {e}')
+
+        if self.enable_visualization:
+            self.visualizer = CarlaVisualizer(self.world, self.vehicle)
+            message('Visualization enabled')
 
         try:
             message('Spawning camera and attaching to vehicle')
@@ -52,10 +58,23 @@ class Collector:
             elapsed = 0
             while elapsed <= time * 60:
                 self.world.tick()
+                
+                if self.enable_visualization and self.visualizer:
+                    camera_location = self.vehicle.get_transform().transform(camera_init_trans.location)
+                    self.visualizer.draw_all(camera_location)
+                
                 if elapsed != int((datetime.datetime.now() - self.start_time).total_seconds()):
                     elapsed = int((datetime.datetime.now() - self.start_time).total_seconds())
                     clear()
                     message(f'Time elapsed: {int(elapsed / 60.0)}m {elapsed % 60}s')
+                    
+                    if self.enable_visualization and self.visualizer:
+                        stats = self.visualizer.get_statistics()
+                        if stats:
+                            message(f'Speed: {stats["avg_speed"]:.1f} km/h (Max: {stats["max_speed"]:.1f} km/h)')
+                            message(f'Control - Steer: {stats["avg_steer"]:.3f}, Throttle: {stats["avg_throttle"]:.3f}, Brake: {stats["avg_brake"]:.3f}')
+                            message(f'Frames recorded: {stats["total_frames"]}')
+                            
             self.stop()
         except KeyboardInterrupt:
             self.stop()
@@ -69,4 +88,14 @@ class Collector:
         except:
             pass
         message("Vehicle destroyed")
-        # 不再调用 pygame.display.quit()
+        
+        if self.enable_visualization and self.visualizer:
+            stats = self.visualizer.get_statistics()
+            if stats:
+                message(f'\nRecording Statistics:')
+                message(f'Average Speed: {stats["avg_speed"]:.1f} km/h')
+                message(f'Maximum Speed: {stats["max_speed"]:.1f} km/h')
+                message(f'Average Steering: {stats["avg_steer"]:.3f}')
+                message(f'Average Throttle: {stats["avg_throttle"]:.3f}')
+                message(f'Average Brake: {stats["avg_brake"]:.3f}')
+                message(f'Total Frames Recorded: {stats["total_frames"]}')
