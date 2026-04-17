@@ -16,10 +16,13 @@ class FlightControl:
         # 更灵活的命令行参数解析
         self.use_gui = "--gui" in sys.argv
         self.use_map = "--map" in sys.argv
+        self.use_video = "--video" in sys.argv
         self.gui = None
         self.map_display = None
+        self.video_stream = None
         self.gui_started = False
         self.map_started = False
+        self.video_started = False
         self.current_velocity = (0, 0, 0)
         self.waypoints = []
         self.is_cruising = False
@@ -31,6 +34,8 @@ class FlightControl:
         self.print_startup_info()
         self.import_gui()
         self.import_map()
+        self.import_video()
+        # 尝试连接无人机，但即使连接失败也继续运行
         connected = self.connect_drone()
         if connected:
             self.takeoff()
@@ -71,11 +76,14 @@ class FlightControl:
         print(f"Python 版本: {sys.version}")
         print(f"启用 GUI: {self.use_gui}")
         print(f"启用地图显示: {self.use_map}")
+        print(f"启用视频流: {self.use_video}")
         print("使用说明:")
         print("  python main.py              - 仅使用命令行控制")
         print("  python main.py --gui        - 启用 GUI 控制")
         print("  python main.py --map        - 启用地图显示")
+        print("  python main.py --video      - 启用视频流显示")
         print("  python main.py --gui --map  - 同时启用 GUI 和地图显示")
+        print("  python main.py --gui --video - 同时启用 GUI 和视频流显示")
     
     def import_gui(self):
         """导入 GUI 模块"""
@@ -105,33 +113,6 @@ class FlightControl:
         """导入地图显示模块"""
         if self.use_map:
             try:
-                print("开始导入地图显示模块...")
-                # 尝试相对导入
-                from .map_display import MapDisplay
-                self.MapDisplay = MapDisplay
-                print("成功导入地图显示模块（相对导入）")
-            except Exception as e:
-                print(f"相对导入失败: {e}")
-                try:
-                    # 尝试直接导入
-                    import sys
-                    import os
-                    # 添加src目录到Python路径
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
-                    from src.flight_control.map_display import MapDisplay
-                    self.MapDisplay = MapDisplay
-                    print("成功导入地图显示模块（直接导入）")
-                except Exception as e2:
-                    print(f"导入地图显示模块失败: {e2}")
-                    import traceback
-                    traceback.print_exc()
-                    self.use_map = False
-    
-    def import_map(self):
-        """导入地图显示模块"""
-        if self.use_map:
-            try:
                 # 尝试相对导入
                 from .map_display import MapDisplay
                 self.MapDisplay = MapDisplay
@@ -150,6 +131,33 @@ class FlightControl:
                 except Exception as e2:
                     print(f"导入地图显示模块失败: {e2}")
                     self.use_map = False
+    
+    def import_video(self):
+        """导入视频流模块"""
+        if self.use_video:
+            try:
+                print("开始导入视频流模块...")
+                # 尝试相对导入
+                from .video_stream import create_video_window
+                self.create_video_window = create_video_window
+                print("成功导入视频流模块（相对导入）")
+            except Exception as e:
+                print(f"相对导入失败: {e}")
+                try:
+                    # 尝试直接导入
+                    import sys
+                    import os
+                    # 添加src目录到Python路径
+                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
+                    from src.flight_control.video_stream import create_video_window
+                    self.create_video_window = create_video_window
+                    print("成功导入视频流模块（直接导入）")
+                except Exception as e2:
+                    print(f"导入视频流模块失败: {e2}")
+                    import traceback
+                    traceback.print_exc()
+                    self.use_video = False
     
     def connect_drone(self):
         """连接到无人机"""
@@ -333,6 +341,42 @@ class FlightControl:
         else:
             print("未启用地图显示")
     
+    def start_video(self):
+        """启动视频流显示"""
+        if self.use_video:
+            try:
+                print("导入视频流模块...")
+                import tkinter as tk
+                from src.flight_control.video_stream import VideoStreamFrame
+                print("创建独立视频流窗口...")
+                # 创建独立的视频流窗口
+                self.video_window = tk.Toplevel()
+                self.video_window.title("无人机视频流")
+                self.video_window.geometry("640x480")
+                
+                # 创建视频流组件
+                self.video_frame = VideoStreamFrame(self.video_window, self.client, airsim, width=640, height=480)
+                self.video_frame.pack(fill=tk.BOTH, expand=True)
+                
+                # 处理窗口关闭事件
+                def on_video_close():
+                    if self.video_frame:
+                        self.video_frame.stop()
+                    self.video_window.destroy()
+                
+                self.video_window.protocol("WM_DELETE_WINDOW", on_video_close)
+                
+                # 启动视频流
+                self.video_frame.start()
+                self.video_started = True
+                print("视频流显示已启动")
+            except Exception as e:
+                print(f"视频流显示启动失败: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("未启用视频流显示")
+    
     def update_position(self):
         """更新无人机位置"""
         # 模拟位置数据，用于测试地图显示
@@ -383,6 +427,8 @@ class FlightControl:
             self.start_gui()
             # 启动地图显示
             self.start_map()
+            # 启动视频流显示
+            self.start_video()
             
             # 启动键盘监听
             print("启动键盘监听...")
