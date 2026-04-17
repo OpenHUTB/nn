@@ -1,0 +1,13 @@
+# Python 虚拟环境
+lane_env/
+venv/
+env/
+
+# 可执行文件
+*.exe
+*.dll
+*.bin
+
+# Python 缓存
+__pycache__/
+*.pyc
