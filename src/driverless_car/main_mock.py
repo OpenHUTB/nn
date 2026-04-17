@@ -9,9 +9,8 @@ from ultralytics import YOLO
 
 
 ALLOWED_CLASSES = {
-    0: {"name": "person", "cn": "人", "real_height_m": 1.7},
-    1: {"name": "bicycle", "cn": "自行车", "real_height_m": 1.4},
-    2: {"name": "car", "cn": "车", "real_height_m": 1.6},
+    0: {"name": "person", "label": "Person", "real_height_m": 1.7},
+    2: {"name": "car", "label": "Car", "real_height_m": 1.6},
 }
 ALLOWED_CLASS_IDS = list(ALLOWED_CLASSES.keys())
 
@@ -83,10 +82,10 @@ def estimate_distance_meters(box, cls_id, frame_height):
 
 def risk_level_by_distance(distance_m):
     if distance_m < 8.0:
-        return "danger", "红色危险"
+        return "danger", "Danger"
     if distance_m < 16.0:
-        return "warning", "黄色警告"
-    return "safe", "绿色安全"
+        return "warning", "Warning"
+    return "safe", "Safe"
 
 
 def draw_label(frame, text, x1, y1, color):
@@ -104,6 +103,13 @@ class Detection:
     bbox: np.ndarray
     score: float
     cls_id: int
+
+
+@dataclass
+class RadarMeasurement:
+    position: np.ndarray
+    distance_m: float
+    velocity_mps: float
 
 
 class SortTrack:
@@ -247,7 +253,7 @@ class VirtualEnv:
         self._init_objects()
 
     def _init_objects(self):
-        preset_classes = [2, 0, 1, 2]
+        preset_classes = [2, 0, 2, 0]
         for cls_id in preset_classes:
             distance_m = random.uniform(6.0, 22.0)
             self.objects.append(
@@ -307,6 +313,24 @@ class VirtualEnv:
             )
         return detections
 
+    def get_mock_radar_measurements(self):
+        radar_points = []
+        ego_center_x = self.width / 2.0
+        for obj in self.objects:
+            radar_x = obj["cx"] + random.uniform(-10.0, 10.0)
+            radar_y = obj["cy"] + random.uniform(-8.0, 8.0)
+            lateral_offset = (radar_x - ego_center_x) / max(self.width / 2.0, 1.0)
+            radar_distance = obj["distance_m"] + random.uniform(-0.35, 0.35)
+            relative_speed = -(obj["distance_v"] * 12.0)
+            radar_points.append(
+                RadarMeasurement(
+                    position=np.array([radar_x, radar_y], dtype=np.float32),
+                    distance_m=max(0.5, radar_distance),
+                    velocity_mps=relative_speed + lateral_offset * 0.6,
+                )
+            )
+        return radar_points
+
     def render(self):
         frame = np.full((self.height, self.width, 3), 24, dtype=np.uint8)
         cv2.rectangle(frame, (0, self.height // 2), (self.width, self.height), (45, 45, 45), -1)
@@ -325,10 +349,6 @@ class VirtualEnv:
             if obj["cls_id"] == 0:
                 cv2.circle(frame, (int(obj["cx"]), y1 + 12), 10, color, -1)
                 cv2.rectangle(frame, (int(obj["cx"]) - 8, y1 + 24), (int(obj["cx"]) + 8, y2), color, -1)
-            elif obj["cls_id"] == 1:
-                cv2.rectangle(frame, (x1, y1 + 10), (x2, y2 - 8), color, -1)
-                cv2.circle(frame, (x1 + 12, y2 - 2), 10, (40, 40, 40), 2)
-                cv2.circle(frame, (x2 - 12, y2 - 2), 10, (40, 40, 40), 2)
             else:
                 cv2.rectangle(frame, (x1, y1), (x2, y2), color, -1)
                 cv2.rectangle(frame, (x1 + 10, y1 + 8), (x2 - 10, y1 + 24), (255, 255, 255), -1)
@@ -362,27 +382,67 @@ class PerceptionDemo:
                 )
         return detections
 
-    def annotate_tracks(self, frame, tracks):
-        frame_h, frame_w = frame.shape[:2]
+    def fuse_radar_with_tracks(self, tracks, radar_measurements):
+        fused_results = []
+        used_radar = set()
         for track in tracks:
+            box = track.current_bbox()
+            x1, y1, x2, y2 = box
+            center = np.array([(x1 + x2) / 2.0, (y1 + y2) / 2.0], dtype=np.float32)
+            best_idx = None
+            best_score = float("inf")
+            for idx, radar in enumerate(radar_measurements):
+                if idx in used_radar:
+                    continue
+                score = np.linalg.norm(center - radar.position)
+                if score < best_score:
+                    best_score = score
+                    best_idx = idx
+            if best_idx is not None:
+                used_radar.add(best_idx)
+                fused_results.append((track, radar_measurements[best_idx]))
+            else:
+                fused_results.append((track, None))
+        return fused_results
+
+    def annotate_tracks(self, frame, fused_tracks):
+        frame_h, frame_w = frame.shape[:2]
+        for track, radar in fused_tracks:
             box = clamp_box(track.current_bbox(), frame_w, frame_h)
-            distance_m = estimate_distance_meters(box, track.cls_id, frame_h)
+            camera_distance = estimate_distance_meters(box, track.cls_id, frame_h)
+            distance_m = radar.distance_m if radar is not None else camera_distance
             track.last_distance = distance_m
-            risk_key, risk_cn = risk_level_by_distance(distance_m)
+            risk_key, risk_text = risk_level_by_distance(distance_m)
             color = RISK_COLORS[risk_key]
             x1, y1, x2, y2 = box
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
             info = ALLOWED_CLASSES[track.cls_id]
             label = (
-                f"ID {track.track_id} {info['cn']} "
-                f"{distance_m:.1f}m {risk_cn} conf {track.score:.2f}"
+                f"ID {track.track_id} {info['label']} "
+                f"Radar {distance_m:.1f}m {risk_text} conf {track.score:.2f}"
             )
             draw_label(frame, label, x1, y1, color)
+            if radar is not None:
+                radar_point = tuple(radar.position.astype(int))
+                box_center = ((x1 + x2) // 2, (y1 + y2) // 2)
+                cv2.circle(frame, radar_point, 6, (255, 255, 0), -1)
+                cv2.line(frame, radar_point, box_center, (255, 255, 0), 2)
+                radar_text = f"Radar {radar.distance_m:.1f}m | {radar.velocity_mps:+.1f}m/s"
+                cv2.putText(
+                    frame,
+                    radar_text,
+                    (x1, min(frame_h - 10, y2 + 24)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    (255, 255, 0),
+                    2,
+                    cv2.LINE_AA,
+                )
 
         legend_items = [
-            "SORT: 抑制检测框抖动",
-            "类别过滤: 只保留车/人/自行车",
-            "危险等级: 红<8m 黄<16m 绿>=16m",
+            "Camera: detect person/car",
+            "Radar: measure target distance",
+            "Fusion: overlay radar range on camera box",
         ]
         for idx, text in enumerate(legend_items):
             cv2.putText(
@@ -397,11 +457,14 @@ class PerceptionDemo:
             )
         return frame
 
-    def process_frame(self, frame, detections=None):
+    def process_frame(self, frame, detections=None, radar_measurements=None):
         if detections is None:
             detections = self.detect_with_yolo(frame)
+        if radar_measurements is None:
+            radar_measurements = []
         tracks = self.sort_tracker.update(detections)
-        return self.annotate_tracks(frame.copy(), tracks)
+        fused_tracks = self.fuse_radar_with_tracks(tracks, radar_measurements)
+        return self.annotate_tracks(frame.copy(), fused_tracks)
 
 def generate_effect_image(output_path=None, num_frames=18):
     env = VirtualEnv()
@@ -411,10 +474,15 @@ def generate_effect_image(output_path=None, num_frames=18):
         env.update()
         frame = env.render()
         detections = env.get_mock_detections()
-        final_frame = demo.process_frame(frame, detections=detections)
+        radar_measurements = env.get_mock_radar_measurements()
+        final_frame = demo.process_frame(
+            frame,
+            detections=detections,
+            radar_measurements=radar_measurements,
+        )
 
     if output_path is None:
-        output_path = os.path.join(os.path.dirname(__file__), "outputs", "sort_distance_demo.png")
+        output_path = os.path.join(os.path.dirname(__file__), "outputs", "camera_radar_fusion_demo.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, final_frame)
     return output_path
@@ -423,14 +491,19 @@ def generate_effect_image(output_path=None, num_frames=18):
 def main():
     env = VirtualEnv()
     demo = PerceptionDemo(load_model=False)
-    cv2.namedWindow("Driverless Car SORT Demo", cv2.WINDOW_NORMAL)
+    cv2.namedWindow("Driverless Car Camera Radar Fusion Demo", cv2.WINDOW_NORMAL)
 
     while True:
         env.update()
         frame = env.render()
         detections = env.get_mock_detections()
-        annotated = demo.process_frame(frame, detections=detections)
-        cv2.imshow("Driverless Car SORT Demo", annotated)
+        radar_measurements = env.get_mock_radar_measurements()
+        annotated = demo.process_frame(
+            frame,
+            detections=detections,
+            radar_measurements=radar_measurements,
+        )
+        cv2.imshow("Driverless Car Camera Radar Fusion Demo", annotated)
         if cv2.waitKey(30) & 0xFF == ord("q"):
             break
 
