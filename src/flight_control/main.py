@@ -113,6 +113,33 @@ class FlightControl:
         """导入地图显示模块"""
         if self.use_map:
             try:
+                print("开始导入地图显示模块...")
+                # 尝试相对导入
+                from .map_display import MapDisplay
+                self.MapDisplay = MapDisplay
+                print("成功导入地图显示模块（相对导入）")
+            except Exception as e:
+                print(f"相对导入失败: {e}")
+                try:
+                    # 尝试直接导入
+                    import sys
+                    import os
+                    # 添加src目录到Python路径
+                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
+                    from src.flight_control.map_display import MapDisplay
+                    self.MapDisplay = MapDisplay
+                    print("成功导入地图显示模块（直接导入）")
+                except Exception as e2:
+                    print(f"导入地图显示模块失败: {e2}")
+                    import traceback
+                    traceback.print_exc()
+                    self.use_map = False
+    
+    def import_map(self):
+        """导入地图显示模块"""
+        if self.use_map:
+            try:
                 # 尝试相对导入
                 from .map_display import MapDisplay
                 self.MapDisplay = MapDisplay
