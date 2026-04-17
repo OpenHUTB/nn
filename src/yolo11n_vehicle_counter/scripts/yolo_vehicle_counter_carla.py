@@ -5,11 +5,11 @@ import supervision as sv
 
 # ==================== 配置路径 ====================
 # 模型文件路径
-MODEL_PATH = "../models/yolo11n.pt"
+MODEL_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/models/yolo11n.pt"
 # 输入视频文件路径 - 针对CARLA录制的视频
-INPUT_VIDEO_PATH = "../dataset/sample_carla.mp4"
+INPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/dataset/sample.mp4"
 # 输出视频文件路径
-OUTPUT_VIDEO_PATH = "../res/sample_carla_res.mp4"
+OUTPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/res/sample_res.mp4"
 # ==================================================
 
 
