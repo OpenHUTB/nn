@@ -11,14 +11,14 @@ import numpy as np
 
 # 配置环境参数
 params = {
-    'number_of_vehicles': 100,
+    'number_of_vehicles': 20,
     'number_of_walkers': 0,
     'dt': 0.1,  # 两帧之间的时间间隔
     'ego_vehicle_filter': 'vehicle.tesla.model3',  # 用于定义自车的车辆过滤器
     'surrounding_vehicle_spawned_randomly': True, # 周围车辆是否随机生成（True）或手动设置（False）
     'port': 2000,  # 连接端口
     'town': 'Town03',  # 要模拟的城市场景
-    'max_time_episode': 1000,  # 每个 episode 的最大时间步数
+    'max_time_episode': 300,  # 每个 episode 的最大时间步数
     'max_waypoints': 12,  # 最大路点数量
     'visualize_waypoints': True,  # 是否可视化路点（默认：True）
     'desired_speed': 8,  # 期望速度（米/秒）
@@ -31,41 +31,84 @@ params = {
 
 # 创建环境
 env = gym.make('carla-v0', params=params)
-obs = env.reset()
+
+reset_result = env.reset()
+if isinstance(reset_result, tuple):
+    obs, info = reset_result
+else:
+    obs = reset_result
+    info = {}
 
 # 定义一个简单的动作策略
 def get_action(env, obs):
-    """随机选择简单的手动动作或自动驾驶动作。"""
-    p = random.random()
-    if p < 0.5:
-        # 使用自动驾驶（专家模式）
-        env.ego.set_autopilot(True)
-        control = env.ego.get_control()
-        action = [control.throttle, control.steer, control.brake]
-    else:
-        # 使用随机动作（新手模式）
-        env.ego.set_autopilot(False)
-        throttle = random.uniform(0.0, 1.0)
-        steer = random.uniform(-0.6, 0.6)
-        brake = random.uniform(0.0, 0.3)
-        action = [throttle, steer, brake]
-    return action
+    env.ego.set_autopilot(True)
+    control = env.ego.get_control()
+    return [control.throttle, control.steer, control.brake]
 
 # 与环境交互
-for episode in range(5):  # 运行 5 个 episode
-    obs = env.reset()
-    done = False
-    total_reward = 0
+try:
+    for episode in range(5):  # 运行 5 个 episode
+        reset_result = env.reset()
+        if isinstance(reset_result, tuple):
+            obs, info = reset_result
+        else:
+            obs = reset_result
+            info = {}
 
-    while not done:
-        action = get_action(env, obs)
-        next_obs, reward, cost, done, info = env.step(action)
+        done = False
+        total_reward = 0
 
-        print(f"Step: {env.time_step}, Reward: {reward:.2f}, Cost: {cost:.2f}, Done: {done}")
+        while not done:
+            action = get_action(env, obs)
 
-        obs = next_obs
-        total_reward += reward
+            try:
+                step_result = env.step(action)
+            except Exception as e:
+                print(f"[Error] Carla step failed: {e}")
+                break
 
-    print(f"Episode {episode} finished. Total reward: {total_reward:.2f}")
+            if len(step_result) == 5:
+                next_obs, reward, cost, done, info = step_result
+            elif len(step_result) == 6:
+                next_obs, reward, cost, terminated, truncated, info = step_result
+                done = terminated or truncated
+            else:
+                raise ValueError(f"Unexpected step return length: {len(step_result)}")
+            
+            # 每隔固定步数输出一次当前 step 的奖励、代价和结束状态
+            if env.time_step % 10 == 0 or done:
+                print(
+                    f"Step: {env.time_step:4d} | "
+                    f"Reward: {reward:7.2f} | "
+                    f"Cost: {cost:6.2f} | "
+                    f"Done: {done}"
+                )
 
-env.close()
+            # 提取车辆当前速度及运行状态，并在 CARLA 画面中显示监控信息
+            speed = next_obs['ego_state'][3]
+            collision = info.get('is_collision', False)
+            off_road = info.get('is_off_road', False)
+
+            ego_location = env.ego.get_transform().location
+            text_location = carla.Location(
+                x=ego_location.x,
+                y=ego_location.y,
+                z=ego_location.z + 2.5
+            )
+
+            env.world.debug.draw_string(
+                text_location,
+                f"Speed: {speed:.2f} m/s | Reward: {reward:.2f} | Cost: {cost:.2f} | Collision: {collision} | OffRoad: {off_road}",
+                draw_shadow=False,
+                color=carla.Color(0, 255, 0),
+                life_time=0.12,
+                persistent_lines=False
+            )
+
+            obs = next_obs
+            total_reward += reward
+
+        print(f"Episode {episode} finished. Total reward: {total_reward:.2f}")
+
+finally:
+    env.close()
