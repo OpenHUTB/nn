@@ -12,6 +12,7 @@ import random
 import copy
 import os
 import sys
+import cv2
 
 sys.path.append(r"D:\nn\src\grasp_rl\grasp_rl")
 
@@ -111,7 +112,7 @@ class DQN_Trainer(object):
                 return q_max
         else:
             self.last_action = "random"
-            action = np.random.randint(low=0, high=(self.env.IMAGE_WIDTH - 1) * (self.env.IMAGE_HEIGHT - 1))
+            action = np.random.randint(low=0, high=self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT)
             return torch.tensor([[action]], dtype=torch.long)
 
     def select_action_by_eps(self, state):
@@ -127,9 +128,10 @@ class DQN_Trainer(object):
             r = g = b = 0
             threshold = 0
             while r == g and g == b:
+
                 action = np.random.randint(low=0, high=(self.env.IMAGE_WIDTH - 1) * (self.env.IMAGE_HEIGHT - 1))
                 pixel_x = action % self.env.IMAGE_WIDTH
-                pixel_y = action // self.env.IMAGE_HEIGHT
+                pixel_y = action // self.env.IMAGE_WIDTH
                 r, g, b = self.env.observation["rgb"][pixel_x][pixel_y]
                 threshold += 1
                 if threshold == 10:
@@ -158,38 +160,40 @@ class DQN_Trainer(object):
             for obj_name in self.env.target_objects:
                 wx, wy, wz = self.env.get_body_com(obj_name)
                 if -0.224 <= wx <= 0.224 and -0.224 <= wy <= 0.224 and wz >= 0.9:
+
                     px, py = self.env.world2pixel(cam_id=1, x=wx, y=wy, z=wz)
                     action = py * self.env.IMAGE_WIDTH + px
+                    action = max(0, min(action, self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT - 1))
                     break
             if action is None:
-                action = np.random.randint(low=0, high=(self.env.IMAGE_WIDTH - 1) * (self.env.IMAGE_HEIGHT - 1))
+                action = np.random.randint(low=0, high=self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT)
             return torch.tensor([[action]], dtype=torch.long)
 
-    def learn(self,gamma=0.99):
-        if len(self.memory) < 2 * BATCH_SIZE:
+    def learn(self, gamma=0.99):
+        if len(self.memory) < BATCH_SIZE:
             print("Filling the replay buffer ...")
             return
         transitions = self.memory.sample(BATCH_SIZE)
         batch = Transition(*zip(*transitions))
+        state_batch = torch.cat(batch.state).to(self.device)
+        action_batch = torch.cat(batch.action).to(self.device)
+        reward_batch = torch.cat(batch.reward).to(self.device)
+        next_state_batch = torch.cat(batch.next_state).to(self.device)
+    
         self.optimizer.zero_grad()
-        for i in range(NUMBER_ACCUMULATIONS_BEFORE_UPDATE):
-            start_idx = i * MAX_POSSIBLE_SAMPLES
-            end_idx = (i + 1) * MAX_POSSIBLE_SAMPLES
-            state_batch = torch.cat(batch.state[start_idx:end_idx]).to(self.device)
-            action_batch = torch.cat(batch.action[start_idx:end_idx]).to(self.device)
-            reward_batch = torch.cat(batch.reward[start_idx:end_idx]).to(self.device)
-            next_state_batch = torch.cat(batch.next_state[start_idx:end_idx]).to(self.device)
-
-            q_pred = self.q_net(state_batch).view(MAX_POSSIBLE_SAMPLES, -1).gather(1, action_batch)
-            with torch.no_grad():
-                q_next = self.q_net(next_state_batch).max(dim=1, keepdim=True)[0]
-                q_expected = reward_batch.float() + gamma * q_next
-
-            loss = self.criterion(q_pred, q_expected).mean() / NUMBER_ACCUMULATIONS_BEFORE_UPDATE
-            loss.backward()
-
+    
+        
+        q_out = self.q_net(state_batch).view(-1, self.env.IMAGE_WIDTH * self.env.IMAGE_HEIGHT)
+        q_pred = q_out.gather(1, action_batch)
+        with torch.no_grad():
+            q_next = self.q_net(next_state_batch).max(1, keepdim=True)[0]
+            q_target = reward_batch + gamma * q_next
+    
+        loss = self.criterion(q_pred, q_target).mean()
+        self.optimizer.zero_grad()
+        loss.backward()
         self.optimizer.step()
-        self.writer.add_scalar("losses", loss, self.steps_done)
+        self.writer.add_scalar("losses", loss.item(), self.steps_done)
 
     def predict(self, state, show=False):
         with torch.no_grad():
@@ -219,9 +223,28 @@ class DQN_Trainer(object):
             random_num += 1
         return greedy, random_num
 
+    def save_dataset_sample(self, action, reward, info, iter_num):
+        data_dir = "grasprl/dataset/grasp_samples"
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+    
+        rgb_img = self.env.observation["rgb"]
+        rgb_img_bgr = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(f"{data_dir}/rgb_{iter_num}.png", rgb_img_bgr)
+    
+        depth_img = self.env.observation["depth"]
+        np.save(f"{data_dir}/depth_{iter_num}.npy", depth_img)
+    
+        label = {
+            "action": action,
+            "grasp_success": 1 if info["grasp"] == "Success" else 0,
+            "reward": reward,
+            "iter_num": iter_num
+        }
+        np.save(f"{data_dir}/label_{iter_num}.npy", label)
 
 def main():
-    max_iter = 9999
+    max_iter = 50
     grasp_success = 0
     loop = tqdm(range(1, max_iter + 1))
 
@@ -247,8 +270,9 @@ def main():
         trainer.writer.add_scalar("Grasping performance(Success rate)", success_rate, trainer.steps_done)
         reward = torch.tensor([[reward]], dtype=torch.float32)
         next_state = trainer.transform_state(next_state)
-        trainer.memory.push(state, max_idx, next_state, reward)
+        trainer.memory.push(state.detach(), max_idx, next_state.detach(), reward)
         state = next_state
+        trainer.save_dataset_sample(action, reward.item(), info, i_iter)
         trainer.learn()
 
     trainer.save(path_name="grasprl/trained/resnet/resnet", filename="insne")
