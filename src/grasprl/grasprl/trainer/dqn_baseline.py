@@ -247,7 +247,6 @@ def main():
     max_iter = 50
     grasp_success = 0
     loop = tqdm(range(1, max_iter + 1))
-
     trainer = DQN_Trainer(log_dir="resnet_dqn_insne",render_mode="human")
 
     state = trainer.env.reset_without_random()

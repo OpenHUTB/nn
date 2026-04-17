@@ -12,7 +12,6 @@ for f in rgb_files:
     iter_num = int(f.split("_")[1].split(".")[0])
     label_path = os.path.join(data_dir, f"label_{iter_num}.npy")
     label = np.load(label_path, allow_pickle=True).item()
-    
     if label["grasp_success"] == 1:
         success_num += 1
     else:

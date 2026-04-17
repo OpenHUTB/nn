@@ -135,7 +135,6 @@ class GraspRobot(MujocoPhyEnv):
                 self.step_mujoco_simulation()
                 return down_success 
 
-
     def move_up_drop(self):
         success = False
         up_pose = list(self.get_ee_pos().copy())
