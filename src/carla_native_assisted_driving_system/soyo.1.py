@@ -357,6 +357,7 @@ class CollisionSensor(object):
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
 
+
     def get_collision_history(self):
         history = collections.defaultdict(int)
         for frame, intensity in self.history:
