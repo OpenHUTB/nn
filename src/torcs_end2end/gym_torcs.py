@@ -13,18 +13,16 @@ import time
 class TorcsEnv:
     terminal_judge_start = 100  # 如果经过100个时间步仍无进展，则终止回合
     termination_limit_progress = 5  # [km/h]，如果车辆运行速度低于此限制，回合终止
-    default_speed = 60  # 改进: 提高默认速度到60
+    default_speed = 50  # 默认速度
 
     initial_reset = True  # 初始重置标记
 
-    def __init__(self, vision=False, throttle=True, gear_change=False):
+    def __init__(self, vision=False, throttle=False, gear_change=False):
         self.vision = vision  # 是否启用视觉观测
         self.throttle = throttle  # 是否手动控制油门（False则自动控制）
         self.gear_change = gear_change  # 是否手动控制换挡（False则自动换挡）
 
         self.initial_run = True  # 初始运行标记
-        self.time_step = 0  # 改进: 初始化时间步计数器
-        self.last_steer = 0  # 记录上次转向值用于平滑度计算
 
         ##print("launch torcs")
         # 终止已运行的TORCS进程
@@ -45,7 +43,7 @@ class TorcsEnv:
             # 仅转向控制，动作空间为[-1,1]的一维向量
             self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,))
         else:
-            # 改进: 改为3维动作空间 [转向, 油门, 刹车]
+            # 转向+油门/刹车控制，动作空间为[-1,1]的三维向量
             self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(3,))
 
         # 定义观测空间
@@ -61,11 +59,7 @@ class TorcsEnv:
             self.observation_space = spaces.Box(low=low, high=high)
 
     def step(self, u):
-        # 改进: 添加动作维度检查
-        if len(u) != self.action_space.shape[0]:
-            print(f"警告：动作维度不匹配，期望 {self.action_space.shape[0]}，实际 {len(u)}")
-
-        # print("Step")
+        #print("Step")
         # 将智能体动作转换为TORCS实际的动作格式
         client = self.client
 
@@ -81,7 +75,7 @@ class TorcsEnv:
         if self.throttle is False:
             target_speed = self.default_speed  # 设置目标速度
             # 根据当前速度和转向调整油门
-            if client.S.d['speedX'] < target_speed - (client.R.d['steer'] * 50):
+            if client.S.d['speedX'] < target_speed - (client.R.d['steer']*50):
                 client.R.d['accel'] += .01  # 加速
             else:
                 client.R.d['accel'] -= .01  # 减速
@@ -92,24 +86,21 @@ class TorcsEnv:
 
             # 低速时增加油门
             if client.S.d['speedX'] < 10:
-                client.R.d['accel'] += 1 / (client.S.d['speedX'] + .1)
+                client.R.d['accel'] += 1/(client.S.d['speedX']+.1)
 
             # 牵引力控制系统
-            if ((client.S.d['wheelSpinVel'][2] + client.S.d['wheelSpinVel'][3]) -
-                    (client.S.d['wheelSpinVel'][0] + client.S.d['wheelSpinVel'][1]) > 5):
+            if ((client.S.d['wheelSpinVel'][2]+client.S.d['wheelSpinVel'][3]) -
+               (client.S.d['wheelSpinVel'][0]+client.S.d['wheelSpinVel'][1]) > 5):
                 action_torcs['accel'] -= .2  # 车轮打滑时降低油门
         else:
             # 手动油门/刹车控制
-            if 'accel' in this_action:
-                action_torcs['accel'] = this_action['accel']
-            if 'brake' in this_action:
-                action_torcs['brake'] = this_action['brake']
+            action_torcs['accel'] = this_action['accel']
+            action_torcs['brake'] = this_action['brake']
 
         # 由Snakeoil实现的自动换挡
         if self.gear_change is True:
             # 手动换挡控制
-            if 'gear' in this_action:
-                action_torcs['gear'] = this_action['gear']
+            action_torcs['gear'] = this_action['gear']
         else:
             # 自动换挡逻辑（根据速度换挡）
             action_torcs['gear'] = 1  # 默认1挡
@@ -141,89 +132,57 @@ class TorcsEnv:
         self.observation = self.make_observaton(obs)
 
         # 奖励函数设置 #######################################
-        # 初始化终止标记
-        episode_terminate = False
-
+        # 方向相关的正向奖励
         track = np.array(obs['track'])
         trackPos = np.array(obs['trackPos'])
         sp = np.array(obs['speedX'])
-        angle = np.array(obs['angle'])
+        damage = np.array(obs['damage'])
+        rpm = np.array(obs['rpm'])
 
-        # 基础进度奖励
-        progress = sp * np.cos(angle)
+        # 进度计算：综合考虑前进速度、方向和赛道位置
+        progress = sp*np.cos(obs['angle']) - np.abs(sp*np.sin(obs['angle'])) - sp * np.abs(obs['trackPos'])
+        reward = progress
 
-        # 赛道位置惩罚（偏离中心）
-        track_pos_penalty = -2.0 * abs(trackPos)
+        # 碰撞检测（损伤值增加说明发生碰撞）
+        if obs['damage'] - obs_pre['damage'] > 0:
+            reward = -1
 
-        # 转向平滑度惩罚
-        steer_change = abs(obs['steer'] - self.last_steer)
-        steering_smoothness_penalty = -5.0 * steer_change
-        self.last_steer = obs['steer']
+        # 惩罚方向盘大幅度动作
+        reward -= abs(u[0]) * 0.6
 
-        # 速度奖励（鼓励保持适当速度）
-        target_speed = 80.0
-        speed_reward = 0.1 * (1.0 - min(abs(sp - target_speed) / target_speed, 1.0))
-
-        # 赛道跟踪奖励（根据赛道传感器）
-        track_center_reward = 0
-        if len(track) > 0:
-            # 改进: 添加安全检查，避免索引越界
-            if len(track) > 15:
-                min_track_dist = min(track[5:15])  # 检查前方传感器
-            else:
-                min_track_dist = min(track)  # 后备方案
-            if min_track_dist < 10:  # 弯道
-                track_center_reward = 5.0 * (1.0 - abs(trackPos))
-
-        # 总奖励（初始值）
-        reward = (progress * 0.3 +
-                  track_pos_penalty * 0.2 +
-                  steering_smoothness_penalty * 0.2 +
-                  speed_reward * 0.1 +
-                  track_center_reward * 0.2)
-
-        # 碰撞检测和惩罚
-        damage_increase = obs['damage'] - obs_pre['damage']
-        if damage_increase > 0:
-            reward = -10.0  # 覆盖之前的reward
-            episode_terminate = False  # 碰撞不终止，只是惩罚
-
-        # 驶出赛道检测（严重违规）
-        # 改进: 修复 track.any() 语法错误
-        if np.any(np.abs(track) > 1) or abs(trackPos) > 1:
-            reward = -50.0  # 覆盖之前的reward
+        # 终止条件判断 #########################
+        episode_terminate = False
+        # 车辆驶出赛道则终止回合
+        if (abs(track.any()) > 1 or abs(trackPos) > 1):  # 车辆驶出赛道则终止回合
+            reward = -200  # 驶出赛道严重惩罚
             episode_terminate = True
             client.R.d['meta'] = True  # 设置重置标记
 
         # 长时间无进展则终止回合
-        if self.terminal_judge_start < self.time_step:
+        if self.terminal_judge_start < self.time_step: # 如果经过一定时间步数后进度仍然很小
             if progress < self.termination_limit_progress:
-                print("无进度推进")
-                reward = -20.0  # 添加进度惩罚
+                print("无进度推进")  # 无进展提示
                 episode_terminate = True
                 client.R.d['meta'] = True  # 设置重置标记
 
         # 车辆倒车（角度余弦值小于0）则终止回合
-        if np.cos(obs['angle']) < 0:
-            reward = -30.0  # 倒车惩罚
+        if np.cos(obs['angle']) < 0: # 车辆倒车则终止回合
             episode_terminate = True
             client.R.d['meta'] = True  # 设置重置标记
 
         # 发送重置信号
-        if client.R.d['meta'] is True:
+        if client.R.d['meta'] is True: # 发送重置信号
             self.initial_run = False
             client.respond_to_server()
 
         self.time_step += 1  # 时间步计数+1
 
-        # 返回观测、奖励、终止标记和额外信息
-        return self.get_obs(), reward, episode_terminate, {}
+        return self.get_obs(), reward, client.R.d['meta'], {}
 
     def reset(self, relaunch=False):
-        # print("Reset")
+        #print("Reset")
 
         self.time_step = 0  # 重置时间步计数
-        self.last_steer = 0  # 重置转向记录
 
         if self.initial_reset is not True:
             # 设置重置标记并发送到服务器
@@ -233,7 +192,7 @@ class TorcsEnv:
             ## 临时解决方案：每次回合重启TORCS会存在内存泄漏问题！
             if relaunch is True:
                 self.reset_torcs()  # 重启TORCS
-                print("### TORCS 已重启 ###")
+                print("### TORCS 已重启 ###")  # TORCS重启提示
 
         # 如果你在环境中使用多个赛道，请在此处修改
         self.client = snakeoil3.Client(p=3101, vision=self.vision)  # 在vtorcs中打开新的UDP连接
@@ -259,7 +218,7 @@ class TorcsEnv:
         return self.observation
 
     def reset_torcs(self):
-        # print("relaunch torcs")
+       #print("relaunch torcs")
         # 终止现有TORCS进程
         os.system('pkill torcs')
         time.sleep(0.5)
@@ -275,32 +234,21 @@ class TorcsEnv:
 
     def agent_to_torcs(self, u):
         # 将智能体输出的动作转换为TORCS可识别的动作格式
-        # 改进: 添加边界检查，避免索引越界
         torcs_action = {'steer': u[0]}  # 转向动作
 
-        if len(u) == 0:
-            return torcs_action
-
         if self.throttle is True:  # 启用油门控制时
-            if len(u) >= 2:
-                # 油门范围 [0, 1]，将[-1,1]映射到[0,1]
-                accel = (u[1] + 1) / 2
-                torcs_action.update({'accel': np.clip(accel, 0.0, 0.8)})  # 限制最大油门0.8
-            if len(u) >= 3:
-                # 刹车范围 [0, 1]，将[-1,1]映射到[0,1]
-                brake = (u[2] + 1) / 2
-                torcs_action.update({'brake': np.clip(brake, 0.0, 0.3)})  # 限制最大刹车0.3
+            torcs_action.update({'accel': u[1]})  # 油门动作
+            torcs_action.update({'brake': u[2]})  # 刹车动作
 
-        if self.gear_change is True:  # 启用换挡控制时
-            if len(u) >= 4:
-                gear = int(np.clip(u[3], -1, 6))
-                torcs_action.update({'gear': gear})
+        if self.gear_change is True: # 启用换挡控制时
+            torcs_action.update({'gear': int(u[3])})  # 换挡动作
 
         return torcs_action
 
+
     def obs_vision_to_image_rgb(self, obs_image_vec):
         # 将视觉观测向量转换为RGB图像格式
-        image_vec = obs_image_vec
+        image_vec =  obs_image_vec
         # 分离RGB通道
         r = image_vec[0:len(image_vec):3]
         g = image_vec[1:len(image_vec):3]
@@ -327,16 +275,16 @@ class TorcsEnv:
                      'wheelSpinVel']
             Observation = col.namedtuple('Observaion', names)  # 定义观测数据结构
             # 标准化各观测值到合理范围
-            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32) / 200.,
-                               speedX=np.array(raw_obs['speedX'], dtype=np.float32) / 300.0,
-                               speedY=np.array(raw_obs['speedY'], dtype=np.float32) / 300.0,
-                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32) / 300.0,
-                               angle=np.array(raw_obs['angle'], dtype=np.float32) / 3.1416,  # 角度归一化到[-1,1]
+            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32)/200.,
+                               speedX=np.array(raw_obs['speedX'], dtype=np.float32)/300.0,
+                               speedY=np.array(raw_obs['speedY'], dtype=np.float32)/300.0,
+                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32)/300.0,
+                               angle=np.array(raw_obs['angle'], dtype=np.float32)/3.1416,  # 角度归一化到[-1,1]
                                damage=np.array(raw_obs['damage'], dtype=np.float32),
-                               opponents=np.array(raw_obs['opponents'], dtype=np.float32) / 200.,
-                               rpm=np.array(raw_obs['rpm'], dtype=np.float32) / 10000,  # 转速归一化
-                               track=np.array(raw_obs['track'], dtype=np.float32) / 200.,  # 赛道距离归一化
-                               trackPos=np.array(raw_obs['trackPos'], dtype=np.float32) / 1.,
+                               opponents=np.array(raw_obs['opponents'], dtype=np.float32)/200.,
+                               rpm=np.array(raw_obs['rpm'], dtype=np.float32)/10000,  # 转速归一化
+                               track=np.array(raw_obs['track'], dtype=np.float32)/200.,  # 赛道距离归一化
+                               trackPos=np.array(raw_obs['trackPos'], dtype=np.float32)/1.,
                                wheelSpinVel=np.array(raw_obs['wheelSpinVel'], dtype=np.float32))
         else:
             # 有视觉模式下的观测字段（增加图像字段）
@@ -354,13 +302,13 @@ class TorcsEnv:
             image_rgb = self.obs_vision_to_image_rgb(raw_obs[names[8]])
 
             # 标准化各观测值（视觉模式）
-            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32) / 200.,
-                               speedX=np.array(raw_obs['speedX'], dtype=np.float32) / self.default_speed,
-                               speedY=np.array(raw_obs['speedY'], dtype=np.float32) / self.default_speed,
-                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32) / self.default_speed,
-                               opponents=np.array(raw_obs['opponents'], dtype=np.float32) / 200.,
+            return Observation(focus=np.array(raw_obs['focus'], dtype=np.float32)/200.,
+                               speedX=np.array(raw_obs['speedX'], dtype=np.float32)/self.default_speed,
+                               speedY=np.array(raw_obs['speedY'], dtype=np.float32)/self.default_speed,
+                               speedZ=np.array(raw_obs['speedZ'], dtype=np.float32)/self.default_speed,
+                               opponents=np.array(raw_obs['opponents'], dtype=np.float32)/200.,
                                rpm=np.array(raw_obs['rpm'], dtype=np.float32),
-                               track=np.array(raw_obs['track'], dtype=np.float32) / 200.,
-                               trackPos=np.array(raw_obs['trackPos'], dtype=np.float32) / 1.,
+                               track=np.array(raw_obs['track'], dtype=np.float32)/200.,
+                               trackPos=np.array(raw_obs['trackPos'], dtype=np.float32)/1.,
                                wheelSpinVel=np.array(raw_obs['wheelSpinVel'], dtype=np.float32),
-                               img=image_rgb)  # 加入RGB图像数据
+                               img=image_rgb)
