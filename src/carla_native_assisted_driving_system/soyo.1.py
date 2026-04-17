@@ -1,10 +1,7 @@
 
 from __future__ import print_function
 """Example of automatic vehicle control from client side. (无agents纯净版)"""
-
-
 """CARLA-Native-Assisted-Driving-System - Version 1.0"""
-
 import argparse
 import collections
 import datetime
@@ -43,9 +40,6 @@ except IndexError:
 import carla
 from carla import ColorConverter as cc
 
-# ==============================================================================
-# -- 已删除所有agents代码 ✅----------------------------------------------------
-# ==============================================================================
 
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
@@ -210,7 +204,6 @@ class KeyboardControl(object):
         # 应用控制
         self.world.player.apply_control(control)
         return False
-
 class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
