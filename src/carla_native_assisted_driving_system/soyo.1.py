@@ -44,6 +44,25 @@ from carla import ColorConverter as cc
 # ==============================================================================
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
+# ==============================================================================
+# -- PID Controller (智能控制算法) ------------------------------------------------
+# ==============================================================================
+class PIDController:
+    def __init__(self, Kp=1.0, Ki=0.0, Kd=0.0):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.error = 0.0
+        self.last_error = 0.0
+        self.integral = 0.0
+
+    def step(self, target, current, dt=0.05):
+        self.error = target - current
+        self.integral += self.error * dt
+        derivative = (self.error - self.last_error) / dt
+        output = self.Kp * self.error + self.Ki * self.integral + self.Kd * derivative
+        self.last_error = self.error
+        return max(0.0, min(1.0, output))
 def find_weather_presets():
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
 
@@ -152,58 +171,6 @@ class World(object):
             if actor is not None:
                 actor.destroy()
 
-
-# ==============================================================================
-# -- KeyboardControl (完美版手动控制) -----------------------------------------------------------
-# ==============================================================================
-# ==============================================================================
-# -- KeyboardControl (最终稳定版) -----------------------------------------------------------
-# ==============================================================================
-class KeyboardControl(object):
-    def __init__(self, world):
-        self.world = world
-        self.steer = 0.0
-        world.hud.notification("W前进 S刹车 A/D转向 空格手刹 C切换视角 ESC退出", 10)
-
-    def parse_events(self):
-        # 退出事件
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            # 按键按下
-            if event.type == pygame.KEYDOWN:
-                # C 切换视角
-                if event.key == K_c:
-                    self.world.camera_manager.toggle_camera()
-                # ESC 退出
-                if event.key == K_ESCAPE:
-                    return True
-
-        # 实时按键检测
-        keys = pygame.key.get_pressed()
-
-        # 车辆控制
-        control = carla.VehicleControl()
-        control.manual_gear_shift = False
-
-        # 油门
-        control.throttle = 0.6 if keys[K_w] else 0.0
-        # 刹车
-        control.brake = 1.0 if keys[K_s] else 0.0
-        # 转向
-        if keys[K_a]:
-            self.steer = max(self.steer - 0.05, -1.0)
-        elif keys[K_d]:
-            self.steer = min(self.steer + 0.05, 1.0)
-        else:
-            self.steer = 0.0
-        control.steer = self.steer
-        # 手刹
-        control.hand_brake = keys[K_SPACE]
-
-        # 应用控制
-        self.world.player.apply_control(control)
-        return False
 class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
@@ -357,7 +324,7 @@ class FadingText(object):
 
 class HelpText(object):
     def __init__(self, font, width, height):
-        lines = ["CARLA-Native-Assisted-Driving-System", "WASD Drive, C Switch Camera, ESC Quit"]
+        lines = ["CARLA-Native-Assisted-Driving-System", "PID自动定速巡航 | ESC退出"]
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
@@ -559,14 +526,21 @@ class CameraManager(object):
 # -- --------------------------------------------
 # ==============================================================================
 
+# ==============================================================================
+# -- game_loop (PID定速巡航 自动控制版) ------------------------------------------
+# ==============================================================================
 def game_loop(args):
     pygame.init()
     pygame.font.init()
     world = None
 
+    # 初始化PID控制器（目标速度：30 km/h）
+    pid = PIDController(Kp=0.8, Ki=0.1, Kd=0.05)
+    target_speed = 30.0  # 目标巡航速度
+
     try:
         client = carla.Client(args.host, args.port)
-        client.set_timeout(4.0)
+        client.set_timeout(10.0)
 
         display = pygame.display.set_mode(
             (args.width, args.height),
@@ -574,19 +548,36 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
-        controller = KeyboardControl(world)
         clock = pygame.time.Clock()
 
         while True:
             clock.tick_busy_loop(60)
-            # 仅处理键盘控制
-            if controller.parse_events():
-                return
+
+            # 仅处理退出事件，无任何手动控制
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYUP and event.key == K_ESCAPE):
+                    return
 
             world.world.wait_for_tick()
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
+
+            # ===================== PID算法自动控制 =====================
+            # 获取当前车速(km/h)
+            vel = world.player.get_velocity()
+            current_speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+
+            # PID计算油门
+            control = carla.VehicleControl()
+            control.throttle = pid.step(target_speed, current_speed)
+            control.brake = 0.0
+            control.steer = 0.0
+            control.hand_brake = False
+            control.manual_gear_shift = False
+
+            # 算法输出控制指令
+            world.player.apply_control(control)
 
     finally:
         if world is not None:
