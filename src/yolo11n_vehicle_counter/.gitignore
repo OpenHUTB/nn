@@ -1,3 +1,54 @@
+# ============== 核心：Python 虚拟环境（彻底屏蔽所有 venv） ==============
+venv/
+venv*/
+*venv/
+env/
+env*/
+*env/
+.venv/
+venv311/
+**/venv311/
+src/yolo11n_vehicle_counter/venv311/
+
+# ============== Python 缓存与编译文件 ==============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ============== 日志、临时文件、IDE 配置 ==============
+*.log
+*.tmp
+*.temp
+.cache/
+.vscode/
+.idea/
+*.swp
+*~
+
+# ============== 大文件：模型、数据集、输出 ==============
+*.pt
+*.pth
+*.onnx
+*.weights
 dataset/
+data/
 models/
+runs/
 res/
