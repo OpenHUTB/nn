@@ -3,18 +3,25 @@
 功能：轨迹规划/PID控制/手动控制/目标跟随/碰撞检测/轨迹保存/目标可视化
 特性：鲁棒性强、性能优化、易扩展、易维护
 """
+import os
+
+# 获取脚本目录作为基准路径
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 禁用MuJoCo日志（设置空路径）
+os.environ['MUJOCO_LOG_DIR'] = os.devnull
+
 import mujoco
 import mujoco.viewer
 import numpy as np
 import time
 import logging
-import os
 import threading
 import sys
 import queue
 import json
 from dataclasses import dataclass
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict
 
 
 # ======================== 全局配置（解耦硬编码） ========================
@@ -196,17 +203,10 @@ class TargetVisualizer:
         self.geom = self._create_geom()
         self._is_rendered = False
 
-    def _create_geom(self) -> mujoco.MjGeom:
+    def _create_geom(self) -> mujoco.MjvGeom:
         """创建目标点几何（红色球体）"""
-        geom = mujoco.MjGeom()
-        mujoco.mj_initGeom(
-            geom,
-            mujoco.mjtGeom.mjGEOM_SPHERE,
-            np.array(self.size, dtype=np.float64),
-            np.zeros(3, dtype=np.float64),
-            np.eye(3, dtype=np.float64).flatten(),
-            np.array([1.0, 0.0, 0.0, 1.0], dtype=np.float64)  # RGBA：红色不透明
-        )
+        geom = mujoco.MjvGeom()
+        mujoco.mjv_initGeom(geom, mujoco.mjtGeom.mjGEOM_SPHERE, np.array(self.size, dtype=np.float64), np.zeros(3), np.eye(3).flatten(), np.array([1.0, 0.0, 0.0, 1.0]))
         return geom
 
     def update(self, pos: List[float]) -> None:
@@ -216,11 +216,11 @@ class TargetVisualizer:
             return
         self.target_pos = np.array(pos, dtype=np.float64)
 
-    def render(self, viewer: mujoco.viewer.Viewer) -> None:
-        """渲染目标点（防重复渲染）"""
+    def render(self, viewer) -> None:
+        """渲染目标点（MuJoCo 3.x兼容）"""
         try:
-            self.geom.pos = self.target_pos
-            mujoco.mjv_geom(viewer.vopt, self.model, self.data, [self.geom], 1)
+            self.geom.pos[:] = self.target_pos
+            mujoco.mjv_addGeoms(viewer.model, viewer.data, viewer.user_scn, [self.geom])
             self._is_rendered = True
         except Exception as e:
             if not self._is_rendered:
@@ -562,7 +562,7 @@ class ArmSimulator:
             self.pid.reset()
             logger.info(f"仿真结束 | 总帧数：{frame_count} | 平均帧率：{frame_count / (time.time() - start_time):.1f}FPS")
 
-    def _init_viewer(self, viewer: mujoco.viewer.Viewer) -> None:
+    def _init_viewer(self, viewer) -> None:
         """初始化Viewer视角（集中配置）"""
         viewer.cam.distance = 2.0
         viewer.cam.azimuth = 45.0
