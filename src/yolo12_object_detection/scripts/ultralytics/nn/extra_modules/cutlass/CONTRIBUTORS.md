@@ -45,7 +45,6 @@ Albert Xu
 Jack Yang  
 Xiuxia Zhang  
 Nick Zhao  
-jokic
 ## ACKNOWLEDGEMENTS
 
 Girish Bharambe  
