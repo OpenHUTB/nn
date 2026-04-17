@@ -4,8 +4,9 @@ import threading
 import time
 
 class FlightControlGUI:
-    def __init__(self, client):
+    def __init__(self, client, flight_control=None):
         self.client = client
+        self.flight_control = flight_control
         self.root = None
         self.running = False
         
@@ -91,6 +92,21 @@ class FlightControlGUI:
             
 
             
+            # 航点操作按钮
+            ttk.Button(self.cruise_frame, text="添加航点", command=self.add_waypoint).grid(row=1, column=6, padx=5, pady=2)
+            ttk.Button(self.cruise_frame, text="删除航点", command=self.remove_waypoint).grid(row=1, column=7, padx=5, pady=2)
+            
+            # 航点列表
+            ttk.Label(self.cruise_frame, text="航点列表:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+            self.waypoint_list = tk.Listbox(self.cruise_frame, width=80, height=5)
+            self.waypoint_list.grid(row=3, column=0, columnspan=8, padx=5, pady=2)
+            
+            # 巡航控制按钮
+            ttk.Button(self.cruise_frame, text="开始巡航", command=self.start_cruise).grid(row=4, column=0, padx=5, pady=5)
+            ttk.Button(self.cruise_frame, text="停止巡航", command=self.stop_cruise).grid(row=4, column=1, padx=5, pady=5)
+            ttk.Button(self.cruise_frame, text="清空航点", command=self.clear_waypoints).grid(row=4, column=2, padx=5, pady=5)
+            print("创建巡航路线设置区域成功")
+
             # 创建日志区域
             self.log_frame = ttk.LabelFrame(self.main_frame, text="日志", padding="10")
             self.log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
@@ -236,6 +252,9 @@ class FlightControlGUI:
             self.root.mainloop()
         finally:
             self.running = False
+            # 停止巡航
+            if self.is_cruising:
+                self.stop_cruise()
             if hasattr(self, 'update_thread') and self.update_thread.is_alive():
                 self.update_thread.join(timeout=1.0)
             print("GUI 已关闭")
