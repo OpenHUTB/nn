@@ -4,6 +4,7 @@ import numpy as np
 import supervision as sv
 import os
 import json
+import time
 
 # ==================== 配置路径 ====================
 # 模型文件路径
@@ -567,8 +568,17 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     detection_accuracies = []  # 存储每帧的检测精度
     total_detections = 0  # 总检测数
     correct_detections = 0  # 正确检测数
+    
+    # FPS计算相关变量
+    start_time = time.time()
+    fps_history = []  # 存储FPS历史
+    frame_time_history = []  # 存储帧时间历史
+    fps_update_interval = 10  # 每10帧更新一次FPS
 
     while cap.isOpened():
+        # 记录帧开始时间
+        frame_start_time = time.time()
+        
         ret, frame = cap.read()
         if not ret:
             break
@@ -604,6 +614,43 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         if detections.tracker_id is not None:
             # 处理车辆轨迹和计数
             draw_tracks_and_count(frame, detections, total_counts, counting_region, vehicle_states, speed_history, w)
+
+        # 计算帧时间和FPS
+        frame_end_time = time.time()
+        frame_time = (frame_end_time - frame_start_time) * 1000  # 转换为毫秒
+        current_fps = 1000 / frame_time if frame_time > 0 else 0
+        
+        # 存储历史数据
+        fps_history.append(current_fps)
+        frame_time_history.append(frame_time)
+        
+        # 只保留最近30帧的数据
+        if len(fps_history) > 30:
+            fps_history.pop(0)
+        if len(frame_time_history) > 30:
+            frame_time_history.pop(0)
+        
+        # 计算平均FPS和帧时间
+        avg_fps = np.mean(fps_history) if fps_history else 0
+        avg_frame_time = np.mean(frame_time_history) if frame_time_history else 0
+        
+        # 计算状态色标
+        if avg_fps > 60:
+            fps_color = (0, 255, 0)  # 绿色
+        elif avg_fps > 30:
+            fps_color = (0, 255, 255)  # 黄色
+        else:
+            fps_color = (0, 0, 255)  # 红色
+        
+        # 显示FPS、帧时间和状态色标
+        fps_text = f"FPS: {avg_fps:.1f}"
+        frame_time_text = f"Frame Time: {avg_frame_time:.1f}ms"
+        
+        # 绘制FPS信息面板
+        cv.rectangle(frame, (w - 200, 60), (w - 10, 120), (255, 255, 255), cv.FILLED)
+        cv.rectangle(frame, (w - 200, 60), (w - 10, 120), fps_color, 2)
+        cv.putText(frame, fps_text, (w - 190, 90), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv.putText(frame, frame_time_text, (w - 190, 115), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
         # 写入帧到输出视频
         out.write(frame)
