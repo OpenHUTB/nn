@@ -11,7 +11,13 @@
 - 如果模拟器尚未运行，应用会自动启动它。  
 - 自动部署交通流（车辆和行人）。  
 - 启动基于 Pygame 的交互式窗口，您可以在其中可视化所选的传感器并与它们交互。  
-- 应用还会管理垃圾回收和进程终止。如果希望在退出应用后保持模拟器继续运行，可以使用 `--keepsim` 标志，以便下次更快启动应用。
+- 应用还会管理垃圾回收和进程终止。如果希望在退出应用后保持模拟器继续运行，可以使用 `--keepsim` 标志，以便下次更快启动应用.  
+
+### 轻量化运行方式
+* python carla_CAM.py      最轻量模式，只开启前置RGB相机
+* python carla_CAM.py --lidar     开机激光雷达
+* python carla_CAM.py --side-cams    开启侧面/后面摄像头
+* python carla_CAM.py --side-cams --lidar --semantic-lidar --res 1920x1080    全开
 
 ### 运行中的交互选择
 
@@ -60,6 +66,8 @@
 
 ### 注意项
 由于是在hutb模拟器上进行测试，不要将原生的python API 与hutb 提供的专用python API 混乱，不然导致无法运行
+
+
 
 
 

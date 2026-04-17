@@ -18,9 +18,12 @@ class SimpleController:
         self.world = world
         self.vehicle = vehicle
         self.map = world.get_map()
-        self.target_speed = 30.0  # km/h
+        # self.target_speed = 30.0  # km/h，原速度限制
+        self.target_speed = 50.0  # km/h，增加最高速度限制
         self.waypoint_distance = 5.0
         self.last_waypoint = None
+        # self.reverse_mode = False  # 倒车模式标志（未使用）
+        self.manual_reverse = False  # 手动倒车标志
 
     def get_control(self):
         """基于路点的简单控制"""
@@ -29,15 +32,21 @@ class SimpleController:
         transform = self.vehicle.get_transform()
         velocity = self.vehicle.get_velocity()
 
-        # 计算速度
+        # 计算速度（考虑倒车方向）
         speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6  # km/h
+
+        # 检查是否在倒车模式
+        if self.manual_reverse:
+            # 倒车模式：直接返回倒车控制
+            return 0.3, 0.0, 0.0, True  # throttle, brake, steer, reverse
 
         # 获取路点
         waypoint = self.map.get_waypoint(location, project_to_road=True)
 
         if not waypoint:
             # 如果没有找到路点，返回保守控制
-            return 0.3, 0.0, 0.0
+            # return 0.3, 0.0, 0.0  # 原返回值（3个值）
+            return 0.3, 0.0, 0.0, False  # 新返回值（4个值，增加reverse标志）
 
         # 获取下一个路点
         next_waypoints = waypoint.next(self.waypoint_distance)
@@ -75,7 +84,16 @@ class SimpleController:
         else:
             throttle, brake = 0.3, 0.0
 
-        return throttle, brake, steer
+        # return throttle, brake, steer  # 原返回值（3个值）
+        return throttle, brake, steer, False  # 新返回值（4个值，增加reverse标志）
+
+    def toggle_reverse(self):
+        """切换倒车模式"""
+        self.manual_reverse = not self.manual_reverse
+        if self.manual_reverse:
+            print("进入倒车模式")
+        else:
+            print("退出倒车模式，恢复前进")
 
 
 class SimpleDrivingSystem:
@@ -268,6 +286,7 @@ class SimpleDrivingSystem:
         print("  q - 退出程序")
         print("  r - 重置车辆")
         print("  s - 紧急停止")
+        print("  x - 切换倒车/前进模式（速度为0时生效）")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -279,8 +298,9 @@ class SimpleDrivingSystem:
                 velocity = self.vehicle.get_velocity()
                 speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
 
-                # 获取控制指令
-                throttle, brake, steer = self.controller.get_control()
+                # 获取控制指令（现在返回4个值，原代码返回3个值）
+                # throttle, brake, steer = self.controller.get_control()  # 原代码
+                throttle, brake, steer, reverse = self.controller.get_control()  # 新代码
 
                 # 应用控制
                 control = carla.VehicleControl(
@@ -288,7 +308,8 @@ class SimpleDrivingSystem:
                     brake=float(brake),
                     steer=float(steer),
                     hand_brake=False,
-                    reverse=False
+                    # reverse=False  # 原代码
+                    reverse=reverse  # 新代码，支持倒车
                 )
                 self.vehicle.apply_control(control)
 
@@ -309,6 +330,12 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"Frame: {frame_count}",
                                 (20, 160), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (255, 255, 255), 2)
+                    
+                    # 显示倒车状态（新功能）
+                    if self.controller.manual_reverse:
+                        cv2.putText(display_img, "REVERSE MODE",
+                                    (20, 200), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8, (0, 0, 255), 2)  # 红色显示
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
@@ -325,6 +352,12 @@ class SimpleDrivingSystem:
                         throttle=0.0, brake=1.0, hand_brake=True
                     ))
                     print("紧急停止")
+                elif key == ord('x'):
+                    # 切换倒车模式（只在速度接近0时允许切换）
+                    if speed < 1.0:  # 速度小于1km/h时允许切换
+                        self.controller.toggle_reverse()
+                    else:
+                        print("请先减速到接近停止（速度<1km/h）再切换倒车模式")
 
                 frame_count += 1
 
