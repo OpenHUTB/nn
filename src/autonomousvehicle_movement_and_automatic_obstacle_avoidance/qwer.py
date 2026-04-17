@@ -9,7 +9,7 @@
 - 修正车辆初始朝向，优化速度获取，平滑油门控制
 - 【修复】初始化时正确设置航向角，避免启动时误转向
 """
-
+# 第1次提交：无人车项目初始化
 import mujoco
 import mujoco.viewer
 import numpy as np
