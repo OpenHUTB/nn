@@ -4,6 +4,7 @@ import os
 import signal
 import threading
 import sys
+import json
 from pynput import keyboard
 
 class FlightControl:
@@ -20,6 +21,10 @@ class FlightControl:
         self.gui_started = False
         self.map_started = False
         self.current_velocity = (0, 0, 0)
+        self.waypoints = []
+        self.is_cruising = False
+        # 加载配置文件
+        self.load_config()
         
     def setup(self):
         """设置飞行控制系统"""
@@ -30,6 +35,35 @@ class FlightControl:
         if connected:
             self.takeoff()
         self.print_control_instructions()
+    
+    def load_config(self):
+        """加载配置文件"""
+        config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                # 加载基本配置
+                if 'speed' in config:
+                    self.SPEED = config['speed']
+                if 'default_height' in config:
+                    self.HEIGHT = config['default_height']
+                # 加载巡航配置
+                if 'cruise' in config:
+                    cruise_config = config['cruise']
+                    if 'speed' in cruise_config:
+                        self.SPEED = cruise_config['speed']
+                    if 'waypoints' in cruise_config:
+                        self.waypoints = [tuple(wp) for wp in cruise_config['waypoints']]
+                print(f"成功加载配置文件: {config_path}")
+                print(f"默认飞行速度: {self.SPEED} m/s")
+                print(f"默认飞行高度: {abs(self.HEIGHT)} m")
+                if self.waypoints:
+                    print(f"加载了 {len(self.waypoints)} 个默认航点")
+            except Exception as e:
+                print(f"加载配置文件失败: {e}")
+        else:
+            print(f"配置文件不存在: {config_path}")
     
     def print_startup_info(self):
         """打印启动信息"""
@@ -47,12 +81,52 @@ class FlightControl:
         """导入 GUI 模块"""
         if self.use_gui:
             try:
-                from gui import FlightControlGUI
+                print("开始导入 GUI 模块...")
+                from .gui import FlightControlGUI
                 self.FlightControlGUI = FlightControlGUI
                 print("成功导入 GUI 模块")
             except Exception as e:
-                print(f"导入 GUI 模块失败: {e}")
-                self.use_gui = False
+                print(f"相对导入失败: {e}")
+                try:
+                    import sys
+                    import os
+                    sys.path.append(os.path.dirname(__file__))
+                    print(f"添加路径: {os.path.dirname(__file__)}")
+                    from gui import FlightControlGUI
+                    self.FlightControlGUI = FlightControlGUI
+                    print("成功导入 GUI 模块（直接导入）")
+                except Exception as e2:
+                    print(f"导入 GUI 模块失败: {e2}")
+                    import traceback
+                    traceback.print_exc()
+                    self.use_gui = False
+    
+    def import_map(self):
+        """导入地图显示模块"""
+        if self.use_map:
+            try:
+                print("开始导入地图显示模块...")
+                # 尝试相对导入
+                from .map_display import MapDisplay
+                self.MapDisplay = MapDisplay
+                print("成功导入地图显示模块（相对导入）")
+            except Exception as e:
+                print(f"相对导入失败: {e}")
+                try:
+                    # 尝试直接导入
+                    import sys
+                    import os
+                    # 添加src目录到Python路径
+                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
+                    from src.flight_control.map_display import MapDisplay
+                    self.MapDisplay = MapDisplay
+                    print("成功导入地图显示模块（直接导入）")
+                except Exception as e2:
+                    print(f"导入地图显示模块失败: {e2}")
+                    import traceback
+                    traceback.print_exc()
+                    self.use_map = False
     
     def import_map(self):
         """导入地图显示模块"""
@@ -206,7 +280,7 @@ class FlightControl:
         """运行 GUI 界面"""
         try:
             print("启动可视化控制面板...")
-            self.gui = self.FlightControlGUI(self.client)
+            self.gui = self.FlightControlGUI(self.client, self)
             if self.gui.running:
                 self.gui_started = True
                 print("可视化控制面板已启动")
