@@ -1,8 +1,9 @@
 
-
+from __future__ import print_function
 """Example of automatic vehicle control from client side. (无agents纯净版)"""
 
-from __future__ import print_function
+
+"""CARLA-Native-Assisted-Driving-System - Version 1.0"""
 
 import argparse
 import collections
@@ -16,19 +17,9 @@ import re
 import sys
 import weakref
 
-try:
-    import pygame
-    from pygame.locals import KMOD_CTRL
-    from pygame.locals import K_ESCAPE
-    from pygame.locals import K_q
-except ImportError:
-    raise RuntimeError('cannot import pygame, make sure pygame package is installed')
-
-try:
-    import numpy as np
-except ImportError:
-    raise RuntimeError(
-        'cannot import numpy, make sure numpy package is installed')
+import pygame
+from pygame.locals import *
+import numpy as np
 
 # ==============================================================================
 # -- Find CARLA module ---------------------------------------------------------
@@ -51,7 +42,6 @@ except IndexError:
 
 import carla
 from carla import ColorConverter as cc
-
 
 # ==============================================================================
 # -- 已删除所有agents代码 ✅----------------------------------------------------
@@ -170,28 +160,57 @@ class World(object):
 
 
 # ==============================================================================
-# -- KeyboardControl -----------------------------------------------------------
+# -- KeyboardControl (完美版手动控制) -----------------------------------------------------------
+# ==============================================================================
+# ==============================================================================
+# -- KeyboardControl (最终稳定版) -----------------------------------------------------------
 # ==============================================================================
 class KeyboardControl(object):
     def __init__(self, world):
-        world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
+        self.world = world
+        self.steer = 0.0
+        world.hud.notification("W前进 S刹车 A/D转向 空格手刹 C切换视角 ESC退出", 10)
 
     def parse_events(self):
+        # 退出事件
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return True
-            if event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
+            # 按键按下
+            if event.type == pygame.KEYDOWN:
+                # C 切换视角
+                if event.key == K_c:
+                    self.world.camera_manager.toggle_camera()
+                # ESC 退出
+                if event.key == K_ESCAPE:
                     return True
 
-    @staticmethod
-    def _is_quit_shortcut(key):
-        return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
+        # 实时按键检测
+        keys = pygame.key.get_pressed()
 
+        # 车辆控制
+        control = carla.VehicleControl()
+        control.manual_gear_shift = False
 
-# ==============================================================================
-# -- HUD -----------------------------------------------------------------------
-# ==============================================================================
+        # 油门
+        control.throttle = 0.6 if keys[K_w] else 0.0
+        # 刹车
+        control.brake = 1.0 if keys[K_s] else 0.0
+        # 转向
+        if keys[K_a]:
+            self.steer = max(self.steer - 0.05, -1.0)
+        elif keys[K_d]:
+            self.steer = min(self.steer + 0.05, 1.0)
+        else:
+            self.steer = 0.0
+        control.steer = self.steer
+        # 手刹
+        control.hand_brake = keys[K_SPACE]
+
+        # 应用控制
+        self.world.player.apply_control(control)
+        return False
+
 class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
@@ -345,7 +364,7 @@ class FadingText(object):
 
 class HelpText(object):
     def __init__(self, font, width, height):
-        lines = __doc__.split('\n')
+        lines = ["CARLA-Native-Assisted-Driving-System", "WASD Drive, C Switch Camera, ESC Quit"]
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
@@ -546,9 +565,7 @@ class CameraManager(object):
 # ==============================================================================
 # -- --------------------------------------------
 # ==============================================================================
-# ==============================================================================
-# --  --------------------------------------------
-# ==============================================================================
+
 def game_loop(args):
     pygame.init()
     pygame.font.init()
@@ -569,6 +586,7 @@ def game_loop(args):
 
         while True:
             clock.tick_busy_loop(60)
+            # 仅处理键盘控制
             if controller.parse_events():
                 return
 
@@ -577,22 +595,10 @@ def game_loop(args):
             world.render(display)
             pygame.display.flip()
 
-            # ===================== =====================
-            control = carla.VehicleControl()
-            control.throttle = 0.5  # 满油门
-            control.steer = 0.0      # 直线
-            control.brake = 0.0       # 不刹车
-            control.hand_brake = False# 松手刹
-            control.reverse = False   # 不倒车
-            control.gear = 1          # 强制1档前进
-            # ====================================================
-            world.player.apply_control(control)
-
     finally:
         if world is not None:
             world.destroy()
         pygame.quit()
-
 # ==============================================================================
 # -- main() --------------------------------------------------------------
 # ==============================================================================
