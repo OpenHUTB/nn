@@ -1,13 +1,23 @@
 # Python 虚拟环境
-../../../../Users/章鱼哥/Desktop/lane_env/
+lane_env/
 venv/
 env/
+
+# Python 缓存文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # 可执行文件
 *.exe
 *.dll
 *.bin
 
-# Python 缓存
-__pycache__/
-*.pyc
+# IDE 配置
+.idea/
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db
