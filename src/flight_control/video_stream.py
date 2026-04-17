@@ -3,6 +3,8 @@ import numpy as np
 import threading
 import tkinter as tk
 from PIL import Image, ImageTk
+import time
+import queue
 
 class VideoStreamFrame(tk.Frame):
     def __init__(self, parent, client, airsim, width=320, height=240):
@@ -14,67 +16,104 @@ class VideoStreamFrame(tk.Frame):
         self.running = False
         self.current_frame = None
         self.image_id = None
-        
+        self.frame_queue = queue.Queue(maxsize=2)
+        self.capture_thread = None
+        self.stop_capture = threading.Event()
+
         self.label = tk.Label(self, text="视频加载中...", width=width//10, height=height//20)
         self.label.pack(fill=tk.BOTH, expand=True)
-    
+
     def start(self):
         """开始视频流"""
         if self.running:
             return
         self.running = True
+        self.stop_capture.clear()
+        self.capture_thread = threading.Thread(target=self._capture_frames, daemon=True)
+        self.capture_thread.start()
         self.update_frame()
-    
+
     def stop(self):
         """停止视频流"""
         self.running = False
-    
-    def get_frame(self):
-        """从AirSim获取视频帧"""
-        if not self.client:
-            return None
-        
-        try:
-            responses = self.client.simGetImages([self.airsim.ImageRequest(0, self.airsim.ImageType.Scene, False, False)])
-            response = responses[0]
-            
-            if response.height <= 0 or response.width <= 0:
-                print(f"无效的图像尺寸: {response.height}x{response.width}")
-                return None
-            
-            img1d = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
-            if img1d.size == 0:
-                print("图像数据为空")
-                return None
-            
-            img_rgb = img1d.reshape(response.height, response.width, 3)
-            
-            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-            img_resized = cv2.resize(img_bgr, (self.width, self.height))
-            
-            return img_resized
-        except Exception as e:
-            print(f"获取视频帧失败: {e}")
-            return None
-    
+        self.stop_capture.set()
+        if self.capture_thread:
+            self.capture_thread.join(timeout=1.0)
+
+    def _capture_frames(self):
+        """在单独线程中捕获帧"""
+        while not self.stop_capture.is_set():
+            try:
+                if not self.client:
+                    time.sleep(0.5)
+                    continue
+
+                responses = self.client.simGetImages([self.airsim.ImageRequest(0, self.airsim.ImageType.Scene, False, False)])
+                response = responses[0]
+
+                if not hasattr(response, 'height') or not hasattr(response, 'width'):
+                    time.sleep(0.1)
+                    continue
+
+                if response.height <= 0 or response.width <= 0:
+                    time.sleep(0.1)
+                    continue
+
+                if not hasattr(response, 'image_data_uint8') or response.image_data_uint8 is None:
+                    time.sleep(0.1)
+                    continue
+
+                image_data = bytes(response.image_data_uint8)
+                img1d = np.frombuffer(image_data, dtype=np.uint8)
+
+                if img1d.size == 0:
+                    time.sleep(0.1)
+                    continue
+
+                if len(img1d) != response.height * response.width * 3:
+                    time.sleep(0.1)
+                    continue
+
+                img_rgb = img1d.reshape(response.height, response.width, 3)
+                img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
+                img_resized = cv2.resize(img_bgr, (self.width, self.height))
+
+                if self.frame_queue.full():
+                    try:
+                        self.frame_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+                self.frame_queue.put(img_resized, block=False)
+
+            except (BufferError, AssertionError):
+                time.sleep(0.5)
+                continue
+            except Exception as e:
+                time.sleep(0.5)
+                continue
+
+            time.sleep(0.1)
+
     def update_frame(self):
         """更新视频帧"""
         if not self.running:
             return
-        
+
         try:
-            frame = self.get_frame()
-            if frame is not None:
+            if not self.frame_queue.empty():
+                frame = self.frame_queue.get_nowait()
                 img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 img = Image.fromarray(img_rgb)
                 imgtk = ImageTk.PhotoImage(image=img)
-                
+
                 self.current_frame = imgtk
                 self.label.configure(image=imgtk)
                 self.label.image = imgtk
+        except queue.Empty:
+            pass
         except Exception as e:
             print(f"更新视频帧失败: {e}")
-        
+
         self.after(33, self.update_frame)
 
 def create_video_window(client, airsim_module):
