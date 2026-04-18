@@ -27,6 +27,17 @@ DRAW_OBJECT_COLORS = {
     2: (255, 160, 60),
 }
 
+DEFAULT_EFFECT_IMAGE_PATH = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "docs",
+        "driverless_car",
+        "camera_radar_fusion_demo.png",
+    )
+)
+
 
 def iou_xyxy(box_a, box_b):
     ax1, ay1, ax2, ay2 = box_a
@@ -489,7 +500,7 @@ def generate_effect_image(output_path=None, num_frames=18, seed=7):
         )
 
     if output_path is None:
-        output_path = os.path.join(os.path.dirname(__file__), "outputs", "camera_radar_fusion_demo.png")
+        output_path = DEFAULT_EFFECT_IMAGE_PATH
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, final_frame)
     return output_path
