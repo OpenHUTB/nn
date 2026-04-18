@@ -88,7 +88,8 @@
 ## 6. 运行效果展示
 当用户驾驶车辆接近十字路口时，YOLO 模型能够在不同光照和角度下，稳定捕获交通标志。
 
-> **[在此处插入你录制的 GIF 动图]**
+> <img width="776" height="441" alt="image" src="https://github.com/user-attachments/assets/e2ff66f4-fc36-48ea-92b7-a600fdac816e" />
+
 > *图：Carla 模拟器中的实车第一视角，YOLOv8 成功锁定 Stop Sign 并实时绘制检测框，延迟稳定在 30ms 左右。*
 
 ## 7. 局限性与未来优化方向
