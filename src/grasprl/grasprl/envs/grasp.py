@@ -20,7 +20,7 @@ class GraspRobot(MujocoPhyEnv):
     def __init__(
         self,
         model_path="../worlds/grasp.xml",
-        frame_skip=1000,
+        frame_skip=200,
         **kwargs,
     ):
         xml_file_path = path.join(
@@ -135,7 +135,6 @@ class GraspRobot(MujocoPhyEnv):
                 self.step_mujoco_simulation()
                 return down_success 
 
-
     def move_up_drop(self):
         success = False
         up_pose = list(self.get_ee_pos().copy())
@@ -144,6 +143,11 @@ class GraspRobot(MujocoPhyEnv):
         up_pose.extend([0,0,1,1])
         target_pose = self.drop_area.copy()
         target_pose.extend([0,0,1,1])
+        obj_pos = self.get_body_com(self.target_objects[0]) 
+        ee_pos = self.get_ee_pos() 
+        dist = np.linalg.norm(ee_pos - obj_pos)  
+        self.reward = -0.01 * dist
+
         for i in range(self.frame_skip):
             self.controller.run(
                 up_pose
