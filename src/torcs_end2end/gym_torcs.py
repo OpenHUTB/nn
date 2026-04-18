@@ -147,6 +147,9 @@ class TorcsEnv:
         if obs['damage'] - obs_pre['damage'] > 0:
             reward = -1  # 碰撞惩罚
 
+        # 惩罚方向盘大幅度动作（鼓励平稳驾驶）
+        reward -= abs(u[0]) * 0.3
+
         # 终止条件判断 #########################
         episode_terminate = False
         # 车辆驶出赛道则终止回合
