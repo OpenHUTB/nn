@@ -13,7 +13,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from airsim_controller import AirSimController
-from gesture_detector_enhanced import EnhancedGestureDetector
+from gesture_detector import GestureDetector
 
 
 def main(show_window=True):
@@ -42,10 +42,10 @@ def main(show_window=True):
     
     # 2. 初始化手势检测器
     print("\n[2/4] 正在初始化手势检测器...")
-    print("[DEBUG] 正在创建 EnhancedGestureDetector 实例...")
-    detector = EnhancedGestureDetector(use_ml=False)
-    print("[DEBUG] EnhancedGestureDetector 实例创建成功")
-    print("[OK] 手势检测器就绪")
+    print("[DEBUG] 正在创建 GestureDetector 实例...")
+    detector = GestureDetector()
+    print("[DEBUG] GestureDetector 实例创建成功")
+    print("[OK] 手势检测器就绪（规则检测）")
     
     # 3. 初始化摄像头
     print("\n[3/4] 正在初始化摄像头...")
@@ -69,13 +69,14 @@ def main(show_window=True):
     print("\n[4/4] 系统就绪！")
     print("\n" + "=" * 70)
     print("手势控制:")
-    print("  张开手掌 - 悬停")
-    print("  食指向上 - 上升")
-    print("  食指向下 - 下降")
-    print("  指向左侧 - 左移")
-    print("  指向右侧 - 右移")
-    print("  两指向前 - 前进")
-    print("  握拳     - 降落")
+    print("  张开手掌   - 起飞")
+    print("  握拳       - 降落")
+    print("  食指上指   - 上升")
+    print("  食指向下   - 下降")
+    print("  胜利手势   - 前进")
+    print("  大拇指     - 后退")
+    print("  OK手势     - 悬停")
+    print("  大拇指向下 - 停止")
     print("\n键盘控制:")
     print("  空格键 - 起飞/降落")
     print("  T     - 手动起飞")
@@ -87,9 +88,12 @@ def main(show_window=True):
     
     # 主循环
     is_flying = False
-    last_gesture_time = 0
+    last_command_time = 0
     current_gesture = ""
-    gesture_hold_duration = 1.0
+    last_processed_gesture = ""
+    last_processed_time = 0
+    command_cooldown = 1.5  # 命令冷却时间（秒）
+    gesture_threshold = 0.5  # 置信度阈值（gesture_detector返回0.75-0.95）
     frame_count = 0
     start_time = time.time()
     
@@ -101,6 +105,9 @@ def main(show_window=True):
             if not ret:
                 print("[WARNING] 无法读取摄像头画面")
                 break
+            
+            # 镜像翻转画面，让操作更自然
+            frame = cv2.flip(frame, 1)
             
             frame_count += 1
             
@@ -116,48 +123,73 @@ def main(show_window=True):
             cv2.putText(debug_frame, f"Gesture: {gesture} ({confidence:.2f})", 
                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
-            # 处理手势
-            if gesture and gesture != "none" and gesture != "no_hand":
-                current_time = time.time()
+            # 处理手势（参考main.py的优化逻辑）
+            current_time = time.time()
+            in_cooldown = current_time - last_command_time <= command_cooldown
+            same_gesture = (gesture == last_processed_gesture and 
+                           current_time - last_processed_time < 2.0)
+            
+            # 使用detector的get_command方法获取指令（与main.py一致）
+            command = detector.get_command(gesture)
+            
+            if (gesture not in ["no_hand", "hand_detected", "none"] 
+                    and confidence > gesture_threshold 
+                    and not in_cooldown 
+                    and not same_gesture
+                    and command != "none"):
                 
-                if gesture == current_gesture:
-                    if current_time - last_gesture_time > gesture_hold_duration:
-                        print(f"[CMD] 手势：{gesture}")
-                        
-                        if gesture == 'fist':
-                            if is_flying:
-                                print("[INFO] 降落...")
-                                controller.land()
-                                is_flying = False
-                            
-                        elif gesture == 'point_up':
-                            print("[INFO] 上升")
-                            controller.move_by_velocity(0, 0, -1.0, duration=0.5)
-                            
-                        elif gesture == 'point_down':
-                            print("[INFO] 下降")
-                            controller.move_by_velocity(0, 0, 1.0, duration=0.5)
-                            
-                        elif gesture == 'point_left':
-                            print("[INFO] 左移")
-                            controller.move_by_velocity(-1.0, 0, 0, duration=0.5)
-                            
-                        elif gesture == 'point_right':
-                            print("[INFO] 右移")
-                            controller.move_by_velocity(1.0, 0, 0, duration=0.5)
-                            
-                        elif gesture == 'victory':
-                            print("[INFO] 前进")
-                            controller.move_by_velocity(0, 1.0, 0, duration=0.5)
-                            
-                        elif gesture == 'open_palm':
-                            print("[INFO] 悬停")
-                            controller.hover()
-                        
-                        last_gesture_time = current_time
-                else:
-                    current_gesture = gesture
-                    last_gesture_time = current_time
+                print(f"[CMD] 手势：{gesture} (置信度: {confidence:.2f}) -> 执行: {command}")
+                
+                # 根据command执行对应操作（与main.py的drone_controller.send_command逻辑一致）
+                if command == "land":
+                    if is_flying:
+                        print("[INFO] 降落...")
+                        controller.land()
+                        is_flying = False
+                    
+                elif command == "up":
+                    print("[INFO] 上升")
+                    controller.move_by_velocity(0, 0, -1.0, duration=0.5)
+                    
+                elif command == "down":
+                    print("[INFO] 下降")
+                    controller.move_by_velocity(0, 0, 1.0, duration=0.5)
+                    
+                elif command == "left":
+                    print("[INFO] 左移")
+                    controller.move_by_velocity(-1.0, 0, 0, duration=0.5)
+                    
+                elif command == "right":
+                    print("[INFO] 右移")
+                    controller.move_by_velocity(1.0, 0, 0, duration=0.5)
+                    
+                elif command == "forward":
+                    print("[INFO] 前进")
+                    controller.move_by_velocity(0, 1.0, 0, duration=0.5)
+                    
+                elif command == "backward":
+                    print("[INFO] 后退")
+                    controller.move_by_velocity(0, -1.0, 0, duration=0.5)
+                    
+                elif command == "hover":
+                    print("[INFO] 悬停")
+                    controller.hover()
+                    
+                elif command == "takeoff":
+                    if not is_flying:
+                        print("[INFO] 起飞...")
+                        controller.takeoff()
+                        is_flying = True
+                    
+                elif command == "stop":
+                    print("[INFO] 停止")
+                    controller.hover()
+                
+                # 更新状态
+                last_command_time = current_time
+                last_processed_gesture = gesture
+                last_processed_time = current_time
+                current_gesture = gesture
             
             # 显示画面
             if show_window:
