@@ -2,14 +2,15 @@ import cv2 as cv
 from ultralytics import YOLO
 import numpy as np
 import supervision as sv
+from keyboard_handler import handle_keyboard_events
 
 # ==================== 配置路径 ====================
 # 模型文件路径
-MODEL_PATH = "../models/yolo11n.pt"
+MODEL_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/models/yolo11n.pt"
 # 输入视频文件路径 - 针对CARLA录制的视频
-INPUT_VIDEO_PATH = "../dataset/sample_carla.mp4"
+INPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/dataset/sample.mp4"
 # 输出视频文件路径
-OUTPUT_VIDEO_PATH = "../res/sample_carla_res.mp4"
+OUTPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/res/sample_res.mp4"
 # ==================================================
 
 
@@ -57,11 +58,17 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
     selected_classes = [cls_id for cls_id, class_name in model.names.items() if class_name in vehicle_classes]
 
     # 初始化计数器
-    # 针对CARLA视频优化：红线再往右移，更容易捕捉到车辆
-    # 原limits: [400, 400, 1250, 400] - 红线在y=400，太高了
-    # 新limits: [350, 500, 1230, 500] - 红线在y=500，进一步往右移动
-    limits = [350, 500, 1230, 500]  # 计数线位置：起点(x1, y)到终点(x2, y) - 针对CARLA视频放低并进一步往右移红线
+    limits = [350, 750, 1230, 750]  # 计数线位置
     total_counts, crossed_ids = [], set()  # 总计数和已计数车辆ID集合
+    track_history = {}  # 轨迹历史: {track_id: [y1, y2, ...]}
+    counted_tracks = set()  # 已完成计数的轨迹ID
+
+    # 分类计数器
+    class_counts = {'car': 0, 'motorbike': 0, 'bus': 0, 'truck': 0}  # 各类别已计数ID集合
+    crossed_by_class = {cls: set() for cls in class_counts.keys()}  # 各类别已计数ID集合
+    
+    # 轨迹历史记录（用于判断穿越方向）
+    previous_y = {}  # 上一帧的y坐标
 
 
     def draw_overlay(frame, pt1, pt2, alpha=0.25, color=(51, 68, 255), filled=True):
@@ -81,7 +88,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         cv.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
 
-    def count_vehicles(track_id, cx, cy, limits, crossed_ids):
+    def count_vehicles(track_id, cx, cy, limits, crossed_ids, class_name=None, crossed_by_class=None, class_counts=None):
         """统计穿过计数线的车辆
 
         Args:
@@ -89,27 +96,35 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
             cx, cy: 车辆中心点坐标
             limits: 计数线位置
             crossed_ids: 已计数车辆ID集合
+            class_name: 车辆类别名称
+            crossed_by_class: 各类别已计数ID集合
+            class_counts: 各类别计数器
 
         Returns:
-            bool: 是否计数成功
+            tuple: (是否计数成功, 车辆类别)
         """
         if limits[0] < cx < limits[2] and limits[1] - 15 < cy < limits[1] + 15 and track_id not in crossed_ids:
             crossed_ids.add(track_id)
-            return True
-        return False
+            if class_name and crossed_by_class and class_counts:
+                if track_id not in crossed_by_class[class_name]:
+                    crossed_by_class[class_name].add(track_id)
+                    class_counts[class_name] += 1
+            return True, class_name
+        return False, None
 
 
-    def draw_tracks_and_count(frame, detections, total_counts, limits):
-        """绘制轨迹并统计车辆
+    def draw_tracks_and_count(frame, detections, limits):
+        """绘制轨迹并统计车辆（按类别分类统计）
 
         Args:
             frame: 输入帧
             detections: 检测结果
-            total_counts: 总计数列表
             limits: 计数线位置
         """
-        # 按车辆类别和检测置信度过滤 - 针对CARLA视频优化置信度阈值
-        detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > 0.4)]
+        nonlocal total_counts, crossed_ids, class_counts, crossed_by_class
+
+        # 按车辆类别和检测置信度过滤 - 降低阈值提高检测率
+        detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > 0.15)]
 
         # 为每个检测框生成标签
         labels = [f"#{track_id} {class_names[cls_id]}" for track_id, cls_id in
@@ -121,21 +136,51 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         trace_annotator.annotate(frame, detections=detections)
 
         # 处理每个检测到的车辆
-        for track_id, center_point in zip(detections.tracker_id,
-                                          detections.get_anchors_coordinates(anchor=sv.Position.CENTER)):
+        for i, (track_id, center_point) in enumerate(zip(detections.tracker_id,
+                                                         detections.get_anchors_coordinates(anchor=sv.Position.CENTER))):
             cx, cy = map(int, center_point)
+            cls_id = detections.class_id[i]
+            cls_name = class_names[cls_id]
 
             cv.circle(frame, (cx, cy), 4, (0, 255, 255), cv.FILLED)  # 绘制车辆中心点
 
-            if count_vehicles(track_id, cx, cy, limits, crossed_ids):
-                total_counts.append(track_id)
-                sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
-                             color=sv.Color.ROBOFLOW, thickness=4)
-                # 调整覆盖区域位置，与新的计数线匹配 - 跟着红线一起往右移
-                draw_overlay(frame, (350, 450), (1230, 550), alpha=0.25, color=(10, 255, 50))
+            # 记录轨迹历史
+            if track_id not in track_history:
+                track_history[track_id] = []
+                previous_y[track_id] = cy  # 初始化上一帧y坐标
+            track_history[track_id].append(cy)
+            # 只保留最近30帧历史
+            if len(track_history[track_id]) > 30:
+                track_history[track_id] = track_history[track_id][-30:]
 
-        # 显示车辆计数 - 往右移避免遮挡
-        sv.draw_text(frame, f"COUNTS: {len(total_counts)}", sv.Point(x=150, y=80), sv.Color.ROBOFLOW, 1.25,
+            # 严谨的穿越方向判断
+            if track_id not in crossed_ids:
+                prev_y = previous_y.get(track_id, cy)
+                curr_y = cy
+                line_y = limits[1]
+                
+                # 检查是否在线的x范围内
+                if limits[0] < cx < limits[2]:
+                    # 判断是否从上往下穿越计数线
+                    crossed_line = (prev_y < line_y <= curr_y) or (prev_y < line_y and curr_y > prev_y + 10)
+                    if crossed_line:
+                        crossed_ids.add(track_id)
+                        counted_tracks.add(track_id)
+                        total_counts.append(track_id)
+
+                        # 分类计数
+                        if cls_name in class_counts:
+                            class_counts[cls_name] += 1
+
+                        sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
+                                     color=sv.Color.ROBOFLOW, thickness=4)
+                        draw_overlay(frame, (350, 700), (1230, 800), alpha=0.25, color=(10, 255, 50))
+                
+                # 更新上一帧y坐标
+                previous_y[track_id] = curr_y
+
+        # 显示车辆总计数
+        sv.draw_text(frame, f"TOTAL: {len(total_counts)}", sv.Point(x=50, y=50), sv.Color.ROBOFLOW, 0.8,
                      2, background_color=sv.Color.WHITE)
 
 
@@ -158,11 +203,10 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         if frame_count % 30 == 0:  # 每30帧打印一次进度
             print(f"处理进度: 第 {frame_count} 帧, 已计数: {len(total_counts)} 辆车")
 
-        # 针对CARLA视频优化ROI区域 - 减少不必要的区域
-        # CARLA视频通常上半部分有天空，下半部分有车辆
-        # 调整ROI为中间到下半部分，提高检测效率
-        roi_top = h // 3  # 从1/3高度开始
-        roi_left = w // 6  # 从1/6宽度开始
+        # 针对CARLA视频优化ROI区域 - 扩大检测范围避免漏检
+        # 只裁剪左右边缘和最顶部天空区域，保留更多车辆检测机会
+        roi_top = h // 6  # 从1/6高度开始（之前是1/3，丢失太多）
+        roi_left = w // 12  # 从1/12宽度开始（之前是1/6，减少裁剪）
         crop = frame[roi_top:, roi_left:w-roi_left]
         mask_b = np.zeros_like(frame, dtype=np.uint8)
         mask_w = np.ones_like(crop, dtype=np.uint8) * 255
@@ -171,9 +215,21 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         # 应用掩码到原始帧
         ROI = cv.bitwise_and(frame, mask_b)
 
-        # YOLO检测和追踪
-        results = model(ROI)[0]
-        detections = sv.Detections.from_ultralytics(results)
+        # YOLO多尺度检测 - 使用不同输入尺寸提高远处车辆检测率
+        # 原始尺寸用于近处大目标，640尺寸用于远处小目标
+        results_main = model(ROI, imgsz=1280)[0]  # 增大输入尺寸，检测更多细节
+        detections_main = sv.Detections.from_ultralytics(results_main)
+        
+        # 如果需要额外补充检测（可选）
+        if len(detections_main) < 3:  # 检测过少时尝试小目标检测
+            results_small = model(ROI, imgsz=1920)[0]
+            detections_small = sv.Detections.from_ultralytics(results_small)
+            # 合并结果（去重）
+            all_detections = detections_main if len(detections_main) > 0 else detections_small
+        else:
+            all_detections = detections_main
+        
+        detections = all_detections
         detections = tracker.update_with_detections(detections)
         detections = smoother.update_with_detections(detections)
 
@@ -182,24 +238,31 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
             sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
                          color=sv.Color.RED, thickness=4)
             # 调整覆盖区域透明度 - 与红线位置匹配
-            draw_overlay(frame, (350, 450), (1230, 550), alpha=0.15)
-            draw_tracks_and_count(frame, detections, total_counts, limits)
+            draw_overlay(frame, (350, 700), (1230, 800), alpha=0.15)
+            draw_tracks_and_count(frame, detections, limits)
 
         # 写入帧到输出视频
         out.write(frame)
         # 显示当前帧
         cv.imshow("YOLO11n Vehicle Counter - CARLA", frame)
 
-        if cv.waitKey(1) & 0xff == ord('p'):  # 按'p'键暂停
-            print("用户暂停，按任意键继续...")
-            cv.waitKey(0)
+        # 键盘事件处理
+        key = cv.waitKey(1) & 0xff
+        if not handle_keyboard_events(key, frame, frame_count, cap, out, "YOLO11n Vehicle Counter - CARLA"):
+            break
 
     # 释放资源
     cap.release()
     out.release()
     cv.destroyAllWindows()
 
-    print(f"处理完成！总计数: {len(total_counts)} 辆车")
+    print(f"处理完成！")
+    print(f"=" * 40)
+    print(f"总计数: {len(total_counts)} 辆车")
+    print("-" * 40)
+    for cls_name, count in class_counts.items():
+        print(f"  {cls_name}: {count}")
+    print("=" * 40)
 
 
 if __name__ == "__main__":

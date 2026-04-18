@@ -5,12 +5,12 @@ import numpy as np
 import carla
 import argparse  # [新增] 引入命令行参数解析库
 
-from config import config
-from utils.carla_client import CarlaClient
-from models.yolo_detector import YOLODetector
-from utils.visualization import draw_results, draw_safe_zone
-from utils.planner import SimplePlanner
-from utils.logger import PerformanceLogger
+from .config import config
+from .utils.carla_client import CarlaClient
+from .models.yolo_detector import YOLODetector
+from .utils.visualization import draw_results, draw_safe_zone
+from .utils.planner import SimplePlanner
+from .utils.logger import PerformanceLogger
 
 
 # [新增] 参数解析函数
