@@ -215,7 +215,6 @@ class GraspRobot(MujocoPhyEnv):
         return self.observation
 
     def get_ee_pos(self):
-        # 通过 physics.bind 获取 mjcf 元素的位置
         return self.physics.bind(self.eef_site).xpos.copy()
 
     def pixel2world(self, cam_id, px, py, depth):

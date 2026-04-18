@@ -141,7 +141,7 @@ class DQN_Trainer(object):
     def save(self, path_name, filename):
         os.makedirs(path_name, exist_ok=True)
         torch.save(self.q_net.state_dict(), os.path.join(path_name, filename + "_qnet"))
-
+        
     def save_dataset_sample(self, action, reward, info, iter_num):
         data_dir = "grasprl/dataset/grasp_samples"
         os.makedirs(data_dir, exist_ok=True)
