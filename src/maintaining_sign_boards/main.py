@@ -133,7 +133,7 @@ def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_ti
             base_control.throttle = 0.0
 
             if obstacle_distance < safe_distance * 0.3:
-                # 极近：直接满刹，必停
+                # 极近：满刹
                 base_control.brake = 1.0
             elif obstacle_distance < safe_distance * 0.6:
                 # 较近：重刹
@@ -233,7 +233,17 @@ def main():
         world = client.get_world()
         map = world.get_map()
         blueprint_library = world.get_blueprint_library()
+
         print("连接CARLA模拟器成功")
+        actors_to_destroy = []
+        vehicle_actors = world.get_actors().filter('vehicle.*')
+        for actor in vehicle_actors:
+            actors_to_destroy.append(actor)
+        walker_actors = world.get_actors().filter('walker.pedestrian.*')
+        for actor in walker_actors:
+            actors_to_destroy.append(actor)
+        for actor in actors_to_destroy:
+            actor.destroy()
 
         # 生成交通标志
         elements = spawn_dynamic_elements(world, blueprint_library)
@@ -241,19 +251,27 @@ def main():
 
         # 生成主车辆 特斯拉Model3
         vehicle_bp = blueprint_library.filter("vehicle.tesla.model3")[0]
-        spawn_point = random.choice(map.get_spawn_points())
-        vehicle = world.spawn_actor(vehicle_bp, spawn_point)
-        actor_list.append(vehicle)
-        print(f"车辆生成于: {spawn_point.location}")
 
-        # 生成10辆随机交通车并开启自动行驶
-        for _ in range(10):
-            traffic_bp = random.choice(blueprint_library.filter('vehicle.*'))
-            traffic_spawn = random.choice(map.get_spawn_points())
-            traffic_vehicle = world.try_spawn_actor(traffic_bp, traffic_spawn)
-            if traffic_vehicle:
-                traffic_vehicle.set_autopilot(True)
-                actor_list.append(traffic_vehicle)
+        fixed_location = carla.Location(x=105.906349, y=67.419144, z=0.5)
+        fixed_waypoint = map.get_waypoint(fixed_location, project_to_road=True, lane_type=carla.LaneType.Driving)
+        if fixed_waypoint:
+            fixed_rotation = fixed_waypoint.transform.rotation
+            spawn_point = carla.Transform(fixed_location, fixed_rotation)
+            print("使用固定生成点（已对齐车道方向）")
+        else:
+            all_spawn_points = map.get_spawn_points()
+            spawn_point = random.choice(all_spawn_points)
+            print("无法获取固定点的道路方向，使用随机生成点")
+
+        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+        if not vehicle:
+            all_spawn_points = map.get_spawn_points()
+            spawn_point = random.choice(all_spawn_points)
+            vehicle = world.spawn_actor(vehicle_bp, spawn_point)
+            print("固定点生成失败，使用随机生成点重试")
+
+        actor_list.append(vehicle)
+        print(f"车辆最终生成于: {spawn_point.location}")
 
         # 挂载RGB摄像头到主车辆
         camera_bp = blueprint_library.find("sensor.camera.rgb")
@@ -335,7 +353,7 @@ def main():
                 display.blit(surface, (0, 0))
                 pygame.display.flip()
 
-            # 4. 统一执行最终控制指令（只执行一次！）
+            # 统一执行最终控制指令
             vehicle.apply_control(final_control)
 
             # 限制帧率30FPS

@@ -14,6 +14,28 @@ import re
 import sys
 import weakref
 
+
+# ==============================================================================
+# -- 导入RL模块 ----------------------------------------------------------------
+# ==============================================================================
+
+try:
+    from rl_agent import (
+        CARLARLEnvironment, DQNAgent, PPOAgent,
+        RLTrainer
+    )
+    RL_AVAILABLE = True
+    print("✓ RL模块导入成功")
+except ImportError as e:
+    print(f"⚠ RL模块导入失败: {e}")
+    RL_AVAILABLE = False
+    CARLARLEnvironment = None
+    DQNAgent = None
+    PPOAgent = None
+    RLTrainer = None
+
+
+
 try:
     import pygame
     from pygame.locals import *
@@ -376,6 +398,11 @@ class World(object):
         self.world.on_tick(hud.on_world_tick)
         self.recording_enabled = False
         self.recording_start = 0
+        self.rl_env = None
+        self.rl_agent = None
+        self.rl_trainer = None
+        self.rl_enabled = getattr(args, 'rl_mode', False)
+        self.rl_training = getattr(args, 'rl_train', False)
 
     def restart(self, args):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
@@ -1002,7 +1029,12 @@ def game_loop(args):
     num_min_waypoints = 21
     autopilot_enabled = True
     last_f_key_time = 0
-    spawn_points = None
+
+    rl_enabled = getattr(args, 'rl_mode', False) and RL_AVAILABLE
+    rl_training = getattr(args, 'rl_train', False) and rl_enabled
+    rl_episode_count = 0
+    rl_episode_reward = 0
+    rl_step_count = 0
 
     try:
         client = carla.Client(args.host, args.port)
@@ -1012,6 +1044,61 @@ def game_loop(args):
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
         controller = KeyboardControl(world)
+
+        if rl_enabled:
+            world.rl_env = CARLARLEnvironment(world.player, world.world, hud, world.assisted_driving)
+            state_dim = world.rl_env.state_dim
+            action_dim = world.rl_env.action_dim
+            algorithm = getattr(args, 'rl_algorithm', 'ppo')
+
+            if algorithm == 'dqn':
+                world.rl_agent = DQNAgent(state_dim, action_dim)
+                world.rl_env.continuous_actions = False
+                hud.notification("RL Agent: DQN", seconds=2.0, color=(0, 255, 255))
+            else:
+                world.rl_agent = PPOAgent(state_dim, action_dim, continuous=True)
+                world.rl_env.continuous_actions = True
+                hud.notification("RL Agent: PPO", seconds=2.0, color=(0, 255, 255))
+
+            model_path = getattr(args, 'rl_model', None)
+            if model_path and os.path.exists(model_path):
+                world.rl_agent.load(model_path)
+                hud.notification(f"RL Model Loaded", seconds=2.0, color=(0, 255, 0))
+
+            if rl_training:
+                # 每帧强制禁用辅助驾驶
+                if world.assisted_driving:
+                    world.assisted_driving.enabled = False
+                    world.assisted_driving.is_taking_over = False
+                    hud.notification("Assist DISABLED for training", seconds=2.0, color=(255, 150, 0))
+
+                save_dir = getattr(args, 'rl_save_dir', './rl_checkpoints')
+                world.rl_trainer = RLTrainer(world.rl_env, world.rl_agent, save_dir)
+                hud.notification("RL Training Mode", seconds=3.0, color=(255, 255, 0))
+
+                spawn_points = world.map.get_spawn_points()
+                if spawn_points:
+                    # --- 物理卡死修复（与测试阶段保持一致）---
+                    new_transform = random.choice(spawn_points)
+                    new_transform.location.z += 1.5
+                    new_transform.rotation.yaw = random.uniform(0, 360)
+                    world.player.set_transform(new_transform)
+
+                    # 强制松开所有控制
+                    world.player.apply_control(carla.VehicleControl())
+
+                    # 选择远距离目标
+                    vehicle_loc = new_transform.location
+                    far_spawns = [sp for sp in spawn_points
+                                  if sp.location.distance(vehicle_loc) > 30.0]
+                    if far_spawns:
+                        target_point = random.choice(far_spawns)
+                    else:
+                        target_point = random.choice(spawn_points)
+                    world.rl_env.set_target(target_point.location)
+                    print(f"New episode target distance: {vehicle_loc.distance(target_point.location):.1f}m")
+
+            world.rl_enabled = True
 
         if args.agent == "Roaming":
             agent = RoamingAgent(world.player)
@@ -1032,10 +1119,42 @@ def game_loop(args):
         clock = pygame.time.Clock()
 
         hud.notification("=== DRIVING MODES ===", seconds=5.0)
-        hud.notification("F: Auto/Manual Mode", seconds=5.0)
-        hud.notification("R: Assist ON/OFF (Manual)", seconds=5.0)
+        hud.notification("F: Toggle Auto/Manual", seconds=5.0)
+        hud.notification("R: Assist ON/OFF", seconds=5.0)
         hud.notification("T: Avoidance ON/OFF", seconds=5.0)
         hud.notification("SPACE: Reverse", seconds=5.0)
+
+        if rl_enabled:
+            mode_str = "RL TRAIN" if rl_training else "RL INFERENCE"
+            hud.notification(f"=== {mode_str} ===", seconds=3.0, color=(255, 0, 255))
+            if rl_training:
+                hud.notification("L: Save checkpoint", seconds=3.0)
+
+        # 可选：训练前先测试一下车辆是否能动
+        if rl_training:
+            print("Testing vehicle control for 2 seconds...")
+            # 先确保车辆处于安全状态
+            spawn_points = world.map.get_spawn_points()
+            if spawn_points:
+                safe_transform = random.choice(spawn_points)
+                safe_transform.location.z += 1.5
+                world.player.set_transform(safe_transform)
+            test_control = carla.VehicleControl()
+            test_control.throttle = 0.8
+            test_control.steer = 0.0
+            test_control.hand_brake = False
+            test_control.reverse = False
+            world.player.apply_control(test_control)
+            for i in range(40):
+                world.world.wait_for_tick(10.0)
+                world.tick(clock)
+                world.render(display)
+                pygame.display.flip()
+                if i % 10 == 0:
+                    vel = world.player.get_velocity()
+                    speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+                    print(f"Test step {i}: speed={speed:.2f} km/h")
+            print("Test complete.")
 
         while True:
             clock.tick_busy_loop(60)
@@ -1048,20 +1167,14 @@ def game_loop(args):
                         return
                     elif event.key == K_f:
                         current_time = time.time()
-                        if current_time - last_f_key_time > 0.2:
+                        if current_time - last_f_key_time > 0.3:
                             last_f_key_time = current_time
                             autopilot_enabled = not autopilot_enabled
-                            if autopilot_enabled:
-                                mode = "AUTO MODE"
-                                hud.notification(mode, seconds=2.0, color=(0, 255, 0))
-                                if world.assisted_driving:
-                                    world.assisted_driving.is_taking_over = False
-                            else:
-                                mode = "MANUAL MODE"
-                                hud.notification(mode, seconds=2.0, color=(255, 255, 0))
-                                if world.assisted_driving:
-                                    world.assisted_driving.enabled = True
-                                    hud.notification("Assist ENABLED (Auto-takeover)", seconds=1.0, color=(0, 255, 0))
+                            mode = "AUTO MODE" if autopilot_enabled else "MANUAL MODE"
+                            hud.notification(mode, seconds=2.0,
+                                             color=(0, 255, 0) if autopilot_enabled else (255, 255, 0))
+                            if world.assisted_driving:
+                                world.assisted_driving.is_taking_over = False
                     elif event.key == K_r:
                         if world.assisted_driving and not autopilot_enabled:
                             world.assisted_driving.toggle()
@@ -1070,112 +1183,204 @@ def game_loop(args):
                             world.assisted_driving.toggle_obstacle_avoidance()
                     elif event.key == K_h:
                         hud.help.toggle()
-
-            keys = pygame.key.get_pressed()
-            reverse_pressed = keys[K_SPACE]
+                    elif event.key == K_l and rl_enabled:
+                        if world.rl_agent:
+                            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                            save_path = f"./rl_checkpoints/model_{timestamp}.pth"
+                            os.makedirs("./rl_checkpoints", exist_ok=True)
+                            world.rl_agent.save(save_path)
+                            hud.notification(f"Model saved: {timestamp}", seconds=2.0, color=(0, 255, 0))
 
             if not world.world.wait_for_tick(10.0):
                 continue
 
-            if args.agent == "Roaming" or args.agent == "Basic":
-                world.world.wait_for_tick(10.0)
-                world.tick(clock)
-                world.render(display)
-                pygame.display.flip()
-                control = agent.run_step()
-                control.manual_gear_shift = False
-                if world.assisted_driving and not autopilot_enabled:
-                    control = world.assisted_driving.apply_assistance(control)
-                world.player.apply_control(control)
-            else:
+            keys = pygame.key.get_pressed()
+            reverse_pressed = keys[K_SPACE]
+
+            if rl_enabled:
                 world.tick(clock)
                 world.render(display)
                 pygame.display.flip()
 
-                if autopilot_enabled:
-                    local_planner = agent.get_local_planner()
-                    if hasattr(local_planner, '_waypoints_queue'):
-                        waypoints_len = len(local_planner._waypoints_queue)
-                    elif hasattr(local_planner, 'waypoints_queue'):
-                        waypoints_len = len(local_planner.waypoints_queue)
+                if rl_training:
+                    state = world.rl_env.get_state()
+
+                    if isinstance(world.rl_agent, DQNAgent):
+                        action = world.rl_agent.select_action(state)
                     else:
-                        waypoints_len = 0
+                        action, log_prob, value = world.rl_agent.select_action(state)
 
-                    if waypoints_len < num_min_waypoints and args.loop and spawn_points is not None:
-                        agent.reroute(spawn_points)
-                        tot_target_reached += 1
-                        world.hud.notification(f"Target reached x{tot_target_reached}", seconds=4.0)
-                    elif waypoints_len == 0 and not args.loop:
-                        print("Target reached, mission accomplished...")
-                        break
+                    # 调试输出（每100步打印一次）
+                    if rl_step_count % 100 == 0:
+                        print(f"[RL Step {rl_step_count}] Action: {action}")
 
-                    speed_limit = world.player.get_speed_limit()
-                    agent.get_local_planner().set_speed(speed_limit)
-                    control = agent.run_step()
+                    next_state, reward, done, _ = world.rl_env.step(action)
+                    rl_episode_reward += reward
+                    rl_step_count += 1
 
-                    if world.assisted_driving and world.assisted_driving.obstacle_avoidance_enabled:
-                        try:
-                            result = world.assisted_driving.detect_obstacles()
-                            if len(result) == 4:
-                                distance, angle, emergency, obs_type = result
-                            elif len(result) == 3:
-                                distance, angle, emergency = result
-                            else:
-                                distance, angle, emergency = 20.0, 0, False
+                    if isinstance(world.rl_agent, DQNAgent):
+                        world.rl_agent.memory.push(state, action, reward, next_state, done)
+                        loss = world.rl_agent.update()
+                    else:
+                        world.rl_agent.store_transition(state, action, log_prob, reward, done, value)
 
-                            if distance < 8.0:
-                                if distance < 5.0 or emergency:
-                                    world.hud.notification("⚠ AUTO BRAKE!", seconds=0.3, color=(255, 0, 0))
-                                    control.brake = 1.0
-                                    control.throttle = 0.0
-                                    steer = -angle / 30.0 * 0.6
-                                    control.steer = max(-0.7, min(0.7, steer))
-                                elif distance < 8.0:
-                                    control.throttle = 0.2
-                                    control.brake = 0.3
-                        except Exception as e:
-                            pass
+                    if done or rl_step_count >= getattr(args, 'rl_max_steps', 2000):
+                        if isinstance(world.rl_agent, PPOAgent):
+                            loss = world.rl_agent.update()
+
+                        rl_episode_count += 1
+                        print(f"Episode {rl_episode_count} | Reward: {rl_episode_reward:.2f} | Steps: {rl_step_count}")
+
+                        if rl_episode_count % 100 == 0:
+                            save_path = f"./rl_checkpoints/episode_{rl_episode_count}.pth"
+                            world.rl_agent.save(save_path)
+                            hud.notification(f"Checkpoint saved: Ep {rl_episode_count}", seconds=2.0)
+
+                        total_episodes = getattr(args, 'rl_episodes', 1000)
+                        if rl_episode_count >= total_episodes:
+                            hud.notification("Training Complete!", seconds=5.0, color=(0, 255, 0))
+                            final_path = "./rl_checkpoints/final_model.pth"
+                            world.rl_agent.save(final_path)
+                            break
+
+                        rl_episode_reward = 0
+                        rl_step_count = 0
+                        world.rl_env.reset()
+
+                        spawn_points = world.map.get_spawn_points()
+                        if spawn_points:
+                            world.player.set_transform(random.choice(spawn_points))
+                            target_point = random.choice(spawn_points)
+                            world.rl_env.set_target(target_point.location)
 
                 else:
-                    control = carla.VehicleControl()
-                    control.throttle = 0.0
-                    control.steer = 0.0
-                    control.brake = 0.0
-                    control.reverse = False
-                    control.hand_brake = False
+                    state = world.rl_env.get_state()
 
-                    if reverse_pressed:
-                        control.reverse = True
-                        if keys[K_UP] or keys[K_w]:
-                            control.throttle = 0.5
-                        elif keys[K_DOWN] or keys[K_s]:
-                            control.brake = 0.5
-                        else:
-                            control.throttle = 0.3
-                        if keys[K_LEFT] or keys[K_a]:
-                            control.steer = -0.5
-                        if keys[K_RIGHT] or keys[K_d]:
-                            control.steer = 0.5
-                        if not hasattr(world, '_reverse_notified'):
-                            world.hud.notification("REVERSING", seconds=0.5, color=(255, 200, 0))
-                            world._reverse_notified = True
+                    if isinstance(world.rl_agent, DQNAgent):
+                        action = world.rl_agent.select_action(state, evaluate=True)
                     else:
-                        world._reverse_notified = False
-                        if keys[K_UP] or keys[K_w]:
-                            control.throttle = 0.7
-                        if keys[K_DOWN] or keys[K_s]:
-                            control.brake = 0.7
-                        if keys[K_LEFT] or keys[K_a]:
-                            control.steer = -0.5
-                        if keys[K_RIGHT] or keys[K_d]:
-                            control.steer = 0.5
+                        action, _, _ = world.rl_agent.select_action(state, deterministic=True)
+
+                    control = carla.VehicleControl()
+                    if world.rl_env.continuous_actions:
+                        control.steer = float(np.clip(action[0], -1, 1))
+                        throttle_brake = float(action[1])
+                        if throttle_brake >= 0:
+                            control.throttle = np.clip(throttle_brake, 0, 1)
+                            control.brake = 0.0
+                        else:
+                            control.throttle = 0.0
+                            control.brake = np.clip(-throttle_brake, 0, 1)
+                    else:
+                        if action == 0:
+                            control.steer = -0.5; control.throttle = 0.5
+                        elif action == 1:
+                            control.steer = 0.0; control.throttle = 0.5
+                        elif action == 2:
+                            control.steer = 0.5; control.throttle = 0.5
+                        elif action == 3:
+                            control.steer = 0.0; control.throttle = 0.8
+                        elif action == 4:
+                            control.steer = 0.0; control.brake = 0.8
 
                     if world.assisted_driving and world.assisted_driving.enabled:
                         control = world.assisted_driving.apply_assistance(control)
 
-                world.player.apply_control(control)
+                    world.player.apply_control(control)
+
+                    speed = 3.6 * math.sqrt(world.player.get_velocity().x**2 + world.player.get_velocity().y**2)
+                    if hasattr(world.rl_env, 'target_location') and world.rl_env.target_location:
+                        dist = world.player.get_location().distance(world.rl_env.target_location)
+                        hud.notification(f"RL | Speed: {speed:.0f} | Target: {dist:.1f}m",
+                                         seconds=0.1, color=(200, 200, 255))
+
+            else:
+                # 原有的手动/自动模式代码保持不变
+                if args.agent == "Roaming" or args.agent == "Basic":
+                    world.world.wait_for_tick(10.0)
+                    world.tick(clock)
+                    world.render(display)
+                    pygame.display.flip()
+                    control = agent.run_step()
+                    control.manual_gear_shift = False
+                    if world.assisted_driving and not autopilot_enabled:
+                        control = world.assisted_driving.apply_assistance(control)
+                    world.player.apply_control(control)
+                else:
+                    world.tick(clock)
+                    world.render(display)
+                    pygame.display.flip()
+
+                    if autopilot_enabled:
+                        local_planner = agent.get_local_planner()
+                        if hasattr(local_planner, '_waypoints_queue'):
+                            waypoints_len = len(local_planner._waypoints_queue)
+                        elif hasattr(local_planner, 'waypoints_queue'):
+                            waypoints_len = len(local_planner.waypoints_queue)
+                        else:
+                            waypoints_len = 0
+
+                        if waypoints_len < num_min_waypoints and args.loop and spawn_points:
+                            agent.reroute(spawn_points)
+                            tot_target_reached += 1
+                            world.hud.notification(f"Target reached x{tot_target_reached}", seconds=4.0)
+                        elif waypoints_len == 0 and not args.loop:
+                            print("Target reached, mission accomplished...")
+                            break
+
+                        speed_limit = world.player.get_speed_limit()
+                        agent.get_local_planner().set_speed(speed_limit)
+                        control = agent.run_step()
+
+                        if world.assisted_driving and world.assisted_driving.obstacle_avoidance_enabled:
+                            result = world.assisted_driving.detect_obstacles()
+                            if len(result) >= 3:
+                                distance, angle, emergency = result[0], result[1], result[2]
+                                if distance < 8.0:
+                                    if distance < 5.0 or emergency:
+                                        control.brake = 1.0
+                                        control.throttle = 0.0
+                    else:
+                        control = carla.VehicleControl()
+                        control.throttle = 0.0
+                        control.steer = 0.0
+                        control.brake = 0.0
+                        control.reverse = False
+
+                        if reverse_pressed:
+                            control.reverse = True
+                            if keys[K_UP] or keys[K_w]:
+                                control.throttle = 0.5
+                            elif keys[K_DOWN] or keys[K_s]:
+                                control.brake = 0.5
+                            else:
+                                control.throttle = 0.3
+                            if keys[K_LEFT] or keys[K_a]:
+                                control.steer = -0.5
+                            if keys[K_RIGHT] or keys[K_d]:
+                                control.steer = 0.5
+                        else:
+                            if keys[K_UP] or keys[K_w]:
+                                control.throttle = 0.7
+                            if keys[K_DOWN] or keys[K_s]:
+                                control.brake = 0.7
+                            if keys[K_LEFT] or keys[K_a]:
+                                control.steer = -0.5
+                            if keys[K_RIGHT] or keys[K_d]:
+                                control.steer = 0.5
+
+                        if world.assisted_driving:
+                            control = world.assisted_driving.apply_assistance(control)
+
+                    world.player.apply_control(control)
 
     finally:
+        if rl_enabled and rl_training and world.rl_agent:
+            final_path = "./rl_checkpoints/final_model.pth"
+            os.makedirs("./rl_checkpoints", exist_ok=True)
+            world.rl_agent.save(final_path)
+            print(f"Final model saved to {final_path}")
+
         if world is not None:
             world.destroy()
         pygame.quit()
@@ -1199,7 +1404,19 @@ def main():
     argparser.add_argument("-a", "--agent", type=str, choices=["Behavior", "Roaming", "Basic"],
                            help="选择使用的AI代理", default="Behavior")
     argparser.add_argument('-s', '--seed', help='设置随机种子 (默认: None)', default=None, type=int)
-
+    # 添加RL相关参数
+    argparser.add_argument('--rl-mode', action='store_true',
+                           help='启用RL控制模式')
+    argparser.add_argument('--rl-train', action='store_true',
+                           help='启用RL训练模式')
+    argparser.add_argument('--rl-algorithm', type=str, choices=['dqn', 'ppo'],
+                           default='ppo', help='RL算法类型 (默认: ppo)')
+    argparser.add_argument('--rl-model', type=str, default='./rl_checkpoints/best_model.pth',
+                           help='加载的RL模型路径')
+    argparser.add_argument('--rl-save-dir', type=str, default='./rl_checkpoints',
+                           help='RL模型保存目录')
+    argparser.add_argument('--rl-episodes', type=int, default=1000,
+                           help='训练episode数量')
     args = argparser.parse_args()
     args.width, args.height = [int(x) for x in args.res.split('x')]
 

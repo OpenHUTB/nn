@@ -4,6 +4,8 @@ import numpy as np
 import supervision as sv
 import os
 import json
+import time
+from keyboard_handler import handle_keyboard_events
 
 # ==================== 配置路径 ====================
 # 模型文件路径
@@ -127,6 +129,14 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     iou_threshold = 0.25  # IOU阈值（适中的NMS严格度）
     min_track_length = 4  # 最小轨迹长度（轨迹至少6个点才计数）
     max_speed_threshold = 150  # 最大速度阈值（像素/帧），过滤不合理的跳跃
+    
+    # 速度计算参数
+    speed_history = {}  # 存储车辆速度历史 {track_id: [speed1, speed2, ...]}
+    max_speed_history = 10  # 每个车辆保留的最大速度历史记录
+    pixel_to_meter_ratio = 0.02  # 像素到米的转换比例（根据实际场景调整，更符合真实道路场景）
+    speed_units = 'km/h'  # 速度单位：'km/h' 或 'm/s'
+    speed_display_threshold = 10  # 最小显示速度阈值（避免显示低速噪声）
+    speed_smoothing_factor = 0.7  # 速度平滑因子，使速度变化更自然
 
     # 精度衡量配置
     ground_truth_file = "../dataset/ground_truth/ground_truth.txt"  # 可以设置为包含真实车辆总数的文件路径
@@ -189,6 +199,76 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         cv.rectangle(overlay, pt1, pt2, rect_color, cv.FILLED if filled else 1)
         cv.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
+
+    def calculate_vehicle_speed(track_id, cx, cy, vehicle_states, speed_history, fps):
+        """计算车辆速度
+
+        Args:
+            track_id: 车辆追踪ID
+            cx, cy: 车辆中心点坐标
+            vehicle_states: 车辆状态字典
+            speed_history: 速度历史字典
+            fps: 视频帧率
+
+        Returns:
+            float: 车辆速度（像素/秒）
+        """
+        if track_id not in vehicle_states or len(vehicle_states[track_id]['positions']) < 2:
+            return 0.0
+        
+        # 获取最近的两个位置
+        positions = vehicle_states[track_id]['positions']
+        prev_pos = positions[-2]
+        curr_pos = (cx, cy)
+        
+        # 计算距离（像素）
+        dx = curr_pos[0] - prev_pos[0]
+        dy = curr_pos[1] - prev_pos[1]
+        distance_pixels = np.sqrt(dx**2 + dy**2)
+        
+        # 计算时间差（秒）
+        time_diff = 1.0 / fps
+        
+        # 计算速度（像素/秒）
+        speed_pixels_per_second = distance_pixels / time_diff
+        
+        # 存储速度历史
+        if track_id not in speed_history:
+            speed_history[track_id] = []
+        
+        # 应用速度平滑
+        if speed_history[track_id]:
+            # 使用指数移动平均进行平滑
+            last_speed = speed_history[track_id][-1]
+            smoothed_speed = last_speed * speed_smoothing_factor + speed_pixels_per_second * (1 - speed_smoothing_factor)
+            speed_history[track_id].append(smoothed_speed)
+        else:
+            speed_history[track_id].append(speed_pixels_per_second)
+        
+        if len(speed_history[track_id]) > max_speed_history:
+            speed_history[track_id].pop(0)
+        
+        # 返回平均速度
+        return np.mean(speed_history[track_id]) if speed_history[track_id] else 0.0
+
+    def convert_pixel_speed_to_real(speed_pixels_per_second, pixel_to_meter_ratio, units='km/h'):
+        """将像素速度转换为真实速度
+
+        Args:
+            speed_pixels_per_second: 像素/秒
+            pixel_to_meter_ratio: 像素到米的转换比例
+            units: 速度单位 ('km/h' 或 'm/s')
+
+        Returns:
+            float: 真实速度
+        """
+        # 转换为米/秒
+        speed_mps = speed_pixels_per_second * pixel_to_meter_ratio
+        
+        # 转换为指定单位
+        if units == 'km/h':
+            return speed_mps * 3.6  # 米/秒 -> 公里/小时
+        return speed_mps  # 米/秒
 
     def count_vehicles_by_region(track_id, cx, cy, region, vehicle_states, total_counts):
         """基于区域统计车辆 - 改进版：使用轨迹方向判断 + 稳定性检查
@@ -386,7 +466,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         accuracy = 1.0 - error_rate
         return {'accuracy': accuracy, 'precision': accuracy, 'recall': accuracy, 'f1_score': accuracy}
 
-    def draw_tracks_and_count(frame, detections, total_counts, region, vehicle_states, w=1920):
+    def draw_tracks_and_count(frame, detections, total_counts, region, vehicle_states, speed_history, w=1920):
         """绘制轨迹并统计车辆
 
         Args:
@@ -395,6 +475,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             total_counts: 总计数列表
             region: 计数区域
             vehicle_states: 车辆状态字典
+            speed_history: 速度历史字典
             w: 视频宽度
         """
         # 按车辆类别和检测置信度过滤（使用更高的阈值）
@@ -404,9 +485,23 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         if len(detections) > 0:
             detections = filter_overlapping_detections(detections, iou_threshold)
 
-        # 为每个检测框生成标签
-        labels = [f"#{track_id} {class_names[cls_id]}" for track_id, cls_id in
-                  zip(detections.tracker_id, detections.class_id)]
+        # 为每个检测框生成标签（包含速度信息）
+        labels = []
+        for track_id, cls_id in zip(detections.tracker_id, detections.class_id):
+            # 计算车辆速度
+            center_point = detections.get_anchors_coordinates(anchor=sv.Position.CENTER)[list(detections.tracker_id).index(track_id)]
+            cx, cy = map(int, center_point)
+            
+            # 计算速度
+            pixel_speed = calculate_vehicle_speed(track_id, cx, cy, vehicle_states, speed_history, fps)
+            real_speed = convert_pixel_speed_to_real(pixel_speed, pixel_to_meter_ratio, speed_units)
+            
+            # 生成标签
+            if real_speed >= speed_display_threshold:
+                label = f"#{track_id} {class_names[cls_id]} {real_speed:.1f} {speed_units}"
+            else:
+                label = f"#{track_id} {class_names[cls_id]}"
+            labels.append(label)
 
         # 绘制边界框、标签和轨迹
         box_annotator.annotate(frame, detections=detections)
@@ -441,6 +536,23 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
             accuracy_text = f"ACC: {accuracy_metrics['accuracy']:.2%} | F1: {accuracy_metrics['f1_score']:.2f}"
             sv.draw_text(frame, accuracy_text, sv.Point(x=w-400, y=30), sv.Color.GREEN, 1.0,
                          1, background_color=sv.Color.WHITE)
+        
+        # 显示速度统计信息
+        if speed_history:
+            all_speeds = []
+            for speeds in speed_history.values():
+                if speeds:
+                    all_speeds.extend(speeds)
+            
+            if all_speeds:
+                avg_speed_pixel = np.mean(all_speeds)
+                avg_speed_real = convert_pixel_speed_to_real(avg_speed_pixel, pixel_to_meter_ratio, speed_units)
+                max_speed_pixel = np.max(all_speeds)
+                max_speed_real = convert_pixel_speed_to_real(max_speed_pixel, pixel_to_meter_ratio, speed_units)
+                
+                speed_text = f"AVG: {avg_speed_real:.1f} {speed_units} | MAX: {max_speed_real:.1f} {speed_units}"
+                sv.draw_text(frame, speed_text, sv.Point(x=w//2 - 150, y=30), sv.Color.BLUE, 1.0,
+                             1, background_color=sv.Color.WHITE)
 
 
 
@@ -457,8 +569,17 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     detection_accuracies = []  # 存储每帧的检测精度
     total_detections = 0  # 总检测数
     correct_detections = 0  # 正确检测数
+    
+    # FPS计算相关变量
+    start_time = time.time()
+    fps_history = []  # 存储FPS历史
+    frame_time_history = []  # 存储帧时间历史
+    fps_update_interval = 10  # 每10帧更新一次FPS
 
     while cap.isOpened():
+        # 记录帧开始时间
+        frame_start_time = time.time()
+        
         ret, frame = cap.read()
         if not ret:
             break
@@ -493,14 +614,53 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
 
         if detections.tracker_id is not None:
             # 处理车辆轨迹和计数
-            draw_tracks_and_count(frame, detections, total_counts, counting_region, vehicle_states, w)
+            draw_tracks_and_count(frame, detections, total_counts, counting_region, vehicle_states, speed_history, w)
+
+        # 计算帧时间和FPS
+        frame_end_time = time.time()
+        frame_time = (frame_end_time - frame_start_time) * 1000  # 转换为毫秒
+        current_fps = 1000 / frame_time if frame_time > 0 else 0
+        
+        # 存储历史数据
+        fps_history.append(current_fps)
+        frame_time_history.append(frame_time)
+        
+        # 只保留最近30帧的数据
+        if len(fps_history) > 30:
+            fps_history.pop(0)
+        if len(frame_time_history) > 30:
+            frame_time_history.pop(0)
+        
+        # 计算平均FPS和帧时间
+        avg_fps = np.mean(fps_history) if fps_history else 0
+        avg_frame_time = np.mean(frame_time_history) if frame_time_history else 0
+        
+        # 计算状态色标
+        if avg_fps > 60:
+            fps_color = (0, 255, 0)  # 绿色
+        elif avg_fps > 30:
+            fps_color = (0, 255, 255)  # 黄色
+        else:
+            fps_color = (0, 0, 255)  # 红色
+        
+        # 显示FPS、帧时间和状态色标
+        fps_text = f"FPS: {avg_fps:.1f}"
+        frame_time_text = f"Frame Time: {avg_frame_time:.1f}ms"
+        
+        # 绘制FPS信息面板
+        cv.rectangle(frame, (w - 200, 60), (w - 10, 120), (255, 255, 255), cv.FILLED)
+        cv.rectangle(frame, (w - 200, 60), (w - 10, 120), fps_color, 2)
+        cv.putText(frame, fps_text, (w - 190, 90), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+        cv.putText(frame, frame_time_text, (w - 190, 115), cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
 
         # 写入帧到输出视频
         out.write(frame)
         # 显示当前帧
         cv.imshow("Camera", frame)
 
-        if cv.waitKey(1) & 0xff == ord('p'):  # 按'p'键暂停
+        # 键盘事件处理
+        key = cv.waitKey(1) & 0xff
+        if not handle_keyboard_events(key, frame, frame_count, cap, out, "Camera"):
             break
 
     # 计算整体精度
