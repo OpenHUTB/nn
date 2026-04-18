@@ -2,6 +2,8 @@ import cv2 as cv
 from ultralytics import YOLO
 import numpy as np
 import supervision as sv
+import json
+from datetime import datetime
 
 # ==================== 配置路径 ====================
 # 模型文件路径
@@ -10,6 +12,8 @@ MODEL_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/models/yolo11n.pt"
 INPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/dataset/sample.mp4"
 # 输出视频文件路径
 OUTPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/res/sample_res.mp4"
+# 统计数据保存路径
+STATS_OUTPUT_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/res/counting_stats.json"
 # ==================================================
 
 
@@ -152,28 +156,26 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
             if len(track_history[track_id]) > 30:
                 track_history[track_id] = track_history[track_id][-30:]
 
-            # 严谨的穿越方向判断
+            # 简化判断：只要y变小就算穿越（不管方向、不限x范围）
             if track_id not in crossed_ids:
                 prev_y = previous_y.get(track_id, cy)
                 curr_y = cy
                 line_y = limits[1]
                 
-                # 检查是否在线的x范围内
-                if limits[0] < cx < limits[2]:
-                    # 判断是否从上往下穿越计数线
-                    crossed_line = (prev_y < line_y <= curr_y) or (prev_y < line_y and curr_y > prev_y + 10)
-                    if crossed_line:
-                        crossed_ids.add(track_id)
-                        counted_tracks.add(track_id)
-                        total_counts.append(track_id)
+                # 简化穿越逻辑：y变小就计数
+                crossed_line = curr_y < prev_y
+                if crossed_line:
+                    crossed_ids.add(track_id)
+                    counted_tracks.add(track_id)
+                    total_counts.append(track_id)
 
-                        # 分类计数
-                        if cls_name in class_counts:
-                            class_counts[cls_name] += 1
+                    # 分类计数
+                    if cls_name in class_counts:
+                        class_counts[cls_name] += 1
 
-                        sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
-                                     color=sv.Color.ROBOFLOW, thickness=4)
-                        draw_overlay(frame, (350, 700), (1230, 800), alpha=0.25, color=(10, 255, 50))
+                    sv.draw_line(frame, start=sv.Point(x=limits[0], y=limits[1]), end=sv.Point(x=limits[2], y=limits[3]),
+                                 color=sv.Color.ROBOFLOW, thickness=4)
+                    draw_overlay(frame, (350, 700), (1230, 800), alpha=0.25, color=(10, 255, 50))
                 
                 # 更新上一帧y坐标
                 previous_y[track_id] = curr_y
@@ -181,6 +183,27 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         # 显示车辆总计数
         sv.draw_text(frame, f"TOTAL: {len(total_counts)}", sv.Point(x=50, y=50), sv.Color.ROBOFLOW, 0.8,
                      2, background_color=sv.Color.WHITE)
+        
+        # 显示分类统计面板
+        y_offset = 100
+        for cls_name, count in class_counts.items():
+            sv.draw_text(frame, f"{cls_name.upper()}: {count}", sv.Point(x=50, y=y_offset), sv.Color.YELLOW, 0.6,
+                         1, background_color=sv.Color.BLACK)
+            y_offset += 30
+        
+        # 显示当前帧检测到的车辆数
+        active_count = len(detections.tracker_id) if detections.tracker_id is not None else 0
+        sv.draw_text(frame, f"Active: {active_count}", sv.Point(x=50, y=y_offset+10), sv.Color.BLUE, 0.6,
+                     1, background_color=sv.Color.BLACK)
+        
+        # 显示当前优化策略说明
+        y_offset += 50
+        # 显示优化策略（使用英文避免字体问题）
+        sv.draw_text(frame, "[Strategy]", sv.Point(x=50, y=y_offset), sv.Color.GREEN, 0.5,
+                     1, background_color=sv.Color.from_hex("#404040"))
+        y_offset += 25
+        sv.draw_text(frame, "conf:0.15 | y-down", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+                     1, background_color=sv.Color.from_hex("#404040"))
 
 
     # 打开视频文件
@@ -200,7 +223,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
 
         frame_count += 1
         if frame_count % 30 == 0:  # 每30帧打印一次进度
-            print(f"处理进度: 第 {frame_count} 帧, 已计数: {len(total_counts)} 辆车")
+            print(f"[帧{frame_count}] 检测中... 当前已计数: {len(total_counts)}辆 | {class_counts}")
 
         # 针对CARLA视频优化ROI区域 - 扩大检测范围避免漏检
         # 只裁剪左右边缘和最顶部天空区域，保留更多车辆检测机会
@@ -254,13 +277,47 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
     out.release()
     cv.destroyAllWindows()
 
-    print(f"处理完成！")
-    print(f"=" * 40)
-    print(f"总计数: {len(total_counts)} 辆车")
-    print("-" * 40)
+    # ========== 功能扩展：保存统计数据到JSON ==========
+    stats_data = {
+        "video_path": video_path,
+        "processed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "video_info": {
+            "width": w,
+            "height": h,
+            "fps": fps,
+            "total_frames": frame_count
+        },
+        "counting_line": {
+            "x1": limits[0], "y1": limits[1],
+            "x2": limits[2], "y2": limits[3]
+        },
+        "total_count": len(total_counts),
+        "class_counts": class_counts,
+        "counted_track_ids": list(counted_tracks)
+    }
+    
+    with open(STATS_OUTPUT_PATH, 'w', encoding='utf-8') as f:
+        json.dump(stats_data, f, ensure_ascii=False, indent=2)
+    print(f"统计数据已保存至: {STATS_OUTPUT_PATH}")
+    
+    print(f"\n" + "=" * 50)
+    print(f"            YOLO车辆计数结果")
+    print(f"=" * 50)
+    print(f"  视频信息: {w}x{h}, {fps}fps, 共{frame_count}帧")
+    print(f"  计数线: ({limits[0]},{limits[1]}) -> ({limits[2]},{limits[3]})")
+    print(f"-" * 50)
+    print(f"  检测阈值: 0.15 | 穿越判断: y变小即计数")
+    print(f"-" * 50)
+    print(f"  [分类统计]")
     for cls_name, count in class_counts.items():
-        print(f"  {cls_name}: {count}")
-    print("=" * 40)
+        bar = "█" * count + "░" * (max(class_counts.values()) - count) if max(class_counts.values()) > 0 else ""
+        print(f"    {cls_name:10s}: {count:3d} {bar}")
+    print(f"-" * 50)
+    print(f"  [总计] {len(total_counts)} 辆车")
+    print(f"=" * 50)
+    print(f"  统计数据已保存: counting_stats.json")
+    print(f"  输出视频: sample_res.mp4")
+    print(f"=" * 50)
 
 
 if __name__ == "__main__":
