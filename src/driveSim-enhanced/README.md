@@ -38,3 +38,53 @@ python3 main.py
 [aitorzip/DeepGTAV](https://github.com/aitorzip/DeepGTAV)
 [aitorzip/VPilot](https://github.com/aitorzip/VPilot)
 
+
+=========================================
+
+
+
+## 在 CARLA 模拟器上运行自动驾驶
+
+**如果你没有 GTAV，或者希望在更真实的自动驾驶仿真环境中进行开发，可以使用 CARLA 模拟器运行automatic_control.py**
+
+CARLA 是一个开源的自动驾驶仿真器，提供更专业的交通场景、传感器模拟和车辆动力学。
+
+### CARLA 版本要求
+
+- **CARLA 0.9.15**
+- Python 3.7 - 3.9
+
+### 安装步骤
+
+#### 1. 下载 CARLA 模拟器
+
+从 [CARLA 官方 GitHub](https://github.com/carla-simulator/carla/releases/tag/0.9.15) 下载 `CARLA_0.9.15.zip`
+1. 安装所需依赖包
+
+```
+pip3 install -r Requirements.txt
+```
+## 启动 CARLA 模拟器
+
+# 进入 CARLA 安装目录
+cd H:\carla0.9.15\WindowsNoEditor
+
+# 启动模拟器
+CarlaUE4.exe
+
+# 运行自动驾驶程序
+# 确保已激活虚拟环境
+python code/automatic_control.py
+本项目的 CARLA 版本支持以下功能：
+
+🚦 交通信号灯检测
+实时识别交通信号灯状态（红、黄、绿）
+
+车辆速度、档位、转向角等信息
+
+## 常见问题
+Q: 连接 CARLA 时提示版本不匹配
+A: 确保 Python API 版本与 CARLA 模拟器版本一致：
+# 检查 Python API 版本
+python -c "import carla; print(carla.__version__)"
+
