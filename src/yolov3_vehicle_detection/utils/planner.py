@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Tuple
-from config import config
+from ..config import config
 
 
 class SimplePlanner:

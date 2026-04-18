@@ -18,9 +18,12 @@ class SimpleController:
         self.world = world
         self.vehicle = vehicle
         self.map = world.get_map()
-        self.target_speed = 30.0  # km/h
+        # self.target_speed = 30.0  # km/h，原速度限制
+        self.target_speed = 50.0  # km/h，增加最高速度限制
         self.waypoint_distance = 5.0
         self.last_waypoint = None
+        # self.reverse_mode = False  # 倒车模式标志（未使用）
+        self.manual_reverse = False  # 手动倒车标志
 
     def get_control(self):
         """基于路点的简单控制"""
@@ -29,15 +32,21 @@ class SimpleController:
         transform = self.vehicle.get_transform()
         velocity = self.vehicle.get_velocity()
 
-        # 计算速度
+        # 计算速度（考虑倒车方向）
         speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6  # km/h
+
+        # 检查是否在倒车模式
+        if self.manual_reverse:
+            # 倒车模式：直接返回倒车控制
+            return 0.3, 0.0, 0.0, True  # throttle, brake, steer, reverse
 
         # 获取路点
         waypoint = self.map.get_waypoint(location, project_to_road=True)
 
         if not waypoint:
             # 如果没有找到路点，返回保守控制
-            return 0.3, 0.0, 0.0
+            # return 0.3, 0.0, 0.0  # 原返回值（3个值）
+            return 0.3, 0.0, 0.0, False  # 新返回值（4个值，增加reverse标志）
 
         # 获取下一个路点
         next_waypoints = waypoint.next(self.waypoint_distance)
@@ -75,7 +84,16 @@ class SimpleController:
         else:
             throttle, brake = 0.3, 0.0
 
-        return throttle, brake, steer
+        # return throttle, brake, steer  # 原返回值（3个值）
+        return throttle, brake, steer, False  # 新返回值（4个值，增加reverse标志）
+
+    def toggle_reverse(self):
+        """切换倒车模式"""
+        self.manual_reverse = not self.manual_reverse
+        if self.manual_reverse:
+            print("进入倒车模式")
+        else:
+            print("退出倒车模式，恢复前进")
 
 
 class SimpleDrivingSystem:
@@ -83,9 +101,10 @@ class SimpleDrivingSystem:
         self.client = None
         self.world = None
         self.vehicle = None
-        self.camera = None
+        self.cameras = {}  # 存储多个相机
         self.controller = None
         self.camera_image = None
+        self.current_view = 'third_person'  # 当前视角模式：'first_person', 'third_person', 'birdseye'
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -178,7 +197,7 @@ class SimpleDrivingSystem:
             return False
 
     def setup_camera(self):
-        """设置相机"""
+        """设置多个相机"""
         print("正在设置相机...")
 
         try:
@@ -190,36 +209,70 @@ class SimpleDrivingSystem:
             camera_bp.set_attribute('image_size_y', '480')
             camera_bp.set_attribute('fov', '90')
 
-            # 相机位置（车辆后方）
-            camera_transform = carla.Transform(
+            # 第一人称相机
+            first_person_transform = carla.Transform(
+                carla.Location(x=2.0, z=1.2),  # 驾驶座位置
+                carla.Rotation(pitch=0.0)  # 平视
+            )
+            first_person_camera = self.world.spawn_actor(
+                camera_bp, first_person_transform, attach_to=self.vehicle
+            )
+            first_person_camera.listen(lambda image: self.camera_callback(image, 'first_person'))
+            self.cameras['first_person'] = first_person_camera
+
+            # 第三人称相机
+            third_person_transform = carla.Transform(
                 carla.Location(x=-8.0, z=6.0),  # 在车辆后方上方
                 carla.Rotation(pitch=-20.0)  # 向下看
             )
-
-            # 生成相机
-            self.camera = self.world.spawn_actor(
-                camera_bp, camera_transform, attach_to=self.vehicle
+            third_person_camera = self.world.spawn_actor(
+                camera_bp, third_person_transform, attach_to=self.vehicle
             )
+            third_person_camera.listen(lambda image: self.camera_callback(image, 'third_person'))
+            self.cameras['third_person'] = third_person_camera
 
-            # 设置回调函数
-            self.camera.listen(lambda image: self.camera_callback(image))
+            # 鸟瞰图相机
+            birdseye_transform = carla.Transform(
+                carla.Location(x=0.0, z=30.0),  # 车辆正上方30米
+                carla.Rotation(pitch=-90.0)  # 垂直向下
+            )
+            birdseye_camera = self.world.spawn_actor(
+                camera_bp, birdseye_transform, attach_to=self.vehicle
+            )
+            birdseye_camera.listen(lambda image: self.camera_callback(image, 'birdseye'))
+            self.cameras['birdseye'] = birdseye_camera
 
-            print("相机设置成功")
+            print("相机设置成功 - 已创建三个视角相机")
             return True
 
         except Exception as e:
             print(f"设置相机时出错: {e}")
             return False
 
-    def camera_callback(self, image):
+    def camera_callback(self, image, view_mode=None):
         """相机数据回调"""
         try:
-            # 转换图像数据
-            array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
-            array = np.reshape(array, (image.height, image.width, 4))
-            self.camera_image = array[:, :, :3]  # RGB通道
+            # 只有当前视角的相机数据才会被使用
+            if view_mode == self.current_view:
+                # 转换图像数据
+                array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
+                array = np.reshape(array, (image.height, image.width, 4))
+                self.camera_image = array[:, :, :3]  # RGB通道
         except:
             pass
+
+    def update_camera_view(self):
+        """更新相机视角"""
+        print(f"已切换到{self.get_view_name()}视角")
+
+    def get_view_name(self):
+        """获取视角名称"""
+        view_names = {
+            'first_person': 'First Person',
+            'third_person': 'Third Person',
+            'birdseye': 'Birds Eye'
+        }
+        return view_names.get(self.current_view, 'Unknown')
 
     def setup_controller(self):
         """设置控制器"""
@@ -268,6 +321,8 @@ class SimpleDrivingSystem:
         print("  q - 退出程序")
         print("  r - 重置车辆")
         print("  s - 紧急停止")
+        print("  x - 切换倒车/前进模式（速度为0时生效）")
+        print("  v - 切换视角（第一人称/第三人称/鸟瞰图）")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -279,8 +334,9 @@ class SimpleDrivingSystem:
                 velocity = self.vehicle.get_velocity()
                 speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
 
-                # 获取控制指令
-                throttle, brake, steer = self.controller.get_control()
+                # 获取控制指令（现在返回4个值，原代码返回3个值）
+                # throttle, brake, steer = self.controller.get_control()  # 原代码
+                throttle, brake, steer, reverse = self.controller.get_control()  # 新代码
 
                 # 应用控制
                 control = carla.VehicleControl(
@@ -288,7 +344,8 @@ class SimpleDrivingSystem:
                     brake=float(brake),
                     steer=float(steer),
                     hand_brake=False,
-                    reverse=False
+                    # reverse=False  # 原代码
+                    reverse=reverse  # 新代码，支持倒车
                 )
                 self.vehicle.apply_control(control)
 
@@ -309,6 +366,17 @@ class SimpleDrivingSystem:
                     cv2.putText(display_img, f"Frame: {frame_count}",
                                 (20, 160), cv2.FONT_HERSHEY_SIMPLEX,
                                 0.8, (255, 255, 255), 2)
+                    
+                    # 显示倒车状态（新功能）
+                    if self.controller.manual_reverse:
+                        cv2.putText(display_img, "REVERSE MODE",
+                                    (20, 200), cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.8, (0, 0, 255), 2)  # 红色显示
+                    
+                    # 显示当前视角模式
+                    cv2.putText(display_img, f"View: {self.get_view_name()}",
+                                (20, 240), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.8, (0, 255, 0), 2)  # 绿色显示
 
                     cv2.imshow('Autonomous Driving - Simple Version', display_img)
 
@@ -325,6 +393,19 @@ class SimpleDrivingSystem:
                         throttle=0.0, brake=1.0, hand_brake=True
                     ))
                     print("紧急停止")
+                elif key == ord('x'):
+                    # 切换倒车模式（只在速度接近0时允许切换）
+                    if speed < 1.0:  # 速度小于1km/h时允许切换
+                        self.controller.toggle_reverse()
+                    else:
+                        print("请先减速到接近停止（速度<1km/h）再切换倒车模式")
+                elif key == ord('v'):
+                    # 切换视角模式
+                    view_modes = ['third_person', 'first_person', 'birdseye']
+                    current_index = view_modes.index(self.current_view)
+                    next_index = (current_index + 1) % len(view_modes)
+                    self.current_view = view_modes[next_index]
+                    self.update_camera_view()
 
                 frame_count += 1
 
@@ -394,12 +475,14 @@ class SimpleDrivingSystem:
         """清理资源"""
         print("\n正在清理资源...")
 
-        if self.camera:
-            try:
-                self.camera.stop()
-                self.camera.destroy()
-            except:
-                pass
+        # 清理所有相机
+        for view_mode, camera in self.cameras.items():
+            if camera:
+                try:
+                    camera.stop()
+                    camera.destroy()
+                except:
+                    pass
 
         if self.vehicle:
             try:

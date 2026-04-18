@@ -5,6 +5,9 @@ pyqt5>=5.15.9
 pyopengl>=3.1.6
 matplotlib>=3.7.1
 
+# 数值优化依赖
+numba>=0.57.0  # JIT编译加速
+
 # MuJoCo 相关依赖
 mujoco>=2.3.7
 glfw>=2.5.5  # MuJoCo 渲染依赖
