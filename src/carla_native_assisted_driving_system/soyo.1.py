@@ -613,6 +613,15 @@ def game_loop(args):
             if current_speed < 0.5 and min_dist > danger_dist + 2:
                 brake = 0.0
                 throttle = max(throttle, 0.2)
+            # ==========交通信号灯自动识别（红灯停，绿灯行） ==========
+            traffic_light = ego.get_traffic_light()
+
+            if traffic_light is not None:
+                light_state = traffic_light.get_state()
+                # 红灯/黄灯 刹车停车
+                if light_state == carla.TrafficLightState.Red or light_state == carla.TrafficLightState.Yellow:
+                    brake = 1.0
+                    throttle = 0.0
 
             # ========== 最终控制 ==========
             control = carla.VehicleControl()
