@@ -124,7 +124,7 @@ traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
 
 # 5. 背景车辆数量
 num_vehicles = 10
-```\
+```
 
 
 ---
