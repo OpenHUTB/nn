@@ -1,7 +1,8 @@
-import os
-# 显示游戏窗口
-# os.environ["SDL_VIDEODRIVER"] = "dummy"
+import warnings
 
+warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
+
+import os
 import gymnasium as gym
 import torch
 import numpy as np
@@ -19,59 +20,79 @@ def train():
     max_action = float(env.action_space.high[0])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"使用设备: {device}")
 
     # 创建带有动作平滑的代理
-    # action_smooth_factor: 0.1-0.5之间，越小越平滑但响应越慢
     agent = TD3Agent(
         state_dim=state_dim,
         action_dim=action_dim,
         max_action=max_action,
         device=device,
         use_cnn=True,
-        action_smooth_factor=0.3  # 添加动作平滑
+        action_smooth_factor=0.3  # 平滑系数
     )
 
-    max_episodes = 1000
+    max_episodes = 2000
     max_timesteps = 1000
-    expl_noise = 0.15  # 稍微降低初始噪声
-    min_expl_noise = 0.02  # 最小探索噪声
+    expl_noise = 0.15
+    min_expl_noise = 0.02
 
     print("开始训练...")
+
+    best_reward = -float('inf')
+    episode_rewards = []
 
     for episode in range(max_episodes):
         state, _ = env.reset()
         episode_reward = 0
-
-        # 重置动作历史（每个episode开始）
         agent.reset_action_history()
 
-        # 动态调整平滑因子（初期更平滑，后期更响应）
-        if episode < 200:
-            agent.action_smoother.smooth_factor = 0.4  # 更平滑
-        elif episode < 500:
-            agent.action_smoother.smooth_factor = 0.3
+        # 动态调整平滑因子
+        if episode < 300:
+            agent.action_smoother.smooth_factor = 0.15
+        elif episode < 800:
+            agent.action_smoother.smooth_factor = 0.2
         else:
-            agent.action_smoother.smooth_factor = 0.2  # 更响应
+            agent.action_smoother.smooth_factor = 0.25
+
+        action_stats = {'steering': [], 'gas': [], 'brake': []}
 
         for t in range(max_timesteps):
             # 选择平滑后的动作
             action = agent.select_action(state, apply_smoothing=True)
 
-            # 添加随时间衰减的探索噪声
-            current_noise = expl_noise * (1 - episode / max_episodes * 0.8)
-            noisy_action = (action + np.random.normal(0, current_noise, size=action_dim))
-            noisy_action = np.clip(noisy_action, -max_action, max_action)
+            # 添加探索噪声
+            current_noise = expl_noise * (1 - episode / max_episodes * 0.9)
+            noisy_action = action + np.random.normal(0, current_noise, size=action_dim)
+
+            # 矫正动作范围
+            noisy_action[0] = np.clip(noisy_action[0], -max_action, max_action)
+            noisy_action[1] = np.clip(noisy_action[1], 0, max_action)
+            noisy_action[2] = np.clip(noisy_action[2], 0, max_action)
+
+            # gas和brake互斥约束
+            if noisy_action[1] > 0.3 and noisy_action[2] > 0.3:
+                noisy_action[1] = 0.1
+
+            # 记录动作统计
+            action_stats['steering'].append(noisy_action[0])
+            action_stats['gas'].append(noisy_action[1])
+            action_stats['brake'].append(noisy_action[2])
 
             next_state, reward, terminated, truncated, _ = env.step(noisy_action)
             done = terminated or truncated
 
-            # 奖励整形：鼓励平滑动作
-            if t > 0:
-                action_change = np.abs(noisy_action - agent.action_history[-2] if len(agent.action_history) > 1 else 0)
-                smoothness_bonus = -0.01 * np.mean(action_change)  # 惩罚剧烈的动作变化
-                reward += smoothness_bonus
+            # 奖励整形 - 鼓励平滑驾驶
+            forward_reward = noisy_action[1] * 0.5
+            brake_penalty = -noisy_action[2] * 0.3
+            steering_penalty = -abs(noisy_action[0]) * 0.05
 
-            agent.replay_buffer.add((state, noisy_action, reward, next_state, done))
+            shaped_reward = reward + forward_reward + brake_penalty + steering_penalty
+
+            if reward < -0.1:
+                shaped_reward -= 0.2
+
+            agent.replay_buffer.add((state, noisy_action, shaped_reward, next_state, done))
             state = next_state
             episode_reward += reward
 
@@ -83,15 +104,37 @@ def train():
         # 衰减探索噪声
         expl_noise = max(min_expl_noise, expl_noise * 0.998)
 
-        print(f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, "
-              f"噪声: {current_noise:.3f}, 平滑系数: {agent.action_smoother.smooth_factor:.2f}")
+        # 计算统计信息
+        avg_steering = np.mean(action_stats['steering']) if action_stats['steering'] else 0
+        avg_gas = np.mean(action_stats['gas']) if action_stats['gas'] else 0
+        avg_brake = np.mean(action_stats['brake']) if action_stats['brake'] else 0
 
+        episode_rewards.append(episode_reward)
+        avg_reward = np.mean(episode_rewards[-50:]) if len(episode_rewards) >= 50 else episode_reward
+
+        # 打印进度
+        print(f"回合: {episode + 1:4d} | "
+              f"奖励: {episode_reward:6.1f} | "
+              f"平均(50): {avg_reward:6.1f} | "
+              f"噪声: {current_noise:.3f} | "
+              f"平滑: {agent.action_smoother.smooth_factor:.2f}")
+        print(f"  动作 - 转向: {avg_steering:+.2f}, 油门: {avg_gas:.2f}, 刹车: {avg_brake:.2f}")
+
+        # 保存最佳模型
+        if episode_reward > best_reward and episode > 100:
+            best_reward = episode_reward
+            os.makedirs("models", exist_ok=True)
+            agent.save(f"models/td3_best")
+            print(f"  ★ 新最佳模型! 奖励: {best_reward:.1f}")
+
+        # 定期保存
         if (episode + 1) % 50 == 0:
             os.makedirs("models", exist_ok=True)
             agent.save(f"models/td3_car_{episode + 1}")
-            print(f"模型已保存: models/td3_car_{episode + 1}")
+            print(f"  模型已保存: models/td3_car_{episode + 1}")
 
     env.close()
+    print("训练完成!")
 
 
 if __name__ == "__main__":
