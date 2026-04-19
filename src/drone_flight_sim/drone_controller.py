@@ -18,8 +18,8 @@ import os
 import cv2
 # 导入 numpy 模块，用于数值计算
 import numpy as np
-# 从 config 模块导入飞行配置参数和相机配置
-from config import FlightConfig, RGB_CAMERA_NAME, DEFAULT_IMAGE_COUNT
+# 从 config 模块导入飞行配置参数、相机配置和键盘控制参数
+from config import FlightConfig, RGB_CAMERA_NAME, DEFAULT_IMAGE_COUNT, KEYBOARD_VELOCITY, KEYBOARD_YAW_RATE, KEYBOARD_STEP
 # 从 collision_handler 模块导入碰撞处理器
 from collision_handler import CollisionHandler
 
@@ -67,6 +67,9 @@ class DroneController:
         self.output_dir = os.path.join(script_dir, "drone_images")
         # 创建保存目录（如果不存在）
         self._ensure_output_dir()
+
+        # 键盘控制速度属性（供 keyboard_control.py 使用）
+        self.velocity = KEYBOARD_VELOCITY
 
     def takeoff(self):
         """执行起飞操作
@@ -556,3 +559,135 @@ class DroneController:
         except Exception as e:
             print(f"❌ 全景拍照失败: {e}")
             return None
+
+    # ==================== 键盘控制方法 ====================
+
+    def move_forward(self):
+        """向前移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(pos.x_val + KEYBOARD_STEP, pos.y_val, pos.z_val, KEYBOARD_VELOCITY)
+        print(f"⬆️  前进 +X: {KEYBOARD_STEP}m")
+
+    def move_backward(self):
+        """向后移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(pos.x_val - KEYBOARD_STEP, pos.y_val, pos.z_val, KEYBOARD_VELOCITY)
+        print(f"⬇️  后退 -X: {KEYBOARD_STEP}m")
+
+    def move_left(self):
+        """向左移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(pos.x_val, pos.y_val + KEYBOARD_STEP, pos.z_val, KEYBOARD_VELOCITY)
+        print(f"⬅️  左移 +Y: {KEYBOARD_STEP}m")
+
+    def move_right(self):
+        """向右移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(pos.x_val, pos.y_val - KEYBOARD_STEP, pos.z_val, KEYBOARD_VELOCITY)
+        print(f"➡️  右移 -Y: {KEYBOARD_STEP}m")
+
+    def move_up(self):
+        """上升"""
+        pos = self.get_position()
+        new_z = pos.z_val - KEYBOARD_STEP  # 负值表示上升
+        self.client.moveToZAsync(new_z, KEYBOARD_VELOCITY)
+        print(f"🔼  上升 -Z: {KEYBOARD_STEP}m (高度: {abs(new_z):.1f}m)")
+
+    def move_down(self):
+        """下降"""
+        pos = self.get_position()
+        new_z = pos.z_val + KEYBOARD_STEP  # 正值表示下降
+        # 防止降到地面以下
+        if new_z > -0.5:
+            new_z = -0.5
+        self.client.moveToZAsync(new_z, KEYBOARD_VELOCITY)
+        print(f"🔽  下降 +Z: {KEYBOARD_STEP}m (高度: {abs(new_z):.1f}m)")
+
+    def rotate_left(self):
+        """向左旋转（偏航）
+
+        使用角速度控制，让无人机以设定速度向左旋转。
+        """
+        self.client.rotateByYawRateAsync(-KEYBOARD_YAW_RATE, KEYBOARD_STEP)
+
+    def rotate_right(self):
+        """向右旋转（偏航）
+
+        使用角速度控制，让无人机以设定速度向右旋转。
+        """
+        self.client.rotateByYawRateAsync(KEYBOARD_YAW_RATE, KEYBOARD_STEP)
+
+    def hover(self):
+        """悬停
+
+        让无人机停止移动并保持在当前位置悬停。
+        """
+        self.client.hoverAsync()
+
+    def go_forward_continuous(self):
+        """持续向前飞行
+
+        使用速度控制，让无人机以设定速度向前飞行。
+        """
+        self.client.moveByVelocityAsync(KEYBOARD_VELOCITY, 0, 0, 0.1)
+
+    def go_backward_continuous(self):
+        """持续向后飞行
+
+        使用速度控制，让无人机以设定速度向后飞行。
+        """
+        self.client.moveByVelocityAsync(-KEYBOARD_VELOCITY, 0, 0, 0.1)
+
+    def go_left_continuous(self):
+        """持续向左飞行
+
+        在 AirSim 中，Y 轴正方向指向右方，
+        所以向左移动需要负的 Y 速度。
+        """
+        self.client.moveByVelocityAsync(0, -KEYBOARD_VELOCITY, 0, 0.1)
+
+    def go_right_continuous(self):
+        """持续向右飞行
+
+        在 AirSim 中，Y 轴正方向指向右方，
+        所以向右移动需要正的 Y 速度。
+        """
+        self.client.moveByVelocityAsync(0, KEYBOARD_VELOCITY, 0, 0.1)
+
+    def go_up_continuous(self):
+        """持续上升
+
+        使用速度控制，让无人机以设定速度上升。
+        AirSim 中 Z 轴向下为正，所以上升需要负的 Z 速度。
+        """
+        self.client.moveByVelocityAsync(0, 0, -KEYBOARD_VELOCITY, 0.1)
+
+    def go_down_continuous(self):
+        """持续下降
+
+        使用速度控制，让无人机以设定速度下降。
+        AirSim 中 Z 轴向下为正，所以下降需要正的 Z 速度。
+        防止降到地面以下（z > -0.5）。
+        """
+        pos = self.get_position()
+        # 只有高于地面安全高度时才下降
+        if pos.z_val < -0.5:
+            self.client.moveByVelocityAsync(0, 0, KEYBOARD_VELOCITY, 0.1)
+
+    def get_telemetry(self):
+        """获取并打印无人机状态信息"""
+        pos = self.get_position()
+        state = self.client.getMultirotorState()
+        linear_vel = state.kinematics_estimated.linear_velocity
+        collision_info = self.client.simGetCollisionInfo()
+
+        height = abs(pos.z_val)
+        speed = (linear_vel.x_val**2 + linear_vel.y_val**2 + linear_vel.z_val**2) ** 0.5
+
+        print(f"\n{'─' * 40}")
+        print(f"📊 无人机状态:")
+        print(f"   位置: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+        print(f"   高度: {height:.2f}m")
+        print(f"   速度: {speed:.2f} m/s")
+        print(f"   碰撞: {'⚠️ 是' if collision_info.has_collided else '✅ 否'}")
+        print(f"{'─' * 40}\n")
