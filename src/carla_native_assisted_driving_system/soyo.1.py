@@ -1,9 +1,7 @@
 
-
-"""Example of automatic vehicle control from client side. (无agents纯净版)"""
-
 from __future__ import print_function
-
+"""Example of automatic vehicle control from client side. (无agents纯净版)"""
+"""CARLA-Native-Assisted-Driving-System - Version 1.0"""
 import argparse
 import collections
 import datetime
@@ -16,19 +14,9 @@ import re
 import sys
 import weakref
 
-try:
-    import pygame
-    from pygame.locals import KMOD_CTRL
-    from pygame.locals import K_ESCAPE
-    from pygame.locals import K_q
-except ImportError:
-    raise RuntimeError('cannot import pygame, make sure pygame package is installed')
-
-try:
-    import numpy as np
-except ImportError:
-    raise RuntimeError(
-        'cannot import numpy, make sure numpy package is installed')
+import pygame
+from pygame.locals import *
+import numpy as np
 
 # ==============================================================================
 # -- Find CARLA module ---------------------------------------------------------
@@ -54,12 +42,27 @@ from carla import ColorConverter as cc
 
 
 # ==============================================================================
-# -- 已删除所有agents代码 ✅----------------------------------------------------
-# ==============================================================================
-
-# ==============================================================================
 # -- Global functions ----------------------------------------------------------
 # ==============================================================================
+# ==============================================================================
+# -- PID Controller (智能控制算法) ------------------------------------------------
+# ==============================================================================
+class PIDController:
+    def __init__(self, Kp=1.0, Ki=0.0, Kd=0.0):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.error = 0.0
+        self.last_error = 0.0
+        self.integral = 0.0
+
+    def step(self, target, current, dt=0.05):
+        self.error = target - current
+        self.integral += self.error * dt
+        derivative = (self.error - self.last_error) / dt
+        output = self.Kp * self.error + self.Ki * self.integral + self.Kd * derivative
+        self.last_error = self.error
+        return max(0.0, min(1.0, output))
 def find_weather_presets():
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
 
@@ -168,30 +171,6 @@ class World(object):
             if actor is not None:
                 actor.destroy()
 
-
-# ==============================================================================
-# -- KeyboardControl -----------------------------------------------------------
-# ==============================================================================
-class KeyboardControl(object):
-    def __init__(self, world):
-        world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
-    def parse_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            if event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
-                    return True
-
-    @staticmethod
-    def _is_quit_shortcut(key):
-        return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
-
-
-# ==============================================================================
-# -- HUD -----------------------------------------------------------------------
-# ==============================================================================
 class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
@@ -345,7 +324,7 @@ class FadingText(object):
 
 class HelpText(object):
     def __init__(self, font, width, height):
-        lines = __doc__.split('\n')
+        lines = ["CARLA-Native-Assisted-Driving-System", "PID自动定速巡航 | ESC退出"]
         self.font = font
         self.dim = (680, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
@@ -377,6 +356,7 @@ class CollisionSensor(object):
         self.sensor = world.spawn_actor(blueprint, carla.Transform(), attach_to=self._parent)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
+
 
     def get_collision_history(self):
         history = collections.defaultdict(int)
@@ -546,17 +526,22 @@ class CameraManager(object):
 # ==============================================================================
 # -- --------------------------------------------
 # ==============================================================================
+
 # ==============================================================================
-# --  --------------------------------------------
+# -- game_loop (PID定速巡航 自动控制版) ------------------------------------------
 # ==============================================================================
 def game_loop(args):
     pygame.init()
     pygame.font.init()
     world = None
 
+    # 初始化PID控制器（目标速度：30 km/h）
+    pid = PIDController(Kp=0.8, Ki=0.1, Kd=0.05)
+    target_speed = 30.0  # 目标巡航速度
+
     try:
         client = carla.Client(args.host, args.port)
-        client.set_timeout(4.0)
+        client.set_timeout(10.0)
 
         display = pygame.display.set_mode(
             (args.width, args.height),
@@ -564,35 +549,84 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
-        controller = KeyboardControl(world)
         clock = pygame.time.Clock()
 
         while True:
             clock.tick_busy_loop(60)
-            if controller.parse_events():
-                return
+
+            # 仅ESC退出
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == pygame.KEYUP and event.key == K_ESCAPE):
+                    return
 
             world.world.wait_for_tick()
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
 
-            # ===================== =====================
+            ego = world.player
+            transform = ego.get_transform()
+            vehicle_loc = transform.location
+            vehicle_forward = transform.get_forward_vector()
+
+            # ========== 1. PID定速巡航 ==========
+            vel = ego.get_velocity()
+            current_speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+            speed_pid = PIDController(Kp=0.8, Ki=0.1, Kd=0.05)
+            throttle = speed_pid.step(30.0, current_speed)
+            brake = 0.0
+
+            # ========== 2. 超柔和小幅度车道居中【重点：大幅降低转向增益，绝不撞墙】 ==========
+            waypoint = world.world.get_map().get_waypoint(vehicle_loc)
+            dx = waypoint.transform.location.x - vehicle_loc.x
+            dy = waypoint.transform.location.y - vehicle_loc.y
+            cross = dx * vehicle_forward.y - dy * vehicle_forward.x
+
+            # 转向PID参数大幅减小，仅轻微修正，转向平缓幅度极小
+            steer_pid = PIDController(Kp=0.20, Ki=0.0, Kd=0.03)
+            steer = steer_pid.step(0, cross)
+            # 额外限制最大转向角度，防止打满方向
+            steer = max(-0.25, min(0.25, steer))
+
+            # ========== 3. 障碍物检测+分级制动+防卡死脱困 ==========
+            safe_dist = 30.0
+            danger_dist = 10.0
+            min_dist = 9999
+
+            for vehicle in world.world.get_actors().filter('vehicle.*'):
+                if vehicle.id == ego.id:
+                    continue
+                diff = vehicle.get_transform().location - vehicle_loc
+                dot = diff.x * vehicle_forward.x + diff.y * vehicle_forward.y
+                if dot > 0:
+                    dist = math.hypot(diff.x, diff.y)
+                    if dist < min_dist:
+                        min_dist = dist
+
+            if min_dist < danger_dist:
+                brake = 0.6
+                throttle *= 0.15
+            elif min_dist < safe_dist:
+                brake = 0.25
+                throttle *= 0.4
+
+            if current_speed < 0.5 and min_dist > danger_dist + 2:
+                brake = 0.0
+                throttle = max(throttle, 0.2)
+
+            # ========== 最终控制 ==========
             control = carla.VehicleControl()
-            control.throttle = 0.5  # 满油门
-            control.steer = 0.0      # 直线
-            control.brake = 0.0       # 不刹车
-            control.hand_brake = False# 松手刹
-            control.reverse = False   # 不倒车
-            control.gear = 1          # 强制1档前进
-            # ====================================================
-            world.player.apply_control(control)
+            control.throttle = throttle
+            control.brake = brake
+            control.steer = steer
+            control.hand_brake = False
+            control.manual_gear_shift = False
+            ego.apply_control(control)
 
     finally:
         if world is not None:
             world.destroy()
         pygame.quit()
-
 # ==============================================================================
 # -- main() --------------------------------------------------------------
 # ==============================================================================
