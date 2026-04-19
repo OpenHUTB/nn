@@ -554,7 +554,7 @@ def game_loop(args):
         while True:
             clock.tick_busy_loop(60)
 
-            # 仅处理退出事件，无任何手动控制
+            # 仅ESC退出
             for event in pygame.event.get():
                 if event.type == pygame.QUIT or (event.type == pygame.KEYUP and event.key == K_ESCAPE):
                     return
@@ -564,21 +564,64 @@ def game_loop(args):
             world.render(display)
             pygame.display.flip()
 
-            # ===================== PID算法自动控制 =====================
-            # 获取当前车速(km/h)
-            vel = world.player.get_velocity()
-            current_speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+            ego = world.player
+            transform = ego.get_transform()
+            vehicle_loc = transform.location
+            vehicle_forward = transform.get_forward_vector()
 
-            # PID计算油门
+            # ========== 1. PID定速巡航 ==========
+            vel = ego.get_velocity()
+            current_speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+            speed_pid = PIDController(Kp=0.8, Ki=0.1, Kd=0.05)
+            throttle = speed_pid.step(30.0, current_speed)
+            brake = 0.0
+
+            # ========== 2. 超柔和小幅度车道居中【重点：大幅降低转向增益，绝不撞墙】 ==========
+            waypoint = world.world.get_map().get_waypoint(vehicle_loc)
+            dx = waypoint.transform.location.x - vehicle_loc.x
+            dy = waypoint.transform.location.y - vehicle_loc.y
+            cross = dx * vehicle_forward.y - dy * vehicle_forward.x
+
+            # 转向PID参数大幅减小，仅轻微修正，转向平缓幅度极小
+            steer_pid = PIDController(Kp=0.20, Ki=0.0, Kd=0.03)
+            steer = steer_pid.step(0, cross)
+            # 额外限制最大转向角度，防止打满方向
+            steer = max(-0.25, min(0.25, steer))
+
+            # ========== 3. 障碍物检测+分级制动+防卡死脱困 ==========
+            safe_dist = 30.0
+            danger_dist = 10.0
+            min_dist = 9999
+
+            for vehicle in world.world.get_actors().filter('vehicle.*'):
+                if vehicle.id == ego.id:
+                    continue
+                diff = vehicle.get_transform().location - vehicle_loc
+                dot = diff.x * vehicle_forward.x + diff.y * vehicle_forward.y
+                if dot > 0:
+                    dist = math.hypot(diff.x, diff.y)
+                    if dist < min_dist:
+                        min_dist = dist
+
+            if min_dist < danger_dist:
+                brake = 0.6
+                throttle *= 0.15
+            elif min_dist < safe_dist:
+                brake = 0.25
+                throttle *= 0.4
+
+            if current_speed < 0.5 and min_dist > danger_dist + 2:
+                brake = 0.0
+                throttle = max(throttle, 0.2)
+
+            # ========== 最终控制 ==========
             control = carla.VehicleControl()
-            control.throttle = pid.step(target_speed, current_speed)
-            control.brake = 0.0
-            control.steer = 0.0
+            control.throttle = throttle
+            control.brake = brake
+            control.steer = steer
             control.hand_brake = False
             control.manual_gear_shift = False
-
-            # 算法输出控制指令
-            world.player.apply_control(control)
+            ego.apply_control(control)
 
     finally:
         if world is not None:
