@@ -107,22 +107,14 @@ class TargetVisualizer:
 
     def _add_target_geom(self):
         """动态添加目标点几何"""
-        # 创建临时几何
         self.target_geom = mujoco.MjvGeom()
-        mujoco.mj_initGeom(
-            self.target_geom,
-            mujoco.mjtGeom.mjGEOM_SPHERE,
-            np.array([0.02, 0.02, 0.02]),  # 大小
-            np.zeros(3),  # 偏移
-            np.eye(3).flatten(),  # 旋转
-            np.array([1.0, 0.0, 0.0, 1.0])  # 颜色（红色）
-        )
+        mujoco.mjv_initGeom(self.target_geom, mujoco.mjtGeom.mjGEOM_SPHERE, np.array([0.02, 0.02, 0.02]), np.zeros(3), np.eye(3).flatten(), np.array([1.0, 0.0, 0.0, 1.0]))
 
     def update_target(self, pos):
         """更新目标点位置"""
         self.target_pos = pos
 
     def render(self, viewer):
-        """在Viewer中渲染目标点"""
-        self.target_geom.pos = np.array(self.target_pos)
-        mujoco.mjv_geom(viewer.vopt, self.sim.model, self.sim.data, [self.target_geom], 1)
+        """在Viewer中渲染目标点（MuJoCo 3.x兼容）"""
+        self.target_geom.pos[:] = np.array(self.target_pos)
+        mujoco.mjv_addGeoms(viewer.model, viewer.data, viewer.user_scn, [self.target_geom])
