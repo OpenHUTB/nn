@@ -76,31 +76,15 @@ python src/carla_traffic_sign_recognition/main.py
 
 ## 5. 工程实践与部署避坑指南 (Troubleshooting)
 
-<<<<<<< HEAD
 在向官方开源社区提交代码的过程中，我们克服了一系列棘手的底层环境与网络部署问题：
 
 1. **幽灵文件排查 (`nul` 索引错误)**：在 Windows 操作系统下提交代码时，遭遇了底层文件系统冲突引发的 `error: unable to index file 'nul'` 致命报错。通过深入排查 Git 索引缓存与强制删除无效文件引用，成功修复了本地暂存区损坏问题。
 2. **分支管理映射 (Branching)**：在团队协作中，严格理清了本地开发分支（`dev-yss`）与云端主分支（`main`）的合并策略与映射关系，避免了代码覆盖灾难。
 3. **网络层抗压与图床调试**：解决了国内拉取 GitHub 依赖时常见的 `Connection was reset` 代理拦截问题。同时，在编写本篇文档时，修复了 Markdown 的换行渲染失效 Bug，并通过精确设定相对路径，成功将高帧率演示动图嵌入官方文档页面。
-=======
-2. **启动 Client**：在 `nn` 项目根目录下开启新终端，执行：
-   ```
-   python src/carla_traffic_sign_recognition/main.py
-   ```  
-3. **交互控制**：
-   必须用鼠标点击弹出的 `Carla Traffic Sign Recognition` 视频窗口以激活键盘监听。
-   * **W**: 油门前进 | **S**: 刹车/倒车 | **A/D**: 左右转向 | **Q**: 安全退出并销毁车辆实例。<img width="875" height="351" alt="image-20260418195910551" src="https://github.com/user-attachments/assets/864eae7e-6618-452c-96f9-b1e5e7d83e7c" />
->>>>>>> e4e0f7f12f9b832a40398d302e51096ca0fc0818
 
 ## 6. 运行效果展示
 
-<<<<<<< HEAD
 当用户驾驶 Ego Vehicle 接近十字路口时，YOLO 视觉引擎能够在复杂的城市背景、不同的光照条件以及多变的角度下，稳定锁定目标。
-=======
-> <img width="776" height="441" alt="image" src="https://github.com/user-attachments/assets/e2ff66f4-fc36-48ea-92b7-a600fdac816e" />
-
-> *图：Carla 模拟器中的实车第一视角，YOLOv8 成功锁定 Stop Sign 并实时绘制检测框，延迟稳定在 30ms 左右。*
->>>>>>> e4e0f7f12f9b832a40398d302e51096ca0fc0818
 
 ![Carla 第一视角：YOLOv8 检测 Stop Sign（置信度示例）](assets/2026-04-18_222914.png)
 
@@ -114,11 +98,3 @@ python src/carla_traffic_sign_recognition/main.py
 2. **感知与控制的深度融合 (P&C Integration)**：抛弃现有的手动键盘接管，将检测框中心的像素坐标及其面积变化率，转化为相对物理距离与偏航角误差。将其作为状态空间（State Space）输入给 PID 控制器或强化学习智能体（RL Agent），真正实现“看见标志 -> 自动平滑刹停”的 L2 级别自动驾驶策略。
 3. **LiDAR 多传感器前融合 (Sensor Fusion)**：单目相机缺乏深度信息，后续将尝试结合 Carla 挂载的 LiDAR（激光雷达）点云数据，将 2D 图像平面的 Bounding Box 投影映射到 3D 空间，为感知系统赋予真实的物理距离感知能力。
 
-<<<<<<< HEAD
-=======
-2. **感知与控制的融合 (P&C Integration)**：将当前的检测框中心坐标转化为相对距离和角度误差，输入给 PID 控制器或强化学习（RL）智能体，真正实现“看见标志 -> 自动刹车”的全自动驾驶策略。
-
-   
-
-3. **多传感器融合 (Sensor Fusion)**：结合 Carla 提供的 LiDAR（激光雷达）数据，为 2D 交通标志检测框赋予真实的 3D 深度信息。
->>>>>>> e4e0f7f12f9b832a40398d302e51096ca0fc0818
