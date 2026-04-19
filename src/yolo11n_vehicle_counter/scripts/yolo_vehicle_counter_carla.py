@@ -6,14 +6,19 @@ import json
 from datetime import datetime
 
 # ==================== 配置路径 ====================
+import os
+# 获取脚本所在目录的相对路径
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))  # yolo11n_vehicle_counter上级目录
+
 # 模型文件路径
-MODEL_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/models/yolo11n.pt"
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models/yolo11n.pt")
 # 输入视频文件路径 - 针对CARLA录制的视频
-INPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/dataset/sample.mp4"
+INPUT_VIDEO_PATH = os.path.join(PROJECT_ROOT, "dataset/sample.mp4")
 # 输出视频文件路径
-OUTPUT_VIDEO_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/res/sample_res.mp4"
+OUTPUT_VIDEO_PATH = os.path.join(PROJECT_ROOT, "res/sample_res.mp4")
 # 统计数据保存路径
-STATS_OUTPUT_PATH = "d:/git/nn/src/yolo11n_vehicle_counter/res/counting_stats.json"
+STATS_OUTPUT_PATH = os.path.join(PROJECT_ROOT, "res/counting_stats.json")
 # ==================================================
 
 
