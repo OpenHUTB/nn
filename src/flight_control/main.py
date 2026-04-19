@@ -17,15 +17,12 @@ class FlightControl:
         self.use_gui = "--gui" in sys.argv
         self.use_map = "--map" in sys.argv
         self.use_video = "--video" in sys.argv
-        self.use_rl = "--rl" in sys.argv
         self.gui = None
         self.map_display = None
         self.video_stream = None
-        self.rl_controller = None
         self.gui_started = False
         self.map_started = False
         self.video_started = False
-        self.rl_started = False
         self.current_velocity = (0, 0, 0)
         self.waypoints = []
         self.is_cruising = False
@@ -38,7 +35,6 @@ class FlightControl:
         self.import_gui()
         self.import_map()
         self.import_video()
-        self.import_rl()
         # 尝试连接无人机，但即使连接失败也继续运行
         connected = self.connect_drone()
         if connected:
@@ -81,16 +77,13 @@ class FlightControl:
         print(f"启用 GUI: {self.use_gui}")
         print(f"启用地图显示: {self.use_map}")
         print(f"启用视频流: {self.use_video}")
-        print(f"启用强化学习: {self.use_rl}")
         print("使用说明:")
         print("  python main.py              - 仅使用命令行控制")
         print("  python main.py --gui        - 启用 GUI 控制")
         print("  python main.py --map        - 启用地图显示")
         print("  python main.py --video      - 启用视频流显示")
-        print("  python main.py --rl         - 启用强化学习控制")
         print("  python main.py --gui --map  - 同时启用 GUI 和地图显示")
         print("  python main.py --gui --video - 同时启用 GUI 和视频流显示")
-        print("  python main.py --rl --gui   - 同时启用强化学习和 GUI")
     
     def import_gui(self):
         """导入 GUI 模块"""
@@ -192,33 +185,6 @@ class FlightControl:
                     import traceback
                     traceback.print_exc()
                     self.use_video = False
-    
-    def import_rl(self):
-        """导入强化学习模块"""
-        if self.use_rl:
-            try:
-                print("开始导入强化学习模块...")
-                # 尝试相对导入
-                from .reinforcement_learning.run_model import RLController
-                self.RLController = RLController
-                print("成功导入强化学习模块（相对导入）")
-            except Exception as e:
-                print(f"相对导入失败: {e}")
-                try:
-                    # 尝试直接导入
-                    import sys
-                    import os
-                    # 添加src目录到Python路径
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-                    print(f"添加路径: {os.path.join(os.path.dirname(__file__), '..', '..')}")
-                    from src.flight_control.reinforcement_learning.run_model import RLController
-                    self.RLController = RLController
-                    print("成功导入强化学习模块（直接导入）")
-                except Exception as e2:
-                    print(f"导入强化学习模块失败: {e2}")
-                    import traceback
-                    traceback.print_exc()
-                    self.use_rl = False
     
     def connect_drone(self):
         """连接到无人机"""
@@ -438,28 +404,6 @@ class FlightControl:
         else:
             print("未启用视频流显示")
     
-    def start_rl(self):
-        """启动强化学习控制"""
-        if self.use_rl:
-            try:
-                print("启动强化学习控制...")
-                # 创建强化学习控制器
-                model_path = os.path.join(os.path.dirname(__file__), 'reinforcement_learning', 'models', 'ppo_drone_final.zip')
-                self.rl_controller = self.RLController(model_path=model_path, client=self.client)
-                self.rl_controller.initialize()
-                
-                # 设置运行状态（不在单独线程中运行，由主循环调用step()）
-                self.rl_controller.running = True
-                
-                self.rl_started = True
-                print("强化学习控制已启动")
-            except Exception as e:
-                print(f"强化学习控制启动失败: {e}")
-                import traceback
-                traceback.print_exc()
-        else:
-            print("未启用强化学习控制")
-    
     def update_position(self):
         """更新无人机位置"""
         # 模拟位置数据，用于测试地图显示
@@ -514,8 +458,6 @@ class FlightControl:
             self.start_map()
             # 启动视频流显示
             self.start_video()
-            # 启动强化学习控制
-            self.start_rl()
             
             # 启动键盘监听
             print("启动键盘监听...")
