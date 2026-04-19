@@ -41,8 +41,6 @@ class ReplayBuffer:
 
 
 class ActionSmoother:
-    """动作平滑器 - 使用指数移动平均使动作更平滑"""
-
     def __init__(self, action_dim, smooth_factor=0.3):
         self.action_dim = action_dim
         self.smooth_factor = smooth_factor
@@ -52,8 +50,6 @@ class ActionSmoother:
         if self.prev_action is None:
             self.prev_action = action.copy()
             return action
-
-        # 指数移动平均
         smoothed = self.smooth_factor * action + (1 - self.smooth_factor) * self.prev_action
         self.prev_action = smoothed.copy()
         return smoothed
@@ -67,7 +63,6 @@ class TD3Agent:
         self.device = device
         self.use_cnn = use_cnn
 
-        # 网络初始化
         self.actor = Actor(state_dim, action_dim, max_action, use_cnn).to(device)
         self.actor_target = Actor(state_dim, action_dim, max_action, use_cnn).to(device)
         self.actor_target.load_state_dict(self.actor.state_dict())
@@ -93,33 +88,25 @@ class TD3Agent:
         self.policy_freq = 2
         self.total_it = 0
 
-        # 动作平滑组件
         self.action_smoother = ActionSmoother(action_dim, action_smooth_factor)
         self.action_history = deque(maxlen=3)
 
     def select_action(self, state, apply_smoothing=True):
-        """选择动作，可选应用平滑"""
         self.actor.eval()
-
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             raw_action = self.actor(state_tensor).cpu().numpy().flatten()
-
         self.actor.train()
 
-        # 矫正动作范围
-        raw_action[0] = np.clip(raw_action[0], -self.max_action, self.max_action)  # steering
-        raw_action[1] = np.clip(raw_action[1], 0, self.max_action)  # gas
-        raw_action[2] = np.clip(raw_action[2], 0, self.max_action)  # brake
+        raw_action[0] = np.clip(raw_action[0], -self.max_action, self.max_action)
+        raw_action[1] = np.clip(raw_action[1], 0, self.max_action)
+        raw_action[2] = np.clip(raw_action[2], 0, self.max_action)
 
         if apply_smoothing:
-            # 应用指数移动平均平滑
             smoothed_action = self.action_smoother.smooth(raw_action)
-
-            # 限制动作变化率，防止突变
             if len(self.action_history) > 0:
                 prev_action = self.action_history[-1]
-                max_change = 0.3  # 最大变化率
+                max_change = 0.3
                 change = np.abs(smoothed_action - prev_action)
                 if np.any(change > max_change):
                     for i in range(len(smoothed_action)):
@@ -127,14 +114,11 @@ class TD3Agent:
                             smoothed_action[i] = prev_action[i] + np.clip(
                                 smoothed_action[i] - prev_action[i], -max_change, max_change
                             )
-
             self.action_history.append(smoothed_action.copy())
             return smoothed_action
-        else:
-            return raw_action
+        return raw_action
 
     def reset_action_history(self):
-        """重置动作历史（在每个episode开始时调用）"""
         self.action_smoother.reset()
         self.action_history.clear()
 
@@ -157,7 +141,6 @@ class TD3Agent:
         with torch.no_grad():
             noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
             next_action = (self.actor_target(next_state) + noise)
-            # 矫正动作范围
             next_action[..., 0] = next_action[..., 0].clamp(-self.max_action, self.max_action)
             next_action[..., 1] = next_action[..., 1].clamp(0, self.max_action)
             next_action[..., 2] = next_action[..., 2].clamp(0, self.max_action)
@@ -179,13 +162,11 @@ class TD3Agent:
 
         if self.total_it % self.policy_freq == 0:
             actor_loss = -self.critic1(state, self.actor(state)).mean()
-
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
             torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 1.0)
             self.actor_optimizer.step()
 
-            # 软更新目标网络
             for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
             for param, target_param in zip(self.critic1.parameters(), self.critic1_target.parameters()):
