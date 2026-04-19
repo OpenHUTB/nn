@@ -72,7 +72,7 @@ python src/carla_traffic_sign_recognition/main.py
 
 在主循环中，我们引入了 OpenCV 的按键事件监听机制 (`cv2.waitKey`)。系统通过非阻塞方式精准捕获用户的 `W/A/S/D` 键盘指令，并通过平滑插值算法将其映射为 `carla.VehicleControl()` 的油门（Throttle）、刹车（Brake）和转向（Steer）参数。这一设计成功实现了从“纯看客”到“人在回路接管”的转变。
 
-![操纵）](assets/image-20260418195910551.png)
+<img width="875" height="351" alt="image-20260418195910551" src="https://github.com/user-attachments/assets/5e40baef-0934-4d90-b90e-496f03bc325c" />
 
 ## 5. 工程实践与部署避坑指南 (Troubleshooting)
 
@@ -86,7 +86,7 @@ python src/carla_traffic_sign_recognition/main.py
 
 当用户驾驶 Ego Vehicle 接近十字路口时，YOLO 视觉引擎能够在复杂的城市背景、不同的光照条件以及多变的角度下，稳定锁定目标。
 
-![Carla 第一视角：YOLOv8 检测 Stop Sign（置信度示例）](assets/2026-04-18_222914.png)
+<img width="776" height="441" alt="2026-04-18_222914" src="https://github.com/user-attachments/assets/c1a8e52c-275b-4137-968a-a4b90d50bdd3" />
 
 > *图：Carla 模拟器中的实车第一视角。经过张量重塑与 NMS 过滤后，YOLOv8 成功锁定 Stop Sign 并实时绘制检测框，整体感知延迟稳定在 30ms 量级。*
 
