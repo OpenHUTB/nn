@@ -1,0 +1,42 @@
+NEW_FILE_CODE
+# Python virtual environment
+lane_venv/
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.venv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+*.jpg
+*.png
+*.mp4
+*.avi
