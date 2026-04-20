@@ -74,7 +74,8 @@ try:
                 done = terminated or truncated
             else:
                 raise ValueError(f"Unexpected step return length: {len(step_result)}")
-
+            
+            # 每隔固定步数输出一次当前 step 的奖励、代价和结束状态
             if env.time_step % 10 == 0 or done:
                 print(
                     f"Step: {env.time_step:4d} | "
@@ -82,6 +83,27 @@ try:
                     f"Cost: {cost:6.2f} | "
                     f"Done: {done}"
                 )
+
+            # 提取车辆当前速度及运行状态，并在 CARLA 画面中显示监控信息
+            speed = next_obs['ego_state'][3]
+            collision = info.get('is_collision', False)
+            off_road = info.get('is_off_road', False)
+
+            ego_location = env.ego.get_transform().location
+            text_location = carla.Location(
+                x=ego_location.x,
+                y=ego_location.y,
+                z=ego_location.z + 2.5
+            )
+
+            env.world.debug.draw_string(
+                text_location,
+                f"Speed: {speed:.2f} m/s | Reward: {reward:.2f} | Cost: {cost:.2f} | Collision: {collision} | OffRoad: {off_road}",
+                draw_shadow=False,
+                color=carla.Color(0, 255, 0),
+                life_time=0.12,
+                persistent_lines=False
+            )
 
             obs = next_obs
             total_reward += reward
