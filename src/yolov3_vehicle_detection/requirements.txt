@@ -1,5 +1,5 @@
 # CARLA Simulator Client (版本需与你的模拟器匹配)
-carla==0.9.11
+carla==0.9.14
 
 # 计算机视觉与目标检测
 opencv-python>=4.5.5
