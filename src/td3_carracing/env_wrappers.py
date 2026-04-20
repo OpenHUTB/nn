@@ -2,6 +2,7 @@ import gymnasium as gym
 import cv2
 import numpy as np
 
+
 class SkipFrame(gym.Wrapper):
     def __init__(self, env, skip=4):
         super().__init__(env)
@@ -16,6 +17,7 @@ class SkipFrame(gym.Wrapper):
                 break
         return obs, total_reward, terminated, truncated, info
 
+
 class PreProcessObs(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -29,6 +31,7 @@ class PreProcessObs(gym.ObservationWrapper):
         obs = obs / 255.0
         obs = obs[..., None]
         return obs
+
 
 class StackFrames(gym.ObservationWrapper):
     def __init__(self, env, stack=4):
@@ -55,8 +58,30 @@ class StackFrames(gym.ObservationWrapper):
         state = state.transpose(2, 0, 1)
         return state
 
+
+class SmoothActionWrapper(gym.Wrapper):
+    """动作平滑包装器 - 让车辆运行更平滑"""
+
+    def __init__(self, env, alpha=0.7):
+        super().__init__(env)
+        self.alpha = alpha  # 平滑系数，越大越接近原始动作
+        self.last_action = None
+
+    def step(self, action):
+        if self.last_action is not None:
+            # 指数移动平均平滑
+            action = self.alpha * action + (1 - self.alpha) * self.last_action
+        self.last_action = action.copy()
+        return self.env.step(action)
+
+    def reset(self, **kwargs):
+        self.last_action = None
+        return self.env.reset(**kwargs)
+
+
 def wrap_env(env):
     env = SkipFrame(env)
     env = PreProcessObs(env)
     env = StackFrames(env)
+    env = SmoothActionWrapper(env, alpha=0.7)  # 添加动作平滑
     return env
