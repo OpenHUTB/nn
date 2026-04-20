@@ -1,0 +1,7 @@
+# MuJoCo 日志
+MUJOCO_LOG.TXT
+
+# Python 字节码文件
+__pycache__/
+*.py[cod]
+*$py.class
