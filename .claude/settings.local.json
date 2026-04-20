@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(del \"d:\\\\Project_whd\\\\nn\\\\src\\\\carla_autonomous_car\\\\agents\\\\reinforcement_learning\\\\stable_baselines\\\\ppo1\\\\experiments\\\\__init__.py\" \"d:\\\\Project_whd\\\\nn\\\\src\\\\carla_autonomous_car\\\\agents\\\\reinforcement_learning\\\\stable_baselines\\\\deepq\\\\experiments\\\\__init__.py\")",
-      "Bash(del \"d:\\\\Project_whd\\\\nn\\\\src\\\\carla_autonomous_car\\\\__init__.py\")"
-    ]
-  }
-}
