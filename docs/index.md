@@ -40,6 +40,8 @@ title: 主页
 
 [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
 
+[__目标检测__](./test/object_detection.md) - 目标检测与危险评估
+
 [__跟踪__](#tracking) 
 
 ## 规划 <span id="planning"></span>

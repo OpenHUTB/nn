@@ -3,6 +3,9 @@
 它遵循标准的 Gym 接口（reset、step），并演示了环境的基本使用方法。
 """
 
+import os
+import pickle
+
 import gym
 import easycarla
 import carla
@@ -32,6 +35,10 @@ params = {
 # 创建环境
 env = gym.make('carla-v0', params=params)
 
+# 数据保存目录
+save_dir = "collected_episodes"
+os.makedirs(save_dir, exist_ok=True)
+
 reset_result = env.reset()
 if isinstance(reset_result, tuple):
     obs, info = reset_result
@@ -57,6 +64,8 @@ try:
 
         done = False
         total_reward = 0
+        total_cost = 0.0
+        episode_data = []
 
         while not done:
             action = get_action(env, obs)
@@ -75,6 +84,17 @@ try:
             else:
                 raise ValueError(f"Unexpected step return length: {len(step_result)}")
             
+            transition = {
+                "obs": obs,
+                "action": np.array(action, dtype=np.float32),
+                "reward": float(reward),
+                "cost": float(cost),
+                "next_obs": next_obs,
+                "done": bool(done),
+                "info": info,
+            }
+            episode_data.append(transition)
+
             # 每隔固定步数输出一次当前 step 的奖励、代价和结束状态
             if env.time_step % 10 == 0 or done:
                 print(
@@ -107,8 +127,27 @@ try:
 
             obs = next_obs
             total_reward += reward
+            total_cost += cost
 
-        print(f"Episode {episode} finished. Total reward: {total_reward:.2f}")
+        episode_record = {
+            "episode_id": episode,
+            "total_reward": float(total_reward),
+            "total_cost": float(total_cost),
+            "num_steps": len(episode_data),
+            "data": episode_data,
+        }
+
+        save_path = os.path.join(save_dir, f"episode_{episode:03d}.pkl")
+        with open(save_path, "wb") as f:
+            pickle.dump(episode_record, f)
+
+        print(
+            f"Episode {episode} finished. "
+            f"Total reward: {total_reward:.2f} | "
+            f"Total cost: {total_cost:.2f} | "
+            f"Steps: {len(episode_data)} | "
+            f"Saved to: {save_path}"
+        )
 
 finally:
     env.close()
