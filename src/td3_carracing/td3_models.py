@@ -10,6 +10,8 @@ class CNNEncoder(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, 3, stride=1)
         self.flatten = nn.Flatten()
+        # 计算卷积后的特征维度
+        # 输入 (4,42,42) -> conv1: (32,9,9) -> conv2: (64,3,3) -> conv3: (64,1,1) -> 展平: 64
         self.fc = nn.Linear(64, 256)
 
     def forward(self, x):
@@ -46,7 +48,7 @@ class Actor(nn.Module):
 # Critic 价值网络
 class Critic(nn.Module):
     def __init__(self, state_dim, action_dim, use_cnn=True):
-        super().__init__()  # 这里修复了！
+        super().__init__()
         self.use_cnn = use_cnn
         if use_cnn:
             self.encoder = CNNEncoder(input_channels=4)
