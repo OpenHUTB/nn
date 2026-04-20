@@ -1,0 +1,13 @@
+# TensorBoard logs
+logs/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Debug images
+debug_*.png
+
+# Model files (large binaries)
+*.weights

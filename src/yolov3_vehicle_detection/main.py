@@ -3,14 +3,22 @@ import time
 import queue
 import numpy as np
 import carla
-import argparse  # [新增] 引入命令行参数解析库
+import argparse
+import sys
+import os
 
-from .config import config
-from .utils.carla_client import CarlaClient
-from .models.yolo_detector import YOLODetector
-from .utils.visualization import draw_results, draw_safe_zone
-from .utils.planner import SimplePlanner
-from .utils.logger import PerformanceLogger
+# 添加项目根目录到路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.dirname(current_dir)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
+from yolov3_vehicle_detection.config import config
+from yolov3_vehicle_detection.utils.carla_client import CarlaClient
+from yolov3_vehicle_detection.models.yolo_detector import YOLODetector
+from yolov3_vehicle_detection.utils.visualization import draw_results, draw_safe_zone
+from yolov3_vehicle_detection.utils.planner import SimplePlanner
+from yolov3_vehicle_detection.utils.logger import PerformanceLogger
 
 
 # [新增] 参数解析函数
