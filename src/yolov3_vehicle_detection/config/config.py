@@ -1,8 +1,8 @@
 class Config:
     # YOLO模型配置
-    yolo_cfg_path = "models/yolov3-tiny.cfg"
-    yolo_weights_path = "models/yolov3-tiny.weights"
-    yolo_names_path = "models/coco.names"
+    yolo_cfg_path = "src/yolov3_vehicle_detection/models/yolov3-tiny.cfg"
+    yolo_weights_path = "src/yolov3_vehicle_detection/models/yolov3-tiny.weights"
+    yolo_names_path = "src/yolov3_vehicle_detection/models/coco.names"
     conf_thres = 0.5
     nms_thres = 0.4
 
