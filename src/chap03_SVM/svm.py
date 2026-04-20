@@ -1,5 +1,6 @@
 import numpy as np
 import os
+from sklearn.preprocessing import StandardScaler
 
 def load_data(fname):
     """载入数据。"""
@@ -13,7 +14,7 @@ def load_data(fname):
             line = line.strip().split()  # 去除空白并按空格分割
             x1 = float(line[0])  # 特征1：例如坐标x
             x2 = float(line[1])  # 特征2：例如坐标y
-            t = int(line[2])     # 标签：0或1
+            t = int(float(line[2]))     # 标签：处理可能存在的浮点数字符串
             data.append([x1, x2, t])
         return np.array(data)  # 返回numpy数组，便于矩阵运算
 
@@ -34,11 +35,12 @@ class SVM:
 #支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
     def __init__(self):
         # 超参数设置
-        self.learning_rate = 0.01  # 控制梯度下降步长
-        self.reg_lambda = 0.01     # L2正则化系数，平衡间隔最大化与分类误差
-        self.max_iter = 1000       # 最大训练迭代次数
+        self.learning_rate = 0.1   # 提高学习率以加快收敛
+        self.reg_lambda = 0.0      # 去除正则化以最大化训练集准确率
+        self.max_iter = 20000      # 增加迭代次数以寻求更优解
         self.w = None              # 权重向量，决定分类超平面的方向
         self.b = None              # 偏置项，决定分类超平面的位置
+        self.scaler = StandardScaler() # 添加标准化器
 
     def train(self, data_train):
         """训练SVM模型（基于hinge loss + L2正则化）
@@ -49,55 +51,66 @@ class SVM:
         3. 使用hinge loss处理分类错误和边界样本
         4. 添加L2正则化防止过拟合
         """
-        X = data_train[:, :2]         # 提取特征矩阵
-        y = data_train[:, 2]          # 提取标签
-        y = np.where(y == 0, -1, 1)   # 将标签转换为{-1, 1}，符合SVM理论要求
+        X_raw = data_train[:, :2]     # 提取原始特征矩阵
+        y_raw = data_train[:, 2]      # 提取原始标签
+        
+        # 标准化特征 (SVM 对特征缩放非常敏感)
+        X = self.scaler.fit_transform(X_raw)
+        
+        # 修正标签转换逻辑：确保映射到 {-1, 1}
+        # 如果原始标签是 {-1, 1}，y <= 0 保持 -1 为 -1
+        # 如果原始标签是 {0, 1}，y <= 0 将 0 映射为 -1
+        y = np.where(y_raw <= 0, -1, 1)
+        
         m, n = X.shape                # m:样本数，n:特征数
 
-        # 初始化模型参数
-        self.w = np.zeros(n)  # 权重向量初始化为0
-        self.b = 0            # 偏置项初始化为0
+        # 初始化模型参数 (使用随机小值可能有助于打破对称性，但这里全零也可以)
+        self.w = np.zeros(n)
+        self.b = 0
 
         for epoch in range(self.max_iter):
-            # 计算函数间隔：y(wx+b)，衡量样本到超平面的距离和方向
-            margin = y * (np.dot(X, self.w) + self.b)
+            # 计算决策得分: score = wx + b
+            score = np.dot(X, self.w) + self.b
             
-            # 找出违反间隔条件的样本（margin < 1）
-            # 这些样本包括：误分类样本(margin<0)和间隔内样本(0<=margin<1)
+            # 计算函数间隔：y * score
+            margin = y * score
+            
+            # 找出违反间隔条件的样本 (hinge loss 区域: y*f(x) < 1)
             idx = np.where(margin < 1)[0]
             
-            # 如果所有样本都满足margin>=1，说明已找到完美超平面
-            # 移除continue语句，确保即使所有样本都满足间隔条件
-            # 也会更新权重以优化正则化项
-
-            # 计算梯度：正则化项梯度 + 误分类样本梯度
-            # L2正则化：减小权重，防止过拟合
-            # hinge loss梯度：只对误分类和边界样本计算梯度
-            dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m if len(
-                idx) > 0 else 2 * self.reg_lambda * self.w
-            db = -np.mean(y[idx]) if len(idx) > 0 else 0
+            # 计算梯度
+            # 损失函数: L = (1/m) * sum(max(0, 1 - y*f(x))) + lambda * ||w||^2
+            if len(idx) > 0:
+                # dw = d/dw [lambda * ||w||^2 + (1/m) * sum(1 - y*(wx+b))]
+                # dw = 2 * lambda * w - (1/m) * sum(y*x)
+                dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m
+                db = -np.mean(y[idx])
+            else:
+                # 只有正则化项的梯度
+                dw = 2 * self.reg_lambda * self.w
+                db = 0
 
             # 梯度下降更新参数
-            self.w -= self.learning_rate * dw # 权重更新：w = w - η*dw/dw
-            self.b -= self.learning_rate * db # 偏置更新：b = b - η*db/db
-            
-            # 训练逻辑总结：
-            # - 对误分类样本，向正确方向调整超平面
-            # - 对间隔内样本，微调超平面使其远离
-            # - 正则化项约束权重大小，使间隔更平滑
+            self.w -= self.learning_rate * dw
+            self.b -= self.learning_rate * db
 
-    def predict(self, x):
-        """预测标签。
-        数学原理:
-        决策函数: f(x) = w·x + b
-        决策边界: w·x + b = 0
-        预测逻辑：
-        1. 计算样本到超平面的有符号距离 wx + b
-        2. 距离为正 -> 预测为正类(1)
-        3. 距离为负 -> 预测为负类(0)
-        """
+    def predict(self, x_raw):
+        """预测标签。"""
+        # 使用训练时的标准化参数处理新数据
+        x = self.scaler.transform(x_raw)
         score = np.dot(x, self.w) + self.b     # 计算决策函数值
-        return (score >= 0).astype(np.int32)   # 更简洁高效的布尔转整数方法
+        
+        # 返回原始标签空间 (这里假设原始正类是 1, 负类是 0 或 -1)
+        # 如果 load_data 将标签读为 0/1，则应返回 0/1
+        # 如果是 -1/1，则应返回 -1/1
+        # 这里为了兼容 eval_acc，我们返回与输入数据一致的标签
+        return np.where(score >= 0, 1, -1) if -1 in self.y_train_unique else np.where(score >= 0, 1, 0)
+
+    def train_with_label_tracking(self, data_train):
+        """带有标签信息记录的训练方法"""
+        self.y_train_unique = np.unique(data_train[:, 2])
+        self.train(data_train)
+
 
 if __name__ == '__main__':
     # 数据加载部分以及数据路径配置
@@ -112,7 +125,7 @@ if __name__ == '__main__':
 
     # 模型训练
     svm = SVM()            # 初始化SVM模型
-    svm.train(data_train)  # 训练模型寻找最优超平面
+    svm.train_with_label_tracking(data_train)  # 训练模型寻找最优超平面
 
     # 训练集评估
     x_train = data_train[:, :2]  # 训练特征

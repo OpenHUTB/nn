@@ -14,6 +14,7 @@ import cv2 as cv
 from ultralytics import YOLO
 import numpy as np
 import supervision as sv
+from keyboard_handler import handle_keyboard_events
 
 # ==================== 配置路径 ====================
 # 模型文件路径
@@ -197,9 +198,10 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         # 显示当前帧
         cv.imshow("YOLO11n Region Vehicle Counter", frame)
 
-        if cv.waitKey(1) & 0xff == ord('p'):  # 按'p'键暂停
-            print("用户暂停，按任意键继续...")
-            cv.waitKey(0)
+        # 键盘事件处理
+        key = cv.waitKey(1) & 0xff
+        if not handle_keyboard_events(key, frame, frame_count, cap, out, "YOLO11n Region Vehicle Counter"):
+            break
 
     # 释放资源
     cap.release()

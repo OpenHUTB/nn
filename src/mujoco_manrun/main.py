@@ -1,4 +1,3 @@
-import mujoco
 import numpy as np
 from mujoco import viewer
 import time
@@ -8,7 +7,7 @@ import threading
 from collections import deque
 
 
-# ===================== ROS话题接收模块（原有逻辑完全保留） =====================
+# ===================== ROS话题接收模块 =====================
 class ROSCmdVelHandler(threading.Thread):
     """ROS /cmd_vel话题接收线程，映射linear.x→速度，angular.z→转向"""
 
@@ -78,7 +77,7 @@ class ROSCmdVelHandler(threading.Thread):
         self.running = False
 
 
-# ===================== 键盘输入监听线程（新增步态切换按键） =====================
+# ===================== 终端键盘控制（pycham） =====================
 class KeyboardInputHandler(threading.Thread):
     def __init__(self, stabilizer):
         super().__init__(daemon=True)
@@ -86,87 +85,88 @@ class KeyboardInputHandler(threading.Thread):
         self.running = True
 
     def run(self):
-        print("\n===== 控制指令说明 =====")
-        print("w: 开始行走 | s: 停止行走 | e: 紧急停止 | r: 恢复站立")
-        print("a: 左转 | d: 右转 | 空格: 原地转向 | z: 减速 | x: 加速")
-        print("m: 传感器模拟开关 | p: 打印传感器数据")
-        print("1: 慢走 | 2: 正常走 | 3: 小跑 | 4: 原地踏步")  # 新增步态切换
-        print("========================\n")
+        print("\n===== PyCharm 终端控制已启动 =====")
+        print("w: 行走 | s: 停止 | e: 急停 | r: 复位")
+        print("a: 左转 | d: 右转 | 空格: 原地转")
+        print("z: 减速 | x: 加速")
+        print("1: 慢走 | 2: 正常 | 3: 小跑 | 4: 踏步")
+        print("m: 传感器开关 | p: 打印数据")
+        print("===================================\n")
+
         while self.running:
             try:
-                # 非阻塞键盘输入（兼容不同系统）
-                if sys.platform == "win32":
-                    import msvcrt
-                    if msvcrt.kbhit():
-                        key = msvcrt.getch().decode('utf-8').lower()
-                        self._handle_key(key)
-                else:
-                    import select
-                    if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
-                        key = sys.stdin.read(1).lower()
-                        self._handle_key(key)
-                time.sleep(0.01)
+                import sys
+                import tty
+                import termios
+                fd = sys.stdin.fileno()
+                old = termios.tcgetattr(fd)
+                tty.setraw(fd)
+
+                if sys.stdin.read(1) == '\x1b':  # 方向键忽略
+                    sys.stdin.read(2)
+                    termios.tcsetattr(fd, termios.TCSADRAIN, old)
+                    continue
+
+                key = sys.stdin.read(1)
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+                self._handle_key(key)
             except:
-                continue
+                key = sys.stdin.read(1)
+                self._handle_key(key)
+            time.sleep(0.05)
 
     def _handle_key(self, key):
+        key = key.lower()
         if key == 'w':
-            # 启动行走时保留当前步态模式
             current_gait = self.stabilizer.gait_mode
             self.stabilizer.set_state("WALK")
             self.stabilizer.set_gait_mode(current_gait)
-            print(
-                f"[指令] 切换为行走状态 | 当前步态: {current_gait} | 速度: {self.stabilizer.walk_speed:.2f} | 转向: {self.stabilizer.turn_angle:.2f}")
+            print(f"[行走] 速度:{self.stabilizer.walk_speed:.2f} | 转向:{self.stabilizer.turn_angle:.2f}")
         elif key == 's':
             self.stabilizer.set_state("STOP")
-            print("[指令] 切换为停止状态")
+            print("[停止]")
         elif key == 'e':
             self.stabilizer.set_state("EMERGENCY")
-            print("[指令] 触发紧急停止")
+            print("[紧急停止]")
         elif key == 'r':
             self.stabilizer.set_state("STAND")
-            print("[指令] 恢复站立姿态")
+            print("[恢复站立]")
         elif key == 'a':
             self.stabilizer.set_turn_angle(self.stabilizer.turn_angle + 0.05)
-            print(f"[指令] 左转 | 当前转向角度: {self.stabilizer.turn_angle:.2f}rad")
+            print(f"[左转] {self.stabilizer.turn_angle:.2f} rad")
         elif key == 'd':
             self.stabilizer.set_turn_angle(self.stabilizer.turn_angle - 0.05)
-            print(f"[指令] 右转 | 当前转向角度: {self.stabilizer.turn_angle:.2f}rad")
+            print(f"[右转] {self.stabilizer.turn_angle:.2f} rad")
         elif key == ' ':
             self.stabilizer.set_turn_angle(0.2 if self.stabilizer.turn_angle <= 0 else -0.2)
-            print(f"[指令] 原地转向 | 当前转向角度: {self.stabilizer.turn_angle:.2f}rad")
+            print(f"[原地转向] {self.stabilizer.turn_angle:.2f} rad")
         elif key == 'z':
             self.stabilizer.set_walk_speed(self.stabilizer.walk_speed - 0.1)
-            print(f"[指令] 减速 | 当前速度: {self.stabilizer.walk_speed:.2f} | 当前步态: {self.stabilizer.gait_mode}")
+            print(f"[减速] 速度:{self.stabilizer.walk_speed:.2f}")
         elif key == 'x':
             self.stabilizer.set_walk_speed(self.stabilizer.walk_speed + 0.1)
-            print(f"[指令] 加速 | 当前速度: {self.stabilizer.walk_speed:.2f} | 当前步态: {self.stabilizer.gait_mode}")
+            print(f"[加速] 速度:{self.stabilizer.walk_speed:.2f}")
         elif key == 'm':
-            # 传感器模拟开关
             self.stabilizer.enable_sensor_simulation = not self.stabilizer.enable_sensor_simulation
-            print(f"[指令] 传感器模拟{'开启' if self.stabilizer.enable_sensor_simulation else '关闭'}")
+            print(f"[传感器] {'开启' if self.stabilizer.enable_sensor_simulation else '关闭'}")
         elif key == 'p':
-            # 打印传感器数据
             self.stabilizer.print_sensor_data()
-        # 新增：步态模式切换
         elif key == '1':
             self.stabilizer.set_gait_mode("SLOW")
-            print(
-                f"[指令] 切换为慢走模式 | CPG频率: {self.stabilizer.gait_config['SLOW']['freq']:.2f}Hz | 振幅: {self.stabilizer.gait_config['SLOW']['amp']:.2f}")
+            print("[模式] 慢走")
         elif key == '2':
             self.stabilizer.set_gait_mode("NORMAL")
-            print(
-                f"[指令] 切换为正常走模式 | CPG频率: {self.stabilizer.gait_config['NORMAL']['freq']:.2f}Hz | 振幅: {self.stabilizer.gait_config['NORMAL']['amp']:.2f}")
+            print("[模式] 正常")
         elif key == '3':
             self.stabilizer.set_gait_mode("TROT")
-            print(
-                f"[指令] 切换为小跑模式 | CPG频率: {self.stabilizer.gait_config['TROT']['freq']:.2f}Hz | 振幅: {self.stabilizer.gait_config['TROT']['amp']:.2f}")
+            print("[模式] 小跑")
         elif key == '4':
             self.stabilizer.set_gait_mode("STEP_IN_PLACE")
-            print(f"[指令] 切换为原地踏步模式 | 步幅减半，躯干锁定")
+            print("[模式] 原地踏步")
 
 
-# ===================== CPG中枢模式发生器（原有逻辑完全保留） =====================
+# ===================== CPG中枢模式发生器 =====================
 class CPGOscillator:
     def __init__(self, freq=0.5, amp=0.4, phase=0.0, coupling_strength=0.2):
         self.base_freq = freq  # 基础频率（对应原始步态周期2s）
@@ -203,15 +203,11 @@ class CPGOscillator:
         self.freq = self.base_freq
         self.amp = self.base_amp
         self.coupling = self.base_coupling
-        self.phase = 0.0 if self.base_phase == 0.0 else np.pi
+        self.phase = 0.0 if self.phase < np.pi else np.pi
         self.state = np.array([np.sin(self.phase), np.cos(self.phase)])
 
-    @property
-    def base_phase(self):
-        return 0.0 if self.phase < np.pi else np.pi
 
-
-# ===================== 人形机器人控制器（新增多步态模式） =====================
+# ===================== 人形机器人控制器 =====================
 class HumanoidStabilizer:
     """适配humanoid.xml模型的稳定站立与行走控制器（新增多步态+传感器模拟+鲁棒性优化）"""
 
@@ -664,7 +660,7 @@ class HumanoidStabilizer:
         # 关节目标低通滤波（原有逻辑）
         if self.enable_robust_optim:
             self.joint_targets = (
-                                             1 - self.filter_alpha) * self.prev_joint_targets + self.filter_alpha * self.joint_targets
+                    1 - self.filter_alpha) * self.prev_joint_targets + self.filter_alpha * self.joint_targets
             self.prev_joint_targets = self.joint_targets.copy()
 
         # 更新原始步态相位（原有逻辑）
@@ -970,7 +966,7 @@ class HumanoidStabilizer:
 
 if __name__ == "__main__":
     current_directory = os.path.dirname(os.path.abspath(__file__))
-    model_file_path = os.path.join(current_directory, "humanoid.xml")
+    model_file_path = os.path.join(current_directory, "models","humanoid.xml")
 
     print(f"模型路径：{model_file_path}")
     if not os.path.exists(model_file_path):
@@ -978,13 +974,8 @@ if __name__ == "__main__":
 
     try:
         stabilizer = HumanoidStabilizer(model_file_path)
-        # 可选配置：关闭传感器模拟/鲁棒优化/修改默认步态
-        # stabilizer.enable_sensor_simulation = False
-        # stabilizer.enable_robust_optim = False
-        # stabilizer.set_gait_mode("SLOW")  # 默认改为慢走
         stabilizer.simulate_stable_standing()
     except Exception as e:
         print(f"错误：{e}")
         import traceback
-
         traceback.print_exc()
