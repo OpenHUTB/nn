@@ -19,6 +19,7 @@ carla_egg_path = r"F:\hutb下载\Carla_0.9.15\CARLA_0.9.15\WindowsNoEditor\Pytho
 # Define the path to the CARLA Egg file
 sys.path.append(carla_egg_path)
 
+
 import carla
 
 # Connect to CARLA server
