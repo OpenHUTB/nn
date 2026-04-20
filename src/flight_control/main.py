@@ -444,6 +444,8 @@ class FlightControl:
                 self.gui.stop()
             if self.map_display:
                 self.map_display.stop()
+            if self.rl_controller:
+                self.rl_controller.stop()
             os.kill(os.getpid(), signal.SIGTERM)
     
     def run(self):
@@ -472,7 +474,10 @@ class FlightControl:
             print("程序已启动，按 ESC 键退出...")
             try:
                 while True:
-                    time.sleep(1)
+                    # 在主循环中执行强化学习步骤
+                    if self.rl_controller and self.rl_started:
+                        self.rl_controller.step()
+                    time.sleep(0.1)
             except KeyboardInterrupt:
                 print("\n收到中断信号，正在降落...")
                 self.exit_program()
