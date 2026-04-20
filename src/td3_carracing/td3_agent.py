@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn.functional as F
 from td3_models import Actor, Critic
 
+
 class ReplayBuffer:
     def __init__(self, capacity=1000000):
         self.capacity = capacity
@@ -37,6 +38,7 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
+
 class TD3Agent:
     def __init__(self, state_dim, action_dim, max_action, device, use_cnn=True):
         self.device = device
@@ -67,9 +69,20 @@ class TD3Agent:
         self.policy_freq = 2
         self.total_it = 0
 
-    def select_action(self, state):
+        # 动作平滑相关
+        self.last_action = None
+        self.smooth_alpha = 0.6  # 平滑系数
+
+    def select_action(self, state, smooth=True):
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-        return self.actor(state).cpu().data.numpy().flatten()
+        action = self.actor(state).cpu().data.numpy().flatten()
+
+        # 动作平滑 - 减少抖动
+        if smooth and self.last_action is not None:
+            action = self.smooth_alpha * action + (1 - self.smooth_alpha) * self.last_action
+
+        self.last_action = action.copy()
+        return action
 
     def train(self):
         if len(self.replay_buffer) < self.batch_size * 10:
@@ -83,14 +96,17 @@ class TD3Agent:
         next_state = next_state.to(self.device)
         done = done.to(self.device)
 
+        # 添加目标策略噪声
         noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
         next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
 
+        # 计算目标 Q 值
         target_q1 = self.critic1_target(next_state, next_action)
         target_q2 = self.critic2_target(next_state, next_action)
         target_q = torch.min(target_q1, target_q2)
         target_q = reward + (1 - done) * self.gamma * target_q
 
+        # 更新 Critic
         current_q1 = self.critic1(state, action)
         current_q2 = self.critic2(state, action)
         critic_loss = F.mse_loss(current_q1, target_q) + F.mse_loss(current_q2, target_q)
@@ -99,6 +115,7 @@ class TD3Agent:
         critic_loss.backward()
         self.critic_optimizer.step()
 
+        # 延迟更新 Actor
         if self.total_it % self.policy_freq == 0:
             actor_loss = -self.critic1(state, self.actor(state)).mean()
 
@@ -106,6 +123,7 @@ class TD3Agent:
             actor_loss.backward()
             self.actor_optimizer.step()
 
+            # 软更新目标网络
             for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
             for param, target_param in zip(self.critic1.parameters(), self.critic1_target.parameters()):
