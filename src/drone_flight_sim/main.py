@@ -1,4 +1,3 @@
-# main.py
 """无人机飞行控制主程序
 
 这是无人机飞行控制程序的入口文件。
@@ -40,10 +39,10 @@ def auto_flight_mode(drone):
     # 定义飞行航点列表，每个航点是 (x, y, z) 坐标元组
     # 注意：AirSim 中 Z 轴向下为正，所以负值表示向上飞行
     waypoints = [
-        (5, 0, -3),    # 航点1：向右飞行 5 米
-        (5, -5, -3),   # 航点2：向前飞行 5 米
-        (0, -5, -3),   # 航点3：向左飞行 5 米
-        (0, 0, -3),    # 航点4：向后飞行 5 米，回到原点
+        (5, 0, -3),  # 航点1：向右飞行 5 米
+        (5, -5, -3),  # 航点2：向前飞行 5 米
+        (0, -5, -3),  # 航点3：向左飞行 5 米
+        (0, 0, -3),  # 航点4：向后飞行 5 米，回到原点
     ]
 
     # ===== 使用预设路径的示例代码（可替换上方 waypoints）=====
@@ -130,60 +129,35 @@ def keyboard_control_mode(drone):
 
 
 def main():
-    """主函数：无人机控制程序入口
-
-    让用户选择飞行模式：自动航点飞行或键盘手动控制。
-    """
-    print_separator()
-    print("🚁 AirSim 无人机控制程序启动")
-    print_separator()
-
-    # 初始化无人机控制器对象
-    drone = None
+    """主函数，程序入口"""
+    # 创建无人机控制器实例
+    drone = DroneController()
 
     try:
-        # 创建无人机控制器实例
-        drone = DroneController()
+        # 选择飞行模式
+        print("\n请选择飞行模式：")
+        print("1 - 自动航点飞行模式")
+        print("2 - 键盘手动控制模式")
+        choice = input("请输入模式编号：")
 
-        # 询问用户选择飞行模式
-        print("\n请选择飞行模式:")
-        print("  1 - 自动航点飞行模式（无人机按预设航点自动飞行）")
-        print("  2 - 键盘手动控制模式（使用键盘手动控制无人机）")
-        print()
-
-        # 获取用户选择
-        choice = input("请输入选择 (1/2，默认为1): ").strip()
-
-        # 根据选择执行对应模式
-        if choice == '2':
-            # 键盘手动控制模式
+        if choice == "1":
+            auto_flight_mode(drone)
+        elif choice == "2":
             keyboard_control_mode(drone)
         else:
-            # 默认为自动航点飞行模式
-            auto_flight_mode(drone)
+            print("❌ 无效输入，请输入 1 或 2！")
 
     except KeyboardInterrupt:
-        """捕获键盘中断（Ctrl+C）"""
-        print("\n⚠️  用户中断程序")
-        if drone:
-            drone.emergency_stop()
-
+        print("\n\n⚠️  检测到中断信号，正在安全降落...")
+        drone.safe_land()
     except Exception as e:
-        """捕获所有其他异常"""
-        print(f"❌ 发生异常: {e}")
-        import traceback
-        traceback.print_exc()
-        if drone:
-            drone.emergency_stop()
-
+        print(f"\n❌ 程序异常：{e}")
+        drone.emergency_stop()
     finally:
-        """无论是否发生异常，都会执行清理"""
-        if drone:
-            drone.cleanup()
-
-    print("\n🏁 程序结束")
+        # 无论如何都执行资源清理
+        drone.cleanup()
+        print("\n👋 程序已退出")
 
 
-# 程序入口点
 if __name__ == "__main__":
     main()
