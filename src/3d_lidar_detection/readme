@@ -1,0 +1,32 @@
+
+## 子项目概览
+1. [**二维目标检测**](2d_object_detection/README.md)
+   本项目基于 YOLOv8 模型实现二维目标检测，使用 Mapillary 交通标志数据集进行训练。
+
+2. [**三维目标检测**](3d_object_detection/README.md)
+   本项目基于 VoxelNext 架构实现三维目标检测，在 ONCE 数据集上训练，并基于 OpenPCDet 框架开发。
+
+3. [**Manim 动画制作**](manim_animations/README.md)
+   本项目使用 Manim 社区版库，为演示制作动画素材。
+
+4. [**报告图表绘制**](report_plots/README.md)
+   本项目通过多种 Python 库手动绘制图表，展示各类机器学习相关概念与指标。
+
+5. [**实时仿真可视化工具**](real_time_simulation_visualizer/README.md)
+   本项目基于 Carla 开源仿真平台，结合 Flask 服务器与 WebSocket 实现模型性能的实时测试与可视化。
+
+每个子项目均有独立的依赖环境与详细使用说明，可查看各子项目目录下的 `README.md` 文件获取具体信息。
+
+## 许可说明
+### 项目整体许可
+本仓库整体采用 **GNU Affero 通用公共许可证 v3.0（AGPL-3.0）** 授权。除非另有说明，所有子项目均遵循该协议。详细内容见 [LICENSE](LICENSE.md) 文件。
+
+### 第三方组件许可
+- **YOLOv8 模型（二维目标检测项目使用）**：采用 GNU Affero 通用公共许可证 v3.0（AGPL-3.0）
+- **Mapillary 交通标志数据集（二维目标检测项目使用）**：采用知识共享署名-非商业性使用-相同方式共享 4.0 国际许可协议（CC BY-NC-SA 4.0）
+- **OpenPCDet 框架（三维目标检测项目使用）**：采用 Apache 许可证 2.0 版
+- **VoxelNext 模型（三维目标检测项目使用）**：采用 Apache 许可证 2.0 版
+- **Manim 社区版（动画项目使用）**：采用 MIT 许可证
+- **Carla 开源仿真器（实时可视化项目使用）**：采用 MIT 许可证
+- **Flask（实时可视化项目使用）**：采用 BSD 许可证
+
