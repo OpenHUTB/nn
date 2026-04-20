@@ -64,14 +64,14 @@ class TD3Agent:
         self.batch_size = 64
         self.gamma = 0.99
         self.tau = 0.005
-        self.policy_noise = 0.1  # 降低策略噪声（原0.2）
-        self.noise_clip = 0.3  # 降低噪声裁剪范围（原0.5）
+        self.policy_noise = 0.08  # 进一步降低策略噪声（原0.1）
+        self.noise_clip = 0.2  # 进一步降低噪声裁剪范围（原0.3）
         self.policy_freq = 2
         self.total_it = 0
 
         # 动作平滑相关
         self.last_action = None
-        self.smooth_alpha = 0.8  # 提高平滑系数（原0.6），减少抖动
+        self.smooth_alpha = 0.9  # 更高的平滑系数（原0.8），减少抖动
 
     def select_action(self, state, smooth=True):
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
@@ -81,8 +81,13 @@ class TD3Agent:
         if smooth and self.last_action is not None:
             action = self.smooth_alpha * action + (1 - self.smooth_alpha) * self.last_action
 
-        # 额外约束：转向动作衰减（进一步防止持续转向）
-        action[0] = action[0] * 0.9  # 转向角衰减10%
+        # 强化转向动作衰减（进一步防止持续转向）
+        action[0] = action[0] * 0.8  # 转向角衰减20%（原10%）
+
+        # 额外约束：转向死区，小转向直接置0
+        if abs(action[0]) < 0.05:
+            action[0] = 0.0
+
         self.last_action = action.copy()
         return action
 
@@ -100,8 +105,8 @@ class TD3Agent:
 
         # 添加目标策略噪声（降低噪声幅度）
         noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
-        # 对转向动作单独降低噪声
-        noise[:, 0] = noise[:, 0] * 0.7  # 转向噪声额外衰减30%
+        # 对转向动作单独降低噪声（更强的衰减）
+        noise[:, 0] = noise[:, 0] * 0.5  # 转向噪声额外衰减50%（原30%）
         next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
 
         # 计算目标 Q 值
