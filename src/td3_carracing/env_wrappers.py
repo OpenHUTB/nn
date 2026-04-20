@@ -65,19 +65,19 @@ class SmoothActionWrapper(gym.Wrapper):
     def __init__(self, env, alpha=0.85):  # 提高平滑系数
         super().__init__(env)
         self.alpha = alpha  # 越大越接近原始动作，更平滑
+
         self.last_action = None
 
     def step(self, action):
         if self.last_action is not None:
             # 指数移动平均平滑
             action = self.alpha * action + (1 - self.alpha) * self.last_action
+
         # 额外的转向动作约束：限制转向变化率
         if self.last_action is not None:
             action[0] = np.clip(action[0],
                                 self.last_action[0] - 0.1,
                                 self.last_action[0] + 0.1)
-        self.last_action = action.copy()
-        return self.env.step(action)
 
     def reset(self, **kwargs):
         self.last_action = None
@@ -148,12 +148,3 @@ class AntiSpinWrapper(gym.Wrapper):
         self.last_pos = None
         self.position_history = []
         return self.env.reset(**kwargs)
-
-
-def wrap_env(env):
-    env = SkipFrame(env)
-    env = PreProcessObs(env)
-    env = StackFrames(env)
-    env = SmoothActionWrapper(env, alpha=0.85)  # 更高的平滑系数
-    env = AntiSpinWrapper(env)  # 强化防原地转圈约束
-    return env

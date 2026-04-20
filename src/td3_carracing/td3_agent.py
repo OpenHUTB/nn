@@ -88,8 +88,6 @@ class TD3Agent:
         if abs(action[0]) < 0.05:
             action[0] = 0.0
 
-        self.last_action = action.copy()
-        return action
 
     def train(self):
         if len(self.replay_buffer) < self.batch_size * 10:
@@ -103,7 +101,6 @@ class TD3Agent:
         next_state = next_state.to(self.device)
         done = done.to(self.device)
 
-        # 添加目标策略噪声（降低噪声幅度）
         noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
         # 对转向动作单独降低噪声（更强的衰减）
         noise[:, 0] = noise[:, 0] * 0.5  # 转向噪声额外衰减50%（原30%）

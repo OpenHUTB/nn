@@ -31,9 +31,13 @@ def train():
 
     max_episodes = 1000
     max_timesteps = 1000
+<<<<<<< HEAD
     # 进一步降低转向探索噪声
     expl_noise_steer = 0.01  # 转向探索噪声（原0.02）
     expl_noise_throttle = 0.04  # 油门/刹车噪声（原0.05）
+=======
+    expl_noise = 0.05  # 减小探索噪声，从 0.1 改为 0.05，让动作更平滑
+>>>>>>> b9a6b4a442e0709e43a58f106e938306ffa044d7
     best_reward = -float('inf')
 
     print("开始训练...")
@@ -41,10 +45,20 @@ def train():
         state, _ = env.reset()
         episode_reward = 0
         agent.last_action = None  # 重置动作历史
+<<<<<<< HEAD
         spin_counter = 0  # 原地转圈计数器
 
         for t in range(max_timesteps):
             action = agent.select_action(state, smooth=True)  # 启用平滑
+=======
+
+        for t in range(max_timesteps):
+            action = agent.select_action(state, smooth=True)  # 启用平滑
+
+            # 添加探索噪声（噪声更小）
+            noise = np.random.normal(0, expl_noise, size=action_dim)
+            action = (action + noise).clip(-max_action, max_action)
+>>>>>>> b9a6b4a442e0709e43a58f106e938306ffa044d7
 
             # 差异化添加探索噪声：转向噪声单独降低
             noise = np.zeros_like(action)
@@ -82,6 +96,7 @@ def train():
             agent.save(f"models/td3_car_best")
             print(f"★ 新最佳模型！奖励: {episode_reward:.1f}")
 
+<<<<<<< HEAD
         # 噪声衰减：转向噪声衰减更快
         expl_noise_steer = max(0.001, expl_noise_steer * 0.99)  # 更快衰减
         expl_noise_throttle = max(0.01, expl_noise_throttle * 0.995)
@@ -89,6 +104,13 @@ def train():
         print(
             f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, 转向噪声: {expl_noise_steer:.4f}, "
             f"油门噪声: {expl_noise_throttle:.3f}, 缓冲区: {len(agent.replay_buffer)}")
+=======
+        # 噪声衰减更慢，保持平滑
+        expl_noise = max(0.02, expl_noise * 0.998)
+
+        print(
+            f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, 噪声: {expl_noise:.3f}, 缓冲区: {len(agent.replay_buffer)}")
+>>>>>>> b9a6b4a442e0709e43a58f106e938306ffa044d7
 
         if (episode + 1) % 50 == 0:
             os.makedirs("models", exist_ok=True)
