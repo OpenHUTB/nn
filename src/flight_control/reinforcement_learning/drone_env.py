@@ -2,12 +2,13 @@ import gym
 import numpy as np
 import airsim
 import time
+import cv2
 from gym import spaces
 
 class DroneEnv(gym.Env):
-    def __init__(self, client=None):
+    def __init__(self, client=None, use_yolo=False, yolo_model_path=None):
         super(DroneEnv, self).__init__()
-        
+
         # 连接到AirSim
         if client is None:
             self.client = airsim.MultirotorClient()
@@ -16,13 +17,27 @@ class DroneEnv(gym.Env):
             self.client.armDisarm(True)
         else:
             self.client = client
-        
+
+        # YOLO 配置
+        self.use_yolo = use_yolo
+        self.yolo_model_path = yolo_model_path
+        self.yolo = None
+
+        if self.use_yolo:
+            self._init_yolo()
+
         # 定义动作空间：9个离散动作
         # 0: 前进, 1: 后退, 2: 左移, 3: 右移, 4: 上升, 5: 下降, 6: 左转, 7: 右转, 8: 悬停
         self.action_space = spaces.Discrete(9)
-        
-        # 定义观察空间：360x240 RGB图像
-        self.observation_space = spaces.Box(low=0, high=255, shape=(240, 360, 3), dtype=np.uint8)
+
+        # 定义观察空间
+        if self.use_yolo:
+            self.observation_space = spaces.Dict({
+                'image': spaces.Box(low=0, high=255, shape=(240, 360, 3), dtype=np.uint8),
+                'detection_info': spaces.Box(low=-1, high=1, shape=(5,), dtype=np.float32)
+            })
+        else:
+            self.observation_space = spaces.Box(low=0, high=255, shape=(240, 360, 3), dtype=np.uint8)
         
         # 飞行参数
         self.speed = 2.0
@@ -37,9 +52,34 @@ class DroneEnv(gym.Env):
             (0, 0, -3.0)
         ]
         self.current_target_idx = 0
-        
+
+        self.last_detection_info = {
+            'has_target': False,
+            'target_center_offset': (0.0, 0.0),
+            'target_distance': 1.0,
+            'target_size': 0.0,
+            'num_detections': 0
+        }
+
         # 重置无人机
         self.reset()
+
+    def _init_yolo(self):
+        try:
+            from .yolo_inference import YOLOInference
+            self.yolo = YOLOInference(model_path=self.yolo_model_path)
+            print(f"YOLO initialized successfully (use_yolo=True)")
+        except ImportError:
+            try:
+                import sys
+                import os
+                sys.path.append(os.path.dirname(__file__))
+                from yolo_inference import YOLOInference
+                self.yolo = YOLOInference(model_path=self.yolo_model_path)
+                print(f"YOLO initialized successfully (use_yolo=True)")
+            except Exception as e:
+                print(f"YOLO initialization failed: {e}, falling back to no YOLO")
+                self.use_yolo = False
     
     def reset(self):
         # 重置无人机位置到当前目标点
@@ -58,46 +98,58 @@ class DroneEnv(gym.Env):
         return observation
     
     def step(self, action):
-        # 执行动作
         self._take_action(action)
-        
-        # 获取新的观察
+
         observation = self._get_observation()
-        
-        # 计算奖励
+
         reward = self._calculate_reward()
-        
-        # 检查是否完成任务
+
         done = self._check_done()
-        
-        # 信息
+
         info = {
             'current_target': self.current_target_idx,
-            'position': self._get_position()
+            'position': self._get_position(),
+            'detection_info': self.last_detection_info
         }
-        
+
         return observation, reward, done, info
     
     def _get_observation(self):
-        # 获取RGB图像
+        image_data = self._get_raw_image()
+
+        if self.use_yolo and self.yolo is not None:
+            detections = self.yolo.detect(image_data)
+            self.last_detection_info = self.yolo.get_detection_info(image_data.shape, detections)
+
+            detection_array = np.array([
+                1.0 if self.last_detection_info['has_target'] else 0.0,
+                self.last_detection_info['target_center_offset'][0],
+                self.last_detection_info['target_center_offset'][1],
+                self.last_detection_info['target_distance'],
+                self.last_detection_info['target_size']
+            ], dtype=np.float32)
+
+            return {
+                'image': image_data,
+                'detection_info': detection_array
+            }
+
+        return image_data
+
+    def _get_raw_image(self):
         try:
             responses = self.client.simGetImages([airsim.ImageRequest(0, airsim.ImageType.Scene, False, False)])
             response = responses[0]
-            
-            # 处理图像数据
+
             image_data = np.frombuffer(response.image_data_uint8, dtype=np.uint8)
             image_data = image_data.reshape(response.height, response.width, 3)
-            
-            # 确保图像尺寸正确
+
             if image_data.shape != (240, 360, 3):
-                import cv2
                 image_data = cv2.resize(image_data, (360, 240))
-            
+
             return image_data
         except Exception as e:
-            # 返回空图像或之前的图像
             print(f"获取图像失败: {e}")
-            # 返回默认的黑色图像
             return np.zeros((240, 360, 3), dtype=np.uint8)
     
     def _take_action(self, action):
@@ -171,9 +223,15 @@ class DroneEnv(gym.Env):
         return False  # 持续运行
     
     def close(self):
-        # 关闭环境
         try:
             self.client.armDisarm(False)
             self.client.enableApiControl(False)
         except Exception as e:
             print(f"关闭环境失败: {e}")
+
+    def get_annotated_frame(self):
+        image = self._get_raw_image()
+        if self.use_yolo and self.yolo is not None:
+            detections = self.yolo.detect(image)
+            return self.yolo.annotate_image(image, detections)
+        return image
