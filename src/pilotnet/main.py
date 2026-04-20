@@ -43,7 +43,11 @@ class Menu():
         message('Starting training')
         try:
             pilotnet.train(name, data, epochs, steps, steps_val, batch_size)
-        except:
+        except Exception as e:
+            from utils.screen import error
+            error(f'Training error: {str(e)}')
+            import traceback
+            traceback.print_exc()
             raise PilotError('Some unexpected error occured during training. Please try again.')
 
     @staticmethod
