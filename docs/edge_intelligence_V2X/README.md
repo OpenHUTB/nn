@@ -100,8 +100,7 @@ CARLA_EGG_PATH = r"D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-wi
 #### 2.2.1 系统整体流程
 
 ```
-CARLA 仿真场景 → 路侧摄像头采集 → YOLOv8n 目标检测 → 分类统计
-     → V2X 态势分析 → 预警消息生成 → HUD 面板可视化显示
+CARLA 仿真场景 → 路侧摄像头采集 → YOLOv8n 目标检测 → 分类统计 → V2X 态势分析 → 预警消息生成 → HUD 面板可视化显示
 ```
 
 #### 2.2.2 关键技术原理
@@ -123,7 +122,11 @@ $$
 为提升系统帧率，采用隔帧检测：每 $N$ 帧运行一次 YOLO 推理，中间帧复用上一次检测结果：
 
 $$
-D_t = \begin{cases} \text{YOLO}(I_t) & \text{if } t \mod N = 0 \\ D_{t-1} & \text{otherwise} \end{cases}
+D_t =
+\begin{cases}
+    ext{YOLO}(I_t), & t \bmod N = 0 \\
+D_{t-1}, & \text{otherwise}
+\end{cases}
 $$
 
 其中 $N = 2$。在当前测试环境下可观察到帧率提升，具体增益会随硬件性能、交通密度和天气场景变化。
