@@ -124,8 +124,8 @@ $$
 $$
 D_t =
 \begin{cases}
-    ext{YOLO}(I_t), & t \bmod N = 0 \\
-D_{t-1}, & \text{otherwise}
+\mathrm{YOLO}(I_t), & t \bmod N = 0 \\
+D_{t-1}, & \mathrm{otherwise}
 \end{cases}
 $$
 
