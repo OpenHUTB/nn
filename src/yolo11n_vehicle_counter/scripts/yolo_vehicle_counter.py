@@ -5,6 +5,7 @@ import supervision as sv
 import os
 import json
 import time
+from keyboard_handler import handle_keyboard_events
 
 # ==================== 配置路径 ====================
 # 模型文件路径
@@ -657,7 +658,9 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 显示当前帧
         cv.imshow("Camera", frame)
 
-        if cv.waitKey(1) & 0xff == ord('p'):  # 按'p'键暂停
+        # 键盘事件处理
+        key = cv.waitKey(1) & 0xff
+        if not handle_keyboard_events(key, frame, frame_count, cap, out, "Camera"):
             break
 
     # 计算整体精度
