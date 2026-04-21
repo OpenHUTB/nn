@@ -81,12 +81,17 @@ class TD3Agent:
         if smooth and self.last_action is not None:
             action = self.smooth_alpha * action + (1 - self.smooth_alpha) * self.last_action
 
-        # 强化转向动作衰减（进一步防止持续转向）
-        action[0] = action[0] * 0.8  # 转向角衰减20%（原10%）
+        # 强化转向动作衰减
+        action[0] = action[0] * 0.8
 
         # 额外约束：转向死区，小转向直接置0
         if abs(action[0]) < 0.05:
             action[0] = 0.0
+
+        # 保存当前动作供下次使用
+        self.last_action = action.copy()
+
+        return action
 
 
     def train(self):
