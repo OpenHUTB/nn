@@ -46,7 +46,12 @@ COLLISION_THRESHOLD = 0.01
 COLLISION_FORCE_THRESHOLD = 5.0
 
 # 目录配置（预创建）
-DIRS = {name: Path(name) for name in ["trajectories", "params", "logs", "data"]}
+DIRS = {
+    "trajectories": Path("trajectories"),
+    "params": Path(__file__).parent / "params",
+    "logs": Path("logs"),
+    "data": Path("data")
+}
 for dir_path in DIRS.values():
     dir_path.mkdir(exist_ok=True)
 
@@ -99,21 +104,8 @@ class ControlConfig:
                     setattr(cfg, k, v)
         return cfg
 
-            # 写入特殊级别日志
-            if level in log_files and level != "INFO":
-                with open(log_files[level], "a", encoding="utf-8") as f:
-                    f.write(log_msg + "\n")
-
 # 全局配置（单例）
 CFG = ControlConfig()
-
-    @classmethod
-    def deg2rad(cls, x):
-        """角度转弧度（向量化+异常安全）"""
-        try:
-            return np.asarray(x, np.float64) * DEG2RAD
-        except:
-            return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
 # ====================== 工具类（极简+高效） ======================
 class Utils:
@@ -138,7 +130,8 @@ class Utils:
             log_file = DIRS["logs"] / f"arm_{level.lower()}.log"
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(log_msg + "\n")
-        except:
+        except (IOError, OSError) as e:
+            # 日志写入失败不影响主程序
             pass
 
     @classmethod
@@ -146,7 +139,7 @@ class Utils:
         """向量化角度转弧度"""
         try:
             return np.asarray(x, np.float64) * DEG2RAD
-        except:
+        except (TypeError, ValueError):
             return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
     @classmethod
@@ -154,7 +147,7 @@ class Utils:
         """向量化弧度转角度"""
         try:
             return np.asarray(x, np.float64) * RAD2DEG
-        except:
+        except (TypeError, ValueError):
             return np.zeros(JOINT_COUNT) if isinstance(x, (list, np.ndarray)) else 0.0
 
     @classmethod
@@ -178,14 +171,23 @@ class Trajectory:
 
     @classmethod
     @Utils.perf
-    def plan(cls, start, target, smooth=True):
+    def plan(cls, start, target, smooth=True, method="trapezoid"):
+        """轨迹规划
+        method: trapezoid(梯形) / scurve(S曲线)
+        """
+        if method == "scurve":
+            return cls.plan_scurve(start, target, smooth)
+        return cls.plan_trapezoid(start, target, smooth)
+
+    @classmethod
+    def plan_trapezoid(cls, start, target, smooth=True):
         """梯形轨迹规划"""
         # 边界裁剪
-        start = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
-        target = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        start_clipped = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        target_clipped = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
 
-        # 缓存检查
-        cache_key = (start.tobytes(), target.tobytes(), smooth)
+        # 缓存检查（使用元组键，避免tobytes开销）
+        cache_key = (tuple(start_clipped), tuple(target_clipped), smooth)
         if cache_key in cls._cache:
             return cls._cache[cache_key]
 
@@ -196,7 +198,7 @@ class Trajectory:
 
         # 批量规划
         for i in range(JOINT_COUNT):
-            delta = target[i] - start[i]
+            delta = target_clipped[i] - start_clipped[i]
             if abs(delta) < 1e-5:
                 pos, vel = np.array([target[i]]), np.array([0.0])
             else:
@@ -226,22 +228,22 @@ class Trajectory:
                 mask_dec = ~(mask_acc | mask_uni)
 
                 vel[mask_acc] = MAX_ACC[i] * t[mask_acc] * dir
-                pos[mask_acc] = start[i] + 0.5 * MAX_ACC[i] * t[mask_acc] ** 2 * dir
+                pos[mask_acc] = start_clipped[i] + 0.5 * MAX_ACC[i] * t[mask_acc] ** 2 * dir
 
                 if dist > 2 * accel_dist:
                     t_uni = t[mask_uni] - accel_time
                     vel[mask_uni] = MAX_VEL[i] * dir
-                    pos[mask_uni] = start[i] + (accel_dist + MAX_VEL[i] * t_uni) * dir
+                    pos[mask_uni] = start_clipped[i] + (accel_dist + MAX_VEL[i] * t_uni) * dir
 
                     t_dec = t[mask_dec] - (accel_time + uniform_time)
                     vel[mask_dec] = (MAX_VEL[i] - MAX_ACC[i] * t_dec) * dir
-                    pos[mask_dec] = start[i] + (dist - (accel_dist - 0.5 * MAX_ACC[i] * t_dec ** 2)) * dir
+                    pos[mask_dec] = start_clipped[i] + (dist - (accel_dist - 0.5 * MAX_ACC[i] * t_dec ** 2)) * dir
                 else:
                     t_dec = t[mask_dec] - accel_time
                     vel[mask_dec] = (peak_vel - MAX_ACC[i] * t_dec) * dir
-                    pos[mask_dec] = start[i] + (peak_vel * accel_time - 0.5 * MAX_ACC[i] * t_dec ** 2) * dir
+                    pos[mask_dec] = start_clipped[i] + (peak_vel * accel_time - 0.5 * MAX_ACC[i] * t_dec ** 2) * dir
 
-                pos[-1], vel[-1] = target[i], 0.0
+                pos[-1], vel[-1] = target_clipped[i], 0.0
 
             # 扩展数组
             if len(traj_pos) < len(pos):
@@ -255,7 +257,7 @@ class Trajectory:
         # 统一长度
         if len(traj_pos) < max_len:
             pad = max_len - len(traj_pos)
-            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target)
+            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target_clipped)
             traj_vel = np.pad(traj_vel, ((0, pad), (0, 0)), 'constant')
 
         # 轨迹平滑
@@ -294,6 +296,128 @@ class Trajectory:
             smooth_vel[2:] = smooth_vel[1:-1] + jerk_clipped * CTRL_DT
 
         return smooth_pos, smooth_vel
+
+    @classmethod
+    def plan_scurve(cls, start, target, smooth=True):
+        """S-curve 轨迹规划（向量化实现，极致优化）"""
+        # 边界裁剪
+        start_clipped = np.clip(start, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+        target_clipped = np.clip(target, JOINT_LIMITS[:, 0] + 0.01, JOINT_LIMITS[:, 1] - 0.01)
+
+        # 缓存检查（使用元组键，避免tobytes开销）
+        cache_key = (tuple(start_clipped), tuple(target_clipped), smooth, "scurve")
+        if cache_key in cls._cache:
+            return cls._cache[cache_key]
+
+        # 预分配
+        max_len = 1
+        traj_pos = np.zeros((0, JOINT_COUNT))
+        traj_vel = np.zeros((0, JOINT_COUNT))
+
+        jerk_limit = CFG.jerk_limit
+        max_acc = MAX_ACC
+
+        for i in range(JOINT_COUNT):
+            delta = target_clipped[i] - start_clipped[i]
+            if abs(delta) < 1e-5:
+                pos, vel = np.array([target_clipped[i]]), np.array([0.0])
+            else:
+                dist = abs(delta)
+                direction = np.sign(delta)
+
+                # S-curve 参数计算
+                jerk_time = max_acc[i] / jerk_limit[i]
+                accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3
+
+                peak_vel = np.sqrt(dist * jerk_limit[i])
+                if peak_vel > MAX_VEL[i]:
+                    peak_vel = MAX_VEL[i]
+                    jerk_time = np.sqrt(dist / peak_vel)
+                    accel_dist = 0.5 * jerk_limit[i] * jerk_time ** 3
+
+                t_jerk = jerk_time
+                t_const_acc = (peak_vel / max_acc[i]) - jerk_time
+                t_const_vel = max(0, (dist - 2 * (accel_dist + peak_vel * t_const_acc / 2)) / peak_vel)
+
+                # 关键时间点（向量化分段边界）
+                t1 = t_jerk
+                t2 = 2 * t_jerk
+                t3 = 2 * t_jerk + t_const_acc
+                t4 = 2 * t_jerk + t_const_acc + t_const_vel
+                total_time = 2 * (2 * t_jerk + t_const_acc) + t_const_vel
+
+                # 时间序列（向量化）
+                t = np.arange(0, total_time + CTRL_DT, CTRL_DT)
+                n = len(t)
+
+                # 向量化位置计算 - 使用掩码分段
+                pos = np.zeros(n)
+                vel = np.zeros(n)
+
+                # 各阶段掩码（向量化判断）
+                mask1 = t <= t1
+                mask2 = (t > t1) & (t <= t2)
+                mask3 = (t > t2) & (t <= t3)
+                mask4 = (t > t3) & (t <= t4)
+                mask5 = t > t4
+
+                # 阶段1: 加加速（0 ~ t1）
+                t1_arr = t[mask1]
+                pos[mask1] = start_clipped[i] + (1/6) * jerk_limit[i] * t1_arr ** 3
+                vel[mask1] = 0.5 * jerk_limit[i] * t1_arr ** 2
+
+                # 阶段2: 匀减速加速（t1 ~ t2）
+                tau2 = t[mask2] - t1
+                pos[mask2] = start_clipped[i] + accel_dist + peak_vel * tau2 - (1/6) * jerk_limit[i] * tau2 ** 3
+                vel[mask2] = peak_vel - 0.5 * jerk_limit[i] * tau2 ** 2
+
+                # 阶段3: 匀速（t2 ~ t3）
+                tau3 = t[mask3] - t2 - t_const_acc
+                pos[mask3] = start_clipped[i] + 2 * accel_dist + peak_vel * (tau3 + t_const_acc / 2)
+                vel[mask3] = peak_vel
+
+                # 阶段4: 匀减速（t3 ~ t4）
+                tau4 = t[mask4] - t3
+                pos[mask4] = target_clipped[i] - 2 * accel_dist - peak_vel * (t_const_acc / 2 + t_const_vel) + peak_vel * tau4 - (1/6) * jerk_limit[i] * tau4 ** 3
+                vel[mask4] = peak_vel - 0.5 * jerk_limit[i] * tau4 ** 2
+
+                # 阶段5: 减加速（t4 ~ end）
+                tau5 = t[mask5] - t4
+                pos[mask5] = target_clipped[i] - (1/6) * jerk_limit[i] * (t_jerk - tau5) ** 3
+                vel[mask5] = 0.5 * jerk_limit[i] * (t_jerk - tau5) ** 2
+
+                # 应用方向
+                pos = pos * direction
+                vel = vel * direction
+
+                # 确保终点精确
+                pos[-1] = target_clipped[i]
+                vel[-1] = 0.0
+
+            # 扩展数组
+            if len(traj_pos) < len(pos):
+                traj_pos = np.pad(traj_pos, ((0, len(pos) - len(traj_pos)), (0, 0)), 'constant')
+                traj_vel = np.pad(traj_vel, ((0, len(pos) - len(traj_vel)), (0, 0)), 'constant')
+            traj_pos[:len(pos), i] = pos
+            traj_vel[:len(pos), i] = vel
+            max_len = max(max_len, len(pos))
+
+        # 统一长度
+        if len(traj_pos) < max_len:
+            pad = max_len - len(traj_pos)
+            traj_pos = np.pad(traj_pos, ((0, pad), (0, 0)), 'constant', constant_values=target_clipped)
+            traj_vel = np.pad(traj_vel, ((0, pad), (0, 0)), 'constant')
+
+        # 轨迹平滑
+        if smooth:
+            traj_pos, traj_vel = cls.smooth(traj_pos, traj_vel)
+
+        # 缓存管理
+        if len(cls._cache) >= cls._cache_max:
+            cls._cache.pop(next(iter(cls._cache)))
+        cls._cache[cache_key] = (traj_pos, traj_vel)
+
+        return traj_pos, traj_vel
 
     @classmethod
     def save(cls, traj_pos, traj_vel, name):
@@ -475,13 +599,14 @@ class ArmController:
         self.err = np.zeros(JOINT_COUNT)
         self.max_err = np.zeros(JOINT_COUNT)
 
+        # 预分配缓冲区（避免循环中重复分配）
+        self._qpos_buf = np.zeros(JOINT_COUNT, dtype=np.float64)
+        self._qvel_buf = np.zeros(JOINT_COUNT, dtype=np.float64)
+
         # 性能统计
         self.step = 0
         self.last_ctrl = time.time()
         self.last_status = time.time()
-
-        # Viewer
-        self.viewer = None
 
         # Viewer
         self.viewer = None
@@ -492,7 +617,7 @@ class ArmController:
             self.joint_ids = [-1] * JOINT_COUNT
             self.motor_ids = [-1] * JOINT_COUNT
             self.ee_id = -1
-            self.link_geom_ids = [-1] * JOINT_COUNT
+            self.link_ids = [-1] * JOINT_COUNT
             return
 
         # 批量获取ID
@@ -501,15 +626,16 @@ class ArmController:
         self.motor_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f'motor{i + 1}')
                           for i in range(JOINT_COUNT)]
         self.ee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, 'ee_geom')
-        self.link_geom_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}')
-                              for i in range(JOINT_COUNT)]
+        self.link_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}')
+                         for i in range(JOINT_COUNT)]
 
     def _init_mujoco(self):
         """极简MuJoCo初始化"""
+        jlim = JOINT_LIMITS
         xml = f"""
 <mujoco model="arm">
     <compiler angle="radian" inertiafromgeom="true"/>
-    <option timestep="{sim_dt}" gravity="0 0 -9.81" collision="all"/>
+    <option timestep="{SIM_DT}" gravity="0 0 -9.81"/>
     <default>
         <joint type="hinge" limited="true"/>
         <motor ctrllimited="true" ctrlrange="-1 1" gear="100"/>
@@ -519,21 +645,21 @@ class ArmController:
         <geom name="floor" type="plane" size="3 3 0.1" rgba="0.8 0.8 0.8 1"/>
         <body name="base" pos="0 0 0">
             <geom type="cylinder" size="0.1 0.1" rgba="0.2 0.2 0.8 1"/>
-            <joint name="joint1" axis="0 0 1" pos="0 0 0.1" range="{j1_min} {j1_max}"/>
+            <joint name="joint1" axis="0 0 1" pos="0 0 0.1" range="{jlim[0,0]} {jlim[0,1]}"/>
             <body name="link1" pos="0 0 0.1">
                 <geom name="link1" type="cylinder" size="0.04 0.18" mass="0.8" rgba="0 0.8 0 0.8"/>
-                <joint name="joint2" axis="0 1 0" pos="0 0 0.18" range="{j2_min} {j2_max}"/>
+                <joint name="joint2" axis="0 1 0" pos="0 0 0.18" range="{jlim[1,0]} {jlim[1,1]}"/>
                 <body name="link2" pos="0 0 0.18">
                     <geom name="link2" type="cylinder" size="0.04 0.18" mass="0.6" rgba="0 0.8 0 0.8"/>
-                    <joint name="joint3" axis="0 1 0" pos="0 0 0.18" range="{j3_min} {j3_max}"/>
+                    <joint name="joint3" axis="0 1 0" pos="0 0 0.18" range="{jlim[2,0]} {jlim[2,1]}"/>
                     <body name="link3" pos="0 0 0.18">
                         <geom name="link3" type="cylinder" size="0.04 0.18" mass="0.6" rgba="0 0.8 0 0.8"/>
-                        <joint name="joint4" axis="0 1 0" pos="0 0 0.18" range="{j4_min} {j4_max}"/>
+                        <joint name="joint4" axis="0 1 0" pos="0 0 0.18" range="{jlim[3,0]} {jlim[3,1]}"/>
                         <body name="link4" pos="0 0 0.18">
                             <geom name="link4" type="cylinder" size="0.04 0.18" mass="0.4" rgba="0 0.8 0 0.8"/>
-                            <joint name="joint5" axis="0 1 0" pos="0 0 0.18" range="{j5_min} {j5_max}"/>
+                            <joint name="joint5" axis="0 1 0" pos="0 0 0.18" range="{jlim[4,0]} {jlim[4,1]}"/>
                             <body name="ee" pos="0 0 0.18">
-                                <geom name="ee_geom" type="sphere" size="0.04" mass="{self.load}" rgba="0.8 0.2 0.2 1"/>
+                                <geom name="ee_geom" type="sphere" size="0.04" mass="0.5" rgba="0.8 0.2 0.2 1"/>
                             </body>
                         </body>
                     </body>
@@ -553,19 +679,8 @@ class ArmController:
 </mujoco>
         """
 
-        # 模板参数
-        xml_params = {
-            "sim_dt": SIM_DT,
-            "load": self.load_set,
-            "j1_min": JOINT_LIMITS[0, 0], "j1_max": JOINT_LIMITS[0, 1],
-            "j2_min": JOINT_LIMITS[1, 0], "j2_max": JOINT_LIMITS[1, 1],
-            "j3_min": JOINT_LIMITS[2, 0], "j3_max": JOINT_LIMITS[2, 1],
-            "j4_min": JOINT_LIMITS[3, 0], "j4_max": JOINT_LIMITS[3, 1],
-            "j5_min": JOINT_LIMITS[4, 0], "j5_max": JOINT_LIMITS[4, 1],
-        }
 
         try:
-            xml = xml_template.format(**xml_params)
             model = mujoco.MjModel.from_xml_string(xml)
             data = mujoco.MjData(model)
             return model, data
@@ -575,31 +690,17 @@ class ArmController:
             self.running = False
             return None, None
 
-    def _init_ids(self):
-        """初始化ID"""
-        if self.model is None:
-            self.joint_ids = self.motor_ids = self.link_ids = [-1] * JOINT_COUNT
-            self.ee_id = -1
-            return
-
-        self.joint_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, f'joint{i + 1}') for i in
-                          range(JOINT_COUNT)]
-        self.motor_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, f'motor{i + 1}') for i in
-                          range(JOINT_COUNT)]
-        self.link_ids = [mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, f'link{i + 1}') for i in
-                         range(JOINT_COUNT)]
-        self.ee_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, 'ee_geom')
-
     def get_states(self):
-        """获取关节状态"""
+        """获取关节状态（预分配缓冲区，避免循环内分配）"""
         if self.data is None:
-            return np.zeros(JOINT_COUNT), np.zeros(JOINT_COUNT)
+            return self._qpos_buf.copy(), self._qvel_buf.copy()
 
-        # 批量获取状态
-        qpos = np.array([self.data.qpos[jid] if jid >= 0 else 0.0 for jid in self.joint_ids])
-        qvel = np.array([self.data.qvel[jid] if jid >= 0 else 0.0 for jid in self.joint_ids])
+        # 使用预分配缓冲区，直接写入
+        for i, jid in enumerate(self.joint_ids):
+            self._qpos_buf[i] = self.data.qpos[jid] if jid >= 0 else 0.0
+            self._qvel_buf[i] = self.data.qvel[jid] if jid >= 0 else 0.0
 
-        return qpos, qvel
+        return self._qpos_buf.copy(), self._qvel_buf.copy()
 
     @Utils.perf
     def control_step(self):
@@ -737,8 +838,8 @@ class ArmController:
             'avoid': [15, 25, 10, 5, 0]
         }
 
-        if pose_name in poses:
-            self.move_to(poses[pose_name])
+        if pose in poses:
+            self.move_to(poses[pose])
         else:
             Utils.log(f"未知姿态: {pose}", "ERROR")
 
@@ -840,8 +941,11 @@ class ArmController:
                     self.load_params(parts[1] if len(parts) > 1 else "default")
                 else:
                     Utils.log("未知命令，输入help查看帮助")
-            except:
-                pass
+            except (EOFError, KeyboardInterrupt):
+                # 输入流关闭或用户中断，优雅退出
+                break
+            except Exception as e:
+                Utils.log(f"命令执行错误: {e}", "ERROR")
 
     def _control_joint(self, idx, deg):
         """控制单个关节"""
@@ -869,12 +973,12 @@ class ArmController:
     def run(self):
         """主运行循环"""
         # 启动Viewer
+        self.viewer = None
         try:
+            import mujoco.viewer
             self.viewer = mujoco.viewer.launch_passive(self.model, self.data) if self.model else None
         except Exception as e:
-            Utils.log(f"Viewer启动失败: {e}", "ERROR")
-            self.running = False
-            return
+            Utils.log(f"Viewer不可用，跳过可视化: {e}", "WARN")
 
         # 启动交互线程
         threading.Thread(target=self._shell, daemon=True).start()
@@ -884,7 +988,7 @@ class ArmController:
 
         # 主循环
         Utils.log("控制器启动成功！输入help查看命令")
-        while self.running and (self.viewer.is_running() if self.viewer else True):
+        while self.running:
             try:
                 self.control_step()
                 if self.data:

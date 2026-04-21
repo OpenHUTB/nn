@@ -2,11 +2,17 @@
 import numpy as np
 # 导入matplotlib.pyplot模块，用于数据可视化和绘图
 import matplotlib.pyplot as plt 
+# 导入argparse，用于命令行参数配置
+import argparse
+# 导入csv，用于保存收敛日志
+import csv
+# 导入Path，便于跨平台路径处理
+from pathlib import Path
 #添加类型提示支持
 from typing import Tuple, List 
 
 # 生成混合高斯分布数据
-def generate_data(n_samples = 1000):
+def generate_data(n_samples = 1000, random_state = 42):
     """生成混合高斯分布数据集
     
     Args:
@@ -18,7 +24,7 @@ def generate_data(n_samples = 1000):
             X: 特征矩阵 (n_samples, 2)
             y_true: 真实标签 (n_samples,)
     """
-    np.random.seed(42)  # 固定随机种子以确保结果可复现
+    np.random.seed(random_state)  # 固定随机种子以确保结果可复现
     # 定义三个高斯分布的中心点
     mu_true = np.array([ 
         [0, 0],  # 第一个高斯分布的均值
@@ -277,7 +283,7 @@ class GaussianMixtureModel:
             exponent = -0.5 * np.einsum('...i,...i->...', X_centered @ inv, X_centered) #计算指数部分（二次型）
             return -0.5 * n_features * np.log(2 * np.pi) - 0.5 * logdet + exponent #组合对数概率密度
         
-    def plot_convergence(self):
+    def plot_convergence(self, save_path = None, show = True):
         """可视化对数似然的收敛过程"""
         # 检查是否有对数似然值记录
         if not self.log_likelihoods:
@@ -296,23 +302,50 @@ class GaussianMixtureModel:
         plt.title('EM算法收敛曲线')
         # 启用网格线，增强可读性
         plt.grid(True, alpha=0.5) 
-        plt.show()
+        # 如提供保存路径，则写入文件
+        if save_path is not None:
+            plt.savefig(save_path, dpi=140, bbox_inches='tight')
+        # 是否显示窗口
+        if show:
+            plt.show()
+        else:
+            plt.close()
 
 # 主程序
 if __name__ == "__main__":
+    # 命令行参数
+    parser = argparse.ArgumentParser(description="GMM 无监督聚类实验（最小改动版）")
+    parser.add_argument("--n-samples", type=int, default=1000, help="样本数量")
+    parser.add_argument("--n-components", type=int, default=3, help="高斯成分数量")
+    parser.add_argument("--max-iter", type=int, default=100, help="EM最大迭代次数")
+    parser.add_argument("--tol", type=float, default=1e-6, help="收敛阈值")
+    parser.add_argument("--random-state", type=int, default=42, help="随机种子")
+    parser.add_argument("--out-dir", type=str, default="outputs", help="输出目录")
+    parser.add_argument("--no-show", action="store_true", help="不弹出图像窗口，仅保存文件")
+    args = parser.parse_args()
+
+    # 创建输出目录
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     # 1. 生成合成数据
     print("生成混合高斯分布数据...")
     # 调用generate_data函数生成样本数据：
-    X, y_true = generate_data(n_samples=1000)
+    X, y_true = generate_data(n_samples=args.n_samples, random_state=args.random_state)
     print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
     
     # 训练GMM模型
     # 初始化高斯混合模型，指定3个高斯成分
-    gmm = GaussianMixtureModel(n_components=3)
+    gmm = GaussianMixtureModel(
+        n_components=args.n_components,
+        max_iter=args.max_iter,
+        tol=args.tol,
+        random_state=args.random_state,
+    )
     gmm.fit(X)
     y_pred = gmm.labels_#训练后存储预测标签的属性，将其赋值给 y_pred 以便后续使用
      #
-     
+      
     # 可视化结果
     plt.figure(figsize=(12, 5))#创建图形和子图
     plt.subplot(1, 2, 1)
@@ -331,11 +364,31 @@ if __name__ == "__main__":
     plt.xlabel("Feature 1")
     plt.ylabel("Feature 2")
     plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
-    plt.show()#显示创建的图形窗口
-    #打印信息
-    print("生成混合高斯分布数据...")
-    print("生成混合高斯分布数据...")
-    print("生成混合高斯分布数据...")
+    # 保存聚类对比图
+    cluster_path = out_dir / "cluster_comparison.png"
+    plt.savefig(cluster_path, dpi=140, bbox_inches='tight')
+    if args.no_show:
+        plt.close()
+    else:
+        plt.show()#显示创建的图形窗口
+
+    # 保存收敛曲线图
+    conv_path = out_dir / "convergence_curve.png"
+    gmm.plot_convergence(save_path=conv_path, show=(not args.no_show))
+
+    # 保存迭代日志
+    log_path = out_dir / "iteration_log.csv"
+    with log_path.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["iteration", "log_likelihood"])
+        for i, ll in enumerate(gmm.log_likelihoods, start=1):
+            writer.writerow([i, ll])
+
+    # 打印输出信息
+    print(f"输出目录: {out_dir.resolve()}")
+    print(f"聚类图: {cluster_path.name}")
+    print(f"收敛图: {conv_path.name}")
+    print(f"日志: {log_path.name}")
 
 
 

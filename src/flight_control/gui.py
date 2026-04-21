@@ -4,20 +4,24 @@ import threading
 import time
 
 class FlightControlGUI:
-    def __init__(self, client):
+    def __init__(self, client, flight_control=None):
         self.client = client
+        self.flight_control = flight_control
         self.root = None
         self.running = False
         
         try:
+            print("开始初始化 GUI...")
             # 尝试创建 tkinter 窗口
             self.root = tk.Tk()
+            print("创建窗口成功")
             self.root.title("无人机控制系统")
             self.root.geometry("800x600")
             
             # 创建主框架
             self.main_frame = ttk.Frame(self.root, padding="10")
             self.main_frame.pack(fill=tk.BOTH, expand=True)
+            print("创建主框架成功")
             
             # 创建状态显示区域
             self.status_frame = ttk.LabelFrame(self.main_frame, text="无人机状态", padding="10")
@@ -35,6 +39,7 @@ class FlightControlGUI:
             for i, (label, var) in enumerate(self.status_labels.items()):
                 ttk.Label(self.status_frame, text=label + ":").grid(row=i, column=0, sticky=tk.W, padx=5, pady=2)
                 ttk.Label(self.status_frame, textvariable=var).grid(row=i, column=1, sticky=tk.W, padx=5, pady=2)
+            print("创建状态显示区域成功")
             
             # 创建传感器数据区域
             self.sensor_frame = ttk.LabelFrame(self.main_frame, text="传感器数据", padding="10")
@@ -50,6 +55,7 @@ class FlightControlGUI:
             for i, (label, var) in enumerate(self.sensor_labels.items()):
                 ttk.Label(self.sensor_frame, text=label + ":").grid(row=i, column=0, sticky=tk.W, padx=5, pady=2)
                 ttk.Label(self.sensor_frame, textvariable=var).grid(row=i, column=1, sticky=tk.W, padx=5, pady=2)
+            print("创建传感器数据区域成功")
             
             # 创建控制按钮区域
             self.control_frame = ttk.LabelFrame(self.main_frame, text="控制", padding="10")
@@ -65,6 +71,7 @@ class FlightControlGUI:
             
             for i, (text, command) in enumerate(control_buttons):
                 ttk.Button(self.control_frame, text=text, command=command).grid(row=0, column=i, padx=5, pady=5)
+            print("创建控制按钮区域成功")
             
             # 创建参数设置区域
             self.params_frame = ttk.LabelFrame(self.main_frame, text="参数设置", padding="10")
@@ -81,7 +88,27 @@ class FlightControlGUI:
             self.height_var = tk.DoubleVar(value=-3.0)
             ttk.Entry(self.params_frame, textvariable=self.height_var, width=10).grid(row=1, column=1, padx=5, pady=2)
             ttk.Label(self.params_frame, text="m").grid(row=1, column=2, sticky=tk.W, padx=5, pady=2)
+            print("创建参数设置区域成功")
             
+            # 创建巡航路线设置区域
+            self.cruise_frame = ttk.LabelFrame(self.main_frame, text="巡航路线设置", padding="10")
+            self.cruise_frame.pack(fill=tk.X, pady=5)
+            
+            # 航点操作按钮
+            ttk.Button(self.cruise_frame, text="添加航点", command=self.add_waypoint).grid(row=1, column=6, padx=5, pady=2)
+            ttk.Button(self.cruise_frame, text="删除航点", command=self.remove_waypoint).grid(row=1, column=7, padx=5, pady=2)
+            
+            # 航点列表
+            ttk.Label(self.cruise_frame, text="航点列表:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
+            self.waypoint_list = tk.Listbox(self.cruise_frame, width=80, height=5)
+            self.waypoint_list.grid(row=3, column=0, columnspan=8, padx=5, pady=2)
+            
+            # 巡航控制按钮
+            ttk.Button(self.cruise_frame, text="开始巡航", command=self.start_cruise).grid(row=4, column=0, padx=5, pady=5)
+            ttk.Button(self.cruise_frame, text="停止巡航", command=self.stop_cruise).grid(row=4, column=1, padx=5, pady=5)
+            ttk.Button(self.cruise_frame, text="清空航点", command=self.clear_waypoints).grid(row=4, column=2, padx=5, pady=5)
+            print("创建巡航路线设置区域成功")
+
             # 创建日志区域
             self.log_frame = ttk.LabelFrame(self.main_frame, text="日志", padding="10")
             self.log_frame.pack(fill=tk.BOTH, expand=True, pady=5)
@@ -93,6 +120,7 @@ class FlightControlGUI:
             scrollbar = ttk.Scrollbar(self.log_text, command=self.log_text.yview)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             self.log_text.config(yscrollcommand=scrollbar.set)
+            print("创建日志区域成功")
             
             # 开始更新数据
             self.running = True
@@ -103,6 +131,8 @@ class FlightControlGUI:
             print("GUI 初始化成功")
         except Exception as e:
             print(f"GUI 初始化失败: {e}")
+            import traceback
+            traceback.print_exc()
             self.running = False
         
     def takeoff(self):
@@ -157,6 +187,16 @@ class FlightControlGUI:
         def _update_data():
             while self.running:
                 try:
+                    # 检查客户端是否连接
+                    if not self.client:
+                        self.status_labels["连接状态"].set("未连接")
+                        self.status_labels["位置"].set("(0, 0, 0)")
+                        self.status_labels["速度"].set("(0, 0, 0)")
+                        self.status_labels["高度"].set("0.0 m")
+                        self.status_labels["飞行状态"].set("未起飞")
+                        time.sleep(0.5)
+                        continue
+                    
                     # 更新状态信息
                     state = self.client.getMultirotorState()
                     
@@ -196,6 +236,114 @@ class FlightControlGUI:
         
         threading.Thread(target=_update_data).start()
     
+    def add_waypoint(self):
+        """添加航点"""
+        try:
+            if not self.client:
+                self.log("未连接无人机，无法添加航点")
+                return
+            
+            state = self.client.getMultirotorState()
+            pos = state.kinematics_estimated.position
+            waypoint = (pos.x_val, pos.y_val, pos.z_val)
+            
+            if not hasattr(self, 'waypoints'):
+                self.waypoints = []
+            
+            self.waypoints.append(waypoint)
+            self.waypoint_list.insert(tk.END, f"航点 {len(self.waypoints)}: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+            self.log(f"添加航点: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+            
+            if self.flight_control:
+                self.flight_control.waypoints.append(waypoint)
+        except Exception as e:
+            self.log(f"添加航点失败: {e}")
+    
+    def remove_waypoint(self):
+        """删除航点"""
+        try:
+            selection = self.waypoint_list.curselection()
+            if not selection:
+                self.log("请先选择要删除的航点")
+                return
+            
+            index = selection[0]
+            self.waypoint_list.delete(index)
+            self.waypoints.pop(index)
+            self.log(f"删除航点 {index + 1}")
+            
+            if self.flight_control and index < len(self.flight_control.waypoints):
+                self.flight_control.waypoints.pop(index)
+            
+            self.refresh_waypoint_list()
+        except Exception as e:
+            self.log(f"删除航点失败: {e}")
+    
+    def clear_waypoints(self):
+        """清空航点"""
+        try:
+            self.waypoint_list.delete(0, tk.END)
+            self.waypoints = []
+            if self.flight_control:
+                self.flight_control.waypoints = []
+            self.log("已清空所有航点")
+        except Exception as e:
+            self.log(f"清空航点失败: {e}")
+    
+    def refresh_waypoint_list(self):
+        """刷新航点列表显示"""
+        self.waypoint_list.delete(0, tk.END)
+        for i, waypoint in enumerate(self.waypoints):
+            self.waypoint_list.insert(tk.END, f"航点 {i+1}: ({waypoint[0]:.2f}, {waypoint[1]:.2f}, {waypoint[2]:.2f})")
+    
+    def start_cruise(self):
+        """开始巡航"""
+        try:
+            if not self.client:
+                self.log("未连接无人机，无法开始巡航")
+                return
+            
+            if not hasattr(self, 'waypoints') or not self.waypoints:
+                self.log("请先添加航点")
+                return
+            
+            self.is_cruising = True
+            self.log(f"开始巡航，共 {len(self.waypoints)} 个航点")
+            
+            def cruise_task():
+                for i, waypoint in enumerate(self.waypoints):
+                    if not self.is_cruising:
+                        break
+                    self.log(f"飞往航点 {i+1}: ({waypoint[0]:.2f}, {waypoint[1]:.2f}, {waypoint[2]:.2f})")
+                    self.client.moveToPositionAsync(waypoint[0], waypoint[1], waypoint[2], 2).join()
+                    time.sleep(1)
+                
+                if self.is_cruising:
+                    self.log("巡航完成")
+                self.is_cruising = False
+            
+            threading.Thread(target=cruise_task, daemon=True).start()
+        except Exception as e:
+            self.log(f"开始巡航失败: {e}")
+            self.is_cruising = False
+    
+    def stop_cruise(self):
+        """停止巡航"""
+        try:
+            self.is_cruising = False
+            self.log("停止巡航")
+            if self.client:
+                self.client.hoverAsync().join()
+        except Exception as e:
+            self.log(f"停止巡航失败: {e}")
+    
+    def stop(self):
+        """停止 GUI"""
+        if self.root:
+            self.running = False
+            self.root.quit()
+            print("GUI 已停止")
+    
     def run(self):
         if self.root is None:
             print("GUI 未初始化，无法运行")
@@ -205,6 +353,9 @@ class FlightControlGUI:
             self.root.mainloop()
         finally:
             self.running = False
+            # 停止巡航
+            if self.is_cruising:
+                self.stop_cruise()
             if hasattr(self, 'update_thread') and self.update_thread.is_alive():
                 self.update_thread.join(timeout=1.0)
             print("GUI 已关闭")
