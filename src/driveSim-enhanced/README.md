@@ -197,14 +197,14 @@ python --version
 
 ```
 openhutb/
-├── src/
-│   └── driveSim-enhanced/
-│       ├── automatic_control.py      # CARLA 自动驾驶主程序
-│       ├── lane_detection.py         # 车道检测模块
-│       └── traffic_light.py          # 交通信号灯检测模块
-├── requirements.txt                  # Python 依赖列表
-├── start_carla.bat                   # 一键启动脚本 (CARLA)
-└── README.md                         # 项目文档
+├── src\
+    └── driveSim-enhanced\
+        └── automatic_control.py
+        └── drive.py
+        └── rl_agent.py
+        └── map_swithcer.py
+        └── main.py
+        └── README.py
 ```
 
 ---
