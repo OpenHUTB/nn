@@ -23,6 +23,8 @@ from direction_analyzer import DirectionAnalyzer
 from visualizer import Visualizer
 from video_processor import VideoProcessor
 from utils import PerformanceMonitor, Timer, safe_resize, calculate_fps
+from confidence_calibrator import ConfidenceCalibrator
+from quality_evaluator import QualityEvaluator
 
 
 class LaneDetectionApp:
@@ -91,6 +93,8 @@ class LaneDetectionApp:
             self.direction_analyzer = DirectionAnalyzer(self.config)
             self.visualizer = Visualizer(self.config)
             self.video_processor = VideoProcessor(self.config)
+            self.confidence_calibrator = ConfidenceCalibrator()
+            self.quality_evaluator = QualityEvaluator()
             print("所有模块初始化完成")
         except Exception as e:
             print(f"模块初始化失败: {e}")
