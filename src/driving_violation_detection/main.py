@@ -141,7 +141,7 @@ traffic_manager.auto_lane_change(vehicle, True)
 # 设置全局跟车距离
 traffic_manager.set_global_distance_to_leading_vehicle(2.5)
 #设置遵守交通规则
-traffic_manager.ignore_lights_percentage(vehicle, 100.0)  # Ignore all traffic lights
+traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
 traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
 # 减少跟车距离
