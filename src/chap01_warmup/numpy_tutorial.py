@@ -1,283 +1,380 @@
 #!/usr/bin/env python3
 # coding: utf-8
-# numpy 的 array 操作
 
-# 1. 导入 numpy 库
-import numpy as np                    # 将 numpy 库命名为 np
-import matplotlib.pyplot as plt       # 仅保留需要使用的导入
-# import 放一起代码美观
+"""
+NumPy 热身教程操作脚本
+该脚本包含了一系列基础的 NumPy 数组操作和 Matplotlib 绘图示例。
+"""
 
+import numpy as np
+import matplotlib.pyplot as plt
 
-
-# 2. 建立一个一维数组 a 初始化为 [4, 5, 6]，(1) 输出 a 的类型（type）(2) 输出 a 的各维度的大小（shape）(3) 输出 a 的第一个元素（element）
 
 def question_2():
-    print("第二题：\n") #格式修改为缩进
-# 创建一个一维NumPy数组，存储整数类型的数值
-# 数组元素为[4, 5, 6]，数据类型默认推断为numpy.int64
-# 形状：a.shape = (3,)，表示包含3个元素的一维数组     
+    """
+    建立并操作一维数组。
+    初始化为 [4, 5, 6]，并输出其类型、形状以及第一个元素。
+    """
+    print("第二题：\n")
+    
+    # 创建一个一维NumPy数组，存储整数类型的数值，形状为 (3,)
     a = np.array([4, 5, 6])
 
     print("(1) 输出 a 的类型（type）\n", type(a))
     print("(2) 输出 a 的各维度的大小（shape）\n", a.shape)
     print("(3) 输出 a 的第一个元素（element）\n", a[0])
-# 使用 array() 函数创建数组，函数可基于序列型的对象。创建了一个一维数组 a，并输出其类型（numpy.ndarray）、形状（(3,)） 和第一个元素（4）。
-# 使用 type() 获取数组的类型(numpy.ndarray),使用 shape 属性查看数组维度信息(一维数组的形状表示为 (n,)),通过索引访问数组元素（索引从 0 开始）
-# 3. 建立一个二维数组 b, 初始化为 [ [4, 5, 6], [1, 2, 3]] (1) 输出二维数组 b 的形状（shape）（输出值为（2,3））(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）
+
+
 def question_3():
+    """
+    建立并操作二维数组。
+    初始化为 [[4, 5, 6],[1, 2, 3]]，输出其形状及指定下标的元素。
+    """
     print("第三题：\n")
-    b = np.array([[4, 5, 6], [1, 2, 3]])  # 创建一个二维数组 b
-    print("(1) 输出各维度的大小（shape）\n", b.shape)  # 输出数组 b 的形状 - 应该是(2,3)
-    print("(2) 输出 b(0,0)，b(0,1),b(1,1) 这三个元素（对应值分别为 4,5,2）\n", b[0, 0], b[0, 1], b[1, 1])  # 输出数组 b 的指定元素 - b[0,0]是4, b[0,1]是5, b[1,1]是2
+    
+    b = np.array([[4, 5, 6], [1, 2, 3]])  # 创建一个形状为 (2,3) 的二维数组 b
+    print("(1) 输出各维度的大小（shape）\n", b.shape)
+    print("(2) 输出 b(0,0)，b(0,1), b(1,1) 这三个元素\n", b[0, 0], b[0, 1], b[1, 1])
 
 
-# 4. (1) 建立一个全 0 矩阵 a, 大小为 3x3; 类型为整型（提示: dtype = int）(2) 建立一个全 1 矩阵 b, 大小为 4x5;  (3) 建立一个单位矩阵 c ,大小为 4x4; (4) 生成一个随机数矩阵 d,
-# 大小为 3x2.
 def question_4():
-    print("第四题：")
+    """
+    创建多种特殊矩阵：全 0 矩阵、全 1 矩阵、单位矩阵以及随机数矩阵。
+    """
+    print("第四题：\n")
 
-# 全 0 矩阵，3x3，指定数据类型为int
+    # 全 0 矩阵，3x3，指定数据类型为 int
     a = np.zeros((3, 3), dtype=int)
     print("(1) 全0矩阵:\n", a)
-# 全 1 矩阵，4x5，默认数据类型为float
+    
+    # 全 1 矩阵，4x5，默认数据类型为 float
     b = np.ones((4, 5))
     print("(2) 全1矩阵:\n", b)
-# 单位矩阵，4x4(对角线为1，其余为0)
+    
+    # 单位矩阵，4x4 (对角线为1，其余为0)
     c = np.eye(4)
     print("(3) 单位矩阵:\n", c)
-# 随机数矩阵，3x2：设置随机种子（42）确保结果可复现，生成0-1之间的浮点数
-    np.random.seed(42)  #  固定随机种子，使随机结果可复现
-    d = np.random.rand(3, 2)# 生成一个形状为(3, 2)的NumPy数组，其中每个元素都是0到1之间的随机浮点数
+    
+    # 随机数矩阵，3x2：设置随机种子确保结果可复现，生成 0-1 之间的浮点数
+    np.random.seed(42)
+    d = np.random.rand(3, 2)
     print("(4) 随机矩阵:\n", d)
 
-# 5. 建立一个数组 a,(值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]] ) ,(1) 打印 a; (2) 输出数组中下标为 (2,3),(0,0) 这两个元素的值
+
 def question_5():
+    """
+    建立一个 3x4 的二维数组，并输出特定下标的元素。
+
+    Returns:
+        numpy.ndarray: 形状为 (3, 4) 的二维数组 a。
+    """
     print("第五题：\n")
-# 创建一个 3x4 的二维数组 a，值为 [[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]
-    a = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]])
-# 输出数组 a
+    
+    a = np.array([[1, 2, 3, 4],[5, 6, 7, 8],[9, 10, 11, 12]])
     print(a)
-# 输出数组 a 中下标为 (2,3) 和 (0,0) 的两个元素的值
-    print(a[2, 3], a[0, 0])
-    return a  # 添加返回语句
+    print("指定下标元素 (2,3) 和 (0,0):", a[2, 3], a[0, 0])
+    
+    return a
 
-# 6. 把上一题的 a 数组的 0 到 1 行，2 到 3 列，放到 b 里面去，（此处不需要从新建立 a, 直接调用即可）(1) 输出 b; (2) 输出 b 数组中（0,0）这个元素的值
+
 def question_6(a):
-    print("第六题：")
+    """
+    利用切片提取数组 a 的部分元素放入 b 中，并输出结果。
 
-# 0:2 表示取第 0 行（包含）到第 2 行（不包含），即实际取第 0 行和第 1 行；2:4 表示取第 2 列（包含）到第 4 列（不包含），即实际取第 2 列和第 3 列
+    Args:
+        a (numpy.ndarray): 形状为 (3, 4) 的源数组。
+    """
+    print("第六题：\n")
+
+    # 提取第 0-1 行，第 2-3 列的元素
     b = a[0:2, 2:4]
     print("(1) 输出 b\n", b)
     print("(2) 输出 b 的（0,0）这个元素的值\n", b[0, 0])
 
-# 7. 把第 5 题中数组 a 的最后两行所有元素放到 c 中 (1) 输出 c ; (2) 输出 c 中第一行的最后一个元素（提示，使用 -1 表示最后一个元素）
-def question_7(a):
-    print("第七题：")
 
-# -2: 提取最后两行的所有列元素
+def question_7(a):
+    """
+    利用切片提取数组 a 的最后两行所有元素放入 c 中。
+
+    Args:
+        a (numpy.ndarray): 形状为 (3, 4) 的源数组。
+    """
+    print("第七题：\n")
+
+    # -2: 提取最后两行的所有列元素
     c = a[-2:, :]  
     print("(1) 输出 c \n", c)
-# -1 表示选取该行的最后一个元素
+    # -1 表示选取该行的最后一个元素
     print("(2) 输出 c 中第一行的最后一个元素\n", c[0, -1]) 
 
-# 8. 建立数组 a, 创建数组 a 为 [[1, 2], [3, 4], [5, 6]]，输出 （0,0）（1,1）（2,0） 这三个元素（提示： 使用 print(a[[0, 1, 2], [0, 1, 0]]) ）
+
 def question_8():
-    print("第八题：")
+    """
+    使用整数数组索引获取二维数组中的特定元素。
+    """
+    print("第八题：\n")
 
-    a = np.array([[1, 2], [3, 4], [5, 6]])
-# a[行索引列表, 列索引列表] 表示依次获取到的元素是第 0 行第 0 列的 1 、第 1 行第 1 列的 4 、第 2 行第 0 列的 5 
-    print("输出:\n", a[[0, 1, 2], [0, 1, 0]])  
+    a = np.array([[1, 2], [3, 4],[5, 6]])
+    # a[行索引列表, 列索引列表]
+    print("输出 (0,0)(1,1)(2,0) 元素:\n", a[[0, 1, 2],[0, 1, 0]])  
 
-# 9：使用NumPy高级索引提取矩阵特定元素
+
 def question_9():
-    print("第九题：")
+    """
+    使用 NumPy 高级索引提取矩阵特定元素。
 
-# 创建一个4行3列的二维数组（矩阵）a，并初始化数值
-# 矩阵结构：
-# 第0行: [1,  2,  3]
-# 第1行: [4,  5,  6] 
-# 第2行: [7,  8,  9]
-# 第3行: [10, 11, 12]
+    Returns:
+        tuple: 包含数组 a (4, 3) 和列索引数组 b (4,)。
+    """
+    print("第九题：\n")
 
     a = np.array([[1, 2, 3], 
-              [4, 5, 6], 
-              [7, 8, 9], 
-              [10, 11, 12]])
+                  [4, 5, 6], 
+                  [7, 8, 9],[10, 11, 12]])
 
-# 创建一个列索引数组b，用于指定每行要提取的元素所在的列
-# b[0]=0: 第0行取第0列
-# b[1]=2: 第1行取第2列
-# b[2]=0: 第2行取第0列 
-# b[3]=1: 第3行取第1列
+    # 创建一个列索引数组 b，用于指定每行要提取的元素所在的列
     b = np.array([0, 2, 0, 1])
 
-# 使用高级索引提取元素：
-# np.arange(4) 生成行索引数组 [0,1,2,3]
-# b 是对应的列索引数组 [0,2,0,1]
-# 组合效果相当于：
-# a[0,0] → 第0行第0列 → 1
-# a[1,2] → 第1行第2列 → 6
-# a[2,0] → 第2行第0列 → 7
-# a[3,1] → 第3行第1列 → 11
-    print("输出:\n", a[np.arange(4), b])  # 输出: [1, 6, 7, 11]
-    return a, b  # 添加返回语句
+    # np.arange(4) 生成行索引[0, 1, 2, 3]，结合列索引 b 提取特定元素
+    print("输出:\n", a[np.arange(4), b])
+    
+    return a, b
 
-# 10. 对 9 中输出的那四个元素，每个都加上 10，然后重新输出矩阵 a.(提示： a[np.arange(4), b] += 10 ）
+
 def question_10(a, b):
-    print("第十题：")
+    """
+    对矩阵 a 中高级索引指定的元素执行原地加法操作。
 
-    a[np.arange(4), b] += 10  # 利用 numpy 的高级索引功能，行用 np.arange(4) 生成，列用 b 数组指定，进行加法操作
-    print("输出:", a)
+    Args:
+        a (numpy.ndarray): 源矩阵，形状为 (4, 3)。
+        b (numpy.ndarray): 列索引数组，形状为 (4,)。
+    """
+    print("第十题：\n")
 
-# 11. 执行 x = np.array([1, 2])，然后输出 x 的数据类型
+    a[np.arange(4), b] += 10
+    print("输出:\n", a)
+
+
 def question_11():
-    print("第十一题：")
+    """
+    查看由整数构成的 NumPy 数组的默认数据类型。
+    """
+    print("第十一题：\n")
 
     x = np.array([1, 2])
-# 创建一个包含整数1和2的NumPy数组
-    print("输出:",x.dtype)
+    print("输出:", x.dtype)
 
-# 12. 执行 x = np.array([1.0, 2.0]) ，然后输出 x 的数据类类型
+
 def question_12():
-    print("第十二题：")
+    """
+    查看由浮点数构成的 NumPy 数组的默认数据类型。
+    """
+    print("第十二题：\n")
 
     x = np.array([1.0, 2.0])
     print("输出:", x.dtype)
 
-# 13. 执行 x = np.array([[1, 2], [3, 4]], dtype=np.float64) ，y = np.array([[5, 6], [7, 8]], dtype = np.float64)，然后输出 x+y , 和 np.add(x,y)
+
 def question_13():
-    print("第十三题：")
+    """
+    创建 float64 类型的数组并执行矩阵加法操作。
 
-    x = np.array([[1, 2], [3, 4]], dtype=np.float64)  # 创建一个二维的 NumPy 数组 x，其元素为 [[1, 2], [3, 4]]，数据类型指定为 np.float64（双精度浮点数）
-    y = np.array([[5, 6], [7, 8]], dtype=np.float64)  # 创建另一个二维的 NumPy 数组 y，其元素为 [[5, 6], [7, 8]]，数据类型同样为 np.float64
+    Returns:
+        tuple: 包含两个形状为 (2, 2) 的 NumPy 数组 (x, y)。
+    """
+    print("第十三题：\n")
 
-    print("x+y\n", x + y)  # 使用 + 运算符对两个数组进行逐元素相加操作，并将结果打印出来
+    x = np.array([[1, 2],[3, 4]], dtype=np.float64)
+    y = np.array([[5, 6], [7, 8]], dtype=np.float64)
 
-    print("np.add(x,y)\n", np.add(x, y))  # np.add 是 NumPy 库中用于数组相加的函数，同样会对两个数组进行逐元素相加
-    return x, y  # 添加返回语句
+    print("x+y\n", x + y)
+    print("np.add(x,y)\n", np.add(x, y))
+    
+    return x, y
 
-# 14. 利用 13 题目中的 x,y 输出 x-y 和 np.subtract(x,y)
+
 def question_14(x, y):
-    print("第十四题：")
+    """
+    利用操作符和 numpy 函数执行矩阵减法。
 
-    print("x-y\n", x - y)# 打印直接使用减法运算符得到的 x 减 y 的结果
-    print("np.subtract(x,y)\n", np.subtract(x, y))# 打印使用 numpy 的 subtract 函数得到的 x 减 y 的结果
+    Args:
+        x (numpy.ndarray): 被减矩阵。
+        y (numpy.ndarray): 减数矩阵。
+    """
+    print("第十四题：\n")
 
-# 15. 利用 13 题目中的 x,y 输出 x*y , 和 np.multiply(x,y) 还有 np.dot(x,y), 比较差异。然后自己换一个不是方阵的试试。
+    print("x-y\n", x - y)
+    print("np.subtract(x,y)\n", np.subtract(x, y))
+
+
 def question_15(x, y):
-    print("第十五题：")
-    print("x*y\n", x * y)  # 对应位置相乘
-    print("np.multiply(x, y)\n", np.multiply(x, y))  # 对应位置相乘
-    print("np.dot(x,y)\n", np.dot(x, y))  # 标准的行乘列求和
+    """
+    比较矩阵的逐元素乘法和矩阵乘法 (点乘)。
 
-# 16. 利用 13 题目中的 x,y, 输出 x / y .(提示：使用函数 np.divide())
+    Args:
+        x (numpy.ndarray): 矩阵 x。
+        y (numpy.ndarray): 矩阵 y。
+    """
+    print("第十五题：\n")
+    
+    print("x*y (逐元素乘法)\n", x * y)
+    print("np.multiply(x, y) (逐元素乘法)\n", np.multiply(x, y))
+    print("np.dot(x,y) (行乘列求和)\n", np.dot(x, y))
+
+
 def question_16(x, y):
-    print("第十六题：")
+    """
+    执行矩阵逐元素除法。
 
-    print("x/y\n", x / y)  # 逐元素除法
-    print("np.divide(x,y)\n", np.divide(x, y))  # 逐元素除法
+    Args:
+        x (numpy.ndarray): 分子矩阵。
+        y (numpy.ndarray): 分母矩阵。
+    """
+    print("第十六题：\n")
 
-# 17. 利用 13 题目中的 x, 输出 x 的 开方。(提示： 使用函数 np.sqrt() )
+    print("x/y\n", x / y)
+    print("np.divide(x,y)\n", np.divide(x, y))
+
+
 def question_17(x):
-    print("第十七题：")
+    """
+    计算矩阵逐元素的平方根。
+
+    Args:
+        x (numpy.ndarray): 输入矩阵。
+    """
+    print("第十七题：\n")
 
     print("np.sqrt(x)\n", np.sqrt(x))
 
-# 18. 利用 13 题目中的 x,y , 执行 print(x.dot(y)) 和 print(np.dot(x,y))
+
 def question_18(x, y):
-    print("第十八题：")
+    """
+    利用对象方法和 numpy 函数执行矩阵点乘。
 
-    print("x.dot(y)\n", x.dot(y))  # 使用 dot 方法进行矩阵乘法
-    print("np.dot(x,y)\n", np.dot(x, y))  # 使用 np.dot 函数进行矩阵乘法
+    Args:
+        x (numpy.ndarray): 矩阵 x。
+        y (numpy.ndarray): 矩阵 y。
+    """
+    print("第十八题：\n")
 
-# 19. 利用 13 题目中的 x, 进行求和。提示：输出三种求和 (1)print(np.sum(x)):   (2)print(np.sum(x，axis =0 ));   (3)print(np.sum(x,axis = 1))
+    print("x.dot(y)\n", x.dot(y))
+    print("np.dot(x,y)\n", np.dot(x, y))
+
+
 def question_19(x):
-    print("第十九题：")
+    """
+    演示矩阵在不同轴 (axis) 上的求和操作。
+
+    Args:
+        x (numpy.ndarray): 输入矩阵。
+    """
+    print("第十九题：\n")
+    
     print("print(np.sum(x)):", np.sum(x))  # 所有元素求和
-    print("print(np.sum(x, axis=0))", np.sum(x, axis=0))  # 按列求和（列维度）
-    print("print(np.sum(x, axis = 1))", np.sum(x, axis = 1))  # 按行求和（行维度）
+    print("print(np.sum(x, axis=0)):", np.sum(x, axis=0))  # 按列求和
+    print("print(np.sum(x, axis=1)):", np.sum(x, axis=1))  # 按行求和
 
-# 20. 利用 13 题目中的 x, 进行求平均数（提示：输出三种平均数(1)print(np.mean(x)) (2)print(np.mean(x,axis = 0))(3) print(np.mean(x,axis =1))）
+
 def question_20(x):
-    print("第二十题：")
+    """
+    演示矩阵在不同轴 (axis) 上的均值计算。
 
-    print("print(np.mean(x))", np.mean(x))  # 全局均值
-    print("print(np.mean(x, axis = 0))", np.mean(x, axis=0))  # 列均值
-    print("print(np.mean(x, axis = 1))", np.mean(x, axis=1))  # 行均值
+    Args:
+        x (numpy.ndarray): 输入矩阵。
+    """
+    print("第二十题：\n")
 
-# 21. 利用 13 题目中的 x，对 x 进行矩阵转置，然后输出转置后的结果，（提示： x.T 表示对 x 的转置）
+    print("print(np.mean(x)):", np.mean(x))  # 全局均值
+    print("print(np.mean(x, axis=0)):", np.mean(x, axis=0))  # 按列求平均
+    print("print(np.mean(x, axis=1)):", np.mean(x, axis=1))  # 按行求平均
+
+
 def question_21(x):
-    print("第二十一题：")
+    """
+    演示矩阵的转置操作。
+
+    Args:
+        x (numpy.ndarray): 输入矩阵。
+    """
+    print("第二十一题：\n")
 
     print("x 转置后的结果:\n", x.T)
 
-# 22. 利用 13 题目中的 x, 求 e 的指数（提示： 函数 np.exp()）
+
 def question_22(x):
-    print("第二十二题：")
+    """
+    计算矩阵的指数 (e^x)。
 
-    print("e 的指数：np.exp(x)")  
-    print(np.exp(x))
+    Args:
+        x (numpy.ndarray): 输入矩阵。
+    """
+    print("第二十二题：\n")
 
-# 23. 利用 13 题目中的 x, 求值最大的下标（提示 (1)print(np.argmax(x)) ,(2) print(np.argmax(x, axis =0))(3)print(np.argmax(x),axis =1))
+    print("e 的指数：np.exp(x)\n", np.exp(x))
+
+
 def question_23(x):
-    print("第二十三题：")
-    print("全局最大值的下标:", np.argmax(x))          # 打印整个数组 x 中最大值的下标
-    print("每列最大值的下标:", np.argmax(x, axis=0))   # 打印数组 x 沿着第 0 轴（通常是行方向）上每一列最大值的下标
-    print("每行最大值的下标:", np.argmax(x, axis=1))   # 打印数组 x 沿着第 1 轴（通常是列方向）上每一行最大值的下标
+    """
+    演示在不同维度上获取最大值索引。
 
-# 24. 画图，y=x*x 其中 x = np.arange(0, 100, 0.1) （使用 NumPy 和 Matplotlib 绘制了二次函数 y=x^2 的图像）
-def question_24(): #绘制二次函数 y = x^2 的图像。
+    Args:
+        x (numpy.ndarray): 输入矩阵。
+    """
+    print("第二十三题：\n")
+    
+    print("全局最大值的下标:", np.argmax(x))
+    print("每列最大值的下标:", np.argmax(x, axis=0))
+    print("每行最大值的下标:", np.argmax(x, axis=1))
 
-    print("\n第二十四题：绘制二次函数")
 
-    x = np.arange(0, 100, 0.1)  # 生成从 0 到 99.9 的数组，步长为 0.1，共 1000 个点 （注：np.arange() 遵循的是左闭右开原则）
-    y = x * x  # 计算每个 x 对应的 y=x^2 的值
+def question_24():
+    """
+    使用 Matplotlib 绘制二次函数 y = x^2 的图像。
+    """
+    print("\n第二十四题：绘制二次函数\n")
 
-    plt.figure(figsize=(10, 6))  # 创建一个宽 10 英寸、高 6 英寸的图像窗口
-    plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)  # 绘制蓝色曲线，并设置图例标签为 y = x^2
+    x = np.arange(0, 100, 0.1)  # 从 0 到 99.9 的数组，步长 0.1
+    y = x * x
 
-    # 添加标题和标签
-    plt.title("Plot of y = x^2")  # 图像标题
-    plt.xlabel("x")  # x 轴标签
-    plt.ylabel("y")  # y 轴标签
+    plt.figure(figsize=(10, 6))
+    plt.plot(x, y, label="y = x^2", color="blue", linewidth=2)
 
-    # 显示出半透明网格线
+    plt.title("Plot of y = x^2")
+    plt.xlabel("x")
+    plt.ylabel("y")
     plt.grid(True, alpha=0.5)
-
-    # 在右上角显示图例
-    plt.legend(loc='upper right') # 在图表中添加图例(legend)，并将图例放置在右上角
-    plt.show()  # 显示绘制的图像
-    plt.close()  # 关闭图形，释放内存
-
-# 25. 画图：画正弦函数和余弦函数， x = np.arange(0, 3 * np.pi, 0.1)(提示：这里用到 np.sin() ，np.cos() 函数和 matplotlib.pyplot 库)
-def question_25():
-    print("第二十五题：绘制正弦和余弦函数")
-    # 改用linspace确保包含端点
-    x = np.linspace(0, 3 * np.pi, 100)  ## 生成从 0 到 3π 的 x 值，步长为 0.1
-    y_sin = np.sin(x)  # 计算对应的正弦值
-    y_cos = np.cos(x)  # 计算对应的余弦值
-
-    plt.figure(figsize=(10, 6))  # 创建一个图像窗口，设置大小为 10×6 英寸 
-    plt.plot(x, y_sin, label="y = sin(x)", color="blue")  # 绘制正弦函数曲线
-    plt.plot(x, y_cos, label="y = cos(x)", color="red")  # 绘制余弦函数曲线
-
-    # 添加标题和标签
-    plt.title("Sine and Cosine Functions")  # 设置图像的标题为 "Sine and Cosine Functions"
-    plt.xlabel("x")  # 设置图像中 x 轴的标签为 "x"
-    plt.ylabel("y")  # 设置图像中 y 轴的标签为 "y"
-
-    # 添加网格线
-    plt.grid(True, alpha=0.5)
-
-    # 显示图例
-    plt.legend(loc='best')
-
-    # 自动调整布局，防止标签被截断
-    plt.tight_layout() 
-
-    # 显示图像
+    plt.legend(loc='upper right')
+    
     plt.show()
-    plt.close()  # 关闭图形，释放内存
+    plt.close()
+
+
+def question_25():
+    """
+    使用 Matplotlib 绘制正弦和余弦函数图像。
+    """
+    print("\n第二十五题：绘制正弦和余弦函数\n")
+    
+    x = np.linspace(0, 3 * np.pi, 100)
+    y_sin = np.sin(x)
+    y_cos = np.cos(x)
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(x, y_sin, label="y = sin(x)", color="blue")
+    plt.plot(x, y_cos, label="y = cos(x)", color="red")
+
+    plt.title("Sine and Cosine Functions")
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.grid(True, alpha=0.5)
+    plt.legend(loc='best')
+    plt.tight_layout() 
+    
+    plt.show()
+    plt.close()
+
+
 if __name__ == "__main__":
     # 按顺序执行所有问题
     question_2()
