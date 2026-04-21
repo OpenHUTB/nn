@@ -9,7 +9,7 @@ class Config:
     # CARLA配置
     carla_host = "127.0.0.1"
     carla_port = 2000
-    carla_timeout = 10.0
+    carla_timeout = 30.0
     CARLA_HOST = carla_host
     CARLA_PORT = carla_port
     CARLA_TIMEOUT = carla_timeout
