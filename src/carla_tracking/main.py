@@ -786,13 +786,14 @@ def load_detection_model(model_type):
     """加载检测模型 - YOLOv5/v8"""
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    # 模型路径映射
+    # 模型路径映射 - 使用相对路径增强可移植性
+    base_path = os.path.join(os.path.dirname(__file__), '..', '..', 'models')
     model_paths = {
-        'yolov5s': r"D:\yolo\yolov5s.pt",
-        'yolov5su': r"D:\yolo\yolov5su.pt",
-        'yolov5m': r"D:\yolo\yolov5m.pt",
-        'yolov5mu': r"D:\yolo\yolov5mu.pt",
-        'yolov5x': r"D:\yolo\yolov5x.pt"
+        'yolov5s': os.path.join(base_path, 'yolov5s.pt'),
+        'yolov5su': os.path.join(base_path, 'yolov5su.pt'),
+        'yolov5m': os.path.join(base_path, 'yolov5m.pt'),
+        'yolov5mu': os.path.join(base_path, 'yolov5mu.pt'),
+        'yolov5x': os.path.join(base_path, 'yolov5x.pt')
     }
 
     # 模型类型回退逻辑

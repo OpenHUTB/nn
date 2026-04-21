@@ -1,0 +1,4 @@
+carla
+opencv-python
+numpy
+ultralytics
