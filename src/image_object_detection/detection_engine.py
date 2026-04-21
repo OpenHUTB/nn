@@ -1,12 +1,12 @@
 # detection_engine.py
 # 功能：封装 YOLOv8 模型的加载与推理逻辑，提供干净的检测接口
-# 修改：增加距离估计和危险等级显示
+# 修改：增加距离估计和危险等级显示 + 危险等级颜色
 
 from ultralytics import YOLO
 import io
 import sys
 import os
-import cv2  # 新增导入
+import cv2
 
 
 class ModelLoadError(Exception):
@@ -85,13 +85,13 @@ class DetectionEngine:
         return (known_height * focal_length) / box_height
 
     def _get_danger_level(self, distance):
-        """根据距离判定危险等级"""
+        """根据距离判定危险等级 + 颜色"""
         if distance < 10:
-            return "DANGER"
+            return "DANGER", (0, 0, 255)       # 红色
         elif distance < 20:
-            return "WARNING"
+            return "WARNING", (0, 255, 255)    # 黄色
         else:
-            return "SAFE"
+            return "SAFE", (0, 255, 0)         # 绿色
 
     def detect(self, frame):
         """
@@ -128,13 +128,13 @@ class DetectionEngine:
                     box_height = y2 - y1
                     # 估算距离
                     distance = self._estimate_distance(box_height)
-                    # 判定危险等级
-                    danger = self._get_danger_level(distance)
+                    # 判定危险等级 + 颜色
+                    danger, color = self._get_danger_level(distance)
                     # 准备显示的文字
                     info_text = f"{danger} {distance:.1f}m"
                     # 在框的上方绘制文字（y1-15 偏移避免与原始标签重叠）
                     cv2.putText(annotated_frame, info_text, (x1, y1 - 15),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
             # -------------------------------------------------
 
             return annotated_frame, results
@@ -146,4 +146,3 @@ class DetectionEngine:
             # 恢复标准输出
             sys.stdout = old_stdout
             sys.stderr = old_stderr
-
