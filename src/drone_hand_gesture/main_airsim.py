@@ -122,73 +122,65 @@ def main(show_window=True):
             cv2.putText(debug_frame, f"Gesture: {gesture} ({confidence:.2f})", 
                        (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
-            # 处理手势（参考main.py的优化逻辑）
+            # 处理手势（持续移动模式）
             current_time = time.time()
-            in_cooldown = current_time - last_command_time <= command_cooldown
-            same_gesture = (gesture == last_processed_gesture and
-                           current_time - last_processed_time < 2.0)
 
-            # 使用detector的get_command方法获取指令（与main.py一致）
+            # 使用detector的get_command方法获取指令
             command = detector.get_command(gesture)
 
+            # 持续移动模式：只要手势持续就持续移动
             if (gesture not in ["no_hand", "hand_detected", "none"]
                     and confidence > gesture_threshold
-                    and not in_cooldown
-                    and not same_gesture
                     and command != "none"):
 
-                print(f"[CMD] 手势：{gesture} (置信度: {confidence:.2f}) -> 执行: {command}")
+                # 移动类命令（持续执行）
+                move_commands = ["up", "down", "left", "right", "forward", "backward"]
+                
+                if command in move_commands:
+                    # AirSim NED 坐标系: X=前进, Y=右移, Z=下降
+                    move_velocity = {
+                        "forward":  (1.0, 0, 0),    # X正=前进
+                        "backward": (-1.0, 0, 0),   # X负=后退
+                        "right":    (0, 1.0, 0),    # Y正=右移
+                        "left":     (0, -1.0, 0),   # Y负=左移
+                        "down":     (0, 0, 1.0),    # Z正=下降
+                        "up":       (0, 0, -1.0),   # Z负=上升
+                    }
+                    vx, vy, vz = move_velocity[command]
+                    # 持续发送速度命令（0.1秒很短，只要手势持续就会不断发送）
+                    controller.move_by_velocity(vx, vy, vz, duration=0.1)
+                    
+                    # 打印一次指令即可
+                    if command != getattr(controller, '_last_command', None):
+                        print(f"[CMD] 手势：{gesture} (置信度: {confidence:.2f}) -> 执行: {command}")
+                        controller._last_command = command
 
-                # 根据command执行对应操作（与main.py的drone_controller.send_command逻辑一致）
-                if command == "land":
-                    if is_flying:
+                # 一次性命令（带冷却时间）
+                elif command == "land":
+                    if is_flying and current_time - last_command_time > command_cooldown:
                         print("[INFO] 降落...")
                         controller.land()
                         is_flying = False
-
-                elif command == "up":
-                    print("[INFO] 上升")
-                    controller.move_by_velocity(0, 0, -1.0, duration=0.5)
-
-                elif command == "down":
-                    print("[INFO] 下降")
-                    controller.move_by_velocity(0, 0, 1.0, duration=0.5)
-
-                elif command == "left":
-                    print("[INFO] 左移")
-                    controller.move_by_velocity(-1.0, 0, 0, duration=0.5)
-
-                elif command == "right":
-                    print("[INFO] 右移")
-                    controller.move_by_velocity(1.0, 0, 0, duration=0.5)
-
-                elif command == "forward":
-                    print("[INFO] 前进")
-                    controller.move_by_velocity(0, 1.0, 0, duration=0.5)
-
-                elif command == "backward":
-                    print("[INFO] 后退")
-                    controller.move_by_velocity(0, -1.0, 0, duration=0.5)
+                        last_command_time = current_time
 
                 elif command == "hover":
-                    print("[INFO] 悬停")
-                    controller.hover()
+                    if current_time - last_command_time > command_cooldown:
+                        print("[INFO] 悬停")
+                        controller.hover()
+                        last_command_time = current_time
 
                 elif command == "takeoff":
-                    if not is_flying:
+                    if not is_flying and current_time - last_command_time > command_cooldown:
                         print("[INFO] 起飞...")
                         controller.takeoff()
                         is_flying = True
+                        last_command_time = current_time
 
                 elif command == "stop":
-                    print("[INFO] 停止")
-                    controller.hover()
-
-                # 更新状态
-                last_command_time = current_time
-                last_processed_gesture = gesture
-                last_processed_time = current_time
-                current_gesture = gesture
+                    if current_time - last_command_time > command_cooldown:
+                        print("[INFO] 停止")
+                        controller.hover()
+                        last_command_time = current_time
             
             # 显示画面
             if show_window:
