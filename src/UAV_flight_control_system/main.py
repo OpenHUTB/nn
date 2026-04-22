@@ -33,7 +33,7 @@ except:
 print("="*60)
 print("W 前  S 后  A 左  D 右")
 print("Z 上升  X 下降  H 悬停  B 返航")
-print("O 环绕   M 方形   ESC 退出")
+print("O 环绕   M 方形   N原地旋转   ESC 退出")
 print("="*60)
 
 # ===================== 环绕飞行 =======================
@@ -64,6 +64,17 @@ def square_mode():
 def start_square():
     threading.Thread(target=square_mode, daemon=True).start()
 
+# ======================= 原地旋转巡视功能 =======================
+def rotate_mode():
+    print("开启原地旋转模式")
+    while is_flying:
+        # 原地旋转（机身自转）
+        client.rotateByYawRateAsync(20, 0.1)
+        time.sleep(0.1)
+
+def start_rotate():
+    threading.Thread(target=rotate_mode, daemon=True).start()
+    
 # ======================= 键盘 =======================
 def on_press(key):
     try:
@@ -87,6 +98,7 @@ def on_press(key):
 
         if key.char == 'o': start_orbit()
         if key.char == 'm': start_square()
+        if key.char == 'n': start_rotate()
 
     except:
         pass

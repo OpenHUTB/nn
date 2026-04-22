@@ -1,0 +1,141 @@
+# MuJoCo 日志
+MUJOCO_LOG.TXT
+
+# ========================================
+# Python
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ========================================
+# 虚拟环境
+# ========================================
+.venv/
+venv/
+ENV/
+env/
+.envrc
+
+# ========================================
+# IDE / 编辑器
+# ========================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ========================================
+# 深度学习模型��件（通常较大）
+# ========================================
+*.weights
+*.pt
+*.pth
+*.onnx
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.ckpt
+models/
+!src/yolo12_object_detection/scripts/ultralytics/models/
+!src/yolo12_object_detection/scripts/ultralytics/cfg/models/
+
+checkpoints/
+*.tflite
+
+# ========================================
+# 数据文件
+# ========================================
+*.csv
+*.xlsx
+*.xls
+!contributions.csv
+data/
+!src/yolo12_object_detection/scripts/ultralytics/data/
+
+dataset/
+datasets/
+
+# ========================================
+# 日志与缓存
+# ========================================
+*.log
+logs/
+tensorboard/
+runs/
+wandb/
+.mlflow/
+.cache/
+
+# ========================================
+# ROS / Catkin
+# ========================================
+devel/
+.catkin_workspace
+*.sage.py
+
+# ========================================
+# CARLA / 仿真器
+# ========================================
+*.bag
+recordings/
+screenshots/
+*.avi
+*.mp4
+*.png
+*.jpg
+*.jpeg
+!docs/images/
+
+# ========================================
+# Jupyter Notebook
+# ========================================
+.ipynb_checkpoints/
+
+# ========================================
+# 测试与覆盖率
+# ========================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ========================================
+# 系统文件
+# ========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================================
+# 其他
+# ========================================
+*.bak
+*.tmp
+*.temp
+.mujoco/
+site/
+.claude/
