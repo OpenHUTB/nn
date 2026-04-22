@@ -1,4 +1,3 @@
-<img width="500" height="1566" alt="1" src="https://github.com/user-attachments/assets/b1287ca6-d9a4-4ea0-820d-92c4969eb645" />
 # 基于 YOLOv8 与 Carla 的交通标志实时感知与交互控制系统
 
 ## 摘要
