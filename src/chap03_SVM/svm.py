@@ -1,5 +1,8 @@
 import numpy as np
 import os
+import argparse
+import json
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler
 
 def load_data(fname):
@@ -33,11 +36,11 @@ def eval_acc(label, pred):
 class SVM:
     """SVM模型：基于最大间隔分类的监督学习算法。"""
 #支持向量机（Support Vector Machine, SVM） 是一种经典的监督学习算法，主要用于分类（也可用于回归和异常检测）。
-    def __init__(self):
+    def __init__(self, learning_rate=0.1, reg_lambda=0.0, max_iter=20000):
         # 超参数设置
-        self.learning_rate = 0.1   # 提高学习率以加快收敛
-        self.reg_lambda = 0.0      # 去除正则化以最大化训练集准确率
-        self.max_iter = 20000      # 增加迭代次数以寻求更优解
+        self.learning_rate = learning_rate
+        self.reg_lambda = reg_lambda
+        self.max_iter = max_iter
         self.w = None              # 权重向量，决定分类超平面的方向
         self.b = None              # 偏置项，决定分类超平面的位置
         self.scaler = StandardScaler() # 添加标准化器
@@ -114,9 +117,21 @@ class SVM:
 
 if __name__ == '__main__':
     # 数据加载部分以及数据路径配置
-    base_dir = os.path.dirname(os.path.abspath(__file__))             # 获取当前脚本的绝对路径
-    train_file = os.path.join(base_dir, 'data', 'train_linear.txt')   # 拼接训练数据文件路径
-    test_file = os.path.join(base_dir, 'data', 'test_linear.txt')     # 拼接测试数据文件路径
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    default_train = os.path.join(base_dir, 'data', 'train_linear.txt')
+    default_test = os.path.join(base_dir, 'data', 'test_linear.txt')
+
+    parser = argparse.ArgumentParser(description='Linear SVM training script')
+    parser.add_argument('--train-file', type=str, default=default_train, help='???????')
+    parser.add_argument('--test-file', type=str, default=default_test, help='???????')
+    parser.add_argument('--learning-rate', type=float, default=0.1, help='???')
+    parser.add_argument('--reg-lambda', type=float, default=0.0, help='L2?????')
+    parser.add_argument('--max-iter', type=int, default=20000, help='??????')
+    parser.add_argument('--out-dir', type=str, default='outputs', help='??????')
+    args = parser.parse_args()
+
+    train_file = args.train_file if os.path.isabs(args.train_file) else os.path.join(base_dir, args.train_file)
+    test_file = args.test_file if os.path.isabs(args.test_file) else os.path.join(base_dir, args.test_file)
 
     # 加载训练数据
     data_train = load_data(train_file)
@@ -124,7 +139,11 @@ if __name__ == '__main__':
     data_test = load_data(test_file)
 
     # 模型训练
-    svm = SVM()            # 初始化SVM模型
+    svm = SVM(
+        learning_rate=args.learning_rate,
+        reg_lambda=args.reg_lambda,
+        max_iter=args.max_iter,
+    )
     svm.train_with_label_tracking(data_train)  # 训练模型寻找最优超平面
 
     # 训练集评估
@@ -143,4 +162,21 @@ if __name__ == '__main__':
     
     print("train accuracy: {:.1f}%".format(acc_train * 100))  # 输出训练集准确率
     print("test accuracy: {:.1f}%".format(acc_test * 100))  # 输出测试集准确率
+
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    metrics_path = out_dir / 'svm_metrics.json'
+    metrics = {
+        'train_accuracy': float(acc_train),
+        'test_accuracy': float(acc_test),
+        'learning_rate': float(args.learning_rate),
+        'reg_lambda': float(args.reg_lambda),
+        'max_iter': int(args.max_iter),
+        'train_file': str(train_file),
+        'test_file': str(test_file),
+    }
+    with metrics_path.open('w', encoding='utf-8') as f:
+        json.dump(metrics, f, ensure_ascii=False, indent=2)
+    print(f"metrics saved: {metrics_path.resolve()}")
 
