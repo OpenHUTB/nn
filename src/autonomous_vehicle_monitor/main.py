@@ -232,9 +232,7 @@ def main():
             world.tick()
             update_top_view()
 
-            # ======================
-            # 【修复】按键移到这里，每帧都响应
-            # ======================
+            
             key = cv2.waitKey(1) & 0xFF
 
             if key == ord('r'):
