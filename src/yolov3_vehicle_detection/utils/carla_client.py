@@ -52,7 +52,7 @@ class CarlaClient:
             print(f"[ERROR] 连接失败: {e}")
             return False
 
-    def spawn_vehicle(self, spawn_npc=True, npc_count=15):
+    def spawn_vehicle(self, spawn_npc=True, npc_count=15, spawn_obstacle=True, obstacle_count=3):
         if not self.world:
             print("[ERROR] 世界未加载，请先连接！")
             return None
@@ -74,6 +74,10 @@ class CarlaClient:
             # 生成NPC车辆
             if spawn_npc:
                 self._spawn_npc_vehicles(npc_count)
+            
+            # 生成障碍物
+            if spawn_obstacle:
+                self.spawn_obstacles(obstacle_type='all', count=obstacle_count)
             
             return self.vehicle
         except Exception as e:
@@ -106,6 +110,7 @@ class CarlaClient:
             
         except Exception as e:
             print(f"[WARNING] 生成NPC车辆失败: {e}")
+
 
     def setup_camera(self):
         """设置摄像头（图像处理仍有问题，主要用于获取帧）"""
