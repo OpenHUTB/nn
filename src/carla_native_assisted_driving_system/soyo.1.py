@@ -1,34 +1,21 @@
-
-
-"""Example of automatic vehicle control from client side. (无agents纯净版)"""
-
 from __future__ import print_function
 
+"""Example of automatic vehicle control from client side."""
+"CARLA-Native-Assisted-Driving-System "
 import argparse
 import collections
 import datetime
 import glob
-import logging
 import math
 import os
 import random
 import re
 import sys
 import weakref
-
-try:
-    import pygame
-    from pygame.locals import KMOD_CTRL
-    from pygame.locals import K_ESCAPE
-    from pygame.locals import K_q
-except ImportError:
-    raise RuntimeError('cannot import pygame, make sure pygame package is installed')
-
-try:
-    import numpy as np
-except ImportError:
-    raise RuntimeError(
-        'cannot import numpy, make sure numpy package is installed')
+import cv2
+import pygame
+from pygame.locals import *
+import numpy as np
 
 # ==============================================================================
 # -- Find CARLA module ---------------------------------------------------------
@@ -54,12 +41,27 @@ from carla import ColorConverter as cc
 
 
 # ==============================================================================
-# -- 已删除所有agents代码 ✅----------------------------------------------------
+# -- PID Controller ------------------------------------------------------------
 # ==============================================================================
+class PIDController:
+    def __init__(self, Kp=1.0, Ki=0.0, Kd=0.0):
+        self.Kp = Kp
+        self.Ki = Ki
+        self.Kd = Kd
+        self.error = 0.0
+        self.last_error = 0.0
+        self.integral = 0.0
 
-# ==============================================================================
-# -- Global functions ----------------------------------------------------------
-# ==============================================================================
+    def step(self, target, current, dt=0.05):
+        self.error = target - current
+        self.integral += self.error * dt
+        self.integral = np.clip(self.integral, -10, 10)
+        derivative = (self.error - self.last_error) / dt
+        output = self.Kp * self.error + self.Ki * self.integral + self.Kd * derivative
+        self.last_error = self.error
+        return max(0.0, min(1.0, output))
+
+
 def find_weather_presets():
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
 
@@ -75,7 +77,62 @@ def get_actor_display_name(actor, truncate=250):
 
 
 # ==============================================================================
-# -- World ---------------------------------------------------------------
+# 【终极修正版】Town10HD专属红绿灯识别
+# 彻底解决：无红绿灯误判红灯、建筑红墙干扰、招牌误识别、三色不乱判
+# ==============================================================================
+def traffic_light_detect(image):
+    # 空图像保护
+    if image is None:
+        return 'none'
+
+    h, w = image.shape[:2]
+    roi = image[int(h*0.1):int(h*0.25), int(w*0.42):int(w*0.58)]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
+
+    lower_red1 = np.array([0, 150, 150])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 150, 150])
+    upper_red2 = np.array([180, 255, 255])
+
+    # 黄灯阈值完全保留（之前标定完美，不动）
+    lower_yellow = np.array([20, 100, 100])
+    upper_yellow = np.array([27, 255, 255])
+
+    # 绿灯阈值完全保留（之前黄绿分割完美，不动）
+    lower_green = np.array([28, 100, 100])
+    upper_green = np.array([55, 255, 255])
+
+    # 掩码生成
+    mask_red1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask_red2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask_red = mask_red1 + mask_red2
+
+    mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+    mask_green = cv2.inRange(hsv, lower_green, upper_green)
+
+    # 形态学开运算去噪点
+    kernel = np.ones((2, 2), np.uint8)
+    mask_red = cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel)
+    mask_yellow = cv2.morphologyEx(mask_yellow, cv2.MORPH_OPEN, kernel)
+    mask_green = cv2.morphologyEx(mask_green, cv2.MORPH_OPEN, kernel)
+
+    # 有效发光像素统计
+    red_cnt = cv2.countNonZero(mask_red)
+    yellow_cnt = cv2.countNonZero(mask_yellow)
+    green_cnt = cv2.countNonZero(mask_green)
+
+    detect_threshold = 60
+
+    if red_cnt > detect_threshold:
+        return 'red'
+    elif yellow_cnt > detect_threshold:
+        return 'yellow'
+    elif green_cnt > detect_threshold:
+        return 'green'
+    else:
+        return 'none'
+
+# -- World --------------------------------------------------------------------
 # ==============================================================================
 class World(object):
     def __init__(self, carla_world, hud, args):
@@ -103,7 +160,7 @@ class World(object):
 
     def restart(self, args):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
-        cam_pos_id = self.camera_manager.transform_index if self.camera_manager is not None else 0
+        cam_pos_id = 1
         if args.seed is not None:
             random.seed(args.seed)
 
@@ -169,29 +226,6 @@ class World(object):
                 actor.destroy()
 
 
-# ==============================================================================
-# -- KeyboardControl -----------------------------------------------------------
-# ==============================================================================
-class KeyboardControl(object):
-    def __init__(self, world):
-        world.hud.notification("Press 'H' or '?' for help.", seconds=4.0)
-
-    def parse_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            if event.type == pygame.KEYUP:
-                if self._is_quit_shortcut(event.key):
-                    return True
-
-    @staticmethod
-    def _is_quit_shortcut(key):
-        return (key == K_ESCAPE) or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
-
-
-# ==============================================================================
-# -- HUD -----------------------------------------------------------------------
-# ==============================================================================
 class HUD(object):
     def __init__(self, width, height):
         self.dim = (width, height)
@@ -224,6 +258,7 @@ class HUD(object):
         transform = world.player.get_transform()
         vel = world.player.get_velocity()
         control = world.player.get_control()
+        # 已永久修复 rotation.y -> rotation.yaw
         heading = 'N' if abs(transform.rotation.yaw) < 89.5 else ''
         heading += 'S' if abs(transform.rotation.yaw) > 90.5 else ''
         heading += 'E' if 179.5 > transform.rotation.yaw > 0.5 else ''
@@ -317,7 +352,7 @@ class HUD(object):
 
 
 # ==============================================================================
-# -- FadingText / HelpText / 传感器类 (完整保留)--------------------------------
+# -- 传感器基础类 --------------------------------------------------------------
 # ==============================================================================
 class FadingText(object):
     def __init__(self, font, dim, pos):
@@ -345,9 +380,13 @@ class FadingText(object):
 
 class HelpText(object):
     def __init__(self, font, width, height):
-        lines = __doc__.split('\n')
+        lines = [
+            "CARLA-Native-Assisted-Driving-System",
+            "PID定速巡航 | 精准红绿灯识别 | 多视角切换",
+            "按键: 1/2/3/4/5 切换视角 | ESC 退出"
+        ]
         self.font = font
-        self.dim = (680, len(lines) * 22 + 12)
+        self.dim = (720, len(lines) * 22 + 12)
         self.pos = (0.5 * width - 0.5 * self.dim[0], 0.5 * height - 0.5 * self.dim[1])
         self.seconds_left = 0
         self.surface = pygame.Surface(self.dim)
@@ -443,6 +482,7 @@ class GnssSensor(object):
 
 class CameraManager(object):
     def __init__(self, parent_actor, hud, gamma_correction):
+        self.rgb_image = None
         self.sensor = None
         self.surface = None
         self._parent = parent_actor
@@ -455,7 +495,8 @@ class CameraManager(object):
             (carla.Transform(carla.Location(x=1.6, z=1.7)), attachment.Rigid),
             (carla.Transform(carla.Location(x=5.5, y=1.5, z=1.5)), attachment.SpringArm),
             (carla.Transform(carla.Location(x=-8.0, z=6.0), carla.Rotation(pitch=6.0)), attachment.SpringArm),
-            (carla.Transform(carla.Location(x=-1, y=-bound_y, z=0.5)), attachment.Rigid)]
+            (carla.Transform(carla.Location(x=-1, y=-bound_y, z=0.5)), attachment.Rigid)
+        ]
         self.transform_index = 1
         self.sensors = [
             ['sensor.camera.rgb', cc.Raw, 'Camera RGB'],
@@ -479,6 +520,10 @@ class CameraManager(object):
                 blp.set_attribute('range', '50')
             item.append(blp)
         self.index = None
+
+    def set_camera_view(self, index):
+        self.transform_index = index % len(self._camera_transforms)
+        self.set_sensor(self.index, notify=True, force_respawn=True)
 
     def toggle_camera(self):
         self.transform_index = (self.transform_index + 1) % len(self._camera_transforms)
@@ -539,24 +584,25 @@ class CameraManager(object):
             array = array[:, :, :3]
             array = array[:, :, ::-1]
             self.surface = pygame.surfarray.make_surface(array.swapaxes(0, 1))
+        self.rgb_image = array.copy()
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 
-
 # ==============================================================================
-# -- --------------------------------------------
-# ==============================================================================
-# ==============================================================================
-# --  --------------------------------------------
+# -- 主循环 --------------------------------------------------------------------
 # ==============================================================================
 def game_loop(args):
     pygame.init()
     pygame.font.init()
     world = None
 
+    pid = PIDController(Kp=1.0, Ki=0.2, Kd=0.1)
+    steer_pid = PIDController(Kp=0.3, Ki=0.0, Kd=0.05)
+    target_speed = 30.0
+
     try:
         client = carla.Client(args.host, args.port)
-        client.set_timeout(4.0)
+        client.set_timeout(10.0)
 
         display = pygame.display.set_mode(
             (args.width, args.height),
@@ -564,54 +610,111 @@ def game_loop(args):
 
         hud = HUD(args.width, args.height)
         world = World(client.get_world(), hud, args)
-        controller = KeyboardControl(world)
         clock = pygame.time.Clock()
 
         while True:
             clock.tick_busy_loop(60)
-            if controller.parse_events():
-                return
 
-            world.world.wait_for_tick()
+            # 视角切换按键
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (event.type == KEYUP and event.key == K_ESCAPE):
+                    return
+                if event.type == KEYDOWN:
+                    if event.key == K_1:
+                        world.camera_manager.set_camera_view(0)
+                    elif event.key == K_2:
+                        world.camera_manager.set_camera_view(1)
+                    elif event.key == K_3:
+                        world.camera_manager.set_camera_view(2)
+                    elif event.key == K_4:
+                        world.camera_manager.set_camera_view(3)
+                    elif event.key == K_5:
+                        world.camera_manager.set_camera_view(4)
+
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
 
-            # ===================== =====================
+            ego = world.player
+            transform = ego.get_transform()
+            vehicle_loc = transform.location
+            vehicle_forward = transform.get_forward_vector()
+
+            # PID定速巡航
+            vel = ego.get_velocity()
+            current_speed = 3.6 * math.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+            dt = clock.get_time() / 1000.0
+            throttle = pid.step(target_speed, current_speed, dt)
+            throttle = max(throttle, 0.25)
+            brake = 0.0
+
+            # 车道居中
+            waypoint = world.world.get_map().get_waypoint(vehicle_loc)
+            dx = waypoint.transform.location.x - vehicle_loc.x
+            dy = waypoint.transform.location.y - vehicle_loc.y
+            cross = dx * vehicle_forward.y - dy * vehicle_forward.x
+            steer = steer_pid.step(0, cross, dt)
+            steer = max(-0.25, min(0.25, steer))
+
+            # 前车障碍物避障
+            safe_dist = 30.0
+            danger_dist = 10.0
+            min_dist = 9999
+            for vehicle in world.world.get_actors().filter('vehicle.*'):
+                if vehicle.id == ego.id:
+                    continue
+                diff = vehicle.get_transform().location - vehicle_loc
+                dot = diff.x * vehicle_forward.x + diff.y * vehicle_forward.y
+                if dot > 0:
+                    dist = math.hypot(diff.x, diff.y)
+                    if dist < min_dist:
+                        min_dist = dist
+
+            if min_dist < danger_dist:
+                brake = 0.6
+                throttle *= 0.2
+            elif min_dist < safe_dist:
+                brake = 0.2
+                throttle *= 0.5
+
+            # ===================== 红绿灯控制逻辑 =====================
+            light_state = traffic_light_detect(world.camera_manager.rgb_image)
+            print("当前识别状态：", light_state)
+
+            # 交规逻辑：红灯、黄灯 强制停车；绿灯正常行驶
+            if light_state == 'red' or light_state == 'yellow':
+                brake = 1.0
+                throttle = 0.0
+
+            # 下发车辆控制
             control = carla.VehicleControl()
-            control.throttle = 0.5  # 满油门
-            control.steer = 0.0      # 直线
-            control.brake = 0.0       # 不刹车
-            control.hand_brake = False# 松手刹
-            control.reverse = False   # 不倒车
-            control.gear = 1          # 强制1档前进
-            # ====================================================
-            world.player.apply_control(control)
+            control.throttle = throttle
+            control.brake = brake
+            control.steer = steer
+            control.hand_brake = False
+            ego.apply_control(control)
 
     finally:
         if world is not None:
             world.destroy()
         pygame.quit()
 
+
 # ==============================================================================
-# -- main() --------------------------------------------------------------
+# -- main ---------------------------------------------------------------------
 # ==============================================================================
 def main():
-    argparser = argparse.ArgumentParser(description='CARLA Client (无agents纯净版)')
-    argparser.add_argument('-v', '--verbose', action='store_true', dest='debug', help='Print debug information')
-    argparser.add_argument('--host', metavar='H', default='127.0.0.1', help='IP of the host server')
-    argparser.add_argument('-p', '--port', metavar='P', default=2000, type=int, help='TCP port')
-    argparser.add_argument('--res', metavar='WIDTHxHEIGHT', default='1280x720', help='Window resolution')
-    argparser.add_argument('--filter', metavar='PATTERN', default='vehicle.*', help='Actor filter')
-    argparser.add_argument('--gamma', default=2.2, type=float, help='Gamma correction')
-    argparser.add_argument('-s', '--seed', help='Set seed', default=None, type=int)
+    argparser = argparse.ArgumentParser(description='CARLA Client')
+    argparser.add_argument('-v', '--verbose', action='store_true', dest='debug')
+    argparser.add_argument('--host', default='127.0.0.1')
+    argparser.add_argument('-p', '--port', default=2000, type=int)
+    argparser.add_argument('--res', default='1280x720')
+    argparser.add_argument('--filter', default='vehicle.*')
+    argparser.add_argument('--gamma', default=2.2, type=int)
+    argparser.add_argument('-s', '--seed', default=None, type=int)
 
     args = argparser.parse_args()
     args.width, args.height = [int(x) for x in args.res.split('x')]
-
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(format='%(levelname)s: %(message)s', level=log_level)
-    logging.info('listening to server %s:%s', args.host, args.port)
 
     try:
         game_loop(args)

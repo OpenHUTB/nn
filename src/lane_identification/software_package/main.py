@@ -23,6 +23,8 @@ from direction_analyzer import DirectionAnalyzer
 from visualizer import Visualizer
 from video_processor import VideoProcessor
 from utils import PerformanceMonitor, Timer, safe_resize, calculate_fps
+from confidence_calibrator import ConfidenceCalibrator
+from quality_evaluator import QualityEvaluator
 
 
 class LaneDetectionApp:
@@ -91,6 +93,8 @@ class LaneDetectionApp:
             self.direction_analyzer = DirectionAnalyzer(self.config)
             self.visualizer = Visualizer(self.config)
             self.video_processor = VideoProcessor(self.config)
+            self.confidence_calibrator = ConfidenceCalibrator()
+            self.quality_evaluator = QualityEvaluator()
             print("所有模块初始化完成")
         except Exception as e:
             print(f"模块初始化失败: {e}")
@@ -1036,11 +1040,23 @@ class LaneDetectionApp:
                 
                 # 车道线检测
                 with self.performance_monitor.start_timer("lane_detection"):
-                    lane_info = self.lane_detector.detect(
-                        processed_frame, 
-                        roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8))
-                    )
-                
+                    # 1. 提取光照条件
+                    light_mode = roi_info.get('light_condition', 'day')
+
+                    # 2. 获取 mask（安全获取）
+                    mask = roi_info.get('mask', np.ones(processed_frame.shape[:2], dtype=np.uint8))
+
+                    # 3. 传入光照条件到检测器
+                    lane_info = self.lane_detector.detect(processed_frame, mask, light_mode)
+
+                    # 可选：更新状态栏显示模式
+                    if light_mode == 'night':
+                        self.status_var.set(f"视频检测中 [夜间模式] | FPS: {self.current_fps:.1f}")
+                    elif light_mode == 'dusk':
+                        self.status_var.set(f"视频检测中 [黄昏模式] | FPS: {self.current_fps:.1f}")
+                    else:
+                        self.status_var.set(f"视频检测中 | FPS: {self.current_fps:.1f}")
+
                 # 方向分析
                 with self.performance_monitor.start_timer("direction_analysis"):
                     direction_info = self.direction_analyzer.analyze(road_info, lane_info)
@@ -1088,7 +1104,7 @@ class LaneDetectionApp:
                 messagebox.showwarning("警告", "错误次数过多，建议重启应用程序")
         
         self.last_error_time = current_time
-    
+
     def _load_image(self, file_path):
         """加载图像"""
         try:
@@ -1096,12 +1112,12 @@ class LaneDetectionApp:
             self.status_var.set("正在加载图片...")
             self.file_info_label.config(text=os.path.basename(file_path))
             self.redetect_btn.config(state="normal")
-            
+
             # 在后台线程中处理
             thread = threading.Thread(target=self._process_image_with_recovery, args=(file_path,))
             thread.daemon = True
             thread.start()
-            
+
         except Exception as e:
             self._handle_error(e)
             messagebox.showerror("错误", f"加载图片失败: {str(e)}")
@@ -1139,8 +1155,23 @@ class LaneDetectionApp:
                 
                 # 3. 车道线检测
                 with self.performance_monitor.start_timer("lane_detection"):
-                    lane_info = self.lane_detector.detect(self.current_image, roi_info['mask'])
-                
+                    # 1. 提取光照条件
+                    light_mode = roi_info.get('light_condition', 'day')
+
+                    # 2. 获取 mask（安全获取）
+                    mask = roi_info.get('mask', np.ones(self.current_image.shape[:2], dtype=np.uint8))
+
+                    # 3. 传入光照条件到检测器
+                    lane_info = self.lane_detector.detect(self.current_image, mask, light_mode)
+
+                    # 可选：在界面上显示当前光照模式
+                    if light_mode == 'night':
+                        self.status_var.set("图像检测完成 [夜间模式]")
+                    elif light_mode == 'dusk':
+                        self.status_var.set("图像检测完成 [黄昏模式]")
+                    else:
+                        self.status_var.set("图像检测完成")
+
                 # 4. 方向分析
                 with self.performance_monitor.start_timer("direction_analysis"):
                     direction_info = self.direction_analyzer.analyze(road_info, lane_info)

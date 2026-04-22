@@ -1,0 +1,64 @@
+# Lyapunov实验配置（理论驱动塑形）
+GYM_ENV:
+  # 基础参数
+  TARGET_SPEED: 30.0
+  MAX_SPEED: 40.0
+  MAX_ACC: 5.0
+  TRACK_LENGTH: 1000
+  LOOK_BACK: 20
+  TIME_STEP: 10
+  LOOP_BREAK: 5
+  DISTN_FRM_VHCL_AHD: 40
+  FIXED_REPRESENTATION: true
+
+  # 观测配置
+  USE_LOCAL_OBS: true
+  SENSOR_RANGE: 50.0
+  USE_COOP_PERCEPTION: false
+  COOP_RANGE: 150.0
+  USE_PREDICTION: false
+  PREDICTION_HORIZON: 3.0
+  PREDICTION_DT: 0.5
+
+  # 安全层
+  USE_SAFETY_LAYER: true
+  MIN_SAFE_DIST: 10.0
+  MIN_TTC: 3.0
+
+  # ⭐ Lyapunov理论参数
+  LYAPUNOV_OMEGA_N: 2.0         # 自然频率 (rad/s)
+  LYAPUNOV_ZETA: 0.7            # 阻尼比
+  LYAPUNOV_TTC_MIN: 2.5         # 最小TTC (s)
+  LYAPUNOV_D_MIN: 5.0           # 最小安全距离 (m)
+  LYAPUNOV_D_COMFORTABLE: 20.0  # 舒适距离 (m)
+  LYAPUNOV_ALPHA_LATERAL: 0.5        # 侧向势能权重
+  LYAPUNOV_ALPHA_LONGITUDINAL: 0.3   # 纵向势能权重
+  LYAPUNOV_SIGMA_SAFETY: 5.0         # 安全势能陡峭度
+  LYAPUNOV_WEIGHT: 0.30              # Lyapunov塑形总权重
+  DISABLE_SIMPLE_LC_SHAPING: true    # 禁用简单塑形
+
+POLICY:
+  NAME: 'PPO2'
+  NET: 'LSTM'
+  CNN_EXTRACTOR: 'nature_cnn'
+  ACTION_NOISE: 0.1
+  PARAM_NOISE_STD: 0.2
+
+CARLA:
+  LANE_WIDTH: 3.5
+  DT: 0.05
+  MAX_S: 2000
+
+LOCAL_PLANNER:
+  MIN_SPEED: 13.89 # 5.56                                       # Allowed min speed for ego vehicle; RL's -1 action maps to this value
+  MAX_SPEED: 15.28
+
+TRAFFIC_MANAGER:
+  N_SPAWN_CARS: 15
+  MIN_SPEED: 20.0
+  MAX_SPEED: 40.0
+  PERC_CARS_OBEY_TRAFFIC_LIGHTS: 0.8
+  PERC_IGNORE_TRAFFIC_LIGHTS: 0.2
+  GLOBAL_DISTANCE_TO_LEADING_VEHICLE: 2.5
+  VEHICLE_LANE_OFFSET: 0.0
+  GLOBAL_PERCENTAGE_SPEED_DIFFERENCE: 30.0
