@@ -23,7 +23,7 @@ def main():
     # 加载MJCF模型文件
     # 模型定义了完整的人形机器人结构：包括躯干、四肢、关节和执行器
     try:
-        model = mujoco.MjModel.from_xml_path("mujoco01\humanoid.xml")
+        model = mujoco.MjModel.from_xml_path("src/mujoco01/humanoid.xml")
     except Exception as e:
         print(f"模型加载失败: {e}")
         return
@@ -52,6 +52,11 @@ def main():
             print(f"时间: {data.time:.2f}, "
                 f"躯干位置: ({data.qpos[0]:.2f}, {data.qpos[1]:.2f}, {data.qpos[2]:.2f})")
             
+            # 摔倒检测：躯干高度低于 0.2 米判定摔倒
+            if data.qpos[2] < 0.2:
+                print("⚠️ 机器人摔倒了！")
+                break
+
             # 更新可视化窗口
             # 将当前模拟状态同步到视图
             v.sync()
