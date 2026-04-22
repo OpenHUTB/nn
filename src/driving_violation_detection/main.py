@@ -114,6 +114,9 @@ spawn_points = world.get_map().get_spawn_points()
 num_vehicles = 10
 vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
 
+for v in vehicles:
+    v.set_autopilot(True, traffic_manager.get_port())
+
 #num_walkers = 2
 #walkers = spawn_walkers(num_walkers, world, spawn_points)
 
@@ -132,12 +135,17 @@ except Exception as e:
 
 # Disable Autopilot for manual control
 vehicle.set_autopilot(True, traffic_manager.get_port())
-print("✅ 自动驾驶已启用")
+print("自动驾驶已启用")
+# 开启自动变道
+traffic_manager.auto_lane_change(vehicle, True)
+# 设置全局跟车距离
+traffic_manager.set_global_distance_to_leading_vehicle(2.5)
 #设置遵守交通规则
 traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
 traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
-
+# 减少跟车距离
+traffic_manager.distance_to_leading_vehicle(vehicle, 3.0)
 # Spawn camera
 camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', '1024')
@@ -490,7 +498,7 @@ try:
         pygame.event.pump()  # Process event queue for keyboard input
 
         # Handle manual input
-        handle_input(vehicle)
+        # handle_input(vehicle)
 
         # Get the latest image from the queue
         image = image_queue.get()
