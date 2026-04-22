@@ -7,11 +7,7 @@ from mujoco import viewer
 
 def main():
     """
-<<<<<<< HEAD
-    主函数：加载人形机器人模型并运行物理模拟
-=======
     主函数：加载人形机器人模型并运行物理模拟 
->>>>>>> 59edd6d88ab1de0fff277330649faf17b887b8e6
     """
     # 1. 加载MJCF模型文件
     model_path = "src/mujoco01/humanoid.xml" 
@@ -27,16 +23,8 @@ def main():
     # 3. 启动可视化窗口
     print("启动模拟器...")
     with viewer.launch_passive(model, data) as v:
-<<<<<<< HEAD
-        # 新增：初始化机器人为标准站立姿态（对应keyframe索引1）
-    # 解决开局蹲伏姿态不稳定、易倒地的问题
-        mujoco.mj_resetDataKeyframe(model, data, 1)
-        # 4. 运行模拟循环
-        # (新增) 记录上次打印时间
-=======
         # 初始化机器人为标准站立姿态（keyframe索引1对应站立姿势）
         mujoco.mj_resetDataKeyframe(model, data, 1)
->>>>>>> 59edd6d88ab1de0fff277330649faf17b887b8e6
         last_print_time = 0
         
         while v.is_running():
@@ -46,19 +34,12 @@ def main():
             if data.time - last_print_time > 0.5:
                 print(f"时间: {data.time:.2f}, 躯干高度: {data.qpos[2]:.2f}m")
                 last_print_time = data.time
-<<<<<<< HEAD
-=======
         # 4. 运行模拟循环
->>>>>>> 59edd6d88ab1de0fff277330649faf17b887b8e6
         while v.is_running():
             # 步进物理引擎
             mujoco.mj_step(model, data)
 
-<<<<<<< HEAD
-            # 输出关键模拟数据
-=======
             # 输出关键模拟数据 (注意：每帧输出会导致刷屏)
->>>>>>> 59edd6d88ab1de0fff277330649faf17b887b8e6
             print(f"时间: {data.time:.2f}, "
                   f"躯干位置: ({data.qpos[0]:.2f}, {data.qpos[1]:.2f}, {data.qpos[2]:.2f})")
 
