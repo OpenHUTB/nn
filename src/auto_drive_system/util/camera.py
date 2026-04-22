@@ -3,7 +3,7 @@ import random
 import pygame
 import numpy as np
 
-# 渲染对象来保持和传递 PyGame 表面
+# 渲染对象来保持和传递PyGame表面
 class RenderObject(object):
     def __init__(self, width, height):
         init_image = np.random.randint(0, 255, (height, width, 3), dtype='uint8')
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         "image_y": 600
     }
 
-    #调用cameraManage类，生成摄像头
+    #调用cameraManage类，生成四个摄像头
     cameras = cameraManage(world, ego_vehicle, pygame_size).camaraGenarate()
 
     #采集carla世界中camera的图像
