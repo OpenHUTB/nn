@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>V2X路侧智能感知 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "V2X\u8def\u4fa7\u667a\u80fd\u611f\u77e5";
+        var mkdocs_page_input_path = "edge_intelligence_V2X/README.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">V2X路侧智能感知</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#1">1. 项目背景与优化动机</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#11">1.1 功能定位</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#12">1.2 优化动机</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2">2. 核心技术栈与理论基础</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#21">2.1 核心技术栈</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#22">2.2 核心理论基础</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3">3. 优化整体思路</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#31">3.1 优化总体原则</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#32">3.2 整体技术路线</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4">4. 针对性优化方案与实现</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#41-yolov8n">4.1 检测引擎：从假检测到真实 YOLOv8n 推理</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#42">4.2 多摄像头机位切换</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#43">4.3 行人闯入安全报警</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#44">4.4 多天气场景支持</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#45-npc">4.5 NPC 交通流优化</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#46-v2x-rsu">4.6 V2X RSU 信息面板</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#5">5. 系统运行效果</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#51">5.1 运行环境</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#52">5.2 运行方式</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#53">5.3 按键操作</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#54">5.4 运行效果展示</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#6">6. 功能扩展与未来规划</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#7">7. 总结</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">V2X路侧智能感知</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/edge_intelligence_V2X/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="yolov8n-v2x">基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现</h1>
+<h2 id="1">1. 项目背景与优化动机</h2>
+<h3 id="11">1.1 功能定位</h3>
+<p>V2X（Vehicle-to-Everything）路侧感知是智能交通系统的核心基础设施之一，<code>edge_intelligence_V2X</code> 模块作为路侧边缘计算节点的感知组件，承担着 <strong>"实时检测道路上的车辆与行人、生成交通态势信息、通过 V2X 通信向周围车辆广播预警消息"</strong> 的关键职责，直接影响交通安全与通行效率。</p>
+<p>本次优化的 <code>edge_intelligence_V2X</code> 模块，来自 OpenHUTB/nn 开源项目，面向智慧交通、车路协同、自动驾驶仿真等应用场景。</p>
+<h4 id="111">1.1.1 模块在整个系统中的位置</h4>
+<p>在 V2X 车路协同技术栈中，本模块属于路侧感知层的核心视觉任务：</p>
+<ul>
+<li><strong>上游</strong>：路侧摄像头视频流采集（CARLA 仿真器模拟）</li>
+<li><strong>本模块</strong>：目标检测（车辆/行人/交通标志）、态势分析、预警生成</li>
+<li><strong>下游</strong>：V2X 消息广播、交通信号控制、车辆路径规划、交通管理平台</li>
+</ul>
+<p>路侧感知是车路协同的 "眼睛"，是实现超视距感知、盲区预警、交通态势共享的第一步。</p>
+<h4 id="112">1.1.2 路侧感知的核心任务</h4>
+<p><code>edge_intelligence_V2X</code> 模块主要完成以下关键工作：</p>
+<ol>
+<li><strong>目标检测</strong> — 从路侧摄像头画面中实时检测车辆、行人、交通标志等目标，输出类别、位置、置信度</li>
+<li><strong>交通态势分析</strong> — 统计当前路段的车辆密度、行人数量，判断交通拥堵程度</li>
+<li><strong>V2X 预警广播</strong> — 根据检测结果和天气条件，生成预警消息（行人闯入、交通拥堵、恶劣天气提醒等）</li>
+<li><strong>多场景适应</strong> — 支持不同天气（晴/雨/雾/夜）和不同摄像头视角下的稳定检测</li>
+</ol>
+<h4 id="113">1.1.3 应用场景与重要性</h4>
+<ul>
+<li><strong>智慧路口</strong>：路侧感知单元实时监测路口交通状况，向接近车辆推送预警信息</li>
+<li><strong>车路协同</strong>：弥补单车感知盲区，提供超视距感知能力，提升交通安全</li>
+<li><strong>自动驾驶仿真</strong>：在 CARLA 仿真环境中验证 V2X 感知算法的有效性</li>
+<li><strong>交通管理</strong>：实时监测车流量与行人密度，辅助交通信号优化与调度</li>
+</ul>
+<h4 id="114">1.1.4 原模块设计缺陷</h4>
+<p>原项目更偏向概念演示与原型验证，在工程可运行性、版本兼容性和结果一致性方面仍有较大优化空间。</p>
+<h3 id="12">1.2 优化动机</h3>
+<p>在实际测试中，原 <code>edge_intelligence_V2X</code> 模块主要有三方面可提升点：</p>
+<p><strong>检测逻辑由演示模式升级为模型推理模式</strong></p>
+<p>原代码使用 <code>sin/cos</code> 数学函数模拟检测结果（<code>simulate_detection()</code>），检测框位置随时间做周期运动。本次将其升级为 YOLOv8n 的真实目标检测推理流程。</p>
+<pre><code class="language-python"># 原始代码 v2xEdgeYolov7Light2.py 中的假检测（已废弃）
+def simulate_detection(image):
+    &quot;&quot;&quot;模拟检测框（随画面动态刷新）&quot;&quot;&quot;
+    h, w = image.shape[:2]
+    t = time.time() % 10
+    offset_x = int(np.sin(t) * 10)
+    offset_y = int(np.cos(t) * 5)
+    boxes = [
+        [w//4 + offset_x, h//4 + offset_y, w//3 + offset_x, h//3 + offset_y],
+        [w//2 - offset_x, h//2 - offset_y, w//1.5 - offset_x, h//1.5 - offset_y],
+    ]
+    return np.array(boxes)
+</code></pre>
+<p><strong>主程序依赖需要工程化梳理</strong></p>
+<p>原 <code>src/main.py</code> 依赖 <code>tools.pygame_display</code> 和 <code>tools.plotter_x</code>，在当前仓库结构下缺少对应模块，运行时会出现 <code>ImportError</code>，因此本次采用独立入口文件重构运行链路：</p>
+<pre><code class="language-python"># 原始 src/main.py 中缺失的依赖导入
+from tools.pygame_display import PygameDisplay   # 模块不存在
+from tools.plotter_x import Plotter              # 模块不存在
+</code></pre>
+<p><strong>环境版本需要统一到当前实验环境</strong></p>
+<p>原代码硬编码了 CARLA 0.9.10 的 <code>.egg</code> 路径，本次统一适配到当前使用的 CARLA 0.9.16 环境：</p>
+<pre><code class="language-python"># 原始代码中硬编码的旧版路径
+CARLA_EGG_PATH = r&quot;D:\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.10-py3.7-win-amd64.egg&quot;
+</code></pre>
+<p>基于以上改进点，本次优化的核心目标是：<strong>将原型化演示版本升级为可运行、可复现实验结果的 V2X 路侧感知系统。</strong></p>
+<h2 id="2">2. 核心技术栈与理论基础</h2>
+<h3 id="21">2.1 核心技术栈</h3>
+<table>
+<thead>
+<tr>
+<th>技术 / 工具</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Python 3.12</td>
+<td>核心开发语言</td>
+</tr>
+<tr>
+<td>CARLA 0.9.16</td>
+<td>自动驾驶仿真平台，提供真实感渲染的交通场景</td>
+</tr>
+<tr>
+<td>YOLOv8n (Ultralytics)</td>
+<td>轻量级实时目标检测模型，COCO 80 类预训练</td>
+</tr>
+<tr>
+<td>OpenCV 4.x</td>
+<td>图像处理、检测框绘制、视频显示、截图保存</td>
+</tr>
+<tr>
+<td>NumPy</td>
+<td>图像数据转换与数值计算</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22">2.2 核心理论基础</h3>
+<h4 id="221">2.2.1 系统整体流程</h4>
+<pre><code>CARLA 仿真场景 → 路侧摄像头采集 → YOLOv8n 目标检测 → 分类统计 → V2X 态势分析 → 预警消息生成 → HUD 面板可视化显示
+</code></pre>
+<h4 id="222">2.2.2 关键技术原理</h4>
+<p><strong>YOLOv8n 实时目标检测</strong></p>
+<p>YOLOv8 是 Ultralytics 推出的最新一代 YOLO 系列模型。本项目采用 YOLOv8n（nano 版本），具有以下特点：</p>
+<ul>
+<li>参数量仅 3.2M，推理速度快，适合边缘部署场景</li>
+<li>在 COCO 数据集上预训练，可直接检测 80 类常见目标</li>
+<li>本项目重点关注：<code>car</code>、<code>truck</code>、<code>bus</code>、<code>motorcycle</code>、<code>bicycle</code>（车辆类）和 <code>person</code>（行人类）</li>
+</ul>
+<p>
+<script type="math/tex; mode=display">
+\text{Detection} = \text{YOLO}(I_{frame}) \rightarrow \{(x_1, y_1, x_2, y_2, \text{class}, \text{conf})\}
+</script>
+</p>
+<p><strong>隔帧检测策略</strong></p>
+<p>为提升系统帧率，采用隔帧检测：每 $N$ 帧运行一次 YOLO 推理，中间帧复用上一次检测结果：</p>
+<p>
+<script type="math/tex; mode=display">
+D_t =
+\begin{cases}
+\mathrm{YOLO}(I_t), & t \bmod N = 0 \\
+D_{t-1}, & \mathrm{otherwise}
+\end{cases}
+</script>
+</p>
+<p>其中 $N = 2$。在当前测试环境下可观察到帧率提升，具体增益会随硬件性能、交通密度和天气场景变化。</p>
+<p><strong>V2X 路侧单元 (RSU) 信息融合</strong></p>
+<p>路侧单元综合检测结果与环境信息，生成多类 V2X 预警广播：</p>
+<table>
+<thead>
+<tr>
+<th>触发条件</th>
+<th>预警类型</th>
+<th>广播消息</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>检测到行人</td>
+<td>行人预警</td>
+<td><code>Pedestrian(s) ahead</code></td>
+</tr>
+<tr>
+<td>车辆数 &gt; 5</td>
+<td>交通拥堵</td>
+<td><code>Heavy traffic: N vehicles</code></td>
+</tr>
+<tr>
+<td>雨天/暴风天气</td>
+<td>路面预警</td>
+<td><code>Wet road, reduce speed</code></td>
+</tr>
+<tr>
+<td>大雾天气</td>
+<td>能见度预警</td>
+<td><code>Low visibility, use fog lights</code></td>
+</tr>
+<tr>
+<td>夜间场景</td>
+<td>照明提醒</td>
+<td><code>Night driving, headlights on</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="3">3. 优化整体思路</h2>
+<p>本次改进围绕运行稳定性、结果可观测性和实验复现性展开，对原有运行链路进行了整理，并将演示型检测流程替换为基于模型推理的实现。</p>
+<h3 id="31">3.1 优化总体原则</h3>
+<ul>
+<li>使用 YOLOv8n 预训练模型替换原有演示型检测逻辑</li>
+<li>保持轻量化实现，避免引入额外训练流程和复杂依赖</li>
+<li>简化运行入口，降低环境配置和复现实验的成本</li>
+<li>保留必要的可视化与交互功能，便于演示、观察和调试</li>
+</ul>
+<h3 id="32">3.2 整体技术路线</h3>
+<table>
+<thead>
+<tr>
+<th>层次</th>
+<th>原版本问题</th>
+<th>优化方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>检测引擎</td>
+<td>演示型模拟框输出</td>
+<td>YOLOv8n 真实推理</td>
+</tr>
+<tr>
+<td>运行环境</td>
+<td>依赖链路不完整</td>
+<td>全新 main.py，形成独立可运行入口</td>
+</tr>
+<tr>
+<td>CARLA 版本</td>
+<td>硬编码 0.9.10</td>
+<td>适配 0.9.16，同步模式</td>
+</tr>
+<tr>
+<td>摄像头</td>
+<td>无</td>
+<td>路侧高处部署，3 种机位可切换</td>
+</tr>
+<tr>
+<td>交通场景</td>
+<td>交通参与者较少</td>
+<td>60 辆车 + 30 个行人，优先近处生成</td>
+</tr>
+<tr>
+<td>天气支持</td>
+<td>无</td>
+<td>7 种天气预设可切换</td>
+</tr>
+<tr>
+<td>V2X 面板</td>
+<td>无</td>
+<td>实时统计 + 预警广播 + 监控风格 HUD</td>
+</tr>
+<tr>
+<td>安全预警</td>
+<td>无</td>
+<td>行人闯入红色边框闪烁报警</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4">4. 针对性优化方案与实现</h2>
+<h3 id="41-yolov8n">4.1 检测引擎：从假检测到真实 YOLOv8n 推理</h3>
+<p><strong>改进点：</strong> 原代码采用演示型模拟框逻辑，本次切换为基于 YOLOv8n 的真实推理流程。</p>
+<p><strong>解决方案：</strong> 引入 YOLOv8n 预训练模型，对每一帧进行真实的目标检测推理。</p>
+<pre><code class="language-python">def _load_model(self):
+    &quot;&quot;&quot;加载 YOLOv8n 预训练模型（COCO 80类，自动下载）&quot;&quot;&quot;
+    self.model = YOLO('yolov8n.pt')
+
+def _detect(self, frame):
+    &quot;&quot;&quot;YOLOv8 前向推理（隔帧检测提升帧率）&quot;&quot;&quot;
+    self.tick_count += 1
+    if self.tick_count % DETECT_INTERVAL == 0 or self.last_detections is None:
+        results = self.model(frame, verbose=False, conf=YOLO_CONFIDENCE)
+        self.last_detections = results[0]
+    return self.last_detections
+</code></pre>
+<p>检测结果按 V2X 关注的类别分类统计：</p>
+<pre><code class="language-python">VEHICLE_CLASSES = {'car', 'truck', 'bus', 'motorcycle', 'bicycle'}
+PERSON_CLASSES = {'person'}
+</code></pre>
+<p>每个检测目标用彩色检测框标注：绿色=车辆，红色=行人，橙色=其他。</p>
+<h3 id="42">4.2 多摄像头机位切换</h3>
+<p><strong>设计目标：</strong> 模拟真实路侧感知部署中的多角度监控需求。</p>
+<p>系统预设了 3 种摄像头机位，按 <code>C</code> 键可实时切换：</p>
+<table>
+<thead>
+<tr>
+<th>机位</th>
+<th>高度</th>
+<th>俯仰角</th>
+<th>FOV</th>
+<th>适用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Intersection（路口）</td>
+<td>8m</td>
+<td>-25°</td>
+<td>100°</td>
+<td>路口车辆/行人监控</td>
+</tr>
+<tr>
+<td>Straight（直道）</td>
+<td>6m</td>
+<td>-15°</td>
+<td>90°</td>
+<td>直线道路车流监测</td>
+</tr>
+<tr>
+<td>Bird-Eye（鸟瞰）</td>
+<td>14m</td>
+<td>-50°</td>
+<td>110°</td>
+<td>全局交通态势俯瞰</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="language-python">CAMERA_POSITIONS = [
+    {&quot;name&quot;: &quot;Intersection&quot;, &quot;fwd&quot;: 8.0,  &quot;right&quot;: 5.0, &quot;z&quot;: 8.0,  &quot;pitch&quot;: -25.0, &quot;fov&quot;: 100},
+    {&quot;name&quot;: &quot;Straight&quot;,     &quot;fwd&quot;: 0.0,  &quot;right&quot;: 8.0, &quot;z&quot;: 6.0,  &quot;pitch&quot;: -15.0, &quot;fov&quot;: 90},
+    {&quot;name&quot;: &quot;Bird-Eye&quot;,     &quot;fwd&quot;: 0.0,  &quot;right&quot;: 0.0, &quot;z&quot;: 14.0, &quot;pitch&quot;: -50.0, &quot;fov&quot;: 110},
+]
+</code></pre>
+<p>切换时自动销毁旧摄像头、创建新摄像头，并同步 CARLA 观察者视角：</p>
+<pre><code class="language-python">def _switch_camera_position(self, first_time=False):
+    if self.camera and self.camera.is_alive:
+        self.camera.stop()
+        self.camera.destroy()
+    pos = CAMERA_POSITIONS[self.cam_index]
+    # ... 创建新摄像头并注册回调 ...
+</code></pre>
+<p><strong>路口机位（Intersection）：</strong> 监控路口车辆通行</p>
+<p><img alt="路口机位" src="img/cam_intersection.jpg" /></p>
+<p><strong>直道机位（Straight）：</strong> 侧方监测直线车流</p>
+<p><img alt="直道机位" src="img/cam_straight.jpg" /></p>
+<p><strong>鸟瞰机位（Bird-Eye）：</strong> 俯瞰全局交通态势</p>
+<p><img alt="鸟瞰机位" src="img/cam_birdeye.jpg" /></p>
+<h3 id="43">4.3 行人闯入安全报警</h3>
+<p><strong>设计目标：</strong> V2X 路侧感知的核心安全功能——当检测到行人时，立即向驾驶员发出视觉警报。</p>
+<p>当检测到行人时，系统触发持续 1.5 秒的红色报警效果：</p>
+<ul>
+<li>画面边框红色闪烁（频率 4Hz）</li>
+<li>画面顶部显示居中的 <code>! PEDESTRIAN ALERT !</code> 警告文字</li>
+<li>V2X 面板同步广播行人预警消息</li>
+</ul>
+<pre><code class="language-python">def _draw_pedestrian_alert(self, frame):
+    if time.time() &lt; self.ped_alert_timer:
+        thickness = 8 if int(time.time() * 4) % 2 == 0 else 4
+        cv2.rectangle(frame, (0, 0), (CAMERA_WIDTH - 1, CAMERA_HEIGHT - 1),
+                      (0, 0, 255), thickness)
+        # ... 绘制警告文字 ...
+</code></pre>
+<p><img alt="行人闯入报警" src="img/pedestrian_alert.jpg" /></p>
+<h3 id="44">4.4 多天气场景支持</h3>
+<p>系统内置 7 种天气预设，按 <code>W</code> 键循环切换，V2X 面板自动生成对应的天气预警广播：</p>
+<table>
+<thead>
+<tr>
+<th>天气</th>
+<th>特点</th>
+<th>V2X 预警</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Clear（晴天）</td>
+<td>能见度好</td>
+<td>无特殊预警</td>
+</tr>
+<tr>
+<td>Cloudy（多云）</td>
+<td>光线偏暗</td>
+<td>无特殊预警</td>
+</tr>
+<tr>
+<td>Rainy（雨天）</td>
+<td>路面湿滑</td>
+<td><code>Wet road, reduce speed</code></td>
+</tr>
+<tr>
+<td>Storm（暴风雨）</td>
+<td>大雨+强风</td>
+<td><code>Wet road, reduce speed</code></td>
+</tr>
+<tr>
+<td>Foggy（大雾）</td>
+<td>能见度极低</td>
+<td><code>Low visibility, use fog lights</code></td>
+</tr>
+<tr>
+<td>Sunset（黄昏）</td>
+<td>逆光干扰</td>
+<td>无特殊预警</td>
+</tr>
+<tr>
+<td>Night（夜晚）</td>
+<td>光照不足</td>
+<td><code>Night driving, headlights on</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>多云天气：</strong></p>
+<p><img alt="多云场景" src="img/weather_cloudy.jpg" /></p>
+<p><strong>暴风雨天气：</strong></p>
+<p><img alt="暴风雨场景" src="img/weather_storm.jpg" /></p>
+<p><strong>大雾天气：</strong></p>
+<p><img alt="大雾场景" src="img/weather_foggy.jpg" /></p>
+<p><strong>黄昏场景：</strong></p>
+<p><img alt="黄昏场景" src="img/weather_sunset.jpg" /></p>
+<p><strong>夜晚场景：</strong></p>
+<p><img alt="夜晚场景" src="img/weather_night.jpg" /></p>
+<h3 id="45-npc">4.5 NPC 交通流优化</h3>
+<p><strong>改进目标：</strong> 提高画面中的交通参与者密度，增强可观察性与演示稳定性。</p>
+<p><strong>优化方案：</strong> 生成 60 辆 NPC 车辆 + 30 个行人，且<strong>按与摄像头的距离排序</strong>，优先在摄像头附近的路点生成车辆，确保画面中有丰富的检测目标。</p>
+<pre><code class="language-python">def _spawn_traffic(self):
+    # 按与摄像头的距离排序，优先在附近生成
+    cam_loc = self.cam_ref_point.location
+    spawn_points.sort(key=lambda sp: sp.location.distance(cam_loc))
+
+    for i in range(min(NPC_VEHICLE_COUNT, len(spawn_points))):
+        v = self.world.try_spawn_actor(bp, spawn_points[i])
+        if v:
+            v.set_autopilot(True, self.tm.get_port())
+</code></pre>
+<p>行人同样自动生成并设置 AI 控制器，随机行走于人行道和路口区域：</p>
+<pre><code class="language-python">walker = self.world.try_spawn_actor(bp, carla.Transform(loc))
+if walker:
+    ctrl = self.world.spawn_actor(controller_bp, carla.Transform(), walker)
+    ctrl.start()
+    ctrl.go_to_location(self.world.get_random_location_from_navigation())
+    ctrl.set_max_speed(random.uniform(1.0, 2.5))
+</code></pre>
+<h3 id="46-v2x-rsu">4.6 V2X RSU 信息面板</h3>
+<p>系统在画面右上角绘制半透明的 V2X 路侧单元信息面板，实时显示：</p>
+<ul>
+<li>检测统计：车辆数、行人数、总目标数</li>
+<li>当前摄像头机位和天气信息</li>
+<li>V2X 预警广播消息（根据检测结果和天气动态生成）</li>
+</ul>
+<p>画面顶部为监控风格的标题栏，显示时间戳、FPS、录制指示灯；底部为操作提示栏和运行时长。</p>
+<p>预警广播消息根据当前检测结果和天气条件动态生成：</p>
+<pre><code class="language-python">def _get_v2x_messages(self):
+    msgs = []
+    if self.stats['pedestrians'] &gt; 0:
+        msgs.append(f&quot;&gt; {self.stats['pedestrians']} pedestrian(s) ahead&quot;)
+    if self.stats['vehicles'] &gt; 5:
+        msgs.append(f&quot;&gt; Heavy traffic: {self.stats['vehicles']} vehicles&quot;)
+
+    weather_name = self.weather_presets[self.weather_index][0]
+    if weather_name in ('Rainy', 'Storm'):
+        msgs.append(&quot;&gt; Wet road, reduce speed&quot;)
+    elif weather_name == 'Foggy':
+        msgs.append(&quot;&gt; Low visibility, use fog lights&quot;)
+    elif weather_name == 'Night':
+        msgs.append(&quot;&gt; Night driving, headlights on&quot;)
+    return msgs if msgs else [&quot;&gt; All clear&quot;]
+</code></pre>
+<p>V2X 面板效果可在下方运行 GIF 和天气截图中观察到。</p>
+<h2 id="5">5. 系统运行效果</h2>
+<h3 id="51">5.1 运行环境</h3>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>操作系统</td>
+<td>Windows 11</td>
+</tr>
+<tr>
+<td>Python</td>
+<td>3.12.0</td>
+</tr>
+<tr>
+<td>CARLA</td>
+<td>0.9.16</td>
+</tr>
+<tr>
+<td>ultralytics</td>
+<td>8.4.39</td>
+</tr>
+<tr>
+<td>opencv-python</td>
+<td>4.13.0.92</td>
+</tr>
+</tbody>
+</table>
+<h3 id="52">5.2 运行方式</h3>
+<pre><code class="language-bash"># 1. 启动 CARLA 服务器
+CarlaUE4.exe
+
+# 2. 安装依赖
+pip install carla opencv-python numpy ultralytics
+
+# 3. 运行系统
+cd src/edge_intelligence_V2X
+python main.py
+</code></pre>
+<h3 id="53">5.3 按键操作</h3>
+<table>
+<thead>
+<tr>
+<th>按键</th>
+<th>功能</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>W</code></td>
+<td>切换天气场景（7 种循环）</td>
+</tr>
+<tr>
+<td><code>C</code></td>
+<td>切换摄像头机位（路口→直道→鸟瞰）</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>保存当前画面截图到 <code>results/</code> 目录</td>
+</tr>
+<tr>
+<td><code>Q</code> / <code>ESC</code></td>
+<td>退出系统</td>
+</tr>
+</tbody>
+</table>
+<h3 id="54">5.4 运行效果展示</h3>
+<p>以下 GIF 展示了系统在运行中的连续效果（机位切换、天气变化、检测框与面板联动）：</p>
+<p><img alt="系统运行演示" src="img/show.gif" /></p>
+<h2 id="6">6. 功能扩展与未来规划</h2>
+<ul>
+<li><strong>多路摄像头同时工作</strong>：从单路切换扩展为多路画面拼接显示，实现路口全方位监控</li>
+<li><strong>目标追踪</strong>：引入 DeepSORT / ByteTrack，对检测到的车辆和行人进行跨帧追踪，统计车流量和行人流量</li>
+<li><strong>在线学习与自适应</strong>：实现在线微调机制，根据当前场景动态调整模型参数，提升检测效果</li>
+<li><strong>V2X 协议集成</strong>：接入 SAE J2735 等 V2X 标准协议，实现仿真环境内的消息编码与解码，模拟真实车路协同通信</li>
+</ul>
+<h2 id="7">7. 总结</h2>
+<p>本次优化主要完成了以下几方面工作：</p>
+<ol>
+<li>将原有演示型检测逻辑替换为基于 YOLOv8n 的目标检测流程，并补充了类别统计与可视化标注。</li>
+<li>结合 CARLA 0.9.16 环境重新整理了运行入口，补充了多机位、多天气和交通参与者生成逻辑。</li>
+<li>增加了行人报警、V2X 面板和运行 GIF 展示，使实验结果更便于观察和说明。</li>
+<li>补充了依赖说明、运行方式和文档展示内容，便于在课程作业和演示场景中复现。</li>
+</ol>
+<p>当前版本已经能够完成单路路侧摄像头场景下的目标检测、基础态势展示和简单预警信息生成，也为后续接入目标追踪、协议栈和多传感器融合预留了扩展空间。</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="首页"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; 前一页</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
