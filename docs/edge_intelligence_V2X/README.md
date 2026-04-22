@@ -233,15 +233,15 @@ def _switch_camera_position(self, first_time=False):
 
 **路口机位（Intersection）：** 监控路口车辆通行
 
-![路口机位](img/cam_intersection.png)
+![路口机位](img/cam_intersection.jpg)
 
 **直道机位（Straight）：** 侧方监测直线车流
 
-![直道机位](img/cam_straight.png)
+![直道机位](img/cam_straight.jpg)
 
 **鸟瞰机位（Bird-Eye）：** 俯瞰全局交通态势
 
-![鸟瞰机位](img/cam_birdeye.png)
+![鸟瞰机位](img/cam_birdeye.jpg)
 
 ### 4.3 行人闯入安全报警
 
@@ -262,7 +262,7 @@ def _draw_pedestrian_alert(self, frame):
         # ... 绘制警告文字 ...
 ```
 
-![行人闯入报警](img/pedestrian_alert.png)
+![行人闯入报警](img/pedestrian_alert.jpg)
 
 ### 4.4 多天气场景支持
 
@@ -280,23 +280,23 @@ def _draw_pedestrian_alert(self, frame):
 
 **多云天气：**
 
-![多云场景](img/weather_cloudy.png)
+![多云场景](img/weather_cloudy.jpg)
 
 **暴风雨天气：**
 
-![暴风雨场景](img/weather_storm.png)
+![暴风雨场景](img/weather_storm.jpg)
 
 **大雾天气：**
 
-![大雾场景](img/weather_foggy.png)
+![大雾场景](img/weather_foggy.jpg)
 
 **黄昏场景：**
 
-![黄昏场景](img/weather_sunset.png)
+![黄昏场景](img/weather_sunset.jpg)
 
 **夜晚场景：**
 
-![夜晚场景](img/weather_night.png)
+![夜晚场景](img/weather_night.jpg)
 
 ### 4.5 NPC 交通流优化
 
