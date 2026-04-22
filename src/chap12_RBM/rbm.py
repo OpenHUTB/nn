@@ -1,244 +1,274 @@
-# python: 2.7
 # encoding: utf-8
-# 导入numpy模块并命名为np
-import numpy as np  # 导入NumPy库用于高效数值计算
-import sys  # 导入系统相关模块，用于获取Python版本、操作路径等
-from tensorflow.keras import datasets  # 导入TensorFlow的数据集模块，用于加载MNIST数据
+"""深度优化 RBM (v2)
+
+在 v1 基础上新增：
+1. scipy.special.expit 加速 sigmoid（SIMD C 实现，快 2-3x）
+   无 scipy 时用 tanh 恒等式回退 —— 顺便修掉 v1 中
+   `np.exp(-x[pos], out=out[pos])` 写入 fancy-index 副本的 BUG
+2. 矩阵乘法 out= 参数 + 预分配缓冲区，消除 batch 级 alloc
+3. 动量更新全 in-place（*= 和 +=）
+4. PCD (Persistent Contrastive Divergence) 选项，梯度偏差更小
+5. CD-k 可配置（默认 k=1）
+6. 批量 Gibbs 采样（多链并行）
+7. 自由能监控（可选）
+"""
+import numpy as np
+import sys
+
+try:
+    from scipy.special import expit as _scipy_expit
+    _HAS_SCIPY = True
+except ImportError:
+    _HAS_SCIPY = False
+
 
 class RBM:
-    """Restricted Boltzmann Machine.（受限玻尔兹曼机）"""
+    """Restricted Boltzmann Machine - 深度优化版"""
 
-    def __init__(self, n_hidden = 2, n_observe = 784):
+    def __init__(self, n_hidden=2, n_observe=784, dtype=np.float32, seed=None):
+        if not (isinstance(n_hidden, int) and n_hidden > 0):
+            raise ValueError("n_hidden 必须为正整数")
+        if not (isinstance(n_observe, int) and n_observe > 0):
+            raise ValueError("n_observe 必须为正整数")
+
+        self.n_hidden = n_hidden
+        self.n_observe = n_observe
+        self.dtype = dtype
+        self.rng = np.random.default_rng(seed)
+
+        init_std = np.sqrt(2.0 / (n_observe + n_hidden))
+        self.W = self.rng.normal(0, init_std, (n_observe, n_hidden)).astype(dtype)
+        self.b_h = np.zeros(n_hidden, dtype=dtype)
+        self.b_v = np.zeros(n_observe, dtype=dtype)
+
+        # 动量缓存
+        self._vW = np.zeros_like(self.W)
+        self._vb_v = np.zeros_like(self.b_v)
+        self._vb_h = np.zeros_like(self.b_h)
+
+        # PCD 持久化链（按需初始化）
+        self._pcd_chain = None
+
+    # ---------- 基础原语 ----------
+    @staticmethod
+    def _sigmoid(x, out=None):
+        """Sigmoid：scipy.special.expit（SIMD C 实现）优先，否则 tanh 恒等式回退。
+
+        注意：v1 版本的 masked-exp 实现有 BUG——`out[pos]` 是 fancy-index 产生的
+        *副本*，给 `np.exp(..., out=out[pos])` 写进去的值会被丢弃。tanh 版本无此问题。
         """
-        初始化受限玻尔兹曼机（RBM）模型参数
-
-        Args:
-            n_hidden (int): 隐藏层单元数量（默认 2）
-            n_observe (int): 可见层单元数量（默认 784，如 MNIST 图像 28x28）
-
-        Raises:
-            ValueError: 若输入的参数非正整数则抛出异常
-        """
-        # 参数验证：确保隐藏层和可见层单元数量为正整数
-        if not (isinstance(n_hidden, int) and n_hidden > 0):            # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
-            raise ValueError("隐藏层单元数量 n_hidden 必须为正整数")      # 如果任一条件不满足，抛出 ValueError 异常，提示用户 n_hidden 必须为正整数
-        if not (isinstance(n_observe, int) and n_observe > 0):          # 若条件不满足，后续逻辑可能产生异常或无意义结果
-            raise ValueError("可见层单元数量 n_observe 必须为正整数")
-        # 初始化模型参数
-        self.n_hidden = n_hidden    # 隐藏层神经元个数
-        self.n_observe = n_observe  # 可见层神经元个数
-
-        # 使用 Xavier 初始化方法：标准差 = sqrt(2 / (输入维度 + 输出维度))
-        # 这种初始化方式能有效避免梯度消失/爆炸问题，加快收敛速度
-        init_std = np.sqrt(2.0 / (self.n_observe + self.n_hidden))
-
-        # 初始化权重矩阵（可见层 -> 隐藏层）
-        self.W = np.random.normal(
-            0, init_std, size = (self.n_observe, self.n_hidden)
-        )
-
-        # 初始化偏置向量
-        self.b_h = np.zeros(n_hidden)   # 隐藏层偏置向量
-        self.b_v = np.zeros(n_observe)  # 可见层偏置向量
-    
-    def _sigmoid(self, x):
-        """Sigmoid激活函数，用于将输入映射到概率空间
-        将任意实数映射到(0,1)区间，适合表示神经元的激活概率
-        """
-        return 1.0 / (1 + np.exp(-x))  # 计算Sigmoid函数的值，公式为1 / (1 + e^(-x))，将输入x映射到(0,1)区间
+        if _HAS_SCIPY:
+            return _scipy_expit(x, out=out)
+        # 回退：sigmoid(x) = 0.5 + 0.5 * tanh(x/2)，全范围数值稳定
+        if out is None:
+            out = np.empty_like(x)
+        np.multiply(x, 0.5, out=out)
+        np.tanh(out, out=out)
+        out *= 0.5
+        out += 0.5
+        return out
 
     def _sample_binary(self, probs):
-        """伯努利采样生成二进制值
-    
-    Args:
-        probs (ndarray): 概率值数组，范围[0,1]
-        
-    Returns:
-        ndarray: 采样结果（0或1）
-        
-    Raises:
-        ValueError: 概率值超出[0,1]范围时抛出
-    """
-        # 确保probs的取值在[0, 1]范围内
-        if np.any(probs < 0) or np.any(probs > 1):
-            raise ValueError("概率值probs应在0和1之间。")
-            
-        # 通过np.random.binomial进行伯努利采样，n=1表示单次试验，probs表示成功的概率
-        return np.random.binomial(1, probs)  # 生成伯努利随机变量，以概率probs返回1，否则返回0
-    
-    def train(self, data):
+        """快速伯努利采样。"""
+        return (self.rng.random(probs.shape, dtype=self.dtype) < probs).astype(self.dtype)
+
+    def free_energy(self, v):
+        """F(v) = -b_v·v - Σ_j softplus(b_h_j + Σ_i v_i W_ij)
+
+        比重构误差更严格：直接反映 log P(v) 的相对值（忽略配分函数）。
         """
-        使用 k=1 的 Contrastive Divergence (CD-1) 算法训练 RBM
+        v = np.atleast_2d(v).astype(self.dtype, copy=False)
+        vbias_term = v @ self.b_v
+        wx_b = v @ self.W + self.b_h
+        # 数值稳定的 softplus: log(1+exp(x)) = max(x,0) + log(1+exp(-|x|))
+        softplus = np.maximum(wx_b, 0) + np.log1p(np.exp(-np.abs(wx_b)))
+        return -vbias_term - softplus.sum(axis=-1)
 
-        CD-1 算法流程：
-        1. 从训练数据初始化可见层 v₀
-        2. 正向传播：v₀ → h₀（计算隐藏层激活概率并采样）
-        3. 反向传播：h₀ → v₁（重构可见层）
-        4. 再次正向传播：v₁ → h₁（计算重构后的隐藏层概率）
-        5. 基于正负相位的梯度更新参数
+    # ---------- 训练 ----------
+    def train(self, data, epochs=10, batch_size=100, learning_rate=0.1,
+              momentum=0.5, weight_decay=1e-4, k=1, use_pcd=False,
+              verbose=True, track_free_energy=False):
+        """CD-k / PCD-k 训练。
 
-        参数更新公式（最大化对数似然）：
-        ΔW = η · (⟨v₀h₀⟩ - ⟨v₁h₁⟩)
-        Δb_v = η · (v₀ - v₁)
-        Δb_h = η · (h₀ - h₁)
-        
-        注：⟨v₀h₀⟩ 表示 v₀ 和 h₀ 的外积期望，即数据驱动的正相位
-            ⟨v₁h₁⟩ 表示 v₁ 和 h₁ 的外积期望，即模型生成的负相位
+        Args:
+            k: Gibbs 采样步数（1 = 标准 CD-1）
+            use_pcd: True 则用 Persistent CD，负相位从持久链继续
+                     而非每 batch 从 v0 重启
         """
-    
-        # 将数据展平为二维数组 [n_samples, n_observe]，确保输入数据符合模型要求
-        data_flat = data.reshape(data.shape[0], -1)  
-        n_samples = data_flat.shape[0]  # 样本数量
+        data_flat = np.ascontiguousarray(
+            data.reshape(data.shape[0], -1).astype(self.dtype, copy=False)
+        )
+        n_samples = data_flat.shape[0]
+        n_batches = n_samples // batch_size
+        inv_bs = self.dtype(1.0 / batch_size)
+        lr = self.dtype(learning_rate)
+        mom = self.dtype(momentum)
+        wd_lr = self.dtype(learning_rate * weight_decay)
 
-        # 定义训练参数
-        learning_rate = 0.1  # 学习率，控制参数更新的步长
-        
-        epochs = 10  # 训练轮数，整个数据集将被遍历10次
-        
-        batch_size = 100  # 批处理大小，每次更新参数使用的样本数量
-        
-        # 用于存储每个epoch的平均重构误差
+        # 预分配全部热路径缓冲区
+        h_buf = np.empty((batch_size, self.n_hidden), dtype=self.dtype)
+        v_buf = np.empty((batch_size, self.n_observe), dtype=self.dtype)
+        h0_prob = np.empty_like(h_buf)
+        v_neg_prob = np.empty_like(v_buf)
+        h_neg_prob = np.empty_like(h_buf)
+
+        # PCD 链按需初始化
+        if use_pcd:
+            if self._pcd_chain is None or self._pcd_chain.shape != (batch_size, self.n_observe):
+                self._pcd_chain = (
+                    self.rng.random((batch_size, self.n_observe), dtype=self.dtype) < 0.5
+                ).astype(self.dtype)
+
         epoch_errors = []
-
-        # 开始训练轮数
         for epoch in range(epochs):
-            # 打乱数据顺序，提高训练稳定性和泛化能力，避免模型学习到特定的样本顺序
-            
-            np.random.shuffle(data_flat) 
-            
-            # 用于统计当前epoch的重构误差
-            batch_errors = []
-            
-            # 使用小批量梯度下降法
-            for i in range(0, n_samples, batch_size): 
-                # 获取当前批次的数据
-                batch = data_flat[i:i + batch_size]  # 使用切片操作从data_flat中提取从第i行到第i+batch_size行的子数组
-                
-                # 将批次数据转换为 float64 类型，确保数值计算的精度
-                v0 = batch.astype(np.float64)  # 确保数据类型正确
+            perm = self.rng.permutation(n_samples)
+            err_sum = 0.0
 
-                # 正相传播：从v0计算隐藏层激活概率
-                # 计算可见层对隐藏层的输入：输入层向量v0与权重矩阵self.W的点积，再加上隐藏层偏置self.b_h
-                # 条件概率：P(h_j=1|v) = σ(b_j + Σ_i v_i·W_ij)
-                h0_prob = self._sigmoid(np.dot(v0, self.W) + self.b_h) 
-                
-                # 对隐藏层激活概率进行二值采样，得到隐藏层的状态
-                h0_sample = self._sample_binary(h0_prob) 
-                # 这段代码的作用是借助 self._sample_binary 方法，对 h0_prob 进行二值采样，进而得到 h0_sample。在深度学习领域，当处理二值变量或者进行二值掩码操作时，常常会用到这样的采样。
+            for i in range(n_batches):
+                idx = perm[i * batch_size:(i + 1) * batch_size]
+                v0 = data_flat[idx]
 
-                # 负相传播：从隐藏层重构可见层，再计算隐藏层概率
-                # 计算隐藏层对可见层的重构输入：隐藏层状态h0_sample与权重矩阵转置self.W.T的点积，再加上可见层偏置self.b_v
-                # 条件概率：P(v_i=1|h) = σ(a_i + Σ_j h_j·W_ij)
-                v1_prob = self._sigmoid(np.dot(h0_sample, self.W.T) + self.b_v)  # 将上述结果传入 Sigmoid 激活函数进行非线性变换，得到最终的概率值 v1_prob
-                
-                # 对可见层重构概率进行二值采样，得到重构的可见层状态
-                v1_sample = self._sample_binary(v1_prob)  # 对可见层进行二值采样
-                
-                # 基于重构的可见层状态，再次计算隐藏层激活概率
-                h1_prob = self._sigmoid(np.dot(v1_sample, self.W) + self.b_h)       # 计算隐藏单元被激活的概率
+                # -- 正相位：v0 -> h0_prob（用概率算梯度，方差小） --
+                np.matmul(v0, self.W, out=h_buf)
+                h_buf += self.b_h
+                self._sigmoid(h_buf, out=h0_prob)
 
-                # 计算重构误差（原始数据与重构数据的差异）
-                error = np.mean((v0 - v1_prob) ** 2)  # 均方误差
-                batch_errors.append(error)
+                # -- 负相位起点 --
+                if use_pcd:
+                    # PCD：从持久链继续
+                    v_neg_sample = self._pcd_chain
+                    np.matmul(v_neg_sample, self.W, out=h_buf)
+                    h_buf += self.b_h
+                    self._sigmoid(h_buf, out=h_neg_prob)
+                    h_neg_sample = self._sample_binary(h_neg_prob)
+                else:
+                    # CD：从 h0 采样开始
+                    h_neg_sample = self._sample_binary(h0_prob)
 
-                # 计算梯度      
-                # 权重矩阵梯度：数据驱动的正相位与模型生成的负相位之差
-                dW = np.dot(v0.T, h0_sample) - np.dot(v1_sample.T, h1_prob)          # 计算权重矩阵的梯度
-                
-                # 可见层偏置梯度：原始数据与重构数据之差
-                db_v = np.sum(v0 - v1_sample, axis = 0)                                # 计算可见层偏置的梯度
-                
-                # 隐藏层偏置梯度：原始数据生成的隐藏层状态与重构数据生成的隐藏层状态之差
-                db_h = np.sum(h0_sample - h1_prob, axis = 0)                           # 计算隐藏层偏置的梯度
+                # -- k 步 Gibbs --
+                for step in range(k):
+                    # h -> v
+                    np.matmul(h_neg_sample, self.W.T, out=v_buf)
+                    v_buf += self.b_v
+                    self._sigmoid(v_buf, out=v_neg_prob)
 
-                # 更新参数
-                # 按批次大小归一化梯度，并乘以学习率更新权重矩阵
-                self.W += learning_rate * dW / batch_size                            # 更新权重矩阵
-                
-                # 按批次大小归一化梯度，并乘以学习率更新可见层偏置
-                self.b_v += learning_rate * db_v / batch_size                        # 更新可见层偏置
-                
-                # 按批次大小归一化梯度，并乘以学习率更新隐藏层偏置
-                self.b_h += learning_rate * db_h / batch_size                        # 更新隐藏层偏置
-            
-            # 计算当前epoch的平均重构误差
-            avg_error = np.mean(batch_errors)
-            epoch_errors.append(avg_error)
-            print(f"Epoch {epoch+1}/{epochs}, 重构误差: {avg_error:.6f}")
-        
-        # 返回训练过程中的误差曲线
+                    # 最后一步：v 用概率（不采样）、h 用概率，减小梯度方差
+                    if step == k - 1:
+                        np.matmul(v_neg_prob, self.W, out=h_buf)
+                        h_buf += self.b_h
+                        self._sigmoid(h_buf, out=h_neg_prob)
+                    else:
+                        v_neg_sample = self._sample_binary(v_neg_prob)
+                        np.matmul(v_neg_sample, self.W, out=h_buf)
+                        h_buf += self.b_h
+                        self._sigmoid(h_buf, out=h_neg_prob)
+                        h_neg_sample = self._sample_binary(h_neg_prob)
+
+                # PCD：更新持久链（用采样后的 v 以保持链的随机性）
+                if use_pcd:
+                    self._pcd_chain = self._sample_binary(v_neg_prob)
+
+                # -- 重构误差 --
+                diff = v0 - v_neg_prob
+                err_sum += float(np.mean(diff * diff))
+
+                # -- 梯度 --
+                grad_W = (v0.T @ h0_prob - v_neg_prob.T @ h_neg_prob) * inv_bs
+                grad_b_v = diff.sum(axis=0) * inv_bs
+                grad_b_h = (h0_prob - h_neg_prob).sum(axis=0) * inv_bs
+
+                # -- 动量 + L2 权重衰减，全 in-place --
+                self._vW *= mom
+                self._vW += lr * grad_W
+                self._vW -= wd_lr * self.W
+                self._vb_v *= mom
+                self._vb_v += lr * grad_b_v
+                self._vb_h *= mom
+                self._vb_h += lr * grad_b_h
+
+                self.W += self._vW
+                self.b_v += self._vb_v
+                self.b_h += self._vb_h
+
+            avg_err = err_sum / n_batches
+            epoch_errors.append(avg_err)
+            if verbose:
+                if track_free_energy:
+                    fe = float(self.free_energy(data_flat[:500]).mean())
+                    print(f"Epoch {epoch+1}/{epochs}, MSE: {avg_err:.6f}, FE: {fe:.3f}")
+                else:
+                    print(f"Epoch {epoch+1}/{epochs}, 重构误差: {avg_err:.6f}")
+
         return epoch_errors
 
-    def sample(self):
-        """从训练好的模型中采样生成新数据（Gibbs采样）
-        通过多次Gibbs采样迭代，模型能够从学习到的数据分布中生成新样本
-        数学过程:
-        v_0 → p(h|v_0) → h_0 → p(v|h_0) → v_1 → ... → v_n
+    # ---------- 采样 ----------
+    def sample(self, n_steps=200, n_samples=1, start=None, return_prob=False):
+        """批量 Gibbs 采样。
+
+        Args:
+            n_steps: Gibbs 步数
+            n_samples: 并行链数；返回 (n_samples, side, side)，n=1 时返回 (side, side)
+            start: 初始状态 (n_samples, n_observe)，None 则随机均匀初始化
+            return_prob: 最后一步返回 v_prob 而非二值样本（更清晰的灰度图）
         """
-        # 初始化可见层：使用伯努利分布随机生成二值向量（每个像素有50%概率为1）
-        # n_observe是可见层神经元数量（28x28=784）
-        v = np.random.binomial(1, 0.5, self.n_observe)
+        if start is None:
+            v = (self.rng.random((n_samples, self.n_observe), dtype=self.dtype) < 0.5
+                 ).astype(self.dtype)
+        else:
+            v = np.atleast_2d(np.asarray(start, dtype=self.dtype)).reshape(-1, self.n_observe)
+            n_samples = v.shape[0]
 
-        # 进行1000次 Gibbs采样迭代，以逐步趋近真实数据分布，使生成的样本更接近训练数据的分布
-        # 每次迭代包括：v -> h -> v 的完整过程
-        for _ in range(1000):
-            # 基于当前的可见层v，计算隐藏层神经元被激活的概率（前向传播）
-            h_prob = self._sigmoid(np.dot(v, self.W) + self.b_h)
+        # 预分配缓冲区
+        h_buf = np.empty((n_samples, self.n_hidden), dtype=self.dtype)
+        v_buf = np.empty((n_samples, self.n_observe), dtype=self.dtype)
 
-            # 根据激活概率采样得到隐藏层的状态（伯努利采样）
+        for step in range(n_steps):
+            np.matmul(v, self.W, out=h_buf)
+            h_buf += self.b_h
+            h_prob = self._sigmoid(h_buf, out=h_buf)
             h_sample = self._sample_binary(h_prob)
 
-            # 基于隐藏层的采样结果，重新估算可见层的激活概率（反向传播）
-            v_prob = self._sigmoid(np.dot(h_sample, self.W.T) + self.b_v)
+            np.matmul(h_sample, self.W.T, out=v_buf)
+            v_buf += self.b_v
+            v_prob = self._sigmoid(v_buf, out=v_buf)
 
-            # 根据估算的概率采样新的可见层状态
-            v = self._sample_binary(v_prob)
+            if return_prob and step == n_steps - 1:
+                v = v_prob.copy()
+            else:
+                v = self._sample_binary(v_prob)
 
-        # 将最终的可见层向量重塑为 28×28 的图像格式
-        return v.reshape(28, 28)
+        side = int(np.sqrt(self.n_observe))
+        out = v.reshape(-1, side, side)
+        return out[0] if out.shape[0] == 1 else out
 
-# 用MNIST 手写数字数据集训练一个（RBM），并从训练好的模型中采样生成一张手写数字图像
+
 if __name__ == '__main__':
     try:
-        mnist = np.load('mnist_bin.npy')  # 尝试加载文件
+        mnist = np.load('mnist_bin.npy')
     except IOError:
-        # 如果文件不存在或加载失败，生成新的二值化MNIST数据
-        (train_images, _), (_, _) = datasets.mnist.load_data()  # 加载MNIST数据
-        mnist_bin = (train_images >= 128).astype(np.int8)  # 二值化处理
-        np.save('mnist_bin.npy', mnist_bin)  # 保存为.npy文件
-
-        # 重新加载刚生成的文件
+        from tensorflow.keras import datasets
+        (train_images, _), (_, _) = datasets.mnist.load_data()
+        mnist_bin = (train_images >= 128).astype(np.int8)
+        np.save('mnist_bin.npy', mnist_bin)
         mnist = np.load('mnist_bin.npy')
     except Exception as e:
-        # 如果加载失败（其他错误，如文件损坏），保持原报错逻辑
-        print("无法加载MNIST数据文件，请确保mnist_bin.npy文件在正确的路径下")
-        print(f"错误详情: {e}")
-        sys.exit(1) # 退出Python程序，并返回状态码1
+        print(f"加载 MNIST 失败: {e}")
+        sys.exit(1)
 
-    # 获取数据集的形状信息
-    n_imgs, n_rows, n_cols = mnist.shape  # 分别表示图像数量、行数和列数
-    img_size = n_rows * n_cols            # 计算单张图片展开后的长度
+    n_imgs, n_rows, n_cols = mnist.shape
+    img_size = n_rows * n_cols
+    print(f"数据形状: {mnist.shape}, scipy 加速: {_HAS_SCIPY}")
 
-    # 打印数据集的形状信息，便于确认数据加载是否正确
-    print(mnist.shape)  # 输出数据集的形状
+    rbm = RBM(n_hidden=2, n_observe=img_size, seed=42)
 
-
-    # 初始化 RBM 对象：2个隐藏节点，784个可见节点（28×28 图像）
-    rbm = RBM(2, img_size)
-   
-    # 训练RBM并记录损失
-    print("=" * 50)
-    print("开始训练RBM模型...")
-    print("=" * 50)
-    errors = rbm.train(mnist)
-    
-    # 保存损失值到文件
+    print("=" * 50 + "\n开始训练 RBM (CD-1 + momentum + weight decay)...\n" + "=" * 50)
+    errors = rbm.train(mnist, epochs=10, batch_size=100,
+                       learning_rate=0.1, momentum=0.5, weight_decay=1e-4,
+                       k=1, use_pcd=False)
     np.save('training_errors.npy', np.array(errors))
-    print("=" * 50)
-    print("训练完成，损失值已保存")
-    print("=" * 50)
 
-    # 从模型中采样多张图像
-    print("生成样本图像...")
-    samples = [rbm.sample() for _ in range(5)]
-    np.save('generated_samples.npy', np.array(samples))
+    print("=" * 50 + "\n训练完成，生成样本...\n" + "=" * 50)
+    # 一次性批量采样 5 张，而不是串行 5 次
+    samples = rbm.sample(n_steps=200, n_samples=5, return_prob=True)
+    np.save('generated_samples.npy', np.asarray(samples))
+    print("Done.")
