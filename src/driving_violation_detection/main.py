@@ -103,12 +103,23 @@ world.apply_settings(settings)
 # Initialize Traffic Manager
 traffic_manager = client.get_trafficmanager(8000)
 traffic_manager.set_synchronous_mode(True)
+world_map = world.get_map()
+
+
+# Conservative driving profile for tighter urban turns.
+BASE_SPEED_DIFFERENCE = 10.0
+TURNING_SPEED_DIFFERENCE = 55.0
+BASE_FOLLOW_DISTANCE = 4.0
+TURNING_FOLLOW_DISTANCE = 6.0
+RIGHT_TURN_LOOKAHEAD_DISTANCES = (4.0, 8.0, 12.0, 16.0)
+RIGHT_TURN_ANGLE_THRESHOLD = 35.0
+RIGHT_STEER_THRESHOLD = 0.15
 
 
 
 
 # Get map spawn points
-spawn_points = world.get_map().get_spawn_points()
+spawn_points = world_map.get_spawn_points()
 
 # Spawn vehicles and walkers
 num_vehicles = 10
@@ -137,15 +148,15 @@ except Exception as e:
 vehicle.set_autopilot(True, traffic_manager.get_port())
 print("自动驾驶已启用")
 # 开启自动变道
-traffic_manager.auto_lane_change(vehicle, True)
+traffic_manager.auto_lane_change(vehicle, False)
 # 设置全局跟车距离
-traffic_manager.set_global_distance_to_leading_vehicle(2.5)
+traffic_manager.set_global_distance_to_leading_vehicle(BASE_FOLLOW_DISTANCE)
 #设置遵守交通规则
 traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
 traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
 # 减少跟车距离
-traffic_manager.distance_to_leading_vehicle(vehicle, 3.0)
+traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
 # Spawn camera
 camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', '1024')
@@ -342,6 +353,58 @@ def create_xml_file(image_name, bboxes, width, height, weather_params):
 def dot_product(v1, v2):
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 
+
+def normalize_angle(angle):
+    return (angle + 180.0) % 360.0 - 180.0
+
+
+def get_max_upcoming_turn_angle(waypoint, lookahead_distances):
+    if waypoint is None:
+        return 0.0
+
+    current_yaw = waypoint.transform.rotation.yaw
+    max_turn_angle = 0.0
+
+    for distance in lookahead_distances:
+        next_waypoints = waypoint.next(distance)
+        if not next_waypoints:
+            continue
+
+        next_yaw = next_waypoints[0].transform.rotation.yaw
+        delta_yaw = normalize_angle(next_yaw - current_yaw)
+        if abs(delta_yaw) > abs(max_turn_angle):
+            max_turn_angle = delta_yaw
+
+    return max_turn_angle
+
+
+def is_right_turn_imminent(vehicle, world_map):
+    waypoint = world_map.get_waypoint(
+        vehicle.get_location(),
+        project_to_road=True,
+        lane_type=carla.LaneType.Driving
+    )
+    if waypoint is None:
+        return False
+
+    vehicle_control = vehicle.get_control()
+    max_turn_angle = get_max_upcoming_turn_angle(waypoint, RIGHT_TURN_LOOKAHEAD_DISTANCES)
+
+    # Slow down before entering the junction and while already steering into it.
+    return (
+        max_turn_angle >= RIGHT_TURN_ANGLE_THRESHOLD or
+        (waypoint.is_junction and vehicle_control.steer > RIGHT_STEER_THRESHOLD)
+    )
+
+
+def update_autopilot_safety(vehicle, traffic_manager, world_map):
+    if is_right_turn_imminent(vehicle, world_map):
+        traffic_manager.vehicle_percentage_speed_difference(vehicle, TURNING_SPEED_DIFFERENCE)
+        traffic_manager.distance_to_leading_vehicle(vehicle, TURNING_FOLLOW_DISTANCE)
+    else:
+        traffic_manager.vehicle_percentage_speed_difference(vehicle, BASE_SPEED_DIFFERENCE)
+        traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
+
 # Define a list of possible weather conditions
 weather_conditions = [
     'rainy',
@@ -496,6 +559,7 @@ try:
         world.tick()
         time.sleep(0.033)
         pygame.event.pump()  # Process event queue for keyboard input
+        update_autopilot_safety(vehicle, traffic_manager, world_map)
 
         # Handle manual input
         # handle_input(vehicle)
