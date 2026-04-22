@@ -1,3 +1,4 @@
+<img width="500" height="1566" alt="1" src="https://github.com/user-attachments/assets/b1287ca6-d9a4-4ea0-820d-92c4969eb645" />
 # 基于 YOLOv8 与 Carla 的交通标志实时感知与交互控制系统
 
 ## 摘要
@@ -30,7 +31,8 @@
 
 本模块严格遵循 Carla 官方推荐的 **Client-Server 异步架构**。图 2.1 展示了系统内部的数据流转闭环。
 
-![数据流转闭环](assets/1.png)
+<img width="500" height="1566" alt="1" src="https://github.com/user-attachments/assets/227638ab-db96-47aa-8322-f132a9b6588e" />
+
 
 *图 2.1：系统核心数据流与模块交互示意图。从物理模拟到神经网络推理再到可视化控制，构成了完整的感知闭环。*
 
@@ -216,13 +218,15 @@ python src/carla_traffic_sign_recognition/main.py
 
 - **远距离感知**：当 Stop Sign 占据画面像素面积约 **20x20** 时，YOLOv8 即开始响应并绘制淡黄色锚框。
 - **近距离锁定**：随着距离拉近，置信度迅速攀升至 **0.85 - 0.95** 区间，检测框稳定无抖动。
-- **交互响应**：按下 `W` 键，车辆平滑加速；按下 `S` 键，车辆依据当前速度智能判断是减速还是倒车。
+- **交互响应**：按下 `W` 键，车辆平滑加速；按下 `S` 键，车辆依据当前速度智能判断是减速还是倒车
 
-![操作展示](assets/image-20260418195910551.png)
+<img width="875" height="351" alt="image-20260418195910551" src="https://github.com/user-attachments/assets/c40a0542-cc8a-47e5-8fae-320fe7704cbe" />
+
 
 *图 6.1：展示操作说明。*
 
-![Carla 模拟器实车第一视角](assets/2026-04-18_222914.png)
+<img width="776" height="441" alt="2026-04-18_222914" src="https://github.com/user-attachments/assets/08a81001-1e82-47aa-b04b-27e64814b502" />
+
 
 *图 6.2：Carla 模拟器实车第一视角。左侧画面叠加了 YOLOv8 推理结果，展示了 Stop Sign 的精准识别。*
 
