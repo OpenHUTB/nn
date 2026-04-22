@@ -45,6 +45,7 @@ copyright: OpenHUTB 版权所有 &copy; {year}
 
 nav:
 - 首页: 'index.md'
+- V2X路侧智能感知: 'edge_intelligence_V2X/README.md'
 
 
 # - mdx_math 用于行内公式显示
