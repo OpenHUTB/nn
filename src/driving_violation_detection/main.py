@@ -106,14 +106,19 @@ traffic_manager.set_synchronous_mode(True)
 world_map = world.get_map()
 
 
-# Conservative driving profile for tighter urban turns.
-BASE_SPEED_DIFFERENCE = 10.0
+# Fast cruising with a slower profile only for tight urban turns.
+BASE_SPEED_DIFFERENCE = -50.0
 TURNING_SPEED_DIFFERENCE = 55.0
 BASE_FOLLOW_DISTANCE = 4.0
 TURNING_FOLLOW_DISTANCE = 6.0
 RIGHT_TURN_LOOKAHEAD_DISTANCES = (4.0, 8.0, 12.0, 16.0)
 RIGHT_TURN_ANGLE_THRESHOLD = 35.0
 RIGHT_STEER_THRESHOLD = 0.15
+OVERTAKE_MIN_TRIGGER_DISTANCE = 14.0
+OVERTAKE_LANE_CLEAR_DISTANCE = 18.0
+OVERTAKE_RELATIVE_SPEED_THRESHOLD = 2.0
+OVERTAKE_TARGET_MAX_SPEED = 4.0
+OVERTAKE_COOLDOWN = 3.0
 
 
 
@@ -354,6 +359,11 @@ def dot_product(v1, v2):
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
 
 
+def get_speed(vehicle_actor):
+    velocity = vehicle_actor.get_velocity()
+    return np.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
+
+
 def normalize_angle(angle):
     return (angle + 180.0) % 360.0 - 180.0
 
@@ -397,13 +407,151 @@ def is_right_turn_imminent(vehicle, world_map):
     )
 
 
-def update_autopilot_safety(vehicle, traffic_manager, world_map):
+def lane_change_allowed(lane_change, direction):
+    if direction == 'left':
+        return lane_change in (carla.LaneChange.Left, carla.LaneChange.Both)
+    return lane_change in (carla.LaneChange.Right, carla.LaneChange.Both)
+
+
+def find_blocking_vehicle(vehicle, world, world_map):
+    ego_transform = vehicle.get_transform()
+    ego_location = ego_transform.location
+    ego_forward = ego_transform.get_forward_vector()
+    ego_waypoint = world_map.get_waypoint(
+        ego_location,
+        project_to_road=True,
+        lane_type=carla.LaneType.Driving
+    )
+    if ego_waypoint is None or ego_waypoint.is_junction:
+        return None
+
+    ego_speed = get_speed(vehicle)
+    closest_vehicle = None
+    closest_distance = float('inf')
+
+    for other in world.get_actors().filter('vehicle.*'):
+        if other.id == vehicle.id:
+            continue
+
+        other_location = other.get_location()
+        offset = other_location - ego_location
+        forward_distance = dot_product(ego_forward, offset)
+        if forward_distance <= 0.0 or forward_distance > OVERTAKE_MIN_TRIGGER_DISTANCE:
+            continue
+
+        other_waypoint = world_map.get_waypoint(
+            other_location,
+            project_to_road=True,
+            lane_type=carla.LaneType.Driving
+        )
+        if other_waypoint is None:
+            continue
+
+        same_lane = (
+            other_waypoint.road_id == ego_waypoint.road_id and
+            other_waypoint.lane_id == ego_waypoint.lane_id
+        )
+        if not same_lane:
+            continue
+
+        other_speed = get_speed(other)
+        if other_speed > OVERTAKE_TARGET_MAX_SPEED and ego_speed - other_speed < OVERTAKE_RELATIVE_SPEED_THRESHOLD:
+            continue
+
+        if forward_distance < closest_distance:
+            closest_distance = forward_distance
+            closest_vehicle = other
+
+    return closest_vehicle
+
+
+def is_lane_clear_for_overtake(vehicle, world, world_map, target_waypoint):
+    ego_location = vehicle.get_location()
+
+    for other in world.get_actors().filter('vehicle.*'):
+        if other.id == vehicle.id:
+            continue
+
+        other_waypoint = world_map.get_waypoint(
+            other.get_location(),
+            project_to_road=True,
+            lane_type=carla.LaneType.Driving
+        )
+        if other_waypoint is None:
+            continue
+
+        same_target_lane = (
+            other_waypoint.road_id == target_waypoint.road_id and
+            other_waypoint.lane_id == target_waypoint.lane_id
+        )
+        if not same_target_lane:
+            continue
+
+        if other.get_location().distance(ego_location) < OVERTAKE_LANE_CLEAR_DISTANCE:
+            return False
+
+    return True
+
+
+def try_overtake_blocking_vehicle(vehicle, world, traffic_manager, world_map, current_time, last_overtake_time):
+    if current_time - last_overtake_time < OVERTAKE_COOLDOWN:
+        return last_overtake_time
+
+    ego_waypoint = world_map.get_waypoint(
+        vehicle.get_location(),
+        project_to_road=True,
+        lane_type=carla.LaneType.Driving
+    )
+    if ego_waypoint is None or ego_waypoint.is_junction or is_right_turn_imminent(vehicle, world_map):
+        return last_overtake_time
+
+    blocking_vehicle = find_blocking_vehicle(vehicle, world, world_map)
+    if blocking_vehicle is None:
+        return last_overtake_time
+
+    for direction in ('left', 'right'):
+        if not lane_change_allowed(ego_waypoint.lane_change, direction):
+            continue
+
+        target_waypoint = ego_waypoint.get_left_lane() if direction == 'left' else ego_waypoint.get_right_lane()
+        if target_waypoint is None:
+            continue
+
+        if target_waypoint.lane_type != carla.LaneType.Driving:
+            continue
+
+        if target_waypoint.is_junction or target_waypoint.road_id != ego_waypoint.road_id:
+            continue
+
+        if ego_waypoint.lane_id * target_waypoint.lane_id < 0:
+            continue
+
+        if not is_lane_clear_for_overtake(vehicle, world, world_map, target_waypoint):
+            continue
+
+        traffic_manager.force_lane_change(vehicle, direction == 'right')
+        return current_time
+
+    return last_overtake_time
+
+
+def update_autopilot_safety(vehicle, world, traffic_manager, world_map, current_time, last_overtake_time):
     if is_right_turn_imminent(vehicle, world_map):
         traffic_manager.vehicle_percentage_speed_difference(vehicle, TURNING_SPEED_DIFFERENCE)
         traffic_manager.distance_to_leading_vehicle(vehicle, TURNING_FOLLOW_DISTANCE)
     else:
         traffic_manager.vehicle_percentage_speed_difference(vehicle, BASE_SPEED_DIFFERENCE)
         traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
+        last_overtake_time = try_overtake_blocking_vehicle(
+            vehicle,
+            world,
+            traffic_manager,
+            world_map,
+            current_time,
+            last_overtake_time
+        )
+
+    return last_overtake_time
 
 # Define a list of possible weather conditions
 weather_conditions = [
@@ -551,6 +699,7 @@ def non_maximum_suppression(bboxes, iou_threshold=0.2):
 
 # Variable to track if the last image had bounding boxes
 last_image_had_bboxes = False
+last_overtake_time = 0.0
 
 
 # Start the game loop
@@ -559,7 +708,15 @@ try:
         world.tick()
         time.sleep(0.033)
         pygame.event.pump()  # Process event queue for keyboard input
-        update_autopilot_safety(vehicle, traffic_manager, world_map)
+        loop_time = time.time()
+        last_overtake_time = update_autopilot_safety(
+            vehicle,
+            world,
+            traffic_manager,
+            world_map,
+            loop_time,
+            last_overtake_time
+        )
 
         # Handle manual input
         # handle_input(vehicle)
