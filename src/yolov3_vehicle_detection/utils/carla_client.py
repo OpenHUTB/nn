@@ -55,9 +55,7 @@ class CarlaClient:
             print(f"[ERROR] 连接失败: {e}")
             return False
 
-
     def spawn_vehicle(self, spawn_npc=True, npc_count=15, spawn_obstacle=True, obstacle_count=3):
-
         if not self.world:
             print("[ERROR] 世界未加载，请先连接！")
             return None
@@ -80,14 +78,10 @@ class CarlaClient:
             if spawn_npc:
                 self._spawn_npc_vehicles(npc_count)
             
-
             # 生成障碍物
             if spawn_obstacle:
                 self.spawn_obstacles(obstacle_type='all', count=obstacle_count)
             
-            # 安装障碍物传感器
-            self.setup_obstacle_sensor()
-
             return self.vehicle
         except Exception as e:
             print(f"[ERROR] 车辆生成失败: {e}")
@@ -119,80 +113,6 @@ class CarlaClient:
             
         except Exception as e:
             print(f"[WARNING] 生成NPC车辆失败: {e}")
-
-
-    def spawn_obstacles(self, obstacle_type='static', count=5):
-        """
-        生成道路障碍物
-        
-        Args:
-            obstacle_type: 'static' 静态障碍物, 'walker' 行人, 'all' 全部
-            count: 生成数量
-        """
-        try:
-            if obstacle_type in ['static', 'all']:
-                # 静态障碍物：锥桶、箱子等
-                static_blueprints = [
-                    'static.prop.streetbarrier',
-                    'static.prop.constructioncone',
-                    'static.prop.dog',
-                    'static.prop.pushchair',
-                    'static.prop.luggage',
-                ]
-                
-                for _ in range(count):
-                    blueprint = random.choice(self.blueprint_library.filter('static.prop.*'))
-                    spawn_points = self.world.get_map().get_spawn_points()
-                    spawn_point = random.choice(spawn_points)
-                    
-                    # 设置随机高度（避免埋入地面）
-                    spawn_point.location.z += 0.5
-                    
-                    actor = self.world.try_spawn_actor(blueprint, spawn_point)
-                    if actor:
-                        # 绘制绿色标记
-                        self.debug_helper.draw_point(
-                            spawn_point.location,
-                            size=0.5,
-                            color=carla.Color(255, 165, 0),  # 橙色
-                            life_time=10.0
-                        )
-                        print(f"[INFO] 生成静态障碍物: {blueprint.id}")
-            
-            if obstacle_type in ['walker', 'all']:
-                # 行人
-                walker_bp = self.blueprint_library.filter('walker.*')
-                walker_controller_bp = self.blueprint_library.filter('controller.ai.walker')
-                
-                for _ in range(count):
-                    spawn_point = random.choice(self.world.get_map().get_spawn_points())
-                    spawn_point.location.z += 0.5
-                    
-                    walker = self.world.try_spawn_actor(random.choice(walker_bp), spawn_point)
-                    if walker:
-                        # 创建行人控制器
-                        controller = self.world.spawn_actor(
-                            random.choice(walker_controller_bp),
-                            carla.Transform(),
-                            walker
-                        )
-                        if controller:
-                            # 让行人随机行走
-                            controller.start()
-                            controller.go_to_location(
-                                carla.Location(
-                                    x=spawn_point.location.x + random.uniform(-20, 20),
-                                    y=spawn_point.location.y + random.uniform(-20, 20),
-                                    z=spawn_point.location.z
-                                )
-                            )
-                            controller.set_max_speed(1.4)
-                        print(f"[INFO] 生成行人")
-            
-            print(f"[INFO] 障碍物生成完成")
-            
-        except Exception as e:
-            print(f"[WARNING] 生成障碍物失败: {e}")
 
 
     def setup_camera(self):
