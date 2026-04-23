@@ -63,13 +63,21 @@ class PIDController:
 
 
 def find_weather_presets():
+    # 驼峰命名拆分正则（不变，用来美化名字）
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-
     def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
 
-    presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
-    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
+    weather_class = carla.WeatherParameters
+    presets = []
+    for attr_name in dir(weather_class):
+        # 筛选规则：大写开头 + 不是私有属性(__开头) + 不是方法/函数
+        if attr_name[0].isupper() and not attr_name.startswith('__'):
+            attr_value = getattr(weather_class, attr_name)
+            # 额外校验：确保是天气参数对象（排除无效属性）
+            if isinstance(attr_value, carla.WeatherParameters):
+                presets.append(attr_name)
 
+    return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
@@ -77,8 +85,7 @@ def get_actor_display_name(actor, truncate=250):
 
 
 # ==============================================================================
-# 【终极修正版】Town10HD专属红绿灯识别
-# 彻底解决：无红绿灯误判红灯、建筑红墙干扰、招牌误识别、三色不乱判
+
 # ==============================================================================
 def traffic_light_detect(image):
     # 空图像保护
@@ -132,6 +139,75 @@ def traffic_light_detect(image):
     else:
         return 'none'
 
+
+# ==============================================================================
+# 【新增】天气自适应控制系统 - 自动车灯 + 自动相机参数
+# ==============================================================================
+# 1. 判断当前天气类型（黑夜/雨天/雾天/晴天）
+def get_weather_type(world):
+    weather = world.get_weather()
+    # 光照强度 (0=黑夜, 100=大晴天)
+    illumination = weather.sun_altitude_angle
+    # 雨/雾强度
+    rain = weather.precipitation
+    fog = weather.fog_density
+
+    if illumination < 5:
+        return "night"  # 黑夜
+    elif rain > 30:
+        return "rain"  # 雨天
+    elif fog > 40:
+        return "fog"  # 雾天
+    else:
+        return "sunny"  # 晴天
+
+
+# 2. 自动控制车辆车灯（近光灯 + 雾灯）
+# 2. 自动控制车辆车灯（CARLA官方正确写法，无报错版）
+def auto_vehicle_lights(vehicle, weather_type):
+
+    light_state = carla.VehicleLightState()
+
+    if weather_type == "night":
+        # 黑夜：开启近光灯
+        light_state = carla.VehicleLightState.LowBeam
+    elif weather_type == "rain":
+        # 雨天：近光灯 + 雾灯
+        light_state = carla.VehicleLightState.LowBeam | carla.VehicleLightState.Fog
+    elif weather_type == "fog":
+        # 雾天：雾灯
+        light_state = carla.VehicleLightState.Fog
+    else:
+        # 晴天：关闭所有灯光
+        light_state = carla.VehicleLightState.NONE
+    vehicle.set_light_state(light_state)
+# 3. 自动调整相机参数（曝光/对比度）
+def auto_camera_settings(camera_manager, weather_type):
+    if camera_manager.sensor is None:
+        return
+    sensor = camera_manager.sensor
+    # 只对RGB相机调整参数
+    if 'sensor.camera.rgb' in sensor.type_id:
+        if weather_type == "night":
+            # 黑夜：提高曝光，提亮画面
+            sensor.set_attribute('exposure_mode', 'manual')
+            sensor.set_attribute('exposure_compensation', '3.0')
+            sensor.set_attribute('contrast', '1.4')
+        elif weather_type == "fog":
+            # 雾天：提高对比度，看清道路
+            sensor.set_attribute('exposure_compensation', '1.5')
+            sensor.set_attribute('contrast', '1.6')
+            sensor.set_attribute('saturation', '1.2')
+        elif weather_type == "rain":
+            # 雨天：柔和参数
+            sensor.set_attribute('exposure_compensation', '1.0')
+            sensor.set_attribute('contrast', '1.2')
+        else:
+            # 晴天：默认参数
+            sensor.set_attribute('exposure_mode', 'auto')
+            sensor.set_attribute('exposure_compensation', '0.0')
+            sensor.set_attribute('contrast', '1.0')
+            sensor.set_attribute('saturation', '1.0')
 # -- World --------------------------------------------------------------------
 # ==============================================================================
 class World(object):
@@ -150,7 +226,7 @@ class World(object):
         self.gnss_sensor = None
         self.camera_manager = None
         self._weather_presets = find_weather_presets()
-        self._weather_index = 0
+        self._weather_index =0
         self._actor_filter = args.filter
         self._gamma = args.gamma
         self.restart(args)
@@ -194,7 +270,13 @@ class World(object):
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
-
+        night_weather = carla.WeatherParameters(
+            sun_altitude_angle=-90.0,
+            cloudiness=100.0,
+            fog_density=0.0
+        )
+        self.world.set_weather(night_weather)
+        self.hud.notification('Weather: Night')
     def next_weather(self, reverse=False):
         self._weather_index += -1 if reverse else 1
         self._weather_index %= len(self._weather_presets)
@@ -258,7 +340,7 @@ class HUD(object):
         transform = world.player.get_transform()
         vel = world.player.get_velocity()
         control = world.player.get_control()
-        # 已永久修复 rotation.y -> rotation.yaw
+
         heading = 'N' if abs(transform.rotation.yaw) < 89.5 else ''
         heading += 'S' if abs(transform.rotation.yaw) > 90.5 else ''
         heading += 'E' if 179.5 > transform.rotation.yaw > 0.5 else ''
@@ -516,6 +598,9 @@ class CameraManager(object):
                 blp.set_attribute('image_size_y', str(hud.dim[1]))
                 if blp.has_attribute('gamma'):
                     blp.set_attribute('gamma', str(gamma_correction))
+                    # 新增：默认曝光模式
+                if blp.has_attribute('exposure_mode'):
+                    blp.set_attribute('exposure_mode', 'auto')
             elif item[0].startswith('sensor.lidar'):
                 blp.set_attribute('range', '50')
             item.append(blp)
@@ -630,7 +715,10 @@ def game_loop(args):
                         world.camera_manager.set_camera_view(3)
                     elif event.key == K_5:
                         world.camera_manager.set_camera_view(4)
-
+                    elif event.key == K_c:  # 按 C 键 → 切换下一个天气（白天→黑夜→雨天→雾天）
+                        world.next_weather()
+                    elif event.key == K_v:  # 按 V 键 → 切换上一个天气
+                        world.next_weather(reverse=True)
             world.tick(clock)
             world.render(display)
             pygame.display.flip()
@@ -676,6 +764,11 @@ def game_loop(args):
             elif min_dist < safe_dist:
                 brake = 0.2
                 throttle *= 0.5
+            # ===================== 天气自适应控制（全自动） =====================
+            weather_type = get_weather_type(world.world)
+            auto_vehicle_lights(ego, weather_type)
+
+            print("当前天气：", weather_type)
 
             # ===================== 红绿灯控制逻辑 =====================
             light_state = traffic_light_detect(world.camera_manager.rgb_image)
