@@ -20,7 +20,7 @@ class BatchDetector:
     并将标注后的图像保存至输出目录。
     """
 
-    def __init__(self, detection_engine, input_dir, output_dir):
+    def __init__(self, detection_engine, input_dir, output_dir, batch_size=16, log_interval=10):
         """
         初始化 BatchDetector 实例。
 
@@ -32,6 +32,8 @@ class BatchDetector:
         self.engine = detection_engine                      # 检测引擎实例
         self.input_dir = Path(input_dir)                    # 输入目录（转换为 Path 对象）
         self.output_dir = Path(output_dir)                  # 输出目录（转换为 Path 对象）
+        self.batch_size = int(batch_size)
+        self.log_interval = int(log_interval)
 
         # 支持的图像文件扩展名集合（小写）
         self.image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
@@ -62,35 +64,47 @@ class BatchDetector:
             return
 
         print(f"🔍 Found {len(image_files)} images. Starting batch detection...")
-        success_count = 0  # 成功处理的图像计数器
+        success_count = 0
 
-        # 按文件名排序以保证处理顺序可预测
-        for img_path in sorted(image_files):
+        image_files_sorted = sorted(image_files)
+        batch_size = self.batch_size if self.batch_size > 0 else 1
+
+        for start in range(0, len(image_files_sorted), batch_size):
+            batch_files = image_files_sorted[start : start + batch_size]
+            batch_sources = [str(p) for p in batch_files]
+            annotated_frames = None
+
             try:
-                # 使用 OpenCV 读取图像
-                frame = cv2.imread(str(img_path))
-                if frame is None:
-                    # 若读取失败（如文件损坏或格式不支持），跳过该图像
-                    print(f"❌ Failed to read image (corrupted or unsupported): {img_path.name}")
+                if hasattr(self.engine, "detect_batch"):
+                    annotated_frames, _ = self.engine.detect_batch(batch_sources)
+            except Exception:
+                annotated_frames = None
+
+            if annotated_frames is None:
+                annotated_frames = []
+                for img_path in batch_files:
+                    frame = cv2.imread(str(img_path))
+                    if frame is None:
+                        annotated_frames.append(None)
+                        continue
+                    try:
+                        annotated_frame, _ = self.engine.detect(frame)
+                    except Exception:
+                        annotated_frame = None
+                    annotated_frames.append(annotated_frame)
+
+            for img_path, annotated_frame in zip(batch_files, annotated_frames):
+                if annotated_frame is None:
+                    print(f"❌ Failed to process image: {img_path.name}")
                     continue
-
-                # 调用检测引擎进行目标检测
-                # 返回值：annotated_frame（带标注的图像），_（检测结果元数据，此处未使用）
-                annotated_frame, _ = self.engine.detect(frame)
-
-                # 构造输出文件路径：保留原文件名，在扩展名前加 "_detected"
                 output_path = self.output_dir / f"{img_path.stem}_detected{img_path.suffix}"
-
-                # 尝试将标注后的图像写入磁盘
                 if cv2.imwrite(str(output_path), annotated_frame):
-                    print(f"✅ Saved: {output_path.name}")
                     success_count += 1
                 else:
                     print(f"❌ Failed to save: {output_path}")
 
-            except Exception as e:
-                # 捕获并报告处理单张图像时发生的任何异常
-                print(f"💥 Error processing {img_path.name}: {e}")
+            processed = min(start + len(batch_files), len(image_files_sorted))
+            if self.log_interval > 0 and (processed % self.log_interval == 0 or processed == len(image_files_sorted)):
+                print(f"Progress: {processed}/{len(image_files_sorted)}")
 
-        # 打印最终处理统计信息
         print(f"\n🎉 Batch detection completed. {success_count}/{len(image_files)} images processed successfully.")
