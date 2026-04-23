@@ -64,22 +64,22 @@ print("=" * 50)
 
 # 创建 CarRacing 环境
 # continuous=False: 使用离散动作空间 (5个动作: 左/右/加速/刹车/空)
-env = gym.make("CarRacing-v3", continuous=False)
+env = gym.make("CarRacing-v2", continuous=False)
 
 # 应用环境预处理 wrapper
 env = SkipFrame(env, skip=4)  # 每4步执行一次相同动作
 
-from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation
+from gymnasium.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
 
 # 灰度化处理: RGB -> 灰度，减少信息量加速训练
-env = GrayscaleObservation(env)
+env = GrayScaleObservation(env)
 
 # 缩放到 (84, 84): 标准 Atari 游戏预处理尺寸
 env = ResizeObservation(env, (84, 84))
 
 # 帧堆叠: 将连续4帧组合在一起，提供时序信息
 # 这样网络可以看到小车的运动方向
-env = FrameStackObservation(env, stack_size=4)
+env = FrameStack(env, num_stack=4)
 
 # 重置环境，获取初始状态
 state, info = env.reset()
@@ -278,11 +278,11 @@ def evaluate_agent(agent, num_episodes=5, render=False):
     """
     # 创建评估环境
     render_mode = "human" if render else "rgb_array"
-    eval_env = gym.make("CarRacing-v3", continuous=False, render_mode=render_mode)
+    eval_env = gym.make("CarRacing-v2", continuous=False, render_mode=render_mode)
     eval_env = SkipFrame(eval_env, skip=4)
-    eval_env = GrayscaleObservation(eval_env)
+    eval_env = GrayScaleObservation(eval_env)
     eval_env = ResizeObservation(eval_env, (84, 84))
-    eval_env = FrameStackObservation(eval_env, stack_size=4)
+    eval_env = FrameStack(eval_env, num_stack=4)
     
     # 评估时关闭探索
     agent.epsilon = 0

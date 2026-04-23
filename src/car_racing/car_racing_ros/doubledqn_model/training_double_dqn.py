@@ -57,16 +57,16 @@ print("正在初始化环境...")
 print("=" * 50)
 
 # 创建环境
-env = gym.make("CarRacing-v3", continuous=False)
+env = gym.make("CarRacing-v2", continuous=False)
 
 # 预处理
 env = SkipFrame(env, skip=4)
 
-from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation
+from gymnasium.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
 
-env = GrayscaleObservation(env)
+env = GrayScaleObservation(env)
 env = ResizeObservation(env, (84, 84))
-env = FrameStackObservation(env, stack_size=4)
+env = FrameStack(env, num_stack=4)
 
 # 重置环境
 state, info = env.reset()
@@ -229,11 +229,11 @@ def evaluate_agent(agent, num_episodes=5, render=False):
     - 计算平均得分
     """
     render_mode = "human" if render else "rgb_array"
-    eval_env = gym.make("CarRacing-v3", continuous=False, render_mode=render_mode)
+    eval_env = gym.make("CarRacing-v2", continuous=False, render_mode=render_mode)
     eval_env = SkipFrame(eval_env, skip=4)
-    eval_env = GrayscaleObservation(eval_env)
+    eval_env = GrayScaleObservation(eval_env)
     eval_env = ResizeObservation(eval_env, (84, 84))
-    eval_env = FrameStackObservation(eval_env, stack_size=4)
+    eval_env = FrameStack(eval_env, num_stack=4)
     
     agent.epsilon = 0
     
