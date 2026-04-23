@@ -75,8 +75,8 @@ class DQNAgent(BaseAgent):
         # -------------------------------------------------------------------------
         # 从策略网络获取所有动作的Q值
         # actions 是采样时执行的动作索引
-        # np.arange(batch_size) 创建 [0, 1, 2, ..., batch_size-1]
-        current_q = self.policy_net(states)[np.arange(batch_size), actions]
+        q_values = self.policy_net(states)
+        current_q = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
         
         # -------------------------------------------------------------------------
         # 步骤2: 计算目标Q值
