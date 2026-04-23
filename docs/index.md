@@ -13,7 +13,6 @@ title: 主页
 
 ## 入门 <span id="primary"></span>
 
-[__交通标识识别__](./carla_traffic_sign_recognition/carla_traffic_sign_recognition.md) — 交通标识识别  
 [__热身__](warmup.md) — 入门热身示例
 
 [__线性回归__](linear_regression.md)
@@ -40,6 +39,8 @@ title: 主页
 ## 感知 <span id="perception"></span>
 
 [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
+
+[__交通标识识别__](./carla_traffic_sign_recognition/carla_traffic_sign_recognition.md) — 交通标识识别  
 
 [__跟踪__](#tracking) 
 
