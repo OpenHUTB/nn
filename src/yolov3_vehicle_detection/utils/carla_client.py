@@ -34,6 +34,9 @@ class CarlaClient:
         self.image_queue = queue.Queue()
         self.debug_helper = None
         self.spectator = None
+        self.obstacle_sensor = None
+        self.obstacle_distance = float('inf')
+        self.obstacle_info = None
 
     def connect(self):
         print(f"[INFO] 正在连接 CARLA 服务器 ({self.host}:{self.port})...")
@@ -52,7 +55,9 @@ class CarlaClient:
             print(f"[ERROR] 连接失败: {e}")
             return False
 
+
     def spawn_vehicle(self, spawn_npc=True, npc_count=15, spawn_obstacle=True, obstacle_count=3):
+
         if not self.world:
             print("[ERROR] 世界未加载，请先连接！")
             return None
@@ -75,10 +80,14 @@ class CarlaClient:
             if spawn_npc:
                 self._spawn_npc_vehicles(npc_count)
             
+
             # 生成障碍物
             if spawn_obstacle:
                 self.spawn_obstacles(obstacle_type='all', count=obstacle_count)
             
+            # 安装障碍物传感器
+            self.setup_obstacle_sensor()
+
             return self.vehicle
         except Exception as e:
             print(f"[ERROR] 车辆生成失败: {e}")
@@ -110,6 +119,80 @@ class CarlaClient:
             
         except Exception as e:
             print(f"[WARNING] 生成NPC车辆失败: {e}")
+
+
+    def spawn_obstacles(self, obstacle_type='static', count=5):
+        """
+        生成道路障碍物
+        
+        Args:
+            obstacle_type: 'static' 静态障碍物, 'walker' 行人, 'all' 全部
+            count: 生成数量
+        """
+        try:
+            if obstacle_type in ['static', 'all']:
+                # 静态障碍物：锥桶、箱子等
+                static_blueprints = [
+                    'static.prop.streetbarrier',
+                    'static.prop.constructioncone',
+                    'static.prop.dog',
+                    'static.prop.pushchair',
+                    'static.prop.luggage',
+                ]
+                
+                for _ in range(count):
+                    blueprint = random.choice(self.blueprint_library.filter('static.prop.*'))
+                    spawn_points = self.world.get_map().get_spawn_points()
+                    spawn_point = random.choice(spawn_points)
+                    
+                    # 设置随机高度（避免埋入地面）
+                    spawn_point.location.z += 0.5
+                    
+                    actor = self.world.try_spawn_actor(blueprint, spawn_point)
+                    if actor:
+                        # 绘制绿色标记
+                        self.debug_helper.draw_point(
+                            spawn_point.location,
+                            size=0.5,
+                            color=carla.Color(255, 165, 0),  # 橙色
+                            life_time=10.0
+                        )
+                        print(f"[INFO] 生成静态障碍物: {blueprint.id}")
+            
+            if obstacle_type in ['walker', 'all']:
+                # 行人
+                walker_bp = self.blueprint_library.filter('walker.*')
+                walker_controller_bp = self.blueprint_library.filter('controller.ai.walker')
+                
+                for _ in range(count):
+                    spawn_point = random.choice(self.world.get_map().get_spawn_points())
+                    spawn_point.location.z += 0.5
+                    
+                    walker = self.world.try_spawn_actor(random.choice(walker_bp), spawn_point)
+                    if walker:
+                        # 创建行人控制器
+                        controller = self.world.spawn_actor(
+                            random.choice(walker_controller_bp),
+                            carla.Transform(),
+                            walker
+                        )
+                        if controller:
+                            # 让行人随机行走
+                            controller.start()
+                            controller.go_to_location(
+                                carla.Location(
+                                    x=spawn_point.location.x + random.uniform(-20, 20),
+                                    y=spawn_point.location.y + random.uniform(-20, 20),
+                                    z=spawn_point.location.z
+                                )
+                            )
+                            controller.set_max_speed(1.4)
+                        print(f"[INFO] 生成行人")
+            
+            print(f"[INFO] 障碍物生成完成")
+            
+        except Exception as e:
+            print(f"[WARNING] 生成障碍物失败: {e}")
 
 
     def setup_camera(self):
@@ -228,6 +311,9 @@ class CarlaClient:
 
     def destroy_actors(self):
         try:
+            if self.obstacle_sensor:
+                self.obstacle_sensor.destroy()
+                self.obstacle_sensor = None
             if self.camera:
                 self.camera.destroy()
                 self.camera = None
@@ -266,3 +352,155 @@ class CarlaClient:
         
         # 更新 spectator
         self.spectator.set_transform(carla.Transform(location, rotation))
+
+    def setup_obstacle_sensor(self):
+        """
+        设置障碍物传感器，用于检测前方障碍物
+        使用 CARLA 自带的 sensor.other.obstacle 传感器
+        """
+        if not self.vehicle:
+            print("[WARNING] 车辆未生成，无法安装障碍物传感器")
+            return
+        
+        try:
+            # 创建障碍物传感器
+            obstacle_bp = self.blueprint_library.find('sensor.other.obstacle')
+            obstacle_bp.set_attribute('distance', '30')      # 检测距离 30 米
+            obstacle_bp.set_attribute('hit_radius', '1')      # 碰撞半径
+            obstacle_bp.set_attribute('only_dynamics', 'False')  # 也检测静态障碍物
+            obstacle_bp.set_attribute('debug_linetrace', 'False')  # 关闭调试线条减少干扰
+            
+            # 安装在车辆前方
+            spawn_point = carla.Transform(
+                carla.Location(x=0.5, z=1.5),
+                carla.Rotation(yaw=0)
+            )
+            
+            self.obstacle_sensor = self.world.spawn_actor(
+                obstacle_bp,
+                spawn_point,
+                attach_to=self.vehicle
+            )
+            
+            # 设置回调函数
+            self.obstacle_sensor.listen(lambda event: self._on_obstacle_detected(event))
+            
+            print("[INFO] 障碍物传感器安装成功！")
+            print(f"[DEBUG] 传感器绑定到车辆 ID: {self.vehicle.id}")
+            
+        except Exception as e:
+            print(f"[WARNING] 障碍物传感器安装失败: {e}")
+
+    def _on_obstacle_detected(self, event):
+        """
+        障碍物检测回调函数
+        当检测到障碍物时更新障碍物信息
+        """
+        # 过滤掉自车（距离为0或检测到的是自己）
+        if event.distance < 0.1:
+            return
+        if self.vehicle and event.other_actor and event.other_actor.id == self.vehicle.id:
+            return
+        
+        self.obstacle_distance = event.distance
+        self.obstacle_info = {
+            'distance': event.distance,
+            'actor': event.other_actor,
+            'transform': event.transform
+        }
+        
+        # 绘制检测线（红色表示检测到障碍物）
+        if self.debug_helper:
+            self.debug_helper.draw_line(
+                event.transform.location,
+                self.vehicle.get_location(),
+                thickness=0.1,
+                color=carla.Color(255, 0, 0),  # 红色
+                life_time=0.5
+            )
+            
+            # 在障碍物位置绘制红色点
+            self.debug_helper.draw_point(
+                event.transform.location,
+                size=0.3,
+                color=carla.Color(255, 0, 0),
+                life_time=0.5
+            )
+
+    def apply_obstacle_avoidance(self, auto_brake=True):
+        """
+        应用障碍物躲避控制（改进版）
+        
+        - 提前减速：根据距离渐进刹车
+        - 更早检测：安全距离 = 速度 * 1.5秒（原来0.5秒太短）
+        - 分级刹车：根据危险程度调整刹车力度
+        """
+        if not self.vehicle:
+            return
+        
+        # 获取当前速度 (m/s)
+        velocity = self.vehicle.get_velocity()
+        speed_ms = np.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        speed_kmh = speed_ms * 3.6
+        
+        if auto_brake and self.obstacle_info:
+            distance = self.obstacle_distance
+            
+            # 安全距离 = 速度 * 2秒（提前2秒开始反应）
+            safety_distance = speed_ms * 2.0 + 8  # 加上8米基础距离
+            
+            # 极危险距离 = 速度 * 1秒
+            danger_distance = speed_ms * 1.0 + 3
+            
+            if distance < safety_distance:
+                # 检测到危险，禁用自动驾驶（让手动控制生效）
+                self.vehicle.set_autopilot(False)
+                
+                # 计算刹车力度（距离越近力度越大）
+                if distance < danger_distance:
+                    # 极危险：全力刹车
+                    brake_value = 1.0
+                    if speed_kmh > 5:  # 只在有速度时打印
+                        print(f"[WARNING] 紧急刹车！障碍物距离: {distance:.1f}m, 速度: {speed_kmh:.1f}km/h")
+                else:
+                    # 一般危险：渐进刹车
+                    brake_value = max(0.1, 1.0 - (distance - danger_distance) / (safety_distance - danger_distance))
+                
+                brake_control = carla.VehicleControl(
+                    throttle=0.0,
+                    brake=brake_value,
+                    steer=0.0,
+                    hand_brake=False
+                )
+                self.vehicle.apply_control(brake_control)
+            else:
+                # 障碍物已远离，恢复自动驾驶
+                self.vehicle.set_autopilot(True)
+                self.obstacle_info = None
+        elif auto_brake and not self.obstacle_info:
+            # 无障碍物信息，正常行驶
+            try:
+                self.vehicle.set_autopilot(True)
+            except:
+                pass
+                    
+    def enable_autopilot_with_obstacle_avoidance(self):
+        """
+        启用带障碍物躲避的自动驾驶
+        """
+        if not self.vehicle:
+            return
+        
+        # 获取交通管理器
+        traffic_manager = self.client.get_trafficmanager(8000)
+        
+        # 启用自动驾驶
+        self.vehicle.set_autopilot(True, traffic_manager.get_port())
+        
+        # 设置更激进的障碍物响应距离
+        traffic_manager.set_vehicle_distance_to_leading_vehicle(self.vehicle, 1.0)
+        
+        # 设置更短的安全距离
+        traffic_manager.minimum_distance(self.vehicle, 1.0)
+        
+        print("[INFO] 已启用带障碍物躲避的自动驾驶")
