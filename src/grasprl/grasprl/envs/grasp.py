@@ -19,7 +19,7 @@ class GraspRobot(MujocoPhyEnv):
     def __init__(self, model_path="../worlds/grasp.xml", frame_skip=200, **kwargs):
         xml_file_path = path.join(path.dirname(path.realpath(__file__)), model_path)
         self.fullpath = xml_file_path
-        super().__init__(xml_file_path, frame_skip, **kwargs)
+        super().__init__(xml_file_path, frame_skip,** kwargs)
 
         self.IMAGE_WIDTH = 64
         self.IMAGE_HEIGHT = 64
@@ -30,7 +30,6 @@ class GraspRobot(MujocoPhyEnv):
         self.drop_area = [0.6, 0.0, 1.15]
         self.arm_joints_names = list(self.model_names.joint_names[:6])
 
-        # 修复：从 mjcf 模型中获取关节和末端执行器的 mjcf 元素（不是整数id）
         self.arm_joints = [self.mjcf_model.find('joint', name) for name in self.arm_joints_names]
         self.eef_name = self.model_names.site_names[1]
         self.eef_site = self.mjcf_model.find('site', self.eef_name)
@@ -56,7 +55,7 @@ class GraspRobot(MujocoPhyEnv):
         for _ in range(self.frame_skip):
             self.controller.run(eyehand_target)
             self.grp_ctrl.run(signal=0)
-            self.physics.data.qvel[:] = np.nan_to_num(self.physics.data.qvel, nan=0.0, posinf=0.0, neginf=0.0)
+            self.physics.data.qpos[:] = np.nan_to_num(self.physics.data.qpos, nan=0.0, posinf=0.0, neginf=0.0)
             self.physics.data.qacc[:] = np.nan_to_num(self.physics.data.qacc, nan=0.0, posinf=0.0, neginf=0.0)
             self.physics.data.ctrl[:] = np.nan_to_num(self.physics.data.ctrl, nan=0.0, posinf=1.0, neginf=-1.0)
             self.step_mujoco_simulation()
@@ -116,9 +115,11 @@ class GraspRobot(MujocoPhyEnv):
         drop_pose = self.drop_area + [0,0,1,1]
         dist = np.linalg.norm(self.get_ee_pos() - self.get_body_com(self.target_objects[0]))
         self.reward = -0.01 * dist
+
         for _ in range(self.frame_skip):
             self.controller.run(up_pose)
             self.step_mujoco_simulation()
+
         if self.check_grasp_success():
             self.info["grasp"] = "Success"
             self.grasped_num += 1
@@ -133,8 +134,7 @@ class GraspRobot(MujocoPhyEnv):
                     self.controller.run(drop_pose)
                     self.grp_ctrl.run(signal=0)
                     self.step_mujoco_simulation()
-                if self.physics.data.ctrl[0] == 0:
-                    return success
+                return success
 
     def check_terminated(self):
         for box in _target_box:
@@ -146,7 +146,7 @@ class GraspRobot(MujocoPhyEnv):
         right = self.get_body_com(_right_finger_name)
         left = self.get_body_com(_left_finger_name)
         dist = max(np.abs(right - left))
-        return (_close_finger_dis < dist < _open_finger_dis) and (self.physics.data.ctrl[0] == 255)
+        return dist < 0.12
 
     def open_gripper(self):
         target_pose = list(self.get_ee_pos()) + [0,0,1,1]
@@ -156,7 +156,9 @@ class GraspRobot(MujocoPhyEnv):
             self.step_mujoco_simulation()
 
     def move_and_grasp(self, action):
-        action[2] = 1.15
+        self.open_gripper()
+        action[2] = 1.18
+        
         if self.move_eef(action):
             if self.down_and_grasp(action):
                 self.move_up_drop()
@@ -177,19 +179,24 @@ class GraspRobot(MujocoPhyEnv):
         self.before_grasp(show=False)
         self.move_and_grasp(action)
         self.after_grasp(show=False)
+        
         ee_pos = self.get_ee_pos()
         obj_pos = self.get_body_com(self.target_objects[0])
         dist = np.linalg.norm(ee_pos - obj_pos)
         reward = -0.02 * dist
+        
         if self.info.get("grasp") == "Success":
             reward += 10.0
         elif self.info.get("move") == "Failed":
             reward -= 1.0
+        
         self.reward = reward
+        
         if self.grasped_num == _grasp_target_num or self.grasp_step == 5:
             self.terminated = True
         if self.check_terminated():
             self.terminated = True
+        
         self.grasp_step += 1
         return self.observation, self.reward, self.terminated, self.info
 
@@ -203,6 +210,7 @@ class GraspRobot(MujocoPhyEnv):
         self.grasped_num = 0
         self.grasp_step = 0
         self.info["completion"] = "Failed"
+        self.open_gripper()
         self.before_grasp(show=False)
         return self.observation
 
@@ -211,6 +219,7 @@ class GraspRobot(MujocoPhyEnv):
         self.grasped_num = 0
         self.grasp_step = 0
         self.info["completion"] = "Failed"
+        self.open_gripper()
         self.before_grasp(show=False)
         return self.observation
 

@@ -1,6 +1,21 @@
 """
-简单实现静止障碍车自动避障
+Carla自动驾驶避障演示程序
+
+模块名称: carla_obstacle_avoidance
+功能描述: 在Carla模拟器中实现静止障碍物的自动检测和避让
+核心算法: 纯追踪算法(Pure Pursuit)控制车辆转向
+
+依赖库:
+    - carla: CARLA模拟器API
+    - numpy: 数值计算
+    - opencv-python: 图像处理
+    - math: 数学计算
+
+运行环境:
+    - Carla模拟器运行在 localhost:2000
+    - Python 3.7+
 """
+
 
 import carla
 import time
