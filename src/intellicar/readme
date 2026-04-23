@@ -1,0 +1,69 @@
+IntelliCar
+智能车辆视觉感知项目
+面向自动驾驶车辆、城市场景仿真下目标检测与识别的计算机视觉技术应用
+
+---
+项目简介
+本项目基于YOLO算法训练检测模型，实现图像目标检测功能。依托CARLA自动驾驶仿真平台完成场景仿真，并完成与ROS系统的集成开发，实现自动驾驶环境下的视觉感知与智能决策。
+![项目封面图](imgs/portada-edit.jpg)
+工具与技术栈
+- 数据集：结合公开数据集，依托Roboflow平台自制专属数据集，补充多天气、多环境、多路况场景图像数据，完成数据集整合与标注优化。[Roboflow 公开数据集链接](https://universe.roboflow.com/carla-awmfg/carladataset/model/5)（注：该链接当前解析失败，可通过Roboflow平台搜索“carladataset”获取）
+- 仿真平台：采用开源自动驾驶仿真工具 CARLA 作为核心仿真环境。[CARLA 官方网站](https://carla.org/)、[CARLA 开源仓库](https://github.com/carla-simulator/carla)
+- 模型训练：基于Ultralytics 最新版本 YOLOv8 算法搭建检测模型，完成训练与优化。[YOLOv8 开源仓库](https://github.com/ultralytics/ultralytics)
+- 机器人操作系统：利用 ROS 运行模型推理预测，搭载辅助决策算法模块，实现感知信息下发与逻辑控制。
+- 通信中间件：通过 ROS-Bridge 搭建 CARLA 与 ROS 之间的数据通信桥梁，完成跨平台数据交互。[ROS-Bridge 开源仓库](https://github.com/carla-simulator/ros-bridge)
+![整体系统架构图](imgs/global_diagram.png)
+
+---
+模型性能指标
+![归一化混淆矩阵](imgs/confusion_matrix_normalized.png)
+![精确率-召回率曲线](imgs/pr-curve.png)
+![模型训练综合指标](imgs/results.png)
+
+---
+实验成果展示
+![模型推理效果](imgs/inferencia.png)
+![多场景检测拼接演示](imgs/collage-demo.png)
+信号灯识别与紧急制动控制模块
+![信号灯检测任务架构图](imgs/traffic_light_task_diagram_.jpg)
+![传统颜色分割识别效果](imgs/classic_color_segmentation.png)
+
+---
+项目完整报告
+项目详细技术文档与实验分析详见：Memory.pdf
+功能演示视频
+[![演示视频](https://img.youtube.com/vi/j6nA76eiCRw/0.jpg)](https://www.youtube.com/watch?v=j6nA76eiCRw)（注：该视频链接当前无法访问）
+
+---
+English Version
+Application of Computer Vision Techniques for Object Detection and Recognition in Urban Environment Simulation oriented to Autonomous Driving Vehicles
+
+---
+INTRODUCTION
+This project is focus on image object detection by training a model using YOLO. Simulations are done on CARLA Simulator and a integration with ROS has been developed.
+![A](imgs/portada-edit.jpg)
+TOOLS
+- Dataset: We create our custom dataset, using Roboflow Platform, by the integration of some existing datasets and the addition of multiple images of scenarios with different environmental and weather conditions. [Dataset on Roboflow Platform](https://universe.roboflow.com/carla-awmfg/carladataset/model/5) (Note: The link cannot be accessed currently, please search "carladataset" on Roboflow Platform)
+- Simulator: We use the open-source simulator for autonomous driving systems CARLA. [CARLA web page](https://carla.org/)、[CARLA Github](https://github.com/carla-simulator/carla)
+- Model Training: Model based on newest version of YOLO (YOLOv8) from Ultralytics. [YOLOv8 Github](https://github.com/ultralytics/ultralytics)
+- ROS: Running model inference for prediction and extra decission tasks modules.
+- ROS-Bridge: CARLA - ROS communication. [ROS-Bridge Github](https://github.com/carla-simulator/ros-bridge)
+![A](imgs/global_diagram.png)
+MODEL PERFORMANCE:
+![A](imgs/confusion_matrix_normalized.png)
+![A](imgs/pr-curve.png)
+![A](imgs/results.png)
+
+---
+EXPERIMENTS RESULTS:
+![A](imgs/inferencia.png)
+![A](imgs/collage-demo.png)
+TRAFFIC LIGHT STATE AND EMERGENCY BRAKE SUPERVISOR
+![A](imgs/traffic_light_task_diagram_.jpg)
+![A](imgs/classic_color_segmentation.png)
+
+---
+PROJECT REPORT:
+More info about the project can be found on Memory.pdf
+FUNCTIONAL VIDEO:
+[![DEMO-Video](https://img.youtube.com/vi/j6nA76eiCRw/0.jpg)](https://www.youtube.com/watch?v=j6nA76eiCRw) (Note: The video link cannot be accessed currently)
