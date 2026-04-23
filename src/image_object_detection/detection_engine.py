@@ -7,6 +7,7 @@ import io
 import sys
 import os
 import cv2  # 新增导入
+import numpy as np
 
 
 class ModelLoadError(Exception):
@@ -34,6 +35,8 @@ class DetectionEngine:
         self.conf_threshold = conf_threshold
         # 加载 YOLO 模型（在初始化时完成，避免每次检测重复加载）
         self.model = self._load_model()
+        self._last_error_time = 0.0
+        self._error_count = 0
 
     def _load_model(self):
         """
@@ -53,6 +56,7 @@ class DetectionEngine:
         sys.stdout = io.StringIO()
         sys.stderr = io.StringIO()
 
+        model = None
         try:
             # 判断是本地文件还是官方模型名
             if os.path.isfile(self.model_path):
@@ -60,7 +64,6 @@ class DetectionEngine:
             else:
                 # 尝试作为 Ultralytics 官方模型加载（会自动下载）
                 model = YOLO(self.model_path)
-            return model
         except FileNotFoundError as e:
             raise ModelLoadError(f"Model file not found: {self.model_path}") from e
         except RuntimeError as e:
@@ -77,6 +80,13 @@ class DetectionEngine:
             raise ModelLoadError(f"Unexpected error loading YOLO model: {e}") from e
         finally:
             sys.stdout, sys.stderr = old_stdout, old_stderr
+        if model is None:
+            raise ModelLoadError(f"Unexpected error loading YOLO model: {self.model_path}")
+        try:
+            model.fuse()
+        except Exception:
+            pass
+        return model
 
     def _estimate_distance(self, box_height, known_height=1.6, focal_length=700):
         """根据检测框高度估算距离（米）"""
@@ -93,6 +103,174 @@ class DetectionEngine:
         else:
             return "SAFE"
 
+    def _color_for_class(self, class_id: int):
+        palette = (
+            (255, 56, 56),
+            (255, 157, 151),
+            (255, 112, 31),
+            (255, 178, 29),
+            (207, 210, 49),
+            (72, 249, 10),
+            (146, 204, 23),
+            (61, 219, 134),
+            (26, 147, 52),
+            (0, 212, 187),
+            (44, 153, 168),
+            (0, 194, 255),
+            (52, 69, 147),
+            (100, 115, 255),
+            (0, 24, 236),
+            (132, 56, 255),
+            (82, 0, 133),
+            (203, 56, 255),
+            (255, 149, 200),
+            (255, 55, 199),
+        )
+        return palette[class_id % len(palette)]
+
+    def _annotate(self, frame: np.ndarray, result):
+        boxes = getattr(result, "boxes", None)
+        if boxes is None:
+            return frame
+        try:
+            box_count = len(boxes)
+        except Exception:
+            box_count = 0
+        if box_count == 0:
+            return frame
+
+        annotated_frame = frame.copy()
+        names = getattr(result, "names", None) or getattr(self.model, "names", {}) or {}
+
+        xyxy = getattr(boxes, "xyxy", None)
+        cls = getattr(boxes, "cls", None)
+        conf = getattr(boxes, "conf", None)
+        if xyxy is None:
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                class_id = int(box.cls[0]) if hasattr(box, "cls") else 0
+                score = float(box.conf[0]) if hasattr(box, "conf") else 0.0
+                name = names.get(class_id, str(class_id))
+                color = self._color_for_class(class_id)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(
+                    annotated_frame,
+                    f"{name} {score:.2f}",
+                    (x1, max(0, y1 - 7)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    color,
+                    2,
+                )
+                box_height = y2 - y1
+                distance = self._estimate_distance(box_height)
+                danger = self._get_danger_level(distance)
+                cv2.putText(
+                    annotated_frame,
+                    f"{danger} {distance:.1f}m",
+                    (x1, max(0, y1 - 24)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                    2,
+                )
+            return annotated_frame
+
+        try:
+            xyxy_np = xyxy
+            if hasattr(xyxy_np, "cpu"):
+                xyxy_np = xyxy_np.cpu()
+            if hasattr(xyxy_np, "numpy"):
+                xyxy_np = xyxy_np.numpy()
+            xyxy_np = np.asarray(xyxy_np, dtype=np.float32)
+        except Exception:
+            xyxy_np = None
+
+        try:
+            cls_np = cls
+            if hasattr(cls_np, "cpu"):
+                cls_np = cls_np.cpu()
+            if hasattr(cls_np, "numpy"):
+                cls_np = cls_np.numpy()
+            cls_np = np.asarray(cls_np, dtype=np.int32)
+        except Exception:
+            cls_np = None
+
+        try:
+            conf_np = conf
+            if hasattr(conf_np, "cpu"):
+                conf_np = conf_np.cpu()
+            if hasattr(conf_np, "numpy"):
+                conf_np = conf_np.numpy()
+            conf_np = np.asarray(conf_np, dtype=np.float32)
+        except Exception:
+            conf_np = None
+
+        if xyxy_np is None or cls_np is None or conf_np is None:
+            for box in boxes:
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                class_id = int(box.cls[0]) if hasattr(box, "cls") else 0
+                score = float(box.conf[0]) if hasattr(box, "conf") else 0.0
+                name = names.get(class_id, str(class_id))
+                color = self._color_for_class(class_id)
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(
+                    annotated_frame,
+                    f"{name} {score:.2f}",
+                    (x1, max(0, y1 - 7)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    color,
+                    2,
+                )
+                box_height = y2 - y1
+                distance = self._estimate_distance(box_height)
+                danger = self._get_danger_level(distance)
+                cv2.putText(
+                    annotated_frame,
+                    f"{danger} {distance:.1f}m",
+                    (x1, max(0, y1 - 24)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 0, 255),
+                    2,
+                )
+            return annotated_frame
+
+        xyxy_int = xyxy_np.astype(np.int32, copy=False)
+        for (x1, y1, x2, y2), class_id, score in zip(xyxy_int, cls_np, conf_np):
+            x1i = int(x1)
+            y1i = int(y1)
+            x2i = int(x2)
+            y2i = int(y2)
+            class_id_int = int(class_id)
+            score_float = float(score)
+            name = names.get(class_id_int, str(class_id_int))
+            color = self._color_for_class(class_id_int)
+            cv2.rectangle(annotated_frame, (x1i, y1i), (x2i, y2i), color, 2)
+            cv2.putText(
+                annotated_frame,
+                f"{name} {score_float:.2f}",
+                (x1i, max(0, y1i - 7)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                2,
+            )
+            box_height = y2i - y1i
+            distance = self._estimate_distance(box_height)
+            danger = self._get_danger_level(distance)
+            cv2.putText(
+                annotated_frame,
+                f"{danger} {distance:.1f}m",
+                (x1i, max(0, y1i - 24)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 255),
+                2,
+            )
+        return annotated_frame
+
     def detect(self, frame):
         """
         对单帧图像执行目标检测。
@@ -105,45 +283,31 @@ class DetectionEngine:
                 - annotated_frame (np.ndarray): 带有检测框、标签和置信度的可视化图像（HWC, BGR 格式）
                 - results (List[ultralytics.engine.results.Results]): 原始检测结果对象列表（通常长度为1）
         """
-        # 保存原始输出流
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-
-        # 临时静音 YOLO 的 verbose 输出（如 "image 1/1 ..."）
-        sys.stdout = io.StringIO()
-        sys.stderr = io.StringIO()
-
         try:
-            # 执行推理：传入图像、置信度阈值，并关闭详细日志（verbose=False）
             results = self.model(frame, conf=self.conf_threshold, verbose=False)
-            annotated_frame = results[0].plot()   # 获取 YOLO 默认标注图
-
-            # ---------- 新增：添加距离估计和危险等级 ----------
-            if results[0].boxes is not None:
-                boxes = results[0].boxes
-                for box in boxes:
-                    # 获取坐标 (x1, y1, x2, y2)
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    # 计算框高度
-                    box_height = y2 - y1
-                    # 估算距离
-                    distance = self._estimate_distance(box_height)
-                    # 判定危险等级
-                    danger = self._get_danger_level(distance)
-                    # 准备显示的文字
-                    info_text = f"{danger} {distance:.1f}m"
-                    # 在框的上方绘制文字（y1-15 偏移避免与原始标签重叠）
-                    cv2.putText(annotated_frame, info_text, (x1, y1 - 15),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            # -------------------------------------------------
-
+            result0 = results[0] if results else None
+            if result0 is None:
+                return frame, []
+            annotated_frame = self._annotate(frame, result0)
             return annotated_frame, results
         except Exception as e:
-            # 不抛出异常，而是返回原图以维持流程
-            print(f"⚠️ Warning: Detection failed on current frame: {e}")
-            return frame.copy(), []
-        finally:
-            # 恢复标准输出
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
+            import time
+
+            now = time.time()
+            self._error_count += 1
+            if now - self._last_error_time >= 2.0:
+                print(f"⚠️ Warning: Detection failed on current frame: {e} (errors={self._error_count})")
+                self._last_error_time = now
+            return frame, []
+
+    def detect_batch(self, sources):
+        results = self.model(sources, conf=self.conf_threshold, verbose=False)
+        annotated_frames = []
+        for r in results:
+            base = getattr(r, "orig_img", None)
+            if base is None:
+                annotated_frames.append(None)
+                continue
+            annotated_frames.append(self._annotate(base, r))
+        return annotated_frames, results
 
