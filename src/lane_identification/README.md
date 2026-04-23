@@ -50,7 +50,7 @@ pip install tkinter  # 通常Python自带
    ```
 3. 运行主程序：
    ```bash
-   python lane_detection_app.py
+   python software_package\main.py
    ```
 
 ### 方法二：从源码构建
@@ -68,7 +68,7 @@ pip install tkinter  # 通常Python自带
 3. 安装依赖并运行：
    ```bash
    pip install -r requirements.txt
-   python lane_detection_app.py
+   python software_package\main.py
    ```
 
 ## 快速开始
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 ## 使用说明
 
 ### 基本操作流程
-1. **启动应用**：运行 `lane_detection_app.py`
+1. **启动应用**：运行 `software_package\main.py`
 2. **选择图片**：点击"选择道路图片"按钮，选择要分析的图像文件
 3. **查看原图**：原图将显示在左侧面板
 4. **开始检测**：点击"检测道路方向"按钮开始分析
