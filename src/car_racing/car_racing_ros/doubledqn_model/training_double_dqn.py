@@ -1,3 +1,22 @@
+"""
+================================================================================
+Double DQN 训练脚本
+================================================================================
+训练 Double DQN 智能体玩 CarRacing-v3 游戏。
+
+Double DQN 相对于 DQN 的改进:
+================================================================================
+1. Double DQN: 解决 Q 值过估计问题
+2. Soft Update: 更平滑的目标网络更新
+3. 梯度裁剪: 防止梯度爆炸
+4. 学习率调度: 自动调整学习率
+
+与 DQN 训练脚本的主要区别:
+- 配置文件不同
+- 使用 DoubleDQNAgent
+- 支持学习率调度器和梯度裁剪
+================================================================================
+"""
 import os
 import sys
 import matplotlib
@@ -11,15 +30,11 @@ import gymnasium.wrappers as gym_wrap
 import matplotlib.pyplot as plt
 import numpy as np
 
-from double_dqn import plot_reward
-from double_dqn import DoubleDQNAgent
-
-# Adjust path to import from parent directory
+# 添加路径
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from double_dqn_model.double_dqn import DoubleDQNAgent
-from dqn_model.DQN_model import SkipFrame
 
-from double_dqn_model.double_dqn import plot_reward
+# 导入 DoubleDQN 智能体（使用新模块）
+from doubledqn_agent import DoubleDQNAgent as Agent, SkipFrame, plot_reward
 
 from gymnasium.spaces import Box
 from tensordict import TensorDict
@@ -30,124 +45,149 @@ is_ipython = 'inline' in matplotlib.get_backend()
 if is_ipython:
     from IPython import display
 
+# 开启交互式绘图
 plt.ion()
 
-# Environment setup
-env = gym.make("CarRacing-v3", continuous=False)
-env = SkipFrame(env, skip=4)
-from gymnasium.wrappers import GrayscaleObservation, ResizeObservation, FrameStackObservation
-env = GrayscaleObservation(env)
-env = ResizeObservation(env, (84, 84))
-env = FrameStackObservation(env, stack_size=4)
 
-# Initialize environment and get state shape
+# ================================================================================
+# 1. 环境设置
+# ================================================================================
+print("=" * 50)
+print("正在初始化环境...")
+print("=" * 50)
+
+# 创建环境
+env = gym.make("CarRacing-v2", continuous=False)
+
+# 预处理
+env = SkipFrame(env, skip=4)
+
+from gymnasium.wrappers import GrayScaleObservation, ResizeObservation, FrameStack
+
+env = GrayScaleObservation(env)
+env = ResizeObservation(env, (84, 84))
+env = FrameStack(env, num_stack=4)
+
+# 重置环境
 state, info = env.reset()
 action_n = env.action_space.n
-print(f"Action space size: {action_n}")
-print(f"Action space details: {env.action_space}")
 
-# Ensure correct config path
+print(f"动作空间大小: {action_n}")
+print(f"状态空间形状: {state.shape}")
+print("环境初始化完成！")
+print("=" * 50)
+
+
+# ================================================================================
+# 2. 智能体初始化
+# ================================================================================
+print("\n正在创建 DoubleDQN 智能体...")
+
 config_path = Path(__file__).parent.parent / 'configs' / 'double_dqn.yaml'
 
-# Agent initialization
-driver = DoubleDQNAgent(
+driver = Agent(
     state_space_shape=state.shape,
     action_n=action_n,
     config_path=config_path,
-    load_state=False,  # Explicitly set to False if not loading a model
-    load_model=None    # Set to model filename if loading
+    load_state=False,
+    load_model=None
 )
 
-# Verify config loaded
-print(f"Using tau: {driver.tau}")
-print(f"Target update every: {driver.update_target_every} steps")
+print(f"使用设备: {driver.device}")
+print(f"折扣因子 (gamma): {driver.gamma}")
+print(f"软更新系数 (tau): {driver.tau}")
+print(f"目标网络更新间隔: {driver.update_target_every}")
+print(f"初始探索率 (epsilon): {driver.epsilon}")
+print(f"学习率: {driver.hyperparameters.get('lr', 0.0001)}")
 
-# Training parameters
+if driver.scheduler:
+    print(f"学习率调度: StepLR (step={driver.scheduler.step_size}, gamma={driver.scheduler.gamma})")
+
+print("智能体创建完成！")
+
+
+# ================================================================================
+# 3. 训练参数
+# ================================================================================
 batch_n = 32
-play_n_episodes = 2000  # Keep low for quick testing, adjust as needed
-episode_epsilon_list = []
+play_n_episodes = 2000
+
 episode_reward_list = []
 episode_length_list = []
 episode_loss_list = []
+episode_epsilon_list = []
 episode_date_list = []
 episode_time_list = []
-episode = 0
-timestep_n = 2
-when2learn = 4  # in timesteps
-when2sync = 5000  # in timesteps
-when2save = 100000  # in timesteps
-when2report = 5000  # in timesteps
-when2eval = 50000  # in timesteps
-when2log = 10  # in episodes
-report_type = 'plot'  # 'text', 'plot', None
 
-# Training loop
-while episode <= play_n_episodes:
+episode = 0
+timestep_n = 0
+when2learn = 4
+when2log = 10
+
+report_type = 'plot'
+
+
+# ================================================================================
+# 4. 训练主循环
+# ================================================================================
+print("\n" + "=" * 50)
+print("开始训练 DoubleDQN！")
+print("=" * 50)
+
+while episode < play_n_episodes:
     episode += 1
     episode_reward = 0
     episode_length = 0
-    updating = True
     loss_list = []
     episode_epsilon_list.append(driver.epsilon)
-
-    while updating:
+    
+    state, info = env.reset()
+    
+    done = False
+    while not done:
         timestep_n += 1
         episode_length += 1
-
+        
+        # 选择动作
         action = driver.take_action(state)
+        
+        # 与环境交互
         new_state, reward, terminated, truncated, info = env.step(action)
         episode_reward += reward
+        
+        # 存储经验
         driver.store(state, action, reward, new_state, terminated)
+        
         state = new_state
-        updating = not (terminated or truncated)
-
-        if timestep_n % when2sync == 0:
-            # Sync target network manually (Double DQN handles this internally, but we can enforce it)
-            driver.target_net.load_state_dict(driver.policy_net.state_dict())
-
-        if timestep_n % when2save == 0:
-            driver.save(driver.save_dir, 'DoubleDQN')
-
+        done = terminated or truncated
+        
+        # 训练网络
         if timestep_n % when2learn == 0 and len(driver.buffer) >= batch_n:
-            q, loss = driver.update_net(batch_n)
+            q_value, loss = driver.update_net(batch_n)
             loss_list.append(loss)
-
-        if timestep_n % when2report == 0 and report_type == 'text':
-            print(f'Report: {timestep_n} timestep')
-            print(f'    episodes: {episode}')
-            print(f'    n_updates: {driver.n_updates}')
-            print(f'    epsilon: {driver.epsilon}')
-
-        if timestep_n % when2eval == 0 and report_type == 'text':
-            rewards_tensor = torch.tensor(episode_reward_list, dtype=torch.float)
-            eval_reward = torch.clone(rewards_tensor[-50:])
-            mean_eval_reward = round(torch.mean(eval_reward).item(), 2)
-            std_eval_reward = round(torch.std(eval_reward).item(), 2)
-
-            lengths_tensor = torch.tensor(episode_length_list, dtype=torch.float)
-            eval_length = torch.clone(lengths_tensor[-50:])
-            mean_eval_length = round(torch.mean(eval_length).item(), 2)
-            std_eval_length = round(torch.std(eval_length).item(), 2)
-
-            print(f'Evaluation: {timestep_n} timestep')
-            print(f'    reward {mean_eval_reward}±{std_eval_reward}')
-            print(f'    episode length {mean_eval_length}±{std_eval_length}')
-            print(f'    episodes: {episode}')
-            print(f'    n_updates: {driver.n_updates}')
-            print(f'    epsilon: {driver.epsilon}')
-
-    state, info = env.reset()
-
+        
+        # 打印训练进度
+        if report_type == 'text' and timestep_n % 5000 == 0:
+            print(f"\n[t={timestep_n}] Episode {episode}")
+            print(f"    epsilon: {driver.epsilon:.4f}")
+            print(f"    n_updates: {driver.n_updates}")
+            if driver.scheduler:
+                print(f"    learning rate: {driver.get_current_lr():.6f}")
+    
+    # 记录结果
     episode_reward_list.append(episode_reward)
     episode_length_list.append(episode_length)
     episode_loss_list.append(np.mean(loss_list) if loss_list else 0)
+    
     now_time = datetime.datetime.now()
-    episode_date_list.append(now_time.date().strftime('%Y-%m-%d'))
-    episode_time_list.append(now_time.time().strftime('%H:%M:%S'))
-
+    episode_date_list.append(now_time.date().isoformat())
+    episode_time_list.append(now_time.time().isoformat())
+    
+    # 绘图
     if report_type == 'plot':
-        draw_check = plot_reward(episode, episode_reward_list, timestep_n)
-
+        plot_reward(episode, episode_reward_list, timestep_n)
+    
+    # 保存日志
     if episode % when2log == 0:
         driver.write_log(
             episode_date_list,
@@ -156,28 +196,86 @@ while episode <= play_n_episodes:
             episode_length_list,
             episode_loss_list,
             episode_epsilon_list,
-            log_filename='DoubleDQN_log_test.csv'
+            log_filename='DoubleDQN_log.csv'
         )
+    
+    # 打印结果
+    if episode % 10 == 0:
+        recent_rewards = episode_reward_list[-10:]
+        mean_reward = np.mean(recent_rewards)
+        lr_info = f", LR: {driver.get_current_lr():.6f}" if driver.scheduler else ""
+        print(f"Episode {episode}/{play_n_episodes} | "
+              f"Reward: {episode_reward:.1f} | "
+              f"Mean(10): {mean_reward:.1f} | "
+              f"Steps: {episode_length} | "
+              f"Epsilon: {driver.epsilon:.4f}"
+              f"{lr_info}")
 
-if report_type == 'text':
-    rewards_tensor = torch.tensor(episode_reward_list, dtype=torch.float)
-    eval_reward = torch.clone(rewards_tensor[-100:])
-    mean_eval_reward = round(torch.mean(eval_reward).item(), 2)
-    std_eval_reward = round(torch.std(eval_reward).item(), 2)
 
-    lengths_tensor = torch.tensor(episode_length_list, dtype=torch.float)
-    eval_length = torch.clone(lengths_tensor[-100:])
-    mean_eval_length = round(torch.mean(eval_length).item(), 2)
-    std_eval_length = round(torch.std(eval_length).item(), 2)
+# ================================================================================
+# 5. 评估
+# ================================================================================
+print("\n" + "=" * 50)
+print("训练完成！开始评估...")
+print("=" * 50)
 
-    print(f'Final evaluation: {timestep_n} timestep')
-    print(f'    reward {mean_eval_reward}±{std_eval_reward}')
-    print(f'    episode length {mean_eval_length}±{std_eval_length}')
-    print(f'    episodes: {episode}')
-    print(f'    n_updates: {driver.n_updates}')
-    print(f'    epsilon: {driver.epsilon}')
+def evaluate_agent(agent, num_episodes=5, render=False):
+    """
+    评估训练好的智能体
+    
+    评估时:
+    - epsilon = 0: 完全利用
+    - 使用固定种子
+    - 计算平均得分
+    """
+    render_mode = "human" if render else "rgb_array"
+    eval_env = gym.make("CarRacing-v2", continuous=False, render_mode=render_mode)
+    eval_env = SkipFrame(eval_env, skip=4)
+    eval_env = GrayScaleObservation(eval_env)
+    eval_env = ResizeObservation(eval_env, (84, 84))
+    eval_env = FrameStack(eval_env, num_stack=4)
+    
+    agent.epsilon = 0
+    
+    scores = []
+    for ep in range(num_episodes):
+        state, _ = eval_env.reset(seed=ep)
+        score = 0
+        done = False
+        
+        while not done:
+            action = agent.take_action(state)
+            state, reward, terminated, truncated, _ = eval_env.step(action)
+            score += reward
+            done = terminated or truncated
+        
+        scores.append(score)
+        print(f"评估 Episode {ep+1}/{num_episodes} | 种子: {ep} | 得分: {score:.1f}")
+    
+    eval_env.close()
+    return np.mean(scores)
 
-driver.save(driver.save_dir, 'DoubleDQN')
+
+avg_score = evaluate_agent(driver, num_episodes=5, render=True)
+
+print("=" * 50)
+print(f"评估完成！平均得分: {avg_score:.1f}")
+if avg_score >= 900:
+    print("🎉 优秀！DoubleDQN 表现优异！")
+elif avg_score >= 700:
+    print("👍 良好！")
+elif avg_score >= 400:
+    print("📈 一般")
+else:
+    print("⚠️ 建议继续训练")
+print("=" * 50)
+
+
+# ================================================================================
+# 6. 保存
+# ================================================================================
+print("\n正在保存最终模型...")
+driver.save(driver.save_dir, 'DoubleDQN_final')
 driver.write_log(
     episode_date_list,
     episode_time_list,
@@ -185,47 +283,9 @@ driver.write_log(
     episode_length_list,
     episode_loss_list,
     episode_epsilon_list,
-    log_filename='DoubleDQN_log_test.csv'
+    log_filename='DoubleDQN_log.csv'
 )
+
 env.close()
 plt.ioff()
-
-# Evaluation Mode
-def evaluate_agent(agent, num_episodes=2, render=True):
-    """Evaluate the trained agent with visualization"""
-    if render:
-        env = gym.make("CarRacing-v3", continuous=False, render_mode="human")
-    else:
-        env = gym.make("CarRacing-v3", continuous=False, render_mode="rgb_array")
-    
-    env = SkipFrame(env, skip=4)  # Use SkipFrame from DQN_model.py
-    env = GrayscaleObservation(env)
-    env = ResizeObservation(env, (84, 84))
-    env = FrameStackObservation(env, stack_size=4)
-    
-    agent.epsilon = 0  # Disable exploration
-    seeds_list = [i for i in range(num_episodes)]
-    scores = []
-    
-    for episode, seed in enumerate(seeds_list):
-        state, info = env.reset(seed=seed)
-        score = 0
-        updating = True
-        
-        while updating:
-            action = agent.take_action(state)
-            state, reward, terminated, truncated, info = env.step(action)
-            score += reward
-            updating = not (terminated or truncated)
-        
-        scores.append(score)
-        print(f"Evaluation Episode {episode+1}/{num_episodes} | Seed: {seed} | Score: {score:.1f}")
-    
-    env.close()
-    return np.mean(scores)
-
-# Run evaluation after training
-print("\n=== Starting Evaluation ===")
-avg_score = evaluate_agent(driver, num_episodes=2)
-print(f"\nAverage evaluation score: {avg_score:.1f}")
-plt.show()
+print("\n训练脚本执行完毕！")

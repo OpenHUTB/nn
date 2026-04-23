@@ -6,46 +6,88 @@
 import cv2
 import numpy as np
 from typing import Dict, Any, Tuple
+from PIL import Image, ImageDraw, ImageFont
 from config import AppConfig
+
 
 class Visualizer:
     """可视化引擎"""
-    
+
     def __init__(self, config: AppConfig):
         self.config = config
         self._setup_colors()
-    
+        self._setup_font()
+
     def _setup_colors(self):
         """设置颜色方案"""
         self.colors = {
             # 道路相关
             'road_area': (0, 180, 0, 100),
             'road_boundary': (0, 255, 255, 200),
-            
+
             # 车道线
             'left_lane': (255, 100, 100, 200),
             'right_lane': (100, 100, 255, 200),
             'center_line': (255, 255, 0, 180),
-            
+
             # 路径预测
             'future_path': (255, 0, 255, 180),
             'prediction_points': (255, 150, 255, 220),
-            
+
             # 置信度颜色
             'confidence_high': (0, 255, 0),
             'confidence_medium': (255, 165, 0),
             'confidence_low': (255, 0, 0),
             'confidence_very_low': (128, 128, 128),
-            
+
             # 文本颜色
             'text_primary': (255, 255, 255),
             'text_secondary': (200, 200, 200),
-            
+
             # 状态指示器
             'status_active': (0, 255, 0),
             'status_paused': (255, 165, 0),
             'status_stopped': (255, 0, 0)
         }
+
+    def _setup_font(self):
+        """设置中文字体"""
+        try:
+            # 尝试加载 Windows 系统自带中文字体
+            self.font_large = ImageFont.truetype("msyh.ttc", 28)
+            self.font_medium = ImageFont.truetype("msyh.ttc", 20)
+            self.font_small = ImageFont.truetype("msyh.ttc", 16)
+        except IOError:
+            try:
+                self.font_large = ImageFont.truetype("simhei.ttf", 28)
+                self.font_medium = ImageFont.truetype("simhei.ttf", 20)
+                self.font_small = ImageFont.truetype("simhei.ttf", 16)
+            except IOError:
+                # 备用方案：使用默认字体
+                self.font_large = ImageFont.load_default()
+                self.font_medium = ImageFont.load_default()
+                self.font_small = ImageFont.load_default()
+
+    def _put_chinese_text(self, image: np.ndarray, text: str, position: Tuple[int, int],
+                          color: Tuple[int, int, int], font_size: str = 'medium') -> np.ndarray:
+        """在图像上绘制中文文本"""
+        # 选择字体
+        if font_size == 'large':
+            font = self.font_large
+        elif font_size == 'small':
+            font = self.font_small
+        else:
+            font = self.font_medium
+
+        # 转换为 PIL Image
+        img_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_pil)
+
+        # 绘制文本
+        draw.text(position, text, fill=color[::-1], font=font)
+
+        # 转回 OpenCV 格式
+        return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
     
     def create_visualization(self, image: np.ndarray, 
                            road_info: Dict[str, Any],
@@ -164,73 +206,66 @@ class Visualizer:
         cv2.addWeighted(path_layer, 0.6, image, 0.4, 0, image)
         
         return image
-    
+
     def _draw_info_panel(self, image: np.ndarray, direction_info: Dict[str, Any],
-                        lane_info: Dict[str, Any], is_video: bool = False,
-                        frame_info: Dict[str, Any] = None) -> np.ndarray:
+                         lane_info: Dict[str, Any], is_video: bool = False,
+                         frame_info: Dict[str, Any] = None) -> np.ndarray:
         """绘制信息面板"""
         height, width = image.shape[:2]
-        
+
         # 创建半透明背景
         panel_height = 120
         overlay = image.copy()
         cv2.rectangle(overlay, (0, 0), (width, panel_height), (0, 0, 0, 180), -1)
         cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
-        
+
         # 获取信息
         direction = direction_info.get('direction', '未知')
         confidence = direction_info.get('confidence', 0.0)
         quality = lane_info.get('detection_quality', 0.0)
-        
+
         # 设置颜色
         confidence_color = self._get_confidence_color(confidence)
-        
-        # 绘制方向信息
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        
+
         # 1. 方向
         direction_text = f"方向: {direction}"
-        cv2.putText(image, direction_text, (20, 35), 
-                   font, 1.2, confidence_color, 2)
-        
+        image = self._put_chinese_text(image, direction_text, (20, 10), confidence_color, 'large')
+
         # 2. 置信度
         confidence_text = f"置信度: {confidence:.1%}"
-        cv2.putText(image, confidence_text, (20, 70), 
-                   font, 0.9, confidence_color, 2)
-        
+        image = self._put_chinese_text(image, confidence_text, (20, 45), confidence_color, 'medium')
+
         # 3. 检测质量
         quality_text = f"检测质量: {quality:.1%}"
-        cv2.putText(image, quality_text, (20, 100), 
-                   font, 0.7, self.colors['text_secondary'], 1)
-        
+        image = self._put_chinese_text(image, quality_text, (20, 75), self.colors['text_secondary'], 'small')
+
         # 4. 视频信息
         if is_video and frame_info:
             fps_text = f"FPS: {frame_info.get('fps', 0):.1f}"
             frame_text = f"帧: {frame_info.get('frame_number', 0)}"
-            
-            cv2.putText(image, fps_text, (width - 200, 35), 
-                       font, 0.7, self.colors['text_primary'], 1)
-            cv2.putText(image, frame_text, (width - 200, 65), 
-                       font, 0.7, self.colors['text_primary'], 1)
-        
+
+            image = self._put_chinese_text(image, fps_text, (width - 200, 10),
+                                           self.colors['text_primary'], 'small')
+            image = self._put_chinese_text(image, frame_text, (width - 200, 40),
+                                           self.colors['text_primary'], 'small')
+
         # 5. 概率分布
         if 'probabilities' in direction_info:
             probabilities = direction_info['probabilities']
             start_x = width - 200
-            start_y = 95 if is_video else 30
-            
+            start_y = 70 if is_video else 10
+
             for i, (dir_name, prob) in enumerate(probabilities.items()):
                 y = start_y + i * 25
                 prob_text = f"{dir_name}: {prob:.1%}"
-                
+
                 color = self.colors['text_primary'] if dir_name == direction else self.colors['text_secondary']
-                
-                cv2.putText(image, prob_text, (start_x, y), 
-                           font, 0.7, color, 1)
-        
+
+                image = self._put_chinese_text(image, prob_text, (start_x, y), color, 'small')
+
         return image
-    
-    def _draw_direction_indicator(self, image: np.ndarray, 
+
+    def _draw_direction_indicator(self, image: np.ndarray,
                                 direction_info: Dict[str, Any]) -> np.ndarray:
         """绘制方向指示器"""
         height, width = image.shape[:2]

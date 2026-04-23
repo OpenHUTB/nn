@@ -13,10 +13,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 try:
     from gesture_detector_enhanced import EnhancedGestureDetector
 
-    print("✅ 导入增强版手势检测器 (机器学习)")
+    print("[OK] 导入增强版手势检测器 (机器学习)")
     HAS_ENHANCED_DETECTOR = True
 except ImportError:
-    print("⚠️  未找到增强版检测器，使用原始手势检测器")
+    print("[WARNING] 未找到增强版检测器，使用原始手势检测器")
     from gesture_detector import GestureDetector
 
     HAS_ENHANCED_DETECTOR = False
@@ -61,21 +61,21 @@ class IntegratedDroneSimulation:
         for model_path, model_name in model_candidates:
             if os.path.exists(model_path):
                 file_size = os.path.getsize(model_path)
-                print(f"📁 找到 {model_name}: {file_size / 1024:.1f} KB")
+                print(f"[INFO] 找到 {model_name}: {file_size / 1024:.1f} KB")
 
                 # 检查文件大小是否合理
                 if file_size > 10 * 1024:
                     selected_model = model_path
                     selected_model_name = model_name
-                    print(f"✅ 选择: {model_name}")
+                    print(f"[OK] 选择: {model_name}")
                     break
 
         if selected_model:
-            print(f"🎯 使用模型: {selected_model_name}")
+            print(f"[INFO] 使用模型: {selected_model_name}")
 
             try:
                 from gesture_detector_enhanced import EnhancedGestureDetector
-                print("✅ 导入增强版手势检测器")
+                print("[OK] 导入增强版手势检测器")
 
                 # 使用实际的模型文件
                 self.gesture_detector = EnhancedGestureDetector(
@@ -85,21 +85,21 @@ class IntegratedDroneSimulation:
 
                 # 验证模型是否真正加载成功
                 if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
-                    print(f"✅ 机器学习模型加载成功 ({selected_model_name})")
+                    print(f"[OK] 机器学习模型加载成功 ({selected_model_name})")
                     print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
                 else:
-                    print("⚠️  机器学习模型未加载，回退到规则检测")
+                    print("[WARNING] 机器学习模型未加载，回退到规则检测")
                     self.gesture_detector = EnhancedGestureDetector(use_ml=False)
 
             except ImportError as e:
-                print(f"⚠️  无法导入增强版检测器: {e}")
-                print("✅ 使用原始手势检测器")
+                print(f"[WARNING] 无法导入增强版检测器: {e}")
+                print("[OK] 使用原始手势检测器")
                 from gesture_detector import GestureDetector
                 self.gesture_detector = GestureDetector()
 
         else:
-            print("⚠️  未找到可用的机器学习模型文件")
-            print("✅ 使用原始手势检测器")
+            print("[WARNING] 未找到可用的机器学习模型文件")
+            print("[OK] 使用原始手势检测器")
             from gesture_detector import GestureDetector
             self.gesture_detector = GestureDetector()
 
@@ -140,7 +140,7 @@ class IntegratedDroneSimulation:
         # 手势识别阈值（降低以提高灵敏度）
         # 如果是机器学习模式，阈值可以进一步降低
         if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml') and self.gesture_detector.use_ml:
-            print("✅ 使用机器学习模式，置信度阈值更低")
+            print("[OK] 使用机器学习模式，置信度阈值更低")
             base_threshold = 0.55  # 机器学习可以更低
         else:
             base_threshold = 0.6  # 规则检测需要高一点
@@ -166,13 +166,13 @@ class IntegratedDroneSimulation:
 
         print("无人机初始化完成，等待手势指令...")
 
-        print("无人机仿真系统初始化完成 ✓")
+        print("无人机仿真系统初始化完成 [OK]")
 
         if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
             if self.gesture_detector.use_ml:
-                print("📊 当前模式: 机器学习手势识别")
+                print("[INFO] 当前模式: 机器学习手势识别")
             else:
-                print("📊 当前模式: 规则手势识别")
+                print("[INFO] 当前模式: 规则手势识别")
 
     def _initialize_camera(self):
         """初始化摄像头"""
@@ -197,7 +197,7 @@ class IntegratedDroneSimulation:
                     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fps = cap.get(cv2.CAP_PROP_FPS)
 
-                    print(f"✅ 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
+                    print(f"[OK] 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
                     return cap
                 else:
                     cap.release()
@@ -205,7 +205,7 @@ class IntegratedDroneSimulation:
             else:
                 print(f"摄像头 {camera_id} 无法打开")
 
-        print("❌ 所有摄像头尝试失败，使用虚拟模式")
+        print("[ERROR] 所有摄像头尝试失败，使用虚拟模式")
         return None
 
     def _gesture_recognition_loop(self):
@@ -223,7 +223,7 @@ class IntegratedDroneSimulation:
 
         # 显示虚拟模式提示（如果摄像头未连接）
         if self.cap is None:
-            print("⚠️ 使用虚拟摄像头模式，请连接摄像头进行真实手势识别")
+            print("[WARNING] 使用虚拟摄像头模式，请连接摄像头进行真实手势识别")
 
         while self.running:
             if self.paused:
@@ -284,17 +284,24 @@ class IntegratedDroneSimulation:
                 # 处理手势命令（使用降低的阈值）
                 self._process_gesture_command(gesture, confidence)
 
+                # 增强界面显示
+                enhanced_frame = self._enhance_interface(processed_frame, gesture, confidence)
+
                 # 显示手势识别窗口
-                cv2.imshow('Gesture Control', processed_frame)
+                cv2.imshow('Gesture Control', enhanced_frame)
 
             except Exception as e:
                 print(f"手势检测错误: {e}")
                 self.current_frame = frame
                 self.current_gesture = None
 
+                # 增强界面显示（错误情况）
+                enhanced_frame = self._enhance_interface(frame, "error", 0.0)
+                cv2.imshow('Gesture Control', enhanced_frame)
+
                 # 检查退出
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q'):
+            key = cv2.waitKey(10) & 0xFF
+            if key == ord('q') or key == 27:  # q 或 ESC 键退出
                 print("收到退出指令...")
                 self.running = False
                 break
@@ -305,8 +312,160 @@ class IntegratedDroneSimulation:
                 self._debug_gesture_detection()
             elif key == ord('m'):  # 切换模式（如果有多个模型）
                 self._switch_detection_mode()
+            elif key == ord('h'):  # 显示帮助
+                self._show_help()
+            elif key == ord('f'):  # 切换全屏
+                self._toggle_fullscreen()
 
         print("手势识别线程结束")
+
+    def _enhance_interface(self, frame, gesture, confidence):
+        """增强界面显示"""
+        # 创建一个更大的画布，包含摄像头画面和信息面板
+        height, width = frame.shape[:2]
+        panel_width = 300
+        total_width = width + panel_width
+        enhanced_frame = np.ones((height, total_width, 3), dtype=np.uint8) * 20  # 深灰色背景
+        
+        # 复制摄像头画面
+        enhanced_frame[:, :width] = frame
+        
+        # 绘制信息面板边框
+        cv2.rectangle(enhanced_frame, (width, 0), (total_width, height), (50, 50, 50), 2)
+        
+        # 显示标题
+        cv2.putText(enhanced_frame, "DRONE CONTROL", (width + 20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        
+        # 显示手势信息
+        y_offset = 80
+        if gesture and gesture != "no_hand":
+            # 手势名称
+            cv2.putText(enhanced_frame, f"GESTURE: {gesture.upper()}", 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+            y_offset += 30
+            
+            # 置信度
+            confidence_color = (0, 255, 0) if confidence > 0.7 else (0, 255, 255) if confidence > 0.5 else (0, 0, 255)
+            cv2.putText(enhanced_frame, f"CONFIDENCE: {confidence:.2f}", 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, confidence_color, 1)
+            y_offset += 40
+        else:
+            cv2.putText(enhanced_frame, "GESTURE: NO HAND", 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+            y_offset += 40
+        
+        # 显示无人机状态
+        cv2.putText(enhanced_frame, "DRONE STATUS", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        y_offset += 25
+        
+        # 获取无人机状态
+        drone_state = self.drone_controller.get_state()
+        
+        # 状态信息
+        status_info = [
+            f"MODE: {drone_state['mode'].upper()}",
+            f"ARMED: {'YES' if drone_state['armed'] else 'NO'}",
+            f"BATTERY: {drone_state['battery']:.1f}%",
+            f"ALTITUDE: {abs(drone_state['position'][2]):.2f}m"
+        ]
+        
+        for info in status_info:
+            cv2.putText(enhanced_frame, info, 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 255), 1)
+            y_offset += 20
+        
+        y_offset += 10
+        
+        # 显示位置信息
+        cv2.putText(enhanced_frame, "POSITION", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        y_offset += 25
+        
+        pos = drone_state['position']
+        cv2.putText(enhanced_frame, f"X: {pos[0]:.2f}m", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 255, 150), 1)
+        y_offset += 15
+        cv2.putText(enhanced_frame, f"Y: {pos[1]:.2f}m", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 255, 150), 1)
+        y_offset += 15
+        cv2.putText(enhanced_frame, f"Z: {pos[2]:.2f}m", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 255, 150), 1)
+        y_offset += 30
+        
+        # 显示控制提示
+        cv2.putText(enhanced_frame, "CONTROLS", 
+                    (width + 20, y_offset),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        y_offset += 25
+        
+        controls = [
+            "Q/ESC: Exit",
+            "C: Switch Camera",
+            "D: Debug Info",
+            "H: Help",
+            "F: Fullscreen"
+        ]
+        
+        for control in controls:
+            cv2.putText(enhanced_frame, control, 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
+            y_offset += 15
+        
+        # 显示帧率
+        current_time = time.time()
+        if hasattr(self, 'last_frame_time'):
+            fps = 1.0 / (current_time - self.last_frame_time)
+            cv2.putText(enhanced_frame, f"FPS: {fps:.1f}", 
+                        (width + 20, height - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        self.last_frame_time = current_time
+        
+        return enhanced_frame
+
+    def _show_help(self):
+        """显示帮助信息"""
+        print("=" * 60)
+        print("手势控制无人机 - 帮助信息")
+        print("=" * 60)
+        print("手势指令:")
+        print("  张开手掌 - 起飞")
+        print("  握拳 - 降落")
+        print("  胜利手势 - 前进")
+        print("  大拇指 - 后退")
+        print("  食指上指 - 上升")
+        print("  食指向下 - 下降")
+        print("  OK手势 - 悬停")
+        print("  大拇指向下 - 停止")
+        print("=" * 60)
+        print("键盘控制:")
+        print("  Q/ESC - 退出")
+        print("  C - 切换摄像头")
+        print("  D - 显示调试信息")
+        print("  H - 显示帮助")
+        print("  F - 切换全屏")
+        print("  R - 重置无人机位置")
+        print("  T - 手动起飞")
+        print("  L - 手动降落")
+        print("  H - 悬停")
+        print("  S - 停止")
+        print("=" * 60)
+
+    def _toggle_fullscreen(self):
+        """切换全屏模式"""
+        # 简化实现，实际需要更复杂的窗口管理
+        print("全屏模式切换功能已触发")
 
     def _switch_detection_mode(self):
         """切换检测模式（如果有多个可用模型）"""
@@ -410,7 +569,7 @@ class IntegratedDroneSimulation:
 
                 # 添加调试信息
                 print(
-                    f"🎯 检测到手势: {gesture} (置信度: {confidence:.2f}, 阈值: {threshold}) -> 执行: {command} (强度: {intensity:.2f})")
+                    f"[INFO] 检测到手势: {gesture} (置信度: {confidence:.2f}, 阈值: {threshold}) -> 执行: {command} (强度: {intensity:.2f})")
 
                 # 发送命令到控制器
                 self.drone_controller.send_command(command, intensity)
@@ -446,7 +605,7 @@ class IntegratedDroneSimulation:
         target_fps = 60
         frame_delay = 1.0 / target_fps
 
-        print("\n🎮 键盘提示：按 'R' 键重置无人机位置到原点")
+        print("\n[INFO] 键盘提示：按 'R' 键重置无人机位置到原点")
         print("           按 'T' 键手动起飞")
         print("           按 'L' 键手动降落")
         print("           按 'H' 键悬停")
@@ -485,7 +644,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_r]:
                 if ('r' not in self._last_key_press or
                         current_time - self._last_key_press['r'] > 1.0):
-                    print("🎮 键盘：重置无人机位置")
+                    print("[INFO] 键盘：重置无人机位置")
                     self.drone_controller.reset()
                     print("  无人机已重置到原点位置")
                     self._last_key_press['r'] = current_time
@@ -494,7 +653,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_t]:
                 if ('t' not in self._last_key_press or
                         current_time - self._last_key_press['t'] > 1.0):
-                    print("🎮 键盘：起飞")
+                    print("[INFO] 键盘：起飞")
                     self.drone_controller.send_command("takeoff", 0.8)
                     self._last_key_press['t'] = current_time
 
@@ -502,7 +661,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_l]:
                 if ('l' not in self._last_key_press or
                         current_time - self._last_key_press['l'] > 1.0):
-                    print("🎮 键盘：降落")
+                    print("[INFO] 键盘：降落")
                     self.drone_controller.send_command("land", 0.5)
                     self._last_key_press['l'] = current_time
 
@@ -510,7 +669,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_h]:
                 if ('h' not in self._last_key_press or
                         current_time - self._last_key_press['h'] > 1.0):
-                    print("🎮 键盘：悬停")
+                    print("[INFO] 键盘：悬停")
                     self.drone_controller.send_command("hover")
                     self._last_key_press['h'] = current_time
 
@@ -518,7 +677,7 @@ class IntegratedDroneSimulation:
             if keys[pygame.K_s]:
                 if ('s' not in self._last_key_press or
                         current_time - self._last_key_press['s'] > 1.0):
-                    print("🎮 键盘：停止")
+                    print("[INFO] 键盘：停止")
                     self.drone_controller.send_command("stop")
                     self._last_key_press['s'] = current_time
 
@@ -707,7 +866,7 @@ class IntegratedDroneSimulation:
             # 保存日志
             self._save_log()
 
-            print("无人机仿真系统已安全关闭 ✓")
+            print("无人机仿真系统已安全关闭 [OK]")
 
 
 def load_config():
@@ -732,18 +891,18 @@ if __name__ == "__main__":
     try:
         import pygame
 
-        print("✅ Pygame 已安装")
+        print("[OK] Pygame 已安装")
     except ImportError:
-        print("❌ 错误: Pygame 未安装!")
+        print("[ERROR] 错误: Pygame 未安装!")
         print("请运行: pip install pygame")
         sys.exit(1)
 
     try:
         import OpenGL
 
-        print("✅ PyOpenGL 已安装")
+        print("[OK] PyOpenGL 已安装")
     except ImportError:
-        print("❌ 错误: PyOpenGL 未安装!")
+        print("[ERROR] 错误: PyOpenGL 未安装!")
         print("请运行: pip install PyOpenGL PyOpenGL-accelerate")
         sys.exit(1)
 

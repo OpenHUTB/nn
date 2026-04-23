@@ -39,6 +39,8 @@ This project is based on the CARLA simulation platform and implements a basic au
 ├── util/
 │   ├── camera.py                    # Camera utilities
 │   └── data_collector.py            # Data recording module (TODO)
+=======
+│   └── recorder.py                  # Data recording module (TODO)
 ├── videos/
 │   ├── carla_a_dynamic.gif          # Dynamic obstacle avoidance demo
 │   ├── carla_a_dynamic.mp4
