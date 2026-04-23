@@ -90,7 +90,8 @@ def spawn_vehicles(num_vehicles, world, spawn_points):
     return spawned_walkers '''
 
 # Define the map you want to load
-world = client.load_world('Town03')
+# 换一个交通标志多的地图
+world = client.load_world('Town05')
 
 
 # Set up the simulator in synchronous mode
@@ -113,6 +114,9 @@ spawn_points = world.get_map().get_spawn_points()
 num_vehicles = 10
 vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
 
+for v in vehicles:
+    v.set_autopilot(True, traffic_manager.get_port())
+
 #num_walkers = 2
 #walkers = spawn_walkers(num_walkers, world, spawn_points)
 
@@ -131,12 +135,17 @@ except Exception as e:
 
 # Disable Autopilot for manual control
 vehicle.set_autopilot(True, traffic_manager.get_port())
-print("✅ 自动驾驶已启用")
+print("自动驾驶已启用")
+# 开启自动变道
+traffic_manager.auto_lane_change(vehicle, True)
+# 设置全局跟车距离
+traffic_manager.set_global_distance_to_leading_vehicle(2.5)
 #设置遵守交通规则
 traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
 traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
-
+# 减少跟车距离
+traffic_manager.distance_to_leading_vehicle(vehicle, 3.0)
 # Spawn camera
 camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', '1024')
@@ -160,9 +169,22 @@ def image_callback(image):
         image_queue.put(image)
 
 camera.listen(image_callback)
+# 使用相对路径保存记录到的数据
+# 当前文件目录
+current_dirc = os.path.dirname(os.path.abspath(__file__))
+
+# 向上回到 Git 目录
+project_root = os.path.abspath(os.path.join(current_dirc, '..', '..', '..'))
+
+# 拼接 carla 路径
+data_path = os.path.join(
+    project_root,
+    'OutPut',
+    'data01'
+)
 
 # Directory to save images and XML files
-output_dir = r'D:\software\workspace\OutPut\data01'
+output_dir = data_path
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -212,7 +234,8 @@ fov = camera_bp.get_attribute("fov").as_float()
 K = build_projection_matrix(image_w, image_h, fov)
 
 # Define the distance threshold for a clearly visible sign
-DISTANCE_THRESHOLD = 5.0  # Example threshold in meters
+# 扩大检测距离到20米
+DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
 
 # Set to track captured traffic sign locations
 captured_sign_locations = set()
@@ -252,7 +275,8 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                     area = (xmax - xmin) * (ymax - ymin)
 
                     # Set a threshold for the minimum area to capture the sign
-                    min_area_threshold = 13000  # Adjust this value as needed
+                    # 降低“面积阈值”过滤
+                    min_area_threshold = 10  # Adjust this value as needed
 
                     # Check if the bounding box is fully within the image frame
                     if xmin >= 0 and ymin >= 0 and xmax < image_w and ymax < image_h:
@@ -474,7 +498,7 @@ try:
         pygame.event.pump()  # Process event queue for keyboard input
 
         # Handle manual input
-        handle_input(vehicle)
+        # handle_input(vehicle)
 
         # Get the latest image from the queue
         image = image_queue.get()
