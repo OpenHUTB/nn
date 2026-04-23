@@ -47,14 +47,14 @@ def main():
             # 阶段3：轻微左转
             elif i < 700:
                 control.throttle = 0.3
-                control.steer = -0.3
+                control.steer=-0.3
             # 阶段4：减速停车
             else:
-                control.brake = 1.0
+                control.brake=1.0
 
             vehicle.apply_control(control)
 
-            # 视角锁定在车后
+            # 视角锁定在车后面
             trans = vehicle.get_transform()
             spectator.set_transform(carla.Transform(
                 trans.location + carla.Location(x=-12, z=4),
