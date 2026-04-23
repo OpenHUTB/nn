@@ -2,7 +2,6 @@ import gymnasium as gym
 import cv2
 import numpy as np
 
-
 class SkipFrame(gym.Wrapper):
     def __init__(self, env, skip=4):
         super().__init__(env)
@@ -17,7 +16,6 @@ class SkipFrame(gym.Wrapper):
                 break
         return obs, total_reward, terminated, truncated, info
 
-
 class PreProcessObs(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -31,7 +29,6 @@ class PreProcessObs(gym.ObservationWrapper):
         obs = obs / 255.0
         obs = obs[..., None]
         return obs
-
 
 class StackFrames(gym.ObservationWrapper):
     def __init__(self, env, stack=4):
@@ -55,30 +52,20 @@ class StackFrames(gym.ObservationWrapper):
         return self._get_state(), reward, terminated, truncated, info
 
     def _get_state(self):
-        # 返回形状 (stack, h, w) 与 CNN 期望的输入格式一致
         state = np.concatenate(self.frames, axis=-1)
         state = state.transpose(2, 0, 1)
         return state
 
-
 class SmoothActionWrapper(gym.Wrapper):
-    """动作平滑包装器 - 让车辆运行更平滑"""
-
-    def __init__(self, env, alpha=0.85):
+    def __init__(self, env, alpha=0.9):
         super().__init__(env)
         self.alpha = alpha
         self.last_action = None
 
     def step(self, action):
         if self.last_action is not None:
-            # 指数移动平均平滑
             action = self.alpha * action + (1 - self.alpha) * self.last_action
-
-            # 额外的转向动作约束：限制转向变化率
-            action[0] = np.clip(action[0],
-                                self.last_action[0] - 0.1,
-                                self.last_action[0] + 0.1)
-
+            action[0] = np.clip(action[0], self.last_action[0] - 0.08, self.last_action[0] + 0.08)
         self.last_action = action.copy()
         return self.env.step(action)
 
@@ -86,77 +73,52 @@ class SmoothActionWrapper(gym.Wrapper):
         self.last_action = None
         return self.env.reset(**kwargs)
 
-
-class AntiSpinWrapper(gym.Wrapper):
+class TrackBoundaryWrapper(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.last_pos = None
-        self.turn_penalty = 0.2
-        self.stagnation_penalty = 1.0
-        self.speed_reward = 0.3
-        self.max_steer_angle = 0.5
-        self.spin_threshold = 0.15
-        self.position_history = []
+        self.off_track_penalty = 2.0       # 出赛道惩罚大幅提高
+        self.small_steer_penalty = 0.05    # 小角度乱打方向惩罚
+        self.max_steer = 0.55               # 限制转向更温和
+        self.on_track_reward = 0.4          # 在赛道上奖励
+        self.last_progress = 0.0
 
     def step(self, action):
-        # 1. 严格限制最大转向角
-        action[0] = np.clip(action[0], -self.max_steer_angle, self.max_steer_angle)
+        # 强制限制转向，防止冲出去
+        action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
 
-        # 2. 执行动作
         obs, reward, terminated, truncated, info = self.env.step(action)
-
-        # 3. 获取速度（CarRacing-v3 使用 'speed' 键）
         speed = info.get('speed', 0.0)
-        pos = info.get('position', (0, 0))
 
-        # 4. 位置历史
-        self.position_history.append(pos)
-        if len(self.position_history) > 10:
-            self.position_history.pop(0)
+        # ===== 出赛道检测 =====
+        if reward < -0.5:  # CarRacing 内部出赛道会给负奖励
+            reward -= self.off_track_penalty  # 额外重罚
+            # 出赛道立即减速，强制纠正
+            action[1] = 0.0
+            action[2] = 0.2
 
-        # 5. 转向惩罚
-        steer_penalty = abs(action[0]) * (1 - min(1.0, abs(speed))) * self.turn_penalty
+        # ===== 在赛道内奖励 =====
+        if reward > -0.1 and speed > 0.5:
+            reward += self.on_track_reward
 
-        # 6. 原地惩罚
-        stagnation_penalty = 0.0
-        pos_range = np.array([0, 0])
-        if len(self.position_history) >= 10:
-            positions = np.array(self.position_history)
-            pos_range = np.max(positions, axis=0) - np.min(positions, axis=0)
-            if np.all(pos_range < 0.2) and abs(speed) < self.spin_threshold:
-                stagnation_penalty = self.stagnation_penalty
+        # ===== 禁止原地小角度乱摆 =====
+        if abs(action[0]) < 0.08 and speed < 1.0:
+            reward -= self.small_steer_penalty
 
-        # 7. 速度奖励
-        forward_reward = max(0.0, speed) * self.speed_reward
-        backward_penalty = min(0.0, speed) * 0.5
-        speed_reward = forward_reward + backward_penalty
-
-        # 8. 综合奖励
-        reward = reward + speed_reward - steer_penalty - stagnation_penalty
-
-        # 9. 更新位置
-        self.last_pos = pos
-
-        # 10. 极端情况：持续原地转圈直接终止
-        if (len(self.position_history) >= 10 and
-                np.all(pos_range < 0.2) and
-                abs(speed) < self.spin_threshold and
-                abs(action[0]) > 0.2):
+        # ===== 出赛道直接终止 =====
+        if reward < -1.0:
             truncated = True
-            reward -= 5.0
+            reward -= 3.0
 
         return obs, reward, terminated, truncated, info
 
     def reset(self, **kwargs):
-        self.last_pos = None
-        self.position_history = []
+        self.last_progress = 0.0
         return self.env.reset(**kwargs)
 
 def wrap_env(env):
-    """应用所有包装器到环境"""
     env = SkipFrame(env, skip=4)
     env = PreProcessObs(env)
     env = StackFrames(env, stack=4)
-    env = AntiSpinWrapper(env)
-    env = SmoothActionWrapper(env, alpha=0.85)
+    env = TrackBoundaryWrapper(env)
+    env = SmoothActionWrapper(env, alpha=0.9)
     return env
