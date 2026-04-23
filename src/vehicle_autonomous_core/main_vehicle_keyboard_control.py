@@ -46,7 +46,7 @@ def main():
                 control.steer = 0.3
             # 阶段3：轻微左转
             elif i < 700:
-                control.throttle = 0.3
+                control.throttle= 0.3
                 control.steer=-0.3
             # 阶段4：减速停车
             else:
