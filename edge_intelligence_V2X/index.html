@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <link rel="shortcut icon" href="../img/favicon.ico" />
-    <title>V2X路侧智能感知 - 神经网络</title>
+    <title>基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现 - 神经网络</title>
     <link rel="stylesheet" href="../css/theme.css" />
     <link rel="stylesheet" href="../css/theme_extra.css" />
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
@@ -13,7 +13,7 @@
     
       <script>
         // Current page data
-        var mkdocs_page_name = "V2X\u8def\u4fa7\u667a\u80fd\u611f\u77e5";
+        var mkdocs_page_name = "\u57fa\u4e8e YOLOv8n \u7684 V2X \u8def\u4fa7\u667a\u80fd\u611f\u77e5\u7cfb\u7edf\u4f18\u5316\u4e0e\u5b9e\u73b0";
         var mkdocs_page_input_path = "edge_intelligence_V2X/README.md";
         var mkdocs_page_url = null;
       </script>
@@ -44,68 +44,6 @@
                 <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
                 </li>
               </ul>
-              <ul class="current">
-                <li class="toctree-l1 current"><a class="reference internal current" href="#">V2X路侧智能感知</a>
-    <ul class="current">
-    <li class="toctree-l2"><a class="reference internal" href="#1">1. 项目背景与优化动机</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#11">1.1 功能定位</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#12">1.2 优化动机</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#2">2. 核心技术栈与理论基础</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#21">2.1 核心技术栈</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#22">2.2 核心理论基础</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#3">3. 优化整体思路</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#31">3.1 优化总体原则</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#32">3.2 整体技术路线</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#4">4. 针对性优化方案与实现</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#41-yolov8n">4.1 检测引擎：从假检测到真实 YOLOv8n 推理</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#42">4.2 多摄像头机位切换</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#43">4.3 行人闯入安全报警</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#44">4.4 多天气场景支持</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#45-npc">4.5 NPC 交通流优化</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#46-v2x-rsu">4.6 V2X RSU 信息面板</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#5">5. 系统运行效果</a>
-        <ul>
-    <li class="toctree-l3"><a class="reference internal" href="#51">5.1 运行环境</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#52">5.2 运行方式</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#53">5.3 按键操作</a>
-    </li>
-    <li class="toctree-l3"><a class="reference internal" href="#54">5.4 运行效果展示</a>
-    </li>
-        </ul>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#6">6. 功能扩展与未来规划</a>
-    </li>
-    <li class="toctree-l2"><a class="reference internal" href="#7">7. 总结</a>
-    </li>
-    </ul>
-                </li>
-              </ul>
       </div>
     </div>
     </nav>
@@ -120,7 +58,7 @@
         <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
   <ul class="wy-breadcrumbs">
     <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
-      <li class="breadcrumb-item active">V2X路侧智能感知</li>
+      <li class="breadcrumb-item active">基于 YOLOv8n 的 V2X 路侧智能感知系统优化与实现</li>
     <li class="wy-breadcrumbs-aside">
           <a href="https://github.com/OpenHUTB/nn/edit/master/docs/edge_intelligence_V2X/README.md" class="icon icon-github"> 在 GitHub 上编辑</a>
     </li>
@@ -640,9 +578,6 @@ python main.py
               
             </div>
           </div><footer>
-    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
-        <a href=".." class="btn btn-neutral float-left" title="首页"><span class="icon icon-circle-arrow-left"></span> 前一页</a>
-    </div>
 
   <hr/>
 
@@ -667,8 +602,6 @@ python main.py
           <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
         </span>
     
-    
-      <span><a href=".." style="color: #fcfcfc">&laquo; 前一页</a></span>
     
     
   </span>
