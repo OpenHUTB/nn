@@ -68,7 +68,8 @@
       <default class="joint_big">
         <joint damping="5" stiffness="10"/>
         <default class="hip_x">
-          <joint range="-30 10"/>
+          <!-- 👉 1. 这里改了关节角度范围 -->
+          <joint range="-35 15"/>
         </default>
         <default class="hip_z">
           <joint range="-60 35"/>
@@ -200,7 +201,8 @@
   </tendon>
 
   <actuator>
-    <motor name="abdomen_z"       gear="40"  joint="abdomen_z"/>
+    <!-- 👉 2. 这里改了电机齿轮比 -->
+    <motor name="abdomen_z"       gear="45"  joint="abdomen_z"/>
     <motor name="abdomen_y"       gear="40"  joint="abdomen_y"/>
     <motor name="abdomen_x"       gear="40"  joint="abdomen_x"/>
     <motor name="hip_x_right"     gear="40"  joint="hip_x_right"/>
