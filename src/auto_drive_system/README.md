@@ -40,7 +40,6 @@
 ├── util/
 │   ├── camera.py                    # 摄像头相关工具
 │   └── data_collector.py            # 数据记录工具（TODO）
-│   └── recorder.py                  # 数据记录工具（TODO）
 ├── videos/
 │   ├── carla_a_dynamic.gif          # 动态避障演示
 │   ├── carla_a_dynamic.mp4
@@ -54,13 +53,8 @@
 ## 使用说明
 
 ### 环境要求
-<<<<<<< HEAD
 - CARLA 0.9.16
 - Python 3.13
-=======
-- CARLA 0.9.11
-- Python 3.7
-- 依赖库：pygame numpy
 
 ### 快速开始
 ```bash
