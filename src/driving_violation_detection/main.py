@@ -44,15 +44,32 @@ client.set_timeout(60.0)
 def load_map(map_name):
     return client.load_world(map_name)
 
+
+def spawn_vehicle_with_retries(world, blueprint, spawn_points, used_spawn_indices=None):
+    if used_spawn_indices is None:
+        used_spawn_indices = set()
+
+    candidate_indices = [index for index in range(len(spawn_points)) if index not in used_spawn_indices]
+    random.shuffle(candidate_indices)
+
+    for index in candidate_indices:
+        vehicle = world.try_spawn_actor(blueprint, spawn_points[index])
+        if vehicle is not None:
+            used_spawn_indices.add(index)
+            return vehicle, index
+
+    return None, None
+
+
 # Function to spawn vehicles
-def spawn_vehicles(num_vehicles, world, spawn_points):
+def spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices=None):
     vehicle_bp_lib = world.get_blueprint_library().filter('vehicle.*')
     spawned_vehicles = []
+    used_indices = used_spawn_indices if used_spawn_indices is not None else set()
 
     for _ in range(num_vehicles):
         vehicle_bp = random.choice(vehicle_bp_lib)
-        spawn_point = random.choice(spawn_points)
-        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+        vehicle, _ = spawn_vehicle_with_retries(world, vehicle_bp, spawn_points, used_indices)
         if vehicle:
             spawned_vehicles.append(vehicle)
             # print(f"Spawned vehicle: {vehicle.id} at {spawn_point}")
@@ -125,10 +142,11 @@ OVERTAKE_COOLDOWN = 3.0
 
 # Get map spawn points
 spawn_points = world_map.get_spawn_points()
+used_spawn_indices = set()
 
 # Spawn vehicles and walkers
 num_vehicles = 10
-vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
+vehicles = spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices)
 
 for v in vehicles:
     v.set_autopilot(True, traffic_manager.get_port())
@@ -142,7 +160,7 @@ bp_lib = world.get_blueprint_library().filter('*')
 # Spawn vehicle
 vehicle_bp = bp_lib.find('vehicle.audi.a2')
 try:
-    vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
+    vehicle, spawn_index = spawn_vehicle_with_retries(world, vehicle_bp, spawn_points, used_spawn_indices)
     if vehicle is None:
         raise RuntimeError("Failed to spawn vehicle")
 except Exception as e:
@@ -153,13 +171,13 @@ except Exception as e:
 vehicle.set_autopilot(True, traffic_manager.get_port())
 print("自动驾驶已启用")
 # 开启自动变道
-traffic_manager.auto_lane_change(vehicle, False)
+traffic_manager.auto_lane_change(vehicle, True)
 # 设置全局跟车距离
 traffic_manager.set_global_distance_to_leading_vehicle(BASE_FOLLOW_DISTANCE)
 #设置遵守交通规则
-traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
+traffic_manager.ignore_lights_percentage(vehicle, 100.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
-traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
+traffic_manager.vehicle_percentage_speed_difference(vehicle,-50)
 # 减少跟车距离
 traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
 # Spawn camera
@@ -252,6 +270,7 @@ K = build_projection_matrix(image_w, image_h, fov)
 # Define the distance threshold for a clearly visible sign
 # 扩大检测距离到20米
 DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
+SIGN_FACE_ALIGNMENT_THRESHOLD = 0.2
 
 # Set to track captured traffic sign locations
 captured_sign_locations = set()
@@ -280,7 +299,11 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
 
                 # Use location tuple to check if sign is not already captured
                 sign_location_tuple = (round(obj.location.x, 2), round(obj.location.y, 2), round(obj.location.z, 2))
-                if camera_dot_product > 0 and sign_location_tuple not in captured_sign_locations:
+                if (
+                    camera_dot_product > 0 and
+                    sign_location_tuple not in captured_sign_locations and
+                    is_sign_front_visible(obj, camera_location)
+                ):
                     verts = [v for v in obj.get_world_vertices(carla.Transform())]
                     x_coords = [get_image_point(v, K, world_2_camera)[0] for v in verts]
                     y_coords = [get_image_point(v, K, world_2_camera)[1] for v in verts]
@@ -357,6 +380,33 @@ def create_xml_file(image_name, bboxes, width, height, weather_params):
 # Function to manually compute dot product
 def dot_product(v1, v2):
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+
+
+def vector_length(vector):
+    return np.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
+
+
+def normalized_dot_product(v1, v2):
+    v1_length = vector_length(v1)
+    v2_length = vector_length(v2)
+    if v1_length == 0.0 or v2_length == 0.0:
+        return 0.0
+    return dot_product(v1, v2) / (v1_length * v2_length)
+
+
+def is_sign_front_visible(sign_bbox, camera_location):
+    sign_transform = carla.Transform(sign_bbox.location, sign_bbox.rotation)
+    sign_forward_vector = sign_transform.get_forward_vector()
+    vector_to_camera = camera_location - sign_bbox.location
+    # CARLA traffic sign bounding boxes often use a forward vector that points away from
+    # the printable face, so we flip it here to keep front-facing signs.
+    sign_face_vector = carla.Vector3D(
+        x=-sign_forward_vector.x,
+        y=-sign_forward_vector.y,
+        z=-sign_forward_vector.z
+    )
+    facing_score = normalized_dot_product(sign_face_vector, vector_to_camera)
+    return facing_score > SIGN_FACE_ALIGNMENT_THRESHOLD
 
 
 def get_speed(vehicle_actor):
@@ -536,7 +586,10 @@ def try_overtake_blocking_vehicle(vehicle, world, traffic_manager, world_map, cu
 
 
 def update_autopilot_safety(vehicle, world, traffic_manager, world_map, current_time, last_overtake_time):
-    if is_right_turn_imminent(vehicle, world_map):
+    right_turn_imminent = is_right_turn_imminent(vehicle, world_map)
+    traffic_manager.auto_lane_change(vehicle, not right_turn_imminent)
+
+    if right_turn_imminent:
         traffic_manager.vehicle_percentage_speed_difference(vehicle, TURNING_SPEED_DIFFERENCE)
         traffic_manager.distance_to_leading_vehicle(vehicle, TURNING_FOLLOW_DISTANCE)
     else:
