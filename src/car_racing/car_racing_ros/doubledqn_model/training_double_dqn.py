@@ -19,6 +19,7 @@ Double DQN 相对于 DQN 的改进:
 """
 import os
 import sys
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 import matplotlib
 import torch
 import datetime
@@ -124,7 +125,7 @@ timestep_n = 0
 when2learn = 4
 when2log = 10
 
-report_type = 'plot'
+report_type = 'text'
 
 
 # ================================================================================
@@ -256,7 +257,7 @@ def evaluate_agent(agent, num_episodes=5, render=False):
     return np.mean(scores)
 
 
-avg_score = evaluate_agent(driver, num_episodes=5, render=True)
+avg_score = evaluate_agent(driver, num_episodes=5, render=False)
 
 print("=" * 50)
 print(f"评估完成！平均得分: {avg_score:.1f}")
