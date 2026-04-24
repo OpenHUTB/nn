@@ -1,119 +1,109 @@
+# 支持向量机 (SVM)
 
+## 工程化小改动（第三次提交）
 
-# 支持向量机(SVM)
+本次在不改变 SVM 核心训练逻辑的前提下，对 `svm.py` 做了轻量改进，方便复现实验和作业提交。
 
+1. 新增命令行参数入口：
+`--train-file`、`--test-file`、`--learning-rate`、`--reg-lambda`、`--max-iter`、`--out-dir`
+2. 将 SVM 超参数改为可配置：
+学习率、正则化系数、最大迭代次数无需手动修改源码
+3. 新增实验结果自动留档：
+运行后自动生成 `outputs/svm_metrics.json`
 
+### 运行示例
 
-## 问题描述：
+```bash
+python svm.py --learning-rate 0.1 --reg-lambda 0.0 --max-iter 20000 --out-dir outputs
+```
 
-本次作业分为三个部分：
+### 输出文件
 
-1. 使用基于某种核函数（线性，多项式或高斯核函数）的SVM 解决非线性可分的二分类问题，数
-  据集为train_kernel.txt 及test_kernel.txt。
+- `outputs/svm_metrics.json`
 
-2. 分别使用线性分类器（squared error）、logistic 回归（cross entropy error）以及SVM（hinge error) 解
-  决线性二分类问题，并比较三种模型的效果。数据集为train_linear.txt 及test_linear.txt。
-  三种误差函数定义如下（Bishop P327）：
-![image](http://latex.codecogs.com/gif.latex?E_%7Blinear%7D%3D%5Csum_%7Bn%3D1%7D%5E%7BN%7D%28y_%7Bn%7D%20-t_%7Bn%7D%29%5E%7B2%7D&plus;%5Clambda%20%5Cleft%20%5C%7C%20%5Cmathbf%7Bw%7D%20%5Cright%20%5C%7C%5E%7B2%7D)  
+## 问题描述
 
-![image](http://latex.codecogs.com/gif.latex?E_%7Blogistic%7D%3D%5Csum_%7Bn%3D1%7D%5E%7BN%7Dlog%281&plus;exp%28-y_%7Bn%7Dt_%7Bn%7D%29%29%20&plus;%20%5Clambda%5Cleft%20%5C%7C%20%5Cmathbf%7Bw%7D%20%5Cright%20%5C%7C%5E%7B2%7D) 
+本项目完成了以下三个部分的实验内容：
 
-![image](http://latex.codecogs.com/gif.latex?E_%7BSVM%7D%3D%5Csum_%7Bn%3D1%7D%5E%7BN%7D%5B1-y_%7Bn%7Dt_%7Bn%7D%5D&plus;%5Clambda%20%5Cleft%20%5C%7C%20%5Cmathbf%7Bw%7D%20%5Cright%20%5C%7C%5E%7B2%7D)
+1. **核 SVM 非线性分类**：使用基于 RBF（高斯核）、多项式或线性核函数的 SVM 解决非线性可分的二分类问题。数据集：`train_kernel.txt` 和 `test_kernel.txt`。
+2. **损失函数对比**：分别使用线性分类器（平方误差）、逻辑回归（交叉熵）以及 SVM（合页损失）解决线性二分类问题，并比较三种模型的效果。数据集：`train_linear.txt` 和 `test_linear.txt`。
+3. **多分类 SVM**：使用 One-vs-Rest (OvR) 策略的多分类 SVM 解决三分类问题。数据集：`train_multi.txt` 和 `test_multi.txt`。
 
+### 损失函数定义 (Bishop P327)
 
-  ​
-  其中![image](http://latex.codecogs.com/gif.latex?y_%7Bn%7D%3D%5Cmathbf%7Bw%7D%5E%7BT%7Dx_%7Bn%7D&plus;b),![image](http://latex.codecogs.com/gif.latex?t_%7Bn%7D) 为类别标签。
+- **平方误差 (Squared Error)**: 
+  $$E_{linear} = \sum_{n=1}^{N} (y_n - t_n)^2 + \lambda \| \mathbf{w} \|^2$$
+- **交叉熵 (Cross Entropy)**: 
+  $$E_{logistic} = \sum_{n=1}^{N} \log(1 + \exp(-y_n t_n)) + \lambda \| \mathbf{w} \|^2$$
+- **合页损失 (Hinge Error)**: 
+  $$E_{SVM} = \sum_{n=1}^{N} [1 - y_n t_n]_+ + \lambda \| \mathbf{w} \|^2$$
 
-3. 使用多分类SVM 解决三分类问题。数据集为train_multi.txt 及test_multi.txt。（5%）
+其中 $y_n = \mathbf{w}^T x_n + b$，$t_n$ 为类别标签。
 
+## 数据集
 
+本项目使用的数据集位于 `data/` 目录下，均为 2D 坐标特征数据，包含两维特征 ($x_1, x_2$) 和一类标签 ($t$)。
 
+- **线性数据集**：用于 Part 2 的线性可分二分类测试。
+- **核函数数据集**：用于 Part 1 的非线性二分类测试。
+- **多分类数据集**：用于 Part 3 的三分类测试。
 
+## 项目要求与进度
 
-## 数据集: 
-
- 	MNIST数据集包括60000张训练图片和10000张测试图片。图片样本的数量已经足够训练一个很复杂的模型（例如 CNN的深层神经网络）。它经常被用来作为一个新 的模式识别模型的测试用例。而且它也是一个方便学生和研究者们执行用例的数据集。除此之外，MNIST数据集是一个相对较小的数据集，可以在你的笔记本CPUs上面直接执行
-
-
-
-
-
-## 题目要求： 
-
-- [ ] 请使用代码模板rbm.py，补全缺失部分，尽量不改动主体部分。
-- [ ] 推荐使用python 及numpy 编写主要逻辑代码，适度使用框架。
-
-SVM 线性分类器实现
-
-## 项目概述
-
-本项目实现了一个基于梯度下降法的线性支持向量机(SVM)分类器，用于二分类任务。该实现包含数据加载、模型训练、预测和评估功能。
+- [x] 使用代码模板补全缺失部分，支持核函数和多分类。
+- [x] 使用 Python 及 NumPy 编写主要逻辑代码，不依赖复杂深度学习框架。
+- [x] 提供不同损失函数的性能对比分析。
+- [x] 提供决策边界的可视化（支持环境时）。
 
 ## 文件结构
 
-├── svm.py                # SVM实现主文件
-
-├── data/
-├── train_linear.txt  # 训练数据
-
-└── test_linear.txt   # 测试数据
-
+```text
+├── svm.py                # 基础线性 SVM 实现 (Hinge Loss + 梯度下降)
+├── svm_improved.py       # 改进的核 SVM 实现 (支持 RBF/Linear 核 + 对比 sklearn)
+├── svm_comparison.py     # Part 2：三种损失函数 (Squared/Logistic/Hinge) 的对比
+├── svm_multi.py          # Part 3：多分类 SVM 实现 (One-vs-Rest 策略)
+├── data/                 # 数据集目录
+│   ├── train_linear.txt  # 线性训练集
+│   ├── train_kernel.txt  # 核函数训练集
+│   └── train_multi.txt   # 多分类训练集
 └── README.md             # 本说明文件
-
-## 功能说明
-
-数据加载
-load_data(fname) 函数从文本文件加载数据
-
-数据格式：每行包含两个特征(x1, x2)和一个标签(0或1)
-
-SVM模型
-实现了线性SVM分类器
-
-使用梯度下降法优化目标函数
-
-包含L2正则化项控制模型复杂度
-
-## 主要功能
-数据加载和预处理
-
-模型训练
-
-预测功能
-
-准确率评估
+```
 
 ## 使用方法
-准备训练和测试数据文件(格式见示例)
 
-运行主程序：
+### 1. 运行核 SVM (Part 1)
+```bash
+python src/chap03_SVM/svm_improved.py
+```
+该程序会训练自定义的核 SVM 并与 Scikit-learn 的实现进行准确率对比。
 
-      python svm.py
-   
-程序将输出训练集和测试集的准确率
+### 2. 运行损失函数对比 (Part 2)
+```bash
+python src/chap03_SVM/svm_comparison.py
+```
+该程序将输出线性分类器、逻辑回归和 SVM 在相同线性数据集上的性能差异。
 
-## 参数配置
+### 3. 运行多分类 SVM (Part 3)
+```bash
+python src/chap03_SVM/svm_multi.py
+```
+该程序将使用 One-vs-Rest 策略训练三个二分类器来解决三分类问题。
 
-可在代码中调整以下超参数：
-学习率(learning_rate)
+## 实验结果总结
 
-正则化系数(lambda_)
+- **线性分类**：对于线性可分数据，三种损失函数（平方误差、交叉熵、合页损失）均能达到 **95% 以上** 的准确率。
+- **非线性分类**：引入 RBF 核函数后，自定义 SVM 在非线性数据集上的准确率从约 70% 提升至 **95% 以上**，与 Scikit-learn 的基准实现差异极小。
+- **多分类**：通过 One-vs-Rest (OvR) 策略，线性 SVM 在三分类任务上表现优异，准确率达到 **97% 以上**。
 
-训练轮数(epochs)
+## 主要功能与技术点
 
-## 示例输出
-
-train accuracy: 98.3%
-test accuracy: 97.5%
+- **标准化处理**：所有实验均包含数据标准化步骤，这对 SVM 和核方法的收敛至关重要。
+- **SMO 优化**：`svm_improved.py` 实现了简化版的序列最小优化 (SMO) 算法，支持高效训练。
+- **核函数支持**：实现了线性、RBF（高斯）、多项式和 Sigmoid 核函数。
+- **鲁棒性**：处理了 Windows 环境下的控制台编码问题和特定库版本导致的循环引用问题。
 
 ## 依赖环境
-Python 3.5.2+
-
-NumPy
-
-## 注意事项
-当前实现为线性SVM，适用于线性可分数据
-
-对于非线性问题，可考虑添加核函数扩展
-
-训练数据应标准化以获得更好效果
+- Python 3.x
+- NumPy
+- Matplotlib (可选，用于可视化)
+- Scikit-learn (可选，用于性能基准对比)
