@@ -17,18 +17,19 @@
 
     <!-- 人形机器人根节点 -->
     <body name="pelvis" pos="0 0 1.0">
+      <!-- 添加freejoint允许身体移动 -->
       <freejoint/>
       <geom name="pelvis_geom" type="ellipsoid" size="0.12 0.08 0.05" material="skin_mat" mass="5"/>
 
-      <!-- 躯干 -->
+      <!-- 躯干 (锁定旋转，防止身体转动) -->
       <body name="torso" pos="0 0 0.1">
         <geom name="torso_geom" type="box" size="0.15 0.08 0.2" material="skin_mat" pos="0 0 0.1" mass="8"/>
-        <joint name="torso_joint" type="hinge" axis="0 0 1" range="-45 45" damping="1"/>
+        <joint name="torso_joint" type="hinge" axis="0 0 1" range="-20 20" damping="5"/>
 
         <!-- 头部 -->
         <body name="head" pos="0 0 0.35">
           <geom name="head_geom" type="sphere" size="0.1" material="skin_mat" mass="2"/>
-          <joint name="neck_joint" type="hinge" axis="0 1 0" range="-60 60" damping="0.5"/>
+          <joint name="neck_joint" type="hinge" axis="0 1 0" range="-30 30" damping="2"/>
         </body>
 
         <!-- 左肩 -->
@@ -78,47 +79,47 @@
         </body>
       </body>
 
-      <!-- 左髋 -->
-      <body name="left_hip" pos="-0.08 0 -0.05">
+      <!-- 左髋 (锁定，防止腿交叉) -->
+      <body name="left_hip" pos="-0.10 0 -0.05">
         <geom name="l_hip_geom" type="sphere" size="0.05" material="joint_mat"/>
-        <joint name="left_hip_y" type="hinge" axis="0 0 1" range="-45 45" damping="3"/>
+        <joint name="left_hip_y" type="hinge" axis="0 0 1" range="-45 45" damping="5"/>
 
         <!-- 左大腿 -->
-        <body name="left_thigh" pos="0 0 -0.05">
-          <geom name="l_thigh_geom" type="capsule" size="0.04 0.15" material="skin_mat" mass="3"/>
-          <joint name="left_knee_x" type="hinge" axis="1 0 0" range="-150 0" damping="2"/>
+        <body name="left_thigh" pos="0 0 -0.15">
+          <geom name="l_thigh_geom" type="capsule" size="0.04 0.18" material="skin_mat" mass="3"/>
+          <joint name="left_knee_x" type="hinge" axis="1 0 0" range="-150 0" damping="5"/>
 
           <!-- 左小腿 -->
-          <body name="left_shin" pos="0 0 -0.3">
-            <geom name="l_shin_geom" type="capsule" size="0.03 0.15" material="skin_mat" mass="2"/>
+          <body name="left_shin" pos="0 0 -0.36">
+            <geom name="l_shin_geom" type="capsule" size="0.03 0.18" material="skin_mat" mass="2"/>
 
-            <!-- 左脚 -->
-            <body name="left_foot" pos="0 0 -0.3">
-              <geom name="l_foot_geom" type="box" size="0.06 0.04 0.02" material="skin_mat" pos="0 0 -0.01" mass="0.5"/>
-              <joint name="left_ankle_y" type="hinge" axis="0 1 0" range="-45 45" damping="1"/>
+            <!-- 左脚 (锁定) -->
+            <body name="left_foot" pos="0 0 -0.36">
+              <geom name="l_foot_geom" type="box" size="0.08 0.05 0.02" material="skin_mat" pos="0 0 -0.01" mass="0.5"/>
+              <joint name="left_ankle_y" type="hinge" axis="0 1 0" range="-25 25" damping="3"/>
             </body>
           </body>
         </body>
       </body>
 
-      <!-- 右髋 -->
-      <body name="right_hip" pos="0.08 0 -0.05">
+      <!-- 右髋 (锁定，防止腿交叉) -->
+      <body name="right_hip" pos="0.10 0 -0.05">
         <geom name="r_hip_geom" type="sphere" size="0.05" material="joint_mat"/>
-        <joint name="right_hip_y" type="hinge" axis="0 0 1" range="-45 45" damping="3"/>
+        <joint name="right_hip_y" type="hinge" axis="0 0 1" range="-45 45" damping="5"/>
 
         <!-- 右大腿 -->
-        <body name="right_thigh" pos="0 0 -0.05">
-          <geom name="r_thigh_geom" type="capsule" size="0.04 0.15" material="skin_mat" mass="3"/>
-          <joint name="right_knee_x" type="hinge" axis="1 0 0" range="0 150" damping="2"/>
+        <body name="right_thigh" pos="0 0 -0.15">
+          <geom name="r_thigh_geom" type="capsule" size="0.04 0.18" material="skin_mat" mass="3"/>
+          <joint name="right_knee_x" type="hinge" axis="1 0 0" range="0 150" damping="5"/>
 
           <!-- 右小腿 -->
-          <body name="right_shin" pos="0 0 -0.3">
-            <geom name="r_shin_geom" type="capsule" size="0.03 0.15" material="skin_mat" mass="2"/>
+          <body name="right_shin" pos="0 0 -0.36">
+            <geom name="r_shin_geom" type="capsule" size="0.03 0.18" material="skin_mat" mass="2"/>
 
-            <!-- 右脚 -->
-            <body name="right_foot" pos="0 0 -0.3">
-              <geom name="r_foot_geom" type="box" size="0.06 0.04 0.02" material="skin_mat" pos="0 0 -0.01" mass="0.5"/>
-              <joint name="right_ankle_y" type="hinge" axis="0 1 0" range="-45 45" damping="1"/>
+            <!-- 右脚 (锁定) -->
+            <body name="right_foot" pos="0 0 -0.36">
+              <geom name="r_foot_geom" type="box" size="0.08 0.05 0.02" material="skin_mat" pos="0 0 -0.01" mass="0.5"/>
+              <joint name="right_ankle_y" type="hinge" axis="0 1 0" range="-25 25" damping="3"/>
             </body>
           </body>
         </body>
@@ -127,19 +128,19 @@
   </worldbody>
 
   <actuator>
-    <general name="torso_act" joint="torso_joint" gainprm="100 0 0"/>
-    <general name="neck_act" joint="neck_joint" gainprm="50 0 0"/>
-    <general name="l_shoulder_act" joint="left_shoulder_y" gainprm="80 0 0"/>
-    <general name="l_elbow_act" joint="left_elbow_y" gainprm="50 0 0"/>
-    <general name="l_wrist_act" joint="left_wrist_y" gainprm="20 0 0"/>
-    <general name="r_shoulder_act" joint="right_shoulder_y" gainprm="80 0 0"/>
-    <general name="r_elbow_act" joint="right_elbow_y" gainprm="50 0 0"/>
-    <general name="r_wrist_act" joint="right_wrist_y" gainprm="20 0 0"/>
-    <general name="l_hip_act" joint="left_hip_y" gainprm="100 0 0"/>
-    <general name="l_knee_act" joint="left_knee_x" gainprm="80 0 0"/>
-    <general name="l_ankle_act" joint="left_ankle_y" gainprm="50 0 0"/>
-    <general name="r_hip_act" joint="right_hip_y" gainprm="100 0 0"/>
-    <general name="r_knee_act" joint="right_knee_x" gainprm="80 0 0"/>
-    <general name="r_ankle_act" joint="right_ankle_y" gainprm="50 0 0"/>
+    <motor name="torso_act" joint="torso_joint" ctrllimited="true" ctrlrange="-100 100"/>
+    <motor name="neck_act" joint="neck_joint" ctrllimited="true" ctrlrange="-50 50"/>
+    <motor name="l_shoulder_act" joint="left_shoulder_y" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="l_elbow_act" joint="left_elbow_y" ctrllimited="true" ctrlrange="-50 50"/>
+    <motor name="l_wrist_act" joint="left_wrist_y" ctrllimited="true" ctrlrange="-20 20"/>
+    <motor name="r_shoulder_act" joint="right_shoulder_y" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="r_elbow_act" joint="right_elbow_y" ctrllimited="true" ctrlrange="-50 50"/>
+    <motor name="r_wrist_act" joint="right_wrist_y" ctrllimited="true" ctrlrange="-20 20"/>
+    <motor name="l_hip_act" joint="left_hip_y" ctrllimited="true" ctrlrange="-100 100"/>
+    <motor name="l_knee_act" joint="left_knee_x" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="l_ankle_act" joint="left_ankle_y" ctrllimited="true" ctrlrange="-50 50"/>
+    <motor name="r_hip_act" joint="right_hip_y" ctrllimited="true" ctrlrange="-100 100"/>
+    <motor name="r_knee_act" joint="right_knee_x" ctrllimited="true" ctrlrange="-80 80"/>
+    <motor name="r_ankle_act" joint="right_ankle_y" ctrllimited="true" ctrlrange="-50 50"/>
   </actuator>
 </mujoco>
