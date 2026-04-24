@@ -1,5 +1,26 @@
 # 支持向量机 (SVM)
 
+## 工程化小改动（第三次提交）
+
+本次在不改变 SVM 核心训练逻辑的前提下，对 `svm.py` 做了轻量改进，方便复现实验和作业提交。
+
+1. 新增命令行参数入口：
+`--train-file`、`--test-file`、`--learning-rate`、`--reg-lambda`、`--max-iter`、`--out-dir`
+2. 将 SVM 超参数改为可配置：
+学习率、正则化系数、最大迭代次数无需手动修改源码
+3. 新增实验结果自动留档：
+运行后自动生成 `outputs/svm_metrics.json`
+
+### 运行示例
+
+```bash
+python svm.py --learning-rate 0.1 --reg-lambda 0.0 --max-iter 20000 --out-dir outputs
+```
+
+### 输出文件
+
+- `outputs/svm_metrics.json`
+
 ## 问题描述
 
 本项目完成了以下三个部分的实验内容：

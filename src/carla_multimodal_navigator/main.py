@@ -107,10 +107,16 @@ class SimpleDrivingSystem:
         self.world = None
         self.vehicle = None
         self.camera = None
+        self.cameras = {}  # 多相机字典
+        self.camera_images = {}  # 多相机图像
         self.speed_sensor = None
         self.controller = None
         self.camera_image = None
         self.vehicle_speed = 0.0  # km/h
+        # 视角切换相关
+        self.view_mode = 'single'  # 'all' = 全部视角, 'single' = 单一视角
+        self.current_view_index = 5  # 当前选中的视角索引（第三人称视角）
+        self.view_names = ['front', 'rear', 'left', 'right', 'birdview', 'third']
 
     def connect(self):
         """连接到CARLA服务器"""
@@ -203,8 +209,8 @@ class SimpleDrivingSystem:
             return False
 
     def setup_camera(self):
-        """设置相机"""
-        print("正在设置相机...")
+        """设置多相机系统"""
+        print("正在设置多相机系统...")
 
         try:
             blueprint_library = self.world.get_blueprint_library()
@@ -215,25 +221,59 @@ class SimpleDrivingSystem:
             camera_bp.set_attribute('image_size_y', '480')
             camera_bp.set_attribute('fov', '90')
 
-            # 相机位置（车辆后方）
-            camera_transform = carla.Transform(
-                carla.Location(x=-8.0, z=6.0),  # 在车辆后方上方
-                carla.Rotation(pitch=-20.0)  # 向下看
-            )
+            # 相机位置配置
+            camera_configs = {
+                'front': carla.Transform(
+                    carla.Location(x=2.0, z=1.5),  # 车辆前方
+                    carla.Rotation(pitch=0.0)  # 水平向前
+                ),
+                'rear': carla.Transform(
+                    carla.Location(x=-3.0, z=1.5),  # 车辆后方
+                    carla.Rotation(pitch=0.0, yaw=180.0)  # 水平向后
+                ),
+                'left': carla.Transform(
+                    carla.Location(x=0.0, y=1.5, z=1.5),  # 车辆左侧
+                    carla.Rotation(pitch=0.0, yaw=-90.0)  # 水平向左
+                ),
+                'right': carla.Transform(
+                    carla.Location(x=0.0, y=-1.5, z=1.5),  # 车辆右侧
+                    carla.Rotation(pitch=0.0, yaw=90.0)  # 水平向右
+                ),
+                'birdview': carla.Transform(
+                    carla.Location(x=0.0, z=15.0),  # 车辆上方
+                    carla.Rotation(pitch=-90.0)  # 垂直向下
+                ),
+                'third': carla.Transform(
+                    carla.Location(x=-8.0, z=4.0),  # 车辆后方上方
+                    carla.Rotation(pitch=-20.0)  # 向下看
+                )
+            }
 
-            # 生成相机
-            self.camera = self.world.spawn_actor(
-                camera_bp, camera_transform, attach_to=self.vehicle
-            )
+            # 生成所有相机
+            for name, transform in camera_configs.items():
+                try:
+                    camera = self.world.spawn_actor(
+                        camera_bp, transform, attach_to=self.vehicle
+                    )
+                    if camera:
+                        self.cameras[name] = camera
+                        self.camera_images[name] = None
+                        # 设置回调函数
+                        camera.listen(lambda image, name=name: self.camera_callback(image, name))
+                        print(f"{name}相机设置成功")
+                except Exception as e:
+                    print(f"设置{name}相机时出错: {e}")
 
-            # 设置回调函数
-            self.camera.listen(lambda image: self.camera_callback(image))
+            # 保留原始相机引用
+            if 'front' in self.cameras:
+                self.camera = self.cameras['front']
+                self.camera_image = self.camera_images['front']
 
-            print("相机设置成功")
-            return True
+            print(f"多相机系统设置成功，共{len(self.cameras)}个相机")
+            return len(self.cameras) > 0
 
         except Exception as e:
-            print(f"设置相机时出错: {e}")
+            print(f"设置多相机系统时出错: {e}")
             return False
 
     def setup_speed_sensor(self):
@@ -293,13 +333,16 @@ class SimpleDrivingSystem:
             print(f"设置速度传感器时出错: {e}")
             return False
 
-    def camera_callback(self, image):
-        """相机数据回调"""
+    def camera_callback(self, image, name='front'):
+        """多相机数据回调"""
         try:
             # 转换图像数据
             array = np.frombuffer(image.raw_data, dtype=np.dtype("uint8"))
             array = np.reshape(array, (image.height, image.width, 4))
-            self.camera_image = array[:, :, :3]  # RGB通道
+            self.camera_images[name] = array[:, :, :3]  # RGB通道
+            # 同时更新主相机图像
+            if name == 'front':
+                self.camera_image = self.camera_images[name]
         except:
             pass
 
@@ -336,6 +379,107 @@ class SimpleDrivingSystem:
         """设置控制器"""
         self.controller = SimpleController(self.world, self.vehicle)
         print("控制器设置完成")
+
+    def create_multi_view_display(self, speed, throttle, steer):
+        """创建多视角显示"""
+        if self.view_mode == 'single':
+            # 单一视角模式
+            view_name = self.view_names[self.current_view_index]
+            if view_name in self.camera_images and self.camera_images[view_name] is not None:
+                display_img = self.camera_images[view_name].copy()
+                
+                # 添加状态信息
+                cv2.putText(display_img, f"View: {view_name.upper()}",
+                            (20, 40), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, (255, 255, 255), 2)
+                # 添加速度和限速信息
+                speed_color = (0, 255, 0) if speed <= self.controller.speed_limit else (0, 0, 255)
+                cv2.putText(display_img, f"Speed: {speed:.1f} km/h",
+                            (20, 80), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, speed_color, 2)
+                cv2.putText(display_img, f"Limit: {self.controller.speed_limit:.0f} km/h",
+                            (20, 100), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, (0, 255, 0), 2)
+                cv2.putText(display_img, f"Throttle: {throttle:.2f}",
+                            (20, 140), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, (255, 255, 255), 2)
+                cv2.putText(display_img, f"Steer: {steer:.2f}",
+                            (20, 180), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, (255, 255, 255), 2)
+                # 添加速度传感器状态
+                speed_sensor_status = "Active" if self.speed_sensor else "Inactive"
+                cv2.putText(display_img, f"Speed Sensor: {speed_sensor_status}",
+                            (20, 220), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.8, (0, 255, 255), 2)
+                
+                return display_img
+        else:
+            # 全部视角模式 - 2x3网格
+            grid_width = 1280
+            grid_height = 960
+            display_img = np.zeros((grid_height, grid_width, 3), dtype=np.uint8)
+            display_img[:] = (50, 50, 50)  # 深灰色背景
+            
+            # 定义视角布局
+            view_layouts = [
+                (0, 0, 'front'),
+                (0, 1, 'rear'),
+                (1, 0, 'left'),
+                (1, 1, 'right'),
+                (0, 2, 'birdview'),
+                (1, 2, 'third')
+            ]
+            
+            cell_width = int(grid_width / 3)
+            cell_height = int(grid_height / 2)
+            
+            # 绘制所有视角
+            for row, col, view_name in view_layouts:
+                x_start = col * cell_width
+                y_start = row * cell_height
+                x_end = x_start + cell_width
+                y_end = y_start + cell_height
+                
+                # 创建视角图像
+                view_img = np.zeros((cell_height, cell_width, 3), dtype=np.uint8)
+                view_img[:] = (40, 40, 40)
+                
+                # 添加视角标签
+                cv2.putText(view_img, view_name.upper(),
+                            (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.6, (0, 255, 0), 2)
+                
+                # 绘制视角内容
+                if view_name in self.camera_images and self.camera_images[view_name] is not None:
+                    camera_img = self.camera_images[view_name]
+                    # 缩放图像以适应单元格
+                    resized_img = cv2.resize(camera_img, (cell_width - 20, cell_height - 40))
+                    view_img[40:40+resized_img.shape[0], 10:10+resized_img.shape[1]] = resized_img
+                
+                # 放置到网格中
+                display_img[y_start:y_end, x_start:x_end] = view_img
+            
+            # 添加模式指示
+            cv2.putText(display_img, "SPACE: toggle mode | 1-5: select view | T: next view",
+                        (300, grid_height - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5, (0, 255, 255), 1)
+            
+            # 添加速度状态指示
+            speed_color = (0, 255, 0) if speed <= self.controller.speed_limit else (0, 0, 255)
+            cv2.putText(display_img, f"Speed: {speed:.1f} km/h | Limit: {self.controller.speed_limit:.0f} km/h",
+                        (400, 30), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, speed_color, 2)
+            # 添加速度传感器状态
+            speed_sensor_status = "Active" if self.speed_sensor else "Inactive"
+            sensor_color = (0, 255, 255) if self.speed_sensor else (0, 165, 255)
+            cv2.putText(display_img, f"Speed Sensor: {speed_sensor_status}",
+                        (400, 60), cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6, sensor_color, 2)
+            
+            return display_img
+        
+        # 如果没有图像，返回空图像
+        return np.zeros((480, 640, 3), dtype=np.uint8)
 
     def run(self):
         """主运行循环"""
@@ -384,6 +528,10 @@ class SimpleDrivingSystem:
         print("  q - 退出程序")
         print("  r - 重置车辆")
         print("  s - 紧急停止")
+        print("  空格键 - 切换全部/单一视角模式")
+        print("  1-6 - 选择视角 (仅在单一视角模式下)")
+        print("  t - 切换到下一个视角 (仅在单一视角模式下)")
+        print("\n视角: 1-前视 2-后视 3-左视 4-右视 5-鸟瞰 6-第三人称")
         print("\n开始自动驾驶...\n")
 
         frame_count = 0
@@ -412,38 +560,9 @@ class SimpleDrivingSystem:
                 )
                 self.vehicle.apply_control(control)
 
-                # 更新显示
-                if self.camera_image is not None:
-                    display_img = self.camera_image.copy()
-
-                    # 添加状态信息
-                    cv2.putText(display_img, f"Speed: {speed:.1f} km/h",
-                                (20, 40), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (255, 255, 255), 2)
-                    cv2.putText(display_img, f"Throttle: {throttle:.2f}",
-                                (20, 80), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (255, 255, 255), 2)
-                    cv2.putText(display_img, f"Steer: {steer:.2f}",
-                                (20, 120), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (255, 255, 255), 2)
-                    cv2.putText(display_img, f"Frame: {frame_count}",
-                                (20, 160), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (255, 255, 255), 2)
-                    # 添加限速信息
-                    speed_limit_status = "Detected" if self.controller.speed_limit_detected else "Default"
-                    cv2.putText(display_img, f"Speed Limit: {self.controller.speed_limit:.0f} km/h",
-                                (20, 200), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (0, 255, 0), 2)
-                    cv2.putText(display_img, f"Limit Status: {speed_limit_status}",
-                                (20, 240), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (0, 255, 0), 2)
-                    # 添加速度传感器状态
-                    speed_sensor_status = "Active" if self.speed_sensor else "Inactive"
-                    cv2.putText(display_img, f"Speed Sensor: {speed_sensor_status}",
-                                (20, 280), cv2.FONT_HERSHEY_SIMPLEX,
-                                0.8, (0, 255, 255), 2)
-
-                    cv2.imshow('Autonomous Driving - Simple Version', display_img)
+                # 创建多视角显示
+                display_img = self.create_multi_view_display(speed, throttle, steer)
+                cv2.imshow('Autonomous Driving - Multi View (SPACE: toggle mode | 1-5: select view)', display_img)
 
                 # 处理按键
                 key = cv2.waitKey(1) & 0xFF
@@ -458,12 +577,30 @@ class SimpleDrivingSystem:
                         throttle=0.0, brake=1.0, hand_brake=True
                     ))
                     print("紧急停止")
+                elif key == 32:  # 空格键
+                    # 切换视角模式
+                    if self.view_mode == 'all':
+                        self.view_mode = 'single'
+                        print(f"切换到单一视角模式: {self.view_names[self.current_view_index].upper()}")
+                    else:
+                        self.view_mode = 'all'
+                        print("切换到全部视角模式")
+                elif key == ord('t'):
+                    # 切换到下一个视角
+                    if self.view_mode == 'single':
+                        self.current_view_index = (self.current_view_index + 1) % len(self.view_names)
+                        print(f"切换到视角: {self.view_names[self.current_view_index].upper()}")
+                elif key >= ord('1') and key <= ord('6'):
+                    # 数字键选择视角
+                    if self.view_mode == 'single':
+                        self.current_view_index = key - ord('1')
+                        print(f"选择视角: {self.view_names[self.current_view_index].upper()}")
 
                 frame_count += 1
 
                 # 每100帧显示一次状态
                 if frame_count % 100 == 0:
-                    print(f"运行中... 帧数: {frame_count}, 速度: {speed:.1f} km/h")
+                    print(f"运行中... 帧数: {frame_count}, 速度: {speed:.1f} km/h, 视角: {self.view_mode}")
 
                 time.sleep(0.05)
 
@@ -527,7 +664,18 @@ class SimpleDrivingSystem:
         """清理资源"""
         print("\n正在清理资源...")
 
-        if self.camera:
+        # 清理所有相机
+        for name, camera in self.cameras.items():
+            if camera:
+                try:
+                    camera.stop()
+                    camera.destroy()
+                    print(f"{name}相机已清理")
+                except:
+                    pass
+
+        # 清理原始相机
+        if self.camera and self.camera not in self.cameras.values():
             try:
                 self.camera.stop()
                 self.camera.destroy()

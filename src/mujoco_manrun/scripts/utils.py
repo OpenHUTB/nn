@@ -21,9 +21,11 @@ def normalize_angle(angle):
     angle = np.mod(angle + np.pi, 2 * np.pi) - np.pi
     return angle
 
-def clip_value(value, min_val, max_val, name="value"):
-    """带日志的数值限幅"""
+def clip_value(value, min_val, max_val, name=""):
+    # 完美兼容单个数字 和 整个数组
     clipped = np.clip(value, min_val, max_val)
-    if clipped != value:
-        print(f"[警告] {name}超出范围[{min_val}, {max_val}]，已限幅为{clipped}")
+    # 只有单个值才打印警告，数组直接跳过判断
+    if np.isscalar(value):
+        if clipped != value:
+            print(f"警告：{name} 超出范围，已限制到 [{min_val}, {max_val}]")
     return clipped
