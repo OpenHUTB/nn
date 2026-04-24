@@ -20,6 +20,10 @@ import os
 import random
 import re
 import sys
+# 双反斜杠写法
+sys.path.append("D:\\BaiduNetdiskDownload\\hutb_v2.2\\PythonAPI")
+sys.path.append("D:\\BaiduNetdiskDownload\\hutb_v2.2\\PythonAPI\\carla")
+sys.path.append("D:\\BaiduNetdiskDownload\\hutb_v2.2\\PythonAPI\\carla\\agents")
 import weakref
 
 try:
