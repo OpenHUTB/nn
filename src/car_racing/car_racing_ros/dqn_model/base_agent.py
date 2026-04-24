@@ -13,6 +13,8 @@
 ================================================================================
 """
 import os
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+import warnings
 import torch
 import numpy as np
 import csv
@@ -185,7 +187,14 @@ class BaseAgent:
         self.epsilon_min = self.hyperparameters.get('epsilon_min', 0.05)
         
         # 3. 设置设备（GPU或CPU）
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            cuda_available = torch.cuda.is_available()
+        self.device = "cuda" if cuda_available else "cpu"
+        if self.device == "cuda":
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
         
         # 4. 构建神经网络
         self.policy_net = None
@@ -248,20 +257,20 @@ class BaseAgent:
         new_state_arr = np.asarray(new_state)
         self.buffer.add(TensorDict({
             "state": torch.as_tensor(state_arr),
-            "action": torch.tensor(action, dtype=torch.int64),
-            "reward": torch.tensor(reward, dtype=torch.float32),
+            "action": torch.as_tensor(action, dtype=torch.int64),
+            "reward": torch.as_tensor(reward, dtype=torch.float32),
             "new_state": torch.as_tensor(new_state_arr),
-            "terminated": torch.tensor(terminated, dtype=torch.bool),
+            "terminated": torch.as_tensor(terminated, dtype=torch.bool),
         }, batch_size=[]))
 
     def get_samples(self, batch_size):
         """从回放缓冲区随机采样一批经验"""
-        batch = self.buffer.sample(batch_size)
-        states = batch.get('state').to(self.device, dtype=torch.float32)
-        new_states = batch.get('new_state').to(self.device, dtype=torch.float32)
-        actions = batch.get('action').to(self.device, dtype=torch.int64).squeeze()
-        rewards = batch.get('reward').to(self.device, dtype=torch.float32).squeeze()
-        terminateds = batch.get('terminated').to(self.device, dtype=torch.bool).squeeze()
+        batch = self.buffer.sample(batch_size).to(self.device)
+        states = batch.get('state').to(dtype=torch.float32)
+        new_states = batch.get('new_state').to(dtype=torch.float32)
+        actions = batch.get('action').to(dtype=torch.int64).view(-1)
+        rewards = batch.get('reward').to(dtype=torch.float32).view(-1)
+        terminateds = batch.get('terminated').to(dtype=torch.bool).view(-1)
         return states, actions, rewards, new_states, terminateds
 
     def take_action(self, state):
@@ -275,10 +284,12 @@ class BaseAgent:
         if np.random.rand() < self.epsilon:
             action_idx = np.random.randint(self.action_n)
         else:
-            state_tensor = torch.as_tensor(np.asarray(state), dtype=torch.float32, device=self.device).unsqueeze(0)
+            state_tensor = torch.as_tensor(np.asarray(state), device=self.device)
+            if state_tensor.dtype != torch.float32:
+                state_tensor = state_tensor.to(dtype=torch.float32)
+            state_tensor = state_tensor.unsqueeze(0)
             with torch.inference_mode():
-                action_values = self.policy_net(state_tensor)
-                action_idx = torch.argmax(action_values, axis=1).item()
+                action_idx = int(self.policy_net(state_tensor).argmax(dim=1).item())
         
         if self.epsilon != 0:
             if self.epsilon > self.epsilon_min:
