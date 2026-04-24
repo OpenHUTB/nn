@@ -132,10 +132,15 @@ class AirSimController:
         """
         按速度控制无人机
         
+        AirSim 使用 NED (North-East-Down) 坐标系:
+        - X 轴: 前进方向 (正=前进)
+        - Y 轴: 右移方向 (正=右移)  
+        - Z 轴: 下降方向 (正=下降, 负=上升)
+        
         Args:
-            vx: X 轴速度 (m/s), 右移为正
-            vy: Y 轴速度 (m/s), 前进为正
-            vz: Z 轴速度 (m/s), 下降为正
+            vx: 前进速度 (m/s), 正=前进, 负=后退
+            vy: 右移速度 (m/s), 正=右移, 负=左移
+            vz: 垂直速度 (m/s), 正=下降, 负=上升
             duration: 持续时间 (秒)
         """
         if not self.connected:
@@ -143,8 +148,8 @@ class AirSimController:
         
         try:
             import airsim
-            self.client.moveByVelocityZAsync(
-                vx, vy, -vz, duration,
+            self.client.moveByVelocityAsync(
+                vx, vy, vz, duration,
                 drivetrain=airsim.DrivetrainType.ForwardOnly,
                 yaw_mode=airsim.YawMode(),
                 vehicle_name=self.vehicle_name
