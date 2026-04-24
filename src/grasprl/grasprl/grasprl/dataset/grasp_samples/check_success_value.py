@@ -29,7 +29,6 @@ print(f"读取失败：{len(error_files)}")
 if total_num > 0:
     print(f"成功率：{success_num/total_num*100:.2f}%")
 
-
 if error_files:
     print("\n===== 失败文件 =====")
     for f in error_files:

@@ -80,7 +80,6 @@ def check_files():
         except:
             label_err.append(f"{label_file}：加载失败或文件损坏")
 
-    # 生成报告
     report = []
     report.append("数据集检查结果")
     report.append("------------")
