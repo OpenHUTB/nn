@@ -13,26 +13,12 @@ import pygame  # Import pygame for keyboard input handling
 pygame.init()
 screen = pygame.display.set_mode((400, 300))
 
-# 当前文件目录
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 向上回到 Git 目录
-project_root = os.path.abspath(os.path.join(current_dir, '..', '..', '..'))
-
-# 拼接 carla 路径
-carla_egg_path = os.path.join(
-    project_root,
-    'Carla',
-    'WindowsNoEditor',
-    'PythonAPI',
-    'carla',
-    'dist',
-    'carla-0.9.11-py3.7-win-amd64.egg'
-)
+carla_egg_path = r"F:\hutb下载\Carla_0.9.15\CARLA_0.9.15\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.15-py3.7-win-amd64.egg"
 
 
 # Define the path to the CARLA Egg file
 sys.path.append(carla_egg_path)
+
 
 import carla
 
@@ -44,32 +30,15 @@ client.set_timeout(60.0)
 def load_map(map_name):
     return client.load_world(map_name)
 
-
-def spawn_vehicle_with_retries(world, blueprint, spawn_points, used_spawn_indices=None):
-    if used_spawn_indices is None:
-        used_spawn_indices = set()
-
-    candidate_indices = [index for index in range(len(spawn_points)) if index not in used_spawn_indices]
-    random.shuffle(candidate_indices)
-
-    for index in candidate_indices:
-        vehicle = world.try_spawn_actor(blueprint, spawn_points[index])
-        if vehicle is not None:
-            used_spawn_indices.add(index)
-            return vehicle, index
-
-    return None, None
-
-
 # Function to spawn vehicles
-def spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices=None):
+def spawn_vehicles(num_vehicles, world, spawn_points):
     vehicle_bp_lib = world.get_blueprint_library().filter('vehicle.*')
     spawned_vehicles = []
-    used_indices = used_spawn_indices if used_spawn_indices is not None else set()
 
     for _ in range(num_vehicles):
         vehicle_bp = random.choice(vehicle_bp_lib)
-        vehicle, _ = spawn_vehicle_with_retries(world, vehicle_bp, spawn_points, used_indices)
+        spawn_point = random.choice(spawn_points)
+        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
         if vehicle:
             spawned_vehicles.append(vehicle)
             # print(f"Spawned vehicle: {vehicle.id} at {spawn_point}")
@@ -120,36 +89,16 @@ world.apply_settings(settings)
 # Initialize Traffic Manager
 traffic_manager = client.get_trafficmanager(8000)
 traffic_manager.set_synchronous_mode(True)
-world_map = world.get_map()
-
-
-# Fast cruising with a slower profile only for tight urban turns.
-BASE_SPEED_DIFFERENCE = -50.0
-TURNING_SPEED_DIFFERENCE = 55.0
-BASE_FOLLOW_DISTANCE = 4.0
-TURNING_FOLLOW_DISTANCE = 6.0
-RIGHT_TURN_LOOKAHEAD_DISTANCES = (4.0, 8.0, 12.0, 16.0)
-RIGHT_TURN_ANGLE_THRESHOLD = 35.0
-RIGHT_STEER_THRESHOLD = 0.15
-OVERTAKE_MIN_TRIGGER_DISTANCE = 14.0
-OVERTAKE_LANE_CLEAR_DISTANCE = 18.0
-OVERTAKE_RELATIVE_SPEED_THRESHOLD = 2.0
-OVERTAKE_TARGET_MAX_SPEED = 4.0
-OVERTAKE_COOLDOWN = 3.0
 
 
 
 
 # Get map spawn points
-spawn_points = world_map.get_spawn_points()
-used_spawn_indices = set()
+spawn_points = world.get_map().get_spawn_points()
 
 # Spawn vehicles and walkers
 num_vehicles = 10
-vehicles = spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices)
-
-for v in vehicles:
-    v.set_autopilot(True, traffic_manager.get_port())
+vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
 
 #num_walkers = 2
 #walkers = spawn_walkers(num_walkers, world, spawn_points)
@@ -160,7 +109,7 @@ bp_lib = world.get_blueprint_library().filter('*')
 # Spawn vehicle
 vehicle_bp = bp_lib.find('vehicle.audi.a2')
 try:
-    vehicle, spawn_index = spawn_vehicle_with_retries(world, vehicle_bp, spawn_points, used_spawn_indices)
+    vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
     if vehicle is None:
         raise RuntimeError("Failed to spawn vehicle")
 except Exception as e:
@@ -169,17 +118,12 @@ except Exception as e:
 
 # Disable Autopilot for manual control
 vehicle.set_autopilot(True, traffic_manager.get_port())
-print("自动驾驶已启用")
-# 开启自动变道
-traffic_manager.auto_lane_change(vehicle, True)
-# 设置全局跟车距离
-traffic_manager.set_global_distance_to_leading_vehicle(BASE_FOLLOW_DISTANCE)
+print("✅ 自动驾驶已启用")
 #设置遵守交通规则
-traffic_manager.ignore_lights_percentage(vehicle, 100.0)  # Ignore all traffic lights
+traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
-traffic_manager.vehicle_percentage_speed_difference(vehicle,-50)
-# 减少跟车距离
-traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
+traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
+
 # Spawn camera
 camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', '1024')
@@ -270,7 +214,6 @@ K = build_projection_matrix(image_w, image_h, fov)
 # Define the distance threshold for a clearly visible sign
 # 扩大检测距离到20米
 DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
-SIGN_FACE_ALIGNMENT_THRESHOLD = 0.2
 
 # Set to track captured traffic sign locations
 captured_sign_locations = set()
@@ -299,11 +242,7 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
 
                 # Use location tuple to check if sign is not already captured
                 sign_location_tuple = (round(obj.location.x, 2), round(obj.location.y, 2), round(obj.location.z, 2))
-                if (
-                    camera_dot_product > 0 and
-                    sign_location_tuple not in captured_sign_locations and
-                    is_sign_front_visible(obj, camera_location)
-                ):
+                if camera_dot_product > 0 and sign_location_tuple not in captured_sign_locations:
                     verts = [v for v in obj.get_world_vertices(carla.Transform())]
                     x_coords = [get_image_point(v, K, world_2_camera)[0] for v in verts]
                     y_coords = [get_image_point(v, K, world_2_camera)[1] for v in verts]
@@ -380,231 +319,6 @@ def create_xml_file(image_name, bboxes, width, height, weather_params):
 # Function to manually compute dot product
 def dot_product(v1, v2):
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
-
-
-def vector_length(vector):
-    return np.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
-
-
-def normalized_dot_product(v1, v2):
-    v1_length = vector_length(v1)
-    v2_length = vector_length(v2)
-    if v1_length == 0.0 or v2_length == 0.0:
-        return 0.0
-    return dot_product(v1, v2) / (v1_length * v2_length)
-
-
-def is_sign_front_visible(sign_bbox, camera_location):
-    sign_transform = carla.Transform(sign_bbox.location, sign_bbox.rotation)
-    sign_forward_vector = sign_transform.get_forward_vector()
-    vector_to_camera = camera_location - sign_bbox.location
-    # CARLA traffic sign bounding boxes often use a forward vector that points away from
-    # the printable face, so we flip it here to keep front-facing signs.
-    sign_face_vector = carla.Vector3D(
-        x=-sign_forward_vector.x,
-        y=-sign_forward_vector.y,
-        z=-sign_forward_vector.z
-    )
-    facing_score = normalized_dot_product(sign_face_vector, vector_to_camera)
-    return facing_score > SIGN_FACE_ALIGNMENT_THRESHOLD
-
-
-def get_speed(vehicle_actor):
-    velocity = vehicle_actor.get_velocity()
-    return np.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)
-
-
-def normalize_angle(angle):
-    return (angle + 180.0) % 360.0 - 180.0
-
-
-def get_max_upcoming_turn_angle(waypoint, lookahead_distances):
-    if waypoint is None:
-        return 0.0
-
-    current_yaw = waypoint.transform.rotation.yaw
-    max_turn_angle = 0.0
-
-    for distance in lookahead_distances:
-        next_waypoints = waypoint.next(distance)
-        if not next_waypoints:
-            continue
-
-        next_yaw = next_waypoints[0].transform.rotation.yaw
-        delta_yaw = normalize_angle(next_yaw - current_yaw)
-        if abs(delta_yaw) > abs(max_turn_angle):
-            max_turn_angle = delta_yaw
-
-    return max_turn_angle
-
-
-def is_right_turn_imminent(vehicle, world_map):
-    waypoint = world_map.get_waypoint(
-        vehicle.get_location(),
-        project_to_road=True,
-        lane_type=carla.LaneType.Driving
-    )
-    if waypoint is None:
-        return False
-
-    vehicle_control = vehicle.get_control()
-    max_turn_angle = get_max_upcoming_turn_angle(waypoint, RIGHT_TURN_LOOKAHEAD_DISTANCES)
-
-    # Slow down before entering the junction and while already steering into it.
-    return (
-        max_turn_angle >= RIGHT_TURN_ANGLE_THRESHOLD or
-        (waypoint.is_junction and vehicle_control.steer > RIGHT_STEER_THRESHOLD)
-    )
-
-
-def lane_change_allowed(lane_change, direction):
-    if direction == 'left':
-        return lane_change in (carla.LaneChange.Left, carla.LaneChange.Both)
-    return lane_change in (carla.LaneChange.Right, carla.LaneChange.Both)
-
-
-def find_blocking_vehicle(vehicle, world, world_map):
-    ego_transform = vehicle.get_transform()
-    ego_location = ego_transform.location
-    ego_forward = ego_transform.get_forward_vector()
-    ego_waypoint = world_map.get_waypoint(
-        ego_location,
-        project_to_road=True,
-        lane_type=carla.LaneType.Driving
-    )
-    if ego_waypoint is None or ego_waypoint.is_junction:
-        return None
-
-    ego_speed = get_speed(vehicle)
-    closest_vehicle = None
-    closest_distance = float('inf')
-
-    for other in world.get_actors().filter('vehicle.*'):
-        if other.id == vehicle.id:
-            continue
-
-        other_location = other.get_location()
-        offset = other_location - ego_location
-        forward_distance = dot_product(ego_forward, offset)
-        if forward_distance <= 0.0 or forward_distance > OVERTAKE_MIN_TRIGGER_DISTANCE:
-            continue
-
-        other_waypoint = world_map.get_waypoint(
-            other_location,
-            project_to_road=True,
-            lane_type=carla.LaneType.Driving
-        )
-        if other_waypoint is None:
-            continue
-
-        same_lane = (
-            other_waypoint.road_id == ego_waypoint.road_id and
-            other_waypoint.lane_id == ego_waypoint.lane_id
-        )
-        if not same_lane:
-            continue
-
-        other_speed = get_speed(other)
-        if other_speed > OVERTAKE_TARGET_MAX_SPEED and ego_speed - other_speed < OVERTAKE_RELATIVE_SPEED_THRESHOLD:
-            continue
-
-        if forward_distance < closest_distance:
-            closest_distance = forward_distance
-            closest_vehicle = other
-
-    return closest_vehicle
-
-
-def is_lane_clear_for_overtake(vehicle, world, world_map, target_waypoint):
-    ego_location = vehicle.get_location()
-
-    for other in world.get_actors().filter('vehicle.*'):
-        if other.id == vehicle.id:
-            continue
-
-        other_waypoint = world_map.get_waypoint(
-            other.get_location(),
-            project_to_road=True,
-            lane_type=carla.LaneType.Driving
-        )
-        if other_waypoint is None:
-            continue
-
-        same_target_lane = (
-            other_waypoint.road_id == target_waypoint.road_id and
-            other_waypoint.lane_id == target_waypoint.lane_id
-        )
-        if not same_target_lane:
-            continue
-
-        if other.get_location().distance(ego_location) < OVERTAKE_LANE_CLEAR_DISTANCE:
-            return False
-
-    return True
-
-
-def try_overtake_blocking_vehicle(vehicle, world, traffic_manager, world_map, current_time, last_overtake_time):
-    if current_time - last_overtake_time < OVERTAKE_COOLDOWN:
-        return last_overtake_time
-
-    ego_waypoint = world_map.get_waypoint(
-        vehicle.get_location(),
-        project_to_road=True,
-        lane_type=carla.LaneType.Driving
-    )
-    if ego_waypoint is None or ego_waypoint.is_junction or is_right_turn_imminent(vehicle, world_map):
-        return last_overtake_time
-
-    blocking_vehicle = find_blocking_vehicle(vehicle, world, world_map)
-    if blocking_vehicle is None:
-        return last_overtake_time
-
-    for direction in ('left', 'right'):
-        if not lane_change_allowed(ego_waypoint.lane_change, direction):
-            continue
-
-        target_waypoint = ego_waypoint.get_left_lane() if direction == 'left' else ego_waypoint.get_right_lane()
-        if target_waypoint is None:
-            continue
-
-        if target_waypoint.lane_type != carla.LaneType.Driving:
-            continue
-
-        if target_waypoint.is_junction or target_waypoint.road_id != ego_waypoint.road_id:
-            continue
-
-        if ego_waypoint.lane_id * target_waypoint.lane_id < 0:
-            continue
-
-        if not is_lane_clear_for_overtake(vehicle, world, world_map, target_waypoint):
-            continue
-
-        traffic_manager.force_lane_change(vehicle, direction == 'right')
-        return current_time
-
-    return last_overtake_time
-
-
-def update_autopilot_safety(vehicle, world, traffic_manager, world_map, current_time, last_overtake_time):
-    right_turn_imminent = is_right_turn_imminent(vehicle, world_map)
-    traffic_manager.auto_lane_change(vehicle, not right_turn_imminent)
-
-    if right_turn_imminent:
-        traffic_manager.vehicle_percentage_speed_difference(vehicle, TURNING_SPEED_DIFFERENCE)
-        traffic_manager.distance_to_leading_vehicle(vehicle, TURNING_FOLLOW_DISTANCE)
-    else:
-        traffic_manager.vehicle_percentage_speed_difference(vehicle, BASE_SPEED_DIFFERENCE)
-        traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
-        last_overtake_time = try_overtake_blocking_vehicle(
-            vehicle,
-            world,
-            traffic_manager,
-            world_map,
-            current_time,
-            last_overtake_time
-        )
-
-    return last_overtake_time
 
 # Define a list of possible weather conditions
 weather_conditions = [
@@ -752,7 +466,6 @@ def non_maximum_suppression(bboxes, iou_threshold=0.2):
 
 # Variable to track if the last image had bounding boxes
 last_image_had_bboxes = False
-last_overtake_time = 0.0
 
 
 # Start the game loop
@@ -761,18 +474,9 @@ try:
         world.tick()
         time.sleep(0.033)
         pygame.event.pump()  # Process event queue for keyboard input
-        loop_time = time.time()
-        last_overtake_time = update_autopilot_safety(
-            vehicle,
-            world,
-            traffic_manager,
-            world_map,
-            loop_time,
-            last_overtake_time
-        )
 
         # Handle manual input
-        # handle_input(vehicle)
+        handle_input(vehicle)
 
         # Get the latest image from the queue
         image = image_queue.get()

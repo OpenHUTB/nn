@@ -1,4 +1,5 @@
 import numpy as np
+import mujoco
 from mujoco import viewer
 import time
 import os
@@ -69,16 +70,31 @@ class ROSCmdVelHandler(threading.Thread):
         """线程主循环（ROS自旋）"""
         if not self.has_ros:
             return
+        if hasattr(self.rospy, "spin_once"):
+            while self.running and not self.rospy.is_shutdown():
+                try:
+                    self.rospy.spin_once()
+                except Exception:
+                    pass
+                time.sleep(0.01)
+            return
+
+        rate = self.rospy.Rate(100)
         while self.running and not self.rospy.is_shutdown():
-            self.rospy.spin_once()
-            time.sleep(0.01)
+            try:
+                rate.sleep()
+            except Exception:
+                time.sleep(0.01)
 
     def stop(self):
+        """停止线程（不强制关闭ROS进程，仅停止本线程循环）"""
         self.running = False
 
 
 # ===================== 终端键盘控制（pycham） =====================
 class KeyboardInputHandler(threading.Thread):
+    """终端键盘控制线程（Windows使用msvcrt，Linux/macOS使用termios/tty）"""
+
     def __init__(self, stabilizer):
         super().__init__(daemon=True)
         self.stabilizer = stabilizer
@@ -93,27 +109,47 @@ class KeyboardInputHandler(threading.Thread):
         print("m: 传感器开关 | p: 打印数据")
         print("===================================\n")
 
+        if sys.platform == "win32":
+            import msvcrt
+
+            while self.running:
+                try:
+                    if msvcrt.kbhit():
+                        key = msvcrt.getwch()
+                        if key in ("\x00", "\xe0"):
+                            msvcrt.getwch()
+                            continue
+                        self._handle_key(key)
+                    time.sleep(0.01)
+                except Exception:
+                    time.sleep(0.01)
+            return
+
         while self.running:
+            old = None
             try:
-                import sys
                 import tty
                 import termios
+
                 fd = sys.stdin.fileno()
                 old = termios.tcgetattr(fd)
                 tty.setraw(fd)
 
-                if sys.stdin.read(1) == '\x1b':  # 方向键忽略
+                if sys.stdin.read(1) == '\x1b':
                     sys.stdin.read(2)
                     termios.tcsetattr(fd, termios.TCSADRAIN, old)
                     continue
 
                 key = sys.stdin.read(1)
                 termios.tcsetattr(fd, termios.TCSADRAIN, old)
-
+                old = None
                 self._handle_key(key)
-            except:
-                key = sys.stdin.read(1)
-                self._handle_key(key)
+            except Exception:
+                if old is not None:
+                    try:
+                        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+                    except Exception:
+                        pass
             time.sleep(0.05)
 
     def _handle_key(self, key):
@@ -267,6 +303,15 @@ class HumanoidStabilizer:
         self.foot_contact_threshold = 1.5
         self.com_safety_threshold = 0.6  # 重心z轴安全阈值（新增）
         self.speed_reduction_factor = 0.5  # 重心过低时的降速系数（新增）
+
+        self._left_foot_geom_ids = {
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot1_left"),
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot2_left"),
+        }
+        self._right_foot_geom_ids = {
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot1_right"),
+            mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot2_right"),
+        }
 
         # 状态变量（原有逻辑保留，新增鲁棒优化参数）
         self.joint_targets = np.zeros(self.num_joints)
@@ -481,23 +526,7 @@ class HumanoidStabilizer:
 
     def _simulate_foot_force_data(self):
         """模拟带噪声+零漂的足底力传感器数据"""
-        # 获取真实接触力（原有逻辑）
-        left_foot_geoms = ["foot1_left", "foot2_left"]
-        right_foot_geoms = ["foot1_right", "foot2_right"]
-
-        true_left_force = 0.0
-        for geom_name in left_foot_geoms:
-            geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            force = np.zeros(6, dtype=np.float64)
-            mujoco.mj_contactForce(self.model, self.data, geom_id, force)
-            true_left_force += np.linalg.norm(force[:3])
-
-        true_right_force = 0.0
-        for geom_name in right_foot_geoms:
-            geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-            force = np.zeros(6, dtype=np.float64)
-            mujoco.mj_contactForce(self.model, self.data, geom_id, force)
-            true_right_force += np.linalg.norm(force[:3])
+        true_left_force, true_right_force = self._compute_foot_forces()
 
         # 添加噪声和零漂（模拟真实传感器）
         noisy_left_force = true_left_force + np.random.normal(0, self.foot_force_noise) + self.foot_force_offset
@@ -594,7 +623,6 @@ class HumanoidStabilizer:
         """站立状态：维持初始稳定姿态，CPG重置"""
         self.right_leg_cpg.reset()
         self.left_leg_cpg.reset()
-        self._init_stable_pose()  # 恢复站立姿态
 
     def _state_walk(self):
         """行走状态：根据当前步态模式调整CPG参数 + 原有鲁棒优化"""
@@ -721,22 +749,7 @@ class HumanoidStabilizer:
     # 原有接触检测方法（保留，用于关闭传感器模拟时的 fallback）
     def _detect_foot_contact(self):
         try:
-            left_foot_geoms = ["foot1_left", "foot2_left"]
-            right_foot_geoms = ["foot1_right", "foot2_right"]
-
-            left_force = 0.0
-            for geom_name in left_foot_geoms:
-                geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-                force = np.zeros(6, dtype=np.float64)
-                mujoco.mj_contactForce(self.model, self.data, geom_id, force)
-                left_force += np.linalg.norm(force[:3])
-
-            right_force = 0.0
-            for geom_name in right_foot_geoms:
-                geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_name)
-                force = np.zeros(6, dtype=np.float64)
-                mujoco.mj_contactForce(self.model, self.data, geom_id, force)
-                right_force += np.linalg.norm(force[:3])
+            left_force, right_force = self._compute_foot_forces()
 
             self.foot_contact[1] = 1 if left_force > self.foot_contact_threshold else 0
             self.foot_contact[0] = 1 if right_force > self.foot_contact_threshold else 0
@@ -748,6 +761,29 @@ class HumanoidStabilizer:
             self.foot_contact = np.ones(2)
             self.left_foot_force = self.foot_contact_threshold
             self.right_foot_force = self.foot_contact_threshold
+
+    def _compute_foot_forces(self):
+        left_force = 0.0
+        right_force = 0.0
+        for contact_id in range(self.data.ncon):
+            contact = self.data.contact[contact_id]
+            geom1 = int(contact.geom1)
+            geom2 = int(contact.geom2)
+
+            in_left = (geom1 in self._left_foot_geom_ids) or (geom2 in self._left_foot_geom_ids)
+            in_right = (geom1 in self._right_foot_geom_ids) or (geom2 in self._right_foot_geom_ids)
+            if not (in_left or in_right):
+                continue
+
+            force = np.zeros(6, dtype=np.float64)
+            mujoco.mj_contactForce(self.model, self.data, contact_id, force)
+            f = float(np.linalg.norm(force[:3]))
+            if in_left:
+                left_force += f
+            if in_right:
+                right_force += f
+
+        return left_force, right_force
 
     # 计算稳定力矩（核心：基于传感器数据的反馈控制，新增步态信息）
     def _calculate_stabilizing_torques(self):
@@ -803,8 +839,8 @@ class HumanoidStabilizer:
         waist_joints = ["abdomen_z", "abdomen_y", "abdomen_x"]
         for joint_name in waist_joints:
             idx = self.joint_name_to_idx[joint_name]
-            joint_error = self.joint_targets[idx] - current_joints[idx]
-            joint_error = np.clip(joint_error, -0.3, 0.3)
+            joint_error = float(self.joint_targets[idx] - current_joints[idx])
+            joint_error = max(-0.3, min(0.3, joint_error))
             torques[idx] = self.kp_waist * joint_error - self.kd_waist * current_vel[idx]
 
         # 腿部关节控制（新增：基于接触力的动态PD增益）
@@ -817,8 +853,8 @@ class HumanoidStabilizer:
 
         for joint_name in leg_joints:
             idx = self.joint_name_to_idx[joint_name]
-            joint_error = self.joint_targets[idx] - current_joints[idx]
-            joint_error = np.clip(joint_error, -0.3, 0.3)
+            joint_error = float(self.joint_targets[idx] - current_joints[idx])
+            joint_error = max(-0.3, min(0.3, joint_error))
 
             # 动态PD增益 - 接触力越小，增益越低（避免打滑）
             if self.enable_robust_optim:
@@ -906,62 +942,63 @@ class HumanoidStabilizer:
         keyboard_handler = KeyboardInputHandler(self)
         keyboard_handler.start()
 
-        with viewer.launch_passive(self.model, self.data) as v:
-            # 优化相机视角（原有逻辑保留）
-            v.cam.distance = 3.0
-            v.cam.azimuth = 90
-            v.cam.elevation = -25
-            v.cam.lookat = [0, 0, 0.6]
+        try:
+            with viewer.launch_passive(self.model, self.data) as v:
+                # 优化相机视角（原有逻辑保留）
+                v.cam.distance = 3.0
+                v.cam.azimuth = 90
+                v.cam.elevation = -25
+                v.cam.lookat = [0, 0, 0.6]
 
-            print("人形机器人稳定站立+行走仿真启动（已启用多步态+传感器模拟+步态鲁棒性优化）...")
-            print(f"初始稳定{self.init_wait_time}秒后，按W开始行走 | 支持多步态切换（1=慢走/2=正常/3=小跑/4=原地踏步）")
-            print(f"默认步态模式：{self.gait_mode}\n")
+                print("人形机器人稳定站立+行走仿真启动（已启用多步态+传感器模拟+步态鲁棒性优化）...")
+                print(f"初始稳定{self.init_wait_time}秒后，按W开始行走 | 支持多步态切换（1=慢走/2=正常/3=小跑/4=原地踏步）")
+                print(f"默认步态模式：{self.gait_mode}\n")
 
-            # 初始落地阶段（原有逻辑保留）
-            start_time = time.time()
-            while time.time() - start_time < self.init_wait_time:
-                alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
-                torques = self._calculate_stabilizing_torques() * alpha
-                self.data.ctrl[:] = torques
-                mujoco.mj_step(self.model, self.data)
-                self.data.qvel[:] *= 0.97
-                v.sync()
-                time.sleep(self.dt)
+                # 初始落地阶段（原有逻辑保留）
+                start_time = time.time()
+                while time.time() - start_time < self.init_wait_time:
+                    alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
+                    torques = self._calculate_stabilizing_torques() * alpha
+                    self.data.ctrl[:] = torques
+                    mujoco.mj_step(self.model, self.data)
+                    self.data.qvel[:] *= 0.97
+                    v.sync()
+                    time.sleep(self.dt)
 
-            # 主仿真循环（原有逻辑保留）
-            print("=== 初始稳定完成，可输入控制指令 ===")
-            while self.data.time < self.sim_duration:
-                torques = self._calculate_stabilizing_torques()
-                self.data.ctrl[:] = torques
-                mujoco.mj_step(self.model, self.data)
+                # 主仿真循环（原有逻辑保留）
+                print("=== 初始稳定完成，可输入控制指令 ===")
+                while self.data.time < self.sim_duration:
+                    torques = self._calculate_stabilizing_torques()
+                    self.data.ctrl[:] = torques
+                    mujoco.mj_step(self.model, self.data)
 
-                # 状态监测（新增步态信息）
-                if self.data.time % 2 < 0.1:
+                    # 状态监测（新增步态信息）
+                    if self.data.time % 2 < 0.1:
+                        com = self.data.subtree_com[0]
+                        euler = self.current_sensor_data["imu"][
+                            "euler"] if self.current_sensor_data else self._get_root_euler()
+                        print(
+                            f"时间:{self.data.time:.1f}s | 重心(x/z):{com[0]:.3f}/{com[2]:.3f}m | "
+                            f"姿态(roll/pitch):{euler[0]:.3f}/{euler[1]:.3f}rad | 脚接触:{self.foot_contact} | "
+                            f"当前步态:{self.gait_mode}"
+                        )
+
+                    v.sync()
+                    time.sleep(self.dt * 0.5)
+
+                    # 跌倒判定（原有逻辑保留）
                     com = self.data.subtree_com[0]
-                    euler = self.current_sensor_data["imu"][
-                        "euler"] if self.current_sensor_data else self._get_root_euler()
-                    print(
-                        f"时间:{self.data.time:.1f}s | 重心(x/z):{com[0]:.3f}/{com[2]:.3f}m | "
-                        f"姿态(roll/pitch):{euler[0]:.3f}/{euler[1]:.3f}rad | 脚接触:{self.foot_contact} | "
-                        f"当前步态:{self.gait_mode}"
-                    )
-
-                v.sync()
-                time.sleep(self.dt * 0.5)
-
-                # 跌倒判定（原有逻辑保留）
-                com = self.data.subtree_com[0]
-                euler = self.current_sensor_data["imu"]["euler"] if self.current_sensor_data else self._get_root_euler()
-                if com[2] < 0.4 or abs(euler[0]) > 0.6 or abs(euler[1]) > 0.6:
-                    print(
-                        f"跌倒！时间:{self.data.time:.1f}s | 重心(z):{com[2]:.3f}m | "
-                        f"最大倾角:{max(abs(euler[0]), abs(euler[1])):.3f}rad | 当前步态:{self.gait_mode}"
-                    )
-                    self.set_state("STAND")  # 跌倒后自动恢复站立
-
-        # 停止ROS线程
-        self.ros_handler.stop()
-        print("仿真完成！")
+                    euler = self.current_sensor_data["imu"]["euler"] if self.current_sensor_data else self._get_root_euler()
+                    if com[2] < 0.4 or abs(euler[0]) > 0.6 or abs(euler[1]) > 0.6:
+                        print(
+                            f"跌倒！时间:{self.data.time:.1f}s | 重心(z):{com[2]:.3f}m | "
+                            f"最大倾角:{max(abs(euler[0]), abs(euler[1])):.3f}rad | 当前步态:{self.gait_mode}"
+                        )
+                        self.set_state("STAND")  # 跌倒后自动恢复站立
+        finally:
+            keyboard_handler.running = False
+            self.ros_handler.stop()
+            print("仿真完成！")
 
 
 if __name__ == "__main__":
