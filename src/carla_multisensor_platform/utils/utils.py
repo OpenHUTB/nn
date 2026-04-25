@@ -24,10 +24,13 @@ def exit_game():
 
 def git_describe(path=Path(__file__).parent):  # path must be a directory
     # return human-readable git description, i.e. v5.0-5-g3e25f1e https://git-scm.com/docs/git-describe
-    s = f'git -C {path} describe --tags --long --always'
     try:
-        return subprocess.check_output(s, shell=True, stderr=subprocess.STDOUT).decode()[:-1]
-    except subprocess.CalledProcessError as e:
+        return subprocess.check_output(
+            ["git", "-C", str(path), "describe", "--tags", "--long", "--always"],
+            stderr=subprocess.STDOUT,
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
         return ''  # not a git repository
 
 def date_modified(path=__file__):
@@ -70,13 +73,40 @@ def time_synchronized():
 def plot_one_box(x, img, color=None, label=None, line_thickness=3):
     # Plots one bounding box on image img
     tl = line_thickness or round(0.002 * (img.shape[0] + img.shape[1]) / 2) + 1  # line/font thickness
-    color = color or [random.randint(0, 255) for _ in range(3)]
+    color = tuple(color or [random.randint(0, 255) for _ in range(3)])
     c1, c2 = (int(x[0]), int(x[1])), (int(x[2]), int(x[3]))
-    cv2.rectangle(img, c1, c2, [0,255,255], thickness=2, lineType=cv2.LINE_AA)
+    cv2.rectangle(img, c1, c2, color, thickness=tl, lineType=cv2.LINE_AA)
     if label:
         tf = max(tl - 1, 1)  # font thickness
         t_size = cv2.getTextSize(label, 0, fontScale=tl / 3, thickness=tf)[0]
-        c2 = c1[0] + t_size[0], c1[1] - t_size[1] - 3
+        label_fits_above = c1[1] - t_size[1] - 3 >= 0
+        if label_fits_above:
+            label_bg_top_left = (c1[0], c1[1] - t_size[1] - 3)
+            label_bg_bottom_right = (c1[0] + t_size[0], c1[1])
+            label_origin = (c1[0], c1[1] - 2)
+        else:
+            label_bg_top_left = c1
+            label_bg_bottom_right = (c1[0] + t_size[0], c1[1] + t_size[1] + 3)
+            label_origin = (c1[0], c1[1] + t_size[1] + 2)
+
+        cv2.rectangle(
+            img,
+            label_bg_top_left,
+            label_bg_bottom_right,
+            color,
+            thickness=-1,
+            lineType=cv2.LINE_AA,
+        )
+        cv2.putText(
+            img,
+            label,
+            label_origin,
+            0,
+            tl / 3,
+            (255, 255, 255),
+            thickness=tf,
+            lineType=cv2.LINE_AA,
+        )
 
 class SegmentationMetric(object):
     '''
@@ -170,7 +200,10 @@ class AverageMeter(object):
         self.avg = self.sum / self.count if self.count != 0 else 0
 
 def _make_grid(nx=20, ny=20):
-        yv, xv = torch.meshgrid([torch.arange(ny), torch.arange(nx)])
+        try:
+            yv, xv = torch.meshgrid(torch.arange(ny), torch.arange(nx), indexing='ij')
+        except TypeError:
+            yv, xv = torch.meshgrid(torch.arange(ny), torch.arange(nx))
         return torch.stack((xv, yv), 2).view((1, 1, ny, nx, 2)).float()
     
 def split_for_trace_model(pred = None, anchor_grid = None):
