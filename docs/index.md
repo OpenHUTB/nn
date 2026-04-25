@@ -47,6 +47,8 @@ title: 主页
 
 [__跟踪__](#tracking) 
 
+[__交通标识检测__](./traffic_sign_detection/traffic_sign_detection.md) - 目标检测
+
 ## 规划 <span id="planning"></span>
 
 [__导航__](#navigation)
