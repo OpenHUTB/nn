@@ -64,8 +64,10 @@ class PIDController:
 
 def find_weather_presets():
     # 驼峰命名拆分正则（不变，用来美化名字）
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?=[A-Z])(?=[A-Z][a-z])|$)')
+
+    def name(x):
+        return ' '.join(m.group(0) for m in rgx.finditer(x))
 
     weather_class = carla.WeatherParameters
     presets = []
@@ -78,6 +80,7 @@ def find_weather_presets():
                 presets.append(attr_name)
 
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
+
 
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
@@ -93,7 +96,7 @@ def traffic_light_detect(image):
         return 'none'
 
     h, w = image.shape[:2]
-    roi = image[int(h*0.1):int(h*0.25), int(w*0.42):int(w*0.58)]
+    roi = image[int(h * 0.1):int(h * 0.25), int(w * 0.42):int(w * 0.58)]
     hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
 
     lower_red1 = np.array([0, 150, 150])
@@ -165,7 +168,6 @@ def get_weather_type(world):
 # 2. 自动控制车辆车灯（近光灯 + 雾灯）
 # 2. 自动控制车辆车灯（CARLA官方正确写法，无报错版）
 def auto_vehicle_lights(vehicle, weather_type):
-
     light_state = carla.VehicleLightState()
 
     if weather_type == "night":
@@ -181,6 +183,8 @@ def auto_vehicle_lights(vehicle, weather_type):
         # 晴天：关闭所有灯光
         light_state = carla.VehicleLightState.NONE
     vehicle.set_light_state(light_state)
+
+
 # 3. 自动调整相机参数（曝光/对比度）
 def auto_camera_settings(camera_manager, weather_type):
     if camera_manager.sensor is None:
@@ -208,6 +212,8 @@ def auto_camera_settings(camera_manager, weather_type):
             sensor.set_attribute('exposure_compensation', '0.0')
             sensor.set_attribute('contrast', '1.0')
             sensor.set_attribute('saturation', '1.0')
+
+
 # -- World --------------------------------------------------------------------
 # ==============================================================================
 class World(object):
@@ -226,7 +232,7 @@ class World(object):
         self.gnss_sensor = None
         self.camera_manager = None
         self._weather_presets = find_weather_presets()
-        self._weather_index =0
+        self._weather_index = 0
         self._actor_filter = args.filter
         self._gamma = args.gamma
         self.restart(args)
@@ -270,13 +276,8 @@ class World(object):
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
-        night_weather = carla.WeatherParameters(
-            sun_altitude_angle=-90.0,
-            cloudiness=100.0,
-            fog_density=0.0
-        )
-        self.world.set_weather(night_weather)
-        self.hud.notification('Weather: Night')
+
+
     def next_weather(self, reverse=False):
         self._weather_index += -1 if reverse else 1
         self._weather_index %= len(self._weather_presets)
@@ -327,6 +328,13 @@ class HUD(object):
         self._info_text = []
         self._server_clock = pygame.time.Clock()
 
+        # 【新增】LDW车道偏离预警状态
+        self.ldw_warning = False
+        self.ldw_warning_duration = 1.0  # 警告持续1秒
+        self.ldw_timer = 0.0
+        # 预警大字体
+        self.ldw_font = pygame.font.Font(mono, 48)
+
     def on_world_tick(self, timestamp):
         self._server_clock.tick()
         self.server_fps = self._server_clock.get_fps()
@@ -337,6 +345,14 @@ class HUD(object):
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
+
+        # 【新增】更新LDW警告计时器
+        delta_seconds = 1e-3 * clock.get_time()
+        if self.ldw_warning:
+            self.ldw_timer -= delta_seconds
+            if self.ldw_timer <= 0:
+                self.ldw_warning = False
+
         transform = world.player.get_transform()
         vel = world.player.get_velocity()
         control = world.player.get_control()
@@ -394,6 +410,11 @@ class HUD(object):
     def error(self, text):
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
+    # 【新增】触发LDW车道偏离警告
+    def trigger_ldw_warning(self):
+        self.ldw_warning = True
+        self.ldw_timer = self.ldw_warning_duration
+
     def render(self, display):
         if self._show_info:
             info_surface = pygame.Surface((220, self.dim[1]))
@@ -431,6 +452,12 @@ class HUD(object):
                 v_offset += 18
         self._notifications.render(display)
         self.help.render(display)
+
+        # 【新增】绘制LDW车道偏离警告（屏幕中央红色大字）
+        if self.ldw_warning:
+            warning_text = self.ldw_font.render("车道偏离警告！", True, (255, 0, 0))
+            text_rect = warning_text.get_rect(center=(self.dim[0] // 2, self.dim[1] // 2))
+            display.blit(warning_text, text_rect)
 
 
 # ==============================================================================
@@ -535,6 +562,14 @@ class LaneInvasionSensor(object):
         self = weak_self()
         if not self:
             return
+        # 【新增】触发LDW预警（屏幕警告+提示音）
+        self.hud.trigger_ldw_warning()
+        try:
+            self.hud.ldw_sound.play()  # 播放提示音
+        except:
+            pass
+
+        # 原有提示保留
         lane_types = set(x.type for x in event.crossed_lane_markings)
         text = ['%r' % str(x).split()[-1] for x in lane_types]
         self.hud.notification('Crossed line %s' % ' and '.join(text))
@@ -617,7 +652,7 @@ class CameraManager(object):
     def set_sensor(self, index, notify=True, force_respawn=False):
         index = index % len(self.sensors)
         needs_respawn = True if self.index is None else (
-                    force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
+                force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
         if needs_respawn:
             if self.sensor is not None:
                 self.sensor.destroy()
@@ -673,17 +708,33 @@ class CameraManager(object):
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 
+
 # ==============================================================================
 # -- 主循环 --------------------------------------------------------------------
 # ==============================================================================
 def game_loop(args):
     pygame.init()
     pygame.font.init()
+    # 【新增】初始化Pygame音频模块
+    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
     world = None
 
     pid = PIDController(Kp=1.0, Ki=0.2, Kd=0.1)
     steer_pid = PIDController(Kp=0.3, Ki=0.0, Kd=0.05)
     target_speed = 30.0
+
+    # 【新增】生成LDW预警提示音（无外部文件依赖）
+    def generate_ldw_beep():
+        sample_rate = 22050
+        duration = 0.15
+        freq = 900
+        t = np.linspace(0, duration, int(sample_rate * duration), False)
+        wave = np.sin(2 * np.pi * freq * t)
+        wave = (wave * 32767).astype(np.int16)
+        stereo_wave = np.column_stack((wave, wave))
+        return pygame.sndarray.make_sound(stereo_wave)
+
+    ldw_warning_sound = generate_ldw_beep()
 
     try:
         client = carla.Client(args.host, args.port)
@@ -694,6 +745,9 @@ def game_loop(args):
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
+        # 【新增】将提示音绑定到HUD
+        hud.ldw_sound = ldw_warning_sound
+
         world = World(client.get_world(), hud, args)
         clock = pygame.time.Clock()
 
