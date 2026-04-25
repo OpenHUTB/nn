@@ -1,9 +1,11 @@
 import sys
-
-sys.path.append(r"D:\hutb\PythonAPI\carla\dist")
+from pathlib import Path
 import carla
 import time
 import keyboard
+
+BASE_DIR = Path(__file__).parent
+sys.path.append(str(BASE_DIR / "PythonAPI" / "carla" / "dist"))
 
 # 连接CARLA
 client = carla.Client("127.0.0.1", 2000)
@@ -47,18 +49,13 @@ try:
 
         car.apply_control(ctrl)
 
-        # ==============================================
         # 视角在车正后上方
-        # ==============================================
         trans = car.get_transform()
         forward = trans.get_forward_vector()
 
-        # 相机固定在车后上方
         camera_loc = trans.location - forward * 10 + carla.Location(z=4)
-
-        # 相机看向车
         camera_rot = trans.rotation
-        camera_rot.pitch = -20  # 固定俯视角度
+        camera_rot.pitch = -20
 
         spectator.set_transform(carla.Transform(camera_loc, camera_rot))
 
