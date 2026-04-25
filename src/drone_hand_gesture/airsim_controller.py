@@ -105,6 +105,20 @@ class AirSimController(BaseDroneController):
             self.logger.warning(f"悬停控制失败 - {e}")
 
     def move_by_velocity(self, vx: float, vy: float, vz: float, duration: float = 0.5):
+        """
+        按速度控制无人机
+        
+        AirSim 使用 NED (North-East-Down) 坐标系:
+        - X 轴: 前进方向 (正=前进)
+        - Y 轴: 右移方向 (正=右移)  
+        - Z 轴: 下降方向 (正=下降, 负=上升)
+        
+        Args:
+            vx: 前进速度 (m/s), 正=前进, 负=后退
+            vy: 右移速度 (m/s), 正=右移, 负=左移
+            vz: 垂直速度 (m/s), 正=下降, 负=上升
+            duration: 持续时间 (秒)
+        """
         if not self.connected:
             return
 
