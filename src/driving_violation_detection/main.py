@@ -181,10 +181,12 @@ traffic_manager.vehicle_percentage_speed_difference(vehicle,-50)
 # 减少跟车距离
 traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
 # Spawn camera
+CAMERA_IMAGE_SIZE = 1280
+CAMERA_FOV = 45
 camera_bp = bp_lib.find('sensor.camera.rgb')
-camera_bp.set_attribute('image_size_x', '1024')
-camera_bp.set_attribute('image_size_y', '1024')
-camera_bp.set_attribute('fov', '70')
+camera_bp.set_attribute('image_size_x', str(CAMERA_IMAGE_SIZE))
+camera_bp.set_attribute('image_size_y', str(CAMERA_IMAGE_SIZE))
+camera_bp.set_attribute('fov', str(CAMERA_FOV))
 
 # Adjust camera position and orientation to avoid car front
 #camera_init_trans = carla.Transform(carla.Location(x=2, z=2), carla.Rotation(pitch=-10))
@@ -271,16 +273,25 @@ K = build_projection_matrix(image_w, image_h, fov)
 # 扩大检测距离到20米
 DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
 SIGN_FACE_ALIGNMENT_THRESHOLD = 0.2
+SIGN_LOCATION_ROUND_DIGITS = 1
+MIN_CAPTURE_AREA = 2500
+MIN_CAPTURE_WIDTH = 40
+MIN_CAPTURE_HEIGHT = 40
+MAX_CAPTURE_DISTANCE = 18.0
+FRAME_EDGE_MARGIN_RATIO = 0.08
 
-# Set to track captured traffic sign locations
-captured_sign_locations = set()
+# Track each physical sign and only capture it once when it is clear enough.
+captured_sign_states = {}
 
-# Variable to track the last captured image time
-last_capture_time = 0
-capture_cooldown = 5  # Seconds to wait before capturing another image of the same sign
+
+def get_sign_key(location):
+    return (
+        round(location.x, SIGN_LOCATION_ROUND_DIGITS),
+        round(location.y, SIGN_LOCATION_ROUND_DIGITS),
+        round(location.z, SIGN_LOCATION_ROUND_DIGITS)
+    )
 
 def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_camera):
-    global captured_sign_locations, last_capture_time  # Use global set to track captured sign locations
     bounding_boxes = []
     camera_location = camera_transform.location
     vehicle_location = vehicle_transform.location
@@ -297,11 +308,14 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                 vector_to_camera = obj.location - camera_location
                 camera_dot_product = dot_product(camera_transform.get_forward_vector(), vector_to_camera)
 
-                # Use location tuple to check if sign is not already captured
-                sign_location_tuple = (round(obj.location.x, 2), round(obj.location.y, 2), round(obj.location.z, 2))
+                sign_location_tuple = get_sign_key(obj.location)
+                sign_state = captured_sign_states.setdefault(
+                    sign_location_tuple,
+                    {'captured': False, 'best_area': 0}
+                )
                 if (
                     camera_dot_product > 0 and
-                    sign_location_tuple not in captured_sign_locations and
+                    not sign_state['captured'] and
                     is_sign_front_visible(obj, camera_location)
                 ):
                     verts = [v for v in obj.get_world_vertices(carla.Transform())]
@@ -310,8 +324,9 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                     xmin, xmax = int(min(x_coords)), int(max(x_coords))
                     ymin, ymax = int(min(y_coords)), int(max(y_coords))
 
-                    # Calculate the area of the bounding box
+                    # Larger projected area usually means the sign is closer and clearer.
                     area = (xmax - xmin) * (ymax - ymin)
+                    sign_state['best_area'] = max(sign_state['best_area'], area)
 
                     # Set a threshold for the minimum area to capture the sign
                     # 降低“面积阈值”过滤
@@ -320,16 +335,28 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                     # Check if the bounding box is fully within the image frame
                     if xmin >= 0 and ymin >= 0 and xmax < image_w and ymax < image_h:
                         # Check the size and aspect ratio of the bounding box
-                        aspect_ratio = (xmax - xmin) / float(ymax - ymin) if (ymax - ymin) != 0 else 0
-                        if area > min_area_threshold and 0.5 < aspect_ratio < 2.0:
+                        box_width = xmax - xmin
+                        box_height = ymax - ymin
+                        aspect_ratio = box_width / float(box_height) if box_height != 0 else 0
+                        edge_margin_x = image_w * FRAME_EDGE_MARGIN_RATIO
+                        edge_margin_y = image_h * FRAME_EDGE_MARGIN_RATIO
+                        inside_safe_region = (
+                            xmin >= edge_margin_x and
+                            ymin >= edge_margin_y and
+                            xmax <= image_w - edge_margin_x and
+                            ymax <= image_h - edge_margin_y
+                        )
+                        is_clear_enough = (
+                            area >= MIN_CAPTURE_AREA and
+                            box_width >= MIN_CAPTURE_WIDTH and
+                            box_height >= MIN_CAPTURE_HEIGHT and
+                            distance <= MAX_CAPTURE_DISTANCE and
+                            inside_safe_region
+                        )
+                        if area > min_area_threshold and 0.5 < aspect_ratio < 2.0 and is_clear_enough:
                             bounding_boxes.append(
                                 {'label': 'TrafficSign', 'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax})
-
-                            # Store sign location in the set to avoid multiple captures
-                            current_time = time.time()
-                            if current_time - last_capture_time > capture_cooldown:
-                                captured_sign_locations.add(sign_location_tuple)
-                                last_capture_time = current_time
+                            sign_state['captured'] = True
 
     return bounding_boxes
 
