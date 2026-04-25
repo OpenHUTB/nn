@@ -22,9 +22,10 @@ from configparser import ConfigParser
 import torch as th
 import os
 import sys
+from pathlib import Path
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(CURRENT_DIR))
+CURRENT_DIR = Path(__file__).resolve().parent
+sys.path.append(str(CURRENT_DIR.parent))
 
 
 def get_parser():
@@ -87,29 +88,24 @@ class TrainingThread(QtCore.QThread):
         # ! -----------------------------------初始化文件夹-----------------------------------------
         now = datetime.datetime.now()
         now_string = now.strftime("%Y_%m_%d_%H_%M")
-        file_path = (
-            "logs/"
-            + self.project_name
-            + "/"
-            + now_string
-            + "_"
-            + self.cfg.get("options", "dynamic_name")
-            + "_"
-            + self.cfg.get("options", "policy_name")
-            + "_"
-            + self.cfg.get("options", "algo")
+        run_name = (
+            f"{now_string}_"
+            f"{self.cfg.get('options', 'dynamic_name')}_"
+            f"{self.cfg.get('options', 'policy_name')}_"
+            f"{self.cfg.get('options', 'algo')}"
         )
-        log_path = file_path + "/tb_logs"
-        model_path = file_path + "/models"
-        config_path = file_path + "/config"
-        data_path = file_path + "/data"
+        file_path = Path("logs") / self.project_name / run_name
+        log_path = file_path / "tb_logs"
+        model_path = file_path / "models"
+        config_path = file_path / "config"
+        data_path = file_path / "data"
         os.makedirs(log_path, exist_ok=True)
         os.makedirs(model_path, exist_ok=True)
         os.makedirs(config_path, exist_ok=True)
         os.makedirs(data_path, exist_ok=True)  # 创建用于保存q_map的数据目录
 
         # 保存配置文件
-        with open(config_path + "\config.ini", "w") as configfile:
+        with (config_path / "config.ini").open("w", encoding="utf-8") as configfile:
             self.cfg.write(configfile)
 
         #! -----------------------------------策略选择-------------------------------------
@@ -164,7 +160,7 @@ class TrainingThread(QtCore.QThread):
                 # n_steps = 200,  # 备选参数
                 learning_rate=self.cfg.getfloat("DRL", "learning_rate"),
                 policy_kwargs=policy_kwargs,
-                tensorboard_log=log_path,
+                tensorboard_log=str(log_path),
                 seed=0,
                 verbose=2,
             )
@@ -188,7 +184,7 @@ class TrainingThread(QtCore.QThread):
                 batch_size=self.cfg.getint("DRL", "batch_size"),
                 train_freq=(self.cfg.getint("DRL", "train_freq"), "step"),
                 gradient_steps=self.cfg.getint("DRL", "gradient_steps"),
-                tensorboard_log=log_path,
+                tensorboard_log=str(log_path),
                 seed=0,
                 verbose=2,
             )
@@ -213,7 +209,7 @@ class TrainingThread(QtCore.QThread):
                 train_freq=(self.cfg.getint("DRL", "train_freq"), "step"),
                 gradient_steps=self.cfg.getint("DRL", "gradient_steps"),
                 buffer_size=self.cfg.getint("DRL", "buffer_size"),
-                tensorboard_log=log_path,
+                tensorboard_log=str(log_path),
                 seed=0,
                 verbose=2,
             )
@@ -231,7 +227,7 @@ class TrainingThread(QtCore.QThread):
         print("start training model")
         total_timesteps = self.cfg.getint("options", "total_timesteps")
         self.env.model = model
-        self.env.data_path = data_path
+        self.env.data_path = str(data_path)
 
         # Local checkpoint fallback so training progress is not lost when interrupted.
         checkpoint_freq = 10000
@@ -240,7 +236,7 @@ class TrainingThread(QtCore.QThread):
 
         local_checkpoint_callback = CheckpointCallback(
             save_freq=checkpoint_freq,
-            save_path=model_path,
+            save_path=str(model_path),
             name_prefix="model_sb3_ckpt",
             save_replay_buffer=False,
             save_vecnormalize=False,
@@ -273,7 +269,7 @@ class TrainingThread(QtCore.QThread):
 
         #! ---------------------------模型保存----------------------------------------------------
         model_name = "model_sb3"
-        model.save(model_path + "/" + model_name)
+        model.save(str(model_path / model_name))
 
         print("training finished")
         print("model saved to: {}".format(model_path))
@@ -283,7 +279,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    config_file = "configs/" + args.config + ".ini"
+    config_file = Path("configs") / f"{args.config}.ini"
 
     print(config_file)
 
