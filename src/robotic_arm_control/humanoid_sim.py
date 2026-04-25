@@ -25,6 +25,7 @@ class HumanoidConfig:
     fps: int = 60
     sim_duration: float = 60.0
     enable_vision: bool = True
+    gravity_z: float = -9.81  # 重力加速度 (可以调小用于测试)
 
 
 def setup_logger(name: str = "HumanoidSim") -> logging.Logger:
@@ -48,6 +49,10 @@ logger = setup_logger()
 class HumanoidController:
     """人形机器人控制器"""
 
+    # 站立姿势定义 (双腿完全对称伸直)
+    # 格式: [躯干, 颈部, 左肩, 左肘, 左腕, 右肩, 右肘, 右腕, 左髋, 左膝, 左踝, 右髋, 右膝, 右踝]
+    STANDING_POSE = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+
     # 关节列表 (按 XML 顺序)
     JOINT_NAMES = [
         "torso_joint", "neck_joint",
@@ -68,14 +73,30 @@ class HumanoidController:
             self.joint_ids[name] = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
             self.actuator_ids[name] = i  # actuator 按顺序排列
 
-        # 初始化目标角度
-        self.target_qpos = np.zeros(len(self.JOINT_NAMES))
-        self.pid_kp = np.array([150, 50, 80, 50, 20, 80, 50, 20, 100, 80, 50, 100, 80, 50])
-        self.pid_kd = np.array([15, 5, 8, 5, 2, 8, 5, 2, 10, 8, 5, 10, 8, 5])
+        # 获取pelvis freejoint ID (用于平衡控制)
+        self.pelvis_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "pelvis")
+        self.pelvis_qposadr = model.body_jntadr[self.pelvis_id]  # freejoint在qpos中的起始地址
 
-        # 积分项 (防饱和)
-        self.integral = np.zeros(len(self.JOINT_NAMES))
-        self.last_error = np.zeros(len(self.JOINT_NAMES))
+        # 站立姿势
+        self.standing_pose = np.zeros(len(self.JOINT_NAMES))  # 所有关节目标为0
+        self.target_qpos = self.standing_pose.copy()
+
+        # 初始位置和姿态 (用于保持平衡)
+        self.initial_pelvis_pos = np.array([0, 0, 1.0])  # 初始位置
+        self.initial_pelvis_quat = np.array([1, 0, 0, 0])  # 初始姿态 (w,x,y,z)
+
+        # PD 控制参数 (关节控制)
+        # 躯干 颈部 左肩 左肘 左腕 右肩 右肘 右腕 左髋 左膝 左踝 右髋 右膝 右踝
+        kp = np.array([80, 50, 80, 60, 40, 80, 60, 40, 100, 120, 60, 100, 120, 60])
+        kd = np.array([25, 15, 25, 20, 12, 25, 20, 12, 35, 40, 20, 35, 40, 20])
+        self.pid_kp = kp
+        self.pid_kd = kd
+
+        # 平衡控制参数
+        self.balance_kp_pos = 300   # 位置控制刚度
+        self.balance_kd_pos = 80   # 位置控制阻尼
+        self.balance_kp_rot = 150   # 姿态控制刚度
+        self.balance_kd_rot = 40   # 姿态控制阻尼
 
     def set_target(self, joint_name: str, angle: float):
         """设置单个关节目标角度 (度)"""
@@ -89,7 +110,7 @@ class HumanoidController:
             self.target_qpos = np.radians(angles_deg)
 
     def compute(self, dt: float = 0.002) -> np.ndarray:
-        """计算 PID 控制力矩"""
+        """计算 PD 控制力矩"""
         current_qpos = np.array([self.data.joint(jid).qpos[0] for jid in self.joint_ids.values()])
         current_qvel = np.array([self.data.joint(jid).qvel[0] for jid in self.joint_ids.values()])
 
@@ -97,54 +118,110 @@ class HumanoidController:
         error = self.target_qpos - current_qpos
         error = np.arctan2(np.sin(error), np.cos(error))  # 环绕处理
 
-        # PID 计算
-        self.integral += error * dt
-        self.integral = np.clip(self.integral, -0.5, 0.5)  # 积分限幅
-        derivative = (error - self.last_error) / dt if dt > 1e-6 else 0
-        self.last_error = error.copy()
+        # 误差限幅
+        error = np.clip(error, -0.5, 0.5)
 
-        torque = self.pid_kp * error + self.pid_kd * derivative
+        # PD 控制
+        torque = self.pid_kp * error - self.pid_kd * current_qvel
+
+        # 添加平衡控制 (通过髋关节调整)
+        balance_torque = self._compute_balance_control()
+        torque += balance_torque
+
         return torque
+
+    def _compute_balance_control(self) -> np.ndarray:
+        """计算平衡控制力矩"""
+        # 获取pelvis位置和姿态
+        pelvis_pos = self.data.body(self.pelvis_id).xpos.copy()
+        pelvis_quat = self.data.body(self.pelvis_id).xquat.copy()  # w,x,y,z格式
+
+        # 计算位置误差
+        pos_error = pelvis_pos - self.initial_pelvis_pos
+        pos_vel = self.data.body(self.pelvis_id).cvel[3:6]  # 线速度
+
+        # 计算姿态误差 (使用四元数)
+        quat_error = self._quat_diff(self.initial_pelvis_quat, pelvis_quat)
+        ang_vel = self.data.body(self.pelvis_id).cvel[0:3]  # 角速度
+
+        # 平衡力矩
+        balance_moment = self.balance_kp_rot * quat_error - self.balance_kd_rot * ang_vel
+
+        # 将力矩分配到关节 (躯干和髋关节负责平衡)
+        # torso: 0, neck: 1, 左髋: 8, 右髋: 11
+        balance_torque = np.zeros(len(self.JOINT_NAMES))
+        balance_torque[0] = balance_moment[2] * 0.5  # 躯干yaw
+        balance_torque[8] = -quat_error[0] * 50 - pos_error[0] * 100  # 左髋
+        balance_torque[11] = quat_error[0] * 50 + pos_error[0] * 100  # 右髋
+
+        # X方向倾斜控制
+        balance_torque[8] += -quat_error[1] * 50 - pos_error[1] * 80
+        balance_torque[11] += -quat_error[1] * 50 - pos_error[1] * 80
+
+        return balance_torque
+
+    def _quat_diff(self, quat1: np.ndarray, quat2: np.ndarray) -> np.ndarray:
+        """计算两个四元数之间的误差角 (绕x,y,z轴)"""
+        # 四元数乘法: q1 * conj(q2)
+        w1, x1, y1, z1 = quat1
+        w2, x2, y2, z2 = quat2
+
+        # conj(quat2)
+        w2_c, x2_c, y2_c, z2_c = w2, -x2, -y2, -z2
+
+        # q = q1 * conj(q2)
+        w = w1*w2_c - x1*x2_c - y1*y2_c - z1*z2_c
+        x = w1*x2_c + x1*w2_c + y1*z2_c - z1*y2_c
+        y = w1*y2_c - x1*z2_c + y1*w2_c + z1*x2_c
+        z = w1*z2_c + x1*y2_c - y1*x2_c + z1*w2_c
+
+        # 转换为欧拉角 (简化的yaw-pitch-roll)
+        # 从四元数提取角度
+        error_angle_x = np.arctan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
+        error_angle_y = np.arcsin(np.clip(2*(w*y - z*x), -1, 1))
+        error_angle_z = np.arctan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
+
+        return np.array([error_angle_x, error_angle_y, error_angle_z])
 
     def reset(self):
         """重置控制器"""
-        self.integral.fill(0)
-        self.last_error.fill(0)
 
 
 # ======================== 仿真器 ========================
 class HumanoidSimulator:
     """人形机器人仿真器"""
 
-    # 预设姿势
+    # 站立待机姿势 (关键：腿部分开，重心在中间)
+    STANDING_POSE = HumanoidController.STANDING_POSE
+
     PRESETS = {
         "idle": {
             "name": "站立待机",
-            "angles": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "angles": STANDING_POSE,
         },
         "wave_left": {
             "name": "左手挥手",
-            "angles": [0, 0, -80, -60, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            "angles": [0, 0, -70, -45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         },
         "wave_right": {
             "name": "右手挥手",
-            "angles": [0, 0, 0, 0, 0, 80, 60, -20, 0, 0, 0, 0, 0, 0],
+            "angles": [0, 0, 0, 0, 0, 70, 45, 0, 0, 0, 0, 0, 0, 0],
         },
         "arms_up": {
             "name": "双臂举起",
-            "angles": [0, 0, -120, -90, 0, 120, 90, 0, 0, 0, 0, 0, 0, 0],
+            "angles": [0, 0, -90, -80, 0, 90, 80, 0, 0, 0, 0, 0, 0, 0],
         },
         "squat": {
             "name": "蹲下",
-            "angles": [0, 0, 0, 0, 0, 0, 0, 0, 0, 80, -30, 0, 80, -30],
+            "angles": [0, 0, 0, 0, 0, 0, 0, 0, 0, -45, -15, 0, 45, 15],
         },
         "tilt_left": {
             "name": "身体左倾",
-            "angles": [20, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, -10, 0, 0],
+            "angles": [15, 0, 0, 0, 0, 0, 0, 0, 10, 0, 0, -10, 0, 0],
         },
         "tilt_right": {
             "name": "身体右倾",
-            "angles": [-20, 0, 0, 0, 0, 0, 0, 0, -10, 0, 0, 10, 0, 0],
+            "angles": [-15, 0, 0, 0, 0, 0, 0, 0, -10, 0, 0, 10, 0, 0],
         },
     }
 
@@ -157,6 +234,8 @@ class HumanoidSimulator:
         self._load_model()
         # 初始化控制器
         self.controller = HumanoidController(self.model)
+        # 初始化站立姿势
+        self._init_standing_pose()
 
         logger.info(f"人形机器人加载成功 | 关节数: {len(self.controller.JOINT_NAMES)}")
 
@@ -168,6 +247,26 @@ class HumanoidSimulator:
 
         self.model = mujoco.MjModel.from_xml_path(model_path)
         self.data = mujoco.MjData(self.model)
+
+        # 应用重力设置
+        self.model.opt.gravity[2] = self.config.gravity_z
+
+    def _init_standing_pose(self):
+        """初始化站立姿势"""
+        standing_rad = np.radians(self.STANDING_POSE)
+        for i, name in enumerate(self.controller.JOINT_NAMES):
+            jid = self.controller.joint_ids[name]
+            self.data.joint(jid).qpos[0] = standing_rad[i]
+            self.data.joint(jid).qvel[0] = 0
+        # 更新前向运动学
+        mujoco.mj_forward(self.model, self.data)
+
+        # 记录pelvis初始位置和姿态
+        self.controller.initial_pelvis_pos = self.data.body(self.controller.pelvis_id).xpos.copy()
+        self.controller.initial_pelvis_quat = self.data.body(self.controller.pelvis_id).xquat.copy()
+
+        # 确保初始控制目标与初始姿势一致
+        self.controller.target_qpos = self.controller.standing_pose.copy()
 
     def get_joint_positions(self) -> List[float]:
         """获取所有关节当前角度 (度)"""
@@ -207,28 +306,28 @@ class HumanoidSimulator:
         preset = self.PRESETS[preset_name]
         target_angles = preset["angles"]
 
-        # 保存目标用于平滑过渡
-        self._target_angles = np.array(target_angles, dtype=np.float64)
+        # 保存当前角度用于平滑过渡 (从当前角度过渡到目标角度)
+        self._start_angles = self.controller.target_qpos.copy()
+        self._target_angles = np.radians(target_angles)
         self._transition_start = time.time()
-        self._transition_duration = transition_time
+        self._transition_duration = max(transition_time, 0.3)
 
         logger.info(f"切换到姿势: {preset['name']}")
 
     def _update_pose_transition(self):
         """更新姿势过渡"""
-        if hasattr(self, '_target_angles'):
+        if hasattr(self, '_target_angles') and hasattr(self, '_start_angles'):
             elapsed = time.time() - self._transition_start
             t = min(elapsed / self._transition_duration, 1.0)
             # 使用 smoothstep 曲线平滑过渡
             t_smooth = t * t * (3 - 2 * t)
 
-            current = np.array(self.get_joint_positions())
-            target = self._target_angles
-            interpolated = current + (target - current) * t_smooth * 0.3
-            self.controller.set_targets_all(interpolated.tolist())
+            # 从当前角度平滑过渡到目标角度
+            self.controller.target_qpos = self._start_angles * (1 - t_smooth) + self._target_angles * t_smooth
 
             if t >= 1.0:
                 del self._target_angles
+                del self._start_angles
 
     # 演示模式的姿势序列
     DEMO_PRESETS = ["idle", "wave_left", "idle", "arms_up", "idle", "squat", "idle", "wave_right", "idle"]
@@ -243,8 +342,10 @@ class HumanoidSimulator:
         self.last_demo_switch = time.time()
         self.demo_interval = 3.0
 
-        # 初始姿势
-        self.apply_pose("idle", transition_time=0.5)
+        # 初始姿势 (使用站立姿势，已包含右腿方向修正)
+        self.controller.target_qpos = self.controller.standing_pose.copy()
+        # 重置调试计数器
+        self.controller._debug_counter = 0
 
         # 启动命令监听线程
         if mode == "interactive":
@@ -272,7 +373,7 @@ class HumanoidSimulator:
                     # 施加控制力
                     for i, name in enumerate(self.controller.JOINT_NAMES):
                         act_id = self.controller.actuator_ids[name]
-                        self.data.ctrl[act_id] = np.clip(torque[i], -50, 50)
+                        self.data.ctrl[act_id] = np.clip(torque[i], -150, 150)
 
                     # 仿真一步
                     mujoco.mj_step(self.model, self.data)
@@ -362,27 +463,36 @@ class HumanoidSimulator:
 # ======================== 主函数 ========================
 def main():
     """主函数"""
+    print("\n" + "="*50)
+    print("      人形机器人 MuJoCo 仿真器")
+    print("="*50)
+    print("重力设置:")
+    print("  1. 正常重力 (9.81 m/s²)")
+    print("  2. 低重力 (3.0 m/s²) - 更容易保持平衡")
+    print("  3. 零重力 (0.0 m/s²) - 仅测试关节控制")
+    print("\n运行模式:")
+    print("  a. 交互模式 (命令行控制)")
+    print("  b. 演示模式 (自动循环姿势)")
+    print("="*50)
+
+    gravity_choice = input("\n选择重力 [1/2/3]: ").strip()
+    gravity_map = {"1": -9.81, "2": -3.0, "3": 0.0}
+    gravity = gravity_map.get(gravity_choice, -9.81)
+
+    mode_choice = input("选择模式 [a/b]: ").strip()
+    mode = "demo" if mode_choice == "b" else "interactive"
+
     config = HumanoidConfig(
         model_path=os.path.join(os.path.dirname(__file__), "model/humanoid.xml"),
         fps=60,
         sim_duration=120.0,
+        gravity_z=gravity,
     )
 
-    print("\n" + "="*50)
-    print("      人形机器人 MuJoCo 仿真器")
-    print("="*50)
-    print("1. 交互模式 (命令行控制)")
-    print("2. 演示模式 (自动循环姿势)")
-    print("="*50)
-
-    choice = input("\n选择模式 [1/2]: ").strip()
+    print(f"\n启动仿真 | 重力: {abs(gravity):.2f} m/s² | 模式: {mode}\n")
 
     simulator = HumanoidSimulator(config)
-
-    if choice == "2":
-        simulator.run(mode="demo")
-    else:
-        simulator.run(mode="interactive")
+    simulator.run(mode=mode)
 
 
 if __name__ == "__main__":
