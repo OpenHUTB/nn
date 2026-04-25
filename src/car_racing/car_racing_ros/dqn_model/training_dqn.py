@@ -23,6 +23,7 @@ DQN 训练脚本
 """
 import os
 import sys
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 
 import matplotlib
 import torch
@@ -140,7 +141,7 @@ when2save = 100000           # 每隔几步保存模型
 when2log = 10                # 每隔几个 episode 写入日志
 
 # 报告类型: 'plot' 显示实时曲线, 'text' 打印文字, None 静默
-report_type = 'plot'
+report_type = 'text'
 
 
 # ================================================================================
@@ -307,7 +308,7 @@ def evaluate_agent(agent, num_episodes=5, render=False):
 
 
 # 运行评估
-avg_score = evaluate_agent(driver, num_episodes=5, render=True)
+avg_score = evaluate_agent(driver, num_episodes=5, render=False)
 
 print("=" * 50)
 print(f"评估完成！平均得分: {avg_score:.1f}")
