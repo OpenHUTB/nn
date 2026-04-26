@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn.functional as F
 from td3_models import Actor, Critic
 
+
 class ReplayBuffer:
     def __init__(self, capacity=1000000):
         self.capacity = capacity
@@ -37,6 +38,7 @@ class ReplayBuffer:
     def __len__(self):
         return len(self.buffer)
 
+
 class TD3Agent:
     def __init__(self, state_dim, action_dim, max_action, device, use_cnn=True):
         self.device = device
@@ -62,14 +64,32 @@ class TD3Agent:
         self.batch_size = 64
         self.gamma = 0.99
         self.tau = 0.005
-        self.policy_noise = 0.2
-        self.noise_clip = 0.5
+        self.policy_noise = 0.08
+        self.noise_clip = 0.2
         self.policy_freq = 2
         self.total_it = 0
 
-    def select_action(self, state):
+        # 动作平滑相关
+        self.last_action = None
+        self.smooth_alpha = 0.9
+
+    def select_action(self, state, smooth=True):
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-        return self.actor(state).cpu().data.numpy().flatten()
+        action = self.actor(state).cpu().data.numpy().flatten()
+
+        if smooth and self.last_action is not None:
+            action = self.smooth_alpha * action + (1 - self.smooth_alpha) * self.last_action
+
+        action[0] = np.clip(action[0], -0.55, 0.55)
+        action[0] *= 0.7
+
+        # 死区：微小转向直接置0
+        if abs(action[0]) < 0.06:
+            action[0] = 0.0
+
+        self.last_action = action.copy()
+        return action
+
 
     def train(self):
         if len(self.replay_buffer) < self.batch_size * 10:
@@ -84,13 +104,17 @@ class TD3Agent:
         done = done.to(self.device)
 
         noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
+        # 对转向动作单独降低噪声
+        noise[:, 0] = noise[:, 0] * 0.5
         next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
 
+        # 计算目标 Q 值
         target_q1 = self.critic1_target(next_state, next_action)
         target_q2 = self.critic2_target(next_state, next_action)
         target_q = torch.min(target_q1, target_q2)
         target_q = reward + (1 - done) * self.gamma * target_q
 
+        # 更新 Critic
         current_q1 = self.critic1(state, action)
         current_q2 = self.critic2(state, action)
         critic_loss = F.mse_loss(current_q1, target_q) + F.mse_loss(current_q2, target_q)
@@ -99,6 +123,7 @@ class TD3Agent:
         critic_loss.backward()
         self.critic_optimizer.step()
 
+        # 延迟更新 Actor
         if self.total_it % self.policy_freq == 0:
             actor_loss = -self.critic1(state, self.actor(state)).mean()
 
@@ -106,6 +131,7 @@ class TD3Agent:
             actor_loss.backward()
             self.actor_optimizer.step()
 
+            # 软更新目标网络
             for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
                 target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
             for param, target_param in zip(self.critic1.parameters(), self.critic1_target.parameters()):
