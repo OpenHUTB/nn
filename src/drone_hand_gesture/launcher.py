@@ -3,6 +3,11 @@ import sys
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
+from pathlib import Path
+
+# 获取当前脚本所在目录
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
 
 from core import ConfigManager, Logger
 
@@ -59,10 +64,16 @@ class Launcher:
     def _launch_simulation(self):
         try:
             self.logger.info("启动本地仿真模式 (新架构)...")
-            if os.path.exists("main_v2.py"):
+            # 使用相对于脚本目录的路径
+            main_v2_path = SCRIPT_DIR / "main_v2.py"
+            main_path = SCRIPT_DIR / "main.py"
+            
+            if main_v2_path.exists():
+                os.chdir(SCRIPT_DIR)
                 os.system(f"{sys.executable} main_v2.py")
-            elif os.path.exists("main.py"):
+            elif main_path.exists():
                 self.logger.info("使用旧版 main.py")
+                os.chdir(SCRIPT_DIR)
                 os.system(f"{sys.executable} main.py")
             else:
                 messagebox.showinfo("提示", "正在启动仿真模式")
@@ -73,7 +84,11 @@ class Launcher:
     def _launch_airsim(self):
         try:
             self.logger.info("启动 AirSim 模式...")
-            if os.path.exists("main_airsim.py"):
+            # 使用相对于脚本目录的路径
+            main_airsim_path = SCRIPT_DIR / "main_airsim.py"
+            
+            if main_airsim_path.exists():
+                os.chdir(SCRIPT_DIR)
                 os.system(f"{sys.executable} main_airsim.py")
             else:
                 messagebox.showinfo("提示", "正在启动 AirSim 模式，请运行 main_airsim.py 文件")

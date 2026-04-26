@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 import tkinter as tk
 from tkinter import ttk, messagebox
+from pathlib import Path
 from typing import Optional, Callable
+
+# 获取当前脚本所在目录
+BASE_DIR = Path(__file__).resolve().parent
 
 from core import ConfigManager, Logger
 

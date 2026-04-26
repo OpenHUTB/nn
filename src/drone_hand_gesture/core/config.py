@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+# 获取当前脚本所在目录的父目录（drone_hand_gesture 目录）
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 class ConfigManager:
     DEFAULT_CONFIG: Dict[str, Any] = {
@@ -43,8 +46,12 @@ class ConfigManager:
         }
     }
 
-    def __init__(self, config_path: str = "config.json"):
-        self.config_path = Path(config_path)
+    def __init__(self, config_path: Optional[str] = None):
+        # 如果没有指定路径，使用相对于项目根目录的默认路径
+        if config_path is None:
+            self.config_path = BASE_DIR / "config.json"
+        else:
+            self.config_path = Path(config_path)
         self.config: Dict[str, Any] = self.DEFAULT_CONFIG.copy()
         self._load_config()
 
