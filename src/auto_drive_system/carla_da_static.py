@@ -1,21 +1,6 @@
 """
-Carla自动驾驶避障演示程序
-
-模块名称: carla_obstacle_avoidance
-功能描述: 在Carla模拟器中实现静止障碍物的自动检测和避让
-核心算法: 纯追踪算法(Pure Pursuit)控制车辆转向
-
-依赖库:
-    - carla: CARLA模拟器API
-    - numpy: 数值计算
-    - opencv-python: 图像处理
-    - math: 数学计算
-
-运行环境:
-    - Carla模拟器运行在 localhost:2000
-    - Python 3.7+
+简单实现静止障碍车自动避障
 """
-
 
 import carla
 import time
@@ -76,7 +61,7 @@ def spawn_obstacles(world, blueprint_library, vehicle, num_obstacles=3, distance
         obstacles.append(obstacle)  # 将障碍物添加到障碍物列表
 
     return obstacles
-# 纯追踪算法实现转向控制
+
 
 def pure_pursuit(tar_location, v_transform):
     L = 2.875  # 汽车轴距
@@ -175,7 +160,7 @@ try:
         # 视角设置
         vehicle_transform = vehicle.get_transform()
         spectator = world.get_spectator()
-        offset = carla.Location(x=-6.0, z=2.5)  # 车辆后方 6 米，高度 2.5 米
+        offset = carla.Location(x=-6.0, z=6)  # 车辆后方 6 米，高度 2.5 米
         spectator.set_transform(carla.Transform(
             vehicle_transform.location + vehicle_transform.get_forward_vector() * offset.x + offset,
             vehicle_transform.rotation
