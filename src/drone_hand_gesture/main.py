@@ -152,6 +152,11 @@ class IntegratedDroneSimulation:
         self.current_gesture = None
         self.gesture_confidence = 0.0
         self.hand_landmarks = None
+        self.current_intensity = 0.5  # 当前手势强度
+
+        # 连续控制参数
+        self.continuous_control_enabled = True  # 启用连续控制
+        self.continuous_control_interval = 0.3  # 连续控制间隔（秒）
 
         # 控制参数（降低阈值以提高识别率）
         self.control_intensity = 1.0
@@ -566,13 +571,25 @@ class IntegratedDroneSimulation:
               f"{self.drone_controller.state['position'][2]:.1f})")
 
     def _process_gesture_command(self, gesture, confidence):
-        """处理手势命令（使用降低的阈值）"""
+        """处理手势命令（支持连续手势强度控制）"""
         current_time = time.time()
 
         # 获取该手势的阈值（降低以提高识别率）
         threshold = self.gesture_thresholds.get(gesture, self.gesture_thresholds['default'])
 
-        # 检查是否在冷却期内
+        # 计算手势强度（如果有手部关键点）
+        intensity = 0.5
+        intensity_info = None
+        if self.hand_landmarks:
+            intensity = self.gesture_detector.get_gesture_intensity(
+                self.hand_landmarks, gesture
+            )
+            # 获取详细强度信息
+            if len(self.hand_landmarks) > 21 and 'intensity_info' in self.hand_landmarks[-1]:
+                intensity_info = self.hand_landmarks[-1]['intensity_info']
+            self.current_intensity = intensity
+
+        # 检查是否在冷却期内（仅针对新手势触发）
         in_cooldown = current_time - self.last_command_time <= self.command_cooldown
 
         # 检查是否是重复手势（避免频繁处理同一个手势）
@@ -591,16 +608,12 @@ class IntegratedDroneSimulation:
             command = self.gesture_detector.get_command(gesture)
 
             if command != "none":
-                # 计算手势强度（如果有手部关键点）
-                intensity = 1.0
-                if self.hand_landmarks:
-                    intensity = self.gesture_detector.get_gesture_intensity(
-                        self.hand_landmarks, gesture
-                    )
-
                 # 添加调试信息
+                palm_info = ""
+                if intensity_info:
+                    palm_info = f" 手掌:{intensity_info['palm_openness']:.0%}"
                 print(
-                    f"[INFO] 检测到手势: {gesture} (置信度: {confidence:.2f}, 阈值: {threshold}) -> 执行: {command} (强度: {intensity:.2f})")
+                    f"[INFO] 检测到手势: {gesture} (置信度:{confidence:.2f}) -> 执行:{command} (速度:{intensity:.0%}){palm_info}")
 
                 # 发送命令到控制器
                 self.drone_controller.send_command(command, intensity)
@@ -612,6 +625,27 @@ class IntegratedDroneSimulation:
                 self.last_command_time = current_time
                 self.last_processed_gesture = gesture
                 self.last_processed_time = current_time
+
+                # 存储当前命令用于连续控制
+                self.current_command = command
+
+        # 连续控制：持续手势时动态调整速度
+        elif (gesture not in ["no_hand", "hand_detected"] and
+              same_gesture and
+              self.continuous_control_enabled and
+              current_time - getattr(self, 'last_continuous_time', 0) >= self.continuous_control_interval):
+
+            command = self.gesture_detector.get_command(gesture)
+
+            if command != "none" and command in ["forward", "backward", "up", "down", "left", "right"]:
+                # 根据强度动态调整速度
+                self.drone_controller.send_command(command, intensity)
+                self.last_continuous_time = current_time
+
+        # 无手势时停止移动
+        elif gesture in ["no_hand", "hand_detected"]:
+            self.current_command = None
+
         elif gesture not in ["no_hand", "hand_detected"] and confidence > 0.3:
             # 只在调试模式下显示检测到但未触发的情况
             debug_mode = False  # 可以设为True启用详细调试
