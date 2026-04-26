@@ -1,5 +1,6 @@
 import os
 import random
+import argparse
 from dataclasses import dataclass
 
 import cv2
@@ -25,6 +26,17 @@ DRAW_OBJECT_COLORS = {
     1: (70, 190, 255),
     2: (255, 160, 60),
 }
+
+DEFAULT_EFFECT_IMAGE_PATH = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "docs",
+        "driverless_car",
+        "camera_radar_fusion_demo.png",
+    )
+)
 
 
 def iou_xyxy(box_a, box_b):
@@ -92,10 +104,12 @@ def draw_label(frame, text, x1, y1, color):
     font = cv2.FONT_HERSHEY_SIMPLEX
     scale = 0.55
     thickness = 2
+    frame_w = frame.shape[1]
     (tw, th), baseline = cv2.getTextSize(text, font, scale, thickness)
     top = max(0, y1 - th - baseline - 10)
-    cv2.rectangle(frame, (x1, top), (x1 + tw + 8, top + th + baseline + 8), color, -1)
-    cv2.putText(frame, text, (x1 + 4, top + th + 2), font, scale, (0, 0, 0), thickness, cv2.LINE_AA)
+    left = int(np.clip(x1, 0, max(frame_w - tw - 8, 0)))
+    cv2.rectangle(frame, (left, top), (left + tw + 8, top + th + baseline + 8), color, -1)
+    cv2.putText(frame, text, (left + 4, top + th + 2), font, scale, (0, 0, 0), thickness, cv2.LINE_AA)
 
 
 @dataclass
@@ -389,6 +403,7 @@ class PerceptionDemo:
             box = track.current_bbox()
             x1, y1, x2, y2 = box
             center = np.array([(x1 + x2) / 2.0, (y1 + y2) / 2.0], dtype=np.float32)
+            diagonal = max(np.linalg.norm([x2 - x1, y2 - y1]), 1.0)
             best_idx = None
             best_score = float("inf")
             for idx, radar in enumerate(radar_measurements):
@@ -398,7 +413,7 @@ class PerceptionDemo:
                 if score < best_score:
                     best_score = score
                     best_idx = idx
-            if best_idx is not None:
+            if best_idx is not None and best_score <= diagonal * 0.8:
                 used_radar.add(best_idx)
                 fused_results.append((track, radar_measurements[best_idx]))
             else:
@@ -417,9 +432,10 @@ class PerceptionDemo:
             x1, y1, x2, y2 = box
             cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
             info = ALLOWED_CLASSES[track.cls_id]
+            range_source = "Radar" if radar is not None else "Camera"
             label = (
                 f"ID {track.track_id} {info['label']} "
-                f"Radar {distance_m:.1f}m {risk_text} conf {track.score:.2f}"
+                f"{range_source} {distance_m:.1f}m {risk_text} conf {track.score:.2f}"
             )
             draw_label(frame, label, x1, y1, color)
             if radar is not None:
@@ -427,11 +443,11 @@ class PerceptionDemo:
                 box_center = ((x1 + x2) // 2, (y1 + y2) // 2)
                 cv2.circle(frame, radar_point, 6, (255, 255, 0), -1)
                 cv2.line(frame, radar_point, box_center, (255, 255, 0), 2)
-                radar_text = f"Radar {radar.distance_m:.1f}m | {radar.velocity_mps:+.1f}m/s"
+                radar_text = f"Speed {radar.velocity_mps:+.1f}m/s"
                 cv2.putText(
                     frame,
                     radar_text,
-                    (x1, min(frame_h - 10, y2 + 24)),
+                    (x1, min(frame_h - 10, y2 + 22)),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.55,
                     (255, 255, 0),
@@ -466,7 +482,9 @@ class PerceptionDemo:
         fused_tracks = self.fuse_radar_with_tracks(tracks, radar_measurements)
         return self.annotate_tracks(frame.copy(), fused_tracks)
 
-def generate_effect_image(output_path=None, num_frames=18):
+def generate_effect_image(output_path=None, num_frames=18, seed=7):
+    random.seed(seed)
+    np.random.seed(seed)
     env = VirtualEnv()
     demo = PerceptionDemo(load_model=False)
     final_frame = None
@@ -482,13 +500,30 @@ def generate_effect_image(output_path=None, num_frames=18):
         )
 
     if output_path is None:
-        output_path = os.path.join(os.path.dirname(__file__), "outputs", "camera_radar_fusion_demo.png")
+        output_path = DEFAULT_EFFECT_IMAGE_PATH
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cv2.imwrite(output_path, final_frame)
     return output_path
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Driverless car camera-radar fusion mock demo")
+    parser.add_argument("--save-only", action="store_true", help="Only export the effect image without opening the demo window")
+    parser.add_argument("--output", type=str, default=None, help="Custom output image path")
+    parser.add_argument("--frames", type=int, default=18, help="Warm-up frames before saving the effect image")
+    parser.add_argument("--seed", type=int, default=7, help="Random seed used for deterministic demo output")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+    if args.save_only:
+        output_path = generate_effect_image(output_path=args.output, num_frames=args.frames, seed=args.seed)
+        print(f"效果图已保存: {output_path}")
+        return
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
     env = VirtualEnv()
     demo = PerceptionDemo(load_model=False)
     cv2.namedWindow("Driverless Car Camera Radar Fusion Demo", cv2.WINDOW_NORMAL)
@@ -507,7 +542,7 @@ def main():
         if cv2.waitKey(30) & 0xFF == ord("q"):
             break
 
-    output_path = generate_effect_image()
+    output_path = generate_effect_image(output_path=args.output, num_frames=args.frames, seed=args.seed)
     print(f"效果图已保存: {output_path}")
     cv2.destroyAllWindows()
 
