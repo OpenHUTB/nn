@@ -43,6 +43,8 @@ class Actor(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = torch.tanh(self.fc3(x))
+        # 输出前再次限制转向动作
+        x[:, 0] = x[:, 0] * 0.8  # 转向输出额外衰减20%
         return self.max_action * x
 
 # Critic 价值网络

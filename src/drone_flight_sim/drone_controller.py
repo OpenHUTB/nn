@@ -10,16 +10,29 @@
 
 # 导入 AirSim 库，用于与仿真器通信
 import airsim
+
 # 导入 time 模块，用于延时和超时控制
 import time
+
 # 导入 os 模块，用于创建目录和路径操作
 import os
+
 # 导入 cv2 (OpenCV) 模块，用于图像处理
 import cv2
+
 # 导入 numpy 模块，用于数值计算
 import numpy as np
-# 从 config 模块导入飞行配置参数和相机配置
-from config import FlightConfig, RGB_CAMERA_NAME, DEFAULT_IMAGE_COUNT
+
+# 从 config 模块导入飞行配置参数、相机配置和键盘控制参数
+from config import (
+    FlightConfig,
+    RGB_CAMERA_NAME,
+    DEFAULT_IMAGE_COUNT,
+    KEYBOARD_VELOCITY,
+    KEYBOARD_YAW_RATE,
+    KEYBOARD_STEP,
+)
+
 # 从 collision_handler 模块导入碰撞处理器
 from collision_handler import CollisionHandler
 
@@ -68,6 +81,9 @@ class DroneController:
         # 创建保存目录（如果不存在）
         self._ensure_output_dir()
 
+        # 键盘控制速度属性（供 keyboard_control.py 使用）
+        self.velocity = KEYBOARD_VELOCITY
+
     def takeoff(self):
         """执行起飞操作
 
@@ -98,7 +114,9 @@ class DroneController:
 
         # 获取当前位置并打印
         pos = self.get_position()
-        print(f"✅ 起飞完成，当前位置: ({pos.x_val:.1f}, {pos.y_val:.1f}, {pos.z_val:.1f})")
+        print(
+            f"✅ 起飞完成，当前位置: ({pos.x_val:.1f}, {pos.y_val:.1f}, {pos.z_val:.1f})"
+        )
         return True
 
     def fly_to_position(self, x, y, z, velocity=None):
@@ -125,7 +143,9 @@ class DroneController:
         # 获取起始位置
         start_pos = self.get_position()
         # 打印起始位置信息
-        print(f"   起始位置: ({start_pos.x_val:.1f}, {start_pos.y_val:.1f}, {start_pos.z_val:.1f})")
+        print(
+            f"   起始位置: ({start_pos.x_val:.1f}, {start_pos.y_val:.1f}, {start_pos.z_val:.1f})"
+        )
 
         # 发送异步飞往目标位置的命令（非阻塞）
         self.client.moveToPositionAsync(x, y, z, velocity)
@@ -172,7 +192,9 @@ class DroneController:
         for attempt in range(FlightConfig.LANDING_MAX_ATTEMPTS):
             try:
                 # 打印当前尝试次数
-                print(f"   尝试 {attempt + 1}/{FlightConfig.LANDING_MAX_ATTEMPTS}: 稳定无人机...")
+                print(
+                    f"   尝试 {attempt + 1}/{FlightConfig.LANDING_MAX_ATTEMPTS}: 稳定无人机..."
+                )
                 # 进入悬停状态
                 self.client.hoverAsync().join()
                 # 等待 1 秒稳定
@@ -197,7 +219,12 @@ class DroneController:
                 self.client.landAsync().join()
 
                 # 等待降落完成，轮询检查高度
-                for _ in range(int(FlightConfig.LANDING_MAX_WAIT / FlightConfig.LANDING_CHECK_INTERVAL)):
+                for _ in range(
+                    int(
+                        FlightConfig.LANDING_MAX_WAIT
+                        / FlightConfig.LANDING_CHECK_INTERVAL
+                    )
+                ):
                     # 等待检查间隔时间
                     time.sleep(FlightConfig.LANDING_CHECK_INTERVAL)
                     # 获取当前 Z 轴坐标
@@ -276,7 +303,9 @@ class DroneController:
         # 获取当前位置
         pos = self.get_position()
         # 计算到目标点的欧几里得距离
-        distance = ((pos.x_val - x)**2 + (pos.y_val - y)**2 + (pos.z_val - z)**2)**0.5
+        distance = (
+            (pos.x_val - x) ** 2 + (pos.y_val - y) ** 2 + (pos.z_val - z) ** 2
+        ) ** 0.5
         # 比较距离与容差值
         return distance < FlightConfig.ARRIVAL_TOLERANCE
 
@@ -348,9 +377,13 @@ class DroneController:
             # 调用 AirSim API 捕获图像
             # CameraType: 0 = 视角相机（RGB），1 = 深度，2 = 分割
             # ImageType: 0 = 场景（RGB），1 = 深度，2 = 分割，3 = 表面法线，4 = 红外
-            responses = self.client.simGetImages([
-                airsim.ImageRequest(RGB_CAMERA_NAME, airsim.ImageType.Scene, False, False)
-            ])
+            responses = self.client.simGetImages(
+                [
+                    airsim.ImageRequest(
+                        RGB_CAMERA_NAME, airsim.ImageType.Scene, False, False
+                    )
+                ]
+            )
 
             # 检查响应是否有效
             if responses is None or len(responses) == 0:
@@ -413,9 +446,13 @@ class DroneController:
             filepath = os.path.join(self.output_dir, filename)
 
             # 获取深度图像
-            responses = self.client.simGetImages([
-                airsim.ImageRequest(RGB_CAMERA_NAME, airsim.ImageType.DepthPerspective, True, False)
-            ])
+            responses = self.client.simGetImages(
+                [
+                    airsim.ImageRequest(
+                        RGB_CAMERA_NAME, airsim.ImageType.DepthPerspective, True, False
+                    )
+                ]
+            )
 
             if responses is None or len(responses) == 0:
                 print("❌ 未能获取深度图像数据")
@@ -467,9 +504,13 @@ class DroneController:
             filepath = os.path.join(self.output_dir, filename)
 
             # 获取分割图像
-            responses = self.client.simGetImages([
-                airsim.ImageRequest(RGB_CAMERA_NAME, airsim.ImageType.Segmentation, False, False)
-            ])
+            responses = self.client.simGetImages(
+                [
+                    airsim.ImageRequest(
+                        RGB_CAMERA_NAME, airsim.ImageType.Segmentation, False, False
+                    )
+                ]
+            )
 
             if responses is None or len(responses) == 0:
                 print("❌ 未能获取分割图像数据")
@@ -512,11 +553,19 @@ class DroneController:
                 prefix = f"all_{timestamp}_{pos.x_val:.1f}_{pos.y_val:.1f}"
 
             # 同时请求三种图像
-            responses = self.client.simGetImages([
-                airsim.ImageRequest(RGB_CAMERA_NAME, airsim.ImageType.Scene, False, False),
-                airsim.ImageRequest(RGB_CAMERA_NAME, airsim.ImageType.DepthPerspective, True, False),
-                airsim.ImageRequest(RGB_CAMERA_NAME, airsim.ImageType.Segmentation, False, False)
-            ])
+            responses = self.client.simGetImages(
+                [
+                    airsim.ImageRequest(
+                        RGB_CAMERA_NAME, airsim.ImageType.Scene, False, False
+                    ),
+                    airsim.ImageRequest(
+                        RGB_CAMERA_NAME, airsim.ImageType.DepthPerspective, True, False
+                    ),
+                    airsim.ImageRequest(
+                        RGB_CAMERA_NAME, airsim.ImageType.Segmentation, False, False
+                    ),
+                ]
+            )
 
             if responses is None or len(responses) < 3:
                 print("❌ 未能获取完整的图像数据")
@@ -529,23 +578,25 @@ class DroneController:
             img_rgb = img1d.reshape(responses[0].height, responses[0].width, 3)
             rgb_path = os.path.join(self.output_dir, f"{prefix}_rgb.png")
             cv2.imwrite(rgb_path, img_rgb)
-            result['rgb'] = rgb_path
+            result["rgb"] = rgb_path
 
             # 处理深度图像
             img1d = np.array(responses[1].image_data_float, dtype=np.float32)
             img_depth = img1d.reshape(responses[1].height, responses[1].width)
             img_normalized = cv2.normalize(img_depth, None, 0, 255, cv2.NORM_MINMAX)
-            img_depth_colored = cv2.applyColorMap(img_normalized.astype(np.uint8), cv2.COLORMAP_JET)
+            img_depth_colored = cv2.applyColorMap(
+                img_normalized.astype(np.uint8), cv2.COLORMAP_JET
+            )
             depth_path = os.path.join(self.output_dir, f"{prefix}_depth.png")
             cv2.imwrite(depth_path, img_depth_colored)
-            result['depth'] = depth_path
+            result["depth"] = depth_path
 
             # 处理分割图像
             img1d = np.frombuffer(responses[2].image_data_uint8, dtype=np.uint8)
             img_seg = img1d.reshape(responses[2].height, responses[2].width, 3)
             seg_path = os.path.join(self.output_dir, f"{prefix}_seg.png")
             cv2.imwrite(seg_path, img_seg)
-            result['segmentation'] = seg_path
+            result["segmentation"] = seg_path
 
             pos = self.get_position()
             print(f"📸 全景拍照成功！保存 3 张图像到: {self.output_dir}/")
@@ -556,3 +607,143 @@ class DroneController:
         except Exception as e:
             print(f"❌ 全景拍照失败: {e}")
             return None
+
+    # ==================== 键盘控制方法 ====================
+
+    def move_forward(self):
+        """向前移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(
+            pos.x_val + KEYBOARD_STEP, pos.y_val, pos.z_val, KEYBOARD_VELOCITY
+        )
+        print(f"⬆️  前进 +X: {KEYBOARD_STEP}m")
+
+    def move_backward(self):
+        """向后移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(
+            pos.x_val - KEYBOARD_STEP, pos.y_val, pos.z_val, KEYBOARD_VELOCITY
+        )
+        print(f"⬇️  后退 -X: {KEYBOARD_STEP}m")
+
+    def move_left(self):
+        """向左移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(
+            pos.x_val, pos.y_val + KEYBOARD_STEP, pos.z_val, KEYBOARD_VELOCITY
+        )
+        print(f"⬅️  左移 +Y: {KEYBOARD_STEP}m")
+
+    def move_right(self):
+        """向右移动"""
+        pos = self.get_position()
+        self.client.moveToPositionAsync(
+            pos.x_val, pos.y_val - KEYBOARD_STEP, pos.z_val, KEYBOARD_VELOCITY
+        )
+        print(f"➡️  右移 -Y: {KEYBOARD_STEP}m")
+
+    def move_up(self):
+        """上升"""
+        pos = self.get_position()
+        new_z = pos.z_val - KEYBOARD_STEP  # 负值表示上升
+        self.client.moveToZAsync(new_z, KEYBOARD_VELOCITY)
+        print(f"🔼  上升 -Z: {KEYBOARD_STEP}m (高度: {abs(new_z):.1f}m)")
+
+    def move_down(self):
+        """下降"""
+        pos = self.get_position()
+        new_z = pos.z_val + KEYBOARD_STEP  # 正值表示下降
+        # 防止降到地面以下
+        if new_z > -0.5:
+            new_z = -0.5
+        self.client.moveToZAsync(new_z, KEYBOARD_VELOCITY)
+        print(f"🔽  下降 +Z: {KEYBOARD_STEP}m (高度: {abs(new_z):.1f}m)")
+
+    def rotate_left(self):
+        """向左旋转（偏航）
+
+        使用角速度控制，让无人机以设定速度向左旋转。
+        """
+        self.client.rotateByYawRateAsync(-KEYBOARD_YAW_RATE, KEYBOARD_STEP)
+
+    def rotate_right(self):
+        """向右旋转（偏航）
+
+        使用角速度控制，让无人机以设定速度向右旋转。
+        """
+        self.client.rotateByYawRateAsync(KEYBOARD_YAW_RATE, KEYBOARD_STEP)
+
+    def hover(self):
+        """悬停
+
+        让无人机停止移动并保持在当前位置悬停。
+        """
+        self.client.hoverAsync()
+
+    def go_forward_continuous(self):
+        """持续向前飞行
+
+        使用速度控制，让无人机以设定速度向前飞行。
+        """
+        self.client.moveByVelocityAsync(KEYBOARD_VELOCITY, 0, 0, 0.1)
+
+    def go_backward_continuous(self):
+        """持续向后飞行
+
+        使用速度控制，让无人机以设定速度向后飞行。
+        """
+        self.client.moveByVelocityAsync(-KEYBOARD_VELOCITY, 0, 0, 0.1)
+
+    def go_left_continuous(self):
+        """持续向左飞行
+
+        在 AirSim 中，Y 轴正方向指向右方，
+        所以向左移动需要负的 Y 速度。
+        """
+        self.client.moveByVelocityAsync(0, -KEYBOARD_VELOCITY, 0, 0.1)
+
+    def go_right_continuous(self):
+        """持续向右飞行
+
+        在 AirSim 中，Y 轴正方向指向右方，
+        所以向右移动需要正的 Y 速度。
+        """
+        self.client.moveByVelocityAsync(0, KEYBOARD_VELOCITY, 0, 0.1)
+
+    def go_up_continuous(self):
+        """持续上升
+
+        使用速度控制，让无人机以设定速度上升。
+        AirSim 中 Z 轴向下为正，所以上升需要负的 Z 速度。
+        """
+        self.client.moveByVelocityAsync(0, 0, -KEYBOARD_VELOCITY, 0.1)
+
+    def go_down_continuous(self):
+        """持续下降
+
+        使用速度控制，让无人机以设定速度下降。
+        AirSim 中 Z 轴向下为正，所以下降需要正的 Z 速度。
+        防止降到地面以下（z > -0.5）。
+        """
+        pos = self.get_position()
+        # 只有高于地面安全高度时才下降
+        if pos.z_val < -0.5:
+            self.client.moveByVelocityAsync(0, 0, KEYBOARD_VELOCITY, 0.1)
+
+    def get_telemetry(self):
+        """获取并打印无人机状态信息"""
+        pos = self.get_position()
+        state = self.client.getMultirotorState()
+        linear_vel = state.kinematics_estimated.linear_velocity
+        collision_info = self.client.simGetCollisionInfo()
+
+        height = abs(pos.z_val)
+        speed = (linear_vel.x_val**2 + linear_vel.y_val**2 + linear_vel.z_val**2) ** 0.5
+
+        print(f"\n{'─' * 40}")
+        print(f"📊 无人机状态:")
+        print(f"   位置: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+        print(f"   高度: {height:.2f}m")
+        print(f"   速度: {speed:.2f} m/s")
+        print(f"   碰撞: {'⚠️ 是' if collision_info.has_collided else '✅ 否'}")
+        print(f"{'─' * 40}\n")

@@ -1,26 +1,33 @@
 import os
 import numpy as np
 
-data_dir = "grasprl/dataset/grasp_samples"
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(current_dir, "grasprl", "dataset", "grasp_samples")
+
+if not os.path.exists(data_dir):
+    print("数据集目录不存在")
+    exit()
 
 rgb_files = [f for f in os.listdir(data_dir) if f.startswith("rgb_") and f.endswith(".png")]
-total_samples = len(rgb_files)
+total = len(rgb_files)
+success = 0
+fail = 0
 
-success_num = 0
-fail_num = 0
 for f in rgb_files:
-    iter_num = int(f.split("_")[1].split(".")[0])
-    label_path = os.path.join(data_dir, f"label_{iter_num}.npy")
-    label = np.load(label_path, allow_pickle=True).item()
-    if label["grasp_success"] == 1:
-        success_num += 1
-    else:
-        fail_num += 1
+    try:
+        idx = f.split("_")[1].split(".")[0]
+        label = np.load(os.path.join(data_dir, f"label_{idx}.npy"), allow_pickle=True).item()
+        if label["grasp_success"] == 1:
+            success +=1
+        else:
+            fail +=1
+    except:
+        continue
 
-print("="*30)
+print("==============================")
 print("数据集统计结果")
-print("="*30)
-print(f"总样本数：{total_samples}")
-print(f"成功抓取样本：{success_num}（{success_num/total_samples:.2%}）")
-print(f"失败抓取样本：{fail_num}（{fail_num/total_samples:.2%}）")
-print("="*30)
+print("==============================")
+print(f"总样本数：{total}")
+print(f"成功抓取：{success} ({success/total:.2%})" if total>0 else "成功抓取：0")
+print(f"失败抓取：{fail}")
+print("==============================")

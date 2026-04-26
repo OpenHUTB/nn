@@ -17,55 +17,65 @@ class SmartImageProcessor:
         self.config = config
         self._cache = {}
         self._cache_order = deque(maxlen=config.cache_size)
-    
+
+    def _detect_light_condition(self, image: np.ndarray) -> str:
+        """检测图像光照条件"""
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        avg_brightness = np.mean(gray)
+
+        if avg_brightness < 70:
+            return 'night'
+        elif avg_brightness < 130:
+            return 'dusk'
+        else:
+            return 'day'
+
     def load_and_preprocess(self, image_path: str) -> Optional[Tuple[np.ndarray, Dict]]:
         """加载并预处理图像"""
         try:
-            # 检查缓存
             if image_path in self._cache:
                 self._cache_order.remove(image_path)
                 self._cache_order.append(image_path)
                 return self._cache[image_path]
-            
-            # 读取图像
+
             image = cv2.imread(image_path, cv2.IMREAD_COLOR)
             if image is None:
                 print(f"无法读取图像: {image_path}")
                 return None
-            
-            # 智能调整尺寸
+
             processed = self._smart_resize(image)
-            
-            # 自适应预处理
-            processed = self._adaptive_preprocessing(processed)
-            
-            # 计算ROI区域
+            light_condition = self._detect_light_condition(processed)
+            processed = self._adaptive_preprocessing(processed, light_condition)
+
             roi_info = self._calculate_roi(processed.shape)
-            
-            # 更新缓存
+            roi_info['light_condition'] = light_condition
+
             result = (processed, roi_info)
             self._update_cache(image_path, result)
-            
+
             return result
-            
+
         except Exception as e:
             print(f"图像处理失败 {image_path}: {e}")
             return None
-    
+
     def preprocess_frame(self, frame: np.ndarray) -> Tuple[np.ndarray, Dict]:
         """预处理视频帧"""
         try:
-            # 智能调整尺寸
             processed = self._smart_resize(frame)
-            
-            # 自适应预处理
-            processed = self._adaptive_preprocessing(processed)
-            
-            # 计算ROI区域
+
+            # 1. 检测光照条件
+            light_condition = self._detect_light_condition(processed)
+
+            # 2. 根据光照进行预处理
+            processed = self._adaptive_preprocessing(processed, light_condition)
+
             roi_info = self._calculate_roi(processed.shape)
-            
+            # 3. 将光照状态存入 ROI 信息中传递给下游
+            roi_info['light_condition'] = light_condition
+
             return processed, roi_info
-            
+
         except Exception as e:
             print(f"帧预处理失败: {e}")
             return frame, {}
@@ -85,28 +95,39 @@ class SmartImageProcessor:
             return cv2.resize(image, new_size, interpolation=cv2.INTER_AREA)
         
         return image
-    
-    def _adaptive_preprocessing(self, image: np.ndarray) -> np.ndarray:
+
+    def _adaptive_preprocessing(self, image: np.ndarray, light_condition: str) -> np.ndarray:
         """自适应图像预处理"""
-        # 转换为YUV颜色空间
         yuv = cv2.cvtColor(image, cv2.COLOR_BGR2YUV)
         y_channel = yuv[:, :, 0]
-        
-        # 自适应直方图均衡化
-        clahe = cv2.createCLAHE(
-            clipLimit=self.config.adaptive_clip_limit,
-            tileGridSize=self.config.adaptive_grid_size
-        )
+
+        # 根据光照条件动态调整参数
+        if light_condition == 'night':
+            clip_limit = 3.0
+            grid_size = (16, 16)
+            # 夜间增加伽马校正提亮
+            gamma = 0.8
+            y_channel = np.array(255 * (y_channel / 255.0) ** (1 / gamma), dtype=np.uint8)
+        elif light_condition == 'dusk':
+            clip_limit = 2.5
+            grid_size = (10, 10)
+        else:
+            clip_limit = self.config.adaptive_clip_limit
+            grid_size = self.config.adaptive_grid_size
+
+        clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=grid_size)
         yuv[:, :, 0] = clahe.apply(y_channel)
-        
-        # 转换回BGR
+
         enhanced = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
-        
-        # 自适应去噪
-        noise_level = self._estimate_noise_level(y_channel)
-        if noise_level > 30:
-            enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
-        
+
+        # 夜间噪声更大，使用更强的双边滤波去噪
+        if light_condition == 'night':
+            enhanced = cv2.bilateralFilter(enhanced, 9, 100, 100)
+        else:
+            noise_level = self._estimate_noise_level(y_channel)
+            if noise_level > 30:
+                enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+
         return enhanced
     
     def _estimate_noise_level(self, image: np.ndarray) -> float:

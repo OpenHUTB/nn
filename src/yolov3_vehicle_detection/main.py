@@ -174,6 +174,10 @@ def main():
                         if frame_count % 100 == 0:  # 每100帧打印一次
                             print(f"[DEBUG] 检测到 {len(results)} 个目标")
                 
+                # --- 障碍物躲避控制 ---
+                if client.obstacle_info:
+                    client.apply_obstacle_avoidance(auto_brake=True)
+                
                 # --- 规划 ---
                 is_brake, warning_msg = planner.plan(results)
 

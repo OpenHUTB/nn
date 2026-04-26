@@ -10,16 +10,31 @@ import json
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入自定义模块
+# 优先使用MediaPipe，失败则使用OpenCV版本的检测器
+USE_CV_DETECTOR = False
+HAS_ENHANCED_DETECTOR = False
+
 try:
+    import mediapipe as mp
+    mp.solutions.hands  # 测试是否可用
     from gesture_detector_enhanced import EnhancedGestureDetector
-
-    print("[OK] 导入增强版手势检测器 (机器学习)")
+    print("[OK] 使用 MediaPipe 手势检测器")
     HAS_ENHANCED_DETECTOR = True
-except ImportError:
-    print("[WARNING] 未找到增强版检测器，使用原始手势检测器")
-    from gesture_detector import GestureDetector
-
-    HAS_ENHANCED_DETECTOR = False
+except (ImportError, AttributeError) as e:
+    print(f"[WARNING] MediaPipe 不可用: {e}")
+    try:
+        from gesture_detector_cv import CVGestureDetector
+        print("[OK] 使用 OpenCV 手势检测器 (无MediaPipe依赖)")
+        USE_CV_DETECTOR = True
+        HAS_ENHANCED_DETECTOR = True
+    except ImportError:
+        print("[WARNING] OpenCV检测器也不可用")
+        try:
+            from gesture_detector import GestureDetector
+            HAS_ENHANCED_DETECTOR = False
+        except ImportError:
+            print("[ERROR] 没有任何手势检测器可用!")
+            sys.exit(1)
 
 from drone_controller import DroneController
 from simulation_3d import Drone3DViewer
@@ -70,7 +85,13 @@ class IntegratedDroneSimulation:
                     print(f"[OK] 选择: {model_name}")
                     break
 
-        if selected_model:
+        # 初始化手势检测器（根据可用情况选择）
+        if USE_CV_DETECTOR:
+            # 使用OpenCV版本的检测器（无MediaPipe依赖）
+            print("[OK] 初始化 OpenCV 手势检测器")
+            self.gesture_detector = CVGestureDetector()
+            self.gesture_detector.use_ml = False
+        elif selected_model:
             print(f"[INFO] 使用模型: {selected_model_name}")
 
             try:
@@ -91,7 +112,7 @@ class IntegratedDroneSimulation:
                     print("[WARNING] 机器学习模型未加载，回退到规则检测")
                     self.gesture_detector = EnhancedGestureDetector(use_ml=False)
 
-            except ImportError as e:
+            except (ImportError, Exception) as e:
                 print(f"[WARNING] 无法导入增强版检测器: {e}")
                 print("[OK] 使用原始手势检测器")
                 from gesture_detector import GestureDetector
@@ -139,7 +160,10 @@ class IntegratedDroneSimulation:
 
         # 手势识别阈值（降低以提高灵敏度）
         # 如果是机器学习模式，阈值可以进一步降低
-        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml') and self.gesture_detector.use_ml:
+        if USE_CV_DETECTOR:
+            print("[OK] OpenCV模式，置信度阈值为0.55")
+            base_threshold = 0.55
+        elif HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml') and self.gesture_detector.use_ml:
             print("[OK] 使用机器学习模式，置信度阈值更低")
             base_threshold = 0.55  # 机器学习可以更低
         else:
@@ -168,7 +192,9 @@ class IntegratedDroneSimulation:
 
         print("无人机仿真系统初始化完成 [OK]")
 
-        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
+        if USE_CV_DETECTOR:
+            print("[INFO] 当前模式: OpenCV手势识别 (无需MediaPipe)")
+        elif HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
             if self.gesture_detector.use_ml:
                 print("[INFO] 当前模式: 机器学习手势识别")
             else:
@@ -213,7 +239,9 @@ class IntegratedDroneSimulation:
         print("手势识别线程启动...")
 
         # 显示当前检测模式
-        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
+        if USE_CV_DETECTOR:
+            print("[INFO] 当前模式: OpenCV手势识别 (无需MediaPipe)")
+        elif HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
             if self.gesture_detector.use_ml:
                 mode_text = "机器学习模式"
             else:
@@ -469,6 +497,9 @@ class IntegratedDroneSimulation:
 
     def _switch_detection_mode(self):
         """切换检测模式（如果有多个可用模型）"""
+        if USE_CV_DETECTOR:
+            print("当前使用OpenCV检测器，不支持切换模式")
+            return
         if not HAS_ENHANCED_DETECTOR:
             print("当前只有规则检测器可用")
             return
@@ -779,13 +810,18 @@ class IntegratedDroneSimulation:
         print("=" * 60)
 
         # 显示当前检测模式
-        if HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
+        if USE_CV_DETECTOR:
+            print("[INFO] 当前模式: OpenCV手势识别 (无需MediaPipe)")
+        elif HAS_ENHANCED_DETECTOR and hasattr(self.gesture_detector, 'use_ml'):
             if self.gesture_detector.use_ml:
                 mode_info = "机器学习模式 (更高精度)"
             else:
                 mode_info = "规则检测模式 (基础)"
         else:
             mode_info = "规则检测模式"
+
+        if USE_CV_DETECTOR:
+            mode_info = "OpenCV手势识别 (无需MediaPipe)"
 
         print(f"检测模式: {mode_info}")
 

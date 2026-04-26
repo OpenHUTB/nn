@@ -4,6 +4,7 @@ import numpy as np
 import supervision as sv
 import json
 from datetime import datetime
+import keyboard_handler  # 导入键盘处理模块
 
 # ==================== 配置路径 ====================
 import os
@@ -22,13 +23,14 @@ STATS_OUTPUT_PATH = os.path.join(PROJECT_ROOT, "res/counting_stats.json")
 # ==================================================
 
 
-def main(model_path=None, input_video_path=None, output_video_path=None):
+def main(model_path=None, input_video_path=None, output_video_path=None, ground_truth=None):
     """主函数 - 运行车辆计数，针对CARLA视频优化
 
     Args:
         model_path: 模型文件路径 (如果为None则使用默认值)
         input_video_path: 输入视频路径 (如果为None则使用默认值)
         output_video_path: 输出视频路径 (如果为None则使用默认值)
+        ground_truth: ground truth文件路径 (可选，用于精度衡量)
     """
     # 使用传入的参数或默认值
     model_path = model_path or MODEL_PATH
@@ -77,6 +79,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
     
     # 轨迹历史记录（用于判断穿越方向）
     previous_y = {}  # 上一帧的y坐标
+    CONFIDENCE_THRESHOLD = keyboard_handler.get_confidence_threshold()  # 置信度阈值（可调整）
 
 
     def draw_overlay(frame, pt1, pt2, alpha=0.25, color=(51, 68, 255), filled=True):
@@ -131,8 +134,8 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
         """
         nonlocal total_counts, crossed_ids, class_counts, crossed_by_class
 
-        # 按车辆类别和检测置信度过滤 - 降低阈值提高检测率
-        detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > 0.15)]
+        # 按车辆类别和检测置信度过滤 - 使用可调整的阈值
+        detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > CONFIDENCE_THRESHOLD)]
 
         # 为每个检测框生成标签
         labels = [f"#{track_id} {class_names[cls_id]}" for track_id, cls_id in
@@ -267,7 +270,14 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
             # 调整覆盖区域透明度 - 与红线位置匹配
             draw_overlay(frame, (350, 700), (1230, 800), alpha=0.15)
             draw_tracks_and_count(frame, detections, limits)
-
+        
+        # 更新置信度阈值（从keyboard_handler获取）
+        CONFIDENCE_THRESHOLD = keyboard_handler.get_confidence_threshold()
+        
+        # 显示当前检测阈值（可调）
+        sv.draw_text(frame, f"Conf: {CONFIDENCE_THRESHOLD:.2f} (C/D)", sv.Point(x=50, y=h-100), sv.Color.WHITE, 0.5,
+                    1, background_color=sv.Color.from_hex("#303030"))
+        
         # 写入帧到输出视频
         out.write(frame)
         # 显示当前帧
@@ -275,7 +285,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
 
         # 键盘事件处理
         key = cv.waitKey(1) & 0xff
-        if not handle_keyboard_events(key, frame, frame_count, cap, out, "YOLO11n Vehicle Counter - CARLA"):
+        if not keyboard_handler.handle_keyboard_events(key, frame, frame_count, cap, out, "YOLO11n Vehicle Counter - CARLA"):
             break
 
     # 释放资源
@@ -284,22 +294,23 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
     cv.destroyAllWindows()
 
     # ========== 功能扩展：保存统计数据到JSON ==========
+    # 转换numpy类型为Python原生类型，避免JSON序列化错误
     stats_data = {
         "video_path": video_path,
         "processed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "video_info": {
-            "width": w,
-            "height": h,
-            "fps": fps,
-            "total_frames": frame_count
+            "width": int(w),
+            "height": int(h),
+            "fps": float(fps),
+            "total_frames": int(frame_count)
         },
         "counting_line": {
-            "x1": limits[0], "y1": limits[1],
-            "x2": limits[2], "y2": limits[3]
+            "x1": int(limits[0]), "y1": int(limits[1]),
+            "x2": int(limits[2]), "y2": int(limits[3])
         },
         "total_count": len(total_counts),
-        "class_counts": class_counts,
-        "counted_track_ids": list(counted_tracks)
+        "class_counts": {k: int(v) for k, v in class_counts.items()},
+        "counted_track_ids": [int(tid) for tid in counted_tracks]
     }
     
     with open(STATS_OUTPUT_PATH, 'w', encoding='utf-8') as f:
@@ -312,7 +323,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None):
     print(f"  视频信息: {w}x{h}, {fps}fps, 共{frame_count}帧")
     print(f"  计数线: ({limits[0]},{limits[1]}) -> ({limits[2]},{limits[3]})")
     print(f"-" * 50)
-    print(f"  检测阈值: 0.15 | 穿越判断: y变小即计数")
+    print(f"  检测阈值: {keyboard_handler.get_confidence_threshold():.2f} | 穿越判断: y变小即计数")
     print(f"-" * 50)
     print(f"  [分类统计]")
     for cls_name, count in class_counts.items():

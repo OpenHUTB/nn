@@ -14,85 +14,68 @@ class LaneDetector:
     def __init__(self, config: AppConfig):
         self.config = config
         self.lane_history = deque(maxlen=5)
-    
-    def detect(self, image: np.ndarray, roi_mask: np.ndarray) -> Dict[str, Any]:
+
+    def detect(self, image: np.ndarray, roi_mask: np.ndarray, light_condition: str = 'day') -> Dict[str, Any]:
         """检测车道线"""
         try:
-            # 预处理
-            processed = self._preprocess_for_lanes(image, roi_mask)
-            
-            # 边缘检测
-            edges = self._detect_edges(processed)
-            
-            # 霍夫变换检测直线
+            processed = self._preprocess_for_lanes(image, roi_mask, light_condition)
+            edges = self._detect_edges(processed, light_condition)
+
             lines = self._hough_transform(edges)
-            
+
             if lines is None or len(lines) == 0:
                 return self._create_empty_result()
-            
-            # 分类和过滤车道线
+
             left_lines, right_lines = self._classify_and_filter(lines, image.shape[1])
-            
-            # 拟合车道线
             left_lane = self._fit_lane_model(left_lines, image.shape)
             right_lane = self._fit_lane_model(right_lines, image.shape)
-            
-            # 验证车道线
+
             left_lane, right_lane = self._validate_lanes(left_lane, right_lane, image.shape)
-            
-            # 计算中心线
             center_line = self._calculate_center_line(left_lane, right_lane, image.shape)
-            
-            # 预测路径
             future_path = self._predict_future_path(left_lane, right_lane, image.shape)
-            
-            # 计算检测质量
             detection_quality = self._calculate_detection_quality(left_lane, right_lane)
-            
-            # 创建结果
+
             result = {
-                'left_lines': left_lines,
-                'right_lines': right_lines,
-                'left_lane': left_lane,
-                'right_lane': right_lane,
-                'center_line': center_line,
-                'future_path': future_path,
+                'left_lines': left_lines, 'right_lines': right_lines,
+                'left_lane': left_lane, 'right_lane': right_lane,
+                'center_line': center_line, 'future_path': future_path,
                 'detection_quality': detection_quality
             }
-            
-            # 时间平滑
+
             result = self._apply_temporal_smoothing(result)
-            
             return result
-            
+
         except Exception as e:
             print(f"车道线检测失败: {e}")
             return self._create_empty_result()
-    
-    def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray) -> np.ndarray:
+
+    def _preprocess_for_lanes(self, image: np.ndarray, roi_mask: np.ndarray, light_condition: str) -> np.ndarray:
         """为车道线检测预处理图像"""
-        # 转换为灰度图
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        # 应用ROI
         gray = cv2.bitwise_and(gray, gray, mask=roi_mask)
-        
-        # 自适应直方图均衡化
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(gray)
-        
-        return enhanced
-    
-    def _detect_edges(self, image: np.ndarray) -> np.ndarray:
+
+        # 夜间模式二次增强
+        if light_condition == 'night':
+            clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+            gray = clahe.apply(gray)
+
+        return gray
+
+    def _detect_edges(self, image: np.ndarray, light_condition: str) -> np.ndarray:
         """边缘检测"""
-        # 自适应Canny阈值
-        median = np.median(image)
-        sigma = 0.33
-        lower = int(max(0, (1.0 - sigma) * median))
-        upper = int(min(255, (1.0 + sigma) * median))
-        
+        # 根据光照动态调整阈值
+        if light_condition == 'night':
+            lower, upper = 30, 100
+        elif light_condition == 'dusk':
+            lower, upper = 40, 120
+        else:
+            median = np.median(image)
+            sigma = 0.33
+            lower = int(max(0, (1.0 - sigma) * median))
+            upper = int(min(255, (1.0 + sigma) * median))
+
         return cv2.Canny(image, lower, upper)
-    
+
     def _hough_transform(self, edges: np.ndarray) -> Optional[np.ndarray]:
         """霍夫变换检测直线"""
         lines = cv2.HoughLinesP(
