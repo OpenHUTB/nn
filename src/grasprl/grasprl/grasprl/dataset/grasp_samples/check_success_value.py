@@ -1,7 +1,8 @@
 import os
 import numpy as np
 
-data_path = r"D:\nn\src\grasprl\grasprl\grasprl\dataset\grasp_samples"
+#改成相对路径
+data_path = os.path.dirname(os.path.abspath(__file__))
 success_num = 0
 total_num = 0
 error_files = []
