@@ -77,9 +77,13 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
     class_counts = {'car': 0, 'motorbike': 0, 'bus': 0, 'truck': 0}  # 各类别已计数ID集合
     crossed_by_class = {cls: set() for cls in class_counts.keys()}  # 各类别已计数ID集合
     
-    # 轨迹历史记录（用于判断穿越方向）
+    # 轨迹历史记录（用于判断穿越方向和速度估算）
     previous_y = {}  # 上一帧的y坐标
     CONFIDENCE_THRESHOLD = keyboard_handler.get_confidence_threshold()  # 置信度阈值（可调整）
+    
+    # 速度估算参数
+    PIXELS_TO_METERS = 0.05  # 像素到米的转换系数（每像素=0.05米）
+    track_speeds = {}  # 记录每个轨迹的速度
 
 
     def draw_overlay(frame, pt1, pt2, alpha=0.25, color=(51, 68, 255), filled=True):
@@ -137,9 +141,11 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 按车辆类别和检测置信度过滤 - 使用可调整的阈值
         detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > CONFIDENCE_THRESHOLD)]
 
-        # 为每个检测框生成标签
-        labels = [f"#{track_id} {class_names[cls_id]}" for track_id, cls_id in
-                  zip(detections.tracker_id, detections.class_id)]
+        # 为每个检测框生成标签（包含速度信息）
+        labels = []
+        for track_id, cls_id in zip(detections.tracker_id, detections.class_id):
+            speed = track_speeds.get(track_id, 0)
+            labels.append(f"#{track_id} {class_names[cls_id]} {speed:.1f}m/s")
 
         # 绘制边界框、标签和轨迹
         box_annotator.annotate(frame, detections=detections)
@@ -155,14 +161,26 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
 
             cv.circle(frame, (cx, cy), 4, (0, 255, 255), cv.FILLED)  # 绘制车辆中心点
 
-            # 记录轨迹历史
+            # 记录轨迹历史（包括x, y坐标）
             if track_id not in track_history:
                 track_history[track_id] = []
                 previous_y[track_id] = cy  # 初始化上一帧y坐标
-            track_history[track_id].append(cy)
+            track_history[track_id].append((cx, cy))
             # 只保留最近30帧历史
             if len(track_history[track_id]) > 30:
                 track_history[track_id] = track_history[track_id][-30:]
+            
+            # 速度估算：基于最近的位移计算
+            if len(track_history[track_id]) >= 2:
+                prev_x, prev_y_pos = track_history[track_id][-2]
+                curr_x, curr_y_pos = track_history[track_id][-1]
+                # 计算像素位移
+                pixel_displacement = np.sqrt((curr_x - prev_x)**2 + (curr_y_pos - prev_y_pos)**2)
+                # 转换为米/秒
+                speed = pixel_displacement * PIXELS_TO_METERS * fps
+                track_speeds[track_id] = speed
+            else:
+                track_speeds[track_id] = 0
 
             # 简化判断：只要y变小就算穿越（不管方向、不限x范围）
             if track_id not in crossed_ids:
@@ -210,8 +228,26 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         sv.draw_text(frame, "[Strategy]", sv.Point(x=50, y=y_offset), sv.Color.GREEN, 0.5,
                      1, background_color=sv.Color.from_hex("#404040"))
         y_offset += 25
-        sv.draw_text(frame, "conf:0.15 | y-down", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
                      1, background_color=sv.Color.from_hex("#404040"))
+        
+        # 显示速度估算面板
+        y_offset += 35
+        sv.draw_text(frame, "[Speed Estimation]", sv.Point(x=50, y=y_offset), sv.Color.BLUE, 0.5,
+                     1, background_color=sv.Color.from_hex("#404040"))
+        y_offset += 25
+        
+        # 显示所有检测到的车辆速度
+        if track_speeds:
+            speed_values = list(track_speeds.values())
+            if speed_values:
+                avg_speed = sum(speed_values) / len(speed_values)
+                max_speed = max(speed_values)
+                sv.draw_text(frame, f"Avg: {avg_speed:.1f} m/s", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+                            1, background_color=sv.Color.from_hex("#404040"))
+                y_offset += 25
+                sv.draw_text(frame, f"Max: {max_speed:.1f} m/s", sv.Point(x=50, y=y_offset), sv.Color.YELLOW, 0.4,
+                            1, background_color=sv.Color.from_hex("#404040"))
 
 
     # 打开视频文件
