@@ -186,8 +186,65 @@ def get_steering_angle(vehicle_transform, waypoint_transform):
         angle *= -1
     return angle
 
+# 车辆控制器类 - 基于简单的阈值控制和角度计算
+class SimpleVehicleController:
+    def __init__(self):
+        self.target_speed = 30.0  # 目标速度 km/h
+        self.prev_steer = 0.0  # 上一次的转向角，用于平滑
+    
+    def update_control(self, vehicle, waypoint):
+        """
+        基于waypoint更新车辆控制
+        参考EgoVehicleController的简单有效控制方法
+        """
+        transform = vehicle.get_transform()
+        velocity = vehicle.get_velocity()
+        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6  # km/h
+        
+        # 简单的速度控制：基于阈值
+        if speed < self.target_speed:
+            throttle = 0.5
+            brake = 0.0
+        else:
+            throttle = 0.0
+            brake = 0.1
+        
+        # 简单的车道保持控制
+        if waypoint:
+            # 获取下一个航点
+            next_waypoint = waypoint.next(5.0)[0]
+            if next_waypoint:
+                # 计算到下一个航点的角度
+                next_location = next_waypoint.transform.location
+                angle = math.atan2(next_location.y - transform.location.y,
+                                next_location.x - transform.location.x)
+                angle = math.degrees(angle) - transform.rotation.yaw
+                angle = (angle + 180) % 360 - 180  # 归一化到[-180, 180]
+                
+                # 基于角度计算转向角，限制在±0.5范围内
+                steer = max(-0.5, min(0.5, angle / 90.0))
+                
+                # 平滑转向角变化
+                steer = 0.7 * self.prev_steer + 0.3 * steer
+                self.prev_steer = steer
+            else:
+                steer = self.prev_steer
+        else:
+            steer = self.prev_steer
+        
+        return throttle, brake, steer
+    
+    def set_target_speed(self, speed):
+        self.target_speed = speed
+    
+    def get_target_speed(self):
+        return self.target_speed
+
+# 全局车辆控制器
+simple_controller = SimpleVehicleController()
+
 # 根据检测到的标志执行操作
-def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_time):
+def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_time, controller):
     velocity = vehicle.get_velocity()
     current_speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2) * 3.6  # m/s转换为km/h
     print(f"当前车辆速度: {current_speed:.2f} km/h")
@@ -195,27 +252,27 @@ def control_vehicle_based_on_sign(vehicle, detected_signs, lights, simulation_ti
     traffic_light_state = vehicle.get_traffic_light_state()
     if traffic_light_state == carla.TrafficLightState.Red:
         print("交通灯: 红色 - 应用制动")
-        vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=1.0))
+        controller.set_target_speed(0)
         return
 
+    # 检查检测到的标志，设置目标速度
     for sign, conf, bbox in detected_signs:
         print(f"检测到交通标志: {sign}，置信度 {conf:.2f}")
         if "stop" in sign.lower() and conf > 0.5:
             print("操作: 检测到停止标志！应用完全制动。")
-            control = carla.VehicleControl()
-            control.brake = 1.0
-            vehicle.apply_control(control)
-            time.sleep(2)
+            controller.set_target_speed(0)
+            return
         elif "speed limit" in sign.lower():
             digits = [int(s) for s in sign.split() if s.isdigit()]
             if digits:
                 speed_limit = digits[0]
                 print(f"操作: 将速度调整为 {speed_limit} km/h")
-                desired_speed = speed_limit * 1000 / 3600
-                if current_speed < speed_limit:
-                    vehicle.apply_control(carla.VehicleControl(throttle=0.5, brake=0))
-                else:
-                    vehicle.apply_control(carla.VehicleControl(throttle=0.0, brake=0.5))
+                controller.set_target_speed(speed_limit)
+                return
+    
+    # 如果没有检测到特殊标志，恢复默认速度
+    if controller.get_target_speed() == 0:
+        controller.set_target_speed(30.0)
 
 # 生成带有红色计时和动态速度限制的交通灯
 def spawn_dynamic_elements(world, blueprint_library):
@@ -314,20 +371,21 @@ def main():
 
             transform = vehicle.get_transform()
             waypoint = map.get_waypoint(transform.location, project_to_road=True, lane_type=carla.LaneType.Driving)
-            next_waypoint = waypoint.next(2.0)[0]
-            angle = get_steering_angle(transform, next_waypoint.transform)
-            steer = max(-1.0, min(1.0, angle * 2.0))
-
+            
+            # 使用简单控制器计算控制
+            throttle, brake, steer = simple_controller.update_control(vehicle, waypoint)
+            
+            # 应用控制
             control = carla.VehicleControl()
-            control.throttle = 0.5
+            control.throttle = throttle
             control.steer = steer
-            control.brake = 0.0
+            control.brake = brake
             vehicle.apply_control(control)
 
             if image_surface[0] is not None:
                 detected_signs = detect_traffic_signs(image_surface[0])
                 simulation_time = time.time() - start_time
-                control_vehicle_based_on_sign(vehicle, detected_signs, world.get_actors().filter("traffic.traffic_light"), simulation_time)
+                control_vehicle_based_on_sign(vehicle, detected_signs, world.get_actors().filter("traffic.traffic_light"), simulation_time, simple_controller)
 
                 # 绘制检测结果
                 surface = draw_detections(image_surface[0], detected_signs)

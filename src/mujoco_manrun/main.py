@@ -48,10 +48,18 @@ class ROSCmdVelHandler(threading.Thread):
     def _cmd_vel_callback(self, msg):
         """回调函数：解析/cmd_vel并映射到速度/转向"""
         self.twist_msg = msg
+        raw_speed = float(msg.linear.x)
+        if raw_speed <= 0.05:
+            self.stabilizer.set_turn_angle(0.0)
+            self.stabilizer.set_state("STOP")
+            if hasattr(self.stabilizer, "_should_log") and self.stabilizer._should_log("ros_cmd_vel", 0.5):
+                print("[ROS指令] 停止")
+            return
+
         # 1. linear.x → 行走速度（限幅0.1~1.0）
-        target_speed = np.clip(msg.linear.x, 0.1, 1.0)
+        target_speed = float(np.clip(raw_speed, 0.1, 1.0))
         # 2. angular.z → 转向角度（-1.0~1.0映射到-0.3~0.3rad）
-        target_turn = np.clip(msg.angular.z, -1.0, 1.0) * 0.3  # 缩放系数0.3
+        target_turn = float(np.clip(msg.angular.z, -1.0, 1.0) * 0.3)  # 缩放系数0.3
 
         # 更新到控制器（优先级高于键盘，避免冲突）
         self.stabilizer.set_walk_speed(target_speed)
@@ -62,7 +70,7 @@ class ROSCmdVelHandler(threading.Thread):
             self.stabilizer.set_state("WALK")  # 默认切换到正常走
 
         # 调试输出
-        if self.stabilizer.data.time % 0.5 < 0.1:  # 避免刷屏，每0.5秒输出一次
+        if hasattr(self.stabilizer, "_should_log") and self.stabilizer._should_log("ros_cmd_vel", 0.5):
             print(
                 f"[ROS指令] 速度={target_speed:.2f} | 转向={target_turn:.2f}rad | 当前步态: {self.stabilizer.gait_mode}")
 
@@ -266,6 +274,12 @@ class HumanoidStabilizer:
         self.model.opt.iterations = 200
         self.model.opt.tolerance = 1e-8
 
+        self._log_last = {}
+        self._fall_cooldown_until = 0.0
+        self._fall_count = 0
+        self._imu_euler_filt = np.zeros(3, dtype=np.float64)
+        self._imu_angvel_filt = np.zeros(3, dtype=np.float64)
+
         # 关节名称映射（原有逻辑完全保留）
         self.joint_names = [
             "abdomen_z", "abdomen_y", "abdomen_x",
@@ -278,6 +292,19 @@ class HumanoidStabilizer:
         ]
         self.joint_name_to_idx = {name: i for i, name in enumerate(self.joint_names)}
         self.num_joints = len(self.joint_names)
+
+        self._actuator_id_by_joint = {}
+        self._actuator_gear_by_joint = {}
+        self._actuator_ctrlrange_by_joint = {}
+        for joint_name in self.joint_names:
+            actuator_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_ACTUATOR, joint_name)
+            if actuator_id < 0:
+                raise RuntimeError(f"未找到与关节同名的执行器：{joint_name}")
+            self._actuator_id_by_joint[joint_name] = int(actuator_id)
+            self._actuator_gear_by_joint[joint_name] = float(self.model.actuator_gear[actuator_id, 0])
+            self._actuator_ctrlrange_by_joint[joint_name] = self.model.actuator_ctrlrange[actuator_id].astype(
+                np.float64
+            )
 
         # PD控制增益（原有逻辑保留，新增动态增益系数）
         self.kp_roll = 120.0
@@ -300,7 +327,10 @@ class HumanoidStabilizer:
         # 重心目标（原有逻辑保留，新增重心保护参数）
         self.com_target = np.array([0.05, 0.0, 0.78])
         self.kp_com = 50.0
-        self.foot_contact_threshold = 1.5
+        self.total_mass = float(np.sum(self.model.body_mass))
+        self.weight = float(self.total_mass * abs(float(self.model.opt.gravity[2])))
+        self.foot_contact_threshold = float(max(20.0, 0.12 * self.weight))
+        self._force_factor_norm = float(max(1.0, 0.5 * self.weight))
         self.com_safety_threshold = 0.6  # 重心z轴安全阈值（新增）
         self.speed_reduction_factor = 0.5  # 重心过低时的降速系数（新增）
 
@@ -420,6 +450,27 @@ class HumanoidStabilizer:
         # 初始化稳定姿态（原有逻辑完全保留）
         self._init_stable_pose()
 
+    def _should_log(self, key, interval_s):
+        now = float(self.data.time)
+        last = float(self._log_last.get(key, -1e9))
+        if (now - last) >= float(interval_s):
+            self._log_last[key] = now
+            return True
+        return False
+
+    def _torques_to_ctrl(self, joint_torques):
+        ctrl = np.zeros(self.model.nu, dtype=np.float64)
+        for joint_name in self.joint_names:
+            joint_idx = self.joint_name_to_idx[joint_name]
+            actuator_id = self._actuator_id_by_joint[joint_name]
+            gear = float(self._actuator_gear_by_joint[joint_name])
+            ctrl_min, ctrl_max = self._actuator_ctrlrange_by_joint[joint_name]
+            max_torque = max(abs(ctrl_min), abs(ctrl_max)) * max(gear, 1e-9)
+            torque = float(np.clip(joint_torques[joint_idx], -max_torque, max_torque))
+            ctrl_val = torque / max(gear, 1e-9)
+            ctrl[actuator_id] = float(np.clip(ctrl_val, ctrl_min, ctrl_max))
+        return ctrl
+
     # ===================== 新增：步态模式切换接口 =====================
     def set_gait_mode(self, mode):
         """切换步态模式"""
@@ -452,11 +503,20 @@ class HumanoidStabilizer:
 
     def _init_stable_pose(self):
         """初始化稳定姿态（原有逻辑完全保留）"""
+        keep_time = float(self.data.time)
         mujoco.mj_resetData(self.model, self.data)
+        self.data.time = keep_time
         self.data.qpos[2] = 1.282
         self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
         self.data.qvel[:] = 0.0
         self.data.xfrc_applied[:] = 0.0
+        self.integral_roll = 0.0
+        self.integral_pitch = 0.0
+        self._imu_euler_filt[:] = 0.0
+        self._imu_angvel_filt[:] = 0.0
+        self.current_sensor_data = {}
+        self.imu_data_buffer.clear()
+        self.foot_data_buffer.clear()
 
         # 腰部关节
         self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = 0.0
@@ -486,6 +546,7 @@ class HumanoidStabilizer:
         self.joint_targets[self.joint_name_to_idx["shoulder1_left"]] = 0.1
         self.joint_targets[self.joint_name_to_idx["shoulder2_left"]] = 0.1
         self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.5
+        self.prev_joint_targets = self.joint_targets.copy()
 
         mujoco.mj_forward(self.model, self.data)
 
@@ -634,7 +695,7 @@ class HumanoidStabilizer:
         if current_com_z < self.com_safety_threshold and self.enable_robust_optim:
             current_speed = self.walk_speed * self.speed_reduction_factor
             self.walk_speed = np.clip(current_speed, 0.1, self.walk_speed)
-            if self.data.time % 1 < 0.1:
+            if self._should_log("com_low_speed_reduce", 1.0):
                 print(
                     f"[鲁棒优化] 重心过低({current_com_z:.2f}m)，自动降速到{self.walk_speed:.2f} | 当前步态: {self.gait_mode}")
 
@@ -678,6 +739,8 @@ class HumanoidStabilizer:
         )
 
         # 5. 更新关节目标（原有逻辑保留）
+        if self.gait_mode != "STEP_IN_PLACE":
+            self.joint_targets[self.joint_name_to_idx["abdomen_y"]] = float(np.clip(0.12 * speed_factor, -0.2, 0.2))
         self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.1 + right_hip_offset
         self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.4 - right_hip_offset * 1.2
         self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0 + right_hip_offset * 0.5
@@ -803,18 +866,22 @@ class HumanoidStabilizer:
         root_vel = imu["ang_vel"]  # 带噪声的角速度
         root_vel = np.clip(root_vel, -3.0, 3.0)
 
-        roll_error = -root_euler[0]
+        imu_alpha = 0.2
+        self._imu_euler_filt = (1.0 - imu_alpha) * self._imu_euler_filt + imu_alpha * root_euler
+        self._imu_angvel_filt = (1.0 - imu_alpha) * self._imu_angvel_filt + imu_alpha * root_vel
+
+        roll_error = -self._imu_euler_filt[0]
         self.integral_roll += roll_error * self.dt
         self.integral_roll = np.clip(self.integral_roll, -self.integral_limit, self.integral_limit)
-        roll_torque = self.kp_roll * roll_error + self.kd_roll * (-root_vel[0]) + 5.0 * self.integral_roll
+        roll_torque = self.kp_roll * roll_error + self.kd_roll * (-self._imu_angvel_filt[0]) + 5.0 * self.integral_roll
 
-        pitch_error = -root_euler[1]
+        pitch_error = -self._imu_euler_filt[1]
         self.integral_pitch += pitch_error * self.dt
         self.integral_pitch = np.clip(self.integral_pitch, -self.integral_limit, self.integral_limit)
-        pitch_torque = self.kp_pitch * pitch_error + self.kd_pitch * (-root_vel[1]) + 4.0 * self.integral_pitch
+        pitch_torque = self.kp_pitch * pitch_error + self.kd_pitch * (-self._imu_angvel_filt[1]) + 4.0 * self.integral_pitch
 
-        yaw_error = -root_euler[2]
-        yaw_torque = self.kp_yaw * yaw_error + self.kd_yaw * (-root_vel[2])
+        yaw_error = -self._imu_euler_filt[2]
+        yaw_torque = self.kp_yaw * yaw_error + self.kd_yaw * (-self._imu_angvel_filt[2])
 
         torso_torque = np.array([roll_torque, pitch_torque, yaw_torque])
         torso_torque = np.clip(torso_torque, -30.0, 30.0)
@@ -860,9 +927,9 @@ class HumanoidStabilizer:
             if self.enable_robust_optim:
                 # 计算接触力归一化系数（0~1）
                 if "right" in joint_name:
-                    force_factor = np.clip(self.right_foot_force / (self.foot_contact_threshold * 2), 0.5, 1.0)
+                    force_factor = np.clip(self.right_foot_force / self._force_factor_norm, 0.4, 1.1)
                 else:
-                    force_factor = np.clip(self.left_foot_force / (self.foot_contact_threshold * 2), 0.5, 1.0)
+                    force_factor = np.clip(self.left_foot_force / self._force_factor_norm, 0.4, 1.1)
             else:
                 force_factor = 1.0  # 关闭优化则使用原始增益
 
@@ -920,7 +987,7 @@ class HumanoidStabilizer:
             torques[idx] = np.clip(torques[idx], -limit, limit)
 
         # 调试输出（新增步态模式信息）
-        if self.data.time % 1 < 0.1 and self.data.time > self.init_wait_time:
+        if self.data.time > self.init_wait_time and self._should_log("walk_debug", 2.0):
             print(f"=== 行走调试 ===")
             print(
                 f"状态: {self.state} | 步态模式: {self.gait_mode} | 步态相位: {self.gait_phase:.2f} | 速度: {self.walk_speed:.2f} | 转向: {self.turn_angle:.2f}")
@@ -959,7 +1026,7 @@ class HumanoidStabilizer:
                 while time.time() - start_time < self.init_wait_time:
                     alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
                     torques = self._calculate_stabilizing_torques() * alpha
-                    self.data.ctrl[:] = torques
+                    self.data.ctrl[:] = self._torques_to_ctrl(torques)
                     mujoco.mj_step(self.model, self.data)
                     self.data.qvel[:] *= 0.97
                     v.sync()
@@ -969,11 +1036,11 @@ class HumanoidStabilizer:
                 print("=== 初始稳定完成，可输入控制指令 ===")
                 while self.data.time < self.sim_duration:
                     torques = self._calculate_stabilizing_torques()
-                    self.data.ctrl[:] = torques
+                    self.data.ctrl[:] = self._torques_to_ctrl(torques)
                     mujoco.mj_step(self.model, self.data)
 
                     # 状态监测（新增步态信息）
-                    if self.data.time % 2 < 0.1:
+                    if self._should_log("status", 2.0):
                         com = self.data.subtree_com[0]
                         euler = self.current_sensor_data["imu"][
                             "euler"] if self.current_sensor_data else self._get_root_euler()
@@ -984,17 +1051,25 @@ class HumanoidStabilizer:
                         )
 
                     v.sync()
-                    time.sleep(self.dt * 0.5)
+                    time.sleep(self.dt)
 
                     # 跌倒判定（原有逻辑保留）
+                    if self.data.time < self._fall_cooldown_until:
+                        continue
                     com = self.data.subtree_com[0]
-                    euler = self.current_sensor_data["imu"]["euler"] if self.current_sensor_data else self._get_root_euler()
-                    if com[2] < 0.4 or abs(euler[0]) > 0.6 or abs(euler[1]) > 0.6:
+                    if self.current_sensor_data:
+                        imu_data = self.current_sensor_data["imu"]
+                        euler_for_fall = imu_data.get("true_euler", imu_data.get("euler"))
+                    else:
+                        euler_for_fall = self._get_root_euler()
+                    if com[2] < 0.4 or abs(euler_for_fall[0]) > 0.6 or abs(euler_for_fall[1]) > 0.6:
+                        self._fall_count += 1
                         print(
-                            f"跌倒！时间:{self.data.time:.1f}s | 重心(z):{com[2]:.3f}m | "
-                            f"最大倾角:{max(abs(euler[0]), abs(euler[1])):.3f}rad | 当前步态:{self.gait_mode}"
+                            f"跌倒！#{self._fall_count} 时间:{self.data.time:.1f}s | 重心(z):{com[2]:.3f}m | "
+                            f"最大倾角:{max(abs(euler_for_fall[0]), abs(euler_for_fall[1])):.3f}rad | 当前步态:{self.gait_mode}"
                         )
                         self.set_state("STAND")  # 跌倒后自动恢复站立
+                        self._fall_cooldown_until = float(self.data.time) + 1.0
         finally:
             keyboard_handler.running = False
             self.ros_handler.stop()
