@@ -1,4 +1,4 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加日志记录）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加连续失败提醒）
 import sys
 import mujoco
 import mujoco.viewer
