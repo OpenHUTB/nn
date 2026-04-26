@@ -258,6 +258,7 @@ def main():
         attach_to=vehicle
     )
 
+
     frame = None
 
     def camera_callback(image):
