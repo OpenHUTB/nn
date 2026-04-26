@@ -1,10 +1,17 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加连续失败提醒）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加速度控制）
 import sys
 import mujoco
 import mujoco.viewer
 import time
 import numpy as np
 import datetime
+
+# 速度配置（单位：秒）
+SPEED_CONFIG = {
+    "slow":   {"joint": 3.0, "grip": 1.5, "pause": 0.02},
+    "medium": {"joint": 2.0, "grip": 1.0, "pause": 0.001},
+    "fast":   {"joint": 1.0, "grip": 0.5, "pause": 0.0005}
+}
 
 
 def robot_arm_auto_reset_demo():
@@ -190,27 +197,32 @@ def robot_arm_auto_reset_demo():
         mujoco.mj_step(model, data)
         print("✅ 目标物体已重置到原位")
 
-    def grab_and_place(viewer, retry_max=2):
-        """完整取放流程（含自动重试和连续失败提醒）"""
+    def grab_and_place(viewer, retry_max=2, speed="medium"):
+        """完整取放流程（含自动重试、连续失败提醒、速度控制）"""
         retry_count = 0
         success = False
         consecutive_fails = 0  # 连续失败次数计数器
+        
+        # 获取速度参数
+        joint_duration = SPEED_CONFIG[speed]["joint"]
+        grip_duration = SPEED_CONFIG[speed]["grip"]
+        pause_time = SPEED_CONFIG[speed]["pause"]
 
         while retry_count < retry_max and not success:
             print(f"\n\n===== 开始第 {retry_count + 1} 次抓取尝试 =====")
             try:
                 # 阶段1：对准目标
-                joint_move("joint1", 0.0, 2.0, viewer, "步骤1：旋转基座对准蓝色目标")
-                joint_move("joint2", -0.7, 2.0, viewer, "步骤2：俯仰大臂接近目标")
-                joint_move("joint3", 0.35, 2.0, viewer, "步骤3：伸缩小臂对准目标")
+                joint_move("joint1", 0.0, joint_duration, viewer, "步骤1：旋转基座对准蓝色目标")
+                joint_move("joint2", -0.7, joint_duration, viewer, "步骤2：俯仰大臂接近目标")
+                joint_move("joint3", 0.35, joint_duration, viewer, "步骤3：伸缩小臂对准目标")
 
                 # 阶段2：抓取目标
                 gripper_close(viewer, "蓝色球体")
 
                 # 阶段3：抬升并转移目标
-                joint_move("joint2", 0.0, 1.5, viewer, "步骤4：抬升目标脱离平台")
-                joint_move("joint1", 3.14, 2.5, viewer, "步骤5：旋转基座对准绿色放置区域")
-                joint_move("joint2", -0.7, 1.5, viewer, "步骤6：降低目标接近放置区域")
+                joint_move("joint2", 0.0, joint_duration, viewer, "步骤4：抬升目标脱离平台")
+                joint_move("joint1", 3.14, joint_duration, viewer, "步骤5：旋转基座对准绿色放置区域")
+                joint_move("joint2", -0.7, joint_duration, viewer, "步骤6：降低目标接近放置区域")
 
                 # 阶段4：放置目标
                 gripper_open(viewer, "蓝色球体")
@@ -253,6 +265,17 @@ def robot_arm_auto_reset_demo():
         else:
             total_rounds = 5
         print(f"📌 本次将抓取 {total_rounds} 次")
+        
+        # 读取速度参数
+        speed = "medium"
+        if len(sys.argv) > 2:
+            speed_arg = sys.argv[2].lower()
+            if speed_arg in SPEED_CONFIG:
+                speed = speed_arg
+                print(f"📌 速度模式: {speed} (slow/medium/fast)")
+            else:
+                print(f"⚠️ 速度参数 '{speed_arg}' 无效，使用默认 'medium'")
+        
         success_count = 0          # 成功次数计数器
 
         for round_num in range(1, total_rounds + 1):
@@ -261,7 +284,7 @@ def robot_arm_auto_reset_demo():
             print(f"{'='*40}")
 
             # 执行完整取放流程
-            grab_success = grab_and_place(viewer)
+            grab_success = grab_and_place(viewer, speed=speed)
 
             if grab_success:
                 success_count += 1
@@ -303,7 +326,7 @@ def robot_arm_auto_reset_demo():
     # 保存日志到文件
     try:
         with open("grasp_log.txt", "a", encoding="gbk") as f:
-            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{success_count/total_rounds*100:.1f}%\n")
+            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{success_count/total_rounds*100:.1f}%, 速度:{speed}\n")
         print("📝 日志已保存到 grasp_log.txt")
     except Exception as e:
         print(f"⚠️ 日志保存失败：{e}")
