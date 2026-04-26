@@ -1,3 +1,4 @@
+#绘制二次函数图像
 #!/usr/bin/env python3
 # coding: utf-8
 # numpy 的 array 操作
