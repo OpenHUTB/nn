@@ -161,3 +161,8 @@ TTC = distance / relative_velocity
 | yolov8n.pt | 最快 | 较低 | ~1GB |
 | yolov8s.pt | 快 | 中等 | ~2GB |
 | yolov8m.pt | 中等 | 高 | ~4GB |
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 57a5b282 (更改readme)
