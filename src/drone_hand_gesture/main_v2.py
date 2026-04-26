@@ -6,11 +6,9 @@ import threading
 import sys
 import os
 import json
-from pathlib import Path
 
-# 获取当前脚本所在目录，并确保在路径中
-SCRIPT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(SCRIPT_DIR))
+# 添加项目路径
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 导入新架构的模块
 from core import ConfigManager, Logger
@@ -51,23 +49,23 @@ class IntegratedDroneSimulationV2:
         # 初始化模块
         self.logger.info("正在初始化手势检测器...")
 
-        # 检查可用的模型文件（按优先级排序）- 使用相对于脚本目录的路径
+        # 检查可用的模型文件（按优先级排序）
         model_candidates = [
-            (SCRIPT_DIR / "dataset" / "models" / "gesture_svm.pkl", "SVM模型"),
-            (SCRIPT_DIR / "dataset" / "models" / "gesture_random_forest.pkl", "随机森林模型"),
-            (SCRIPT_DIR / "dataset" / "models" / "gesture_mlp.pkl", "神经网络模型"),
+            ("dataset/models/gesture_svm.pkl", "SVM模型"),
+            ("dataset/models/gesture_random_forest.pkl", "随机森林模型"),
+            ("dataset/models/gesture_mlp.pkl", "神经网络模型"),
         ]
 
         selected_model = None
         selected_model_name = None
 
         for model_path, model_name in model_candidates:
-            if model_path.exists():
-                file_size = model_path.stat().st_size
+            if os.path.exists(model_path):
+                file_size = os.path.getsize(model_path)
                 self.logger.info(f"找到 {model_name}: {file_size / 1024:.1f} KB")
 
                 if file_size > 10 * 1024:
-                    selected_model = str(model_path)
+                    selected_model = model_path
                     selected_model_name = model_name
                     self.logger.info(f"选择: {model_name}")
                     break
@@ -493,8 +491,7 @@ class IntegratedDroneSimulationV2:
     def _save_log(self):
         if self.data_log:
             try:
-                # 使用相对于脚本目录的路径
-                log_file = SCRIPT_DIR / "flight_log.json"
+                log_file = "flight_log.json"
                 with open(log_file, 'w', encoding='utf-8') as f:
                     json.dump(self.data_log, f, indent=2, ensure_ascii=False)
                 self.logger.info(f"飞行日志已保存到: {log_file}")
