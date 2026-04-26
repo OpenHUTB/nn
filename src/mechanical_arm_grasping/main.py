@@ -1,9 +1,10 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加连续失败提醒）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加日志记录）
 import sys
 import mujoco
 import mujoco.viewer
 import time
 import numpy as np
+import datetime
 
 
 def robot_arm_auto_reset_demo():
@@ -298,6 +299,14 @@ def robot_arm_auto_reset_demo():
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
+
+    # 保存日志到文件
+    try:
+        with open("grasp_log.txt", "a", encoding="gbk") as f:
+            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{success_count/total_rounds*100:.1f}%\n")
+        print("📝 日志已保存到 grasp_log.txt")
+    except Exception as e:
+        print(f"⚠️ 日志保存失败：{e}")
 
     print("\n\n🎉 3自由度机械臂自动复位取放演示完毕！")
 
