@@ -64,8 +64,10 @@ class PIDController:
 
 def find_weather_presets():
     # 驼峰命名拆分正则（不变，用来美化名字）
-    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|$)')
-    def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
+    rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?=[A-Z])(?=[A-Z][a-z])|$)')
+
+    def name(x):
+        return ' '.join(m.group(0) for m in rgx.finditer(x))
 
     weather_class = carla.WeatherParameters
     presets = []
@@ -79,12 +81,11 @@ def find_weather_presets():
 
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
 
+
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
 
-
-# ==============================================================================
 
 # ==============================================================================
 def traffic_light_detect(image):
@@ -93,7 +94,7 @@ def traffic_light_detect(image):
         return 'none'
 
     h, w = image.shape[:2]
-    roi = image[int(h*0.1):int(h*0.25), int(w*0.42):int(w*0.58)]
+    roi = image[int(h * 0.1):int(h * 0.25), int(w * 0.42):int(w * 0.58)]
     hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
 
     lower_red1 = np.array([0, 150, 150])
@@ -141,6 +142,50 @@ def traffic_light_detect(image):
 
 
 # ==============================================================================
+# 【新增】交通标志识别（停车牌 / 限速牌）- 复用红绿灯视觉逻辑
+# ==============================================================================
+def traffic_sign_detect(image):
+    if image is None:
+        return 'none'
+
+    h, w = image.shape[:2]
+    # 扩大ROI：覆盖道路上方的交通标志区域（比红绿灯ROI更大）
+    roi = image[int(h * 0.05):int(h * 0.35), int(w * 0.35):int(w * 0.65)]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
+
+    # 1. 停车标志：红色（和红绿灯红色阈值一致）
+    lower_red1 = np.array([0, 150, 150])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 150, 150])
+    upper_red2 = np.array([180, 255, 255])
+    mask_stop = cv2.inRange(hsv, lower_red1, upper_red1) + cv2.inRange(hsv, lower_red2, upper_red2)
+
+    # 2. 限速标志：CARLA标准蓝色（HSV蓝色区间）
+    lower_blue = np.array([90, 100, 100])
+    upper_blue = np.array([130, 255, 255])
+    mask_speed = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # 形态学去噪
+    kernel = np.ones((3, 3), np.uint8)
+    mask_stop = cv2.morphologyEx(mask_stop, cv2.MORPH_OPEN, kernel)
+    mask_speed = cv2.morphologyEx(mask_speed, cv2.MORPH_OPEN, kernel)
+
+    # 像素计数阈值
+    stop_cnt = cv2.countNonZero(mask_stop)
+    speed_cnt = cv2.countNonZero(mask_speed)
+    sign_threshold = 80
+
+    # 识别逻辑：停车牌优先级 > 限速牌
+    if stop_cnt > sign_threshold:
+        return 'stop'
+    elif speed_cnt > sign_threshold:
+        # 简化版：CARLA常见限速 30/50/60，可根据地图调整
+        return 'speed_50'
+    else:
+        return 'none'
+
+
+# ==============================================================================
 # 【新增】天气自适应控制系统 - 自动车灯 + 自动相机参数
 # ==============================================================================
 # 1. 判断当前天气类型（黑夜/雨天/雾天/晴天）
@@ -165,7 +210,6 @@ def get_weather_type(world):
 # 2. 自动控制车辆车灯（近光灯 + 雾灯）
 # 2. 自动控制车辆车灯（CARLA官方正确写法，无报错版）
 def auto_vehicle_lights(vehicle, weather_type):
-
     light_state = carla.VehicleLightState()
 
     if weather_type == "night":
@@ -181,6 +225,8 @@ def auto_vehicle_lights(vehicle, weather_type):
         # 晴天：关闭所有灯光
         light_state = carla.VehicleLightState.NONE
     vehicle.set_light_state(light_state)
+
+
 # 3. 自动调整相机参数（曝光/对比度）
 def auto_camera_settings(camera_manager, weather_type):
     if camera_manager.sensor is None:
@@ -208,6 +254,8 @@ def auto_camera_settings(camera_manager, weather_type):
             sensor.set_attribute('exposure_compensation', '0.0')
             sensor.set_attribute('contrast', '1.0')
             sensor.set_attribute('saturation', '1.0')
+
+
 # -- World --------------------------------------------------------------------
 # ==============================================================================
 class World(object):
@@ -226,7 +274,7 @@ class World(object):
         self.gnss_sensor = None
         self.camera_manager = None
         self._weather_presets = find_weather_presets()
-        self._weather_index =0
+        self._weather_index = 0
         self._actor_filter = args.filter
         self._gamma = args.gamma
         self.restart(args)
@@ -270,13 +318,8 @@ class World(object):
         self.camera_manager.set_sensor(cam_index, notify=False)
         actor_type = get_actor_display_name(self.player)
         self.hud.notification(actor_type)
-        night_weather = carla.WeatherParameters(
-            sun_altitude_angle=-90.0,
-            cloudiness=100.0,
-            fog_density=0.0
-        )
-        self.world.set_weather(night_weather)
-        self.hud.notification('Weather: Night')
+
+
     def next_weather(self, reverse=False):
         self._weather_index += -1 if reverse else 1
         self._weather_index %= len(self._weather_presets)
@@ -327,6 +370,13 @@ class HUD(object):
         self._info_text = []
         self._server_clock = pygame.time.Clock()
 
+        # 【新增】LDW车道偏离预警状态
+        self.ldw_warning = False
+        self.ldw_warning_duration = 1.0  # 警告持续1秒
+        self.ldw_timer = 0.0
+        # 预警大字体
+        self.ldw_font = pygame.font.Font(mono, 48)
+
     def on_world_tick(self, timestamp):
         self._server_clock.tick()
         self.server_fps = self._server_clock.get_fps()
@@ -337,6 +387,14 @@ class HUD(object):
         self._notifications.tick(world, clock)
         if not self._show_info:
             return
+
+        # 【新增】更新LDW警告计时器
+        delta_seconds = 1e-3 * clock.get_time()
+        if self.ldw_warning:
+            self.ldw_timer -= delta_seconds
+            if self.ldw_timer <= 0:
+                self.ldw_warning = False
+
         transform = world.player.get_transform()
         vel = world.player.get_velocity()
         control = world.player.get_control()
@@ -394,6 +452,11 @@ class HUD(object):
     def error(self, text):
         self._notifications.set_text('Error: %s' % text, (255, 0, 0))
 
+    # 【新增】触发LDW车道偏离警告
+    def trigger_ldw_warning(self):
+        self.ldw_warning = True
+        self.ldw_timer = self.ldw_warning_duration
+
     def render(self, display):
         if self._show_info:
             info_surface = pygame.Surface((220, self.dim[1]))
@@ -432,6 +495,12 @@ class HUD(object):
         self._notifications.render(display)
         self.help.render(display)
 
+        # 【新增】绘制LDW车道偏离警告（屏幕中央红色大字）
+        if self.ldw_warning:
+            warning_text = self.ldw_font.render("车道偏离警告！", True, (255, 0, 0))
+            text_rect = warning_text.get_rect(center=(self.dim[0] // 2, self.dim[1] // 2))
+            display.blit(warning_text, text_rect)
+
 
 # ==============================================================================
 # -- 传感器基础类 --------------------------------------------------------------
@@ -464,8 +533,8 @@ class HelpText(object):
     def __init__(self, font, width, height):
         lines = [
             "CARLA-Native-Assisted-Driving-System",
-            "PID定速巡航 | 精准红绿灯识别 | 多视角切换",
-            "按键: 1/2/3/4/5 切换视角 | ESC 退出"
+            "PID定速巡航 | 精准红绿灯识别 | 交通标志识别",
+            "按键: 1/2/3/4/5 切换视角 | C/V切换天气 | ESC 退出"
         ]
         self.font = font
         self.dim = (720, len(lines) * 22 + 12)
@@ -535,6 +604,14 @@ class LaneInvasionSensor(object):
         self = weak_self()
         if not self:
             return
+        # 【新增】触发LDW预警（屏幕警告+提示音）
+        self.hud.trigger_ldw_warning()
+        try:
+            self.hud.ldw_sound.play()  # 播放提示音
+        except:
+            pass
+
+        # 原有提示保留
         lane_types = set(x.type for x in event.crossed_lane_markings)
         text = ['%r' % str(x).split()[-1] for x in lane_types]
         self.hud.notification('Crossed line %s' % ' and '.join(text))
@@ -617,7 +694,7 @@ class CameraManager(object):
     def set_sensor(self, index, notify=True, force_respawn=False):
         index = index % len(self.sensors)
         needs_respawn = True if self.index is None else (
-                    force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
+                force_respawn or (self.sensors[index][0] != self.sensors[self.index][0]))
         if needs_respawn:
             if self.sensor is not None:
                 self.sensor.destroy()
@@ -673,17 +750,35 @@ class CameraManager(object):
         if self.recording:
             image.save_to_disk('_out/%08d' % image.frame)
 
+
 # ==============================================================================
 # -- 主循环 --------------------------------------------------------------------
 # ==============================================================================
 def game_loop(args):
     pygame.init()
     pygame.font.init()
+    # 【新增】初始化Pygame音频模块
+    pygame.mixer.init(frequency=22050, size=-16, channels=2, buffer=1024)
     world = None
 
     pid = PIDController(Kp=1.0, Ki=0.2, Kd=0.1)
     steer_pid = PIDController(Kp=0.3, Ki=0.0, Kd=0.05)
     target_speed = 30.0
+    # 【新增】默认巡航速度（未识别到限速标志时使用）
+    DEFAULT_CRUISE_SPEED = 30.0
+
+    # 【新增】生成LDW预警提示音（无外部文件依赖）
+    def generate_ldw_beep():
+        sample_rate = 22050
+        duration = 0.15
+        freq = 900
+        t = np.linspace(0, duration, int(sample_rate * duration), False)
+        wave = np.sin(2 * np.pi * freq * t)
+        wave = (wave * 32767).astype(np.int16)
+        stereo_wave = np.column_stack((wave, wave))
+        return pygame.sndarray.make_sound(stereo_wave)
+
+    ldw_warning_sound = generate_ldw_beep()
 
     try:
         client = carla.Client(args.host, args.port)
@@ -694,6 +789,9 @@ def game_loop(args):
             pygame.HWSURFACE | pygame.DOUBLEBUF)
 
         hud = HUD(args.width, args.height)
+        # 【新增】将提示音绑定到HUD
+        hud.ldw_sound = ldw_warning_sound
+
         world = World(client.get_world(), hud, args)
         clock = pygame.time.Clock()
 
@@ -770,12 +868,31 @@ def game_loop(args):
 
             print("当前天气：", weather_type)
 
+            # ===================== 交通标志识别控制（新增） =====================
+            sign_state = traffic_sign_detect(world.camera_manager.rgb_image)
+            print("交通标志识别：", sign_state)
+
+            # 标志优先级：停车牌 > 红绿灯 > 障碍物
+            if sign_state == 'stop':
+                # 识别到停车牌：强制急停
+                brake = 1.0
+                throttle = 0.0
+            elif sign_state == 'speed_30':
+                target_speed = 30.0
+            elif sign_state == 'speed_50':
+                target_speed = 50.0
+            elif sign_state == 'speed_60':
+                target_speed = 60.0
+            else:
+                # 无标志：恢复默认巡航速度
+                target_speed = DEFAULT_CRUISE_SPEED
+
             # ===================== 红绿灯控制逻辑 =====================
             light_state = traffic_light_detect(world.camera_manager.rgb_image)
-            print("当前识别状态：", light_state)
+            print("红绿灯识别：", light_state)
 
             # 交规逻辑：红灯、黄灯 强制停车；绿灯正常行驶
-            if light_state == 'red' or light_state == 'yellow':
+            if light_state == 'red' or light_state == 'yellow' and sign_state != 'stop':
                 brake = 1.0
                 throttle = 0.0
 
