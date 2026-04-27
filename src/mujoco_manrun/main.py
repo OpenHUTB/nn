@@ -164,9 +164,11 @@ class KeyboardInputHandler(threading.Thread):
         key = key.lower()
         if key == 'w':
             current_gait = self.stabilizer.gait_mode
-            self.stabilizer.set_state("WALK")
-            self.stabilizer.set_gait_mode(current_gait)
-            print(f"[行走] 速度:{self.stabilizer.walk_speed:.2f} | 转向:{self.stabilizer.turn_angle:.2f}")
+            if self.stabilizer.state != "WALK":
+                self.stabilizer.set_state("WALK")
+                self.stabilizer.set_gait_mode(current_gait)
+            if hasattr(self.stabilizer, "_should_log") and self.stabilizer._should_log("key_walk", 0.5):
+                print(f"[行走] 速度:{self.stabilizer.walk_speed:.2f} | 转向:{self.stabilizer.turn_angle:.2f}")
         elif key == 's':
             self.stabilizer.set_state("STOP")
             print("[停止]")
@@ -277,6 +279,7 @@ class HumanoidStabilizer:
         self._log_last = {}
         self._fall_cooldown_until = 0.0
         self._fall_count = 0
+        self._recovery_until = 0.0
         self._imu_euler_filt = np.zeros(3, dtype=np.float64)
         self._imu_angvel_filt = np.zeros(3, dtype=np.float64)
 
@@ -777,6 +780,8 @@ class HumanoidStabilizer:
     # 外部控制接口（原有逻辑完全保留）
     def set_state(self, state):
         if state in self.state_map.keys():
+            if state == "WALK" and float(self.data.time) < float(self._recovery_until):
+                return
             self.state = state
             if state == "WALK":
                 self.walk_start_time = None
@@ -813,7 +818,7 @@ class HumanoidStabilizer:
         quat = self.data.qpos[3:7].astype(np.float64).copy()
         euler = self._quat_to_euler_xyz(quat)
         euler = np.mod(euler + np.pi, 2 * np.pi) - np.pi
-        return np.clip(euler, -0.3, 0.3)
+        return euler
 
     # 原有接触检测方法（保留，用于关闭传感器模拟时的 fallback）
     def _detect_foot_contact(self):
@@ -1078,6 +1083,8 @@ class HumanoidStabilizer:
                         )
                         self.set_state("STAND")  # 跌倒后自动恢复站立
                         self._fall_cooldown_until = float(self.data.time) + 1.0
+                        self._recovery_until = float(self.data.time) + 2.0
+                        self.set_turn_angle(0.0)
         finally:
             keyboard_handler.running = False
             self.ros_handler.stop()
