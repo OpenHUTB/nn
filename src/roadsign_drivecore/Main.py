@@ -303,7 +303,6 @@ def main():
             update_traffic_light_state(vehicle)
             control_vehicle(vehicle, world)
 
-
             # 绘制界面
             if frame is not None:
                 surf = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
