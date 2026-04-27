@@ -20,12 +20,12 @@ class PreProcessObs(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = gym.spaces.Box(
-            low=0, high=1, shape=(42, 42, 1), dtype=np.float32
+            low=0, high=1, shape=(84, 84, 1), dtype=np.float32
         )
 
     def observation(self, obs):
         obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-        obs = cv2.resize(obs, (42, 42), interpolation=cv2.INTER_AREA)
+        obs = cv2.resize(obs, (84, 84), interpolation=cv2.INTER_AREA)
         obs = obs / 255.0
         obs = obs[..., None]
         return obs
@@ -57,15 +57,18 @@ class StackFrames(gym.ObservationWrapper):
         return state
 
 class SmoothActionWrapper(gym.Wrapper):
-    def __init__(self, env, alpha=0.9):
+    def __init__(self, env, alpha=0.85, max_steer_change=0.15):
         super().__init__(env)
         self.alpha = alpha
+        self.max_steer_change = max_steer_change
         self.last_action = None
 
     def step(self, action):
         if self.last_action is not None:
             action = self.alpha * action + (1 - self.alpha) * self.last_action
-            action[0] = np.clip(action[0], self.last_action[0] - 0.08, self.last_action[0] + 0.08)
+            action[0] = np.clip(action[0],
+                                self.last_action[0] - self.max_steer_change,
+                                self.last_action[0] + self.max_steer_change)
         self.last_action = action.copy()
         return self.env.step(action)
 
@@ -73,52 +76,69 @@ class SmoothActionWrapper(gym.Wrapper):
         self.last_action = None
         return self.env.reset(**kwargs)
 
-class TrackBoundaryWrapper(gym.Wrapper):
+class RewardShapingWrapper(gym.Wrapper):
     def __init__(self, env):
         super().__init__(env)
-        self.off_track_penalty = 2.0       # 出赛道惩罚大幅提高
-        self.small_steer_penalty = 0.05    # 小角度乱打方向惩罚
-        self.max_steer = 0.55               # 限制转向更温和
-        self.on_track_reward = 0.4          # 在赛道上奖励
-        self.last_progress = 0.0
+        self.max_steer = 0.6
+        self.consecutive_off_track = 0
+        self.max_off_track_steps = 5
 
     def step(self, action):
-        # 强制限制转向，防止冲出去
         action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
 
         obs, reward, terminated, truncated, info = self.env.step(action)
         speed = info.get('speed', 0.0)
 
-        # ===== 出赛道检测 =====
-        if reward < -0.5:  # CarRacing 内部出赛道会给负奖励
-            reward -= self.off_track_penalty  # 额外重罚
-            # 出赛道立即减速，强制纠正
-            action[1] = 0.0
-            action[2] = 0.2
+        # 计算原始奖励
+        original_reward = reward
+        shaped_reward = 0.0
 
-        # ===== 在赛道内奖励 =====
-        if reward > -0.1 and speed > 0.5:
-            reward += self.on_track_reward
+        # ===== 速度奖励 =====
+        if speed > 0.5:
+            speed_reward = min(speed / 10.0, 0.3)
+            shaped_reward += speed_reward
 
-        # ===== 禁止原地小角度乱摆 =====
-        if abs(action[0]) < 0.08 and speed < 1.0:
-            reward -= self.small_steer_penalty
+        # ===== 出赛道检测与惩罚 =====
+        if original_reward < -0.5:
+            self.consecutive_off_track += 1
+            off_track_penalty = 1.0 + self.consecutive_off_track * 0.5
+            shaped_reward -= off_track_penalty
 
-        # ===== 出赛道直接终止 =====
-        if reward < -1.0:
-            truncated = True
-            reward -= 3.0
+            if self.consecutive_off_track >= self.max_off_track_steps:
+                truncated = True
+                shaped_reward -= 5.0
+        else:
+            self.consecutive_off_track = 0
+            if original_reward > -0.1:
+                shaped_reward += 0.15
 
-        return obs, reward, terminated, truncated, info
+        # ===== 平滑驾驶奖励 =====
+        steer_magnitude = abs(action[0])
+        if steer_magnitude < 0.05 and speed > 1.0:
+            shaped_reward += 0.05
+        elif steer_magnitude > 0.3 and speed > 2.0:
+            shaped_reward -= 0.1
+
+        # ===== 高速平稳驾驶额外奖励 =====
+        if speed > 2.0 and steer_magnitude < 0.2 and original_reward > -0.1:
+            shaped_reward += 0.2
+
+        # ===== 低速惩罚（防止龟速行驶） =====
+        if speed < 0.3 and original_reward > -0.1:
+            shaped_reward -= 0.05
+
+        total_reward = original_reward + shaped_reward
+
+        return obs, total_reward, terminated, truncated, info
 
     def reset(self, **kwargs):
-        self.last_progress = 0.0
+        self.consecutive_off_track = 0
         return self.env.reset(**kwargs)
 
 def wrap_env(env):
     env = SkipFrame(env, skip=4)
     env = PreProcessObs(env)
     env = StackFrames(env, stack=4)
-    env = TrackBoundaryWrapper(env)
-    env = SmoothActionWrapper(env, alpha=0.9)
+    env = RewardShapingWrapper(env)
+    env = SmoothActionWrapper(env, alpha=0.85, max_steer_change=0.15)
     return env
