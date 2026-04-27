@@ -50,6 +50,7 @@ title: 主页
 [__目标检测__](./test/object_detection.md) - 目标检测与危险评估
 
 [__跟踪__](#tracking) 
+[__路径追踪__](./test.md)
 
 ## 规划 <span id="planning"></span>
 
