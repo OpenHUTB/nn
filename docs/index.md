@@ -20,6 +20,8 @@ title: 主页
 
 [__softmax回归__](softmax_regression.md)
 
+[__线性回归和softmax回归改进__](模型优化技术报告.md)
+
 [__支持向量机__](svm.md)
 
 [__简单神经网络__](simple_nn.md)
