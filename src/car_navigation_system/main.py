@@ -24,7 +24,7 @@ class SimpleController:
         self.last_waypoint = None
         # self.reverse_mode = False  # 倒车模式标志（未使用）
         self.manual_reverse = False  # 手动倒车标志
-
+        self.last_steer = 0.0  # 新增：记录上一帧转向值，用于平滑
     def get_control(self):
         """基于路点的简单控制"""
         # 获取车辆状态
@@ -70,12 +70,16 @@ class SimpleController:
         local_x = dx * math.cos(vehicle_yaw) + dy * math.sin(vehicle_yaw)
         local_y = -dx * math.sin(vehicle_yaw) + dy * math.cos(vehicle_yaw)
 
-        if abs(local_x) < 0.1:
-            steer = 0.0
-        else:
-            angle = math.atan2(local_y, local_x)
-            steer = max(-0.5, min(0.5, angle / 1.0))
-
+       if abs(local_x) < 0.1:
+          steer = 0.0
+else:
+          angle = math.atan2(local_y, local_x)
+    # 新增：转向平滑系数（从1.0改为1.5，减少转向幅度）
+         steer = max(-0.5, min(0.5, angle / 1.5))  
+    # 新增：转向速率限制（避免转向突变）
+        if hasattr(self, 'last_steer'):
+             steer = self.last_steer + max(-0.05, min(0.05, steer - self.last_steer))
+        self.last_steer = steer  # 记录上一帧转向值
         # 速度控制
         if speed < self.target_speed * 0.8:
             throttle, brake = 0.6, 0.0
