@@ -45,9 +45,10 @@ env/
 .project
 .pydevproject
 .settings/
+.vscode/settings.json
 
 # ========================================
-# 深度学习模型��件（通常较大）
+# 深度学习模型  件（通常较大）
 # ========================================
 *.weights
 *.pt
@@ -139,3 +140,30 @@ desktop.ini
 .mujoco/
 site/
 .claude/
+# =========================================
+# Added by contributor: development tools
+# =========================================
+
+# Pytest
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# VSCode
+.vscode/
+
+# JetBrains IDE
+.idea/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files
+.env.local
+.env.*.local
+
+# Jupyter
+.ipynb_checkpoints/
