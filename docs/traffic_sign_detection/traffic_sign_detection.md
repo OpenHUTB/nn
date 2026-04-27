@@ -77,7 +77,7 @@ CARLA 场景构建与自动采集
 
 ### 2.1.1 项目流程图
 
-<div class="mermaid">
+```mermaid
 flowchart LR
     A["CARLA 仿真环境"] --> B["main.py 场景构建与自动采集"]
     B --> C["PNG 图像 + XML 标注"]
@@ -87,7 +87,7 @@ flowchart LR
     F --> G["ONNX 模型"]
     G --> H["detector_onnx.py 推理与可视化验证"]
     H --> I["图片 / 视频检测结果"]
-</div>
+```
 
 ### 2.2 仿真层：CARLA
 
