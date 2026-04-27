@@ -342,3 +342,4 @@ if __name__ == "__main__":
 
     # 使用封装的绘图函数
     plot_results(x_train, y_train, x_test, y_test, y_test_pred)
+    print("✅ 线性回归项目运行成功！开源贡献练习完成！")
