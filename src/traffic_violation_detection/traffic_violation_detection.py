@@ -13,8 +13,7 @@ import pygame
 pygame.init()
 screen = pygame.display.set_mode((400, 300))
 
-carla_egg_path = r"F:\hutb下载\Carla_0.9.15\CARLA_0.9.15\WindowsNoEditor\PythonAPI\carla\dist\carla-0.9.15-py3.7-win64.egg"
-sys.path.append(carla_egg_path)
+
 import carla
 
 # 全局违章变量
