@@ -201,7 +201,7 @@ def robot_arm_auto_reset_demo():
         """完整取放流程（含自动重试、连续失败提醒、速度控制）"""
         retry_count = 0
         success = False
-        consecutive_fails = 0  # 连续失败次数计数器
+        consecutive_fails = 0
         
         # 获取速度参数
         joint_duration = SPEED_CONFIG[speed]["joint"]
@@ -228,14 +228,13 @@ def robot_arm_auto_reset_demo():
                 gripper_open(viewer, "蓝色球体")
 
                 success = True
-                consecutive_fails = 0  # 成功后重置连续失败计数
+                consecutive_fails = 0
                 print(f"\n\n🎉 第 {retry_count+1} 次抓取尝试成功！")
             except Exception as e:
                 retry_count += 1
                 consecutive_fails += 1
                 print(f"\n❌ 第 {retry_count} 次抓取失败：{e}")
                 
-                # 连续失败提醒
                 if consecutive_fails >= 3:
                     print("\n" + "="*50)
                     print("⚠️⚠️⚠️ 连续失败次数过多！")
@@ -276,14 +275,13 @@ def robot_arm_auto_reset_demo():
             else:
                 print(f"⚠️ 速度参数 '{speed_arg}' 无效，使用默认 'medium'")
         
-        success_count = 0          # 成功次数计数器
+        success_count = 0
 
         for round_num in range(1, total_rounds + 1):
             print(f"\n{'='*40}")
             print(f"🔄 第 {round_num}/{total_rounds} 次抓取")
             print(f"{'='*40}")
 
-            # 执行完整取放流程
             grab_success = grab_and_place(viewer, speed=speed)
 
             if grab_success:
@@ -292,13 +290,9 @@ def robot_arm_auto_reset_demo():
             else:
                 print(f"❌ 第 {round_num} 次抓取失败")
 
-            # 机械臂自动复位
             robot_auto_reset(viewer)
-
-            # 目标物体重置到原位（为下一次抓取做准备）
             target_auto_reset(viewer)
 
-            # 每两次抓取之间稍微停顿，便于观察
             if round_num < total_rounds:
                 print("\n⏸ 准备下一次抓取...")
                 for _ in range(30):
@@ -315,7 +309,6 @@ def robot_arm_auto_reset_demo():
         print(f"📈 成功率：{success_count/total_rounds*100:.1f}%")
         print(f"{'='*50}")
 
-        # 保持可视化查看结果
         print("\n\n📌 流程结束，保持可视化5秒...")
         start_hold = time.time()
         while (time.time() - start_hold) < 5 and viewer.is_running():
