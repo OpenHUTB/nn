@@ -186,6 +186,36 @@ def traffic_sign_detect(image):
 
 
 # ==============================================================================
+#  行人检测 AEB
+# ==============================================================================
+def pedestrian_detect(image):
+    if image is None:
+        return False
+
+    h, w = image.shape[:2]
+    # 严格缩小ROI：只看车辆正前方路面，砍掉天空、路边建筑、围墙干扰
+    roi = image[int(h * 0.6):int(h * 0.9), int(w * 0.4):int(w * 0.6)]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
+
+    # 极度收紧行人肤色阈值，过滤路面/黄土/墙壁
+    lower_ped = np.array([0, 80, 120])
+    upper_ped = np.array([12, 130, 200])
+
+    mask = cv2.inRange(hsv, lower_ped, upper_ped)
+
+    # 强力降噪
+    kernel = np.ones((6, 6), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        # 只有足够大的物体才判定为行人
+        if area > 600:
+            return True
+    return False
+# ==============================================================================
 # 【新增】天气自适应控制系统 - 自动车灯 + 自动相机参数
 # ==============================================================================
 # 1. 判断当前天气类型（黑夜/雨天/雾天/晴天）
@@ -791,7 +821,6 @@ def game_loop(args):
         hud = HUD(args.width, args.height)
         # 【新增】将提示音绑定到HUD
         hud.ldw_sound = ldw_warning_sound
-
         world = World(client.get_world(), hud, args)
         clock = pygame.time.Clock()
 
@@ -871,10 +900,18 @@ def game_loop(args):
             # ===================== 交通标志识别控制（新增） =====================
             sign_state = traffic_sign_detect(world.camera_manager.rgb_image)
             print("交通标志识别：", sign_state)
+            # ===================== 行人检测 + AEB自动刹车（新增） =====================
+            has_pedestrian = pedestrian_detect(world.camera_manager.rgb_image)
+            print("前方行人：", "检测到" if has_pedestrian else "无")
 
-            # 标志优先级：停车牌 > 红绿灯 > 障碍物
+            # ===================== 控制优先级：行人AEB > 停车牌 > 红绿灯 > 限速 =====================
+            # 1. 行人检测（最高优先级，必须第一）
+            if has_pedestrian:
+                brake = 1.0
+                throttle = 0.0
+
+            # 2. 停车标志
             if sign_state == 'stop':
-                # 识别到停车牌：强制急停
                 brake = 1.0
                 throttle = 0.0
             elif sign_state == 'speed_30':
@@ -884,8 +921,8 @@ def game_loop(args):
             elif sign_state == 'speed_60':
                 target_speed = 60.0
             else:
-                # 无标志：恢复默认巡航速度
                 target_speed = DEFAULT_CRUISE_SPEED
+
 
             # ===================== 红绿灯控制逻辑 =====================
             light_state = traffic_light_detect(world.camera_manager.rgb_image)
