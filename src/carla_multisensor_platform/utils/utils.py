@@ -38,23 +38,31 @@ def date_modified(path=__file__):
     t = datetime.datetime.fromtimestamp(Path(path).stat().st_mtime)
     return f'{t.year}-{t.month}-{t.day}'
 
+def _parse_device_ids(device):
+    # Normalize "0,1, 2" into ["0", "1", "2"] and drop empty fragments.
+    return [item.strip() for item in device.split(',') if item.strip()]
+
 def select_device(device='', batch_size=None):
     # device = 'cpu' or '0' or '0,1,2,3'
     s = f'YOLOPv2 🚀 {git_describe() or date_modified()} torch {torch.__version__} '  # string
     cpu = device.lower() == 'cpu'
+    device_ids = _parse_device_ids(device) if device and not cpu else []
     if cpu:
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force torch.cuda.is_available() = False
     elif device:  # non-cpu device requested
-        os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
+        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(device_ids)  # set environment variable
         assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {device} requested'  # check availability
 
     cuda = not cpu and torch.cuda.is_available()
     if cuda:
         n = torch.cuda.device_count()
+        if device_ids:
+            assert len(device_ids) == n, f'Expected {len(device_ids)} visible CUDA devices, found {n}'
         if n > 1 and batch_size:  # check that batch_size is compatible with device_count
             assert batch_size % n == 0, f'batch-size {batch_size} not multiple of GPU count {n}'
         space = ' ' * len(s)
-        for i, d in enumerate(device.split(',') if device else range(n)):
+        visible_devices = device_ids or [str(i) for i in range(n)]
+        for i, d in enumerate(visible_devices):
             p = torch.cuda.get_device_properties(i)
             s += f"{'' if i == 0 else space}CUDA:{d} ({p.name}, {p.total_memory / 1024 ** 2}MB)\n"  # bytes to MB
     else:
@@ -260,12 +268,21 @@ def increment_path(path, exist_ok=True, sep=''):
     path = Path(path)  # os-agnostic
     if (path.exists() and exist_ok) or (not path.exists()):
         return str(path)
-    else:
-        dirs = glob.glob(f"{path}{sep}*")  # similar paths
-        matches = [re.search(rf"%s{sep}(\d+)" % path.stem, d) for d in dirs]
-        i = [int(m.groups()[0]) for m in matches if m]  # indices
-        n = max(i) + 1 if i else 2  # increment number
-        return f"{path}{sep}{n}"  # update path
+
+    suffix = ''.join(path.suffixes)
+    stem = path.name[:-len(suffix)] if suffix else path.name
+    parent = path.parent
+    pattern = re.compile(rf'^{re.escape(stem)}{re.escape(sep)}(\d+)$')
+    indices = []
+
+    for sibling in parent.glob(f'{stem}{sep}*'):
+        sibling_name = sibling.name[:-len(suffix)] if suffix else sibling.name
+        match = pattern.match(sibling_name)
+        if match:
+            indices.append(int(match.group(1)))
+
+    next_index = max(indices, default=1) + 1
+    return str(parent / f'{stem}{sep}{next_index}{suffix}')
 
 def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None):
     # Rescale coords (xyxy) from img1_shape to img0_shape
