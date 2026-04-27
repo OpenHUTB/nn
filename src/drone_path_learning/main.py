@@ -1,239 +1,122 @@
-"""
-快速启动脚本，用于无人机强化学习路径规划项目
-运行此脚本来验证设置和快速开始训练
-"""
-
+import argparse
+import os
+import subprocess
 import sys
-import logging
+from dataclasses import dataclass
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 
-def check_dependencies():
-    """检查是否已安装所有必需的依赖项"""
-    logger.info("正在检查依赖项...")
-
-    required = {
-        "gymnasium": "Gymnasium (Gym)",
-        "stable_baselines3": "Stable Baselines3",
-        "numpy": "NumPy",
-        "torch": "PyTorch",
-        "yaml": "PyYAML",
-        "PIL": "Pillow",
-    }
-
-    missing = []
-    for module, name in required.items():
-        try:
-            __import__(module)
-            logger.info(f"✓ {name}")
-        except ImportError:
-            logger.error(f"✗ {name} - 未安装")
-            missing.append(name)
-
-    if missing:
-        logger.error(f"\n缺少依赖项: {', '.join(missing)}")
-        logger.info("通过以下命令安装: pip install -r requirements.txt")
-        return False
-
-    logger.info("✓ 所有依赖项已安装\n")
-    return True
+@dataclass(frozen=True)
+class MenuEntry:
+    label: str
+    script: Path
 
 
-def validate_environment():
-    """验证 AirSim 环境设置"""
-    logger.info("正在验证 AirSim 环境...")
+MENU_ENTRIES = {
+    "train": MenuEntry(
+        label="训练（可视化）",
+        script=PROJECT_ROOT / "scripts" / "start_train_with_plot.py",
+    ),
+    "eval": MenuEntry(
+        label="评估（可视化）",
+        script=PROJECT_ROOT / "scripts" / "start_evaluate_with_plot.py",
+    ),
+    "torch_check": MenuEntry(
+        label="Torch/CUDA 检查",
+        script=PROJECT_ROOT / "tools" / "test" / "torch_gpu_cpu_test.py",
+    ),
+    "env_test": MenuEntry(
+        label="环境快速测试",
+        script=PROJECT_ROOT / "tools" / "test" / "env_test.py",
+    ),
+}
 
-    try:
-        from src.envs.base_drone_env import AirSimDroneEnv
-        from stable_baselines3.common.env_checker import check_env
-
-        logger.info("正在创建环境...")
-        env = AirSimDroneEnv(verbose=False)
-
-        logger.info("正在检查环境格式...")
-        check_env(env.unwrapped)
-
-        logger.info("✓ 环境验证成功\n")
-        env.close()
-        return True
-
-    except Exception as e:
-        logger.error(f"✗ 环境验证失败: {e}")
-        logger.info("确保 AirSim 模拟器正在运行!")
-        return False
+MENU_ORDER = [
+    ("1", "train"),
+    ("2", "eval"),
+    ("3", "torch_check"),
+    ("4", "env_test"),
+]
 
 
-def show_menu():
-    """显示交互式菜单"""
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="drone_path_learning 启动器")
+    parser.add_argument(
+        "mode",
+        nargs="?",
+        default=None,
+        choices=sorted(MENU_ENTRIES.keys()),
+        help="启动模式（可选）: train / eval / torch_check / env_test",
+    )
+    parser.add_argument(
+        "script_args",
+        nargs=argparse.REMAINDER,
+        help="透传给目标启动脚本的参数",
+    )
+    return parser
+
+
+def _interactive_select_mode() -> str | None:
+    print("\ndrone_path_learning 启动菜单")
+    for idx, key in MENU_ORDER:
+        print(f"{idx}) {MENU_ENTRIES[key].label} ({key})")
+    print("0) 退出")
+
+    mapping = {idx: key for idx, key in MENU_ORDER}
+    mapping.update({"0": None, "q": None, "quit": None, "exit": None})
+
     while True:
-        print("\n" + "=" * 50)
-        print("DRONE RL PATH PLANNING - QUICK START")
-        print("=" * 50)
-        print("1. 验证环境")
-        print("2. 从头开始训练新模型")
-        print("3. 从检查点继续训练")
-        print("4. 评估模型")
-        print("5. 可视化结果")
-        print("6. 查看 TensorBoard 日志")
-        print("0. 退出")
-        print("=" * 50)
-
-        choice = input("请选择选项 (0-6): ").strip()
-
-        if choice == "1":
-            validate_environment()
-
-        elif choice == "2":
-            train_new()
-
-        elif choice == "3":
-            train_continue()
-
-        elif choice == "4":
-            evaluate()
-
-        elif choice == "5":
-            visualize()
-
-        elif choice == "6":
-            tensorboard()
-
-        elif choice == "0":
-            print("Goodbye!")
-            break
-
-        else:
-            print("无效选项, try again")
+        choice = input("请选择功能编号（或输入功能键）: ").strip().lower()
+        if choice in MENU_ENTRIES:
+            return choice
+        if choice in mapping:
+            return mapping[choice]
+        print("输入无效，请重新输入。")
 
 
-def train_new():
-    """训练新模型"""
-    print("\n--- 训练新模型 ---")
+def _run_entry(mode: str, forwarded_args: list[str]) -> None:
+    target = MENU_ENTRIES[mode]
+    if not target.script.exists():
+        raise FileNotFoundError(f"未找到启动脚本: {target.script}")
 
-    timesteps = input("总时间步长 [1000000]: ").strip()
-    timesteps = int(timesteps) if timesteps else 1000000
+    rel_path = target.script.relative_to(PROJECT_ROOT)
+    print(f"\n正在启动: {target.label}")
+    print(f"脚本路径: {rel_path}")
 
-    from src.training.train import train
+    cmd = [sys.executable, str(target.script), *forwarded_args]
 
-    try:
-        train(total_timesteps=timesteps)
-        logger.info("✓ 训练完成!")
-    except KeyboardInterrupt:
-        logger.info("训练被用户中断")
-    except Exception as e:
-        logger.error(f"训练失败: {e}")
+    env = os.environ.copy()
+    pythonpath_items = [
+        str(PROJECT_ROOT),
+        str(PROJECT_ROOT / "gym_env"),
+    ]
+    existing_pythonpath = env.get("PYTHONPATH")
+    if existing_pythonpath:
+        pythonpath_items.append(existing_pythonpath)
+    env["PYTHONPATH"] = os.pathsep.join(pythonpath_items)
 
-
-def train_continue():
-    """从检查点继续训练"""
-    print("\n--- 继续训练 ---")
-
-    model_path = input("Model path [./data/best_model/final_model]: ").strip()
-    model_path = model_path or "./data/best_model/final_model"
-
-    timesteps = input("频次时间步长 [500000]: ").strip()
-    timesteps = int(timesteps) if timesteps else 500000
-
-    from src.training.train import train
-
-    try:
-        train(load_model_path=model_path, total_timesteps=timesteps)
-        logger.info("✓ 训练完成!")
-    except Exception as e:
-        logger.error(f"训练失败: {e}")
+    subprocess.run(cmd, cwd=str(PROJECT_ROOT), env=env, check=True)
 
 
-def evaluate():
-    """评估模型"""
-    print("\n--- 评估模型 ---")
+def main() -> None:
+    args = _build_parser().parse_args()
 
-    model_path = input("Model path [./data/best_model/final_model]: ").strip()
-    model_path = model_path or "./data/best_model/final_model"
+    if args.mode is None:
+        mode = _interactive_select_mode()
+        if mode is None:
+            print("已退出启动器。")
+            return
+        forwarded_args = []
+    else:
+        mode = args.mode
+        forwarded_args = list(args.script_args)
+        if forwarded_args and forwarded_args[0] == "--":
+            forwarded_args = forwarded_args[1:]
 
-    episodes = input("回合数 [10]: ").strip()
-    episodes = int(episodes) if episodes else 10
-
-    results_dir = input("Results directory [./data/results/]: ").strip()
-    results_dir = results_dir or "./data/results/"
-
-    from src.evaluation.evaluate import evaluate_model
-
-    try:
-        evaluate_model(
-            model_path=model_path, n_episodes=episodes, results_dir=results_dir
-        )
-        logger.info("✓ 评估完成!")
-    except Exception as e:
-        logger.error(f"评估失败: {e}")
-
-
-def visualize():
-    """可视化结果"""
-    print("\n--- 可视化结果 ---")
-
-    results_dir = input("Results directory [./data/results/]: ").strip()
-    results_dir = results_dir or "./data/results/"
-
-    from src.evaluation.trajectory_vis import visualize_evaluation_results
-
-    try:
-        visualize_evaluation_results(results_dir)
-        logger.info("✓ 可视化完成!")
-    except Exception as e:
-        logger.error(f"可视化失败: {e}")
-
-
-def tensorboard():
-    """启动 TensorBoard"""
-    print("\n--- TensorBoard ---")
-
-    import subprocess
-    import shutil
-
-    log_dir = "./data/logs/"
-
-    logger.info(f"启动 TensorBoard，日志位置 {log_dir}")
-    logger.info("在浏览器中打开 http://localhost:6006")
-
-    try:
-        # 较新的 TensorBoard 版本可能不再暴露 tensorboard.__main__。
-        # 优先使用 CLI 入口，失败时回退到 tensorboard.main 模块。
-        tensorboard_exe = shutil.which("tensorboard")
-        if tensorboard_exe:
-            cmd = [tensorboard_exe, f"--logdir={log_dir}", "--port=6006"]
-        else:
-            cmd = [
-                sys.executable,
-                "-m",
-                "tensorboard.main",
-                f"--logdir={log_dir}",
-                "--port=6006",
-            ]
-
-        subprocess.run(cmd)
-    except Exception as e:
-        logger.error(f"启动 TensorBoard 失败: {e}")
-
-
-def main():
-    """主入口点"""
-    logger.info("启动无人机强化学习路径规划项目\n")
-
-    # 检查依赖项
-    if not check_dependencies():
-        sys.exit(1)
-
-    # 展示菜单
-    try:
-        show_menu()
-    except KeyboardInterrupt:
-        print("\n\n退出")
-        sys.exit(0)
+    _run_entry(mode, forwarded_args)
 
 
 if __name__ == "__main__":

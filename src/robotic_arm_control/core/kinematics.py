@@ -2,6 +2,7 @@ import numpy as np
 import math
 import yaml
 import logging
+import os
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -13,6 +14,10 @@ class RoboticArmKinematics:
 
     def __init__(self, config_path="config/arm_config.yaml"):
         """初始化：加载D-H参数和关节限位"""
+        # 转换为绝对路径（基于模块目录）
+        if not os.path.isabs(config_path):
+            module_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            config_path = os.path.join(module_dir, config_path)
         self.config_path = config_path
         self.dh_params = {}
         self.joint_limits = {}

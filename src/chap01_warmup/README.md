@@ -1,5 +1,29 @@
 # numpy exercise
 
+## 工程化小改动（第二次提交）
+
+本次在不改变题目核心逻辑的前提下，对 `numpy_tutorial.py` 做了轻量改进，方便复现实验和提交作业：
+
+1. 新增命令行参数入口：
+`--seed`、`--save-dir`、`--no-show`
+2. 第 4 题随机数生成支持可配置种子：
+`question_4(seed=...)`
+3. 第 24、25 题绘图支持自动保存：
+`quadratic.png`、`trigonometric.png`
+
+### 运行示例
+
+```bash
+python numpy_tutorial.py --seed 42 --save-dir outputs --no-show
+```
+
+### 运行结果
+
+当使用 `--save-dir outputs` 时，会在 `outputs/` 下生成：
+
+- `quadratic.png`
+- `trigonometric.png`
+
 ## 题目要求： 
 
 按照 [python 文件](https://github.com/OpenHUTB/nn/blob/main/src/chap01_warmup/numpy_tutorial.py) 中的要求，利用numpy 实现对应的操作。
