@@ -1,6 +1,5 @@
-import glob
-import os
 import time
+from pathlib import Path
 import numpy as np
 import cv2
 import csv
@@ -12,13 +11,18 @@ import math
 # ==============================================================================
 # 配置区域
 # ==============================================================================
-MODELS_DIR = r"D:\Others\MyAirsimprojects\models"
-LOG_PATH = r"D:\Others\MyAirsimprojects\inference_logs"  # 轨迹保存路径
-os.makedirs(LOG_PATH, exist_ok=True)
+MODELS_DIR = Path(r"D:\Others\MyAirsimprojects\models")
+LOG_PATH = Path(r"D:\Others\MyAirsimprojects\inference_logs")  # 轨迹保存路径
+LOG_PATH.mkdir(parents=True, exist_ok=True)
 
 # 可视化配置
 SHOW_DASHBOARD = True  # 是否显示 OpenCV 仪表盘
 DASHBOARD_SIZE = (800, 400)  # 宽, 高
+DEPTH_PANEL_SIZE = (350, 350)
+LIDAR_MAX_DISTANCE = 20.0
+LIDAR_DANGER_DISTANCE = 5.0
+TRAJECTORY_CSV_HEADERS = ["Episode", "Step", "X", "Y", "Z", "Reward", "DoneType"]
+CSV_ENCODING = "utf-8-sig"
 
 
 # ==============================================================================
@@ -27,22 +31,68 @@ DASHBOARD_SIZE = (800, 400)  # 宽, 高
 
 def get_all_models(path_dir):
     """获取所有模型并按时间排序"""
-    files = glob.glob(os.path.join(path_dir, '*.zip'))
-    # 按修改时间倒序排列 (最新的在前)
-    files.sort(key=os.path.getctime, reverse=True)
-    return files
+    path_dir = Path(path_dir)
+    return sorted(path_dir.glob("*.zip"), key=lambda file_path: file_path.stat().st_ctime, reverse=True)
+
+
+def get_episode_outcome(reward):
+    """根据回合奖励推断结束类型。"""
+    if reward >= 50:
+        return "success", "✅ SUCCESS"
+    if reward <= -50:
+        return "collision", "❌ COLLISION"
+    if reward == -20:
+        return "out_of_bounds", "⚠️ OUT OF BOUNDS"
+    return "timeout", "⏳ TIMEOUT/OTHER"
+
+
+def create_trajectory_log(log_dir):
+    """创建轨迹日志并写入表头。"""
+    csv_path = Path(log_dir) / f"trajectory_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    with csv_path.open("w", newline="", encoding=CSV_ENCODING) as file_obj:
+        csv.writer(file_obj).writerow(TRAJECTORY_CSV_HEADERS)
+    return csv_path
+
+
+def append_trajectory_rows(csv_path, rows, done_reason):
+    """将单回合轨迹批量写入 CSV。"""
+    with Path(csv_path).open("a", newline="", encoding=CSV_ENCODING) as file_obj:
+        writer = csv.writer(file_obj)
+        for row in rows:
+            writer.writerow(row + [done_reason])
+
+
+def _get_obs_value(obs, key, default=None):
+    return obs.get(key, default) if isinstance(obs, dict) else default
+
+
+def _prepare_depth_image(image):
+    if image is None:
+        return None
+    image = np.asarray(image)
+    if len(image.shape) == 2:
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+    elif len(image.shape) != 3 or image.shape[2] != 3:
+        return None
+    return cv2.resize(image, DEPTH_PANEL_SIZE, interpolation=cv2.INTER_NEAREST)
+
+
+def _dashboard_status_text(text):
+    ascii_text = text.encode("ascii", errors="ignore").decode().strip()
+    return ascii_text or text
 
 
 def draw_dashboard(obs, action, reward, step_count, last_info):
     """绘制实时仪表盘"""
     # 1. 创建黑色背景画布
     canvas = np.zeros((DASHBOARD_SIZE[1], DASHBOARD_SIZE[0], 3), dtype=np.uint8)
+    action = np.asarray(action).flatten() if action is not None else np.zeros(2, dtype=float)
+    forward_velocity = action[0] if action.size > 0 else 0.0
+    yaw_rate = action[1] if action.size > 1 else 0.0
 
     # --- 左侧: 深度摄像头画面 ---
-    if 'image' in obs:
-        depth_img = obs['image']
-        depth_img = cv2.cvtColor(depth_img, cv2.COLOR_GRAY2BGR)
-        depth_img = cv2.resize(depth_img, (350, 350), interpolation=cv2.INTER_NEAREST)
+    depth_img = _prepare_depth_image(_get_obs_value(obs, "image"))
+    if depth_img is not None:
         h, w, _ = depth_img.shape
         canvas[25:25 + h, 25:25 + w] = depth_img
         cv2.putText(canvas, "Depth Camera", (25, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
@@ -54,21 +104,19 @@ def draw_dashboard(obs, action, reward, step_count, last_info):
 
     infos = [
         f"Step: {step_count}",
-        f"Fwd Vel: {action[0]:.2f} (x5.0 m/s)",
-        f"Yaw Rate: {action[1]:.2f} (x60 deg/s)",
+        f"Fwd Vel: {forward_velocity:.2f} (x5.0 m/s)",
+        f"Yaw Rate: {yaw_rate:.2f} (x60 deg/s)",
         f"Reward: {reward:.3f}",
-        f"Status: {last_info}"
+        f"Status: {_dashboard_status_text(last_info)}"
     ]
 
     for i, text in enumerate(infos):
         color = (0, 255, 0)
         if "Reward" in text and reward < 0:
             color = (0, 0, 255)
-        if "Status" in text and "撞墙" in text:
+        if "Status" in text and ("COLLISION" in text or "OUT OF BOUNDS" in text):
             color = (0, 0, 255)
 
-        # 这里需要注意: OpenCV putText 不支持 emoji，如果 last_info 包含 emoji 可能会显示乱码或问号
-        # 但不会报错崩溃。崩溃是在写入 CSV 时发生的。
         cv2.putText(canvas, text, (x_start, y_start + i * line_height),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
@@ -78,17 +126,18 @@ def draw_dashboard(obs, action, reward, step_count, last_info):
     cv2.circle(canvas, lidar_center, 2, (0, 255, 255), -1)
     cv2.circle(canvas, lidar_center, lidar_radius, (50, 50, 50), 1)
 
-    if 'lidar' in obs:
-        lidar_data = obs['lidar']
-        for i in range(0, 180, 2):
+    lidar_data = _get_obs_value(obs, "lidar")
+    if lidar_data is not None:
+        lidar_data = np.asarray(lidar_data).flatten()
+        for i in range(0, min(180, lidar_data.size), 2):
             dist = lidar_data[i]
-            if dist < 20:
+            if dist < LIDAR_MAX_DISTANCE:
                 angle_deg = -90 + i
                 angle_rad = math.radians(angle_deg - 90)
-                r_pixel = (dist / 20.0) * lidar_radius
+                r_pixel = (dist / LIDAR_MAX_DISTANCE) * lidar_radius
                 pt_x = int(lidar_center[0] + r_pixel * math.cos(angle_rad))
                 pt_y = int(lidar_center[1] + r_pixel * math.sin(angle_rad))
-                pt_color = (0, 255, 0) if dist > 5 else (0, 0, 255)
+                pt_color = (0, 255, 0) if dist > LIDAR_DANGER_DISTANCE else (0, 0, 255)
                 cv2.circle(canvas, (pt_x, pt_y), 2, pt_color, -1)
 
     return canvas
@@ -110,17 +159,13 @@ def main():
         return
 
     print(f"发现 {len(models)} 个模型存档。")
-    print(f"默认加载最新的: {os.path.basename(models[0])}")
+    print(f"默认加载最新的: {models[0].name}")
     model_path = models[0]
 
-    # 2. 加载环境与模型
-    print("正在初始化环境...")
-    env = AirSimMazeEnv()
+    env = None
+    csv_filename = None
 
-    print(f"正在加载神经网络: {model_path} ...")
-    model = PPO.load(model_path)
-
-    # 3. 初始化统计数据
+    # 2. 初始化统计数据
     stats = {
         "episodes": 0,
         "success": 0,
@@ -129,18 +174,19 @@ def main():
         "timeout": 0
     }
 
-    # 4. 创建轨迹日志文件
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_filename = os.path.join(LOG_PATH, f"trajectory_{timestamp}.csv")
-
-    # 【修复点 1】增加 encoding='utf-8-sig'
-    with open(csv_filename, 'w', newline='', encoding='utf-8-sig') as f:
-        writer = csv.writer(f)
-        writer.writerow(["Episode", "Step", "X", "Y", "Z", "Reward", "DoneType"])
-
-    print("\n>>> 开始推理 (按 'q' 退出 OpenCV 窗口或 Ctrl+C 停止) <<<\n")
-
     try:
+        # 3. 加载环境与模型
+        print("正在初始化环境...")
+        env = AirSimMazeEnv()
+
+        print(f"正在加载神经网络: {model_path} ...")
+        model = PPO.load(str(model_path))
+
+        # 4. 创建轨迹日志文件
+        csv_filename = create_trajectory_log(LOG_PATH)
+
+        print("\n>>> 开始推理 (按 'q' 退出 OpenCV 窗口或 Ctrl+C 停止) <<<\n")
+
         obs, _ = env.reset()
         episode_reward = 0
         step_count = 0
@@ -158,27 +204,13 @@ def main():
 
             if done:
                 stats['episodes'] += 1
-                if reward >= 50:
-                    stats['success'] += 1
-                    done_reason = "✅ SUCCESS"
-                elif reward <= -50:
-                    stats['collision'] += 1
-                    done_reason = "❌ COLLISION"
-                elif reward == -20:
-                    stats['out_of_bounds'] += 1
-                    done_reason = "⚠️ OUT OF BOUNDS"
-                else:
-                    stats['timeout'] += 1
-                    done_reason = "⏳ TIMEOUT/OTHER"
+                outcome_key, done_reason = get_episode_outcome(reward)
+                stats[outcome_key] += 1
 
                 print(
                     f"Episode {stats['episodes']} 结束 | 原因: {done_reason} | 总分: {episode_reward:.2f} | 步数: {step_count}")
 
-                # 【修复点 2】增加 encoding='utf-8-sig'
-                with open(csv_filename, 'a', newline='', encoding='utf-8-sig') as f:
-                    writer = csv.writer(f)
-                    for row in current_traj:
-                        writer.writerow(row + [done_reason])
+                append_trajectory_rows(csv_filename, current_traj, done_reason)
 
                 obs, _ = env.reset()
                 episode_reward = 0
@@ -208,12 +240,14 @@ def main():
             print(f"成功次数: {stats['success']} ({stats['success'] / total * 100:.1f}%)")
             print(f"撞墙次数: {stats['collision']} ({stats['collision'] / total * 100:.1f}%)")
             print(f"越界次数: {stats['out_of_bounds']} ({stats['out_of_bounds'] / total * 100:.1f}%)")
-            print(f"轨迹数据已保存至: {csv_filename}")
+            if csv_filename is not None:
+                print(f"轨迹数据已保存至: {csv_filename}")
         else:
             print("未完成任何完整回合。")
         print("=" * 50)
 
-        env.close()
+        if env is not None:
+            env.close()
         cv2.destroyAllWindows()
 
 
