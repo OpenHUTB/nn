@@ -88,8 +88,6 @@ def get_actor_display_name(actor, truncate=250):
 
 
 # ==============================================================================
-
-# ==============================================================================
 def traffic_light_detect(image):
     # 空图像保护
     if image is None:
@@ -143,6 +141,80 @@ def traffic_light_detect(image):
         return 'none'
 
 
+# ==============================================================================
+# 【新增】交通标志识别（停车牌 / 限速牌）- 复用红绿灯视觉逻辑
+# ==============================================================================
+def traffic_sign_detect(image):
+    if image is None:
+        return 'none'
+
+    h, w = image.shape[:2]
+    # 扩大ROI：覆盖道路上方的交通标志区域（比红绿灯ROI更大）
+    roi = image[int(h * 0.05):int(h * 0.35), int(w * 0.35):int(w * 0.65)]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
+
+    # 1. 停车标志：红色（和红绿灯红色阈值一致）
+    lower_red1 = np.array([0, 150, 150])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 150, 150])
+    upper_red2 = np.array([180, 255, 255])
+    mask_stop = cv2.inRange(hsv, lower_red1, upper_red1) + cv2.inRange(hsv, lower_red2, upper_red2)
+
+    # 2. 限速标志：CARLA标准蓝色（HSV蓝色区间）
+    lower_blue = np.array([90, 100, 100])
+    upper_blue = np.array([130, 255, 255])
+    mask_speed = cv2.inRange(hsv, lower_blue, upper_blue)
+
+    # 形态学去噪
+    kernel = np.ones((3, 3), np.uint8)
+    mask_stop = cv2.morphologyEx(mask_stop, cv2.MORPH_OPEN, kernel)
+    mask_speed = cv2.morphologyEx(mask_speed, cv2.MORPH_OPEN, kernel)
+
+    # 像素计数阈值
+    stop_cnt = cv2.countNonZero(mask_stop)
+    speed_cnt = cv2.countNonZero(mask_speed)
+    sign_threshold = 80
+
+    # 识别逻辑：停车牌优先级 > 限速牌
+    if stop_cnt > sign_threshold:
+        return 'stop'
+    elif speed_cnt > sign_threshold:
+        # 简化版：CARLA常见限速 30/50/60，可根据地图调整
+        return 'speed_50'
+    else:
+        return 'none'
+
+
+# ==============================================================================
+#  行人检测 AEB
+# ==============================================================================
+def pedestrian_detect(image):
+    if image is None:
+        return False
+
+    h, w = image.shape[:2]
+    # 严格缩小ROI：只看车辆正前方路面，砍掉天空、路边建筑、围墙干扰
+    roi = image[int(h * 0.6):int(h * 0.9), int(w * 0.4):int(w * 0.6)]
+    hsv = cv2.cvtColor(roi, cv2.COLOR_RGB2HSV)
+
+    # 极度收紧行人肤色阈值，过滤路面/黄土/墙壁
+    lower_ped = np.array([0, 80, 120])
+    upper_ped = np.array([12, 130, 200])
+
+    mask = cv2.inRange(hsv, lower_ped, upper_ped)
+
+    # 强力降噪
+    kernel = np.ones((6, 6), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    for cnt in contours:
+        area = cv2.contourArea(cnt)
+        # 只有足够大的物体才判定为行人
+        if area > 600:
+            return True
+    return False
 # ==============================================================================
 # 【新增】天气自适应控制系统 - 自动车灯 + 自动相机参数
 # ==============================================================================
@@ -491,8 +563,8 @@ class HelpText(object):
     def __init__(self, font, width, height):
         lines = [
             "CARLA-Native-Assisted-Driving-System",
-            "PID定速巡航 | 精准红绿灯识别 | 多视角切换",
-            "按键: 1/2/3/4/5 切换视角 | ESC 退出"
+            "PID定速巡航 | 精准红绿灯识别 | 交通标志识别",
+            "按键: 1/2/3/4/5 切换视角 | C/V切换天气 | ESC 退出"
         ]
         self.font = font
         self.dim = (720, len(lines) * 22 + 12)
@@ -722,6 +794,8 @@ def game_loop(args):
     pid = PIDController(Kp=1.0, Ki=0.2, Kd=0.1)
     steer_pid = PIDController(Kp=0.3, Ki=0.0, Kd=0.05)
     target_speed = 30.0
+    # 【新增】默认巡航速度（未识别到限速标志时使用）
+    DEFAULT_CRUISE_SPEED = 30.0
 
     # 【新增】生成LDW预警提示音（无外部文件依赖）
     def generate_ldw_beep():
@@ -747,7 +821,6 @@ def game_loop(args):
         hud = HUD(args.width, args.height)
         # 【新增】将提示音绑定到HUD
         hud.ldw_sound = ldw_warning_sound
-
         world = World(client.get_world(), hud, args)
         clock = pygame.time.Clock()
 
@@ -824,12 +897,39 @@ def game_loop(args):
 
             print("当前天气：", weather_type)
 
+            # ===================== 交通标志识别控制（新增） =====================
+            sign_state = traffic_sign_detect(world.camera_manager.rgb_image)
+            print("交通标志识别：", sign_state)
+            # ===================== 行人检测 + AEB自动刹车（新增） =====================
+            has_pedestrian = pedestrian_detect(world.camera_manager.rgb_image)
+            print("前方行人：", "检测到" if has_pedestrian else "无")
+
+            # ===================== 控制优先级：行人AEB > 停车牌 > 红绿灯 > 限速 =====================
+            # 1. 行人检测（最高优先级，必须第一）
+            if has_pedestrian:
+                brake = 1.0
+                throttle = 0.0
+
+            # 2. 停车标志
+            if sign_state == 'stop':
+                brake = 1.0
+                throttle = 0.0
+            elif sign_state == 'speed_30':
+                target_speed = 30.0
+            elif sign_state == 'speed_50':
+                target_speed = 50.0
+            elif sign_state == 'speed_60':
+                target_speed = 60.0
+            else:
+                target_speed = DEFAULT_CRUISE_SPEED
+
+
             # ===================== 红绿灯控制逻辑 =====================
             light_state = traffic_light_detect(world.camera_manager.rgb_image)
-            print("当前识别状态：", light_state)
+            print("红绿灯识别：", light_state)
 
             # 交规逻辑：红灯、黄灯 强制停车；绿灯正常行驶
-            if light_state == 'red' or light_state == 'yellow':
+            if light_state == 'red' or light_state == 'yellow' and sign_state != 'stop':
                 brake = 1.0
                 throttle = 0.0
 
