@@ -1,8 +1,10 @@
-import os
+from pathlib import Path
+
+import torch
 import yaml
 
 # 基础配置
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = Path(__file__).resolve().parent
 CARLA_HOST = "localhost"
 CARLA_PORT = 2000
 CARLA_TIMEOUT = 10.0
@@ -23,17 +25,29 @@ SENSOR_CONFIG = {
 
 # 异常检测模型配置
 ANOMALY_DETECTOR_CONFIG = {
-    "model_path": os.path.join(BASE_DIR, "models/anomaly_detector.pth"),
+    "model_path": str(BASE_DIR / "models" / "anomaly_detector.pth"),
     "confidence_threshold": 0.7,
     "fusion_method": "weighted",  # 多模态融合方式：weighted/concat/attention
     "device": "cuda" if torch.cuda.is_available() else "cpu"
 }
 
+
+def _merge_config_value(current_value, custom_value):
+    if isinstance(current_value, dict) and isinstance(custom_value, dict):
+        merged_value = current_value.copy()
+        merged_value.update(custom_value)
+        return merged_value
+    return custom_value
+
+
 def load_config(custom_config_path=None):
     """加载自定义配置文件（可选）"""
-    if custom_config_path and os.path.exists(custom_config_path):
-        with open(custom_config_path, "r") as f:
-            custom_config = yaml.safe_load(f)
-        # 合并配置
-        globals().update(custom_config)
+    if custom_config_path:
+        config_path = Path(custom_config_path)
+        if config_path.exists():
+            with config_path.open("r", encoding="utf-8") as f:
+                custom_config = yaml.safe_load(f) or {}
+
+            for key, value in custom_config.items():
+                globals()[key] = _merge_config_value(globals().get(key), value)
     return globals()
