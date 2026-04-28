@@ -47,7 +47,7 @@ def main():
     """
     print("开始 YOLO 模型推理测试...")
 
-    model = load_model("model.pt
+    model = load_model("model.pt")
     if model is None:
         print("模型未加载，跳过推理")
         return
