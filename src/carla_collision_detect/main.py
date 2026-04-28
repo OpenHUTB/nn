@@ -26,6 +26,7 @@ def main():
     settings.fixed_delta_seconds = 0.05
     world.apply_settings(settings)
 
+    # 提前声明变量，防止后续报错
     ego_vehicle = None
     dummy_target = None       
     collision_sensor = None   
@@ -49,7 +50,7 @@ def main():
         
         if ego_vehicle:
             print("✅ 主车已生成！定速巡航模块已就绪。")
-            
+          
             vision_system = VisionSystem(ego_vehicle, world)
 
             target_transform = carla.Transform(
