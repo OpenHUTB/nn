@@ -8,7 +8,14 @@ import argparse  # [新增] 引入命令行参数解析库
 from config import config
 from utils.carla_client import CarlaClient
 from models.yolo_detector import YOLODetector
-from utils.visualization import draw_results, draw_safe_zone
+from utils.visualization import (
+    draw_results, draw_safe_zone, show_fps, show_confidence_value,
+    create_confidence_trackbar, get_confidence_threshold,
+    Tracker, draw_trajectories, draw_tracking_ids,
+    draw_risk_heatmap, draw_object_count, draw_detection_cost_bar,
+    trigger_aeb_animation, draw_aeb_warning,
+    draw_depth_overlay
+)
 from utils.planner import SimplePlanner
 from utils.logger import PerformanceLogger
 
@@ -46,10 +53,11 @@ def generate_demo_frame():
 
 
 def main():
-    # 1. 解析命令行参数
     args = parse_arguments()
-
     print("[Main] 初始化模块...")
+    
+    # 初始化目标跟踪器
+    tracker = Tracker()
     
     # 演示模式
     if args.demo:
@@ -65,17 +73,30 @@ def main():
         planner = SimplePlanner()
         logger = PerformanceLogger(log_dir=config.LOG_DIR)
         
-        print("[Main] 演示模式开始 (按 'q' 退出)...")
+        # 创建窗口和滑动条
+        cv2.namedWindow("CARLA Object Detection - DEMO")
+        create_confidence_trackbar("CARLA Object Detection - DEMO")
+        
+        print("[Main] 演示模式开始 (按 'q' 退出, 按 'r' 重置阈值)...")
         try:
             frame_count = 0
             while True:
                 start_time = time.time()
                 
+                # 获取当前置信度阈值
+                current_conf_thres = get_confidence_threshold("CARLA Object Detection - DEMO")
+                config.conf_thres = current_conf_thres
+                
                 # 生成模拟帧
                 frame = generate_demo_frame()
                 
                 # --- 感知 ---
+                t0 = time.time()
                 results = detector.detect(frame)
+                t1 = time.time()
+
+                # 更新跟踪器
+                tracker.update(results)
 
                 # --- 规划 ---
                 is_brake, warning_msg = planner.plan(results)
@@ -83,23 +104,37 @@ def main():
                 # --- 控制 ---
                 if is_brake:
                     print(f"[控制] 刹车: {warning_msg}")
+                    trigger_aeb_animation(frame_count)
 
                 # --- 记录数据 ---
-                fps = 1 / (time.time() - start_time)
+                total_time = time.time() - start_time
+                fps = 1 / total_time
                 logger.log_step(fps, len(results))
 
                 # --- 可视化 ---
                 if not args.no_render:
-                    display_frame = draw_results(draw_safe_zone(frame.copy()), results, detector.classes)
-                    cv2.putText(display_frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                    cv2.putText(display_frame, "DEMO MODE", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                    display_frame = draw_results(
+                        draw_safe_zone(frame.copy()), 
+                        results, 
+                        detector.classes, 
+                        fps=fps,
+                        tracker=tracker,
+                        detect_time=t1 - t0,
+                        total_time=total_time
+                    )
+                    
+                    # AEB 警告动画
                     if is_brake:
-                        cv2.putText(display_frame, "EMERGENCY BRAKING!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
-                        cv2.putText(display_frame, warning_msg, (180, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-
+                        display_frame = draw_aeb_warning(display_frame, frame_count)
+                    
                     cv2.imshow("CARLA Object Detection - DEMO", display_frame)
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                    
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q'):
                         break
+                    elif key == ord('r') or key == ord('R'):
+                        cv2.setTrackbarPos("Confidence", "CARLA Object Detection - DEMO", 50)
+                        config.conf_thres = 0.5
                 
                 frame_count += 1
                 time.sleep(0.1)
@@ -128,7 +163,6 @@ def main():
     planner = SimplePlanner()
     logger = PerformanceLogger(log_dir=config.LOG_DIR)
 
-    # [Mod] 使用命令行参数初始化客户端
     client = CarlaClient(host=args.host, port=args.port)
 
     if not client.connect():
@@ -137,9 +171,12 @@ def main():
     client.spawn_vehicle()
     client.setup_camera()
 
-    print("[Main] 开始主循环 (按 Ctrl+C 退出)...")
+    # 创建窗口和滑动条
+    cv2.namedWindow("CARLA Object Detection")
+    create_confidence_trackbar()
     
-    # 模式选择提示
+    print("[Main] 开始主循环 (按 Ctrl+C 或 'q' 退出, 按 'r' 重置阈值)...")
+    
     if args.in_carla:
         print("[INFO] 显示模式: 在 CARLA 模拟器窗口中显示检测结果")
         print("[INFO] 检测到的车辆, 白色框 = 车辆边界框")
@@ -153,58 +190,71 @@ def main():
         while True:
             try:
                 # --- 感知 ---
-                start_time = time.time()
+                t0 = time.time()
                 
-                # 处理摄像头图像（用于检测）
+                # 获取当前置信度阈值
+                current_conf_thres = get_confidence_threshold()
+                config.conf_thres = current_conf_thres
+                
                 try:
                     frame = client.image_queue.get(timeout=0.1)
                     results = detector.detect(frame)
                 except queue.Empty:
                     results = []
                 
-                # --- 在 CARLA 中绘制所有车辆边界框 ---
+                t1 = time.time()
+                
+                # 更新跟踪器
+                tracker.update(results)
+                
                 if args.in_carla:
-                    # 第三人称跟随主车辆
                     client.follow_vehicle()
                     client.draw_vehicle_boxes()
                     
-                    # 绘制 YOLO 检测结果（如果有）
                     if results:
                         client.draw_detection_in_carla(results)
-                        if frame_count % 100 == 0:  # 每100帧打印一次
+                        if frame_count % 100 == 0:
                             print(f"[DEBUG] 检测到 {len(results)} 个目标")
                 
                 # --- 规划 ---
                 is_brake, warning_msg = planner.plan(results)
 
                 # --- 控制 ---
-                # [临时禁用刹车] if client.vehicle:
-                # [临时禁用刹车]     if is_brake:
-                # [临时禁用刹车]         client.vehicle.set_autopilot(False)
-                # [临时禁用刹车]         control = carla.VehicleControl()
-                # [临时禁用刹车]         control.throttle = 0.0
-                # [临时禁用刹车]         control.brake = 1.0
-                # [临时禁用刹车]         client.vehicle.apply_control(control)
-                # [临时禁用刹车]     else:
-                # [临时禁用刹车]         client.vehicle.set_autopilot(True)
+                if is_brake:
+                    trigger_aeb_animation(frame_count)
                 pass
 
                 # --- 记录数据 ---
-                fps = 1 / (time.time() - start_time)
+                total_time = time.time() - t0
+                fps = 1 / total_time if total_time > 0 else 0
                 logger.log_step(fps, len(results))
 
                 # --- 在 OpenCV 窗口中显示 ---
                 if not args.no_render and not args.in_carla:
                     try:
                         frame = client.image_queue.get(timeout=0.01)
-                        display_frame = draw_results(draw_safe_zone(frame.copy()), results, detector.classes)
-                        cv2.putText(display_frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        display_frame = draw_results(
+                            draw_safe_zone(frame.copy()), 
+                            results, 
+                            detector.classes,
+                            fps=fps,
+                            tracker=tracker,
+                            detect_time=t1 - t0,
+                            total_time=total_time
+                        )
+                        
+                        # AEB 警告动画
                         if is_brake:
-                            cv2.putText(display_frame, "EMERGENCY BRAKING!", (150, 300), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 4)
-                            cv2.putText(display_frame, warning_msg, (180, 350), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                            display_frame = draw_aeb_warning(display_frame, frame_count)
+                        
                         cv2.imshow("CARLA Object Detection", display_frame)
-                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                        
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord('q'):
                             break
+                        elif key == ord('r') or key == ord('R'):
+                            cv2.setTrackbarPos("Confidence", "CARLA Object Detection", 50)
+                            config.conf_thres = 0.5
                     except queue.Empty:
                         pass
 
@@ -221,7 +271,6 @@ def main():
         print("[Main] 正在清理资源...")
         client.destroy_actors()
         logger.close()
-        # 只有创建了窗口才需要销毁
         if not args.no_render:
             cv2.destroyAllWindows()
         print("[Main] 程序已退出")
