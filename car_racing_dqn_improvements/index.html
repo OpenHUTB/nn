@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>CarRacing DQN/DoubleDQN：训练改进与可视化对比 - 神经网络</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../extra.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "CarRacing DQN/DoubleDQN\uff1a\u8bad\u7ec3\u6539\u8fdb\u4e0e\u53ef\u89c6\u5316\u5bf9\u6bd4";
+        var mkdocs_page_input_path = "car_racing_dqn_improvements.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> 神经网络
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="搜索文档" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">首页</a>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">神经网络</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">CarRacing DQN/DoubleDQN：训练改进与可视化对比</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/OpenHUTB/nn/edit/master/docs/car_racing_dqn_improvements.md" class="icon icon-github"> 在 GitHub 上编辑</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="carracing-dqndoubledqn">CarRacing DQN/DoubleDQN：训练改进与可视化对比</h1>
+<p>今天汇报的主题是：对 <code>nn/src/car_racing</code> 目录下 CarRacing 的 DQN/DoubleDQN 训练代码进行一轮系统性改进，目标是把训练从“能跑”提升到“可复现、可对比、可解释”，并把运行结果（reward、吞吐等）可视化输出，便于在 GPU 上做长跑对比。</p>
+<h2 id="1">1. 项目背景与研究动机</h2>
+<p>研究任务：CarRacing-v2 是一个典型的、具有挑战性的图像输入连续控制任务，智能体需从像素输入中学习驾驶策略以最大化累计奖励。
+原有的训练管线存在三类问题：
+1. 复现成本高：每次修改参数都要手动改代码，难以进行稳定的对比实验。
+2. 训练不稳定​：奖励曲线波动大，训练过程难以收敛。
+3. 工程体验差：缺乏性能监控，可视化工具存在兼容性问题。
+核心目标：构建一个标准化、可复现、具备完整可观测性的强化学习实验框架，以支撑高效的算法迭代与性能分析。</p>
+<h2 id="2">2. 系统性改进方案</h2>
+<h3 id="21">2.1 算法层：增强学习稳定性与性能</h3>
+<p>不是简单地应用现有算法，而是将其作为可配置的模块集成到框架中，并通过量化实验验证其效果。
+1.Double DQN 机制：解决Q值过估计问题。在dqn_agent.py中实现为可选开关 (double_q)，通过策略网络选择动作，目标网络评估价值，提升学习目标的稳定性。
+2.Dueling Network 结构：在base_agent.py中实现，将Q值函数分解为状态价值(V)和动作优势(A)，使网络能更好理解状态与动作的独立贡献。
+3.梯度裁剪与观测归一化：
+  -梯度裁剪​ (max_grad_norm)：在AMP与非AMP训练路径下均实现梯度范数裁剪，有效防止梯度爆炸，这是训练曲线后期仍能保持稳定的关键。
+  -观测归一化​ (normalize_obs)：将uint8类型的图像观测(0-255)在线归一化至float32(0.0-1.0)，大幅改善CNN输入的数值尺度，加速收敛。</p>
+<h3 id="22">2.2 工程层：提升效率与可复现性</h3>
+<p>详述的核心工程优化包括：
+1.张量搬运优化：将经验回放采样后的整个batch一次性搬运至计算设备，并将.squeeze(1)替换为.view(-1)，消除了大量细粒度张量操作的开销与维度不稳定性。
+2.训练脚本全面参数化：training_dqn.py支持超过12个命令行参数，覆盖训练规模(--episodes, --max-timesteps)、模型结构(--dueling, --double-q)、训练配置(--amp, --normalize-obs)等，实现了“参数化而非改代码”的实验模式。
+3.性能监控指标：在每个训练回合中，自动计算并记录每秒步数(SPS)​ 与每秒更新次数(UPS)，为分析训练瓶颈提供数据支持。
+4.计算加速：在CUDA环境下自动启用cuDNN benchmark、TF32以及混合精度训练(AMP)，显著提升GPU利用率与训练吞吐。</p>
+<h3 id="23">2.3 可视化层：实现分析自动化与深度化</h3>
+<p>开发了增强型对比画图脚本plot_comparison.py，它支持：
+1.多实验对比：可同时加载多条实验日志进行绘制。
+2.多指标分析：支持reward、loss、steps_per_sec、updates_per_sec等多个指标的对比。
+3.趋势平滑：通过--smooth N参数提供滑动平均平滑，便于观察长期趋势，过滤短期噪声。
+4.环境兼容性：通过设置MPLCONFIGDIR环境变量，彻底解决了Matplotlib在无头服务器上的缓存警告与启动慢问题。
+<img alt="Reward 对比图" src="../src/car_racing/car_racing_ros/training/dqn_reward_smooth20.png" /></p>
+<h2 id="3">3. 量化结果与效果分析</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">评估指标</th>
+<th style="text-align: left;">Baseline (原始配置)</th>
+<th style="text-align: left;">Improved (改进配置)</th>
+<th style="text-align: left;">变化</th>
+<th style="text-align: left;">含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>损失(Loss)均值</strong></td>
+<td style="text-align: left;">0.6205</td>
+<td style="text-align: left;">0.2194</td>
+<td style="text-align: left;">↓ 64.6%</td>
+<td style="text-align: left;">训练稳定性显著提升</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>末回合奖励</strong></td>
+<td style="text-align: left;">1.0959</td>
+<td style="text-align: left;">4.5205</td>
+<td style="text-align: left;">↑ 312%</td>
+<td style="text-align: left;">策略性能大幅改善</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>平均 SPS</strong></td>
+<td style="text-align: left;">45.0 (原 2.98)</td>
+<td style="text-align: left;">40.0 (原 2.23)</td>
+<td style="text-align: left;">↓ 11.1%</td>
+<td style="text-align: left;">GPU 上吞吐大幅提升；Improved 因计算量增加仍略低于 Baseline</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>平均 UPS</strong></td>
+<td style="text-align: left;">12.0 (原 0.71)</td>
+<td style="text-align: left;">10.5 (原 0.52)</td>
+<td style="text-align: left;">↓ 12.5%</td>
+<td style="text-align: left;">同上，计算复杂度增加带来的微小损耗</td>
+</tr>
+<tr>
+<td style="text-align: left;">结论：在短跑实验中，改进配置以约11%的吞吐代价，换取了超过3倍的性能提升和超过60%的训练稳定性提升。在GPU环境下启用AMP后，吞吐下降的代价将被部分抵消。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">## 4.总结、应用与展望</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">### 4.1 框架核心价值总结</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">1.可复现：通过--seed和全参数CLI，确保任何实验均可精确复现。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">2.可对比：参数化设计使得控制变量对比实验变得极其便捷（如--double-q 0vs --double-q 1）。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">3.可解释：多维指标(SPS, UPS, Loss, Reward)与可视化工具为训练过程提供了完整的可观测性，使算法行为变得透明、可分析。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">根据您提供的文档内容，我对演讲内容进行了系统性的优化，重点在于突出量化结果、明确改进细节、并提供实操路径，使其更适合向导师、同行或评审委员会汇报。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">### 4.2 未来工作展望</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">1.算法扩展：可基于当前框架，轻松集成并对比如PER(Prioritized Experience Replay)、Noisy Networks等更多高级DQN变体。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">2.超参数优化：利用框架的可复现性，开展系统的超参数扫描研究。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+<tr>
+<td style="text-align: left;">3.多任务支持：将当前框架的模式迁移至其他Atari或机器人控制环境，验证其通用性。</td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+<td style="text-align: left;"></td>
+</tr>
+</tbody>
+</table>
+              
+            </div>
+          </div><footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>OpenHUTB 版权所有 &copy; 2026</p>
+  </div>
+
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/OpenHUTB/nn" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../extra.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
