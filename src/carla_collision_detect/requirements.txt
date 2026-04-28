@@ -3,9 +3,15 @@
 # Simulation ----------------------------------------
 carla==0.9.15
 
-# Video Stream ---------------------------------------
-Flask>=2.2.5
+# Perception & AI -----------------------------------
+ultralytics>=8.0.0
 opencv-python==4.8.1.78
 numpy==1.23.5
-Werkzeug>=3.0.6
+
+# Control & Interaction -----------------------------
 pygame>=2.0.0
+keyboard>=0.13.5
+
+# Video Stream ---------------------------------------
+Flask>=2.2.5
+Werkzeug>=3.0.6

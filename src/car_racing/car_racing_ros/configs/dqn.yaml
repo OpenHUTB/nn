@@ -70,3 +70,9 @@ hyperparameters:
                                  # 每隔多少步训练一次
                                  # 4 = 每4步训练一次
                                  # 推荐: 4 (经典 Atari 设置)
+
+  dueling: true
+  amp: true
+  normalize_obs: true
+  double_q: false
+  max_grad_norm: 10.0

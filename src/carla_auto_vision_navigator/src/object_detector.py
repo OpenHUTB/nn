@@ -3,7 +3,7 @@ import torch.nn as nn
 import cv2
 import numpy as np
 import open3d as o3d
-from config import ANOMALY_DETECTOR_CONFIG
+from config import ANOMALY_DETECTOR_CONFIG, UNSTRUCTURED_SCENES
 from utils.model_loader import load_pretrained_model
 
 
@@ -13,27 +13,55 @@ class MultimodalAnomalyDetector(nn.Module):
         self.device = ANOMALY_DETECTOR_CONFIG["device"]
         self.confidence_thresh = ANOMALY_DETECTOR_CONFIG["confidence_threshold"]
         self.fusion_method = ANOMALY_DETECTOR_CONFIG["fusion_method"]
+        self.anomaly_types = self._resolve_anomaly_types()
+        self.rgb_feature_dim = 2048
+        self.lidar_feature_dim = 1024
+        self.fusion_feature_dim = 512
 
         # 加载单模态检测模型
-        self.rgb_model = load_pretrained_model("yolov7", ANOMALY_DETECTOR_CONFIG["model_path"]).to(self.device)
-        self.lidar_model = self._build_lidar_model().to(self.device)
+        self.rgb_model = load_pretrained_model("yolov7", ANOMALY_DETECTOR_CONFIG["model_path"])
+        self.lidar_model = self._build_lidar_model()
+        self.rgb_projection = nn.Sequential(
+            nn.Linear(self.rgb_feature_dim, self.fusion_feature_dim),
+            nn.ReLU()
+        )
+        self.lidar_projection = nn.Sequential(
+            nn.Linear(self.lidar_feature_dim, self.fusion_feature_dim),
+            nn.ReLU()
+        )
 
         # 多模态融合层
         if self.fusion_method == "weighted":
             self.rgb_weight = nn.Parameter(torch.tensor(0.7, device=self.device))
             self.lidar_weight = nn.Parameter(torch.tensor(0.3, device=self.device))
         elif self.fusion_method == "concat":
-            self.fusion_layer = nn.Linear(2048 + 1024, 512)  # RGB特征+LiDAR特征 -> 融合特征
+            self.fusion_layer = nn.Linear(self.fusion_feature_dim * 2, self.fusion_feature_dim)
         elif self.fusion_method == "attention":
-            self.attention_layer = nn.MultiheadAttention(512, 8)
+            self.attention_layer = nn.MultiheadAttention(self.fusion_feature_dim, 8, batch_first=True)
+        else:
+            raise ValueError(f"不支持的融合方式：{self.fusion_method}")
 
         # 异常分类头
         self.classifier = nn.Sequential(
-            nn.Linear(512, 256),
+            nn.Linear(self.fusion_feature_dim, 256),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(256, len(ANOMALY_DETECTOR_CONFIG["anomaly_types"]) + 1)  # 异常类型+正常
+            nn.Linear(256, len(self.anomaly_types) + 1)  # 异常类型+正常
         )
+        self.to(self.device)
+
+    @staticmethod
+    def _resolve_anomaly_types():
+        configured_types = ANOMALY_DETECTOR_CONFIG.get("anomaly_types")
+        if configured_types:
+            return configured_types
+
+        merged_types = []
+        for scene_config in UNSTRUCTURED_SCENES.values():
+            for anomaly_type in scene_config.get("anomaly_types", []):
+                if anomaly_type not in merged_types:
+                    merged_types.append(anomaly_type)
+        return merged_types or ["unknown_anomaly"]
 
     def _build_lidar_model(self):
         """构建LiDAR点云特征提取模型"""
@@ -66,8 +94,8 @@ class MultimodalAnomalyDetector(nn.Module):
     def forward(self, rgb_data, lidar_data):
         """前向传播：多模态融合+异常检测"""
         # 1. 单模态特征提取
-        rgb_feat = self.rgb_model(self.preprocess_rgb(rgb_data))
-        lidar_feat = self.lidar_model(self.preprocess_lidar(lidar_data))
+        rgb_feat = self.rgb_projection(self.rgb_model(self.preprocess_rgb(rgb_data)))
+        lidar_feat = self.lidar_projection(self.lidar_model(self.preprocess_lidar(lidar_data)))
 
         # 2. 多模态融合
         if self.fusion_method == "weighted":
@@ -76,10 +104,9 @@ class MultimodalAnomalyDetector(nn.Module):
             fusion_feat = torch.cat([rgb_feat, lidar_feat], dim=1)
             fusion_feat = self.fusion_layer(fusion_feat)
         elif self.fusion_method == "attention":
-            rgb_feat = rgb_feat.unsqueeze(0)  # (1, 1, 512)
-            lidar_feat = lidar_feat.unsqueeze(0)  # (1, 1, 512)
-            fusion_feat, _ = self.attention_layer(rgb_feat, lidar_feat, lidar_feat)
-            fusion_feat = fusion_feat.squeeze(0)
+            fusion_inputs = torch.stack([rgb_feat, lidar_feat], dim=1)
+            fusion_feat, _ = self.attention_layer(fusion_inputs, fusion_inputs, fusion_inputs)
+            fusion_feat = fusion_feat.mean(dim=1)
 
         # 3. 异常分类
         logits = self.classifier(fusion_feat)
@@ -89,8 +116,7 @@ class MultimodalAnomalyDetector(nn.Module):
         max_prob, pred_idx = torch.max(probs, dim=1)
         if max_prob.item() > self.confidence_thresh:
             return {
-                "anomaly_type": ANOMALY_DETECTOR_CONFIG["anomaly_types"][
-                    pred_idx.item() - 1] if pred_idx.item() > 0 else "normal",
+                "anomaly_type": self.anomaly_types[pred_idx.item() - 1] if pred_idx.item() > 0 else "normal",
                 "confidence": max_prob.item(),
                 "bbox": None  # 可拓展：输出异常目标框
             }
