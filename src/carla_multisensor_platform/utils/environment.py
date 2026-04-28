@@ -1,11 +1,7 @@
-import sys
-import math
-import time
 import carla
 import random
 import pygame
 import logging
-from colorama import Fore, Back, Style, Cursor
 from utils.utils import exit_game
 
 class CarlaEnvironment:
@@ -125,39 +121,55 @@ class Actors(object):
 
     def spawn_pedestrians(self, world, num_walkers, percentage_pedestrians_running, percentage_pedestrians_crossing):
         ped_blueprints = world.get_blueprint_library().filter('*pedestrian*')
+        walker_ai_blueprint = world.get_blueprint_library().find('controller.ai.walker')
         ped_spawn_points = []
-        
-        for i in range(num_walkers):
+
+        for _ in range(num_walkers):
             spawn_point = carla.Transform()
             loc = world.get_random_location_from_navigation()
             if loc is not None:
                 spawn_point.location = loc
                 ped_spawn_points.append(spawn_point)
 
-        walkers_batch = []
-        walkers_speed = []
-        walker_ai_batch = []
+        if not ped_spawn_points:
+            logging.warning("No valid pedestrian spawn points were found.")
+            return
 
-        for j in range(num_walkers):
+        walker_speed_pairs = []
+        for spawn_point in ped_spawn_points:
             walker_bp = random.choice(ped_blueprints)
             if walker_bp.has_attribute('is_invincible'):
                 walker_bp.set_attribute('is_invincible', 'false')
+            walker_speed = 0.0
             if walker_bp.has_attribute('speed'):
                 if random.random() > percentage_pedestrians_running:
-                    walkers_speed.append(walker_bp.get_attribute('speed').recommended_values[1])
+                    walker_speed = float(walker_bp.get_attribute('speed').recommended_values[1])
                 else:
-                    walkers_speed.append(walker_bp.get_attribute('speed').recommended_values[2])
-                walkers_batch.append(world.try_spawn_actor(walker_bp, random.choice(ped_spawn_points)))
+                    walker_speed = float(walker_bp.get_attribute('speed').recommended_values[2])
+            walker = world.try_spawn_actor(walker_bp, spawn_point)
+            if walker is not None:
+                walker_speed_pairs.append((walker, walker_speed))
 
-            walker_ai_blueprint = world.get_blueprint_library().find('controller.ai.walker')
+        if not walker_speed_pairs:
+            logging.warning("Failed to spawn any pedestrians from the sampled navigation points.")
+            return
 
-        for walker in world.get_actors().filter('*pedestrian*'):
-            walker_ai_batch.append(world.spawn_actor(walker_ai_blueprint, carla.Transform(), walker))
+        walker_ai_batch = []
+        for walker, walker_speed in walker_speed_pairs:
+            try:
+                walker_ai = world.spawn_actor(walker_ai_blueprint, carla.Transform(), walker)
+            except RuntimeError:
+                logging.warning("Failed to spawn AI controller for pedestrian %s", walker.id)
+                walker.destroy()
+                continue
+            walker_ai_batch.append((walker_ai, walker_speed))
 
-        for i in range(len(walker_ai_batch)):
-            walker_ai_batch[i].start()
-            walker_ai_batch[i].go_to_location(world.get_random_location_from_navigation())
-            walker_ai_batch[i].set_max_speed(float(walkers_speed[i]))
+        for walker_ai, walker_speed in walker_ai_batch:
+            walker_ai.start()
+            destination = world.get_random_location_from_navigation()
+            if destination is not None:
+                walker_ai.go_to_location(destination)
+            walker_ai.set_max_speed(walker_speed)
 
         world.set_pedestrians_cross_factor(percentage_pedestrians_crossing)
 
@@ -165,13 +177,13 @@ class Actors(object):
         """Spawn vehicles with autopilot enabled"""
         vehicle_blueprints = world.get_blueprint_library().filter('*vehicle*')
         vehicle_spawn_points = world.get_map().get_spawn_points()
+        random.shuffle(vehicle_spawn_points)
         spawned_vehicles = []
 
         # Try to spawn vehicles
-        for i in range(0, num_vehicle):
+        for spawn_point in vehicle_spawn_points[:num_vehicle]:
             blueprint = random.choice(vehicle_blueprints)
-            spawn_point = random.choice(vehicle_spawn_points)
-            
+
             # Try to spawn the vehicle
             vehicle = world.try_spawn_actor(blueprint, spawn_point)
             if vehicle is not None:
