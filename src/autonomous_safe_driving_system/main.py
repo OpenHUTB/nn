@@ -15,7 +15,7 @@ def main():
     settings.fixed_delta_seconds = 0.05
     world.apply_settings(settings)
 
-    ego_vehicle = None
+    ego_vehicle =None
     try:
         # 生成自车（直接写在这里，不依赖外部模块）
         blueprint_lib = world.get_blueprint_library()
@@ -49,7 +49,7 @@ def main():
                 control.throttle = 0.5
             else:
                 control.throttle = 0.0
-            control.brake = 0.0
+            control.brake =0.0
             control.steer = 0.0
 
             ego_vehicle.apply_control(control)
