@@ -13,11 +13,16 @@ title: 主页
 
 ## 入门 <span id="primary"></span>
 
+[__11__](carla_traffic_sign_recognition\carla_traffic_sign_recognition.md) — 入门热身示例  
 [__热身__](warmup.md) — 入门热身示例
 
 [__线性回归__](linear_regression.md)
 
+[__线性回归改进__](linear_regression_improved.md)
+
 [__softmax回归__](softmax_regression.md)
+
+[__线性回归和softmax回归改进__](softmax_regression_improved.md)
 
 [__支持向量机__](svm.md)
 
@@ -40,7 +45,12 @@ title: 主页
 
 [__carla_CAM__](./carla_CAM/README.md) - 使用类激活映射测试卷积神经网络
 
+[__V2X路侧智能感知__](./edge_intelligence_V2X/README.md) - 基于YOLOv8n的V2X路侧智能感知系统优化与实现
+
+[__目标检测__](./test/object_detection.md) - 目标检测与危险评估
+
 [__跟踪__](#tracking) 
+[__路径追踪__](./test.md)
 
 ## 规划 <span id="planning"></span>
 

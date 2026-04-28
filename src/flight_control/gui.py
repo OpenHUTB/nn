@@ -90,7 +90,9 @@ class FlightControlGUI:
             ttk.Label(self.params_frame, text="m").grid(row=1, column=2, sticky=tk.W, padx=5, pady=2)
             print("创建参数设置区域成功")
             
-
+            # 创建巡航路线设置区域
+            self.cruise_frame = ttk.LabelFrame(self.main_frame, text="巡航路线设置", padding="10")
+            self.cruise_frame.pack(fill=tk.X, pady=5)
             
             # 航点操作按钮
             ttk.Button(self.cruise_frame, text="添加航点", command=self.add_waypoint).grid(row=1, column=6, padx=5, pady=2)
@@ -234,7 +236,106 @@ class FlightControlGUI:
         
         threading.Thread(target=_update_data).start()
     
-
+    def add_waypoint(self):
+        """添加航点"""
+        try:
+            if not self.client:
+                self.log("未连接无人机，无法添加航点")
+                return
+            
+            state = self.client.getMultirotorState()
+            pos = state.kinematics_estimated.position
+            waypoint = (pos.x_val, pos.y_val, pos.z_val)
+            
+            if not hasattr(self, 'waypoints'):
+                self.waypoints = []
+            
+            self.waypoints.append(waypoint)
+            self.waypoint_list.insert(tk.END, f"航点 {len(self.waypoints)}: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+            self.log(f"添加航点: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
+            
+            if self.flight_control:
+                self.flight_control.waypoints.append(waypoint)
+        except Exception as e:
+            self.log(f"添加航点失败: {e}")
+    
+    def remove_waypoint(self):
+        """删除航点"""
+        try:
+            selection = self.waypoint_list.curselection()
+            if not selection:
+                self.log("请先选择要删除的航点")
+                return
+            
+            index = selection[0]
+            self.waypoint_list.delete(index)
+            self.waypoints.pop(index)
+            self.log(f"删除航点 {index + 1}")
+            
+            if self.flight_control and index < len(self.flight_control.waypoints):
+                self.flight_control.waypoints.pop(index)
+            
+            self.refresh_waypoint_list()
+        except Exception as e:
+            self.log(f"删除航点失败: {e}")
+    
+    def clear_waypoints(self):
+        """清空航点"""
+        try:
+            self.waypoint_list.delete(0, tk.END)
+            self.waypoints = []
+            if self.flight_control:
+                self.flight_control.waypoints = []
+            self.log("已清空所有航点")
+        except Exception as e:
+            self.log(f"清空航点失败: {e}")
+    
+    def refresh_waypoint_list(self):
+        """刷新航点列表显示"""
+        self.waypoint_list.delete(0, tk.END)
+        for i, waypoint in enumerate(self.waypoints):
+            self.waypoint_list.insert(tk.END, f"航点 {i+1}: ({waypoint[0]:.2f}, {waypoint[1]:.2f}, {waypoint[2]:.2f})")
+    
+    def start_cruise(self):
+        """开始巡航"""
+        try:
+            if not self.client:
+                self.log("未连接无人机，无法开始巡航")
+                return
+            
+            if not hasattr(self, 'waypoints') or not self.waypoints:
+                self.log("请先添加航点")
+                return
+            
+            self.is_cruising = True
+            self.log(f"开始巡航，共 {len(self.waypoints)} 个航点")
+            
+            def cruise_task():
+                for i, waypoint in enumerate(self.waypoints):
+                    if not self.is_cruising:
+                        break
+                    self.log(f"飞往航点 {i+1}: ({waypoint[0]:.2f}, {waypoint[1]:.2f}, {waypoint[2]:.2f})")
+                    self.client.moveToPositionAsync(waypoint[0], waypoint[1], waypoint[2], 2).join()
+                    time.sleep(1)
+                
+                if self.is_cruising:
+                    self.log("巡航完成")
+                self.is_cruising = False
+            
+            threading.Thread(target=cruise_task, daemon=True).start()
+        except Exception as e:
+            self.log(f"开始巡航失败: {e}")
+            self.is_cruising = False
+    
+    def stop_cruise(self):
+        """停止巡航"""
+        try:
+            self.is_cruising = False
+            self.log("停止巡航")
+            if self.client:
+                self.client.hoverAsync().join()
+        except Exception as e:
+            self.log(f"停止巡航失败: {e}")
     
     def stop(self):
         """停止 GUI"""
