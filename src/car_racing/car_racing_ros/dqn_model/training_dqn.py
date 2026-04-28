@@ -71,6 +71,7 @@ def _parse_args():
     parser.add_argument("--dueling", type=int, default=1, choices=[0, 1])
     parser.add_argument("--amp", type=int, default=1, choices=[0, 1])
     parser.add_argument("--normalize-obs", type=int, default=1, choices=[0, 1])
+    parser.add_argument("--double-q", type=int, default=-1, choices=[-1, 0, 1])
     return parser.parse_args()
 
 
@@ -138,6 +139,7 @@ driver = Agent(
         "dueling": bool(args.dueling),
         "amp": bool(args.amp),
         "normalize_obs": bool(args.normalize_obs),
+        **({} if args.double_q < 0 else {"double_q": bool(args.double_q)}),
     }
 )
 

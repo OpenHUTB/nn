@@ -74,3 +74,5 @@ hyperparameters:
   dueling: true
   amp: true
   normalize_obs: true
+  double_q: false
+  max_grad_norm: 10.0
