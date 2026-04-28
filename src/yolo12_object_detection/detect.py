@@ -1,5 +1,5 @@
 import torch
-
+import os
 try:
     from yolov5 import YOLO  
 except ImportError:
@@ -23,6 +23,9 @@ def load_model(model_path="model.pt"):
     """
     安全加载 YOLO 模型
     """
+    if not os.path.exists(model_path):
+        print(f"模型文件不存在: {model_path}")
+        return None
     device = get_device()
     if YOLO is None:
         print("YOLO 模块未导入，无法加载模型")
