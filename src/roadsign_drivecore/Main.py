@@ -201,6 +201,7 @@ def main():
                 display.blit(surface, (0, 0))
                 pygame.display.flip()
 
+
             clock.tick(30)
 
             if time.time() - start_time > 120:
