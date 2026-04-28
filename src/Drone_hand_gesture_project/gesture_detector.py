@@ -9,17 +9,25 @@ class GestureDetector:
         """
         初始化手势检测器
         """
-        self.mp_hands = mp.solutions.hands
-        self.mp_drawing = mp.solutions.drawing_utils
-        self.mp_drawing_styles = mp.solutions.drawing_styles
+        self.mediapipe_ready = hasattr(mp, "solutions")
+        if self.mediapipe_ready:
+            self.mp_hands = mp.solutions.hands
+            self.mp_drawing = mp.solutions.drawing_utils
+            self.mp_drawing_styles = mp.solutions.drawing_styles
 
-        # 初始化手部检测模型
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=1,
-            min_detection_confidence=0.7,
-            min_tracking_confidence=0.5
-        )
+            # 初始化手部检测模型
+            self.hands = self.mp_hands.Hands(
+                static_image_mode=False,
+                max_num_hands=1,
+                min_detection_confidence=0.7,
+                min_tracking_confidence=0.5
+            )
+        else:
+            self.mp_hands = None
+            self.mp_drawing = None
+            self.mp_drawing_styles = None
+            self.hands = None
+            print("⚠️  当前 mediapipe 包不包含 solutions 接口，手势检测器进入兼容模式")
 
         # 手势到控制指令的映射
         self.gesture_commands = {
@@ -47,6 +55,13 @@ class GestureDetector:
             confidence: 置信度
             landmarks: 关键点坐标（仅仿真模式返回）
         """
+        if not self.mediapipe_ready or self.hands is None:
+            cv2.putText(image, "MediaPipe fallback mode", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
+            cv2.putText(image, "Real-time hand landmarks unavailable", (10, 65),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2)
+            return image, "no_hand", 0.0, None
+
         # 转换颜色空间
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.hands.process(image_rgb)

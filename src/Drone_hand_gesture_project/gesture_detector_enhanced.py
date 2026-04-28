@@ -18,16 +18,24 @@ class EnhancedGestureDetector:
 
     def __init__(self, ml_model_path=None, use_ml=True):
         # 基础检测器
-        self.mp_hands = mp.solutions.hands
-        self.mp_drawing = mp.solutions.drawing_utils
-        self.mp_drawing_styles = mp.solutions.drawing_styles
+        self.mediapipe_ready = hasattr(mp, "solutions")
+        if self.mediapipe_ready:
+            self.mp_hands = mp.solutions.hands
+            self.mp_drawing = mp.solutions.drawing_utils
+            self.mp_drawing_styles = mp.solutions.drawing_styles
 
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=1,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
+            self.hands = self.mp_hands.Hands(
+                static_image_mode=False,
+                max_num_hands=1,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5
+            )
+        else:
+            self.mp_hands = None
+            self.mp_drawing = None
+            self.mp_drawing_styles = None
+            self.hands = None
+            print("⚠️  当前 mediapipe 包不包含 solutions 接口，增强检测器进入兼容模式")
 
         # 机器学习模型
         self.use_ml = use_ml
@@ -154,6 +162,13 @@ class EnhancedGestureDetector:
 
     def detect_gestures(self, image, simulation_mode=False):
         """检测手势（支持中文显示）"""
+        if not self.mediapipe_ready or self.hands is None:
+            cv2.putText(image, "MediaPipe fallback mode", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 165, 255), 2)
+            cv2.putText(image, "Hand tracking disabled", (10, 65),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            return image, "none", 0.0, None
+
         # 转换为RGB
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.hands.process(image_rgb)

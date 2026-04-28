@@ -215,7 +215,12 @@ class Drone3DViewer:
             f"位置: X={state.get('position', [0, 0, 0])[0]:.2f}m, Y={state.get('position', [0, 0, 0])[1]:.2f}m, Z={state.get('position', [0, 0, 0])[2]:.2f}m",
             f"电池: {state.get('battery', 100):.1f}%",
             f"解锁: {'是' if state.get('armed', True) else '否'}",
-            f"俯仰: {np.degrees(state.get('orientation', [0, 0, 0])[1]):.1f}°, 横滚: {np.degrees(state.get('orientation', [0, 0, 0])[0]):.1f}°, 偏航: {np.degrees(state.get('orientation', [0, 0, 0])[2]):.1f}°"
+            f"俯仰: {np.degrees(state.get('orientation', [0, 0, 0])[1]):.1f}°, 横滚: {np.degrees(state.get('orientation', [0, 0, 0])[0]):.1f}°, 偏航: {np.degrees(state.get('orientation', [0, 0, 0])[2]):.1f}°",
+            f"当前手势: {state.get('current_gesture', 'none')}",
+            f"原始置信度: {state.get('gesture_confidence', 0.0):.2f}",
+            f"增强置信度: {state.get('enhanced_confidence', 0.0):.2f}",
+            f"手势稳定度: {state.get('gesture_stability', 0.0):.2f}",
+            f"最近指令: {state.get('last_command', 'none')} | 强度: {state.get('last_intensity', 0.0):.2f}",
         ]
 
         for i, text in enumerate(status_info):
@@ -228,6 +233,11 @@ class Drone3DViewer:
 
         # 绘制控制提示
         controls = [
+            "增强状态面板:",
+            "新增: 原始/增强置信度对比",
+            "新增: 手势稳定度显示",
+            "新增: 最近指令与强度",
+            "",
             "控制提示:",
             "ESC - 退出仿真",
             "G - 切换网格显示",

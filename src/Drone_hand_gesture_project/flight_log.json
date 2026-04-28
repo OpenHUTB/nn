@@ -1,0 +1,587 @@
+[
+  {
+    "timestamp": 1777265165.7702067,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "battery": 100.0,
+    "armed": false,
+    "mode": "DISARMED"
+  },
+  {
+    "timestamp": 1777265167.3571954,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 1.0,
+    "position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "battery": 100.0,
+    "armed": true,
+    "mode": "TAKEOFF"
+  },
+  {
+    "timestamp": 1777265168.8574438,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      1.5090956687927246,
+      0.0
+    ],
+    "battery": 98.6418138980866,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265170.357541,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.8732214710072961,
+    "position": [
+      0.0,
+      3.0021023750305176,
+      -1.493006706237793
+    ],
+    "battery": 97.29810786247253,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265172.1593244,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      4.812066316604614,
+      -3.3029706478118896
+    ],
+    "battery": 95.66914031505586,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265174.2567832,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      6.907271385192871,
+      -5.3981757164001465
+    ],
+    "battery": 93.7834557533265,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265176.2694654,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      8.920754671096802,
+      -7.411659002304077
+    ],
+    "battery": 91.97132079601292,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265178.157303,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.24684108966471796,
+    "position": [
+      0.0,
+      10.0,
+      -9.30608344078064
+    ],
+    "battery": 90.26633880138395,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265180.2576172,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.3032933203868893,
+    "position": [
+      0.0,
+      10.0,
+      -11.401238203048706
+    ],
+    "battery": 88.38069951534268,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265182.2576606,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.22648938968593743,
+    "position": [
+      0.0,
+      10.0,
+      -13.39602780342102
+    ],
+    "battery": 86.58538887500758,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265184.357014,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.3501993004625384,
+    "position": [
+      0.0,
+      10.0,
+      -15.491416931152344
+    ],
+    "battery": 84.69953866004927,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265185.9526417,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -17.085073947906494
+    ],
+    "battery": 83.26524734497048,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265187.552538,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -17.085073947906494
+    ],
+    "battery": 82.29970474243142,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265189.0527012,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.3848092337036503,
+    "position": [
+      0.0,
+      10.0,
+      -18.57894778251648
+    ],
+    "battery": 80.95521829128246,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265190.5539212,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -20.088767051696777
+    ],
+    "battery": 79.5963809490202,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265192.6525435,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -20.088767051696777
+    ],
+    "battery": 78.33807888030988,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265194.6530068,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -20.088767051696777
+    ],
+    "battery": 77.14078354835495,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265196.1530907,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -20.088767051696777
+    ],
+    "battery": 76.23496050834652,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265197.752558,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -21.681283235549927
+    ],
+    "battery": 74.8016959428787,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265199.752736,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -21.681283235549927
+    ],
+    "battery": 73.60362584590908,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265201.652313,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.30144521397334045,
+    "position": [
+      0.0,
+      10.0,
+      -21.681283235549927
+    ],
+    "battery": 72.46596467494956,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265203.1526558,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -21.681283235549927
+    ],
+    "battery": 71.5597385168075,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265204.6529052,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.5777794396333226,
+    "position": [
+      0.0,
+      10.0,
+      -23.17423725128174
+    ],
+    "battery": 70.21607990264883,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265206.2522593,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -24.78438901901245
+    ],
+    "battery": 68.76694331169112,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265208.351998,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -26.879844188690186
+    ],
+    "battery": 66.88103365898114,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265210.4479759,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -28.976584911346436
+    ],
+    "battery": 64.99396700859056,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265212.4484727,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -30.97052025794983
+    ],
+    "battery": 63.19942519664747,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265213.9488082,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.36271879809108265,
+    "position": [
+      0.0,
+      10.0,
+      -32.478941440582275
+    ],
+    "battery": 61.84184613227827,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265215.5482156,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -34.07159399986267
+    ],
+    "battery": 60.40845882892591,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265217.6478884,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -34.07159399986267
+    ],
+    "battery": 59.15096042156203,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265219.6483517,
+    "gesture": "ok_sign",
+    "command": "hover",
+    "confidence": 0.9,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -34.07159399986267
+    ],
+    "battery": 57.944152474403225,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265221.1485832,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.3297272941545237,
+    "position": [
+      0.0,
+      10.0,
+      -34.07159399986267
+    ],
+    "battery": 57.04935095310194,
+    "armed": true,
+    "mode": "HOVER"
+  },
+  {
+    "timestamp": 1777265224.4594355,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -34.07159399986267
+    ],
+    "battery": 55.05720050334912,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265226.548282,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -36.15100598335266
+    ],
+    "battery": 53.18572971820818,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265228.647939,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -38.247819662094116
+    ],
+    "battery": 51.2985974073409,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265230.64873,
+    "gesture": "thumb_up",
+    "command": "backward",
+    "confidence": 0.95,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      10.0,
+      -40.259215354919434
+    ],
+    "battery": 49.48834128379811,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265232.5478141,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.33615771735396777,
+    "position": [
+      0.0,
+      10.0,
+      -42.15316581726074
+    ],
+    "battery": 47.78378586769094,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265234.6442065,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.3171156902975009,
+    "position": [
+      0.0,
+      10.0,
+      -44.24901723861694
+    ],
+    "battery": 45.89751958847036,
+    "armed": true,
+    "mode": "BACKWARD"
+  },
+  {
+    "timestamp": 1777265236.743531,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.8,
+    "intensity": 0.347685023361393,
+    "position": [
+      0.0,
+      10.0,
+      -46.34457492828369
+    ],
+    "battery": 44.01151766777031,
+    "armed": true,
+    "mode": "BACKWARD"
+  }
+]
