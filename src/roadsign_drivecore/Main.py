@@ -192,7 +192,6 @@ def main():
             control.steer = steer
             control.brake = 0.0
             vehicle.apply_control(control)
-
             if image_surface[0] is not None:
                 detected_signs = detect_traffic_signs(image_surface[0])
                 simulation_time = time.time() - start_time
