@@ -1,8 +1,21 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（无传感器，零XML错误）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加成功率阈值检查）
+import sys
 import mujoco
 import mujoco.viewer
 import time
 import numpy as np
+import datetime
+
+# 退出码定义
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
+
+# 速度配置（单位：秒）
+SPEED_CONFIG = {
+    "slow":   {"joint": 3.0, "grip": 1.5, "pause": 0.02},
+    "medium": {"joint": 2.0, "grip": 1.0, "pause": 0.001},
+    "fast":   {"joint": 1.0, "grip": 0.5, "pause": 0.0005}
+}
 
 
 def robot_arm_auto_reset_demo():
@@ -111,37 +124,47 @@ def robot_arm_auto_reset_demo():
 
     # ---------------------- 模块化功能函数 ----------------------
     def joint_move(joint_name, target_val, duration, viewer, step_desc):
-        """单关节精准移动"""
+        """单关节精准移动，带进度条显示"""
         print(f"\n🔧 {step_desc}")
         idx = joint_idxs[joint_name]
         start_val = data.ctrl[idx]
         start_time = time.time()
+        bar_length = 20
 
         while (time.time() - start_time) < duration and viewer.is_running():
             progress = (time.time() - start_time) / duration
             current_val = start_val + progress * (target_val - start_val)
             data.ctrl[idx] = current_val
 
-            print(f"\r{joint_name} 进度：{progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            # 进度条显示
+            filled = int(progress * bar_length)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            print(f"\r{joint_name} 进度：|{bar}| {progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
-        print()  # 换行
+        print()
         return True
 
     def gripper_close(viewer, desc="目标"):
-        """软接触闭合夹爪"""
+        """软接触闭合夹爪，带进度条显示"""
         print(f"\n🔧 闭合夹爪抓取{desc}")
         grip_speed = -0.25
         close_duration = 1.0
         start_time = time.time()
+        bar_length = 20
 
         while (time.time() - start_time) < close_duration and viewer.is_running():
             progress = (time.time() - start_time) / close_duration
             data.ctrl[left_grip_idx] = grip_speed
             data.ctrl[right_grip_idx] = -grip_speed
 
-            print(f"\r夹爪闭合进度：{progress * 100:.1f}%", end="")
+            # 进度条显示
+            filled = int(progress * bar_length)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            print(f"\r夹爪闭合进度：|{bar}| {progress * 100:.1f}%", end="")
+            
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
@@ -172,45 +195,71 @@ def robot_arm_auto_reset_demo():
     def robot_auto_reset(viewer):
         """机械臂自动复位到初始位置"""
         print("\n\n🔧 开始机械臂自动复位")
-        # 步骤1：抬升大臂
         joint_move("joint2", 0.0, 1.5, viewer, "复位：抬升大臂")
-        # 步骤2：收缩小臂
         joint_move("joint3", 0.0, 1.5, viewer, "复位：收缩小臂")
-        # 步骤3：旋转基座回正
         joint_move("joint1", 0.0, 2.0, viewer, "复位：基座回正")
         print("✅ 机械臂已完成自动复位，准备下一次抓取")
         return True
 
-    def grab_and_place(viewer, retry_max=2):
-        """完整取放流程（含自动重试）"""
+    def target_auto_reset(viewer):
+        """目标物体自动重置到原位"""
+        print("\n🔧 目标物体自动重置中...")
+        target_ball_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "target_ball")
+        target_qpos = np.array([0.9, 0.6, 0.0, 1, 0, 0, 0])
+        data.qpos[7:14] = target_qpos
+        data.qvel[6:12] = 0
+        mujoco.mj_step(model, data)
+        print("✅ 目标物体已重置到原位")
+
+    def grab_and_place(viewer, retry_max=2, speed="medium"):
+        """完整取放流程（含自动重试、连续失败提醒、速度控制）"""
         retry_count = 0
         success = False
+        consecutive_fails = 0
+        
+        # 获取速度参数
+        joint_duration = SPEED_CONFIG[speed]["joint"]
+        grip_duration = SPEED_CONFIG[speed]["grip"]
+        pause_time = SPEED_CONFIG[speed]["pause"]
 
         while retry_count < retry_max and not success:
             print(f"\n\n===== 开始第 {retry_count + 1} 次抓取尝试 =====")
             try:
                 # 阶段1：对准目标
-                joint_move("joint1", 0.0, 2.0, viewer, "步骤1：旋转基座对准蓝色目标")
-                joint_move("joint2", -0.7, 2.0, viewer, "步骤2：俯仰大臂接近目标")
-                joint_move("joint3", 0.35, 2.0, viewer, "步骤3：伸缩小臂对准目标")
+                joint_move("joint1", 0.0, joint_duration, viewer, "步骤1：旋转基座对准蓝色目标")
+                joint_move("joint2", -0.7, joint_duration, viewer, "步骤2：俯仰大臂接近目标")
+                joint_move("joint3", 0.35, joint_duration, viewer, "步骤3：伸缩小臂对准目标")
 
                 # 阶段2：抓取目标
                 gripper_close(viewer, "蓝色球体")
 
                 # 阶段3：抬升并转移目标
-                joint_move("joint2", 0.0, 1.5, viewer, "步骤4：抬升目标脱离平台")
-                joint_move("joint1", 3.14, 2.5, viewer, "步骤5：旋转基座对准绿色放置区域")
-                joint_move("joint2", -0.7, 1.5, viewer, "步骤6：降低目标接近放置区域")
+                joint_move("joint2", 0.0, joint_duration, viewer, "步骤4：抬升目标脱离平台")
+                joint_move("joint1", 3.14, joint_duration, viewer, "步骤5：旋转基座对准绿色放置区域")
+                joint_move("joint2", -0.7, joint_duration, viewer, "步骤6：降低目标接近放置区域")
 
                 # 阶段4：放置目标
                 gripper_open(viewer, "蓝色球体")
 
-                # 抓取成功，退出重试循环
                 success = True
-                print("\n\n🎉 第 {retry_count+1} 次抓取尝试成功！")
+                consecutive_fails = 0
+                print(f"\n\n🎉 第 {retry_count+1} 次抓取尝试成功！")
             except Exception as e:
                 retry_count += 1
-                print(f"\n❌ 第 {retry_count} 次抓取失败：{e}，准备重试...")
+                consecutive_fails += 1
+                print(f"\n❌ 第 {retry_count} 次抓取失败：{e}")
+                
+                if consecutive_fails >= 3:
+                    print("\n" + "="*50)
+                    print("⚠️⚠️⚠️ 连续失败次数过多！")
+                    print("请检查：")
+                    print("  1. 目标物体是否在抓取范围内？")
+                    print("  2. 夹爪是否正常工作？")
+                    print("  3. 机械臂关节是否卡住？")
+                    print("="*50)
+                    input("按 Enter 键继续尝试...")
+                    consecutive_fails = 0
+                
                 robot_auto_reset(viewer)
 
         if not success:
@@ -222,17 +271,77 @@ def robot_arm_auto_reset_demo():
         print("\n📌 开始带自动复位的机械臂精准取放流程...")
         print("-" * 60)
 
-        # 执行完整取放流程
-        grab_success = grab_and_place(viewer)
-
-        # 无论成功与否，最终执行自动复位
-        if grab_success:
-            robot_auto_reset(viewer)
+        # ========== 命令行参数解析 ==========
+        # 抓取次数，默认 5 次
+        if len(sys.argv) > 1:
+            total_rounds = int(sys.argv[1])
         else:
-            print("\n🔧 强制执行机械臂自动复位")
-            robot_auto_reset(viewer)
+            total_rounds = 5
+        print(f"📌 本次将抓取 {total_rounds} 次")
+        
+        # 速度参数，默认 medium
+        speed = "medium"
+        if len(sys.argv) > 2:
+            speed_arg = sys.argv[2].lower()
+            if speed_arg in SPEED_CONFIG:
+                speed = speed_arg
+                print(f"📌 速度模式: {speed} (slow/medium/fast)")
+            else:
+                print(f"⚠️ 速度参数 '{speed_arg}' 无效，使用默认 'medium'")
+        
+        # 最低成功率要求，默认 0（不检查）
+        min_success_rate = 0.0
+        if len(sys.argv) > 3:
+            try:
+                min_success_rate = float(sys.argv[3])
+                print(f"📌 最低成功率要求: {min_success_rate}%")
+            except ValueError:
+                print(f"⚠️ 成功率参数 '{sys.argv[3]}' 无效，使用默认 0%（不检查）")
+        
+        success_count = 0
 
-        # 保持可视化查看结果
+        for round_num in range(1, total_rounds + 1):
+            print(f"\n{'='*40}")
+            print(f"🔄 第 {round_num}/{total_rounds} 次抓取")
+            print(f"{'='*40}")
+
+            grab_success = grab_and_place(viewer, speed=speed)
+
+            if grab_success:
+                success_count += 1
+                print(f"✅ 第 {round_num} 次抓取成功")
+            else:
+                print(f"❌ 第 {round_num} 次抓取失败")
+
+            robot_auto_reset(viewer)
+            target_auto_reset(viewer)
+
+            if round_num < total_rounds:
+                print("\n⏸ 准备下一次抓取...")
+                for _ in range(30):
+                    if not viewer.is_running():
+                        break
+                    mujoco.mj_step(model, data)
+                    viewer.sync()
+                    time.sleep(0.05)
+
+        # ========== 输出统计结果 ==========
+        actual_rate = success_count / total_rounds * 100
+        print(f"\n{'='*50}")
+        print(f"🎉 所有抓取完成！")
+        print(f"📊 统计结果：成功 {success_count}/{total_rounds} 次")
+        print(f"📈 成功率：{actual_rate:.1f}%")
+        print(f"{'='*50}")
+
+        # ========== 成功率阈值检查 ==========
+        if min_success_rate > 0:
+            if actual_rate >= min_success_rate:
+                print(f"✅ 成功率 {actual_rate:.1f}% 已达到要求 {min_success_rate:.1f}%")
+            else:
+                print(f"⚠️ 警告：实际成功率 {actual_rate:.1f}% 低于要求 {min_success_rate:.1f}%")
+                print(f"❌ 抓取任务失败，退出码: {EXIT_FAILURE}")
+                sys.exit(EXIT_FAILURE)
+
         print("\n\n📌 流程结束，保持可视化5秒...")
         start_hold = time.time()
         while (time.time() - start_hold) < 5 and viewer.is_running():
@@ -240,8 +349,17 @@ def robot_arm_auto_reset_demo():
             viewer.sync()
             time.sleep(0.001)
 
+    # 保存日志到文件
+    try:
+        with open("grasp_log.txt", "a", encoding="gbk") as f:
+            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{actual_rate:.1f}%, 速度:{speed}\n")
+        print("📝 日志已保存到 grasp_log.txt")
+    except Exception as e:
+        print(f"⚠️ 日志保存失败：{e}")
+
     print("\n\n🎉 3自由度机械臂自动复位取放演示完毕！")
+    return EXIT_SUCCESS
 
 
 if __name__ == "__main__":
-    robot_arm_auto_reset_demo()
+    sys.exit(robot_arm_auto_reset_demo())
