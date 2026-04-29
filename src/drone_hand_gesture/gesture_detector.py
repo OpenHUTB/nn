@@ -68,6 +68,11 @@ class GestureDetector:
             "ok_sign": "hover",
         }
         
+        # 手势序列检测（用于握拳→松开触发起飞）
+        self.prev_gesture = None
+        self.fist_start_time = None
+        self.FIST_TIMEOUT = 1.5  # 握拳后1.5秒内松开才触发起飞
+        
         print("[INFO] 使用纯 OpenCV 手势检测器")
     
     def detect_gestures(self, image, simulation_mode=False):
