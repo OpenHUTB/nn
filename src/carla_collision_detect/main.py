@@ -5,6 +5,7 @@ import math
 import keyboard
 import numpy as np
 from vision_module import VisionSystem
+from planner import LanePlanner
 
 def main():
     print("===================================")
@@ -26,7 +27,6 @@ def main():
     settings.fixed_delta_seconds = 0.05
     world.apply_settings(settings)
 
-    # 提前声明变量，防止后续报错
     ego_vehicle = None
     dummy_target = None       
     collision_sensor = None   
@@ -44,19 +44,38 @@ def main():
         vehicle_bp = bp_lib.find('vehicle.lincoln.mkz_2017')
         
         spawn_points = world.get_map().get_spawn_points()
-        spawn_point = spawn_points[0] 
+        
+        # 1. 寻找一条前方至少有 80 米没有路口的纯直道
+        ego_spawn_point = None
+        target_waypoint = None
+        
+        for sp in spawn_points:
+            wp = world.get_map().get_waypoint(sp.location)
+            # 必须当前不是路口
+            if not wp.is_junction:
+                # 探寻前方 60 米处的路点
+                fwd_wps = wp.next(60.0)
+                if fwd_wps and not fwd_wps[0].is_junction:
+                    ego_spawn_point = sp
+                    target_waypoint = fwd_wps[0]
+                    break
+                    
+        if not ego_spawn_point:
+            print("⚠️ 没找到完美的超长直道，将就用默认点。")
+            ego_spawn_point = spawn_points[0]
+            target_waypoint = world.get_map().get_waypoint(ego_spawn_point.location).next(40.0)[0]
 
-        ego_vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+        # 2. 生成主车
+        ego_vehicle = world.try_spawn_actor(vehicle_bp, ego_spawn_point)
         
         if ego_vehicle:
             print("✅ 主车已生成！定速巡航模块已就绪。")
-          
             vision_system = VisionSystem(ego_vehicle, world)
+            lane_planner = LanePlanner(ego_vehicle, world) 
 
-            target_transform = carla.Transform(
-                carla.Location(x=-52.64, y=24.47, z=0.5),
-                carla.Rotation(yaw=0.16)
-            )
+            # 3. 生成靶标 (使用地图路网获取的精确前方航点)
+            target_transform = target_waypoint.transform
+            target_transform.location.z += 0.5  # 稍微抬高防止卡地里
             
             if choice == '2':
                 target_bp = bp_lib.filter('walker.pedestrian.*')[0]
@@ -153,22 +172,36 @@ def main():
                     control.hand_brake = False
 
                 # ==========================================
-                # 🌟 核心：视觉系统处理与 AEB 动态计算
+                # 🌟 核心：感知、规划与控制
                 # ==========================================
                 vision_aeb_active = False
+                
                 if vision_system:
+                    # 1. 视觉感知：获取最近障碍物距离
                     _, min_dist = vision_system.process_and_render()
                     
+                    safe_dist = min_dist if min_dist != float('inf') else 100.0
+                    planner_steer = lane_planner.get_lateral_control(safe_dist, current_speed_kmh)
+                    
+                    if not is_reverse and planner_steer is not None:
+                        control.steer = planner_steer
+                        
+                    # 3. 纵向决策 (AES 减速 vs AEB 急刹)
                     if min_dist != float('inf'):
+                        # 计算当前车速下的安全制动距离 (公式：v²/2a + 反应距离)
                         braking_dist = (speed_m_s ** 2) / (2 * 6.0) + 3.0 
                         
-                        # 🌟 关键修改：加入了 `and not is_reverse` 逻辑
-                        if min_dist <= braking_dist and current_speed_kmh > 2.0 and not is_reverse:
-                            vision_aeb_active = True
+                        if lane_planner.is_changing_lane and not is_reverse:
+                            # 【变道优先级高】：如果正在变道，我们选择“减速绕过”而不是“原地停死”
+                            # 这样可以防止车子切到一半停在马路中间
+                            target_speed_kmh = 15.0  
+                            control.brake = 0.0     # 变道时禁制 AEB 介入
                             
+                        elif min_dist <= braking_dist and current_speed_kmh > 2.0 and not is_reverse:
+                            # 【制动保底】：如果没有在变道（比如旁边没路），则触发 AEB 紧急制动
+                            vision_aeb_active = True
                             if not was_aeb_active:
-                                print(f"\033[91m⚠️ 与前方的[{target_type_name}]距离过近，触发紧急刹车！\033[0m")
-                                
+                                print(f"\033[91m⚠️ 路径受阻且无法变道，触发 AEB 紧急刹车！\033[0m")
                             target_speed_kmh = 0.0   
                             control.throttle = 0.0
                             control.brake = 1.0      
@@ -178,16 +211,6 @@ def main():
                 # ==========================================
 
                 control.reverse = is_reverse
-                steer_speed = 0.02 
-                if curr_a: steer_cache = max(steer_cache - steer_speed, -1.0)
-                elif curr_d: steer_cache = min(steer_cache + steer_speed, 1.0)
-                else:
-                    if steer_cache > 0: steer_cache = max(steer_cache - steer_speed, 0.0)
-                    elif steer_cache < 0: steer_cache = min(steer_cache + steer_speed, 0.0)
-                
-                if abs(steer_cache) < 0.01: steer_cache = 0.0
-                control.steer = steer_cache
-                
                 ego_vehicle.apply_control(control)
                 world.tick()
 

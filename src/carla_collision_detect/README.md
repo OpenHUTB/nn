@@ -6,7 +6,7 @@
 
 * **操作系统:** Windows 11
 * **仿真器版本:** CARLA 0.9.15
-* **Python 版本:** Python 3.7.9
+* **Python 版本:** Python 3.10.11
 * **IDE:** Visual Studio Code
 
 ## 功能规划

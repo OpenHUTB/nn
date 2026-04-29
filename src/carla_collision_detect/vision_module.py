@@ -24,7 +24,7 @@ class VisionSystem:
         }
         
         self.focal_length = 320.0 
-        
+        self.smoothed_distance = float('inf')
         self._setup_camera(fov, res_x, res_y)
 
     def _setup_camera(self, fov, res_x, res_y):
@@ -53,15 +53,13 @@ class VisionSystem:
             img_array = np.reshape(img_array, (image.height, image.width, 4))
             img_bgr = img_array[:, :, :3]
             
-            results = self.yolo_model(img_bgr, verbose=False)
+            results = self.yolo_model(img_bgr, conf=0.6, verbose=False)
             current_seen_classes = set()
             min_distance = float('inf') 
             
             roi_left = 200
             roi_right = 440
             
-            # 🌟 新增：设置雷达的“最远有效预警距离” (单位：米)
-            # 你可以随时调整这个值，40米对于城市道路巡航是一个很舒服的预警距离
             radar_max_range = 40.0
             
             for box in results[0].boxes:
@@ -72,15 +70,22 @@ class VisionSystem:
                 box_width = x2 - x1
                 box_height = y2 - y1
                 box_center_x = (x1 + x2) / 2
-                
-                if roi_left < box_center_x < roi_right:
+                ratio = max(0.0, min(1.0, (y2 - 240.0) / 240.0))
+                dynamic_roi_left = 320.0 - (220.0 * ratio)
+                dynamic_roi_right = 320.0 + (220.0 * ratio)
+                if dynamic_roi_left < box_center_x < dynamic_roi_right:
                     if cls_name in ["car", "person"]:
                         real_height = 1.7 if cls_name == "person" else 1.5
                         distance = (self.focal_length * real_height) / max(1.0, box_height)
                         
                         # (AEB 会用到这个最小距离，哪怕在40米外也要持续算)
                         if distance < min_distance:
-                            min_distance = distance
+                            if self.smoothed_distance == float('inf'):
+                                self.smoothed_distance = distance
+                            else:
+                                self.smoothed_distance = (0.3 * distance) + (0.7 * self.smoothed_distance)
+                                
+                            min_distance = self.smoothed_distance
                             
                         # 🌟 核心拦截逻辑：只有距离小于 40 米时，才将其计入“雷达监控名单”
                         if distance <= radar_max_range:
@@ -100,10 +105,16 @@ class VisionSystem:
             
             self.last_seen_classes = current_seen_classes
             
+            # 替换原来画垂直直线的代码
             annotated_frame = results[0].plot()
-            cv2.line(annotated_frame, (roi_left, 0), (roi_left, 480), (0, 255, 0), 2)
-            cv2.line(annotated_frame, (roi_right, 0), (roi_right, 480), (0, 255, 0), 2)
-            cv2.putText(annotated_frame, "Ego Lane ROI", (roi_left + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            pt_horizon = (320, 240)      # 远方的地平线中心 (灭点)
+            pt_bottom_left = (100, 480)  # 本车道左下角
+            pt_bottom_right = (540, 480) # 本车道右下角
+            
+            cv2.line(annotated_frame, pt_horizon, pt_bottom_left, (0, 255, 0), 2)
+            cv2.line(annotated_frame, pt_horizon, pt_bottom_right, (0, 255, 0), 2)
+            cv2.putText(annotated_frame, "Dynamic Perspective ROI", (100, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
             cv2.imshow("CARLA YOLOv8 Vision", annotated_frame)
             cv2.waitKey(1)
