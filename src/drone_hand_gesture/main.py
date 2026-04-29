@@ -402,17 +402,37 @@ class IntegratedDroneSimulation:
                 
                 # 显示方向命令
                 direction_cmd = ""
-                if left_hand.get('gesture') == 'victory':
+                direction_source = ""  # 手势或滑动
+                gesture_name = left_hand.get('gesture', 'none')
+                
+                if gesture_name == 'victory':
                     direction_cmd = "FORWARD"
-                elif left_hand.get('gesture') == 'thumb_up':
+                    direction_source = "(手势)"
+                elif gesture_name == 'thumb_up':
                     direction_cmd = "BACKWARD"
-                elif left_hand.get('gesture') == 'pointing_up':
+                    direction_source = "(手势)"
+                elif gesture_name == 'pointing_up':
                     direction_cmd = "TURN LEFT"
-                elif left_hand.get('gesture') == 'pointing_down':
+                    direction_source = "(手势)"
+                elif gesture_name == 'pointing_down':
                     direction_cmd = "TURN RIGHT"
+                    direction_source = "(手势)"
+                # 滑动手势
+                elif gesture_name == 'swipe_left':
+                    direction_cmd = "LEFT"
+                    direction_source = "(滑动)"
+                elif gesture_name == 'swipe_right':
+                    direction_cmd = "RIGHT"
+                    direction_source = "(滑动)"
+                elif gesture_name == 'swipe_up':
+                    direction_cmd = "FORWARD"
+                    direction_source = "(滑动)"
+                elif gesture_name == 'swipe_down':
+                    direction_cmd = "BACKWARD"
+                    direction_source = "(滑动)"
                     
                 if direction_cmd:
-                    cv2.putText(enhanced_frame, f"Direction: {direction_cmd}", 
+                    cv2.putText(enhanced_frame, f"Direction: {direction_cmd} {direction_source}", 
                                 (width + 20, y_offset),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
                     y_offset += 18
@@ -570,9 +590,13 @@ class IntegratedDroneSimulation:
             print("  大拇指向上 - 后退")
             print("  食指向左倾斜 - 左转")
             print("  食指向右倾斜 - 右转")
+            print("  向左滑动 - 左移 (滑动手势)")
+            print("  向右滑动 - 右移 (滑动手势)")
+            print("  向上滑动 - 前进 (滑动手势)")
+            print("  向下滑动 - 后退 (滑动手势)")
             print()
             print("右手控制高度:")
-            print("  食指向下 - 上升")
+            print("  食指向上 - 上升")
             print("  食指向下 - 下降")
             print("  OK手势 - 悬停")
             print()
@@ -775,12 +799,13 @@ class IntegratedDroneSimulation:
         intensity = 0.5
         intensity_info = None
         if self.hand_landmarks and not isinstance(self.hand_landmarks, dict):
+            # 检查landmarks是否是有效的数据结构
+            if hasattr(self.hand_landmarks, '__len__') or isinstance(self.hand_landmarks, (list, tuple)):
+                if len(self.hand_landmarks) > 21 and 'intensity_info' in self.hand_landmarks[-1]:
+                    intensity_info = self.hand_landmarks[-1]['intensity_info']
             intensity = self.gesture_detector.get_gesture_intensity(
                 self.hand_landmarks, gesture
             )
-            # 获取详细强度信息
-            if len(self.hand_landmarks) > 21 and 'intensity_info' in self.hand_landmarks[-1]:
-                intensity_info = self.hand_landmarks[-1]['intensity_info']
             self.current_intensity = intensity
 
         # 检查是否在冷却期内（仅针对新手势触发）
@@ -802,12 +827,20 @@ class IntegratedDroneSimulation:
             command = self.gesture_detector.get_command(gesture)
 
             if command != "none":
+                # 判断是否是滑动手势
+                is_swipe = gesture.startswith("swipe_")
+                swipe_info = ""
+                if is_swipe:
+                    swipe_info = f" [滑动手势]"
+                    # 滑动手势使用更高的强度
+                    intensity = max(self.gesture_confidence, 0.7)
+                
                 # 添加调试信息
                 palm_info = ""
                 if intensity_info:
                     palm_info = f" 手掌:{intensity_info['palm_openness']:.0%}"
                 print(
-                    f"[INFO] 检测到手势: {gesture} (置信度:{confidence:.2f}) -> 执行:{command} (速度:{intensity:.0%}){palm_info}")
+                    f"[INFO] 检测到手势: {gesture} (置信度:{confidence:.2f}) -> 执行:{command} (速度:{intensity:.0%}){palm_info}{swipe_info}")
 
                 # 发送命令到控制器
                 self.drone_controller.send_command(command, intensity)
@@ -823,11 +856,12 @@ class IntegratedDroneSimulation:
                 # 存储当前命令用于连续控制
                 self.current_command = command
 
-        # 连续控制：持续手势时动态调整速度
+        # 连续控制：持续手势时动态调整速度（滑动手势不进行连续控制）
         elif (gesture not in ["no_hand", "hand_detected"] and
               same_gesture and
               self.continuous_control_enabled and
-              current_time - getattr(self, 'last_continuous_time', 0) >= self.continuous_control_interval):
+              current_time - getattr(self, 'last_continuous_time', 0) >= self.continuous_control_interval and
+              not gesture.startswith("swipe_")):  # 滑动手势不进行连续控制
 
             command = self.gesture_detector.get_command(gesture)
 
@@ -1067,6 +1101,10 @@ class IntegratedDroneSimulation:
         print("  大拇指向上 - 后退")
         print("  食指向左 - 左转")
         print("  食指向右 - 右转")
+        print("  向左滑动 - 无人机左移")
+        print("  向右滑动 - 无人机右移")
+        print("  向上滑动 - 无人机前进")
+        print("  向下滑动 - 无人机后退")
         print()
         print("右手控制高度:")
         print("  食指向上 - 上升")

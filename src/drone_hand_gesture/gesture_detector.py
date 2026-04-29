@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+import time
 
 # 尝试导入 MediaPipe（可选）
 try:
@@ -15,6 +16,7 @@ class GestureDetector:
     """
     纯 OpenCV 手势检测器
     基于肤色检测和轮廓分析
+    支持滑动手势控制
     """
     
     def __init__(self):
@@ -46,7 +48,7 @@ class GestureDetector:
         self.right_hand_commands = {
             "pointing_up": "up",       # 食指向下 - 上升
             "pointing_down": "down",   # 食指向下 - 下降
-            "ok_sign": "hover",        # OK手势 - 悬停
+            "ok_sign": "hover",         # OK手势 - 悬停
         }
 
         # 双手手势指令（特殊命令）
@@ -66,13 +68,44 @@ class GestureDetector:
             "thumb_up": "backward",
             "thumb_down": "stop",
             "ok_sign": "hover",
+            # 滑动手势命令
+            "swipe_left": "left",
+            "swipe_right": "right",
+            "swipe_up": "forward",
+            "swipe_down": "backward",
         }
         
-        print("[INFO] 使用纯 OpenCV 手势检测器")
+        # ============ 滑动手势控制相关 ============
+        # 手掌位置历史记录（用于检测滑动）
+        self.palm_history = {
+            'left': [],   # 左手历史位置 [(x, y, timestamp), ...]
+            'right': []   # 右手历史位置
+        }
+        self.max_history_length = 10  # 最大历史记录数量
+        
+        # 滑动手势命令映射
+        self.swipe_commands = {
+            "swipe_left": "left",      # 向左滑动 - 无人机左移
+            "swipe_right": "right",     # 向右滑动 - 无人机右移
+            "swipe_up": "forward",      # 向上滑动 - 无人机前进
+            "swipe_down": "backward",  # 向下滑动 - 无人机后退
+        }
+        
+        # 滑动检测参数
+        self.swipe_threshold = 0.15    # 滑动阈值（屏幕宽/高的比例）
+        self.swipe_min_velocity = 0.3 # 最小滑动速度
+        self.swipe_cooldown = 0.5     # 滑动检测冷却时间（秒）
+        self.last_swipe_time = 0      # 上次滑动检测时间
+        
+        # 当前检测到的滑动手势
+        self.current_swipe = None
+        self.swipe_intensity = 0.5
+        
+        print("[INFO] 使用纯 OpenCV 手势检测器 + 滑动手势支持")
     
     def detect_gestures(self, image, simulation_mode=False):
         """
-        检测图像中的手势（支持双手）
+        检测图像中的手势（支持双手和滑动手势）
 
         Args:
             image: 输入图像
@@ -87,6 +120,10 @@ class GestureDetector:
         # 复制图像
         result_image = image.copy()
         height, width = image.shape[:2]
+        
+        # 重置当前滑动手势
+        self.current_swipe = None
+        self.swipe_intensity = 0.5
         
         # 肤色检测
         skin_mask = self._detect_skin(image)
@@ -122,6 +159,33 @@ class GestureDetector:
 
                 # 识别具体手势
                 detected_gesture, gesture_confidence = self._classify_gesture(hand_landmarks)
+
+                # 获取手掌中心位置（用于滑动检测）
+                palm_position = self._get_palm_center(hand_landmarks)
+                
+                # 检测滑动手势
+                if palm_position:
+                    current_time = time.time()
+                    palm_key = 'left' if hand_type == "Left" else 'right'
+                    
+                    # 添加当前位置到历史记录
+                    self.palm_history[palm_key].append({
+                        'position': (palm_position['x'], palm_position['y']),
+                        'timestamp': current_time
+                    })
+                    
+                    # 限制历史记录长度
+                    if len(self.palm_history[palm_key]) > self.max_history_length:
+                        self.palm_history[palm_key].pop(0)
+                    
+                    # 检测滑动手势
+                    swipe_result = self._detect_swipe_gesture(palm_key, width, height, current_time)
+                    if swipe_result:
+                        self.current_swipe = swipe_result['direction']
+                        self.swipe_intensity = swipe_result['intensity']
+                        # 滑动手势覆盖原有的手势命令
+                        detected_gesture = swipe_result['gesture_name']
+                        gesture_confidence = swipe_result['confidence']
 
                 # 提取关键点数据
                 if simulation_mode:
@@ -179,46 +243,27 @@ class GestureDetector:
         获取归一化的关键点坐标（用于仿真模式）
 
         Args:
-            hand_landmarks: 手部关键点
+            hand_landmarks: MediaPipe手部关键点对象
 
         Returns:
             list: 包含21个关键点的字典列表，每个点有x,y,z坐标
         """
         landmarks = []
         
-        # 获取边界矩形
-        x, y, w, h = cv2.boundingRect(contour)
+        # 从MediaPipe hand_landmarks提取关键点
+        if hasattr(hand_landmarks, 'landmark'):
+            # MediaPipe模式
+            for landmark in hand_landmarks.landmark:
+                landmarks.append({
+                    'x': landmark.x,
+                    'y': landmark.y,
+                    'z': landmark.z if hasattr(landmark, 'z') else 0
+                })
+        elif isinstance(hand_landmarks, list):
+            # 已经是列表格式
+            landmarks = hand_landmarks
         
-        # 生成5个手指尖的简化位置
-        for i in range(5):
-            # 简化的手指位置
-            finger_x = x + w * (0.2 + i * 0.15)
-            finger_y = y
-            landmarks.append({
-                'x': finger_x / 640,
-                'y': finger_y / 480,
-                'z': 0
-            })
-        
-        # 添加手掌中心
-        M = cv2.moments(contour)
-        if M["m00"] != 0:
-            cx = int(M["m10"] / M["m00"])
-            cy = int(M["m01"] / M["m00"])
-        else:
-            cx, cy = x + w // 2, y + h // 2
-        
-        # 添加掌指关节位置
-        for i in range(5):
-            mcp_x = x + w * (0.2 + i * 0.15)
-            mcp_y = y + h * 0.3
-            landmarks.append({
-                'x': mcp_x / 640,
-                'y': mcp_y / 480,
-                'z': 0
-            })
-        
-        # 填充到21个关键点
+        # 确保返回21个关键点
         while len(landmarks) < 21:
             landmarks.append({'x': 0, 'y': 0, 'z': 0})
         
@@ -230,7 +275,7 @@ class GestureDetector:
 
     def get_dual_hand_commands(self, left_hand_data, right_hand_data):
         """
-        获取双手控制命令
+        获取双手控制命令（支持滑动手势）
 
         Args:
             left_hand_data: 左手关键点数据
@@ -243,7 +288,9 @@ class GestureDetector:
                     'direction_intensity': 强度,
                     'altitude_command': 命令或None,
                     'altitude_intensity': 强度,
-                    'special_command': 特殊命令（起飞/降落/停止）或None
+                    'special_command': 特殊命令（起飞/降落/停止）或None,
+                    'left_gesture': 左手手势名称,
+                    'right_gesture': 右手手势名称
                 }
         """
         result = {
@@ -262,8 +309,12 @@ class GestureDetector:
             intensity = self.get_gesture_intensity(left_hand_data, gesture)
             result['left_gesture'] = gesture
 
+            # 检查是否是滑动手势（优先处理）
+            if gesture in self.swipe_commands:
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
             # 检查是否是方向控制手势
-            if gesture in self.left_hand_commands:
+            elif gesture in self.left_hand_commands:
                 result['direction_command'] = self.left_hand_commands[gesture]
                 result['direction_intensity'] = intensity
             # 检查是否是特殊手势
@@ -276,8 +327,13 @@ class GestureDetector:
             intensity = self.get_gesture_intensity(right_hand_data, gesture)
             result['right_gesture'] = gesture
 
+            # 检查是否是滑动手势
+            if gesture in self.swipe_commands:
+                # 滑动手势在右手时也作为方向控制
+                result['direction_command'] = self.swipe_commands[gesture]
+                result['direction_intensity'] = self.swipe_intensity
             # 检查是否是高度控制手势
-            if gesture in self.right_hand_commands:
+            elif gesture in self.right_hand_commands:
                 result['altitude_command'] = self.right_hand_commands[gesture]
                 result['altitude_intensity'] = intensity
             # 检查是否是特殊手势
@@ -312,3 +368,146 @@ class GestureDetector:
     def release(self):
         """释放资源"""
         pass
+
+    # ============ 滑动手势检测相关方法 ============
+    
+    def _get_palm_center(self, hand_landmarks):
+        """
+        获取手掌中心位置
+        
+        Args:
+            hand_landmarks: MediaPipe手部关键点
+            
+        Returns:
+            dict: 包含x, y归一化坐标的字典
+        """
+        if not hand_landmarks:
+            return None
+        
+        # MediaPipe手掌中心是第9个关键点（掌指关节）
+        palm_landmark = hand_landmarks.landmark[9]
+        
+        return {
+            'x': palm_landmark.x,
+            'y': palm_landmark.y,
+            'z': palm_landmark.z if hasattr(palm_landmark, 'z') else 0
+        }
+    
+    def _detect_swipe_gesture(self, hand_key, frame_width, frame_height, current_time):
+        """
+        检测滑动手势
+        
+        Args:
+            hand_key: 'left' 或 'right'
+            frame_width: 帧宽度
+            frame_height: 帧高度
+            current_time: 当前时间戳
+            
+        Returns:
+            dict: 包含direction, intensity, gesture_name, confidence的字典，如果没有滑动则返回None
+        """
+        # 检查冷却时间
+        if current_time - self.last_swipe_time < self.swipe_cooldown:
+            return None
+        
+        history = self.palm_history.get(hand_key, [])
+        
+        # 需要至少3个点才能检测滑动
+        if len(history) < 3:
+            return None
+        
+        # 获取最近的两个点（用于计算速度）
+        recent_points = history[-3:]
+        
+        # 计算位移
+        start_point = recent_points[0]['position']
+        end_point = recent_points[-1]['position']
+        
+        delta_x = end_point[0] - start_point[0]
+        delta_y = end_point[1] - start_point[1]
+        
+        # 计算时间差
+        time_delta = recent_points[-1]['timestamp'] - recent_points[0]['timestamp']
+        if time_delta <= 0:
+            return None
+        
+        # 计算速度
+        velocity_x = abs(delta_x) / time_delta
+        velocity_y = abs(delta_y) / time_delta
+        
+        # 检测是否有足够的滑动
+        swipe_threshold = self.swipe_threshold
+        velocity_threshold = self.swipe_min_velocity
+        
+        # 判断滑动方向
+        direction = None
+        gesture_name = None
+        
+        if abs(delta_x) > swipe_threshold and velocity_x > velocity_threshold:
+            # 水平滑动
+            if delta_x > 0:
+                direction = "swipe_right"
+                gesture_name = "swipe_right"
+            else:
+                direction = "swipe_left"
+                gesture_name = "swipe_left"
+            intensity = min(abs(delta_x) * 2, 1.0)
+            confidence = min(velocity_x / 2.0, 1.0)
+            
+        elif abs(delta_y) > swipe_threshold and velocity_y > velocity_threshold:
+            # 垂直滑动
+            if delta_y < 0:
+                direction = "swipe_up"
+                gesture_name = "swipe_up"
+            else:
+                direction = "swipe_down"
+                gesture_name = "swipe_down"
+            intensity = min(abs(delta_y) * 2, 1.0)
+            confidence = min(velocity_y / 2.0, 1.0)
+        
+        if direction:
+            # 更新滑动检测时间
+            self.last_swipe_time = current_time
+            
+            # 清除该手的历史记录，防止连续触发
+            self.palm_history[hand_key] = []
+            
+            return {
+                'direction': direction,
+                'intensity': intensity,
+                'gesture_name': gesture_name,
+                'confidence': confidence,
+                'delta_x': delta_x,
+                'delta_y': delta_y,
+                'velocity_x': velocity_x,
+                'velocity_y': velocity_y
+            }
+        
+        return None
+    
+    def get_swipe_command(self, swipe_gesture):
+        """
+        获取滑动手势对应的控制指令
+        
+        Args:
+            swipe_gesture: 滑动手势名称
+            
+        Returns:
+            str: 控制指令
+        """
+        return self.swipe_commands.get(swipe_gesture, "none")
+    
+    def get_current_swipe(self):
+        """
+        获取当前检测到的滑动手势
+        
+        Returns:
+            tuple: (swipe_direction, intensity) 或 (None, 0.5)
+        """
+        return (self.current_swipe, self.swipe_intensity)
+    
+    def reset_swipe_history(self):
+        """重置滑动历史记录"""
+        self.palm_history = {'left': [], 'right': []}
+        self.last_swipe_time = 0
+        self.current_swipe = None
