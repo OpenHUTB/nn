@@ -872,8 +872,12 @@ class HumanoidStabilizer:
         torques = np.zeros(self.num_joints, dtype=np.float64)
 
         # 躯干姿态控制（改用传感器IMU数据）
-        root_euler = imu["euler"]  # 带噪声的欧拉角
-        root_vel = imu["ang_vel"]  # 带噪声的角速度
+        if self.enable_sensor_simulation:
+            root_euler = imu.get("true_euler", imu["euler"])
+            root_vel = imu.get("true_ang_vel", imu["ang_vel"])
+        else:
+            root_euler = imu["euler"]
+            root_vel = imu["ang_vel"]
         root_vel = np.clip(root_vel, -3.0, 3.0)
 
         imu_alpha = 0.2
@@ -936,7 +940,7 @@ class HumanoidStabilizer:
             joint_error = max(-0.3, min(0.3, joint_error))
 
             # 动态PD增益 - 接触力越小，增益越低（避免打滑）
-            if self.enable_robust_optim:
+            if self.enable_robust_optim and self.state == "WALK":
                 # 计算接触力归一化系数（0~1）
                 if "right" in joint_name:
                     force_factor = np.clip(self.right_foot_force / self._force_factor_norm, 0.4, 1.1)
@@ -959,18 +963,20 @@ class HumanoidStabilizer:
                 kp = self.base_kp_knee * force_factor
                 kd = self.base_kd_knee * force_factor
                 joint_error += com_compensation[2] * 0.05
+                joint_error += torso_torque[1] * 0.01
 
             elif "ankle" in joint_name:
                 kp = self.base_kp_ankle * force_factor
                 kd = self.base_kd_ankle * force_factor
                 if "y" in joint_name:
-                    joint_error -= torso_torque[1] * 0.015
+                    joint_error += torso_torque[1] * 0.015
 
             # 原有接触判断逻辑（保留，与动态增益叠加）
-            if ("left" in joint_name and self.foot_contact[1] == 0) or \
-                    ("right" in joint_name and self.foot_contact[0] == 0):
-                kp *= 0.8
-                kd *= 0.9
+            if self.state == "WALK":
+                if ("left" in joint_name and self.foot_contact[1] == 0) or \
+                        ("right" in joint_name and self.foot_contact[0] == 0):
+                    kp *= 0.8
+                    kd *= 0.9
 
             torques[idx] = kp * joint_error - kd * current_vel[idx]
 
