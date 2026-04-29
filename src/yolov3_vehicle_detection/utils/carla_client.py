@@ -14,6 +14,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from config import config
+from utils.deep_sort import DeepSORTTracker
 
 
 class CarlaClient:
@@ -65,6 +66,11 @@ class CarlaClient:
         # 新增：碰撞后恢复
         self.post_collision_recovery = False
         self.collision_recovery_start = 0
+        
+        # DeepSORT 目标跟踪
+        self.deep_sort = DeepSORTTracker(max_age=30, min_hits=3, iou_threshold=0.3)
+        self.tracked_obstacles = {}  # 跟踪的障碍物 {track_id: info}
+        self.frame_count = 0
 
     def connect(self):
         print(f"[INFO] 正在连接 CARLA 服务器 ({self.host}:{self.port})...")
@@ -292,28 +298,79 @@ class CarlaClient:
         self.lane_change_completed = False
 
     def _on_obstacle_detected(self, event):
-        """障碍物检测回调"""
+        """障碍物检测回调 - 集成 DeepSORT 跟踪"""
         # 过滤掉自车（距离为0或检测到的是自己）
         if event.distance < 0.1:
             return
         if self.vehicle and event.other_actor and event.other_actor.id == self.vehicle.id:
             return
         
-        self.obstacle_distance = event.distance
-        self.obstacle_info = {
-            'distance': event.distance,
-            'actor': event.other_actor,
-            'actor_id': event.other_actor.id if event.other_actor else None,
-            'transform': event.transform,
-            'yaw': event.transform.rotation.yaw if event.transform else 0
-        }
-        # 持续跟踪这个障碍物（不清除）
-        self.current_obstacle = event.other_actor
+        self.frame_count += 1
+        
+        # 使用 DeepSORT 跟踪障碍物
+        # 由于 obstacle_sensor 不提供 2D bbox，我们基于距离和角度估算一个伪 bbox
+        # 格式：[x1, y1, x2, y2] 基于障碍物相对于车辆的位置
+        vehicle_transform = self.vehicle.get_transform()
+        vehicle_yaw = np.radians(vehicle_transform.rotation.yaw)
+        
+        # 计算障碍物在车辆坐标系中的相对位置
+        rel_x = event.transform.location.x - vehicle_transform.location.x
+        rel_y = event.transform.location.y - vehicle_transform.location.y
+        
+        # 将相对位置转换到图像坐标系（简化模型）
+        # 假设障碍物在车辆正前方，根据距离映射到 y 坐标
+        img_x = 640 // 2  # 图像中心 x
+        img_y = max(10, min(470, int(400 - event.distance * 10)))  # 距离越远，y 越小
+        bbox_size = max(20, min(200, int(300 / (event.distance + 1))))  # 距离越远，框越小
+        
+        # 创建伪边界框 [x1, y1, x2, y2]
+        pseudo_bbox = np.array([
+            img_x - bbox_size // 2,
+            img_y - bbox_size // 2,
+            img_x + bbox_size // 2,
+            img_y + bbox_size // 2
+        ]).reshape(1, 4)
+        
+        # 更新 DeepSORT 跟踪器
+        tracked_results = self.deep_sort.update(pseudo_bbox)
+        
+        # 更新障碍物信息（使用跟踪结果）
+        if len(tracked_results) > 0:
+            track_id = int(tracked_results[0][4])
+            self.obstacle_distance = event.distance
+            self.obstacle_info = {
+                'distance': event.distance,
+                'actor': event.other_actor,
+                'actor_id': event.other_actor.id if event.other_actor else None,
+                'track_id': track_id,  # DeepSORT 分配的跟踪ID
+                'transform': event.transform,
+                'yaw': event.transform.rotation.yaw if event.transform else 0,
+                'confidence': 1.0,
+                'stable_hits': self.deep_sort.tracks[0].hits if self.deep_sort.tracks else 0
+            }
+            
+            # 持续跟踪这个障碍物（不清除）
+            self.current_obstacle = event.other_actor
+            self.tracked_obstacles[track_id] = self.obstacle_info.copy()
+            
+            # 如果跟踪稳定（命中次数足够），更新 last_obstacle_id
+            if self.deep_sort.tracks and self.deep_sort.tracks[0].hits >= 3:
+                self.last_obstacle_id = event.other_actor.id if event.other_actor else None
+        else:
+            self.obstacle_info = {
+                'distance': event.distance,
+                'actor': event.other_actor,
+                'actor_id': event.other_actor.id if event.other_actor else None,
+                'transform': event.transform,
+                'yaw': event.transform.rotation.yaw if event.transform else 0,
+                'confidence': 0.5,
+                'stable_hits': 0
+            }
         
         # 如果障碍物非常近（< 3米），设置碰撞警告
         if event.distance < 3.0:
             self.collision_warning = True
-            print(f"[WARNING] 障碍物距离过近: {event.distance:.1f}m!")
+            print(f"[WARNING] 障碍物距离过近: {event.distance:.1f}m! (跟踪ID: {tracked_results[0][4] if len(tracked_results) > 0 else 'N/A'})")
 
     def apply_smart_avoidance(self):
         """
@@ -407,45 +464,62 @@ class CarlaClient:
                             pass
                     else:
                         # 新障碍物或冷却期已过，可以变道
-                        # 安全距离 = 速度 * 2秒 + 8米（缩短反应时间）
-                        safety_distance = speed_ms * 2.0 + 8
+                        # 【DeepSORT优化】检查跟踪是否稳定
+                        stable_hits = self.obstacle_info.get('stable_hits', 0)
+                        track_id = self.obstacle_info.get('track_id', None)
                         
-                        if distance < safety_distance:
-                            # 决定变道方向
-                            vehicle_transform = self.vehicle.get_transform()
-                            obstacle_transform = self.obstacle_info.get('transform')
+                        # 只有稳定跟踪（至少3帧命中）才触发变道，避免误检
+                        if stable_hits < 3:
+                            if self.frame_count % 30 == 0:  # 每30帧打印一次
+                                print(f"[DEEP SORT] 跟踪不稳定 (hits={stable_hits})，等待更多帧...")
+                            pass
+                        else:
+                            # 安全距离 = 速度 * 2秒 + 8米（缩短反应时间）
+                            safety_distance = speed_ms * 2.0 + 8
                             
-                            if obstacle_transform:
-                                dx = obstacle_transform.location.x - vehicle_transform.location.x
-                                dy = obstacle_transform.location.y - vehicle_transform.location.y
-                                vehicle_yaw = np.radians(vehicle_transform.rotation.yaw)
-                                
-                                # 转换到车辆坐标系: rel_y > 0 表示障碍物在右侧，应该向左变道
-                                rel_y = -dx * np.sin(vehicle_yaw) + dy * np.cos(vehicle_yaw)
-                                
-                                if rel_y >= 0:
-                                    self.lane_change_direction = 'left'
-                                else:
-                                    self.lane_change_direction = 'right'
-                                
-                                # 保存变道初始位置用于反馈检测
-                                self.lane_change_start_lateral = vehicle_transform.location.y
-                                
-                                # 保存变道初始状态
-                                self.lane_change_start_time = current_time
-                                self.lane_change_start_yaw = vehicle_transform.rotation.yaw
-                                
-                                # 【关键修复3】记录当前障碍物ID，防止重复处理
-                                self.last_obstacle_id = current_obstacle_id
-                                
-                                # 禁用自动驾驶，开始变道
-                                try:
-                                    self.vehicle.set_autopilot(False)
-                                except:
-                                    pass
-                                
-                                self.avoidance_state = 'changing_lane'
-                                print(f"[LANE CHANGE] 开始{self.lane_change_direction}侧变道，障碍物距离: {distance:.1f}m，速度: {speed_kmh:.1f}km/h")
+                            if distance < safety_distance:
+                                # 【DeepSORT优化】使用 track_id 避免重复触发
+                                if track_id is not None:
+                                    tracked_ids = [info.get('track_id') for info in self.tracked_obstacles.values() if info.get('track_id') == track_id]
+                                    if len(tracked_ids) > 1:
+                                        print(f"[DEEP SORT] 跳过重复跟踪 (track_id={track_id})")
+                                    else:
+                                        print(f"[DEEP SORT] 稳定跟踪确认 (track_id={track_id}, hits={stable_hits})")
+                                        # 决定变道方向
+                                        vehicle_transform = self.vehicle.get_transform()
+                                        obstacle_transform = self.obstacle_info.get('transform')
+                                        
+                                        if obstacle_transform:
+                                            dx = obstacle_transform.location.x - vehicle_transform.location.x
+                                            dy = obstacle_transform.location.y - vehicle_transform.location.y
+                                            vehicle_yaw = np.radians(vehicle_transform.rotation.yaw)
+                                            
+                                            # 转换到车辆坐标系: rel_y > 0 表示障碍物在右侧，应该向左变道
+                                            rel_y = -dx * np.sin(vehicle_yaw) + dy * np.cos(vehicle_yaw)
+                                            
+                                            if rel_y >= 0:
+                                                self.lane_change_direction = 'left'
+                                            else:
+                                                self.lane_change_direction = 'right'
+                                            
+                                            # 保存变道初始位置用于反馈检测
+                                            self.lane_change_start_lateral = vehicle_transform.location.y
+                                            
+                                            # 保存变道初始状态
+                                            self.lane_change_start_time = current_time
+                                            self.lane_change_start_yaw = vehicle_transform.rotation.yaw
+                                            
+                                            # 【关键修复3】记录当前障碍物ID，防止重复处理
+                                            self.last_obstacle_id = current_obstacle_id
+                                            
+                                            # 禁用自动驾驶，开始变道
+                                            try:
+                                                self.vehicle.set_autopilot(False)
+                                            except:
+                                                pass
+                                            
+                                            self.avoidance_state = 'changing_lane'
+                                            print(f"[LANE CHANGE] 开始{self.lane_change_direction}侧变道，障碍物距离: {distance:.1f}m，速度: {speed_kmh:.1f}km/h")
         
         elif self.avoidance_state == 'changing_lane':
             # 变道中：使用渐进式转向
