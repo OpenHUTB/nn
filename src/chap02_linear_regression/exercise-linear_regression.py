@@ -259,8 +259,8 @@ if __name__ == "__main__":
     print("测试集形状:", x_test.shape)
 
     # 可以选择是否使用标准化（此处设置为 True 演示效果，可改为 False 对比）
-    # use_std = True   # 启用标准化
-    use_std = False  # 关闭标准化
+    use_std = True   # 启用标准化
+    # use_std = False  # 关闭标准化
 
     f, w_lsq, w_gd = main(x_train, y_train, use_gradient_descent=False,
                           basis_func=gaussian_basis, use_standardization=use_std)
