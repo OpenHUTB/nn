@@ -35,9 +35,8 @@
   <default>
     <motor ctrlrange="-1 1" ctrllimited="true"/>
     <default class="body">
-
-      <!-- geoms -->
-      <geom type="capsule" condim="1" friction="1.2" solimp=".9 .99 .003" solref=".015 1" material="body" group="1"/>
+      <geom type="capsule" condim="1" friction=".7" solimp=".9 .99 .003" solref=".015 1" material="body" group="1"/>
+      
       <default class="thigh">
         <geom size=".06"/>
       </default>
@@ -63,12 +62,10 @@
         <geom type="sphere" size=".04"/>
       </default>
 
-      <!-- joints -->
       <joint type="hinge" damping=".2" stiffness="1" armature=".01" limited="true" solimplimit="0 .99 .01"/>
       <default class="joint_big">
         <joint damping="5" stiffness="10"/>
         <default class="hip_x">
-          <!-- 👉 1. 这里改了关节角度范围 -->
           <joint range="-35 15"/>
         </default>
         <default class="hip_z">
@@ -107,6 +104,7 @@
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <light name="top" pos="0 0 2" mode="trackcom"/>
     <body name="torso" pos="0 0 1.282" childclass="body">
+      <site name="torso_site" pos="0 0 0" size="0.01"/> <!-- 传感器用 -->
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
       <freejoint name="root"/>
@@ -136,6 +134,7 @@
                 <joint name="ankle_x_right" class="ankle_x" axis="1 0 .5"/>
                 <geom name="foot1_right" class="foot1"/>
                 <geom name="foot2_right" class="foot2"/>
+                <site name="foot_site" pos="0 0 0" size="0.01"/>
               </body>
             </body>
           </body>
@@ -149,7 +148,7 @@
               <geom name="shin_left" fromto="0 0 0 0 0 -.3" class="shin"/>
               <body name="foot_left" pos="0 0 -.39">
                 <joint name="ankle_y_left" class="ankle_y"/>
-                <joint name="ankle_x_left" class="ankle_x" axis="-1 0 -.5"/>
+                <joint name="ankle_x_left" class="ankle_x" axis="-1 0 .5"/>
                 <geom name="foot1_left" class="foot1"/>
                 <geom name="foot2_left" class="foot2"/>
               </body>
@@ -157,6 +156,8 @@
           </body>
         </body>
       </body>
+
+      <!-- 右臂 -->
       <body name="upper_arm_right" pos="0 -.17 .06">
         <joint name="shoulder1_right" axis="2 1 1"  class="shoulder"/>
         <joint name="shoulder2_right" axis="0 -1 1" class="shoulder"/>
@@ -164,11 +165,21 @@
         <body name="lower_arm_right" pos=".18 -.18 -.18">
           <joint name="elbow_right" axis="0 -1 1" class="elbow"/>
           <geom name="lower_arm_right" fromto=".01 .01 .01 .17 .17 .17" class="arm_lower"/>
+          
           <body name="hand_right" pos=".18 .18 .18">
             <geom name="hand_right" zaxis="1 1 1" class="hand"/>
+
+            <!-- 新增：机器人手持刚体部件 -->
+            <body name="hold_obj" pos="0.05 0 0">
+              <geom type="box" size="0.05 0.05 0.05" rgba="1 0 0 1"/>
+            </body>
+
           </body>
+
         </body>
       </body>
+
+      <!-- 左臂 -->
       <body name="upper_arm_left" pos="0 .17 .06">
         <joint name="shoulder1_left" axis="-2 1 -1" class="shoulder"/>
         <joint name="shoulder2_left" axis="0 -1 -1"  class="shoulder"/>
@@ -201,7 +212,6 @@
   </tendon>
 
   <actuator>
-    <!-- 👉 2. 这里改了电机齿轮比 -->
     <motor name="abdomen_z"       gear="45"  joint="abdomen_z"/>
     <motor name="abdomen_y"       gear="40"  joint="abdomen_y"/>
     <motor name="abdomen_x"       gear="40"  joint="abdomen_x"/>
@@ -225,45 +235,20 @@
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
   </actuator>
 
+  <!-- ✅ 正确传感器写法 -->
+  <sensor>
+    <accelerometer name="torso_acc" site="torso_site"/>
+    <velocimeter name="torso_vel" site="torso_site"/>
+    <force name="foot_force" site="foot_site"/>
+  </sensor>
+
   <keyframe>
-    <!--
-    The values below are split into rows for readibility:
-      torso position
-      torso orientation
-      spinal
-      right leg
-      left leg
-      arms
-    -->
-    <key name="squat"
-        qpos="0 0 0.596
-              0.988015 0 0.154359 0
-              0 0.4 0
-              -0.25 -0.5 -2.5 -2.65 -0.8 0.56
-              -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+    <key name="home"
+        qpos="0 0 1.282
+              1 0 0 0
+              0 0 0
+              0 0 0 0 0 0
+              0 0 0 0 0 0
               0 0 0 0 0 0"/>
-    <key name="stand_on_left_leg"
-        qpos="0 0 1.21948
-              0.971588 -0.179973 0.135318 -0.0729076
-              -0.0516 -0.202 0.23
-              -0.24 -0.007 -0.34 -1.76 -0.466 -0.0415
-              -0.08 -0.01 -0.37 -0.685 -0.35 -0.09
-              0.109 -0.067 -0.7 -0.05 0.12 0.16"/>
-    <key name="prone"
-        qpos="0.4 0 0.0757706
-              0.7325 0 0.680767 0
-              0 0.0729 0
-              0.0077 0.0019 -0.026 -0.351 -0.27 0
-              0.0077 0.0019 -0.026 -0.351 -0.27 0
-              0.56 -0.62 -1.752
-              0.56 -0.62 -1.752"/>
-    <key name="supine"
-        qpos="-0.4 0 0.08122
-              0.722788 0 -0.69107 0
-              0 -0.25 0
-              0.0182 0.0142 0.3 0.042 -0.44 -0.02
-              0.0182 0.0142 0.3 0.042 -0.44 -0.02
-              0.186 -0.73 -1.73
-              0.186 -0.73 -1.73"/>
-</keyframe>
+  </keyframe>
 </mujoco>
