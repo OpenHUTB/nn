@@ -1,0 +1,17 @@
+# YOLOv8 dataset configuration for CARLA multi-object tracking
+# Path is relative to the directory containing this file
+
+# Train/val/test directories
+path: ./dataset  # base path for dataset
+train: train/images  # training images (relative to 'path')
+val: valid/images    # validation images (relative to 'path')
+test: test/images    # test images (optional, relative to 'path')
+
+# Number of classes
+nc: 4
+
+# Class names
+names: ['bike', 'motobike', 'person', 'vehicle']
+
+# Download script (optional)
+# download: https://example.com/carla_dataset.zip
