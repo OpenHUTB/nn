@@ -34,7 +34,9 @@ class GestureDetector:
             "thumb_down": "stop",      # 大拇指向下 - 停止
             "ok_sign": "hover",       # OK手势 - 悬停
             "left_palm": "left",      # 左手掌 - 左移
-            "right_palm": "right"     # 右手掌 - 右移
+            "right_palm": "right",    # 右手掌 - 右移
+            "three_fingers_left": "turn_left",   # 3指+左手位置 - 左转
+            "three_fingers_right": "turn_right"  # 3指+右手位置 - 右转
         }
         
         # 手势序列检测（用于握拳→松开触发起飞）
@@ -202,6 +204,14 @@ class GestureDetector:
         elif finger_count == 2:
             gesture = "victory"
             confidence = 0.80
+        elif finger_count == 3:
+            # 3个手指：根据手掌位置判断左转/右转
+            if cx < width // 2:
+                gesture = "three_fingers_left"
+                confidence = 0.75
+            else:
+                gesture = "three_fingers_right"
+                confidence = 0.75
         elif finger_count >= 4:
             # 根据手掌位置区分手势
             # 定义中央区域（图像宽度的中间1/3）
