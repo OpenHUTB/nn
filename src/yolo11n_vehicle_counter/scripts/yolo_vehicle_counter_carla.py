@@ -141,11 +141,12 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         # 按车辆类别和检测置信度过滤 - 使用可调整的阈值
         detections = detections[(np.isin(detections.class_id, selected_classes)) & (detections.confidence > CONFIDENCE_THRESHOLD)]
 
-        # 为每个检测框生成标签（包含速度信息）
+        # 为每个检测框生成标签（包含速度信息和轨迹长度）
         labels = []
         for track_id, cls_id in zip(detections.tracker_id, detections.class_id):
             speed = track_speeds.get(track_id, 0)
-            labels.append(f"#{track_id} {class_names[cls_id]} {speed:.1f}m/s")
+            track_len = len(track_history.get(track_id, []))
+            labels.append(f"#{track_id} {class_names[cls_id]} {speed:.1f}m/s L:{track_len}")
 
         # 绘制边界框、标签和轨迹
         box_annotator.annotate(frame, detections=detections)
@@ -228,7 +229,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         sv.draw_text(frame, "[Strategy]", sv.Point(x=50, y=y_offset), sv.Color.GREEN, 0.5,
                      1, background_color=sv.Color.from_hex("#404040"))
         y_offset += 25
-        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on | track:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
                      1, background_color=sv.Color.from_hex("#404040"))
         
         # 显示速度估算面板
@@ -247,6 +248,29 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
                             1, background_color=sv.Color.from_hex("#404040"))
                 y_offset += 25
                 sv.draw_text(frame, f"Max: {max_speed:.1f} m/s", sv.Point(x=50, y=y_offset), sv.Color.YELLOW, 0.4,
+                            1, background_color=sv.Color.from_hex("#404040"))
+        
+        # 显示轨迹长度统计面板
+        y_offset += 35
+        sv.draw_text(frame, "[Track Length]", sv.Point(x=50, y=y_offset), sv.Color.GREEN, 0.5,
+                     1, background_color=sv.Color.from_hex("#404040"))
+        y_offset += 25
+        
+        # 计算所有轨迹的长度统计
+        if track_history:
+            track_lengths = [len(pts) for pts in track_history.values()]
+            if track_lengths:
+                avg_length = sum(track_lengths) / len(track_lengths)
+                max_length = max(track_lengths)
+                min_length = min(track_lengths)
+                active_tracks = len([tid for tid in detections.tracker_id if tid in track_history]) if detections.tracker_id is not None else 0
+                sv.draw_text(frame, f"Active: {active_tracks} tracks", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+                            1, background_color=sv.Color.from_hex("#404040"))
+                y_offset += 25
+                sv.draw_text(frame, f"Avg: {avg_length:.1f} frames", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+                            1, background_color=sv.Color.from_hex("#404040"))
+                y_offset += 25
+                sv.draw_text(frame, f"Max: {max_length} | Min: {min_length}", sv.Point(x=50, y=y_offset), sv.Color.YELLOW, 0.4,
                             1, background_color=sv.Color.from_hex("#404040"))
 
 
