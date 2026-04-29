@@ -50,3 +50,7 @@ hyperparameters:
   # epsilon_decay_type: exponential  # epsilon 衰减类型
                                     # exponential: 指数衰减
                                     # linear: 线性衰减
+
+  dueling: true
+  amp: true
+  normalize_obs: true
