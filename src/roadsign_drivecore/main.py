@@ -234,7 +234,6 @@ def main():
                     control.throttle = 0.2
                     control.brake = 0.0
 
-
             vehicle.apply_control(control)
 
             # 画面显示
