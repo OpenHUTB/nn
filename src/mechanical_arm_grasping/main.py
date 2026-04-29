@@ -1,4 +1,4 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加成功率阈值检查）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加力矩监控）
 import sys
 import mujoco
 import mujoco.viewer
@@ -124,7 +124,7 @@ def robot_arm_auto_reset_demo():
 
     # ---------------------- 模块化功能函数 ----------------------
     def joint_move(joint_name, target_val, duration, viewer, step_desc):
-        """单关节精准移动，带进度条显示"""
+        """单关节精准移动，带进度条和力矩显示"""
         print(f"\n🔧 {step_desc}")
         idx = joint_idxs[joint_name]
         start_val = data.ctrl[idx]
@@ -136,10 +136,13 @@ def robot_arm_auto_reset_demo():
             current_val = start_val + progress * (target_val - start_val)
             data.ctrl[idx] = current_val
 
+            # 获取力矩
+            torque = data.qfrc_actuator[idx]
+
             # 进度条显示
             filled = int(progress * bar_length)
             bar = '█' * filled + '░' * (bar_length - filled)
-            print(f"\r{joint_name} 进度：|{bar}| {progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            print(f"\r{joint_name} 进度：|{bar}| {progress * 100:.1f}% | 力矩：{torque:8.2f} | 当前值：{current_val:6.2f}", end="")
             
             mujoco.mj_step(model, data)
             viewer.sync()
@@ -160,10 +163,14 @@ def robot_arm_auto_reset_demo():
             data.ctrl[left_grip_idx] = grip_speed
             data.ctrl[right_grip_idx] = -grip_speed
 
+            # 获取力矩（夹爪关节）
+            torque_left = data.qfrc_actuator[left_grip_idx] if left_grip_idx >= 0 else 0
+            torque_right = data.qfrc_actuator[right_grip_idx] if right_grip_idx >= 0 else 0
+
             # 进度条显示
             filled = int(progress * bar_length)
             bar = '█' * filled + '░' * (bar_length - filled)
-            print(f"\r夹爪闭合进度：|{bar}| {progress * 100:.1f}%", end="")
+            print(f"\r夹爪闭合进度：|{bar}| {progress * 100:.1f}% | 力矩 L:{torque_left:6.2f} R:{torque_right:6.2f}", end="")
             
             mujoco.mj_step(model, data)
             viewer.sync()
