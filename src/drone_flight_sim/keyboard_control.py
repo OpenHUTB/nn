@@ -2,7 +2,7 @@
 """键盘控制模块
 
 使用 pynput 库实现键盘监听，支持无人机的手动键盘控制。
-按 WASD 移动，QE 升降，方向键旋转，空格悬停，P 拍照，ESC 退出。
+按 WASD 移动，QE 升降，空格悬停，P 拍照，ESC 退出。
 """
 
 # 导入 pynput 库的键盘监听模块
@@ -14,6 +14,9 @@ import time
 
 # 全局变量，用于控制监听循环
 listener_running = True
+
+# 速度档位配置
+SPEED_LEVELS = [1, 2, 3, 5, 8]  # 5个速度档位: 慢/中/快/很快/极速
 
 
 class KeyboardController:
@@ -36,6 +39,15 @@ class KeyboardController:
         self._movement_thread = None  # 持续移动线程
         self._movement_running = False  # 移动线程运行标志
         self._lock = threading.Lock()  # 线程锁
+        # 每次移动的距离（米）
+        self.move_step = 3
+
+        # 速度档位
+        self.speed_level = 2  # 默认第2档(中速)
+        self.drone.velocity = SPEED_LEVELS[self.speed_level]
+
+        # 起飞点位置
+        self.home_position = None
 
     def _get_direction_key(self, key):
         """获取按键对应的移动方向"""
@@ -94,6 +106,11 @@ class KeyboardController:
             'up': '上升',
             'down': '下降'
         }
+        # 高度锁定时不允许上下移动
+        if self.height_locked and (direction == 'up' or direction == 'down'):
+            print("⚠️ 高度已锁定，无法上下移动")
+            return
+
         print(f"🚀 {direction_names.get(direction, direction)} (速度: {self.drone.velocity} m/s)")
 
     def _continuous_move_loop(self, direction):
@@ -185,14 +202,6 @@ class KeyboardController:
                     print("🛸 悬停")
                 return
 
-            # 方向键：旋转（旋转不停止平移）
-            if key == keyboard.Key.left:
-                self.drone.rotate_left()
-                return
-            elif key == keyboard.Key.right:
-                self.drone.rotate_right()
-                return
-
             # 获取按键字符
             key_char = key.char if hasattr(key, 'char') else None
 
@@ -206,9 +215,27 @@ class KeyboardController:
                     print("📷 退出拍照预览模式")
                 return
 
-            # R 键：显示状态信息
+            # 速度档位切换 1-5
+            if key_char in ['1', '2', '3', '4', '5']:
+                self.speed_level = int(key_char) - 1
+                self.drone.velocity = SPEED_LEVELS[self.speed_level]
+                names = ['慢', '中', '快', '很快', '极速']
+                print(f"🎚️ 速度档位: {key_char} ({names[self.speed_level]}) - {SPEED_LEVELS[self.speed_level]} m/s")
+                return
+
+            # R 键：一键返航
             if key_char == 'r' or key_char == 'R':
-                self.drone.get_telemetry()
+                if self.home_position:
+                    print("🏠 开始返航...")
+                    self.drone.fly_to_position(
+                        self.home_position.x_val,
+                        self.home_position.y_val,
+                        self.home_position.z_val,
+                        velocity=5
+                    )
+                    self.drone.safe_land()
+                else:
+                    print("⚠️ 未设置返航点")
                 return
 
             # P 键：拍照
@@ -300,20 +327,17 @@ def print_control_help():
     print("=" * 50)
     print("""
   📍 移动控制:
-     W / ↑     : 前进
-     S / ↓     : 后退
-     A         : 向左移动
-     D         : 向右移动
+     W         : 前进
+     S         : 后退
+     A         : 向左横移
+     D         : 向右横移
      Q         : 上升
      E         : 下降
 
-  🔄 旋转控制:
-     ←         : 向左旋转
-     →         : 向右旋转
-
   🎮 功能键:
      空格      : 悬停（停止移动）
-     R         : 显示无人机状态
+     1-5       : 切换速度档位（慢/中/快/很快/极速）
+     R         : 一键返航
      P         : 拍照
      T         : 拍摄所有图像(RGB+深度+分割)
      N         : 拍摄深度图像
@@ -324,6 +348,5 @@ def print_control_help():
 
   ⚠️  注意:
      - 释放移动键后会自动显示移动距离并悬停
-     - 同时按住多个方向键可以实现斜向飞行
     """)
     print("=" * 50 + "\n")

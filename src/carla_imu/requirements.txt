@@ -1,0 +1,4 @@
+# CARLA 自动驾驶仿真依赖
+pandas>=1.1.0
+pygame>=2.0.0
+numpy>=1.19.2

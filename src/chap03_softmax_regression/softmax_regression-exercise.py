@@ -16,11 +16,17 @@ import matplotlib.pyplot as plt # 数据可视化库
 from matplotlib import animation, rc # 动画功能
 import matplotlib.cm as cm # 颜色映射
 import numpy as np # 数值计算库
+import os # 读取环境变量参数
+import json # 保存实验指标
+from pathlib import Path # 路径处理
 
 # get_ipython().run_line_magic('matplotlib', 'inline')  # 仅在Jupyter环境下需要
 
 # 设置数据点数量
 dot_num = 100  # 每类样本的数量
+TRAIN_STEPS = int(os.getenv("SOFTMAX_TRAIN_STEPS", "1000"))  # 训练轮数
+LOG_INTERVAL = int(os.getenv("SOFTMAX_LOG_INTERVAL", "50"))  # 打印间隔
+METRICS_OUT = os.getenv("SOFTMAX_METRICS_OUT", "outputs/softmax_metrics.json")  # 指标输出路径
 
 # 生成类别1的数据：均值为(3,6)，标准差为1
 x_p = np.random.normal(3.0, 1, dot_num)  # x坐标
@@ -161,6 +167,21 @@ def train_one_step(model, optimizer, x_batch, y_batch):
     # 返回当前批次的损失和准确率
     return loss, accuracy
 
+def save_training_metrics(path, loss, accuracy, train_steps, log_interval):
+    """保存训练指标，便于结果留档。"""
+    out_path = Path(path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    metrics = {
+        "final_loss": float(loss),
+        "final_accuracy": float(accuracy),
+        "train_steps": int(train_steps),
+        "log_interval": int(log_interval),
+        "dot_num": int(dot_num),
+    }
+    with out_path.open("w", encoding="utf-8") as f:
+        json.dump(metrics, f, ensure_ascii=False, indent=2)
+    print(f"metrics saved to: {out_path.resolve()}")
+
 # ### 实例化一个模型，进行训练，提取所需的数据
 
 # In[12]:
@@ -177,11 +198,24 @@ x = np.array(list(zip(x1, x2)), dtype=np.float32)
 y = np.array(y, dtype=np.int32)  
 # 从混合数据集 data_set 中提取特征和标签，并转换为所需的数据类型
 
-for i in range(1000):
+if TRAIN_STEPS <= 0:
+    raise ValueError("SOFTMAX_TRAIN_STEPS must be > 0")
+if LOG_INTERVAL <= 0:
+    raise ValueError("SOFTMAX_LOG_INTERVAL must be > 0")
+
+for i in range(TRAIN_STEPS):
     loss, accuracy = train_one_step(model, opt, x, y)
-    if i % 50 == 49:
+    if (i + 1) % LOG_INTERVAL == 0:
         print(f"loss: {loss.numpy():.4}\t accuracy: {accuracy.numpy():.4}")
-# 执行 1000 次迭代的模型训练，并每隔 50 步打印损失和准确率
+# 执行 TRAIN_STEPS 次迭代训练，并按 LOG_INTERVAL 打印损失和准确率
+
+save_training_metrics(
+    METRICS_OUT,
+    loss.numpy(),
+    accuracy.numpy(),
+    TRAIN_STEPS,
+    LOG_INTERVAL,
+)
 
 # # 结果展示，无需填写代码
 

@@ -10,9 +10,14 @@ class CNNEncoder(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, 4, stride=2)
         self.conv3 = nn.Conv2d(64, 64, 3, stride=1)
         self.flatten = nn.Flatten()
-        # 计算卷积后的特征维度
-        # 输入 (4,42,42) -> conv1: (32,9,9) -> conv2: (64,3,3) -> conv3: (64,1,1) -> 展平: 64
-        self.fc = nn.Linear(64, 256)
+
+        # 计算卷积后的特征维度（根据实际计算）
+        # 输入 (4,84,84)
+        # 第1层卷积：84 - 8 / 4 + 1 = 19.0 → (32,19,19)
+        # 第2层卷积：19 - 4 / 2 + 1 = 8.5 → (64,8,8)
+        # 第3层卷积：8 - 3 / 1 + 1 = 6 → (64,6,6)
+        # 实际计算为 3136，可能存在浮点数计算误差
+        self.fc = nn.Linear(3136, 512)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -29,12 +34,12 @@ class Actor(nn.Module):
         self.use_cnn = use_cnn
         if use_cnn:
             self.encoder = CNNEncoder(input_channels=4)
-            self.fc1 = nn.Linear(256, 256)
+            self.fc1 = nn.Linear(512, 256)
         else:
             self.fc1 = nn.Linear(state_dim[0], 256)
 
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, action_dim)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, action_dim)
         self.max_action = max_action
 
     def forward(self, x):
@@ -43,8 +48,6 @@ class Actor(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = torch.tanh(self.fc3(x))
-        # 输出前再次限制转向动作
-        x[:, 0] = x[:, 0] * 0.8  # 转向输出额外衰减20%
         return self.max_action * x
 
 # Critic 价值网络
@@ -54,12 +57,12 @@ class Critic(nn.Module):
         self.use_cnn = use_cnn
         if use_cnn:
             self.encoder = CNNEncoder(input_channels=4)
-            self.fc1 = nn.Linear(256 + action_dim, 256)
+            self.fc1 = nn.Linear(512 + action_dim, 256)
         else:
             self.fc1 = nn.Linear(state_dim[0] + action_dim, 256)
 
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 1)
+        self.fc2 = nn.Linear(256, 128)
+        self.fc3 = nn.Linear(128, 1)
 
     def forward(self, x, action):
         if self.use_cnn:
