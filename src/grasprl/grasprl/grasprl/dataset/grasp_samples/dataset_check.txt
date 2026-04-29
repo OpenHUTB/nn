@@ -1,0 +1,21 @@
+机械抓取数据集检查
+-------------------
+RGB总数：50
+Label总数：50
+可用样本：0
+
+有RGB无Label：0
+
+有Label无RGB：0
+
+Label错误：0
+
+缺少抓取关键字段：50
+  label_1.npy 缺少字段：['grasp_pose']
+  label_10.npy 缺少字段：['grasp_pose']
+  label_11.npy 缺少字段：['grasp_pose']
+  label_12.npy 缺少字段：['grasp_pose']
+  label_13.npy 缺少字段：['grasp_pose']
+
+可用样本 = 格式正确 + 字段完整
+可直接用于机械抓取训练与分析
