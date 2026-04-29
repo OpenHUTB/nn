@@ -78,6 +78,84 @@ def spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices=None):
 
     return spawned_vehicles
 
+
+def get_driving_waypoint(world_map, location):
+    return world_map.get_waypoint(
+        location,
+        project_to_road=True,
+        lane_type=carla.LaneType.Driving
+    )
+
+
+def get_road_id_for_location(world_map, location):
+    waypoint = get_driving_waypoint(world_map, location)
+    if waypoint is None:
+        return None
+    return waypoint.road_id
+
+
+def choose_next_ego_spawn_index(world_map, spawn_points, current_location, current_spawn_index):
+    current_road_id = get_road_id_for_location(world_map, current_location)
+    far_different_road = []
+    far_same_road = []
+    nearby_different_road = []
+    nearby_same_road = []
+
+    candidate_indices = list(range(len(spawn_points)))
+    random.shuffle(candidate_indices)
+
+    for index in candidate_indices:
+        if index == current_spawn_index:
+            continue
+
+        spawn_point = spawn_points[index]
+        waypoint = get_driving_waypoint(world_map, spawn_point.location)
+        if waypoint is None:
+            continue
+
+        is_far_enough = spawn_point.location.distance(current_location) >= EGO_MIN_RESPAWN_DISTANCE
+        is_different_road = waypoint.road_id != current_road_id
+
+        if is_far_enough and is_different_road:
+            far_different_road.append(index)
+        elif is_far_enough:
+            far_same_road.append(index)
+        elif is_different_road:
+            nearby_different_road.append(index)
+        else:
+            nearby_same_road.append(index)
+
+    for bucket in (far_different_road, far_same_road, nearby_different_road, nearby_same_road):
+        if bucket:
+            return bucket[0]
+
+    return None
+
+
+def relocate_ego_vehicle(vehicle, spawn_points, world_map, traffic_manager, current_spawn_index):
+    next_spawn_index = choose_next_ego_spawn_index(
+        world_map,
+        spawn_points,
+        vehicle.get_location(),
+        current_spawn_index
+    )
+    if next_spawn_index is None:
+        return current_spawn_index, False
+
+    vehicle.set_autopilot(False, traffic_manager.get_port())
+    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=1.0))
+    vehicle.set_target_velocity(carla.Vector3D(0.0, 0.0, 0.0))
+    vehicle.set_target_angular_velocity(carla.Vector3D(0.0, 0.0, 0.0))
+    vehicle.set_transform(spawn_points[next_spawn_index])
+    vehicle.set_autopilot(True, traffic_manager.get_port())
+    traffic_manager.auto_lane_change(vehicle, True)
+    traffic_manager.vehicle_percentage_speed_difference(vehicle, BASE_SPEED_DIFFERENCE)
+    traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
+
+    new_road_id = get_road_id_for_location(world_map, spawn_points[next_spawn_index].location)
+    print(f"Ego vehicle relocated to spawn index {next_spawn_index}, road_id={new_road_id}")
+    return next_spawn_index, True
+
 # Function to spawn walkers
 '''def spawn_walkers(num_walkers, world, spawn_points):
     walker_bp_lib = world.get_blueprint_library().filter('walker.pedestrian.*')
@@ -120,6 +198,8 @@ world.apply_settings(settings)
 # Initialize Traffic Manager
 traffic_manager = client.get_trafficmanager(8000)
 traffic_manager.set_synchronous_mode(True)
+if hasattr(traffic_manager, 'set_random_device_seed'):
+    traffic_manager.set_random_device_seed(int(time.time()))
 world_map = world.get_map()
 
 
@@ -136,6 +216,8 @@ OVERTAKE_LANE_CLEAR_DISTANCE = 18.0
 OVERTAKE_RELATIVE_SPEED_THRESHOLD = 2.0
 OVERTAKE_TARGET_MAX_SPEED = 4.0
 OVERTAKE_COOLDOWN = 3.0
+EGO_RESPAWN_INTERVAL_SECONDS = 45.0
+EGO_MIN_RESPAWN_DISTANCE = 120.0
 
 
 
@@ -182,7 +264,7 @@ traffic_manager.vehicle_percentage_speed_difference(vehicle,-50)
 traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
 # Spawn camera
 CAMERA_IMAGE_SIZE = 1280
-CAMERA_FOV = 45
+CAMERA_FOV = 55
 camera_bp = bp_lib.find('sensor.camera.rgb')
 camera_bp.set_attribute('image_size_x', str(CAMERA_IMAGE_SIZE))
 camera_bp.set_attribute('image_size_y', str(CAMERA_IMAGE_SIZE))
@@ -205,6 +287,21 @@ def image_callback(image):
         image_queue.put(image)
 
 camera.listen(image_callback)
+
+
+def get_latest_image(image_queue_obj, timeout=1.0):
+    try:
+        image = image_queue_obj.get(timeout=timeout)
+    except queue.Empty:
+        return None
+
+    while True:
+        try:
+            image = image_queue_obj.get_nowait()
+        except queue.Empty:
+            break
+
+    return image
 # 使用相对路径保存记录到的数据
 # 当前文件目录
 current_dirc = os.path.dirname(os.path.abspath(__file__))
@@ -274,11 +371,11 @@ K = build_projection_matrix(image_w, image_h, fov)
 DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
 SIGN_FACE_ALIGNMENT_THRESHOLD = 0.2
 SIGN_LOCATION_ROUND_DIGITS = 1
-MIN_CAPTURE_AREA = 2500
-MIN_CAPTURE_WIDTH = 40
-MIN_CAPTURE_HEIGHT = 40
-MAX_CAPTURE_DISTANCE = 18.0
-FRAME_EDGE_MARGIN_RATIO = 0.08
+MIN_CAPTURE_AREA = 1200
+MIN_CAPTURE_WIDTH = 24
+MIN_CAPTURE_HEIGHT = 24
+MAX_CAPTURE_DISTANCE = 24.0
+FRAME_EDGE_MARGIN_RATIO = 0.03
 
 # Track each physical sign and only capture it once when it is clear enough.
 captured_sign_states = {}
@@ -780,6 +877,7 @@ def non_maximum_suppression(bboxes, iou_threshold=0.2):
 # Variable to track if the last image had bounding boxes
 last_image_had_bboxes = False
 last_overtake_time = 0.0
+last_ego_respawn_time = time.time()
 
 
 # Start the game loop
@@ -798,11 +896,33 @@ try:
             last_overtake_time
         )
 
+        if loop_time - last_ego_respawn_time >= EGO_RESPAWN_INTERVAL_SECONDS:
+            spawn_index, relocated = relocate_ego_vehicle(
+                vehicle,
+                spawn_points,
+                world_map,
+                traffic_manager,
+                spawn_index
+            )
+            if relocated:
+                while True:
+                    try:
+                        image_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                last_ego_respawn_time = loop_time
+
         # Handle manual input
         # handle_input(vehicle)
 
-        # Get the latest image from the queue
-        image = image_queue.get()
+        # Get the latest image from the queue without blocking the UI thread indefinitely.
+        image = get_latest_image(image_queue, timeout=1.0)
+        if image is None:
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('x'):
+                print("X key pressed")
+                break
+            continue
 
         # Automatically change the weather
         current_time = time.time()
