@@ -1,5 +1,25 @@
 # 线性回归
 
+## 本次改进说明
+
+本次提交对 `test_verify.py` 做了轻量化工程改进，不改变原有测试逻辑：
+
+1. 将终端不兼容符号（如 ✓/✗/⊘）替换为 ASCII 标记（`[PASS] / [FAIL] / [SKIP]`），避免 Windows 终端出现 `UnicodeEncodeError`。
+2. 新增可选命令行参数：
+`--json-out`（将测试结果导出为 JSON 文件）
+`--stop-on-fail`（首个失败时立即停止）
+3. 保留原有测试用例集合，仅增强运行稳定性与结果留档能力。
+
+### 示例命令
+
+```bash
+python test_verify.py --json-out outputs/test_verify_report.json
+```
+
+### 输出文件
+
+- `outputs/test_verify_report.json`
+
 ## 问题描述：
 
 有一个函数![image](http://latex.codecogs.com/gif.latex?f%3A%20%5Cmathbb%7BR%7D%5Crightarrow%20%5Cmathbb%7BR%7D) ，使得。现 ![image](http://latex.codecogs.com/gif.latex?y%20%3D%20f%28x%29)在不知道函数 $f(\cdot)$的具体形式，给定满足函数关系的一组训练样本![image](http://latex.codecogs.com/gif.latex?%5Cleft%20%5C%7B%20%5Cleft%20%28%20x_%7B1%7D%2Cy_%7B1%7D%20%5Cright%20%29%2C...%2C%5Cleft%20%28%20x_%7BN%7D%2Cy_%7BN%7D%20%5Cright%20%29%20%5Cright%20%5C%7D%2CN%3D300)，请使用线性回归模型拟合出函数$y=f(x)$。
