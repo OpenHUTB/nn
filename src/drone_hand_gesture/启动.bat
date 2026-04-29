@@ -37,8 +37,9 @@ echo   1. 使用启动器（推荐）
 echo   2. 直接运行新版仿真
 echo   3. 直接运行旧版仿真
 echo   4. 打开配置编辑器
+echo   5. AirSim仿真模式（带无人机摄像头）
 echo.
-set /p choice=请输入选项 (1-4):
+set /p choice=请输入选项 (1-5):
 
 if "%choice%"=="1" (
     echo.
@@ -56,6 +57,10 @@ if "%choice%"=="1" (
     echo.
     echo 正在打开配置编辑器...
     python config_ui.py
+) else if "%choice%"=="5" (
+    echo.
+    echo 正在启动 AirSim仿真模式（带无人机摄像头）...
+    python main_airsim_camera.py
 ) else (
     echo.
     echo [错误] 无效选项！

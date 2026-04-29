@@ -13,7 +13,23 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from airsim_controller import AirSimController
-from gesture_detector import GestureDetector
+
+# 优先使用增强版检测器
+USE_ENHANCED_DETECTOR = False
+HAS_ENHANCED = False
+
+try:
+    import mediapipe as mp
+    from gesture_detector_enhanced import EnhancedGestureDetector
+    USE_ENHANCED_DETECTOR = True
+    HAS_ENHANCED = True
+except ImportError:
+    try:
+        from gesture_detector_cv import CVGestureDetector
+        from gesture_detector import GestureDetector
+        print("[INFO] MediaPipe 不可用，使用 OpenCV 检测器")
+    except ImportError:
+        from gesture_detector import GestureDetector
 
 
 def main(show_window=True):
@@ -25,12 +41,11 @@ def main(show_window=True):
     
     # 1. 连接 AirSim
     print("[1/4] 正在连接 AirSim 模拟器...")
-    print("[DEBUG] 正在创建 AirSimController 实例...")
     controller = AirSimController(ip_address="127.0.0.1", port=41451)
-    print("[DEBUG] AirSimController 实例创建成功")
     
-    print("[DEBUG] 正在连接 AirSim...")
-    if not controller.connect():
+    if controller.connect():
+        print("[OK] AirSim 连接成功")
+    else:
         print("\n[ERROR] AirSim 连接失败")
         print("\n请检查:")
         print("  1. AirSim 模拟器是否运行")
@@ -38,32 +53,82 @@ def main(show_window=True):
         print("\n按回车键退出...")
         input()
         return
-    print("[DEBUG] AirSim 连接成功")
     
     # 2. 初始化手势检测器
     print("\n[2/4] 正在初始化手势检测器...")
-    print("[DEBUG] 正在创建 GestureDetector 实例...")
-    detector = GestureDetector()
-    print("[DEBUG] GestureDetector 实例创建成功")
-    print("[OK] 手势检测器就绪（规则检测）")
+    
+    # 查找机器学习模型
+    model_candidates = [
+        "dataset/models/gesture_svm.pkl",
+        "dataset/models/gesture_random_forest.pkl",
+        "dataset/models/gesture_mlp.pkl",
+    ]
+    
+    selected_model = None
+    for model_path in model_candidates:
+        if os.path.exists(model_path):
+            selected_model = model_path
+            print(f"[INFO] 找到模型: {model_path}")
+            break
+    
+    # 初始化检测器
+    if USE_ENHANCED_DETECTOR and HAS_ENHANCED:
+        if selected_model:
+            detector = EnhancedGestureDetector(ml_model_path=selected_model, use_ml=True)
+            print("[OK] 使用增强版检测器（机器学习模式）")
+        else:
+            detector = EnhancedGestureDetector(use_ml=False)
+            print("[OK] 使用增强版检测器（规则模式）")
+    else:
+        try:
+            from gesture_detector_cv import CVGestureDetector
+            detector = CVGestureDetector()
+            detector.use_ml = False
+            print("[OK] 使用 OpenCV 检测器")
+        except:
+            from gesture_detector import GestureDetector
+            detector = GestureDetector()
+            print("[OK] 使用基础手势检测器")
+    
+    print("[OK] 手势检测器就绪")
     
     # 3. 初始化摄像头
     print("\n[3/4] 正在初始化摄像头...")
-    print("[DEBUG] 正在打开摄像头...")
-    cap = cv2.VideoCapture(0)
-    print("[DEBUG] 摄像头打开成功")
+    # 尝试多个摄像头ID
+    cap = None
+    for cam_id in [1, 0]:
+        print(f"  尝试打开摄像头 {cam_id}...")
+        cap = cv2.VideoCapture(cam_id)
+        if cap.isOpened():
+            ret, test_frame = cap.read()
+            if ret:
+                print(f"[OK] 摄像头 {cam_id} 已就绪")
+                break
+            else:
+                cap.release()
+                cap = None
     
-    if not cap.isOpened():
+    if not cap or not cap.isOpened():
         print("[ERROR] 摄像头不可用")
         controller.disconnect()
         return
     
-    print("[DEBUG] 正在设置摄像头参数...")
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     cap.set(cv2.CAP_PROP_FPS, 30)
-    print("[DEBUG] 摄像头参数设置成功")
-    print("[OK] 摄像头已就绪：640x480 @ 30fps")
+    
+    # 手势阈值配置
+    gesture_thresholds = {
+        'open_palm': 0.5,
+        'closed_fist': 0.55,
+        'victory': 0.55,
+        'thumb_up': 0.55,
+        'thumb_down': 0.55,
+        'pointing_up': 0.5,
+        'pointing_down': 0.5,
+        'ok_sign': 0.6,
+        'default': 0.5
+    }
     
     # 4. 系统就绪
     print("\n[4/4] 系统就绪！")
@@ -72,7 +137,7 @@ def main(show_window=True):
     print("  张开手掌   - 起飞")
     print("  握拳       - 降落")
     print("  食指上指   - 上升")
-    print("  食指向下   - 下降")
+    print("  食指下指   - 下降")
     print("  胜利手势   - 前进")
     print("  大拇指     - 后退")
     print("  OK手势     - 悬停")
@@ -89,29 +154,28 @@ def main(show_window=True):
     # 主循环
     is_flying = False
     last_command_time = 0
-    current_gesture = ""
     last_processed_gesture = ""
     last_processed_time = 0
     command_cooldown = 1.5  # 命令冷却时间（秒）
-    gesture_threshold = 0.5  # 置信度阈值（gesture_detector返回0.75-0.95）
     frame_count = 0
     start_time = time.time()
     
     print("[INFO] 按 空格键 或 T 键 起飞")
+    print("[INFO] 调试模式: 显示手势检测信息")
     
     try:
         while True:
-            ret, frame = cap.read()
+            ret, gesture_frame = cap.read()
             if not ret:
-                print("[WARNING] 无法读取摄像头画面")
+                print("[WARNING] 无法读取手势摄像头画面")
                 break
             
             # 镜像翻转画面，让操作更自然
-            frame = cv2.flip(frame, 1)
+            gesture_frame = cv2.flip(gesture_frame, 1)
             frame_count += 1
             
             # 手势识别
-            debug_frame, gesture, confidence, _ = detector.detect_gestures(frame)
+            debug_frame, gesture, confidence, _ = detector.detect_gestures(gesture_frame, simulation_mode=False)
             
             # 显示帧率
             elapsed = time.time() - start_time
@@ -120,79 +184,54 @@ def main(show_window=True):
             cv2.putText(debug_frame, f"FPS: {fps:.1f}", (10, 30),
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.putText(debug_frame, f"Gesture: {gesture} ({confidence:.2f})", 
-                       (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                       (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
-            # 处理手势（参考main.py的优化逻辑）
+            # 处理手势
             current_time = time.time()
             in_cooldown = current_time - last_command_time <= command_cooldown
             same_gesture = (gesture == last_processed_gesture and
                            current_time - last_processed_time < 2.0)
-
-            # 使用detector的get_command方法获取指令（与main.py一致）
+            
+            # 使用 detector 的 get_command 方法获取指令
             command = detector.get_command(gesture)
-
+            threshold = gesture_thresholds.get(gesture, gesture_thresholds['default'])
+            
+            # 调试输出
+            if gesture not in ["no_hand", "hand_detected", "none"]:
+                if frame_count % 60 == 0:  # 每秒显示一次
+                    print(f"[DEBUG] 手势: {gesture}, 置信度: {confidence:.2f}, 阈值: {threshold}")
+            
             if (gesture not in ["no_hand", "hand_detected", "none"]
-                    and confidence > gesture_threshold
+                    and confidence > threshold
                     and not in_cooldown
                     and not same_gesture
                     and command != "none"):
-
-                print(f"[CMD] 手势：{gesture} (置信度: {confidence:.2f}) -> 执行: {command}")
-
-                # 根据command执行对应操作（与main.py的drone_controller.send_command逻辑一致）
-                if command == "land":
-                    if is_flying:
-                        print("[INFO] 降落...")
-                        controller.land()
-                        is_flying = False
-
-                elif command == "up":
-                    print("[INFO] 上升")
-                    controller.move_by_velocity(0, 0, -1.0, duration=0.5)
-
-                elif command == "down":
-                    print("[INFO] 下降")
-                    controller.move_by_velocity(0, 0, 1.0, duration=0.5)
-
-                elif command == "left":
-                    print("[INFO] 左移")
-                    controller.move_by_velocity(-1.0, 0, 0, duration=0.5)
-
-                elif command == "right":
-                    print("[INFO] 右移")
-                    controller.move_by_velocity(1.0, 0, 0, duration=0.5)
-
-                elif command == "forward":
-                    print("[INFO] 前进")
-                    controller.move_by_velocity(0, 1.0, 0, duration=0.5)
-
-                elif command == "backward":
-                    print("[INFO] 后退")
-                    controller.move_by_velocity(0, -1.0, 0, duration=0.5)
-
-                elif command == "hover":
-                    print("[INFO] 悬停")
-                    controller.hover()
-
-                elif command == "takeoff":
-                    if not is_flying:
-                        print("[INFO] 起飞...")
-                        controller.takeoff()
-                        is_flying = True
-
-                elif command == "stop":
-                    print("[INFO] 停止")
-                    controller.hover()
-
+                
+                print(f"[CMD] 手势: {gesture} (置信度: {confidence:.2f}) -> 执行: {command}")
+                
+                # 使用 send_command 方法
+                controller.send_command(command)
+                
+                # 更新飞行状态
+                if command == "takeoff":
+                    is_flying = True
+                elif command == "land":
+                    is_flying = False
+                
                 # 更新状态
                 last_command_time = current_time
                 last_processed_gesture = gesture
                 last_processed_time = current_time
-                current_gesture = gesture
+            elif gesture not in ["no_hand", "hand_detected"] and confidence > 0.3:
+                if frame_count % 120 == 0:  # 每2秒显示一次
+                    if in_cooldown:
+                        print(f"[DEBUG] 冷却中: {command}, 剩余: {command_cooldown - (current_time - last_command_time):.1f}s")
+                    elif confidence < threshold:
+                        print(f"[DEBUG] 置信度不足: {gesture} {confidence:.2f} < {threshold}")
             
             # 显示画面
             if show_window:
-                cv2.imshow('Gesture Control - AirSim', debug_frame)
+                cv2.imshow("Gesture Control - AirSim", debug_frame)
                 
                 # 键盘控制
                 key = cv2.waitKey(10) & 0xFF
@@ -238,7 +277,7 @@ def main(show_window=True):
             # 显示状态
             if is_flying and frame_count % 30 == 0:
                 state = controller.get_state()
-                print(f"[状态] 高度：{state['position'][2]:.2f}m")
+                print(f"[状态] 高度: {state['position'][2]:.2f}米")
     
     except KeyboardInterrupt:
         print("\n[INFO] 程序中断")
@@ -254,6 +293,9 @@ def main(show_window=True):
         if show_window:
             cv2.destroyAllWindows()
         controller.disconnect()
+        
+        if hasattr(detector, "release"):
+            detector.release()
         
         print("[OK] 程序安全退出")
 
