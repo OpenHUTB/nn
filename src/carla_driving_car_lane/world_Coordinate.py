@@ -6,11 +6,7 @@
 # This work is licensed under the terms of the MIT license.
 # For a copy, see <https://opensource.org/licenses/MIT>
 
-"""
-CARLA Automatic Control Client
-适配：Python 3.9 + CARLA 0.9.15
-功能：自动导航行驶 + 传感器 + HUD 显示
-"""
+
 
 from __future__ import print_function
 
@@ -59,18 +55,23 @@ from carla import ColorConverter as cc
 
 from agents.navigation.behavior_agent import BehaviorAgent
 
+
 # ==============================================================================
 # -- Global functions
 # ==============================================================================
 def find_weather_presets():
     rgx = re.compile('.+?(?:(?<=[a-z])(?=[A-Z])|(?=[A-Z])(?=[A-Z][a-z])|$)')
+
     def name(x): return ' '.join(m.group(0) for m in rgx.finditer(x))
+
     presets = [x for x in dir(carla.WeatherParameters) if re.match('[A-Z].+', x)]
     return [(getattr(carla.WeatherParameters, x), name(x)) for x in presets]
+
 
 def get_actor_display_name(actor, truncate=250):
     name = ' '.join(actor.type_id.replace('_', '.').title().split('.')[1:])
     return (name[:truncate - 1] + u'\u2026') if len(name) > truncate else name
+
 
 # ==============================================================================
 # -- World
@@ -100,12 +101,14 @@ class World(object):
         blueprint = random.choice(blueprint_library.filter(self._actor_filter))
         blueprint.set_attribute('role_name', 'hero')
 
+        # 无绝对坐标：使用当前车辆位置重生（相对偏移）
         if self.player is not None:
             spawn_point = self.player.get_transform()
-            spawn_point.location.z += 2.0
+            spawn_point.location.z += 2.0  # 仅相对抬高，无绝对坐标
             self.destroy()
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
 
+        # 无绝对坐标：使用地图原生生成点
         while self.player is None:
             spawn_point = random.choice(self.map.get_spawn_points())
             self.player = self.world.try_spawn_actor(blueprint, spawn_point)
@@ -142,6 +145,7 @@ class World(object):
             if actor is not None and actor.is_alive:
                 actor.destroy()
 
+
 # ==============================================================================
 # -- KeyboardControl
 # ==============================================================================
@@ -167,6 +171,7 @@ class KeyboardControl(object):
     def _is_quit_shortcut(key):
         return key == K_ESCAPE or (key == K_q and pygame.key.get_mods() & KMOD_CTRL)
 
+
 # ==============================================================================
 # -- HUD (显示车速、GPS、信息)
 # ==============================================================================
@@ -191,7 +196,7 @@ class HUD(object):
         if not world.player:
             return
         v = world.player.get_velocity()
-        speed = round(3.6 * math.sqrt(v.x**2 + v.y**2 + v.z**2), 1)
+        speed = round(3.6 * math.sqrt(v.x ** 2 + v.y ** 2 + v.z ** 2), 1)
         lat = round(world.gnss_sensor.lat, 6)
         lon = round(world.gnss_sensor.lon, 6)
         self.speed = speed
@@ -214,10 +219,11 @@ class HUD(object):
             ]
             y = 10
             for s in info_text:
-                surf = self.font.render(s, True, (255,255,255))
+                surf = self.font.render(s, True, (255, 255, 255))
                 display.blit(surf, (10, y))
                 y += 20
         self._notifications.render(display)
+
 
 # ==============================================================================
 # -- FadingText
@@ -242,6 +248,7 @@ class FadingText(object):
         self.surface.set_alpha(alpha)
         display.blit(self.surface, self.pos)
 
+
 # ==============================================================================
 # -- CollisionSensor
 # ==============================================================================
@@ -252,6 +259,7 @@ class CollisionSensor(object):
         self.hud = hud
         world = parent_actor.get_world()
         bp = world.get_blueprint_library().find('sensor.other.collision')
+        # 无绝对坐标：默认挂载点
         self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=parent_actor)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: CollisionSensor._on_collision(weak_self, event))
@@ -264,6 +272,7 @@ class CollisionSensor(object):
         actor_type = get_actor_display_name(event.other_actor)
         self.hud.notification(f"碰撞 → {actor_type}")
 
+
 # ==============================================================================
 # -- LaneInvasionSensor
 # ==============================================================================
@@ -274,6 +283,7 @@ class LaneInvasionSensor(object):
         self.hud = hud
         world = parent_actor.get_world()
         bp = world.get_blueprint_library().find('sensor.other.lane_invasion')
+        # 无绝对坐标：默认挂载点
         self.sensor = world.spawn_actor(bp, carla.Transform(), attach_to=parent_actor)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: LaneInvasionSensor._on_lane(weak_self, event))
@@ -284,6 +294,7 @@ class LaneInvasionSensor(object):
         if not self:
             return
         self.hud.notification("车道偏离！")
+
 
 # ==============================================================================
 # -- GnssSensor
@@ -296,6 +307,7 @@ class GnssSensor(object):
         self.lon = 0.0
         world = parent_actor.get_world()
         bp = world.get_blueprint_library().find('sensor.other.gnss')
+        # 无绝对坐标：仅相对高度，无 x/y
         self.sensor = world.spawn_actor(bp, carla.Transform(carla.Location(z=2.0)), attach_to=parent_actor)
         weak_self = weakref.ref(self)
         self.sensor.listen(lambda event: GnssSensor._on_gnss(weak_self, event))
@@ -308,8 +320,9 @@ class GnssSensor(object):
         self.lat = event.latitude
         self.lon = event.longitude
 
+
 # ==============================================================================
-# -- CameraManager
+# -- CameraManager (✅ 已移除所有硬编码相机坐标)
 # ==============================================================================
 class CameraManager(object):
     def __init__(self, parent_actor, hud, gamma_correction):
@@ -319,9 +332,10 @@ class CameraManager(object):
         self.hud = hud
         self.transform_index = 0
         self.sensors = [['sensor.camera.rgb', cc.Raw, 'RGB Camera']]
-        self._camera_transforms = [
-            carla.Transform(carla.Location(x=-5.5, z=2.5), carla.Rotation(pitch=8.0))
-        ]
+
+        # ✅ 动态计算相机位置：基于车辆包围盒，无任何绝对坐标
+        self._auto_camera_transform()
+
         self.index = None
         world = parent_actor.get_world()
         for i, it in enumerate(self.sensors):
@@ -329,6 +343,18 @@ class CameraManager(object):
             bp.set_attribute('image_size_x', str(hud.dim[0]))
             bp.set_attribute('image_size_y', str(hud.dim[1]))
             self.sensors[i].append(bp)
+
+    def _auto_camera_transform(self):
+        """ 自动计算相机位置：基于车辆尺寸，自适应所有车型，无硬编码坐标 """
+        vehicle = self._parent
+        bounds = vehicle.bounding_box
+        ext = bounds.extent
+        # 相机放在车辆后上方，自适应尺寸
+        x = -ext.x * 2.5
+        z = ext.z * 2.0
+        self._camera_transforms = [
+            carla.Transform(carla.Location(x=x, z=z), carla.Rotation(pitch=8.0))
+        ]
 
     def set_sensor(self, index, notify=True):
         if self.sensor and self.sensor.is_alive:
@@ -357,6 +383,7 @@ class CameraManager(object):
         if self.surface is not None:
             display.blit(self.surface, (0, 0))
 
+
 # ==============================================================================
 # -- Game Loop
 # ==============================================================================
@@ -374,6 +401,7 @@ def game_loop(args):
         controller = KeyboardControl(world)
 
         agent = BehaviorAgent(world.player, behavior=args.behavior)
+        # ✅ 无绝对坐标：随机目标点来自地图生成点
         spawn_points = world.map.get_spawn_points()
         destination = random.choice(spawn_points).location
         agent.set_destination(destination)
@@ -399,6 +427,7 @@ def game_loop(args):
             world.destroy()
         pygame.quit()
 
+
 # ==============================================================================
 # -- main()
 # ==============================================================================
@@ -412,6 +441,7 @@ def main():
     args = argparser.parse_args()
     args.width, args.height = [int(x) for x in args.res.split('x')]
     game_loop(args)
+
 
 if __name__ == '__main__':
     main()
