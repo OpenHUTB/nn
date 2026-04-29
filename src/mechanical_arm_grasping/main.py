@@ -1,4 +1,5 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加速度控制）
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加进度条显示）
+
 import sys
 import mujoco
 import mujoco.viewer
@@ -120,18 +121,23 @@ def robot_arm_auto_reset_demo():
 
     # ---------------------- 模块化功能函数 ----------------------
     def joint_move(joint_name, target_val, duration, viewer, step_desc):
-        """单关节精准移动"""
+        """单关节精准移动，带进度条显示"""
         print(f"\n🔧 {step_desc}")
         idx = joint_idxs[joint_name]
         start_val = data.ctrl[idx]
         start_time = time.time()
+        bar_length = 20
 
         while (time.time() - start_time) < duration and viewer.is_running():
             progress = (time.time() - start_time) / duration
             current_val = start_val + progress * (target_val - start_val)
             data.ctrl[idx] = current_val
 
-            print(f"\r{joint_name} 进度：{progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            # 进度条显示
+            filled = int(progress * bar_length)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            print(f"\r{joint_name} 进度：|{bar}| {progress * 100:.1f}% | 当前值：{current_val:.2f}", end="")
+            
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
@@ -139,18 +145,23 @@ def robot_arm_auto_reset_demo():
         return True
 
     def gripper_close(viewer, desc="目标"):
-        """软接触闭合夹爪"""
+        """软接触闭合夹爪，带进度条显示"""
         print(f"\n🔧 闭合夹爪抓取{desc}")
         grip_speed = -0.25
         close_duration = 1.0
         start_time = time.time()
+        bar_length = 20
 
         while (time.time() - start_time) < close_duration and viewer.is_running():
             progress = (time.time() - start_time) / close_duration
             data.ctrl[left_grip_idx] = grip_speed
             data.ctrl[right_grip_idx] = -grip_speed
 
-            print(f"\r夹爪闭合进度：{progress * 100:.1f}%", end="")
+            # 进度条显示
+            filled = int(progress * bar_length)
+            bar = '█' * filled + '░' * (bar_length - filled)
+            print(f"\r夹爪闭合进度：|{bar}| {progress * 100:.1f}%", end="")
+            
             mujoco.mj_step(model, data)
             viewer.sync()
             time.sleep(0.001)
