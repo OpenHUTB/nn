@@ -57,6 +57,10 @@ def train():
             for param_group in agent.critic_optimizer.param_groups:
                 param_group['lr'] = param_group['lr'] * 0.8
 
+        # 记录出赛道状态
+        off_track_counter = 0
+        on_track_counter = 0
+
         for t in range(max_timesteps):
             # 预热期：使用更保守的策略
             if episode < warmup_episodes:
@@ -71,10 +75,25 @@ def train():
                 noise[0] = np.random.normal(0, expl_noise_steer)
                 noise[1:] = np.random.normal(0, expl_noise_throttle, size=2)
 
+            # 如果刚出赛道，降低转向探索
+            if off_track_counter > 0 and off_track_counter < 5:
+                noise[0] *= 0.3
+                noise[1] *= 1.2  # 稍微增加油门，鼓励回到赛道
+
             action = (action + noise).clip(-max_action, max_action)
 
             next_state, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
+
+            # 更新赛道状态计数
+            on_track = info.get('on_track', True)
+            if not on_track:
+                off_track_counter += 1
+                on_track_counter = 0
+            else:
+                on_track_counter += 1
+                if on_track_counter > 3:
+                    off_track_counter = 0
 
             speed = info.get('speed', 0.0)
             if abs(speed) < 0.2 and abs(action[0]) > 0.4:
