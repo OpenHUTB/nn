@@ -40,7 +40,7 @@ params = {
 }
 
 
-CONTROL_MODE = "manual"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
+CONTROL_MODE = "safe_random"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
 SAVE_EPISODES = True
 SAVE_SUMMARY_CSV = True
 DEBUG_DRAW_EVERY = 5
@@ -61,7 +61,8 @@ env = gym.make('carla-v0', params=params)
 
 
 # 数据保存目录
-save_dir = "collected_episodes"
+save_root_dir = "collected_episodes"
+save_dir = os.path.join(save_root_dir, CONTROL_MODE)
 os.makedirs(save_dir, exist_ok=True)
 
 summary_csv_path = os.path.join(save_dir, "summary.csv")
@@ -76,7 +77,12 @@ if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
             "steps",
             "total_reward",
             "total_cost",
-            "end_reason"
+            "end_reason",
+            "collision",
+            "off_road",
+            "avg_speed",
+            "max_speed",
+            "min_speed"
         ])
 
 
@@ -133,6 +139,30 @@ def safe_info_dict(info):
         "is_collision": bool(info.get("is_collision", False)),
         "is_off_road": bool(info.get("is_off_road", False)),
     }
+
+
+def get_ego_pose(env):
+    """
+    获取自车的位置和朝向信息。
+    """
+    ego_transform = env.ego.get_transform()
+    ego_location = ego_transform.location
+    ego_rotation = ego_transform.rotation
+
+    ego_pose = {
+        "location": {
+            "x": float(ego_location.x),
+            "y": float(ego_location.y),
+            "z": float(ego_location.z),
+        },
+        "rotation": {
+            "pitch": float(ego_rotation.pitch),
+            "yaw": float(ego_rotation.yaw),
+            "roll": float(ego_rotation.roll),
+        }
+    }
+
+    return ego_pose
 
 
 def init_manual_control():
@@ -330,6 +360,7 @@ try:
             speed = float(next_obs['ego_state'][3])
             collision = bool(info.get('is_collision', False))
             off_road = bool(info.get('is_off_road', False))
+            ego_pose = get_ego_pose(env)
 
             speed_list.append(speed)
             episode_collision = episode_collision or collision
@@ -355,6 +386,7 @@ try:
                 "next_state": flatten_obs(next_obs),
                 "done": bool(done),
                 "info": safe_info_dict(info),
+                "ego_pose": ego_pose,
             }
 
             episode_data.append(transition)
@@ -435,7 +467,12 @@ try:
                     len(episode_data),
                     float(total_reward),
                     float(total_cost),
-                    end_reason
+                    end_reason,
+                    bool(episode_collision),
+                    bool(episode_off_road),
+                    avg_speed,
+                    max_speed,
+                    min_speed
                 ])
 
         print(

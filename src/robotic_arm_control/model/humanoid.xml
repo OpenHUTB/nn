@@ -9,7 +9,7 @@
 
   <worldbody>
     <light pos="0 0 4"/>
-    <camera name="cam" pos="0 -4 2"/>
+    <camera name="cam" pos="0 -3.5 1.2" xyaxes="1 0 0 0 0.6 1"/>
     <geom name="ground" type="plane" size="4 4 0.1" material="floor" friction="2.5 1 1"/>
 
     <body name="body" pos="0 0 1.0">

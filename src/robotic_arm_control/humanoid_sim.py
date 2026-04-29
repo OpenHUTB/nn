@@ -43,6 +43,12 @@ stand()
 
 # 运行 —— 完全保留你原来的逻辑
 with mujoco.viewer.launch_passive(model, data) as v:
+    v.cam.distance = 4.0
+    v.cam.azimuth = 90     # 关键：改成90，正对机器人正面
+    v.cam.elevation = -12
+    v.cam.lookat = [0, 0, 1.0]
+    v.sync()
+
     print("=== 稳定人形机器人 ===")
     print("指令：stand / wave_l / wave_r / squat / exit")
 
