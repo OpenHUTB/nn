@@ -70,22 +70,27 @@ class IntegratedDroneSimulationV2:
                     self.logger.info(f"选择: {model_name}")
                     break
 
-        if selected_model:
-            self.logger.info(f"使用模型: {selected_model_name}")
-
+        if HAS_ENHANCED_DETECTOR:
+            # 优先使用增强版检测器（MediaPipe）
             try:
                 from gesture_detector_enhanced import EnhancedGestureDetector
                 self.logger.info("导入增强版手势检测器")
 
-                self.gesture_detector = EnhancedGestureDetector(
-                    ml_model_path=selected_model,
-                    use_ml=True
-                )
+                if selected_model:
+                    self.logger.info(f"使用模型: {selected_model_name}")
+                    self.gesture_detector = EnhancedGestureDetector(
+                        ml_model_path=selected_model,
+                        use_ml=True
+                    )
 
-                if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
-                    self.logger.info(f"机器学习模型加载成功 ({selected_model_name})")
+                    if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
+                        self.logger.info("机器学习模型加载成功")
+                    else:
+                        self.logger.warning("机器学习模型未加载，使用规则检测")
+                        self.gesture_detector = EnhancedGestureDetector(use_ml=False)
                 else:
-                    self.logger.warning("机器学习模型未加载，回退到规则检测")
+                    # 使用规则检测（不需要模型）
+                    self.logger.info("未找到模型文件，使用规则检测")
                     self.gesture_detector = EnhancedGestureDetector(use_ml=False)
 
             except ImportError as e:
@@ -93,9 +98,8 @@ class IntegratedDroneSimulationV2:
                 self.logger.info("使用原始手势检测器")
                 from gesture_detector import GestureDetector
                 self.gesture_detector = GestureDetector()
-
         else:
-            self.logger.warning("未找到可用的机器学习模型文件")
+            self.logger.warning("增强版检测器不可用")
             self.logger.info("使用原始手势检测器")
             from gesture_detector import GestureDetector
             self.gesture_detector = GestureDetector()
@@ -160,13 +164,14 @@ class IntegratedDroneSimulationV2:
             cap = cv2.VideoCapture(cid)
 
             if cap.isOpened():
-                width = self.config.get("camera.width", 640)
-                height = self.config.get("camera.height", 480)
-                fps = self.config.get("camera.fps", 30)
+                width = 640
+                height = 480
+                fps = 30
 
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
                 cap.set(cv2.CAP_PROP_FPS, fps)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                 ret, test_frame = cap.read()
                 if ret:
@@ -203,9 +208,8 @@ class IntegratedDroneSimulationV2:
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                 cv2.putText(frame, "虚拟摄像头模式", (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.putText(frame, f"手势指令 ({mode_text}):", (50, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
 
+            # 每帧检测手势（流畅响应）
             try:
                 processed_frame, gesture, confidence, landmarks = \
                     self.gesture_detector.detect_gestures(frame, simulation_mode=True)
@@ -224,8 +228,10 @@ class IntegratedDroneSimulationV2:
                 self.logger.error(f"手势检测错误: {e}")
                 self.current_frame = frame
                 self.current_gesture = None
+                enhanced_frame = self._enhance_interface(frame, "error", 0.0)
+                cv2.imshow('Gesture Control', enhanced_frame)
 
-            key = cv2.waitKey(10) & 0xFF
+            key = cv2.waitKey(1) & 0xFF
             if key == ord('q') or key == 27:
                 self.logger.info("收到退出指令...")
                 self.running = False
