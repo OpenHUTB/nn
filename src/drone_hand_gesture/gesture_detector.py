@@ -17,11 +17,18 @@ class GestureDetector:
     基于肤色检测和轮廓分析
     """
     
-    def __init__(self):
-        """初始化手势检测器"""
-        # 肤色检测的颜色范围 (HSV)
-        self.skin_lower = np.array([0, 20, 70], dtype=np.uint8)
-        self.skin_upper = np.array([20, 255, 255], dtype=np.uint8)
+    def __init__(self, sensitivity=0.5):
+        """
+        初始化手势检测器
+        
+        Args:
+            sensitivity: 灵敏度参数 (0.1-1.0)，越高越敏感
+        """
+        # 灵敏度参数 (0.1-1.0)
+        self.sensitivity = max(0.1, min(1.0, sensitivity))
+        
+        # 肤色检测的颜色范围 (HSV) - 根据灵敏度调整
+        self._update_skin_range()
         
         # 手势到控制指令的映射
         self.gesture_commands = {
@@ -44,7 +51,40 @@ class GestureDetector:
         self.fist_start_time = None
         self.FIST_TIMEOUT = 1.5  # 握拳后1.5秒内松开才触发起飞
         
-        print("[INFO] 使用纯 OpenCV 手势检测器")
+        # 轮廓面积阈值（根据灵敏度调整）
+        self.min_contour_area_ratio = 0.01 * (1.5 - self.sensitivity)  # 灵敏度越高，阈值越低
+        
+        print(f"[INFO] 使用纯 OpenCV 手势检测器 (灵敏度: {self.sensitivity:.1f})")
+    
+    def _update_skin_range(self):
+        """根据灵敏度更新肤色检测范围"""
+        # 灵敏度越高，肤色范围越宽
+        h_range = int(5 + 40 * self.sensitivity)  # 5-45度
+        s_min = int(15 + 45 * (1 - self.sensitivity))  # 15-60
+        v_min = int(40 + 60 * (1 - self.sensitivity))  # 40-100
+        
+        self.skin_lower = np.array([0, s_min, v_min], dtype=np.uint8)
+        self.skin_upper = np.array([h_range, 255, 255], dtype=np.uint8)
+    
+    def set_sensitivity(self, value):
+        """
+        设置灵敏度 (0.1-1.0)
+        
+        Args:
+            value: 灵敏度值
+        """
+        self.sensitivity = max(0.1, min(1.0, value))
+        self._update_skin_range()
+        self.min_contour_area_ratio = 0.01 * (1.5 - self.sensitivity)
+        print(f"[INFO] 灵敏度已调整为: {self.sensitivity:.2f}")
+    
+    def increase_sensitivity(self):
+        """增加灵敏度"""
+        self.set_sensitivity(self.sensitivity + 0.1)
+    
+    def decrease_sensitivity(self):
+        """降低灵敏度"""
+        self.set_sensitivity(self.sensitivity - 0.1)
     
     def detect_gestures(self, image, simulation_mode=False):
         """

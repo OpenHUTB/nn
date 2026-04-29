@@ -344,6 +344,12 @@ class IntegratedDroneSimulation:
                 self._show_help()
             elif key == ord('f'):  # 切换全屏
                 self._toggle_fullscreen()
+            elif key == ord('+') or key == ord('='):  # 增加灵敏度
+                if hasattr(self, 'gesture_detector') and hasattr(self.gesture_detector, 'increase_sensitivity'):
+                    self.gesture_detector.increase_sensitivity()
+            elif key == ord('-') or key == ord('_'):  # 降低灵敏度
+                if hasattr(self, 'gesture_detector') and hasattr(self.gesture_detector, 'decrease_sensitivity'):
+                    self.gesture_detector.decrease_sensitivity()
 
         print("手势识别线程结束")
 
@@ -391,6 +397,15 @@ class IntegratedDroneSimulation:
                     (width + 20, y_offset),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         y_offset += 25
+        
+        # 显示手势检测器灵敏度（如果有）
+        if hasattr(self, 'gesture_detector') and hasattr(self.gesture_detector, 'sensitivity'):
+            sensitivity = self.gesture_detector.sensitivity
+            sensitivity_color = (0, 255, 0) if sensitivity > 0.7 else (0, 255, 255) if sensitivity > 0.4 else (0, 0, 255)
+            cv2.putText(enhanced_frame, f"SENSITIVITY: {sensitivity:.1f}", 
+                        (width + 20, y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, sensitivity_color, 1)
+            y_offset += 20
         
         # 获取无人机状态
         drone_state = self.drone_controller.get_state()
