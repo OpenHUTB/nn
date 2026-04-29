@@ -16,7 +16,7 @@ class LaneDetector:
         self.lane_history = deque(maxlen=5)
 
     def detect(self, image: np.ndarray, roi_mask: np.ndarray, light_condition: str = 'day') -> Dict[str, Any]:
-        """检测车道线"""
+        """检测车道线 - 支持多车道场景"""
         try:
             processed = self._preprocess_for_lanes(image, roi_mask, light_condition)
             edges = self._detect_edges(processed, light_condition)
@@ -27,19 +27,37 @@ class LaneDetector:
                 return self._create_empty_result()
 
             left_lines, right_lines = self._classify_and_filter(lines, image.shape[1])
-            left_lane = self._fit_lane_model(left_lines, image.shape)
-            right_lane = self._fit_lane_model(right_lines, image.shape)
+
+            # 新增：选择主车道和邻车道
+            primary_left, primary_right, neighbor_left, neighbor_right = \
+                self._select_primary_lanes(left_lines, right_lines, image.shape[1], image.shape[0])
+
+            # 使用主车道线进行拟合
+            left_lane = self._fit_lane_model(primary_left, image.shape)
+            right_lane = self._fit_lane_model(primary_right, image.shape)
 
             left_lane, right_lane = self._validate_lanes(left_lane, right_lane, image.shape)
             center_line = self._calculate_center_line(left_lane, right_lane, image.shape)
             future_path = self._predict_future_path(left_lane, right_lane, image.shape)
             detection_quality = self._calculate_detection_quality(left_lane, right_lane)
 
+            # 新增：计算车道统计信息
+            all_lines = left_lines + right_lines
+            lane_stats = self._calculate_lane_statistics(all_lines, image.shape)
+
             result = {
-                'left_lines': left_lines, 'right_lines': right_lines,
-                'left_lane': left_lane, 'right_lane': right_lane,
-                'center_line': center_line, 'future_path': future_path,
-                'detection_quality': detection_quality
+                'left_lines': left_lines,
+                'right_lines': right_lines,
+                'primary_left_lines': primary_left,
+                'primary_right_lines': primary_right,
+                'neighbor_left_lines': neighbor_left,
+                'neighbor_right_lines': neighbor_right,
+                'left_lane': left_lane,
+                'right_lane': right_lane,
+                'center_line': center_line,
+                'future_path': future_path,
+                'detection_quality': detection_quality,
+                'lane_statistics': lane_stats
             }
 
             result = self._apply_temporal_smoothing(result)
@@ -128,6 +146,71 @@ class LaneDetector:
                     })
         
         return left_lines, right_lines
+
+    def _select_primary_lanes(self, left_lines: List[Dict], right_lines: List[Dict],
+                              image_width: int, image_height: int) -> Tuple[List, List, List, List]:
+        """从多条候选线中选择主车道和邻车道
+
+        Returns:
+            primary_left: 主车道左边界线（最靠近中心的）
+            primary_right: 主车道右边界线（最靠近中心的）
+            neighbor_left: 左侧邻车道线列表
+            neighbor_right: 右侧邻车道线列表
+        """
+        if not left_lines and not right_lines:
+            return [], [], [], []
+
+        center_x = image_width / 2
+
+        # 按到中点的距离排序
+        left_lines_sorted = sorted(left_lines, key=lambda x: abs(x['midpoint'][0] - center_x))
+        right_lines_sorted = sorted(right_lines, key=lambda x: abs(x['midpoint'][0] - center_x))
+
+        # 选择最靠近中心的前2条作为主车道边界
+        primary_left = left_lines_sorted[:2] if len(left_lines_sorted) >= 2 else left_lines_sorted
+        primary_right = right_lines_sorted[:2] if len(right_lines_sorted) >= 2 else right_lines_sorted
+
+        # 其余的作为邻车道
+        neighbor_left = left_lines_sorted[2:] if len(left_lines_sorted) > 2 else []
+        neighbor_right = right_lines_sorted[2:] if len(right_lines_sorted) > 2 else []
+
+        return primary_left, primary_right, neighbor_left, neighbor_right
+
+    def _calculate_lane_statistics(self, all_lines: List[Dict], image_shape: Tuple[int, ...]) -> Dict:
+        """计算车道统计信息"""
+        height, width = image_shape[:2]
+
+        if not all_lines:
+            return {
+                'total_detected_lines': 0,
+                'estimated_lanes': 1,
+                'is_multi_lane': False,
+                'avg_lane_width': 0,
+                'lane_positions': []
+            }
+
+        # 按X坐标排序所有车道线的中点
+        midpoints = sorted([line['midpoint'][0] for line in all_lines])
+
+        # 估算车道数量（每2条线形成一个车道）
+        estimated_lanes = max(1, len(all_lines) // 2)
+
+        # 计算平均车道宽度
+        lane_widths = []
+        for i in range(len(midpoints) - 1):
+            width_diff = abs(midpoints[i + 1] - midpoints[i])
+            if width_diff > width * 0.05 and width_diff < width * 0.4:
+                lane_widths.append(width_diff)
+
+        avg_lane_width = np.mean(lane_widths) if lane_widths else 0
+
+        return {
+            'total_detected_lines': len(all_lines),
+            'estimated_lanes': estimated_lanes,
+            'is_multi_lane': estimated_lanes > 2,
+            'avg_lane_width': avg_lane_width,
+            'lane_positions': midpoints
+        }
     
     def _fit_lane_model(self, lines: List[Dict], image_shape: Tuple[int, ...]) -> Optional[Dict]:
         """拟合车道线模型"""
@@ -370,9 +453,20 @@ class LaneDetector:
         return {
             'left_lines': [],
             'right_lines': [],
+            'primary_left_lines': [],
+            'primary_right_lines': [],
+            'neighbor_left_lines': [],
+            'neighbor_right_lines': [],
             'left_lane': None,
             'right_lane': None,
             'center_line': None,
             'future_path': None,
-            'detection_quality': 0.0
+            'detection_quality': 0.0,
+            'lane_statistics': {
+                'total_detected_lines': 0,
+                'estimated_lanes': 1,
+                'is_multi_lane': False,
+                'avg_lane_width': 0,
+                'lane_positions': []
+            }
         }
