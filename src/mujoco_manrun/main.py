@@ -164,9 +164,11 @@ class KeyboardInputHandler(threading.Thread):
         key = key.lower()
         if key == 'w':
             current_gait = self.stabilizer.gait_mode
-            self.stabilizer.set_state("WALK")
-            self.stabilizer.set_gait_mode(current_gait)
-            print(f"[行走] 速度:{self.stabilizer.walk_speed:.2f} | 转向:{self.stabilizer.turn_angle:.2f}")
+            if self.stabilizer.state != "WALK":
+                self.stabilizer.set_state("WALK")
+                self.stabilizer.set_gait_mode(current_gait)
+            if hasattr(self.stabilizer, "_should_log") and self.stabilizer._should_log("key_walk", 0.5):
+                print(f"[行走] 速度:{self.stabilizer.walk_speed:.2f} | 转向:{self.stabilizer.turn_angle:.2f}")
         elif key == 's':
             self.stabilizer.set_state("STOP")
             print("[停止]")
@@ -277,6 +279,7 @@ class HumanoidStabilizer:
         self._log_last = {}
         self._fall_cooldown_until = 0.0
         self._fall_count = 0
+        self._recovery_until = 0.0
         self._imu_euler_filt = np.zeros(3, dtype=np.float64)
         self._imu_angvel_filt = np.zeros(3, dtype=np.float64)
 
@@ -548,6 +551,7 @@ class HumanoidStabilizer:
         self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.5
         self.prev_joint_targets = self.joint_targets.copy()
 
+        self.data.qpos[7:7 + self.num_joints] = self.joint_targets.astype(np.float64)
         mujoco.mj_forward(self.model, self.data)
 
     # ===================== 传感器模拟相关方法（原有新增逻辑保留） =====================
@@ -739,8 +743,12 @@ class HumanoidStabilizer:
         )
 
         # 5. 更新关节目标（原有逻辑保留）
+        ramp = float(np.clip((float(self.data.time) - float(self.walk_start_time)) / 1.0, 0.0, 1.0))
+        right_hip_offset *= ramp
+        left_hip_offset *= ramp
+
         if self.gait_mode != "STEP_IN_PLACE":
-            self.joint_targets[self.joint_name_to_idx["abdomen_y"]] = float(np.clip(0.12 * speed_factor, -0.2, 0.2))
+            self.joint_targets[self.joint_name_to_idx["abdomen_y"]] = float(np.clip(-0.06 * speed_factor, -0.12, 0.0))
         self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.1 + right_hip_offset
         self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.4 - right_hip_offset * 1.2
         self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0 + right_hip_offset * 0.5
@@ -771,6 +779,8 @@ class HumanoidStabilizer:
     # 外部控制接口（原有逻辑完全保留）
     def set_state(self, state):
         if state in self.state_map.keys():
+            if state == "WALK" and float(self.data.time) < float(self._recovery_until):
+                return
             self.state = state
             if state == "WALK":
                 self.walk_start_time = None
@@ -807,7 +817,7 @@ class HumanoidStabilizer:
         quat = self.data.qpos[3:7].astype(np.float64).copy()
         euler = self._quat_to_euler_xyz(quat)
         euler = np.mod(euler + np.pi, 2 * np.pi) - np.pi
-        return np.clip(euler, -0.3, 0.3)
+        return euler
 
     # 原有接触检测方法（保留，用于关闭传感器模拟时的 fallback）
     def _detect_foot_contact(self):
@@ -908,6 +918,8 @@ class HumanoidStabilizer:
             idx = self.joint_name_to_idx[joint_name]
             joint_error = float(self.joint_targets[idx] - current_joints[idx])
             joint_error = max(-0.3, min(0.3, joint_error))
+            if joint_name == "abdomen_y":
+                joint_error -= float(np.clip(torso_torque[1] * 0.008, -0.15, 0.15))
             torques[idx] = self.kp_waist * joint_error - self.kd_waist * current_vel[idx]
 
         # 腿部关节控制（新增：基于接触力的动态PD增益）
@@ -939,9 +951,9 @@ class HumanoidStabilizer:
                 kd = self.base_kd_hip * force_factor
                 if "y" in joint_name:
                     if "right" in joint_name:
-                        joint_error += torso_torque[1] * 0.02
+                        joint_error -= torso_torque[1] * 0.02
                     else:
-                        joint_error += torso_torque[1] * 0.02
+                        joint_error -= torso_torque[1] * 0.02
 
             elif "knee" in joint_name:
                 kp = self.base_kp_knee * force_factor
@@ -952,7 +964,7 @@ class HumanoidStabilizer:
                 kp = self.base_kp_ankle * force_factor
                 kd = self.base_kd_ankle * force_factor
                 if "y" in joint_name:
-                    joint_error += torso_torque[1] * 0.01
+                    joint_error -= torso_torque[1] * 0.015
 
             # 原有接触判断逻辑（保留，与动态增益叠加）
             if ("left" in joint_name and self.foot_contact[1] == 0) or \
@@ -1042,8 +1054,11 @@ class HumanoidStabilizer:
                     # 状态监测（新增步态信息）
                     if self._should_log("status", 2.0):
                         com = self.data.subtree_com[0]
-                        euler = self.current_sensor_data["imu"][
-                            "euler"] if self.current_sensor_data else self._get_root_euler()
+                        if self.current_sensor_data:
+                            imu_data = self.current_sensor_data["imu"]
+                            euler = imu_data.get("true_euler", imu_data.get("euler"))
+                        else:
+                            euler = self._get_root_euler()
                         print(
                             f"时间:{self.data.time:.1f}s | 重心(x/z):{com[0]:.3f}/{com[2]:.3f}m | "
                             f"姿态(roll/pitch):{euler[0]:.3f}/{euler[1]:.3f}rad | 脚接触:{self.foot_contact} | "
@@ -1069,7 +1084,9 @@ class HumanoidStabilizer:
                             f"最大倾角:{max(abs(euler_for_fall[0]), abs(euler_for_fall[1])):.3f}rad | 当前步态:{self.gait_mode}"
                         )
                         self.set_state("STAND")  # 跌倒后自动恢复站立
-                        self._fall_cooldown_until = float(self.data.time) + 1.0
+                        self._fall_cooldown_until = float(self.data.time) + 2.0
+                        self._recovery_until = float(self.data.time) + 2.0
+                        self.set_turn_angle(0.0)
         finally:
             keyboard_handler.running = False
             self.ros_handler.stop()
