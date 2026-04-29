@@ -18,7 +18,7 @@ except ImportError:
 
 # 用于创建各种静态、交互式和动画可视化图表
 
-# 下面这段代码从文件中读取数据，然后把数据拆分成特征和标签，最后以 NumPy 数组的形式返回
+
 def load_data(filename):
     """载入数据。
     Args:
@@ -26,75 +26,40 @@ def load_data(filename):
     Returns:
         tuple: 包含特征和标签的numpy数组 (xs, ys)
     """
-    xys = []# 用于存储每行的数据，每行数据是一个列表
-    with open(filename, "r") as f:  # 以只读模式打开文件进行读取
-        for line in f: # 遍历文件的每一行
-            # 将每行内容按空格分割并转换为浮点数
-            # strip() 去除行首尾的空白字符，split() 按空格分割字符串
-            # map(float, ...) 将分割后的字符串转换为浮点数
+    xys = []
+    with open(filename, "r") as f:
+        for line in f:
             line_data = list(map(float, line.strip().split()))
             xys.append(line_data)
-    # 使用zip(*xys)转置数据，将数据拆分为特征和标签
-    # 假设每行数据的最后一个元素是标签，其余是特征
-    # zip(*xys) 将 xys 列表的行和列进行转置
-    xs, ys = zip(*xys)# xs 是特征列表，ys 是标签列表
-    # 将特征和标签列表转换为 NumPy 数组
-    # NumPy 数组便于后续的数学运算和数据处理
-    return np.asarray(xs), np.asarray(ys) # 将Python列表转换为NumPy数组并返回
+    xs, ys = zip(*xys)
+    return np.asarray(xs), np.asarray(ys)
 
 
-# ## 恒等基函数（Identity Basis Function）的实现 填空顺序 2
 def identity_basis(x):
-    # 在 x 的最后一个维度上增加一个维度，将其转换为二维数组
-    # 用于适配线性回归的矩阵运算格式
-    # 通过 np.expand_dims，将 x 转换为列向量的形式，形状变为 (len(x), 1)
-    return np.expand_dims(x, axis = 1)
+    """恒等基函数"""
+    return np.expand_dims(x, axis=1)
 
 
-# 请分别在这里实现"多项式基函数"（Multinomial Basis Function）以及"高斯基函数"（Gaussian Basis Function）
-
-# 其中以及训练集的x的范围在0-25之间
 def multinomial_basis(x, feature_num=10):
     """多项式基函数：将输入x映射为多项式特征
     feature_num: 多项式的最高次数
     返回 shape (N, feature_num)"""
-    x = np.expand_dims(x, axis=1)  # shape(N, 1)
-    # 生成各次幂特征：x^1, x^2, ..., x^feature_num，将其拼接
-    ret = [x**i for i in range(1, feature_num + 1)]
-    # 将存储不同次幂特征的数组在第二个维度（列方向）上进行拼接
-    # 例如，若每个特征数组形状为 (N, 1)，拼接后形状变为 (N, feature_num)
+    x = np.expand_dims(x, axis=1)
+    ret = [x ** i for i in range(1, feature_num + 1)]
     ret = np.concatenate(ret, axis=1)
     return ret
 
 
-
 def gaussian_basis(x, feature_num=10):
-    """
-    高斯基函数：将输入x映射为一组高斯分布特征
-    用于提升模型对非线性关系的拟合能力
-    """
-    # 定义中心在区间 [0, 25] 内均匀分布
+    """高斯基函数：将输入x映射为一组高斯分布特征
+    用于提升模型对非线性关系的拟合能力"""
     centers = np.linspace(0, 25, feature_num)
-    # 每个高斯函数的标准差（带宽）
     sigma = 25 / feature_num
-    # 计算每个输入 x 对所有中心的响应，输出 shape (N, feature_num)
     return np.exp(-0.5 * ((x[:, np.newaxis] - centers) / sigma) ** 2)
 
 
-# 返回一个训练好的模型 填空顺序 1 用最小二乘法进行模型优化
-# ## 填空顺序 3 用梯度下降进行模型优化
-# > 先完成最小二乘法的优化 (参考书中第二章 2.3中的公式)
-#
-# > 再完成梯度下降的优化   (参考书中第二章 2.3中的公式)
-#
-# 在main中利用训练集训练好模型的参数，并且返回一个训练好的模型。
-#
-# 计算出一个优化后的w，请分别使用最小二乘法以及梯度下降两种办法优化w
-
-
 def least_squares(phi, y, alpha=0.0, solver="pinv"):
-    """
-    带正则化的最小二乘法优化，支持多种求解器
+    """带正则化的最小二乘法优化，支持多种求解器
 
     参数:
     phi (np.ndarray): 设计矩阵，形状为 (n_samples, n_features)
@@ -104,63 +69,39 @@ def least_squares(phi, y, alpha=0.0, solver="pinv"):
 
     返回:
     np.ndarray: 优化后的权重向量，形状为 (n_features,) 或 (n_features, n_targets)
-
-    异常:
-    ValueError: 当 solver 参数不是支持的类型时抛出
     """
-    # 检查输入矩阵是否为空
-    if phi.size == 0 or y.size == 0: # 如果矩阵 phi 或 y 是空的，抛出 ValueError 异常
+    if phi.size == 0 or y.size == 0:
         raise ValueError("输入矩阵 phi 和目标值 y 不能为零矩阵")
-
-    # 检查维度是否兼容
     if phi.shape[0] != y.shape[0]:
         raise ValueError(
             f"设计矩阵 phi 的样本数 ({phi.shape[0]}) 与目标值 y 的样本数 ({y.shape[0]}) 不匹配"
         )
+    n_samples, n_features = phi.shape
 
-    n_samples, n_features = phi.shape # 获取样本数和特征数
-
-    # 根据选择的求解器执行计算
     if solver == "pinv":
-        # 使用 numpy 的伪逆函数，基于 SVD 分解
-        # 对病态矩阵具有良好的数值稳定性
         A = phi.T @ phi + alpha * np.eye(n_features)
         w = np.linalg.pinv(A) @ phi.T @ y
-
     elif solver == "cholesky":
-        # 使用 Cholesky 分解求解正规方程
-        # 计算效率高，但要求矩阵正定（alpha > 0 时保证）
         if alpha < 0:
             raise ValueError("使用 Cholesky 求解器时，正则化参数 alpha 必须为非负数")
         A = phi.T @ phi + alpha * np.eye(n_features)
         try:
             L = np.linalg.cholesky(A)
-            # 解 L*z = phi.T @ y
             z = np.linalg.solve(L, phi.T @ y)
-            # 解 L^T*w = z
             w = np.linalg.solve(L.T, z)
         except np.linalg.LinAlgError:
-            # 处理非正定矩阵的情况，回退到 pinv
             print("警告: Cholesky 分解失败，矩阵可能非正定，回退到伪逆求解")
             w = np.linalg.pinv(A) @ phi.T @ y
-
     elif solver == "svd":
-        # 直接使用 SVD 分解求解
-        # 对病态矩阵最稳定，但计算成本较高
-        U, s, Vt = np.linalg.svd(phi, full_matrices = False)
-        # 计算正则化的 SVD 解
-        s_reg = s / (s**2 + alpha)
-        # 构建对角矩阵
+        U, s, Vt = np.linalg.svd(phi, full_matrices=False)
+        s_reg = s / (s ** 2 + alpha)
         S_reg = np.zeros((n_features, n_samples))
         np.fill_diagonal(S_reg, s_reg)
         w = Vt.T @ S_reg @ U.T @ y
-
     else:
-         # 如果 solver 不是支持的选项，抛出 ValueError
         raise ValueError(
             f"不支持的求解器: {solver}，支持的选项有 'pinv', 'cholesky', 'svd'"
         )
-
     return w
 
 
@@ -173,78 +114,122 @@ def gradient_descent(phi, y, lr=0.01, epochs=1000):
         epochs: 训练轮数，默认1000
     返回:
         w: 优化后的权重向量，形状为 (n_features,)
-    数学原理:
-        最小化损失函数 J(w) = 1/m * ||φw - y||²
-        梯度计算: ∇J(w) = 2/m * φ.T @ (φw - y)
-        参数更新: w := w - α * ∇J(w)
     """
-    # 初始化权重向量（全零开始）
-    # 形状与特征数量相同，即每个特征对应一个权重
     w = np.zeros(phi.shape[1])
-    
-    # 迭代优化循环
     for epoch in range(epochs):
-        # 1. 前向传播：计算当前权重下的预测值
-        # 矩阵乘法 φw，结果形状 (n_samples,)
         y_pred = phi @ w
-        
-        # 2. 计算误差：预测值与真实值的差
-        # 形状 (n_samples,)
         error = y - y_pred
-        
-        # 3. 计算梯度（损失函数对权重的导数）
-        # 梯度公式推导：
-        #   J(w) = 1/m * ∑(φw - y)²
-        #   ∇J(w) = 2/m * φ.T @ (φw - y)
-        # 其中：
-        # φ.T @ error 计算每个特征上的误差总和
-        # -2/len(y) 是损失函数导数的系数
-        # 最终形状 (n_features,)
         gradient = -2 * phi.T @ error / len(y)
-        
-        # 4. 参数更新：沿负梯度方向调整权重
-        # 学习率控制更新步长
-        # 公式: w_new = w_old - lr * ∇J(w)
         w -= lr * gradient
-    
     return w
 
 
-def main(x_train, y_train, use_gradient_descent=False, basis_func=None):
+# ========== 新增：特征标准化 ==========
+def standardize_features(X):
+    """
+    将特征矩阵标准化为均值为0，标准差为1。
+
+    参数:
+        X : numpy.ndarray, shape (n_samples, n_features)
+            输入特征矩阵。
+
+    返回:
+        X_scaled : numpy.ndarray, shape same as X
+            标准化后的特征矩阵。
+        mean : numpy.ndarray, shape (n_features,)
+            每个特征的均值。
+        std : numpy.ndarray, shape (n_features,)
+            每个特征的标准差。
+    """
+    mean = np.mean(X, axis=0)
+    std = np.std(X, axis=0)
+    # 避免除以零：如果标准差为0，则标准化后仍为0
+    std = np.where(std == 0, 1, std)
+    X_scaled = (X - mean) / std
+    return X_scaled, mean, std
+
+
+# ========== 新增：回归评估指标 ==========
+def regression_metrics(y_true, y_pred):
+    """
+    计算回归评估指标：MSE, MAE, R²
+
+    参数:
+        y_true : numpy.ndarray, shape (n_samples,)
+            真实值。
+        y_pred : numpy.ndarray, shape (n_samples,)
+            预测值。
+
+    返回:
+        metrics : dict
+            包含 'MSE', 'MAE', 'R2' 的字典。
+    """
+    mse = np.mean((y_true - y_pred) ** 2)
+    mae = np.mean(np.abs(y_true - y_pred))
+    ss_res = np.sum((y_true - y_pred) ** 2)
+    ss_tot = np.sum((y_true - np.mean(y_true)) ** 2)
+    r2 = 1 - (ss_res / (ss_tot + 1e-8))   # 加小量避免除零
+    return {'MSE': mse, 'MAE': mae, 'R2': r2}
+
+
+# ========== 修改：main 函数增加标准化选项 ==========
+def main(x_train, y_train, use_gradient_descent=False, basis_func=None, use_standardization=False):
     """训练模型，并返回从x到y的映射。
     basis_func: 可选，基函数（如identity_basis, multinomial_basis, gaussian_basis），默认恒等基
+    use_standardization: 是否对基函数特征进行标准化（不包括偏置列）
     """
-    # 支持自定义基函数
     if basis_func is None:
         basis_func = identity_basis
 
     # 生成偏置项和特征矩阵
     phi0 = np.expand_dims(np.ones_like(x_train), axis=1)
-    # 构造偏置项1
     phi1 = basis_func(x_train)
-    phi = np.concatenate([phi0, phi1], axis=1) # 将偏置项和特征矩阵拼接成完整的特征矩阵
+    
+    # 如果需要标准化，对 phi1 进行标准化（保留 phi0 不变）
+    std_mean = (None, None)  # 用于返回标准化参数
+    if use_standardization:
+        phi1_scaled, mean1, std1 = standardize_features(phi1)
+        phi1 = phi1_scaled
+        std_mean = (mean1, std1)
+    
+    phi = np.concatenate([phi0, phi1], axis=1)
+
     # 最小二乘法求解权重
     w_lsq = least_squares(phi, y_train)
 
     w_gd = None
     if use_gradient_descent:
-# 直接调用已实现的gradient_descent函数
         w_gd = gradient_descent(phi, y_train, lr=0.01, epochs=1000)
 
-    def f(x):
-        phi0 = np.expand_dims(np.ones_like(x), axis=1)
-        phi1 = basis_func(x)
-        phi = np.concatenate([phi0, phi1], axis=1)
+    def f(x, std_mean_params=None):
+        # 预测时的特征处理
+        phi0_pred = np.expand_dims(np.ones_like(x), axis=1)
+        phi1_pred = basis_func(x)
+        if std_mean_params is not None and use_standardization:
+            mean1, std1 = std_mean_params
+            # 使用训练集上的均值和标准差进行标准化
+            phi1_pred = (phi1_pred - mean1) / std1
+        phi_pred = np.concatenate([phi0_pred, phi1_pred], axis=1)
         if use_gradient_descent and w_gd is not None:
-            return np.dot(phi, w_gd)
+            return np.dot(phi_pred, w_gd)
         else:
-            return np.dot(phi, w_lsq)
-    return f, w_lsq, w_gd# 返回预测函数、最小二乘权重和梯度下降权重
+            return np.dot(phi_pred, w_lsq)
+
+    # 为了让预测函数能够访问标准化参数，将参数绑定为闭包变量
+    # 这里返回一个包装函数，使得调用 f(x) 时可自动使用训练时的参数
+    if use_standardization:
+        mean1, std1 = std_mean
+        def predict_func(x):
+            return f(x, (mean1, std1))
+        return predict_func, w_lsq, w_gd
+    else:
+        def predict_func(x):
+            return f(x, None)
+        return predict_func, w_lsq, w_gd
 
 
 def evaluate(ys, ys_pred):
-    """评估模型。"""
-    # 计算预测值与真实值的标准差
+    """评估模型：计算标准差（保留原有函数）"""
     std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
     return std
 
@@ -261,84 +246,52 @@ def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
     plt.show()
 
 
-# 程序主入口（建议不要改动以下函数的接口）
+# 程序主入口
 if __name__ == "__main__":
     # 定义训练和测试数据文件路径
-    train_file = "train.txt"  # 训练集文件
-    test_file = "test.txt"  # 测试集文件
-    # 载入数据
-    x_train, y_train = load_data(
-        train_file
-    )  # 从文件加载训练数据，返回特征矩阵x_train和标签向量y_train
-    x_test, y_test = load_data(
-        test_file
-    )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)  # x_train.shape 返回训练集特征矩阵的维度信息
-    print(x_test.shape)  # x_test.shape 返回测试集特征矩阵的维度信息
-
-    # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
-    # f: 预测函数 y = f(x)
-    # w_lsq: 通过最小二乘法得到的权重向量
-    # w_gd: 通过梯度下降法得到的权重向量
-    f, w_lsq, w_gd = main(x_train, y_train)
-    y_pred = f(x_test)
-    mse = np.mean((y_test - y_pred) ** 2)
-    print(f"均方误差(MSE): {mse:.4f}")
-    print("\n最小二乘法权重:")
-    print(w_lsq)
-    print("\n梯度下降法权重:")
-    print(w_gd)
+    train_file = "train.txt"
+    test_file = "test.txt"
     
-
-def evaluate(ys, ys_pred):
-    """评估模型。"""
-    # 计算预测值与真实值的标准差
-    std = np.sqrt(np.mean(np.abs(ys - ys_pred) ** 2))
-    return std
-
-
-def plot_results(x_train, y_train, x_test, y_test, y_test_pred):
-    """绘制训练集、测试集和预测结果"""
-    plt.plot(x_train, y_train, "ro", markersize=3)
-    plt.plot(x_test, y_test, "k")
-    plt.plot(x_test, y_test_pred, "k")
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title("Linear Regression")
-    plt.legend(["train", "test", "pred"])
-    plt.show()
-
-
-# 程序主入口（建议不要改动以下函数的接口）
-if __name__ == "__main__":
-    # 定义训练和测试数据文件路径
-    train_file = "train.txt"  # 训练集文件
-    test_file = "test.txt"  # 测试集文件
     # 载入数据
-    x_train, y_train = load_data(
-        train_file
-    )  # 从文件加载训练数据，返回特征矩阵x_train和标签向量y_train
-    x_test, y_test = load_data(
-        test_file
-    )  # 从文件加载测试数据，返回特征矩阵x_test和标签向量y_test
-    print(x_train.shape)  # x_train.shape 返回训练集特征矩阵的维度信息
-    print(x_test.shape)  # x_test.shape 返回测试集特征矩阵的维度信息
+    x_train, y_train = load_data(train_file)
+    x_test, y_test = load_data(test_file)
+    print("训练集形状:", x_train.shape)
+    print("测试集形状:", x_test.shape)
 
-    # 使用线性回归训练模型，返回一个函数 f() 使得 y = f(x)
-    # f: 预测函数 y = f(x)
-    # w_lsq: 通过最小二乘法得到的权重向量
-    # w_gd: 通过梯度下降法得到的权重向量
-    f, w_lsq, w_gd = main(x_train, y_train)
+    # 可以选择是否使用标准化（此处设置为 True 演示效果，可改为 False 对比）
+    # use_std = True   # 启用标准化
+    use_std = False  # 关闭标准化
 
-    y_train_pred = f(x_train)  # 对训练数据应用预测函数
-    std = evaluate(y_train, y_train_pred)  # 计算预测值与真实值的标准差作为评估指标
-    print("训练集预测值与真实值的标准差：{:.1f}".format(std))
+    f, w_lsq, w_gd = main(x_train, y_train, use_gradient_descent=False,
+                          basis_func=gaussian_basis, use_standardization=use_std)
 
-    # 计算预测的输出值
+    # 训练集预测
+    y_train_pred = f(x_train)
+    train_std = evaluate(y_train, y_train_pred)
+    print(f"训练集标准差 (原有指标): {train_std:.4f}")
+    
+    # 测试集预测
     y_test_pred = f(x_test)
-    # 使用测试集评估模型
-    std = evaluate(y_test, y_test_pred)
-    print("预测值与真实值的标准差：{:.1f}".format(std))
-
-    # 使用封装的绘图函数
+    test_std = evaluate(y_test, y_test_pred)
+    print(f"测试集标准差 (原有指标): {test_std:.4f}")
+    
+    # 新增：计算更多评估指标
+    train_metrics = regression_metrics(y_train, y_train_pred)
+    test_metrics = regression_metrics(y_test, y_test_pred)
+    
+    print("\n=== 训练集评估指标 ===")
+    print(f"MSE: {train_metrics['MSE']:.4f}")
+    print(f"MAE: {train_metrics['MAE']:.4f}")
+    print(f"R² : {train_metrics['R2']:.4f}")
+    
+    print("\n=== 测试集评估指标 ===")
+    print(f"MSE: {test_metrics['MSE']:.4f}")
+    print(f"MAE: {test_metrics['MAE']:.4f}")
+    print(f"R² : {test_metrics['R2']:.4f}")
+    
+    print("\n最小二乘法权重 (前10个):", w_lsq[:10])   # 只打印前10个避免过多
+    if w_gd is not None:
+        print("梯度下降法权重 (前10个):", w_gd[:10])
+    
+    # 绘图
     plot_results(x_train, y_train, x_test, y_test, y_test_pred)
