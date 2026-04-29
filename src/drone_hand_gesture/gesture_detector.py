@@ -74,6 +74,30 @@ class GestureDetector:
             "swipe_up": "forward",
             "swipe_down": "backward",
         }
+
+        # 双手手势指令（特殊命令）
+        self.both_hands_commands = {
+            "open_palm": "takeoff",    # 张开手掌（任意手）- 起飞
+            "closed_fist": "land",     # 握拳（任意手）- 降落
+            "thumb_down": "stop",       # 大拇指向下 - 停止
+        }
+
+        # 合并所有手势命令（用于显示）
+        self.gesture_commands = {
+            "open_palm": "takeoff",
+            "closed_fist": "land",
+            "pointing_up": "up",
+            "pointing_down": "down",
+            "victory": "forward",
+            "thumb_up": "backward",
+            "thumb_down": "stop",
+            "ok_sign": "hover",
+        }
+        
+        # 手势序列检测（用于握拳→松开触发起飞）
+        self.prev_gesture = None
+        self.fist_start_time = None
+        self.FIST_TIMEOUT = 1.5  # 握拳后1.5秒内松开才触发起飞
         
         # ============ 滑动手势控制相关 ============
         # 手掌位置历史记录（用于检测滑动）
