@@ -692,19 +692,19 @@ class DroneController:
 
     def go_forward_continuous(self):
         """持续向前飞行"""
-        self.client.moveByVelocityAsync(KEYBOARD_VELOCITY, 0, 0, 0.1)
+        self.client.moveByVelocityAsync(self.velocity, 0, 0, 0.1)
 
     def go_backward_continuous(self):
         """持续向后飞行"""
-        self.client.moveByVelocityAsync(-KEYBOARD_VELOCITY, 0, 0, 0.1)
+        self.client.moveByVelocityAsync(-self.velocity, 0, 0, 0.1)
 
     def go_left_continuous(self):
         """持续向左飞行"""
-        self.client.moveByVelocityAsync(0, -KEYBOARD_VELOCITY, 0, 0.1)
+        self.client.moveByVelocityAsync(0, -self.velocity, 0, 0.1)
 
     def go_right_continuous(self):
         """持续向右飞行"""
-        self.client.moveByVelocityAsync(0, KEYBOARD_VELOCITY, 0, 0.1)
+        self.client.moveByVelocityAsync(0, self.velocity, 0, 0.1)
 
     def rotate_left_continuous(self):
         """持续向左旋转（偏航）"""
@@ -720,7 +720,7 @@ class DroneController:
         使用速度控制，让无人机以设定速度上升。
         AirSim 中 Z 轴向下为正，所以上升需要负的 Z 速度。
         """
-        self.client.moveByVelocityAsync(0, 0, -KEYBOARD_VELOCITY, 0.1)
+        self.client.moveByVelocityAsync(0, 0, -self.velocity, 0.1)
 
     def go_down_continuous(self):
         """持续下降
@@ -732,7 +732,7 @@ class DroneController:
         pos = self.get_position()
         # 只有高于地面安全高度时才下降
         if pos.z_val < -0.5:
-            self.client.moveByVelocityAsync(0, 0, KEYBOARD_VELOCITY, 0.1)
+            self.client.moveByVelocityAsync(0, 0, self.velocity, 0.1)
 
     def get_telemetry(self):
         """获取并打印无人机状态信息"""
