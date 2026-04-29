@@ -39,40 +39,21 @@ class SimulationDroneController(BaseDroneController):
         self.connected = False
         self.logger.info("已断开连接")
 
-        if command == "takeoff":
-            self._takeoff_simulation(intensity)
-        elif command == "land":
-            self._land_simulation(intensity)
-        elif command == "forward":
-            self._move_simulation('forward', intensity)
-        elif command == "backward":
-            self._move_simulation('backward', intensity)
-        elif command == "up":
-            self._move_simulation('up', intensity)
-        elif command == "down":
-            self._move_simulation('down', intensity)
-        elif command == "left":
-            self._move_simulation('left', intensity)
-        elif command == "right":
-            self._move_simulation('right', intensity)
-        elif command == "turn_left":
-            self._rotate_simulation('yaw_left', intensity)
-        elif command == "turn_right":
-            self._rotate_simulation('yaw_right', intensity)
-        elif command == "hover":
-            self._hover_simulation()
-        elif command == "stop":
-            self._stop_simulation()
+    def takeoff(self, altitude: Optional[float] = None) -> bool:
+        """起飞"""
+        if not self.connected:
+            self.logger.error("未连接")
+            return False
+
+        if altitude is None:
+            altitude = self.config.get("drone.takeoff_altitude", 2.0)
+
+        if not self.simulation_mode and self.master:
+            self._send_mavlink_takeoff()
         else:
             self._simulate_takeoff(altitude)
 
         return True
-
-    def _simulate_takeoff(self, altitude: float):
-        self.logger.info(f"仿真: 无人机起飞到 {altitude} 米高度")
-        self.state['armed'] = True
-        self.state['mode'] = 'TAKEOFF'
-        self.state['velocity'][1] = 1.0
 
     def land(self) -> bool:
         if not self.connected:
@@ -86,12 +67,6 @@ class SimulationDroneController(BaseDroneController):
 
         return True
 
-    def _simulate_land(self):
-        self.logger.info("仿真: 无人机降落")
-        if self.state['armed']:
-            self.state['mode'] = 'LAND'
-            self.state['velocity'][1] = -1.0
-
     def hover(self):
         if not self.connected:
             return
@@ -100,55 +75,6 @@ class SimulationDroneController(BaseDroneController):
             self._send_mavlink_hover()
         else:
             self._simulate_hover()
-
-        if direction == 'forward':
-            self.state['velocity'][2] = speed  # 向前（Z轴正方向）
-            self.state['mode'] = 'FORWARD'
-        elif direction == 'backward':
-            self.state['velocity'][2] = -speed  # 向后（Z轴负方向）
-            self.state['mode'] = 'BACKWARD'
-        elif direction == 'up':
-            self.state['velocity'][1] = speed  # 向上（Y轴正方向）
-            self.state['mode'] = 'UP'
-        elif direction == 'down':
-            self.state['velocity'][1] = -speed  # 向下（Y轴负方向）
-            self.state['mode'] = 'DOWN'
-        elif direction == 'left':
-            self.state['velocity'][0] = -speed  # 向左（X轴负方向）
-            self.state['mode'] = 'LEFT'
-        elif direction == 'right':
-            self.state['velocity'][0] = speed  # 向右（X轴正方向）
-            self.state['mode'] = 'RIGHT'
-
-        print(f"[OK] 仿真：无人机{direction}移动，速度{speed:.1f}m/s")
-
-    def _rotate_simulation(self, direction, intensity):
-        """仿真旋转"""
-        if not self.state['armed']:
-            print("[ERROR] 警告：无人机未解锁，无法旋转")
-            print("   请先做出'张开手掌'手势进行起飞解锁")
-            return
-
-        rotation_speed = 30.0 * intensity  # 度/秒
-
-        if direction == 'yaw_left':
-            self.state['orientation'][2] += rotation_speed  # yaw左转
-            self.state['mode'] = 'YAW_LEFT'
-        elif direction == 'yaw_right':
-            self.state['orientation'][2] -= rotation_speed  # yaw右转
-            self.state['mode'] = 'YAW_RIGHT'
-
-        # 保持位置不变
-        self.state['velocity'] = np.array([0.0, 0.0, 0.0])
-
-        print(f"[OK] 仿真：无人机{direction}，速度{rotation_speed:.1f}度/秒")
-
-    def _hover_simulation(self):
-        """仿真悬停"""
-        if self.state['armed']:
-            self.state['velocity'] = np.array([0.0, 0.0, 0.0])
-            self.state['mode'] = 'HOVER'
-            self.logger.info("仿真: 无人机悬停")
 
     def move_by_velocity(self, vx: float, vy: float, vz: float, duration: float = 0.5):
         if not self.connected:
@@ -159,7 +85,66 @@ class SimulationDroneController(BaseDroneController):
         else:
             self._simulate_move(vx, vy, vz)
 
+    def send_command(self, command: str, intensity: float = 1.0):
+        """发送控制命令"""
+        self.logger.info(f"收到命令: {command}, 强度: {intensity}")
+
+        if command == "takeoff":
+            self.takeoff()
+        elif command == "land":
+            self.land()
+        elif command == "hover":
+            self.hover()
+        elif command == "forward":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(speed, 0, 0)
+        elif command == "backward":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(-speed, 0, 0)
+        elif command == "left":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, -speed, 0)
+        elif command == "right":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, speed, 0)
+        elif command == "up":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, 0, -speed)
+        elif command == "down":
+            speed = self.config.get("drone.max_speed", 2.0) * intensity
+            self.move_by_velocity(0, 0, speed)
+        elif command == "stop":
+            self.move_by_velocity(0, 0, 0)
+            self.state['armed'] = False
+            self.state['mode'] = 'DISARMED'
+        elif command == "turn_left":
+            self._rotate_simulation('yaw_left', intensity)
+        elif command == "turn_right":
+            self._rotate_simulation('yaw_right', intensity)
+
+    def _simulate_takeoff(self, altitude: float):
+        """仿真起飞"""
+        self.logger.info(f"仿真: 无人机起飞到 {altitude} 米高度")
+        self.state['armed'] = True
+        self.state['mode'] = 'TAKEOFF'
+        self.state['velocity'][1] = 1.0
+
+    def _simulate_land(self):
+        """仿真降落"""
+        self.logger.info("仿真: 无人机降落")
+        if self.state['armed']:
+            self.state['mode'] = 'LAND'
+            self.state['velocity'][1] = -1.0
+
+    def _simulate_hover(self):
+        """仿真悬停"""
+        if self.state['armed']:
+            self.state['velocity'] = np.array([0.0, 0.0, 0.0])
+            self.state['mode'] = 'HOVER'
+            self.logger.info("仿真: 无人机悬停")
+
     def _simulate_move(self, vx: float, vy: float, vz: float):
+        """仿真移动"""
         if not self.state['armed']:
             self.logger.warning("警告: 无人机未解锁，无法移动")
             return
@@ -181,7 +166,26 @@ class SimulationDroneController(BaseDroneController):
 
         self.logger.info(f"仿真: 无人机移动，速度: ({vx:.2f}, {vy:.2f}, {vz:.2f})")
 
+    def _rotate_simulation(self, direction, intensity):
+        """仿真旋转"""
+        if not self.state['armed']:
+            self.logger.warning("警告: 无人机未解锁，无法旋转")
+            return
+
+        rotation_speed = 30.0 * intensity  # 度/秒
+
+        if direction == 'yaw_left':
+            self.state['orientation'][2] += rotation_speed
+            self.state['mode'] = 'YAW_LEFT'
+        elif direction == 'yaw_right':
+            self.state['orientation'][2] -= rotation_speed
+            self.state['mode'] = 'YAW_RIGHT'
+
+        self.state['velocity'] = np.array([0.0, 0.0, 0.0])
+        self.logger.info(f"仿真: 无人机旋转，速度: {rotation_speed:.1f}度/秒")
+
     def update_physics(self, dt: float):
+        """更新物理状态"""
         if self.state['armed']:
             self.state['position'] += self.state['velocity'] * dt
 
@@ -222,10 +226,12 @@ class SimulationDroneController(BaseDroneController):
                     self._emergency_land()
 
     def _emergency_land(self):
+        """紧急降落"""
         self.logger.warning("警告: 电池耗尽，紧急降落！")
         self._simulate_land()
 
     def _send_mavlink_takeoff(self):
+        """发送MAVLink起飞命令"""
         try:
             from pymavlink import mavutil
             self.master.mav.command_long_send(
@@ -238,6 +244,7 @@ class SimulationDroneController(BaseDroneController):
             self.logger.error(f"起飞失败: {e}")
 
     def _send_mavlink_land(self):
+        """发送MAVLink降落命令"""
         try:
             self._set_mavlink_mode("LAND")
             self.logger.info("真实无人机: 开始降落")
@@ -245,15 +252,18 @@ class SimulationDroneController(BaseDroneController):
             self.logger.error(f"降落失败: {e}")
 
     def _send_mavlink_hover(self):
+        """发送MAVLink悬停命令"""
         try:
             self._set_mavlink_mode("LOITER")
         except Exception as e:
             self.logger.error(f"设置悬停模式失败: {e}")
 
     def _send_mavlink_velocity(self, vx: float, vy: float, vz: float):
+        """发送MAVLink速度命令"""
         pass
 
     def _set_mavlink_mode(self, mode: str):
+        """设置MAVLink模式"""
         try:
             from pymavlink import mavutil
             mode_id = self.master.mode_mapping()[mode]
