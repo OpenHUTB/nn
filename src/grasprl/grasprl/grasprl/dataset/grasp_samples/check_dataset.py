@@ -1,6 +1,7 @@
 import os
 import numpy as np
 
+
 #改成相对路径
 data_path = os.path.dirname(os.path.abspath(__file__))
 need_fields = ["grasp_success", "grasp_pose"]

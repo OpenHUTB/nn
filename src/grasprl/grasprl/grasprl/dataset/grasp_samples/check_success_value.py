@@ -27,7 +27,6 @@ for f in label_files:
         val = label.get("grasp_success", -1)
         print(f"{f} → {val}")
         
-        # 提取样本编号，分层统计
         idx = int(f.replace("label_", "").replace(".npy", ""))
         if 1 <= idx <= 20:
             segment1_total += 1
