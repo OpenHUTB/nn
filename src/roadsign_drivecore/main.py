@@ -244,6 +244,7 @@ def main():
                 display.blit(surface, (0, 0))
                 pygame.display.flip()
 
+
             clock.tick(30)
 
     finally:
