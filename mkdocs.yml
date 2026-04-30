@@ -28,11 +28,27 @@ extra_javascript:
   - https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.4/MathJax.js?config=TeX-AMS-MML_HTMLorMML
 
 plugins:
+
 #  - mkdocs-video
+
   - search:
       lang: ja
       separator: '[\s\-\.]+'
       min_search_length: 3
+
+  - mermaid2:
+      version: "10.6.1"
+      arguments:
+        theme: 'default'
+        flowchart:
+          useMaxWidth: true
+          htmlLabels: true
+          curve: 'basis'
+          diagramPadding: 20
+          nodeSpacing: 50
+          rankSpacing: 100
+      securityLevel: 'loose'
+      class: 'mermaid-center'
 
 extra:
   generator: false

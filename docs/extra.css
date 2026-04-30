@@ -1,0 +1,22 @@
+/* 流程图居中样式 */
+.mermaid-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 20px auto;
+    padding: 10px;
+}
+
+/* 或者使用更通用的选择器 */
+.mermaid {
+    text-align: center;
+    margin: 20px auto;
+}
+
+/* 确保SVG图形本身居中 */
+.mermaid svg {
+    display: block;
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
+}
