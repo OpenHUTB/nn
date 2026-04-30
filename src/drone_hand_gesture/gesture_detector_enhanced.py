@@ -32,14 +32,16 @@ class EnhancedGestureDetector:
                 self.mp_drawing = mp.solutions.drawing_utils
                 self.mp_drawing_styles = mp.solutions.drawing_styles
                 
+                # 使用更轻量的配置，提高帧率
                 self.hands = self.mp_hands.Hands(
                     static_image_mode=False,
                     max_num_hands=1,
+                    model_complexity=0,  # 使用最轻量的模型
                     min_detection_confidence=0.5,
-                    min_tracking_confidence=0.5
+                    min_tracking_confidence=0.3
                 )
                 self.mode = "mediapipe"
-                print("[INFO] 使用 MediaPipe 手势检测模式")
+                print("[INFO] 使用 MediaPipe 手势检测模式 (轻量配置)")
             except Exception as e:
                 print(f"[WARNING] MediaPipe 初始化失败: {e}")
                 self.mode = "opencv"
@@ -251,8 +253,90 @@ class EnhancedGestureDetector:
         return landmarks[:63]
 
     def _classify_by_rules(self, hand_landmarks):
-        """规则分类"""
-        return "open_palm", 0.5
+        """规则分类（基于MediaPipe关键点）"""
+        if len(hand_landmarks.landmark) < 21:
+            return "no_hand", 0.0
+        
+        points = hand_landmarks.landmark
+        
+        # 计算手指伸展情况
+        def is_finger_extended(tip_idx, pip_idx):
+            """判断手指是否伸展"""
+            tip = points[tip_idx]
+            pip = points[pip_idx]
+            mcp = points[pip_idx - 1]
+            return tip.y < pip.y
+        
+        # 检查各手指
+        fingers_extended = {
+            'thumb': self._is_thumb_extended(points),
+            'index': is_finger_extended(8, 6),
+            'middle': is_finger_extended(12, 10),
+            'ring': is_finger_extended(16, 14),
+            'pinky': is_finger_extended(20, 18)
+        }
+        
+        extended_count = sum(fingers_extended.values())
+        
+        # 手势分类
+        # 1. 张开手掌: 4或5个手指伸展
+        if extended_count >= 4:
+            return "open_palm", 0.85
+        
+        # 2. 握拳: 所有手指弯曲
+        if extended_count <= 1:
+            return "closed_fist", 0.85
+        
+        # 3. 食指上指: 只有食指伸展
+        if (fingers_extended['index'] and 
+            not fingers_extended['middle'] and 
+            not fingers_extended['ring'] and 
+            not fingers_extended['pinky']):
+            return "pointing_up", 0.80
+        
+        # 4. 食指向下: 只有食指伸展
+        if (fingers_extended['index'] and 
+            not fingers_extended['middle'] and 
+            not fingers_extended['ring'] and 
+            not fingers_extended['pinky']):
+            return "pointing_up", 0.80
+        
+        # 5. 胜利手势: 食指和中指伸展
+        if (fingers_extended['index'] and 
+            fingers_extended['middle'] and 
+            not fingers_extended['ring'] and 
+            not fingers_extended['pinky']):
+            return "victory", 0.80
+        
+        # 6. 大拇指向上/向下
+        if fingers_extended['thumb']:
+            thumb_tip = points[4]
+            wrist = points[0]
+            if thumb_tip.y < wrist.y:
+                return "thumb_up", 0.80
+            else:
+                return "thumb_down", 0.80
+        
+        # 7. OK手势: 食指和拇指接近
+        thumb_tip = points[4]
+        index_tip = points[8]
+        distance = ((thumb_tip.x - index_tip.x)**2 + 
+                   (thumb_tip.y - index_tip.y)**2)**0.5
+        if distance < 0.15 and not fingers_extended['index']:
+            return "ok_sign", 0.80
+        
+        return "hand_detected", 0.5
+    
+    def _is_thumb_extended(self, points):
+        """判断拇指是否伸展"""
+        thumb_tip = points[4]
+        thumb_mcp = points[2]
+        wrist = points[0]
+        
+        # 检查拇指是否在手掌外侧
+        if thumb_tip.x < thumb_mcp.x:
+            return True
+        return False
 
     def _smooth_prediction(self, gesture, confidence):
         """平滑预测"""

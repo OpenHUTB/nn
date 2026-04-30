@@ -44,15 +44,32 @@ client.set_timeout(60.0)
 def load_map(map_name):
     return client.load_world(map_name)
 
+
+def spawn_vehicle_with_retries(world, blueprint, spawn_points, used_spawn_indices=None):
+    if used_spawn_indices is None:
+        used_spawn_indices = set()
+
+    candidate_indices = [index for index in range(len(spawn_points)) if index not in used_spawn_indices]
+    random.shuffle(candidate_indices)
+
+    for index in candidate_indices:
+        vehicle = world.try_spawn_actor(blueprint, spawn_points[index])
+        if vehicle is not None:
+            used_spawn_indices.add(index)
+            return vehicle, index
+
+    return None, None
+
+
 # Function to spawn vehicles
-def spawn_vehicles(num_vehicles, world, spawn_points):
+def spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices=None):
     vehicle_bp_lib = world.get_blueprint_library().filter('vehicle.*')
     spawned_vehicles = []
+    used_indices = used_spawn_indices if used_spawn_indices is not None else set()
 
     for _ in range(num_vehicles):
         vehicle_bp = random.choice(vehicle_bp_lib)
-        spawn_point = random.choice(spawn_points)
-        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+        vehicle, _ = spawn_vehicle_with_retries(world, vehicle_bp, spawn_points, used_indices)
         if vehicle:
             spawned_vehicles.append(vehicle)
             # print(f"Spawned vehicle: {vehicle.id} at {spawn_point}")
@@ -60,6 +77,84 @@ def spawn_vehicles(num_vehicles, world, spawn_points):
             print("Failed to spawn vehicle")
 
     return spawned_vehicles
+
+
+def get_driving_waypoint(world_map, location):
+    return world_map.get_waypoint(
+        location,
+        project_to_road=True,
+        lane_type=carla.LaneType.Driving
+    )
+
+
+def get_road_id_for_location(world_map, location):
+    waypoint = get_driving_waypoint(world_map, location)
+    if waypoint is None:
+        return None
+    return waypoint.road_id
+
+
+def choose_next_ego_spawn_index(world_map, spawn_points, current_location, current_spawn_index):
+    current_road_id = get_road_id_for_location(world_map, current_location)
+    far_different_road = []
+    far_same_road = []
+    nearby_different_road = []
+    nearby_same_road = []
+
+    candidate_indices = list(range(len(spawn_points)))
+    random.shuffle(candidate_indices)
+
+    for index in candidate_indices:
+        if index == current_spawn_index:
+            continue
+
+        spawn_point = spawn_points[index]
+        waypoint = get_driving_waypoint(world_map, spawn_point.location)
+        if waypoint is None:
+            continue
+
+        is_far_enough = spawn_point.location.distance(current_location) >= EGO_MIN_RESPAWN_DISTANCE
+        is_different_road = waypoint.road_id != current_road_id
+
+        if is_far_enough and is_different_road:
+            far_different_road.append(index)
+        elif is_far_enough:
+            far_same_road.append(index)
+        elif is_different_road:
+            nearby_different_road.append(index)
+        else:
+            nearby_same_road.append(index)
+
+    for bucket in (far_different_road, far_same_road, nearby_different_road, nearby_same_road):
+        if bucket:
+            return bucket[0]
+
+    return None
+
+
+def relocate_ego_vehicle(vehicle, spawn_points, world_map, traffic_manager, current_spawn_index):
+    next_spawn_index = choose_next_ego_spawn_index(
+        world_map,
+        spawn_points,
+        vehicle.get_location(),
+        current_spawn_index
+    )
+    if next_spawn_index is None:
+        return current_spawn_index, False
+
+    vehicle.set_autopilot(False, traffic_manager.get_port())
+    vehicle.apply_control(carla.VehicleControl(throttle=0.0, steer=0.0, brake=1.0))
+    vehicle.set_target_velocity(carla.Vector3D(0.0, 0.0, 0.0))
+    vehicle.set_target_angular_velocity(carla.Vector3D(0.0, 0.0, 0.0))
+    vehicle.set_transform(spawn_points[next_spawn_index])
+    vehicle.set_autopilot(True, traffic_manager.get_port())
+    traffic_manager.auto_lane_change(vehicle, True)
+    traffic_manager.vehicle_percentage_speed_difference(vehicle, BASE_SPEED_DIFFERENCE)
+    traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
+
+    new_road_id = get_road_id_for_location(world_map, spawn_points[next_spawn_index].location)
+    print(f"Ego vehicle relocated to spawn index {next_spawn_index}, road_id={new_road_id}")
+    return next_spawn_index, True
 
 # Function to spawn walkers
 '''def spawn_walkers(num_walkers, world, spawn_points):
@@ -103,6 +198,8 @@ world.apply_settings(settings)
 # Initialize Traffic Manager
 traffic_manager = client.get_trafficmanager(8000)
 traffic_manager.set_synchronous_mode(True)
+if hasattr(traffic_manager, 'set_random_device_seed'):
+    traffic_manager.set_random_device_seed(int(time.time()))
 world_map = world.get_map()
 
 
@@ -119,16 +216,19 @@ OVERTAKE_LANE_CLEAR_DISTANCE = 18.0
 OVERTAKE_RELATIVE_SPEED_THRESHOLD = 2.0
 OVERTAKE_TARGET_MAX_SPEED = 4.0
 OVERTAKE_COOLDOWN = 3.0
+EGO_RESPAWN_INTERVAL_SECONDS = 45.0
+EGO_MIN_RESPAWN_DISTANCE = 120.0
 
 
 
 
 # Get map spawn points
 spawn_points = world_map.get_spawn_points()
+used_spawn_indices = set()
 
 # Spawn vehicles and walkers
 num_vehicles = 10
-vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
+vehicles = spawn_vehicles(num_vehicles, world, spawn_points, used_spawn_indices)
 
 for v in vehicles:
     v.set_autopilot(True, traffic_manager.get_port())
@@ -142,7 +242,7 @@ bp_lib = world.get_blueprint_library().filter('*')
 # Spawn vehicle
 vehicle_bp = bp_lib.find('vehicle.audi.a2')
 try:
-    vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
+    vehicle, spawn_index = spawn_vehicle_with_retries(world, vehicle_bp, spawn_points, used_spawn_indices)
     if vehicle is None:
         raise RuntimeError("Failed to spawn vehicle")
 except Exception as e:
@@ -153,20 +253,22 @@ except Exception as e:
 vehicle.set_autopilot(True, traffic_manager.get_port())
 print("自动驾驶已启用")
 # 开启自动变道
-traffic_manager.auto_lane_change(vehicle, False)
+traffic_manager.auto_lane_change(vehicle, True)
 # 设置全局跟车距离
 traffic_manager.set_global_distance_to_leading_vehicle(BASE_FOLLOW_DISTANCE)
 #设置遵守交通规则
-traffic_manager.ignore_lights_percentage(vehicle, 0.0)  # Ignore all traffic lights
+traffic_manager.ignore_lights_percentage(vehicle, 100.0)  # Ignore all traffic lights
 #控制自动驾驶速度（加快）
-traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
+traffic_manager.vehicle_percentage_speed_difference(vehicle,-50)
 # 减少跟车距离
 traffic_manager.distance_to_leading_vehicle(vehicle, BASE_FOLLOW_DISTANCE)
 # Spawn camera
+CAMERA_IMAGE_SIZE = 1280
+CAMERA_FOV = 55
 camera_bp = bp_lib.find('sensor.camera.rgb')
-camera_bp.set_attribute('image_size_x', '1024')
-camera_bp.set_attribute('image_size_y', '1024')
-camera_bp.set_attribute('fov', '70')
+camera_bp.set_attribute('image_size_x', str(CAMERA_IMAGE_SIZE))
+camera_bp.set_attribute('image_size_y', str(CAMERA_IMAGE_SIZE))
+camera_bp.set_attribute('fov', str(CAMERA_FOV))
 
 # Adjust camera position and orientation to avoid car front
 #camera_init_trans = carla.Transform(carla.Location(x=2, z=2), carla.Rotation(pitch=-10))
@@ -185,6 +287,21 @@ def image_callback(image):
         image_queue.put(image)
 
 camera.listen(image_callback)
+
+
+def get_latest_image(image_queue_obj, timeout=1.0):
+    try:
+        image = image_queue_obj.get(timeout=timeout)
+    except queue.Empty:
+        return None
+
+    while True:
+        try:
+            image = image_queue_obj.get_nowait()
+        except queue.Empty:
+            break
+
+    return image
 # 使用相对路径保存记录到的数据
 # 当前文件目录
 current_dirc = os.path.dirname(os.path.abspath(__file__))
@@ -252,16 +369,26 @@ K = build_projection_matrix(image_w, image_h, fov)
 # Define the distance threshold for a clearly visible sign
 # 扩大检测距离到20米
 DISTANCE_THRESHOLD = 50.0  # Example threshold in meters
+SIGN_FACE_ALIGNMENT_THRESHOLD = 0.2
+SIGN_LOCATION_ROUND_DIGITS = 1
+MIN_CAPTURE_AREA = 1200
+MIN_CAPTURE_WIDTH = 24
+MIN_CAPTURE_HEIGHT = 24
+MAX_CAPTURE_DISTANCE = 24.0
+FRAME_EDGE_MARGIN_RATIO = 0.03
 
-# Set to track captured traffic sign locations
-captured_sign_locations = set()
+# Track each physical sign and only capture it once when it is clear enough.
+captured_sign_states = {}
 
-# Variable to track the last captured image time
-last_capture_time = 0
-capture_cooldown = 5  # Seconds to wait before capturing another image of the same sign
+
+def get_sign_key(location):
+    return (
+        round(location.x, SIGN_LOCATION_ROUND_DIGITS),
+        round(location.y, SIGN_LOCATION_ROUND_DIGITS),
+        round(location.z, SIGN_LOCATION_ROUND_DIGITS)
+    )
 
 def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_camera):
-    global captured_sign_locations, last_capture_time  # Use global set to track captured sign locations
     bounding_boxes = []
     camera_location = camera_transform.location
     vehicle_location = vehicle_transform.location
@@ -278,17 +405,25 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                 vector_to_camera = obj.location - camera_location
                 camera_dot_product = dot_product(camera_transform.get_forward_vector(), vector_to_camera)
 
-                # Use location tuple to check if sign is not already captured
-                sign_location_tuple = (round(obj.location.x, 2), round(obj.location.y, 2), round(obj.location.z, 2))
-                if camera_dot_product > 0 and sign_location_tuple not in captured_sign_locations:
+                sign_location_tuple = get_sign_key(obj.location)
+                sign_state = captured_sign_states.setdefault(
+                    sign_location_tuple,
+                    {'captured': False, 'best_area': 0}
+                )
+                if (
+                    camera_dot_product > 0 and
+                    not sign_state['captured'] and
+                    is_sign_front_visible(obj, camera_location)
+                ):
                     verts = [v for v in obj.get_world_vertices(carla.Transform())]
                     x_coords = [get_image_point(v, K, world_2_camera)[0] for v in verts]
                     y_coords = [get_image_point(v, K, world_2_camera)[1] for v in verts]
                     xmin, xmax = int(min(x_coords)), int(max(x_coords))
                     ymin, ymax = int(min(y_coords)), int(max(y_coords))
 
-                    # Calculate the area of the bounding box
+                    # Larger projected area usually means the sign is closer and clearer.
                     area = (xmax - xmin) * (ymax - ymin)
+                    sign_state['best_area'] = max(sign_state['best_area'], area)
 
                     # Set a threshold for the minimum area to capture the sign
                     # 降低“面积阈值”过滤
@@ -297,16 +432,28 @@ def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_cam
                     # Check if the bounding box is fully within the image frame
                     if xmin >= 0 and ymin >= 0 and xmax < image_w and ymax < image_h:
                         # Check the size and aspect ratio of the bounding box
-                        aspect_ratio = (xmax - xmin) / float(ymax - ymin) if (ymax - ymin) != 0 else 0
-                        if area > min_area_threshold and 0.5 < aspect_ratio < 2.0:
+                        box_width = xmax - xmin
+                        box_height = ymax - ymin
+                        aspect_ratio = box_width / float(box_height) if box_height != 0 else 0
+                        edge_margin_x = image_w * FRAME_EDGE_MARGIN_RATIO
+                        edge_margin_y = image_h * FRAME_EDGE_MARGIN_RATIO
+                        inside_safe_region = (
+                            xmin >= edge_margin_x and
+                            ymin >= edge_margin_y and
+                            xmax <= image_w - edge_margin_x and
+                            ymax <= image_h - edge_margin_y
+                        )
+                        is_clear_enough = (
+                            area >= MIN_CAPTURE_AREA and
+                            box_width >= MIN_CAPTURE_WIDTH and
+                            box_height >= MIN_CAPTURE_HEIGHT and
+                            distance <= MAX_CAPTURE_DISTANCE and
+                            inside_safe_region
+                        )
+                        if area > min_area_threshold and 0.5 < aspect_ratio < 2.0 and is_clear_enough:
                             bounding_boxes.append(
                                 {'label': 'TrafficSign', 'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax})
-
-                            # Store sign location in the set to avoid multiple captures
-                            current_time = time.time()
-                            if current_time - last_capture_time > capture_cooldown:
-                                captured_sign_locations.add(sign_location_tuple)
-                                last_capture_time = current_time
+                            sign_state['captured'] = True
 
     return bounding_boxes
 
@@ -357,6 +504,33 @@ def create_xml_file(image_name, bboxes, width, height, weather_params):
 # Function to manually compute dot product
 def dot_product(v1, v2):
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+
+
+def vector_length(vector):
+    return np.sqrt(vector.x ** 2 + vector.y ** 2 + vector.z ** 2)
+
+
+def normalized_dot_product(v1, v2):
+    v1_length = vector_length(v1)
+    v2_length = vector_length(v2)
+    if v1_length == 0.0 or v2_length == 0.0:
+        return 0.0
+    return dot_product(v1, v2) / (v1_length * v2_length)
+
+
+def is_sign_front_visible(sign_bbox, camera_location):
+    sign_transform = carla.Transform(sign_bbox.location, sign_bbox.rotation)
+    sign_forward_vector = sign_transform.get_forward_vector()
+    vector_to_camera = camera_location - sign_bbox.location
+    # CARLA traffic sign bounding boxes often use a forward vector that points away from
+    # the printable face, so we flip it here to keep front-facing signs.
+    sign_face_vector = carla.Vector3D(
+        x=-sign_forward_vector.x,
+        y=-sign_forward_vector.y,
+        z=-sign_forward_vector.z
+    )
+    facing_score = normalized_dot_product(sign_face_vector, vector_to_camera)
+    return facing_score > SIGN_FACE_ALIGNMENT_THRESHOLD
 
 
 def get_speed(vehicle_actor):
@@ -536,7 +710,10 @@ def try_overtake_blocking_vehicle(vehicle, world, traffic_manager, world_map, cu
 
 
 def update_autopilot_safety(vehicle, world, traffic_manager, world_map, current_time, last_overtake_time):
-    if is_right_turn_imminent(vehicle, world_map):
+    right_turn_imminent = is_right_turn_imminent(vehicle, world_map)
+    traffic_manager.auto_lane_change(vehicle, not right_turn_imminent)
+
+    if right_turn_imminent:
         traffic_manager.vehicle_percentage_speed_difference(vehicle, TURNING_SPEED_DIFFERENCE)
         traffic_manager.distance_to_leading_vehicle(vehicle, TURNING_FOLLOW_DISTANCE)
     else:
@@ -700,6 +877,7 @@ def non_maximum_suppression(bboxes, iou_threshold=0.2):
 # Variable to track if the last image had bounding boxes
 last_image_had_bboxes = False
 last_overtake_time = 0.0
+last_ego_respawn_time = time.time()
 
 
 # Start the game loop
@@ -718,11 +896,33 @@ try:
             last_overtake_time
         )
 
+        if loop_time - last_ego_respawn_time >= EGO_RESPAWN_INTERVAL_SECONDS:
+            spawn_index, relocated = relocate_ego_vehicle(
+                vehicle,
+                spawn_points,
+                world_map,
+                traffic_manager,
+                spawn_index
+            )
+            if relocated:
+                while True:
+                    try:
+                        image_queue.get_nowait()
+                    except queue.Empty:
+                        break
+                last_ego_respawn_time = loop_time
+
         # Handle manual input
         # handle_input(vehicle)
 
-        # Get the latest image from the queue
-        image = image_queue.get()
+        # Get the latest image from the queue without blocking the UI thread indefinitely.
+        image = get_latest_image(image_queue, timeout=1.0)
+        if image is None:
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('x'):
+                print("X key pressed")
+                break
+            continue
 
         # Automatically change the weather
         current_time = time.time()

@@ -32,8 +32,17 @@ class GestureDetector:
             "victory": "forward",      # 胜利手势 - 前进
             "thumb_up": "backward",   # 大拇指 - 后退
             "thumb_down": "stop",      # 大拇指向下 - 停止
-            "ok_sign": "hover"        # OK手势 - 悬停
+            "ok_sign": "hover",       # OK手势 - 悬停
+            "left_palm": "left",      # 左手掌 - 左移
+            "right_palm": "right",    # 右手掌 - 右移
+            "three_fingers_left": "turn_left",   # 3指+左手位置 - 左转
+            "three_fingers_right": "turn_right"  # 3指+右手位置 - 右转
         }
+        
+        # 手势序列检测（用于握拳→松开触发起飞）
+        self.prev_gesture = None
+        self.fist_start_time = None
+        self.FIST_TIMEOUT = 1.5  # 握拳后1.5秒内松开才触发起飞
         
         print("[INFO] 使用纯 OpenCV 手势检测器")
     
@@ -81,6 +90,36 @@ class GestureDetector:
                 # 分析手势
                 gesture, confidence = self._analyze_hand_shape(max_contour, result_image)
                 
+                # 手势序列检测：握拳→松开在中央区域=起飞
+                import time
+                current_time = time.time()
+                
+                if gesture == "open_palm":
+                    # 检查是否从握拳状态转换而来
+                    if self.prev_gesture == "closed_fist" and self.fist_start_time:
+                        time_diff = current_time - self.fist_start_time
+                        if time_diff <= self.FIST_TIMEOUT:
+                            # 握拳后1.5秒内松开，触发起飞
+                            pass  # 保持 gesture = "open_palm"
+                        else:
+                            # 超时，不触发起飞
+                            gesture = "hand_detected"
+                            confidence = 0.5
+                    else:
+                        # 不是从握拳转换而来，不触发起飞
+                        gesture = "hand_detected"
+                        confidence = 0.5
+                
+                # 更新状态
+                if gesture != "no_hand" and gesture != "hand_detected":
+                    if gesture == "closed_fist" and self.prev_gesture != "closed_fist":
+                        self.fist_start_time = current_time
+                    self.prev_gesture = gesture
+                elif gesture == "no_hand":
+                    # 手消失，重置状态
+                    self.prev_gesture = None
+                    self.fist_start_time = None
+                
                 # 在仿真模式下生成简化关键点
                 if simulation_mode:
                     landmarks_data = self._generate_landmarks_from_contour(max_contour)
@@ -96,6 +135,12 @@ class GestureDetector:
             command = self.gesture_commands.get(gesture, "none")
             cv2.putText(result_image, f"Command: {command}", (10, 110),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+            
+            # 调试：显示手掌位置
+            if 'cx' in dir() or M["m00"] != 0:
+                cv2.circle(result_image, (cx, cy), 5, (255, 0, 0), -1)
+                cv2.putText(result_image, f"Hand X: {cx}", (10, 150),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
         else:
             cv2.putText(result_image, "No hand detected", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
@@ -136,6 +181,16 @@ class GestureDetector:
         # 计算手指数量
         finger_count = self._count_fingers(contour, defects)
         
+        # 获取图像尺寸和手部中心位置
+        height, width = image.shape[:2]
+        M = cv2.moments(contour)
+        if M["m00"] != 0:
+            cx = int(M["m10"] / M["m00"])
+            cy = int(M["m01"] / M["m00"])
+        else:
+            cx = width // 2
+            cy = height // 2
+        
         # 根据手指数量判断手势
         gesture = "hand_detected"
         confidence = 0.5
@@ -149,9 +204,32 @@ class GestureDetector:
         elif finger_count == 2:
             gesture = "victory"
             confidence = 0.80
+        elif finger_count == 3:
+            # 3个手指：根据手掌位置判断左转/右转
+            if cx < width // 2:
+                gesture = "three_fingers_left"
+                confidence = 0.75
+            else:
+                gesture = "three_fingers_right"
+                confidence = 0.75
         elif finger_count >= 4:
-            gesture = "open_palm"
-            confidence = 0.75
+            # 根据手掌位置区分手势
+            # 定义中央区域（图像宽度的中间1/3）
+            left_boundary = width // 3
+            right_boundary = 2 * width // 3
+            
+            if cx < left_boundary:
+                # 手掌在左侧 → 左移
+                gesture = "left_palm"
+                confidence = 0.75
+            elif cx > right_boundary:
+                # 手掌在右侧 → 右移
+                gesture = "right_palm"
+                confidence = 0.75
+            else:
+                # 手掌在中央 → 起飞
+                gesture = "open_palm"
+                confidence = 0.75
         
         # 额外检测拇指
         if gesture == "hand_detected":

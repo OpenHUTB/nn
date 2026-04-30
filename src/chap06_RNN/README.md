@@ -151,3 +151,32 @@ Step 100: Loss = 0.6821
 Step 3000: Loss = 0.1235
 Accuracy: 98.75%
 ```
+
+---
+
+# Learn2Carry-exercise.py 工程化补充说明
+
+本次在不改变 RNN 加法核心逻辑的前提下，对 `Learn2Carry-exercise.py` 做了小幅工程化改进：
+
+1. 增加环境变量参数，减少反复改源码：
+   - `LEARN2CARRY_SEED`（随机种子）
+   - `LEARN2CARRY_TRAIN_STEPS`（训练步数）
+   - `LEARN2CARRY_TRAIN_BATCH`（训练 batch）
+   - `LEARN2CARRY_EVAL_BATCH`（评估 batch）
+   - `LEARN2CARRY_MAXLEN`（最大位长）
+   - `LEARN2CARRY_LOG_INTERVAL`（日志打印间隔）
+   - `LEARN2CARRY_REPORT_OUT`（报告输出路径）
+2. 增加可复现机制：固定 `numpy` 与 `tensorflow` 随机种子。
+3. 增加结果留档：运行完成后自动保存 `outputs/learn2carry_report.json`。
+
+## 运行示例（PowerShell）
+
+```powershell
+$env:LEARN2CARRY_SEED=42
+$env:LEARN2CARRY_TRAIN_STEPS=50
+$env:LEARN2CARRY_TRAIN_BATCH=128
+$env:LEARN2CARRY_EVAL_BATCH=200
+$env:LEARN2CARRY_LOG_INTERVAL=10
+$env:LEARN2CARRY_REPORT_OUT="outputs/learn2carry_report.json"
+python .\Learn2Carry-exercise.py
+```
