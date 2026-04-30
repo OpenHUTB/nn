@@ -168,21 +168,26 @@ try:
 
         velocity = vehicle.get_velocity()
         speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)  # 计算速度大小
-        if not is_avoiding:
-            if speed < 2.5:
-                stuck_timer += 1
-                if stuck_timer > 5:  # 车速过慢超过 0.02 * 5 = 0.1 秒，触发避障
-                    print("前方障碍！")
-                    current_waypoint = map.get_waypoint(vehicle.get_transform().location)
-                    target_lane = get_new_lane(current_waypoint)
-                    if target_lane:
-                        print("开始绕行")
-                        vehicle.set_autopilot(False)
-                        is_avoiding = True
-                        stuck_timer = 0
-                    else:
-                        print("无可用车道，紧急停车！")
-                        vehicle.apply_control(carla.VehicleControl(brake=1.0))
+       if not is_avoiding:
+    # 新增：获取前车道路点，判断前方是否有堵塞
+    current_wp = map.get_waypoint(vehicle.get_transform().location)
+    next_wps = current_wp.next(15.0)
+    # 车速低 + 前方15米无路点/拥堵 才触发避障
+    if speed < 2.5 and len(next_wps) == 0:
+        stuck_timer += 1
+        if stuck_timer > 5:
+            print("前方道路受阻，触发避障！")
+            target_lane = get_new_lane(current_wp)
+            if target_lane:
+                print("开始绕行换道")
+                vehicle.set_autopilot(False)
+                is_avoiding = True
+                stuck_timer = 0
+            else:
+                print("无可用车道，紧急停车！")
+                vehicle.apply_control(carla.VehicleControl(brake=1.0))
+    else:
+        stuck_timer = 0
         else:
             # 持续跟踪目标车道点
             steer = pure_pursuit(target_lane.transform.location, vehicle.get_transform())
