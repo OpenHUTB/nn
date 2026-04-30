@@ -146,14 +146,14 @@ class PurePursuit:
 系统实现效果图如下
 
 
-![起始图](images/1.png)
+![起始图](./test/image/1.png)
 
 
-![结尾图](images/2.png)
+![结尾图](./test/image/2.png)
 
 ### 4.3 轨迹跟踪结果可视化分析
 轨迹对比图如下：
-![轨迹对比图](images/result.png)
+![轨迹对比图](./test/image/3.png)
 
 
 - 直线路段：实际轨迹与参考路径高度重合，跟踪误差小于0.5m，无明显偏移。
