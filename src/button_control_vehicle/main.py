@@ -143,7 +143,7 @@ class GlobalPlannerNode(Node):
         # 新增：检查CARLA连接状态
         if not self.carla_connected or not self.map:
             self.get_logger().error("CARLA连接未建立或地图未初始化，无法规划路径")
-            response.success = False  # 假设服务定义中有success字段
+        
             return response
 
         try:
