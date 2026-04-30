@@ -346,6 +346,10 @@ class HumanoidStabilizer:
         self._force_factor_norm = float(max(1.0, 0.5 * self.weight))
         self.com_safety_threshold = 0.6  # 重心z轴安全阈值（新增）
         self.speed_reduction_factor = 0.5  # 重心过低时的降速系数（新增）
+        self._support_body_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis"))
+        if self._support_body_id < 0:
+            self._support_body_id = 0
+        self._support_until = 0.0
 
         self._left_foot_geom_ids = {
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot1_left"),
@@ -569,6 +573,22 @@ class HumanoidStabilizer:
 
         self.data.qpos[self._qpos_adr] = self.joint_targets.astype(np.float64)
         mujoco.mj_forward(self.model, self.data)
+        target_clearance = 0.002
+        min_bottom_z = None
+        foot_geom_ids = list(self._left_foot_geom_ids | self._right_foot_geom_ids)
+        for gid in foot_geom_ids:
+            if gid < 0:
+                continue
+            radius = float(self.model.geom_size[gid, 0])
+            z = float(self.data.geom_xpos[gid, 2]) - radius
+            if min_bottom_z is None or z < min_bottom_z:
+                min_bottom_z = z
+        if min_bottom_z is not None:
+            dz = (min_bottom_z - target_clearance)
+            if abs(dz) > 1e-6:
+                self.data.qpos[2] -= dz
+                mujoco.mj_forward(self.model, self.data)
+        self._support_until = float(self.data.time) + 3.0
 
     # ===================== 传感器模拟相关方法（原有新增逻辑保留） =====================
     def _simulate_imu_data(self):
@@ -916,6 +936,14 @@ class HumanoidStabilizer:
         torso_torque = np.array([roll_torque, pitch_torque, yaw_torque])
         torso_torque = np.clip(torso_torque, -30.0, 30.0)
 
+        self.data.xfrc_applied[self._support_body_id, :] = 0.0
+        now_t = float(self.data.time)
+        if now_t < float(self._support_until):
+            scale = float(np.clip((float(self._support_until) - now_t) / 3.0, 0.0, 1.0))
+            self.data.xfrc_applied[self._support_body_id, 2] = self.weight * 0.9 * scale
+            self.data.xfrc_applied[self._support_body_id, 3] = (-80.0 * self._imu_euler_filt[0] - 20.0 * self._imu_angvel_filt[0]) * scale
+            self.data.xfrc_applied[self._support_body_id, 4] = (-80.0 * self._imu_euler_filt[1] - 20.0 * self._imu_angvel_filt[1]) * scale
+
         # 重心补偿（原有逻辑完全保留）
         com = self.data.subtree_com[0].astype(np.float64).copy()
         com_error = self.com_target - com
@@ -1056,6 +1084,7 @@ class HumanoidStabilizer:
                 print(f"默认步态模式：{self.gait_mode}\n")
 
                 # 初始落地阶段（原有逻辑保留）
+                self._support_until = max(float(self._support_until), float(self.data.time) + float(self.init_wait_time))
                 start_time = time.time()
                 while time.time() - start_time < self.init_wait_time:
                     elapsed = time.time() - start_time
