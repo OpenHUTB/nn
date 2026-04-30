@@ -81,6 +81,7 @@ def get_distance_to_intersection(vehicle, map):
     return 999
 
 
+
 # ================== V4.0 碰撞事件回调函数 ==================
 def on_collision(event):
     global need_vehicle_reset
