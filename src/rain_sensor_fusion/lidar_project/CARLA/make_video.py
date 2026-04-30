@@ -24,3 +24,4 @@ for i, path in enumerate(img_paths[:80]):
 out.release()
 print("\n✅ 视频生成完成：lidar_short.mp4")
 print("📦 大小大约 3~5MB")
+
