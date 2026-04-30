@@ -56,6 +56,7 @@ title: 主页
 
 [__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
 
+[__td3_carracing__](./robot_navigation_simulation/基于栅格地图与多算法对比的机器人自主导航仿真系统.md) 
 ## 规划 <span id="planning"></span>
 
 [__导航__](#navigation)
