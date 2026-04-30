@@ -64,7 +64,6 @@ def get_steer(vehicle_transform, waypoint_transform):
         angle *= -1
     return max(-1.0, min(1.0, angle * 2.0))
 
-
 # 计算到路口距离
 def get_distance_to_intersection(vehicle, map):
     vehicle_loc = vehicle.get_transform().location
