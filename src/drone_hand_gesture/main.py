@@ -91,25 +91,30 @@ class IntegratedDroneSimulation:
             print("[OK] 初始化 OpenCV 手势检测器")
             self.gesture_detector = CVGestureDetector()
             self.gesture_detector.use_ml = False
-        elif selected_model:
-            print(f"[INFO] 使用模型: {selected_model_name}")
-
+        elif HAS_ENHANCED_DETECTOR:
+            # 优先使用增强版检测器（MediaPipe）
             try:
                 from gesture_detector_enhanced import EnhancedGestureDetector
                 print("[OK] 导入增强版手势检测器")
 
-                # 使用实际的模型文件
-                self.gesture_detector = EnhancedGestureDetector(
-                    ml_model_path=selected_model,
-                    use_ml=True
-                )
-
-                # 验证模型是否真正加载成功
-                if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
-                    print(f"[OK] 机器学习模型加载成功 ({selected_model_name})")
-                    print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
+                if selected_model:
+                    # 使用机器学习模型
+                    self.gesture_detector = EnhancedGestureDetector(
+                        ml_model_path=selected_model,
+                        use_ml=True
+                    )
+                    print(f"[INFO] 使用模型: {selected_model_name}")
+                    
+                    # 验证模型是否真正加载成功
+                    if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
+                        print(f"[OK] 机器学习模型加载成功")
+                        print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
+                    else:
+                        print("[WARNING] 机器学习模型未加载，使用规则检测")
+                        self.gesture_detector = EnhancedGestureDetector(use_ml=False)
                 else:
-                    print("[WARNING] 机器学习模型未加载，回退到规则检测")
+                    # 使用规则检测（不需要模型）
+                    print("[INFO] 未找到模型文件，使用规则检测")
                     self.gesture_detector = EnhancedGestureDetector(use_ml=False)
 
             except (ImportError, Exception) as e:
@@ -117,9 +122,8 @@ class IntegratedDroneSimulation:
                 print("[OK] 使用原始手势检测器")
                 from gesture_detector import GestureDetector
                 self.gesture_detector = GestureDetector()
-
         else:
-            print("[WARNING] 未找到可用的机器学习模型文件")
+            print("[WARNING] 增强版检测器不可用")
             print("[OK] 使用原始手势检测器")
             from gesture_detector import GestureDetector
             self.gesture_detector = GestureDetector()
@@ -212,28 +216,27 @@ class IntegratedDroneSimulation:
                 print("[INFO] 当前模式: 规则手势识别")
 
     def _initialize_camera(self):
-        """初始化摄像头"""
+        """初始化摄像头（恢复正常分辨率）"""
         # 尝试多个摄像头ID，优先使用1，如果失败则尝试0
-        camera_ids = [1, 0]  # 优先使用摄像头1
+        camera_ids = [1, 0]
 
         for camera_id in camera_ids:
             print(f"尝试打开摄像头 {camera_id}...")
             cap = cv2.VideoCapture(camera_id)
 
             if cap.isOpened():
-                # 设置摄像头参数
+                # 正常分辨率
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 cap.set(cv2.CAP_PROP_FPS, 30)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                 # 尝试读取一帧测试
                 ret, test_frame = cap.read()
                 if ret:
-                    # 获取实际参数
                     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fps = cap.get(cv2.CAP_PROP_FPS)
-
                     print(f"[OK] 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
                     return cap
                 else:
@@ -246,7 +249,7 @@ class IntegratedDroneSimulation:
         return None
 
     def _gesture_recognition_loop(self):
-        """手势识别循环"""
+        """手势识别循环（恢复每帧检测）"""
         print("手势识别线程启动...")
 
         # 显示当前检测模式
@@ -288,28 +291,8 @@ class IntegratedDroneSimulation:
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                 cv2.putText(frame, "虚拟摄像头模式", (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.putText(frame, f"手势指令 ({mode_text}):", (50, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
-                cv2.putText(frame, "张开手掌 - 起飞", (50, 140),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "握拳 - 降落", (50, 170),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "胜利手势 - 前进", (50, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "大拇指 - 后退", (50, 230),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "食指上指 - 上升", (50, 260),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "食指向下 - 下降", (50, 290),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "OK手势 - 悬停", (50, 320),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "大拇指向下 - 停止", (50, 350),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "按 'q' 键退出", (50, 400),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
-            # 手势检测
+            # 每帧检测手势（流畅响应）
             try:
                 processed_frame, gesture, confidence, landmarks = \
                     self.gesture_detector.detect_gestures(frame, simulation_mode=True)
@@ -320,34 +303,27 @@ class IntegratedDroneSimulation:
                 self.gesture_confidence = confidence
                 self.hand_landmarks = landmarks
 
-                # 处理手势命令（使用降低的阈值）
+                # 处理手势命令
                 self._process_gesture_command(gesture, confidence)
 
-                # 增强界面显示
                 enhanced_frame = self._enhance_interface(processed_frame, gesture, confidence)
-
-                # 显示手势识别窗口
                 cv2.imshow('Gesture Control', enhanced_frame)
 
             except Exception as e:
                 print(f"手势检测错误: {e}")
                 self.current_frame = frame
                 self.current_gesture = None
-
-                # 增强界面显示（错误情况）
                 enhanced_frame = self._enhance_interface(frame, "error", 0.0)
                 cv2.imshow('Gesture Control', enhanced_frame)
 
-                # 检查退出
-            key = cv2.waitKey(10) & 0xFF
-            if key == ord('q') or key == 27:  # q 或 ESC 键退出
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or key == 27:
                 print("收到退出指令...")
                 self.running = False
                 break
             elif key == ord('c'):
-                # 切换摄像头功能
                 self._switch_camera()
-            elif key == ord('d'):  # 调试模式
+            elif key == ord('d'):
                 self._debug_gesture_detection()
             elif key == ord('m'):  # 切换单手/双手控制模式
                 self._toggle_dual_hand_mode()
