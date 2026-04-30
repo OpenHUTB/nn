@@ -245,6 +245,7 @@ def main():
 
             clock.tick(30)
 
+
     finally:
         print("清理资源...")
         for actor in actor_list:
