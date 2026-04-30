@@ -103,6 +103,65 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         cv.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
 
+    def draw_confidence_distribution(frame, confidences, start_x, start_y, bar_width=15, max_height=80):
+        """绘制置信度分布条形图
+
+        Args:
+            frame: 输入帧
+            confidences: 置信度列表
+            start_x, start_y: 起始坐标
+            bar_width: 每个柱子的宽度
+            max_height: 最大柱高
+        """
+        if len(confidences) == 0:
+            return start_y
+
+        # 将置信度分成5个区间
+        bins = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        counts, _ = np.histogram(confidences, bins=bins)
+        
+        # 计算分布比例
+        total = len(confidences)
+        max_count = max(counts) if max(counts) > 0 else 1
+        
+        # 绘制背景面板
+        panel_width = 6 * (bar_width + 2) + 10
+        panel_height = max_height + 50
+        cv.rectangle(frame, (start_x, start_y), (start_x + panel_width, start_y + panel_height), 
+                     (40, 40, 40), cv.FILLED)
+        
+        # 绘制每个区间的柱状图
+        colors = [(255, 100, 100), (255, 180, 100), (255, 255, 100), 
+                  (100, 255, 100), (100, 200, 255)]  # 从红到蓝渐变
+        labels = ['0-0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '0.8-1.0']
+        
+        x_pos = start_x + 5
+        for i, (count, color) in enumerate(zip(counts, colors)):
+            # 计算柱高
+            height = int((count / max_count) * max_height) if max_count > 0 else 0
+            
+            # 绘制柱子
+            cv.rectangle(frame, 
+                        (x_pos, start_y + 30 + (max_height - height)),
+                        (x_pos + bar_width, start_y + 30 + max_height),
+                        color, cv.FILLED)
+            
+            # 显示数量
+            if count > 0:
+                text = str(int(count))
+                cv.putText(frame, text, (x_pos + 2, start_y + 25 + (max_height - height)),
+                          cv.FONT_HERSHEY_SIMPLEX, 0.35, (255, 255, 255), 1)
+            
+            x_pos += bar_width + 2
+        
+        # 显示标签
+        y_offset = start_y + max_height + 35
+        cv.putText(frame, "Conf Distribution", (start_x + 5, y_offset),
+                  cv.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
+        
+        return y_offset + 15
+
+
     def count_vehicles(track_id, cx, cy, limits, crossed_ids, class_name=None, crossed_by_class=None, class_counts=None):
         """统计穿过计数线的车辆
 
@@ -229,7 +288,7 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
         sv.draw_text(frame, "[Strategy]", sv.Point(x=50, y=y_offset), sv.Color.GREEN, 0.5,
                      1, background_color=sv.Color.from_hex("#404040"))
         y_offset += 25
-        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on | track:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
+        sv.draw_text(frame, f"conf:{CONFIDENCE_THRESHOLD:.2f} | speed:on | track:on | dist:on", sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.4,
                      1, background_color=sv.Color.from_hex("#404040"))
         
         # 显示速度估算面板
@@ -272,6 +331,27 @@ def main(model_path=None, input_video_path=None, output_video_path=None, ground_
                 y_offset += 25
                 sv.draw_text(frame, f"Max: {max_length} | Min: {min_length}", sv.Point(x=50, y=y_offset), sv.Color.YELLOW, 0.4,
                             1, background_color=sv.Color.from_hex("#404040"))
+        
+        # 显示置信度分布可视化面板
+        y_offset += 35
+        sv.draw_text(frame, "[Conf Distribution]", sv.Point(x=50, y=y_offset), sv.Color.RED, 0.5,
+                     1, background_color=sv.Color.from_hex("#404040"))
+        y_offset += 25
+        
+        # 获取当前帧所有检测的置信度（过滤前）
+        all_confidences = detections_main.confidence.tolist() if hasattr(detections_main, 'confidence') and detections_main.confidence is not None else []
+        if all_confidences:
+            # 绘制置信度分布条形图
+            y_offset = draw_confidence_distribution(frame, all_confidences, 50, y_offset)
+            
+            # 显示置信度统计信息
+            y_offset += 5
+            avg_conf = np.mean(all_confidences)
+            max_conf = np.max(all_confidences)
+            min_conf = np.min(all_confidences)
+            sv.draw_text(frame, f"Min: {min_conf:.2f} | Avg: {avg_conf:.2f} | Max: {max_conf:.2f}", 
+                        sv.Point(x=50, y=y_offset), sv.Color.WHITE, 0.35,
+                        1, background_color=sv.Color.from_hex("#404040"))
 
 
     # 打开视频文件
