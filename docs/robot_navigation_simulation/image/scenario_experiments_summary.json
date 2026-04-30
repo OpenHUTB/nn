@@ -1,0 +1,337 @@
+{
+  "scenario_experiments": [
+    {
+      "experiment_name": "obstacle_density",
+      "image_name": "experiment_obstacle_density.png",
+      "results": [
+        {
+          "label": "0.10",
+          "parameter": "obstacle_density",
+          "value": 0.1,
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 482.0,
+              "avg_runtime_ms": 4.094,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 972.0,
+              "avg_runtime_ms": 5.681,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 46.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 86.0,
+              "avg_runtime_ms": 0.91,
+              "best_map_wins": 0
+            }
+          ]
+        },
+        {
+          "label": "0.18",
+          "parameter": "obstacle_density",
+          "value": 0.18,
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 284.0,
+              "avg_runtime_ms": 1.869,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 878.0,
+              "avg_runtime_ms": 4.979,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 48.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 98.0,
+              "avg_runtime_ms": 0.955,
+              "best_map_wins": 0
+            }
+          ]
+        },
+        {
+          "label": "0.26",
+          "parameter": "obstacle_density",
+          "value": 0.26,
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 243.0,
+              "avg_runtime_ms": 1.46,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 811.0,
+              "avg_runtime_ms": 4.482,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 58.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 121.0,
+              "avg_runtime_ms": 1.187,
+              "best_map_wins": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "experiment_name": "injection_step",
+      "image_name": "experiment_injection_step.png",
+      "results": [
+        {
+          "label": "4",
+          "parameter": "obstacle_injection_step",
+          "value": 4,
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 382.0,
+              "avg_runtime_ms": 2.159,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 851.0,
+              "avg_runtime_ms": 4.707,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 50.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 106.0,
+              "avg_runtime_ms": 1.071,
+              "best_map_wins": 0
+            }
+          ]
+        },
+        {
+          "label": "8",
+          "parameter": "obstacle_injection_step",
+          "value": 8,
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 353.0,
+              "avg_runtime_ms": 1.677,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 850.0,
+              "avg_runtime_ms": 11.412,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 50.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 102.0,
+              "avg_runtime_ms": 1.013,
+              "best_map_wins": 0
+            }
+          ]
+        },
+        {
+          "label": "12",
+          "parameter": "obstacle_injection_step",
+          "value": 12,
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 342.0,
+              "avg_runtime_ms": 1.45,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 850.0,
+              "avg_runtime_ms": 10.785,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 52.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 98.0,
+              "avg_runtime_ms": 0.942,
+              "best_map_wins": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "experiment_name": "map_scale",
+      "image_name": "experiment_map_scale.png",
+      "results": [
+        {
+          "label": "20x20",
+          "parameter": "grid_size",
+          "value": [
+            20,
+            20
+          ],
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 34.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 209.0,
+              "avg_runtime_ms": 1.405,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 34.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 558.0,
+              "avg_runtime_ms": 8.41,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 36.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 66.0,
+              "avg_runtime_ms": 0.589,
+              "best_map_wins": 0
+            }
+          ]
+        },
+        {
+          "label": "25x25",
+          "parameter": "grid_size",
+          "value": [
+            25,
+            25
+          ],
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 284.0,
+              "avg_runtime_ms": 1.869,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 44.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 878.0,
+              "avg_runtime_ms": 8.468,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 48.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 98.0,
+              "avg_runtime_ms": 0.939,
+              "best_map_wins": 0
+            }
+          ]
+        },
+        {
+          "label": "30x30",
+          "parameter": "grid_size",
+          "value": [
+            30,
+            30
+          ],
+          "summary": [
+            {
+              "planner_name": "A*",
+              "success_rate": 1.0,
+              "avg_travel_cost": 58.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 713.0,
+              "avg_runtime_ms": 13.267,
+              "best_map_wins": 0
+            },
+            {
+              "planner_name": "Dijkstra",
+              "success_rate": 1.0,
+              "avg_travel_cost": 54.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 1287.0,
+              "avg_runtime_ms": 13.498,
+              "best_map_wins": 1
+            },
+            {
+              "planner_name": "Greedy Best-First",
+              "success_rate": 1.0,
+              "avg_travel_cost": 62.0,
+              "avg_replans": 1.0,
+              "avg_expanded_nodes": 135.0,
+              "avg_runtime_ms": 1.441,
+              "best_map_wins": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -138,8 +138,15 @@ class RewardShapingWrapper(gym.Wrapper):
         self.last_on_track_step = 0
         self.total_steps = 0
 
+        # 方向盘转角惩罚相关
+        self.last_steer = 0.0
+        self.consecutive_large_steer = 0
+        self.steer_history = []
+        self.max_steer_history = 10
+
     def step(self, action):
         action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
+        current_steer = action[0]
 
         obs, reward, terminated, truncated, info = self.env.step(action)
         speed = info.get('speed', 0.0)
@@ -157,6 +164,41 @@ class RewardShapingWrapper(gym.Wrapper):
         if speed > 0.5:
             speed_reward = min(speed / 10.0, 0.3)
             shaped_reward += speed_reward
+
+        # ===== 方向盘转角惩罚 =====
+        # 1. 大转角惩罚（与速度相关）
+        steer_magnitude = abs(current_steer)
+        if steer_magnitude > 0.2:
+            # 高速时大转向惩罚更严重
+            speed_factor = min(speed / 3.0, 1.0)
+            turn_penalty = steer_magnitude * 0.15 * speed_factor
+            shaped_reward -= turn_penalty
+
+            # 连续大转角惩罚
+            self.consecutive_large_steer += 1
+            if self.consecutive_large_steer > 3:
+                shaped_reward -= 0.05 * (self.consecutive_large_steer - 3)
+        else:
+            self.consecutive_large_steer = 0
+
+        # 2. 方向盘抖动惩罚（快速来回转向）
+        self.steer_history.append(current_steer)
+        if len(self.steer_history) > self.max_steer_history:
+            self.steer_history.pop(0)
+
+        if len(self.steer_history) > 3:
+            steer_changes = np.abs(np.diff(self.steer_history))
+            avg_steer_change = np.mean(steer_changes)
+            if avg_steer_change > 0.1 and speed > 0.5:
+                jitter_penalty = min(avg_steer_change * 0.2, 0.15)
+                shaped_reward -= jitter_penalty
+
+        # 3. 极端转向惩罚
+        if steer_magnitude > 0.4:
+            shaped_reward -= 0.2
+
+        # 更新历史转向
+        self.last_steer = current_steer
 
         # ===== 基于图像的出赛道检测 =====
         if not on_track or original_reward < -0.5:
@@ -225,6 +267,9 @@ class RewardShapingWrapper(gym.Wrapper):
         self.consecutive_on_grass = 0
         self.last_on_track_step = 0
         self.total_steps = 0
+        self.last_steer = 0.0
+        self.consecutive_large_steer = 0
+        self.steer_history = []
         return self.env.reset(**kwargs)
 
 def wrap_env(env):
