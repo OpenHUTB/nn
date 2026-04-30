@@ -64,6 +64,7 @@ def get_steer(vehicle_transform, waypoint_transform):
         angle *= -1
     return max(-1.0, min(1.0, angle * 2.0))
 
+
 # 计算到路口距离
 def get_distance_to_intersection(vehicle, map):
     vehicle_loc = vehicle.get_transform().location
@@ -79,7 +80,6 @@ def get_distance_to_intersection(vehicle, map):
         if current_wp.is_junction or len(current_wp.next(2.0)) > 1:
             return check_distance
     return 999
-
 
 
 # ================== V4.0 碰撞事件回调函数 ==================
@@ -234,7 +234,6 @@ def main():
                     control.throttle = 0.2
                     control.brake = 0.0
 
-
             vehicle.apply_control(control)
 
             # 画面显示
@@ -243,7 +242,6 @@ def main():
                                                   (CONFIG["CAMERA_WIDTH"], CONFIG["CAMERA_HEIGHT"]), "RGB")
                 display.blit(surface, (0, 0))
                 pygame.display.flip()
-
 
             clock.tick(30)
 
