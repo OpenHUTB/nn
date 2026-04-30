@@ -285,6 +285,9 @@ def main():
         # 初始化Pygame窗口
         display = init_pygame(800, 600)
 
+        pygame.font.init()
+        hud_font = pygame.font.SysFont("Arial", 20)  # 使用Arial字体，大小20
+
         # 摄像头回调：接收并转换图像
         image_surface = [None]
         def image_callback(image):
@@ -351,6 +354,29 @@ def main():
                 # 渲染摄像头画面到Pygame窗口
                 surface = pygame.image.frombuffer(image_surface[0].tobytes(), (800, 600), "RGB")
                 display.blit(surface, (0, 0))
+
+                # 1. 显示当前车速
+                velocity = vehicle.get_velocity()
+                current_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2) * 3.6
+                speed_text = hud_font.render(f"Speed: {current_speed:.1f} km/h", True, (255, 255, 255))
+                display.blit(speed_text, (10, 10))
+
+                # 2. 显示前方障碍物距离
+                obstacle_distance = detect_front_obstacle(vehicle, world)
+                if obstacle_distance:
+                    obstacle_text = hud_font.render(f"Obstacle: {obstacle_distance:.1f} m", True, (255, 0, 0))
+                else:
+                    obstacle_text = hud_font.render("Obstacle: None", True, (0, 255, 0))
+                display.blit(obstacle_text, (10, 40))
+
+                # 3. 显示检测到的交通标志
+                if detected_signs:
+                    sign_label = detected_signs[0][0]  # 取第一个检测到的标志
+                    sign_text = hud_font.render(f"Sign: {sign_label}", True, (255, 255, 0))
+                else:
+                    sign_text = hud_font.render("Sign: None", True, (200, 200, 200))
+                display.blit(sign_text, (10, 70))
+
                 pygame.display.flip()
 
             # 统一执行最终控制指令
