@@ -1,0 +1,76 @@
+# ============================================================
+# CARLA 自动驾驶仿真系统 - 依赖配置文件
+# ============================================================
+# 项目功能：
+#   - 基于 CARLA 仿真器的自动驾驶控制
+#   - MPC (Model Predictive Control) 路径跟踪
+#   - Pygame 实时可视化（速度、转向、评分等）
+#   - 障碍物检测与碰撞警告
+#   - 驾驶评分与航点导航
+# ============================================================
+
+# ---------- CARLA 仿真器 ----------
+# CARLA Python API - 与 CARLA 仿真器通信
+# 注意：CARLA 需要单独下载安装，版本需与 Python API 匹配
+# 下载地址：https://github.com/carla-simulator/carla/releases
+carla>=0.9.13
+
+# ---------- 数值计算 ----------
+# NumPy - 矩阵运算、数组操作、数值计算
+numpy>=1.24.0
+
+# SciPy - 优化算法（MPC 使用 SLSQP 求解器）
+scipy>=1.10.0
+
+# ---------- 图形界面与可视化 ----------
+# Pygame - 实时画面渲染、UI 绘制、键盘/鼠标事件处理
+pygame>=2.5.0
+
+# ---------- 可选依赖 ----------
+# OpenCV - 图像处理（如需相机图像处理）
+# opencv-python>=4.8.0
+
+# Matplotlib - 数据分析可视化（如需绘制训练曲线）
+# matplotlib>=3.7.0
+
+# ============================================================
+# 安装说明
+# ============================================================
+#
+# 1. 基础安装（PyPI 依赖）：
+#    pip install -r requirements.txt
+#
+# 2. CARLA 安装（重要）：
+#    - 下载 CARLA 仿真器：https://github.com/carla-simulator/carla/releases
+#    - 推荐版本：CARLA 0.9.13 或更高版本
+#    - 将 CARLA Python API 添加到 Python 路径：
+#      export PYTHONPATH=$PYTHONPATH:/path/to/CARLA/PythonAPI/carla/dist/carla-*.egg
+#
+# 3. 运行项目：
+#    - 启动 CARLA 仿真器：./CarlaUE4.sh 或 CarlaUE4.exe
+#    - 运行主程序：python main.py
+#
+# 4. 项目模块说明：
+#    - main.py       : 主程序入口，车辆控制逻辑
+#    - config.py     : 系统配置文件
+#    - drawer.py     : Pygame 可视化绘制模块
+#    - mpc.py        : MPC 模型预测控制器
+#    - utils.py      : 坐标转换等工具函数
+#
+# ============================================================
+# 环境验证
+# ============================================================
+#
+# 验证 NumPy：
+#   python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+#
+# 验证 SciPy：
+#   python -c "import scipy; print(f'SciPy: {scipy.__version__}')"
+#
+# 验证 Pygame：
+#   python -c "import pygame; print(f'Pygame: {pygame.version.ver}')"
+#
+# 验证 CARLA（需先启动 CARLA 服务）：
+#   python -c "import carla; client = carla.Client('localhost', 2000); print('CARLA OK')"
+#
+# ============================================================
