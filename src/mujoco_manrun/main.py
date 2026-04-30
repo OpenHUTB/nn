@@ -309,6 +309,16 @@ class HumanoidStabilizer:
                 np.float64
             )
 
+        self._qpos_adr = np.empty(self.num_joints, dtype=np.int32)
+        self._qvel_adr = np.empty(self.num_joints, dtype=np.int32)
+        for joint_name in self.joint_names:
+            joint_idx = self.joint_name_to_idx[joint_name]
+            joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+            if joint_id < 0:
+                raise RuntimeError(f"未找到关节：{joint_name}")
+            self._qpos_adr[joint_idx] = int(self.model.jnt_qposadr[joint_id])
+            self._qvel_adr[joint_idx] = int(self.model.jnt_dofadr[joint_id])
+
         # PD控制增益（原有逻辑保留，新增动态增益系数）
         self.kp_roll = 120.0
         self.kd_roll = 40.0
@@ -461,6 +471,12 @@ class HumanoidStabilizer:
             return True
         return False
 
+    def _get_joint_positions(self):
+        return self.data.qpos[self._qpos_adr].astype(np.float64, copy=True)
+
+    def _get_joint_velocities(self):
+        return self.data.qvel[self._qvel_adr].astype(np.float64, copy=True)
+
     def _torques_to_ctrl(self, joint_torques):
         ctrl = np.zeros(self.model.nu, dtype=np.float64)
         for joint_name in self.joint_names:
@@ -551,7 +567,7 @@ class HumanoidStabilizer:
         self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.5
         self.prev_joint_targets = self.joint_targets.copy()
 
-        self.data.qpos[7:7 + self.num_joints] = self.joint_targets.astype(np.float64)
+        self.data.qpos[self._qpos_adr] = self.joint_targets.astype(np.float64)
         mujoco.mj_forward(self.model, self.data)
 
     # ===================== 传感器模拟相关方法（原有新增逻辑保留） =====================
@@ -907,8 +923,8 @@ class HumanoidStabilizer:
         com_compensation = self.kp_com * com_error
 
         # 关节控制（改用传感器足底力数据）
-        current_joints = self.data.qpos[7:7 + self.num_joints].astype(np.float64)
-        current_vel = self.data.qvel[6:6 + self.num_joints].astype(np.float64)
+        current_joints = self._get_joint_positions()
+        current_vel = self._get_joint_velocities()
         current_vel = np.clip(current_vel, -8.0, 8.0)
 
         # 更新接触状态（来自传感器）
@@ -1042,8 +1058,10 @@ class HumanoidStabilizer:
                 # 初始落地阶段（原有逻辑保留）
                 start_time = time.time()
                 while time.time() - start_time < self.init_wait_time:
-                    alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
-                    torques = self._calculate_stabilizing_torques() * alpha
+                    elapsed = time.time() - start_time
+                    alpha = min(1.0, elapsed / 1.0)
+                    torque_scale = 0.5 + 0.5 * alpha
+                    torques = self._calculate_stabilizing_torques() * torque_scale
                     self.data.ctrl[:] = self._torques_to_ctrl(torques)
                     mujoco.mj_step(self.model, self.data)
                     self.data.qvel[:] *= 0.97
