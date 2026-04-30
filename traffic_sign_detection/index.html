@@ -76,7 +76,7 @@
 <p>项目来源于开源项目：zaidi007/simulator-generated-data-for-enhanced-model-training部分的交通标志采集部分，本项目对该模块进行优化和功能扩充。</p>
 <p>项目核心目标是：在低成本、可控环境下，自动生成高质量目标检测数据，并完成部署级验证。</p>
 <h3 id="12">1.2 项目整体流程</h3>
-<p><img alt="项目流程图" src="./img/project_flow.png" /></p>
+<p><img alt="项目流程图" src="img/project_flow.png" /></p>
 <h3 id="12_1">1.2 项目组成</h3>
 <table>
 <thead>
@@ -119,7 +119,7 @@
 </ul>
 <p>基于这些问题，本项目选择使用 CARLA 仿真平台作为数据源，通过程序自动生成交通标志检测数据，再进一步转换为 YOLO 训练格式，并通过 ONNX 推理脚本完成部署侧验证。</p>
 <p>另外，在复现原仓库代码时，发现在采集数据时，车辆会因为前车阻碍而停止，就此阻塞，故尝试对交通标志数据采集部分进行逻辑优化。</p>
-<p><img alt="车辆阻塞图" src="./img/block.png" /></p>
+<p><img alt="车辆阻塞图" src="img/block.png" /></p>
 <h3 id="23">2.3 项目目标</h3>
 <p>本次课程设计主要完成两部分内容：</p>
 <ul>
@@ -517,7 +517,7 @@ python .\detector_onnx.py --model ..\..\..\nn\src\driving_violation_detection\ru
 <p>交通标志采集演示：</p>
 <p><img alt="系统运行演示" src="img/catch01.gif" /></p>
 <p>交通标志进行检测：</p>
-<p><img alt="系统运行演示" src="./img/result02.png" /></p>
+<p><img alt="系统运行演示" src="img/result02.png" /></p>
 <h3 id="54">5.4 当前系统效果的客观评价</h3>
 <p>从工程能力上讲，这个项目已经具备以下成果：</p>
 <ul>
