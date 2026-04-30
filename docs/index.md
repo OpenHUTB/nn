@@ -18,7 +18,11 @@ title: 主页
 
 [__线性回归__](linear_regression.md)
 
+[__线性回归改进__](linear_regression_improved.md)
+
 [__softmax回归__](softmax_regression.md)
+
+[__线性回归和softmax回归改进__](softmax_regression_improved.md)
 
 [__支持向量机__](svm.md)
 
@@ -46,6 +50,11 @@ title: 主页
 [__目标检测__](./test/object_detection.md) - 目标检测与危险评估
 
 [__跟踪__](#tracking) 
+[__路径追踪__](./test.md)
+
+[__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
+
+[__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
 
 ## 规划 <span id="planning"></span>
 

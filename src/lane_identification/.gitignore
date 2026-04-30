@@ -40,3 +40,8 @@ Thumbs.db
 *.png
 *.mp4
 *.avi
+
+# Test files
+test.py
+*_test.py
+tests/
