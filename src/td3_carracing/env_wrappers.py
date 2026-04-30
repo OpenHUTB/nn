@@ -20,12 +20,12 @@ class PreProcessObs(gym.ObservationWrapper):
     def __init__(self, env):
         super().__init__(env)
         self.observation_space = gym.spaces.Box(
-            low=0, high=1, shape=(42, 42, 1), dtype=np.float32
+            low=0, high=1, shape=(84, 84, 1), dtype=np.float32
         )
 
     def observation(self, obs):
         obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-        obs = cv2.resize(obs, (42, 42), interpolation=cv2.INTER_AREA)
+        obs = cv2.resize(obs, (84, 84), interpolation=cv2.INTER_AREA)
         obs = obs / 255.0
         obs = obs[..., None]
         return obs
@@ -57,15 +57,18 @@ class StackFrames(gym.ObservationWrapper):
         return state
 
 class SmoothActionWrapper(gym.Wrapper):
-    def __init__(self, env, alpha=0.9):
+    def __init__(self, env, alpha=0.85, max_steer_change=0.15):
         super().__init__(env)
         self.alpha = alpha
+        self.max_steer_change = max_steer_change
         self.last_action = None
 
     def step(self, action):
         if self.last_action is not None:
             action = self.alpha * action + (1 - self.alpha) * self.last_action
-            action[0] = np.clip(action[0], self.last_action[0] - 0.08, self.last_action[0] + 0.08)
+            action[0] = np.clip(action[0],
+                                self.last_action[0] - self.max_steer_change,
+                                self.last_action[0] + self.max_steer_change)
         self.last_action = action.copy()
         return self.env.step(action)
 
@@ -73,52 +76,207 @@ class SmoothActionWrapper(gym.Wrapper):
         self.last_action = None
         return self.env.reset(**kwargs)
 
-class TrackBoundaryWrapper(gym.Wrapper):
+class TrackDetectionWrapper(gym.Wrapper):
+    """基于图像检测车辆是否在赛道上的包装器"""
     def __init__(self, env):
         super().__init__(env)
-        self.off_track_penalty = 2.0       # 出赛道惩罚大幅提高
-        self.small_steer_penalty = 0.05    # 小角度乱打方向惩罚
-        self.max_steer = 0.55               # 限制转向更温和
-        self.on_track_reward = 0.4          # 在赛道上奖励
-        self.last_progress = 0.0
+        # 赛道颜色阈值（RGB）
+        # 赛道通常是深灰色，路边有红色/绿色标记
+        self.track_low = np.array([90, 90, 90], dtype=np.uint8)
+        self.track_high = np.array([120, 120, 120], dtype=np.uint8)
+        self.grass_low1 = np.array([0, 100, 0], dtype=np.uint8)
+        self.grass_high1 = np.array([80, 180, 80], dtype=np.uint8)
+        self.grass_low2 = np.array([0, 140, 0], dtype=np.uint8)
+        self.grass_high2 = np.array([100, 255, 100], dtype=np.uint8)
+
+    def _check_on_track(self, obs):
+        """检测车辆是否在赛道上"""
+        # 检查图像底部中心区域（车辆位置）
+        h, w = obs.shape[:2]
+        check_region = obs[int(h*0.65):int(h*0.85), int(w*0.35):int(w*0.65)]
+
+        # 检测赛道像素（灰色）
+        track_mask = cv2.inRange(check_region, self.track_low, self.track_high)
+
+        # 检测草地像素
+        grass_mask1 = cv2.inRange(check_region, self.grass_low1, self.grass_high1)
+        grass_mask2 = cv2.inRange(check_region, self.grass_low2, self.grass_high2)
+        grass_mask = cv2.bitwise_or(grass_mask1, grass_mask2)
+
+        track_ratio = np.sum(track_mask > 0) / (check_region.shape[0] * check_region.shape[1])
+        grass_ratio = np.sum(grass_mask > 0) / (check_region.shape[0] * check_region.shape[1])
+
+        # 如果赛道像素比例足够高，认为在赛道上
+        on_track = track_ratio > 0.15
+        on_grass = grass_ratio > 0.3
+
+        return on_track, on_grass, track_ratio, grass_ratio
 
     def step(self, action):
-        # 强制限制转向，防止冲出去
-        action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
-
         obs, reward, terminated, truncated, info = self.env.step(action)
-        speed = info.get('speed', 0.0)
 
-        # ===== 出赛道检测 =====
-        if reward < -0.5:  # CarRacing 内部出赛道会给负奖励
-            reward -= self.off_track_penalty  # 额外重罚
-            # 出赛道立即减速，强制纠正
-            action[1] = 0.0
-            action[2] = 0.2
+        # 检测是否在赛道上
+        on_track, on_grass, track_ratio, grass_ratio = self._check_on_track(obs)
 
-        # ===== 在赛道内奖励 =====
-        if reward > -0.1 and speed > 0.5:
-            reward += self.on_track_reward
-
-        # ===== 禁止原地小角度乱摆 =====
-        if abs(action[0]) < 0.08 and speed < 1.0:
-            reward -= self.small_steer_penalty
-
-        # ===== 出赛道直接终止 =====
-        if reward < -1.0:
-            truncated = True
-            reward -= 3.0
+        # 更新 info
+        info['on_track'] = on_track
+        info['on_grass'] = on_grass
+        info['track_ratio'] = track_ratio
+        info['grass_ratio'] = grass_ratio
 
         return obs, reward, terminated, truncated, info
 
+
+class RewardShapingWrapper(gym.Wrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.max_steer = 0.6
+        self.consecutive_off_track = 0
+        self.consecutive_on_grass = 0
+        self.max_off_track_steps = 8
+        self.max_grass_steps = 15
+        self.last_on_track_step = 0
+        self.total_steps = 0
+
+        # 方向盘转角惩罚相关
+        self.last_steer = 0.0
+        self.consecutive_large_steer = 0
+        self.steer_history = []
+        self.max_steer_history = 10
+
+    def step(self, action):
+        action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
+        current_steer = action[0]
+
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        speed = info.get('speed', 0.0)
+        on_track = info.get('on_track', True)
+        on_grass = info.get('on_grass', False)
+        track_ratio = info.get('track_ratio', 0.5)
+
+        self.total_steps += 1
+
+        # 计算原始奖励
+        original_reward = reward
+        shaped_reward = 0.0
+
+        # ===== 速度奖励 =====
+        if speed > 0.5:
+            speed_reward = min(speed / 10.0, 0.3)
+            shaped_reward += speed_reward
+
+        # ===== 方向盘转角惩罚 =====
+        # 1. 大转角惩罚（与速度相关）
+        steer_magnitude = abs(current_steer)
+        if steer_magnitude > 0.2:
+            # 高速时大转向惩罚更严重
+            speed_factor = min(speed / 3.0, 1.0)
+            turn_penalty = steer_magnitude * 0.15 * speed_factor
+            shaped_reward -= turn_penalty
+
+            # 连续大转角惩罚
+            self.consecutive_large_steer += 1
+            if self.consecutive_large_steer > 3:
+                shaped_reward -= 0.05 * (self.consecutive_large_steer - 3)
+        else:
+            self.consecutive_large_steer = 0
+
+        # 2. 方向盘抖动惩罚（快速来回转向）
+        self.steer_history.append(current_steer)
+        if len(self.steer_history) > self.max_steer_history:
+            self.steer_history.pop(0)
+
+        if len(self.steer_history) > 3:
+            steer_changes = np.abs(np.diff(self.steer_history))
+            avg_steer_change = np.mean(steer_changes)
+            if avg_steer_change > 0.1 and speed > 0.5:
+                jitter_penalty = min(avg_steer_change * 0.2, 0.15)
+                shaped_reward -= jitter_penalty
+
+        # 3. 极端转向惩罚
+        if steer_magnitude > 0.4:
+            shaped_reward -= 0.2
+
+        # 更新历史转向
+        self.last_steer = current_steer
+
+        # ===== 基于图像的出赛道检测 =====
+        if not on_track or original_reward < -0.5:
+            self.consecutive_off_track += 1
+            off_track_penalty = 1.5 + self.consecutive_off_track * 0.8
+            shaped_reward -= off_track_penalty
+
+            # 记录最后一次在赛道上的时间步
+            if self.consecutive_off_track == 1:
+                self.last_on_track_step = self.total_steps - 1
+
+            if self.consecutive_off_track >= self.max_off_track_steps:
+                truncated = True
+                shaped_reward -= 10.0
+        else:
+            self.consecutive_off_track = 0
+            # 在赛道上的奖励
+            if original_reward > -0.1:
+                shaped_reward += 0.15
+            # 高赛道比例额外奖励
+            if track_ratio > 0.4:
+                shaped_reward += 0.1
+
+        # ===== 草地检测与惩罚 =====
+        if on_grass:
+            self.consecutive_on_grass += 1
+            grass_penalty = 0.3 + self.consecutive_on_grass * 0.2
+            shaped_reward -= grass_penalty
+
+            # 在草地上速度越高惩罚越大
+            if speed > 1.0:
+                shaped_reward -= speed * 0.2
+
+            if self.consecutive_on_grass >= self.max_grass_steps:
+                truncated = True
+                shaped_reward -= 5.0
+        else:
+            self.consecutive_on_grass = 0
+
+        # ===== 平滑驾驶奖励 =====
+        steer_magnitude = abs(action[0])
+        if steer_magnitude < 0.05 and speed > 1.0 and on_track:
+            shaped_reward += 0.05
+        elif steer_magnitude > 0.3 and speed > 2.0:
+            shaped_reward -= 0.1
+
+        # ===== 高速平稳驾驶额外奖励 =====
+        if speed > 2.0 and steer_magnitude < 0.2 and on_track and original_reward > -0.1:
+            shaped_reward += 0.25
+
+        # ===== 低速惩罚（防止龟速行驶） =====
+        if speed < 0.3 and on_track and original_reward > -0.1:
+            shaped_reward -= 0.05
+
+        # ===== 回到赛道的奖励 =====
+        if self.consecutive_off_track == 0 and self.total_steps - self.last_on_track_step <= 10 and self.last_on_track_step > 0:
+            shaped_reward += 2.0
+            self.last_on_track_step = 0
+
+        total_reward = original_reward + shaped_reward
+
+        return obs, total_reward, terminated, truncated, info
+
     def reset(self, **kwargs):
-        self.last_progress = 0.0
+        self.consecutive_off_track = 0
+        self.consecutive_on_grass = 0
+        self.last_on_track_step = 0
+        self.total_steps = 0
+        self.last_steer = 0.0
+        self.consecutive_large_steer = 0
+        self.steer_history = []
         return self.env.reset(**kwargs)
 
 def wrap_env(env):
     env = SkipFrame(env, skip=4)
+    env = TrackDetectionWrapper(env)  # 在预处理前使用原始图像检测赛道
     env = PreProcessObs(env)
     env = StackFrames(env, stack=4)
-    env = TrackBoundaryWrapper(env)
-    env = SmoothActionWrapper(env, alpha=0.9)
+    env = RewardShapingWrapper(env)
+    env = SmoothActionWrapper(env, alpha=0.85, max_steer_change=0.15)
     return env

@@ -1,0 +1,17 @@
+# Usage: pip install -r requirements.txt
+
+# Simulation ----------------------------------------
+carla==0.9.15
+
+# Perception & AI -----------------------------------
+ultralytics>=8.0.0
+opencv-python==4.8.1.78
+numpy==1.23.5
+
+# Control & Interaction -----------------------------
+pygame>=2.0.0
+keyboard>=0.13.5
+
+# Video Stream ---------------------------------------
+Flask>=2.2.5
+Werkzeug>=3.0.6
