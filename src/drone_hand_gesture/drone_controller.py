@@ -31,24 +31,36 @@ class SimulationDroneController(BaseDroneController):
         if not self.simulation_mode:
             self._connect_to_real_drone()
         else:
-            self.connected = True
-            self.logger.info("仿真模式启动")
-        return True
+            self._simulate_command(command, intensity)
 
-    def disconnect(self):
-        self.connected = False
-        self.logger.info("已断开连接")
+    def _simulate_command(self, command, intensity):
+        """仿真模式命令处理"""
+        intensity = max(0.1, min(1.0, intensity))
 
-    def takeoff(self, altitude: Optional[float] = None) -> bool:
-        if altitude is None:
-            altitude = self.config.get("drone.takeoff_altitude", 2.0)
-
-        if not self.connected:
-            self.logger.error("未连接")
-            return False
-
-        if not self.simulation_mode and self.master:
-            self._send_mavlink_takeoff()
+        if command == "takeoff":
+            self._takeoff_simulation(intensity)
+        elif command == "land":
+            self._land_simulation(intensity)
+        elif command == "forward":
+            self._move_simulation('forward', intensity)
+        elif command == "backward":
+            self._move_simulation('backward', intensity)
+        elif command == "up":
+            self._move_simulation('up', intensity)
+        elif command == "down":
+            self._move_simulation('down', intensity)
+        elif command == "left":
+            self._move_simulation('left', intensity)
+        elif command == "right":
+            self._move_simulation('right', intensity)
+        elif command == "turn_left":
+            self._rotate_simulation('yaw_left', intensity)
+        elif command == "turn_right":
+            self._rotate_simulation('yaw_right', intensity)
+        elif command == "hover":
+            self._hover_simulation()
+        elif command == "stop":
+            self._stop_simulation()
         else:
             self._simulate_takeoff(altitude)
 
@@ -124,7 +136,29 @@ class SimulationDroneController(BaseDroneController):
 
         self.logger.info(f"仿真: 无人机移动，速度: ({vx:.2f}, {vy:.2f}, {vz:.2f})")
 
-    def update_physics(self, dt: float):
+    def _rotate_simulation(self, direction, intensity):
+        """仿真旋转"""
+        if not self.state['armed']:
+            print("[ERROR] 警告：无人机未解锁，无法旋转")
+            print("   请先做出'张开手掌'手势进行起飞解锁")
+            return
+
+        rotation_speed = 30.0 * intensity  # 度/秒
+
+        if direction == 'yaw_left':
+            self.state['orientation'][2] += rotation_speed  # yaw左转
+            self.state['mode'] = 'YAW_LEFT'
+        elif direction == 'yaw_right':
+            self.state['orientation'][2] -= rotation_speed  # yaw右转
+            self.state['mode'] = 'YAW_RIGHT'
+
+        # 保持位置不变
+        self.state['velocity'] = np.array([0.0, 0.0, 0.0])
+
+        print(f"[OK] 仿真：无人机{direction}，速度{rotation_speed:.1f}度/秒")
+
+    def _hover_simulation(self):
+        """仿真悬停"""
         if self.state['armed']:
             self.state['position'] += self.state['velocity'] * dt
 
