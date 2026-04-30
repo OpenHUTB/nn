@@ -1,0 +1,32 @@
+# CARLA SLAM GMMapping Navigation System - Python Dependencies
+# Generated for deep learning-based autonomous navigation with CARLA simulator
+
+# Deep Learning Framework
+torch>=1.12.0
+torchvision>=0.13.0
+
+# Computer Vision
+opencv-python>=4.5.0
+
+# Scientific Computing
+numpy>=1.21.0
+pandas>=1.3.0
+
+# Visualization and Plotting
+matplotlib>=3.5.0
+
+# CARLA Simulator Python API
+# Note: CARLA Python API typically needs to be installed from the CARLA distribution
+# For CARLA 0.9.x, install from: carla-<version>-py3.x-linux-x86_64.egg
+# Example: pip install /path/to/carla/PythonAPI/carla/dist/carla-0.9.13-cp38-cp38-linux_x86_64.whl
+carla>=0.9.13
+
+# ROS Bridge Dependencies (if using ROS Python packages directly)
+# Note: Most ROS dependencies are handled through ROS installation
+# These are supplementary Python packages that might be needed
+# tf-transformations>=1.0.0  # Uncomment if not using ROS's built-in version
+
+# Optional: Additional utilities for development
+# jupyter>=1.0.0  # For interactive development
+# tensorboard>=2.8.0  # For training visualization
+# scikit-learn>=1.0.0  # For additional ML utilities

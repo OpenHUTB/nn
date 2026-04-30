@@ -1,0 +1,185 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- =====================================================================
+       CARLA + Gmapping + Move_Base 同步建图与导航
+       功能：边建图边导航（探索模式）
+       
+       适用场景：
+       - 未知环境探索
+       - 动态障碍物环境
+       - 实时地图更新
+       ===================================================================== -->
+
+  <!-- ====================== 公共参数配置 ====================== -->
+  <arg name="role_name" default="ego_vehicle"/>
+  
+  <!-- ====================== CARLA 连接参数 ====================== -->
+  <arg name="host" default="localhost"/>
+  <arg name="port" default="2000"/>
+  <arg name="timeout" default="60"/>
+  <arg name="town" default="Town01"/>
+  
+  <!-- ====================== 车辆生成参数 ====================== -->
+  <arg name="objects_definition_file" default='$(find carla_spawn_objects)/config/objects.json'/>
+  <arg name="spawn_point_ego_vehicle" default=""/>
+  <arg name="spawn_sensors_only" default="false"/>
+
+  <!-- ====================== 同步模式参数 ====================== -->
+  <arg name="synchronous_mode" default="True"/>
+  <arg name="synchronous_mode_wait_for_vehicle_control_command" default="False"/>
+  <arg name="fixed_delta_seconds" default="0.05"/>
+
+  <!-- ====================== SLAM参数 ====================== -->
+  <arg name="map_resolution" default="0.05"/>
+  <arg name="map_update_interval" default="2.0"/>
+
+  <!-- 设置仿真时间源为CARLA -->
+  <param name="use_sim_time" value="True"/>
+
+
+  <!-- ====================== 1. CARLA ROS Bridge ====================== -->
+  <node 
+    pkg="carla_ros_bridge" 
+    name="carla_ros_bridge" 
+    type="bridge.py" 
+    output="screen" 
+    required="true"
+  >
+    <param name="host" value="$(arg host)"/>
+    <param name="port" value="$(arg port)"/>
+    <param name="timeout" value="$(arg timeout)"/>
+    <param name="passive" value="False"/>
+    <param name="synchronous_mode" value="$(arg synchronous_mode)"/>
+    <param name="synchronous_mode_wait_for_vehicle_control_command" value="$(arg synchronous_mode_wait_for_vehicle_control_command)"/>
+    <param name="fixed_delta_seconds" value="$(arg fixed_delta_seconds)"/>
+    <param name="register_all_sensors" value="True"/>
+    <param name="town" value="$(arg town)"/>
+    <param name="ego_vehicle_role_name" value='["hero", "ego_vehicle", "hero0", "hero1", "hero2", "hero3", "hero4", "hero5", "hero6", "hero7", "hero8", "hero9"]'/>
+  </node>
+
+
+  <!-- ====================== 2. Spawn Objects ====================== -->
+  <node 
+    pkg="carla_spawn_objects" 
+    type="carla_spawn_objects.py" 
+    name="$(anon carla_spawn_objects)" 
+    output="screen"
+    required="true"
+    launch-prefix="bash -c 'sleep 3; $0 $@' "
+  >
+    <param name="objects_definition_file" value="$(arg objects_definition_file)" />
+    <param name="spawn_point_$(arg role_name)" value="$(arg spawn_point_ego_vehicle)" />
+    <param name="spawn_sensors_only" value="$(arg spawn_sensors_only)" />
+    <param name="role_name" value="$(arg role_name)"/>
+  </node>
+
+
+  <!-- ====================== 3. PointCloud转LaserScan ====================== -->
+  <node 
+    pkg="pointcloud_to_laserscan" 
+    type="pointcloud_to_laserscan_node" 
+    name="pointcloud_to_laserscan"
+    launch-prefix="bash -c 'sleep 5; $0 $@' "
+  >
+    <remap from="cloud_in" to="/carla/$(arg role_name)/lidar"/>
+    <remap from="scan" to="/carla/$(arg role_name)/scan"/>
+    <param name="min_height" value="-0.5"/>
+    <param name="max_height" value="1.0"/>
+    <param name="angle_min" value="-3.14159"/>
+    <param name="angle_max" value="3.14159"/>
+    <param name="angle_increment" value="0.0087"/>
+    <param name="scan_time" value="0.1"/>
+    <param name="range_min" value="0.5"/>
+    <param name="range_max" value="100.0"/>
+    <param name="use_inf" value="true"/>
+    <param name="target_frame" value="$(arg role_name)/lidar"/>
+  </node>
+
+
+  <!-- ====================== 4. Gmapping SLAM ====================== -->
+  <node 
+    pkg="gmapping" 
+    type="slam_gmapping" 
+    name="slam_gmapping" 
+    output="screen"
+    launch-prefix="bash -c 'sleep 6; $0 $@' "
+  >
+    <remap from="scan" to="/carla/$(arg role_name)/scan"/>
+    <remap from="odom" to="/carla/$(arg role_name)/odometry"/>
+    
+    <param name="base_frame" value="$(arg role_name)"/>
+    <param name="odom_frame" value="odom"/>
+    <param name="map_frame" value="map"/>
+    <param name="map_update_interval" value="$(arg map_update_interval)"/>
+    <param name="maxUrange" value="50.0"/>
+    <param name="maxRange" value="100.0"/>
+    <param name="sigma" value="0.05"/>
+    <param name="kernelSize" value="1"/>
+    <param name="lstep" value="0.05"/>
+    <param name="astep" value="0.05"/>
+    <param name="iterations" value="5"/>
+    <param name="lsigma" value="0.075"/>
+    <param name="ogain" value="3.0"/>
+    <param name="lskip" value="0"/>
+    <param name="minimumScore" value="50"/>
+    <param name="srr" value="0.1"/>
+    <param name="srt" value="0.2"/>
+    <param name="str" value="0.1"/>
+    <param name="stt" value="0.2"/>
+    <param name="linearUpdate" value="0.5"/>
+    <param name="angularUpdate" value="0.3"/>
+    <param name="temporalUpdate" value="-1.0"/>
+    <param name="resampleThreshold" value="0.5"/>
+    <param name="particles" value="30"/>
+    <param name="xmin" value="-50.0"/>
+    <param name="ymin" value="-50.0"/>
+    <param name="xmax" value="50.0"/>
+    <param name="ymax" value="50.0"/>
+    <param name="delta" value="$(arg map_resolution)"/>
+    <param name="llsamplerange" value="0.01"/>
+    <param name="llsamplestep" value="0.01"/>
+    <param name="lasamplerange" value="0.005"/>
+    <param name="lasamplestep" value="0.005"/>
+  </node>
+
+
+  <!-- ====================== 5. Move Base导航 ====================== -->
+  <node 
+    pkg="move_base" 
+    type="move_base" 
+    name="move_base" 
+    output="screen"
+    launch-prefix="bash -c 'sleep 7; $0 $@' "
+  >
+    <remap from="cmd_vel" to="/carla/$(arg role_name)/cmd_vel"/>
+    <remap from="odom" to="/carla/$(arg role_name)/odometry"/>
+    <remap from="scan" to="/carla/$(arg role_name)/scan"/>
+    
+    <!-- 参数文件加载 -->
+    <rosparam file="$(find carla_spawn_objects)/config/costmap_common_params.yaml" command="load" ns="global_costmap"/>
+    <rosparam file="$(find carla_spawn_objects)/config/costmap_common_params.yaml" command="load" ns="local_costmap"/>
+    <rosparam file="$(find carla_spawn_objects)/config/global_costmap_params.yaml" command="load"/>
+    <rosparam file="$(find carla_spawn_objects)/config/local_costmap_params.yaml" command="load"/>
+    <rosparam file="$(find carla_spawn_objects)/config/dwa_local_planner_params.yaml" command="load"/>
+    <rosparam file="$(find carla_spawn_objects)/config/move_base_params.yaml" command="load"/>
+    
+    <!-- 坐标系 -->
+    <param name="global_costmap/robot_base_frame" value="$(arg role_name)"/>
+    <param name="local_costmap/robot_base_frame" value="$(arg role_name)"/>
+    
+    <!-- 探索模式：使用滚动窗口 -->
+    <param name="global_costmap/rolling_window" value="true"/>
+    <param name="global_costmap/static_map" value="false"/>
+  </node>
+
+
+  <!-- ====================== 6. TF变换发布 ====================== -->
+  <node 
+    pkg="tf" 
+    type="static_transform_publisher" 
+    name="base_to_lidar" 
+    args="0 0 0.5 0 0 0 $(arg role_name) $(arg role_name)/lidar 100"
+    launch-prefix="bash -c 'sleep 5; $0 $@' "
+  />
+
+</launch>

@@ -1,0 +1,448 @@
+﻿"""
+可视化模块 - 负责结果可视化显示
+支持实时视频显示
+"""
+
+import cv2
+import numpy as np
+from typing import Dict, Any, Tuple
+from PIL import Image, ImageDraw, ImageFont
+from config import AppConfig
+
+
+class Visualizer:
+    """可视化引擎"""
+
+    def __init__(self, config: AppConfig):
+        self.config = config
+        self._setup_colors()
+        self._setup_font()
+
+    def _setup_colors(self):
+        """设置颜色方案"""
+        self.colors = {
+            # 道路相关
+            'road_area': (0, 180, 0, 100),
+            'road_boundary': (0, 255, 255, 200),
+
+            # 车道线 - 主车道（高亮）
+            'left_lane': (255, 100, 100, 200),
+            'right_lane': (100, 100, 255, 200),
+
+            # 邻车道（黄色）
+            'neighbor_lane': (255, 255, 0, 150),
+
+            # 中心线
+            'center_line': (255, 255, 0, 180),
+
+            # 路径预测
+            'future_path': (255, 0, 255, 180),
+            'prediction_points': (255, 150, 255, 220),
+
+            # 置信度颜色
+            'confidence_high': (0, 255, 0),
+            'confidence_medium': (255, 165, 0),
+            'confidence_low': (255, 0, 0),
+            'confidence_very_low': (128, 128, 128),
+
+            # 文本颜色
+            'text_primary': (255, 255, 255),
+            'text_secondary': (200, 200, 200),
+
+            # 状态指示器
+            'status_active': (0, 255, 0),
+            'status_paused': (255, 165, 0),
+            'status_stopped': (255, 0, 0)
+        }
+
+    def _setup_font(self):
+        """设置中文字体"""
+        try:
+            # 尝试加载 Windows 系统自带中文字体
+            self.font_large = ImageFont.truetype("msyh.ttc", 28)
+            self.font_medium = ImageFont.truetype("msyh.ttc", 20)
+            self.font_small = ImageFont.truetype("msyh.ttc", 16)
+        except IOError:
+            try:
+                self.font_large = ImageFont.truetype("simhei.ttf", 28)
+                self.font_medium = ImageFont.truetype("simhei.ttf", 20)
+                self.font_small = ImageFont.truetype("simhei.ttf", 16)
+            except IOError:
+                # 备用方案：使用默认字体
+                self.font_large = ImageFont.load_default()
+                self.font_medium = ImageFont.load_default()
+                self.font_small = ImageFont.load_default()
+
+    def _put_chinese_text(self, image: np.ndarray, text: str, position: Tuple[int, int],
+                          color: Tuple[int, int, int], font_size: str = 'medium') -> np.ndarray:
+        """在图像上绘制中文文本"""
+        # 选择字体
+        if font_size == 'large':
+            font = self.font_large
+        elif font_size == 'small':
+            font = self.font_small
+        else:
+            font = self.font_medium
+
+        # 转换为 PIL Image
+        img_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(img_pil)
+
+        # 绘制文本
+        draw.text(position, text, fill=color[::-1], font=font)
+
+        # 转回 OpenCV 格式
+        return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
+
+    def create_visualization(self, image: np.ndarray,
+                             road_info: Dict[str, Any],
+                             lane_info: Dict[str, Any],
+                             direction_info: Dict[str, Any],
+                             is_video: bool = False,
+                             frame_info: Dict[str, Any] = None) -> np.ndarray:
+        """创建可视化结果"""
+        try:
+            visualization = image.copy()
+
+            # 1. 绘制道路区域
+            if road_info.get('contour') is not None:
+                visualization = self._draw_road_area(visualization, road_info)
+
+            # 2. 绘制车道线
+            visualization = self._draw_lanes(visualization, lane_info)
+
+            # 3. 绘制路径预测
+            if lane_info.get('future_path'):
+                visualization = self._draw_future_path(visualization, lane_info['future_path'])
+
+            # 4. 绘制信息面板
+            visualization = self._draw_info_panel(visualization, direction_info, lane_info, is_video, frame_info)
+
+            # 5. 绘制方向指示器
+            visualization = self._draw_direction_indicator(visualization, direction_info)
+
+            # 6. 绘制图例（新增）
+            visualization = self._draw_legend(visualization, lane_info)
+
+            # 7. 应用全局效果
+            visualization = self._apply_global_effects(visualization)
+
+            return visualization
+
+        except Exception as e:
+            print(f"可视化创建失败: {e}")
+            return image
+
+    def _draw_road_area(self, image: np.ndarray, road_info: Dict[str, Any]) -> np.ndarray:
+        """绘制道路区域"""
+        contour = road_info['contour']
+        if contour is None or len(contour) == 0:
+            return image
+        
+        # 创建道路图层
+        road_layer = image.copy()
+        
+        # 填充道路区域
+        cv2.drawContours(road_layer, [contour], -1, self.colors['road_area'][:3], -1)
+        
+        # 绘制道路边界
+        cv2.drawContours(road_layer, [contour], -1, self.colors['road_boundary'][:3], 2)
+        
+        # 混合图层
+        alpha = self.colors['road_area'][3] / 255.0
+        cv2.addWeighted(road_layer, alpha, image, 1 - alpha, 0, image)
+        
+        return image
+
+    def _draw_lanes(self, image: np.ndarray, lane_info: Dict[str, Any]) -> np.ndarray:
+        """绘制车道线 - 支持多车道显示"""
+        lane_layer = image.copy()
+
+        # 1. 绘制所有原始检测线段（浅色）
+        for side in ['left_lines', 'right_lines']:
+            lines = lane_info.get(side, [])
+
+            for line in lines:
+                points = line.get('points', [])
+                if len(points) == 2:
+                    cv2.line(lane_layer, points[0], points[1], (100, 100, 100), 1, cv2.LINE_AA)
+
+        # 2. 绘制邻车道线（黄色虚线）
+        for side in ['neighbor_left_lines', 'neighbor_right_lines']:
+            lines = lane_info.get(side, [])
+
+            for line in lines:
+                points = line.get('points', [])
+                if len(points) == 2:
+                    cv2.line(lane_layer, points[0], points[1],
+                             self.colors['neighbor_lane'][:3], 2, cv2.LINE_AA)
+
+        # 3. 绘制主车道边界线（加粗高亮）
+        primary_left_lines = lane_info.get('primary_left_lines', [])
+        primary_right_lines = lane_info.get('primary_right_lines', [])
+
+        for line in primary_left_lines:
+            points = line.get('points', [])
+            if len(points) == 2:
+                cv2.line(lane_layer, points[0], points[1],
+                         self.colors['left_lane'][:3], 3, cv2.LINE_AA)
+
+        for line in primary_right_lines:
+            points = line.get('points', [])
+            if len(points) == 2:
+                cv2.line(lane_layer, points[0], points[1],
+                         self.colors['right_lane'][:3], 3, cv2.LINE_AA)
+
+        # 4. 绘制拟合的主车道线
+        for side, color_key in [('left_lane', 'left_lane'), ('right_lane', 'right_lane')]:
+            lane = lane_info.get(side)
+            if lane and 'points' in lane and len(lane['points']) == 2:
+                points = lane['points']
+                color = self.colors[color_key]
+
+                confidence = lane.get('confidence', 0.5)
+                thickness = 3 + int(confidence * 4)
+
+                cv2.line(lane_layer, points[0], points[1], color[:3], thickness, cv2.LINE_AA)
+
+        # 5. 绘制中心线
+        center_line = lane_info.get('center_line')
+        if center_line and 'points' in center_line and len(center_line['points']) == 2:
+            points = center_line['points']
+            color = self.colors['center_line']
+            cv2.line(lane_layer, points[0], points[1], color[:3], 2, cv2.LINE_AA)
+
+        # 混合车道线图层
+        cv2.addWeighted(lane_layer, 0.7, image, 0.3, 0, image)
+
+        return image
+    
+    def _draw_future_path(self, image: np.ndarray, future_path: Dict[str, Any]) -> np.ndarray:
+        """绘制未来路径"""
+        path_points = future_path.get('center_path', [])
+        if len(path_points) < 2:
+            return image
+        
+        path_layer = image.copy()
+        color = self.colors['future_path']
+        
+        for i in range(len(path_points) - 1):
+            alpha_factor = 0.5 + 0.5 * (i / (len(path_points) - 1))
+            line_color = tuple(int(c * alpha_factor) for c in color[:3])
+            
+            thickness = 5 - int(i / len(path_points) * 3)
+            
+            cv2.line(path_layer, path_points[i], path_points[i + 1], 
+                    line_color, thickness, cv2.LINE_AA)
+        
+        cv2.addWeighted(path_layer, 0.6, image, 0.4, 0, image)
+        
+        return image
+
+    def _draw_info_panel(self, image: np.ndarray, direction_info: Dict[str, Any],
+                         lane_info: Dict[str, Any], is_video: bool = False,
+                         frame_info: Dict[str, Any] = None) -> np.ndarray:
+        """绘制信息面板"""
+        height, width = image.shape[:2]
+
+        # 创建半透明背景
+        panel_height = 140
+        overlay = image.copy()
+        cv2.rectangle(overlay, (0, 0), (width, panel_height), (0, 0, 0, 180), -1)
+        cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
+
+        # 获取信息
+        direction = direction_info.get('direction', '未知')
+        confidence = direction_info.get('confidence', 0.0)
+        quality = lane_info.get('detection_quality', 0.0)
+
+        # 设置颜色
+        confidence_color = self._get_confidence_color(confidence)
+
+        # 1. 方向
+        direction_text = f"方向: {direction}"
+        image = self._put_chinese_text(image, direction_text, (20, 10), confidence_color, 'large')
+
+        # 2. 置信度
+        confidence_text = f"置信度: {confidence:.1%}"
+        image = self._put_chinese_text(image, confidence_text, (20, 45), confidence_color, 'medium')
+
+        # 3. 检测质量
+        quality_text = f"检测质量: {quality:.1%}"
+        image = self._put_chinese_text(image, quality_text, (20, 75), self.colors['text_secondary'], 'small')
+
+        # 4. 车道统计信息（新增）
+        lane_stats = lane_info.get('lane_statistics', {})
+        if lane_stats:
+            total_lines = lane_stats.get('total_detected_lines', 0)
+            estimated_lanes = lane_stats.get('estimated_lanes', 1)
+            is_multi = lane_stats.get('is_multi_lane', False)
+
+            stats_text = f"检测到{total_lines}条线 | 估算{estimated_lanes}车道"
+            if is_multi:
+                stats_text += " [多车道]"
+
+            image = self._put_chinese_text(image, stats_text, (20, 100),
+                                           self.colors['text_secondary'], 'small')
+
+        # 5. 视频信息
+        if is_video and frame_info:
+            fps_text = f"FPS: {frame_info.get('fps', 0):.1f}"
+            frame_text = f"帧: {frame_info.get('frame_number', 0)}"
+
+            image = self._put_chinese_text(image, fps_text, (width - 200, 10),
+                                           self.colors['text_primary'], 'small')
+            image = self._put_chinese_text(image, frame_text, (width - 200, 40),
+                                           self.colors['text_primary'], 'small')
+
+        # 6. 概率分布
+        if 'probabilities' in direction_info:
+            probabilities = direction_info['probabilities']
+            start_x = width - 200
+            start_y = 70 if is_video else 10
+
+            for i, (dir_name, prob) in enumerate(probabilities.items()):
+                y = start_y + i * 25
+                prob_text = f"{dir_name}: {prob:.1%}"
+
+                color = self.colors['text_primary'] if dir_name == direction else self.colors['text_secondary']
+
+                image = self._put_chinese_text(image, prob_text, (start_x, y), color, 'small')
+
+        return image
+
+    def _draw_direction_indicator(self, image: np.ndarray,
+                                direction_info: Dict[str, Any]) -> np.ndarray:
+        """绘制方向指示器"""
+        height, width = image.shape[:2]
+        direction = direction_info.get('direction', '未知')
+        confidence = direction_info.get('confidence', 0.0)
+        
+        # 指示器位置
+        center_x = width // 2
+        indicator_y = height - 150
+        
+        # 创建指示器图层
+        indicator_layer = np.zeros_like(image)
+        
+        if direction == "左转":
+            # 左转箭头
+            points = np.array([
+                [center_x, indicator_y],
+                [center_x - 80, indicator_y],
+                [center_x - 60, indicator_y - 40],
+                [center_x - 100, indicator_y - 40],
+                [center_x - 120, indicator_y],
+                [center_x - 200, indicator_y],
+                [center_x - 100, indicator_y + 80],
+                [center_x, indicator_y + 80]
+            ], dtype=np.int32)
+            base_color = (0, 165, 255)
+            
+        elif direction == "右转":
+            # 右转箭头
+            points = np.array([
+                [center_x, indicator_y],
+                [center_x + 80, indicator_y],
+                [center_x + 60, indicator_y - 40],
+                [center_x + 100, indicator_y - 40],
+                [center_x + 120, indicator_y],
+                [center_x + 200, indicator_y],
+                [center_x + 100, indicator_y + 80],
+                [center_x, indicator_y + 80]
+            ], dtype=np.int32)
+            base_color = (0, 165, 255)
+            
+        else:  # 直行或未知
+            # 直行箭头
+            points = np.array([
+                [center_x - 60, indicator_y + 40],
+                [center_x, indicator_y - 40],
+                [center_x + 60, indicator_y + 40],
+                [center_x + 40, indicator_y + 40],
+                [center_x + 40, indicator_y + 120],
+                [center_x - 40, indicator_y + 120],
+                [center_x - 40, indicator_y + 40]
+            ], dtype=np.int32)
+            base_color = (0, 255, 0)
+        
+        # 根据置信度调整颜色亮度
+        brightness_factor = 0.5 + confidence * 0.5
+        color = tuple(int(c * brightness_factor) for c in base_color)
+        
+        # 绘制指示器
+        cv2.fillPoly(indicator_layer, [points], color)
+        
+        alpha = 0.3 + confidence * 0.5
+        cv2.addWeighted(indicator_layer, alpha, image, 1 - alpha, 0, image)
+        
+        # 绘制边框
+        cv2.polylines(image, [points], True, (255, 255, 255), 2, cv2.LINE_AA)
+        
+        return image
+    
+    def _get_confidence_color(self, confidence: float) -> Tuple[int, int, int]:
+        """根据置信度获取颜色"""
+        if confidence >= 0.8:
+            return self.colors['confidence_high']
+        elif confidence >= 0.6:
+            return self.colors['confidence_medium']
+        elif confidence >= 0.4:
+            return self.colors['confidence_low']
+        else:
+            return self.colors['confidence_very_low']
+
+    def _draw_legend(self, image: np.ndarray, lane_info: Dict[str, Any]) -> np.ndarray:
+        """绘制图例说明"""
+        lane_stats = lane_info.get('lane_statistics', {})
+        if not lane_stats or lane_stats.get('total_detected_lines', 0) < 3:
+            return image
+
+        height, width = image.shape[:2]
+
+        # 创建图例背景
+        legend_width = 180
+        legend_height = 90
+        overlay = image.copy()
+        cv2.rectangle(overlay, (width - legend_width - 10, height - legend_height - 10),
+                      (width - 10, height - 10), (0, 0, 0, 200), -1)
+        cv2.addWeighted(overlay, 0.6, image, 0.4, 0, image)
+
+        # 图例文字
+        legend_start_x = width - legend_width
+        legend_start_y = height - legend_height
+
+        # 主车道
+        cv2.line(image, (legend_start_x + 10, legend_start_y + 25),
+                 (legend_start_x + 40, legend_start_y + 25), (255, 100, 100), 3)
+        image = self._put_chinese_text(image, "主车道",
+                                       (legend_start_x + 50, legend_start_y + 15),
+                                       self.colors['text_primary'], 'small')
+
+        # 邻车道
+        cv2.line(image, (legend_start_x + 10, legend_start_y + 50),
+                 (legend_start_x + 40, legend_start_y + 50), (255, 255, 0), 2)
+        image = self._put_chinese_text(image, "邻车道",
+                                       (legend_start_x + 50, legend_start_y + 40),
+                                       self.colors['text_primary'], 'small')
+
+        # 中心线
+        cv2.line(image, (legend_start_x + 10, legend_start_y + 75),
+                 (legend_start_x + 40, legend_start_y + 75), (255, 255, 0), 2)
+        image = self._put_chinese_text(image, "中心线",
+                                       (legend_start_x + 50, legend_start_y + 65),
+                                       self.colors['text_primary'], 'small')
+
+        return image
+
+    def _apply_global_effects(self, image: np.ndarray) -> np.ndarray:
+        """应用全局效果"""
+        # 轻微锐化
+        kernel = np.array([[-1, -1, -1],
+                          [-1, 9, -1],
+                          [-1, -1, -1]])
+        sharpened = cv2.filter2D(image, -1, kernel)
+        
+        cv2.addWeighted(sharpened, 0.3, image, 0.7, 0, image)
+        
+        return image

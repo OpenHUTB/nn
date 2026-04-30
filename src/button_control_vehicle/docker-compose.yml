@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # CARLA服务器容器
+  carla:
+    image: carlasim/carla:0.9.14
+    container_name: carla_server
+    ports:
+      - "2000-2002:2000-2002" # CARLA默认端口
+    command: ./CarlaUE4.sh -RenderOffScreen -nosound
+    restart: unless-stopped
+    networks:
+      - carla-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+
+  # 路径规划节点容器
+  global-planner:
+    build: .
+    container_name: carla_global_planner
+    depends_on:
+      - carla
+    environment:
+      - CARLA_HOST=carla # 与CARLA服务名一致
+      - CARLA_PORT=2000
+      - CARLA_TIMEOUT=15.0
+      - RECONNECT_INTERVAL=5.0
+      - MAX_MEMORY_THRESHOLD_MB=1024
+    restart: unless-stopped
+    networks:
+      - carla-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
+networks:
+  carla-network:
+    driver: bridge
