@@ -309,6 +309,16 @@ class HumanoidStabilizer:
                 np.float64
             )
 
+        self._qpos_adr = np.empty(self.num_joints, dtype=np.int32)
+        self._qvel_adr = np.empty(self.num_joints, dtype=np.int32)
+        for joint_name in self.joint_names:
+            joint_idx = self.joint_name_to_idx[joint_name]
+            joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+            if joint_id < 0:
+                raise RuntimeError(f"未找到关节：{joint_name}")
+            self._qpos_adr[joint_idx] = int(self.model.jnt_qposadr[joint_id])
+            self._qvel_adr[joint_idx] = int(self.model.jnt_dofadr[joint_id])
+
         # PD控制增益（原有逻辑保留，新增动态增益系数）
         self.kp_roll = 120.0
         self.kd_roll = 40.0
@@ -336,6 +346,10 @@ class HumanoidStabilizer:
         self._force_factor_norm = float(max(1.0, 0.5 * self.weight))
         self.com_safety_threshold = 0.6  # 重心z轴安全阈值（新增）
         self.speed_reduction_factor = 0.5  # 重心过低时的降速系数（新增）
+        self._support_body_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis"))
+        if self._support_body_id < 0:
+            self._support_body_id = 0
+        self._support_until = 0.0
 
         self._left_foot_geom_ids = {
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot1_left"),
@@ -461,6 +475,12 @@ class HumanoidStabilizer:
             return True
         return False
 
+    def _get_joint_positions(self):
+        return self.data.qpos[self._qpos_adr].astype(np.float64, copy=True)
+
+    def _get_joint_velocities(self):
+        return self.data.qvel[self._qvel_adr].astype(np.float64, copy=True)
+
     def _torques_to_ctrl(self, joint_torques):
         ctrl = np.zeros(self.model.nu, dtype=np.float64)
         for joint_name in self.joint_names:
@@ -551,8 +571,24 @@ class HumanoidStabilizer:
         self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.5
         self.prev_joint_targets = self.joint_targets.copy()
 
-        self.data.qpos[7:7 + self.num_joints] = self.joint_targets.astype(np.float64)
+        self.data.qpos[self._qpos_adr] = self.joint_targets.astype(np.float64)
         mujoco.mj_forward(self.model, self.data)
+        target_clearance = 0.002
+        min_bottom_z = None
+        foot_geom_ids = list(self._left_foot_geom_ids | self._right_foot_geom_ids)
+        for gid in foot_geom_ids:
+            if gid < 0:
+                continue
+            radius = float(self.model.geom_size[gid, 0])
+            z = float(self.data.geom_xpos[gid, 2]) - radius
+            if min_bottom_z is None or z < min_bottom_z:
+                min_bottom_z = z
+        if min_bottom_z is not None:
+            dz = (min_bottom_z - target_clearance)
+            if abs(dz) > 1e-6:
+                self.data.qpos[2] -= dz
+                mujoco.mj_forward(self.model, self.data)
+        self._support_until = float(self.data.time) + 3.0
 
     # ===================== 传感器模拟相关方法（原有新增逻辑保留） =====================
     def _simulate_imu_data(self):
@@ -872,8 +908,12 @@ class HumanoidStabilizer:
         torques = np.zeros(self.num_joints, dtype=np.float64)
 
         # 躯干姿态控制（改用传感器IMU数据）
-        root_euler = imu["euler"]  # 带噪声的欧拉角
-        root_vel = imu["ang_vel"]  # 带噪声的角速度
+        if self.enable_sensor_simulation:
+            root_euler = imu.get("true_euler", imu["euler"])
+            root_vel = imu.get("true_ang_vel", imu["ang_vel"])
+        else:
+            root_euler = imu["euler"]
+            root_vel = imu["ang_vel"]
         root_vel = np.clip(root_vel, -3.0, 3.0)
 
         imu_alpha = 0.2
@@ -896,6 +936,14 @@ class HumanoidStabilizer:
         torso_torque = np.array([roll_torque, pitch_torque, yaw_torque])
         torso_torque = np.clip(torso_torque, -30.0, 30.0)
 
+        self.data.xfrc_applied[self._support_body_id, :] = 0.0
+        now_t = float(self.data.time)
+        if now_t < float(self._support_until):
+            scale = float(np.clip((float(self._support_until) - now_t) / 3.0, 0.0, 1.0))
+            self.data.xfrc_applied[self._support_body_id, 2] = self.weight * 0.9 * scale
+            self.data.xfrc_applied[self._support_body_id, 3] = (-80.0 * self._imu_euler_filt[0] - 20.0 * self._imu_angvel_filt[0]) * scale
+            self.data.xfrc_applied[self._support_body_id, 4] = (-80.0 * self._imu_euler_filt[1] - 20.0 * self._imu_angvel_filt[1]) * scale
+
         # 重心补偿（原有逻辑完全保留）
         com = self.data.subtree_com[0].astype(np.float64).copy()
         com_error = self.com_target - com
@@ -903,8 +951,8 @@ class HumanoidStabilizer:
         com_compensation = self.kp_com * com_error
 
         # 关节控制（改用传感器足底力数据）
-        current_joints = self.data.qpos[7:7 + self.num_joints].astype(np.float64)
-        current_vel = self.data.qvel[6:6 + self.num_joints].astype(np.float64)
+        current_joints = self._get_joint_positions()
+        current_vel = self._get_joint_velocities()
         current_vel = np.clip(current_vel, -8.0, 8.0)
 
         # 更新接触状态（来自传感器）
@@ -936,7 +984,7 @@ class HumanoidStabilizer:
             joint_error = max(-0.3, min(0.3, joint_error))
 
             # 动态PD增益 - 接触力越小，增益越低（避免打滑）
-            if self.enable_robust_optim:
+            if self.enable_robust_optim and self.state == "WALK":
                 # 计算接触力归一化系数（0~1）
                 if "right" in joint_name:
                     force_factor = np.clip(self.right_foot_force / self._force_factor_norm, 0.4, 1.1)
@@ -959,18 +1007,20 @@ class HumanoidStabilizer:
                 kp = self.base_kp_knee * force_factor
                 kd = self.base_kd_knee * force_factor
                 joint_error += com_compensation[2] * 0.05
+                joint_error += torso_torque[1] * 0.01
 
             elif "ankle" in joint_name:
                 kp = self.base_kp_ankle * force_factor
                 kd = self.base_kd_ankle * force_factor
                 if "y" in joint_name:
-                    joint_error -= torso_torque[1] * 0.015
+                    joint_error += torso_torque[1] * 0.015
 
             # 原有接触判断逻辑（保留，与动态增益叠加）
-            if ("left" in joint_name and self.foot_contact[1] == 0) or \
-                    ("right" in joint_name and self.foot_contact[0] == 0):
-                kp *= 0.8
-                kd *= 0.9
+            if self.state == "WALK":
+                if ("left" in joint_name and self.foot_contact[1] == 0) or \
+                        ("right" in joint_name and self.foot_contact[0] == 0):
+                    kp *= 0.8
+                    kd *= 0.9
 
             torques[idx] = kp * joint_error - kd * current_vel[idx]
 
@@ -1034,10 +1084,13 @@ class HumanoidStabilizer:
                 print(f"默认步态模式：{self.gait_mode}\n")
 
                 # 初始落地阶段（原有逻辑保留）
+                self._support_until = max(float(self._support_until), float(self.data.time) + float(self.init_wait_time))
                 start_time = time.time()
                 while time.time() - start_time < self.init_wait_time:
-                    alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
-                    torques = self._calculate_stabilizing_torques() * alpha
+                    elapsed = time.time() - start_time
+                    alpha = min(1.0, elapsed / 1.0)
+                    torque_scale = 0.5 + 0.5 * alpha
+                    torques = self._calculate_stabilizing_torques() * torque_scale
                     self.data.ctrl[:] = self._torques_to_ctrl(torques)
                     mujoco.mj_step(self.model, self.data)
                     self.data.qvel[:] *= 0.97

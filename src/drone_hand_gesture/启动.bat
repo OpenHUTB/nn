@@ -1,68 +1,80 @@
 @echo off
 chcp 65001 >nul
+title Drone Hand Gesture Control System
+
 echo ==========================================
-echo    无人机手势控制系统 - 一键启动
+echo    Drone Hand Gesture Control System
 echo ==========================================
 echo.
 
 cd /d "%~dp0"
 
-echo [1/3] 检查 Python 环境...
+echo [1/3] Checking Python environment...
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [错误] 未找到 Python，请先安装 Python！
+    echo [ERROR] Python not found! Please install Python first!
     pause
     exit /b 1
 )
-echo [成功] Python 环境就绪
+echo [SUCCESS] Python environment ready
 echo.
 
-echo [2/3] 检查依赖...
+echo [2/3] Checking dependencies...
 python -c "import pygame" >nul 2>&1
 if errorlevel 1 (
-    echo [提示] 正在安装依赖...
+    echo [INFO] Installing dependencies...
     if exist requirements.txt (
         pip install -r requirements.txt
     ) else (
-        echo [提示] 未找到 requirements.txt，跳过安装
+        echo [INFO] requirements.txt not found, skipping installation
     )
 )
-echo [成功] 依赖就绪
+echo [SUCCESS] Dependencies ready
 echo.
 
-echo [3/3] 启动程序...
+echo [3/3] Starting program...
 echo.
-echo 请选择启动模式:
-echo   1. 使用启动器（推荐）
-echo   2. 直接运行新版仿真
-echo   3. 直接运行旧版仿真
-echo   4. 打开配置编辑器
+echo Please select mode:
+echo   1. Use Launcher (Recommended)
+echo   2. Run New Simulation
+echo   3. Run Old Simulation
+echo   4. Run AirSim Version
+echo   5. Run AirSim (with Drone Camera!)
+echo   6. Open Config Editor
 echo.
-set /p choice=请输入选项 (1-4):
+set /p choice=Enter your choice (1-6):
 
 if "%choice%"=="1" (
     echo.
-    echo 正在启动启动器...
+    echo Starting launcher...
     python launcher.py
 ) else if "%choice%"=="2" (
     echo.
-    echo 正在启动新版仿真...
+    echo Starting new simulation...
     python main_v2.py
 ) else if "%choice%"=="3" (
     echo.
-    echo 正在启动旧版仿真...
+    echo Starting old simulation...
     python main.py
 ) else if "%choice%"=="4" (
     echo.
-    echo 正在打开配置编辑器...
+    echo Starting AirSim version...
+    python main_airsim.py
+) else if "%choice%"=="5" (
+    echo.
+    echo Starting AirSim with DRONE CAMERA!
+    python main_airsim_camera.py
+) else if "%choice%"=="6" (
+    echo.
+    echo Opening config editor...
     python config_ui.py
 ) else (
     echo.
-    echo [错误] 无效选项！
+    echo [ERROR] Invalid choice!
     pause
     exit /b 1
 )
 
 echo.
-echo 程序已退出
+echo Program exited
 pause
