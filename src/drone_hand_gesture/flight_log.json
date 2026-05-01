@@ -1,10 +1,25 @@
 [
   {
-    "timestamp": 1777018795.604554,
+    "timestamp": 1777461572.4898877,
+    "gesture": "closed_fist",
+    "command": "land",
+    "confidence": 0.85,
+    "intensity": 0.5,
+    "position": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "battery": 100.0,
+    "armed": false,
+    "mode": "DISARMED"
+  },
+  {
+    "timestamp": 1777461574.020086,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
       0.0,
       0.0,
@@ -15,663 +30,498 @@
     "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018797.6320484,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461575.849015,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
       0.0,
-      0.8247661590576172,
+      1.769471025466919,
       0.0
     ],
-    "battery": 99.07213807106015,
+    "battery": 98.40747607707975,
+    "armed": true,
+    "mode": "FORWARD"
+  },
+  {
+    "timestamp": 1777461577.3702562,
+    "gesture": "closed_fist",
+    "command": "land",
+    "confidence": 0.85,
+    "intensity": 0.5,
+    "position": [
+      1.520254135131836,
+      1.769471025466919,
+      0.0
+    ],
+    "battery": 97.03924735546106,
+    "armed": true,
+    "mode": "LAND"
+  },
+  {
+    "timestamp": 1777461581.2710574,
+    "gesture": "open_palm",
+    "command": "takeoff",
+    "confidence": 0.85,
+    "intensity": 0.5,
+    "position": [
+      3.1979029178619385,
+      0.0,
+      0.0
+    ],
+    "battery": 95.52936345100406,
     "armed": true,
     "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018799.6609354,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461582.7739708,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
+      4.701655626296997,
+      1.5037527084350586,
       0.0
     ],
-    "battery": 97.41495811939232,
+    "battery": 94.17598601341254,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018801.678001,
+    "timestamp": 1777461584.302303,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
+      6.235738277435303,
+      1.5037527084350586,
       0.0
     ],
-    "battery": 96.21142218112936,
+    "battery": 92.79531162738803,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018803.6938918,
+    "timestamp": 1777461586.313976,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
+      8.2438805103302,
+      2.0080885887145996,
       0.0
     ],
-    "battery": 94.99636089801785,
+    "battery": 90.9879836177827,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018805.7141576,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "timestamp": 1777461588.2072213,
+    "gesture": "closed_fist",
+    "command": "land",
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
+      10.130092144012451,
+      2.0250515937805176,
       0.0
     ],
-    "battery": 93.78449280261994,
+    "battery": 89.29039314746863,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "LAND"
   },
   {
-    "timestamp": 1777018807.7455282,
+    "timestamp": 1777461589.7175968,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
+      11.648648738861084,
+      0.5064949989318848,
       0.0
     ],
-    "battery": 92.56686904430391,
+    "battery": 87.92369221210485,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018809.7605572,
+    "timestamp": 1777461597.1478827,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
       0.0,
-      2.0034725189208986,
+      0.0,
       0.0
     ],
-    "battery": 91.35953495502469,
+    "battery": 100.0,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018811.7737544,
+    "timestamp": 1777461599.1654446,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
       0.0,
-      2.0034725189208986,
+      2.0111052989959717,
       0.0
     ],
-    "battery": 90.15313370227804,
+    "battery": 98.19549918174744,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018813.7772417,
+    "timestamp": 1777461603.205355,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
       0.0,
-      2.0034725189208986,
+      2.028597593307495,
       0.0
     ],
-    "battery": 88.94570963382708,
+    "battery": 95.77349348068229,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018815.8073518,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461605.1646314,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
       0.0,
-      2.0034725189208986,
+      2.046715021133423,
       0.0
     ],
-    "battery": 87.7292517423629,
+    "battery": 94.5975688457487,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018817.8282416,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461606.8882792,
+    "gesture": "pointing_up",
+    "command": "up",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
+      1.7256145477294922,
+      2.046715021133423,
       0.0
     ],
-    "battery": 86.5151918172836,
+    "battery": 93.0445157527921,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "UP"
   },
   {
-    "timestamp": 1777018819.857842,
+    "timestamp": 1777461608.5637321,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      1.7256145477294922,
+      2.046715021133423,
+      -1.6790623664855957
     ],
-    "battery": 85.29716522693634,
+    "battery": 91.53335962295503,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018821.8717804,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461610.251094,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      1.7256145477294922,
+      2.063878297805786,
+      -3.3764657974243164
     ],
-    "battery": 84.09034798145294,
+    "battery": 90.0056965351102,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018823.8860788,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461612.2631881,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      3.7317802906036377,
+      2.063878297805786,
+      -3.3764657974243164
     ],
-    "battery": 82.8843135118485,
+    "battery": 88.20014736652352,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018825.8886976,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461613.7845495,
+    "gesture": "pointing_up",
+    "command": "up",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      5.2488086223602295,
+      2.063878297805786,
+      -3.3764657974243164
     ],
-    "battery": 81.6791090250016,
+    "battery": 86.8348218679426,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "UP"
   },
   {
-    "timestamp": 1777018827.9029882,
+    "timestamp": 1777461615.3054903,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      5.2488086223602295,
+      2.063878297805786,
+      -4.892033576965332
     ],
-    "battery": 80.47510573863984,
+    "battery": 85.47081086635572,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018829.9066527,
+    "timestamp": 1777461617.3231072,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      5.2488086223602295,
+      2.081503391265869,
+      -6.921411752700806
     ],
-    "battery": 79.26667401790625,
+    "battery": 83.64437050819379,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018831.9161253,
+    "timestamp": 1777461619.3305185,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      5.2488086223602295,
+      2.0993995666503906,
+      -8.93167519569397
     ],
-    "battery": 78.06500375270846,
+    "battery": 81.8351334094999,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018834.5313993,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461620.8377898,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      5.2488086223602295,
+      2.116624116897583,
+      -10.43892788887024
     ],
-    "battery": 76.99784013271325,
+    "battery": 80.47860598564124,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018836.544694,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "timestamp": 1777461622.35927,
+    "gesture": "closed_fist",
+    "command": "land",
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      6.766809940338135,
+      2.116624116897583,
+      -10.43892788887024
     ],
-    "battery": 75.79528767108916,
+    "battery": 79.11240479946115,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "LAND"
   },
   {
-    "timestamp": 1777018838.5580919,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461623.882436,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      8.282436609268188,
+      0.6009974479675293,
+      -10.43892788887024
     ],
-    "battery": 74.58871990680683,
+    "battery": 77.74834079742415,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018840.5618107,
-    "gesture": "open_palm",
-    "command": "takeoff",
+    "timestamp": 1777461625.9030545,
+    "gesture": "victory",
+    "command": "forward",
     "confidence": 0.8,
-    "intensity": 0.8,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      10.299646377563477,
+      0.6009974479675293,
+      -10.43892788887024
     ],
-    "battery": 73.38208047389973,
+    "battery": 75.93285200595847,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "FORWARD"
   },
   {
-    "timestamp": 1777018842.5738895,
+    "timestamp": 1777461627.4186969,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      11.821661710739136,
+      0.6009974479675293,
+      -10.43892788887024
     ],
-    "battery": 72.17475310802442,
+    "battery": 74.56303820610042,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018844.5935595,
+    "timestamp": 1777461629.4267876,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      13.83314847946167,
+      2.0158135890960693,
+      -10.43892788887024
     ],
-    "battery": 70.9635978364943,
+    "battery": 72.7527001142502,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018846.602969,
+    "timestamp": 1777461631.4505715,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      15.848886966705322,
+      2.0336225032806396,
+      -10.43892788887024
     ],
-    "battery": 69.7573280477522,
+    "battery": 70.9385354757309,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018848.6088388,
+    "timestamp": 1777461633.4977274,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      17.893758535385132,
+      2.0513758659362793,
+      -10.43892788887024
     ],
-    "battery": 68.55756980419139,
+    "battery": 69.09815106391906,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018850.6393764,
+    "timestamp": 1777461635.5297544,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      19.936779499053955,
+      2.068908214569092,
+      -10.43892788887024
     ],
-    "battery": 67.46492705821966,
+    "battery": 67.25943219661717,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018852.6849723,
+    "timestamp": 1777461637.548032,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      21.951134204864502,
+      2.086520195007324,
+      -10.43892788887024
     ],
-    "battery": 66.23724108219125,
+    "battery": 65.44651296138771,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018854.6882205,
+    "timestamp": 1777461639.5643413,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
+      23.96742081642151,
+      2.1042990684509277,
+      -10.43892788887024
     ],
-    "battery": 65.03981342792487,
+    "battery": 63.63185501098641,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018856.7029555,
+    "timestamp": 1777461644.0652173,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
       0.0,
-      2.0034725189208986,
+      0.0,
       0.0
     ],
-    "battery": 63.83109817981695,
+    "battery": 100.0,
     "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   },
   {
-    "timestamp": 1777018858.7186856,
+    "timestamp": 1777461646.0769408,
     "gesture": "open_palm",
     "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
+    "confidence": 0.85,
+    "intensity": 0.5,
     "position": [
       0.0,
-      2.0034725189208986,
+      2.010009765625,
       0.0
     ],
-    "battery": 62.616150336265314,
+    "battery": 98.19622709751124,
     "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018860.7229812,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 61.413069157600134,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018862.73626,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 60.208867030143495,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018864.7646108,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 58.99241786479926,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018866.7785442,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 57.78494730472541,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018868.815897,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 56.560928015708676,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018870.834837,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 55.34347091197945,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018872.8621242,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 54.13363471508005,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018874.8786433,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 52.92339611530285,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018876.8910787,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 51.71510515689831,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018878.965663,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 50.471283011436284,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018880.9762414,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 49.26497488498668,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018883.004565,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 48.049502615928446,
-    "armed": true,
-    "mode": "HOVER"
-  },
-  {
-    "timestamp": 1777018885.024433,
-    "gesture": "open_palm",
-    "command": "takeoff",
-    "confidence": 0.8,
-    "intensity": 0.8,
-    "position": [
-      0.0,
-      2.0034725189208986,
-      0.0
-    ],
-    "battery": 46.83374538898448,
-    "armed": true,
-    "mode": "HOVER"
+    "mode": "TAKEOFF"
   }
 ]

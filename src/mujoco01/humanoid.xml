@@ -104,6 +104,7 @@
     <light name="spotlight" mode="targetbodycom" target="torso" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <light name="top" pos="0 0 2" mode="trackcom"/>
     <body name="torso" pos="0 0 1.282" childclass="body">
+      <site name="torso_site" pos="0 0 0" size="0.01"/> <!-- 传感器用 -->
       <camera name="back" pos="-3 0 1" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
       <camera name="side" pos="0 -3 1" xyaxes="1 0 0 0 1 2" mode="trackcom"/>
       <freejoint name="root"/>
@@ -133,6 +134,7 @@
                 <joint name="ankle_x_right" class="ankle_x" axis="1 0 .5"/>
                 <geom name="foot1_right" class="foot1"/>
                 <geom name="foot2_right" class="foot2"/>
+                <site name="foot_site" pos="0 0 0" size="0.01"/>
               </body>
             </body>
           </body>
@@ -233,13 +235,20 @@
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
   </actuator>
 
+  <!-- ✅ 正确传感器写法 -->
+  <sensor>
+    <accelerometer name="torso_acc" site="torso_site"/>
+    <velocimeter name="torso_vel" site="torso_site"/>
+    <force name="foot_force" site="foot_site"/>
+  </sensor>
+
   <keyframe>
-    <key name="squat"
-        qpos="0 0 0.596
-              0.988015 0 0.154359 0
-              0 0.4 0
-              -0.25 -0.5 -2.5 -2.65 -0.8 0.56
-              -0.25 -0.5 -2.5 -2.65 -0.8 0.56
+    <key name="home"
+        qpos="0 0 1.282
+              1 0 0 0
+              0 0 0
+              0 0 0 0 0 0
+              0 0 0 0 0 0
               0 0 0 0 0 0"/>
   </keyframe>
 </mujoco>

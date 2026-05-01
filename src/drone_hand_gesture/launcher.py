@@ -3,6 +3,7 @@ import sys
 import os
 import tkinter as tk
 from tkinter import ttk, messagebox
+from typing import Optional
 
 from core import ConfigManager, Logger
 
@@ -16,7 +17,7 @@ class Launcher:
     def show(self):
         self.root = tk.Tk()
         self.root.title("无人机手势控制系统 - 启动器")
-        self.root.geometry("500x400")
+        self.root.geometry("550x480")
 
         title_frame = ttk.Frame(self.root)
         title_frame.pack(pady=20)
@@ -31,11 +32,14 @@ class Launcher:
         style.configure("Launch.TButton", font=("Arial", 12))
 
         ttk.Button(
-            button_frame, text="🔧 配置编辑器", style="Launch.TButton", command=self._open_config, width=30).pack(pady=10)
+            button_frame, text="🔧 配置编辑器", style="Launch.TButton", command=self._open_config, width=35).pack(pady=8)
         ttk.Button(
-            button_frame, text="🎮 本地仿真模式", style="Launch.TButton", command=self._launch_simulation, width=30).pack(pady=10)
+            button_frame, text="🎮 本地仿真模式", style="Launch.TButton", command=self._launch_simulation, width=35).pack(pady=8)
         ttk.Button(
-            button_frame, text="🛩️ AirSim仿真模式", style="Launch.TButton", command=self._launch_airsim, width=30).pack(pady=10)
+            button_frame, text="🛩️ AirSim仿真模式", style="Launch.TButton", command=self._launch_airsim, width=35).pack(pady=8)
+        ttk.Button(
+            button_frame, text="📷 AirSim仿真模式 (带无人机摄像头)", style="Launch.TButton", 
+            command=self._launch_airsim_camera, width=35).pack(pady=8)
 
         info_frame = ttk.LabelFrame(self.root, text="信息")
         info_frame.pack(pady=20, padx=20, fill=tk.X)
@@ -80,6 +84,17 @@ class Launcher:
         except Exception as e:
             self.logger.error(f"启动 AirSim 模式失败: {e}")
             messagebox.showerror("错误", f"启动 AirSim 模式失败: {e}")
+
+    def _launch_airsim_camera(self):
+        try:
+            self.logger.info("启动 AirSim 模式 (带无人机摄像头)...")
+            if os.path.exists("main_airsim_camera.py"):
+                os.system(f"{sys.executable} main_airsim_camera.py")
+            else:
+                messagebox.showinfo("提示", "正在启动 AirSim 模式 (带无人机摄像头)，请运行 main_airsim_camera.py 文件")
+        except Exception as e:
+            self.logger.error(f"启动 AirSim 模式 (带无人机摄像头) 失败: {e}")
+            messagebox.showerror("错误", f"启动 AirSim 模式 (带无人机摄像头) 失败: {e}")
 
 
 def main():

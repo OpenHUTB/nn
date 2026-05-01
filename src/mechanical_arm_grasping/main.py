@@ -1,11 +1,14 @@
-# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加进度条显示）
-
+# MuJoCo 3.4.0 带自动复位的3自由度机械臂精准取放（增加成功率阈值检查）
 import sys
 import mujoco
 import mujoco.viewer
 import time
 import numpy as np
 import datetime
+
+# 退出码定义
+EXIT_SUCCESS = 0
+EXIT_FAILURE = 1
 
 # 速度配置（单位：秒）
 SPEED_CONFIG = {
@@ -268,15 +271,15 @@ def robot_arm_auto_reset_demo():
         print("\n📌 开始带自动复位的机械臂精准取放流程...")
         print("-" * 60)
 
-        # ========== 多次抓取配置 ==========
-        # 从命令行读取抓取次数，默认 5 次
+        # ========== 命令行参数解析 ==========
+        # 抓取次数，默认 5 次
         if len(sys.argv) > 1:
             total_rounds = int(sys.argv[1])
         else:
             total_rounds = 5
         print(f"📌 本次将抓取 {total_rounds} 次")
         
-        # 读取速度参数
+        # 速度参数，默认 medium
         speed = "medium"
         if len(sys.argv) > 2:
             speed_arg = sys.argv[2].lower()
@@ -285,6 +288,15 @@ def robot_arm_auto_reset_demo():
                 print(f"📌 速度模式: {speed} (slow/medium/fast)")
             else:
                 print(f"⚠️ 速度参数 '{speed_arg}' 无效，使用默认 'medium'")
+        
+        # 最低成功率要求，默认 0（不检查）
+        min_success_rate = 0.0
+        if len(sys.argv) > 3:
+            try:
+                min_success_rate = float(sys.argv[3])
+                print(f"📌 最低成功率要求: {min_success_rate}%")
+            except ValueError:
+                print(f"⚠️ 成功率参数 '{sys.argv[3]}' 无效，使用默认 0%（不检查）")
         
         success_count = 0
 
@@ -314,11 +326,21 @@ def robot_arm_auto_reset_demo():
                     time.sleep(0.05)
 
         # ========== 输出统计结果 ==========
+        actual_rate = success_count / total_rounds * 100
         print(f"\n{'='*50}")
         print(f"🎉 所有抓取完成！")
         print(f"📊 统计结果：成功 {success_count}/{total_rounds} 次")
-        print(f"📈 成功率：{success_count/total_rounds*100:.1f}%")
+        print(f"📈 成功率：{actual_rate:.1f}%")
         print(f"{'='*50}")
+
+        # ========== 成功率阈值检查 ==========
+        if min_success_rate > 0:
+            if actual_rate >= min_success_rate:
+                print(f"✅ 成功率 {actual_rate:.1f}% 已达到要求 {min_success_rate:.1f}%")
+            else:
+                print(f"⚠️ 警告：实际成功率 {actual_rate:.1f}% 低于要求 {min_success_rate:.1f}%")
+                print(f"❌ 抓取任务失败，退出码: {EXIT_FAILURE}")
+                sys.exit(EXIT_FAILURE)
 
         print("\n\n📌 流程结束，保持可视化5秒...")
         start_hold = time.time()
@@ -330,13 +352,14 @@ def robot_arm_auto_reset_demo():
     # 保存日志到文件
     try:
         with open("grasp_log.txt", "a", encoding="gbk") as f:
-            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{success_count/total_rounds*100:.1f}%, 速度:{speed}\n")
+            f.write(f"[{datetime.datetime.now()}] 抓取{total_rounds}次, 成功{success_count}次, 成功率{actual_rate:.1f}%, 速度:{speed}\n")
         print("📝 日志已保存到 grasp_log.txt")
     except Exception as e:
         print(f"⚠️ 日志保存失败：{e}")
 
     print("\n\n🎉 3自由度机械臂自动复位取放演示完毕！")
+    return EXIT_SUCCESS
 
 
 if __name__ == "__main__":
-    robot_arm_auto_reset_demo()
+    sys.exit(robot_arm_auto_reset_demo())
