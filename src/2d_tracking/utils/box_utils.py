@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-def draw_bounding_boxes(image, boxes, labels, class_names, ids):
+def draw_bounding_boxes(image, boxes, labels, class_names, ids,dists):
     '''
     boxes: (x_min, y_min, x_max, y_max)
     '''
@@ -14,20 +14,20 @@ def draw_bounding_boxes(image, boxes, labels, class_names, ids):
     # Draw bounding boxes and labels
     for i in range(boxes.shape[0]):
         box = boxes[i]
-        label = f"{class_names[labels[i]]}: {int(ids[i])}"
+        label = f"{class_names[labels[i]]}: {int(ids[i])} {dists[i]:.1f}m"
         # print(label)
 
         # Draw bounding boxes
-        cv2.rectangle(  image, 
-                        (int(box[0].item()), int(box[1].item())), (int(box[2].item()), int(box[3].item())), 
-                        tuple([int(c) for c in draw_bounding_boxes.colours[int(ids[i]) % 32, :]]), 
+        cv2.rectangle(  image,
+                        (int(box[0].item()), int(box[1].item())), (int(box[2].item()), int(box[3].item())),
+                        tuple([int(c) for c in draw_bounding_boxes.colours[int(ids[i]) % 32, :]]),
                         4)
 
         # Draw labels
         cv2.putText(image, label,
                     (int(box[0]+20), int(box[1]+40)),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    1,  # font scale
+                    0.5,  # font scale
                     tuple([int(c) for c in draw_bounding_boxes.colours[int(ids[i]) % 32, :]]),
                     2)  # line type
     return image

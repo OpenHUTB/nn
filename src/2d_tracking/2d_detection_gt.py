@@ -7,17 +7,21 @@ import cv2
 import numpy as np
 
 # COCO 类别名称
-COCO_CLASS_NAMES = [
-     'car', 'motorcycle', 'airplane', 'bus', 'truck'
-]
-
 from utils.box_utils import draw_bounding_boxes
 from utils.projection import *
 from utils.world import *
+MY_CLASS_NAMES = [
+    "car",        # 0
+    "motorcycle", # 1
+    "unused",     # 2
+    "bus",        # 3
+    "truck"       # 4
+]
 
 def camera_callback(image, rgb_image_queue):
     rgb_image_queue.put(np.reshape(np.copy(image.raw_data),
                         (image.height, image.width, 4)))
+
 
 # ===================== Part 1: 初始化环境 =====================
 client = carla.Client('localhost', 2000)
@@ -85,6 +89,7 @@ while True:
         boxes = []
         ids = []
         labels = []  # 存储识别出的类型标签
+        dists=[]#
 
         # 遍历所有交通工具
         for npc in world.get_actors().filter('*vehicle*'):
@@ -137,13 +142,14 @@ while True:
                             ids.append(npc.id)
                             boxes.append([x_min, y_min, x_max, y_max])
                             labels.append(cls)
+                            dists.append(dist)
 
         # 绘制带类型的框
         if len(boxes) > 0:
             boxes = np.array(boxes)
             labels = np.array(labels)
             probs = np.array([1.0]*len(boxes))
-            image = draw_bounding_boxes(image, boxes, labels, COCO_CLASS_NAMES, ids)
+            image = draw_bounding_boxes(image, boxes, labels, MY_CLASS_NAMES, ids,dists)
 
         cv2.imshow('Carla 2D Tracking (Car/Bus/Truck/Motorcycle)', image)
 
