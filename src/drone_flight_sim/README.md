@@ -18,14 +18,16 @@
 ## 项目结构
 ```
 drone_flight_sim/
-├── main.py                  # 主程序入口（支持两种飞行模式）
-├── drone_controller.py     # 无人机核心控制模块（含相机控制和键盘控制）
-├── collision_handler.py     # 碰撞检测与处理模块
-├── flight_path.py           # 航点规划模块
-├── keyboard_control.py      # 键盘控制模块（新增）
-├── config.py                # 配置文件（含相机和键盘配置）
-├── utils.py                 # 工具函数
-└── drone_images/            # 拍摄照片保存目录（自动创建）
+├── main.py                      # 主程序入口（支持两种飞行模式）
+├── drone_controller.py          # 无人机核心控制模块
+├── collision_handler.py         # 碰撞检测与处理模块
+├── flight_path.py               # 航点规划模块
+├── keyboard_control.py          # 键盘控制模块
+├── collision_data_collector.py  # 碰撞检测数据采集模块（机器学习）
+├── config.py                    # 配置文件
+├── utils.py                     # 工具函数
+├── drone_images/                # 拍摄照片保存目录（自动创建）
+└── collision_dataset/           # 碰撞数据采集保存目录（自动创建）
 ```
 
 ## 飞行模式
@@ -253,3 +255,37 @@ waypoints = [(5, 0, -3), (5, -5, -3), (0, -5, -3), (0, 0, -3)]
 - 分割图像：`seg_YYYYMMDD_HHMMSS_X_Y.png`
 
 其中 `X`、`Y` 为拍照时的无人机坐标，`序号` 为该次运行的第 N 张照片。
+
+## 机器学习碰撞检测（开发中）
+
+### 碰撞数据采集
+
+使用 `collision_data_collector.py` 采集前视深度图像，用于训练碰撞预测模型。
+
+**运行方式：**
+```bash
+python collision_data_collector.py
+```
+
+**控制说明：**
+
+| 按键 | 功能 |
+|------|------|
+| W/S/A/D | 飞行控制（前进/后退/左移/右移） |
+| Q/E | 上升/下降 |
+| 空格 | 悬停 |
+| L | 降落 |
+| 0 | 设置为安全标签（前方无障碍物） |
+| 1 | 设置为危险标签（前方有障碍物） |
+| C | 采集当前样本 |
+| P | 自动采集10个样本 |
+| ESC | 退出 |
+
+**数据采集建议：**
+- 安全样本：在开阔地带、低空飞行时采集（按 0 设置标签）
+- 危险样本：靠近建筑物、树木时采集（按 1 设置标签）
+- 每种类型至少采集 20-30 个样本
+
+**数据保存位置：**
+- `collision_dataset/depth/` - 深度图像
+- `collision_dataset/labels.csv` - 标签记录

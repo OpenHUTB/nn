@@ -6,6 +6,7 @@
 import os
 import csv
 import pickle
+import math
 
 import gym
 import easycarla
@@ -43,6 +44,7 @@ params = {
 CONTROL_MODE = "safe_random"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
 SAVE_EPISODES = True
 SAVE_SUMMARY_CSV = True
+SAVE_TRAJECTORY_CSV = True
 DEBUG_DRAW_EVERY = 5
 NUM_EPISODES = 5
 
@@ -82,7 +84,8 @@ if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
             "off_road",
             "avg_speed",
             "max_speed",
-            "min_speed"
+            "min_speed",
+            "total_distance"
         ])
 
 
@@ -163,6 +166,62 @@ def get_ego_pose(env):
     }
 
     return ego_pose
+
+
+def calculate_distance(location_1, location_2):
+    """
+    计算两个位置之间的平面距离。
+    """
+    if location_1 is None or location_2 is None:
+        return 0.0
+
+    dx = location_2["x"] - location_1["x"]
+    dy = location_2["y"] - location_1["y"]
+
+    return float(math.sqrt(dx * dx + dy * dy))
+
+
+def save_trajectory_csv(save_path, trajectory_data):
+    """
+    保存车辆轨迹数据。
+    """
+    with open(save_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
+        writer.writerow([
+            "step",
+            "x",
+            "y",
+            "z",
+            "pitch",
+            "yaw",
+            "roll",
+            "speed",
+            "reward",
+            "cost",
+            "step_distance",
+            "total_distance",
+            "collision",
+            "off_road"
+        ])
+
+        for row in trajectory_data:
+            writer.writerow([
+                row["step"],
+                row["x"],
+                row["y"],
+                row["z"],
+                row["pitch"],
+                row["yaw"],
+                row["roll"],
+                row["speed"],
+                row["reward"],
+                row["cost"],
+                row["step_distance"],
+                row["total_distance"],
+                row["collision"],
+                row["off_road"]
+            ])
 
 
 def init_manual_control():
@@ -331,11 +390,16 @@ try:
         total_reward = 0.0
         total_cost = 0.0
         episode_data = []
+        trajectory_data = []
         end_reason = "unknown"
 
         speed_list = []
         episode_collision = False
         episode_off_road = False
+
+        total_distance = 0.0
+        previous_pose = get_ego_pose(env)
+        previous_location = previous_pose["location"]
 
         while not done:
             action = get_action(env, obs, CONTROL_MODE)
@@ -362,6 +426,11 @@ try:
             off_road = bool(info.get('is_off_road', False))
             ego_pose = get_ego_pose(env)
 
+            current_location = ego_pose["location"]
+            step_distance = calculate_distance(previous_location, current_location)
+            total_distance += step_distance
+            previous_location = current_location
+
             speed_list.append(speed)
             episode_collision = episode_collision or collision
             episode_off_road = episode_off_road or off_road
@@ -387,9 +456,28 @@ try:
                 "done": bool(done),
                 "info": safe_info_dict(info),
                 "ego_pose": ego_pose,
+                "step_distance": float(step_distance),
+                "total_distance": float(total_distance),
             }
 
             episode_data.append(transition)
+
+            trajectory_data.append({
+                "step": int(env.time_step),
+                "x": ego_pose["location"]["x"],
+                "y": ego_pose["location"]["y"],
+                "z": ego_pose["location"]["z"],
+                "pitch": ego_pose["rotation"]["pitch"],
+                "yaw": ego_pose["rotation"]["yaw"],
+                "roll": ego_pose["rotation"]["roll"],
+                "speed": speed,
+                "reward": reward,
+                "cost": cost,
+                "step_distance": float(step_distance),
+                "total_distance": float(total_distance),
+                "collision": collision,
+                "off_road": off_road,
+            })
 
             if env.time_step % 10 == 0 or done:
                 print(
@@ -397,6 +485,7 @@ try:
                     f"Speed: {speed:6.2f} m/s | "
                     f"Reward: {reward:7.2f} | "
                     f"Cost: {cost:6.2f} | "
+                    f"Distance: {total_distance:7.2f} m | "
                     f"Done: {done}"
                 )
 
@@ -412,6 +501,7 @@ try:
                     text_location,
                     f"Mode: {CONTROL_MODE} | "
                     f"Speed: {speed:.2f} m/s | "
+                    f"Distance: {total_distance:.2f} m | "
                     f"Reward: {reward:.2f} | "
                     f"Cost: {cost:.2f} | "
                     f"Collision: {collision} | "
@@ -449,6 +539,7 @@ try:
                 "avg_speed": avg_speed,
                 "max_speed": max_speed,
                 "min_speed": min_speed,
+                "total_distance": float(total_distance),
                 "data": episode_data,
             }
 
@@ -457,6 +548,11 @@ try:
                 pickle.dump(episode_record, f)
 
             print(f"Episode data saved to: {save_path}")
+
+        if SAVE_TRAJECTORY_CSV:
+            trajectory_csv_path = os.path.join(save_dir, f"trajectory_episode_{episode:03d}.csv")
+            save_trajectory_csv(trajectory_csv_path, trajectory_data)
+            print(f"Trajectory data saved to: {trajectory_csv_path}")
 
         if SAVE_SUMMARY_CSV:
             with open(summary_csv_path, "a", newline="", encoding="utf-8") as f:
@@ -472,7 +568,8 @@ try:
                     bool(episode_off_road),
                     avg_speed,
                     max_speed,
-                    min_speed
+                    min_speed,
+                    float(total_distance)
                 ])
 
         print(
@@ -482,7 +579,8 @@ try:
             f"Total cost: {total_cost:.2f} | "
             f"End reason: {end_reason} | "
             f"Avg speed: {avg_speed:.2f} m/s | "
-            f"Max speed: {max_speed:.2f} m/s"
+            f"Max speed: {max_speed:.2f} m/s | "
+            f"Distance: {total_distance:.2f} m"
         )
 
         if CONTROL_MODE == "manual" and MANUAL_QUIT:
