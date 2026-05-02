@@ -7,6 +7,8 @@ import os
 import csv
 import pickle
 import math
+import json
+from datetime import datetime
 
 import gym
 import easycarla
@@ -41,12 +43,15 @@ params = {
 }
 
 
-CONTROL_MODE = "safe_random"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
+CONTROL_MODE = "autopilot"   # 可选: "autopilot" / "random" / "safe_random" / "manual"
 SAVE_EPISODES = True
 SAVE_SUMMARY_CSV = True
 SAVE_TRAJECTORY_CSV = True
 DEBUG_DRAW_EVERY = 5
 NUM_EPISODES = 5
+
+# 运行批次编号
+RUN_ID = datetime.now().strftime("run_%Y%m%d_%H%M%S")
 
 # 手动驾驶相关参数
 MANUAL_STEER_CACHE = 0.0
@@ -64,10 +69,11 @@ env = gym.make('carla-v0', params=params)
 
 # 数据保存目录
 save_root_dir = "collected_episodes"
-save_dir = os.path.join(save_root_dir, CONTROL_MODE)
+save_dir = os.path.join(save_root_dir, CONTROL_MODE, RUN_ID)
 os.makedirs(save_dir, exist_ok=True)
 
 summary_csv_path = os.path.join(save_dir, "summary.csv")
+config_json_path = os.path.join(save_dir, "config.json")
 
 
 if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
@@ -87,6 +93,33 @@ if SAVE_SUMMARY_CSV and not os.path.exists(summary_csv_path):
             "min_speed",
             "total_distance"
         ])
+
+
+def save_config_json(save_path):
+    """
+    保存本次运行的实验配置。
+    """
+    config = {
+        "run_id": RUN_ID,
+        "control_mode": CONTROL_MODE,
+        "num_episodes": NUM_EPISODES,
+        "save_episodes": SAVE_EPISODES,
+        "save_summary_csv": SAVE_SUMMARY_CSV,
+        "save_trajectory_csv": SAVE_TRAJECTORY_CSV,
+        "debug_draw_every": DEBUG_DRAW_EVERY,
+        "save_root_dir": save_root_dir,
+        "save_dir": save_dir,
+        "manual_control": {
+            "manual_throttle_value": MANUAL_THROTTLE_VALUE,
+            "manual_brake_value": MANUAL_BRAKE_VALUE,
+            "manual_steer_step": MANUAL_STEER_STEP,
+            "manual_steer_decay": MANUAL_STEER_DECAY
+        },
+        "params": params
+    }
+
+    with open(save_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=4)
 
 
 def handle_reset_result(reset_result):
@@ -374,6 +407,13 @@ def get_action(env, obs, control_mode="autopilot"):
     return action
 
 
+# 保存本次运行配置
+save_config_json(config_json_path)
+print(f"Run ID: {RUN_ID}")
+print(f"Save directory: {save_dir}")
+print(f"Config saved to: {config_json_path}")
+
+
 # 初始化手动驾驶窗口
 init_manual_control()
 
@@ -529,6 +569,7 @@ try:
             episode_record = {
                 "episode_id": episode,
                 "control_mode": CONTROL_MODE,
+                "run_id": RUN_ID,
                 "params": params,
                 "total_reward": float(total_reward),
                 "total_cost": float(total_cost),
