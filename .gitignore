@@ -45,6 +45,7 @@ env/
 .project
 .pydevproject
 .settings/
+.vscode/settings.json
 
 # ========================================
 # 深度学习模型  件（通常较大）

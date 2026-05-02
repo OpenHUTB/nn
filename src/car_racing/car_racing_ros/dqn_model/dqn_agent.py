@@ -47,8 +47,9 @@ class DQNAgent(BaseAgent):
     
     def _build_networks(self):
         """构建策略网络和目标网络"""
-        self.policy_net = BaseDQNNetwork(self.state_shape, self.action_n).float()
-        self.frozen_net = BaseDQNNetwork(self.state_shape, self.action_n).float()
+        dueling = bool(self.hyperparameters.get('dueling', True))
+        self.policy_net = BaseDQNNetwork(self.state_shape, self.action_n, dueling=dueling).float()
+        self.frozen_net = BaseDQNNetwork(self.state_shape, self.action_n, dueling=dueling).float()
         self.frozen_net.load_state_dict(self.policy_net.state_dict())
         self.policy_net = self.policy_net.to(self.device)
         self.frozen_net = self.frozen_net.to(self.device)
@@ -69,33 +70,45 @@ class DQNAgent(BaseAgent):
         """
         self.n_updates += 1
         states, actions, rewards, new_states, terminateds = self.get_samples(batch_size)
-        
-        # -------------------------------------------------------------------------
-        # 步骤1: 计算当前Q值
-        # -------------------------------------------------------------------------
-        # 从策略网络获取所有动作的Q值
-        # actions 是采样时执行的动作索引
-        q_values = self.policy_net(states)
-        current_q = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
-        
-        # -------------------------------------------------------------------------
-        # 步骤2: 计算目标Q值
-        # -------------------------------------------------------------------------
-        with torch.no_grad():
-            # 使用目标网络计算下一状态所有动作的Q值
-            # .max(1)[0] 选取最大Q值
-            # target = r + γ * max(Q_target(s', a')) * (1 - done)
-            # 乘以 (1-done) 是为了在 episode 结束时不让未来Q值影响当前决策
-            target_q = rewards + (1 - terminateds.float()) * self.gamma * \
-                      self.frozen_net(new_states).max(1)[0]
-        
-        # -------------------------------------------------------------------------
-        # 步骤3: 计算损失并更新
-        # -------------------------------------------------------------------------
-        loss = self.loss_fn(current_q, target_q)
-        self.optimizer.zero_grad()  # 清空梯度
-        loss.backward()               # 反向传播
-        self.optimizer.step()        # 更新参数
+        use_double_q = bool(self.hyperparameters.get("double_q", False))
+        max_grad_norm = self.hyperparameters.get("max_grad_norm", None)
+
+        if self.use_amp:
+            from torch.cuda.amp import autocast
+            with torch.no_grad(), autocast():
+                if use_double_q:
+                    next_actions = self.policy_net(new_states).argmax(dim=1)
+                    next_q = self.frozen_net(new_states).gather(1, next_actions.unsqueeze(1)).view(-1)
+                else:
+                    next_q = self.frozen_net(new_states).max(1)[0]
+                target_q = rewards + (1 - terminateds.float()) * self.gamma * next_q
+
+            self.optimizer.zero_grad(set_to_none=True)
+            with autocast():
+                current_q = self.policy_net(states).gather(1, actions.unsqueeze(1)).view(-1)
+                loss = self.loss_fn(current_q, target_q)
+            self.scaler.scale(loss).backward()
+            if max_grad_norm is not None:
+                self.scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), float(max_grad_norm))
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            q_values = self.policy_net(states)
+            current_q = q_values.gather(1, actions.unsqueeze(1)).view(-1)
+            with torch.no_grad():
+                if use_double_q:
+                    next_actions = self.policy_net(new_states).argmax(dim=1)
+                    next_q = self.frozen_net(new_states).gather(1, next_actions.unsqueeze(1)).view(-1)
+                else:
+                    next_q = self.frozen_net(new_states).max(1)[0]
+                target_q = rewards + (1 - terminateds.float()) * self.gamma * next_q
+            loss = self.loss_fn(current_q, target_q)
+            self.optimizer.zero_grad(set_to_none=True)
+            loss.backward()
+            if max_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), float(max_grad_norm))
+            self.optimizer.step()
         
         # -------------------------------------------------------------------------
         # 步骤4: 定期同步目标网络
@@ -103,7 +116,7 @@ class DQNAgent(BaseAgent):
         if self.n_updates % self.hyperparameters.get('target_update', 5000) == 0:
             self.sync_target_net()
         
-        return current_q.mean().item(), loss.item()
+        return current_q.mean().item(), float(loss.item())
 
 
 # ============================================================================
