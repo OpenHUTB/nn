@@ -1,0 +1,420 @@
+import sys
+import glob
+import random
+import numpy as np
+import queue
+import cv2
+import os
+import xml.etree.ElementTree as ET
+import time
+import pygame
+
+# Initialize Pygame
+pygame.init()
+screen = pygame.display.set_mode((400, 300))
+
+
+import carla
+
+# 全局违章变量
+violation_info = {
+    "speeding": False,
+    "red_light": False,
+    "ignore_sign": False,
+    "current_speed": 0.0
+}
+SPEED_LIMIT = 50.0  # 限速50km/h
+
+
+# ------------------------------
+# 【移除】模拟器直接读取红绿灯
+# 【新增】纯图像视觉检测红绿灯
+# ------------------------------
+def detect_traffic_light_vision(img_rgb):
+    """
+    基于OpenCV图像处理，从车载相机图像中检测红绿灯状态
+    返回：True=红灯, False=绿灯/无灯
+    """
+    hsv = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2HSV)
+
+    # 红色信号灯HSV阈值（仿真环境专用）
+    lower_red1 = np.array([0, 100, 120])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 100, 120])
+    upper_red2 = np.array([179, 255, 255])
+
+    # 绿色信号灯HSV阈值
+    lower_green = np.array([40, 50, 120])
+    upper_green = np.array([70, 255, 255])
+
+    # 提取红色区域
+    mask_red = cv2.inRange(hsv, lower_red1, upper_red1) + cv2.inRange(hsv, lower_red2, upper_red2)
+    # 提取绿色区域
+    mask_green = cv2.inRange(hsv, lower_green, upper_green)
+
+    # 形态学操作去噪
+    kernel = np.ones((3, 3), np.uint8)
+    mask_red = cv2.morphologyEx(mask_red, cv2.MORPH_OPEN, kernel)
+    mask_green = cv2.morphologyEx(mask_green, cv2.MORPH_OPEN, kernel)
+
+    # 计算有效像素面积
+    red_pixels = cv2.countNonZero(mask_red)
+    green_pixels = cv2.countNonZero(mask_green)
+
+    # 判断：红色区域面积大于阈值 → 识别为红灯
+    if red_pixels > 80:
+        return True
+    else:
+        return False
+
+
+def load_map(map_name):
+    return client.load_world(map_name)
+
+
+def spawn_vehicles(num_vehicles, world, spawn_points):
+    vehicle_bp_lib = world.get_blueprint_library().filter('vehicle.*')
+    spawned_vehicles = []
+    for _ in range(num_vehicles):
+        vehicle_bp = random.choice(vehicle_bp_lib)
+        spawn_point = random.choice(spawn_points)
+        vehicle = world.try_spawn_actor(vehicle_bp, spawn_point)
+        if vehicle:
+            spawned_vehicles.append(vehicle)
+    return spawned_vehicles
+
+
+# 获取车辆当前速度（km/h）
+def get_vehicle_speed(vehicle):
+    vel = vehicle.get_velocity()
+    speed = 3.6 * np.sqrt(vel.x ** 2 + vel.y ** 2 + vel.z ** 2)
+    return round(speed, 2)
+
+
+# ------------------------------
+# 【修改】违章判断：使用视觉检测红绿灯
+# ------------------------------
+def detect_violations(vehicle, img_rgb):
+    speed = get_vehicle_speed(vehicle)
+    violation_info["current_speed"] = speed
+    violation_info["speeding"] = speed > SPEED_LIMIT
+    # 纯图像识别红绿灯
+    violation_info["red_light"] = detect_traffic_light_vision(img_rgb)
+    violation_info["ignore_sign"] = False
+
+
+# 绘制违章信息到画面
+def draw_violation_info(img):
+    speed = violation_info["current_speed"]
+    cv2.putText(img, f"Speed: {speed} km/h", (20, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 3)
+
+    if violation_info["speeding"]:
+        cv2.putText(img, "VIOLATION: SPEEDING!", (20, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 4)
+    if violation_info["red_light"]:
+        cv2.putText(img, "VIOLATION: RED LIGHT!", (20, 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 4)
+
+
+# 加载地图
+client = carla.Client('localhost', 2000)
+client.set_timeout(60.0)
+world = client.load_world('Town05')
+
+# 同步模式设置
+settings = world.get_settings()
+settings.synchronous_mode = True
+settings.fixed_delta_seconds = 0.05
+world.apply_settings(settings)
+
+traffic_manager = client.get_trafficmanager(8000)
+traffic_manager.set_synchronous_mode(True)
+spawn_points = world.get_map().get_spawn_points()
+
+# 生成车辆
+num_vehicles = 10
+vehicles = spawn_vehicles(num_vehicles, world, spawn_points)
+
+bp_lib = world.get_blueprint_library().filter('*')
+vehicle_bp = bp_lib.find('vehicle.audi.a2')
+try:
+    vehicle = world.try_spawn_actor(vehicle_bp, random.choice(spawn_points))
+    if vehicle is None:
+        raise RuntimeError("Failed to spawn vehicle")
+except Exception as e:
+    print(f"An error occurred: {e}")
+    sys.exit(1)
+
+# 自动驾驶设置
+vehicle.set_autopilot(True, traffic_manager.get_port())
+print("✅ 自动驾驶已启用")
+traffic_manager.ignore_lights_percentage(vehicle, 0.0)
+traffic_manager.vehicle_percentage_speed_difference(vehicle, -50)
+
+# 相机设置
+camera_bp = bp_lib.find('sensor.camera.rgb')
+camera_bp.set_attribute('image_size_x', '1024')
+camera_bp.set_attribute('image_size_y', '1024')
+camera_bp.set_attribute('fov', '70')
+camera_init_trans = carla.Transform(carla.Location(x=1, z=2), carla.Rotation(pitch=-3))
+camera = world.spawn_actor(camera_bp, camera_init_trans, attach_to=vehicle)
+
+image_queue = queue.Queue(maxsize=50)
+
+
+def image_callback(image):
+    if not image_queue.full():
+        image_queue.put(image)
+
+
+camera.listen(image_callback)
+
+# 保存路径
+current_dirc = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dirc, '..', '..', '..'))
+data_path = os.path.join(project_root, "OutPut", "data01")
+output_dir = data_path
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+
+# 天气参数获取
+def get_weather_params(world):
+    weather = world.get_weather()
+    return {
+        "cloudiness": weather.cloudiness,
+        "precipitation": weather.precipitation,
+        "precipitation_deposits": weather.precipitation_deposits,
+        "wind_intensity": weather.wind_intensity,
+        "sun_azimuth_angle": weather.sun_azimuth_angle,
+        "sun_altitude_angle": weather.sun_altitude_angle,
+        "fog_density": weather.fog_density,
+        "wetness": weather.wetness
+    }
+
+
+# 投影矩阵
+def build_projection_matrix(w, h, fov, is_behind_camera=False):
+    focal = w / (2.0 * np.tan(fov * np.pi / 360.0))
+    K = np.identity(3)
+    K[0, 0] = K[1, 1] = -focal if is_behind_camera else focal
+    K[0, 2] = w / 2.0
+    K[1, 2] = h / 2.0
+    return K
+
+
+def get_image_point(loc, K, w2c):
+    point = np.array([loc.x, loc.y, loc.z, 1])
+    point_camera = np.dot(w2c, point)
+    point_camera = [point_camera[1], -point_camera[2], point_camera[0]]
+    point_img = np.dot(K, point_camera)
+    point_img[0] /= point_img[2]
+    point_img[1] /= point_img[2]
+    return point_img[0:2]
+
+
+image_w = camera_bp.get_attribute("image_size_x").as_int()
+image_h = camera_bp.get_attribute("image_size_y").as_int()
+fov = camera_bp.get_attribute("fov").as_float()
+K = build_projection_matrix(image_w, image_h, fov)
+
+DISTANCE_THRESHOLD = 50.0
+captured_sign_locations = set()
+last_capture_time = 0
+capture_cooldown = 5
+
+
+def dot_product(v1, v2):
+    return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z
+
+
+def get_signs_bounding_boxes(vehicle_transform, camera_transform, K, world_2_camera):
+    global captured_sign_locations, last_capture_time
+    bounding_boxes = []
+    camera_location = camera_transform.location
+    vehicle_location = vehicle_transform.location
+    vehicle_right_vector = vehicle_transform.get_right_vector()
+
+    for obj in world.get_level_bbs(carla.CityObjectLabel.TrafficSigns):
+        distance = obj.location.distance(vehicle_location)
+        vector_to_object = obj.location - vehicle_location
+
+        if distance < DISTANCE_THRESHOLD:
+            right_side_dot_product = dot_product(vehicle_right_vector, vector_to_object)
+            if right_side_dot_product > 0:
+                vector_to_camera = obj.location - camera_location
+                camera_dot_product = dot_product(camera_transform.get_forward_vector(), vector_to_camera)
+                sign_location_tuple = (round(obj.location.x, 2), round(obj.location.y, 2), round(obj.location.z, 2))
+
+                if camera_dot_product > 0 and sign_location_tuple not in captured_sign_locations:
+                    verts = [v for v in obj.get_world_vertices(carla.Transform())]
+                    x_coords = [get_image_point(v, K, world_2_camera)[0] for v in verts]
+                    y_coords = [get_image_point(v, K, world_2_camera)[1] for v in verts]
+                    xmin, xmax = int(min(x_coords)), int(max(x_coords))
+                    ymin, ymax = int(min(y_coords)), int(max(y_coords))
+                    area = (xmax - xmin) * (ymax - ymin)
+
+                    if 0 <= xmin and 0 <= ymin and xmax < image_w and ymax < image_h and area > 10:
+                        bounding_boxes.append(
+                            {'label': 'TrafficSign', 'xmin': xmin, 'ymin': ymin, 'xmax': xmax, 'ymax': ymax})
+                        current_time = time.time()
+                        if current_time - last_capture_time > capture_cooldown:
+                            captured_sign_locations.add(sign_location_tuple)
+                            last_capture_time = current_time
+    return bounding_boxes
+
+
+# XML标注（保留违章信息）
+def create_xml_file(image_name, bboxes, width, height, weather_params):
+    annotation = ET.Element("annotation")
+    ET.SubElement(annotation, "filename").text = image_name
+    size = ET.SubElement(annotation, "size")
+    ET.SubElement(size, "width").text = str(width)
+    ET.SubElement(size, "height").text = str(height)
+    ET.SubElement(size, "depth").text = "3"
+
+    weather_category = get_weather_category(weather_params)
+    ET.SubElement(ET.SubElement(annotation, "weather"), "condition").text = str(weather_category)
+
+    # 违章信息
+    violation_node = ET.SubElement(annotation, "violation")
+    ET.SubElement(violation_node, "speeding").text = str(violation_info["speeding"])
+    ET.SubElement(violation_node, "red_light").text = str(violation_info["red_light"])
+
+    for bbox in bboxes:
+        obj = ET.SubElement(annotation, "object")
+        ET.SubElement(obj, "name").text = bbox['label']
+        bndbox = ET.SubElement(obj, "bndbox")
+        ET.SubElement(bndbox, "xmin").text = str(bbox['xmin'])
+        ET.SubElement(bndbox, "ymin").text = str(bbox['ymin'])
+        ET.SubElement(bndbox, "xmax").text = str(bbox['xmax'])
+        ET.SubElement(bndbox, "ymax").text = str(bbox['ymax'])
+
+    tree = ET.ElementTree(annotation)
+    tree.write(os.path.join(output_dir, image_name.replace(".png", ".xml")))
+
+
+# 天气切换
+weather_conditions = ['rainy', 'sunny', 'night', 'foggy']
+
+
+def update_weather(world, condition):
+    if condition == 'rainy':
+        weather = carla.WeatherParameters(80, 80, 80, 10, 270, 10, 10, 70)
+    elif condition == 'sunny':
+        weather = carla.WeatherParameters(20, 0, 0, 5, 180, 60, 0, 0)
+    elif condition == 'night':
+        weather = carla.WeatherParameters(0, 0, 0, 3, 0, -5, 0, 0)
+    elif condition == 'foggy':
+        weather = carla.WeatherParameters(0, 0, 0, 3, 0, 0, 60, 0)
+    world.set_weather(weather)
+
+
+def get_weather_category(w):
+    if w['cloudiness'] > 70 or w['precipitation'] > 50:
+        return 0
+    elif w['sun_altitude_angle'] > 30:
+        return 1
+    elif w['fog_density'] > 50:
+        return 2
+    else:
+        return 3
+
+
+# 手动控制
+def handle_input(vehicle):
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+    keys = pygame.key.get_pressed()
+    control = vehicle.get_control()
+    if keys[pygame.K_w]: control.throttle = 1.0
+    if keys[pygame.K_s]: control.brake = 1.0
+    if keys[pygame.K_a]: control.steer = -1.0
+    if keys[pygame.K_d]: control.steer = 1.0
+    vehicle.apply_control(control)
+
+
+# NMS非极大值抑制
+def compute_iou(box1, box2):
+    x1 = max(box1['xmin'], box2['xmin'])
+    y1 = max(box1['ymin'], box2['ymin'])
+    x2 = min(box1['xmax'], box2['xmax'])
+    y2 = min(box1['ymax'], box2['ymax'])
+    inter_area = max(0, x2 - x1) * max(0, y2 - y1)
+    box1_area = (box1['xmax'] - box1['xmin']) * (box1['ymax'] - box1['ymin'])
+    box2_area = (box2['xmax'] - box2['xmin']) * (box2['ymax'] - box2['ymin'])
+    return inter_area / (box1_area + box2_area - inter_area) if box1_area and box2_area else 0
+
+
+def non_maximum_suppression(bboxes, iou_threshold=0.2):
+    if not bboxes: return []
+    bboxes = sorted(bboxes, key=lambda x: (x['xmax'] - x['xmin']) * (x['ymax'] - x['ymin']), reverse=True)
+    final = []
+    while bboxes:
+        curr = bboxes.pop(0)
+        final.append(curr)
+        bboxes = [b for b in bboxes if compute_iou(curr, b) < iou_threshold]
+    return final
+
+
+# 主循环
+weather_transition_interval = 10
+last_weather_change_time = time.time()
+current_condition_index = 0
+
+try:
+    while True:
+        world.tick()
+        time.sleep(0.033)
+        pygame.event.pump()
+        handle_input(vehicle)
+
+        # 获取相机图像
+        image = image_queue.get()
+        img = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
+        img_rgb = img[:, :, :3].astype(np.uint8)
+
+        # ------------------------------
+        # 核心：基于图像的违章检测
+        # ------------------------------
+        detect_violations(vehicle, img_rgb)
+
+        # 天气切换
+        current_time = time.time()
+        if current_time - last_weather_change_time > weather_transition_interval:
+            update_weather(world, weather_conditions[current_condition_index])
+            current_condition_index = (current_condition_index + 1) % 4
+            last_weather_change_time = current_time
+
+        # 交通标志检测
+        world_2_camera = np.array(camera.get_transform().get_inverse_matrix())
+        bboxes = get_signs_bounding_boxes(vehicle.get_transform(), camera.get_transform(), K, world_2_camera)
+        bboxes = non_maximum_suppression(bboxes)
+
+        # 绘制与保存
+        if bboxes:
+            show_img = img_rgb.copy()
+            for box in bboxes:
+                cv2.rectangle(show_img, (box['xmin'], box['ymin']), (box['xmax'], box['ymax']), (0, 0, 255), 2)
+            draw_violation_info(show_img)
+            img_name = f"image_{int(time.time())}.png"
+            cv2.imwrite(os.path.join(output_dir, img_name), img_rgb)
+            create_xml_file(img_name, bboxes, image_w, image_h, get_weather_params(world))
+        else:
+            show_img = img_rgb
+            draw_violation_info(show_img)
+
+        cv2.imshow('Vision-based Traffic Light Detection', show_img)
+        if cv2.waitKey(10) & 0xFF == ord('x'):
+            break
+
+finally:
+    cv2.destroyAllWindows()
+    vehicle.destroy()
+    camera.destroy()
+    pygame.quit()
+    for v in vehicles:
+        v.destroy()

@@ -1,5 +1,4 @@
-import numpy as np
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 from config import config
 
 
@@ -11,14 +10,35 @@ class SimplePlanner:
 
     def __init__(self):
         # 从全局配置中加载参数
-        self.img_width = config.CAMERA_WIDTH
-        self.img_height = config.CAMERA_HEIGHT
+        self.img_width = max(1, int(config.CAMERA_WIDTH))
+        self.img_height = max(1, int(config.CAMERA_HEIGHT))
 
         # 驾驶走廊宽度比例 (0.0 - 1.0)
-        self.center_zone_ratio = config.SAFE_ZONE_RATIO
+        self.center_zone_ratio = self._clamp_ratio(config.SAFE_ZONE_RATIO)
 
         # 碰撞预警面积阈值 (0.0 - 1.0)
-        self.collision_area_threshold = config.COLLISION_AREA_THRES
+        self.collision_area_threshold = self._clamp_ratio(config.COLLISION_AREA_THRES)
+
+    @staticmethod
+    def _clamp_ratio(value: float) -> float:
+        return max(0.0, min(1.0, float(value)))
+
+    @staticmethod
+    def _normalize_detection(detection) -> Optional[Tuple[float, float, float, float]]:
+        if detection is None or len(detection) < 4:
+            return None
+
+        x, y, w, h = detection[:4]
+        try:
+            x = float(x)
+            y = float(y)
+            w = float(w)
+            h = float(h)
+        except (TypeError, ValueError):
+            return None
+        if w <= 0 or h <= 0:
+            return None
+        return x, y, w, h
 
     def plan(self, detections: List[list]) -> Tuple[bool, str]:
         """
@@ -38,7 +58,12 @@ class SimplePlanner:
         # 计算安全区域的半宽 (像素)
         safe_zone_half_width = (self.img_width * self.center_zone_ratio) / 2
 
-        for (x, y, w, h, class_id, conf) in detections:
+        for detection in detections or []:
+            normalized_detection = self._normalize_detection(detection)
+            if normalized_detection is None:
+                continue
+
+            x, y, w, h = normalized_detection
             # 1. 计算物体中心点
             box_center_x = x + (w / 2)
 

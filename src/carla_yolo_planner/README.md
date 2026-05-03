@@ -44,31 +44,45 @@ yolov3_vehicle_detection/
 # 安装依赖
 pip install -r requirements.txt
 
-# 下载 YOLO 模型权重
-python -m src.yolov3_vehicle_detection.download_weights
+
 ```
 
-### 2. 基础运行
+### 2. 模型权重获取
+由于模型权重文件较大，未包含在 Git 仓库中，您可以通过以下方式获取：
+自动下载：运行上述 `download_weights.py` 脚本，会自动从官方源下载所需文件
+
+下载 YOLO 模型权重
+python download_weights.py
+
+下载完成后，请确保将权重文件放置在 `models/` 目录下，文件结构如下：
+```
+models/
+├── yolov3-tiny.weights    # YOLO 模型权重文件
+├── yolov3-tiny.cfg         # YOLO 模型配置文件
+└── coco.names              # 类别名称文件
+```
+
+### 3. 基础运行
 确保 CARLA 模拟器已启动，然后运行：
 ```bash
-python -m src.yolov3_vehicle_detection.main
+python main.py
 ```
 
-### 3. 高级用法 (CLI)
+### 4. 高级用法 (CLI)
 本项目支持命令行参数，适用于不同测试场景：
 
 * **连接远程服务器**:
   ```bash
-  python -m src.yolov3_vehicle_detection.main --host 192.168.1.X --port 2000
+  python main.py --host 192.168.1.X --port 2000
   ```
 
 * **后台无界面模式 (Headless)**:
   用于在服务器上长时间挂机测试，不显示 OpenCV 窗口：
   ```bash
-  python -m src.yolov3_vehicle_detection.main --no-render
+  python main.py --no-render
   ```
 
-### 4. 性能监控
+### 5. 性能监控
 ```bash
 tensorboard --logdir=logs
 ```

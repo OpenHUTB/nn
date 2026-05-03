@@ -47,7 +47,7 @@ class TD3Agent:
         self.actor = Actor(state_dim, action_dim, max_action, use_cnn).to(device)
         self.actor_target = Actor(state_dim, action_dim, max_action, use_cnn).to(device)
         self.actor_target.load_state_dict(self.actor.state_dict())
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-4)
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=1e-4, weight_decay=1e-5)
 
         self.critic1 = Critic(state_dim, action_dim, use_cnn).to(device)
         self.critic2 = Critic(state_dim, action_dim, use_cnn).to(device)
@@ -56,7 +56,9 @@ class TD3Agent:
         self.critic1_target.load_state_dict(self.critic1.state_dict())
         self.critic2_target.load_state_dict(self.critic2.state_dict())
         self.critic_optimizer = torch.optim.Adam(
-            list(self.critic1.parameters()) + list(self.critic2.parameters()), lr=1e-4
+            list(self.critic1.parameters()) + list(self.critic2.parameters()),
+            lr=1e-4,
+            weight_decay=1e-5
         )
 
         self.max_action = max_action
@@ -64,27 +66,28 @@ class TD3Agent:
         self.batch_size = 64
         self.gamma = 0.99
         self.tau = 0.005
-        self.policy_noise = 0.08
-        self.noise_clip = 0.2
+        self.policy_noise = 0.1
+        self.noise_clip = 0.3
         self.policy_freq = 2
         self.total_it = 0
 
         # 动作平滑相关
         self.last_action = None
-        self.smooth_alpha = 0.9
+        self.smooth_alpha = 0.8
+        self.max_steer = 0.6
 
-    def select_action(self, state, smooth=True):
+    def select_action(self, state, smooth=True, deterministic=False):
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
         action = self.actor(state).cpu().data.numpy().flatten()
 
         if smooth and self.last_action is not None:
             action = self.smooth_alpha * action + (1 - self.smooth_alpha) * self.last_action
-
-        action[0] = np.clip(action[0], -0.55, 0.55)
-        action[0] *= 0.7
+            action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
+        else:
+            action[0] = np.clip(action[0], -self.max_steer, self.max_steer)
 
         # 死区：微小转向直接置0
-        if abs(action[0]) < 0.06:
+        if abs(action[0]) < 0.05:
             action[0] = 0.0
 
         self.last_action = action.copy()
@@ -105,7 +108,7 @@ class TD3Agent:
 
         noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
         # 对转向动作单独降低噪声
-        noise[:, 0] = noise[:, 0] * 0.5
+        noise[:, 0] = noise[:, 0] * 0.6
         next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
 
         # 计算目标 Q 值
