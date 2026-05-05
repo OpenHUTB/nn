@@ -4,6 +4,9 @@ import carla
 import time
 import keyboard
 
+# 导入独立的红绿灯模块
+from traffic_light_controller import set_all_traffic_lights, get_current_light_state
+
 BASE_DIR = Path(__file__).parent
 sys.path.append(str(BASE_DIR / "PythonAPI" / "carla" / "dist"))
 
@@ -13,22 +16,41 @@ client.set_timeout(10.0)
 world = client.get_world()
 carla_map = world.get_map()
 
-# 车辆只在道路合法点位生成
+# 车辆生成
 road_spawns = carla_map.get_spawn_points()
 spawn_point = road_spawns[0]
 
-# 生成车辆
 bp_lib = world.get_blueprint_library()
 car_bp = bp_lib.filter("vehicle")[0]
 car = world.spawn_actor(car_bp, spawn_point)
 spectator = world.get_spectator()
 
 print("↑前进 ↓倒车 ←左转 →右转  ESC退出")
+print("S键刹车 | 限速50km/h | 红绿灯10秒切换")
+
+MAX_SPEED_KMH = 50
+
+# 设置红绿灯
+set_all_traffic_lights(world, green_time=10.0, red_time=10.0, yellow_time=2.0)
+
+print_counter = 0
 
 try:
     while True:
+        # 速度计算
+        velocity = car.get_velocity()
+        speed_ms = (velocity.x**2 + velocity.y**2)**0.5
+        current_speed = 3.6 * speed_ms
+
+        # 打印信息
+        print_counter += 1
+        if print_counter % 20 == 0:
+            light_state = get_current_light_state(car)
+            print(f"\r速度：{current_speed:.1f} km/h | 灯：{light_state}", end="")
+
         # 车辆控制
         ctrl = carla.VehicleControl()
+
         if keyboard.is_pressed("up"):
             ctrl.throttle = 1.0
         else:
@@ -47,22 +69,30 @@ try:
         else:
             ctrl.steer = 0.0
 
+        if keyboard.is_pressed("s"):
+            ctrl.brake = 1.0
+        else:
+            ctrl.brake = 0.0
+
+        # 限速
+        if current_speed > MAX_SPEED_KMH:
+            ctrl.throttle = 0.0
+
         car.apply_control(ctrl)
 
-        # 视角在车正后上方
+        # 视角
         trans = car.get_transform()
         forward = trans.get_forward_vector()
-
         camera_loc = trans.location - forward * 10 + carla.Location(z=4)
         camera_rot = trans.rotation
         camera_rot.pitch = -20
-
         spectator.set_transform(carla.Transform(camera_loc, camera_rot))
 
         time.sleep(0.02)
+
         if keyboard.is_pressed("esc"):
             break
 
 finally:
     car.destroy()
-    print("✅ 程序退出，车辆销毁")
+    print("\n✅ 退出成功")
