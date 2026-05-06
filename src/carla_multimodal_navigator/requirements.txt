@@ -1,0 +1,23 @@
+# CARLA仿真环境交互
+carla>=0.9.15
+# 基础数据处理
+numpy>=1.24.0
+pandas>=2.0.0
+# 多模态感知/可视化
+opencv-python>=4.8.0
+matplotlib>=3.7.0
+pillow>=10.0.0
+# 路径规划/导航
+networkx>=3.2.0
+scipy>=1.11.0
+# 网络通信（wxapp交互/数据传输）
+requests>=2.31.0
+websockets>=12.0
+# 配置管理
+python-dotenv>=1.0.0
+# 日志/进度
+tqdm>=4.65.0
+logging>=0.4.9.6
+# 开发测试
+pytest>=7.4.0
+flake8>=6.0.0

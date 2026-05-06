@@ -1,11 +1,21 @@
-from custom_policy_sb3 import (
-    CNN_FC,
-    CNN_GAP,
-    CNN_GAP_BN,
-    No_CNN,
-    CNN_MobileNet,
-    CNN_GAP_new,
-)
+try:
+    from .custom_policy_sb3 import (
+        CNN_FC,
+        CNN_GAP,
+        CNN_GAP_BN,
+        No_CNN,
+        CNN_MobileNet,
+        CNN_GAP_new,
+    )
+except ImportError:
+    from scripts.utils.custom_policy_sb3 import (
+        CNN_FC,
+        CNN_GAP,
+        CNN_GAP_BN,
+        No_CNN,
+        CNN_MobileNet,
+        CNN_GAP_new,
+    )
 import datetime
 import gym
 import gym_env
@@ -21,10 +31,6 @@ import ast
 from configparser import ConfigParser
 import torch as th
 import os
-import sys
-
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.dirname(CURRENT_DIR))
 
 
 def get_parser():
@@ -103,7 +109,7 @@ class TrainingThread(QtCore.QThread):
         os.makedirs(data_path, exist_ok=True)  # 创建用于保存q_map的数据目录
 
         # 保存配置文件
-        with open(config_path + "\config.ini", "w") as configfile:
+        with open(os.path.join(config_path, "config.ini"), "w") as configfile:
             self.cfg.write(configfile)
 
         #! -----------------------------------策略选择-------------------------------------
@@ -155,7 +161,13 @@ class TrainingThread(QtCore.QThread):
             model = PPO(
                 policy_base,
                 self.env,
-                # n_steps = 200,  # 备选参数
+                n_steps=self.cfg.getint("DRL", "n_steps"),
+                batch_size=self.cfg.getint("DRL", "batch_size"),
+                n_epochs=self.cfg.getint("DRL", "n_epochs"),
+                gamma=self.cfg.getfloat("DRL", "gamma"),
+                ent_coef=self.cfg.getfloat("DRL", "ent_coef"),
+                clip_range=self.cfg.getfloat("DRL", "clip_range"),
+                max_grad_norm=self.cfg.getfloat("DRL", "max_grad_norm"),
                 learning_rate=self.cfg.getfloat("DRL", "learning_rate"),
                 policy_kwargs=policy_kwargs,
                 tensorboard_log=log_path,

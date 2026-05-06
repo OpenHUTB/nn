@@ -74,6 +74,10 @@ COLOR_PERSON = (0, 0, 230)      # 红色 — 行人
 COLOR_OTHER = (230, 165, 0)     # 橙色 — 其他
 COLOR_PANEL_BG = (30, 30, 30)   # 面板背景
 
+# 虚拟围栏配置
+FENCE_Y_RATIO = 0.58             # 围栏线纵坐标占画面高度的比例（0~1）
+FENCE_COLOR   = (0, 215, 255)    # 围栏正常颜色（金黄色，BGR）
+
 # 截图保存目录
 SCREENSHOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
 
@@ -109,6 +113,12 @@ class V2XRoadsideSystem:
         self.last_detections = None
         # 行人闯入报警
         self.ped_alert_timer = 0.0       # 报警持续到此时间戳
+        # 虚拟围栏入侵检测
+        self.fence_y = int(CAMERA_HEIGHT * FENCE_Y_RATIO)
+        self.intrusion_event_count = 0   # 累计入侵事件次数
+        self.prev_intrusion = False       # 上一帧是否存在入侵
+        self.intrusion_alert_timer = 0.0  # 入侵警报持续到此时间戳
+        self.intrusion_objects = 0        # 当前帧检测到的入侵目标数
         # 检测历史记录（用于底部统计条）
         self.history_vehicles = []
         self.history_pedestrians = []
@@ -306,9 +316,10 @@ class V2XRoadsideSystem:
         return self.last_detections
 
     def _draw_detections(self, frame, detections):
-        """在画面上绘制检测框、类别标签、置信度"""
+        """在画面上绘制检测框、类别标签、置信度，并检测虚拟围栏入侵"""
         v_count = 0
         p_count = 0
+        intrusion_count = 0
 
         for box in detections.boxes:
             cls_id = int(box.cls[0])
@@ -316,18 +327,31 @@ class V2XRoadsideSystem:
             conf = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
 
-            # 按类别选择颜色
+            # 按类别选择基础颜色并计数
             if cls_name in VEHICLE_CLASSES:
-                color = COLOR_VEHICLE
+                base_color = COLOR_VEHICLE
                 v_count += 1
             elif cls_name in PERSON_CLASSES:
-                color = COLOR_PERSON
+                base_color = COLOR_PERSON
                 p_count += 1
             else:
-                color = COLOR_OTHER
+                base_color = COLOR_OTHER
+
+            # 判断是否越过虚拟围栏（目标底部进入受限区域）
+            intruding = (y2 > self.fence_y and
+                         cls_name in (VEHICLE_CLASSES | PERSON_CLASSES))
+            if intruding:
+                intrusion_count += 1
+                color = (0, 60, 255)   # 橙红色标记入侵目标
+                thickness = 3
+                cv2.putText(frame, "!INTRUSION!", (x1, max(y1 - 24, 36)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 60, 255), 2)
+            else:
+                color = base_color
+                thickness = 2
 
             # 检测框
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
 
             # 标签（背景 + 文字）
             label = f"{cls_name} {conf:.2f}"
@@ -353,6 +377,46 @@ class V2XRoadsideSystem:
         if p_count > 0:
             self.ped_alert_timer = time.time() + 1.5  # 报警持续 1.5 秒
 
+        # 虚拟围栏：上升沿计数（新一波入侵才累加，避免持续存在的目标重复计数）
+        self.intrusion_objects = intrusion_count
+        if intrusion_count > 0 and not self.prev_intrusion:
+            self.intrusion_event_count += 1
+        if intrusion_count > 0:
+            self.intrusion_alert_timer = time.time() + 2.0
+        self.prev_intrusion = intrusion_count > 0
+
+        return frame
+
+    def _draw_virtual_fence(self, frame):
+        """绘制虚拟围栏线：虚线效果 + 区域标注，入侵时变橙红色闪烁"""
+        fy = self.fence_y
+        # 入侵时围栏线变橙红色并闪烁，否则显示金黄色
+        if time.time() < self.intrusion_alert_timer:
+            color = (0, 60, 255) if int(time.time() * 4) % 2 == 0 else (0, 140, 255)
+        else:
+            color = FENCE_COLOR
+
+        # 虚线效果：18px 实线 + 10px 间隔
+        dash, gap = 18, 10
+        x = 0
+        while x < CAMERA_WIDTH:
+            cv2.line(frame, (x, fy), (min(x + dash, CAMERA_WIDTH), fy), color, 2)
+            x += dash + gap
+
+        # 围栏标签（左侧带深色背景）
+        label = "[ VIRTUAL FENCE ]"
+        (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+        cv2.rectangle(frame, (8, fy - th - 6), (8 + tw + 6, fy + 4), (20, 20, 20), -1)
+        cv2.putText(frame, label, (11, fy - 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1)
+
+        # 右侧区域标注
+        cv2.putText(frame, "SAFE ZONE",
+                    (CAMERA_WIDTH - 120, fy - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (80, 220, 80), 1)
+        cv2.putText(frame, "RESTRICTED ZONE",
+                    (CAMERA_WIDTH - 178, fy + 20),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (80, 100, 255), 1)
         return frame
 
     def _draw_v2x_panel(self, frame):
@@ -382,6 +446,10 @@ class V2XRoadsideSystem:
         y += 26
         cv2.putText(frame, f"Total:       {self.stats['total']}",
                     (x0 + 15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+        y += 26
+        i_color = (0, 100, 255) if self.intrusion_objects > 0 else (160, 160, 160)
+        cv2.putText(frame, f"Intrusions:  {self.intrusion_event_count} events",
+                    (x0 + 15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.55, i_color, 1)
 
         # 摄像头机位
         y += 30
@@ -410,6 +478,8 @@ class V2XRoadsideSystem:
     def _get_v2x_messages(self):
         """根据检测结果和天气生成 V2X 预警广播"""
         msgs = []
+        if self.intrusion_objects > 0:
+            msgs.append(f"> FENCE BREACH: {self.intrusion_objects} target(s)")
         if self.stats['pedestrians'] > 0:
             msgs.append(f"> {self.stats['pedestrians']} pedestrian(s) ahead")
         if self.stats['vehicles'] > 5:
@@ -476,6 +546,24 @@ class V2XRoadsideSystem:
                         cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
         return frame
 
+    def _draw_intrusion_alert(self, frame):
+        """虚拟围栏入侵时绘制橙红色边框与文字警报（与行人红色警报视觉区分）"""
+        if time.time() < self.intrusion_alert_timer:
+            thick = 6 if int(time.time() * 4) % 2 == 0 else 3
+            cv2.rectangle(frame, (2, 2), (CAMERA_WIDTH - 3, CAMERA_HEIGHT - 3),
+                          (0, 80, 255), thick)
+            text = f"! FENCE INTRUSION  Total: {self.intrusion_event_count} !"
+            (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+            tx = (CAMERA_WIDTH - tw) // 2
+            ty = min(self.fence_y + 45, CAMERA_HEIGHT - 40)
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (tx - 12, ty - th - 6),
+                          (tx + tw + 12, ty + 8), (0, 40, 160), -1)
+            cv2.addWeighted(overlay, 0.65, frame, 0.35, 0, frame)
+            cv2.putText(frame, text, (tx, ty),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 200, 100), 2)
+        return frame
+
     # ==================== 控制操作 ====================
 
     def switch_weather(self):
@@ -528,7 +616,9 @@ class V2XRoadsideSystem:
                 # 检测 + 绘制
                 detections = self._detect(frame)
                 frame = self._draw_detections(frame, detections)
+                frame = self._draw_virtual_fence(frame)
                 frame = self._draw_v2x_panel(frame)
+                frame = self._draw_intrusion_alert(frame)
                 frame = self._draw_pedestrian_alert(frame)
                 frame = self._draw_header(frame)
                 frame = self._draw_footer(frame)

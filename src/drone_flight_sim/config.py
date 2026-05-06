@@ -17,11 +17,11 @@ class FlightConfig:
 
     # ==================== 飞行参数 ====================
     # 起飞高度（负值表示向上，AirSim 中 Z 轴向下为正）
-    TAKEOFF_HEIGHT = -3
+    TAKEOFF_HEIGHT = -5
     # 飞行速度，单位：米/秒
-    FLIGHT_VELOCITY = 3
+    FLIGHT_VELOCITY = 4
     # 最大飞行时间，单位：秒，超过此时间将强制结束飞行
-    MAX_FLIGHT_TIME = 60
+    MAX_FLIGHT_TIME = 120
 
     # ==================== 碰撞检测参数 ====================
     # 碰撞冷却时间，单位：秒，用于防止重复触发碰撞检测
@@ -29,15 +29,17 @@ class FlightConfig:
     # 地面判断阈值，单位：米，高度低于此值认为是地面接触
     GROUND_HEIGHT_THRESHOLD = 1.5
     # 到达目标点的容差，单位：米，用于判断是否已到达目标位置
-    ARRIVAL_TOLERANCE = 1.0
+    ARRIVAL_TOLERANCE = 1.5
+    # 最大自动恢复尝试次数
+    MAX_AUTO_RECOVERY_ATTEMPTS = 3
 
     # ==================== 降落参数 ====================
     # 最大降落尝试次数
-    LANDING_MAX_ATTEMPTS = 3
+    LANDING_MAX_ATTEMPTS = 2
     # 降落检查间隔，单位：秒
     LANDING_CHECK_INTERVAL = 0.5
     # 降落最大等待时间，单位：秒
-    LANDING_MAX_WAIT = 5
+    LANDING_MAX_WAIT = 3
 
     # ==================== 起飞参数 ====================
     # 起飞超时时间，单位：秒
@@ -60,8 +62,8 @@ GROUND_OBJECTS = ["Road", "Ground", "Terrain", "Grass", "Floor"]
 
 # ==================== 键盘控制参数 ====================
 # 键盘控制模式下的移动速度，单位：米/秒
-KEYBOARD_VELOCITY = 2
+KEYBOARD_VELOCITY = 3
 # 键盘控制模式下的旋转速度，单位：度/秒
 KEYBOARD_YAW_RATE = 45
 # 速度增量，每次按键移动的距离（米）
-KEYBOARD_STEP = 2
+KEYBOARD_STEP = 3

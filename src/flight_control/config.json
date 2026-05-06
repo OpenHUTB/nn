@@ -21,5 +21,14 @@
     "hover": "h",
     "return": "b",
     "exit": "esc"
+  },
+  "reinforcement_learning": {
+    "enabled": false,
+    "model": "ppo",
+    "model_path": null,
+    "use_yolo": false,
+    "yolo_model_path": null,
+    "yolo_conf_threshold": 0.5,
+    "yolo_iou_threshold": 0.45
   }
 }

@@ -119,7 +119,7 @@ class DroneController:
         )
         return True
 
-    def fly_to_position(self, x, y, z, velocity=None):
+    def fly_to_position(self, x, y, z, velocity=None, show_progress=True):
         """飞向目标位置
 
         控制无人机从当前位置飞向指定的目标点。
@@ -130,6 +130,7 @@ class DroneController:
             y (float): 目标点 Y 坐标
             z (float): 目标点 Z 坐标
             velocity (float): 飞行速度，默认为 None（使用配置中的速度）
+            show_progress (bool): 是否显示飞行进度，默认为 True
 
         返回:
             bool: 成功到达返回 True，超时或碰撞返回 False
@@ -142,16 +143,23 @@ class DroneController:
         print(f"✈️  正在飞往: ({x}, {y}, {z})")
         # 获取起始位置
         start_pos = self.get_position()
-        # 打印起始位置信息
-        print(
-            f"   起始位置: ({start_pos.x_val:.1f}, {start_pos.y_val:.1f}, {start_pos.z_val:.1f})"
-        )
+        # 计算总距离
+        total_distance = (
+            (start_pos.x_val - x) ** 2 +
+            (start_pos.y_val - y) ** 2 +
+            (start_pos.z_val - z) ** 2
+        ) ** 0.5
+        # 打印起始位置和总距离
+        print(f"   起始位置: ({start_pos.x_val:.1f}, {start_pos.y_val:.1f}, {start_pos.z_val:.1f})")
+        print(f"   目标距离: {total_distance:.1f}m")
 
         # 发送异步飞往目标位置的命令（非阻塞）
         self.client.moveToPositionAsync(x, y, z, velocity)
 
         # 记录飞行开始时间
         start_time = time.time()
+        # 上一进度打印时间
+        last_print_time = 0
         # 进入飞行监控循环
         while time.time() - start_time < FlightConfig.MAX_FLIGHT_TIME:
             # 检查是否发生严重碰撞
@@ -169,9 +177,25 @@ class DroneController:
                 print(f"📍 成功到达目标点 ({x}, {y}, {z})")
                 return True
 
+            # 显示飞行进度（每0.5秒更新一次）
+            current_time = time.time()
+            if show_progress and current_time - last_print_time >= 0.5:
+                pos = self.get_position()
+                current_distance = (
+                    (pos.x_val - x) ** 2 +
+                    (pos.y_val - y) ** 2 +
+                    (pos.z_val - z) ** 2
+                ) ** 0.5
+                progress = max(0, min(100, (1 - current_distance / total_distance) * 100)) if total_distance > 0 else 100
+                speed = self.get_speed()
+                print(f"   进度: {progress:5.1f}% | 剩余: {current_distance:5.1f}m | 速度: {speed:.1f}m/s    ", end="\r")
+                last_print_time = current_time
+
             # 短暂休眠，减少 CPU 占用
             time.sleep(0.1)
 
+        # 清除进度行
+        print(" " * 80, end="\r")
         # 飞行超时
         print("❌ 飞行超时！")
         return False
@@ -659,20 +683,6 @@ class DroneController:
         self.client.moveToZAsync(new_z, KEYBOARD_VELOCITY)
         print(f"🔽  下降 +Z: {KEYBOARD_STEP}m (高度: {abs(new_z):.1f}m)")
 
-    def rotate_left(self):
-        """向左旋转（偏航）
-
-        使用角速度控制，让无人机以设定速度向左旋转。
-        """
-        self.client.rotateByYawRateAsync(-KEYBOARD_YAW_RATE, KEYBOARD_STEP)
-
-    def rotate_right(self):
-        """向右旋转（偏航）
-
-        使用角速度控制，让无人机以设定速度向右旋转。
-        """
-        self.client.rotateByYawRateAsync(KEYBOARD_YAW_RATE, KEYBOARD_STEP)
-
     def hover(self):
         """悬停
 
@@ -681,34 +691,28 @@ class DroneController:
         self.client.hoverAsync()
 
     def go_forward_continuous(self):
-        """持续向前飞行
-
-        使用速度控制，让无人机以设定速度向前飞行。
-        """
-        self.client.moveByVelocityAsync(KEYBOARD_VELOCITY, 0, 0, 0.1)
+        """持续向前飞行"""
+        self.client.moveByVelocityAsync(self.velocity, 0, 0, 0.1)
 
     def go_backward_continuous(self):
-        """持续向后飞行
-
-        使用速度控制，让无人机以设定速度向后飞行。
-        """
-        self.client.moveByVelocityAsync(-KEYBOARD_VELOCITY, 0, 0, 0.1)
+        """持续向后飞行"""
+        self.client.moveByVelocityAsync(-self.velocity, 0, 0, 0.1)
 
     def go_left_continuous(self):
-        """持续向左飞行
-
-        在 AirSim 中，Y 轴正方向指向右方，
-        所以向左移动需要负的 Y 速度。
-        """
-        self.client.moveByVelocityAsync(0, -KEYBOARD_VELOCITY, 0, 0.1)
+        """持续向左飞行"""
+        self.client.moveByVelocityAsync(0, -self.velocity, 0, 0.1)
 
     def go_right_continuous(self):
-        """持续向右飞行
+        """持续向右飞行"""
+        self.client.moveByVelocityAsync(0, self.velocity, 0, 0.1)
 
-        在 AirSim 中，Y 轴正方向指向右方，
-        所以向右移动需要正的 Y 速度。
-        """
-        self.client.moveByVelocityAsync(0, KEYBOARD_VELOCITY, 0, 0.1)
+    def rotate_left_continuous(self):
+        """持续向左旋转（偏航）"""
+        self.client.rotateByYawRateAsync(-KEYBOARD_YAW_RATE, 0.1)
+
+    def rotate_right_continuous(self):
+        """持续向右旋转（偏航）"""
+        self.client.rotateByYawRateAsync(KEYBOARD_YAW_RATE, 0.1)
 
     def go_up_continuous(self):
         """持续上升
@@ -716,7 +720,7 @@ class DroneController:
         使用速度控制，让无人机以设定速度上升。
         AirSim 中 Z 轴向下为正，所以上升需要负的 Z 速度。
         """
-        self.client.moveByVelocityAsync(0, 0, -KEYBOARD_VELOCITY, 0.1)
+        self.client.moveByVelocityAsync(0, 0, -self.velocity, 0.1)
 
     def go_down_continuous(self):
         """持续下降
@@ -728,7 +732,7 @@ class DroneController:
         pos = self.get_position()
         # 只有高于地面安全高度时才下降
         if pos.z_val < -0.5:
-            self.client.moveByVelocityAsync(0, 0, KEYBOARD_VELOCITY, 0.1)
+            self.client.moveByVelocityAsync(0, 0, self.velocity, 0.1)
 
     def get_telemetry(self):
         """获取并打印无人机状态信息"""
@@ -740,10 +744,35 @@ class DroneController:
         height = abs(pos.z_val)
         speed = (linear_vel.x_val**2 + linear_vel.y_val**2 + linear_vel.z_val**2) ** 0.5
 
+        # 获取飞行姿态
+        orientation = state.kinematics_estimated.orientation
+        pitch, roll, yaw = airsim.to_euler_angles(orientation)
+        yaw_deg = round(yaw * 180 / 3.14159, 1)
+
         print(f"\n{'─' * 40}")
         print(f"📊 无人机状态:")
         print(f"   位置: ({pos.x_val:.2f}, {pos.y_val:.2f}, {pos.z_val:.2f})")
         print(f"   高度: {height:.2f}m")
         print(f"   速度: {speed:.2f} m/s")
+        print(f"   朝向: {yaw_deg}°")
         print(f"   碰撞: {'⚠️ 是' if collision_info.has_collided else '✅ 否'}")
         print(f"{'─' * 40}\n")
+
+    def get_velocity(self):
+        """获取无人机当前速度
+
+        返回:
+            tuple: (vx, vy, vz) 速度分量
+        """
+        state = self.client.getMultirotorState()
+        vel = state.kinematics_estimated.linear_velocity
+        return vel.x_val, vel.y_val, vel.z_val
+
+    def get_speed(self):
+        """获取无人机当前速率
+
+        返回:
+            float: 速率（米/秒）
+        """
+        vx, vy, vz = self.get_velocity()
+        return (vx**2 + vy**2 + vz**2) ** 0.5

@@ -1,0 +1,38 @@
+{
+  "latest_ckpt": {
+    "fusion_layer": "fusion_layer-11136.tckpt",
+    "adam_optimizer": "adam_optimizer-11136.tckpt"
+  },
+  "all_ckpts": {
+    "fusion_layer": [
+      "fusion_layer-3712.tckpt",
+      "fusion_layer-7424.tckpt",
+      "fusion_layer-11028.tckpt",
+      "fusion_layer-11136.tckpt",
+      "fusion_layer-14848.tckpt",
+      "fusion_layer-18560.tckpt",
+      "fusion_layer-18561.tckpt",
+      "fusion_layer-22272.tckpt",
+      "fusion_layer-25984.tckpt",
+      "fusion_layer-29568.tckpt",
+      "fusion_layer-29696.tckpt",
+      "fusion_layer-33408.tckpt",
+      "fusion_layer-37120.tckpt"
+    ],
+    "adam_optimizer": [
+      "adam_optimizer-3712.tckpt",
+      "adam_optimizer-7424.tckpt",
+      "adam_optimizer-11028.tckpt",
+      "adam_optimizer-11136.tckpt",
+      "adam_optimizer-14848.tckpt",
+      "adam_optimizer-18560.tckpt",
+      "adam_optimizer-18561.tckpt",
+      "adam_optimizer-22272.tckpt",
+      "adam_optimizer-25984.tckpt",
+      "adam_optimizer-29568.tckpt",
+      "adam_optimizer-29696.tckpt",
+      "adam_optimizer-33408.tckpt",
+      "adam_optimizer-37120.tckpt"
+    ]
+  }
+}
