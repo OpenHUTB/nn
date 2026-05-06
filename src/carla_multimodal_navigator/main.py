@@ -354,24 +354,24 @@ class SimpleDrivingSystem:
             if hasattr(data, 'velocity'):
                 # 专用速度传感器
                 velocity = data.velocity
-                self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
             elif hasattr(data, 'accelerometer'):
                 # IMU传感器，使用车辆速度作为参考
                 if self.vehicle:
                     velocity = self.vehicle.get_velocity()
-                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
             else:
                 # 其他类型传感器
                 if self.vehicle:
                     velocity = self.vehicle.get_velocity()
-                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
         except Exception as e:
             print(f"速度传感器回调错误: {e}")
             # 回退到直接获取车辆速度
             if self.vehicle:
                 try:
                     velocity = self.vehicle.get_velocity()
-                    self.vehicle_speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6
+                    self.vehicle_speed = 0.8 * self.vehicle_speed + 0.2 * (math.sqrt(velocity.x ** 2 + velocity.y ** 2) * 3.6)
                 except:
                     pass
 

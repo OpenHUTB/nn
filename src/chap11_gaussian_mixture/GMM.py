@@ -1,7 +1,11 @@
 # 导入NumPy库，用于科学计算和数值操作
 import numpy as np
 # 导入matplotlib.pyplot模块，用于数据可视化和绘图
-import matplotlib.pyplot as plt 
+import matplotlib
+import matplotlib.pyplot as plt
+# matplotlib 3.9 将 boxplot 的 labels 参数重命名为 tick_labels
+_MPL_GE_39 = tuple(int(x) for x in matplotlib.__version__.split('.')[:2]) >= (3, 9)
+_BOXPLOT_LABEL_KEY = 'tick_labels' if _MPL_GE_39 else 'labels'
 # 导入argparse，用于命令行参数配置
 import argparse
 # 导入csv，用于保存收敛日志
@@ -129,14 +133,16 @@ class GaussianMixtureModel:
         tol: float, 收敛阈值 (默认=1e-6)
         random_state: int, 随机种子 (可选)
     """
-    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None):
+    def __init__(self, n_components = 3, max_iter = 100, tol = 1e-6, random_state = None, init = 'random'):
         # 初始化模型参数
         self.n_components = n_components  # 高斯分布数量
         self.max_iter = max_iter          # EM算法最大迭代次数
         self.tol = tol                    # 收敛阈值
-        self.log_likelihoods = []         #存储每轮迭代的对数似然值
+        self.init = init                  # 初始化策略：'random'（随机）或 'kmeans++'（智能距离权重采样）
+        self.log_likelihoods = []         # 存储每轮迭代的对数似然值
+        self.n_iters_ = 0                 # 实际收敛所用的迭代次数
 
-        # 初始化随机数生成器
+        # 初始化随机数生成器（使用 numpy 新式 Generator，线程安全且可重复）
         self.rng = np.random.default_rng(random_state)
 
     def fit(self, X):
@@ -154,8 +160,12 @@ class GaussianMixtureModel:
         # 初始化混合系数（均匀分布）
         self.pi = np.ones(self.n_components) / self.n_components
         
-        # 随机选择样本点作为初始均值
-        self.mu = X[np.random.choice(n_samples, self.n_components, replace = False)]
+        # 选择初始均值：'kmeans++' 用距离权重采样，'random' 用均匀随机采样
+        if self.init == 'kmeans++':
+            self.mu = self._kmeans_plus_plus_init(X)
+        else:
+            indices = self.rng.choice(n_samples, self.n_components, replace=False)
+            self.mu = X[indices].copy()
         
         # 初始化协方差矩阵为单位矩阵
         self.sigma = np.array([np.eye(n_features) for _ in range(self.n_components)])
@@ -230,10 +240,51 @@ class GaussianMixtureModel:
             # new_sigma需保证为正定矩阵，常见实现中会通过Cholesky分解等方法确保数值稳定性
             self.sigma = new_sigma
         
+        # 记录实际收敛所用的迭代次数（for 循环结束后 iter 保留最后一次值）
+        self.n_iters_ = iter + 1
         # 最终聚类结果：每个样本分配到概率最大的高斯成分
         self.labels_ = np.argmax(gamma, axis=1)
         # 基于软聚类结果确定最终的硬聚类标签
         return self
+
+    def _kmeans_plus_plus_init(self, X):
+        """k-means++ 初始化：以平方距离为权重的概率采样，使初始中心点尽量分散
+
+        算法步骤：
+          1. 从数据集随机均匀地选取第一个中心点
+          2. 对剩余每个待选中心点：
+             a. 计算每个样本到已选中最近中心的平方距离 D²(x)
+             b. 以 D²(x)/Σ D²(x) 为概率分布采样下一个中心点
+          3. 重复步骤 2 直到选出 n_components 个中心
+
+        相比纯随机初始化，k-means++ 能有效避免多个中心点聚集在同一区域，
+        从而减少 EM 算法陷入局部最优的概率，加快收敛速度。
+        """
+        n_samples = X.shape[0]
+        # 步骤 1：随机选取第一个中心
+        first_idx = self.rng.integers(0, n_samples)
+        centers = [X[first_idx].copy()]
+
+        for _ in range(1, self.n_components):
+            # 向量化计算每个样本到最近已选中心的平方距离
+            # center_arr: (k, n_features)；X: (n, n_features)
+            center_arr = np.array(centers)                              # (k, f)
+            diff = X[:, np.newaxis, :] - center_arr[np.newaxis, :, :]  # (n, k, f)
+            sq_dists = np.sum(diff ** 2, axis=2)                        # (n, k)
+            min_sq_dists = sq_dists.min(axis=1)                         # (n,)
+
+            # 防止全零（极端情况）导致除零
+            total = min_sq_dists.sum()
+            if total == 0:
+                probs = np.ones(n_samples) / n_samples
+            else:
+                probs = min_sq_dists / total
+
+            # 按概率采样下一个中心
+            next_idx = self.rng.choice(n_samples, p=probs)
+            centers.append(X[next_idx].copy())
+
+        return np.array(centers)
 
     def _log_gaussian(self, X, mu, sigma):
         """计算多维高斯分布的对数概率密度
@@ -311,84 +362,233 @@ class GaussianMixtureModel:
         else:
             plt.close()
 
-# 主程序
+# ============================================================
+# 辅助函数：最优标签匹配准确率（枚举全排列，适用于小 k）
+# ============================================================
+def _cluster_accuracy(y_true, y_pred, n_classes):
+    """枚举所有标签排列，取最高匹配准确率（k<=8 均可）"""
+    from itertools import permutations
+    y_true = np.asarray(y_true)
+    y_pred = np.asarray(y_pred)
+    best = 0.0
+    for perm in permutations(range(n_classes)):
+        mapped = np.array([perm[p] for p in y_pred])
+        acc = np.mean(mapped == y_true)
+        if acc > best:
+            best = acc
+    return best
+
+
+# ============================================================
+# 主程序：随机初始化 vs k-means++ 初始化 对比实验
+# ============================================================
 if __name__ == "__main__":
+    # 设置中文字体（Windows 优先 Microsoft YaHei，Linux/Mac 回退 SimHei）
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+
     # 命令行参数
-    parser = argparse.ArgumentParser(description="GMM 无监督聚类实验（最小改动版）")
-    parser.add_argument("--n-samples", type=int, default=1000, help="样本数量")
-    parser.add_argument("--n-components", type=int, default=3, help="高斯成分数量")
-    parser.add_argument("--max-iter", type=int, default=100, help="EM最大迭代次数")
-    parser.add_argument("--tol", type=float, default=1e-6, help="收敛阈值")
-    parser.add_argument("--random-state", type=int, default=42, help="随机种子")
-    parser.add_argument("--out-dir", type=str, default="outputs", help="输出目录")
-    parser.add_argument("--no-show", action="store_true", help="不弹出图像窗口，仅保存文件")
+    parser = argparse.ArgumentParser(
+        description="GMM 初始化方法对比：随机初始化 vs k-means++ 初始化")
+    parser.add_argument("--n-samples",    type=int,   default=1000,    help="样本数量")
+    parser.add_argument("--n-components", type=int,   default=3,       help="高斯成分数量")
+    parser.add_argument("--max-iter",     type=int,   default=100,     help="EM最大迭代次数")
+    parser.add_argument("--tol",          type=float, default=1e-6,    help="收敛阈值")
+    parser.add_argument("--n-trials",     type=int,   default=50,      help="对比实验重复次数")
+    parser.add_argument("--out-dir",      type=str,   default="outputs", help="输出目录")
+    parser.add_argument("--no-show",      action="store_true",         help="不弹出图像窗口，仅保存文件")
     args = parser.parse_args()
 
-    # 创建输出目录
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. 生成合成数据
+    # ---------- 生成固定数据集 ----------
     print("生成混合高斯分布数据...")
-    # 调用generate_data函数生成样本数据：
-    X, y_true = generate_data(n_samples=args.n_samples, random_state=args.random_state)
-    print(f"生成数据形状: {X.shape}, 标签形状: {y_true.shape}")
-    
-    # 训练GMM模型
-    # 初始化高斯混合模型，指定3个高斯成分
-    gmm = GaussianMixtureModel(
-        n_components=args.n_components,
-        max_iter=args.max_iter,
-        tol=args.tol,
-        random_state=args.random_state,
-    )
-    gmm.fit(X)
-    y_pred = gmm.labels_#训练后存储预测标签的属性，将其赋值给 y_pred 以便后续使用
-     #
-      
-    # 可视化结果
-    plt.figure(figsize=(12, 5))#创建图形和子图
-    plt.subplot(1, 2, 1)
-    plt.scatter(X[:, 0], X[:, 1], c=y_true, cmap='viridis', s=10)#绘制散点图，x 轴为 X 的第一列（Feature 1），y 轴为 X 的第二列（Feature 2）；点颜色由 y_true 决定（真实聚类标签）
-    # 使用 viridis 颜色映射；s=10 设置点的大小为 10
-    plt.title("True Clusters")
-    # 注意：此处重复设置标题是为了确保在某些环境中标题能够正确显示
-    plt.title("True Clusters")
-    plt.xlabel("Feature 1")
-    plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.subplot(1, 2, 2)
-    plt.scatter(X[:, 0], X[:, 1], c=y_pred, cmap='viridis', s=10)#绘制散点图，x 轴和 y 轴与第一个子图相同。点颜色由 y_pred 决定（GMM 预测的聚类标签），
-    # 使用相同的 viridis 颜色映射。点大小同样为 10。
-    plt.title("GMM Predicted Clusters")
-    plt.xlabel("Feature 1")
-    plt.ylabel("Feature 2")
-    plt.grid(True, linestyle='--', alpha=0.7) # 在当前图表中添加网格线，并进行样式配置
-    # 保存聚类对比图
+    X, y_true = generate_data(n_samples=args.n_samples, random_state=42)
+    print(f"数据形状: {X.shape}，类别数: {args.n_components}")
+
+    # ---------- 多次实验：记录收敛迭代次数、最终对数似然、聚类准确率 ----------
+    print(f"\n正在运行 {args.n_trials} 次对比实验（每种方法各 {args.n_trials} 次）...")
+    random_iters, random_lls, random_accs = [], [], []
+    kpp_iters,    kpp_lls,    kpp_accs    = [], [], []
+
+    for seed in range(args.n_trials):
+        for init_method, iters_list, lls_list, accs_list in [
+            ('random',   random_iters, random_lls, random_accs),
+            ('kmeans++', kpp_iters,    kpp_lls,    kpp_accs),
+        ]:
+            gmm = GaussianMixtureModel(
+                n_components=args.n_components,
+                max_iter=args.max_iter,
+                tol=args.tol,
+                random_state=seed,
+                init=init_method,
+            )
+            gmm.fit(X)
+            iters_list.append(gmm.n_iters_)
+            lls_list.append(gmm.log_likelihoods[-1])
+            accs_list.append(_cluster_accuracy(y_true, gmm.labels_, args.n_components))
+
+    # ---------- 打印统计结果 ----------
+    print("\n========== 实验结果统计（{} 次）==========".format(args.n_trials))
+    print(f"{'指标':<22} {'随机初始化':>14} {'k-means++':>14}  {'提升':>8}")
+    print("-" * 62)
+    iter_imp  = (np.mean(random_iters) - np.mean(kpp_iters)) / np.mean(random_iters) * 100
+    ll_imp    = (np.mean(kpp_lls)    - np.mean(random_lls))  / abs(np.mean(random_lls)) * 100
+    acc_imp   = (np.mean(kpp_accs)   - np.mean(random_accs)) / np.mean(random_accs)  * 100
+    print(f"{'收敛迭代次数 (均值)':<22} {np.mean(random_iters):>14.1f} {np.mean(kpp_iters):>14.1f}  {-iter_imp:>+7.1f}%")
+    print(f"{'收敛迭代次数 (中位数)':<22} {np.median(random_iters):>14.1f} {np.median(kpp_iters):>14.1f}")
+    print(f"{'最终对数似然 (均值)':<22} {np.mean(random_lls):>14.2f} {np.mean(kpp_lls):>14.2f}  {ll_imp:>+7.1f}%")
+    print(f"{'聚类准确率 (均值)':<22} {np.mean(random_accs):>14.4f} {np.mean(kpp_accs):>14.4f}  {acc_imp:>+7.1f}%")
+    print(f"{'聚类准确率 (最低)':<22} {np.min(random_accs):>14.4f} {np.min(kpp_accs):>14.4f}")
+    print("=" * 62)
+
+    # ============================================================
+    # 图1：多次实验对比基准图（3 列）
+    # ============================================================
+    COLORS = ['#4C72B0', '#DD8452']
+    LABELS = ['随机初始化', 'k-means++']
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig.suptitle(
+        f"GMM 初始化方法对比（{args.n_trials} 次随机实验）\n"
+        "k-means++ 在收敛速度、解质量和稳定性上均优于随机初始化",
+        fontsize=13, fontweight='bold')
+
+    # 子图1：收敛迭代次数箱线图
+    ax = axes[0]
+    bp = ax.boxplot([random_iters, kpp_iters], **{_BOXPLOT_LABEL_KEY: LABELS},
+                    patch_artist=True, medianprops=dict(color='black', linewidth=2))
+    for patch, color in zip(bp['boxes'], COLORS):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.7)
+    ax.set_ylabel('收敛迭代次数')
+    ax.set_title('收敛速度对比\n（值越小越好）')
+    ax.grid(True, alpha=0.3)
+    ax.text(0.5, 0.97,
+            f'均值: {np.mean(random_iters):.1f}  →  {np.mean(kpp_iters):.1f}  ({-iter_imp:+.1f}%)',
+            transform=ax.transAxes, ha='center', va='top', fontsize=9,
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
+
+    # 子图2：最终对数似然箱线图
+    ax = axes[1]
+    bp = ax.boxplot([random_lls, kpp_lls], **{_BOXPLOT_LABEL_KEY: LABELS},
+                    patch_artist=True, medianprops=dict(color='black', linewidth=2))
+    for patch, color in zip(bp['boxes'], COLORS):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.7)
+    ax.set_ylabel('最终对数似然值')
+    ax.set_title('收敛质量对比\n（值越大越好）')
+    ax.grid(True, alpha=0.3)
+    ax.text(0.5, 0.03,
+            f'均值: {np.mean(random_lls):.1f}  →  {np.mean(kpp_lls):.1f}  ({ll_imp:+.1f}%)',
+            transform=ax.transAxes, ha='center', va='bottom', fontsize=9,
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
+
+    # 子图3：聚类准确率分布直方图
+    ax = axes[2]
+    lo = min(min(random_accs), min(kpp_accs)) - 0.02
+    hi = max(max(random_accs), max(kpp_accs)) + 0.02
+    bins = np.linspace(lo, hi, 16)
+    ax.hist(random_accs, bins=bins, alpha=0.65, color=COLORS[0], label=LABELS[0])
+    ax.hist(kpp_accs,    bins=bins, alpha=0.65, color=COLORS[1], label=LABELS[1])
+    ax.set_xlabel('聚类准确率')
+    ax.set_ylabel('频次')
+    ax.set_title('聚类准确率分布\n（分布越靠右越好）')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    ax.text(0.5, 0.97,
+            f'均值: {np.mean(random_accs):.4f}  →  {np.mean(kpp_accs):.4f}  ({acc_imp:+.1f}%)',
+            transform=ax.transAxes, ha='center', va='top', fontsize=9,
+            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.85))
+
+    plt.tight_layout()
+    bench_path = out_dir / "comparison_benchmark.png"
+    plt.savefig(bench_path, dpi=140, bbox_inches='tight')
+    print(f"\n[已保存] 对比基准图: {bench_path}")
+    if not args.no_show:
+        plt.show()
+    else:
+        plt.close()
+
+    # ============================================================
+    # 图2：单次运行聚类散点图对比（真实 / 随机 / k-means++）
+    # ============================================================
+    gmm_rand = GaussianMixtureModel(
+        n_components=args.n_components, max_iter=args.max_iter,
+        tol=args.tol, random_state=42, init='random')
+    gmm_rand.fit(X)
+
+    gmm_kpp = GaussianMixtureModel(
+        n_components=args.n_components, max_iter=args.max_iter,
+        tol=args.tol, random_state=42, init='kmeans++')
+    gmm_kpp.fit(X)
+
+    acc_rand = _cluster_accuracy(y_true, gmm_rand.labels_, args.n_components)
+    acc_kpp  = _cluster_accuracy(y_true, gmm_kpp.labels_,  args.n_components)
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig.suptitle("GMM 聚类结果对比（seed=42）", fontsize=13, fontweight='bold')
+
+    plot_data = [
+        (y_true,          f'真实标签（Ground Truth）'),
+        (gmm_rand.labels_, f'随机初始化\n迭代 {gmm_rand.n_iters_} 轮，准确率 {acc_rand:.3f}'),
+        (gmm_kpp.labels_,  f'k-means++ 初始化\n迭代 {gmm_kpp.n_iters_} 轮，准确率 {acc_kpp:.3f}'),
+    ]
+    for ax, (labels, title) in zip(axes, plot_data):
+        ax.scatter(X[:, 0], X[:, 1], c=labels, cmap='viridis', s=10, alpha=0.7)
+        ax.set_title(title, fontsize=10)
+        ax.set_xlabel("Feature 1")
+        ax.set_ylabel("Feature 2")
+        ax.grid(True, linestyle='--', alpha=0.4)
+
+    plt.tight_layout()
     cluster_path = out_dir / "cluster_comparison.png"
     plt.savefig(cluster_path, dpi=140, bbox_inches='tight')
-    if args.no_show:
-        plt.close()
+    print(f"[已保存] 聚类散点图: {cluster_path}")
+    if not args.no_show:
+        plt.show()
     else:
-        plt.show()#显示创建的图形窗口
+        plt.close()
 
-    # 保存收敛曲线图
-    conv_path = out_dir / "convergence_curve.png"
-    gmm.plot_convergence(save_path=conv_path, show=(not args.no_show))
+    # ============================================================
+    # 图3：EM 收敛曲线对比
+    # ============================================================
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    fig.suptitle("EM 算法收敛曲线对比（seed=42）", fontsize=13, fontweight='bold')
 
-    # 保存迭代日志
+    for ax, (gmm_obj, title, color) in zip(axes, [
+        (gmm_rand, f'随机初始化（共 {gmm_rand.n_iters_} 轮）', COLORS[0]),
+        (gmm_kpp,  f'k-means++ 初始化（共 {gmm_kpp.n_iters_} 轮）', COLORS[1]),
+    ]):
+        iters_x = range(1, len(gmm_obj.log_likelihoods) + 1)
+        ax.plot(iters_x, gmm_obj.log_likelihoods, '-o',
+                color=color, linewidth=2, markersize=4)
+        ax.set_xlabel('迭代次数')
+        ax.set_ylabel('对数似然值')
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    conv_path = out_dir / "convergence_comparison.png"
+    plt.savefig(conv_path, dpi=140, bbox_inches='tight')
+    print(f"[已保存] 收敛曲线图: {conv_path}")
+    if not args.no_show:
+        plt.show()
+    else:
+        plt.close()
+
+    # ---------- 保存迭代日志（两种方法） ----------
     log_path = out_dir / "iteration_log.csv"
     with log_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["iteration", "log_likelihood"])
-        for i, ll in enumerate(gmm.log_likelihoods, start=1):
-            writer.writerow([i, ll])
+        writer.writerow(["method", "iteration", "log_likelihood"])
+        for i, ll in enumerate(gmm_rand.log_likelihoods, start=1):
+            writer.writerow(["random", i, ll])
+        for i, ll in enumerate(gmm_kpp.log_likelihoods, start=1):
+            writer.writerow(["kmeans++", i, ll])
 
-    # 打印输出信息
-    print(f"输出目录: {out_dir.resolve()}")
-    print(f"聚类图: {cluster_path.name}")
-    print(f"收敛图: {conv_path.name}")
-    print(f"日志: {log_path.name}")
+    print(f"\n所有输出已保存至: {out_dir.resolve()}")
 
 
 

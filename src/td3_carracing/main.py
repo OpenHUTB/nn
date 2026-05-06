@@ -29,26 +29,81 @@ def train():
         use_cnn=True
     )
 
-    max_episodes = 1000
+    max_episodes = 2000
     max_timesteps = 1000
-    expl_noise = 0.05  # 减小探索噪声，从 0.1 改为 0.05，让动作更平滑
+    warmup_episodes = 50
+
+    # 探索噪声设置
+    expl_noise_steer = 0.08
+    expl_noise_throttle = 0.15
+    min_noise_steer = 0.005
+    min_noise_throttle = 0.02
+
     best_reward = -float('inf')
+    reward_history = []
 
     print("开始训练...")
     for episode in range(max_episodes):
         state, _ = env.reset()
         episode_reward = 0
-        agent.last_action = None  # 重置动作历史
+        agent.last_action = None
+
+        spin_counter = 0
+
+        # 学习率调整
+        if episode % 500 == 0 and episode > 0:
+            for param_group in agent.actor_optimizer.param_groups:
+                param_group['lr'] = param_group['lr'] * 0.8
+            for param_group in agent.critic_optimizer.param_groups:
+                param_group['lr'] = param_group['lr'] * 0.8
+
+        # 记录出赛道状态
+        off_track_counter = 0
+        on_track_counter = 0
 
         for t in range(max_timesteps):
-            action = agent.select_action(state, smooth=True)  # 启用平滑
+            # 预热期：使用更保守的策略
+            if episode < warmup_episodes:
+                # 预热阶段：降低探索，更多利用
+                action = agent.select_action(state, smooth=True)
+                noise = np.zeros_like(action)
+                noise[0] = np.random.normal(0, expl_noise_steer * 0.3)
+                noise[1:] = np.random.normal(0, expl_noise_throttle * 0.5, size=2)
+            else:
+                action = agent.select_action(state, smooth=True)
+                noise = np.zeros_like(action)
+                noise[0] = np.random.normal(0, expl_noise_steer)
+                noise[1:] = np.random.normal(0, expl_noise_throttle, size=2)
 
-            # 添加探索噪声（噪声更小）
-            noise = np.random.normal(0, expl_noise, size=action_dim)
+            # 如果刚出赛道，降低转向探索
+            if off_track_counter > 0 and off_track_counter < 5:
+                noise[0] *= 0.3
+                noise[1] *= 1.2  # 稍微增加油门，鼓励回到赛道
+
             action = (action + noise).clip(-max_action, max_action)
 
-            next_state, reward, terminated, truncated, _ = env.step(action)
+            next_state, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
+
+            # 更新赛道状态计数
+            on_track = info.get('on_track', True)
+            if not on_track:
+                off_track_counter += 1
+                on_track_counter = 0
+            else:
+                on_track_counter += 1
+                if on_track_counter > 3:
+                    off_track_counter = 0
+
+            speed = info.get('speed', 0.0)
+            if abs(speed) < 0.2 and abs(action[0]) > 0.4:
+                spin_counter += 1
+                reward -= 0.3
+                if spin_counter > 15:
+                    reward -= 5.0
+                    truncated = True
+            else:
+                spin_counter = 0
 
             agent.replay_buffer.add((state, action, reward, next_state, done))
             state = next_state
@@ -59,20 +114,27 @@ def train():
             if done:
                 break
 
-        # 保存最佳模型
+        reward_history.append(episode_reward)
+
         if episode_reward > best_reward:
             best_reward = episode_reward
             os.makedirs("models", exist_ok=True)
             agent.save(f"models/td3_car_best")
             print(f"★ 新最佳模型！奖励: {episode_reward:.1f}")
 
-        # 噪声衰减更慢，保持平滑
-        expl_noise = max(0.02, expl_noise * 0.998)
+        # 动态噪声衰减
+        if episode > warmup_episodes:
+            expl_noise_steer = max(min_noise_steer, expl_noise_steer * 0.998)
+            expl_noise_throttle = max(min_noise_throttle, expl_noise_throttle * 0.999)
+
+        avg_reward = np.mean(reward_history[-10:]) if len(reward_history) >= 10 else episode_reward
 
         print(
-            f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, 噪声: {expl_noise:.3f}, 缓冲区: {len(agent.replay_buffer)}")
+            f"回合: {episode + 1}, 奖励: {episode_reward:.1f}, 平均奖励(10): {avg_reward:.1f}, "
+            f"转向噪声: {expl_noise_steer:.4f}, 油门噪声: {expl_noise_throttle:.3f}, "
+            f"缓冲区: {len(agent.replay_buffer)}")
 
-        if (episode + 1) % 50 == 0:
+        if (episode + 1) % 100 == 0:
             os.makedirs("models", exist_ok=True)
             agent.save(f"models/td3_car_{episode + 1}")
             print(f"模型已保存: models/td3_car_{episode + 1}")

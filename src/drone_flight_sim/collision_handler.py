@@ -3,10 +3,13 @@
 
 本模块负责检测无人机飞行过程中的碰撞事件，
 区分地面接触和严重碰撞，并记录碰撞统计信息。
+提供碰撞后自动恢复和手动接管机制。
 """
 
 # 导入 time 模块，用于获取当前时间实现碰撞冷却
 import time
+# 导入随机模块，用于随机避障方向
+import random
 # 从 config 模块导入飞行配置和地面物体列表
 from config import FlightConfig, GROUND_OBJECTS
 
@@ -16,6 +19,7 @@ class CollisionHandler:
 
     负责与 AirSim 仿真器交互，检测并处理碰撞事件。
     使用冷却机制避免短时间内重复触发同一碰撞。
+    提供碰撞后自动恢复和手动接管功能。
     """
 
     def __init__(self, client):
@@ -32,6 +36,10 @@ class CollisionHandler:
         self.last_collision_time = 0
         # 标记当前是否处于碰撞状态
         self.is_collided = False
+        # 自动恢复尝试次数
+        self.auto_recovery_attempts = 0
+        # 最大自动恢复尝试次数（从配置读取）
+        self.max_auto_recovery_attempts = FlightConfig.MAX_AUTO_RECOVERY_ATTEMPTS
 
     def check_collision(self):
         """检测碰撞事件
@@ -97,6 +105,95 @@ class CollisionHandler:
         # 返回严重碰撞标志和碰撞信息对象
         return True, collision_info
 
+    def auto_recover(self):
+        """自动恢复碰撞
+
+        尝试通过后退和上升来脱离碰撞状态。
+        如果自动恢复失败，返回 False 表示需要手动接管。
+
+        返回:
+            bool: 自动恢复成功返回 True，失败返回 False
+        """
+        self.auto_recovery_attempts += 1
+
+        if self.auto_recovery_attempts > self.max_auto_recovery_attempts:
+            # 超过最大自动恢复次数，需要手动接管
+            return False
+
+        print(f"\n🔧 尝试自动恢复 ({self.auto_recovery_attempts}/{self.max_auto_recovery_attempts})...")
+
+        try:
+            # 1. 取消当前任务
+            self.client.cancelLastTask()
+            time.sleep(0.5)
+
+            # 2. 获取当前位置
+            pos = self.client.getMultirotorState().kinematics_estimated.position
+
+            # 3. 后退一段距离（随机选择后退方向）
+            backward_distance = 3
+            directions = [-1, 1]  # 后退方向：左后方或右后方
+            direction = random.choice(directions)
+
+            new_x = pos.x_val - backward_distance * 0.7
+            new_y = pos.y_val + direction * backward_distance * 0.7
+            new_z = pos.z_val - 2  # 上升 2 米
+
+            print(f"   后退避障中...")
+            self.client.moveToPositionAsync(new_x, new_y, new_z, FlightConfig.FLIGHT_VELOCITY)
+
+            # 等待移动完成
+            time.sleep(3)
+
+            # 4. 悬停等待稳定
+            self.client.hoverAsync().join()
+            time.sleep(1)
+
+            # 5. 检查是否脱离碰撞
+            collision_info = self.client.simGetCollisionInfo()
+            if not collision_info.has_collided:
+                print(f"✅ 自动恢复成功！")
+                self.auto_recovery_attempts = 0
+                return True
+            else:
+                print(f"⚠️  自动恢复后仍处于碰撞状态")
+                return False
+
+        except Exception as e:
+            print(f"❌ 自动恢复失败: {e}")
+            return False
+
+    def request_manual_control(self):
+        """请求手动接管控制
+
+        打印手动接管提示信息，提示用户如何手动解决碰撞。
+
+        返回:
+            bool: 始终返回 True，表示需要手动接管
+        """
+        print(f"\n{'=' * 50}")
+        print(f"🚨 自动恢复失败，需要手动接管！")
+        print(f"{'=' * 50}")
+        print(f"""
+📋 手动接管说明:
+   碰撞后无人机可能处于卡住状态，请使用键盘控制：
+   
+   键盘控制说明:
+   - W/↑     : 前进
+   - S/↓     : 后退
+   - A       : 向左移动
+   - D       : 向右移动
+   - Q       : 上升
+   - E       : 下降
+   - 空格    : 悬停
+   - L       : 执行降落
+   - ESC     : 紧急停止并退出
+
+💡 提示: 先按 Q 上升脱离碰撞，然后按 L 降落
+""")
+        print(f"{'=' * 50}\n")
+        return True
+
     def reset_collision_state(self):
         """重置碰撞状态
 
@@ -105,3 +202,5 @@ class CollisionHandler:
         """
         # 重置碰撞状态标志
         self.is_collided = False
+        # 重置自动恢复计数器
+        self.auto_recovery_attempts = 0
