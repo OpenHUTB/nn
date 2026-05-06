@@ -30,6 +30,8 @@ title: 主页
 
 [__卷积神经网络__](CNN.md)
 
+[__卷积神经网络改进__](cnn_keras_sequential_improved.md)
+
 [__循环神经网络__](RNN.md)
 
 [__注意力机制__](attention.md)
