@@ -1,341 +1,308 @@
-# SVM 支持向量机改进报告
+# SVM 支持向量机代码改进报告
 
 ## 一、概述
 
-本次改进基于 `src/chap03_SVM/` 模块，针对原始 `svm.py` 中仅支持线性分类、缺乏数据预处理等问题进行了系统性优化。改进后的代码分布在以下四个文件中：
+本次改进针对 `src/chap03_SVM/svm.py` 中的线性 SVM 实现，修复了一个关键 Bug 并增加了四项训练优化功能。改进保持了原有算法（hinge loss + L2 正则化 + 梯度下降）不变，仅在工程实现层面进行优化。
 
-- `svm_improved.py` — 核函数 SVM（支持 RBF/Linear/Poly/Sigmoid 核）
-- `svm_comparison.py` — 三种损失函数对比（平方误差/交叉熵/合页损失）
-- `svm_kernel_compare.py` — 线性 vs RBF 核可视化对比
-- `svm_multi.py` — 多分类 SVM（One-vs-Rest 策略）
+核心改进：
 
-核心改进涵盖以下五个方面：
-
-1. 核函数支持（RBF 高斯核处理非线性数据）
-2. 数据标准化（Z-score 标准化提升收敛速度与精度）
-3. SMO 优化算法（替代梯度下降，提升训练效率）
-4. 多分类扩展（One-vs-Rest 策略支持多类别分类）
-5. 与 scikit-learn 基准对比（验证实现正确性）
+1. **修复 predict() 崩溃 Bug** — 原代码调用 `train()` 后再调用 `predict()` 会因 `y_train_unique` 未定义而报错
+2. **学习率指数衰减** — 训练初期快速下降，后期精细调优
+3. **训练损失监控** — 每隔固定轮数打印 loss、accuracy、lr，便于观察收敛过程
+4. **早停机制** — 损失不再下降时自动停止，节省计算资源
+5. **默认开启正则化** — `reg_lambda` 从 0.0 改为 0.001，防止过拟合
 
 ---
 
 ## 二、原代码问题分析
 
-### 2.1 仅支持线性分类
-
-**原代码 `svm.py`：**
-```python
-class SVM:
-    def train(self, data_train):
-        X = data_train[:, :2]
-        y = data_train[:, 2]
-        # 仅使用线性决策边界: score = w·x + b
-        score = np.dot(X, self.w) + self.b
-```
-
-**问题：**
-- 决策函数 `f(x) = w·x + b` 只能产生线性决策边界
-- 对于非线性可分数据集（如 `train_kernel.txt`），模型无法有效分类
-- 在非线性数据集上的测试准确率仅约 81%，远低于核方法的 94.5%
-
-### 2.2 缺乏数据标准化
+### 2.1 predict() 方法存在崩溃 Bug
 
 **原代码：**
 ```python
-def train(self, data_train):
-    X = data_train[:, :2]  # 直接使用原始特征
+def predict(self, x_raw):
+    x = self.scaler.transform(x_raw)
+    score = np.dot(x, self.w) + self.b
+    return np.where(score >= 0, 1, -1) if -1 in self.y_train_unique else np.where(score >= 0, 1, 0)
+
+def train_with_label_tracking(self, data_train):
+    self.y_train_unique = np.unique(data_train[:, 2])  # 只在这里赋值
+    self.train(data_train)
 ```
 
 **问题：**
-- SVM 对特征尺度非常敏感，不同特征的量纲差异会影响间隔计算
-- 未标准化的数据导致梯度下降收敛缓慢
-- 实验表明，不标准化时测试准确率为 94.50%，标准化后提升至 97.00%
+- `predict()` 依赖 `self.y_train_unique` 属性
+- 该属性只在 `train_with_label_tracking()` 中赋值
+- 如果直接调用 `train()` 后再调用 `predict()`，会抛出 `AttributeError: 'SVM' object has no attribute 'y_train_unique'`
+- 需要一个专门的 wrapper 方法来避免这个 Bug，说明封装存在缺陷
 
-### 2.3 梯度下降效率低
+### 2.2 训练过程无反馈
 
-**原代码使用批量梯度下降优化 hinge loss：**
+**原代码：**
 ```python
 for epoch in range(self.max_iter):
-    score = np.dot(X, self.w) + self.b
-    margin = y * score
-    idx = np.where(margin < 1)[0]
-    dw = (2 * self.reg_lambda * self.w) - np.sum(y[idx, None] * X[idx], axis=0) / m
-    self.w -= self.learning_rate * dw
+    # ... 梯度计算和更新 ...
+    # 无任何输出
 ```
 
 **问题：**
-- 每次迭代需要计算所有样本的梯度，计算复杂度高
-- 学习率需要手动调节，过大导致震荡，过小导致收敛慢
-- 无法利用核函数的对偶形式
+- 默认 20000 次迭代，全程无输出
+- 无法判断模型是否收敛、收敛速度如何
+- 调试和调参非常困难
 
-### 2.4 仅支持二分类
+### 2.3 固定学习率
+
+**原代码：**
+```python
+self.learning_rate = learning_rate  # 始终不变
+```
 
 **问题：**
-- 原始代码只能处理二分类问题
-- 无法直接扩展到多分类场景（如三分类数据集 `train_multi.txt`）
+- 训练初期需要大学习率快速收敛
+- 训练后期需要小学习率精细调优
+- 固定学习率无法同时满足两者，容易在最优点附近震荡
+
+### 2.4 无早停机制
+
+**问题：**
+- 无论是否已收敛，都跑满 `max_iter` 轮
+- 浪费计算资源
+- 过多的迭代可能导致过拟合
+
+### 2.5 正则化默认关闭
+
+**原代码：**
+```python
+def __init__(self, learning_rate=0.1, reg_lambda=0.0, max_iter=20000):
+```
+
+**问题：**
+- `reg_lambda=0.0` 意味着没有正则化
+- SVM 的核心优势之一就是通过正则化控制模型复杂度
+- 默认关闭正则化容易导致过拟合
 
 ---
 
 ## 三、改进内容详解
 
-### 3.1 核函数支持
-
-**改进代码 `svm_improved.py`：**
-
-```python
-def _compute_kernel(self, X, Z):
-    if self.kernel == 'linear':
-        return np.dot(X, Z.T)
-    elif self.kernel == 'rbf':
-        gamma = self.gamma if isinstance(self.gamma, (int, float)) else 1.0 / X.shape[1]
-        sq_norm = np.add.outer(np.sum(X**2, axis=1), np.sum(Z**2, axis=1))
-        sq_norm -= 2 * np.dot(X, Z.T)
-        return np.exp(-gamma * sq_norm)
-    elif self.kernel == 'poly':
-        return (1 + np.dot(X, Z.T)) ** self.degree
-    elif self.kernel == 'sigmoid':
-        gamma = self.gamma if isinstance(self.gamma, (int, float)) else 1.0 / X.shape[1]
-        return np.tanh(gamma * np.dot(X, Z.T) + 1)
-```
-
-**支持的核函数：**
-
-| 核函数 | 公式 | 适用场景 |
-|--------|------|----------|
-| Linear | $K(x, z) = x^T z$ | 线性可分数据 |
-| RBF (高斯核) | $K(x, z) = \exp(-\gamma \|x-z\|^2)$ | 非线性数据，通用性最强 |
-| Poly (多项式核) | $K(x, z) = (1 + x^T z)^d$ | 特定多项式分布数据 |
-| Sigmoid | $K(x, z) = \tanh(\gamma x^T z + 1)$ | 类神经网络映射 |
-
-**效果：**
-- RBF 核在非线性数据上的测试准确率从 81.0% 提升至 94.5%（+13.5%）
-- 核函数通过隐式高维映射，使原本线性不可分的数据变得可分
-
-### 3.2 数据标准化（Z-score）
+### 3.1 修复 predict() Bug
 
 **改进代码：**
-
 ```python
-if self.normalize:
-    self.mean_ = np.mean(X, axis=0)
-    self.std_ = np.std(X, axis=0)
-    self.std_[self.std_ == 0] = 1e-8  # 防止除以零
-    X = (X - self.mean_) / self.std_
+def train(self, data_train):
+    X_raw = data_train[:, :2]
+    y_raw = data_train[:, 2]
+    # 在 train() 中直接记录标签空间
+    self.label_set = np.unique(y_raw)
+    # ...
+
+def predict(self, x_raw):
+    x = self.scaler.transform(x_raw)
+    score = np.dot(x, self.w) + self.b
+    # 使用 train() 中记录的 self.label_set
+    if -1 in self.label_set:
+        return np.where(score >= 0, 1, -1)
+    else:
+        return np.where(score >= 0, 1, 0)
+```
+
+**改进点：**
+- 将标签记录逻辑从 `train_with_label_tracking()` 移入 `train()` 本身
+- 删除了多余的 `train_with_label_tracking()` 方法
+- `train()` + `predict()` 可以直接配合使用，无需 wrapper
+
+### 3.2 学习率指数衰减
+
+**改进代码：**
+```python
+def __init__(self, ..., lr_decay=0.9995, ...):
+    self.lr_decay = lr_decay
+
+def train(self, data_train):
+    lr = self.learning_rate
+    for epoch in range(self.max_iter):
+        # ... 使用 lr 进行梯度更新 ...
+        # 学习率衰减
+        lr = self.learning_rate * (self.lr_decay ** epoch)
 ```
 
 **原理：**
-- Z-score 标准化：$X_{norm} = \frac{X - \mu}{\sigma}$
-- 将每个特征缩放到均值为 0、标准差为 1 的分布
-- 防止不同量纲的特征主导模型训练
+- 学习率按 `lr = lr_0 × decay^epoch` 指数衰减
+- 默认 `decay=0.9995`，即每轮衰减 0.05%
+- 20000 轮后学习率衰减至初始值的约 0.004 倍
 
-**实验对比（核数据集）：**
+**效果：**
+- 线性数据集：lr 从 0.1 衰减至 0.000033
+- 非线性数据集：lr 从 0.1 衰减至 0.004977（6000 轮时早停）
 
-| 指标 | 无标准化 | Z-score 标准化 | 变化 |
-|------|----------|----------------|------|
-| 训练准确率 | 100.00% | 98.50% | -1.50% |
-| 测试准确率 | 94.50% | 97.00% | **+2.50%** |
-| 训练耗时 | 0.1288s | 0.0655s | **-49%** |
-
-**分析：**
-- 标准化后测试准确率提升 2.50%，说明泛化能力增强
-- 训练耗时减少 49%，因为标准化后的数据梯度下降收敛更快
-- 训练准确率略有下降（100% → 98.50%），实际上是减少了过拟合
-
-### 3.3 SMO 优化算法
+### 3.3 训练损失监控
 
 **改进代码：**
-
 ```python
-# SMO 核心更新逻辑
+def _compute_hinge_loss(self, X, y):
+    """计算 hinge loss + L2 正则化损失"""
+    score = np.dot(X, self.w) + self.b
+    hinge = np.maximum(0, 1 - y * score)
+    return np.mean(hinge) + self.reg_lambda * np.dot(self.w, self.w)
+
+def train(self, data_train):
+    for epoch in range(self.max_iter):
+        # ... 训练逻辑 ...
+        if (epoch + 1) % self.print_interval == 0 or epoch == 0:
+            loss = self._compute_hinge_loss(X, y)
+            pred = np.where(np.dot(X, self.w) + self.b >= 0, 1, -1)
+            acc = np.mean(pred == y)
+            print(f"  epoch {epoch+1:>6d} | loss: {loss:.4f} | acc: {acc*100:.1f}% | lr: {lr:.6f}")
+```
+
+**效果：**
+- 每 2000 轮打印一次训练状态
+- 显示当前 epoch、hinge loss、训练准确率、学习率
+- 直观观察收敛过程
+
+### 3.4 早停机制
+
+**改进代码：**
+```python
+best_loss = float('inf')
+no_improve_count = 0
+
 for epoch in range(self.max_iter):
-    i = np.random.randint(m)  # 随机选择第一个变量
-    f_i = np.sum(self.alpha * y * K[i, :]) + self.b
-    E_i = f_i - y[i]
-    r_i = E_i * y[i]
-    if (r_i < -0.001 and self.alpha[i] < self.C) or (r_i > 0.001 and self.alpha[i] > 0):
-        j = np.random.randint(m)  # 随机选择第二个变量
-        # 计算边界 L, H
-        # 更新 alpha_j, alpha_i
-        # 更新偏置 b
+    # ... 训练逻辑 ...
+
+    if (epoch + 1) % self.print_interval == 0:
+        loss = self._compute_hinge_loss(X, y)
+        if loss < best_loss - 1e-6:
+            best_loss = loss
+            no_improve_count = 0
+        else:
+            no_improve_count += self.print_interval
+            if no_improve_count >= self.patience:
+                print(f"  早停触发于 epoch {epoch+1}，最佳损失: {best_loss:.4f}")
+                break
 ```
 
 **原理：**
-- SMO（Sequential Minimal Optimization）每次只优化两个拉格朗日乘子
-- 通过 KKT 条件选择违反条件最严重的变量进行优化
-- 无需设置学习率，收敛性由理论保证
+- 每 `print_interval` 轮检查一次损失
+- 如果损失连续 `patience` 轮没有显著下降（< 1e-6），则停止训练
+- 默认 `patience=2000`，即连续 2000 轮无改善则早停
 
-**效果：**
-- 利用核矩阵预计算，避免重复计算核函数
-- 对偶形式天然支持核函数扩展
-- 支持向量自动识别，模型具有稀疏性
+**效果（实测）：**
 
-### 3.4 多分类 SVM（One-vs-Rest）
+| 数据集 | 原始轮数 | 改进后轮数 | 节省 |
+|--------|----------|------------|------|
+| 线性数据 | 20000 | 16000 | 20% |
+| 非线性数据 | 20000 | 6000 | **70%** |
 
-**改进代码 `svm_multi.py`：**
+### 3.5 默认开启正则化
 
+**改进代码：**
 ```python
-class MultiClassSVM:
-    def train(self, X, y):
-        self.models = []
-        for c in np.unique(y):
-            y_binary = np.where(y == c, 1, -1)  # 当前类 vs 其他类
-            w, b = self._train_binary_svm(X, y_binary)
-            self.models.append((c, w, b))
-
-    def predict(self, X):
-        scores = []
-        for class_label, w, b in self.models:
-            score = np.dot(X, w) + b
-            scores.append(score)
-        scores = np.vstack(scores)
-        return np.array([self.models[i][0] for i in np.argmax(scores, axis=0)])
+def __init__(self, learning_rate=0.1, reg_lambda=0.001, ...):
 ```
 
-**原理：**
-- 对 K 个类别训练 K 个二分类器
-- 第 i 个分类器将第 i 类作为正类，其余所有类作为负类
-- 预测时选择决策得分最高的类别
-
 **效果：**
-- 三分类任务训练准确率：97.67%
-- 三分类任务测试准确率：98.67%
-
-### 3.5 三种损失函数对比
-
-**`svm_comparison.py` 实现了三种线性分类器的对比：**
-
-| 损失函数 | 公式 | 特点 |
-|----------|------|------|
-| 平方误差 | $E = \sum(y_n - t_n)^2 + \lambda\|w\|^2$ | 对异常值敏感，梯度恒定 |
-| 交叉熵 | $E = \sum\log(1+\exp(-y_n t_n)) + \lambda\|w\|^2$ | 概率解释，平滑梯度 |
-| 合页损失 | $E = \sum[1-y_n t_n]_+ + \lambda\|w\|^2$ | 稀疏支持向量，最大间隔 |
-
-**实验结果（线性数据集）：**
-
-| 方法 | 训练准确率 | 测试准确率 |
-|------|------------|------------|
-| 线性分类器（平方误差） | 96.00% | 98.00% |
-| 逻辑回归（交叉熵） | 95.50% | 97.00% |
-| SVM（合页损失） | 95.50% | 97.50% |
+- `reg_lambda` 从 0.0 改为 0.001
+- 提供适度的 L2 正则化，限制权重大小
+- 防止过拟合，提高泛化能力
 
 ---
 
-## 四、可视化改进
+## 四、结果对比
 
-**`svm_kernel_compare.py` 生成决策边界对比图：**
+### 线性数据集
 
-- 左图：线性 SVM 的决策边界（直线，无法正确分类非线性数据）
-- 中图：RBF 核 SVM 的决策边界（曲线，准确拟合数据分布）
-- 右图：准确率对比柱状图
+| 指标 | 改进前 | 改进后 |
+|------|--------|--------|
+| 训练准确率 | 95.5% | 95.5% |
+| 测试准确率 | 97.5% | 97.5% |
+| 训练轮数 | 20000 | 16000（早停） |
+| 训练过程 | 无输出 | 每 2000 轮打印 loss/acc/lr |
 
-```python
-# 生成对比图
-fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-plot_decision_boundary(axes[0], linear_svm, X_train, y_train, ...)
-plot_decision_boundary(axes[1], rbf_wrapper, X_train, y_train, ...)
-# 柱状图对比
-axes[2].bar(...)
+### 非线性数据集
+
+| 指标 | 改进前 | 改进后 |
+|------|--------|--------|
+| 训练准确率 | 81.5% | 81.5% |
+| 测试准确率 | 81.0% | 81.0% |
+| 训练轮数 | 20000 | 6000（早停） |
+| 训练过程 | 无输出 | 每 2000 轮打印 loss/acc/lr |
+
+### 训练过程日志（线性数据集）
+
+```
+  epoch      1 | loss: 0.8834 | acc: 96.0% | lr: 0.100000
+  epoch   2000 | loss: 0.1116 | acc: 95.5% | lr: 0.036797
+  epoch   4000 | loss: 0.1109 | acc: 95.5% | lr: 0.013534
+  epoch   6000 | loss: 0.1107 | acc: 95.5% | lr: 0.004977
+  epoch   8000 | loss: 0.1106 | acc: 95.5% | lr: 0.001831
+  epoch  10000 | loss: 0.1106 | acc: 95.5% | lr: 0.000673
+  epoch  12000 | loss: 0.1106 | acc: 95.5% | lr: 0.000248
+  epoch  14000 | loss: 0.1106 | acc: 95.5% | lr: 0.000091
+  epoch  16000 | loss: 0.1106 | acc: 95.5% | lr: 0.000033
+  早停触发于 epoch 16000，最佳损失: 0.1106
+train accuracy: 95.5%
+test accuracy: 97.5%
 ```
 
-输出文件：`src/chap03_SVM/outputs/svm_kernel_comparison.png`
+### 训练过程日志（非线性数据集）
+
+```
+  epoch      1 | loss: 0.9460 | acc: 81.5% | lr: 0.100000
+  epoch   2000 | loss: 0.3947 | acc: 81.0% | lr: 0.036797
+  epoch   4000 | loss: 0.3947 | acc: 81.5% | lr: 0.013534
+  epoch   6000 | loss: 0.3947 | acc: 81.5% | lr: 0.004977
+  早停触发于 epoch 6000，最佳损失: 0.3947
+train accuracy: 81.5%
+test accuracy: 81.0%
+```
 
 ---
 
-## 五、结果对比
+## 五、新增命令行参数
 
-### 核函数效果对比（非线性数据集）
-
-| 方法 | 训练准确率 | 测试准确率 | 提升 |
-|------|------------|------------|------|
-| 线性 SVM（原始） | 81.5% | 81.0% | — |
-| RBF 核 SVM（改进） | 97.5% | 94.5% | **+13.5%** |
-
-### 标准化效果对比（核数据集）
-
-| 指标 | 无标准化 | Z-score 标准化 | 变化 |
-|------|----------|----------------|------|
-| 训练准确率 | 100.00% | 98.50% | -1.50% |
-| 测试准确率 | 94.50% | 97.00% | **+2.50%** |
-| 训练耗时 | 0.1288s | 0.0655s | **-49%** |
-
-### 完整性能汇总
-
-| 模型 | 数据集 | 训练准确率 | 测试准确率 |
-|------|--------|------------|------------|
-| 线性 SVM（原始） | 线性 | 95.50% | 97.50% |
-| RBF 核 SVM | 线性 | 96.00% | 97.00% |
-| RBF 核 SVM | 非线性 | 99.00% | 95.00% |
-| scikit-learn SVM | 非线性 | 96.00% | 95.50% |
-| 多分类 SVM (OvR) | 三分类 | 97.67% | 98.67% |
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--learning-rate` | 0.1 | 初始学习率 |
+| `--reg-lambda` | 0.001 | L2 正则化系数（原默认 0.0） |
+| `--max-iter` | 20000 | 最大迭代次数 |
+| `--lr-decay` | 0.9995 | 学习率衰减系数（新增） |
+| `--patience` | 2000 | 早停耐心值（新增） |
 
 ---
 
-## 六、总结与展望
+## 六、总结
 
 ### 改进总结
 
-本次改进针对原代码中的 4 个核心问题进行了修复和优化：
+本次对 `svm.py` 的改进聚焦于工程实践层面，不改变核心算法：
 
-1. **引入核函数支持** — RBF 核使非线性数据的测试准确率从 81% 提升至 94.5%
-2. **添加数据标准化** — Z-score 标准化提升测试准确率 2.5%，训练速度提升 49%
-3. **实现 SMO 优化** — 替代梯度下降，支持对偶形式和核函数高效计算
-4. **扩展多分类能力** — One-vs-Rest 策略实现三分类，准确率达 98.67%
+1. **修复了 predict() 的属性未定义 Bug** — 消除了对 `train_with_label_tracking()` 的依赖
+2. **添加学习率指数衰减** — 兼顾初期快速收敛和后期精细调优
+3. **添加训练过程监控** — 实时显示 loss、accuracy、lr，便于调试
+4. **添加早停机制** — 线性数据节省 20% 迭代，非线性数据节省 70%
+5. **默认开启 L2 正则化** — 提高泛化能力
 
 ### 可继续改进的方向
 
-- **在线学习（增量训练）**：支持新样本的增量更新，避免全量重训练
-- **核函数自动选择**：通过交叉验证自动选择最优核函数及其参数
-- **GPU 加速**：利用 CuPy 或 Numba 对大规模核矩阵计算进行 GPU 加速
-- **概率输出**：通过 Platt Scaling 将 SVM 决策值转换为概率
-- **不平衡数据处理**：引入类别权重或 SMOTE 过采样处理类别不均衡问题
+- **Mini-batch SGD**：用小批量梯度下降替代全批量，加速大数据集训练
+- **核函数扩展**：引入 RBF 核处理非线性数据
+- **交叉验证**：自动选择最优超参数组合
+- **可视化**：绘制决策边界和训练 loss 曲线
 
 ---
 
 ## 七、使用方式
 
-### 运行核 SVM（Part 1）
 ```bash
 cd src/chap03_SVM
-python svm_improved.py
-```
 
-### 运行标准化对比实验
-```bash
-python svm_improved.py --compare
-```
+# 使用默认参数运行（线性数据集）
+python svm.py
 
-### 运行损失函数对比（Part 2）
-```bash
-python svm_comparison.py
-```
+# 自定义参数运行
+python svm.py --learning-rate 0.05 --reg-lambda 0.01 --lr-decay 0.999 --patience 3000
 
-### 运行多分类 SVM（Part 3）
-```bash
-python svm_multi.py
-```
-
-### 运行核函数可视化对比
-```bash
-python svm_kernel_compare.py
-```
-
----
-
-## 八、文件结构
-
-```text
-src/chap03_SVM/
-├── svm.py                # 原始线性 SVM（Hinge Loss + 梯度下降）
-├── svm_improved.py       # 改进：核 SVM（支持 RBF/Linear/Poly/Sigmoid 核 + SMO）
-├── svm_comparison.py     # 三种损失函数对比（平方误差/交叉熵/合页损失）
-├── svm_kernel_compare.py # 线性 vs RBF 核可视化对比
-├── svm_multi.py          # 多分类 SVM（One-vs-Rest 策略）
-├── data/                 # 数据集目录
-│   ├── train_linear.txt  # 线性训练集
-│   ├── test_linear.txt   # 线性测试集
-│   ├── train_kernel.txt  # 核函数训练集
-│   ├── test_kernel.txt   # 核函数测试集
-│   ├── train_multi.txt   # 多分类训练集
-│   └── test_multi.txt    # 多分类测试集
-└── README.md             # 项目说明文件
+# 使用非线性数据集
+python svm.py --train-file data/train_kernel.txt --test-file data/test_kernel.txt
 ```
