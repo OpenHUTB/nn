@@ -1,6 +1,7 @@
 from utils.screen import clear, warn, message, error
 from utils.collect import Collector
 from utils.piloterror import PilotError
+from utils.logger import logger
 from src.data import Data, PilotData
 from src.model import PilotNet
 import carla, random, time, datetime, os
@@ -15,8 +16,10 @@ class Menu():
     @staticmethod
     def run_1():
         'Train using generated data'
+        logger.info('Starting model training')
         data = Data()
         message('Data collection finished')
+        logger.info('Training data loaded successfully')
 
         # this is some nasty code here, will have to be cleaned up
         message('How much epochs do you wanna train the model? The default is 30.')
@@ -33,50 +36,65 @@ class Menu():
         width = input('Enter width (default 160) >> ') or 160
         height = input('Enter height (default 120) >> ') or 120
 
+        logger.info(f'Training parameters - epochs: {epochs}, steps: {steps}, validation_steps: {steps_val}, batch_size: {batch_size}, model_name: {name}, image_size: {width}x{height}')
+
         clear()
         try:
             message(f'Starting tensorflow model with {width}x{height} images')
             pilotnet = PilotNet(width, height)
-        except:
+            logger.info('TensorFlow model initialized successfully')
+        except Exception as e:
+            logger.error(f'Failed to initialize TensorFlow model: {e}')
             raise PilotError('Oops, that didnt work. System might be out of memory. Try again with smaller dimensions.')
         clear()
         message('Starting training')
         try:
             pilotnet.train(name, data, epochs, steps, steps_val, batch_size)
-        except:
+            logger.info(f'Training completed successfully, model saved as: {name}')
+        except Exception as e:
+            logger.error(f'Training failed with error: {e}', exc_info=True)
             raise PilotError('Some unexpected error occured during training. Please try again.')
 
     @staticmethod
     def run_2():
         'Generate new data'
+        logger.info('Starting data generation')
         message('Connecting to CARLA world')
         client = carla.Client('localhost', 2000)
         try:
             world = client.get_world()
             message('Connected to CARLA server')
-        except:
+            logger.info('Connected to CARLA server on localhost:2000')
+        except Exception as e:
+            logger.warning(f'Failed to connect to CARLA on localhost:2000, retrying with WSL address: {e}')
             try:
                 warn('There seems to be a problem with your CARLA server. Retrying with WSL address...')
                 client = carla.Client('172.17.128.1', 2000)
                 world = client.get_world()
                 message('Connected to CARLA server')
-            except:
+                logger.info('Connected to CARLA server on WSL address')
+            except Exception as e:
+                logger.error(f'Failed to connect to CARLA server: {e}')
                 raise PilotError('Connection to CARLA simulator failed. Check your CARLA installation, confirm simulator is running on port 2000.\nIf in WSL, refer to the troubleshooting guide for tips.')
         
         time = int(input('Enter the time you need the generator to run for (in minutes) >> '))
+        logger.info(f'Data generation time: {time} minutes')
         
         message('Do you want to enable CARLA visualization?')
         message('1. Yes - Show vehicle trajectory, control values, and statistics')
         message('2. No - Just record data without visualization')
         viz_choice = input('Enter your choice (1-2, default 1) >> ') or '1'
         enable_visualization = viz_choice == '1'
+        logger.info(f'Visualization enabled: {enable_visualization}')
         
         clear()
         collector = Collector(world, time, enable_visualization=enable_visualization)
+        logger.info('Data collection completed')
 
     @staticmethod
     def run_3():
         'Predict on a single video frame'
+        logger.info('Starting single frame prediction')
         i = 0
         models = []
         message('Fetching list of saved models...')
@@ -85,24 +103,32 @@ class Menu():
                 print(f'{i+1}. {model.name}')
                 models.append(model.name)
                 i+=1
+        logger.info(f'Found {len(models)} saved models')
+        
         if len(models) <= 0:
             warn('There are no saved models. Using previously trained models from the same session is totally possible but disabled due to performance issues.')
             message('Simply train a model from the menu and try again...')
+            logger.warning('No saved models found for prediction')
         else:
             choice = int(input('Choose the model you wanna use (1) >> ') or 0)
             while choice not in models:
                 try:
                     choice = models[choice-1]
                     message(f'{choice} selected.')
+                    logger.info(f'Selected model: {choice}')
                 except:
                     error('Wrong choice. Try again...')
             model = choice
             path = input('Enter path relative to this directory >> ')
+            logger.info(f'Input image path: {path}')
             try:
                 frame = PilotData(isTraining=False, path_to=path)
-            except:
+                logger.info('Image loaded successfully')
+            except Exception as e:
+                logger.error(f'Failed to load image: {e}')
                 raise PilotError("That didn't work. The path you entered must be wrong. Start again...")
             predictions = PilotNet(160, 120, predict=True).predict(frame, given_model=model)
+            logger.info(f'Prediction completed - steering: {predictions[0][0][0]}, throttle: {predictions[1][0][0]}, brake: {predictions[2][0][0]}')
             clear()
             message('Predictions are...')
             message(f'Steering angle: {predictions[0][0][0]}')
@@ -113,11 +139,13 @@ class Menu():
     @staticmethod
     def run_4():
         'Predict on live video feed'
+        logger.warning('Live video prediction feature requested but not yet implemented')
         raise PilotError("Um sorry bruh. Live video prediction isn't available yet. I'm working on it keep an eye here.")
 
     @staticmethod
     def run_5():
         'Wrap up. I wanna quit.'
+        logger.info('User requested to exit the application')
         message('Hope you enjoyed PilotNet. Report any issues on GitHub..')
 
     @staticmethod
@@ -159,7 +187,13 @@ class Menu():
                 message('Hope you enjoyed using PilotNet. Report any issues on GitHub.')
 
 def main():
-    Menu.run()
+    logger.info('PilotNet application started')
+    logger.info('Log file: %s', logger.get_log_path())
+    try:
+        Menu.run()
+    except Exception as e:
+        logger.critical(f'Application crashed with error: {e}', exc_info=True)
+        raise
 
 if __name__ == '__main__':
     main()
