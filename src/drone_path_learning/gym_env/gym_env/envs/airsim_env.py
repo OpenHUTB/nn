@@ -19,6 +19,32 @@ from PyQt5.QtCore import pyqtSignal
 logger = logging.getLogger(__name__)
 
 
+def apply_environment_overrides(cfg, dynamic_model):
+    """Apply optional curriculum-style environment overrides from config."""
+    if not cfg.has_section("environment"):
+        return
+
+    if cfg.has_option("environment", "start_position"):
+        import ast
+
+        raw_position = cfg.get("environment", "start_position")
+        start_position = ast.literal_eval(raw_position)
+        if not isinstance(start_position, (list, tuple)) or len(start_position) != 3:
+            raise ValueError(
+                "environment.start_position must be a list like [x, y, z]"
+            )
+        dynamic_model.start_position = [float(value) for value in start_position]
+
+    float_overrides = {
+        "start_random_angle": "start_random_angle",
+        "goal_distance": "goal_distance",
+        "goal_random_angle": "goal_random_angle",
+    }
+    for option_name, attr_name in float_overrides.items():
+        if cfg.has_option("environment", option_name):
+            setattr(dynamic_model, attr_name, cfg.getfloat("environment", option_name))
+
+
 class AirsimGymEnv(gym.Env, QtCore.QThread):
     
     action_signal = pyqtSignal(int, np.ndarray)
@@ -167,6 +193,8 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
         else:
             raise ValueError(f"Invalid env_name: {self.env_name}")
 
+        apply_environment_overrides(cfg, self.dynamic_model)
+
         self.client = self.dynamic_model.client
         self.state_feature_length = self.dynamic_model.state_feature_length
         self.cnn_feature_length = self.cfg.getint("options", "cnn_feature_num")
@@ -179,6 +207,15 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
 
         self.crash_distance = cfg.getfloat("environment", "crash_distance")
         self.accept_radius = cfg.getint("environment", "accept_radius")
+        self.success_check_mode = "planar_with_altitude"
+        self.success_altitude_tolerance = 5.0
+        if cfg.has_option("environment", "success_check_mode"):
+            self.success_check_mode = cfg.get("environment", "success_check_mode").strip().lower()
+        if cfg.has_option("environment", "success_altitude_tolerance"):
+            self.success_altitude_tolerance = cfg.getfloat(
+                "environment", "success_altitude_tolerance"
+            )
+        self.success_altitude_tolerance = max(self.success_altitude_tolerance, 0.0)
         self.depth_collision_percentile = 5.0
         self.depth_collision_roi_top_ratio = 0.65
         if cfg.has_option("environment", "depth_collision_percentile"):
@@ -308,12 +345,19 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
                 )
             else:
                 logger.info(
-                    "Episode done | reason: %s | success=%s crash=%s workspace=%s max_steps=%s | step=%d",
+                    "Episode done | reason: %s | success=%s crash=%s workspace=%s max_steps=%s | "
+                    "distance_3d=%.2f distance_2d=%.2f z_err=%.2f | step=%d",
                     done_reason,
                     is_success,
                     is_crash,
                     is_not_in_workspace,
                     is_max_steps,
+                    self.get_distance_to_goal_3d(),
+                    self.dynamic_model.get_distance_to_goal_2d(),
+                    abs(
+                        self.dynamic_model.get_position()[2]
+                        - self.dynamic_model.goal_position[2]
+                    ),
                     self.step_num,
                 )
 
@@ -998,11 +1042,22 @@ class AirsimGymEnv(gym.Env, QtCore.QThread):
         return is_not_inside
 
     def is_in_desired_pose(self):
-        in_desired_pose = False
-        if self.get_distance_to_goal_3d() < self.accept_radius:
-            in_desired_pose = True
+        distance_2d = self.dynamic_model.get_distance_to_goal_2d()
+        current_pose = self.dynamic_model.get_position()
+        goal_pose = self.dynamic_model.goal_position
+        z_error = abs(current_pose[2] - goal_pose[2])
 
-        return in_desired_pose
+        if self.success_check_mode == "3d":
+            return self.get_distance_to_goal_3d() < self.accept_radius
+
+        if self.success_check_mode == "2d":
+            return distance_2d < self.accept_radius
+
+        # default: planar success + altitude tolerance
+        return (
+            distance_2d < self.accept_radius
+            and z_error < self.success_altitude_tolerance
+        )
 
     def is_crashed(self):
         is_crashed = False

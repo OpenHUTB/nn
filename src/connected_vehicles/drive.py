@@ -4,8 +4,9 @@ import carla
 import time
 import keyboard
 
-# 导入独立的红绿灯模块
+# 导入独立的红绿灯模块和碰撞监测模块
 from traffic_light_controller import set_all_traffic_lights, get_current_light_state
+from collision_monitor import create_collision_sensor, stop_collision_monitor  # 新增导入
 
 BASE_DIR = Path(__file__).parent
 sys.path.append(str(BASE_DIR / "PythonAPI" / "carla" / "dist"))
@@ -25,12 +26,15 @@ car_bp = bp_lib.filter("vehicle")[0]
 car = world.spawn_actor(car_bp, spawn_point)
 spectator = world.get_spectator()
 
+# 为车辆挂载碰撞传感器（新增）
+collision_sensor = create_collision_sensor(world, car)
+
 print("↑前进 ↓倒车 ←左转 →右转  ESC退出")
 print("S键刹车 | 限速50km/h | 红绿灯10秒切换")
 
 MAX_SPEED_KMH = 50
 
-# 设置红绿灯
+# 设置红绿灯（调用外部函数）
 set_all_traffic_lights(world, green_time=10.0, red_time=10.0, yellow_time=2.0)
 
 print_counter = 0
@@ -42,7 +46,7 @@ try:
         speed_ms = (velocity.x**2 + velocity.y**2)**0.5
         current_speed = 3.6 * speed_ms
 
-        # 打印信息
+        # 打印信息（每20帧一次）
         print_counter += 1
         if print_counter % 20 == 0:
             light_state = get_current_light_state(car)
@@ -94,5 +98,9 @@ try:
             break
 
 finally:
+    # 销毁传感器和车辆
+    collision_sensor.destroy()
     car.destroy()
-    print("\n✅ 退出成功")
+    # 停止碰撞监测，确保剩余数据写入文件（新增）
+    stop_collision_monitor()
+    print("\n✅ 退出成功（碰撞日志已保存到 collision_logs.txt）")

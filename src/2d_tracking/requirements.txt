@@ -1,0 +1,95 @@
+# ============================================================
+# 2D Tracking Module - CARLA 2D多目标跟踪模块
+# ============================================================
+# 功能：
+#   - 2D目标检测真值生成
+#   - 3D到2D投影变换
+#   - 边界框绘制与可视化
+#   - 图像特征编码（用于DeepSORT等算法）
+# ============================================================
+
+# ---------- 核心依赖 ----------
+# NumPy - 数值计算、数组操作、矩阵运算
+numpy>=1.21.0
+
+# OpenCV - 图像处理、2D边界框绘制、视频处理
+opencv-python>=4.5.0
+
+# ---------- CARLA仿真器 ----------
+# CARLA Python API - 与CARLA仿真器通信
+# 注意：CARLA需要单独下载安装，版本需与Python API匹配
+# 下载地址：https://github.com/carla-simulator/carla/releases
+# 推荐版本：CARLA 0.9.14
+carla>=0.9.13
+
+# ---------- 深度学习框架（可选，用于特征提取）----------
+# TensorFlow - 图像特征编码器（encoder.py）
+# 注意：TensorFlow 2.x 与 CARLA 可能存在兼容性问题
+# 建议使用 TensorFlow 2.10 或更早版本
+tensorflow>=2.10.0,<2.13.0
+
+# PyTorch - 可选，用于YOLO检测器或DeepSORT
+# torch>=1.9.0
+# torchvision>=0.10.0
+
+# ---------- 跟踪算法依赖（可选）----------
+# filterpy - 卡尔曼滤波（SORT/DeepSORT）
+# filterpy>=1.4.5
+
+# lap - 线性分配（匈牙利算法，用于数据关联）
+# lap>=0.4.0
+
+# scipy - 距离计算、矩阵运算
+# scipy>=1.7.0
+
+# scikit-learn - 最近邻匹配
+# scikit-learn>=1.0.0
+
+# ---------- 可选依赖（用于可视化）----------
+# matplotlib - 绘制跟踪结果曲线
+# matplotlib>=3.5.0
+
+# ============================================================
+# 安装说明
+# ============================================================
+#
+# 1. 基础安装：
+#    pip install -r requirements.txt
+#
+# 2. CARLA 安装（重要）：
+#    - 下载 CARLA 仿真器：https://github.com/carla-simulator/carla/releases
+#    - 推荐版本：CARLA 0.9.14
+#    - 将 CARLA Python API 添加到 Python 路径：
+#      export PYTHONPATH=$PYTHONPATH:/path/to/CARLA/PythonAPI/carla/dist/carla-*.egg
+#
+# 3. TensorFlow 兼容性说明：
+#    - TensorFlow 2.10+ 可能与 CARLA 存在protobuf版本冲突
+#    - 如遇问题，尝试安装 TensorFlow 2.10.0：
+#      pip install tensorflow==2.10.0
+#
+# 4. 扩展依赖（跟踪算法）：
+#    - SORT/DeepSORT：需要 filterpy 和 lap
+#      pip install filterpy lap
+#    - 可选：安装 scipy 和 scikit-learn
+#
+# 5. 运行项目：
+#    - 启动 CARLA 仿真器：./CarlaUE4.sh 或 CarlaUE4.exe
+#    - 运行主程序：python 2d_detection_gt.py
+#
+# ============================================================
+# 环境验证
+# ============================================================
+#
+# 验证 NumPy：
+#   python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+#
+# 验证 OpenCV：
+#   python -c "import cv2; print(f'OpenCV: {cv2.__version__}')"
+#
+# 验证 TensorFlow：
+#   python -c "import tensorflow as tf; print(f'TensorFlow: {tf.__version__}')"
+#
+# 验证 CARLA（需先启动 CARLA 服务）：
+#   python -c "import carla; client = carla.Client('localhost', 2000); print('CARLA OK')"
+#
+# ============================================================

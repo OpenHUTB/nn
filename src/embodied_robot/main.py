@@ -127,7 +127,7 @@ def check_dependencies():
                 sys.exit(1)
 
 
-def run_robot_simulation(python_exe, robot_walk_dir, script_file):
+def run_robot_simulation(python_exe, robot_walk_dir, script_file,extra_args):
     """
     Launch robot simulation script (run in robot_walk directory for correct path resolution)
     """
@@ -140,9 +140,12 @@ def run_robot_simulation(python_exe, robot_walk_dir, script_file):
         env['MUJOCO_QUIET'] = '1'
         env['PYTHONPATH'] = str(Path(__file__).resolve().parent) + os.pathsep + env.get('PYTHONPATH', '')
 
+        # 核心修改点：将 extra_args 拼接到启动命令列表中
+        cmd = [python_exe, str(script_file)] + extra_args
+
         # Run script in robot_walk directory
         result = subprocess.run(
-            [python_exe, str(script_file)],
+            cmd,  # 使用拼接好的命令
             cwd=str(robot_walk_dir),
             env=env,
             stdout=sys.stdout,
@@ -191,8 +194,13 @@ def main():
     print("\n🔍 Checking dependencies...")
     check_dependencies()
 
+    # 核心修改点：获取 sys.argv 中除了脚本名(main.py)之外的所有参数
+    extra_args = sys.argv[1:]
+    if extra_args:
+        print(f"📥 Received passthrough arguments: {' '.join(extra_args)}")
+
     # 4. Run simulation
-    exit_code = run_robot_simulation(python_exe, robot_walk_dir, script_file)
+    exit_code = run_robot_simulation(python_exe, robot_walk_dir, script_file,extra_args)
 
     # 5. Exit
     sys.exit(exit_code)

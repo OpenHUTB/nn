@@ -28,7 +28,7 @@ random.seed(42)
 
 
 class StablePatrolController:
-    def __init__(self, model_path):
+    def __init__(self, model_path,args=None):
         """Initialize robot controller with enhanced balance control and distance-priority target selection"""
         # Load MuJoCo model and data
         self.model = mujoco.MjModel.from_xml_path(model_path)
@@ -63,7 +63,7 @@ class StablePatrolController:
         self.patrol_body_ids = {}
         self.last_target_update = {i: 0.0 for i in range(len(self.patrol_points))}
         self.target_movement_range = {"x": [-1.0, 9.0], "y": [-3.0, 3.0]}
-        self.target_move_speed = 0.2  # Slow target movement for stability
+        self.target_move_speed = args.target_move_speed if args else 0.2  # 动态目标移动速度  # Slow target movement for stability
 
         # -------------------------- Obstacle Avoidance Parameters --------------------------
         self.valid_wall_names = ["wall1", "wall2", "wall3", "wall4"]
@@ -89,7 +89,12 @@ class StablePatrolController:
         self.gait_period = 3.0  # Longer gait period for stability
         self.swing_gain = 0.3
         self.stance_gain = 0.4
-        self.forward_speed = 0.05  # Reduced speed to prevent flying (fix disappearing issue)
+        self.forward_speed = args.forward_speed if args else 0.05  # 机器人前进速度  # Reduced speed to prevent flying (fix disappearing issue)
+        print("\n" + "✨" * 20)
+        print("📥 【系统确认】底层已成功接收到外部参数：")
+        print(f"   🏃 机器人设定的前进速度: {self.forward_speed}")
+        print(f"   🎯 巡逻目标点的移动速度: {self.target_move_speed}")
+        print("✨" * 20 + "\n")
         self.heading_kp = 40.0
         self.balance_kp = 60.0
         self.balance_kd = 30.0
@@ -878,22 +883,26 @@ class StablePatrolController:
 
 
 if __name__ == "__main__":
-    # Default model path
-    model_file = "Robot_move_straight.xml"
+    import argparse
 
-    # Override model path with command line argument
-    if len(sys.argv) > 1:
-        model_file = sys.argv[1]
+    # 设置参数解析器
+    parser = argparse.ArgumentParser(description="DeepMind Humanoid Patrol Controller")
+    parser.add_argument("--model_file", type=str, default="Robot_move_straight.xml", help="Path to MuJoCo XML model")
+    parser.add_argument("--forward_speed", type=float, default=0.05, help="Robot forward walking speed")
+    parser.add_argument("--target_move_speed", type=float, default=0.2, help="Dynamic target movement speed")
 
-    # Check if model file exists
-    if not os.path.exists(model_file):
-        print(f"❌ Model file not found: {model_file}")
+    # 解析参数
+    args = parser.parse_args()
+
+    # 检查模型文件是否存在
+    if not os.path.exists(args.model_file):
+        print(f"❌ Model file not found: {args.model_file}")
         print(f"ℹ️  Current working directory: {os.getcwd()}")
         sys.exit(1)
 
-    # Run simulation
+    # 运行仿真 (把解析好的 args 传给控制器)
     try:
-        controller = StablePatrolController(model_file)
+        controller = StablePatrolController(args.model_file, args)
         controller.run_simulation()
     except Exception as e:
         print(f"\n❌ Failed to start simulation: {e}")
