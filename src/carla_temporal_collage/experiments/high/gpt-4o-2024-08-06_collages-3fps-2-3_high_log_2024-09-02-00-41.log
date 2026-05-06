@@ -1,0 +1,1744 @@
+2024-09-02T00:41:41.854083+0900 INFO Start running the script.
+2024-09-02T00:41:41.854286+0900 INFO Processing label: norm, directory: collages-3fps-2-3/norm
+2024-09-02T00:41:41.854456+0900 INFO Processing subfolder: collages-3fps-2-3/norm/24
+2024-09-02T00:41:41.854572+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/24
+2024-09-02T00:41:42.017288+0900 DEBUG Processed 6 frames
+2024-09-02T00:41:42.018058+0900 INFO Start calling OpenAI API
+2024-09-02T00:41:53.909885+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+### Explanation:
+
+1. **Frame Analysis**:
+   - In the sequence of frames, a blue van and a red car are following the same path.
+   - In frames 11 to 14, the red car is seen moving towards the blue van.
+   - By frame 15, the red car is closer to the blue van, indicating a potential collision.
+   - Continuing through frames 16 to 18, the vehicles appear overlapping, confirming a collision.
+
+2. **Classification**:
+   - The close proximity and overlapping of the vehicle positions suggest that an accident has occurred.
+   - As the accident involves two vehicles, it is classified as Type B: a car crashes with another vehicle.
+2024-09-02T00:41:53.910392+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:41:53.910745+0900 DEBUG Completion tokens: 165
+2024-09-02T00:41:53.911079+0900 INFO Start extracting response
+2024-09-02T00:41:53.911525+0900 DEBUG Strip json response:
+2024-09-02T00:41:53.911872+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:41:53.912222+0900 INFO Processing subfolder: collages-3fps-2-3/norm/19
+2024-09-02T00:41:53.912549+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/19
+2024-09-02T00:41:54.204949+0900 DEBUG Processed 8 frames
+2024-09-02T00:41:54.206518+0900 INFO Start calling OpenAI API
+2024-09-02T00:42:08.539464+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:42:08.539988+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:42:08.540488+0900 DEBUG Completion tokens: 22
+2024-09-02T00:42:08.540976+0900 INFO Start extracting response
+2024-09-02T00:42:08.541576+0900 DEBUG Strip json response:
+2024-09-02T00:42:08.542077+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:42:08.542564+0900 INFO Processing subfolder: collages-3fps-2-3/norm/21
+2024-09-02T00:42:08.543051+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/21
+2024-09-02T00:42:08.853996+0900 DEBUG Processed 8 frames
+2024-09-02T00:42:08.855513+0900 INFO Start calling OpenAI API
+2024-09-02T00:42:22.455543+0900 DEBUG Based on the frames provided:
+
+1. **Frames 1-12:** The car is moving forward smoothly. There are no indications of an accident.
+2. **Frames 13-18:** Another car begins to change lanes but there is no collision.
+3. **Frames 19-24:** The red SUV gets closer but safely changes lanes; still no crash.
+4. **Frames 25-44:** Multiple vehicles continue to move in the opposite lane, and a blue vehicle approaches but there is no contact between any vehicles.
+
+Overall, no accident occurs in the video. The scenario appears to be typical urban traffic with cars changing lanes but without any collisions.
+
+Here's the JSON format:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:42:22.456062+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:42:22.456413+0900 DEBUG Completion tokens: 160
+2024-09-02T00:42:22.456744+0900 INFO Start extracting response
+2024-09-02T00:42:22.457138+0900 DEBUG Strip json response:
+2024-09-02T00:42:22.457479+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:42:22.457815+0900 INFO Processing subfolder: collages-3fps-2-3/norm/08
+2024-09-02T00:42:22.458128+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/08
+2024-09-02T00:42:22.842220+0900 DEBUG Processed 10 frames
+2024-09-02T00:42:22.843926+0900 INFO Start calling OpenAI API
+2024-09-02T00:42:43.288018+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+### Explanation:
+
+1. **Frames Examination**: Analyze the sequence of frames very closely.
+2. **Traffic Lights**: Initially, the traffic lights progress from green to yellow to red, indicating normal traffic flow.
+3. **Vehicle Movement**: The leading vehicle proceeds forward without any indication of stopping at a red light.
+4. **Accident Identification**: By frame 43 onward, a blue van is visible coming into the intersection from the right.
+5. **Collision Indication**: From frames 45 to 47, the leading vehicle and the blue van are approaching each other with no stopping action, suggesting a potential crash course.
+6. **Accident Confirmation**: By frame 49 onwards, it's visible that the vehicles have possibly collided or are about to collide, classifying this as an accident situation.
+   
+The accident also aligns with Type B, wherein one vehicle collides with another vehicle.
+2024-09-02T00:42:43.288548+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:42:43.288907+0900 DEBUG Completion tokens: 208
+2024-09-02T00:42:43.289238+0900 INFO Start extracting response
+2024-09-02T00:42:43.289636+0900 DEBUG Strip json response:
+2024-09-02T00:42:43.289985+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:42:43.290331+0900 INFO Processing subfolder: collages-3fps-2-3/norm/01
+2024-09-02T00:42:43.290656+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/01
+2024-09-02T00:42:43.598575+0900 DEBUG Processed 9 frames
+2024-09-02T00:42:43.599719+0900 INFO Start calling OpenAI API
+2024-09-02T00:42:57.455068+0900 DEBUG In the provided frames, we need to assess if an accident occurs and determine its type.
+
+1. **Observation of Frames**:
+   - Frames 1 to 18 show a car approaching a series of parked and moving vehicles on a street.
+   - From frame 19 onward, a red vehicle starts turning across the lane where the focus vehicle is traveling.
+   - At frame 22, the red vehicle is in close proximity to a blue van, suggesting a collision is imminent or has occurred.
+
+2. **Analysis**:
+   - The interaction between the red vehicle and the blue van suggests an accident, as it indicates a collision between two vehicles.
+
+3. **Accident Type Determination**:
+   - Since the collision involves two vehicles (the red vehicle and the blue van), it qualifies as a Type B accident (car crashes with another vehicle).
+
+**Conclusion**:
+- An accident is present in the frames.
+- Type B: A car crashes with another vehicle.
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:42:57.455593+0900 DEBUG Prompt tokens: 10098
+2024-09-02T00:42:57.455931+0900 DEBUG Completion tokens: 219
+2024-09-02T00:42:57.456246+0900 INFO Start extracting response
+2024-09-02T00:42:57.456620+0900 DEBUG Strip json response:
+2024-09-02T00:42:57.456943+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:42:57.457256+0900 INFO Processing subfolder: collages-3fps-2-3/norm/04
+2024-09-02T00:42:57.457552+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/04
+2024-09-02T00:42:57.706214+0900 DEBUG Processed 7 frames
+2024-09-02T00:42:57.708010+0900 INFO Start calling OpenAI API
+2024-09-02T00:43:08.812519+0900 DEBUG To determine if an accident occurs in the video frames and identify its type, let's go through the frames step-by-step:
+
+1. **Frames 1-9**: The vehicle's viewpoint shows a clear road with no sign of an accident. Cars are moving normally.
+2. **Frames 10-15**: A vehicle appears to be moving on the road coming from the opposite direction, but no collision is evident.
+3. **Frames 16-30**: The vehicle is still following its path, passing other cars on the road without any interaction that suggests an accident.
+4. **Frames 31-39**: The road remains clear, and there are no visible pedestrians or vehicles indicating a collision.
+
+Based on the analysis:
+- No collision with another vehicle or pedestrian is evident in these frames.
+- No unexpected obstructions or incidents are visible.
+
+**Conclusion**:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:43:08.812818+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:43:08.813009+0900 DEBUG Completion tokens: 199
+2024-09-02T00:43:08.813184+0900 INFO Start extracting response
+2024-09-02T00:43:08.813419+0900 DEBUG Strip json response:
+2024-09-02T00:43:08.813606+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:43:08.813785+0900 INFO Processing subfolder: collages-3fps-2-3/norm/22
+2024-09-02T00:43:08.813958+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/22
+2024-09-02T00:43:09.068724+0900 DEBUG Processed 7 frames
+2024-09-02T00:43:09.070180+0900 INFO Start calling OpenAI API
+2024-09-02T00:43:21.223108+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B",
+  "Reason": "In the sequence of frames, a red car changes lanes and crashes into a blue van, indicating a collision between two vehicles."
+}
+```
+2024-09-02T00:43:21.223626+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:43:21.223982+0900 DEBUG Completion tokens: 53
+2024-09-02T00:43:21.224314+0900 INFO Start extracting response
+2024-09-02T00:43:21.224738+0900 DEBUG Strip json response:
+2024-09-02T00:43:21.225081+0900 DEBUG {'class': 'accident', 'accident_type': 'b', 'reason': 'in the sequence of frames, a red car changes lanes and crashes into a blue van, indicating a collision between two vehicles.'}
+2024-09-02T00:43:21.225432+0900 INFO Processing subfolder: collages-3fps-2-3/norm/14
+2024-09-02T00:43:21.225746+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/14
+2024-09-02T00:43:21.640006+0900 DEBUG Processed 10 frames
+2024-09-02T00:43:21.641939+0900 INFO Start calling OpenAI API
+2024-09-02T00:43:39.337131+0900 DEBUG Based on the frames provided:
+
+1. Review the sequence of frames for any signs of collision or unusual behavior involving the vehicles or pedestrians.
+2. Identify the presence of any collision between vehicles (Type B) or between a vehicle and pedestrians (Type A).
+
+After analyzing:
+
+- **Frames 1-6**: Vehicles at an intersection; normal traffic flow.
+- **Frames 7-12**: The vehicle navigates a turn; no visible signs of collision.
+- **Frames 13-24**: Vehicles continue down the street; no collision.
+- **Frames 25-42**: Ordinary traffic movement; no interaction indicating an accident.
+- **Frames 43-56**: Traffic continues; vehicles remain in their lanes without incident.
+
+Conclusion: No visible accidents involving vehicles or pedestrians. The video appears normal without any accidents.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:43:39.337671+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:43:39.338030+0900 DEBUG Completion tokens: 191
+2024-09-02T00:43:39.338381+0900 INFO Start extracting response
+2024-09-02T00:43:39.338827+0900 DEBUG Strip json response:
+2024-09-02T00:43:39.339230+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:43:39.339608+0900 INFO Processing subfolder: collages-3fps-2-3/norm/30
+2024-09-02T00:43:39.339965+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/30
+2024-09-02T00:43:39.676449+0900 DEBUG Processed 8 frames
+2024-09-02T00:43:39.678578+0900 INFO Start calling OpenAI API
+2024-09-02T00:43:53.759450+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:43:53.759953+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:43:53.760302+0900 DEBUG Completion tokens: 23
+2024-09-02T00:43:53.760630+0900 INFO Start extracting response
+2024-09-02T00:43:53.761017+0900 DEBUG Strip json response:
+2024-09-02T00:43:53.761356+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:43:53.761688+0900 INFO Processing subfolder: collages-3fps-2-3/norm/10
+2024-09-02T00:43:53.761998+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/10
+2024-09-02T00:43:54.072606+0900 DEBUG Processed 8 frames
+2024-09-02T00:43:54.073945+0900 INFO Start calling OpenAI API
+2024-09-02T00:44:09.714222+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:44:09.714747+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:44:09.715294+0900 DEBUG Completion tokens: 22
+2024-09-02T00:44:09.715781+0900 INFO Start extracting response
+2024-09-02T00:44:09.716367+0900 DEBUG Strip json response:
+2024-09-02T00:44:09.716903+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:44:09.717411+0900 INFO Processing subfolder: collages-3fps-2-3/norm/25
+2024-09-02T00:44:09.717891+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/25
+2024-09-02T00:44:10.004987+0900 DEBUG Processed 9 frames
+2024-09-02T00:44:10.006510+0900 INFO Start calling OpenAI API
+2024-09-02T00:44:25.399860+0900 DEBUG Based on the frames:
+
+1. **Initial Frames (1-12):** The scene is calm, with no unusual activity. Vehicles are moving smoothly.
+
+2. **Middle Frames (13-24):** A blue car appears to be merging into the lane. There’s no indication of an accident; it seems to continue without issue.
+
+3. **Later Frames (25-42):** The focus is on an orange car approaching and merging. Again, no evident collision occurs.
+
+4. **Final Frames (43-49):** The view returns to normal. No collisions are observed.
+
+After analyzing the sequence, there is no evidence of collisions with pedestrians or other vehicles. Therefore, there is no accident.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:44:25.400383+0900 DEBUG Prompt tokens: 10098
+2024-09-02T00:44:25.400746+0900 DEBUG Completion tokens: 165
+2024-09-02T00:44:25.401073+0900 INFO Start extracting response
+2024-09-02T00:44:25.401486+0900 DEBUG Strip json response:
+2024-09-02T00:44:25.401829+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:44:25.402190+0900 INFO Processing subfolder: collages-3fps-2-3/norm/09
+2024-09-02T00:44:25.402506+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/09
+2024-09-02T00:44:25.733844+0900 DEBUG Processed 9 frames
+2024-09-02T00:44:25.735397+0900 INFO Start calling OpenAI API
+2024-09-02T00:44:39.455053+0900 DEBUG To determine if an accident occurred and its type, let's analyze the frames step-by-step:
+
+1. **Initial Frames (1-6):** The frames show a yellow car approaching from the left, but no collision is visible.
+2. **Middle Frames (7-12):** These frames depict a red car approaching from the right and entering the lane in front. Still, no collision occurs.
+3. **Later Frames (13-18):** The red car continues to move in the lane, but there is no contact or unusual traffic activity.
+4. **Further Frames (19-30):** Various cars move in the lanes, but they maintain safe distances and no incidents occur.
+5. **Final Frames (31-49):** All vehicles, including a blue van, travel without any collisions or interactions.
+
+**Conclusion:** Throughout the frames, there are no indications of a vehicle hitting a pedestrian or colliding with another vehicle.
+
+Based on the analysis, the video is classified as:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:44:39.455554+0900 DEBUG Prompt tokens: 10098
+2024-09-02T00:44:39.455885+0900 DEBUG Completion tokens: 222
+2024-09-02T00:44:39.456194+0900 INFO Start extracting response
+2024-09-02T00:44:39.456567+0900 DEBUG Strip json response:
+2024-09-02T00:44:39.456897+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:44:39.457211+0900 INFO Processing subfolder: collages-3fps-2-3/norm/12
+2024-09-02T00:44:39.457501+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/12
+2024-09-02T00:44:39.700684+0900 DEBUG Processed 6 frames
+2024-09-02T00:44:39.700980+0900 INFO Start calling OpenAI API
+2024-09-02T00:44:52.084445+0900 DEBUG Let's analyze the frames step-by-step:
+
+1. **Frames 1-12:** The camera shows a city street with several vehicles, including a blue van and other cars. Traffic is moving smoothly.
+
+2. **Frames 13-18:** The camera continues along the street. Traffic conditions remain the same, with no signs of sudden stops or unusual movements.
+
+3. **Frames 19-24:** Vehicles, including the yellow car, continue moving along the street. There are no pedestrians visible in the path, and no sudden vehicle movements that suggest an impending collision.
+
+4. **Frames 25-36:** The sequence shows normal traffic flow. Cars are in their lanes, and there are no visible collisions with vehicles or pedestrians.
+
+**Conclusion:**
+
+- There is no evidence of any accident occurring throughout the frames.
+- The entire sequence appears to show normal traffic behavior with no collisions or accidents.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+
+2024-09-02T00:44:52.084984+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:44:52.085348+0900 DEBUG Completion tokens: 203
+2024-09-02T00:44:52.085678+0900 INFO Start extracting response
+2024-09-02T00:44:52.086070+0900 DEBUG Strip json response:
+2024-09-02T00:44:52.086414+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:44:52.086746+0900 INFO Processing subfolder: collages-3fps-2-3/norm/18
+2024-09-02T00:44:52.087277+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/18
+2024-09-02T00:44:52.358505+0900 DEBUG Processed 7 frames
+2024-09-02T00:44:52.358799+0900 INFO Start calling OpenAI API
+2024-09-02T00:45:02.768827+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:45:02.769290+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:45:02.769625+0900 DEBUG Completion tokens: 22
+2024-09-02T00:45:02.769934+0900 INFO Start extracting response
+2024-09-02T00:45:02.770300+0900 DEBUG Strip json response:
+2024-09-02T00:45:02.770625+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:45:02.770941+0900 INFO Processing subfolder: collages-3fps-2-3/norm/07
+2024-09-02T00:45:02.771271+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/07
+2024-09-02T00:45:03.161387+0900 DEBUG Processed 11 frames
+2024-09-02T00:45:03.161921+0900 INFO Start calling OpenAI API
+2024-09-02T00:45:23.333914+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+### Analysis:
+
+1. **Initial Frames (1-30):**
+   - The video shows a consistent view of a road with a car driving in the same lane. Nothing unusual is noticed, as the car maintains its lane and speed.
+
+2. **Middle Frames (31-35):**
+   - A car from the left side enters the scene and begins to maneuver into the lane occupied by the car with the camera. 
+
+3. **Key Frames (36-42):**
+   - The most significant frames (36-42) depict the black car moving into the lane of the camera-view car, leading to a side collision. This confirms an accident, as the cars make contact.
+
+4. **Final Frames (43-65):**
+   - After the collision, the offending car continues on its path, and the view returns to normal, focusing on the original lane.
+
+### Conclusion:
+
+The frames indicate that an accident occurs between two vehicles, specifically from a car moving into the other car's lane, causing a collision, which categorizes it as a Type B accident.
+2024-09-02T00:45:23.334392+0900 DEBUG Prompt tokens: 12308
+2024-09-02T00:45:23.334722+0900 DEBUG Completion tokens: 241
+2024-09-02T00:45:23.335025+0900 INFO Start extracting response
+2024-09-02T00:45:23.335447+0900 DEBUG Strip json response:
+2024-09-02T00:45:23.335774+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:45:23.336089+0900 INFO Processing subfolder: collages-3fps-2-3/norm/06
+2024-09-02T00:45:23.336384+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/06
+2024-09-02T00:45:23.686460+0900 DEBUG Processed 10 frames
+2024-09-02T00:45:23.686939+0900 INFO Start calling OpenAI API
+2024-09-02T00:45:39.399733+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:45:39.400212+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:45:39.400564+0900 DEBUG Completion tokens: 22
+2024-09-02T00:45:39.400894+0900 INFO Start extracting response
+2024-09-02T00:45:39.401277+0900 DEBUG Strip json response:
+2024-09-02T00:45:39.401614+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:45:39.401941+0900 INFO Processing subfolder: collages-3fps-2-3/norm/28
+2024-09-02T00:45:39.402248+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/28
+2024-09-02T00:45:39.743688+0900 DEBUG Processed 10 frames
+2024-09-02T00:45:39.744655+0900 INFO Start calling OpenAI API
+2024-09-02T00:45:55.250347+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+**Reasoning:**
+
+- **Frames 1-18:** The vehicle is moving steadily with no visible obstructions.
+- **Frames 19-24:** A car starts appearing from the left, entering the lane of the main vehicle.
+- **Frames 25-30:** The car on the left continues to move into the same lane, indicating a potential collision course.
+- **Frames 31-42:** The cars are increasingly close, suggesting an imminent crash.
+- **Frames 43-56:** The interaction between the two vehicles suggests a collision has occurred.
+
+This sequence of events fits the description of a Type B accident, where two vehicles collide.
+2024-09-02T00:45:55.250885+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:45:55.251270+0900 DEBUG Completion tokens: 156
+2024-09-02T00:45:55.251604+0900 INFO Start extracting response
+2024-09-02T00:45:55.252000+0900 DEBUG Strip json response:
+2024-09-02T00:45:55.252349+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:45:55.252687+0900 INFO Processing subfolder: collages-3fps-2-3/norm/16
+2024-09-02T00:45:55.253001+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/16
+2024-09-02T00:45:55.489933+0900 DEBUG Processed 6 frames
+2024-09-02T00:45:55.490594+0900 INFO Start calling OpenAI API
+2024-09-02T00:46:09.345424+0900 DEBUG Based on the analysis of the frames from the video:
+
+1. **Frames 1-6:** The scene begins at night with a car driving on a street. A car is parked on the left side, and a car is in front of the viewer's vehicle.
+
+2. **Frames 7-18:** The vehicle continues to move forward. Other cars can be seen further down the street.
+
+3. **Frames 19-34:** The vehicle continues along the street without any incidents. No pedestrians or collisions with other vehicles are evident.
+
+Overall, the sequence of frames does not depict any collision with a pedestrian or another vehicle.
+
+**Conclusion:** 
+- **Class:** Normal
+- **Accident_type:** None
+
+No accident is present in the frames provided.
+2024-09-02T00:46:09.345989+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:46:09.346547+0900 DEBUG Completion tokens: 154
+2024-09-02T00:46:09.347055+0900 INFO Start extracting response
+2024-09-02T00:46:09.347651+0900 ERROR Response does not contain valid JSON
+2024-09-02T00:46:09.348185+0900 ERROR Error calling OpenAI API: Response does not contain valid JSON
+2024-09-02T00:46:09.348697+0900 INFO Retrying...
+2024-09-02T00:46:10.349344+0900 INFO Start calling OpenAI API
+2024-09-02T00:46:23.468621+0900 DEBUG Based on the sequence of frames provided, I will analyze each section to determine if an accident occurs.
+
+1. **Frames 1-6**: The vehicle begins to drive down a narrow street. There's a car parked on the left; no signs of an accident.
+
+2. **Frames 7-12**: The vehicle continues moving forward. Another car is approaching slowly from the opposite direction but stays within its lane.
+
+3. **Frames 13-18**: The vehicle passes by the approaching car without incident. Both vehicles remain in their respective lanes.
+
+4. **Frames 19-24**: The road is clear, and the vehicle continues to drive straight. No signs of any potential hazards or accidents.
+
+5. **Frames 25-34**: The vehicle maintains a steady course with no obstructions. No pedestrians or other vehicles are in the vicinity.
+
+Overall, there is no evidence in these frames that indicates a collision with another vehicle or with pedestrians crossing the street. Therefore, it is classified as a "Normal" scenario.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:46:23.469128+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:46:23.469478+0900 DEBUG Completion tokens: 233
+2024-09-02T00:46:23.469797+0900 INFO Start extracting response
+2024-09-02T00:46:23.470179+0900 DEBUG Strip json response:
+2024-09-02T00:46:23.470510+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:46:23.470830+0900 INFO Processing subfolder: collages-3fps-2-3/norm/17
+2024-09-02T00:46:23.471135+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/17
+2024-09-02T00:46:23.771062+0900 DEBUG Processed 8 frames
+2024-09-02T00:46:23.771359+0900 INFO Start calling OpenAI API
+2024-09-02T00:46:35.952762+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:46:35.953300+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:46:35.953657+0900 DEBUG Completion tokens: 22
+2024-09-02T00:46:35.953984+0900 INFO Start extracting response
+2024-09-02T00:46:35.954374+0900 DEBUG Strip json response:
+2024-09-02T00:46:35.954715+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:46:35.955048+0900 INFO Processing subfolder: collages-3fps-2-3/norm/15
+2024-09-02T00:46:35.955390+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/15
+2024-09-02T00:46:36.308407+0900 DEBUG Processed 9 frames
+2024-09-02T00:46:36.308706+0900 INFO Start calling OpenAI API
+2024-09-02T00:46:51.927225+0900 DEBUG To analyze the frames systematically:
+
+1. **Frame Analysis (1-6):** The vehicle is moving steadily on a straight road, maintaining a safe distance from the car ahead.
+
+2. **Frame Analysis (7-12):** An oncoming car crosses into the opposite lane but does not make contact with the viewer's vehicle or the car it was trailing.
+
+3. **Frame Analysis (13-18):** The situation returns to normal, with the vehicle continuing to follow the car ahead without any obstacles or incidents.
+
+4. **Frame Analysis (19-24):** Again, an oncoming car briefly crosses the opposite lane but corrects the path without any collision.
+
+5. **Frame Analysis (25-30):** The vehicle continues on its path with no visible disruptions or potential hazards.
+
+6. **Frame Analysis (31-36):** An approaching car in the opposite lane moves towards the other lane but does so without any accidents occurring.
+
+7. **Frame Analysis (37-42):** Vehicles continue moving in their respective lanes without any incident.
+
+8. **Frame Analysis (43-48):** The car continues following the preceding vehicle without any abnormalities.
+
+9. **Frame Analysis (49-53):** A red car approaches, but there is no collision with the viewer’s vehicle or the car it follows.
+
+**Conclusion:** Throughout all frames, there is no collision or interaction with pedestrians; thus, no accidents have occurred. The movements observed were corrected without incident.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:46:51.927779+0900 DEBUG Prompt tokens: 10098
+2024-09-02T00:46:51.928141+0900 DEBUG Completion tokens: 321
+2024-09-02T00:46:51.928482+0900 INFO Start extracting response
+2024-09-02T00:46:51.928928+0900 DEBUG Strip json response:
+2024-09-02T00:46:51.929290+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:46:51.929636+0900 INFO Processing subfolder: collages-3fps-2-3/norm/20
+2024-09-02T00:46:51.929965+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/20
+2024-09-02T00:46:52.265283+0900 DEBUG Processed 9 frames
+2024-09-02T00:46:52.265591+0900 INFO Start calling OpenAI API
+2024-09-02T00:47:08.521912+0900 DEBUG To evaluate whether an accident occurs in the video frames, let's analyze the sequence depicted in the images:
+
+1. **Frames 1-6**: The video starts with a vehicle moving down the street; a pedestrian is seen in frame 2-3 but avoids contact, indicating no accident involving pedestrians.
+
+2. **Frames 7-24**: The vehicle continues down the street without collision. No vehicles or pedestrians are impacted.
+
+3. **Frames 25-36**: Cars are parked and the moving car continues safely down the street. There's no evident collision.
+
+4. **Frames 37-48**: The car continues further with more parked vehicles, but no collision occurs. The vehicle maintains a safe path.
+
+5. **Frames 49-53**: Similarly, the path remains clear of accidents.
+
+Based on the examination of these frames:
+- No collision with pedestrians (Type A) or other vehicles (Type B) is evident.
+
+Thus, the classification is as follows:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:47:08.522437+0900 DEBUG Prompt tokens: 10098
+2024-09-02T00:47:08.522789+0900 DEBUG Completion tokens: 222
+2024-09-02T00:47:08.523121+0900 INFO Start extracting response
+2024-09-02T00:47:08.523552+0900 DEBUG Strip json response:
+2024-09-02T00:47:08.523924+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:47:08.524269+0900 INFO Processing subfolder: collages-3fps-2-3/norm/11
+2024-09-02T00:47:08.524583+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/11
+2024-09-02T00:47:08.818796+0900 DEBUG Processed 8 frames
+2024-09-02T00:47:08.819092+0900 INFO Start calling OpenAI API
+2024-09-02T00:47:20.728826+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:47:20.729314+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:47:20.729668+0900 DEBUG Completion tokens: 22
+2024-09-02T00:47:20.729996+0900 INFO Start extracting response
+2024-09-02T00:47:20.730379+0900 DEBUG Strip json response:
+2024-09-02T00:47:20.730724+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:47:20.731055+0900 INFO Processing subfolder: collages-3fps-2-3/norm/29
+2024-09-02T00:47:20.731395+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/29
+2024-09-02T00:47:21.154579+0900 DEBUG Processed 11 frames
+2024-09-02T00:47:21.156057+0900 INFO Start calling OpenAI API
+2024-09-02T00:47:40.351971+0900 DEBUG To analyze the frames:
+
+1. **Frames 1-6:** A blue car is seen driving ahead and passing by the camera vehicle.
+2. **Frames 7-12:** The blue car continues to drive past the camera vehicle without any incident.
+3. **Frames 13-54:** The camera vehicle continues to move along the street, maintaining a safe distance from other cars.
+4. **Frames 55-62:** The vehicles continue along the road without any incidents involving crashes with pedestrians or other cars.
+
+### Conclusion:
+- The frames do not show any collision with pedestrians or other vehicles.
+- There are no signs of an accident throughout the sequence of frames.
+
+Therefore, the event can be classified as:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:47:40.352474+0900 DEBUG Prompt tokens: 12308
+2024-09-02T00:47:40.352880+0900 DEBUG Completion tokens: 166
+2024-09-02T00:47:40.353218+0900 INFO Start extracting response
+2024-09-02T00:47:40.353629+0900 DEBUG Strip json response:
+2024-09-02T00:47:40.353971+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:47:40.354306+0900 INFO Processing subfolder: collages-3fps-2-3/norm/13
+2024-09-02T00:47:40.354622+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/13
+2024-09-02T00:47:40.598249+0900 DEBUG Processed 6 frames
+2024-09-02T00:47:40.599693+0900 INFO Start calling OpenAI API
+2024-09-02T00:47:50.713669+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:47:50.714169+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:47:50.714592+0900 DEBUG Completion tokens: 22
+2024-09-02T00:47:50.714957+0900 INFO Start extracting response
+2024-09-02T00:47:50.715394+0900 DEBUG Strip json response:
+2024-09-02T00:47:50.715744+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:47:50.716178+0900 INFO Processing subfolder: collages-3fps-2-3/norm/02
+2024-09-02T00:47:50.716524+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/02
+2024-09-02T00:47:50.985288+0900 DEBUG Processed 8 frames
+2024-09-02T00:47:50.986305+0900 INFO Start calling OpenAI API
+2024-09-02T00:48:03.622557+0900 DEBUG Based on the frames provided, here's the analysis:
+
+1. **Frames 1-18:**
+   - The video shows a vehicle navigating a street at night.
+   - From frames 1 to 6, there is a vehicle approaching.
+   - By frames 7-18, the vehicle passes by without incident.
+
+2. **Frames 19-45:**
+   - The perspective continues from the driver's view with other vehicles seen ahead.
+   - Frames 31-36 show another vehicle that is moving alongside and passes without collision.
+   - Across all frames, there is no visible evidence of a collision with pedestrians or other vehicles.
+
+Conclusion: There is no accident observed in the frames.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:48:03.623068+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:48:03.623467+0900 DEBUG Completion tokens: 162
+2024-09-02T00:48:03.623824+0900 INFO Start extracting response
+2024-09-02T00:48:03.624230+0900 DEBUG Strip json response:
+2024-09-02T00:48:03.624571+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:48:03.624908+0900 INFO Processing subfolder: collages-3fps-2-3/norm/05
+2024-09-02T00:48:03.625217+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/05
+2024-09-02T00:48:04.038177+0900 DEBUG Processed 12 frames
+2024-09-02T00:48:04.039331+0900 INFO Start calling OpenAI API
+2024-09-02T00:48:29.229481+0900 DEBUG Based on the provided frames from the video, I'll analyze the situation by observing if any accidents occur:
+
+1. **Frames 1-18**: Vehicles are moving smoothly without any collisions.
+2. **Frames 19-24**: The blue van appears to be swerving slightly, but there's no impact with other vehicles.
+3. **Frames 25-30**: The path is clear, and all vehicles maintain their lanes.
+4. **Frames 31-36**: Vehicles continue driving normally without incidents.
+5. **Frames 37-42**: No collisions or sudden disruptions occur.
+6. **Frames 43-50**: Traffic remains steady and organized.
+7. **Frames 51-60**: No evidence of any accidents; traffic is flowing normally.
+8. **Frames 61-68**: Cars continue moving without any contact or crashes.
+
+Overall, there are no visible accidents in the sequence of frames. Vehicles are maintaining safe distances and lanes.
+
+Therefore, the classification is:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:48:29.229758+0900 DEBUG Prompt tokens: 13413
+2024-09-02T00:48:29.229925+0900 DEBUG Completion tokens: 227
+2024-09-02T00:48:29.230078+0900 INFO Start extracting response
+2024-09-02T00:48:29.230314+0900 DEBUG Strip json response:
+2024-09-02T00:48:29.230480+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:48:29.230638+0900 INFO Processing subfolder: collages-3fps-2-3/norm/26
+2024-09-02T00:48:29.230784+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/26
+2024-09-02T00:48:29.477371+0900 DEBUG Processed 8 frames
+2024-09-02T00:48:29.478536+0900 INFO Start calling OpenAI API
+2024-09-02T00:48:42.273177+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:48:42.273622+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:48:42.273943+0900 DEBUG Completion tokens: 22
+2024-09-02T00:48:42.274246+0900 INFO Start extracting response
+2024-09-02T00:48:42.274600+0900 DEBUG Strip json response:
+2024-09-02T00:48:42.274914+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:48:42.275240+0900 INFO Processing subfolder: collages-3fps-2-3/norm/27
+2024-09-02T00:48:42.275531+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/27
+2024-09-02T00:48:42.622268+0900 DEBUG Processed 10 frames
+2024-09-02T00:48:42.623692+0900 INFO Start calling OpenAI API
+2024-09-02T00:48:57.988126+0900 DEBUG To assess the video frames step-by-step:
+
+1. **Frames 1-12**: A black car moves from the sidewalk into the street, entering the main road.
+
+2. **Frames 13-18**: The black car crosses in front of the camera view and proceeds left towards the opposite lane.
+
+3. **Frames 19-24**: The black car is no longer visible, having completed its turn without collision.
+
+4. **Frames 25-36**: The road is clear past the intersection. No other vehicles or pedestrians visible nearing a crash.
+
+5. **Frames 37-56**: The road remains clear with no evident incidents.
+
+**Assessment**:
+- There is no collision with pedestrians (Type A) observed.
+- There is no visible collision with another vehicle (Type B).
+
+**Conclusion**:
+The sequence appears to be normal with no accidents.
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:48:57.988590+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:48:57.988914+0900 DEBUG Completion tokens: 201
+2024-09-02T00:48:57.989215+0900 INFO Start extracting response
+2024-09-02T00:48:57.989576+0900 DEBUG Strip json response:
+2024-09-02T00:48:57.989887+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:48:57.990197+0900 INFO Processing subfolder: collages-3fps-2-3/norm/03
+2024-09-02T00:48:57.990499+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/03
+2024-09-02T00:48:58.194532+0900 DEBUG Processed 8 frames
+2024-09-02T00:48:58.195796+0900 INFO Start calling OpenAI API
+2024-09-02T00:49:14.824122+0900 DEBUG First, let's analyze the frames step-by-step to identify any signs of an accident:
+
+1. **Frames 1-6**: Show the car approaching a parked vehicle with no immediate collision.
+2. **Frames 7-18**: The car continues past parked vehicles. No signs of a crash or interaction with people.
+3. **Frames 19-30**: The car drives past a red vehicle. The path is clear, and there are no signs of collision.
+4. **Frames 31-36**: The car interacts with a white vehicle but continues without hitting anything.
+5. **Frames 37-44**: The sequence shows continued driving past parked cars, with no incidents.
+
+Based on the frame analysis, no collisions with pedestrians or other vehicles occur. Thus, the event in the video is "Normal".
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:49:14.824623+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:49:14.824985+0900 DEBUG Completion tokens: 191
+2024-09-02T00:49:14.825315+0900 INFO Start extracting response
+2024-09-02T00:49:14.825710+0900 DEBUG Strip json response:
+2024-09-02T00:49:14.826057+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:49:14.826395+0900 INFO Processing subfolder: collages-3fps-2-3/norm/23
+2024-09-02T00:49:14.826708+0900 INFO Start processing frames from directory: collages-3fps-2-3/norm/23
+2024-09-02T00:49:15.011262+0900 DEBUG Processed 7 frames
+2024-09-02T00:49:15.011499+0900 INFO Start calling OpenAI API
+2024-09-02T00:49:30.706563+0900 DEBUG ```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:49:30.707058+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:49:30.707465+0900 DEBUG Completion tokens: 22
+2024-09-02T00:49:30.707795+0900 INFO Start extracting response
+2024-09-02T00:49:30.708185+0900 DEBUG Strip json response:
+2024-09-02T00:49:30.708539+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:49:30.708883+0900 INFO Processing label: ped, directory: collages-3fps-2-3/ped
+2024-09-02T00:49:30.709287+0900 INFO Processing subfolder: collages-3fps-2-3/ped/08
+2024-09-02T00:49:30.709625+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/08
+2024-09-02T00:49:31.008001+0900 DEBUG Processed 7 frames
+2024-09-02T00:49:31.008730+0900 INFO Start calling OpenAI API
+2024-09-02T00:49:45.560593+0900 DEBUG Based on the given frames:
+
+1. **Frames 1-24:** These frames show a car driving down a street at night. There is no evident incident occurring. The road is clear, and the car is moving smoothly.
+
+2. **Frames 25-27:** People are visible starting to cross the street as the car approaches the intersection.
+
+3. **Frames 28-30:** A collision occurs where the car hits the pedestrians.
+
+4. **Frames 31-41:** The aftermath of the collision is evident, with individuals visibly impacted.
+
+**Conclusion:**
+An "Accident" does occur in the video. The type of accident is **Type A**: the car crashes into people who are crossing the street.
+
+**JSON Output:**
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:49:45.560908+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:49:45.561097+0900 DEBUG Completion tokens: 175
+2024-09-02T00:49:45.561273+0900 INFO Start extracting response
+2024-09-02T00:49:45.561490+0900 DEBUG Strip json response:
+2024-09-02T00:49:45.561703+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:49:45.561886+0900 INFO Processing subfolder: collages-3fps-2-3/ped/01
+2024-09-02T00:49:45.562055+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/01
+2024-09-02T00:49:45.738676+0900 DEBUG Processed 8 frames
+2024-09-02T00:49:45.738913+0900 INFO Start calling OpenAI API
+2024-09-02T00:49:56.169647+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:49:56.170487+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:49:56.171054+0900 DEBUG Completion tokens: 23
+2024-09-02T00:49:56.171584+0900 INFO Start extracting response
+2024-09-02T00:49:56.172171+0900 DEBUG Strip json response:
+2024-09-02T00:49:56.172697+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:49:56.173173+0900 INFO Processing subfolder: collages-3fps-2-3/ped/04
+2024-09-02T00:49:56.173665+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/04
+2024-09-02T00:49:56.346508+0900 DEBUG Processed 5 frames
+2024-09-02T00:49:56.347740+0900 INFO Start calling OpenAI API
+2024-09-02T00:50:07.983414+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+``` 
+
+### Explanation:
+
+1. **Frames 1-12**: The car is moving down the street, approaching a crossing where pedestrians are gathered.
+
+2. **Frames 13-18**: Pedestrians begin to cross the street, while the car continues to move forward.
+
+3. **Frames 19-24**: A pedestrian is hit by the car, as seen when one of them lands on the hood of the vehicle.
+
+4. **Frames 25-30**: The pedestrian is on the ground in front of the car, confirming the collision.
+
+The scenario matches **Type A**: a car crashes into people who are crossing the street.
+2024-09-02T00:50:07.983902+0900 DEBUG Prompt tokens: 5678
+2024-09-02T00:50:07.984243+0900 DEBUG Completion tokens: 156
+2024-09-02T00:50:07.984559+0900 INFO Start extracting response
+2024-09-02T00:50:07.984957+0900 DEBUG Strip json response:
+2024-09-02T00:50:07.985284+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:50:07.985607+0900 INFO Processing subfolder: collages-3fps-2-3/ped/14
+2024-09-02T00:50:07.985911+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/14
+2024-09-02T00:50:08.249874+0900 DEBUG Processed 7 frames
+2024-09-02T00:50:08.250158+0900 INFO Start calling OpenAI API
+2024-09-02T00:50:29.122612+0900 DEBUG To analyze the frames step-by-step:
+
+1. **Frames 1-6:** A car is moving in a street, approaching from the left side.
+
+2. **Frames 7-24:** The car continues on an empty road with no significant events.
+
+3. **Frames 25-30:** The car approaches an intersection where pedestrians are crossing.
+
+4. **Frames 31-36:** A pedestrian is struck by the vehicle, indicating a collision.
+
+5. **Frames 37-42:** The car continues through the intersection, following the accident.
+
+Based on these observations, it appears that an accident occurred:
+
+- **Type A Accident:** The car crashes into a pedestrian who is crossing the street.
+
+The detailed reason is that the vehicle failed to stop or yield at the pedestrian crossing, resulting in a collision with the person walking across.
+
+Here is the JSON output:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:50:29.123088+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:50:29.123460+0900 DEBUG Completion tokens: 198
+2024-09-02T00:50:29.123771+0900 INFO Start extracting response
+2024-09-02T00:50:29.124141+0900 DEBUG Strip json response:
+2024-09-02T00:50:29.124454+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:50:29.124761+0900 INFO Processing subfolder: collages-3fps-2-3/ped/10
+2024-09-02T00:50:29.125047+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/10
+2024-09-02T00:50:29.396514+0900 DEBUG Processed 7 frames
+2024-09-02T00:50:29.396788+0900 INFO Start calling OpenAI API
+2024-09-02T00:50:41.032803+0900 DEBUG Based on the frames provided:
+
+1. **Initial Movement**: The sequence begins with multiple vehicles moving in a city intersection, with no immediate signs of an accident.
+
+2. **Presence of Pedestrians**: Around frames 16 to 24, pedestrians begin to cross the street.
+
+3. **Accident Observation**: In frames 25 to 30, a pedestrian is clearly struck by a car. This is evidenced by the pedestrian being lifted and coming into contact with the vehicle.
+
+4. **Type Identification**: The accident involves a car hitting pedestrians who are crossing the street.
+
+Based on the analysis of the frames:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:50:41.033078+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:50:41.033262+0900 DEBUG Completion tokens: 149
+2024-09-02T00:50:41.033421+0900 INFO Start extracting response
+2024-09-02T00:50:41.033615+0900 DEBUG Strip json response:
+2024-09-02T00:50:41.033778+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:50:41.033938+0900 INFO Processing subfolder: collages-3fps-2-3/ped/09
+2024-09-02T00:50:41.034087+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/09
+2024-09-02T00:50:41.207647+0900 DEBUG Processed 5 frames
+2024-09-02T00:50:41.207938+0900 INFO Start calling OpenAI API
+2024-09-02T00:50:53.044141+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+
+The frames show a sequence where a car approaches a crossing with pedestrians. In frames 19 to 22, a collision occurs between the car and a person crossing the street, indicating an accident of Type A, where the car crashes into people.
+2024-09-02T00:50:53.044602+0900 DEBUG Prompt tokens: 5678
+2024-09-02T00:50:53.044935+0900 DEBUG Completion tokens: 73
+2024-09-02T00:50:53.045248+0900 INFO Start extracting response
+2024-09-02T00:50:53.045618+0900 DEBUG Strip json response:
+2024-09-02T00:50:53.045939+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:50:53.046252+0900 INFO Processing subfolder: collages-3fps-2-3/ped/12
+2024-09-02T00:50:53.046551+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/12
+2024-09-02T00:50:53.277659+0900 DEBUG Processed 6 frames
+2024-09-02T00:50:53.278253+0900 INFO Start calling OpenAI API
+2024-09-02T00:51:05.568655+0900 DEBUG Let's analyze the sequence of frames to determine if there is an accident and its type:
+
+1. **Examining Frames 1-12:**
+   - The frames show a car approaching an intersection. No signs of an accident at this point.
+   
+2. **Examining Frames 13-24:**
+   - Frames 13-18: Pedestrians are visible, starting to cross the street at a crosswalk.
+   - Frames 19-24: A person is visibly impacted by the car, suggesting the occurrence of an accident involving pedestrians.
+
+3. **Examining Frames 25-36:**
+   - The sequence continues to show the pedestrians in the air, confirming the collision.
+
+From the frames, it is clear that an accident occurs where the car crashes into people who are crossing the street. Therefore, this matches **Type A**.
+
+Here’s the JSON classification:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:51:05.569174+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:51:05.569532+0900 DEBUG Completion tokens: 201
+2024-09-02T00:51:05.569900+0900 INFO Start extracting response
+2024-09-02T00:51:05.570364+0900 DEBUG Strip json response:
+2024-09-02T00:51:05.570716+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:51:05.571055+0900 INFO Processing subfolder: collages-3fps-2-3/ped/07
+2024-09-02T00:51:05.571412+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/07
+2024-09-02T00:51:05.812721+0900 DEBUG Processed 7 frames
+2024-09-02T00:51:05.813017+0900 INFO Start calling OpenAI API
+2024-09-02T00:51:19.187115+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+
+**Explanation**:
+
+1. **Observing the frames**: In frames 17 to 23, we can see people are starting to cross the street.
+2. **Collision**: From frames 24 to 38, it appears that the vehicle hits the people crossing the street.
+3. **Accident type**: The accident involves a car crashing into pedestrians, which corresponds to Type A. 
+
+Therefore, the sequence of frames indicates an "Accident" of type "A".
+2024-09-02T00:51:19.187634+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:51:19.187985+0900 DEBUG Completion tokens: 123
+2024-09-02T00:51:19.188313+0900 INFO Start extracting response
+2024-09-02T00:51:19.188704+0900 DEBUG Strip json response:
+2024-09-02T00:51:19.189039+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:51:19.189372+0900 INFO Processing subfolder: collages-3fps-2-3/ped/06
+2024-09-02T00:51:19.189686+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/06
+2024-09-02T00:51:19.536159+0900 DEBUG Processed 10 frames
+2024-09-02T00:51:19.536470+0900 INFO Start calling OpenAI API
+2024-09-02T00:51:36.961952+0900 DEBUG Based on the frames provided:
+
+1. The video starts with a street view from a car, progressing forward.
+2. Initially, the street is clear, and a white car approaches from the left (frames 13-22) but does not interfere.
+3. As the car approaches an intersection (frames 31-42), pedestrians are seen crossing the street.
+4. In frames 43-57, the car continues moving forward and collides with pedestrians crossing at the crosswalk.
+
+Conclusion:
+- An accident occurs where people are hit by the car while they are crossing the street, which classifies as Type A.
+
+Therefore, the classification and accident type is:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:51:36.962429+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:51:36.962782+0900 DEBUG Completion tokens: 157
+2024-09-02T00:51:36.963092+0900 INFO Start extracting response
+2024-09-02T00:51:36.963508+0900 DEBUG Strip json response:
+2024-09-02T00:51:36.963723+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:51:36.963900+0900 INFO Processing subfolder: collages-3fps-2-3/ped/15
+2024-09-02T00:51:36.964063+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/15
+2024-09-02T00:51:37.195544+0900 DEBUG Processed 8 frames
+2024-09-02T00:51:37.195837+0900 INFO Start calling OpenAI API
+2024-09-02T00:51:51.769094+0900 DEBUG Based on the provided frames from the video, let's analyze the sequence step-by-step to identify any accident:
+
+1. **Frames 1-12**: The car is driving down the street, and other vehicles are observed driving and parked alongside. No incident is visible.
+
+2. **Frames 13-18**: The car approaches an intersection. Traffic is present, but no collisions or dangerous interactions are seen yet.
+
+3. **Frames 19-24**: The car continues through the intersection. Pedestrians are starting to cross the street.
+
+4. **Frames 25-30**: Around frames 28-30, a vehicle is shown hitting pedestrians who are crossing the street at the crosswalk.
+
+5. **Frames 31-43**: The pedestrians have been hit by the car, confirming the accident.
+
+### Conclusion:
+
+- **Accident Detected**: Yes
+- **Type of Accident**: Type A
+- **Reason**: The car crashes into pedestrians who are crossing the street at a crosswalk.
+
+Here's the JSON response based on the analysis:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:51:51.769610+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:51:51.769961+0900 DEBUG Completion tokens: 241
+2024-09-02T00:51:51.770286+0900 INFO Start extracting response
+2024-09-02T00:51:51.770678+0900 DEBUG Strip json response:
+2024-09-02T00:51:51.771020+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:51:51.771376+0900 INFO Processing subfolder: collages-3fps-2-3/ped/11
+2024-09-02T00:51:51.771692+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/11
+2024-09-02T00:51:52.024686+0900 DEBUG Processed 7 frames
+2024-09-02T00:51:52.025453+0900 INFO Start calling OpenAI API
+2024-09-02T00:52:05.832529+0900 DEBUG To identify whether an accident occurs in these frames:
+
+1. Observe the initial frames (1-18) where vehicles are visible on the road but appear to be moving without incident.
+2. Notice frames 19-24 show a red car and yellow taxi approaching a crosswalk with pedestrians.
+3. In frames 25-30, pedestrians are in the crosswalk, and as the sequence progresses, the red car collides with them.
+4. By frame 31, the collision with pedestrians is apparent.
+
+Based on these observations, an accident does occur involving a car crashing into pedestrians. This fits the description of Accident Type A.
+
+Here's the classification:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:52:05.832887+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:52:05.833096+0900 DEBUG Completion tokens: 154
+2024-09-02T00:52:05.833290+0900 INFO Start extracting response
+2024-09-02T00:52:05.833533+0900 DEBUG Strip json response:
+2024-09-02T00:52:05.833739+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:52:05.833960+0900 INFO Processing subfolder: collages-3fps-2-3/ped/13
+2024-09-02T00:52:05.834152+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/13
+2024-09-02T00:52:06.079867+0900 DEBUG Processed 8 frames
+2024-09-02T00:52:06.081059+0900 INFO Start calling OpenAI API
+2024-09-02T00:52:20.293908+0900 DEBUG To analyze the frames step-by-step:
+
+1. **Frames 1-30:** The sequence shows a car moving on the road, with other vehicles and pedestrians visible. However, no collision occurs during these frames.
+
+2. **Frame 31:** A pedestrian is seen in the path of the car.
+
+3. **Frames 32-42:** The pedestrian impacts the hood of the car, indicating that a collision has occurred.
+
+4. **Frames 43-47:** The aftermath of the collision is visible as the pedestrian is being carried over the hood of the car.
+
+Given this sequence:
+
+- An accident occurs as a car collides with a pedestrian crossing the street.
+
+Thus, the classification of this video would be:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:52:20.294420+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:52:20.294789+0900 DEBUG Completion tokens: 168
+2024-09-02T00:52:20.295136+0900 INFO Start extracting response
+2024-09-02T00:52:20.295598+0900 DEBUG Strip json response:
+2024-09-02T00:52:20.295983+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:52:20.296344+0900 INFO Processing subfolder: collages-3fps-2-3/ped/02
+2024-09-02T00:52:20.296691+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/02
+2024-09-02T00:52:20.493726+0900 DEBUG Processed 7 frames
+2024-09-02T00:52:20.495016+0900 INFO Start calling OpenAI API
+2024-09-02T00:52:31.744758+0900 DEBUG Based on the sequence of frames provided:
+
+1. **Frames 1 to 6**: These frames show a vehicle moving along a road in the dark with visible lights from other vehicles, suggesting normal driving conditions.
+
+2. **Frames 7 to 18**: The vehicle continues on the road; no unusual activity is evident.
+
+3. **Frames 19 to 24**: There are people visible crossing the road, indicating a potential for collision with the vehicle.
+
+4. **Frames 25 to 30**: People are clearly crossing in front of the vehicle, which appears to have stopped, suggesting an interaction might have occurred.
+
+5. **Frames 31 to 37**: The scene remains dark with no further significant changes visible.
+
+Given these observations, it seems that there might have been a situation in which people were crossing the street in front of the vehicle.
+
+### Conclusion:
+- **Class**: Accident
+- **Accident_type**: A (The car potentially interacts with people crossing the street.)
+
+### Detailed Reason:
+In frames 19-24, pedestrians are visibly crossing in front of the vehicle, indicating a potential Type A accident, where the vehicle might have needed to stop or avoid the crossing pedestrians, suggesting the possibility of a collision or abrupt stop.
+2024-09-02T00:52:31.745154+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:52:31.745392+0900 DEBUG Completion tokens: 258
+2024-09-02T00:52:31.745609+0900 INFO Start extracting response
+2024-09-02T00:52:31.745847+0900 ERROR Response does not contain valid JSON
+2024-09-02T00:52:31.746068+0900 ERROR Error calling OpenAI API: Response does not contain valid JSON
+2024-09-02T00:52:31.746277+0900 INFO Retrying...
+2024-09-02T00:52:32.746634+0900 INFO Start calling OpenAI API
+2024-09-02T00:52:48.283338+0900 DEBUG Based on the frames provided, the following observations can be made:
+
+1. **Frames 1-3:** The road is visible with illuminated green lights; there's no apparent incident.
+2. **Frames 4-6:** A car appears to be visible on the side, but no collision is evident yet.
+3. **Frames 7-12:** The road is clear; no incident observed.
+4. **Frames 13-18:** The green lights continue to be visible; no change indicating an incident.
+5. **Frames 19-24:** People start to become visible crossing the street.
+6. **Frames 25-30:** People are now clearly crossing, indicating an interaction with a vehicle.
+7. **Frames 31-37:** Visibility decreases, but the earlier frames indicate a potential scenario where people could be hit.
+
+Given these observations, the classification is as follows:
+
+- **Class:** Accident
+- **Accident_type:** A (The video likely depicts a car involvement with pedestrians crossing the street.)
+
+### Explanation:
+In frames 22-25, pedestrians are clearly crossing and there's potential for them to be in the path of a vehicle. Hence, it aligns more suitably with a Type A accident.
+2024-09-02T00:52:48.283867+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:52:48.284224+0900 DEBUG Completion tokens: 246
+2024-09-02T00:52:48.284555+0900 INFO Start extracting response
+2024-09-02T00:52:48.284903+0900 ERROR Response does not contain valid JSON
+2024-09-02T00:52:48.285233+0900 ERROR Error calling OpenAI API: Response does not contain valid JSON
+2024-09-02T00:52:48.285545+0900 INFO Retrying...
+2024-09-02T00:52:50.285995+0900 INFO Start calling OpenAI API
+2024-09-02T00:53:03.025151+0900 DEBUG To determine if an accident occurs in these video frames, let's analyze the sequence of events:
+
+1. **Frames 1-6:** The frames depict a dark road with some illuminated elements, possibly lights or reflections.
+
+2. **Frames 7-18:** The vehicle continues to move smoothly along the road, with no significant changes or disturbances visible.
+
+3. **Frames 19-24:** Starting from frame 22, people appear to be crossing the street, and by frame 24, they are more prominently visible, suggesting that the vehicle may have stopped or encountered them.
+
+4. **Frames 25-37:** The individuals continue to be visible, possibly moving across the road. There are no signs of collision with a vehicle.
+
+Based on this analysis, frames show people crossing the street, but there is no visible collision between the car and the pedestrians or other vehicles. Therefore, this scenario does not clearly depict an accident according to the given types.
+
+Hence, the final classification is:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:53:03.025659+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:53:03.026052+0900 DEBUG Completion tokens: 221
+2024-09-02T00:53:03.026394+0900 INFO Start extracting response
+2024-09-02T00:53:03.026800+0900 DEBUG Strip json response:
+2024-09-02T00:53:03.027206+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:53:03.027609+0900 INFO Processing subfolder: collages-3fps-2-3/ped/05
+2024-09-02T00:53:03.027934+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/05
+2024-09-02T00:53:03.314385+0900 DEBUG Processed 8 frames
+2024-09-02T00:53:03.314689+0900 INFO Start calling OpenAI API
+2024-09-02T00:53:22.537800+0900 DEBUG To analyze the frames systematically:
+
+1. **Frames 1-12:** The video shows a car moving through a street with other vehicles and pedestrians nearby.
+2. **Frames 13-18:** The car approaches a pedestrian crossing where people are walking.
+3. **Frames 19-24:** The car does not stop and collides with a pedestrian, causing an impact.
+4. **Frames 25-43:** After the collision, the pedestrian's body is seen on the car's hood and then potentially falling off as the car proceeds.
+
+### Conclusion:
+An accident occurs in the video.
+
+**Type of Accident:**
+- **Type A:** A car crashes into people who are crossing the street.
+
+The frames illustrate a clear impact with a pedestrian crossing the road.
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:53:22.538308+0900 DEBUG Prompt tokens: 8993
+2024-09-02T00:53:22.538658+0900 DEBUG Completion tokens: 178
+2024-09-02T00:53:22.538985+0900 INFO Start extracting response
+2024-09-02T00:53:22.539425+0900 DEBUG Strip json response:
+2024-09-02T00:53:22.539776+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:53:22.540117+0900 INFO Processing subfolder: collages-3fps-2-3/ped/03
+2024-09-02T00:53:22.540433+0900 INFO Start processing frames from directory: collages-3fps-2-3/ped/03
+2024-09-02T00:53:22.758786+0900 DEBUG Processed 6 frames
+2024-09-02T00:53:22.759400+0900 INFO Start calling OpenAI API
+2024-09-02T00:53:36.766213+0900 DEBUG To determine whether an accident occurs in the video, let's analyze the sequence of frames:
+
+1. **Initial Conditions (Frames 1-6):**
+   - The video starts with a clear street view, and several cars are parked along the side.
+   - No movement of vehicles or pedestrians is perceived.
+
+2. **Progression (Frames 7-12):**
+   - The car appears to be moving forward.
+   - No pedestrians are visible in the earlier frames.
+
+3. **Pedestrian Crossing and Potential Incident (Frames 13-24):**
+   - Around frames 16-20, pedestrians start to appear on the crosswalk.
+   - By frames 21-24, it appears that the car is dangerously close to the pedestrians.
+
+4. **Incident Confirmation (Frames 25-36):**
+   - From frames 22-24, the pedestrians appear to be impacted by the vehicle.
+   - The remaining frames show pedestrians in distress.
+
+Conclusion: An accident occurs where a car crashes into people who are crossing the street.
+
+Here is the classification and detailed information:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "A"
+}
+```
+2024-09-02T00:53:36.766756+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:53:36.767279+0900 DEBUG Completion tokens: 241
+2024-09-02T00:53:36.767777+0900 INFO Start extracting response
+2024-09-02T00:53:36.768469+0900 DEBUG Strip json response:
+2024-09-02T00:53:36.769019+0900 DEBUG {'class': 'accident', 'accident_type': 'a'}
+2024-09-02T00:53:36.769532+0900 INFO Processing label: col, directory: collages-3fps-2-3/col
+2024-09-02T00:53:36.770131+0900 INFO Processing subfolder: collages-3fps-2-3/col/08
+2024-09-02T00:53:36.770633+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/08
+2024-09-02T00:53:36.946264+0900 DEBUG Processed 4 frames
+2024-09-02T00:53:36.948193+0900 INFO Start calling OpenAI API
+2024-09-02T00:53:46.951278+0900 DEBUG To determine if an accident occurs in the frames, let's analyze the sequence step-by-step:
+
+1. **Frames 1-6:** The images show a vehicle driving straight without any apparent incident. No pedestrians or cars are visibly intersecting the path.
+
+2. **Frames 7-12:** The vehicle continues moving forward. Still, there are no pedestrians crossing the street or any visible incidents with other vehicles. Everything appears normal.
+
+3. **Frames 13-18:** In these frames, it becomes evident that another vehicle (white car) is approaching from the front and appears to enter the lane of the main vehicle.
+
+4. **Frames 19-23:** The images show a close proximity between the main vehicle and the white car, indicating a collision has occurred.
+
+Based on the sequence of images:
+
+- **Class:** Accident
+- **Accident Type:** B (a car crashes with another vehicle)
+
+**Reason:** The white car moves into the lane of the main vehicle, resulting in a collision, as visible in frames 19-23.
+2024-09-02T00:53:46.951810+0900 DEBUG Prompt tokens: 4573
+2024-09-02T00:53:46.952182+0900 DEBUG Completion tokens: 212
+2024-09-02T00:53:46.952515+0900 INFO Start extracting response
+2024-09-02T00:53:46.952871+0900 ERROR Response does not contain valid JSON
+2024-09-02T00:53:46.953213+0900 ERROR Error calling OpenAI API: Response does not contain valid JSON
+2024-09-02T00:53:46.953718+0900 INFO Retrying...
+2024-09-02T00:53:47.954356+0900 INFO Start calling OpenAI API
+2024-09-02T00:53:57.133924+0900 DEBUG To analyze the frames step-by-step:
+
+1. **Frames 1-6**: A black vehicle is seen moving forward, but no accident occurs. Traffic appears normal.
+   
+2. **Frames 7-12**: The view continues forward in a straight line. No pedestrians are visible, and no collisions happen with other vehicles.
+
+3. **Frames 13-18**: A white vehicle comes into view and appears close to our vehicle. The frames show a potential collision with another car.
+
+4. **Frames 19-23**: The white car is prominently visible, suggesting a collision with our vehicle. No pedestrians are present, and the impact is with another vehicle.
+
+In summary, an accident occurs between two cars (Type B).
+
+Here's the output:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:53:57.134428+0900 DEBUG Prompt tokens: 4573
+2024-09-02T00:53:57.134781+0900 DEBUG Completion tokens: 178
+2024-09-02T00:53:57.135136+0900 INFO Start extracting response
+2024-09-02T00:53:57.135577+0900 DEBUG Strip json response:
+2024-09-02T00:53:57.135920+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:53:57.136250+0900 INFO Processing subfolder: collages-3fps-2-3/col/01
+2024-09-02T00:53:57.136565+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/01
+2024-09-02T00:53:57.341901+0900 DEBUG Processed 5 frames
+2024-09-02T00:53:57.343036+0900 INFO Start calling OpenAI API
+2024-09-02T00:54:07.578806+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+**Reasoning:**
+
+1. **Frames 1-17**: The car in front moves through a city street without any visible issues or collisions. Other vehicles are visible but maintain their lanes.
+   
+2. **Frames 18-24**: The red car begins to veer closer to the side of the camera car.
+
+3. **Frames 25-27**: A collision occurs. The red car sideswipes the vehicle from which the video is taken, indicating an accident between two vehicles.
+
+Given that no pedestrians are involved, this is identified as Type B accident.
+2024-09-02T00:54:07.579333+0900 DEBUG Prompt tokens: 5678
+2024-09-02T00:54:07.579696+0900 DEBUG Completion tokens: 142
+2024-09-02T00:54:07.580041+0900 INFO Start extracting response
+2024-09-02T00:54:07.580437+0900 DEBUG Strip json response:
+2024-09-02T00:54:07.580778+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:54:07.581121+0900 INFO Processing subfolder: collages-3fps-2-3/col/04
+2024-09-02T00:54:07.581441+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/04
+2024-09-02T00:54:07.975845+0900 DEBUG Processed 10 frames
+2024-09-02T00:54:07.977342+0900 INFO Start calling OpenAI API
+2024-09-02T00:54:25.820209+0900 DEBUG To analyze the frames:
+
+1. **Frame Sequence Review**:
+   - Frames 1 through 55 show a sequence from an initial normal traffic situation to a close incident.
+   
+2. **Observation**:
+   - In frame 9 onward, a yellow taxi attempts to merge into traffic.
+   - The taxi moves closer to the black car on the left.
+   - By frame 12, the black car and the yellow taxi have collided along the side.
+   - Following frames show the taxi brushing past the black car and eventually clearing it.
+
+3. **Accident Type Identification**:
+   - There is a side collision between two vehicles.
+   - This fits the description of **Type B**: a car crashes with another vehicle.
+
+4. **Conclusion**:
+   - An accident does occur in the video.
+   - It is categorized as a Type B accident.
+
+Here is the JSON response:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:54:25.820731+0900 DEBUG Prompt tokens: 11203
+2024-09-02T00:54:25.821084+0900 DEBUG Completion tokens: 205
+2024-09-02T00:54:25.821408+0900 INFO Start extracting response
+2024-09-02T00:54:25.821821+0900 DEBUG Strip json response:
+2024-09-02T00:54:25.822174+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:54:25.822550+0900 INFO Processing subfolder: collages-3fps-2-3/col/14
+2024-09-02T00:54:25.822885+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/14
+2024-09-02T00:54:26.094345+0900 DEBUG Processed 7 frames
+2024-09-02T00:54:26.096299+0900 INFO Start calling OpenAI API
+2024-09-02T00:54:43.292660+0900 DEBUG To determine if an accident occurs in the video, let's analyze the sequence of frames:
+
+1. **Frames 1-6:** Cars are approaching the intersection with a red traffic light. All vehicles are stopping normally.
+
+2. **Frames 7-12:** Vehicles remain stopped at the red light. There is no unusual activity or movement.
+
+3. **Frames 13-18:** Cars continue to be stationary with no indication of any disturbance.
+
+4. **Frames 19-24:** Vehicles slowly start moving, but without any evident collisions or disruptions. The white car merges safely.
+
+5. **Frames 25-30:** As the white and red cars proceed, they maintain a safe gap. There are no visible signs of any crash.
+
+6. **Frames 31-38:** The cars pass through the intersection without any incident. There is no interaction suggesting a collision between cars or with pedestrians.
+
+After reviewing each frame, the video does not display any collision or accident involving cars or pedestrians. Therefore, the conclusion is:
+
+```json
+{
+  "Class": "Normal",
+  "Accident_type": "None"
+}
+```
+2024-09-02T00:54:43.293306+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:54:43.293680+0900 DEBUG Completion tokens: 228
+2024-09-02T00:54:43.294032+0900 INFO Start extracting response
+2024-09-02T00:54:43.294461+0900 DEBUG Strip json response:
+2024-09-02T00:54:43.294843+0900 DEBUG {'class': 'normal', 'accident_type': 'none'}
+2024-09-02T00:54:43.295233+0900 INFO Processing subfolder: collages-3fps-2-3/col/10
+2024-09-02T00:54:43.295598+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/10
+2024-09-02T00:54:43.539158+0900 DEBUG Processed 6 frames
+2024-09-02T00:54:43.539468+0900 INFO Start calling OpenAI API
+2024-09-02T00:54:57.744986+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+**Reasoning:**
+
+1. **Frames Analysis:**
+   - In frames 1 to 36, the vehicles are navigating through a city street, and there is a progressive change in the cars' positions.
+   
+2. **Identifying the Incident:**
+   - In frames 29 to 36, a black car on the left side appears to be colliding with the vehicle from which the perspective is given.
+  
+3. **Classification:**
+   - Since the collision is between two vehicles, this situation falls under "Accident" and is specifically "Type B." 
+
+No pedestrians are visible in these frames, ruling out Type A accidents.
+2024-09-02T00:54:57.745464+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:54:57.745792+0900 DEBUG Completion tokens: 156
+2024-09-02T00:54:57.746098+0900 INFO Start extracting response
+2024-09-02T00:54:57.746466+0900 DEBUG Strip json response:
+2024-09-02T00:54:57.746785+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:54:57.747097+0900 INFO Processing subfolder: collages-3fps-2-3/col/09
+2024-09-02T00:54:57.747413+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/09
+2024-09-02T00:54:58.006320+0900 DEBUG Processed 7 frames
+2024-09-02T00:54:58.006952+0900 INFO Start calling OpenAI API
+2024-09-02T00:55:11.919099+0900 DEBUG To determine whether an accident occurs in the video, let's analyze the sequence of frames:
+
+1. **Initial Observation (Frames 1-12):**
+   - The street appears calm with vehicles parked on both sides.
+   - The vehicle in front seems to be in a stationary position.
+
+2. **Approaching Situation (Frames 13-24):**
+   - A car in the opposite direction begins to move toward the observing vehicle.
+   - There is still no collision visible yet.
+
+3. **Potential Collision (Frames 25-36):**
+   - The moving car from the opposite direction continues to approach the stationary vehicle.
+   - By frame 30, it is evident that the moving car is very close to the observing vehicle.
+
+4. **Collision Confirmation (Frame 37):**
+   - The final frame suggests a collision has occurred between the moving car and the stationary or observing vehicle.
+
+Given this analysis, an accident has occurred.
+
+- **Accident Type:** Type B
+- **Reason:**
+  - A moving vehicle traveling in the opposite direction collides with the front of the observing vehicle.
+
+Here's the classification in JSON format:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:55:11.919660+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:55:11.920034+0900 DEBUG Completion tokens: 253
+2024-09-02T00:55:11.920382+0900 INFO Start extracting response
+2024-09-02T00:55:11.920820+0900 DEBUG Strip json response:
+2024-09-02T00:55:11.921196+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:55:11.921560+0900 INFO Processing subfolder: collages-3fps-2-3/col/12
+2024-09-02T00:55:11.921912+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/12
+2024-09-02T00:55:12.096360+0900 DEBUG Processed 4 frames
+2024-09-02T00:55:12.097845+0900 INFO Start calling OpenAI API
+2024-09-02T00:55:23.094880+0900 DEBUG Upon reviewing the frames:
+
+1. **Frames 1-6**: Cars are parked along the street, with no signs of any interaction or collision.
+2. **Frames 7-12**: The red car moves slowly along the street, approaching the other vehicles.
+3. **Frames 13-18**: The red car continues moving, getting closer to a blue vehicle.
+4. **Frames 19-23**: The red car collides with the blue vehicle.
+
+### Conclusion
+
+- An accident occurs where the red car crashes into the blue vehicle.
+- This is classified as **Type B: a car crashes with another vehicle**.
+
+Here's the detailed JSON response:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:55:23.095446+0900 DEBUG Prompt tokens: 4573
+2024-09-02T00:55:23.095805+0900 DEBUG Completion tokens: 161
+2024-09-02T00:55:23.096134+0900 INFO Start extracting response
+2024-09-02T00:55:23.096523+0900 DEBUG Strip json response:
+2024-09-02T00:55:23.096870+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:55:23.097209+0900 INFO Processing subfolder: collages-3fps-2-3/col/07
+2024-09-02T00:55:23.097526+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/07
+2024-09-02T00:55:23.298367+0900 DEBUG Processed 5 frames
+2024-09-02T00:55:23.299587+0900 INFO Start calling OpenAI API
+2024-09-02T00:55:35.263707+0900 DEBUG Based on the frames provided:
+
+1. **Frames 1-6:** Show a normal traffic situation with cars moving through an intersection. No visible incidents.
+   
+2. **Frames 7-12:** Continue depicting vehicles moving, with no unusual activity or collisions.
+
+3. **Frames 13-18:** The red car begins to approach the path of the camera.
+
+4. **Frames 19-25:** The red car collides with the vehicle from which the camera perspective is given.
+
+From the analysis, there is a collision between two vehicles.
+
+Classification:
+- **Class:** Accident
+- **Accident_type:** B (a car crashes with another vehicle)
+
+Detailed Reason:
+A red car collides with the camera vehicle, making it a Type B accident.
+2024-09-02T00:55:35.264221+0900 DEBUG Prompt tokens: 5678
+2024-09-02T00:55:35.264573+0900 DEBUG Completion tokens: 154
+2024-09-02T00:55:35.264901+0900 INFO Start extracting response
+2024-09-02T00:55:35.265260+0900 ERROR Response does not contain valid JSON
+2024-09-02T00:55:35.265593+0900 ERROR Error calling OpenAI API: Response does not contain valid JSON
+2024-09-02T00:55:35.265906+0900 INFO Retrying...
+2024-09-02T00:55:36.266365+0900 INFO Start calling OpenAI API
+2024-09-02T00:55:46.014255+0900 DEBUG Based on the frames from the video:
+
+1. Frames 1-12 show vehicles moving normally through an intersection without any sign of collision or unusual activity.
+2. From frame 13 onward, a red car is visible approaching closely to the perspective of the camera.
+3. In frames 17-25, it is clear that the red car collides with the vehicle from the camera's perspective.
+
+Therefore, an accident occurs with the following details:
+
+- **Type of Accident:** Type B
+- **Reason:** A collision between two vehicles is evident from the frames.
+
+Here's the JSON output:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:55:46.014736+0900 DEBUG Prompt tokens: 5678
+2024-09-02T00:55:46.015071+0900 DEBUG Completion tokens: 142
+2024-09-02T00:55:46.015429+0900 INFO Start extracting response
+2024-09-02T00:55:46.015811+0900 DEBUG Strip json response:
+2024-09-02T00:55:46.016134+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:55:46.016453+0900 INFO Processing subfolder: collages-3fps-2-3/col/06
+2024-09-02T00:55:46.016751+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/06
+2024-09-02T00:55:46.180248+0900 DEBUG Processed 4 frames
+2024-09-02T00:55:46.180537+0900 INFO Start calling OpenAI API
+2024-09-02T00:55:55.548091+0900 DEBUG To determine what happens in the video frames, let's analyze them step-by-step:
+
+1. **Frames 1-6:** The vehicle is approaching an intersection. Cars are visible on the road, but no immediate signs of an accident.
+   
+2. **Frames 7-12:** The vehicle continues down the street, and there appears to be normal traffic. Still no sign of an accident involving either pedestrians or another vehicle.
+
+3. **Frames 13-20:** The vehicle approaches another black car that seems to merge into its lane. By frame 13, the cars appear to be very close. From frames 14-20, there is apparent contact between the two cars.
+
+Based on the analysis:
+- An accident occurs between two vehicles, as evident by the close contact observed from frames 13-20.
+
+Thus, the classification is "Accident," specifically Type B, where a car crashes with another vehicle. The black car merges into the lane of the vehicle capturing the frames, leading to a collision.
+
+Here is the JSON result:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:55:55.548617+0900 DEBUG Prompt tokens: 4573
+2024-09-02T00:55:55.548974+0900 DEBUG Completion tokens: 233
+2024-09-02T00:55:55.549295+0900 INFO Start extracting response
+2024-09-02T00:55:55.549681+0900 DEBUG Strip json response:
+2024-09-02T00:55:55.550020+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:55:55.550352+0900 INFO Processing subfolder: collages-3fps-2-3/col/15
+2024-09-02T00:55:55.550659+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/15
+2024-09-02T00:55:55.818398+0900 DEBUG Processed 7 frames
+2024-09-02T00:55:55.818715+0900 INFO Start calling OpenAI API
+2024-09-02T00:56:08.219688+0900 DEBUG To determine if an accident occurs in the video and to identify the type, let's analyze the frames step-by-step:
+
+1. Frames 1-18: The scene is a nighttime city street with multiple vehicles. Nothing unusual or concerning happens; vehicles maintain their lanes.
+
+2. Frames 19-30: A blue van moves into the path of the camera's vehicle. No collision is evident yet.
+
+3. Frames 31-41: A black car is now in close proximity to the vehicle with the camera. Eventually, the black car collides with the vehicle, as seen in frames 37-41.
+
+Based on this analysis:
+
+- There is a collision between two vehicles (the camera's vehicle and the black car).
+- No pedestrians are involved.
+
+Thus, an accident occurs in the video, and it can be classified as Type B (a car crashes with another vehicle).
+
+Here's the JSON response:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:56:08.220204+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:56:08.220568+0900 DEBUG Completion tokens: 205
+2024-09-02T00:56:08.220894+0900 INFO Start extracting response
+2024-09-02T00:56:08.221291+0900 DEBUG Strip json response:
+2024-09-02T00:56:08.221645+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:56:08.221985+0900 INFO Processing subfolder: collages-3fps-2-3/col/11
+2024-09-02T00:56:08.222305+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/11
+2024-09-02T00:56:08.348111+0900 DEBUG Processed 3 frames
+2024-09-02T00:56:08.348405+0900 INFO Start calling OpenAI API
+2024-09-02T00:56:16.135478+0900 DEBUG To determine if an accident occurs and its type, let's analyze the frames:
+
+1. **Frames 1-6:**
+   - A red car is moving on a road with other vehicles.
+   - A gray car begins to swerve into the path of the red car.
+
+2. **Frames 7-13:**
+   - The red car continues forward as the gray car closes in from the left.
+   - By frame 13, the red car collides with a blue vehicle on the right.
+
+Based on these observations:
+
+- An accident occurs as the red car collides with another vehicle.
+- This is classified as Type B since it involves a car crashing with another vehicle.
+
+Here is the JSON output based on this analysis:
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:56:16.135872+0900 DEBUG Prompt tokens: 3468
+2024-09-02T00:56:16.136127+0900 DEBUG Completion tokens: 173
+2024-09-02T00:56:16.136364+0900 INFO Start extracting response
+2024-09-02T00:56:16.136650+0900 DEBUG Strip json response:
+2024-09-02T00:56:16.136903+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:56:16.137152+0900 INFO Processing subfolder: collages-3fps-2-3/col/13
+2024-09-02T00:56:16.137396+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/13
+2024-09-02T00:56:16.288582+0900 DEBUG Processed 4 frames
+2024-09-02T00:56:16.288866+0900 INFO Start calling OpenAI API
+2024-09-02T00:56:25.704411+0900 DEBUG To determine if an accident occurs in the video, let's analyze the frames provided:
+
+1. **Frames 1-12:** 
+   - The vehicle proceeds down a road, passing parked cars without incidents.
+   - The path is clear, and there are no visible pedestrians.
+
+2. **Frames 13-24:** 
+   - The vehicle continues forward.
+   - Around frames 17-22, the car in front seems to slow down significantly.
+   - By frame 23, the angle of the car suggests close proximity to another vehicle, but it's not clear if there's an impact.
+
+**Analysis:**
+
+- There are no pedestrians visible in any frame, so Type A is not applicable.
+- The sequence suggests close proximity to another vehicle by frame 23, possibly indicating a rear-end collision or near-miss in the same lane. Given the indicated distance and positioning, it suggests a potential accident.
+
+**Conclusion:**
+
+Given the visual information, it suggests a rear-end collision scenario.
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+This indicates an accident occurred involving a vehicle crashing with another vehicle (Type B).
+2024-09-02T00:56:25.704926+0900 DEBUG Prompt tokens: 4573
+2024-09-02T00:56:25.705278+0900 DEBUG Completion tokens: 239
+2024-09-02T00:56:25.705605+0900 INFO Start extracting response
+2024-09-02T00:56:25.705999+0900 DEBUG Strip json response:
+2024-09-02T00:56:25.706347+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:56:25.706688+0900 INFO Processing subfolder: collages-3fps-2-3/col/02
+2024-09-02T00:56:25.707005+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/02
+2024-09-02T00:56:26.068294+0900 DEBUG Processed 11 frames
+2024-09-02T00:56:26.068584+0900 INFO Start calling OpenAI API
+2024-09-02T00:56:45.742274+0900 DEBUG To analyze the frames step-by-step:
+
+1. **Frames 1-6**: A clear street view with vehicles proceeding normally through an intersection.
+2. **Frames 7-12**: A white car speeds through the intersection, seeming to overtake the car from which the frames are captured.
+3. **Frames 13-18**: The white car weaves through traffic but does not collide with pedestrians or vehicles yet.
+4. **Frames 19-24**: Traffic continues; the white car starts to drift more aggressively, suggesting potential trouble.
+5. **Frames 25-30**: The white car gets closer to another car but avoids impact.
+6. **Frames 31-36**: The car continues through traffic without any apparent collision.
+7. **Frames 37-42**: The car maintains its path without incident.
+8. **Frames 43-48**: A potential collision course as traffic becomes denser.
+9. **Frames 49-54**: The white car maneuvers close to other vehicles, heading towards potential impact.
+10. **Frames 55-63**: A clear collision with a red vehicle occurs.
+
+Conclusion: An accident is identified.
+
+**Accident Type**: Type B - A car crashes with another vehicle.
+
+**Reason**: The white car was weaving through traffic aggressively and eventually collided with the red car as shown in the final frames.
+
+**JSON Output**:
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:56:45.742790+0900 DEBUG Prompt tokens: 12308
+2024-09-02T00:56:45.743144+0900 DEBUG Completion tokens: 316
+2024-09-02T00:56:45.743508+0900 INFO Start extracting response
+2024-09-02T00:56:45.743912+0900 DEBUG Strip json response:
+2024-09-02T00:56:45.744257+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:56:45.744597+0900 INFO Processing subfolder: collages-3fps-2-3/col/05
+2024-09-02T00:56:45.744909+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/05
+2024-09-02T00:56:46.015722+0900 DEBUG Processed 7 frames
+2024-09-02T00:56:46.016448+0900 INFO Start calling OpenAI API
+2024-09-02T00:57:01.054405+0900 DEBUG Let's analyze the frames step-by-step:
+
+1. **Frames 1-12**: Vehicles are moving along the street. A yellow taxi is visible, but traffic seems smooth and orderly.
+
+2. **Frames 13-30**: The camera continues to move forward, maintaining its lane. No collisions are evident.
+
+3. **Frames 31-36**: A red car begins to enter the path of the camera, coming from the side.
+
+4. **Frames 37-41**: The red car collides with the front of the camera’s vehicle.
+
+Given these observations, an accident does occur:
+
+- **Nature of Accident**: A collision between the camera’s vehicle and the red car.
+- **Accident Type**: Type B (a car crashes with another vehicle).
+
+```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+2024-09-02T00:57:01.054696+0900 DEBUG Prompt tokens: 7888
+2024-09-02T00:57:01.054897+0900 DEBUG Completion tokens: 183
+2024-09-02T00:57:01.055069+0900 INFO Start extracting response
+2024-09-02T00:57:01.055321+0900 DEBUG Strip json response:
+2024-09-02T00:57:01.055501+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:57:01.055669+0900 INFO Processing subfolder: collages-3fps-2-3/col/03
+2024-09-02T00:57:01.055831+0900 INFO Start processing frames from directory: collages-3fps-2-3/col/03
+2024-09-02T00:57:01.228438+0900 DEBUG Processed 6 frames
+2024-09-02T00:57:01.228731+0900 INFO Start calling OpenAI API
+2024-09-02T00:57:13.410942+0900 DEBUG ```json
+{
+  "Class": "Accident",
+  "Accident_type": "B"
+}
+```
+
+### Explanation:
+1. **Analysis of Frames**: The frames clearly show two vehicles in close proximity, with the red car moving into the path of the car capturing the video.
+2. **Progression of Events**: As the frames progress, it becomes evident that the red car collides with the front of the vehicle from which the frames are captured.
+3. **Conclusion**: This constitutes an accident between two vehicles, thus classifying it as an "Accident" of Type B (car crashes with another vehicle).
+2024-09-02T00:57:13.411470+0900 DEBUG Prompt tokens: 6783
+2024-09-02T00:57:13.411824+0900 DEBUG Completion tokens: 130
+2024-09-02T00:57:13.412147+0900 INFO Start extracting response
+2024-09-02T00:57:13.412533+0900 DEBUG Strip json response:
+2024-09-02T00:57:13.412874+0900 DEBUG {'class': 'accident', 'accident_type': 'b'}
+2024-09-02T00:57:13.430421+0900 INFO Confusion Matrix:
+2024-09-02T00:57:13.430845+0900 INFO [[23  0  7]
+ [ 1 14  0]
+ [ 1  0 14]]
+2024-09-02T00:57:13.431562+0900 INFO Classification Report:
+2024-09-02T00:57:13.431912+0900 INFO                      precision    recall  f1-score   support
+
+             Normal       0.92      0.77      0.84        30
+Pedestrian Accident       1.00      0.93      0.97        15
+          Collision       0.67      0.93      0.78        15
+
+           accuracy                           0.85        60
+          macro avg       0.86      0.88      0.86        60
+       weighted avg       0.88      0.85      0.85        60
+
+2024-09-02T00:57:13.432611+0900 DEBUG Input tokens: 505325
+2024-09-02T00:57:13.432982+0900 DEBUG Output tokens 9528
