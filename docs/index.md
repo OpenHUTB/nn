@@ -26,6 +26,8 @@ title: 主页
 
 [__支持向量机__](svm.md)
 
+[__支持向量机改进__](svm_improved.md)
+
 [__简单神经网络__](simple_nn.md)
 
 [__卷积神经网络__](CNN.md)
