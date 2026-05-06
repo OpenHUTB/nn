@@ -132,9 +132,6 @@ class MultirotorDynamicsAirsim:
                     is_rate=True, yaw_or_rate=math.degrees(self.yaw_rate_sp)
                 ),
             ).join()
-            # self.client.moveByVelocityZAsync(vx_local_sp, vy_local_sp, -self.start_position[2], self.dt,
-            #                                 drivetrain=airsim.DrivetrainType.ForwardOnly,
-            #                                 yaw_mode=airsim.YawMode(is_rate=False, yaw_or_rate=math.degrees(0))).join()
         elif len(action) == 3:
             self.client.moveByVelocityAsync(
                 vx_local_sp,
@@ -165,7 +162,6 @@ class MultirotorDynamicsAirsim:
         self.goal_position[0] = goal_x
         self.goal_position[1] = goal_y
         self.goal_position[2] = self.start_position[2]
-        # print('New goal pose: ', self.goal_position)
 
     def set_start(self, position, random_angle):
         self.start_position = position
@@ -182,10 +178,8 @@ class MultirotorDynamicsAirsim:
         rect = rect_set
         random_angle = random_angle_set
         noise = np.random.random()
-        angle = random_angle * noise - math.pi  # -pi~pi
+        angle = random_angle * noise - math.pi
         rect = [-128, -128, 128, 128]
-        # goal_x = 100*math.sin(angle)
-        # goal_y = 100*math.cos(angle)
 
         if abs(angle) == math.pi / 2:
             goal_x = 0
@@ -214,14 +208,14 @@ class MultirotorDynamicsAirsim:
         @description: 更新并获取当前无人机状态及state_norm
         @param {type}
         @return: state_norm
-                    归一化状态范围 0-255
+        归一化状态范围 0-255
         """
 
         distance = self.get_distance_to_goal_2d()
-        relative_yaw = self._get_relative_yaw()  # 返回范围为 -pi 到 pi 的相对偏航
+        relative_yaw = self._get_relative_yaw()
         relative_pose_z = (
             self.get_position()[2] - self.goal_position[2]
-        )  # 当前位置z为正值
+        )
         vertical_distance_norm = (
             relative_pose_z / self.max_vertical_difference / 2 + 0.5
         ) * 255
