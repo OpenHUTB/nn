@@ -91,25 +91,30 @@ class IntegratedDroneSimulation:
             print("[OK] 初始化 OpenCV 手势检测器")
             self.gesture_detector = CVGestureDetector()
             self.gesture_detector.use_ml = False
-        elif selected_model:
-            print(f"[INFO] 使用模型: {selected_model_name}")
-
+        elif HAS_ENHANCED_DETECTOR:
+            # 优先使用增强版检测器（MediaPipe）
             try:
                 from gesture_detector_enhanced import EnhancedGestureDetector
                 print("[OK] 导入增强版手势检测器")
 
-                # 使用实际的模型文件
-                self.gesture_detector = EnhancedGestureDetector(
-                    ml_model_path=selected_model,
-                    use_ml=True
-                )
-
-                # 验证模型是否真正加载成功
-                if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
-                    print(f"[OK] 机器学习模型加载成功 ({selected_model_name})")
-                    print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
+                if selected_model:
+                    # 使用机器学习模型
+                    self.gesture_detector = EnhancedGestureDetector(
+                        ml_model_path=selected_model,
+                        use_ml=True
+                    )
+                    print(f"[INFO] 使用模型: {selected_model_name}")
+                    
+                    # 验证模型是否真正加载成功
+                    if hasattr(self.gesture_detector, 'ml_classifier') and self.gesture_detector.ml_classifier:
+                        print(f"[OK] 机器学习模型加载成功")
+                        print(f"   可识别手势: {self.gesture_detector.ml_classifier.gesture_classes}")
+                    else:
+                        print("[WARNING] 机器学习模型未加载，使用规则检测")
+                        self.gesture_detector = EnhancedGestureDetector(use_ml=False)
                 else:
-                    print("[WARNING] 机器学习模型未加载，回退到规则检测")
+                    # 使用规则检测（不需要模型）
+                    print("[INFO] 未找到模型文件，使用规则检测")
                     self.gesture_detector = EnhancedGestureDetector(use_ml=False)
 
             except (ImportError, Exception) as e:
@@ -117,9 +122,8 @@ class IntegratedDroneSimulation:
                 print("[OK] 使用原始手势检测器")
                 from gesture_detector import GestureDetector
                 self.gesture_detector = GestureDetector()
-
         else:
-            print("[WARNING] 未找到可用的机器学习模型文件")
+            print("[WARNING] 增强版检测器不可用")
             print("[OK] 使用原始手势检测器")
             from gesture_detector import GestureDetector
             self.gesture_detector = GestureDetector()
@@ -162,6 +166,12 @@ class IntegratedDroneSimulation:
         self.control_intensity = 1.0
         self.last_command_time = time.time()
         self.command_cooldown = 1.5  # 命令冷却时间（秒），从2.0降低到1.5
+
+        # 双手控制模式
+        self.dual_hand_mode = True  # 启用双手控制模式
+        self.last_direction_command = None
+        self.last_altitude_command = None
+        self.dual_control_cooldown = 0.3  # 双手控制更新间隔（秒）
 
         # 手势识别阈值（降低以提高灵敏度）
         # 如果是机器学习模式，阈值可以进一步降低
@@ -206,28 +216,27 @@ class IntegratedDroneSimulation:
                 print("[INFO] 当前模式: 规则手势识别")
 
     def _initialize_camera(self):
-        """初始化摄像头"""
+        """初始化摄像头（恢复正常分辨率）"""
         # 尝试多个摄像头ID，优先使用1，如果失败则尝试0
-        camera_ids = [1, 0]  # 优先使用摄像头1
+        camera_ids = [1, 0]
 
         for camera_id in camera_ids:
             print(f"尝试打开摄像头 {camera_id}...")
             cap = cv2.VideoCapture(camera_id)
 
             if cap.isOpened():
-                # 设置摄像头参数
+                # 正常分辨率
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 cap.set(cv2.CAP_PROP_FPS, 30)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
                 # 尝试读取一帧测试
                 ret, test_frame = cap.read()
                 if ret:
-                    # 获取实际参数
                     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     fps = cap.get(cv2.CAP_PROP_FPS)
-
                     print(f"[OK] 摄像头 {camera_id} 初始化成功: {width}x{height} @ {fps:.1f}fps")
                     return cap
                 else:
@@ -240,7 +249,7 @@ class IntegratedDroneSimulation:
         return None
 
     def _gesture_recognition_loop(self):
-        """手势识别循环"""
+        """手势识别循环（恢复每帧检测）"""
         print("手势识别线程启动...")
 
         # 显示当前检测模式
@@ -282,28 +291,8 @@ class IntegratedDroneSimulation:
                 frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
                 cv2.putText(frame, "虚拟摄像头模式", (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                cv2.putText(frame, f"手势指令 ({mode_text}):", (50, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 100, 0), 2)
-                cv2.putText(frame, "张开手掌 - 起飞", (50, 140),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "握拳 - 降落", (50, 170),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "胜利手势 - 前进", (50, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "大拇指 - 后退", (50, 230),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "食指上指 - 上升", (50, 260),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "食指向下 - 下降", (50, 290),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "OK手势 - 悬停", (50, 320),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "大拇指向下 - 停止", (50, 350),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1)
-                cv2.putText(frame, "按 'q' 键退出", (50, 400),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
 
-            # 手势检测
+            # 每帧检测手势（流畅响应）
             try:
                 processed_frame, gesture, confidence, landmarks = \
                     self.gesture_detector.detect_gestures(frame, simulation_mode=True)
@@ -314,37 +303,30 @@ class IntegratedDroneSimulation:
                 self.gesture_confidence = confidence
                 self.hand_landmarks = landmarks
 
-                # 处理手势命令（使用降低的阈值）
+                # 处理手势命令
                 self._process_gesture_command(gesture, confidence)
 
-                # 增强界面显示
                 enhanced_frame = self._enhance_interface(processed_frame, gesture, confidence)
-
-                # 显示手势识别窗口
                 cv2.imshow('Gesture Control', enhanced_frame)
 
             except Exception as e:
                 print(f"手势检测错误: {e}")
                 self.current_frame = frame
                 self.current_gesture = None
-
-                # 增强界面显示（错误情况）
                 enhanced_frame = self._enhance_interface(frame, "error", 0.0)
                 cv2.imshow('Gesture Control', enhanced_frame)
 
-                # 检查退出
-            key = cv2.waitKey(10) & 0xFF
-            if key == ord('q') or key == 27:  # q 或 ESC 键退出
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or key == 27:
                 print("收到退出指令...")
                 self.running = False
                 break
             elif key == ord('c'):
-                # 切换摄像头功能
                 self._switch_camera()
-            elif key == ord('d'):  # 调试模式
+            elif key == ord('d'):
                 self._debug_gesture_detection()
-            elif key == ord('m'):  # 切换模式（如果有多个模型）
-                self._switch_detection_mode()
+            elif key == ord('m'):  # 切换单手/双手控制模式
+                self._toggle_dual_hand_mode()
             elif key == ord('h'):  # 显示帮助
                 self._show_help()
             elif key == ord('f'):  # 切换全屏
@@ -353,10 +335,10 @@ class IntegratedDroneSimulation:
         print("手势识别线程结束")
 
     def _enhance_interface(self, frame, gesture, confidence):
-        """增强界面显示"""
+        """增强界面显示（支持双手控制模式）"""
         # 创建一个更大的画布，包含摄像头画面和信息面板
         height, width = frame.shape[:2]
-        panel_width = 300
+        panel_width = 320
         total_width = width + panel_width
         enhanced_frame = np.ones((height, total_width, 3), dtype=np.uint8) * 20  # 深灰色背景
         
@@ -370,26 +352,104 @@ class IntegratedDroneSimulation:
         cv2.putText(enhanced_frame, "DRONE CONTROL", (width + 20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
         
+        # 显示控制模式
+        mode_color = (0, 255, 255) if self.dual_hand_mode else (150, 150, 150)
+        mode_text = "DUAL-HAND MODE" if self.dual_hand_mode else "SINGLE-HAND MODE"
+        cv2.putText(enhanced_frame, mode_text, (width + 20, 65),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, mode_color, 1)
+        
         # 显示手势信息
-        y_offset = 80
-        if gesture and gesture != "no_hand":
-            # 手势名称
-            cv2.putText(enhanced_frame, f"GESTURE: {gesture.upper()}", 
-                        (width + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-            y_offset += 30
+        y_offset = 90
+        
+        # 如果是双手模式，显示左右手分别的信息
+        if self.dual_hand_mode and isinstance(self.hand_landmarks, dict):
+            left_hand = self.hand_landmarks.get('left_hand')
+            right_hand = self.hand_landmarks.get('right_hand')
             
-            # 置信度
-            confidence_color = (0, 255, 0) if confidence > 0.7 else (0, 255, 255) if confidence > 0.5 else (0, 0, 255)
-            cv2.putText(enhanced_frame, f"CONFIDENCE: {confidence:.2f}", 
-                        (width + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, confidence_color, 1)
-            y_offset += 40
+            # 左手信息
+            if left_hand:
+                cv2.putText(enhanced_frame, "LEFT HAND (Direction)", (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                y_offset += 20
+                cv2.putText(enhanced_frame, f"Gesture: {left_hand.get('gesture', 'none')}", 
+                            (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 200, 0), 1)
+                y_offset += 18
+                
+                # 显示方向命令
+                direction_cmd = ""
+                if left_hand.get('gesture') == 'victory':
+                    direction_cmd = "FORWARD"
+                elif left_hand.get('gesture') == 'thumb_up':
+                    direction_cmd = "BACKWARD"
+                elif left_hand.get('gesture') == 'pointing_up':
+                    direction_cmd = "TURN LEFT"
+                elif left_hand.get('gesture') == 'pointing_down':
+                    direction_cmd = "TURN RIGHT"
+                    
+                if direction_cmd:
+                    cv2.putText(enhanced_frame, f"Direction: {direction_cmd}", 
+                                (width + 20, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
+                    y_offset += 18
+            else:
+                cv2.putText(enhanced_frame, "LEFT HAND: Not detected", (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+                y_offset += 38
+            
+            y_offset += 10
+            
+            # 右手信息
+            if right_hand:
+                cv2.putText(enhanced_frame, "RIGHT HAND (Altitude)", (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 128, 0), 1)
+                y_offset += 20
+                cv2.putText(enhanced_frame, f"Gesture: {right_hand.get('gesture', 'none')}", 
+                            (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 100, 0), 1)
+                y_offset += 18
+                
+                # 显示高度命令
+                altitude_cmd = ""
+                if right_hand.get('gesture') == 'pointing_up':
+                    altitude_cmd = "UP"
+                elif right_hand.get('gesture') == 'pointing_down':
+                    altitude_cmd = "DOWN"
+                elif right_hand.get('gesture') == 'ok_sign':
+                    altitude_cmd = "HOVER"
+                    
+                if altitude_cmd:
+                    cv2.putText(enhanced_frame, f"Altitude: {altitude_cmd}", 
+                                (width + 20, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 128, 0), 1)
+                    y_offset += 18
+            else:
+                cv2.putText(enhanced_frame, "RIGHT HAND: Not detected", (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (100, 100, 100), 1)
+                y_offset += 38
+            
+            y_offset += 10
+            
         else:
-            cv2.putText(enhanced_frame, "GESTURE: NO HAND", 
-                        (width + 20, y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
-            y_offset += 40
+            # 单手模式显示
+            if gesture and gesture != "no_hand":
+                # 手势名称
+                cv2.putText(enhanced_frame, f"GESTURE: {gesture.upper()}", 
+                            (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+                y_offset += 30
+                
+                # 置信度
+                confidence_color = (0, 255, 0) if confidence > 0.7 else (0, 255, 255) if confidence > 0.5 else (0, 0, 255)
+                cv2.putText(enhanced_frame, f"CONFIDENCE: {confidence:.2f}", 
+                            (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, confidence_color, 1)
+                y_offset += 40
+            else:
+                cv2.putText(enhanced_frame, "GESTURE: NO HAND", 
+                            (width + 20, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 1)
+                y_offset += 40
         
         # 显示无人机状态
         cv2.putText(enhanced_frame, "DRONE STATUS", 
@@ -405,7 +465,7 @@ class IntegratedDroneSimulation:
             f"MODE: {drone_state['mode'].upper()}",
             f"ARMED: {'YES' if drone_state['armed'] else 'NO'}",
             f"BATTERY: {drone_state['battery']:.1f}%",
-            f"ALTITUDE: {abs(drone_state['position'][2]):.2f}m"
+            f"ALTITUDE: {abs(drone_state['position'][1]):.2f}m"
         ]
         
         for info in status_info:
@@ -447,7 +507,8 @@ class IntegratedDroneSimulation:
             "C: Switch Camera",
             "D: Debug Info",
             "H: Help",
-            "F: Fullscreen"
+            "F: Fullscreen",
+            "M: Toggle Mode"
         ]
         
         for control in controls:
@@ -472,15 +533,41 @@ class IntegratedDroneSimulation:
         print("=" * 60)
         print("手势控制无人机 - 帮助信息")
         print("=" * 60)
-        print("手势指令:")
-        print("  张开手掌 - 起飞")
-        print("  握拳 - 降落")
-        print("  胜利手势 - 前进")
-        print("  大拇指 - 后退")
-        print("  食指上指 - 上升")
-        print("  食指向下 - 下降")
-        print("  OK手势 - 悬停")
-        print("  大拇指向下 - 停止")
+        
+        mode_text = "双手控制模式" if self.dual_hand_mode else "单手控制模式"
+        print(f"【当前模式: {mode_text}】")
+        print()
+        
+        if self.dual_hand_mode:
+            print("【双手控制模式】")
+            print("-" * 40)
+            print("左手控制方向:")
+            print("  胜利手势 - 前进")
+            print("  大拇指向上 - 后退")
+            print("  食指向左倾斜 - 左转")
+            print("  食指向右倾斜 - 右转")
+            print()
+            print("右手控制高度:")
+            print("  食指向下 - 上升")
+            print("  食指向下 - 下降")
+            print("  OK手势 - 悬停")
+            print()
+            print("双手通用:")
+            print("  张开手掌 - 起飞")
+            print("  握拳 - 降落")
+            print("  大拇指向下 - 停止")
+        else:
+            print("【单手控制模式】")
+            print("-" * 40)
+            print("  张开手掌 - 起飞")
+            print("  握拳 - 降落")
+            print("  胜利手势 - 前进")
+            print("  大拇指 - 后退")
+            print("  食指上指 - 上升")
+            print("  食指向下 - 下降")
+            print("  OK手势 - 悬停")
+            print("  大拇指向下 - 停止")
+        
         print("=" * 60)
         print("键盘控制:")
         print("  Q/ESC - 退出")
@@ -488,10 +575,10 @@ class IntegratedDroneSimulation:
         print("  D - 显示调试信息")
         print("  H - 显示帮助")
         print("  F - 切换全屏")
+        print("  M - 切换单手/双手模式")
         print("  R - 重置无人机位置")
         print("  T - 手动起飞")
         print("  L - 手动降落")
-        print("  H - 悬停")
         print("  S - 停止")
         print("=" * 60)
 
@@ -499,6 +586,24 @@ class IntegratedDroneSimulation:
         """切换全屏模式"""
         # 简化实现，实际需要更复杂的窗口管理
         print("全屏模式切换功能已触发")
+
+    def _toggle_dual_hand_mode(self):
+        """切换单手/双手控制模式"""
+        self.dual_hand_mode = not self.dual_hand_mode
+        mode_text = "双手控制模式" if self.dual_hand_mode else "单手控制模式"
+        print(f"\n{'='*60}")
+        print(f"已切换到: {mode_text}")
+        print(f"{'='*60}")
+        
+        if self.dual_hand_mode:
+            print("\n【双手控制模式说明】")
+            print("  左手: 胜利=前进 | 拇指向上=后退 | 食指向左=左转 | 食指向右=右转")
+            print("  右手: 食指向上=上升 | 食指向下=下降 | OK手势=悬停")
+            print("  通用: 张开手掌=起飞 | 握拳=降落 | 拇指向下=停止")
+        else:
+            print("\n【单手控制模式说明】")
+            print("  张开手掌=起飞 | 握拳=降落 | 胜利=前进 | 拇指=后退")
+            print("  食指向上=上升 | 食指向下=下降 | OK=悬停 | 拇指向下=停止")
 
     def _switch_detection_mode(self):
         """切换检测模式（如果有多个可用模型）"""
@@ -571,16 +676,81 @@ class IntegratedDroneSimulation:
               f"{self.drone_controller.state['position'][2]:.1f})")
 
     def _process_gesture_command(self, gesture, confidence):
-        """处理手势命令（支持连续手势强度控制）"""
+        """处理手势命令（支持双手控制）"""
         current_time = time.time()
 
         # 获取该手势的阈值（降低以提高识别率）
         threshold = self.gesture_thresholds.get(gesture, self.gesture_thresholds['default'])
 
+        # 检查是否是双手控制模式
+        if self.dual_hand_mode and self.hand_landmarks:
+            # 检查是否有双手数据
+            if isinstance(self.hand_landmarks, dict):
+                left_hand = self.hand_landmarks.get('left_hand')
+                right_hand = self.hand_landmarks.get('right_hand')
+
+                if left_hand or right_hand:
+                    # 使用双手控制逻辑
+                    dual_commands = self.gesture_detector.get_dual_hand_commands(
+                        left_hand, right_hand
+                    )
+
+                    # 处理特殊命令（起飞/降落/停止）
+                    if dual_commands['special_command']:
+                        special_cmd = dual_commands['special_command']
+                        if current_time - self.last_command_time >= self.command_cooldown:
+                            print(f"[双手模式] 特殊命令: {special_cmd}")
+                            self.drone_controller.send_command(special_cmd, 1.0)
+                            self.last_command_time = current_time
+                            self.last_processed_gesture = dual_commands.get(
+                                'left_gesture') or dual_commands.get('right_gesture')
+                            self.last_processed_time = current_time
+                            self.current_command = special_cmd
+                        return
+
+                    # 处理方向命令（左手）
+                    if dual_commands['direction_command']:
+                        dir_cmd = dual_commands['direction_command']
+                        dir_intensity = dual_commands['direction_intensity']
+
+                        # 检查是否需要发送新命令
+                        if (dir_cmd != self.last_direction_command or
+                            current_time - getattr(self, 'last_direction_time', 0) >= self.dual_control_cooldown):
+
+                            print(f"[左手-方向] {dual_commands['left_gesture']} -> {dir_cmd} (强度:{dir_intensity:.0%})")
+                            self.drone_controller.send_command(dir_cmd, dir_intensity)
+                            self.last_direction_command = dir_cmd
+                            self.last_direction_time = current_time
+                            self.last_command_time = current_time
+                            self.current_command = dir_cmd
+
+                    # 处理高度命令（右手）
+                    if dual_commands['altitude_command']:
+                        alt_cmd = dual_commands['altitude_command']
+                        alt_intensity = dual_commands['altitude_intensity']
+
+                        # 检查是否需要发送新命令
+                        if (alt_cmd != self.last_altitude_command or
+                            current_time - getattr(self, 'last_altitude_time', 0) >= self.dual_control_cooldown):
+
+                            print(f"[右手-高度] {dual_commands['right_gesture']} -> {alt_cmd} (强度:{alt_intensity:.0%})")
+                            self.drone_controller.send_command(alt_cmd, alt_intensity)
+                            self.last_altitude_command = alt_cmd
+                            self.last_altitude_time = current_time
+                            self.last_command_time = current_time
+                            self.current_command = alt_cmd
+
+                    # 双手同时检测时显示状态
+                    if left_hand and right_hand:
+                        pass  # 信息已在detect_gestures中显示
+
+                    return
+
+        # 如果不是双手模式或没有双手数据，使用原有单手逻辑
         # 计算手势强度（如果有手部关键点）
         intensity = 0.5
         intensity_info = None
-        if self.hand_landmarks:
+        if self.hand_landmarks and not isinstance(self.hand_landmarks, dict):
             intensity = self.gesture_detector.get_gesture_intensity(
                 self.hand_landmarks, gesture
             )
@@ -860,25 +1030,35 @@ class IntegratedDroneSimulation:
         print(f"检测模式: {mode_info}")
 
         print("系统功能:")
-        print("  1. 实时手势识别 (8种手势)")
-        print("  2. 无人机控制仿真")
-        print("  3. 3D可视化 (OpenGL渲染)")
-        print("  4. 飞行数据记录")
+        print("  1. 实时手势识别 (双手检测)")
+        print("  2. 双手控制模式（左手方向+右手高度）")
+        print("  3. 无人机控制仿真")
+        print("  4. 3D可视化 (OpenGL渲染)")
+        print("  5. 飞行数据记录")
         print("=" * 60)
-        print("手势指令:")
-        print("  张开手掌 - 起飞")
-        print("  握拳 - 降落")
+        print("【双手控制模式】(默认)")
+        print("-" * 40)
+        print("左手控制方向:")
         print("  胜利手势 - 前进")
-        print("  大拇指 - 后退")
-        print("  食指上指 - 上升")
+        print("  大拇指向上 - 后退")
+        print("  食指向左 - 左转")
+        print("  食指向右 - 右转")
+        print()
+        print("右手控制高度:")
+        print("  食指向上 - 上升")
         print("  食指向下 - 下降")
         print("  OK手势 - 悬停")
+        print()
+        print("双手通用:")
+        print("  张开手掌 - 起飞")
+        print("  握拳 - 降落")
         print("  大拇指向下 - 停止")
         print("=" * 60)
         print("使用说明:")
         print("  手势控制窗口: 按 'q' 退出")
         print("  手势控制窗口: 按 'c' 切换摄像头")
         print("  手势控制窗口: 按 'd' 显示调试信息")
+        print("  手势控制窗口: 按 'm' 切换单手/双手模式")
         print("  3D仿真窗口: 按 'ESC' 退出")
         print("  3D窗口按键控制:")
         print("    G - 切换网格显示")
@@ -890,9 +1070,9 @@ class IntegratedDroneSimulation:
         print("=" * 60)
         print("提示:")
         print("  1. 无人机初始在地面，等待手势指令")
-        print("  2. 手势识别阈值已降低，更容易触发")
-        print("  3. 做手势时保持手在摄像头中心")
-        print("  4. 每个手势保持1.5秒以上")
+        print("  2. 使用双手控制时，同时伸出左右手")
+        print("  3. 左手在屏幕左侧控制方向，右手在右侧控制高度")
+        print("  4. 按 'm' 键可切换回单手控制模式")
         print("=" * 60)
         print("系统启动中...")
 

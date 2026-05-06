@@ -1,10 +1,24 @@
-﻿import argparse
+import argparse
 import ast
 import datetime
 import logging
 import os
+import sys
 from configparser import ConfigParser
 from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _bootstrap_project_paths() -> None:
+    for path in (PROJECT_ROOT, PROJECT_ROOT / "gym_env"):
+        path_text = str(path)
+        if path_text not in sys.path:
+            sys.path.insert(0, path_text)
+
+
+_bootstrap_project_paths()
 
 import gym
 import gym_env
@@ -38,7 +52,6 @@ logger = logging.getLogger(__name__)
 if not logging.getLogger().handlers:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_BASENAME = "config_NH_center_Multirotor_3D"
 
 
@@ -154,6 +167,7 @@ class TrainingThread(QtCore.QThread):
 
         algo = self.cfg.get("options", "algo")
         logger.info("Algorithm selected: %s", algo)
+        training_device = "cpu" if algo == "PPO" and policy_name == "mlp" else "auto"
 
         resume_model_path = None
         if self.cfg.has_option("options", "resume_model_path"):
@@ -170,7 +184,7 @@ class TrainingThread(QtCore.QThread):
         if is_resume_training:
             logger.info("Resume training from model: %s", resume_model_path)
             if algo == "PPO":
-                model = PPO.load(str(resume_model_path), env=self.env, tensorboard_log=log_path, device="auto")
+                model = PPO.load(str(resume_model_path), env=self.env, tensorboard_log=log_path, device=training_device)
             elif algo == "SAC":
                 model = SAC.load(str(resume_model_path), env=self.env, tensorboard_log=log_path, device="auto")
             elif algo == "TD3":
@@ -207,6 +221,7 @@ class TrainingThread(QtCore.QThread):
                     learning_rate=self.cfg.getfloat("DRL", "learning_rate"),
                     policy_kwargs=policy_kwargs,
                     tensorboard_log=log_path,
+                    device=training_device,
                     seed=0,
                     verbose=2,
                 )
@@ -253,6 +268,7 @@ class TrainingThread(QtCore.QThread):
             else:
                 raise ValueError(f"Invalid algo name: {algo}")
 
+        logger.info("Training device: %s", getattr(model, "device", "unknown"))
         logger.info("Start training model")
         total_timesteps = self.cfg.getint("options", "total_timesteps")
         reset_num_timesteps = not is_resume_training

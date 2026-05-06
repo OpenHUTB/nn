@@ -1,188 +1,279 @@
 """
-简单实现动态障碍车超车
+动态避障超车脚本 (最终修复版)
+1. 修复障碍物生成：确保生成在主车正前方
+2. 修复视角抖动：引入平滑插值
+3. 修复车道偏离：优化纯追踪算法与边界检查
 """
 
 import carla
 import time
 import math
+import random
 
+# --- 全局配置 ---
+TARGET_FPS = 60
+DT = 1.0 / TARGET_FPS
+AVOIDANCE_SPEED = 15.0  # 避障时的速度 (m/s)
 
+# --- 全局变量 ---
 actor_list = []
-collision_flag = False  # 添加全局变量
-is_avoiding = False  # 全局状态标记
-target_lane = None   # 目标车道点
+collision_flag = False
+is_avoiding = False
+avoidance_stage = 0  # 0:正常, 1:变道, 2:直行超车, 3:回归
+target_waypoint = None
+original_lane_id = None
+stuck_timer = 0
 
-
-# 在碰撞回调中强制刹车
-def callback(event):
+# --- 传感器回调 ---
+def on_collision(event):
     global collision_flag
     if not collision_flag:
-        vehicle.apply_control(carla.VehicleControl(brake=1.0))  # 紧急制动
+        print(f"⚠️ 碰撞! 强度: {event.normal_impulse}")
         collision_flag = True
-        print("碰撞！")
+        vehicle.apply_control(carla.VehicleControl(brake=1.0))
 
-# 车道偏离回调
-def callback2(event):
-    print("穿越车道!")
+def on_lane_invasion(event):
+    # 仅在非避障阶段报警
+    if not is_avoiding:
+        lane_types = [x.lane_type for x in event.crossed_lane_markings]
+        print(f"⚠️ 意外偏离车道! 类型: {lane_types}")
 
-
-def spawn_obstacles(world, blueprint_library, vehicle, num_obstacles=2, distance=30.0):
+# --- 核心算法 ---
+def pure_pursuit(target_loc, vehicle_transform, lookahead_distance=10.0):
     """
-    在主循环开始前，生成障碍物，确保障碍物在主车前方
+    优化的纯追踪算法
+    """
+    L = 2.875  # 轴距
+    v_loc = vehicle_transform.location
+    v_rot = vehicle_transform.rotation
+    yaw = math.radians(v_rot.yaw)
+
+    # 1. 计算后轴中心
+    rear_x = v_loc.x - (L / 2) * math.cos(yaw)
+    rear_y = v_loc.y - (L / 2) * math.sin(yaw)
+
+    # 2. 计算目标向量
+    dx = target_loc.x - rear_x
+    dy = target_loc.y - rear_y
+    ld = math.sqrt(dx**2 + dy**2)
+
+    if ld < 0.5: # 距离太近，停止转向
+        return 0.0
+
+    # 3. 计算夹角
+    alpha = math.atan2(dy, dx) - yaw
+    # 归一化角度到 -pi ~ pi
+    alpha = math.atan2(math.sin(alpha), math.cos(alpha))
+
+    # 4. 计算曲率 (引入死区防止抖动)
+    delta = math.atan2(2 * L * math.sin(alpha), ld)
+    steer = math.degrees(delta) / 90.0
+
+    # 死区处理：如果转角很小，直接回正，防止画龙
+    if abs(steer) < 0.05:
+        steer = 0.0
+
+    return max(-1.0, min(1.0, steer))
+
+def spawn_obstacles_ahead(world, blueprint_library, vehicle, count=2, distance=25.0):
+    """
+    强制在主车正前方生成障碍物
     """
     obstacles = []
-    vehicle_transform = vehicle.get_transform()
-    vehicle_location = vehicle_transform.location
-    vehicle_yaw = vehicle_transform.rotation.yaw  # 车辆的朝向（Yaw角）
-    offset_ys = [3.0, 7] * num_obstacles
-    # 障碍物的位置偏移：根据车辆的朝向（Yaw角）计算障碍物的生成位置
-    for i in range(num_obstacles):
-        offset_x = distance + i * 10.0  # 障碍物距离主车的偏移
-        offset_y = offset_ys[i] # 障碍物的侧向偏移量
-        # 计算障碍物的实际位置
-        obstacle_x = vehicle_location.x + offset_x
-        obstacle_y = vehicle_location.y + offset_y
-        print(math.radians(vehicle_yaw))
-        # 生成障碍物的spawn point
-        spawn_point = carla.Transform(carla.Location(x=obstacle_x, y=obstacle_y, z=0.5))  # 设置Z轴为0.3，避免地面生成
-        obstacle_bp = blueprint_library.filter('vehicle.*')[0]  # 障碍物类型为车辆
-        print(spawn_point.location)
-        obstacle = world.spawn_actor(obstacle_bp, spawn_point)  # 在指定位置生成障碍物
-        obstacle.apply_control(carla.VehicleControl(throttle=0.15 * (i + 1), steer=0.0))
-        actor_list.append(obstacle)  # 将障碍物添加到actor_list
-        obstacles.append(obstacle)  # 将障碍物添加到障碍物列表
+    v_trans = vehicle.get_transform()
+    v_loc = v_trans.location
+    v_forward = v_trans.get_forward_vector() # 获取车头朝向向量
+
+    # 获取车辆蓝图
+    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
+
+    for i in range(count):
+        # 计算生成位置：当前位置 + 朝向向量 * 距离
+        # 稍微增加一点侧向偏移，避免完全重叠导致物理爆炸
+        offset_dist = distance + (i * 6.0)
+        spawn_x = v_loc.x + v_forward.x * offset_dist
+        spawn_y = v_loc.y + v_forward.y * offset_dist
+        spawn_z = v_loc.z + 0.5 # 保持Z轴一致
+
+        spawn_location = carla.Location(spawn_x, spawn_y, spawn_z)
+
+        # 尝试将障碍物吸附到最近的车道中心（防止生成在路肩）
+        map = world.get_map()
+        waypoint = map.get_waypoint(spawn_location, project_to_road=True)
+
+        final_transform = carla.Transform(spawn_location, v_trans.rotation)
+        if waypoint:
+            final_transform = carla.Transform(waypoint.transform.location, waypoint.transform.rotation)
+
+        try:
+            obs = world.try_spawn_actor(vehicle_bp, final_transform)
+            if obs:
+                # 关键：强制障碍物刹车或极低速，模拟路障
+                obs.set_autopilot(False)
+                obs.apply_control(carla.VehicleControl(brake=1.0))
+                actor_list.append(obs)
+                obstacles.append(obs)
+                print(f"✅ 障碍物 {i+1} 已生成在正前方 {offset_dist:.1f}米处")
+        except Exception as e:
+            print(f"❌ 障碍物生成失败: {e}")
 
     return obstacles
 
-
-def pure_pursuit(tar_location, v_transform):
-    L = 2.875  # 汽车轴距
-    yaw = v_transform.rotation.yaw * (math.pi / 180)  # 汽车航向角
-    # 计算汽车后轮位置
-    x = v_transform.location.x - L / 2 * math.cos(yaw)
-    y = v_transform.location.y - L / 2 * math.sin(yaw)
-    # 计算x, y方向上的距离
-    dx = tar_location.x - x
-    dy = tar_location.y - y
-    ld = math.sqrt(dx ** 2 + dy ** 2)
-    alpha = math.atan2(dy, dx) - yaw
-    # 最优转角公式：tan(delta) = (2L sin(alpha)) / ld
-    delta = math.atan(2 * math.sin(alpha) * L / ld) * 180 / math.pi
-    steer = delta / 90
-    if steer > 1:
-        steer = 1
-    elif steer < -1:
-        steer = -1
-    return steer
-
-def destroy_actor(world, actor):
-    """
-    安全销毁Carla Actor，处理控制器
-    """
-    # 处理车辆
-    if 'vehicle' in actor.type_id:
-        actor.set_autopilot(False)  # 禁用autopilot
-    # 处理行人
-    if 'walker' in actor.type_id and hasattr(actor, 'controller'):
-        actor.controller.stop()  # 停止控制器
-        world.try_destroy_actor(actor.controller)  # 销毁控制器
-    # 销毁Actor
-    actor.destroy()
-
-def get_new_lane(current_waypoint):
-    right_lane = current_waypoint.get_right_lane()
-    if right_lane and (right_lane.lane_type & carla.LaneType.Driving):
-        return right_lane
-    left_lane = current_waypoint.get_left_lane()
-    if left_lane and (left_lane.lane_type & carla.LaneType.Driving):
-        return left_lane
-    return None
-
-
+# --- 主程序 ---
 try:
     client = carla.Client('localhost', 2000)
-    client.set_timeout(5.0)
+    client.set_timeout(10.0)
     world = client.get_world()
-
-    map = world.get_map()
     blueprint_library = world.get_blueprint_library()
+    map = world.get_map()
 
-    # 生成主车
-    v_bp = blueprint_library.filter("model3")[0]
-    spawn_points = world.get_map().get_spawn_points()
-    location = carla.Location(x=-48.73557, y=-46.606361, z=0.275307)
-    rotation = carla.Rotation(yaw=0)
-    spawn_point = carla.Transform(location, rotation)
-    vehicle = world.spawn_actor(v_bp, spawn_point)
+    # 1. 生成主车
+    spawn_points = map.get_spawn_points()
+    start_spawn = random.choice(spawn_points)
+    vehicle_bp = blueprint_library.find('vehicle.tesla.model3')
+    vehicle = world.spawn_actor(vehicle_bp, start_spawn)
     actor_list.append(vehicle)
+    print(f"🚗 主车生成: {start_spawn.location}")
 
-    # 传感器collision_detector设置
-    blueprint_collisionDetector = blueprint_library.find('sensor.other.collision')
-    transform = carla.Transform(carla.Location(x=0.8, z=1.7))
-    sensor_collision = world.spawn_actor(blueprint_collisionDetector, transform, attach_to=vehicle)
-    actor_list.append(sensor_collision)
-    sensor_collision.listen(callback)
+    # 2. 传感器
+    collision_bp = blueprint_library.find('sensor.other.collision')
+    sensor_col = world.spawn_actor(collision_bp, carla.Transform(), attach_to=vehicle)
+    sensor_col.listen(on_collision)
+    actor_list.append(sensor_col)
 
-    # 传感器lane_invasion设置
-    blueprint_lane_invasion = blueprint_library.find('sensor.other.lane_invasion')
-    transform = carla.Transform(carla.Location(x=0.8, z=1.7))
-    sensor_lane_invasion = world.spawn_actor(blueprint_lane_invasion, transform, attach_to=vehicle)
-    actor_list.append(sensor_lane_invasion)
-    sensor_lane_invasion.listen(callback2)
+    lane_inv_bp = blueprint_library.find('sensor.other.lane_invasion')
+    sensor_lane = world.spawn_actor(lane_inv_bp, carla.Transform(), attach_to=vehicle)
+    sensor_lane.listen(on_lane_invasion)
+    actor_list.append(sensor_lane)
 
-    # 在主循环开始之前生成3-4辆障碍车，并确保它们位于主车前方
-    obstacles = spawn_obstacles(world, blueprint_library, vehicle, num_obstacles=2, distance=20.0)
+    # 3. 生成障碍物 (关键修复)
+    obstacles = spawn_obstacles_ahead(world, blueprint_library, vehicle, count=2, distance=20.0)
 
+    # 4. 启动
     vehicle.set_autopilot(True)
-    time.sleep(2)  # 等autopilot启动车辆
+    time.sleep(1) # 等待车辆启动
 
-    stuck_timer = 0  # 停滞计时器
+    print("🚀 模拟开始...")
+
     while True:
-        # 视角设置
-        vehicle_transform = vehicle.get_transform()
-        spectator = world.get_spectator()
-        offset = carla.Location(x=-6.0, z=2.5)  # 车辆后方 6 米，高度 2.5 米
-        spectator.set_transform(carla.Transform(
-            vehicle_transform.location + vehicle_transform.get_forward_vector() * offset.x + offset,
-            vehicle_transform.rotation
+        # --- 视角控制 (平滑插值) ---
+        v_trans = vehicle.get_transform()
+        v_loc = v_trans.location
+        v_rot = v_trans.rotation
+
+        # 目标摄像机位置：车后8米，高4米
+        target_cam_loc = v_loc + v_trans.get_forward_vector() * -8.0
+        target_cam_loc.z += 4.0
+
+        # 目标旋转：始终看向车辆
+        target_cam_rot = carla.Rotation(pitch=-15, yaw=v_rot.yaw)
+
+        # 获取当前摄像机状态并插值 (0.1是平滑系数)
+        current_spec = world.get_spectator().get_transform()
+
+        # 简单的线性插值
+        smooth_x = current_spec.location.x + (target_cam_loc.x - current_spec.location.x) * 0.1
+        smooth_y = current_spec.location.y + (target_cam_loc.y - current_spec.location.y) * 0.1
+        smooth_z = current_spec.location.z + (target_cam_loc.z - current_spec.location.z) * 0.1
+
+        # yaw角插值需要处理360度跳变，这里简化处理
+        smooth_yaw = v_rot.yaw
+
+        world.get_spectator().set_transform(carla.Transform(
+            carla.Location(smooth_x, smooth_y, smooth_z),
+            carla.Rotation(pitch=-15, yaw=smooth_yaw)
         ))
 
+        # --- 避障逻辑 ---
         velocity = vehicle.get_velocity()
-        speed = math.sqrt(velocity.x ** 2 + velocity.y ** 2 + velocity.z ** 2)  # 计算速度大小
-        if not is_avoiding:
-            if speed < 2.5:
-                stuck_timer += 1
-                if stuck_timer > 5:  # 车速过慢超过 0.02 * 5 = 0.1 秒，触发避障
-                    print("前方障碍！")
-                    current_waypoint = map.get_waypoint(vehicle.get_transform().location)
-                    target_lane = get_new_lane(current_waypoint)
-                    if target_lane:
-                        print("开始绕行")
-                        vehicle.set_autopilot(False)
-                        is_avoiding = True
-                        stuck_timer = 0
-                    else:
-                        print("无可用车道，紧急停车！")
-                        vehicle.apply_control(carla.VehicleControl(brake=1.0))
-        else:
-            # 持续跟踪目标车道点
-            steer = pure_pursuit(target_lane.transform.location, vehicle.get_transform())
-            vehicle.apply_control(carla.VehicleControl(throttle=0.4, steer=steer))
-            # 检测是否到达目标车道
-            current_loc = vehicle.get_location()
-            target_distance = current_loc.distance(target_lane.transform.location)
-            current_waypoint = map.get_waypoint(current_loc)
-            # 条件1：距离目标点<1米 或 条件2：已进入右侧车道
-            if target_distance < 1.0 or current_waypoint.lane_id == target_lane.lane_id:
-                print("绕行完成，恢复正常行驶")
-                vehicle.set_autopilot(True)
-                is_avoiding = False
-                target_lane = None
+        speed = math.sqrt(velocity.x**2 + velocity.y**2 + velocity.z**2)
+        current_waypoint = map.get_waypoint(vehicle.get_location())
 
-        time.sleep(0.02) # 控制循环频率
+        if not is_avoiding:
+            # 阶段 0: 正常行驶
+            if speed < 1.5: # 阈值调低，防止误判
+                stuck_timer += 1
+            else:
+                stuck_timer = 0
+
+            if stuck_timer > 15: # 持续低速约0.3秒
+                print("🚧 检测到前方障碍，准备变道...")
+                original_lane_id = current_waypoint.lane_id
+
+                # 寻找相邻车道
+                target_waypoint = current_waypoint.get_left_lane()
+                direction = "左"
+                if not target_waypoint or target_waypoint.lane_type != carla.LaneType.Driving:
+                    target_waypoint = current_waypoint.get_right_lane()
+                    direction = "右"
+
+                # 边界检查：确保目标车道存在且是行车道
+                if target_waypoint and target_waypoint.lane_type == carla.LaneType.Driving:
+                    is_avoiding = True
+                    avoidance_stage = 1
+                    vehicle.set_autopilot(False)
+                    print(f"👉 向{direction}变道")
+                else:
+                    print("❌ 无路可走，紧急停车")
+                    vehicle.apply_control(carla.VehicleControl(brake=1.0))
+                    stuck_timer = 0
+
+        else:
+            # 阶段 1, 2, 3: 手动控制
+            if avoidance_stage == 1:
+                # 变道阶段
+                if target_waypoint:
+                    # 目标点：目标车道前方15米
+                    next_wp = target_waypoint.next(15.0)
+                    if next_wp:
+                        steer = pure_pursuit(next_wp[0].transform.location, v_trans)
+                        vehicle.apply_control(carla.VehicleControl(throttle=0.5, steer=steer))
+
+                        # 判断变道完成：进入目标车道
+                        if current_waypoint.lane_id == target_waypoint.lane_id:
+                            print("✅ 变道完成，加速超车")
+                            avoidance_stage = 2
+                            super_timer = time.time()
+
+            elif avoidance_stage == 2:
+                # 超车直行阶段
+                vehicle.apply_control(carla.VehicleControl(throttle=0.5, steer=0.0))
+                # 超车持续3秒
+                if time.time() - super_timer > 3.0:
+                    print("🔙 准备回归")
+                    avoidance_stage = 3
+
+            elif avoidance_stage == 3:
+                # 回归阶段
+                if original_lane_id:
+                    # 寻找回原车道的路点
+                    return_wp = None
+                    if original_lane_id > current_waypoint.lane_id:
+                        return_wp = current_waypoint.get_right_lane()
+                    else:
+                        return_wp = current_waypoint.get_left_lane()
+
+                    if return_wp and return_wp.lane_id == original_lane_id:
+                        next_wp = return_wp.next(10.0)
+                        if next_wp:
+                            steer = pure_pursuit(next_wp[0].transform.location, v_trans)
+                            vehicle.apply_control(carla.VehicleControl(throttle=0.5, steer=steer))
+
+                            # 回归完成
+                            if current_waypoint.lane_id == original_lane_id:
+                                print("🏁 回归完成")
+                                is_avoiding = False
+                                vehicle.set_autopilot(True)
+                                original_lane_id = None
+
+        time.sleep(DT)
+
+except Exception as e:
+    print(f"❌ 错误: {e}")
 
 finally:
-    # 安全销毁所有Actor
+    print("\n🧹 清理环境...")
     for actor in actor_list:
-        destroy_actor(world, actor)
-    print("程序结束，所有Actor已销毁")
+        if actor is not None:
+            actor.destroy()
+    print("✅ 结束")

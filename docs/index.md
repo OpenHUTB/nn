@@ -52,6 +52,10 @@ title: 主页
 [__跟踪__](#tracking) 
 [__路径追踪__](./test.md)
 
+[__交通标识检测__](./traffic_sign_detection/README.md) - 目标检测
+
+[__td3_carracing__](./td3_carracing/README.md) - 基于 TD3 + CNN 的 CarRacing 强化学习自动驾驶系统
+
 ## 规划 <span id="planning"></span>
 
 [__导航__](#navigation)

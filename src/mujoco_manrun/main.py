@@ -309,26 +309,41 @@ class HumanoidStabilizer:
                 np.float64
             )
 
+        self._qpos_adr = np.empty(self.num_joints, dtype=np.int32)
+        self._qvel_adr = np.empty(self.num_joints, dtype=np.int32)
+        for joint_name in self.joint_names:
+            joint_idx = self.joint_name_to_idx[joint_name]
+            joint_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, joint_name)
+            if joint_id < 0:
+                raise RuntimeError(f"未找到关节：{joint_name}")
+            self._qpos_adr[joint_idx] = int(self.model.jnt_qposadr[joint_id])
+            self._qvel_adr[joint_idx] = int(self.model.jnt_dofadr[joint_id])
+
         # PD控制增益（原有逻辑保留，新增动态增益系数）
-        self.kp_roll = 120.0
-        self.kd_roll = 40.0
-        self.kp_pitch = 100.0
-        self.kd_pitch = 35.0
-        self.kp_yaw = 30.0
-        self.kd_yaw = 15.0
-        self.base_kp_hip = 250.0  # 基础KP（新增）
-        self.base_kd_hip = 45.0  # 基础KD（新增）
-        self.base_kp_knee = 280.0
-        self.base_kd_knee = 50.0
-        self.base_kp_ankle = 200.0
-        self.base_kd_ankle = 60.0
-        self.kp_waist = 40.0
-        self.kd_waist = 20.0
+        # 关节控制增益（根据生物学原理调整，提升步态自然性和稳定性）
+        self.kp_roll = 350.0
+        self.kd_roll = 90.0
+        self.kp_pitch = 300.0
+        self.kd_pitch = 80.0
+        self.kp_yaw = 60.0
+        self.kd_yaw = 30.0
+
+        # 髋、膝盖、脚踝大幅加固
+        self.base_kp_hip = 320.0
+        self.base_kd_hip = 65.0
+        self.base_kp_knee = 300.0
+        self.base_kd_knee = 60.0
+        # 脚踝拉满，专治左右摇晃
+        self.base_kp_ankle = 400.0
+        self.base_kd_ankle = 100.0
+
+        self.kp_waist = 60.0
+        self.kd_waist = 30.0
         self.kp_arm = 20.0
         self.kd_arm = 20.0
 
         # 重心目标（原有逻辑保留，新增重心保护参数）
-        self.com_target = np.array([0.05, 0.0, 0.78])
+        self.com_target = np.array([0.08, 0.0, 0.78])
         self.kp_com = 50.0
         self.total_mass = float(np.sum(self.model.body_mass))
         self.weight = float(self.total_mass * abs(float(self.model.opt.gravity[2])))
@@ -336,6 +351,10 @@ class HumanoidStabilizer:
         self._force_factor_norm = float(max(1.0, 0.5 * self.weight))
         self.com_safety_threshold = 0.6  # 重心z轴安全阈值（新增）
         self.speed_reduction_factor = 0.5  # 重心过低时的降速系数（新增）
+        self._support_body_id = int(mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "pelvis"))
+        if self._support_body_id < 0:
+            self._support_body_id = 0
+        self._support_until = 0.0
 
         self._left_foot_geom_ids = {
             mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "foot1_left"),
@@ -354,7 +373,7 @@ class HumanoidStabilizer:
         self.integral_roll = 0.0
         self.integral_pitch = 0.0
         self.integral_limit = 0.15
-        self.filter_alpha = 0.1  # 低通滤波系数（新增，0.1=更平滑）
+        self.filter_alpha = 0.06  # 低通滤波系数（新增，0.1=更平滑）
         self.enable_robust_optim = True  # 鲁棒优化开关（新增，默认启用）
 
         # ===================== 新增：多步态模式配置 =====================
@@ -461,6 +480,12 @@ class HumanoidStabilizer:
             return True
         return False
 
+    def _get_joint_positions(self):
+        return self.data.qpos[self._qpos_adr].astype(np.float64, copy=True)
+
+    def _get_joint_velocities(self):
+        return self.data.qvel[self._qvel_adr].astype(np.float64, copy=True)
+
     def _torques_to_ctrl(self, joint_torques):
         ctrl = np.zeros(self.model.nu, dtype=np.float64)
         for joint_name in self.joint_names:
@@ -505,11 +530,11 @@ class HumanoidStabilizer:
         self.left_leg_cpg.reset()
 
     def _init_stable_pose(self):
-        """初始化稳定姿态（原有逻辑完全保留）"""
+        # """初始化稳定姿态（原有逻辑完全保留）"""
         keep_time = float(self.data.time)
         mujoco.mj_resetData(self.model, self.data)
         self.data.time = keep_time
-        self.data.qpos[2] = 1.282
+        self.data.qpos[2] = 0.72
         self.data.qpos[3:7] = [1.0, 0.0, 0.0, 0.0]
         self.data.qvel[:] = 0.0
         self.data.xfrc_applied[:] = 0.0
@@ -529,17 +554,17 @@ class HumanoidStabilizer:
         # 右腿关节
         self.joint_targets[self.joint_name_to_idx["hip_x_right"]] = 0.0
         self.joint_targets[self.joint_name_to_idx["hip_z_right"]] = 0.0
-        self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.1
-        self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.4
-        self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.05
+        self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.70
+        self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.10
         self.joint_targets[self.joint_name_to_idx["ankle_x_right"]] = 0.0
 
         # 左腿关节
         self.joint_targets[self.joint_name_to_idx["hip_x_left"]] = 0.0
         self.joint_targets[self.joint_name_to_idx["hip_z_left"]] = 0.0
-        self.joint_targets[self.joint_name_to_idx["hip_y_left"]] = 0.1
-        self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.4
-        self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.0
+        self.joint_targets[self.joint_name_to_idx["hip_y_left"]] = 0.05
+        self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.70
+        self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.10
         self.joint_targets[self.joint_name_to_idx["ankle_x_left"]] = 0.0
 
         # 手臂关节
@@ -551,8 +576,24 @@ class HumanoidStabilizer:
         self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.5
         self.prev_joint_targets = self.joint_targets.copy()
 
-        self.data.qpos[7:7 + self.num_joints] = self.joint_targets.astype(np.float64)
+        self.data.qpos[self._qpos_adr] = self.joint_targets.astype(np.float64)
         mujoco.mj_forward(self.model, self.data)
+        target_clearance = 0.002
+        min_bottom_z = None
+        foot_geom_ids = list(self._left_foot_geom_ids | self._right_foot_geom_ids)
+        for gid in foot_geom_ids:
+            if gid < 0:
+                continue
+            radius = float(self.model.geom_size[gid, 0])
+            z = float(self.data.geom_xpos[gid, 2]) - radius
+            if min_bottom_z is None or z < min_bottom_z:
+                min_bottom_z = z
+        if min_bottom_z is not None:
+            dz = (min_bottom_z - target_clearance)
+            if abs(dz) > 1e-6:
+                self.data.qpos[2] -= dz
+                mujoco.mj_forward(self.model, self.data)
+        self._support_until = float(self.data.time) + 3.0
 
     # ===================== 传感器模拟相关方法（原有新增逻辑保留） =====================
     def _simulate_imu_data(self):
@@ -684,13 +725,51 @@ class HumanoidStabilizer:
         print("==================\n")
 
     # 状态机方法（WALK状态适配多步态模式）
+    # ===================== 站立状态：维持初始稳定姿态，CPG重置 =====================
+        #  【修正版】标准直立站立状态   躯干完全挺直，不弯腰不后仰；双腿对称伸直，脚掌放平贴地。
     def _state_stand(self):
-        """站立状态：维持初始稳定姿态，CPG重置"""
+        # 站立状态：完全固定姿态，只允许身体转向
         self.right_leg_cpg.reset()
         self.left_leg_cpg.reset()
+        self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = self.turn_angle * 0.8
+        # self.right_leg_cpg.reset()
+        # self.left_leg_cpg.reset()
+
+        # # 1. 躯干/腰部：强制挺直，不弯腰、不后仰
+        # self.joint_targets[self.joint_name_to_idx["abdomen_z"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["abdomen_y"]] = 0.0  # 关键：设为0，不弯腰
+        # self.joint_targets[self.joint_name_to_idx["abdomen_x"]] = 0.0
+
+        # # 2. 右腿：标准直立站姿（膝盖微屈、脚踝放平）
+        # self.joint_targets[self.joint_name_to_idx["hip_x_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_z_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_y_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["knee_right"]] = -0.70
+        # self.joint_targets[self.joint_name_to_idx["ankle_y_right"]] = 0.0 # 关键：设为0，脚掌放平，不上翘不下勾
+        # self.joint_targets[self.joint_name_to_idx["ankle_x_right"]] = 0.0
+
+        # # 3. 左腿：和右腿完全对称
+        # self.joint_targets[self.joint_name_to_idx["hip_x_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_z_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["hip_y_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["knee_left"]] = -0.70
+        # self.joint_targets[self.joint_name_to_idx["ankle_y_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["ankle_x_left"]] = 0.0
+
+        # # 4. 手臂：自然下垂，不影响平衡
+        # self.joint_targets[self.joint_name_to_idx["shoulder1_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["shoulder2_right"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["elbow_right"]] = 1.2
+        # self.joint_targets[self.joint_name_to_idx["shoulder1_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["shoulder2_left"]] = 0.0
+        # self.joint_targets[self.joint_name_to_idx["elbow_left"]] = 1.2
+
+        # # 5. 低通滤波，消除抖动
+        # self.joint_targets = (1 - self.filter_alpha) * self.prev_joint_targets + self.filter_alpha * self.joint_targets
+        # self.prev_joint_targets = self.joint_targets.copy()
 
     def _state_walk(self):
-        """行走状态：根据当前步态模式调整CPG参数 + 原有鲁棒优化"""
+        # """行走状态：根据当前步态模式调整CPG参数 + 原有鲁棒优化"""
         if self.walk_start_time is None:
             self.walk_start_time = self.data.time
 
@@ -872,8 +951,12 @@ class HumanoidStabilizer:
         torques = np.zeros(self.num_joints, dtype=np.float64)
 
         # 躯干姿态控制（改用传感器IMU数据）
-        root_euler = imu["euler"]  # 带噪声的欧拉角
-        root_vel = imu["ang_vel"]  # 带噪声的角速度
+        if self.enable_sensor_simulation:
+            root_euler = imu.get("true_euler", imu["euler"])
+            root_vel = imu.get("true_ang_vel", imu["ang_vel"])
+        else:
+            root_euler = imu["euler"]
+            root_vel = imu["ang_vel"]
         root_vel = np.clip(root_vel, -3.0, 3.0)
 
         imu_alpha = 0.2
@@ -896,6 +979,14 @@ class HumanoidStabilizer:
         torso_torque = np.array([roll_torque, pitch_torque, yaw_torque])
         torso_torque = np.clip(torso_torque, -30.0, 30.0)
 
+        self.data.xfrc_applied[self._support_body_id, :] = 0.0
+        # now_t = float(self.data.time)
+        # if now_t < float(self._support_until):
+        #     scale = float(np.clip((float(self._support_until) - now_t) / 3.0, 0.0, 1.0))
+        #     self.data.xfrc_applied[self._support_body_id, 2] = self.weight * 0.9 * scale
+        #     self.data.xfrc_applied[self._support_body_id, 3] = (-80.0 * self._imu_euler_filt[0] - 20.0 * self._imu_angvel_filt[0]) * scale
+        #     self.data.xfrc_applied[self._support_body_id, 4] = (-80.0 * self._imu_euler_filt[1] - 20.0 * self._imu_angvel_filt[1]) * scale
+
         # 重心补偿（原有逻辑完全保留）
         com = self.data.subtree_com[0].astype(np.float64).copy()
         com_error = self.com_target - com
@@ -903,8 +994,8 @@ class HumanoidStabilizer:
         com_compensation = self.kp_com * com_error
 
         # 关节控制（改用传感器足底力数据）
-        current_joints = self.data.qpos[7:7 + self.num_joints].astype(np.float64)
-        current_vel = self.data.qvel[6:6 + self.num_joints].astype(np.float64)
+        current_joints = self._get_joint_positions()
+        current_vel = self._get_joint_velocities()
         current_vel = np.clip(current_vel, -8.0, 8.0)
 
         # 更新接触状态（来自传感器）
@@ -936,7 +1027,7 @@ class HumanoidStabilizer:
             joint_error = max(-0.3, min(0.3, joint_error))
 
             # 动态PD增益 - 接触力越小，增益越低（避免打滑）
-            if self.enable_robust_optim:
+            if self.enable_robust_optim and self.state == "WALK":
                 # 计算接触力归一化系数（0~1）
                 if "right" in joint_name:
                     force_factor = np.clip(self.right_foot_force / self._force_factor_norm, 0.4, 1.1)
@@ -959,18 +1050,20 @@ class HumanoidStabilizer:
                 kp = self.base_kp_knee * force_factor
                 kd = self.base_kd_knee * force_factor
                 joint_error += com_compensation[2] * 0.05
+                joint_error += torso_torque[1] * 0.01
 
             elif "ankle" in joint_name:
                 kp = self.base_kp_ankle * force_factor
                 kd = self.base_kd_ankle * force_factor
                 if "y" in joint_name:
-                    joint_error -= torso_torque[1] * 0.015
+                    joint_error += torso_torque[1] * 0.015
 
             # 原有接触判断逻辑（保留，与动态增益叠加）
-            if ("left" in joint_name and self.foot_contact[1] == 0) or \
-                    ("right" in joint_name and self.foot_contact[0] == 0):
-                kp *= 0.8
-                kd *= 0.9
+            if self.state == "WALK":
+                if ("left" in joint_name and self.foot_contact[1] == 0) or \
+                        ("right" in joint_name and self.foot_contact[0] == 0):
+                    kp *= 0.8
+                    kd *= 0.9
 
             torques[idx] = kp * joint_error - kd * current_vel[idx]
 
@@ -1034,10 +1127,13 @@ class HumanoidStabilizer:
                 print(f"默认步态模式：{self.gait_mode}\n")
 
                 # 初始落地阶段（原有逻辑保留）
+                self._support_until = max(float(self._support_until), float(self.data.time) + float(self.init_wait_time))
                 start_time = time.time()
                 while time.time() - start_time < self.init_wait_time:
-                    alpha = min(1.0, (time.time() - start_time) / self.init_wait_time)
-                    torques = self._calculate_stabilizing_torques() * alpha
+                    elapsed = time.time() - start_time
+                    alpha = min(1.0, elapsed / 1.0)
+                    torque_scale = 0.5 + 0.5 * alpha
+                    torques = self._calculate_stabilizing_torques() * torque_scale
                     self.data.ctrl[:] = self._torques_to_ctrl(torques)
                     mujoco.mj_step(self.model, self.data)
                     self.data.qvel[:] *= 0.97
